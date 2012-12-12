@@ -1,11 +1,11 @@
 <!--  build JAR libraty -->
-<project name="DataExtractionOSM" default="build" basedir=".">
+<project name="OsmAndMapCreator" default="build" basedir=".">
 
 	<property file="local.properties" />
 
 	<property name="src.dir" value="src"/>
-	<property name="osmand-android.dir" location="../../platforms/android/OsmAnd/"/>
-	<property name="osmand-core.dir" location="../../platforms/android/OsmAnd-java/"/>
+	<property name="osmand-resources.dir" location="../../core/resources/"/>
+	<property name="osmand-core.dir" location="../../core/OsmAnd-java/"/>
 	<property name="osmand-core.jar" value="OsmAnd-core.jar"/>
 	<property name="src.absolute.dir" location="${src.dir}" />
 	<property name="icons.dir" value="icons/resources"/>
@@ -36,7 +36,7 @@
 	<target name="-copy-resources">
 		<mkdir dir="${icons.absolute.dir}"/>
 		<copy todir="${icons.absolute.dir}">
-			<fileset dir="${osmand-android.dir}/res/drawable-mdpi/">
+			<fileset dir="${osmand-resources.dir}">
 				<include name="h_*.png"/>
 				<include name="g_*.png"/>
 			</fileset>
@@ -150,7 +150,7 @@
 			</fileset>
 			
 			<fileset dir=".">
-				<include name="../build-scripts/regions/indexes.xml" />
+				<include name="../obf-generation/regions/indexes.xml" />
 			</fileset>
 			<fileset dir="src/net/osmand/data/index">
 				<include name="batch.xml" />
