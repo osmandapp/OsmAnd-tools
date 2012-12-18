@@ -41,7 +41,8 @@
 				<include name="g_*.png"/>
 			</fileset>
 		</copy>
-		<ant antfile="${osmand-core.dir}/build.xml" target="jar"  dir="${osmand-core.dir}">
+		<ant antfile="${osmand-core.dir}/build.xml" target="jar"  dir="${osmand-core.dir}"
+                         inheritAll="false" inheritRefs="false">
 		</ant>
 	</target>
 
