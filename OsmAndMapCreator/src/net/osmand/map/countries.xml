@@ -5479,11 +5479,13 @@
       </country>
     </continent>
   <continent name="caribbean">
-    <country size="1" bbox="-63 18 -63 18" name="anguilla">
-      <tiles>-63 18</tiles>
+	<!-- tiles>-85 21;-85 22;-84 21;-84 22;-84 23;-83 21;-83 22;-83 23;-82 19;-82 21;-82 22;-82 23;-81 19;-81 21;-81 22;-81 23; -80 23;-80 24;-80 25;-80 26;-80 19;-80 20;-80 21;-80 22;-80 23;-79 24;-79 25;-79 26;-79 27;-79 23;-79 20;-79 21;-79 22;-79 18;-79 17;-78 23;-78 24;-78 25;-78 26;-78 27;-78 19;-78 20;-78 21;-78 22;-78 17;-78 18;-77 22;-77 23;-77 24;-77 25;-77 26;-77 19;-77 20;-77 21;-77 17;-77 18;-76 21;-76 22;-76 23;-76 24;-76 19;-76 20;-76 17;-76 18;-75 21;-75 22;-75 23;-75 24;-75 19;-75 20;-75 18;-74 20;-74 21;-74 22;-74 23;-74 17;-74 18;-74 19;-73 20;-73 21;-73 22;-73 18;-73 19;-72 17;-72 18;-72 19;-72 20;-72 21;-72 22;-71 12;-71 18;-71 19;-71 20;-71 21;-70 12;-70 18;-70 19;-70 11;-69 18;-69 19;-69 11;-69 12;-68 17;-68 18;-67 17;-67 18;-66 17;-66 18;-65 18;-65 17;-64 18;-64 17;-63 18;-63 15;-63 14;-63 16;-63 17;-62 17;-62 16;-62 15;-62 14;-62 12;-62 11;-62 13;-62 9;-62 10;-61 15;-61 16;-61 14;-61 13;-61 12;-61 10;-61 11;-60 13;-60 12;-60 15;-60 16;-59 16;-59 15;-58 16</tiles -->
+    <country size="2" bbox="-64 18 -63 18" name="anguilla">
+      <tiles>-64 18;-63 18</tiles>
     </country>
     <country size="2" bbox="-62 16 -62 17" name="antigua_and_barbuda">
-      <tiles>-62 16;-62 17</tiles>
+      <tiles>-62 17;-62 16</tiles>
+	<!--
       <region size="2" bbox="-62 16 -62 17" name="barbuda">
         <tiles>-62 16;-62 17</tiles>
       </region>
@@ -5508,12 +5510,15 @@
       <region size="1" bbox="-61 16 -61 16" name="saint_philip">
         <tiles>-61 16</tiles>
       </region>
+	-->
       </country>
-    <country size="1" bbox="-70 12 -70 12" name="aruba">
-      <tiles>-70 12</tiles>
+    <country size="2" bbox="-71 12 -70 12" name="aruba">
+      <tiles>-71 12;-70 12</tiles>
     </country>
     <country size="34" bbox="-80 20 -73 27" name="bahamas">
-      <tiles>-80 23;-80 24;-80 25;-80 26;-79 22;-79 24;-79 25;-79 26;-79 27;-78 23;-78 24;-78 25;-78 26;-78 27;-77 22;-77 23;-77 24;-77 25;-77 26;-76 21;-76 22;-76 23;-76 24;-75 21;-75 22;-75 23;-75 24;-74 20;-74 21;-74 22;-74 23;-73 20;-73 21;-73 22</tiles>
+      <tiles>
+-80 23;-80 24;-80 25;-80 26;-79 24;-79 25;-79 26;-79 27;-79 23;-78 23;-78 24;-78 25;-78 26;-78 27;-77 22;-77 23;-77 24;-77 25;-77 26;-76 21;-76 22;-76 23;-76 24;-75 21;-75 22;-75 23;-75 24;-74 20;-74 21;-74 22;-74 23;-73 20;-73 21;-73 22</tiles>
+	<!--
       <region size="2" bbox="-74 21 -74 22" name="acklins">
         <tiles>-74 21;-74 22</tiles>
       </region>
@@ -5610,9 +5615,11 @@
       <region size="2" bbox="-79 26 -79 27" name="west_grand_bahama">
         <tiles>-79 26;-79 27</tiles>
       </region>
+	-->
       </country>
-    <country size="1" bbox="-59 12 -59 12" name="barbados">
-      <tiles>-59 12</tiles>
+    <country size="2" bbox="-60 13 -60 12" name="barbados">
+      <tiles>-60 13;-60 12</tiles>
+	<!--
       <region size="1" bbox="-59 12 -59 12" name="christ_church">
         <tiles>-59 12</tiles>
       </region>
@@ -5646,12 +5653,14 @@
       <region size="1" bbox="-59 13 -59 13" name="saint_thomas">
         <tiles>-59 13</tiles>
       </region>
+	-->
     </country>
-    <country size="1" bbox="-64 18 -64 18" name="british_virgin_islands">
-      <tiles>-64 18</tiles>
+    <country size="1" bbox="-65 18 -65 18" name="british_virgin_islands">
+      <tiles>-65 18</tiles>
     </country>
-    <country size="2" bbox="-81 19 -80 19" name="cayman_islands">
-      <tiles>-81 19;-80 19</tiles>
+    <country size="3" bbox="-82 19 -80 19" name="cayman_islands">
+      <tiles>-82 19;-81 19;-80 19</tiles>
+	<!--
       <region size="1" bbox="-81 19 -81 19" name="bodden_town">
         <tiles>-81 19</tiles>
       </region>
@@ -5673,9 +5682,11 @@
     <region size="1" bbox="-81 19 -81 19" name="west_bay">
         <tiles>-81 19</tiles>
       </region>
+	-->
       </country>
     <country size="33" bbox="-85 19 -75 23" name="cuba">
       <tiles>-85 21;-85 22;-84 21;-84 22;-84 23;-83 21;-83 22;-83 23;-82 21;-82 22;-82 23;-81 21;-81 22;-81 23;-80 20;-80 21;-80 22;-80 23;-79 20;-79 21;-79 22;-78 19;-78 20;-78 21;-78 22;-77 19;-77 20;-77 21;-76 19;-76 20;-76 21;-75 19;-75 20</tiles>
+	<!--
       <region size="7" bbox="-79 20 -77 22" name="camaguey">
         <tiles>-79 20;-79 21;-79 22;-78 20;-78 21;-78 22;-77 21</tiles>
       </region>
@@ -5721,9 +5732,11 @@
       <region size="3" bbox="-80 21 -80 23" name="villa_clara">
         <tiles>-80 21;-80 22;-80 23</tiles>
       </region>
+	-->
     </country>
-    <country size="1" bbox="-61 15 -61 15" name="dominica">
-      <tiles>-61 15</tiles>
+    <country size="10" bbox="-63 15 -58 16" name="dominica">
+      <tiles>-63 15;-63 14;-62 15;-62 14;-61 15;-60 15;-60 16;-59 16;-59 15;-58 16</tiles>
+	<!--
       <region size="1" bbox="-61 15 -61 15" name="saint_andrew">
         <tiles>-61 15</tiles>
       </region>
@@ -5754,9 +5767,11 @@
       <region size="1" bbox="-61 15 -61 15" name="saint_peter">
         <tiles>-61 15</tiles>
       </region>
+	-->
       </country>
     <country size="11" bbox="-72 17 -69 20" name="dominican_republic">
       <tiles>-72 17;-72 18;-72 19;-72 20;-71 18;-71 19;-71 20;-70 18;-70 19;-69 18;-69 19</tiles>
+	<!--
       <region size="2" bbox="-71 18 -71 19" name="azua">
         <tiles>-71 18;-71 19</tiles>
       </region>
@@ -5853,9 +5868,11 @@
       <region size="1" bbox="-71 19 -71 19" name="valverde">
         <tiles>-71 19</tiles>
       </region>
+	-->
       </country>
-    <country size="1" bbox="-61 11 -61 11" name="grenada">
-      <tiles>-61 11</tiles>
+    <country size="2" bbox="-62 12 -62 11" name="grenada">
+      <tiles>-62 12;-62 11</tiles>
+	<!--
       <region size="1" bbox="-61 12 -61 12" name="carriacou">
         <tiles>-61 12</tiles>
       </region>
@@ -5877,9 +5894,11 @@
       <region size="1" bbox="-61 12 -61 12" name="saint_patrick">
         <tiles>-61 12</tiles>
       </region>
+	-->
       </country>
-    <country size="5" bbox="-63 15 -61 18" name="guadeloupe">
-      <tiles>-63 17;-63 18;-62 15;-62 16;-61 16</tiles>
+    <country size="3" bbox="-62 15 -61 16" name="guadeloupe">
+      <tiles>-62 15;-62 16;-61 16</tiles>
+	<!--
       <region size="1" bbox="-61 15 -61 15" name="basse-terre">
         <tiles>-61 15</tiles>
       </region>
@@ -5889,9 +5908,11 @@
       <region size="2" bbox="-63 17 -63 18" name="saint-martin_et_saint-barthelemy">
         <tiles>-63 17;-63 18</tiles>
       </region>
+	-->
       </country>
-    <country size="10" bbox="-74 17 -72 20" name="haiti">
-      <tiles>-74 17;-74 18;-74 19;-74 20;-73 18;-73 19;-73 20;-72 17;-72 18;-72 19</tiles>
+    <country size="11" bbox="-75 17 -72 20" name="haiti">
+      <tiles>-75 18;-74 17;-74 18;-74 19;-74 20;-73 18;-73 19;-73 20;-72 17;-72 18;-72 19</tiles>
+	<!--
       <region size="2" bbox="-72 18 -72 19" name="centre">
         <tiles>-72 18;-72 19</tiles>
       </region>
@@ -5922,9 +5943,11 @@
       <region size="3" bbox="-73 17 -72 18" name="sud-est">
         <tiles>-73 18;-72 17;-72 18</tiles>
       </region>
+	-->
       </country>
-    <country size="7" bbox="-78 16 -76 18" name="jamaica">
-      <tiles>-78 16;-78 17;-78 18;-77 17;-77 18;-76 17;-76 18</tiles>
+    <country size="8" bbox="-79 17 -76 18" name="jamaica">
+      <tiles>-79 18;-79 17;-78 17;-78 18;-77 17;-77 18;-76 17;-76 18</tiles>
+	<!--
       <region size="1" bbox="-77 17 -77 17" name="clarendon">
         <tiles>-77 17</tiles>
       </region>
@@ -5967,9 +5990,11 @@
       <region size="2" bbox="-78 17 -78 18" name="westmoreland">
         <tiles>-78 17;-78 18</tiles>
       </region>
+	-->
       </country>
-    <country size="1" bbox="-61 14 -61 14" name="martinique">
-      <tiles>-61 14</tiles>
+    <country size="3" bbox="-62 14 -61 15" name="martinique">
+      <tiles>-62 14;-62 15;-61 14</tiles>
+	<!--
       <region size="1" bbox="-61 14 -61 14" name="fort-de-france">
         <tiles>-61 14</tiles>
       </region>
@@ -5982,12 +6007,14 @@
       <region size="1" bbox="-61 14 -61 14" name="saint-pierre">
         <tiles>-61 14</tiles>
       </region>
+	-->
       </country>
-    <country size="1" bbox="-62 16 -62 16" name="montserrat">
-      <tiles>-62 16</tiles>
+    <country size="1" bbox="-63 16 -63 16" name="montserrat">
+      <tiles>-63 16</tiles>
     </country>
-    <country size="6" bbox="-69 11 -63 18" name="netherlands_antilles">
-      <tiles>-69 11;-69 12;-64 17;-64 18;-63 17;-63 18</tiles>
+    <country size="9" bbox="-71 11 -63 18" name="netherlands_antilles">
+      <tiles>-71 12;-70 12;-70 11;-69 11;-69 12;-64 17;-64 18;-63 18;-63 17</tiles>
+	<!--
       <region size="1" bbox="-68 11 -68 11" name="bonaire">
         <tiles>-68 11</tiles>
       </region>
@@ -6003,9 +6030,11 @@
       <region size="2" bbox="-63 17 -63 18" name="sint_maarten">
         <tiles>-63 17;-63 18</tiles>
       </region>
+	-->
       </country>
   <country size="8" bbox="-68 17 -65 18" name="puerto_rico">
       <tiles>-68 17;-68 18;-67 17;-67 18;-66 17;-66 18;-65 17;-65 18</tiles>
+	<!--
       <region size="1" bbox="-66 18 -66 18" name="adjuntas">
         <tiles>-66 18</tiles>
       </region>
@@ -6240,9 +6269,11 @@
       <region size="2" bbox="-67 17 -67 18" name="yauco">
         <tiles>-67 17;-67 18</tiles>
       </region>
+	-->
       </country>
-    <country size="1" bbox="-62 16 -62 16" name="saint_kitts_and_nevis">
-      <tiles>-62 16</tiles>
+    <country size="1" bbox="-63 17 -63 17" name="saint_kitts_and_nevis">
+      <tiles>-63 17</tiles>
+	<!--
       <region size="1" bbox="-62 17 -62 17" name="christ_church_nichola_town">
         <tiles>-62 17</tiles>
       </region>
@@ -6285,9 +6316,11 @@
       <region size="1" bbox="-62 17 -62 17" name="trinity_palmetto_point">
         <tiles>-62 17</tiles>
       </region>
+	-->
       </country>
-    <country size="2" bbox="-61 13 -61 14" name="saint_lucia">
-      <tiles>-61 13;-61 14</tiles>
+    <country size="4" bbox="-62 13 -61 14" name="saint_lucia">
+      <tiles>-62 14;-62 13;-61 13;-61 14</tiles>
+	<!--
       <region size="2" bbox="-61 13 -61 14" name="anse-la-raye">
         <tiles>-61 13;-61 14</tiles>
       </region>
@@ -6318,9 +6351,11 @@
       <region size="1" bbox="-61 13 -61 13" name="vieux_fort">
         <tiles>-61 13</tiles>
       </region>
+	-->
     </country>
-    <country size="1" bbox="-61 12 -61 12" name="saint_vincent_and_the_grenadines">
-      <tiles>-61 12</tiles>
+    <country size="4" bbox="-62 12 -61 13" name="saint_vincent_and_the_grenadines">
+      <tiles>-62 13;-62 12;-61 13;-61 12</tiles>
+	<!--
       <region size="1" bbox="-61 13 -61 13" name="charlotte">
         <tiles>-61 13</tiles>
       </region>
@@ -6339,9 +6374,11 @@
       <region size="1" bbox="-61 13 -61 13" name="saint_patrick">
         <tiles>-61 13</tiles>
       </region>
+	-->
       </country>
     <country size="5" bbox="-62 9 -61 11" name="trinidad_and_tobago">
       <tiles>-62 9;-62 10;-62 11;-61 10;-61 11</tiles>
+	<!--
       <region size="1" bbox="-61 10 -61 10" name="chaguanas">
         <tiles>-61 10</tiles>
       </region>
@@ -6384,12 +6421,14 @@
       <region size="1" bbox="-61 10 -61 10" name="tunapuna_piarco">
         <tiles>-61 10</tiles>
       </region>
+	-->
     </country>
-    <country size="3" bbox="-72 21 -71 22" name="turks_and_caicos_islands">
-      <tiles>-72 21;-72 22;-71 21</tiles>
+    <country size="5" bbox="-73 21 -71 22" name="turks_and_caicos_islands">
+      <tiles>-73 22;-73 21;-72 21;-72 22;-71 21</tiles>
     </country>
-    <country size="4" bbox="-65 17 -64 18" name="virgin_islands_us">
-      <tiles>-65 17;-65 18;-64 17;-64 18</tiles>
+    <country size="4" bbox="-66 17 -65 18" name="virgin_islands_us">
+      <tiles>-66 18;-66 17;-65 17;-65 18</tiles>
+	<!--
       <region size="4" bbox="-65 17 -64 18" name="saint_croix">
         <tiles>-65 17;-65 18;-64 17;-64 18</tiles>
       </region>
@@ -6399,6 +6438,7 @@
       <region size="1" bbox="-65 18 -65 18" name="saint_thomas">
         <tiles>-65 18</tiles>
       </region>
+	-->
     </country>
     </continent>
   <continent name="central-america">
@@ -7369,8 +7409,8 @@
       <region size="2" bbox="6 49 7 49" name="saarland">
         <tiles>6 49;7 49</tiles>
       </region>
-      <region size="9" bbox="11 50 15 51" name="sachsen">
-        <tiles>11 50;12 50;12 51;13 50;13 51;14 50;14 51;15 50;15 51</tiles>
+      <region size="8" bbox="11 50 15 51" name="sachsen">
+        <tiles>11 50;12 50;12 51;13 50;13 51;14 50;14 51;15 51</tiles>
       </region>
       <region size="12" bbox="10 50 13 53" name="sachsen-anhalt">
         <tiles>10 51;10 52;10 53;11 50;11 51;11 52;11 53;12 50;12 51;12 52;13 51;13 52</tiles>
@@ -8534,10 +8574,10 @@
         <tiles>14 45;14 46;15 45;15 46</tiles>
       </region>
       </country>
-    <country size="104" bbox="-18 27 4 43" name="spain">
-      <tiles>-18 27;-18 28;-17 27;-17 28;-17 29;-17 30;-16 27;-16 28;-16 29;-16 30;-15 27;-15 28;-14 28;-14 29;-10 42;-10 43;-9 41;-9 42;-9 43;-8 37;-8 38;-8 39;-8 40;-8 41;-8 42;-8 43;-7 36;-7 37;-7 38;-7 39;-7 40;-7 41;-7 42;-7 43;-6 35;-6 36;-6 37;-6 38;-6 39;-6 40;-6 41;-6 42;-6 43;-5 36;-5 37;-5 38;-5 39;-5 40;-5 41;-5 42;-5 43;-4 35;-4 36;-4 37;-4 38;-4 39;-4 40;-4 41;-4 42;-4 43;-3 35;-3 36;-3 37;-3 38;-3 39;-3 40;-3 41;-3 42;-3 43;-2 36;-2 37;-2 38;-2 39;-2 40;-2 41;-2 42;-2 43;-1 37;-1 38;-1 39;-1 40;-1 41;-1 42;-1 43;0 38;0 39;0 40;0 41;0 42;1 38;1 39;1 40;1 41;1 42;2 39;2 40;2 41;2 42;3 39;3 40;3 41;3 42;4 39;4 40</tiles>
-      <region size="18" bbox="-7 35 -2 38" name="andalucia">
-        <tiles>-7 36;-7 37;-7 38;-6 35;-6 36;-6 37;-6 38;-5 36;-5 37;-5 38;-4 36;-4 37;-4 38;-3 36;-3 37;-3 38;-2 36;-2 37</tiles>
+    <country size="107" bbox="-19 27 4 43" name="spain">
+      <tiles>-19 29;-19 28;-19 27;-18 27;-18 28;-18 29;-17 27;-17 28;-17 29;-17 30;-16 27;-16 28;-16 29;-16 30;-15 27;-15 28;-15 29;-14 28;-14 29;-9 41;-9 42;-9 43;-8 38;-8 37;-8 39;-8 40;-8 41;-8 42;-8 43;-7 36;-7 37;-7 38;-7 40;-7 41;-7 42;-7 43;-7 39;-6 35;-6 36;-6 37;-6 38;-6 39;-6 40;-6 41;-6 42;-6 43;-5 36;-5 37;-5 38;-5 39;-5 40;-5 41;-5 42;-5 43;-4 36;-4 37;-4 38;-4 42;-4 43;-4 39;-4 40;-4 41;-4 35;-3 36;-3 37;-3 38;-3 39;-3 40;-3 41;-3 42;-3 43;-3 35;-2 36;-2 37;-2 39;-2 40;-2 41;-2 42;-2 38;-2 43;-1 39;-1 40;-1 41;-1 42;-1 43;-1 38;-1 37;0 40;0 41;0 42;0 38;0 39;1 40;1 41;1 42;1 38;1 39;2 41;2 42;2 39;2 40;3 41;3 42;3 39;3 40;4 39;4 40</tiles>
+      <region size="20" bbox="-8 35 -2 38" name="andalucia">
+        <tiles>-8 38;-8 37;-7 36;-7 37;-7 38;-6 35;-6 36;-6 37;-6 38;-5 36;-5 37;-5 38;-4 36;-4 37;-4 38;-3 36;-3 37;-3 38;-2 36;-2 37</tiles>
       </region>
       <region size="12" bbox="-2 39 0 43" name="aragon">
         <tiles>-2 39;-2 40;-2 41;-2 42;-1 39;-1 40;-1 41;-1 42;-1 43;0 40;0 41;0 42</tiles>
@@ -8566,8 +8606,8 @@
       <region size="7" bbox="-1 37 0 40" name="comunidad_valenciana">
         <tiles>-1 37;-1 38;-1 39;-1 40;0 38;0 39;0 40</tiles>
       </region>
-      <region size="10" bbox="-7 37 -5 40" name="extremadura">
-        <tiles>-7 37;-7 38;-7 39;-7 40;-6 37;-6 38;-6 39;-6 40;-5 38;-5 39</tiles>
+      <region size="13" bbox="-8 37 -5 40" name="extremadura">
+        <tiles>-8 39;-8 40;-8 38;-7 37;-7 38;-7 39;-7 40;-6 37;-6 38;-6 39;-6 40;-5 38;-5 39</tiles>
       </region>
       <region size="9" bbox="-9 41 -7 43" name="galicia">
         <tiles>-9 41;-9 42;-9 43;-8 41;-8 42;-8 43;-7 41;-7 42;-7 43</tiles>
@@ -8575,8 +8615,8 @@
       <region size="8" bbox="1 38 4 40" name="islas_baleares">
         <tiles>1 38;1 39;2 39;2 40;3 39;3 40;4 39;4 40</tiles>
       </region>
-      <region size="14" bbox="-18 27 -14 30" name="islas_canarias">
-        <tiles>-18 27;-18 28;-17 27;-17 28;-17 29;-17 30;-16 27;-16 28;-16 29;-16 30;-15 27;-15 28;-14 28;-14 29</tiles>
+      <region size="19" bbox="-19 27 -14 30" name="islas_canarias">
+        <tiles>-19 29;-19 28;-19 27;-18 27;-18 28;-18 29;-17 27;-17 28;-17 29;-17 30;-16 27;-16 28;-16 29;-16 30;-15 27;-15 28;-15 29;-14 28;-14 29</tiles>
       </region>
       <region size="4" bbox="-3 41 -2 42" name="la_rioja">
         <tiles>-3 41;-3 42;-2 41;-2 42</tiles>
