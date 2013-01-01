@@ -9042,13 +9042,13 @@
         <tiles>-104 20;-104 21;-104 22;-104 23;-104 24;-103 21;-103 22;-103 23;-103 24;-103 25;-102 21;-102 22;-102 23;-102 24;-102 25;-101 24</tiles>
       </region>
       </country>
-    <country size="1" bbox="-56 46 -56 46" name="saint_pierre_and_miquelon">
-      <tiles>-56 46</tiles>
-      <region size="1" bbox="-56 46 -56 46" name="miquelon-langlade">
-        <tiles>-56 46</tiles>
+    <country size="1" bbox="-57 47 -57 46" name="saint_pierre_and_miquelon">
+      <tiles>-57 47;-57 46</tiles>
+      <region size="2" bbox="-57 47 -57 46" name="miquelon-langlade">
+        <tiles>-57 47;-57 46</tiles>
       </region>
-      <region size="1" bbox="-56 46 -56 46" name="saint-pierre">
-        <tiles>-56 46</tiles>
+      <region size="2" bbox="-57 47 -57 46" name="saint-pierre">
+        <tiles>-57 47;-57 46</tiles>
       </region>
     </country>
     <country size="1426" bbox="172 18 -66 71" name="united_states">
