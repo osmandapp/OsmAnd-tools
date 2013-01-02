@@ -4,6 +4,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import javax.xml.parsers.ParserConfigurationException;
@@ -84,7 +85,7 @@ public class RegionsRegistryConverter {
 				String[] s = txt.toString().split("( |;)");
 				RegionCountry a = currentRegion == null ? current : currentRegion;
 				for(int i =0; i < s.length; i+=2) {
-					a.add(Integer.parseInt(s[i]), Integer.parseInt(s[i+1]));
+					a.add(Integer.parseInt(s[i].trim()), Integer.parseInt(s[i+1].trim()));
 				}
 			}
 		}
@@ -103,7 +104,7 @@ public class RegionsRegistryConverter {
 			regions.addRegions(c.convert());
 		}
 		
-		String filePath = "../OsmAnd-java/src/net/osmand/map/"+RegionRegistry.fileName;
+		String filePath = "../../core/OsmAnd-java/src/net/osmand/map/"+RegionRegistry.fileName;
 		long t = -System.currentTimeMillis();
 		FileOutputStream out = new FileOutputStream(filePath);
 		OsmAndRegionInfo.newBuilder().setRegionInfo(regions)
