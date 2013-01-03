@@ -341,7 +341,10 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 	}
 	
 	public void indexAddressRelation(Relation i, OsmDbAccessorContext ctx) throws SQLException {
-		if (i instanceof Relation && "address".equals(i.getTag(OSMTagKey.TYPE))) { //$NON-NLS-1$
+		if (!(i instanceof Relation))
+			return;
+		
+		if ("address".equals(i.getTag(OSMTagKey.TYPE))) { //$NON-NLS-1$
 			String type = i.getTag(OSMTagKey.ADDRESS_TYPE);
 			boolean house = "house".equals(type); //$NON-NLS-1$
 			boolean street = "a6".equals(type); //$NON-NLS-1$
@@ -450,6 +453,60 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 								log.info("For relation " + i.getId() + " border not found"); //$NON-NLS-1$ //$NON-NLS-2$
 							}
 
+						}
+					}
+				}
+			}
+		} else
+		if ("street".equals(i.getTag(OSMTagKey.TYPE)) || "associatedStreet".equals(i.getTag(OSMTagKey.TYPE))) { //$NON-NLS-1$
+			
+			LatLon l = null;
+			String streetName = null;
+			Set<String> isInNames = null;
+			ctx.loadEntityRelation(i);
+			
+			Collection<Entity> members = i.getMembers("street");
+			for(Entity street : members) { // find the first street member with name and use it as a street name
+				String name = street.getTag(OSMTagKey.NAME);
+				if (name != null) {
+					streetName = name;
+					l = street.getLatLon();
+					isInNames = street.getIsInNames();
+					break;
+				}
+			}
+			
+			if (streetName == null) { // use relation name as a street name
+				streetName = i.getTag(OSMTagKey.NAME);
+				l = i.getMemberEntities().keySet().iterator().next().getLatLon(); // get coordinates from any relation member
+				isInNames = i.getIsInNames();
+			}
+			
+			if (streetName != null) {
+				Set<Long> idsOfStreet = getStreetInCity(isInNames, streetName, null, l);
+				if (!idsOfStreet.isEmpty()) {
+					Collection<Entity> houses = i.getMembers("house"); // both house and address roles can have address
+					houses.addAll(i.getMembers("address"));
+					
+					for (Entity house : houses) {
+						
+						String hno = house.getTag(OSMTagKey.ADDR_HOUSE_NUMBER);
+						
+						if (hno == null)
+							continue;
+						
+						if (!streetDAO.findBuilding(house)) {
+							// process multipolygon (relation) houses - preload members to create building with correct latlon
+							if (house instanceof Relation)
+								ctx.loadEntityRelation((Relation) house);
+							
+							Building building = new Building(house);
+							if (building.getLocation() == null) {
+								log.warn("building with empty location! id: " + house.getId());
+							}
+							building.setName(hno);
+							
+							streetDAO.writeBuilding(idsOfStreet, building);
 						}
 					}
 				}
