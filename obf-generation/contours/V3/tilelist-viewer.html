@@ -1,4 +1,4 @@
-<!DOCTYPE HTML>
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
 <html>
   <head>
 	<title>Tilelist-viewer</title>
@@ -86,6 +86,7 @@ html, body {
 	var vectorLayer;
 	var feature;
 	var tileList;
+	var opt;
 	tileList=[]
 	var fromProjection = new OpenLayers.Projection("EPSG:4326");   // Transform from WGS 1984
 	var toProjection   = new OpenLayers.Projection("EPSG:900913"); // to Spherical Mercator Projection
@@ -102,6 +103,8 @@ html, body {
 			el = document.createElement("option");
 			el.textContent = opt;
 			el.value = opt;
+			el.text = opt;
+			el.innerHTML=opt;
 			selectcont.appendChild(el);
 		}
 	}
@@ -124,6 +127,8 @@ html, body {
 					el = document.createElement("option");
 					el.textContent = opt;
 					el.value = opt;
+					el.text = opt;
+					el.innerHTML=opt;
 					selectcount.appendChild(el);
 				}
 			}
@@ -136,7 +141,7 @@ html, body {
 		var el = document.createElement("option");
 		el.textContent = '';
 		el.value = '';
-		selectregi.appendChild(el);	
+		selectregi.appendChild(el);
 		
 		var counts=xmlDoc.getElementsByTagName("country");
 		for(var j = 0; j < counts.length; j++) {
@@ -147,6 +152,8 @@ html, body {
 					var el = document.createElement("option");
 					el.textContent = opt;
 					el.value = opt;
+					el.text = opt;
+					el.innerHTML=opt;
 					selectregi.appendChild(el);
 				}
 			}
@@ -259,12 +266,15 @@ html, body {
 			}
 		}
 		// remove duplicates
-		tileList = tileList.filter(function(elem, pos) {
-			return tileList.indexOf(elem) == pos;
-		})
+		try {
+			tileList = tileList.filter(function(elem, pos) {
+				return tileList.indexOf(elem) == pos;
+			})
+		} catch (err) {
+			var err = null;
+		}
 		// sort
 		tileList.sort(function(a,b){return a.split(' ')[0]-b.split(' ')[0]})
-
 	}
 	
 	function init() {
@@ -313,9 +323,9 @@ html, body {
 		<hr>
 		Choose a region below:</br>
 		<form>
-		<select id="continents" onchange="setCountries(this.value);"></select></br>
-		<select id="countries" onchange="setRegions(this.value);"></select></br>
-		<select id="regions"></select></br>
+		<select id="continents" name="continents" onchange="setCountries(this.value);"></select></br>
+		<select id="countries" name="countries" onchange="setRegions(this.value);"></select></br>
+		<select id="regions" name="regions"></select></br>
 		<input type="button" value="Show" onclick="show();">
 		<input type="button" value="Clear" onclick="clearList();">
 		</form>
