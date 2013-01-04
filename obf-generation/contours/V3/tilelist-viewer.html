@@ -164,12 +164,7 @@ html, body {
 		continent=selectcont.value;
 		country=selectcount.value;
 		region=selectregi.value;
-		if (continent != '' &&  country!= '' && region != '') {
-			getTilelist(continent,country,region);
-		}
-		else if (continent != '' &&  country!= '' && region == '') {
-			getTilelist(continent,country, '');
-		}
+		getTilelist(continent,country,region);
 		document.getElementById('tiles').innerHTML =tileList.join(';');
 		var x;
 		var y;
