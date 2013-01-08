@@ -100,6 +100,13 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 						propogated = new LinkedHashMap<String, String>();
 					}
 					propogated.put(ev.getKey(), ev.getValue());
+					MapRulType ruleType = renderingTypes.getEncodingRuleTypes().get(MapRenderingTypes.constructRuleKey(ev.getKey(), ev.getValue()));
+					if (ruleType != null) {
+						if (ruleType.getTargetTagValue() != null) {
+							MapRulType target = ruleType.getTargetTagValue();
+							propogated.put(target.getTag(), target.getValue()==null?"":target.getValue());
+						}
+					}
 				}
 			}
 			if(propogated != null) {
