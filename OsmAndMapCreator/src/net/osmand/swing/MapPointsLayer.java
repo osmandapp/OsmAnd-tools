@@ -33,7 +33,7 @@ public class MapPointsLayer implements MapPanelLayer {
 	
 	private Color color = Color.black;
 	private int size = 3;
-	private String tagToShow = null;
+	private String tagToShow = OSMTagKey.NAME.getValue();
 	
 	private Map<Point, String> pointsToDraw = new LinkedHashMap<Point, String>();
 	private List<LineObject> linesToDraw = new ArrayList<LineObject>();
@@ -89,7 +89,14 @@ public class MapPointsLayer implements MapPanelLayer {
 			g.drawOval(p.x, p.y, size, size);
 			g.fillOval(p.x, p.y, size, size);
 			if(tagToShow != null && pointsToDraw.get(p) != null){
-				g.drawString(pointsToDraw.get(p), p.x, p.y);
+				int i = 0;
+				int k;
+				String s = pointsToDraw.get(p);
+				while((k =s.indexOf('\n')) != -1) {
+					g.drawString(s.substring(0, k), p.x, (p.y + i++ * 15));
+					s = s.substring(k+1);
+				}
+				g.drawString(s, p.x, (p.y + i++ * 15));
 			}
 		}
 		
