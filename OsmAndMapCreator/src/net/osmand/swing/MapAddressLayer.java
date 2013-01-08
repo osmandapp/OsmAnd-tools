@@ -35,7 +35,7 @@ public class MapAddressLayer implements MapPanelLayer {
 	private Log log = LogFactory.getLog(MapAddressLayer.class);
 	
 	private MapPanel map;
-	private static int distance = 10000;
+	private static int distance = 15000;
 	
 	@Override
 	public void destroyLayer() {
