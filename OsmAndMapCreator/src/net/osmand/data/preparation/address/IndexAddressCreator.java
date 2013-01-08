@@ -73,7 +73,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 	private DataTileManager<City> cityManager = new DataTileManager<City>(10);
 	private List<Relation> postalCodeRelations = new ArrayList<Relation>();
 	private Map<City, Boundary> cityBoundaries = new HashMap<City, Boundary>();
-	private Map<Boundary,List<City>> boundariesToCities = new HashMap<Boundary,List<City>>();
+	private Map<Boundary,List<City>> boundaryToContainingCities = new HashMap<Boundary,List<City>>();
 	private Set<Boundary> allBoundaries = new HashSet<Boundary>();
 	private TLongHashSet visitedBoundaryWays = new TLongHashSet();
 	
@@ -218,14 +218,19 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 		}
 		
 		//now for each city, try to put it in all boundaries it belongs to
+		indexContainingCitiesForBoundaries(progress);
+	}
+
+
+	private void indexContainingCitiesForBoundaries(IProgress progress) {
 		for (City c : cities.values()) {
 			progress.progress(1);
 			for (Boundary b : allBoundaries) {
 				if (b.containsPoint(c.getLocation())) {
-					List<City> list = boundariesToCities.get(b);
+					List<City> list = boundaryToContainingCities.get(b);
 					if (list == null) {
 						list = new ArrayList<City>(1);
-						boundariesToCities.put(b, list);
+						boundaryToContainingCities.put(b, list);
 					}
 					list.add(c);
 				}
@@ -249,18 +254,19 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 	private Boundary putCityBoundary(Boundary boundary, City cityFound) {
 		final Boundary oldBoundary = cityBoundaries.get(cityFound);
 		if (oldBoundary != null) {
+			boolean oldBad = badBoundary(cityFound, oldBoundary);
 			if (boundary.getAdminCenterId() == cityFound.getId()
-					&& badBoundary(cityFound, oldBoundary)) {
+					&& oldBad) {
 				cityBoundaries.put(cityFound, boundary);
 				logBoundaryChanged(boundary, cityFound);
 			} else
 			// try to found the biggest area (not small center district)
 			if (oldBoundary.getAdminLevel() > boundary.getAdminLevel()
-					&& badBoundary(cityFound, oldBoundary)) {
+					&& oldBad) {
 				cityBoundaries.put(cityFound, boundary);
 				logBoundaryChanged(boundary, cityFound);
 			} else if (boundary.getName().equalsIgnoreCase(cityFound.getName())
-					&& badBoundary(cityFound, oldBoundary)) {
+					&& oldBad) {
 				cityBoundaries.put(cityFound, boundary);
 				logBoundaryChanged(boundary, cityFound);
 			} else if (oldBoundary.getAdminLevel() == boundary.getAdminLevel()
@@ -540,7 +546,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 		boolean found = false;
 		Boundary cityBoundary = cityBoundaries.get(city);
 		if (cityBoundary != null) {
-			List<City> subcities = boundariesToCities.get(cityBoundary);
+			List<City> subcities = boundaryToContainingCities.get(cityBoundary);
 			if (subcities != null) {
 				for (City subpart : subcities) {
 					if (subpart != city) {
@@ -568,7 +574,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 		List<City> list = new ArrayList<City>();
 		if(greatestBoundary != null) {
 			result = greatestBoundary.getName();
-			list = boundariesToCities.get(greatestBoundary);
+			list = boundaryToContainingCities.get(greatestBoundary);
 		} else {
 			list.addAll(cityManager.getClosestObjects(location.getLatitude(),location.getLongitude()));
 			list.addAll(cityVillageManager.getClosestObjects(location.getLatitude(),location.getLongitude()));
