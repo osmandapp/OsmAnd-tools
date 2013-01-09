@@ -48,6 +48,10 @@ public class Boundary
 		this.adminCenterId = l;
 	}
 	
+	public boolean hasAdminCenterId(){
+		return adminCenterId != 0;
+	}
+	
 	public long getAdminCenterId() {
 		return adminCenterId;
 	}

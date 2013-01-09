@@ -238,11 +238,21 @@ message CityBlockIndex {
 
     // shift from start cityBlockIndex to CityIndex 
 	optional fixed32 shiftToCityIndex = 4;
+	
+	// city boundary
+	optional CityBoundaryIndex = 6;
 
 	// buildings that doesn't belong to the street
 	repeated BuildingIndex buildings = 10;
 	
 	repeated StreetIndex streets = 12;
+}
+
+message CityBoundaryIndex {
+	// 1 way is encoded as bytes (raw array of x, y delta-encoded as uint32)
+	repeated bytes outerWays;
+	
+	repeated bytes innerWays;
 }
 
 message StreetIndex {

@@ -199,7 +199,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 				Boundary smallestBoundary = null;
 				//try to found boundary
 				for (Boundary b : freeBoundaries) {
-					if (b.getAdminLevel() > smallestAdminLevel) {
+					if (b.getAdminLevel() >= smallestAdminLevel) {
 						if (b.containsPoint(location.getLatitude(), location.getLongitude())) {
 							//the bigger the admin level, the smaller the boundary :-)
 								smallestAdminLevel = b.getAdminLevel();
@@ -253,7 +253,11 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 
 	private Boundary putCityBoundary(Boundary boundary, City cityFound) {
 		final Boundary oldBoundary = cityBoundaries.get(cityFound);
-		if (oldBoundary != null) {
+		// don't try to assign very big area (state, land)
+		if(boundary.getAdminLevel() <= 4) {
+			// nothing changed
+			return null;
+		} else if (oldBoundary != null) {
 			boolean oldBad = badBoundary(cityFound, oldBoundary);
 			if (boundary.getAdminCenterId() == cityFound.getId()
 					&& oldBad) {
@@ -261,7 +265,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 				logBoundaryChanged(boundary, cityFound);
 			} else
 			// try to found the biggest area (not small center district)
-			if (oldBoundary.getAdminLevel() > boundary.getAdminLevel()
+			if ( (oldBoundary.getAdminLevel() > boundary.getAdminLevel())
 					&& oldBad) {
 				cityBoundaries.put(cityFound, boundary);
 				logBoundaryChanged(boundary, cityFound);
@@ -275,11 +279,13 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 							oldBoundary.getName())) {
 				oldBoundary.copyPolygonsFrom(boundary);
 			}
+			return oldBoundary;
 		} else {
 			cityBoundaries.put(cityFound, boundary);
 			logBoundaryChanged(boundary, cityFound);
+			return oldBoundary;
 		}
-		return oldBoundary;
+		
 	}
 
 
@@ -328,6 +334,8 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 							boundary.addOuterWay((Way) es);
 						}
 					} else if (es instanceof Node && ("admin_centre".equals(entities.get(es)) || "admin_center".equals(entities.get(es)))) {
+						boundary.setAdminCenterId(es.getId());
+					} else if (es instanceof Node && ("label".equals(entities.get(es)) && !boundary.hasAdminCenterId())) {
 						boundary.setAdminCenterId(es.getId());
 					}
 				}
