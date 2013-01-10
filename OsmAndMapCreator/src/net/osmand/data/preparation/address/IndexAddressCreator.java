@@ -127,14 +127,20 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 	public void registerCityIfNeeded(Entity e) {
 		if (e instanceof Node && e.getTag(OSMTagKey.PLACE) != null) {
 			City city = new City((Node) e);
-			if (city.getType() != null && !Algoritms.isEmpty(city.getName())) {
-				if (city.getType() == CityType.CITY || city.getType() == CityType.TOWN) {
-					cityManager.registerObject(((Node) e).getLatitude(), ((Node) e).getLongitude(), city);
-				} else {
-					cityVillageManager.registerObject(((Node) e).getLatitude(), ((Node) e).getLongitude(), city);
-				}
-				cities.put(city.getEntityId(), city);
+			regCity(city);
+		}
+	}
+
+
+	private void regCity(City city) {
+		LatLon l = city.getLocation();
+		if (city.getType() != null && !Algoritms.isEmpty(city.getName()) && l != null) {
+			if (city.getType() == CityType.CITY || city.getType() == CityType.TOWN) {
+				cityManager.registerObject(l.getLatitude(), l.getLongitude(), city);
+			} else {
+				cityVillageManager.registerObject(l.getLatitude(), l.getLongitude(), city);
 			}
+			cities.put(city.getEntityId(), city);
 		}
 	}
 	
@@ -339,6 +345,11 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 			return null;
 		}
 		CityType ct = CityType.valueFromString(e.getTag(OSMTagKey.PLACE));
+		if(ct == null && "townland".equals(e.getTag(OSMTagKey.LOCALITY))) {
+			City c = new City(e, CityType.VILLAGE);
+			regCity(c);
+			ct = CityType.VILLAGE;
+		}
 		boolean administrative = "administrative".equals(e.getTag(OSMTagKey.BOUNDARY));
 		if (administrative || ct != null) {
 			if (e instanceof Way && visitedBoundaryWays.contains(e.getId())) {
