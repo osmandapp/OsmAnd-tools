@@ -15,17 +15,18 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import net.osmand.data.TransportRoute;
 import net.osmand.data.TransportStop;
 import net.osmand.osm.Entity;
+import net.osmand.osm.Entity.EntityId;
 import net.osmand.osm.MapUtils;
 import net.osmand.osm.Node;
+import net.osmand.osm.OSMSettings.OSMTagKey;
 import net.osmand.osm.Relation;
 import net.osmand.osm.Way;
-import net.osmand.osm.OSMSettings.OSMTagKey;
 import net.sf.junidecode.Junidecode;
 
 import org.apache.commons.logging.Log;
@@ -39,6 +40,7 @@ import rtree.RTree;
 import rtree.RTreeException;
 import rtree.RTreeInsertException;
 import rtree.Rect;
+import sun.misc.Regexp;
 
 public class IndexTransportCreator extends AbstractIndexPartCreator {
 	
@@ -50,6 +52,9 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	private PreparedStatement transStopsStat;
 	private RTree transportStopsTree;
 	private Map<Long, Relation> masterRoutes = new HashMap<Long, Relation>();
+	// Note: in future when we need more information from stop_area relation, it is better to memorize relations itself
+	// now we need only specific names of stops and platforms
+	private Map<EntityId, String> stopNames = new HashMap<EntityId, String>();
 
 	
 	private static Set<String> acceptedRoutes = new HashSet<String>();
@@ -129,13 +134,28 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		transportStopsTree = packRtreeFile(transportStopsTree, rtreeTransportStopsFileName, rtreeTransportStopsPackFileName);
 	}
 	
-	public void indexRelations(Entity e, OsmDbAccessorContext ctx) throws SQLException {
-		if (e instanceof Relation && e.getTag(OSMTagKey.ROUTE_MASTER) != null) {
+	public void indexRelations(Relation e, OsmDbAccessorContext ctx) throws SQLException {
+		if (e.getTag(OSMTagKey.ROUTE_MASTER) != null) {
 			ctx.loadEntityRelation((Relation) e);
 			for (Entry<Entity, String> child : ((Relation) e).getMemberEntities().entrySet()) {
 				Entity entity = child.getKey();
 				masterRoutes.put(entity.getId(), (Relation) e);
-			}	
+			}
+		}
+		if ("stop_area".equals(e.getTag(OSMTagKey.PUBLIC_TRANSPORT))) {
+			// save stop area relation members for future processing
+			String name = e.getTag(OSMTagKey.NAME);
+			if (name == null) return;
+
+			ctx.loadEntityRelation(e);
+			for (Entry<Entity, String> entry : e.getMemberEntities().entrySet()) {
+				String role = entry.getValue();
+				if ("platform".equals(role) || "stop".equals(role)) {
+					if (entry.getKey().getTag(OSMTagKey.NAME) == null) {
+						stopNames.put(EntityId.valueOf(entry.getKey()), name);
+					}
+				}
+			}
 		}
 	}
 	
@@ -426,6 +446,61 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			route = operator + " : " + route; //$NON-NLS-1$
 		}
 
+		if (!processNewTransportRelation(rel, r)) { // try new transport relations first
+			if (!processOldTransportRelation(rel, r)) { // old relation style otherwise
+				return null;
+			}
+		}
+
+		return r;
+	}
+
+
+	private boolean processNewTransportRelation(Relation rel, TransportRoute r) {
+		// first, verify we can accept this relation as new transport relation
+		// accepted roles restricted to: <empty>, stop, platform, ^(stop|platform)_(entry|exit)_only$
+
+		for (Entry<Entity, String> entry : rel.getMemberEntities().entrySet()) {
+			String role = entry.getValue();
+			if (role.isEmpty()) continue; // accepted roles
+			if ("stop".equals(role)) continue;
+			if ("platform".equals(role)) continue;
+			if (role.matches("^(stop|platform)_(entry|exit)_only$")) continue;
+
+			return false; // there is wrong role in the relation, exit
+		}
+
+		List<Entity> platforms = new ArrayList<Entity>();
+		List<Entity> stops = new ArrayList<Entity>();
+		for (Entry<Entity, String> entry : rel.getMemberEntities().entrySet()) {
+			String role = entry.getValue();
+			if (role.startsWith("platform"))
+				platforms.add(entry.getKey());
+			else if (role.startsWith("stop"))
+				stops.add(entry.getKey());
+			else
+				r.addWay((Way) entry.getKey());
+		}
+
+		if (platforms.isEmpty())
+			platforms.addAll(stops);
+		if (platforms.isEmpty())
+			return false; // nothing to get from this relation - there is no stop
+
+		for (Entity s : platforms) {
+			TransportStop stop = new TransportStop(s);
+
+			// refill empty name with name from stop_area relation if there was such
+			if (stop.getName().isEmpty() && stopNames.containsKey(s))
+				stop.setName(stopNames.get(EntityId.valueOf(s)));
+
+			r.getForwardStops().add(stop);
+		}
+
+		return true;
+	}
+
+	private boolean processOldTransportRelation(Relation rel, TransportRoute r) {
 		final Map<TransportStop, Integer> forwardStops = new LinkedHashMap<TransportStop, Integer>();
 		final Map<TransportStop, Integer> backwardStops = new LinkedHashMap<TransportStop, Integer>();
 		int currentStop = 0;
@@ -435,6 +510,9 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			if (e.getValue().contains("stop")) { //$NON-NLS-1$
 				if (e.getKey() instanceof Node) {
 					TransportStop stop = new TransportStop(e.getKey());
+					// add stop name if there was no name on the point, but was name on the corresponding stop_area relation
+					if (stop.getName().isEmpty() && stopNames.containsKey(e.getKey()))
+						stop.setName(stopNames.get(EntityId.valueOf(e.getKey())));
 					boolean forward = e.getValue().contains("forward"); //$NON-NLS-1$
 					boolean backward = e.getValue().contains("backward"); //$NON-NLS-1$
 					currentStop++;
@@ -481,7 +559,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			}
 		}
 		if (forwardStops.isEmpty() && backwardStops.isEmpty()) {
-			return null;
+			return false;
 		}
 		Collections.sort(r.getForwardStops(), new Comparator<TransportStop>() {
 			@Override
@@ -501,8 +579,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 				return backwardStops.get(o1) - backwardStops.get(o2);
 			}
 		});
-
-		return r;
+		return true;
 	}
 	
 }
