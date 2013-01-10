@@ -1,5 +1,7 @@
 package net.osmand.data;
 
+import net.osmand.data.City.CityType;
+
 
 
 public class Boundary 
@@ -11,6 +13,7 @@ public class Boundary
 	private int adminLevel;
 	
 	private long adminCenterId;
+	private CityType cityType;
 	
 	public Boundary() {
 	}
@@ -34,6 +37,10 @@ public class Boundary
 	public int getAdminLevel() {
 		return adminLevel;
 	}
+	
+	public boolean hasAdminLevel(){
+		return adminLevel > 0;
+	}
 
 	public void setAdminLevel(int adminLevel) {
 		this.adminLevel = adminLevel;
@@ -54,6 +61,14 @@ public class Boundary
 	
 	public long getAdminCenterId() {
 		return adminCenterId;
+	}
+
+	public void setCityType(CityType cityType) {
+		this.cityType = cityType;
+	}
+	
+	public CityType getCityType() {
+		return cityType;
 	}
 
 }

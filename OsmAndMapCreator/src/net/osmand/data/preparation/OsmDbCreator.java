@@ -11,6 +11,7 @@ import java.sql.Statement;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import net.osmand.data.City.CityType;
 import net.osmand.osm.Entity;
 import net.osmand.osm.Node;
 import net.osmand.osm.OSMSettings.OSMTagKey;
@@ -218,7 +219,8 @@ public class OsmDbCreator implements IOsmStorageFilter {
 					allWays++;
 					short ord = 0;
 					TLongArrayList nodeIds = ((Way) e).getNodeIds();
-					int boundary = ((Way)e).getTag(OSMTagKey.BOUNDARY) != null ? 1 : 0; 
+					boolean city = CityType.valueFromString(((Way)e).getTag(OSMTagKey.PLACE)) != null;
+					int boundary = ((Way)e).getTag(OSMTagKey.BOUNDARY) != null || city ? 1 : 0; 
 					for (int j = 0; j < nodeIds.size(); j++) {
 						currentWaysCount++;
 						if (ord == 0) {

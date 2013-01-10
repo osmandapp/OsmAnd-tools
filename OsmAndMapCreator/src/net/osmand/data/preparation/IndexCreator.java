@@ -565,7 +565,7 @@ public class IndexCreator {
 						progress.setGeneralProgress("[42 / 100]"); //$NON-NLS-1$
 						progress.startTask(Messages.getString("IndexCreator.BIND_CITIES_AND_BOUNDARIES"), 100); //$NON-NLS-1$
 						//finish up the boundaries and cities
-						indexAddressCreator.bindCitiesWithBoundaries(progress);
+						indexAddressCreator.tryToAssignBoundaryToFreeCities(progress);
 						
 						progress.setGeneralProgress("[45 / 100]"); //$NON-NLS-1$
 						progress.startTask(Messages.getString("IndexCreator.PREINDEX_ADRESS_MAP"), accessor.getAllRelations()); //$NON-NLS-1$

@@ -15,7 +15,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -35,7 +34,6 @@ import net.osmand.data.DataTileManager;
 import net.osmand.data.MapObject;
 import net.osmand.data.Multipolygon;
 import net.osmand.data.Street;
-import net.osmand.data.WayBoundary;
 import net.osmand.data.preparation.AbstractIndexPartCreator;
 import net.osmand.data.preparation.BinaryFileReference;
 import net.osmand.data.preparation.BinaryMapIndexWriter;
@@ -74,7 +72,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 	private List<Relation> postalCodeRelations = new ArrayList<Relation>();
 	private Map<City, Boundary> cityBoundaries = new HashMap<City, Boundary>();
 	private Map<Boundary,List<City>> boundaryToContainingCities = new HashMap<Boundary,List<City>>();
-	private Set<Boundary> allBoundaries = new HashSet<Boundary>();
+	private List<Boundary> notAssignedBoundaries = new ArrayList<Boundary>();
 	private TLongHashSet visitedBoundaryWays = new TLongHashSet();
 	
 	private boolean normalizeStreets; 
@@ -86,6 +84,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 	
 	Connection mapConnection;
 	DBStreetDAO streetDAO;
+
 
 	
 
@@ -119,6 +118,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 		cityManager.clear();
 		postalCodeRelations.clear();
 		cityBoundaries.clear();
+		notAssignedBoundaries.clear();
 		this.normalizeStreets = normalizeStreets;
 		this.normalizeDefaultSuffixes = normalizeDefaultSuffixes;
 		this.normalizeSuffixes = normalizeSuffixes;
@@ -140,7 +140,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 	
 	public void indexBoundariesRelation(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 		Boundary boundary = extractBoundary(e, ctx);
-		if (boundary != null && boundary.getAdminLevel() >= 4 && boundary.getCenterPoint() != null && !Algoritms.isEmpty(boundary.getName())) {
+		boolean boundaryValid = boundary != null && (!boundary.hasAdminLevel() && boundary.getAdminLevel() > 4) &&
+				boundary.getCenterPoint() != null && !Algoritms.isEmpty(boundary.getName());
+		if (boundaryValid) {
 			LatLon boundaryCenter = boundary.getCenterPoint();
 			List<City> citiesToSearch = new ArrayList<City>();
 			citiesToSearch.addAll(cityManager.getClosestObjects(boundaryCenter.getLatitude(), boundaryCenter.getLongitude(), 3));
@@ -148,24 +150,30 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 
 			City cityFound = null;
 			String boundaryName = boundary.getName().toLowerCase();
-			for (City c : citiesToSearch) {
-				if (c.getId() == boundary.getAdminCenterId()) {
-					cityFound = c;
-					break;
-				} else if (boundary.containsPoint(c.getLocation())) {
-					if (boundaryName.equalsIgnoreCase(c.getName())) {
+			if(boundary.hasAdminCenterId()) {
+				for (City c : citiesToSearch) {
+					if (c.getId() == boundary.getAdminCenterId()) {
 						cityFound = c;
 						break;
 					}
 				}
 			}
-			//We should not look for similarities, this can be 'very' wrong....
-			if (cityFound == null) {
-				// try to find same name in the middle
+			if(cityFound == null) {
 				for (City c : citiesToSearch) {
-					if (boundary.containsPoint(c.getLocation())) {
-						String lower = c.getName().toLowerCase();
-						if (boundaryName.startsWith(lower + " ") || boundaryName.endsWith(" " + lower) || boundaryName.contains(" " + lower + " ")) {
+					if (boundaryName.equalsIgnoreCase(c.getName()) && boundary.containsPoint(c.getLocation())) {
+						cityFound = c;
+						break;
+					}
+				}
+			}
+			// We should not look for similarities, this can be 'very' wrong (we can find much bigger region)....
+			// but here we just find what is the center of the boundary 
+			if (cityFound == null) {
+				for (City c : citiesToSearch) {
+					String lower = c.getName().toLowerCase();
+					if (boundaryName.startsWith(lower + " ") || boundaryName.endsWith(" " + lower)
+							|| boundaryName.contains(" " + lower + " ")) {
+						if (boundary.containsPoint(c.getLocation())) {
 							cityFound = c;
 							break;
 						}
@@ -174,8 +182,10 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 			}
 			if (cityFound != null) {
 				putCityBoundary(boundary, cityFound);
+			} else {
+				notAssignedBoundaries.add(boundary);
 			}
-			allBoundaries.add(boundary);
+			attachAllCitiesToBoundary(boundary);
 		} else if (boundary != null){
 			if(logMapDataWarn != null) {
 				logMapDataWarn.warn("Not using boundary: " + boundary);
@@ -185,58 +195,48 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 		}
 	}
 
-	public void bindCitiesWithBoundaries(IProgress progress) {
-		progress.startWork(cities.size()*2);
-		Set<Boundary> freeBoundaries = new HashSet<Boundary>(allBoundaries);
-		freeBoundaries.removeAll(cityBoundaries.values());
+
+	private void attachAllCitiesToBoundary(Boundary boundary) {
+		List<City> list = new ArrayList<City>(1);
+		for (City c : cities.values()) {
+			if (boundary.containsPoint(c.getLocation())) {
+				list.add(c);
+			}
+		}
+		if(list.size() > 0) {
+			boundaryToContainingCities.put(boundary, list);
+		}
+	}
+
+	public void tryToAssignBoundaryToFreeCities(IProgress progress) {
+		progress.startWork(cities.size());
 		//for cities without boundaries, try to find the right one
+		int smallestAdminLevel = 7; //start at level 8 for now...
 		for (City c : cities.values()) {
 			progress.progress(1);
 			Boundary cityB = cityBoundaries.get(c);
-			int smallestAdminLevel = 8; //TODO start at level 8 for now...
 			if (cityB == null) {
 				LatLon location = c.getLocation();
 				Boundary smallestBoundary = null;
-				//try to found boundary
-				for (Boundary b : freeBoundaries) {
+				// try to found boundary
+				for (Boundary b : notAssignedBoundaries) {
 					if (b.getAdminLevel() >= smallestAdminLevel) {
 						if (b.containsPoint(location.getLatitude(), location.getLongitude())) {
-							//the bigger the admin level, the smaller the boundary :-)
-								smallestAdminLevel = b.getAdminLevel();
-								smallestBoundary = b;
+							// the bigger the admin level, the smaller the boundary :-)
+							smallestAdminLevel = b.getAdminLevel();
+							smallestBoundary = b;
 						}
 					}
 				}
 				if (smallestBoundary != null) {
-					Boundary oldBoundary = putCityBoundary(smallestBoundary,c);
-					freeBoundaries.remove(smallestBoundary);
-					if (oldBoundary != null) {
-						freeBoundaries.add(oldBoundary);
-					}
-				}
-			}
-		}
-		
-		//now for each city, try to put it in all boundaries it belongs to
-		indexContainingCitiesForBoundaries(progress);
-	}
-
-
-	private void indexContainingCitiesForBoundaries(IProgress progress) {
-		for (City c : cities.values()) {
-			progress.progress(1);
-			for (Boundary b : allBoundaries) {
-				if (b.containsPoint(c.getLocation())) {
-					List<City> list = boundaryToContainingCities.get(b);
-					if (list == null) {
-						list = new ArrayList<City>(1);
-						boundaryToContainingCities.put(b, list);
-					}
-					list.add(c);
+					putCityBoundary(smallestBoundary, c);
+					notAssignedBoundaries.remove(smallestBoundary);
 				}
 			}
 		}
 	}
+
+
 
 	private int extractBoundaryAdminLevel(Entity e) {
 		int adminLevel = -1;
@@ -250,48 +250,78 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 			return adminLevel;
 		}
 	}
+	
 
-	private Boundary putCityBoundary(Boundary boundary, City cityFound) {
-		final Boundary oldBoundary = cityBoundaries.get(cityFound);
-		// don't try to assign very big area (state, land)
-		if(boundary.getAdminLevel() <= 4) {
-			// nothing changed
-			return null;
-		} else if (oldBoundary != null) {
-			boolean oldBad = badBoundary(cityFound, oldBoundary);
-			if (boundary.getAdminCenterId() == cityFound.getId()
-					&& oldBad) {
-				cityBoundaries.put(cityFound, boundary);
-				logBoundaryChanged(boundary, cityFound);
-			} else
-			// try to found the biggest area (not small center district)
-			if ( (oldBoundary.getAdminLevel() > boundary.getAdminLevel())
-					&& oldBad) {
-				cityBoundaries.put(cityFound, boundary);
-				logBoundaryChanged(boundary, cityFound);
-			} else if (boundary.getName().equalsIgnoreCase(cityFound.getName())
-					&& oldBad) {
-				cityBoundaries.put(cityFound, boundary);
-				logBoundaryChanged(boundary, cityFound);
-			} else if (oldBoundary.getAdminLevel() == boundary.getAdminLevel()
-					&& oldBoundary != boundary
-					&& boundary.getName().equalsIgnoreCase(
-							oldBoundary.getName())) {
-				oldBoundary.copyPolygonsFrom(boundary);
+	// lower is better
+//  1. place = city (Moscow, Nizhniy Novgorod)
+//	2. Cuxhoven admin_level = 7 win admin_level = 6
+//	3. Catania admin_level = 8 win admin_level = 6
+//	4. Zurich admin_level = 6 win admin_level = 4
+	private int getCityBoundaryImportance(Boundary b, City c) {
+		boolean nameEq = b.getName().equalsIgnoreCase(c.getName());
+		boolean cityBoundary = b.getCityType() != null;
+		// max 10
+		int adminLevelImportance = getAdminLevelImportance(b);
+		if(nameEq) {
+			if(cityBoundary) {
+				return 0;
+			} else if(c.getId() == b.getAdminCenterId() || 
+					!b.hasAdminCenterId()){
+				return adminLevelImportance;
 			}
-			return oldBoundary;
+			return 10 + adminLevelImportance;
 		} else {
-			cityBoundaries.put(cityFound, boundary);
-			logBoundaryChanged(boundary, cityFound);
-			return oldBoundary;
+			if(c.getId() == b.getAdminCenterId()) {
+				return 20 + adminLevelImportance;
+			} else {
+				return 30  + adminLevelImportance;
+			}
 		}
-		
 	}
 
 
-	private boolean badBoundary(City cityFound, final Boundary oldBoundary) {
-		return oldBoundary.getAdminCenterId() != cityFound.getId() ||
-				!oldBoundary.getName().equalsIgnoreCase(cityFound.getName());
+	private int getAdminLevelImportance(Boundary b) {
+		int adminLevelImportance = 5;
+		if(b.hasAdminLevel()) {
+			int adminLevel = b.getAdminLevel();
+			if(adminLevel == 8) {
+				adminLevelImportance = 1;
+			} else if(adminLevel == 7) {
+				adminLevelImportance = 2;
+			} else if(adminLevel == 6) {
+				adminLevelImportance = 3;
+			} else if(adminLevel == 9) {
+				adminLevelImportance = 4;
+			} else if(adminLevel == 10) {
+				adminLevelImportance = 5;
+			} else {
+				adminLevelImportance = 6;
+			}
+		}
+		return adminLevelImportance;
+	}
+	
+	private Boundary putCityBoundary(Boundary boundary, City cityFound) {
+		final Boundary oldBoundary = cityBoundaries.get(cityFound);
+		if(oldBoundary == null) {
+			cityBoundaries.put(cityFound, boundary);
+			logBoundaryChanged(boundary, cityFound);
+			return oldBoundary;
+		} else if (oldBoundary.getAdminLevel() == boundary.getAdminLevel()
+				&& oldBoundary != boundary
+				&& boundary.getName().equalsIgnoreCase(
+						oldBoundary.getName())) {
+			oldBoundary.copyPolygonsFrom(boundary);
+			return oldBoundary;
+		} else {
+			int old = getCityBoundaryImportance(oldBoundary, cityFound);
+			int n = getCityBoundaryImportance(boundary, cityFound);
+			if (n < old) {
+				cityBoundaries.put(cityFound, boundary);
+				logBoundaryChanged(boundary, cityFound);
+			}
+			return oldBoundary;
+		}
 	}
 
 
@@ -304,21 +334,25 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 		}
 	}
 
-	private boolean isBoundary(Entity e) {
-		return "administrative".equals(e.getTag(OSMTagKey.BOUNDARY)) && (e instanceof Relation || e instanceof Way);
-	}
-	
-	
 	private Boundary extractBoundary(Entity e, OsmDbAccessorContext ctx) throws SQLException {
-		if (isBoundary(e)) {
+		if(e instanceof Node) {
+			return null;
+		}
+		CityType ct = CityType.valueFromString(e.getTag(OSMTagKey.PLACE));
+		boolean administrative = "administrative".equals(e.getTag(OSMTagKey.BOUNDARY));
+		if (administrative || ct != null) {
+			if (e instanceof Way && visitedBoundaryWays.contains(e.getId())) {
+				return null;
+			}
 			Boundary boundary = null;
+			boundary = new Boundary(); //is computed later
+			boundary.setName(e.getTag(OSMTagKey.NAME));
+			boundary.setBoundaryId(e.getId());
+			boundary.setCityType(ct);
+			boundary.setAdminLevel(extractBoundaryAdminLevel(e));
 			if (e instanceof Relation) {
 				Relation aRelation = (Relation) e;
 				ctx.loadEntityRelation(aRelation);
-				boundary = new Boundary(); //is computed later
-				boundary.setName(aRelation.getTag(OSMTagKey.NAME));
-				boundary.setBoundaryId(aRelation.getId());
-				boundary.setAdminLevel(extractBoundaryAdminLevel(aRelation));
 				Map<Entity, String> entities = aRelation.getMemberEntities();
 				for (Entity es : entities.keySet()) {
 					if (es instanceof Way) {
@@ -340,13 +374,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 					}
 				}
 			} else if (e instanceof Way) {
-				if (!visitedBoundaryWays.contains(e.getId())) {
-					boundary = new WayBoundary();
-					boundary.setName(e.getTag(OSMTagKey.NAME));
-					boundary.setBoundaryId(e.getId());
-					boundary.setAdminLevel(extractBoundaryAdminLevel(e));
-					boundary.addOuterWay((Way) e);
-				}
+				boundary.addOuterWay((Way) e);
 			}
 			return boundary;
 		} else {
@@ -384,11 +412,8 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 				if (!idsOfStreet.isEmpty()) {
 					Collection<Entity> houses = i.getMembers("house"); // both house and address roles can have address
 					houses.addAll(i.getMembers("address"));
-					
 					for (Entity house : houses) {
-						
 						String hno = house.getTag(OSMTagKey.ADDR_HOUSE_NUMBER);
-						
 						if (hno == null)
 							continue;
 						

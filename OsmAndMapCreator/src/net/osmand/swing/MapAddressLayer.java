@@ -75,7 +75,7 @@ public class MapAddressLayer implements MapPanelLayer {
 			@Override
 			public void run() {
 				try {
-					DataTileManager<Entity> points = new DataTileManager<Entity>(13);
+					DataTileManager<Entity> points = new DataTileManager<Entity>(15);
 					List<Entity> os = searchAddress(latitude, longitude, points);
 					for (Entity w : os) {
 						LatLon n = w.getLatLon();

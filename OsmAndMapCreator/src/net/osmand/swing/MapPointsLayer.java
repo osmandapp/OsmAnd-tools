@@ -88,7 +88,7 @@ public class MapPointsLayer implements MapPanelLayer {
 		for (Point p : pointsToDraw.keySet()) {
 			g.drawOval(p.x, p.y, size, size);
 			g.fillOval(p.x, p.y, size, size);
-			if(tagToShow != null && pointsToDraw.get(p) != null){
+			if(tagToShow != null && pointsToDraw.get(p) != null && map.getZoom() > 14){
 				int i = 0;
 				int k;
 				String s = pointsToDraw.get(p);
