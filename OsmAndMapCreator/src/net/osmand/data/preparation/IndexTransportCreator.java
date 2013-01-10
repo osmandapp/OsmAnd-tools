@@ -40,7 +40,6 @@ import rtree.RTree;
 import rtree.RTreeException;
 import rtree.RTreeInsertException;
 import rtree.Rect;
-import sun.misc.Regexp;
 
 public class IndexTransportCreator extends AbstractIndexPartCreator {
 	
