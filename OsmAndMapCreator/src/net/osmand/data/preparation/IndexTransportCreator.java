@@ -490,7 +490,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			TransportStop stop = new TransportStop(s);
 
 			// refill empty name with name from stop_area relation if there was such
-			if (stop.getName().isEmpty() && stopNames.containsKey(s))
+			if (stop.getName().isEmpty() && stopNames.containsKey(EntityId.valueOf(s)))
 				stop.setName(stopNames.get(EntityId.valueOf(s)));
 
 			r.getForwardStops().add(stop);
@@ -510,7 +510,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 				if (e.getKey() instanceof Node) {
 					TransportStop stop = new TransportStop(e.getKey());
 					// add stop name if there was no name on the point, but was name on the corresponding stop_area relation
-					if (stop.getName().isEmpty() && stopNames.containsKey(e.getKey()))
+					if (stop.getName().isEmpty() && stopNames.containsKey(EntityId.valueOf(e.getKey())))
 						stop.setName(stopNames.get(EntityId.valueOf(e.getKey())));
 					boolean forward = e.getValue().contains("forward"); //$NON-NLS-1$
 					boolean backward = e.getValue().contains("backward"); //$NON-NLS-1$
