@@ -14,18 +14,22 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Map;
-import java.util.Set;
 import java.util.Map.Entry;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import net.osmand.data.TransportRoute;
 import net.osmand.data.TransportStop;
 import net.osmand.osm.Entity;
+import net.osmand.osm.Entity.EntityId;
 import net.osmand.osm.MapUtils;
 import net.osmand.osm.Node;
+import net.osmand.osm.OSMSettings.OSMTagKey;
 import net.osmand.osm.Relation;
 import net.osmand.osm.Way;
-import net.osmand.osm.OSMSettings.OSMTagKey;
 import net.sf.junidecode.Junidecode;
 
 import org.apache.commons.logging.Log;
@@ -50,6 +54,9 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	private PreparedStatement transStopsStat;
 	private RTree transportStopsTree;
 	private Map<Long, Relation> masterRoutes = new HashMap<Long, Relation>();
+	// Note: in future when we need more information from stop_area relation, it is better to memorize relations itself
+	// now we need only specific names of stops and platforms
+	private Map<EntityId, Relation> stopAreas = new HashMap<EntityId, Relation>();
 
 	
 	private static Set<String> acceptedRoutes = new HashSet<String>();
@@ -129,13 +136,28 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		transportStopsTree = packRtreeFile(transportStopsTree, rtreeTransportStopsFileName, rtreeTransportStopsPackFileName);
 	}
 	
-	public void indexRelations(Entity e, OsmDbAccessorContext ctx) throws SQLException {
-		if (e instanceof Relation && e.getTag(OSMTagKey.ROUTE_MASTER) != null) {
+	public void indexRelations(Relation e, OsmDbAccessorContext ctx) throws SQLException {
+		if (e.getTag(OSMTagKey.ROUTE_MASTER) != null) {
 			ctx.loadEntityRelation((Relation) e);
 			for (Entry<Entity, String> child : ((Relation) e).getMemberEntities().entrySet()) {
 				Entity entity = child.getKey();
 				masterRoutes.put(entity.getId(), (Relation) e);
-			}	
+			}
+		}
+		if ("stop_area".equals(e.getTag(OSMTagKey.PUBLIC_TRANSPORT))) {
+			// save stop area relation members for future processing
+			String name = e.getTag(OSMTagKey.NAME);
+			if (name == null) return;
+
+			ctx.loadEntityRelation(e);
+			for (Entry<Entity, String> entry : e.getMemberEntities().entrySet()) {
+				String role = entry.getValue();
+				if ("platform".equals(role) || "stop".equals(role)) {
+					if (entry.getKey().getTag(OSMTagKey.NAME) == null) {
+						stopAreas.put(EntityId.valueOf(entry.getKey()), e);
+					}
+				}
+			}
 		}
 	}
 	
@@ -426,6 +448,157 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			route = operator + " : " + route; //$NON-NLS-1$
 		}
 
+		if (!processNewTransportRelation(rel, r)) { // try new transport relations first
+			if (!processOldTransportRelation(rel, r)) { // old relation style otherwise
+				return null;
+			}
+		}
+
+		return r;
+	}
+
+
+	private Pattern platforms = Pattern.compile("^(stop|platform)_(entry|exit)_only$");
+	private Matcher stopPlatformMatcher = platforms.matcher("");
+
+	private boolean processNewTransportRelation(Relation rel, TransportRoute r) {
+		// first, verify we can accept this relation as new transport relation
+		// accepted roles restricted to: <empty>, stop, platform, ^(stop|platform)_(entry|exit)_only$
+
+		for (Entry<Entity, String> entry : rel.getMemberEntities().entrySet()) {
+			String role = entry.getValue();
+			if (role.isEmpty()) continue; // accepted roles
+			if ("stop".equals(role)) continue;
+			if ("platform".equals(role)) continue;
+
+			stopPlatformMatcher.reset(role);
+			if (stopPlatformMatcher.matches()) continue;
+
+			return false; // there is wrong role in the relation, exit
+		}
+
+		List<Entity> platforms = new ArrayList<Entity>();
+		List<Entity> stops = new ArrayList<Entity>();
+		for (Entry<Entity, String> entry : rel.getMemberEntities().entrySet()) {
+			String role = entry.getValue();
+			if (role.startsWith("platform"))
+				platforms.add(entry.getKey());
+			else if (role.startsWith("stop"))
+				stops.add(entry.getKey());
+			else
+				if (entry.getKey() instanceof Way)
+					r.addWay((Way) entry.getKey());
+		}
+
+		Map<Entity, String> replacement = new HashMap<Entity, String>();
+		List<Entity> merged = mergePlatformsStops(platforms, stops, replacement);
+
+		if (merged.isEmpty())
+			return false; // nothing to get from this relation - there is no stop
+
+		for (Entity s : merged) {
+			TransportStop stop = new TransportStop(s);
+
+			// name replacement (platform<->stop)
+			if (replacement.containsKey(s))
+				stop.setName(replacement.get(s));
+			else
+			// refill empty name with name from stop_area relation if there was such
+			// verify name tag, not stop.getName because it may contain unnecessary refs, etc
+			if (s.getTag(OSMTagKey.NAME) == null && stopAreas.containsKey(EntityId.valueOf(s)))
+				stop.setName(stopAreas.get(EntityId.valueOf(s)).getTag(OSMTagKey.NAME));
+
+			r.getForwardStops().add(stop);
+		}
+
+		return true;
+	}
+
+	private List<Entity> mergePlatformsStops(List<Entity> platforms, List<Entity> stops, Map<Entity, String> nameReplacement) {
+
+		// simple first - use one if other is empty
+		if (platforms.isEmpty())
+			return stops;
+		if (stops.isEmpty())
+			return platforms;
+
+		// walk through bigger array (platforms or stops), and verify names from the second:
+
+		List<Entity> first;
+		List<Entity> second;
+		List<Entity> merge = new ArrayList<Entity>();
+		if (platforms.size() > stops.size()) {
+			first = platforms;
+			second = stops;
+		} else {
+			first = stops;
+			second = platforms;
+		}
+
+		// find stops and platforms that are part of one station - it could be stopArea or distance compare
+
+		Map<Entity, Entity> fullStops = new HashMap<Entity, Entity>();
+
+		for (Entity a : first) {
+			Entity bMin = null;
+			Relation aStopArea = stopAreas.get(a);
+			double distance = 1e10;
+			for (Entity b : second) {
+				double d = MapUtils.getDistance(a.getLatLon(), b.getLatLon());
+				if (d < distance) {
+					distance = d;
+					bMin = b;
+				}
+				if (aStopArea != null && aStopArea == stopAreas.get(b)) {
+					// the best match - both are in one stop_area relation
+					bMin = b;
+					distance = 0;
+					break;
+				}
+			}
+			if (bMin != null && distance < 300) {
+				fullStops.put(a, bMin);
+			}
+		}
+
+		// walk through bigger array and fill nameReplacement map with correct names
+		// prefer platforms when both variants exist
+
+		ListIterator<Entity> i1 = first.listIterator();
+		while (i1.hasNext()) {
+			Entity a = i1.next();
+			if (fullStops.containsKey(a)) {
+				Entity b = fullStops.get(a);
+
+				// check which element satisfies us better (a or b) - which is platform
+				boolean useA = true;
+				if (!"platform".equals(a.getTag(OSMTagKey.PUBLIC_TRANSPORT))) {
+					if("platform".equals(b.getTag(OSMTagKey.PUBLIC_TRANSPORT)) || platforms.contains(b))
+						useA = false;
+				}
+
+				if (useA) {
+					merge.add(a);
+				} else {
+					merge.add(b);
+				}
+
+				// if a does not have name, but b has - add a nameReplacement
+				Entity platform = useA?a:b;
+				Entity stop = useA?b:a;
+				if (stop.getTag(OSMTagKey.NAME) != null) {
+					nameReplacement.put(platform, stop.getTag(OSMTagKey.NAME));
+				}
+			} else {
+				merge.add(a);
+			}
+		}
+
+		return merge;
+	}
+
+
+	private boolean processOldTransportRelation(Relation rel, TransportRoute r) {
 		final Map<TransportStop, Integer> forwardStops = new LinkedHashMap<TransportStop, Integer>();
 		final Map<TransportStop, Integer> backwardStops = new LinkedHashMap<TransportStop, Integer>();
 		int currentStop = 0;
@@ -435,6 +608,9 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			if (e.getValue().contains("stop")) { //$NON-NLS-1$
 				if (e.getKey() instanceof Node) {
 					TransportStop stop = new TransportStop(e.getKey());
+					// add stop name if there was no name on the point, but was name on the corresponding stop_area relation
+					if (e.getKey().getTag(OSMTagKey.NAME) == null && stopAreas.containsKey(EntityId.valueOf(e.getKey())))
+						stop.setName(stopAreas.get(EntityId.valueOf(e.getKey())).getTag(OSMTagKey.NAME));
 					boolean forward = e.getValue().contains("forward"); //$NON-NLS-1$
 					boolean backward = e.getValue().contains("backward"); //$NON-NLS-1$
 					currentStop++;
@@ -481,7 +657,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			}
 		}
 		if (forwardStops.isEmpty() && backwardStops.isEmpty()) {
-			return null;
+			return false;
 		}
 		Collections.sort(r.getForwardStops(), new Comparator<TransportStop>() {
 			@Override
@@ -501,8 +677,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 				return backwardStops.get(o1) - backwardStops.get(o2);
 			}
 		});
-
-		return r;
+		return true;
 	}
 	
 }

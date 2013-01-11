@@ -548,7 +548,7 @@ public class IndexCreator {
 								indexRouteCreator.indexRelations(e, ctx);
 							}
 							if (indexTransport) {
-								indexTransportCreator.indexRelations(e, ctx);
+								indexTransportCreator.indexRelations((Relation) e, ctx);
 							}
 						}
 					});
@@ -581,22 +581,22 @@ public class IndexCreator {
 				}
 
 				// 3.3 MAIN iterate over all entities
-					progress.setGeneralProgress("[50 / 100]");
-					progress.startTask(Messages.getString("IndexCreator.PROCESS_OSM_NODES"), accessor.getAllNodes());
-					accessor.iterateOverEntities(progress, EntityType.NODE, new OsmDbVisitor() {
-						@Override
-						public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
-							iterateMainEntity(e, ctx);
-						}
-					});
-					progress.setGeneralProgress("[70 / 100]");
-					progress.startTask(Messages.getString("IndexCreator.PROCESS_OSM_WAYS"), accessor.getAllWays());
-					accessor.iterateOverEntities(progress, EntityType.WAY, new OsmDbVisitor() {
-						@Override
-						public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
-							iterateMainEntity(e, ctx);
-						}
-					});
+				progress.setGeneralProgress("[50 / 100]");
+				progress.startTask(Messages.getString("IndexCreator.PROCESS_OSM_NODES"), accessor.getAllNodes());
+				accessor.iterateOverEntities(progress, EntityType.NODE, new OsmDbVisitor() {
+					@Override
+					public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
+						iterateMainEntity(e, ctx);
+					}
+				});
+				progress.setGeneralProgress("[70 / 100]");
+				progress.startTask(Messages.getString("IndexCreator.PROCESS_OSM_WAYS"), accessor.getAllWays());
+				accessor.iterateOverEntities(progress, EntityType.WAY, new OsmDbVisitor() {
+					@Override
+					public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
+						iterateMainEntity(e, ctx);
+					}
+				});
 				progress.setGeneralProgress("[85 / 100]");
 				progress.startTask(Messages.getString("IndexCreator.PROCESS_OSM_REL"), accessor.getAllRelations());
 				accessor.iterateOverEntities(progress, EntityType.RELATION, new OsmDbVisitor() {
