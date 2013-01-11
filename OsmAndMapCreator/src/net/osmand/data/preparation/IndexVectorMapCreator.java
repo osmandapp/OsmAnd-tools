@@ -442,7 +442,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 				} else {
 					id |= 1;
 
-					// simplify route
+					// simplify route id>>1
 					int zoomToSimplify = mapZooms.getLevel(level).getMaxZoom() - 1;
 					if (zoomToSimplify < 15) {
 						boolean cycle = ((Way) e).getFirstNodeId() == ((Way) e).getLastNodeId();

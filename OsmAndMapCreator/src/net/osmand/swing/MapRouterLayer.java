@@ -583,7 +583,7 @@ public class MapRouterLayer implements MapPanelLayer {
 				}
 				String m = DataExtractionSettings.getSettings().getRouteMode();
 				String[] props = m.split("\\,");
-				RoutePlannerFrontEnd router = new RoutePlannerFrontEnd(true);
+				RoutePlannerFrontEnd router = new RoutePlannerFrontEnd(false);
 				RoutingConfiguration config = builder.build(props[0], RoutingConfiguration.DEFAULT_MEMORY_LIMIT, props);
 //				config.initialDirection = 90d / 180d * Math.PI; // EAST
 //				config.initialDirection = 180d / 180d * Math.PI; // SOUTH
@@ -591,7 +591,7 @@ public class MapRouterLayer implements MapPanelLayer {
 //				config.initialDirection = 0 / 180d * Math.PI; // NORTH
 				// config.NUMBER_OF_DESIRABLE_TILES_IN_MEMORY = 300;
 				// config.ZOOM_TO_LOAD_TILES = 14;
-				final RoutingContext ctx = new RoutingContext(config, NativeSwingRendering.getDefaultFromSettings(), rs, useBasemap);
+				final RoutingContext ctx = new RoutingContext(config, /*NativeSwingRendering.getDefaultFromSettings()*/ null, rs, useBasemap);
 				ctx.previouslyCalculatedRoute = previousRoute;
 				log.info("Use " + config.routerName + "mode for routing");
 				
