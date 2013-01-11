@@ -99,8 +99,7 @@ public class MapAddressLayer implements MapPanelLayer {
 			if (f.getName().endsWith(".obf")) {
 				RandomAccessFile raf = new RandomAccessFile(f, "r"); //$NON-NLS-1$ //$NON-NLS-2$
 				BinaryMapIndexReader rd = new BinaryMapIndexReader(raf);
-				if(rd.containsAddressData() && rd.containsPoiData(lat, lon)){
-					
+				if(rd.containsAddressData() && (!rd.containsPoiData() || rd.containsPoiData(lat, lon))){
 					searchAddressDetailedInfo(rd, lat, lon, results);
 				}
 				rd.close();

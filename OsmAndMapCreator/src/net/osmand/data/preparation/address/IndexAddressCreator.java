@@ -146,7 +146,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 	
 	public void indexBoundariesRelation(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 		Boundary boundary = extractBoundary(e, ctx);
-		boolean boundaryValid = boundary != null && (!boundary.hasAdminLevel() && boundary.getAdminLevel() > 4) &&
+		boolean boundaryValid = boundary != null && (!boundary.hasAdminLevel() || boundary.getAdminLevel() > 4) &&
 				boundary.getCenterPoint() != null && !Algoritms.isEmpty(boundary.getName());
 		if (boundaryValid) {
 			LatLon boundaryCenter = boundary.getCenterPoint();
@@ -344,11 +344,16 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 		if(e instanceof Node) {
 			return null;
 		}
+		long centerId = 0;
 		CityType ct = CityType.valueFromString(e.getTag(OSMTagKey.PLACE));
 		if(ct == null && "townland".equals(e.getTag(OSMTagKey.LOCALITY))) {
-			City c = new City(e, CityType.VILLAGE);
+			ctx.loadEntityRelation((Relation) e);
+			City c = new City(e, CityType.SUBURB);
+			ct = CityType.SUBURB;
+			centerId = e.getId();
 			regCity(c);
-			ct = CityType.VILLAGE;
+			writeCity(c);
+			commitWriteCity();
 		}
 		boolean administrative = "administrative".equals(e.getTag(OSMTagKey.BOUNDARY));
 		if (administrative || ct != null) {
@@ -360,6 +365,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 			boundary.setName(e.getTag(OSMTagKey.NAME));
 			boundary.setBoundaryId(e.getId());
 			boundary.setCityType(ct);
+			if(centerId != 0) {
+				boundary.setAdminCenterId(centerId);
+			}
 			boundary.setAdminLevel(extractBoundaryAdminLevel(e));
 			if (e instanceof Relation) {
 				Relation aRelation = (Relation) e;
@@ -792,6 +800,11 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 			writeCity(c);
 		}
 		// commit to put all cities
+		commitWriteCity();
+	}
+
+
+	private void commitWriteCity() throws SQLException {
 		if (pStatements.get(addressCityStat) > 0) {
 			addressCityStat.executeBatch();
 			pStatements.put(addressCityStat, 0);
