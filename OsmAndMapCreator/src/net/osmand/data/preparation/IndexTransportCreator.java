@@ -481,13 +481,18 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		List<Entity> stops = new ArrayList<Entity>();
 		for (Entry<Entity, String> entry : rel.getMemberEntities().entrySet()) {
 			String role = entry.getValue();
-			if (role.startsWith("platform"))
+			if(entry.getKey().getLatLon() == null) {
+				continue;
+			}
+			if (role.startsWith("platform")) {
 				platforms.add(entry.getKey());
-			else if (role.startsWith("stop"))
+			} else if (role.startsWith("stop")) {
 				stops.add(entry.getKey());
-			else
-				if (entry.getKey() instanceof Way)
+			} else {
+				if (entry.getKey() instanceof Way) {
 					r.addWay((Way) entry.getKey());
+				}
+			}
 		}
 
 		Map<Entity, String> replacement = new HashMap<Entity, String>();
@@ -500,9 +505,9 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			TransportStop stop = new TransportStop(s);
 
 			// name replacement (platform<->stop)
-			if (replacement.containsKey(s))
+			if (replacement.containsKey(s)) {
 				stop.setName(replacement.get(s));
-			else
+			} else
 			// refill empty name with name from stop_area relation if there was such
 			// verify name tag, not stop.getName because it may contain unnecessary refs, etc
 			if (s.getTag(OSMTagKey.NAME) == null && stopAreas.containsKey(EntityId.valueOf(s)))
