@@ -542,8 +542,14 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		for (Entity a : first) {
 			Entity bMin = null;
 			Relation aStopArea = stopAreas.get(a);
+			if(a.getLatLon() == null){
+				continue;
+			}
 			double distance = 1e10;
 			for (Entity b : second) {
+				if (b.getLatLon() == null) {
+					continue;
+				}
 				double d = MapUtils.getDistance(a.getLatLon(), b.getLatLon());
 				if (d < distance) {
 					distance = d;
