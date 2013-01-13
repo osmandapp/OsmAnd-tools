@@ -347,7 +347,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 		long centerId = 0;
 		CityType ct = CityType.valueFromString(e.getTag(OSMTagKey.PLACE));
 		if(ct == null && "townland".equals(e.getTag(OSMTagKey.LOCALITY))) {
-			ctx.loadEntityRelation((Relation) e);
+			if(e instanceof Relation) {
+				ctx.loadEntityRelation((Relation) e);
+			}
 			City c = new City(e, CityType.SUBURB);
 			ct = CityType.SUBURB;
 			centerId = e.getId();
