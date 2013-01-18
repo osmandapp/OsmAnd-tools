@@ -8878,7 +8878,7 @@
 				<tiles>10 58;10 59;11 57;11 58;11 59;12 57;12 58;12 59;13 57;13 58;13 59;14 57;14 58;14 59</tiles>
 			</region>
 		</country>
-		<country size="15" bbox="5 45 10 47" name="switzerland">
+		<country size="15" bbox="5 45 10 47" name="switzerland" hillshade_sqlite="yes" >
 			<tiles>7 45;7 47;7 46;6 46;6 47;6 45;5 46;9 47;9 46;9 45;8 45;8 46;8 47;10 46;10 47</tiles><region size="2" bbox="7 47 8 47" name="aargau">
 				<tiles>7 47;8 47</tiles>
 			</region>
