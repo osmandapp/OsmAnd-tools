@@ -313,6 +313,10 @@ for area in Aois:
 	store=SqliteTileStorage('TMS')
 	store.open(inputSqlite)
 	
+	outputFilename=os.path.join(outputDirectory,outName)
+	if os.path.isfile(outputFilename):
+		print "file exists, skip", outputFilename
+		continue
 	out_storeTMS=SqliteTileStorage('BigPlanet')
 	out_storeTMS.create(os.path.join(outputDirectory,outName),True)
 	
