@@ -282,7 +282,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				
 			}
 		}
-		log.info("Poi processing finishied");
+		log.info("Poi processing finished");
 		// Finish process all entities
 		
 		// 1. write header
@@ -300,7 +300,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		Map<PoiTileBox, List<BinaryFileReference>> fpToWriteSeeks = writer.writePoiNameIndex(namesIndex, startFpPoiIndex);
 
 		// 3. write boxes
-		log.info("Poi box processing finishied");
+		log.info("Poi box processing finished");
 		int level = 0;
 		for (; level < (ZOOM_TO_SAVE_END - zoomToStart); level++) {
 			int subtrees = rootZoomsTree.getSubTreesOnLevel(level);
