@@ -6958,7 +6958,7 @@
 		<tiles>-83 9;-83 8;-80 7;-80 8;-84 8;-83 7;-79 9;-81 9;-81 8;-79 7;-78 9;-82 7;-78 7;-80 9;-82 8;-82 9;-79 8;-81 7;-78 8</tiles></country>
 	</continent>
 	<continent name="europe">
-		<country size="6" bbox="19 59 21 60" name="aland">
+		<country size="6" bbox="19 59 21 60" name="aland" hillshade_sqlite="yes">
 			<tiles>21 59;19 60;21 60;19 59;20 60;20 59</tiles><region size="2" bbox="20 60 21 60" name="brando">
 				<tiles>20 60;21 60</tiles>
 			</region>
@@ -7008,7 +7008,7 @@
 				<tiles>20 60</tiles>
 			</region>
 		</country>
-		<country size="10" bbox="19 39 21 42" name="albania">
+		<country size="10" bbox="19 39 21 42" name="albania" hillshade_sqlite="yes">
 			<tiles>21 41;19 39;20 42;20 41;20 39;21 40;20 40;19 42;19 41;19 40</tiles><region size="2" bbox="19 40 20 40" name="berat">
 				<tiles>19 40;20 40</tiles>
 			</region>
@@ -7046,7 +7046,7 @@
 				<tiles>19 39;19 40;20 39;20 40</tiles>
 			</region>
 		</country>
-		<country size="1" bbox="1 42 1 42" name="andorra">
+		<country size="1" bbox="1 42 1 42" name="andorra" hillshade_sqlite="yes">
 			<tiles>1 42</tiles><region size="1" bbox="1 42 1 42" name="andorra_la_vella">
 				<tiles>1 42</tiles>
 			</region>
@@ -7069,7 +7069,7 @@
 				<tiles>1 42</tiles>
 			</region>
 		</country>
-		<country size="25" bbox="9 46 17 49" name="austria">
+		<country size="25" bbox="9 46 17 49" name="austria" hillshade_sqlite="yes">
 			<tiles>17 47;17 48;13 48;13 47;13 46;15 47;15 46;16 48;16 46;16 47;15 49;15 48;11 47;11 46;12 46;12 47;12 48;9 47;9 46;14 46;14 47;14 48;14 49;10 46;10 47</tiles><region size="7" bbox="15 46 17 48" name="burgenland">
 				<tiles>15 46;15 47;16 46;16 47;16 48;17 47;17 48</tiles>
 			</region>
@@ -7098,7 +7098,7 @@
 				<tiles>16 48</tiles>
 			</region>
 		</country>
-		<country size="48" bbox="23 51 32 56" name="belarus">
+		<country size="48" bbox="23 51 32 56" name="belarus" hillshade_sqlite="yes">
 			<tiles>31 52;31 53;31 51;31 54;31 55;27 53;28 54;28 55;28 56;27 52;28 51;28 52;28 53;30 51;27 55;30 53;30 52;30 55;30 54;29 53;29 52;29 51;29 56;29 55;29 54;26 52;26 53;26 51;26 54;26 55;23 54;23 51;23 53;23 52;27 51;24 51;24 52;24 53;24 54;27 54;27 56;32 53;32 52;25 55;25 54;25 53;25 52;25 51</tiles><region size="13" bbox="23 51 27 53" name="brest">
 				<tiles>23 51;23 52;24 51;24 52;24 53;25 51;25 52;25 53;26 51;26 52;26 53;27 51;27 52</tiles>
 			</region>
@@ -7118,7 +7118,7 @@
 				<tiles>26 54;26 55;27 54;27 55;27 56;28 54;28 55;28 56;29 54;29 55;29 56;30 54;30 55;31 54;31 55</tiles>
 			</region>
 		</country>
-		<country size="12" bbox="2 49 6 51" name="belgium">
+		<country size="12" bbox="2 49 6 51" name="belgium" hillshade_sqlite="yes">
 			<tiles>5 49;6 49;5 50;5 51;3 50;3 51;2 51;2 50;4 51;4 50;6 50;4 49</tiles><region size="4" bbox="4 50 5 51" name="antwerp">
 				<tiles>4 50;4 51;5 50;5 51</tiles>
 			</region>
@@ -7153,7 +7153,7 @@
 				<tiles>2 50;2 51;3 50;3 51</tiles>
 			</region>
 		</country>
-		<country size="16" bbox="15 42 19 45" name="bosnia_and_herzegovina">
+		<country size="16" bbox="15 42 19 45" name="bosnia_and_herzegovina" hillshade_sqlite="yes">
 			<tiles>17 45;17 44;19 44;17 43;17 42;19 45;18 42;18 43;18 44;18 45;15 45;15 44;16 44;16 45;19 43;16 43</tiles><region size="14" bbox="15 42 19 45" name="federacija_bosna_i_hercegovina">
 				<tiles>15 44;15 45;16 43;16 44;16 45;17 42;17 43;17 44;18 42;18 43;18 44;18 45;19 43;19 44</tiles>
 			</region>
@@ -7161,7 +7161,7 @@
 				<tiles>16 44;16 45;17 42;17 43;17 44;17 45;18 42;18 43;18 44;18 45;19 43;19 44;19 45</tiles>
 			</region>
 		</country>
-		<country size="27" bbox="22 41 28 44" name="bulgaria">
+		<country size="27" bbox="22 41 28 44" name="bulgaria" hillshade_sqlite="yes">
 			<tiles>27 42;27 43;27 41;24 43;24 42;24 41;27 44;25 41;25 42;25 43;25 44;22 44;22 41;22 43;22 42;26 41;28 42;26 43;26 42;26 44;28 44;28 43;28 41;23 44;23 42;23 43;23 41</tiles><region size="5" bbox="22 41 24 42" name="blagoevgrad">
 				<tiles>22 41;22 42;23 41;23 42;24 41</tiles>
 			</region>
@@ -7247,7 +7247,7 @@
 				<tiles>26 41;26 42;27 41;27 42</tiles>
 			</region>
 		</country>
-	<country size="25" bbox="13 42 19 46" name="croatia">
+	<country size="25" bbox="13 42 19 46" name="croatia" hillshade_sqlite="yes">
 			<tiles>17 45;17 44;17 46;17 43;17 42;13 45;13 44;15 43;15 42;18 42;18 44;15 46;15 45;15 44;16 46;16 44;16 45;16 42;16 43;18 45;18 46;14 44;14 45;19 45;19 44</tiles><region size="4" bbox="16 45 17 46" name="bjelovarska-bilogorska">
 				<tiles>16 45;16 46;17 45;17 46</tiles>
 			</region>
@@ -7312,7 +7312,7 @@
 				<tiles>15 45;15 46;16 45;16 46</tiles>
 			</region>
 		</country>
-		<country size="21" bbox="12 48 18 51" name="czech_republic">
+		<country size="21" bbox="12 48 18 51" name="czech_republic" hillshade_sqlite="yes">
 			<!--
 			<region size="6" bbox="13 48 15 49" name="jihocesky">
 				<tiles>13 48;13 49;14 48;14 49;15 48;15 49</tiles>
@@ -7358,7 +7358,7 @@
 			</region>
 		-->
 		<tiles>13 49;12 50;14 50;16 50;17 50;13 48;15 50;13 50;12 49;17 49;17 48;15 51;14 51;16 48;16 49;18 49;15 49;15 48;14 48;14 49;18 50</tiles></country>
-		<country size="23" bbox="8 54 15 57" name="denmark">
+		<country size="23" bbox="8 54 15 57" name="denmark" hillshade_sqlite="yes">
 			<tiles>11 54;11 55;11 56;11 57;9 54;9 55;9 56;9 57;12 55;12 54;12 56;14 55;14 54;10 57;10 56;10 55;10 54;8 57;8 56;8 55;8 54;15 54;15 55</tiles><region size="5" bbox="9 55 11 56" name="arhus">
 				<tiles>9 55;9 56;10 55;10 56;11 56</tiles>
 			</region>
@@ -7402,7 +7402,7 @@
 				<tiles>8 56;8 57;9 56;9 57</tiles>
 			</region>
 		</country>
-		<country size="22" bbox="21 57 28 59" name="estonia">
+		<country size="22" bbox="21 57 28 59" name="estonia" hillshade_sqlite="yes">
 			<tiles>22 57;22 58;22 59;28 59;26 58;26 59;26 57;27 59;23 59;23 58;24 59;23 57;27 57;24 57;24 58;27 58;21 59;21 58;21 57;25 59;25 58;25 57</tiles><region size="7" bbox="23 58 26 59" name="harju">
 				<tiles>23 58;23 59;24 58;24 59;25 58;25 59;26 59</tiles>
 			</region>
@@ -7449,7 +7449,7 @@
 				<tiles>26 57;26 58;27 57;27 58</tiles>
 			</region>
 		</country>
-		<country size="4" bbox="-8 61 -7 62" name="faroe_islands">
+		<country size="4" bbox="-8 61 -7 62" name="faroe_islands" hillshade_sqlite="yes">
 			<!--
 			<region size="2" bbox="-7 61 -7 62" name="eysturoyar">
 				<tiles>-7 61;-7 62</tiles>
@@ -7471,7 +7471,7 @@
 			</region>
 		-->
 		<tiles>-8 62;-7 62;-7 61;-8 61</tiles></country>
-		<country size="101" bbox="20 59 31 70" name="finland">
+		<country size="101" bbox="20 59 31 70" name="finland" hillshade_sqlite="yes">
 			<tiles>21 68;21 69;21 62;21 63;21 60;21 61;26 68;29 64;26 67;26 66;26 65;26 64;26 63;26 62;26 61;26 60;28 69;26 69;29 63;29 66;29 67;21 59;29 65;29 62;28 68;29 61;28 65;28 64;28 67;28 66;28 61;28 60;28 63;28 62;22 59;26 70;24 68;29 68;24 61;24 60;24 63;24 62;24 65;24 64;24 67;24 66;28 70;22 63;22 62;22 61;22 60;22 69;22 68;27 70;27 68;27 69;27 60;27 61;27 62;27 63;27 64;27 65;27 66;27 67;23 59;24 59;31 63;31 62;20 60;20 63;20 62;20 69;20 68;29 69;25 62;25 63;25 60;25 61;25 66;25 67;25 64;25 65;25 68;25 69;30 61;30 62;30 63;30 64;30 65;30 66;30 67;23 64;23 65;23 66;23 67;23 60;23 61;23 62;23 63;23 68;25 59</tiles><region size="24" bbox="25 60 31 64" name="eastern_finland">
 				<tiles>25 60;25 61;25 62;25 63;26 60;26 61;26 62;26 63;26 64;27 61;27 62;27 63;27 64;28 61;28 62;28 63;29 61;29 62;29 63;30 61;30 62;30 63;31 62;31 63</tiles>
 			</region>
@@ -7488,7 +7488,7 @@
 				<tiles>20 60;20 62;20 63;21 59;21 60;21 61;21 62;21 63;22 59;22 60;22 61;22 62;22 63;23 59;23 60;23 61;23 62;23 63;23 64;24 60;24 61;24 62;24 63;24 64;25 60;25 61;25 62;25 63;26 60;26 61;26 62;26 63</tiles>
 			</region>
 		</country>
-		<country size="101" bbox="-5 41 9 51" name="france">
+		<country size="101" bbox="-5 41 9 51" name="france" hillshade_sqlite="yes">
 			<tiles>-6 48;-2 45;2 51;2 50;4 46;4 47;8 44;4 43;8 48;8 49;4 48;4 49;-4 48;-1 45;-1 44;-4 47;4 50;-1 49;5 44;1 50;1 51;7 45;7 44;7 47;7 46;7 43;9 43;9 42;9 41;7 49;7 48;3 50;1 43;1 42;-3 47;-3 46;1 47;1 46;1 45;1 44;1 49;1 48;-3 49;-3 48;8 41;3 49;3 48;8 42;4 45;3 43;3 42;3 45;3 44;3 47;3 46;8 43;0 48;0 49;4 44;0 42;0 43;0 44;0 45;0 46;0 47;-1 43;-1 42;-1 47;-1 46;5 49;5 48;5 47;5 46;5 45;-1 48;5 43;0 50;6 42;6 43;6 46;6 47;6 44;-2 49;-2 46;-2 47;6 48;6 49;-2 42;-2 43;-5 47;-5 48;-2 48;6 45;2 46;2 47;2 44;2 45;2 42;2 43;-2 44;2 48;2 49</tiles><region size="8" bbox="6 47 8 49" name="alsace">
 				<tiles>6 47;6 48;6 49;7 47;7 48;7 49;8 48;8 49</tiles>
 			</region>
@@ -7556,7 +7556,7 @@
 				<tiles>3 44;3 45;3 46;4 44;4 45;4 46;5 44;5 45;5 46;6 44;6 45;6 46;7 45;7 46</tiles>
 			</region>
 		</country>
-		<country size="70" bbox="5 47 15 55" name="germany">
+		<country size="70" bbox="5 47 15 55" name="germany" hillshade_sqlite="yes">
 			<tiles>11 50;11 51;11 52;11 53;11 54;12 54;12 50;9 50;9 51;9 52;9 53;9 54;9 49;12 53;12 52;13 54;7 52;7 53;7 50;7 51;7 54;13 49;10 48;10 49;14 53;14 52;14 51;6 49;5 50;5 51;13 47;14 54;8 47;8 48;8 49;10 54;10 53;10 52;10 51;10 50;11 47;7 47;9 48;12 47;13 48;9 47;12 48;12 49;7 49;7 48;11 49;11 48;14 50;12 51;13 52;13 53;13 50;13 51;6 51;6 50;6 53;6 52;8 53;8 52;8 51;8 50;8 55;8 54;15 51;10 47</tiles><region size="11" bbox="7 47 10 49" name="baden-wurttemberg">
 				<tiles>7 47;7 48;8 47;8 48;8 49;9 47;9 48;9 49;10 47;10 48;10 49</tiles>
 			</region>
@@ -7606,9 +7606,9 @@
 				<tiles>9 50;9 51;10 50;10 51;11 50;11 51;12 50;12 51</tiles>
 			</region>
 		</country>
-		<country size="1" bbox="-6 36 -6 36" name="gibraltar">
+		<country size="1" bbox="-6 36 -6 36" name="gibraltar" hillshade_sqlite="yes">
 			<tiles>-6 36</tiles></country>
-		<country size="53" bbox="19 34 28 41" name="greece">
+		<country size="53" bbox="19 34 28 41" name="greece" hillshade_sqlite="yes">
 			<tiles>26 37;25 39;25 38;24 41;24 40;25 35;25 34;25 37;25 36;21 40;21 41;28 36;26 38;26 39;23 39;23 38;23 37;23 36;23 35;23 34;20 38;20 39;27 35;25 40;25 41;20 37;22 41;22 40;19 39;26 35;24 36;24 37;24 34;24 35;21 37;21 36;21 39;21 38;27 37;27 36;24 38;24 39;26 41;26 40;26 34;20 40;22 36;22 37;22 38;22 39;26 36;23 40;23 41</tiles><region size="8" bbox="23 40 26 41" name="anatoliki_makedonia_kai_thraki">
 				<tiles>23 40;23 41;24 40;24 41;25 40;25 41;26 40;26 41</tiles>
 			</region>
@@ -7652,9 +7652,9 @@
 				<tiles>24 39;24 40;25 37;25 38;25 39;25 40;26 37;26 38;26 39;27 37</tiles>
 			</region>
 		</country>
-		<country size="1" bbox="-3 49 -3 49" name="guernsey">
+		<country size="1" bbox="-3 49 -3 49" name="guernsey" hillshade_sqlite="yes">
 			<tiles>-3 49</tiles></country>
-		<country size="22" bbox="16 45 22 48" name="hungary">
+		<country size="22" bbox="16 45 22 48" name="hungary" hillshade_sqlite="yes">
 			<!--
 			<region size="8" bbox="18 45 20 47" name="bacs-kiskun">
 				<tiles>18 45;18 46;18 47;19 45;19 46;19 47;20 46;20 47</tiles>
@@ -7718,7 +7718,7 @@
 			</region>
 		-->
 		<tiles>17 45;17 47;17 46;17 48;21 46;21 47;21 48;18 45;18 46;18 47;18 48;16 47;22 47;22 48;16 46;20 47;20 46;19 48;19 47;19 46;19 45;20 48</tiles></country>
-		<country size="41" bbox="-25 63 -14 66" name="iceland">
+		<country size="41" bbox="-25 63 -14 66" name="iceland" hillshade_sqlite="yes">
 			<!--
 			<region size="11" bbox="-17 63 -14 66" name="austurland">
 				<tiles>-17 63;-17 64;-17 65;-16 64;-16 65;-16 66;-15 64;-15 65;-15 66;-14 64;-14 65</tiles>
@@ -7746,7 +7746,7 @@
 			</region>
 		-->
 		<tiles>-18 63;-18 66;-18 64;-18 65;-24 65;-24 64;-24 66;-19 63;-19 65;-19 64;-19 66;-25 64;-25 65;-22 66;-22 65;-22 64;-22 63;-23 65;-23 66;-14 64;-14 65;-16 64;-16 65;-16 66;-23 63;-20 65;-20 64;-20 66;-20 63;-21 66;-23 64;-21 64;-21 65;-21 63;-17 66;-17 65;-17 64;-17 63;-15 65;-15 64;-15 66</tiles></country>
-		<country size="26" bbox="-11 51 -6 55" name="ireland">
+		<country size="26" bbox="-11 51 -6 55" name="ireland" hillshade_sqlite="yes">
 			<!--
 			<region size="2" bbox="-7 52 -7 53" name="carlow">
 				<tiles>-7 52;-7 53</tiles>
@@ -7828,9 +7828,9 @@
 			</region>
 		-->
 		<tiles>-11 54;-10 54;-11 51;-11 52;-11 53;-9 54;-9 55;-9 51;-9 52;-9 53;-8 53;-10 52;-8 51;-8 55;-8 54;-7 52;-7 53;-7 54;-7 55;-10 53;-8 52;-10 51;-6 53;-6 52;-6 55;-6 54</tiles></country>
-		<country size="1" bbox="-5 53 -5 53" name="isle_of_man">
+		<country size="1" bbox="-5 53 -5 53" name="isle_of_man" hillshade_sqlite="yes">
 			<tiles>-5 53</tiles></country>
-		<country size="83" bbox="6 35 18 47" name="italy">
+		<country size="83" bbox="6 35 18 47" name="italy" hillshade_sqlite="yes">
 			<tiles>11 47;17 41;17 40;12 43;11 46;9 38;9 39;18 39;12 40;11 36;11 37;15 39;11 44;14 37;14 36;12 46;12 37;12 36;12 35;12 47;18 40;11 41;6 44;6 45;13 41;13 40;13 43;13 42;13 45;13 46;8 40;8 41;15 41;8 43;8 44;8 45;8 46;15 40;17 38;12 41;16 42;10 36;16 41;7 45;7 44;11 45;7 46;11 43;11 42;7 43;12 45;9 43;9 42;9 41;9 40;9 46;9 45;9 44;15 36;14 40;14 41;14 42;17 39;15 42;15 37;12 44;13 38;16 39;16 38;12 42;10 44;13 37;10 45;16 37;15 38;12 38;16 40;14 38;10 42;10 43;8 39;8 38;10 46</tiles><region size="6" bbox="12 41 14 42" name="abruzzo">
 				<tiles>12 41;12 42;13 41;13 42;14 41;14 42</tiles>
 			</region>
@@ -7892,9 +7892,9 @@
 				<tiles>10 45;11 44;11 45;11 46;12 44;12 45;12 46;13 45</tiles>
 			</region>
 		</country>
-		<country size="1" bbox="-3 49 -3 49" name="jersey">
+		<country size="1" bbox="-3 49 -3 49" name="jersey" hillshade_sqlite="yes">
 			<tiles>-3 49</tiles></country>
-		<country size="6" bbox="20 41 21 43" name="kosovo">
+		<country size="6" bbox="20 41 21 43" name="kosovo" hillshade_sqlite="yes">
 			<!--
 			<region size="2" bbox="19 42 20 42" name="dakovica">
 				<tiles>19 42;20 42</tiles>
@@ -7919,7 +7919,7 @@
 			</region>
 		-->
 		<tiles>20 43;20 42;20 41;21 41;21 42;21 43</tiles></country>
-		<country size="24" bbox="20 55 28 58" name="latvia">
+		<country size="24" bbox="20 55 28 58" name="latvia" hillshade_sqlite="yes">
 			<tiles>22 56;22 57;28 55;28 56;27 57;24 57;26 56;26 57;26 55;20 55;20 56;23 56;27 55;24 56;27 56;24 58;23 57;21 57;21 56;21 55;25 58;25 57;25 56;25 55</tiles><region size="9" bbox="20 55 23 57" name="kurzeme">
 				<tiles>20 55;20 56;21 55;21 56;21 57;22 56;22 57;23 56;23 57</tiles>
 			</region>
@@ -7936,7 +7936,7 @@
 				<tiles>22 56;23 56;23 57;24 56;25 55;25 56;26 55;26 56</tiles>
 			</region>
 		</country>
-		<country size="1" bbox="9 47 9 47" name="liechtenstein">
+		<country size="1" bbox="9 47 9 47" name="liechtenstein" hillshade_sqlite="yes">
 			<!--
 			<region size="2" bbox="9 46 9 47" name="balzers">
 				<tiles>9 46;9 47</tiles>
@@ -7973,7 +7973,7 @@
 			</region>
 		-->
 		<tiles>9 47</tiles></country>
-		<country size="22" bbox="20 53 26 56" name="lithuania">
+		<country size="22" bbox="20 53 26 56" name="lithuania" hillshade_sqlite="yes">
 			<tiles>22 56;22 54;22 55;26 56;26 54;26 55;23 55;23 54;20 56;23 56;23 53;24 53;24 54;24 55;24 56;20 55;21 56;21 55;21 54;25 56;25 55;25 54</tiles><region size="5" bbox="23 53 25 54" name="alytaus">
 				<tiles>23 53;23 54;24 53;24 54;25 54</tiles>
 			</region>
@@ -8005,7 +8005,7 @@
 				<tiles>24 54;24 55;25 54;25 55;26 54;26 55</tiles>
 			</region>
 		</country>
-		<country size="4" bbox="5 49 6 50" name="luxembourg">
+		<country size="4" bbox="5 49 6 50" name="luxembourg" hillshade_sqlite="yes">
 			<!--
 			<region size="4" bbox="5 49 6 50" name="diekirch">
 				<tiles>5 49;5 50;6 49;6 50</tiles>
@@ -8018,7 +8018,7 @@
 			</region>
 		-->
 		<tiles>6 49;5 50;6 50;5 49</tiles></country>
-		<country size="9" bbox="20 40 23 42" name="macedonia">
+		<country size="9" bbox="20 40 23 42" name="macedonia" hillshade_sqlite="yes">
 			<tiles>22 41;22 42;20 42;20 41;20 40;21 40;21 41;21 42;23 41</tiles><region size="5" bbox="21 41 23 42" name="eastern">
 				<tiles>21 41;21 42;22 41;22 42;23 41</tiles>
 			</region>
@@ -8044,9 +8044,9 @@
 				<tiles>21 41;21 42;22 41</tiles>
 			</region>
 		</country>
-		<country size="2" bbox="14 35 14 36" name="malta">
+		<country size="2" bbox="14 35 14 36" name="malta" hillshade_sqlite="yes">
 			<tiles>14 35;14 36</tiles></country>
-		<country size="15" bbox="26 45 30 48" name="moldova">
+		<country size="15" bbox="26 45 30 48" name="moldova" hillshade_sqlite="yes">
 			<tiles>26 48;28 48;27 46;27 47;27 45;29 45;27 48;29 47;28 47;28 46;26 47;28 45;29 48;30 46;29 46</tiles><region size="4" bbox="28 46 29 47" name="anenii_noi">
 				<tiles>28 46;28 47;29 46;29 47</tiles>
 			</region>
@@ -8159,12 +8159,12 @@
 				<tiles>27 46;27 47;28 46;28 47</tiles>
 			</region>
 		</country>
-		<country size="1" bbox="7 43 7 43" name="monaco">
+		<country size="1" bbox="7 43 7 43" name="monaco" hillshade_sqlite="yes">
 			<tiles>7 43</tiles><region size="1" bbox="7 43 7 43" name="monaco">
 				<tiles>7 43</tiles>
 			</region>
 		</country>
-		<country size="7" bbox="18 41 20 43" name="montenegro">
+		<country size="7" bbox="18 41 20 43" name="montenegro" hillshade_sqlite="yes">
 			<tiles>20 43;20 42;18 42;18 43;19 43;19 42;19 41</tiles><region size="1" bbox="19 42 19 42" name="andrijevica">
 				<tiles>19 42</tiles>
 			</region>
@@ -8229,7 +8229,7 @@
 				<tiles>18 42;18 43;19 42;19 43</tiles>
 			</region>
 		</country>
-		<country size="14" bbox="3 50 7 53" name="netherlands">
+		<country size="14" bbox="3 50 7 53" name="netherlands" hillshade_sqlite="yes">
 			<tiles>7 53;6 51;6 50;5 50;5 51;5 52;3 51;4 53;4 52;4 51;6 52;7 52;6 53;5 53</tiles><region size="4" bbox="6 52 7 53" name="drenthe">
 				<tiles>6 52;6 53;7 52;7 53</tiles>
 			</region>
@@ -8273,7 +8273,7 @@
 				<tiles>3 51;4 51;4 52;5 51;5 52</tiles>
 			</region>
 		</country>
-		<country size="130" bbox="4 57 31 71" name="norway">
+		<country size="130" bbox="4 57 31 71" name="norway" hillshade_sqlite="yes">
 			<tiles>12 59;13 67;13 66;13 65;13 64;13 63;13 68;29 70;21 68;21 69;7 63;19 70;7 62;11 67;20 70;11 61;11 60;11 63;11 62;11 65;11 64;7 61;7 60;25 69;28 69;28 68;29 68;29 69;8 57;8 59;8 58;4 59;9 58;9 59;17 67;22 69;17 69;17 68;24 69;24 68;7 58;7 59;7 57;25 71;25 70;28 70;28 71;4 62;4 60;4 61;8 62;8 63;8 60;8 61;12 68;22 68;12 60;12 61;12 62;12 63;12 64;12 65;12 66;12 67;27 71;6 60;24 70;24 71;6 61;27 70;20 68;27 69;11 58;11 59;23 69;22 70;5 58;5 59;6 62;15 67;15 66;15 69;15 68;31 69;26 69;26 70;26 71;10 62;10 63;10 60;10 61;10 64;10 65;19 69;19 68;20 69;14 64;30 70;18 70;21 70;16 66;16 67;16 68;16 69;9 61;9 60;9 63;9 62;9 64;10 59;10 58;23 71;23 70;25 68;18 68;18 69;30 69;18 67;5 61;5 60;5 62;6 59;6 58;14 68;14 66;14 67;6 57;14 65;23 68;14 63</tiles><region size="5" bbox="10 59 12 60" name="akershus">
 				<tiles>10 59;10 60;11 59;11 60;12 59</tiles>
 			</region>
@@ -8332,7 +8332,7 @@
 				<tiles>9 58;9 59;10 58;10 59</tiles>
 			</region>
 		</country>
-		<country size="63" bbox="14 48 24 54" name="poland">
+		<country size="63" bbox="14 48 24 54" name="poland" hillshade_sqlite="yes">
 			<tiles>22 54;22 52;22 53;22 50;22 51;17 49;24 52;23 51;19 49;21 54;21 49;14 53;14 52;14 51;14 50;14 54;23 50;16 49;19 50;18 49;19 52;19 53;19 54;20 51;20 52;18 52;24 50;24 51;17 54;24 53;17 52;17 53;17 50;17 51;23 54;23 49;22 49;22 48;20 54;23 53;19 51;20 50;21 52;21 53;15 50;21 51;21 50;20 53;15 51;23 52;18 54;18 53;15 52;18 51;18 50;15 54;16 54;20 49;15 53;16 51;16 50;16 53;16 52</tiles><region size="14" bbox="15 50 19 53" name="greater_poland">
 				<tiles>15 51;15 52;15 53;16 51;16 52;16 53;17 50;17 51;17 52;17 53;18 50;18 51;18 52;19 52</tiles>
 			</region>
@@ -8382,7 +8382,7 @@
 				<tiles>14 52;14 53;14 54;15 52;15 53;15 54;16 52;16 53;16 54;17 53;17 54</tiles>
 			</region>
 		</country>
-		<country size="32" bbox="-32 30 -7 42" name="portugal">
+		<country size="32" bbox="-32 30 -7 42" name="portugal" hillshade_sqlite="yes">
 			<!--
 			<region size="2" bbox="-8 40 -8 41" name="aveiro">
 				<tiles>-8 40;-8 41</tiles>
@@ -8446,7 +8446,7 @@
 			</region>
 		-->
 		<tiles>-16 30;-25 37;-7 40;-7 41;-9 42;-9 41;-9 40;-8 40;-8 41;-29 39;-29 38;-8 36;-17 30;-17 32;-17 33;-9 36;-9 37;-9 38;-9 39;-8 39;-8 38;-7 38;-7 39;-26 36;-26 37;-32 39;-28 38;-28 39;-8 37;-18 32;-10 39;-10 38</tiles></country>
-		<country size="49" bbox="20 43 29 48" name="romania">
+		<country size="49" bbox="20 43 29 48" name="romania" hillshade_sqlite="yes">
 			<tiles>24 47;24 46;24 45;24 44;24 43;27 47;27 44;27 43;28 47;27 48;24 48;21 44;21 45;21 46;21 47;28 45;27 46;28 44;27 45;25 48;25 43;25 44;25 45;25 46;25 47;22 45;22 44;22 47;22 46;20 45;22 43;22 48;28 46;26 48;28 43;29 45;26 43;26 45;26 44;26 47;26 46;29 44;20 46;23 48;23 46;23 47;23 44;23 45;23 43</tiles><region size="5" bbox="22 45 24 46" name="alba">
 				<tiles>22 46;23 45;23 46;24 45;24 46</tiles>
 			</region>
@@ -8571,7 +8571,7 @@
 				<tiles>26 45;26 46;27 45;27 46</tiles>
 			</region>
 		</country>
-		<country size="1" bbox="12 43 12 43" name="san_marino">
+		<country size="1" bbox="12 43 12 43" name="san_marino" hillshade_sqlite="yes">
 			<!--
 			<region size="2" bbox="12 43 12 44" name="acquaviva">
 				<tiles>12 43;12 44</tiles>
@@ -8602,7 +8602,7 @@
 			</region>
 		-->
 		<tiles>12 43</tiles></country>
-		<country size="20" bbox="18 42 23 46" name="serbia">
+		<country size="20" bbox="18 42 23 46" name="serbia" hillshade_sqlite="yes">
 			<!--
 			<region size="4" bbox="21 43 22 44" name="borski">
 				<tiles>21 43;21 44;22 43;22 44</tiles>
@@ -8681,7 +8681,7 @@
 			</region>
 		-->
 		<tiles>21 44;21 42;22 43;21 45;22 42;21 43;23 43;20 43;20 42;22 44;18 44;18 45;20 45;20 44;19 46;19 45;19 44;19 43;19 42;20 46</tiles></country>
-		<country size="15" bbox="16 47 22 49" name="slovakia">
+		<country size="15" bbox="16 47 22 49" name="slovakia" hillshade_sqlite="yes">
 			<!--
 			<region size="7" bbox="18 47 20 49" name="banskobystricky">
 				<tiles>18 47;18 48;19 47;19 48;19 49;20 48;20 49</tiles>
@@ -8709,7 +8709,7 @@
 			</region>
 		-->
 		<tiles>17 47;19 49;22 49;19 48;17 49;17 48;22 48;16 48;18 47;18 48;18 49;20 49;20 48;21 48;21 49</tiles></country>
-		<country size="7" bbox="13 45 16 46" name="slovenia">
+		<country size="7" bbox="13 45 16 46" name="slovenia" hillshade_sqlite="yes">
 			<!--
 			<region size="4" bbox="13 45 14 46" name="gorenjska">
 				<tiles>13 45;13 46;14 45;14 46</tiles>
@@ -8749,7 +8749,7 @@
 			</region>
 		-->
 		<tiles>13 45;13 46;14 45;14 46;15 46;15 45;16 46</tiles></country>
-		<country size="100" bbox="-19 27 4 43" name="spain">
+		<country size="100" bbox="-19 27 4 43" name="spain" hillshade_sqlite="yes">
 			<tiles>-5 36;-5 37;-6 39;-6 38;-6 37;-6 36;-6 35;-5 39;-19 27;-10 42;-10 43;-7 41;-9 42;-7 43;-7 42;-19 28;-1 38;-1 39;-1 37;4 40;2 39;-5 38;-4 40;-15 28;-4 42;-4 43;-4 41;-9 43;-7 40;-8 40;-9 41;-8 42;-8 43;-3 35;-3 36;-3 37;-3 38;-3 39;-4 39;-4 38;-4 35;-4 37;-4 36;-16 27;-16 28;-8 39;-8 38;-2 39;-2 38;-2 37;-2 36;-8 37;1 42;1 41;-3 41;-3 40;-3 43;-3 42;-16 30;0 39;0 38;3 41;3 40;3 42;-6 42;-6 43;-6 40;-6 41;-14 28;-14 29;0 40;0 41;0 42;-1 42;-1 41;-1 40;3 39;-18 28;-18 27;-2 42;-2 43;-2 40;-8 41;-5 43;-5 42;-5 41;-5 40;-17 30;1 38;1 39;-7 38;-7 39;-7 36;-7 37;-2 41;4 39;-17 28;2 42;2 41;-17 27</tiles><region size="20" bbox="-8 35 -2 38" name="andalucia">
 				<tiles>-8 38;-8 37;-7 36;-7 37;-7 38;-6 35;-6 36;-6 37;-6 38;-5 36;-5 37;-5 38;-4 36;-4 37;-4 38;-3 36;-3 37;-3 38;-2 36;-2 37</tiles>
 			</region>
@@ -8805,7 +8805,7 @@
 				<tiles>-2 37;-2 38;-1 37;-1 38</tiles>
 			</region>
 		</country>
-		<country size="3" bbox="-9 70 -8 71" name="svalbard_and_jan_mayen">
+		<country size="3" bbox="-9 70 -8 71" name="svalbard_and_jan_mayen" hillshade_sqlite="yes">
 			<tiles>-8 71;-9 70;-9 71;-10 70</tiles><region size="3" bbox="-9 70 -8 71" name="jan_mayen">
 				<tiles>-9 70;-9 71;-8 71;-10 70</tiles>
 			</region>
@@ -8813,7 +8813,7 @@
 				<tiles/>
 			</region>
 		</country>
-		<country size="125" bbox="10 55 24 69" name="sweden">
+		<country size="125" bbox="10 55 24 69" name="sweden" hillshade_sqlite="yes">
 			<tiles>12 55;12 57;12 56;12 59;12 58;13 65;13 64;13 63;13 62;13 61;13 60;14 59;14 58;21 68;21 69;21 66;21 67;21 64;21 65;14 57;14 56;14 55;19 58;19 59;19 57;17 57;17 58;17 59;11 63;11 62;18 57;18 56;18 59;18 58;17 63;17 62;17 61;17 60;17 67;17 66;17 65;17 64;17 68;24 65;22 66;20 64;20 67;22 68;22 67;20 63;22 65;12 60;12 61;12 62;12 63;12 64;23 68;16 59;16 58;16 57;16 56;11 57;11 58;11 59;21 63;15 65;15 64;15 67;15 66;15 61;15 60;15 63;15 62;23 66;23 67;20 65;19 60;19 63;20 66;19 65;19 64;19 67;19 66;19 69;19 68;20 69;20 68;14 62;13 57;13 55;16 64;16 65;16 66;16 67;16 60;16 61;16 62;16 63;16 68;10 59;10 58;24 66;18 68;18 62;18 63;18 60;18 66;18 67;18 64;18 65;23 65;13 58;13 59;14 66;14 64;14 65;13 56;14 63;14 60;14 61;15 58;15 59;15 55;15 56;15 57</tiles><region size="5" bbox="14 55 16 56" name="blekinge">
 				<tiles>14 55;14 56;15 55;15 56;16 56</tiles>
 			</region>
@@ -8878,7 +8878,7 @@
 				<tiles>10 58;10 59;11 57;11 58;11 59;12 57;12 58;12 59;13 57;13 58;13 59;14 57;14 58;14 59</tiles>
 			</region>
 		</country>
-		<country size="15" bbox="5 45 10 47" name="switzerland" hillshade_sqlite="yes" >
+		<country size="15" bbox="5 45 10 47" name="switzerland" hillshade_sqlite="yes">
 			<tiles>7 45;7 47;7 46;6 46;6 47;6 45;5 46;9 47;9 46;9 45;8 45;8 46;8 47;10 46;10 47</tiles><region size="2" bbox="7 47 8 47" name="aargau">
 				<tiles>7 47;8 47</tiles>
 			</region>
@@ -8961,7 +8961,7 @@
 				<tiles>8 47;9 47</tiles>
 			</region>
 		</country>
-		<country size="114" bbox="22 44 40 52" name="ukraine">
+		<country size="114" bbox="22 44 40 52" name="ukraine" hillshade_sqlite="yes">
 			<tiles>31 52;39 49;39 48;26 52;26 50;26 51;39 47;25 48;25 49;34 51;34 50;34 52;35 50;25 47;27 51;27 50;22 47;22 49;22 48;34 46;34 47;34 44;34 45;33 49;33 48;33 47;33 46;33 45;33 44;34 48;34 49;38 50;27 48;27 49;29 51;29 50;33 50;33 51;33 52;38 46;38 47;31 47;31 46;31 49;31 48;38 48;38 49;28 49;28 48;29 48;29 49;29 45;29 46;29 47;28 47;28 46;28 45;32 52;32 51;32 50;36 50;24 47;31 50;31 51;24 49;24 48;28 50;28 51;30 51;30 50;30 52;37 49;37 48;36 48;36 49;36 45;36 46;36 47;37 47;37 46;32 45;32 46;32 47;32 48;32 49;23 51;23 50;40 48;24 50;24 51;24 52;30 48;30 49;37 50;30 46;30 47;30 45;23 48;23 49;23 47;35 51;40 49;26 49;26 48;26 47;35 49;35 48;35 45;35 44;35 47;35 46;25 52;25 51;25 50</tiles><region size="11" bbox="29 48 33 50" name="cherkasy">
 				<tiles>29 48;29 49;30 48;30 49;31 48;31 49;31 50;32 48;32 49;32 50;33 49</tiles>
 			</region>
@@ -9044,7 +9044,7 @@
 				<tiles>27 49;27 50;27 51;28 49;28 50;28 51;29 49;29 50;29 51</tiles>
 			</region>
 		</country>
-		<country size="79" bbox="-9 49 1 60" name="united_kingdom">
+		<country size="79" bbox="-9 49 1 60" name="united_kingdom" hillshade_sqlite="yes">
 			<tiles>-14 57;1 52;-3 55;-5 59;-4 52;-7 49;-2 60;-1 52;0 53;0 52;0 51;-3 60;-5 50;0 50;-1 50;-4 59;-5 51;-4 57;-4 56;-4 55;-4 54;-4 53;-5 52;-4 51;-4 50;-3 56;-3 57;-3 54;-5 53;-3 52;-3 53;-3 50;-3 51;-5 54;-1 51;-6 49;-3 58;-5 55;-9 54;-9 57;-5 56;1 51;-5 57;-1 54;-5 58;-7 58;-7 59;-8 57;-8 56;-8 55;-8 54;-7 53;1 50;-8 58;-7 56;-7 57;-7 54;-7 55;-2 59;-1 60;-1 53;-2 55;-2 54;-2 57;-4 58;-2 51;-2 50;-2 53;-2 52;-6 51;-6 50;-6 53;-6 52;-6 55;-6 54;-6 57;-6 56;-6 59;-6 58;-3 59</tiles>
 			<region size="34" bbox="-6 49 1 55" name="england">
 				<tiles>-6 49;-6 50;-5 50;-5 51;-4 50;-4 51;-4 52;-4 53;-4 54;-4 55;-3 50;-3 51;-3 52;-3 53;-3 54;-3 55;-2 50;-2 51;-2 52;-2 53;-2 54;-2 55;-1 50;-1 51;-1 52;-1 53;-1 54;0 50;0 51;0 52;0 53;1 50;1 51;1 52</tiles>
@@ -9059,7 +9059,7 @@
 				<tiles>-5 51;-5 52;-5 53;-4 51;-4 52;-4 53;-3 51;-3 52;-3 53</tiles>
 			</region>
 		</country>
-		<country size="1" bbox="12 41 12 41" name="vatican_city">
+		<country size="1" bbox="12 41 12 41" name="vatican_city" hillshade_sqlite="yes">
 			<tiles>12 41</tiles></country>
 	</continent>
 	<continent name="north-america">
