@@ -261,7 +261,7 @@ def listTiles(tree):
 
 parser = OptionParser()
 parser.add_option("-i", "--input", dest="inputXMLfilename",
-                  help="XML file to be consolidated", metavar="FILE")
+                  help="XML file with file to generate and tilelists (countries.xml)", metavar="FILE")
 parser.add_option("-s", "--sqlite", dest="inputSqlite",
                   help="Original Sqlite file to read", metavar="FILE")
 parser.add_option("-o", "--output", dest="outputDirectory",
@@ -324,7 +324,7 @@ for area in Aois:
 		lon=float(tile1deg.split(' ')[0])
 		lat=float(tile1deg.split(' ')[1])
 		print lon,lat
-		for z in range(4,11):
+		for z in range(4,12):
 			tile=TileNames()
 			tile.fromLL(lat,lon,float(z))
 			xmin=tile.x
