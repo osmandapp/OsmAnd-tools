@@ -2,7 +2,7 @@
 # create Osmand-compatible sqlite from a big sqlite, only for areas with
 # hillshade_sqlite='yes' in tile list xml file.
 
-import os, sys
+import os, sys, pdb
 import sqlite3
 import math
 from lxml import etree
@@ -115,10 +115,10 @@ class SqliteTileStorage():
         cur.execute(
             """
             CREATE TABLE IF NOT EXISTS info (
-                desc TEXT,
-                tilenumbering TEXT,
-                minzoom int,
-                maxzoom int)
+                desc,
+                tilenumbering,
+                minzoom,
+                maxzoom)
             """)
         
         if CREATEINDEX:
@@ -128,10 +128,9 @@ class SqliteTileStorage():
                 ON tiles(x,y,z,s)
                 """)
                 
-        cur.execute("insert into info(desc) values('Simple sqlite tile storage..')")
-        
-        cur.execute("insert into info(tilenumbering) values(?)",(self.type,))
-        
+        cur.execute("insert into info (desc) values ('Simple sqlite tile storage..')")
+        self.db.commit()
+        cur.execute("update info set tilenumbering=?",(self.type,))
         self.db.commit()
         
     def open(self, filename) :
@@ -170,6 +169,18 @@ class SqliteTileStorage():
             return image
         else :
             return None
+        
+    def updateMinMaxZoom(self):
+        cur = self.db.cursor()
+        cur.execute("select z from tiles")
+        zoom = cur.fetchall()
+        zoom.sort()
+        minZoom= str(zoom[0][0])
+        maxZoom= str(zoom[-1][0])
+        cur.execute("update info set minzoom=?",(minZoom,))
+        self.db.commit()
+        cur.execute("update info set maxzoom=?",(maxZoom,))
+        self.db.commit()
         
     def createFromDirectory(self, filename, basedir, overwrite=False) :
         """ Create a new sqlite file from a z/y/x.ext directory structure"""
@@ -339,6 +350,7 @@ for area in Aois:
 					zzz= 17 - z
 					yyy= 2**z - yy -1
 					if tile: out_storeTMS.writeImage(xxx,yyy,zzz,tile)
+	out_storeTMS.updateMinMaxZoom()
 
 
 
