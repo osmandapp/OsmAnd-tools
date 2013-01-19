@@ -6957,7 +6957,7 @@
 		-->
 		<tiles>-83 9;-83 8;-80 7;-80 8;-84 8;-83 7;-79 9;-81 9;-81 8;-79 7;-78 9;-82 7;-78 7;-80 9;-82 8;-82 9;-79 8;-81 7;-78 8</tiles></country>
 	</continent>
-	<continent name="europe" hillshade_sqlite="yes">
+	<continent name="europe">
 		<country size="6" bbox="19 59 21 60" name="aland">
 			<tiles>21 59;19 60;21 60;19 59;20 60;20 59</tiles><region size="2" bbox="20 60 21 60" name="brando">
 				<tiles>20 60;21 60</tiles>
