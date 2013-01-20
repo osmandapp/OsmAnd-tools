@@ -334,19 +334,18 @@ for area in Aois:
         continent=area.get('name')
         name=continent
     print "Processing ", name
-    outName='Hillshade_'+name.capitalize()+'.sqlitedb.work'
-    finalName='Hillshade_'+name.capitalize()+'.sqlitedb'
+
     
     # Get tile list from this record and children
     tile1degList=listTiles(area)
     
-    
-    outputFilename=os.path.join(outputDirectory,outName)
+    finalName='Hillshade_'+name.capitalize()+'.sqlitedb'    
+    outputFilename=os.path.join(outputDirectory,'Hillshade_'+name.capitalize()+'.sqlitedb.work')
     finalOutputFilename=os.path.join(outputDirectory,finalName)
-    if os.path.exists(outputFilename):
-        print "file exists, skip", outputFilename
+    if os.path.exists(finalOutputFilename):
+        print "file exists, skip", finalOutputFilename
         continue
-    outputUploadedFilename=os.path.join(outputDirectory,"uploaded/"+outName)
+    outputUploadedFilename=os.path.join(outputDirectory,"uploaded/"+finalName)
     if os.path.exists(outputUploadedFilename):
         print "file exists, skip", outputUploadedFilename
         continue
