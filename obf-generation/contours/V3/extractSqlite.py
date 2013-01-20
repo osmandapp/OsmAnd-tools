@@ -369,7 +369,7 @@ for area in Aois:
                     xxx= xx
                     zzz= 17 - z
                     yyy= 2**z - yy -1
-                    exists=out_storeTMS.readImage(xxx,yyy,zzz,tile)
+                    exists=out_storeTMS.readImage(xxx,yyy,zzz)
                     if tile and not exists : out_storeTMS.writeImage(xxx,yyy,zzz,tile)
     
     out_storeTMS.updateMinMaxZoom()
