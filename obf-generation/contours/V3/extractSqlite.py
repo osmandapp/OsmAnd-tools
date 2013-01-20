@@ -335,18 +335,20 @@ for area in Aois:
         name=continent
     print "Processing ", name
     outName='Hillshade_'+name.capitalize()+'.sqlitedb'
+    finalName='Hillshade_'+name.capitalize()+'.sqlitedb.work'
     
     # Get tile list from this record and children
     tile1degList=listTiles(area)
     
     
     outputFilename=os.path.join(outputDirectory,outName)
+    finalOutputFilename=os.path.join(outputDirectory,finalName)
     if os.path.exists(outputFilename):
         print "file exists, skip", outputFilename
         continue
     outputUploadedFilename=os.path.join(outputDirectory,"uploaded/"+outName)
     if os.path.exists(outputUploadedFilename):
-        print "file exists, skip", outputFilename
+        print "file exists, skip", outputUploadedFilename
         continue
     sys.stdout.flush()
     
@@ -379,6 +381,7 @@ for area in Aois:
     
     out_storeTMS.updateMinMaxZoom()
     out_storeTMS.db.close()
+    os.rename(outputFilename, finalOutputFilename)
     sys.stdout.flush()
     
 
