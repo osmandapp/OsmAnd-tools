@@ -344,6 +344,10 @@ for area in Aois:
     if os.path.exists(outputFilename):
         print "file exists, skip", outputFilename
         continue
+    outputUploadedFilename=os.path.join(outputDirectory,"uploaded/"+outName)
+    if os.path.exists(outputUploadedFilename):
+        print "file exists, skip", outputFilename
+        continue
     sys.stdout.flush()
     
     store=SqliteTileStorage('TMS')
