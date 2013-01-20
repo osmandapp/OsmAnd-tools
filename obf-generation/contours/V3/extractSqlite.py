@@ -372,7 +372,9 @@ for area in Aois:
                     if tile: out_storeTMS.writeImage(xxx,yyy,zzz,tile)
     
     out_storeTMS.updateMinMaxZoom()
+    out_storeTMS.db.close()
     sys.stdout.flush()
+    
 
 
 
