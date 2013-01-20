@@ -170,7 +170,7 @@ class SqliteTileStorage():
         except:
             print "failed to write", x, y, z
             sys.stdout.flush()
-            cur.execute('insert into tiles (z, x, y,s,image) \
+            cur.execute('insert or replace into tiles (z, x, y,s,image) \
                             values (?,?,?,?,?)',
                             (z, x, y, 0, sqlite3.Binary(image)))
             self.db.commit()
