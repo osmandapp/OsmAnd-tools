@@ -152,6 +152,7 @@ class SqliteTileStorage():
             self.db.commit()
         except:
             print "failed to write", x, y, z
+            sys.stdout.flush()
             cur.execute('insert into tiles (z, x, y,s,image) \
                             values (?,?,?,?,?)',
                             (z, x, y, 0, sqlite3.Binary(f.read())))
@@ -161,10 +162,19 @@ class SqliteTileStorage():
     def writeImage(self, x, y, z, image) :
         """ write a single tile from string """
         cur = self.db.cursor()
-        cur.execute('insert or replace into tiles (z, x, y,s,image) \
-                        values (?,?,?,?,?)',
-                        (z, x, y, 0, sqlite3.Binary(image)))
-        self.db.commit()
+        try:
+	        cur.execute('insert or replace into tiles (z, x, y,s,image) \
+	                        values (?,?,?,?,?)',
+	                        (z, x, y, 0, sqlite3.Binary(image)))
+	        self.db.commit()
+        except:
+            print "failed to write", x, y, z
+            sys.stdout.flush()
+            cur.execute('insert into tiles (z, x, y,s,image) \
+                            values (?,?,?,?,?)',
+                            (z, x, y, 0, sqlite3.Binary(image)))
+            self.db.commit()
+            print "second attempt ok"
         
     def readImage(self, x, y, z) :
         """ read a single tile as string """
