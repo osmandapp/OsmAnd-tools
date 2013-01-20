@@ -334,6 +334,7 @@ for area in Aois:
     if os.path.exists(outputFilename):
         print "file exists, skip", outputFilename
         continue
+    sys.stdout.flush()
     
     store=SqliteTileStorage('TMS')
     store.open(inputSqlite)
@@ -359,7 +360,9 @@ for area in Aois:
                     zzz= 17 - z
                     yyy= 2**z - yy -1
                     if tile: out_storeTMS.writeImage(xxx,yyy,zzz,tile)
+    
     out_storeTMS.updateMinMaxZoom()
+    sys.stdout.flush()
 
 
 
