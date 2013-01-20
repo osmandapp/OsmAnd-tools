@@ -334,8 +334,8 @@ for area in Aois:
         continent=area.get('name')
         name=continent
     print "Processing ", name
-    outName='Hillshade_'+name.capitalize()+'.sqlitedb'
-    finalName='Hillshade_'+name.capitalize()+'.sqlitedb.work'
+    outName='Hillshade_'+name.capitalize()+'.sqlitedb.work'
+    finalName='Hillshade_'+name.capitalize()+'.sqlitedb'
     
     # Get tile list from this record and children
     tile1degList=listTiles(area)
