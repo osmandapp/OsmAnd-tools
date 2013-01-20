@@ -355,6 +355,7 @@ for area in Aois:
         lon=float(tile1deg.split(' ')[0])
         lat=float(tile1deg.split(' ')[1])
         print lon,lat
+        sys.stdout.flush()
         for z in range(4,12):
             tile=TileNames()
             tile.fromLL(lat,lon,float(z))
