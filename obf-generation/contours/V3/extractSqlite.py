@@ -145,10 +145,18 @@ class SqliteTileStorage():
     def writeImageFile(self, x, y, z, f) :
         """ write a single tile from a file """
         cur = self.db.cursor()
-        cur.execute('insert into tiles (z, x, y,s,image) \
-                        values (?,?,?,?,?)',
-                        (z, x, y, 0, sqlite3.Binary(f.read())))
-        self.db.commit()
+        try:
+            cur.execute('insert into tiles (z, x, y,s,image) \
+                            values (?,?,?,?,?)',
+                            (z, x, y, 0, sqlite3.Binary(f.read())))
+            self.db.commit()
+        except:
+            print "failed to write", x, y, z
+            cur.execute('insert into tiles (z, x, y,s,image) \
+                            values (?,?,?,?,?)',
+                            (z, x, y, 0, sqlite3.Binary(f.read())))
+            self.db.commit()
+            print "second attempt ok"
         
     def writeImage(self, x, y, z, image) :
         """ write a single tile from string """
@@ -263,12 +271,12 @@ class SqliteTileStorage():
             target.writeImage(xx,yy,zz,im)
 
 def listTiles(tree):
-	tilelists=tree.findall('.//tiles')
-	tilelist=[]
-	for l in tilelists:
-		try: tilelist.extend(l.text.split(';'))
-		except: continue
-	return list(set(tilelist)) 
+    tilelists=tree.findall('.//tiles')
+    tilelist=[]
+    for l in tilelists:
+        try: tilelist.extend(l.text.split(';'))
+        except: continue
+    return list(set(tilelist)) 
 
 parser = OptionParser()
 parser.add_option("-i", "--input", dest="inputXMLfilename",
@@ -298,59 +306,60 @@ inTree=etree.parse(inputXMLfilename)
 
 Aois=inTree.xpath("//*[@hillshade_sqlite='yes']")
 for area in Aois:
-	# Find a name for the area of interest
-	areaType=area.tag
-	if areaType=='region':
-		region=area.get('name')
-		country=area.getparent().get('name')
-		continent=area.getparent().getparent().get('name')
-		name=country+'_'+region+'_'+continent
-	if areaType=='country':
-		region=''
-		country=area.get('name')
-		continent=area.getparent().get('name')
-		name=country+'_'+continent
-	if areaType=='continent':
-		region=''
-		country=''
-		continent=area.get('name')
-		name=continent
-	print "Processing ", name
-	outName='Hillshade_'+name.capitalize()+'.sqlitedb'
-	
-	# Get tile list from this record and children
-	tile1degList=listTiles(area)
-	
-	store=SqliteTileStorage('TMS')
-	store.open(inputSqlite)
-	
-	outputFilename=os.path.join(outputDirectory,outName)
-	if os.path.isfile(outputFilename):
-		print "file exists, skip", outputFilename
-		continue
-	out_storeTMS=SqliteTileStorage('BigPlanet')
-	out_storeTMS.create(os.path.join(outputDirectory,outName),True)
-	
-	for tile1deg in tile1degList:
-		lon=float(tile1deg.split(' ')[0])
-		lat=float(tile1deg.split(' ')[1])
-		print lon,lat
-		for z in range(4,12):
-			tile=TileNames()
-			tile.fromLL(lat,lon,float(z))
-			xmin=tile.x
-			ymin=tile.y
-			tile.fromLL(lat+1,lon+1,z)
-			xmax=tile.x
-			ymax=tile.y
-			for xx in range(xmin-1, xmax+1):
-				for yy in range(ymin-1, ymax+1):
-					tile=store.readImage(xx,yy,z)
-					xxx= xx
-					zzz= 17 - z
-					yyy= 2**z - yy -1
-					if tile: out_storeTMS.writeImage(xxx,yyy,zzz,tile)
-	out_storeTMS.updateMinMaxZoom()
+    # Find a name for the area of interest
+    areaType=area.tag
+    if areaType=='region':
+        region=area.get('name')
+        country=area.getparent().get('name')
+        continent=area.getparent().getparent().get('name')
+        name=country+'_'+region+'_'+continent
+    if areaType=='country':
+        region=''
+        country=area.get('name')
+        continent=area.getparent().get('name')
+        name=country+'_'+continent
+    if areaType=='continent':
+        region=''
+        country=''
+        continent=area.get('name')
+        name=continent
+    print "Processing ", name
+    outName='Hillshade_'+name.capitalize()+'.sqlitedb'
+    
+    # Get tile list from this record and children
+    tile1degList=listTiles(area)
+    
+    
+    outputFilename=os.path.join(outputDirectory,outName)
+    if os.path.exists(outputFilename):
+        print "file exists, skip", outputFilename
+        continue
+    
+    store=SqliteTileStorage('TMS')
+    store.open(inputSqlite)
+    out_storeTMS=SqliteTileStorage('BigPlanet')
+    out_storeTMS.create(outputFilename,True)
+    
+    for tile1deg in tile1degList:
+        lon=float(tile1deg.split(' ')[0])
+        lat=float(tile1deg.split(' ')[1])
+        print lon,lat
+        for z in range(4,12):
+            tile=TileNames()
+            tile.fromLL(lat,lon,float(z))
+            xmin=tile.x
+            ymin=tile.y
+            tile.fromLL(lat+1,lon+1,z)
+            xmax=tile.x
+            ymax=tile.y
+            for xx in range(xmin-1, xmax+1):
+                for yy in range(ymin-1, ymax+1):
+                    tile=store.readImage(xx,yy,z)
+                    xxx= xx
+                    zzz= 17 - z
+                    yyy= 2**z - yy -1
+                    if tile: out_storeTMS.writeImage(xxx,yyy,zzz,tile)
+    out_storeTMS.updateMinMaxZoom()
 
 
 
