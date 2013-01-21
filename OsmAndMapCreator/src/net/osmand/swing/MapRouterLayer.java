@@ -37,10 +37,8 @@ import net.osmand.osm.LatLon;
 import net.osmand.osm.MapUtils;
 import net.osmand.osm.OSMSettings.OSMTagKey;
 import net.osmand.osm.Way;
-import net.osmand.router.BinaryRoutePlanner;
 import net.osmand.router.BinaryRoutePlanner.RouteSegment;
 import net.osmand.router.BinaryRoutePlanner.RouteSegmentVisitor;
-import net.osmand.router.BinaryRoutePlannerOld;
 import net.osmand.router.RoutePlannerFrontEnd;
 import net.osmand.router.RouteSegmentResult;
 import net.osmand.router.RoutingConfiguration;
@@ -57,6 +55,7 @@ import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
+import org.xmlpull.v1.XmlPullParserException;
 
 
 
@@ -554,7 +553,7 @@ public class MapRouterLayer implements MapPanelLayer {
 				builder = RoutingConfiguration.parseFromInputStream(new FileInputStream(xmlPath));
 			} catch (IOException e) {
 				throw new IllegalArgumentException("Error parsing routing.xml file",e);
-			} catch (SAXException e) {
+			} catch (XmlPullParserException e) {
 				throw new IllegalArgumentException("Error parsing routing.xml file",e);
 			}
 		}
