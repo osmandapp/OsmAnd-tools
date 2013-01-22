@@ -17,7 +17,6 @@ import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
 
-
 @Ignore
 public class JUnitRouteTest  {
 
@@ -58,16 +57,19 @@ public class JUnitRouteTest  {
 	}
 	
 	@Test
+	@Ignore
 	public void runNL() throws Exception {
 		RouterTestsSuite.test(lib, getClass().getResourceAsStream("nl.test.xml"), rs, RoutingConfiguration.getDefault());
 	}
 
 	@Test
+	@Ignore
 	public void runNL2() throws Exception {
 		RouterTestsSuite.test(lib, getClass().getResourceAsStream("nl2.test.xml"), rs, RoutingConfiguration.getDefault());
 	}
 	
 	@Test
+	@Ignore
 	public void runNLLeid() throws Exception {
 		RouterTestsSuite.test(lib, getClass().getResourceAsStream("nl_leid.test.xml"), rs, RoutingConfiguration.getDefault());
 	}

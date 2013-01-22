@@ -603,7 +603,7 @@ public class MapRouterLayer implements MapPanelLayer {
 				new Thread(){
 					@Override
 					public void run() {
-						while(!ctx.calculationProgress.isCancelled) {
+						while(ctx.calculationProgress != null && !ctx.calculationProgress.isCancelled) {
 							float p = ctx.calculationProgress.distanceFromBegin + ctx.calculationProgress.distanceFromEnd;
 							float all = ctx.calculationProgress.totalEstimatedDistance;
 //							while (p > all * 0.9) {
