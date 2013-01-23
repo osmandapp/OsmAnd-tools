@@ -356,12 +356,20 @@ for area in Aois:
     out_storeTMS=SqliteTileStorage('BigPlanet')
     out_storeTMS.create(outputFilename,True)
     
+    maxZ=11
+    # generate up to zoom 10 for areas above 60deg north
+    for tile1deg in tile1degList:
+        lat=float(tile1deg.split(' ')[1])
+        if lat >= 60: maxZ=10
+    print "Zoom range: 4", maxZ
+    
     for tile1deg in tile1degList:
         lon=float(tile1deg.split(' ')[0])
         lat=float(tile1deg.split(' ')[1])
         print lon,lat
         sys.stdout.flush()
-        for z in range(4,12):
+        
+        for z in range(4,maxZ+1):
             tile=TileNames()
             tile.fromLL(lat,lon,float(z))
             xmin=tile.x
