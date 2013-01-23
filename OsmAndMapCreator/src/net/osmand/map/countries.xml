@@ -5700,9 +5700,9 @@
 	</continent>
 	<continent name="caribbean">
 		<!-- tiles>-85 21;-85 22;-84 21;-84 22;-84 23;-83 21;-83 22;-83 23;-82 19;-82 21;-82 22;-82 23;-81 19;-81 21;-81 22;-81 23; -80 23;-80 24;-80 25;-80 26;-80 19;-80 20;-80 21;-80 22;-80 23;-79 24;-79 25;-79 26;-79 27;-79 23;-79 20;-79 21;-79 22;-79 18;-79 17;-78 23;-78 24;-78 25;-78 26;-78 27;-78 19;-78 20;-78 21;-78 22;-78 17;-78 18;-77 22;-77 23;-77 24;-77 25;-77 26;-77 19;-77 20;-77 21;-77 17;-77 18;-76 21;-76 22;-76 23;-76 24;-76 19;-76 20;-76 17;-76 18;-75 21;-75 22;-75 23;-75 24;-75 19;-75 20;-75 18;-74 20;-74 21;-74 22;-74 23;-74 17;-74 18;-74 19;-73 20;-73 21;-73 22;-73 18;-73 19;-72 17;-72 18;-72 19;-72 20;-72 21;-72 22;-71 12;-71 18;-71 19;-71 20;-71 21;-70 12;-70 18;-70 19;-70 11;-69 18;-69 19;-69 11;-69 12;-68 17;-68 18;-67 17;-67 18;-66 17;-66 18;-65 18;-65 17;-64 18;-64 17;-63 18;-63 15;-63 14;-63 16;-63 17;-62 17;-62 16;-62 15;-62 14;-62 12;-62 11;-62 13;-62 9;-62 10;-61 15;-61 16;-61 14;-61 13;-61 12;-61 10;-61 11;-60 13;-60 12;-60 15;-60 16;-59 16;-59 15;-58 16</tiles -->
-		<country size="2" bbox="-64 18 -63 18" name="anguilla">
+		<country size="2" bbox="-64 18 -63 18" name="anguilla" hillshade_sqlite="yes">
 			<tiles>-64 18;-63 18</tiles></country>
-		<country size="2" bbox="-62 16 -62 17" name="antigua_and_barbuda">
+		<country size="2" bbox="-62 16 -62 17" name="antigua_and_barbuda" hillshade_sqlite="yes">
 			<!--
 			<region size="2" bbox="-62 16 -62 17" name="barbuda">
 				<tiles>-62 16;-62 17</tiles>
@@ -5730,9 +5730,9 @@
 			</region>
 		-->
 		<tiles>-62 16;-62 17</tiles></country>
-		<country size="2" bbox="-71 12 -70 12" name="aruba">
+		<country size="2" bbox="-71 12 -70 12" name="aruba" hillshade_sqlite="yes">
 			<tiles>-71 12;-70 12</tiles></country>
-		<country size="31" bbox="-80 20 -73 27" name="bahamas">
+		<country size="31" bbox="-80 20 -73 27" name="bahamas" hillshade_sqlite="yes">
 			<!--
 			<region size="2" bbox="-74 21 -74 22" name="acklins">
 				<tiles>-74 21;-74 22</tiles>
@@ -5832,7 +5832,7 @@
 			</region>
 		-->
 		<tiles>-80 23;-80 26;-80 25;-80 24;-73 21;-73 20;-73 22;-79 24;-75 23;-75 22;-75 24;-76 22;-76 23;-76 21;-76 24;-77 23;-77 25;-77 24;-77 26;-79 27;-79 26;-79 25;-78 23;-78 24;-78 25;-78 26;-78 27;-74 20;-74 21;-74 22;-74 23</tiles></country>
-		<country size="1" bbox="-60 13 -60 13" name="barbados">
+		<country size="1" bbox="-60 13 -60 13" name="barbados" hillshade_sqlite="yes">
 			<!--
 			<region size="1" bbox="-59 12 -59 12" name="christ_church">
 				<tiles>-59 12</tiles>
@@ -5869,9 +5869,9 @@
 			</region>
 		-->
 		<tiles>-60 13</tiles></country>
-		<country size="1" bbox="-65 18 -65 18" name="british_virgin_islands">
+		<country size="1" bbox="-65 18 -65 18" name="british_virgin_islands" hillshade_sqlite="yes">
 			<tiles>-65 18</tiles></country>
-		<country size="3" bbox="-82 19 -80 19" name="cayman_islands">
+		<country size="3" bbox="-82 19 -80 19" name="cayman_islands" hillshade_sqlite="yes">
 			<!--
 			<region size="1" bbox="-81 19 -81 19" name="bodden_town">
 				<tiles>-81 19</tiles>
@@ -5896,7 +5896,7 @@
 			</region>
 		-->
 		<tiles>-81 19;-80 19;-82 19</tiles></country>
-		<country size="33" bbox="-85 19 -75 23" name="cuba">
+		<country size="33" bbox="-85 19 -75 23" name="cuba" hillshade_sqlite="yes">
 			<!--
 			<region size="7" bbox="-79 20 -77 22" name="camaguey">
 				<tiles>-79 20;-79 21;-79 22;-78 20;-78 21;-78 22;-77 21</tiles>
@@ -5945,7 +5945,7 @@
 			</region>
 		-->
 		<tiles>-80 23;-80 22;-80 21;-80 20;-81 21;-81 22;-81 23;-78 19;-77 19;-75 20;-83 22;-83 23;-83 21;-76 20;-76 21;-82 21;-82 23;-82 22;-77 21;-77 20;-78 20;-78 21;-78 22;-79 22;-79 21;-79 20;-76 19;-75 19;-85 21;-85 22;-84 23;-84 22;-84 21</tiles></country>
-		<country size="2" bbox="-62 14 -62 15" name="dominica">
+		<country size="2" bbox="-62 14 -62 15" name="dominica" hillshade_sqlite="yes">
 			<!--
 			<region size="1" bbox="-61 15 -61 15" name="saint_andrew">
 				<tiles>-61 15</tiles>
@@ -5979,7 +5979,7 @@
 			</region>
 		-->
 		<tiles>-62 14;-62 15</tiles></country>
-		<country size="9" bbox="-72 17 -69 19" name="dominican_republic">
+		<country size="9" bbox="-72 17 -69 19" name="dominican_republic" hillshade_sqlite="yes">
 			<!--
 			<region size="2" bbox="-71 18 -71 19" name="azua">
 				<tiles>-71 18;-71 19</tiles>
@@ -6079,7 +6079,7 @@
 			</region>
 		-->
 		<tiles>-72 19;-72 18;-70 19;-70 18;-71 18;-71 19;-72 17;-69 19;-69 18</tiles></country>
-		<country size="2" bbox="-62 11 -62 12" name="grenada">
+		<country size="2" bbox="-62 11 -62 12" name="grenada" hillshade_sqlite="yes">
 			<!--
 			<region size="1" bbox="-61 12 -61 12" name="carriacou">
 				<tiles>-61 12</tiles>
@@ -6104,7 +6104,7 @@
 			</region>
 		-->
 		<tiles>-62 12;-62 11</tiles></country>
-		<country size="2" bbox="-62 15 -62 16" name="guadeloupe">
+		<country size="2" bbox="-62 15 -62 16" name="guadeloupe" hillshade_sqlite="yes">
 			<!--
 			<region size="1" bbox="-61 15 -61 15" name="basse-terre">
 				<tiles>-61 15</tiles>
@@ -6117,7 +6117,7 @@
 			</region>
 		-->
 		<tiles>-62 16;-62 15</tiles></country>
-		<country size="10" bbox="-75 17 -72 20" name="haiti">
+		<country size="10" bbox="-75 17 -72 20" name="haiti" hillshade_sqlite="yes">
 			<!--
 			<region size="2" bbox="-72 18 -72 19" name="centre">
 				<tiles>-72 18;-72 19</tiles>
@@ -6151,7 +6151,7 @@
 			</region>
 		-->
 		<tiles>-74 19;-74 18;-73 19;-73 18;-75 18;-73 20;-74 20;-72 19;-72 18;-72 17</tiles></country>
-		<country size="7" bbox="-79 17 -76 18" name="jamaica">
+		<country size="7" bbox="-79 17 -76 18" name="jamaica" hillshade_sqlite="yes">
 			<!--
 			<region size="1" bbox="-77 17 -77 17" name="clarendon">
 				<tiles>-77 17</tiles>
@@ -6197,7 +6197,7 @@
 			</region>
 		-->
 		<tiles>-76 17;-76 18;-77 18;-78 18;-78 17;-77 17;-79 18</tiles></country>
-		<country size="3" bbox="-62 14 -61 15" name="martinique">
+		<country size="3" bbox="-62 14 -61 15" name="martinique" hillshade_sqlite="yes">
 			<!--
 			<region size="1" bbox="-61 14 -61 14" name="fort-de-france">
 				<tiles>-61 14</tiles>
@@ -6213,9 +6213,9 @@
 			</region>
 		-->
 		<tiles>-62 14;-62 15;-61 14</tiles></country>
-		<country size="1" bbox="-63 16 -63 16" name="montserrat">
+		<country size="1" bbox="-63 16 -63 16" name="montserrat" hillshade_sqlite="yes">
 			<tiles>-63 16</tiles></country>
-		<country size="9" bbox="-71 11 -63 18" name="netherlands_antilles">
+		<country size="9" bbox="-71 11 -63 18" name="netherlands_antilles" hillshade_sqlite="yes">
 			<!--
 			<region size="1" bbox="-68 11 -68 11" name="bonaire">
 				<tiles>-68 11</tiles>
@@ -6234,7 +6234,7 @@
 			</region>
 		-->
 		<tiles>-63 17;-70 11;-70 12;-63 18;-64 18;-69 12;-69 11;-64 17;-71 12</tiles></country>
-	<country size="8" bbox="-68 17 -65 18" name="puerto_rico">
+	<country size="8" bbox="-68 17 -65 18" name="puerto_rico" hillshade_sqlite="yes">
 			<!--
 			<region size="1" bbox="-66 18 -66 18" name="adjuntas">
 				<tiles>-66 18</tiles>
@@ -6472,7 +6472,7 @@
 			</region>
 		-->
 		<tiles>-67 18;-65 17;-66 17;-68 17;-68 18;-66 18;-65 18;-67 17</tiles></country>
-		<country size="1" bbox="-63 17 -63 17" name="saint_kitts_and_nevis">
+		<country size="1" bbox="-63 17 -63 17" name="saint_kitts_and_nevis" hillshade_sqlite="yes">
 			<!--
 			<region size="1" bbox="-62 17 -62 17" name="christ_church_nichola_town">
 				<tiles>-62 17</tiles>
@@ -6518,7 +6518,7 @@
 			</region>
 		-->
 		<tiles>-63 17</tiles></country>
-		<country size="4" bbox="-62 13 -61 14" name="saint_lucia">
+		<country size="4" bbox="-62 13 -61 14" name="saint_lucia" hillshade_sqlite="yes">
 			<!--
 			<region size="2" bbox="-61 13 -61 14" name="anse-la-raye">
 				<tiles>-61 13;-61 14</tiles>
@@ -6552,7 +6552,7 @@
 			</region>
 		-->
 		<tiles>-62 14;-61 14;-61 13;-62 13</tiles></country>
-		<country size="3" bbox="-62 12 -61 13" name="saint_vincent_and_the_grenadines">
+		<country size="3" bbox="-62 12 -61 13" name="saint_vincent_and_the_grenadines" hillshade_sqlite="yes">
 			<!--
 			<region size="1" bbox="-61 13 -61 13" name="charlotte">
 				<tiles>-61 13</tiles>
@@ -6574,7 +6574,7 @@
 			</region>
 		-->
 		<tiles>-61 13;-62 12;-62 13</tiles></country>
-		<country size="5" bbox="-62 9 -61 11" name="trinidad_and_tobago">
+		<country size="5" bbox="-62 9 -61 11" name="trinidad_and_tobago" hillshade_sqlite="yes">
 			<!--
 			<region size="1" bbox="-61 10 -61 10" name="chaguanas">
 				<tiles>-61 10</tiles>
@@ -6620,9 +6620,9 @@
 			</region>
 		-->
 		<tiles>-61 11;-61 10;-62 9;-62 10;-62 11</tiles></country>
-		<country size="3" bbox="-73 21 -72 22" name="turks_and_caicos_islands">
+		<country size="3" bbox="-73 21 -72 22" name="turks_and_caicos_islands" hillshade_sqlite="yes">
 			<tiles>-72 21;-73 21;-73 22</tiles></country>
-		<country size="4" bbox="-66 17 -65 18" name="virgin_islands_us">
+		<country size="4" bbox="-66 17 -65 18" name="virgin_islands_us" hillshade_sqlite="yes">
 			<!--
 			<region size="4" bbox="-65 17 -64 18" name="saint_croix">
 				<tiles>-65 17;-65 18;-64 17;-64 18</tiles>
