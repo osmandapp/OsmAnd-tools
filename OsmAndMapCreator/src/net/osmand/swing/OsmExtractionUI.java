@@ -54,6 +54,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.tools.bzip2.CBZip2OutputStream;
 import org.xml.sax.SAXException;
+import org.xmlpull.v1.XmlPullParserException;
 
 import rtree.RTree;
 
@@ -256,6 +257,9 @@ public class OsmExtractionUI implements IMapLocationListener {
 					log.error(e.getMessage(), e);
 					throw new RuntimeException(e);
 				} catch (IOException e) {
+					log.error(e.getMessage(), e);
+					throw new RuntimeException(e);
+				} catch (XmlPullParserException e) {
 					log.error(e.getMessage(), e);
 					throw new RuntimeException(e);
 				}

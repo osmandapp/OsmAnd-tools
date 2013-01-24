@@ -20,6 +20,7 @@ import javax.xml.parsers.SAXParserFactory;
 import org.xml.sax.Attributes;
 import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
+import org.xmlpull.v1.XmlPullParserException;
 
 import resources._R;
 
@@ -60,19 +61,15 @@ public class NativeSwingRendering extends NativeLibrary {
 		}
 	}
 	
-	public void loadRuleStorage(String path, String renderingProperties) throws SAXException, IOException{
+	public void loadRuleStorage(String path, String renderingProperties) throws IOException, XmlPullParserException, SAXException{
 		final LinkedHashMap<String, String> renderingConstants = new LinkedHashMap<String, String>();
 		
 		final RenderingRulesStorageResolver resolver = new RenderingRulesStorageResolver() {
 			@Override
-			public RenderingRulesStorage resolve(String name, RenderingRulesStorageResolver ref) throws SAXException {
+			public RenderingRulesStorage resolve(String name, RenderingRulesStorageResolver ref) throws XmlPullParserException, IOException {
 				RenderingRulesStorage depends = new RenderingRulesStorage(name, renderingConstants);
-				try {
 					depends.parseRulesFromXmlInputStream(RenderingRulesStorage.class.getResourceAsStream(name+".render.xml"),
 							ref);
-				} catch (IOException e) {
-					throw new SAXException(e);
-				}
 				return depends;
 			}
 		};
@@ -103,6 +100,8 @@ public class NativeSwingRendering extends NativeLibrary {
 		} catch (SAXException e) {
 			throw new RuntimeException(e);
 		} catch (IOException e) {
+			throw new RuntimeException(e);
+		} catch (XmlPullParserException e) {
 			throw new RuntimeException(e);
 		}
 	}
