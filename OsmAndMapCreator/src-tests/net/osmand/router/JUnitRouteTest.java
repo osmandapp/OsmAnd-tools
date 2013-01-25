@@ -53,30 +53,30 @@ public class JUnitRouteTest  {
 	
 	@Test
 	public void runCZ() throws Exception {
-		RouterTestsSuite.test(lib, getClass().getResourceAsStream("cz.test.xml"), rs, RoutingConfiguration.getDefault());
+		TestRouting.test(lib, getClass().getResourceAsStream("cz.test.xml"), rs, RoutingConfiguration.getDefault());
 	}
 	
 	@Test
 	@Ignore
 	public void runNL() throws Exception {
-		RouterTestsSuite.test(lib, getClass().getResourceAsStream("nl.test.xml"), rs, RoutingConfiguration.getDefault());
+		TestRouting.test(lib, getClass().getResourceAsStream("nl.test.xml"), rs, RoutingConfiguration.getDefault());
 	}
 
 	@Test
 	@Ignore
 	public void runNL2() throws Exception {
-		RouterTestsSuite.test(lib, getClass().getResourceAsStream("nl2.test.xml"), rs, RoutingConfiguration.getDefault());
+		TestRouting.test(lib, getClass().getResourceAsStream("nl2.test.xml"), rs, RoutingConfiguration.getDefault());
 	}
 	
 	@Test
 	@Ignore
 	public void runNLLeid() throws Exception {
-		RouterTestsSuite.test(lib, getClass().getResourceAsStream("nl_leid.test.xml"), rs, RoutingConfiguration.getDefault());
+		TestRouting.test(lib, getClass().getResourceAsStream("nl_leid.test.xml"), rs, RoutingConfiguration.getDefault());
 	}
 	
 	@Test
 	public void runBLR() throws Exception {
-		RouterTestsSuite.test(lib, getClass().getResourceAsStream("blr.test.xml"), rs, RoutingConfiguration.getDefault());
+		TestRouting.test(lib, getClass().getResourceAsStream("blr.test.xml"), rs, RoutingConfiguration.getDefault());
 	}
 	
 }
