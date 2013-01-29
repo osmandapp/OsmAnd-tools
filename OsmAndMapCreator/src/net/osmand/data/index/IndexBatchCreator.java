@@ -30,7 +30,7 @@ import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
 import net.osmand.Algoritms;
-import net.osmand.LogUtil;
+import net.osmand.PlatformUtil;
 import net.osmand.MapCreatorVersion;
 import net.osmand.data.IndexConstants;
 import net.osmand.data.preparation.DBDialect;
@@ -54,7 +54,7 @@ public class IndexBatchCreator {
 	
 	private static final int INMEM_LIMIT = 600;
 
-	protected static final Log log = LogUtil.getLog(IndexBatchCreator.class);
+	protected static final Log log = PlatformUtil.getLog(IndexBatchCreator.class);
 	
 	public static final String GEN_LOG_EXT = ".gen.log";
 	

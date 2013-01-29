@@ -26,7 +26,7 @@ import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
 
 import net.osmand.Algoritms;
-import net.osmand.LogUtil;
+import net.osmand.PlatformUtil;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.data.IndexConstants;
 import net.osmand.data.index.ExtractGooglecodeAuthorization.GooglecodeUploadTokens;
@@ -65,7 +65,7 @@ import com.jcraft.jsch.Session;
  */
 public class IndexUploader {
 
-	protected static final Log log = LogUtil.getLog(IndexUploader.class);
+	protected static final Log log = PlatformUtil.getLog(IndexUploader.class);
 	private final static double MIN_SIZE_TO_UPLOAD = 0.001d;
 	private final static double MAX_SIZE_TO_NOT_SPLIT = 190d;
 	private final static double MAX_UPLOAD_SIZE = 195d;

@@ -21,7 +21,7 @@ import javax.swing.JPanel;
 import javax.swing.JTextField;
 
 import net.osmand.Algoritms;
-import net.osmand.LogUtil;
+import net.osmand.PlatformUtil;
 import net.osmand.map.TileSourceManager;
 import net.osmand.map.TileSourceManager.TileSourceTemplate;
 
@@ -31,7 +31,7 @@ import org.apache.commons.logging.Log;
 public class NewTileSourceDialog extends JDialog {
 	
 	private static final long serialVersionUID = -4862884032977071296L;
-	private static final Log log = LogUtil.getLog(NewTileSourceDialog.class);
+	private static final Log log = PlatformUtil.getLog(NewTileSourceDialog.class);
 	
 	private JButton okButton;
 	private JButton cancelButton;

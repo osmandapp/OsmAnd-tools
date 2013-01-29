@@ -13,7 +13,7 @@ import javax.swing.JProgressBar;
 import javax.swing.SwingUtilities;
 
 import net.osmand.IProgress;
-import net.osmand.LogUtil;
+import net.osmand.PlatformUtil;
 
 import org.apache.commons.logging.Log;
 
@@ -22,7 +22,7 @@ import org.apache.commons.logging.Log;
 public class ProgressDialog extends JDialog implements IProgress {
 
 	private static final long serialVersionUID = -3915486672514402269L;
-	private final static Log log = LogUtil.getLog(ProgressDialog.class);
+	private final static Log log = PlatformUtil.getLog(ProgressDialog.class);
 	private JProgressBar progressBar;
 	private JLabel label;
 	private Runnable run;

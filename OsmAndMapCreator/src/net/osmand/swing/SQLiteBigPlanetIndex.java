@@ -9,7 +9,7 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Statement;
 
-import net.osmand.LogUtil;
+import net.osmand.PlatformUtil;
 import net.osmand.map.ITileSource;
 import net.osmand.map.TileSourceManager.BeanShellTileSourceTemplate;
 import net.osmand.map.TileSourceManager.TileSourceTemplate;
@@ -18,7 +18,7 @@ import org.apache.commons.logging.Log;
 
 
 public class SQLiteBigPlanetIndex {
-	private static final Log log = LogUtil.getLog(SQLiteBigPlanetIndex.class);
+	private static final Log log = PlatformUtil.getLog(SQLiteBigPlanetIndex.class);
 	
 	private static final int BATCH_SIZE = 50;
 	

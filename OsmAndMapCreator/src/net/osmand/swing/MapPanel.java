@@ -44,7 +44,7 @@ import javax.swing.JPopupMenu;
 import javax.swing.UIManager;
 
 import net.osmand.Algoritms;
-import net.osmand.LogUtil;
+import net.osmand.PlatformUtil;
 import net.osmand.MapCreatorVersion;
 import net.osmand.data.DataTileManager;
 import net.osmand.map.IMapLocationListener;
@@ -68,7 +68,7 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 	private static final int EXPAND_X = 100;
 	private static final int EXPAND_Y = 100;
 	
-	protected static final Log log = LogUtil.getLog(MapPanel.class);
+	protected static final Log log = PlatformUtil.getLog(MapPanel.class);
 	public static final int divNonLoadedImage = 16;
 	
 	private static Map<String, TileSourceTemplate> getCommonTemplates(File dir){

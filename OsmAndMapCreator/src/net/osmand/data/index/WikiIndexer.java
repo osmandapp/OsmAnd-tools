@@ -28,7 +28,7 @@ import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 
 import net.osmand.Algoritms;
-import net.osmand.LogUtil;
+import net.osmand.PlatformUtil;
 import net.osmand.MapCreatorVersion;
 import net.osmand.data.IndexConstants;
 import net.osmand.data.preparation.IndexCreator;
@@ -37,7 +37,7 @@ import net.osmand.impl.ConsoleProgressImplementation;
 // http://toolserver.org/~dispenser/dumps/coord_commonswiki.sql.gz
 // select * from coord_commonswiki limit 10;
 public class WikiIndexer {
-	private static final Log log = LogUtil.getLog(WikiIndexer.class);
+	private static final Log log = PlatformUtil.getLog(WikiIndexer.class);
 	private final File srcPath;
 	private final File workPath;
 	private final File targetPath;

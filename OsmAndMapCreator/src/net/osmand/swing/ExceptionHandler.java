@@ -2,13 +2,13 @@ package net.osmand.swing;
 
 import javax.swing.JOptionPane;
 
-import net.osmand.LogUtil;
+import net.osmand.PlatformUtil;
 
 import org.apache.commons.logging.Log;
 
 
 public class ExceptionHandler {
-	private static final Log log = LogUtil.getLog(ExceptionHandler.class);
+	private static final Log log = PlatformUtil.getLog(ExceptionHandler.class);
 	
 	public static void handle(Throwable e){
 		handle("Error occurred", e);

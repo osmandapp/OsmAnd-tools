@@ -29,7 +29,7 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
-import net.osmand.LogUtil;
+import net.osmand.PlatformUtil;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.data.DataTileManager;
 import net.osmand.osm.Entity;
@@ -61,7 +61,7 @@ import org.xmlpull.v1.XmlPullParserException;
 
 public class MapRouterLayer implements MapPanelLayer {
 	
-	private final static Log log = LogUtil.getLog(MapRouterLayer.class);
+	private final static Log log = PlatformUtil.getLog(MapRouterLayer.class);
 
 	private MapPanel map;
 	private LatLon startRoute ;

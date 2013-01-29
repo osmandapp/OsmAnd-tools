@@ -14,7 +14,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import net.osmand.LogUtil;
+import net.osmand.PlatformUtil;
 import net.osmand.data.index.ExtractGooglecodeAuthorization.GooglecodeUploadTokens;
 
 import org.apache.commons.logging.Log;
@@ -22,7 +22,7 @@ import org.apache.commons.logging.Log;
 
 public class DownloaderIndexFromGoogleCode {
 
-	private final static Log log = LogUtil.getLog(DownloaderIndexFromGoogleCode.class);
+	private final static Log log = PlatformUtil.getLog(DownloaderIndexFromGoogleCode.class);
 
 	public static void main(String[] args) {
 		System.out.println(DownloaderIndexFromGoogleCode.getIndexFiles(new LinkedHashMap<String, String>()));

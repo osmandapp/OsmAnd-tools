@@ -4,7 +4,7 @@ import java.text.MessageFormat;
 
 import net.osmand.Algoritms;
 import net.osmand.IProgress;
-import net.osmand.LogUtil;
+import net.osmand.PlatformUtil;
 
 import org.apache.commons.logging.Log;
 
@@ -12,7 +12,7 @@ import org.apache.commons.logging.Log;
 public class ConsoleProgressImplementation implements IProgress {
 	public static double deltaPercentsToPrint = 3.5;
 	public static long deltaTimeToPrint = 1000;
-	private static Log log = LogUtil.getLog(ConsoleProgressImplementation.class);
+	private static Log log = PlatformUtil.getLog(ConsoleProgressImplementation.class);
 	
 	String currentTask;
 	int work;

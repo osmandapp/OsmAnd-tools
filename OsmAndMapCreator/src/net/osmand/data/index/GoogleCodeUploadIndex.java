@@ -15,7 +15,7 @@ import java.net.MalformedURLException;
 import java.net.URL;
 
 import net.osmand.Base64;
-import net.osmand.LogUtil;
+import net.osmand.PlatformUtil;
 
 import org.apache.commons.logging.Log;
 
@@ -26,7 +26,7 @@ import org.apache.commons.logging.Log;
  */
 public class GoogleCodeUploadIndex {
     
-	private final static Log log = LogUtil.getLog(GoogleCodeUploadIndex.class);
+	private final static Log log = PlatformUtil.getLog(GoogleCodeUploadIndex.class);
 	
     /**
      * Google user name to authenticate as (this is just the username part; 
