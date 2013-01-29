@@ -21,18 +21,18 @@ import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamWriter;
 
+import net.osmand.MapCreatorVersion;
+import net.osmand.PlatformUtil;
+import net.osmand.data.IndexConstants;
+import net.osmand.data.preparation.IndexCreator;
+import net.osmand.impl.ConsoleProgressImplementation;
+import net.osmand.util.Algorithms;
+
 import org.apache.commons.logging.Log;
 import org.apache.tools.bzip2.CBZip2InputStream;
 import org.xml.sax.Attributes;
 import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
-
-import net.osmand.Algoritms;
-import net.osmand.PlatformUtil;
-import net.osmand.MapCreatorVersion;
-import net.osmand.data.IndexConstants;
-import net.osmand.data.preparation.IndexCreator;
-import net.osmand.impl.ConsoleProgressImplementation;
 
 // http://toolserver.org/~dispenser/dumps/coord_commonswiki.sql.gz
 // select * from coord_commonswiki limit 10;
@@ -213,8 +213,8 @@ public class WikiIndexer {
 		} catch (SQLException e) {
 			throw new WikiIndexerException("Database exception or locale configuration problem", e);
 		} finally {
-			Algoritms.closeStream(out);
-			Algoritms.closeStream(fi);
+			Algorithms.closeStream(out);
+			Algorithms.closeStream(fi);
 		}
 	}
 

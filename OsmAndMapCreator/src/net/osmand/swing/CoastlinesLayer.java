@@ -14,7 +14,6 @@ import javax.swing.JPopupMenu;
 
 import net.osmand.data.preparation.BasemapProcessor;
 import net.osmand.data.preparation.MapZooms;
-import net.osmand.osm.LatLon;
 import net.osmand.osm.MapRenderingTypes;
 import net.osmand.osm.MapUtils;
 

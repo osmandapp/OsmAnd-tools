@@ -13,12 +13,12 @@ import java.util.Map.Entry;
 
 import net.osmand.data.City.CityType;
 import net.osmand.osm.Entity;
+import net.osmand.osm.Entity.EntityId;
+import net.osmand.osm.Entity.EntityType;
 import net.osmand.osm.Node;
 import net.osmand.osm.OSMSettings.OSMTagKey;
 import net.osmand.osm.Relation;
 import net.osmand.osm.Way;
-import net.osmand.osm.Entity.EntityId;
-import net.osmand.osm.Entity.EntityType;
 import net.osmand.osm.io.IOsmStorageFilter;
 import net.osmand.osm.io.OsmBaseStorage;
 

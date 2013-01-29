@@ -22,7 +22,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import net.osmand.Algoritms;
 import net.osmand.IProgress;
 import net.osmand.binary.OsmandOdb.MapData;
 import net.osmand.binary.OsmandOdb.MapDataBlock;
@@ -39,6 +38,7 @@ import net.osmand.osm.Node;
 import net.osmand.osm.OSMSettings.OSMTagKey;
 import net.osmand.osm.Relation;
 import net.osmand.osm.Way;
+import net.osmand.util.Algorithms;
 
 import org.apache.commons.logging.Log;
 
@@ -229,9 +229,9 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	private void loadNodes(byte[] nodes, List<Float> toPut) {
 		toPut.clear();
 		for (int i = 0; i < nodes.length;) {
-			int lat = Algoritms.parseIntFromBytes(nodes, i);
+			int lat = Algorithms.parseIntFromBytes(nodes, i);
 			i += 4;
-			int lon = Algoritms.parseIntFromBytes(nodes, i);
+			int lon = Algorithms.parseIntFromBytes(nodes, i);
 			i += 4;
 			toPut.add(Float.intBitsToFloat(lat));
 			toPut.add(Float.intBitsToFloat(lon));
@@ -242,7 +242,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		ts.clear();
 		if (bs != null && bs.length > 0) {
 			for (int j = 0; j < bs.length; j += 2) {
-				ts.add(Algoritms.parseSmallIntFromBytes(bs, j));
+				ts.add(Algorithms.parseSmallIntFromBytes(bs, j));
 			}
 		}
 		ts.sort();
@@ -306,7 +306,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 							startNode = fs.getLong(2);
 							visitedWays.add(lid);
 							loadNodes(fs.getBytes(4), list);
-							if(!Algoritms.objectEquals(fs.getString(5), name)){
+							if(!Algorithms.objectEquals(fs.getString(5), name)){
 								name = null;
 							}
 							ArrayList<Float> li = new ArrayList<Float>(list);
@@ -335,7 +335,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 						if(temp.equals(typeUse) && tempAdd.equals(addtypeUse)){
 							combined = true;
 							long lid = fs.getLong(1);
-							if (!Algoritms.objectEquals(fs.getString(5), name)) {
+							if (!Algorithms.objectEquals(fs.getString(5), name)) {
 								name = null;
 							}
 							endNode = fs.getLong(3);
@@ -572,7 +572,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 					byte[] types = rs.getBytes(4);
 					int[] typeUse = new int[types.length / 2];
 					for (int j = 0; j < types.length; j += 2) {
-						int ids = Algoritms.parseSmallIntFromBytes(types, j);
+						int ids = Algorithms.parseSmallIntFromBytes(types, j);
 						typeUse[j / 2] = renderingTypes.getTypeByInternalId(ids).getTargetId();
 					}
 					byte[] addTypes = rs.getBytes(5);
@@ -580,7 +580,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 					if (addTypes != null) {
 						addtypeUse = new int[addTypes.length / 2];
 						for (int j = 0; j < addTypes.length; j += 2) {
-							int ids = Algoritms.parseSmallIntFromBytes(addTypes, j);
+							int ids = Algorithms.parseSmallIntFromBytes(addTypes, j);
 							addtypeUse[j / 2] = renderingTypes.getTypeByInternalId(ids).getTargetId();
 						}
 					}
@@ -714,8 +714,8 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 						first = false;
 					}
 					lastId = n.getId();
-					Algoritms.writeInt(bNodes, Float.floatToRawIntBits((float) n.getLatitude()));
-					Algoritms.writeInt(bNodes, Float.floatToRawIntBits((float) n.getLongitude()));
+					Algorithms.writeInt(bNodes, Float.floatToRawIntBits((float) n.getLatitude()));
+					Algorithms.writeInt(bNodes, Float.floatToRawIntBits((float) n.getLongitude()));
 				}
 			}
 		} catch (IOException e) {
@@ -726,13 +726,13 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		}
 		for (int j = 0; j < types.size(); j++) {
 			try {
-				Algoritms.writeSmallInt(bTypes, types.get(j));
+				Algorithms.writeSmallInt(bTypes, types.get(j));
 			} catch (IOException e) {
 			}
 		}
 		for (int j = 0; j < addTypes.size(); j++) {
 			try {
-				Algoritms.writeSmallInt(bAddtTypes, addTypes.get(j));
+				Algorithms.writeSmallInt(bAddtTypes, addTypes.get(j));
 			} catch (IOException e) {
 			}
 		}
@@ -764,10 +764,10 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 
 		try {
 			for (int j = 0; j < types.size(); j++) {
-				Algoritms.writeSmallInt(btypes, types.get(j));
+				Algorithms.writeSmallInt(btypes, types.get(j));
 			}
 			for (int j = 0; j < addTypes.size(); j++) {
-				Algoritms.writeSmallInt(badditionalTypes, addTypes.get(j));
+				Algorithms.writeSmallInt(badditionalTypes, addTypes.get(j));
 			}
 
 			for (Node n : nodes) {
@@ -779,8 +779,8 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 					minY = Math.min(minY, y);
 					maxY = Math.max(maxY, y);
 					init = true;
-					Algoritms.writeInt(bcoordinates, x);
-					Algoritms.writeInt(bcoordinates, y);
+					Algorithms.writeInt(bcoordinates, x);
+					Algorithms.writeInt(bcoordinates, y);
 				}
 			}
 
@@ -793,14 +793,14 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 								exist = true;
 								int y = MapUtils.get31TileNumberY(n.getLatitude());
 								int x = MapUtils.get31TileNumberX(n.getLongitude());
-								Algoritms.writeInt(binnercoord, x);
-								Algoritms.writeInt(binnercoord, y);
+								Algorithms.writeInt(binnercoord, x);
+								Algorithms.writeInt(binnercoord, y);
 							}
 						}
 					}
 					if (exist) {
-						Algoritms.writeInt(binnercoord, 0);
-						Algoritms.writeInt(binnercoord, 0);
+						Algorithms.writeInt(binnercoord, 0);
+						Algorithms.writeInt(binnercoord, 0);
 					}
 				}
 			}

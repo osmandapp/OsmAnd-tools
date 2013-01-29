@@ -12,7 +12,6 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
 
-import net.osmand.Algoritms;
 import net.osmand.IProgress;
 import net.osmand.data.IndexConstants;
 import net.osmand.data.preparation.OsmDbAccessor.OsmDbVisitor;
@@ -28,6 +27,7 @@ import net.osmand.osm.io.OsmBaseStorage;
 import net.osmand.osm.io.OsmBaseStoragePbf;
 import net.osmand.swing.DataExtractionSettings;
 import net.osmand.swing.Messages;
+import net.osmand.util.Algorithms;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -462,7 +462,7 @@ public class IndexCreator {
 		if (readFile != null && regionName == null) {
 			int i = readFile.getName().indexOf('.');
 			if (i > -1) {
-				regionName = Algoritms.capitalizeFirstLetterAndLowercase(readFile.getName().substring(0, i));
+				regionName = Algorithms.capitalizeFirstLetterAndLowercase(readFile.getName().substring(0, i));
 			}
 		}
 		this.indexTransportCreator = new IndexTransportCreator();

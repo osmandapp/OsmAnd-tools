@@ -19,10 +19,6 @@ import java.util.Set;
 import java.util.Stack;
 import java.util.TreeSet;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-
-import net.osmand.Algoritms;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.OsmandOdb;
 import net.osmand.binary.OsmandOdb.AddressNameIndexDataAtom;
@@ -31,32 +27,32 @@ import net.osmand.binary.OsmandOdb.CityIndex;
 import net.osmand.binary.OsmandOdb.MapData;
 import net.osmand.binary.OsmandOdb.MapDataBlock;
 import net.osmand.binary.OsmandOdb.OsmAndAddressIndex;
-import net.osmand.binary.OsmandOdb.OsmAndRoutingIndex.RouteBorderBox;
-import net.osmand.binary.OsmandOdb.OsmAndRoutingIndex.RouteBorderPoint;
-import net.osmand.binary.OsmandOdb.OsmAndRoutingIndex.RouteBorderPointsBlock;
-import net.osmand.binary.OsmandOdb.RouteData;
 import net.osmand.binary.OsmandOdb.OsmAndAddressIndex.CitiesIndex;
-import net.osmand.binary.OsmandOdb.OsmAndAddressNameIndexData.AddressNameIndexData;
 import net.osmand.binary.OsmandOdb.OsmAndAddressNameIndexData;
+import net.osmand.binary.OsmandOdb.OsmAndAddressNameIndexData.AddressNameIndexData;
+import net.osmand.binary.OsmandOdb.OsmAndCategoryTable.Builder;
+import net.osmand.binary.OsmandOdb.OsmAndMapIndex;
 import net.osmand.binary.OsmandOdb.OsmAndMapIndex.MapDataBox;
 import net.osmand.binary.OsmandOdb.OsmAndMapIndex.MapEncodingRule;
 import net.osmand.binary.OsmandOdb.OsmAndMapIndex.MapRootLevel;
-import net.osmand.binary.OsmandOdb.OsmAndMapIndex;
 import net.osmand.binary.OsmandOdb.OsmAndPoiBoxDataAtom;
 import net.osmand.binary.OsmandOdb.OsmAndPoiNameIndex;
 import net.osmand.binary.OsmandOdb.OsmAndPoiNameIndexDataAtom;
 import net.osmand.binary.OsmandOdb.OsmAndRoutingIndex;
+import net.osmand.binary.OsmandOdb.OsmAndRoutingIndex.RouteBorderBox;
 import net.osmand.binary.OsmandOdb.OsmAndRoutingIndex.RouteBorderLine;
+import net.osmand.binary.OsmandOdb.OsmAndRoutingIndex.RouteBorderPoint;
+import net.osmand.binary.OsmandOdb.OsmAndRoutingIndex.RouteBorderPointsBlock;
 import net.osmand.binary.OsmandOdb.OsmAndRoutingIndex.RouteDataBlock;
 import net.osmand.binary.OsmandOdb.OsmAndRoutingIndex.RouteDataBox;
 import net.osmand.binary.OsmandOdb.OsmAndRoutingIndex.RouteEncodingRule;
 import net.osmand.binary.OsmandOdb.OsmAndTransportIndex;
+import net.osmand.binary.OsmandOdb.RouteData;
 import net.osmand.binary.OsmandOdb.StreetIndex;
 import net.osmand.binary.OsmandOdb.StreetIntersection;
 import net.osmand.binary.OsmandOdb.StringTable;
 import net.osmand.binary.OsmandOdb.TransportRoute;
 import net.osmand.binary.OsmandOdb.TransportRouteStop;
-import net.osmand.binary.OsmandOdb.OsmAndCategoryTable.Builder;
 import net.osmand.data.Building;
 import net.osmand.data.City;
 import net.osmand.data.City.CityType;
@@ -66,11 +62,15 @@ import net.osmand.data.Street;
 import net.osmand.data.TransportStop;
 import net.osmand.data.preparation.IndexPoiCreator.PoiTileBox;
 import net.osmand.osm.LatLon;
-import net.osmand.osm.MapUtils;
-import net.osmand.osm.Node;
 import net.osmand.osm.MapRenderingTypes.MapRulType;
 import net.osmand.osm.MapRoutingTypes.MapRouteType;
+import net.osmand.osm.MapUtils;
+import net.osmand.osm.Node;
+import net.osmand.util.Algorithms;
 import net.sf.junidecode.Junidecode;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 
 import com.google.protobuf.ByteString;
 import com.google.protobuf.CodedOutputStream;
@@ -631,8 +631,8 @@ public class BinaryMapIndexWriter {
 		int len = coordinates.length / 8;
 		int delta = 1;
 		for (int i = 0; i < len; i+= delta) {
-			int x = Algoritms.parseIntFromBytes(coordinates, i * 8);
-			int y = Algoritms.parseIntFromBytes(coordinates, i * 8 + 4);
+			int x = Algorithms.parseIntFromBytes(coordinates, i * 8);
+			int y = Algorithms.parseIntFromBytes(coordinates, i * 8 + 4);
 			int tx = (x >> SHIFT_COORDINATES) - pcalcx;
 			int ty = (y >> SHIFT_COORDINATES) - pcalcy;
 			writeRawVarint32(mapDataBuf, CodedOutputStream.encodeZigZag32(tx));
@@ -658,8 +658,8 @@ public class BinaryMapIndexWriter {
 			pcalcy = (ptop >> SHIFT_COORDINATES);
 			len = innerPolygonTypes.length / 8;
 			for (int i = 0; i < len; i+= delta) {
-				int x = Algoritms.parseIntFromBytes(innerPolygonTypes, i * 8);
-				int y = Algoritms.parseIntFromBytes(innerPolygonTypes, i * 8 + 4);
+				int x = Algorithms.parseIntFromBytes(innerPolygonTypes, i * 8);
+				int y = Algorithms.parseIntFromBytes(innerPolygonTypes, i * 8 + 4);
 				if (x == 0 && y == 0) {
 					if (mapDataBuf.size() > 0) {
 						data.addPolygonInnerCoordinates(ByteString.copyFrom(mapDataBuf.toArray()));
@@ -742,10 +742,10 @@ public class BinaryMapIndexWriter {
 		// simplified douglas\peuker
 		// just try to skip some points very close to this point
 		while (i + delta < len - 1) {
-			int nx = Algoritms.parseIntFromBytes(coordinates, (i + delta) * 8);
-			int ny = Algoritms.parseIntFromBytes(coordinates, (i + delta) * 8 + 4);
-			int nnx = Algoritms.parseIntFromBytes(coordinates, (i + delta + 1) * 8);
-			int nny = Algoritms.parseIntFromBytes(coordinates, (i + delta + 1) * 8 + 4);
+			int nx = Algorithms.parseIntFromBytes(coordinates, (i + delta) * 8);
+			int ny = Algorithms.parseIntFromBytes(coordinates, (i + delta) * 8 + 4);
+			int nnx = Algorithms.parseIntFromBytes(coordinates, (i + delta + 1) * 8);
+			int nny = Algorithms.parseIntFromBytes(coordinates, (i + delta + 1) * 8 + 4);
 			if(nnx == 0 && nny == 0) {
 				break;
 			}
@@ -950,7 +950,7 @@ public class BinaryMapIndexWriter {
 			bbuilder.setY((by - sy) >> 7);
 			
 			String number2 = b.getName2();
-			if(!Algoritms.isEmpty(number2)){
+			if(!Algorithms.isEmpty(number2)){
 				LatLon loc = b.getLatLon2();
 				if(loc == null) {
 					bbuilder.setX((bx - sx) >> 7);
@@ -1305,24 +1305,24 @@ public class BinaryMapIndexWriter {
 			int j = types.get(i);
 			builder.addCategories(j);
 		}
-		if (!Algoritms.isEmpty(name)) {
+		if (!Algorithms.isEmpty(name)) {
 			builder.setName(name);
 		}
-		if (!Algoritms.isEmpty(nameEn)) {
+		if (!Algorithms.isEmpty(nameEn)) {
 			builder.setNameEn(nameEn);
 		}
 		builder.setId(id);
 
-		if (!Algoritms.isEmpty(openingHours)) {
+		if (!Algorithms.isEmpty(openingHours)) {
 			builder.setOpeningHours(openingHours);
 		}
-		if (!Algoritms.isEmpty(site)) {
+		if (!Algorithms.isEmpty(site)) {
 			builder.setSite(site);
 		}
-		if (!Algoritms.isEmpty(phone)) {
+		if (!Algorithms.isEmpty(phone)) {
 			builder.setPhone(phone);
 		}
-		if (!Algoritms.isEmpty(description)) {
+		if (!Algorithms.isEmpty(description)) {
 			builder.setNote(description);
 		}
 

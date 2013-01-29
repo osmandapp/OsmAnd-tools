@@ -1,8 +1,8 @@
 package net.osmand.osm.io;
 
 import net.osmand.osm.Entity;
-import net.osmand.osm.Node;
 import net.osmand.osm.Entity.EntityId;
+import net.osmand.osm.Node;
 
 public class OsmBoundsFilter implements IOsmStorageFilter {
 	

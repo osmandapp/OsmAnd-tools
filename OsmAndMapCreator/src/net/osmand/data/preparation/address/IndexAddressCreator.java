@@ -23,7 +23,6 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
-import net.osmand.Algoritms;
 import net.osmand.IProgress;
 import net.osmand.data.Boundary;
 import net.osmand.data.Building;
@@ -49,6 +48,7 @@ import net.osmand.osm.OSMSettings.OSMTagKey;
 import net.osmand.osm.Relation;
 import net.osmand.osm.Way;
 import net.osmand.swing.Messages;
+import net.osmand.util.Algorithms;
 import net.sf.junidecode.Junidecode;
 
 import org.apache.commons.logging.Log;
@@ -134,7 +134,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 
 	private void regCity(City city) {
 		LatLon l = city.getLocation();
-		if (city.getType() != null && !Algoritms.isEmpty(city.getName()) && l != null) {
+		if (city.getType() != null && !Algorithms.isEmpty(city.getName()) && l != null) {
 			if (city.getType() == CityType.CITY || city.getType() == CityType.TOWN) {
 				cityManager.registerObject(l.getLatitude(), l.getLongitude(), city);
 			} else {
@@ -147,7 +147,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 	public void indexBoundariesRelation(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 		Boundary boundary = extractBoundary(e, ctx);
 		boolean boundaryValid = boundary != null && (!boundary.hasAdminLevel() || boundary.getAdminLevel() > 4) &&
-				boundary.getCenterPoint() != null && !Algoritms.isEmpty(boundary.getName());
+				boundary.getCenterPoint() != null && !Algorithms.isEmpty(boundary.getName());
 		if (boundaryValid) {
 			LatLon boundaryCenter = boundary.getCenterPoint();
 			List<City> citiesToSearch = new ArrayList<City>();
@@ -383,7 +383,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 						} else {
 							String wName = es.getTag(OSMTagKey.NAME);
 							// if name are not equal keep the way for further check (it could be different suburb)
-							if (Algoritms.objectEquals(wName, boundary.getName()) || wName == null) {
+							if (Algorithms.objectEquals(wName, boundary.getName()) || wName == null) {
 								visitedBoundaryWays.add(es.getId());
 							}
 							boundary.addOuterWay((Way) es);
@@ -562,7 +562,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 		if (result.isEmpty()) {
 			return Collections.emptySet();
 		}
-		if (Algoritms.isEmpty(nameEn)) {
+		if (Algorithms.isEmpty(nameEn)) {
 			nameEn = Junidecode.unidecode(name);
 		}
 

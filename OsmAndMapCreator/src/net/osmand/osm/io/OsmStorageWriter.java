@@ -21,7 +21,6 @@ import static net.osmand.osm.io.OsmBaseStorage.ELEM_OSM;
 import static net.osmand.osm.io.OsmBaseStorage.ELEM_RELATION;
 import static net.osmand.osm.io.OsmBaseStorage.ELEM_TAG;
 import static net.osmand.osm.io.OsmBaseStorage.ELEM_WAY;
-
 import gnu.trove.list.array.TLongArrayList;
 
 import java.io.IOException;
@@ -31,21 +30,21 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.Stack;
 import java.util.Map.Entry;
+import java.util.Stack;
 
+import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamWriter;
-import javax.xml.stream.XMLOutputFactory;
 
-import net.osmand.Algoritms;
 import net.osmand.data.MapObject;
 import net.osmand.osm.Entity;
+import net.osmand.osm.Entity.EntityId;
 import net.osmand.osm.EntityInfo;
 import net.osmand.osm.Node;
 import net.osmand.osm.Relation;
 import net.osmand.osm.Way;
-import net.osmand.osm.Entity.EntityId;
+import net.osmand.util.Algorithms;
 
 public class OsmStorageWriter {
 
@@ -175,7 +174,7 @@ public class OsmStorageWriter {
 	}
 	
 	public boolean couldBeWrited(MapObject e){
-		if(!Algoritms.isEmpty(e.getName()) && e.getLocation() != null){
+		if(!Algorithms.isEmpty(e.getName()) && e.getLocation() != null){
 			return true;
 		}
 		return false;

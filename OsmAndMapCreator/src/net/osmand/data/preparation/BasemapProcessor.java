@@ -15,20 +15,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
-
-
-import net.osmand.Algoritms;
 import net.osmand.binary.OsmandOdb.MapData;
 import net.osmand.binary.OsmandOdb.MapDataBlock;
 import net.osmand.data.MapAlgorithms;
 import net.osmand.data.preparation.MapZooms.MapZoomPair;
 import net.osmand.osm.Entity;
 import net.osmand.osm.MapRenderingTypes;
+import net.osmand.osm.MapRenderingTypes.MapRulType;
 import net.osmand.osm.MapUtils;
 import net.osmand.osm.Node;
 import net.osmand.osm.Way;
 import net.osmand.osm.WayChain;
-import net.osmand.osm.MapRenderingTypes.MapRulType;
+import net.osmand.util.Algorithms;
 
 import org.apache.commons.logging.Log;
 import org.apache.tools.bzip2.CBZip2InputStream;
@@ -385,7 +383,7 @@ public class BasemapProcessor {
 					if(((Way) e).getNodes().size() < 2){
 						continue;
 					}
-					if ("coastline".equals(e.getTag("natural")) || !Algoritms.isEmpty(e.getTag("admin_level"))) {
+					if ("coastline".equals(e.getTag("natural")) || !Algorithms.isEmpty(e.getTag("admin_level"))) {
 						splitContinuousWay(((Way) e).getNodes(), typeUse.toArray(), !addtypeUse.isEmpty() ? addtypeUse.toArray() : null,
 								zoomPair, quadTrees[level]);
 					} else {
@@ -507,8 +505,8 @@ public class BasemapProcessor {
 				int y = MapUtils.get31TileNumberY(n.getLatitude());
 				int x = MapUtils.get31TileNumberX(n.getLongitude());
 				try {
-					Algoritms.writeInt(bcoordinates, x);
-					Algoritms.writeInt(bcoordinates, y);
+					Algorithms.writeInt(bcoordinates, x);
+					Algorithms.writeInt(bcoordinates, y);
 				} catch (IOException e1) {
 					throw new IllegalStateException(e1);
 				}

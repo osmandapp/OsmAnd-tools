@@ -43,20 +43,20 @@ import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.UIManager;
 
-import net.osmand.Algoritms;
-import net.osmand.PlatformUtil;
 import net.osmand.MapCreatorVersion;
+import net.osmand.PlatformUtil;
 import net.osmand.data.DataTileManager;
 import net.osmand.map.IMapLocationListener;
 import net.osmand.map.ITileSource;
 import net.osmand.map.MapTileDownloader;
-import net.osmand.map.TileSourceManager;
 import net.osmand.map.MapTileDownloader.DownloadRequest;
 import net.osmand.map.MapTileDownloader.IMapDownloaderCallback;
+import net.osmand.map.TileSourceManager;
 import net.osmand.map.TileSourceManager.TileSourceTemplate;
 import net.osmand.osm.Entity;
 import net.osmand.osm.LatLon;
 import net.osmand.osm.MapUtils;
+import net.osmand.util.Algorithms;
 
 import org.apache.commons.logging.Log;
 
@@ -161,7 +161,7 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 		}
 
 		for (final Map.Entry<TileSourceTemplate, JCheckBoxMenuItem> em : items.entrySet()) {
-			if(Algoritms.objectEquals(panel.getMap(), em.getKey())){
+			if(Algorithms.objectEquals(panel.getMap(), em.getKey())){
 				em.getValue().setSelected(true);
 			}
 		}

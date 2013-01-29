@@ -34,7 +34,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
-import net.osmand.Algoritms;
 import net.osmand.IProgress;
 import net.osmand.binary.OsmandOdb.IdTable;
 import net.osmand.binary.OsmandOdb.OsmAndRoutingIndex.RouteBorderPoint;
@@ -55,6 +54,7 @@ import net.osmand.osm.Node;
 import net.osmand.osm.OSMSettings.OSMTagKey;
 import net.osmand.osm.Relation;
 import net.osmand.osm.Way;
+import net.osmand.util.Algorithms;
 
 import org.apache.commons.logging.Log;
 
@@ -142,21 +142,21 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 
 		try {
 			for (int j = 0; j < outTypes.size(); j++) {
-				Algoritms.writeSmallInt(btypes, outTypes.get(j));
+				Algorithms.writeSmallInt(btypes, outTypes.get(j));
 			}
 
 			for (Node n : nodes) {
 				if (n != null) {
 					// write id
-					Algoritms.writeLongInt(bpointIds, n.getId());
+					Algorithms.writeLongInt(bpointIds, n.getId());
 					// write point type
 					TIntArrayList types = pointTypes.get(n.getId());
 					if (types != null) {
 						for (int j = 0; j < types.size(); j++) {
-							Algoritms.writeSmallInt(bpointTypes, types.get(j));
+							Algorithms.writeSmallInt(bpointTypes, types.get(j));
 						}
 					}
-					Algoritms.writeSmallInt(bpointTypes, 0);
+					Algorithms.writeSmallInt(bpointTypes, 0);
 					// write coordinates
 					int y = MapUtils.get31TileNumberY(n.getLatitude());
 					int x = MapUtils.get31TileNumberX(n.getLongitude());
@@ -165,8 +165,8 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 					minY = Math.min(minY, y);
 					maxY = Math.max(maxY, y);
 					init = true;
-					Algoritms.writeInt(bcoordinates, x);
-					Algoritms.writeInt(bcoordinates, y);
+					Algorithms.writeInt(bcoordinates, x);
+					Algorithms.writeInt(bcoordinates, y);
 				}
 			}
 
@@ -1032,7 +1032,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 					byte[] types = rs.getBytes(1);
 					int[] typeUse = new int[types.length / 2];
 					for (int j = 0; j < types.length; j += 2) {
-						int ids = Algoritms.parseSmallIntFromBytes(types, j);
+						int ids = Algorithms.parseSmallIntFromBytes(types, j);
 						typeUse[j / 2] = routeTypes.getTypeByInternalId(ids).getTargetId();
 					}
 					byte[] pointTypes = rs.getBytes(2);
@@ -1053,14 +1053,14 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 					}
 					for (int j = 0; j < points.length; j++) {
 						points[j] = new RoutePointToWrite();
-						points[j].x = Algoritms.parseIntFromBytes(pointCoordinates, j * 8);
-						points[j].y = Algoritms.parseIntFromBytes(pointCoordinates, j * 8 + 4);
+						points[j].x = Algorithms.parseIntFromBytes(pointCoordinates, j * 8);
+						points[j].y = Algorithms.parseIntFromBytes(pointCoordinates, j * 8 + 4);
 						if(WRITE_POINT_ID) {
-							points[j].id = registerId(pointMapIds, Algoritms.parseLongFromBytes(pointIds, j * 8));
+							points[j].id = registerId(pointMapIds, Algorithms.parseLongFromBytes(pointIds, j * 8));
 						}
 						int type = 0;
 						do {
-							type = Algoritms.parseSmallIntFromBytes(pointTypes, typeInd);
+							type = Algorithms.parseSmallIntFromBytes(pointTypes, typeInd);
 							typeInd += 2;
 							if (type != 0) {
 								points[j].types.add(routeTypes.getTypeByInternalId(type).getTargetId());

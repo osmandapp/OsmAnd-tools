@@ -12,11 +12,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.URL;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 
 import javax.swing.JFrame;
@@ -24,24 +22,23 @@ import javax.swing.JMenuBar;
 import javax.swing.UIManager;
 import javax.xml.stream.XMLStreamException;
 
-import net.osmand.Algoritms;
 import net.osmand.data.DataTileManager;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.osm.Entity;
+import net.osmand.osm.Entity.EntityId;
 import net.osmand.osm.EntityInfo;
 import net.osmand.osm.LatLon;
 import net.osmand.osm.MapUtils;
 import net.osmand.osm.Node;
 import net.osmand.osm.OpeningHoursParser;
-import net.osmand.osm.Entity.EntityId;
 import net.osmand.osm.OpeningHoursParser.BasicDayOpeningHourRule;
-import net.osmand.osm.OpeningHoursParser.OpeningHoursRule;
 import net.osmand.osm.io.IOsmStorageFilter;
 import net.osmand.osm.io.OsmBaseStorage;
 import net.osmand.osm.io.OsmStorageWriter;
 import net.osmand.swing.DataExtractionSettings;
 import net.osmand.swing.MapPanel;
 import net.osmand.swing.MapPointsLayer;
+import net.osmand.util.Algorithms;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -229,7 +226,7 @@ public class AHSupermarketResolver {
 				boolean changed = false;
 				for(String k : newTags.keySet()){
 					String val = newTags.get(k);
-					if(!Algoritms.objectEquals(val, e.getTag(k))){
+					if(!Algorithms.objectEquals(val, e.getTag(k))){
 						e.putTag(k, val);
 						changed = true;
 					}

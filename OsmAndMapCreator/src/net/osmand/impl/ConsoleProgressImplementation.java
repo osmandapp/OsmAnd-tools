@@ -2,9 +2,9 @@ package net.osmand.impl;
 
 import java.text.MessageFormat;
 
-import net.osmand.Algoritms;
 import net.osmand.IProgress;
 import net.osmand.PlatformUtil;
+import net.osmand.util.Algorithms;
 
 import org.apache.commons.logging.Log;
 
@@ -78,7 +78,7 @@ public class ConsoleProgressImplementation implements IProgress {
 
 	@Override
 	public void startTask(String taskName, int work) {
-		if(!Algoritms.objectEquals(currentTask, taskName)){
+		if(!Algorithms.objectEquals(currentTask, taskName)){
 			this.currentTask = taskName;
 			log.debug("Memory before task exec: " + Runtime.getRuntime().totalMemory() + " free : " + Runtime.getRuntime().freeMemory()); //$NON-NLS-1$ //$NON-NLS-2$
 			if (previousTaskStarted == 0) {

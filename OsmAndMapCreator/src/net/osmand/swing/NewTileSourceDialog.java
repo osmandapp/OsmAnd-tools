@@ -20,10 +20,10 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JTextField;
 
-import net.osmand.Algoritms;
 import net.osmand.PlatformUtil;
 import net.osmand.map.TileSourceManager;
 import net.osmand.map.TileSourceManager.TileSourceTemplate;
+import net.osmand.util.Algorithms;
 
 import org.apache.commons.logging.Log;
 
@@ -176,11 +176,11 @@ public class NewTileSourceDialog extends JDialog {
 	
 	
 	public boolean okPressed(){
-		if(Algoritms.isEmpty(templateName.getText())){
+		if(Algorithms.isEmpty(templateName.getText())){
 			JOptionPane.showMessageDialog(this, Messages.getString("NewTileSourceDialog.SPECIFY.TEMPLATE.NAME") , Messages.getString("NewTileSourceDialog.ERROR.CREATING.NEW.TILE.SRC"), JOptionPane.ERROR_MESSAGE); //$NON-NLS-1$ //$NON-NLS-2$
 			return false;
 		}
-		if(Algoritms.isEmpty(templateUrl.getText())){
+		if(Algorithms.isEmpty(templateUrl.getText())){
 			JOptionPane.showMessageDialog(this, Messages.getString("NewTileSourceDialog.SPECIFY.TEMPLATE.URL") , Messages.getString("NewTileSourceDialog.ERROR.CREATING.NEW.TILE.SRC"), JOptionPane.ERROR_MESSAGE); //$NON-NLS-1$ //$NON-NLS-2$
 			return false;
 		}

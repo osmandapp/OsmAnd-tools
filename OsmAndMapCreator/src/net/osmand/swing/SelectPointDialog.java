@@ -18,11 +18,9 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JTextField;
 
-import net.osmand.Algoritms;
 import net.osmand.PlatformUtil;
-import net.osmand.map.TileSourceManager;
-import net.osmand.map.TileSourceManager.TileSourceTemplate;
 import net.osmand.osm.LatLon;
+import net.osmand.util.Algorithms;
 
 import org.apache.commons.logging.Log;
 
@@ -157,7 +155,7 @@ public class SelectPointDialog extends JDialog {
 	}
 	
 	private double parseDouble(String s) {
-		if (Algoritms.isEmpty(s)) {
+		if (Algorithms.isEmpty(s)) {
 			return Double.NaN;
 		}
 		try {

@@ -25,11 +25,11 @@ import java.util.zip.ZipException;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
 
-import net.osmand.Algoritms;
 import net.osmand.PlatformUtil;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.data.IndexConstants;
 import net.osmand.data.index.ExtractGooglecodeAuthorization.GooglecodeUploadTokens;
+import net.osmand.util.Algorithms;
 
 import org.apache.commons.logging.Log;
 
@@ -249,7 +249,7 @@ public class IndexUploader {
 					matchers.add(Pattern.compile(line));
 				}
 			} finally {
-				Algoritms.closeStream(reader);
+				Algorithms.closeStream(reader);
 			}
 		}
 		
@@ -366,10 +366,10 @@ public class IndexUploader {
 				zEntry.setComment(description);
 				zout.putNextEntry(zEntry);
 				FileInputStream is = new FileInputStream(f);
-				Algoritms.streamCopy(is, zout);
-				Algoritms.closeStream(is);
+				Algorithms.streamCopy(is, zout);
+				Algorithms.closeStream(is);
 			}
-			Algoritms.closeStream(zout);
+			Algorithms.closeStream(zout);
 			zFile.setLastModified(lastModifiedTime);
 		} catch (IOException e) {
 			throw new OneFileException("cannot zip file:" + e.getMessage());
@@ -444,7 +444,7 @@ public class IndexUploader {
 
 	private File unzip(File f) throws OneFileException {
 		try {
-			if (!Algoritms.isZipFile(f)) {
+			if (!Algorithms.isZipFile(f)) {
 				return f;
 			}
 			log.info("Unzipping file: " + f.getName());
@@ -462,9 +462,9 @@ public class IndexUploader {
 				File tempFile = new File(f.getParentFile(), entry.getName());
 				InputStream zin = zipFile.getInputStream(entry);
 				FileOutputStream out = new FileOutputStream(tempFile);
-				Algoritms.streamCopy(zin, out);
-				Algoritms.closeStream(zin);
-				Algoritms.closeStream(out);
+				Algorithms.streamCopy(zin, out);
+				Algorithms.closeStream(zin);
+				Algorithms.closeStream(out);
 				if (!tempFile.getName().endsWith(IndexConstants.GEN_LOG_EXT)) {
 					mainFile = tempFile;
 				}

@@ -17,14 +17,6 @@ import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 
-import org.xml.sax.Attributes;
-import org.xml.sax.SAXException;
-import org.xml.sax.helpers.DefaultHandler;
-import org.xmlpull.v1.XmlPullParserException;
-
-import resources._R;
-
-import net.osmand.Algoritms;
 import net.osmand.NativeLibrary;
 import net.osmand.RenderingContext;
 import net.osmand.osm.MapUtils;
@@ -33,6 +25,14 @@ import net.osmand.render.RenderingRuleSearchRequest;
 import net.osmand.render.RenderingRuleStorageProperties;
 import net.osmand.render.RenderingRulesStorage;
 import net.osmand.render.RenderingRulesStorage.RenderingRulesStorageResolver;
+import net.osmand.util.Algorithms;
+
+import org.xml.sax.Attributes;
+import org.xml.sax.SAXException;
+import org.xml.sax.helpers.DefaultHandler;
+import org.xmlpull.v1.XmlPullParserException;
+
+import resources._R;
 
 public class NativeSwingRendering extends NativeLibrary {
 
@@ -122,7 +122,7 @@ public class NativeSwingRendering extends NativeLibrary {
 		request.setBooleanFilter(request.ALL.R_NIGHT_MODE, rctx.nightMode);
 		for (RenderingRuleProperty customProp : storage.PROPS.getCustomRules()) {
 			String res = renderingProps.get(customProp.getAttrName());
-			if (!Algoritms.isEmpty(res)) {
+			if (!Algorithms.isEmpty(res)) {
 				if (customProp.isString()) {
 					request.setStringFilter(customProp, res);
 				} else if (customProp.isBoolean()) {

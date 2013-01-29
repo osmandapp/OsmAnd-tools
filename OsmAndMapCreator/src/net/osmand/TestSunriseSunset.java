@@ -6,6 +6,8 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.TimeZone;
 
+import net.osmand.util.SunriseSunset;
+
 public class TestSunriseSunset {
 	
 	public static final String MARCH = "05.03.2012";

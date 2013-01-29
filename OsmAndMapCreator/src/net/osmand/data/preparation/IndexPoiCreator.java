@@ -20,7 +20,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 
-import net.osmand.Algoritms;
 import net.osmand.IProgress;
 import net.osmand.binary.BinaryMapPoiReaderAdapter;
 import net.osmand.data.Amenity;
@@ -31,6 +30,7 @@ import net.osmand.osm.Entity;
 import net.osmand.osm.MapRenderingTypes;
 import net.osmand.osm.MapUtils;
 import net.osmand.osm.OSMSettings.OSMTagKey;
+import net.osmand.util.Algorithms;
 import net.sf.junidecode.Junidecode;
 
 import org.apache.commons.logging.Log;
@@ -90,7 +90,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	}
 	
 	public void removePoiFile(){
-		Algoritms.removeAllFiles(poiIndexFile);
+		Algorithms.removeAllFiles(poiIndexFile);
 	}
 
 	public void checkEntity(Entity e) {
@@ -137,7 +137,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		this.poiIndexFile = poiIndexFile;
 		// delete previous file to save space
 		if (poiIndexFile.exists()) {
-			Algoritms.removeAllFiles(poiIndexFile);
+			Algorithms.removeAllFiles(poiIndexFile);
 		}
 		poiIndexFile.getParentFile().mkdirs();
 		// creating connection
@@ -385,7 +385,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	}
 	
 	public void addNamePrefix(String name, String nameEn, PoiTileBox data, Map<String, Set<PoiTileBox>> poiData) {
-		if(Algoritms.isEmpty(nameEn)){
+		if(Algorithms.isEmpty(nameEn)){
 			nameEn = Junidecode.unidecode(name);
 		}
 		parsePrefix(name, data, poiData);

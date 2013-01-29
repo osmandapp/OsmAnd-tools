@@ -6,7 +6,7 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
 
-import net.osmand.Algoritms;
+import net.osmand.util.Algorithms;
 
 import org.apache.commons.logging.Log;
 import org.sqlite.SQLiteJDBCLoader;
@@ -49,11 +49,11 @@ public enum DBDialect {
 			File[] list = file.getParentFile().listFiles();
 			for (File f : list) {
 				if (f.getName().startsWith(file.getName())) {
-					Algoritms.removeAllFiles(f);
+					Algorithms.removeAllFiles(f);
 				}
 			}
 		} else {
-			Algoritms.removeAllFiles(file);
+			Algorithms.removeAllFiles(file);
 		}
 	}
 	

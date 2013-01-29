@@ -29,9 +29,8 @@ import java.util.logging.SimpleFormatter;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
-import net.osmand.Algoritms;
-import net.osmand.PlatformUtil;
 import net.osmand.MapCreatorVersion;
+import net.osmand.PlatformUtil;
 import net.osmand.data.IndexConstants;
 import net.osmand.data.preparation.DBDialect;
 import net.osmand.data.preparation.IndexCreator;
@@ -39,6 +38,7 @@ import net.osmand.data.preparation.MapZooms;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.osm.MapRenderingTypes;
 import net.osmand.swing.OsmExtractionUI;
+import net.osmand.util.Algorithms;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.impl.Jdk14Logger;
@@ -288,7 +288,7 @@ public class IndexBatchCreator {
 				String url = MessageFormat.format(site, name);
 				
 				String regionName = prefix + name;
-				String fileName = Algoritms.capitalizeFirstLetterAndLowercase(prefix + name + suffix);
+				String fileName = Algorithms.capitalizeFirstLetterAndLowercase(prefix + name + suffix);
 				if (skipExistingIndexes != null) {
 					File bmif = new File(skipExistingIndexes, fileName + "_" + IndexConstants.BINARY_MAP_VERSION
 							+ IndexConstants.BINARY_MAP_INDEX_EXT);
@@ -412,7 +412,7 @@ public class IndexBatchCreator {
 			if (f.getName().endsWith(".osm.bz2") || f.getName().endsWith(".osm") || f.getName().endsWith(".osm.pbf")) {
 				if (skipExistingIndexes != null) {
 					int i = f.getName().indexOf(".osm");
-					String name = Algoritms.capitalizeFirstLetterAndLowercase(f.getName().substring(0, i));
+					String name = Algorithms.capitalizeFirstLetterAndLowercase(f.getName().substring(0, i));
 					File bmif = new File(skipExistingIndexes, name + "_" + IndexConstants.BINARY_MAP_VERSION
 							+ IndexConstants.BINARY_MAP_INDEX_EXT_ZIP);
 					log.info("Check if " + bmif.getAbsolutePath() + " exists");
@@ -438,12 +438,12 @@ public class IndexBatchCreator {
 			log.warn("----------- Generate " + f.getName() + "\n\n\n");
 			int i = f.getName().indexOf('.');
 			if (i > -1) {
-				regionName = Algoritms.capitalizeFirstLetterAndLowercase(f.getName().substring(0, i));
+				regionName = Algorithms.capitalizeFirstLetterAndLowercase(f.getName().substring(0, i));
 			}
-			if(Algoritms.isEmpty(rName)){
+			if(Algorithms.isEmpty(rName)){
 				rName = regionName;
 			} else {
-				rName = Algoritms.capitalizeFirstLetterAndLowercase(rName);
+				rName = Algorithms.capitalizeFirstLetterAndLowercase(rName);
 			}
 			DBDialect osmDb = this.osmDbDialect;
 			if(f.length() / 1024 / 1024 > INMEM_LIMIT && osmDb == DBDialect.SQLITE_IN_MEMORY) {
@@ -510,7 +510,7 @@ public class IndexBatchCreator {
 				File copyLog = new File(indexDirFiles, logFileName.getName());
 				FileOutputStream fout = new FileOutputStream(copyLog);
 				FileInputStream fin = new FileInputStream(logFileName);
-				Algoritms.streamCopy(fin, fout);
+				Algorithms.streamCopy(fin, fout);
 				fin.close();
 				fout.close();
 				//	logFileName.renameTo(new File(indexDirFiles, logFileName.getName()));
