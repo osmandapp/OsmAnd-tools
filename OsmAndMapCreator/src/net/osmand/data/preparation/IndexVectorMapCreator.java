@@ -25,7 +25,6 @@ import java.util.Map.Entry;
 import net.osmand.IProgress;
 import net.osmand.binary.OsmandOdb.MapData;
 import net.osmand.binary.OsmandOdb.MapDataBlock;
-import net.osmand.data.MapAlgorithms;
 import net.osmand.data.Multipolygon;
 import net.osmand.data.Ring;
 import net.osmand.data.preparation.MapZooms.MapZoomPair;
@@ -39,6 +38,7 @@ import net.osmand.osm.OSMSettings.OSMTagKey;
 import net.osmand.osm.Relation;
 import net.osmand.osm.Way;
 import net.osmand.util.Algorithms;
+import net.osmand.util.MapAlgorithms;
 
 import org.apache.commons.logging.Log;
 

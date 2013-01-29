@@ -17,7 +17,6 @@ import java.util.Map.Entry;
 
 import net.osmand.binary.OsmandOdb.MapData;
 import net.osmand.binary.OsmandOdb.MapDataBlock;
-import net.osmand.data.MapAlgorithms;
 import net.osmand.data.preparation.MapZooms.MapZoomPair;
 import net.osmand.osm.Entity;
 import net.osmand.osm.MapRenderingTypes;
@@ -27,6 +26,7 @@ import net.osmand.osm.Node;
 import net.osmand.osm.Way;
 import net.osmand.osm.WayChain;
 import net.osmand.util.Algorithms;
+import net.osmand.util.MapAlgorithms;
 
 import org.apache.commons.logging.Log;
 import org.apache.tools.bzip2.CBZip2InputStream;

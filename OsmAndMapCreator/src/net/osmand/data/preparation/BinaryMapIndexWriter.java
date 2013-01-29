@@ -19,6 +19,7 @@ import java.util.Set;
 import java.util.Stack;
 import java.util.TreeSet;
 
+import net.osmand.IndexConstants;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.OsmandOdb;
 import net.osmand.binary.OsmandOdb.AddressNameIndexDataAtom;
@@ -56,7 +57,6 @@ import net.osmand.binary.OsmandOdb.TransportRouteStop;
 import net.osmand.data.Building;
 import net.osmand.data.City;
 import net.osmand.data.City.CityType;
-import net.osmand.data.IndexConstants;
 import net.osmand.data.MapObject;
 import net.osmand.data.Street;
 import net.osmand.data.TransportStop;

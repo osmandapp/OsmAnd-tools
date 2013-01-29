@@ -21,9 +21,9 @@ import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamWriter;
 
+import net.osmand.IndexConstants;
 import net.osmand.MapCreatorVersion;
 import net.osmand.PlatformUtil;
-import net.osmand.data.IndexConstants;
 import net.osmand.data.preparation.IndexCreator;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.util.Algorithms;

@@ -13,7 +13,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 
 import net.osmand.IProgress;
-import net.osmand.data.IndexConstants;
+import net.osmand.IndexConstants;
 import net.osmand.data.preparation.OsmDbAccessor.OsmDbVisitor;
 import net.osmand.data.preparation.address.IndexAddressCreator;
 import net.osmand.impl.ConsoleProgressImplementation;

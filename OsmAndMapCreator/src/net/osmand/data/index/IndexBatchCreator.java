@@ -29,9 +29,9 @@ import java.util.logging.SimpleFormatter;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
+import net.osmand.IndexConstants;
 import net.osmand.MapCreatorVersion;
 import net.osmand.PlatformUtil;
-import net.osmand.data.IndexConstants;
 import net.osmand.data.preparation.DBDialect;
 import net.osmand.data.preparation.IndexCreator;
 import net.osmand.data.preparation.MapZooms;

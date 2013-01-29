@@ -25,9 +25,9 @@ import java.util.zip.ZipException;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
 
+import net.osmand.IndexConstants;
 import net.osmand.PlatformUtil;
 import net.osmand.binary.BinaryMapIndexReader;
-import net.osmand.data.IndexConstants;
 import net.osmand.data.index.ExtractGooglecodeAuthorization.GooglecodeUploadTokens;
 import net.osmand.util.Algorithms;
 

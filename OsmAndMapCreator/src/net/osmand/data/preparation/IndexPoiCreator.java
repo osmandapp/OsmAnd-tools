@@ -21,10 +21,10 @@ import java.util.Set;
 import java.util.TreeMap;
 
 import net.osmand.IProgress;
+import net.osmand.IndexConstants;
 import net.osmand.binary.BinaryMapPoiReaderAdapter;
 import net.osmand.data.Amenity;
 import net.osmand.data.AmenityType;
-import net.osmand.data.IndexConstants;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.osm.Entity;
 import net.osmand.osm.MapRenderingTypes;

@@ -7,6 +7,7 @@ import java.util.List;
 import net.osmand.osm.LatLon;
 import net.osmand.osm.Node;
 import net.osmand.osm.Way;
+import net.osmand.util.MapAlgorithms;
 
 /**
  * A ring is a list of ways that form a simple boundary or an area. <p />
