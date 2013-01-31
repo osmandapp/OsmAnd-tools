@@ -109,13 +109,15 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 	public void iterateMainEntity(Entity es, OsmDbAccessorContext ctx) throws SQLException {
 		if (es instanceof Way) {
 			Way e = (Way) es;
-			boolean encoded = routeTypes.encodeEntity(e, outTypes, names);
+			boolean encoded = routeTypes.encodeEntity(e, outTypes, names) ;
 			if (encoded) {
 				// Load point with  tags!
 				ctx.loadEntityWay(e);
 				routeTypes.encodePointTypes(e, pointTypes);
-				routeBorders.addWay(e, outTypes);
-				addWayToIndex(e.getId(), e.getNodes(), mapRouteInsertStat, routeTree);
+				if(e.getNodes().size() >= 2) {
+				    routeBorders.addWay(e, outTypes);
+				    addWayToIndex(e.getId(), e.getNodes(), mapRouteInsertStat, routeTree);
+				}
 			}
 			encoded = routeTypes.encodeBaseEntity(e, outTypes, names) && e.getNodes().size() >= 2;
 			if (encoded ) {
