@@ -85,7 +85,12 @@ public class RegionsRegistryConverter {
 				String[] s = txt.toString().split("( |;)");
 				RegionCountry a = currentRegion == null ? current : currentRegion;
 				for(int i =0; i < s.length; i+=2) {
-					a.add(Integer.parseInt(s[i].trim()), Integer.parseInt(s[i+1].trim()));
+					try {
+						a.add(Integer.parseInt(s[i].trim()), Integer.parseInt(s[i+1].trim()));
+					} catch(RuntimeException e){
+						System.err.println(a.name);
+						throw e;
+					}
 				}
 			}
 		}
