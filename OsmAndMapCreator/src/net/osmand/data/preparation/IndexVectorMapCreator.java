@@ -26,6 +26,7 @@ import net.osmand.IProgress;
 import net.osmand.binary.OsmandOdb.MapData;
 import net.osmand.binary.OsmandOdb.MapDataBlock;
 import net.osmand.data.Multipolygon;
+import net.osmand.data.MultipolygonBuilder;
 import net.osmand.data.Ring;
 import net.osmand.data.preparation.MapZooms.MapZoomPair;
 import net.osmand.osm.Entity;
@@ -128,43 +129,28 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		if (! (e instanceof Relation) || 
 				! "multipolygon".equals(e.getTag(OSMTagKey.TYPE)) || 
 				e.getTag(OSMTagKey.ADMIN_LEVEL) != null ) return;
-
-		ctx.loadEntityRelation((Relation) e);
-		Map<Entity, String> entities = ((Relation) e).getMemberEntities();
-
-		// create a multipolygon object for this
-		Multipolygon original = new Multipolygon(e.getId());
-
-		// fill the multipolygon with all ways from the Relation
-		for (Entity es : entities.keySet()) {
-			if (es instanceof Way) {
-				boolean inner = "inner".equals(entities.get(es)); //$NON-NLS-1$
-				if (inner) {
-					original.addInnerWay((Way) es);
-				} else {
-					original.addOuterWay((Way) es);
-				}
-			}
-		}
-
+		MultipolygonBuilder original = createMultipolygonBuilder(e, ctx);
 		renderingTypes.encodeEntityWithType(e, mapZooms.getLevel(0).getMaxZoom(), typeUse, addtypeUse, namesUse, tempNameUse);
 
 		//Don't add multipolygons with an unknown type
 		if (typeUse.size() == 0) return;
+		excludeFromMainIteration(original.getOuterWays());
+		excludeFromMainIteration(original.getInnerWays());
 
-		// Log the fact that Rings aren't complete, but continue with the relation, try to close it as well as possible
-		if (!original.areRingsComplete()) {
-			logMapDataWarn.warn("In multipolygon  " + e.getId() + " there are incompleted ways");
-		}
+		
 		// Rings with different types (inner or outer) in one ring will be logged in the previous case
 		// The Rings are only composed by type, so if one way gets in a different Ring, the rings will be incomplete
-
 		List<Multipolygon> multipolygons = original.splitPerOuterRing(logMapDataWarn);
 
 
 		for (Multipolygon m : multipolygons) {
-			
-			if(m.getOuterNodes().size() == 0) {
+			assert m.getOuterRings().size() == 1;
+			// Log the fact that Rings aren't complete, but continue with the relation, try to close it as well as possible
+			if (!m.areRingsComplete()) {
+				logMapDataWarn.warn("In multipolygon  " + e.getId() + " there are incompleted ways");
+			}
+			Ring out = m.getOuterRings().get(0);
+			if(out.getBorder().size() == 0) {
 				logMapDataWarn.warn("Multipolygon has an outer ring that can't be formed: "+e.getId());
 				// don't index this
 				continue;
@@ -177,7 +163,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 				innerWays.add(r.getBorder());
 			}
 
-			// don't use the relation ids. Create new ones
+			// don't use the relation ids. Create new onesgetInnerRings
 			long baseId = notUsedId --;
 			nextZoom: for (int level = 0; level < mapZooms.size(); level++) {
 				renderingTypes.encodeEntityWithType(e, mapZooms.getLevel(level).getMaxZoom(), typeUse, addtypeUse, namesUse,
@@ -187,7 +173,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 				}
 				long id = convertBaseIdToGeneratedId(baseId, level);
 				// simplify route
-				List<Node> outerWay = m.getOuterNodes();
+				List<Node> outerWay = out.getBorder();
 				int zoomToSimplify = mapZooms.getLevel(level).getMaxZoom() - 1;
 				if (zoomToSimplify < 15) {
 					outerWay = simplifyCycleWay(outerWay, zoomToSimplify, zoomWaySmothness);
@@ -206,6 +192,37 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 				insertBinaryMapRenderObjectIndex(mapTree[level], outerWay, innerWays, namesUse, id, true, typeUse, addtypeUse, true);
 
 			}
+		}
+	}
+
+	private MultipolygonBuilder createMultipolygonBuilder(Entity e, OsmDbAccessorContext ctx) throws SQLException {
+		ctx.loadEntityRelation((Relation) e);
+		Map<Entity, String> entities = ((Relation) e).getMemberEntities();
+
+		// create a multipolygon object for this
+		MultipolygonBuilder original = new MultipolygonBuilder();
+		original.setId(e.getId());
+
+		// fill the multipolygon with all ways from the Relation
+		for (Entity es : entities.keySet()) {
+			if (es instanceof Way) {
+				boolean inner = "inner".equals(entities.get(es)); //$NON-NLS-1$
+				if (inner) {
+					original.addInnerWay((Way) es);
+				} else if("outer".equals(entities.get(es))){
+					original.addOuterWay((Way) es);
+				}
+			}
+		}
+		return original;
+	}
+
+	private void excludeFromMainIteration(List<Way> l) {
+		for(Way w : l) {
+			if(!multiPolygonsWays.containsKey(w.getId())) {
+				multiPolygonsWays.put(w.getId(), new TIntArrayList());
+			}
+			multiPolygonsWays.get(w.getId()).addAll(typeUse);
 		}
 	}
 	

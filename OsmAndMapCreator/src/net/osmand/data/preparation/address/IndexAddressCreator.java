@@ -31,7 +31,7 @@ import net.osmand.data.City;
 import net.osmand.data.City.CityType;
 import net.osmand.data.DataTileManager;
 import net.osmand.data.MapObject;
-import net.osmand.data.Multipolygon;
+import net.osmand.data.MultipolygonBuilder;
 import net.osmand.data.Street;
 import net.osmand.data.preparation.AbstractIndexPartCreator;
 import net.osmand.data.preparation.BinaryFileReference;
@@ -317,7 +317,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 				&& oldBoundary != boundary
 				&& boundary.getName().equalsIgnoreCase(
 						oldBoundary.getName())) {
-			oldBoundary.copyPolygonsFrom(boundary);
+			oldBoundary.mergeWith(boundary);
 			return oldBoundary;
 		} else {
 			int old = getCityBoundaryImportance(oldBoundary, cityFound);
@@ -362,15 +362,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 			if (e instanceof Way && visitedBoundaryWays.contains(e.getId())) {
 				return null;
 			}
-			Boundary boundary = null;
-			boundary = new Boundary(); //is computed later
-			boundary.setName(e.getTag(OSMTagKey.NAME));
-			boundary.setBoundaryId(e.getId());
-			boundary.setCityType(ct);
-			if(centerId != 0) {
-				boundary.setAdminCenterId(centerId);
-			}
-			boundary.setAdminLevel(extractBoundaryAdminLevel(e));
+			
+			String bname = e.getTag(OSMTagKey.NAME);
+			MultipolygonBuilder m = new MultipolygonBuilder();
 			if (e instanceof Relation) {
 				Relation aRelation = (Relation) e;
 				ctx.loadEntityRelation(aRelation);
@@ -379,23 +373,31 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 					if (es instanceof Way) {
 						boolean inner = "inner".equals(entities.get(es)); //$NON-NLS-1$
 						if (inner) {
-							boundary.addInnerWay((Way) es);
+							m.addInnerWay((Way) es);
 						} else {
 							String wName = es.getTag(OSMTagKey.NAME);
 							// if name are not equal keep the way for further check (it could be different suburb)
-							if (Algorithms.objectEquals(wName, boundary.getName()) || wName == null) {
+							if (Algorithms.objectEquals(wName, bname) || wName == null) {
 								visitedBoundaryWays.add(es.getId());
 							}
-							boundary.addOuterWay((Way) es);
+							m.addOuterWay((Way) es);
 						}
 					} else if (es instanceof Node && ("admin_centre".equals(entities.get(es)) || "admin_center".equals(entities.get(es)))) {
-						boundary.setAdminCenterId(es.getId());
-					} else if (es instanceof Node && ("label".equals(entities.get(es)) && !boundary.hasAdminCenterId())) {
-						boundary.setAdminCenterId(es.getId());
+						centerId =  es.getId();
+					} else if (es instanceof Node && ("label".equals(entities.get(es)) && centerId == 0)) {
+						centerId =  es.getId();
 					}
 				}
 			} else if (e instanceof Way) {
-				boundary.addOuterWay((Way) e);
+				m.addOuterWay((Way) e);
+			}
+			Boundary boundary = new Boundary(m); 
+			boundary.setName(bname);
+			boundary.setAdminLevel(extractBoundaryAdminLevel(e));
+			boundary.setBoundaryId(e.getId());
+			boundary.setCityType(ct);
+			if(centerId != 0) {
+				boundary.setAdminCenterId(centerId);
 			}
 			return boundary;
 		} else {
@@ -542,7 +544,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 		nearestObjects.addAll(cityVillageManager.getClosestObjects(location.getLatitude(),location.getLongitude()));
 		//either we found a city boundary the street is in
 		for (City c : nearestObjects) {
-			Multipolygon boundary = cityBoundaries.get(c);
+			Boundary boundary = cityBoundaries.get(c);
 			if (isInNames.contains(c.getName()) || (boundary != null && boundary.containsPoint(location))) {
 				result.add(c);
 			}

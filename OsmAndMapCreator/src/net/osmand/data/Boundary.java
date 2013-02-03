@@ -1,12 +1,9 @@
 package net.osmand.data;
 
 import net.osmand.data.City.CityType;
+import net.osmand.osm.LatLon;
 
-
-
-public class Boundary 
-	extends Multipolygon 
-{
+public class Boundary {
 	
 	private long boundaryId;
 	private String name;
@@ -14,8 +11,22 @@ public class Boundary
 	
 	private long adminCenterId;
 	private CityType cityType;
+	private Multipolygon multipolygon;
 	
-	public Boundary() {
+	public Boundary(MultipolygonBuilder m) {
+		multipolygon = m.build();
+	}
+	
+	public boolean containsPoint(double latitude, double longitude) {
+		return multipolygon.containsPoint(latitude, longitude);
+	}
+	
+	public void mergeWith(Boundary boundary) {
+		multipolygon.mergeWith(boundary.multipolygon);
+	}
+	
+	public boolean containsPoint(LatLon location) {
+		return multipolygon.containsPoint(location);
 	}
 	
 	public long getBoundaryId() {
@@ -48,7 +59,8 @@ public class Boundary
 	
 	@Override
 	public String toString() {
-		return  getName() + " alevel:" + getAdminLevel() + " type: has opened polygons:" + hasOpenedPolygons() + " no. of outer polygons:" + countOuterPolygons();
+		return  getName() + " alevel:" + getAdminLevel() + " type: has opened polygons:" + 
+				multipolygon.hasOpenedPolygons() + " no. of outer polygons:" +multipolygon.countOuterPolygons();
 	}
 
 	public void setAdminCenterId(long l) {
@@ -69,6 +81,10 @@ public class Boundary
 	
 	public CityType getCityType() {
 		return cityType;
+	}
+
+	public LatLon getCenterPoint() {
+		return multipolygon.getCenterPoint();
 	}
 
 }

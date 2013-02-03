@@ -12,7 +12,6 @@ import org.junit.Test;
 
 public class MultipolygonTest {
 
-	private Multipolygon testee;
 	private Way poly1_1_of_2;
 	private Way poly1_2_of_2;
 	private int wayid;
@@ -23,7 +22,6 @@ public class MultipolygonTest {
 	@Before
 	public void setUp() 
 	{
-		testee = new Multipolygon();
 		poly1_1_of_2 = polygon(n(0,0),n(1,0),n(1,1),n(1,2));
 		poly1_2_of_2 = polygon(n(1,2),n(0,2),n(-1,2),n(0,0));
 		poly2 = polygon(n(4,4), n(4,5), n(3,5), n(4,4));
@@ -61,8 +59,8 @@ public class MultipolygonTest {
 
 	@Test
 	public void test_twoWayPolygon() {
-		testee.addOuterWay(poly1_1_of_2);
-		testee.addOuterWay(poly1_2_of_2);
+		Multipolygon testee = new MultipolygonBuilder().addOuterWay(poly1_1_of_2).
+				addOuterWay(poly1_2_of_2).build();
 		assertEquals(1, testee.countOuterPolygons());
 		assertFalse(testee.hasOpenedPolygons());
 	}
@@ -77,8 +75,7 @@ public class MultipolygonTest {
 		w.addNode(new Node(1.5, 0.5, 4));
 		w.addNode(new Node(1.0, 1.0, 5));
 		
-		Multipolygon m = new Multipolygon();
-		m.addOuterWay(w);
+		Multipolygon m = new MultipolygonBuilder().addOuterWay(w).build();
 		
 		Ring r = m.getOuterRings().get(0);
 		// calculated with JOSM measurement tool
@@ -90,7 +87,8 @@ public class MultipolygonTest {
 
 	@Test
 	public void test_oneWayPolygon() {
-		testee.addOuterWay(poly2);
+		Multipolygon testee = new MultipolygonBuilder().addOuterWay(poly2)
+				.build();
 		assertEquals(1, testee.countOuterPolygons());
 		assertFalse(testee.hasOpenedPolygons());
 	}
@@ -98,7 +96,8 @@ public class MultipolygonTest {
 	@Test
 	public void test_containsPoint()
 	{
-		testee.addOuterWay(scale(4,poly2));
+		Multipolygon testee = new MultipolygonBuilder().addOuterWay(scale(4,poly2))
+				.build();
 		LatLon center = testee.getCenterPoint();
 		assertTrue(testee.containsPoint(center));
 	}
@@ -106,7 +105,8 @@ public class MultipolygonTest {
 	@Test
 	public void test_containsPointOpenedCircle()
 	{
-		testee.addOuterWay(scale(4,openedBaseCircle));
+		Multipolygon testee = new MultipolygonBuilder().addOuterWay(scale(4,openedBaseCircle))
+				.build();
 		LatLon center = testee.getCenterPoint();
 		assertTrue(testee.containsPoint(center));
 	}
@@ -114,7 +114,8 @@ public class MultipolygonTest {
 	@Test
 	public void test_containsPointClosedCircle()
 	{
-		testee.addOuterWay(scale(4,openedBaseCircle));
+		Multipolygon testee = new MultipolygonBuilder().addOuterWay(scale(4,closedBaseCircle))
+				.build();
 		LatLon center = testee.getCenterPoint();
 		assertTrue(testee.containsPoint(center));
 	}
@@ -133,18 +134,20 @@ public class MultipolygonTest {
 
 	public void test_oneInnerRingOneOuterRing(Way polygon)
 	{
-		testee.addOuterWay(scale(4,polygon));
+		MultipolygonBuilder bld = new MultipolygonBuilder();
+		bld.addOuterWay(scale(4,polygon));
+		Multipolygon testee = bld.build();
 		LatLon center = testee.getCenterPoint();
 		assertTrue(testee.containsPoint(center));
 
-		Multipolygon mpoly2 = new Multipolygon();
+		MultipolygonBuilder mpoly2 = new MultipolygonBuilder();
 		mpoly2.addOuterWay(polygon);
 		
-		assertTrue(testee.containsPoint(mpoly2.getCenterPoint()));
+		assertTrue(testee.containsPoint(mpoly2.build().getCenterPoint()));
 		
-		testee.addInnerWay(polygon);
-		
-		assertFalse(testee.containsPoint(mpoly2.getCenterPoint()));
+		bld.addInnerWay(polygon);
+		testee = bld.build();
+		assertFalse(testee.containsPoint(mpoly2.build().getCenterPoint()));
 	}
 
 	@Test
@@ -161,31 +164,34 @@ public class MultipolygonTest {
 	
 	public void test_twoInnerRingsOneOuterRing(Way polygon)
 	{
-		testee.addOuterWay(scale(40,polygon));
+		MultipolygonBuilder bld = new MultipolygonBuilder();
+		bld.addOuterWay(scale(40,polygon));
+		Multipolygon testee = bld.build();
 		LatLon center = testee.getCenterPoint();
 		assertTrue(testee.containsPoint(center));
 		
-		Multipolygon mpoly2 = new Multipolygon();
+		MultipolygonBuilder mpoly2 = new MultipolygonBuilder();
 		mpoly2.addOuterWay(polygon);
-		Multipolygon movepoly2 = new Multipolygon();
+		MultipolygonBuilder movepoly2 = new MultipolygonBuilder();
 		movepoly2.addOuterWay(move(10,10,polygon));
 
-		assertTrue(testee.containsPoint(mpoly2.getCenterPoint()));
-		assertTrue(testee.containsPoint(movepoly2.getCenterPoint()));
+		assertTrue(testee.containsPoint(mpoly2.build().getCenterPoint()));
+		assertTrue(testee.containsPoint(movepoly2.build().getCenterPoint()));
 
-		testee.addInnerWay(polygon);
-		testee.addInnerWay(move(10,10,polygon));
+		bld.addInnerWay(polygon);
+		bld.addInnerWay(move(10,10,polygon));
+		testee = bld.build();
 
-		assertFalse(testee.containsPoint(mpoly2.getCenterPoint()));
-		assertFalse(testee.containsPoint(movepoly2.getCenterPoint()));
+		assertFalse(testee.containsPoint(mpoly2.build().getCenterPoint()));
+		assertFalse(testee.containsPoint(movepoly2.build().getCenterPoint()));
 	}
 
 	@Test
 	public void test_multipolygon1twoWay2oneWay()
 	{
-		testee.addOuterWay(poly1_1_of_2);
-		testee.addOuterWay(poly1_2_of_2);
-		testee.addOuterWay(poly2);
+		MultipolygonBuilder bld = new MultipolygonBuilder();
+		bld.addOuterWay(poly1_1_of_2).addOuterWay(poly1_2_of_2).addOuterWay(poly2);
+		Multipolygon testee = bld.build();
 		assertEquals(2, testee.countOuterPolygons());
 		assertFalse(testee.hasOpenedPolygons());
 	}
@@ -193,8 +199,9 @@ public class MultipolygonTest {
 	@Test
 	public void test_firstEmptyWayThanOpenedWay()
 	{
-		testee.addOuterWay(new Way(111));
-		testee.addOuterWay(poly1_1_of_2);
+		MultipolygonBuilder bld = new MultipolygonBuilder();
+		bld.addOuterWay(new Way(111)).addOuterWay(poly1_1_of_2);
+		Multipolygon testee = bld.build();
 		assertEquals(1, testee.countOuterPolygons());
 		assertTrue(testee.hasOpenedPolygons());
 	}
@@ -202,12 +209,14 @@ public class MultipolygonTest {
 	@Test
 	public void test_mergingExistingPolygons()
 	{
+		MultipolygonBuilder bld = new MultipolygonBuilder();
 		Way part1 = polygon(n(1,1),n(1,2),n(1,3));
 		Way part2 = polygon(n(1,3),n(1,4),n(1,5));
 		Way part3 = polygon(n(1,5),n(1,6),n(1,2));
-		testee.addOuterWay(part1);
-		testee.addOuterWay(part3);
-		testee.addOuterWay(part2);
+		bld.addOuterWay(part1);
+		bld.addOuterWay(part3);
+		bld.addOuterWay(part2);
+		Multipolygon testee = bld.build();
 		assertEquals(1, testee.countOuterPolygons());
 		assertTrue(testee.hasOpenedPolygons());
 	}
@@ -215,12 +224,14 @@ public class MultipolygonTest {
 	@Test
 	public void test_mergingExistingPolygonsReversed()
 	{
+		MultipolygonBuilder bld = new MultipolygonBuilder();
 		Way part1 = polygon(n(1,3),n(1,2),n(1,1));
 		Way part2 = polygon(n(1,3),n(1,4),n(1,5));
 		Way part3 = polygon(n(1,5),n(1,6),n(1,2));
-		testee.addOuterWay(part1);
-		testee.addOuterWay(part3);
-		testee.addOuterWay(part2);
+		bld.addOuterWay(part1);
+		bld.addOuterWay(part3);
+		bld.addOuterWay(part2);
+		Multipolygon testee = bld.build();
 		assertEquals(1, testee.countOuterPolygons());
 		assertTrue(testee.hasOpenedPolygons());
 	}
