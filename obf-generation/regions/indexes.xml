@@ -121,7 +121,7 @@
 			<region name="calabria"  cityAdminLevel="4"/>
 			<region name="campania"  cityAdminLevel="4"/>
 			<region name="emilia-romagna"  cityAdminLevel="4"/>
-			<region name="friuli-venezia_giulia"  cityAdminLevel="4"/>
+			<region name="friuli-venezia-giulia"  cityAdminLevel="4"/>
 			<region name="lazio"  cityAdminLevel="4"/>
 			<region name="liguria"  cityAdminLevel="4"/>
 			<region name="lombardia"  cityAdminLevel="4"/>
@@ -133,7 +133,7 @@
 			<region name="sicilia"  cityAdminLevel="4"/>
 			<region name="umbria"  cityAdminLevel="4"/>
 			<region name="toscana"  cityAdminLevel="4"/>
-			<region name="trentino-alto_adige"  cityAdminLevel="4"/>
+			<region name="trentino-alto-adige"  cityAdminLevel="4"/>
 			<region name="valle_d_aosta"  cityAdminLevel="4"/>
 			<region name="veneto"  cityAdminLevel="4"/>
 		</regions>
