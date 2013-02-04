@@ -134,7 +134,7 @@
 			<region name="umbria"  cityAdminLevel="4"/>
 			<region name="toscana"  cityAdminLevel="4"/>
 			<region name="trentino-alto-adige"  cityAdminLevel="4"/>
-			<region name="valle_d_aosta"  cityAdminLevel="4"/>
+			<region name="valle-aosta"  cityAdminLevel="4"/>
 			<region name="veneto"  cityAdminLevel="4"/>
 		</regions>
 
