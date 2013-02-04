@@ -801,7 +801,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 	
 	public void writeCitiesIntoDb() throws SQLException {
 		for (City c : cities.values()) {
-			writeCity(c);
+			if(c.getType() != CityType.DISTRICT){
+				writeCity(c);
+			}
 		}
 		// commit to put all cities
 		commitWriteCity();
