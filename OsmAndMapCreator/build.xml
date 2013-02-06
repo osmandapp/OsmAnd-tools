@@ -19,14 +19,6 @@
 	<property name="srctests.dir" value="src-tests"/>
 	<property name="reports.tests" value="${basedir}/test-results" />
 
-	<path id="build.path">
-		<fileset dir="${osmand-core.dir}">
-			<include name="${osmand-core.jar}"/>
-		</fileset> 
-		<fileset dir="${lib.absolute.dir}">
-			<include name="*.jar"/>
-		</fileset>
-	</path>
 
 	<target name="-dirs">
 		<mkdir dir="${bin.absolute.dir}"/>
@@ -45,6 +37,16 @@
                          inheritAll="false" inheritRefs="false">
 		</ant>
 	</target>
+
+	
+	<path id="build.path">
+		<fileset dir="${osmand-core.dir}">
+			<include name="${osmand-core.jar}"/>
+		</fileset> 
+		<fileset dir="${lib.absolute.dir}">
+			<include name="*.jar"/>
+		</fileset>
+	</path>
 
 	<target name="-version" if="build.version">
 		<replace file="src/net/osmand/MapCreatorVersion.java" token="String APP_DESCRIPTION" value="String APP_DESCRIPTION=&quot;${build.version}&quot;;//"/>
