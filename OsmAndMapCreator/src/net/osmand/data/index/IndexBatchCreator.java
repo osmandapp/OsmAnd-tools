@@ -451,7 +451,7 @@ public class IndexBatchCreator {
 				osmDb = DBDialect.SQLITE;
 			}
 			IndexCreator indexCreator = new IndexCreator(workDir);
-			indexCreator.setDialects(osmDb, this.mapDBDialect);
+			indexCreator.setDialects(osmDb, osmDb);
 			indexCreator.setIndexAddress(indexAddress);
 			indexCreator.setIndexPOI(indexPOI);
 			indexCreator.setIndexTransport(indexTransport);
