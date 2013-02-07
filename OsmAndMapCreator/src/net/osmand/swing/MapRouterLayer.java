@@ -62,6 +62,8 @@ import org.xmlpull.v1.XmlPullParserException;
 public class MapRouterLayer implements MapPanelLayer {
 	
 	private final static Log log = PlatformUtil.getLog(MapRouterLayer.class);
+	private boolean USE_OLD_ROUTING = true;
+	private boolean USE_NATIVE_ROUTING = true;
 
 	private MapPanel map;
 	private LatLon startRoute ;
@@ -582,7 +584,7 @@ public class MapRouterLayer implements MapPanelLayer {
 				}
 				String m = DataExtractionSettings.getSettings().getRouteMode();
 				String[] props = m.split("\\,");
-				RoutePlannerFrontEnd router = new RoutePlannerFrontEnd(true);
+				RoutePlannerFrontEnd router = new RoutePlannerFrontEnd(USE_OLD_ROUTING);
 				RoutingConfiguration config = builder.build(props[0], /*RoutingConfiguration.DEFAULT_MEMORY_LIMIT*/ 500, props);
 //				config.initialDirection = 90d / 180d * Math.PI; // EAST
 //				config.initialDirection = 180d / 180d * Math.PI; // SOUTH
@@ -591,7 +593,7 @@ public class MapRouterLayer implements MapPanelLayer {
 				// config.NUMBER_OF_DESIRABLE_TILES_IN_MEMORY = 300;
 				// config.ZOOM_TO_LOAD_TILES = 14;
 				final RoutingContext ctx = new RoutingContext(config, 
-//						NativeSwingRendering.getDefaultFromSettings()
+						USE_NATIVE_ROUTING ? NativeSwingRendering.getDefaultFromSettings() :
 						null
 						, rs, useBasemap);
 				ctx.previouslyCalculatedRoute = previousRoute;
