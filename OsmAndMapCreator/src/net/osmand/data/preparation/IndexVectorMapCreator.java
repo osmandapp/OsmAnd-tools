@@ -91,18 +91,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	public void indexMapRelationsAndMultiPolygons(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 		indexMultiPolygon(e, ctx);
 		if(e instanceof Relation) {
-			Map<String, String> ts = ((Relation) e).getTags();
-			Map<String, String> propogated = null;
-			Iterator<Entry<String, String>> its = ts.entrySet().iterator();
-			while(its.hasNext()) {
-				Entry<String, String> ev = its.next();
-				if(renderingTypes.isRelationalTagValuePropogated(ev.getKey(), ev.getValue())) {
-					if(propogated == null) {
-						propogated = new LinkedHashMap<String, String>();
-					}
-					propogated.put(ev.getKey(), ev.getValue());
-				}
-			}
+			Map<String, String> propogated = renderingTypes.getRelationPropogatedTags(((Relation)e));
 			if(propogated != null) {
 				ctx.loadEntityRelation((Relation) e);
 				for(EntityId id : ((Relation) e).getMembersMap().keySet()) {
