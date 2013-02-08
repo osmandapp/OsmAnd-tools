@@ -500,8 +500,9 @@
 				
 		<!-- 7. NEW ZEALAND-AUSTRALIA [SOURCE: GEOFABRIK.DE] -->
 		<regions siteToDownload="http://download.geofabrik.de/openstreetmap/australia-oceania/{0}.osm.pbf" region_prefix="" region_suffix="_Australia"  skip="false">
-			<region name="new-zealand" esize=""/>
+			<region name="australia" esize=""/>
 			<region name="new-caledonia" esize=""/>
+			<region name="new-zealand" esize=""/>
 		</regions>
 							
 </regions_list> 
