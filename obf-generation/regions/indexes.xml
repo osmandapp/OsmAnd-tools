@@ -65,6 +65,36 @@
 			<region name="england" esize="230"/>
 		</regions>
 
+		<!-- 1.1.1 GREAT BRITAIN - ENGLAND [SOURCE: GEOFABRIK.DE] -->
+		<regions siteToDownload="http://download.geofabrik.de/openstreetmap/europe/great_britain/england/{0}.osm.pbf" region_prefix="GB_England_" skip="false" region_suffix="_Europe">
+			<region name="buckinghamshire" esize=""/>		
+			<region name="cambridgeshire" esize=""/>
+			<region name="cheshire" esize=""/>
+			<region name="cumbria" esize=""/>
+			<region name="derbyshire" esize=""/>
+			<region name="devon" esize=""/>
+			<region name="east_yorkshire_with_hull" esize=""/>
+			<region name="essex" esize=""/>
+			<region name="greater_london" esize=""/>
+			<region name="hampshire" esize=""/>
+			<region name="herefordshire" esize=""/>
+			<region name="kent" esize=""/>
+			<region name="lancashire" esize=""/>
+			<region name="leicestershire" esize=""/>
+			<region name="norfolk" esize=""/>
+			<region name="north_yorkshire" esize=""/>
+			<region name="nottinghamshire" esize=""/>
+			<region name="oxfordshire" esize=""/>
+			<region name="shropshire" esize=""/>
+			<region name="somerset" esize=""/>
+			<region name="south_yorkshire" esize=""/>
+			<region name="suffolk" esize=""/>
+			<region name="surrey" esize=""/>
+			<region name="west_midlands" esize=""/>
+			<region name="west_sussex" esize=""/>
+			<region name="wiltshire" esize=""/>
+		</regions>
+
 		<!-- 1.2 FRANCE [SOURCE: GEOFABRIK.DE] -->
 		<regions siteToDownload="http://download.geofabrik.de/openstreetmap/europe/france/{0}.osm.pbf" region_prefix="France_" 
 			skip="false" region_suffix="_Europe">
@@ -504,8 +534,9 @@
 				
 		<!-- 7. NEW ZEALAND-AUSTRALIA [SOURCE: GEOFABRIK.DE] -->
 		<regions siteToDownload="http://download.geofabrik.de/openstreetmap/australia-oceania/{0}.osm.pbf" region_prefix="" region_suffix="_Australia"  skip="false">
-			<region name="new-zealand"/>
+		<!-- 	<region name="australia" esize=""/> -->
 			<region name="new-caledonia"/>
+			<region name="new-zealand"/>
 		</regions>
 		
 		<!--  5. SOUTH AMERICA [SOURCE: GEOFABRIK.DE] -->
