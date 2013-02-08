@@ -95,20 +95,44 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 	private RouteBorderLines baseRouteBorders = new RouteBorderLines(12, true);
 	private PreparedStatement mapRouteInsertStat;
 	private PreparedStatement basemapRouteInsertStat;
+	private Map<EntityId, Map<String, String>> propogatedTags = new LinkedHashMap<Entity.EntityId, Map<String, String>>();
 
 
-	public IndexRouteCreator(Log logMapDataWarn) {
+	public IndexRouteCreator(MapRenderingTypes renderingTypes, Log logMapDataWarn) {
 		this.logMapDataWarn = logMapDataWarn;
-		this.routeTypes = new MapRoutingTypes();
+		this.routeTypes = new MapRoutingTypes(renderingTypes);
 	}
 	public void indexRelations(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 		indexHighwayRestrictions(e, ctx);
+		if(e instanceof Relation) {
+			Map<String, String> propogated = routeTypes.getRouteRelationPropogatedTags(e);
+			if(propogated != null) {
+				ctx.loadEntityRelation((Relation) e);
+				for(EntityId id : ((Relation) e).getMembersMap().keySet()) {
+					if(!propogatedTags.containsKey(id)) {
+						propogatedTags.put(id, new LinkedHashMap<String, String>());
+					}
+					propogatedTags.get(id).putAll(propogated);
+				}
+			}
+		}
 	}
-
+	
 
 	public void iterateMainEntity(Entity es, OsmDbAccessorContext ctx) throws SQLException {
 		if (es instanceof Way) {
 			Way e = (Way) es;
+			Map<String, String> tags = propogatedTags.get(EntityId.valueOf(e));
+			if (tags != null) {
+				Iterator<Entry<String, String>> iterator = tags.entrySet().iterator();
+				while (iterator.hasNext()) {
+					Entry<String, String> ts = iterator.next();
+					if (e.getTag(ts.getKey()) == null) {
+						e.putTag(ts.getKey(), ts.getValue());
+					}
+				}
+			}
+			
 			boolean encoded = routeTypes.encodeEntity(e, outTypes, names) ;
 			if (encoded) {
 				// Load point with  tags!
