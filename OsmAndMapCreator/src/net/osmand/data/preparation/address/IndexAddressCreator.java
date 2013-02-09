@@ -273,7 +273,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 		int adminLevelImportance = getAdminLevelImportance(b);
 		if(nameEq) {
 			if(cityBoundary) {
-				return 50;
+				return 0;
 			} else if(c.getId() == b.getAdminCenterId() || 
 					!b.hasAdminCenterId()){
 				return adminLevelImportance;
