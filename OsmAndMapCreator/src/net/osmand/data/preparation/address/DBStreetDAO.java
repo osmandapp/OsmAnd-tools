@@ -147,6 +147,9 @@ public class DBStreetDAO extends AbstractIndexPartCreator
 	}
 
 	public DBStreetDAO.SimpleStreet findStreet(String name, City city, String cityPart) throws SQLException {
+		if(cityPart == null) {
+			return findStreet(name, city);
+		}
 		addressSearchStreetStat.setLong(1, city.getId());
 		addressSearchStreetStat.setString(2, cityPart);
 		addressSearchStreetStat.setString(3, name);
