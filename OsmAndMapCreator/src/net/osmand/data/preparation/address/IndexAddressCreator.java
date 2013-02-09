@@ -82,7 +82,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 	//TODO make it an option
 	private boolean DEBUG_FULL_NAMES = false; //true to see atached cityPart and boundaries to the street names
 	
-	private boolean FIND_CITY_PART_FOR_ALL_STREETS = false; 
+	private boolean FIND_CITY_PART_FOR_ALL_STREETS = true; 
 	private final int ADDRESS_NAME_CHARACTERS_TO_INDEX = 4; 
 	
 	Connection mapConnection;
@@ -620,9 +620,15 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 					if (subpart != city) {
 						Boundary subBoundary = cityBoundaries.get(subpart);
 						if (cityBoundary != null && subBoundary != null && subBoundary.getAdminLevel() > cityBoundary.getAdminLevel()) {
-							cityPart = findNearestCityOrSuburb(subBoundary, location); // subpart.getName();
-							found = true;
-							break;
+							// old code
+//							cityPart = findNearestCityOrSuburb(subBoundary, location); // subpart.getName();
+							if(subBoundary.containsPoint(location)) {
+								cityPart = subpart.getName();
+								found = true;
+								break;	
+							}
+							
+							
 						}
 					}
 				}
@@ -642,17 +648,25 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 		if(greatestBoundary != null) {
 			result = greatestBoundary.getName();
 			list = boundaryToContainingCities.get(greatestBoundary);
-		} else if(!FIND_CITY_PART_FOR_ALL_STREETS) {
+		} else {
 			list.addAll(cityManager.getClosestObjects(location.getLatitude(),location.getLongitude()));
 			list.addAll(cityVillageManager.getClosestObjects(location.getLatitude(),location.getLongitude()));
 		}
 		if(list != null) {
 			for (City c : list) {
 				double actualDistance = MapUtils.getDistance(location, c.getLocation());
-				if (actualDistance < dist) {
-					result = c.getName();
-					dist = actualDistance;
+				if(FIND_CITY_PART_FOR_ALL_STREETS) {
+					if(actualDistance < 1.5 * c.getType().getRadius() && actualDistance < dist) {
+						result = c.getName();
+						dist = actualDistance;	
+					}
+				} else {
+					if (actualDistance < dist) {
+						result = c.getName();
+						dist = actualDistance;
+					}	
 				}
+				
 			}
 		}
 		return result;
@@ -1111,7 +1125,6 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 					street.setEnName(streetEnName + cityPart);
 					streetNodes.put(street, thisWayNodes);
 				}
-				System.out.println(streetId+" " + street.getName());
 				visitedStreets.put(streetId, street); // mark the street as visited
 			}
 			if (set.getObject(6) != null) {
