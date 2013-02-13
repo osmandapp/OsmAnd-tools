@@ -216,7 +216,7 @@ public class IndexBatchCreator {
 					String name = ncountry.getAttribute("name");
 					RegionSpecificData data = new RegionSpecificData();
 					data.cityAdminLevel = ncountry.getAttribute("cityAdminLevel");
-					String dname = ncountry.getAttribute("downloadname");
+					String dname = ncountry.getAttribute("downloadName");
 					data.downloadName = dname == null ? name : dname;
 					if(name != null && !Boolean.parseBoolean(ncountry.getAttribute("skip"))){
 						countries.regionNames.put(name, data);
