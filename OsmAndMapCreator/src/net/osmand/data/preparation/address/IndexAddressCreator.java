@@ -219,12 +219,14 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 
 	public void tryToAssignBoundaryToFreeCities(IProgress progress) {
 		progress.startWork(cities.size());
+		// Why to do this? This is completely incorrect to do with suburbs because it assigns boundary that is much bigger 
+		// than suburb and after that findCityPart works incorrectly
 		//for cities without boundaries, try to find the right one
 		int smallestAdminLevel = 7; //start at level 8 for now...
 		for (City c : cities.values()) {
 			progress.progress(1);
 			Boundary cityB = cityBoundaries.get(c);
-			if (cityB == null) {
+			if (cityB == null && (c.getType() == CityType.CITY || c.getType() == CityType.TOWN)) {
 				LatLon location = c.getLocation();
 				Boundary smallestBoundary = null;
 				// try to found boundary
@@ -621,7 +623,8 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 						Boundary subBoundary = cityBoundaries.get(subpart);
 						if (cityBoundary != null && subBoundary != null && subBoundary.getAdminLevel() > cityBoundary.getAdminLevel()) {
 							// old code
-//							cityPart = findNearestCityOrSuburb(subBoundary, location); // subpart.getName();
+							cityPart = findNearestCityOrSuburb(subBoundary, location); // subpart.getName();
+							// ?FIXME
 							if(subBoundary.containsPoint(location)) {
 								cityPart = subpart.getName();
 								found = true;

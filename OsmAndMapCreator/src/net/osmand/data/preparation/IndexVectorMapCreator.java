@@ -92,7 +92,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		indexMultiPolygon(e, ctx);
 		if(e instanceof Relation) {
 			Map<String, String> propogated = renderingTypes.getRelationPropogatedTags(((Relation)e));
-			if(propogated != null) {
+			if(propogated != null && propogated.size() > 0) {
 				ctx.loadEntityRelation((Relation) e);
 				for(EntityId id : ((Relation) e).getMembersMap().keySet()) {
 					if(!propogatedTags.containsKey(id)) {
