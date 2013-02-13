@@ -68,6 +68,7 @@ public class IndexBatchCreator {
 	
 	private static class RegionSpecificData {
 		public String cityAdminLevel;
+		public String downloadName;
 	}
 	
 	
@@ -215,6 +216,8 @@ public class IndexBatchCreator {
 					String name = ncountry.getAttribute("name");
 					RegionSpecificData data = new RegionSpecificData();
 					data.cityAdminLevel = ncountry.getAttribute("cityAdminLevel");
+					String dname = ncountry.getAttribute("downloadname");
+					data.downloadName = dname == null ? name : dname;
 					if(name != null && !Boolean.parseBoolean(ncountry.getAttribute("skip"))){
 						countries.regionNames.put(name, data);
 					}
@@ -285,7 +288,7 @@ public class IndexBatchCreator {
 			for(String name : regionCountries.regionNames.keySet()){
 				name = name.toLowerCase();
 				RegionSpecificData regionSpecificData = regionCountries.regionNames.get(name);
-				String url = MessageFormat.format(site, name);
+				String url = MessageFormat.format(site, regionSpecificData.downloadName);
 				
 				String regionName = prefix + name;
 				String fileName = Algorithms.capitalizeFirstLetterAndLowercase(prefix + name + suffix);
