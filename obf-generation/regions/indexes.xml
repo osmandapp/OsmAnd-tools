@@ -185,9 +185,9 @@
 			<region name="belgorod" downloadName="BEL"/>
 			<region name="bryansk" downloadName="BRY"/> 
 			<region name="buryat" downloadName="BU"/>
-			<region name="chechen" downloadName="CH"/>
+			<region name="chechen" downloadName="CE"/>
 			<region name="chel" downloadName="CHE"/>
-			<region name="chukot" downloadName="CH"/>
+			<region name="chukot" downloadName="CHU"/>
 			<region name="chuvash" downloadName="CU"/>
 			<region name="dagestan" downloadName="DA"/>
 			<region name="evrey" downloadName="YEV"/>
