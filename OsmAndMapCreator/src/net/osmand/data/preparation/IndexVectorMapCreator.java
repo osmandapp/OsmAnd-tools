@@ -91,7 +91,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	public void indexMapRelationsAndMultiPolygons(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 		indexMultiPolygon(e, ctx);
 		if(e instanceof Relation) {
-			Map<String, String> propogated = renderingTypes.getRelationPropogatedTags(((Relation)e));
+			Map<MapRulType, String> propogated = renderingTypes.getRelationPropogatedTags(((Relation)e));
 			if(propogated != null && propogated.size() > 0) {
 				ctx.loadEntityRelation((Relation) e);
 				for(EntityId id : ((Relation) e).getMembersMap().keySet()) {
@@ -99,13 +99,14 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 						propogatedTags.put(id, new LinkedHashMap<String, String>());
 					}
 					Map<String, String> map = propogatedTags.get(id);
-					Iterator<Entry<String, String>> it = propogated.entrySet().iterator();
+					Iterator<Entry<MapRulType, String>> it = propogated.entrySet().iterator();
 					while(it.hasNext()) {
-						Entry<String, String> es = it.next();
-						if(map.containsKey(es.getKey())) {
-							map.put(es.getKey(), map.get(es.getKey()) + ", " +  es.getValue());
+						Entry<MapRulType, String> es = it.next();
+						String key = es.getKey().getTag();
+						if(es.getKey().isOnlyNameRef() && map.containsKey(key)) {
+							map.put(key, map.get(key) + ", " +  es.getValue());
 						} else {
-							map.put(es.getKey(), es.getValue());
+							map.put(key, es.getValue());
 						}
 					}
 				}
