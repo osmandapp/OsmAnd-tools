@@ -98,7 +98,16 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 					if(!propogatedTags.containsKey(id)) {
 						propogatedTags.put(id, new LinkedHashMap<String, String>());
 					}
-					propogatedTags.get(id).putAll(propogated);
+					Map<String, String> map = propogatedTags.get(id);
+					Iterator<Entry<String, String>> it = propogated.entrySet().iterator();
+					while(it.hasNext()) {
+						Entry<String, String> es = it.next();
+						if(map.containsKey(es.getKey())) {
+							map.put(es.getKey(), map.get(es.getKey()) + ", " +  es.getValue());
+						} else {
+							map.put(es.getKey(), es.getValue());
+						}
+					}
 				}
 			}
 		}
