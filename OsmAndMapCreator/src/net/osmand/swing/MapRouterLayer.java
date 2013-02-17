@@ -34,7 +34,6 @@ import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.data.DataTileManager;
 import net.osmand.osm.Entity;
 import net.osmand.osm.LatLon;
-import net.osmand.osm.MapUtils;
 import net.osmand.osm.OSMSettings.OSMTagKey;
 import net.osmand.osm.Way;
 import net.osmand.router.BinaryRoutePlanner.RouteSegment;
@@ -44,6 +43,7 @@ import net.osmand.router.RouteSegmentResult;
 import net.osmand.router.RoutingConfiguration;
 import net.osmand.router.RoutingConfiguration.Builder;
 import net.osmand.router.RoutingContext;
+import net.osmand.util.MapUtils;
 
 import org.apache.commons.logging.Log;
 import org.json.JSONException;

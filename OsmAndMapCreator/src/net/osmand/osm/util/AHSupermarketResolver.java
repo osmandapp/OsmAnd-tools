@@ -28,7 +28,6 @@ import net.osmand.osm.Entity;
 import net.osmand.osm.Entity.EntityId;
 import net.osmand.osm.EntityInfo;
 import net.osmand.osm.LatLon;
-import net.osmand.osm.MapUtils;
 import net.osmand.osm.Node;
 import net.osmand.osm.OpeningHoursParser;
 import net.osmand.osm.OpeningHoursParser.BasicDayOpeningHourRule;
@@ -39,6 +38,7 @@ import net.osmand.swing.DataExtractionSettings;
 import net.osmand.swing.MapPanel;
 import net.osmand.swing.MapPointsLayer;
 import net.osmand.util.Algorithms;
+import net.osmand.util.MapUtils;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;

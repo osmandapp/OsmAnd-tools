@@ -33,13 +33,13 @@ import net.osmand.osm.Entity;
 import net.osmand.osm.Entity.EntityId;
 import net.osmand.osm.MapRenderingTypes;
 import net.osmand.osm.MapRenderingTypes.MapRulType;
-import net.osmand.osm.MapUtils;
 import net.osmand.osm.Node;
 import net.osmand.osm.OSMSettings.OSMTagKey;
 import net.osmand.osm.Relation;
 import net.osmand.osm.Way;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapAlgorithms;
+import net.osmand.util.MapUtils;
 
 import org.apache.commons.logging.Log;
 

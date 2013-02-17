@@ -19,13 +19,13 @@ import javax.xml.parsers.SAXParserFactory;
 
 import net.osmand.NativeLibrary;
 import net.osmand.RenderingContext;
-import net.osmand.osm.MapUtils;
 import net.osmand.render.RenderingRuleProperty;
 import net.osmand.render.RenderingRuleSearchRequest;
 import net.osmand.render.RenderingRuleStorageProperties;
 import net.osmand.render.RenderingRulesStorage;
 import net.osmand.render.RenderingRulesStorage.RenderingRulesStorageResolver;
 import net.osmand.util.Algorithms;
+import net.osmand.util.MapUtils;
 
 import org.xml.sax.Attributes;
 import org.xml.sax.SAXException;

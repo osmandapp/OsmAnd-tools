@@ -42,13 +42,13 @@ import net.osmand.data.preparation.address.DBStreetDAO.SimpleStreet;
 import net.osmand.osm.Entity;
 import net.osmand.osm.Entity.EntityId;
 import net.osmand.osm.LatLon;
-import net.osmand.osm.MapUtils;
 import net.osmand.osm.Node;
 import net.osmand.osm.OSMSettings.OSMTagKey;
 import net.osmand.osm.Relation;
 import net.osmand.osm.Way;
 import net.osmand.swing.Messages;
 import net.osmand.util.Algorithms;
+import net.osmand.util.MapUtils;
 import net.sf.junidecode.Junidecode;
 
 import org.apache.commons.logging.Log;

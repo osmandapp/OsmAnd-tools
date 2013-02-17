@@ -28,9 +28,9 @@ import net.osmand.data.AmenityType;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.osm.Entity;
 import net.osmand.osm.MapRenderingTypes;
-import net.osmand.osm.MapUtils;
 import net.osmand.osm.OSMSettings.OSMTagKey;
 import net.osmand.util.Algorithms;
+import net.osmand.util.MapUtils;
 import net.sf.junidecode.Junidecode;
 
 import org.apache.commons.logging.Log;

@@ -22,9 +22,9 @@ import net.osmand.data.DataTileManager;
 import net.osmand.data.Street;
 import net.osmand.osm.Entity;
 import net.osmand.osm.LatLon;
-import net.osmand.osm.MapUtils;
 import net.osmand.osm.Node;
 import net.osmand.osm.OSMSettings.OSMTagKey;
+import net.osmand.util.MapUtils;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;

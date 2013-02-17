@@ -21,12 +21,12 @@ import net.osmand.data.preparation.MapZooms.MapZoomPair;
 import net.osmand.osm.Entity;
 import net.osmand.osm.MapRenderingTypes;
 import net.osmand.osm.MapRenderingTypes.MapRulType;
-import net.osmand.osm.MapUtils;
 import net.osmand.osm.Node;
 import net.osmand.osm.Way;
 import net.osmand.osm.WayChain;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapAlgorithms;
+import net.osmand.util.MapUtils;
 
 import org.apache.commons.logging.Log;
 import org.apache.tools.bzip2.CBZip2InputStream;
