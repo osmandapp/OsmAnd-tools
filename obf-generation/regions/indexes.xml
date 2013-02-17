@@ -259,12 +259,7 @@
 			<region name="yarosl" downloadName="YAR"/>
 			<region name="zabaikal" downloadName="ZAB"/>
 		</regions>
-		
-		<regions siteToDownload="http://downloads.cloudmade.com/asia/northern_asia/{0}/{0}.osm.bz2" region_prefix="" region_suffix="_Asia"  skip="true">
-      			<region name="russia" esize="820"/> 
-	        </regions>
-		
-		
+	
 		
 		<!-- 3. North America  -->		
 		<!-- 3.1 USA-AVAILABLE ON GEOFABRIK.DE [SOURCE: GEOFABRIK.DE] (REST OF USA IS BELOW FROM CLOUDMADE.COM) -->
@@ -322,19 +317,6 @@
 			<region name="wyoming"/>
 			
 		</regions>
-				
-		<!-- 3.1 USA MINOR OUTLYING ISLANDS [SOURCE: CLOUDMADE.COM] 
-		<regions siteToDownload="http://downloads.cloudmade.com/americas/northern_america/united_states_minor_outlying_islands/{0}/{0}.osm.bz2" skip="true" region_prefix="US-Islands_" region_suffix="_NorthAmerica">
-			<region name="baker"/>
-			<region name="howland"/>
-			<region name="jarvis_island"/>
-			<region name="johnston"/>
-			<region name="kingman_reef"/>
-			<region name="midway"/>
-			<region name="navassa"/>
-			<region name="palmyra"/>
-			<region name="wake"/>
-		</regions> -->
 		
 		<!-- 3.2 CANADA [SOURCE: GEOFABRIK.DE] -->
 		<regions siteToDownload="http://download.geofabrik.de/openstreetmap/north-america/canada/{0}.osm.pbf" region_prefix="Canada_" skip="false" region_suffix="_NorthAmerica">
