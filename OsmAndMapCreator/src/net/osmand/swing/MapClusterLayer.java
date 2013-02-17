@@ -23,7 +23,7 @@ import javax.swing.SwingUtilities;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.RouteDataObject;
 import net.osmand.data.DataTileManager;
-import net.osmand.osm.LatLon;
+import net.osmand.data.LatLon;
 import net.osmand.osm.Way;
 import net.osmand.router.BinaryRoutePlanner;
 import net.osmand.router.BinaryRoutePlanner.RouteSegment;

@@ -3,7 +3,6 @@ package net.osmand.data;
 import static org.junit.Assert.*;
 
 
-import net.osmand.osm.LatLon;
 import net.osmand.osm.Node;
 import net.osmand.osm.Way;
 

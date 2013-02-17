@@ -19,7 +19,7 @@ import javax.swing.JPanel;
 import javax.swing.JTextField;
 
 import net.osmand.PlatformUtil;
-import net.osmand.osm.LatLon;
+import net.osmand.data.LatLon;
 import net.osmand.util.Algorithms;
 
 import org.apache.commons.logging.Log;

@@ -9,10 +9,10 @@ import java.util.Set;
 
 import net.osmand.data.Building;
 import net.osmand.data.City;
+import net.osmand.data.LatLon;
 import net.osmand.data.preparation.AbstractIndexPartCreator;
 import net.osmand.data.preparation.DBDialect;
 import net.osmand.osm.Entity;
-import net.osmand.osm.LatLon;
 import net.osmand.osm.Node;
 import net.osmand.osm.Way;
 

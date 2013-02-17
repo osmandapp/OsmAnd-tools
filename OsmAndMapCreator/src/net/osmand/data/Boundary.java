@@ -1,7 +1,6 @@
 package net.osmand.data;
 
 import net.osmand.data.City.CityType;
-import net.osmand.osm.LatLon;
 
 public class Boundary {
 	

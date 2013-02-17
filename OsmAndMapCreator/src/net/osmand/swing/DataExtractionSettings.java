@@ -6,9 +6,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.prefs.Preferences;
 
+import net.osmand.data.LatLon;
 import net.osmand.data.preparation.IndexCreator;
 import net.osmand.data.preparation.MapZooms;
-import net.osmand.osm.LatLon;
 
 
 public class DataExtractionSettings {

@@ -16,7 +16,7 @@ import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JPopupMenu;
 
-import net.osmand.osm.LatLon;
+import net.osmand.data.LatLon;
 
 public class MapInformationLayer implements MapPanelLayer {
 

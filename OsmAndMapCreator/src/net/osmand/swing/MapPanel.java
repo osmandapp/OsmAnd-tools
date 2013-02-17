@@ -46,6 +46,7 @@ import javax.swing.UIManager;
 import net.osmand.MapCreatorVersion;
 import net.osmand.PlatformUtil;
 import net.osmand.data.DataTileManager;
+import net.osmand.data.LatLon;
 import net.osmand.map.IMapLocationListener;
 import net.osmand.map.ITileSource;
 import net.osmand.map.MapTileDownloader;
@@ -54,7 +55,6 @@ import net.osmand.map.MapTileDownloader.IMapDownloaderCallback;
 import net.osmand.map.TileSourceManager;
 import net.osmand.map.TileSourceManager.TileSourceTemplate;
 import net.osmand.osm.Entity;
-import net.osmand.osm.LatLon;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 

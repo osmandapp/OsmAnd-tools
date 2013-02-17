@@ -4,7 +4,6 @@ package net.osmand.data;
 import java.util.ArrayList;
 import java.util.List;
 
-import net.osmand.osm.LatLon;
 import net.osmand.osm.Node;
 import net.osmand.osm.Way;
 import net.osmand.util.MapAlgorithms;
