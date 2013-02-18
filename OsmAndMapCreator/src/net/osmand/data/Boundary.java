@@ -61,6 +61,7 @@ public class Boundary {
 		return  getName() + " alevel:" + getAdminLevel() + " type: has opened polygons:" + 
 				multipolygon.hasOpenedPolygons() + " no. of outer polygons:" +multipolygon.countOuterPolygons();
 	}
+	
 
 	public void setAdminCenterId(long l) {
 		this.adminCenterId = l;
