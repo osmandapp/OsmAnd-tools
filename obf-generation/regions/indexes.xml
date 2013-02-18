@@ -108,17 +108,22 @@
 			<region name="champagne-ardenne" />
 			<region name="corse" />
 			<region name="franche-comte" />
+			<region name="guadeloupe" />
+			<region name="guyane" />
 			<region name="haute-normandie" />
 			<region name="ile-de-france" />
 			<region name="languedoc-roussillon" />
 			<region name="limousin" />
 			<region name="lorraine" />
+			<region name="martinique" />
+			<region name="mayotte" />
 			<region name="midi-pyrenees" />
 			<region name="nord-pas-de-calais" />
 			<region name="pays-de-la-loire" />
 			<region name="picardie" />
 			<region name="poitou-charentes" />
 			<region name="provence-alpes-cote-d-azur" />
+			<region name="reunion" />
 			<region name="rhone-alpes" />
 		</regions>
 
