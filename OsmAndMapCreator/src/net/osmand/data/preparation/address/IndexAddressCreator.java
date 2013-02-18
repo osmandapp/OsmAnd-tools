@@ -197,9 +197,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 			attachAllCitiesToBoundary(boundary);
 		} else if (boundary != null){
 			if(logMapDataWarn != null) {
-				logMapDataWarn.warn("Not using boundary: " + boundary);
+				logMapDataWarn.warn("Not using boundary: " + boundary + " " + boundary.getBoundaryId());
 			} else {
-				log.info("Not using boundary: " + boundary);
+				log.info("Not using boundary: " + boundary + " " + boundary.getBoundaryId());
 			}
 		}
 	}
@@ -337,7 +337,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 
 
 	private void logBoundaryChanged(Boundary boundary, City cityFound) {
-		String s = "City: " + cityFound.getName() + " boundary: " + boundary.getName();
+		String s = "City: " + cityFound.getName() + " boundary: " + boundary.getName() + " " + boundary.getBoundaryId();
 		if(logMapDataWarn != null) {
 			logMapDataWarn.info(s);
 		} else {
