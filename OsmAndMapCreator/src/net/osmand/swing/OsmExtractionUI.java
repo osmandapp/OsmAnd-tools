@@ -244,25 +244,22 @@ public class OsmExtractionUI implements IMapLocationListener {
 	}
 	
 	private void initNativeRendering(String renderingProperties) {
-		String fl = DataExtractionSettings.getSettings().getNativeLibFile();
-		if (fl != null) {
-			NativeSwingRendering lib = NativeSwingRendering.loadLibrary(fl);
-			if (lib != null) {
-				try {
-					lib.initFilesInDir(new File(DataExtractionSettings.getSettings().getBinaryFilesDir()));
-					lib.loadRuleStorage(DataExtractionSettings.getSettings().getRenderXmlPath(), renderingProperties);
-					mapPanel.setNativeLibrary(lib);
-					mapPanel.repaint();
-				} catch (SAXException e) {
-					log.error(e.getMessage(), e);
-					throw new RuntimeException(e);
-				} catch (IOException e) {
-					log.error(e.getMessage(), e);
-					throw new RuntimeException(e);
-				} catch (XmlPullParserException e) {
-					log.error(e.getMessage(), e);
-					throw new RuntimeException(e);
-				}
+		NativeSwingRendering lib = NativeSwingRendering.getDefaultFromSettings();
+		if (lib != null) {
+			try {
+				lib.initFilesInDir(new File(DataExtractionSettings.getSettings().getBinaryFilesDir()));
+				lib.loadRuleStorage(DataExtractionSettings.getSettings().getRenderXmlPath(), renderingProperties);
+				mapPanel.setNativeLibrary(lib);
+				mapPanel.repaint();
+			} catch (SAXException e) {
+				log.error(e.getMessage(), e);
+				throw new RuntimeException(e);
+			} catch (IOException e) {
+				log.error(e.getMessage(), e);
+				throw new RuntimeException(e);
+			} catch (XmlPullParserException e) {
+				log.error(e.getMessage(), e);
+				throw new RuntimeException(e);
 			}
 		} else {
 			JOptionPane.showMessageDialog(frame, "Native library was not configured in settings");
