@@ -6,8 +6,13 @@
 
 #include <QFile>
 
+#include <ObfReader.h>
+
 // Forward declarations
+struct VerboseInfo;
 void printUsage(std::string warning = std::string());
+void printFileInformation(std::string fileName, VerboseInfo* verbose);
+void printFileInformation(QFile* file, VerboseInfo* verbose);
 
 int main(int argc, char* argv[])
 {
@@ -58,12 +63,12 @@ int main(int argc, char* argv[])
                 printFileInformation(args[args.length - 1], vinfo);
             }*/
         } else {
-            printUsage("Unknown command : " + f);
+            printUsage("Unknown command : " + cmd);
         }
     }
     else
     {
-        //printFileInformation(f, null);
+        printFileInformation(cmd, nullptr);
     }
     return 0;
 }
@@ -80,10 +85,95 @@ void printUsage(std::string warning)
     std::cout << "\nUsage for combining indexes : inspector -c file_to_create (file_from_extract ((+|-)parts_to_extract)? )*" << std::endl;
     std::cout << "\tCreate new file of extracted parts from input file. [parts_to_extract] could be parts to include or exclude." << std::endl;
     std::cout << "  Example : inspector -c output_file input_file +1,2,3\n\tExtracts 1, 2, 3 parts (could be find in print info)" << std::endl;
-    std::cout << "  Example : inspector -c output_file input_file -2,3\n\tExtracts all  parts excluding 2, 3" << std::endl;
+    std::cout << "  Example : inspector -c output_file input_file -2,3\n\tExtracts all parts excluding 2, 3" << std::endl;
     std::cout << "  Example : inspector -c output_file input_file1 input_file2 input_file3\n\tSimply combine 3 files" << std::endl;
     std::cout << "  Example : inspector -c output_file input_file1 input_file2 -4\n\tCombine all parts of 1st file and all parts excluding 4th part of 2nd file" << std::endl;
 }
+
+void printFileInformation(std::string fileName, VerboseInfo* verbose)
+{
+    QFile file(QString::fromStdString(fileName));
+    if(!file.exists())
+    {
+        std::cout << "Binary OsmAnd index " << fileName << " was not found." << std::endl;
+        return;
+    }
+
+    printFileInformation(&file, verbose);
+}
+
+void printFileInformation(QFile* file, VerboseInfo* verbose)
+{
+    if(!file->open(QIODevice::ReadOnly))
+    {
+        std::cout << "Failed to open file " << file->fileName().toStdString().c_str() << std::endl;
+        return;
+    }
+
+    OsmAnd::ObfReader obfMap(file);
+
+    file->close();
+}
+    //    public static void printFileInformation(File file, VerboseInfo verbose) throws IOException {
+    //        RandomAccessFile r = new RandomAccessFile(file.getAbsolutePath(), "r");
+    //        try {
+    //            BinaryMapIndexReader index = new BinaryMapIndexReader(r);
+    //            int i = 1;
+    //            std::cout << "Binary index " + file.getName() + " version = " + index.getVersion());
+    //            for(BinaryIndexPart p : index.getIndexes()){
+    //                String partname = "";
+    //                if(p instanceof MapIndex ){
+    //                    partname = "Map";
+    //                } else if(p instanceof TransportIndex){
+    //                    partname = "Transport";
+    //                } else if(p instanceof RouteRegion){
+    //                    partname = "Route";
+    //                } else if(p instanceof PoiRegion){
+    //                    partname = "Poi";
+    //                } else if(p instanceof AddressRegion){
+    //                    partname = "Address";
+    //                }
+    //                String name = p.getName() == null ? "" : p.getName(); 
+    //                std::cout << MessageFormat.format("{0}. {1} data {3} - {2} bytes",
+    //                    new Object[]{Integer.valueOf(i), partname, p.getLength(), name}));
+    //                if(p instanceof TransportIndex){
+    //                    TransportIndex ti = ((TransportIndex) p);
+    //                    int sh = (31 - BinaryMapIndexReader.TRANSPORT_STOP_ZOOM);
+    //                    std::cout << "\t Bounds " + formatBounds(ti.getLeft() << sh, ti.getRight() << sh, 
+    //                        ti.getTop() << sh, ti.getBottom() << sh));
+    //                } else if(p instanceof RouteRegion){
+    //                    RouteRegion ri = ((RouteRegion) p);
+    //                    std::cout << "\t Bounds " + formatLatBounds(ri.getLeftLongitude(), ri.getRightLongitude(), 
+    //                        ri.getTopLatitude(), ri.getBottomLatitude()));
+    //                } else if(p instanceof MapIndex){
+    //                    MapIndex m = ((MapIndex) p);
+    //                    int j = 1;
+    //                    for(MapRoot mi : m.getRoots()){
+    //                        std::cout << MessageFormat.format("\t{4}.{5} Map level minZoom = {0}, maxZoom = {1}, size = {2} bytes \n\t\tBounds {3}",
+    //                            new Object[] {
+    //                                mi.getMinZoom(), mi.getMaxZoom(), mi.getLength(), 
+    //                                    formatBounds(mi.getLeft(), mi.getRight(), mi.getTop(), mi.getBottom()), 
+    //                                    i, j++}));
+    //                    }
+    //                    if((verbose != null && verbose.isVmap())){
+    //                        printMapDetailInfo(verbose, index);
+    //                    }
+    //                } else if(p instanceof PoiRegion && (verbose != null && verbose.isVpoi())){
+    //                    printPOIDetailInfo(verbose, index, (PoiRegion) p);
+    //                } else if (p instanceof AddressRegion && (verbose != null && verbose.isVaddress())) {
+    //                    printAddressDetailedInfo(verbose, index);
+    //                }
+    //                i++;
+    //            }
+    //
+    //
+    //        } catch (IOException e) {
+    //            System.err.std::cout << "File is not valid index : " + file.getAbsolutePath());
+    //            throw e;
+    //        }
+    //
+    //    }
+
 //
 //package net.osmand.binary;
 //
@@ -362,76 +452,7 @@ void printUsage(std::string warning)
 //        return format.format(new Object[]{l, t, r, b}); 
 //    }
 //
-//    public static void printFileInformation(String fileName,VerboseInfo verbose) throws IOException {
-//        File file = new File(fileName);
-//        if(!file.exists()){
-//            std::cout << "Binary OsmAnd index " + fileName + " was not found.");
-//            return;
-//        }
-//        printFileInformation(file,verbose);
-//    }
-//
-//
-//
-//    public static void printFileInformation(File file, VerboseInfo verbose) throws IOException {
-//        RandomAccessFile r = new RandomAccessFile(file.getAbsolutePath(), "r");
-//        try {
-//            BinaryMapIndexReader index = new BinaryMapIndexReader(r);
-//            int i = 1;
-//            std::cout << "Binary index " + file.getName() + " version = " + index.getVersion());
-//            for(BinaryIndexPart p : index.getIndexes()){
-//                String partname = "";
-//                if(p instanceof MapIndex ){
-//                    partname = "Map";
-//                } else if(p instanceof TransportIndex){
-//                    partname = "Transport";
-//                } else if(p instanceof RouteRegion){
-//                    partname = "Route";
-//                } else if(p instanceof PoiRegion){
-//                    partname = "Poi";
-//                } else if(p instanceof AddressRegion){
-//                    partname = "Address";
-//                }
-//                String name = p.getName() == null ? "" : p.getName(); 
-//                std::cout << MessageFormat.format("{0}. {1} data {3} - {2} bytes",
-//                    new Object[]{Integer.valueOf(i), partname, p.getLength(), name}));
-//                if(p instanceof TransportIndex){
-//                    TransportIndex ti = ((TransportIndex) p);
-//                    int sh = (31 - BinaryMapIndexReader.TRANSPORT_STOP_ZOOM);
-//                    std::cout << "\t Bounds " + formatBounds(ti.getLeft() << sh, ti.getRight() << sh, 
-//                        ti.getTop() << sh, ti.getBottom() << sh));
-//                } else if(p instanceof RouteRegion){
-//                    RouteRegion ri = ((RouteRegion) p);
-//                    std::cout << "\t Bounds " + formatLatBounds(ri.getLeftLongitude(), ri.getRightLongitude(), 
-//                        ri.getTopLatitude(), ri.getBottomLatitude()));
-//                } else if(p instanceof MapIndex){
-//                    MapIndex m = ((MapIndex) p);
-//                    int j = 1;
-//                    for(MapRoot mi : m.getRoots()){
-//                        std::cout << MessageFormat.format("\t{4}.{5} Map level minZoom = {0}, maxZoom = {1}, size = {2} bytes \n\t\tBounds {3}",
-//                            new Object[] {
-//                                mi.getMinZoom(), mi.getMaxZoom(), mi.getLength(), 
-//                                    formatBounds(mi.getLeft(), mi.getRight(), mi.getTop(), mi.getBottom()), 
-//                                    i, j++}));
-//                    }
-//                    if((verbose != null && verbose.isVmap())){
-//                        printMapDetailInfo(verbose, index);
-//                    }
-//                } else if(p instanceof PoiRegion && (verbose != null && verbose.isVpoi())){
-//                    printPOIDetailInfo(verbose, index, (PoiRegion) p);
-//                } else if (p instanceof AddressRegion && (verbose != null && verbose.isVaddress())) {
-//                    printAddressDetailedInfo(verbose, index);
-//                }
-//                i++;
-//            }
-//
-//
-//        } catch (IOException e) {
-//            System.err.std::cout << "File is not valid index : " + file.getAbsolutePath());
-//            throw e;
-//        }
-//
-//    }
+//   
 //
 //    private static void printAddressDetailedInfo(VerboseInfo verbose, BinaryMapIndexReader index) throws IOException {
 //        for(String region : index.getRegionNames()){
