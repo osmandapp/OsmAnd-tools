@@ -1,7 +1,8 @@
 #!/bin/bash
 SCRIPT_LOC="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 LIB_LOC="$SCRIPT_LOC"/src/net/osmand/swing/
-cd "$SCRIPT_LOC"/../../../
+
+cd "$SCRIPT_LOC"/../../
 
 core/externals/configure.sh
 
