@@ -1,18 +1,34 @@
 
 #include <string>
 #include <iostream>
+#include <sstream>
 #include <map>
 #include <memory>
 
 #include <QFile>
+#include <QStringList>
 
 #include <ObfReader.h>
+#include <Utilities.h>
+
+// Options
+bool verboseAddress = false;
+bool verboseMap = false;
+bool verbosePoi = false;
+bool verboseTrasport = false;
+double latTop = 85;
+double latBottom = -85;
+double lonLeft = -180;
+double lonRight = 180;
+int zoom = 15;
 
 // Forward declarations
-struct VerboseInfo;
 void printUsage(std::string warning = std::string());
-void printFileInformation(std::string fileName, VerboseInfo* verbose);
-void printFileInformation(QFile* file, VerboseInfo* verbose);
+void printFileInformation(std::string fileName);
+void printFileInformation(QFile* file);
+void printAddressDetailedInfo(OsmAnd::ObfReader* reader, OsmAnd::ObfAddressSection* section);
+std::string formatBounds(int left, int right, int top, int bottom);
+std::string formatGeoBounds(double l, double r, double t, double b);
 
 int main(int argc, char* argv[])
 {
@@ -56,19 +72,45 @@ int main(int argc, char* argv[])
         }
         else if (cmd.find("-v") == 0)
         {
-            /*if (args.length < 2) {
+            if (argc < 3)
+            {
                 printUsage("Missing file parameter");
-            } else {
-                VerboseInfo vinfo = new VerboseInfo(args);
-                printFileInformation(args[args.length - 1], vinfo);
-            }*/
+                return -1;
+            }
+
+            for(int argIdx = 1; argIdx < argc - 1; argIdx++)
+            {
+                std::string arg = argv[argIdx];
+                if(arg == "-vaddress")
+                    verboseAddress = true;
+                else if(arg == "-vmap")
+                    verboseMap = true;
+                else if(arg == "-vpoi")
+                    verbosePoi = true;
+                else if(arg == "-vtransport")
+                    verboseTrasport = true;
+                else if(arg.find("-zoom=") == 0)
+                {
+                    zoom = atoi(arg.c_str() + 5);
+                }
+                else if(arg.find("-bbox=") == 0)
+                {
+                    auto values = QString(arg.c_str() + 5).split(",");
+                    lonLeft = values[0].toDouble();
+                    latTop = values[1].toDouble();
+                    lonRight = values[2].toDouble();
+                    latBottom =  values[3].toDouble();
+                }
+            }
+
+            printFileInformation(argv[argc - 1]);
         } else {
             printUsage("Unknown command : " + cmd);
         }
     }
     else
     {
-        printFileInformation(cmd, nullptr);
+        printFileInformation(cmd);
     }
     return 0;
 }
@@ -81,7 +123,7 @@ void printUsage(std::string warning)
     std::cout << "It allows print info about file, extract parts and merge indexes." << std::endl;
     std::cout << "\nUsage for print info : inspector [-vaddress] [-vmap] [-vpoi] [-vtransport] [-zoom=Zoom] [-bbox=LeftLon,TopLat,RightLon,BottomLan] [file]" << std::endl;
     std::cout << "  Prints information about [file] binary index of OsmAnd." << std::endl;
-    std::cout << "  -v.. more verbouse output (like all cities and their streets or all map objects with tags/values and coordinates)" << std::endl;
+    std::cout << "  -v.. more verbose output (like all cities and their streets or all map objects with tags/values and coordinates)" << std::endl;
     std::cout << "\nUsage for combining indexes : inspector -c file_to_create (file_from_extract ((+|-)parts_to_extract)? )*" << std::endl;
     std::cout << "\tCreate new file of extracted parts from input file. [parts_to_extract] could be parts to include or exclude." << std::endl;
     std::cout << "  Example : inspector -c output_file input_file +1,2,3\n\tExtracts 1, 2, 3 parts (could be find in print info)" << std::endl;
@@ -90,7 +132,7 @@ void printUsage(std::string warning)
     std::cout << "  Example : inspector -c output_file input_file1 input_file2 -4\n\tCombine all parts of 1st file and all parts excluding 4th part of 2nd file" << std::endl;
 }
 
-void printFileInformation(std::string fileName, VerboseInfo* verbose)
+void printFileInformation(std::string fileName)
 {
     QFile file(QString::fromStdString(fileName));
     if(!file.exists())
@@ -99,10 +141,10 @@ void printFileInformation(std::string fileName, VerboseInfo* verbose)
         return;
     }
 
-    printFileInformation(&file, verbose);
+    printFileInformation(&file);
 }
 
-void printFileInformation(QFile* file, VerboseInfo* verbose)
+void printFileInformation(QFile* file)
 {
     if(!file->open(QIODevice::ReadOnly))
     {
@@ -111,68 +153,153 @@ void printFileInformation(QFile* file, VerboseInfo* verbose)
     }
 
     OsmAnd::ObfReader obfMap(file);
+    std::cout << "Binary index " << file->fileName().toStdString() << " version = " << obfMap.getVersion() << std::endl;
+    const auto& sections = obfMap.getSections();
+    int idx = 1;
+    for(auto itSection = sections.begin(); itSection != sections.end(); ++itSection, idx++)
+    {
+        OsmAnd::ObfSection* section = *itSection;
+
+        std::string sectionType = "unknown";
+        if(dynamic_cast<OsmAnd::ObfMapSection*>(section))
+            sectionType = "Map";
+        else if(dynamic_cast<OsmAnd::ObfTransportSection*>(section))
+            sectionType = "Transport";
+        else if(dynamic_cast<OsmAnd::ObfRoutingSection*>(section))
+            sectionType = "Route";
+        else if(dynamic_cast<OsmAnd::ObfPoiSection*>(section))
+            sectionType = "Poi";
+        else if(dynamic_cast<OsmAnd::ObfAddressSection*>(section))
+            sectionType = "Address";
+
+        std::cout << "#" << idx << " " << sectionType << " data " << section->_name << " - " << section->_length << " bytes" << std::endl;
+        
+        if(dynamic_cast<OsmAnd::ObfTransportSection*>(section))
+        {
+            auto transportSection = dynamic_cast<OsmAnd::ObfTransportSection*>(section);
+            int sh = (31 - OsmAnd::ObfReader::TransportStopZoom);
+            std::cout << "\t Bounds " << formatBounds(transportSection->_left << sh, transportSection->_right << sh, transportSection->_top << sh, transportSection->_bottom << sh) << std::endl;
+        }
+        else if(dynamic_cast<OsmAnd::ObfRoutingSection*>(section))
+        {
+            auto routingSection = dynamic_cast<OsmAnd::ObfRoutingSection*>(section);
+            double lonLeft = 180;
+            double lonRight = -180;
+            double latTop = -90;
+            double latBottom = 90;
+            for(auto itSubregion = routingSection->_subregions.begin(); itSubregion != routingSection->_subregions.end(); ++itSubregion)
+            {
+                OsmAnd::ObfRoutingSection::Subregion* subregion = itSubregion->get();
+
+                lonLeft = std::min(lonLeft, OsmAnd::Utilities::get31LongitudeX(subregion->_left));
+                lonRight = std::max(lonRight, OsmAnd::Utilities::get31LongitudeX(subregion->_right));
+                latTop = std::max(latTop, OsmAnd::Utilities::get31LatitudeY(subregion->_top));
+                latBottom = std::min(latBottom, OsmAnd::Utilities::get31LatitudeY(subregion->_bottom));
+            }
+            std::cout << "\t Bounds " << formatGeoBounds(lonLeft, lonRight, latTop, latBottom) << std::endl;
+        }
+        else if(dynamic_cast<OsmAnd::ObfMapSection*>(section))
+        {
+            auto mapSection = dynamic_cast<OsmAnd::ObfMapSection*>(section);
+            int levelIdx = 1;
+            for(auto itLevel = mapSection->_levels.begin(); itLevel != mapSection->_levels.end(); ++itLevel, levelIdx++)
+            {
+                OsmAnd::ObfMapSection::MapRoot* level = itLevel->get();
+                std::cout << "\t" << idx << "." << levelIdx << " Map level minZoom = " << level->_minZoom << ", maxZoom = " << level->_maxZoom << ", size = " << level->_length << " bytes" << std::endl;
+                std::cout << "\t\tBounds " << formatBounds(level->_left, level->_right, level->_top, level->_bottom) << std::endl;
+            }
+
+            //if(verboseMap)
+                //printMapDetailInfo(mapSection);
+        }
+        else if(dynamic_cast<OsmAnd::ObfPoiSection*>(section) && verbosePoi)
+        {
+//            printPOIDetailInfo(dynamic_cast<OsmAnd::ObfPoiSection*>(section));
+        }
+        else if (dynamic_cast<OsmAnd::ObfAddressSection*>(section) && verbosePoi)
+        {
+            printAddressDetailedInfo(&obfMap, dynamic_cast<OsmAnd::ObfAddressSection*>(section));
+        }
+    }
 
     file->close();
 }
-    //    public static void printFileInformation(File file, VerboseInfo verbose) throws IOException {
-    //        RandomAccessFile r = new RandomAccessFile(file.getAbsolutePath(), "r");
-    //        try {
-    //            BinaryMapIndexReader index = new BinaryMapIndexReader(r);
-    //            int i = 1;
-    //            std::cout << "Binary index " + file.getName() + " version = " + index.getVersion());
-    //            for(BinaryIndexPart p : index.getIndexes()){
-    //                String partname = "";
-    //                if(p instanceof MapIndex ){
-    //                    partname = "Map";
-    //                } else if(p instanceof TransportIndex){
-    //                    partname = "Transport";
-    //                } else if(p instanceof RouteRegion){
-    //                    partname = "Route";
-    //                } else if(p instanceof PoiRegion){
-    //                    partname = "Poi";
-    //                } else if(p instanceof AddressRegion){
-    //                    partname = "Address";
-    //                }
-    //                String name = p.getName() == null ? "" : p.getName(); 
-    //                std::cout << MessageFormat.format("{0}. {1} data {3} - {2} bytes",
-    //                    new Object[]{Integer.valueOf(i), partname, p.getLength(), name}));
-    //                if(p instanceof TransportIndex){
-    //                    TransportIndex ti = ((TransportIndex) p);
-    //                    int sh = (31 - BinaryMapIndexReader.TRANSPORT_STOP_ZOOM);
-    //                    std::cout << "\t Bounds " + formatBounds(ti.getLeft() << sh, ti.getRight() << sh, 
-    //                        ti.getTop() << sh, ti.getBottom() << sh));
-    //                } else if(p instanceof RouteRegion){
-    //                    RouteRegion ri = ((RouteRegion) p);
-    //                    std::cout << "\t Bounds " + formatLatBounds(ri.getLeftLongitude(), ri.getRightLongitude(), 
-    //                        ri.getTopLatitude(), ri.getBottomLatitude()));
-    //                } else if(p instanceof MapIndex){
-    //                    MapIndex m = ((MapIndex) p);
-    //                    int j = 1;
-    //                    for(MapRoot mi : m.getRoots()){
-    //                        std::cout << MessageFormat.format("\t{4}.{5} Map level minZoom = {0}, maxZoom = {1}, size = {2} bytes \n\t\tBounds {3}",
-    //                            new Object[] {
-    //                                mi.getMinZoom(), mi.getMaxZoom(), mi.getLength(), 
-    //                                    formatBounds(mi.getLeft(), mi.getRight(), mi.getTop(), mi.getBottom()), 
-    //                                    i, j++}));
-    //                    }
-    //                    if((verbose != null && verbose.isVmap())){
-    //                        printMapDetailInfo(verbose, index);
-    //                    }
-    //                } else if(p instanceof PoiRegion && (verbose != null && verbose.isVpoi())){
-    //                    printPOIDetailInfo(verbose, index, (PoiRegion) p);
-    //                } else if (p instanceof AddressRegion && (verbose != null && verbose.isVaddress())) {
-    //                    printAddressDetailedInfo(verbose, index);
-    //                }
-    //                i++;
-    //            }
-    //
-    //
-    //        } catch (IOException e) {
-    //            System.err.std::cout << "File is not valid index : " + file.getAbsolutePath());
-    //            throw e;
-    //        }
-    //
-    //    }
+
+void printAddressDetailedInfo(OsmAnd::ObfReader* reader, OsmAnd::ObfAddressSection* section)
+{
+    std::cout << "\tRegion: " << section->_enName << std::endl;
+    char* strTypes[] = {
+        "City/Towns",
+        "Villages",
+        "Postcodes",
+    };
+    /*for(int typeIdx = 0; typeIdx < sizeof(types)/sizeof(types[0]); typeIdx++)
+    {
+        auto type = types[typeIdx];
+        int total = 0;
+        std::cout << "\t\t" << strTypes[typeIdx] << ":" << std::endl;*/
+        /*for(auto itEntry = section->_entries.begin(); itEntry != section->_entries.end(); ++itEntry)
+        {
+            auto entry = *itEntry;
+            if(entry->_type != type)
+                continue;
+
+            total++;
+        }*/
+        
+        //auto cities = OsmAnd::ObfAddressSection::readCities(reader, section, type);
+        //auto cities = section->loadCities();//TODO:
+    ///}
+}
+//                for (City c : index.getCities(region, null, type)) {				
+//                    index.preloadStreets(c, null);
+//                    std::cout << "\t\t" + c + " " + c.getId() + "\t(" + c.getStreets().size() + ")");
+//                    for (Street t : c.getStreets()) {
+//                        if (verbose.contains(t)) {
+//                            index.preloadBuildings(t, null);
+//                            print("\t\t\t\t" + t.getName() + getId(t) + "\t(" + t.getBuildings().size() + ")");
+//                            // if (type == BinaryMapAddressReaderAdapter.CITY_TOWN_TYPE) {
+//                            List<Building> buildings = t.getBuildings();
+//                            if (buildings != null && !buildings.isEmpty()) {
+//                                print("\t\t (");
+//                                for (Building b : buildings) {
+//                                    print(b.toString() + ",");
+//                                }
+//                                print(")");
+//                            }
+//                            List<Street> streets = t.getIntersectedStreets();
+//                            if (streets != null && !streets.isEmpty()) {
+//                                print("\n\t\t\t\t\t\t\t\t\t x (");
+//                                for (Street s : streets) {
+//                                    print(s.getName() + ", ");
+//                                }
+//                                print(")");
+//                            }
+//                            // }
+//                            std::cout << "");
+//                        }
+//
+//                    }
+//                }
+
+
+std::string formatBounds(int left, int right, int top, int bottom)
+{
+    double l = OsmAnd::Utilities::get31LongitudeX(left);
+    double r = OsmAnd::Utilities::get31LongitudeX(right);
+    double t = OsmAnd::Utilities::get31LatitudeY(top);
+    double b = OsmAnd::Utilities::get31LatitudeY(bottom);
+    return formatGeoBounds(l, r, t, b);
+}
+
+std::string formatGeoBounds(double l, double r, double t, double b)
+{
+    std::ostringstream oStream;
+    static std::locale enUS("en-US");
+    oStream.imbue(enUS);
+    oStream << "(left top - right bottom) : " << l << ", " << t << " NE - " << r << ", " << b << " NE";
+    return oStream.str();
+}
 
 //
 //package net.osmand.binary;
@@ -221,65 +348,6 @@ void printFileInformation(QFile* file, VerboseInfo* verbose)
 //
 //
 //    public static final int BUFFER_SIZE = 1 << 20;
-//
-//    protected static class VerboseInfo {
-//        boolean vaddress;
-//        boolean vtransport;
-//        boolean vpoi;
-//        boolean vmap;
-//        double lattop = 85;
-//        double latbottom = -85;
-//        double lonleft = -180;
-//        double lonright = 180;
-//        int zoom = 15;
-//
-//        public boolean isVaddress() {
-//            return vaddress;
-//        }
-//
-//        public int getZoom() {
-//            return zoom;
-//        }
-//
-//        public boolean isVmap() {
-//            return vmap;
-//        }
-//        public boolean isVpoi() {
-//            return vpoi;
-//        }
-//
-//        public boolean isVtransport() {
-//            return vtransport;
-//        }
-//
-//        public VerboseInfo(String[] params){
-//            for(int i=0;i<params.length;i++){
-//                if(params[i].equals("-vaddress")){
-//                    vaddress = true;
-//                } else if(params[i].equals("-vmap")){
-//                    vmap = true;
-//                } else if(params[i].equals("-vpoi")){
-//                    vpoi = true;
-//                } else if(params[i].equals("-vtransport")){
-//                    vtransport = true;
-//                } else if(params[i].startsWith("-zoom=")){
-//                    zoom = Integer.parseInt(params[i].substring("-zoom=".length()));
-//                } else if(params[i].startsWith("-bbox=")){
-//                    String[] values = params[i].substring("-bbox=".length()).split(",");
-//                    lonleft = Double.parseDouble(values[0]);
-//                    lattop = Double.parseDouble(values[1]);
-//                    lonright = Double.parseDouble(values[2]);
-//                    latbottom = Double.parseDouble(values[3]);
-//                }
-//            }
-//        }
-//
-//        public boolean contains(MapObject o){
-//            return lattop >= o.getLocation().getLatitude() && latbottom <= o.getLocation().getLatitude()
-//                && lonleft <= o.getLocation().getLongitude() && lonright >= o.getLocation().getLongitude();
-//
-//        }
-//    }
 //
 //    public static final void writeInt(CodedOutputStream ous, int v) throws IOException {
 //        ous.writeRawByte((v >>> 24) & 0xFF);
@@ -438,63 +506,11 @@ void printFileInformation(QFile* file, VerboseInfo* verbose)
 //    }
 //
 //
-//    protected static String formatBounds(int left, int right, int top, int bottom){
-//        double l = MapUtils.get31LongitudeX(left);
-//        double r = MapUtils.get31LongitudeX(right);
-//        double t = MapUtils.get31LatitudeY(top);
-//        double b = MapUtils.get31LatitudeY(bottom);
-//        MessageFormat format = new MessageFormat("(left top - right bottom) : {0}, {1} NE - {2}, {3} NE", new Locale("EN", "US"));
-//        return format.format(new Object[]{l, t, r, b}); 
-//    }
-//
-//    protected static String formatLatBounds(double l, double r, double t, double b){
-//        MessageFormat format = new MessageFormat("(left top - right bottom) : {0}, {1} NE - {2}, {3} NE", new Locale("EN", "US"));
-//        return format.format(new Object[]{l, t, r, b}); 
-//    }
+//    
 //
 //   
 //
-//    private static void printAddressDetailedInfo(VerboseInfo verbose, BinaryMapIndexReader index) throws IOException {
-//        for(String region : index.getRegionNames()){
-//            std::cout << "\tRegion:" + region);
-//            int[] cityType = new int[] {BinaryMapAddressReaderAdapter.CITY_TOWN_TYPE,
-//                BinaryMapAddressReaderAdapter.POSTCODES_TYPE, 
-//                BinaryMapAddressReaderAdapter.VILLAGES_TYPE};
-//            for (int j = 0; j < cityType.length; j++) {
-//                int type = cityType[j];
-//                for (City c : index.getCities(region, null, type)) {				
-//                    index.preloadStreets(c, null);
-//                    std::cout << "\t\t" + c + " " + c.getId() + "\t(" + c.getStreets().size() + ")");
-//                    for (Street t : c.getStreets()) {
-//                        if (verbose.contains(t)) {
-//                            index.preloadBuildings(t, null);
-//                            print("\t\t\t\t" + t.getName() + getId(t) + "\t(" + t.getBuildings().size() + ")");
-//                            // if (type == BinaryMapAddressReaderAdapter.CITY_TOWN_TYPE) {
-//                            List<Building> buildings = t.getBuildings();
-//                            if (buildings != null && !buildings.isEmpty()) {
-//                                print("\t\t (");
-//                                for (Building b : buildings) {
-//                                    print(b.toString() + ",");
-//                                }
-//                                print(")");
-//                            }
-//                            List<Street> streets = t.getIntersectedStreets();
-//                            if (streets != null && !streets.isEmpty()) {
-//                                print("\n\t\t\t\t\t\t\t\t\t x (");
-//                                for (Street s : streets) {
-//                                    print(s.getName() + ", ");
-//                                }
-//                                print(")");
-//                            }
-//                            // }
-//                            std::cout << "");
-//                        }
-//
-//                    }
-//                }
-//            }
-//        }
-//    }
+
 //
 //    private static void printMapDetailInfo(VerboseInfo verbose, BinaryMapIndexReader index) throws IOException {
 //        final StringBuilder b = new StringBuilder();
