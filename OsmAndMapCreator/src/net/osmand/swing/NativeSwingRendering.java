@@ -3,8 +3,10 @@ package net.osmand.swing;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -18,6 +20,7 @@ import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 
 import net.osmand.NativeLibrary;
+import net.osmand.PlatformUtil;
 import net.osmand.RenderingContext;
 import net.osmand.render.RenderingRuleProperty;
 import net.osmand.render.RenderingRuleSearchRequest;
@@ -27,17 +30,24 @@ import net.osmand.render.RenderingRulesStorage.RenderingRulesStorageResolver;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
+import org.apache.commons.logging.Log;
 import org.xml.sax.Attributes;
 import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 import org.xmlpull.v1.XmlPullParserException;
 
+import com.mysql.jdbc.log.LogUtils;
+
 import resources._R;
 
 public class NativeSwingRendering extends NativeLibrary {
 
+	public static final String NATIVE_LIB_NAME = "OsmAndCore";
+	private static final Log log = PlatformUtil.getLog(NativeSwingRendering.class);
 	RenderingRulesStorage storage;
 	private HashMap<String, String> renderingProps;
+	
+	public static Boolean loaded = null;
 	private static NativeSwingRendering defaultLoadedLibrary; 
 	
 	private void loadRenderingAttributes(InputStream is, final Map<String, String> renderingConstants) throws SAXException, IOException{
@@ -198,31 +208,76 @@ public class NativeSwingRendering extends NativeLibrary {
 		}
 	}
 	
-	private static NativeSwingRendering loaded = null;
-	public static NativeSwingRendering loadLibrary(String path){
-		if(loaded == null) {
-			System.load(path);
-			loaded = new NativeSwingRendering();
-		}
-		return loaded;
-	}
 	
 	public static NativeSwingRendering getDefaultFromSettings() {
-//		if(true) {
-//			return null;
-//		}
-		if(defaultLoadedLibrary != null) {
+		if (defaultLoadedLibrary != null) {
 			return defaultLoadedLibrary;
 		}
 		String filename = DataExtractionSettings.getSettings().getNativeLibFile();
-		if(filename.length() == 0 || !(new File(filename).exists())) {
-			return null;
+		if (filename.length() == 0 || !(new File(filename).exists())) {
+			filename = null;
 		}
-		NativeSwingRendering lib = NativeSwingRendering.loadLibrary(filename);
-		if(lib != null){
-			lib.initFilesInDir(new File(DataExtractionSettings.getSettings().getBinaryFilesDir()));
-			defaultLoadedLibrary = lib;
+		if (load(filename)) {
+			defaultLoadedLibrary = new NativeSwingRendering();
+			defaultLoadedLibrary.initFilesInDir(new File(DataExtractionSettings.getSettings().getBinaryFilesDir()));
 		}
-		return lib;
+		return defaultLoadedLibrary;
 	}
+	
+
+
+	private static boolean load(String path) {
+		// look for a pre-installed library
+		if (path != null) {
+			try {
+				System.load(path);
+				return true;
+			} catch (UnsatisfiedLinkError e) {
+				log.error(e);
+			} // fall through
+		}
+
+		// guess what a bundled library would be called
+		String osname = System.getProperty("os.name").toLowerCase();
+		String osarch = System.getProperty("os.arch");
+		if (osname.startsWith("mac os")) {
+			osname = "mac";
+			osarch = "universal";
+		}
+		if (osname.startsWith("windows"))
+			osname = "win";
+		if (osname.startsWith("sunos"))
+			osname = "solaris";
+		if (osarch.startsWith("i") && osarch.endsWith("86"))
+			osarch = "x86";
+		String libname = NATIVE_LIB_NAME +"-" + osname + '-' + osarch + ".lib";
+
+		// try a bundled library
+		try {
+			ClassLoader cl = NativeSwingRendering.class.getClassLoader();
+			InputStream in = cl.getResourceAsStream(libname);
+			if (in == null) {
+				log.error("libname: " + libname + " not found");
+				return false;
+			}
+			File tmplib = File.createTempFile(NATIVE_LIB_NAME + "-", ".lib");
+			tmplib.deleteOnExit();
+			OutputStream out = new FileOutputStream(tmplib);
+			byte[] buf = new byte[1024];
+			for (int len; (len = in.read(buf)) != -1;)
+				out.write(buf, 0, len);
+			in.close();
+			out.close();
+
+			System.load(tmplib.getAbsolutePath());
+			return true;
+		} catch (Exception e) {
+			e.printStackTrace();
+			log.error(e.getMessage(), e);
+		} catch (UnsatisfiedLinkError e) {
+			log.error(e.getMessage(), e);
+		} // fall through
+		return false;
+	}
+
 }
