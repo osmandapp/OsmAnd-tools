@@ -4,3 +4,4 @@ build.zip
 cpd.xml
 OsmAnd-core.jar
 /bin-tests
+*.lib
