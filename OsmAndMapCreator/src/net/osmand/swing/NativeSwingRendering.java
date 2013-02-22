@@ -36,7 +36,6 @@ import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 import org.xmlpull.v1.XmlPullParserException;
 
-import com.mysql.jdbc.log.LogUtils;
 
 import resources._R;
 

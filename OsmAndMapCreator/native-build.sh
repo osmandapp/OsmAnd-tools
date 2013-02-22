@@ -13,8 +13,8 @@ fi
 (cd baked/amd64-linux-gcc-amd64-linux-gcc && make)
 cp binaries/linux/amd64/libOsmAndCore.so "$LIB_LOC"/OsmAndCore-linux-amd64.lib
 
-# if [ ! -d baked/i686-linux-gcc-i686-linux-gcc ]; then 
-# build/i686-linux-gcc.sh 
-# fi
-# (cd baked/i686-linux-gcc-i686-linux-gcc && make)
-# cp binaries/linux/i686/libOsmAndCore.so "$LIB_LOC"/OsmAndCore-linux-x86.lib
+if [ ! -d baked/i686-linux-gcc-i686-linux-gcc ]; then 
+build/i686-linux-gcc.sh 
+fi
+(cd baked/i686-linux-gcc-i686-linux-gcc && make)
+cp binaries/linux/i686/libOsmAndCore.so "$LIB_LOC"/OsmAndCore-linux-x86.lib
