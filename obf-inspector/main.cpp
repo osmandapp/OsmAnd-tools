@@ -185,7 +185,7 @@ void printFileInformation(QFile* file)
         else if(dynamic_cast<OsmAnd::ObfAddressSection*>(section))
             sectionType = "Address";
 
-        std::cout << "#" << idx << " " << sectionType << " data " << section->_name.toStdString() << " - " << section->_length << " bytes" << std::endl;
+        std::cout << idx << ". " << sectionType << " data " << section->_name.toStdString() << " - " << section->_length << " bytes" << std::endl;
         
         if(dynamic_cast<OsmAnd::ObfTransportSection*>(section))
         {

@@ -5,7 +5,7 @@ LIB_LOC="$SCRIPT_LOC"/src/
 cd "$SCRIPT_LOC"/../../
 
 core/externals/configure.sh
-core/qtbase-desktop/build.sh # neeeded?
+core/externals/qtbase-desktop/build.sh # neeeded?
 
 if [ ! -d baked/amd64-linux-gcc-amd64-linux-gcc ]; then 
 build/amd64-linux-gcc.sh
