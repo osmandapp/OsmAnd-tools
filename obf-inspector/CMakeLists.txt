@@ -6,11 +6,12 @@ include_directories(AFTER SYSTEM
 	"${OSMAND_ROOT}/core/include"
 	"${OSMAND_ROOT}/core/protos"
 	"${OSMAND_ROOT}/core/native/include"
+	"${OSMAND_ROOT}/core/utils/inspector"
 )
 
 find_package(Qt5Core REQUIRED)
 add_executable(inspector
 	"main.cpp"
 )
-target_link_libraries(inspector OsmAndCore)
+target_link_libraries(inspector OsmAndInspector OsmAndCore)
 qt5_use_modules(inspector Core)
