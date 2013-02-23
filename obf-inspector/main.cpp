@@ -191,7 +191,7 @@ void printFileInformation(QFile* file)
         {
             auto transportSection = dynamic_cast<OsmAnd::ObfTransportSection*>(section);
             int sh = (31 - OsmAnd::ObfReader::TransportStopZoom);
-            std::cout << "\t Bounds " << formatBounds(transportSection->_left << sh, transportSection->_right << sh, transportSection->_top << sh, transportSection->_bottom << sh) << std::endl;
+            std::cout << "\tBounds " << formatBounds(transportSection->_left << sh, transportSection->_right << sh, transportSection->_top << sh, transportSection->_bottom << sh) << std::endl;
         }
         else if(dynamic_cast<OsmAnd::ObfRoutingSection*>(section))
         {
@@ -209,7 +209,7 @@ void printFileInformation(QFile* file)
                 latTop = std::max(latTop, OsmAnd::Utilities::get31LatitudeY(subregion->_top));
                 latBottom = std::min(latBottom, OsmAnd::Utilities::get31LatitudeY(subregion->_bottom));
             }
-            std::cout << "\t Bounds " << formatGeoBounds(lonLeft, lonRight, latTop, latBottom) << std::endl;
+            std::cout << "\tBounds " << formatGeoBounds(lonLeft, lonRight, latTop, latBottom) << std::endl;
         }
         else if(dynamic_cast<OsmAnd::ObfMapSection*>(section))
         {
@@ -240,7 +240,7 @@ void printFileInformation(QFile* file)
 
 void printPOIDetailInfo(OsmAnd::ObfReader* reader, OsmAnd::ObfPoiSection* section)
 {
-
+    std::cout << "\tRegion: " << section->_name.toStdString() << std::endl;
 }
 
 void printAddressDetailedInfo(OsmAnd::ObfReader* reader, OsmAnd::ObfAddressSection* section)
