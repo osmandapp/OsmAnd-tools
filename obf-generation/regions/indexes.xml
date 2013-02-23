@@ -267,7 +267,7 @@
 	
 		
 		<!-- 3. North America  -->		
-		<!-- 3.1 USA-AVAILABLE ON GEOFABRIK.DE [SOURCE: GEOFABRIK.DE] (REST OF USA IS BELOW FROM CLOUDMADE.COM) -->
+		<!-- 3.1 USA-AVAILABLE ON GEOFABRIK.DE [SOURCE: GEOFABRIK.DE]  -->
 		<regions siteToDownload="http://download.geofabrik.de/openstreetmap/north-america/us/{0}.osm.pbf" skip="false" region_prefix="US_" region_suffix="_NorthAmerica">
 			<region name="alabama"/>
 			<region name="alaska"/>
@@ -347,7 +347,7 @@
 			<region name="greenland"/>
 		</regions>	
 		
-			<!-- 2.2 ASIA-AVAILABLE ON GEOFABRIK.DE [SOURCE: GEOFABRIK.DE] (REST OF ASIA IS BELOW FROM CLOUDMADE.COM) -->
+			<!-- 2.2 ASIA-AVAILABLE ON GEOFABRIK.DE [SOURCE: GEOFABRIK.DE] (REST OF ASIA IS BELOW ) -->
 		<regions siteToDownload="http://download.geofabrik.de/openstreetmap/asia/{0}.osm.pbf" region_prefix="" region_suffix="_Asia" skip="false">
 			<region name="azerbaijan" esize="15"/>
 			<region name="china" esize="4"/>
