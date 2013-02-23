@@ -5,7 +5,8 @@
 
 	<property name="src.dir" value="src"/>
 	<property name="osmand-resources.dir" location="../../core/resources"/>
-	<property name="osmand-core.dir" location="../../jni/java"/>
+	<property name="osmand-jni.dir" location="../../jni"/>
+	<property name="osmand-jni.absolute.dir" location="${osmand-core.dir}" />
 	<property name="osmand-core.jar" value="OsmAnd-core.jar"/>
 	<property name="src.absolute.dir" location="${src.dir}" />
 	<property name="icons.dir" value="icons/resources"/>
@@ -33,14 +34,14 @@
 				<include name="g_*.png"/>
 			</fileset>
 		</copy>
-		<ant antfile="${osmand-core.dir}/build.xml" target="jar"  dir="${osmand-core.dir}"
+		<ant antfile="${osmand-jni.dir}/build.xml" target="jar" dir="${osmand-jni.dir}"
                          inheritAll="false" inheritRefs="false">
 		</ant>
 	</target>
 
 	
 	<path id="build.path">
-		<fileset dir="${osmand-core.dir}">
+		<fileset dir="${osmand-jni.dir}">
 			<include name="${osmand-core.jar}"/>
 		</fileset> 
 		<fileset dir="${lib.absolute.dir}">
@@ -83,7 +84,7 @@
 		<pathelement location="${bin.absolute.dir}" />
 		<pathelement location="${bintests.dir}" />
 		<pathelement location="${srctests.dir}" />
-		<fileset dir="${osmand-core.dir}">
+		<fileset dir="${osmand-jni.dir}">
 			<include name="${osmand-core.jar}"/>
 		</fileset>
 		<fileset dir="${lib.absolute.dir}">
@@ -160,7 +161,7 @@
 			</fileset>
 		</copy>
 		<copy todir="build/lib">
-			<fileset dir="${osmand-core.dir}">
+			<fileset dir="${osmand-jni.dir}">
 				<include name="${osmand-core.jar}" />
 			</fileset>
 		</copy>
