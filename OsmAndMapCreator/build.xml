@@ -148,6 +148,7 @@
 				<include name="*.bat"/>
 				<include name="*.sh"/>
 				<exclude name="lib/h2*"/>
+				<exclude name="native-build.sh"/>
 			</fileset>
 			<fileset dir="src/net/osmand/osm/">
 				<include name="rendering_types.xml"/>
