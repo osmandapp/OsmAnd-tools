@@ -37,92 +37,17 @@ int main(int argc, char* argv[])
 {
     OsmAnd::Inspector::Configuration cfg;
 
-    if(argc <= 1)
+    QString error;
+    QStringList args;
+    for (int idx = 1; idx < argc; idx++)
+        args.push_back(argv[idx]);
+
+    if(!OsmAnd::Inspector::parseCommandLineArguments(args, cfg, error))
     {
-        printUsage();
+        printUsage(error.toStdString());
         return -1;
     }
-
-    std::string cmd = argv[1];
-    if (cmd[0] == '-')
-    {
-        // command
-        if (cmd == "-c" || cmd == "-combine") {
-            if (argc < 5)
-            {
-                printUsage("Too few parameters to extract (require minimum 4)");
-                return -1;
-            }
-
-            std::map<std::shared_ptr<QFile>, std::string> parts;
-            /*for (int i = 3; i < argc; i++)
-            {
-                file = new File(args[i]);
-                if (!file.exists()) {
-                    System.err.std::cout << "File to extract from doesn't exist " + args[i]);
-                    return;
-                }
-                parts.put(file, null);
-                if (i < args.length - 1) {
-                    if (args[i + 1].startsWith("-") || args[i + 1].startsWith("+")) {
-                        parts.put(file, args[i + 1]);
-                        i++;
-                    }
-                }
-            }
-            List<Float> extracted = combineParts(new File(args[1]), parts);
-            if (extracted != null) {
-                std::cout << "\n" + extracted.size() + " parts were successfully extracted to " + args[1]);
-            }*/
-        }
-        else if (cmd.find("-v") == 0)
-        {
-            if (argc < 3)
-            {
-                printUsage("Missing file parameter");
-                return -1;
-            }
-
-            for(int argIdx = 1; argIdx < argc - 1; argIdx++)
-            {
-                std::string arg = argv[argIdx];
-                if(arg == "-vaddress")
-                    cfg.verboseAddress = true;
-                else if(arg == "-vstreets")
-                    cfg.verboseStreets = true;
-                else if(arg == "-vstreetgroups")
-                    cfg.verboseStreetGroups = true;
-                else if(arg == "-vbuildings")
-                    cfg.verboseBuildings = true;
-                else if(arg == "-vintersections")
-                    cfg.verboseIntersections = true;
-                else if(arg == "-vmap")
-                    cfg.verboseMap = true;
-                else if(arg == "-vpoi")
-                    cfg.verbosePoi = true;
-                else if(arg == "-vtransport")
-                    cfg.verboseTrasport = true;
-                else if(arg.find("-zoom=") == 0)
-                    cfg.zoom = atoi(arg.c_str() + 5);
-                else if(arg.find("-bbox=") == 0)
-                {
-                    auto values = QString(arg.c_str() + 5).split(",");
-                    cfg.lonLeft = values[0].toDouble();
-                    cfg.latTop = values[1].toDouble();
-                    cfg.lonRight = values[2].toDouble();
-                    cfg.latBottom =  values[3].toDouble();
-                }
-            }
-
-            OsmAnd::Inspector::dumpToStdOut(QString::fromStdString(argv[argc - 1]), cfg);
-        } else {
-            printUsage("Unknown command : " + cmd);
-        }
-    }
-    else
-    {
-        OsmAnd::Inspector::dumpToStdOut(QString::fromStdString(cmd), cfg);
-    }
+    OsmAnd::Inspector::dumpToStdOut(cfg);
     return 0;
 }
 
