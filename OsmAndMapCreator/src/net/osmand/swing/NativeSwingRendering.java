@@ -3,10 +3,8 @@ package net.osmand.swing;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -20,7 +18,6 @@ import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 
 import net.osmand.NativeLibrary;
-import net.osmand.PlatformUtil;
 import net.osmand.RenderingContext;
 import net.osmand.render.RenderingRuleProperty;
 import net.osmand.render.RenderingRuleSearchRequest;
@@ -30,12 +27,10 @@ import net.osmand.render.RenderingRulesStorage.RenderingRulesStorageResolver;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
-import org.apache.commons.logging.Log;
 import org.xml.sax.Attributes;
 import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 import org.xmlpull.v1.XmlPullParserException;
-
 
 import resources._R;
 
@@ -215,7 +210,7 @@ public class NativeSwingRendering extends NativeLibrary {
 		if (filename.length() == 0 || !(new File(filename).exists())) {
 			filename = null;
 		}
-		if (NativeLibrary.load(filename)) {
+		if (NativeLibrary.loadAllLibs(filename)) {
 			defaultLoadedLibrary = new NativeSwingRendering();
 			defaultLoadedLibrary.initFilesInDir(new File(DataExtractionSettings.getSettings().getBinaryFilesDir()));
 		}
