@@ -12,6 +12,9 @@ import java.util.Map.Entry;
 import java.util.Set;
 
 import net.osmand.osm.MapRenderingTypes.MapRouteTag;
+import net.osmand.osm.edit.Entity;
+import net.osmand.osm.edit.Node;
+import net.osmand.osm.edit.Way;
 
 
 public class MapRoutingTypes {

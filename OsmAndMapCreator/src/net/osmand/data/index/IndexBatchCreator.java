@@ -37,6 +37,7 @@ import net.osmand.data.preparation.IndexCreator;
 import net.osmand.data.preparation.MapZooms;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.osm.MapRenderingTypes;
+import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.swing.OsmExtractionUI;
 import net.osmand.util.Algorithms;
 
@@ -76,7 +77,7 @@ public class IndexBatchCreator {
 	File skipExistingIndexes;
 	MapZooms mapZooms = null;
 	Integer zoomWaySmoothness = null; 
-	MapRenderingTypes types = MapRenderingTypes.getDefault();
+	MapRenderingTypesEncoder types = MapRenderingTypesEncoder.getDefault();
 	
 	File osmDirFiles;
 	File indexDirFiles;
@@ -242,9 +243,9 @@ public class IndexBatchCreator {
 		}
 		String f = process.getAttribute("renderingTypesFile");
 		if(f == null || f.length() == 0){
-			types = MapRenderingTypes.getDefault();
+			types = MapRenderingTypesEncoder.getDefault();
 		} else {
-			types = new MapRenderingTypes(f);
+			types = new MapRenderingTypesEncoder(f);
 		}
 		
 		String osmDbDialect = process.getAttribute("osmDbDialect");

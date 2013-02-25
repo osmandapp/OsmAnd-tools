@@ -43,7 +43,7 @@ import net.osmand.MapCreatorVersion;
 import net.osmand.data.preparation.IndexCreator;
 import net.osmand.map.IMapLocationListener;
 import net.osmand.map.ITileSource;
-import net.osmand.osm.MapRenderingTypes;
+import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.io.IOsmStorageFilter;
 import net.osmand.osm.io.OsmBaseStorage;
 import net.osmand.osm.io.OsmBoundsFilter;
@@ -500,11 +500,11 @@ public class OsmExtractionUI implements IMapLocationListener {
 						creator.setIndexRouting(buildRoutingIndex.isSelected());
 						creator.setCityAdminLevel(DataExtractionSettings.getSettings().getCityAdminLevel());
 						String fn = DataExtractionSettings.getSettings().getMapRenderingTypesFile();
-						MapRenderingTypes types;
+						MapRenderingTypesEncoder types;
 						if(fn == null || fn.length() == 0){
-							types = MapRenderingTypes.getDefault();
+							types = MapRenderingTypesEncoder.getDefault();
 						} else {
-							types = new MapRenderingTypes(fn);
+							types = new MapRenderingTypesEncoder(fn);
 						}
 						RTree.clearCache();
 						int smoothness = 0;

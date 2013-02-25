@@ -24,7 +24,7 @@ import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.RouteDataObject;
 import net.osmand.data.DataTileManager;
 import net.osmand.data.LatLon;
-import net.osmand.osm.Way;
+import net.osmand.osm.edit.Way;
 import net.osmand.router.BinaryRoutePlanner;
 import net.osmand.router.BinaryRoutePlanner.RouteSegment;
 import net.osmand.router.BinaryRoutePlanner.RouteSegmentVisitor;
@@ -113,7 +113,7 @@ public class MapClusterLayer implements MapPanelLayer {
 							end = t;
 
 							for (int i = st; i <= end; i++) {
-								net.osmand.osm.Node n = new net.osmand.osm.Node(MapUtils.get31LatitudeY(s.getRoad().getPoint31YTile(i)),
+								net.osmand.osm.edit.Node n = new net.osmand.osm.edit.Node(MapUtils.get31LatitudeY(s.getRoad().getPoint31YTile(i)),
 										MapUtils.get31LongitudeX(s.getRoad().getPoint31XTile(i)), -1);
 								w.addNode(n);
 							}
@@ -171,7 +171,7 @@ public class MapClusterLayer implements MapPanelLayer {
 				for (RouteSegment segment : cache) {
 					Way way = new Way(-1);
 					for (int i = 0; i < segment.getRoad().getPointsLength(); i++) {
-						net.osmand.osm.Node n = new net.osmand.osm.Node(MapUtils.get31LatitudeY(segment.getRoad()
+						net.osmand.osm.edit.Node n = new net.osmand.osm.edit.Node(MapUtils.get31LatitudeY(segment.getRoad()
 								.getPoint31YTile(i)), MapUtils.get31LongitudeX(segment.getRoad().getPoint31XTile(i)), -1);
 						way.addNode(n);
 					}

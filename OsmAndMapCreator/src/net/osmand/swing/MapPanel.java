@@ -54,7 +54,7 @@ import net.osmand.map.MapTileDownloader.DownloadRequest;
 import net.osmand.map.MapTileDownloader.IMapDownloaderCallback;
 import net.osmand.map.TileSourceManager;
 import net.osmand.map.TileSourceManager.TileSourceTemplate;
-import net.osmand.osm.Entity;
+import net.osmand.osm.edit.Entity;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 

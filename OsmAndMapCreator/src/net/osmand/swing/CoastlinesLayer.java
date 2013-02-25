@@ -14,7 +14,7 @@ import javax.swing.JPopupMenu;
 
 import net.osmand.data.preparation.BasemapProcessor;
 import net.osmand.data.preparation.MapZooms;
-import net.osmand.osm.MapRenderingTypes;
+import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.util.MapUtils;
 
 
@@ -35,7 +35,7 @@ public class CoastlinesLayer implements MapPanelLayer {
 	@Override
 	public void initLayer(MapPanel map) {
 		this.map = map;
-		basemapProcessor = new BasemapProcessor(null, MapZooms.getDefault(), MapRenderingTypes.getDefault(), 0);
+		basemapProcessor = new BasemapProcessor(null, MapZooms.getDefault(), MapRenderingTypesEncoder.getDefault(), 0);
 		fillPopupMenuWithActions(map.getPopupMenu());
 	}
 	

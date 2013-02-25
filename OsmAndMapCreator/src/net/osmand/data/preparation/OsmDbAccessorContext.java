@@ -2,8 +2,8 @@ package net.osmand.data.preparation;
 
 import java.sql.SQLException;
 
-import net.osmand.osm.Relation;
-import net.osmand.osm.Way;
+import net.osmand.osm.edit.Relation;
+import net.osmand.osm.edit.Way;
 
 public interface OsmDbAccessorContext {
 	

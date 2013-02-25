@@ -29,14 +29,15 @@ import net.osmand.data.Multipolygon;
 import net.osmand.data.MultipolygonBuilder;
 import net.osmand.data.Ring;
 import net.osmand.data.preparation.MapZooms.MapZoomPair;
-import net.osmand.osm.Entity;
-import net.osmand.osm.Entity.EntityId;
 import net.osmand.osm.MapRenderingTypes;
+import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.MapRenderingTypes.MapRulType;
-import net.osmand.osm.Node;
-import net.osmand.osm.OSMSettings.OSMTagKey;
-import net.osmand.osm.Relation;
-import net.osmand.osm.Way;
+import net.osmand.osm.edit.Entity;
+import net.osmand.osm.edit.Node;
+import net.osmand.osm.edit.Relation;
+import net.osmand.osm.edit.Way;
+import net.osmand.osm.edit.Entity.EntityId;
+import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapAlgorithms;
 import net.osmand.util.MapUtils;
@@ -57,7 +58,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	// map zoom levels <= 2^MAP_LEVELS
 	private static final int MAP_LEVELS_POWER = 3;
 	private static final int MAP_LEVELS_MAX = 1 << MAP_LEVELS_POWER;
-	private MapRenderingTypes renderingTypes;
+	private MapRenderingTypesEncoder renderingTypes;
 	private MapZooms mapZooms;
 
 	Map<Long, TIntArrayList> multiPolygonsWays = new LinkedHashMap<Long, TIntArrayList>();
@@ -80,7 +81,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	
 	private static long notUsedId = - 1 << 40; // million million  
 
-	public IndexVectorMapCreator(Log logMapDataWarn, MapZooms mapZooms, MapRenderingTypes renderingTypes, int zoomWaySmothness) {
+	public IndexVectorMapCreator(Log logMapDataWarn, MapZooms mapZooms, MapRenderingTypesEncoder renderingTypes, int zoomWaySmothness) {
 		this.logMapDataWarn = logMapDataWarn;
 		this.mapZooms = mapZooms;
 		this.zoomWaySmothness = zoomWaySmothness;

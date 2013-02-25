@@ -10,8 +10,8 @@ import java.util.Set;
 import net.osmand.data.Building;
 import net.osmand.data.City;
 import net.osmand.data.LatLon;
-import net.osmand.osm.Entity;
-import net.osmand.osm.Way;
+import net.osmand.osm.edit.Entity;
+import net.osmand.osm.edit.Way;
 
 public class CachedDBStreetDAO extends DBStreetDAO
 {

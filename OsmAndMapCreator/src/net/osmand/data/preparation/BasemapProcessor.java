@@ -18,12 +18,13 @@ import java.util.Map.Entry;
 import net.osmand.binary.OsmandOdb.MapData;
 import net.osmand.binary.OsmandOdb.MapDataBlock;
 import net.osmand.data.preparation.MapZooms.MapZoomPair;
-import net.osmand.osm.Entity;
 import net.osmand.osm.MapRenderingTypes;
 import net.osmand.osm.MapRenderingTypes.MapRulType;
-import net.osmand.osm.Node;
-import net.osmand.osm.Way;
+import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.WayChain;
+import net.osmand.osm.edit.Entity;
+import net.osmand.osm.edit.Node;
+import net.osmand.osm.edit.Way;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapAlgorithms;
 import net.osmand.util.MapUtils;
@@ -52,7 +53,7 @@ public class BasemapProcessor {
 	Map<MapRulType, String> namesUse = new LinkedHashMap<MapRenderingTypes.MapRulType, String>();
 	
 	private final int zoomWaySmothness;
-	private final MapRenderingTypes renderingTypes;
+	private final MapRenderingTypesEncoder renderingTypes;
 	private final MapZooms mapZooms;
 	private final Log logMapDataWarn;
 	private SimplisticQuadTree[] quadTrees;
@@ -138,7 +139,7 @@ public class BasemapProcessor {
 	}
 	
 	
-	public BasemapProcessor(Log logMapDataWarn, MapZooms mapZooms, MapRenderingTypes renderingTypes, int zoomWaySmothness) {
+	public BasemapProcessor(Log logMapDataWarn, MapZooms mapZooms, MapRenderingTypesEncoder renderingTypes, int zoomWaySmothness) {
 		this.logMapDataWarn = logMapDataWarn;
 		this.mapZooms = mapZooms;
 		this.renderingTypes = renderingTypes;

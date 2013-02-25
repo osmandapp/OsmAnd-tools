@@ -7,7 +7,7 @@ import java.util.ListIterator;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
-import net.osmand.osm.Way;
+import net.osmand.osm.edit.Way;
 
 import org.apache.commons.logging.Log;
 

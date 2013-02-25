@@ -15,12 +15,12 @@ import javax.xml.stream.XMLStreamException;
 
 import net.osmand.data.LatLon;
 import net.osmand.impl.ConsoleProgressImplementation;
-import net.osmand.osm.Entity;
-import net.osmand.osm.Entity.EntityId;
-import net.osmand.osm.Entity.EntityType;
-import net.osmand.osm.Node;
-import net.osmand.osm.OSMSettings.OSMTagKey;
-import net.osmand.osm.Way;
+import net.osmand.osm.edit.Entity;
+import net.osmand.osm.edit.Node;
+import net.osmand.osm.edit.Way;
+import net.osmand.osm.edit.Entity.EntityId;
+import net.osmand.osm.edit.Entity.EntityType;
+import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.osm.io.OsmBaseStorage;
 import net.osmand.osm.io.OsmStorageWriter;
 import net.osmand.util.MapAlgorithms;
@@ -114,7 +114,7 @@ public class FixLinkedCoastline {
 		}
 	}
 	
-	private static long calcCoordinate(net.osmand.osm.Node node){
+	private static long calcCoordinate(net.osmand.osm.edit.Node node){
 		LatLon l = node.getLatLon();
 		double lon  =l.getLongitude();
 		if(180 - Math.abs(l.getLongitude()) < 0.0001){
@@ -133,13 +133,13 @@ public class FixLinkedCoastline {
 	private static int ERRORS = 0;
 	
 	private static Way revertWay(Way way){
-		ArrayList<net.osmand.osm.Node> revNodes = new ArrayList<net.osmand.osm.Node>(way.getNodes());
+		ArrayList<net.osmand.osm.edit.Node> revNodes = new ArrayList<net.osmand.osm.edit.Node>(way.getNodes());
 		Collections.reverse(revNodes);
 		Way ws = new Way(way.getId());
 		for(String key : way.getTagKeySet()){
 			ws.putTag(key, way.getTag(key));
 		}
-		for(net.osmand.osm.Node n : revNodes){
+		for(net.osmand.osm.edit.Node n : revNodes){
 			ws.addNode(n);
 		}
 		return ws;

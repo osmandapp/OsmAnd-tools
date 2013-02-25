@@ -33,9 +33,9 @@ import net.osmand.PlatformUtil;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.data.DataTileManager;
 import net.osmand.data.LatLon;
-import net.osmand.osm.Entity;
-import net.osmand.osm.OSMSettings.OSMTagKey;
-import net.osmand.osm.Way;
+import net.osmand.osm.edit.Entity;
+import net.osmand.osm.edit.Way;
+import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.router.BinaryRoutePlanner.RouteSegment;
 import net.osmand.router.BinaryRoutePlanner.RouteSegmentVisitor;
 import net.osmand.router.RoutePlannerFrontEnd;
@@ -353,7 +353,7 @@ public class MapRouterLayer implements MapPanelLayer {
 							try {
 								double lon = Double.parseDouble(coordinate.substring(0, s));
 								double lat = Double.parseDouble(coordinate.substring(s + 1));
-								w.addNode(new net.osmand.osm.Node(lat, lon, -1));
+								w.addNode(new net.osmand.osm.edit.Node(lat, lon, -1));
 							} catch (NumberFormatException e) {
 							}
 						}
@@ -420,7 +420,7 @@ public class MapRouterLayer implements MapPanelLayer {
 					try {
 						double lon = Double.parseDouble(item.getAttribute("lon"));
 						double lat = Double.parseDouble(item.getAttribute("lat"));
-						w.addNode(new net.osmand.osm.Node(lat, lon, -1));
+						w.addNode(new net.osmand.osm.edit.Node(lat, lon, -1));
 					} catch (NumberFormatException e) {
 					}
 				}
@@ -521,7 +521,7 @@ public class MapRouterLayer implements MapPanelLayer {
 					latitude += route[routePointIdx * 2 + 0];
 					longitude += route[routePointIdx * 2 + 1];
 					
-					w.addNode(new net.osmand.osm.Node(latitude, longitude, -1));
+					w.addNode(new net.osmand.osm.edit.Node(latitude, longitude, -1));
 				}
 				
 				if (!w.getNodes().isEmpty()) {
@@ -675,7 +675,7 @@ public class MapRouterLayer implements MapPanelLayer {
 	}
 
 	private void calculateResult(List<Way> res, List<RouteSegmentResult> searchRoute) {
-		net.osmand.osm.Node prevWayNode = null;
+		net.osmand.osm.edit.Node prevWayNode = null;
 		for (RouteSegmentResult s : searchRoute) {
 			// double dist = MapUtils.getDistance(s.startPoint, s.endPoint);
 			Way way = new Way(-1);
@@ -690,7 +690,7 @@ public class MapRouterLayer implements MapPanelLayer {
 			int i = s.getStartPointIndex();
 			while (true) {
 				LatLon l = s.getPoint(i);
-				net.osmand.osm.Node n = new net.osmand.osm.Node(l.getLatitude(), l.getLongitude(), -1);
+				net.osmand.osm.edit.Node n = new net.osmand.osm.edit.Node(l.getLatitude(), l.getLongitude(), -1);
 				if (prevWayNode != null) {
 					if (MapUtils.getDistance(prevWayNode, n) > 0) {
 						System.out.println("Warning not connected road " + " " + s.getObject().id + " dist "
@@ -772,7 +772,7 @@ public class MapRouterLayer implements MapPanelLayer {
 					}
 					for (int i = from; i <= to; i++) {
 						if (i >= 0 && i < segment.getRoad().getPointsLength()) {
-							net.osmand.osm.Node n = createNode(segment, i);
+							net.osmand.osm.edit.Node n = createNode(segment, i);
 							way.addNode(n);
 						}
 					}
@@ -784,8 +784,8 @@ public class MapRouterLayer implements MapPanelLayer {
 		};
 	}
 	
-	private net.osmand.osm.Node createNode(RouteSegment segment, int i) {
-		net.osmand.osm.Node n = new net.osmand.osm.Node(MapUtils.get31LatitudeY(segment.getRoad().getPoint31YTile(i)),
+	private net.osmand.osm.edit.Node createNode(RouteSegment segment, int i) {
+		net.osmand.osm.edit.Node n = new net.osmand.osm.edit.Node(MapUtils.get31LatitudeY(segment.getRoad().getPoint31YTile(i)),
 				MapUtils.get31LongitudeX(segment.getRoad().getPoint31XTile(i)), -1);
 		return n;
 	}

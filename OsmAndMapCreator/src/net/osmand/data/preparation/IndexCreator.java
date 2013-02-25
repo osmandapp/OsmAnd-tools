@@ -17,11 +17,12 @@ import net.osmand.IndexConstants;
 import net.osmand.data.preparation.OsmDbAccessor.OsmDbVisitor;
 import net.osmand.data.preparation.address.IndexAddressCreator;
 import net.osmand.impl.ConsoleProgressImplementation;
-import net.osmand.osm.Entity;
-import net.osmand.osm.Entity.EntityId;
-import net.osmand.osm.Entity.EntityType;
 import net.osmand.osm.MapRenderingTypes;
-import net.osmand.osm.Relation;
+import net.osmand.osm.MapRenderingTypesEncoder;
+import net.osmand.osm.edit.Entity;
+import net.osmand.osm.edit.Relation;
+import net.osmand.osm.edit.Entity.EntityId;
+import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.io.IOsmStorageFilter;
 import net.osmand.osm.io.OsmBaseStorage;
 import net.osmand.osm.io.OsmBaseStoragePbf;
@@ -366,7 +367,7 @@ public class IndexCreator {
 	}
 	
 	public void generateBasemapIndex(IProgress progress, IOsmStorageFilter addFilter, MapZooms mapZooms,
-			MapRenderingTypes renderingTypes, Log logMapDataWarn, String regionName, File... readFiles) throws IOException, SAXException, SQLException, InterruptedException {
+			MapRenderingTypesEncoder renderingTypes, Log logMapDataWarn, String regionName, File... readFiles) throws IOException, SAXException, SQLException, InterruptedException {
 		if (logMapDataWarn == null) {
 			logMapDataWarn = log;
 		}
@@ -375,7 +376,7 @@ public class IndexCreator {
 		}
 
 		if (renderingTypes == null) {
-			renderingTypes = MapRenderingTypes.getDefault();
+			renderingTypes = MapRenderingTypesEncoder.getDefault();
 		}
 		if (mapZooms == null) {
 			mapZooms = MapZooms.getDefault();
@@ -443,7 +444,7 @@ public class IndexCreator {
 	}
 	
 	public void generateIndexes(File readFile, IProgress progress, IOsmStorageFilter addFilter, MapZooms mapZooms,
-			MapRenderingTypes renderingTypes, Log logMapDataWarn) throws IOException, SAXException, SQLException, InterruptedException {
+			MapRenderingTypesEncoder renderingTypes, Log logMapDataWarn) throws IOException, SAXException, SQLException, InterruptedException {
 //		if(LevelDBAccess.load()){
 //			dialect = DBDialect.NOSQL;
 //		}
@@ -452,7 +453,7 @@ public class IndexCreator {
 		}
 		
 		if (renderingTypes == null) {
-			renderingTypes = MapRenderingTypes.getDefault();
+			renderingTypes = MapRenderingTypesEncoder.getDefault();
 		}
 		if (mapZooms == null) {
 			mapZooms = MapZooms.getDefault();
@@ -762,7 +763,7 @@ public class IndexCreator {
 //		creator.deleteOsmDB = false;
 				
 		creator.setZoomWaySmothness(2);
-		MapRenderingTypes rt = MapRenderingTypes.getDefault();
+		MapRenderingTypesEncoder rt = MapRenderingTypesEncoder.getDefault();
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 
 //		String file = "/home/victor/projects/OsmAnd/temp/map.osm";

@@ -38,12 +38,12 @@ import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamWriter;
 
 import net.osmand.data.MapObject;
-import net.osmand.osm.Entity;
-import net.osmand.osm.Entity.EntityId;
-import net.osmand.osm.EntityInfo;
-import net.osmand.osm.Node;
-import net.osmand.osm.Relation;
-import net.osmand.osm.Way;
+import net.osmand.osm.edit.Entity;
+import net.osmand.osm.edit.EntityInfo;
+import net.osmand.osm.edit.Node;
+import net.osmand.osm.edit.Relation;
+import net.osmand.osm.edit.Way;
+import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.util.Algorithms;
 
 public class OsmStorageWriter {

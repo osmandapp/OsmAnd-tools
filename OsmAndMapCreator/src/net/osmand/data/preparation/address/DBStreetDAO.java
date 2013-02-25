@@ -12,9 +12,9 @@ import net.osmand.data.City;
 import net.osmand.data.LatLon;
 import net.osmand.data.preparation.AbstractIndexPartCreator;
 import net.osmand.data.preparation.DBDialect;
-import net.osmand.osm.Entity;
-import net.osmand.osm.Node;
-import net.osmand.osm.Way;
+import net.osmand.osm.edit.Entity;
+import net.osmand.osm.edit.Node;
+import net.osmand.osm.edit.Way;
 
 public class DBStreetDAO extends AbstractIndexPartCreator
 {

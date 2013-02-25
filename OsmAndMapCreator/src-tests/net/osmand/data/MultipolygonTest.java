@@ -3,8 +3,8 @@ package net.osmand.data;
 import static org.junit.Assert.*;
 
 
-import net.osmand.osm.Node;
-import net.osmand.osm.Way;
+import net.osmand.osm.edit.Node;
+import net.osmand.osm.edit.Way;
 
 import org.junit.Before;
 import org.junit.Test;

@@ -21,9 +21,9 @@ import net.osmand.data.City;
 import net.osmand.data.DataTileManager;
 import net.osmand.data.LatLon;
 import net.osmand.data.Street;
-import net.osmand.osm.Entity;
-import net.osmand.osm.Node;
-import net.osmand.osm.OSMSettings.OSMTagKey;
+import net.osmand.osm.edit.Entity;
+import net.osmand.osm.edit.Node;
+import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.util.MapUtils;
 
 import org.apache.commons.logging.Log;

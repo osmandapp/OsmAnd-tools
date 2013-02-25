@@ -23,14 +23,14 @@ import java.util.regex.Pattern;
 
 import net.osmand.data.TransportRoute;
 import net.osmand.data.TransportStop;
-import net.osmand.osm.Entity;
-import net.osmand.osm.Entity.EntityId;
-import net.osmand.osm.Node;
-import net.osmand.osm.OSMSettings.OSMTagKey;
-import net.osmand.osm.EntityParser;
-import net.osmand.osm.OsmTransportRoute;
-import net.osmand.osm.Relation;
-import net.osmand.osm.Way;
+import net.osmand.osm.edit.Entity;
+import net.osmand.osm.edit.EntityParser;
+import net.osmand.osm.edit.Node;
+import net.osmand.osm.edit.OsmTransportRoute;
+import net.osmand.osm.edit.Relation;
+import net.osmand.osm.edit.Way;
+import net.osmand.osm.edit.Entity.EntityId;
+import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.util.MapUtils;
 import net.sf.junidecode.Junidecode;
 

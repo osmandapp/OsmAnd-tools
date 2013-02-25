@@ -64,7 +64,7 @@ import net.osmand.data.TransportStop;
 import net.osmand.data.preparation.IndexPoiCreator.PoiTileBox;
 import net.osmand.osm.MapRenderingTypes.MapRulType;
 import net.osmand.osm.MapRoutingTypes.MapRouteType;
-import net.osmand.osm.Node;
+import net.osmand.osm.edit.Node;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import net.sf.junidecode.Junidecode;

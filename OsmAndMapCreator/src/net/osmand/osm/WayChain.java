@@ -3,6 +3,9 @@ package net.osmand.osm;
 import java.util.ArrayList;
 import java.util.List;
 
+import net.osmand.osm.edit.Node;
+import net.osmand.osm.edit.Way;
+
 public class WayChain  {
 	private List<Way> ways = new ArrayList<Way>(1);
 	private List<Node> chainNodes;
