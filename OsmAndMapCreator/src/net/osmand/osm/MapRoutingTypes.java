@@ -11,7 +11,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
-import net.osmand.osm.MapRenderingTypes.MapRouteTag;
+import net.osmand.osm.MapRenderingTypesEncoder.MapRouteTag;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Way;
@@ -31,7 +31,7 @@ public class MapRoutingTypes {
 	private MapRouteType refRuleType;
 	private MapRouteType nameRuleType; 
 	
-	public MapRoutingTypes(MapRenderingTypes baseTypes) {
+	public MapRoutingTypes(MapRenderingTypesEncoder baseTypes) {
 		for(MapRouteTag tg :  baseTypes.getRouteTags() ) {
 			String t = tg.tag;
 			if(tg.value != null) {

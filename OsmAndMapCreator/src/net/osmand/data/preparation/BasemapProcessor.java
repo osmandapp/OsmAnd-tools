@@ -18,9 +18,8 @@ import java.util.Map.Entry;
 import net.osmand.binary.OsmandOdb.MapData;
 import net.osmand.binary.OsmandOdb.MapDataBlock;
 import net.osmand.data.preparation.MapZooms.MapZoomPair;
-import net.osmand.osm.MapRenderingTypes;
-import net.osmand.osm.MapRenderingTypes.MapRulType;
 import net.osmand.osm.MapRenderingTypesEncoder;
+import net.osmand.osm.MapRenderingTypesEncoder.MapRulType;
 import net.osmand.osm.WayChain;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Node;
@@ -49,9 +48,9 @@ public class BasemapProcessor {
 	private BitSet seaTileInfo = new BitSet(BITS_COUNT);
 	private BitSet landTileInfo = new BitSet(BITS_COUNT);
 	private TIntArrayList typeUse = new TIntArrayList();
-	List<MapRulType> tempNameUse = new ArrayList<MapRenderingTypes.MapRulType>();
+	List<MapRulType> tempNameUse = new ArrayList<MapRulType>();
 	TIntArrayList addtypeUse = new TIntArrayList(8);
-	Map<MapRulType, String> namesUse = new LinkedHashMap<MapRenderingTypes.MapRulType, String>();
+	Map<MapRulType, String> namesUse = new LinkedHashMap<MapRulType, String>();
 	
 	private final int zoomWaySmothness;
 	private final MapRenderingTypesEncoder renderingTypes;
@@ -413,14 +412,14 @@ public class BasemapProcessor {
 						List<Node> res = new ArrayList<Node>();
 						OsmMapUtils.simplifyDouglasPeucker(ns, zoomPair.getMaxZoom() - 1 + 8 + zoomWaySmothness, 3, res);
 						addSimplisticData(res, typeUse.toArray(), !addtypeUse.isEmpty() ? addtypeUse.toArray() : null, zoomPair,
-								quadTrees[level], z, tilex, tiley, namesUse.isEmpty() ? null : new LinkedHashMap<MapRenderingTypes.MapRulType, String>(namesUse));
+								quadTrees[level], z, tilex, tiley, namesUse.isEmpty() ? null : new LinkedHashMap<MapRulType, String>(namesUse));
 					}
 				} else {
 					int z = getViewZoom(zoomPair);
 					int tilex = (int) MapUtils.getTileNumberX(z, ((Node) e).getLongitude());
 					int tiley = (int) MapUtils.getTileNumberY(z, ((Node) e).getLatitude());
 					addSimplisticData(Collections.singletonList((Node)e), typeUse.toArray(), !addtypeUse.isEmpty() ? addtypeUse.toArray() : null, zoomPair,
-							quadTrees[level], z, tilex, tiley, namesUse.isEmpty() ? null : new LinkedHashMap<MapRenderingTypes.MapRulType, String>(namesUse));
+							quadTrees[level], z, tilex, tiley, namesUse.isEmpty() ? null : new LinkedHashMap<MapRulType, String>(namesUse));
 				}
 				 
 			}

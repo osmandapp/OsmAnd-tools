@@ -62,7 +62,7 @@ import net.osmand.data.MapObject;
 import net.osmand.data.Street;
 import net.osmand.data.TransportStop;
 import net.osmand.data.preparation.IndexPoiCreator.PoiTileBox;
-import net.osmand.osm.MapRenderingTypes.MapRulType;
+import net.osmand.osm.MapRenderingTypesEncoder.MapRulType;
 import net.osmand.osm.MapRoutingTypes.MapRouteType;
 import net.osmand.osm.edit.Node;
 import net.osmand.util.Algorithms;

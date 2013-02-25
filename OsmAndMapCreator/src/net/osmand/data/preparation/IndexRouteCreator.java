@@ -44,6 +44,7 @@ import net.osmand.binary.OsmandOdb.RouteData;
 import net.osmand.data.LatLon;
 import net.osmand.data.preparation.BinaryMapIndexWriter.RoutePointToWrite;
 import net.osmand.osm.MapRenderingTypes;
+import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.MapRoutingTypes;
 import net.osmand.osm.MapRoutingTypes.MapRouteType;
 import net.osmand.osm.edit.Entity;
@@ -98,7 +99,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 	private Map<EntityId, Map<String, String>> propogatedTags = new LinkedHashMap<Entity.EntityId, Map<String, String>>();
 
 
-	public IndexRouteCreator(MapRenderingTypes renderingTypes, Log logMapDataWarn) {
+	public IndexRouteCreator(MapRenderingTypesEncoder renderingTypes, Log logMapDataWarn) {
 		this.logMapDataWarn = logMapDataWarn;
 		this.routeTypes = new MapRoutingTypes(renderingTypes);
 	}

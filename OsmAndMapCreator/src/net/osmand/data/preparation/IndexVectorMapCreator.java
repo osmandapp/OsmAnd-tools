@@ -29,9 +29,8 @@ import net.osmand.data.Multipolygon;
 import net.osmand.data.MultipolygonBuilder;
 import net.osmand.data.Ring;
 import net.osmand.data.preparation.MapZooms.MapZoomPair;
-import net.osmand.osm.MapRenderingTypes;
-import net.osmand.osm.MapRenderingTypes.MapRulType;
 import net.osmand.osm.MapRenderingTypesEncoder;
+import net.osmand.osm.MapRenderingTypesEncoder.MapRulType;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.Node;
@@ -65,8 +64,8 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	
 	// local purpose to speed up processing cache allocation
 	TIntArrayList typeUse = new TIntArrayList(8);
-	List<MapRulType> tempNameUse = new ArrayList<MapRenderingTypes.MapRulType>();
-	Map<MapRulType, String> namesUse = new LinkedHashMap<MapRenderingTypes.MapRulType, String>();
+	List<MapRulType> tempNameUse = new ArrayList<MapRulType>();
+	Map<MapRulType, String> namesUse = new LinkedHashMap<MapRulType, String>();
 	Map<EntityId, Map<String, String>> propogatedTags = new LinkedHashMap<Entity.EntityId, Map<String, String>>();
 	TIntArrayList addtypeUse = new TIntArrayList(8);
 
@@ -506,7 +505,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 					writeBinaryMapTree(root, rootBounds, rtree, writer, treeHeader);
 					
 					writeBinaryMapBlock(root,  rootBounds, rtree, writer, selectData, treeHeader, new LinkedHashMap<String, Integer>(),
-								new LinkedHashMap<MapRenderingTypes.MapRulType, String>(), mapZooms.getLevel(i));
+								new LinkedHashMap<MapRulType, String>(), mapZooms.getLevel(i));
 
 					writer.endWriteMapLevelIndex();
 				}
