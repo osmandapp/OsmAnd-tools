@@ -1041,7 +1041,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 							newS.setId(s.getId());
 							post.registerStreet(newS);
 						}
-						newS.registerBuildingCheckById(b);
+						newS.addBuildingCheckById(b);
 					}
 				}
 			}
@@ -1153,7 +1153,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 					b.setInterpolationType(BuildingInterpolation.valueOf(type));
 				}
 				
-				s.registerBuildingCheckById(b);
+				s.addBuildingCheckById(b);
 			}
 		}
 

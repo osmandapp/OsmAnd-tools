@@ -24,6 +24,7 @@ import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.WayChain;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Node;
+import net.osmand.osm.edit.OsmMapUtils;
 import net.osmand.osm.edit.Way;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapAlgorithms;
@@ -410,7 +411,7 @@ public class BasemapProcessor {
 							}
 						}
 						List<Node> res = new ArrayList<Node>();
-						MapAlgorithms.simplifyDouglasPeucker(ns, zoomPair.getMaxZoom() - 1 + 8 + zoomWaySmothness, 3, res);
+						OsmMapUtils.simplifyDouglasPeucker(ns, zoomPair.getMaxZoom() - 1 + 8 + zoomWaySmothness, 3, res);
 						addSimplisticData(res, typeUse.toArray(), !addtypeUse.isEmpty() ? addtypeUse.toArray() : null, zoomPair,
 								quadTrees[level], z, tilex, tiley, namesUse.isEmpty() ? null : new LinkedHashMap<MapRenderingTypes.MapRulType, String>(namesUse));
 					}
@@ -484,7 +485,7 @@ public class BasemapProcessor {
 				}
 			}
 			List<Node> res = new ArrayList<Node>();
-			MapAlgorithms.simplifyDouglasPeucker(w, zoomPair.getMaxZoom() - 1 + 8 + zoomWaySmothness, 3, res);
+			OsmMapUtils.simplifyDouglasPeucker(w, zoomPair.getMaxZoom() - 1 + 8 + zoomWaySmothness, 3, res);
 			addSimplisticData(res, types, addTypes, zoomPair, quadTree, z, tilex, tiley, null);
 		}
 	}

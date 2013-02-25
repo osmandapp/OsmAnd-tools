@@ -32,13 +32,14 @@ import net.osmand.data.DataTileManager;
 import net.osmand.data.LatLon;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.osm.edit.Entity;
-import net.osmand.osm.edit.EntityInfo;
-import net.osmand.osm.edit.Node;
-import net.osmand.osm.edit.Relation;
-import net.osmand.osm.edit.Way;
 import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.Entity.EntityType;
+import net.osmand.osm.edit.EntityInfo;
+import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
+import net.osmand.osm.edit.OsmMapUtils;
+import net.osmand.osm.edit.Relation;
+import net.osmand.osm.edit.Way;
 import net.osmand.osm.io.IOsmStorageFilter;
 import net.osmand.osm.io.OsmBaseStorage;
 import net.osmand.osm.io.OsmStorageWriter;
@@ -131,13 +132,13 @@ public class MinskTransReader {
 			List<Node> closestObjects = busStops.getClosestObjects(r.latitude, r.longitude, 0, 1);
 			// filter closest objects
 			for(int i=0; i<closestObjects.size(); ){
-				if(MapUtils.getDistance(closestObjects.get(i), r.latitude, r.longitude) > default_dist_to_stop){
+				if(OsmMapUtils.getDistance(closestObjects.get(i), r.latitude, r.longitude) > default_dist_to_stop){
 					closestObjects.remove(i);
 				} else{
 					i++;
 				}
 			}
-			MapUtils.sortListOfEntities(closestObjects, r.latitude, r.longitude);
+			OsmMapUtils.sortListOfEntities(closestObjects, r.latitude, r.longitude);
 			int ind = 0; 
 			boolean ccorrelated = false;
 			int cOsize = closestObjects.size();
@@ -152,7 +153,7 @@ public class MinskTransReader {
 					// recorrelate existing node and add to todo list
 					String stopId = reverse.get(foundNode);
 					TransportStop st = stopsMap.get(stopId);
-					if(MapUtils.getDistance(foundNode, r.latitude, r.longitude) < MapUtils.getDistance(foundNode, st.latitude, st.longitude)){
+					if(OsmMapUtils.getDistance(foundNode, r.latitude, r.longitude) < OsmMapUtils.getDistance(foundNode, st.latitude, st.longitude)){
 						// check that stop again
 						stopsToCheck.add(st);
 						reverse.put(foundNode, r.stopId);
@@ -294,7 +295,7 @@ public class MinskTransReader {
 				}
 				
 			} else if(correlatedNode.getId() != e.getId()){
-				double dist = MapUtils.getDistance(correlatedNode, e.getLatLon());
+				double dist = OsmMapUtils.getDistance(correlatedNode, e.getLatLon());
 				if(i==lsize - 1 && !direct && dist < 150){
 					continue;
 				} 

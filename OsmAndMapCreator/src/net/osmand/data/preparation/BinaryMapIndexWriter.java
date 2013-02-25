@@ -881,7 +881,6 @@ public class BinaryMapIndexWriter {
 		Map<Long, Set<Street>> mapNodeToStreet = new LinkedHashMap<Long, Set<Street>>();
 		if (wayNodes != null) {
 			for (int i = 0; i < streets.size(); i++) {
-				streets.get(i).setIndexInCity(i);
 				for (Node n : wayNodes.get(streets.get(i))) {
 					if (!mapNodeToStreet.containsKey(n.getId())) {
 						mapNodeToStreet.put(n.getId(), new LinkedHashSet<Street>(3));

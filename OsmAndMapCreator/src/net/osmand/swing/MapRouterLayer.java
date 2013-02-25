@@ -34,8 +34,9 @@ import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.data.DataTileManager;
 import net.osmand.data.LatLon;
 import net.osmand.osm.edit.Entity;
-import net.osmand.osm.edit.Way;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
+import net.osmand.osm.edit.OsmMapUtils;
+import net.osmand.osm.edit.Way;
 import net.osmand.router.BinaryRoutePlanner.RouteSegment;
 import net.osmand.router.BinaryRoutePlanner.RouteSegmentVisitor;
 import net.osmand.router.RoutePlannerFrontEnd;
@@ -692,9 +693,9 @@ public class MapRouterLayer implements MapPanelLayer {
 				LatLon l = s.getPoint(i);
 				net.osmand.osm.edit.Node n = new net.osmand.osm.edit.Node(l.getLatitude(), l.getLongitude(), -1);
 				if (prevWayNode != null) {
-					if (MapUtils.getDistance(prevWayNode, n) > 0) {
+					if (OsmMapUtils.getDistance(prevWayNode, n) > 0) {
 						System.out.println("Warning not connected road " + " " + s.getObject().id + " dist "
-								+ MapUtils.getDistance(prevWayNode, n));
+								+ OsmMapUtils.getDistance(prevWayNode, n));
 					}
 					prevWayNode = null;
 				}

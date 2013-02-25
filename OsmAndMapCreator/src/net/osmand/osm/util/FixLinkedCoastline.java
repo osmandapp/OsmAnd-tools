@@ -16,14 +16,14 @@ import javax.xml.stream.XMLStreamException;
 import net.osmand.data.LatLon;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.osm.edit.Entity;
-import net.osmand.osm.edit.Node;
-import net.osmand.osm.edit.Way;
 import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.Entity.EntityType;
+import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
+import net.osmand.osm.edit.OsmMapUtils;
+import net.osmand.osm.edit.Way;
 import net.osmand.osm.io.OsmBaseStorage;
 import net.osmand.osm.io.OsmStorageWriter;
-import net.osmand.util.MapAlgorithms;
 import net.osmand.util.MapUtils;
 
 import org.xml.sax.SAXException;
@@ -225,7 +225,7 @@ public class FixLinkedCoastline {
 		}
 		
 		if (cycle != null) {
-			boolean clockwiseWay = MapAlgorithms.isClockwiseWay(cycle);
+			boolean clockwiseWay = OsmMapUtils.isClockwiseWay(cycle);
 			if (clockwiseWay) {
 				List<Way> ways = new ArrayList<Way>();
 				ERRORS ++;

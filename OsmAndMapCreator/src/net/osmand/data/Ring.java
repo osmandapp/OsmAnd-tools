@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import net.osmand.osm.edit.Node;
+import net.osmand.osm.edit.OsmMapUtils;
 import net.osmand.osm.edit.Way;
 import net.osmand.util.MapAlgorithms;
 
@@ -81,14 +82,14 @@ public class Ring implements Comparable<Ring> {
 		List<Node> polyNodes = getBorder();
 		if (polyNodes.size() == 0) return 0;
 		for (int i = 0; i < polyNodes.size() - 1; i++) {
-			if (MapAlgorithms.ray_intersect_lon(polyNodes.get(i),
+			if (OsmMapUtils.ray_intersect_lon(polyNodes.get(i),
 					polyNodes.get(i + 1), latitude, longitude) != -360d) {
 				intersections++;
 			}
 		}
 		// special handling, also count first and last, might not be closed, but
 		// we want this!
-		if (MapAlgorithms.ray_intersect_lon(polyNodes.get(0),
+		if (OsmMapUtils.ray_intersect_lon(polyNodes.get(0),
 				polyNodes.get(polyNodes.size() - 1), latitude, longitude) != -360d) {
 			intersections++;
 		}
@@ -216,7 +217,7 @@ public class Ring implements Comparable<Ring> {
 	public double getArea() {
 		if (area == -1) {
 			//cache the area
-			area = MapAlgorithms.getArea(getBorder());
+			area = OsmMapUtils.getArea(getBorder());
 		}
 		return area;
 	}

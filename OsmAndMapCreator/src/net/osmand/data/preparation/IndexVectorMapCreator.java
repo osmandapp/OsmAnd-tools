@@ -30,16 +30,16 @@ import net.osmand.data.MultipolygonBuilder;
 import net.osmand.data.Ring;
 import net.osmand.data.preparation.MapZooms.MapZoomPair;
 import net.osmand.osm.MapRenderingTypes;
-import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.MapRenderingTypes.MapRulType;
+import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.edit.Entity;
+import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.Node;
+import net.osmand.osm.edit.OSMSettings.OSMTagKey;
+import net.osmand.osm.edit.OsmMapUtils;
 import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Way;
-import net.osmand.osm.edit.Entity.EntityId;
-import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.util.Algorithms;
-import net.osmand.util.MapAlgorithms;
 import net.osmand.util.MapUtils;
 
 import org.apache.commons.logging.Log;
@@ -232,7 +232,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		}
 		List<Node> res = new ArrayList<Node>();
 		// simplification
-		MapAlgorithms.simplifyDouglasPeucker(ns, zoom + 8 + zoomWaySmothness, 3, res);
+		OsmMapUtils.simplifyDouglasPeucker(ns, zoom + 8 + zoomWaySmothness, 3, res);
 		if (res.size() < 2) {
 			return null;
 		}
@@ -383,7 +383,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			}
 			if (!skip) {
 				List<Node> res = new ArrayList<Node>();
-				MapAlgorithms.simplifyDouglasPeucker(wNodes, zoom - 1 + 8 + zoomWaySmothness, 3, res);
+				OsmMapUtils.simplifyDouglasPeucker(wNodes, zoom - 1 + 8 + zoomWaySmothness, 3, res);
 				if (res.size() > 0) {
 					namesUse.clear();
 					if (name != null && name.length() > 0) {
@@ -716,7 +716,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			throws SQLException {
 		lowLevelWays++;
 		List<Node> nodes = new ArrayList<Node>();
-		MapAlgorithms.simplifyDouglasPeucker(in, zoom + 8 + zoomWaySmothness, 3, nodes);
+		OsmMapUtils.simplifyDouglasPeucker(in, zoom + 8 + zoomWaySmothness, 3, nodes);
 		boolean first = true;
 		long firstId = -1;
 		long lastId = -1;

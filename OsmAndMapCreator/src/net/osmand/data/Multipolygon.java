@@ -10,7 +10,7 @@ import java.util.Map;
 import java.util.Set;
 
 import net.osmand.osm.edit.Node;
-import net.osmand.util.MapUtils;
+import net.osmand.osm.edit.OsmMapUtils;
 
 public class Multipolygon {
 	private List<Ring> innerRings, outerRings;
@@ -154,7 +154,7 @@ public class Multipolygon {
 			points.addAll(w.getBorder());
 		}
 		
-		return MapUtils.getWeightCenterForNodes(points);
+		return OsmMapUtils.getWeightCenterForNodes(points);
 	}
 
 	public void mergeWith(Multipolygon multipolygon) {
