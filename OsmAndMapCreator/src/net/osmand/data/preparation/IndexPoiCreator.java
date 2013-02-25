@@ -27,6 +27,7 @@ import net.osmand.data.Amenity;
 import net.osmand.data.AmenityType;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.osm.Entity;
+import net.osmand.osm.EntityParser;
 import net.osmand.osm.MapRenderingTypes;
 import net.osmand.osm.OSMSettings.OSMTagKey;
 import net.osmand.util.Algorithms;
@@ -61,13 +62,13 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 	public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 		tempAmenityList.clear();
-		tempAmenityList = Amenity.parseAmenities(renderingTypes, e, tempAmenityList);
+		tempAmenityList = EntityParser.parseAmenities(renderingTypes, e, tempAmenityList);
 		if (!tempAmenityList.isEmpty() && poiPreparedStatement != null) {
 			for (Amenity a : tempAmenityList) {
 				// do not add that check because it is too much printing for batch creation
 				// by statistic < 1% creates maps manually
 				// checkEntity(e);
-				a.setEntity(e);
+				EntityParser.parseMapObject(a, e);
 				if (a.getLocation() != null) {
 					// do not convert english name
 					// convertEnglishName(a);

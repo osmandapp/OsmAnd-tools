@@ -42,6 +42,8 @@ import net.osmand.data.preparation.OsmDbAccessorContext;
 import net.osmand.data.preparation.address.DBStreetDAO.SimpleStreet;
 import net.osmand.osm.Entity;
 import net.osmand.osm.Entity.EntityId;
+import net.osmand.osm.Entity.EntityType;
+import net.osmand.osm.EntityParser;
 import net.osmand.osm.Node;
 import net.osmand.osm.OSMSettings.OSMTagKey;
 import net.osmand.osm.Relation;
@@ -129,13 +131,13 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 
 	public void registerCityIfNeeded(Entity e) {
 		if (e instanceof Node && e.getTag(OSMTagKey.PLACE) != null) {
-			City city = new City((Node) e);
-			regCity(city);
+			City city = EntityParser.parseCity((Node) e);
+			regCity(city, e);
 		}
 	}
 
 
-	private void regCity(City city) {
+	private void regCity(City city, Entity e) {
 		LatLon l = city.getLocation();
 		if (city.getType() != null && !Algorithms.isEmpty(city.getName()) && l != null) {
 			if (city.getType() == CityType.CITY || city.getType() == CityType.TOWN) {
@@ -143,7 +145,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 			} else {
 				cityVillageManager.registerObject(l.getLatitude(), l.getLongitude(), city);
 			}
-			cities.put(city.getEntityId(), city);
+			cities.put(EntityId.valueOf(e), city);
 		}
 	}
 	
@@ -355,10 +357,10 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 			if(e instanceof Relation) {
 				ctx.loadEntityRelation((Relation) e);
 			}
-			City c = new City(e, CityType.SUBURB);
+			City c = EntityParser.parseCity(e, CityType.SUBURB);
 			ct = CityType.SUBURB;
 			centerId = e.getId();
-			regCity(c);
+			regCity(c, e);
 			writeCity(c);
 			commitWriteCity();
 		}
@@ -449,8 +451,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 							// process multipolygon (relation) houses - preload members to create building with correct latlon
 							if (house instanceof Relation)
 								ctx.loadEntityRelation((Relation) house);
-							
-							Building building = new Building(house);
+							Building building = EntityParser.parseBuilding(house);
 							if (building.getLocation() == null) {
 								log.warn("building with empty location! id: " + house.getId());
 							}
@@ -733,7 +734,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 						LatLon l = e.getLatLon();
 						Set<Long> idsOfStreet = getStreetInCity(first.getIsInNames(), first.getTag(OSMTagKey.ADDR_STREET), null, l);
 						if (!idsOfStreet.isEmpty()) {
-							Building building = new Building(first);
+							Building building = EntityParser.parseBuilding(first);
 							building.setInterpolationInterval(interpolationInterval);
 							building.setInterpolationType(type);
 							building.setName(first.getTag(OSMTagKey.ADDR_HOUSE_NUMBER));
@@ -751,7 +752,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 				LatLon l = e.getLatLon();
 				Set<Long> idsOfStreet = getStreetInCity(e.getIsInNames(), e.getTag(OSMTagKey.ADDR_STREET), null, l);
 				if (!idsOfStreet.isEmpty()) {
-					Building building = new Building(e);
+					Building building = EntityParser.parseBuilding(e);
 					String hno = e.getTag(OSMTagKey.ADDR_HOUSE_NUMBER);
 					int i = hno.indexOf('-');
 					if(i != -1) {
@@ -774,7 +775,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 							building.setName(hno);
 						} else {
 							building.setName(hno.substring(0, secondNumber));
-							Building building2 = new Building(e);
+							Building building2 = EntityParser.parseBuilding(e);
 							building2.setName(hno.substring(secondNumber + 1));
 							Set<Long> ids2OfStreet = getStreetInCity(e.getIsInNames(), e.getTag(OSMTagKey.ADDR_STREET2), null, l);
 							ids2OfStreet.removeAll(idsOfStreet); //remove duplicated entries!

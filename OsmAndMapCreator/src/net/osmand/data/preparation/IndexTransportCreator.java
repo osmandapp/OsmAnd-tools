@@ -27,6 +27,8 @@ import net.osmand.osm.Entity;
 import net.osmand.osm.Entity.EntityId;
 import net.osmand.osm.Node;
 import net.osmand.osm.OSMSettings.OSMTagKey;
+import net.osmand.osm.EntityParser;
+import net.osmand.osm.OsmTransportRoute;
 import net.osmand.osm.Relation;
 import net.osmand.osm.Way;
 import net.osmand.util.MapUtils;
@@ -440,7 +442,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		if (!acceptedRoutes.contains(route)) {
 			return null;
 		}
-		TransportRoute r = new TransportRoute(rel, ref);
+		OsmTransportRoute r = EntityParser.parserRoute(rel, ref);
 		r.setOperator(operator);
 		r.setType(route);
 
@@ -461,7 +463,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	private Pattern platforms = Pattern.compile("^(stop|platform)_(entry|exit)_only$");
 	private Matcher stopPlatformMatcher = platforms.matcher("");
 
-	private boolean processNewTransportRelation(Relation rel, TransportRoute r) {
+	private boolean processNewTransportRelation(Relation rel, OsmTransportRoute r) {
 		// first, verify we can accept this relation as new transport relation
 		// accepted roles restricted to: <empty>, stop, platform, ^(stop|platform)_(entry|exit)_only$
 
@@ -502,7 +504,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			return false; // nothing to get from this relation - there is no stop
 
 		for (Entity s : merged) {
-			TransportStop stop = new TransportStop(s);
+			TransportStop stop = EntityParser.parseTransportStop(s);
 
 			// name replacement (platform<->stop)
 			if (replacement.containsKey(s)) {
@@ -609,7 +611,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	}
 
 
-	private boolean processOldTransportRelation(Relation rel, TransportRoute r) {
+	private boolean processOldTransportRelation(Relation rel, OsmTransportRoute r) {
 		final Map<TransportStop, Integer> forwardStops = new LinkedHashMap<TransportStop, Integer>();
 		final Map<TransportStop, Integer> backwardStops = new LinkedHashMap<TransportStop, Integer>();
 		int currentStop = 0;
@@ -618,7 +620,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		for (Entry<Entity, String> e : rel.getMemberEntities().entrySet()) {
 			if (e.getValue().contains("stop")) { //$NON-NLS-1$
 				if (e.getKey() instanceof Node) {
-					TransportStop stop = new TransportStop(e.getKey());
+					TransportStop stop = EntityParser.parseTransportStop(e.getKey());
 					// add stop name if there was no name on the point, but was name on the corresponding stop_area relation
 					if (e.getKey().getTag(OSMTagKey.NAME) == null && stopAreas.containsKey(EntityId.valueOf(e.getKey())))
 						stop.setName(stopAreas.get(EntityId.valueOf(e.getKey())).getTag(OSMTagKey.NAME));
