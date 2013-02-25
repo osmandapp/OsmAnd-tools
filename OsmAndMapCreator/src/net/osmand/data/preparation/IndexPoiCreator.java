@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.Map.Entry;
 
 import net.osmand.IProgress;
 import net.osmand.IndexConstants;
@@ -29,7 +30,9 @@ import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.osm.MapRenderingTypes;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.EntityParser;
+import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
+import net.osmand.osm.edit.Relation;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import net.sf.junidecode.Junidecode;
@@ -53,6 +56,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	
 
 	private List<Amenity> tempAmenityList = new ArrayList<Amenity>();
+	private Map<EntityId, Map<String, String>> propogatedTags = new LinkedHashMap<Entity.EntityId, Map<String, String>>();
 
 	private final MapRenderingTypes renderingTypes;
 
@@ -62,6 +66,17 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 	public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 		tempAmenityList.clear();
+		EntityId eid = EntityId.valueOf(e);
+		Map<String, String> tags = propogatedTags.get(eid);
+		if (tags != null) {
+			Iterator<Entry<String, String>> iterator = tags.entrySet().iterator();
+			while (iterator.hasNext()) {
+				Entry<String, String> ts = iterator.next();
+				if (e.getTag(ts.getKey()) == null) {
+					e.putTag(ts.getKey(), ts.getValue());
+				}
+			}
+		}
 		tempAmenityList = EntityParser.parseAmenities(renderingTypes, e, tempAmenityList);
 		if (!tempAmenityList.isEmpty() && poiPreparedStatement != null) {
 			for (Amenity a : tempAmenityList) {
@@ -76,6 +91,21 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				}
 			}
 		}
+	}
+	
+	public void iterateRelation(Relation e, OsmDbAccessorContext ctx) throws SQLException {
+		for (String t : e.getTagKeySet()) {
+			AmenityType type = renderingTypes.getAmenityType(t, e.getTag(t), true);
+			if (type != null) {
+				ctx.loadEntityRelation(e);
+				for(EntityId id : ((Relation) e).getMembersMap().keySet()) {
+					if(!propogatedTags.containsKey(id)) {
+						propogatedTags.put(id, new LinkedHashMap<String, String>());
+					}
+					propogatedTags.get(id).put(t, e.getTag(t));
+				}
+			}
+		}		
 	}
 
 	public void commitAndClosePoiFile(Long lastModifiedDate) throws SQLException {
@@ -563,6 +593,5 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		}
 
 	}
-
 
 }

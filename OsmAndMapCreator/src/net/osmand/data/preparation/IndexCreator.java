@@ -532,7 +532,7 @@ public class IndexCreator {
 				}
 
 				// 3.2 index address relations
-				if (indexAddress || indexMap || indexRouting) {
+				if (indexAddress || indexMap || indexRouting || indexPOI) {
 					progress.setGeneralProgress("[30 / 100]"); //$NON-NLS-1$
 					progress.startTask(Messages.getString("IndexCreator.PREINDEX_BOUNDARIES_RELATIONS"), accessor.getAllRelations()); //$NON-NLS-1$
 					accessor.iterateOverEntities(progress, EntityType.RELATION, new OsmDbVisitor() {
@@ -547,6 +547,9 @@ public class IndexCreator {
 							}
 							if (indexRouting) {
 								indexRouteCreator.indexRelations(e, ctx);
+							}
+							if (indexPOI) {
+								indexPoiCreator.iterateRelation((Relation) e, ctx);
 							}
 							if (indexTransport) {
 								indexTransportCreator.indexRelations((Relation) e, ctx);
@@ -754,8 +757,8 @@ public class IndexCreator {
 		IndexCreator creator = new IndexCreator(new File("/home/victor/projects/OsmAnd/data/osm-gen/")); //$NON-NLS-1$
 //		creator.setIndexMap(true);
 //		creator.setIndexAddress(true);
-//		creator.setIndexPOI(true);
-//		creator.setIndexTransport(true);
+		creator.setIndexPOI(true);
+		creator.setIndexTransport(true);
 		creator.setIndexRouting(true);
 
 //		creator.deleteDatabaseIndexes = false;
@@ -766,8 +769,8 @@ public class IndexCreator {
 		MapRenderingTypesEncoder rt = MapRenderingTypesEncoder.getDefault();
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 
-//		String file = "/home/victor/projects/OsmAnd/temp/map.osm";
-		String file = "/home/victor/projects/OsmAnd/temp/luxembourg.osm.pbf";
+		String file = "/home/victor/projects/OsmAnd/temp/map.osm";
+//		String file = "/home/victor/projects/OsmAnd/temp/luxembourg.osm.pbf";
 		int st = file.lastIndexOf('/');
 		int e = file.indexOf('.', st);
 		creator.setNodesDBFile(new File("/home/victor/projects/OsmAnd/data/osm-gen/"+file.substring(st, e) + ".tmp.odb"));
