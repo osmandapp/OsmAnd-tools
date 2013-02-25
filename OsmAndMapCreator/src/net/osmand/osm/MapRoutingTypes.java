@@ -21,6 +21,7 @@ public class MapRoutingTypes {
 
 	private static Set<String> TAGS_TO_SAVE = new HashSet<String>();
 	private static Set<String> TAGS_TO_ACCEPT = new HashSet<String>();
+	private static Set<String> TAGS_RELATION_TO_ACCEPT = new HashSet<String>();
 	private static Set<String> TAGS_TEXT = new HashSet<String>();
 	private static Set<String> BASE_TAGS_TEXT = new HashSet<String>();
 	private static Set<String> BASE_TAGS_TO_SAVE = new HashSet<String>();
@@ -38,6 +39,9 @@ public class MapRoutingTypes {
 				t += TAG_DELIMETER + tg.value;
 			}
 			if(tg.register) {
+				if(tg.relation) {
+					TAGS_RELATION_TO_ACCEPT.add(t);
+				}
 				TAGS_TO_ACCEPT.add(t);
 			} else if(tg.text) {
 				if(tg.base) {
@@ -90,7 +94,7 @@ public class MapRoutingTypes {
 		for(Entry<String, String> es : e.getTags().entrySet()) {
 			String tag = es.getKey();
 			String value = converBooleanValue(es.getValue());
-			if(contains(TAGS_TO_ACCEPT, tag, value)) {
+			if(contains(TAGS_RELATION_TO_ACCEPT, tag, value)) {
 				propogated = new LinkedHashMap<String, String>();
 				break;
 			}

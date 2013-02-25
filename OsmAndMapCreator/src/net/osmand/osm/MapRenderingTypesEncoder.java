@@ -155,7 +155,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		rtype.register = "register".equalsIgnoreCase(mode);
 		rtype.amend = "amend".equalsIgnoreCase(mode);
 		rtype.text = "text".equalsIgnoreCase(mode);
-		rtype.relation = "relation".equalsIgnoreCase(parser.getAttributeValue("", "relation"));
+		rtype.relation = Boolean.parseBoolean(parser.getAttributeValue("", "relation"));
 		routeTags.add(rtype);
 	}
 		
