@@ -57,7 +57,7 @@ void printUsage(std::string warning)
         std::cout << warning << std::endl;
     std::cout << "Inspector is console utility for working with binary indexes of OsmAnd." << std::endl;
     std::cout << "It allows print info about file, extract parts and merge indexes." << std::endl;
-    std::cout << "\nUsage for print info : inspector [-vaddress] [-vstreetgroups] [-vstreets] [-vbuildings] [-vintersections] [-vmap] [-vpoi] [-vtransport] [-zoom=Zoom] [-bbox=LeftLon,TopLat,RightLon,BottomLan] [file]" << std::endl;
+    std::cout << "\nUsage for print info : inspector [-vaddress] [-vstreetgroups] [-vstreets] [-vbuildings] [-vintersections] [-vmap] [-vpoi] [] [-vtransport] [-zoom=Zoom] [-bbox=LeftLon,TopLat,RightLon,BottomLan] [file]" << std::endl;
     std::cout << "  Prints information about [file] binary index of OsmAnd." << std::endl;
     std::cout << "  -v.. more verbose output (like all cities and their streets or all map objects with tags/values and coordinates)" << std::endl;
     std::cout << "\nUsage for combining indexes : inspector -c file_to_create (file_from_extract ((+|-)parts_to_extract)? )*" << std::endl;
