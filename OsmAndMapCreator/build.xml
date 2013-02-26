@@ -39,11 +39,11 @@
 		</ant>
 	</target>
 
-	
+
 	<path id="build.path">
 		<fileset dir="${osmand-jni.dir}">
 			<include name="${osmand-core.jar}"/>
-		</fileset> 
+		</fileset>
 		<fileset dir="${lib.absolute.dir}">
 			<include name="*.jar"/>
 		</fileset>
@@ -99,12 +99,12 @@
 			<classpath refid="test.classpath"/>
 			<formatter type="xml" />
 			<!-- test name="net.osmand.router.test.JUnitRouteTest" todir="${basedir}/test-results" /-->
-		    <batchtest fork="false" todir="${reports.tests}" >
-			     <fileset dir="${srctests.dir}" >
-			        <include name="**/*Test*.java" />
-			        <exclude name="**/AllTests.java" />
-			        <exclude name="**/*Suite*.java" />
-			    </fileset>
+			<batchtest fork="false" todir="${reports.tests}" >
+				<fileset dir="${srctests.dir}" >
+					<include name="**/*Test*.java" />
+					<exclude name="**/AllTests.java" />
+					<exclude name="**/*Suite*.java" />
+				</fileset>
 			</batchtest>
 		</junit>
 	</target>
@@ -138,7 +138,12 @@
 		<delete file="MANIFEST.MF" />
 	</target>
 
-	<target name="build" depends="jar, junits">
+	<target name="native-libs">
+		<ant antfile="${osmand-jni.dir}/build.xml" target="native-libs-jar" dir="${osmand-jni.dir}" inheritAll="false" inheritRefs="false">
+		</ant>
+	</target>
+
+	<target name="build" depends="jar, native-libs, junits">
 		<delete dir="build"/>
 		<copy todir="build">
 			<fileset dir=".">
@@ -153,7 +158,7 @@
 			<fileset dir="src/net/osmand/osm/">
 				<include name="rendering_types.xml"/>
 			</fileset>
-			
+
 			<fileset dir=".">
 				<include name="../obf-generation/regions/indexes.xml" />
 			</fileset>
