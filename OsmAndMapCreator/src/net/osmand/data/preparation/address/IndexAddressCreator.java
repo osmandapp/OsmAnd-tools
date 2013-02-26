@@ -132,7 +132,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 	public void registerCityIfNeeded(Entity e) {
 		if (e instanceof Node && e.getTag(OSMTagKey.PLACE) != null) {
 			City city = EntityParser.parseCity((Node) e);
-			regCity(city, e);
+			if(city != null) {
+				regCity(city, e);
+			}
 		}
 	}
 
