@@ -344,7 +344,8 @@
 		<!--  3.3 NORTH AMERICA EXCEPT USA AND CANADA [SOURCE: CLOUDMADE.COM] 
 			siteToDownload="http://downloads.cloudmade.com/americas/northern_america/{0}/{0}.osm.bz2" -->	
 		<regions 
-			 siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf"region_prefix=""  skip="false" region_suffix="_NorthAmerica">	
+			 siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf"
+			 region_prefix=""  skip="false" region_suffix="_NorthAmerica">	
 			<region name="bermuda"/>
 			<region name="greenland"/>
 		</regions>	
@@ -373,16 +374,20 @@
 			<region name="vietnam"/>
 		</regions>
 		
-		<!-- 2.3 EASTERN ASIA [SOURCE: CLOUDMADE.COM] -->
-		<regions siteToDownload="http://downloads.cloudmade.com/asia/eastern_asia/{0}/{0}.osm.bz2" region_prefix="" region_suffix="_Asia" skip="false">
+		<!-- 2.3 EASTERN ASIA [SOURCE: CLOUDMADE.COM] 
+	siteToDownload="http://downloads.cloudmade.com/asia/eastern_asia/{0}/{0}.osm.bz2"-->
+		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf"
+		 region_prefix="" region_suffix="_Asia" skip="false">
 			<region name="hong_kong" esize="67"/>
 			<region name="macao" esize="1"/>
 			<region name="north_korea" esize="5"/>
 			<region name="south_korea" esize="25"/>
 		</regions>	
 		
-		<!-- 2.3 SOUTH-EASTERN ASIA [SOURCE: CLOUDMADE.COM] -->
-		<regions siteToDownload="http://downloads.cloudmade.com/asia/south-eastern_asia/{0}/{0}.osm.bz2" region_prefix="" region_suffix="_Asia" skip="false">
+		<!-- 2.3 SOUTH-EASTERN ASIA [SOURCE: CLOUDMADE.COM]
+		siteToDownload="http://downloads.cloudmade.com/asia/south-eastern_asia/{0}/{0}.osm.bz2"-->
+		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf"
+		 region_prefix="" region_suffix="_Asia" skip="false">
 			<region name="brunei" esize="1"/>
 			<region name="cambodia" esize="2"/>
 			<region name="christmas_island" esize="1"/>
@@ -396,8 +401,10 @@
 			<region name="vietnam"/>
 		</regions>	
 			
-		<!-- 2.3 SOUTHERN ASIA [SOURCE: CLOUDMADE.COM] -->
-		<regions siteToDownload="http://downloads.cloudmade.com/asia/southern_asia/{0}/{0}.osm.bz2" region_prefix="" region_suffix="_Asia" skip="false">
+		<!-- 2.3 SOUTHERN ASIA [SOURCE: CLOUDMADE.COM] 
+		siteToDownload="http://downloads.cloudmade.com/asia/southern_asia/{0}/{0}.osm.bz2" -->
+		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf"
+			region_prefix="" region_suffix="_Asia" skip="false">
 			<region name="afghanistan" esize="6"/>
 			<region name="bangladesh" esize="3"/>
 			<region name="bhutan" esize="1"/>
@@ -408,7 +415,8 @@
 			<region name="sri_lanka" esize="2"/>			
 		</regions>		
 			
-		<!-- 2.3 WESTERN ASIA [SOURCE: CLOUDMADE.COM] http://downloads.cloudmade.com/asia/western_asia/{0}/{0}.osm.bz2 -->
+		<!-- 2.3 WESTERN ASIA [SOURCE: CLOUDMADE.COM]
+		  siteToDownload="http://downloads.cloudmade.com/asia/western_asia/{0}/{0}.osm.bz2" -->
 		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" region_suffix="_Asia" skip="false">
 			<region name="armenia" esize="1"/>
 			<region name="bahrain" esize="1"/>
