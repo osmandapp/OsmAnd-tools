@@ -196,6 +196,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 			if (cityFound != null) {
 				putCityBoundary(boundary, cityFound);
 			} else {
+				logBoundaryChanged(boundary, null);
 				notAssignedBoundaries.add(boundary);
 			}
 			attachAllCitiesToBoundary(boundary);
@@ -341,8 +342,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 
 
 	private void logBoundaryChanged(Boundary boundary, City cityFound) {
-		String s = "City: " + cityFound.getName() + " boundary: " + boundary.toString() + " " + boundary.getBoundaryId();
-		if(logMapDataWarn != null) {
+		String s = "City: " + cityFound == null ? "null" : cityFound.getName();
+		s += " boundary: " + boundary.toString() + " " + boundary.getBoundaryId();
+		if (logMapDataWarn != null) {
 			logMapDataWarn.info(s);
 		} else {
 			log.info(s);
