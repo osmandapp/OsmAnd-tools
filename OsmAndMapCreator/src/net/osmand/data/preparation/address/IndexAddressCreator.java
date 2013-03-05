@@ -152,6 +152,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 	}
 	
 	public void indexBoundariesRelation(Entity e, OsmDbAccessorContext ctx) throws SQLException {
+		if(logMapDataWarn != null) {
+			logMapDataWarn.warn("Indexing boundary from "+ e.getClass().getSimpleName() + " " + e.getId() + " " + e.getTag("name"));
+		}
 		Boundary boundary = extractBoundary(e, ctx);
 		boolean boundaryValid = boundary != null && (!boundary.hasAdminLevel() || boundary.getAdminLevel() > 4) &&
 				boundary.getCenterPoint() != null && !Algorithms.isEmpty(boundary.getName());
@@ -342,7 +345,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 
 
 	private void logBoundaryChanged(Boundary boundary, City cityFound) {
-		String s = "City: " + (cityFound == null ? "null" : cityFound.getName());
+		String s = "City " + (cityFound == null ? " not found " : " : " +cityFound.getName());
 		s += " boundary: " + boundary.toString() + " " + boundary.getBoundaryId();
 		if (logMapDataWarn != null) {
 			logMapDataWarn.info(s);
