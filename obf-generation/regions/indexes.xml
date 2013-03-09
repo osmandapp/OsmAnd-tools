@@ -527,6 +527,11 @@
 			<region name="south_africa_and_lesotho" />
 			<region name="tanzania" />
 		</regions>
+		
+		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf"
+			region_prefix="" region_suffix="_Africa"  skip="false">
+			<region name="mali" />
+		</regions>
 			
 		<!-- 7. AUSTRALIA-OCEANIA [SOURCE: GEOFABRIK.DE] -->
 		<regions siteToDownload="http://download.geofabrik.de/openstreetmap/{0}.osm.pbf" region_prefix="" region_suffix=""  skip="false">

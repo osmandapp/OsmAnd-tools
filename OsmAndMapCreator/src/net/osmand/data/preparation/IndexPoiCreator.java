@@ -83,7 +83,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				// do not add that check because it is too much printing for batch creation
 				// by statistic < 1% creates maps manually
 				// checkEntity(e);
-				EntityParser.parseMapObject(a, e);
+				EntityParser.parseAmenity(a, e);
 				if (a.getLocation() != null) {
 					// do not convert english name
 					// convertEnglishName(a);
