@@ -2,14 +2,14 @@
 <regions_list>
    
  <regions siteToDownload="http://download.geofabrik.de/europe/{0}.osm.pbf" skip="false" region_suffix="_europe">
-	    <region name="germany" esize="820"/>
+	    <region name="germany-latest" esize="820"/>
  </regions> 
   
 	<regions siteToDownload="http://download.geofabrik.de/{0}.osm.pbf" region_prefix="" skip="false"	region_suffix="">
-		 <region name="south-america" esize="22"/>
+		 <region name="south-america-latest" esize="22"/>
 	</regions>
     <regions siteToDownload="http://download.geofabrik.de/europe/{0}.osm.bz2" skip="false" region_suffix="_europe">
-	     <region name="france" esize="1820"/> 			 			            
+	     <region name="france-latest" esize="1820"/> 			 			            
     </regions>
 							
 </regions_list> 
