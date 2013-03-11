@@ -12,7 +12,7 @@
 		
         <!-- Countries to download from geofabrik or cloudmade server -->
 		<!-- 1. EUROPE [SOURCE: GEOFABRIK.DE] -->
-		<regions siteToDownload="http://download.geofabrik.de/openstreetmap/europe/{0}.osm.pbf" region_prefix="" skip="false" region_suffix="_Europe">
+		<regions siteToDownload="http://download.geofabrik.de/europe/{0}.osm.pbf" region_prefix="" skip="false" region_suffix="_Europe">
 			<region name="albania" esize="6"/>
 			<region name="andorra" esize="1"/>
 			<region name="austria" esize="110"/>
@@ -59,14 +59,14 @@
 		</regions>
 
 		<!-- 1.1 GREAT BRITAIN [SOURCE: GEOFABRIK.DE] -->
-		<regions siteToDownload="http://download.geofabrik.de/openstreetmap/europe/great_britain/{0}.osm.pbf" region_prefix="GB_" skip="false" region_suffix="_Europe">
+		<regions siteToDownload="http://download.geofabrik.de/europe/great_britain/{0}.osm.pbf" region_prefix="GB_" skip="false" region_suffix="_Europe">
 			<region name="scotland"/>		
 			<region name="wales" esize="10"/>
 			<region name="england" esize="230"/>
 		</regions>
 
 		<!-- 1.1.1 GREAT BRITAIN - ENGLAND [SOURCE: GEOFABRIK.DE] -->
-		<regions siteToDownload="http://download.geofabrik.de/openstreetmap/europe/great_britain/england/{0}.osm.pbf" region_prefix="GB_England_" skip="false" region_suffix="_Europe">
+		<regions siteToDownload="http://download.geofabrik.de/europe/great_britain/england/{0}.osm.pbf" region_prefix="GB_England_" skip="false" region_suffix="_Europe">
 			<region name="buckinghamshire" esize=""/>		
 			<region name="cambridgeshire" esize=""/>
 			<region name="cheshire" esize=""/>
@@ -96,7 +96,7 @@
 		</regions>
 
 		<!-- 1.2 FRANCE [SOURCE: GEOFABRIK.DE] -->
-		<regions siteToDownload="http://download.geofabrik.de/openstreetmap/europe/france/{0}.osm.pbf" region_prefix="France_" 
+		<regions siteToDownload="http://download.geofabrik.de/europe/france/{0}.osm.pbf" region_prefix="France_" 
 			skip="false" region_suffix="_Europe">
 			<region name="alsace" />
 			<region name="aquitaine" />
@@ -128,7 +128,7 @@
 		</regions>
 
 		<!-- 1.3 GERMANY [SOURCE: GEOFABRIK.DE] -->
-		<regions siteToDownload="http://download.geofabrik.de/openstreetmap/europe/germany/{0}.osm.pbf" region_prefix="Germany_" skip="false" 
+		<regions siteToDownload="http://download.geofabrik.de/europe/germany/{0}.osm.pbf" region_prefix="Germany_" skip="false" 
 			region_suffix="_Europe">
 			<region name="baden-wuerttemberg"  cityAdminLevel="7"/>
 			<region name="bayern"  cityAdminLevel="7"/>
@@ -268,7 +268,7 @@
 		
 		<!-- 3. North America  -->		
 		<!-- 3.1 USA-AVAILABLE ON GEOFABRIK.DE [SOURCE: GEOFABRIK.DE]  -->
-		<regions siteToDownload="http://download.geofabrik.de/openstreetmap/north-america/us/{0}.osm.pbf" skip="false" region_prefix="US_" region_suffix="_NorthAmerica">
+		<regions siteToDownload="http://download.geofabrik.de/north-america/{0}.osm.pbf" skip="false" region_prefix="US_" region_suffix="_NorthAmerica">
 			<region name="alabama"/>
 			<region name="alaska"/>
 			<region name="arizona"/>
@@ -324,7 +324,7 @@
 		</regions>
 		
 		<!-- 3.2 CANADA [SOURCE: GEOFABRIK.DE] -->
-		<regions siteToDownload="http://download.geofabrik.de/openstreetmap/north-america/canada/{0}.osm.pbf" region_prefix="Canada_" skip="false" region_suffix="_NorthAmerica">
+		<regions siteToDownload="http://download.geofabrik.de/north-america/canada/{0}.osm.pbf" region_prefix="Canada_" skip="false" region_suffix="_NorthAmerica">
 			<region name="alberta" esize="36"/>
 			<region name="british-columbia"/>
 			<region name="manitoba"/>
@@ -351,7 +351,7 @@
 		</regions>	
 		
 			<!-- 2.2 ASIA-AVAILABLE ON GEOFABRIK.DE [SOURCE: GEOFABRIK.DE] (REST OF ASIA IS BELOW ) -->
-		<regions siteToDownload="http://download.geofabrik.de/openstreetmap/asia/{0}.osm.pbf" region_prefix="" region_suffix="_Asia" skip="false">
+		<regions siteToDownload="http://download.geofabrik.de/asia/{0}.osm.pbf" region_prefix="" region_suffix="_Asia" skip="false">
 			<region name="azerbaijan" esize="15"/>
 			<region name="china" esize="4"/>
 			<region name="gaza" esize="3"/>
@@ -434,10 +434,10 @@
 	
 				
 		<!--  4. CENTRAL AMERICA [SOURCE: GEOFABRIK.DE] -->
-		<regions siteToDownload="http://download.geofabrik.de/openstreetmap/{0}.osm.pbf" region_prefix=""  skip="true" region_suffix="">
+		<regions siteToDownload="http://download.geofabrik.de/{0}.osm.pbf" region_prefix=""  skip="true" region_suffix="">
 			<region name="central-america"/>
 		</regions>	
-		<regions siteToDownload="http://download.geofabrik.de/openstreetmap/central-america/{0}.osm.pbf" region_prefix=""  skip="false" region_suffix="_CentralAmerica">
+		<regions siteToDownload="http://download.geofabrik.de/central-america/{0}.osm.pbf" region_prefix=""  skip="false" region_suffix="_CentralAmerica">
 			<region name="belize" />
 			<region name="guatemala" />
 			<region name="haiti-and-domrep" />
@@ -485,7 +485,7 @@
 		</regions>
 				
 		
-		<regions siteToDownload="http://download.geofabrik.de/openstreetmap/south-america/{0}.osm.pbf" region_prefix="" skip="false"
+		<regions siteToDownload="http://download.geofabrik.de/south-america/{0}.osm.pbf" region_prefix="" skip="false"
 			region_suffix="_SouthAmerica">
 			<region name="argentina" />
 			<region name="bolivia" />
@@ -509,7 +509,7 @@
 		
 		
 		<!-- 6. AFRICA [SOURCE: GEOFABRIK.DE] -->
-		<regions siteToDownload="http://download.geofabrik.de/openstreetmap/africa/{0}.osm.pbf" region_prefix="" region_suffix="_Africa"  skip="false">
+		<regions siteToDownload="http://download.geofabrik.de/africa/{0}.osm.pbf" region_prefix="" region_suffix="_Africa"  skip="false">
 			<region name="burkina_faso" />
 			<region name="canary_islands" />
 			<region name="congo_democratic_republic" />
@@ -534,24 +534,24 @@
 		</regions>
 			
 		<!-- 7. AUSTRALIA-OCEANIA [SOURCE: GEOFABRIK.DE] -->
-		<regions siteToDownload="http://download.geofabrik.de/openstreetmap/{0}.osm.pbf" region_prefix="" region_suffix=""  skip="false">
+		<regions siteToDownload="http://download.geofabrik.de/{0}.osm.pbf" region_prefix="" region_suffix=""  skip="false">
 			<region name="australia-oceania"/>
 		</regions>
 				
 		<!-- 7. NEW ZEALAND-AUSTRALIA [SOURCE: GEOFABRIK.DE] -->
-		<regions siteToDownload="http://download.geofabrik.de/openstreetmap/australia-oceania/{0}.osm.pbf" region_prefix="" region_suffix="_Australia"  skip="false">
+		<regions siteToDownload="http://download.geofabrik.de/australia-oceania/{0}.osm.pbf" region_prefix="" region_suffix="_Australia"  skip="false">
 		<!-- 	<region name="australia" esize=""/> -->
 			<region name="new-caledonia"/>
 			<region name="new-zealand"/>
 		</regions>
 		
 		<!--  5. SOUTH AMERICA [SOURCE: GEOFABRIK.DE] -->
-		<regions siteToDownload="http://download.geofabrik.de/openstreetmap/{0}.osm.pbf" region_prefix="" skip="true"
+		<regions siteToDownload="http://download.geofabrik.de/{0}.osm.pbf" region_prefix="" skip="true"
 			region_suffix="">
 			<region name="south-america" esize="22"/>
 		</regions>
 		<!-- 6. AFRICA [SOURCE: GEOFABRIK.DE] -->
-		<regions siteToDownload="http://download.geofabrik.de/openstreetmap/{0}.osm.pbf" region_prefix="" region_suffix=""  skip="false">
+		<regions siteToDownload="http://download.geofabrik.de/{0}.osm.pbf" region_prefix="" region_suffix=""  skip="false">
 			<region name="africa"/>
 		</regions>
 							
