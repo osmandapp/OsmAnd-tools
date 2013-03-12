@@ -172,7 +172,6 @@
 		<region name="myanmar"/>
 		<region name="singapore"/>
 		<region name="spratly_islands"/>
-		<region name="thailand"/>
 		<region name="vietnam"/>
 	</regions>	
 
@@ -310,91 +309,91 @@
 	</regions>
 
 	<!-- 5.2 GREAT BRITAIN [SOURCE: GEOFABRIK.DE] -->
-	<regions siteToDownload="http://download.geofabrik.de/europe/great_britain/{0}.osm.pbf" region_prefix="GB_" skip="false" region_suffix="_Europe">
-		<region name="scotland"/>		
-		<region name="wales"/>
-		<region name="england" esize="230"/>
+	<regions siteToDownload="http://download.geofabrik.de/europe/great-britain/{0}.osm.pbf" region_prefix="GB_" skip="false" region_suffix="_Europe">
+		<region name="scotland" downloadname="scotland-latest"/>
+		<region name="wales" downloadname="wales-latest"/>
+		<region name="england" downloadname="england-latest"/>
 	</regions>
 
 	<!-- 5.2.1 GREAT BRITAIN - ENGLAND [SOURCE: GEOFABRIK.DE] -->
-	<regions siteToDownload="http://download.geofabrik.de/europe/great_britain/england/{0}.osm.pbf" region_prefix="GB_England_" skip="false" region_suffix="_Europe">
-		<region name="buckinghamshire"/>		
-		<region name="cambridgeshire"/>
-		<region name="cheshire"/>
-		<region name="cumbria"/>
-		<region name="derbyshire"/>
-		<region name="devon"/>
-		<region name="east_yorkshire_with_hull"/>
-		<region name="essex"/>
-		<region name="greater_london"/>
-		<region name="hampshire"/>
-		<region name="herefordshire"/>
-		<region name="kent"/>
-		<region name="lancashire"/>
-		<region name="leicestershire"/>
-		<region name="norfolk"/>
-		<region name="north_yorkshire"/>
-		<region name="nottinghamshire"/>
-		<region name="oxfordshire"/>
-		<region name="shropshire"/>
-		<region name="somerset"/>
-		<region name="south_yorkshire"/>
-		<region name="suffolk"/>
-		<region name="surrey"/>
-		<region name="west_midlands"/>
-		<region name="west_sussex"/>
-		<region name="wiltshire"/>
+	<regions siteToDownload="http://download.geofabrik.de/europe/great-britain/england/{0}.osm.pbf" region_prefix="GB_England_" skip="false" region_suffix="_Europe">
+		<region name="buckinghamshire" downloadname="buckinghamshire-latest"/>
+		<region name="cambridgeshire" downloadname="cambridgeshire-latest"/>
+		<region name="cheshire" downloadname="cheshire-latest"/>
+		<region name="cumbria" downloadname="cumbria-latest"/>
+		<region name="derbyshire" downloadname="derbyshire-latest"/>
+		<region name="devon" downloadname="devon-latest"/>
+		<region name="east-yorkshire-with-hull" downloadname="east-yorkshire-with-hull-latest"/>
+		<region name="essex" downloadname="essex-latest"/>
+		<region name="greater-london" downloadname="greater-london-latest"/>
+		<region name="hampshire" downloadname="hampshire-latest"/>
+		<region name="herefordshire" downloadname="herefordshire-latest"/>
+		<region name="kent" downloadname="kent-latest"/>
+		<region name="lancashire" downloadname="lancashire-latest"/>
+		<region name="leicestershire" downloadname="leicestershire-latest"/>
+		<region name="norfolk" downloadname="norfolk-latest"/>
+		<region name="north-yorkshire" downloadname="north-yorkshire-latest"/>
+		<region name="nottinghamshire" downloadname="nottinghamshire-latest"/>
+		<region name="oxfordshire" downloadname="oxfordshire-latest"/>
+		<region name="shropshire" downloadname="shropshire-latest"/>
+		<region name="somerset" downloadname="somerset-latest"/>
+		<region name="south-yorkshire" downloadname="south-yorkshire-latest"/>
+		<region name="suffolk" downloadname="suffolk-latest"/>
+		<region name="surrey" downloadname="surrey-latest"/>
+		<region name="west-midlands" downloadname="west-midlands-latest"/>
+		<region name="west-sussex" downloadname="west-sussex-latest"/>
+		<region name="wiltshire" downloadname="wiltshire-latest"/>
 	</regions>
 
 	<!-- 5.3 FRANCE [SOURCE: GEOFABRIK.DE] -->
 	<regions siteToDownload="http://download.geofabrik.de/europe/france/{0}.osm.pbf" region_prefix="France_" skip="false" region_suffix="_Europe">
-		<region name="alsace" />
-		<region name="aquitaine" />
-		<region name="auvergne" />
-		<region name="basse-normandie" />
-		<region name="bourgogne" />
-		<region name="bretagne" />
-		<region name="centre" />
-		<region name="champagne-ardenne" />
-		<region name="corse" />
-		<region name="franche-comte" />
-		<region name="guadeloupe" />
-		<region name="guyane" />
-		<region name="haute-normandie" />
-		<region name="ile-de-france" />
-		<region name="languedoc-roussillon" />
-		<region name="limousin" />
-		<region name="lorraine" />
-		<region name="martinique" />
-		<region name="mayotte" />
-		<region name="midi-pyrenees" />
-		<region name="nord-pas-de-calais" />
-		<region name="pays-de-la-loire" />
-		<region name="picardie" />
-		<region name="poitou-charentes" />
-		<region name="provence-alpes-cote-d-azur" />
-		<region name="reunion" />
-		<region name="rhone-alpes" />
+		<region name="alsace" downloadname="alsace-latest"/>
+		<region name="aquitaine" downloadname="aquitaine-latest"/>
+		<region name="auvergne" downloadname="auvergne-latest"/>
+		<region name="basse-normandie" downloadname="basse-normandie-latest"/>
+		<region name="bourgogne" downloadname="bourgogne-latest"/>
+		<region name="bretagne" downloadname="bretagne-latest"/>
+		<region name="centre" downloadname="centre-latest"/>
+		<region name="champagne-ardenne" downloadname="champagne-ardenne-latest"/>
+		<region name="corse" downloadname="corse-latest"/>
+		<region name="franche-comte" downloadname="franche-comte-latest"/>
+		<region name="guadeloupe" downloadname="guadeloupe-latest"/>
+		<region name="guyane" downloadname="guyane-latest"/>
+		<region name="haute-normandie" downloadname="haute-normandie-latest"/>
+		<region name="ile-de-france" downloadname="ile-de-france-latest"/>
+		<region name="languedoc-roussillon" downloadname="languedoc-roussillon-latest"/>
+		<region name="limousin" downloadname="limousin-latest"/>
+		<region name="lorraine" downloadname="lorraine-latest"/>
+		<region name="martinique" downloadname="martinique-latest"/>
+		<region name="mayotte" downloadname="mayotte-latest"/>
+		<region name="midi-pyrenees" downloadname="midi-pyrenees-latest"/>
+		<region name="nord-pas-de-calais" downloadname="nord-pas-de-calais-latest"/>
+		<region name="pays-de-la-loire" downloadname="pays-de-la-loire-latest"/>
+		<region name="picardie" downloadname="picardie-latest"/>
+		<region name="poitou-charentes" downloadname="poitou-charentes-latest"/>
+		<region name="provence-alpes-cote-d-azur" downloadname="provence-alpes-cote-d-azur-latest"/>
+		<region name="reunion" downloadname="reunion-latest"/>
+		<region name="rhone-alpes" downloadname="rhone-alpes-latest"/>
 	</regions>
 
 	<!-- 5.4 GERMANY [SOURCE: GEOFABRIK.DE] -->
 	<regions siteToDownload="http://download.geofabrik.de/europe/germany/{0}.osm.pbf" region_prefix="Germany_" skip="false" region_suffix="_Europe">
-		<region name="baden-wuerttemberg"  cityAdminLevel="7"/>
-		<region name="bayern"  cityAdminLevel="7"/>
-		<region name="berlin"  cityAdminLevel="7"/>
-		<region name="brandenburg"  cityAdminLevel="7"/>
-		<region name="bremen"  cityAdminLevel="7"/>
-		<region name="hamburg"  cityAdminLevel="7"/>
-		<region name="hessen"  cityAdminLevel="7"/>
-		<region name="mecklenburg-vorpommern"  cityAdminLevel="7"/>
-		<region name="niedersachsen"  cityAdminLevel="7"/>
-		<region name="nordrhein-westfalen"  cityAdminLevel="7"/>
-		<region name="rheinland-pfalz"  cityAdminLevel="7"/>
-		<region name="saarland"  cityAdminLevel="7"/>
-		<region name="sachsen-anhalt"  cityAdminLevel="7"/>
-		<region name="sachsen"  cityAdminLevel="7"/>
-		<region name="schleswig-holstein"  cityAdminLevel="7"/>
-		<region name="thueringen"  cityAdminLevel="7"/>
+		<region name="baden-wuerttemberg" downloadname="baden-wuerttemberg-latest" cityAdminLevel="7"/>
+		<region name="bayern" downloadname="bayern-latest" cityAdminLevel="7"/>
+		<region name="berlin" downloadname="berlin-latest" cityAdminLevel="7"/>
+		<region name="brandenburg" downloadname="brandenburg-latest" cityAdminLevel="7"/>
+		<region name="bremen" downloadname="bremen-latest" cityAdminLevel="7"/>
+		<region name="hamburg" downloadname="hamburg-latest" cityAdminLevel="7"/>
+		<region name="hessen" downloadname="hessen-latest" cityAdminLevel="7"/>
+		<region name="mecklenburg-vorpommern" downloadname="mecklenburg-vorpommern-latest" cityAdminLevel="7"/>
+		<region name="niedersachsen" downloadname="niedersachsen-latest" cityAdminLevel="7"/>
+		<region name="nordrhein-westfalen" downloadname="nordrhein-westfalen-latest" cityAdminLevel="7"/>
+		<region name="rheinland-pfalz" downloadname="rheinland-pfalz-latest" cityAdminLevel="7"/>
+		<region name="saarland" downloadname="saarland-latest" cityAdminLevel="7"/>
+		<region name="sachsen" downloadname="sachsen-latest" cityAdminLevel="7"/>
+		<region name="sachsen-anhalt" downloadname="sachsen-anhalt-latest" cityAdminLevel="7"/>
+		<region name="schleswig-holstein" downloadname="schleswig-holstein-latest" cityAdminLevel="7"/>
+		<region name="thueringen" downloadname="thueringen-latest" cityAdminLevel="7"/>
 	</regions>
 
 	<!-- 5.5 ITALY [SOURCE: GFOSS.it] -->		
@@ -414,9 +413,9 @@
 		<region name="puglia"  cityAdminLevel="4"/>
 		<region name="sardegna"  cityAdminLevel="4"/>
 		<region name="sicilia"  cityAdminLevel="4"/>
-		<region name="umbria"  cityAdminLevel="4"/>
 		<region name="toscana"  cityAdminLevel="4"/>
 		<region name="trentino-alto-adige"  cityAdminLevel="4"/>
+		<region name="umbria"  cityAdminLevel="4"/>
 		<region name="valle-aosta"  cityAdminLevel="4"/>
 		<region name="veneto"  cityAdminLevel="4"/>
 	</regions>
@@ -427,75 +426,75 @@
 
 <!-- 6. North America  -->		
 	<!-- 6.1 USA [SOURCE: GEOFABRIK.DE]  -->
-	<regions siteToDownload="http://download.geofabrik.de/north-america/{0}.osm.pbf" skip="false" region_prefix="US_" region_suffix="_NorthAmerica">
-		<region name="alabama"/>
-		<region name="alaska"/>
-		<region name="arizona"/>
-		<region name="arkansas"/>
-		<region name="california"/>
-		<region name="colorado"/>
-		<region name="connecticut"/>
-		<region name="delaware"/>
-		<region name="district-of-columbia"/>
-		<region name="florida"/>
-		<region name="georgia"/>
-		<region name="hawaii"/>
-		<region name="idaho"/>
-		<region name="illinois"/>
-		<region name="indiana"/>
-		<region name="iowa"/>
-		<region name="kansas"/>
-		<region name="kentucky"/>
-		<region name="louisiana"/>
-		<region name="maine"/>
-		<region name="maryland"/>
-		<region name="massachusetts"/>
-		<region name="michigan"/>
-		<region name="minnesota"/>
-		<region name="mississippi"/>
-		<region name="missouri"/>
-		<region name="montana"/>
-		<region name="nebraska"/>
-		<region name="nevada"/>
-		<region name="new-hampshire"/>
-		<region name="new-jersey"/>
-		<region name="new-mexico"/>
-		<region name="new-york"/>
-		<region name="north-carolina"/>
-		<region name="north-dakota"/>
-		<region name="ohio"/>
-		<region name="oklahoma"/>			
-		<region name="oregon"/>
-		<region name="texas"/>
-		<region name="pennsylvania"/>
-		<region name="rhode-island"/>
-		<region name="south-carolina"/>
-		<region name="south-dakota"/>
-		<region name="tennessee"/>
-		<region name="utah"/>
-		<region name="vermont"/>
-		<region name="virginia"/>
-		<region name="washington"/>
-		<region name="west-virginia"/>
-		<region name="wisconsin"/>
-		<region name="wyoming"/>
+	<regions siteToDownload="http://download.geofabrik.de/north-america/us/{0}.osm.pbf" skip="false" region_prefix="US_" region_suffix="_NorthAmerica">
+		<region  name="alabama" downloadname="alabama-latest"/>
+		<region  name="alaska" downloadname="alaska-latest"/>
+		<region  name="arizona" downloadname="arizona-latest"/>
+		<region  name="arkansas" downloadname="arkansas-latest"/>
+		<region  name="california" downloadname="california-latest"/>
+		<region  name="colorado" downloadname="colorado-latest"/>
+		<region  name="connecticut" downloadname="connecticut-latest"/>
+		<region  name="delaware" downloadname="delaware-latest"/>
+		<region  name="district-of-columbia" downloadname="district-of-columbia-latest"/>
+		<region  name="florida" downloadname="florida-latest"/>
+		<region  name="georgia" downloadname="georgia-latest"/>
+		<region  name="hawaii" downloadname="hawaii-latest"/>
+		<region  name="idaho" downloadname="idaho-latest"/>
+		<region  name="illinois" downloadname="illinois-latest"/>
+		<region  name="indiana" downloadname="indiana-latest"/>
+		<region  name="iowa" downloadname="iowa-latest"/>
+		<region  name="kansas" downloadname="kansas-latest"/>
+		<region  name="kentucky" downloadname="kentucky-latest"/>
+		<region  name="louisiana" downloadname="louisiana-latest"/>
+		<region  name="maine" downloadname="maine-latest"/>
+		<region  name="maryland" downloadname="maryland-latest"/>
+		<region  name="massachusetts" downloadname="massachusetts-latest"/>
+		<region  name="michigan" downloadname="michigan-latest"/>
+		<region  name="minnesota" downloadname="minnesota-latest"/>
+		<region  name="mississippi" downloadname="mississippi-latest"/>
+		<region  name="missouri" downloadname="missouri-latest"/>
+		<region  name="montana" downloadname="montana-latest"/>
+		<region  name="nebraska" downloadname="nebraska-latest"/>
+		<region  name="nevada" downloadname="nevada-latest"/>
+		<region  name="new-hampshire" downloadname="new-hampshire-latest"/>
+		<region  name="new-jersey" downloadname="new-jersey-latest"/>
+		<region  name="new-mexico" downloadname="new-mexico-latest"/>
+		<region  name="new-york" downloadname="new-york-latest"/>
+		<region  name="north-carolina" downloadname="north-carolina-latest"/>
+		<region  name="north-dakota" downloadname="north-dakota-latest"/>
+		<region  name="ohio" downloadname="ohio-latest"/>
+		<region  name="oklahoma" downloadname="oklahoma-latest"/>
+		<region  name="oregon" downloadname="oregon-latest"/>
+		<region  name="pennsylvania" downloadname="pennsylvania-latest"/>
+		<region  name="rhode-island" downloadname="rhode-island-latest"/>
+		<region  name="south-carolina" downloadname="south-carolina-latest"/>
+		<region  name="south-dakota" downloadname="south-dakota-latest"/>
+		<region  name="tennessee" downloadname="tennessee-latest"/>
+		<region  name="texas" downloadname="texas-latest"/>
+		<region  name="utah" downloadname="utah-latest"/>
+		<region  name="vermont" downloadname="vermont-latest"/>
+		<region  name="virginia" downloadname="virginia-latest"/>
+		<region  name="washington" downloadname="washington-latest"/>
+		<region  name="west-virginia" downloadname="west-virginia-latest"/>
+		<region  name="wisconsin" downloadname="wisconsin-latest"/>
+		<region  name="wyoming" downloadname="wyoming-latest"/>
 	</regions>
 
 	<!-- 6.2 CANADA [SOURCE: GEOFABRIK.DE] -->
 	<regions siteToDownload="http://download.geofabrik.de/north-america/canada/{0}.osm.pbf" region_prefix="Canada_" skip="false" region_suffix="_NorthAmerica">
-		<region name="alberta"/>
-		<region name="british-columbia"/>
-		<region name="manitoba"/>
-		<region name="new-brunswick"/>
-		<region name="newfoundland-and-labrador"/>
-		<region name="northwest-territories"/>
-		<region name="nova-scotia"/>
-		<region name="nunavut"/>
-		<region name="ontario"/>
-		<region name="prince-edward-island"/>
-		<region name="quebec"/>
-		<region name="saskatchewan"/>
-		<region name="yukon"/>
+		<region name="alberta" downloadname="alberta-latest"/>
+		<region name="british-columbia" downloadname="british-columbia-latest"/>
+		<region name="manitoba" downloadname="manitoba-latest"/>
+		<region name="new-brunswick" downloadname="ew-brunswick-latest"/>
+		<region name="newfoundland-and-labrador" downloadname="newfoundland-and-labrador-latest"/>
+		<region name="northwest-territories" downloadname="northwest-territories"/>
+		<region name="nova-scotia" downloadname="nova-scotia-latest"/>
+		<region name="nunavut" downloadname="nunavut-latest"/>
+		<region name="ontario" downloadname="ontario-latest"/>
+		<region name="prince-edward-island" downloadname="prince-edward-island-latest"/>
+		<region name="quebec" downloadname="quebec-latest"/>
+		<region name="saskatchewan" downloadname="saskatchewan-latest"/>
+		<region name="yukon" downloadname="yukon-latest"/>
 	</regions>
 
 	<!--  6.3 NORTH AMERICA EXCEPT USA AND CANADA [SOURCE: OSMAND:NET]  -->	
