@@ -155,23 +155,23 @@
 
 	<!-- 2.3 EASTERN ASIA [SOURCE: OSMAND:NET] -->
 	<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" region_suffix="_Asia" skip="false">
-		<region name="hong_kong"/>
+		<region name="hong-kong"/>
 		<region name="macao"/>
-		<region name="north_korea"/>
-		<region name="south_korea"/>
+		<region name="north-korea"/>
+		<region name="south-korea"/>
 	</regions>	
 
 	<!-- 2.3 SOUTH-EASTERN ASIA [SOURCE: OSMAND:NET] -->
 	<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" region_suffix="_Asia" skip="false">
 		<region name="brunei"/>
 		<region name="cambodia"/>
-		<region name="christmas_island"/>
-		<region name="east_timor"/>
+		<region name="christmas-island"/>
+		<region name="east-timor"/>
 		<region name="laos"/>
 		<region name="malaysia"/>
 		<region name="myanmar"/>
 		<region name="singapore"/>
-		<region name="spratly_islands"/>
+		<region name="spratly-islands"/>
 		<region name="vietnam"/>
 	</regions>	
 
@@ -180,11 +180,11 @@
 		<region name="afghanistan"/>
 		<region name="bangladesh"/>
 		<region name="bhutan"/>
-		<region name="british_indian_ocean_territory"/>  
+		<region name="british-indian-ocean-territory"/>  
 		<region name="iran"/>
 		<region name="maldives"/>
 		<region name="nepal"/>
-		<region name="sri_lanka"/>			
+		<region name="sri-lanka"/>			
 	</regions>		
 
 	<!-- 2.3 WESTERN ASIA [SOURCE: OSMAND:NET] -->
@@ -197,9 +197,9 @@
 		<region name="lebanon"/>
 		<region name="oman"/>
 		<region name="qatar"/>
-		<region name="saudi_arabia"/>
+		<region name="saudi-arabia"/>
 		<region name="syria"/>
-		<region name="united_arab_emirates"/>
+		<region name="united-arab-emirates"/>
 		<region name="yemen"/>
 	</regions>
 
@@ -230,32 +230,30 @@
 
 	<!--  4.2 CENTRAL AMERICA [SOURCE: OSMAND:NET] -->
 	<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix=""  skip="false" region_suffix="_CentralAmerica">
-		<region name="costa_rica" />
-		<region name="el_salvador" />
-		<region name="honduras" />
-		<region name="nicaragua" />
-		<region name="panama" />
 		<region name="anguilla" />
-		<region name="antigua_and_barbuda" />
+		<region name="antigua-and-barbuda" />
 		<region name="aruba" />
 		<region name="bahamas" />
 		<region name="barbados" />
-		<region name="british_virgin_islands"/>
-		<region name="cayman_islands"/>
+		<region name="cayman-islands"/>
+		<region name="costa-rica" />
 		<region name="cuba" />
 		<region name="dominica" />
-		<region name="dominican_republic" />
-		<region name="haiti" />
+		<region name="el-salvador" />
+		<region name="honduras" />
 		<region name="jamaica" />
-		<region name="grenada" />
 		<region name="guadeloupe" />
+		<region name="grenada" />
 		<region name="martinique" />
 		<region name="montserrat"/>
-		<region name="netherlands_antilles" />
-		<region name="puerto_rico" />
-		<region name="saint_vincent_and_the_grenadines"/>
-		<region name="trinidad_and_tobago" />
-		<region name="virgin_islands_us"/>
+		<region name="netherlands-antilles" />
+		<region name="nicaragua" />
+		<region name="panama" />
+		<region name="puerto-rico" />
+		<region name="saint-vincent-and-the-grenadines"/>
+		<region name="trinidad-and-tobago" />
+		<region name="virgin-islands-british"/>		
+		<region name="virgin-islands-us"/>
 	</regions>
 
 <!-- 5 EUROPE -->
