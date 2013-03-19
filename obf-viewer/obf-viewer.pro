@@ -1,20 +1,34 @@
-#-------------------------------------------------
-#
-# Project created by QtCreator 2013-02-27T16:12:30
-#
-#-------------------------------------------------
-
-QT       += core gui
-
-greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
+QT += core gui widgets
 
 TARGET = obf-viewer
 TEMPLATE = app
 
+INCLUDEPATH += \
+    "$$_PRO_FILE_PWD_/../../core/include" \
+    "$$_PRO_FILE_PWD_/../../core/protos" \
+    "$$_PRO_FILE_PWD_/../../core/externals/protobuf/upstream.patched/src"
 
-SOURCES += main.cpp\
-        mainwindow.cpp
+win32:TARGET_OS = windows
+unix:TARGET_OS = linux
+equals(QMAKE_TARGET.arch, x86) {
+    ARCH = i686
+}
+equals(QMAKE_TARGET.arch, x86_64) {
+    ARCH = amd64
+}
+CONFIG(release):FLAVOR = Release
+CONFIG(debug):FLAVOR = Debug
+DEPENDPATH += "$$_PRO_FILE_PWD_/../../binaries/$$TARGET_OS/$$ARCH/$$FLAVOR"
 
-HEADERS  += mainwindow.h
+win32:LIBS += OsmAndCore.lib
+unix:LIBS += -lOsmAndCore
 
-FORMS    += mainwindow.ui
+SOURCES += \
+	main.cpp \
+	mainwindow.cpp
+
+HEADERS += \
+	mainwindow.h
+
+FORMS += \
+	mainwindow.ui

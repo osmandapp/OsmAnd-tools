@@ -1,1 +1,14 @@
-/*.user
+# Qt specific files
+/*.pro.user
+
+# VisualStudio specific files
+/*.vcxproj
+/*.vcxproj.user
+/*.suo
+/*.sdf
+/*.opensdf
+/*.filters
+
+# VisualStudio specific folders
+/ipch
+/*/*
