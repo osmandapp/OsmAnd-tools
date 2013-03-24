@@ -12,7 +12,7 @@
 
 <!-- 1. AFRICA  -->
 	<!-- 1.1 AFRICA [SOURCE: GEOFABRIK.DE] -->
-	<regions siteToDownload="http://download.geofabrik.de/{0}.osm.pbf" region_prefix="" region_suffix=""skip="false">
+	<regions siteToDownload="http://download.geofabrik.de/{0}.osm.pbf" region_prefix="" region_suffix="" skip="false">
 		<region name="africa" downloadname="africa-latest"/>
 	</regions>
 
@@ -294,7 +294,7 @@
 		<region  name="netherlands" downloadname="netherlands-latest" cityAdminLevel="10"/>
 		<region  name="norway" downloadname="norway-latest"/>
 		<region  name="poland" downloadname="poland-latest"/>
-		<!-- <region  name="portugal" downloadname="portugal-latest"/> -->
+		<!-- region  name="portugal" downloadname="portugal-latest" -->
 		<region  name="romania" downloadname="romania-latest"/>
 		<region  name="serbia" downloadname="serbia-latest"/>
 		<region  name="slovakia" downloadname="slovakia-latest" cityAdminLevel="6"/>
