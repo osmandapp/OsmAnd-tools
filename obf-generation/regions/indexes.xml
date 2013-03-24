@@ -294,7 +294,7 @@
 		<region  name="netherlands" downloadname="netherlands-latest" cityAdminLevel="10"/>
 		<region  name="norway" downloadname="norway-latest"/>
 		<region  name="poland" downloadname="poland-latest"/>
-		<region  name="portugal" downloadname="portugal-latest"/>
+		<!-- <region  name="portugal" downloadname="portugal-latest"/> -->
 		<region  name="romania" downloadname="romania-latest"/>
 		<region  name="serbia" downloadname="serbia-latest"/>
 		<region  name="slovakia" downloadname="slovakia-latest" cityAdminLevel="6"/>
@@ -304,6 +304,10 @@
 		<region  name="switzerland" downloadname="switzerland-latest"/>
 		<region  name="turkey" downloadname="turkey-latest"/>
 		<region  name="ukraine" downloadname="ukraine-latest"/>
+	</regions>
+	
+	<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" skip="false" region_suffix="_Europe">	
+	 	<region  name="portugal"/>
 	</regions>
 
 	<!-- 5.2 GREAT BRITAIN [SOURCE: GEOFABRIK.DE] -->
