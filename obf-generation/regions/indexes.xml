@@ -530,6 +530,9 @@
 
 		<!-- 8.2 AFRICA [SOURCE: OSMAND:NET] -->
 		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" region_suffix="_Africa"  skip="false">
+			<region name="burundi"/>
+			<region name="chad"/>
+			<region name="kenya"/>
 			<region name="mali"/>
 		</regions>
 </regions_list> 
