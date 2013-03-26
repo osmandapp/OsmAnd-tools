@@ -27,7 +27,7 @@
 			<region  name="cyprus" downloadName="cyprus-latest"/>
 			<region  name="czech-republic" downloadName="czech-republic-latest"/>
 			<region  name="denmark" downloadName="denmark-latest"/>
-			<region  name="estonia" downloadName="estoni-latesta"/>
+			<region  name="estonia" downloadName="estonia-latest"/>
 			<region  name="faroe-islands" downloadName="faroe-islands-latest"/>
 			<region  name="finland" downloadName="finland-latest"/>
 			<region  name="greece" downloadName="greece-latest"/>
@@ -326,9 +326,9 @@
 			<region name="alberta" downloadName="alberta-latest"/>
 			<region name="british-columbia" downloadName="british-columbia-latest"/>
 			<region name="manitoba" downloadName="manitoba-latest"/>
-			<region name="new-brunswick" downloadName="ew-brunswick-latest"/>
+			<region name="new-brunswick" downloadName="new-brunswick-latest"/>
 			<region name="newfoundland-and-labrador" downloadName="newfoundland-and-labrador-latest"/>
-			<region name="northwest-territories" downloadName="northwest-territories"/>
+			<region name="northwest-territories" downloadName="northwest-territories-latest"/>
 			<region name="nova-scotia" downloadName="nova-scotia-latest"/>
 			<region name="nunavut" downloadName="nunavut-latest"/>
 			<region name="ontario" downloadName="ontario-latest"/>
