@@ -285,7 +285,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 				if(rt != null) {
 					propogated.put(rt, "");
 					if (tokens.length > 2 && rt.names != null) {
-						String symbol = "osmc_symbol_" + tokens[1] + "_" + tokens[2];
+						String symbol = "osmc_symbol_" + tokens[1] + "_" + tokens[2] + "_name";
 						String name = "\u00A0";
 						if (tokens.length > 3 && tokens[3].trim().length() > 0) {
 							name = tokens[3];
