@@ -44,6 +44,7 @@ import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.EntityParser;
 import net.osmand.osm.edit.Node;
+import net.osmand.osm.edit.OsmMapUtils;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Way;
@@ -89,25 +90,6 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 	DBStreetDAO streetDAO;
 
 
-	
-
-	public static class StreetAndDistrict {
-		private final Street street;
-		private final String district;
-
-		StreetAndDistrict(Street street, String district) {
-			this.street = street;
-			this.district = district;
-		}
-
-		public Street getStreet() {
-			return street;
-		}
-
-		public String getDistrict() {
-			return district;
-		}
-	}
 	
 	public IndexAddressCreator(Log logMapDataWarn){
 		this.logMapDataWarn = logMapDataWarn;
@@ -589,7 +571,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 		String cityPart = findCityPart(location, city);
 		SimpleStreet foundStreet = streetDAO.findStreet(name, city, cityPart);
 		if (foundStreet == null) {
-			//by default write city with cityPart of the city
+			// by default write city with cityPart of the city
 			if(cityPart == null ) {
 				cityPart = city.getName();
 			}
@@ -618,8 +600,6 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 								found = true;
 								break;	
 							}
-							
-							
 						}
 					}
 				}
@@ -650,7 +630,6 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 					result = c.getName();
 					dist = actualDistance;
 				}
-
 			}
 		}
 		return result;
@@ -1066,7 +1045,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 	private List<Street> readStreetsBuildings(PreparedStatement streetBuildingsStat, City city, PreparedStatement waynodesStat,
 			Map<Street, List<Node>> streetNodes, List<City> citySuburbs) throws SQLException {
 		TLongObjectHashMap<Street> visitedStreets = new TLongObjectHashMap<Street>();
-		Map<String, List<StreetAndDistrict>> uniqueNames = new HashMap<String, List<StreetAndDistrict>>();
+		Map<String, List<Street>> uniqueNames = new LinkedHashMap<String, List<Street>>();
 
 		// read streets for city
 		readStreetsAndBuildingsForCity(streetBuildingsStat, city, waynodesStat, streetNodes, visitedStreets, uniqueNames);
@@ -1078,30 +1057,72 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 		}
 		return new ArrayList<Street>(streetNodes.keySet());
 	}
+	
+	private Street createOrFindSameStreet(String streetName, String streetEnName, List<Node> thisWayNodes, 
+			Map<String, List<Street>> uniqueNames, Map<Street, List<Node>> streetNodes) {
+		List<Street> streets = uniqueNames.get(streetName);
+		if (streets != null) {
+			for (Street s : streets) {
+				List<Node> oppositeStreetNodes = streetNodes.get(streets);
+				double d = getDistance(thisWayNodes, oppositeStreetNodes);
+				if (d <= 250) {
+					return s;
+				}
+
+			}
+		}
+		return null;
+	}
+
+	private double getDistance(List<Node> thisWayNodes, List<Node> oppositeStreetNodes) {
+		double md = Double.POSITIVE_INFINITY;
+		for(Node n : thisWayNodes) {
+			for(Node d : oppositeStreetNodes) {
+				md = Math.min(md, OsmMapUtils.getDistance(n, d));
+			}
+		}
+		return md;
+	}
+
 
 	private void readStreetsAndBuildingsForCity(PreparedStatement streetBuildingsStat, City city,
 			PreparedStatement waynodesStat, Map<Street, List<Node>> streetNodes, TLongObjectHashMap<Street> visitedStreets,
-			Map<String, List<StreetAndDistrict>> uniqueNames) throws SQLException {
+			Map<String, List<Street>> uniqueNames) throws SQLException {
 		streetBuildingsStat.setLong(1, city.getId());
 		ResultSet set = streetBuildingsStat.executeQuery();
 		while (set.next()) {
 			long streetId = set.getLong(1);
 			if (!visitedStreets.containsKey(streetId)) {
-				Street street = new Street(city);
 				String streetName = set.getString(2);
 				String streetEnName = set.getString(3);
-				street.setLocation(set.getDouble(4), set.getDouble(5));
-				street.setId(streetId);
+				double lat = set.getDouble(4);
+				double lon = set.getDouble(5);
 				// load the street nodes
 				List<Node> thisWayNodes = loadStreetNodes(streetId, waynodesStat);
+				if(thisWayNodes.isEmpty()) {
+					thisWayNodes.add(new Node(lat, lon, -1));
+				}
+				Street street = createOrFindSameStreet(streetName, streetEnName, thisWayNodes, uniqueNames, streetNodes);
+				if (street == null) {
+					if (!uniqueNames.containsKey(streetName)) {
+						uniqueNames.put(streetName, new ArrayList<Street>());
+					}
+					street = new Street(city);
+					uniqueNames.get(streetName).add(street);
+					street.setLocation(lat, lon);
+					street.setId(streetId);
+					// If there are more streets with same name in different districts.
+					// Add district name to all other names. If sorting is right, the first street was the one in the city
+					String district = set.getString(12);
+					String cityPart = district == null || district.equals(city.getName()) ? "" : " (" + district + ")";
+					street.setName(streetName + cityPart);
+					street.setEnName(streetEnName + cityPart);
+					streetNodes.put(street, thisWayNodes);
+				} else {
+					streetNodes.get(street).addAll(thisWayNodes);
+				}
+				
 
-				// If there are more streets with same name in different districts.
-				// Add district name to all other names. If sorting is right, the first street was the one in the city
-				String defaultDistrict = set.getString(12);
-				String cityPart = defaultDistrict == null || defaultDistrict.equals(city.getName()) ? "" : " (" + defaultDistrict + ")";
-				street.setName(streetName + cityPart);
-				street.setEnName(streetEnName + cityPart);
-				streetNodes.put(street, thisWayNodes);
 				visitedStreets.put(streetId, street); // mark the street as visited
 			}
 			if (set.getObject(6) != null) {
