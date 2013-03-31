@@ -1085,7 +1085,8 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 					if(!candidate.getName().equals(s.getName())) {
 						candidate.getCity().unregisterStreet(candidate.getName());
 					}
-					streetNodes.get(s).addAll(streetNodes.get(candidate));
+					List<Node> old = streetNodes.remove(candidate);
+					streetNodes.get(s).addAll(old);
 					streets.remove(j);
 				} else {
 					j++;
