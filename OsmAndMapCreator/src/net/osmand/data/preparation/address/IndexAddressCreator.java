@@ -1067,7 +1067,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 			for (Street s : streets) {
 				List<Node> oppositeStreetNodes = streetNodes.get(s);
 				double d = getDistance(thisWayNodes, oppositeStreetNodes);
-				if (d <= 250) {
+				if (d <= 900) {
 					return s;
 				}
 
