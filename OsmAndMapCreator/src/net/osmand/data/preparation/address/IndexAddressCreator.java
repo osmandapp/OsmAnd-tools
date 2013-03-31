@@ -1075,7 +1075,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 		for(int i = 0; i < streets.size() - 1 ; ) {
 			Street s = streets.get(i);
 			boolean merged = false;
-			for (int j = i + 1; j < streets.size(); j++) {
+			for (int j = i + 1; j < streets.size(); ) {
 				Street candidate = streets.get(j);
 				if(getDistance(s, candidate, streetNodes) <= 900) { 
 					merged = true;
@@ -1086,6 +1086,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 						candidate.getCity().unregisterStreet(candidate.getName());
 					}
 					streetNodes.get(s).addAll(streetNodes.get(candidate));
+					streets.remove(j);
+				} else {
+					j++;
 				}
 			}
 			if(!merged) {
