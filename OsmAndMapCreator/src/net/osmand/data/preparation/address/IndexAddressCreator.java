@@ -133,7 +133,8 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 	
 	public void indexBoundariesRelation(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 		Boundary boundary = extractBoundary(e, ctx);
-		boolean boundaryValid = boundary != null && (!boundary.hasAdminLevel() || boundary.getAdminLevel() > 4) &&
+		// Bucurest has admin level 4
+		boolean boundaryValid = boundary != null && (!boundary.hasAdminLevel() || boundary.getAdminLevel() >= 4) &&
 				boundary.getCenterPoint() != null && !Algorithms.isEmpty(boundary.getName());
 		if (boundaryValid) {
 			LatLon boundaryCenter = boundary.getCenterPoint();
@@ -253,6 +254,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 //	2. Cuxhoven admin_level = 7 win admin_level = 6
 //	3. Catania admin_level = 8 win admin_level = 6
 //	4. Zurich admin_level = 6 win admin_level = 4
+//  5. Bucurest admin_level = 4 win nothing
 	private int getCityBoundaryImportance(Boundary b, City c) {
 		boolean nameEq = b.getName().equalsIgnoreCase(c.getName());
 		boolean cityBoundary = b.getCityType() != null;
@@ -1078,7 +1080,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 		double md = Double.POSITIVE_INFINITY;
 		for(Node n : thisWayNodes) {
 			for(Node d : oppositeStreetNodes) {
-				md = Math.min(md, OsmMapUtils.getDistance(n, d));
+				if(n != null && d != null) {
+					md = Math.min(md, OsmMapUtils.getDistance(n, d));
+				}
 			}
 		}
 		return md;
