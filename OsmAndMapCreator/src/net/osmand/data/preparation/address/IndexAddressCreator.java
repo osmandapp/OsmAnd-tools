@@ -1057,26 +1057,46 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 				readStreetsAndBuildingsForCity(streetBuildingsStat, suburb, waynodesStat, streetNodes, visitedStreets, uniqueNames);
 			}
 		}
+		mergeStreetsWithSameNames(streetNodes, uniqueNames);
 		return new ArrayList<Street>(streetNodes.keySet());
 	}
 	
-	private Street createOrFindSameStreet(String streetName, String streetEnName, List<Node> thisWayNodes, 
-			Map<String, List<Street>> uniqueNames, Map<Street, List<Node>> streetNodes) {
-		List<Street> streets = uniqueNames.get(streetName);
-		if (streets != null) {
-			for (Street s : streets) {
-				List<Node> oppositeStreetNodes = streetNodes.get(s);
-				double d = getDistance(thisWayNodes, oppositeStreetNodes);
-				if (d <= 900) {
-					return s;
-				}
-
+	private void mergeStreetsWithSameNames(Map<Street, List<Node>> streetNodes, Map<String, List<Street>> uniqueNames) {
+		for(String streetName : uniqueNames.keySet()) {
+			List<Street> streets = uniqueNames.get(streetName);
+			if(streets.size() > 1) {
+				mergeStreets(streets, streetNodes);
 			}
 		}
-		return null;
 	}
 
-	private double getDistance(List<Node> thisWayNodes, List<Node> oppositeStreetNodes) {
+
+	private void mergeStreets(List<Street> streets, Map<Street, List<Node>> streetNodes) {
+		for(int i = 0; i < streets.size() - 1 ; ) {
+			Street s = streets.get(i);
+			boolean merged = false;
+			for (int j = i + 1; j < streets.size(); j++) {
+				Street candidate = streets.get(j);
+				if(getDistance(s, candidate, streetNodes) <= 900) { 
+					merged = true;
+					logMapDataWarn.info("City : " + s.getCity() + 
+						" combine 2 district streets '" + s.getName() + "' with '" + candidate.getName() + "'");
+					s.mergeWith(candidate);
+					if(!candidate.getName().equals(s.getName())) {
+						candidate.getCity().unregisterStreet(candidate.getName());
+					}
+					streetNodes.get(s).addAll(streetNodes.get(candidate));
+				}
+			}
+			if(!merged) {
+				i++;
+			}
+		}
+	}
+
+	private double getDistance(Street s, Street c, Map<Street, List<Node>> streetNodes) {
+		List<Node> thisWayNodes = streetNodes.get(s);
+		List<Node> oppositeStreetNodes = streetNodes.get(c);
 		double md = Double.POSITIVE_INFINITY;
 		for(Node n : thisWayNodes) {
 			for(Node d : oppositeStreetNodes) {
@@ -1103,29 +1123,23 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 				double lon = set.getDouble(5);
 				// load the street nodes
 				List<Node> thisWayNodes = loadStreetNodes(streetId, waynodesStat);
-				if(thisWayNodes.isEmpty()) {
+				if (thisWayNodes.isEmpty()) {
 					thisWayNodes.add(new Node(lat, lon, -1));
 				}
-				Street street = createOrFindSameStreet(streetName, streetEnName, thisWayNodes, uniqueNames, streetNodes);
-				if (street == null) {
-					if (!uniqueNames.containsKey(streetName)) {
-						uniqueNames.put(streetName, new ArrayList<Street>());
-					}
-					street = new Street(city);
-					uniqueNames.get(streetName).add(street);
-					street.setLocation(lat, lon);
-					street.setId(streetId);
-					// If there are more streets with same name in different districts.
-					// Add district name to all other names. If sorting is right, the first street was the one in the city
-					String district = set.getString(12);
-					String cityPart = district == null || district.equals(city.getName()) ? "" : " (" + district + ")";
-					street.setName(streetName + cityPart);
-					street.setEnName(streetEnName + cityPart);
-					streetNodes.put(street, thisWayNodes);
-				} else {
-					streetNodes.get(street).addAll(thisWayNodes);
+				if (!uniqueNames.containsKey(streetName)) {
+					uniqueNames.put(streetName, new ArrayList<Street>());
 				}
-				
+				Street street = new Street(city);
+				uniqueNames.get(streetName).add(street);
+				street.setLocation(lat, lon);
+				street.setId(streetId);
+				// If there are more streets with same name in different districts.
+				// Add district name to all other names. If sorting is right, the first street was the one in the city
+				String district = set.getString(12);
+				String cityPart = district == null || district.equals(city.getName()) ? "" : " (" + district + ")";
+				street.setName(streetName + cityPart);
+				street.setEnName(streetEnName + cityPart);
+				streetNodes.put(street, thisWayNodes);
 
 				visitedStreets.put(streetId, street); // mark the street as visited
 			}
@@ -1142,15 +1156,15 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 				b.setName2(set.getString(14));
 				double lat2 = set.getDouble(15);
 				double lon2 = set.getDouble(16);
-				if(lat2 != 0 || lon2 != 0) {
+				if (lat2 != 0 || lon2 != 0) {
 					b.setLatLon2(new LatLon(lat2, lon2));
 				}
 				b.setInterpolationInterval(set.getInt(17));
 				String type = set.getString(18);
-				if(type != null){
+				if (type != null) {
 					b.setInterpolationType(BuildingInterpolation.valueOf(type));
 				}
-				
+
 				s.addBuildingCheckById(b);
 			}
 		}
