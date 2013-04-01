@@ -1079,8 +1079,8 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 				Street candidate = streets.get(j);
 				if(getDistance(s, candidate, streetNodes) <= 900) { 
 					merged = true;
-					logMapDataWarn.info("City : " + s.getCity() + 
-						" combine 2 district streets '" + s.getName() + "' with '" + candidate.getName() + "'");
+					//logMapDataWarn.info("City : " + s.getCity() + 
+					//	" combine 2 district streets '" + s.getName() + "' with '" + candidate.getName() + "'");
 					s.mergeWith(candidate);
 					if(!candidate.getName().equals(s.getName())) {
 						candidate.getCity().unregisterStreet(candidate.getName());
