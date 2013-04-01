@@ -957,8 +957,8 @@ public class BinaryMapIndexWriter {
 				} else {
 					int bcx = MapUtils.get31TileNumberX(loc.getLongitude());
 					int bcy = MapUtils.get31TileNumberY(loc.getLatitude());
-					bbuilder.setX((bcx - sx) >> 7);
-					bbuilder.setY((bcy - sy) >> 7);
+					bbuilder.setX2((bcx - sx) >> 7);
+					bbuilder.setY2((bcy - sy) >> 7);
 				}
 				bbuilder.setName2(number2);
 				if(b.getInterpolationType() != null) {
