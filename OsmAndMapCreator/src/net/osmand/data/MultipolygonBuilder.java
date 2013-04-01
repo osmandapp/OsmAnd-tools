@@ -124,7 +124,7 @@ public class MultipolygonBuilder {
 					ListIterator<Way> it = multiLines.listIterator();
 					while(it.hasNext()){
 						Way w = it.next();
-						newWay = combineTwoWaysIfHasPoints(toAdd, w);
+						newWay = combineTwoWaysIfHasPoints(changedWay, w);
 						if(newWay != null) {
 							changedWay = newWay;
 							it.remove();
