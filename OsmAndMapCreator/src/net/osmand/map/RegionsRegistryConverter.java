@@ -109,7 +109,7 @@ public class RegionsRegistryConverter {
 			regions.addRegions(c.convert());
 		}
 		
-		String filePath = "../../core/OsmAnd-java/src/net/osmand/map/"+RegionRegistry.fileName;
+		String filePath = "../../jni/java/net/osmand/map/"+RegionRegistry.fileName;
 		long t = -System.currentTimeMillis();
 		FileOutputStream out = new FileOutputStream(filePath);
 		OsmAndRegionInfo.newBuilder().setRegionInfo(regions)
