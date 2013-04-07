@@ -485,7 +485,7 @@ public class IndexBatchCreator {
 					fout.write((new Date() + "\n").getBytes());
 					fout.write((MapCreatorVersion.APP_MAP_CREATOR_FULL_NAME + "\n").getBytes());
 					fout.close();
-					fh = new FileHandler(logFileName.getAbsolutePath(), 5000000, 1, true);
+					fh = new FileHandler(logFileName.getAbsolutePath(), 10*1000*1000, 1, true);
 					fh.setFormatter(new SimpleFormatter());
 					fh.setLevel(Level.ALL);
 					Jdk14Logger jdk14Logger = new Jdk14Logger("tempLogger");
