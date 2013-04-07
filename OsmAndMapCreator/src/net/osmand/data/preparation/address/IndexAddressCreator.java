@@ -15,10 +15,12 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -844,7 +846,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 				"B.id, B.name, B.name_en, B.latitude, B.longitude, B.postcode, A.cityPart, "+ //$NON-NLS-1$
 				" B.name2, B.name_en2, B.lat2, B.lon2, B.interval, B.interpolateType, A.cityPart == C.name as MainTown " +
 				"FROM street A left JOIN building B ON B.street = A.id JOIN city C ON A.city = C.id " + //$NON-NLS-1$
-				"WHERE A.city = ? ORDER BY MainTown DESC"); //$NON-NLS-1$
+				"WHERE A.city = ? ORDER BY MainTown DESC, A.name ASC"); //$NON-NLS-1$
 		PreparedStatement waynodesStat =
 			 mapConnection.prepareStatement("SELECT A.id, A.latitude, A.longitude FROM street_node A WHERE A.street = ? "); //$NON-NLS-1$
 
@@ -1061,6 +1063,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 		return new ArrayList<Street>(streetNodes.keySet());
 	}
 	
+
 	private void mergeStreetsWithSameNames(Map<Street, List<Node>> streetNodes, Map<String, List<Street>> uniqueNames) {
 		for(String streetName : uniqueNames.keySet()) {
 			List<Street> streets = uniqueNames.get(streetName);
@@ -1127,9 +1130,6 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 				double lon = set.getDouble(5);
 				// load the street nodes
 				List<Node> thisWayNodes = loadStreetNodes(streetId, waynodesStat);
-				if (thisWayNodes.isEmpty()) {
-					thisWayNodes.add(new Node(lat, lon, -1));
-				}
 				if (!uniqueNames.containsKey(streetName)) {
 					uniqueNames.put(streetName, new ArrayList<Street>());
 				}

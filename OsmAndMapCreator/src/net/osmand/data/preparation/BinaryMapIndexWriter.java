@@ -867,7 +867,6 @@ public class BinaryMapIndexWriter {
 			BinaryFileReference ref) throws IOException {
 		checkPeekState(CITY_INDEX_INIT);
 		codedOutStream.writeTag(CitiesIndex.BLOCKS_FIELD_NUMBER, FieldType.MESSAGE.getWireType());
-		// 225489 223992+6710 = 230700
 		long startMessage = getFilePointer();
 		long startCityBlock = ref.getStartPointer();
 		codedOutStream.flush();
