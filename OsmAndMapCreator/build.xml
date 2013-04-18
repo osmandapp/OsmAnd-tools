@@ -5,7 +5,7 @@
 
 	<property name="src.dir" value="src"/>
 	<property name="osmand-resources.dir" location="../../core/resources"/>
-	<property name="osmand-jni.dir" location="../../jni"/>
+	<property name="osmand-jni.dir" location="../../android/OsmAnd-java/"/>
 	<property name="osmand-jni.absolute.dir" location="${osmand-core.dir}" />
 	<property name="osmand-core.jar" value="OsmAnd-core.jar"/>
 	<property name="src.absolute.dir" location="${src.dir}" />
