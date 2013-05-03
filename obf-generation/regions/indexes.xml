@@ -80,6 +80,7 @@
 			<region name="cumbria" downloadName="cumbria-latest"/>
 			<region name="derbyshire" downloadName="derbyshire-latest"/>
 			<region name="devon" downloadName="devon-latest"/>
+			<region name="east-sussex" downloadName="east-sussex-latest"/>
 			<region name="east-yorkshire-with-hull" downloadName="east-yorkshire-with-hull-latest"/>
 			<region name="essex" downloadName="essex-latest"/>
 			<region name="greater-london" downloadName="greater-london-latest"/>
