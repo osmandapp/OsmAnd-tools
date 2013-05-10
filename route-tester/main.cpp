@@ -47,7 +47,7 @@ int main(int argc, char* argv[])
         printUsage(error.toStdString());
         return -1;
     }
-    //OsmAnd::Voyager::dumpToStdOut(cfg);
+    OsmAnd::Voyager::logJourneyToStdOut(cfg);
     return 0;
 }
 
@@ -56,11 +56,12 @@ void printUsage(std::string warning)
     if(!warning.empty())
         std::cout << warning << std::endl;
     std::cout << "Voyager is console utility to test OsmAnd routing engine." << std::endl;
-    std::cout << std::endl << "Usage: voyager [-config=path/to/config.xml] [-verbose] [-obfsDir=path/to/OBFs] [-start=lat;lon] [-end=lat;lon]" << std::endl;
+    std::cout << std::endl << "Usage: voyager [-config=path/to/config.xml] [-verbose] [-obfsDir=path/to/OBFs] [-vehicle=car] [-memlimit=0] [-start=lat;lon] [-waypoint=lat;lon] [-end=lat;lon] [-left]" << std::endl;
     std::cout << "\tconfig - Routing configuration file. If not specified, default configuration will be used" << std::endl;
     std::cout << "\tverbose - Be verbose?" << std::endl;
     std::cout << "\tobfsDir - Root folder of OBF files" << std::endl;
     std::cout << "\tstart - Route start point" << std::endl;
     std::cout << "\tend - Route end point" << std::endl;
+    std::cout << "\tleft - Use left-side navigation" << std::endl;
 }
 
