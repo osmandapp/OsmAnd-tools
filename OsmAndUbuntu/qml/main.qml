@@ -30,7 +30,9 @@ MainView {
                     id: text_input1
 
                     anchors.left: parent.left
+                    anchors.right: button.left
                     anchors.leftMargin: units.gu(2);
+                    anchors.rightMargin: units.gu(2);
                     anchors.top: parent.top
                     anchors.topMargin: units.gu(2);
                     text: "Enter osmand directory"
@@ -44,22 +46,50 @@ MainView {
                     color: "green"
                     anchors.topMargin: units.gu(2);
                     anchors.leftMargin: units.gu(2);
+                    anchors.rightMargin: units.gu(2);
                     anchors.top : parent.top
-                    anchors.left: text_input1.right
+                    anchors.right: parent.right
                     width: units.gu(15);
                     onClicked: {
                         applicationData.setOsmandDirectiory(text_input1.text);
+                        groupedModel.clear();
+                        var files = applicationData.getFiles();
+                        for(var i = 0; i < files.length; i++) {
+                            var text = files[i].
+                            replace('.obf', '').replace('_2','');
+                            text = text.split('_').join(' ');
+                            groupedModel.append({name:text});
+                        }
+
                     }
                 }
-                Column {
+                ListModel {
+                    id: groupedModel
+                }
+
+                Rectangle {
                     anchors.top : text_input1.bottom
-
-                    ListItem.Caption {
-                        text: "This is a caption text, which can span multiple lines."
+                    anchors.topMargin: units.gu(2);
+                    color: "#f7f7f7"
+                    anchors.bottom: parent.bottom
+                    width : parent.width
+                    ListView {
+                        id: groupedList
+                        model: groupedModel
+                        anchors.fill: parent
+                        delegate: ListItem.Standard {
+                            text: i18n.tr(name)
+                            progression: true
+                        }
+                    }
+                    Scrollbar {
+                        flickableItem: groupedList
+                        align: Qt.AlignTrailing
                     }
                 }
-            }
 
+            }
         }
     }
+
 }

@@ -9,7 +9,9 @@ class ApplicationData : public QObject
 public:
     explicit ApplicationData(QObject *parent = 0);
     Q_INVOKABLE QString setOsmandDirectiory(QString);
+    Q_INVOKABLE QStringList getFiles() { return files; }
     QStringList files;
+
 private:
     QString osmandDirectory;
 signals:

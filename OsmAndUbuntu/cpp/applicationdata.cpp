@@ -12,13 +12,10 @@ QString ApplicationData::setOsmandDirectiory(QString directory) {
     this->files.clear();
     QDir dir(osmandDirectory);
     QStringList files = dir.entryList();
-    std::cout << "SIZE : " << files.size() << std::endl;
     for(QString it : files) {
         if(it.endsWith(".obf")) {
-            std::cout << it.toStdString() << std::endl;
             this->files.append(it);
         }
     }
-    std::cout.flush();
     return directory;
 }
