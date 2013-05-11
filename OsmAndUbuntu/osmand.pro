@@ -6,7 +6,9 @@ QT += qml quick
 
 #C++ source files
 SOURCES +=  cpp/main.cpp\
-            cpp/applicationdata.cpp\
+            cpp/applicationdata.cpp
+
+QMAKE_CXXFLAGS +=-std=c++11
 
 #C++ header files
 HEADERS  += cpp/applicationdata.h
@@ -15,7 +17,9 @@ HEADERS  += cpp/applicationdata.h
 INCLUDEPATH +=  $$PWD\
                 $$PWD/../../core/include $$PWD/../../core/include/native $$PWD/../../core/protos
 DEPENDPATH += $$PWD/../../../../usr/lib
-unix:!macx: LIBS += -L$$PWD/../../binaries/linux/i686/Debug/ -lOsmAndCore
+
+unix:!macx:
+LIBS += -L$$PWD/../../binaries/linux/i686/Debug/ -lOsmAndCore
 
 #Path to "other files" in this case the QML-Files
 OTHER_FILES += \
