@@ -9,16 +9,15 @@
 	<classpathentry kind="lib" path="lib/jsch-20120101.jar"/>
 	<classpathentry kind="lib" path="lib/mysql-connector-java-5.1.18-bin.jar"/>
 	<classpathentry kind="lib" path="lib/junit-4.10.jar"/>
-	<classpathentry combineaccessrules="false" kind="src" path="/OsmAnd-java"/>
-	<classpathentry kind="lib" path="/OsmAnd-java/libs/bsh-core-2.0b4.jar"/>
-	<classpathentry kind="lib" path="/OsmAnd-java/libs/bzip2-20090327.jar"/>
-	<classpathentry kind="lib" path="/OsmAnd-java/libs/commons-logging-1.1.1.jar"/>
-	<classpathentry kind="lib" path="/OsmAnd-java/libs/gnu-trove-osmand.jar"/>
-	<classpathentry kind="lib" path="/OsmAnd-java/libs/icu4j-49_1.jar"/>
-	<classpathentry kind="lib" path="/OsmAnd-java/libs/json-20090211.jar"/>
-	<classpathentry kind="lib" path="/OsmAnd-java/libs/junidecode-0.1.jar"/>
-	<classpathentry kind="lib" path="/OsmAnd-java/libs/kxml2-2.3.0.jar"/>
-	<classpathentry kind="lib" path="/OsmAnd-java/libs/tuprolog.jar"/>
+	<classpathentry kind="lib" path="lib/bzip2-20090327.jar"/>
+	<classpathentry kind="lib" path="lib/commons-logging-1.1.1.jar"/>
+	<classpathentry kind="lib" path="lib/gnu-trove-osmand.jar"/>
+	<classpathentry kind="lib" path="lib/bsh-core-2.0b4.jar"/>
+	<classpathentry kind="lib" path="lib/icu4j-49_1.jar"/>
+	<classpathentry kind="lib" path="lib/json-20090211.jar"/>
+	<classpathentry kind="lib" path="lib/junidecode-0.1.jar"/>
+	<classpathentry kind="lib" path="lib/kxml2-2.3.0.jar"/>
 	<classpathentry kind="lib" path="lib/jleveldb-v01.jar"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/OsmAnd-java"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
