@@ -40,11 +40,6 @@ MainView {
                     font.pixelSize: FontUtils.sizeToPixels("large")
 
                     height: units.gu(4)
-                    Component.onCompleted: {
-                        text = applicationData.getOsmandDirectiory();;
-                    }
-
-                    //font.pixelSize: units.gu(5);
                 }
                 Button {
                     id: button
@@ -58,66 +53,17 @@ MainView {
                     width: units.gu(15);
                     onClicked: {
                         applicationData.setOsmandDirectiory(text_input1.text);
-                        groupedModel.clear();
-                        var files = applicationData.getFiles();
-                        for(var i = 0; i < files.length; i++) {
-                            var text = files[i].
-                            replace('.obf', '').replace('_2','');
-                            text = text.split('_').join(' ');
-                            groupedModel.append({name:text});
-                        }
-                        text_input1.text = applicationData.getOsmandDirectiory();
-                        PopupUtils.open(popoverComponent, button)
+                        reloadList();
                     }
                 }
                 ListModel {
                     id: groupedModel
                 }
-                Component {
-                    id: popoverComponent
-
-                    Popover {
-                        id: popover
-                        Column {
-                            id: containerLayout
-                            anchors {
-                                left: parent.left
-                                top: parent.top
-                                right: parent.right
-                            }
-                            ListItem.Header { text: "Standard list items" }
-                            ListItem.Standard { text: "Do something" }
-                            ListItem.Standard { text: "Do something else" }
-                            ListItem.Header { text: "Buttons" }
-                            ListItem.SingleControl {
-                                highlightWhenPressed: false
-                                control: Button {
-                                    text: "Do nothing"
-                                    anchors {
-                                        fill: parent
-                                        margins: units.gu(1)
-                                    }
-                                }
-                            }
-                            ListItem.SingleControl {
-                                highlightWhenPressed: false
-                                control: Button {
-                                    text: "Close"
-                                    anchors {
-                                        fill: parent
-                                        margins: units.gu(1)
-                                    }
-                                    onClicked: PopupUtils.close(popover)
-                                }
-                            }
-                        }
-                    }
-                }
-
                 Rectangle {
                     anchors.top : text_input1.bottom
                     anchors.topMargin: units.gu(2);
                     color: "#f7f7f7"
+                    clip: true
                     anchors.bottom: parent.bottom
                     width : parent.width
                     ListView {
@@ -127,6 +73,13 @@ MainView {
                         delegate: ListItem.Standard {
                             text: i18n.tr(name)
                             progression: true
+                            onClicked : {
+                                groupedList.currentIndex = model.index;
+                                PopupUtils.open(popoverComponent, groupedList);
+                            }
+                        }
+                        Component.onCompleted: {
+                            reloadList();
                         }
                     }
                     Scrollbar {
@@ -134,7 +87,72 @@ MainView {
                         align: Qt.AlignTrailing
                     }
                 }
+            }
+        }
+    }
 
+    function reloadList() {
+        groupedModel.clear();
+        var files = applicationData.getFiles();
+        for(var i = 0; i < files.length; i++) {
+            var text = files[i].
+            replace('.obf', '').replace('_2','');
+            text = text.split('_').join(' ');
+            groupedModel.append({name:text});
+        }
+        if(applicationData.getOsmandDirectiory() !== "") {
+            text_input1.text = applicationData.getOsmandDirectiory();
+        }
+    }
+
+
+    Component {
+        id: popoverComponent
+        Popover {
+            id: popover
+            Column {
+                id: containerLayout
+                anchors {
+                    left: parent.left
+                    top: parent.top
+                    right: parent.right
+                }
+                ListItem.Header {
+                    text: groupedModel.get(groupedList.currentIndex).name;
+                }
+                ListItem.SingleControl {
+                    highlightWhenPressed: false
+                    height:  units.gu(30);
+                    Flickable {
+                        id : textItem
+                        anchors.fill: parent
+                        contentHeight: textItemSingle.height
+                        clip: true
+                        Text {
+                            id : textItemSingle
+                            wrapMode:  Text.WrapAtWordBoundaryOrAnywhere
+                            width : parent.width- units.gu(2)
+                            x:  parent.x + units.gu(1)
+                            text: applicationData.describeFile(groupedList.currentIndex);
+                        }
+                    }
+                    Scrollbar {
+                        flickableItem: textItem
+                        align: Qt.AlignTrailing
+                    }
+
+                }
+                ListItem.SingleControl {
+                    highlightWhenPressed: false
+                    control: Button {
+                        text: "Close"
+                        anchors {
+                            fill: parent
+                            margins: units.gu(1)
+                        }
+                        onClicked: PopupUtils.close(popover)
+                    }
+                }
             }
         }
     }

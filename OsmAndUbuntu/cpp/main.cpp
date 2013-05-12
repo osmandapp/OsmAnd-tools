@@ -3,13 +3,13 @@
 #include <QQuickView>
 #include <QtQml/qqmlcontext.h>
 #include <stdio.h>
-#include  "applicationdata.h"
+#include  "MainApplicationSettings.h"
 
 int main(int argc, char *argv[])
 {
     QGuiApplication app(argc, argv);
     QQuickView view;
-    ApplicationData data;
+    MainApplicationSettings data;
 
     //Resize Mode so the content of the QML file will scale to the window size
     view.setResizeMode(QQuickView::SizeRootObjectToView);

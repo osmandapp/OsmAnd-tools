@@ -4,14 +4,18 @@
 #include <QStringList>
 #include "OsmAndApplication.h"
 
-class ApplicationData : public QObject
+class MainApplicationSettings : public QObject
 {
     Q_OBJECT
+private:
+    std::shared_ptr<OsmAnd::OsmAndApplication> app;
 public:
-    explicit ApplicationData(QObject *parent = 0);
+    explicit MainApplicationSettings(QObject *parent = 0);
+    void reloadFiles();
     Q_INVOKABLE void setOsmandDirectiory(QString);
     Q_INVOKABLE QString getOsmandDirectiory();
     Q_INVOKABLE QStringList getFiles() { return files; }
+    Q_INVOKABLE QString describeFile(int index);
     QStringList files;
 
 signals:

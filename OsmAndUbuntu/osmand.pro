@@ -5,18 +5,24 @@ QT += qml quick
 # MOBILITY +=
 
 #C++ source files
-SOURCES +=  cpp/main.cpp\
-            cpp/applicationdata.cpp
+SOURCES +=  cpp/main.cpp \
+    cpp/MainApplicationSettings.cpp
 
 QMAKE_CXXFLAGS +=-std=c++11
 
 #C++ header files
-HEADERS  += cpp/applicationdata.h
+HEADERS  += \
+    cpp/MainApplicationSettings.h
 
 #Path to the libraries...
-INCLUDEPATH +=  $$PWD\
-                $$PWD/../../core/include $$PWD/../../core/include/native $$PWD/../../core/protos
-DEPENDPATH += $$PWD/../../../../usr/lib
+INCLUDEPATH +=  $$PWD/../../core/externals/protobuf/upstream.patched/src/ \
+                $$PWD/../../core/include $$PWD/../../core/include/native \
+                $$PWD/../../core/protos \
+                $$PWD
+DEPENDPATH += $$PWD/../../../../usr/lib \
+              $$PWD/../../core/externals/protobuf/upstream.patched \
+              $$PWD/../../core/include $$PWD/../../core/include/native \
+              $$PWD/../../core/protos
 
 unix:!macx:
 LIBS += -L$$PWD/../../binaries/linux/i686/Debug/ -lOsmAndCore
