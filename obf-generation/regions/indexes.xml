@@ -56,13 +56,13 @@
 			<region  name="slovenia" downloadName="slovenia-latest"/>
 			<region  name="spain" downloadName="spain-latest"/>
 			<region  name="sweden"  downloadName="sweden-latest" />
-			<region  name="switzerland" downloadName="switzerland-latest"/>
 			<region  name="turkey" downloadName="turkey-latest"/>
 			<region  name="ukraine" downloadName="ukraine-latest"/>
 		</regions>
 		
 		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" skip="false" region_suffix="_Europe">	
 		 	<region  name="portugal"/>
+		 	<region  name="switzerland"/>
 		</regions>
 
 		<!-- 1.2 GREAT BRITAIN [SOURCE: GEOFABRIK.DE] -->
