@@ -1,6 +1,7 @@
 import QtQuick 2.0
 import Ubuntu.Components 0.1
 import Ubuntu.Components.ListItems 0.1 as ListItem
+import Ubuntu.Components.Popups 0.1
 import QtQuick.Window 2.0
 MainView {
     //objectName for functional testing purposes (autopilot-qt5)
@@ -37,7 +38,12 @@ MainView {
                     anchors.topMargin: units.gu(2);
                     text: "Enter osmand directory"
                     font.pixelSize: FontUtils.sizeToPixels("large")
+
                     height: units.gu(4)
+                    Component.onCompleted: {
+                        text = applicationData.getOsmandDirectiory();;
+                    }
+
                     //font.pixelSize: units.gu(5);
                 }
                 Button {
@@ -60,11 +66,52 @@ MainView {
                             text = text.split('_').join(' ');
                             groupedModel.append({name:text});
                         }
-
+                        text_input1.text = applicationData.getOsmandDirectiory();
+                        PopupUtils.open(popoverComponent, button)
                     }
                 }
                 ListModel {
                     id: groupedModel
+                }
+                Component {
+                    id: popoverComponent
+
+                    Popover {
+                        id: popover
+                        Column {
+                            id: containerLayout
+                            anchors {
+                                left: parent.left
+                                top: parent.top
+                                right: parent.right
+                            }
+                            ListItem.Header { text: "Standard list items" }
+                            ListItem.Standard { text: "Do something" }
+                            ListItem.Standard { text: "Do something else" }
+                            ListItem.Header { text: "Buttons" }
+                            ListItem.SingleControl {
+                                highlightWhenPressed: false
+                                control: Button {
+                                    text: "Do nothing"
+                                    anchors {
+                                        fill: parent
+                                        margins: units.gu(1)
+                                    }
+                                }
+                            }
+                            ListItem.SingleControl {
+                                highlightWhenPressed: false
+                                control: Button {
+                                    text: "Close"
+                                    anchors {
+                                        fill: parent
+                                        margins: units.gu(1)
+                                    }
+                                    onClicked: PopupUtils.close(popover)
+                                }
+                            }
+                        }
+                    }
                 }
 
                 Rectangle {

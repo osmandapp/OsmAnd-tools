@@ -2,18 +2,18 @@
 #define APPLICATIONDATA_H
 #include <QObject>
 #include <QStringList>
+#include "OsmAndApplication.h"
 
 class ApplicationData : public QObject
 {
     Q_OBJECT
 public:
     explicit ApplicationData(QObject *parent = 0);
-    Q_INVOKABLE QString setOsmandDirectiory(QString);
+    Q_INVOKABLE void setOsmandDirectiory(QString);
+    Q_INVOKABLE QString getOsmandDirectiory();
     Q_INVOKABLE QStringList getFiles() { return files; }
     QStringList files;
 
-private:
-    QString osmandDirectory;
 signals:
     
 public slots:

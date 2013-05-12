@@ -4,18 +4,24 @@
 #include <iostream>
 
 ApplicationData::ApplicationData(QObject *parent) :
-    QObject(parent), osmandDirectory("")
+    QObject(parent)
 {
 }
-QString ApplicationData::setOsmandDirectiory(QString directory) {
-    osmandDirectory = directory;
+
+QString ApplicationData::getOsmandDirectiory() {
+    auto app = OsmAnd::OsmAndApplication::getAndInitializeApplication();
+    return app->getSettings()->APPLICATION_DIRECTORY.get().toString();
+}
+
+void ApplicationData::setOsmandDirectiory(QString directory) {
+    auto app = OsmAnd::OsmAndApplication::getAndInitializeApplication();
+    app->getSettings()->APPLICATION_DIRECTORY.set(directory);
     this->files.clear();
-    QDir dir(osmandDirectory);
+    QDir dir(directory);
     QStringList files = dir.entryList();
     for(QString it : files) {
         if(it.endsWith(".obf")) {
             this->files.append(it);
         }
     }
-    return directory;
 }
