@@ -18,18 +18,20 @@ MainView {
         id:mainWindow;
         Tab {
             title: "Settings"
-            id:tab;
-            x: 0
-            y: 0
-            anchors.rightMargin: 0
-            anchors.bottomMargin: 0
-            anchors.leftMargin: 0
-            anchors.topMargin: 0
             page : Loader {
                 anchors {
                     fill : parent
                 }
                 source : "files.qml"
+            }
+        }
+        Tab {
+            title: "Map"
+            page : Loader {
+                anchors {
+                    fill : parent
+                }
+                source : "map.qml"
             }
         }
     }

@@ -6,13 +6,15 @@ QT += qml quick
 
 #C++ source files
 SOURCES +=  cpp/main.cpp \
-    cpp/MainApplicationSettings.cpp
+    cpp/MainApplicationSettings.cpp \
+    cpp/Map.cpp
 
 QMAKE_CXXFLAGS +=-std=c++11
 
 #C++ header files
 HEADERS  += \
-    cpp/MainApplicationSettings.h
+    cpp/MainApplicationSettings.h \
+    cpp/Map.h
 
 #Path to the libraries...
 INCLUDEPATH +=  $$PWD/../../core/externals/protobuf/upstream.patched/src/ \
@@ -31,4 +33,5 @@ LIBS += -L$$PWD/../../binaries/linux/i686/Debug/ -lOsmAndCore
 OTHER_FILES += \
     qml/main.qml\
     qml/*.qml \
-    qml/files.qml
+    qml/files.qml \
+    qml/map.qml
