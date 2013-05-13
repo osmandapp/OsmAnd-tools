@@ -123,17 +123,7 @@ void dump(std::ostream &output, const QString& filePath)
                 output << "      Bounds " << formatBounds(level->_area31.left, level->_area31.right, level->_area31.top, level->_area31.bottom) << std::endl;
             }
 
-            //            if(cfg.verboseMap)
-            //                printMapDetailInfo(output, cfg, &obfMap, mapSection);
         }
-        //        else if(dynamic_cast<OsmAnd::ObfPoiSection*>(section) && cfg.verbosePoi)
-        //        {
-        // printPOIDetailInfo(output, cfg, &obfMap, dynamic_cast<OsmAnd::ObfPoiSection*>(section));
-        //        }
-        //        else if (dynamic_cast<OsmAnd::ObfAddressSection*>(section) &&cfg. verboseAddress)
-        //        {
-        // printAddressDetailedInfo(output, cfg, &obfMap, dynamic_cast<OsmAnd::ObfAddressSection*>(section));
-        //        }
     }
 
     file->close();
