@@ -196,8 +196,8 @@
 			<region name="chukotka" downloadName="CHU"/>
 			<region name="chuvashia" downloadName="CU"/>
 			<region name="dagestan" downloadName="DA"/>
-			<region name="evrey" downloadName="YEV"/>
-			<region name="ingush" downloadName="IN"/>
+			<region name="evreyskaya" downloadName="YEV"/>
+			<region name="ingushetia" downloadName="IN"/>
 			<region name="irkutsk" downloadName="IRK"/>
 			<region name="ivanov" downloadName="IVA"/>
 			<region name="kabardino-balkaria" downloadName="KB"/>
@@ -208,7 +208,7 @@
 			<region name="karachaevo" downloadName="KC"/>
 			<region name="karelia" downloadName="KR"/>
 			<region name="kemerovo" downloadName="KEM"/>
-			<region name="khabar" downloadName="KHA"/>
+			<region name="khabarovsk" downloadName="KHA"/>
 			<region name="khakasia" downloadName="KK"/>
 			<region name="khanty-mansiisk" downloadName="KHM"/>
 			<region name="kirov" downloadName="KIR"/>
@@ -232,7 +232,7 @@
 			<region name="novosib" downloadName="NVS"/>
 			<region name="omsk" downloadName="OMS"/>
 			<region name="orenburg" downloadName="ORE"/>
-			<region name="orlovsk" downloadName="ORL"/>
+			<region name="orel" downloadName="ORL"/>
 			<region name="osetiya" downloadName="SE"/>
 			<region name="penza" downloadName="PNZ"/>
 			<region name="perm" downloadName="PER"/>
