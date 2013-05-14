@@ -215,7 +215,7 @@
 			<region name="komi" downloadName="KO"/>
 			<region name="kostroma" downloadName="KOS"/>
 			<region name="krasnodar" downloadName="KDA"/>
-			<region name="krasnoyarskii" downloadName="KYA"/>
+			<region name="krasnoyarsk" downloadName="KYA"/>
 			<region name="kurgan" downloadName="KGN"/>
 			<region name="kursk" downloadName="KRS"/>
 			<region name="leningradskaya" downloadName="LEN"/>
@@ -229,7 +229,7 @@
 			<region name="neneckaya" downloadName="NEN"/>
 			<region name="nizhegorod" downloadName="NIZ"/>
 			<region name="novgorod" downloadName="NGR"/>
-			<region name="novosib" downloadName="NVS"/>
+			<region name="novosibirsk" downloadName="NVS"/>
 			<region name="omsk" downloadName="OMS"/>
 			<region name="orenburg" downloadName="ORE"/>
 			<region name="orel" downloadName="ORL"/>
@@ -262,8 +262,8 @@
 			<region name="voronezh" downloadName="VOR"/>
 			<region name="yakut" downloadName="SA"/>
 			<region name="yamal" downloadName="YAN"/>
-			<region name="yarosl" downloadName="YAR"/>
-			<region name="zabaikal" downloadName="ZAB"/>
+			<region name="yaroslavl" downloadName="YAR"/>
+			<region name="zabaikalie" downloadName="ZAB"/>
 		</regions>
 
 		<!-- 3. North America  -->		
