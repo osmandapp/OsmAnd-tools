@@ -80,7 +80,7 @@
 			<region name="cumbria" downloadName="cumbria-latest"/>
 			<region name="derbyshire" downloadName="derbyshire-latest"/>
 			<region name="devon" downloadName="devon-latest"/>
-			<region name="east-sussex" downloadName="east-sussex-latest"/>
+			<region name="east-sussex" downloadName="east-sussex-latest"/>
 			<region name="east-yorkshire-with-hull" downloadName="east-yorkshire-with-hull-latest"/>
 			<region name="essex" downloadName="essex-latest"/>
 			<region name="greater-london" downloadName="greater-london-latest"/>
@@ -185,48 +185,48 @@
 			<region name="altay" downloadName="AL"/>
 			<region name="altayskiy" downloadName="ALT"/>
 			<region name="amur" downloadName="AMU"/>
-			<region name="arkhan" downloadName="ARK"/>
+			<region name="arkhangelsk" downloadName="ARK"/>
 			<region name="astrakhan" downloadName="AST"/>
-			<region name="bashkir" downloadName="BA"/>
+			<region name="bashkiria" downloadName="BA"/>
 			<region name="belgorod" downloadName="BEL"/>
 			<region name="bryansk" downloadName="BRY"/> 
-			<region name="buryat" downloadName="BU"/>
-			<region name="chechen" downloadName="CE"/>
-			<region name="chel" downloadName="CHE"/>
-			<region name="chukot" downloadName="CHU"/>
-			<region name="chuvash" downloadName="CU"/>
+			<region name="buryatia" downloadName="BU"/>
+			<region name="chechenskaya" downloadName="CE"/>
+			<region name="cheliabinsk" downloadName="CHE"/>
+			<region name="chukotka" downloadName="CHU"/>
+			<region name="chuvashia" downloadName="CU"/>
 			<region name="dagestan" downloadName="DA"/>
 			<region name="evrey" downloadName="YEV"/>
 			<region name="ingush" downloadName="IN"/>
 			<region name="irkutsk" downloadName="IRK"/>
 			<region name="ivanov" downloadName="IVA"/>
-			<region name="kabardin" downloadName="KB"/>
+			<region name="kabardino-balkaria" downloadName="KB"/>
 			<region name="kalinin" downloadName="KGD"/>
-			<region name="kalmyk" downloadName="KL"/>
-			<region name="kaluzh" downloadName="KLU"/>
-			<region name="kamch" downloadName="KAM"/>
-			<region name="karach" downloadName="KC"/>
-			<region name="karel" downloadName="KR"/>
+			<region name="kalmykia" downloadName="KL"/>
+			<region name="kaluga" downloadName="KLU"/>
+			<region name="kamchatka" downloadName="KAM"/>
+			<region name="karachaevo" downloadName="KC"/>
+			<region name="karelia" downloadName="KR"/>
 			<region name="kemerovo" downloadName="KEM"/>
 			<region name="khabar" downloadName="KHA"/>
-			<region name="khakas" downloadName="KK"/>
-			<region name="khanty" downloadName="KHM"/>
+			<region name="khakasia" downloadName="KK"/>
+			<region name="khanty-mansiisk" downloadName="KHM"/>
 			<region name="kirov" downloadName="KIR"/>
 			<region name="komi" downloadName="KO"/>
-			<region name="kostrom" downloadName="KOS"/>
+			<region name="kostroma" downloadName="KOS"/>
 			<region name="krasnodar" downloadName="KDA"/>
-			<region name="krasnoyarsk" downloadName="KYA"/>
+			<region name="krasnoyarskii" downloadName="KYA"/>
 			<region name="kurgan" downloadName="KGN"/>
 			<region name="kursk" downloadName="KRS"/>
-			<region name="leningrad" downloadName="LEN"/>
+			<region name="leningradskaya" downloadName="LEN"/>
 			<region name="lipetsk" downloadName="LIP"/>
 			<region name="magadan" downloadName="MAG"/>
 			<region name="mariyel" downloadName="ME"/>
-			<region name="mordov" downloadName="MO"/>
+			<region name="mordovia" downloadName="MO"/>
 			<region name="moscow" downloadName="MOW"/>
-			<region name="mosobl" downloadName="MOS"/>
+			<region name="moskovskaya-oblast" downloadName="MOS"/>
 			<region name="murmansk" downloadName="MUR"/>
-			<region name="nenec" downloadName="NEN"/>
+			<region name="neneckaya" downloadName="NEN"/>
 			<region name="nizhegorod" downloadName="NIZ"/>
 			<region name="novgorod" downloadName="NGR"/>
 			<region name="novosib" downloadName="NVS"/>
@@ -234,28 +234,28 @@
 			<region name="orenburg" downloadName="ORE"/>
 			<region name="orlovsk" downloadName="ORL"/>
 			<region name="osetiya" downloadName="SE"/>
-			<region name="penz" downloadName="PNZ"/>
+			<region name="penza" downloadName="PNZ"/>
 			<region name="perm" downloadName="PER"/>
-			<region name="prim" downloadName="PRI"/>
+			<region name="primorskii" downloadName="PRI"/>
 			<region name="pskov" downloadName="PSK"/>
-			<region name="rostov" downloadName="ROS"/>
+			<region name="rostovskaya" downloadName="ROS"/>
 			<region name="ryazan" downloadName="RYA"/>
 			<region name="sakhalin" downloadName="SAK"/>
-			<region name="samar" downloadName="SAM"/>
+			<region name="samara" downloadName="SAM"/>
 			<region name="saratov" downloadName="SAR"/>
-			<region name="smol" downloadName="SMO"/>
-			<region name="stavrop" downloadName="STA"/>
-			<region name="stpeter" downloadName="SPE"/>
-			<region name="sverdl" downloadName="SVE"/>
+			<region name="smolensk" downloadName="SMO"/>
+			<region name="stavropol" downloadName="STA"/>
+			<region name="sankt-peterburg" downloadName="SPE"/>
+			<region name="sverdlovsk" downloadName="SVE"/>
 			<region name="tambov" downloadName="TAM"/>
-			<region name="tatar" downloadName="TA"/>
+			<region name="tatarstan" downloadName="TA"/>
 			<region name="tomsk" downloadName="TOM"/>
-			<region name="tul" downloadName="TUL"/>
+			<region name="tula" downloadName="TUL"/>
 			<region name="tumen" downloadName="TYU"/>
 			<region name="tver" downloadName="TVE"/>
 			<region name="tyva" downloadName="TY"/>
-			<region name="udmurt" downloadName="UD"/>
-			<region name="ulyan" downloadName="ULY"/>
+			<region name="udmurtia" downloadName="UD"/>
+			<region name="ulyanovsk" downloadName="ULY"/>
 			<region name="vladimir" downloadName="VLA"/>
 			<region name="volgograd" downloadName="VGG"/>
 			<region name="vologda" downloadName="VLG"/>
