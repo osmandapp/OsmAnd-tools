@@ -29,33 +29,33 @@
 #include <QFile>
 #include <QStringList>
 
-#include <Inspector.h>
+#include <EyePiece.h>
 
-void printUsage(const std::string& warning = std::string());
+void printUsage(std::string warning = std::string());
 
 int main(int argc, char* argv[])
 {
-    OsmAnd::Inspector::Configuration cfg;
+    OsmAnd::EyePiece::Configuration cfg;
 
     QString error;
     QStringList args;
     for (int idx = 1; idx < argc; idx++)
         args.push_back(argv[idx]);
 
-    if(!OsmAnd::Inspector::parseCommandLineArguments(args, cfg, error))
+    if(!OsmAnd::EyePiece::parseCommandLineArguments(args, cfg, error))
     {
         printUsage(error.toStdString());
         return -1;
     }
-    OsmAnd::Inspector::dumpToStdOut(cfg);
+    OsmAnd::EyePiece::rasterizeToStdOut(cfg);
     return 0;
 }
 
-void printUsage(const std::string& warning)
+void printUsage(std::string warning)
 {
     if(!warning.empty())
         std::cout << warning << std::endl;
-    std::cout << "Inspector is console utility for working with binary indexes of OsmAnd." << std::endl;
-    std::cout << std::endl << "Usage: inspector -obf=path [-vaddress] [-vstreetgroups] [-vstreets] [-vbuildings] [-vintersections] [-vmap] [-vpoi] [] [-vtransport] [-zoom=Zoom] [-bbox=LeftLon,TopLat,RightLon,BottomLan]" << std::endl;
+    std::cout << "EyePiece is console utility to rasterize OsmAnd map tile." << std::endl;
+    std::cout << std::endl << "Usage: eyepiece -stylePath=path/to/styles1 [-stylePath=path/to/styles2] -style=style.xml [-verbose] [-bbox=LeftLon,TopLat,RightLon,BottomLan]" << std::endl;
 }
 
