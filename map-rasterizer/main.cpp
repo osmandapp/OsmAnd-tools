@@ -35,6 +35,8 @@ void printUsage(std::string warning = std::string());
 
 int main(int argc, char* argv[])
 {
+    std::locale::global(std::locale(""));
+
     OsmAnd::EyePiece::Configuration cfg;
 
     QString error;
