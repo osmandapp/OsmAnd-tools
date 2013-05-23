@@ -56,6 +56,6 @@ void printUsage(const std::string& warning)
     if(!warning.empty())
         std::cout << warning << std::endl;
     std::cout << "Inspector is console utility for working with binary indexes of OsmAnd." << std::endl;
-    std::cout << std::endl << "Usage: inspector -obf=path [-vaddress] [-vstreetgroups] [-vstreets] [-vbuildings] [-vintersections] [-vmap] [-vpoi] [] [-vtransport] [-zoom=Zoom] [-bbox=LeftLon,TopLat,RightLon,BottomLan]" << std::endl;
+    std::cout << std::endl << "Usage: inspector -obf=path [-vaddress] [-vstreetgroups] [-vstreets] [-vbuildings] [-vintersections] [-vmap] [-vmapObjects] [-vpoi] [-vtransport] [-zoom=Zoom] [-bbox=LeftLon,TopLat,RightLon,BottomLan]" << std::endl;
 }
 
