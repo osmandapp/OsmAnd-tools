@@ -25,6 +25,10 @@
 #include <sstream>
 #include <map>
 #include <memory>
+#if (defined(UNICODE) || defined(_UNICODE)) && defined(_WIN32)
+#   include <io.h>
+#   include <fcntl.h>
+#endif
 
 #include <QFile>
 #include <QStringList>
@@ -35,7 +39,13 @@ void printUsage(std::string warning = std::string());
 
 int main(int argc, char* argv[])
 {
+#if defined(UNICODE) || defined(_UNICODE)
+#   if defined(_WIN32)
+    _setmode(_fileno(stdout), _O_U16TEXT);
+#   else
     std::locale::global(std::locale(""));
+#   endif
+#endif
 
     OsmAnd::Voyager::Configuration cfg;
 
