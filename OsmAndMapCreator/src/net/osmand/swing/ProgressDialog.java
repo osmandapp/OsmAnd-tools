@@ -170,7 +170,6 @@ public class ProgressDialog extends JDialog implements IProgress {
 		return progressBar.isIndeterminate();
 	}
 	
-	@Override
 	public void setGeneralProgress(String genProgress) {
 		this.genProgress = genProgress;
 		

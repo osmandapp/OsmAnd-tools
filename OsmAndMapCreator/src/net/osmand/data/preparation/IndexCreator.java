@@ -28,6 +28,7 @@ import net.osmand.osm.io.OsmBaseStorage;
 import net.osmand.osm.io.OsmBaseStoragePbf;
 import net.osmand.swing.DataExtractionSettings;
 import net.osmand.swing.Messages;
+import net.osmand.swing.ProgressDialog;
 import net.osmand.util.Algorithms;
 
 import org.apache.commons.logging.Log;
@@ -276,7 +277,7 @@ public class IndexCreator {
 		// 1. Loading osm file
 		OsmDbCreator dbCreator = new OsmDbCreator(this);
 		try {
-			progress.setGeneralProgress("[15 / 100]"); //$NON-NLS-1$
+			setGeneralProgress(progress,"[15 / 100]"); //$NON-NLS-1$
 			progress.startTask(Messages.getString("IndexCreator.LOADING_FILE") + readFile.getAbsolutePath(), -1); //$NON-NLS-1$
 			// 1 init database to store temporary data
 			dbCreator.initDatabase(osmDBdialect, dbConn);
@@ -392,7 +393,7 @@ public class IndexCreator {
 				createPlainOsmDb(progress, readFile, addFilter, true);
 				// 2. Create index connections and index structure
 
-				progress.setGeneralProgress("[50 / 100]");
+				setGeneralProgress(progress,"[50 / 100]");
 				progress.startTask(Messages.getString("IndexCreator.PROCESS_OSM_NODES"), accessor.getAllNodes());
 				accessor.iterateOverEntities(progress, EntityType.NODE, new OsmDbVisitor() {
 					@Override
@@ -400,7 +401,7 @@ public class IndexCreator {
 						processor.processEntity(e);
 					}
 				});
-				progress.setGeneralProgress("[70 / 100]");
+				setGeneralProgress(progress,"[70 / 100]");
 				progress.startTask(Messages.getString("IndexCreator.PROCESS_OSM_WAYS"), accessor.getAllWays());
 				accessor.iterateOverEntities(progress, EntityType.WAY, new OsmDbVisitor() {
 					@Override
@@ -421,7 +422,7 @@ public class IndexCreator {
 			mapRAFile = new RandomAccessFile(mapFile, "rw");
 			BinaryMapIndexWriter writer = new BinaryMapIndexWriter(mapRAFile);
 
-			progress.setGeneralProgress("[95 of 100]");
+			setGeneralProgress(progress,"[95 of 100]");
 			progress.startTask("Writing map index to binary file...", -1);
 			processor.writeBasemapFile(writer, regionName);
 			progress.finishTask();
@@ -517,7 +518,7 @@ public class IndexCreator {
 				
 				// 3.1 write all cities
 				if (indexAddress) {
-					progress.setGeneralProgress("[20 / 100]"); //$NON-NLS-1$
+					setGeneralProgress(progress,"[20 / 100]"); //$NON-NLS-1$
 					progress.startTask(Messages.getString("IndexCreator.INDEX_CITIES"), accessor.getAllNodes()); //$NON-NLS-1$
 					if (loadFromExistingFile) {
 						// load cities names
@@ -533,7 +534,7 @@ public class IndexCreator {
 
 				// 3.2 index address relations
 				if (indexAddress || indexMap || indexRouting || indexPOI) {
-					progress.setGeneralProgress("[30 / 100]"); //$NON-NLS-1$
+					setGeneralProgress(progress,"[30 / 100]"); //$NON-NLS-1$
 					progress.startTask(Messages.getString("IndexCreator.PREINDEX_BOUNDARIES_RELATIONS"), accessor.getAllRelations()); //$NON-NLS-1$
 					accessor.iterateOverEntities(progress, EntityType.RELATION, new OsmDbVisitor() {
 						@Override
@@ -557,7 +558,7 @@ public class IndexCreator {
 						}
 					});
 					if (indexAddress) {
-						progress.setGeneralProgress("[40 / 100]"); //$NON-NLS-1$
+						setGeneralProgress(progress,"[40 / 100]"); //$NON-NLS-1$
 						progress.startTask(Messages.getString("IndexCreator.PREINDEX_BOUNDARIES_WAYS"), accessor.getAllWays()); //$NON-NLS-1$
 						accessor.iterateOverEntities(progress, EntityType.WAY_BOUNDARY, new OsmDbVisitor() {
 							@Override
@@ -566,12 +567,12 @@ public class IndexCreator {
 							}
 						});
 
-						progress.setGeneralProgress("[42 / 100]"); //$NON-NLS-1$
+						setGeneralProgress(progress,"[42 / 100]"); //$NON-NLS-1$
 						progress.startTask(Messages.getString("IndexCreator.BIND_CITIES_AND_BOUNDARIES"), 100); //$NON-NLS-1$
 						//finish up the boundaries and cities
 						indexAddressCreator.tryToAssignBoundaryToFreeCities(progress);
 						
-						progress.setGeneralProgress("[45 / 100]"); //$NON-NLS-1$
+						setGeneralProgress(progress,"[45 / 100]"); //$NON-NLS-1$
 						progress.startTask(Messages.getString("IndexCreator.PREINDEX_ADRESS_MAP"), accessor.getAllRelations()); //$NON-NLS-1$
 						accessor.iterateOverEntities(progress, EntityType.RELATION, new OsmDbVisitor() {
 							@Override
@@ -585,7 +586,7 @@ public class IndexCreator {
 				}
 
 				// 3.3 MAIN iterate over all entities
-				progress.setGeneralProgress("[50 / 100]");
+				setGeneralProgress(progress,"[50 / 100]");
 				progress.startTask(Messages.getString("IndexCreator.PROCESS_OSM_NODES"), accessor.getAllNodes());
 				accessor.iterateOverEntities(progress, EntityType.NODE, new OsmDbVisitor() {
 					@Override
@@ -593,7 +594,7 @@ public class IndexCreator {
 						iterateMainEntity(e, ctx);
 					}
 				});
-				progress.setGeneralProgress("[70 / 100]");
+				setGeneralProgress(progress,"[70 / 100]");
 				progress.startTask(Messages.getString("IndexCreator.PROCESS_OSM_WAYS"), accessor.getAllWays());
 				accessor.iterateOverEntities(progress, EntityType.WAY, new OsmDbVisitor() {
 					@Override
@@ -601,7 +602,7 @@ public class IndexCreator {
 						iterateMainEntity(e, ctx);
 					}
 				});
-				progress.setGeneralProgress("[85 / 100]");
+				setGeneralProgress(progress,"[85 / 100]");
 				progress.startTask(Messages.getString("IndexCreator.PROCESS_OSM_REL"), accessor.getAllRelations());
 				accessor.iterateOverEntities(progress, EntityType.RELATION, new OsmDbVisitor() {
 					@Override
@@ -612,7 +613,7 @@ public class IndexCreator {
 
 				// 3.4 combine all low level ways and simplify them
 				if (indexMap || indexRouting) {
-					progress.setGeneralProgress("[90 / 100]");
+					setGeneralProgress(progress,"[90 / 100]");
 					if(indexMap) {
 						progress.startTask(Messages.getString("IndexCreator.INDEX_LO_LEVEL_WAYS"), indexMapCreator.getLowLevelWays());
 						indexMapCreator.processingLowLevelWays(progress);
@@ -626,14 +627,14 @@ public class IndexCreator {
 
 				// 3.5 update all postal codes from relations
 				if (indexAddress) {
-					progress.setGeneralProgress("[90 / 100]");
+					setGeneralProgress(progress,"[90 / 100]");
 					progress.startTask(Messages.getString("IndexCreator.REGISTER_PCODES"), -1);
 					indexAddressCreator.processingPostcodes();
 				}
 
 				// 4. packing map rtree indexes
 				if (indexMap) {
-					progress.setGeneralProgress("[90 / 100]"); //$NON-NLS-1$
+					setGeneralProgress(progress,"[90 / 100]"); //$NON-NLS-1$
 					progress.startTask(Messages.getString("IndexCreator.PACK_RTREE_MAP"), -1); //$NON-NLS-1$
 					indexMapCreator.packRtreeFiles(getRTreeMapIndexNonPackFileName(), getRTreeMapIndexPackFileName());
 				}
@@ -642,7 +643,7 @@ public class IndexCreator {
 				}
 
 				if (indexTransport) {
-					progress.setGeneralProgress("[90 / 100]"); //$NON-NLS-1$
+					setGeneralProgress(progress,"[90 / 100]"); //$NON-NLS-1$
 					progress.startTask(Messages.getString("IndexCreator.PACK_RTREE_TRANSP"), -1); //$NON-NLS-1$
 					indexTransportCreator.packRTree(getRTreeTransportStopsFileName(), getRTreeTransportStopsPackFileName());
 				}
@@ -656,30 +657,30 @@ public class IndexCreator {
 				mapRAFile = new RandomAccessFile(mapFile, "rw");
 				BinaryMapIndexWriter writer = new BinaryMapIndexWriter(mapRAFile);
 				if (indexMap) {
-					progress.setGeneralProgress("[95 of 100]");
+					setGeneralProgress(progress,"[95 of 100]");
 					progress.startTask("Writing map index to binary file...", -1);
 					indexMapCreator.writeBinaryMapIndex(writer, regionName);
 				}
 				if (indexRouting) {
-					progress.setGeneralProgress("[95 of 100]");
+					setGeneralProgress(progress,"[95 of 100]");
 					progress.startTask("Writing route index to binary file...", -1);
 					indexRouteCreator.writeBinaryRouteIndex(writer, regionName);
 				}
 
 				if (indexAddress) {
-					progress.setGeneralProgress("[95 of 100]");
+					setGeneralProgress(progress,"[95 of 100]");
 					progress.startTask("Writing address index to binary file...", -1);
 					indexAddressCreator.writeBinaryAddressIndex(writer, regionName, progress);
 				}
 				
 				if (indexPOI) {
-					progress.setGeneralProgress("[95 of 100]");
+					setGeneralProgress(progress,"[95 of 100]");
 					progress.startTask("Writing poi index to binary file...", -1);
 					indexPoiCreator.writeBinaryPoiIndex(writer, regionName, progress);
 				}
 
 				if (indexTransport) {
-					progress.setGeneralProgress("[95 of 100]");
+					setGeneralProgress(progress,"[95 of 100]");
 					progress.startTask("Writing transport index to binary file...", -1);
 					indexTransportCreator.writeBinaryTransportIndex(writer, regionName, mapConnection);
 				}
@@ -751,6 +752,12 @@ public class IndexCreator {
 		}
 	}
 
+
+	private void setGeneralProgress(IProgress progress, String genProgress) {
+		if(progress instanceof ProgressDialog) {
+			((ProgressDialog) progress).setGeneralProgress(genProgress);
+		}
+	}
 
 	public static void main(String[] args) throws IOException, SAXException, SQLException, InterruptedException {
 		long time = System.currentTimeMillis();
