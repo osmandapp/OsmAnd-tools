@@ -21,6 +21,7 @@ Page {
             if(loaded) {
                 var context = canvas.getContext("2d");
                 context.clearRect(0, 0, canvas.width, canvas.height);
+                context.rotate((mapData.getRotate() / 180) *Math.PI  , mapData.getCenterPointX(), mapData.getCenterPointY());
                 var left = Math.floor(mapData.getTiles().x);
                 var top = Math.floor(mapData.getTiles().y);
                 var tileX = mapData.getXTile();
@@ -49,6 +50,30 @@ Page {
             mapData.setZoom(5);
             mapData.setLatLon(52, 4);
             refreshMap();
+        }
+
+        Button {
+            id : rotRight
+            text : 'R'
+            anchors.top: parent.top
+            anchors.right: parent.right
+            anchors.margins: units.gu(1)
+            onClicked: {
+                var r = mapData.getRotate() ;
+                mapData.setRotate(r+ 30);
+                refreshMap();
+            }
+        }
+        Button {
+            id : rotLeft
+            text : 'L'
+            anchors.right: rotRight.left
+            anchors.top: parent.top
+            anchors.margins: units.gu(1)
+            onClicked: {
+                mapData.setRotate(mapData.getRotate() - 30);
+                refreshMap();
+            }
         }
 
         Button {
@@ -86,6 +111,10 @@ Page {
                 if(rcontains(zoomIn, mouse.x, mouse.y)) {
                     mouse.accepted =false;
                 } else if(rcontains(zoomOut, mouse.x, mouse.y)) {
+                    mouse.accepted =false;
+                } else if(rcontains(rotLeft, mouse.x, mouse.y)) {
+                    mouse.accepted =false;
+                } else if(rcontains(rotRight, mouse.x, mouse.y)) {
                     mouse.accepted =false;
                 } else {
                     mouse.accepted = true;

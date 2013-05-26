@@ -84,7 +84,7 @@ void dump(std::ostream &output, const QString& filePath)
         else if(dynamic_cast<OsmAnd::ObfAddressSection*>(section))
             sectionType = "Address";
 
-        output << idx << ". " << sectionType << " data " << section->_name.toStdString() << " - " << formatSize( section->_length ) << std::endl;
+        output << idx << ". " << sectionType << " data " << section->name.toStdString() << " - " << formatSize( section->length ) << std::endl;
 
         if(dynamic_cast<OsmAnd::ObfTransportSection*>(section))
         {
@@ -114,13 +114,13 @@ void dump(std::ostream &output, const QString& filePath)
         {
             auto mapSection = dynamic_cast<OsmAnd::ObfMapSection*>(section);
             int levelIdx = 1;
-            for(auto itLevel = mapSection->_levels.begin(); itLevel != mapSection->_levels.end(); ++itLevel, levelIdx++)
+            for(auto itLevel = mapSection->mapLevels.begin(); itLevel != mapSection->mapLevels.end(); ++itLevel, levelIdx++)
             {
                 auto level = itLevel->get();
-                output << "  " << idx << "." << levelIdx << " Map level minZoom = " << level->_minZoom << ", maxZoom = " << level->_maxZoom << ", size = ";
-                output << formatSize(level->_length );
+                output << "  " << idx << "." << levelIdx << " Map level minZoom = " << level->minZoom << ", maxZoom = " << level->maxZoom << ", size = ";
+                output << formatSize(level->length );
                 output << std::endl;
-                output << "      Bounds " << formatBounds(level->_area31.left, level->_area31.right, level->_area31.top, level->_area31.bottom) << std::endl;
+                output << "      Bounds " << formatBounds(level->area31.left, level->area31.right, level->area31.top, level->area31.bottom) << std::endl;
             }
 
         }

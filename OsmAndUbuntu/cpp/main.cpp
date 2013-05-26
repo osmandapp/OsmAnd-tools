@@ -24,11 +24,6 @@ int main(int argc, char *argv[])
     const QString qmlFilePath= QString::fromLatin1("%1/%2").arg(QCoreApplication::applicationDirPath(), "qml/main.qml");
     view.setSource(QUrl::fromLocalFile(qmlFilePath));
 
-    //For debugging we print out the location of the qml file
-    QByteArray ba = qmlFilePath.toLocal8Bit();
-    const char *str = ba.data();
-    printf("Qml File:%s\n",str);
-
     //Not sure if this is nessesary, but on mobile devices the app should start in fullscreen mode
     #if defined(Q_WS_SIMULATOR) || defined(Q_OS_QNX)
     view.showFullScreen();

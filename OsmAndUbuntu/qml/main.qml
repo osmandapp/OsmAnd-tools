@@ -3,6 +3,7 @@ import Ubuntu.Components 0.1
 import Ubuntu.Components.ListItems 0.1 as ListItem
 import Ubuntu.Components.Popups 0.1
 import QtQuick.Window 2.0
+
 MainView {
     //objectName for functional testing purposes (autopilot-qt5)
     objectName: "mainView"

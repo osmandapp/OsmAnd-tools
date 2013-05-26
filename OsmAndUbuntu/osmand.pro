@@ -25,13 +25,14 @@ DEPENDPATH += $$PWD/../../../../usr/lib \
               $$PWD/../../core/externals/protobuf/upstream.patched \
               $$PWD/../../core/include $$PWD/../../core/include/native \
               $$PWD/../../core/protos
-
-unix:!macx:
-LIBS += -L$$PWD/../../binaries/linux/i686/Debug/ -lOsmAndCore
-
 #Path to "other files" in this case the QML-Files
 OTHER_FILES += \
     qml/main.qml\
     qml/*.qml \
     qml/files.qml \
     qml/map.qml
+
+unix:!macx:
+LIBS += -L$$PWD/../../binaries/linux/i686/Debug/ -lOsmAndCore
+
+

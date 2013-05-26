@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--Start point (LAT 50.4132; LON 28.2242): -->
+<!-- Road name(s): М-06; E 40; (220707755) -->
+
+<!--End point (LAT 50.4418; LON 28.1747): -->
+<!-- Road name(s): М-06; E 40; (188511591) -->
+
+<!--Started route calculation 23:58:08 -->
+
+<!--Finished route calculation 23:58:08, took 21.0244 ms -->
+<test regions="" description="" best_percent="" vehicle="car" start_lat="50.4132" start_lon="28.2242" target_lat="50.4418" target_lon="28.1747" loadedTiles="0" visitedSegments="0" complete_distance="17036.4" complete_time="553.163" routing_time="0">
+	<segment id="220707755" start="31" end="32" name="М-06" time="11.8227" distance="361.251" start_bearing="-45" end_bearing="133.945" />
+	<segment id="220707769" start="1" end="6" name="" time="1.36791" distance="102.594" start_bearing="-5.12264e-06" end_bearing="103.496" />
+	<segment id="220707755" start="33" end="40" name="М-06" time="75.8182" distance="2316.67" start_bearing="-45" end_bearing="134.837" />
+	<segment id="188511586" start="0" end="1" name="М-06" time="2.54992" distance="77.9141" start_bearing="-45" end_bearing="133.012" />
+	<segment id="188511590" start="0" end="8" name="М-06" time="107.047" distance="3270.88" start_bearing="-45" end_bearing="134.194" />
+	<segment id="220707766" start="0" end="6" name="" time="1.65266" distance="123.95" start_bearing="-90" end_bearing="135" />
+	<segment id="115574002" start="53" end="62" name="М-06" time="103.708" distance="3168.85" start_bearing="-45.9426" end_bearing="135" />
+	<segment id="188511587" start="0" end="1" name="М-06" time="2.81591" distance="86.0416" start_bearing="-46.3105" end_bearing="135" />
+	<segment id="188511591" start="0" end="28" name="М-06" time="246.381" distance="7528.31" start_bearing="-45.8913" end_bearing="135" />
+</test>

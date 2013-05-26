@@ -22,6 +22,7 @@ import java.util.List;
 import javax.swing.AbstractAction;
 import javax.swing.Action;
 import javax.swing.JButton;
+import javax.swing.JFileChooser;
 import javax.swing.JOptionPane;
 import javax.swing.JPopupMenu;
 import javax.swing.SwingUtilities;
@@ -229,6 +230,31 @@ public class MapRouterLayer implements MapPanelLayer {
 			}
 		};
 		menu.add(route_YOURS);
+		Action loadGPXFile = new AbstractAction("Load GPX file...") {
+			private static final long serialVersionUID = 507156107455281238L;
+
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				new Thread(){
+					@Override
+					public void run() {
+						JFileChooser fileChooser = new JFileChooser();
+						if (fileChooser.showOpenDialog(map) == JFileChooser.APPROVE_OPTION) {
+							File file = fileChooser.getSelectedFile();
+							DataTileManager<Way> points = new DataTileManager<Way>(11);
+							List<Way> ways = parseGPX(file);
+							for (Way w : ways) {
+								LatLon n = w.getLatLon();
+								points.registerObject(n.getLatitude(), n.getLongitude(), w);
+							}
+							// load from file
+							map.setPoints(points);
+						}
+					}
+				}.start();
+			}
+		};
+		menu.add(loadGPXFile);
 		Action route_CloudMate = new AbstractAction("Calculate CloudMade route") {
 			private static final long serialVersionUID = 507156107455281238L;
 
@@ -377,6 +403,47 @@ public class MapRouterLayer implements MapPanelLayer {
 		return res;
 	}
 	
+	public List<Way> parseGPX(File f) {
+		List<Way> res = new ArrayList<Way>();
+		try {
+			StringBuilder content = new StringBuilder();
+			BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(f)));
+			{
+				String s = null;
+				boolean fist = true;
+				while ((s = reader.readLine()) != null) {
+					if (fist) {
+						fist = false;
+					}
+					content.append(s).append("\n");
+				}
+			}
+			DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+			DocumentBuilder dom = factory.newDocumentBuilder();
+			Document doc = dom.parse(new InputSource(new StringReader(content.toString())));
+			NodeList list = doc.getElementsByTagName("trkpt");
+			Way w = new Way(-1);
+			for (int i = 0; i < list.getLength(); i++) {
+				Element item = (Element) list.item(i);
+				try {
+					double lon = Double.parseDouble(item.getAttribute("lon"));
+					double lat = Double.parseDouble(item.getAttribute("lat"));
+					w.addNode(new net.osmand.osm.edit.Node(lat, lon, -1));
+				} catch (NumberFormatException e) {
+				}
+			}
+			if (!w.getNodes().isEmpty()) {
+				res.add(w);
+			}
+		} catch (IOException e) {
+			ExceptionHandler.handle(e);
+		} catch (ParserConfigurationException e) {
+			ExceptionHandler.handle(e);
+		} catch (SAXException e) {
+			ExceptionHandler.handle(e);
+		}
+		return res;
+	}
 	
 
 		

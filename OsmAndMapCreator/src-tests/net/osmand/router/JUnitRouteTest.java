@@ -15,7 +15,6 @@ import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
 
-@Ignore
 public class JUnitRouteTest  {
 
 	static BinaryMapIndexReader[]  rs;
@@ -52,6 +51,11 @@ public class JUnitRouteTest  {
 	@Test
 	public void runCZ() throws Exception {
 		TestRouting.test(lib, getClass().getResourceAsStream("cz.test.xml"), rs, RoutingConfiguration.getDefault());
+	}
+	
+	@Test
+	public void runUk() throws Exception {
+		TestRouting.test(lib, getClass().getResourceAsStream("uk.test.xml"), rs, RoutingConfiguration.getDefault());
 	}
 	
 	@Test
