@@ -4,6 +4,7 @@
 #include <QObject>
 #include <QStringList>
 #include <QRectF>
+#include <Logging.h>
 #include "OsmAndApplication.h"
 #include "MapView.h"
 
@@ -29,7 +30,11 @@ public:
     Q_INVOKABLE int getCenterPointY() {return mapView->getCenterPointY();}
     Q_INVOKABLE float getXTile() {return mapView->getXTile();}
     Q_INVOKABLE float getYTile() {return mapView->getYTile(); }
-    Q_INVOKABLE void moveTo(int dx, int dy) {mapView->moveTo(dx, dy); }
+    Q_INVOKABLE float getLat() {return mapView->getLatitude();}
+    Q_INVOKABLE float getLon() {return mapView->getLongitude(); }
+    Q_INVOKABLE void moveTo(int dx, int dy) {mapView->moveTo(dx, dy);}
+    Q_INVOKABLE int getRotatedMapXForPoint(double lat, double lon) {mapView->getRotatedMapXForPoint(lat, lon); }
+    Q_INVOKABLE int getRotatedMapYForPoint(double lat, double lon) {mapView->getRotatedMapYForPoint(lat, lon); }
 
 };
 

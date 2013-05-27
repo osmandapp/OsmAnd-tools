@@ -7,11 +7,10 @@ import QtQuick.Window 2.0
 
 Page {
 
-
     Canvas {
+        id: canvas;
         property bool loaded;
         property variant paths : [[]];
-        id: canvas;
         anchors.top : parent.top
         anchors.bottom: parent.bottom
         width : parent.width
@@ -21,23 +20,12 @@ Page {
             if(loaded) {
                 var context = canvas.getContext("2d");
                 context.clearRect(0, 0, canvas.width, canvas.height);
-                context.rotate((mapData.getRotate() / 180) *Math.PI  , mapData.getCenterPointX(), mapData.getCenterPointY());
-                var left = Math.floor(mapData.getTiles().x);
-                var top = Math.floor(mapData.getTiles().y);
-                var tileX = mapData.getXTile();
-                var tileY = mapData.getYTile();
-                var w = mapData.getCenterPointX();
-                var h = mapData.getCenterPointY();
-                var ftileSize = mapData.getTileSize();
-                for (var i = 0; i < paths.length; i++) {
-                    for (var j = 0; j < paths[i].length; j++) {
-                        var leftPlusI = left + i;
-                        var topPlusJ = top + j;
-                        var x1 = (left + i - tileX) * ftileSize + w;
-                        var y1 = (top + j - tileY) * ftileSize + h;
-                        context.drawImage(paths[i][j],  x1, y1, ftileSize, ftileSize);
-                    }
-                }
+                context.save();
+                drawLayerMap(context);
+                context.restore();
+                context.save();
+                drawTargetLocation(context);
+                context.restore();
             }
         }
 
@@ -47,9 +35,14 @@ Page {
         }
         onCanvasSizeChanged: {
             mapData.setBounds(canvas.width, canvas.height);
-            mapData.setZoom(5);
-            mapData.setLatLon(52, 4);
+            var z = mapLayerData.getMapZoom();
+            mapData.setZoom(z);
+            mapData.setLatLon(mapLayerData.getMapLatitude(), mapLayerData.getMapLongitude());
             refreshMap();
+        }
+
+        Component.onDestruction: {
+            mapLayerData.setMapLatLonZoom(mapData.getLat(), mapData.getLon(), mapData.getZoom());
         }
 
         Button {
@@ -170,6 +163,45 @@ Page {
         }
         canvas.paths = p;
         canvas.requestPaint();
+    }
+
+    function drawTargetLocation(context) {
+        if(mapLayerData.isTargetPresent()) {
+            context.translate(mapData.getCenterPointX(), mapData.getCenterPointY());
+            context.rotate((mapData.getRotate() / 180) *Math.PI  );
+            context.translate(-mapData.getCenterPointX(), -mapData.getCenterPointY());
+            var x = mapData.getRotatedMapXForPoint(mapLayerData.getTargetLatitude(), mapLayerData.getTargetLongitude());
+            var y = mapData.getRotatedMapYForPoint(mapLayerData.getTargetLatitude(), mapLayerData.getTargetLongitude());
+            context.beginPath();
+            context.fillStyle = 'rgba(200, 10, 10, 0.8)';
+            context.strokeStyle = 'rgb(0, 0, 0)'
+            context.arc(x, y, 10, 0, 360, true);
+            context.closePath();
+            context.fill();
+
+        }
+    }
+
+    function drawLayerMap(context) {
+        context.translate(mapData.getCenterPointX(), mapData.getCenterPointY());
+        context.rotate((mapData.getRotate() / 180) *Math.PI  );
+        context.translate(-mapData.getCenterPointX(), -mapData.getCenterPointY());
+        var left = Math.floor(mapData.getTiles().x);
+        var top = Math.floor(mapData.getTiles().y);
+        var tileX = mapData.getXTile();
+        var tileY = mapData.getYTile();
+        var w = mapData.getCenterPointX();
+        var h = mapData.getCenterPointY();
+        var ftileSize = mapData.getTileSize();
+        for (var i = 0; i < canvas.paths.length; i++) {
+            for (var j = 0; j < canvas.paths[i].length; j++) {
+                var leftPlusI = left + i;
+                var topPlusJ = top + j;
+                var x1 = (left + i - tileX) * ftileSize + w;
+                var y1 = (top + j - tileY) * ftileSize + h;
+                context.drawImage(canvas.paths[i][j],  x1, y1, ftileSize, ftileSize);
+            }
+        }
     }
 
 }
