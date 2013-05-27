@@ -33,8 +33,10 @@ public:
     Q_INVOKABLE float getLat() {return mapView->getLatitude();}
     Q_INVOKABLE float getLon() {return mapView->getLongitude(); }
     Q_INVOKABLE void moveTo(int dx, int dy) {mapView->moveTo(dx, dy);}
-    Q_INVOKABLE int getRotatedMapXForPoint(double lat, double lon) {mapView->getRotatedMapXForPoint(lat, lon); }
-    Q_INVOKABLE int getRotatedMapYForPoint(double lat, double lon) {mapView->getRotatedMapYForPoint(lat, lon); }
+    Q_INVOKABLE int getRotatedMapXForPoint(double lat, double lon) {return mapView->getRotatedMapXForPoint(lat, lon); }
+    Q_INVOKABLE int getRotatedMapYForPoint(double lat, double lon) {return mapView->getRotatedMapYForPoint(lat, lon); }
+    Q_INVOKABLE float getRotatedMapLatForPoint(int x, int y) {return mapView->getRotatedMapLatForPoint(x, y); }
+    Q_INVOKABLE float getRotatedMapLonForPoint(int x, int y) {return mapView->getRotatedMapLonForPoint(x, y); }
 
 };
 

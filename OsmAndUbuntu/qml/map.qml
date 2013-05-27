@@ -26,6 +26,9 @@ Page {
                 context.save();
                 drawTargetLocation(context);
                 context.restore();
+                context.save();
+                drawStartLocation(context);
+                context.restore();
             }
         }
 
@@ -40,6 +43,8 @@ Page {
             mapData.setLatLon(mapLayerData.getMapLatitude(), mapLayerData.getMapLongitude());
             refreshMap();
         }
+
+
 
         Component.onDestruction: {
             mapLayerData.setMapLatLonZoom(mapData.getLat(), mapData.getLon(), mapData.getZoom());
@@ -100,8 +105,13 @@ Page {
             property int px;
             property int py;
             anchors.fill: parent
+            acceptedButtons : 'AllButtons'
             onPressed : {
-                if(rcontains(zoomIn, mouse.x, mouse.y)) {
+                if(mouse.button === 2) {
+                    var o = PopupUtils.open(popoverComponent, canvas);
+                    o.lat = mapData.getRotatedMapLatForPoint(mouse.x, mouse.y);
+                    o.lon = mapData.getRotatedMapLonForPoint(mouse.x, mouse.y);
+                } else if(rcontains(zoomIn, mouse.x, mouse.y)) {
                     mouse.accepted =false;
                 } else if(rcontains(zoomOut, mouse.x, mouse.y)) {
                     mouse.accepted =false;
@@ -137,6 +147,67 @@ Page {
 
     }
 
+    Component {
+        id: popoverComponent
+        Popover {
+            id: popover
+            property variant lat;
+            property variant lon;
+            Column {
+                id: containerLayout
+                anchors {
+                    left: parent.left
+                    top: parent.top
+                    right: parent.right
+                }
+                ListItem.Header {
+                    text: "Local actions";
+                }
+                ListItem.SingleControl {
+                    highlightWhenPressed: false
+                    control: Button {
+                        text: "Set destination point"
+                        anchors {
+                            fill: parent
+                            margins: units.gu(1)
+                        }
+                        onClicked: {
+                            mapLayerData.setTargetLatLon(lat, lon);
+                            PopupUtils.close(popover)
+                            refreshMap();
+                        }
+                    }
+                }
+                ListItem.SingleControl {
+                    highlightWhenPressed: false
+                    control: Button {
+                        text: "Set start point"
+                        anchors {
+                            fill: parent
+                            margins: units.gu(1)
+                        }
+                        onClicked: {
+                            mapLayerData.setStartLatLon(lat, lon);
+                            PopupUtils.close(popover)
+                            refreshMap();
+                        }
+                    }
+                }
+                ListItem.SingleControl {
+                    highlightWhenPressed: false
+                    control: Button {
+                        text: "Close"
+                        anchors {
+                            fill: parent
+                            margins: units.gu(1)
+                        }
+                        onClicked: PopupUtils.close(popover)
+                    }
+                }
+            }
+        }
+    }
+
     function rcontains(item, x, y) {
         var v = mapToItem(item, x, y);
         if(v.x>= 0 && v.x<= item.width && v.y >= 0 && v.y <=item.height) {
@@ -167,9 +238,6 @@ Page {
 
     function drawTargetLocation(context) {
         if(mapLayerData.isTargetPresent()) {
-            context.translate(mapData.getCenterPointX(), mapData.getCenterPointY());
-            context.rotate((mapData.getRotate() / 180) *Math.PI  );
-            context.translate(-mapData.getCenterPointX(), -mapData.getCenterPointY());
             var x = mapData.getRotatedMapXForPoint(mapLayerData.getTargetLatitude(), mapLayerData.getTargetLongitude());
             var y = mapData.getRotatedMapYForPoint(mapLayerData.getTargetLatitude(), mapLayerData.getTargetLongitude());
             context.beginPath();
@@ -178,7 +246,21 @@ Page {
             context.arc(x, y, 10, 0, 360, true);
             context.closePath();
             context.fill();
+            context.stroke();
+        }
+    }
 
+    function drawStartLocation(context) {
+        if(mapLayerData.isStartPresent()) {
+            var x = mapData.getRotatedMapXForPoint(mapLayerData.getStartLatitude(), mapLayerData.getStartLongitude());
+            var y = mapData.getRotatedMapYForPoint(mapLayerData.getStartLatitude(), mapLayerData.getStartLongitude());
+            context.beginPath();
+            context.fillStyle = 'rgba(10, 200, 10, 0.8)';
+            context.strokeStyle = 'rgb(0, 0, 0)'
+            context.arc(x, y, 10, 0, 360, true);
+            context.closePath();
+            context.fill();
+            context.stroke();
         }
     }
 
