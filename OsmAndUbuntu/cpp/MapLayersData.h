@@ -1,6 +1,8 @@
 #ifndef MAPLAYERSDATA_H
 #define MAPLAYERSDATA_H
+#include "OsmAndCore.h"
 #include "OsmAndApplication.h"
+#include "RouteSegment.h"
 #include "Map.h"
 
 class MapLayersData: public QObject
@@ -8,6 +10,8 @@ class MapLayersData: public QObject
     Q_OBJECT
 private:
     std::shared_ptr<OsmAnd::OsmAndApplication> app;
+    QList< OsmAnd::PointF > route;
+
 public:
     explicit MapLayersData(QObject *parent = 0);
 
@@ -15,6 +19,11 @@ public:
     Q_INVOKABLE double getMapLatitude();
     Q_INVOKABLE double getMapLongitude();
     Q_INVOKABLE void setMapLatLonZoom(double,double,int);
+
+    void setRoute(QList< std::shared_ptr<OsmAnd::RouteSegment> >& r);
+    Q_INVOKABLE int getRoutePointLength() { return route.size();}
+    Q_INVOKABLE float getRoutePointLat(int i) {return route[i].y; }
+    Q_INVOKABLE float getRoutePointLon(int i) {return route[i].x; }
 
 
     Q_INVOKABLE bool isTargetPresent();

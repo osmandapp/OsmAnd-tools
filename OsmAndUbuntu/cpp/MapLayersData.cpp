@@ -5,6 +5,20 @@ MapLayersData::MapLayersData(QObject *) : app(OsmAnd::OsmAndApplication::getAndI
 
 }
 
+void MapLayersData::setRoute(QList< std::shared_ptr<OsmAnd::RouteSegment> >& r)
+{
+    this->route.clear();
+    bool first = true;
+    for(std::shared_ptr<OsmAnd::RouteSegment> rt : r) {
+        int sz = rt->road->points.size();
+        for(int k = (first?0:1); k<sz; k++) {
+            this->route.append(OsmAnd::PointF(OsmAnd::Utilities::get31LongitudeX(rt->road->points[k].x),
+                                              OsmAnd::Utilities::get31LatitudeY(rt->road->points[k].y)));
+        }
+        if(!first) first = false;
+    }
+}
+
 void MapLayersData::setMapLatLonZoom(double lat,double lon,int zoom) {
     app->getSettings()->MAP_SHOW_LATITUDE.set(QVariant(lat));
     app->getSettings()->MAP_SHOW_LONGITUDE.set(QVariant(lon));

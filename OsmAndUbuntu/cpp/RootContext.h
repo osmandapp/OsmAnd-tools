@@ -15,7 +15,7 @@ private :
     MapLayersData mapLayerData;
     MapActions mapActions;
 public:
-    explicit RootContext(QObject *parent = 0)  {
+    explicit RootContext(QObject *parent = 0) :mapActions(&mapLayerData) {
     }
     virtual ~RootContext() {}
 

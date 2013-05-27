@@ -3,6 +3,7 @@
 
 #include <QObject>
 #include <ObfReader.h>
+#include "MapLayersData.h"
 #include "OsmAndApplication.h"
 
 class MapActions : public QObject
@@ -10,9 +11,10 @@ class MapActions : public QObject
     Q_OBJECT
 private:
     std::shared_ptr<OsmAnd::OsmAndApplication> app;
+    MapLayersData* data;
 
 public:
-    explicit MapActions(QObject *parent = 0);
+    explicit MapActions(MapLayersData* d, QObject *parent = 0);
 
     Q_INVOKABLE QString calculateRoute();
     

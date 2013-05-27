@@ -23,6 +23,10 @@ Page {
                 context.save();
                 drawLayerMap(context);
                 context.restore();
+
+                context.save();
+                drawRouteLayer(context);
+                context.restore();
                 context.save();
                 drawTargetLocation(context);
                 context.restore();
@@ -253,13 +257,35 @@ Page {
         canvas.requestPaint();
     }
 
+
+    function drawRouteLayer(context) {
+        if(mapLayerData.getRoutePointLength() >  0) {
+            context.strokeStyle = Qt.rgba(0, 200, 200,0.6);
+            context.lineWidth = 4;
+            context.beginPath();
+            for(var i = 0; i < mapLayerData.getRoutePointLength(); i++) {
+                var lat = mapLayerData.getRoutePointLat(i);
+                var lon = mapLayerData.getRoutePointLon(i);
+                var x = mapData.getRotatedMapXForPoint(lat, lon);
+                var y = mapData.getRotatedMapYForPoint(lat, lon);
+                if(i == 0) {
+                    context.moveTo(x, y);
+                } else {
+                    context.lineTo(x, y);
+                }
+            }
+            context.stroke();
+        }
+    }
+
     function drawTargetLocation(context) {
         if(mapLayerData.isTargetPresent()) {
             var x = mapData.getRotatedMapXForPoint(mapLayerData.getTargetLatitude(), mapLayerData.getTargetLongitude());
             var y = mapData.getRotatedMapYForPoint(mapLayerData.getTargetLatitude(), mapLayerData.getTargetLongitude());
-            context.beginPath();
             context.fillStyle = 'rgba(200, 10, 10, 0.8)';
             context.strokeStyle = 'rgb(0, 0, 0)'
+            context.beginPath();
+
             context.arc(x, y, 5, 0, 360, true);
             context.closePath();
             context.fill();
@@ -271,9 +297,9 @@ Page {
         if(mapLayerData.isStartPresent()) {
             var x = mapData.getRotatedMapXForPoint(mapLayerData.getStartLatitude(), mapLayerData.getStartLongitude());
             var y = mapData.getRotatedMapYForPoint(mapLayerData.getStartLatitude(), mapLayerData.getStartLongitude());
-            context.beginPath();
             context.fillStyle = 'rgba(10, 200, 10, 0.8)';
             context.strokeStyle = 'rgb(0, 0, 0)'
+            context.beginPath();
             context.arc(x, y, 5, 0, 360, true);
             context.closePath();
             context.fill();

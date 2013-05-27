@@ -2,15 +2,18 @@
 #include <QDir>
 #include <ctime>
 #include <chrono>
+#include <sstream>
+#include <ostream>
 #include "MapActions.h"
 #include "ObfReader.h"
 #include "RoutePlannerContext.h"
 #include "RoutePlanner.h"
+#include "MapLayersData.h"
 #include "RoutingConfiguration.h"
 
 
-MapActions::MapActions(QObject *parent) :
-    QObject(parent), app(OsmAnd::OsmAndApplication::getAndInitializeApplication())
+MapActions::MapActions(MapLayersData* d, QObject *parent) :
+    data(d), QObject(parent), app(OsmAnd::OsmAndApplication::getAndInitializeApplication())
 {
 }
 
@@ -53,13 +56,14 @@ QString MapActions::calculateRoute(){
     auto routeCalculationStart = std::chrono::steady_clock::now();
     bool routeFound = OsmAnd::RoutePlanner::calculateRoute(&plannerContext, points, false, nullptr, &route);
     auto routeCalculationFinish = std::chrono::steady_clock::now();
-    QString output;
+
     if(!routeFound) {
         return "Route is not found" ;
     }
-    output = QString("Route in ") + std::chrono::duration<double, std::milli> (routeCalculationFinish - routeCalculationStart).count() + " ms ";
-    output += route.length();
-    output += " segments ";
-    return output;
+    std::stringstream os;
+    os << "Route in " << std::chrono::duration<double, std::milli> (routeCalculationFinish - routeCalculationStart).count() << " ms ";
+    os << route.length() << " segments ";
+    data->setRoute(route);
+    return QString(os.str().c_str());
 
 }
