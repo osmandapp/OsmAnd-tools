@@ -196,6 +196,23 @@ Page {
                 ListItem.SingleControl {
                     highlightWhenPressed: false
                     control: Button {
+                        text: "Calculate route"
+                        anchors {
+                            fill: parent
+                            margins: units.gu(1)
+                        }
+                        onClicked: {
+                            PopupUtils.close(popover)
+                            var log = mapActions.calculateRoute();
+                            console.log("Route : " + log);
+                            refreshMap();
+
+                        }
+                    }
+                }
+                ListItem.SingleControl {
+                    highlightWhenPressed: false
+                    control: Button {
                         text: "Close"
                         anchors {
                             fill: parent
@@ -243,7 +260,7 @@ Page {
             context.beginPath();
             context.fillStyle = 'rgba(200, 10, 10, 0.8)';
             context.strokeStyle = 'rgb(0, 0, 0)'
-            context.arc(x, y, 10, 0, 360, true);
+            context.arc(x, y, 5, 0, 360, true);
             context.closePath();
             context.fill();
             context.stroke();
@@ -257,7 +274,7 @@ Page {
             context.beginPath();
             context.fillStyle = 'rgba(10, 200, 10, 0.8)';
             context.strokeStyle = 'rgb(0, 0, 0)'
-            context.arc(x, y, 10, 0, 360, true);
+            context.arc(x, y, 5, 0, 360, true);
             context.closePath();
             context.fill();
             context.stroke();

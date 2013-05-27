@@ -64,8 +64,8 @@ import org.xmlpull.v1.XmlPullParserException;
 public class MapRouterLayer implements MapPanelLayer {
 	
 	private final static Log log = PlatformUtil.getLog(MapRouterLayer.class);
-	private boolean USE_OLD_ROUTING = true;
-	private boolean USE_NATIVE_ROUTING = true;
+	private boolean USE_OLD_ROUTING = false;
+	private boolean USE_NATIVE_ROUTING = false;
 
 	private MapPanel map;
 	private LatLon startRoute ;
