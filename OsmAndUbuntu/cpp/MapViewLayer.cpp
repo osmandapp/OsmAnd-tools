@@ -17,15 +17,10 @@ const QImage* MapViewLayer::loadImage(QString &s) {
 
 }
 
-QPixmap MapViewLayer::requestPixmap(const QString &id, QSize *size, const QSize& requestedSize) {
-    if(img == nullptr || (img->size().width() != adapter->getWidth() || adapter->getHeight() != img->size().height())) {
-        if(img != nullptr) {
-            delete img;
-        }
-        img = new QPixmap(QSize(adapter->getWidth(), adapter->getHeight()));
-    }
+void MapViewLayer::renderRaster(QString& tileSource, QString& appDir)
+{
     QRectF ts =  adapter->getTiles();
-    int left =floor(ts.x());
+    int left = floor(ts.x());
     int top = floor(ts.y());
     int width  = ceil(ts.x() + ts.width()) - left;
     int height  = ceil(ts.y() + ts.height()) - top;
@@ -35,9 +30,9 @@ QPixmap MapViewLayer::requestPixmap(const QString &id, QSize *size, const QSize&
     float w = adapter->getCenterPointX();
     float h = adapter->getCenterPointY();
     float ftileSize = adapter->getTileSize();
-    QString base = app->getSettings()->APPLICATION_DIRECTORY.get().toString() + "/tiles/Mapnik/";
-    base = base + QString::number(adapter->getZoom())+"/";
 
+
+    QString base =  appDir + "/tiles/" + tileSource +"/" + QString::number(adapter->getZoom())+"/";
     QVector<QVector<const QImage*> > images;
     images.resize(width);
     for (int i = 0; i < width; i++) {
@@ -49,7 +44,7 @@ QPixmap MapViewLayer::requestPixmap(const QString &id, QSize *size, const QSize&
     }
     QPainter p(img);
     p.translate(adapter->getCenterPointX(), adapter->getCenterPointY());
-    p.rotate(adapter->getRotate());//(adapter->getRotate() / 180) *M_PI  );
+    p.rotate(adapter->getRotate());
     p.translate(-adapter->getCenterPointX(), -adapter->getCenterPointY());
     for (int  i = 0; i < images.size(); i++) {
         for (int j = 0; j < images[i].size(); j++) {
@@ -58,10 +53,27 @@ QPixmap MapViewLayer::requestPixmap(const QString &id, QSize *size, const QSize&
             p.drawImage(x1, y1, *images[i][j], 0, 0,ftileSize, ftileSize);
         }
     }
+}
+
+QPixmap MapViewLayer::requestPixmap(const QString &id, QSize *size, const QSize& requestedSize) {
+    if(img == nullptr || (img->size().width() != adapter->getWidth() || adapter->getHeight() != img->size().height())) {
+        if(img != nullptr) {
+            delete img;
+        }
+        img = new QPixmap(QSize(adapter->getWidth(), adapter->getHeight()));
+    }
+    QString tileSource = app->getSettings()->APPLICATION_DIRECTORY.get().toString();
+    QString appDir = app->getSettings()->APPLICATION_DIRECTORY.get().toString();
+    if(tileSource == "") {
+
+
+
+    } else {
+        renderRaster(tileSource, appDir);
+    }
     if(size) {
         size->setWidth(img->width());
         size->setHeight(img->height());
     }
-
     return *img;
 }

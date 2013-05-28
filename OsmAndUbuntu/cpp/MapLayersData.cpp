@@ -1,9 +1,28 @@
 #include "MapLayersData.h"
 #include "Utilities.h"
 
-MapLayersData::MapLayersData(QObject *) : app(OsmAnd::OsmAndApplication::getAndInitializeApplication())
+MapLayersData::MapLayersData(QObject *) : app(OsmAnd::OsmAndApplication::getAndInitializeApplication()),
+    lastRenderedImage(nullptr)
 {
 
+}
+
+QImage* MapLayersData::getRenderedImage(OsmAnd::AreaI* bbox) {
+    if(lastRenderedImage == nullptr) {
+        return lastRenderedImage;
+    }
+    *bbox = this->lastRenderedBox;
+    return lastRenderedImage;
+}
+
+void MapLayersData::setRenderedImage(SkBitmap& bmp, OsmAnd::AreaI bbox) {
+    if(lastRenderedImage != nullptr) {
+        delete lastRenderedImage;
+    }
+    lastRenderedImage = new QImage(bmp.width(), bmp.height(), QImage::Format_ARGB32);
+    void* pixels = bmp.getPixels();
+    memcpy(lastRenderedImage->bits(), pixels, bmp.getSize());
+    lastRenderedBox = bbox;
 }
 
 void MapLayersData::setRoute(QList< std::shared_ptr<OsmAnd::RouteSegment> >& r)

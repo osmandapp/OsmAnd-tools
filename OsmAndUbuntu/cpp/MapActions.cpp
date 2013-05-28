@@ -1,15 +1,30 @@
-#include <QFile>
-#include <QDir>
 #include <ctime>
 #include <chrono>
 #include <sstream>
 #include <ostream>
+
+
+#include <QFile>
+#include <QDir>
+
+
+#include <SkDevice.h>
+
+#include <Utilities.h>
+#include <ObfReader.h>
+#include <Rasterizer.h>
+#include <RasterizerContext.h>
+#include <RasterizationStyles.h>
+#include <RasterizationStyle.h>
+#include <RasterizationStyleEvaluator.h>
+#include <RoutePlannerContext.h>
+#include <RoutePlanner.h>
+#include <RoutingConfiguration.h>
+
 #include "MapActions.h"
-#include "ObfReader.h"
-#include "RoutePlannerContext.h"
-#include "RoutePlanner.h"
 #include "MapLayersData.h"
-#include "RoutingConfiguration.h"
+
+
 
 
 MapActions::MapActions(MapLayersData* d, QObject *parent) :
@@ -23,6 +38,87 @@ bool MapActions::isActivityRunning() {
     }
     return pseudoCounter > 0  && threadPool.activeThreadCount() > 0;
 }
+
+class RunRouteRasterization : public QRunnable
+{
+    std::shared_ptr<OsmAnd::OsmAndApplication> app;
+    OsmAnd::AreaI bbox;
+    uint32_t zoom;
+    MapLayersData* data;
+    MapActions* actions;
+public:
+    RunRouteRasterization(std::shared_ptr<OsmAnd::OsmAndApplication> app, OsmAnd::AreaI bbox, uint32_t zoom,
+                          MapLayersData* d, MapActions* a) :
+        app(app), bbox(bbox), zoom(zoom), data(d),actions(a) {
+
+    }
+    
+    void run()
+    {
+        bool is32bit = true;
+        float tileSide = 256;
+
+        OsmAnd::RasterizationStyles stylesCollection;
+        std::shared_ptr<OsmAnd::RasterizationStyle> style;
+        stylesCollection.obtainStyle("default", style);
+
+        QList< std::shared_ptr<OsmAnd::ObfReader> > obfData;
+        QString d = app->getSettings()->APPLICATION_DIRECTORY.get().toString();
+        if(d != "") {
+            QDir dir(d);
+            QStringList files = dir.entryList();
+            for(QString it : files) {
+                if(it.endsWith(".obf")) {
+                    std::shared_ptr<QFile> qf(new QFile(dir.absolutePath() + "/" + it));
+                    std::shared_ptr<OsmAnd::ObfReader> obfReader(new OsmAnd::ObfReader(qf));
+                    obfData.push_back(obfReader);
+                }
+            }
+        }
+
+        // Collect all map objects (this should be replaced by something like RasterizerViewport/RasterizerContext)
+        QList< std::shared_ptr<OsmAnd::Model::MapObject> > mapObjects;
+        OsmAnd::QueryFilter filter;
+        filter._bbox31 = &bbox;
+        filter._zoom = &zoom;
+        for(auto itObf = obfData.begin(); itObf != obfData.end(); ++itObf)
+        {
+            auto obf = *itObf;
+
+            for(auto itMapSection = obf->mapSections.begin(); itMapSection != obf->mapSections.end(); ++itMapSection)
+            {
+                auto mapSection = *itMapSection;
+
+                OsmAnd::ObfMapSection::loadMapObjects(obf.get(), mapSection.get(), &mapObjects, &filter, nullptr);
+            }
+        }
+
+        // Allocate render target
+        SkBitmap renderSurface;
+        const auto pixelWidth = (bbox.right >> (31 - zoom + 8)) - (bbox.left >> (31 - zoom + 8));
+        const auto pixelHeight = (bbox.top >> (31 - zoom + 8)) - (bbox.bottom >> (31 - zoom + 8));
+        renderSurface.setConfig(is32bit ? SkBitmap::kARGB_8888_Config : SkBitmap::kRGB_565_Config, pixelWidth, pixelHeight);
+        if(!renderSurface.allocPixels())
+        {
+            return;
+        }
+        SkDevice renderTarget(renderSurface);
+        // Create render canvas
+        SkCanvas canvas(&renderTarget);
+
+        // Perform actual rendering
+        OsmAnd::RasterizerContext rasterizerContext(style);
+        OsmAnd::AreaD dbox;
+        dbox.left = OsmAnd::Utilities::get31LongitudeX(bbox.left);
+        dbox.right = OsmAnd::Utilities::get31LongitudeX(bbox.right);
+        dbox.top = OsmAnd::Utilities::get31LatitudeY(bbox.top);
+        dbox.bottom = OsmAnd::Utilities::get31LatitudeY(bbox.bottom);
+        OsmAnd::Rasterizer::rasterize(rasterizerContext, true, canvas, dbox, zoom, tileSide, mapObjects, OsmAnd::PointI(), nullptr);
+        data->setRenderedImage(renderSurface, bbox);
+        actions->taskFinished();
+        emit data->mapNeedsToRefresh(QString(""));
+    }
+};
 
 class RunRouteCalculation : public QRunnable
 {
@@ -93,4 +189,10 @@ public:
 
 void MapActions::calculateRoute(){
     start(new RunRouteCalculation(data, this));
+}
+
+void MapActions::runRasterization(OsmAnd::AreaI bbox, uint32_t zoom){
+    if(!isActivityRunning()) {
+        start(new RunRouteRasterization(app, bbox, zoom, data, this));
+    }
 }

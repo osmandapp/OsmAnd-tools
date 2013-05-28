@@ -23,10 +23,16 @@ HEADERS  += \
     cpp/MapViewAdapter.h \
     cpp/MapViewLayer.h
 
+
+SKIA_PATCHED = $$PWD/../../core/externals/skia/upstream.patched/
+
 #Path to the libraries...
 INCLUDEPATH +=  $$PWD/../../core/externals/protobuf/upstream.patched/src/ \
                 $$PWD/../../core/include $$PWD/../../core/include/native \
                 $$PWD/../../core/protos \
+                $$SKIA_PATCHED/include/core  $$SKIA_PATCHED/include/utils \
+                $$SKIA_PATCHED/include/config $$SKIA_PATCHED/include/effects \
+                $$SKIA_PATCHED/include/src \
                 $$PWD
 DEPENDPATH += $$PWD/../../../../usr/lib \
               $$PWD/../../core/externals/protobuf/upstream.patched \

@@ -1,6 +1,7 @@
 #ifndef MAPACTIONS_H
 #define MAPACTIONS_H
 
+#include <stdint.h>
 #include <QObject>
 #include <ObfReader.h>
 #include <QThreadPool>
@@ -22,13 +23,16 @@ private:
     void taskFinished() {pseudoCounter--;}
 
 
+    friend class RunRouteCalculation;
+    friend class RunRouteRasterization;
 public:
     explicit MapActions(MapLayersData* d, QObject *parent = 0);
 
     Q_INVOKABLE void calculateRoute();
+    void runRasterization(OsmAnd::AreaI bbox, uint32_t zoom);
     Q_INVOKABLE bool isActivityRunning();
     
-    friend class RunRouteCalculation;
+
 };
 
 #endif // MAPACTIONS_H

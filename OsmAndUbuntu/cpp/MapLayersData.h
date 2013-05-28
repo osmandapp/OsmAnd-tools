@@ -1,8 +1,13 @@
 #ifndef MAPLAYERSDATA_H
 #define MAPLAYERSDATA_H
-#include "OsmAndCore.h"
-#include "OsmAndApplication.h"
-#include "RouteSegment.h"
+#include <SkBitmap.h>
+
+#include <QImage>
+#include <OsmAndCore.h>
+#include <OsmAndApplication.h>
+#include <RouteSegment.h>
+
+
 
 class MapLayersData: public QObject
 {
@@ -10,17 +15,23 @@ class MapLayersData: public QObject
 private:
     std::shared_ptr<OsmAnd::OsmAndApplication> app;
     QList< OsmAnd::PointF > route;
+    QImage* lastRenderedImage;
+    OsmAnd::AreaI lastRenderedBox;
 signals:
     void mapNeedsToRefresh(QString message);
 public:
     explicit MapLayersData(QObject *parent = 0);
+
+    void setRoute(QList< std::shared_ptr<OsmAnd::RouteSegment> >& r);
+    QImage* getRenderedImage(OsmAnd::AreaI* bbox) ;
+    void setRenderedImage(SkBitmap& bmp, OsmAnd::AreaI bbox);
+
 
     Q_INVOKABLE int getMapZoom();
     Q_INVOKABLE double getMapLatitude();
     Q_INVOKABLE double getMapLongitude();
     Q_INVOKABLE void setMapLatLonZoom(double,double,int);
 
-    void setRoute(QList< std::shared_ptr<OsmAnd::RouteSegment> >& r);
     Q_INVOKABLE int getRoutePointLength() { return route.size();}
     Q_INVOKABLE float getRoutePointLat(int i) {return route[i].y; }
     Q_INVOKABLE float getRoutePointLon(int i) {return route[i].x; }
