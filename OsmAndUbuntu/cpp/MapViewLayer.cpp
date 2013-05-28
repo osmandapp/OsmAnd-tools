@@ -18,12 +18,12 @@ const QImage* MapViewLayer::loadImage(QString &s) {
 }
 
 QPixmap MapViewLayer::requestPixmap(const QString &id, QSize *size, const QSize& requestedSize) {
-    if(img == nullptr || (img->size().width() != adapter->getWidth() || adapter->getHeight() != img->size().height())) {
+//    if(img == nullptr || (img->size().width() != adapter->getWidth() || adapter->getHeight() != img->size().height())) {
         if(img != nullptr) {
             delete img;
         }
         img = new QPixmap(QSize(adapter->getWidth(), adapter->getHeight()));
-    }
+  //  }
     QRectF ts =  adapter->getTiles();
     int left =floor(ts.x());
     int top = floor(ts.y());

@@ -9,30 +9,33 @@ Page {
     Canvas {
         id: canvas;
         property bool loaded;
+        property bool useSpecialLayer : true;
+        property int counter : 0;
         property variant paths : [[]];
         anchors.top : parent.top
         anchors.bottom: parent.bottom
         width : parent.width
         antialiasing: true;
         onPaint: {
-            var ctx = canvas.getContext("2d");
-            if(true) {
-                var context = canvas.getContext("2d");
-                context.clearRect(0, 0, canvas.width, canvas.height);
-                context.save();
+            var context = canvas.getContext("2d");
+            context.clearRect(0, 0, canvas.width, canvas.height);
+            context.save();
+            if(useSpecialLayer) {
+                context.drawImage("image://map/map"+counter, 0, 0);
+            } else {
                 drawLayerMap(context);
-                context.restore();
-
-                context.save();
-                drawRouteLayer(context);
-                context.restore();
-                context.save();
-                drawTargetLocation(context);
-                context.restore();
-                context.save();
-                drawStartLocation(context);
-                context.restore();
             }
+            context.restore();
+
+            context.save();
+            drawRouteLayer(context);
+            context.restore();
+            context.save();
+            drawTargetLocation(context);
+            context.restore();
+            context.save();
+            drawStartLocation(context);
+            context.restore();
         }
 
         onImageLoaded:  {
@@ -249,23 +252,30 @@ Page {
     }
 
     function refreshMap() {
+
         activity.running = mapActions.isActivityRunning();
-        var left = Math.floor(mapViewAdapter.getTiles().x);
-        var top = Math.floor(mapViewAdapter.getTiles().y);
-        var width  = Math.ceil(mapViewAdapter.getTiles().x + mapViewAdapter.getTiles().width) - left;
-        var height  = Math.ceil(mapViewAdapter.getTiles().y + mapViewAdapter.getTiles().height) - top;
-        var base = applicationData.getOsmandDirectiory() + "/tiles/Mapnik/";
-        base = base + mapViewAdapter.getZoom()+"/";
-        var p = new Array(width);
-        for (var i = 0; i < width; i++) {
-            p[i]= new Array(height);
-            for (var j = 0; j < height; j++) {
-                var s = base +  (left + i)+"/"+(top+j)+".png.tile";
-                p[i][j] = s;
-                canvas.loadImage(p[i][j]);
+        if(canvas.useSpecialLayer) {
+            canvas.unloadImage("image://map/map"+canvas.counter, 0, 0);
+            canvas.counter ++;
+            canvas.loadImage("image://map/map"+canvas.counter, 0, 0);
+        } else {
+            var left = Math.floor(mapViewAdapter.getTiles().x);
+            var top = Math.floor(mapViewAdapter.getTiles().y);
+            var width  = Math.ceil(mapViewAdapter.getTiles().x + mapViewAdapter.getTiles().width) - left;
+            var height  = Math.ceil(mapViewAdapter.getTiles().y + mapViewAdapter.getTiles().height) - top;
+            var base = applicationData.getOsmandDirectiory() + "/tiles/Mapnik/";
+            base = base + mapViewAdapter.getZoom()+"/";
+            var p = new Array(width);
+            for (var i = 0; i < width; i++) {
+                p[i]= new Array(height);
+                for (var j = 0; j < height; j++) {
+                    var s = base +  (left + i)+"/"+(top+j)+".png.tile";
+                    p[i][j] = s;
+                    canvas.loadImage(p[i][j]);
+                }
             }
+            canvas.paths = p;
         }
-        canvas.paths = p;
         canvas.requestPaint();
     }
 
@@ -334,7 +344,6 @@ Page {
         context.translate(mapViewAdapter.getCenterPointX(), mapViewAdapter.getCenterPointY());
         context.rotate((mapViewAdapter.getRotate() / 180) *Math.PI  );
         context.translate(-mapViewAdapter.getCenterPointX(), -mapViewAdapter.getCenterPointY());
-        //context.drawImage("image://map/map"+mapViewAdapter.getRotate(), 0, 0);
         var left = Math.floor(mapViewAdapter.getTiles().x);
         var top = Math.floor(mapViewAdapter.getTiles().y);
         var tileX = mapViewAdapter.getXTile();
