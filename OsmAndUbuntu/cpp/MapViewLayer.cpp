@@ -17,7 +17,7 @@ const QImage* MapViewLayer::loadImage(QString &s) {
 
 }
 
-void MapViewLayer::renderRaster(QString& tileSource, QString& appDir)
+void MapViewLayer::renderRaster(const QString& tileSource, const QString& appDir)
 {
     QRectF ts =  adapter->getTiles();
     int left = floor(ts.x());
@@ -62,12 +62,10 @@ QPixmap MapViewLayer::requestPixmap(const QString &id, QSize *size, const QSize&
         }
         img = new QPixmap(QSize(adapter->getWidth(), adapter->getHeight()));
     }
-    QString tileSource = app->getSettings()->APPLICATION_DIRECTORY.get().toString();
+    QString tileSource = app->getSettings()->TILE_SOURCE.get().toString();
     QString appDir = app->getSettings()->APPLICATION_DIRECTORY.get().toString();
     if(tileSource == "") {
-
-
-
+        renderRaster(QString("Mapnik"), appDir);
     } else {
         renderRaster(tileSource, appDir);
     }

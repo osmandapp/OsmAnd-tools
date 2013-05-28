@@ -17,7 +17,7 @@ class MapViewLayer : public QObject, public QQuickImageProvider
     QMap<QString, QImage* > cache;
 
     const QImage* loadImage(QString& s);
-     void renderRaster(QString& tileSource, QString& appDir);
+     void renderRaster(const QString& tileSource, const QString& appDir);
 public:
     explicit MapViewLayer(MapViewAdapter* adapter, QObject *parent = 0);
     virtual QPixmap requestPixmap(const QString &id, QSize *size, const QSize& requestedSize);

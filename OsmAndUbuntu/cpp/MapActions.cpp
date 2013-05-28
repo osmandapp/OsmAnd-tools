@@ -113,7 +113,7 @@ public:
         dbox.right = OsmAnd::Utilities::get31LongitudeX(bbox.right);
         dbox.top = OsmAnd::Utilities::get31LatitudeY(bbox.top);
         dbox.bottom = OsmAnd::Utilities::get31LatitudeY(bbox.bottom);
-        OsmAnd::Rasterizer::rasterize(rasterizerContext, true, canvas, dbox, zoom, tileSide, mapObjects, OsmAnd::PointI(), nullptr);
+        //OsmAnd::Rasterizer::rasterize(rasterizerContext, true, canvas, dbox, zoom, tileSide, mapObjects, OsmAnd::PointI(), nullptr);
         data->setRenderedImage(renderSurface, bbox);
         actions->taskFinished();
         emit data->mapNeedsToRefresh(QString(""));
