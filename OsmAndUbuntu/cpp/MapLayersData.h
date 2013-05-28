@@ -11,7 +11,8 @@ class MapLayersData: public QObject
 private:
     std::shared_ptr<OsmAnd::OsmAndApplication> app;
     QList< OsmAnd::PointF > route;
-
+signals:
+    void mapNeedsToRefresh(QString message);
 public:
     explicit MapLayersData(QObject *parent = 0);
 

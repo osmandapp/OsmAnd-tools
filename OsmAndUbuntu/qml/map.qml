@@ -6,7 +6,6 @@ import QtQuick.Window 2.0
 
 
 Page {
-
     Canvas {
         id: canvas;
         property bool loaded;
@@ -42,23 +41,32 @@ Page {
         }
         onCanvasSizeChanged: {
             mapData.setBounds(canvas.width, canvas.height);
-            var z = mapLayerData.getMapZoom();
-            mapData.setZoom(z);
-            mapData.setLatLon(mapLayerData.getMapLatitude(), mapLayerData.getMapLongitude());
             refreshMap();
         }
 
-
+        Component.onCompleted: {
+            var z = mapLayerData.getMapZoom();
+            mapData.setZoom(z);
+            mapData.setLatLon(mapLayerData.getMapLatitude(), mapLayerData.getMapLongitude());
+            mapLayerData.mapNeedsToRefresh.connect(refreshMapMessage);
+        }
 
         Component.onDestruction: {
             mapLayerData.setMapLatLonZoom(mapData.getLat(), mapData.getLon(), mapData.getZoom());
+        }
+
+        ActivityIndicator {
+            id: activity;
+            anchors.right: parent.right
+            anchors.top: parent.top
+            anchors.margins: units.gu(1)
         }
 
         Button {
             id : rotRight
             text : 'R'
             anchors.top: parent.top
-            anchors.right: parent.right
+            anchors.right: activity.left
             anchors.margins: units.gu(1)
             onClicked: {
                 var r = mapData.getRotate() ;
@@ -207,10 +215,8 @@ Page {
                         }
                         onClicked: {
                             PopupUtils.close(popover)
-                            var log = mapActions.calculateRoute();
-                            console.log("Route : " + log);
+                            mapActions.calculateRoute();
                             refreshMap();
-
                         }
                     }
                 }
@@ -237,7 +243,14 @@ Page {
         return false;
     }
 
+    function refreshMapMessage(msg) {
+        if(msg) console.log(msg);
+        refreshMap();
+    }
+
     function refreshMap() {
+        activity.running = mapActions.isActivityRunning();
+
         var left = Math.floor(mapData.getTiles().x);
         var top = Math.floor(mapData.getTiles().y);
         var width  = Math.ceil(mapData.getTiles().x + mapData.getTiles().width) - left;
@@ -260,8 +273,8 @@ Page {
 
     function drawRouteLayer(context) {
         if(mapLayerData.getRoutePointLength() >  0) {
-            context.strokeStyle = Qt.rgba(0, 200, 200,0.6);
-            context.lineWidth = 4;
+            context.strokeStyle = Qt.rgba(0, 0,0.9,0.8);
+            context.lineWidth = 6;
             context.beginPath();
             for(var i = 0; i < mapLayerData.getRoutePointLength(); i++) {
                 var lat = mapLayerData.getRoutePointLat(i);
@@ -275,6 +288,17 @@ Page {
                 }
             }
             context.stroke();
+            context.beginPath();
+            context.lineWidth = 1;
+            context.strokeStyle = Qt.rgba(0, 0,0,1);
+            for(var i = 0; i < mapLayerData.getRoutePointLength(); i++) {
+                var lat = mapLayerData.getRoutePointLat(i);
+                var lon = mapLayerData.getRoutePointLon(i);
+                var x = mapData.getRotatedMapXForPoint(lat, lon);
+                var y = mapData.getRotatedMapYForPoint(lat, lon);
+                context.strokeText((i+1)+".", x, y -i);
+                context.fillText((i+1)+".", x, y -i);
+            }
         }
     }
 

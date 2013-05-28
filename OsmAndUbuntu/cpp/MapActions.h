@@ -3,8 +3,10 @@
 
 #include <QObject>
 #include <ObfReader.h>
+#include <QThreadPool>
 #include "MapLayersData.h"
 #include "OsmAndApplication.h"
+
 
 class MapActions : public QObject
 {
@@ -12,16 +14,21 @@ class MapActions : public QObject
 private:
     std::shared_ptr<OsmAnd::OsmAndApplication> app;
     MapLayersData* data;
+    QThreadPool threadPool;
+    int pseudoCounter;
+
+    void start(QRunnable *r) {pseudoCounter++; threadPool.start(r);}
+    // This method is called to let UI know that there is know active threads
+    void taskFinished() {pseudoCounter--;}
+
 
 public:
     explicit MapActions(MapLayersData* d, QObject *parent = 0);
 
-    Q_INVOKABLE QString calculateRoute();
+    Q_INVOKABLE void calculateRoute();
+    Q_INVOKABLE bool isActivityRunning();
     
-signals:
-    
-public slots:
-    
+    friend class RunRouteCalculation;
 };
 
 #endif // MAPACTIONS_H
