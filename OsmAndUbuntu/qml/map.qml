@@ -250,22 +250,22 @@ Page {
 
     function refreshMap() {
         activity.running = mapActions.isActivityRunning();
-//        var left = Math.floor(mapViewAdapter.getTiles().x);
-//        var top = Math.floor(mapViewAdapter.getTiles().y);
-//        var width  = Math.ceil(mapViewAdapter.getTiles().x + mapViewAdapter.getTiles().width) - left;
-//        var height  = Math.ceil(mapViewAdapter.getTiles().y + mapViewAdapter.getTiles().height) - top;
-//        var base = applicationData.getOsmandDirectiory() + "/tiles/Mapnik/";
-//        base = base + mapViewAdapter.getZoom()+"/";
-//        var p = new Array(width);
-//        for (var i = 0; i < width; i++) {
-//            p[i]= new Array(height);
-//            for (var j = 0; j < height; j++) {
-//                var s = base +  (left + i)+"/"+(top+j)+".png.tile";
-//                p[i][j] = s;
-//                canvas.loadImage(p[i][j]);
-//            }
-//        }
-//        canvas.paths = p;
+        var left = Math.floor(mapViewAdapter.getTiles().x);
+        var top = Math.floor(mapViewAdapter.getTiles().y);
+        var width  = Math.ceil(mapViewAdapter.getTiles().x + mapViewAdapter.getTiles().width) - left;
+        var height  = Math.ceil(mapViewAdapter.getTiles().y + mapViewAdapter.getTiles().height) - top;
+        var base = applicationData.getOsmandDirectiory() + "/tiles/Mapnik/";
+        base = base + mapViewAdapter.getZoom()+"/";
+        var p = new Array(width);
+        for (var i = 0; i < width; i++) {
+            p[i]= new Array(height);
+            for (var j = 0; j < height; j++) {
+                var s = base +  (left + i)+"/"+(top+j)+".png.tile";
+                p[i][j] = s;
+                canvas.loadImage(p[i][j]);
+            }
+        }
+        canvas.paths = p;
         canvas.requestPaint();
     }
 
@@ -334,23 +334,23 @@ Page {
         context.translate(mapViewAdapter.getCenterPointX(), mapViewAdapter.getCenterPointY());
         context.rotate((mapViewAdapter.getRotate() / 180) *Math.PI  );
         context.translate(-mapViewAdapter.getCenterPointX(), -mapViewAdapter.getCenterPointY());
-        context.drawImage("image://map/map"+mapViewAdapter.getRotate(), 0, 0);
-//        var left = Math.floor(mapViewAdapter.getTiles().x);
-//        var top = Math.floor(mapViewAdapter.getTiles().y);
-//        var tileX = mapViewAdapter.getXTile();
-//        var tileY = mapViewAdapter.getYTile();
-//        var w = mapViewAdapter.getCenterPointX();
-//        var h = mapViewAdapter.getCenterPointY();
-//        var ftileSize = mapViewAdapter.getTileSize();
-//        for (var i = 0; i < canvas.paths.length; i++) {
-//            for (var j = 0; j < canvas.paths[i].length; j++) {
-//                var leftPlusI = left + i;
-//                var topPlusJ = top + j;
-//                var x1 = (left + i - tileX) * ftileSize + w;
-//                var y1 = (top + j - tileY) * ftileSize + h;
-//                context.drawImage(canvas.paths[i][j],  x1, y1, ftileSize, ftileSize);
-//            }
-//        }
+        //context.drawImage("image://map/map"+mapViewAdapter.getRotate(), 0, 0);
+        var left = Math.floor(mapViewAdapter.getTiles().x);
+        var top = Math.floor(mapViewAdapter.getTiles().y);
+        var tileX = mapViewAdapter.getXTile();
+        var tileY = mapViewAdapter.getYTile();
+        var w = mapViewAdapter.getCenterPointX();
+        var h = mapViewAdapter.getCenterPointY();
+        var ftileSize = mapViewAdapter.getTileSize();
+        for (var i = 0; i < canvas.paths.length; i++) {
+            for (var j = 0; j < canvas.paths[i].length; j++) {
+                var leftPlusI = left + i;
+                var topPlusJ = top + j;
+                var x1 = (left + i - tileX) * ftileSize + w;
+                var y1 = (top + j - tileY) * ftileSize + h;
+                context.drawImage(canvas.paths[i][j],  x1, y1, ftileSize, ftileSize);
+            }
+        }
     }
 
 }
