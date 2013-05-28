@@ -18,12 +18,12 @@ const QImage* MapViewLayer::loadImage(QString &s) {
 }
 
 QPixmap MapViewLayer::requestPixmap(const QString &id, QSize *size, const QSize& requestedSize) {
-//    if(img == nullptr || (img->size().width() != adapter->getWidth() || adapter->getHeight() != img->size().height())) {
+    if(img == nullptr || (img->size().width() != adapter->getWidth() || adapter->getHeight() != img->size().height())) {
         if(img != nullptr) {
             delete img;
         }
         img = new QPixmap(QSize(adapter->getWidth(), adapter->getHeight()));
-  //  }
+    }
     QRectF ts =  adapter->getTiles();
     int left =floor(ts.x());
     int top = floor(ts.y());
@@ -48,6 +48,9 @@ QPixmap MapViewLayer::requestPixmap(const QString &id, QSize *size, const QSize&
         }
     }
     QPainter p(img);
+    p.translate(adapter->getCenterPointX(), adapter->getCenterPointY());
+    p.rotate(adapter->getRotate());//(adapter->getRotate() / 180) *M_PI  );
+    p.translate(-adapter->getCenterPointX(), -adapter->getCenterPointY());
     for (int  i = 0; i < images.size(); i++) {
         for (int j = 0; j < images[i].size(); j++) {
             float x1 = (left + i - tileX) * ftileSize + w;
