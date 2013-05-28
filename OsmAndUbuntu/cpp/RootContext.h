@@ -3,25 +3,30 @@
 #include <QObject>
 #include <QQmlContext>
 #include  "MainApplicationSettings.h"
-#include "Map.h"
+#include "MapViewAdapter.h"
 #include "MapLayersData.h"
+#include "MapViewLayer.h"
 #include "MapActions.h"
 
 class RootContext : public QObject {
     Q_OBJECT
 private :
     MainApplicationSettings appData;
-    Map mapData;
+    MapViewAdapter mapViewAdapter;
     MapLayersData mapLayerData;
     MapActions mapActions;
 public:
-    explicit RootContext(QObject *parent = 0) :mapActions(&mapLayerData) {
+    explicit RootContext(QObject *parent = 0) :
+        mapActions(&mapLayerData) {
     }
     virtual ~RootContext() {}
 
+    MapViewAdapter* getMapViewAdapter() {return &mapViewAdapter;}
+    MapLayersData* getMapLayersData() {return &mapLayerData;}
+
     void createProperties(QQmlContext* r) {
         r->setContextProperty("applicationData", &appData);
-        r->setContextProperty("mapData", &mapData);
+        r->setContextProperty("mapViewAdapter", &mapViewAdapter);
         r->setContextProperty("mapLayerData", &mapLayerData);
         r->setContextProperty("mapActions", &mapActions);
 

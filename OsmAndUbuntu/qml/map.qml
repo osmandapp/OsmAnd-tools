@@ -16,7 +16,7 @@ Page {
         antialiasing: true;
         onPaint: {
             var ctx = canvas.getContext("2d");
-            if(loaded) {
+            if(true) {
                 var context = canvas.getContext("2d");
                 context.clearRect(0, 0, canvas.width, canvas.height);
                 context.save();
@@ -40,19 +40,19 @@ Page {
             canvas.requestPaint();
         }
         onCanvasSizeChanged: {
-            mapData.setBounds(canvas.width, canvas.height);
+            mapViewAdapter.setBounds(canvas.width, canvas.height);
             refreshMap();
         }
 
         Component.onCompleted: {
             var z = mapLayerData.getMapZoom();
-            mapData.setZoom(z);
-            mapData.setLatLon(mapLayerData.getMapLatitude(), mapLayerData.getMapLongitude());
+            mapViewAdapter.setZoom(z);
+            mapViewAdapter.setLatLon(mapLayerData.getMapLatitude(), mapLayerData.getMapLongitude());
             mapLayerData.mapNeedsToRefresh.connect(refreshMapMessage);
         }
 
         Component.onDestruction: {
-            mapLayerData.setMapLatLonZoom(mapData.getLat(), mapData.getLon(), mapData.getZoom());
+            mapLayerData.setMapLatLonZoom(mapViewAdapter.getLat(), mapViewAdapter.getLon(), mapViewAdapter.getZoom());
         }
 
         ActivityIndicator {
@@ -69,8 +69,8 @@ Page {
             anchors.right: activity.left
             anchors.margins: units.gu(1)
             onClicked: {
-                var r = mapData.getRotate() ;
-                mapData.setRotate(r+ 30);
+                var r = mapViewAdapter.getRotate() ;
+                mapViewAdapter.setRotate(r+ 30);
                 refreshMap();
             }
         }
@@ -81,7 +81,7 @@ Page {
             anchors.top: parent.top
             anchors.margins: units.gu(1)
             onClicked: {
-                mapData.setRotate(mapData.getRotate() - 30);
+                mapViewAdapter.setRotate(mapViewAdapter.getRotate() - 30);
                 refreshMap();
             }
         }
@@ -94,7 +94,7 @@ Page {
             anchors.right: parent.right
             anchors.margins: units.gu(1)
             onClicked: {
-                mapData.setZoom(mapData.getZoom() + 1);
+                mapViewAdapter.setZoom(mapViewAdapter.getZoom() + 1);
                 refreshMap();
             }
         }
@@ -106,7 +106,7 @@ Page {
             anchors.bottom: parent.bottom
             anchors.margins: units.gu(1)
             onClicked: {
-                mapData.setZoom(mapData.getZoom() - 1);
+                mapViewAdapter.setZoom(mapViewAdapter.getZoom() - 1);
                 refreshMap();
             }
         }
@@ -121,8 +121,8 @@ Page {
             onPressed : {
                 if(mouse.button === 2) {
                     var o = PopupUtils.open(popoverComponent, canvas);
-                    o.lat = mapData.getRotatedMapLatForPoint(mouse.x, mouse.y);
-                    o.lon = mapData.getRotatedMapLonForPoint(mouse.x, mouse.y);
+                    o.lat = mapViewAdapter.getRotatedMapLatForPoint(mouse.x, mouse.y);
+                    o.lon = mapViewAdapter.getRotatedMapLonForPoint(mouse.x, mouse.y);
                 } else if(rcontains(zoomIn, mouse.x, mouse.y)) {
                     mouse.accepted =false;
                 } else if(rcontains(zoomOut, mouse.x, mouse.y)) {
@@ -141,7 +141,7 @@ Page {
 
             onPositionChanged : {
                 if(marea.pressed) {
-                    mapData.moveTo( px - mouse.x, py - mouse.y);
+                    mapViewAdapter.moveTo( px - mouse.x, py - mouse.y);
                     px = mouse.x;
                     py = mouse.y;
                     refreshMap();
@@ -151,7 +151,7 @@ Page {
             onReleased: {
                 if(marea.pressed) {
                     marea.pressed = false;
-                    mapData.moveTo( px - mouse.x, py - mouse.y);
+                    mapViewAdapter.moveTo( px - mouse.x, py - mouse.y);
                     refreshMap();
                 }
             }
@@ -250,23 +250,22 @@ Page {
 
     function refreshMap() {
         activity.running = mapActions.isActivityRunning();
-
-        var left = Math.floor(mapData.getTiles().x);
-        var top = Math.floor(mapData.getTiles().y);
-        var width  = Math.ceil(mapData.getTiles().x + mapData.getTiles().width) - left;
-        var height  = Math.ceil(mapData.getTiles().y + mapData.getTiles().height) - top;
-        var base = applicationData.getOsmandDirectiory() + "/tiles/Mapnik/";
-        base = base + mapData.getZoom()+"/";
-        var p = new Array(width);
-        for (var i = 0; i < width; i++) {
-            p[i]= new Array(height);
-            for (var j = 0; j < height; j++) {
-                var s = base +  (left + i)+"/"+(top+j)+".png.tile";
-                p[i][j] = s;
-                canvas.loadImage(p[i][j]);
-            }
-        }
-        canvas.paths = p;
+//        var left = Math.floor(mapViewAdapter.getTiles().x);
+//        var top = Math.floor(mapViewAdapter.getTiles().y);
+//        var width  = Math.ceil(mapViewAdapter.getTiles().x + mapViewAdapter.getTiles().width) - left;
+//        var height  = Math.ceil(mapViewAdapter.getTiles().y + mapViewAdapter.getTiles().height) - top;
+//        var base = applicationData.getOsmandDirectiory() + "/tiles/Mapnik/";
+//        base = base + mapViewAdapter.getZoom()+"/";
+//        var p = new Array(width);
+//        for (var i = 0; i < width; i++) {
+//            p[i]= new Array(height);
+//            for (var j = 0; j < height; j++) {
+//                var s = base +  (left + i)+"/"+(top+j)+".png.tile";
+//                p[i][j] = s;
+//                canvas.loadImage(p[i][j]);
+//            }
+//        }
+//        canvas.paths = p;
         canvas.requestPaint();
     }
 
@@ -279,8 +278,8 @@ Page {
             for(var i = 0; i < mapLayerData.getRoutePointLength(); i++) {
                 var lat = mapLayerData.getRoutePointLat(i);
                 var lon = mapLayerData.getRoutePointLon(i);
-                var x = mapData.getRotatedMapXForPoint(lat, lon);
-                var y = mapData.getRotatedMapYForPoint(lat, lon);
+                var x = mapViewAdapter.getRotatedMapXForPoint(lat, lon);
+                var y = mapViewAdapter.getRotatedMapYForPoint(lat, lon);
                 if(i == 0) {
                     context.moveTo(x, y);
                 } else {
@@ -294,8 +293,8 @@ Page {
             for(var i = 0; i < mapLayerData.getRoutePointLength(); i++) {
                 var lat = mapLayerData.getRoutePointLat(i);
                 var lon = mapLayerData.getRoutePointLon(i);
-                var x = mapData.getRotatedMapXForPoint(lat, lon);
-                var y = mapData.getRotatedMapYForPoint(lat, lon);
+                var x = mapViewAdapter.getRotatedMapXForPoint(lat, lon);
+                var y = mapViewAdapter.getRotatedMapYForPoint(lat, lon);
                 context.strokeText((i+1)+".", x, y -i);
                 context.fillText((i+1)+".", x, y -i);
             }
@@ -304,8 +303,8 @@ Page {
 
     function drawTargetLocation(context) {
         if(mapLayerData.isTargetPresent()) {
-            var x = mapData.getRotatedMapXForPoint(mapLayerData.getTargetLatitude(), mapLayerData.getTargetLongitude());
-            var y = mapData.getRotatedMapYForPoint(mapLayerData.getTargetLatitude(), mapLayerData.getTargetLongitude());
+            var x = mapViewAdapter.getRotatedMapXForPoint(mapLayerData.getTargetLatitude(), mapLayerData.getTargetLongitude());
+            var y = mapViewAdapter.getRotatedMapYForPoint(mapLayerData.getTargetLatitude(), mapLayerData.getTargetLongitude());
             context.fillStyle = 'rgba(200, 10, 10, 0.8)';
             context.strokeStyle = 'rgb(0, 0, 0)'
             context.beginPath();
@@ -319,8 +318,8 @@ Page {
 
     function drawStartLocation(context) {
         if(mapLayerData.isStartPresent()) {
-            var x = mapData.getRotatedMapXForPoint(mapLayerData.getStartLatitude(), mapLayerData.getStartLongitude());
-            var y = mapData.getRotatedMapYForPoint(mapLayerData.getStartLatitude(), mapLayerData.getStartLongitude());
+            var x = mapViewAdapter.getRotatedMapXForPoint(mapLayerData.getStartLatitude(), mapLayerData.getStartLongitude());
+            var y = mapViewAdapter.getRotatedMapYForPoint(mapLayerData.getStartLatitude(), mapLayerData.getStartLongitude());
             context.fillStyle = 'rgba(10, 200, 10, 0.8)';
             context.strokeStyle = 'rgb(0, 0, 0)'
             context.beginPath();
@@ -332,25 +331,26 @@ Page {
     }
 
     function drawLayerMap(context) {
-        context.translate(mapData.getCenterPointX(), mapData.getCenterPointY());
-        context.rotate((mapData.getRotate() / 180) *Math.PI  );
-        context.translate(-mapData.getCenterPointX(), -mapData.getCenterPointY());
-        var left = Math.floor(mapData.getTiles().x);
-        var top = Math.floor(mapData.getTiles().y);
-        var tileX = mapData.getXTile();
-        var tileY = mapData.getYTile();
-        var w = mapData.getCenterPointX();
-        var h = mapData.getCenterPointY();
-        var ftileSize = mapData.getTileSize();
-        for (var i = 0; i < canvas.paths.length; i++) {
-            for (var j = 0; j < canvas.paths[i].length; j++) {
-                var leftPlusI = left + i;
-                var topPlusJ = top + j;
-                var x1 = (left + i - tileX) * ftileSize + w;
-                var y1 = (top + j - tileY) * ftileSize + h;
-                context.drawImage(canvas.paths[i][j],  x1, y1, ftileSize, ftileSize);
-            }
-        }
+        context.translate(mapViewAdapter.getCenterPointX(), mapViewAdapter.getCenterPointY());
+        context.rotate((mapViewAdapter.getRotate() / 180) *Math.PI  );
+        context.translate(-mapViewAdapter.getCenterPointX(), -mapViewAdapter.getCenterPointY());
+        context.drawImage("image://map/map"+mapViewAdapter.getRotate(), 0, 0);
+//        var left = Math.floor(mapViewAdapter.getTiles().x);
+//        var top = Math.floor(mapViewAdapter.getTiles().y);
+//        var tileX = mapViewAdapter.getXTile();
+//        var tileY = mapViewAdapter.getYTile();
+//        var w = mapViewAdapter.getCenterPointX();
+//        var h = mapViewAdapter.getCenterPointY();
+//        var ftileSize = mapViewAdapter.getTileSize();
+//        for (var i = 0; i < canvas.paths.length; i++) {
+//            for (var j = 0; j < canvas.paths[i].length; j++) {
+//                var leftPlusI = left + i;
+//                var topPlusJ = top + j;
+//                var x1 = (left + i - tileX) * ftileSize + w;
+//                var y1 = (top + j - tileY) * ftileSize + h;
+//                context.drawImage(canvas.paths[i][j],  x1, y1, ftileSize, ftileSize);
+//            }
+//        }
     }
 
 }

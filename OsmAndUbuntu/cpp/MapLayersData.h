@@ -3,7 +3,6 @@
 #include "OsmAndCore.h"
 #include "OsmAndApplication.h"
 #include "RouteSegment.h"
-#include "Map.h"
 
 class MapLayersData: public QObject
 {

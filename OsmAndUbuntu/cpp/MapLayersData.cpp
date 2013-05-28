@@ -1,4 +1,5 @@
 #include "MapLayersData.h"
+#include "Utilities.h"
 
 MapLayersData::MapLayersData(QObject *) : app(OsmAnd::OsmAndApplication::getAndInitializeApplication())
 {
@@ -11,7 +12,7 @@ void MapLayersData::setRoute(QList< std::shared_ptr<OsmAnd::RouteSegment> >& r)
     bool first = true;
     for(std::shared_ptr<OsmAnd::RouteSegment> rt : r) {
         int sz = rt->road->points.size();
-        for(int k = (first?0:1); k<sz; k++) {
+        for(int k = 0/*(first?0:1)*/; k<sz; k++) {
             this->route.append(OsmAnd::PointF(OsmAnd::Utilities::get31LongitudeX(rt->road->points[k].x),
                                               OsmAnd::Utilities::get31LatitudeY(rt->road->points[k].y)));
         }

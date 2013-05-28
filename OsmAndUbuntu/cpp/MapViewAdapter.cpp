@@ -1,6 +1,6 @@
-#include "Map.h"
+#include "MapViewAdapter.h"
 
-Map::Map(QObject *) : app(OsmAnd::OsmAndApplication::getAndInitializeApplication())
+MapViewAdapter::MapViewAdapter(QObject *) : app(OsmAnd::OsmAndApplication::getAndInitializeApplication())
 {
 
     mapView = std::shared_ptr<OsmAnd::OsmAndMapView>(new OsmAnd::OsmAndMapView(app));

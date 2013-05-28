@@ -1,7 +1,8 @@
 #include <QtGui/QGuiApplication>
 #include <QGuiApplication>
 #include <QQuickView>
-#include <QtQml/qqmlcontext.h>
+#include <QtQml/QQmlContext>
+#include <QtQml/QQmlEngine>
 #include <stdio.h>
 #include <QObject>
 #include "RootContext.h"
@@ -21,7 +22,7 @@ int main(int argc, char *argv[])
     //Resolve the relativ path to the absolute path (at runtime)
     const QString qmlFilePath= QString::fromLatin1("%1/%2").arg(QCoreApplication::applicationDirPath(), "qml/main.qml");
     view->setSource(QUrl::fromLocalFile(qmlFilePath));
-
+    view->engine()->addImageProvider("map", new MapViewLayer(r->getMapViewAdapter()));
     //Not sure if this is nessesary, but on mobile devices the app should start in fullscreen mode
     #if defined(Q_WS_SIMULATOR) || defined(Q_OS_QNX)
     view->showFullScreen();

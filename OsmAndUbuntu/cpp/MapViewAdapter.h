@@ -8,7 +8,8 @@
 #include "OsmAndApplication.h"
 #include "MapView.h"
 
-class Map : public QObject
+// Viewport
+class MapViewAdapter : public QObject
 {
     Q_OBJECT
 private:
@@ -16,9 +17,11 @@ private:
     std::shared_ptr<OsmAnd::OsmAndMapView> mapView;
 
 public:
-    explicit Map(QObject *parent = 0);
+    explicit MapViewAdapter(QObject *parent = 0);
 
     Q_INVOKABLE void setBounds(int w, int h) {mapView->setBounds(w, h);}
+    Q_INVOKABLE int getHeight() {mapView->getHeight();}
+    Q_INVOKABLE int getWidth() {mapView->getWidth();}
     Q_INVOKABLE void setLatLon(float lat, float lon) {mapView->setLatLon(lat, lon); }
     Q_INVOKABLE void setZoom(int z) {mapView->setZoom(z);}
     Q_INVOKABLE int getZoom() {return mapView->getZoom();}

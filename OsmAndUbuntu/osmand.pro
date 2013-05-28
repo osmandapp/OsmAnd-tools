@@ -7,19 +7,21 @@ QT += qml quick
 #C++ source files
 SOURCES +=  cpp/main.cpp \
     cpp/MainApplicationSettings.cpp \
-    cpp/Map.cpp \
     cpp/MapLayersData.cpp \
-    cpp/MapActions.cpp
+    cpp/MapActions.cpp \
+    cpp/MapViewAdapter.cpp \
+    cpp/MapViewLayer.cpp
 
 QMAKE_CXXFLAGS +=-std=c++11
 
 #C++ header files
 HEADERS  += \
     cpp/MainApplicationSettings.h \
-    cpp/Map.h \
     cpp/MapLayersData.h \
     cpp/MapActions.h \
-    cpp/RootContext.h
+    cpp/RootContext.h \
+    cpp/MapViewAdapter.h \
+    cpp/MapViewLayer.h
 
 #Path to the libraries...
 INCLUDEPATH +=  $$PWD/../../core/externals/protobuf/upstream.patched/src/ \
