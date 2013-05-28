@@ -12,7 +12,8 @@ SOURCES +=  cpp/main.cpp \
     cpp/MapViewAdapter.cpp \
     cpp/MapViewLayer.cpp
 
-QMAKE_CXXFLAGS +=-std=c++11
+QMAKE_CXXFLAGS +=-std=c++11 -DSK_ALLOW_STATIC_GLOBAL_INITIALIZERS=0 \
+        -DSK_RELEASE -DSK_CPU_LENDIAN
 
 #C++ header files
 HEADERS  += \
@@ -28,6 +29,7 @@ SKIA_PATCHED = $$PWD/../../core/externals/skia/upstream.patched/
 
 #Path to the libraries...
 INCLUDEPATH +=  $$PWD/../../core/externals/protobuf/upstream.patched/src/ \
+                $$PWD/../../core/client/ \
                 $$PWD/../../core/include $$PWD/../../core/include/native \
                 $$PWD/../../core/protos \
                 $$SKIA_PATCHED/include/core  $$SKIA_PATCHED/include/utils \
@@ -35,6 +37,7 @@ INCLUDEPATH +=  $$PWD/../../core/externals/protobuf/upstream.patched/src/ \
                 $$SKIA_PATCHED/include/src \
                 $$PWD
 DEPENDPATH += $$PWD/../../../../usr/lib \
+              $$PWD/../../core/client/  \
               $$PWD/../../core/externals/protobuf/upstream.patched \
               $$PWD/../../core/include $$PWD/../../core/include/native \
               $$PWD/../../core/protos

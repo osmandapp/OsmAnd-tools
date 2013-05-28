@@ -1,12 +1,13 @@
 #ifndef MAPACTIONS_H
 #define MAPACTIONS_H
 
-#include <stdint.h>
 #include <QObject>
 #include <ObfReader.h>
 #include <QThreadPool>
+#include <OsmAndApplication.h>
+
 #include "MapLayersData.h"
-#include "OsmAndApplication.h"
+
 
 
 class MapActions : public QObject

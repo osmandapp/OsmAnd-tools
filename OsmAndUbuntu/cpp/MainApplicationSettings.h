@@ -2,7 +2,7 @@
 #define APPLICATIONDATA_H
 #include <QObject>
 #include <QStringList>
-#include "OsmAndApplication.h"
+#include <OsmAndApplication.h>
 
 class MainApplicationSettings : public QObject
 {
