@@ -68,7 +68,7 @@ public class RegionsRegistryConverter {
 	}
 	
 	public static void validate(boolean overwrite) throws SAXException, IOException, ParserConfigurationException, TransformerException {
-		List<RegionCountry> regCountries = parseRegions(true);
+		List<RegionCountry> regCountries = parseRegions(false);
 		InputStream is = RegionsRegistryConverter.class.getResourceAsStream("countries.xml");
 		DocumentBuilder docbuilder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
 		Document doc = docbuilder.parse(is);
@@ -82,10 +82,10 @@ public class RegionsRegistryConverter {
 		}
 	
 		for (RegionCountry rc : regCountries) {
-			validateRegion(elements, rc, rc.name);
+//			validateRegion(elements, rc, rc.name);
 			for (RegionCountry r : rc.getSubRegions()) {
 				String rgName = rc.name + "#" + r.name;
-				validateRegion(elements, r, rgName);
+//				validateRegion(elements, r, rgName);
 			}
 		}
 		if (overwrite) {
