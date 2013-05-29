@@ -103,7 +103,7 @@ public class RegionsRegistryConverter {
 
 	private static void validateRegion(Map<String, Element> elements, RegionCountry r, String rgName) {
 		Element reg = elements.get(rgName);
-		// Element tiles = (Element) reg.getElementsByTagName("tiles").item(0);
+		// 
 		// tiles.setTextContent(r.serializeTilesArray());
 		String bbox = reg.getAttribute("bbox");
 		String b = r.left + " " + r.top + " " + r.right + " " + r.bottom;
@@ -119,6 +119,16 @@ public class RegionsRegistryConverter {
 			System.out.println("Region " + rgName);
 			System.out.println("Validate size '" + size + "' != '" +sz +"'");
 			reg.setAttribute("size", b);
+		}
+		
+		// format tiles
+		Element tiles = (Element) reg.getElementsByTagName("tiles").item(0);
+		String ts = tiles.getTextContent();
+		String tsz = r.serializeTilesArray();
+		if(!ts.equals(tsz)) {
+			System.out.println("Region " + rgName);
+			System.out.println("Format tiles '" + ts + "' != '" +tsz +"'");
+			tiles.setTextContent(tsz);
 		}
 	}
 
