@@ -82,7 +82,7 @@ public class RegionsRegistryConverter {
 		}
 	
 		for(RegionCountry r : regCountries) {
-			if (r.getTileSize() < 15) {
+			if (r.getTileSize() < 30) {
 				boolean optimized = new AreaOptimizer().tryToCutBigSquareArea(r, true);
 				if (optimized) {
 					NodeList ts = elements.get(r.name).getElementsByTagName("tiles");
