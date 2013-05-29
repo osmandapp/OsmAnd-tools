@@ -82,13 +82,13 @@ public class RegionsRegistryConverter {
 		}
 	
 		for(RegionCountry r : regCountries) {
-			if(r.getTileSize()  < 8) {
+			if (r.getTileSize() < 15) {
 				boolean optimized = new AreaOptimizer().tryToCutBigSquareArea(r, true);
-				if(optimized) {
+				if (optimized) {
 					NodeList ts = elements.get(r.name).getElementsByTagName("tiles");
 					Element e = (Element) ts.item(0);
-					System.out.println("-"+e.getTextContent());
-					System.out.println("+"+r.serializeTilesArray());
+					System.out.println("-" + e.getTextContent());
+					System.out.println("+" + r.serializeTilesArray());
 					System.out.println("-----------------------------------\n");
 					e.setTextContent(r.serializeTilesArray());
 				}

@@ -817,7 +817,7 @@
 				<tiles>-23 15</tiles>
 			</region>
 		-->
-		<tiles>-25 17;-24 14;-24 15;-25 16;-23 16;-26 16;-26 17;-25 15;-25 14;-23 15</tiles></country>
+		<tiles>-23 16;-23 15;-26 17 x -25 16;-25 15 x -24 14</tiles></country>
 		<country bbox="14 2 27 11" hillshade_sqlite="yes" name="central_african_republic" size="79">
 			<tiles>15 2;15 3;25 4;15 6;15 7;15 4;15 5;14 3;22 10;22 11;14 6;14 5;14 4;18 7;18 6;18 5;17 3;17 4;17 5;17 6;17 7;17 8;16 3;16 2;16 5;16 4;16 7;16 6;23 10;26 5;26 7;25 8;18 9;18 8;21 9;21 8;20 6;20 7;20 4;20 5;20 8;20 9;21 7;21 6;21 5;21 4;23 9;23 8;22 4;22 5;22 6;22 7;22 8;22 9;23 6;23 5;23 4;23 7;21 10;24 6;24 7;24 4;24 5;19 8;19 9;19 6;19 7;19 4;19 5;24 8;26 4;25 7;26 6;18 4;25 6;27 5;18 3;25 5;27 4</tiles><region bbox="18 6 22 9" name="bamingui-bangoran" size="14">
 				<tiles>18 8;18 9;19 7;19 8;19 9;20 6;20 7;20 8;20 9;21 7;21 8;21 9;22 8;22 9</tiles>
@@ -1031,7 +1031,7 @@
 			</region>
 		</country>
 		<country bbox="41 10 43 12" hillshade_sqlite="yes" name="djibouti" size="9">
-			<tiles>43 10;42 10;43 12;43 11;42 11;41 11;41 10;42 12;41 12</tiles><region bbox="42 10 43 11" name="ali_sabieh" size="4">
+			<tiles>41 12 x 43 10</tiles><region bbox="42 10 43 11" name="ali_sabieh" size="4">
 				<tiles>42 10;42 11;43 10;43 11</tiles>
 			</region>
 			<region bbox="41 10 42 12" name="dikhil" size="6">
@@ -1128,7 +1128,7 @@
 			</region>
 		</country>
 		<country bbox="5 -2 11 3" hillshade_sqlite="yes" name="equatorial_guinea" size="12">
-			<tiles>11 2;5 -2;11 0;11 1;8 3;10 2;10 1;10 0;9 2;9 3;9 0;9 1</tiles><region bbox="5 -2 5 -2" name="annobon" size="1">
+			<tiles>5 -2;8 3;9 3;9 2 x 11 0</tiles><region bbox="5 -2 5 -2" name="annobon" size="1">
 				<tiles>5 -2</tiles>
 			</region>
 			<region bbox="8 3 9 3" name="bioko_norte" size="2">
@@ -1346,7 +1346,7 @@
 				<tiles>-15 10;-15 11</tiles>
 			</region>
 		-->
-		<tiles>-15 10;-15 11;-15 12;-17 12;-14 12;-14 11;-17 11;-16 11;-16 10;-16 12</tiles></country>
+		<tiles>-15 10;-16 10;-17 12 x -14 11</tiles></country>
 		<country bbox="33 -5 41 4" hillshade_sqlite="yes" name="kenya" size="73">
 			<!--
 			<region size="4" bbox="36 -1 37 0" name="central">
@@ -1408,7 +1408,7 @@
 				<tiles>27 -29</tiles>
 			</region>
 		-->
-		<tiles>27 -29;28 -30;28 -31;27 -31;27 -30;29 -31;29 -30;29 -29;28 -29</tiles></country>
+		<tiles>27 -29 x 29 -31</tiles></country>
 		<country bbox="-12 4 -8 8" hillshade_sqlite="yes" name="liberia" size="18">
 			<!--
 			<region size="2" bbox="-11 6 -11 7" name="bomi">
@@ -2427,7 +2427,7 @@
 				<tiles>0 9;0 10;0 11;1 10;1 11</tiles>
 			</region>
 		-->
-		<tiles>1 8;1 9;0 7;0 6;1 10;0 9;0 8;1 6;1 7;-1 10;-1 11;0 11;0 10</tiles></country>
+		<tiles>-1 10;-1 11;0 11;0 10 x 1 6</tiles></country>
 		<country bbox="7 30 11 37" hillshade_sqlite="yes" name="tunisia" size="31">
 			<tiles>9 32;9 33;9 30;7 33;7 34;9 37;9 34;9 35;11 36;11 37;11 34;9 31;11 32;11 33;9 36;10 35;10 34;10 37;10 36;10 31;10 30;10 33;10 32;11 35;8 35;8 34;8 37;8 36;8 31;8 33;8 32</tiles><region bbox="9 36 10 37" name="ariana" size="4">
 				<tiles>9 36;9 37;10 36;10 37</tiles>
@@ -2862,7 +2862,7 @@
 			</region>
 		</country>
 		<country bbox="43 38 46 41" hillshade_sqlite="yes" name="armenia" size="13">
-			<tiles>43 39;44 40;45 41;46 38;46 39;43 40;43 41;44 41;44 39;45 39;45 38;45 40;46 40</tiles><region bbox="43 40 44 40" name="aragatsotn" size="2">
+			<tiles>46 38;46 39;45 38;46 40;43 41 x 45 39</tiles><region bbox="43 40 44 40" name="aragatsotn" size="2">
 				<tiles>43 40;44 40</tiles>
 			</region>
 			<region bbox="44 39 45 40" name="ararat" size="4">
@@ -3149,7 +3149,7 @@
 			</region>
 		</country>
 		<country bbox="88 26 92 28" hillshade_sqlite="yes" name="bhutan" size="13">
-			<tiles>92 26;92 27;90 26;90 27;89 26;89 27;88 27;88 26;91 27;91 26;89 28;90 28;91 28</tiles><region bbox="90 27 91 28" name="bumthang" size="3">
+			<tiles>89 28;90 28;91 28;88 27 x 92 26</tiles><region bbox="90 27 91 28" name="bumthang" size="3">
 				<tiles>90 27;90 28;91 27</tiles>
 			</region>
 			<region bbox="89 26 89 27" name="chhukha" size="2">
@@ -3920,7 +3920,7 @@
 			</region>
 		</country>
 		<country bbox="34 29 36 33" hillshade_sqlite="yes" name="israel" size="11">
-			<tiles>35 33;34 32;35 29;34 31;35 30;34 29;35 32;34 30;35 31;36 33;36 32</tiles><region bbox="35 32 36 33" name="golan" size="4">
+			<tiles>35 33;36 33;36 32;34 32 x 35 29</tiles><region bbox="35 32 36 33" name="golan" size="4">
 				<tiles>35 32;35 33;36 32;36 33</tiles>
 			</region>
 			<region bbox="34 29 35 31" name="hadarom" size="6">
@@ -4169,7 +4169,7 @@
 			</region>
 		</country>
 		<country bbox="46 28 48 30" hillshade_sqlite="yes" name="kuwait" size="8">
-			<tiles>46 28;46 29;47 30;47 28;47 29;48 30;48 29;48 28</tiles><region bbox="47 28 48 29" name="al_ahmadi" size="4">
+			<tiles>47 30;48 30;46 29 x 48 28</tiles><region bbox="47 28 48 29" name="al_ahmadi" size="4">
 				<tiles>47 28;47 29;48 28;48 29</tiles>
 			</region>
 			<region bbox="47 29 48 29" name="al_farwaniyah" size="2">
@@ -4916,7 +4916,7 @@
 		<country bbox="114 10 115 11" hillshade_sqlite="yes" name="spratly_islands" size="4">
 			<tiles>113 8;111 8;114 11 x 115 10</tiles></country>
 		<country bbox="79 5 81 9" hillshade_sqlite="yes" name="sri_lanka" size="12">
-			<tiles>79 8;79 9;80 8;80 9;80 5;80 6;80 7;79 6;79 7;81 7;81 6;81 8</tiles><region bbox="80 6 81 7" name="ampara" size="3">
+			<tiles>79 9;80 9;80 5;79 8 x 81 6</tiles><region bbox="80 6 81 7" name="ampara" size="3">
 				<tiles>80 7;81 6;81 7</tiles>
 			</region>
 			<region bbox="79 7 81 9" name="anuradhapura" size="5">
@@ -5037,7 +5037,7 @@
 			</region>
 		</country>
 		<country bbox="116 20 122 25" hillshade_sqlite="yes" name="taiwan" size="13">
-			<tiles>121 24;121 25;121 22;121 23;121 21;116 20;122 25;122 24;120 24;119 23;120 21;120 23;120 22</tiles><region bbox="120 22 120 22" name="kaohsiung" size="1">
+			<tiles>121 25;116 20;122 25;122 24;119 23;120 24 x 121 21</tiles><region bbox="120 22 120 22" name="kaohsiung" size="1">
 				<tiles>120 22</tiles>
 			</region>
 			<region bbox="116 20 116 20" name="pratas_islands" size="1">
@@ -6080,7 +6080,7 @@
 				<tiles>-71 19</tiles>
 			</region>
 		-->
-		<tiles>-72 19;-72 18;-70 19;-70 18;-71 18;-71 19;-72 17;-69 19;-69 18</tiles></country>
+		<tiles>-72 17;-72 19 x -69 18</tiles></country>
 		<country bbox="-62 11 -62 12" hillshade_sqlite="yes" name="grenada" size="2">
 			<!--
 			<region size="1" bbox="-61 12 -61 12" name="carriacou">
@@ -6152,7 +6152,7 @@
 				<tiles>-73 18;-72 17;-72 18</tiles>
 			</region>
 		-->
-		<tiles>-74 19;-74 18;-73 19;-73 18;-75 18;-73 20;-74 20;-72 19;-72 18;-72 17</tiles></country>
+		<tiles>-75 18;-72 19;-72 18;-72 17;-74 20 x -73 18</tiles></country>
 		<country bbox="-79 17 -76 18" hillshade_sqlite="yes" name="jamaica" size="7">
 			<!--
 			<region size="1" bbox="-77 17 -77 17" name="clarendon">
@@ -6235,7 +6235,7 @@
 				<tiles>-63 17;-63 18</tiles>
 			</region>
 		-->
-		<tiles>-63 17;-70 11;-70 12;-63 18;-64 18;-69 12;-69 11;-64 17;-71 12</tiles></country>
+		<tiles>-71 12;-64 18 x -63 17;-70 12 x -69 11</tiles></country>
 	<country bbox="-68 17 -65 18" hillshade_sqlite="yes" name="puerto_rico" size="8">
 			<!--
 			<region size="1" bbox="-66 18 -66 18" name="adjuntas">
@@ -6473,7 +6473,7 @@
 				<tiles>-67 17;-67 18</tiles>
 			</region>
 		-->
-		<tiles>-67 18;-65 17;-66 17;-68 17;-68 18;-66 18;-65 18;-67 17</tiles></country>
+		<tiles>-68 18 x -65 17</tiles></country>
 		<country bbox="-63 17 -63 17" hillshade_sqlite="yes" name="saint_kitts_and_nevis" size="1">
 			<!--
 			<region size="1" bbox="-62 17 -62 17" name="christ_church_nichola_town">
@@ -6660,7 +6660,7 @@
 				<tiles>-89 15;-89 16</tiles>
 			</region>
 		-->
-		<tiles>-89 18;-88 16;-88 17;-88 18;-89 15;-89 17;-89 16;-90 17;-90 16;-90 15;-90 18</tiles></country>
+		<tiles>-89 15;-90 15;-90 18 x -88 16</tiles></country>
 		<country bbox="-110 10 -110 10" hillshade_sqlite="yes" name="clipperton_island" size="1">
 			<tiles>-110 10</tiles></country>
 	<country bbox="-88 5 -83 11" hillshade_sqlite="yes" name="costa_rica" size="14">
@@ -6687,7 +6687,7 @@
 				<tiles>-84 8;-84 9;-84 10</tiles>
 			</region>
 		-->
-		<tiles>-86 10;-86 11;-83 9;-83 8;-83 7;-84 8;-84 9;-88 5;-85 9;-84 10;-84 11;-85 11;-85 10;-86 9</tiles></country>
+		<tiles>-83 9;-83 8;-83 7;-84 8;-88 5;-86 11 x -84 9</tiles></country>
 		<country bbox="-91 13 -88 14" hillshade_sqlite="yes" name="el_salvador" size="7">
 			<!--
 			<region size="2" bbox="-90 13 -90 14" name="ahuachapan">
@@ -7013,7 +7013,7 @@
 			</region>
 		</country>
 		<country bbox="19 39 21 42" hillshade_sqlite="yes" name="albania" size="10">
-			<tiles>21 41;19 39;20 42;20 41;20 39;21 40;20 40;19 42;19 41;19 40</tiles><region bbox="19 40 20 40" name="berat" size="2">
+			<tiles>21 41;21 40;19 42 x 20 39</tiles><region bbox="19 40 20 40" name="berat" size="2">
 				<tiles>19 40;20 40</tiles>
 			</region>
 			<region bbox="19 41 20 42" name="diber" size="3">
@@ -7123,7 +7123,7 @@
 			</region>
 		</country>
 		<country bbox="2 49 6 51" hillshade_sqlite="yes" name="belgium" size="12">
-			<tiles>5 49;6 49;5 50;5 51;3 50;3 51;2 51;2 50;4 51;4 50;6 50;4 49</tiles><region bbox="4 50 5 51" name="antwerp" size="4">
+			<tiles>5 49;6 49;6 50;4 49;2 51 x 5 50</tiles><region bbox="4 50 5 51" name="antwerp" size="4">
 				<tiles>4 50;4 51;5 50;5 51</tiles>
 			</region>
 			<region bbox="4 50 4 51" name="brussels" size="2">
@@ -8023,7 +8023,7 @@
 		-->
 		<tiles>5 50 x 6 49</tiles></country>
 		<country bbox="20 40 23 42" hillshade_sqlite="yes" name="macedonia" size="9">
-			<tiles>22 41;22 42;20 42;20 41;20 40;21 40;21 41;21 42;23 41</tiles><region bbox="21 41 23 42" name="eastern" size="5">
+			<tiles>20 40;21 40;23 41;20 42 x 22 41</tiles><region bbox="21 41 23 42" name="eastern" size="5">
 				<tiles>21 41;21 42;22 41;22 42;23 41</tiles>
 			</region>
 			<region bbox="21 41 22 42" name="northeastern" size="4">
@@ -8234,7 +8234,7 @@
 			</region>
 		</country>
 		<country bbox="3 50 7 53" hillshade_sqlite="yes" name="netherlands" size="14">
-			<tiles>7 53;6 51;6 50;5 50;5 51;5 52;3 51;4 53;4 52;4 51;6 52;7 52;6 53;5 53</tiles><region bbox="6 52 7 53" name="drenthe" size="4">
+			<tiles>7 53;6 50;5 50;3 51;7 52;4 53 x 6 51</tiles><region bbox="6 52 7 53" name="drenthe" size="4">
 				<tiles>6 52;6 53;7 52;7 53</tiles>
 			</region>
 			<region bbox="5 52 6 52" name="flevoland" size="2">
@@ -10008,7 +10008,7 @@
 		-->
 		<tiles>-92 1;-77 -1;-77 -2;-77 -3;-77 0;-81 -5;-81 -4;-76 0;-81 -1;-81 -3;-81 -2;-80 -6;-80 -4;-80 -5;-80 -2;-80 -3;-80 -1;-80 0;-80 1;-76 -2;-76 -1;-82 -2;-82 -3;-78 -4;-92 -1;-81 0;-92 -2;-79 -2;-79 -3;-79 -1;-79 -4;-79 -5;-90 0;-78 -1;-78 -3;-78 -2;-92 0;-79 0;-79 1;-78 0;-90 -2;-90 -1;-91 0;-91 -1;-91 -2</tiles></country>
 	<country bbox="-62 -53 -58 -51" hillshade_sqlite="yes" name="falkland_islands" size="10">
-		<tiles>-58 -52;-61 -53;-61 -52;-60 -52;-60 -53;-59 -52;-59 -53;-62 -51;-62 -52;-62 -53</tiles></country>
+		<tiles>-58 -52;-62 -51;-62 -52 x -59 -53</tiles></country>
 		<country bbox="-55 2 -52 5" hillshade_sqlite="yes" name="french_guiana" size="14">
 			<!--
 		<region size="6" bbox="-53 2 -52 5" name="cayenne">
@@ -10018,7 +10018,7 @@
 				<tiles>-54 2;-54 3;-54 4;-54 5;-53 2;-53 3</tiles>
 			</region>
 		-->
-		<tiles>-54 5;-54 4;-54 3;-54 2;-55 4;-55 5;-55 2;-55 3;-52 3;-52 4;-53 2;-53 3;-53 4;-53 5</tiles></country>
+		<tiles>-52 3;-52 4;-55 5 x -53 2</tiles></country>
 		<country bbox="-62 1 -57 8" hillshade_sqlite="yes" name="guyana" size="30">
 			<!--
 			<region size="5" bbox="-60 6 -59 8" name="barima-waini">
