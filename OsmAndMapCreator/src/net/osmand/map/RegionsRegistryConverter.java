@@ -43,11 +43,11 @@ import org.xml.sax.helpers.DefaultHandler;
 
 public class RegionsRegistryConverter {
 	
-	public static List<RegionCountry> parseRegions() throws IllegalStateException {
+	public static List<RegionCountry> parseRegions(boolean withNoValidated) throws IllegalStateException {
 		InputStream is = RegionsRegistryConverter.class.getResourceAsStream("countries.xml");
 		try {
 			SAXParser parser = SAXParserFactory.newInstance().newSAXParser();
-			RegionsHandler h = new RegionsHandler(parser);
+			RegionsHandler h = new RegionsHandler(parser, withNoValidated);
 			parser.parse(new InputSource(is), h);
 			return h.getCountries();
 		} catch (SAXException e) {
@@ -63,12 +63,12 @@ public class RegionsRegistryConverter {
 //		List<RegionCountry> countries = recreateReginfo();
 //		checkFileRead(countries);
 		
-//		validate(true);
+		validate(true);
 //		optimizeBoxes();
 	}
 	
 	public static void validate(boolean overwrite) throws SAXException, IOException, ParserConfigurationException, TransformerException {
-		List<RegionCountry> regCountries = parseRegions();
+		List<RegionCountry> regCountries = parseRegions(true);
 		InputStream is = RegionsRegistryConverter.class.getResourceAsStream("countries.xml");
 		DocumentBuilder docbuilder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
 		Document doc = docbuilder.parse(is);
@@ -103,8 +103,6 @@ public class RegionsRegistryConverter {
 
 	private static void validateRegion(Map<String, Element> elements, RegionCountry r, String rgName) {
 		Element reg = elements.get(rgName);
-		// 
-		// tiles.setTextContent(r.serializeTilesArray());
 		String bbox = reg.getAttribute("bbox");
 		String b = r.left + " " + r.top + " " + r.right + " " + r.bottom;
 		if(!bbox.equals(b)) {
@@ -122,7 +120,14 @@ public class RegionsRegistryConverter {
 		}
 		
 		// format tiles
-		Element tiles = (Element) reg.getElementsByTagName("tiles").item(0);
+		Element tiles = null;
+		NodeList ch = elements.get(rgName).getChildNodes();
+		for(int i =0; i< ch.getLength(); i++) {
+			if(ch.item(i).getNodeName().equals("tiles")) {
+				tiles = (Element) ch.item(i);
+				break;
+			}
+		}
 		String ts = tiles.getTextContent();
 		String tsz = r.serializeTilesArray();
 		if(!ts.equals(tsz)) {
@@ -134,7 +139,7 @@ public class RegionsRegistryConverter {
 
 
 	public static void optimizeBoxes() throws SAXException, IOException, ParserConfigurationException, TransformerException {
-		List<RegionCountry> regCountries = parseRegions();
+		List<RegionCountry> regCountries = parseRegions(true);
 		InputStream is = RegionsRegistryConverter.class.getResourceAsStream("countries.xml");
 		DocumentBuilder docbuilder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
 		Document doc = docbuilder.parse(is);
@@ -157,12 +162,18 @@ public class RegionsRegistryConverter {
 						optimized = new AreaOptimizer().tryToCutBigSquareArea(r, true);
 					}
 					if (replace) {
-						NodeList ts = elements.get(rgName).getElementsByTagName("tiles");
-						Element e = (Element) ts.item(0);
-						System.out.println("-" + e.getTextContent());
+						Element tiles = null;
+						NodeList ch = elements.get(rgName).getChildNodes();
+						for(int i =0; i< ch.getLength(); i++) {
+							if(ch.item(i).getNodeName().equals("tiles")) {
+								tiles = (Element) ch.item(i);
+								break;
+							}
+						}
+						System.out.println("-" + tiles.getTextContent());
 						System.out.println("+" + r.serializeTilesArray());
 						System.out.println("-----------------------------------\n");
-						e.setTextContent(r.serializeTilesArray());
+						tiles.setTextContent(r.serializeTilesArray());
 					}
 				}
 			}
@@ -191,8 +202,8 @@ public class RegionsRegistryConverter {
 		}
 	}
 
-	private static List<RegionCountry> recreateReginfo() throws FileNotFoundException, IOException {
-		List<RegionCountry> countries = parseRegions();
+	public static List<RegionCountry> recreateReginfo() throws FileNotFoundException, IOException {
+		List<RegionCountry> countries = parseRegions(false);
 		OsmAndRegions.Builder regions = OsmAndRegions.newBuilder();
 		for (RegionCountry c : countries) {
 			regions.addRegions(c.convert());
@@ -205,7 +216,7 @@ public class RegionsRegistryConverter {
 	}
 
 
-	private static void checkFileRead(List<RegionCountry> originalcountries) throws IOException {
+	public  static void checkFileRead(List<RegionCountry> originalcountries) throws IOException {
 		long t = -System.currentTimeMillis();
 		InputStream in = RegionRegistry.class.getResourceAsStream(RegionRegistry.fileName);
 		OsmAndRegionInfo regInfo = OsmAndRegionInfo.newBuilder().mergeFrom(in).build();
@@ -226,9 +237,11 @@ public class RegionsRegistryConverter {
 		private RegionCountry currentRegion;
 		private List<RegionCountry> countries = new ArrayList<RegionCountry>();
 		private StringBuilder txt = new StringBuilder();
+		private boolean withNoValidated;
 
-		public RegionsHandler(SAXParser parser) {
+		public RegionsHandler(SAXParser parser, boolean withNoValidated) {
 			this.parser = parser;
+			this.withNoValidated = withNoValidated;
 		}
 
 		@Override
@@ -248,7 +261,9 @@ public class RegionsRegistryConverter {
 				RegionCountry c = new RegionCountry();
 				c.name = attributes.getValue("name");
 				currentRegion = c;
-				current.addSubregion(c);
+				if(!"no".equals(attributes.getValue("verified")) || withNoValidated) {
+					current.addSubregion(c);
+				}
 			}
 		}
 		@Override
