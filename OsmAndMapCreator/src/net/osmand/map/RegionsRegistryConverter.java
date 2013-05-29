@@ -15,6 +15,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Stack;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -181,23 +183,36 @@ public class RegionsRegistryConverter {
 			txt.append(ch, start, length);
 		}
 		
+		
 		@Override
 		public void endElement(String uri, String localName, String qName) throws SAXException {
 			String tagName = parser.isNamespaceAware() ? localName : qName;
 			if(tagName.equals("region")) {
 				currentRegion = null;
 			} else if(tagName.equals("tiles")) {
-				String[] s = txt.toString().split("( |;)");
+				String[] s = txt.toString().split(";");
+				Pattern p = Pattern.compile("(-?\\d+)");
 				RegionCountry a = currentRegion == null ? current : currentRegion;
-				for(int i =0; i < s.length; i+=2) {
+				for (int i = 0; i < s.length; i++) {
 					try {
-						a.add(Integer.parseInt(s[i].trim()), Integer.parseInt(s[i+1].trim()));
-					} catch(RuntimeException e){
+						Matcher m = p.matcher(s[i]);
+						if (s[i].contains("x")) {
+							a.add(parseInt(m), parseInt(m), parseInt(m), parseInt(m));
+						} else {
+							a.add(parseInt(m), parseInt(m));
+						}
+					} catch (RuntimeException e) {
 						System.err.println(a.name);
 						throw e;
 					}
 				}
 			}
+		}
+
+		private int parseInt(Matcher m) {
+			m.find();
+			int i = Integer.parseInt(m.group(1));
+			return i;
 		}
 		
 		public List<RegionCountry> getCountries() {
@@ -211,11 +226,11 @@ public class RegionsRegistryConverter {
 			int i = odd ? 1 : 0;
 			TIntArrayList ts = r.getSingleTiles();
 			int init = ts.get(i);
-			for(; i<ts.size(); i+=2) {
-				if(min) {
-					init  = Math.min(ts.get(i), init); 
+			for (; i < ts.size(); i += 2) {
+				if (min) {
+					init = Math.min(ts.get(i), init);
 				} else {
-					init  = Math.max(ts.get(i), init);
+					init = Math.max(ts.get(i), init);
 				}
 			}
 			return init;
@@ -265,6 +280,9 @@ public class RegionsRegistryConverter {
 		
 		
 		public boolean tryToCutBigSquareArea(RegionCountry r, boolean verbose) {
+			if(r.getSingleTiles().size() == 0) {
+				return false;
+			}
 			int minX = findExtremumCoordinate(r, true, false);
 			int maxX = findExtremumCoordinate(r, false, false);
 			int minY = findExtremumCoordinate(r, true, true);
@@ -288,7 +306,7 @@ public class RegionsRegistryConverter {
 						r.removeSingle(x, y);
 					}
 				}
-				r.add(xleft, xright, ytop, ybottom);
+				r.add(xleft, ytop, xright, ybottom);
 				if (verbose) {
 					System.out.println("-" + r.name);
 					for (int t = 0; t < areaMatrix.length; t++) {
