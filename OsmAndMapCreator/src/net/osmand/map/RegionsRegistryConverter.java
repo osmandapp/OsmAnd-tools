@@ -2,6 +2,7 @@ package net.osmand.map;
 
 import gnu.trove.list.array.TIntArrayList;
 
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -20,6 +21,11 @@ import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerException;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
 
 import net.osmand.map.OsmandRegionInfo.OsmAndRegionInfo;
 import net.osmand.map.OsmandRegionInfo.OsmAndRegions;
@@ -59,7 +65,7 @@ public class RegionsRegistryConverter {
 	}
 
 
-	private static void optimizeBoxes() throws SAXException, IOException, ParserConfigurationException {
+	private static void optimizeBoxes() throws SAXException, IOException, ParserConfigurationException, TransformerException {
 		List<RegionCountry> regCountries = parseRegions();
 		InputStream is = RegionsRegistryConverter.class.getResourceAsStream("countries.xml");
 		DocumentBuilder docbuilder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
@@ -75,10 +81,23 @@ public class RegionsRegistryConverter {
 	
 		for(RegionCountry r : regCountries) {
 			if(r.getTileSize()  < 15) {
-				new AreaOptimizer().tryToCutBigSquareArea(r);
+				boolean optimized = new AreaOptimizer().tryToCutBigSquareArea(r);
+				if(optimized) {
+					NodeList ts = elements.get(r.name).getElementsByTagName("tiles");
+					Element e = (Element) ts.item(0);
+//					e.setTextContent(r.serializeTilesArray());
+				}
 			}
 		}
-		
+		TransformerFactory transformerFactory = TransformerFactory.newInstance();
+		Transformer transformer = transformerFactory.newTransformer();
+		DOMSource source = new DOMSource(doc);
+		StreamResult result = new StreamResult(new File("src/net/osmand/map/countries.xml"));
+ 
+		// Output to console for testing
+		// StreamResult result = new StreamResult(System.out);
+ 
+		transformer.transform(source, result);
 	}
 
 	private static void parseDomRegions(Node parent, Map<String, Element> elements, String parentName, String tag) {
