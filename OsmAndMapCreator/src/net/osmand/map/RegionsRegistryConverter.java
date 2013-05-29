@@ -63,7 +63,7 @@ public class RegionsRegistryConverter {
 //		List<RegionCountry> countries = recreateReginfo();
 //		checkFileRead(countries);
 		
-		validate(true);
+//		validate(true);
 //		optimizeBoxes();
 	}
 	
@@ -139,7 +139,7 @@ public class RegionsRegistryConverter {
 
 
 	public static void optimizeBoxes() throws SAXException, IOException, ParserConfigurationException, TransformerException {
-		List<RegionCountry> regCountries = parseRegions(false);
+		List<RegionCountry> regCountries = parseRegions(true);
 		InputStream is = RegionsRegistryConverter.class.getResourceAsStream("countries.xml");
 		DocumentBuilder docbuilder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
 		Document doc = docbuilder.parse(is);
@@ -153,28 +153,26 @@ public class RegionsRegistryConverter {
 		}
 	
 		for(RegionCountry rc : regCountries) {
-			for(RegionCountry r : rc.getSubRegions()) {
-				if (r.getTileSize() < 1000000) {
-					String rgName = rc.name + "#" + r.name;
-					boolean optimized = new AreaOptimizer().tryToCutBigSquareArea(r, true);
-					boolean replace = optimized;
-					while (optimized) {
-						optimized = new AreaOptimizer().tryToCutBigSquareArea(r, true);
-					}
-					if (replace) {
-						Element tiles = null;
-						NodeList ch = elements.get(rgName).getChildNodes();
-						for(int i =0; i< ch.getLength(); i++) {
-							if(ch.item(i).getNodeName().equals("tiles")) {
-								tiles = (Element) ch.item(i);
-								break;
-							}
+			for (RegionCountry r : rc.getSubRegions()) {
+				String rgName = rc.name + "#" + r.name;
+				boolean optimized = new AreaOptimizer().tryToCutBigSquareArea(r, true);
+				boolean replace = optimized;
+				while (optimized) {
+					optimized = new AreaOptimizer().tryToCutBigSquareArea(r, true);
+				}
+				if (replace) {
+					Element tiles = null;
+					NodeList ch = elements.get(rgName).getChildNodes();
+					for (int i = 0; i < ch.getLength(); i++) {
+						if (ch.item(i).getNodeName().equals("tiles")) {
+							tiles = (Element) ch.item(i);
+							break;
 						}
-						System.out.println("-" + tiles.getTextContent());
-						System.out.println("+" + r.serializeTilesArray());
-						System.out.println("-----------------------------------\n");
-						tiles.setTextContent(r.serializeTilesArray());
 					}
+					System.out.println("-" + tiles.getTextContent());
+					System.out.println("+" + r.serializeTilesArray());
+					System.out.println("-----------------------------------\n");
+					tiles.setTextContent(r.serializeTilesArray());
 				}
 			}
 		}
@@ -224,7 +222,16 @@ public class RegionsRegistryConverter {
 		for (int j = 0; j < regInfo.getRegionInfo().getRegionsCount(); j++) {
 			RegionCountry.construct(regInfo.getRegionInfo().getRegions(j));
 		}
+		int subregions = 0;
+		for(int i = 0; i < regInfo.getRegionInfo().getRegionsCount(); i++) {
+			subregions += regInfo.getRegionInfo().getRegions(i).getSubregionsCount();
+		}
+		int subregionsOrig = 0;
+		for(RegionCountry c : originalcountries) {
+			subregionsOrig += c.getSubRegions().size();
+		}
 		System.out.println("Read countries " + regInfo.getRegionInfo().getRegionsCount() + " " + originalcountries.size());
+		System.out.println("Read countries " + subregions + " " + subregionsOrig );
 		System.out.println("Timing " + t);
 	}
 	
@@ -414,3 +421,4 @@ public class RegionsRegistryConverter {
 		
 	}
 }
+

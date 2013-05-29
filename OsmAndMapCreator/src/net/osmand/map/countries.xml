@@ -556,7 +556,7 @@
 				<tiles>-4 11;-4 12</tiles>
 			</region>
 			<region bbox="-2 12 -1 11" name="bazega" size="4">
-				<tiles>-2 11;-2 12;-1 11;-1 12</tiles>
+				<tiles>-2 12 x -1 11</tiles>
 			</region>
 			<region bbox="-3 10 -3 10" name="bougouriba" size="1">
 				<tiles>-3 10</tiles>
@@ -574,7 +574,7 @@
 				<tiles>0 12;0 13</tiles>
 			</region>
 			<region bbox="0 12 1 11" name="gourma" size="4">
-				<tiles>0 11;0 12;1 11;1 12</tiles>
+				<tiles>0 12 x 1 11</tiles>
 			</region>
 			<region bbox="-4 12 -4 10" name="houet" size="3">
 				<tiles>-4 10;-4 11;-4 12</tiles>
@@ -589,13 +589,13 @@
 				<tiles>-5 10;-5 11;-5 12</tiles>
 			</region>
 			<region bbox="-5 10 -4 9" name="komoe" size="4">
-				<tiles>-5 9;-5 10;-4 9;-4 10</tiles>
+				<tiles>-5 10 x -4 9</tiles>
 			</region>
 			<region bbox="0 13 1 12" name="komondjari" size="4">
-				<tiles>0 12;0 13;1 12;1 13</tiles>
+				<tiles>0 13 x 1 12</tiles>
 			</region>
 			<region bbox="0 12 1 10" name="kompienga" size="5">
-				<tiles>0 10;0 11;0 12;1 10;1 11</tiles>
+				<tiles>0 11 x 1 10;0 12</tiles>
 			</region>
 			<region bbox="-4 13 -4 12" name="kossi" size="2">
 				<tiles>-4 12;-4 13</tiles>
@@ -616,7 +616,7 @@
 				<tiles>-2 13;-2 14</tiles>
 			</region>
 			<region bbox="-4 12 -3 11" name="mou_houn" size="4">
-				<tiles>-4 11;-4 12;-3 11;-3 12</tiles>
+				<tiles>-4 12 x -3 11</tiles>
 			</region>
 			<region bbox="-1 11 -1 10" name="nahouri" size="2">
 				<tiles>-1 10;-1 11</tiles>
@@ -631,13 +631,13 @@
 				<tiles>-1 12</tiles>
 			</region>
 			<region bbox="-1 15 0 14" name="oudalan" size="4">
-				<tiles>-1 14;-1 15;0 14;0 15</tiles>
+				<tiles>-1 15 x 0 14</tiles>
 			</region>
 			<region bbox="-2 13 -2 12" name="passore" size="2">
 				<tiles>-2 12;-2 13</tiles>
 			</region>
 			<region bbox="-4 10 -3 9" name="poni" size="4">
-				<tiles>-4 9;-4 10;-3 9;-3 10</tiles>
+				<tiles>-4 10 x -3 9</tiles>
 			</region>
 			<region bbox="-3 12 -3 11" name="sanguie" size="2">
 				<tiles>-3 11;-3 12</tiles>
@@ -652,22 +652,22 @@
 				<tiles>-2 10;-2 11</tiles>
 			</region>
 			<region bbox="-2 14 -1 13" name="soum" size="4">
-				<tiles>-2 13;-2 14;-1 13;-1 14</tiles>
+				<tiles>-2 14 x -1 13</tiles>
 			</region>
 			<region bbox="-3 13 -3 12" name="sourou" size="2">
 				<tiles>-3 12;-3 13</tiles>
 			</region>
 			<region bbox="1 12 2 11" name="tapoa" size="4">
-				<tiles>1 11;1 12;2 11;2 12</tiles>
+				<tiles>1 12 x 2 11</tiles>
 			</region>
 			<region bbox="-4 11 -3 10" name="tuy" size="3">
 				<tiles>-4 10;-4 11;-3 11</tiles>
 			</region>
 			<region bbox="0 13 1 12" name="yagha" size="4">
-				<tiles>0 12;0 13;1 12;1 13</tiles>
+				<tiles>0 13 x 1 12</tiles>
 			</region>
 			<region bbox="-3 14 -2 12" name="yatenga" size="5">
-				<tiles>-3 12;-3 13;-3 14;-2 12;-2 13</tiles>
+				<tiles>-3 13 x -2 12;-3 14</tiles>
 			</region>
 			<region bbox="-2 12 -2 11" name="ziro" size="2">
 				<tiles>-2 11;-2 12</tiles>
@@ -948,58 +948,58 @@
 				<tiles>-4 5;-4 6</tiles>
 			</region>
 			<region bbox="-8 9 -7 7" name="bafing" size="5">
-				<tiles>-8 7;-8 8;-8 9;-7 7;-7 8</tiles>
+				<tiles>-8 8 x -7 7;-8 9</tiles>
 			</region>
 			<region bbox="-7 6 -6 4" name="bas-sassandra" size="5">
-				<tiles>-7 4;-7 5;-7 6;-6 4;-6 5</tiles>
+				<tiles>-7 5 x -6 4;-7 6</tiles>
 			</region>
 			<region bbox="-8 10 -7 8" name="denguele" size="6">
-				<tiles>-8 8;-8 9;-8 10;-7 8;-7 9;-7 10</tiles>
+				<tiles>-8 10 x -7 8</tiles>
 			</region>
 			<region bbox="-8 8 -7 6" name="dix-huit_montagnes" size="5">
-				<tiles>-8 6;-8 7;-8 8;-7 6;-7 7</tiles>
+				<tiles>-8 7 x -7 6;-8 8</tiles>
 			</region>
 			<region bbox="-6 6 -6 5" name="fromager" size="2">
 				<tiles>-6 5;-6 6</tiles>
 			</region>
 			<region bbox="-7 7 -6 6" name="haut-sassandra" size="4">
-				<tiles>-7 6;-7 7;-6 6;-6 7</tiles>
+				<tiles>-7 7 x -6 6</tiles>
 			</region>
 			<region bbox="-5 7 -5 6" name="lacs" size="2">
 				<tiles>-5 6;-5 7</tiles>
 			</region>
 			<region bbox="-5 6 -4 5" name="lagunes" size="4">
-				<tiles>-5 5;-5 6;-4 5;-4 6</tiles>
+				<tiles>-5 6 x -4 5</tiles>
 			</region>
 			<region bbox="-6 7 -6 6" name="marahoue" size="2">
 				<tiles>-6 6;-6 7</tiles>
 			</region>
 			<region bbox="-8 7 -7 5" name="moyen-cavally" size="6">
-				<tiles>-8 5;-8 6;-8 7;-7 5;-7 6;-7 7</tiles>
+				<tiles>-8 7 x -7 5</tiles>
 			</region>
 			<region bbox="-3 7 -3 6" name="moyen-comoe" size="2">
 				<tiles>-3 6;-3 7</tiles>
 			</region>
 			<region bbox="-5 8 -4 6" name="n_zi-comoe" size="6">
-				<tiles>-5 6;-5 7;-5 8;-4 6;-4 7;-4 8</tiles>
+				<tiles>-5 8 x -4 6</tiles>
 			</region>
 			<region bbox="-7 10 -4 8" name="savanes" size="11">
-				<tiles>-7 8;-7 9;-7 10;-6 8;-6 9;-6 10;-5 8;-5 9;-5 10;-4 8;-4 9</tiles>
+				<tiles>-7 10 x -5 8;-4 8;-4 9</tiles>
 			</region>
 			<region bbox="-6 6 -5 4" name="sud-bandama" size="5">
-				<tiles>-6 4;-6 5;-6 6;-5 5;-5 6</tiles>
+				<tiles>-6 6 x -5 5;-6 4</tiles>
 			</region>
 			<region bbox="-3 6 -3 4" name="sud-comoe" size="3">
 				<tiles>-3 4;-3 5;-3 6</tiles>
 			</region>
 			<region bbox="-5 9 -4 7" name="vallee_du_bandama" size="5">
-				<tiles>-5 7;-5 8;-5 9;-4 7;-4 8</tiles>
+				<tiles>-5 8 x -4 7;-5 9</tiles>
 			</region>
 			<region bbox="-7 9 -6 7" name="worodougou" size="5">
-				<tiles>-7 7;-7 8;-7 9;-6 7;-6 8</tiles>
+				<tiles>-7 8 x -6 7;-7 9</tiles>
 			</region>
 			<region bbox="-4 10 -3 6" name="zanzan" size="9">
-				<tiles>-4 6;-4 7;-4 8;-4 9;-4 10;-3 6;-3 7;-3 8;-3 9</tiles>
+				<tiles>-4 9 x -3 6;-4 10</tiles>
 			</region>
 		</country>
 		<country bbox="12 5 31 -14" hillshade_sqlite="yes" name="democratic_republic_of_the_congo" size="241">
@@ -1258,61 +1258,61 @@
 		<country bbox="-4 11 1 4" hillshade_sqlite="yes" name="ghana" size="35" verified="no">
 			<tiles>-3 11 x 0 5;1 6;1 5;-3 4;-2 4;-4 7;-4 6;-4 5</tiles>
 			<region bbox="-2 7 -1 5" name="ashanti" size="5">
-				<tiles>-2 5;-2 6;-2 7;-1 6;-1 7</tiles>
+				<tiles>-2 7 x -1 6;-2 5</tiles>
 			</region>
 			<region bbox="-3 8 0 6" name="brong_ahafo" size="9">
-				<tiles>-3 6;-3 7;-3 8;-2 6;-2 7;-2 8;-1 7;-1 8;0 7</tiles>
+				<tiles>-3 8 x -1 7;-3 6;-2 6;0 7</tiles>
 			</region>
 			<region bbox="-2 6 -1 4" name="central" size="4">
 				<tiles>-2 4;-2 5;-2 6;-1 5</tiles>
 			</region>
 			<region bbox="-1 7 0 5" name="eastern" size="6">
-				<tiles>-1 5;-1 6;-1 7;0 5;0 6;0 7</tiles>
+				<tiles>-1 7 x 0 5</tiles>
 			</region>
 			<region bbox="0 6 0 5" name="greater_accra" size="2">
 				<tiles>0 5;0 6</tiles>
 			</region>
 			<region bbox="-2 10 0 7" name="northern" size="11">
-				<tiles>-2 7;-2 8;-2 9;-2 10;-1 7;-1 8;-1 9;-1 10;0 8;0 9;0 10</tiles>
+				<tiles>-2 10 x 0 8;-2 7;-1 7</tiles>
 			</region>
 			<region bbox="-1 11 0 10" name="upper_east" size="4">
-				<tiles>-1 10;-1 11;0 10;0 11</tiles>
+				<tiles>-1 11 x 0 10</tiles>
 			</region>
 			<region bbox="-3 11 -2 9" name="upper_west" size="6">
-				<tiles>-3 9;-3 10;-3 11;-2 9;-2 10;-2 11</tiles>
+				<tiles>-3 11 x -2 9</tiles>
 			</region>
 			<region bbox="0 8 1 5" name="volta" size="6">
-				<tiles>0 5;0 6;0 7;0 8;1 5;1 6</tiles>
+				<tiles>0 8 x 0 5;1 5;1 6</tiles>
 			</region>
 			<region bbox="-3 7 -2 4" name="western" size="7">
-				<tiles>-3 4;-3 5;-3 6;-3 7;-2 4;-2 5;-2 6</tiles>
+				<tiles>-3 6 x -2 4;-3 7</tiles>
 			</region>
 		</country>
 		<country bbox="-16 12 -8 7" hillshade_sqlite="yes" name="guinea" size="36" verified="no">
 			<tiles>-14 12 x -9 9;-11 8 x -8 8;-16 10;-8 9;-15 10;-15 11;-10 7;-9 7;-8 10;-15 9</tiles>
 			<region bbox="-15 12 -13 9" name="boke" size="10">
-				<tiles>-15 9;-15 10;-15 11;-15 12;-14 9;-14 10;-14 11;-14 12;-13 11;-13 12</tiles>
+				<tiles>-15 12 x -14 9;-13 11;-13 12</tiles>
 			</region>
 			<region bbox="-13 9 -13 9" name="conarky" size="1">
 				<tiles>-13 9</tiles>
 			</region>
 			<region bbox="-11 12 -10 8" name="faranah" size="9">
-				<tiles>-11 8;-11 9;-11 10;-11 11;-11 12;-10 8;-10 9;-10 11;-10 12</tiles>
+				<tiles>-11 12 x -11 8;-10 8;-10 9;-10 11;-10 12</tiles>
 			</region>
 			<region bbox="-11 12 -8 8" name="kankan" size="16">
-				<tiles>-11 9;-11 10;-11 11;-11 12;-10 8;-10 9;-10 10;-10 11;-10 12;-9 8;-9 9;-9 10;-9 11;-9 12;-8 9;-8 10</tiles>
+				<tiles>-11 12 x -9 9;-10 8;-9 8;-8 9;-8 10</tiles>
 			</region>
 			<region bbox="-14 11 -13 8" name="kindia" size="8">
-				<tiles>-14 8;-14 9;-14 10;-14 11;-13 8;-13 9;-13 10;-13 11</tiles>
+				<tiles>-14 11 x -13 8</tiles>
 			</region>
 			<region bbox="-13 12 -11 10" name="labe" size="6">
-				<tiles>-13 11;-13 12;-12 10;-12 11;-12 12;-11 11</tiles>
+				<tiles>-13 12 x -12 11;-12 10;-11 11</tiles>
 			</region>
 			<region bbox="-13 11 -12 9" name="mamou" size="6">
-				<tiles>-13 9;-13 10;-13 11;-12 9;-12 10;-12 11</tiles>
+				<tiles>-13 11 x -12 9</tiles>
 			</region>
 			<region bbox="-10 9 -8 7" name="nzerekore" size="9">
-				<tiles>-10 7;-10 8;-10 9;-9 7;-9 8;-9 9;-8 7;-8 8;-8 9</tiles>
+				<tiles>-10 9 x -8 7</tiles>
 			</region>
 		</country>
 		<country bbox="-17 12 -14 10" hillshade_sqlite="yes" name="guinea-bissau" size="10" verified="no">
@@ -1348,28 +1348,28 @@
 		<country bbox="33 4 41 -5" hillshade_sqlite="yes" name="kenya" size="73" verified="no">
 			<tiles>35 3 x 41 -3;34 4 x 34 -2;37 -4 x 40 -4;37 4;33 -1;33 -2;35 4;40 4;39 4;41 4;36 4;38 -5;39 -5;33 4;33 3;33 0</tiles>
 			<region bbox="36 0 37 -1" name="central" size="4">
-				<tiles>36 -1;36 0;37 -1;37 0</tiles>
+				<tiles>36 0 x 37 -1</tiles>
 			</region>
 			<region bbox="37 0 41 -4" name="coast" size="18">
-				<tiles>37 -4;37 -3;38 -4;38 -3;38 -2;38 -1;38 0;39 -4;39 -3;39 -2;39 -1;39 0;40 -4;40 -3;40 -2;40 -1;41 -3;41 -2</tiles>
+				<tiles>38 -1 x 40 -4;37 -4;37 -3;38 0;39 0;41 -3;41 -2</tiles>
 			</region>
 			<region bbox="35 4 39 -3" name="eastern" size="30">
-				<tiles>35 3;36 -2;36 -1;36 0;36 1;36 2;36 3;36 4;37 -3;37 -2;37 -1;37 0;37 1;37 2;37 3;37 4;38 -3;38 -2;38 -1;38 0;38 1;38 2;38 3;39 -3;39 -2;39 -1;39 0;39 1;39 2;39 3</tiles>
+				<tiles>36 3 x 39 -2;35 3;36 4;37 -3;37 4;38 -3;39 -3</tiles>
 			</region>
 			<region bbox="36 -1 36 -1" name="nairobi" size="1">
 				<tiles>36 -1</tiles>
 			</region>
 			<region bbox="38 4 41 -2" name="north-eastern" size="25">
-				<tiles>38 -1;38 0;38 1;38 2;39 -2;39 -1;39 0;39 1;39 2;39 3;39 4;40 -2;40 -1;40 0;40 1;40 2;40 3;40 4;41 -2;41 -1;41 0;41 1;41 2;41 3;41 4</tiles>
+				<tiles>39 4 x 41 -2;38 2 x 38 -1</tiles>
 			</region>
 			<region bbox="33 0 35 -1" name="nyanza" size="6">
-				<tiles>33 -1;33 0;34 -1;34 0;35 -1;35 0</tiles>
+				<tiles>33 0 x 35 -1</tiles>
 			</region>
 			<region bbox="33 4 38 -3" name="rift_valley" size="34">
-				<tiles>33 3;33 4;34 -2;34 -1;34 0;34 1;34 2;34 3;34 4;35 -3;35 -2;35 -1;35 0;35 1;35 2;35 3;35 4;36 -3;36 -2;36 -1;36 0;36 1;36 2;36 3;36 4;37 -3;37 -2;37 -1;37 0;37 1;37 2;38 -3;38 0;38 1</tiles>
+				<tiles>34 4 x 36 -2;37 2 x 37 -3;33 3;33 4;35 -3;36 -3;38 -3;38 0;38 1</tiles>
 			</region>
 			<region bbox="33 1 35 0" name="western" size="5">
-				<tiles>33 0;34 0;34 1;35 0;35 1</tiles>
+				<tiles>34 1 x 35 0;33 0</tiles>
 			</region>
 		</country>
 		<country bbox="27 -29 29 -31" hillshade_sqlite="yes" name="lesotho" size="9" verified="no">
@@ -1423,7 +1423,7 @@
 				<tiles>-10 5;-10 6</tiles>
 			</region>
 			<region bbox="-9 6 -8 5" name="grandgedeh" size="4">
-				<tiles>-9 5;-9 6;-8 5;-8 6</tiles>
+				<tiles>-9 6 x -8 5</tiles>
 			</region>
 			<region bbox="-8 5 -8 4" name="grandkru" size="2">
 				<tiles>-8 4;-8 5</tiles>
@@ -1555,22 +1555,22 @@
 		<country bbox="40 -12 50 -26" hillshade_sqlite="yes" name="madagascar" size="79" verified="no">
 			<tiles>44 -17 x 47 -26;48 -13 x 49 -20;43 -21 x 43 -25;50 -14 x 50 -17;42 -18;40 -23;48 -21;48 -23;48 -22;43 -19;43 -18;43 -17;46 -16;47 -16;47 -15;47 -14;49 -12;45 -16</tiles>
 			<region bbox="45 -18 48 -20" name="antananarivo" size="12">
-				<tiles>45 -20;45 -19;45 -18;46 -20;46 -19;46 -18;47 -20;47 -19;47 -18;48 -20;48 -19;48 -18</tiles>
+				<tiles>45 -18 x 48 -20</tiles>
 			</region>
 			<region bbox="47 -12 50 -16" name="antsiranana" size="14">
-				<tiles>47 -15;47 -14;48 -15;48 -14;48 -13;49 -16;49 -15;49 -14;49 -13;49 -12;50 -16;50 -15;50 -14;50 -13</tiles>
+				<tiles>48 -13 x 50 -15;47 -15;47 -14;49 -16;49 -12;50 -16</tiles>
 			</region>
 			<region bbox="44 -20 48 -24" name="fianarantsoa" size="20">
-				<tiles>44 -24;44 -23;45 -24;45 -23;45 -22;45 -21;45 -20;46 -24;46 -23;46 -22;46 -21;46 -20;47 -24;47 -23;47 -22;47 -21;47 -20;48 -23;48 -22;48 -21</tiles>
+				<tiles>45 -20 x 47 -24;44 -24;44 -23;48 -23;48 -22;48 -21</tiles>
 			</region>
 			<region bbox="43 -14 49 -19" name="mahajanga" size="28">
-				<tiles>43 -19;43 -18;43 -17;44 -19;44 -18;44 -17;45 -19;45 -18;45 -17;45 -16;46 -19;46 -18;46 -17;46 -16;47 -19;47 -18;47 -17;47 -16;47 -15;47 -14;48 -18;48 -17;48 -16;48 -15;48 -14;49 -17;49 -16;49 -15</tiles>
+				<tiles>43 -17 x 47 -19;47 -14 x 48 -16;45 -16;46 -16;48 -18;48 -17;49 -17;49 -16;49 -15</tiles>
 			</region>
 			<region bbox="47 -15 50 -20" name="toamasina" size="18">
-				<tiles>47 -20;47 -19;47 -18;47 -17;48 -20;48 -19;48 -18;48 -17;48 -16;49 -20;49 -19;49 -18;49 -17;49 -16;49 -15;50 -18;50 -17;50 -16</tiles>
+				<tiles>47 -17 x 49 -20;48 -16;49 -16;49 -15;50 -18;50 -17;50 -16</tiles>
 			</region>
 			<region bbox="43 -19 47 -25" name="toliary" size="24">
-				<tiles>43 -25;43 -24;43 -23;43 -22;43 -21;44 -25;44 -24;44 -23;44 -22;44 -21;44 -20;44 -19;45 -25;45 -24;45 -23;45 -22;45 -21;45 -20;45 -19;46 -25;46 -24;46 -23;47 -25;47 -24</tiles>
+				<tiles>43 -21 x 45 -25;44 -19 x 45 -20;46 -24 x 47 -25;46 -23</tiles>
 			</region>
 		</country>
 		<country bbox="32 -10 35 -18" hillshade_sqlite="yes" name="malawi" size="24" verified="no">
@@ -1621,7 +1621,7 @@
 				<tiles>34 -15</tiles>
 			</region>
 			<region bbox="33 -11 34 -12" name="mzimba" size="4">
-				<tiles>33 -12;33 -11;34 -12;34 -11</tiles>
+				<tiles>33 -11 x 34 -12</tiles>
 			</region>
 			<region bbox="33 -11 35 -12" name="nkhata_bay" size="4">
 				<tiles>33 -12;34 -12;34 -11;35 -12</tiles>
@@ -1687,43 +1687,43 @@
 		<country bbox="-18 27 -5 14" hillshade_sqlite="yes" name="mauritania" size="129" verified="no">
 		<tiles>-13 26 x -7 15;-17 21 x -14 16;-6 20 x -6 15;-6 25 x -5 24;-14 15;-9 27;-10 27;-12 14;-13 14;-8 27;-14 22;-14 23;-18 20;-18 21;-14 24</tiles>
 			<region bbox="-14 24 -7 18" name="adrar" size="35">
-				<tiles>-14 18;-14 19;-14 20;-14 21;-13 18;-13 19;-13 20;-13 21;-12 18;-12 19;-12 20;-12 21;-11 19;-11 20;-11 21;-11 22;-10 19;-10 20;-10 21;-10 22;-9 19;-9 20;-9 21;-9 22;-9 23;-8 19;-8 20;-8 21;-8 22;-8 23;-8 24;-7 21;-7 22;-7 23;-7 24</tiles>
+				<tiles>-14 21 x -8 19;-9 23 x -7 22;-14 18;-13 18;-12 18;-11 22;-10 22;-8 24;-7 21;-7 24</tiles>
 			</region>
 			<region bbox="-12 18 -11 15" name="assaba" size="8">
-				<tiles>-12 15;-12 16;-12 17;-12 18;-11 15;-11 16;-11 17;-11 18</tiles>
+				<tiles>-12 18 x -11 15</tiles>
 			</region>
 			<region bbox="-15 18 -13 16" name="brakna" size="8">
-				<tiles>-15 16;-15 17;-14 16;-14 17;-14 18;-13 16;-13 17;-13 18</tiles>
+				<tiles>-15 17 x -13 16;-14 18;-13 18</tiles>
 			</region>
 			<region bbox="-17 21 -15 19" name="dakhlet_nouadhibou" size="7">
-				<tiles>-17 19;-17 20;-17 21;-16 19;-16 20;-16 21;-15 21</tiles>
+				<tiles>-17 21 x -16 19;-15 21</tiles>
 			</region>
 			<region bbox="-13 16 -12 15" name="gorgol" size="4">
-				<tiles>-13 15;-13 16;-12 15;-12 16</tiles>
+				<tiles>-13 16 x -12 15</tiles>
 			</region>
 			<region bbox="-12 16 -12 14" name="guidimaka" size="3">
 				<tiles>-12 14;-12 15;-12 16</tiles>
 			</region>
 			<region bbox="-9 23 -6 15" name="hodh_ech_chargui" size="28">
-				<tiles>-9 15;-9 16;-9 17;-9 18;-9 19;-8 15;-8 16;-8 17;-8 18;-8 19;-8 20;-8 21;-8 22;-7 15;-7 16;-7 17;-7 18;-7 19;-7 20;-7 21;-7 22;-7 23;-6 15;-6 16;-6 17;-6 18;-6 19;-6 20</tiles>
+				<tiles>-9 19 x -6 15;-8 22 x -7 20;-7 23;-6 20</tiles>
 			</region>
 			<region bbox="-11 17 -9 15" name="hodh_el_gharbi" size="9">
-				<tiles>-11 15;-11 16;-11 17;-10 15;-10 16;-10 17;-9 15;-9 16;-9 17</tiles>
+				<tiles>-11 17 x -9 15</tiles>
 			</region>
 			<region bbox="-16 21 -15 18" name="inchiri" size="8">
-				<tiles>-16 18;-16 19;-16 20;-16 21;-15 18;-15 19;-15 20;-15 21</tiles>
+				<tiles>-16 21 x -15 18</tiles>
 			</region>
 			<region bbox="-16 18 -16 17" name="nouakchott" size="2">
 				<tiles>-16 17;-16 18</tiles>
 			</region>
 			<region bbox="-12 19 -8 16" name="tagant" size="14">
-				<tiles>-12 16;-12 17;-12 18;-12 19;-11 17;-11 18;-11 19;-10 17;-10 18;-10 19;-9 17;-9 18;-9 19;-8 19</tiles>
+				<tiles>-12 19 x -9 17;-12 16;-8 19</tiles>
 			</region>
 			<region bbox="-13 27 -5 21" name="tiris_zemmour" size="43">
-				<tiles>-13 21;-13 22;-13 23;-13 24;-13 25;-13 26;-12 21;-12 22;-12 23;-12 24;-12 25;-12 26;-11 21;-11 22;-11 23;-11 24;-11 25;-11 26;-10 21;-10 22;-10 23;-10 24;-10 25;-10 26;-9 22;-9 23;-9 24;-9 25;-9 26;-9 27;-8 23;-8 24;-8 25;-8 26;-8 27;-7 23;-7 24;-7 25;-7 26;-6 24;-6 25;-5 24;-5 25</tiles>
+				<tiles>-13 26 x -7 23;-13 22 x -10 21;-6 25 x -5 24;-9 22;-9 27;-8 27</tiles>
 			</region>
 			<region bbox="-16 19 -13 16" name="trarza" size="12">
-				<tiles>-16 16;-16 17;-16 18;-16 19;-15 16;-15 17;-15 18;-15 19;-14 17;-14 18;-14 19;-13 18</tiles>
+				<tiles>-16 19 x -14 17;-16 16;-15 16;-13 18</tiles>
 			</region>
 		</country>
 		<country bbox="54 -11 63 -21" hillshade_sqlite="yes" name="mauritius" size="6" verified="no">
@@ -2146,22 +2146,22 @@
 				<tiles>-16 13;-16 14</tiles>
 			</region>
 			<region bbox="-16 14 -15 13" name="kaolack" size="4">
-				<tiles>-16 13;-16 14;-15 13;-15 14</tiles>
+				<tiles>-16 14 x -15 13</tiles>
 			</region>
 			<region bbox="-16 13 -14 12" name="kolda" size="6">
-				<tiles>-16 12;-16 13;-15 12;-15 13;-14 12;-14 13</tiles>
+				<tiles>-16 13 x -14 12</tiles>
 			</region>
 			<region bbox="-16 16 -15 14" name="louga" size="6">
-				<tiles>-16 14;-16 15;-16 16;-15 14;-15 15;-15 16</tiles>
+				<tiles>-16 16 x -15 14</tiles>
 			</region>
 			<region bbox="-14 16 -13 14" name="matam" size="5">
-				<tiles>-14 14;-14 15;-14 16;-13 14;-13 15</tiles>
+				<tiles>-14 15 x -13 14;-14 16</tiles>
 			</region>
 			<region bbox="-16 16 -14 15" name="saint-louis" size="6">
-				<tiles>-16 15;-16 16;-15 15;-15 16;-14 15;-14 16</tiles>
+				<tiles>-16 16 x -14 15</tiles>
 			</region>
 			<region bbox="-14 15 -12 12" name="tambacounda" size="10">
-				<tiles>-14 12;-14 13;-14 14;-13 12;-13 13;-13 14;-13 15;-12 12;-12 13;-12 14</tiles>
+				<tiles>-14 14 x -12 12;-13 15</tiles>
 			</region>
 			<region bbox="-17 15 -17 13" name="thies" size="3">
 				<tiles>-17 13;-17 14;-17 15</tiles>
@@ -2178,10 +2178,10 @@
 				<tiles>-11 7;-11 8;-11 9</tiles>
 			</region>
 			<region bbox="-13 10 -11 8" name="northern" size="8">
-				<tiles>-13 8;-13 9;-13 10;-12 8;-12 9;-12 10;-11 8;-11 9</tiles>
+				<tiles>-13 10 x -12 8;-11 8;-11 9</tiles>
 			</region>
 			<region bbox="-13 8 -12 6" name="southern" size="5">
-				<tiles>-13 7;-13 8;-12 6;-12 7;-12 8</tiles>
+				<tiles>-13 8 x -12 7;-12 6</tiles>
 			</region>
 			<region bbox="-13 8 -13 8" name="western" size="1">
 				<tiles>-13 8</tiles>
@@ -2190,58 +2190,58 @@
 		<tiles>-14 9 x -11 7;-12 6;-13 10;-12 10</tiles></country>
 		<country bbox="40 11 51 -2" hillshade_sqlite="yes" name="somalia" size="86" verified="no">
 			<region bbox="42 11 44 9" name="awdal" size="7">
-				<tiles>42 9;42 10;42 11;43 9;43 10;43 11;44 10</tiles>
+				<tiles>42 11 x 43 9;44 10</tiles>
 			</region>
 			<region bbox="42 5 44 3" name="bakool" size="8">
-				<tiles>42 3;42 4;43 3;43 4;43 5;44 3;44 4;44 5</tiles>
+				<tiles>42 4 x 44 3;43 5;44 5</tiles>
 			</region>
 			<region bbox="45 2 45 1" name="banaadir" size="2">
 				<tiles>45 1;45 2</tiles>
 			</region>
 			<region bbox="48 12 51 8" name="bari" size="17">
-				<tiles>48 8;48 9;48 10;48 11;49 8;49 9;49 10;49 11;50 8;50 9;50 10;50 11;50 12;51 9;51 10;51 11;51 12</tiles>
+				<tiles>48 11 x 51 9;48 8;49 8;50 8;50 12;51 12</tiles>
 			</region>
 			<region bbox="42 4 44 1" name="bay" size="11">
-				<tiles>42 1;42 2;42 3;43 1;43 2;43 3;43 4;44 1;44 2;44 3;44 4</tiles>
+				<tiles>42 3 x 44 1;43 4;44 4</tiles>
 			</region>
 			<region bbox="45 6 47 3" name="galguduud" size="11">
-				<tiles>45 4;45 5;45 6;46 3;46 4;46 5;46 6;47 3;47 4;47 5;47 6</tiles>
+				<tiles>45 6 x 47 4;46 3;47 3</tiles>
 			</region>
 			<region bbox="40 4 43 1" name="gedo" size="13">
-				<tiles>40 1;40 2;41 1;41 2;41 3;41 4;42 1;42 2;42 3;42 4;43 2;43 3;43 4</tiles>
+				<tiles>41 4 x 43 2;40 1;40 2;41 1;42 1</tiles>
 			</region>
 			<region bbox="44 5 46 3" name="hiiraan" size="9">
-				<tiles>44 3;44 4;44 5;45 3;45 4;45 5;46 3;46 4;46 5</tiles>
+				<tiles>44 5 x 46 3</tiles>
 			</region>
 			<region bbox="41 2 43 0" name="jubbada_dhexe" size="7">
-				<tiles>41 1;41 2;42 0;42 1;42 2;43 0;43 1</tiles>
+				<tiles>41 2 x 42 1;42 0;43 0;43 1</tiles>
 			</region>
 			<region bbox="40 1 43 -1" name="jubbada_hoose" size="11">
-				<tiles>40 -1;40 0;40 1;41 -1;41 0;41 1;42 -1;42 0;42 1;43 -1;43 0</tiles>
+				<tiles>40 1 x 42 -1;43 -1;43 0</tiles>
 			</region>
 			<region bbox="46 7 49 4" name="mudug" size="13">
-				<tiles>46 6;46 7;47 4;47 5;47 6;47 7;48 4;48 5;48 6;48 7;49 5;49 6;49 7</tiles>
+				<tiles>47 7 x 49 5;46 6;46 7;47 4;48 4</tiles>
 			</region>
 			<region bbox="47 9 50 7" name="nugaal" size="10">
-				<tiles>47 7;47 8;48 7;48 8;48 9;49 7;49 8;49 9;50 7;50 8</tiles>
+				<tiles>47 8 x 50 7;48 9;49 9</tiles>
 			</region>
 			<region bbox="45 11 49 9" name="sanaag" size="14">
-				<tiles>45 9;45 10;46 9;46 10;46 11;47 9;47 10;47 11;48 9;48 10;48 11;49 9;49 10;49 11</tiles>
+				<tiles>46 11 x 49 9;45 9;45 10</tiles>
 			</region>
 			<region bbox="44 3 47 2" name="shabeellaha_dhexe" size="6">
-				<tiles>44 3;45 2;45 3;46 2;46 3;47 3</tiles>
+				<tiles>44 3 x 47 3;45 2;46 2</tiles>
 			</region>
 			<region bbox="42 3 45 0" name="shabeellaha_hoose" size="11">
-				<tiles>42 1;43 0;43 1;43 2;44 0;44 1;44 2;44 3;45 1;45 2;45 3</tiles>
+				<tiles>43 2 x 45 1;42 1;43 0;44 0;44 3;45 3</tiles>
 			</region>
 			<region bbox="45 10 49 7" name="sool" size="14">
-				<tiles>45 9;45 10;46 7;46 8;46 9;46 10;47 7;47 8;47 9;48 7;48 8;48 9;49 8;49 9</tiles>
+				<tiles>46 9 x 48 7;45 9;45 10;46 10;49 8;49 9</tiles>
 			</region>
 			<region bbox="44 10 47 7" name="togdheer" size="12">
-				<tiles>44 8;44 9;44 10;45 8;45 9;45 10;46 7;46 8;46 9;46 10;47 7;47 8</tiles>
+				<tiles>44 10 x 46 8;46 7;47 7;47 8</tiles>
 			</region>
 			<region bbox="43 10 46 8" name="woqooyi_galbeed" size="10">
-				<tiles>43 8;43 9;43 10;44 8;44 9;44 10;45 9;45 10;46 9;46 10</tiles>
+				<tiles>43 10 x 46 9;43 8;44 8</tiles>
 			</region>
 		
 		<tiles>43 10 x 50 8;41 4 x 45 1;46 7 x 48 4;40 0 x 42 -1;47 11 x 51 11;43 11;45 5;45 6;43 0;43 5;42 9;42 10;42 11;44 5;41 -2;51 10;49 7;49 6;40 1;40 2;42 -2;46 2;46 3;47 3</tiles></country>
@@ -2313,7 +2313,7 @@
 				<tiles>30 -26;31 -26</tiles>
 			</region>
 			<region bbox="31 -26 32 -27" name="lubombo" size="4">
-				<tiles>31 -27;31 -26;32 -27;32 -26</tiles>
+				<tiles>31 -26 x 32 -27</tiles>
 			</region>
 			<region bbox="30 -26 30 -26" name="manzini" size="1">
 				<tiles>30 -26</tiles>
@@ -2325,19 +2325,19 @@
 		<tiles>31 -26 x 32 -27;30 -27;31 -28;30 -28</tiles></country>
 		<country bbox="29 -1 40 -12" hillshade_sqlite="yes" name="tanzania" size="104" verified="no">
 			<region bbox="34 -2 37 -4" name="arusha" size="10">
-				<tiles>34 -4;34 -3;35 -4;35 -3;35 -2;36 -4;36 -3;36 -2;37 -4;37 -3</tiles>
+				<tiles>34 -3 x 37 -4;35 -2;36 -2</tiles>
 			</region>
 			<region bbox="38 -7 40 -7" name="dar-es-salaam" size="3">
 				<tiles>38 -7;39 -7;40 -7</tiles>
 			</region>
 			<region bbox="34 -5 36 -7" name="dodoma" size="8">
-				<tiles>34 -7;34 -6;35 -7;35 -6;35 -5;36 -7;36 -6;36 -5</tiles>
+				<tiles>34 -6 x 36 -7;35 -5;36 -5</tiles>
 			</region>
 			<region bbox="33 -7 37 -10" name="iringa" size="14">
-				<tiles>33 -10;33 -9;33 -8;34 -10;34 -9;34 -8;34 -7;35 -10;35 -9;35 -8;35 -7;36 -9;36 -8;37 -8</tiles>
+				<tiles>33 -8 x 35 -10;34 -7;35 -7;36 -9;36 -8;37 -8</tiles>
 			</region>
 			<region bbox="30 -1 32 -3" name="kagera" size="9">
-				<tiles>30 -3;30 -2;30 -1;31 -3;31 -2;31 -1;32 -3;32 -2;32 -1</tiles>
+				<tiles>30 -1 x 32 -3</tiles>
 			</region>
 			<region bbox="39 -5 39 -5" name="kaskazini-pemba" size="1">
 				<tiles>39 -5</tiles>
@@ -2346,55 +2346,55 @@
 				<tiles>39 -6</tiles>
 			</region>
 			<region bbox="29 -3 31 -6" name="kigoma" size="10">
-				<tiles>29 -6;29 -5;30 -6;30 -5;30 -4;30 -3;31 -6;31 -5;31 -4;31 -3</tiles>
+				<tiles>30 -3 x 31 -6;29 -6;29 -5</tiles>
 			</region>
 			<region bbox="36 -3 38 -4" name="kilimanjaro" size="5">
-				<tiles>36 -4;36 -3;37 -4;37 -3;38 -4</tiles>
+				<tiles>36 -3 x 37 -4;38 -4</tiles>
 			</region>
 			<region bbox="39 -5 39 -5" name="kusini-pemba" size="1">
 				<tiles>39 -5</tiles>
 			</region>
 			<region bbox="36 -8 40 -10" name="lindi" size="10">
-				<tiles>36 -10;37 -10;37 -9;37 -8;38 -10;38 -9;38 -8;39 -10;39 -9;40 -10</tiles>
+				<tiles>37 -8 x 38 -10;36 -10;39 -10;39 -9;40 -10</tiles>
 			</region>
 			<region bbox="34 -4 38 -6" name="manyara" size="12">
-				<tiles>34 -5;34 -4;35 -5;35 -4;36 -6;36 -5;36 -4;37 -6;37 -5;37 -4;38 -6;38 -5</tiles>
+				<tiles>34 -4 x 37 -5;36 -6;37 -6;38 -6;38 -5</tiles>
 			</region>
 			<region bbox="32 -1 35 -2" name="mara" size="7">
-				<tiles>32 -2;32 -1;33 -2;33 -1;34 -2;34 -1;35 -2</tiles>
+				<tiles>32 -1 x 34 -2;35 -2</tiles>
 			</region>
 			<region bbox="31 -7 35 -9" name="mbeya" size="12">
-				<tiles>31 -9;31 -8;32 -9;32 -8;32 -7;33 -9;33 -8;33 -7;34 -9;34 -8;35 -9;35 -8</tiles>
+				<tiles>31 -8 x 35 -9;32 -7;33 -7</tiles>
 			</region>
 			<region bbox="35 -6 38 -10" name="morogoro" size="14">
-				<tiles>35 -10;35 -9;36 -10;36 -9;36 -8;36 -7;36 -6;37 -10;37 -9;37 -8;37 -7;37 -6;38 -8;38 -7</tiles>
+				<tiles>36 -6 x 37 -10;35 -10;35 -9;38 -8;38 -7</tiles>
 			</region>
 			<region bbox="37 -11 40 -11" name="mtwara" size="4">
-				<tiles>37 -11;38 -11;39 -11;40 -11</tiles>
+				<tiles>37 -11 x 40 -11</tiles>
 			</region>
 			<region bbox="31 -2 34 -3" name="mwanza" size="7">
-				<tiles>31 -3;31 -2;32 -3;32 -2;33 -3;33 -2;34 -3</tiles>
+				<tiles>31 -2 x 33 -3;34 -3</tiles>
 			</region>
 			<region bbox="37 -6 40 -8" name="pwani" size="9">
-				<tiles>37 -8;37 -7;37 -6;38 -8;38 -7;38 -6;39 -8;39 -7;40 -8</tiles>
+				<tiles>37 -6 x 38 -8;39 -8;39 -7;40 -8</tiles>
 			</region>
 			<region bbox="29 -6 32 -9" name="rukwa" size="14">
-				<tiles>29 -7;29 -6;30 -9;30 -8;30 -7;30 -6;31 -9;31 -8;31 -7;31 -6;32 -9;32 -8;32 -7;32 -6</tiles>
+				<tiles>30 -6 x 32 -9;29 -7;29 -6</tiles>
 			</region>
 			<region bbox="34 -10 38 -11" name="ruvuma" size="8">
-				<tiles>34 -11;35 -11;35 -10;36 -11;36 -10;37 -11;37 -10;38 -11</tiles>
+				<tiles>35 -10 x 37 -11;34 -11;38 -11</tiles>
 			</region>
 			<region bbox="31 -3 35 -4" name="shinyanga" size="8">
-				<tiles>31 -4;32 -4;33 -4;33 -3;34 -4;34 -3;35 -4;35 -3</tiles>
+				<tiles>33 -3 x 35 -4;31 -4;32 -4</tiles>
 			</region>
 			<region bbox="33 -4 35 -7" name="singida" size="11">
-				<tiles>33 -7;33 -6;33 -5;34 -7;34 -6;34 -5;34 -4;35 -7;35 -6;35 -5;35 -4</tiles>
+				<tiles>33 -5 x 35 -7;34 -4;35 -4</tiles>
 			</region>
 			<region bbox="30 -4 34 -7" name="tabora" size="16">
-				<tiles>30 -6;31 -6;31 -5;31 -4;32 -7;32 -6;32 -5;32 -4;33 -7;33 -6;33 -5;33 -4;34 -7;34 -6;34 -5;34 -4</tiles>
+				<tiles>31 -4 x 34 -6;30 -6;32 -7;33 -7;34 -7</tiles>
 			</region>
 			<region bbox="36 -5 39 -6" name="tanga" size="7">
-				<tiles>36 -6;37 -6;37 -5;38 -6;38 -5;39 -6;39 -5</tiles>
+				<tiles>37 -5 x 39 -6;36 -6</tiles>
 			</region>
 			<region bbox="39 -6 39 -6" name="zanzibar_south_and_central" size="1">
 				<tiles>39 -6</tiles>
@@ -2406,19 +2406,19 @@
 		<tiles>30 -2 x 36 -9;37 -5 x 39 -12;34 -10 x 36 -12;30 -1 x 34 -1;31 -10;29 -7;29 -6;29 -5;38 -4;33 -10;32 -10;40 -11;37 -4;37 -3</tiles></country>
 		<country bbox="-1 11 1 6" hillshade_sqlite="yes" name="togo" size="13" verified="no">
 			<region bbox="0 9 1 7" name="centre" size="6">
-				<tiles>0 7;0 8;0 9;1 7;1 8;1 9</tiles>
+				<tiles>0 9 x 1 7</tiles>
 			</region>
 			<region bbox="0 10 1 8" name="kara" size="6">
-				<tiles>0 8;0 9;0 10;1 8;1 9;1 10</tiles>
+				<tiles>0 10 x 1 8</tiles>
 			</region>
 			<region bbox="0 7 1 6" name="maritime" size="3">
 				<tiles>0 6;1 6;1 7</tiles>
 			</region>
 			<region bbox="0 8 1 6" name="plateaux" size="6">
-				<tiles>0 6;0 7;0 8;1 6;1 7;1 8</tiles>
+				<tiles>0 8 x 1 6</tiles>
 			</region>
 			<region bbox="0 11 1 9" name="savanes" size="5">
-				<tiles>0 9;0 10;0 11;1 10;1 11</tiles>
+				<tiles>0 11 x 1 10;0 9</tiles>
 			</region>
 		
 		<tiles>0 10 x 1 6;-1 10;-1 11;0 11</tiles></country>
@@ -2498,13 +2498,13 @@
 		</country>
 		<country bbox="29 4 34 -2" hillshade_sqlite="yes" name="uganda" size="31" verified="no">
 			<region bbox="31 3 32 2" name="adjumani" size="4">
-				<tiles>31 2;31 3;32 2;32 3</tiles>
+				<tiles>31 3 x 32 2</tiles>
 			</region>
 			<region bbox="31 2 33 1" name="apac" size="5">
-				<tiles>31 1;32 1;32 2;33 1;33 2</tiles>
+				<tiles>32 2 x 33 1;31 1</tiles>
 			</region>
 			<region bbox="30 3 31 2" name="arua" size="4">
-				<tiles>30 2;30 3;31 2;31 3</tiles>
+				<tiles>30 3 x 31 2</tiles>
 			</region>
 			<region bbox="33 0 34 0" name="bugiri" size="2">
 				<tiles>33 0;34 0</tiles>
@@ -2519,7 +2519,7 @@
 				<tiles>33 0;34 0</tiles>
 			</region>
 			<region bbox="31 3 32 2" name="gulu" size="4">
-				<tiles>31 2;31 3;32 2;32 3</tiles>
+				<tiles>31 3 x 32 2</tiles>
 			</region>
 			<region bbox="30 1 31 0" name="hoima" size="3">
 				<tiles>30 0;30 1;31 1</tiles>
@@ -2546,7 +2546,7 @@
 				<tiles>32 0</tiles>
 			</region>
 			<region bbox="32 1 33 0" name="kamuli" size="4">
-				<tiles>32 0;32 1;33 0;33 1</tiles>
+				<tiles>32 1 x 33 0</tiles>
 			</region>
 			<region bbox="30 0 30 0" name="kamwenge" size="1">
 				<tiles>30 0</tiles>
@@ -2561,16 +2561,16 @@
 				<tiles>29 0;30 0</tiles>
 			</region>
 			<region bbox="33 2 34 1" name="katakwi" size="4">
-				<tiles>33 1;33 2;34 1;34 2</tiles>
+				<tiles>33 2 x 34 1</tiles>
 			</region>
 			<region bbox="32 1 33 0" name="kayunga" size="4">
-				<tiles>32 0;32 1;33 0;33 1</tiles>
+				<tiles>32 1 x 33 0</tiles>
 			</region>
 			<region bbox="30 1 31 0" name="kibale" size="4">
-				<tiles>30 0;30 1;31 0;31 1</tiles>
+				<tiles>30 1 x 31 0</tiles>
 			</region>
 			<region bbox="31 1 32 0" name="kiboga" size="4">
-				<tiles>31 0;31 1;32 0;32 1</tiles>
+				<tiles>31 1 x 32 0</tiles>
 			</region>
 			<region bbox="29 -1 29 -1" name="kisoro" size="1">
 				<tiles>29 -1</tiles>
@@ -2579,7 +2579,7 @@
 				<tiles>32 3;33 3</tiles>
 			</region>
 			<region bbox="33 4 34 2" name="kotido" size="6">
-				<tiles>33 2;33 3;33 4;34 2;34 3;34 4</tiles>
+				<tiles>33 4 x 34 2</tiles>
 			</region>
 			<region bbox="33 1 34 1" name="kumi" size="2">
 				<tiles>33 1;34 1</tiles>
@@ -2591,28 +2591,28 @@
 				<tiles>30 0;30 1;31 1;31 2</tiles>
 			</region>
 			<region bbox="31 0 34 -1" name="lake_victoria" size="8">
-				<tiles>31 -1;31 0;32 -1;32 0;33 -1;33 0;34 -1;34 0</tiles>
+				<tiles>31 0 x 34 -1</tiles>
 			</region>
 			<region bbox="32 2 33 1" name="lira" size="4">
-				<tiles>32 1;32 2;33 1;33 2</tiles>
+				<tiles>32 2 x 33 1</tiles>
 			</region>
 			<region bbox="31 1 32 0" name="luwero" size="4">
-				<tiles>31 0;31 1;32 0;32 1</tiles>
+				<tiles>31 1 x 32 0</tiles>
 			</region>
 			<region bbox="31 0 33 0" name="masaka" size="3">
 				<tiles>31 0;32 0;33 0</tiles>
 			</region>
 			<region bbox="31 2 32 1" name="masindi" size="4">
-				<tiles>31 1;31 2;32 1;32 2</tiles>
+				<tiles>31 2 x 32 1</tiles>
 			</region>
 			<region bbox="33 0 33 0" name="mayuge" size="1">
 				<tiles>33 0</tiles>
 			</region>
 			<region bbox="33 1 34 0" name="mbale" size="4">
-				<tiles>33 0;33 1;34 0;34 1</tiles>
+				<tiles>33 1 x 34 0</tiles>
 			</region>
 			<region bbox="30 0 31 -1" name="mbarara" size="4">
-				<tiles>30 -1;30 0;31 -1;31 0</tiles>
+				<tiles>30 0 x 31 -1</tiles>
 			</region>
 			<region bbox="33 3 35 1" name="moroto" size="5">
 				<tiles>33 2;34 1;34 2;34 3;35 2</tiles>
@@ -2630,7 +2630,7 @@
 				<tiles>32 0;33 0</tiles>
 			</region>
 			<region bbox="34 2 35 1" name="nakapiripirit" size="4">
-				<tiles>34 1;34 2;35 1;35 2</tiles>
+				<tiles>34 2 x 35 1</tiles>
 			</region>
 			<region bbox="31 1 32 0" name="nakasongola" size="3">
 				<tiles>31 1;32 0;32 1</tiles>
@@ -2642,10 +2642,10 @@
 				<tiles>29 -1;30 -1</tiles>
 			</region>
 			<region bbox="32 3 33 2" name="pader" size="4">
-				<tiles>32 2;32 3;33 2;33 3</tiles>
+				<tiles>32 3 x 33 2</tiles>
 			</region>
 			<region bbox="33 1 34 0" name="pallisa" size="4">
-				<tiles>33 0;33 1;34 0;34 1</tiles>
+				<tiles>33 1 x 34 0</tiles>
 			</region>
 			<region bbox="30 0 31 -1" name="rakai" size="3">
 				<tiles>30 -1;31 -1;31 0</tiles>
@@ -2663,7 +2663,7 @@
 				<tiles>32 1;33 1;33 2</tiles>
 			</region>
 			<region bbox="33 1 34 0" name="tororo" size="4">
-				<tiles>33 0;33 1;34 0;34 1</tiles>
+				<tiles>33 1 x 34 0</tiles>
 			</region>
 			<region bbox="32 0 32 0" name="wakiso" size="1">
 				<tiles>32 0</tiles>
@@ -2675,46 +2675,46 @@
 		<tiles>30 3 x 34 -1;34 4;29 0;30 -2;29 -2;29 -1;33 4</tiles></country>
 		<country bbox="-18 27 -9 20" hillshade_sqlite="yes" name="western_sahara" size="43" verified="no">
 			<region bbox="-15 26 -12 24" name="boujdour" size="12">
-				<tiles>-15 24;-15 25;-15 26;-14 24;-14 25;-14 26;-13 24;-13 25;-13 26;-12 24;-12 25;-12 26</tiles>
+				<tiles>-15 26 x -12 24</tiles>
 			</region>
 			<region bbox="-12 27 -9 25" name="es_semara" size="12">
-				<tiles>-12 25;-12 26;-12 27;-11 25;-11 26;-11 27;-10 25;-10 26;-10 27;-9 25;-9 26;-9 27</tiles>
+				<tiles>-12 27 x -9 25</tiles>
 			</region>
 			<region bbox="-14 27 -12 25" name="laayoune" size="7">
-				<tiles>-14 25;-14 26;-14 27;-13 25;-13 26;-13 27;-12 27</tiles>
+				<tiles>-14 27 x -13 25;-12 27</tiles>
 			</region>
 			<region bbox="-17 24 -12 20" name="oued_el_dahab" size="22">
-				<tiles>-17 20;-17 21;-17 22;-17 23;-16 21;-16 22;-16 23;-16 24;-15 21;-15 22;-15 23;-15 24;-14 21;-14 22;-14 23;-14 24;-13 21;-13 22;-13 23;-13 24;-12 23;-12 24</tiles>
+				<tiles>-16 24 x -13 21;-17 23 x -17 20;-12 23;-12 24</tiles>
 			</region>
 		
 		<tiles>-14 27 x -9 25;-16 24 x -13 21;-18 20;-18 21;-15 25;-15 26;-12 23;-12 24;-17 23;-17 22;-17 21</tiles></country>
 		<country bbox="21 -9 33 -19" hillshade_sqlite="yes" name="zambia" size="93" verified="no">
 			<region bbox="25 -12 31 -15" name="central" size="17">
-				<tiles>25 -15;26 -15;26 -14;27 -15;27 -14;28 -15;28 -14;29 -15;29 -14;29 -13;29 -12;30 -15;30 -14;30 -13;30 -12;31 -14;31 -13</tiles>
+				<tiles>26 -14 x 30 -15;29 -12 x 30 -13;25 -15;31 -14;31 -13</tiles>
 			</region>
 			<region bbox="26 -13 29 -14" name="copperbelt" size="7">
-				<tiles>26 -14;26 -13;27 -14;27 -13;28 -14;28 -13;29 -14</tiles>
+				<tiles>26 -13 x 28 -14;29 -14</tiles>
 			</region>
 			<region bbox="29 -11 33 -15" name="eastern" size="16">
-				<tiles>29 -15;30 -15;30 -14;31 -15;31 -14;31 -13;32 -15;32 -14;32 -13;32 -12;32 -11;33 -15;33 -14;33 -13;33 -12;33 -11</tiles>
+				<tiles>32 -11 x 33 -15;30 -14 x 31 -15;29 -15;31 -13</tiles>
 			</region>
 			<region bbox="28 -9 30 -12" name="luapula" size="11">
-				<tiles>28 -12;28 -11;28 -10;28 -9;29 -12;29 -11;29 -10;29 -9;30 -12;30 -11;30 -10</tiles>
+				<tiles>28 -10 x 30 -12;28 -9;29 -9</tiles>
 			</region>
 			<region bbox="27 -15 30 -16" name="lusaka" size="7">
-				<tiles>27 -16;28 -16;28 -15;29 -16;29 -15;30 -16;30 -15</tiles>
+				<tiles>28 -15 x 30 -16;27 -16</tiles>
 			</region>
 			<region bbox="21 -11 27 -14" name="north-western" size="21">
-				<tiles>21 -14;21 -13;22 -14;22 -13;23 -14;23 -13;23 -12;23 -11;24 -14;24 -13;24 -12;24 -11;25 -14;25 -13;25 -12;26 -14;26 -13;26 -12;27 -14;27 -13;27 -12</tiles>
+				<tiles>23 -12 x 27 -14;21 -13 x 22 -14;23 -11;24 -11</tiles>
 			</region>
 			<region bbox="28 -9 33 -13" name="northern" size="24">
-				<tiles>28 -12;28 -11;29 -13;29 -12;29 -11;29 -10;29 -9;30 -13;30 -12;30 -11;30 -10;30 -9;31 -13;31 -12;31 -11;31 -10;31 -9;32 -13;32 -12;32 -11;32 -10;32 -9;33 -11;33 -10</tiles>
+				<tiles>29 -9 x 32 -13;28 -12;28 -11;33 -11;33 -10</tiles>
 			</region>
 			<region bbox="24 -16 29 -18" name="southern" size="14">
-				<tiles>24 -18;24 -17;25 -18;25 -17;25 -16;26 -18;26 -17;26 -16;27 -18;27 -17;27 -16;28 -17;28 -16;29 -16</tiles>
+				<tiles>25 -16 x 27 -18;24 -18;24 -17;28 -17;28 -16;29 -16</tiles>
 			</region>
 			<region bbox="21 -14 25 -17" name="western" size="19">
-				<tiles>21 -17;21 -16;21 -15;21 -14;22 -17;22 -16;22 -15;22 -14;23 -17;23 -16;23 -15;23 -14;24 -17;24 -16;24 -15;24 -14;25 -17;25 -16;25 -15</tiles>
+				<tiles>21 -14 x 24 -17;25 -17;25 -16;25 -15</tiles>
 			</region>
 		
 		<tiles>23 -12 x 33 -15;21 -16 x 29 -17;28 -9 x 32 -11;22 -18 x 27 -18;21 -14 x 22 -15;26 -19;33 -10;33 -11;23 -11;30 -16;24 -11</tiles></country>
@@ -2726,28 +2726,28 @@
 				<tiles>30 -18;31 -18</tiles>
 			</region>
 			<region bbox="31 -18 33 -21" name="manicaland" size="11">
-				<tiles>31 -20;31 -19;31 -18;32 -21;32 -20;32 -19;32 -18;33 -21;33 -20;33 -19;33 -18</tiles>
+				<tiles>31 -18 x 33 -20;32 -21;33 -21</tiles>
 			</region>
 			<region bbox="29 -16 32 -17" name="mashonaland_central" size="7">
-				<tiles>29 -17;29 -16;30 -17;30 -16;31 -17;31 -16;32 -17</tiles>
+				<tiles>29 -16 x 31 -17;32 -17</tiles>
 			</region>
 			<region bbox="30 -17 33 -19" name="mashonaland_east" size="10">
-				<tiles>30 -19;30 -18;31 -19;31 -18;31 -17;32 -19;32 -18;32 -17;33 -18;33 -17</tiles>
+				<tiles>31 -17 x 33 -18;30 -19;30 -18;31 -19;32 -19</tiles>
 			</region>
 			<region bbox="27 -16 31 -18" name="mashonaland_west" size="12">
-				<tiles>27 -18;27 -17;28 -18;28 -17;28 -16;29 -18;29 -17;29 -16;30 -18;30 -17;30 -16;31 -18</tiles>
+				<tiles>28 -16 x 30 -18;27 -18;27 -17;31 -18</tiles>
 			</region>
 			<region bbox="29 -20 32 -22" name="masvingo" size="11">
-				<tiles>29 -22;29 -21;30 -22;30 -21;30 -20;31 -22;31 -21;31 -20;32 -22;32 -21;32 -20</tiles>
+				<tiles>30 -20 x 32 -22;29 -22;29 -21</tiles>
 			</region>
 			<region bbox="25 -17 29 -20" name="matabeleland_north" size="16">
-				<tiles>25 -20;25 -19;25 -18;26 -20;26 -19;26 -18;27 -20;27 -19;27 -18;27 -17;28 -20;28 -19;28 -18;28 -17;29 -20;29 -19</tiles>
+				<tiles>25 -18 x 28 -20;27 -17;28 -17;29 -20;29 -19</tiles>
 			</region>
 			<region bbox="26 -20 30 -22" name="matabeleland_south" size="12">
-				<tiles>26 -21;26 -20;27 -22;27 -21;27 -20;28 -22;28 -21;28 -20;29 -22;29 -21;29 -20;30 -22</tiles>
+				<tiles>27 -20 x 29 -22;26 -21;26 -20;30 -22</tiles>
 			</region>
 			<region bbox="27 -18 30 -21" name="midlands" size="12">
-				<tiles>27 -19;27 -18;28 -20;28 -19;28 -18;29 -21;29 -20;29 -19;29 -18;30 -21;30 -20;30 -19</tiles>
+				<tiles>27 -18 x 29 -19;29 -20 x 30 -21;28 -20;30 -19</tiles>
 			</region>
 		
 		<tiles>27 -17 x 32 -22;25 -18 x 26 -20;33 -17 x 33 -21;28 -16 x 31 -16;29 -23;31 -23;30 -23;26 -21</tiles></country>
@@ -4260,10 +4260,10 @@
 				<tiles>35 33;35 34</tiles>
 			</region>
 			<region bbox="35 34 36 33" name="beqaa" size="4">
-				<tiles>35 33;35 34;36 33;36 34</tiles>
+				<tiles>35 34 x 36 33</tiles>
 			</region>
 			<region bbox="35 34 36 33" name="mount_lebanon" size="4">
-				<tiles>35 33;35 34;36 33;36 34</tiles>
+				<tiles>35 34 x 36 33</tiles>
 			</region>
 			<region bbox="35 34 36 34" name="north_lebanon" size="2">
 				<tiles>35 34;36 34</tiles>
@@ -5728,7 +5728,7 @@
 				<tiles>-78 25</tiles>
 			</region>
 			<region bbox="-80 26 -79 22" name="biminis" size="8">
-				<tiles>-80 23;-80 24;-80 25;-80 26;-79 22;-79 24;-79 25;-79 26</tiles>
+				<tiles>-80 26 x -79 24;-80 23;-79 22</tiles>
 			</region>
 			<region bbox="-76 23 -76 23" name="black_point" size="1">
 				<tiles>-76 23</tiles>
@@ -5881,13 +5881,13 @@
 		<tiles>-81 19;-80 19;-82 19</tiles></country>
 		<country bbox="-85 23 -75 19" hillshade_sqlite="yes" name="cuba" size="33" verified="no">
 			<region bbox="-79 22 -77 20" name="camaguey" size="7">
-				<tiles>-79 20;-79 21;-79 22;-78 20;-78 21;-78 22;-77 21</tiles>
+				<tiles>-79 22 x -78 20;-77 21</tiles>
 			</region>
 			<region bbox="-79 22 -78 20" name="ciego_de_avila" size="5">
-				<tiles>-79 20;-79 21;-79 22;-78 21;-78 22</tiles>
+				<tiles>-79 22 x -78 21;-79 20</tiles>
 			</region>
 			<region bbox="-81 22 -80 21" name="cienfuegos" size="4">
-				<tiles>-81 21;-81 22;-80 21;-80 22</tiles>
+				<tiles>-81 22 x -80 21</tiles>
 			</region>
 			<region bbox="-82 23 -82 22" name="ciudad_de_la_habana" size="2">
 				<tiles>-82 22;-82 23</tiles>
@@ -5905,22 +5905,22 @@
 				<tiles>-83 21;-83 22;-82 21;-81 21</tiles>
 			</region>
 			<region bbox="-83 23 -82 22" name="la_habana" size="4">
-				<tiles>-83 22;-83 23;-82 22;-82 23</tiles>
+				<tiles>-83 23 x -82 22</tiles>
 			</region>
 			<region bbox="-77 21 -77 20" name="las_tunas" size="2">
 				<tiles>-77 20;-77 21</tiles>
 			</region>
 			<region bbox="-82 23 -81 21" name="matanzas" size="6">
-				<tiles>-82 21;-82 22;-82 23;-81 21;-81 22;-81 23</tiles>
+				<tiles>-82 23 x -81 21</tiles>
 			</region>
 			<region bbox="-85 23 -83 21" name="pinar_del_rio" size="7">
-				<tiles>-85 21;-85 22;-84 21;-84 22;-84 23;-83 22;-83 23</tiles>
+				<tiles>-84 23 x -83 22;-85 21;-85 22;-84 21</tiles>
 			</region>
 			<region bbox="-80 22 -79 21" name="sancti_spiritus" size="4">
-				<tiles>-80 21;-80 22;-79 21;-79 22</tiles>
+				<tiles>-80 22 x -79 21</tiles>
 			</region>
 			<region bbox="-77 20 -75 19" name="santiago_de_cuba" size="5">
-				<tiles>-77 19;-77 20;-76 19;-76 20;-75 20</tiles>
+				<tiles>-77 20 x -76 19;-75 20</tiles>
 			</region>
 			<region bbox="-80 23 -80 21" name="villa_clara" size="3">
 				<tiles>-80 21;-80 22;-80 23</tiles>
@@ -6115,10 +6115,10 @@
 				<tiles>-72 19</tiles>
 			</region>
 			<region bbox="-74 20 -73 19" name="nord-ouest" size="4">
-				<tiles>-74 19;-74 20;-73 19;-73 20</tiles>
+				<tiles>-74 20 x -73 19</tiles>
 			</region>
 			<region bbox="-74 19 -72 18" name="ouest" size="5">
-				<tiles>-74 18;-74 19;-73 18;-73 19;-72 18</tiles>
+				<tiles>-74 19 x -73 18;-72 18</tiles>
 			</region>
 			<region bbox="-74 18 -73 17" name="sud" size="3">
 				<tiles>-74 17;-74 18;-73 18</tiles>
@@ -6593,7 +6593,7 @@
 			<tiles>-72 21;-73 21;-73 22</tiles></country>
 		<country bbox="-66 18 -65 17" hillshade_sqlite="yes" name="virgin_islands_us" size="4" verified="no">
 			<region bbox="-65 18 -64 17" name="saint_croix" size="4">
-				<tiles>-65 17;-65 18;-64 17;-64 18</tiles>
+				<tiles>-65 18 x -64 17</tiles>
 			</region>
 			<region bbox="-64 18 -64 18" name="saint_john" size="1">
 				<tiles>-64 18</tiles>
@@ -6642,10 +6642,10 @@
 				<tiles>-84 9;-84 10</tiles>
 			</region>
 			<region bbox="-84 11 -83 8" name="limon" size="7">
-				<tiles>-84 8;-84 9;-84 10;-84 11;-83 8;-83 9;-83 10</tiles>
+				<tiles>-84 10 x -83 8;-84 11</tiles>
 			</region>
 			<region bbox="-87 10 -83 5" name="puntarenas" size="10">
-				<tiles>-87 5;-86 9;-86 10;-85 9;-85 10;-84 8;-84 9;-83 7;-83 8;-83 9</tiles>
+				<tiles>-86 10 x -85 9;-84 9 x -83 8;-87 5;-83 7</tiles>
 			</region>
 			<region bbox="-84 10 -84 8" name="san_jose" size="3">
 				<tiles>-84 8;-84 9;-84 10</tiles>
@@ -6720,7 +6720,7 @@
 				<tiles>-90 14</tiles>
 			</region>
 			<region bbox="-92 16 -91 15" name="huehuetenango" size="4">
-				<tiles>-92 15;-92 16;-91 15;-91 16</tiles>
+				<tiles>-92 16 x -91 15</tiles>
 			</region>
 			<region bbox="-89 16 -89 15" name="izabal" size="2">
 				<tiles>-89 15;-89 16</tiles>
@@ -6732,7 +6732,7 @@
 				<tiles>-90 13;-90 14</tiles>
 			</region>
 			<region bbox="-91 17 -90 15" name="peten" size="6">
-				<tiles>-91 15;-91 16;-91 17;-90 15;-90 16;-90 17</tiles>
+				<tiles>-91 17 x -90 15</tiles>
 			</region>
 			<region bbox="-92 15 -92 14" name="quezaltenango" size="2">
 				<tiles>-92 14;-92 15</tiles>
@@ -6774,7 +6774,7 @@
 				<tiles>-87 12;-87 13</tiles>
 			</region>
 			<region bbox="-86 16 -85 14" name="colon" size="6">
-				<tiles>-86 14;-86 15;-86 16;-85 14;-85 15;-85 16</tiles>
+				<tiles>-86 16 x -85 14</tiles>
 			</region>
 			<region bbox="-88 15 -88 13" name="comayagua" size="3">
 				<tiles>-88 13;-88 14;-88 15</tiles>
@@ -6786,13 +6786,13 @@
 				<tiles>-88 14;-88 15;-88 16</tiles>
 			</region>
 			<region bbox="-87 14 -86 13" name="el_paraiso" size="4">
-				<tiles>-87 13;-87 14;-86 13;-86 14</tiles>
+				<tiles>-87 14 x -86 13</tiles>
 			</region>
 			<region bbox="-87 15 -87 13" name="francisco_morazan" size="3">
 				<tiles>-87 13;-87 14;-87 15</tiles>
 			</region>
 			<region bbox="-85 17 -83 14" name="gracias_a_dios" size="10">
-				<tiles>-85 14;-85 15;-85 16;-85 17;-84 14;-84 15;-84 16;-84 17;-83 14;-83 15</tiles>
+				<tiles>-85 17 x -84 14;-83 14;-83 15</tiles>
 			</region>
 			<region bbox="-88 14 -88 14" name="intibuca" size="1">
 				<tiles>-88 14</tiles>
@@ -6810,7 +6810,7 @@
 				<tiles>-89 14</tiles>
 			</region>
 			<region bbox="-87 15 -85 13" name="olancho" size="7">
-				<tiles>-87 14;-87 15;-86 13;-86 14;-86 15;-85 14;-85 15</tiles>
+				<tiles>-87 15 x -85 14;-86 13</tiles>
 			</region>
 			<region bbox="-88 15 -88 14" name="santa_barbara" size="2">
 				<tiles>-88 14;-88 15</tiles>
@@ -6819,16 +6819,16 @@
 				<tiles>-87 13</tiles>
 			</region>
 			<region bbox="-88 15 -87 14" name="yoro" size="4">
-				<tiles>-88 14;-88 15;-87 14;-87 15</tiles>
+				<tiles>-88 15 x -87 14</tiles>
 			</region>
 		
 		<tiles>-90 15 x -83 14;-89 16 x -86 16;-89 13 x -86 13;-88 12;-84 17</tiles></country>
 		<country bbox="-88 15 -82 10" hillshade_sqlite="yes" name="nicaragua" size="25" verified="no">
 			<region bbox="-85 15 -82 12" name="atlantico_norte" size="10">
-				<tiles>-85 13;-85 14;-84 12;-84 13;-84 14;-84 15;-83 13;-83 14;-82 13;-82 14</tiles>
+				<tiles>-85 14 x -82 13;-84 12;-84 15</tiles>
 			</region>
 			<region bbox="-85 13 -83 10" name="atlantico_sur" size="9">
-				<tiles>-85 10;-85 11;-85 12;-85 13;-84 10;-84 11;-84 12;-84 13;-83 12</tiles>
+				<tiles>-85 13 x -84 10;-83 12</tiles>
 			</region>
 			<region bbox="-86 12 -85 11" name="boaco" size="3">
 				<tiles>-86 11;-86 12;-85 12</tiles>
@@ -6849,7 +6849,7 @@
 				<tiles>-86 11;-86 12</tiles>
 			</region>
 			<region bbox="-86 14 -85 12" name="jinotega" size="5">
-				<tiles>-86 12;-86 13;-86 14;-85 13;-85 14</tiles>
+				<tiles>-86 14 x -85 13;-86 12</tiles>
 			</region>
 			<region bbox="-87 13 -87 11" name="leon" size="3">
 				<tiles>-87 11;-87 12;-87 13</tiles>
@@ -6864,16 +6864,16 @@
 				<tiles>-86 11;-86 12</tiles>
 			</region>
 			<region bbox="-86 13 -85 12" name="matagalpa" size="4">
-				<tiles>-86 12;-86 13;-85 12;-85 13</tiles>
+				<tiles>-86 13 x -85 12</tiles>
 			</region>
 			<region bbox="-86 12 -85 10" name="nicaragua" size="5">
-				<tiles>-86 10;-86 11;-86 12;-85 10;-85 11</tiles>
+				<tiles>-86 11 x -85 10;-86 12</tiles>
 			</region>
 			<region bbox="-86 14 -86 13" name="nueva_segovia" size="2">
 				<tiles>-86 13;-86 14</tiles>
 			</region>
 			<region bbox="-85 11 -84 10" name="rio_san_juan" size="4">
-				<tiles>-85 10;-85 11;-84 10;-84 11</tiles>
+				<tiles>-85 11 x -84 10</tiles>
 			</region>
 			<region bbox="-86 11 -86 10" name="rivas" size="2">
 				<tiles>-86 10;-86 11</tiles>
@@ -6882,10 +6882,10 @@
 		<tiles>-87 14 x -84 11;-88 12;-88 13;-86 10;-84 15;-84 10;-85 10;-82 13;-83 12;-83 14</tiles></country>
 		<country bbox="-84 9 -78 7" hillshade_sqlite="yes" name="panama" size="19" verified="no">
 			<region bbox="-83 9 -82 8" name="bocas_del_toro" size="4">
-				<tiles>-83 8;-83 9;-82 8;-82 9</tiles>
+				<tiles>-83 9 x -82 8</tiles>
 			</region>
 			<region bbox="-83 9 -82 7" name="chiriqui" size="5">
-				<tiles>-83 7;-83 8;-83 9;-82 7;-82 8</tiles>
+				<tiles>-83 8 x -82 7;-83 9</tiles>
 			</region>
 			<region bbox="-80 8 -80 8" name="cocle" size="1">
 				<tiles>-80 8</tiles>
@@ -6903,7 +6903,7 @@
 				<tiles>-81 7;-81 8</tiles>
 			</region>
 			<region bbox="-79 9 -78 8" name="kuna_yala" size="4">
-				<tiles>-79 8;-79 9;-78 8;-78 9</tiles>
+				<tiles>-79 9 x -78 8</tiles>
 			</region>
 			<region bbox="-80 8 -80 7" name="los_santos" size="2">
 				<tiles>-80 7;-80 8</tiles>
@@ -6912,10 +6912,10 @@
 				<tiles>-82 8;-82 9</tiles>
 			</region>
 			<region bbox="-80 9 -78 7" name="panama" size="8">
-				<tiles>-80 7;-80 8;-80 9;-79 7;-79 8;-79 9;-78 8;-78 9</tiles>
+				<tiles>-80 9 x -78 8;-80 7;-79 7</tiles>
 			</region>
 			<region bbox="-82 9 -81 7" name="veraguas" size="6">
-				<tiles>-82 7;-82 8;-82 9;-81 7;-81 8;-81 9</tiles>
+				<tiles>-82 9 x -81 7</tiles>
 			</region>
 		
 		<tiles>-83 9 x -78 7;-84 8</tiles></country>
@@ -7277,46 +7277,46 @@
 		</country>
 		<country bbox="12 51 18 48" hillshade_sqlite="yes" name="czech_republic" size="21" verified="no">
 			<region bbox="13 49 15 48" name="jihocesky" size="6">
-				<tiles>13 48;13 49;14 48;14 49;15 48;15 49</tiles>
+				<tiles>13 49 x 15 48</tiles>
 			</region>
 			<region bbox="15 49 17 48" name="jihomoravsky" size="6">
-				<tiles>15 48;15 49;16 48;16 49;17 48;17 49</tiles>
+				<tiles>15 49 x 17 48</tiles>
 			</region>
 			<region bbox="12 50 13 49" name="karlovarsky" size="4">
-				<tiles>12 49;12 50;13 49;13 50</tiles>
+				<tiles>12 50 x 13 49</tiles>
 			</region>
 			<region bbox="14 49 16 48" name="kraj_vysocina" size="5">
-				<tiles>14 49;15 48;15 49;16 48;16 49</tiles>
+				<tiles>15 49 x 16 48;14 49</tiles>
 			</region>
 			<region bbox="15 50 16 49" name="kralovehradecky" size="4">
-				<tiles>15 49;15 50;16 49;16 50</tiles>
+				<tiles>15 50 x 16 49</tiles>
 			</region>
 			<region bbox="14 51 15 50" name="liberecky" size="4">
-				<tiles>14 50;14 51;15 50;15 51</tiles>
+				<tiles>14 51 x 15 50</tiles>
 			</region>
 			<region bbox="17 50 18 49" name="moravskoslezsky" size="4">
-				<tiles>17 49;17 50;18 49;18 50</tiles>
+				<tiles>17 50 x 18 49</tiles>
 			</region>
 			<region bbox="16 50 18 49" name="olomoucky" size="5">
-				<tiles>16 49;16 50;17 49;17 50;18 49</tiles>
+				<tiles>16 50 x 17 49;18 49</tiles>
 			</region>
 			<region bbox="15 50 16 49" name="pardubicky" size="4">
-				<tiles>15 49;15 50;16 49;16 50</tiles>
+				<tiles>15 50 x 16 49</tiles>
 			</region>
 			<region bbox="12 50 13 48" name="plzensky" size="5">
-				<tiles>12 49;12 50;13 48;13 49;13 50</tiles>
+				<tiles>12 50 x 13 49;13 48</tiles>
 			</region>
 			<region bbox="14 50 14 49" name="prague" size="2">
 				<tiles>14 49;14 50</tiles>
 			</region>
 			<region bbox="13 50 15 49" name="stredocesky" size="6">
-				<tiles>13 49;13 50;14 49;14 50;15 49;15 50</tiles>
+				<tiles>13 50 x 15 49</tiles>
 			</region>
 			<region bbox="12 51 14 49" name="ustecky" size="5">
 				<tiles>12 50;13 49;13 50;14 50;14 51</tiles>
 			</region>
 			<region bbox="17 49 18 48" name="zlinsky" size="4">
-				<tiles>17 48;17 49;18 48;18 49</tiles>
+				<tiles>17 49 x 18 48</tiles>
 			</region>
 		
 		<tiles>13 50 x 17 48;12 50;12 49;15 51;14 51;18 49;18 50</tiles></country>
@@ -7617,16 +7617,16 @@
 			<tiles>-3 49</tiles></country>
 		<country bbox="16 48 22 45" hillshade_sqlite="yes" name="hungary" size="22" verified="no">
 			<region bbox="18 47 20 45" name="bacs-kiskun" size="8">
-				<tiles>18 45;18 46;18 47;19 45;19 46;19 47;20 46;20 47</tiles>
+				<tiles>18 47 x 20 46;18 45;19 45</tiles>
 			</region>
 			<region bbox="17 46 18 45" name="baranya" size="4">
-				<tiles>17 45;17 46;18 45;18 46</tiles>
+				<tiles>17 46 x 18 45</tiles>
 			</region>
 			<region bbox="20 47 21 46" name="bekes" size="4">
-				<tiles>20 46;20 47;21 46;21 47</tiles>
+				<tiles>20 47 x 21 46</tiles>
 			</region>
 			<region bbox="19 48 22 47" name="borsod-abauj-zemplen" size="6">
-				<tiles>19 48;20 47;20 48;21 47;21 48;22 48</tiles>
+				<tiles>19 48 x 22 48;20 47;21 47</tiles>
 			</region>
 			<region bbox="18 47 19 47" name="budapest" size="2">
 				<tiles>18 47;19 47</tiles>
@@ -7635,73 +7635,73 @@
 				<tiles>19 46;20 46</tiles>
 			</region>
 			<region bbox="17 47 19 46" name="fejer" size="5">
-				<tiles>17 47;18 46;18 47;19 46;19 47</tiles>
+				<tiles>18 47 x 19 46;17 47</tiles>
 			</region>
 			<region bbox="16 48 18 47" name="gyor-moson-sopron" size="5">
-				<tiles>16 47;16 48;17 47;17 48;18 47</tiles>
+				<tiles>16 48 x 17 47;18 47</tiles>
 			</region>
 			<region bbox="20 48 22 46" name="hajdu-bihar" size="5">
 				<tiles>20 47;21 46;21 47;21 48;22 47</tiles>
 			</region>
 			<region bbox="19 48 20 47" name="heves" size="4">
-				<tiles>19 47;19 48;20 47;20 48</tiles>
+				<tiles>19 48 x 20 47</tiles>
 			</region>
 			<region bbox="19 47 21 46" name="jasz-nagykun-szolnok" size="5">
-				<tiles>19 46;19 47;20 46;20 47;21 47</tiles>
+				<tiles>19 47 x 20 46;21 47</tiles>
 			</region>
 			<region bbox="17 47 19 47" name="komarom-esztergom" size="3">
 				<tiles>17 47;18 47;19 47</tiles>
 			</region>
 			<region bbox="18 48 20 47" name="nograd" size="6">
-				<tiles>18 47;18 48;19 47;19 48;20 47;20 48</tiles>
+				<tiles>18 48 x 20 47</tiles>
 			</region>
 			<region bbox="18 48 20 46" name="pest" size="8">
-				<tiles>18 46;18 47;18 48;19 46;19 47;19 48;20 46;20 47</tiles>
+				<tiles>18 48 x 19 46;20 46;20 47</tiles>
 			</region>
 			<region bbox="16 47 18 45" name="somogy" size="6">
-				<tiles>16 46;17 45;17 46;17 47;18 46;18 47</tiles>
+				<tiles>17 47 x 18 46;16 46;17 45</tiles>
 			</region>
 			<region bbox="20 48 23 47" name="szabolcs-szatmar-bereg" size="7">
-				<tiles>20 47;20 48;21 47;21 48;22 47;22 48;23 47</tiles>
+				<tiles>20 48 x 22 47;23 47</tiles>
 			</region>
 			<region bbox="17 46 19 45" name="tolna" size="4">
 				<tiles>17 46;18 45;18 46;19 46</tiles>
 			</region>
 			<region bbox="16 47 17 46" name="vas" size="4">
-				<tiles>16 46;16 47;17 46;17 47</tiles>
+				<tiles>16 47 x 17 46</tiles>
 			</region>
 			<region bbox="16 47 18 46" name="veszprem" size="5">
-				<tiles>16 47;17 46;17 47;18 46;18 47</tiles>
+				<tiles>17 47 x 18 46;16 47</tiles>
 			</region>
 			<region bbox="16 47 17 46" name="zala" size="4">
-				<tiles>16 46;16 47;17 46;17 47</tiles>
+				<tiles>16 47 x 17 46</tiles>
 			</region>
 		
 		<tiles>17 48 x 21 46;17 45;18 45;16 47;22 47;22 48;16 46;19 45</tiles></country>
 		<country bbox="-25 66 -14 63" hillshade_sqlite="yes" name="iceland" size="41" verified="no">
 			<region bbox="-17 66 -14 63" name="austurland" size="11">
-				<tiles>-17 63;-17 64;-17 65;-16 64;-16 65;-16 66;-15 64;-15 65;-15 66;-14 64;-14 65</tiles>
+				<tiles>-17 65 x -14 64;-17 63;-16 66;-15 66</tiles>
 			</region>
 			<region bbox="-19 66 -15 64" name="halshreppur" size="12">
-				<tiles>-19 64;-19 65;-19 66;-18 64;-18 65;-18 66;-17 64;-17 65;-17 66;-16 65;-16 66;-15 66</tiles>
+				<tiles>-19 66 x -17 64;-16 65;-16 66;-15 66</tiles>
 			</region>
 			<region bbox="-22 64 -22 63" name="hofudborgarsvaedi" size="2">
 				<tiles>-22 63;-22 64</tiles>
 			</region>
 			<region bbox="-21 66 -19 64" name="nordurland_vestra" size="9">
-				<tiles>-21 64;-21 65;-21 66;-20 64;-20 65;-20 66;-19 64;-19 65;-19 66</tiles>
+				<tiles>-21 66 x -19 64</tiles>
 			</region>
 			<region bbox="-22 64 -18 63" name="sudurland" size="10">
-				<tiles>-22 63;-22 64;-21 63;-21 64;-20 63;-20 64;-19 63;-19 64;-18 63;-18 64</tiles>
+				<tiles>-22 64 x -18 63</tiles>
 			</region>
 			<region bbox="-22 64 -22 63" name="sudurnes" size="2">
 				<tiles>-22 63;-22 64</tiles>
 			</region>
 			<region bbox="-24 66 -21 64" name="vestfirdir" size="9">
-				<tiles>-24 65;-24 66;-23 65;-23 66;-22 64;-22 65;-22 66;-21 64;-21 65</tiles>
+				<tiles>-24 66 x -22 65;-22 64;-21 64;-21 65</tiles>
 			</region>
 			<region bbox="-24 65 -20 64" name="vesturland" size="10">
-				<tiles>-24 64;-24 65;-23 64;-23 65;-22 64;-22 65;-21 64;-21 65;-20 64;-20 65</tiles>
+				<tiles>-24 65 x -20 64</tiles>
 			</region>
 		
 		<tiles>-24 66 x -15 64;-23 63 x -17 63;-25 64;-25 65;-14 64;-14 65</tiles></country>
@@ -7710,13 +7710,13 @@
 				<tiles>-7 52;-7 53</tiles>
 			</region>
 			<region bbox="-8 54 -7 53" name="cavan" size="4">
-				<tiles>-8 53;-8 54;-7 53;-7 54</tiles>
+				<tiles>-8 54 x -7 53</tiles>
 			</region>
 			<region bbox="-10 53 -9 52" name="clare" size="4">
-				<tiles>-10 52;-10 53;-9 52;-9 53</tiles>
+				<tiles>-10 53 x -9 52</tiles>
 			</region>
 			<region bbox="-10 52 -8 51" name="cork" size="6">
-				<tiles>-10 51;-10 52;-9 51;-9 52;-8 51;-8 52</tiles>
+				<tiles>-10 52 x -8 51</tiles>
 			</region>
 			<region bbox="-8 55 -7 54" name="donegal" size="3">
 				<tiles>-8 54;-8 55;-7 55</tiles>
@@ -7725,7 +7725,7 @@
 				<tiles>-6 53</tiles>
 			</region>
 			<region bbox="-10 53 -8 52" name="galway" size="5">
-				<tiles>-10 52;-10 53;-9 52;-9 53;-8 53</tiles>
+				<tiles>-10 53 x -9 52;-8 53</tiles>
 			</region>
 			<region bbox="-10 52 -10 51" name="kerry" size="2">
 				<tiles>-10 51;-10 52</tiles>
@@ -7752,7 +7752,7 @@
 				<tiles>-6 54</tiles>
 			</region>
 			<region bbox="-10 54 -9 53" name="mayo" size="4">
-				<tiles>-10 53;-10 54;-9 53;-9 54</tiles>
+				<tiles>-10 54 x -9 53</tiles>
 			</region>
 			<region bbox="-7 54 -7 53" name="meath" size="2">
 				<tiles>-7 53;-7 54</tiles>
@@ -7761,7 +7761,7 @@
 				<tiles>-7 53;-7 54</tiles>
 			</region>
 			<region bbox="-10 53 -7 51" name="offaly" size="7">
-				<tiles>-10 51;-9 51;-9 52;-9 53;-8 52;-8 53;-7 53</tiles>
+				<tiles>-9 53 x -8 52;-10 51;-9 51;-7 53</tiles>
 			</region>
 			<region bbox="-8 54 -8 53" name="roscommon" size="2">
 				<tiles>-8 53;-8 54</tiles>
@@ -7860,13 +7860,13 @@
 				<tiles>21 42</tiles>
 			</region>
 			<region bbox="20 43 21 42" name="kosovska_mitrovica" size="4">
-				<tiles>20 42;20 43;21 42;21 43</tiles>
+				<tiles>20 43 x 21 42</tiles>
 			</region>
 			<region bbox="19 42 20 42" name="pecki" size="2">
 				<tiles>19 42;20 42</tiles>
 			</region>
 			<region bbox="20 43 21 42" name="pristina" size="4">
-				<tiles>20 42;20 43;21 42;21 43</tiles>
+				<tiles>20 43 x 21 42</tiles>
 			</region>
 			<region bbox="20 42 21 41" name="prizren" size="3">
 				<tiles>20 41;20 42;21 42</tiles>
@@ -7963,7 +7963,7 @@
 		</country>
 		<country bbox="5 50 6 49" hillshade_sqlite="yes" name="luxembourg" size="4" verified="no">
 			<region bbox="5 50 6 49" name="diekirch" size="4">
-				<tiles>5 49;5 50;6 49;6 50</tiles>
+				<tiles>5 50 x 6 49</tiles>
 			</region>
 			<region bbox="6 49 6 49" name="grevenmacher" size="1">
 				<tiles>6 49</tiles>
@@ -8342,10 +8342,10 @@
 				<tiles>-8 40;-8 41</tiles>
 			</region>
 			<region bbox="-32 39 -25 36" name="azores" size="12">
-				<tiles>-32 39;-31 39;-29 38;-29 39;-28 38;-28 39;-27 38;-26 36;-26 37;-26 38;-25 36;-25 37</tiles>
+				<tiles>-29 39 x -28 38;-26 37 x -25 36;-32 39;-31 39;-27 38;-26 38</tiles>
 			</region>
 			<region bbox="-8 38 -7 37" name="beja" size="4">
-				<tiles>-8 37;-8 38;-7 37;-7 38</tiles>
+				<tiles>-8 38 x -7 37</tiles>
 			</region>
 			<region bbox="-8 41 -8 41" name="braga" size="1">
 				<tiles>-8 41</tiles>
@@ -8354,16 +8354,16 @@
 				<tiles>-7 40;-7 41;-7 42</tiles>
 			</region>
 			<region bbox="-8 40 -7 39" name="castelo_branco" size="4">
-				<tiles>-8 39;-8 40;-7 39;-7 40</tiles>
+				<tiles>-8 40 x -7 39</tiles>
 			</region>
 			<region bbox="-9 40 -8 39" name="coimbra" size="4">
-				<tiles>-9 39;-9 40;-8 39;-8 40</tiles>
+				<tiles>-9 40 x -8 39</tiles>
 			</region>
 			<region bbox="-8 39 -8 38" name="evora" size="2">
 				<tiles>-8 38;-8 39</tiles>
 			</region>
 			<region bbox="-9 37 -8 36" name="faro" size="4">
-				<tiles>-9 36;-9 37;-8 36;-8 37</tiles>
+				<tiles>-9 37 x -8 36</tiles>
 			</region>
 			<region bbox="-7 41 -7 40" name="guarda" size="2">
 				<tiles>-7 40;-7 41</tiles>
@@ -8375,10 +8375,10 @@
 				<tiles>-9 38;-9 39</tiles>
 			</region>
 			<region bbox="-17 33 -16 29" name="madeira" size="6">
-				<tiles>-17 29;-17 30;-17 32;-17 33;-16 29;-16 30</tiles>
+				<tiles>-17 30 x -16 29;-17 32;-17 33</tiles>
 			</region>
 			<region bbox="-8 39 -7 38" name="portalegre" size="4">
-				<tiles>-8 38;-8 39;-7 38;-7 39</tiles>
+				<tiles>-8 39 x -7 38</tiles>
 			</region>
 			<region bbox="-8 41 -8 41" name="porto" size="1">
 				<tiles>-8 41</tiles>
@@ -8557,7 +8557,7 @@
 		<tiles>12 43</tiles></country>
 		<country bbox="18 46 23 42" hillshade_sqlite="yes" name="serbia" size="20" verified="no">
 			<region bbox="21 44 22 43" name="borski" size="4">
-				<tiles>21 43;21 44;22 43;22 44</tiles>
+				<tiles>21 44 x 22 43</tiles>
 			</region>
 			<region bbox="20 44 22 43" name="branicevski" size="4">
 				<tiles>20 44;21 43;21 44;22 44</tiles>
@@ -8566,22 +8566,22 @@
 				<tiles>19 44;20 44;20 45</tiles>
 			</region>
 			<region bbox="21 43 22 42" name="jablanicki" size="4">
-				<tiles>21 42;21 43;22 42;22 43</tiles>
+				<tiles>21 43 x 22 42</tiles>
 			</region>
 			<region bbox="18 45 20 45" name="juzno-backi" size="3">
 				<tiles>18 45;19 45;20 45</tiles>
 			</region>
 			<region bbox="20 45 21 44" name="juzno-banatski" size="4">
-				<tiles>20 44;20 45;21 44;21 45</tiles>
+				<tiles>20 45 x 21 44</tiles>
 			</region>
 			<region bbox="19 44 20 43" name="kolubarski" size="4">
-				<tiles>19 43;19 44;20 43;20 44</tiles>
+				<tiles>19 44 x 20 43</tiles>
 			</region>
 			<region bbox="19 45 20 43" name="macvanski" size="4">
 				<tiles>19 43;19 44;19 45;20 44</tiles>
 			</region>
 			<region bbox="19 44 20 43" name="moravicki" size="4">
-				<tiles>19 43;19 44;20 43;20 44</tiles>
+				<tiles>19 44 x 20 43</tiles>
 			</region>
 			<region bbox="21 43 22 42" name="nisavski" size="3">
 				<tiles>21 43;22 42;22 43</tiles>
@@ -8596,79 +8596,79 @@
 				<tiles>20 44;21 44</tiles>
 			</region>
 			<region bbox="20 44 21 43" name="pomoravski" size="4">
-				<tiles>20 43;20 44;21 43;21 44</tiles>
+				<tiles>20 44 x 21 43</tiles>
 			</region>
 			<region bbox="20 43 21 43" name="rasinski" size="2">
 				<tiles>20 43;21 43</tiles>
 			</region>
 			<region bbox="19 43 21 42" name="raski" size="5">
-				<tiles>19 42;19 43;20 42;20 43;21 43</tiles>
+				<tiles>19 43 x 20 42;21 43</tiles>
 			</region>
 			<region bbox="19 46 19 45" name="severno-backi" size="2">
 				<tiles>19 45;19 46</tiles>
 			</region>
 			<region bbox="19 46 20 45" name="severno-banatski" size="4">
-				<tiles>19 45;19 46;20 45;20 46</tiles>
+				<tiles>19 46 x 20 45</tiles>
 			</region>
 			<region bbox="19 45 21 44" name="srednje-banatski" size="4">
 				<tiles>19 45;20 44;20 45;21 45</tiles>
 			</region>
 			<region bbox="18 45 20 44" name="sremski" size="6">
-				<tiles>18 44;18 45;19 44;19 45;20 44;20 45</tiles>
+				<tiles>18 45 x 20 44</tiles>
 			</region>
 			<region bbox="20 44 21 43" name="sumadijski" size="4">
-				<tiles>20 43;20 44;21 43;21 44</tiles>
+				<tiles>20 44 x 21 43</tiles>
 			</region>
 			<region bbox="20 43 21 42" name="toplicki" size="4">
-				<tiles>20 42;20 43;21 42;21 43</tiles>
+				<tiles>20 43 x 21 42</tiles>
 			</region>
 			<region bbox="21 44 22 43" name="zajecarski" size="4">
-				<tiles>21 43;21 44;22 43;22 44</tiles>
+				<tiles>21 44 x 22 43</tiles>
 			</region>
 			<region bbox="18 46 19 45" name="zapadno-backi" size="4">
-				<tiles>18 45;18 46;19 45;19 46</tiles>
+				<tiles>18 46 x 19 45</tiles>
 			</region>
 			<region bbox="19 44 20 42" name="zlatiborski" size="6">
-				<tiles>19 42;19 43;19 44;20 42;20 43;20 44</tiles>
+				<tiles>19 44 x 20 42</tiles>
 			</region>
 		
 		<tiles>19 45 x 21 42;22 43;22 42;23 43;22 44;18 44;18 45;19 46;20 46</tiles></country>
 		<country bbox="16 49 22 47" hillshade_sqlite="yes" name="slovakia" size="15" verified="no">
 			<region bbox="18 49 20 47" name="banskobystricky" size="7">
-				<tiles>18 47;18 48;19 47;19 48;19 49;20 48;20 49</tiles>
+				<tiles>19 49 x 20 48;18 47;18 48;19 47</tiles>
 			</region>
 			<region bbox="16 48 17 47" name="bratislavsky" size="4">
-				<tiles>16 47;16 48;17 47;17 48</tiles>
+				<tiles>16 48 x 17 47</tiles>
 			</region>
 			<region bbox="20 49 22 48" name="kosicky" size="6">
-				<tiles>20 48;20 49;21 48;21 49;22 48;22 49</tiles>
+				<tiles>20 49 x 22 48</tiles>
 			</region>
 			<region bbox="17 48 19 47" name="nitriansky" size="6">
-				<tiles>17 47;17 48;18 47;18 48;19 47;19 48</tiles>
+				<tiles>17 48 x 19 47</tiles>
 			</region>
 			<region bbox="19 49 22 48" name="presov" size="8">
-				<tiles>19 48;19 49;20 48;20 49;21 48;21 49;22 48;22 49</tiles>
+				<tiles>19 49 x 22 48</tiles>
 			</region>
 			<region bbox="17 49 18 48" name="trenciansky" size="4">
-				<tiles>17 48;17 49;18 48;18 49</tiles>
+				<tiles>17 49 x 18 48</tiles>
 			</region>
 			<region bbox="16 48 18 47" name="trnavsky" size="4">
 				<tiles>16 48;17 47;17 48;18 48</tiles>
 			</region>
 			<region bbox="18 49 20 48" name="zilinsky" size="6">
-				<tiles>18 48;18 49;19 48;19 49;20 48;20 49</tiles>
+				<tiles>18 49 x 20 48</tiles>
 			</region>
 		
 		<tiles>17 49 x 22 48;17 47;16 48;18 47</tiles></country>
 		<country bbox="13 46 16 45" hillshade_sqlite="yes" name="slovenia" size="7" verified="no">
 			<region bbox="13 46 14 45" name="gorenjska" size="4">
-				<tiles>13 45;13 46;14 45;14 46</tiles>
+				<tiles>13 46 x 14 45</tiles>
 			</region>
 			<region bbox="13 46 14 45" name="goriska" size="4">
-				<tiles>13 45;13 46;14 45;14 46</tiles>
+				<tiles>13 46 x 14 45</tiles>
 			</region>
 			<region bbox="14 46 15 45" name="jugovzhodna_slovenija" size="4">
-				<tiles>14 45;14 46;15 45;15 46</tiles>
+				<tiles>14 46 x 15 45</tiles>
 			</region>
 			<region bbox="14 46 15 46" name="koroska" size="2">
 				<tiles>14 46;15 46</tiles>
@@ -8680,7 +8680,7 @@
 				<tiles>13 45;14 45</tiles>
 			</region>
 			<region bbox="13 46 15 45" name="osrednjeslovenska" size="5">
-				<tiles>13 45;14 45;14 46;15 45;15 46</tiles>
+				<tiles>14 46 x 15 45;13 45</tiles>
 			</region>
 			<region bbox="15 46 16 46" name="podravska" size="2">
 				<tiles>15 46;16 46</tiles>
@@ -8689,13 +8689,13 @@
 				<tiles>15 46;16 46</tiles>
 			</region>
 			<region bbox="14 46 15 45" name="savinjska" size="4">
-				<tiles>14 45;14 46;15 45;15 46</tiles>
+				<tiles>14 46 x 15 45</tiles>
 			</region>
 			<region bbox="14 46 15 45" name="spodnjeposavska" size="4">
-				<tiles>14 45;14 46;15 45;15 46</tiles>
+				<tiles>14 46 x 15 45</tiles>
 			</region>
 			<region bbox="14 46 15 45" name="zasavska" size="4">
-				<tiles>14 45;14 46;15 45;15 46</tiles>
+				<tiles>14 46 x 15 45</tiles>
 			</region>
 		
 		<tiles>13 46 x 15 45;16 46</tiles></country>
@@ -9466,52 +9466,52 @@
 		</country>
 		<country bbox="-179 -22 179 -53" hillshade_sqlite="yes" name="new_zealand" size="80" verified="no">
 			<region bbox="174 -36 175 -37" name="auckland" size="4">
-				<tiles>174 -37;174 -36;175 -37;175 -36</tiles>
+				<tiles>174 -36 x 175 -37</tiles>
 			</region>
 			<region bbox="175 -38 178 -39" name="bay_of_plenty" size="8">
-				<tiles>175 -39;175 -38;176 -39;176 -38;177 -39;177 -38;178 -39;178 -38</tiles>
+				<tiles>175 -38 x 178 -39</tiles>
 			</region>
 			<region bbox="169 -42 174 -46" name="canterbury" size="18">
-				<tiles>169 -45;169 -44;170 -46;170 -45;170 -44;171 -46;171 -45;171 -44;171 -43;172 -45;172 -44;172 -43;172 -42;173 -44;173 -43;173 -42;174 -43;174 -42</tiles>
+				<tiles>169 -44 x 172 -45;172 -42 x 174 -43;170 -46;171 -46;171 -43;173 -44</tiles>
 			</region>
 			<region bbox="-177 -44 -176 -44" name="chatham_islands" size="2">
 				<tiles>-177 -44;-176 -44</tiles>
 			</region>
 			<region bbox="177 -38 178 -39" name="gisborne" size="4">
-				<tiles>177 -39;177 -38;178 -39;178 -38</tiles>
+				<tiles>177 -38 x 178 -39</tiles>
 			</region>
 			<region bbox="175 -39 178 -40" name="hawke_s_bay" size="7">
-				<tiles>175 -40;176 -40;176 -39;177 -40;177 -39;178 -40;178 -39</tiles>
+				<tiles>176 -39 x 178 -40;175 -40</tiles>
 			</region>
 			<region bbox="174 -39 176 -40" name="manawatu-wanganui" size="5">
-				<tiles>174 -40;174 -39;175 -40;175 -39;176 -40</tiles>
+				<tiles>174 -39 x 175 -40;176 -40</tiles>
 			</region>
 			<region bbox="172 -41 174 -42" name="marlborough" size="5">
-				<tiles>172 -42;173 -42;173 -41;174 -42;174 -41</tiles>
+				<tiles>173 -41 x 174 -42;172 -42</tiles>
 			</region>
 			<region bbox="171 -41 173 -42" name="nelson" size="5">
-				<tiles>171 -42;172 -42;172 -41;173 -42;173 -41</tiles>
+				<tiles>172 -41 x 173 -42;171 -42</tiles>
 			</region>
 			<region bbox="-178 -30 174 -36" name="northland" size="8">
-				<tiles>-178 -30;171 -35;172 -36;172 -35;173 -36;173 -35;174 -36;174 -35</tiles>
+				<tiles>172 -35 x 174 -36;-178 -30;171 -35</tiles>
 			</region>
 			<region bbox="168 -44 171 -47" name="otago" size="12">
-				<tiles>168 -47;168 -46;168 -45;169 -47;169 -46;169 -45;169 -44;170 -47;170 -46;170 -45;171 -46;171 -45</tiles>
+				<tiles>168 -45 x 170 -47;169 -44;171 -46;171 -45</tiles>
 			</region>
 			<region bbox="165 -45 169 -52" name="southland" size="19">
-				<tiles>165 -52;165 -51;166 -52;166 -51;166 -49;166 -48;166 -47;166 -46;166 -45;167 -48;167 -47;167 -46;167 -45;168 -48;168 -47;168 -46;168 -45;169 -47;169 -46</tiles>
+				<tiles>166 -45 x 168 -48;165 -51 x 166 -52;166 -49;169 -47;169 -46</tiles>
 			</region>
 			<region bbox="173 -39 175 -39" name="taranaki" size="3">
 				<tiles>173 -39;174 -39;175 -39</tiles>
 			</region>
 			<region bbox="174 -37 176 -39" name="waikato" size="9">
-				<tiles>174 -39;174 -38;174 -37;175 -39;175 -38;175 -37;176 -39;176 -38;176 -37</tiles>
+				<tiles>174 -37 x 176 -39</tiles>
 			</region>
 			<region bbox="174 -41 176 -41" name="wellington" size="3">
 				<tiles>174 -41;175 -41;176 -41</tiles>
 			</region>
 			<region bbox="168 -41 172 -44" name="west_coast" size="11">
-				<tiles>168 -44;169 -44;170 -44;170 -43;171 -44;171 -43;171 -42;171 -41;172 -43;172 -42;172 -41</tiles>
+				<tiles>171 -41 x 172 -43;168 -44 x 171 -44;170 -43</tiles>
 			</region>
 		
 		<tiles>174 -37 x 176 -42;168 -44 x 171 -46;172 -41 x 173 -44;177 -38 x 178 -40;166 -47 x 170 -47;-177 -44 x -176 -45;155 -22;170 -43;169 -53;178 -50;179 -48;174 -43;-178 -30;173 -40;166 -46;172 -35;168 -53;166 -49;165 -51;173 -35;173 -36;173 -37;167 -46;167 -45;174 -36;167 -48;166 -51;168 -48;171 -43;171 -42;175 -36;-179 -32;-179 -31</tiles></country>
@@ -9629,31 +9629,31 @@
 		</country>
 		<country bbox="-70 -10 -58 -23" hillshade_sqlite="yes" name="bolivia" size="122" verified="no">
 		<region bbox="-65 -19 -63 -21" name="chuquisaca" size="7">
-				<tiles>-65 -21;-65 -20;-65 -19;-64 -21;-64 -20;-64 -19;-63 -21</tiles>
+				<tiles>-65 -19 x -64 -21;-63 -21</tiles>
 			</region>
 			<region bbox="-67 -16 -65 -18" name="cochabamba" size="9">
-				<tiles>-67 -18;-67 -17;-67 -16;-66 -18;-66 -17;-66 -16;-65 -18;-65 -17;-65 -16</tiles>
+				<tiles>-67 -16 x -65 -18</tiles>
 			</region>
 			<region bbox="-67 -11 -62 -16" name="el_beni" size="26">
-				<tiles>-67 -16;-67 -15;-67 -14;-67 -13;-67 -12;-67 -11;-66 -16;-66 -15;-66 -14;-66 -13;-66 -12;-66 -11;-65 -16;-65 -15;-65 -14;-65 -13;-65 -12;-64 -16;-64 -15;-64 -14;-64 -13;-63 -16;-63 -15;-63 -14;-63 -13;-62 -14</tiles>
+				<tiles>-67 -13 x -63 -16;-67 -11 x -66 -12;-65 -12;-62 -14</tiles>
 			</region>
 			<region bbox="-69 -12 -67 -18" name="la_paz" size="19">
-				<tiles>-69 -18;-69 -17;-69 -16;-69 -15;-69 -14;-69 -13;-69 -12;-68 -18;-68 -17;-68 -16;-68 -15;-68 -14;-68 -13;-68 -12;-67 -18;-67 -17;-67 -16;-67 -14;-67 -13</tiles>
+				<tiles>-69 -12 x -68 -18;-67 -18;-67 -17;-67 -16;-67 -14;-67 -13</tiles>
 			</region>
 			<region bbox="-69 -18 -67 -19" name="oruro" size="6">
-				<tiles>-69 -19;-69 -18;-68 -19;-68 -18;-67 -19;-67 -18</tiles>
+				<tiles>-69 -18 x -67 -19</tiles>
 			</region>
 			<region bbox="-69 -10 -66 -12" name="pando" size="10">
-				<tiles>-69 -12;-69 -11;-68 -12;-68 -11;-67 -12;-67 -11;-67 -10;-66 -12;-66 -11;-66 -10</tiles>
+				<tiles>-69 -11 x -66 -12;-67 -10;-66 -10</tiles>
 			</region>
 			<region bbox="-68 -18 -65 -22" name="potosi" size="15">
-				<tiles>-68 -22;-68 -21;-68 -20;-67 -22;-67 -21;-67 -20;-67 -19;-67 -18;-66 -22;-66 -21;-66 -20;-66 -19;-66 -18;-65 -21;-65 -20</tiles>
+				<tiles>-67 -18 x -66 -22;-68 -22;-68 -21;-68 -20;-65 -21;-65 -20</tiles>
 			</region>
 			<region bbox="-64 -14 -58 -20" name="santa_cruz" size="38">
-				<tiles>-64 -20;-64 -19;-64 -18;-64 -17;-64 -16;-64 -15;-63 -20;-63 -19;-63 -18;-63 -17;-63 -16;-63 -15;-63 -14;-62 -20;-62 -19;-62 -18;-62 -17;-62 -16;-62 -15;-62 -14;-61 -20;-61 -19;-61 -18;-61 -17;-61 -16;-61 -15;-61 -14;-60 -20;-60 -19;-60 -18;-60 -17;-59 -20;-59 -19;-59 -18;-59 -17;-58 -20;-58 -19;-58 -18</tiles>
+				<tiles>-64 -15 x -61 -20;-60 -18 x -58 -20;-63 -14;-62 -14;-61 -14;-60 -17;-59 -17</tiles>
 			</region>
 			<region bbox="-65 -21 -63 -22" name="tarija" size="6">
-				<tiles>-65 -22;-65 -21;-64 -22;-64 -21;-63 -22;-63 -21</tiles>
+				<tiles>-65 -21 x -63 -22</tiles>
 			</region>
 		
 		<tiles>-68 -13 x -63 -23;-62 -17 x -59 -20;-69 -11 x -66 -12;-70 -14 x -69 -16;-62 -14 x -61 -16;-69 -18 x -69 -23;-58 -18 x -58 -21;-59 -21;-70 -18;-65 -12;-66 -10;-69 -13;-70 -17;-70 -12;-70 -19;-62 -21;-67 -10</tiles></country>
@@ -9743,115 +9743,115 @@
 		</country>
 		<country bbox="-110 -18 -67 -56" hillshade_sqlite="yes" name="chile" size="162" verified="no">
 			<region bbox="-75 -44 -72 -49" name="aisen_del_general_carlos_ibanez_del_campo" size="23">
-				<tiles>-75 -49;-75 -48;-75 -47;-75 -46;-75 -45;-75 -44;-74 -49;-74 -48;-74 -47;-74 -46;-74 -45;-74 -44;-73 -49;-73 -48;-73 -47;-73 -46;-73 -45;-73 -44;-72 -48;-72 -47;-72 -46;-72 -45;-72 -44</tiles>
+				<tiles>-75 -44 x -72 -48;-75 -49;-74 -49;-73 -49</tiles>
 			</region>
 			<region bbox="-70 -21 -67 -26" name="antofagasta" size="17">
-				<tiles>-70 -26;-70 -25;-70 -24;-70 -23;-70 -22;-69 -26;-69 -25;-69 -24;-69 -23;-69 -22;-69 -21;-68 -25;-68 -24;-68 -23;-68 -22;-67 -24;-67 -23</tiles>
+				<tiles>-70 -22 x -68 -25;-70 -26;-69 -26;-69 -21;-67 -24;-67 -23</tiles>
 			</region>
 			<region bbox="-73 -38 -71 -39" name="araucania" size="6">
-				<tiles>-73 -39;-73 -38;-72 -39;-72 -38;-71 -39;-71 -38</tiles>
+				<tiles>-73 -38 x -71 -39</tiles>
 			</region>
 			<region bbox="-71 -26 -69 -29" name="atacama" size="11">
-				<tiles>-71 -29;-71 -28;-71 -27;-71 -26;-70 -29;-70 -28;-70 -27;-70 -26;-69 -28;-69 -27;-69 -26</tiles>
+				<tiles>-71 -26 x -69 -28;-71 -29;-70 -29</tiles>
 			</region>
 			<region bbox="-74 -36 -71 -38" name="bio-bio" size="9">
-				<tiles>-74 -38;-74 -37;-73 -38;-73 -37;-73 -36;-72 -38;-72 -37;-71 -38;-71 -37</tiles>
+				<tiles>-74 -37 x -71 -38;-73 -36</tiles>
 			</region>
 			<region bbox="-71 -29 -70 -32" name="coquimbo" size="6">
-				<tiles>-71 -32;-71 -31;-71 -30;-71 -29;-70 -31;-70 -30</tiles>
+				<tiles>-71 -30 x -70 -31;-71 -32;-71 -29</tiles>
 			</region>
 			<region bbox="-72 -34 -70 -35" name="libertador_general_bernardo_o_higgins" size="5">
-				<tiles>-72 -35;-72 -34;-71 -35;-71 -34;-70 -35</tiles>
+				<tiles>-72 -34 x -71 -35;-70 -35</tiles>
 			</region>
 			<region bbox="-74 -40 -72 -44" name="los_lagos" size="15">
-				<tiles>-74 -44;-74 -43;-74 -42;-74 -41;-74 -40;-73 -44;-73 -43;-73 -42;-73 -41;-73 -40;-72 -44;-72 -43;-72 -42;-72 -41;-72 -40</tiles>
+				<tiles>-74 -40 x -72 -44</tiles>
 			</region>
 			<region bbox="-75 -49 -67 -56" name="magallanes_y_antartica_chilena" size="42">
-				<tiles>-75 -54;-75 -53;-75 -52;-75 -51;-75 -50;-75 -49;-74 -55;-74 -54;-74 -53;-74 -52;-74 -51;-74 -50;-74 -49;-73 -55;-73 -54;-73 -53;-73 -52;-73 -51;-73 -50;-72 -56;-72 -55;-72 -54;-72 -53;-72 -52;-71 -56;-71 -55;-71 -54;-71 -53;-71 -52;-70 -56;-70 -55;-70 -54;-70 -53;-70 -52;-69 -56;-69 -55;-69 -54;-69 -53;-68 -56;-68 -55;-67 -56;-67 -55</tiles>
+				<tiles>-74 -52 x -70 -55;-75 -49 x -74 -51;-72 -56 x -67 -56;-75 -54;-75 -53;-75 -52;-73 -51;-73 -50;-69 -55;-69 -54;-69 -53;-68 -55;-67 -55</tiles>
 			</region>
 			<region bbox="-72 -35 -71 -36" name="maule" size="4">
-				<tiles>-72 -36;-72 -35;-71 -36;-71 -35</tiles>
+				<tiles>-72 -35 x -71 -36</tiles>
 			</region>
 			<region bbox="-71 -33 -70 -34" name="region_metropolitana_de_santiago" size="4">
-				<tiles>-71 -34;-71 -33;-70 -34;-70 -33</tiles>
+				<tiles>-71 -33 x -70 -34</tiles>
 			</region>
 			<region bbox="-70 -18 -69 -21" name="tarapaca" size="8">
-				<tiles>-70 -21;-70 -20;-70 -19;-70 -18;-69 -21;-69 -20;-69 -19;-69 -18</tiles>
+				<tiles>-70 -18 x -69 -21</tiles>
 			</region>
 			<region bbox="-106 -27 -70 -34" name="valparaiso" size="14">
-				<tiles>-106 -27;-81 -34;-81 -27;-80 -34;-80 -27;-79 -34;-72 -34;-72 -33;-72 -32;-71 -34;-71 -33;-71 -32;-70 -34;-70 -33</tiles>
+				<tiles>-72 -32 x -71 -34;-106 -27;-81 -34;-81 -27;-80 -34;-80 -27;-79 -34;-70 -34;-70 -33</tiles>
 			</region>
 		
 		<tiles>-75 -42 x -73 -54;-71 -19 x -69 -28;-72 -28 x -72 -48;-72 -53 x -69 -56;-74 -37 x -73 -41;-71 -29 x -71 -37;-76 -45 x -76 -53;-68 -55 x -67 -56;-106 -27;-79 -34;-70 -52;-110 -28;-81 -34;-81 -27;-73 -55;-68 -25;-68 -24;-68 -23;-73 -35;-73 -36;-70 -33;-70 -31;-70 -30;-70 -35;-74 -55;-70 -29;-71 -39;-70 -34;-70 -18;-72 -52;-80 -27;-71 -52</tiles></country>
 		<country bbox="-82 13 -67 -5" hillshade_sqlite="yes" name="colombia" size="138" verified="no">
 			<region bbox="-74 0 -70 -4" name="amazonas" size="19">
-				<tiles>-74 -3;-74 -2;-74 -1;-73 -3;-73 -2;-73 -1;-72 -3;-72 -2;-72 -1;-72 0;-71 -4;-71 -3;-71 -2;-71 -1;-71 0;-70 -4;-70 -3;-70 -2;-70 -1</tiles>
+				<tiles>-74 -1 x -70 -3;-72 0;-71 -4;-71 0;-70 -4</tiles>
 			</region>
 			<region bbox="-77 9 -74 5" name="antioquia" size="15">
-				<tiles>-77 5;-77 6;-77 7;-77 8;-77 9;-76 5;-76 6;-76 7;-76 8;-75 5;-75 6;-75 7;-75 8;-74 6;-74 7</tiles>
+				<tiles>-77 8 x -75 5;-77 9;-74 6;-74 7</tiles>
 			</region>
 			<region bbox="-72 7 -70 5" name="arauca" size="8">
-				<tiles>-72 6;-72 7;-71 5;-71 6;-71 7;-70 5;-70 6;-70 7</tiles>
+				<tiles>-72 7 x -70 6;-71 5;-70 5</tiles>
 			</region>
 			<region bbox="-75 11 -75 10" name="atlantico" size="2">
 				<tiles>-75 10;-75 11</tiles>
 			</region>
 			<region bbox="-75 10 -74 6" name="bolivar" size="8">
-				<tiles>-75 6;-75 7;-75 8;-75 9;-75 10;-74 7;-74 8;-74 9</tiles>
+				<tiles>-75 9 x -74 7;-75 6;-75 10</tiles>
 			</region>
 			<region bbox="-74 7 -72 4" name="boyaca" size="9">
-				<tiles>-74 4;-74 5;-74 6;-73 4;-73 5;-73 6;-73 7;-72 6;-72 7</tiles>
+				<tiles>-74 6 x -73 4;-73 7;-72 6;-72 7</tiles>
 			</region>
 			<region bbox="-76 5 -75 4" name="caldas" size="3">
 				<tiles>-76 4;-76 5;-75 5</tiles>
 			</region>
 			<region bbox="-76 3 -72 0" name="caqueta" size="13">
-				<tiles>-76 0;-76 1;-76 2;-76 3;-75 0;-75 1;-75 2;-75 3;-74 0;-74 1;-73 0;-73 1;-72 0</tiles>
+				<tiles>-76 3 x -75 0;-74 1 x -73 0;-72 0</tiles>
 			</region>
 			<region bbox="-73 6 -70 4" name="casanare" size="11">
-				<tiles>-73 4;-73 5;-73 6;-72 4;-72 5;-72 6;-71 4;-71 5;-71 6;-70 5;-70 6</tiles>
+				<tiles>-73 6 x -71 4;-70 5;-70 6</tiles>
 			</region>
 			<region bbox="-78 3 -76 0" name="cauca" size="11">
-				<tiles>-78 1;-78 2;-78 3;-77 0;-77 1;-77 2;-77 3;-76 0;-76 1;-76 2;-76 3</tiles>
+				<tiles>-78 3 x -76 1;-77 0;-76 0</tiles>
 			</region>
 			<region bbox="-74 10 -73 7" name="cesar" size="6">
-				<tiles>-74 7;-74 8;-74 9;-74 10;-73 9;-73 10</tiles>
+				<tiles>-74 10 x -73 9;-74 7;-74 8</tiles>
 			</region>
 			<region bbox="-78 8 -76 3" name="choco" size="12">
-				<tiles>-78 4;-78 5;-78 6;-78 7;-78 8;-77 3;-77 4;-77 5;-77 6;-77 7;-77 8;-76 5</tiles>
+				<tiles>-78 8 x -77 4;-77 3;-76 5</tiles>
 			</region>
 			<region bbox="-76 9 -75 7" name="cordoba" size="5">
-				<tiles>-76 7;-76 8;-76 9;-75 7;-75 8</tiles>
+				<tiles>-76 8 x -75 7;-76 9</tiles>
 			</region>
 			<region bbox="-75 5 -73 3" name="cundinamarca" size="7">
-				<tiles>-75 3;-75 4;-75 5;-74 3;-74 4;-74 5;-73 4</tiles>
+				<tiles>-75 5 x -74 3;-73 4</tiles>
 			</region>
 			<region bbox="-70 4 -67 1" name="guainia" size="12">
-				<tiles>-70 1;-70 2;-70 3;-69 1;-69 2;-69 3;-69 4;-68 1;-68 2;-68 3;-68 4;-67 1</tiles>
+				<tiles>-70 3 x -68 1;-69 4;-68 4;-67 1</tiles>
 			</region>
 			<region bbox="-73 2 -70 0" name="guaviare" size="9">
-				<tiles>-73 0;-73 1;-73 2;-72 0;-72 1;-72 2;-71 1;-71 2;-70 2</tiles>
+				<tiles>-73 2 x -71 1;-73 0;-72 0;-70 2</tiles>
 			</region>
 			<region bbox="-76 3 -75 1" name="huila" size="5">
-				<tiles>-76 1;-76 2;-76 3;-75 2;-75 3</tiles>
+				<tiles>-76 3 x -75 2;-76 1</tiles>
 			</region>
 			<region bbox="-73 12 -71 10" name="la_guajira" size="7">
-				<tiles>-73 10;-73 11;-73 12;-72 11;-72 12;-71 11;-71 12</tiles>
+				<tiles>-73 12 x -71 11;-73 10</tiles>
 			</region>
 			<region bbox="-75 11 -74 8" name="magdalena" size="8">
-				<tiles>-75 8;-75 9;-75 10;-75 11;-74 8;-74 9;-74 10;-74 11</tiles>
+				<tiles>-75 11 x -74 8</tiles>
 			</region>
 			<region bbox="-75 4 -71 1" name="meta" size="17">
-				<tiles>-75 1;-75 2;-75 3;-75 4;-74 1;-74 2;-74 3;-74 4;-73 2;-73 3;-73 4;-72 2;-72 3;-72 4;-71 2;-71 3;-71 4</tiles>
+				<tiles>-75 4 x -71 2;-75 1;-74 1</tiles>
 			</region>
 			<region bbox="-79 2 -77 0" name="narino" size="8">
-				<tiles>-79 0;-79 1;-79 2;-78 0;-78 1;-78 2;-77 0;-77 1</tiles>
+				<tiles>-79 2 x -78 0;-77 0;-77 1</tiles>
 			</region>
 			<region bbox="-73 9 -72 6" name="norte_de_santander" size="6">
-				<tiles>-73 6;-73 7;-73 8;-73 9;-72 6;-72 7</tiles>
+				<tiles>-73 9 x -73 6;-72 6;-72 7</tiles>
 			</region>
 			<region bbox="-77 1 -75 0" name="putumayo" size="5">
-				<tiles>-77 0;-77 1;-76 0;-76 1;-75 0</tiles>
+				<tiles>-77 1 x -76 0;-75 0</tiles>
 			</region>
 			<region bbox="-76 4 -76 4" name="quindio" size="1">
 				<tiles>-76 4</tiles>
@@ -9863,22 +9863,22 @@
 				<tiles>-81 14;-80 15;-79 15;-79 16</tiles>
 			</region>
 			<region bbox="-74 8 -73 5" name="santander" size="7">
-				<tiles>-74 5;-74 6;-74 7;-74 8;-73 5;-73 6;-73 7</tiles>
+				<tiles>-74 7 x -73 5;-74 8</tiles>
 			</region>
 			<region bbox="-75 9 -75 8" name="sucre" size="2">
 				<tiles>-75 8;-75 9</tiles>
 			</region>
 			<region bbox="-76 5 -75 2" name="tolima" size="7">
-				<tiles>-76 2;-76 3;-76 4;-76 5;-75 3;-75 4;-75 5</tiles>
+				<tiles>-76 5 x -75 3;-76 2</tiles>
 			</region>
 			<region bbox="-79 5 -76 2" name="valle_del_cauca" size="12">
-				<tiles>-79 2;-79 3;-78 2;-78 3;-78 4;-77 2;-77 3;-77 4;-77 5;-76 3;-76 4;-76 5</tiles>
+				<tiles>-78 4 x -76 3;-79 2;-79 3;-78 2;-77 2;-77 5;-76 5</tiles>
 			</region>
 			<region bbox="-72 2 -70 -1" name="vaupes" size="10">
-				<tiles>-72 -1;-72 0;-72 1;-71 -1;-71 0;-71 1;-71 2;-70 -1;-70 0;-70 1</tiles>
+				<tiles>-72 1 x -70 -1;-71 2</tiles>
 			</region>
 			<region bbox="-71 6 -68 2" name="vichada" size="16">
-				<tiles>-71 2;-71 3;-71 4;-71 5;-70 3;-70 4;-70 5;-70 6;-69 3;-69 4;-69 5;-69 6;-68 3;-68 4;-68 5;-68 6</tiles>
+				<tiles>-71 5 x -68 3;-71 2;-70 6;-69 6;-68 6</tiles>
 			</region>
 		
 		<tiles>-78 7 x -70 0;-74 -1 x -70 -3;-76 10 x -73 8;-69 6 x -68 1;-73 12 x -71 11;-79 3 x -79 0;-71 -4 x -70 -5;-82 4;-82 3;-76 -1;-67 1;-78 8;-82 12;-82 13;-77 8;-77 9;-75 -2;-75 -1;-74 11;-75 11</tiles></country>
@@ -9905,13 +9905,13 @@
 				<tiles>-80 -3</tiles>
 			</region>
 			<region bbox="-80 1 -79 0" name="esmeraldas" size="4">
-				<tiles>-80 0;-80 1;-79 0;-79 1</tiles>
+				<tiles>-80 1 x -79 0</tiles>
 			</region>
 			<region bbox="-91 0 -90 -1" name="galapagos" size="4">
-				<tiles>-91 -1;-91 0;-90 -1;-90 0</tiles>
+				<tiles>-91 0 x -90 -1</tiles>
 			</region>
 			<region bbox="-81 -1 -80 -3" name="guayas" size="5">
-				<tiles>-81 -3;-81 -2;-80 -3;-80 -2;-80 -1</tiles>
+				<tiles>-81 -2 x -80 -3;-80 -1</tiles>
 			</region>
 			<region bbox="-79 0 -78 0" name="imbabura" size="2">
 				<tiles>-79 0;-78 0</tiles>
@@ -9923,16 +9923,16 @@
 				<tiles>-79 -1</tiles>
 			</region>
 			<region bbox="-81 0 -80 -2" name="manabi" size="6">
-				<tiles>-81 -2;-81 -1;-81 0;-80 -2;-80 -1;-80 0</tiles>
+				<tiles>-81 0 x -80 -2</tiles>
 			</region>
 			<region bbox="-79 -2 -77 -3" name="morona_santiago" size="5">
-				<tiles>-79 -3;-79 -2;-78 -3;-78 -2;-77 -3</tiles>
+				<tiles>-79 -2 x -78 -3;-77 -3</tiles>
 			</region>
 			<region bbox="-78 0 -76 -1" name="orellana" size="5">
-				<tiles>-78 -1;-78 0;-77 -1;-77 0;-76 -1</tiles>
+				<tiles>-78 0 x -77 -1;-76 -1</tiles>
 			</region>
 			<region bbox="-78 -1 -76 -2" name="pastaza" size="5">
-				<tiles>-78 -2;-78 -1;-77 -2;-77 -1;-76 -2</tiles>
+				<tiles>-78 -1 x -77 -2;-76 -2</tiles>
 			</region>
 			<region bbox="-79 0 -78 0" name="pichincha" size="2">
 				<tiles>-79 0;-78 0</tiles>
@@ -9952,16 +9952,16 @@
 		<tiles>-62 -52 x -59 -53;-58 -52;-62 -51</tiles></country>
 		<country bbox="-55 5 -52 2" hillshade_sqlite="yes" name="french_guiana" size="14" verified="no">
 		<region bbox="-53 5 -52 2" name="cayenne" size="6">
-				<tiles>-53 2;-53 3;-53 4;-53 5;-52 3;-52 4</tiles>
+				<tiles>-53 4 x -52 3;-53 2;-53 5</tiles>
 			</region>
 			<region bbox="-54 5 -53 2" name="saint-laurent-du-maroni" size="6">
-				<tiles>-54 2;-54 3;-54 4;-54 5;-53 2;-53 3</tiles>
+				<tiles>-54 5 x -54 2;-53 2;-53 3</tiles>
 			</region>
 		
 		<tiles>-55 5 x -53 2;-52 3;-52 4</tiles></country>
 		<country bbox="-62 8 -57 1" hillshade_sqlite="yes" name="guyana" size="30" verified="no">
 			<region bbox="-60 8 -59 6" name="barima-waini" size="5">
-				<tiles>-60 6;-60 7;-60 8;-59 7;-59 8</tiles>
+				<tiles>-60 8 x -59 7;-60 6</tiles>
 			</region>
 			<region bbox="-59 7 -59 6" name="cuyuni-mazaruni" size="2">
 				<tiles>-59 6;-59 7</tiles>
@@ -9976,25 +9976,25 @@
 				<tiles>-58 5;-58 6</tiles>
 			</region>
 			<region bbox="-58 6 -57 1" name="mahaica-berbice" size="8">
-				<tiles>-58 1;-58 2;-58 3;-58 4;-58 5;-58 6;-57 1;-57 2</tiles>
+				<tiles>-58 6 x -58 1;-57 1;-57 2</tiles>
 			</region>
 			<region bbox="-61 7 -59 5" name="pomeroon-supenaam" size="8">
-				<tiles>-61 5;-61 6;-61 7;-60 5;-60 6;-60 7;-59 5;-59 6</tiles>
+				<tiles>-61 7 x -60 5;-59 5;-59 6</tiles>
 			</region>
 			<region bbox="-60 5 -59 3" name="potaro-siparuni" size="6">
-				<tiles>-60 3;-60 4;-60 5;-59 3;-59 4;-59 5</tiles>
+				<tiles>-60 5 x -59 3</tiles>
 			</region>
 			<region bbox="-60 4 -58 1" name="upper_demerara-berbice" size="10">
-				<tiles>-60 1;-60 2;-60 3;-60 4;-59 1;-59 2;-59 3;-59 4;-58 2;-58 3</tiles>
+				<tiles>-60 4 x -59 1;-58 2;-58 3</tiles>
 			</region>
 			<region bbox="-59 6 -58 4" name="upper_takutu-upper_essequibo" size="6">
-				<tiles>-59 4;-59 5;-59 6;-58 4;-58 5;-58 6</tiles>
+				<tiles>-59 6 x -58 4</tiles>
 			</region>
 		
 		<tiles>-60 6 x -58 1;-61 8 x -61 4;-57 1;-57 2;-60 8;-60 7;-59 7;-62 5;-62 6</tiles></country>
 		<country bbox="-63 -20 -55 -28" hillshade_sqlite="yes" name="paraguay" size="53" verified="no">
 		<region bbox="-62 -20 -58 -22" name="alto_paraguay" size="13">
-				<tiles>-62 -21;-62 -20;-61 -22;-61 -21;-61 -20;-60 -22;-60 -21;-60 -20;-59 -22;-59 -21;-59 -20;-58 -22;-58 -21</tiles>
+				<tiles>-61 -20 x -59 -22;-62 -21;-62 -20;-58 -22;-58 -21</tiles>
 			</region>
 			<region bbox="-55 -25 -55 -26" name="alto_parana" size="2">
 				<tiles>-55 -26;-55 -25</tiles>
@@ -10006,7 +10006,7 @@
 				<tiles>-57 -25</tiles>
 			</region>
 			<region bbox="-62 -20 -60 -23" name="boqueron" size="10">
-				<tiles>-62 -23;-62 -22;-62 -21;-62 -20;-61 -23;-61 -22;-61 -21;-60 -23;-60 -22;-60 -21</tiles>
+				<tiles>-62 -21 x -60 -23;-62 -20</tiles>
 			</region>
 			<region bbox="-56 -25 -56 -25" name="caaguazu" size="1">
 				<tiles>-56 -25</tiles>
@@ -10042,28 +10042,28 @@
 				<tiles>-57 -26</tiles>
 			</region>
 			<region bbox="-61 -22 -58 -25" name="presidente_hayes" size="13">
-				<tiles>-61 -25;-61 -24;-61 -23;-60 -25;-60 -24;-60 -23;-60 -22;-59 -25;-59 -24;-59 -23;-58 -25;-58 -24;-58 -23</tiles>
+				<tiles>-61 -23 x -58 -25;-60 -22</tiles>
 			</region>
 			<region bbox="-57 -24 -56 -25" name="san_pedro" size="4">
-				<tiles>-57 -25;-57 -24;-56 -25;-56 -24</tiles>
+				<tiles>-57 -24 x -56 -25</tiles>
 			</region>
 		
 		<tiles>-59 -23 x -56 -28;-62 -20 x -60 -24;-59 -21 x -58 -22;-55 -24 x -55 -27;-59 -20;-60 -25;-61 -25;-63 -21;-63 -22;-63 -23</tiles></country>
 		<country bbox="-82 0 -69 -19" hillshade_sqlite="yes" name="peru" size="150" verified="no">
 			<region bbox="-78 -3 -78 -7" name="amazonas" size="5">
-				<tiles>-78 -7;-78 -6;-78 -5;-78 -4;-78 -3</tiles>
+				<tiles>-78 -3 x -78 -7</tiles>
 			</region>
 			<region bbox="-78 -8 -77 -10" name="ancash" size="5">
-				<tiles>-78 -10;-78 -9;-78 -8;-77 -10;-77 -9</tiles>
+				<tiles>-78 -9 x -77 -10;-78 -8</tiles>
 			</region>
 			<region bbox="-73 -14 -72 -14" name="apurimac" size="2">
 				<tiles>-73 -14;-72 -14</tiles>
 			</region>
 			<region bbox="-75 -15 -71 -17" name="arequipa" size="14">
-				<tiles>-75 -17;-75 -16;-75 -15;-74 -17;-74 -16;-74 -15;-73 -17;-73 -16;-73 -15;-72 -17;-72 -16;-72 -15;-71 -17;-71 -16</tiles>
+				<tiles>-75 -15 x -72 -17;-71 -17;-71 -16</tiles>
 			</region>
 			<region bbox="-75 -13 -73 -15" name="ayacucho" size="7">
-				<tiles>-75 -15;-75 -14;-75 -13;-74 -15;-74 -14;-74 -13;-73 -15</tiles>
+				<tiles>-75 -13 x -74 -15;-73 -15</tiles>
 			</region>
 			<region bbox="-79 -5 -78 -7" name="cajamarca" size="4">
 				<tiles>-79 -7;-79 -6;-79 -5;-78 -7</tiles>
@@ -10072,58 +10072,58 @@
 				<tiles>-77 -13;-77 -12;-71 -16;-70 -16</tiles>
 			</region>
 			<region bbox="-74 -12 -71 -15" name="cusco" size="13">
-				<tiles>-74 -14;-74 -13;-74 -12;-73 -15;-73 -14;-73 -13;-73 -12;-72 -15;-72 -14;-72 -13;-71 -15;-71 -14;-71 -13</tiles>
+				<tiles>-73 -13 x -71 -15;-74 -14;-74 -13;-74 -12;-73 -12</tiles>
 			</region>
 			<region bbox="-75 -12 -75 -14" name="huancavelica" size="3">
 				<tiles>-75 -14;-75 -13;-75 -12</tiles>
 			</region>
 			<region bbox="-77 -9 -75 -10" name="huanuco" size="6">
-				<tiles>-77 -10;-77 -9;-76 -10;-76 -9;-75 -10;-75 -9</tiles>
+				<tiles>-77 -9 x -75 -10</tiles>
 			</region>
 			<region bbox="-76 -13 -75 -15" name="ica" size="4">
 				<tiles>-76 -15;-76 -14;-76 -13;-75 -15</tiles>
 			</region>
 			<region bbox="-76 -11 -74 -12" name="junin" size="6">
-				<tiles>-76 -12;-76 -11;-75 -12;-75 -11;-74 -12;-74 -11</tiles>
+				<tiles>-76 -11 x -74 -12</tiles>
 			</region>
 			<region bbox="-79 -7 -77 -9" name="la_libertad" size="8">
-				<tiles>-79 -9;-79 -8;-79 -7;-78 -9;-78 -8;-78 -7;-77 -9;-77 -8</tiles>
+				<tiles>-79 -7 x -78 -9;-77 -9;-77 -8</tiles>
 			</region>
 			<region bbox="-80 -6 -80 -7" name="lambayeque" size="2">
 				<tiles>-80 -7;-80 -6</tiles>
 			</region>
 			<region bbox="-77 -11 -76 -13" name="lima" size="5">
-				<tiles>-77 -13;-77 -12;-77 -11;-76 -13;-76 -12</tiles>
+				<tiles>-77 -12 x -76 -13;-77 -11</tiles>
 			</region>
 			<region bbox="-77 0 -70 -8" name="loreto" size="44">
-				<tiles>-77 -8;-77 -7;-77 -6;-77 -5;-77 -4;-77 -3;-77 -2;-76 -8;-76 -7;-76 -6;-76 -5;-76 -4;-76 -3;-76 -2;-76 -1;-76 0;-75 -8;-75 -7;-75 -6;-75 -5;-75 -4;-75 -3;-75 -2;-75 -1;-74 -8;-74 -7;-74 -6;-74 -5;-74 -4;-74 -3;-74 -2;-74 -1;-73 -6;-73 -5;-73 -4;-73 -3;-72 -5;-72 -4;-72 -3;-71 -5;-71 -4;-71 -3;-70 -5;-70 -3</tiles>
+				<tiles>-77 -2 x -74 -8;-73 -3 x -71 -5;-76 -1;-76 0;-75 -1;-74 -1;-73 -6;-70 -5;-70 -3</tiles>
 			</region>
 			<region bbox="-72 -10 -69 -13" name="madre_de_dios" size="12">
-				<tiles>-72 -13;-72 -12;-72 -11;-71 -13;-71 -12;-71 -11;-71 -10;-70 -13;-70 -12;-70 -11;-69 -13;-69 -12</tiles>
+				<tiles>-72 -11 x -70 -13;-71 -10;-69 -13;-69 -12</tiles>
 			</region>
 			<region bbox="-71 -16 -70 -17" name="moquegua" size="3">
 				<tiles>-71 -17;-71 -16;-70 -17</tiles>
 			</region>
 			<region bbox="-76 -10 -75 -11" name="pasco" size="4">
-				<tiles>-76 -11;-76 -10;-75 -11;-75 -10</tiles>
+				<tiles>-76 -10 x -75 -11</tiles>
 			</region>
 			<region bbox="-81 -4 -80 -6" name="piura" size="5">
-				<tiles>-81 -6;-81 -5;-81 -4;-80 -6;-80 -5</tiles>
+				<tiles>-81 -5 x -80 -6;-81 -4</tiles>
 			</region>
 			<region bbox="-71 -13 -69 -17" name="puno" size="13">
-				<tiles>-71 -17;-71 -16;-71 -15;-71 -14;-70 -17;-70 -16;-70 -15;-70 -14;-70 -13;-69 -17;-69 -15;-69 -14;-69 -13</tiles>
+				<tiles>-71 -14 x -70 -17;-70 -13;-69 -17;-69 -15;-69 -14;-69 -13</tiles>
 			</region>
 			<region bbox="-77 -6 -76 -8" name="san_martin" size="6">
-				<tiles>-77 -8;-77 -7;-77 -6;-76 -8;-76 -7;-76 -6</tiles>
+				<tiles>-77 -6 x -76 -8</tiles>
 			</region>
 			<region bbox="-71 -17 -70 -18" name="tacna" size="4">
-				<tiles>-71 -18;-71 -17;-70 -18;-70 -17</tiles>
+				<tiles>-71 -17 x -70 -18</tiles>
 			</region>
 			<region bbox="-81 -4 -81 -4" name="tumbes" size="1">
 				<tiles>-81 -4</tiles>
 			</region>
 			<region bbox="-76 -8 -71 -11" name="ucayali" size="18">
-				<tiles>-76 -10;-76 -9;-76 -8;-75 -11;-75 -10;-75 -9;-75 -8;-74 -11;-74 -10;-74 -9;-74 -8;-73 -11;-73 -10;-73 -9;-72 -11;-72 -10;-71 -11;-71 -10</tiles>
+				<tiles>-75 -10 x -71 -11;-76 -8 x -74 -9;-76 -10;-73 -9</tiles>
 			</region>
 		
 		<tiles>-77 -2 x -74 -15;-73 -11 x -70 -18;-79 -4 x -78 -11;-73 -3 x -71 -5;-82 -5 x -80 -7;-69 -12 x -69 -15;-75 -16 x -74 -17;-69 -17;-80 -8;-80 -9;-76 -1;-76 -16;-78 -3;-74 -1;-78 -13;-78 -12;-75 -1;-72 -10;-71 -10;-71 -19;-76 0;-73 -10;-70 -19;-73 -6;-81 -4;-73 -9;-70 -5</tiles></country>
@@ -10144,7 +10144,7 @@
 				<tiles>-57 5;-57 6</tiles>
 			</region>
 			<region bbox="-56 5 -55 4" name="para" size="4">
-				<tiles>-56 4;-56 5;-55 4;-55 5</tiles>
+				<tiles>-56 5 x -55 4</tiles>
 			</region>
 			<region bbox="-55 5 -55 5" name="paramaribo" size="1">
 				<tiles>-55 5</tiles>
@@ -10153,7 +10153,7 @@
 				<tiles>-56 5;-56 6</tiles>
 			</region>
 			<region bbox="-58 5 -54 1" name="sipaliwini" size="19">
-				<tiles>-58 2;-58 3;-58 4;-58 5;-57 1;-57 2;-57 3;-57 4;-57 5;-56 1;-56 2;-56 3;-56 4;-56 5;-55 2;-55 3;-55 4;-55 5;-54 3</tiles>
+				<tiles>-58 5 x -55 2;-57 1;-56 1;-54 3</tiles>
 			</region>
 			<region bbox="-55 5 -55 5" name="wanica" size="1">
 				<tiles>-55 5</tiles>
@@ -10168,7 +10168,7 @@
 				<tiles>-56 -35</tiles>
 			</region>
 			<region bbox="-55 -32 -54 -33" name="cerro_largo" size="4">
-				<tiles>-55 -33;-55 -32;-54 -33;-54 -32</tiles>
+				<tiles>-55 -32 x -54 -33</tiles>
 			</region>
 			<region bbox="-58 -34 -57 -34" name="colonia" size="2">
 				<tiles>-58 -34;-57 -34</tiles>
@@ -10222,64 +10222,64 @@
 		<tiles>-59 -32 x -54 -35;-53 -33;-57 -30;-58 -31;-56 -31;-57 -31</tiles></country>
 		<country bbox="-74 15 -60 0" hillshade_sqlite="yes" name="venezuela" size="113" verified="no">
 		<region bbox="-67 6 -64 0" name="amazonas" size="21">
-				<tiles>-67 0;-67 1;-67 2;-67 3;-67 4;-67 5;-66 0;-66 1;-66 2;-66 3;-66 4;-66 5;-66 6;-65 1;-65 2;-65 3;-65 4;-65 5;-64 1;-64 2;-64 3</tiles>
+				<tiles>-67 5 x -65 1;-67 0;-66 0;-66 6;-64 1;-64 2;-64 3</tiles>
 			</region>
 			<region bbox="-65 10 -63 7" name="anzoategui" size="9">
-				<tiles>-65 7;-65 8;-65 9;-65 10;-64 7;-64 8;-64 9;-64 10;-63 8</tiles>
+				<tiles>-65 10 x -64 7;-63 8</tiles>
 			</region>
 			<region bbox="-72 8 -67 5" name="apure" size="15">
-				<tiles>-72 6;-72 7;-71 6;-71 7;-70 5;-70 6;-70 7;-70 8;-69 6;-69 7;-69 8;-68 6;-68 7;-67 6;-67 7</tiles>
+				<tiles>-72 7 x -67 6;-70 5;-70 8;-69 8</tiles>
 			</region>
 			<region bbox="-67 10 -67 9" name="aragua" size="2">
 				<tiles>-67 9;-67 10</tiles>
 			</region>
 			<region bbox="-71 9 -68 7" name="barinas" size="10">
-				<tiles>-71 7;-71 8;-71 9;-70 7;-70 8;-70 9;-69 7;-69 8;-68 7;-68 8</tiles>
+				<tiles>-71 8 x -68 7;-71 9;-70 9</tiles>
 			</region>
 			<region bbox="-67 8 -61 3" name="bolivar" size="35">
-				<tiles>-67 5;-67 6;-67 7;-66 4;-66 5;-66 6;-66 7;-65 3;-65 4;-65 5;-65 6;-65 7;-65 8;-64 3;-64 4;-64 5;-64 6;-64 7;-64 8;-63 3;-63 4;-63 5;-63 6;-63 7;-63 8;-62 4;-62 5;-62 6;-62 7;-62 8;-61 4;-61 5;-61 6;-61 7;-61 8</tiles>
+				<tiles>-65 8 x -61 4;-67 7 x -66 5;-66 4;-65 3;-64 3;-63 3</tiles>
 			</region>
 			<region bbox="-68 10 -68 9" name="carabobo" size="2">
 				<tiles>-68 9;-68 10</tiles>
 			</region>
 			<region bbox="-69 10 -68 8" name="cojedes" size="6">
-				<tiles>-69 8;-69 9;-69 10;-68 8;-68 9;-68 10</tiles>
+				<tiles>-69 10 x -68 8</tiles>
 			</region>
 			<region bbox="-62 10 -60 7" name="delta_amacuro" size="9">
-				<tiles>-62 7;-62 8;-62 9;-62 10;-61 7;-61 8;-61 9;-60 7;-60 8</tiles>
+				<tiles>-62 9 x -61 7;-62 10;-60 7;-60 8</tiles>
 			</region>
 			<region bbox="-67 12 -63 10" name="dependencias_federales" size="7">
-				<tiles>-67 11;-67 12;-66 10;-66 11;-65 11;-64 11;-63 11</tiles>
+				<tiles>-67 11 x -63 11;-67 12;-66 10</tiles>
 			</region>
 			<region bbox="-67 15 -64 10" name="distrito_capital" size="3">
 				<tiles>-67 10;-67 11;-64 15</tiles>
 			</region>
 			<region bbox="-71 12 -68 10" name="falcon" size="10">
-				<tiles>-71 10;-71 11;-71 12;-70 10;-70 11;-70 12;-69 10;-69 11;-68 10;-68 11</tiles>
+				<tiles>-71 11 x -68 10;-71 12;-70 12</tiles>
 			</region>
 			<region bbox="-68 10 -65 7" name="guarico" size="14">
-				<tiles>-68 7;-68 8;-68 9;-68 10;-67 7;-67 8;-67 9;-67 10;-66 7;-66 8;-66 9;-66 10;-65 8;-65 9</tiles>
+				<tiles>-68 10 x -66 7;-65 8;-65 9</tiles>
 			</region>
 			<region bbox="-70 10 -69 9" name="lara" size="4">
-				<tiles>-70 9;-70 10;-69 9;-69 10</tiles>
+				<tiles>-70 10 x -69 9</tiles>
 			</region>
 			<region bbox="-72 9 -71 7" name="merida" size="6">
-				<tiles>-72 7;-72 8;-72 9;-71 7;-71 8;-71 9</tiles>
+				<tiles>-72 9 x -71 7</tiles>
 			</region>
 			<region bbox="-67 10 -66 9" name="miranda" size="4">
-				<tiles>-67 9;-67 10;-66 9;-66 10</tiles>
+				<tiles>-67 10 x -66 9</tiles>
 			</region>
 			<region bbox="-64 10 -62 8" name="monagas" size="8">
-				<tiles>-64 8;-64 9;-64 10;-63 8;-63 9;-63 10;-62 8;-62 9</tiles>
+				<tiles>-64 10 x -63 8;-62 8;-62 9</tiles>
 			</region>
 			<region bbox="-64 11 -64 10" name="nueva_esparta" size="2">
 				<tiles>-64 10;-64 11</tiles>
 			</region>
 			<region bbox="-70 10 -69 7" name="portuguesa" size="6">
-				<tiles>-70 8;-70 9;-70 10;-69 7;-69 8;-69 9</tiles>
+				<tiles>-70 9 x -69 8;-70 10;-69 7</tiles>
 			</region>
 			<region bbox="-64 10 -62 9" name="sucre" size="5">
-				<tiles>-64 9;-64 10;-63 9;-63 10;-62 10</tiles>
+				<tiles>-64 10 x -63 9;-62 10</tiles>
 			</region>
 			<region bbox="-72 8 -72 7" name="tachira" size="2">
 				<tiles>-72 7;-72 8</tiles>
@@ -10291,7 +10291,7 @@
 				<tiles>-69 9;-69 10</tiles>
 			</region>
 			<region bbox="-73 12 -71 8" name="zulia" size="12">
-				<tiles>-73 8;-73 9;-73 10;-73 11;-72 8;-72 9;-72 10;-72 11;-72 12;-71 9;-71 10;-71 12</tiles>
+				<tiles>-73 11 x -72 8;-72 12;-71 9;-71 10;-71 12</tiles>
 			</region>
 		
 		<tiles>-72 10 x -62 6;-68 5 x -64 1;-73 11 x -67 11;-63 5 x -61 4;-73 10 x -73 7;-61 8 x -60 7;-64 15;-74 9;-72 12;-67 0;-63 3;-71 12;-61 6;-70 12;-61 9;-65 11;-66 0;-64 11</tiles></country>
