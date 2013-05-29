@@ -83,7 +83,7 @@ public class RegionsRegistryConverter {
 	
 		for(RegionCountry rc : regCountries) {
 			for(RegionCountry r : rc.getSubRegions()) {
-				if (r.getTileSize() < 8) {
+				if (r.getTileSize() < 1000000) {
 					String rgName = rc.name + "#" + r.name;
 					boolean optimized = new AreaOptimizer().tryToCutBigSquareArea(r, true);
 					boolean replace = optimized;
