@@ -112,6 +112,14 @@ public class RegionsRegistryConverter {
 			System.out.println("Validate bbox '" + bbox + "' != '" +b +"'");
 			reg.setAttribute("bbox", b);
 		}
+		
+		String size = reg.getAttribute("size");
+		String sz = r.getTileSize()+"";
+		if(!size.equals(sz)) {
+			System.out.println("Region " + rgName);
+			System.out.println("Validate size '" + size + "' != '" +sz +"'");
+			reg.setAttribute("size", b);
+		}
 	}
 
 
