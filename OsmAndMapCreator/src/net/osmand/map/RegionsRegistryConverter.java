@@ -81,20 +81,23 @@ public class RegionsRegistryConverter {
 			parseDomRegions(e.getValue(), elements, e.getKey() +"#", "region");
 		}
 	
-		for(RegionCountry r : regCountries) {
-			if (r.getTileSize() < 1000 || true) {
-				boolean optimized = new AreaOptimizer().tryToCutBigSquareArea(r, true);
-				boolean replace = optimized;
-				while(optimized) {
-					optimized = new AreaOptimizer().tryToCutBigSquareArea(r, true);
-				}
-				if (replace) {
-					NodeList ts = elements.get(r.name).getElementsByTagName("tiles");
-					Element e = (Element) ts.item(0);
-					System.out.println("-" + e.getTextContent());
-					System.out.println("+" + r.serializeTilesArray());
-					System.out.println("-----------------------------------\n");
-					e.setTextContent(r.serializeTilesArray());
+		for(RegionCountry rc : regCountries) {
+			for(RegionCountry r : rc.getSubRegions()) {
+				if (r.getTileSize() < 8) {
+					String rgName = rc.name + "#" + r.name;
+					boolean optimized = new AreaOptimizer().tryToCutBigSquareArea(r, true);
+					boolean replace = optimized;
+					while (optimized) {
+						optimized = new AreaOptimizer().tryToCutBigSquareArea(r, true);
+					}
+					if (replace) {
+						NodeList ts = elements.get(rgName).getElementsByTagName("tiles");
+						Element e = (Element) ts.item(0);
+						System.out.println("-" + e.getTextContent());
+						System.out.println("+" + r.serializeTilesArray());
+						System.out.println("-----------------------------------\n");
+						e.setTextContent(r.serializeTilesArray());
+					}
 				}
 			}
 		}
