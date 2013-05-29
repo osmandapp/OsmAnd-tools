@@ -68,7 +68,7 @@ public class RegionsRegistryConverter {
 	}
 	
 	public static void validate(boolean overwrite) throws SAXException, IOException, ParserConfigurationException, TransformerException {
-		List<RegionCountry> regCountries = parseRegions(false);
+		List<RegionCountry> regCountries = parseRegions(true);
 		InputStream is = RegionsRegistryConverter.class.getResourceAsStream("countries.xml");
 		DocumentBuilder docbuilder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
 		Document doc = docbuilder.parse(is);
@@ -82,10 +82,10 @@ public class RegionsRegistryConverter {
 		}
 	
 		for (RegionCountry rc : regCountries) {
-//			validateRegion(elements, rc, rc.name);
+			validateRegion(elements, rc, rc.name);
 			for (RegionCountry r : rc.getSubRegions()) {
 				String rgName = rc.name + "#" + r.name;
-//				validateRegion(elements, r, rgName);
+				validateRegion(elements, r, rgName);
 			}
 		}
 		if (overwrite) {
@@ -139,7 +139,7 @@ public class RegionsRegistryConverter {
 
 
 	public static void optimizeBoxes() throws SAXException, IOException, ParserConfigurationException, TransformerException {
-		List<RegionCountry> regCountries = parseRegions(true);
+		List<RegionCountry> regCountries = parseRegions(false);
 		InputStream is = RegionsRegistryConverter.class.getResourceAsStream("countries.xml");
 		DocumentBuilder docbuilder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
 		Document doc = docbuilder.parse(is);
@@ -253,6 +253,7 @@ public class RegionsRegistryConverter {
 				RegionCountry c = new RegionCountry();
 				c.continentName = continentName;
 				c.name = attributes.getValue("name");
+				c.subregionsVerified = !"no".equals(attributes.getValue("verified")) || withNoValidated;
 				current = c;
 				countries.add(c);
 			} else if(tagName.equals("tiles")) {
@@ -261,7 +262,7 @@ public class RegionsRegistryConverter {
 				RegionCountry c = new RegionCountry();
 				c.name = attributes.getValue("name");
 				currentRegion = c;
-				if(!"no".equals(attributes.getValue("verified")) || withNoValidated) {
+				if(current.subregionsVerified) {
 					current.addSubregion(c);
 				}
 			}
