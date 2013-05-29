@@ -80,7 +80,7 @@ public class RegionsRegistryConverter {
 		}
 	
 		for(RegionCountry r : regCountries) {
-			if(r.getTileSize()  < 15) {
+			if(r.getTileSize()  < 8) {
 				boolean optimized = new AreaOptimizer().tryToCutBigSquareArea(r, true);
 				if(optimized) {
 					NodeList ts = elements.get(r.name).getElementsByTagName("tiles");
@@ -88,7 +88,7 @@ public class RegionsRegistryConverter {
 					System.out.println("-"+e.getTextContent());
 					System.out.println("+"+r.serializeTilesArray());
 					System.out.println("-----------------------------------\n");
-//					e.setTextContent(r.serializeTilesArray());
+					e.setTextContent(r.serializeTilesArray());
 				}
 			}
 		}
