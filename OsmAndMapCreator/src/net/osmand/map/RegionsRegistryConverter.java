@@ -81,10 +81,13 @@ public class RegionsRegistryConverter {
 	
 		for(RegionCountry r : regCountries) {
 			if(r.getTileSize()  < 15) {
-				boolean optimized = new AreaOptimizer().tryToCutBigSquareArea(r);
+				boolean optimized = new AreaOptimizer().tryToCutBigSquareArea(r, true);
 				if(optimized) {
 					NodeList ts = elements.get(r.name).getElementsByTagName("tiles");
 					Element e = (Element) ts.item(0);
+					System.out.println("-"+e.getTextContent());
+					System.out.println("+"+r.serializeTilesArray());
+					System.out.println("-----------------------------------\n");
 //					e.setTextContent(r.serializeTilesArray());
 				}
 			}
@@ -261,7 +264,7 @@ public class RegionsRegistryConverter {
 		}
 		
 		
-		public boolean tryToCutBigSquareArea(RegionCountry r) {
+		public boolean tryToCutBigSquareArea(RegionCountry r, boolean verbose) {
 			int minX = findExtremumCoordinate(r, true, false);
 			int maxX = findExtremumCoordinate(r, false, false);
 			int minY = findExtremumCoordinate(r, true, true);
@@ -280,21 +283,22 @@ public class RegionsRegistryConverter {
 				int ytop = maxY - sub[0];
 				int xright = sub[3]  + minX;
 				int ybottom = maxY - sub[2] ;
-				System.out.println("--------------" + r.name);
-				for (int t = 0; t < areaMatrix.length; t++) {
-//					System.out.println(Arrays.toString(areaMatrix[t]));
-				}
-				System.out.println(xleft + " " + ytop + " x " + xright + " " + ybottom + " --- " + a);
-				
 				for (int x = xleft; x <= xright; x++) {
 					for (int y = ytop; y >= ybottom; y--) {
 						r.removeSingle(x, y);
 					}
 				}
 				r.add(xleft, xright, ytop, ybottom);
-				float c = (float)r.calcAllTiles().size() /  (r.getBoxTiles().size() + r.getSingleTiles().size()); 
-				System.out.println("Compression " +c );
-				System.out.println("--------------");
+				if (verbose) {
+					System.out.println("-" + r.name);
+					for (int t = 0; t < areaMatrix.length; t++) {
+						 System.out.println(Arrays.toString(areaMatrix[t]));
+					}
+					System.out.println(xleft + " " + ytop + " x " + xright + " " + ybottom + " --- " + a);
+
+					float c = (float) r.calcAllTiles().size() / (r.getBoxTiles().size() + r.getSingleTiles().size());
+					System.out.println("Compression " + c);
+				}
 				return true;
 			}
 			return false;
