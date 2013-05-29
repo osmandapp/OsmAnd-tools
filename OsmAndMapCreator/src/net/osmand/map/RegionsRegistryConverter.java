@@ -82,9 +82,13 @@ public class RegionsRegistryConverter {
 		}
 	
 		for(RegionCountry r : regCountries) {
-			if (r.getTileSize() < 30) {
+			if (r.getTileSize() < 1000 || true) {
 				boolean optimized = new AreaOptimizer().tryToCutBigSquareArea(r, true);
-				if (optimized) {
+				boolean replace = optimized;
+				while(optimized) {
+					optimized = new AreaOptimizer().tryToCutBigSquareArea(r, true);
+				}
+				if (replace) {
 					NodeList ts = elements.get(r.name).getElementsByTagName("tiles");
 					Element e = (Element) ts.item(0);
 					System.out.println("-" + e.getTextContent());
