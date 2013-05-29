@@ -60,10 +60,10 @@ public class RegionsRegistryConverter {
 	}
 	
 	public static void main(String[] args) throws Exception {
-//		List<RegionCountry> countries = recreateReginfo();
-//		checkFileRead(countries);
+		List<RegionCountry> countries = recreateReginfo();
+		checkFileRead(countries);
 		
-		optimizeBoxes();
+//		optimizeBoxes();
 	}
 
 
