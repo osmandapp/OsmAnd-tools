@@ -60,14 +60,62 @@ public class RegionsRegistryConverter {
 	}
 	
 	public static void main(String[] args) throws Exception {
-		List<RegionCountry> countries = recreateReginfo();
-		checkFileRead(countries);
+//		List<RegionCountry> countries = recreateReginfo();
+//		checkFileRead(countries);
 		
+		validate(true);
 //		optimizeBoxes();
+	}
+	
+	public static void validate(boolean overwrite) throws SAXException, IOException, ParserConfigurationException, TransformerException {
+		List<RegionCountry> regCountries = parseRegions();
+		InputStream is = RegionsRegistryConverter.class.getResourceAsStream("countries.xml");
+		DocumentBuilder docbuilder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
+		Document doc = docbuilder.parse(is);
+		Map<String, Element> elements = new LinkedHashMap<String, Element>();
+		parseDomRegions(doc.getDocumentElement(), elements, "", "country");
+		Map<String, Element> countries = new LinkedHashMap<String, Element>(elements);
+		Iterator<Entry<String, Element>> it = countries.entrySet().iterator();
+		while(it.hasNext()) {
+			Entry<String, Element> e = it.next();
+			parseDomRegions(e.getValue(), elements, e.getKey() +"#", "region");
+		}
+	
+		for (RegionCountry rc : regCountries) {
+			validateRegion(elements, rc, rc.name);
+			for (RegionCountry r : rc.getSubRegions()) {
+				String rgName = rc.name + "#" + r.name;
+				validateRegion(elements, r, rgName);
+			}
+		}
+		if (overwrite) {
+			TransformerFactory transformerFactory = TransformerFactory.newInstance();
+			Transformer transformer = transformerFactory.newTransformer();
+			DOMSource source = new DOMSource(doc);
+			StreamResult result = new StreamResult(new File("src/net/osmand/map/countries.xml"));
+
+			// Output to console for testing
+			// StreamResult result = new StreamResult(System.out);
+
+			transformer.transform(source, result);
+		}
+	}
+
+	private static void validateRegion(Map<String, Element> elements, RegionCountry r, String rgName) {
+		Element reg = elements.get(rgName);
+		// Element tiles = (Element) reg.getElementsByTagName("tiles").item(0);
+		// tiles.setTextContent(r.serializeTilesArray());
+		String bbox = reg.getAttribute("bbox");
+		String b = r.left + " " + r.top + " " + r.right + " " + r.bottom;
+		if(!bbox.equals(b)) {
+			System.out.println("Region " + rgName);
+			System.out.println("Validate bbox '" + bbox + "' != '" +b +"'");
+			reg.setAttribute("bbox", b);
+		}
 	}
 
 
-	private static void optimizeBoxes() throws SAXException, IOException, ParserConfigurationException, TransformerException {
+	public static void optimizeBoxes() throws SAXException, IOException, ParserConfigurationException, TransformerException {
 		List<RegionCountry> regCountries = parseRegions();
 		InputStream is = RegionsRegistryConverter.class.getResourceAsStream("countries.xml");
 		DocumentBuilder docbuilder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
