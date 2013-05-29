@@ -63,7 +63,7 @@ public class RegionsRegistryConverter {
 //		List<RegionCountry> countries = recreateReginfo();
 //		checkFileRead(countries);
 		
-		validate(true);
+//		validate(true);
 //		optimizeBoxes();
 	}
 	
@@ -118,7 +118,7 @@ public class RegionsRegistryConverter {
 		if(!size.equals(sz)) {
 			System.out.println("Region " + rgName);
 			System.out.println("Validate size '" + size + "' != '" +sz +"'");
-			reg.setAttribute("size", b);
+			reg.setAttribute("size", sz);
 		}
 		
 		// format tiles
