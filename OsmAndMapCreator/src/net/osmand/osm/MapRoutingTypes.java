@@ -4,6 +4,7 @@ import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.hash.TLongObjectHashMap;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -21,10 +22,12 @@ public class MapRoutingTypes {
 
 	private static Set<String> TAGS_TO_SAVE = new HashSet<String>();
 	private static Set<String> TAGS_TO_ACCEPT = new HashSet<String>();
+	private static Map<String, String> TAGS_TO_REPLACE = new HashMap<String, String>();
 	private static Set<String> TAGS_RELATION_TO_ACCEPT = new HashSet<String>();
 	private static Set<String> TAGS_TEXT = new HashSet<String>();
 	private static Set<String> BASE_TAGS_TEXT = new HashSet<String>();
 	private static Set<String> BASE_TAGS_TO_SAVE = new HashSet<String>();
+	private static Map<String, String> BASE_TAGS_TO_REPLACE = new HashMap<String, String>();
 	private static char TAG_DELIMETER = '/'; //$NON-NLS-1$
 	
 	private Map<String, MapRouteType> types = new LinkedHashMap<String, MapRoutingTypes.MapRouteType>();
@@ -43,6 +46,15 @@ public class MapRoutingTypes {
 					TAGS_RELATION_TO_ACCEPT.add(t);
 				}
 				TAGS_TO_ACCEPT.add(t);
+			} else if (tg.replace) {
+				String t2 = tg.tag2;
+				if (tg.value2 != null) {
+					t2 += TAG_DELIMETER + tg.value2;
+				}
+				if (tg.base) {
+					BASE_TAGS_TO_REPLACE.put(t, t2);
+				}
+				TAGS_TO_REPLACE.put(t, t2);
 			} else if(tg.text) {
 				if(tg.base) {
 					BASE_TAGS_TEXT.add(t);
@@ -124,6 +136,17 @@ public class MapRoutingTypes {
 		return false;
 	}
 	
+	private String getMap(Map<String, String> s, String tag, String value) {
+		String r = s.get(tag);
+		if (r != null) {
+			return r;
+		}
+		r = s.get(tag + TAG_DELIMETER + value);
+		return r;
+	}
+	
+	
+	
 	private boolean startsWith(Set<String> s, String tag, String value) {
 		for(String st : s) {
 			if(tag.startsWith(st)) {
@@ -153,7 +176,13 @@ public class MapRoutingTypes {
 		for(Entry<String, String> es : e.getTags().entrySet()) {
 			String tag = es.getKey();
 			String value = converBooleanValue(es.getValue());
-			if(contains(TAGS_TO_ACCEPT, tag, value) || startsWith(TAGS_TO_SAVE, tag, value)) {
+			String tvl = getMap(TAGS_TO_REPLACE, tag, value);
+			if(tvl != null) {
+				int i = tvl.indexOf(TAG_DELIMETER);
+				tag = tvl.substring(0, i);
+				value = tvl.substring(i + 1);
+			}
+			if(contains(TAGS_TO_ACCEPT, tag, value) || startsWith(TAGS_TO_SAVE, tag, value) || getMap(TAGS_TO_REPLACE, tag, value) != null) {
 				outTypes.add(registerRule(tag, value).id);
 			}
 			if(TAGS_TEXT.contains(tag)) {
@@ -188,6 +217,12 @@ public class MapRoutingTypes {
 		for(Entry<String, String> es : e.getTags().entrySet()) {
 			String tag = es.getKey();
 			String value = converBooleanValue(es.getValue());
+			String tvl = getMap(BASE_TAGS_TO_REPLACE, tag, value);
+			if(tvl != null) {
+				int i = tvl.indexOf(TAG_DELIMETER);
+				tag = tvl.substring(0, i);
+				value = tvl.substring(i + 1);
+			}
 			if(BASE_TAGS_TEXT.contains(tag)) {
 				names.put(registerRule(tag, null), value);
 			}
@@ -215,6 +250,12 @@ public class MapRoutingTypes {
 				for (Entry<String, String> es : nd.getTags().entrySet()) {
 					String tag = es.getKey();
 					String value = converBooleanValue(es.getValue());
+					String tvl = getMap(TAGS_TO_REPLACE, tag, value);
+					if(tvl != null) {
+						int i = tvl.indexOf(TAG_DELIMETER);
+						tag = tvl.substring(0, i);
+						value = tvl.substring(i + 1);
+					}
 					if (contains(TAGS_TO_ACCEPT, tag, value) || startsWith(TAGS_TO_SAVE, tag, value)) {
 						if (!pointTypes.containsKey(nd.getId())) {
 							pointTypes.put(nd.getId(), new TIntArrayList());

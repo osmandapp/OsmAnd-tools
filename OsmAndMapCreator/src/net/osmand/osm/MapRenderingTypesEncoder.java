@@ -151,7 +151,10 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		String mode = parser.getAttributeValue("", "mode"); //$NON-NLS-1$
 		rtype.tag = parser.getAttributeValue("", "tag"); //$NON-NLS-1$
 		rtype.value = parser.getAttributeValue("", "value"); //$NON-NLS-1$
+		rtype.tag2 = parser.getAttributeValue("", "tag2"); //$NON-NLS-1$
+		rtype.value2 = parser.getAttributeValue("", "value2"); //$NON-NLS-1$
 		rtype.base = Boolean.parseBoolean(parser.getAttributeValue("", "base"));
+		rtype.replace = "replace".equalsIgnoreCase(mode);
 		rtype.register = "register".equalsIgnoreCase(mode);
 		rtype.amend = "amend".equalsIgnoreCase(mode);
 		rtype.text = "text".equalsIgnoreCase(mode);
@@ -305,10 +308,13 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		boolean relation;
 		String tag;
 		String value;
+		String tag2;
+		String value2;
 		boolean register;
 		boolean amend;
 		boolean base; 
 		boolean text;
+		boolean replace;
 		
 	}
 	
