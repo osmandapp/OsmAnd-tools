@@ -709,7 +709,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 				}
 			}
 		} 
-		if (e.getTag(OSMTagKey.ADDR_HOUSE_NUMBER) != null && e.getTag(OSMTagKey.ADDR_STREET) != null) {
+		if ((e.getTag(OSMTagKey.ADDR_HOUSE_NUMBER) != null || e.getTag(OSMTagKey.ADDR_HOUSE_NAME) != null) && e.getTag(OSMTagKey.ADDR_STREET) != null) {
 			boolean exist = streetDAO.findBuilding(e);
 			if (!exist) {
 				LatLon l = e.getLatLon();
@@ -717,6 +717,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 				if (!idsOfStreet.isEmpty()) {
 					Building building = EntityParser.parseBuilding(e);
 					String hno = e.getTag(OSMTagKey.ADDR_HOUSE_NUMBER);
+					if(hno == null) {
+						hno = e.getTag(OSMTagKey.ADDR_HOUSE_NAME);
+					}
 					int i = hno.indexOf('-');
 					if(i != -1) {
 						building.setInterpolationInterval(1);
