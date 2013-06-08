@@ -43,6 +43,10 @@ void MapViewLayer::renderRaster(const QString& tileSource, const QString& appDir
         }
     }
     QPainter p(img);
+    p.setRenderHints(
+                QPainter::Antialiasing | QPainter::SmoothPixmapTransform,
+                true
+        );
     p.translate(adapter->getCenterPointX(), adapter->getCenterPointY());
     p.rotate(adapter->getRotate());
     p.translate(-adapter->getCenterPointX(), -adapter->getCenterPointY());
