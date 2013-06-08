@@ -201,7 +201,7 @@
 			<region name="irkutsk" downloadName="IRK"/>
 			<region name="ivanov" downloadName="IVA"/>
 			<region name="kabardino-balkaria" downloadName="KB"/>
-			<region name="kalinin" downloadName="KGD"/>
+			<region name="kaliningrad" downloadName="KGD"/>
 			<region name="kalmykia" downloadName="KL"/>
 			<region name="kaluga" downloadName="KLU"/>
 			<region name="kamchatka" downloadName="KAM"/>
@@ -260,7 +260,7 @@
 			<region name="volgograd" downloadName="VGG"/>
 			<region name="vologda" downloadName="VLG"/>
 			<region name="voronezh" downloadName="VOR"/>
-			<region name="yakut" downloadName="SA"/>
+			<region name="yakutia" downloadName="SA"/>
 			<region name="yamal" downloadName="YAN"/>
 			<region name="yaroslavl" downloadName="YAR"/>
 			<region name="zabaikalie" downloadName="ZAB"/>
