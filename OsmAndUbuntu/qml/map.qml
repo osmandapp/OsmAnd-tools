@@ -8,10 +8,19 @@ import QtQuick.Window 2.0
 Page {
     Canvas {
         id: canvas;
-        property bool loaded;
-        property bool useSpecialLayer : true;
-        property int counter : 0;
+
         property variant paths : [[]];
+
+        property int mapMargin : 5;
+        property int counter : 0;
+
+        property variant imgToDraw;
+        property variant nimgToDraw;
+        property double tileX;
+        property double tileY;
+        property double ntileX;
+        property double ntileY;
+
         anchors.top : parent.top
         anchors.bottom: parent.bottom
         width : parent.width
@@ -19,32 +28,35 @@ Page {
         onPaint: {
             var context = canvas.getContext("2d");
             context.clearRect(0, 0, canvas.width, canvas.height);
-            context.save();
-            if(useSpecialLayer) {
-                context.drawImage("image://map/map"+counter, 0, 0);
-            } else {
-                drawLayerMap(context);
-            }
-            context.restore();
+
+            var l  = mapViewAdapter.calcDiffPixelX(tileX - mapViewAdapter.getXTile(), tileY - mapViewAdapter.getYTile());
+            var t  = mapViewAdapter.calcDiffPixelY(tileX - mapViewAdapter.getXTile(), tileY - mapViewAdapter.getYTile());
+            context.drawImage(imgToDraw, l - mapMargin, t - mapMargin, canvas.width + 2 * mapMargin,
+                              canvas.height + 2 * mapMargin);
 
             context.save();
             drawRouteLayer(context);
             context.restore();
+
             context.save();
             drawTargetLocation(context);
             context.restore();
+
             context.save();
             drawStartLocation(context);
             context.restore();
         }
 
         onImageLoaded:  {
-            loaded = true;
+            canvas.unloadImage(imgToDraw, 0, 0);
+            imgToDraw = nimgToDraw;
+            tileX = ntileX;
+            tileY = ntileY;
             canvas.requestPaint();
         }
         onCanvasSizeChanged: {
-            mapViewAdapter.setBounds(canvas.width, canvas.height);
-            refreshMap();
+            mapViewAdapter.setBounds(canvas.width + 2* mapMargin, canvas.height + 2* mapMargin);
+            refreshMap(true);
         }
 
         Component.onCompleted: {
@@ -52,6 +64,7 @@ Page {
             mapViewAdapter.setZoom(z);
             mapViewAdapter.setLatLon(mapLayerData.getMapLatitude(), mapLayerData.getMapLongitude());
             mapLayerData.mapNeedsToRefresh.connect(refreshMapMessage);
+            requestPaint();
         }
 
         Component.onDestruction: {
@@ -74,7 +87,7 @@ Page {
             onClicked: {
                 var r = mapViewAdapter.getRotate() ;
                 mapViewAdapter.setRotate(r+ 30);
-                refreshMap();
+                refreshMap(true);
             }
         }
         Button {
@@ -85,7 +98,7 @@ Page {
             anchors.margins: units.gu(1)
             onClicked: {
                 mapViewAdapter.setRotate(mapViewAdapter.getRotate() - 30);
-                refreshMap();
+                refreshMap(true);
             }
         }
 
@@ -98,7 +111,7 @@ Page {
             anchors.margins: units.gu(1)
             onClicked: {
                 mapViewAdapter.setZoom(mapViewAdapter.getZoom() + 1);
-                refreshMap();
+                refreshMap(true);
             }
         }
         Button {
@@ -110,7 +123,7 @@ Page {
             anchors.margins: units.gu(1)
             onClicked: {
                 mapViewAdapter.setZoom(mapViewAdapter.getZoom() - 1);
-                refreshMap();
+                refreshMap(true);
             }
         }
 
@@ -189,7 +202,7 @@ Page {
                         onClicked: {
                             mapLayerData.setTargetLatLon(lat, lon);
                             PopupUtils.close(popover)
-                            refreshMap();
+                            refreshMap(true);
                         }
                     }
                 }
@@ -204,7 +217,7 @@ Page {
                         onClicked: {
                             mapLayerData.setStartLatLon(lat, lon);
                             PopupUtils.close(popover)
-                            refreshMap();
+                            refreshMap(true);
                         }
                     }
                 }
@@ -219,7 +232,7 @@ Page {
                         onClicked: {
                             PopupUtils.close(popover)
                             mapActions.calculateRoute();
-                            refreshMap();
+                            refreshMap(true);
                         }
                     }
                 }
@@ -248,33 +261,18 @@ Page {
 
     function refreshMapMessage(msg) {
         if(msg) console.log(msg);
-        refreshMap();
+        refreshMap(true);
     }
 
-    function refreshMap() {
+    function refreshMap(force) {
 
         activity.running = mapActions.isActivityRunning();
-        if(canvas.useSpecialLayer) {
-            canvas.unloadImage("image://map/map"+canvas.counter, 0, 0);
+        if(canvas.nimgToDraw === canvas.imgToDraw || force) {
             canvas.counter ++;
-            canvas.loadImage("image://map/map"+canvas.counter, 0, 0);
-        } else {
-            var left = Math.floor(mapViewAdapter.getTiles().x);
-            var top = Math.floor(mapViewAdapter.getTiles().y);
-            var width  = Math.ceil(mapViewAdapter.getTiles().x + mapViewAdapter.getTiles().width) - left;
-            var height  = Math.ceil(mapViewAdapter.getTiles().y + mapViewAdapter.getTiles().height) - top;
-            var base = applicationData.getOsmandDirectiory() + "/tiles/Mapnik/";
-            base = base + mapViewAdapter.getZoom()+"/";
-            var p = new Array(width);
-            for (var i = 0; i < width; i++) {
-                p[i]= new Array(height);
-                for (var j = 0; j < height; j++) {
-                    var s = base +  (left + i)+"/"+(top+j)+".png.tile";
-                    p[i][j] = s;
-                    canvas.loadImage(p[i][j]);
-                }
-            }
-            canvas.paths = p;
+            canvas.ntileX = mapViewAdapter.getXTile();
+            canvas.ntileY = mapViewAdapter.getYTile();
+            canvas.nimgToDraw = "image://map/map"+canvas.counter;
+            canvas.loadImage(canvas.nimgToDraw, 0, 0);
         }
         canvas.requestPaint();
     }
@@ -297,7 +295,7 @@ Page {
                 }
             }
             context.stroke();
-            context.beginPath();
+            /*context.beginPath();
             context.lineWidth = 1;
             context.strokeStyle = Qt.rgba(0, 0,0,1);
             for(var i = 0; i < mapLayerData.getRoutePointLength(); i++) {
@@ -307,7 +305,7 @@ Page {
                 var y = mapViewAdapter.getRotatedMapYForPoint(lat, lon);
                 context.strokeText((i+1)+".", x, y -i);
                 context.fillText((i+1)+".", x, y -i);
-            }
+            }*/
         }
     }
 
@@ -337,28 +335,6 @@ Page {
             context.closePath();
             context.fill();
             context.stroke();
-        }
-    }
-
-    function drawLayerMap(context) {
-        context.translate(mapViewAdapter.getCenterPointX(), mapViewAdapter.getCenterPointY());
-        context.rotate((mapViewAdapter.getRotate() / 180) *Math.PI  );
-        context.translate(-mapViewAdapter.getCenterPointX(), -mapViewAdapter.getCenterPointY());
-        var left = Math.floor(mapViewAdapter.getTiles().x);
-        var top = Math.floor(mapViewAdapter.getTiles().y);
-        var tileX = mapViewAdapter.getXTile();
-        var tileY = mapViewAdapter.getYTile();
-        var w = mapViewAdapter.getCenterPointX();
-        var h = mapViewAdapter.getCenterPointY();
-        var ftileSize = mapViewAdapter.getTileSize();
-        for (var i = 0; i < canvas.paths.length; i++) {
-            for (var j = 0; j < canvas.paths[i].length; j++) {
-                var leftPlusI = left + i;
-                var topPlusJ = top + j;
-                var x1 = (left + i - tileX) * ftileSize + w;
-                var y1 = (top + j - tileY) * ftileSize + h;
-                context.drawImage(canvas.paths[i][j],  x1, y1, ftileSize, ftileSize);
-            }
         }
     }
 

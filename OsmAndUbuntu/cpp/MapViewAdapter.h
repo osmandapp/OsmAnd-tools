@@ -5,8 +5,8 @@
 #include <QStringList>
 #include <QRectF>
 #include <Logging.h>
-#include "OsmAndApplication.h"
-#include "MapView.h"
+#include <OsmAndApplication.h>
+#include <OsmAndMapView.h>
 
 // Viewport
 class MapViewAdapter : public QObject
@@ -31,13 +31,15 @@ public:
     Q_INVOKABLE float getTileSize() {return mapView->getTileSize(); }
     Q_INVOKABLE int getCenterPointX() {return mapView->getCenterPointX(); }
     Q_INVOKABLE int getCenterPointY() {return mapView->getCenterPointY();}
+    Q_INVOKABLE float calcDiffPixelX(float dTileX, float dTileY) { return mapView->calcDiffPixelX(dTileX, dTileY); }
+    Q_INVOKABLE float calcDiffPixelY(float dTileX, float dTileY) { return mapView->calcDiffPixelY(dTileX, dTileY); }
     Q_INVOKABLE float getXTile() {return mapView->getXTile();}
     Q_INVOKABLE float getYTile() {return mapView->getYTile(); }
     Q_INVOKABLE float getLat() {return mapView->getLatitude();}
     Q_INVOKABLE float getLon() {return mapView->getLongitude(); }
     Q_INVOKABLE void moveTo(int dx, int dy) {mapView->moveTo(dx, dy);}
-    Q_INVOKABLE int getRotatedMapXForPoint(double lat, double lon) {return mapView->getRotatedMapXForPoint(lat, lon); }
-    Q_INVOKABLE int getRotatedMapYForPoint(double lat, double lon) {return mapView->getRotatedMapYForPoint(lat, lon); }
+    Q_INVOKABLE int getRotatedMapXForPoint(double lat, double lon) {return (mapView->getPixelPointForLatLon(lat, lon)).x; }
+    Q_INVOKABLE int getRotatedMapYForPoint(double lat, double lon) {return (mapView->getPixelPointForLatLon(lat, lon)).y; }
     Q_INVOKABLE float getRotatedMapLatForPoint(int x, int y) {return mapView->getRotatedMapLatForPoint(x, y); }
     Q_INVOKABLE float getRotatedMapLonForPoint(int x, int y) {return mapView->getRotatedMapLonForPoint(x, y); }
 
