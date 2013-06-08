@@ -28,14 +28,13 @@ void MapLayersData::setRenderedImage(SkBitmap& bmp, OsmAnd::AreaI bbox) {
 void MapLayersData::setRoute(QList< std::shared_ptr<OsmAnd::RouteSegment> >& r)
 {
     this->route.clear();
-    bool first = true;
     for(std::shared_ptr<OsmAnd::RouteSegment> rt : r) {
-        int sz = rt->road->points.size();
-        for(int k = 0/*(first?0:1)*/; k<sz; k++) {
+        int k = rt->startPointIndex;
+        while(k != rt->endPointIndex) {
             this->route.append(OsmAnd::PointF(OsmAnd::Utilities::get31LongitudeX(rt->road->points[k].x),
                                               OsmAnd::Utilities::get31LatitudeY(rt->road->points[k].y)));
+            k = k > rt->endPointIndex? k - 1 : k + 1;
         }
-        if(!first) first = false;
     }
 }
 
