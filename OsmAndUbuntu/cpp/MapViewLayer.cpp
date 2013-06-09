@@ -1,12 +1,14 @@
 #include "MapViewLayer.h"
 #include <QPainter>
 #include <qmath.h>
+#include <OsmAndMapTileSource.h>
 
 MapViewLayer::MapViewLayer(MapViewAdapter* adapter, QObject *parent) : QQuickImageProvider(QQuickImageProvider::Image),
     adapter(adapter), QObject(parent), app(OsmAnd::OsmAndApplication::getAndInitializeApplication()),
     rasterLayer(new OsmAnd::OsmAndRasterMapLayer(app))
 {
     adapter->getMapView()->addLayer(rasterLayer);
+    rasterLayer->setTileSource(OsmAnd::MapTileSource::kMapnik);
 }
 
 
