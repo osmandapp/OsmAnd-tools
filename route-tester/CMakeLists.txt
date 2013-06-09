@@ -13,5 +13,6 @@ find_package(Qt5Core REQUIRED)
 add_executable(voyager
 	"main.cpp"
 )
+add_dependencies(voyager OsmAndCoreUtils OsmAndCore)
 target_link_libraries(voyager OsmAndCoreUtils OsmAndCore)
 qt5_use_modules(voyager Core)

@@ -19,5 +19,6 @@ find_package(Qt5Core REQUIRED)
 add_executable(eyepiece
 	"main.cpp"
 )
+add_dependencies(eyepiece OsmAndCoreUtils OsmAndCore)
 target_link_libraries(eyepiece OsmAndCoreUtils OsmAndCore)
 qt5_use_modules(eyepiece Core)

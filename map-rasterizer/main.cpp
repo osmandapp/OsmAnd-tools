@@ -68,6 +68,20 @@ void printUsage(std::string warning)
     if(!warning.empty())
         std::cout << warning << std::endl;
     std::cout << "EyePiece is console utility to rasterize OsmAnd map tile." << std::endl;
-    std::cout << std::endl << "Usage: eyepiece -stylesPath=path/to/styles1 [-stylesPath=path/to/styles2] -style=style.xml [-verbose] [-bbox=LeftLon,TopLat,RightLon,BottomLan]" << std::endl;
+    std::cout << std::endl << "Usage: eyepiece -stylesPath=path/to/styles1";
+    std::cout << " [-stylesPath=path/to/styles2]";
+    std::cout << " -style=style";
+    std::cout << " [-obfsDir=path/to/obf/collection]";
+    std::cout << " [-verbose]";
+    std::cout << " [-dumpRules]";
+    std::cout << " [-zoom=15]";
+    std::cout << " [-32bit]";
+    std::cout << " [-tileSide=256]";
+    std::cout << " [-bbox=LeftLon,TopLat,RightLon,BottomLan]";
+    std::cout << " [-output=path/to/image.png]";
+    std::cout << " [-map]";
+    std::cout << " [-text]";
+    std::cout << " [-icons]";
+    std::cout << std::endl;
 }
 

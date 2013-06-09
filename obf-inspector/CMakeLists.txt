@@ -13,5 +13,6 @@ find_package(Qt5Core REQUIRED)
 add_executable(inspector
 	"main.cpp"
 )
+add_dependencies(inspector OsmAndCoreUtils OsmAndCore)
 target_link_libraries(inspector OsmAndCoreUtils OsmAndCore)
 qt5_use_modules(inspector Core)
