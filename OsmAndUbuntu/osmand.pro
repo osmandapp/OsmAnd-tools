@@ -36,10 +36,11 @@ INCLUDEPATH +=  $$PWD/../../core/externals/protobuf/upstream.patched/src/ \
                 $$SKIA_PATCHED/include/core  $$SKIA_PATCHED/include/utils \
                 $$SKIA_PATCHED/include/config $$SKIA_PATCHED/include/effects \
                 $$SKIA_PATCHED/include/src \
-                $$PWD
+                $$PWDf
 DEPENDPATH += $$PWD/../../../../usr/lib \
               $$PWD/../../core/client/  \
               $$PWD/../../core/externals/protobuf/upstream.patched \
+              $$PWD/../../core/include \
               $$PWD/../../core/include/native \
               $$PWD/../../core/protos
 #Path to "other files" in this case the QML-Files

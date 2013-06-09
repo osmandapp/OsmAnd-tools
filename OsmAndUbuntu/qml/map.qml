@@ -28,9 +28,10 @@ Page {
         onPaint: {
             var context = canvas.getContext("2d");
             context.clearRect(0, 0, canvas.width, canvas.height);
+            mapViewLayer.left(imgToDraw)
 
-            var l  = mapViewAdapter.calcDiffPixelX(tileX - mapViewAdapter.getXTile(), tileY - mapViewAdapter.getYTile());
-            var t  = mapViewAdapter.calcDiffPixelY(tileX - mapViewAdapter.getXTile(), tileY - mapViewAdapter.getYTile());
+            var l  = mapViewLayer.left(imgToDraw);
+            var t  = mapViewLayer.top(imgToDraw);
             context.drawImage(imgToDraw, l - mapMargin, t - mapMargin, canvas.width + 2 * mapMargin,
                               canvas.height + 2 * mapMargin);
 
@@ -50,8 +51,6 @@ Page {
         onImageLoaded:  {
             canvas.unloadImage(imgToDraw, 0, 0);
             imgToDraw = nimgToDraw;
-            tileX = ntileX;
-            tileY = ntileY;
             canvas.requestPaint();
         }
         onCanvasSizeChanged: {

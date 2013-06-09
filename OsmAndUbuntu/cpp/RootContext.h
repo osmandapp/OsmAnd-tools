@@ -15,18 +15,21 @@ private :
     MapViewAdapter mapViewAdapter;
     MapLayersData mapLayerData;
     MapActions mapActions;
+    MapViewLayer mapViewLayer;
 public:
     explicit RootContext(QObject *parent = 0) :
-        mapActions(&mapLayerData) {
+        mapActions(&mapLayerData), mapViewLayer(&mapViewAdapter) {
     }
     virtual ~RootContext() {}
 
     MapViewAdapter* getMapViewAdapter() {return &mapViewAdapter;}
     MapLayersData* getMapLayersData() {return &mapLayerData;}
+    MapViewLayer* getMapViewLayer() {return &mapViewLayer;}
 
     void createProperties(QQmlContext* r) {
         r->setContextProperty("applicationData", &appData);
         r->setContextProperty("mapViewAdapter", &mapViewAdapter);
+        r->setContextProperty("mapViewLayer", &mapViewLayer);
         r->setContextProperty("mapLayerData", &mapLayerData);
         r->setContextProperty("mapActions", &mapActions);
 

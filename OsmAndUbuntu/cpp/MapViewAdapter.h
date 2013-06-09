@@ -19,6 +19,8 @@ private:
 public:
     explicit MapViewAdapter(QObject *parent = 0);
 
+    std::shared_ptr<OsmAnd::OsmAndMapView> getMapView() {return mapView; }
+
     Q_INVOKABLE void setBounds(int w, int h) {mapView->setBounds(w, h);}
     Q_INVOKABLE int getHeight() {mapView->getHeight();}
     Q_INVOKABLE int getWidth() {mapView->getWidth();}
