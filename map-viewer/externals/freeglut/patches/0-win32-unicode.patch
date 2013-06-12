@@ -1,0 +1,26 @@
+diff -rupN upstream.original/src/freeglut_input_devices.c upstream.patched/src/freeglut_input_devices.c
+--- upstream.original/src/freeglut_input_devices.c	2009-12-13 07:06:44.000000000 +0200
++++ upstream.patched/src/freeglut_input_devices.c	2013-06-11 21:59:24.322600300 +0300
+@@ -319,11 +319,11 @@ static SERIALPORT *serial_open(const cha
+     COMMTIMEOUTS timeouts;
+     SERIALPORT *port;
+ 
+-    fh = CreateFile(device,GENERIC_READ|GENERIC_WRITE,0,NULL,
++    fh = CreateFileA(device,GENERIC_READ|GENERIC_WRITE,0,NULL,
+       OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,NULL);
+     if (!fh) return NULL;
+ 
+-    port = malloc(sizeof(SERIALPORT));
++    port = (SERIALPORT*)malloc(sizeof(SERIALPORT));
+     ZeroMemory(port, sizeof(SERIALPORT));
+     port->fh = fh;
+ 
+@@ -332,7 +332,7 @@ static SERIALPORT *serial_open(const cha
+     GetCommTimeouts(fh,&port->timeouts_save);
+ 
+     dcb.DCBlength=sizeof(DCB);
+-    BuildCommDCB("96,n,8,1",&dcb);
++    BuildCommDCBA("96,n,8,1",&dcb);
+     SetCommState(fh,&dcb);
+ 
+     ZeroMemory(&timeouts,sizeof(timeouts));
