@@ -77,6 +77,7 @@ void printUsage(std::string warning)
     std::cout << " [-zoom=15]";
     std::cout << " [-32bit]";
     std::cout << " [-tileSide=256]";
+    std::cout << " [-density=1.0]";
     std::cout << " [-bbox=LeftLon,TopLat,RightLon,BottomLan]";
     std::cout << " [-output=path/to/image.png]";
     std::cout << " [-map]";
