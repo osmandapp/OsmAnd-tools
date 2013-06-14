@@ -40,8 +40,6 @@
 #include <IRenderer.h>
 
 OsmAnd::AreaI viewport;
-float fov = 60.0f;
-float viewDepth = 100.0f;
 std::shared_ptr<OsmAnd::IRenderer> renderer;
 
 void reshapeHandler(int newWidth, int newHeight);
@@ -162,7 +160,7 @@ int main(int argc, char** argv)
     viewport.left = 0;
     viewport.bottom = 600;
     viewport.right = 800;
-    renderer->updateViewport(OsmAnd::PointI(800, 600), viewport, fov, viewDepth);
+    renderer->updateViewport(OsmAnd::PointI(800, 600), viewport, renderer->fieldOfView, renderer->fogDistance);
     
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     glShadeModel(GL_SMOOTH);
@@ -185,7 +183,7 @@ void reshapeHandler(int newWidth, int newHeight)
 {
     viewport.right = newWidth;
     viewport.bottom = newHeight;
-    renderer->updateViewport(OsmAnd::PointI(newWidth, newHeight), viewport, fov, viewDepth);
+    renderer->updateViewport(OsmAnd::PointI(newWidth, newHeight), viewport, renderer->fieldOfView, renderer->fogDistance);
 
     glViewport(0, 0, newWidth, newHeight);
 }
@@ -304,6 +302,28 @@ void keyboardHandler(unsigned char key, int x, int y)
             }
         }
         break;
+    case 'r':
+        {
+            if(renderer->fogDistance < 15000.0f)
+            {
+                if(renderer->updateViewport(renderer->windowSize, renderer->viewport, renderer->fieldOfView, renderer->fogDistance + 1.0f))
+                {
+                    glutPostRedisplay();
+                }
+            }
+        }
+        break;
+    case 'f':
+        {
+            if(renderer->fogDistance >= 1.0f)
+            {
+                if(renderer->updateViewport(renderer->windowSize, renderer->viewport, renderer->fieldOfView, renderer->fogDistance - 1.0f))
+                {
+                    glutPostRedisplay();
+                }
+            }
+        }
+        break;
     }
 }
 
@@ -365,11 +385,7 @@ void displayHandler()
     if(renderer->viewIsDirty)
         renderer->refreshView();
     renderer->performRendering();
-    glPushMatrix();
-    glColor3f(1, 0, 0);
-    glutSolidTeapot(100);
-    glPopMatrix();
-
+    
     //////////////////////////////////////////////////////////////////////////
     
     glMatrixMode(GL_PROJECTION);
@@ -382,52 +398,52 @@ void displayHandler()
     glColor3f(1.0f, 1.0f, 1.0f);
     glPushMatrix();
     glRasterPos2f(8, viewport.height() - 16 * 1);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("fov     : %1").arg(renderer->fieldOfView).toStdString().c_str());
+    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("fov                   : %1").arg(renderer->fieldOfView).toStdString().c_str());
     glPopMatrix();
 
     glPushMatrix();
     glRasterPos2f(8, viewport.height() - 16 * 2);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("fog     : %1").arg(renderer->fogDistance).toStdString().c_str());
+    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("fog (keys r,f)        : %1").arg(renderer->fogDistance).toStdString().c_str());
     glPopMatrix();
 
     glPushMatrix();
     glRasterPos2f(8, viewport.height() - 16 * 3);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("distance: %1").arg(renderer->distanceFromTarget).toStdString().c_str());
+    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("distance (mouse wheel): %1").arg(renderer->distanceFromTarget).toStdString().c_str());
     glPopMatrix();
 
     glPushMatrix();
     glRasterPos2f(8, viewport.height() - 16 * 4);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("azimuth : %1").arg(renderer->azimuth).toStdString().c_str());
+    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("azimuth (arrows l,r)  : %1").arg(renderer->azimuth).toStdString().c_str());
     glPopMatrix();
 
     glPushMatrix();
     glRasterPos2f(8, viewport.height() - 16 * 5);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("pitch   : %1").arg(renderer->elevationAngle).toStdString().c_str());
+    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("pitch (arrows u,d)    : %1").arg(renderer->elevationAngle).toStdString().c_str());
     glPopMatrix();
 
     glPushMatrix();
     glRasterPos2f(8, viewport.height() - 16 * 6);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("target  : %1 %2").arg(renderer->target31.x).arg(renderer->target31.y).toStdString().c_str());
+    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("target (keys w,a,s,d) : %1 %2").arg(renderer->target31.x).arg(renderer->target31.y).toStdString().c_str());
     glPopMatrix();
 
     glPushMatrix();
     glRasterPos2f(8, viewport.height() - 16 * 7);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("zoom    : %1").arg(renderer->zoom).toStdString().c_str());
+    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("zoom (keys q,e)       : %1").arg(renderer->zoom).toStdString().c_str());
     glPopMatrix();
 
     glPushMatrix();
     glRasterPos2f(8, viewport.height() - 16 * 8);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("memcache: %1").arg(renderer->source->approxConsumedMemory).toStdString().c_str());
+    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("memcache              : %1").arg(renderer->source->approxConsumedMemory).toStdString().c_str());
     glPopMatrix();
 
     glPushMatrix();
     glRasterPos2f(8, viewport.height() - 16 * 9);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("objcache: %1").arg(renderer->source->cachedObjects).toStdString().c_str());
+    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("objcache              : %1").arg(renderer->source->cachedObjects).toStdString().c_str());
     glPopMatrix();
 
     glPushMatrix();
     glRasterPos2f(8, viewport.height() - 16 * 10);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("v-tiles : %1").arg(renderer->visibleTiles.size()).toStdString().c_str());
+    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("v-tiles               : %1").arg(renderer->visibleTiles.size()).toStdString().c_str());
     glPopMatrix();
 
     glFlush();
