@@ -433,17 +433,17 @@ void displayHandler()
 
     glPushMatrix();
     glRasterPos2f(8, viewport.height() - 16 * 8);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("memcache              : %1").arg(renderer->source->approxConsumedMemory).toStdString().c_str());
+    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("map objects size      : %1").arg(renderer->source->approxConsumedMemory).toStdString().c_str());
     glPopMatrix();
 
     glPushMatrix();
     glRasterPos2f(8, viewport.height() - 16 * 9);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("objcache              : %1").arg(renderer->source->cachedObjects).toStdString().c_str());
+    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("map objects in cache  : %1").arg(renderer->source->cachedObjects).toStdString().c_str());
     glPopMatrix();
 
     glPushMatrix();
     glRasterPos2f(8, viewport.height() - 16 * 10);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("v-tiles               : %1").arg(renderer->visibleTiles.size()).toStdString().c_str());
+    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("visible tiles         : %1").arg(renderer->visibleTiles.size()).toStdString().c_str());
     glPopMatrix();
 
     glFlush();
