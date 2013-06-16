@@ -149,13 +149,6 @@ int main(int argc, char** argv)
     glutInitContextProfile(GLUT_CORE_PROFILE);
     glutCreateWindow((const char*)xT("OsmAnd Bird : 3D map render tool"));
     
-    glewExperimental = GL_TRUE;
-    if(glewInit() != GLEW_OK)
-        return EXIT_FAILURE;
-    /*
-    if(!GLEW_VERSION_4_3)
-        return EXIT_FAILURE;
-    */
     glutReshapeFunc(&reshapeHandler);
     glutMouseFunc(&mouseHandler);
     glutMouseWheelFunc(&mouseWheelHandler);
