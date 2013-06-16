@@ -160,6 +160,10 @@ int main(int argc, char** argv)
     auto tileProvider = OsmAnd::OnlineMapRasterTileProvider::createMapnikProvider();
     static_cast<OsmAnd::OnlineMapRasterTileProvider*>(tileProvider.get())->setLocalCachePath(QDir::current());
     renderer->setTileProvider(tileProvider);
+    renderer->redrawRequestCallback = []()
+    {
+        glutPostRedisplay();
+    };
     viewport.top = 0;
     viewport.left = 0;
     viewport.bottom = 600;
@@ -439,6 +443,11 @@ void displayHandler()
     glPushMatrix();
     glRasterPos2f(8, viewport.height() - 16 * 8);
     glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("visible tiles         : %1").arg(renderer->visibleTiles.size()).toStdString().c_str());
+    glPopMatrix();
+
+    glPushMatrix();
+    glRasterPos2f(8, viewport.height() - 16 * 9);
+    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("cached tile textures  : %1").arg(renderer->getCachedTilesCount()).toStdString().c_str());
     glPopMatrix();
 
     glFlush();
