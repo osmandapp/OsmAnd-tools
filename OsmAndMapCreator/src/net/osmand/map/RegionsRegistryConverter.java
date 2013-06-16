@@ -43,8 +43,9 @@ import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 
 public class RegionsRegistryConverter {
-	static String COUNTRIES_FILE = "../countries-info/countries.xml";
-	static String COUNTRIES_OPT_FILE = "../countries-info/opt-countries.xml";
+	static String COUNTRIES_FILE = "../../resources/countries-info/countries.xml";
+	static String COUNTRIES_OPT_FILE = "../../resources/countries-info/opt-countries.xml";
+	static String OUTPUT_BINARY_FILE = "../../resources/countries-info/"+RegionRegistry.fileName;
 	
 	public static List<RegionCountry> parseRegions(boolean withNoValidated) throws IllegalStateException, FileNotFoundException {
 		InputStream is = new FileInputStream(COUNTRIES_FILE);
@@ -226,10 +227,10 @@ public class RegionsRegistryConverter {
 	}
 
 	private static void optimizeRegion(Map<String, Element> elements, RegionCountry r, String rgName) {
-		boolean optimized = new AreaOptimizer().tryToCutBigSquareArea(r, true);
+		boolean optimized = new AreaOptimizer().tryToCutBigSquareArea(r, false);
 		boolean replace = optimized;
 		while (optimized) {
-			optimized = new AreaOptimizer().tryToCutBigSquareArea(r, true);
+			optimized = new AreaOptimizer().tryToCutBigSquareArea(r, false);
 		}
 		if (replace) {
 			Element tiles = null;
@@ -266,8 +267,7 @@ public class RegionsRegistryConverter {
 		for (RegionCountry c : countries) {
 			regions.addRegions(c.convert());
 		}
-		String filePath = "../../android/OsmAnd-java/src/net/osmand/map/" + RegionRegistry.fileName;
-		FileOutputStream out = new FileOutputStream(filePath);
+		FileOutputStream out = new FileOutputStream(OUTPUT_BINARY_FILE);
 		OsmAndRegionInfo.newBuilder().setRegionInfo(regions).build().writeTo(out);
 		out.close();
 		return countries;
