@@ -30,6 +30,7 @@
 #include <QList>
 #include <QFile>
 
+#include <OsmAndCore.h>
 #include <OsmAndCommon.h>
 #include <OsmAndUtilities.h>
 #include <Rasterizer.h>
@@ -53,6 +54,7 @@ void displayHandler(void);
 int main(int argc, char** argv)
 {
     //////////////////////////////////////////////////////////////////////////
+    OsmAnd::InitializeCore();
 
     QList< std::shared_ptr<QFile> > styleFiles;
     QList< std::shared_ptr<QFile> > obfFiles;
@@ -69,6 +71,7 @@ int main(int argc, char** argv)
             if(!dir.exists())
             {
                 std::cerr << "Style directory '" << path.toStdString() << "' does not exist" << std::endl;
+                OsmAnd::ReleaseCore();
                 return EXIT_FAILURE;
             }
 
@@ -84,6 +87,7 @@ int main(int argc, char** argv)
             if(!obfRoot.exists())
             {
                 std::cerr << "OBF directory does not exist" << std::endl;
+                OsmAnd::ReleaseCore();
                 return EXIT_FAILURE;
             }
             OsmAnd::Utilities::findFiles(obfRoot, QStringList() << "*.obf", obfFiles);
@@ -95,6 +99,7 @@ int main(int argc, char** argv)
     if(obfFiles.isEmpty())
     {
         std::cerr << "No OBF files loaded" << std::endl;
+        OsmAnd::ReleaseCore();
         return EXIT_FAILURE;
     }
 
@@ -111,6 +116,7 @@ int main(int argc, char** argv)
     if(!stylesCollection.obtainStyle(styleName, style))
     {
         std::cout << "Failed to resolve style '" << styleName.toStdString() << "'" << std::endl;
+        OsmAnd::ReleaseCore();
         return EXIT_FAILURE;
     }
     
@@ -125,10 +131,13 @@ int main(int argc, char** argv)
 
 #if defined(OSMAND_OPENGL_RENDERER_SUPPORTED)
     renderer = OsmAnd::createRenderer_OpenGL();
-#else
-    std::cout << "No supported renderer" << std::endl;
-    return EXIT_FAILURE;
 #endif
+    if(!renderer)
+    {
+        std::cout << "No supported renderer" << std::endl;
+        OsmAnd::ReleaseCore();
+        return EXIT_FAILURE;
+    }
 
     //////////////////////////////////////////////////////////////////////////
 
@@ -155,8 +164,9 @@ int main(int argc, char** argv)
     glutDisplayFunc(&displayHandler);
 
     //////////////////////////////////////////////////////////////////////////
-
-    renderer->setTileProvider(OsmAnd::OnlineMapRasterTileProvider::Mapnik);
+    auto tileProvider = OsmAnd::OnlineMapRasterTileProvider::createMapnikProvider();
+    static_cast<OsmAnd::OnlineMapRasterTileProvider*>(tileProvider.get())->setLocalCachePath(QDir::current());
+    renderer->setTileProvider(tileProvider);
     viewport.top = 0;
     viewport.left = 0;
     viewport.bottom = 600;
@@ -177,6 +187,7 @@ int main(int argc, char** argv)
     //////////////////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////////
 
+    OsmAnd::ReleaseCore();
     return EXIT_SUCCESS;
 }
 
