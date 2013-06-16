@@ -133,6 +133,21 @@ public:
         emit data->mapNeedsToRefresh(s);
     }
 
+    bool parseRouteConfiguration(QString& appDir, std::shared_ptr<OsmAnd::RoutingConfiguration> routingConfig) {
+        QFile configFile(appDir +"/routing.xml");
+        if(!configFile.exists())
+        {
+            return false;
+        }
+        configFile.open(QIODevice::ReadOnly | QIODevice::Text);
+        if(!OsmAnd::RoutingConfiguration::parseConfiguration(&configFile, *routingConfig.get()))
+        {
+            return false;
+        }
+        configFile.close();
+        return true;
+    }
+
     QString runMsg()
     {
         auto app = OsmAnd::OsmAndApplication::getAndInitializeApplication();
@@ -154,7 +169,9 @@ public:
             }
         }
         std::shared_ptr<OsmAnd::RoutingConfiguration> routingConfig(new OsmAnd::RoutingConfiguration);
-        OsmAnd::RoutingConfiguration::loadDefault(*routingConfig);
+        if(!parseRouteConfiguration(d, routingConfig)) {
+            OsmAnd::RoutingConfiguration::loadDefault(*routingConfig);
+        }
         OsmAnd::RoutePlannerContext plannerContext(obfData, routingConfig, QString("car"), false);
         std::shared_ptr<OsmAnd::Model::Road> startRoad;
         if(!OsmAnd::RoutePlanner::findClosestRoadPoint(&plannerContext, slat, slon, &startRoad))

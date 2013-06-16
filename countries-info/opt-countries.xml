@@ -2274,8 +2274,8 @@
 			<region bbox="37 -47 38 -47" name="prince_edward_islands" size="2">
 				<tiles>37 -47;38 -47</tiles>
 			</region>
-			<region bbox="17 -31 24 -34" name="western_cape" size="25">
-				<tiles>17 -33 x 23 -34;17 -31 x 19 -32;21 -32 x 24 -32;24 -33</tiles>
+			<region bbox="17 -31 24 -35" name="western_cape" size="31">
+				<tiles>18 -33 x 23 -35;17 -31 x 19 -32;21 -32 x 24 -32;17 -34;17 -33;24 -33</tiles>
 			</region>
 		</country>
 		<country bbox="21 23 38 3" hillshade_sqlite="yes" name="sudan" size="266">
