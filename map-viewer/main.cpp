@@ -50,6 +50,7 @@ void mouseWheelHandler(int button, int dir, int x, int y);
 void keyboardHandler(unsigned char key, int x, int y);
 void specialHandler(int key, int x, int y);
 void displayHandler(void);
+void activateProvider(int idx);
 
 int main(int argc, char** argv)
 {
@@ -157,9 +158,7 @@ int main(int argc, char** argv)
     glutDisplayFunc(&displayHandler);
 
     //////////////////////////////////////////////////////////////////////////
-    auto tileProvider = OsmAnd::OnlineMapRasterTileProvider::createCycleMapProvider();
-    static_cast<OsmAnd::OnlineMapRasterTileProvider*>(tileProvider.get())->setLocalCachePath(QDir::current());
-    renderer->setTileProvider(tileProvider);
+    activateProvider(1);
     renderer->redrawRequestCallback = []()
     {
         glutPostRedisplay();
@@ -304,6 +303,15 @@ void keyboardHandler(unsigned char key, int x, int y)
             }
         }
         break;
+    case '1':
+        activateProvider(1);
+        break;
+    case '2':
+        activateProvider(2);
+        break;
+    case '3':
+        activateProvider(3);
+        break;
     }
 }
 
@@ -343,6 +351,22 @@ void specialHandler(int key, int x, int y)
             }
         }
         break;
+    }
+}
+
+void activateProvider(int idx)
+{
+    if(idx == 1)
+    {
+        auto tileProvider = OsmAnd::OnlineMapRasterTileProvider::createCycleMapProvider();
+        static_cast<OsmAnd::OnlineMapRasterTileProvider*>(tileProvider.get())->setLocalCachePath(QDir::current());
+        renderer->setTileProvider(tileProvider);
+    }
+    else if(idx == 2)
+    {
+        auto tileProvider = OsmAnd::OnlineMapRasterTileProvider::createMapnikProvider();
+        static_cast<OsmAnd::OnlineMapRasterTileProvider*>(tileProvider.get())->setLocalCachePath(QDir::current());
+        renderer->setTileProvider(tileProvider);
     }
 }
 
@@ -407,6 +431,21 @@ void displayHandler()
     glPushMatrix();
     glRasterPos2f(8, viewport.height() - 16 * 9);
     glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("cached tile textures  : %1").arg(renderer->getCachedTilesCount()).toStdString().c_str());
+    glPopMatrix();
+
+    glPushMatrix();
+    glRasterPos2f(8, 16 * 3);
+    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("1 - Mapnik").toStdString().c_str());
+    glPopMatrix();
+
+    glPushMatrix();
+    glRasterPos2f(8, 16 * 2);
+    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("2 - CycleMap").toStdString().c_str());
+    glPopMatrix();
+
+    glPushMatrix();
+    glRasterPos2f(8, 16 * 1);
+    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("3 - Vector maps").toStdString().c_str());
     glPopMatrix();
 
     glFlush();
