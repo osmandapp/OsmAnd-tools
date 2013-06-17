@@ -168,8 +168,8 @@ int main(int argc, char** argv)
     viewport.left = 0;
     viewport.bottom = 600;
     viewport.right = 800;
-    renderer->updateViewport(OsmAnd::PointI(800, 600), viewport, renderer->fieldOfView, renderer->fogDistance);
-    renderer->updateMap(renderer->target31, 0);
+    renderer->updateViewport(OsmAnd::PointI(800, 600), viewport, renderer->configuration.fieldOfView, renderer->configuration.fogDistance);
+    renderer->updateMap(renderer->configuration.target31, 0);
     
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     glShadeModel(GL_SMOOTH);
@@ -193,7 +193,7 @@ void reshapeHandler(int newWidth, int newHeight)
 {
     viewport.right = newWidth;
     viewport.bottom = newHeight;
-    renderer->updateViewport(OsmAnd::PointI(newWidth, newHeight), viewport, renderer->fieldOfView, renderer->fogDistance);
+    renderer->updateViewport(OsmAnd::PointI(newWidth, newHeight), viewport, renderer->configuration.fieldOfView, renderer->configuration.fogDistance);
 
     glViewport(0, 0, newWidth, newHeight);
 }
@@ -207,22 +207,16 @@ void mouseWheelHandler(int button, int dir, int x, int y)
 {
     if(dir > 0)
     {
-        if(renderer->distanceFromTarget > 0)
+        if(renderer->configuration.distanceFromTarget > 0)
         {
-            if(renderer->updateCamera(renderer->distanceFromTarget - 1, renderer->azimuth, renderer->elevationAngle))
-            {
-                glutPostRedisplay();
-            }
+            renderer->updateCamera(renderer->configuration.distanceFromTarget - 1, renderer->configuration.azimuth, renderer->configuration.elevationAngle);
         }
     }
     else
     {
-        if(renderer->distanceFromTarget < 100000)
+        if(renderer->configuration.distanceFromTarget < 100000)
         {
-            if(renderer->updateCamera(renderer->distanceFromTarget + 1, renderer->azimuth, renderer->elevationAngle))
-            {
-                glutPostRedisplay();
-            }
+            renderer->updateCamera(renderer->configuration.distanceFromTarget + 1, renderer->configuration.azimuth, renderer->configuration.elevationAngle);
         }
     }
 }
@@ -236,101 +230,77 @@ void keyboardHandler(unsigned char key, int x, int y)
         break;
     case 'q':
         {
-            if(renderer->zoom > 0)
+            if(renderer->configuration.zoom > 0)
             {
-                if(renderer->updateMap(renderer->target31, renderer->zoom - 1))
-                {
-                    glutPostRedisplay();
-                }
+                renderer->updateMap(renderer->configuration.target31, renderer->configuration.zoom - 1);
             }
         }
         break;
     case 'e':
         {
-            if(renderer->zoom < 31)
+            if(renderer->configuration.zoom < 31)
             {
-                if(renderer->updateMap(renderer->target31, renderer->zoom + 1))
-                {
-                    glutPostRedisplay();
-                }
+                renderer->updateMap(renderer->configuration.target31, renderer->configuration.zoom + 1);
             }
         }
         break;
     case 'w':
         {
-            if(renderer->target31.y >= (1 << renderer->zoom) / 100)
+            if(renderer->configuration.target31.y >= (1 << renderer->configuration.zoom) / 100)
             {
-                auto newTarget = renderer->target31;
-                newTarget.y = qMax(0, newTarget.y - (1 << renderer->zoom) / 100);
+                auto newTarget = renderer->configuration.target31;
+                newTarget.y = qMax(0, newTarget.y - (1 << renderer->configuration.zoom) / 100);
 
-                if(renderer->updateMap(newTarget, renderer->zoom))
-                {
-                    glutPostRedisplay();
-                }
+                renderer->updateMap(newTarget, renderer->configuration.zoom);
             }
         }
         break;
     case 's':
         {
-            if(renderer->target31.y <= std::numeric_limits<int32_t>::max() - (1 << renderer->zoom) / 100)
+            if(renderer->configuration.target31.y <= std::numeric_limits<int32_t>::max() - (1 << renderer->configuration.zoom) / 100)
             {
-                auto newTarget = renderer->target31;
-                newTarget.y = qMin(std::numeric_limits<int32_t>::max(), newTarget.y + (1 << renderer->zoom) / 100);
+                auto newTarget = renderer->configuration.target31;
+                newTarget.y = qMin(std::numeric_limits<int32_t>::max(), newTarget.y + (1 << renderer->configuration.zoom) / 100);
 
-                if(renderer->updateMap(newTarget, renderer->zoom))
-                {
-                    glutPostRedisplay();
-                }
+                renderer->updateMap(newTarget, renderer->configuration.zoom);
             }
         }
         break;
     case 'a':
         {
-            if(renderer->target31.x >= (1 << renderer->zoom) / 100)
+            if(renderer->configuration.target31.x >= (1 << renderer->configuration.zoom) / 100)
             {
-                auto newTarget = renderer->target31;
-                newTarget.x = qMax(0, newTarget.x - (1 << renderer->zoom) / 100);
+                auto newTarget = renderer->configuration.target31;
+                newTarget.x = qMax(0, newTarget.x - (1 << renderer->configuration.zoom) / 100);
 
-                if(renderer->updateMap(newTarget, renderer->zoom))
-                {
-                    glutPostRedisplay();
-                }
+                renderer->updateMap(newTarget, renderer->configuration.zoom);
             }
         }
         break;
     case 'd':
         {
-            if(renderer->target31.x <= std::numeric_limits<int32_t>::max() - (1 << renderer->zoom) / 100)
+            if(renderer->configuration.target31.x <= std::numeric_limits<int32_t>::max() - (1 << renderer->configuration.zoom) / 100)
             {
-                auto newTarget = renderer->target31;
-                newTarget.x = qMin(std::numeric_limits<int32_t>::max(), newTarget.x + (1 << renderer->zoom) / 100);
+                auto newTarget = renderer->configuration.target31;
+                newTarget.x = qMin(std::numeric_limits<int32_t>::max(), newTarget.x + (1 << renderer->configuration.zoom) / 100);
 
-                if(renderer->updateMap(newTarget, renderer->zoom))
-                {
-                    glutPostRedisplay();
-                }
+                renderer->updateMap(newTarget, renderer->configuration.zoom);
             }
         }
         break;
     case 'r':
         {
-            if(renderer->fogDistance < 15000.0f)
+            if(renderer->configuration.fogDistance < 15000.0f)
             {
-                if(renderer->updateViewport(renderer->windowSize, renderer->viewport, renderer->fieldOfView, renderer->fogDistance + 1.0f))
-                {
-                    glutPostRedisplay();
-                }
+                renderer->updateViewport(renderer->configuration.windowSize, renderer->configuration.viewport, renderer->configuration.fieldOfView, renderer->configuration.fogDistance + 1.0f);
             }
         }
         break;
     case 'f':
         {
-            if(renderer->fogDistance >= 1.0f)
+            if(renderer->configuration.fogDistance >= 1.0f)
             {
-                if(renderer->updateViewport(renderer->windowSize, renderer->viewport, renderer->fieldOfView, renderer->fogDistance - 1.0f))
-                {
-                    glutPostRedisplay();
-                }
+                renderer->updateViewport(renderer->configuration.windowSize, renderer->configuration.viewport, renderer->configuration.fieldOfView, renderer->configuration.fogDistance - 1.0f);
             }
         }
         break;
@@ -343,45 +313,33 @@ void specialHandler(int key, int x, int y)
     {
     case GLUT_KEY_LEFT:
         {
-            if(renderer->azimuth <= 360.0f - 1.0f)
+            if(renderer->configuration.azimuth <= 360.0f - 1.0f)
             {
-                if(renderer->updateCamera(renderer->distanceFromTarget, renderer->azimuth + 1.0f, renderer->elevationAngle))
-                {
-                    glutPostRedisplay();
-                }
+                renderer->updateCamera(renderer->configuration.distanceFromTarget, renderer->configuration.azimuth + 1.0f, renderer->configuration.elevationAngle);
             }
         }
         break;
     case GLUT_KEY_RIGHT:
         {
-            if(renderer->azimuth >= 1.0f)
+            if(renderer->configuration.azimuth >= 1.0f)
             {
-                if(renderer->updateCamera(renderer->distanceFromTarget, renderer->azimuth - 1.0f, renderer->elevationAngle))
-                {
-                    glutPostRedisplay();
-                }
+                renderer->updateCamera(renderer->configuration.distanceFromTarget, renderer->configuration.azimuth - 1.0f, renderer->configuration.elevationAngle);
             }
         }
         break;
     case GLUT_KEY_UP:
         {
-            if(renderer->elevationAngle <= 90.0f - 1.0f)
+            if(renderer->configuration.elevationAngle <= 90.0f - 1.0f)
             {
-                if(renderer->updateCamera(renderer->distanceFromTarget, renderer->azimuth, renderer->elevationAngle + 1.0f))
-                {
-                    glutPostRedisplay();
-                }
+                renderer->updateCamera(renderer->configuration.distanceFromTarget, renderer->configuration.azimuth, renderer->configuration.elevationAngle + 1.0f);
             }
         }
         break;
     case GLUT_KEY_DOWN:
         {
-            if(renderer->elevationAngle >= 1.0f)
+            if(renderer->configuration.elevationAngle >= 1.0f)
             {
-                if(renderer->updateCamera(renderer->distanceFromTarget, renderer->azimuth, renderer->elevationAngle - 1.0f))
-                {
-                    glutPostRedisplay();
-                }
+                renderer->updateCamera(renderer->configuration.distanceFromTarget, renderer->configuration.azimuth, renderer->configuration.elevationAngle - 1.0f);
             }
         }
         break;
@@ -392,8 +350,8 @@ void displayHandler()
 {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
-    if(renderer->viewIsDirty)
-        renderer->refreshView();
+    if(!renderer->isRenderingInitialized)
+        renderer->initializeRendering();
     renderer->performRendering();
     
     //////////////////////////////////////////////////////////////////////////
@@ -408,37 +366,37 @@ void displayHandler()
     glColor3f(1.0f, 1.0f, 1.0f);
     glPushMatrix();
     glRasterPos2f(8, viewport.height() - 16 * 1);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("fov                   : %1").arg(renderer->fieldOfView).toStdString().c_str());
+    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("fov                   : %1").arg(renderer->configuration.fieldOfView).toStdString().c_str());
     glPopMatrix();
 
     glPushMatrix();
     glRasterPos2f(8, viewport.height() - 16 * 2);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("fog (keys r,f)        : %1").arg(renderer->fogDistance).toStdString().c_str());
+    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("fog (keys r,f)        : %1").arg(renderer->configuration.fogDistance).toStdString().c_str());
     glPopMatrix();
 
     glPushMatrix();
     glRasterPos2f(8, viewport.height() - 16 * 3);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("distance (mouse wheel): %1").arg(renderer->distanceFromTarget).toStdString().c_str());
+    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("distance (mouse wheel): %1").arg(renderer->configuration.distanceFromTarget).toStdString().c_str());
     glPopMatrix();
 
     glPushMatrix();
     glRasterPos2f(8, viewport.height() - 16 * 4);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("azimuth (arrows l,r)  : %1").arg(renderer->azimuth).toStdString().c_str());
+    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("azimuth (arrows l,r)  : %1").arg(renderer->configuration.azimuth).toStdString().c_str());
     glPopMatrix();
 
     glPushMatrix();
     glRasterPos2f(8, viewport.height() - 16 * 5);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("pitch (arrows u,d)    : %1").arg(renderer->elevationAngle).toStdString().c_str());
+    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("pitch (arrows u,d)    : %1").arg(renderer->configuration.elevationAngle).toStdString().c_str());
     glPopMatrix();
 
     glPushMatrix();
     glRasterPos2f(8, viewport.height() - 16 * 6);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("target (keys w,a,s,d) : %1 %2").arg(renderer->target31.x).arg(renderer->target31.y).toStdString().c_str());
+    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("target (keys w,a,s,d) : %1 %2").arg(renderer->configuration.target31.x).arg(renderer->configuration.target31.y).toStdString().c_str());
     glPopMatrix();
 
     glPushMatrix();
     glRasterPos2f(8, viewport.height() - 16 * 7);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("zoom (keys q,e)       : %1").arg(renderer->zoom).toStdString().c_str());
+    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("zoom (keys q,e)       : %1").arg(renderer->configuration.zoom).toStdString().c_str());
     glPopMatrix();
 
     glPushMatrix();
