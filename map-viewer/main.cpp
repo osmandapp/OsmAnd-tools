@@ -157,7 +157,7 @@ int main(int argc, char** argv)
     glutDisplayFunc(&displayHandler);
 
     //////////////////////////////////////////////////////////////////////////
-    auto tileProvider = OsmAnd::OnlineMapRasterTileProvider::createMapnikProvider();
+    auto tileProvider = OsmAnd::OnlineMapRasterTileProvider::createCycleMapProvider();
     static_cast<OsmAnd::OnlineMapRasterTileProvider*>(tileProvider.get())->setLocalCachePath(QDir::current());
     renderer->setTileProvider(tileProvider);
     renderer->redrawRequestCallback = []()
@@ -169,6 +169,7 @@ int main(int argc, char** argv)
     viewport.bottom = 600;
     viewport.right = 800;
     renderer->updateViewport(OsmAnd::PointI(800, 600), viewport, renderer->fieldOfView, renderer->fogDistance);
+    renderer->updateMap(renderer->target31, 0);
     
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     glShadeModel(GL_SMOOTH);
