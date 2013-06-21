@@ -38,11 +38,11 @@
 #include <RasterizationStyles.h>
 #include <RasterizationStyleEvaluator.h>
 #include <MapDataCache.h>
-#include <IRenderer.h>
+#include <IMapRenderer.h>
 #include <OnlineMapRasterTileProvider.h>
 
 OsmAnd::AreaI viewport;
-std::shared_ptr<OsmAnd::IRenderer> renderer;
+std::shared_ptr<OsmAnd::IMapRenderer> renderer;
 
 void reshapeHandler(int newWidth, int newHeight);
 void mouseHandler(int button, int state, int x, int y);
@@ -131,7 +131,7 @@ int main(int argc, char** argv)
     }
 
 #if defined(OSMAND_OPENGL_RENDERER_SUPPORTED)
-    renderer = OsmAnd::createRenderer_OpenGL();
+    renderer = OsmAnd::createAtlasMapRenderer_OpenGL();
 #endif
     if(!renderer)
     {
