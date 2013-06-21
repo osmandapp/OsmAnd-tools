@@ -167,8 +167,8 @@ int main(int argc, char** argv)
     viewport.left = 0;
     viewport.bottom = 600;
     viewport.right = 800;
-    renderer->updateViewport(OsmAnd::PointI(800, 600), viewport, renderer->configuration.fieldOfView, renderer->configuration.fogDistance);
-    renderer->updateMap(renderer->configuration.target31, 0);
+    renderer->setWindowSize(OsmAnd::PointI(800, 600));
+    renderer->setViewport(viewport);
     
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     glShadeModel(GL_SMOOTH);
@@ -192,7 +192,8 @@ void reshapeHandler(int newWidth, int newHeight)
 {
     viewport.right = newWidth;
     viewport.bottom = newHeight;
-    renderer->updateViewport(OsmAnd::PointI(newWidth, newHeight), viewport, renderer->configuration.fieldOfView, renderer->configuration.fogDistance);
+    renderer->setWindowSize(OsmAnd::PointI(newWidth, newHeight));
+    renderer->setViewport(viewport);
 
     glViewport(0, 0, newWidth, newHeight);
 }
@@ -206,16 +207,16 @@ void mouseWheelHandler(int button, int dir, int x, int y)
 {
     if(dir > 0)
     {
-        if(renderer->configuration.distanceFromTarget > 0)
+        if(renderer->configuration.requestedZoom < 31)
         {
-            renderer->updateCamera(renderer->configuration.distanceFromTarget - 1, renderer->configuration.azimuth, renderer->configuration.elevationAngle);
+            renderer->setZoom(renderer->configuration.requestedZoom + 0.01f);
         }
     }
     else
     {
-        if(renderer->configuration.distanceFromTarget < 100000)
+        if(renderer->configuration.requestedZoom > 0)
         {
-            renderer->updateCamera(renderer->configuration.distanceFromTarget + 1, renderer->configuration.azimuth, renderer->configuration.elevationAngle);
+            renderer->setZoom(renderer->configuration.requestedZoom - 0.01f);
         }
     }
 }
@@ -227,63 +228,47 @@ void keyboardHandler(unsigned char key, int x, int y)
     case '\x1B':
         glutLeaveMainLoop();
         break;
-    case 'q':
-        {
-            if(renderer->configuration.zoom > 0)
-            {
-                renderer->updateMap(renderer->configuration.target31, renderer->configuration.zoom - 1);
-            }
-        }
-        break;
-    case 'e':
-        {
-            if(renderer->configuration.zoom < 31)
-            {
-                renderer->updateMap(renderer->configuration.target31, renderer->configuration.zoom + 1);
-            }
-        }
-        break;
     case 'w':
         {
-            if(renderer->configuration.target31.y >= (1 << renderer->configuration.zoom) / 100)
+            if(renderer->configuration.target31.y >= (1 << static_cast<int>(renderer->configuration.requestedZoom)) / 100)
             {
                 auto newTarget = renderer->configuration.target31;
-                newTarget.y = qMax(0, newTarget.y - (1 << renderer->configuration.zoom) / 100);
+                newTarget.y = qMax(0, newTarget.y - (1 << static_cast<int>(renderer->configuration.requestedZoom)) / 100);
 
-                renderer->updateMap(newTarget, renderer->configuration.zoom);
+                renderer->setTarget(newTarget);
             }
         }
         break;
     case 's':
         {
-            if(renderer->configuration.target31.y <= std::numeric_limits<int32_t>::max() - (1 << renderer->configuration.zoom) / 100)
+            if(renderer->configuration.target31.y <= std::numeric_limits<int32_t>::max() - (1 << static_cast<int>(renderer->configuration.requestedZoom)) / 100)
             {
                 auto newTarget = renderer->configuration.target31;
-                newTarget.y = qMin(std::numeric_limits<int32_t>::max(), newTarget.y + (1 << renderer->configuration.zoom) / 100);
+                newTarget.y = qMin(std::numeric_limits<int32_t>::max(), newTarget.y + (1 << static_cast<int>(renderer->configuration.requestedZoom)) / 100);
 
-                renderer->updateMap(newTarget, renderer->configuration.zoom);
+                renderer->setTarget(newTarget);
             }
         }
         break;
     case 'a':
         {
-            if(renderer->configuration.target31.x >= (1 << renderer->configuration.zoom) / 100)
+            if(renderer->configuration.target31.x >= (1 << static_cast<int>(renderer->configuration.requestedZoom)) / 100)
             {
                 auto newTarget = renderer->configuration.target31;
-                newTarget.x = qMax(0, newTarget.x - (1 << renderer->configuration.zoom) / 100);
+                newTarget.x = qMax(0, newTarget.x - (1 << static_cast<int>(renderer->configuration.requestedZoom)) / 100);
 
-                renderer->updateMap(newTarget, renderer->configuration.zoom);
+                renderer->setTarget(newTarget);
             }
         }
         break;
     case 'd':
         {
-            if(renderer->configuration.target31.x <= std::numeric_limits<int32_t>::max() - (1 << renderer->configuration.zoom) / 100)
+            if(renderer->configuration.target31.x <= std::numeric_limits<int32_t>::max() - (1 << static_cast<int>(renderer->configuration.requestedZoom)) / 100)
             {
                 auto newTarget = renderer->configuration.target31;
-                newTarget.x = qMin(std::numeric_limits<int32_t>::max(), newTarget.x + (1 << renderer->configuration.zoom) / 100);
+                newTarget.x = qMin(std::numeric_limits<int32_t>::max(), newTarget.x + (1 << static_cast<int>(renderer->configuration.requestedZoom)) / 100);
 
-                renderer->updateMap(newTarget, renderer->configuration.zoom);
+                renderer->setTarget(newTarget);
             }
         }
         break;
@@ -291,7 +276,7 @@ void keyboardHandler(unsigned char key, int x, int y)
         {
             if(renderer->configuration.fogDistance < 15000.0f)
             {
-                renderer->updateViewport(renderer->configuration.windowSize, renderer->configuration.viewport, renderer->configuration.fieldOfView, renderer->configuration.fogDistance + 1.0f);
+                renderer->setDistanceToFog(renderer->configuration.fogDistance + 1.0f);
             }
         }
         break;
@@ -299,7 +284,7 @@ void keyboardHandler(unsigned char key, int x, int y)
         {
             if(renderer->configuration.fogDistance >= 1.0f)
             {
-                renderer->updateViewport(renderer->configuration.windowSize, renderer->configuration.viewport, renderer->configuration.fieldOfView, renderer->configuration.fogDistance - 1.0f);
+                renderer->setDistanceToFog(renderer->configuration.fogDistance - 1.0f);
             }
         }
         break;
@@ -323,7 +308,7 @@ void specialHandler(int key, int x, int y)
         {
             if(renderer->configuration.azimuth <= 360.0f - 1.0f)
             {
-                renderer->updateCamera(renderer->configuration.distanceFromTarget, renderer->configuration.azimuth + 1.0f, renderer->configuration.elevationAngle);
+                renderer->setAzimuth(renderer->configuration.azimuth + 1.0f);
             }
         }
         break;
@@ -331,7 +316,7 @@ void specialHandler(int key, int x, int y)
         {
             if(renderer->configuration.azimuth >= 1.0f)
             {
-                renderer->updateCamera(renderer->configuration.distanceFromTarget, renderer->configuration.azimuth - 1.0f, renderer->configuration.elevationAngle);
+                renderer->setAzimuth(renderer->configuration.azimuth - 1.0f);
             }
         }
         break;
@@ -339,7 +324,7 @@ void specialHandler(int key, int x, int y)
         {
             if(renderer->configuration.elevationAngle <= 90.0f - 1.0f)
             {
-                renderer->updateCamera(renderer->configuration.distanceFromTarget, renderer->configuration.azimuth, renderer->configuration.elevationAngle + 1.0f);
+                renderer->setElevationAngle(renderer->configuration.elevationAngle + 1.0f);
             }
         }
         break;
@@ -347,7 +332,7 @@ void specialHandler(int key, int x, int y)
         {
             if(renderer->configuration.elevationAngle >= 1.0f)
             {
-                renderer->updateCamera(renderer->configuration.distanceFromTarget, renderer->configuration.azimuth, renderer->configuration.elevationAngle - 1.0f);
+                renderer->setElevationAngle(renderer->configuration.elevationAngle - 1.0f);
             }
         }
         break;
@@ -400,36 +385,41 @@ void displayHandler()
 
     glPushMatrix();
     glRasterPos2f(8, viewport.height() - 16 * 3);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("distance (mouse wheel): %1").arg(renderer->configuration.distanceFromTarget).toStdString().c_str());
-    glPopMatrix();
-
-    glPushMatrix();
-    glRasterPos2f(8, viewport.height() - 16 * 4);
     glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("azimuth (arrows l,r)  : %1").arg(renderer->configuration.azimuth).toStdString().c_str());
     glPopMatrix();
 
     glPushMatrix();
-    glRasterPos2f(8, viewport.height() - 16 * 5);
+    glRasterPos2f(8, viewport.height() - 16 * 4);
     glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("pitch (arrows u,d)    : %1").arg(renderer->configuration.elevationAngle).toStdString().c_str());
     glPopMatrix();
 
     glPushMatrix();
-    glRasterPos2f(8, viewport.height() - 16 * 6);
+    glRasterPos2f(8, viewport.height() - 16 * 5);
     glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("target (keys w,a,s,d) : %1 %2").arg(renderer->configuration.target31.x).arg(renderer->configuration.target31.y).toStdString().c_str());
     glPopMatrix();
 
     glPushMatrix();
+    glRasterPos2f(8, viewport.height() - 16 * 6);
+    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("zoom (mouse wheel)    : %1").arg(renderer->configuration.requestedZoom).toStdString().c_str());
+    glPopMatrix();
+
+    glPushMatrix();
     glRasterPos2f(8, viewport.height() - 16 * 7);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("zoom (keys q,e)       : %1").arg(renderer->configuration.zoom).toStdString().c_str());
+    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("zoom base             : %1").arg(renderer->configuration.zoomBase).toStdString().c_str());
     glPopMatrix();
 
     glPushMatrix();
     glRasterPos2f(8, viewport.height() - 16 * 8);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("visible tiles         : %1").arg(renderer->visibleTiles.size()).toStdString().c_str());
+    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("zoom fraction         : %1").arg(renderer->configuration.zoomFraction).toStdString().c_str());
     glPopMatrix();
 
     glPushMatrix();
     glRasterPos2f(8, viewport.height() - 16 * 9);
+    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("visible tiles         : %1").arg(renderer->visibleTiles.size()).toStdString().c_str());
+    glPopMatrix();
+
+    glPushMatrix();
+    glRasterPos2f(8, viewport.height() - 16 * 10);
     glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("cached tile textures  : %1").arg(renderer->getCachedTilesCount()).toStdString().c_str());
     glPopMatrix();
 
