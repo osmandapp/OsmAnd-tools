@@ -33,6 +33,7 @@
 #include <OsmAndCore.h>
 #include <OsmAndCommon.h>
 #include <OsmAndUtilities.h>
+#include <OsmAndLogging.h>
 #include <Rasterizer.h>
 #include <RasterizerContext.h>
 #include <RasterizationStyles.h>
@@ -51,6 +52,7 @@ void keyboardHandler(unsigned char key, int x, int y);
 void specialHandler(int key, int x, int y);
 void displayHandler(void);
 void activateProvider(int idx);
+void verifyOpenGL();
 
 int main(int argc, char** argv)
 {
@@ -142,12 +144,14 @@ int main(int argc, char** argv)
 
     //////////////////////////////////////////////////////////////////////////
 
+    assert(glutInit);
     glutInit(&argc, argv);
 
     glutInitWindowSize(800, 600);
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA | GLUT_DEPTH);
-    glutInitContextVersion(3, 0);
+    glutInitContextVersion(3, 1);
     glutInitContextProfile(GLUT_CORE_PROFILE);
+    assert(glutCreateWindow);
     glutCreateWindow((const char*)xT("OsmAnd Bird : 3D map render tool"));
     
     glutReshapeFunc(&reshapeHandler);
@@ -156,6 +160,7 @@ int main(int argc, char** argv)
     glutKeyboardFunc(&keyboardHandler);
     glutSpecialFunc(&specialHandler);
     glutDisplayFunc(&displayHandler);
+    verifyOpenGL();
 
     //////////////////////////////////////////////////////////////////////////
     activateProvider(1);
@@ -171,12 +176,17 @@ int main(int argc, char** argv)
     renderer->setViewport(viewport);
     
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+    verifyOpenGL();
     glShadeModel(GL_SMOOTH);
+    verifyOpenGL();
     glClearDepth(1.0f);
+    verifyOpenGL();
     glEnable(GL_DEPTH_TEST);
+    verifyOpenGL();
     glDepthFunc(GL_LEQUAL);
+    verifyOpenGL();
     glDisable(GL_CULL_FACE);
-    glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
+    verifyOpenGL();
     //////////////////////////////////////////////////////////////////////////
 
     glutMainLoop();
@@ -357,6 +367,9 @@ void activateProvider(int idx)
 
 void displayHandler()
 {
+    (void)glGetError();
+    //////////////////////////////////////////////////////////////////////////
+
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
     if(!renderer->isRenderingInitialized)
@@ -373,71 +386,67 @@ void displayHandler()
     glLoadIdentity();
 
     glColor3f(1.0f, 1.0f, 1.0f);
-    glPushMatrix();
     glRasterPos2f(8, viewport.height() - 16 * 1);
     glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("fov                   : %1").arg(renderer->configuration.fieldOfView).toStdString().c_str());
-    glPopMatrix();
+    verifyOpenGL();
 
-    glPushMatrix();
     glRasterPos2f(8, viewport.height() - 16 * 2);
     glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("fog (keys r,f)        : %1").arg(renderer->configuration.fogDistance).toStdString().c_str());
-    glPopMatrix();
+    verifyOpenGL();
 
-    glPushMatrix();
     glRasterPos2f(8, viewport.height() - 16 * 3);
     glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("azimuth (arrows l,r)  : %1").arg(renderer->configuration.azimuth).toStdString().c_str());
-    glPopMatrix();
+    verifyOpenGL();
 
-    glPushMatrix();
     glRasterPos2f(8, viewport.height() - 16 * 4);
     glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("pitch (arrows u,d)    : %1").arg(renderer->configuration.elevationAngle).toStdString().c_str());
-    glPopMatrix();
+    verifyOpenGL();
 
-    glPushMatrix();
     glRasterPos2f(8, viewport.height() - 16 * 5);
     glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("target (keys w,a,s,d) : %1 %2").arg(renderer->configuration.target31.x).arg(renderer->configuration.target31.y).toStdString().c_str());
-    glPopMatrix();
+    verifyOpenGL();
 
-    glPushMatrix();
     glRasterPos2f(8, viewport.height() - 16 * 6);
     glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("zoom (mouse wheel)    : %1").arg(renderer->configuration.requestedZoom).toStdString().c_str());
-    glPopMatrix();
+    verifyOpenGL();
 
-    glPushMatrix();
     glRasterPos2f(8, viewport.height() - 16 * 7);
     glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("zoom base             : %1").arg(renderer->configuration.zoomBase).toStdString().c_str());
-    glPopMatrix();
+    verifyOpenGL();
 
-    glPushMatrix();
     glRasterPos2f(8, viewport.height() - 16 * 8);
     glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("zoom fraction         : %1").arg(renderer->configuration.zoomFraction).toStdString().c_str());
-    glPopMatrix();
+    verifyOpenGL();
 
-    glPushMatrix();
     glRasterPos2f(8, viewport.height() - 16 * 9);
     glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("visible tiles         : %1").arg(renderer->visibleTiles.size()).toStdString().c_str());
-    glPopMatrix();
+    verifyOpenGL();
 
-    glPushMatrix();
     glRasterPos2f(8, viewport.height() - 16 * 10);
     glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("cached tile textures  : %1").arg(renderer->getCachedTilesCount()).toStdString().c_str());
-    glPopMatrix();
+    verifyOpenGL();
 
-    glPushMatrix();
     glRasterPos2f(8, 16 * 3);
     glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("1 - Mapnik").toStdString().c_str());
-    glPopMatrix();
+    verifyOpenGL();
 
-    glPushMatrix();
     glRasterPos2f(8, 16 * 2);
     glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("2 - CycleMap").toStdString().c_str());
-    glPopMatrix();
+    verifyOpenGL();
 
-    glPushMatrix();
     glRasterPos2f(8, 16 * 1);
     glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("3 - Vector maps").toStdString().c_str());
-    glPopMatrix();
-
+    verifyOpenGL();
+    
     glFlush();
     glutSwapBuffers();
+}
+
+void verifyOpenGL()
+{
+    auto result = glGetError();
+    if(result == GL_NO_ERROR)
+        return;
+
+    OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Error, "Host OpenGL error 0x%08x : %s\n", result, gluErrorString(result));
 }
