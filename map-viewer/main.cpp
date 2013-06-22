@@ -174,19 +174,8 @@ int main(int argc, char** argv)
     viewport.right = 800;
     renderer->setWindowSize(OsmAnd::PointI(800, 600));
     renderer->setViewport(viewport);
+    renderer->setZoom(1.75f);
     
-    glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
-    verifyOpenGL();
-    glShadeModel(GL_SMOOTH);
-    verifyOpenGL();
-    glClearDepth(1.0f);
-    verifyOpenGL();
-    glEnable(GL_DEPTH_TEST);
-    verifyOpenGL();
-    glDepthFunc(GL_LEQUAL);
-    verifyOpenGL();
-    glDisable(GL_CULL_FACE);
-    verifyOpenGL();
     //////////////////////////////////////////////////////////////////////////
 
     glutMainLoop();
