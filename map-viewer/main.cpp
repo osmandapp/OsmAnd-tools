@@ -233,6 +233,9 @@ void mouseWheelHandler(int button, int dir, int x, int y)
 
 void keyboardHandler(unsigned char key, int x, int y)
 {
+    const auto wasdZoom = static_cast<int>(renderer->configuration.requestedZoom);
+    const auto wasdStep = (1 << 31 - wasdZoom);
+
     switch (key)
     {
     case '\x1B':
@@ -240,10 +243,10 @@ void keyboardHandler(unsigned char key, int x, int y)
         break;
     case 'w':
         {
-            if(renderer->configuration.target31.y >= (1 << static_cast<int>(renderer->configuration.requestedZoom)) / 100)
+            if(renderer->configuration.target31.y >= wasdStep)
             {
                 auto newTarget = renderer->configuration.target31;
-                newTarget.y = qMax(0, newTarget.y - (1 << static_cast<int>(renderer->configuration.requestedZoom)) / 100);
+                newTarget.y = qMax(0, newTarget.y - wasdStep);
 
                 renderer->setTarget(newTarget);
             }
@@ -251,10 +254,10 @@ void keyboardHandler(unsigned char key, int x, int y)
         break;
     case 's':
         {
-            if(renderer->configuration.target31.y <= std::numeric_limits<int32_t>::max() - (1 << static_cast<int>(renderer->configuration.requestedZoom)) / 100)
+            if(renderer->configuration.target31.y <= std::numeric_limits<int32_t>::max() - wasdStep)
             {
                 auto newTarget = renderer->configuration.target31;
-                newTarget.y = qMin(std::numeric_limits<int32_t>::max(), newTarget.y + (1 << static_cast<int>(renderer->configuration.requestedZoom)) / 100);
+                newTarget.y = qMin(std::numeric_limits<int32_t>::max(), newTarget.y + wasdStep);
 
                 renderer->setTarget(newTarget);
             }
@@ -262,10 +265,10 @@ void keyboardHandler(unsigned char key, int x, int y)
         break;
     case 'a':
         {
-            if(renderer->configuration.target31.x >= (1 << static_cast<int>(renderer->configuration.requestedZoom)) / 100)
+            if(renderer->configuration.target31.x >= wasdStep)
             {
                 auto newTarget = renderer->configuration.target31;
-                newTarget.x = qMax(0, newTarget.x - (1 << static_cast<int>(renderer->configuration.requestedZoom)) / 100);
+                newTarget.x = qMax(0, newTarget.x - wasdStep);
 
                 renderer->setTarget(newTarget);
             }
@@ -273,10 +276,10 @@ void keyboardHandler(unsigned char key, int x, int y)
         break;
     case 'd':
         {
-            if(renderer->configuration.target31.x <= std::numeric_limits<int32_t>::max() - (1 << static_cast<int>(renderer->configuration.requestedZoom)) / 100)
+            if(renderer->configuration.target31.x <= std::numeric_limits<int32_t>::max() - wasdStep)
             {
                 auto newTarget = renderer->configuration.target31;
-                newTarget.x = qMin(std::numeric_limits<int32_t>::max(), newTarget.x + (1 << static_cast<int>(renderer->configuration.requestedZoom)) / 100);
+                newTarget.x = qMin(std::numeric_limits<int32_t>::max(), newTarget.x + wasdStep);
 
                 renderer->setTarget(newTarget);
             }
@@ -377,7 +380,6 @@ void displayHandler()
     renderer->performRendering();
     
     //////////////////////////////////////////////////////////////////////////
-    
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
     gluOrtho2D(0, viewport.width(), 0, viewport.height());
