@@ -393,6 +393,7 @@ public class IndexUploader {
 				}
 				String summary = getDescription(reader, fileName);
 				reader.close();
+				f.setLastModified(reader.getDateCreated());
 				return summary;
 			} catch (IOException e) {
 				if (raf != null) {
