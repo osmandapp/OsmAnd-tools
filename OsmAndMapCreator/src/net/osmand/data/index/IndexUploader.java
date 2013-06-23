@@ -365,6 +365,7 @@ public class IndexUploader {
 				ZipEntry zEntry = new ZipEntry(f.getName());
 				zEntry.setSize(f.length());
 				zEntry.setComment(description);
+				zEntry.setTime(lastModifiedTime);
 				zout.putNextEntry(zEntry);
 				FileInputStream is = new FileInputStream(f);
 				Algorithms.streamCopy(is, zout);
