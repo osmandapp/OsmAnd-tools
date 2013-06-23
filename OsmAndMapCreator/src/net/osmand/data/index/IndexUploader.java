@@ -301,6 +301,7 @@ public class IndexUploader {
 					File logFile = new File(f.getParentFile(), unzipped.getName() + IndexBatchCreator.GEN_LOG_EXT);
 					try {
 						String description = checkfileAndGetDescription(unzipped);
+						timestampCreated = unzipped.lastModified();
 						if(description == null) {
 							log.info("Skip file " + f.getName());
 							skip = true;
