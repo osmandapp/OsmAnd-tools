@@ -45,6 +45,7 @@
 OsmAnd::AreaI viewport;
 std::shared_ptr<OsmAnd::IMapRenderer> renderer;
 
+bool renderWireframe = false;
 void reshapeHandler(int newWidth, int newHeight);
 void mouseHandler(int button, int state, int x, int y);
 void mouseWheelHandler(int button, int dir, int x, int y);
@@ -174,8 +175,13 @@ int main(int argc, char** argv)
     viewport.right = 800;
     renderer->setWindowSize(OsmAnd::PointI(800, 600));
     renderer->setViewport(viewport);
+    /*renderer->setTarget(OsmAnd::PointI(
+        OsmAnd::Utilities::get31TileNumberX(34.0062),
+        OsmAnd::Utilities::get31TileNumberY(44.4039)
+        ));
+    renderer->setZoom(18.0f);*/
     renderer->setZoom(1.75f);
-    
+
     //////////////////////////////////////////////////////////////////////////
 
     glutMainLoop();
@@ -290,6 +296,12 @@ void keyboardHandler(unsigned char key, int x, int y)
             }
         }
         break;
+    case 'x':
+        {
+            renderWireframe = !renderWireframe;
+            glutPostRedisplay();
+        }
+        break;
     case '1':
         activateProvider(1);
         break;
@@ -360,6 +372,7 @@ void activateProvider(int idx)
 void displayHandler()
 {
     (void)glGetError();
+    glPolygonMode( GL_FRONT_AND_BACK, renderWireframe ? GL_LINE : GL_FILL );
     //////////////////////////////////////////////////////////////////////////
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -415,6 +428,10 @@ void displayHandler()
 
     glRasterPos2f(8, viewport.height() - 16 * 10);
     glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("cached tile textures  : %1").arg(renderer->getCachedTilesCount()).toStdString().c_str());
+    verifyOpenGL();
+
+    glRasterPos2f(8, viewport.height() - 16 * 11);
+    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("wireframe (key x)     : %1").arg(renderWireframe).toStdString().c_str());
     verifyOpenGL();
 
     glRasterPos2f(8, 16 * 3);
