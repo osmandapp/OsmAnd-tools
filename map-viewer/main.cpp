@@ -41,6 +41,8 @@
 #include <MapDataCache.h>
 #include <IMapRenderer.h>
 #include <OnlineMapRasterTileProvider.h>
+#include <IMapElevationDataProvider.h>
+#include <OneDegreeMapElevationDataProvider_Flat.h>
 
 OsmAnd::AreaI viewport;
 std::shared_ptr<OsmAnd::IMapRenderer> renderer;
@@ -302,6 +304,24 @@ void keyboardHandler(unsigned char key, int x, int y)
             glutPostRedisplay();
         }
         break;
+    case 'e':
+        {
+            if(renderer->configuration.elevationDataProvider)
+            {
+                renderer->setElevationDataProvider(std::shared_ptr<OsmAnd::IMapElevationDataProvider>());
+            }
+            else
+            {
+                auto provider = new OsmAnd::OneDegreeMapElevationDataProvider_Flat();
+                renderer->setElevationDataProvider(std::shared_ptr<OsmAnd::IMapElevationDataProvider>(provider));
+            }
+        }
+        break;
+    case 'z':
+        {
+            renderer->setTextureAtlasesUsagePermit(!renderer->configuration.textureAtlasesAllowed);
+        }
+        break;
     case '1':
         activateProvider(1);
         break;
@@ -432,6 +452,14 @@ void displayHandler()
 
     glRasterPos2f(8, viewport.height() - 16 * 11);
     glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("wireframe (key x)     : %1").arg(renderWireframe).toStdString().c_str());
+    verifyOpenGL();
+
+    glRasterPos2f(8, viewport.height() - 16 * 12);
+    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("elevation data (key e): %1").arg((bool)renderer->configuration.elevationDataProvider).toStdString().c_str());
+    verifyOpenGL();
+
+    glRasterPos2f(8, viewport.height() - 16 * 13);
+    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("use atlases (key z)   : %1").arg(renderer->configuration.textureAtlasesAllowed).toStdString().c_str());
     verifyOpenGL();
 
     glRasterPos2f(8, 16 * 3);
