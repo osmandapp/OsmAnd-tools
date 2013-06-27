@@ -33,6 +33,11 @@ void MapLayersData::setRoute(QList< std::shared_ptr<OsmAnd::RouteSegment> >& r)
         while(k != rt->endPointIndex) {
             this->route.append(OsmAnd::PointF(OsmAnd::Utilities::get31LongitudeX(rt->road->points[k].x),
                                               OsmAnd::Utilities::get31LatitudeY(rt->road->points[k].y)));
+            if(k == rt->startPointIndex) {
+                this->routeText.append(rt->description);
+            } else {
+                this->routeText.append("");
+            }
             k = k > rt->endPointIndex? k - 1 : k + 1;
         }
     }

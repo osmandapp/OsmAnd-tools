@@ -15,6 +15,7 @@ class MapLayersData: public QObject
 private:
     std::shared_ptr<OsmAnd::OsmAndApplication> app;
     QList< OsmAnd::PointF > route;
+    QList< QString > routeText;
     QImage* lastRenderedImage;
     OsmAnd::AreaI lastRenderedBox;
 signals:
@@ -35,6 +36,7 @@ public:
     Q_INVOKABLE int getRoutePointLength() { return route.size();}
     Q_INVOKABLE float getRoutePointLat(int i) {return route[i].y; }
     Q_INVOKABLE float getRoutePointLon(int i) {return route[i].x; }
+    Q_INVOKABLE QString getRoutePointText(int i) {return routeText[i]; }
 
 
     Q_INVOKABLE bool isTargetPresent();

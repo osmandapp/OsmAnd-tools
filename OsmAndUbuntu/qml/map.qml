@@ -294,17 +294,22 @@ Page {
                 }
             }
             context.stroke();
-            /*context.beginPath();
+            context.beginPath();
             context.lineWidth = 1;
             context.strokeStyle = Qt.rgba(0, 0,0,1);
-            for(var i = 0; i < mapLayerData.getRoutePointLength(); i++) {
-                var lat = mapLayerData.getRoutePointLat(i);
-                var lon = mapLayerData.getRoutePointLon(i);
-                var x = mapViewAdapter.getRotatedMapXForPoint(lat, lon);
-                var y = mapViewAdapter.getRotatedMapYForPoint(lat, lon);
-                context.strokeText((i+1)+".", x, y -i);
-                context.fillText((i+1)+".", x, y -i);
-            }*/
+            if(mapViewAdapter.getZoom() > 15) {
+                for(var i = 0; i < mapLayerData.getRoutePointLength(); i++) {
+                    var txt = mapLayerData.getRoutePointText(i);
+                    if(txt != "") {
+                        var lat = mapLayerData.getRoutePointLat(i);
+                        var lon = mapLayerData.getRoutePointLon(i);
+                        var x = mapViewAdapter.getRotatedMapXForPoint(lat, lon);
+                        var y = mapViewAdapter.getRotatedMapYForPoint(lat, lon);
+                        context.strokeText(txt, x, y);
+                        context.fillText(txt, x, y);
+                    }
+                }
+            }
         }
     }
 
