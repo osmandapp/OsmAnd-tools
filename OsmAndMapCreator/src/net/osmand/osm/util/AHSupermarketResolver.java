@@ -1,5 +1,6 @@
 package net.osmand.osm.util;
 
+
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Container;
@@ -38,7 +39,7 @@ import net.osmand.swing.MapPointsLayer;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import net.osmand.util.OpeningHoursParser;
-import net.osmand.util.OpeningHoursParser.BasicDayOpeningHourRule;
+import net.osmand.util.OpeningHoursParser.BasicOpeningHourRule;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -189,7 +190,7 @@ public class AHSupermarketResolver {
 				
 				JSONArray o = (JSONArray) props.get("hours");
 				OpeningHoursParser.OpeningHours rules = new OpeningHoursParser.OpeningHours();
-				BasicDayOpeningHourRule prev = null;
+				BasicOpeningHourRule prev = null;
 				for(int i=0; i<7; i++){
 					JSONObject obj = o.getJSONObject(i);
 					
@@ -202,7 +203,7 @@ public class AHSupermarketResolver {
 						if(prev != null && prev.getStartTime() == start && prev.getEndTime() == end){
 							prev.getDays()[i] = true;
 						} else {
-							BasicDayOpeningHourRule rule = new OpeningHoursParser.BasicDayOpeningHourRule();
+							BasicOpeningHourRule rule = new OpeningHoursParser.BasicOpeningHourRule();
 							rule.getDays()[i] = true;
 							rule.addTimeRange(start, end);
 							prev = rule;
