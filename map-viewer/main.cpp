@@ -184,11 +184,13 @@ int main(int argc, char** argv)
     renderer->setZoom(18.0f);*/
     renderer->setZoom(1.75f);
 
+    renderer->initializeRendering();
     //////////////////////////////////////////////////////////////////////////
 
     glutMainLoop();
 
     //////////////////////////////////////////////////////////////////////////
+    renderer->releaseRendering();
     //////////////////////////////////////////////////////////////////////////
 
     OsmAnd::ReleaseCore();
@@ -231,7 +233,7 @@ void mouseWheelHandler(int button, int dir, int x, int y)
 void keyboardHandler(unsigned char key, int x, int y)
 {
     const auto wasdZoom = static_cast<int>(renderer->configuration.requestedZoom);
-    const auto wasdStep = (1 << 31 - wasdZoom);
+    const auto wasdStep = (1 << (31 - wasdZoom));
 
     switch (key)
     {
@@ -306,20 +308,25 @@ void keyboardHandler(unsigned char key, int x, int y)
         break;
     case 'e':
         {
-            if(renderer->configuration.elevationDataProvider)
+            if(renderer->configuration.tileProviders[OsmAnd::IMapRenderer::ElevationData])
             {
-                renderer->setElevationDataProvider(std::shared_ptr<OsmAnd::IMapElevationDataProvider>());
+                renderer->setTileProvider(OsmAnd::IMapRenderer::ElevationData, std::shared_ptr<OsmAnd::IMapElevationDataProvider>());
             }
             else
             {
-                auto provider = new OsmAnd::OneDegreeMapElevationDataProvider_Flat();
-                renderer->setElevationDataProvider(std::shared_ptr<OsmAnd::IMapElevationDataProvider>(provider));
+                //auto provider = new OsmAnd::OneDegreeMapElevationDataProvider_Flat();
+                //renderer->setElevationDataProvider(std::shared_ptr<OsmAnd::IMapElevationDataProvider>(provider));
             }
         }
         break;
     case 'z':
         {
             renderer->setTextureAtlasesUsagePermit(!renderer->configuration.textureAtlasesAllowed);
+        }
+        break;
+    case 'c':
+        {
+            renderer->set16bitColorDepthLimit(!renderer->configuration.force16bitColorDepthLimit);
         }
         break;
     case '1':
@@ -379,13 +386,13 @@ void activateProvider(int idx)
     {
         auto tileProvider = OsmAnd::OnlineMapRasterTileProvider::createCycleMapProvider();
         static_cast<OsmAnd::OnlineMapRasterTileProvider*>(tileProvider.get())->setLocalCachePath(QDir::current());
-        renderer->setTileProvider(tileProvider);
+        renderer->setTileProvider(OsmAnd::IMapRenderer::RasterMap, tileProvider);
     }
     else if(idx == 2)
     {
         auto tileProvider = OsmAnd::OnlineMapRasterTileProvider::createMapnikProvider();
         static_cast<OsmAnd::OnlineMapRasterTileProvider*>(tileProvider.get())->setLocalCachePath(QDir::current());
-        renderer->setTileProvider(tileProvider);
+        renderer->setTileProvider(OsmAnd::IMapRenderer::RasterMap, tileProvider);
     }
 }
 
@@ -397,9 +404,9 @@ void displayHandler()
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
-    if(!renderer->isRenderingInitialized)
-        renderer->initializeRendering();
+    //OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Debug, "-FS{-\n");
     renderer->performRendering();
+    //OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Debug, "-}FS-\n");
     
     //////////////////////////////////////////////////////////////////////////
     glMatrixMode(GL_PROJECTION);
@@ -447,19 +454,19 @@ void displayHandler()
     verifyOpenGL();
 
     glRasterPos2f(8, viewport.height() - 16 * 10);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("cached tile textures  : %1").arg(renderer->getCachedTilesCount()).toStdString().c_str());
-    verifyOpenGL();
-
-    glRasterPos2f(8, viewport.height() - 16 * 11);
     glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("wireframe (key x)     : %1").arg(renderWireframe).toStdString().c_str());
     verifyOpenGL();
 
+    glRasterPos2f(8, viewport.height() - 16 * 11);
+    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("elevation data (key e): %1").arg((bool)renderer->configuration.tileProviders[OsmAnd::IMapRenderer::ElevationData]).toStdString().c_str());
+    verifyOpenGL();
+
     glRasterPos2f(8, viewport.height() - 16 * 12);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("elevation data (key e): %1").arg((bool)renderer->configuration.elevationDataProvider).toStdString().c_str());
+    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("use atlases (key z)   : %1").arg(renderer->configuration.textureAtlasesAllowed).toStdString().c_str());
     verifyOpenGL();
 
     glRasterPos2f(8, viewport.height() - 16 * 13);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("use atlases (key z)   : %1").arg(renderer->configuration.textureAtlasesAllowed).toStdString().c_str());
+    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("16bit limit (key c)   : %1").arg(renderer->configuration.force16bitColorDepthLimit).toStdString().c_str());
     verifyOpenGL();
 
     glRasterPos2f(8, 16 * 3);
