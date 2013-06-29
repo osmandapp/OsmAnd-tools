@@ -314,8 +314,8 @@ void keyboardHandler(unsigned char key, int x, int y)
             }
             else
             {
-                //auto provider = new OsmAnd::OneDegreeMapElevationDataProvider_Flat();
-                //renderer->setElevationDataProvider(std::shared_ptr<OsmAnd::IMapElevationDataProvider>(provider));
+                auto provider = new OsmAnd::OneDegreeMapElevationDataProvider_Flat(renderer->configuration.heightmapPatchesPerSide * 2 + 1);
+                renderer->setTileProvider(OsmAnd::IMapRenderer::TileLayerId::ElevationData, std::shared_ptr<OsmAnd::IMapElevationDataProvider>(provider));
             }
         }
         break;
@@ -327,6 +327,16 @@ void keyboardHandler(unsigned char key, int x, int y)
     case 'c':
         {
             renderer->set16bitColorDepthLimit(!renderer->configuration.force16bitColorDepthLimit);
+        }
+        break;
+    case 't':
+        {
+            renderer->setHeightmapPatchesPerSide(renderer->configuration.heightmapPatchesPerSide + 1);
+        }
+        break;
+    case 'g':
+        {
+            renderer->setHeightmapPatchesPerSide(renderer->configuration.heightmapPatchesPerSide - 1);
         }
         break;
     case '1':
@@ -416,7 +426,7 @@ void displayHandler()
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
 
-    glColor3f(1.0f, 1.0f, 1.0f);
+    glColor3f(1.0f, 0.0f, 0.0f);
     glRasterPos2f(8, viewport.height() - 16 * 1);
     glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("fov                   : %1").arg(renderer->configuration.fieldOfView).toStdString().c_str());
     verifyOpenGL();
@@ -430,43 +440,47 @@ void displayHandler()
     verifyOpenGL();
 
     glRasterPos2f(8, viewport.height() - 16 * 4);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("pitch (arrows u,d)    : %1").arg(renderer->configuration.elevationAngle).toStdString().c_str());
+    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("pitch (arrows u,d)     : %1").arg(renderer->configuration.elevationAngle).toStdString().c_str());
     verifyOpenGL();
 
     glRasterPos2f(8, viewport.height() - 16 * 5);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("target (keys w,a,s,d) : %1 %2").arg(renderer->configuration.target31.x).arg(renderer->configuration.target31.y).toStdString().c_str());
+    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("target (keys w,a,s,d)  : %1 %2").arg(renderer->configuration.target31.x).arg(renderer->configuration.target31.y).toStdString().c_str());
     verifyOpenGL();
 
     glRasterPos2f(8, viewport.height() - 16 * 6);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("zoom (mouse wheel)    : %1").arg(renderer->configuration.requestedZoom).toStdString().c_str());
+    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("zoom (mouse wheel)     : %1").arg(renderer->configuration.requestedZoom).toStdString().c_str());
     verifyOpenGL();
 
     glRasterPos2f(8, viewport.height() - 16 * 7);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("zoom base             : %1").arg(renderer->configuration.zoomBase).toStdString().c_str());
+    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("zoom base              : %1").arg(renderer->configuration.zoomBase).toStdString().c_str());
     verifyOpenGL();
 
     glRasterPos2f(8, viewport.height() - 16 * 8);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("zoom fraction         : %1").arg(renderer->configuration.zoomFraction).toStdString().c_str());
+    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("zoom fraction          : %1").arg(renderer->configuration.zoomFraction).toStdString().c_str());
     verifyOpenGL();
 
     glRasterPos2f(8, viewport.height() - 16 * 9);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("visible tiles         : %1").arg(renderer->visibleTiles.size()).toStdString().c_str());
+    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("visible tiles          : %1").arg(renderer->visibleTiles.size()).toStdString().c_str());
     verifyOpenGL();
 
     glRasterPos2f(8, viewport.height() - 16 * 10);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("wireframe (key x)     : %1").arg(renderWireframe).toStdString().c_str());
+    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("wireframe (key x)      : %1").arg(renderWireframe).toStdString().c_str());
     verifyOpenGL();
 
     glRasterPos2f(8, viewport.height() - 16 * 11);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("elevation data (key e): %1").arg((bool)renderer->configuration.tileProviders[OsmAnd::IMapRenderer::ElevationData]).toStdString().c_str());
+    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("elevation data (key e) : %1").arg((bool)renderer->configuration.tileProviders[OsmAnd::IMapRenderer::ElevationData]).toStdString().c_str());
     verifyOpenGL();
 
     glRasterPos2f(8, viewport.height() - 16 * 12);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("use atlases (key z)   : %1").arg(renderer->configuration.textureAtlasesAllowed).toStdString().c_str());
+    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("use atlases (key z)    : %1").arg(renderer->configuration.textureAtlasesAllowed).toStdString().c_str());
     verifyOpenGL();
 
     glRasterPos2f(8, viewport.height() - 16 * 13);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("16bit limit (key c)   : %1").arg(renderer->configuration.force16bitColorDepthLimit).toStdString().c_str());
+    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("16bit limit (key c)    : %1").arg(renderer->configuration.force16bitColorDepthLimit).toStdString().c_str());
+    verifyOpenGL();
+
+    glRasterPos2f(8, viewport.height() - 16 * 14);
+    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("DEM-patches# (keys t,g): %1").arg(renderer->configuration.heightmapPatchesPerSide).toStdString().c_str());
     verifyOpenGL();
 
     glRasterPos2f(8, 16 * 3);
