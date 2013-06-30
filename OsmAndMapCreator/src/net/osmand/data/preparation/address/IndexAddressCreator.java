@@ -219,7 +219,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 				Boundary smallestBoundary = null;
 				// try to found boundary
 				for (Boundary b : notAssignedBoundaries) {
-					if (b.getAdminLevel() >= smallestAdminLevel) {
+					if (b.getAdminLevel() >= smallestAdminLevel && b.getName().equals("")) {
 						if (b.containsPoint(location.getLatitude(), location.getLongitude())) {
 							// the bigger the admin level, the smaller the boundary :-)
 							smallestAdminLevel = b.getAdminLevel();
