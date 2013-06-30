@@ -544,9 +544,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 				result.add(c);
 			}
 		}
-		//or we need to find closes city
+		//or we need to find closest city
 		City city = getClosestCity(location, isInNames, nearestObjects);
-		if (city != null && cityBoundaries.containsKey(city) && !result.contains(city)) {
+		if (city != null && !cityBoundaries.containsKey(city) && !result.contains(city)) {
 			result.add(city);
 		}
 		return registerStreetInCities(name, nameEn, location, result);
