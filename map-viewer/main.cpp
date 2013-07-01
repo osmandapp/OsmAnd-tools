@@ -54,7 +54,7 @@ void mouseWheelHandler(int button, int dir, int x, int y);
 void keyboardHandler(unsigned char key, int x, int y);
 void specialHandler(int key, int x, int y);
 void displayHandler(void);
-void activateProvider(int idx);
+void activateProvider(OsmAnd::IMapRenderer::TileLayerId layerId, int idx);
 void verifyOpenGL();
 
 int main(int argc, char** argv)
@@ -166,7 +166,7 @@ int main(int argc, char** argv)
     verifyOpenGL();
 
     //////////////////////////////////////////////////////////////////////////
-    activateProvider(1);
+    activateProvider(OsmAnd::IMapRenderer::TileLayerId::RasterMap, 1);
     renderer->redrawRequestCallback = []()
     {
         glutPostRedisplay();
@@ -230,40 +230,43 @@ void mouseWheelHandler(int button, int dir, int x, int y)
 void keyboardHandler(unsigned char key, int x, int y)
 {
     const auto modifiers = glutGetModifiers();
-    
     const auto wasdZoom = static_cast<int>(renderer->configuration.requestedZoom);
-    const auto wasdStep = (1 << (31 - wasdZoom)) / ((modifiers & GLUT_ACTIVE_SHIFT) ? 10 : 50);
+    const auto wasdStep = (1 << (31 - wasdZoom));
 
     switch (key)
     {
     case '\x1B':
         glutLeaveMainLoop();
         break;
+    case 'W':
     case 'w':
         {
             auto newTarget = renderer->configuration.target31;
-            newTarget.y -= wasdStep;
+            newTarget.y -= wasdStep / (key == 'W' ? 50 : 10);
             renderer->setTarget(newTarget);
         }
         break;
+    case 'S':
     case 's':
         {
             auto newTarget = renderer->configuration.target31;
-            newTarget.y += wasdStep;
+            newTarget.y += wasdStep / (key == 'S' ? 50 : 10);
             renderer->setTarget(newTarget);
         }
         break;
+    case 'A':
     case 'a':
         {
             auto newTarget = renderer->configuration.target31;
-            newTarget.x -= wasdStep;
+            newTarget.x -= wasdStep / (key == 'A' ? 50 : 10);
             renderer->setTarget(newTarget);
         }
         break;
+    case 'D':
     case 'd':
         {
             auto newTarget = renderer->configuration.target31;
-            newTarget.x += wasdStep;
+            newTarget.x += wasdStep / (key == 'D' ? 50 : 10);
             renderer->setTarget(newTarget);
         }
         break;
@@ -316,14 +319,29 @@ void keyboardHandler(unsigned char key, int x, int y)
             renderer->setHeightmapPatchesPerSide(renderer->configuration.heightmapPatchesPerSide - 1);
         }
         break;
+    case '0':
+        {
+            auto layerId = (modifiers & GLUT_ACTIVE_ALT) ? OsmAnd::IMapRenderer::TileLayerId::MapOverlay0 : OsmAnd::IMapRenderer::TileLayerId::RasterMap;
+            activateProvider(layerId, 0);
+        }
+        break;
     case '1':
-        activateProvider(1);
+        {
+            auto layerId = (modifiers & GLUT_ACTIVE_ALT) ? OsmAnd::IMapRenderer::TileLayerId::MapOverlay0 : OsmAnd::IMapRenderer::TileLayerId::RasterMap;
+            activateProvider(layerId, 1);
+        }
         break;
     case '2':
-        activateProvider(2);
+        {
+            auto layerId = (modifiers & GLUT_ACTIVE_ALT) ? OsmAnd::IMapRenderer::TileLayerId::MapOverlay0 : OsmAnd::IMapRenderer::TileLayerId::RasterMap;
+            activateProvider(layerId, 2);
+        }
         break;
     case '3':
-        activateProvider(3);
+        {
+            auto layerId = (modifiers & GLUT_ACTIVE_ALT) ? OsmAnd::IMapRenderer::TileLayerId::MapOverlay0 : OsmAnd::IMapRenderer::TileLayerId::RasterMap;
+            activateProvider(layerId, 3);
+        }
         break;
     }
 }
@@ -358,19 +376,23 @@ void specialHandler(int key, int x, int y)
     }
 }
 
-void activateProvider(int idx)
+void activateProvider(OsmAnd::IMapRenderer::TileLayerId layerId, int idx)
 {
-    if(idx == 1)
+    if(idx == 0)
+    {
+        renderer->setTileProvider(layerId, std::shared_ptr<OsmAnd::IMapTileProvider>());
+    }
+    else if(idx == 1)
     {
         auto tileProvider = OsmAnd::OnlineMapRasterTileProvider::createCycleMapProvider();
         static_cast<OsmAnd::OnlineMapRasterTileProvider*>(tileProvider.get())->setLocalCachePath(QDir::current());
-        renderer->setTileProvider(OsmAnd::IMapRenderer::RasterMap, tileProvider);
+        renderer->setTileProvider(layerId, tileProvider);
     }
     else if(idx == 2)
     {
         auto tileProvider = OsmAnd::OnlineMapRasterTileProvider::createMapnikProvider();
         static_cast<OsmAnd::OnlineMapRasterTileProvider*>(tileProvider.get())->setLocalCachePath(QDir::current());
-        renderer->setTileProvider(OsmAnd::IMapRenderer::RasterMap, tileProvider);
+        renderer->setTileProvider(layerId, tileProvider);
     }
 }
 
@@ -449,6 +471,14 @@ void displayHandler()
 
     glRasterPos2f(8, viewport.height() - 16 * 14);
     glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("DEM-patches# (keys t,g): %1").arg(renderer->configuration.heightmapPatchesPerSide).toStdString().c_str());
+    verifyOpenGL();
+
+    glRasterPos2f(8, 16 * 5);
+    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("Tile providers (holding alt controls overlay0):").toStdString().c_str());
+    verifyOpenGL();
+
+    glRasterPos2f(8, 16 * 4);
+    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("0 - disable").toStdString().c_str());
     verifyOpenGL();
 
     glRasterPos2f(8, 16 * 3);
