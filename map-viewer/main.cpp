@@ -242,7 +242,7 @@ void keyboardHandler(unsigned char key, int x, int y)
     case 'w':
         {
             auto newTarget = renderer->configuration.target31;
-            newTarget.y -= wasdStep / (key == 'W' ? 50 : 10);
+            newTarget.y -= wasdStep / (key == 'w' ? 50 : 10);
             renderer->setTarget(newTarget);
         }
         break;
@@ -250,7 +250,7 @@ void keyboardHandler(unsigned char key, int x, int y)
     case 's':
         {
             auto newTarget = renderer->configuration.target31;
-            newTarget.y += wasdStep / (key == 'S' ? 50 : 10);
+            newTarget.y += wasdStep / (key == 's' ? 50 : 10);
             renderer->setTarget(newTarget);
         }
         break;
@@ -258,7 +258,7 @@ void keyboardHandler(unsigned char key, int x, int y)
     case 'a':
         {
             auto newTarget = renderer->configuration.target31;
-            newTarget.x -= wasdStep / (key == 'A' ? 50 : 10);
+            newTarget.x -= wasdStep / (key == 'a' ? 50 : 10);
             renderer->setTarget(newTarget);
         }
         break;
@@ -266,7 +266,7 @@ void keyboardHandler(unsigned char key, int x, int y)
     case 'd':
         {
             auto newTarget = renderer->configuration.target31;
-            newTarget.x += wasdStep / (key == 'D' ? 50 : 10);
+            newTarget.x += wasdStep / (key == 'd' ? 50 : 10);
             renderer->setTarget(newTarget);
         }
         break;
