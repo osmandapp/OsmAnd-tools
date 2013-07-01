@@ -214,26 +214,25 @@ void mouseHandler(int button, int state, int x, int y)
 
 void mouseWheelHandler(int button, int dir, int x, int y)
 {
+    const auto modifiers = glutGetModifiers();
+    const auto step = (modifiers & GLUT_ACTIVE_SHIFT) ? 0.1f : 0.01f;
+
     if(dir > 0)
     {
-        if(renderer->configuration.requestedZoom < 31)
-        {
-            renderer->setZoom(renderer->configuration.requestedZoom + 0.01f);
-        }
+        renderer->setZoom(renderer->configuration.requestedZoom + step);
     }
     else
     {
-        if(renderer->configuration.requestedZoom > 0)
-        {
-            renderer->setZoom(renderer->configuration.requestedZoom - 0.01f);
-        }
+        renderer->setZoom(renderer->configuration.requestedZoom - step);
     }
 }
 
 void keyboardHandler(unsigned char key, int x, int y)
 {
+    const auto modifiers = glutGetModifiers();
+    
     const auto wasdZoom = static_cast<int>(renderer->configuration.requestedZoom);
-    const auto wasdStep = (1 << (31 - wasdZoom));
+    const auto wasdStep = (1 << (31 - wasdZoom)) / ((modifiers & GLUT_ACTIVE_SHIFT) ? 10 : 50);
 
     switch (key)
     {
@@ -242,62 +241,40 @@ void keyboardHandler(unsigned char key, int x, int y)
         break;
     case 'w':
         {
-            if(renderer->configuration.target31.y >= wasdStep)
-            {
-                auto newTarget = renderer->configuration.target31;
-                newTarget.y = qMax(0, newTarget.y - wasdStep);
-
-                renderer->setTarget(newTarget);
-            }
+            auto newTarget = renderer->configuration.target31;
+            newTarget.y -= wasdStep;
+            renderer->setTarget(newTarget);
         }
         break;
     case 's':
         {
-            if(renderer->configuration.target31.y <= std::numeric_limits<int32_t>::max() - wasdStep)
-            {
-                auto newTarget = renderer->configuration.target31;
-                newTarget.y = qMin(std::numeric_limits<int32_t>::max(), newTarget.y + wasdStep);
-
-                renderer->setTarget(newTarget);
-            }
+            auto newTarget = renderer->configuration.target31;
+            newTarget.y += wasdStep;
+            renderer->setTarget(newTarget);
         }
         break;
     case 'a':
         {
-            if(renderer->configuration.target31.x >= wasdStep)
-            {
-                auto newTarget = renderer->configuration.target31;
-                newTarget.x = qMax(0, newTarget.x - wasdStep);
-
-                renderer->setTarget(newTarget);
-            }
+            auto newTarget = renderer->configuration.target31;
+            newTarget.x -= wasdStep;
+            renderer->setTarget(newTarget);
         }
         break;
     case 'd':
         {
-            if(renderer->configuration.target31.x <= std::numeric_limits<int32_t>::max() - wasdStep)
-            {
-                auto newTarget = renderer->configuration.target31;
-                newTarget.x = qMin(std::numeric_limits<int32_t>::max(), newTarget.x + wasdStep);
-
-                renderer->setTarget(newTarget);
-            }
+            auto newTarget = renderer->configuration.target31;
+            newTarget.x += wasdStep;
+            renderer->setTarget(newTarget);
         }
         break;
     case 'r':
         {
-            if(renderer->configuration.fogDistance < 15000.0f)
-            {
-                renderer->setDistanceToFog(renderer->configuration.fogDistance + 1.0f);
-            }
+            renderer->setDistanceToFog(renderer->configuration.fogDistance + 1.0f);
         }
         break;
     case 'f':
         {
-            if(renderer->configuration.fogDistance >= 1.0f)
-            {
-                renderer->setDistanceToFog(renderer->configuration.fogDistance - 1.0f);
-            }
+            renderer->setDistanceToFog(renderer->configuration.fogDistance - 1.0f);
         }
         break;
     case 'x':
@@ -353,38 +330,29 @@ void keyboardHandler(unsigned char key, int x, int y)
 
 void specialHandler(int key, int x, int y)
 {
+    const auto modifiers = glutGetModifiers();
+    const auto step = (modifiers & GLUT_ACTIVE_SHIFT) ? 1.0f : 0.1f;
+
     switch (key)
     {
     case GLUT_KEY_LEFT:
         {
-            if(renderer->configuration.azimuth <= 360.0f - 1.0f)
-            {
-                renderer->setAzimuth(renderer->configuration.azimuth + 1.0f);
-            }
+            renderer->setAzimuth(renderer->configuration.azimuth + step);
         }
         break;
     case GLUT_KEY_RIGHT:
         {
-            if(renderer->configuration.azimuth >= 1.0f)
-            {
-                renderer->setAzimuth(renderer->configuration.azimuth - 1.0f);
-            }
+            renderer->setAzimuth(renderer->configuration.azimuth - step);
         }
         break;
     case GLUT_KEY_UP:
         {
-            if(renderer->configuration.elevationAngle <= 90.0f - 1.0f)
-            {
-                renderer->setElevationAngle(renderer->configuration.elevationAngle + 1.0f);
-            }
+            renderer->setElevationAngle(renderer->configuration.elevationAngle + step);
         }
         break;
     case GLUT_KEY_DOWN:
         {
-            if(renderer->configuration.elevationAngle >= 1.0f)
-            {
-                renderer->setElevationAngle(renderer->configuration.elevationAngle - 1.0f);
-            }
+            renderer->setElevationAngle(renderer->configuration.elevationAngle - step);
         }
         break;
     }
