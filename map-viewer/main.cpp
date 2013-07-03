@@ -153,6 +153,7 @@ int main(int argc, char** argv)
     glutInitWindowSize(800, 600);
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA | GLUT_DEPTH);
     glutInitContextVersion(3, 1);
+    //glutInitContextVersion(4, 3);
     glutInitContextProfile(GLUT_CORE_PROFILE);
     assert(glutCreateWindow);
     glutCreateWindow((const char*)xT("OsmAnd Bird : 3D map render tool"));
@@ -182,7 +183,7 @@ int main(int argc, char** argv)
         OsmAnd::Utilities::get31TileNumberY(44.4039)
         ));
     renderer->setZoom(18.0f);*/
-    renderer->setZoom(1.75f);
+    renderer->setZoom(1.5f);
 
     renderer->initializeRendering();
     //////////////////////////////////////////////////////////////////////////
@@ -309,14 +310,34 @@ void keyboardHandler(unsigned char key, int x, int y)
             renderer->set16bitColorDepthLimit(!renderer->configuration.force16bitColorDepthLimit);
         }
         break;
-    case 't':
+    case 'y':
         {
             renderer->setHeightmapPatchesPerSide(renderer->configuration.heightmapPatchesPerSide + 1);
         }
         break;
-    case 'g':
+    case 'h':
         {
             renderer->setHeightmapPatchesPerSide(renderer->configuration.heightmapPatchesPerSide - 1);
+        }
+        break;
+    case 't':
+        {
+            renderer->setFogDensity(renderer->configuration.fogDensity + 0.01f);
+        }
+        break;
+    case 'g':
+        {
+            renderer->setFogDensity(renderer->configuration.fogDensity - 0.01f);
+        }
+        break;
+    case 'u':
+        {
+            renderer->setFogOriginFactor(renderer->configuration.fogOriginFactor + 0.01f);
+        }
+        break;
+    case 'j':
+        {
+            renderer->setFogOriginFactor(renderer->configuration.fogOriginFactor - 0.01f);
         }
         break;
     case '0':
@@ -400,12 +421,15 @@ void displayHandler()
 {
     (void)glGetError();
     glPolygonMode( GL_FRONT_AND_BACK, renderWireframe ? GL_LINE : GL_FILL );
+    verifyOpenGL();
     //////////////////////////////////////////////////////////////////////////
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    verifyOpenGL();
     
     //OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Debug, "-FS{-\n");
     renderer->performRendering();
+    verifyOpenGL();
     //OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Debug, "-}FS-\n");
     
     //////////////////////////////////////////////////////////////////////////
@@ -416,17 +440,17 @@ void displayHandler()
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
 
-    glColor3f(1.0f, 0.0f, 0.0f);
+    glColor3f(0.0f, 1.0f, 0.0f);
     glRasterPos2f(8, viewport.height() - 16 * 1);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("fov                   : %1").arg(renderer->configuration.fieldOfView).toStdString().c_str());
+    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("fov                    : %1").arg(renderer->configuration.fieldOfView).toStdString().c_str());
     verifyOpenGL();
 
     glRasterPos2f(8, viewport.height() - 16 * 2);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("fog (keys r,f)        : %1").arg(renderer->configuration.fogDistance).toStdString().c_str());
+    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("fog distance (keys r,f): %1").arg(renderer->configuration.fogDistance).toStdString().c_str());
     verifyOpenGL();
 
     glRasterPos2f(8, viewport.height() - 16 * 3);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("azimuth (arrows l,r)  : %1").arg(renderer->configuration.azimuth).toStdString().c_str());
+    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("azimuth (arrows l,r)   : %1").arg(renderer->configuration.azimuth).toStdString().c_str());
     verifyOpenGL();
 
     glRasterPos2f(8, viewport.height() - 16 * 4);
@@ -470,7 +494,15 @@ void displayHandler()
     verifyOpenGL();
 
     glRasterPos2f(8, viewport.height() - 16 * 14);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("DEM-patches# (keys t,g): %1").arg(renderer->configuration.heightmapPatchesPerSide).toStdString().c_str());
+    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("DEM-patches# (keys y,h): %1").arg(renderer->configuration.heightmapPatchesPerSide).toStdString().c_str());
+    verifyOpenGL();
+
+    glRasterPos2f(8, viewport.height() - 16 * 15);
+    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("fog density (keys t,g) : %1").arg(renderer->configuration.fogDensity).toStdString().c_str());
+    verifyOpenGL();
+
+    glRasterPos2f(8, viewport.height() - 16 * 16);
+    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("fog origin F (keys u,j): %1").arg(renderer->configuration.fogOriginFactor).toStdString().c_str());
     verifyOpenGL();
 
     glRasterPos2f(8, 16 * 5);
