@@ -9,5 +9,3 @@ add_dependencies(voyager
 target_link_libraries(voyager
 	OsmAndCoreUtils
 )
-find_package(Qt5Core REQUIRED)
-qt5_use_modules(voyager Core)

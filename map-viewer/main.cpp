@@ -41,8 +41,8 @@
 #include <MapDataCache.h>
 #include <IMapRenderer.h>
 #include <OnlineMapRasterTileProvider.h>
+#include <HillshadeTileProvider.h>
 #include <IMapElevationDataProvider.h>
-#include <OneDegreeMapElevationDataProvider_Flat.h>
 
 OsmAnd::AreaI viewport;
 std::shared_ptr<OsmAnd::IMapRenderer> renderer;
@@ -152,7 +152,7 @@ int main(int argc, char** argv)
 
     glutInitWindowSize(800, 600);
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA | GLUT_DEPTH);
-    glutInitContextVersion(3, 1);
+    glutInitContextVersion(3, 0);
     //glutInitContextVersion(4, 3);
     glutInitContextProfile(GLUT_CORE_PROFILE);
     assert(glutCreateWindow);
@@ -289,7 +289,7 @@ void keyboardHandler(unsigned char key, int x, int y)
         break;
     case 'e':
         {
-            if(renderer->configuration.tileProviders[OsmAnd::IMapRenderer::ElevationData])
+            /*if(renderer->configuration.tileProviders[OsmAnd::IMapRenderer::ElevationData])
             {
                 renderer->setTileProvider(OsmAnd::IMapRenderer::ElevationData, std::shared_ptr<OsmAnd::IMapElevationDataProvider>());
             }
@@ -297,7 +297,7 @@ void keyboardHandler(unsigned char key, int x, int y)
             {
                 auto provider = new OsmAnd::OneDegreeMapElevationDataProvider_Flat(renderer->configuration.heightmapPatchesPerSide * 2 + 1);
                 renderer->setTileProvider(OsmAnd::IMapRenderer::TileLayerId::ElevationData, std::shared_ptr<OsmAnd::IMapElevationDataProvider>(provider));
-            }
+            }*/
         }
         break;
     case 'z':
@@ -415,6 +415,11 @@ void activateProvider(OsmAnd::IMapRenderer::TileLayerId layerId, int idx)
         static_cast<OsmAnd::OnlineMapRasterTileProvider*>(tileProvider.get())->setLocalCachePath(QDir::current());
         renderer->setTileProvider(layerId, tileProvider);
     }
+    else if(idx == 3)
+    {
+//        auto hillshadeTileProvider = new OsmAnd::HillshadeTileProvider();
+//        renderer->setTileProvider(layerId, hillshadeTileProvider);
+    }
 }
 
 void displayHandler()
@@ -505,24 +510,28 @@ void displayHandler()
     glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("fog origin F (keys u,j): %1").arg(renderer->configuration.fogOriginFactor).toStdString().c_str());
     verifyOpenGL();
 
-    glRasterPos2f(8, 16 * 5);
+    glRasterPos2f(8, 16 * 6);
     glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("Tile providers (holding alt controls overlay0):").toStdString().c_str());
     verifyOpenGL();
 
-    glRasterPos2f(8, 16 * 4);
+    glRasterPos2f(8, 16 * 5);
     glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("0 - disable").toStdString().c_str());
     verifyOpenGL();
 
-    glRasterPos2f(8, 16 * 3);
+    glRasterPos2f(8, 16 * 4);
     glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("1 - Mapnik").toStdString().c_str());
     verifyOpenGL();
 
-    glRasterPos2f(8, 16 * 2);
+    glRasterPos2f(8, 16 * 3);
     glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("2 - CycleMap").toStdString().c_str());
     verifyOpenGL();
 
-    glRasterPos2f(8, 16 * 1);
+    glRasterPos2f(8, 16 * 2);
     glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("3 - Vector maps").toStdString().c_str());
+    verifyOpenGL();
+
+    glRasterPos2f(8, 16 * 1);
+    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("4 - Hillshade").toStdString().c_str());
     verifyOpenGL();
     
     glFlush();
