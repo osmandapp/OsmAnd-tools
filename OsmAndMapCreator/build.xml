@@ -28,9 +28,8 @@
 	<target name="copy-resources">
 		<mkdir dir="${icons.absolute.dir}"/>
 		<copy todir="${icons.absolute.dir}">
-			<fileset dir="../../resources/rendering_styles/icons-mdpi/">
-				<include name="h_*.png"/>
-				<include name="g_*.png"/>
+			<fileset dir="../../resources/rendering_styles/style-icons/drawable-mdpi/">
+				<include name="*"/>
 			</fileset>
 		</copy>
 		<ant antfile="${osmand-jni.dir}/build.xml" target="jar" dir="${osmand-jni.dir}"
