@@ -412,6 +412,7 @@
 			<region name="panama" />
 			<region name="puerto-rico" />
 			<region name="saint-vincent-and-the-grenadines"/>
+			<region name="saint-lucia"/>
 			<region name="trinidad-and-tobago" />
 			<region name="virgin-islands-british"/>		
 			<region name="virgin-islands-us"/>
@@ -534,8 +535,11 @@
 
 		<!-- 8.2 AFRICA [SOURCE: OSMAND:NET] -->
 		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" region_suffix="_Africa"  skip="false">
+			<region name="angola"/>
 			<region name="burundi"/>
+			<region name="cape-verde"/>
 			<region name="chad"/>
+			<region name="guinea"/>
 			<region name="kenya"/>
 			<region name="mali"/>
 			<region name="mauritania"/>
