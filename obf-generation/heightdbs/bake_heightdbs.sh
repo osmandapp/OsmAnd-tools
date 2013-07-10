@@ -28,6 +28,10 @@ shift
 echo "Tile size:            $TILE_SIZE"
 echo "Tile size (inner):    $TILE_INNER_SIZE"
 
+COUNTRIES=$1
+shift
+echo "Countries:            $COUNTRIES"
+
 GDAL2TILES=`which gdal2tiles.py`
 GDAL2TILES_PATH=$(dirname "$GDAL2TILES")
 echo "gdal2tiles:           $GDAL2TILES"
@@ -98,7 +102,7 @@ if [ ! -d "$WORK_PATH/overlapped_tiles" ]; then
 	echo "Overlapping..."
 	mkdir -p "$WORK_PATH/overlapped_tiles"
 	(cd "$WORK_PATH/overlapped_tiles" && \
-	PYTHONPATH="$PYTHONPATH:$GDAL2TILES_PATH" "$SRC_PATH/overlap.py" \
+	"$SRC_PATH/overlap.py" \
 		--driver=GTiff \
 		--driver-options="COMPRESS=LZW" \
 		--extension=tif \
@@ -106,12 +110,13 @@ if [ ! -d "$WORK_PATH/overlapped_tiles" ]; then
 		"$WORK_PATH/tiles" "$WORK_PATH/overlapped_tiles")
 fi
 
-#-co="MTW=ON" \
-#		-co="BLOCKXSIZE=$TILE_SIZE" \
-#		-co="BLOCKYSIZE=$TILE_SIZE" \
-#		-co="TILED=YES" \
-#		-co="NBITS=16" \
-#		-co="BIGTIFF=NO" \
-#		-co="SPARSE_OK=NO" \
-#		-co="COMPRESS=NONE" \
-	
+# Step 6. Pack overlapped tiles into TileDB
+if [ ! -d "$OUTPUT_PATH" ]; then
+	echo "Packing..."
+	mkdir -p "$OUTPUT_PATH"
+	(cd "$OUTPUT_PATH" && \
+	"$SRC_PATH/pack.py" \
+		--verbose \
+		--countries="$COUNTRIES"
+		"$WORK_PATH/overlapped_tiles" "$OUTPUT_PATH")
+fi

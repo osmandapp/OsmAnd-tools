@@ -3,8 +3,7 @@
 import sys
 import os
 from optparse import OptionParser, OptionGroup
-from osgeo import gdal, gdalconst
-from gdal2tiles import GlobalMercator
+from osgeo import gdal
 
 # =============================================================================
 # =============================================================================
