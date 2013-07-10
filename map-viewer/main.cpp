@@ -147,7 +147,7 @@ int main(int argc, char** argv)
 
     //////////////////////////////////////////////////////////////////////////
 
-    assert(glutInit);
+    assert(glutInit != nullptr);
     glutInit(&argc, argv);
 
     glutInitWindowSize(800, 600);
@@ -155,7 +155,7 @@ int main(int argc, char** argv)
     glutInitContextVersion(3, 0);
     //glutInitContextVersion(4, 3);
     glutInitContextProfile(GLUT_CORE_PROFILE);
-    assert(glutCreateWindow);
+    assert(glutCreateWindow != nullptr);
     glutCreateWindow((const char*)xT("OsmAnd Bird : 3D map render tool"));
     
     glutReshapeFunc(&reshapeHandler);
@@ -184,6 +184,15 @@ int main(int argc, char** argv)
         ));
     renderer->setZoom(18.0f);*/
     renderer->setZoom(1.5f);
+    //renderer->setAzimuth(137.6f);
+    renderer->setAzimuth(69.4f);
+    renderer->setElevationAngle(13.0f);
+
+    /// Amsterdam
+    renderer->setTarget(OsmAnd::PointI(
+        1102430866,
+        704978668));
+    renderer->setZoom(12.5f);
 
     renderer->initializeRendering();
     //////////////////////////////////////////////////////////////////////////
@@ -429,6 +438,7 @@ void displayHandler()
     verifyOpenGL();
     //////////////////////////////////////////////////////////////////////////
 
+    glClearColor(0.0f, 1.0f, 1.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     verifyOpenGL();
     
