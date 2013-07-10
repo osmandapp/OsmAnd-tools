@@ -100,6 +100,7 @@ if [ ! -d "$WORK_PATH/overlapped_tiles" ]; then
 	(cd "$WORK_PATH/overlapped_tiles" && \
 	PYTHONPATH="$PYTHONPATH:$GDAL2TILES_PATH" "$SRC_PATH/overlap.py" \
 		--driver=GTiff \
+		--driver-options="COMPRESS=LZW" \
 		--extension=tif \
 		--verbose \
 		"$WORK_PATH/tiles" "$WORK_PATH/overlapped_tiles")

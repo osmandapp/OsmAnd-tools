@@ -39,6 +39,12 @@ class OsmAndHeightMapOverlap(object):
         if not os.path.exists(self.outputDir):
             os.makedirs(self.outputDir)
 
+        # Parse options
+        if self.options.driverOptions != None:
+            self.options.driverOptions = self.options.driverOptions.split(';')
+        else:
+            self.options.driverOptions = []
+
     # -------------------------------------------------------------------------
     def declareOptions(self):
 
@@ -47,11 +53,13 @@ class OsmAndHeightMapOverlap(object):
         p.add_option("--verbose", action="store_true", dest="verbose",
             help="Print status messages to stdout")
         p.add_option("--driver", dest="driver", type="string",
-            help="Size of tile.")
+            help="Tile output driver.")
+        p.add_option("--driver-options", dest="driverOptions", type="string",
+            help="Tile output driver options.")
         p.add_option("--extension", dest="extension", type="string",
-            help="Size of tile.")
+            help="Tile file extension.")
 
-        p.set_defaults(verbose=False)
+        p.set_defaults(verbose=False, driverOptions=None)
 
         self.parser = p
 
@@ -251,7 +259,7 @@ class OsmAndHeightMapOverlap(object):
                     print("\t +BR ",tmsTileX+1,"x",tmsTileY-1,"@",tileZoom)
 
             # Write target to file
-            self.outDriver.CreateCopy(outputTileFile, targetDataset, strict=1)
+            self.outDriver.CreateCopy(outputTileFile, targetDataset, strict=1, options = self.options.driverOptions)
             del targetDataset
 
             if not self.options.verbose:

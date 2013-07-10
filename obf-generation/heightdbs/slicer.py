@@ -39,6 +39,12 @@ class OsmAndHeightMapSlicer(object):
         if not os.path.exists(self.outputDir):
             os.makedirs(self.outputDir)
 
+        # Parse options
+        if self.options.driverOptions != None:
+            self.options.driverOptions = self.options.driverOptions.split(';')
+        else:
+            self.options.driverOptions = []
+
     # -------------------------------------------------------------------------
     def declareOptions(self):
 
@@ -49,11 +55,13 @@ class OsmAndHeightMapSlicer(object):
         p.add_option("--size", dest="size", type="int",
             help="Size of tile.")
         p.add_option("--driver", dest="driver", type="string",
-            help="Size of tile.")
+            help="Tile output driver.")
+        p.add_option("--driver-options", dest="driverOptions", type="string",
+            help="Tile output driver options.")
         p.add_option("--extension", dest="extension", type="string",
-            help="Size of tile.")
+            help="Tile file extension.")
 
-        p.set_defaults(verbose=False)
+        p.set_defaults(verbose=False, driverOptions=None)
 
         self.parser = p
 
@@ -168,12 +176,12 @@ class OsmAndHeightMapSlicer(object):
                     self.scaleDataset(sourceDataset, targetDataset)
 
                     # Save target dataset to a tile
-                    self.outDriver.CreateCopy(outputTileFile, targetDataset, strict=1)
+                    self.outDriver.CreateCopy(outputTileFile, targetDataset, strict=1, options = self.options.driverOptions)
 
                     del targetDataset
                 else:
                     # Save source dataset to a tile
-                    self.outDriver.CreateCopy(outputTileFile, sourceDataset, strict=1)                    
+                    self.outDriver.CreateCopy(outputTileFile, sourceDataset, strict=1, options = self.options.driverOptions)
 
                 # Remove source dataset
                 del sourceDataset
@@ -247,7 +255,7 @@ class OsmAndHeightMapSlicer(object):
                     self.scaleDataset(sourceDataset, targetDataset)
 
                     # Save target dataset to a tile
-                    self.outDriver.CreateCopy(outputTileFile, targetDataset, strict=1)
+                    self.outDriver.CreateCopy(outputTileFile, targetDataset, strict=1, options = self.options.driverOptions)
 
                     # Remove target dataset
                     del targetDataset
