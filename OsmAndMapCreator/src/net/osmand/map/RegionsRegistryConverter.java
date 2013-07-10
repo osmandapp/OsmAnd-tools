@@ -3,6 +3,7 @@ package net.osmand.map;
 import gnu.trove.list.array.TIntArrayList;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -42,9 +43,12 @@ import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 
 public class RegionsRegistryConverter {
+	static String COUNTRIES_FILE = "../../resources/countries-info/countries.xml";
+	static String COUNTRIES_OPT_FILE = "../../resources/countries-info/opt-countries.xml";
+	static String OUTPUT_BINARY_FILE = "../../resources/countries-info/"+RegionRegistry.fileName;
 	
-	public static List<RegionCountry> parseRegions(boolean withNoValidated) throws IllegalStateException {
-		InputStream is = RegionsRegistryConverter.class.getResourceAsStream("countries.xml");
+	public static List<RegionCountry> parseRegions(boolean withNoValidated) throws IllegalStateException, FileNotFoundException {
+		InputStream is = new FileInputStream(COUNTRIES_FILE);
 		try {
 			SAXParser parser = SAXParserFactory.newInstance().newSAXParser();
 			RegionsHandler h = new RegionsHandler(parser, withNoValidated);
@@ -60,16 +64,19 @@ public class RegionsRegistryConverter {
 	}
 	
 	public static void main(String[] args) throws Exception {
-//		List<RegionCountry> countries = recreateReginfo();
-//		checkFileRead(countries);
+		validate(true);
+		optimizeBoxes();
+		List<RegionCountry> countries = recreateReginfo();
+		checkFileRead(countries);
 		
-//		validate(true);
-//		optimizeBoxes();
+		
+//		makeFlat();
+		
 	}
 	
 	public static void validate(boolean overwrite) throws SAXException, IOException, ParserConfigurationException, TransformerException {
 		List<RegionCountry> regCountries = parseRegions(true);
-		InputStream is = RegionsRegistryConverter.class.getResourceAsStream("countries.xml");
+		InputStream is = new FileInputStream(COUNTRIES_FILE);
 		DocumentBuilder docbuilder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
 		Document doc = docbuilder.parse(is);
 		Map<String, Element> elements = new LinkedHashMap<String, Element>();
@@ -92,7 +99,7 @@ public class RegionsRegistryConverter {
 			TransformerFactory transformerFactory = TransformerFactory.newInstance();
 			Transformer transformer = transformerFactory.newTransformer();
 			DOMSource source = new DOMSource(doc);
-			StreamResult result = new StreamResult(new File("src/net/osmand/map/countries.xml"));
+			StreamResult result = new StreamResult(new File(COUNTRIES_FILE));
 
 			// Output to console for testing
 			// StreamResult result = new StreamResult(System.out);
@@ -136,11 +143,10 @@ public class RegionsRegistryConverter {
 			tiles.setTextContent(tsz);
 		}
 	}
-
-
-	public static void optimizeBoxes() throws SAXException, IOException, ParserConfigurationException, TransformerException {
+	
+	public static void makeFlat() throws SAXException, IOException, ParserConfigurationException, TransformerException {
 		List<RegionCountry> regCountries = parseRegions(true);
-		InputStream is = RegionsRegistryConverter.class.getResourceAsStream("countries.xml");
+		InputStream is = new FileInputStream(COUNTRIES_OPT_FILE);
 		DocumentBuilder docbuilder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
 		Document doc = docbuilder.parse(is);
 		Map<String, Element> elements = new LinkedHashMap<String, Element>();
@@ -153,38 +159,93 @@ public class RegionsRegistryConverter {
 		}
 	
 		for(RegionCountry rc : regCountries) {
+			Element tiles = null;
+			NodeList ch = elements.get(rc.name).getChildNodes();
+			for (int i = 0; i < ch.getLength(); i++) {
+				if (ch.item(i).getNodeName().equals("tiles")) {
+					tiles = (Element) ch.item(i);
+					tiles.setTextContent(rc.serializeFlatTilesArray());
+					break;
+				}
+			}
+			
 			for (RegionCountry r : rc.getSubRegions()) {
 				String rgName = rc.name + "#" + r.name;
-				boolean optimized = new AreaOptimizer().tryToCutBigSquareArea(r, true);
-				boolean replace = optimized;
-				while (optimized) {
-					optimized = new AreaOptimizer().tryToCutBigSquareArea(r, true);
-				}
-				if (replace) {
-					Element tiles = null;
-					NodeList ch = elements.get(rgName).getChildNodes();
-					for (int i = 0; i < ch.getLength(); i++) {
-						if (ch.item(i).getNodeName().equals("tiles")) {
-							tiles = (Element) ch.item(i);
-							break;
-						}
+				tiles = null;
+				ch = elements.get(rgName).getChildNodes();
+				for (int i = 0; i < ch.getLength(); i++) {
+					if (ch.item(i).getNodeName().equals("tiles")) {
+						tiles = (Element) ch.item(i);
+						tiles.setTextContent(r.serializeFlatTilesArray());
+						break;
 					}
-					System.out.println("-" + tiles.getTextContent());
-					System.out.println("+" + r.serializeTilesArray());
-					System.out.println("-----------------------------------\n");
-					tiles.setTextContent(r.serializeTilesArray());
 				}
 			}
 		}
 		TransformerFactory transformerFactory = TransformerFactory.newInstance();
 		Transformer transformer = transformerFactory.newTransformer();
 		DOMSource source = new DOMSource(doc);
-		StreamResult result = new StreamResult(new File("src/net/osmand/map/countries.xml"));
+		StreamResult result = new StreamResult(new File(COUNTRIES_FILE));
+ 
+		// Output to console for testing
+//		 StreamResult result = new StreamResult(System.out);
+ 
+		transformer.transform(source, result);
+	}
+
+
+	public static void optimizeBoxes() throws SAXException, IOException, ParserConfigurationException, TransformerException {
+		List<RegionCountry> regCountries = parseRegions(true);
+		InputStream is = new FileInputStream(COUNTRIES_FILE);
+		DocumentBuilder docbuilder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
+		Document doc = docbuilder.parse(is);
+		Map<String, Element> elements = new LinkedHashMap<String, Element>();
+		parseDomRegions(doc.getDocumentElement(), elements, "", "country");
+		Map<String, Element> countries = new LinkedHashMap<String, Element>(elements);
+		Iterator<Entry<String, Element>> it = countries.entrySet().iterator();
+		while(it.hasNext()) {
+			Entry<String, Element> e = it.next();
+			parseDomRegions(e.getValue(), elements, e.getKey() +"#", "region");
+		}
+	
+		for(RegionCountry rc : regCountries) {
+			optimizeRegion(elements, rc, rc.name);
+			for (RegionCountry r : rc.getSubRegions()) {
+				String rgName = rc.name + "#" + r.name;
+				optimizeRegion(elements, r, rgName);
+			}
+		}
+		TransformerFactory transformerFactory = TransformerFactory.newInstance();
+		Transformer transformer = transformerFactory.newTransformer();
+		DOMSource source = new DOMSource(doc);
+		StreamResult result = new StreamResult(new File(COUNTRIES_OPT_FILE));
  
 		// Output to console for testing
 		// StreamResult result = new StreamResult(System.out);
  
 		transformer.transform(source, result);
+	}
+
+	private static void optimizeRegion(Map<String, Element> elements, RegionCountry r, String rgName) {
+		boolean optimized = new AreaOptimizer().tryToCutBigSquareArea(r, false);
+		boolean replace = optimized;
+		while (optimized) {
+			optimized = new AreaOptimizer().tryToCutBigSquareArea(r, false);
+		}
+		if (replace) {
+			Element tiles = null;
+			NodeList ch = elements.get(rgName).getChildNodes();
+			for (int i = 0; i < ch.getLength(); i++) {
+				if (ch.item(i).getNodeName().equals("tiles")) {
+					tiles = (Element) ch.item(i);
+					break;
+				}
+			}
+//			System.out.println("-" + tiles.getTextContent());
+//			System.out.println("+" + r.serializeTilesArray());
+//			System.out.println("-----------------------------------\n");
+			tiles.setTextContent(r.serializeTilesArray());
+		}
 	}
 
 	private static void parseDomRegions(Node parent, Map<String, Element> elements, String parentName, String tag) {
@@ -206,8 +267,7 @@ public class RegionsRegistryConverter {
 		for (RegionCountry c : countries) {
 			regions.addRegions(c.convert());
 		}
-		String filePath = "../../android/OsmAnd-java/src/net/osmand/map/" + RegionRegistry.fileName;
-		FileOutputStream out = new FileOutputStream(filePath);
+		FileOutputStream out = new FileOutputStream(OUTPUT_BINARY_FILE);
 		OsmAndRegionInfo.newBuilder().setRegionInfo(regions).build().writeTo(out);
 		out.close();
 		return countries;

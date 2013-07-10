@@ -4,7 +4,6 @@
 	<property file="local.properties" />
 
 	<property name="src.dir" value="src"/>
-	<property name="osmand-resources.dir" location="../../core/resources"/>
 	<property name="osmand-jni.dir" location="../../android/OsmAnd-java/"/>
 	<property name="osmand-jni.absolute.dir" location="${osmand-core.dir}" />
 	<property name="osmand-core.jar" value="OsmAnd-core.jar"/>
@@ -26,12 +25,11 @@
 		<mkdir dir="${bintests.dir}"/>
 	</target>
 
-	<target name="-copy-resources">
+	<target name="copy-resources">
 		<mkdir dir="${icons.absolute.dir}"/>
 		<copy todir="${icons.absolute.dir}">
-			<fileset dir="${osmand-resources.dir}">
-				<include name="h_*.png"/>
-				<include name="g_*.png"/>
+			<fileset dir="../../resources/rendering_styles/style-icons/drawable-mdpi/">
+				<include name="*"/>
 			</fileset>
 		</copy>
 		<ant antfile="${osmand-jni.dir}/build.xml" target="jar" dir="${osmand-jni.dir}"
@@ -57,7 +55,7 @@
 		<delete dir="${bin.absolute.dir}"/>
 	</target>
 
-	<target name="compile" depends="-copy-resources,-dirs,-version">
+	<target name="compile" depends="copy-resources,-dirs,-version">
 		<copy todir="${bin.absolute.dir}">
 			<fileset dir="${src.absolute.dir}">
 				<exclude name="**/*.java" />
@@ -109,7 +107,7 @@
 		</junit>
 	</target>
 
-	<target name="jar" depends="-copy-resources, -dirs, compile">
+	<target name="jar" depends="copy-resources, -dirs, compile">
 		<manifestclasspath property="lib.list" jarfile="OsmAndMapCreator.jar">
 			<classpath refid="build.path"/>
 		</manifestclasspath>

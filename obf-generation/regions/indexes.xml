@@ -77,15 +77,18 @@
 			<region name="buckinghamshire" downloadName="buckinghamshire-latest"/>
 			<region name="cambridgeshire" downloadName="cambridgeshire-latest"/>
 			<region name="cheshire" downloadName="cheshire-latest"/>
+			<region name="cornwall" downloadName="cornwall-latest"/>
 			<region name="cumbria" downloadName="cumbria-latest"/>
 			<region name="derbyshire" downloadName="derbyshire-latest"/>
 			<region name="devon" downloadName="devon-latest"/>
 			<region name="east-sussex" downloadName="east-sussex-latest"/>
 			<region name="east-yorkshire-with-hull" downloadName="east-yorkshire-with-hull-latest"/>
 			<region name="essex" downloadName="essex-latest"/>
+			<region name="gloucestershire" downloadName="gloucestershire-latest"/>
 			<region name="greater-london" downloadName="greater-london-latest"/>
 			<region name="hampshire" downloadName="hampshire-latest"/>
 			<region name="herefordshire" downloadName="herefordshire-latest"/>
+			<region name="isle-of-wight" downloadName="isle-of-wight-latest"/>
 			<region name="kent" downloadName="kent-latest"/>
 			<region name="lancashire" downloadName="lancashire-latest"/>
 			<region name="leicestershire" downloadName="leicestershire-latest"/>
@@ -409,6 +412,7 @@
 			<region name="panama" />
 			<region name="puerto-rico" />
 			<region name="saint-vincent-and-the-grenadines"/>
+			<region name="saint-lucia"/>
 			<region name="trinidad-and-tobago" />
 			<region name="virgin-islands-british"/>		
 			<region name="virgin-islands-us"/>
@@ -531,12 +535,17 @@
 
 		<!-- 8.2 AFRICA [SOURCE: OSMAND:NET] -->
 		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" region_suffix="_Africa"  skip="false">
+			<region name="angola"/>
 			<region name="burundi"/>
+			<region name="cape-verde"/>
 			<region name="chad"/>
+			<region name="guinea"/>
 			<region name="kenya"/>
 			<region name="mali"/>
 			<region name="mauritania"/>
+			<region name="mauritius"/>
 			<region name="namibia"/>
 			<region name="rwanda"/>
+			<region name="tunisia"/>
 		</regions>
 </regions_list> 

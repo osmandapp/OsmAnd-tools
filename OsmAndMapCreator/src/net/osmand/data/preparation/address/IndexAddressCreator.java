@@ -163,7 +163,8 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 				}
 			}
 			// We should not look for similarities, this can be 'very' wrong (we can find much bigger region)....
-			// but here we just find what is the center of the boundary 
+			// but here we just find what is the center of the boundary
+			// False case : London Borough of Richmond upon Thames (bigger) -> Richmond!
 			if (cityFound == null) {
 				for (City c : citiesToSearch) {
 					String lower = c.getName().toLowerCase();
@@ -543,12 +544,10 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 				result.add(c);
 			}
 		}
-		//or we need to find closes city
-		if (result.isEmpty()) {
-			City city = getClosestCity(location, isInNames, nearestObjects);
-			if (city != null) {
-				result.add(city);
-			}
+		//or we need to find closest city
+		City city = getClosestCity(location, isInNames, nearestObjects);
+		if (city != null && !cityBoundaries.containsKey(city) && !result.contains(city)) {
+			result.add(city);
 		}
 		return registerStreetInCities(name, nameEn, location, result);
 	}

@@ -12,9 +12,9 @@ public class _R {
 	private static final Log log = PlatformUtil.getLog(_R.class);
 
 	public static byte[] getIconData(String data) {
-		InputStream io = _R.class.getResourceAsStream("h_" + data + ".png");
+		InputStream io = _R.class.getResourceAsStream("mm_" + data + ".png");
 		if (io == null) {
-			io = _R.class.getResourceAsStream("g_" + data + ".png");
+			io = _R.class.getResourceAsStream("h_" + data + ".png");
 		}
 		if (io != null) {
 			try {

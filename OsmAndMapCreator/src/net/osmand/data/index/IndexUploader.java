@@ -301,6 +301,7 @@ public class IndexUploader {
 					File logFile = new File(f.getParentFile(), unzipped.getName() + IndexBatchCreator.GEN_LOG_EXT);
 					try {
 						String description = checkfileAndGetDescription(unzipped);
+						timestampCreated = unzipped.lastModified();
 						if(description == null) {
 							log.info("Skip file " + f.getName());
 							skip = true;
@@ -364,6 +365,7 @@ public class IndexUploader {
 				ZipEntry zEntry = new ZipEntry(f.getName());
 				zEntry.setSize(f.length());
 				zEntry.setComment(description);
+				zEntry.setTime(lastModifiedTime);
 				zout.putNextEntry(zEntry);
 				FileInputStream is = new FileInputStream(f);
 				Algorithms.streamCopy(is, zout);
@@ -393,6 +395,7 @@ public class IndexUploader {
 				}
 				String summary = getDescription(reader, fileName);
 				reader.close();
+				f.setLastModified(reader.getDateCreated());
 				return summary;
 			} catch (IOException e) {
 				if (raf != null) {
