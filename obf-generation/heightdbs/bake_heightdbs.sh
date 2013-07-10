@@ -36,10 +36,6 @@ GDAL2TILES=`which gdal2tiles.py`
 GDAL2TILES_PATH=$(dirname "$GDAL2TILES")
 echo "gdal2tiles:           $GDAL2TILES"
 
-######################################################################
-rm -rf "$WORK_PATH"/*
-######################################################################
-
 # Step 1. Create GDAL VRT to reference all DEM files
 if [ ! -f "$WORK_PATH/heightdbs.vrt" ]; then
 	echo "Creating VRT..."
@@ -111,12 +107,12 @@ if [ ! -d "$WORK_PATH/overlapped_tiles" ]; then
 fi
 
 # Step 6. Pack overlapped tiles into TileDB
-if [ ! -d "$OUTPUT_PATH" ]; then
-	echo "Packing..."
-	mkdir -p "$OUTPUT_PATH"
-	(cd "$OUTPUT_PATH" && \
-	"$SRC_PATH/pack.py" \
-		--verbose \
-		--countries="$COUNTRIES"
-		"$WORK_PATH/overlapped_tiles" "$OUTPUT_PATH")
-fi
+#if [ ! -d "$OUTPUT_PATH" ]; then
+#	echo "Packing..."
+#	mkdir -p "$OUTPUT_PATH"
+#	(cd "$OUTPUT_PATH" && \
+#	"$SRC_PATH/pack.py" \
+#		--verbose \
+#		--countries="$COUNTRIES"
+#		"$WORK_PATH/overlapped_tiles" "$OUTPUT_PATH")
+#fi
