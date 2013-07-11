@@ -31,21 +31,30 @@
 #include <QFile>
 
 #include <OsmAndCore.h>
-#include <OsmAndCommon.h>
-#include <OsmAndUtilities.h>
-#include <OsmAndLogging.h>
-#include <Rasterizer.h>
-#include <RasterizerContext.h>
-#include <RasterizationStyles.h>
-#include <RasterizationStyleEvaluator.h>
-#include <MapDataCache.h>
-#include <IMapRenderer.h>
-#include <OnlineMapRasterTileProvider.h>
-#include <HillshadeTileProvider.h>
-#include <IMapElevationDataProvider.h>
+#include <OsmAndCore/Common.h>
+#include <OsmAndCore/Utilities.h>
+#include <OsmAndCore/Logging.h>
+#include <OsmAndCore/Map/Rasterizer.h>
+#include <OsmAndCore/Map/RasterizerContext.h>
+#include <OsmAndCore/Map/RasterizationStyles.h>
+#include <OsmAndCore/Map/RasterizationStyleEvaluator.h>
+#include <OsmAndCore/Map/MapDataCache.h>
+#include <OsmAndCore/Map/IMapRenderer.h>
+#include <OsmAndCore/Map/OnlineMapRasterTileProvider.h>
+#include <OsmAndCore/Map/HillshadeTileProvider.h>
+#include <OsmAndCore/Map/IMapElevationDataProvider.h>
+#include <OsmAndCore/Map/HeightmapProvider.h>
 
 OsmAnd::AreaI viewport;
 std::shared_ptr<OsmAnd::IMapRenderer> renderer;
+
+QDir cacheDir(QDir::current());
+QDir heightsDir;
+bool wasHeightsDirSpecified = false;
+QList< std::shared_ptr<QFile> > styleFiles;
+QList< std::shared_ptr<QFile> > obfFiles;
+QString styleName;
+bool wasObfRootSpecified = false;
 
 bool renderWireframe = false;
 void reshapeHandler(int newWidth, int newHeight);
@@ -62,10 +71,6 @@ int main(int argc, char** argv)
     //////////////////////////////////////////////////////////////////////////
     OsmAnd::InitializeCore();
 
-    QList< std::shared_ptr<QFile> > styleFiles;
-    QList< std::shared_ptr<QFile> > obfFiles;
-    QString styleName;
-    bool wasObfRootSpecified = false;
     for(int argIdx = 1; argIdx < argc; argIdx++)
     {
         const QString arg(argv[argIdx]);
@@ -99,31 +104,37 @@ int main(int argc, char** argv)
             OsmAnd::Utilities::findFiles(obfRoot, QStringList() << "*.obf", obfFiles);
             wasObfRootSpecified = true;
         }
+        else if (arg.startsWith("-cacheDir="))
+        {
+            cacheDir = QDir(arg.mid(strlen("-cacheDir=")));
+        }
+        else if (arg.startsWith("-heightsDir="))
+        {
+            heightsDir = QDir(arg.mid(strlen("-heightsDir=")));
+            wasHeightsDirSpecified = true;
+        }
     }
     if(!wasObfRootSpecified)
         OsmAnd::Utilities::findFiles(QDir::current(), QStringList() << "*.obf", obfFiles);
-    if(obfFiles.isEmpty())
-    {
-        std::cerr << "No OBF files loaded" << std::endl;
-        OsmAnd::ReleaseCore();
-        return EXIT_FAILURE;
-    }
-
+    
     // Obtain and configure rasterization style context
-    OsmAnd::RasterizationStyles stylesCollection;
-    for(auto itStyleFile = styleFiles.begin(); itStyleFile != styleFiles.end(); ++itStyleFile)
-    {
-        auto styleFile = *itStyleFile;
-
-        if(!stylesCollection.registerStyle(*styleFile))
-            std::cout << "Failed to parse metadata of '" << styleFile->fileName().toStdString() << "' or duplicate style" << std::endl;
-    }
     std::shared_ptr<OsmAnd::RasterizationStyle> style;
-    if(!stylesCollection.obtainStyle(styleName, style))
+    if(!styleName.isEmpty())
     {
-        std::cout << "Failed to resolve style '" << styleName.toStdString() << "'" << std::endl;
-        OsmAnd::ReleaseCore();
-        return EXIT_FAILURE;
+        OsmAnd::RasterizationStyles stylesCollection;
+        for(auto itStyleFile = styleFiles.begin(); itStyleFile != styleFiles.end(); ++itStyleFile)
+        {
+            auto styleFile = *itStyleFile;
+
+            if(!stylesCollection.registerStyle(*styleFile))
+                std::cout << "Failed to parse metadata of '" << styleFile->fileName().toStdString() << "' or duplicate style" << std::endl;
+        }
+        if(!stylesCollection.obtainStyle(styleName, style))
+        {
+            std::cout << "Failed to resolve style '" << styleName.toStdString() << "'" << std::endl;
+            OsmAnd::ReleaseCore();
+            return EXIT_FAILURE;
+        }
     }
     
     std::shared_ptr<OsmAnd::MapDataCache> mapDataCache(new OsmAnd::MapDataCache());
@@ -298,15 +309,18 @@ void keyboardHandler(unsigned char key, int x, int y)
         break;
     case 'e':
         {
-            /*if(renderer->configuration.tileProviders[OsmAnd::IMapRenderer::ElevationData])
+            if(renderer->configuration.tileProviders[OsmAnd::IMapRenderer::ElevationData])
             {
-                renderer->setTileProvider(OsmAnd::IMapRenderer::ElevationData, std::shared_ptr<OsmAnd::IMapElevationDataProvider>());
+                renderer->setTileProvider(OsmAnd::IMapRenderer::ElevationData, std::shared_ptr<OsmAnd::IMapTileProvider>());
             }
             else
             {
-                auto provider = new OsmAnd::OneDegreeMapElevationDataProvider_Flat(renderer->configuration.heightmapPatchesPerSide * 2 + 1);
-                renderer->setTileProvider(OsmAnd::IMapRenderer::TileLayerId::ElevationData, std::shared_ptr<OsmAnd::IMapElevationDataProvider>(provider));
-            }*/
+                if(wasHeightsDirSpecified)
+                {
+                    auto provider = new OsmAnd::HeightmapProvider(heightsDir, cacheDir);
+                    renderer->setTileProvider(OsmAnd::IMapRenderer::TileLayerId::ElevationData, std::shared_ptr<OsmAnd::IMapTileProvider>(provider));
+                }
+            }
         }
         break;
     case 'z':
@@ -347,6 +361,16 @@ void keyboardHandler(unsigned char key, int x, int y)
     case 'j':
         {
             renderer->setFogOriginFactor(renderer->configuration.fogOriginFactor - 0.01f);
+        }
+        break;
+    case 'i':
+        {
+            renderer->setFieldOfView(renderer->configuration.fieldOfView + 0.5f);
+        }
+        break;
+    case 'k':
+        {
+            renderer->setFieldOfView(renderer->configuration.fieldOfView - 0.5f);
         }
         break;
     case '0':
@@ -457,7 +481,7 @@ void displayHandler()
 
     glColor3f(0.0f, 1.0f, 0.0f);
     glRasterPos2f(8, viewport.height() - 16 * 1);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("fov                    : %1").arg(renderer->configuration.fieldOfView).toStdString().c_str());
+    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("fov (keys i,k)         : %1").arg(renderer->configuration.fieldOfView).toStdString().c_str());
     verifyOpenGL();
 
     glRasterPos2f(8, viewport.height() - 16 * 2);

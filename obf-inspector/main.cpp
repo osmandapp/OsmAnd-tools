@@ -33,7 +33,7 @@
 #include <QFile>
 #include <QStringList>
 
-#include <Inspector.h>
+#include <OsmAndCoreUtils/Inspector.h>
 
 void printUsage(const std::string& warning = std::string());
 

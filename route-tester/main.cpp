@@ -33,7 +33,7 @@
 #include <QFile>
 #include <QStringList>
 
-#include <Voyager.h>
+#include <OsmAndCoreUtils/Voyager.h>
 
 void printUsage(std::string warning = std::string());
 

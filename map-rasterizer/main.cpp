@@ -33,7 +33,7 @@
 #include <QFile>
 #include <QStringList>
 
-#include <EyePiece.h>
+#include <OsmAndCoreUtils/EyePiece.h>
 
 void printUsage(std::string warning = std::string());
 
