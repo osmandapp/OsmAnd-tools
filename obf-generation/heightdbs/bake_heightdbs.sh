@@ -107,12 +107,10 @@ if [ ! -d "$WORK_PATH/overlapped_tiles" ]; then
 fi
 
 # Step 6. Pack overlapped tiles into TileDB
-#if [ ! -d "$OUTPUT_PATH" ]; then
-#	echo "Packing..."
-#	mkdir -p "$OUTPUT_PATH"
-#	(cd "$OUTPUT_PATH" && \
-#	"$SRC_PATH/pack.py" \
-#		--verbose \
-#		--countries="$COUNTRIES"
-#		"$WORK_PATH/overlapped_tiles" "$OUTPUT_PATH")
-#fi
+echo "Packing..."
+mkdir -p "$OUTPUT_PATH"
+(cd "$OUTPUT_PATH" && \
+PYTHONPATH="$PYTHONPATH:$GDAL2TILES_PATH" "$SRC_PATH/packer.py" \
+	--verbose \
+	--countries="$COUNTRIES" \
+	"$WORK_PATH/overlapped_tiles" "$OUTPUT_PATH")
