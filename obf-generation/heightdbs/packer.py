@@ -133,7 +133,7 @@ class OsmAndHeightMapPacker(object):
                 countryName = None
                 continentName = area.get("name")
 
-            areaName = "-".join(list(filter(None, [ continentName.capitalize(), countryName.capitalize(), regionName.capitalize() ])))
+            areaName = "-".join([ item.capitalize() for item in filter(None, [ continentName, countryName, regionName ]) ])
 
             if self.options.verbose:
                 print("Processing ",areaName)
