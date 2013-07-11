@@ -226,15 +226,13 @@ class OsmAndHeightMapPacker(object):
                     x INTEGER,
                     y INTEGER,
                     zoom INTEGER,
-                    layer INTEGER,
-                    scale REAL,
                     data BLOB,
-                    PRIMARY KEY(x, y, zoom, layer, scale))
+                    PRIMARY KEY(x, y, zoom))
                 """)
             c.execute(
                 """
                 CREATE INDEX idx
-                    ON tiles(x, y, zoom, layer, scale)
+                    ON tiles(x, y, zoom)
                 """)
 
             # Free up current cursor
@@ -273,10 +271,8 @@ class OsmAndHeightMapPacker(object):
                             x,
                             y,
                             zoom,
-                            layer,
-                            scale,
                             data) VALUES ( ?, ?, ?, ?, ?, ? )
-                        """, (tileX, tileY, zoom, 0, 1.0, sqlite3.Binary(tileFile.read())))
+                        """, (tileX, tileY, zoom, sqlite3.Binary(tileFile.read())))
                     db.commit()
 
                 if not self.options.verbose:
