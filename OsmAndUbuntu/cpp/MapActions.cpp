@@ -187,18 +187,17 @@ public:
         points.push_back(std::pair<double, double>(slat, slon));
         points.push_back(std::pair<double, double>(tlat, tlon));
 
-        QList< std::shared_ptr<OsmAnd::RouteSegment> > route;
         auto routeCalculationStart = std::chrono::steady_clock::now();
-        bool routeFound = OsmAnd::RoutePlanner::calculateRoute(&plannerContext, points, false, nullptr, &route);
+        OsmAnd::RouteCalculationResult route = OsmAnd::RoutePlanner::calculateRoute(&plannerContext, points, false, nullptr);
         auto routeCalculationFinish = std::chrono::steady_clock::now();
 
-        if(!routeFound) {
-            return "Route is not found" ;
+        if(route.warnMessage != "") {
+            return "Route is not found ; " + route.warnMessage ;
         }
         std::stringstream os;
         os << "Route in " << std::chrono::duration<double, std::milli> (routeCalculationFinish - routeCalculationStart).count() << " ms ";
-        os << route.length() << " segments ";
-        data->setRoute(route);
+        os << route.list.length() << " segments ";
+        data->setRoute(route.list);
         a->taskFinished();
         return QString(os.str().c_str());
     }
