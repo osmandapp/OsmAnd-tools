@@ -307,7 +307,7 @@ class OsmAndHeightMapPacker(object):
                                 zoom, MIN(x) AS xMin, MIN(y) AS yMin, MAX(x) AS xMax, MAX(y) AS yMax
                             FROM tiles
                             WHERE (zoom = ?)
-                        ) WHERE NOT NULL
+                        ) WHERE xMin NOT NULL AND yMin NOT NULL AND xMax NOT NULL AND yMax NOT NULL
                     """, (zoom,))
                 db.commit()
 
