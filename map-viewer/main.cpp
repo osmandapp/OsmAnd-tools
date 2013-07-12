@@ -43,7 +43,7 @@
 #include <OsmAndCore/Map/OnlineMapRasterTileProvider.h>
 #include <OsmAndCore/Map/HillshadeTileProvider.h>
 #include <OsmAndCore/Map/IMapElevationDataProvider.h>
-#include <OsmAndCore/Map/HeightmapProvider.h>
+#include <OsmAndCore/Map/HeightmapTileProvider.h>
 
 OsmAnd::AreaI viewport;
 std::shared_ptr<OsmAnd::IMapRenderer> renderer;
@@ -51,8 +51,8 @@ std::shared_ptr<OsmAnd::IMapRenderer> renderer;
 QDir cacheDir(QDir::current());
 QDir heightsDir;
 bool wasHeightsDirSpecified = false;
-QList< std::shared_ptr<QFile> > styleFiles;
-QList< std::shared_ptr<QFile> > obfFiles;
+QList< std::shared_ptr<QFileInfo> > styleFiles;
+QList< std::shared_ptr<QFileInfo> > obfFiles;
 QString styleName;
 bool wasObfRootSpecified = false;
 
@@ -141,7 +141,7 @@ int main(int argc, char** argv)
     for(auto itObf = obfFiles.begin(); itObf != obfFiles.end(); ++itObf)
     {
         auto obf = *itObf;
-        std::shared_ptr<OsmAnd::ObfReader> obfReader(new OsmAnd::ObfReader(obf));
+        std::shared_ptr<OsmAnd::ObfReader> obfReader(new OsmAnd::ObfReader(std::shared_ptr<QIODevice>(new QFile(obf->absoluteFilePath()))));
 
         mapDataCache->addSource(obfReader);
     }
@@ -204,6 +204,12 @@ int main(int argc, char** argv)
         1102430866,
         704978668));
     renderer->setZoom(12.5f);
+
+    // Kiev
+    renderer->setTarget(OsmAnd::PointI(
+        1254096891,
+        723769130));
+    renderer->setZoom(8.0f);
 
     renderer->initializeRendering();
     //////////////////////////////////////////////////////////////////////////
@@ -317,7 +323,8 @@ void keyboardHandler(unsigned char key, int x, int y)
             {
                 if(wasHeightsDirSpecified)
                 {
-                    auto provider = new OsmAnd::HeightmapProvider(heightsDir, cacheDir);
+                    auto provider = new OsmAnd::HeightmapTileProvider(heightsDir, cacheDir.absoluteFilePath(OsmAnd::HeightmapTileProvider::defaultIndexFilename));
+                    renderer->setHeightmapPatchesPerSide(provider->getMaxResolutionPatchesCount());
                     renderer->setTileProvider(OsmAnd::IMapRenderer::TileLayerId::ElevationData, std::shared_ptr<OsmAnd::IMapTileProvider>(provider));
                 }
             }

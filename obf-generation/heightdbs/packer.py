@@ -231,8 +231,25 @@ class OsmAndHeightMapPacker(object):
                 """)
             c.execute(
                 """
-                CREATE INDEX idx
+                CREATE INDEX _tiles_index
                     ON tiles(x, y, zoom)
+                """)
+
+            # Create bounds table and index
+            c.execute(
+                """
+                CREATE TABLE bounds (
+                    zoom INTEGER,
+                    xMin INTEGER,
+                    yMin INTEGER,
+                    xMax INTEGER,
+                    yMax INTEGER,
+                    PRIMARY KEY(zoom))
+                """)
+            c.execute(
+                """
+                CREATE INDEX _bounds_index
+                    ON bounds(zoom)
                 """)
 
             # Free up current cursor
@@ -271,13 +288,26 @@ class OsmAndHeightMapPacker(object):
                             x,
                             y,
                             zoom,
-                            data) VALUES ( ?, ?, ?, ?, ?, ? )
+                            data) VALUES ( ?, ?, ?, ? )
                         """, (tileX, tileY, zoom, sqlite3.Binary(tileFile.read())))
                     db.commit()
 
                 if not self.options.verbose:
                     tilesPacked += 1
                     self.progress(tilesPacked / float(len(tilesForPacking)))
+
+            # Form bounds
+            for zoom in range(0, 32):
+                c = db.cursor()
+                c.execute(
+                    """
+                    INSERT INTO bounds
+                        SELECT
+                            zoom, MIN(x) AS xMin, MIN(y) AS yMin, MAX(x) AS xMax, MAX(y) AS yMax
+                        FROM tiles
+                        WHERE (zoom = ? AND (SELECT COUNT(*) FROM tiles WHERE (zoom = ?)) > 0)
+                    """, (zoom, zoom))
+                db.commit()
 
             # Release database
             db.close()
