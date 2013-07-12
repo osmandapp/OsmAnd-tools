@@ -324,7 +324,7 @@ void keyboardHandler(unsigned char key, int x, int y)
                 if(wasHeightsDirSpecified)
                 {
                     auto provider = new OsmAnd::HeightmapTileProvider(heightsDir, cacheDir.absoluteFilePath(OsmAnd::HeightmapTileProvider::defaultIndexFilename));
-                    renderer->setHeightmapPatchesPerSide(provider->getMaxResolutionPatchesCount());
+                    //renderer->setHeightmapPatchesPerSide(provider->getMaxResolutionPatchesCount());
                     renderer->setTileProvider(OsmAnd::IMapRenderer::TileLayerId::ElevationData, std::shared_ptr<OsmAnd::IMapTileProvider>(provider));
                 }
             }
