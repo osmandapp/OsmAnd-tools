@@ -302,11 +302,13 @@ class OsmAndHeightMapPacker(object):
                 c.execute(
                     """
                     INSERT INTO bounds
-                        SELECT
-                            zoom, MIN(x) AS xMin, MIN(y) AS yMin, MAX(x) AS xMax, MAX(y) AS yMax
-                        FROM tiles
-                        WHERE (zoom = ? AND (SELECT COUNT(*) FROM tiles WHERE (zoom = ?)) > 0)
-                    """, (zoom, zoom))
+                        SELECT * FROM (
+                            SELECT
+                                zoom, MIN(x) AS xMin, MIN(y) AS yMin, MAX(x) AS xMax, MAX(y) AS yMax
+                            FROM tiles
+                            WHERE (zoom = ?)
+                        ) WHERE NOT NULL
+                    """, (zoom,))
                 db.commit()
 
             # Release database
