@@ -35,21 +35,40 @@ add_library(freeglut_static STATIC
 
 find_package(OpenGL REQUIRED)
 
+set(target_specific_public_definitions "")
+set(target_specific_public_includes "")
+set(target_specific_public_libraries "")
+if(CMAKE_TARGET_OS STREQUAL "linux" OR CMAKE_TARGET_OS STREQUAL "darwin")
+	find_package(X11 REQUIRED)
+	set(target_specific_public_definitions ${target_specific_public_definitions}
+		${X11_DEFINITIONS}
+	)
+	set(target_specific_public_includes ${target_specific_public_includes}
+		${X11_INCLUDE_DIRS}
+	)
+	set(target_specific_public_libraries ${target_specific_public_libraries}
+		${X11_LIBRARIES}
+	)
+endif()
+
 target_compile_definitions(freeglut_static
 	PRIVATE
 		-DHAVE_CONFIG_H
 	PUBLIC
 		-DFREEGLUT_STATIC
 		${OPENGL_DEFINITIONS}
+		${target_specific_public_definitions}
 )
 target_include_directories(freeglut_static
 	PRIVATE
 		"."
 	PUBLIC
 		${OPENGL_INCLUDE_DIRS}
+		${target_specific_public_includes}
 		"upstream.patched/include"
 )
 target_link_libraries(freeglut_static
 	LINK_PUBLIC
 		${OPENGL_LIBRARIES}
+		${target_specific_public_libraries}
 )
