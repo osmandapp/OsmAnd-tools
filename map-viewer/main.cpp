@@ -198,6 +198,7 @@ int main(int argc, char** argv)
     //renderer->setAzimuth(137.6f);
     renderer->setAzimuth(69.4f);
     renderer->setElevationAngle(13.0f);
+    renderer->setFogColor(1.0f, 1.0f, 1.0f);
 
     /// Amsterdam
     renderer->setTarget(OsmAnd::PointI(
