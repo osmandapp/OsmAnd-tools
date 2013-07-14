@@ -380,6 +380,16 @@ void keyboardHandler(unsigned char key, int x, int y)
             renderer->setFieldOfView(renderer->configuration.fieldOfView - 0.5f);
         }
         break;
+    case 'o':
+        {
+            renderer->setHeightScaleFactor(renderer->configuration.heightScaleFactor + 0.1f);
+        }
+        break;
+    case 'l':
+        {
+            renderer->setHeightScaleFactor(renderer->configuration.heightScaleFactor - 0.1f);
+        }
+        break;
     case '0':
         {
             auto layerId = (modifiers & GLUT_ACTIVE_ALT) ? OsmAnd::IMapRenderer::TileLayerId::MapOverlay0 : OsmAnd::IMapRenderer::TileLayerId::RasterMap;
@@ -549,6 +559,10 @@ void displayHandler()
 
     glRasterPos2f(8, viewport.height() - 16 * 16);
     glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("fog origin F (keys u,j): %1").arg(renderer->configuration.fogOriginFactor).toStdString().c_str());
+    verifyOpenGL();
+
+    glRasterPos2f(8, viewport.height() - 16 * 17);
+    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("height scale (keys o,l): %1").arg(renderer->configuration.heightScaleFactor).toStdString().c_str());
     verifyOpenGL();
 
     glRasterPos2f(8, 16 * 6);
