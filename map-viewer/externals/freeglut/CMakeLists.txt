@@ -40,11 +40,8 @@ set(target_specific_public_includes "")
 set(target_specific_public_libraries "")
 if(CMAKE_TARGET_OS STREQUAL "linux" OR CMAKE_TARGET_OS STREQUAL "darwin")
 	find_package(X11 REQUIRED)
-	set(target_specific_public_definitions ${target_specific_public_definitions}
-		${X11_DEFINITIONS}
-	)
 	set(target_specific_public_includes ${target_specific_public_includes}
-		${X11_INCLUDE_DIRS}
+		${X11_INCLUDE_DIR}
 	)
 	set(target_specific_public_libraries ${target_specific_public_libraries}
 		${X11_LIBRARIES}
