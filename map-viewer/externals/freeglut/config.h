@@ -146,105 +146,105 @@
 
 	/* Define to empty if `const' does not conform to ANSI C. */
 	#undef const
-#else
+#elif defined(ANDROID) || defined(__ANDROID__) || defined(__APPLE__) || defined(__linux__)
 	/* Define to 1 if you have the <dlfcn.h> header file. */
-	#undef HAVE_DLFCN_H
+    #define HAVE_DLFCN_H 1
 
 	/* Define to 1 if you don't have `vprintf' but do have `_doprnt.' */
 	#undef HAVE_DOPRNT
 
 	/* Define to 1 if you have the <errno.h> header file. */
-	#undef HAVE_ERRNO_H
+	#define HAVE_ERRNO_H 1
 
 	/* Define to 1 if you have the <fcntl.h> header file. */
-	#undef HAVE_FCNTL_H
+	#define HAVE_FCNTL_H 1
 
 	/* Define to 1 if you have the `gettimeofday' function. */
-	#undef HAVE_GETTIMEOFDAY
+	#define HAVE_GETTIMEOFDAY 1
 
 	/* Define to 1 if you have the <GL/glu.h> header file. */
-	#undef HAVE_GL_GLU_H
+	#define HAVE_GL_GLU_H 1
 
 	/* Define to 1 if you have the <GL/glx.h> header file. */
-	#undef HAVE_GL_GLX_H
+	#define HAVE_GL_GLX_H 1
 
 	/* Define to 1 if you have the <GL/gl.h> header file. */
-	#undef HAVE_GL_GL_H
+	#define HAVE_GL_GL_H 1
 
 	/* Define to 1 if you have the <inttypes.h> header file. */
-	#undef HAVE_INTTYPES_H
+	#define HAVE_INTTYPES_H 1
 
 	/* Define to 1 if you have the <libusbhid.h> header file. */
 	#undef HAVE_LIBUSBHID_H
 
 	/* Define to 1 if you have the `Xi' library (-lXi). */
-	#undef HAVE_LIBXI
+	#define HAVE_LIBXI 1
 
 	/* Define to 1 if you have the `Xrandr' library (-lXrandr). */
-	#undef HAVE_LIBXRANDR
+	#define HAVE_LIBXRANDR 1
 
 	/* Define to 1 if you have the `Xxf86vm' library (-lXxf86vm). */
-	#undef HAVE_LIBXXF86VM
+	#define HAVE_LIBXXF86VM 1
 
 	/* Define to 1 if you have the <limits.h> header file. */
-	#undef HAVE_LIMITS_H
+	#define HAVE_LIMITS_H 1
 
 	/* Define to 1 if you have the <memory.h> header file. */
-	#undef HAVE_MEMORY_H
+	#define HAVE_MEMORY_H 1
 
 	/* Define to 1 if you have the <stdint.h> header file. */
-	#undef HAVE_STDINT_H
+	#define HAVE_STDINT_H 1
 
 	/* Define to 1 if you have the <stdlib.h> header file. */
-	#undef HAVE_STDLIB_H
+	#define HAVE_STDLIB_H 1
 
 	/* Define to 1 if you have the <strings.h> header file. */
-	#undef HAVE_STRINGS_H
+	#define HAVE_STRINGS_H 1
 
 	/* Define to 1 if you have the <string.h> header file. */
-	#undef HAVE_STRING_H
+	#define HAVE_STRING_H 1
 
 	/* Define to 1 if you have the <sys/ioctl.h> header file. */
-	#undef HAVE_SYS_IOCTL_H
+	#define HAVE_SYS_IOCTL_H 1
 
 	/* Define to 1 if you have the <sys/param.h> header file. */
-	#undef HAVE_SYS_PARAM_H
+	#define HAVE_SYS_PARAM_H 1
 
 	/* Define to 1 if you have the <sys/stat.h> header file. */
-	#undef HAVE_SYS_STAT_H
+	#define HAVE_SYS_STAT_H 1
 
 	/* Define to 1 if you have the <sys/time.h> header file. */
-	#undef HAVE_SYS_TIME_H
+	#define HAVE_SYS_TIME_H 1
 
 	/* Define to 1 if you have the <sys/types.h> header file. */
-	#undef HAVE_SYS_TYPES_H
+	#define HAVE_SYS_TYPES_H 1
 
 	/* Define to 1 if you have the <unistd.h> header file. */
-	#undef HAVE_UNISTD_H
+	#define HAVE_UNISTD_H 1
 
 	/* Define to 1 if you have the <usbhid.h> header file. */
 	#undef HAVE_USBHID_H
 
 	/* Define to 1 if you have the `vfprintf' function. */
-	#undef HAVE_VFPRINTF
+	#define HAVE_VFPRINTF 1
 
 	/* Define to 1 if you have the `vprintf' function. */
-	#undef HAVE_VPRINTF
+	#define HAVE_VPRINTF 1
 
 	/* Define to 1 if you have the <X11/extensions/xf86vmode.h> header file. */
-	#undef HAVE_X11_EXTENSIONS_XF86VMODE_H
+	#define HAVE_X11_EXTENSIONS_XF86VMODE_H 1
 
 	/* Define to 1 if you have the <X11/extensions/XInput2.h> header file. */
-	#undef HAVE_X11_EXTENSIONS_XINPUT2_H
+	#define HAVE_X11_EXTENSIONS_XINPUT2_H 1
 
 	/* Define to 1 if you have the <X11/extensions/XInput.h> header file. */
-	#undef HAVE_X11_EXTENSIONS_XINPUT_H
+	#define HAVE_X11_EXTENSIONS_XINPUT_H 1
 
 	/* Define to 1 if you have the <X11/extensions/XI.h> header file. */
-	#undef HAVE_X11_EXTENSIONS_XI_H
+	#define HAVE_X11_EXTENSIONS_XI_H 1
 
 	/* Define to 1 if you have the <X11/extensions/Xrandr.h> header file. */
-	#undef HAVE_X11_EXTENSIONS_XRANDR_H
+	#define HAVE_X11_EXTENSIONS_XRANDR_H 1
 
 	/* Define to the sub-directory in which libtool stores uninstalled libraries.
 	   */
@@ -275,7 +275,7 @@
 	#undef PACKAGE_VERSION
 
 	/* Define to 1 if you have the ANSI C header files. */
-	#undef STDC_HEADERS
+	#define STDC_HEADERS 1
 
 	/* Define to 1 if you can safely include both <sys/time.h> and <time.h>. */
 	#undef TIME_WITH_SYS_TIME
