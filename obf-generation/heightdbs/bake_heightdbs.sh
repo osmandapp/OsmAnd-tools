@@ -4,7 +4,10 @@
 # These DBs contain tiles of specified size by zoom levels
 
 # Basic usage is
-# bake_heightmaps.sh /path/to/dem/collection /path/to/work/dir /path/to/output/dir 256 
+# bake_heightmaps.sh /path/to/dem/collection /path/to/work/dir /path/to/output/dir 258
+
+# Fail on any error
+set -e
 
 SRC_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
@@ -81,36 +84,40 @@ if [ ! -f "$WORK_PATH/heightdbs_mercator.tif" ]; then
 fi
 
 # Step 4. Slice giant projected GeoTIFF to tiles of specified size and downscale them
-if [ ! -d "$WORK_PATH/tiles" ]; then
-	echo "Slicing..."
-	mkdir -p "$WORK_PATH/tiles"
-	(cd "$WORK_PATH/tiles" && \
-	PYTHONPATH="$PYTHONPATH:$GDAL2TILES_PATH" "$SRC_PATH/slicer.py" \
-		--size=$TILE_INNER_SIZE \
-		--driver=GTiff \
-		--extension=tif \
-		--verbose \
-		"$WORK_PATH/heightdbs_mercator.tif" "$WORK_PATH/tiles")
-fi
+echo "Slicing..."
+mkdir -p "$WORK_PATH/tiles"
+(cd "$WORK_PATH/tiles" && \
+PYTHONPATH="$PYTHONPATH:$GDAL2TILES_PATH" "$SRC_PATH/slicer.py" \
+	--size=$TILE_INNER_SIZE \
+	--driver=GTiff \
+	--extension=tif \
+	--verbose \
+	"$WORK_PATH/heightdbs_mercator.tif" "$WORK_PATH/tiles")
 
 # Step 5. Generate tiles that overlap each other by 1 heixel
-if [ ! -d "$WORK_PATH/overlapped_tiles" ]; then
-	echo "Overlapping..."
-	mkdir -p "$WORK_PATH/overlapped_tiles"
-	(cd "$WORK_PATH/overlapped_tiles" && \
-	"$SRC_PATH/overlap.py" \
-		--driver=GTiff \
-		--driver-options="COMPRESS=LZW" \
-		--extension=tif \
-		--verbose \
-		"$WORK_PATH/tiles" "$WORK_PATH/overlapped_tiles")
-fi
+echo "Overlapping..."
+mkdir -p "$WORK_PATH/overlapped_tiles"
+(cd "$WORK_PATH/overlapped_tiles" && \
+"$SRC_PATH/overlap.py" \
+	--driver=GTiff \
+	--driver-options="COMPRESS=LZW" \
+	--extension=tif \
+	--verbose \
+	"$WORK_PATH/tiles" "$WORK_PATH/overlapped_tiles")
 
 # Step 6. Pack overlapped tiles into TileDB
 echo "Packing..."
-mkdir -p "$OUTPUT_PATH"
-(cd "$OUTPUT_PATH" && \
+mkdir -p "$WORK_PATH/dbs"
+(cd "$WORK_PATH/dbs" && \
 PYTHONPATH="$PYTHONPATH:$GDAL2TILES_PATH" "$SRC_PATH/packer.py" \
 	--verbose \
 	--countries="$COUNTRIES" \
-	"$WORK_PATH/overlapped_tiles" "$OUTPUT_PATH")
+	"$WORK_PATH/overlapped_tiles" "$WORK_PATH/dbs")
+
+# Step 7. Copy output
+echo "Publishing..."
+mkdir -p "$OUTPUT_PATH"
+cp "$WORK_PATH"/dbs/* "$OUTPUT_PATH"
+
+# Step 8. Clean up work
+rm -rf "$WORK_PATH"/*

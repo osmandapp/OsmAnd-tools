@@ -128,10 +128,15 @@ class OsmAndHeightMapSlicer(object):
 
         for tileY in range(tileMinY, tileMaxY+1):
             for tileX in range(tileMinX, tileMaxX+1):
+                outputTileFile = os.path.join(self.outputDir, str(self.baseZoom), str(tileX), "%s.%s" % (tileY, self.options.extension))
+
+                # Skip if this tile already exists
+                if os.path.exists(outputTileFile):
+                    print("Skipping base tile TMS %sx%s@%s" % (tileX, tileY, self.baseZoom))
+                    continue
+
                 if self.options.verbose:
                     print("Baking base tile TMS %sx%s@%s" % (tileX, tileY, self.baseZoom))
-
-                outputTileFile = os.path.join(self.outputDir, str(self.baseZoom), str(tileX), "%s.%s" % (tileY, self.options.extension))
 
                 # Create directories for the tile
                 if not os.path.exists(os.path.dirname(outputTileFile)):
@@ -212,10 +217,15 @@ class OsmAndHeightMapSlicer(object):
 
             for tileY in range(tileMinY, tileMaxY + 1):
                 for tileX in range(tileMinX, tileMaxX + 1):
+                    outputTileFile = os.path.join(self.outputDir, str(zoom), str(tileX), "%s.%s" % (tileY, self.options.extension))
+
+                    # Skip if this tile already exists
+                    if os.path.exists(outputTileFile):
+                        print("Skipping overview tile TMS %sx%s@%s" % (tileX, tileY, self.baseZoom))
+                        continue
+
                     if self.options.verbose:
                         print("Baking overview tile TMS %sx%s@%s" % (tileX, tileY, zoom))
-
-                    outputTileFile = os.path.join(self.outputDir, str(zoom), str(tileX), "%s.%s" % (tileY, self.options.extension))
 
                     # Create directories for the tile
                     if not os.path.exists(os.path.dirname(outputTileFile)):

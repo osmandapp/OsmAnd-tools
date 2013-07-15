@@ -131,10 +131,16 @@ class OsmAndHeightMapOverlap(object):
             tmsTileY = inputTile[1]
             tileZoom = inputTile[2]
 
-            if self.options.verbose:
-                print(tmsTileX,"x",tmsTileY,"@",tileZoom,"...")
-
             outputTileFile = os.path.join(self.outputDir, str(tileZoom), str(tmsTileX), "%s.%s" % (tmsTileY, self.options.extension))
+
+            # Skip if already exists
+            if os.path.exists(outputTileFile):
+                print("Skipping ",tmsTileX,"x",tmsTileY,"@",tileZoom,"...")
+            
+            # Create directories for the tile
+            if self.options.verbose:
+                print("Baking ",tmsTileX,"x",tmsTileY,"@",tileZoom,"...")
+
             if not os.path.exists(os.path.dirname(outputTileFile)):
                 os.makedirs(os.path.dirname(outputTileFile))
 
