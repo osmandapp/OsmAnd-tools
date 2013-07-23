@@ -59,6 +59,7 @@ bool wasObfRootSpecified = false;
 bool renderWireframe = false;
 void reshapeHandler(int newWidth, int newHeight);
 void mouseHandler(int button, int state, int x, int y);
+void mouseMotion(int x, int y);
 void mouseWheelHandler(int button, int dir, int x, int y);
 void keyboardHandler(unsigned char key, int x, int y);
 void specialHandler(int key, int x, int y);
@@ -171,6 +172,7 @@ int main(int argc, char** argv)
     
     glutReshapeFunc(&reshapeHandler);
     glutMouseFunc(&mouseHandler);
+    glutMotionFunc(&mouseMotion);
     glutMouseWheelFunc(&mouseWheelHandler);
     glutKeyboardFunc(&keyboardHandler);
     glutSpecialFunc(&specialHandler);
@@ -179,7 +181,7 @@ int main(int argc, char** argv)
 
     //////////////////////////////////////////////////////////////////////////
     activateProvider(OsmAnd::IMapRenderer::TileLayerId::RasterMap, 1);
-    renderer->redrawRequestCallback = []()
+    renderer->frameRequestCallback = []()
     {
         glutPostRedisplay();
     };
@@ -205,12 +207,16 @@ int main(int argc, char** argv)
         1102430866,
         704978668));
     renderer->setZoom(12.5f);
-
+    /*
     // Kiev
     renderer->setTarget(OsmAnd::PointI(
         1254096891,
         723769130));
     renderer->setZoom(8.0f);
+    */
+
+    renderer->setAzimuth(0.0f);
+    renderer->setElevationAngle(90.0f);
 
     renderer->initializeRendering();
     //////////////////////////////////////////////////////////////////////////
@@ -235,9 +241,56 @@ void reshapeHandler(int newWidth, int newHeight)
     glViewport(0, 0, newWidth, newHeight);
 }
 
+bool dragInitialized = false;
+int dragInitX;
+int dragInitY;
+OsmAnd::PointI dragInitTarget;
+
 void mouseHandler(int button, int state, int x, int y)
 {
+    if(button == GLUT_LEFT_BUTTON)
+    {
+        if(state == GLUT_DOWN && !dragInitialized)
+        {
+            dragInitX = x;
+            dragInitY = y;
+            dragInitTarget = renderer->configuration.target31;
 
+            dragInitialized = true;
+        }
+        else if(state == GLUT_UP && dragInitialized)
+        {
+            dragInitialized = false;
+        }
+    }
+}
+
+void mouseMotion(int x, int y)
+{
+    if(dragInitialized)
+    {
+        auto deltaX = x - dragInitX;
+        auto deltaY = y - dragInitY;
+
+        // Azimuth
+        auto angle = qDegreesToRadians(renderer->configuration.azimuth);
+        auto cosAngle = cosf(angle);
+        auto sinAngle = sinf(angle);
+
+        auto nx = deltaX * cosAngle - deltaY * sinAngle;
+        auto ny = deltaX * sinAngle + deltaY * cosAngle;
+
+        int32_t tileSize31 = 1;
+        if(renderer->configuration.zoomBase != 31)
+            tileSize31 = (1u << (31 - renderer->configuration.zoomBase)) - 1;
+        auto scale31 = static_cast<double>(tileSize31) / renderer->getScaledTileSizeOnScreen();
+
+        OsmAnd::PointI newTarget;
+        newTarget.x = dragInitTarget.x - static_cast<int32_t>(nx * scale31);
+        newTarget.y = dragInitTarget.y - static_cast<int32_t>(ny * scale31);
+
+        renderer->setTarget(newTarget);
+    }
 }
 
 void mouseWheelHandler(int button, int dir, int x, int y)
@@ -334,11 +387,6 @@ void keyboardHandler(unsigned char key, int x, int y)
     case 'z':
         {
             renderer->setTextureAtlasesUsagePermit(!renderer->configuration.textureAtlasesAllowed);
-        }
-        break;
-    case 'c':
-        {
-            renderer->set16bitColorDepthLimit(!renderer->configuration.force16bitColorDepthLimit);
         }
         break;
     case 'y':
@@ -480,12 +528,11 @@ void displayHandler()
     verifyOpenGL();
     //////////////////////////////////////////////////////////////////////////
 
-    glClearColor(0.0f, 1.0f, 1.0f, 1.0f);
+    //OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Debug, "-FS{-\n");
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     verifyOpenGL();
-    
-    //OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Debug, "-FS{-\n");
-    renderer->performRendering();
+    renderer->processRendering();
+    renderer->renderFrame();
     verifyOpenGL();
     //OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Debug, "-}FS-\n");
     
@@ -547,22 +594,18 @@ void displayHandler()
     verifyOpenGL();
 
     glRasterPos2f(8, viewport.height() - 16 * 13);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("16bit limit (key c)    : %1").arg(renderer->configuration.force16bitColorDepthLimit).toStdString().c_str());
-    verifyOpenGL();
-
-    glRasterPos2f(8, viewport.height() - 16 * 14);
     glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("DEM-patches# (keys y,h): %1").arg(renderer->configuration.heightmapPatchesPerSide).toStdString().c_str());
     verifyOpenGL();
 
-    glRasterPos2f(8, viewport.height() - 16 * 15);
+    glRasterPos2f(8, viewport.height() - 16 * 14);
     glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("fog density (keys t,g) : %1").arg(renderer->configuration.fogDensity).toStdString().c_str());
     verifyOpenGL();
 
-    glRasterPos2f(8, viewport.height() - 16 * 16);
+    glRasterPos2f(8, viewport.height() - 16 * 15);
     glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("fog origin F (keys u,j): %1").arg(renderer->configuration.fogOriginFactor).toStdString().c_str());
     verifyOpenGL();
 
-    glRasterPos2f(8, viewport.height() - 16 * 17);
+    glRasterPos2f(8, viewport.height() - 16 * 16);
     glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("height scale (keys o,l): %1").arg(renderer->configuration.heightScaleFactor).toStdString().c_str());
     verifyOpenGL();
 
