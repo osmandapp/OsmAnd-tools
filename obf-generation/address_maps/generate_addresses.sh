@@ -29,7 +29,7 @@ for country in ${countries}; do
     # convert to fastest intermediate format
     osmconvert --drop-author --drop-brokenrefs ${OSMDIR}/${basecountry}.osm.pbf -o=${OSMDIR}/${basecountry}.o5m
     # filter only the necessary stuff out of the entire osm file
-    osmfilter ${OSMDIR}/${basecountry}.o5m  --keep="boundary=administrative addr:* place=* is_in=* highway=residential =unclassified =pedestrian" --keep-ways-relations="boundary=administrative" --keep-ways= --keep-nodes= --keep-relations=   > ${OSMDIR}/${basecountry}_address.o5m
+    osmfilter ${OSMDIR}/${basecountry}.o5m  --keep="boundary=administrative addr:* place=* is_in=* highway=residential =unclassified =pedestrian =living_street =service" --keep-ways-relations="boundary=administrative" --keep-ways= --keep-nodes= --keep-relations=   > ${OSMDIR}/${basecountry}_address.o5m
     # convert back to  format suitable for OsmAndMapCreator
     osmconvert ${OSMDIR}/${basecountry}_address.o5m -o=${OSMDIR}/${basecountry}_address.osm.pbf
     # delete original .osm.pbf (also to prevent OsmAndMapCreator from picking it up) and intermediate .o5m files
