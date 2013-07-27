@@ -14,7 +14,7 @@ INDEXDIR=${WORKDIR}/index/
 # real countries
 countries="europe/british-isles europe/france europe/germany europe/italy north-america/canada"
 
-# clean up before start
+# just to be sure: clean up before start
 rm -rf ${OSMDIR} ${GENDIR} ${INDEXDIR}
 mkdir -p ${OSMDIR} ${GENDIR} ${INDEXDIR}
 
@@ -40,4 +40,8 @@ done
 # Now start the OsmAndMapCreator process
 echo 'Running java net.osmand.data.index.IndexBatchCreator with $INDEXES_FILE'
 java -XX:+UseParallelGC -Xmx4096M -Xmn512M -Djava.util.logging.config.file=build-scripts/batch-logging.properties -cp "DataExtractionOSM/OsmAndMapCreator.jar:DataExtractionOSM/lib/*.jar" net.osmand.data.index.IndexBatchCreator build-scripts/address_maps/address-batch-generate.xml
+
+
+# clean up after our job
+rm -rf ${OSMDIR} ${GENDIR} ${INDEXDIR}
 
