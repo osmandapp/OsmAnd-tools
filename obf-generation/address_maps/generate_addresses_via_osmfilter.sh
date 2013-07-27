@@ -38,7 +38,7 @@ done
 
 
 # Now start the OsmAndMapCreator process
-echo 'Running java net.osmand.data.index.IndexBatchCreator with $INDEXES_FILE'
+echo 'Running java net.osmand.data.index.IndexBatchCreator'
 java -XX:+UseParallelGC -Xmx4096M -Xmn512M -Djava.util.logging.config.file=build-scripts/batch-logging.properties -cp "DataExtractionOSM/OsmAndMapCreator.jar:DataExtractionOSM/lib/*.jar" net.osmand.data.index.IndexBatchCreator build-scripts/address_maps/address-batch-generate.xml
 
 
