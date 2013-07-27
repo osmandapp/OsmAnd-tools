@@ -29,11 +29,11 @@ for country in ${countries}; do
     #wget -O $OSMDIR/${country%latest.osm.pbf}major_roads.osm.pbf "http://download.geofabrik.de/$country.osm.pbf"
     wget -O ${OSMDIR}/${basecountry}.osm.pbf "http://download.geofabrik.de/${country}-latest.osm.pbf"
     # convert to fastest intermediate format
-    osmconvert --drop-author --drop-brokenrefs ${OSMDIR}/${basecountry}.osm.pbf -o=${OSMDIR}/${basecountry}.o5m
+    ~/osmplanet/osmconvert32 --drop-author --drop-brokenrefs ${OSMDIR}/${basecountry}.osm.pbf -o=${OSMDIR}/${basecountry}.o5m
     # filter only the necessary highways out of the entire osm file
-    osmfilter ${OSMDIR}/${basecountry}.o5m  --keep="highway=motorway =motorway_link =trunk =trunk_link =primary =primary_link =secondary =secondary_link place=city =town =village" --keep-relations= --drop-tags=    > ${OSMDIR}/${basecountry}-major_roads.o5m
+    ~/osmtools/osmfilter ${OSMDIR}/${basecountry}.o5m  --keep="highway=motorway =motorway_link =trunk =trunk_link =primary =primary_link =secondary =secondary_link place=city =town =village" --keep-relations= --drop-tags=    > ${OSMDIR}/${basecountry}-major_roads.o5m
     # convert back to  format suitable for OsmAndMapCreator
-    osmconvert ${OSMDIR}/${basecountry}-major_roads.o5m -o=${OSMDIR}/${basecountry}-major_roads.osm.pbf
+    ~/osmplanet/osmconvert32 ${OSMDIR}/${basecountry}-major_roads.o5m -o=${OSMDIR}/${basecountry}-major_roads.osm.pbf
     # delete original .osm.pbf (also to prevent OsmAndMapCreator from picking it up) and intermediate .o5m files
     # sleep 10 seconds in case of write-behind caching of previous process
     sleep 10
