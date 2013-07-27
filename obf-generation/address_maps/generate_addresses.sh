@@ -17,8 +17,8 @@ OUTDIR=${WORKDIR}/output/
 countries="europe/british-isles europe/france europe/germany europe/italy north-america/canada"
 
 # clean up before start
-rm -rf $OSMDIR
-mkdir -p $OSMDIR
+rm -rf ${OSMDIR} ${GENDIR} ${INDEXDIR}
+mkdir -p ${OSMDIR} ${GENDIR} ${INDEXDIR}
 
 for country in ${countries}; do
     basecountry=$(basename ${country})
@@ -38,8 +38,8 @@ for country in ${countries}; do
     rm -f ${OSMDIR}/${basecountry}.osm.pbf ${OSMDIR}/${basecountry}.o5m ${OSMDIR}/${basecountry}_address.o5m
 done
 
-# This is not ready. Continue after training
+
 # Now start the OsmAndMapCreator process
 echo 'Running java net.osmand.data.index.IndexBatchCreator with $INDEXES_FILE'
-java -XX:+UseParallelGC -Xmx4096M -Xmn512M -Djava.util.logging.config.file=build-scripts/batch-logging.properties -cp "DataExtractionOSM/OsmAndMapCreator.jar:DataExtractionOSM/lib/*.jar" net.osmand.data.index.IndexBatchCreator build-scripts/address_maps/address-batch-generate.xml "$INDEXES_FILE"
+java -XX:+UseParallelGC -Xmx4096M -Xmn512M -Djava.util.logging.config.file=build-scripts/batch-logging.properties -cp "DataExtractionOSM/OsmAndMapCreator.jar:DataExtractionOSM/lib/*.jar" net.osmand.data.index.IndexBatchCreator build-scripts/address_maps/address-batch-generate.xml
 
