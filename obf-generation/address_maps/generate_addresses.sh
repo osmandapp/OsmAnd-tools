@@ -5,11 +5,9 @@ cd ${WORKDIR}
 #WORKDIR=`pwd`
 echo ${WORKDIR}
 
-TMPDIR=${WORKDIR}/tmp/
 OSMDIR=${WORKDIR}/osm
 GENDIR=${WORKDIR}/gen
 INDEXDIR=${WORKDIR}/index/
-OUTDIR=${WORKDIR}/output/
 
 # small countries to test with
 #countries="europe/albania europe/andorra europe/azores"
