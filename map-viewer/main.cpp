@@ -56,6 +56,8 @@ QList< std::shared_ptr<QFileInfo> > obfFiles;
 QString styleName;
 bool wasObfRootSpecified = false;
 
+bool use42 = false;
+
 bool renderWireframe = false;
 void reshapeHandler(int newWidth, int newHeight);
 void mouseHandler(int button, int state, int x, int y);
@@ -64,7 +66,7 @@ void mouseWheelHandler(int button, int dir, int x, int y);
 void keyboardHandler(unsigned char key, int x, int y);
 void specialHandler(int key, int x, int y);
 void displayHandler(void);
-void activateProvider(OsmAnd::IMapRenderer::TileLayerId layerId, int idx);
+void activateProvider(OsmAnd::MapTileLayerId layerId, int idx);
 void verifyOpenGL();
 
 int main(int argc, char** argv)
@@ -164,8 +166,10 @@ int main(int argc, char** argv)
 
     glutInitWindowSize(800, 600);
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA | GLUT_DEPTH);
-    glutInitContextVersion(3, 0);
-    //glutInitContextVersion(4, 3);
+    if(!use42)
+        glutInitContextVersion(3, 0);
+    else
+        glutInitContextVersion(4, 3);
     glutInitContextProfile(GLUT_CORE_PROFILE);
     assert(glutCreateWindow != nullptr);
     glutCreateWindow((const char*)xT("OsmAnd Bird : 3D map render tool"));
@@ -180,11 +184,13 @@ int main(int argc, char** argv)
     verifyOpenGL();
 
     //////////////////////////////////////////////////////////////////////////
-    activateProvider(OsmAnd::IMapRenderer::TileLayerId::RasterMap, 1);
-    renderer->frameRequestCallback = []()
+    activateProvider(OsmAnd::MapTileLayerId::RasterMap, 1);
+    OsmAnd::MapRendererConfiguration rendererConfig;
+    rendererConfig.frameRequestCallback = []()
     {
         glutPostRedisplay();
     };
+    renderer->configure(rendererConfig);
     viewport.top = 0;
     viewport.left = 0;
     viewport.bottom = 600;
@@ -217,6 +223,7 @@ int main(int argc, char** argv)
 
     renderer->setAzimuth(0.0f);
     renderer->setElevationAngle(90.0f);
+    //renderer->setDisplayDensityFactor(2.0f);
 
     renderer->initializeRendering();
     //////////////////////////////////////////////////////////////////////////
@@ -254,7 +261,7 @@ void mouseHandler(int button, int state, int x, int y)
         {
             dragInitX = x;
             dragInitY = y;
-            dragInitTarget = renderer->configuration.target31;
+            dragInitTarget = renderer->state.target31;
 
             dragInitialized = true;
         }
@@ -273,7 +280,7 @@ void mouseMotion(int x, int y)
         auto deltaY = y - dragInitY;
 
         // Azimuth
-        auto angle = qDegreesToRadians(renderer->configuration.azimuth);
+        auto angle = qDegreesToRadians(renderer->state.azimuth);
         auto cosAngle = cosf(angle);
         auto sinAngle = sinf(angle);
 
@@ -281,8 +288,8 @@ void mouseMotion(int x, int y)
         auto ny = deltaX * sinAngle + deltaY * cosAngle;
 
         int32_t tileSize31 = 1;
-        if(renderer->configuration.zoomBase != 31)
-            tileSize31 = (1u << (31 - renderer->configuration.zoomBase)) - 1;
+        if(renderer->state.zoomBase != OsmAnd::ZoomLevel31)
+            tileSize31 = (1u << (31 - renderer->state.zoomBase)) - 1;
         auto scale31 = static_cast<double>(tileSize31) / renderer->getScaledTileSizeOnScreen();
 
         OsmAnd::PointI newTarget;
@@ -300,18 +307,18 @@ void mouseWheelHandler(int button, int dir, int x, int y)
 
     if(dir > 0)
     {
-        renderer->setZoom(renderer->configuration.requestedZoom + step);
+        renderer->setZoom(renderer->state.requestedZoom + step);
     }
     else
     {
-        renderer->setZoom(renderer->configuration.requestedZoom - step);
+        renderer->setZoom(renderer->state.requestedZoom - step);
     }
 }
 
 void keyboardHandler(unsigned char key, int x, int y)
 {
     const auto modifiers = glutGetModifiers();
-    const auto wasdZoom = static_cast<int>(renderer->configuration.requestedZoom);
+    const auto wasdZoom = static_cast<int>(renderer->state.requestedZoom);
     const auto wasdStep = (1 << (31 - wasdZoom));
 
     switch (key)
@@ -322,7 +329,7 @@ void keyboardHandler(unsigned char key, int x, int y)
     case 'W':
     case 'w':
         {
-            auto newTarget = renderer->configuration.target31;
+            auto newTarget = renderer->state.target31;
             newTarget.y -= wasdStep / (key == 'w' ? 50 : 10);
             renderer->setTarget(newTarget);
         }
@@ -330,7 +337,7 @@ void keyboardHandler(unsigned char key, int x, int y)
     case 'S':
     case 's':
         {
-            auto newTarget = renderer->configuration.target31;
+            auto newTarget = renderer->state.target31;
             newTarget.y += wasdStep / (key == 's' ? 50 : 10);
             renderer->setTarget(newTarget);
         }
@@ -338,7 +345,7 @@ void keyboardHandler(unsigned char key, int x, int y)
     case 'A':
     case 'a':
         {
-            auto newTarget = renderer->configuration.target31;
+            auto newTarget = renderer->state.target31;
             newTarget.x -= wasdStep / (key == 'a' ? 50 : 10);
             renderer->setTarget(newTarget);
         }
@@ -346,19 +353,19 @@ void keyboardHandler(unsigned char key, int x, int y)
     case 'D':
     case 'd':
         {
-            auto newTarget = renderer->configuration.target31;
+            auto newTarget = renderer->state.target31;
             newTarget.x += wasdStep / (key == 'd' ? 50 : 10);
             renderer->setTarget(newTarget);
         }
         break;
     case 'r':
         {
-            renderer->setDistanceToFog(renderer->configuration.fogDistance + 1.0f);
+            renderer->setDistanceToFog(renderer->state.fogDistance + 1.0f);
         }
         break;
     case 'f':
         {
-            renderer->setDistanceToFog(renderer->configuration.fogDistance - 1.0f);
+            renderer->setDistanceToFog(renderer->state.fogDistance - 1.0f);
         }
         break;
     case 'x':
@@ -369,9 +376,9 @@ void keyboardHandler(unsigned char key, int x, int y)
         break;
     case 'e':
         {
-            if(renderer->configuration.tileProviders[OsmAnd::IMapRenderer::ElevationData])
+            if(renderer->state.tileProviders[OsmAnd::MapTileLayerId::ElevationData])
             {
-                renderer->setTileProvider(OsmAnd::IMapRenderer::ElevationData, std::shared_ptr<OsmAnd::IMapTileProvider>());
+                renderer->setTileProvider(OsmAnd::MapTileLayerId::ElevationData, std::shared_ptr<OsmAnd::IMapTileProvider>());
             }
             else
             {
@@ -379,87 +386,72 @@ void keyboardHandler(unsigned char key, int x, int y)
                 {
                     auto provider = new OsmAnd::HeightmapTileProvider(heightsDir, cacheDir.absoluteFilePath(OsmAnd::HeightmapTileProvider::defaultIndexFilename));
                     //renderer->setHeightmapPatchesPerSide(provider->getMaxResolutionPatchesCount());
-                    renderer->setTileProvider(OsmAnd::IMapRenderer::TileLayerId::ElevationData, std::shared_ptr<OsmAnd::IMapTileProvider>(provider));
+                    renderer->setTileProvider(OsmAnd::MapTileLayerId::ElevationData, std::shared_ptr<OsmAnd::IMapTileProvider>(provider));
                 }
             }
         }
         break;
-    case 'z':
-        {
-            renderer->setTextureAtlasesUsagePermit(!renderer->configuration.textureAtlasesAllowed);
-        }
-        break;
-    case 'y':
-        {
-            renderer->setHeightmapPatchesPerSide(renderer->configuration.heightmapPatchesPerSide + 1);
-        }
-        break;
-    case 'h':
-        {
-            renderer->setHeightmapPatchesPerSide(renderer->configuration.heightmapPatchesPerSide - 1);
-        }
-        break;
     case 't':
         {
-            renderer->setFogDensity(renderer->configuration.fogDensity + 0.01f);
+            renderer->setFogDensity(renderer->state.fogDensity + 0.01f);
         }
         break;
     case 'g':
         {
-            renderer->setFogDensity(renderer->configuration.fogDensity - 0.01f);
+            renderer->setFogDensity(renderer->state.fogDensity - 0.01f);
         }
         break;
     case 'u':
         {
-            renderer->setFogOriginFactor(renderer->configuration.fogOriginFactor + 0.01f);
+            renderer->setFogOriginFactor(renderer->state.fogOriginFactor + 0.01f);
         }
         break;
     case 'j':
         {
-            renderer->setFogOriginFactor(renderer->configuration.fogOriginFactor - 0.01f);
+            renderer->setFogOriginFactor(renderer->state.fogOriginFactor - 0.01f);
         }
         break;
     case 'i':
         {
-            renderer->setFieldOfView(renderer->configuration.fieldOfView + 0.5f);
+            renderer->setFieldOfView(renderer->state.fieldOfView + 0.5f);
         }
         break;
     case 'k':
         {
-            renderer->setFieldOfView(renderer->configuration.fieldOfView - 0.5f);
+            renderer->setFieldOfView(renderer->state.fieldOfView - 0.5f);
         }
         break;
     case 'o':
         {
-            renderer->setHeightScaleFactor(renderer->configuration.heightScaleFactor + 0.1f);
+            renderer->setHeightScaleFactor(renderer->state.heightScaleFactor + 0.1f);
         }
         break;
     case 'l':
         {
-            renderer->setHeightScaleFactor(renderer->configuration.heightScaleFactor - 0.1f);
+            renderer->setHeightScaleFactor(renderer->state.heightScaleFactor - 0.1f);
         }
         break;
     case '0':
         {
-            auto layerId = (modifiers & GLUT_ACTIVE_ALT) ? OsmAnd::IMapRenderer::TileLayerId::MapOverlay0 : OsmAnd::IMapRenderer::TileLayerId::RasterMap;
+            auto layerId = (modifiers & GLUT_ACTIVE_ALT) ? OsmAnd::MapTileLayerId::MapOverlay0 : OsmAnd::MapTileLayerId::RasterMap;
             activateProvider(layerId, 0);
         }
         break;
     case '1':
         {
-            auto layerId = (modifiers & GLUT_ACTIVE_ALT) ? OsmAnd::IMapRenderer::TileLayerId::MapOverlay0 : OsmAnd::IMapRenderer::TileLayerId::RasterMap;
+            auto layerId = (modifiers & GLUT_ACTIVE_ALT) ? OsmAnd::MapTileLayerId::MapOverlay0 : OsmAnd::MapTileLayerId::RasterMap;
             activateProvider(layerId, 1);
         }
         break;
     case '2':
         {
-            auto layerId = (modifiers & GLUT_ACTIVE_ALT) ? OsmAnd::IMapRenderer::TileLayerId::MapOverlay0 : OsmAnd::IMapRenderer::TileLayerId::RasterMap;
+            auto layerId = (modifiers & GLUT_ACTIVE_ALT) ? OsmAnd::MapTileLayerId::MapOverlay0 : OsmAnd::MapTileLayerId::RasterMap;
             activateProvider(layerId, 2);
         }
         break;
     case '3':
         {
-            auto layerId = (modifiers & GLUT_ACTIVE_ALT) ? OsmAnd::IMapRenderer::TileLayerId::MapOverlay0 : OsmAnd::IMapRenderer::TileLayerId::RasterMap;
+            auto layerId = (modifiers & GLUT_ACTIVE_ALT) ? OsmAnd::MapTileLayerId::MapOverlay0 : OsmAnd::MapTileLayerId::RasterMap;
             activateProvider(layerId, 3);
         }
         break;
@@ -475,28 +467,28 @@ void specialHandler(int key, int x, int y)
     {
     case GLUT_KEY_LEFT:
         {
-            renderer->setAzimuth(renderer->configuration.azimuth + step);
+            renderer->setAzimuth(renderer->state.azimuth + step);
         }
         break;
     case GLUT_KEY_RIGHT:
         {
-            renderer->setAzimuth(renderer->configuration.azimuth - step);
+            renderer->setAzimuth(renderer->state.azimuth - step);
         }
         break;
     case GLUT_KEY_UP:
         {
-            renderer->setElevationAngle(renderer->configuration.elevationAngle + step);
+            renderer->setElevationAngle(renderer->state.elevationAngle + step);
         }
         break;
     case GLUT_KEY_DOWN:
         {
-            renderer->setElevationAngle(renderer->configuration.elevationAngle - step);
+            renderer->setElevationAngle(renderer->state.elevationAngle - step);
         }
         break;
     }
 }
 
-void activateProvider(OsmAnd::IMapRenderer::TileLayerId layerId, int idx)
+void activateProvider(OsmAnd::MapTileLayerId layerId, int idx)
 {
     if(idx == 0)
     {
@@ -533,105 +525,101 @@ void displayHandler()
     verifyOpenGL();
     renderer->processRendering();
     renderer->renderFrame();
+    renderer->postprocessRendering();
     verifyOpenGL();
     //OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Debug, "-}FS-\n");
     
     //////////////////////////////////////////////////////////////////////////
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    gluOrtho2D(0, viewport.width(), 0, viewport.height());
+    if(!use42)
+    {
+        glMatrixMode(GL_PROJECTION);
+        glLoadIdentity();
+        gluOrtho2D(0, viewport.width(), 0, viewport.height());
 
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
+        glMatrixMode(GL_MODELVIEW);
+        glLoadIdentity();
 
-    glColor3f(0.0f, 1.0f, 0.0f);
-    glRasterPos2f(8, viewport.height() - 16 * 1);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("fov (keys i,k)         : %1").arg(renderer->configuration.fieldOfView).toStdString().c_str());
-    verifyOpenGL();
+        glColor3f(0.0f, 1.0f, 0.0f);
+        glRasterPos2f(8, viewport.height() - 16 * 1);
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("fov (keys i,k)         : %1").arg(renderer->state.fieldOfView).toStdString().c_str());
+        verifyOpenGL();
 
-    glRasterPos2f(8, viewport.height() - 16 * 2);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("fog distance (keys r,f): %1").arg(renderer->configuration.fogDistance).toStdString().c_str());
-    verifyOpenGL();
+        glRasterPos2f(8, viewport.height() - 16 * 2);
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("fog distance (keys r,f): %1").arg(renderer->state.fogDistance).toStdString().c_str());
+        verifyOpenGL();
 
-    glRasterPos2f(8, viewport.height() - 16 * 3);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("azimuth (arrows l,r)   : %1").arg(renderer->configuration.azimuth).toStdString().c_str());
-    verifyOpenGL();
+        glRasterPos2f(8, viewport.height() - 16 * 3);
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("azimuth (arrows l,r)   : %1").arg(renderer->state.azimuth).toStdString().c_str());
+        verifyOpenGL();
 
-    glRasterPos2f(8, viewport.height() - 16 * 4);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("pitch (arrows u,d)     : %1").arg(renderer->configuration.elevationAngle).toStdString().c_str());
-    verifyOpenGL();
+        glRasterPos2f(8, viewport.height() - 16 * 4);
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("pitch (arrows u,d)     : %1").arg(renderer->state.elevationAngle).toStdString().c_str());
+        verifyOpenGL();
 
-    glRasterPos2f(8, viewport.height() - 16 * 5);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("target (keys w,a,s,d)  : %1 %2").arg(renderer->configuration.target31.x).arg(renderer->configuration.target31.y).toStdString().c_str());
-    verifyOpenGL();
+        glRasterPos2f(8, viewport.height() - 16 * 5);
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("target (keys w,a,s,d)  : %1 %2").arg(renderer->state.target31.x).arg(renderer->state.target31.y).toStdString().c_str());
+        verifyOpenGL();
 
-    glRasterPos2f(8, viewport.height() - 16 * 6);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("zoom (mouse wheel)     : %1").arg(renderer->configuration.requestedZoom).toStdString().c_str());
-    verifyOpenGL();
+        glRasterPos2f(8, viewport.height() - 16 * 6);
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("zoom (mouse wheel)     : %1").arg(renderer->state.requestedZoom).toStdString().c_str());
+        verifyOpenGL();
 
-    glRasterPos2f(8, viewport.height() - 16 * 7);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("zoom base              : %1").arg(renderer->configuration.zoomBase).toStdString().c_str());
-    verifyOpenGL();
+        glRasterPos2f(8, viewport.height() - 16 * 7);
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("zoom base              : %1").arg(renderer->state.zoomBase).toStdString().c_str());
+        verifyOpenGL();
 
-    glRasterPos2f(8, viewport.height() - 16 * 8);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("zoom fraction          : %1").arg(renderer->configuration.zoomFraction).toStdString().c_str());
-    verifyOpenGL();
+        glRasterPos2f(8, viewport.height() - 16 * 8);
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("zoom fraction          : %1").arg(renderer->state.zoomFraction).toStdString().c_str());
+        verifyOpenGL();
 
-    glRasterPos2f(8, viewport.height() - 16 * 9);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("visible tiles          : %1").arg(renderer->visibleTiles.size()).toStdString().c_str());
-    verifyOpenGL();
+        glRasterPos2f(8, viewport.height() - 16 * 9);
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("visible tiles          : %1").arg(renderer->visibleTiles.size()).toStdString().c_str());
+        verifyOpenGL();
 
-    glRasterPos2f(8, viewport.height() - 16 * 10);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("wireframe (key x)      : %1").arg(renderWireframe).toStdString().c_str());
-    verifyOpenGL();
+        glRasterPos2f(8, viewport.height() - 16 * 10);
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("wireframe (key x)      : %1").arg(renderWireframe).toStdString().c_str());
+        verifyOpenGL();
 
-    glRasterPos2f(8, viewport.height() - 16 * 11);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("elevation data (key e) : %1").arg((bool)renderer->configuration.tileProviders[OsmAnd::IMapRenderer::ElevationData]).toStdString().c_str());
-    verifyOpenGL();
+        glRasterPos2f(8, viewport.height() - 16 * 11);
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("elevation data (key e) : %1").arg((bool)renderer->state.tileProviders[OsmAnd::MapTileLayerId::ElevationData]).toStdString().c_str());
+        verifyOpenGL();
 
-    glRasterPos2f(8, viewport.height() - 16 * 12);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("use atlases (key z)    : %1").arg(renderer->configuration.textureAtlasesAllowed).toStdString().c_str());
-    verifyOpenGL();
+        glRasterPos2f(8, viewport.height() - 16 * 12);
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("fog density (keys t,g) : %1").arg(renderer->state.fogDensity).toStdString().c_str());
+        verifyOpenGL();
 
-    glRasterPos2f(8, viewport.height() - 16 * 13);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("DEM-patches# (keys y,h): %1").arg(renderer->configuration.heightmapPatchesPerSide).toStdString().c_str());
-    verifyOpenGL();
+        glRasterPos2f(8, viewport.height() - 16 * 13);
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("fog origin F (keys u,j): %1").arg(renderer->state.fogOriginFactor).toStdString().c_str());
+        verifyOpenGL();
 
-    glRasterPos2f(8, viewport.height() - 16 * 14);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("fog density (keys t,g) : %1").arg(renderer->configuration.fogDensity).toStdString().c_str());
-    verifyOpenGL();
+        glRasterPos2f(8, viewport.height() - 16 * 14);
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("height scale (keys o,l): %1").arg(renderer->state.heightScaleFactor).toStdString().c_str());
+        verifyOpenGL();
 
-    glRasterPos2f(8, viewport.height() - 16 * 15);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("fog origin F (keys u,j): %1").arg(renderer->configuration.fogOriginFactor).toStdString().c_str());
-    verifyOpenGL();
+        glRasterPos2f(8, 16 * 6);
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("Tile providers (holding alt controls overlay0):").toStdString().c_str());
+        verifyOpenGL();
 
-    glRasterPos2f(8, viewport.height() - 16 * 16);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("height scale (keys o,l): %1").arg(renderer->configuration.heightScaleFactor).toStdString().c_str());
-    verifyOpenGL();
+        glRasterPos2f(8, 16 * 5);
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("0 - disable").toStdString().c_str());
+        verifyOpenGL();
 
-    glRasterPos2f(8, 16 * 6);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("Tile providers (holding alt controls overlay0):").toStdString().c_str());
-    verifyOpenGL();
+        glRasterPos2f(8, 16 * 4);
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("1 - Mapnik").toStdString().c_str());
+        verifyOpenGL();
 
-    glRasterPos2f(8, 16 * 5);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("0 - disable").toStdString().c_str());
-    verifyOpenGL();
+        glRasterPos2f(8, 16 * 3);
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("2 - CycleMap").toStdString().c_str());
+        verifyOpenGL();
 
-    glRasterPos2f(8, 16 * 4);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("1 - Mapnik").toStdString().c_str());
-    verifyOpenGL();
+        glRasterPos2f(8, 16 * 2);
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("3 - Vector maps").toStdString().c_str());
+        verifyOpenGL();
 
-    glRasterPos2f(8, 16 * 3);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("2 - CycleMap").toStdString().c_str());
-    verifyOpenGL();
-
-    glRasterPos2f(8, 16 * 2);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("3 - Vector maps").toStdString().c_str());
-    verifyOpenGL();
-
-    glRasterPos2f(8, 16 * 1);
-    glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("4 - Hillshade").toStdString().c_str());
-    verifyOpenGL();
+        glRasterPos2f(8, 16 * 1);
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("4 - Hillshade").toStdString().c_str());
+        verifyOpenGL();
+    }
     
     glFlush();
     glutSwapBuffers();
