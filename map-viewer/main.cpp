@@ -56,7 +56,7 @@ QList< std::shared_ptr<QFileInfo> > obfFiles;
 QString styleName;
 bool wasObfRootSpecified = false;
 
-bool use42 = true;
+bool use43 = false;
 
 bool renderWireframe = false;
 void reshapeHandler(int newWidth, int newHeight);
@@ -168,7 +168,7 @@ int main(int argc, char** argv)
     glutSetOption(GLUT_ACTION_ON_WINDOW_CLOSE, GLUT_ACTION_CONTINUE_EXECUTION);
     glutInitWindowSize(800, 600);
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA | GLUT_DEPTH);
-    if(!use42)
+    if(!use43)
         glutInitContextVersion(3, 0);
     else
         glutInitContextVersion(4, 3);
@@ -538,7 +538,7 @@ void displayHandler()
     //OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Debug, "-}FS-\n");
     
     //////////////////////////////////////////////////////////////////////////
-    if(!use42)
+    if(!use43)
     {
         glMatrixMode(GL_PROJECTION);
         glLoadIdentity();
