@@ -56,7 +56,7 @@ QList< std::shared_ptr<QFileInfo> > obfFiles;
 QString styleName;
 bool wasObfRootSpecified = false;
 
-bool use42 = false;
+bool use42 = true;
 
 bool renderWireframe = false;
 void reshapeHandler(int newWidth, int newHeight);
@@ -66,6 +66,7 @@ void mouseWheelHandler(int button, int dir, int x, int y);
 void keyboardHandler(unsigned char key, int x, int y);
 void specialHandler(int key, int x, int y);
 void displayHandler(void);
+void closeHandler(void);
 void activateProvider(OsmAnd::MapTileLayerId layerId, int idx);
 void verifyOpenGL();
 
@@ -164,6 +165,7 @@ int main(int argc, char** argv)
     assert(glutInit != nullptr);
     glutInit(&argc, argv);
 
+    glutSetOption(GLUT_ACTION_ON_WINDOW_CLOSE, GLUT_ACTION_CONTINUE_EXECUTION);
     glutInitWindowSize(800, 600);
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA | GLUT_DEPTH);
     if(!use42)
@@ -181,6 +183,7 @@ int main(int argc, char** argv)
     glutKeyboardFunc(&keyboardHandler);
     glutSpecialFunc(&specialHandler);
     glutDisplayFunc(&displayHandler);
+    glutCloseFunc(&closeHandler);
     verifyOpenGL();
 
     //////////////////////////////////////////////////////////////////////////
@@ -224,16 +227,13 @@ int main(int argc, char** argv)
     renderer->setAzimuth(0.0f);
     renderer->setElevationAngle(90.0f);
     //renderer->setDisplayDensityFactor(2.0f);
-
+    
     renderer->initializeRendering();
     //////////////////////////////////////////////////////////////////////////
 
     glutMainLoop();
 
-    //////////////////////////////////////////////////////////////////////////
-    renderer->releaseRendering();
-    //////////////////////////////////////////////////////////////////////////
-
+    
     OsmAnd::ReleaseCore();
     return EXIT_SUCCESS;
 }
@@ -324,7 +324,9 @@ void keyboardHandler(unsigned char key, int x, int y)
     switch (key)
     {
     case '\x1B':
-        glutLeaveMainLoop();
+        {
+            glutLeaveMainLoop();
+        }
         break;
     case 'W':
     case 'w':
@@ -488,6 +490,11 @@ void specialHandler(int key, int x, int y)
     }
 }
 
+void closeHandler(void)
+{
+    renderer->releaseRendering();
+}
+
 void activateProvider(OsmAnd::MapTileLayerId layerId, int idx)
 {
     if(idx == 0)
@@ -523,6 +530,7 @@ void displayHandler()
     //OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Debug, "-FS{-\n");
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     verifyOpenGL();
+
     renderer->processRendering();
     renderer->renderFrame();
     renderer->postprocessRendering();
@@ -623,6 +631,8 @@ void displayHandler()
     
     glFlush();
     glutSwapBuffers();
+
+    //glutPostRedisplay();
 }
 
 void verifyOpenGL()
