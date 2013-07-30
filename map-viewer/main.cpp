@@ -443,7 +443,7 @@ void keyboardHandler(unsigned char key, int x, int y)
     case 'c':
         {
             auto config = renderer->configuration;
-            config.force16bitTextureBitmapColorDepth = !config.force16bitTextureBitmapColorDepth;
+            config.limitTextureColorDepthBy16bits = !config.limitTextureColorDepthBy16bits;
             renderer->setConfiguration(config);
         }
         break;
@@ -637,7 +637,7 @@ void displayHandler()
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * 16);
-        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("16-bit textures (key c): %1").arg(renderer->configuration.force16bitTextureBitmapColorDepth).toStdString().c_str());
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("16-bit textures (key c): %1").arg(renderer->configuration.limitTextureColorDepthBy16bits).toStdString().c_str());
         verifyOpenGL();
 
         glRasterPos2f(8, 16 * 6);
