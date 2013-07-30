@@ -56,7 +56,7 @@ QList< std::shared_ptr<QFileInfo> > obfFiles;
 QString styleName;
 bool wasObfRootSpecified = false;
 
-bool use43 = false;
+bool use43 = true;
 
 bool renderWireframe = false;
 void reshapeHandler(int newWidth, int newHeight);
@@ -188,12 +188,12 @@ int main(int argc, char** argv)
 
     //////////////////////////////////////////////////////////////////////////
     activateProvider(OsmAnd::MapTileLayerId::RasterMap, 1);
-    OsmAnd::MapRendererConfiguration rendererConfig;
-    rendererConfig.frameRequestCallback = []()
+    OsmAnd::MapRendererSetupOptions rendererSetup;
+    rendererSetup.frameRequestCallback = []()
     {
         glutPostRedisplay();
     };
-    renderer->configure(rendererConfig);
+    renderer->setup(rendererSetup);
     viewport.top = 0;
     viewport.left = 0;
     viewport.bottom = 600;
@@ -433,6 +433,20 @@ void keyboardHandler(unsigned char key, int x, int y)
             renderer->setHeightScaleFactor(renderer->state.heightScaleFactor - 0.1f);
         }
         break;
+    case 'v':
+        {
+            auto config = renderer->configuration;
+            config.textureAtlasesAllowed = !config.textureAtlasesAllowed;
+            renderer->setConfiguration(config);
+        }
+        break;
+    case 'c':
+        {
+            auto config = renderer->configuration;
+            config.force16bitTextureBitmapColorDepth = !config.force16bitTextureBitmapColorDepth;
+            renderer->setConfiguration(config);
+        }
+        break;
     case '0':
         {
             auto layerId = (modifiers & GLUT_ACTIVE_ALT) ? OsmAnd::MapTileLayerId::MapOverlay0 : OsmAnd::MapTileLayerId::RasterMap;
@@ -523,7 +537,7 @@ void activateProvider(OsmAnd::MapTileLayerId layerId, int idx)
 void displayHandler()
 {
     (void)glGetError();
-    glPolygonMode( GL_FRONT_AND_BACK, renderWireframe ? GL_LINE : GL_FILL );
+    glPolygonMode(GL_FRONT_AND_BACK, renderWireframe ? GL_LINE : GL_FILL);
     verifyOpenGL();
     //////////////////////////////////////////////////////////////////////////
 
@@ -547,61 +561,83 @@ void displayHandler()
         glMatrixMode(GL_MODELVIEW);
         glLoadIdentity();
 
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
+        auto w = 390;
+        auto h1 = 16*17;
+        auto t = viewport.height();
+        glColor4f(0.5f, 0.5f, 0.5f, 0.6f);
+        glBegin(GL_QUADS);
+            glVertex2f(0.0f,    t);
+            glVertex2f(   w,    t);
+            glVertex2f(   w, t-h1);
+            glVertex2f(0.0f, t-h1);
+        glEnd();
+        verifyOpenGL();
+
         glColor3f(0.0f, 1.0f, 0.0f);
-        glRasterPos2f(8, viewport.height() - 16 * 1);
+        glRasterPos2f(8, t - 16 * 1);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("fov (keys i,k)         : %1").arg(renderer->state.fieldOfView).toStdString().c_str());
         verifyOpenGL();
 
-        glRasterPos2f(8, viewport.height() - 16 * 2);
+        glRasterPos2f(8, t - 16 * 2);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("fog distance (keys r,f): %1").arg(renderer->state.fogDistance).toStdString().c_str());
         verifyOpenGL();
 
-        glRasterPos2f(8, viewport.height() - 16 * 3);
+        glRasterPos2f(8, t - 16 * 3);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("azimuth (arrows l,r)   : %1").arg(renderer->state.azimuth).toStdString().c_str());
         verifyOpenGL();
 
-        glRasterPos2f(8, viewport.height() - 16 * 4);
+        glRasterPos2f(8, t - 16 * 4);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("pitch (arrows u,d)     : %1").arg(renderer->state.elevationAngle).toStdString().c_str());
         verifyOpenGL();
 
-        glRasterPos2f(8, viewport.height() - 16 * 5);
+        glRasterPos2f(8, t - 16 * 5);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("target (keys w,a,s,d)  : %1 %2").arg(renderer->state.target31.x).arg(renderer->state.target31.y).toStdString().c_str());
         verifyOpenGL();
 
-        glRasterPos2f(8, viewport.height() - 16 * 6);
+        glRasterPos2f(8, t - 16 * 6);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("zoom (mouse wheel)     : %1").arg(renderer->state.requestedZoom).toStdString().c_str());
         verifyOpenGL();
 
-        glRasterPos2f(8, viewport.height() - 16 * 7);
+        glRasterPos2f(8, t - 16 * 7);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("zoom base              : %1").arg(renderer->state.zoomBase).toStdString().c_str());
         verifyOpenGL();
 
-        glRasterPos2f(8, viewport.height() - 16 * 8);
+        glRasterPos2f(8, t - 16 * 8);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("zoom fraction          : %1").arg(renderer->state.zoomFraction).toStdString().c_str());
         verifyOpenGL();
 
-        glRasterPos2f(8, viewport.height() - 16 * 9);
+        glRasterPos2f(8, t - 16 * 9);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("visible tiles          : %1").arg(renderer->visibleTiles.size()).toStdString().c_str());
         verifyOpenGL();
 
-        glRasterPos2f(8, viewport.height() - 16 * 10);
+        glRasterPos2f(8, t - 16 * 10);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("wireframe (key x)      : %1").arg(renderWireframe).toStdString().c_str());
         verifyOpenGL();
 
-        glRasterPos2f(8, viewport.height() - 16 * 11);
+        glRasterPos2f(8, t - 16 * 11);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("elevation data (key e) : %1").arg((bool)renderer->state.tileProviders[OsmAnd::MapTileLayerId::ElevationData]).toStdString().c_str());
         verifyOpenGL();
 
-        glRasterPos2f(8, viewport.height() - 16 * 12);
+        glRasterPos2f(8, t - 16 * 12);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("fog density (keys t,g) : %1").arg(renderer->state.fogDensity).toStdString().c_str());
         verifyOpenGL();
 
-        glRasterPos2f(8, viewport.height() - 16 * 13);
+        glRasterPos2f(8, t - 16 * 13);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("fog origin F (keys u,j): %1").arg(renderer->state.fogOriginFactor).toStdString().c_str());
         verifyOpenGL();
 
-        glRasterPos2f(8, viewport.height() - 16 * 14);
+        glRasterPos2f(8, t - 16 * 14);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("height scale (keys o,l): %1").arg(renderer->state.heightScaleFactor).toStdString().c_str());
+        verifyOpenGL();
+
+        glRasterPos2f(8, t - 16 * 15);
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("atlas textures (key v) : %1").arg(renderer->configuration.textureAtlasesAllowed).toStdString().c_str());
+        verifyOpenGL();
+
+        glRasterPos2f(8, t - 16 * 16);
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("16-bit textures (key c): %1").arg(renderer->configuration.force16bitTextureBitmapColorDepth).toStdString().c_str());
         verifyOpenGL();
 
         glRasterPos2f(8, 16 * 6);
