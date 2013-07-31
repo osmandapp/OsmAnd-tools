@@ -3,6 +3,7 @@ package crosby.binary;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.Set;
 
 import com.google.protobuf.ByteString;
 
@@ -46,7 +47,8 @@ public class StringTable {
             }
         };
 
-        set = counts.keySet().toArray(new String[0]);
+        Set<String> var = counts.keySet();
+        set = var.toArray(new String[var.size()]);
         if (set.length > 0) {
           // Sort based on the frequency.
           Arrays.sort(set, comparator);
