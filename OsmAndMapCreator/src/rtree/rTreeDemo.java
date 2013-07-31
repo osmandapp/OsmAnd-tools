@@ -248,7 +248,7 @@ public void run()
       xy = rnd.nextInt(h - iy);
       xx = rnd.nextInt(w - ix);
       long start4 = System.currentTimeMillis();
-      List elmts = null;
+      List elmts;
       //  elmts = rt.overlaps(new Rect(ix,iy,ix+xx,iy+xy));
       //  System.out.println("Time in ms:" + (System.currentTimeMillis()-start4));
       //  System.out.println("Search result-Total elements:"+elmts.size());
@@ -580,7 +580,7 @@ class RTreeRead
   public void printFlHdr(byte[] data)
   {
     try{
-      int frNode = 123;
+      int frNode;
       DataInputStream ds = 
         new DataInputStream(new ByteArrayInputStream(data));
       System.out.println("\t***The File Header***");

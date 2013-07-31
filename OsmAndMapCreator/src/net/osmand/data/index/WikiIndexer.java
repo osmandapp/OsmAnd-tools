@@ -479,8 +479,8 @@ public class WikiIndexer {
 			}
 			int ls = text.indexOf("lat_dir");
 			if (ls != -1 && text.charAt(ls + 1 + "lat_dir".length()) != '|') {
-				float lat = 0;
-				float lon = 0;
+				float lat;
+				float lon;
 				String subcategory = "";
 				StringBuilder description = new StringBuilder();
 

@@ -56,7 +56,7 @@ public class SQLiteBigPlanetIndex {
 		int ch = 0;
 		// be attentive to create buf enough for image 
 		int bufSize = 32 * 1024;
-		byte[] buf = new byte[bufSize];
+		byte[] buf;
 		int maxZoom = 17;
 		int minZoom = 1;
 		
