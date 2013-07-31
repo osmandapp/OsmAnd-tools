@@ -180,7 +180,7 @@ public class BasemapProcessor {
 				}
 				if ((currentByte & BITMASK) == SEA) {
 					seaTileInfo.set(i * 4 + 3);
-				} else if (((currentByte >> 0) & BITMASK) == LAND) {
+				} else if ((currentByte & BITMASK) == LAND) {
 					landTileInfo.set(i * 4 + 3);
 				}
 			}
