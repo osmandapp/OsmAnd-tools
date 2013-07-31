@@ -173,9 +173,8 @@ public class Node implements Cloneable //can be made abstract if leaf and non le
         //write the node
         writeNodeHeader(nodeIndex,0,prnt,size,elmtType);
       }
-            
-      return;
-    } 
+
+    }
     catch(IOException e){
       throw new IOException("Node.Node(new) : " + e.getMessage());
     }
