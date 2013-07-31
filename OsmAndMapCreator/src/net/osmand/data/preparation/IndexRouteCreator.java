@@ -1040,7 +1040,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		TLongArrayList pointMapIds = new TLongArrayList();
 		for (int i = 0; i < parent.getTotalElements(); i++) {
 			if (e[i].getElementType() == rtree.Node.LEAF_NODE) {
-				long id = ((LeafElement) e[i]).getPtr();
+				long id = e[i].getPtr();
 				// IndexRouteCreator.SELECT_STAT;
 				// "SELECT types, pointTypes, pointIds, pointCoordinates, name FROM route_objects WHERE id = ?"
 				selectData.setLong(1, id);
@@ -1123,7 +1123,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		}
 		for (int i = 0; i < parent.getTotalElements(); i++) {
 			if (e[i].getElementType() != rtree.Node.LEAF_NODE) {
-				long ptr = ((NonLeafElement) e[i]).getPtr();
+				long ptr = e[i].getPtr();
 				rtree.Node ns = r.getReadNode(ptr);
 				writeBinaryMapBlock(ns, e[i].getRect(), r, writer, selectData, bounds, tempStringTable, tempNames);
 			}
@@ -1147,7 +1147,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		}
 		for (int i = 0; i < parent.getTotalElements(); i++) {
 			if (e[i].getElementType() != rtree.Node.LEAF_NODE) {
-				rtree.Node chNode = r.getReadNode(((NonLeafElement) e[i]).getPtr());
+				rtree.Node chNode = r.getReadNode(e[i].getPtr());
 				writeBinaryRouteTree(chNode, e[i].getRect(), r, writer, bounds, basemap);
 			}
 		}

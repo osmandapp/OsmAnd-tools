@@ -158,7 +158,7 @@ public class MapRoutingTypes {
 	
 	
 	public boolean encodeEntity(Way et, TIntArrayList outTypes, Map<MapRouteType, String> names){
-		Way e = (Way) et;
+		Way e = et;
 		boolean init = false;
 		for(Entry<String, String> es : e.getTags().entrySet()) {
 			String tag = es.getKey();
@@ -193,7 +193,7 @@ public class MapRoutingTypes {
 	}
 	
 	public boolean encodeBaseEntity(Way et, TIntArrayList outTypes, Map<MapRouteType, String> names){
-		Way e = (Way) et;
+		Way e = et;
 		boolean init = false;
 		for(Entry<String, String> es : e.getTags().entrySet()) {
 			String tag = es.getKey();
