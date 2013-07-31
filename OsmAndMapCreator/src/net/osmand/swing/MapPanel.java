@@ -919,11 +919,8 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 				r.sbottom > sbottom + EXPAND_Y * cf) {
 				return false;
 			}
-			if(r.z != z){
-				return false;
-			}
-			return true;
-		}
+            return r.z == z;
+        }
 		
 		
 		

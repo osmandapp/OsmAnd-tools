@@ -670,11 +670,8 @@ public class IndexUploader {
 				return false;
 			}
 			filename += "-1";
-			if (uploaded.containsKey(filename) && date.equals(uploaded.get(filename))) {
-				return false; 
-			}
-			return true;
-		}
+            return !(uploaded.containsKey(filename) && date.equals(uploaded.get(filename)));
+        }
 		
 		@Override
 		public void upload(IndexUploader uploader, File toUpload,

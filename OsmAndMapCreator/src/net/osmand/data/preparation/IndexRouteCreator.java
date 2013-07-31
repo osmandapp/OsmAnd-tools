@@ -877,11 +877,8 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 	private boolean compareRefs(GeneralizedWay gw, GeneralizedWay gn){
 		String rf = gw.names.get(routeTypes.getRefRuleType());
 		String rf2 = gn.names.get(routeTypes.getRefRuleType());
-		if(rf != null && rf2 != null && !rf.equals(rf2)){
-			return false;
-		}
-		return true;
-	}
+        return !(rf != null && rf2 != null && !rf.equals(rf2));
+    }
 	
 	private void mergeName(MapRouteType rt, GeneralizedWay from, GeneralizedWay to){
 		String rf = from.names.get(rt);

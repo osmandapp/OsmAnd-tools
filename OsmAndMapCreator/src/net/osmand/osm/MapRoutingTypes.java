@@ -130,11 +130,8 @@ public class MapRoutingTypes {
 	}
 	
 	private boolean contains(Set<String> s, String tag, String value) {
-		if(s.contains(tag) || s.contains(tag + TAG_DELIMETER + value)){
-			return true;
-		}
-		return false;
-	}
+        return s.contains(tag) || s.contains(tag + TAG_DELIMETER + value);
+    }
 	
 	private String getMap(Map<String, String> s, String tag, String value) {
 		String r = s.get(tag);

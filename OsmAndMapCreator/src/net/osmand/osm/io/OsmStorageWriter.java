@@ -174,11 +174,8 @@ public class OsmStorageWriter {
 	}
 	
 	public boolean couldBeWrited(MapObject e){
-		if(!Algorithms.isEmpty(e.getName()) && e.getLocation() != null){
-			return true;
-		}
-		return false;
-	}
+        return !Algorithms.isEmpty(e.getName()) && e.getLocation() != null;
+    }
 
 	
 	private void writeStartElement(XMLStreamWriter writer, String name, String indent) throws XMLStreamException{

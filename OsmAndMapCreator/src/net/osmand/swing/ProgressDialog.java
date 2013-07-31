@@ -151,11 +151,8 @@ public class ProgressDialog extends JDialog implements IProgress {
 		if (newProgress < progressBar.getValue()) {
 			return false;
 		}
-		if ((newProgress - progressBar.getValue()) / ((float) progressBar.getMaximum()) < deltaToChange) {
-			return false;
-		}
-		return true;
-	}
+        return (newProgress - progressBar.getValue()) / ((float) progressBar.getMaximum()) >= deltaToChange;
+    }
 	@Override
 	public void remaining(int remainingWork) {
 		if(change(progressBar.getMaximum() - remainingWork)){

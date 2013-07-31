@@ -641,8 +641,7 @@ public final class Osmformat {
       if (!hasLeft) return false;
       if (!hasRight) return false;
       if (!hasTop) return false;
-      if (!hasBottom) return false;
-      return true;
+        return hasBottom;
     }
     
     @Override
@@ -3807,8 +3806,7 @@ public final class Osmformat {
     }
     @Override
 	public final boolean isInitialized() {
-      if (!hasId) return false;
-      return true;
+        return hasId;
     }
     
     @Override
@@ -4159,8 +4157,7 @@ public final class Osmformat {
 	public final boolean isInitialized() {
       if (!hasId) return false;
       if (!hasLat) return false;
-      if (!hasLon) return false;
-      return true;
+        return hasLon;
     }
     
     @Override
@@ -5474,8 +5471,7 @@ public final class Osmformat {
     }
     @Override
 	public final boolean isInitialized() {
-      if (!hasId) return false;
-      return true;
+        return hasId;
     }
     
     @Override
@@ -6212,8 +6208,7 @@ public final class Osmformat {
     }
     @Override
 	public final boolean isInitialized() {
-      if (!hasId) return false;
-      return true;
+        return hasId;
     }
     
     @Override

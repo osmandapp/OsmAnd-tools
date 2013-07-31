@@ -335,10 +335,7 @@ public class Rect implements java.io.Serializable
     else
       return ret;
     //Y dim.
-    if((minY <= rect.getMaxY()) && (maxY >= rect.getMinY()))
-      ret = false;
-    else 
-      ret = true;
+      ret = !((minY <= rect.getMaxY()) && (maxY >= rect.getMinY()));
     return ret;
 
   }//disjoint - over
@@ -417,9 +414,7 @@ public class Rect implements java.io.Serializable
     //m21=false && m23=false
     if((minX != rect.getMinX()) || (maxX != rect.getMaxX()))
       return false;
-    if((minY != rect.getMinY()) || (maxY != rect.getMaxY()))
-      return false;
-    return true;
+      return !((minY != rect.getMinY()) || (maxY != rect.getMaxY()));
   }
 
   @Override

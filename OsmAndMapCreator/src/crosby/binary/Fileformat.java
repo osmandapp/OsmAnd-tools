@@ -532,8 +532,7 @@ public final class Fileformat {
     @Override
 	public final boolean isInitialized() {
       if (!hasType) return false;
-      if (!hasDatasize) return false;
-      return true;
+        return hasDatasize;
     }
     
     @Override

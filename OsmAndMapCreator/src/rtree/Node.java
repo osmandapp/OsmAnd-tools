@@ -870,10 +870,7 @@ public Object clone()
   */
   boolean isInsertPossible()
   {
-    if(totalElements >= MAX)
-      return false;
-    else
-      return true;
+      return totalElements < MAX;
   }
 
   /**

@@ -197,11 +197,8 @@ public class BasemapProcessor {
 		if (zoom >= TILE_ZOOMLEVEL) {
 			int x1 = x >> (zoom - TILE_ZOOMLEVEL);
 			int y1 = y >> (zoom - TILE_ZOOMLEVEL);
-			if (!seaTileInfo.get(y1 * 4096 + x1)) {
-				return false;
-			}
-			return true;
-		} else {
+            return seaTileInfo.get(y1 * 4096 + x1);
+        } else {
 			int x1 = x << (TILE_ZOOMLEVEL - zoom);
 			int y1 = y << (TILE_ZOOMLEVEL - zoom);
 			int max = 1 << TILE_ZOOMLEVEL - zoom;
@@ -220,11 +217,8 @@ public class BasemapProcessor {
 		if (zoom >= TILE_ZOOMLEVEL) {
 			int x1 = x >> (zoom - TILE_ZOOMLEVEL);
 			int y1 = y >> (zoom - TILE_ZOOMLEVEL);
-			if (!landTileInfo.get(y1 * 4096 + x1)) {
-				return false;
-			}
-			return true;
-		} else {
+            return landTileInfo.get(y1 * 4096 + x1);
+        } else {
 			int x1 = x << (TILE_ZOOMLEVEL - zoom);
 			int y1 = y << (TILE_ZOOMLEVEL - zoom);
 			int max = 1 << (TILE_ZOOMLEVEL - zoom);
