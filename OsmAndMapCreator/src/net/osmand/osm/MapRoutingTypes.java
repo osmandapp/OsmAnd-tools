@@ -70,7 +70,7 @@ public class MapRoutingTypes {
 	}
 	
 	public static String constructRuleKey(String tag, String val) {
-		if(val == null || val.length() == 0){
+		if(val == null || val.isEmpty()){
 			return tag;
 		}
 		return tag + TAG_DELIMETER + val;
@@ -130,11 +130,8 @@ public class MapRoutingTypes {
 	}
 	
 	private boolean contains(Set<String> s, String tag, String value) {
-		if(s.contains(tag) || s.contains(tag + TAG_DELIMETER + value)){
-			return true;
-		}
-		return false;
-	}
+        return s.contains(tag) || s.contains(tag + TAG_DELIMETER + value);
+    }
 	
 	private String getMap(Map<String, String> s, String tag, String value) {
 		String r = s.get(tag);
@@ -158,7 +155,7 @@ public class MapRoutingTypes {
 	
 	
 	public boolean encodeEntity(Way et, TIntArrayList outTypes, Map<MapRouteType, String> names){
-		Way e = (Way) et;
+		Way e = et;
 		boolean init = false;
 		for(Entry<String, String> es : e.getTags().entrySet()) {
 			String tag = es.getKey();
@@ -193,7 +190,7 @@ public class MapRoutingTypes {
 	}
 	
 	public boolean encodeBaseEntity(Way et, TIntArrayList outTypes, Map<MapRouteType, String> names){
-		Way e = (Way) et;
+		Way e = et;
 		boolean init = false;
 		for(Entry<String, String> es : e.getTags().entrySet()) {
 			String tag = es.getKey();
@@ -327,9 +324,9 @@ public class MapRoutingTypes {
 		@Override
 		public String toString() {
 			if (value == null) {
-				return "'" + tag + "'";
+				return '\'' + tag + '\'';
 			}
-			return tag + "='" + value + "'";
+			return tag + "='" + value + '\'';
 		}
 
 	}

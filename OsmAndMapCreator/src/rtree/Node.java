@@ -173,9 +173,8 @@ public class Node implements Cloneable //can be made abstract if leaf and non le
         //write the node
         writeNodeHeader(nodeIndex,0,prnt,size,elmtType);
       }
-            
-      return;
-    } 
+
+    }
     catch(IOException e){
       throw new IOException("Node.Node(new) : " + e.getMessage());
     }
@@ -870,10 +869,7 @@ public Object clone()
   */
   boolean isInsertPossible()
   {
-    if(totalElements >= MAX)
-      return false;
-    else
-      return true;
+      return totalElements < MAX;
   }
 
   /**
@@ -894,8 +890,7 @@ public Object clone()
     try{        
       int rem = totalElements+1;//no. of elements remaining + the new element
       Element[] elmtPlusOne = new Element[rem];
-      for(int i=0;i<rem-1;i++)
-        elmtPlusOne[i] = elements[i];
+        System.arraycopy(elements, 0, elmtPlusOne, 0, rem - 1);
       elmtPlusOne[totalElements] = elmtM1; 
       //the elements which have been allocated: 1 - present, 0 - absent
       int[] elmtsGone = new int[rem];
@@ -1185,7 +1180,7 @@ public Object clone()
   {
     if(elmts.length <= 1)
       throw new  IllegalValueException("Node.quadPickSeed : PickSeed not possible as there are no elements");
-    int retIdx[] = new int[2];
+    int[] retIdx = new int[2];
     int mostIneff = Integer.MIN_VALUE;//area of the most inefficient pair
     for(int i=0;i<elmts.length;i++){
       for(int j=i+1;j<elmts.length;j++){
@@ -1445,7 +1440,7 @@ public String toString()
    */
   void sweepSort()//check out for null elements
   {
-    if(elements != null && elements.length > 1 && sorted == false){
+    if(elements != null && elements.length > 1 && !sorted){
       Arrays.sort(elements, 0, totalElements, new rtree.join.CompElmtX());
       sorted = true;
     }//if

@@ -48,8 +48,8 @@ import net.osmand.util.Algorithms;
 
 public class OsmStorageWriter {
 
-	private final String INDENT = "    ";
-	private final String INDENT2 = INDENT + INDENT;
+	private static final String INDENT = "    ";
+	private static final String INDENT2 = INDENT + INDENT;
 
 
 	public OsmStorageWriter(){
@@ -97,9 +97,9 @@ public class OsmStorageWriter {
 		streamWriter.writeAttribute(ATTR_VERSION, "0.6");
 		for(Node n : nodes){
 			writeStartElement(streamWriter, ELEM_NODE, INDENT);
-			streamWriter.writeAttribute(ATTR_LAT, n.getLatitude()+"");
-			streamWriter.writeAttribute(ATTR_LON, n.getLongitude()+"");
-			streamWriter.writeAttribute(ATTR_ID, n.getId()+"");
+			streamWriter.writeAttribute(ATTR_LAT, String.valueOf(n.getLatitude()));
+			streamWriter.writeAttribute(ATTR_LON, String.valueOf(n.getLongitude()));
+			streamWriter.writeAttribute(ATTR_ID, String.valueOf(n.getId()));
 			writeEntityAttributes(streamWriter, n, entityInfo.get(EntityId.valueOf(n)));
 			writeTags(streamWriter, n);
 			writeEndElement(streamWriter, INDENT);
@@ -107,12 +107,12 @@ public class OsmStorageWriter {
 		
 		for(Way w : ways){
 			writeStartElement(streamWriter, ELEM_WAY, INDENT);
-			streamWriter.writeAttribute(ATTR_ID, w.getId()+"");
+			streamWriter.writeAttribute(ATTR_ID, String.valueOf(w.getId()));
 			writeEntityAttributes(streamWriter, w, entityInfo.get(EntityId.valueOf(w)));
 			TLongArrayList ids = w.getNodeIds();
 			for(int i=0; i< ids.size(); i++){
 				writeStartElement(streamWriter, ELEM_ND, INDENT2);
-				streamWriter.writeAttribute(ATTR_REF, ids.get(i)+"");
+				streamWriter.writeAttribute(ATTR_REF, String.valueOf(ids.get(i)));
 				writeEndElement(streamWriter, INDENT2);
 			}
 			writeTags(streamWriter, w);
@@ -121,11 +121,11 @@ public class OsmStorageWriter {
 		
 		for(Relation r : relations){
 			writeStartElement(streamWriter, ELEM_RELATION, INDENT);
-			streamWriter.writeAttribute(ATTR_ID, r.getId()+"");
+			streamWriter.writeAttribute(ATTR_ID, String.valueOf(r.getId()));
 			writeEntityAttributes(streamWriter, r, entityInfo.get(EntityId.valueOf(r)));
 			for(Entry<EntityId, String> e : r.getMembersMap().entrySet()){
 				writeStartElement(streamWriter, ELEM_MEMBER, INDENT2);
-				streamWriter.writeAttribute(ATTR_REF, e.getKey().getId()+"");
+				streamWriter.writeAttribute(ATTR_REF, String.valueOf(e.getKey().getId()));
 				String s = e.getValue();
 				if(s == null){
 					s = ""; 
@@ -174,20 +174,17 @@ public class OsmStorageWriter {
 	}
 	
 	public boolean couldBeWrited(MapObject e){
-		if(!Algorithms.isEmpty(e.getName()) && e.getLocation() != null){
-			return true;
-		}
-		return false;
-	}
+        return !Algorithms.isEmpty(e.getName()) && e.getLocation() != null;
+    }
 
 	
 	private void writeStartElement(XMLStreamWriter writer, String name, String indent) throws XMLStreamException{
-		writer.writeCharacters("\n"+indent);
+		writer.writeCharacters('\n' +indent);
 		writer.writeStartElement(name);
 	}
 	
 	private void writeEndElement(XMLStreamWriter writer, String indent) throws XMLStreamException{
-		writer.writeCharacters("\n"+indent);
+		writer.writeCharacters('\n' +indent);
 		writer.writeEndElement();
 	}
 	

@@ -335,10 +335,7 @@ public class Rect implements java.io.Serializable
     else
       return ret;
     //Y dim.
-    if((minY <= rect.getMaxY()) && (maxY >= rect.getMinY()))
-      ret = false;
-    else 
-      ret = true;
+      ret = !((minY <= rect.getMaxY()) && (maxY >= rect.getMinY()));
     return ret;
 
   }//disjoint - over
@@ -417,9 +414,7 @@ public class Rect implements java.io.Serializable
     //m21=false && m23=false
     if((minX != rect.getMinX()) || (maxX != rect.getMaxX()))
       return false;
-    if((minY != rect.getMinY()) || (maxY != rect.getMaxY()))
-      return false;
-    return true;
+      return !((minY != rect.getMinY()) || (maxY != rect.getMaxY()));
   }
 
   @Override
@@ -457,8 +452,8 @@ public String toString()
       ri = maxX;
     else
       ri = pX;
-    Long temp = new Long(Math.abs(pX - ri));
-    minDist = (new Double(Math.pow(temp.doubleValue(),2))).longValue();
+    Long temp = Long.valueOf(Math.abs(pX - ri));
+    minDist = (new Double(StrictMath.pow(temp.doubleValue(),2))).longValue();
     //for Y dim.
     if(pY < minY)
       ri = minY;
@@ -466,8 +461,8 @@ public String toString()
       ri = maxY;
     else
       ri = pY;
-    temp = new Long(Math.abs(pY - ri));
-    minDist += (new Double(Math.pow(temp.doubleValue(),2))).longValue();
+    temp = Long.valueOf(Math.abs(pY - ri));
+    minDist += (new Double(StrictMath.pow(temp.doubleValue(),2))).longValue();
     return minDist;
   }
   /**

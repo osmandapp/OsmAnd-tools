@@ -74,7 +74,7 @@ public void setPtr(long ptr)
   @Override
 public String toString()
   {
-    return (super.toString()+"\n\trecPointer: "+recordPtr);
+    return (super +"\n\trecPointer: "+recordPtr);
   }
   @Override
 public Object clone()
@@ -102,7 +102,7 @@ public Object clone()
     try{
       for (Iterator i = elements.iterator(); i.hasNext();)
         //result.addElement(new Long(((LeafElement)i.next()).getPtr()));
-        result.add(new Integer((int)((LeafElement)i.next()).getPtr()));//temp
+        result.add(Integer.valueOf((int) ((LeafElement) i.next()).getPtr()));//temp
       //System.out.println("LeafElement.Extractptrs : time " + (System.currentTimeMillis() - time));
       return result;
       

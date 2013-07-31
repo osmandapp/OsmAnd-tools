@@ -8,6 +8,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStreamWriter;
+import java.lang.reflect.InvocationTargetException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -41,9 +42,9 @@ public class WikiIndexer {
 	private final File srcPath;
 	private final File workPath;
 	private final File targetPath;
-	private final String userName = "jenkins";
-	private final String password = "jenkins";
-	private final String url = "jdbc:mysql://localhost/wiki";
+	private static final String userName = "jenkins";
+	private static final String password = "jenkins";
+	private static final String url = "jdbc:mysql://localhost/wiki";
 	private final File srcDone;
 	
 	public static class WikiIndexerException extends Exception {
@@ -106,7 +107,7 @@ public class WikiIndexer {
 		log.info("Obtain database connection");
 		Connection conn;
 		try {
-			Class.forName("com.mysql.jdbc.Driver").newInstance();
+            Class.forName("com.mysql.jdbc.Driver").getConstructor().newInstance();
 			conn = DriverManager.getConnection(url, userName, password);
 			log.info("Database connection established");
 		} catch (InstantiationException e1) {
@@ -117,8 +118,12 @@ public class WikiIndexer {
 			throw new WikiIndexerException("Could not establish connection to " + url + " with " + userName, e1);
 		} catch (SQLException e1) {
 			throw new WikiIndexerException("Could not establish connection to " + url + " with " + userName, e1);
-		}
-		File[] listFiles = srcPath.listFiles();
+		} catch (NoSuchMethodException e) {
+            e.printStackTrace();
+        } catch (InvocationTargetException e) {
+            e.printStackTrace();
+        }
+        File[] listFiles = srcPath.listFiles();
 		for (File f : listFiles) {
 			try {
 				if (f.isFile() && (f.getName().endsWith(".xml") || f.getName().endsWith(".xml.bz2"))) {
@@ -138,7 +143,7 @@ public class WikiIndexer {
 						String targetMapFileName = ic.getMapFileName();
 						targetMapFileName = 
 								targetMapFileName.substring(0, targetMapFileName.length() - IndexConstants.BINARY_MAP_INDEX_EXT.length()) +
-								"_" + IndexConstants.BINARY_MAP_VERSION + IndexConstants.BINARY_MAP_INDEX_EXT;
+                                        '_' + IndexConstants.BINARY_MAP_VERSION + IndexConstants.BINARY_MAP_INDEX_EXT;
 								
 						new File(workPath, ic.getMapFileName()).renameTo(new File(targetPath, targetMapFileName));
 					}
@@ -218,7 +223,7 @@ public class WikiIndexer {
 		}
 	}
 
-	public class WikiOsmHandler extends DefaultHandler {
+	public static class WikiOsmHandler extends DefaultHandler {
 		private final static boolean RECOGNIZE_ENGLISH = true;
 		long id = 1;
 		private final SAXParser saxParser;
@@ -334,7 +339,7 @@ public class WikiIndexer {
 						}
 						if (parseText) {
 							if(id % 500 == 0) {
-								log.debug("Article accepted " + cid + " " + title.toString());
+								log.debug("Article accepted " + cid + ' ' + title);
 							}
 							analyzeTextForGeoInfoNew();
 						}
@@ -421,7 +426,7 @@ public class WikiIndexer {
 		}
 		
 		private float zeroParseFloat(String s) {
-			return s == null || s.length() == 0 ? 0 : Float.parseFloat(s);
+			return s == null || s.isEmpty() ? 0 : Float.parseFloat(s);
 		}
 
 		private int findOpenBrackets(int i) {
@@ -474,8 +479,8 @@ public class WikiIndexer {
 			}
 			int ls = text.indexOf("lat_dir");
 			if (ls != -1 && text.charAt(ls + 1 + "lat_dir".length()) != '|') {
-				float lat = 0;
-				float lon = 0;
+				float lat;
+				float lon;
 				String subcategory = "";
 				StringBuilder description = new StringBuilder();
 
@@ -501,7 +506,7 @@ public class WikiIndexer {
 					String lon_dir = readProperty("lon_dir", h, e);
 					String lat_dg = readProperty("lat_deg", h, e);
 					String lon_dg = readProperty("lon_deg", h, e);
-					if (lon_dg == null || lat_dg == null || lat_dg.length() == 0 || lon_dg.length() == 0) {
+					if (lon_dg == null || lat_dg == null || lat_dg.isEmpty() || lon_dg.isEmpty()) {
 						return;
 					}
 					float lat_deg = Float.parseFloat(lat_dg);
@@ -542,7 +547,7 @@ public class WikiIndexer {
 				int h = findOpenBrackets(beg);
 				
 				// 1. Find main header section {{ ... lat, lon }}
-				while (h != -1 && text.substring(beg, h).trim().length() == 0 ) {
+				while (h != -1 && text.substring(beg, h).trim().isEmpty()) {
 					beg = findClosedBrackets(h);
 					if(beg == -1){
 						return;
@@ -654,8 +659,8 @@ public class WikiIndexer {
 			streamWriter.writeStartElement("node");
 			id++;
 			streamWriter.writeAttribute("id", "-" + cid);
-			streamWriter.writeAttribute("lat", lat + "");
-			streamWriter.writeAttribute("lon", lon + "");
+			streamWriter.writeAttribute("lat", String.valueOf(lat));
+			streamWriter.writeAttribute("lon", String.valueOf(lon));
 
 			streamWriter.writeCharacters("\n  ");
 			streamWriter.writeStartElement("tag");
@@ -666,7 +671,7 @@ public class WikiIndexer {
 			streamWriter.writeCharacters("\n  ");
 			streamWriter.writeStartElement("tag");
 			streamWriter.writeAttribute("k", "wikipedia");
-			streamWriter.writeAttribute("v", locale + ":"+title.toString());
+			streamWriter.writeAttribute("v", locale + ':' + title);
 			streamWriter.writeEndElement();
 			
 

@@ -151,7 +151,7 @@ public class OsmExtractionPreferencesDialog extends JDialog {
         
         routingMode = new JTextField();
         
-        routingMode.setText(DataExtractionSettings.getSettings().getRouteMode() +"");
+        routingMode.setText(DataExtractionSettings.getSettings().getRouteMode());
         panel.add(routingMode);
         constr = new GridBagConstraints();
         constr.weightx = 1;

@@ -482,7 +482,7 @@ public class BinaryMapIndexWriter {
 	public void writeRouteDataBlock(RouteDataBlock.Builder builder, Map<String, Integer> stringTable, BinaryFileReference ref)
 			throws IOException {
 		checkPeekState(ROUTE_INDEX_INIT);
-		if (stringTable != null && stringTable.size() > 0) {
+		if (stringTable != null && !stringTable.isEmpty()) {
 			StringTable.Builder bs = OsmandOdb.StringTable.newBuilder();
 			for (String s : stringTable.keySet()) {
 				bs.addS(s);
@@ -552,7 +552,7 @@ public class BinaryMapIndexWriter {
 			writeRawVarint32(mapDataBuf, CodedOutputStream.encodeZigZag32(ty));
 			pcalcx = pcalcx + tx ;
 			pcalcy = pcalcy + ty ;
-			if(points[k].types.size() >0) {
+			if(!points[k].types.isEmpty()) {
 				typesAddDataBuf.clear();
 				for(int ij =0; ij < points[k].types.size(); ij++){
 					writeRawVarint32(typesAddDataBuf, points[k].types.get(ij));
@@ -569,7 +569,7 @@ public class BinaryMapIndexWriter {
 		ROUTE_TYPES_SIZE += CodedOutputStream.computeTagSize(RouteData.POINTTYPES_FIELD_NUMBER)
 						+ CodedOutputStream.computeRawVarint32Size(typesDataBuf.size()) + typesDataBuf.size();
 
-		if (names.size() > 0) {
+		if (!names.isEmpty()) {
 			mapDataBuf.clear();
 			if (names != null) {
 				for (Entry<MapRouteType, String> s : names.entrySet()) {
@@ -661,7 +661,7 @@ public class BinaryMapIndexWriter {
 				int x = Algorithms.parseIntFromBytes(innerPolygonTypes, i * 8);
 				int y = Algorithms.parseIntFromBytes(innerPolygonTypes, i * 8 + 4);
 				if (x == 0 && y == 0) {
-					if (mapDataBuf.size() > 0) {
+					if (!mapDataBuf.isEmpty()) {
 						data.addPolygonInnerCoordinates(ByteString.copyFrom(mapDataBuf.toArray()));
 						mapDataBuf.clear();
 					}

@@ -352,7 +352,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 					} catch (InterruptedException e1) {
 						log.error("Interrupted", e1);  //$NON-NLS-1$
 					} catch (InvocationTargetException e1) {
-						ExceptionHandler.handle("Can't create big planet sqlite index", (Exception) e1.getCause()); //$NON-NLS-1$
+						ExceptionHandler.handle("Can't create big planet sqlite index", e1.getCause()); //$NON-NLS-1$
 					}
 					
 					
@@ -501,7 +501,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 						creator.setCityAdminLevel(DataExtractionSettings.getSettings().getCityAdminLevel());
 						String fn = DataExtractionSettings.getSettings().getMapRenderingTypesFile();
 						MapRenderingTypesEncoder types;
-						if(fn == null || fn.length() == 0){
+						if(fn == null || fn.isEmpty()){
 							types = MapRenderingTypesEncoder.getDefault();
 						} else {
 							types = new MapRenderingTypesEncoder(fn);

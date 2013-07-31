@@ -55,7 +55,7 @@ class BufferHeader
   {
     try{
       //the following two conditions  happens in multithreaded programs
-      if(cache.containsKey(new Integer(key))){
+      if(cache.containsKey(Integer.valueOf(key))){
         update(key);
         return;
       }
@@ -63,22 +63,22 @@ class BufferHeader
         replace(key,node);
         return;
       }
-      if(cache.size() == 0){
+      if(cache.isEmpty()){
         last = key;
-        cache.put(new Integer(key), new NodeValue(node,key,key));
+        cache.put(Integer.valueOf(key), new NodeValue(node,key,key));
       }else{
         //remove recent
-        NodeValue tmpPrev = (NodeValue)(cache.remove(new Integer(recent)));
+        NodeValue tmpPrev = (NodeValue)(cache.remove(Integer.valueOf(recent)));
         if(last == recent){//there is only one node in cache
-          cache.put(new Integer(key), new NodeValue(node,tmpPrev.next,tmpPrev.next));
-          cache.put(new Integer(recent), new NodeValue(tmpPrev.node,key,key));
+          cache.put(Integer.valueOf(key), new NodeValue(node,tmpPrev.next,tmpPrev.next));
+          cache.put(Integer.valueOf(recent), new NodeValue(tmpPrev.node,key,key));
         }
         else{
           //remove next of previous
-          NodeValue tmpPNext = (NodeValue)(cache.remove(new Integer(tmpPrev.next)));
-          cache.put(new Integer(key), new NodeValue(node,tmpPrev.next,recent));
-          cache.put(new Integer(tmpPrev.next), new NodeValue(tmpPNext.node,tmpPNext.next,key));
-          cache.put(new Integer(recent), new NodeValue(tmpPrev.node,key,tmpPrev.prev));
+          NodeValue tmpPNext = (NodeValue)(cache.remove(Integer.valueOf(tmpPrev.next)));
+          cache.put(Integer.valueOf(key), new NodeValue(node,tmpPrev.next,recent));
+          cache.put(Integer.valueOf(tmpPrev.next), new NodeValue(tmpPNext.node,tmpPNext.next,key));
+          cache.put(Integer.valueOf(recent), new NodeValue(tmpPrev.node,key,tmpPrev.prev));
         }
       }
       recent = key;
@@ -92,7 +92,7 @@ class BufferHeader
     throws NodeWriteException
   {
     try{
-      if(cache.containsKey(new Integer(key))){
+      if(cache.containsKey(Integer.valueOf(key))){
         update(key);
         return;
       }
@@ -101,14 +101,14 @@ class BufferHeader
         return;
       }
       //remove the 'last' node
-      NodeValue lastNode = (NodeValue)(cache.remove(new Integer(last)));
+      NodeValue lastNode = (NodeValue)(cache.remove(Integer.valueOf(last)));
       lastNode.node.flush();
-      NodeValue pNode = (NodeValue)(cache.remove(new Integer(lastNode.prev)));
-      NodeValue nNode = (NodeValue)(cache.remove(new Integer(lastNode.next)));
+      NodeValue pNode = (NodeValue)(cache.remove(Integer.valueOf(lastNode.prev)));
+      NodeValue nNode = (NodeValue)(cache.remove(Integer.valueOf(lastNode.next)));
       //put back the three nodes
-      cache.put(new Integer(key), new NodeValue(node,lastNode.next, lastNode.prev));
-      cache.put(new Integer(lastNode.prev), new NodeValue(pNode.node,key,pNode.prev));
-      cache.put(new Integer(lastNode.next), new NodeValue(nNode.node,nNode.next,key));
+      cache.put(Integer.valueOf(key), new NodeValue(node,lastNode.next, lastNode.prev));
+      cache.put(Integer.valueOf(lastNode.prev), new NodeValue(pNode.node,key,pNode.prev));
+      cache.put(Integer.valueOf(lastNode.next), new NodeValue(nNode.node,nNode.next,key));
       recent = key;//this is the latest node
       last = lastNode.next;//set the next in chain as the new 'last'
       
@@ -123,42 +123,42 @@ class BufferHeader
     try{
       if(key != recent){
         NodeValue node,nextNode,prevNode,rcntNode,lastNode;//temp variables
-        node = (NodeValue)(cache.remove(new Integer(key)));
+        node = (NodeValue)(cache.remove(Integer.valueOf(key)));
         if(node == null){//will not happen
           System.out.println("CachedNodes.update: unlikely flow");
           return;
         }
         if(key == last){
           last = node.next;
-          cache.put(new Integer(key), new NodeValue(node.node, node.next, node.prev));
+          cache.put(Integer.valueOf(key), new NodeValue(node.node, node.next, node.prev));
         }
         else{
           //adjust next node and the recent node
-          nextNode = (NodeValue)(cache.remove(new Integer(node.next)));
+          nextNode = (NodeValue)(cache.remove(Integer.valueOf(node.next)));
           if(recent != node.next){//if next node is not the recent node
-            rcntNode = (NodeValue)(cache.remove(new Integer(recent)));
+            rcntNode = (NodeValue)(cache.remove(Integer.valueOf(recent)));
             rcntNode.next = key;
-            cache.put(new Integer(recent), new NodeValue(rcntNode.node, rcntNode.next,rcntNode.prev));
+            cache.put(Integer.valueOf(recent), new NodeValue(rcntNode.node, rcntNode.next,rcntNode.prev));
           }
           else{//next node is the recent node
             nextNode.next = key;
           }
-          cache.put(new Integer(node.next), new NodeValue(nextNode.node, nextNode.next,node.prev));
+          cache.put(Integer.valueOf(node.next), new NodeValue(nextNode.node, nextNode.next,node.prev));
                     
           //adjust previous node and the last node - if unequal
-          prevNode = (NodeValue)(cache.remove(new Integer(node.prev)));
+          prevNode = (NodeValue)(cache.remove(Integer.valueOf(node.prev)));
           if(last != node.prev){//if last node is not the prev node
-            lastNode = (NodeValue)(cache.remove(new Integer(last)));
+            lastNode = (NodeValue)(cache.remove(Integer.valueOf(last)));
             lastNode.prev = key;
-            cache.put(new Integer(last),new NodeValue(lastNode.node, lastNode.next,lastNode.prev));
+            cache.put(Integer.valueOf(last),new NodeValue(lastNode.node, lastNode.next,lastNode.prev));
           }
           else{//if the last node is the prev node.
             prevNode.prev = key;
           }
-          cache.put(new Integer(node.prev), new NodeValue(prevNode.node, node.next,prevNode.prev));
+          cache.put(Integer.valueOf(node.prev), new NodeValue(prevNode.node, node.next,prevNode.prev));
                         
           //put the new node
-          cache.put(new Integer(key), new NodeValue(node.node,last,recent));
+          cache.put(Integer.valueOf(key), new NodeValue(node.node,last,recent));
         }
         //update local variables
       }
@@ -172,22 +172,22 @@ class BufferHeader
     throws NodeWriteException
   {
     try{
-      NodeValue node = (NodeValue)(cache.remove(new Integer(key)));
-      if((cache.size() != 0) && (node != null)){
+      NodeValue node = (NodeValue)(cache.remove(Integer.valueOf(key)));
+      if((!cache.isEmpty()) && (node != null)){
         //if(!RTree.writeThr)
         node.node.flush();
         if(cache.size() == 1){
-          NodeValue oNode = (NodeValue)(cache.remove(new Integer(node.prev)));
-          cache.put(new Integer(node.prev), new NodeValue(oNode.node, node.prev,node.prev));
+          NodeValue oNode = (NodeValue)(cache.remove(Integer.valueOf(node.prev)));
+          cache.put(Integer.valueOf(node.prev), new NodeValue(oNode.node, node.prev,node.prev));
           recent = last = node.prev;
         }
         else{
           //if(!RTree.writeThr)
           node.node.flush();
-          NodeValue pNode = (NodeValue)(cache.remove(new Integer(node.prev)));
-          NodeValue nNode = (NodeValue)(cache.remove(new Integer(node.next)));
-          cache.put(new Integer(node.prev), new NodeValue(pNode.node, node.next,pNode.prev));
-          cache.put(new Integer(node.next), new NodeValue(nNode.node, nNode.next,node.prev));
+          NodeValue pNode = (NodeValue)(cache.remove(Integer.valueOf(node.prev)));
+          NodeValue nNode = (NodeValue)(cache.remove(Integer.valueOf(node.next)));
+          cache.put(Integer.valueOf(node.prev), new NodeValue(pNode.node, node.next,pNode.prev));
+          cache.put(Integer.valueOf(node.next), new NodeValue(nNode.node, nNode.next,node.prev));
           if(key == recent)
             recent = node.prev;
           if(key == last)
@@ -251,7 +251,7 @@ public class CachedNodes
   {
     int ndIndex = (int)lndIndex;
     int key = calKey(fileName,ndIndex);
-    NodeValue node = (NodeValue)(cache.get(new Integer(key)));
+    NodeValue node = (NodeValue)(cache.get(Integer.valueOf(key)));
     Node nNode;
     if(node == null){//Node not in cache
       if(type == NODE){

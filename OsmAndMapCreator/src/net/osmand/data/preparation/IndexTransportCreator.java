@@ -91,7 +91,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		for (int i = 0; i < parent.getTotalElements(); i++) {
 			Rect re = e[i].getRect();
 			if (e[i].getElementType() == rtree.Node.LEAF_NODE) {
-				long id = ((LeafElement) e[i]).getPtr();
+				long id = e[i].getPtr();
 				selectTransportStop.setLong(1, id);
 				selectTransportRouteStop.setLong(1, id);
 				ResultSet rs = selectTransportStop.executeQuery();
@@ -123,7 +123,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 					log.error("Something goes wrong with transport id = " + id); //$NON-NLS-1$
 				}
 			} else {
-				long ptr = ((NonLeafElement) e[i]).getPtr();
+				long ptr = e[i].getPtr();
 				rtree.Node ns = r.getReadNode(ptr);
 
 				writer.startTransportTreeElement(re.getMinX(), re.getMaxX(), re.getMinY(), re.getMaxY());
@@ -140,7 +140,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	
 	public void indexRelations(Relation e, OsmDbAccessorContext ctx) throws SQLException {
 		if (e.getTag(OSMTagKey.ROUTE_MASTER) != null) {
-			ctx.loadEntityRelation((Relation) e);
+			ctx.loadEntityRelation(e);
 			for (Entry<Entity, String> child : ((Relation) e).getMemberEntities().entrySet()) {
 				Entity entity = child.getKey();
 				masterRoutes.put(entity.getId(), (Relation) e);
@@ -552,7 +552,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			if(a.getLatLon() == null){
 				continue;
 			}
-			double distance = 1e10;
+			double distance = 1.0e10;
 			for (Entity b : second) {
 				if (b.getLatLon() == null) {
 					continue;
@@ -562,7 +562,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 					distance = d;
 					bMin = b;
 				}
-				if (aStopArea != null && aStopArea == stopAreas.get(b)) {
+				if (aStopArea != null && aStopArea.equals(stopAreas.get(b))) {
 					// the best match - both are in one stop_area relation
 					bMin = b;
 					distance = 0;

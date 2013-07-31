@@ -51,7 +51,7 @@ public class BinarySerializer {
     }
 
     // Paramaters affecting the output size.
-    protected final int MIN_DENSE = 10;
+    protected static final int MIN_DENSE = 10;
     protected int batch_limit = 4000;
 
     // Parmaters affecting the output.
@@ -89,7 +89,7 @@ public class BinarySerializer {
 
     public void processBatch() {
         // System.out.format("Batch of %d groups: ",groups.size());
-        if (groups.size() == 0)
+        if (groups.isEmpty())
             return;
         Osmformat.PrimitiveBlock.Builder primblock = Osmformat.PrimitiveBlock
                 .newBuilder();
@@ -138,11 +138,11 @@ public class BinarySerializer {
 
     /** Convert from a degrees represented as a double into the serialized offset in nanodegrees.. */
     public long mapRawDegrees(double degrees) {
-        return (long) ((degrees / .000000001));
+        return (long) ((degrees / 0.000000001));
     }
 
     /** Convert from a degrees represented as a double into the serialized offset. */
     public int mapDegrees(double degrees) {
-        return (int) ((degrees / .0000001) / (granularity / 100));
+        return (int) ((degrees / 0.0000001) / (granularity / 100));
     }
 }

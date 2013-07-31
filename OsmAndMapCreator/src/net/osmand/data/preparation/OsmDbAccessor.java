@@ -229,7 +229,7 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 		
 		Entity entityToProcess = null;
 		Entity endEntity = entityProducer.getEndingEntity();
-		while ((entityToProcess = toProcess.take())  != endEntity) {
+		while (!(entityToProcess = toProcess.take()).equals(endEntity)) {
 			if (progress != null) {
 				progress.progress(1);
 			}
@@ -279,7 +279,7 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 		
 	}
 
-	public class AbstractProducer extends Thread {
+	public static class AbstractProducer extends Thread {
 		private final Entity endingEntity = new Node(0,0,0);
 		
 		public Entity getEndingEntity() {

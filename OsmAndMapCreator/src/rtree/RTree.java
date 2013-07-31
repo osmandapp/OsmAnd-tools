@@ -58,7 +58,7 @@ public class RTree //the tree that would be made
   protected FileHdr fileHdr;
   public static CachedNodes chdNodes;
   /**Inner class for the fileList vector - A List of files*/
-  class Header
+  static class Header
   {
     FileHdr flHdr;
     String fileName;
@@ -924,14 +924,13 @@ public class RTree //the tree that would be made
       throw new  IllegalValueException("RTree.trvsRPrePrint: Node is null");
     Element[] elmts = node.getAllElements();
     int totElements = node.getTotalElements();
-    System.out.println(node.toString());
+    System.out.println(node);
     for(int i=0; i<totElements; i++){//for every element
       if(elmts[i].getElementType() == Node.NONLEAF_NODE){//non leaf
         //Integer ndIndex = (Integer)elmts[i].getPtr();
         trvsRPrePrint(chdNodes.getReadNode(fileHdr.getFile(),fileName,elmts[i].getPtr(),fileHdr));
       }
     }
-    return;
   }
   //-----------------------------------------------------------------------
   /**
@@ -1176,7 +1175,7 @@ public class RTree //the tree that would be made
      this class is a wrapper class for a <code>long</code> value. There is no way to overwrite
      the value contained in the <code>java.lang.Long</code> wrapper class.
   */
-  protected class Nearest//a wrapper class for long
+  protected static class Nearest//a wrapper class for long
   {
     public long value;
   }

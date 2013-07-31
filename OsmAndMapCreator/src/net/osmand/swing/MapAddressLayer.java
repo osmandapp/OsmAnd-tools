@@ -113,7 +113,7 @@ public class MapAddressLayer implements MapPanelLayer {
 		Map<String, List<Street>> streets = new LinkedHashMap<String, List<Street>>();
 		for(String region : index.getRegionNames()){
 			log.info("Searching region " + region);
-			int[] cityType = new int[] {BinaryMapAddressReaderAdapter.CITY_TOWN_TYPE,
+			int[] cityType = {BinaryMapAddressReaderAdapter.CITY_TOWN_TYPE,
 					BinaryMapAddressReaderAdapter.POSTCODES_TYPE, 
 					BinaryMapAddressReaderAdapter.VILLAGES_TYPE};
 			for (int j = 0; j < cityType.length; j++) {
@@ -142,7 +142,7 @@ public class MapAddressLayer implements MapPanelLayer {
 		}
 		
 		for(List<Street> l : streets.values()) {
-			while(l.size() > 0){
+			while(!l.isEmpty()){
 				Street s = l.remove(l.size()-1);
 				String cityName = s.getCity().getName();
 				LatLon loc = s.getLocation();

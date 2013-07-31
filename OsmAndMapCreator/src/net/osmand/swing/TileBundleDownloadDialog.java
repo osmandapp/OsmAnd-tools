@@ -238,7 +238,7 @@ public class TileBundleDownloadDialog extends JDialog {
 			progressDialog.run();
 			instance.refuseAllPreviousRequests();
 		} catch (InvocationTargetException e) {
-			ExceptionHandler.handle((Exception) e.getCause());
+			ExceptionHandler.handle(e.getCause());
 		} catch (InterruptedException e) {
 			ExceptionHandler.handle(e);
 		} finally {
@@ -249,7 +249,7 @@ public class TileBundleDownloadDialog extends JDialog {
 	}
 	
 	public String getFileForImage (int x, int y, int zoom, String ext){
-		return map.getName() +"/"+zoom+"/"+(x) +"/"+y+ext+".tile"; //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$
+		return map.getName() +"/"+zoom+ '/' +(x) + '/' +y+ext+".tile"; //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$
 	}
 	
 	

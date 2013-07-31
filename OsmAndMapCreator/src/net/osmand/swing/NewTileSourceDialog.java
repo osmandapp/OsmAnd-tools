@@ -185,7 +185,7 @@ public class NewTileSourceDialog extends JDialog {
 			return false;
 		}
 		String url = templateUrl.getText();
-		if(url.indexOf("{$x}") == -1 || url.indexOf("{$y}") == -1 || url.indexOf("{$z}") == -1){ //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
+		if(!url.contains("{$x}") || !url.contains("{$y}") || !url.contains("{$z}")){ //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
 			JOptionPane.showMessageDialog(this, Messages.getString("NewTileSourceDialog.SPECIFY.ALL.PLACEHLDRS") , Messages.getString("NewTileSourceDialog.ERROR.CREATING.NEW.TILE.SRC"), JOptionPane.ERROR_MESSAGE); //$NON-NLS-1$ //$NON-NLS-2$
 			return false;
 		}
@@ -199,7 +199,7 @@ public class NewTileSourceDialog extends JDialog {
 							url, ".jpg", 18, 1, 256, 16, 20000);
 					TileSourceManager.createMetaInfoFile(dir, tileSourceTemplate, true);
 				} catch (IOException e) {
-					log.error(Messages.getString("NewTileSourceDialog.ERROR.CREATING.NEW.TILE.SRC") +" " + url, e); //$NON-NLS-1$
+					log.error(Messages.getString("NewTileSourceDialog.ERROR.CREATING.NEW.TILE.SRC") + ' ' + url, e); //$NON-NLS-1$
 				}
 			}
 		}

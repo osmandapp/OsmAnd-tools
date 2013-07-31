@@ -16,12 +16,12 @@ public abstract class BinaryParser implements BlockReaderAdapter {
     private long lat_offset;
     private long lon_offset;
     protected int date_granularity;
-    private String strings[];
+    private String[] strings;
 
     /** Take a Info protocol buffer containing a date and convert it into a java Date object */
     protected Date getDate(Osmformat.Info info) {
       if (info.hasTimestamp()) {
-          return new Date(date_granularity * (long) info.getTimestamp());
+          return new Date(date_granularity * info.getTimestamp());
       } else
           return NODATE;
     }
@@ -74,13 +74,13 @@ public abstract class BinaryParser implements BlockReaderAdapter {
     /** Convert a latitude value stored in a protobuf into a double, compensating for granularity and latitude offset */
     public double parseLat(long degree) {
       // Support non-zero offsets. (We don't currently generate them)
-      return (granularity * degree + lat_offset) * .000000001;
+      return (granularity * degree + lat_offset) * 0.000000001;
     }
 
     /** Convert a longitude value stored in a protobuf into a double, compensating for granularity and longitude offset */
     public double parseLon(long degree) {
       // Support non-zero offsets. (We don't currently generate them)
-       return (granularity * degree + lon_offset) * .000000001;
+       return (granularity * degree + lon_offset) * 0.000000001;
     }
    
     /** Parse a Primitive block (containing a string table, other paramaters, and PrimitiveGroups */

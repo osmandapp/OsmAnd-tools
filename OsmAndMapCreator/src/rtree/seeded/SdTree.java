@@ -119,7 +119,7 @@ public class SdTree extends RTree
       chNodes = new Node[sdingNode.getTotalElements()];//sd
       
     Element[] elmts = sdingNode.getAllElements();
-    Element[] newElmts = null;//elements for non-slot levels
+    Element[] newElmts;//elements for non-slot levels
 
     if(level != slotLvl)
       newElmts = new Element[sdingNode.getTotalElements()];//non slots have multiple elements
@@ -316,7 +316,7 @@ public class SdTree extends RTree
       return rect;      
     }//else
   }
-  class LongWraper
+  static class LongWraper
   {
     long val = Node.NOT_DEFINED;
   }

@@ -133,7 +133,7 @@ public final class Osmformat {
             .computeStringSizeNoTag(element);
         }
         size += dataSize;
-        size += 1 * getRequiredFeaturesList().size();
+        size += getRequiredFeaturesList().size();
       }
       {
         int dataSize = 0;
@@ -142,7 +142,7 @@ public final class Osmformat {
             .computeStringSizeNoTag(element);
         }
         size += dataSize;
-        size += 1 * getOptionalFeaturesList().size();
+        size += getOptionalFeaturesList().size();
       }
       if (hasWritingprogram()) {
         size += com.google.protobuf.CodedOutputStream
@@ -304,11 +304,11 @@ public final class Osmformat {
           throw new IllegalStateException(
             "build() has already been called on this Builder.");
         }
-        if (result.requiredFeatures_ != java.util.Collections.EMPTY_LIST) {
+        if (!result.requiredFeatures_.equals(java.util.Collections.EMPTY_LIST)) {
           result.requiredFeatures_ =
             java.util.Collections.unmodifiableList(result.requiredFeatures_);
         }
-        if (result.optionalFeatures_ != java.util.Collections.EMPTY_LIST) {
+        if (!result.optionalFeatures_.equals(java.util.Collections.EMPTY_LIST)) {
           result.optionalFeatures_ =
             java.util.Collections.unmodifiableList(result.optionalFeatures_);
         }
@@ -328,7 +328,7 @@ public final class Osmformat {
       }
       
       public Builder mergeFrom(crosby.binary.Osmformat.HeaderBlock other) {
-        if (other == crosby.binary.Osmformat.HeaderBlock.getDefaultInstance()) return this;
+        if (other.equals(HeaderBlock.getDefaultInstance())) return this;
         if (other.hasBbox()) {
           mergeBbox(other.getBbox());
         }
@@ -428,7 +428,7 @@ public final class Osmformat {
       }
       public Builder mergeBbox(crosby.binary.Osmformat.HeaderBBox value) {
         if (result.hasBbox() &&
-            result.bbox_ != crosby.binary.Osmformat.HeaderBBox.getDefaultInstance()) {
+                !result.bbox_.equals(HeaderBBox.getDefaultInstance())) {
           result.bbox_ =
             crosby.binary.Osmformat.HeaderBBox.newBuilder(result.bbox_).mergeFrom(value).buildPartial();
         } else {
@@ -641,8 +641,7 @@ public final class Osmformat {
       if (!hasLeft) return false;
       if (!hasRight) return false;
       if (!hasTop) return false;
-      if (!hasBottom) return false;
-      return true;
+        return hasBottom;
     }
     
     @Override
@@ -855,7 +854,7 @@ public final class Osmformat {
       }
       
       public Builder mergeFrom(crosby.binary.Osmformat.HeaderBBox other) {
-        if (other == crosby.binary.Osmformat.HeaderBBox.getDefaultInstance()) return this;
+        if (other.equals(HeaderBBox.getDefaultInstance())) return this;
         if (other.hasLeft()) {
           setLeft(other.getLeft());
         }
@@ -1295,7 +1294,7 @@ public final class Osmformat {
           throw new IllegalStateException(
             "build() has already been called on this Builder.");
         }
-        if (result.primitivegroup_ != java.util.Collections.EMPTY_LIST) {
+        if (!result.primitivegroup_.equals(java.util.Collections.EMPTY_LIST)) {
           result.primitivegroup_ =
             java.util.Collections.unmodifiableList(result.primitivegroup_);
         }
@@ -1315,7 +1314,7 @@ public final class Osmformat {
       }
       
       public Builder mergeFrom(crosby.binary.Osmformat.PrimitiveBlock other) {
-        if (other == crosby.binary.Osmformat.PrimitiveBlock.getDefaultInstance()) return this;
+        if (other.equals(PrimitiveBlock.getDefaultInstance())) return this;
         if (other.hasStringtable()) {
           mergeStringtable(other.getStringtable());
         }
@@ -1421,7 +1420,7 @@ public final class Osmformat {
       }
       public Builder mergeStringtable(crosby.binary.Osmformat.StringTable value) {
         if (result.hasStringtable() &&
-            result.stringtable_ != crosby.binary.Osmformat.StringTable.getDefaultInstance()) {
+                !result.stringtable_.equals(StringTable.getDefaultInstance())) {
           result.stringtable_ =
             crosby.binary.Osmformat.StringTable.newBuilder(result.stringtable_).mergeFrom(value).buildPartial();
         } else {
@@ -1876,19 +1875,19 @@ public final class Osmformat {
           throw new IllegalStateException(
             "build() has already been called on this Builder.");
         }
-        if (result.nodes_ != java.util.Collections.EMPTY_LIST) {
+        if (!result.nodes_.equals(java.util.Collections.EMPTY_LIST)) {
           result.nodes_ =
             java.util.Collections.unmodifiableList(result.nodes_);
         }
-        if (result.ways_ != java.util.Collections.EMPTY_LIST) {
+        if (!result.ways_.equals(java.util.Collections.EMPTY_LIST)) {
           result.ways_ =
             java.util.Collections.unmodifiableList(result.ways_);
         }
-        if (result.relations_ != java.util.Collections.EMPTY_LIST) {
+        if (!result.relations_.equals(java.util.Collections.EMPTY_LIST)) {
           result.relations_ =
             java.util.Collections.unmodifiableList(result.relations_);
         }
-        if (result.changesets_ != java.util.Collections.EMPTY_LIST) {
+        if (!result.changesets_.equals(java.util.Collections.EMPTY_LIST)) {
           result.changesets_ =
             java.util.Collections.unmodifiableList(result.changesets_);
         }
@@ -1908,7 +1907,7 @@ public final class Osmformat {
       }
       
       public Builder mergeFrom(crosby.binary.Osmformat.PrimitiveGroup other) {
-        if (other == crosby.binary.Osmformat.PrimitiveGroup.getDefaultInstance()) return this;
+        if (other.equals(PrimitiveGroup.getDefaultInstance())) return this;
         if (!other.nodes_.isEmpty()) {
           if (result.nodes_.isEmpty()) {
             result.nodes_ = new java.util.ArrayList<crosby.binary.Osmformat.Node>();
@@ -2073,7 +2072,7 @@ public final class Osmformat {
       }
       public Builder mergeDense(crosby.binary.Osmformat.DenseNodes value) {
         if (result.hasDense() &&
-            result.dense_ != crosby.binary.Osmformat.DenseNodes.getDefaultInstance()) {
+                !result.dense_.equals(DenseNodes.getDefaultInstance())) {
           result.dense_ =
             crosby.binary.Osmformat.DenseNodes.newBuilder(result.dense_).mergeFrom(value).buildPartial();
         } else {
@@ -2325,7 +2324,7 @@ public final class Osmformat {
             .computeBytesSizeNoTag(element);
         }
         size += dataSize;
-        size += 1 * getSList().size();
+        size += getSList().size();
       }
       size += getUnknownFields().getSerializedSize();
       memoizedSerializedSize = size;
@@ -2479,7 +2478,7 @@ public final class Osmformat {
           throw new IllegalStateException(
             "build() has already been called on this Builder.");
         }
-        if (result.s_ != java.util.Collections.EMPTY_LIST) {
+        if (!result.s_.equals(java.util.Collections.EMPTY_LIST)) {
           result.s_ =
             java.util.Collections.unmodifiableList(result.s_);
         }
@@ -2499,7 +2498,7 @@ public final class Osmformat {
       }
       
       public Builder mergeFrom(crosby.binary.Osmformat.StringTable other) {
-        if (other == crosby.binary.Osmformat.StringTable.getDefaultInstance()) return this;
+        if (other.equals(StringTable.getDefaultInstance())) return this;
         if (!other.s_.isEmpty()) {
           if (result.s_.isEmpty()) {
             result.s_ = new java.util.ArrayList<com.google.protobuf.ByteString>();
@@ -2881,7 +2880,7 @@ public final class Osmformat {
       }
       
       public Builder mergeFrom(crosby.binary.Osmformat.Info other) {
-        if (other == crosby.binary.Osmformat.Info.getDefaultInstance()) return this;
+        if (other.equals(Info.getDefaultInstance())) return this;
         if (other.hasVersion()) {
           setVersion(other.getVersion());
         }
@@ -3155,35 +3154,35 @@ public final class Osmformat {
 	public void writeTo(com.google.protobuf.CodedOutputStream output)
                         throws java.io.IOException {
       getSerializedSize();
-      if (getVersionList().size() > 0) {
+      if (!getVersionList().isEmpty()) {
         output.writeRawVarint32(10);
         output.writeRawVarint32(versionMemoizedSerializedSize);
       }
       for (int element : getVersionList()) {
         output.writeInt32NoTag(element);
       }
-      if (getTimestampList().size() > 0) {
+      if (!getTimestampList().isEmpty()) {
         output.writeRawVarint32(18);
         output.writeRawVarint32(timestampMemoizedSerializedSize);
       }
       for (long element : getTimestampList()) {
         output.writeSInt64NoTag(element);
       }
-      if (getChangesetList().size() > 0) {
+      if (!getChangesetList().isEmpty()) {
         output.writeRawVarint32(26);
         output.writeRawVarint32(changesetMemoizedSerializedSize);
       }
       for (long element : getChangesetList()) {
         output.writeSInt64NoTag(element);
       }
-      if (getUidList().size() > 0) {
+      if (!getUidList().isEmpty()) {
         output.writeRawVarint32(34);
         output.writeRawVarint32(uidMemoizedSerializedSize);
       }
       for (int element : getUidList()) {
         output.writeSInt32NoTag(element);
       }
-      if (getUserSidList().size() > 0) {
+      if (!getUserSidList().isEmpty()) {
         output.writeRawVarint32(42);
         output.writeRawVarint32(userSidMemoizedSerializedSize);
       }
@@ -3422,23 +3421,23 @@ public final class Osmformat {
           throw new IllegalStateException(
             "build() has already been called on this Builder.");
         }
-        if (result.version_ != java.util.Collections.EMPTY_LIST) {
+        if (!result.version_.equals(java.util.Collections.EMPTY_LIST)) {
           result.version_ =
             java.util.Collections.unmodifiableList(result.version_);
         }
-        if (result.timestamp_ != java.util.Collections.EMPTY_LIST) {
+        if (!result.timestamp_.equals(java.util.Collections.EMPTY_LIST)) {
           result.timestamp_ =
             java.util.Collections.unmodifiableList(result.timestamp_);
         }
-        if (result.changeset_ != java.util.Collections.EMPTY_LIST) {
+        if (!result.changeset_.equals(java.util.Collections.EMPTY_LIST)) {
           result.changeset_ =
             java.util.Collections.unmodifiableList(result.changeset_);
         }
-        if (result.uid_ != java.util.Collections.EMPTY_LIST) {
+        if (!result.uid_.equals(java.util.Collections.EMPTY_LIST)) {
           result.uid_ =
             java.util.Collections.unmodifiableList(result.uid_);
         }
-        if (result.userSid_ != java.util.Collections.EMPTY_LIST) {
+        if (!result.userSid_.equals(java.util.Collections.EMPTY_LIST)) {
           result.userSid_ =
             java.util.Collections.unmodifiableList(result.userSid_);
         }
@@ -3458,7 +3457,7 @@ public final class Osmformat {
       }
       
       public Builder mergeFrom(crosby.binary.Osmformat.DenseInfo other) {
-        if (other == crosby.binary.Osmformat.DenseInfo.getDefaultInstance()) return this;
+        if (other.equals(DenseInfo.getDefaultInstance())) return this;
         if (!other.version_.isEmpty()) {
           if (result.version_.isEmpty()) {
             result.version_ = new java.util.ArrayList<java.lang.Integer>();
@@ -3807,8 +3806,7 @@ public final class Osmformat {
     }
     @Override
 	public final boolean isInitialized() {
-      if (!hasId) return false;
-      return true;
+        return hasId;
     }
     
     @Override
@@ -4000,7 +3998,7 @@ public final class Osmformat {
       }
       
       public Builder mergeFrom(crosby.binary.Osmformat.ChangeSet other) {
-        if (other == crosby.binary.Osmformat.ChangeSet.getDefaultInstance()) return this;
+        if (other.equals(ChangeSet.getDefaultInstance())) return this;
         if (other.hasId()) {
           setId(other.getId());
         }
@@ -4159,8 +4157,7 @@ public final class Osmformat {
 	public final boolean isInitialized() {
       if (!hasId) return false;
       if (!hasLat) return false;
-      if (!hasLon) return false;
-      return true;
+        return hasLon;
     }
     
     @Override
@@ -4170,14 +4167,14 @@ public final class Osmformat {
       if (hasId()) {
         output.writeSInt64(1, getId());
       }
-      if (getKeysList().size() > 0) {
+      if (!getKeysList().isEmpty()) {
         output.writeRawVarint32(18);
         output.writeRawVarint32(keysMemoizedSerializedSize);
       }
       for (int element : getKeysList()) {
         output.writeUInt32NoTag(element);
       }
-      if (getValsList().size() > 0) {
+      if (!getValsList().isEmpty()) {
         output.writeRawVarint32(26);
         output.writeRawVarint32(valsMemoizedSerializedSize);
       }
@@ -4399,11 +4396,11 @@ public final class Osmformat {
           throw new IllegalStateException(
             "build() has already been called on this Builder.");
         }
-        if (result.keys_ != java.util.Collections.EMPTY_LIST) {
+        if (!result.keys_.equals(java.util.Collections.EMPTY_LIST)) {
           result.keys_ =
             java.util.Collections.unmodifiableList(result.keys_);
         }
-        if (result.vals_ != java.util.Collections.EMPTY_LIST) {
+        if (!result.vals_.equals(java.util.Collections.EMPTY_LIST)) {
           result.vals_ =
             java.util.Collections.unmodifiableList(result.vals_);
         }
@@ -4423,7 +4420,7 @@ public final class Osmformat {
       }
       
       public Builder mergeFrom(crosby.binary.Osmformat.Node other) {
-        if (other == crosby.binary.Osmformat.Node.getDefaultInstance()) return this;
+        if (other.equals(Node.getDefaultInstance())) return this;
         if (other.hasId()) {
           setId(other.getId());
         }
@@ -4634,7 +4631,7 @@ public final class Osmformat {
       }
       public Builder mergeInfo(crosby.binary.Osmformat.Info value) {
         if (result.hasInfo() &&
-            result.info_ != crosby.binary.Osmformat.Info.getDefaultInstance()) {
+                !result.info_.equals(Info.getDefaultInstance())) {
           result.info_ =
             crosby.binary.Osmformat.Info.newBuilder(result.info_).mergeFrom(value).buildPartial();
         } else {
@@ -4797,7 +4794,7 @@ public final class Osmformat {
 	public void writeTo(com.google.protobuf.CodedOutputStream output)
                         throws java.io.IOException {
       getSerializedSize();
-      if (getIdList().size() > 0) {
+      if (!getIdList().isEmpty()) {
         output.writeRawVarint32(10);
         output.writeRawVarint32(idMemoizedSerializedSize);
       }
@@ -4807,21 +4804,21 @@ public final class Osmformat {
       if (hasDenseinfo()) {
         output.writeMessage(5, getDenseinfo());
       }
-      if (getLatList().size() > 0) {
+      if (!getLatList().isEmpty()) {
         output.writeRawVarint32(66);
         output.writeRawVarint32(latMemoizedSerializedSize);
       }
       for (long element : getLatList()) {
         output.writeSInt64NoTag(element);
       }
-      if (getLonList().size() > 0) {
+      if (!getLonList().isEmpty()) {
         output.writeRawVarint32(74);
         output.writeRawVarint32(lonMemoizedSerializedSize);
       }
       for (long element : getLonList()) {
         output.writeSInt64NoTag(element);
       }
-      if (getKeysValsList().size() > 0) {
+      if (!getKeysValsList().isEmpty()) {
         output.writeRawVarint32(82);
         output.writeRawVarint32(keysValsMemoizedSerializedSize);
       }
@@ -5050,19 +5047,19 @@ public final class Osmformat {
           throw new IllegalStateException(
             "build() has already been called on this Builder.");
         }
-        if (result.id_ != java.util.Collections.EMPTY_LIST) {
+        if (!result.id_.equals(java.util.Collections.EMPTY_LIST)) {
           result.id_ =
             java.util.Collections.unmodifiableList(result.id_);
         }
-        if (result.lat_ != java.util.Collections.EMPTY_LIST) {
+        if (!result.lat_.equals(java.util.Collections.EMPTY_LIST)) {
           result.lat_ =
             java.util.Collections.unmodifiableList(result.lat_);
         }
-        if (result.lon_ != java.util.Collections.EMPTY_LIST) {
+        if (!result.lon_.equals(java.util.Collections.EMPTY_LIST)) {
           result.lon_ =
             java.util.Collections.unmodifiableList(result.lon_);
         }
-        if (result.keysVals_ != java.util.Collections.EMPTY_LIST) {
+        if (!result.keysVals_.equals(java.util.Collections.EMPTY_LIST)) {
           result.keysVals_ =
             java.util.Collections.unmodifiableList(result.keysVals_);
         }
@@ -5082,7 +5079,7 @@ public final class Osmformat {
       }
       
       public Builder mergeFrom(crosby.binary.Osmformat.DenseNodes other) {
-        if (other == crosby.binary.Osmformat.DenseNodes.getDefaultInstance()) return this;
+        if (other.equals(DenseNodes.getDefaultInstance())) return this;
         if (!other.id_.isEmpty()) {
           if (result.id_.isEmpty()) {
             result.id_ = new java.util.ArrayList<java.lang.Long>();
@@ -5258,7 +5255,7 @@ public final class Osmformat {
       }
       public Builder mergeDenseinfo(crosby.binary.Osmformat.DenseInfo value) {
         if (result.hasDenseinfo() &&
-            result.denseinfo_ != crosby.binary.Osmformat.DenseInfo.getDefaultInstance()) {
+                !result.denseinfo_.equals(DenseInfo.getDefaultInstance())) {
           result.denseinfo_ =
             crosby.binary.Osmformat.DenseInfo.newBuilder(result.denseinfo_).mergeFrom(value).buildPartial();
         } else {
@@ -5474,8 +5471,7 @@ public final class Osmformat {
     }
     @Override
 	public final boolean isInitialized() {
-      if (!hasId) return false;
-      return true;
+        return hasId;
     }
     
     @Override
@@ -5485,14 +5481,14 @@ public final class Osmformat {
       if (hasId()) {
         output.writeInt64(1, getId());
       }
-      if (getKeysList().size() > 0) {
+      if (!getKeysList().isEmpty()) {
         output.writeRawVarint32(18);
         output.writeRawVarint32(keysMemoizedSerializedSize);
       }
       for (int element : getKeysList()) {
         output.writeUInt32NoTag(element);
       }
-      if (getValsList().size() > 0) {
+      if (!getValsList().isEmpty()) {
         output.writeRawVarint32(26);
         output.writeRawVarint32(valsMemoizedSerializedSize);
       }
@@ -5502,7 +5498,7 @@ public final class Osmformat {
       if (hasInfo()) {
         output.writeMessage(4, getInfo());
       }
-      if (getRefsList().size() > 0) {
+      if (!getRefsList().isEmpty()) {
         output.writeRawVarint32(66);
         output.writeRawVarint32(refsMemoizedSerializedSize);
       }
@@ -5721,15 +5717,15 @@ public final class Osmformat {
           throw new IllegalStateException(
             "build() has already been called on this Builder.");
         }
-        if (result.keys_ != java.util.Collections.EMPTY_LIST) {
+        if (!result.keys_.equals(java.util.Collections.EMPTY_LIST)) {
           result.keys_ =
             java.util.Collections.unmodifiableList(result.keys_);
         }
-        if (result.vals_ != java.util.Collections.EMPTY_LIST) {
+        if (!result.vals_.equals(java.util.Collections.EMPTY_LIST)) {
           result.vals_ =
             java.util.Collections.unmodifiableList(result.vals_);
         }
-        if (result.refs_ != java.util.Collections.EMPTY_LIST) {
+        if (!result.refs_.equals(java.util.Collections.EMPTY_LIST)) {
           result.refs_ =
             java.util.Collections.unmodifiableList(result.refs_);
         }
@@ -5749,7 +5745,7 @@ public final class Osmformat {
       }
       
       public Builder mergeFrom(crosby.binary.Osmformat.Way other) {
-        if (other == crosby.binary.Osmformat.Way.getDefaultInstance()) return this;
+        if (other.equals(Way.getDefaultInstance())) return this;
         if (other.hasId()) {
           setId(other.getId());
         }
@@ -5965,7 +5961,7 @@ public final class Osmformat {
       }
       public Builder mergeInfo(crosby.binary.Osmformat.Info value) {
         if (result.hasInfo() &&
-            result.info_ != crosby.binary.Osmformat.Info.getDefaultInstance()) {
+                !result.info_.equals(Info.getDefaultInstance())) {
           result.info_ =
             crosby.binary.Osmformat.Info.newBuilder(result.info_).mergeFrom(value).buildPartial();
         } else {
@@ -6212,8 +6208,7 @@ public final class Osmformat {
     }
     @Override
 	public final boolean isInitialized() {
-      if (!hasId) return false;
-      return true;
+        return hasId;
     }
     
     @Override
@@ -6223,14 +6218,14 @@ public final class Osmformat {
       if (hasId()) {
         output.writeInt64(1, getId());
       }
-      if (getKeysList().size() > 0) {
+      if (!getKeysList().isEmpty()) {
         output.writeRawVarint32(18);
         output.writeRawVarint32(keysMemoizedSerializedSize);
       }
       for (int element : getKeysList()) {
         output.writeUInt32NoTag(element);
       }
-      if (getValsList().size() > 0) {
+      if (!getValsList().isEmpty()) {
         output.writeRawVarint32(26);
         output.writeRawVarint32(valsMemoizedSerializedSize);
       }
@@ -6240,21 +6235,21 @@ public final class Osmformat {
       if (hasInfo()) {
         output.writeMessage(4, getInfo());
       }
-      if (getRolesSidList().size() > 0) {
+      if (!getRolesSidList().isEmpty()) {
         output.writeRawVarint32(66);
         output.writeRawVarint32(rolesSidMemoizedSerializedSize);
       }
       for (int element : getRolesSidList()) {
         output.writeInt32NoTag(element);
       }
-      if (getMemidsList().size() > 0) {
+      if (!getMemidsList().isEmpty()) {
         output.writeRawVarint32(74);
         output.writeRawVarint32(memidsMemoizedSerializedSize);
       }
       for (long element : getMemidsList()) {
         output.writeSInt64NoTag(element);
       }
-      if (getTypesList().size() > 0) {
+      if (!getTypesList().isEmpty()) {
         output.writeRawVarint32(82);
         output.writeRawVarint32(typesMemoizedSerializedSize);
       }
@@ -6499,23 +6494,23 @@ public final class Osmformat {
           throw new IllegalStateException(
             "build() has already been called on this Builder.");
         }
-        if (result.keys_ != java.util.Collections.EMPTY_LIST) {
+        if (!result.keys_.equals(java.util.Collections.EMPTY_LIST)) {
           result.keys_ =
             java.util.Collections.unmodifiableList(result.keys_);
         }
-        if (result.vals_ != java.util.Collections.EMPTY_LIST) {
+        if (!result.vals_.equals(java.util.Collections.EMPTY_LIST)) {
           result.vals_ =
             java.util.Collections.unmodifiableList(result.vals_);
         }
-        if (result.rolesSid_ != java.util.Collections.EMPTY_LIST) {
+        if (!result.rolesSid_.equals(java.util.Collections.EMPTY_LIST)) {
           result.rolesSid_ =
             java.util.Collections.unmodifiableList(result.rolesSid_);
         }
-        if (result.memids_ != java.util.Collections.EMPTY_LIST) {
+        if (!result.memids_.equals(java.util.Collections.EMPTY_LIST)) {
           result.memids_ =
             java.util.Collections.unmodifiableList(result.memids_);
         }
-        if (result.types_ != java.util.Collections.EMPTY_LIST) {
+        if (!result.types_.equals(java.util.Collections.EMPTY_LIST)) {
           result.types_ =
             java.util.Collections.unmodifiableList(result.types_);
         }
@@ -6535,7 +6530,7 @@ public final class Osmformat {
       }
       
       public Builder mergeFrom(crosby.binary.Osmformat.Relation other) {
-        if (other == crosby.binary.Osmformat.Relation.getDefaultInstance()) return this;
+        if (other.equals(Relation.getDefaultInstance())) return this;
         if (other.hasId()) {
           setId(other.getId());
         }
@@ -6801,7 +6796,7 @@ public final class Osmformat {
       }
       public Builder mergeInfo(crosby.binary.Osmformat.Info value) {
         if (result.hasInfo() &&
-            result.info_ != crosby.binary.Osmformat.Info.getDefaultInstance()) {
+                !result.info_.equals(Info.getDefaultInstance())) {
           result.info_ =
             crosby.binary.Osmformat.Info.newBuilder(result.info_).mergeFrom(value).buildPartial();
         } else {

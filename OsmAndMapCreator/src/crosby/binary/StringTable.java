@@ -3,6 +3,7 @@ package crosby.binary;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.Set;
 
 import com.google.protobuf.ByteString;
 
@@ -17,13 +18,13 @@ public class StringTable {
 
     private HashMap<String, Integer> counts;
     private HashMap<String, Integer> stringmap;
-    private String set[];
+    private String[] set;
 
     public void incr(String s) {
         if (counts.containsKey(s)) {
-            counts.put(s, new Integer(counts.get(s).intValue() + 1));
+            counts.put(s, Integer.valueOf(counts.get(s).intValue() + 1));
         } else {
-            counts.put(s, new Integer(1));
+            counts.put(s, Integer.valueOf(1));
         }
     }
 
@@ -46,7 +47,8 @@ public class StringTable {
             }
         };
 
-        set = counts.keySet().toArray(new String[0]);
+        Set<String> var = counts.keySet();
+        set = var.toArray(new String[var.size()]);
         if (set.length > 0) {
           // Sort based on the frequency.
           Arrays.sort(set, comparator);
@@ -64,7 +66,7 @@ public class StringTable {
         }
         stringmap = new HashMap<String, Integer>(2 * set.length);
         for (int i = 0; i < set.length; i++) {
-            stringmap.put(set[i], new Integer(i+1)); // Index 0 is reserved for use as a delimiter.
+            stringmap.put(set[i], Integer.valueOf(i + 1)); // Index 0 is reserved for use as a delimiter.
         }
         counts = null;
     }

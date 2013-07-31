@@ -430,7 +430,7 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 	}
 	 
 	public String getFileForImage (int x, int y, int zoom, String ext){
-		return map.getName() +"/"+zoom+"/"+(x) +"/"+y+ext+".tile"; //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$
+		return map.getName() +"/"+zoom+ '/' +(x) + '/' +y+ext+".tile"; //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$
 	}
 	
 	public Image getImageFor(int x, int y, int zoom, boolean loadIfNeeded) throws IOException{
@@ -465,7 +465,7 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 //							log.debug("Loaded file : " + file + " " + (System.currentTimeMillis() - time) + " ms");
 //						}
 					} catch (IIOException e) {
-						log.error("Eror reading png " + x + " " + y + " zoom : " + zoom, e); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
+						log.error("Eror reading png " + x + ' ' + y + " zoom : " + zoom, e); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
 					}
 				} 
 				if(loadIfNeeded && cache.get(file) == null){
@@ -487,8 +487,8 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 			return;	
 		}
 		int tileSize = getTileSize();
-		double xTileLeft = getXTile() - getSize().width / (2d * tileSize);
-		double yTileUp = getYTile() - getSize().height / (2d * tileSize);
+		double xTileLeft = getXTile() - getSize().width / (2.0d * tileSize);
+		double yTileUp = getYTile() - getSize().height / (2.0d * tileSize);
 		int i = request.xTile - (int)xTileLeft;
 		int j = request.yTile - (int)yTileUp;
 		if (request.zoom == this.zoom && (i >= 0 && i < images.length) && (j >= 0 && j < images[i].length)) {
@@ -496,7 +496,7 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 				images[i][j] = getImageFor(request.xTile, request.yTile, zoom, false);
 				repaint();
 			} catch (IOException e) {
-				log.error("Eror reading png " + request.xTile + " " + request.yTile + " zoom : " + zoom, e); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
+				log.error("Eror reading png " + request.xTile + ' ' + request.yTile + " zoom : " + zoom, e); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
 			}
 
 		}
@@ -919,11 +919,8 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 				r.sbottom > sbottom + EXPAND_Y * cf) {
 				return false;
 			}
-			if(r.z != z){
-				return false;
-			}
-			return true;
-		}
+            return r.z == z;
+        }
 		
 		
 		

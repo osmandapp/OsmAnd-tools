@@ -45,7 +45,7 @@ public class DownloaderIndexFromGoogleCode {
 				String prevFile = null;
 				while ((s = reader.readLine()) != null) {
 					boolean hrefDownload = s.indexOf("files") != -1; //$NON-NLS-1$
-					if (hrefDownload || s.indexOf("{") != -1) { //$NON-NLS-1$
+					if (hrefDownload || s.indexOf('{') != -1) { //$NON-NLS-1$
 						downloadNext |= hrefDownload;
 						for (String extension : ext) {
 							prevFile = getIndexFiles(files, s, prevFile, extension);
@@ -112,7 +112,7 @@ public class DownloaderIndexFromGoogleCode {
 		int size = cookies.size();
 		for (String c : cookies.keySet()) {
 			size--;
-			cookieString.append(c).append("=").append(cookies.get(c)); //$NON-NLS-1$
+			cookieString.append(c).append('=').append(cookies.get(c)); //$NON-NLS-1$
 			if (size > 0) {
 				cookieString.append("; "); //$NON-NLS-1$
 			}
@@ -136,7 +136,7 @@ public class DownloaderIndexFromGoogleCode {
 		connection.setConnectTimeout(15000);
 		connection.setRequestMethod("POST"); //$NON-NLS-1$
 		connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");  //$NON-NLS-1$//$NON-NLS-2$
-		connection.setRequestProperty("Content-Length", requestBody.length()+""); //$NON-NLS-1$ //$NON-NLS-2$
+		connection.setRequestProperty("Content-Length", String.valueOf(requestBody.length())); //$NON-NLS-1$ //$NON-NLS-2$
 		
 		connection.setDoInput(true);
 		connection.setDoOutput(true);
@@ -162,7 +162,7 @@ public class DownloaderIndexFromGoogleCode {
 			boolean f = true;
 			while ((s = in.readLine()) != null) {
 				if(!f){
-					responseBody.append("\n"); //$NON-NLS-1$
+					responseBody.append('\n'); //$NON-NLS-1$
 				} else {
 					f = false;
 				}

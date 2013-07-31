@@ -156,7 +156,7 @@ public class IndexBatchCreator {
 		
 		indexPOI = Boolean.parseBoolean(process.getAttribute("indexPOI"));
 		indexMap = Boolean.parseBoolean(process.getAttribute("indexMap"));
-		indexRouting = process.getAttribute("indexRouting") == null || 
+		indexRouting = process.getAttribute("indexRouting") == null ||
 				process.getAttribute("indexRouting").equalsIgnoreCase("true");
 		indexTransport = Boolean.parseBoolean(process.getAttribute("indexTransport"));
 		indexAddress = Boolean.parseBoolean(process.getAttribute("indexAddress"));
@@ -218,7 +218,7 @@ public class IndexBatchCreator {
 					RegionSpecificData data = new RegionSpecificData();
 					data.cityAdminLevel = ncountry.getAttribute("cityAdminLevel");
 					String dname = ncountry.getAttribute("downloadName");
-					data.downloadName = dname == null || dname.length() == 0 ? name : dname;
+					data.downloadName = dname == null || dname.isEmpty() ? name : dname;
 					if(name != null && !Boolean.parseBoolean(ncountry.getAttribute("skip"))){
 						countries.regionNames.put(name, data);
 					}
@@ -231,25 +231,25 @@ public class IndexBatchCreator {
 
 	private void parseProcessAttributes(Element process) {
 		String zooms = process.getAttribute("mapZooms");
-		if(zooms == null || zooms.length() == 0){
+		if(zooms == null || zooms.isEmpty()){
 			mapZooms = MapZooms.getDefault();
 		} else {
 			mapZooms = MapZooms.parseZooms(zooms);
 		}
 		
 		String szoomWaySmoothness = process.getAttribute("zoomWaySmoothness");
-		if(szoomWaySmoothness != null && !szoomWaySmoothness.equals("")){
+		if(szoomWaySmoothness != null && !szoomWaySmoothness.isEmpty()){
 			zoomWaySmoothness = Integer.parseInt(szoomWaySmoothness);
 		}
 		String f = process.getAttribute("renderingTypesFile");
-		if(f == null || f.length() == 0){
+		if(f == null || f.isEmpty()){
 			types = MapRenderingTypesEncoder.getDefault();
 		} else {
 			types = new MapRenderingTypesEncoder(f);
 		}
 		
 		String osmDbDialect = process.getAttribute("osmDbDialect");
-		if(osmDbDialect != null && osmDbDialect.length() > 0){
+		if(osmDbDialect != null && !osmDbDialect.isEmpty()){
 			try {
 				this.osmDbDialect = DBDialect.valueOf(osmDbDialect.toUpperCase());
 			} catch (RuntimeException e) {
@@ -257,7 +257,7 @@ public class IndexBatchCreator {
 		}
 		
 		String mapDbDialect = process.getAttribute("mapDbDialect");
-		if (mapDbDialect != null && mapDbDialect.length() > 0) {
+		if (mapDbDialect != null && !mapDbDialect.isEmpty()) {
 			try {
 				this.mapDBDialect = DBDialect.valueOf(mapDbDialect.toUpperCase());
 			} catch (RuntimeException e) {
@@ -294,7 +294,7 @@ public class IndexBatchCreator {
 				String regionName = prefix + name;
 				String fileName = Algorithms.capitalizeFirstLetterAndLowercase(prefix + name + suffix);
 				if (skipExistingIndexes != null) {
-					File bmif = new File(skipExistingIndexes, fileName + "_" + IndexConstants.BINARY_MAP_VERSION
+					File bmif = new File(skipExistingIndexes, fileName + '_' + IndexConstants.BINARY_MAP_VERSION
 							+ IndexConstants.BINARY_MAP_INDEX_EXT);
 					File bmifz = new File(skipExistingIndexes, bmif.getName() + ".zip");
 					if (bmif.exists() || bmifz.exists()) {
@@ -318,7 +318,7 @@ public class IndexBatchCreator {
 		}
 		File toIndex = null;
 		File saveTo = new File(osmDirFiles, regionName + ext);
-		if (wget == null || wget.trim().length() == 0) {
+		if (wget == null || wget.trim().isEmpty()) {
 			toIndex = internalDownload(url, saveTo);
 		} else {
 			toIndex = wgetDownload(url, saveTo);
@@ -335,7 +335,7 @@ public class IndexBatchCreator {
 		OutputStream wgetInput = null;
 		Process wgetProc = null;
 		try {
-			log.info("Executing " + wget + " " + url + " -O "+ toSave.getCanonicalPath()); //$NON-NLS-1$//$NON-NLS-2$ $NON-NLS-3$
+			log.info("Executing " + wget + ' ' + url + " -O "+ toSave.getCanonicalPath()); //$NON-NLS-1$//$NON-NLS-2$ $NON-NLS-3$
 			ProcessBuilder exec = new ProcessBuilder(wget, "--read-timeout=5", "--progress=dot:binary", url, "-O", //$NON-NLS-1$//$NON-NLS-2$ $NON-NLS-3$
 					toSave.getCanonicalPath());
 			exec.redirectErrorStream(true);
@@ -417,7 +417,7 @@ public class IndexBatchCreator {
 				if (skipExistingIndexes != null) {
 					int i = f.getName().indexOf(".osm");
 					String name = Algorithms.capitalizeFirstLetterAndLowercase(f.getName().substring(0, i));
-					File bmif = new File(skipExistingIndexes, name + "_" + IndexConstants.BINARY_MAP_VERSION
+					File bmif = new File(skipExistingIndexes, name + '_' + IndexConstants.BINARY_MAP_VERSION
 							+ IndexConstants.BINARY_MAP_INDEX_EXT_ZIP);
 					log.info("Check if " + bmif.getAbsolutePath() + " exists");
 					if (bmif.exists()) {
@@ -471,7 +471,7 @@ public class IndexBatchCreator {
 				indexCreator.setZoomWaySmothness(zoomWaySmoothness);
 			}
 
-			String mapFileName = regionName + "_" + IndexConstants.BINARY_MAP_VERSION + IndexConstants.BINARY_MAP_INDEX_EXT;
+			String mapFileName = regionName + '_' + IndexConstants.BINARY_MAP_VERSION + IndexConstants.BINARY_MAP_INDEX_EXT;
 			indexCreator.setMapFileName(mapFileName);
 			try {
 				alreadyGeneratedFiles.add(f.getName());
@@ -483,7 +483,7 @@ public class IndexBatchCreator {
 
 					FileOutputStream fout = new FileOutputStream(logFileName);
 					fout.write((new Date() + "\n").getBytes());
-					fout.write((MapCreatorVersion.APP_MAP_CREATOR_FULL_NAME + "\n").getBytes());
+					fout.write((MapCreatorVersion.APP_MAP_CREATOR_FULL_NAME + '\n').getBytes());
 					fout.close();
 					fh = new FileHandler(logFileName.getAbsolutePath(), 10*1000*1000, 1, true);
 					fh.setFormatter(new SimpleFormatter());

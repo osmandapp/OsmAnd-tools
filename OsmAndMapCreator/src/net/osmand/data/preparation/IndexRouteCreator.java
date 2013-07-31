@@ -263,7 +263,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		}
 		for (int i = 0; i < w.size(); i++) {
 			GeneralizedCluster ncluster = getCluster(w, i, cluster);
-			if (ncluster != cluster) {
+			if (!ncluster.equals(cluster)) {
 				cluster = ncluster;
 			}
 			ncluster.addWayFromLocation(w, i);
@@ -343,7 +343,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		basemapRouteInsertStat = createStatementRouteObjInsert(mapConnection, true);
 		try {
 			routeTree = new RTree(rtreeMapIndexNonPackFileName);
-			baserouteTree = new RTree(rtreeMapIndexNonPackFileName+"b");
+			baserouteTree = new RTree(rtreeMapIndexNonPackFileName+ 'b');
 		} catch (RTreeException e) {
 			throw new IOException(e);
 		}
@@ -361,7 +361,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 			throws IOException, SQLException {
 		// delete map rtree files
 		deleteRouteTreeFiles(rTreeMapIndexNonPackFileName, rTreeMapIndexPackFileName, deleteDatabaseIndexes, routeTree);
-		deleteRouteTreeFiles(rTreeMapIndexNonPackFileName+"b", rTreeMapIndexPackFileName+"b", deleteDatabaseIndexes, baserouteTree);
+		deleteRouteTreeFiles(rTreeMapIndexNonPackFileName+ 'b', rTreeMapIndexPackFileName+ 'b', deleteDatabaseIndexes, baserouteTree);
 		closeAllPreparedStatements();
 	}
 
@@ -427,12 +427,12 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 
 	public void createRTreeFiles(String rTreeRouteIndexPackFileName) throws RTreeException {
 		routeTree = new RTree(rTreeRouteIndexPackFileName);
-		baserouteTree = new RTree(rTreeRouteIndexPackFileName+"b");
+		baserouteTree = new RTree(rTreeRouteIndexPackFileName+ 'b');
 	}
 
 	public void packRtreeFiles(String rTreeRouteIndexNonPackFileName, String rTreeRouteIndexPackFileName) throws IOException {
 		routeTree = packRtreeFile(routeTree, rTreeRouteIndexNonPackFileName, rTreeRouteIndexPackFileName);
-		baserouteTree = packRtreeFile(baserouteTree, rTreeRouteIndexNonPackFileName+"b", rTreeRouteIndexPackFileName+"b");
+		baserouteTree = packRtreeFile(baserouteTree, rTreeRouteIndexNonPackFileName+ 'b', rTreeRouteIndexPackFileName+ 'b');
 	}
 	
 	public void writeBinaryRouteIndex(BinaryMapIndexWriter writer, String regionName) throws IOException, SQLException {
@@ -559,7 +559,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 				MapUtils.get31LongitudeX((int) x), -1);
 	}
 	
-	private String baseOrderValues[] = new String[] { "trunk", "motorway", "ferry", "primary", "secondary", "tertiary", "residential",
+	private String[] baseOrderValues = { "trunk", "motorway", "ferry", "primary", "secondary", "tertiary", "residential",
 			"road", "cycleway", "living_street" };
 	
 	private int getBaseOrderForType(int intType) {
@@ -877,11 +877,8 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 	private boolean compareRefs(GeneralizedWay gw, GeneralizedWay gn){
 		String rf = gw.names.get(routeTypes.getRefRuleType());
 		String rf2 = gn.names.get(routeTypes.getRefRuleType());
-		if(rf != null && rf2 != null && !rf.equals(rf2)){
-			return false;
-		}
-		return true;
-	}
+        return !(rf != null && rf2 != null && !rf.equals(rf2));
+    }
 	
 	private void mergeName(MapRouteType rt, GeneralizedWay from, GeneralizedWay to){
 		String rf = from.names.get(rt);
@@ -910,7 +907,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		Object o = cluster.map.get(loc);
 		GeneralizedWay res = null;
 		if (o instanceof GeneralizedWay) {
-			if (o != gw) {
+			if (!o.equals(gw)) {
 				GeneralizedWay m = (GeneralizedWay) o;
 				if (m.id != gw.id && m.mainType == gw.mainType && compareRefs(gw, m)) {
 					return m;
@@ -1040,7 +1037,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		TLongArrayList pointMapIds = new TLongArrayList();
 		for (int i = 0; i < parent.getTotalElements(); i++) {
 			if (e[i].getElementType() == rtree.Node.LEAF_NODE) {
-				long id = ((LeafElement) e[i]).getPtr();
+				long id = e[i].getPtr();
 				// IndexRouteCreator.SELECT_STAT;
 				// "SELECT types, pointTypes, pointIds, pointCoordinates, name FROM route_objects WHERE id = ?"
 				selectData.setLong(1, id);
@@ -1123,7 +1120,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		}
 		for (int i = 0; i < parent.getTotalElements(); i++) {
 			if (e[i].getElementType() != rtree.Node.LEAF_NODE) {
-				long ptr = ((NonLeafElement) e[i]).getPtr();
+				long ptr = e[i].getPtr();
 				rtree.Node ns = r.getReadNode(ptr);
 				writeBinaryMapBlock(ns, e[i].getRect(), r, writer, selectData, bounds, tempStringTable, tempNames);
 			}
@@ -1147,7 +1144,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		}
 		for (int i = 0; i < parent.getTotalElements(); i++) {
 			if (e[i].getElementType() != rtree.Node.LEAF_NODE) {
-				rtree.Node chNode = r.getReadNode(((NonLeafElement) e[i]).getPtr());
+				rtree.Node chNode = r.getReadNode(e[i].getPtr());
 				writeBinaryRouteTree(chNode, e[i].getRect(), r, writer, bounds, basemap);
 			}
 		}
@@ -1260,9 +1257,9 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 			long loc = delete.getLocation(ind);
 			Object o = map.get(loc);
 			if(o instanceof GeneralizedWay){
-				if(delete == o) {
+				if(delete.equals(o)) {
 					map.put(loc, toReplace);
-				} else if(toReplace !=  o){
+				} else if(!toReplace.equals(o)){
 					addWay(toReplace, loc);
 				}
 			} else if(o instanceof LinkedList){
@@ -1296,14 +1293,14 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 
 			Object o = map.get(loc);
 			if (o instanceof GeneralizedWay) {
-				if (delete == o) {
+				if (delete.equals(o)) {
 					map.remove(loc);
 				}
 			} else if (o instanceof LinkedList) {
 				((LinkedList) o).remove(delete);
 				if (((LinkedList) o).size() == 1) {
 					map.put(loc, ((LinkedList) o).iterator().next());
-				} else if (((LinkedList) o).size() == 0) {
+				} else if (((LinkedList) o).isEmpty()) {
 					map.remove(loc);
 				}
 			}
@@ -1324,7 +1321,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 					if(!((LinkedList<GeneralizedWay>) o).contains(w)){
 						((LinkedList<GeneralizedWay>) o).add(w);
 					}
-				} else if(o != w){
+				} else if(!o.equals(w)){
 					LinkedList<GeneralizedWay> list = new LinkedList<GeneralizedWay>();
 					list.add((GeneralizedWay) o);
 					list.add(w);
@@ -1391,7 +1388,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 				// translate into meters
 				total += Math.abs(px - x) * 0.011d + Math.abs(py - y) * 0.01863d;
 			} while (total < dist);
-			return -Math.atan2( x - px, y - py );
+			return -StrictMath.atan2( x - px, y - py );
 		}
 	}
 }

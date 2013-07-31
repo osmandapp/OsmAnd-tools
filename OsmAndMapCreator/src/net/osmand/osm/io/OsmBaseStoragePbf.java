@@ -81,11 +81,11 @@ public class OsmBaseStoragePbf extends OsmBaseStorage {
 						timestamp += n.getDenseinfo().getTimestamp(i);
 						uid += n.getDenseinfo().getUid(i);
 						user += n.getDenseinfo().getUserSid(i);
-						info.setChangeset((changeset) + ""); //$NON-NLS-1$
+						info.setChangeset(String.valueOf(changeset)); //$NON-NLS-1$
 						info.setTimestamp(format.format(new Date(date_granularity * (timestamp))));
 						info.setUser(getStringById(user));
-						info.setUid(uid + ""); //$NON-NLS-1$
-						info.setVersion(n.getDenseinfo().getVersion(i) + ""); //$NON-NLS-1$
+						info.setUid(String.valueOf(uid)); //$NON-NLS-1$
+						info.setVersion(String.valueOf(n.getDenseinfo().getVersion(i))); //$NON-NLS-1$
 						info.setVisible("true"); //$NON-NLS-1$
 					}
 					if (!tagsEmpty) {
@@ -104,11 +104,11 @@ public class OsmBaseStoragePbf extends OsmBaseStorage {
 
 			protected EntityInfo parseEntityInfo(Info i) {
 				EntityInfo info = new EntityInfo();
-				info.setChangeset(i.getChangeset() + ""); //$NON-NLS-1$
+				info.setChangeset(String.valueOf(i.getChangeset())); //$NON-NLS-1$
 				info.setTimestamp(format.format(getDate(i)));
 				info.setUser(getStringById(i.getUserSid()));
-				info.setUid(i.getUid() + ""); //$NON-NLS-1$
-				info.setVersion(i.getVersion() + ""); //$NON-NLS-1$
+				info.setUid(String.valueOf(i.getUid())); //$NON-NLS-1$
+				info.setVersion(String.valueOf(i.getVersion())); //$NON-NLS-1$
 				info.setVisible("true"); //$NON-NLS-1$
 				return info;
 			}

@@ -306,7 +306,7 @@ public class MapRouterLayer implements MapPanelLayer {
 
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				if(intermediates.size() > 0){
+				if(!intermediates.isEmpty()){
 					intermediates.remove(0);
 				}
 				map.repaint();
@@ -359,7 +359,7 @@ public class MapRouterLayer implements MapPanelLayer {
 						if (fist) {
 							fist = false;
 						}
-						content.append(s).append("\n");
+						content.append(s).append('\n');
 					}
 					System.out.println(content);
 				}
@@ -398,7 +398,7 @@ public class MapRouterLayer implements MapPanelLayer {
 			} catch (SAXException e) {
 				ExceptionHandler.handle(e);
 			}
-			System.out.println("Finding routes " + res.size() + " " + (System.currentTimeMillis() - time) + " ms");
+			System.out.println("Finding routes " + res.size() + ' ' + (System.currentTimeMillis() - time) + " ms");
 		}
 		return res;
 	}
@@ -415,7 +415,7 @@ public class MapRouterLayer implements MapPanelLayer {
 					if (fist) {
 						fist = false;
 					}
-					content.append(s).append("\n");
+					content.append(s).append('\n');
 				}
 			}
 			DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
@@ -457,10 +457,10 @@ public class MapRouterLayer implements MapPanelLayer {
 				// possibly hide that API key because it is privacy of osmand
 				uri.append("http://routes.cloudmade.com/A6421860EBB04234AB5EF2D049F2CD8F/api/0.3/");
 				 
-				uri.append(start.getLatitude()+"").append(",");
-				uri.append(start.getLongitude()+"").append(",");
-				uri.append(end.getLatitude()+"").append(",");
-				uri.append(end.getLongitude()+"").append("/");
+				uri.append(String.valueOf(start.getLatitude())).append(',');
+				uri.append(String.valueOf(start.getLongitude())).append(',');
+				uri.append(String.valueOf(end.getLatitude())).append(',');
+				uri.append(String.valueOf(end.getLongitude())).append('/');
 				uri.append("car.gpx").append("?lang=ru");
 
 				URL url = new URL(uri.toString());
@@ -474,7 +474,7 @@ public class MapRouterLayer implements MapPanelLayer {
 						if (fist) {
 							fist = false;
 						}
-						content.append(s).append("\n");
+						content.append(s).append('\n');
 					}
 					System.out.println(content);
 				}
@@ -517,7 +517,7 @@ public class MapRouterLayer implements MapPanelLayer {
 			} catch (SAXException e) {
 				ExceptionHandler.handle(e);
 			}
-			System.out.println("Finding cloudmade routes " + res.size() + " " + (System.currentTimeMillis() - time) + " ms");
+			System.out.println("Finding cloudmade routes " + res.size() + ' ' + (System.currentTimeMillis() - time) + " ms");
 		}
 		return res;
 	}
@@ -539,7 +539,7 @@ public class MapRouterLayer implements MapPanelLayer {
                 if (isNegative) {
                 	rawDecodedValue = ~rawDecodedValue;
                 }
-                decodedValues.add(((double)rawDecodedValue) / 1e5);
+                decodedValues.add(((double)rawDecodedValue) / 1.0e5);
                 carriage = 0;
                 rawDecodedValue = 0;
             }
@@ -555,8 +555,8 @@ public class MapRouterLayer implements MapPanelLayer {
 				StringBuilder uri = new StringBuilder();
 				uri.append(DataExtractionSettings.getSettings().getOsrmServerAddress());
 				uri.append("/viaroute?");
-				uri.append("&loc=").append(start.getLatitude()).append(",").append(start.getLongitude());
-				uri.append("&loc=").append(end.getLatitude()).append(",").append(end.getLongitude());
+				uri.append("&loc=").append(start.getLatitude()).append(',').append(start.getLongitude());
+				uri.append("&loc=").append(end.getLatitude()).append(',').append(end.getLongitude());
 				uri.append("&output=json");
 				uri.append("&instructions=false");
 				uri.append("&geomformat=cmp");
@@ -572,7 +572,7 @@ public class MapRouterLayer implements MapPanelLayer {
 						if (fist) {
 							fist = false;
 						}
-						content.append(s).append("\n");
+						content.append(s).append('\n');
 					}
 					System.out.println(content);
 				}
@@ -586,7 +586,7 @@ public class MapRouterLayer implements MapPanelLayer {
 				double longitude = 0.0;
 				Way w = new Way(-1);
 				for(int routePointIdx = 0; routePointIdx < route.length / 2; routePointIdx++) {
-					latitude += route[routePointIdx * 2 + 0];
+					latitude += route[(routePointIdx * 2)];
 					longitude += route[routePointIdx * 2 + 1];
 					
 					w.addNode(new net.osmand.osm.edit.Node(latitude, longitude, -1));
@@ -600,7 +600,7 @@ public class MapRouterLayer implements MapPanelLayer {
 			} catch (JSONException e) {
 				ExceptionHandler.handle(e);
 			}
-			System.out.println("Finding routes " + res.size() + " " + (System.currentTimeMillis() - time) + " ms");
+			System.out.println("Finding routes " + res.size() + ' ' + (System.currentTimeMillis() - time) + " ms");
 		}
 		return res;
 	}
@@ -683,10 +683,10 @@ public class MapRouterLayer implements MapPanelLayer {
 //								all *= 1.2;
 //							}
 							if(all > 0 ) {
-								int  t = (int) (p*p/(all*all)*100f);  
+								int  t = (int) (p*p/(all*all)* 100.0f);
 //								int  t = (int) (p/all*100f);
 								System.out.println("Progress " + t + " % " + 
-								ctx.calculationProgress.distanceFromBegin + " " + ctx.calculationProgress.distanceFromEnd+" " + all);
+								ctx.calculationProgress.distanceFromBegin + ' ' + ctx.calculationProgress.distanceFromEnd+ ' ' + all);
 							}
 							try {
 								sleep(100);
@@ -708,15 +708,15 @@ public class MapRouterLayer implements MapPanelLayer {
 								reason = " target point " + ctx.calculationProgress.segmentNotFound + " is too far from road";
 							}
 						} else if (ctx.calculationProgress.directSegmentQueueSize == 0) {
-							reason = " route can not be found from start point (" + ctx.calculationProgress.distanceFromBegin / 1000f
+							reason = " route can not be found from start point (" + ctx.calculationProgress.distanceFromBegin / 1000.0f
 									+ " km)";
 						} else if (ctx.calculationProgress.reverseSegmentQueueSize == 0) {
-							reason = " route can not be found from end point (" + ctx.calculationProgress.distanceFromEnd / 1000f + " km)";
+							reason = " route can not be found from end point (" + ctx.calculationProgress.distanceFromEnd / 1000.0f + " km)";
 						}
 						throw new RuntimeException("Route not found : " + reason);
 					}
 
-					System.out.println("External native time " + (System.nanoTime() - nt) / 1e9f);
+					System.out.println("External native time " + (System.nanoTime() - nt) / 1.0e9f);
 					if (animateRoutingCalculation) {
 						playPauseButton.setVisible(false);
 						nextTurn.setText("FINISH");
@@ -737,7 +737,7 @@ public class MapRouterLayer implements MapPanelLayer {
 					map.getPoints().clear();
 				}
 			}
-			System.out.println("Finding self routes " + res.size() + " " + (System.currentTimeMillis() - time) + " ms");
+			System.out.println("Finding self routes " + res.size() + ' ' + (System.currentTimeMillis() - time) + " ms");
 		}
 		return res;
 	}
@@ -761,7 +761,7 @@ public class MapRouterLayer implements MapPanelLayer {
 				net.osmand.osm.edit.Node n = new net.osmand.osm.edit.Node(l.getLatitude(), l.getLongitude(), -1);
 				if (prevWayNode != null) {
 					if (OsmMapUtils.getDistance(prevWayNode, n) > 0) {
-						System.out.println("Warning not connected road " + " " + s.getObject().id + " dist "
+						System.out.println("Warning not connected road " + ' ' + s.getObject().id + " dist "
 								+ OsmMapUtils.getDistance(prevWayNode, n));
 					}
 					prevWayNode = null;

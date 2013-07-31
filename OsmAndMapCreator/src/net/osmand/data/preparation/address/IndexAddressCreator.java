@@ -86,7 +86,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 	//TODO make it an option
 	private boolean DEBUG_FULL_NAMES = false; //true to see atached cityPart and boundaries to the street names
 	
-	private final int ADDRESS_NAME_CHARACTERS_TO_INDEX = 4; 
+	private static final int ADDRESS_NAME_CHARACTERS_TO_INDEX = 4;
 	
 	Connection mapConnection;
 	DBStreetDAO streetDAO;
@@ -168,8 +168,8 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 			if (cityFound == null) {
 				for (City c : citiesToSearch) {
 					String lower = c.getName().toLowerCase();
-					if (boundaryName.startsWith(lower + " ") || boundaryName.endsWith(" " + lower)
-							|| boundaryName.contains(" " + lower + " ")) {
+					if (boundaryName.startsWith(lower + ' ') || boundaryName.endsWith(' ' + lower)
+							|| boundaryName.contains(' ' + lower + ' ')) {
 						if (boundary.containsPoint(c.getLocation())) {
 							cityFound = c;
 							break;
@@ -186,9 +186,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 			attachAllCitiesToBoundary(boundary);
 		} else if (boundary != null){
 			if(logMapDataWarn != null) {
-				logMapDataWarn.warn("Not using boundary: " + boundary + " " + boundary.getBoundaryId());
+				logMapDataWarn.warn("Not using boundary: " + boundary + ' ' + boundary.getBoundaryId());
 			} else {
-				log.info("Not using boundary: " + boundary + " " + boundary.getBoundaryId());
+				log.info("Not using boundary: " + boundary + ' ' + boundary.getBoundaryId());
 			}
 		}
 	}
@@ -201,7 +201,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 				list.add(c);
 			}
 		}
-		if(list.size() > 0) {
+		if(!list.isEmpty()) {
 			boundaryToContainingCities.put(boundary, list);
 		}
 	}
@@ -309,7 +309,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 			logBoundaryChanged(boundary, cityFound);
 			return oldBoundary;
 		} else if (oldBoundary.getAdminLevel() == boundary.getAdminLevel()
-				&& oldBoundary != boundary
+				&& !oldBoundary.equals(boundary)
 				&& boundary.getName().equalsIgnoreCase(
 						oldBoundary.getName())) {
 			oldBoundary.mergeWith(boundary);
@@ -328,7 +328,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 
 	private void logBoundaryChanged(Boundary boundary, City cityFound) {
 		String s = "City " + (cityFound == null ? " not found " : " : " +cityFound.getName());
-		s += " boundary: " + boundary.toString() + " " + boundary.getBoundaryId();
+		s += " boundary: " + boundary + ' ' + boundary.getBoundaryId();
 		if (logMapDataWarn != null) {
 			logMapDataWarn.info(s);
 		} else {
@@ -592,7 +592,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 			List<City> subcities = boundaryToContainingCities.get(cityBoundary);
 			if (subcities != null) {
 				for (City subpart : subcities) {
-					if (subpart != city) {
+					if (!subpart.equals(city)) {
 						Boundary subBoundary = cityBoundaries.get(subpart);
 						if (cityBoundary != null && subBoundary != null && subBoundary.getAdminLevel() > cityBoundary.getAdminLevel()) {
 							// old code
@@ -1142,7 +1142,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 				// If there are more streets with same name in different districts.
 				// Add district name to all other names. If sorting is right, the first street was the one in the city
 				String district = set.getString(12);
-				String cityPart = district == null || district.equals(city.getName()) ? "" : " (" + district + ")";
+				String cityPart = district == null || district.equals(city.getName()) ? "" : " (" + district + ')';
 				street.setName(streetName + cityPart);
 				street.setEnName(streetEnName + cityPart);
 				streetNodes.put(street, thisWayNodes);
@@ -1212,7 +1212,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 			if (DEBUG_FULL_NAMES) { 
 				Boundary cityB = cityBoundaries.get(city);
 				if (cityB != null) {
-					city.setName(city.getName() + " " + cityB.getAdminLevel() + ":" + cityB.getName());
+					city.setName(city.getName() + " " + cityB.getAdminLevel() + ':' + cityB.getName());
 				}
 			}
 		}

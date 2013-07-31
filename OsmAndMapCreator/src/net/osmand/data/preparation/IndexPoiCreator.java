@@ -136,7 +136,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					// ignore specialties like name:botanical
 					if (cnt == 0)
 						msg += "Entity misses default name tag, but it has localized name tag(s):\n";
-					msg += key + "=" + e.getTag(key) + "\n";
+					msg += key + '=' + e.getTag(key) + '\n';
 					cnt++;
 				}
 			}

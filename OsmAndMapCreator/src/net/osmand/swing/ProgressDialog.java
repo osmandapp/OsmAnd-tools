@@ -142,7 +142,7 @@ public class ProgressDialog extends JDialog implements IProgress {
 	
 	private void updateMessage() {
 		if(!progressBar.isIndeterminate()){
-			String format = String.format("\t %.1f %%", progressBar.getValue() * 100f / ((float) progressBar.getMaximum())); //$NON-NLS-1$
+			String format = String.format("\t %.1f %%", progressBar.getValue() * 100.0f / ((float) progressBar.getMaximum())); //$NON-NLS-1$
 			label.setText(taskName +  format + (genProgress == null ? "" : ("   " + genProgress))); //$NON-NLS-1$ //$NON-NLS-2$
 		}
 	}
@@ -151,11 +151,8 @@ public class ProgressDialog extends JDialog implements IProgress {
 		if (newProgress < progressBar.getValue()) {
 			return false;
 		}
-		if ((newProgress - progressBar.getValue()) / ((float) progressBar.getMaximum()) < deltaToChange) {
-			return false;
-		}
-		return true;
-	}
+        return (newProgress - progressBar.getValue()) / ((float) progressBar.getMaximum()) >= deltaToChange;
+    }
 	@Override
 	public void remaining(int remainingWork) {
 		if(change(progressBar.getMaximum() - remainingWork)){

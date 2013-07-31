@@ -24,11 +24,8 @@ public class OsmBoundsFilter implements IOsmStorageFilter {
 		if(entity instanceof Node){
 			double lon = ((Node) entity).getLongitude();
 			double lat = ((Node) entity).getLatitude();
-			if (latDown <= lat && lat <= latUp && lonStart <= lon && lon <= lonEnd) {
-				return true;
-			}
-			return false;
-		}
+            return latDown <= lat && lat <= latUp && lonStart <= lon && lon <= lonEnd;
+        }
 		// unknown for other locations
 		return true;
 	}

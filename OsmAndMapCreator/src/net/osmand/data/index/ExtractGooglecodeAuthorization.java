@@ -101,7 +101,7 @@ public class ExtractGooglecodeAuthorization {
 				"https://www.google.com/accounts/ServiceLogin?service=code&ltmpl=phosting&continue=http%3A%2F%2Fcode.google.com%2Fp%2Fosmand%2Fdownloads%2Fdelete%3Fname%3Den-tts_0.voice.zip");
 		conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:5.0) Gecko/20100101 Firefox/5.0");
 		conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded"); //$NON-NLS-1$ //$NON-NLS-
-		conn.setRequestProperty("Content-Length", data.length() + "");
+		conn.setRequestProperty("Content-Length", String.valueOf(data.length()));
 		OutputStreamWriter writer = new OutputStreamWriter(conn.getOutputStream());
 
 		// write parameters
@@ -109,8 +109,8 @@ public class ExtractGooglecodeAuthorization {
 		writer.flush();
 		conn.connect();
 		if (debug) {
-			System.out.println("Connected to:" + url.toString());
-			System.out.println("-- Data sent:\n" + data.toString());
+			System.out.println("Connected to:" + url);
+			System.out.println("-- Data sent:\n" + data);
 			System.out.println("--");
 		}
 
@@ -161,11 +161,11 @@ public class ExtractGooglecodeAuthorization {
 
 		StringBuilder data = new StringBuilder();
 		for (String key : values.keySet()) {
-			data.append(URLEncoder.encode(key, "UTF-8")).append("=");
+			data.append(URLEncoder.encode(key, "UTF-8")).append('=');
 			if (values.get(key) != null) {
 				data.append(URLEncoder.encode(values.get(key), "UTF-8"));
 			}
-			data.append("&");
+			data.append('&');
 		}
 		data.deleteCharAt(data.length() - 1);
 		return data;
@@ -198,7 +198,7 @@ public class ExtractGooglecodeAuthorization {
 			boolean f = true;
 			while ((s = in.readLine()) != null) {
 				if (!f) {
-					responseBody.append("\n"); //$NON-NLS-1$
+					responseBody.append('\n'); //$NON-NLS-1$
 				} else {
 					f = false;
 				}
@@ -207,7 +207,7 @@ public class ExtractGooglecodeAuthorization {
 			i.close();
 		}
 		if (debug) {
-			System.out.println("Aswer from server:\n" + responseBody.toString());
+			System.out.println("Answer from server:\n" + responseBody);
 		}
 		return responseBody;
 	}
@@ -216,9 +216,8 @@ public class ExtractGooglecodeAuthorization {
 	{
 		if (args.length < 2) {
 			System.out.println("Use: ExtractGooglecodeAuthorization gmailname gmailpassword");
-			return;
-		} else {
-			System.out.println(new ExtractGooglecodeAuthorization(true).getGooglecodeTokensForUpload(args[0], args[1]).toString());
+        } else {
+			System.out.println(new ExtractGooglecodeAuthorization(true).getGooglecodeTokensForUpload(args[0], args[1]));
 		}
 	}
 

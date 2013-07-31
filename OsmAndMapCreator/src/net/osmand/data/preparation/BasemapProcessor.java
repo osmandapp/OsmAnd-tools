@@ -180,7 +180,7 @@ public class BasemapProcessor {
 				}
 				if ((currentByte & BITMASK) == SEA) {
 					seaTileInfo.set(i * 4 + 3);
-				} else if (((currentByte >> 0) & BITMASK) == LAND) {
+				} else if ((currentByte & BITMASK) == LAND) {
 					landTileInfo.set(i * 4 + 3);
 				}
 			}
@@ -197,11 +197,8 @@ public class BasemapProcessor {
 		if (zoom >= TILE_ZOOMLEVEL) {
 			int x1 = x >> (zoom - TILE_ZOOMLEVEL);
 			int y1 = y >> (zoom - TILE_ZOOMLEVEL);
-			if (!seaTileInfo.get(y1 * 4096 + x1)) {
-				return false;
-			}
-			return true;
-		} else {
+            return seaTileInfo.get(y1 * 4096 + x1);
+        } else {
 			int x1 = x << (TILE_ZOOMLEVEL - zoom);
 			int y1 = y << (TILE_ZOOMLEVEL - zoom);
 			int max = 1 << TILE_ZOOMLEVEL - zoom;
@@ -220,11 +217,8 @@ public class BasemapProcessor {
 		if (zoom >= TILE_ZOOMLEVEL) {
 			int x1 = x >> (zoom - TILE_ZOOMLEVEL);
 			int y1 = y >> (zoom - TILE_ZOOMLEVEL);
-			if (!landTileInfo.get(y1 * 4096 + x1)) {
-				return false;
-			}
-			return true;
-		} else {
+            return landTileInfo.get(y1 * 4096 + x1);
+        } else {
 			int x1 = x << (TILE_ZOOMLEVEL - zoom);
 			int y1 = y << (TILE_ZOOMLEVEL - zoom);
 			int max = 1 << (TILE_ZOOMLEVEL - zoom);
@@ -270,9 +264,7 @@ public class BasemapProcessor {
 				} else if(zoom < TILE_ZOOMLEVEL){
 					SimplisticQuadTree[] vis = rootTree.getOrCreateSubTree(x, y, zoom).getOrCreateSubTree(x, y, zoom)
 							.getAllChildren();
-					for (SimplisticQuadTree t : vis) {
-						newToVisit.add(t);
-					}
+                    Collections.addAll(newToVisit, vis);
 				}
 			}
 			toVisit = newToVisit;
@@ -466,13 +458,13 @@ public class BasemapProcessor {
 
 					long inter = MapAlgorithms.calculateIntersection(px31, py31, nx31, ny31, leftX, rightX, bottomY, topY);
 					int cy31 = (int) inter;
-					int cx31 = (int) (inter >> 32l);
+					int cx31 = (int) (inter >> 32L);
 					if (inter == -1) {
 						cx31 = nx31;
 						cy31 = ny31;
 						i++;
-						logMapDataWarn.warn("Can't find intersection for " + MapUtils.get31LongitudeX(px31) + ","
-								+ MapUtils.get31LatitudeY(py31) + " - " + MapUtils.get31LongitudeX(nx31) + ","
+						logMapDataWarn.warn("Can't find intersection for " + MapUtils.get31LongitudeX(px31) + ','
+								+ MapUtils.get31LatitudeY(py31) + " - " + MapUtils.get31LongitudeX(nx31) + ','
 								+ MapUtils.get31LatitudeY(ny31));
 					}
 

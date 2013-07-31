@@ -213,7 +213,7 @@ public class MinskTransReader {
 			if(!usedNodes.contains(stop) && "yes".equals(stop.getTag("generated"))){
 				EntityInfo info = storage.getRegisteredEntityInfo().get(stop.getId());
 				info.setAction("delete");
-				System.out.println("[DEL] Remove generated not used stop " + stop.getId() + " " + stop.getTag("name"));
+				System.out.println("[DEL] Remove generated not used stop " + stop.getId() + ' ' + stop.getTag("name"));
 			}
 		}
 		
@@ -285,7 +285,7 @@ public class MinskTransReader {
 			String st = route.routeStops.get(i);
 			Node correlatedNode = correlated.get(st);
 			TransportStop trStop = trStops.get(st);
-			String stStr = trStop.stopId + " " + trStop.name;
+			String stStr = trStop.stopId + ' ' + trStop.name;
 			Entity e = list.get(i);
 			if(correlatedNode == null){
 				double dist = MapUtils.getDistance(e.getLatLon(), trStop.latitude, trStop.longitude);
@@ -322,7 +322,7 @@ public class MinskTransReader {
 			if (!r.transport.equals("bus") && !r.transport.equals("trolleybus")) {
 				continue;
 			}
-			String s = r.transport + "_" + r.routeNum;
+			String s = r.transport + '_' + r.routeNum;
 
 			boolean reverse = r.routeType.equals("B>A");
 			boolean direct = r.routeType.equals("A>B");
@@ -330,7 +330,7 @@ public class MinskTransReader {
 				// that's additinal route skip it
 				continue;
 			}
-			if (!visitedRoutes.add(s + "_" + direct)) {
+			if (!visitedRoutes.add(s + '_' + direct)) {
 				// skip it : duplicated route (schedule changed)
 				continue;
 			}
@@ -339,7 +339,7 @@ public class MinskTransReader {
 				checkedRoutes.put(s, definedRoutes.get(s));
 				boolean valid = validateRoute(s, stopsMap, correlated, definedRoutes.get(s), r, direct);
 				if(valid){
-					System.err.println("VALID " + s + " " + direct);
+					System.err.println("VALID " + s + ' ' + direct);
 				}
 				// System.out.println("Already registered " + s);
 			} else {
@@ -379,7 +379,7 @@ public class MinskTransReader {
 						}
 						node.putTag("generated", "yes");
 						storage.getRegisteredEntities().put(new EntityId(EntityType.NODE, node.getId()), node);
-						System.out.println("[ADD] Added new bus_stop : " + node.getId() + " " + st.name + " minsktrans_stop_id " + st.stopId);
+						System.out.println("[ADD] Added new bus_stop : " + node.getId() + ' ' + st.name + " minsktrans_stop_id " + st.stopId);
 						correlated.put(stop, node);
 					}
 					if (i == 0 || i == rSsize - 1) {
@@ -403,7 +403,7 @@ public class MinskTransReader {
 			if(!checkedRoutes.containsKey(s)){
 				Relation rel = definedRoutes.get(s);
 				storage.getRegisteredEntityInfo().get(rel.getId()).setAction("delete");
-				System.out.println("[DEL] Route is deprecated : " + rel.getTag("route")+"_"+rel.getTag("ref") + "  " + rel.getTag("name"));
+				System.out.println("[DEL] Route is deprecated : " + rel.getTag("route")+ '_' +rel.getTag("ref") + "  " + rel.getTag("name"));
 				
 			}
 		}
@@ -427,25 +427,25 @@ public class MinskTransReader {
 				
 				String newS = st.substring(stI, endI);
 				if(i==0){
-					if(newS.length() > 0){
+					if(!newS.isEmpty()){
 						current.routeNum = newS;
 					} else if(previous != null){
 						current.routeNum = previous.routeNum;
 					}
 				} else if(i==3){
-					if(newS.length() > 0){
+					if(!newS.isEmpty()){
 						current.transport = newS;
 					} else if(previous != null){
 						current.transport = previous.transport;
 					}
 				} else if(i==8){
-					if(newS.length() > 0){
+					if(!newS.isEmpty()){
 						current.routeType = newS;
 					} else if(previous != null){
 						current.routeType  = previous.routeType ;
 					}
 				} else if(i==10){
-					if(newS.length() > 0){
+					if(!newS.isEmpty()){
 						current.routeName = newS;
 					} else if(previous != null){
 						current.routeName  = previous.routeName ;
@@ -456,7 +456,7 @@ public class MinskTransReader {
 					String[] strings = newS.split(",");
 					for(String s : strings){
 						s = s.trim();
-						if(s.length() > 0){
+						if(!s.isEmpty()){
 							current.routeStops.add(s);
 						}
 					}
@@ -490,15 +490,15 @@ public class MinskTransReader {
 				if(i==0){
 					current.stopId = newS.trim();
 				} else if(i==4){
-					if(newS.length() == 0 && previous != null){
+					if(newS.isEmpty() && previous != null){
 						current.name = previous.name;
 					} else {
 						current.name = newS;
 					}
 				} else if(i==5){
-					current.longitude = Double.parseDouble(newS)/1e5;
+					current.longitude = Double.parseDouble(newS)/ 1.0e5;
 				} else if(i==6){
-					current.latitude =  Double.parseDouble(newS)/1e5;
+					current.latitude =  Double.parseDouble(newS)/ 1.0e5;
 				}
 				stI = endI + 1;
 				i++;

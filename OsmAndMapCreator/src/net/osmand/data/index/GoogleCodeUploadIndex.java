@@ -128,7 +128,7 @@ public class GoogleCodeUploadIndex {
         
         log("Sending file... "+targetFileName); //$NON-NLS-1$
         sendLine(out, "--" + BOUNDARY); //$NON-NLS-1$
-        sendLine(out, "content-disposition: form-data; name=\"filename\"; filename=\"" + targetFileName + "\""); //$NON-NLS-1$ //$NON-NLS-2$
+        sendLine(out, "content-disposition: form-data; name=\"filename\"; filename=\"" + targetFileName + '"'); //$NON-NLS-1$ //$NON-NLS-2$
         sendLine(out, "Content-Type: application/octet-stream"); //$NON-NLS-1$
         sendLine(out, ""); //$NON-NLS-1$
         int count;
@@ -151,7 +151,7 @@ public class GoogleCodeUploadIndex {
 				errorBody.append(new String(buf, 0, count, "utf-8")); //$NON-NLS-1$
 			}
 			if (errorBody.length() > 0) {
-				log("ERROR " + errorBody.toString());
+				log("ERROR " + errorBody);
 			}
 			in.close();
 		}
@@ -165,7 +165,7 @@ public class GoogleCodeUploadIndex {
         while ( (count = in.read(buf)) >= 0 ) {
             responseBody.append(new String(buf, 0, count, "ascii")); //$NON-NLS-1$
         }
-        log("Upload finished response " + responseBody.toString());
+        log("Upload finished response " + responseBody);
         in.close();
         
         conn.disconnect();
@@ -185,7 +185,7 @@ public class GoogleCodeUploadIndex {
      * given user name and password.
      */
     public  static String createAuthToken(String userName, String password) {
-        String string = (userName + ":" + password); //$NON-NLS-1$
+        String string = (userName + ':' + password); //$NON-NLS-1$
         try {
             return Base64.encode(string.getBytes("UTF-8")); //$NON-NLS-1$
         }

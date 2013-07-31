@@ -372,7 +372,7 @@ protected void finalize() throws Throwable
         /**  If Thread is already in the vector then 
          *   return it's Index
          */
-        if(threadinfo.t == t)
+        if(threadinfo.t.equals(t))
           {
             return index;
           }
@@ -471,7 +471,7 @@ protected void finalize() throws Throwable
     if(threadinfo.nAcquired==0)
       {
         waiters.removeElementAt(index);
-        if(waiters.size()>0){
+        if(!waiters.isEmpty()){
           //System.out.println("FileHdr.unlock : notifiying");
           notifyAll();
         }
@@ -485,14 +485,14 @@ protected void finalize() throws Throwable
 public String toString()
   {
     try{
-      String str = new String();
+      String str = "";
       str += "\nTotal Nodes " +  totalNodes;
       str += "\nRoot Index " +  rootIndex;
       str += "\nFile length " + file.length();
       if(waiters != null){
         str += "\nWaiters : total " + waiters.size();
         for(int i=0; i<waiters.size();i++)
-          str += "\n" + i + " : " + waiters.get(i).toString();
+          str += "\n" + i + " : " + waiters.get(i);
       }
       return str;
     }catch(Exception e){
@@ -528,7 +528,7 @@ class ThreadInfo
   @Override
 public String toString()
   {
-    String str = new String("\nThreadInfo");
+    String str = "\nThreadInfo";
     str += "\n lockType : "+ lockType;
     str += "\n nAcquired : "+ nAcquired;    
     str += "\n Thread : "+ t;    

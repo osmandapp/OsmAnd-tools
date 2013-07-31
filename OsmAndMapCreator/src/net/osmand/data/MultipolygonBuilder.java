@@ -97,7 +97,7 @@ public class MultipolygonBuilder {
 			multipolygons.add(new Multipolygon(outer, innersInsideOuter, id));
 		}
 
-		if (inners.size() != 0 && log != null) {
+		if (!inners.isEmpty() && log != null) {
 			log.warn("Multipolygon " + getId() + " has a mismatch in outer and inner rings");
 		}
 

@@ -25,7 +25,7 @@ import java.util.ArrayList;
 */
 public class rTreeDemo
 {
-  public static void main(String argv[])
+  public static void main(String[] argv)
   {
     //rTreeDemo rt = new rTreeDemo();
     new TreeThread();
@@ -85,9 +85,9 @@ public void run()
       //trySeed("/tmp/seed.dat", new RTree(fileName));
       //System.out.println("rTreeDemo : height " + rt.getHeight());
       
-      RTreeRead rd = new RTreeRead(fileName+"1");
+      RTreeRead rd = new RTreeRead(fileName+ '1');
       rd.readSeq();
-      rd = new RTreeRead(fileName+"2");
+      rd = new RTreeRead(fileName+ '2');
       rd.readSeq();
        
       //tryJoin();
@@ -248,7 +248,7 @@ public void run()
       xy = rnd.nextInt(h - iy);
       xx = rnd.nextInt(w - ix);
       long start4 = System.currentTimeMillis();
-      List elmts = null;
+      List elmts;
       //  elmts = rt.overlaps(new Rect(ix,iy,ix+xx,iy+xy));
       //  System.out.println("Time in ms:" + (System.currentTimeMillis()-start4));
       //  System.out.println("Search result-Total elements:"+elmts.size());
@@ -412,7 +412,7 @@ public void run()
       Rect rect2 = new Rect(4,2,5,3);
       //Rect rect1 = new Rect(9,6,10,7);//true
       //Rect rect2 = new Rect(8,5,11,8);//true
-      System.out.println(rect1.toString()+" \nand\n"+rect2.toString()
+      System.out.println(rect1 +" \nand\n"+ rect2
                          +"\noverlap? \n\tAns- "+rect2.contains(rect1));
     }
     catch(Exception e){
@@ -436,7 +436,7 @@ public void run()
       //Rect rect2 = new Rect(4,2,5,3);//4 2 5 3
       Rect rect1 = new Rect(9,6,10,7);//null
       Rect rect2 = new Rect(8,5,11,8);//null - comp the two 9 6 10 7
-      System.out.println(rect1.toString()+" \nand\n"+rect2.toString()
+      System.out.println(rect1 +" \nand\n"+ rect2
                          +"\nIntersection \n\tAns- "+rect2.intersection(rect1));
     }
     catch(Exception e){
@@ -449,7 +449,7 @@ public void run()
       Rect rect1 = new Rect(3,2,5,4);
       Rect rect2 = new Rect(3,2,4,4);//true 
       //Rect rect2 = new Rect(6,2,6,2);//false
-      System.out.println(rect1.toString()+" \nand\n"+rect2.toString()
+      System.out.println(rect1 +" \nand\n"+ rect2
                          +"\nDoes first Eclose second? \n\tAns- "
                          +rect1.covers(rect2));
     }
@@ -469,7 +469,7 @@ public void run()
       //Rect rect2 = new Rect(3,1,5,3);//true
       //Rect rect2 = new Rect(4,3,4,3);//true - check
       Rect rect2 = new Rect(3,2,3,2);//true
-      System.out.println(rect1.toString()+" \nand\n"+rect2.toString()
+      System.out.println(rect1 +" \nand\n"+ rect2
                          +"\nDo Both Intersect? \n\tAns- "
                          +rect1.meet(rect2));
     }
@@ -513,8 +513,8 @@ public void run()
       //String lt = new String("c:\\temp\temptree.dat");
       //String lt = new String("/mnt/projects/data/MUM4_78.idx");
       //String rt = new String("/mnt/projects/data/MUM4_118.idx");
-      RTree ltTree = new RTree(/*lt*/fileName+"1");
-      RTree rtTree = new RTree(/*rt*/fileName+"2");
+      RTree ltTree = new RTree(/*lt*/fileName+ '1');
+      RTree rtTree = new RTree(/*rt*/fileName+ '2');
       //System.out.println("rTreeDemo.tryJoin : lt size " + ltTree.getAllElements().size());
 
       Join join = new Join(ltTree, rtTree, new Pair(), new IntersectPred());
@@ -558,7 +558,7 @@ class RTreeRead
       long length = file.length();
       if(length == 0)
         return;
-      Integer ln = new Integer((new Long(file.length())).intValue());
+      Integer ln = Integer.valueOf((Long.valueOf(file.length())).intValue());
       int kbytes = (new Double(Math.floor(ln.doubleValue()/4096))).intValue();
       file.seek(0);
       for(int i=0;i<kbytes+1;i++)
@@ -580,7 +580,7 @@ class RTreeRead
   public void printFlHdr(byte[] data)
   {
     try{
-      int frNode = 123;
+      int frNode;
       DataInputStream ds = 
         new DataInputStream(new ByteArrayInputStream(data));
       System.out.println("\t***The File Header***");

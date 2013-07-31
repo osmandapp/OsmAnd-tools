@@ -296,7 +296,7 @@ public final class Fileformat {
       }
       
       public Builder mergeFrom(crosby.binary.Fileformat.Blob other) {
-        if (other == crosby.binary.Fileformat.Blob.getDefaultInstance()) return this;
+        if (other.equals(Blob.getDefaultInstance())) return this;
         if (other.hasRaw()) {
           setRaw(other.getRaw());
         }
@@ -532,8 +532,7 @@ public final class Fileformat {
     @Override
 	public final boolean isInitialized() {
       if (!hasType) return false;
-      if (!hasDatasize) return false;
-      return true;
+        return hasDatasize;
     }
     
     @Override
@@ -739,7 +738,7 @@ public final class Fileformat {
       }
       
       public Builder mergeFrom(crosby.binary.Fileformat.BlockHeader other) {
-        if (other == crosby.binary.Fileformat.BlockHeader.getDefaultInstance()) return this;
+        if (other.equals(BlockHeader.getDefaultInstance())) return this;
         if (other.hasType()) {
           setType(other.getType());
         }

@@ -70,13 +70,13 @@ public class MapClusterLayer implements MapPanelLayer {
 		menu.add(clustering);
 	}
 	
-	private class ClusteringContext {
+	private static class ClusteringContext {
 		// final
 		boolean ANIMATE_CLUSTERING = false;
 		boolean BASEMAP_CLUSTERING = true;
 
 		int ZOOM_LIMIT = BASEMAP_CLUSTERING ? 11 : 15;
-		int LOCAL_TILE_BOUNDARIES = BASEMAP_CLUSTERING? 4 : 4;
+		int LOCAL_TILE_BOUNDARIES = 4;
 		int zm = 31 - ZOOM_LIMIT;
 		
 		
@@ -85,7 +85,7 @@ public class MapClusterLayer implements MapPanelLayer {
 		int outOfDistance = 0;
 		int roadProcessed = 0;
 		int segmentsProcessed = 0;
-		float minRatio = 1f;
+		float minRatio = 1.0f;
 		int roadMinProcessed = 0;
 	}
 	
@@ -151,7 +151,7 @@ public class MapClusterLayer implements MapPanelLayer {
 		if (st != null) {
 			RouteDataObject road = st.getRoad();
 			String highway = getHighway(road);
-			log.info("ROAD TO START " + highway + " " + //road.getName() + " " 
+			log.info("ROAD TO START " + highway + ' ' + //road.getName() + " "
 					+ road.id);
 		}
 		map.setPoints(points);

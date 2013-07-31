@@ -67,8 +67,8 @@ public class IndexUploader {
 
 	protected static final Log log = PlatformUtil.getLog(IndexUploader.class);
 	private final static double MIN_SIZE_TO_UPLOAD = 0.001d;
-	private final static double MAX_SIZE_TO_NOT_SPLIT = 190d;
-	private final static double MAX_UPLOAD_SIZE = 195d;
+	private final static double MAX_SIZE_TO_NOT_SPLIT = 190.0d;
+	private final static double MAX_UPLOAD_SIZE = 195.0d;
 
 	private final static int BUFFER_SIZE = 1 << 15;
 	private final static int MB = 1 << 20;
@@ -494,7 +494,7 @@ public class IndexUploader {
 			int i = 1;
 			int read = 0;
 			while (read != -1) {
-				File fout = new File(f.getParent(), f.getName() + "-" + i);
+				File fout = new File(f.getParent(), f.getName() + '-' + i);
 				arrayList.add(fout);
 				FileOutputStream fo = new FileOutputStream(fout);
 				int limit = (int) (MAX_SIZE_TO_NOT_SPLIT * MB);
@@ -670,11 +670,8 @@ public class IndexUploader {
 				return false;
 			}
 			filename += "-1";
-			if (uploaded.containsKey(filename) && date.equals(uploaded.get(filename))) {
-				return false; 
-			}
-			return true;
-		}
+            return !(uploaded.containsKey(filename) && date.equals(uploaded.get(filename)));
+        }
 		
 		@Override
 		public void upload(IndexUploader uploader, File toUpload,
@@ -683,8 +680,8 @@ public class IndexUploader {
 			if (uploaded.containsKey(toUpload.getName()) && date.equals(uploaded.get(toUpload.getName()))) {
 				return;
 			}
-			String descriptionFile = "{" + date + " : " + size + " MB}";
-			summary += " " + descriptionFile;
+			String descriptionFile = '{' + date + " : " + size + " MB}";
+			summary += ' ' + descriptionFile;
 
 			List<File> splittedFiles = Collections.emptyList();
 			try {
@@ -730,7 +727,7 @@ public class IndexUploader {
 				// wait 5 seconds
 			}
 		} catch (IOException e) {
-			log.warn("Deleting file from downloads" + f.getName() + " " + e.getMessage());
+			log.warn("Deleting file from downloads" + f.getName() + ' ' + e.getMessage());
 		}
 
 		GoogleCodeUploadIndex uploader = new GoogleCodeUploadIndex();
@@ -765,20 +762,20 @@ public class IndexUploader {
 
 	public void uploadToFTP(File f, String description, String size, String date, UploadCredentials credentials)
 			throws IOException {
-		log.info("Uploading file " + f.getName() + " " + size + " MB " + date + " of " + description);
+		log.info("Uploading file " + f.getName() + ' ' + size + " MB " + date + " of " + description);
 		// Upload to ftp
 		FTPFileUpload upload = new FTPFileUpload();
 		String serverName = credentials.url;
 		if(serverName.startsWith("ftp://")){
 			serverName = serverName.substring("ftp://".length());
 		}
-		upload.upload(serverName, credentials.password, credentials.password, credentials.path + "" + f.getName(), f, 1 << 15);
+		upload.upload(serverName, credentials.password, credentials.password, credentials.path + f.getName(), f, 1 << 15);
 		log.info("Finish uploading file index");
 	}
 	
 	public void uploadToSSH(File f, String description, String size, String date, UploadSSHCredentials cred) throws IOException,
 			JSchException {
-		log.info("Uploading file " + f.getName() + " " + size + " MB " + date + " of " + description);
+		log.info("Uploading file " + f.getName() + ' ' + size + " MB " + date + " of " + description);
 		// Upload to ftp
 		JSch jSch = new JSch();
 		boolean knownHosts = false;
@@ -802,7 +799,7 @@ public class IndexUploader {
 			config.put("StrictHostKeyChecking", "no");
 			session.setConfig(config);
 		}
-		String rfile = cred.path + "/"+ f.getName();
+		String rfile = cred.path + '/' + f.getName();
 		String lfile = f.getAbsolutePath();
 		session.connect();
 
@@ -825,7 +822,7 @@ public class IndexUploader {
 
 		// send "C0644 filesize filename", where filename should not include '/'
 		long filesize = (new File(lfile)).length();
-		command = "C0644 " + filesize + " ";
+		command = "C0644 " + filesize + ' ';
 		if (lfile.lastIndexOf('/') > 0) {
 			command += lfile.substring(lfile.lastIndexOf('/') + 1);
 		} else {
@@ -880,17 +877,17 @@ public class IndexUploader {
 			return b;
 
 		if (b == 1 || b == 2) {
-			StringBuffer sb = new StringBuffer();
+			StringBuilder sb = new StringBuilder();
 			int c;
 			do {
 				c = in.read();
 				sb.append((char) c);
 			} while (c != '\n');
 			if (b == 1) { // error
-				System.out.print(sb.toString());
+				System.out.print(sb);
 			}
 			if (b == 2) { // fatal error
-				System.out.print(sb.toString());
+				System.out.print(sb);
 			}
 		}
 		return b;

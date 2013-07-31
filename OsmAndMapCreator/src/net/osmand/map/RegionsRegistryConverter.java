@@ -85,7 +85,7 @@ public class RegionsRegistryConverter {
 		Iterator<Entry<String, Element>> it = countries.entrySet().iterator();
 		while(it.hasNext()) {
 			Entry<String, Element> e = it.next();
-			parseDomRegions(e.getValue(), elements, e.getKey() +"#", "region");
+			parseDomRegions(e.getValue(), elements, e.getKey() + '#', "region");
 		}
 	
 		for (RegionCountry rc : regCountries) {
@@ -111,18 +111,18 @@ public class RegionsRegistryConverter {
 	private static void validateRegion(Map<String, Element> elements, RegionCountry r, String rgName) {
 		Element reg = elements.get(rgName);
 		String bbox = reg.getAttribute("bbox");
-		String b = r.left + " " + r.top + " " + r.right + " " + r.bottom;
+		String b = r.left + " " + r.top + ' ' + r.right + ' ' + r.bottom;
 		if(!bbox.equals(b)) {
 			System.out.println("Region " + rgName);
-			System.out.println("Validate bbox '" + bbox + "' != '" +b +"'");
+			System.out.println("Validate bbox '" + bbox + "' != '" +b + '\'');
 			reg.setAttribute("bbox", b);
 		}
 		
 		String size = reg.getAttribute("size");
-		String sz = r.getTileSize()+"";
+		String sz = String.valueOf(r.getTileSize());
 		if(!size.equals(sz)) {
 			System.out.println("Region " + rgName);
-			System.out.println("Validate size '" + size + "' != '" +sz +"'");
+			System.out.println("Validate size '" + size + "' != '" +sz + '\'');
 			reg.setAttribute("size", sz);
 		}
 		
@@ -139,7 +139,7 @@ public class RegionsRegistryConverter {
 		String tsz = r.serializeTilesArray();
 		if(!ts.equals(tsz)) {
 			System.out.println("Region " + rgName);
-			System.out.println("Format tiles '" + ts + "' != '" +tsz +"'");
+			System.out.println("Format tiles '" + ts + "' != '" +tsz + '\'');
 			tiles.setTextContent(tsz);
 		}
 	}
@@ -155,7 +155,7 @@ public class RegionsRegistryConverter {
 		Iterator<Entry<String, Element>> it = countries.entrySet().iterator();
 		while(it.hasNext()) {
 			Entry<String, Element> e = it.next();
-			parseDomRegions(e.getValue(), elements, e.getKey() +"#", "region");
+			parseDomRegions(e.getValue(), elements, e.getKey() + '#', "region");
 		}
 	
 		for(RegionCountry rc : regCountries) {
@@ -205,7 +205,7 @@ public class RegionsRegistryConverter {
 		Iterator<Entry<String, Element>> it = countries.entrySet().iterator();
 		while(it.hasNext()) {
 			Entry<String, Element> e = it.next();
-			parseDomRegions(e.getValue(), elements, e.getKey() +"#", "region");
+			parseDomRegions(e.getValue(), elements, e.getKey() + '#', "region");
 		}
 	
 		for(RegionCountry rc : regCountries) {
@@ -290,8 +290,8 @@ public class RegionsRegistryConverter {
 		for(RegionCountry c : originalcountries) {
 			subregionsOrig += c.getSubRegions().size();
 		}
-		System.out.println("Read countries " + regInfo.getRegionInfo().getRegionsCount() + " " + originalcountries.size());
-		System.out.println("Read countries " + subregions + " " + subregionsOrig );
+		System.out.println("Read countries " + regInfo.getRegionInfo().getRegionsCount() + ' ' + originalcountries.size());
+		System.out.println("Read countries " + subregions + ' ' + subregionsOrig );
 		System.out.println("Timing " + t);
 	}
 	
@@ -468,7 +468,7 @@ public class RegionsRegistryConverter {
 					for (int t = 0; t < areaMatrix.length; t++) {
 						 System.out.println(Arrays.toString(areaMatrix[t]));
 					}
-					System.out.println(xleft + " " + ytop + " x " + xright + " " + ybottom + " --- " + a);
+					System.out.println(xleft + " " + ytop + " x " + xright + ' ' + ybottom + " --- " + a);
 
 					float c = (float) r.calcAllTiles().size() / (r.getBoxTiles().size() + r.getSingleTiles().size());
 					System.out.println("Compression " + c);

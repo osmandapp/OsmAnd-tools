@@ -100,7 +100,7 @@ public class SelectPointDialog extends JDialog {
 		l.setConstraints(label, constr);
 
 		latPosition = new JTextField();
-		latPosition.setText(((float)position.getLatitude())+""); //$NON-NLS-1$
+		latPosition.setText(String.valueOf((float) position.getLatitude())); //$NON-NLS-1$
 		panel.add(latPosition);
 		constr = new GridBagConstraints();
 		constr.fill = GridBagConstraints.HORIZONTAL;
@@ -121,7 +121,7 @@ public class SelectPointDialog extends JDialog {
 
 		lonPosition = new JTextField();
 		// Give hint about wms 
-		lonPosition.setText(((float)position.getLongitude())+""); //$NON-NLS-1$
+		lonPosition.setText(String.valueOf((float) position.getLongitude())); //$NON-NLS-1$
 		panel.add(lonPosition);
 		constr = new GridBagConstraints();
 		constr.weightx = 1;
@@ -167,11 +167,11 @@ public class SelectPointDialog extends JDialog {
 	
 	
 	public boolean okPressed() {
-		if (parseDouble(latPosition.getText()) == Double.NaN) {
+		if (Double.isNaN(parseDouble(latPosition.getText()))) {
 			JOptionPane.showMessageDialog(this, "Lat coordinate is not a number", "Wrong position", JOptionPane.ERROR_MESSAGE); //$NON-NLS-1$ //$NON-NLS-2$
 			return false;
 		}
-		if (parseDouble(lonPosition.getText()) == Double.NaN) {
+		if (Double.isNaN(parseDouble(lonPosition.getText()))) {
 			JOptionPane.showMessageDialog(this, "Lon coordinate is not a number", "Wrong position", JOptionPane.ERROR_MESSAGE); //$NON-NLS-1$ //$NON-NLS-2$
 			return false;
 		}

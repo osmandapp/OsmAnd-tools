@@ -48,7 +48,7 @@ public class FileBlock extends FileBlockBase {
         Deflater deflater = new Deflater();
         deflater.setInput(data.toByteArray());
         deflater.finish();
-        byte out[] = new byte[size];
+        byte[] out = new byte[size];
         deflater.deflate(out);
         
         if (!deflater.finished()) {
