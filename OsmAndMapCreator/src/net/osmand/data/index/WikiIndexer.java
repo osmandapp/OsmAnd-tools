@@ -334,7 +334,7 @@ public class WikiIndexer {
 						}
 						if (parseText) {
 							if(id % 500 == 0) {
-								log.debug("Article accepted " + cid + ' ' + title.toString());
+								log.debug("Article accepted " + cid + ' ' + title);
 							}
 							analyzeTextForGeoInfoNew();
 						}
@@ -666,7 +666,7 @@ public class WikiIndexer {
 			streamWriter.writeCharacters("\n  ");
 			streamWriter.writeStartElement("tag");
 			streamWriter.writeAttribute("k", "wikipedia");
-			streamWriter.writeAttribute("v", locale + ':' +title.toString());
+			streamWriter.writeAttribute("v", locale + ':' + title);
 			streamWriter.writeEndElement();
 			
 

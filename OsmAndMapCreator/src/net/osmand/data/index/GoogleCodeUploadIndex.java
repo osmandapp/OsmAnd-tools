@@ -151,7 +151,7 @@ public class GoogleCodeUploadIndex {
 				errorBody.append(new String(buf, 0, count, "utf-8")); //$NON-NLS-1$
 			}
 			if (errorBody.length() > 0) {
-				log("ERROR " + errorBody.toString());
+				log("ERROR " + errorBody);
 			}
 			in.close();
 		}
@@ -165,7 +165,7 @@ public class GoogleCodeUploadIndex {
         while ( (count = in.read(buf)) >= 0 ) {
             responseBody.append(new String(buf, 0, count, "ascii")); //$NON-NLS-1$
         }
-        log("Upload finished response " + responseBody.toString());
+        log("Upload finished response " + responseBody);
         in.close();
         
         conn.disconnect();
