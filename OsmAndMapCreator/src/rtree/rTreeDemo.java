@@ -558,7 +558,7 @@ class RTreeRead
       long length = file.length();
       if(length == 0)
         return;
-      Integer ln = new Integer((new Long(file.length())).intValue());
+      Integer ln = Integer.valueOf((Long.valueOf(file.length())).intValue());
       int kbytes = (new Double(Math.floor(ln.doubleValue()/4096))).intValue();
       file.seek(0);
       for(int i=0;i<kbytes+1;i++)

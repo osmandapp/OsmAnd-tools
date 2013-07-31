@@ -168,7 +168,7 @@ public class RTreeClient
     try
       {
         String command="nearest";
-        Object obj[]={pt,new Long(ln),new Integer(in)};
+        Object obj[]={pt, Long.valueOf(ln), Integer.valueOf(in)};
         Object[] response=sendRequest(command,obj);
         if(response!=null)
           {
@@ -193,7 +193,7 @@ public class RTreeClient
     try
       {
         String command="nearestsearch";
-        Object obj[]={pt,new Long(ln)};
+        Object obj[]={pt, Long.valueOf(ln)};
         Object[] response=sendRequest(command,obj);
         return (List) response[0];
       }
@@ -213,7 +213,7 @@ public class RTreeClient
         out.writeObject(command);
         if(param!=null)
           {
-            out.writeObject(new Integer (param.length));
+            out.writeObject(Integer.valueOf(param.length));
             for(int i=0;i<param.length;i++)
               {
                 out.writeObject(param[i]);
@@ -221,7 +221,7 @@ public class RTreeClient
           }
         else
           {
-            out.writeObject(new Integer(0));
+            out.writeObject(Integer.valueOf(0));
           }
         //                      out.flush();
         out.close();

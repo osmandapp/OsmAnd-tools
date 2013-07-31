@@ -22,9 +22,9 @@ public class StringTable {
 
     public void incr(String s) {
         if (counts.containsKey(s)) {
-            counts.put(s, new Integer(counts.get(s).intValue() + 1));
+            counts.put(s, Integer.valueOf(counts.get(s).intValue() + 1));
         } else {
-            counts.put(s, new Integer(1));
+            counts.put(s, Integer.valueOf(1));
         }
     }
 
@@ -66,7 +66,7 @@ public class StringTable {
         }
         stringmap = new HashMap<String, Integer>(2 * set.length);
         for (int i = 0; i < set.length; i++) {
-            stringmap.put(set[i], new Integer(i+1)); // Index 0 is reserved for use as a delimiter.
+            stringmap.put(set[i], Integer.valueOf(i + 1)); // Index 0 is reserved for use as a delimiter.
         }
         counts = null;
     }
