@@ -496,9 +496,9 @@ public class MinskTransReader {
 						current.name = newS;
 					}
 				} else if(i==5){
-					current.longitude = Double.parseDouble(newS)/1e5;
+					current.longitude = Double.parseDouble(newS)/ 1.0e5;
 				} else if(i==6){
-					current.latitude =  Double.parseDouble(newS)/1e5;
+					current.latitude =  Double.parseDouble(newS)/ 1.0e5;
 				}
 				stI = endI + 1;
 				i++;

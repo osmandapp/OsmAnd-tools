@@ -487,8 +487,8 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 			return;	
 		}
 		int tileSize = getTileSize();
-		double xTileLeft = getXTile() - getSize().width / (2d * tileSize);
-		double yTileUp = getYTile() - getSize().height / (2d * tileSize);
+		double xTileLeft = getXTile() - getSize().width / (2.0d * tileSize);
+		double yTileUp = getYTile() - getSize().height / (2.0d * tileSize);
 		int i = request.xTile - (int)xTileLeft;
 		int j = request.yTile - (int)yTileUp;
 		if (request.zoom == this.zoom && (i >= 0 && i < images.length) && (j >= 0 && j < images[i].length)) {

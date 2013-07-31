@@ -67,7 +67,7 @@ public class ConsoleProgressImplementation implements IProgress {
 	}
 
 	public double getCurrentPercent(){
-		return (double) currentDone * 100d / work;
+		return (double) currentDone * 100.0d / work;
 	}
 
 	@Override
