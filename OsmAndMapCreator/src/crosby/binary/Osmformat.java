@@ -133,7 +133,7 @@ public final class Osmformat {
             .computeStringSizeNoTag(element);
         }
         size += dataSize;
-        size += 1 * getRequiredFeaturesList().size();
+        size += getRequiredFeaturesList().size();
       }
       {
         int dataSize = 0;
@@ -142,7 +142,7 @@ public final class Osmformat {
             .computeStringSizeNoTag(element);
         }
         size += dataSize;
-        size += 1 * getOptionalFeaturesList().size();
+        size += getOptionalFeaturesList().size();
       }
       if (hasWritingprogram()) {
         size += com.google.protobuf.CodedOutputStream
@@ -2325,7 +2325,7 @@ public final class Osmformat {
             .computeBytesSizeNoTag(element);
         }
         size += dataSize;
-        size += 1 * getSList().size();
+        size += getSList().size();
       }
       size += getUnknownFields().getSerializedSize();
       memoizedSerializedSize = size;

@@ -89,8 +89,8 @@ public class CoastlinesLayer implements MapPanelLayer {
 				}
 				for (int z = map.getZoom(); z <= basemapProcessor.getTileZoomLevel(); z++) {
 					System.out.println("Zoom " + z);
-					for (int x = xTile * 1 << (z - map.getZoom()); x < (xTile + 1) * (1 << (z - map.getZoom())); x++) {
-						for (int y = yTile * 1 << (z - map.getZoom()); y < (yTile + 1) * (1 << (z - map.getZoom())); y++) {
+					for (int x = xTile << (z - map.getZoom()); x < (xTile + 1) * (1 << (z - map.getZoom())); x++) {
+						for (int y = yTile << (z - map.getZoom()); y < (yTile + 1) * (1 << (z - map.getZoom())); y++) {
 							if (basemapProcessor.isWaterTile(x, y, z)) {
 								System.out.println("Water tile x=" + x + " y=" + y + " z=" + z);
 							}

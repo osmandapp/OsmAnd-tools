@@ -586,7 +586,7 @@ public class MapRouterLayer implements MapPanelLayer {
 				double longitude = 0.0;
 				Way w = new Way(-1);
 				for(int routePointIdx = 0; routePointIdx < route.length / 2; routePointIdx++) {
-					latitude += route[routePointIdx * 2 + 0];
+					latitude += route[(routePointIdx * 2)];
 					longitude += route[routePointIdx * 2 + 1];
 					
 					w.addNode(new net.osmand.osm.edit.Node(latitude, longitude, -1));
