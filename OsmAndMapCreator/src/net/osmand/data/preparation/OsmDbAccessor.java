@@ -279,7 +279,7 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 		
 	}
 
-	public class AbstractProducer extends Thread {
+	public static class AbstractProducer extends Thread {
 		private final Entity endingEntity = new Node(0,0,0);
 		
 		public Entity getEndingEntity() {

@@ -223,7 +223,7 @@ public class WikiIndexer {
 		}
 	}
 
-	public class WikiOsmHandler extends DefaultHandler {
+	public static class WikiOsmHandler extends DefaultHandler {
 		private final static boolean RECOGNIZE_ENGLISH = true;
 		long id = 1;
 		private final SAXParser saxParser;

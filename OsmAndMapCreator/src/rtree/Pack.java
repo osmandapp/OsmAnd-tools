@@ -229,7 +229,7 @@ public class Pack
     return netNodes;
   }
   /**An inner class for the packing method*/
-  class Slice
+  static class Slice
   {
     int start;
     int end;
@@ -240,7 +240,7 @@ public class Pack
     }
   }
   /**A wrapper class for int*/
-  class Int
+  static class Int
   {
     int val;
     Int(int val)

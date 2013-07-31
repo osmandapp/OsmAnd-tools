@@ -316,7 +316,7 @@ public class SdTree extends RTree
       return rect;      
     }//else
   }
-  class LongWraper
+  static class LongWraper
   {
     long val = Node.NOT_DEFINED;
   }

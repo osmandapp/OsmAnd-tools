@@ -70,7 +70,7 @@ public class MapClusterLayer implements MapPanelLayer {
 		menu.add(clustering);
 	}
 	
-	private class ClusteringContext {
+	private static class ClusteringContext {
 		// final
 		boolean ANIMATE_CLUSTERING = false;
 		boolean BASEMAP_CLUSTERING = true;

@@ -58,7 +58,7 @@ public class RTree //the tree that would be made
   protected FileHdr fileHdr;
   public static CachedNodes chdNodes;
   /**Inner class for the fileList vector - A List of files*/
-  class Header
+  static class Header
   {
     FileHdr flHdr;
     String fileName;
@@ -1176,7 +1176,7 @@ public class RTree //the tree that would be made
      this class is a wrapper class for a <code>long</code> value. There is no way to overwrite
      the value contained in the <code>java.lang.Long</code> wrapper class.
   */
-  protected class Nearest//a wrapper class for long
+  protected static class Nearest//a wrapper class for long
   {
     public long value;
   }
