@@ -70,7 +70,7 @@ public class MapRoutingTypes {
 	}
 	
 	public static String constructRuleKey(String tag, String val) {
-		if(val == null || val.length() == 0){
+		if(val == null || val.isEmpty()){
 			return tag;
 		}
 		return tag + TAG_DELIMETER + val;

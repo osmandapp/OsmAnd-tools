@@ -248,7 +248,7 @@ public class DataExtractionSettings {
 		int nextI = 0;
 		while((nextI=s.indexOf(',',i)) >= 0){
 			String t = s.substring(i, nextI).trim();
-			if(t.length() > 0){
+			if(!t.isEmpty()){
 				l.add(t);
 			}
 			i = nextI + 1;
@@ -266,7 +266,7 @@ public class DataExtractionSettings {
 		int nextI = 0;
 		while((nextI=s.indexOf(',',i)) >= 0){
 			String t = s.substring(i, nextI).trim();
-			if(t.length() > 0){
+			if(!t.isEmpty()){
 				l.add(t);
 			}
 			i = nextI + 1;

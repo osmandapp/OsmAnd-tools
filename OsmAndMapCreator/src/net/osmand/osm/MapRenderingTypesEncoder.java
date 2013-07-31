@@ -170,7 +170,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		}
 		rtype.tag = parser.getAttributeValue("", "tag"); //$NON-NLS-1$
 		rtype.value = parser.getAttributeValue("", "value"); //$NON-NLS-1$
-		if (rtype.value != null && rtype.value.length() == 0) { //$NON-NLS-1$
+		if (rtype.value != null && rtype.value.isEmpty()) { //$NON-NLS-1$
 			rtype.value = null;
 		}
 		registerRuleType(rtype.tag, rtype.value, rtype);
@@ -191,7 +191,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			rtype.names = new MapRulType[names.length];
 			for (int i = 0; i < names.length; i++) {
 				String tagName = names[i];
-				if(rtype.namePrefix.length() > 0) {
+				if(!rtype.namePrefix.isEmpty()) {
 					tagName = rtype.namePrefix + tagName;
 				}
 				MapRulType mt = types.get(constructRuleKey(tagName, null));
@@ -265,7 +265,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		}
 		for(MapRulType mt : tempList){
 			String val = e.getTag(mt.tag);
-			if(val != null && val.length() > 0){
+			if(val != null && !val.isEmpty()){
 				namesToEncode.put(mt, val);
 			}
 		}
@@ -283,7 +283,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 					if (tokens.length > 2 && rt.names != null) {
 						String symbol = "osmc_symbol_" + tokens[1] + '_' + tokens[2] + "_name";
 						String name = "\u00A0";
-						if (tokens.length > 3 && tokens[3].trim().length() > 0) {
+						if (tokens.length > 3 && !tokens[3].trim().isEmpty()) {
 							name = tokens[3];
 						}
 						for(int k = 0; k < rt.names.length; k++) {

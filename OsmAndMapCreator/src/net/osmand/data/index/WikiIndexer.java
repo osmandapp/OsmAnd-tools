@@ -426,7 +426,7 @@ public class WikiIndexer {
 		}
 		
 		private float zeroParseFloat(String s) {
-			return s == null || s.length() == 0 ? 0 : Float.parseFloat(s);
+			return s == null || s.isEmpty() ? 0 : Float.parseFloat(s);
 		}
 
 		private int findOpenBrackets(int i) {
@@ -506,7 +506,7 @@ public class WikiIndexer {
 					String lon_dir = readProperty("lon_dir", h, e);
 					String lat_dg = readProperty("lat_deg", h, e);
 					String lon_dg = readProperty("lon_deg", h, e);
-					if (lon_dg == null || lat_dg == null || lat_dg.length() == 0 || lon_dg.length() == 0) {
+					if (lon_dg == null || lat_dg == null || lat_dg.isEmpty() || lon_dg.isEmpty()) {
 						return;
 					}
 					float lat_deg = Float.parseFloat(lat_dg);
@@ -547,7 +547,7 @@ public class WikiIndexer {
 				int h = findOpenBrackets(beg);
 				
 				// 1. Find main header section {{ ... lat, lon }}
-				while (h != -1 && text.substring(beg, h).trim().length() == 0 ) {
+				while (h != -1 && text.substring(beg, h).trim().isEmpty()) {
 					beg = findClosedBrackets(h);
 					if(beg == -1){
 						return;

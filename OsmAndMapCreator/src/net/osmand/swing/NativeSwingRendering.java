@@ -207,7 +207,7 @@ public class NativeSwingRendering extends NativeLibrary {
 			return defaultLoadedLibrary;
 		}
 		String filename = DataExtractionSettings.getSettings().getNativeLibFile();
-		if (filename.length() == 0 || !(new File(filename).exists())) {
+		if (filename.isEmpty() || !(new File(filename).exists())) {
 			filename = null;
 		}
 		if (NativeLibrary.loadAllLibs(filename)) {

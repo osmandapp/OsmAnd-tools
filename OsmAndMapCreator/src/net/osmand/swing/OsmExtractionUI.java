@@ -501,7 +501,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 						creator.setCityAdminLevel(DataExtractionSettings.getSettings().getCityAdminLevel());
 						String fn = DataExtractionSettings.getSettings().getMapRenderingTypesFile();
 						MapRenderingTypesEncoder types;
-						if(fn == null || fn.length() == 0){
+						if(fn == null || fn.isEmpty()){
 							types = MapRenderingTypesEncoder.getDefault();
 						} else {
 							types = new MapRenderingTypesEncoder(fn);

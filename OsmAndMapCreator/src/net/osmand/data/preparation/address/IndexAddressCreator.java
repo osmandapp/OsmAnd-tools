@@ -201,7 +201,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 				list.add(c);
 			}
 		}
-		if(list.size() > 0) {
+		if(!list.isEmpty()) {
 			boundaryToContainingCities.put(boundary, list);
 		}
 	}

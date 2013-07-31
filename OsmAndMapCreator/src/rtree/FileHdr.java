@@ -471,7 +471,7 @@ protected void finalize() throws Throwable
     if(threadinfo.nAcquired==0)
       {
         waiters.removeElementAt(index);
-        if(waiters.size()>0){
+        if(!waiters.isEmpty()){
           //System.out.println("FileHdr.unlock : notifiying");
           notifyAll();
         }

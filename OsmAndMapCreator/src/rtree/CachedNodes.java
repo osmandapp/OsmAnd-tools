@@ -63,7 +63,7 @@ class BufferHeader
         replace(key,node);
         return;
       }
-      if(cache.size() == 0){
+      if(cache.isEmpty()){
         last = key;
         cache.put(Integer.valueOf(key), new NodeValue(node,key,key));
       }else{
@@ -173,7 +173,7 @@ class BufferHeader
   {
     try{
       NodeValue node = (NodeValue)(cache.remove(Integer.valueOf(key)));
-      if((cache.size() != 0) && (node != null)){
+      if((!cache.isEmpty()) && (node != null)){
         //if(!RTree.writeThr)
         node.node.flush();
         if(cache.size() == 1){

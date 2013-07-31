@@ -142,7 +142,7 @@ public class MapAddressLayer implements MapPanelLayer {
 		}
 		
 		for(List<Street> l : streets.values()) {
-			while(l.size() > 0){
+			while(!l.isEmpty()){
 				Street s = l.remove(l.size()-1);
 				String cityName = s.getCity().getName();
 				LatLon loc = s.getLocation();

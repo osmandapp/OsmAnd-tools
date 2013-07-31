@@ -306,7 +306,7 @@ public class MapRouterLayer implements MapPanelLayer {
 
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				if(intermediates.size() > 0){
+				if(!intermediates.isEmpty()){
 					intermediates.remove(0);
 				}
 				map.repaint();

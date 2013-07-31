@@ -92,7 +92,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		indexMultiPolygon(e, ctx);
 		if(e instanceof Relation) {
 			Map<MapRulType, String> propogated = renderingTypes.getRelationPropogatedTags(((Relation)e));
-			if(propogated != null && propogated.size() > 0) {
+			if(propogated != null && !propogated.isEmpty()) {
 				ctx.loadEntityRelation((Relation) e);
 				for(EntityId id : ((Relation) e).getMembersMap().keySet()) {
 					if(!propogatedTags.containsKey(id)) {
@@ -132,7 +132,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		renderingTypes.encodeEntityWithType(e, mapZooms.getLevel(0).getMaxZoom(), typeUse, addtypeUse, namesUse, tempNameUse);
 
 		//Don't add multipolygons with an unknown type
-		if (typeUse.size() == 0) return;
+		if (typeUse.isEmpty()) return;
 		excludeFromMainIteration(original.getOuterWays());
 		excludeFromMainIteration(original.getInnerWays());
 
@@ -149,7 +149,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 				logMapDataWarn.warn("In multipolygon  " + e.getId() + " there are incompleted ways");
 			}
 			Ring out = m.getOuterRings().get(0);
-			if(out.getBorder().size() == 0) {
+			if(out.getBorder().isEmpty()) {
 				logMapDataWarn.warn("Multipolygon has an outer ring that can't be formed: "+e.getId());
 				// don't index this
 				continue;
@@ -383,9 +383,9 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			if (!skip) {
 				List<Node> res = new ArrayList<Node>();
 				OsmMapUtils.simplifyDouglasPeucker(wNodes, zoom - 1 + 8 + zoomWaySmothness, 3, res);
-				if (res.size() > 0) {
+				if (!res.isEmpty()) {
 					namesUse.clear();
-					if (name != null && name.length() > 0) {
+					if (name != null && !name.isEmpty()) {
 						namesUse.put(renderingTypes.getNameRuleType(), name);
 					}
 					insertBinaryMapRenderObjectIndex(mapTree[level], res, null, namesUse, id, false, typeUse, addtypeUse, false);

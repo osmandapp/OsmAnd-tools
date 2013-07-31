@@ -1300,7 +1300,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 				((LinkedList) o).remove(delete);
 				if (((LinkedList) o).size() == 1) {
 					map.put(loc, ((LinkedList) o).iterator().next());
-				} else if (((LinkedList) o).size() == 0) {
+				} else if (((LinkedList) o).isEmpty()) {
 					map.remove(loc);
 				}
 			}

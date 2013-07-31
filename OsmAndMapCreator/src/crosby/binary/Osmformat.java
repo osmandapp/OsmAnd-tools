@@ -3154,35 +3154,35 @@ public final class Osmformat {
 	public void writeTo(com.google.protobuf.CodedOutputStream output)
                         throws java.io.IOException {
       getSerializedSize();
-      if (getVersionList().size() > 0) {
+      if (!getVersionList().isEmpty()) {
         output.writeRawVarint32(10);
         output.writeRawVarint32(versionMemoizedSerializedSize);
       }
       for (int element : getVersionList()) {
         output.writeInt32NoTag(element);
       }
-      if (getTimestampList().size() > 0) {
+      if (!getTimestampList().isEmpty()) {
         output.writeRawVarint32(18);
         output.writeRawVarint32(timestampMemoizedSerializedSize);
       }
       for (long element : getTimestampList()) {
         output.writeSInt64NoTag(element);
       }
-      if (getChangesetList().size() > 0) {
+      if (!getChangesetList().isEmpty()) {
         output.writeRawVarint32(26);
         output.writeRawVarint32(changesetMemoizedSerializedSize);
       }
       for (long element : getChangesetList()) {
         output.writeSInt64NoTag(element);
       }
-      if (getUidList().size() > 0) {
+      if (!getUidList().isEmpty()) {
         output.writeRawVarint32(34);
         output.writeRawVarint32(uidMemoizedSerializedSize);
       }
       for (int element : getUidList()) {
         output.writeSInt32NoTag(element);
       }
-      if (getUserSidList().size() > 0) {
+      if (!getUserSidList().isEmpty()) {
         output.writeRawVarint32(42);
         output.writeRawVarint32(userSidMemoizedSerializedSize);
       }
@@ -4167,14 +4167,14 @@ public final class Osmformat {
       if (hasId()) {
         output.writeSInt64(1, getId());
       }
-      if (getKeysList().size() > 0) {
+      if (!getKeysList().isEmpty()) {
         output.writeRawVarint32(18);
         output.writeRawVarint32(keysMemoizedSerializedSize);
       }
       for (int element : getKeysList()) {
         output.writeUInt32NoTag(element);
       }
-      if (getValsList().size() > 0) {
+      if (!getValsList().isEmpty()) {
         output.writeRawVarint32(26);
         output.writeRawVarint32(valsMemoizedSerializedSize);
       }
@@ -4794,7 +4794,7 @@ public final class Osmformat {
 	public void writeTo(com.google.protobuf.CodedOutputStream output)
                         throws java.io.IOException {
       getSerializedSize();
-      if (getIdList().size() > 0) {
+      if (!getIdList().isEmpty()) {
         output.writeRawVarint32(10);
         output.writeRawVarint32(idMemoizedSerializedSize);
       }
@@ -4804,21 +4804,21 @@ public final class Osmformat {
       if (hasDenseinfo()) {
         output.writeMessage(5, getDenseinfo());
       }
-      if (getLatList().size() > 0) {
+      if (!getLatList().isEmpty()) {
         output.writeRawVarint32(66);
         output.writeRawVarint32(latMemoizedSerializedSize);
       }
       for (long element : getLatList()) {
         output.writeSInt64NoTag(element);
       }
-      if (getLonList().size() > 0) {
+      if (!getLonList().isEmpty()) {
         output.writeRawVarint32(74);
         output.writeRawVarint32(lonMemoizedSerializedSize);
       }
       for (long element : getLonList()) {
         output.writeSInt64NoTag(element);
       }
-      if (getKeysValsList().size() > 0) {
+      if (!getKeysValsList().isEmpty()) {
         output.writeRawVarint32(82);
         output.writeRawVarint32(keysValsMemoizedSerializedSize);
       }
@@ -5481,14 +5481,14 @@ public final class Osmformat {
       if (hasId()) {
         output.writeInt64(1, getId());
       }
-      if (getKeysList().size() > 0) {
+      if (!getKeysList().isEmpty()) {
         output.writeRawVarint32(18);
         output.writeRawVarint32(keysMemoizedSerializedSize);
       }
       for (int element : getKeysList()) {
         output.writeUInt32NoTag(element);
       }
-      if (getValsList().size() > 0) {
+      if (!getValsList().isEmpty()) {
         output.writeRawVarint32(26);
         output.writeRawVarint32(valsMemoizedSerializedSize);
       }
@@ -5498,7 +5498,7 @@ public final class Osmformat {
       if (hasInfo()) {
         output.writeMessage(4, getInfo());
       }
-      if (getRefsList().size() > 0) {
+      if (!getRefsList().isEmpty()) {
         output.writeRawVarint32(66);
         output.writeRawVarint32(refsMemoizedSerializedSize);
       }
@@ -6218,14 +6218,14 @@ public final class Osmformat {
       if (hasId()) {
         output.writeInt64(1, getId());
       }
-      if (getKeysList().size() > 0) {
+      if (!getKeysList().isEmpty()) {
         output.writeRawVarint32(18);
         output.writeRawVarint32(keysMemoizedSerializedSize);
       }
       for (int element : getKeysList()) {
         output.writeUInt32NoTag(element);
       }
-      if (getValsList().size() > 0) {
+      if (!getValsList().isEmpty()) {
         output.writeRawVarint32(26);
         output.writeRawVarint32(valsMemoizedSerializedSize);
       }
@@ -6235,21 +6235,21 @@ public final class Osmformat {
       if (hasInfo()) {
         output.writeMessage(4, getInfo());
       }
-      if (getRolesSidList().size() > 0) {
+      if (!getRolesSidList().isEmpty()) {
         output.writeRawVarint32(66);
         output.writeRawVarint32(rolesSidMemoizedSerializedSize);
       }
       for (int element : getRolesSidList()) {
         output.writeInt32NoTag(element);
       }
-      if (getMemidsList().size() > 0) {
+      if (!getMemidsList().isEmpty()) {
         output.writeRawVarint32(74);
         output.writeRawVarint32(memidsMemoizedSerializedSize);
       }
       for (long element : getMemidsList()) {
         output.writeSInt64NoTag(element);
       }
-      if (getTypesList().size() > 0) {
+      if (!getTypesList().isEmpty()) {
         output.writeRawVarint32(82);
         output.writeRawVarint32(typesMemoizedSerializedSize);
       }

@@ -89,7 +89,7 @@ public class BinarySerializer {
 
     public void processBatch() {
         // System.out.format("Batch of %d groups: ",groups.size());
-        if (groups.size() == 0)
+        if (groups.isEmpty())
             return;
         Osmformat.PrimitiveBlock.Builder primblock = Osmformat.PrimitiveBlock
                 .newBuilder();

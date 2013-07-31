@@ -427,25 +427,25 @@ public class MinskTransReader {
 				
 				String newS = st.substring(stI, endI);
 				if(i==0){
-					if(newS.length() > 0){
+					if(!newS.isEmpty()){
 						current.routeNum = newS;
 					} else if(previous != null){
 						current.routeNum = previous.routeNum;
 					}
 				} else if(i==3){
-					if(newS.length() > 0){
+					if(!newS.isEmpty()){
 						current.transport = newS;
 					} else if(previous != null){
 						current.transport = previous.transport;
 					}
 				} else if(i==8){
-					if(newS.length() > 0){
+					if(!newS.isEmpty()){
 						current.routeType = newS;
 					} else if(previous != null){
 						current.routeType  = previous.routeType ;
 					}
 				} else if(i==10){
-					if(newS.length() > 0){
+					if(!newS.isEmpty()){
 						current.routeName = newS;
 					} else if(previous != null){
 						current.routeName  = previous.routeName ;
@@ -456,7 +456,7 @@ public class MinskTransReader {
 					String[] strings = newS.split(",");
 					for(String s : strings){
 						s = s.trim();
-						if(s.length() > 0){
+						if(!s.isEmpty()){
 							current.routeStops.add(s);
 						}
 					}
@@ -490,7 +490,7 @@ public class MinskTransReader {
 				if(i==0){
 					current.stopId = newS.trim();
 				} else if(i==4){
-					if(newS.length() == 0 && previous != null){
+					if(newS.isEmpty() && previous != null){
 						current.name = previous.name;
 					} else {
 						current.name = newS;

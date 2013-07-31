@@ -156,7 +156,7 @@ public class IndexBatchCreator {
 		
 		indexPOI = Boolean.parseBoolean(process.getAttribute("indexPOI"));
 		indexMap = Boolean.parseBoolean(process.getAttribute("indexMap"));
-		indexRouting = process.getAttribute("indexRouting") == null || 
+		indexRouting = process.getAttribute("indexRouting") == null ||
 				process.getAttribute("indexRouting").equalsIgnoreCase("true");
 		indexTransport = Boolean.parseBoolean(process.getAttribute("indexTransport"));
 		indexAddress = Boolean.parseBoolean(process.getAttribute("indexAddress"));
@@ -218,7 +218,7 @@ public class IndexBatchCreator {
 					RegionSpecificData data = new RegionSpecificData();
 					data.cityAdminLevel = ncountry.getAttribute("cityAdminLevel");
 					String dname = ncountry.getAttribute("downloadName");
-					data.downloadName = dname == null || dname.length() == 0 ? name : dname;
+					data.downloadName = dname == null || dname.isEmpty() ? name : dname;
 					if(name != null && !Boolean.parseBoolean(ncountry.getAttribute("skip"))){
 						countries.regionNames.put(name, data);
 					}
@@ -231,7 +231,7 @@ public class IndexBatchCreator {
 
 	private void parseProcessAttributes(Element process) {
 		String zooms = process.getAttribute("mapZooms");
-		if(zooms == null || zooms.length() == 0){
+		if(zooms == null || zooms.isEmpty()){
 			mapZooms = MapZooms.getDefault();
 		} else {
 			mapZooms = MapZooms.parseZooms(zooms);
@@ -242,14 +242,14 @@ public class IndexBatchCreator {
 			zoomWaySmoothness = Integer.parseInt(szoomWaySmoothness);
 		}
 		String f = process.getAttribute("renderingTypesFile");
-		if(f == null || f.length() == 0){
+		if(f == null || f.isEmpty()){
 			types = MapRenderingTypesEncoder.getDefault();
 		} else {
 			types = new MapRenderingTypesEncoder(f);
 		}
 		
 		String osmDbDialect = process.getAttribute("osmDbDialect");
-		if(osmDbDialect != null && osmDbDialect.length() > 0){
+		if(osmDbDialect != null && !osmDbDialect.isEmpty()){
 			try {
 				this.osmDbDialect = DBDialect.valueOf(osmDbDialect.toUpperCase());
 			} catch (RuntimeException e) {
@@ -257,7 +257,7 @@ public class IndexBatchCreator {
 		}
 		
 		String mapDbDialect = process.getAttribute("mapDbDialect");
-		if (mapDbDialect != null && mapDbDialect.length() > 0) {
+		if (mapDbDialect != null && !mapDbDialect.isEmpty()) {
 			try {
 				this.mapDBDialect = DBDialect.valueOf(mapDbDialect.toUpperCase());
 			} catch (RuntimeException e) {
@@ -318,7 +318,7 @@ public class IndexBatchCreator {
 		}
 		File toIndex = null;
 		File saveTo = new File(osmDirFiles, regionName + ext);
-		if (wget == null || wget.trim().length() == 0) {
+		if (wget == null || wget.trim().isEmpty()) {
 			toIndex = internalDownload(url, saveTo);
 		} else {
 			toIndex = wgetDownload(url, saveTo);
