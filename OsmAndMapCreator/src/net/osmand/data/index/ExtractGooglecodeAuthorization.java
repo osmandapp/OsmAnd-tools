@@ -207,7 +207,7 @@ public class ExtractGooglecodeAuthorization {
 			i.close();
 		}
 		if (debug) {
-			System.out.println("Aswer from server:\n" + responseBody);
+			System.out.println("Answer from server:\n" + responseBody);
 		}
 		return responseBody;
 	}
