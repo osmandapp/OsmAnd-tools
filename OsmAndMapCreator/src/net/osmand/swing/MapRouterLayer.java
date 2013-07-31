@@ -457,10 +457,10 @@ public class MapRouterLayer implements MapPanelLayer {
 				// possibly hide that API key because it is privacy of osmand
 				uri.append("http://routes.cloudmade.com/A6421860EBB04234AB5EF2D049F2CD8F/api/0.3/");
 				 
-				uri.append(start.getLatitude()+"").append(",");
-				uri.append(start.getLongitude()+"").append(",");
-				uri.append(end.getLatitude()+"").append(",");
-				uri.append(end.getLongitude()+"").append("/");
+				uri.append(String.valueOf(start.getLatitude())).append(",");
+				uri.append(String.valueOf(start.getLongitude())).append(",");
+				uri.append(String.valueOf(end.getLatitude())).append(",");
+				uri.append(String.valueOf(end.getLongitude())).append("/");
 				uri.append("car.gpx").append("?lang=ru");
 
 				URL url = new URL(uri.toString());

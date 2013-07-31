@@ -100,7 +100,7 @@ public class SelectPointDialog extends JDialog {
 		l.setConstraints(label, constr);
 
 		latPosition = new JTextField();
-		latPosition.setText(((float)position.getLatitude())+""); //$NON-NLS-1$
+		latPosition.setText(String.valueOf((float) position.getLatitude())); //$NON-NLS-1$
 		panel.add(latPosition);
 		constr = new GridBagConstraints();
 		constr.fill = GridBagConstraints.HORIZONTAL;
@@ -121,7 +121,7 @@ public class SelectPointDialog extends JDialog {
 
 		lonPosition = new JTextField();
 		// Give hint about wms 
-		lonPosition.setText(((float)position.getLongitude())+""); //$NON-NLS-1$
+		lonPosition.setText(String.valueOf((float) position.getLongitude())); //$NON-NLS-1$
 		panel.add(lonPosition);
 		constr = new GridBagConstraints();
 		constr.weightx = 1;

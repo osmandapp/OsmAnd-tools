@@ -175,18 +175,18 @@ public class AHSupermarketResolver {
 				Entity e = storage.getRegisteredEntities().get(id);
 				EntityInfo info = storage.getRegisteredEntityInfo().get(id);
 				Map<String, String> newTags = new LinkedHashMap<String, String>();
-				String p = props.get("format")+"";
+				String p = String.valueOf(props.get("format"));
 				//IMPORTANT : comment what information should be updated or check
 				String name = "Albert Heijn";
 				if(!p.equals("AH")){
 					name += " " + p;
 				}
 				newTags.put("name", name);
-				newTags.put("phone", props.get("phone")+"");
-				newTags.put("addr:city", props.get("city")+"");
-				newTags.put("addr:street", props.get("street")+"");
-				newTags.put("addr:housenumber", props.get("housenr")+"");
-				newTags.put("addr:postcode", props.get("zip")+"");
+				newTags.put("phone", String.valueOf(props.get("phone")));
+				newTags.put("addr:city", String.valueOf(props.get("city")));
+				newTags.put("addr:street", String.valueOf(props.get("street")));
+				newTags.put("addr:housenumber", String.valueOf(props.get("housenr")));
+				newTags.put("addr:postcode", String.valueOf(props.get("zip")));
 				
 				JSONArray o = (JSONArray) props.get("hours");
 				OpeningHoursParser.OpeningHours rules = new OpeningHoursParser.OpeningHours();
@@ -196,8 +196,8 @@ public class AHSupermarketResolver {
 					
 					if(!obj.isNull("C") && obj.getBoolean("C")){
 					} else {
-						String opened  = obj.get("F")+"";
-						String closed = obj.get("U")+"";
+						String opened  = String.valueOf(obj.get("F"));
+						String closed = String.valueOf(obj.get("U"));
 						int start = Integer.parseInt(opened.substring(0, 2)) * 60 + Integer.parseInt(opened.substring(2));
 						int end = Integer.parseInt(closed.substring(0, 2)) * 60 + Integer.parseInt(closed.substring(2));
 						if(prev != null && prev.getStartTime() == start && prev.getEndTime() == end){
