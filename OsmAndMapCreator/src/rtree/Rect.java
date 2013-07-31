@@ -458,7 +458,7 @@ public String toString()
     else
       ri = pX;
     Long temp = new Long(Math.abs(pX - ri));
-    minDist = (new Double(Math.pow(temp.doubleValue(),2))).longValue();
+    minDist = (new Double(StrictMath.pow(temp.doubleValue(),2))).longValue();
     //for Y dim.
     if(pY < minY)
       ri = minY;
@@ -467,7 +467,7 @@ public String toString()
     else
       ri = pY;
     temp = new Long(Math.abs(pY - ri));
-    minDist += (new Double(Math.pow(temp.doubleValue(),2))).longValue();
+    minDist += (new Double(StrictMath.pow(temp.doubleValue(),2))).longValue();
     return minDist;
   }
   /**

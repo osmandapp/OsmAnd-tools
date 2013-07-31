@@ -136,7 +136,7 @@ public class MapPointsLayer implements MapPanelLayer {
 				Color prevColor = g.getColor();
 				AffineTransform prev = g.getTransform();
 
-				double flt = Math.atan2(p.getX2() - p.getX1(), p.getY2() - p.getY1());
+				double flt = StrictMath.atan2(p.getX2() - p.getX1(), p.getY2() - p.getY1());
 				
 				AffineTransform ps = new AffineTransform(prev);
 				ps.translate((p.getX2() + p.getX1()) / 2, (int)(p.getY2() + p.getY1()) / 2);

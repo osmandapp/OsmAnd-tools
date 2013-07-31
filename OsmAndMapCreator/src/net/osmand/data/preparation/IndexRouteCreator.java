@@ -1391,7 +1391,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 				// translate into meters
 				total += Math.abs(px - x) * 0.011d + Math.abs(py - y) * 0.01863d;
 			} while (total < dist);
-			return -Math.atan2( x - px, y - py );
+			return -StrictMath.atan2( x - px, y - py );
 		}
 	}
 }
