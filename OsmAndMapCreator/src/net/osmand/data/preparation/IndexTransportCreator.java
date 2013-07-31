@@ -552,7 +552,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			if(a.getLatLon() == null){
 				continue;
 			}
-			double distance = 1e10;
+			double distance = 1.0e10;
 			for (Entity b : second) {
 				if (b.getLatLon() == null) {
 					continue;

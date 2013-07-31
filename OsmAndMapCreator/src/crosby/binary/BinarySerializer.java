@@ -138,11 +138,11 @@ public class BinarySerializer {
 
     /** Convert from a degrees represented as a double into the serialized offset in nanodegrees.. */
     public long mapRawDegrees(double degrees) {
-        return (long) ((degrees / .000000001));
+        return (long) ((degrees / 0.000000001));
     }
 
     /** Convert from a degrees represented as a double into the serialized offset. */
     public int mapDegrees(double degrees) {
-        return (int) ((degrees / .0000001) / (granularity / 100));
+        return (int) ((degrees / 0.0000001) / (granularity / 100));
     }
 }

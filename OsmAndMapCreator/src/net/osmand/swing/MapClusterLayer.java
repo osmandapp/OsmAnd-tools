@@ -85,7 +85,7 @@ public class MapClusterLayer implements MapPanelLayer {
 		int outOfDistance = 0;
 		int roadProcessed = 0;
 		int segmentsProcessed = 0;
-		float minRatio = 1f;
+		float minRatio = 1.0f;
 		int roadMinProcessed = 0;
 	}
 	
