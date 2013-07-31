@@ -182,12 +182,12 @@ public class OsmStorageWriter {
 
 	
 	private void writeStartElement(XMLStreamWriter writer, String name, String indent) throws XMLStreamException{
-		writer.writeCharacters("\n"+indent);
+		writer.writeCharacters('\n' +indent);
 		writer.writeStartElement(name);
 	}
 	
 	private void writeEndElement(XMLStreamWriter writer, String indent) throws XMLStreamException{
-		writer.writeCharacters("\n"+indent);
+		writer.writeCharacters('\n' +indent);
 		writer.writeEndElement();
 	}
 	

@@ -161,11 +161,11 @@ public class ExtractGooglecodeAuthorization {
 
 		StringBuilder data = new StringBuilder();
 		for (Map.Entry<String, String> stringStringEntry : values.entrySet()) {
-			data.append(URLEncoder.encode(stringStringEntry.getKey(), "UTF-8")).append("=");
+			data.append(URLEncoder.encode(stringStringEntry.getKey(), "UTF-8")).append('=');
 			if (stringStringEntry.getValue() != null) {
 				data.append(URLEncoder.encode(stringStringEntry.getValue(), "UTF-8"));
 			}
-			data.append("&");
+			data.append('&');
 		}
 		data.deleteCharAt(data.length() - 1);
 		return data;
@@ -198,7 +198,7 @@ public class ExtractGooglecodeAuthorization {
 			boolean f = true;
 			while ((s = in.readLine()) != null) {
 				if (!f) {
-					responseBody.append("\n"); //$NON-NLS-1$
+					responseBody.append('\n'); //$NON-NLS-1$
 				} else {
 					f = false;
 				}

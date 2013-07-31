@@ -85,9 +85,9 @@ public void run()
       //trySeed("/tmp/seed.dat", new RTree(fileName));
       //System.out.println("rTreeDemo : height " + rt.getHeight());
       
-      RTreeRead rd = new RTreeRead(fileName+"1");
+      RTreeRead rd = new RTreeRead(fileName+ '1');
       rd.readSeq();
-      rd = new RTreeRead(fileName+"2");
+      rd = new RTreeRead(fileName+ '2');
       rd.readSeq();
        
       //tryJoin();
@@ -513,8 +513,8 @@ public void run()
       //String lt = new String("c:\\temp\temptree.dat");
       //String lt = new String("/mnt/projects/data/MUM4_78.idx");
       //String rt = new String("/mnt/projects/data/MUM4_118.idx");
-      RTree ltTree = new RTree(/*lt*/fileName+"1");
-      RTree rtTree = new RTree(/*rt*/fileName+"2");
+      RTree ltTree = new RTree(/*lt*/fileName+ '1');
+      RTree rtTree = new RTree(/*rt*/fileName+ '2');
       //System.out.println("rTreeDemo.tryJoin : lt size " + ltTree.getAllElements().size());
 
       Join join = new Join(ltTree, rtTree, new Pair(), new IntersectPred());

@@ -469,8 +469,8 @@ public class BasemapProcessor {
 						cx31 = nx31;
 						cy31 = ny31;
 						i++;
-						logMapDataWarn.warn("Can't find intersection for " + MapUtils.get31LongitudeX(px31) + ","
-								+ MapUtils.get31LatitudeY(py31) + " - " + MapUtils.get31LongitudeX(nx31) + ","
+						logMapDataWarn.warn("Can't find intersection for " + MapUtils.get31LongitudeX(px31) + ','
+								+ MapUtils.get31LatitudeY(py31) + " - " + MapUtils.get31LongitudeX(nx31) + ','
 								+ MapUtils.get31LatitudeY(ny31));
 					}
 

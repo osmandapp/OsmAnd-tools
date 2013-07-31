@@ -30,7 +30,7 @@ public class SQLiteBigPlanetIndex {
 			log.error("Illegal configuration", e); //$NON-NLS-1$
 			throw new IllegalStateException(e);
 		}
-		File fileToWrite = new File(dirWithTiles, regionName + "." + template.getName() + ".sqlitedb");
+		File fileToWrite = new File(dirWithTiles, regionName + '.' + template.getName() + ".sqlitedb");
 		fileToWrite.delete();
 		Connection conn = DriverManager.getConnection("jdbc:sqlite:" + fileToWrite.getAbsolutePath()); //$NON-NLS-1$
 		Statement statement = conn.createStatement();
@@ -123,7 +123,7 @@ public class SQLiteBigPlanetIndex {
 		pStatement.close();
 		conn.commit();
 		conn.close();
-		log.info("Index created " + fileToWrite.getName() + " " + (System.currentTimeMillis() - now) + " ms");
+		log.info("Index created " + fileToWrite.getName() + ' ' + (System.currentTimeMillis() - now) + " ms");
 	}
 
 }

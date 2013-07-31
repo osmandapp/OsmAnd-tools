@@ -327,9 +327,9 @@ public class MapRoutingTypes {
 		@Override
 		public String toString() {
 			if (value == null) {
-				return "'" + tag + "'";
+				return '\'' + tag + '\'';
 			}
-			return tag + "='" + value + "'";
+			return tag + "='" + value + '\'';
 		}
 
 	}

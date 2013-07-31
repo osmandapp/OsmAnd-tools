@@ -179,7 +179,7 @@ public class AHSupermarketResolver {
 				//IMPORTANT : comment what information should be updated or check
 				String name = "Albert Heijn";
 				if(!p.equals("AH")){
-					name += " " + p;
+					name += ' ' + p;
 				}
 				newTags.put("name", name);
 				newTags.put("phone", String.valueOf(props.get("phone")));

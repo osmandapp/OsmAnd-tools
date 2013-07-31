@@ -168,8 +168,8 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 			if (cityFound == null) {
 				for (City c : citiesToSearch) {
 					String lower = c.getName().toLowerCase();
-					if (boundaryName.startsWith(lower + " ") || boundaryName.endsWith(" " + lower)
-							|| boundaryName.contains(" " + lower + " ")) {
+					if (boundaryName.startsWith(lower + ' ') || boundaryName.endsWith(' ' + lower)
+							|| boundaryName.contains(' ' + lower + ' ')) {
 						if (boundary.containsPoint(c.getLocation())) {
 							cityFound = c;
 							break;
@@ -186,9 +186,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 			attachAllCitiesToBoundary(boundary);
 		} else if (boundary != null){
 			if(logMapDataWarn != null) {
-				logMapDataWarn.warn("Not using boundary: " + boundary + " " + boundary.getBoundaryId());
+				logMapDataWarn.warn("Not using boundary: " + boundary + ' ' + boundary.getBoundaryId());
 			} else {
-				log.info("Not using boundary: " + boundary + " " + boundary.getBoundaryId());
+				log.info("Not using boundary: " + boundary + ' ' + boundary.getBoundaryId());
 			}
 		}
 	}
@@ -328,7 +328,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 
 	private void logBoundaryChanged(Boundary boundary, City cityFound) {
 		String s = "City " + (cityFound == null ? " not found " : " : " +cityFound.getName());
-		s += " boundary: " + boundary.toString() + " " + boundary.getBoundaryId();
+		s += " boundary: " + boundary.toString() + ' ' + boundary.getBoundaryId();
 		if (logMapDataWarn != null) {
 			logMapDataWarn.info(s);
 		} else {
@@ -1142,7 +1142,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 				// If there are more streets with same name in different districts.
 				// Add district name to all other names. If sorting is right, the first street was the one in the city
 				String district = set.getString(12);
-				String cityPart = district == null || district.equals(city.getName()) ? "" : " (" + district + ")";
+				String cityPart = district == null || district.equals(city.getName()) ? "" : " (" + district + ')';
 				street.setName(streetName + cityPart);
 				street.setEnName(streetEnName + cityPart);
 				streetNodes.put(street, thisWayNodes);
@@ -1212,7 +1212,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 			if (DEBUG_FULL_NAMES) { 
 				Boundary cityB = cityBoundaries.get(city);
 				if (cityB != null) {
-					city.setName(city.getName() + " " + cityB.getAdminLevel() + ":" + cityB.getName());
+					city.setName(city.getName() + " " + cityB.getAdminLevel() + ':' + cityB.getName());
 				}
 			}
 		}

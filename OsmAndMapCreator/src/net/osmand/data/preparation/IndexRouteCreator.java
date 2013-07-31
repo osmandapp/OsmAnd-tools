@@ -343,7 +343,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		basemapRouteInsertStat = createStatementRouteObjInsert(mapConnection, true);
 		try {
 			routeTree = new RTree(rtreeMapIndexNonPackFileName);
-			baserouteTree = new RTree(rtreeMapIndexNonPackFileName+"b");
+			baserouteTree = new RTree(rtreeMapIndexNonPackFileName+ 'b');
 		} catch (RTreeException e) {
 			throw new IOException(e);
 		}
@@ -361,7 +361,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 			throws IOException, SQLException {
 		// delete map rtree files
 		deleteRouteTreeFiles(rTreeMapIndexNonPackFileName, rTreeMapIndexPackFileName, deleteDatabaseIndexes, routeTree);
-		deleteRouteTreeFiles(rTreeMapIndexNonPackFileName+"b", rTreeMapIndexPackFileName+"b", deleteDatabaseIndexes, baserouteTree);
+		deleteRouteTreeFiles(rTreeMapIndexNonPackFileName+ 'b', rTreeMapIndexPackFileName+ 'b', deleteDatabaseIndexes, baserouteTree);
 		closeAllPreparedStatements();
 	}
 
@@ -427,12 +427,12 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 
 	public void createRTreeFiles(String rTreeRouteIndexPackFileName) throws RTreeException {
 		routeTree = new RTree(rTreeRouteIndexPackFileName);
-		baserouteTree = new RTree(rTreeRouteIndexPackFileName+"b");
+		baserouteTree = new RTree(rTreeRouteIndexPackFileName+ 'b');
 	}
 
 	public void packRtreeFiles(String rTreeRouteIndexNonPackFileName, String rTreeRouteIndexPackFileName) throws IOException {
 		routeTree = packRtreeFile(routeTree, rTreeRouteIndexNonPackFileName, rTreeRouteIndexPackFileName);
-		baserouteTree = packRtreeFile(baserouteTree, rTreeRouteIndexNonPackFileName+"b", rTreeRouteIndexPackFileName+"b");
+		baserouteTree = packRtreeFile(baserouteTree, rTreeRouteIndexNonPackFileName+ 'b', rTreeRouteIndexPackFileName+ 'b');
 	}
 	
 	public void writeBinaryRouteIndex(BinaryMapIndexWriter writer, String regionName) throws IOException, SQLException {

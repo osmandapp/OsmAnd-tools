@@ -199,7 +199,7 @@ public class NewTileSourceDialog extends JDialog {
 							url, ".jpg", 18, 1, 256, 16, 20000);
 					TileSourceManager.createMetaInfoFile(dir, tileSourceTemplate, true);
 				} catch (IOException e) {
-					log.error(Messages.getString("NewTileSourceDialog.ERROR.CREATING.NEW.TILE.SRC") +" " + url, e); //$NON-NLS-1$
+					log.error(Messages.getString("NewTileSourceDialog.ERROR.CREATING.NEW.TILE.SRC") + ' ' + url, e); //$NON-NLS-1$
 				}
 			}
 		}

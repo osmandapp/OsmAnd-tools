@@ -294,7 +294,7 @@ public class IndexBatchCreator {
 				String regionName = prefix + name;
 				String fileName = Algorithms.capitalizeFirstLetterAndLowercase(prefix + name + suffix);
 				if (skipExistingIndexes != null) {
-					File bmif = new File(skipExistingIndexes, fileName + "_" + IndexConstants.BINARY_MAP_VERSION
+					File bmif = new File(skipExistingIndexes, fileName + '_' + IndexConstants.BINARY_MAP_VERSION
 							+ IndexConstants.BINARY_MAP_INDEX_EXT);
 					File bmifz = new File(skipExistingIndexes, bmif.getName() + ".zip");
 					if (bmif.exists() || bmifz.exists()) {
@@ -335,7 +335,7 @@ public class IndexBatchCreator {
 		OutputStream wgetInput = null;
 		Process wgetProc = null;
 		try {
-			log.info("Executing " + wget + " " + url + " -O "+ toSave.getCanonicalPath()); //$NON-NLS-1$//$NON-NLS-2$ $NON-NLS-3$
+			log.info("Executing " + wget + ' ' + url + " -O "+ toSave.getCanonicalPath()); //$NON-NLS-1$//$NON-NLS-2$ $NON-NLS-3$
 			ProcessBuilder exec = new ProcessBuilder(wget, "--read-timeout=5", "--progress=dot:binary", url, "-O", //$NON-NLS-1$//$NON-NLS-2$ $NON-NLS-3$
 					toSave.getCanonicalPath());
 			exec.redirectErrorStream(true);
@@ -417,7 +417,7 @@ public class IndexBatchCreator {
 				if (skipExistingIndexes != null) {
 					int i = f.getName().indexOf(".osm");
 					String name = Algorithms.capitalizeFirstLetterAndLowercase(f.getName().substring(0, i));
-					File bmif = new File(skipExistingIndexes, name + "_" + IndexConstants.BINARY_MAP_VERSION
+					File bmif = new File(skipExistingIndexes, name + '_' + IndexConstants.BINARY_MAP_VERSION
 							+ IndexConstants.BINARY_MAP_INDEX_EXT_ZIP);
 					log.info("Check if " + bmif.getAbsolutePath() + " exists");
 					if (bmif.exists()) {
@@ -471,7 +471,7 @@ public class IndexBatchCreator {
 				indexCreator.setZoomWaySmothness(zoomWaySmoothness);
 			}
 
-			String mapFileName = regionName + "_" + IndexConstants.BINARY_MAP_VERSION + IndexConstants.BINARY_MAP_INDEX_EXT;
+			String mapFileName = regionName + '_' + IndexConstants.BINARY_MAP_VERSION + IndexConstants.BINARY_MAP_INDEX_EXT;
 			indexCreator.setMapFileName(mapFileName);
 			try {
 				alreadyGeneratedFiles.add(f.getName());
@@ -483,7 +483,7 @@ public class IndexBatchCreator {
 
 					FileOutputStream fout = new FileOutputStream(logFileName);
 					fout.write((new Date() + "\n").getBytes());
-					fout.write((MapCreatorVersion.APP_MAP_CREATOR_FULL_NAME + "\n").getBytes());
+					fout.write((MapCreatorVersion.APP_MAP_CREATOR_FULL_NAME + '\n').getBytes());
 					fout.close();
 					fh = new FileHandler(logFileName.getAbsolutePath(), 10*1000*1000, 1, true);
 					fh.setFormatter(new SimpleFormatter());

@@ -138,7 +138,7 @@ public class WikiIndexer {
 						String targetMapFileName = ic.getMapFileName();
 						targetMapFileName = 
 								targetMapFileName.substring(0, targetMapFileName.length() - IndexConstants.BINARY_MAP_INDEX_EXT.length()) +
-								"_" + IndexConstants.BINARY_MAP_VERSION + IndexConstants.BINARY_MAP_INDEX_EXT;
+                                        '_' + IndexConstants.BINARY_MAP_VERSION + IndexConstants.BINARY_MAP_INDEX_EXT;
 								
 						new File(workPath, ic.getMapFileName()).renameTo(new File(targetPath, targetMapFileName));
 					}
@@ -334,7 +334,7 @@ public class WikiIndexer {
 						}
 						if (parseText) {
 							if(id % 500 == 0) {
-								log.debug("Article accepted " + cid + " " + title.toString());
+								log.debug("Article accepted " + cid + ' ' + title.toString());
 							}
 							analyzeTextForGeoInfoNew();
 						}
@@ -666,7 +666,7 @@ public class WikiIndexer {
 			streamWriter.writeCharacters("\n  ");
 			streamWriter.writeStartElement("tag");
 			streamWriter.writeAttribute("k", "wikipedia");
-			streamWriter.writeAttribute("v", locale + ":"+title.toString());
+			streamWriter.writeAttribute("v", locale + ':' +title.toString());
 			streamWriter.writeEndElement();
 			
 

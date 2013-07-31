@@ -151,7 +151,7 @@ public class MapClusterLayer implements MapPanelLayer {
 		if (st != null) {
 			RouteDataObject road = st.getRoad();
 			String highway = getHighway(road);
-			log.info("ROAD TO START " + highway + " " + //road.getName() + " " 
+			log.info("ROAD TO START " + highway + ' ' + //road.getName() + " "
 					+ road.id);
 		}
 		map.setPoints(points);

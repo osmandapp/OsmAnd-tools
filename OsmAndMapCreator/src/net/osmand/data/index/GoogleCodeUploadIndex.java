@@ -128,7 +128,7 @@ public class GoogleCodeUploadIndex {
         
         log("Sending file... "+targetFileName); //$NON-NLS-1$
         sendLine(out, "--" + BOUNDARY); //$NON-NLS-1$
-        sendLine(out, "content-disposition: form-data; name=\"filename\"; filename=\"" + targetFileName + "\""); //$NON-NLS-1$ //$NON-NLS-2$
+        sendLine(out, "content-disposition: form-data; name=\"filename\"; filename=\"" + targetFileName + '"'); //$NON-NLS-1$ //$NON-NLS-2$
         sendLine(out, "Content-Type: application/octet-stream"); //$NON-NLS-1$
         sendLine(out, ""); //$NON-NLS-1$
         int count;
@@ -185,7 +185,7 @@ public class GoogleCodeUploadIndex {
      * given user name and password.
      */
     public  static String createAuthToken(String userName, String password) {
-        String string = (userName + ":" + password); //$NON-NLS-1$
+        String string = (userName + ':' + password); //$NON-NLS-1$
         try {
             return Base64.encode(string.getBytes("UTF-8")); //$NON-NLS-1$
         }

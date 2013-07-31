@@ -112,7 +112,7 @@ public class DownloaderIndexFromGoogleCode {
 		int size = cookies.size();
 		for (Map.Entry<String, String> stringStringEntry : cookies.entrySet()) {
 			size--;
-			cookieString.append(stringStringEntry.getKey()).append("=").append(stringStringEntry.getValue()); //$NON-NLS-1$
+			cookieString.append(stringStringEntry.getKey()).append('=').append(stringStringEntry.getValue()); //$NON-NLS-1$
 			if (size > 0) {
 				cookieString.append("; "); //$NON-NLS-1$
 			}
@@ -162,7 +162,7 @@ public class DownloaderIndexFromGoogleCode {
 			boolean f = true;
 			while ((s = in.readLine()) != null) {
 				if(!f){
-					responseBody.append("\n"); //$NON-NLS-1$
+					responseBody.append('\n'); //$NON-NLS-1$
 				} else {
 					f = false;
 				}
