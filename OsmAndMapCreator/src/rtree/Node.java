@@ -1180,7 +1180,7 @@ public Object clone()
   {
     if(elmts.length <= 1)
       throw new  IllegalValueException("Node.quadPickSeed : PickSeed not possible as there are no elements");
-    int retIdx[] = new int[2];
+    int[] retIdx = new int[2];
     int mostIneff = Integer.MIN_VALUE;//area of the most inefficient pair
     for(int i=0;i<elmts.length;i++){
       for(int j=i+1;j<elmts.length;j++){

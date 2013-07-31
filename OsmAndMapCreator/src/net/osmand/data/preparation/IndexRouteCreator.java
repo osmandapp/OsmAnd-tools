@@ -559,7 +559,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 				MapUtils.get31LongitudeX((int) x), -1);
 	}
 	
-	private String baseOrderValues[] = new String[] { "trunk", "motorway", "ferry", "primary", "secondary", "tertiary", "residential",
+	private String[] baseOrderValues = new String[] { "trunk", "motorway", "ferry", "primary", "secondary", "tertiary", "residential",
 			"road", "cycleway", "living_street" };
 	
 	private int getBaseOrderForType(int intType) {

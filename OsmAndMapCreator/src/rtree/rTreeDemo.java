@@ -25,7 +25,7 @@ import java.util.ArrayList;
 */
 public class rTreeDemo
 {
-  public static void main(String argv[])
+  public static void main(String[] argv)
   {
     //rTreeDemo rt = new rTreeDemo();
     new TreeThread();

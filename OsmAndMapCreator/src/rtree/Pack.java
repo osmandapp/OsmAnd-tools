@@ -114,7 +114,7 @@ public class Pack
       //overwrite the old rtree file with the temp file
       FileInputStream fis=new FileInputStream(tmpPckFile);
       FileOutputStream fos=new FileOutputStream(fo);
-      byte b[]=new byte[BUFFER_SIZE];
+      byte[] b=new byte[BUFFER_SIZE];
       int i;
       while((i=fis.read(b))!=-1){
         fos.write(b, 0, i);
@@ -161,7 +161,7 @@ public class Pack
     temp = new Double(Math.ceil(Math.sqrt(temp.doubleValue())));
     int S = temp.intValue();
     //System.out.println("total slices: "+S);
-    Slice sls[] =  new Slice[S];
+    Slice[] sls =  new Slice[S];
 
     //sort all the rectangles on X axis
     NonLeafElement.twoWayMerge(elmts,0,length-1,0);

@@ -31,7 +31,7 @@ public class RTreeClient
     try
       {
         String command="insert";
-        Object obj[]={element};
+        Object[] obj={element};
         sendRequest(command,obj);
       }
     catch(RTreeException e)
@@ -44,7 +44,7 @@ public class RTreeClient
     try
       {
         String command="delete";
-        Object obj[]={element};
+        Object[] obj={element};
         sendRequest(command,obj);
       }
     catch(RTreeException e)
@@ -57,7 +57,7 @@ public class RTreeClient
     try
       {
         String command="overlaps";
-        Object obj[]={rect};
+        Object[] obj={rect};
         Object[] response=sendRequest(command,obj);
         return (List) response[0];
       }
@@ -71,7 +71,7 @@ public class RTreeClient
     try
       {
         String command="nondisjoint";
-        Object obj[]={rect};
+        Object[] obj={rect};
         Object[] response=sendRequest(command,obj);
         return (List) response[0];
       }
@@ -85,7 +85,7 @@ public class RTreeClient
     try
       {
         String command="containedby";
-        Object obj[]={rect};
+        Object[] obj={rect};
         Object[] response=sendRequest(command,obj);
         return (List) response[0];
       }
@@ -99,7 +99,7 @@ public class RTreeClient
     try
       {
         String command="equal";
-        Object obj[]={rect};
+        Object[] obj={rect};
         Object[] response=sendRequest(command,obj);
         return (List) response[0];
       }
@@ -113,7 +113,7 @@ public class RTreeClient
     try
       {
         String command="meet";
-        Object obj[]={rect};
+        Object[] obj={rect};
         Object[] response=sendRequest(command,obj);
         return (List) response[0];
       }
@@ -127,7 +127,7 @@ public class RTreeClient
     try
       {
         String command="contains";
-        Object obj[]={rect};
+        Object[] obj={rect};
         Object[] response=sendRequest(command,obj);
         return (List) response[0];
       }
@@ -168,11 +168,11 @@ public class RTreeClient
     try
       {
         String command="nearest";
-        Object obj[]={pt, Long.valueOf(ln), Integer.valueOf(in)};
+        Object[] obj={pt, Long.valueOf(ln), Integer.valueOf(in)};
         Object[] response=sendRequest(command,obj);
         if(response!=null)
           {
-            ABL abl[]=new ABL[response.length];
+            ABL[] abl=new ABL[response.length];
             for(int i=0;i<response.length;i++)
               {
                 abl[i]=(ABL)response[i];
@@ -193,7 +193,7 @@ public class RTreeClient
     try
       {
         String command="nearestsearch";
-        Object obj[]={pt, Long.valueOf(ln)};
+        Object[] obj={pt, Long.valueOf(ln)};
         Object[] response=sendRequest(command,obj);
         return (List) response[0];
       }
@@ -277,7 +277,7 @@ public class RTreeClient
         //+ (System.currentTimeMillis() - time));
         //time = System.currentTimeMillis();
 
-        byte bbf[]=new byte[100];
+        byte[] bbf=new byte[100];
 
         int i=0;
         int total=-1;
@@ -289,12 +289,12 @@ public class RTreeClient
             i++;
             if(i==10)
               {
-                byte ln[]=new byte[10];
+                byte[] ln=new byte[10];
                 System.arraycopy(bbf,0,ln,0,10);
                 ByteArrayInputStream lin=new ByteArrayInputStream(ln);
                 ObjectInputStream loin=new ObjectInputStream(lin);
                 total=loin.readInt();
-                byte temp[]=new byte[total];
+                byte[] temp=new byte[total];
                 System.arraycopy(bbf,0,temp,0,bbf.length);
                 bbf=temp;
               }
@@ -305,7 +305,7 @@ public class RTreeClient
               }
           }
 
-        byte tby[]=new byte[bbf.length-10];
+        byte[] tby=new byte[bbf.length-10];
         System.arraycopy(bbf,10,tby,0,tby.length);
         ByteArrayInputStream bin=new ByteArrayInputStream(tby);
         ObjectInputStream oIn=new ObjectInputStream(bin);
