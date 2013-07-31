@@ -1155,11 +1155,11 @@ public class BinaryMapIndexWriter {
 		// expect linked hash map
 		int i = 0;
 		OsmandOdb.StringTable.Builder st = OsmandOdb.StringTable.newBuilder();
-		for (String s : stringTable.keySet()) {
-			if (stringTable.get(s) != i++) {
+		for (Entry<String, Integer> stringIntegerEntry : stringTable.entrySet()) {
+			if (stringIntegerEntry.getValue() != i++) {
 				throw new IllegalStateException();
 			}
-			st.addS(s);
+			st.addS(stringIntegerEntry.getKey());
 		}
 		codedOutStream.writeMessage(OsmAndTransportIndex.STRINGTABLE_FIELD_NUMBER, st.build());
 	}
@@ -1193,10 +1193,10 @@ public class BinaryMapIndexWriter {
 		checkPeekState(POI_INDEX_INIT);
 		Map<String, Integer> catIndexes = new LinkedHashMap<String, Integer>();
 		int i = 0;
-		for (String cat : categories.keySet()) {
+		for (Entry<String, Map<String, Integer>> stringMapEntry : categories.entrySet()) {
 			Builder builder = OsmandOdb.OsmAndCategoryTable.newBuilder();
-			builder.setCategory(cat);
-			Map<String, Integer> subcatSource = categories.get(cat);
+			builder.setCategory(stringMapEntry.getKey());
+			Map<String, Integer> subcatSource = stringMapEntry.getValue();
 			Map<String, Integer> subcats = new LinkedHashMap<String, Integer>(subcatSource);
 			int j = 0;
 			for (String s : subcats.keySet()) {
@@ -1204,7 +1204,7 @@ public class BinaryMapIndexWriter {
 				subcatSource.put(s, j);
 				j++;
 			}
-			catIndexes.put(cat, i);
+			catIndexes.put(stringMapEntry.getKey(), i);
 			codedOutStream.writeMessage(OsmandOdb.OsmAndPoiIndex.CATEGORIESTABLE_FIELD_NUMBER, builder.build());
 			i++;
 		}

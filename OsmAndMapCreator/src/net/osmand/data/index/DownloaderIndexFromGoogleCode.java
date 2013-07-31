@@ -110,9 +110,9 @@ public class DownloaderIndexFromGoogleCode {
 		cookies.put("SID", ggtokens.getSid()); //$NON-NLS-1$
 		StringBuilder cookieString = new StringBuilder();
 		int size = cookies.size();
-		for (String c : cookies.keySet()) {
+		for (Map.Entry<String, String> stringStringEntry : cookies.entrySet()) {
 			size--;
-			cookieString.append(c).append("=").append(cookies.get(c)); //$NON-NLS-1$
+			cookieString.append(stringStringEntry.getKey()).append("=").append(stringStringEntry.getValue()); //$NON-NLS-1$
 			if (size > 0) {
 				cookieString.append("; "); //$NON-NLS-1$
 			}

@@ -160,10 +160,10 @@ public class ExtractGooglecodeAuthorization {
 		values.put("timeStmp", null);
 
 		StringBuilder data = new StringBuilder();
-		for (String key : values.keySet()) {
-			data.append(URLEncoder.encode(key, "UTF-8")).append("=");
-			if (values.get(key) != null) {
-				data.append(URLEncoder.encode(values.get(key), "UTF-8"));
+		for (Map.Entry<String, String> stringStringEntry : values.entrySet()) {
+			data.append(URLEncoder.encode(stringStringEntry.getKey(), "UTF-8")).append("=");
+			if (stringStringEntry.getValue() != null) {
+				data.append(URLEncoder.encode(stringStringEntry.getValue(), "UTF-8"));
 			}
 			data.append("&");
 		}

@@ -203,13 +203,13 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		original.setId(e.getId());
 
 		// fill the multipolygon with all ways from the Relation
-		for (Entity es : entities.keySet()) {
-			if (es instanceof Way) {
-				boolean inner = "inner".equals(entities.get(es)); //$NON-NLS-1$
+		for (Entry<Entity, String> entityStringEntry : entities.entrySet()) {
+			if (entityStringEntry.getKey() instanceof Way) {
+				boolean inner = "inner".equals(entityStringEntry.getValue()); //$NON-NLS-1$
 				if (inner) {
-					original.addInnerWay((Way) es);
-				} else if("outer".equals(entities.get(es))){
-					original.addOuterWay((Way) es);
+					original.addInnerWay((Way) entityStringEntry.getKey());
+				} else if("outer".equals(entityStringEntry.getValue())){
+					original.addOuterWay((Way) entityStringEntry.getKey());
 				}
 			}
 		}

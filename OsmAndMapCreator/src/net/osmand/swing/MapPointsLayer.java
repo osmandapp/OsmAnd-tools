@@ -83,18 +83,18 @@ public class MapPointsLayer implements MapPanelLayer {
 		g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
 		g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
 		// draw user points
-		for (Point p : pointsToDraw.keySet()) {
-			g.drawOval(p.x, p.y, size, size);
-			g.fillOval(p.x, p.y, size, size);
-			if(tagToShow != null && pointsToDraw.get(p) != null && map.getZoom() > 14){
+		for (Map.Entry<Point, String> pointStringEntry : pointsToDraw.entrySet()) {
+			g.drawOval(pointStringEntry.getKey().x, pointStringEntry.getKey().y, size, size);
+			g.fillOval(pointStringEntry.getKey().x, pointStringEntry.getKey().y, size, size);
+			if(tagToShow != null && pointStringEntry.getValue() != null && map.getZoom() > 14){
 				int i = 0;
 				int k;
-				String s = pointsToDraw.get(p);
+				String s = pointStringEntry.getValue();
 				while((k =s.indexOf('\n')) != -1) {
-					g.drawString(s.substring(0, k), p.x, (p.y + i++ * 15));
+					g.drawString(s.substring(0, k), pointStringEntry.getKey().x, (pointStringEntry.getKey().y + i++ * 15));
 					s = s.substring(k+1);
 				}
-				g.drawString(s, p.x, (p.y + i++ * 15));
+				g.drawString(s, pointStringEntry.getKey().x, (pointStringEntry.getKey().y + i++ * 15));
 			}
 		}
 		

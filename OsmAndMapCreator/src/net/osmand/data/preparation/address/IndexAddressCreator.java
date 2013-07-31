@@ -365,23 +365,23 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 				Relation aRelation = (Relation) e;
 				ctx.loadEntityRelation(aRelation);
 				Map<Entity, String> entities = aRelation.getMemberEntities();
-				for (Entity es : entities.keySet()) {
-					if (es instanceof Way) {
-						boolean inner = "inner".equals(entities.get(es)); //$NON-NLS-1$
+				for (Entry<Entity, String> entityStringEntry : entities.entrySet()) {
+					if (entityStringEntry.getKey() instanceof Way) {
+						boolean inner = "inner".equals(entityStringEntry.getValue()); //$NON-NLS-1$
 						if (inner) {
-							m.addInnerWay((Way) es);
+							m.addInnerWay((Way) entityStringEntry.getKey());
 						} else {
-							String wName = es.getTag(OSMTagKey.NAME);
+							String wName = entityStringEntry.getKey().getTag(OSMTagKey.NAME);
 							// if name are not equal keep the way for further check (it could be different suburb)
 							if (Algorithms.objectEquals(wName, bname) || wName == null) {
-								visitedBoundaryWays.add(es.getId());
+								visitedBoundaryWays.add(entityStringEntry.getKey().getId());
 							}
-							m.addOuterWay((Way) es);
+							m.addOuterWay((Way) entityStringEntry.getKey());
 						}
-					} else if (es instanceof Node && ("admin_centre".equals(entities.get(es)) || "admin_center".equals(entities.get(es)))) {
-						centerId =  es.getId();
-					} else if (es instanceof Node && ("label".equals(entities.get(es)) && centerId == 0)) {
-						centerId =  es.getId();
+					} else if (entityStringEntry.getKey() instanceof Node && ("admin_centre".equals(entityStringEntry.getValue()) || "admin_center".equals(entityStringEntry.getValue()))) {
+						centerId = entityStringEntry.getKey().getId();
+					} else if (entityStringEntry.getKey() instanceof Node && ("label".equals(entityStringEntry.getValue()) && centerId == 0)) {
+						centerId = entityStringEntry.getKey().getId();
 					}
 				}
 			} else if (e instanceof Way) {
@@ -856,14 +856,14 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 		List<City> suburbs = new ArrayList<City>();
 		List<City> cityTowns = new ArrayList<City>();
 		List<City> villages = new ArrayList<City>();
-		for(CityType t : cities.keySet()) {
-			if(t == CityType.CITY || t == CityType.TOWN){
-				cityTowns.addAll(cities.get(t));
+		for(Entry<CityType, List<City>> cityTypeListEntry : cities.entrySet()) {
+			if(cityTypeListEntry.getKey() == CityType.CITY || cityTypeListEntry.getKey() == CityType.TOWN){
+				cityTowns.addAll(cityTypeListEntry.getValue());
 			} else {
-				villages.addAll(cities.get(t));
+				villages.addAll(cityTypeListEntry.getValue());
 			}
-			if(t == CityType.SUBURB){
-				for(City c : cities.get(t)){
+			if(cityTypeListEntry.getKey() == CityType.SUBURB){
+				for(City c : cityTypeListEntry.getValue()){
 					if(c.getIsInValue() != null) {
 						suburbs.add(c);
 					}
@@ -1067,8 +1067,8 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 	
 
 	private void mergeStreetsWithSameNames(Map<Street, List<Node>> streetNodes, Map<String, List<Street>> uniqueNames) {
-		for(String streetName : uniqueNames.keySet()) {
-			List<Street> streets = uniqueNames.get(streetName);
+		for(Entry<String, List<Street>> stringListEntry : uniqueNames.entrySet()) {
+			List<Street> streets = stringListEntry.getValue();
 			if(streets.size() > 1) {
 				mergeStreets(streets, streetNodes);
 			}
