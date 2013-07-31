@@ -8,6 +8,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStreamWriter;
+import java.lang.reflect.InvocationTargetException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -106,7 +107,7 @@ public class WikiIndexer {
 		log.info("Obtain database connection");
 		Connection conn;
 		try {
-			Class.forName("com.mysql.jdbc.Driver").newInstance();
+            Class.forName("com.mysql.jdbc.Driver").getConstructor().newInstance();
 			conn = DriverManager.getConnection(url, userName, password);
 			log.info("Database connection established");
 		} catch (InstantiationException e1) {
@@ -117,8 +118,12 @@ public class WikiIndexer {
 			throw new WikiIndexerException("Could not establish connection to " + url + " with " + userName, e1);
 		} catch (SQLException e1) {
 			throw new WikiIndexerException("Could not establish connection to " + url + " with " + userName, e1);
-		}
-		File[] listFiles = srcPath.listFiles();
+		} catch (NoSuchMethodException e) {
+            e.printStackTrace();
+        } catch (InvocationTargetException e) {
+            e.printStackTrace();
+        }
+        File[] listFiles = srcPath.listFiles();
 		for (File f : listFiles) {
 			try {
 				if (f.isFile() && (f.getName().endsWith(".xml") || f.getName().endsWith(".xml.bz2"))) {
