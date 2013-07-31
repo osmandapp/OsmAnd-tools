@@ -562,7 +562,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 					distance = d;
 					bMin = b;
 				}
-				if (aStopArea != null && aStopArea == stopAreas.get(b)) {
+				if (aStopArea != null && aStopArea.equals(stopAreas.get(b))) {
 					// the best match - both are in one stop_area relation
 					bMin = b;
 					distance = 0;

@@ -229,7 +229,7 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 		
 		Entity entityToProcess = null;
 		Entity endEntity = entityProducer.getEndingEntity();
-		while ((entityToProcess = toProcess.take())  != endEntity) {
+		while (!(entityToProcess = toProcess.take()).equals(endEntity)) {
 			if (progress != null) {
 				progress.progress(1);
 			}

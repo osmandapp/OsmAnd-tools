@@ -372,7 +372,7 @@ protected void finalize() throws Throwable
         /**  If Thread is already in the vector then 
          *   return it's Index
          */
-        if(threadinfo.t == t)
+        if(threadinfo.t.equals(t))
           {
             return index;
           }

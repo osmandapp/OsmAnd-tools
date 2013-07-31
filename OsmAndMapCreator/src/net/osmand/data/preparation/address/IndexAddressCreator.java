@@ -309,7 +309,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 			logBoundaryChanged(boundary, cityFound);
 			return oldBoundary;
 		} else if (oldBoundary.getAdminLevel() == boundary.getAdminLevel()
-				&& oldBoundary != boundary
+				&& !oldBoundary.equals(boundary)
 				&& boundary.getName().equalsIgnoreCase(
 						oldBoundary.getName())) {
 			oldBoundary.mergeWith(boundary);
@@ -592,7 +592,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 			List<City> subcities = boundaryToContainingCities.get(cityBoundary);
 			if (subcities != null) {
 				for (City subpart : subcities) {
-					if (subpart != city) {
+					if (!subpart.equals(city)) {
 						Boundary subBoundary = cityBoundaries.get(subpart);
 						if (cityBoundary != null && subBoundary != null && subBoundary.getAdminLevel() > cityBoundary.getAdminLevel()) {
 							// old code

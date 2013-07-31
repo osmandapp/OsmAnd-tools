@@ -263,7 +263,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		}
 		for (int i = 0; i < w.size(); i++) {
 			GeneralizedCluster ncluster = getCluster(w, i, cluster);
-			if (ncluster != cluster) {
+			if (!ncluster.equals(cluster)) {
 				cluster = ncluster;
 			}
 			ncluster.addWayFromLocation(w, i);
@@ -910,7 +910,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		Object o = cluster.map.get(loc);
 		GeneralizedWay res = null;
 		if (o instanceof GeneralizedWay) {
-			if (o != gw) {
+			if (!o.equals(gw)) {
 				GeneralizedWay m = (GeneralizedWay) o;
 				if (m.id != gw.id && m.mainType == gw.mainType && compareRefs(gw, m)) {
 					return m;
@@ -1260,9 +1260,9 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 			long loc = delete.getLocation(ind);
 			Object o = map.get(loc);
 			if(o instanceof GeneralizedWay){
-				if(delete == o) {
+				if(delete.equals(o)) {
 					map.put(loc, toReplace);
-				} else if(toReplace !=  o){
+				} else if(!toReplace.equals(o)){
 					addWay(toReplace, loc);
 				}
 			} else if(o instanceof LinkedList){
@@ -1296,7 +1296,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 
 			Object o = map.get(loc);
 			if (o instanceof GeneralizedWay) {
-				if (delete == o) {
+				if (delete.equals(o)) {
 					map.remove(loc);
 				}
 			} else if (o instanceof LinkedList) {
@@ -1324,7 +1324,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 					if(!((LinkedList<GeneralizedWay>) o).contains(w)){
 						((LinkedList<GeneralizedWay>) o).add(w);
 					}
-				} else if(o != w){
+				} else if(!o.equals(w)){
 					LinkedList<GeneralizedWay> list = new LinkedList<GeneralizedWay>();
 					list.add((GeneralizedWay) o);
 					list.add(w);
