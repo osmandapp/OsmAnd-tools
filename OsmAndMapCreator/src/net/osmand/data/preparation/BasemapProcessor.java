@@ -464,7 +464,7 @@ public class BasemapProcessor {
 
 					long inter = MapAlgorithms.calculateIntersection(px31, py31, nx31, ny31, leftX, rightX, bottomY, topY);
 					int cy31 = (int) inter;
-					int cx31 = (int) (inter >> 32l);
+					int cx31 = (int) (inter >> 32L);
 					if (inter == -1) {
 						cx31 = nx31;
 						cy31 = ny31;
