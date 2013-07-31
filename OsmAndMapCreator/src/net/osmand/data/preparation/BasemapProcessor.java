@@ -102,23 +102,20 @@ public class BasemapProcessor {
 		public List<SimplisticBinaryData> getData(MapZoomPair p) {
 			return dataObjects.get(p);
 		}
-
-        public SimplisticQuadTree getOrCreateSubTree(int x, int y, int zm) {
-            SimplisticQuadTree result = this;
-            while (true) {
-                if (zm <= result.zoom) {
-                    return result;
-                } else {
-                    result.initChildren();
-                    int nx = (x >> (zm - result.zoom - 1)) - (result.x << 1);
-                    int ny = (y >> (zm - result.zoom - 1)) - (result.y << 1);
-                    if (nx > 1 || nx < 0 || ny > 1 || ny < 0) {
-                        return null;
-                    }
-                    result = result.children[nx * 2 + ny];
-                }
-            }
-        }
+		
+		public SimplisticQuadTree getOrCreateSubTree(int x, int y, int zm) {
+			if (zm <= zoom) {
+				return this;
+			} else {
+				initChildren();
+				int nx = (x >> (zm - zoom - 1)) - (this.x << 1);
+				int ny = (y >> (zm - zoom - 1)) - (this.y << 1);
+				if (nx > 1 || nx < 0 || ny > 1 || ny < 0) {
+					return null;
+				}
+				return children[nx * 2 + ny].getOrCreateSubTree(x, y, zm);
+			}
+		}
 
 		private void initChildren() {
 			if (children == null) {

@@ -145,76 +145,74 @@ public class RTree //the tree that would be made
       fileHdr.unlock();
     }
   }
-
-    /**
-     * Adjust Tree from <b>Guttman the Great</b>.
-     *
-     * @param Node[]    The nodes that was has the new element and also the element
-     *                  that resulted from the splt(if any).i.e N-node[0], NN-nodes[1]
-     *                  Note:- This method is functionally very much coupled with Node.spliNode()
-     * @param node      The two new nodes caused by split.
-     * @param slotIndex The index of the slot of this tree if any, else give NOT_DEFINED.
-     * @return The new root (if it was created). If no new root was created then returns null.
-     */
-    protected Node adjustTree(Node[] nodes, long slotIndex)
-            throws RTreeException {
-        while (true) {
-            try {
-                //if(nodes[0].getParent() == Node.NOT_DEFINED){//original
-                if (nodes[0].getParent() == slotIndex) {
-                    if (nodes[1] != null) {//if root is split
-                        Node newRoot;
-                        if (fileHdr.isWriteThr())
-                            newRoot = new Node(fileHdr.getFile(), fileName, slotIndex, Node.NONLEAF_NODE,
-                                    ((Header) fileList.get(fileName)).flHdr);
-                        else
-                            newRoot = chdNodes.getNode(fileHdr.getFile(), fileName, slotIndex, Node.NONLEAF_NODE,
-                                    ((Header) fileList.get(fileName)).flHdr, nodes[0]);
-                        NonLeafElement branchA = new NonLeafElement(nodes[0].getNodeMBR(), nodes[0].getNodeIndex());
-                        NonLeafElement branchB = new NonLeafElement(nodes[1].getNodeMBR(), nodes[1].getNodeIndex());
-                        newRoot.insertElement(branchB);
-                        newRoot.insertElement(branchA);
-                        return newRoot;
-                    }
-                    return null;
-                } else {
-                    //where the new element is inserted
-                    Node[] insertedNode = new Node[2];
+  /**
+   * Adjust Tree from <b>Guttman the Great</b>.
+   * @param Node[] The nodes that was has the new element and also the element
+   * that resulted from the splt(if any).i.e N-node[0], NN-nodes[1]
+   * Note:- This method is functionally very much coupled with Node.spliNode()
+   * @param node The two new nodes caused by split.
+   * @param slotIndex The index of the slot of this tree if any, else give NOT_DEFINED.
+   * @return The new root (if it was created). If no new root was created then returns null.
+   */
+  protected Node adjustTree(Node[] nodes, long slotIndex)
+    throws  RTreeException
+  {
+    try{
+      //if(nodes[0].getParent() == Node.NOT_DEFINED){//original
+      if(nodes[0].getParent() == slotIndex){
+        if(nodes[1] != null){//if root is split
+          Node newRoot;
+          if(fileHdr.isWriteThr())
+            newRoot = new Node(fileHdr.getFile(),fileName, slotIndex, Node.NONLEAF_NODE,
+                               ((Header)fileList.get(fileName)).flHdr);
+          else
+            newRoot = chdNodes.getNode(fileHdr.getFile(),fileName, slotIndex, Node.NONLEAF_NODE,
+                                       ((Header)fileList.get(fileName)).flHdr, nodes[0]);
+          NonLeafElement branchA = new NonLeafElement(nodes[0].getNodeMBR(),nodes[0].getNodeIndex());
+          NonLeafElement branchB = new NonLeafElement(nodes[1].getNodeMBR(),nodes[1].getNodeIndex());
+          newRoot.insertElement(branchB);
+          newRoot.insertElement(branchA);
+          return newRoot;
+        }
+        return null;
+      }else{
+        //where the new element is inserted
+        Node[] insertedNode = new Node[2];
         /*
           set the parent element's MBR equal to the nodeA's MBR.
         */
-                    //the parent of this node
-                    Node parentN;
-                    if (fileHdr.isWriteThr())
-                        parentN = new Node(fileHdr.getFile(), fileName, nodes[0].getParent(), fileHdr);
-                    else
-                        parentN = chdNodes.getNode(fileHdr.getFile(), fileName, nodes[0].getParent(), fileHdr);
-                    //get the parent element of nodes[0]
-                    //Integer intValue = new Integer(nodes[0].getNodeIndex());
-                    int parentElmtIndex = parentN.getElementIndex(nodes[0].getNodeIndex()/*intValue*/);
-                    //adjust the parent element's MBR
-                    parentN.modifyElement(parentElmtIndex, nodes[0].getNodeMBR());
-                    insertedNode[0] = parentN;
-                    insertedNode[1] = null;
-                    //if it is an split node add its entry in the parent
-                    if (nodes[1] != null) {
-                        NonLeafElement elmtNN = new NonLeafElement(nodes[1].getNodeMBR(), nodes[1].getNodeIndex());
-                        try {//if another insert is possible
-                            parentN.insertElement(elmtNN);
-                            insertedNode[0] = parentN;
-                            insertedNode[1] = null;
-                        } catch (NodeFullException e) {
-                            insertedNode = parentN.splitNode(elmtNN, Node.NOT_DEFINED);
-                        }
-                    }
-                    nodes = insertedNode;
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
-                throw new RTreeException("RTree.adjustTree: " + e.getMessage());
-            }
+        //the parent of this node
+        Node parentN;
+        if(fileHdr.isWriteThr())
+          parentN = new Node(fileHdr.getFile(),fileName,nodes[0].getParent(),fileHdr);
+        else
+          parentN = chdNodes.getNode(fileHdr.getFile(),fileName,nodes[0].getParent(),fileHdr);
+        //get the parent element of nodes[0]
+        //Integer intValue = new Integer(nodes[0].getNodeIndex());
+        int parentElmtIndex = parentN.getElementIndex(nodes[0].getNodeIndex()/*intValue*/);
+        //adjust the parent element's MBR
+        parentN.modifyElement(parentElmtIndex,nodes[0].getNodeMBR());
+        insertedNode[0] = parentN;
+        insertedNode[1] = null;
+        //if it is an split node add its entry in the parent
+        if(nodes[1] != null){
+          NonLeafElement elmtNN = new NonLeafElement(nodes[1].getNodeMBR(),nodes[1].getNodeIndex());
+          try{//if another insert is possible
+            parentN.insertElement(elmtNN);
+            insertedNode[0] = parentN;
+            insertedNode[1] = null;
+          }catch(NodeFullException e){
+            insertedNode = parentN.splitNode(elmtNN, Node.NOT_DEFINED);
+          }
         }
+        return adjustTree(insertedNode, slotIndex);
+      }
     }
+    catch(Exception e){
+      e.printStackTrace();
+      throw new  RTreeException("RTree.adjustTree: "+e.getMessage());
+    }
+  }
   /**
      Pass a <code>LeafElement</code>object.
   */
