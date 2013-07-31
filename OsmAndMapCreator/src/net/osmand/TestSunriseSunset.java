@@ -16,7 +16,7 @@ public class TestSunriseSunset {
 	public static final String DECEMBER = "05.12.2012";
 	public static final String FEBRUARY = "05.02.2012";
 	public static final String MAY = "05.05.2012";
-	public static final String[] DATES = new String[] {MARCH, AUGUST, OCTOBER, DECEMBER, FEBRUARY, MAY};
+	public static final String[] DATES = {MARCH, AUGUST, OCTOBER, DECEMBER, FEBRUARY, MAY};
 	
 	public static void printSunriseSunset(String date, float lat, float lon, TimeZone tz) throws ParseException {
 		SimpleDateFormat sdf = new SimpleDateFormat("dd.MM.yyyy");

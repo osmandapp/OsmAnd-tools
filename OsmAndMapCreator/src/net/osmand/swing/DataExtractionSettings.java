@@ -236,8 +236,8 @@ public class DataExtractionSettings {
 	
 	
 	
-	String[] SUFFIXES = new String[] {"av.", "avenue", "просп.", "пер.", "пр.","заул.", "проспект", "переул.", "бул.", "бульвар", "тракт"};
-	String[] DEFAUTL_SUFFIXES = new String[] {"str.", "street", "улица", "ул."};
+	String[] SUFFIXES = {"av.", "avenue", "просп.", "пер.", "пр.","заул.", "проспект", "переул.", "бул.", "бульвар", "тракт"};
+	String[] DEFAUTL_SUFFIXES = {"str.", "street", "улица", "ул."};
 	public String[] getSuffixesToNormalizeStreets(){
 		String s = preferences.get("suffixes_normalize_streets", null);
 		if(s == null){
