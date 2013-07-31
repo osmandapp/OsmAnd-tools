@@ -76,7 +76,7 @@ public class MapClusterLayer implements MapPanelLayer {
 		boolean BASEMAP_CLUSTERING = true;
 
 		int ZOOM_LIMIT = BASEMAP_CLUSTERING ? 11 : 15;
-		int LOCAL_TILE_BOUNDARIES = BASEMAP_CLUSTERING? 4 : 4;
+		int LOCAL_TILE_BOUNDARIES = 4;
 		int zm = 31 - ZOOM_LIMIT;
 		
 		
