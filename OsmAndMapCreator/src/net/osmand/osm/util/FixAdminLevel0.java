@@ -66,13 +66,13 @@ public class FixAdminLevel0 {
 				processWay((Way) es);
 			}
 		}
-		for(Map.Entry<String, List<Way>> stringListEntry : countryNames.entrySet()){
-			List<Way> list = stringListEntry.getValue();
+		for(String country : countryNames.keySet()){
+			List<Way> list = countryNames.get(country);
 			for(Way w : list){
 				LatLon latLon = OsmMapUtils.getMathWeightCenterForNodes(w.getNodes());
 //				LatLon latLon = w.getLatLon();
 				Node node = new Node(latLon.getLatitude(), latLon.getLongitude(), id--);
-				node.putTag("name", stringListEntry.getKey());
+				node.putTag("name", country);
 				node.putTag("place", "country");
 				storage.getRegisteredEntities().put(EntityId.valueOf(node), node);
 			}

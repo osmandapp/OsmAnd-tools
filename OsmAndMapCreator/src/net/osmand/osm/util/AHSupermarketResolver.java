@@ -155,10 +155,10 @@ public class AHSupermarketResolver {
 		
 		DataTileManager<Entity> deleted = new DataTileManager<Entity>();
 		
-		for(Map.Entry<String, EntityId> stringEntityIdEntry : winkelNumbers.entrySet()){
-			if(!supermarkets.containsKey(stringEntityIdEntry.getKey())){
-				System.err.println("Shop " + stringEntityIdEntry.getKey() + " id=" + stringEntityIdEntry.getValue() + " doesn't present on the site.");
-				EntityId e = stringEntityIdEntry.getValue();
+		for(String s : winkelNumbers.keySet()){
+			if(!supermarkets.containsKey(s)){
+				System.err.println("Shop " + s + " id=" +winkelNumbers.get(s) + " doesn't present on the site.");
+				EntityId e = winkelNumbers.get(s);
 				Entity en = storage.getRegisteredEntities().get(e);
 				deleted.registerObject(en.getLatLon().getLatitude(), en.getLatLon().getLongitude(), 
 						en);
@@ -168,10 +168,10 @@ public class AHSupermarketResolver {
 		DataTileManager<Entity> notCorrelated = new DataTileManager<Entity>();
 		DataTileManager<Entity> notShown = new DataTileManager<Entity>();
 		
-		for(Map.Entry<String, Map<String, Object>> stringMapEntry : supermarkets.entrySet()){
-			Map<String, Object> props = stringMapEntry.getValue();
-			if(winkelNumbers.get(stringMapEntry.getKey()) != null){
-				EntityId id = winkelNumbers.get(stringMapEntry.getKey());
+		for(String s : supermarkets.keySet()){
+			Map<String, Object> props = supermarkets.get(s);
+			if(winkelNumbers.get(s) != null){
+				EntityId id = winkelNumbers.get(s);
 				Entity e = storage.getRegisteredEntities().get(id);
 				EntityInfo info = storage.getRegisteredEntityInfo().get(id);
 				Map<String, String> newTags = new LinkedHashMap<String, String>();
@@ -219,16 +219,16 @@ public class AHSupermarketResolver {
 				double dist = MapUtils.getDistance(e.getLatLon(), real);
 				if(dist > 150){
 					// TODO move shop ?
-					System.err.println("Winkel number = " + stringMapEntry.getKey() + " is too far from site info - " + dist + " m !!! " + real);
+					System.err.println("Winkel number = " + s + " is too far from site info - " + dist + " m !!! " + real);
 					if(dist > 300){
 						notCorrelated.registerObject(real.getLatitude(), real.getLongitude(), e);
 					}
 				}
 				boolean changed = false;
-				for(Map.Entry<String, String> stringStringEntry : newTags.entrySet()){
-					String val = stringStringEntry.getValue();
-					if(!Algorithms.objectEquals(val, e.getTag(stringStringEntry.getKey()))){
-						e.putTag(stringStringEntry.getKey(), val);
+				for(String k : newTags.keySet()){
+					String val = newTags.get(k);
+					if(!Algorithms.objectEquals(val, e.getTag(k))){
+						e.putTag(k, val);
 						changed = true;
 					}
 				}
@@ -238,9 +238,9 @@ public class AHSupermarketResolver {
 			} else {
 				// TODO?
 				LatLon real = new LatLon((Double)props.get("lat"), (Double) props.get("lng"));
-				System.err.println("Winkel number = " + stringMapEntry.getKey() + " is not found in database !!! " + real);
+				System.err.println("Winkel number = " + s + " is not found in database !!! " + real);
 				Node n = new Node(real.getLatitude(), real.getLongitude(), -1);
-				n.putTag("winkelnummer", "REG : " + stringMapEntry.getKey());
+				n.putTag("winkelnummer", "REG : " + s);
 				notShown.registerObject(real.getLatitude(), real.getLongitude(), n);
 			}
 			

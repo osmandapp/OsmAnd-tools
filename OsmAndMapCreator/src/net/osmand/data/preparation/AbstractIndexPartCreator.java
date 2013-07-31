@@ -41,20 +41,20 @@ public class AbstractIndexPartCreator {
 	}
 	
 	protected void closeAllPreparedStatements() throws SQLException {
-		for (Map.Entry<PreparedStatement, Integer> preparedStatementIntegerEntry : pStatements.entrySet()) {
-			if (preparedStatementIntegerEntry.getValue() > 0) {
-                preparedStatementIntegerEntry.getKey().executeBatch();
+		for (PreparedStatement p : pStatements.keySet()) {
+			if (pStatements.get(p) > 0) {
+				p.executeBatch();
 			}
-            preparedStatementIntegerEntry.getKey().close();
+			p.close();
 		}
 	}
 	
 	protected boolean executePendingPreparedStatements() throws SQLException {
 		boolean exec = false;
-		for (Map.Entry<PreparedStatement, Integer> preparedStatementIntegerEntry : pStatements.entrySet()) {
-			if (preparedStatementIntegerEntry.getValue() > 0) {
-                preparedStatementIntegerEntry.getKey().executeBatch();
-				pStatements.put(preparedStatementIntegerEntry.getKey(), 0);
+		for (PreparedStatement p : pStatements.keySet()) {
+			if (pStatements.get(p) > 0) {
+				p.executeBatch();
+				pStatements.put(p, 0);
 				exec = true;
 			}
 		}

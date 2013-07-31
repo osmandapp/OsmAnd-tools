@@ -107,16 +107,16 @@ public class MinskTransReader {
 	public static void showMapPanelWithCorrelatedBusStops(Map<String, TransportStop> stopsMap, DataTileManager<Node> busStops) {
 		Map<String, Node> result = correlateExistingBusStopsWithImported(busStops, stopsMap);
 		DataTileManager<Entity> nodes = new DataTileManager<Entity>();
-		for (Map.Entry<String, Node> stringNodeEntry : result.entrySet()) {
-			TransportStop r = stopsMap.get(stringNodeEntry.getKey());
+		for (String trId : result.keySet()) {
+			TransportStop r = stopsMap.get(trId);
 			Way way = new Way(-1);
-			way.addNode(stringNodeEntry.getValue());
+			way.addNode(result.get(trId));
 			way.addNode(new Node(r.latitude, r.longitude, -1));
 			nodes.registerObject(r.latitude, r.longitude, way);
 		}
-		for(Map.Entry<String, TransportStop> stringTransportStopEntry : stopsMap.entrySet()){
-			if(!result.containsKey(stringTransportStopEntry.getKey())){
-				TransportStop r = stringTransportStopEntry.getValue();
+		for(String trId : stopsMap.keySet()){
+			if(!result.containsKey(trId)){
+				TransportStop r = stopsMap.get(trId);
 				nodes.registerObject(r.latitude, r.longitude, new Node(r.latitude, r.longitude, -1));
 			}
 		}
@@ -399,9 +399,9 @@ public class MinskTransReader {
 		}
 		
 		// check relations that are not exist
-		for(Map.Entry<String, Relation> stringRelationEntry : definedRoutes.entrySet()){
-			if(!checkedRoutes.containsKey(stringRelationEntry.getKey())){
-				Relation rel = stringRelationEntry.getValue();
+		for(String s : definedRoutes.keySet()){
+			if(!checkedRoutes.containsKey(s)){
+				Relation rel = definedRoutes.get(s);
 				storage.getRegisteredEntityInfo().get(rel.getId()).setAction("delete");
 				System.out.println("[DEL] Route is deprecated : " + rel.getTag("route")+ '_' +rel.getTag("ref") + "  " + rel.getTag("name"));
 				

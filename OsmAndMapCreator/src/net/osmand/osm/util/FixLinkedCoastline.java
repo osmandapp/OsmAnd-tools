@@ -175,8 +175,8 @@ public class FixLinkedCoastline {
 		if (start == end || MapUtils.getDistance(first, last) < 20) {
 			LatLon c = way.getLatLon();
 			cycle = Collections.singletonList(way);
-			for(Map.Entry<Way, LatLon> wayLatLonEntry : duplicatedSimpleIslands.entrySet()){
-				LatLon center = wayLatLonEntry.getValue();
+			for(Way w : duplicatedSimpleIslands.keySet()){
+				LatLon center = duplicatedSimpleIslands.get(w);
 				if(MapUtils.getDistance(center, c) < 4000){
 					//System.out.println("DUPLICATED " + first);
 					return Collections.emptyList();

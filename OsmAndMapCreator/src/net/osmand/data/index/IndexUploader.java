@@ -654,11 +654,11 @@ public class IndexUploader {
 				throw new IndexUploadException("Not enought googlecode credentials entered!");
 			}
 			Map<String, String> uploadedDes = DownloaderIndexFromGoogleCode.getIndexFiles(new HashMap<String, String>());
-			for(Map.Entry<String, String> stringStringEntry : uploadedDes.entrySet()) {
-				String description = stringStringEntry.getValue();
+			for(String fileName : uploadedDes.keySet()) {
+				String description = uploadedDes.get(fileName);
 				int o = description.indexOf('{');
 				if(o != -1 && description.length() > o + 11) {
-					uploaded.put(stringStringEntry.getKey(), description.substring(o+1, o+11));
+					uploaded.put(fileName, description.substring(o+1, o+11));
 				}
 			}
 		}
