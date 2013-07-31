@@ -167,11 +167,11 @@ public class SelectPointDialog extends JDialog {
 	
 	
 	public boolean okPressed() {
-		if (parseDouble(latPosition.getText()) == Double.NaN) {
+		if (Double.isNaN(parseDouble(latPosition.getText()))) {
 			JOptionPane.showMessageDialog(this, "Lat coordinate is not a number", "Wrong position", JOptionPane.ERROR_MESSAGE); //$NON-NLS-1$ //$NON-NLS-2$
 			return false;
 		}
-		if (parseDouble(lonPosition.getText()) == Double.NaN) {
+		if (Double.isNaN(parseDouble(lonPosition.getText()))) {
 			JOptionPane.showMessageDialog(this, "Lon coordinate is not a number", "Wrong position", JOptionPane.ERROR_MESSAGE); //$NON-NLS-1$ //$NON-NLS-2$
 			return false;
 		}
