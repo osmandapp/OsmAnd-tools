@@ -86,7 +86,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 	//TODO make it an option
 	private boolean DEBUG_FULL_NAMES = false; //true to see atached cityPart and boundaries to the street names
 	
-	private final int ADDRESS_NAME_CHARACTERS_TO_INDEX = 4; 
+	private static final int ADDRESS_NAME_CHARACTERS_TO_INDEX = 4;
 	
 	Connection mapConnection;
 	DBStreetDAO streetDAO;
