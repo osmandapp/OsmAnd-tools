@@ -238,7 +238,7 @@ public class IndexBatchCreator {
 		}
 		
 		String szoomWaySmoothness = process.getAttribute("zoomWaySmoothness");
-		if(szoomWaySmoothness != null && !szoomWaySmoothness.equals("")){
+		if(szoomWaySmoothness != null && !szoomWaySmoothness.isEmpty()){
 			zoomWaySmoothness = Integer.parseInt(szoomWaySmoothness);
 		}
 		String f = process.getAttribute("renderingTypesFile");
