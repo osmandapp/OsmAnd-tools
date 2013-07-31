@@ -109,7 +109,7 @@ public class ExtractGooglecodeAuthorization {
 		writer.flush();
 		conn.connect();
 		if (debug) {
-			System.out.println("Connected to:" + url.toString());
+			System.out.println("Connected to:" + url);
 			System.out.println("-- Data sent:\n" + data);
 			System.out.println("--");
 		}
@@ -217,7 +217,7 @@ public class ExtractGooglecodeAuthorization {
 		if (args.length < 2) {
 			System.out.println("Use: ExtractGooglecodeAuthorization gmailname gmailpassword");
         } else {
-			System.out.println(new ExtractGooglecodeAuthorization(true).getGooglecodeTokensForUpload(args[0], args[1]).toString());
+			System.out.println(new ExtractGooglecodeAuthorization(true).getGooglecodeTokensForUpload(args[0], args[1]));
 		}
 	}
 

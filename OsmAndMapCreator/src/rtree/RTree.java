@@ -924,7 +924,7 @@ public class RTree //the tree that would be made
       throw new  IllegalValueException("RTree.trvsRPrePrint: Node is null");
     Element[] elmts = node.getAllElements();
     int totElements = node.getTotalElements();
-    System.out.println(node.toString());
+    System.out.println(node);
     for(int i=0; i<totElements; i++){//for every element
       if(elmts[i].getElementType() == Node.NONLEAF_NODE){//non leaf
         //Integer ndIndex = (Integer)elmts[i].getPtr();

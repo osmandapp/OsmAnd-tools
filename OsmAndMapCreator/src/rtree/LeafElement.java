@@ -74,7 +74,7 @@ public void setPtr(long ptr)
   @Override
 public String toString()
   {
-    return (super.toString()+"\n\trecPointer: "+recordPtr);
+    return (super +"\n\trecPointer: "+recordPtr);
   }
   @Override
 public Object clone()

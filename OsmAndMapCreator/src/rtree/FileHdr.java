@@ -492,7 +492,7 @@ public String toString()
       if(waiters != null){
         str += "\nWaiters : total " + waiters.size();
         for(int i=0; i<waiters.size();i++)
-          str += "\n" + i + " : " + waiters.get(i).toString();
+          str += "\n" + i + " : " + waiters.get(i);
       }
       return str;
     }catch(Exception e){

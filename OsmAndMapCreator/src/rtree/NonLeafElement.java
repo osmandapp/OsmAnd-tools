@@ -65,7 +65,7 @@ public void setPtr(long ptr)
   @Override
 public String toString()
   {
-    return (super.toString()+"\n\tnodePointer: "+nodePtr);
+    return (super +"\n\tnodePointer: "+nodePtr);
   }
   /**
      A merge-sort routine for the Packing algo.

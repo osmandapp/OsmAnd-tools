@@ -328,7 +328,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 
 	private void logBoundaryChanged(Boundary boundary, City cityFound) {
 		String s = "City " + (cityFound == null ? " not found " : " : " +cityFound.getName());
-		s += " boundary: " + boundary.toString() + ' ' + boundary.getBoundaryId();
+		s += " boundary: " + boundary + ' ' + boundary.getBoundaryId();
 		if (logMapDataWarn != null) {
 			logMapDataWarn.info(s);
 		} else {

@@ -412,7 +412,7 @@ public void run()
       Rect rect2 = new Rect(4,2,5,3);
       //Rect rect1 = new Rect(9,6,10,7);//true
       //Rect rect2 = new Rect(8,5,11,8);//true
-      System.out.println(rect1.toString()+" \nand\n"+rect2.toString()
+      System.out.println(rect1 +" \nand\n"+ rect2
                          +"\noverlap? \n\tAns- "+rect2.contains(rect1));
     }
     catch(Exception e){
@@ -436,7 +436,7 @@ public void run()
       //Rect rect2 = new Rect(4,2,5,3);//4 2 5 3
       Rect rect1 = new Rect(9,6,10,7);//null
       Rect rect2 = new Rect(8,5,11,8);//null - comp the two 9 6 10 7
-      System.out.println(rect1.toString()+" \nand\n"+rect2.toString()
+      System.out.println(rect1 +" \nand\n"+ rect2
                          +"\nIntersection \n\tAns- "+rect2.intersection(rect1));
     }
     catch(Exception e){
@@ -449,7 +449,7 @@ public void run()
       Rect rect1 = new Rect(3,2,5,4);
       Rect rect2 = new Rect(3,2,4,4);//true 
       //Rect rect2 = new Rect(6,2,6,2);//false
-      System.out.println(rect1.toString()+" \nand\n"+rect2.toString()
+      System.out.println(rect1 +" \nand\n"+ rect2
                          +"\nDoes first Eclose second? \n\tAns- "
                          +rect1.covers(rect2));
     }
@@ -469,7 +469,7 @@ public void run()
       //Rect rect2 = new Rect(3,1,5,3);//true
       //Rect rect2 = new Rect(4,3,4,3);//true - check
       Rect rect2 = new Rect(3,2,3,2);//true
-      System.out.println(rect1.toString()+" \nand\n"+rect2.toString()
+      System.out.println(rect1 +" \nand\n"+ rect2
                          +"\nDo Both Intersect? \n\tAns- "
                          +rect1.meet(rect2));
     }

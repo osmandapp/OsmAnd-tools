@@ -884,10 +884,10 @@ public class IndexUploader {
 				sb.append((char) c);
 			} while (c != '\n');
 			if (b == 1) { // error
-				System.out.print(sb.toString());
+				System.out.print(sb);
 			}
 			if (b == 2) { // fatal error
-				System.out.print(sb.toString());
+				System.out.print(sb);
 			}
 		}
 		return b;
