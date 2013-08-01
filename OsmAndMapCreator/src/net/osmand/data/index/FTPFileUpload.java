@@ -37,7 +37,7 @@ public class FTPFileUpload
    {
       if (ftpServer != null && fileName != null && source != null)
       {
-         StringBuffer sb = new StringBuffer( "ftp://" );
+         StringBuilder sb = new StringBuilder( "ftp://" );
          // check for authentication else assume its anonymous access.
          if (user != null && password != null)
          {
@@ -119,7 +119,7 @@ public class FTPFileUpload
    {
       if (ftpServer != null && fileName != null && destination != null)
       {
-         StringBuffer sb = new StringBuffer( "ftp://" );
+         StringBuilder sb = new StringBuilder( "ftp://" );
          // check for authentication else assume its anonymous access.
          if (user != null && password != null)
          {
