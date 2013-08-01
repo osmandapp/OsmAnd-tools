@@ -408,8 +408,8 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		for (int i = 0; i < nsize; i++) {
 			if (nodes.get(i) != null) {
 				c++;
-				int x = (int) (MapUtils.getTileNumberX(zoom, nodes.get(i).getLongitude()) * 256d);
-				int y = (int) (MapUtils.getTileNumberY(zoom, nodes.get(i).getLatitude()) * 256d);
+				int x = (int) (MapUtils.getTileNumberX(zoom, nodes.get(i).getLongitude()) * 256.0d);
+				int y = (int) (MapUtils.getTileNumberY(zoom, nodes.get(i).getLatitude()) * 256.0d);
 				minX = Math.min(minX, x);
 				maxX = Math.max(maxX, x);
 				minY = Math.min(minY, y);
