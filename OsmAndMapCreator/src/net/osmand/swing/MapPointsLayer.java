@@ -151,7 +151,7 @@ public class MapPointsLayer implements MapPanelLayer {
 				g.setColor(Color.white);
 				float c = 1.3f;
 				g.scale(c, c);
-				g.drawString(name, (int)(-15), (int) (-10/c));
+				g.drawString(name, -15, (int) (-10/c));
 				g.scale(1/c, 1/c);
 				
 				if(white) {
