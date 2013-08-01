@@ -2,12 +2,7 @@ package net.osmand.osm;
 
 import gnu.trove.list.array.TIntArrayList;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
 
 import net.osmand.osm.edit.Entity;
@@ -256,9 +251,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 				}
 				rType.updateFreq();
 				if (rType.names != null) {
-					for (int i = 0; i < rType.names.length; i++) {
-						tempList.add(rType.names[i]);
-					}
+                    Collections.addAll(tempList, rType.names);
 				}
 
 				if (!rType.onlyNameRef) {
