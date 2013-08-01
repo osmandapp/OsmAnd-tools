@@ -541,7 +541,7 @@ public class IndexCreator {
 						public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 							if (indexAddress) {
 								//indexAddressCreator.indexAddressRelation((Relation) e, ctx); streets needs loaded boundaries !!!
-								indexAddressCreator.indexBoundariesRelation((Relation) e, ctx);
+								indexAddressCreator.indexBoundariesRelation(e, ctx);
 							}
 							if (indexMap) {
 								indexMapCreator.indexMapRelationsAndMultiPolygons(e, ctx);
