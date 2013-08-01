@@ -1443,7 +1443,7 @@ public String toString()
    */
   void sweepSort()//check out for null elements
   {
-    if(elements != null && elements.length > 1 && sorted == false){
+    if(elements != null && elements.length > 1 && !sorted){
       Arrays.sort(elements, 0, totalElements, new rtree.join.CompElmtX());
       sorted = true;
     }//if
