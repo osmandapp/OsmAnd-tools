@@ -2,12 +2,10 @@
 # we should not rm, just do incremental updates for now! rm -rf backup 
 
 # remove all previous files
-mkdir ~/indexes
-mkdir ~/indexes/uploaded
+mkdir -p ~/indexes/uploaded
 
 rm -rf .work
-mkdir .work
-mkdir .work/osm
+mkdir -p .work/osm
 if [ -z $INDEXES_FILE ]; then INDEXES_FILE="build-scripts/regions/indexes.xml"; echo "$INDEXES_FILE"; fi
 
 echo 'Running java net.osmand.data.index.IndexBatchCreator with $INDEXES_FILE'
