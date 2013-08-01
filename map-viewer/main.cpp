@@ -56,7 +56,7 @@ QList< std::shared_ptr<QFileInfo> > obfFiles;
 QString styleName;
 bool wasObfRootSpecified = false;
 
-bool use43 = true;
+bool use43 = false;
 
 bool renderWireframe = false;
 void reshapeHandler(int newWidth, int newHeight);
@@ -447,6 +447,27 @@ void keyboardHandler(unsigned char key, int x, int y)
             renderer->setConfiguration(config);
         }
         break;
+    case 'b':
+        {
+            auto config = renderer->configuration;
+            config.texturesFilteringQuality = OsmAnd::MapRendererConfiguration::TextureFilteringQuality::Normal;
+            renderer->setConfiguration(config);
+        }
+        break;
+    case 'n':
+        {
+            auto config = renderer->configuration;
+            config.texturesFilteringQuality = OsmAnd::MapRendererConfiguration::TextureFilteringQuality::Good;
+            renderer->setConfiguration(config);
+        }
+        break;
+    case 'm':
+        {
+            auto config = renderer->configuration;
+            config.texturesFilteringQuality = OsmAnd::MapRendererConfiguration::TextureFilteringQuality::Best;
+            renderer->setConfiguration(config);
+        }
+        break;
     case '0':
         {
             auto layerId = (modifiers & GLUT_ACTIVE_ALT) ? OsmAnd::MapTileLayerId::MapOverlay0 : OsmAnd::MapTileLayerId::RasterMap;
@@ -564,7 +585,7 @@ void displayHandler()
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
         auto w = 390;
-        auto h1 = 16*17;
+        auto h1 = 16*18;
         auto t = viewport.height();
         glColor4f(0.5f, 0.5f, 0.5f, 0.6f);
         glBegin(GL_QUADS);
@@ -638,6 +659,10 @@ void displayHandler()
 
         glRasterPos2f(8, t - 16 * 16);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("16-bit textures (key c): %1").arg(renderer->configuration.limitTextureColorDepthBy16bits).toStdString().c_str());
+        verifyOpenGL();
+
+        glRasterPos2f(8, t - 16 * 17);
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("tex-filtering (b,n,m)  : %1").arg(static_cast<int>(renderer->configuration.texturesFilteringQuality)).toStdString().c_str());
         verifyOpenGL();
 
         glRasterPos2f(8, 16 * 6);
