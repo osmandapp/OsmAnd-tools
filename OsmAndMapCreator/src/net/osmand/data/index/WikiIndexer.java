@@ -41,9 +41,9 @@ public class WikiIndexer {
 	private final File srcPath;
 	private final File workPath;
 	private final File targetPath;
-	private final String userName = "jenkins";
-	private final String password = "jenkins";
-	private final String url = "jdbc:mysql://localhost/wiki";
+	private static final String userName = "jenkins";
+	private static final String password = "jenkins";
+	private static final String url = "jdbc:mysql://localhost/wiki";
 	private final File srcDone;
 	
 	public static class WikiIndexerException extends Exception {

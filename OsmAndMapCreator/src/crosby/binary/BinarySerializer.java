@@ -51,7 +51,7 @@ public class BinarySerializer {
     }
 
     // Paramaters affecting the output size.
-    protected final int MIN_DENSE = 10;
+    protected static final int MIN_DENSE = 10;
     protected int batch_limit = 4000;
 
     // Parmaters affecting the output.

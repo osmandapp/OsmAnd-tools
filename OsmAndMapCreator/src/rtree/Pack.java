@@ -82,7 +82,7 @@ public class Pack
     }
   }
   
-  public final int BUFFER_SIZE = 8192*8;
+  public static final int BUFFER_SIZE = 8192*8;
   private int packTree(Element[] elmts, RTree rtree, String newFile)
   {
     try{
