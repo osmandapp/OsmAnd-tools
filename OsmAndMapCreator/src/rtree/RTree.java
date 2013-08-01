@@ -931,7 +931,6 @@ public class RTree //the tree that would be made
         trvsRPrePrint(chdNodes.getReadNode(fileHdr.getFile(),fileName,elmts[i].getPtr(),fileHdr));
       }
     }
-    return;
   }
   //-----------------------------------------------------------------------
   /**
