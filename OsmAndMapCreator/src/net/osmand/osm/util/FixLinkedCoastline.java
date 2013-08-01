@@ -124,7 +124,7 @@ public class FixLinkedCoastline {
 				lon = 180;
 			}
 		}
-		return (MapUtils.getTileNumberY(21, l.getLatitude()) << 32l) + MapUtils.getTileNumberX(21, lon);
+		return ((long)MapUtils.getTileNumberY(21, l.getLatitude()) << 32L) + ((long)MapUtils.getTileNumberX(21, lon));
 	}
 	
 	private static Map<Long, List<Way>> startWays = new LinkedHashMap<Long, List<Way>>();
