@@ -270,9 +270,7 @@ public class BasemapProcessor {
 				} else if(zoom < TILE_ZOOMLEVEL){
 					SimplisticQuadTree[] vis = rootTree.getOrCreateSubTree(x, y, zoom).getOrCreateSubTree(x, y, zoom)
 							.getAllChildren();
-					for (SimplisticQuadTree t : vis) {
-						newToVisit.add(t);
-					}
+                    Collections.addAll(newToVisit, vis);
 				}
 			}
 			toVisit = newToVisit;
