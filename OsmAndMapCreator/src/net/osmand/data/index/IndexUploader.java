@@ -772,7 +772,7 @@ public class IndexUploader {
 		if(serverName.startsWith("ftp://")){
 			serverName = serverName.substring("ftp://".length());
 		}
-		upload.upload(serverName, credentials.password, credentials.password, credentials.path + "" + f.getName(), f, 1 << 15);
+		upload.upload(serverName, credentials.password, credentials.password, credentials.path + f.getName(), f, 1 << 15);
 		log.info("Finish uploading file index");
 	}
 	
