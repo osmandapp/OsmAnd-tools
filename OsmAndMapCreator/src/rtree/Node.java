@@ -894,8 +894,7 @@ public Object clone()
     try{        
       int rem = totalElements+1;//no. of elements remaining + the new element
       Element[] elmtPlusOne = new Element[rem];
-      for(int i=0;i<rem-1;i++)
-        elmtPlusOne[i] = elements[i];
+        System.arraycopy(elements, 0, elmtPlusOne, 0, rem - 1);
       elmtPlusOne[totalElements] = elmtM1; 
       //the elements which have been allocated: 1 - present, 0 - absent
       int[] elmtsGone = new int[rem];
