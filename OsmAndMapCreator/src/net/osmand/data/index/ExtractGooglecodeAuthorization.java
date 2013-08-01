@@ -216,8 +216,7 @@ public class ExtractGooglecodeAuthorization {
 	{
 		if (args.length < 2) {
 			System.out.println("Use: ExtractGooglecodeAuthorization gmailname gmailpassword");
-			return;
-		} else {
+        } else {
 			System.out.println(new ExtractGooglecodeAuthorization(true).getGooglecodeTokensForUpload(args[0], args[1]).toString());
 		}
 	}
