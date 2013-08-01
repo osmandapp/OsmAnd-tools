@@ -654,8 +654,8 @@ public class WikiIndexer {
 			streamWriter.writeStartElement("node");
 			id++;
 			streamWriter.writeAttribute("id", "-" + cid);
-			streamWriter.writeAttribute("lat", lat + "");
-			streamWriter.writeAttribute("lon", lon + "");
+			streamWriter.writeAttribute("lat", String.valueOf(lat));
+			streamWriter.writeAttribute("lon", String.valueOf(lon));
 
 			streamWriter.writeCharacters("\n  ");
 			streamWriter.writeStartElement("tag");

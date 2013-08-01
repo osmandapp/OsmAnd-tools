@@ -136,7 +136,7 @@ public class DownloaderIndexFromGoogleCode {
 		connection.setConnectTimeout(15000);
 		connection.setRequestMethod("POST"); //$NON-NLS-1$
 		connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");  //$NON-NLS-1$//$NON-NLS-2$
-		connection.setRequestProperty("Content-Length", requestBody.length()+""); //$NON-NLS-1$ //$NON-NLS-2$
+		connection.setRequestProperty("Content-Length", String.valueOf(requestBody.length())); //$NON-NLS-1$ //$NON-NLS-2$
 		
 		connection.setDoInput(true);
 		connection.setDoOutput(true);

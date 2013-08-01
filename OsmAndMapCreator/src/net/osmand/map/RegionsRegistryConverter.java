@@ -119,7 +119,7 @@ public class RegionsRegistryConverter {
 		}
 		
 		String size = reg.getAttribute("size");
-		String sz = r.getTileSize()+"";
+		String sz = String.valueOf(r.getTileSize());
 		if(!size.equals(sz)) {
 			System.out.println("Region " + rgName);
 			System.out.println("Validate size '" + size + "' != '" +sz +"'");

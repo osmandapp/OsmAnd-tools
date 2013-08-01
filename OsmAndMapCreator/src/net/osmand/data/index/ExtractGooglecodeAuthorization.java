@@ -101,7 +101,7 @@ public class ExtractGooglecodeAuthorization {
 				"https://www.google.com/accounts/ServiceLogin?service=code&ltmpl=phosting&continue=http%3A%2F%2Fcode.google.com%2Fp%2Fosmand%2Fdownloads%2Fdelete%3Fname%3Den-tts_0.voice.zip");
 		conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:5.0) Gecko/20100101 Firefox/5.0");
 		conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded"); //$NON-NLS-1$ //$NON-NLS-
-		conn.setRequestProperty("Content-Length", data.length() + "");
+		conn.setRequestProperty("Content-Length", String.valueOf(data.length()));
 		OutputStreamWriter writer = new OutputStreamWriter(conn.getOutputStream());
 
 		// write parameters

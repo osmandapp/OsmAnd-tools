@@ -128,14 +128,14 @@ public class OsmDbCreator implements IOsmStorageFilter {
 			ArraySerializer.endArray(builder);
 		}
 		if (e instanceof Node) {
-			ArraySerializer.value(builder, ((float) ((Node) e).getLatitude()) + "", false);
-			ArraySerializer.value(builder, ((float) ((Node) e).getLongitude()) + "", false);
+			ArraySerializer.value(builder, String.valueOf((float) ((Node) e).getLatitude()), false);
+			ArraySerializer.value(builder, String.valueOf((float) ((Node) e).getLongitude()), false);
 		} else if (e instanceof Way) {
 			ArraySerializer.startArray(builder, false);
 			boolean f = true;
 			TLongArrayList nodeIds = ((Way) e).getNodeIds();
 			for (int j = 0; j < nodeIds.size(); j++) {
-				ArraySerializer.value(builder, nodeIds.get(j) + "", f);
+				ArraySerializer.value(builder, String.valueOf(nodeIds.get(j)), f);
 				f = false;
 			}
 			ArraySerializer.endArray(builder);
@@ -145,7 +145,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 			boolean f = true;
 			for(Entry<EntityId, String> l : ((Relation) e).getMembersMap().entrySet()) {
 				String k = l.getKey().getType() == EntityType.NODE ? "0" : (l.getKey().getType() == EntityType.WAY ? "1" : "2");
-				ArraySerializer.value(builder, k +""+l.getKey().getId(), f);
+				ArraySerializer.value(builder, k + l.getKey().getId(), f);
 				f = false;
 				ArraySerializer.value(builder, l.getValue(), f);
 			}
@@ -181,8 +181,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 				database.write(options, batch);
 				batch = new DBWriteBatch();
 				long usedMemory = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
-				log.info("" + Runtime.getRuntime().totalMemory() / (1024 * 1024) + " MB Total " + (usedMemory / (1024 * 1024))
-						+ " MB used memory");
+				log.info(Runtime.getRuntime().totalMemory() / (1024 * 1024) + " MB Total " + (usedMemory / (1024 * 1024)) + " MB used memory");
 				currentCountNode = 0;
 			}
 		} else {
