@@ -48,7 +48,7 @@ import net.osmand.util.Algorithms;
 
 public class OsmStorageWriter {
 
-	private final String INDENT = "    ";
+	private static final String INDENT = "    ";
 	private final String INDENT2 = INDENT + INDENT;
 
 
