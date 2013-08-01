@@ -30,11 +30,11 @@ public class CachedDBStreetDAO extends DBStreetDAO
 	}
 
 	private String createStreetUniqueName(String name, City city, String cityPart) {
-		return new StringBuilder().append(name).append('_').append(city.getId()).append('_').append(cityPart).toString();
+		return name + '_' + city.getId() + '_' + cityPart;
 	}
 
 	private String createStreetUniqueName(String name, City city) {
-		return new StringBuilder().append(name).append('_').append(city.getId()).toString();
+		return name + '_' + city.getId();
 	}
 
 	@Override
