@@ -485,7 +485,7 @@ protected void finalize() throws Throwable
 public String toString()
   {
     try{
-      String str = new String();
+      String str = "";
       str += "\nTotal Nodes " +  totalNodes;
       str += "\nRoot Index " +  rootIndex;
       str += "\nFile length " + file.length();
@@ -528,7 +528,7 @@ class ThreadInfo
   @Override
 public String toString()
   {
-    String str = new String("\nThreadInfo");
+    String str = "\nThreadInfo";
     str += "\n lockType : "+ lockType;
     str += "\n nAcquired : "+ nAcquired;    
     str += "\n Thread : "+ t;    
