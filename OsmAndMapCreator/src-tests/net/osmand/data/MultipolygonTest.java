@@ -39,7 +39,7 @@ public class MultipolygonTest {
 	public Way scale(int i, Way w) {
 		Way way = new Way(wayid++);
 		for (Node nn : w.getNodes()) {
-			way.addNode(n(i* nn.getLatitude(),i* nn.getLongitude()));
+			way.addNode(n(i*(int)nn.getLatitude(),i*(int)nn.getLongitude()));
 		}
 		return way;
 	}
@@ -47,7 +47,7 @@ public class MultipolygonTest {
 	public Way move(int i, int j, Way w) {
 		Way way = new Way(wayid++);
 		for (Node nn : w.getNodes()) {
-			way.addNode(n(i+ nn.getLatitude(),j+ nn.getLongitude()));
+			way.addNode(i+(int)nn.getLatitude(),j+(int)nn.getLongitude()));
 		}
 		return way;
 	}
