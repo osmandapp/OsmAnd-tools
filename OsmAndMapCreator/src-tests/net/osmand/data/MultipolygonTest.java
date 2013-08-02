@@ -27,7 +27,7 @@ public class MultipolygonTest {
 		openedBaseCircle = polygon(n(1,-1), n(1,1), n(-1,1), n(-1,-1));
 		closedBaseCircle = polygon(n(1,-1), n(1,1), n(-1,1), n(-1,-1), n(1,-1));
 	}
-	
+
 	public Way polygon(Node... n) {
 		Way way = new Way(wayid++);
 		for (Node nn : n) {
@@ -47,7 +47,7 @@ public class MultipolygonTest {
 	public Way move(int i, int j, Way w) {
 		Way way = new Way(wayid++);
 		for (Node nn : w.getNodes()) {
-			way.addNode(i+(int)nn.getLatitude(),j+(int)nn.getLongitude());
+			way.addNode(n(i+(int)nn.getLatitude(),j+(int)nn.getLongitude()));
 		}
 		return way;
 	}
@@ -63,19 +63,19 @@ public class MultipolygonTest {
 		assertEquals(1, testee.countOuterPolygons());
 		assertFalse(testee.hasOpenedPolygons());
 	}
-	
+
 	@Test
 	public void test_ringArea(){
 		Way w = new Way(0L);
-		
+
 		w.addNode(new Node(0.0, 0.0, 1));
 		w.addNode(new Node(1.0, 0.0, 2));
 		w.addNode(new Node(1.0, 0.5, 3));
 		w.addNode(new Node(1.5, 0.5, 4));
 		w.addNode(new Node(1.0, 1.0, 5));
-		
+
 		Multipolygon m = new MultipolygonBuilder().addOuterWay(w).build();
-		
+
 		Ring r = m.getOuterRings().get(0);
 		// calculated with JOSM measurement tool
 		double expected = 7716818755.73;
@@ -100,7 +100,7 @@ public class MultipolygonTest {
 		LatLon center = testee.getCenterPoint();
 		assertTrue(testee.containsPoint(center));
 	}
-	
+
 	@Test
 	public void test_containsPointOpenedCircle()
 	{
@@ -109,7 +109,7 @@ public class MultipolygonTest {
 		LatLon center = testee.getCenterPoint();
 		assertTrue(testee.containsPoint(center));
 	}
-	
+
 	@Test
 	public void test_containsPointClosedCircle()
 	{
@@ -118,7 +118,7 @@ public class MultipolygonTest {
 		LatLon center = testee.getCenterPoint();
 		assertTrue(testee.containsPoint(center));
 	}
-	
+
 	@Test
 	public void test_oneInnerRingOneOuterRingOpenedCircle()
 	{
@@ -141,9 +141,9 @@ public class MultipolygonTest {
 
 		MultipolygonBuilder mpoly2 = new MultipolygonBuilder();
 		mpoly2.addOuterWay(polygon);
-		
+
 		assertTrue(testee.containsPoint(mpoly2.build().getCenterPoint()));
-		
+
 		bld.addInnerWay(polygon);
 		testee = bld.build();
 		assertFalse(testee.containsPoint(mpoly2.build().getCenterPoint()));
@@ -154,13 +154,13 @@ public class MultipolygonTest {
 	{
 		test_twoInnerRingsOneOuterRing(openedBaseCircle);
 	}
-	
+
 	@Test
 	public void test_twoInnerRingsOneOuterRingClosedCircle()
 	{
 		test_twoInnerRingsOneOuterRing(closedBaseCircle);
 	}
-	
+
 	public void test_twoInnerRingsOneOuterRing(Way polygon)
 	{
 		MultipolygonBuilder bld = new MultipolygonBuilder();
@@ -168,7 +168,7 @@ public class MultipolygonTest {
 		Multipolygon testee = bld.build();
 		LatLon center = testee.getCenterPoint();
 		assertTrue(testee.containsPoint(center));
-		
+
 		MultipolygonBuilder mpoly2 = new MultipolygonBuilder();
 		mpoly2.addOuterWay(polygon);
 		MultipolygonBuilder movepoly2 = new MultipolygonBuilder();
@@ -234,6 +234,6 @@ public class MultipolygonTest {
 		assertEquals(1, testee.countOuterPolygons());
 		assertTrue(testee.hasOpenedPolygons());
 	}
-	
+
 
 }
