@@ -4,6 +4,6 @@
                 osmDbDialect="sqlite" mapDbDialect="sqlite"/>
 
         <process directory_for_osm_files=".work/osm" directory_for_index_files="/var/lib/jenkins/indexes" directory_for_generation=".work"
-                skipExistingIndexesAt="/var/lib/jenkins/indexes/addresses-uploaded" indexPOI="false" indexRouting="false" indexMap="false" indexTransport="false" indexAddress="true">
+                skipExistingIndexesAt="/var/lib/jenkins/indexes/uploaded" indexPOI="false" indexRouting="false" indexMap="false" indexTransport="false" indexAddress="true">
         </process>
 </batch_process>
