@@ -47,7 +47,7 @@ public class MultipolygonTest {
 	public Way move(int i, int j, Way w) {
 		Way way = new Way(wayid++);
 		for (Node nn : w.getNodes()) {
-			way.addNode(i+(int)nn.getLatitude(),j+(int)nn.getLongitude()));
+			way.addNode(i+(int)nn.getLatitude(),j+(int)nn.getLongitude());
 		}
 		return way;
 	}
