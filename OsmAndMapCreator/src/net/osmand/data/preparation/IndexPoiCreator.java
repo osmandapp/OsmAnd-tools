@@ -77,9 +77,14 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				}
 			}
 		}
+		boolean privateReg = "private".equals(e.getTag("access")); 
 		tempAmenityList = EntityParser.parseAmenities(renderingTypes, e, tempAmenityList);
 		if (!tempAmenityList.isEmpty() && poiPreparedStatement != null) {
 			for (Amenity a : tempAmenityList) {
+				if(a.getType() == AmenityType.LEISURE) {
+					// don't index private swimming pools 
+					continue;
+				}
 				// do not add that check because it is too much printing for batch creation
 				// by statistic < 1% creates maps manually
 				// checkEntity(e);
