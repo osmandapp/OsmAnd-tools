@@ -41,9 +41,9 @@ public class WikiIndexer {
 	private final File srcPath;
 	private final File workPath;
 	private final File targetPath;
-	private final String userName = "jenkins";
-	private final String password = "jenkins";
-	private final String url = "jdbc:mysql://localhost/wiki";
+	private static final String userName = "jenkins";
+	private static final String password = "jenkins";
+	private static final String url = "jdbc:mysql://localhost/wiki";
 	private final File srcDone;
 	
 	public static class WikiIndexerException extends Exception {
@@ -474,8 +474,8 @@ public class WikiIndexer {
 			}
 			int ls = text.indexOf("lat_dir");
 			if (ls != -1 && text.charAt(ls + 1 + "lat_dir".length()) != '|') {
-				float lat = 0;
-				float lon = 0;
+				float lat;
+				float lon;
 				String subcategory = "";
 				StringBuilder description = new StringBuilder();
 
@@ -654,8 +654,8 @@ public class WikiIndexer {
 			streamWriter.writeStartElement("node");
 			id++;
 			streamWriter.writeAttribute("id", "-" + cid);
-			streamWriter.writeAttribute("lat", lat + "");
-			streamWriter.writeAttribute("lon", lon + "");
+			streamWriter.writeAttribute("lat", String.valueOf(lat));
+			streamWriter.writeAttribute("lon", String.valueOf(lon));
 
 			streamWriter.writeCharacters("\n  ");
 			streamWriter.writeStartElement("tag");

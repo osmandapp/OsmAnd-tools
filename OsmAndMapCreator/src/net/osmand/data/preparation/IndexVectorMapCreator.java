@@ -408,8 +408,8 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		for (int i = 0; i < nsize; i++) {
 			if (nodes.get(i) != null) {
 				c++;
-				int x = (int) (MapUtils.getTileNumberX(zoom, nodes.get(i).getLongitude()) * 256d);
-				int y = (int) (MapUtils.getTileNumberY(zoom, nodes.get(i).getLatitude()) * 256d);
+				int x = (int) (MapUtils.getTileNumberX(zoom, nodes.get(i).getLongitude()) * 256.0d);
+				int y = (int) (MapUtils.getTileNumberY(zoom, nodes.get(i).getLatitude()) * 256.0d);
 				minX = Math.min(minX, x);
 				maxX = Math.max(maxX, x);
 				minY = Math.min(minY, y);
@@ -571,7 +571,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		long baseId = 0;
 		for (int i = 0; i < parent.getTotalElements(); i++) {
 			if (e[i].getElementType() == rtree.Node.LEAF_NODE) {
-				long id = ((LeafElement) e[i]).getPtr();
+				long id = e[i].getPtr();
 				selectData.setLong(1, id);
 				// selectData = mapConnection.prepareStatement("SELECT area, coordinates, innerPolygons, types, additionalTypes, name FROM binary_map_objects WHERE id = ?");
 				ResultSet rs = selectData.executeQuery();
@@ -617,7 +617,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		}
 		for (int i = 0; i < parent.getTotalElements(); i++) {
 			if (e[i].getElementType() != rtree.Node.LEAF_NODE) {
-				long ptr = ((NonLeafElement) e[i]).getPtr();
+				long ptr = e[i].getPtr();
 				rtree.Node ns = r.getReadNode(ptr);
 				writeBinaryMapBlock(ns, e[i].getRect(), r, writer, selectData, bounds, tempStringTable, tempNames,level);
 			}
@@ -639,7 +639,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		}
 		for (int i = 0; i < parent.getTotalElements(); i++) {
 			if (e[i].getElementType() != rtree.Node.LEAF_NODE) {
-				rtree.Node chNode = r.getReadNode(((NonLeafElement) e[i]).getPtr());
+				rtree.Node chNode = r.getReadNode(e[i].getPtr());
 				writeBinaryMapTree(chNode, e[i].getRect(), r, writer, bounds);
 			}
 		}

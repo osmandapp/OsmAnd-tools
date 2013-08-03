@@ -45,7 +45,7 @@ public class DownloaderIndexFromGoogleCode {
 				String prevFile = null;
 				while ((s = reader.readLine()) != null) {
 					boolean hrefDownload = s.indexOf("files") != -1; //$NON-NLS-1$
-					if (hrefDownload || s.indexOf("{") != -1) { //$NON-NLS-1$
+					if (hrefDownload || s.indexOf('{') != -1) { //$NON-NLS-1$
 						downloadNext |= hrefDownload;
 						for (String extension : ext) {
 							prevFile = getIndexFiles(files, s, prevFile, extension);
@@ -136,7 +136,7 @@ public class DownloaderIndexFromGoogleCode {
 		connection.setConnectTimeout(15000);
 		connection.setRequestMethod("POST"); //$NON-NLS-1$
 		connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");  //$NON-NLS-1$//$NON-NLS-2$
-		connection.setRequestProperty("Content-Length", requestBody.length()+""); //$NON-NLS-1$ //$NON-NLS-2$
+		connection.setRequestProperty("Content-Length", String.valueOf(requestBody.length())); //$NON-NLS-1$ //$NON-NLS-2$
 		
 		connection.setDoInput(true);
 		connection.setDoOutput(true);

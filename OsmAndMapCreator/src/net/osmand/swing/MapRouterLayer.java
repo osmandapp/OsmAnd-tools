@@ -457,10 +457,10 @@ public class MapRouterLayer implements MapPanelLayer {
 				// possibly hide that API key because it is privacy of osmand
 				uri.append("http://routes.cloudmade.com/A6421860EBB04234AB5EF2D049F2CD8F/api/0.3/");
 				 
-				uri.append(start.getLatitude()+"").append(",");
-				uri.append(start.getLongitude()+"").append(",");
-				uri.append(end.getLatitude()+"").append(",");
-				uri.append(end.getLongitude()+"").append("/");
+				uri.append(String.valueOf(start.getLatitude())).append(",");
+				uri.append(String.valueOf(start.getLongitude())).append(",");
+				uri.append(String.valueOf(end.getLatitude())).append(",");
+				uri.append(String.valueOf(end.getLongitude())).append("/");
 				uri.append("car.gpx").append("?lang=ru");
 
 				URL url = new URL(uri.toString());
@@ -539,7 +539,7 @@ public class MapRouterLayer implements MapPanelLayer {
                 if (isNegative) {
                 	rawDecodedValue = ~rawDecodedValue;
                 }
-                decodedValues.add(((double)rawDecodedValue) / 1e5);
+                decodedValues.add(((double)rawDecodedValue) / 1.0e5);
                 carriage = 0;
                 rawDecodedValue = 0;
             }
@@ -683,7 +683,7 @@ public class MapRouterLayer implements MapPanelLayer {
 //								all *= 1.2;
 //							}
 							if(all > 0 ) {
-								int  t = (int) (p*p/(all*all)*100f);  
+								int  t = (int) (p*p/(all*all)* 100.0f);
 //								int  t = (int) (p/all*100f);
 								System.out.println("Progress " + t + " % " + 
 								ctx.calculationProgress.distanceFromBegin + " " + ctx.calculationProgress.distanceFromEnd+" " + all);
@@ -708,15 +708,15 @@ public class MapRouterLayer implements MapPanelLayer {
 								reason = " target point " + ctx.calculationProgress.segmentNotFound + " is too far from road";
 							}
 						} else if (ctx.calculationProgress.directSegmentQueueSize == 0) {
-							reason = " route can not be found from start point (" + ctx.calculationProgress.distanceFromBegin / 1000f
+							reason = " route can not be found from start point (" + ctx.calculationProgress.distanceFromBegin / 1000.0f
 									+ " km)";
 						} else if (ctx.calculationProgress.reverseSegmentQueueSize == 0) {
-							reason = " route can not be found from end point (" + ctx.calculationProgress.distanceFromEnd / 1000f + " km)";
+							reason = " route can not be found from end point (" + ctx.calculationProgress.distanceFromEnd / 1000.0f + " km)";
 						}
 						throw new RuntimeException("Route not found : " + reason);
 					}
 
-					System.out.println("External native time " + (System.nanoTime() - nt) / 1e9f);
+					System.out.println("External native time " + (System.nanoTime() - nt) / 1.0e9f);
 					if (animateRoutingCalculation) {
 						playPauseButton.setVisible(false);
 						nextTurn.setText("FINISH");

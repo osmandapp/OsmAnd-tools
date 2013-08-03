@@ -352,7 +352,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 					} catch (InterruptedException e1) {
 						log.error("Interrupted", e1);  //$NON-NLS-1$
 					} catch (InvocationTargetException e1) {
-						ExceptionHandler.handle("Can't create big planet sqlite index", (Exception) e1.getCause()); //$NON-NLS-1$
+						ExceptionHandler.handle("Can't create big planet sqlite index", e1.getCause()); //$NON-NLS-1$
 					}
 					
 					

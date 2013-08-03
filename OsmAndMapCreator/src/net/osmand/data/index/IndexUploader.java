@@ -67,8 +67,8 @@ public class IndexUploader {
 
 	protected static final Log log = PlatformUtil.getLog(IndexUploader.class);
 	private final static double MIN_SIZE_TO_UPLOAD = 0.001d;
-	private final static double MAX_SIZE_TO_NOT_SPLIT = 190d;
-	private final static double MAX_UPLOAD_SIZE = 195d;
+	private final static double MAX_SIZE_TO_NOT_SPLIT = 190.0d;
+	private final static double MAX_UPLOAD_SIZE = 195.0d;
 
 	private final static int BUFFER_SIZE = 1 << 15;
 	private final static int MB = 1 << 20;
@@ -772,7 +772,7 @@ public class IndexUploader {
 		if(serverName.startsWith("ftp://")){
 			serverName = serverName.substring("ftp://".length());
 		}
-		upload.upload(serverName, credentials.password, credentials.password, credentials.path + "" + f.getName(), f, 1 << 15);
+		upload.upload(serverName, credentials.password, credentials.password, credentials.path + f.getName(), f, 1 << 15);
 		log.info("Finish uploading file index");
 	}
 	
@@ -880,7 +880,7 @@ public class IndexUploader {
 			return b;
 
 		if (b == 1 || b == 2) {
-			StringBuffer sb = new StringBuffer();
+			StringBuilder sb = new StringBuilder();
 			int c;
 			do {
 				c = in.read();

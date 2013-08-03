@@ -86,7 +86,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 	//TODO make it an option
 	private boolean DEBUG_FULL_NAMES = false; //true to see atached cityPart and boundaries to the street names
 	
-	private final int ADDRESS_NAME_CHARACTERS_TO_INDEX = 4; 
+	private static final int ADDRESS_NAME_CHARACTERS_TO_INDEX = 4;
 	
 	Connection mapConnection;
 	DBStreetDAO streetDAO;
@@ -432,8 +432,11 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 					Collection<Entity> houses = i.getMembers("house"); // both house and address roles can have address
 					houses.addAll(i.getMembers("address"));
 					for (Entity house : houses) {
-						String hno = house.getTag(OSMTagKey.ADDR_HOUSE_NUMBER);
-						if (hno == null)
+						String hname = house.getTag(OSMTagKey.ADDR_HOUSE_NAME);
+						if(hname == null) {
+							hname = house.getTag(OSMTagKey.ADDR_HOUSE_NUMBER);
+						}
+						if (hname == null)
 							continue;
 						
 						if (!streetDAO.findBuilding(house)) {
@@ -444,7 +447,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 							if (building.getLocation() == null) {
 								log.warn("building with empty location! id: " + house.getId());
 							}
-							building.setName(hno);
+							building.setName(hname);
 							
 							streetDAO.writeBuilding(idsOfStreet, building);
 						}
@@ -708,18 +711,18 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 				}
 			}
 		} 
-		if ((e.getTag(OSMTagKey.ADDR_HOUSE_NUMBER) != null || e.getTag(OSMTagKey.ADDR_HOUSE_NAME) != null) && e.getTag(OSMTagKey.ADDR_STREET) != null) {
+		if ((e.getTag(OSMTagKey.ADDR_HOUSE_NAME) != null || e.getTag(OSMTagKey.ADDR_HOUSE_NUMBER) != null) && e.getTag(OSMTagKey.ADDR_STREET) != null) {
 			boolean exist = streetDAO.findBuilding(e);
 			if (!exist) {
 				LatLon l = e.getLatLon();
 				Set<Long> idsOfStreet = getStreetInCity(e.getIsInNames(), e.getTag(OSMTagKey.ADDR_STREET), null, l);
 				if (!idsOfStreet.isEmpty()) {
 					Building building = EntityParser.parseBuilding(e);
-					String hno = e.getTag(OSMTagKey.ADDR_HOUSE_NUMBER);
-					if(hno == null) {
-						hno = e.getTag(OSMTagKey.ADDR_HOUSE_NAME);
+					String hname = e.getTag(OSMTagKey.ADDR_HOUSE_NAME);
+					if(hname == null) {
+						hname = e.getTag(OSMTagKey.ADDR_HOUSE_NUMBER);
 					}
-					int i = hno.indexOf('-');
+					int i = hname.indexOf('-');
 					if(i != -1) {
 						building.setInterpolationInterval(1);
 						if(e.getTag(OSMTagKey.ADDR_INTERPOLATION) != null) {
@@ -732,16 +735,16 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 								}
 							}
 						}
-						building.setName(hno.substring(0, i));
-						building.setName2(hno.substring(i + 1));
+						building.setName(hname.substring(0, i));
+						building.setName2(hname.substring(i + 1));
 					} else {
-						int secondNumber = hno.indexOf('/');
-						if(secondNumber == -1 || !(secondNumber < hno.length() - 1)) {
-							building.setName(hno);
+						int secondNumber = hname.indexOf('/');
+						if(secondNumber == -1 || !(secondNumber < hname.length() - 1)) {
+							building.setName(hname);
 						} else {
-							building.setName(hno.substring(0, secondNumber));
+							building.setName(hname.substring(0, secondNumber));
 							Building building2 = EntityParser.parseBuilding(e);
-							building2.setName(hno.substring(secondNumber + 1));
+							building2.setName(hname.substring(secondNumber + 1));
 							Set<Long> ids2OfStreet = getStreetInCity(e.getIsInNames(), e.getTag(OSMTagKey.ADDR_STREET2), null, l);
 							ids2OfStreet.removeAll(idsOfStreet); //remove duplicated entries!
 							if(!ids2OfStreet.isEmpty()) {
