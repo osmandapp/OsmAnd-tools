@@ -56,7 +56,7 @@ QList< std::shared_ptr<QFileInfo> > obfFiles;
 QString styleName;
 bool wasObfRootSpecified = false;
 
-bool use43 = false;
+bool use43 = true;
 
 bool renderWireframe = false;
 void reshapeHandler(int newWidth, int newHeight);
@@ -223,9 +223,7 @@ int main(int argc, char** argv)
         723769130));
     renderer->setZoom(8.0f);
     */
-
     renderer->setAzimuth(0.0f);
-    renderer->setElevationAngle(90.0f);
     //renderer->setDisplayDensityFactor(2.0f);
     
     renderer->initializeRendering();
@@ -436,7 +434,7 @@ void keyboardHandler(unsigned char key, int x, int y)
     case 'v':
         {
             auto config = renderer->configuration;
-            config.textureAtlasesAllowed = !config.textureAtlasesAllowed;
+            config.altasTexturesAllowed = !config.altasTexturesAllowed;
             renderer->setConfiguration(config);
         }
         break;
@@ -468,6 +466,13 @@ void keyboardHandler(unsigned char key, int x, int y)
             renderer->setConfiguration(config);
         }
         break;
+    /*case 'p':
+        {
+            auto config = renderer->configuration;
+            config.paletteTexturesAllowed = !config.paletteTexturesAllowed;
+            renderer->setConfiguration(config);
+        }
+        break;*/
     case '0':
         {
             auto layerId = (modifiers & GLUT_ACTIVE_ALT) ? OsmAnd::MapTileLayerId::MapOverlay0 : OsmAnd::MapTileLayerId::RasterMap;
@@ -563,9 +568,6 @@ void displayHandler()
     //////////////////////////////////////////////////////////////////////////
 
     //OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Debug, "-FS{-\n");
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    verifyOpenGL();
-
     renderer->processRendering();
     renderer->renderFrame();
     renderer->postprocessRendering();
@@ -585,7 +587,7 @@ void displayHandler()
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
         auto w = 390;
-        auto h1 = 16*18;
+        auto h1 = 16*19;
         auto t = viewport.height();
         glColor4f(0.5f, 0.5f, 0.5f, 0.6f);
         glBegin(GL_QUADS);
@@ -654,7 +656,7 @@ void displayHandler()
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * 15);
-        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("atlas textures (key v) : %1").arg(renderer->configuration.textureAtlasesAllowed).toStdString().c_str());
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("atlas textures (key v) : %1").arg(renderer->configuration.altasTexturesAllowed).toStdString().c_str());
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * 16);
@@ -663,6 +665,10 @@ void displayHandler()
 
         glRasterPos2f(8, t - 16 * 17);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("tex-filtering (b,n,m)  : %1").arg(static_cast<int>(renderer->configuration.texturesFilteringQuality)).toStdString().c_str());
+        verifyOpenGL();
+
+        glRasterPos2f(8, t - 16 * 18);
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("palette textures(key p): %1").arg(renderer->configuration.paletteTexturesAllowed).toStdString().c_str());
         verifyOpenGL();
 
         glRasterPos2f(8, 16 * 6);
