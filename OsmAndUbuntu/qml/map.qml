@@ -192,6 +192,7 @@ Page {
                 }
                 ListItem.SingleControl {
                     highlightWhenPressed: false
+                    height:  units.gu(5)
                     control: Button {
                         text: "Set destination point"
                         anchors {
@@ -207,6 +208,7 @@ Page {
                 }
                 ListItem.SingleControl {
                     highlightWhenPressed: false
+                    height:  units.gu(5)
                     control: Button {
                         text: "Set start point"
                         anchors {
@@ -222,6 +224,7 @@ Page {
                 }
                 ListItem.SingleControl {
                     highlightWhenPressed: false
+                    height:  units.gu(5)
                     control: Button {
                         text: "Calculate route"
                         anchors {
@@ -237,6 +240,7 @@ Page {
                 }
                 ListItem.SingleControl {
                     highlightWhenPressed: false
+                    height:  units.gu(5)
                     control: Button {
                         text: "Close"
                         anchors {

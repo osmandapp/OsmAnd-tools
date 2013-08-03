@@ -30,8 +30,9 @@
 #   include <fcntl.h>
 #endif
 
-#include <QFile>
+
 #include <QStringList>
+#include <QFile>
 
 #include <OsmAndCoreUtils/Inspector.h>
 

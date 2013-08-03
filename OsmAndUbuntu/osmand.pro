@@ -4,6 +4,7 @@ QT += qml quick
 # CONFIG += mobility
 # MOBILITY +=
 
+
 #C++ source files
 SOURCES +=  cpp/main.cpp \
     cpp/MainApplicationSettings.cpp \
@@ -23,7 +24,7 @@ HEADERS  += \
     cpp/RootContext.h \
     cpp/MapViewAdapter.h \
     cpp/MapViewLayer.h
-
+CONFIG += debug
 
 SKIA_PATCHED = $$PWD/../../core/externals/skia/upstream.patched/
 
@@ -49,6 +50,9 @@ OTHER_FILES += \
     qml/*.qml \
     qml/files.qml \
     qml/map.qml
+
+QML_IMPORT_PATH = /usr/lib/i386-linux-gnu/qt5/qml/
+
 
 unix:!macx:
 LIBS += -L$$PWD/../../binaries/linux/i686/Debug/ -lOsmAndCore

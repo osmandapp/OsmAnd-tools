@@ -95,7 +95,7 @@ Page {
                 }
                 ListItem.SingleControl {
                     highlightWhenPressed: false
-                    height:  units.gu(30);
+                    height:  units.gu(30)
                     Flickable {
                         id : textItem
                         anchors.fill: parent
