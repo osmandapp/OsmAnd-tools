@@ -177,9 +177,18 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 					}
 				}
 			}
+			if(cityFound == null && !boundary.hasAdminLevel() && 
+					(boundary.getCityType() == CityType.HAMLET || boundary.getCityType() == CityType.SUBURB || boundary.getCityType() == CityType.VILLAGE)) {
+				if(e instanceof Relation) {
+					ctx.loadEntityRelation((Relation) e);
+				}
+				cityFound = createMissingCity(e);
+				boundary.setAdminCenterId(cityFound.getId());
+			}
 			if (cityFound != null) {
 				putCityBoundary(boundary, cityFound);
 			} else {
+				
 				logBoundaryChanged(boundary, null);
 				notAssignedBoundaries.add(boundary);
 			}
@@ -346,12 +355,8 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 			if(e instanceof Relation) {
 				ctx.loadEntityRelation((Relation) e);
 			}
-			City c = EntityParser.parseCity(e, CityType.SUBURB);
+			centerId = createMissingCity(e).getId();
 			ct = CityType.SUBURB;
-			centerId = e.getId();
-			regCity(c, e);
-			writeCity(c);
-			commitWriteCity();
 		}
 		boolean administrative = "administrative".equals(e.getTag(OSMTagKey.BOUNDARY));
 		if (administrative || ct != null) {
@@ -399,6 +404,17 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 		} else {
 			return null;
 		}
+	}
+
+
+	private City createMissingCity(Entity e) throws SQLException {
+		long centerId;
+		City c = EntityParser.parseCity(e, CityType.SUBURB);
+		centerId = e.getId();
+		regCity(c, e);
+		writeCity(c);
+		commitWriteCity();
+		return c;
 	}
 	
 	public void indexAddressRelation(Relation i, OsmDbAccessorContext ctx) throws SQLException {
