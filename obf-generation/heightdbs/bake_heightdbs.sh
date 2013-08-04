@@ -74,9 +74,6 @@ if [ ! -f "$WORK_PATH/heightdbs_mercator.tif" ]; then
 		-co "COMPRESS=LZW" \
 		-co "BIGTIFF=YES" \
 		-co "SPARSE_OK=TRUE" \
-		-co "TILED=YES" \
-		-co "BLOCKXSIZE=$TILE_INNER_SIZE" \
-		-co "BLOCKYSIZE=$TILE_INNER_SIZE" \
 		-t_srs "+init=epsg:3857 +over" \
 		-r cubic \
 		-multi \
