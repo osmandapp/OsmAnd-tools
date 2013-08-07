@@ -207,10 +207,17 @@ public class NativeSwingRendering extends NativeLibrary {
 			return defaultLoadedLibrary;
 		}
 		String filename = DataExtractionSettings.getSettings().getNativeLibFile();
-		if (filename.length() == 0 || !(new File(filename).exists())) {
+		File f = new File(filename);
+		if (filename.length() == 0 || !(f.exists())) {
 			filename = null;
 		}
-		if (NativeLibrary.loadAllLibs(filename)) {
+		boolean loaded;
+		if(f.isFile()){
+			loaded = NativeLibrary.loadOldLib(f.getParentFile().getAbsolutePath());
+		} else {
+			loaded = NativeLibrary.loadAllLibs(filename);
+		}
+		if (loaded) {
 			defaultLoadedLibrary = new NativeSwingRendering();
 			defaultLoadedLibrary.initFilesInDir(new File(DataExtractionSettings.getSettings().getBinaryFilesDir()));
 		}
