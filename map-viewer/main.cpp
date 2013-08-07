@@ -56,7 +56,7 @@ QList< std::shared_ptr<QFileInfo> > obfFiles;
 QString styleName;
 bool wasObfRootSpecified = false;
 
-bool use43 = true;
+bool use43 = false;
 
 bool renderWireframe = false;
 void reshapeHandler(int newWidth, int newHeight);
@@ -67,7 +67,7 @@ void keyboardHandler(unsigned char key, int x, int y);
 void specialHandler(int key, int x, int y);
 void displayHandler(void);
 void closeHandler(void);
-void activateProvider(OsmAnd::MapTileLayerId layerId, int idx);
+void activateProvider(OsmAnd::RasterMapLayerId layerId, int idx);
 void verifyOpenGL();
 
 int main(int argc, char** argv)
@@ -187,7 +187,7 @@ int main(int argc, char** argv)
     verifyOpenGL();
 
     //////////////////////////////////////////////////////////////////////////
-    activateProvider(OsmAnd::MapTileLayerId::RasterMap, 1);
+    activateProvider(OsmAnd::RasterMapLayerId::BaseLayer, 1);
     OsmAnd::MapRendererSetupOptions rendererSetup;
     rendererSetup.frameRequestCallback = []()
     {
@@ -208,23 +208,27 @@ int main(int argc, char** argv)
     renderer->setZoom(1.5f);
     //renderer->setAzimuth(137.6f);
     renderer->setAzimuth(69.4f);
-    renderer->setElevationAngle(13.0f);
-    renderer->setFogColor(1.0f, 1.0f, 1.0f);
+    renderer->setElevationAngle(35.0f);
+    renderer->setFogColor(OsmAnd::FColorRGB(1.0f, 1.0f, 1.0f));
 
     /// Amsterdam
     renderer->setTarget(OsmAnd::PointI(
         1102430866,
         704978668));
     renderer->setZoom(12.5f);
-    /*
+    
     // Kiev
     renderer->setTarget(OsmAnd::PointI(
         1254096891,
         723769130));
-    renderer->setZoom(8.0f);
-    */
+    renderer->setZoom(10.0f);
+    
     renderer->setAzimuth(0.0f);
     //renderer->setDisplayDensityFactor(2.0f);
+    
+    auto renderConfig = renderer->configuration;
+    renderConfig.heixelsPerTileSide = 32;
+    renderer->setConfiguration(renderConfig);
     
     renderer->initializeRendering();
     //////////////////////////////////////////////////////////////////////////
@@ -376,17 +380,16 @@ void keyboardHandler(unsigned char key, int x, int y)
         break;
     case 'e':
         {
-            if(renderer->state.tileProviders[OsmAnd::MapTileLayerId::ElevationData])
+            if(renderer->state.elevationDataProvider)
             {
-                renderer->setTileProvider(OsmAnd::MapTileLayerId::ElevationData, std::shared_ptr<OsmAnd::IMapTileProvider>());
+                renderer->setElevationDataProvider(std::shared_ptr<OsmAnd::IMapElevationDataProvider>());
             }
             else
             {
                 if(wasHeightsDirSpecified)
                 {
                     auto provider = new OsmAnd::HeightmapTileProvider(heightsDir, cacheDir.absoluteFilePath(OsmAnd::HeightmapTileProvider::defaultIndexFilename));
-                    //renderer->setHeightmapPatchesPerSide(provider->getMaxResolutionPatchesCount());
-                    renderer->setTileProvider(OsmAnd::MapTileLayerId::ElevationData, std::shared_ptr<OsmAnd::IMapTileProvider>(provider));
+                    renderer->setElevationDataProvider(std::shared_ptr<OsmAnd::IMapElevationDataProvider>(provider));
                 }
             }
         }
@@ -423,12 +426,12 @@ void keyboardHandler(unsigned char key, int x, int y)
         break;
     case 'o':
         {
-            renderer->setHeightScaleFactor(renderer->state.heightScaleFactor + 0.1f);
+            renderer->setElevationDataScaleFactor(renderer->state.elevationDataScaleFactor + 0.1f);
         }
         break;
     case 'l':
         {
-            renderer->setHeightScaleFactor(renderer->state.heightScaleFactor - 0.1f);
+            renderer->setElevationDataScaleFactor(renderer->state.elevationDataScaleFactor - 0.1f);
         }
         break;
     case 'v':
@@ -475,25 +478,25 @@ void keyboardHandler(unsigned char key, int x, int y)
         break;*/
     case '0':
         {
-            auto layerId = (modifiers & GLUT_ACTIVE_ALT) ? OsmAnd::MapTileLayerId::MapOverlay0 : OsmAnd::MapTileLayerId::RasterMap;
+            auto layerId = (modifiers & GLUT_ACTIVE_ALT) ? OsmAnd::RasterMapLayerId::Overlay0 : OsmAnd::RasterMapLayerId::BaseLayer;
             activateProvider(layerId, 0);
         }
         break;
     case '1':
         {
-            auto layerId = (modifiers & GLUT_ACTIVE_ALT) ? OsmAnd::MapTileLayerId::MapOverlay0 : OsmAnd::MapTileLayerId::RasterMap;
+            auto layerId = (modifiers & GLUT_ACTIVE_ALT) ? OsmAnd::RasterMapLayerId::Overlay0 : OsmAnd::RasterMapLayerId::BaseLayer;
             activateProvider(layerId, 1);
         }
         break;
     case '2':
         {
-            auto layerId = (modifiers & GLUT_ACTIVE_ALT) ? OsmAnd::MapTileLayerId::MapOverlay0 : OsmAnd::MapTileLayerId::RasterMap;
+            auto layerId = (modifiers & GLUT_ACTIVE_ALT) ? OsmAnd::RasterMapLayerId::Overlay0 : OsmAnd::RasterMapLayerId::BaseLayer;
             activateProvider(layerId, 2);
         }
         break;
     case '3':
         {
-            auto layerId = (modifiers & GLUT_ACTIVE_ALT) ? OsmAnd::MapTileLayerId::MapOverlay0 : OsmAnd::MapTileLayerId::RasterMap;
+            auto layerId = (modifiers & GLUT_ACTIVE_ALT) ? OsmAnd::RasterMapLayerId::Overlay0 : OsmAnd::RasterMapLayerId::BaseLayer;
             activateProvider(layerId, 3);
         }
         break;
@@ -535,23 +538,23 @@ void closeHandler(void)
     renderer->releaseRendering();
 }
 
-void activateProvider(OsmAnd::MapTileLayerId layerId, int idx)
+void activateProvider(OsmAnd::RasterMapLayerId layerId, int idx)
 {
     if(idx == 0)
     {
-        renderer->setTileProvider(layerId, std::shared_ptr<OsmAnd::IMapTileProvider>());
+        renderer->setRasterLayerProvider(layerId, std::shared_ptr<OsmAnd::IMapBitmapTileProvider>());
     }
     else if(idx == 1)
     {
         auto tileProvider = OsmAnd::OnlineMapRasterTileProvider::createCycleMapProvider();
         static_cast<OsmAnd::OnlineMapRasterTileProvider*>(tileProvider.get())->setLocalCachePath(QDir::current());
-        renderer->setTileProvider(layerId, tileProvider);
+        renderer->setRasterLayerProvider(layerId, tileProvider);
     }
     else if(idx == 2)
     {
         auto tileProvider = OsmAnd::OnlineMapRasterTileProvider::createMapnikProvider();
         static_cast<OsmAnd::OnlineMapRasterTileProvider*>(tileProvider.get())->setLocalCachePath(QDir::current());
-        renderer->setTileProvider(layerId, tileProvider);
+        renderer->setRasterLayerProvider(layerId, tileProvider);
     }
     else if(idx == 3)
     {
@@ -640,7 +643,7 @@ void displayHandler()
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * 11);
-        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("elevation data (key e) : %1").arg((bool)renderer->state.tileProviders[OsmAnd::MapTileLayerId::ElevationData]).toStdString().c_str());
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("elevation data (key e) : %1").arg((bool)renderer->state.elevationDataProvider).toStdString().c_str());
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * 12);
@@ -652,7 +655,7 @@ void displayHandler()
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * 14);
-        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("height scale (keys o,l): %1").arg(renderer->state.heightScaleFactor).toStdString().c_str());
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("height scale (keys o,l): %1").arg(renderer->state.elevationDataScaleFactor).toStdString().c_str());
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * 15);
