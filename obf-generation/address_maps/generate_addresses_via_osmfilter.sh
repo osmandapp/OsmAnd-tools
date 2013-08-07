@@ -1,47 +1,40 @@
-#where does this script start from
-WORKDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+# This is a copy of the Jenkins GenerateAddressIndexes job
+
+WORKDIR=".work"
+rm -rf ${WORKDIR} 
+mkdir -p ${WORKDIR} ${WORKDIR}/osm ${WORKDIR}/gen ${WORKDIR}/index
+
 cd ${WORKDIR}
 
-#WORKDIR=`pwd`
-echo ${WORKDIR}
-
-OSMDIR=${WORKDIR}/osm
-GENDIR=${WORKDIR}/gen
-INDEXDIR=${WORKDIR}/index/
-
-# small countries to test with
-#countries="europe/albania europe/andorra europe/azores"
-# real countries
 countries="europe/british-isles europe/france europe/germany europe/italy north-america/canada"
-
-# just to be sure: clean up before start
-rm -rf ${OSMDIR} ${GENDIR} ${INDEXDIR}
-mkdir -p ${OSMDIR} ${GENDIR} ${INDEXDIR}
+# test with 2 small countries
+#countries="europe/azores europe/albania"
 
 for country in ${countries}; do
     basecountry=$(basename ${country})
     echo "${country} and the basename ${basecountry}"
     # Download countries
-    #wget -O $OSMDIR/${country%latest.osm.pbf}major_roads.osm.pbf "http://download.geofabrik.de/$country.osm.pbf"
-    wget -O ${OSMDIR}/${basecountry}.osm.pbf "http://download.geofabrik.de/${country}-latest.osm.pbf"
+    wget -O ${basecountry}.osm.pbf -nv "http://download.geofabrik.de/${country}-latest.osm.pbf"
     # convert to fastest intermediate format
-    osmconvert --drop-author --drop-brokenrefs ${OSMDIR}/${basecountry}.osm.pbf -o=${OSMDIR}/${basecountry}.o5m
+    osmconvert --drop-author ${basecountry}.osm.pbf --out-o5m -o=${basecountry}.o5m
     # filter only the necessary stuff out of the entire osm file
-    osmfilter ${OSMDIR}/${basecountry}.o5m  --keep="boundary=administrative addr:* place=* is_in=* highway=residential =unclassified =pedestrian =living_street =service" --keep-ways-relations="boundary=administrative" --keep-ways= --keep-nodes= --keep-relations=   > ${OSMDIR}/${basecountry}_address.o5m
-    # convert back to  format suitable for OsmAndMapCreator
-    osmconvert ${OSMDIR}/${basecountry}_address.o5m -o=${OSMDIR}/${basecountry}_address.osm.pbf
-    # delete original .osm.pbf (also to prevent OsmAndMapCreator from picking it up) and intermediate .o5m files
-    # sleep 10 seconds in case of write-behind caching of previous process
-    sleep 10
-    rm -f ${OSMDIR}/${basecountry}.osm.pbf ${OSMDIR}/${basecountry}.o5m ${OSMDIR}/${basecountry}_address.o5m
+    osmfilter ${basecountry}.o5m --keep="boundary=administrative addr:* place=* is_in=* highway=residential =unclassified =pedestrian =living_street =service =road =unclassified =tertiary" --keep-ways-relations="boundary=administrative" --keep-ways= --keep-nodes= --keep-relations= --out-o5m > ${basecountry}_address.o5m
+    # convert back to format suitable for OsmAndMapCreator
+    osmconvert ${basecountry}_address.o5m --out-pbf -o=osm/${basecountry}_address.osm.pbf
+    # delete original .osm.pbf and intermediate .o5m files
+    rm -f ${basecountry}.osm.pbf ${basecountry}.o5m ${basecountry}_address.o5m
 done
 
+# Do a separate set of actions for the Russia map downloaded from github
+ wget -nv http://gis-lab.info/projects/osm_dump/dump/latest/RU.osm.pbf
+ osmconvert --drop-author RU.osm.pbf --out-o5m -o=RU.o5m
+ osmfilter RU.o5m --keep="boundary=administrative addr:* place=* is_in=* highway=residential =unclassified =pedestrian =living_street =service =road =unclassified =tertiary" --keep-ways-relations="boundary=administrative" --keep-ways= --keep-nodes= --keep-relations= --out-o5m > russia_address.o5m
+ osmconvert russia_address.o5m --out-pbf -o=osm/russia_address.osm.pbf
+ rm -rf RU.osm.pbf RU.o5m russia_address.o5m
 
-# Now start the OsmAndMapCreator process
-echo 'Running java net.osmand.data.index.IndexBatchCreator'
-java -XX:+UseParallelGC -Xmx4096M -Xmn512M -Djava.util.logging.config.file=build-scripts/batch-logging.properties -cp "DataExtractionOSM/OsmAndMapCreator.jar:DataExtractionOSM/lib/*.jar" net.osmand.data.index.IndexBatchCreator build-scripts/address_maps/address-batch-generate.xml
 
+cd ..
 
-# clean up after our job
-rm -rf ${OSMDIR} ${GENDIR} ${INDEXDIR}
+echo "now starting OsmAndMapCreator to create the address maps" 
+java -XX:+UseParallelGC -Xmx8096M -Xmn512M -Djava.util.logging.config.file=tools/obf-generation/batch-logging.properties -cp "tools/OsmAndMapCreator/OsmAndMapCreator.jar:tools/OsmAndMapCreator/lib/*.jar" net.osmand.data.index.IndexBatchCreator tools/obf-generation/indexes-address-batch-generate-inmem.xml
 
