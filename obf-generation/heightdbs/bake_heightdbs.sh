@@ -26,10 +26,10 @@ echo "Output path:          $OUTPUT_PATH"
 mkdir -p "$OUTPUT_PATH"
 
 TILE_SIZE=$1
-let "TILE_INNER_SIZE = $TILE_SIZE - 2"
+let "TILE_FULL_SIZE = $TILE_SIZE + 1"
 shift
 echo "Tile size:            $TILE_SIZE"
-echo "Tile size (inner):    $TILE_INNER_SIZE"
+echo "Tile size (full):     $TILE_FULL_SIZE"
 
 COUNTRIES=$1
 shift
@@ -85,7 +85,7 @@ echo "Slicing..."
 mkdir -p "$WORK_PATH/tiles"
 (cd "$WORK_PATH/tiles" && \
 PYTHONPATH="$PYTHONPATH:$GDAL2TILES_PATH" "$SRC_PATH/slicer.py" \
-	--size=$TILE_INNER_SIZE \
+	--size=$TILE_SIZE \
 	--driver=GTiff \
 	--extension=tif \
 	--verbose \

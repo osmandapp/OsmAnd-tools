@@ -155,25 +155,28 @@ class OsmAndHeightMapSlicer(object):
                 if self.options.verbose:
                     print("\t Bounds ( input): l=%s, t=%s, w=%s, h=%s" % (tileBoundsInInput[0], tileBoundsInInput[1], tileBoundsInInput[2], tileBoundsInInput[3]))
 
-                # Get tile bounds in source
-                tileBoundsInSource = (0, 0, tileSourceSize[0], tileSourceSize[1])
+                # Get tile bounds in output
+                tileBoundsInOutput = (0, 0, tileSourceSize[0], tileSourceSize[1])
                 if self.options.verbose:
-                    print("\t Bounds (source): l=%s, t=%s, w=%s, h=%s" % (tileBoundsInSource[0], tileBoundsInSource[1], tileBoundsInSource[2], tileBoundsInSource[3]))
+                    print("\t Bounds (output): l=%s, t=%s, w=%s, h=%s" % (tileBoundsInOutput[0], tileBoundsInOutput[1], tileBoundsInOutput[2], tileBoundsInOutput[3]))
 
                 # Crop tile bounds in source not to exceed input bounds (and change source bounds accordingly)
-                tileBoundsInInput, tileBoundsInSource = self.cropRastersBounds(self.inputDataset.RasterXSize, self.inputDataset.RasterYSize, *tileBoundsInInput + tileBoundsInSource)
+                tileBoundsInInput, tileBoundsInOutput = self.cropRastersBounds(self.inputDataset.RasterXSize, self.inputDataset.RasterYSize, *tileBoundsInInput + tileBoundsInOutput)
                 if self.options.verbose:
                     print("\t BoundsC( input): l=%s, t=%s, w=%s, h=%s" % (tileBoundsInInput[0], tileBoundsInInput[1], tileBoundsInInput[2], tileBoundsInInput[3]))
-                    print("\t BoundsC(source): l=%s, t=%s, w=%s, h=%s" % (tileBoundsInSource[0], tileBoundsInSource[1], tileBoundsInSource[2], tileBoundsInSource[3]))
+                    print("\t BoundsC(output): l=%s, t=%s, w=%s, h=%s" % (tileBoundsInOutput[0], tileBoundsInOutput[1], tileBoundsInOutput[2], tileBoundsInOutput[3]))
 
                 # Create target dataset
                 sourceDataset = self.memDriver.Create('', tileSourceSize[0], tileSourceSize[1], 1, self.inputBand.DataType)
 
                 # Read data from raster
-                sourceDataset.WriteRaster(tileBoundsInSource[0], tileBoundsInSource[1], tileBoundsInSource[2], tileBoundsInSource[3],
-                    self.inputDataset.ReadRaster(tileBoundsInInput[0], tileBoundsInInput[1], tileBoundsInInput[2], tileBoundsInInput[3], tileBoundsInSource[2], tileBoundsInSource[3]))
+                sourceDataset.WriteRaster(tileBoundsInOutput[0], tileBoundsInOutput[1], tileBoundsInOutput[2], tileBoundsInOutput[3],
+                    self.inputDataset.ReadRaster(tileBoundsInInput[0], tileBoundsInInput[1], tileBoundsInInput[2], tileBoundsInInput[3], tileBoundsInOutput[2], tileBoundsInOutput[3]))
 
                 if tileSourceSize[0] != self.options.size or tileSourceSize[1] != self.options.size:
+                    if self.options.verbose:
+                        print("\t Size   (scaled): w=%s, h=%s" % (self.options.size, self.options.size))
+
                     # Create target dataset
                     targetDataset = self.memDriver.Create('', self.options.size, self.options.size, 1, self.inputBand.DataType)
 

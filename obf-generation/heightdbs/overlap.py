@@ -75,7 +75,6 @@ class OsmAndHeightMapOverlap(object):
 
         self.minZoom = 31
         self.maxZoom = 0
-        self.zoomTileBounds = list(range(0, 32))
         self.inputTiles = list()
         self.inputFiles = dict()
 
@@ -89,28 +88,15 @@ class OsmAndHeightMapOverlap(object):
             if zoom > self.maxZoom:
                 self.maxZoom = zoom
 
-            tmsTileMinX = 2**zoom - 1
-            tmsTileMaxX = 0
-            tmsTileMinY = 2**zoom - 1
-            tmsTileMaxY = 0
-
             for xTilesDir in os.listdir(zoomPath):
                 xTilesPath = os.path.join(zoomPath, xTilesDir)
 
                 tmsTileX = int(xTilesDir)
-                if tmsTileX < tmsTileMinX:
-                    tmsTileMinX = tmsTileX
-                if tmsTileX > tmsTileMaxX:
-                    tmsTileMaxX = tmsTileX
 
                 for yTileFile in os.listdir(xTilesPath):
                     tilePath = os.path.join(xTilesPath, yTileFile)
 
                     tmsTileY = int(os.path.splitext(yTileFile)[0])
-                    if tmsTileY < tmsTileMinY:
-                        tmsTileMinY = tmsTileY
-                    if tmsTileY > tmsTileMaxY:
-                        tmsTileMaxY = tmsTileY
 
                     self.inputTiles.append( (tmsTileX, tmsTileY, zoom, tilePath) )
                     if zoom not in self.inputFiles:
@@ -118,8 +104,6 @@ class OsmAndHeightMapOverlap(object):
                     if tmsTileX not in self.inputFiles[zoom]:
                         self.inputFiles[zoom][tmsTileX] = dict()
                     self.inputFiles[zoom][tmsTileX][tmsTileY] = tilePath
-
-            self.zoomTileBounds[zoom] = (tmsTileMinX, tmsTileMinY, tmsTileMaxX, tmsTileMaxY)
 
     # -------------------------------------------------------------------------
     def overlapTiles(self):
@@ -130,12 +114,16 @@ class OsmAndHeightMapOverlap(object):
             tmsTileX = inputTile[0]
             tmsTileY = inputTile[1]
             tileZoom = inputTile[2]
+            tmsTilesCount = 2**tileZoom
+            tmsTileX_plus1 = (tmsTileX + 1) % tmsTilesCount
+            tmsTileY_minus1 = (tmsTileY - 1) if (tmsTileY > 0) else (tmsTilesCount - 1)
 
             outputTileFile = os.path.join(self.outputDir, str(tileZoom), str(tmsTileX), "%s.%s" % (tmsTileY, self.options.extension))
 
             # Skip if already exists
             if os.path.exists(outputTileFile):
                 print("Skipping ",tmsTileX,"x",tmsTileY,"@",tileZoom,"...")
+                continue
             
             # Create directories for the tile
             if self.options.verbose:
@@ -147,121 +135,56 @@ class OsmAndHeightMapOverlap(object):
             # Open base tile
             baseDataset = gdal.Open(inputTile[3], gdal.GA_ReadOnly)
             if self.options.verbose:
-                print("\t",baseDataset.RasterXSize,"x",baseDataset.RasterYSize," -> ",baseDataset.RasterXSize+2,"x",baseDataset.RasterYSize+2)
+                print("\t",baseDataset.RasterXSize,"x",baseDataset.RasterYSize," -> ",baseDataset.RasterXSize+1,"x",baseDataset.RasterYSize+1)
 
             # Create target dataset
-            targetDataset = self.memDriver.Create('', baseDataset.RasterXSize+2, baseDataset.RasterYSize+2, 1, baseDataset.GetRasterBand(1).DataType)
+            targetDataset = self.memDriver.Create('', baseDataset.RasterXSize+1, baseDataset.RasterYSize+1, 1, baseDataset.GetRasterBand(1).DataType)
 
             # Copy base to target
             if self.options.verbose:
-                print("\t =0  ",tmsTileX,"x",tmsTileY,"@",tileZoom)
-            targetDataset.WriteRaster(1, 1, baseDataset.RasterXSize, baseDataset.RasterYSize,
+                print("\t =0  ",tmsTileX,"x",tmsTileY,"@",tileZoom,"=",inputTile[3])
+            targetDataset.WriteRaster(0, 0, baseDataset.RasterXSize, baseDataset.RasterYSize,
                 baseDataset.ReadRaster(0, 0, baseDataset.RasterXSize, baseDataset.RasterYSize))
             del baseDataset
 
-            # Left tile
-            if tmsTileX > self.zoomTileBounds[tileZoom][0]:
-                filename = self.inputFiles[tileZoom][tmsTileX - 1][tmsTileY]
+            # Right tile
+            if tmsTileX_plus1 in self.inputFiles[tileZoom]:
+                filename = self.inputFiles[tileZoom][tmsTileX_plus1][tmsTileY]
                 dataset = gdal.Open(filename, gdal.GA_ReadOnly)
-
-                targetDataset.WriteRaster(0, 1, 1, dataset.RasterYSize,
-                    dataset.ReadRaster(dataset.RasterXSize - 1, 0, 1, dataset.RasterYSize))
-                
-                del dataset
 
                 if self.options.verbose:
-                    print("\t +L  ",tmsTileX-1,"x",tmsTileY,"@",tileZoom)
-            
-            # Right tile
-            if tmsTileX < self.zoomTileBounds[tileZoom][2]:
-                filename = self.inputFiles[tileZoom][tmsTileX + 1][tmsTileY]
-                dataset = gdal.Open(filename, gdal.GA_ReadOnly)
+                    print("\t +R  ",tmsTileX_plus1,"x",tmsTileY,"@",tileZoom,"=",filename)
 
-                targetDataset.WriteRaster(targetDataset.RasterXSize - 1, 1, 1, dataset.RasterYSize,
+                targetDataset.WriteRaster(targetDataset.RasterXSize - 1, 0, 1, dataset.RasterYSize,
                     dataset.ReadRaster(0, 0, 1, dataset.RasterYSize))
                 
                 del dataset
 
-                if self.options.verbose:
-                    print("\t +R  ",tmsTileX+1,"x",tmsTileY,"@",tileZoom)
-
-            # Top tile
-            if tmsTileY < self.zoomTileBounds[tileZoom][3]:
-                filename = self.inputFiles[tileZoom][tmsTileX][tmsTileY + 1]
-                dataset = gdal.Open(filename, gdal.GA_ReadOnly)
-
-                targetDataset.WriteRaster(1, 0, dataset.RasterXSize, 1,
-                    dataset.ReadRaster(0, dataset.RasterYSize - 1, dataset.RasterXSize, 1))
-                
-                del dataset
-
-                if self.options.verbose:
-                    print("\t +T  ",tmsTileX,"x",tmsTileY+1,"@",tileZoom)
-
             # Bottom tile
-            if tmsTileY > self.zoomTileBounds[tileZoom][1]:
-                filename = self.inputFiles[tileZoom][tmsTileX][tmsTileY - 1]
+            if tmsTileY_minus1 in self.inputFiles[tileZoom][tmsTileX]:
+                filename = self.inputFiles[tileZoom][tmsTileX][tmsTileY_minus1]
                 dataset = gdal.Open(filename, gdal.GA_ReadOnly)
 
-                targetDataset.WriteRaster(1, targetDataset.RasterYSize - 1, dataset.RasterXSize, 1,
+                if self.options.verbose:
+                    print("\t +B  ",tmsTileX,"x",tmsTileY_minus1,"@",tileZoom,"=",filename)
+
+                targetDataset.WriteRaster(0, targetDataset.RasterYSize - 1, dataset.RasterXSize, 1,
                     dataset.ReadRaster(0, 0, dataset.RasterXSize, 1))
                 
                 del dataset
 
-                if self.options.verbose:
-                    print("\t +B  ",tmsTileX,"x",tmsTileY-1,"@",tileZoom)
-
-            # Top-left corner
-            if tmsTileX > self.zoomTileBounds[tileZoom][0] and tmsTileY < self.zoomTileBounds[tileZoom][3]:
-                filename = self.inputFiles[tileZoom][tmsTileX - 1][tmsTileY + 1]
-                dataset = gdal.Open(filename, gdal.GA_ReadOnly)
-
-                targetDataset.WriteRaster(0, 0, 1, 1,
-                    dataset.ReadRaster(dataset.RasterXSize - 1, dataset.RasterYSize - 1, 1, 1))
-                
-                del dataset
-
-                if self.options.verbose:
-                    print("\t +TL ",tmsTileX-1,"x",tmsTileY+1,"@",tileZoom)
-
-            # Top-right corner
-            if tmsTileX < self.zoomTileBounds[tileZoom][2] and tmsTileY < self.zoomTileBounds[tileZoom][3]:
-                filename = self.inputFiles[tileZoom][tmsTileX + 1][tmsTileY + 1]
-                dataset = gdal.Open(filename, gdal.GA_ReadOnly)
-
-                targetDataset.WriteRaster(targetDataset.RasterXSize - 1, 0, 1, 1,
-                    dataset.ReadRaster(0, dataset.RasterYSize - 1, 1, 1))
-                
-                del dataset
-
-                if self.options.verbose:
-                    print("\t +TR ",tmsTileX+1,"x",tmsTileY+1,"@",tileZoom)
-
-            # Bottom-left corner
-            if tmsTileX > self.zoomTileBounds[tileZoom][0] and tmsTileY > self.zoomTileBounds[tileZoom][1]:
-                filename = self.inputFiles[tileZoom][tmsTileX - 1][tmsTileY - 1]
-                dataset = gdal.Open(filename, gdal.GA_ReadOnly)
-
-                targetDataset.WriteRaster(0, targetDataset.RasterYSize - 1, 1, 1,
-                    dataset.ReadRaster(dataset.RasterXSize - 1, 0, 1, 1))
-                
-                del dataset
-
-                if self.options.verbose:
-                    print("\t +BL ",tmsTileX-1,"x",tmsTileY-1,"@",tileZoom)
-
             # Bottom-right corner
-            if tmsTileX < self.zoomTileBounds[tileZoom][2] and tmsTileY > self.zoomTileBounds[tileZoom][1]:
-                filename = self.inputFiles[tileZoom][tmsTileX + 1][tmsTileY - 1]
+            if tmsTileX_plus1 in self.inputFiles[tileZoom] and tmsTileY_minus1 in self.inputFiles[tileZoom][tmsTileX_plus1]:
+                filename = self.inputFiles[tileZoom][tmsTileX_plus1][tmsTileY_minus1]
                 dataset = gdal.Open(filename, gdal.GA_ReadOnly)
+
+                if self.options.verbose:
+                    print("\t +BR ",tmsTileX_plus1,"x",tmsTileY_minus1,"@",tileZoom,"=",filename)
 
                 targetDataset.WriteRaster(targetDataset.RasterXSize - 1, targetDataset.RasterYSize - 1, 1, 1,
                     dataset.ReadRaster(0, 0, 1, 1))
                 
                 del dataset
-
-                if self.options.verbose:
-                    print("\t +BR ",tmsTileX+1,"x",tmsTileY-1,"@",tileZoom)
 
             # Write target to file
             self.outDriver.CreateCopy(outputTileFile, targetDataset, strict=1, options = self.options.driverOptions)
