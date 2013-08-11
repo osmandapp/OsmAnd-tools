@@ -54,7 +54,7 @@ public class SQLiteBigPlanetIndex {
 		
 
 		conn.setAutoCommit(false);
-		pStatement = conn.prepareStatement("INSERT INTO tiles VALUES (?, ?, ?, ?, ?)");
+		pStatement = conn.prepareStatement("INSERT INTO tiles VALUES (?, ?, ?, ?, ?, ?)");
 		int ch = 0;
 		// be attentive to create buf enough for image 
 		byte[] buf;
