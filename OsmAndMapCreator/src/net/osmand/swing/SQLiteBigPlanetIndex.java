@@ -21,6 +21,7 @@ public class SQLiteBigPlanetIndex {
 	private static final Log log = PlatformUtil.getLog(SQLiteBigPlanetIndex.class);
 	
 	private static final int BATCH_SIZE = 50;
+	private static boolean bigPlanet = false;
 	
 	public static void createSQLiteDatabase(File dirWithTiles, String regionName, ITileSource template) throws SQLException, IOException {
 		long now = System.currentTimeMillis();
@@ -36,16 +37,17 @@ public class SQLiteBigPlanetIndex {
 		Statement statement = conn.createStatement();
 		statement.execute("CREATE TABLE tiles (x int, y int, z int, s int, image blob, PRIMARY KEY (x,y,z,s))");
 		statement.execute("CREATE INDEX IND on tiles (x,y,z,s)");
-		statement.execute("CREATE TABLE info(minzoom,maxzoom,url)");
+		statement.execute("CREATE TABLE info(tilenumbering,minzoom,maxzoom,url)");
 		statement.execute("CREATE TABLE android_metadata (locale TEXT)");
 		statement.close();
 		
 
-		PreparedStatement pStatement = conn.prepareStatement("INSERT INTO INFO VALUES(?,?,?)");
+		PreparedStatement pStatement = conn.prepareStatement("INSERT INTO INFO VALUES(?,?,?,?)");
 		if (template instanceof TileSourceTemplate && !(template instanceof BeanShellTileSourceTemplate)) {
-			pStatement.setInt(1, template.getMinimumZoomSupported());
-			pStatement.setInt(2, template.getMaximumZoomSupported());
-			pStatement.setString(3, ((TileSourceTemplate) template).getUrlTemplate());
+			pStatement.setString(1, bigPlanet ? "BigPlanet" : "simple");
+			pStatement.setInt(2, bigPlanet? 17 - template.getMaximumZoomSupported() : template.getMinimumZoomSupported());
+			pStatement.setInt(3, bigPlanet? 17 - template.getMinimumZoomSupported() : template.getMaximumZoomSupported());
+			pStatement.setString(4, ((TileSourceTemplate) template).getUrlTemplate());
 			pStatement.execute();
 		}
 		pStatement.close();
@@ -55,7 +57,6 @@ public class SQLiteBigPlanetIndex {
 		pStatement = conn.prepareStatement("INSERT INTO tiles VALUES (?, ?, ?, ?, ?)");
 		int ch = 0;
 		// be attentive to create buf enough for image 
-		int bufSize = 32 * 1024;
 		byte[] buf;
 		int maxZoom = 17;
 		int minZoom = 1;
@@ -92,7 +93,7 @@ public class SQLiteBigPlanetIndex {
 								if (l > 0) {
 									pStatement.setInt(1, x);
 									pStatement.setInt(2, y);
-									pStatement.setInt(3, 17 - zoom);
+									pStatement.setInt(3, bigPlanet ? 17 - zoom : zoom);
 									pStatement.setInt(4, 0);
 									pStatement.setBytes(5, buf);
 									pStatement.addBatch();

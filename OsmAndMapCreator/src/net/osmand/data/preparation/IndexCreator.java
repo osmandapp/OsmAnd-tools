@@ -770,13 +770,13 @@ public class IndexCreator {
 
 //		creator.deleteDatabaseIndexes = false;
 //		creator.recreateOnlyBinaryFile = true;
-//		creator.deleteOsmDB = false;
+		creator.deleteOsmDB = true;
 				
 		creator.setZoomWaySmothness(2);
 		MapRenderingTypesEncoder rt = MapRenderingTypesEncoder.getDefault();
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 
-		String file = "/home/victor/projects/OsmAnd/temp/map.osm";
+		String file = "/home/victor/projects/OsmAnd/temp/route.osm";
 //		String file = "/home/victor/projects/OsmAnd/temp/luxembourg.osm.pbf";
 		int st = file.lastIndexOf('/');
 		int e = file.indexOf('.', st);
