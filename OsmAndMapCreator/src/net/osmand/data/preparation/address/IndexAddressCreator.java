@@ -15,12 +15,10 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -46,8 +44,8 @@ import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.EntityParser;
 import net.osmand.osm.edit.Node;
-import net.osmand.osm.edit.OsmMapUtils;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
+import net.osmand.osm.edit.OsmMapUtils;
 import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Way;
 import net.osmand.swing.Messages;
@@ -684,15 +682,16 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 	public void iterateMainEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 		// index not only buildings but also nodes that belongs to addr:interpolation ways
 		// currently not supported because nodes are indexed first with buildings 
-		if (e instanceof Way && e.getTag(OSMTagKey.ADDR_INTERPOLATION) != null ){
+		String interpolation = e.getTag(OSMTagKey.ADDR_INTERPOLATION);
+		if (e instanceof Way && interpolation != null ){
 			BuildingInterpolation type = null;
 			int interpolationInterval = 0;
-			if(e.getTag(OSMTagKey.ADDR_INTERPOLATION) != null) {
+			if(interpolation != null) {
 				try {
-					type = BuildingInterpolation.valueOf(e.getTag(OSMTagKey.ADDR_INTERPOLATION).toUpperCase());
+					type = BuildingInterpolation.valueOf(interpolation.toUpperCase());
 				} catch (RuntimeException ex) {
 					try {
-						interpolationInterval = Integer.parseInt(e.getTag(OSMTagKey.ADDR_INTERPOLATION));
+						interpolationInterval = Integer.parseInt(interpolation);
 					} catch(NumberFormatException ex2) {
 					}
 				}
@@ -727,26 +726,38 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 				}
 			}
 		} 
-		if ((e.getTag(OSMTagKey.ADDR_HOUSE_NAME) != null || e.getTag(OSMTagKey.ADDR_HOUSE_NUMBER) != null) && e.getTag(OSMTagKey.ADDR_STREET) != null) {
-			boolean exist = streetDAO.findBuilding(e);
+		String houseName = e.getTag(OSMTagKey.ADDR_HOUSE_NAME);
+		String houseNumber = e.getTag(OSMTagKey.ADDR_HOUSE_NUMBER);
+		String street = e.getTag(OSMTagKey.ADDR_STREET);
+		String street2 = e.getTag(OSMTagKey.ADDR_STREET2);
+		if ((houseName != null || houseNumber != null) && street != null) {
+			if(e instanceof Relation) {
+				ctx.loadEntityRelation((Relation) e);
+				Collection<Entity> outs = ((Relation) e).getMembers("outer");
+				if(!outs.isEmpty()) {
+					e = outs.iterator().next();
+				}
+			}
+			// skip relations
+			boolean exist = e instanceof Relation ||  streetDAO.findBuilding(e);
 			if (!exist) {
 				LatLon l = e.getLatLon();
-				Set<Long> idsOfStreet = getStreetInCity(e.getIsInNames(), e.getTag(OSMTagKey.ADDR_STREET), null, l);
+				Set<Long> idsOfStreet = getStreetInCity(e.getIsInNames(), street, null, l);
 				if (!idsOfStreet.isEmpty()) {
 					Building building = EntityParser.parseBuilding(e);
-					String hname = e.getTag(OSMTagKey.ADDR_HOUSE_NAME);
+					String hname = houseName;
 					if(hname == null) {
-						hname = e.getTag(OSMTagKey.ADDR_HOUSE_NUMBER);
+						hname = houseNumber;
 					}
 					int i = hname.indexOf('-');
 					if(i != -1) {
 						building.setInterpolationInterval(1);
-						if(e.getTag(OSMTagKey.ADDR_INTERPOLATION) != null) {
+						if(interpolation != null) {
 							try {
-								building.setInterpolationType(BuildingInterpolation.valueOf(e.getTag(OSMTagKey.ADDR_INTERPOLATION).toUpperCase()));
+								building.setInterpolationType(BuildingInterpolation.valueOf(interpolation.toUpperCase()));
 							} catch (RuntimeException ex) {
 								try {
-									building.setInterpolationInterval(Integer.parseInt(e.getTag(OSMTagKey.ADDR_INTERPOLATION)));
+									building.setInterpolationInterval(Integer.parseInt(interpolation));
 								} catch(NumberFormatException ex2) {
 								}
 							}
@@ -761,7 +772,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 							building.setName(hname.substring(0, secondNumber));
 							Building building2 = EntityParser.parseBuilding(e);
 							building2.setName(hname.substring(secondNumber + 1));
-							Set<Long> ids2OfStreet = getStreetInCity(e.getIsInNames(), e.getTag(OSMTagKey.ADDR_STREET2), null, l);
+							Set<Long> ids2OfStreet = getStreetInCity(e.getIsInNames(), street2, null, l);
 							ids2OfStreet.removeAll(idsOfStreet); //remove duplicated entries!
 							if(!ids2OfStreet.isEmpty()) {
 								streetDAO.writeBuilding(ids2OfStreet, building2);
