@@ -35,7 +35,7 @@ public class SQLiteBigPlanetIndex {
 		fileToWrite.delete();
 		Connection conn = DriverManager.getConnection("jdbc:sqlite:" + fileToWrite.getAbsolutePath()); //$NON-NLS-1$
 		Statement statement = conn.createStatement();
-		statement.execute("CREATE TABLE tiles (x int, y int, z int, s int, image blob, PRIMARY KEY (x,y,z,s))");
+		statement.execute("CREATE TABLE tiles (x int, y int, z int, s int, image blob, time long, PRIMARY KEY (x,y,z,s))");
 		statement.execute("CREATE INDEX IND on tiles (x,y,z,s)");
 		statement.execute("CREATE TABLE info(tilenumbering,minzoom,maxzoom,url)");
 		statement.execute("CREATE TABLE android_metadata (locale TEXT)");
@@ -96,6 +96,7 @@ public class SQLiteBigPlanetIndex {
 									pStatement.setInt(3, bigPlanet ? 17 - zoom : zoom);
 									pStatement.setInt(4, 0);
 									pStatement.setBytes(5, buf);
+									pStatement.setLong(6, f.lastModified());
 									pStatement.addBatch();
 									ch++;
 									if (ch >= BATCH_SIZE) {
