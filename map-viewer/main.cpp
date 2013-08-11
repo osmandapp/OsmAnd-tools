@@ -51,8 +51,8 @@ std::shared_ptr<OsmAnd::IMapRenderer> renderer;
 QDir cacheDir(QDir::current());
 QDir heightsDir;
 bool wasHeightsDirSpecified = false;
-QList< std::shared_ptr<QFileInfo> > styleFiles;
-QList< std::shared_ptr<QFileInfo> > obfFiles;
+QFileInfoList styleFiles;
+QFileInfoList obfFiles;
 QString styleName;
 bool wasObfRootSpecified = false;
 
@@ -98,7 +98,8 @@ int main(int argc, char** argv)
         }
         else if (arg.startsWith("-obfsDir="))
         {
-            QDir obfRoot(arg.mid(strlen("-obfsDir=")));
+            auto obfRootPath = arg.mid(strlen("-obfsDir="));
+            QDir obfRoot(obfRootPath);
             if(!obfRoot.exists())
             {
                 std::cerr << "OBF directory does not exist" << std::endl;
@@ -128,10 +129,10 @@ int main(int argc, char** argv)
         OsmAnd::RasterizationStyles stylesCollection;
         for(auto itStyleFile = styleFiles.begin(); itStyleFile != styleFiles.end(); ++itStyleFile)
         {
-            auto styleFile = *itStyleFile;
+            const auto& styleFile = *itStyleFile;
 
-            if(!stylesCollection.registerStyle(*styleFile))
-                std::cout << "Failed to parse metadata of '" << styleFile->fileName().toStdString() << "' or duplicate style" << std::endl;
+            if(!stylesCollection.registerStyle(styleFile))
+                std::cout << "Failed to parse metadata of '" << styleFile.fileName().toStdString() << "' or duplicate style" << std::endl;
         }
         if(!stylesCollection.obtainStyle(styleName, style))
         {
@@ -142,11 +143,11 @@ int main(int argc, char** argv)
     }
     
     std::shared_ptr<OsmAnd::MapDataCache> mapDataCache(new OsmAnd::MapDataCache());
-    for(auto itObf = obfFiles.begin(); itObf != obfFiles.end(); ++itObf)
+    for(auto itObfFile = obfFiles.begin(); itObfFile != obfFiles.end(); ++itObfFile)
     {
-        auto obf = *itObf;
-        std::shared_ptr<OsmAnd::ObfReader> obfReader(new OsmAnd::ObfReader(std::shared_ptr<QIODevice>(new QFile(obf->absoluteFilePath()))));
+        const auto& obfFile = *itObfFile;
 
+        std::shared_ptr<OsmAnd::ObfReader> obfReader(new OsmAnd::ObfReader(std::shared_ptr<QIODevice>(new QFile(obfFile.absoluteFilePath()))));
         mapDataCache->addSource(obfReader);
     }
 
