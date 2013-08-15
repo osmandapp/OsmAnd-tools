@@ -175,12 +175,17 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 					}
 				}
 			}
-			if(cityFound == null && !boundary.hasAdminLevel() && 
-					(boundary.getCityType() == CityType.HAMLET || boundary.getCityType() == CityType.SUBURB || boundary.getCityType() == CityType.VILLAGE)) {
+			// Monaco doesn't have place=town point, but has boundary with tags & admin_level
+			// It could be wrong if the boundary doesn't match center point
+			if(cityFound == null /*&& !boundary.hasAdminLevel() */&& 
+					(boundary.getCityType() == CityType.TOWN ||
+					boundary.getCityType() == CityType.HAMLET || 
+					boundary.getCityType() == CityType.SUBURB || 
+					boundary.getCityType() == CityType.VILLAGE)) {
 				if(e instanceof Relation) {
 					ctx.loadEntityRelation((Relation) e);
 				}
-				cityFound = createMissingCity(e);
+				cityFound = createMissingCity(e, boundary.getCityType());
 				boundary.setAdminCenterId(cityFound.getId());
 			}
 			if (cityFound != null) {
@@ -353,7 +358,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 			if(e instanceof Relation) {
 				ctx.loadEntityRelation((Relation) e);
 			}
-			centerId = createMissingCity(e).getId();
+			centerId = createMissingCity(e, CityType.SUBURB).getId();
 			ct = CityType.SUBURB;
 		}
 		boolean administrative = "administrative".equals(e.getTag(OSMTagKey.BOUNDARY));
@@ -405,10 +410,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 	}
 
 
-	private City createMissingCity(Entity e) throws SQLException {
-		long centerId;
-		City c = EntityParser.parseCity(e, CityType.SUBURB);
-		centerId = e.getId();
+	private City createMissingCity(Entity e, CityType t) throws SQLException {
+		City c = EntityParser.parseCity(e, t);
+//		long centerId = e.getId();
 		regCity(c, e);
 		writeCity(c);
 		commitWriteCity();

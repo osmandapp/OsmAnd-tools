@@ -761,7 +761,7 @@ public class IndexCreator {
 
 	public static void main(String[] args) throws IOException, SAXException, SQLException, InterruptedException {
 		long time = System.currentTimeMillis();
-		IndexCreator creator = new IndexCreator(new File("/home/victor/projects/OsmAnd/data/osm-gen/")); //$NON-NLS-1$
+		IndexCreator creator = new IndexCreator(new File("/home/victor/projects/osmand/osm-gen/")); //$NON-NLS-1$
 		creator.setIndexMap(true);
 		creator.setIndexAddress(true);
 		creator.setIndexPOI(true);
@@ -776,11 +776,11 @@ public class IndexCreator {
 		MapRenderingTypesEncoder rt = MapRenderingTypesEncoder.getDefault();
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 
-		String file = "/home/victor/projects/OsmAnd/temp/route.osm";
-//		String file = "/home/victor/projects/OsmAnd/temp/luxembourg.osm.pbf";
+//		String file = "/home/victor/projects/osmand/temp/route.osm";
+		String file = "/home/victor/projects/osmand/temp/monaco.osm.pbf";
 		int st = file.lastIndexOf('/');
 		int e = file.indexOf('.', st);
-		creator.setNodesDBFile(new File("/home/victor/projects/OsmAnd/data/osm-gen/"+file.substring(st, e) + ".tmp.odb"));
+		creator.setNodesDBFile(new File("/home/victor/projects/osmand/osm-gen/"+file.substring(st, e) + ".tmp.odb"));
 		creator.generateIndexes(new File(file),
 				new ConsoleProgressImplementation(1), null, zooms, rt, log);
 		
