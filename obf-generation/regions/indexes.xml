@@ -64,6 +64,9 @@
 		 	<region  name="portugal"/>
 		 	<region  name="switzerland"/>
 		 	<region  name="germany_baden-wuerttemberg"/>
+		 	<region  name="gb_england_bedfordshire"/>
+		 	<region  name="gb_england_berkshire"/>
+		 	<region  name="gb_england_hertfordshire"/>
 		</regions>
 
 		<!-- 1.2 GREAT BRITAIN [SOURCE: GEOFABRIK.DE] -->
@@ -508,6 +511,9 @@
 			<region name="new-zealand" downloadName="new-zealand-latest"/>
 		</regions>
 
+		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" skip="false" region_suffix="_Australia-oceania">
+			<region  name="oceania"/>
+		</regions>
 
 		<!-- 8. AFRICA  -->
 		<!-- 8.1 AFRICA [SOURCE: GEOFABRIK.DE] -->
