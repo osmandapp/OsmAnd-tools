@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<regions_list>
+	<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.osm.pbf" region_prefix="" skip="false" region_suffix="">	
+		 	<region  name="france_addresses-nationwide_europe"/>
+		 	<region  name="germany_addresses-nationwide_europe"/>
+		 	<region  name="italy_addresses-nationwide_europe"/>
+		 	<region  name="british-isles_addresses-nationwide_europe"/>
+		 	<region  name="canada_addresses-nationwide_north-america"/>
+		 	<region  name="russia_addresses-nationwide_asia"/>
+		</regions>
+</regions_list>
