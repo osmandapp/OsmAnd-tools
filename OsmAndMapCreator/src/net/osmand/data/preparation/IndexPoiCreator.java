@@ -81,7 +81,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		tempAmenityList = EntityParser.parseAmenities(renderingTypes, e, tempAmenityList);
 		if (!tempAmenityList.isEmpty() && poiPreparedStatement != null) {
 			for (Amenity a : tempAmenityList) {
-				if(a.getType() == AmenityType.LEISURE) {
+				if(a.getType() == AmenityType.LEISURE && privateReg) {
 					// don't index private swimming pools 
 					continue;
 				}
