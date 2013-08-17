@@ -97,17 +97,20 @@ public class NativeSwingRendering extends NativeLibrary {
 		initRenderingRulesStorage(storage);
 	}
 	
-	public NativeSwingRendering(){
-		try {
-			loadRuleStorage(null, "");
-		} catch (SAXException e) {
-			throw new RuntimeException(e);
-		} catch (IOException e) {
-			throw new RuntimeException(e);
-		} catch (XmlPullParserException e) {
-			throw new RuntimeException(e);
-		}
-	}
+	public NativeSwingRendering(boolean newLibrary){
+        super(newLibrary);
+        if (!newLibrary) {
+            try {
+                defaultLoadedLibrary.loadRuleStorage(null, "");
+            } catch (SAXException e) {
+                throw new RuntimeException(e);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            } catch (XmlPullParserException e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
 	
 	
 	
@@ -212,13 +215,14 @@ public class NativeSwingRendering extends NativeLibrary {
 			filename = null;
 		}
 		boolean loaded;
-		if(f.isFile()){
+        boolean newLib = !f.isFile() || f.getName().contains("JNI");
+		if(!newLib){
 			loaded = NativeLibrary.loadOldLib(f.getParentFile().getAbsolutePath());
 		} else {
-			loaded = NativeLibrary.loadAllLibs(filename);
+			loaded = NativeLibrary.loadNewLib(f.getParentFile().getAbsolutePath());
 		}
 		if (loaded) {
-			defaultLoadedLibrary = new NativeSwingRendering();
+			defaultLoadedLibrary = new NativeSwingRendering(newLib);
 			defaultLoadedLibrary.initFilesInDir(new File(DataExtractionSettings.getSettings().getBinaryFilesDir()));
 		}
 		return defaultLoadedLibrary;

@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module type="JAVA_MODULE" version="4">
+  <component name="EclipseModuleManager">
+    <libelement value="jar://$MODULE_DIR$/lib/h2-latest.jar!/" />
+    <libelement value="jar://$MODULE_DIR$/lib/sqlite-jdbc-3.7.6.3-20110609.081603-3.jar!/" />
+    <libelement value="jar://$MODULE_DIR$/lib/jsch-20120101.jar!/" />
+    <libelement value="jar://$MODULE_DIR$/lib/mysql-connector-java-5.1.18-bin.jar!/" />
+    <libelement value="jar://$MODULE_DIR$/lib/junit-4.10.jar!/" />
+    <libelement value="jar://$MODULE_DIR$/lib/bzip2-20090327.jar!/" />
+    <libelement value="jar://$MODULE_DIR$/lib/commons-logging-1.1.1.jar!/" />
+    <libelement value="jar://$MODULE_DIR$/lib/gnu-trove-osmand.jar!/" />
+    <libelement value="jar://$MODULE_DIR$/lib/bsh-core-2.0b4.jar!/" />
+    <libelement value="jar://$MODULE_DIR$/lib/icu4j-49_1.jar!/" />
+    <libelement value="jar://$MODULE_DIR$/lib/json-20090211.jar!/" />
+    <libelement value="jar://$MODULE_DIR$/lib/junidecode-0.1.jar!/" />
+    <libelement value="jar://$MODULE_DIR$/lib/kxml2-2.3.0.jar!/" />
+    <libelement value="jar://$MODULE_DIR$/lib/jleveldb-v01.jar!/" />
+    <src_description expected_position="0">
+      <src_folder value="file://$MODULE_DIR$/src" expected_position="0" />
+      <src_folder value="file://$MODULE_DIR$/icons" expected_position="1" />
+      <src_folder value="file://$MODULE_DIR$/src-tests" expected_position="2" />
+    </src_description>
+  </component>
+  <component name="NewModuleRootManager" inherit-compiler-output="false">
+    <output url="file://$MODULE_DIR$/bin" />
+    <exclude-output />
+    <content url="file://$MODULE_DIR$">
+      <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/icons" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/src-tests" isTestSource="false" />
+    </content>
+    <orderEntry type="sourceFolder" forTests="false" />
+    <orderEntry type="inheritedJdk" />
+    <orderEntry type="module-library">
+      <library name="h2-latest.jar">
+        <CLASSES>
+          <root url="jar://$MODULE_DIR$/lib/h2-latest.jar!/" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES />
+      </library>
+    </orderEntry>
+    <orderEntry type="module-library">
+      <library name="sqlite-jdbc-3.7.6.3-20110609.081603-3.jar">
+        <CLASSES>
+          <root url="jar://$MODULE_DIR$/lib/sqlite-jdbc-3.7.6.3-20110609.081603-3.jar!/" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES />
+      </library>
+    </orderEntry>
+    <orderEntry type="module-library">
+      <library name="jsch-20120101.jar">
+        <CLASSES>
+          <root url="jar://$MODULE_DIR$/lib/jsch-20120101.jar!/" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES />
+      </library>
+    </orderEntry>
+    <orderEntry type="module-library">
+      <library name="mysql-connector-java-5.1.18-bin.jar">
+        <CLASSES>
+          <root url="jar://$MODULE_DIR$/lib/mysql-connector-java-5.1.18-bin.jar!/" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES />
+      </library>
+    </orderEntry>
+    <orderEntry type="module-library">
+      <library name="junit-4.10.jar">
+        <CLASSES>
+          <root url="jar://$MODULE_DIR$/lib/junit-4.10.jar!/" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES />
+      </library>
+    </orderEntry>
+    <orderEntry type="module-library">
+      <library name="bzip2-20090327.jar">
+        <CLASSES>
+          <root url="jar://$MODULE_DIR$/lib/bzip2-20090327.jar!/" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES />
+      </library>
+    </orderEntry>
+    <orderEntry type="module-library">
+      <library name="commons-logging-1.1.1.jar">
+        <CLASSES>
+          <root url="jar://$MODULE_DIR$/lib/commons-logging-1.1.1.jar!/" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES />
+      </library>
+    </orderEntry>
+    <orderEntry type="module-library">
+      <library name="gnu-trove-osmand.jar">
+        <CLASSES>
+          <root url="jar://$MODULE_DIR$/lib/gnu-trove-osmand.jar!/" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES />
+      </library>
+    </orderEntry>
+    <orderEntry type="module-library">
+      <library name="bsh-core-2.0b4.jar">
+        <CLASSES>
+          <root url="jar://$MODULE_DIR$/lib/bsh-core-2.0b4.jar!/" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES />
+      </library>
+    </orderEntry>
+    <orderEntry type="module-library">
+      <library name="icu4j-49_1.jar">
+        <CLASSES>
+          <root url="jar://$MODULE_DIR$/lib/icu4j-49_1.jar!/" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES />
+      </library>
+    </orderEntry>
+    <orderEntry type="module-library">
+      <library name="json-20090211.jar">
+        <CLASSES>
+          <root url="jar://$MODULE_DIR$/lib/json-20090211.jar!/" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES />
+      </library>
+    </orderEntry>
+    <orderEntry type="module-library">
+      <library name="junidecode-0.1.jar">
+        <CLASSES>
+          <root url="jar://$MODULE_DIR$/lib/junidecode-0.1.jar!/" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES />
+      </library>
+    </orderEntry>
+    <orderEntry type="module-library">
+      <library name="kxml2-2.3.0.jar">
+        <CLASSES>
+          <root url="jar://$MODULE_DIR$/lib/kxml2-2.3.0.jar!/" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES />
+      </library>
+    </orderEntry>
+    <orderEntry type="module-library">
+      <library name="jleveldb-v01.jar">
+        <CLASSES>
+          <root url="jar://$MODULE_DIR$/lib/jleveldb-v01.jar!/" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES />
+      </library>
+    </orderEntry>
+    <orderEntry type="module" module-name="OsmAnd-java" />
+  </component>
+</module>
+
