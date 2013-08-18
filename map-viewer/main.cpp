@@ -34,27 +34,31 @@
 #include <OsmAndCore/Common.h>
 #include <OsmAndCore/Utilities.h>
 #include <OsmAndCore/Logging.h>
+#include <OsmAndCore/Data/ObfsCollection.h>
 #include <OsmAndCore/Map/Rasterizer.h>
 #include <OsmAndCore/Map/RasterizerContext.h>
-#include <OsmAndCore/Map/RasterizationStyles.h>
-#include <OsmAndCore/Map/RasterizationStyleEvaluator.h>
-#include <OsmAndCore/Map/MapDataCache.h>
+#include <OsmAndCore/Map/MapStyles.h>
+#include <OsmAndCore/Map/MapStyleEvaluator.h>
 #include <OsmAndCore/Map/IMapRenderer.h>
 #include <OsmAndCore/Map/OnlineMapRasterTileProvider.h>
 #include <OsmAndCore/Map/HillshadeTileProvider.h>
 #include <OsmAndCore/Map/IMapElevationDataProvider.h>
 #include <OsmAndCore/Map/HeightmapTileProvider.h>
+#include <OsmAndCore/Map/OfflineMapDataProvider.h>
+#include <OsmAndCore/Map/OfflineMapRasterTileProvider.h>
 
 OsmAnd::AreaI viewport;
 std::shared_ptr<OsmAnd::IMapRenderer> renderer;
+std::shared_ptr<OsmAnd::ObfsCollection> obfsCollection;
+std::shared_ptr<OsmAnd::OfflineMapDataProvider> offlineMapDataProvider;
+std::shared_ptr<OsmAnd::MapStyles> stylesCollection;
 
+QDir obfRoot(QDir::current());
 QDir cacheDir(QDir::current());
 QDir heightsDir;
 bool wasHeightsDirSpecified = false;
 QFileInfoList styleFiles;
-QFileInfoList obfFiles;
-QString styleName;
-bool wasObfRootSpecified = false;
+QString styleName = "default";
 
 bool use43 = false;
 
@@ -99,15 +103,13 @@ int main(int argc, char** argv)
         else if (arg.startsWith("-obfsDir="))
         {
             auto obfRootPath = arg.mid(strlen("-obfsDir="));
-            QDir obfRoot(obfRootPath);
+            obfRoot = QDir(obfRootPath);
             if(!obfRoot.exists())
             {
                 std::cerr << "OBF directory does not exist" << std::endl;
                 OsmAnd::ReleaseCore();
                 return EXIT_FAILURE;
             }
-            OsmAnd::Utilities::findFiles(obfRoot, QStringList() << "*.obf", obfFiles);
-            wasObfRootSpecified = true;
         }
         else if (arg.startsWith("-cacheDir="))
         {
@@ -119,22 +121,20 @@ int main(int argc, char** argv)
             wasHeightsDirSpecified = true;
         }
     }
-    if(!wasObfRootSpecified)
-        OsmAnd::Utilities::findFiles(QDir::current(), QStringList() << "*.obf", obfFiles);
     
     // Obtain and configure rasterization style context
-    std::shared_ptr<OsmAnd::RasterizationStyle> style;
+    std::shared_ptr<OsmAnd::MapStyle> style;
     if(!styleName.isEmpty())
     {
-        OsmAnd::RasterizationStyles stylesCollection;
+        stylesCollection.reset(new OsmAnd::MapStyles());
         for(auto itStyleFile = styleFiles.begin(); itStyleFile != styleFiles.end(); ++itStyleFile)
         {
             const auto& styleFile = *itStyleFile;
 
-            if(!stylesCollection.registerStyle(styleFile))
+            if(!stylesCollection->registerStyle(styleFile))
                 std::cout << "Failed to parse metadata of '" << styleFile.fileName().toStdString() << "' or duplicate style" << std::endl;
         }
-        if(!stylesCollection.obtainStyle(styleName, style))
+        if(!stylesCollection->obtainStyle(styleName, style))
         {
             std::cout << "Failed to resolve style '" << styleName.toStdString() << "'" << std::endl;
             OsmAnd::ReleaseCore();
@@ -142,14 +142,7 @@ int main(int argc, char** argv)
         }
     }
     
-    std::shared_ptr<OsmAnd::MapDataCache> mapDataCache(new OsmAnd::MapDataCache());
-    for(auto itObfFile = obfFiles.begin(); itObfFile != obfFiles.end(); ++itObfFile)
-    {
-        const auto& obfFile = *itObfFile;
-
-        std::shared_ptr<OsmAnd::ObfReader> obfReader(new OsmAnd::ObfReader(std::shared_ptr<QIODevice>(new QFile(obfFile.absoluteFilePath()))));
-        mapDataCache->addSource(obfReader);
-    }
+    obfsCollection.reset(new OsmAnd::ObfsCollection(obfRoot/*, cacheDir*/));
 
 #if defined(OSMAND_OPENGL_RENDERER_SUPPORTED)
     renderer = OsmAnd::createAtlasMapRenderer_OpenGL();
@@ -211,6 +204,7 @@ int main(int argc, char** argv)
     renderer->setAzimuth(69.4f);
     renderer->setElevationAngle(35.0f);
     renderer->setFogColor(OsmAnd::FColorRGB(1.0f, 1.0f, 1.0f));
+    offlineMapDataProvider.reset(new OsmAnd::OfflineMapDataProvider(obfsCollection, style));
 
     /// Amsterdam
     renderer->setTarget(OsmAnd::PointI(
@@ -559,6 +553,11 @@ void activateProvider(OsmAnd::RasterMapLayerId layerId, int idx)
     }
     else if(idx == 3)
     {
+        auto tileProvider = new OsmAnd::OfflineMapRasterTileProvider(offlineMapDataProvider, 1.0f);
+        renderer->setRasterLayerProvider(layerId, std::shared_ptr<OsmAnd::IMapBitmapTileProvider>(tileProvider));
+    }
+    else if(idx == 4)
+    {
 //        auto hillshadeTileProvider = new OsmAnd::HillshadeTileProvider();
 //        renderer->setTileProvider(layerId, hillshadeTileProvider);
     }
@@ -675,6 +674,16 @@ void displayHandler()
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("palette textures(key p): %1").arg(renderer->configuration.paletteTexturesAllowed).toStdString().c_str());
         verifyOpenGL();
 
+        glColor4f(0.5f, 0.5f, 0.5f, 0.6f);
+        glBegin(GL_QUADS);
+            glVertex2f(0.0f, 16*7);
+            glVertex2f(   w, 16*7);
+            glVertex2f(   w, 0.0f);
+            glVertex2f(0.0f, 0.0f);
+        glEnd();
+        verifyOpenGL();
+
+        glColor3f(0.0f, 1.0f, 0.0f);
         glRasterPos2f(8, 16 * 6);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("Tile providers (holding alt controls overlay0):").toStdString().c_str());
         verifyOpenGL();
@@ -692,7 +701,7 @@ void displayHandler()
         verifyOpenGL();
 
         glRasterPos2f(8, 16 * 2);
-        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("3 - Vector maps").toStdString().c_str());
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("3 - Offline maps").toStdString().c_str());
         verifyOpenGL();
 
         glRasterPos2f(8, 16 * 1);
