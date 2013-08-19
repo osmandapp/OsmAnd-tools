@@ -543,6 +543,7 @@
 		<!-- 8.2 AFRICA [SOURCE: OSMAND:NET] -->
 		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" region_suffix="_Africa"  skip="false">
 			<region name="angola"/>
+			<region name="algeria"/>
 			<region name="burundi"/>
 			<region name="cape-verde"/>
 			<region name="chad"/>
