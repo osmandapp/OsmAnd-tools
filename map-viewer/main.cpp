@@ -181,7 +181,6 @@ int main(int argc, char** argv)
     verifyOpenGL();
 
     //////////////////////////////////////////////////////////////////////////
-    activateProvider(OsmAnd::RasterMapLayerId::BaseLayer, 1);
     OsmAnd::MapRendererSetupOptions rendererSetup;
     rendererSetup.frameRequestCallback = []()
     {
@@ -571,9 +570,9 @@ void displayHandler()
     //////////////////////////////////////////////////////////////////////////
 
     //OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Debug, "-FS{-\n");
+    if(renderer->prepareFrame())
+        renderer->renderFrame();
     renderer->processRendering();
-    renderer->renderFrame();
-    renderer->postprocessRendering();
     verifyOpenGL();
     //OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Debug, "-}FS-\n");
     
