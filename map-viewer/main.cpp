@@ -541,13 +541,11 @@ void activateProvider(OsmAnd::RasterMapLayerId layerId, int idx)
     else if(idx == 1)
     {
         auto tileProvider = OsmAnd::OnlineMapRasterTileProvider::createCycleMapProvider();
-        static_cast<OsmAnd::OnlineMapRasterTileProvider*>(tileProvider.get())->setLocalCachePath(QDir::current());
         renderer->setRasterLayerProvider(layerId, tileProvider);
     }
     else if(idx == 2)
     {
         auto tileProvider = OsmAnd::OnlineMapRasterTileProvider::createMapnikProvider();
-        static_cast<OsmAnd::OnlineMapRasterTileProvider*>(tileProvider.get())->setLocalCachePath(QDir::current());
         renderer->setRasterLayerProvider(layerId, tileProvider);
     }
     else if(idx == 3)
