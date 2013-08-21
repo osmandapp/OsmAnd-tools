@@ -142,7 +142,8 @@ int main(int argc, char** argv)
         }
     }
     
-    obfsCollection.reset(new OsmAnd::ObfsCollection(obfRoot/*, cacheDir*/));
+    obfsCollection.reset(new OsmAnd::ObfsCollection());
+    obfsCollection->watchDirectory(obfRoot);
 
 #if defined(OSMAND_OPENGL_RENDERER_SUPPORTED)
     renderer = OsmAnd::createAtlasMapRenderer_OpenGL();
