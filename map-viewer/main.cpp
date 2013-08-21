@@ -446,21 +446,21 @@ void keyboardHandler(unsigned char key, int x, int y)
     case 'b':
         {
             auto config = renderer->configuration;
-            config.texturesFilteringQuality = OsmAnd::MapRendererConfiguration::TextureFilteringQuality::Normal;
+            config.texturesFilteringQuality = OsmAnd::TextureFilteringQuality::Normal;
             renderer->setConfiguration(config);
         }
         break;
     case 'n':
         {
             auto config = renderer->configuration;
-            config.texturesFilteringQuality = OsmAnd::MapRendererConfiguration::TextureFilteringQuality::Good;
+            config.texturesFilteringQuality = OsmAnd::TextureFilteringQuality::Good;
             renderer->setConfiguration(config);
         }
         break;
     case 'm':
         {
             auto config = renderer->configuration;
-            config.texturesFilteringQuality = OsmAnd::MapRendererConfiguration::TextureFilteringQuality::Best;
+            config.texturesFilteringQuality = OsmAnd::TextureFilteringQuality::Best;
             renderer->setConfiguration(config);
         }
         break;
