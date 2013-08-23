@@ -74,6 +74,7 @@ void closeHandler(void);
 void activateProvider(OsmAnd::RasterMapLayerId layerId, int idx);
 void verifyOpenGL();
 
+int lastClickedX, lastClickedY;
 OsmAnd::PointI lastClickedLocation31;
 
 int main(int argc, char** argv)
@@ -273,6 +274,8 @@ void mouseHandler(int button, int state, int x, int y)
     {
         if(state == GLUT_DOWN)
         {
+            lastClickedX = x;
+            lastClickedY = y;
             renderer->getLocationFromScreenPoint(OsmAnd::PointI(x, y), lastClickedLocation31);
         }
     }
@@ -692,7 +695,7 @@ void displayHandler()
 
         glColor3f(0.0f, 1.0f, 0.0f);
         glRasterPos2f(8, 16 * 7);
-        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("Last clicked location: %1 %2").arg(lastClickedLocation31.x).arg(lastClickedLocation31.y).toStdString().c_str());
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("Last clicked location: %1(%2) %3(%4)").arg(lastClickedLocation31.x).arg(lastClickedX).arg(lastClickedLocation31.y).arg(lastClickedY).toStdString().c_str());
         verifyOpenGL();
 
         glColor3f(0.0f, 1.0f, 0.0f);
