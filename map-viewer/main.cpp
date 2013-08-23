@@ -74,6 +74,8 @@ void closeHandler(void);
 void activateProvider(OsmAnd::RasterMapLayerId layerId, int idx);
 void verifyOpenGL();
 
+OsmAnd::PointI lastClickedLocation31;
+
 int main(int argc, char** argv)
 {
     //////////////////////////////////////////////////////////////////////////
@@ -210,13 +212,13 @@ int main(int argc, char** argv)
     renderer->setTarget(OsmAnd::PointI(
         1102430866,
         704978668));
-    renderer->setZoom(12.5f);
+    renderer->setZoom(10.0f);
     
     // Kiev
-    renderer->setTarget(OsmAnd::PointI(
+    /*renderer->setTarget(OsmAnd::PointI(
         1254096891,
         723769130));
-    renderer->setZoom(10.0f);
+    renderer->setZoom(10.0f);*/
     
     renderer->setAzimuth(0.0f);
     //renderer->setDisplayDensityFactor(2.0f);
@@ -265,6 +267,13 @@ void mouseHandler(int button, int state, int x, int y)
         else if(state == GLUT_UP && dragInitialized)
         {
             dragInitialized = false;
+        }
+    }
+    else if(button == GLUT_RIGHT_BUTTON)
+    {
+        if(state == GLUT_DOWN)
+        {
+            renderer->getLocationFromScreenPoint(OsmAnd::PointI(x, y), lastClickedLocation31);
         }
     }
 }
@@ -674,11 +683,16 @@ void displayHandler()
 
         glColor4f(0.5f, 0.5f, 0.5f, 0.6f);
         glBegin(GL_QUADS);
-            glVertex2f(0.0f, 16*7);
-            glVertex2f(   w, 16*7);
+            glVertex2f(0.0f, 16*8);
+            glVertex2f(   w, 16*8);
             glVertex2f(   w, 0.0f);
             glVertex2f(0.0f, 0.0f);
         glEnd();
+        verifyOpenGL();
+
+        glColor3f(0.0f, 1.0f, 0.0f);
+        glRasterPos2f(8, 16 * 7);
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("Last clicked location: %1 %2").arg(lastClickedLocation31.x).arg(lastClickedLocation31.y).toStdString().c_str());
         verifyOpenGL();
 
         glColor3f(0.0f, 1.0f, 0.0f);
