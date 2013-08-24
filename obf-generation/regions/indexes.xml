@@ -545,16 +545,21 @@
 			<region name="angola"/>
 			<region name="algeria"/>
 			<region name="burundi"/>
+			<region name="cameroon"/>
 			<region name="cape-verde"/>
+			<region name="central-african-republic"/>
 			<region name="chad"/>
 			<region name="guinea"/>
 			<region name="kenya"/>
+			<region name="malawi"/>
 			<region name="mali"/>
 			<region name="mauritania"/>
 			<region name="mauritius"/>
 			<region name="namibia"/>
+			<region name="niger"/>
 			<region name="rwanda"/>
 			<region name="seychelles"/>
+			<region name="sudan"/>
 			<region name="tunisia"/>
 			<region name="uganda"/>
 		</regions>
