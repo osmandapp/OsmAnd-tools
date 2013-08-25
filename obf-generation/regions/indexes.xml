@@ -535,6 +535,7 @@
 			<region name="madagascar" downloadName="madagascar-latest"/>
 			<region name="morocco" downloadName="morocco-latest"/>
 			<region name="nigeria" downloadName="nigeria-latest"/>
+			<region name="sierra-leone" downloadName="sierra-leone-latest"/>
 			<region name="somalia" downloadName="somalia-latest"/>
 			<region name="south-africa-and-lesotho" downloadName="south-africa-and-lesotho-latest"/>
 			<region name="tanzania-faso" downloadName="tanzania-latest"/>
@@ -560,6 +561,7 @@
 			<region name="rwanda"/>
 			<region name="seychelles"/>
 			<region name="sudan"/>
+			<region name="togo"/>
 			<region name="tunisia"/>
 			<region name="uganda"/>
 		</regions>
