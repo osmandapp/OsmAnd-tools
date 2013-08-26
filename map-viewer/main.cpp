@@ -36,7 +36,7 @@
 #include <OsmAndCore/Logging.h>
 #include <OsmAndCore/Data/ObfsCollection.h>
 #include <OsmAndCore/Map/Rasterizer.h>
-#include <OsmAndCore/Map/RasterizerContext.h>
+#include <OsmAndCore/Map/RasterizerEnvironment.h>
 #include <OsmAndCore/Map/MapStyles.h>
 #include <OsmAndCore/Map/MapStyleEvaluator.h>
 #include <OsmAndCore/Map/IMapRenderer.h>
@@ -125,7 +125,7 @@ int main(int argc, char** argv)
     }
     
     // Obtain and configure rasterization style context
-    std::shared_ptr<OsmAnd::MapStyle> style;
+    std::shared_ptr<const OsmAnd::MapStyle> style;
     if(!styleName.isEmpty())
     {
         stylesCollection.reset(new OsmAnd::MapStyles());
@@ -133,7 +133,7 @@ int main(int argc, char** argv)
         {
             const auto& styleFile = *itStyleFile;
 
-            if(!stylesCollection->registerStyle(styleFile))
+            if(!stylesCollection->registerStyle(styleFile.absoluteFilePath()))
                 std::cout << "Failed to parse metadata of '" << styleFile.fileName().toStdString() << "' or duplicate style" << std::endl;
         }
         if(!stylesCollection->obtainStyle(styleName, style))
@@ -212,7 +212,8 @@ int main(int argc, char** argv)
     renderer->setTarget(OsmAnd::PointI(
         1102430866,
         704978668));
-    renderer->setZoom(10.0f);
+    //renderer->setZoom(10.0f);
+    renderer->setZoom(11.0f);
     
     // Kiev
     /*renderer->setTarget(OsmAnd::PointI(
