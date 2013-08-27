@@ -101,7 +101,7 @@ public class NativeSwingRendering extends NativeLibrary {
         super(newLibrary);
         if (!newLibrary) {
             try {
-                defaultLoadedLibrary.loadRuleStorage(null, "");
+                loadRuleStorage(null, "");
             } catch (SAXException e) {
                 throw new RuntimeException(e);
             } catch (IOException e) {

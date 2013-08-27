@@ -4,12 +4,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import javax.xml.stream.XMLStreamException;
 
@@ -33,15 +28,14 @@ public class FixLinkedCoastline {
 	public static void main(String[] args) throws IOException, SAXException, XMLStreamException {
 		String fileToRead = args != null && args.length > 0 ? args[0] : null; 
 		if(fileToRead == null) {
-//			fileToRead = "/home/victor/projects/OsmAnd/download/basemap/10m_coastline.osm";
-			fileToRead = "/home/victor/projects/OsmAnd/download/basemap/10m_lakes.osm";
+			fileToRead = "/home/victor/projects/osmand/data/basemap/ready/10m_coastline.osm";
+//			fileToRead = "/home/victor/projects/OsmAnd/download/basemap/10m_lakes.osm";
 		}
 		File read = new File(fileToRead);
 		File write ;
 		String fileToWrite =  args != null && args.length > 1 ? args[1] : null;
 		if(fileToWrite != null){
 			write = new File(fileToWrite);
-			 
 		} else {
 			String fileName = read.getName();
 			int i = fileName.lastIndexOf('.');
@@ -77,7 +71,7 @@ public class FixLinkedCoastline {
 			LatLon first = way.getNodes().get(0).getLatLon();
 			LatLon last = lway.getNodes().get(lway.getNodes().size() - 1).getLatLon();
 			double dist = MapUtils.getDistance(first, last);
-			if(dist < 500 && w.size() >= 3){
+			if(dist < 500000){
 				alignAndAddtoStorage(storage, toWrite, w);
 			} else {
 				errors++;
@@ -87,6 +81,12 @@ public class FixLinkedCoastline {
 		}
 		System.out.println("Fixed errors : " + ERRORS +", errors not fixed : " + errors );
 		OsmStorageWriter writer = new OsmStorageWriter();
+        /*Set<Long> ls = new HashSet<Long>();
+        for(EntityId e : toWrite) {
+            if(!ls.add(e.getId())) {
+                System.out.println("!!" + e.getId());
+            }
+        }*/
 		writer.saveStorage(new FileOutputStream(write), storage, toWrite, true);
 	}
 
