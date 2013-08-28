@@ -684,11 +684,16 @@ void displayHandler()
 
         glColor4f(0.5f, 0.5f, 0.5f, 0.6f);
         glBegin(GL_QUADS);
-            glVertex2f(0.0f, 16*8);
-            glVertex2f(   w, 16*8);
+            glVertex2f(0.0f, 16*9);
+            glVertex2f(   w, 16*9);
             glVertex2f(   w, 0.0f);
             glVertex2f(0.0f, 0.0f);
         glEnd();
+        verifyOpenGL();
+
+        glColor3f(0.0f, 1.0f, 0.0f);
+        glRasterPos2f(8, 16 * 8);
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("Last clicked tile: (%1, %2)@%3").arg(lastClickedLocation31.x >> (31 - renderer->state.zoomBase)).arg(lastClickedLocation31.y >> (31 - renderer->state.zoomBase)).arg(renderer->state.zoomBase).toStdString().c_str());
         verifyOpenGL();
 
         glColor3f(0.0f, 1.0f, 0.0f);
