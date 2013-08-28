@@ -792,10 +792,11 @@ public class IndexCreator {
 		File basemapParent = new File("/home/victor/projects/osmand/data/basemap/ready/");
 		creator.generateBasemapIndex(new ConsoleProgressImplementation(1), null, zooms, rt, log, "basemap",
 				new File(basemapParent, "10m_coastline_out_fix_caspean_arctic.osm")
-//				new File(basemapParent, "10m_admin_level.osm"),
-//				new File(basemapParent, "10m_rivers.osm"),
-//				new File(basemapParent, "10m_lakes.osm"),
-//				new File(basemapParent, "10m_populated_places.osm")
+                ,new File(basemapParent, "roads_gen.osm")
+//				,new File(basemapParent, "10m_admin_level.osm")
+//				,new File(basemapParent, "10m_rivers.osm")
+//				,new File(basemapParent, "10m_lakes.osm")
+//				,new File(basemapParent, "10m_populated_places.osm")
 		);
 
 
