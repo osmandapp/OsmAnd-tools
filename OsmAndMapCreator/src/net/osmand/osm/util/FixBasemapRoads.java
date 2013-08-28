@@ -13,13 +13,11 @@ import net.osmand.osm.edit.Way;
 import net.osmand.osm.io.OsmBaseStorage;
 import net.osmand.osm.io.OsmStorageWriter;
 import net.osmand.util.MapUtils;
+import org.apache.tools.bzip2.CBZip2InputStream;
 import org.xml.sax.SAXException;
 
 import javax.xml.stream.XMLStreamException;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.util.*;
 
 public class FixBasemapRoads {
@@ -39,8 +37,8 @@ public class FixBasemapRoads {
 			 
 		} else {
 			String fileName = read.getName();
-			int i = fileName.lastIndexOf('.');
-			fileName = fileName.substring(0, i) + "_out"+ fileName.substring(i);
+			int i = fileName.indexOf('.');
+			fileName = fileName.substring(0, i) + "_out.osm";
 			write = new File(read.getParentFile(), fileName);
 		}
 		
@@ -51,7 +49,17 @@ public class FixBasemapRoads {
 	
 	private void process(File read, File write) throws  IOException, SAXException, XMLStreamException {
 		OsmBaseStorage storage = new OsmBaseStorage();
-		storage.parseOSM(new FileInputStream(read), new ConsoleProgressImplementation());
+        InputStream stream = new BufferedInputStream(new FileInputStream(read), 8192 * 4);
+        InputStream streamFile = stream;
+        long st = System.currentTimeMillis();
+        if (read.getName().endsWith(".bz2")) { //$NON-NLS-1$
+            if (stream.read() != 'B' || stream.read() != 'Z') {
+//				throw new RuntimeException("The source stream must start with the characters BZ if it is to be read as a BZip2 stream."); //$NON-NLS-1$
+            } else {
+                stream = new CBZip2InputStream(stream);
+            }
+        }
+		storage.parseOSM(stream, new ConsoleProgressImplementation(), streamFile, true);
 		
 		Map<EntityId, Entity> entities = new HashMap<EntityId, Entity>( storage.getRegisteredEntities());
 		for(EntityId e : entities.keySet()){
