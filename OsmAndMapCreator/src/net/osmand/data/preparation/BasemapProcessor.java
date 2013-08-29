@@ -545,7 +545,7 @@ public class BasemapProcessor {
         creator.setMapFileName("World_basemap_2.obf");
         ArrayList<File> src = new ArrayList<File>();
         for(File f : folder.listFiles()) {
-            if(f.getName().endsWith(".osm")) {
+            if(f.getName().endsWith(".osm") || f.getName().endsWith(".osm.bz2")) {
                 src.add(f);
             }
         }
