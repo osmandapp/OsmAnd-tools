@@ -4,8 +4,10 @@ import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.hash.TLongObjectHashMap;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collections;
@@ -15,9 +17,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import net.osmand.PlatformUtil;
 import net.osmand.binary.OsmandOdb.MapData;
 import net.osmand.binary.OsmandOdb.MapDataBlock;
 import net.osmand.data.preparation.MapZooms.MapZoomPair;
+import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.MapRenderingTypesEncoder.MapRulType;
 import net.osmand.osm.WayChain;
@@ -31,6 +35,7 @@ import net.osmand.util.MapUtils;
 
 import org.apache.commons.logging.Log;
 import org.apache.tools.bzip2.CBZip2InputStream;
+import org.xml.sax.SAXException;
 
 public class BasemapProcessor {
 	TLongObjectHashMap<WayChain> coastlinesEndPoint = new TLongObjectHashMap<WayChain>();
@@ -38,6 +43,7 @@ public class BasemapProcessor {
 	
 	private static final byte SEA = 0x2;
 	private static final byte LAND = 0x1;
+    private static final Log log = PlatformUtil.getLog(BasemapProcessor.class);
 
 	/**
 	 * The zoom level for which the tile info is valid.
@@ -525,5 +531,29 @@ public class BasemapProcessor {
 		return Math.min((zoomPair.getMinZoom() + zoomPair.getMaxZoom()) / 2 - 1, zoomPair.getMinZoom() + 1);
 	}
 
+
+    public static void main(String[] p) throws InterruptedException, SAXException, SQLException, IOException {
+        long time = System.currentTimeMillis();
+
+        MapRenderingTypesEncoder rt = MapRenderingTypesEncoder.getDefault();
+         // BASEMAP generation
+        File folder = new File(p[0]);
+        MapZooms zooms = MapZooms.parseZooms("1-2;3;4-5;6-7;8-9;10-");
+        IndexCreator creator = new IndexCreator(folder); //$NON-NLS-1$
+        creator.setIndexMap(true);
+        creator.setZoomWaySmothness(2);
+        creator.setMapFileName("World_basemap_2.obf");
+        ArrayList<File> src = new ArrayList<File>();
+        for(File f : folder.listFiles()) {
+            if(f.getName().endsWith(".osm") || f.getName().endsWith(".osm.bz2")) {
+                src.add(f);
+            }
+        }
+        creator.generateBasemapIndex(new ConsoleProgressImplementation(1), null, zooms, rt, log, "basemap",
+                src.toArray(new File[src.size()])
+        );
+
+
+    }
 	
 }

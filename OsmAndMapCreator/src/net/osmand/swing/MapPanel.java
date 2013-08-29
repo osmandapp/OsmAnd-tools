@@ -65,8 +65,9 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 	
 	private static final long serialVersionUID = 1L;
 	
-	private static final int EXPAND_X = 100;
-	private static final int EXPAND_Y = 100;
+	private static final int EXPAND_X = -16;
+	private static final int EXPAND_Y = -16;
+    private static final int PIXEL_FRAME = 16;
 	
 	protected static final Log log = PlatformUtil.getLog(MapPanel.class);
 	public static final int divNonLoadedImage = 16;
@@ -251,8 +252,13 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 	private NativeSwingRendering nativeLibRendering;
 	private NativeRendererRunnable lastAddedRunnable;
 	private Image nativeRenderingImg;
-	private LatLon nativeLatLon;
-	private int nativeZoom;
+
+	private Rect nativeRect;
+    private class Rect {
+        int left31;
+        int top31;
+        int nativeZoom;
+    }
 	
 	private ThreadPoolExecutor nativeRenderer = new ThreadPoolExecutor(1, 1, 30, TimeUnit.SECONDS, 
 			new ArrayBlockingQueue<Runnable>(1));
@@ -376,11 +382,11 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 	protected void paintComponent(Graphics g) {
 		if(nativeLibRendering != null) {
 			// TODO : 1. zoom scale 2. extend margin (these are center positions)
-			if (zoom == nativeZoom) {
-				int shx = (int) ((-MapUtils.getTileNumberX(zoom, longitude) + MapUtils.getTileNumberX(zoom, nativeLatLon.getLongitude())) * getTileSize());
-				int shy = (int) ((-MapUtils.getTileNumberY(zoom, latitude) + MapUtils.getTileNumberY(zoom, nativeLatLon.getLatitude())) * getTileSize());
-				shx -= EXPAND_X;
-				shy -= EXPAND_Y;
+			if (nativeRect != null && zoom == nativeRect.nativeZoom) {
+                double xTileLeft = getXTile() - getWidth() / (2.0d * getTileSize());
+                double yTileUp = getYTile() - getHeight() / (2.0d * getTileSize());
+				int shx = (int) (-xTileLeft * getTileSize()+ ((float)nativeRect.left31)/ (1 <<(31 - zoom - 8))) ;
+				int shy = (int) (-yTileUp * getTileSize() + ((float)nativeRect.top31) / (1 << (31 - zoom - 8)))  ;
 				g.drawImage(nativeRenderingImg, shx, shy, this);
 			}
 		} else if (images != null) {
@@ -897,26 +903,47 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 		private int sright;
 		private int stop;
 		private int sbottom;
+        private int oleft;
+        private int oright;
+        private int otop;
+        private int obottom;
 		private int z;
-		private LatLon latLon;
 		private final int cf;
 
 		public NativeRendererRunnable(int w, int h) {
 			int tileSize = getTileSize();
-			latLon = new LatLon(latitude, longitude);
+            LatLon latLon = new LatLon(latitude, longitude);
 			this.z = zoom;
 			cf = (1 << (31 - z)) / tileSize;
-			sleft = MapUtils.get31TileNumberX(latLon.getLongitude()) - (w / 2) * cf; 
-			sright = MapUtils.get31TileNumberX(latLon.getLongitude()) + (w / 2) * cf;
-			stop = MapUtils.get31TileNumberY(latLon.getLatitude()) - (h / 2) * cf;
-			sbottom = MapUtils.get31TileNumberY(latLon.getLatitude()) + (h / 2) * cf;
+            int minTile =  1;//1000;
+            int mxTile = (1 << 31) - 1;// (1<<26);
+            oleft = MapUtils.get31TileNumberX(latLon.getLongitude()) - (w / 2) * cf  ;
+            oright = MapUtils.get31TileNumberX(latLon.getLongitude()) + (w / 2) * cf ;
+            otop = MapUtils.get31TileNumberY(latLon.getLatitude()) - (h / 2) * cf;
+            obottom = MapUtils.get31TileNumberY(latLon.getLatitude()) + (h / 2) * cf ;
+			sleft = oleft - EXPAND_X * cf;
+			sright = oright + EXPAND_X * cf;
+			stop = otop - EXPAND_Y * cf;
+			sbottom = obottom + EXPAND_Y * cf;
+            if(sleft < minTile) {
+                sleft = minTile;
+            }
+            if(sright > mxTile) {
+                sright = mxTile;
+            }
+            if(stop < minTile) {
+                stop = minTile;
+            }
+            if(sbottom > mxTile) {
+                sbottom = mxTile;
+            }
 		}
 		
 		public boolean contains(NativeRendererRunnable r) {
-			if(r.sright > sright + EXPAND_X * cf || 
-					r.sleft < sleft - EXPAND_X * cf || 
-				r.stop < stop - EXPAND_Y * cf || 
-				r.sbottom > sbottom + EXPAND_Y * cf) {
+			if(r.oright > sright ||
+					r.oleft < sleft ||
+				r.otop < stop ||
+				r.obottom > sbottom ) {
 				return false;
 			}
 			if(r.z != z){
@@ -931,10 +958,13 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 		public void run() {
 			if (nativeRenderer.getQueue().isEmpty()) {
 				try {
-					nativeRenderingImg = nativeLibRendering.renderImage(sleft - EXPAND_X * cf, 
-							sright + EXPAND_X * cf, stop - EXPAND_Y * cf, sbottom + EXPAND_Y * cf, z);
-					nativeLatLon = latLon;
-					nativeZoom = z;
+					nativeRenderingImg = nativeLibRendering.renderImage(sleft,
+							sright , stop , sbottom , z);
+                    Rect rect = new Rect();
+                    rect.left31 = sleft;
+                    rect.top31 = stop;
+                    rect.nativeZoom = z;
+                    nativeRect = rect;
 				} catch (Exception e) {
 					log.error(e.getMessage(), e);
 					e.printStackTrace();

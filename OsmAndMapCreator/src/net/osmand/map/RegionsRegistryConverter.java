@@ -43,12 +43,13 @@ import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 
 public class RegionsRegistryConverter {
-	static String COUNTRIES_FILE = "../../resources/countries-info/countries.xml";
-	static String COUNTRIES_OPT_FILE = "../../resources/countries-info/opt-countries.xml";
-	static String OUTPUT_BINARY_FILE = "../../resources/countries-info/"+RegionRegistry.fileName;
+    static String REPO_PATH = "./"; //"../../"  ;
+	static String COUNTRIES_FILE = "resources/countries-info/countries.xml";
+	static String COUNTRIES_OPT_FILE = "resources/countries-info/opt-countries.xml";
+	static String OUTPUT_BINARY_FILE = "resources/countries-info/"+RegionRegistry.fileName;
 	
 	public static List<RegionCountry> parseRegions(boolean withNoValidated) throws IllegalStateException, FileNotFoundException {
-		InputStream is = new FileInputStream(COUNTRIES_FILE);
+		InputStream is = new FileInputStream(REPO_PATH+COUNTRIES_FILE);
 		try {
 			SAXParser parser = SAXParserFactory.newInstance().newSAXParser();
 			RegionsHandler h = new RegionsHandler(parser, withNoValidated);
@@ -65,7 +66,7 @@ public class RegionsRegistryConverter {
 	
 	public static void main(String[] args) throws Exception {
 		validate(true);
-		optimizeBoxes();
+//		optimizeBoxes();
 		List<RegionCountry> countries = recreateReginfo();
 		checkFileRead(countries);
 		
@@ -76,7 +77,7 @@ public class RegionsRegistryConverter {
 	
 	public static void validate(boolean overwrite) throws SAXException, IOException, ParserConfigurationException, TransformerException {
 		List<RegionCountry> regCountries = parseRegions(true);
-		InputStream is = new FileInputStream(COUNTRIES_FILE);
+		InputStream is = new FileInputStream(REPO_PATH+COUNTRIES_FILE);
 		DocumentBuilder docbuilder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
 		Document doc = docbuilder.parse(is);
 		Map<String, Element> elements = new LinkedHashMap<String, Element>();
@@ -99,7 +100,7 @@ public class RegionsRegistryConverter {
 			TransformerFactory transformerFactory = TransformerFactory.newInstance();
 			Transformer transformer = transformerFactory.newTransformer();
 			DOMSource source = new DOMSource(doc);
-			StreamResult result = new StreamResult(new File(COUNTRIES_FILE));
+			StreamResult result = new StreamResult(new File(REPO_PATH+COUNTRIES_FILE));
 
 			// Output to console for testing
 			// StreamResult result = new StreamResult(System.out);
@@ -146,7 +147,7 @@ public class RegionsRegistryConverter {
 	
 	public static void makeFlat() throws SAXException, IOException, ParserConfigurationException, TransformerException {
 		List<RegionCountry> regCountries = parseRegions(true);
-		InputStream is = new FileInputStream(COUNTRIES_OPT_FILE);
+		InputStream is = new FileInputStream(REPO_PATH + COUNTRIES_OPT_FILE);
 		DocumentBuilder docbuilder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
 		Document doc = docbuilder.parse(is);
 		Map<String, Element> elements = new LinkedHashMap<String, Element>();
@@ -185,7 +186,7 @@ public class RegionsRegistryConverter {
 		TransformerFactory transformerFactory = TransformerFactory.newInstance();
 		Transformer transformer = transformerFactory.newTransformer();
 		DOMSource source = new DOMSource(doc);
-		StreamResult result = new StreamResult(new File(COUNTRIES_FILE));
+		StreamResult result = new StreamResult(new File(REPO_PATH + COUNTRIES_FILE));
  
 		// Output to console for testing
 //		 StreamResult result = new StreamResult(System.out);
@@ -196,7 +197,7 @@ public class RegionsRegistryConverter {
 
 	public static void optimizeBoxes() throws SAXException, IOException, ParserConfigurationException, TransformerException {
 		List<RegionCountry> regCountries = parseRegions(true);
-		InputStream is = new FileInputStream(COUNTRIES_FILE);
+		InputStream is = new FileInputStream(REPO_PATH + COUNTRIES_FILE);
 		DocumentBuilder docbuilder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
 		Document doc = docbuilder.parse(is);
 		Map<String, Element> elements = new LinkedHashMap<String, Element>();
@@ -218,7 +219,7 @@ public class RegionsRegistryConverter {
 		TransformerFactory transformerFactory = TransformerFactory.newInstance();
 		Transformer transformer = transformerFactory.newTransformer();
 		DOMSource source = new DOMSource(doc);
-		StreamResult result = new StreamResult(new File(COUNTRIES_OPT_FILE));
+		StreamResult result = new StreamResult(new File(REPO_PATH + COUNTRIES_OPT_FILE));
  
 		// Output to console for testing
 		// StreamResult result = new StreamResult(System.out);
@@ -267,7 +268,7 @@ public class RegionsRegistryConverter {
 		for (RegionCountry c : countries) {
 			regions.addRegions(c.convert());
 		}
-		FileOutputStream out = new FileOutputStream(OUTPUT_BINARY_FILE);
+		FileOutputStream out = new FileOutputStream(REPO_PATH + OUTPUT_BINARY_FILE);
 		OsmAndRegionInfo.newBuilder().setRegionInfo(regions).build().writeTo(out);
 		out.close();
 		return countries;
