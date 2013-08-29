@@ -154,7 +154,7 @@ public class BasemapProcessor {
 		quadTrees = new SimplisticQuadTree[mapZooms.getLevels().size()];
 		for (int i = 0; i < mapZooms.getLevels().size(); i++) {
 			MapZoomPair p = mapZooms.getLevels().get(i);
-			quadTrees[i] = constructTilesQuadTree(Math.min(p.getMaxZoom() - 1, 12));
+			quadTrees[i] = constructTilesQuadTree(12/*Math.min(p.getMaxZoom() - 1, 12)*/);
 		}
 	}
 	
@@ -379,21 +379,26 @@ public class BasemapProcessor {
 	public void processEntity(Entity e) {
 		if (e instanceof Way || e instanceof Node) {
 			for (int level = 0; level < mapZooms.getLevels().size(); level++) {
-				renderingTypes.encodeEntityWithType(e, mapZooms.getLevel(level).getMaxZoom(), typeUse, addtypeUse, namesUse, tempNameUse);
+                boolean mostDetailed = level == 0;
+                MapZoomPair zoomPair = mapZooms.getLevel(level);
+                int zoomToEncode = mostDetailed ? zoomPair.getMinZoom() + 1 : zoomPair.getMaxZoom() ;
+                if(mostDetailed && zoomPair.getMaxZoom() < 10 ) {
+                    throw new IllegalStateException("Zoom pair is not detailed " + zoomPair);
+                }
+				renderingTypes.encodeEntityWithType(e, zoomToEncode, typeUse, addtypeUse, namesUse, tempNameUse);
 				if (typeUse.isEmpty()) {
 					continue;
 				}
-				MapZoomPair zoomPair = mapZooms.getLevel(level);
 				if (e instanceof Way) {
 					if(((Way) e).getNodes().size() < 2){
 						continue;
 					}
 					if ("coastline".equals(e.getTag("natural")) || !Algorithms.isEmpty(e.getTag("admin_level"))) {
 						splitContinuousWay(((Way) e).getNodes(), typeUse.toArray(), !addtypeUse.isEmpty() ? addtypeUse.toArray() : null,
-								zoomPair, quadTrees[level]);
+								zoomPair, zoomToEncode, quadTrees[level]);
 					} else {
 						List<Node> ns = ((Way) e).getNodes();
-						int z = getViewZoom(zoomPair);
+						int z = getViewZoom(zoomPair.getMinZoom(), zoomToEncode);
 						int tilex = 0;
 						int tiley = 0;
 						boolean sameTile = false;
@@ -414,12 +419,12 @@ public class BasemapProcessor {
 							}
 						}
 						List<Node> res = new ArrayList<Node>();
-						OsmMapUtils.simplifyDouglasPeucker(ns, zoomPair.getMaxZoom() - 1 + 8 + zoomWaySmothness, 3, res);
+						OsmMapUtils.simplifyDouglasPeucker(ns, zoomToEncode - 1 + 8 + zoomWaySmothness, 3, res);
 						addSimplisticData(res, typeUse.toArray(), !addtypeUse.isEmpty() ? addtypeUse.toArray() : null, zoomPair,
 								quadTrees[level], z, tilex, tiley, namesUse.isEmpty() ? null : new LinkedHashMap<MapRulType, String>(namesUse));
 					}
 				} else {
-					int z = getViewZoom(zoomPair);
+					int z = getViewZoom(zoomPair.getMinZoom(), zoomToEncode);
 					int tilex = (int) MapUtils.getTileNumberX(z, ((Node) e).getLongitude());
 					int tiley = (int) MapUtils.getTileNumberY(z, ((Node) e).getLatitude());
 					addSimplisticData(Collections.singletonList((Node)e), typeUse.toArray(), !addtypeUse.isEmpty() ? addtypeUse.toArray() : null, zoomPair,
@@ -430,8 +435,8 @@ public class BasemapProcessor {
 		}
 	}
 	
-	public void splitContinuousWay(List<Node> ns, int[] types, int[] addTypes, MapZoomPair zoomPair, SimplisticQuadTree quadTree) {
-		int z = getViewZoom(zoomPair);
+	public void splitContinuousWay(List<Node> ns, int[] types, int[] addTypes, MapZoomPair zoomPair, int zoomToEncode, SimplisticQuadTree quadTree) {
+		int z = getViewZoom(zoomPair.getMinZoom(), zoomToEncode);
 		int i = 1;
 		Node prevNode = ns.get(0);
 		int px31 = MapUtils.get31TileNumberX(prevNode.getLongitude());
@@ -488,7 +493,7 @@ public class BasemapProcessor {
 				}
 			}
 			List<Node> res = new ArrayList<Node>();
-			OsmMapUtils.simplifyDouglasPeucker(w, zoomPair.getMaxZoom() - 1 + 8 + zoomWaySmothness, 3, res);
+			OsmMapUtils.simplifyDouglasPeucker(w, zoomToEncode - 1 + 8 + zoomWaySmothness, 3, res);
 			addSimplisticData(res, types, addTypes, zoomPair, quadTree, z, tilex, tiley, null);
 		}
 	}
@@ -527,8 +532,8 @@ public class BasemapProcessor {
 		quad.addQuadData(zoomPair, data);
 	}
 
-	private int getViewZoom(MapZoomPair zoomPair) {
-		return Math.min((zoomPair.getMinZoom() + zoomPair.getMaxZoom()) / 2 - 1, zoomPair.getMinZoom() + 1);
+	private int getViewZoom(int minZoom, int maxZoom) {
+        return Math.min((minZoom + maxZoom) / 2 - 1, minZoom + 1);
 	}
 
 
@@ -541,7 +546,7 @@ public class BasemapProcessor {
         MapZooms zooms = MapZooms.parseZooms("1-2;3;4-5;6-7;8-9;10-");
         IndexCreator creator = new IndexCreator(folder); //$NON-NLS-1$
         creator.setIndexMap(true);
-        creator.setZoomWaySmothness(1);
+        creator.setZoomWaySmothness(2);
         creator.setMapFileName("World_basemap_2.obf");
         ArrayList<File> src = new ArrayList<File>();
         for(File f : folder.listFiles()) {
