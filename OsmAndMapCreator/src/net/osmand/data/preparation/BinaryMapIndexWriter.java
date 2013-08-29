@@ -82,6 +82,7 @@ public class BinaryMapIndexWriter {
 	private RandomAccessFile raf;
 	private CodedOutputStream codedOutStream;
 	protected static final int SHIFT_COORDINATES = BinaryMapIndexReader.SHIFT_COORDINATES;
+    public int MASK_TO_READ = ~((1 << SHIFT_COORDINATES) - 1);
 	private static final int ROUTE_SHIFT_COORDINATES = 4;
 	private static Log log = LogFactory.getLog(BinaryMapIndexWriter.class);
 
@@ -433,6 +434,9 @@ public class BinaryMapIndexWriter {
 		preserveInt32Size();
 		long fp = getFilePointer();
 
+        // align with borders with grid
+        leftX &= MASK_TO_READ;
+        topY &= MASK_TO_READ;
 		Bounds bounds = stackBounds.peek();
 		codedOutStream.writeSInt32(MapDataBox.LEFT_FIELD_NUMBER, leftX - bounds.leftX);
 		codedOutStream.writeSInt32(MapDataBox.RIGHT_FIELD_NUMBER, rightX - bounds.rightX);

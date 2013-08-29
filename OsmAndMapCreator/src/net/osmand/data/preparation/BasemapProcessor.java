@@ -541,7 +541,7 @@ public class BasemapProcessor {
         MapZooms zooms = MapZooms.parseZooms("1-2;3;4-5;6-7;8-9;10-");
         IndexCreator creator = new IndexCreator(folder); //$NON-NLS-1$
         creator.setIndexMap(true);
-        creator.setZoomWaySmothness(2);
+        creator.setZoomWaySmothness(1);
         creator.setMapFileName("World_basemap_2.obf");
         ArrayList<File> src = new ArrayList<File>();
         for(File f : folder.listFiles()) {
