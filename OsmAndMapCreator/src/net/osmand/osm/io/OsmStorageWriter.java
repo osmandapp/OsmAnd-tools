@@ -65,9 +65,9 @@ public class OsmStorageWriter {
                 XMLOutputFactory xof = XMLOutputFactory.newInstance();
                 XMLStreamWriter streamWriter = xof.createXMLStreamWriter(new OutputStreamWriter(output));
  
-		List<Node> nodes = new ArrayList<Node>();
-		List<Way> ways = new ArrayList<Way>();
-		List<Relation> relations = new ArrayList<Relation>();
+		Set<Node> nodes = new LinkedHashSet<Node>();
+		Set<Way> ways = new LinkedHashSet<Way>();
+		Set<Relation> relations = new LinkedHashSet<Relation>();
 		if(interestedObjects == null){
 			interestedObjects = entities.keySet();
 		}
