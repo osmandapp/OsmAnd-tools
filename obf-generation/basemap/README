@@ -1,20 +1,22 @@
-1. Find and install perl Geo-ShapeFile-2.52 
-  cd Geo-ShapeFile-2.52/
-  sudo perl Makefile.PL 
-  make
-  make test
-USE smothness = 2
+1. Find and install Geo::ShapeFile, HTML::Entities for Perl.
+   Using perl CPAN:
+       sudo perl -MCPAN -e 'install HTML::Entities'
+       sudo perl -MCPAN -e 'install Geo::ShapeFile'
+   or do it manually according to packages READMEs
+   //? USE smothness = 2
 
-I. Make all 5  files
+I. Make all 5 files
 II. Merge them
 III. Run Index Creator
 
 I
 -------------
 Coastlines
-1. Locate and run shp2osm.pl.
-Example (replacing tags): perl ./shp2osm.pl 10m-coastline/10m_coastline.shp | sed 's/FeatureCla/natural/g;s/Coastline/coastline/g' > 10m_coastline.osm 
-2. Fix manually all 180 degrees breaks (simply divide islands into 2 islands and add connect line on 180 degree) and make Antarctica cycled.
+1. Download ne_10m_coastline.zip from http://www.naturalearthdata.com/downloads/10m-physical-vectors/10m-coastline/
+2. Unzip it
+3. Locate and run 'shp2osm.pl' script as should below:
+   perl ./shp2osm.pl ./ne_10m_coastline.shp | sed 's/FeatureCla/natural/g;s/Coastline/coastline/g' > ./ne_10m_coastline.osm 
+4. Fix manually all 180 degrees breaks (simply divide islands into 2 islands and add connect line on 180 degree) and make Antarctica cycled.
 3. Run net.osmand.osm.util.FixLinkedCoastline from DataExtractionosm.jar with arg0=filename.
 - Open JOSM -
 4. !Fix manually Caspey Sea !
