@@ -68,9 +68,8 @@ public class BasemapProcessor {
 		int zoom;
 		int x;
 		int y;
-		boolean ocean;
-		boolean land;
-		
+		int landCharacteristic;
+
 		public SimplisticQuadTree(int x, int y, int zoom) {
 			this.x = x;
 			this.y = y;
@@ -221,6 +220,38 @@ public class BasemapProcessor {
 			return true;
 		}
 	}
+
+    // get isLand returns > 0 for land and < 0 for water
+    public int getLandTile(int x, int y, int zoom) {
+        if (zoom >= TILE_ZOOMLEVEL) {
+            int x1 = x >> (zoom - TILE_ZOOMLEVEL);
+            int y1 = y >> (zoom - TILE_ZOOMLEVEL);
+            if (landTileInfo.get(y1 * 4096 + x1)) {
+                return 1;
+            }
+            if (seaTileInfo.get(y1 * 4096 + x1)) {
+                return -1;
+            }
+            return 0;
+        } else {
+            int x1 = x << (TILE_ZOOMLEVEL - zoom);
+            int y1 = y << (TILE_ZOOMLEVEL - zoom);
+            int max = 1 << (TILE_ZOOMLEVEL - zoom);
+            int c = 0;
+            for (int i = 0; i < max; i++) {
+                for (int j = 0; j < max; j++) {
+                    if (landTileInfo.get((y1 + i) * 4096 + (x1 + j))) {
+                        c++;
+                    }
+                    if (seaTileInfo.get((y1 + i) * 4096 + (x1 + j))) {
+                        c--;
+                    }
+
+                }
+            }
+            return c;
+        }
+    }
 	
 	public boolean isLandTile(int x, int y, int zoom) {
 		if (zoom >= TILE_ZOOMLEVEL) {
@@ -269,13 +300,10 @@ public class BasemapProcessor {
 			for (SimplisticQuadTree subtree : toVisit) {
 				int x = subtree.x;
 				int y = subtree.y;
-				if (isWaterTile(x, y, zoom)) {
-					rootTree.getOrCreateSubTree(x, y, zoom).ocean = true;
-				} else if (isLandTile(x, y, zoom)) {
-					rootTree.getOrCreateSubTree(x, y, zoom).land = true;
-				} else if(zoom < TILE_ZOOMLEVEL){
-					SimplisticQuadTree[] vis = rootTree.getOrCreateSubTree(x, y, zoom).getOrCreateSubTree(x, y, zoom)
-							.getAllChildren();
+                SimplisticQuadTree st= rootTree.getOrCreateSubTree(x, y, zoom);
+                st.landCharacteristic = getLandTile(x, y, zoom);
+				if(zoom < TILE_ZOOMLEVEL){
+					SimplisticQuadTree[] vis = st.getAllChildren();
                     Collections.addAll(newToVisit, vis);
 				}
 			}
@@ -356,11 +384,7 @@ public class BasemapProcessor {
 		boolean defined = quadTree.dataIsDefined(p);
 		boolean ocean = false;
 		boolean land = false;
-		if (!defined) {
-			ocean = quadTree.ocean ||  isWaterTile(quadTree.x, quadTree.y, quadTree.zoom);
-			land = quadTree.land || isLandTile(quadTree.x, quadTree.y, quadTree.zoom);
-		}
-		BinaryFileReference ref = writer.startMapTreeElement(xL, xR, yT, yB, defined, ocean, land);
+		BinaryFileReference ref = writer.startMapTreeElement(xL, xR, yT, yB, defined, quadTree.landCharacteristic);
 		if (ref != null) {
 			refs.put(quadTree, ref);
 		}
