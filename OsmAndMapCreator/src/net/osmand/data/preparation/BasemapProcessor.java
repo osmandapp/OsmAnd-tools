@@ -393,6 +393,11 @@ public class BasemapProcessor {
 					if(((Way) e).getNodes().size() < 2){
 						continue;
 					}
+                    if(((Way) e).getFirstNodeId() == ((Way) e).getLastNodeId() && !mostDetailed) {
+                        if(OsmMapUtils.polygonAreaPixels(((Way) e).getNodes(), zoomToEncode) < 24) {
+                            continue;
+                        }
+                    }
 					if ("coastline".equals(e.getTag("natural")) || !Algorithms.isEmpty(e.getTag("admin_level"))) {
 						splitContinuousWay(((Way) e).getNodes(), typeUse.toArray(), !addtypeUse.isEmpty() ? addtypeUse.toArray() : null,
 								zoomPair, zoomToEncode, quadTrees[level]);
@@ -539,7 +544,6 @@ public class BasemapProcessor {
 
     public static void main(String[] p) throws InterruptedException, SAXException, SQLException, IOException {
         long time = System.currentTimeMillis();
-
         MapRenderingTypesEncoder rt = MapRenderingTypesEncoder.getDefault();
          // BASEMAP generation
         File folder = new File(p[0]);
