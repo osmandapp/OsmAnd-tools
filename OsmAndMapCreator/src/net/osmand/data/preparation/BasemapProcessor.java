@@ -583,14 +583,14 @@ public class BasemapProcessor {
                 src.toArray(new File[src.size()])
         );
 
-
-        /*fixOceanTiles(new FixTileData() {
+       /* fixOceanTiles(new FixTileData() {
             int c = 0;
             @Override
             public int compareTileData(int x, int y, int z, int origValue) {
                 int sh = z - 5;
                 int ty = y >> sh;
-                if(ty >= 27) {
+                int tx = x >> sh;
+                if(ty == 31 && tx == 2) {
                     if(origValue == SEA) {
                         c++;
                         System.out.println(c + ". " + ty + " " + y + " " + x);
@@ -599,8 +599,8 @@ public class BasemapProcessor {
                 }
                 return 0;
             }
-        }, true);*/
-
+        }, false);
+*/
     }
 
     private static int getTileX(int i) {
