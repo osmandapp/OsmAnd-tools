@@ -65,7 +65,7 @@ public class BasemapProcessor {
         int zoom;
         int x;
         int y;
-        int landCharacteristic;
+        float seaCharacteristic;
 
         public SimplisticQuadTree(int x, int y, int zoom) {
             this.x = x;
@@ -140,6 +140,12 @@ public class BasemapProcessor {
         public Map<MapRulType, String> names;
     }
 
+    private BasemapProcessor() {
+        logMapDataWarn = null;
+        zoomWaySmothness = 0;
+        renderingTypes = null;
+        mapZooms = null;
+    }
 
     public BasemapProcessor(Log logMapDataWarn, MapZooms mapZooms, MapRenderingTypesEncoder renderingTypes, int zoomWaySmothness) {
         this.logMapDataWarn = logMapDataWarn;
@@ -219,15 +225,15 @@ public class BasemapProcessor {
     }
 
     // get isLand returns > 0 for land and < 0 for water
-    public int getLandTile(int x, int y, int zoom) {
+    public float getSeaTile(int x, int y, int zoom) {
         if (zoom >= TILE_ZOOMLEVEL) {
             int x1 = x >> (zoom - TILE_ZOOMLEVEL);
             int y1 = y >> (zoom - TILE_ZOOMLEVEL);
-            if (landTileInfo.get(y1 * 4096 + x1)) {
-                return 1;
-            }
+//            if (landTileInfo.get(y1 * 4096 + x1)) {
+//                return 1;
+//            }
             if (seaTileInfo.get(y1 * 4096 + x1)) {
-                return -1;
+                return 1;
             }
             return 0;
         } else {
@@ -237,16 +243,17 @@ public class BasemapProcessor {
             int c = 0;
             for (int i = 0; i < max; i++) {
                 for (int j = 0; j < max; j++) {
-                    if (landTileInfo.get((y1 + i) * 4096 + (x1 + j))) {
-                        c++;
-                    }
+//                    if (landTileInfo.get((y1 + i) * 4096 + (x1 + j))) {
+//                        c++;
+//                    }
                     if (seaTileInfo.get((y1 + i) * 4096 + (x1 + j))) {
-                        c--;
+                        c++;
                     }
 
                 }
             }
-            return c;
+
+            return ((float)c) / ((float) max * (float) max);
         }
     }
 
@@ -298,7 +305,7 @@ public class BasemapProcessor {
                 int x = subtree.x;
                 int y = subtree.y;
                 SimplisticQuadTree st = rootTree.getOrCreateSubTree(x, y, zoom);
-                st.landCharacteristic = getLandTile(x, y, zoom);
+                st.seaCharacteristic = getSeaTile(x, y, zoom);
                 if (zoom < maxZoom && !isWaterTile(x, y, zoom) && !isLandTile(x, y, zoom)) {
                     SimplisticQuadTree[] vis = st.getAllChildren();
                     Collections.addAll(newToVisit, vis);
@@ -380,7 +387,7 @@ public class BasemapProcessor {
         boolean defined = quadTree.dataIsDefined(p);
         boolean ocean = false;
         boolean land = false;
-        BinaryFileReference ref = writer.startMapTreeElement(xL, xR, yT, yB, defined, quadTree.landCharacteristic);
+        BinaryFileReference ref = writer.startMapTreeElement(xL, xR, yT, yB, defined, quadTree.seaCharacteristic > 0.8 ? -1 : 1);
         if (ref != null) {
             refs.put(quadTree, ref);
         }
@@ -583,6 +590,11 @@ public class BasemapProcessor {
                 src.toArray(new File[src.size()])
         );
 
+//        BasemapProcessor bmp = new BasemapProcessor();
+//        bmp.constructBitSetInfo();;
+//        SimplisticQuadTree quadTree = bmp.constructTilesQuadTree(5);
+//        SimplisticQuadTree ts = quadTree.getOrCreateSubTree(7, 126, 7);
+//        System.out.println(ts.seaCharacteristic);
        /* fixOceanTiles(new FixTileData() {
             int c = 0;
             @Override
