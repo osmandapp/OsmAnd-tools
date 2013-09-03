@@ -153,7 +153,7 @@ public class BasemapProcessor {
 		quadTrees = new SimplisticQuadTree[mapZooms.getLevels().size()];
 		for (int i = 0; i < mapZooms.getLevels().size(); i++) {
 			MapZoomPair p = mapZooms.getLevels().get(i);
-			quadTrees[i] = constructTilesQuadTree(Math.min(p.getMaxZoom() - 1, 11));
+			quadTrees[i] = constructTilesQuadTree(Math.min(p.getMaxZoom(), 11));
 		}
 	}
 	
