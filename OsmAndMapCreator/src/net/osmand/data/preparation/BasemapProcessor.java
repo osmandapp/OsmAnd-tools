@@ -300,11 +300,11 @@ public class BasemapProcessor {
 			for (SimplisticQuadTree subtree : toVisit) {
 				int x = subtree.x;
 				int y = subtree.y;
-                SimplisticQuadTree st= rootTree.getOrCreateSubTree(x, y, zoom);
-                st.landCharacteristic = getLandTile(x, y, zoom);
-				if(zoom < TILE_ZOOMLEVEL){
+                		SimplisticQuadTree st= rootTree.getOrCreateSubTree(x, y, zoom);
+                		st.landCharacteristic = getLandTile(x, y, zoom);
+				if(zoom < maxZoom && !isWaterTile(x, y, zoom) && !isLandTile(x, y, zoom)){
 					SimplisticQuadTree[] vis = st.getAllChildren();
-                    Collections.addAll(newToVisit, vis);
+                    			Collections.addAll(newToVisit, vis);
 				}
 			}
 			toVisit = newToVisit;
