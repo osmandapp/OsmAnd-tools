@@ -571,38 +571,42 @@ public class BasemapProcessor {
 
 
     public static void main(String[] p) throws InterruptedException, SAXException, SQLException, IOException {
-        long time = System.currentTimeMillis();
-        MapRenderingTypesEncoder rt = MapRenderingTypesEncoder.getDefault();
-         // BASEMAP generation
-        File folder = new File(p[0]);
-        MapZooms zooms = MapZooms.parseZooms("1-2;3;4-5;6-7;8-9;10-");
-        IndexCreator creator = new IndexCreator(folder); //$NON-NLS-1$
-        creator.setIndexMap(true);
-        creator.setZoomWaySmothness(2);
-        creator.setMapFileName("World_basemap_2.obf");
-        ArrayList<File> src = new ArrayList<File>();
-        for(File f : folder.listFiles()) {
-            if(f.getName().endsWith(".osm") || f.getName().endsWith(".osm.bz2")) {
-                src.add(f);
+        if (true) {
+            long time = System.currentTimeMillis();
+            MapRenderingTypesEncoder rt = MapRenderingTypesEncoder.getDefault();
+            // BASEMAP generation
+            File folder = new File(p[0]);
+            MapZooms zooms = MapZooms.parseZooms("1-2;3;4-5;6-7;8-9;10-");
+            IndexCreator creator = new IndexCreator(folder); //$NON-NLS-1$
+            creator.setIndexMap(true);
+            creator.setZoomWaySmothness(2);
+            creator.setMapFileName("World_basemap_2.obf");
+            ArrayList<File> src = new ArrayList<File>();
+            for (File f : folder.listFiles()) {
+                if (f.getName().endsWith(".osm") || f.getName().endsWith(".osm.bz2")) {
+                    src.add(f);
+                }
             }
+            creator.generateBasemapIndex(new ConsoleProgressImplementation(1), null, zooms, rt, log, "basemap",
+                    src.toArray(new File[src.size()])
+            );
         }
-        creator.generateBasemapIndex(new ConsoleProgressImplementation(1), null, zooms, rt, log, "basemap",
-                src.toArray(new File[src.size()])
-        );
 
-//        BasemapProcessor bmp = new BasemapProcessor();
-//        bmp.constructBitSetInfo();;
-//        SimplisticQuadTree quadTree = bmp.constructTilesQuadTree(5);
-//        SimplisticQuadTree ts = quadTree.getOrCreateSubTree(7, 126, 7);
-//        System.out.println(ts.seaCharacteristic);
-       /* fixOceanTiles(new FixTileData() {
+   /*     BasemapProcessor bmp = new BasemapProcessor();
+        bmp.constructBitSetInfo();
+        SimplisticQuadTree quadTree = bmp.constructTilesQuadTree(7);
+        SimplisticQuadTree ts = quadTree.getOrCreateSubTree(9, 123, 7);
+        System.out.println(ts.seaCharacteristic);
+        fixOceanTiles(new FixTileData() {
             int c = 0;
             @Override
             public int compareTileData(int x, int y, int z, int origValue) {
-                int sh = z - 5;
+                int sh = z - 7;
                 int ty = y >> sh;
                 int tx = x >> sh;
-                if(ty == 31 && tx == 2) {
+                if((ty == 123 && tx == 9)
+                        || (ty == 121 && tx == 9)
+                        ) {
                     if(origValue == SEA) {
                         c++;
                         System.out.println(c + ". " + ty + " " + y + " " + x);
@@ -611,8 +615,7 @@ public class BasemapProcessor {
                 }
                 return 0;
             }
-        }, false);
-*/
+        }, false);*/
     }
 
     private static int getTileX(int i) {
