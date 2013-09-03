@@ -385,8 +385,6 @@ public class BasemapProcessor {
         int yT = (quadTree.y) << (31 - quadTree.zoom);
         int yB = ((quadTree.y + 1) << (31 - quadTree.zoom)) - 1;
         boolean defined = quadTree.dataIsDefined(p);
-        boolean ocean = false;
-        boolean land = false;
         BinaryFileReference ref = writer.startMapTreeElement(xL, xR, yT, yB, defined, quadTree.seaCharacteristic > 0.5 ? -1 : 1);
         if (ref != null) {
             refs.put(quadTree, ref);
@@ -571,7 +569,9 @@ public class BasemapProcessor {
 
 
     public static void main(String[] p) throws InterruptedException, SAXException, SQLException, IOException {
-        if (true) {
+        if (p.length == 0) {
+            System.out.println("Please specify folder with basemap *.osm or *.osm.bz2 files");
+        } else {
             long time = System.currentTimeMillis();
             MapRenderingTypesEncoder rt = MapRenderingTypesEncoder.getDefault();
             // BASEMAP generation
@@ -592,12 +592,12 @@ public class BasemapProcessor {
             );
         }
 
-   /*     BasemapProcessor bmp = new BasemapProcessor();
+     /*     BasemapProcessor bmp = new BasemapProcessor();
         bmp.constructBitSetInfo();
-        SimplisticQuadTree quadTree = bmp.constructTilesQuadTree(7);
-        SimplisticQuadTree ts = quadTree.getOrCreateSubTree(9, 123, 7);
+        SimplisticQuadTree quadTree = bmp.constructTilesQuadTree(5);
+        SimplisticQuadTree ts = quadTree.getOrCreateSubTree(4, 11, 4);
         System.out.println(ts.seaCharacteristic);
-        fixOceanTiles(new FixTileData() {
+      fixOceanTiles(new FixTileData() {
             int c = 0;
             @Override
             public int compareTileData(int x, int y, int z, int origValue) {
