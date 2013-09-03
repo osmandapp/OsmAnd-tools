@@ -387,7 +387,7 @@ public class BasemapProcessor {
         boolean defined = quadTree.dataIsDefined(p);
         boolean ocean = false;
         boolean land = false;
-        BinaryFileReference ref = writer.startMapTreeElement(xL, xR, yT, yB, defined, quadTree.seaCharacteristic > 0.8 ? -1 : 1);
+        BinaryFileReference ref = writer.startMapTreeElement(xL, xR, yT, yB, defined, quadTree.seaCharacteristic > 0.5 ? -1 : 1);
         if (ref != null) {
             refs.put(quadTree, ref);
         }
