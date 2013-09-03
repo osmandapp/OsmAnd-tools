@@ -280,7 +280,7 @@ public class BasemapProcessor {
 		SimplisticQuadTree rootTree = new SimplisticQuadTree(0, 0, 0);
 
 		
-		int baseZoom = 4;
+		int baseZoom = 2;
 		int tiles = 1 << baseZoom;
 		ArrayList<SimplisticQuadTree> toVisit = new ArrayList<SimplisticQuadTree>();
 		for (int x = 0; x < tiles; x++) {
