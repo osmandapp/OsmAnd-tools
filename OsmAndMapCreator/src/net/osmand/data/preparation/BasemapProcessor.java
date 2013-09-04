@@ -602,9 +602,9 @@ public class BasemapProcessor {
 //        System.out.println(ts.seaCharacteristic);
 //        ts = quadTree.getOrCreateSubTree(45, 112, 7);
 
-        createJOSMFile();
-
-        runFixOceanTiles();
+//        createJOSMFile();
+//
+//        runFixOceanTiles();
     }
 
     private static void runFixOceanTiles() throws IOException {
