@@ -351,8 +351,8 @@ public class BasemapProcessor {
             MapDataBlock.Builder dataBlock = MapDataBlock.newBuilder();
             SimplisticQuadTree quad = e.getKey();
             Map<String, Integer> stringTable = new LinkedHashMap<String, Integer>();
+            dataBlock.setBaseId(0);
             for (SimplisticBinaryData w : quad.getData(level)) {
-                dataBlock.setBaseId(w.id);
                 int[] wts = null;
                 int[] wats = null;
                 if (w.types != null) {
@@ -367,7 +367,7 @@ public class BasemapProcessor {
                         wats[j] = renderingTypes.getTypeByInternalId(w.addTypes[j]).getTargetId();
                     }
                 }
-                MapData mapData = writer.writeMapData(0,
+                MapData mapData = writer.writeMapData(w.id,
                         quad.x << (31 - quad.zoom), quad.y << (31 - quad.zoom), false,
                         w.coordinates, null, wts, wats, w.names, stringTable, dataBlock, level.getMaxZoom() > 15);
                 if (mapData != null) {
