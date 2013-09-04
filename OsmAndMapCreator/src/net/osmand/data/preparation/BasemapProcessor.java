@@ -131,6 +131,7 @@ public class BasemapProcessor {
         }
     }
 
+
     private static class SimplisticBinaryData {
         // consequent 31 coordinates
         public byte[] coordinates;
@@ -403,6 +404,7 @@ public class BasemapProcessor {
 
     public void processEntity(Entity e) {
         if (e instanceof Way || e instanceof Node) {
+            long id = - Math.abs(e.getId());
             for (int level = 0; level < mapZooms.getLevels().size(); level++) {
                 boolean mostDetailed = level == 0;
                 MapZoomPair zoomPair = mapZooms.getLevel(level);
@@ -424,8 +426,9 @@ public class BasemapProcessor {
                         }
                     }
                     if ("coastline".equals(e.getTag("natural")) || !Algorithms.isEmpty(e.getTag("admin_level"))) {
-                        splitContinuousWay(((Way) e).getNodes(), typeUse.toArray(), !addtypeUse.isEmpty() ? addtypeUse.toArray() : null,
-                                zoomPair, zoomToEncode, quadTrees[level]);
+                        splitContinuousWay(((Way) e).getNodes(), typeUse.toArray(),
+                                !addtypeUse.isEmpty() ? addtypeUse.toArray() : null,
+                                zoomPair, zoomToEncode, quadTrees[level], id);
                     } else {
                         List<Node> ns = ((Way) e).getNodes();
                         int z = getViewZoom(zoomPair.getMinZoom(), zoomToEncode);
@@ -451,21 +454,22 @@ public class BasemapProcessor {
                         List<Node> res = new ArrayList<Node>();
                         OsmMapUtils.simplifyDouglasPeucker(ns, zoomToEncode - 1 + 8 + zoomWaySmothness, 3, res);
                         addSimplisticData(res, typeUse.toArray(), !addtypeUse.isEmpty() ? addtypeUse.toArray() : null, zoomPair,
-                                quadTrees[level], z, tilex, tiley, namesUse.isEmpty() ? null : new LinkedHashMap<MapRulType, String>(namesUse));
+                                quadTrees[level], z, tilex, tiley, namesUse.isEmpty() ? null : new LinkedHashMap<MapRulType, String>(namesUse), id);
                     }
                 } else {
                     int z = getViewZoom(zoomPair.getMinZoom(), zoomToEncode);
                     int tilex = (int) MapUtils.getTileNumberX(z, ((Node) e).getLongitude());
                     int tiley = (int) MapUtils.getTileNumberY(z, ((Node) e).getLatitude());
                     addSimplisticData(Collections.singletonList((Node) e), typeUse.toArray(), !addtypeUse.isEmpty() ? addtypeUse.toArray() : null, zoomPair,
-                            quadTrees[level], z, tilex, tiley, namesUse.isEmpty() ? null : new LinkedHashMap<MapRulType, String>(namesUse));
+                            quadTrees[level], z, tilex, tiley, namesUse.isEmpty() ? null : new LinkedHashMap<MapRulType, String>(namesUse),id);
                 }
 
             }
         }
     }
 
-    public void splitContinuousWay(List<Node> ns, int[] types, int[] addTypes, MapZoomPair zoomPair, int zoomToEncode, SimplisticQuadTree quadTree) {
+    public void splitContinuousWay(List<Node> ns, int[] types, int[] addTypes, MapZoomPair zoomPair, int zoomToEncode,
+                                   SimplisticQuadTree quadTree, long id) {
         int z = getViewZoom(zoomPair.getMinZoom(), zoomToEncode);
         int i = 1;
         Node prevNode = ns.get(0);
@@ -525,12 +529,12 @@ public class BasemapProcessor {
             }
             List<Node> res = new ArrayList<Node>();
             OsmMapUtils.simplifyDouglasPeucker(w, zoomToEncode - 1 + 8 + zoomWaySmothness, 3, res);
-            addSimplisticData(res, types, addTypes, zoomPair, quadTree, z, tilex, tiley, null);
+            addSimplisticData(res, types, addTypes, zoomPair, quadTree, z, tilex, tiley, null, id);
         }
     }
 
     private void addSimplisticData(List<Node> res, int[] types, int[] addTypes, MapZoomPair zoomPair, SimplisticQuadTree quadTree, int z, int tilex,
-                                   int tiley, Map<MapRulType, String> names) {
+                                   int tiley, Map<MapRulType, String> names, long id) {
         SimplisticQuadTree quad = quadTree.getOrCreateSubTree(tilex, tiley, z);
         if (quad == null) {
             if (logMapDataWarn != null) {
@@ -555,7 +559,7 @@ public class BasemapProcessor {
         }
         SimplisticBinaryData data = new SimplisticBinaryData();
         // not needed
-        // data.id = w.getId();
+        data.id = id;
         data.coordinates = bcoordinates.toByteArray();
         data.types = types;
         data.addTypes = addTypes;
