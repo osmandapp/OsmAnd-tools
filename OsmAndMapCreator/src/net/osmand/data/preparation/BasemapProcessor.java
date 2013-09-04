@@ -595,23 +595,38 @@ public class BasemapProcessor {
                     src.toArray(new File[src.size()])
             );
         }
-
-      /* BasemapProcessor bmp = new BasemapProcessor();
+/*
+     BasemapProcessor bmp = new BasemapProcessor();
         bmp.constructBitSetInfo();
-        SimplisticQuadTree quadTree = bmp.constructTilesQuadTree(5);
-        SimplisticQuadTree ts = quadTree.getOrCreateSubTree(22, 55, 6);
+        SimplisticQuadTree quadTree = bmp.constructTilesQuadTree(7);
+        SimplisticQuadTree ts = quadTree.getOrCreateSubTree(43, 113, 7);
         System.out.println(ts.seaCharacteristic);
+        ts = quadTree.getOrCreateSubTree(44, 112, 7);
+        System.out.println(ts.seaCharacteristic);
+        ts = quadTree.getOrCreateSubTree(45, 111, 7);
+        System.out.println(ts.seaCharacteristic);
+        ts = quadTree.getOrCreateSubTree(39, 109, 7);
+        System.out.println(ts.seaCharacteristic);
+        ts = quadTree.getOrCreateSubTree(38, 108, 7);
+        System.out.println(ts.seaCharacteristic);
+        ts = quadTree.getOrCreateSubTree(39, 108, 7);
+        System.out.println(ts.seaCharacteristic);
+
         fixOceanTiles(new FixTileData() {
             int c = 0;
             @Override
             public int compareTileData(int x, int y, int z, int origValue) {
-                int sh = z - 6;
+                int sh = z - 7;
                 int ty = y >> sh;
                 int tx = x >> sh;
-                if((tx == 22 && ty == 55)
-                        || (tx == 22 && ty == 55)
+                if((tx == 39 && ty == 108)
+                        || (tx == 38 && ty == 108)
+                        || (tx == 39 && ty == 109)
+                        || (tx == 45 && ty == 111)
+                        || (tx == 44 && ty == 112)
+                        || (tx == 43 && ty == 113)
                         ) {
-                    if(origValue == LAND) {
+                    if(origValue != SEA) {
                         c++;
                         System.out.println(c + ". " + ty + " " + y + " " + x);
                         return SEA;
