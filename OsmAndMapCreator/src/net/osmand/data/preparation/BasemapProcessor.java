@@ -450,7 +450,7 @@ public class BasemapProcessor {
                             }
                         }
                         List<Node> res = new ArrayList<Node>();
-                        OsmMapUtils.simplifyDouglasPeucker(ns, zoomToEncode - 1 + 8 + zoomWaySmothness, 3, res);
+                        OsmMapUtils.simplifyDouglasPeucker(ns, zoomToEncode - 1 + 8 + zoomWaySmothness, 3, res, false);
                         addSimplisticData(res, typeUse.toArray(), !addtypeUse.isEmpty() ? addtypeUse.toArray() : null, zoomPair,
                                 quadTrees[level], z, tilex, tiley, namesUse.isEmpty() ? null : new LinkedHashMap<MapRulType, String>(namesUse), id);
                     }
@@ -526,7 +526,7 @@ public class BasemapProcessor {
                 }
             }
             List<Node> res = new ArrayList<Node>();
-            OsmMapUtils.simplifyDouglasPeucker(w, zoomToEncode - 1 + 8 + zoomWaySmothness, 3, res);
+            OsmMapUtils.simplifyDouglasPeucker(w, zoomToEncode - 1 + 8 + zoomWaySmothness, 3, res, true);
             addSimplisticData(res, types, addTypes, zoomPair, quadTree, z, tilex, tiley, null, id);
         }
     }
@@ -593,22 +593,22 @@ public class BasemapProcessor {
                     src.toArray(new File[src.size()])
             );
         }
-        /*BasemapProcessor bmp = new BasemapProcessor();
-        bmp.constructBitSetInfo();
-        SimplisticQuadTree quadTree = bmp.constructTilesQuadTree(7);
-        SimplisticQuadTree ts = quadTree.getOrCreateSubTree(43, 113, 7);
-        System.out.println(ts.seaCharacteristic);
-        ts = quadTree.getOrCreateSubTree(44, 113, 7);
-        System.out.println(ts.seaCharacteristic);
-        ts = quadTree.getOrCreateSubTree(45, 112, 7);
+//        BasemapProcessor bmp = new BasemapProcessor();
+//        bmp.constructBitSetInfo();
+//        SimplisticQuadTree quadTree = bmp.constructTilesQuadTree(7);
+//        SimplisticQuadTree ts = quadTree.getOrCreateSubTree(43, 113, 7);
+//        System.out.println(ts.seaCharacteristic);
+//        ts = quadTree.getOrCreateSubTree(44, 113, 7);
+//        System.out.println(ts.seaCharacteristic);
+//        ts = quadTree.getOrCreateSubTree(45, 112, 7);
 
         createJOSMFile();
 
-        runFixOceanTiles();*/
+        runFixOceanTiles();
     }
 
     private static void runFixOceanTiles() throws IOException {
-        int land[]  = new int[] {34,29, 20,35, 20,37,21,37, 10, 15, 10, 16, 10, 17, 10, 18, 11, 16, 11, 17,
+        final int land[]  = new int[] {34,29, 20,35, 20,37,21,37, 10, 15, 10, 16, 10, 17, 10, 18, 11, 16, 11, 17,
         11, 18, 11, 19, 11, 20, 12, 17, 12, 18, 12, 19, 12, 20, 13, 17, 13, 19, 13, 20, 13, 21, 14, 16,
         14, 17, 14, 19, 14, 20, 14, 21, 15, 20, 15, 21, 15, 22, 16, 21, 16, 22, 16, 23, 17, 22, 17, 23, 9, 16, 9, 19};
         fixOceanTiles(new FixTileData() {
@@ -627,13 +627,13 @@ public class BasemapProcessor {
                         return SEA;
                     }
                 }
-                if((tx == 21 && ty == 32)
-                        || (tx == 32 && ty == 44)
-                        ) {
-                    if(origValue != LAND) {
-                        c++;
-                        System.out.println("L "+c + ". " + ty + " " + y + " " + x);
-                        return LAND;
+                for(int i = 0; i < land.length; i+= 2) {
+                    if (land[i] == tx && land[i] == ty) {
+                        if (origValue != LAND) {
+                            c++;
+                            System.out.println("L " + c + ". " + ty + " " + y + " " + x);
+                            return LAND;
+                        }
                     }
                 }
                 return 0;
@@ -642,7 +642,7 @@ public class BasemapProcessor {
     }
 
     private static void createJOSMFile() throws XMLStreamException, IOException {
-        int z = 6;
+        int z = 7;
         BasemapProcessor bmp = new BasemapProcessor();
         bmp.constructBitSetInfo();
         SimplisticQuadTree quadTree = bmp.constructTilesQuadTree(z);

@@ -231,7 +231,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		}
 		List<Node> res = new ArrayList<Node>();
 		// simplification
-		OsmMapUtils.simplifyDouglasPeucker(ns, zoom + 8 + zoomWaySmothness, 3, res);
+		OsmMapUtils.simplifyDouglasPeucker(ns, zoom + 8 + zoomWaySmothness, 3, res, false);
 		if (res.size() < 2) {
 			return null;
 		}
@@ -382,7 +382,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			}
 			if (!skip) {
 				List<Node> res = new ArrayList<Node>();
-				OsmMapUtils.simplifyDouglasPeucker(wNodes, zoom - 1 + 8 + zoomWaySmothness, 3, res);
+				OsmMapUtils.simplifyDouglasPeucker(wNodes, zoom - 1 + 8 + zoomWaySmothness, 3, res, false);
 				if (res.size() > 0) {
 					namesUse.clear();
 					if (name != null && name.length() > 0) {
@@ -715,7 +715,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			throws SQLException {
 		lowLevelWays++;
 		List<Node> nodes = new ArrayList<Node>();
-		OsmMapUtils.simplifyDouglasPeucker(in, zoom + 8 + zoomWaySmothness, 3, nodes);
+		OsmMapUtils.simplifyDouglasPeucker(in, zoom + 8 + zoomWaySmothness, 3, nodes, false);
 		boolean first = true;
 		long firstId = -1;
 		long lastId = -1;
