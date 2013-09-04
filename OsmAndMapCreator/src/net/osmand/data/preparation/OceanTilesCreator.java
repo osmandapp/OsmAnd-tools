@@ -36,7 +36,7 @@ public class OceanTilesCreator {
         BasemapProcessor.SimplisticQuadTree ts = quadTree.getOrCreateSubTree(43, 113, 7);
         System.out.println(ts.seaCharacteristic);
 
-        // createTilesFile();
+//        createTilesFile();
 
         createJOSMFile(bmp);
     }
@@ -124,9 +124,10 @@ public class OceanTilesCreator {
         int[] vs = new int[4];
 
         int maxT = 1 << TILE_ZOOMLEVEL;
+        int antarctica = 500;
         for(int y = 0; y < maxT; y++ ) {
             boolean previousSea = true;
-            if( y == maxT - 1) {
+            if( y >> (TILE_ZOOMLEVEL - 3) >= antarctica) {
                 // antarctica
                 previousSea = false;
             }
@@ -169,8 +170,8 @@ public class OceanTilesCreator {
         Set<Entity.EntityId> s = new LinkedHashSet();
         for(int i = 0; i < pz; i++) {
             for(int j = 0; j < pz; j++) {
-                if(quadTree.getOrCreateSubTree(i, j, z).seaCharacteristic > 0 ||
-                        bmp.isWaterTile(i, j, z)) {
+                if((quadTree.getOrCreateSubTree(i, j, z).seaCharacteristic < 0.3 && !bmp.isWaterTile(i, j, z))||
+                        bmp.isLandTile(i, j, z) ) {
                     Way w = new Way(-(i * pz + j + 1));
                     w.addNode(i * pz + j + 1);
                     w.addNode((i + 1) * pz + j + 1);
@@ -197,9 +198,7 @@ public class OceanTilesCreator {
 
 
     private static void runFixOceanTiles() throws IOException {
-        final int land[]  = new int[] {34,29, 20,35, 20,37,21,37, 10, 15, 10, 16, 10, 17, 10, 18, 11, 16, 11, 17,
-                11, 18, 11, 19, 11, 20, 12, 17, 12, 18, 12, 19, 12, 20, 13, 17, 13, 19, 13, 20, 13, 21, 14, 16,
-                14, 17, 14, 19, 14, 20, 14, 21, 15, 20, 15, 21, 15, 22, 16, 21, 16, 22, 16, 23, 17, 22, 17, 23, 9, 16, 9, 19};
+        final int land[]  = new int[] {};
         fixOceanTiles(new FixTileData() {
             int c = 0;
             @Override
