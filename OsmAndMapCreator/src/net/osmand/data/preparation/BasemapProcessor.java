@@ -5,13 +5,7 @@ import gnu.trove.map.hash.TLongObjectHashMap;
 
 import java.io.*;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.BitSet;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
 
 import net.osmand.PlatformUtil;
@@ -26,6 +20,8 @@ import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.OsmMapUtils;
 import net.osmand.osm.edit.Way;
+import net.osmand.osm.io.OsmBaseStorage;
+import net.osmand.osm.io.OsmStorageWriter;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapAlgorithms;
 import net.osmand.util.MapUtils;
@@ -33,6 +29,8 @@ import net.osmand.util.MapUtils;
 import org.apache.commons.logging.Log;
 import org.apache.tools.bzip2.CBZip2InputStream;
 import org.xml.sax.SAXException;
+
+import javax.xml.stream.XMLStreamException;
 
 public class BasemapProcessor {
     TLongObjectHashMap<WayChain> coastlinesEndPoint = new TLongObjectHashMap<WayChain>();
@@ -572,7 +570,7 @@ public class BasemapProcessor {
     }
 
 
-    public static void main(String[] p) throws InterruptedException, SAXException, SQLException, IOException {
+    public static void main(String[] p) throws InterruptedException, SAXException, SQLException, IOException, XMLStreamException {
         if (p.length == 0) {
             System.out.println("Please specify folder with basemap *.osm or *.osm.bz2 files");
         } else {
@@ -595,23 +593,24 @@ public class BasemapProcessor {
                     src.toArray(new File[src.size()])
             );
         }
-/*
-     BasemapProcessor bmp = new BasemapProcessor();
+        /*BasemapProcessor bmp = new BasemapProcessor();
         bmp.constructBitSetInfo();
         SimplisticQuadTree quadTree = bmp.constructTilesQuadTree(7);
         SimplisticQuadTree ts = quadTree.getOrCreateSubTree(43, 113, 7);
         System.out.println(ts.seaCharacteristic);
-        ts = quadTree.getOrCreateSubTree(44, 112, 7);
+        ts = quadTree.getOrCreateSubTree(44, 113, 7);
         System.out.println(ts.seaCharacteristic);
-        ts = quadTree.getOrCreateSubTree(45, 111, 7);
-        System.out.println(ts.seaCharacteristic);
-        ts = quadTree.getOrCreateSubTree(39, 109, 7);
-        System.out.println(ts.seaCharacteristic);
-        ts = quadTree.getOrCreateSubTree(38, 108, 7);
-        System.out.println(ts.seaCharacteristic);
-        ts = quadTree.getOrCreateSubTree(39, 108, 7);
-        System.out.println(ts.seaCharacteristic);
+        ts = quadTree.getOrCreateSubTree(45, 112, 7);
 
+        createJOSMFile();
+
+        runFixOceanTiles();*/
+    }
+
+    private static void runFixOceanTiles() throws IOException {
+        int land[]  = new int[] {34,29, 20,35, 20,37,21,37, 10, 15, 10, 16, 10, 17, 10, 18, 11, 16, 11, 17,
+        11, 18, 11, 19, 11, 20, 12, 17, 12, 18, 12, 19, 12, 20, 13, 17, 13, 19, 13, 20, 13, 21, 14, 16,
+        14, 17, 14, 19, 14, 20, 14, 21, 15, 20, 15, 21, 15, 22, 16, 21, 16, 22, 16, 23, 17, 22, 17, 23, 9, 16, 9, 19};
         fixOceanTiles(new FixTileData() {
             int c = 0;
             @Override
@@ -619,22 +618,63 @@ public class BasemapProcessor {
                 int sh = z - 7;
                 int ty = y >> sh;
                 int tx = x >> sh;
-                if((tx == 39 && ty == 108)
-                        || (tx == 38 && ty == 108)
-                        || (tx == 39 && ty == 109)
-                        || (tx == 45 && ty == 111)
-                        || (tx == 44 && ty == 112)
-                        || (tx == 43 && ty == 113)
+                if((tx == 44 && ty == 113)
+                        || (tx == 45 && ty == 112)
                         ) {
                     if(origValue != SEA) {
                         c++;
-                        System.out.println(c + ". " + ty + " " + y + " " + x);
+                        System.out.println("S "+c + ". " + ty + " " + y + " " + x);
                         return SEA;
+                    }
+                }
+                if((tx == 21 && ty == 32)
+                        || (tx == 32 && ty == 44)
+                        ) {
+                    if(origValue != LAND) {
+                        c++;
+                        System.out.println("L "+c + ". " + ty + " " + y + " " + x);
+                        return LAND;
                     }
                 }
                 return 0;
             }
-        }, false);*/
+        }, false);
+    }
+
+    private static void createJOSMFile() throws XMLStreamException, IOException {
+        int z = 6;
+        BasemapProcessor bmp = new BasemapProcessor();
+        bmp.constructBitSetInfo();
+        SimplisticQuadTree quadTree = bmp.constructTilesQuadTree(z);
+        int pz = 1 << z;
+        OsmBaseStorage st = new OsmBaseStorage();
+        Set<Entity.EntityId> s = new LinkedHashSet();
+        for(int i = 0; i < pz; i++) {
+            for(int j = 0; j < pz; j++) {
+                if(quadTree.getOrCreateSubTree(i, j, z).seaCharacteristic > 0 ||
+                        bmp.isWaterTile(i, j, z)) {
+                    Way w = new Way(-(i * pz + j + 1));
+                    w.addNode(i * pz + j + 1);
+                    w.addNode((i + 1) * pz + j + 1);
+                    w.addNode((i + 1) * pz + j + 1 + 1);
+                    w.addNode(i * pz + j + 1 + 1);
+                    w.addNode(i * pz + j + 1);
+                    w.putTag("place", "island");
+                    w.putTag("name", i+" " + j + " " + z + " " + quadTree.getOrCreateSubTree(i, j, z).seaCharacteristic);
+                    s.addAll(w.getEntityIds());
+
+                    s.add(Entity.EntityId.valueOf(w));
+                    st.registerEntity(w, null);
+                }
+                Node nod = new Node(
+                        MapUtils.getLatitudeFromTile(z, j), MapUtils.getLongitudeFromTile(z, i),
+                        i * pz + j + 1);
+                st.registerEntity(nod, null);
+
+            }
+        }
+        new OsmStorageWriter().saveStorage(new FileOutputStream("/home/victor/projects/osmand/data/basemap/ready/grid.osm"),
+                st, s, true);
     }
 
     private static int getTileX(int i) {
