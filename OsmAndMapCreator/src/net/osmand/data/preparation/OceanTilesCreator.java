@@ -124,10 +124,10 @@ public class OceanTilesCreator {
         int[] vs = new int[4];
 
         int maxT = 1 << TILE_ZOOMLEVEL;
-        int antarctica = 500;
+        double antarcticaStart = MapUtils.getTileNumberY(TILE_ZOOMLEVEL, -84.35);
         for(int y = 0; y < maxT; y++ ) {
             boolean previousSea = true;
-            if( y >> (TILE_ZOOMLEVEL - 3) >= antarctica) {
+            if( y  >= antarcticaStart) {
                 // antarctica
                 previousSea = false;
             }
@@ -170,8 +170,9 @@ public class OceanTilesCreator {
         Set<Entity.EntityId> s = new LinkedHashSet();
         for(int i = 0; i < pz; i++) {
             for(int j = 0; j < pz; j++) {
-                if((quadTree.getOrCreateSubTree(i, j, z).seaCharacteristic < 0.3 && !bmp.isWaterTile(i, j, z))||
-                        bmp.isLandTile(i, j, z) ) {
+//                if((quadTree.getOrCreateSubTree(i, j, z).seaCharacteristic < 0.9 && !bmp.isWaterTile(i, j, z))||
+//                        bmp.isLandTile(i, j, z) ) {
+                if((quadTree.getOrCreateSubTree(i, j, z).seaCharacteristic > 0.8 || bmp.isWaterTile(i, j, z))) {
                     Way w = new Way(-(i * pz + j + 1));
                     w.addNode(i * pz + j + 1);
                     w.addNode((i + 1) * pz + j + 1);
