@@ -2,12 +2,6 @@ package net.osmand.data.preparation;
 
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.hash.TLongObjectHashMap;
-
-import java.io.*;
-import java.sql.SQLException;
-import java.util.*;
-import java.util.Map.Entry;
-
 import net.osmand.PlatformUtil;
 import net.osmand.binary.OsmandOdb.MapData;
 import net.osmand.binary.OsmandOdb.MapDataBlock;
@@ -25,12 +19,15 @@ import net.osmand.osm.io.OsmStorageWriter;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapAlgorithms;
 import net.osmand.util.MapUtils;
-
 import org.apache.commons.logging.Log;
 import org.apache.tools.bzip2.CBZip2InputStream;
 import org.xml.sax.SAXException;
 
 import javax.xml.stream.XMLStreamException;
+import java.io.*;
+import java.sql.SQLException;
+import java.util.*;
+import java.util.Map.Entry;
 
 public class BasemapProcessor {
     TLongObjectHashMap<WayChain> coastlinesEndPoint = new TLongObjectHashMap<WayChain>();
@@ -59,7 +56,7 @@ public class BasemapProcessor {
     private final Log logMapDataWarn;
     private SimplisticQuadTree[] quadTrees;
 
-    private static class SimplisticQuadTree {
+    protected static class SimplisticQuadTree {
         int zoom;
         int x;
         int y;
@@ -139,7 +136,7 @@ public class BasemapProcessor {
         public Map<MapRulType, String> names;
     }
 
-    private BasemapProcessor() {
+    protected BasemapProcessor() {
         logMapDataWarn = null;
         zoomWaySmothness = 0;
         renderingTypes = null;
@@ -159,7 +156,7 @@ public class BasemapProcessor {
         }
     }
 
-    private void constructBitSetInfo() {
+    protected void constructBitSetInfo() {
         try {
 
             InputStream stream = BasemapProcessor.class.getResourceAsStream("oceantiles_12.dat.bz2");
@@ -593,143 +590,7 @@ public class BasemapProcessor {
                     src.toArray(new File[src.size()])
             );
         }
-//        BasemapProcessor bmp = new BasemapProcessor();
-//        bmp.constructBitSetInfo();
-//        SimplisticQuadTree quadTree = bmp.constructTilesQuadTree(7);
-//        SimplisticQuadTree ts = quadTree.getOrCreateSubTree(43, 113, 7);
-//        System.out.println(ts.seaCharacteristic);
-//        ts = quadTree.getOrCreateSubTree(44, 113, 7);
-//        System.out.println(ts.seaCharacteristic);
-//        ts = quadTree.getOrCreateSubTree(45, 112, 7);
-
-//        createJOSMFile();
-//
-//        runFixOceanTiles();
     }
 
-    private static void runFixOceanTiles() throws IOException {
-        final int land[]  = new int[] {34,29, 20,35, 20,37,21,37, 10, 15, 10, 16, 10, 17, 10, 18, 11, 16, 11, 17,
-        11, 18, 11, 19, 11, 20, 12, 17, 12, 18, 12, 19, 12, 20, 13, 17, 13, 19, 13, 20, 13, 21, 14, 16,
-        14, 17, 14, 19, 14, 20, 14, 21, 15, 20, 15, 21, 15, 22, 16, 21, 16, 22, 16, 23, 17, 22, 17, 23, 9, 16, 9, 19};
-        fixOceanTiles(new FixTileData() {
-            int c = 0;
-            @Override
-            public int compareTileData(int x, int y, int z, int origValue) {
-                int sh = z - 7;
-                int ty = y >> sh;
-                int tx = x >> sh;
-                if((tx == 44 && ty == 113)
-                        || (tx == 45 && ty == 112)
-                        ) {
-                    if(origValue != SEA) {
-                        c++;
-                        System.out.println("S "+c + ". " + ty + " " + y + " " + x);
-                        return SEA;
-                    }
-                }
-                for(int i = 0; i < land.length; i+= 2) {
-                    if (land[i] == tx && land[i] == ty) {
-                        if (origValue != LAND) {
-                            c++;
-                            System.out.println("L " + c + ". " + ty + " " + y + " " + x);
-                            return LAND;
-                        }
-                    }
-                }
-                return 0;
-            }
-        }, false);
-    }
 
-    private static void createJOSMFile() throws XMLStreamException, IOException {
-        int z = 7;
-        BasemapProcessor bmp = new BasemapProcessor();
-        bmp.constructBitSetInfo();
-        SimplisticQuadTree quadTree = bmp.constructTilesQuadTree(z);
-        int pz = 1 << z;
-        OsmBaseStorage st = new OsmBaseStorage();
-        Set<Entity.EntityId> s = new LinkedHashSet();
-        for(int i = 0; i < pz; i++) {
-            for(int j = 0; j < pz; j++) {
-                if(quadTree.getOrCreateSubTree(i, j, z).seaCharacteristic > 0 ||
-                        bmp.isWaterTile(i, j, z)) {
-                    Way w = new Way(-(i * pz + j + 1));
-                    w.addNode(i * pz + j + 1);
-                    w.addNode((i + 1) * pz + j + 1);
-                    w.addNode((i + 1) * pz + j + 1 + 1);
-                    w.addNode(i * pz + j + 1 + 1);
-                    w.addNode(i * pz + j + 1);
-                    w.putTag("place", "island");
-                    w.putTag("name", i+" " + j + " " + z + " " + quadTree.getOrCreateSubTree(i, j, z).seaCharacteristic);
-                    s.addAll(w.getEntityIds());
-
-                    s.add(Entity.EntityId.valueOf(w));
-                    st.registerEntity(w, null);
-                }
-                Node nod = new Node(
-                        MapUtils.getLatitudeFromTile(z, j), MapUtils.getLongitudeFromTile(z, i),
-                        i * pz + j + 1);
-                st.registerEntity(nod, null);
-
-            }
-        }
-        new OsmStorageWriter().saveStorage(new FileOutputStream("/home/victor/projects/osmand/data/basemap/ready/grid.osm"),
-                st, s, true);
-    }
-
-    private static int getTileX(int i) {
-        return i % 4096;
-    }
-
-    private static int getTileY(int i) {
-        return i / 4096;
-    }
-
-    private static interface FixTileData {
-
-        public int compareTileData(int x, int y, int z, int origValue);
-    }
-
-    private static void fixOceanTiles(FixTileData fx, boolean dryRun) throws IOException {
-        int currentByte;
-        RandomAccessFile rf = new RandomAccessFile("../tools/OsmAndMapCreator/oceantiles_12.dat", "rw");
-        int[] cs = new int[4];
-        int[] vs = new int[4];
-        int changedT = 0;
-        for (int i = 0; i < BITS_COUNT / 4; i++) {
-            currentByte = rf.readByte();
-            int x = getTileX(i);
-            int y = getTileY(i);
-            vs[0] = ((currentByte >> 6) & BITMASK);
-            vs[1] = ((currentByte >> 4) & BITMASK);
-            vs[2] = ((currentByte >> 2) & BITMASK);
-            vs[3] = ((currentByte >> 0) & BITMASK);
-            cs[0] = i * 4;
-            cs[1] = i * 4 + 1;
-            cs[2] = i * 4 + 2;
-            cs[3] = i * 4 + 3;
-            boolean changed = false;
-            for (int k = 0; k < cs.length; k++) {
-                int tx = getTileX(cs[k]);
-                int ty = getTileY(cs[k]);
-                int c = fx.compareTileData(tx, ty, TILE_ZOOMLEVEL, vs[k]);
-                if (c != 0) {
-                    vs[k] = c;
-                    changed = true;
-                }
-
-            }
-            if (changed && !dryRun) {
-                currentByte = 0;
-                currentByte = (currentByte << 2) | vs[0];
-                currentByte = (currentByte << 2) | vs[1];
-                currentByte = (currentByte << 2) | vs[2];
-                currentByte = (currentByte << 2) | vs[3];
-                rf.seek(rf.getFilePointer() - 1);
-                rf.writeByte(currentByte);
-                changedT++;
-            }
-        }
-        System.out.println("Changed " + changedT + " bytes");
-    }
 }
