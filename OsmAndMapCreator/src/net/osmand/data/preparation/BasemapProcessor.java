@@ -596,25 +596,25 @@ public class BasemapProcessor {
             );
         }
 
-     /*     BasemapProcessor bmp = new BasemapProcessor();
+      /* BasemapProcessor bmp = new BasemapProcessor();
         bmp.constructBitSetInfo();
         SimplisticQuadTree quadTree = bmp.constructTilesQuadTree(5);
-        SimplisticQuadTree ts = quadTree.getOrCreateSubTree(4, 11, 4);
+        SimplisticQuadTree ts = quadTree.getOrCreateSubTree(22, 55, 6);
         System.out.println(ts.seaCharacteristic);
-      fixOceanTiles(new FixTileData() {
+        fixOceanTiles(new FixTileData() {
             int c = 0;
             @Override
             public int compareTileData(int x, int y, int z, int origValue) {
-                int sh = z - 7;
+                int sh = z - 6;
                 int ty = y >> sh;
                 int tx = x >> sh;
-                if((ty == 123 && tx == 9)
-                        || (ty == 121 && tx == 9)
+                if((tx == 22 && ty == 55)
+                        || (tx == 22 && ty == 55)
                         ) {
-                    if(origValue == SEA) {
+                    if(origValue == LAND) {
                         c++;
                         System.out.println(c + ". " + ty + " " + y + " " + x);
-                        return LAND;
+                        return SEA;
                     }
                 }
                 return 0;
