@@ -29,6 +29,7 @@
 #include <QString>
 #include <QList>
 #include <QFile>
+#include <QMutex>
 
 #include <OsmAndCore.h>
 #include <OsmAndCore/Common.h>
@@ -46,6 +47,9 @@
 #include <OsmAndCore/Map/HeightmapTileProvider.h>
 #include <OsmAndCore/Map/OfflineMapDataProvider.h>
 #include <OsmAndCore/Map/OfflineMapRasterTileProvider.h>
+
+bool glutWasInitialized = false;
+QMutex glutWasInitializedFlagMutex;
 
 OsmAnd::AreaI viewport;
 std::shared_ptr<OsmAnd::IMapRenderer> renderer;
@@ -159,35 +163,44 @@ int main(int argc, char** argv)
 
     //////////////////////////////////////////////////////////////////////////
 
-    assert(glutInit != nullptr);
-    glutInit(&argc, argv);
+    {
+        QMutexLocker scopedLocker(&glutWasInitializedFlagMutex);
 
-    glutSetOption(GLUT_ACTION_ON_WINDOW_CLOSE, GLUT_ACTION_CONTINUE_EXECUTION);
-    glutInitWindowSize(800, 600);
-    glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA | GLUT_DEPTH);
-    if(!use43)
-        glutInitContextVersion(3, 0);
-    else
-        glutInitContextVersion(4, 3);
-    glutInitContextProfile(GLUT_CORE_PROFILE);
-    assert(glutCreateWindow != nullptr);
-    glutCreateWindow((const char*)xT("OsmAnd Bird : 3D map render tool"));
+        assert(glutInit != nullptr);
+        glutInit(&argc, argv);
+
+        glutSetOption(GLUT_ACTION_ON_WINDOW_CLOSE, GLUT_ACTION_CONTINUE_EXECUTION);
+        glutInitWindowSize(800, 600);
+        glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA | GLUT_DEPTH);
+        if(!use43)
+            glutInitContextVersion(3, 0);
+        else
+            glutInitContextVersion(4, 3);
+        glutInitContextProfile(GLUT_CORE_PROFILE);
+        assert(glutCreateWindow != nullptr);
+        glutCreateWindow((const char*)xT("OsmAnd Bird : 3D map render tool"));
+
+        glutReshapeFunc(&reshapeHandler);
+        glutMouseFunc(&mouseHandler);
+        glutMotionFunc(&mouseMotion);
+        glutMouseWheelFunc(&mouseWheelHandler);
+        glutKeyboardFunc(&keyboardHandler);
+        glutSpecialFunc(&specialHandler);
+        glutDisplayFunc(&displayHandler);
+        glutCloseFunc(&closeHandler);
+        verifyOpenGL();
+
+        glutWasInitialized = true;
+    }
     
-    glutReshapeFunc(&reshapeHandler);
-    glutMouseFunc(&mouseHandler);
-    glutMotionFunc(&mouseMotion);
-    glutMouseWheelFunc(&mouseWheelHandler);
-    glutKeyboardFunc(&keyboardHandler);
-    glutSpecialFunc(&specialHandler);
-    glutDisplayFunc(&displayHandler);
-    glutCloseFunc(&closeHandler);
-    verifyOpenGL();
-
     //////////////////////////////////////////////////////////////////////////
     OsmAnd::MapRendererSetupOptions rendererSetup;
     rendererSetup.frameRequestCallback = []()
     {
-        glutPostRedisplay();
+        //QMutexLocker scopedLocker(&glutWasInitializedFlagMutex);
+
+        if(glutWasInitialized)
+            glutPostRedisplay();
     };
     renderer->setup(rendererSetup);
     viewport.top = 0;
@@ -213,7 +226,7 @@ int main(int argc, char** argv)
         1102430866,
         704978668));
     //renderer->setZoom(10.0f);
-    renderer->setZoom(11.0f);
+    renderer->setZoom(4.0f);
     
     // Kiev
     /*renderer->setTarget(OsmAnd::PointI(
@@ -232,6 +245,12 @@ int main(int argc, char** argv)
     //////////////////////////////////////////////////////////////////////////
 
     glutMainLoop();
+
+    {
+        QMutexLocker scopedLocker(&glutWasInitializedFlagMutex);
+
+        glutWasInitialized = false;
+    }
 
     OsmAnd::ReleaseCore();
     return EXIT_SUCCESS;
@@ -611,75 +630,93 @@ void displayHandler()
 
         glColor3f(0.0f, 1.0f, 0.0f);
         glRasterPos2f(8, t - 16 * 1);
-        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("fov (keys i,k)         : %1").arg(renderer->state.fieldOfView).toStdString().c_str());
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
+            QString("fov (keys i,k)         : %1").arg(renderer->state.fieldOfView)));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * 2);
-        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("fog distance (keys r,f): %1").arg(renderer->state.fogDistance).toStdString().c_str());
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
+            QString("fog distance (keys r,f): %1").arg(renderer->state.fogDistance)));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * 3);
-        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("azimuth (arrows l,r)   : %1").arg(renderer->state.azimuth).toStdString().c_str());
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
+            QString("azimuth (arrows l,r)   : %1").arg(renderer->state.azimuth)));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * 4);
-        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("pitch (arrows u,d)     : %1").arg(renderer->state.elevationAngle).toStdString().c_str());
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
+            QString("pitch (arrows u,d)     : %1").arg(renderer->state.elevationAngle)));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * 5);
-        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("target (keys w,a,s,d)  : %1 %2").arg(renderer->state.target31.x).arg(renderer->state.target31.y).toStdString().c_str());
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
+            QString("target (keys w,a,s,d)  : %1 %2").arg(renderer->state.target31.x).arg(renderer->state.target31.y)));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * 6);
-        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("zoom (mouse wheel)     : %1").arg(renderer->state.requestedZoom).toStdString().c_str());
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
+            QString("zoom (mouse wheel)     : %1").arg(renderer->state.requestedZoom)));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * 7);
-        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("zoom base              : %1").arg(renderer->state.zoomBase).toStdString().c_str());
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
+            QString("zoom base              : %1").arg(renderer->state.zoomBase)));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * 8);
-        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("zoom fraction          : %1").arg(renderer->state.zoomFraction).toStdString().c_str());
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
+            QString("zoom fraction          : %1").arg(renderer->state.zoomFraction)));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * 9);
-        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("visible tiles          : %1").arg(renderer->visibleTiles.size()).toStdString().c_str());
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
+            QString("visible tiles          : %1").arg(renderer->visibleTiles.size())));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * 10);
-        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("wireframe (key x)      : %1").arg(renderWireframe).toStdString().c_str());
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
+            QString("wireframe (key x)      : %1").arg(renderWireframe)));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * 11);
-        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("elevation data (key e) : %1").arg((bool)renderer->state.elevationDataProvider).toStdString().c_str());
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
+            QString("elevation data (key e) : %1").arg((bool)renderer->state.elevationDataProvider)));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * 12);
-        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("fog density (keys t,g) : %1").arg(renderer->state.fogDensity).toStdString().c_str());
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
+            QString("fog density (keys t,g) : %1").arg(renderer->state.fogDensity)));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * 13);
-        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("fog origin F (keys u,j): %1").arg(renderer->state.fogOriginFactor).toStdString().c_str());
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
+            QString("fog origin F (keys u,j): %1").arg(renderer->state.fogOriginFactor)));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * 14);
-        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("height scale (keys o,l): %1").arg(renderer->state.elevationDataScaleFactor).toStdString().c_str());
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
+            QString("height scale (keys o,l): %1").arg(renderer->state.elevationDataScaleFactor)));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * 15);
-        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("atlas textures (key v) : %1").arg(renderer->configuration.altasTexturesAllowed).toStdString().c_str());
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
+            QString("atlas textures (key v) : %1").arg(renderer->configuration.altasTexturesAllowed)));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * 16);
-        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("16-bit textures (key c): %1").arg(renderer->configuration.limitTextureColorDepthBy16bits).toStdString().c_str());
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
+            QString("16-bit textures (key c): %1").arg(renderer->configuration.limitTextureColorDepthBy16bits)));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * 17);
-        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("tex-filtering (b,n,m)  : %1").arg(static_cast<int>(renderer->configuration.texturesFilteringQuality)).toStdString().c_str());
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
+            QString("tex-filtering (b,n,m)  : %1").arg(static_cast<int>(renderer->configuration.texturesFilteringQuality))));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * 18);
-        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("palette textures(key p): %1").arg(renderer->configuration.paletteTexturesAllowed).toStdString().c_str());
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
+            QString("palette textures(key p): %1").arg(renderer->configuration.paletteTexturesAllowed)));
         verifyOpenGL();
 
         glColor4f(0.5f, 0.5f, 0.5f, 0.6f);
@@ -693,37 +730,45 @@ void displayHandler()
 
         glColor3f(0.0f, 1.0f, 0.0f);
         glRasterPos2f(8, 16 * 8);
-        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("Last clicked tile: (%1, %2)@%3").arg(lastClickedLocation31.x >> (31 - renderer->state.zoomBase)).arg(lastClickedLocation31.y >> (31 - renderer->state.zoomBase)).arg(renderer->state.zoomBase).toStdString().c_str());
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
+            QString("Last clicked tile: (%1, %2)@%3").arg(lastClickedLocation31.x >> (31 - renderer->state.zoomBase)).arg(lastClickedLocation31.y >> (31 - renderer->state.zoomBase)).arg(renderer->state.zoomBase)));
         verifyOpenGL();
 
         glColor3f(0.0f, 1.0f, 0.0f);
         glRasterPos2f(8, 16 * 7);
-        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("Last clicked location: %1 %2").arg(lastClickedLocation31.x).arg(lastClickedLocation31.y).toStdString().c_str());
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
+            QString("Last clicked location: %1 %2").arg(lastClickedLocation31.x).arg(lastClickedLocation31.y)));
         verifyOpenGL();
 
         glColor3f(0.0f, 1.0f, 0.0f);
         glRasterPos2f(8, 16 * 6);
-        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("Tile providers (holding alt controls overlay0):").toStdString().c_str());
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
+            QString("Tile providers (holding alt controls overlay0):")));
         verifyOpenGL();
 
         glRasterPos2f(8, 16 * 5);
-        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("0 - disable").toStdString().c_str());
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
+            QString("0 - disable")));
         verifyOpenGL();
 
         glRasterPos2f(8, 16 * 4);
-        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("1 - Mapnik").toStdString().c_str());
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
+            QString("1 - Mapnik")));
         verifyOpenGL();
 
         glRasterPos2f(8, 16 * 3);
-        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("2 - CycleMap").toStdString().c_str());
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
+            QString("2 - CycleMap")));
         verifyOpenGL();
 
         glRasterPos2f(8, 16 * 2);
-        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("3 - Offline maps").toStdString().c_str());
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
+            QString("3 - Offline maps")));
         verifyOpenGL();
 
         glRasterPos2f(8, 16 * 1);
-        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)QString("4 - Hillshade").toStdString().c_str());
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
+            QString("4 - Hillshade")));
         verifyOpenGL();
     }
     
