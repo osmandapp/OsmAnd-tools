@@ -1,6 +1,8 @@
 project(bird)
 
-find_package(GLUT)
+if(NOT CMAKE_TARGET_OS STREQUAL "darwin")
+	find_package(GLUT)
+endif()
 if(NOT GLUT_FOUND)
 	add_subdirectory("${OSMAND_ROOT}/tools/map-viewer/externals/freeglut" "tools/map-viewer/externals/freeglut")
 endif()
