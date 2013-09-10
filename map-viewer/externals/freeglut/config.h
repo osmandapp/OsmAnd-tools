@@ -148,7 +148,7 @@
 	#undef const
 #elif defined(ANDROID) || defined(__ANDROID__) || defined(__APPLE__) || defined(__linux__)
 	/* Define to 1 if you have the <dlfcn.h> header file. */
-    #define HAVE_DLFCN_H 1
+	#define HAVE_DLFCN_H 1
 
 	/* Define to 1 if you don't have `vprintf' but do have `_doprnt.' */
 	#undef HAVE_DOPRNT
