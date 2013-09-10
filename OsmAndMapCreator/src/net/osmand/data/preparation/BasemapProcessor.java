@@ -586,6 +586,17 @@ public class BasemapProcessor {
                     src.add(f);
                 }
             }
+
+            // BASEMAP generation
+            //		creator.generateBasemapIndex(new ConsoleProgressImplementation(1), null, zooms, rt, log, "basemap",
+            //				new File(basemapParent, "10m_coastline_out_fix_caspean_arctic.osm")
+            //                ,new File(basemapParent, "roads_gen.osm")
+            //				,new File(basemapParent, "10m_admin_level.osm")
+            //				,new File(basemapParent, "10m_rivers.osm")
+            //				,new File(basemapParent, "10m_lakes.osm")
+            //				,new File(basemapParent, "10m_populated_places.osm")
+            //		);
+
             creator.generateBasemapIndex(new ConsoleProgressImplementation(1), null, zooms, rt, log, "basemap",
                     src.toArray(new File[src.size()])
             );

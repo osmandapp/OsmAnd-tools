@@ -777,7 +777,7 @@ public class IndexCreator {
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 
 //		String file = "/home/victor/projects/osmand/temp/route.osm";
-		String file = "/home/victor/projects/osmand/temp/andorra.osm.pbf";
+		String file = "/home/victor/projects/osmand/temp/albal.osm";
 		int st = file.lastIndexOf('/');
 		int e = file.indexOf('.', st);
 		creator.setNodesDBFile(new File("/home/victor/projects/osmand/osm-gen/"+file.substring(st, e) + ".tmp.odb"));
@@ -785,19 +785,6 @@ public class IndexCreator {
 				new ConsoleProgressImplementation(1), null, zooms, rt, log);
 		
 		
-		
-		// BASEMAP generation
-//		zooms = MapZooms.parseZooms("1-2;3;4-5;6-7;8-9;10-");
-//		creator.setMapFileName("World_basemap_2.obf");
-//		File basemapParent = new File("/home/victor/projects/osmand/data/basemap/ready/");
-//		creator.generateBasemapIndex(new ConsoleProgressImplementation(1), null, zooms, rt, log, "basemap",
-//				new File(basemapParent, "10m_coastline_out_fix_caspean_arctic.osm")
-//                ,new File(basemapParent, "roads_gen.osm")
-//				,new File(basemapParent, "10m_admin_level.osm")
-//				,new File(basemapParent, "10m_rivers.osm")
-//				,new File(basemapParent, "10m_lakes.osm")
-//				,new File(basemapParent, "10m_populated_places.osm")
-//		);
 
 
 		log.info("WHOLE GENERATION TIME :  " + (System.currentTimeMillis() - time)); //$NON-NLS-1$
