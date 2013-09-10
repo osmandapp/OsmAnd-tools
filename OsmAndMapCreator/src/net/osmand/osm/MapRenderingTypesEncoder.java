@@ -263,6 +263,9 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 				}
 			}
 		}
+        // sort to get most important features as first type (important for rendering)
+        outTypes.sort();
+        outaddTypes.sort();
 		for(MapRulType mt : tempList){
 			String val = e.getTag(mt.tag);
 			if(val != null && val.length() > 0){
