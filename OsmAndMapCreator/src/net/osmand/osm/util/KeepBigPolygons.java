@@ -52,8 +52,9 @@ public class KeepBigPolygons {
 		}
 		
 		write.createNewFile();
+        boolean keepOldNodes = args.length > 3;
 
-        new KeepBigPolygons().process(read, write);
+        new KeepBigPolygons().process(read, write, keepOldNodes);
 	}
     private Object getDatabaseConnection(String fileName, DBDialect dialect) throws SQLException {
         return dialect.getDatabaseConnection(fileName, log);
@@ -105,18 +106,15 @@ public class KeepBigPolygons {
         }
     }
 	
-	private void process(File read, File write) throws IOException, SAXException, XMLStreamException, SQLException, InterruptedException {
+	private void process(File read, File write, boolean keepOldNodes) throws IOException, SAXException, XMLStreamException, SQLException, InterruptedException {
         osmDBdialect = DBDialect.SQLITE;
         OsmDbAccessor accessor = new OsmDbAccessor();
-        File dbFile = null;
-        boolean loadFromExistingFile = dbFile != null && osmDBdialect.databaseFileExists(dbFile);
-        if (dbFile == null ) {
-            dbFile = new File(read.getParentFile(), "temp.nodes");
-            // to save space
-            if (osmDBdialect.databaseFileExists(dbFile)) {
-                osmDBdialect.removeDatabase(dbFile);
-            }
+        File dbFile =  new File(read.getParentFile(), "temp.nodes");;
+        // to save space
+        if (!keepOldNodes && osmDBdialect.databaseFileExists(dbFile)) {
+            osmDBdialect.removeDatabase(dbFile);
         }
+        boolean loadFromExistingFile = osmDBdialect.databaseFileExists(dbFile);
         dbConn = getDatabaseConnection(dbFile.getAbsolutePath(), osmDBdialect);
         int allRelations = 100000;
         int allWays = 1000000;
