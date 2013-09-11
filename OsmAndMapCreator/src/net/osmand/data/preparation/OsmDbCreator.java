@@ -53,15 +53,13 @@ public class OsmDbCreator implements IOsmStorageFilter {
 	int allWays = 0;
 
 	private Connection dbConn;
-	protected final IndexCreator indexCreator;
 
 	private DBAccessor database;
 	private DBWriteBatch batch;
 	private WriteOptions options;
 
 
-	public OsmDbCreator(IndexCreator indexCreator) {
-		this.indexCreator = indexCreator;
+	public OsmDbCreator() {
 	}
 
 	public void initDatabase(DBDialect dialect, Object databaseConn) throws SQLException {

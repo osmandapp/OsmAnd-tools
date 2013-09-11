@@ -78,7 +78,7 @@ public enum DBDialect {
 		}
 	}
 	
-	protected Object getDatabaseConnection(String fileName, Log log) throws SQLException {
+    public Object getDatabaseConnection(String fileName, Log log) throws SQLException {
 		if (DBDialect.NOSQL == this) {
 			DBAccessor dbAccessor = LevelDBAccess.getDBAcessor();
 			Options opts = new Options();

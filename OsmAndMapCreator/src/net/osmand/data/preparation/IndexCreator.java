@@ -275,7 +275,7 @@ public class IndexCreator {
 		});
 
 		// 1. Loading osm file
-		OsmDbCreator dbCreator = new OsmDbCreator(this);
+		OsmDbCreator dbCreator = new OsmDbCreator();
 		try {
 			setGeneralProgress(progress,"[15 / 100]"); //$NON-NLS-1$
 			progress.startTask(Messages.getString("IndexCreator.LOADING_FILE") + readFile.getAbsolutePath(), -1); //$NON-NLS-1$
