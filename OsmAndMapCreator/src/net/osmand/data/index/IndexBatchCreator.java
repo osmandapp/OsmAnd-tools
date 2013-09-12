@@ -510,7 +510,10 @@ public class IndexBatchCreator {
 					}
 				}
 				File generated = new File(workDir, mapFileName);
-				generated.renameTo(new File(indexDirFiles, generated.getName()));
+				File dest = new File(indexDirFiles, generated.getName());
+				if(!generated.renameTo(dest)) {
+					throw new IllegalStateException("Failed to rename '"+generated.getAbsolutePath()+"' to "+ dest.getAbsolutePath());
+				}
 				File copyLog = new File(indexDirFiles, logFileName.getName());
 				FileOutputStream fout = new FileOutputStream(copyLog);
 				FileInputStream fin = new FileInputStream(logFileName);
