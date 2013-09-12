@@ -182,11 +182,10 @@ public class MapRoutingTypes {
 				tag = tvl.substring(0, i);
 				value = tvl.substring(i + 1);
 			}
-			if(contains(TAGS_TO_ACCEPT, tag, value) || startsWith(TAGS_TO_SAVE, tag, value) || getMap(TAGS_TO_REPLACE, tag, value) != null) {
+            if(TAGS_TEXT.contains(tag)) {
+                names.put(registerRule(tag, null), value);
+            } else if(contains(TAGS_TO_ACCEPT, tag, value) || startsWith(TAGS_TO_SAVE, tag, value) || getMap(TAGS_TO_REPLACE, tag, value) != null) {
 				outTypes.add(registerRule(tag, value).id);
-			}
-			if(TAGS_TEXT.contains(tag)) {
-				names.put(registerRule(tag, null), value);
 			}
 		}
 		return true;
