@@ -52,7 +52,7 @@ public class KeepBigPolygons {
 		}
 		
 		write.createNewFile();
-        boolean keepOldNodes = args.length > 3;
+        boolean keepOldNodes = true; // by default
 
         new KeepBigPolygons().process(read, write, keepOldNodes);
 	}
@@ -145,7 +145,7 @@ public class KeepBigPolygons {
                 } else if (e instanceof Way) {
                     nodes.addAll(((Way) e).getNodes());
                 }
-                if (OsmMapUtils.polygonAreaPixels(nodes, 12) > 24) {
+                if (OsmMapUtils.polygonAreaPixels(nodes, 8) > 24) {
                     storage.registerEntity(e, null);
                     for (Node nt : nodes) {
                         if (nt != null) {
