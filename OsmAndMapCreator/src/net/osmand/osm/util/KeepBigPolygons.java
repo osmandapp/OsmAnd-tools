@@ -44,7 +44,7 @@ public class KeepBigPolygons {
 		} else {
 			String fileName = read.getName();
 			int i = fileName.indexOf('.');
-			fileToWrite = read.getParentFile().getParentFile() + "/" + fileName.substring(0, i) + "_out";
+			fileToWrite = read.getParentFile().getAbsolutePath() + "/" + fileName.substring(0, i) + "_out";
 		}
 		
 
