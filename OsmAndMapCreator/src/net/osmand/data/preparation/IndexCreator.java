@@ -409,6 +409,16 @@ public class IndexCreator {
 						processor.processEntity(e);
 					}
 				});
+				setGeneralProgress(progress,"[90 / 100]");
+
+				progress.startTask(Messages.getString("IndexCreator.PROCESS_OSM_REL"), accessor.getAllRelations());
+				accessor.iterateOverEntities(progress, EntityType.RELATION, new OsmDbVisitor() {
+					@Override
+					public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
+						ctx.loadEntityRelation((Relation) e);
+						processor.processEntity(e);
+					}
+				});
 				accessor.closeReadingConnection();
 			}
 			

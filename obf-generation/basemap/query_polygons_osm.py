@@ -77,7 +77,7 @@ def main():
 			ring = trimParens.match(ring).groups()[0]
 			line = LineString(ring)
 			way_id = way_id - 1;
-			if first = 0:
+			if first == 0:
 				xml += '\t<member type="way" ref="%s" role="outer" />\n' % (way_id)
 				first = 1
 			else:
