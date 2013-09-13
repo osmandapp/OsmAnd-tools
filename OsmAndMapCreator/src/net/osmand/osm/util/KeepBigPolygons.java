@@ -39,7 +39,6 @@ public class KeepBigPolygons {
     public static void main(String[] args) throws IOException, SAXException, XMLStreamException, SQLException, InterruptedException {
 		String fileToRead = args != null && args.length > 0 ? args[0] : null; 
 		File read = new File(fileToRead);
-		File write ;
 		String fileToWrite =  args != null && args.length > 1 ? args[1] : null;
 		if(fileToWrite != null){
 			write = new File(fileToWrite);
@@ -47,14 +46,13 @@ public class KeepBigPolygons {
 		} else {
 			String fileName = read.getName();
 			int i = fileName.indexOf('.');
-			fileName = fileName.substring(0, i) + "_out.osm";
-			write = new File(read.getParentFile(), fileName);
+			fileToWrite = read.getParentFile().getParentFile() + "/" + fileName.substring(0, i) + "_out";
 		}
 		
-		write.createNewFile();
+
         boolean keepOldNodes = true; // by default
 
-        new KeepBigPolygons().process(read, write, keepOldNodes);
+        new KeepBigPolygons().process(read, fileName, keepOldNodes);
 	}
     private Object getDatabaseConnection(String fileName, DBDialect dialect) throws SQLException {
         return dialect.getDatabaseConnection(fileName, log);
@@ -106,7 +104,7 @@ public class KeepBigPolygons {
         }
     }
 	
-	private void process(File read, File write, boolean keepOldNodes) throws IOException, SAXException, XMLStreamException, SQLException, InterruptedException {
+	private void process(File read, final String write, boolean keepOldNodes) throws IOException, SAXException, XMLStreamException, SQLException, InterruptedException {
         osmDBdialect = DBDialect.SQLITE;
         OsmDbAccessor accessor = new OsmDbAccessor();
         File dbFile =  new File(read.getParentFile(), "temp.nodes");;
@@ -128,6 +126,7 @@ public class KeepBigPolygons {
             }
         }
 
+		final int[] index = new int[] {1};
         final OsmDbAccessor access = new OsmDbAccessor();
         access.initDatabase(dbConn, osmDBdialect, allNodes, allWays, allRelations);
         final OsmBaseStorage storage = new OsmBaseStorage();
@@ -159,10 +158,27 @@ public class KeepBigPolygons {
                     }
 
                 }
+	            if(storage.getRegisteredEntities().size() > 10000) {
+		            try {
+			            writeStorage(write, index[0]++, storage);
+		            } catch (Exception e1) {
+			            throw new RuntimeException(e1);
+		            }
+	            }
 
             }
         });
+		writeStorage(write, index[0]++, storage);
+
+	}
+
+	private void writeStorage(String write, int ind, OsmBaseStorage storage) throws IOException, XMLStreamException {
+		if(write.endsWith(".osm")) {
+			write = write.substring(0, write.length() - 4);
+		}
+		write =  write + "_" + ind + ".osm";
 		OsmStorageWriter writer = new OsmStorageWriter();
 		writer.saveStorage(new FileOutputStream(write), storage, null, true);
+		storage.getRegisteredEntities().clear();
 	}
 }
