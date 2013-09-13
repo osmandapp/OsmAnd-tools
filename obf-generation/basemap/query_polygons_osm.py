@@ -72,15 +72,20 @@ def main():
 			xml += '\t<tag k="%s" v="%s" />\n' % (key, esc(value))
 		coordinates = row[2][len("POLYGON("):-1]
 		rings = parenComma.split(coordinates)
+		first = 0
 		for i,ring in enumerate(rings):
 			ring = trimParens.match(ring).groups()[0]
 			line = LineString(ring)
 			way_id = way_id - 1;
-			xml += '\t<member type="way" ref="%s" role="outer" />\n' % (way_id)
+			if first = 0:
+				xml += '\t<member type="way" ref="%s" role="outer" />\n' % (way_id)
+				first = 1
+			else:
+				xml += '\t<member type="way" ref="%s" role="inner" />\n' % (way_id)
 			way_xml += '\n<way id="%s" >\n' % (way_id)
 			for c in line:
 				node_id = node_id - 1
-				node_xml += '\n<node id="%s" lat="%s" lon="%s"/>' % (node_id, c[0], c[1])
+				node_xml += '\n<node id="%s" lat="%s" lon="%s"/>' % (node_id, c[1], c[0])
 				way_xml += '\t<nd ref="%s" />\n' % (node_id)
 			way_xml += '</way>'
 		xml += '</relation>'	

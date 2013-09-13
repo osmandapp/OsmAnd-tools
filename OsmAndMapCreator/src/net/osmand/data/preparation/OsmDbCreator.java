@@ -164,7 +164,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 			currentCountNode++;
 			if (e instanceof Node) {
 				if (!e.getTags().isEmpty()) {
-					allNodes++;                        dbConn.
+					allNodes++;
 				}
 				key = "0" + e.getId();
 			} else if (e instanceof Way) {
