@@ -82,11 +82,22 @@ def main():
 				first = 1
 			else:
 				xml += '\t<member type="way" ref="%s" role="inner" />\n' % (way_id)
+
 			way_xml += '\n<way id="%s" >\n' % (way_id)
+			first_node_id = 0
+			first_node = []
 			for c in line:
 				node_id = node_id - 1
-				node_xml += '\n<node id="%s" lat="%s" lon="%s"/>' % (node_id, c[1], c[0])
-				way_xml += '\t<nd ref="%s" />\n' % (node_id)
+				nid = node_id
+				if first_node_id == 0:
+					first_node_id = node_id
+					first_node = c
+					node_xml += '\n<node id="%s" lat="%s" lon="%s"/>' % (nid, c[1], c[0])
+				elif first_node == c:
+					nid = first_node_id
+				else:
+					node_xml += '\n<node id="%s" lat="%s" lon="%s"/>' % (nid, c[1], c[0])
+				way_xml += '\t<nd ref="%s" />\n' % (nid)
 			way_xml += '</way>'
 		xml += '</relation>'	
 		print "%s %s %s \n" % ( node_xml, way_xml, xml)
