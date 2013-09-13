@@ -156,7 +156,7 @@ public class KeepBigPolygons {
                     }
 
                 }
-	            if(storage.getRegisteredEntities().size() > 10000) {
+	            if(storage.getRegisteredEntities().size() > 1000000) {
 		            try {
 			            writeStorage(write, index[0]++, storage);
 		            } catch (Exception e1) {
