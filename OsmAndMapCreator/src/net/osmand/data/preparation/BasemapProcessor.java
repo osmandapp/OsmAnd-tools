@@ -490,7 +490,7 @@ public class BasemapProcessor {
 				if (OsmMapUtils.polygonAreaPixels(list, zoomToEncode) < PIXELS_THRESHOLD_AREA) {
 					it.remove();
 				} else {
-					OsmMapUtils.simplifyDouglasPeucker(list, zoomToEncode - 1 + 8 + zoomWaySmothness, 4, res, false);
+					OsmMapUtils.simplifyDouglasPeucker(list, zoomToEncode - 1 + 8 + zoomWaySmothness, 4, list, false);
 					if (list.size() <= 3) {
 						it.remove();
 					}
