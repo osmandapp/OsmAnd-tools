@@ -25,9 +25,12 @@ def LineString(geoStr):
 	points = map(Point,points)
 	return points
 
+def esc(s):
+	return s.replace("\"", "&quot;").replace("<", "&lt;").replace(">", "&gt;").replace("&", "&amp;").replace("'","&apos;")
+
 def main():
 	conn_string = "host='127.0.0.1' dbname='osm' user='osm' password='osm' port='5433'"
-	print '"<?xml version="1.0" encoding="UTF-8"?>'
+	print '<?xml version="1.0" encoding="UTF-8"?>'
 	print '<osm version="0.5">'
  
 	# get a connection, if a connect cannot be made an exception will be raised here
@@ -42,15 +45,16 @@ def main():
 				   " from planet_osm_polygon where way_area > 1000000"
 				   " and (landuse <> '' or \"natural\" <> '' or aeroway <> '' or historic <> '' or leisure <> '' or man_made <> ''"
 				   " or military <> '' or  power <> '' or tourism <> '' or water <> '' or waterway <> '' ) "
-				   "LIMIT 1000"
+				  # "LIMIT 1000"
 				   ";")
  
 	# retrieve the records from the database
 	row_count = 0
 	parenComma = re.compile('\)\s*,\s*\(')
 	trimParens = re.compile('^\s*\(?(.*?)\)?\s*$')
+	rel_id = -1
 	way_id = -100000000
-	node_id = -10000000000000
+	node_id =-10000000000000
 
 	for row in cursor:
 		if row[2] is None:
@@ -59,12 +63,13 @@ def main():
 		mapping = selectMapping(row)
 		node_xml = ""
 		way_xml = ""
-		xml = '\n<relation id="%s" >\n' % (row[1])
+		rel_id = rel_id - 1
+		xml = '\n<relation id="%s" >\n' % (rel_id)
 		xml += '\t<tag k="type" v="multipolygon" />\n'
 		if row[0] is not None:
-			xml += '\t<tag k="name" v="%s" />\n' % row[0]
+			xml += '\t<tag k="name" v="%s" />\n' % (esc(row[0]))
 		for key, value in mapping.items():
-			xml += '\t<tag k="%s" v="%s" />\n' % (key, value)
+			xml += '\t<tag k="%s" v="%s" />\n' % (key, esc(value))
 		coordinates = row[2][len("POLYGON("):-1]
 		rings = parenComma.split(coordinates)
 		for i,ring in enumerate(rings):
@@ -76,7 +81,7 @@ def main():
 			for c in line:
 				node_id = node_id - 1
 				node_xml += '\n<node id="%s" lat="%s" lon="%s"/>' % (node_id, c[0], c[1])
-				way_xml += '\t<nd ref="%s" >\n' % (node_id)
+				way_xml += '\t<nd ref="%s" />\n' % (node_id)
 			way_xml += '</way>'
 		xml += '</relation>'	
 		print "%s %s %s \n" % ( node_xml, way_xml, xml)

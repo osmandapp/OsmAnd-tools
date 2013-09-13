@@ -59,5 +59,9 @@ Example (replacing tags):
 Creates 10m_lakes.osm
 2. Run net.osmand.osm.util.FixLinkedCoastline from DataExtractionosm.jar with arg0=filename.
 3. Open in Josm and simply save
-// 4. Run IndexCreator
 
+------------------------------
+Index using osmpgsql planet.osm & run query_polygons_osm.py
+
+------
+Run Generate basemap job

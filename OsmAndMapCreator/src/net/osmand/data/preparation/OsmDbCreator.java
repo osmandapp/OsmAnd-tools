@@ -164,7 +164,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 			currentCountNode++;
 			if (e instanceof Node) {
 				if (!e.getTags().isEmpty()) {
-					allNodes++;
+					allNodes++;                        dbConn.
 				}
 				key = "0" + e.getId();
 			} else if (e instanceof Way) {
@@ -257,7 +257,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 				}
 				
 			} catch (SQLException ex) {
-				log.error("Could not save in db", ex); //$NON-NLS-1$
+				log.error("Could not save in db (entity " +entityId +") ", ex); //$NON-NLS-1$
 			}
 		}
 		// do not add to storage
