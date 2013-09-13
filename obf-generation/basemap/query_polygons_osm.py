@@ -40,9 +40,9 @@ def main():
 	cursor = conn.cursor()
  
 	# execute our Query
-	cursor.execute("select name, osm_id, ST_AsText(ST_Transform(ST_Simplify(way,100),4326)), landuse, \"natural\", historic, aeroway, "
+	cursor.execute("select name, osm_id, ST_AsText(ST_Transform(ST_Simplify(way,500),4326)), landuse, \"natural\", historic, aeroway, "
 				   "    leisure, man_made, military, power, tourism, water, waterway "
-				   " from planet_osm_polygon where way_area > 1000000"
+				   " from planet_osm_polygon where way_area > 10000000"
 				   " and (landuse <> '' or \"natural\" <> '' or aeroway <> '' or historic <> '' or leisure <> '' or man_made <> ''"
 				   " or military <> '' or  power <> '' or tourism <> '' or water <> '' or waterway <> '' ) "
 				  # "LIMIT 1000"
