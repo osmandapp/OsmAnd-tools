@@ -41,8 +41,6 @@ public class KeepBigPolygons {
 		File read = new File(fileToRead);
 		String fileToWrite =  args != null && args.length > 1 ? args[1] : null;
 		if(fileToWrite != null){
-			write = new File(fileToWrite);
-			 
 		} else {
 			String fileName = read.getName();
 			int i = fileName.indexOf('.');
@@ -52,7 +50,7 @@ public class KeepBigPolygons {
 
         boolean keepOldNodes = true; // by default
 
-        new KeepBigPolygons().process(read, fileName, keepOldNodes);
+        new KeepBigPolygons().process(read, fileToWrite, keepOldNodes);
 	}
     private Object getDatabaseConnection(String fileName, DBDialect dialect) throws SQLException {
         return dialect.getDatabaseConnection(fileName, log);
