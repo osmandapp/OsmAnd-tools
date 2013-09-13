@@ -190,15 +190,20 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 			}
 		}
 	}
-	
-	
+
 	public int iterateOverEntities(IProgress progress, EntityType type, OsmDbVisitor visitor) throws SQLException, InterruptedException {
-		Statement statement = dbConn.createStatement();
+		return iterateOverEntities(progress, type, visitor, true);
+	}
+	
+	public int iterateOverEntities(IProgress progress, EntityType type, OsmDbVisitor visitor, boolean realCounts) throws SQLException, InterruptedException {
+
 		PreparedStatement select;
 		int count = 0;
-		
-		computeRealCounts(statement);
-		statement.close();
+		if (realCounts) {
+			Statement statement = dbConn.createStatement();
+			computeRealCounts(statement);
+			statement.close();
+		}
 		
 		BlockingQueue<Entity> toProcess = new ArrayBlockingQueue<Entity>(100000);
 		AbstractProducer entityProducer = null;

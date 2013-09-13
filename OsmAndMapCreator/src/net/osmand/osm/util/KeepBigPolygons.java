@@ -134,9 +134,9 @@ public class KeepBigPolygons {
                 List<Node> nodes = new ArrayList<Node>();
                 if (e instanceof Relation) {
                     access.loadEntityRelation((Relation) e);
-                    for (Entity es : ((Relation) e).getMemberEntities().keySet()) {
-                        if (es instanceof Way) {
-                            nodes.addAll(((Way) es).getNodes());
+                    for (Map.Entry<Entity, String> es : ((Relation) e).getMemberEntities().entrySet()) {
+                        if (es.getKey() instanceof Way && "outer".equals(es.getValue())) {
+                            nodes.addAll(((Way) es.getKey()).getNodes());
                         }
                     }
                 } else if (e instanceof Way) {
@@ -156,7 +156,7 @@ public class KeepBigPolygons {
                     }
 
                 }
-	            if(storage.getRegisteredEntities().size() > 1000000) {
+	            if(storage.getRegisteredEntities().size() > 5000000) {
 		            try {
 			            writeStorage(write, index[0]++, storage);
 		            } catch (Exception e1) {
@@ -165,7 +165,7 @@ public class KeepBigPolygons {
 	            }
 
             }
-        });
+        }, false);
 		writeStorage(write, index[0]++, storage);
 
 	}
