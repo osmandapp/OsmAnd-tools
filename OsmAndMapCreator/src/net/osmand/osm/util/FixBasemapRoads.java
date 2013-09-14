@@ -21,8 +21,8 @@ import java.io.*;
 import java.util.*;
 
 public class FixBasemapRoads {
-    private static float MINIMAL_DISTANCE= 3000;
-    private static float MAXIMAL_DISTANCE_CUT = 3000;
+    private static float MINIMAL_DISTANCE= 500;
+    private static float MAXIMAL_DISTANCE_CUT = 1000;
 	
 	public static void main(String[] args) throws IOException, SAXException, XMLStreamException {
 		String fileToRead = args != null && args.length > 0 ? args[0] : null; 
