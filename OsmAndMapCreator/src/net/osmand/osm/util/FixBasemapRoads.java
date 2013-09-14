@@ -457,7 +457,11 @@ public class FixBasemapRoads {
             }
             return;
         }
-        if(!ref.isEmpty()) {
+	    if(ref == null || ref.isEmpty()) {
+		    ref = way.getTag("name");
+	    }
+
+        if(ref != null && !ref.isEmpty()) {
             if(!roadInfoMap.containsKey(ref)) {
                 roadInfoMap.put(ref, new RoadInfo());
             }
