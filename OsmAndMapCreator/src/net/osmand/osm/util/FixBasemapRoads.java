@@ -191,6 +191,8 @@ public class FixBasemapRoads {
                     f = false;
                 }
             }
+	        // don't keep names
+	        first.removeTag("name");
         }
 
         public void reverse() {
@@ -203,6 +205,7 @@ public class FixBasemapRoads {
     }
 
     class RoadInfo {
+	    String ref;
         Collection<RoadLine> roadLines = new LinkedHashSet<RoadLine>();
         TLongObjectHashMap<List<RoadLine>> startPoints = new TLongObjectHashMap<List<RoadLine>>();
         TLongObjectHashMap<List<RoadLine>> endPoints = new TLongObjectHashMap<List<RoadLine>>();
@@ -465,7 +468,8 @@ public class FixBasemapRoads {
             if(!roadInfoMap.containsKey(ref)) {
                 roadInfoMap.put(ref, new RoadInfo());
             }
-            roadInfoMap.get(ref).registerRoadLine(new RoadLine(way));
+	        RoadInfo ri = roadInfoMap.get(ref);
+	        ri.registerRoadLine(new RoadLine(way));
         }
 
 
