@@ -30,11 +30,17 @@ def process_polygons(tags, filename):
 	array = ['name']
 	queryFields = ", name"
 	conditions = " 1=0"
+	admin_level = false
 	for tag in tags:
 		if tag == "natural" :
 			queryFields += ", \"natural\""
 			conditions += " or (\"natural\" <> '' and \"natural\" <> 'water')"
 			array.append(tag)
+		elif tag == "admin_level" :
+			array.append("admin_level")
+			queryFields += ", admin_level"
+			admin_level = true
+			conditions += " or admin_level = '4' or admin_level = '2'"
 		elif tag == "lake" :
 			array.append("natural")
 			queryFields += ", \"natural\""
@@ -65,12 +71,13 @@ def process_polygons(tags, filename):
 		rel_id = rel_id - 1
 		xml = '\n<relation id="%s" >\n' % (rel_id)
 		xml += '\t<tag k="type" v="multipolygon" />\n'
+		tags_xml = ""
 		base = shift
 		while base - shift < len(array):
 			if row[base] is not None:
-				xml += '\t<tag k="%s" v="%s" />\n' % (array[base - shift], esc(row[base]))
+				tags_xml += '\t<tag k="%s" v="%s" />\n' % (array[base - shift], esc(row[base]))
 			base = base + 1
-
+		xml += tags_xml
 
 		coordinates = row[1][len("POLYGON("):-1]
 		rings = parenComma.split(coordinates)
@@ -86,6 +93,8 @@ def process_polygons(tags, filename):
 				xml += '\t<member type="way" ref="%s" role="inner" />\n' % (way_id)
 
 			way_xml += '\n<way id="%s" >\n' % (way_id)
+			if admin_level:
+				way_xml += tags_xml
 			first_node_id = 0
 			first_node = []
 			for c in line:
@@ -104,7 +113,8 @@ def process_polygons(tags, filename):
 		xml += '</relation>'	
 		f.write(node_xml)
 		f.write(way_xml)
-		f.write(xml)
+		if not admin_level:
+			f.write(xml)
 		f.write('\n')
 	f.write('</osm>')
 
@@ -112,3 +122,4 @@ if __name__ == "__main__":
 		process_polygons(['landuse', 'natural', 'historic','leisure'], 'polygon_natural_landuse.osm')
 		process_polygons(['lake'], 'polygon_lake_water.osm')
 		process_polygons(['aeroway', 'military', 'power', 'tourism'], 'polygon_aeroway_military_tourism.osm')
+		process_polygons(['admin_level'], 'polygon_admin_level.osm') # query from line?

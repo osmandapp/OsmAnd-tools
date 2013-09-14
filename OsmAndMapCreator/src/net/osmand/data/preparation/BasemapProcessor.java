@@ -403,7 +403,7 @@ public class BasemapProcessor {
 		for (int level = 0; level < mapZooms.getLevels().size(); level++) {
 			boolean mostDetailed = level == 0;
 			MapZoomPair zoomPair = mapZooms.getLevel(level);
-			int zoomToEncode = mostDetailed ? zoomPair.getMinZoom() + 1 : zoomPair.getMaxZoom();
+			int zoomToEncode = mostDetailed ? Math.max(10, zoomPair.getMinZoom() + 1) : zoomPair.getMaxZoom();
 			if (mostDetailed && zoomPair.getMaxZoom() < 10) {
 				throw new IllegalStateException("Zoom pair is not detailed " + zoomPair);
 			}
@@ -551,6 +551,8 @@ public class BasemapProcessor {
                         logMapDataWarn.warn("Can't find intersection for " + MapUtils.get31LongitudeX(px31) + ","
                                 + MapUtils.get31LatitudeY(py31) + " - " + MapUtils.get31LongitudeX(nx31) + ","
                                 + MapUtils.get31LatitudeY(ny31));
+	                    logMapDataWarn.warn("Values " +px31 +  "," + py31 + " -- " +nx31+ ","+ny31+
+			                    "   boundary " + leftX + "," + topY + "," + rightX  + "," + bottomY);
                     }
 
                     prevNode = new Node(MapUtils.get31LatitudeY(cy31), MapUtils.get31LongitudeX(cx31), -1000);
@@ -633,7 +635,8 @@ public class BasemapProcessor {
             MapRenderingTypesEncoder rt = MapRenderingTypesEncoder.getDefault();
             // BASEMAP generation
             File folder = new File(p[0]);
-            MapZooms zooms = MapZooms.parseZooms("1-2;3;4-5;6-7;8-9;10-");
+//            MapZooms zooms = MapZooms.parseZooms("1-2;3;4-5;6-7;8-9;10-");
+	        MapZooms zooms = MapZooms.parseZooms("1-2;3;4-5;6-7;8-");
             IndexCreator creator = new IndexCreator(folder); //$NON-NLS-1$
             creator.setIndexMap(true);
             creator.setZoomWaySmothness(2);
