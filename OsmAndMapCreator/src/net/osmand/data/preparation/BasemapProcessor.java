@@ -635,8 +635,8 @@ public class BasemapProcessor {
             MapRenderingTypesEncoder rt = MapRenderingTypesEncoder.getDefault();
             // BASEMAP generation
             File folder = new File(p[0]);
-//            MapZooms zooms = MapZooms.parseZooms("1-2;3;4-5;6-7;8-9;10-");
-	        MapZooms zooms = MapZooms.parseZooms("1-2;3;4-5;6-7;8-");
+            MapZooms zooms = MapZooms.parseZooms("1-2;3;4-5;6-7;8-9;10-");
+//	        MapZooms zooms = MapZooms.parseZooms("1-2;3;4-5;6-7;8-");
             IndexCreator creator = new IndexCreator(folder); //$NON-NLS-1$
             creator.setIndexMap(true);
             creator.setZoomWaySmothness(2);
