@@ -16,10 +16,11 @@ def process_points(filename):
 	conn = psycopg2.connect(conn_string)
 	cursor = conn.cursor()
 	shift = 2
-	array = ['name', 'ref', 'ele', 'place','natural', 'aeroway']
-	cursor.execute("select ST_AsText(ST_Transform(way,4326)), osm_id, name, ref, ele, place, \"natural\", aeroway"
+	array = ['name', 'ref', 'ele', 'place','natural', 'aeroway', 'tourism']
+	cursor.execute("select ST_AsText(ST_Transform(way,4326)), osm_id, name, ref, ele, place, \"natural\", aeroway, tourism"
 				   " from planet_osm_point where place in ('sea','ocean','state', 'country') "
-				   " or \"natural\" in ('peak', 'cave_entrance', 'rock', 'waterfall', 'cape', 'volcano')"
+				   " or \"natural\" in ('peak', 'cave_entrance', 'rock', 'waterfall', 'cape', 'volcano', 'stream')"
+				   " or tourism in ('alpine_hut') "
 				   " or aeroway in ('aerodrome', 'airport')"
 				   # "LIMIT 2"
 				   ";")
