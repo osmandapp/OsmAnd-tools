@@ -4,16 +4,6 @@ import sys
 import pprint
 import re
 
-def selectMapping(row):
-	a = dict()
-	base = 3;
-	array = ['landuse', 'natural', 'historic','aeroway','leisure','man_made','military','power','tourism',
-			'water','waterway']
-	while base - 3 < len(array):
-		if row[base] is not None:
-			a[array[base-3]]=row[base]
-		base=base+1
-	return a
 
 regSpaces = re.compile('\s+')
 def Point(geoStr):
@@ -28,28 +18,39 @@ def LineString(geoStr):
 def esc(s):
 	return s.replace("\"", "&quot;").replace("<", "&lt;").replace(">", "&gt;").replace("&", "&amp;").replace("'","&apos;")
 
-def main():
+def process_polygons(tags, filename):
 	conn_string = "host='127.0.0.1' dbname='osm' user='osm' password='osm' port='5433'"
-	print '<?xml version="1.0" encoding="UTF-8"?>'
-	print '<osm version="0.5">'
+	f = open(filename,'w')
+	f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
+	f.write('<osm version="0.5">\n')
  
-	# get a connection, if a connect cannot be made an exception will be raised here
 	conn = psycopg2.connect(conn_string)
- 
-	# conn.cursor will return a cursor object, you can use this not cursor to perform queries
 	cursor = conn.cursor()
- 
-	# execute our Query
-	cursor.execute("select name, osm_id, ST_AsText(ST_Transform(ST_Simplify(way,500),4326)), landuse, \"natural\", historic, aeroway, "
-				   "    leisure, man_made, military, power, tourism, water, waterway "
+	shift = 2
+	array = ['name']
+	queryFields = ", name"
+	conditions = " 1=0"
+	for tag in tags:
+		if tag == "natural" :
+			queryFields += ", \"natural\""
+			conditions += " or (\"natural\" <> '' and \"natural\" <> 'water')"
+			array.append(tag)
+		elif tag == "lake" :
+			array.append("natural")
+			queryFields += ", \"natural\""
+			conditions += " or \"natural\" = 'water'"
+		else :
+			array.append(tag)
+			queryFields += ", " + tag
+			conditions += " or "+tag+" <> ''"
+
+	cursor.execute("select osm_id, ST_AsText(ST_Transform(ST_Simplify(way,500),4326)) " + queryFields +
 				   " from planet_osm_polygon where way_area > 10000000"
-				   " and (landuse <> '' or \"natural\" <> '' or aeroway <> '' or historic <> '' or leisure <> '' or man_made <> ''"
-				   " or military <> '' or  power <> '' or tourism <> '' or water <> '' or waterway <> '' ) "
+				   " and ("+conditions+") "
 				  # "LIMIT 1000"
 				   ";")
  
 	# retrieve the records from the database
-	row_count = 0
 	parenComma = re.compile('\)\s*,\s*\(')
 	trimParens = re.compile('^\s*\(?(.*?)\)?\s*$')
 	rel_id = -1
@@ -57,20 +58,21 @@ def main():
 	node_id =-10000000000000
 
 	for row in cursor:
-		if row[2] is None:
+		if row[1] is None:
 			continue
-		row_count += 1
-		mapping = selectMapping(row)
 		node_xml = ""
 		way_xml = ""
 		rel_id = rel_id - 1
 		xml = '\n<relation id="%s" >\n' % (rel_id)
 		xml += '\t<tag k="type" v="multipolygon" />\n'
-		if row[0] is not None:
-			xml += '\t<tag k="name" v="%s" />\n' % (esc(row[0]))
-		for key, value in mapping.items():
-			xml += '\t<tag k="%s" v="%s" />\n' % (key, esc(value))
-		coordinates = row[2][len("POLYGON("):-1]
+		base = shift
+		while base - shift < len(array):
+			if row[base] is not None:
+				xml += '\t<tag k="%s" v="%s" />\n' % (array[base - shift], esc(row[base]))
+			base = base + 1
+
+
+		coordinates = row[1][len("POLYGON("):-1]
 		rings = parenComma.split(coordinates)
 		first = 0
 		for i,ring in enumerate(rings):
@@ -100,8 +102,13 @@ def main():
 				way_xml += '\t<nd ref="%s" />\n' % (nid)
 			way_xml += '</way>'
 		xml += '</relation>'	
-		print "%s %s %s \n" % ( node_xml, way_xml, xml)
-	print '</osm>'
+		f.write(node_xml)
+		f.write(way_xml)
+		f.write(xml)
+		f.write('\n')
+	f.write('</osm>')
 
 if __name__ == "__main__":
-	main()
+		process_polygons(['landuse', 'natural', 'historic','leisure'], 'polygon_natural_landuse.osm')
+		process_polygons(['lake'], 'polygon_lake_water.osm')
+		process_polygons(['aeroway', 'military', 'power', 'tourism'], 'polygon_aeroway_military_tourism.osm')
