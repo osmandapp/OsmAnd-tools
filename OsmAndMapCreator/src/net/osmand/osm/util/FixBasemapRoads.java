@@ -105,8 +105,10 @@ public class FixBasemapRoads {
                     }
                 }
             }
-            beginPoint = combinedWays.get(0).getFirstNodeId();
-            endPoint = combinedWays.get(combinedWays.size() - 1).getLastNodeId();
+//            beginPoint = combinedWays.get(0).getFirstNodeId();
+//            endPoint = combinedWays.get(combinedWays.size() - 1).getLastNodeId();
+	        beginPoint =  convertLatLon(combinedWays.get(0).getFirstNode().getLatLon());
+	        endPoint =  convertLatLon( combinedWays.get(combinedWays.size() - 1).getLastNode().getLatLon());
         }
 
         RoadLine(Way w) {
@@ -462,6 +464,12 @@ public class FixBasemapRoads {
         }
 	    if(ref == null || ref.isEmpty()) {
 		    ref = way.getTag("name");
+	    } else {
+		    // fix road inconsistency
+		    ref = ref.replace('-', ' ');
+		    if(ref.indexOf(';') != -1) {
+			    ref = ref.substring(0, ref.indexOf(';'));
+		    }
 	    }
 
         if(ref != null && !ref.isEmpty()) {

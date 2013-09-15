@@ -25,10 +25,10 @@ def process_roads(cond, filename):
  
 	conn = psycopg2.connect(conn_string)
 	cursor = conn.cursor()
-	array = ['name', 'ref', 'highway','railway','waterway', 'junction']
+	array = ['name', 'ref', 'highway','railway','waterway', 'junction', 'route']
 	shift = 2
 	cursor.execute("select osm_id, ST_AsText(ST_Transform(ST_Simplify(way,50),4326)),"
-				   " name, ref, highway, railway, waterway, junction "
+				   " name, ref, highway, railway, waterway, junction, route "
 				   # roads faster but doesn't contain ferry & river
 				   " from planet_osm_line where " + cond + # ST_Length(way) > 100 and
 				  # "LIMIT 1000"
