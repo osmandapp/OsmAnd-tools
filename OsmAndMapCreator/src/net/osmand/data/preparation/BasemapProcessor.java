@@ -403,7 +403,7 @@ public class BasemapProcessor {
 		for (int level = 0; level < mapZooms.getLevels().size(); level++) {
 			boolean mostDetailed = level == 0;
 			MapZoomPair zoomPair = mapZooms.getLevel(level);
-			int zoomToEncode = mostDetailed ? Math.max(10, zoomPair.getMinZoom() + 1) : zoomPair.getMaxZoom();
+			int zoomToEncode = mostDetailed ? Math.max(11, zoomPair.getMinZoom() + 1) : zoomPair.getMaxZoom();
 			if (mostDetailed && zoomPair.getMaxZoom() < 10) {
 				throw new IllegalStateException("Zoom pair is not detailed " + zoomPair);
 			}
