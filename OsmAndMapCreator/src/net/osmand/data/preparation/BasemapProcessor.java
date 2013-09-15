@@ -399,7 +399,9 @@ public class BasemapProcessor {
 
 	public void processEntity(Entity e) {
 
-		long id = -Math.abs(e.getId());
+		//long id = -Math.abs(e.getId());
+		// save space with ids
+		long id = -25;
 		for (int level = 0; level < mapZooms.getLevels().size(); level++) {
 			boolean mostDetailed = level == 0;
 			MapZoomPair zoomPair = mapZooms.getLevel(level);

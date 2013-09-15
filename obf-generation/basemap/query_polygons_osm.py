@@ -30,7 +30,7 @@ def process_polygons(tags, filename):
 	array = ['name']
 	queryFields = ", name"
 	conditions = " 1=0"
-	admin_level = false
+	admin_level = False
 	for tag in tags:
 		if tag == "natural" :
 			queryFields += ", \"natural\""
@@ -39,8 +39,8 @@ def process_polygons(tags, filename):
 		elif tag == "admin_level" :
 			array.append("admin_level")
 			queryFields += ", admin_level"
-			admin_level = true
-			conditions += " or admin_level = '4' or admin_level = '2'"
+			admin_level = True
+			conditions += " or ((admin_level = '4' or admin_level = '2') and boundary <> 'national_park')"
 		elif tag == "lake" :
 			array.append("natural")
 			queryFields += ", \"natural\""

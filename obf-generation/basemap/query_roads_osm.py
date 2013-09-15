@@ -29,15 +29,18 @@ def process_roads(cond, filename):
 	shift = 2
 	cursor.execute("select osm_id, ST_AsText(ST_Transform(ST_Simplify(way,50),4326)),"
 				   " name, ref, highway, railway, waterway, junction "
+				   # roads faster but doesn't contain ferry & river
 				   " from planet_osm_line where " + cond + # ST_Length(way) > 100 and
 				  # "LIMIT 1000"
 				   ";")
  
 	node_id =-1000000000
+	way_id = 1
 	for row in cursor:
 		node_xml = ""
 		way_xml = ""
-		way_xml = '\n<way id="%s" >\n' % (row[0])		
+		way_id = way_id + 1
+		way_xml = '\n<way id="%s" >\n' % (row[0] + way_id * 10000000000)		
 		base = shift
 		while base - shift < len(array):
 			if row[base] is not None:
@@ -61,6 +64,7 @@ if __name__ == "__main__":
 	process_roads("highway='trunk'", "line_trunk.osm")
 	process_roads("highway='primary'", "line_primary.osm")
 	process_roads("highway='secondary'", "line_secondary.osm")
-	process_roads("highway='tertiary'", "line_tertiary.osm")
 	process_roads("railway='rail'", "line_railway.osm")
+	process_roads("route='ferry'", "line_ferry.osm")
+	#process_roads("highway='tertiary'", "line_tertiary.osm")
 	#process_roads("waterway='river' or waterway='canal' ", "line_rivers.osm")
