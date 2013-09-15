@@ -471,6 +471,10 @@ public class FixBasemapRoads {
 			    ref = ref.substring(0, ref.indexOf(';'));
 		    }
 	    }
+	    if(ref == null) {
+		    LatLon lt = way.getLatLon();
+		    ref = MapUtils.getTileNumberY(6, lt.getLatitude()) + " " + MapUtils.getTileNumberX(6, lt.getLongitude());
+	    }
 
         if(ref != null && !ref.isEmpty()) {
             if(!roadInfoMap.containsKey(ref)) {

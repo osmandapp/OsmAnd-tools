@@ -30,7 +30,7 @@ def process_points(filename):
 	for row in cursor:
 		node_id = row[1] #node_id - 1
 		match = parse.search(row[0])
-		xml = '\n<node id="%s" lat="%s" lon="%s">\n' % (node_id, match.groups()[0], match.groups()[1])
+		xml = '\n<node id="%s" lat="%s" lon="%s">\n' % (node_id, match.groups()[1], match.groups()[0])
 		base = shift
 		while base - shift < len(array):
 			if row[base] is not None:
