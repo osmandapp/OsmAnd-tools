@@ -786,13 +786,14 @@ public class IndexCreator {
 		MapRenderingTypesEncoder rt = MapRenderingTypesEncoder.getDefault();
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 
-//		String file = "/home/victor/projects/osmand/temp/route.osm";
-		String file = "/home/victor/projects/osmand/temp/albal.osm";
-		int st = file.lastIndexOf('/');
-		int e = file.indexOf('.', st);
-		creator.setNodesDBFile(new File("/home/victor/projects/osmand/osm-gen/"+file.substring(st, e) + ".tmp.odb"));
-		creator.generateIndexes(new File(file),
-				new ConsoleProgressImplementation(1), null, zooms, rt, log);
+		String file = "/home/victor/projects/osmand/temp/route.osm";
+
+		generateRegionsFile(creator, rt);
+//		int st = file.lastIndexOf('/');
+//		int e = file.indexOf('.', st);
+//		creator.setNodesDBFile(new File("/home/victor/projects/osmand/osm-gen/"+file.substring(st, e) + ".tmp.odb"));
+//		creator.generateIndexes(new File(file),
+//				new ConsoleProgressImplementation(1), null, zooms, rt, log);
 		
 		
 
@@ -806,5 +807,21 @@ public class IndexCreator {
 		log.info("- STRING_TABLE_SIZE " + BinaryMapIndexWriter.STRING_TABLE_SIZE); //$NON-NLS-1$
 		log.info("-- MAP_DATA_AND_STRINGS SIZE " + (BinaryMapIndexWriter.MAP_DATA_SIZE + BinaryMapIndexWriter.STRING_TABLE_SIZE)); //$NON-NLS-1$
 
+	}
+
+	private static void generateRegionsFile(IndexCreator creator, MapRenderingTypesEncoder rt) throws IOException, SAXException, SQLException, InterruptedException {
+		MapZooms zooms;
+		String file = "/home/victor/projects/osmand/temp/osmand_regions.osm";
+		creator.setIndexMap(true);
+		creator.setIndexAddress(false);
+		creator.setIndexPOI(false);
+		creator.setIndexTransport(false);
+		creator.setIndexRouting(false);
+		zooms = MapZooms.parseZooms("5-6");
+		int st = file.lastIndexOf('/');
+		int e = file.indexOf('.', st);
+		creator.setNodesDBFile(new File("/home/victor/projects/osmand/osm-gen/"+file.substring(st, e) + ".tmp.odb"));
+		creator.generateIndexes(new File(file),
+				new ConsoleProgressImplementation(1), null, zooms, rt, log);
 	}
 }

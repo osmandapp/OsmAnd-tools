@@ -626,7 +626,6 @@ public class BinaryMapIndexWriter {
 			int[] addtypeUse, Map<MapRulType, String> names, Map<String, Integer> stringTable, MapDataBlock.Builder dataBlock,
 			boolean allowCoordinateSimplification)
 			throws IOException {
-
 		MapData.Builder data = MapData.newBuilder();
 		// calculate size
 		mapDataBuf.clear();
