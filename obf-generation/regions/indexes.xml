@@ -383,7 +383,7 @@
 		<!--  5. CENTRAL AMERICA -->
 		<!--  5.1 CENTRAL AMERICA [SOURCE: GEOFABRIK.DE] -->
 		<regions siteToDownload="http://download.geofabrik.de/{0}.osm.pbf" region_prefix=""  skip="true" region_suffix="">
-			<region name="central-america" downloadName="entral-america-latest"/>
+			<region name="central-america" downloadName="central-america-latest"/>
 		</regions>	
 
 		<regions siteToDownload="http://download.geofabrik.de/central-america/{0}.osm.pbf" region_prefix=""  skip="false" region_suffix="_CentralAmerica">
@@ -427,6 +427,7 @@
 		<!-- 6.2 ASIA [SOURCE: GEOFABRIK.DE] (REST OF ASIA IS BELOW ) -->
 		<regions siteToDownload="http://download.geofabrik.de/asia/{0}.osm.pbf" region_prefix="" region_suffix="_Asia" skip="false">
 			<region name="azerbaijan" downloadName="azerbaijan-latest"/>
+			<region name="bangladesh" downloadName="bangladesh-latest"/>
 			<region name="china" downloadName="china-latest"/>
 			<region name="gcc-states" downloadName="gcc-states-latest"/>
 			<region name="india" downloadName="india-latest"/>
@@ -435,6 +436,7 @@
 			<region name="iraq" downloadName="iraq-latest"/>
 			<region name="israel-and-palestine" downloadName="israel-and-palestine-latest"/>
 		    <region name="japan" downloadName="japan-latest"/>
+		    <region name="jordan" downloadName="jordan-latest"/>
 			<region name="kazakhstan" downloadName="kazakhstan-latest"/>
 			<region name="kyrgyzstan" downloadName="kyrgyzstan-latest"/>
 			<region name="malaysia-singapore-brunei" downloadName="malaysia-singapore-brunei-latest"/>
@@ -459,22 +461,20 @@
 
 		<!-- 6.3 SOUTH-EASTERN ASIA [SOURCE: OSMAND:NET] -->
 		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" region_suffix="_Asia" skip="false">
-			<region name="brunei"/>
+			<!-- <region name="brunei"/>
+			<region name="malaysia"/>
+			<region name="singapore"/> -->
 			<region name="cambodia"/>
 			<region name="christmas-island"/>
 			<region name="east-timor"/>
 			<region name="laos"/>
-			<region name="malaysia"/>
 			<region name="myanmar"/>
-			<region name="singapore"/>
 			<region name="spratly-islands"/>
-			<region name="vietnam"/>
 		</regions>	
 
 		<!-- 6.3 SOUTHERN ASIA [SOURCE: OSMAND:NET] -->
 		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" region_suffix="_Asia" skip="false">
 			<region name="afghanistan"/>
-			<region name="bangladesh"/>
 			<region name="bhutan"/>
 			<region name="british-indian-ocean-territory"/>  
 			<region name="iran"/>
@@ -488,7 +488,6 @@
 			<region name="armenia"/>
 			<region name="bahrain"/>
 			<region name="georgia"/>
-			<region name="jordan"/>
 			<region name="kuwait"/>
 			<region name="lebanon"/>
 			<region name="oman"/>
