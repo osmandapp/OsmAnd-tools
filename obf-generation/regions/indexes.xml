@@ -367,13 +367,13 @@
 			<region name="colombia" downloadName="colombia-latest"/>
 			<region name="ecuador" downloadName="ecuador-latest"/>
 			<region name="uruguay" downloadName="uruguay-latest"/>
+			<region name="peru" downloadName="peru-latest"/>
 		</regions>
 
 		<!--  4.2 SOUTH AMERICA [SOURCE: OSMAND:NET] --> 
 		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" skip="false" region_suffix="_SouthAmerica">	
 			<region name="guyana"/>
 			<region name="paraguay"/>
-			<region name="peru"/>
 			<region name="suriname"/>
 			<region name="venezuela"/>
 		</regions>	
