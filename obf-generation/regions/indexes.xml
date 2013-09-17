@@ -273,6 +273,18 @@
 			<region name="zabaikalie" downloadName="ZAB"/>
 		</regions>
 
+		<!-- russia federal district -->
+		<regions siteToDownload="http://download.osmand.net/osm-downloads/russia-{0}.osm.pbf" region_prefix="Russia_"  skip="false" region_suffix="_Asia">
+			<region name="central-federal-district"/>
+			<region name="far-eastern-federal-district"/>
+			<region name="north-caucasus-federal-district"/>
+			<region name="northwestern-federal-district"/>
+			<region name="siberian-federal-district"/>
+			<region name="south-federal-district"/>
+			<region name="ural-federal-district"/>
+			<region name="volga-federal-district"/>
+		</regions>
+
 		<!-- 3. North America  -->		
 		<!-- 3.1 USA [SOURCE: GEOFABRIK.DE]  -->
 		<regions siteToDownload="http://download.geofabrik.de/north-america/us/{0}.osm.pbf" skip="false" region_prefix="US_" region_suffix="_NorthAmerica">
@@ -349,8 +361,10 @@
 		<!--  3.3 NORTH AMERICA EXCEPT USA AND CANADA [SOURCE: OSMAND:NET]  -->	
 		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix=""  skip="false" region_suffix="_NorthAmerica">	
 			<region name="bermuda"/>
-			<region name="greenland"/>
 		</regions>	
+		<regions siteToDownload="http://download.geofabrik.de/north-america/{0}.osm.pbf" skip="false" 	region_prefix="" region_suffix="_NorthAmerica">
+			<region name="greenland" downloadName="greenland-latest"/>
+		</regions>
 		
 		<!--  4. SOUTH AMERICA -->
 		<!--  4.1 SOUTH AMERICA [SOURCE: GEOFABRIK.DE] -->
@@ -405,10 +419,10 @@
 			<region name="cuba" />
 			<region name="dominica" />
 			<region name="el-salvador" />
+			<region name="grenada" />
+			<region name="guadeloupe" />
 			<region name="honduras" />
 			<region name="jamaica" />
-			<region name="guadeloupe" />
-			<region name="grenada" />
 			<region name="martinique" />
 			<region name="montserrat"/>
 			<region name="netherlands-antilles" />
@@ -542,8 +556,8 @@
 
 		<!-- 8.2 AFRICA [SOURCE: OSMAND:NET] -->
 		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" region_suffix="_Africa"  skip="false">
-			<region name="angola"/>
 			<region name="algeria"/>
+			<region name="angola"/>
 			<region name="burundi"/>
 			<region name="cameroon"/>
 			<region name="cape-verde"/>
