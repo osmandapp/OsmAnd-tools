@@ -64,9 +64,6 @@
 		 	<region  name="portugal"/>
 		 	<region  name="switzerland"/>
 		 	<region  name="germany_baden-wuerttemberg"/>
-		 	<region  name="gb_england_bedfordshire"/>
-		 	<region  name="gb_england_berkshire"/>
-		 	<region  name="gb_england_hertfordshire"/>
 		</regions>
 
 		<!-- 1.2 GREAT BRITAIN [SOURCE: GEOFABRIK.DE] -->
@@ -76,7 +73,29 @@
 			<region name="england" downloadName="england-latest"/>
 		</regions>
 
+		<!-- REGION division -->
+		<!-- plus  greater-london -->
+		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" skip="false" region_suffix="_Europe">	
+		 	<region  name="gb_england_east-midlands"/>
+		 	<region  name="gb_england_east-of-england"/>
+		 	<region  name="gb_england_north-east-england"/>
+		 	<region  name="gb_england_north-west-england"/>
+		 	<region  name="gb_england_south-east-england"/>
+		 	<region  name="gb_england_south-west-england"/>
+		 	<region  name="gb_england_west-midlands"/>
+		 	<region  name="gb_england_yorkshire-and-the-humber"/>
+		</regions>
+
+
+		<!-- TODO delete shires? -->
 		<!-- 1.2.1 GREAT BRITAIN - ENGLAND [SOURCE: GEOFABRIK.DE] -->
+		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" skip="false" region_suffix="_Europe">	
+		 	<region  name="gb_england_bedfordshire"/>
+		 	<region  name="gb_england_berkshire"/>
+		 	<region  name="gb_england_hertfordshire"/>
+		</regions>
+
+
 		<regions siteToDownload="http://download.geofabrik.de/europe/great-britain/england/{0}.osm.pbf" region_prefix="GB_England_" skip="false" region_suffix="_Europe">
 			<region name="buckinghamshire" downloadName="buckinghamshire-latest"/>
 			<region name="cambridgeshire" downloadName="cambridgeshire-latest"/>
@@ -491,7 +510,6 @@
 			<region name="afghanistan"/>
 			<region name="bhutan"/>
 			<region name="british-indian-ocean-territory"/>  
-			<region name="iran"/>
 			<region name="maldives"/>
 			<region name="nepal"/>
 			<region name="sri-lanka"/>			
