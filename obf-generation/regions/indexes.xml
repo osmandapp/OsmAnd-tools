@@ -75,15 +75,15 @@
 
 		<!-- REGION division -->
 		<!-- plus  greater-london -->
-		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" skip="false" region_suffix="_Europe">	
-		 	<region  name="gb_england_east-midlands"/>
-		 	<region  name="gb_england_east-of-england"/>
-		 	<region  name="gb_england_north-east-england"/>
-		 	<region  name="gb_england_north-west-england"/>
-		 	<region  name="gb_england_south-east-england"/>
-		 	<region  name="gb_england_south-west-england"/>
-		 	<region  name="gb_england_west-midlands"/>
-		 	<region  name="gb_england_yorkshire-and-the-humber"/>
+		<regions siteToDownload="http://download.osmand.net/osm-downloads/gb_england-{0}.pbf" region_prefix="GB_england" skip="false" region_suffix="_Europe">	
+		 	<region  name="east-midlands"/>
+		 	<region  name="east-of-england"/>
+		 	<region  name="north-east-england"/>
+		 	<region  name="north-west-england"/>
+		 	<region  name="south-east-england"/>
+		 	<region  name="south-west-england"/>
+		 	<region  name="west-midlands"/>
+		 	<region  name="yorkshire-and-the-humber"/>
 		</regions>
 
 
