@@ -75,7 +75,7 @@
 
 		<!-- REGION division -->
 		<!-- plus  greater-london -->
-		<regions siteToDownload="http://download.osmand.net/osm-downloads/gb_england-{0}.pbf" region_prefix="GB_england" skip="false" region_suffix="_Europe">	
+		<regions siteToDownload="http://download.osmand.net/osm-downloads/gb_england-{0}.pbf" region_prefix="GB_England_" skip="false" region_suffix="_Europe">	
 		 	<region  name="east-midlands"/>
 		 	<region  name="east-of-england"/>
 		 	<region  name="north-east-england"/>
