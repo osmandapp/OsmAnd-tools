@@ -293,7 +293,7 @@
 		</regions>
 
 		<!-- russia federal district -->
-		<regions siteToDownload="http://download.osmand.net/osm-downloads/russia-{0}.osm.pbf" region_prefix="Russia_"  skip="false" region_suffix="_Asia">
+		<regions siteToDownload="http://download.osmand.net/osm-downloads/russia-{0}.pbf" region_prefix="Russia_"  skip="false" region_suffix="_Asia">
 			<region name="central-federal-district"/>
 			<region name="far-eastern-federal-district"/>
 			<region name="north-caucasus-federal-district"/>
