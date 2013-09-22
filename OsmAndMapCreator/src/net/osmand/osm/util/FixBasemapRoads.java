@@ -195,6 +195,7 @@ public class FixBasemapRoads {
             }
 	        // don't keep names
 	        first.removeTag("name");
+	        first.removeTag("junction");
         }
 
         public void reverse() {
@@ -473,7 +474,7 @@ public class FixBasemapRoads {
 	    }
 	    if(ref == null) {
 		    LatLon lt = way.getLatLon();
-		    ref = MapUtils.getTileNumberY(6, lt.getLatitude()) + " " + MapUtils.getTileNumberX(6, lt.getLongitude());
+		    ref = MapUtils.getTileNumberY(4, lt.getLatitude()) + " " + MapUtils.getTileNumberX(4, lt.getLongitude());
 	    }
 
         if(ref != null && !ref.isEmpty()) {

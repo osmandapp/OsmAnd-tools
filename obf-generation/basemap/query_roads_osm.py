@@ -17,7 +17,7 @@ def LineString(geoStr):
 def esc(s):
 	return s.replace("\"", "&quot;").replace("<", "&lt;").replace(">", "&gt;").replace("&", "&amp;").replace("'","&apos;")
 
-def process_roads(cond, filename):
+def process_roads(cond, filename, fields):
 	conn_string = "host='127.0.0.1' dbname='gis' user='gisuser' password='gisuser' port='5433'"
 	f = open(filename,'w')
 	f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
@@ -25,10 +25,14 @@ def process_roads(cond, filename):
  
 	conn = psycopg2.connect(conn_string)
 	cursor = conn.cursor()
-	array = ['name', 'ref', 'highway','railway','waterway', 'junction', 'route']
+	array = ['name', 'ref']
+	selectFields = ""
+	for field in fields:
+		array.append(field)
+		selectFields += ", " + field
 	shift = 2
 	cursor.execute("select osm_id, ST_AsText(ST_Transform(ST_Simplify(way,50),4326)),"
-				   " name, ref, highway, railway, waterway, junction, route "
+				   " name, ref " + selectFields +
 				   # roads faster but doesn't contain ferry & river
 				   " from planet_osm_line where " + cond + # ST_Length(way) > 100 and
 				  # "LIMIT 1000"
@@ -60,11 +64,12 @@ def process_roads(cond, filename):
 	f.write('</osm>')
 
 if __name__ == "__main__":
-	process_roads("highway='motorway'", "line_motorway.osm")
-	process_roads("highway='trunk'", "line_trunk.osm")
-	process_roads("highway='primary'", "line_primary.osm")
-	process_roads("highway='secondary'", "line_secondary.osm")
-	process_roads("railway='rail'", "line_railway.osm")
-	process_roads("route='ferry'", "line_ferry.osm")
-	#process_roads("highway='tertiary'", "line_tertiary.osm")
-	#process_roads("waterway='river' or waterway='canal' ", "line_rivers.osm")
+	process_roads("(admin_level = '4' or admin_level = '2')", "line_admin_level.osm", ['admin_level'])
+	#process_roads("highway='motorway'", "line_motorway.osm", ['highway', 'junction', 'route'])
+	#process_roads("highway='trunk'", "line_trunk.osm", ['highway', 'junction', 'route'])
+	#process_roads("highway='primary'", "line_primary.osm", ['highway', 'junction', 'route'])
+	#process_roads("highway='secondary'", "line_secondary.osm", ['highway', 'junction', 'route'])
+	#process_roads("railway='rail'", "line_railway.osm", ['railway'])
+	#process_roads("route='ferry'", "line_ferry.osm", ['route'])
+	#process_roads("highway='tertiary'", "line_tertiary.osm", ['highway', 'junction', 'route'])
+	#process_roads("waterway='river' or waterway='canal' ", "line_rivers.osm", ['waterway'])

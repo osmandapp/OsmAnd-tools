@@ -58,6 +58,7 @@ def process_polygons(tags, filename):
  
 	# retrieve the records from the database
 	parenComma = re.compile('\)\s*,\s*\(')
+	doubleParenComma = re.compile('\)\)\s*,\s*\(\(')
 	trimParens = re.compile('^\s*\(?(.*?)\)?\s*$')
 	rel_id = -1
 	way_id = -100000000
@@ -66,55 +67,63 @@ def process_polygons(tags, filename):
 	for row in cursor:
 		if row[1] is None:
 			continue
-		node_xml = ""
-		way_xml = ""
-		rel_id = rel_id - 1
-		xml = '\n<relation id="%s" >\n' % (rel_id)
-		xml += '\t<tag k="type" v="multipolygon" />\n'
-		tags_xml = ""
+		
+		tags_xml = '\t<tag k="type" v="multipolygon" />\n'
 		base = shift
 		while base - shift < len(array):
 			if row[base] is not None:
 				tags_xml += '\t<tag k="%s" v="%s" />\n' % (array[base - shift], esc(row[base]))
 			base = base + 1
-		xml += tags_xml
+		# tags_xml += '\t<tag k="coordinates" v="%s" />\n' % row[1]
 
-		coordinates = row[1][len("POLYGON("):-1]
-		rings = parenComma.split(coordinates)
-		first = 0
-		for i,ring in enumerate(rings):
-			ring = trimParens.match(ring).groups()[0]
-			line = LineString(ring)
-			way_id = way_id - 1;
-			if first == 0:
-				xml += '\t<member type="way" ref="%s" role="outer" />\n' % (way_id)
-				first = 1
-			else:
-				xml += '\t<member type="way" ref="%s" role="inner" />\n' % (way_id)
+		polygons = []
+		if row[1].startswith("POLYGON"):
+			polygons = [row[1][len("POLYGON(("):-2]]
+		elif row[1].startswith("MULTIPOLYGON"):
+			polygons = doubleParenComma.split(row[1][len("MULTIPOLYGON((("):-3])
+		else :
+			polygons = "#ERROR, #ERROR"
 
-			way_xml += '\n<way id="%s" >\n' % (way_id)
-			if admin_level:
-				way_xml += tags_xml
-			first_node_id = 0
-			first_node = []
-			for c in line:
-				node_id = node_id - 1
-				nid = node_id
-				if first_node_id == 0:
-					first_node_id = node_id
-					first_node = c
-					node_xml += '\n<node id="%s" lat="%s" lon="%s"/>' % (nid, c[1], c[0])
-				elif first_node == c:
-					nid = first_node_id
+		for coordinates in polygons:
+			rel_id = rel_id - 1
+			xml = '\n<relation id="%s" >\n' % (rel_id)
+			xml += tags_xml
+			node_xml = ""
+			way_xml = ""
+			rings = parenComma.split(coordinates)
+			first = 0
+			for ring in rings:
+				line = LineString(ring)
+				way_id = way_id - 1;
+				if first == 0:
+					xml += '\t<member type="way" ref="%s" role="outer" />\n' % (way_id)
+					first = 1
 				else:
-					node_xml += '\n<node id="%s" lat="%s" lon="%s"/>' % (nid, c[1], c[0])
-				way_xml += '\t<nd ref="%s" />\n' % (nid)
-			way_xml += '</way>'
-		xml += '</relation>'	
-		f.write(node_xml)
-		f.write(way_xml)
-		if not admin_level:
-			f.write(xml)
+					xml += '\t<member type="way" ref="%s" role="inner" />\n' % (way_id)
+	
+				way_xml += '\n<way id="%s" >\n' % (way_id)
+				if admin_level:
+					way_xml += tags_xml
+				first_node_id = 0
+				first_node = []
+				for c in line:
+					node_id = node_id - 1
+					nid = node_id
+					if first_node_id == 0:
+						first_node_id = node_id
+						first_node = c
+						node_xml += '\n<node id="%s" lat="%s" lon="%s"/>' % (nid, c[1], c[0])
+					elif first_node == c:
+						nid = first_node_id
+					else:
+						node_xml += '\n<node id="%s" lat="%s" lon="%s"/>' % (nid, c[1], c[0])
+					way_xml += '\t<nd ref="%s" />\n' % (nid)
+				way_xml += '</way>'
+			xml += '</relation>'	
+			f.write(node_xml)
+			f.write(way_xml)
+			if not admin_level:
+				f.write(xml)
 		f.write('\n')
 	f.write('</osm>')
 
