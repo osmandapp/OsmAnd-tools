@@ -27,7 +27,7 @@ public class FixBasemapRoads {
 	public static void main(String[] args) throws IOException, SAXException, XMLStreamException {
 		String fileToRead = args != null && args.length > 0 ? args[0] : null; 
 		if(fileToRead == null) {
-			fileToRead = "/home/victor/projects/osmand/temp/area-result.osm";
+			fileToRead = "/home/victor/projects/osmand/temp/line_railway.osm";
 		}
 		File read = new File(fileToRead);
 		File write ;
@@ -329,7 +329,7 @@ public class FixBasemapRoads {
         double last = directionRoute(end.getLastPoints(150), false);
         double first = directionRoute(begin.getFirstPoints(150), true);
         double diff = MapUtils.alignAngleDifference(first - last);
-        return Math.abs(diff) < Math.PI / 4;
+	    return Math.abs(diff) < 3 * Math.PI / 8;
     }
 
     private boolean continuation(RoadLine end, RoadLine begin) {
