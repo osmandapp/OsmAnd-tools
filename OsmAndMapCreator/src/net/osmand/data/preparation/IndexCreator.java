@@ -88,7 +88,6 @@ public class IndexCreator {
 	private boolean recreateOnlyBinaryFile = false; // false;
 	private boolean deleteOsmDB = true;
 	private boolean deleteDatabaseIndexes = true;
-	private boolean combineLowLevelWays = true;
 
 	private Object dbConn;
 	private File dbFile;
@@ -177,9 +176,6 @@ public class IndexCreator {
 		}
 	}
 
-	public void setCombineLowLevelWays(boolean combineLowLevelWays) {
-		this.combineLowLevelWays = combineLowLevelWays;
-	}
 
 	public Long getLastModifiedDate() {
 		return lastModifiedDate;
@@ -486,7 +482,7 @@ public class IndexCreator {
 		this.indexPoiCreator = new IndexPoiCreator(renderingTypes);
 		this.indexAddressCreator = new IndexAddressCreator(logMapDataWarn);
 		this.indexMapCreator = new IndexVectorMapCreator(logMapDataWarn, mapZooms, renderingTypes,
-				combineLowLevelWays, zoomWaySmothness);
+				 zoomWaySmothness);
 		this.indexRouteCreator = new IndexRouteCreator(renderingTypes, logMapDataWarn);
 		this.accessor = new OsmDbAccessor();
 
@@ -638,7 +634,7 @@ public class IndexCreator {
 						progress.startTask(Messages.getString("IndexCreator.INDEX_LO_LEVEL_WAYS"), -1);
 						indexRouteCreator.processingLowLevelWays(progress);
 					}
-					
+
 				}
 
 				// 3.5 update all postal codes from relations
