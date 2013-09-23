@@ -642,6 +642,7 @@ public class BasemapProcessor {
             IndexCreator creator = new IndexCreator(folder); //$NON-NLS-1$
 	        creator.setDialects(DBDialect.SQLITE_IN_MEMORY, DBDialect.SQLITE_IN_MEMORY);
             creator.setIndexMap(true);
+	        creator.setCombineLowLevelWays(false);
             creator.setZoomWaySmothness(2);
             creator.setMapFileName("World_basemap_2.obf");
             ArrayList<File> src = new ArrayList<File>();

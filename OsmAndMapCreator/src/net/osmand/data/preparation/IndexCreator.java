@@ -88,6 +88,7 @@ public class IndexCreator {
 	private boolean recreateOnlyBinaryFile = false; // false;
 	private boolean deleteOsmDB = true;
 	private boolean deleteDatabaseIndexes = true;
+	private boolean combineLowLevelWays = true;
 
 	private Object dbConn;
 	private File dbFile;
@@ -174,6 +175,10 @@ public class IndexCreator {
 		if(mapIndexDBDialect != null) {
 			this.mapIndexDBDialect = mapIndexDBDialect;
 		}
+	}
+
+	public void setCombineLowLevelWays(boolean combineLowLevelWays) {
+		this.combineLowLevelWays = combineLowLevelWays;
 	}
 
 	public Long getLastModifiedDate() {
@@ -480,7 +485,8 @@ public class IndexCreator {
 		this.indexTransportCreator = new IndexTransportCreator();
 		this.indexPoiCreator = new IndexPoiCreator(renderingTypes);
 		this.indexAddressCreator = new IndexAddressCreator(logMapDataWarn);
-		this.indexMapCreator = new IndexVectorMapCreator(logMapDataWarn, mapZooms, renderingTypes, zoomWaySmothness);
+		this.indexMapCreator = new IndexVectorMapCreator(logMapDataWarn, mapZooms, renderingTypes,
+				combineLowLevelWays, zoomWaySmothness);
 		this.indexRouteCreator = new IndexRouteCreator(renderingTypes, logMapDataWarn);
 		this.accessor = new OsmDbAccessor();
 
