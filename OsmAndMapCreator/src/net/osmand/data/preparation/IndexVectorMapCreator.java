@@ -74,18 +74,15 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	private RTree[] mapTree = null;
 	private Connection mapConnection;
 
-	private boolean combineLowLevelWays;
 	private int zoomWaySmothness = 0;
 	private final Log logMapDataWarn;
 
 	private static long notUsedId = - 1 << 40; // million million  
 
 	public IndexVectorMapCreator(Log logMapDataWarn, MapZooms mapZooms, MapRenderingTypesEncoder renderingTypes,
-	                             boolean combineLowLevelWays,
 	                             int zoomWaySmothness) {
 		this.logMapDataWarn = logMapDataWarn;
 		this.mapZooms = mapZooms;
-		this.combineLowLevelWays = combineLowLevelWays;
 		this.zoomWaySmothness = zoomWaySmothness;
 		this.renderingTypes = renderingTypes;
 		lowLevelWays = -1;
@@ -308,20 +305,18 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			ArrayList<Float> wayNodes = new ArrayList<Float>(list);
 
 			// combine startPoint with EndPoint
-			if (combineLowLevelWays) {
-				CombineStartNodeWithEndNodes combineStartNodeWithEndNodes =
-						new CombineStartNodeWithEndNodes(endStat, visitedWays, list, temp, tempAdd, (short) level, startNode, name).
-								invoke(wayNodes);
-				name = combineStartNodeWithEndNodes.getName();
-				startNode = combineStartNodeWithEndNodes.getStartNode();
+			CombineStartNodeWithEndNodes combineStartNodeWithEndNodes =
+					new CombineStartNodeWithEndNodes(endStat, visitedWays, list, temp, tempAdd, (short) level, startNode, name).
+							invoke(wayNodes);
+			name = combineStartNodeWithEndNodes.getName();
+			startNode = combineStartNodeWithEndNodes.getStartNode();
 
-				// combined end point
-				CombineEndNodeWithStartNodes combineEndNodeWithStartNodes =
-						new CombineEndNodeWithStartNodes(startStat, visitedWays, list, temp, tempAdd, (short) level, endNode, name).
-								invoke(wayNodes);
-				endNode = combineEndNodeWithStartNodes.getEndNode();
-				name = combineEndNodeWithStartNodes.getName();
-			}
+			// combined end point
+			CombineEndNodeWithStartNodes combineEndNodeWithStartNodes =
+					new CombineEndNodeWithStartNodes(startStat, visitedWays, list, temp, tempAdd, (short) level, endNode, name).
+							invoke(wayNodes);
+			endNode = combineEndNodeWithStartNodes.getEndNode();
+			name = combineEndNodeWithStartNodes.getName();
 
 			List<Node> wNodes = new ArrayList<Node>();
 			int wNsize = wayNodes.size();

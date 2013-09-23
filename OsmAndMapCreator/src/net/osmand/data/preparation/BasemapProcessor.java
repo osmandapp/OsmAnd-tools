@@ -5,14 +5,13 @@ import gnu.trove.map.hash.TLongObjectHashMap;
 import net.osmand.PlatformUtil;
 import net.osmand.binary.OsmandOdb.MapData;
 import net.osmand.binary.OsmandOdb.MapDataBlock;
+import net.osmand.data.QuadRect;
 import net.osmand.data.preparation.MapZooms.MapZoomPair;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.MapRenderingTypesEncoder.MapRulType;
 import net.osmand.osm.WayChain;
 import net.osmand.osm.edit.*;
-import net.osmand.osm.io.OsmBaseStorage;
-import net.osmand.osm.io.OsmStorageWriter;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapAlgorithms;
 import net.osmand.util.MapUtils;
@@ -430,13 +429,18 @@ public class BasemapProcessor {
 					}
 
 				}
-				addAreaObject(id, level, zoomPair, zoomToEncode, outer, inner);
+				if (OsmMapUtils.polygonAreaPixels(outer, zoomToEncode) < PIXELS_THRESHOLD_AREA) {
+					continue;
+				}
+				addObject(id, level, zoomPair, zoomToEncode, outer, inner);
 			} else if (e instanceof Way) {
 				if (((Way) e).getNodes().size() < 2) {
 					continue;
 				}
-				if ("coastline".equals(e.getTag("natural")) || !Algorithms.isEmpty(e.getTag("admin_level"))) {
-					if (((Way) e).getFirstNodeId() == ((Way) e).getLastNodeId() && !mostDetailed) {
+				double dist = OsmMapUtils.getDistance(((Way) e).getFirstNode(), ((Way) e).getLastNode());
+				boolean polygon = dist < 100;
+				if ("coastline".equals(e.getTag("natural"))) {
+					if (polygon && !mostDetailed) {
 						if (OsmMapUtils.polygonAreaPixels(((Way) e).getNodes(), zoomToEncode) < PIXELS_THRESHOLD_AREA) {
 							continue;
 						}
@@ -446,34 +450,41 @@ public class BasemapProcessor {
 							zoomPair, zoomToEncode, quadTrees[level], id);
 				} else {
 					List<Node> ns = ((Way) e).getNodes();
-					addAreaObject(id, level, zoomPair, zoomToEncode, ns, null);
+					List<Node> polygonToMeasure = ns;
+					if (!polygon) {
+						QuadRect qr = ((Way) e).getLatLonBBox();
+						polygonToMeasure = new ArrayList<Node>();
+						polygonToMeasure.add(new Node(qr.left, qr.top, 1));
+						polygonToMeasure.add(new Node(qr.right, qr.bottom, 1));
+					}
+					if(OsmMapUtils.polygonAreaPixels(ns, zoomToEncode) < PIXELS_THRESHOLD_AREA){
+						continue;
+					}
+					addObject(id, level, zoomPair, zoomToEncode, ns, null);
 				}
 			} else {
 				int z = getViewZoom(zoomPair.getMinZoom(), zoomToEncode);
 				int tilex = (int) MapUtils.getTileNumberX(z, ((Node) e).getLongitude());
 				int tiley = (int) MapUtils.getTileNumberY(z, ((Node) e).getLatitude());
-				addSimplisticData(Collections.singletonList((Node) e), null, typeUse.toArray(), !addtypeUse.isEmpty() ? addtypeUse.toArray() : null, zoomPair,
+				addRawData(Collections.singletonList((Node) e), null, typeUse.toArray(), !addtypeUse.isEmpty() ? addtypeUse.toArray() : null, zoomPair,
 						quadTrees[level], z, tilex, tiley, namesUse.isEmpty() ? null : new LinkedHashMap<MapRulType, String>(namesUse), id);
 			}
 
 		}
 	}
 
-	private void addAreaObject(long id, int level, MapZoomPair zoomPair, int zoomToEncode, List<Node> outer, List<List<Node>> inner) {
+	private void addObject(long id, int level, MapZoomPair zoomPair, int zoomToEncode, List<Node> way, List<List<Node>> inner) {
 		int z = getViewZoom(zoomPair.getMinZoom(), zoomToEncode);
-		if (OsmMapUtils.polygonAreaPixels(outer, zoomToEncode) < PIXELS_THRESHOLD_AREA) {
-			return;
-		}
 		int tilex = 0;
 		int tiley = 0;
 		boolean sameTile = false;
 		while (!sameTile) {
-		    tilex = (int) MapUtils.getTileNumberX(z, outer.get(0).getLongitude());
-		    tiley = (int) MapUtils.getTileNumberY(z, outer.get(0).getLatitude());
+		    tilex = (int) MapUtils.getTileNumberX(z, way.get(0).getLongitude());
+		    tiley = (int) MapUtils.getTileNumberY(z, way.get(0).getLatitude());
 		    sameTile = true;
-		    for (int i = 1; i < outer.size(); i++) {
-		        int tx = (int) MapUtils.getTileNumberX(z, outer.get(i).getLongitude());
-		        int ty = (int) MapUtils.getTileNumberY(z, outer.get(i).getLatitude());
+		    for (int i = 1; i < way.size(); i++) {
+		        int tx = (int) MapUtils.getTileNumberX(z, way.get(i).getLongitude());
+		        int ty = (int) MapUtils.getTileNumberY(z, way.get(i).getLatitude());
 		        if (tx != tilex || ty != tiley) {
 		            sameTile = false;
 		            break;
@@ -484,7 +495,7 @@ public class BasemapProcessor {
 		    }
 		}
 		List<Node> res = new ArrayList<Node>();
-		OsmMapUtils.simplifyDouglasPeucker(outer, zoomToEncode - 1 + 8 + zoomWaySmothness, 3, res, false);
+		OsmMapUtils.simplifyDouglasPeucker(way, zoomToEncode - 1 + 8 + zoomWaySmothness, 3, res, false);
 		if(inner != null) {
 			Iterator<List<Node>> it = inner.iterator();
 			while(it.hasNext()) {
@@ -499,8 +510,8 @@ public class BasemapProcessor {
 				}
 			}
 		}
-		addSimplisticData(res, inner, typeUse.toArray(), !addtypeUse.isEmpty() ? addtypeUse.toArray() : null, zoomPair,
-		        quadTrees[level], z, tilex, tiley, namesUse.isEmpty() ? null : new LinkedHashMap<MapRulType, String>(namesUse), id);
+		addRawData(res, inner, typeUse.toArray(), !addtypeUse.isEmpty() ? addtypeUse.toArray() : null, zoomPair,
+				quadTrees[level], z, tilex, tiley, namesUse.isEmpty() ? null : new LinkedHashMap<MapRulType, String>(namesUse), id);
 	}
 
 	public void splitContinuousWay(List<Node> ns, int[] types, int[] addTypes, MapZoomPair zoomPair, int zoomToEncode,
@@ -566,12 +577,12 @@ public class BasemapProcessor {
             }
             List<Node> res = new ArrayList<Node>();
             OsmMapUtils.simplifyDouglasPeucker(w, zoomToEncode - 1 + 8 + zoomWaySmothness, 3, res, true);
-            addSimplisticData(res, null, types, addTypes, zoomPair, quadTree, z, tilex, tiley, null, id);
+            addRawData(res, null, types, addTypes, zoomPair, quadTree, z, tilex, tiley, null, id);
         }
     }
 
-    private void addSimplisticData(List<Node> res, List<List<Node>> inner, int[] types, int[] addTypes, MapZoomPair zoomPair, SimplisticQuadTree quadTree, int z, int tilex,
-                                   int tiley, Map<MapRulType, String> names, long id) {
+    private void addRawData(List<Node> res, List<List<Node>> inner, int[] types, int[] addTypes, MapZoomPair zoomPair, SimplisticQuadTree quadTree, int z, int tilex,
+                            int tiley, Map<MapRulType, String> names, long id) {
         SimplisticQuadTree quad = quadTree.getOrCreateSubTree(tilex, tiley, z);
         if (quad == null) {
             if (logMapDataWarn != null) {
