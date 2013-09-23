@@ -459,8 +459,8 @@ public class BasemapProcessor {
 						double mult = 1 / MapUtils.getPowZoom(Math.max(31 - (zoomToEncode + 8), 0));
 						int x31 = MapUtils.get31TileNumberX(qr.right - qr.left);
 						int y31 = MapUtils.get31TileNumberY(qr.top - qr.bottom);
-						if(mult * x31 < PIXELS_THRESHOLD_AREA / 2 &&
-								mult * y31 < PIXELS_THRESHOLD_AREA / 2 ) {
+						if(mult * x31 < PIXELS_THRESHOLD_AREA &&
+								mult * y31 < PIXELS_THRESHOLD_AREA ) {
 							continue;
 						}
 					} else {
