@@ -82,7 +82,7 @@ def process_polygons(tags, filename):
 		elif row[1].startswith("MULTIPOLYGON"):
 			polygons = doubleParenComma.split(row[1][len("MULTIPOLYGON((("):-3])
 		else :
-			polygons = "#ERROR, #ERROR"
+			polygons = [];#"#ERROR, #ERROR"
 
 		for coordinates in polygons:
 			rel_id = rel_id - 1
