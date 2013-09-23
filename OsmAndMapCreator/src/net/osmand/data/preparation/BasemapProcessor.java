@@ -461,7 +461,7 @@ public class BasemapProcessor {
 						int y31 = MapUtils.get31TileNumberY(qr.top - qr.bottom);
 						if(mult * x31 < PIXELS_THRESHOLD_AREA / 2 &&
 								mult * y31 < PIXELS_THRESHOLD_AREA / 2 ) {
-						//	continue;
+							continue;
 						}
 					} else {
 						if(OsmMapUtils.polygonAreaPixels(ns, zoomToEncode) < PIXELS_THRESHOLD_AREA){
