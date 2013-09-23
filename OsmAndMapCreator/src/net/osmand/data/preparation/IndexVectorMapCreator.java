@@ -377,7 +377,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			} else {
 				// coastline
 				if(!typeUse.contains(renderingTypes.getCoastlineRuleType().getInternalId())) {
-					skip = checkForSmallAreas(wNodes, zoom  + Math.min(zoomWaySmothness / 2, 3), 2, 8);
+				//	skip = checkForSmallAreas(wNodes, zoom  + Math.min(zoomWaySmothness / 2, 3), 2, 8);
 				}
 			}
 			if (!skip) {
