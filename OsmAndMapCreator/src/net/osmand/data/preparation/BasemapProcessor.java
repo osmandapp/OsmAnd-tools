@@ -453,6 +453,9 @@ public class BasemapProcessor {
 					List<Node> polygonToMeasure = ns;
 					if (!polygon) {
 						QuadRect qr = ((Way) e).getLatLonBBox();
+						if(qr == null) {
+							continue;
+						}
 						polygonToMeasure = new ArrayList<Node>();
 						polygonToMeasure.add(new Node(qr.left, qr.top, 1));
 						polygonToMeasure.add(new Node(qr.right, qr.bottom, 1));
