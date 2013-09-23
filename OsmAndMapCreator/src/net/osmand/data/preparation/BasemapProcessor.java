@@ -456,13 +456,19 @@ public class BasemapProcessor {
 						if(qr == null) {
 							continue;
 						}
-						polygonToMeasure = new ArrayList<Node>();
-						polygonToMeasure.add(new Node(qr.left, qr.top, 1));
-						polygonToMeasure.add(new Node(qr.right, qr.bottom, 1));
+						double mult = 1 / MapUtils.getPowZoom(Math.max(31 - (zoomToEncode + 8), 0));
+						int x31 = MapUtils.get31TileNumberX(qr.right - qr.left);
+						int y31 = MapUtils.get31TileNumberY(qr.top - qr.bottom);
+						if(mult * x31 < PIXELS_THRESHOLD_AREA / 2 &&
+								mult * y31 < PIXELS_THRESHOLD_AREA / 2 ) {
+						//	continue;
+						}
+					} else {
+						if(OsmMapUtils.polygonAreaPixels(ns, zoomToEncode) < PIXELS_THRESHOLD_AREA){
+							continue;
+						}
 					}
-					if(OsmMapUtils.polygonAreaPixels(ns, zoomToEncode) < PIXELS_THRESHOLD_AREA){
-						continue;
-					}
+
 					addObject(id, level, zoomPair, zoomToEncode, ns, null);
 				}
 			} else {
