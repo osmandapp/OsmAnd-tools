@@ -457,10 +457,12 @@ public class BasemapProcessor {
 							continue;
 						}
 						double mult = 1 / MapUtils.getPowZoom(Math.max(31 - (zoomToEncode + 8), 0));
-						int x31 = MapUtils.get31TileNumberX(qr.right - qr.left);
-						int y31 = MapUtils.get31TileNumberY(qr.top - qr.bottom);
-						if(mult * x31 < PIXELS_THRESHOLD_AREA &&
-								mult * y31 < PIXELS_THRESHOLD_AREA ) {
+						int rx = MapUtils.get31TileNumberX(qr.right);
+						int lx = MapUtils.get31TileNumberX(qr.left);
+						int by = MapUtils.get31TileNumberY(qr.bottom);
+						int ty = MapUtils.get31TileNumberY(qr.top);
+						if(mult * (rx - lx) < PIXELS_THRESHOLD_AREA &&
+								mult * (by - ty) < PIXELS_THRESHOLD_AREA ) {
 							continue;
 						}
 					} else {
@@ -651,7 +653,7 @@ public class BasemapProcessor {
 
     public static void main(String[] p) throws InterruptedException, SAXException, SQLException, IOException, XMLStreamException {
         if (p.length == 0) {
-            System.out.println("Please specify folder with basemap *.osm or *.osm.bz2 files");
+	        System.out.println("Please specify folder with basemap *.osm or *.osm.bz2 files");
         } else {
             long time = System.currentTimeMillis();
             MapRenderingTypesEncoder rt = MapRenderingTypesEncoder.getDefault();
