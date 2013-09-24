@@ -788,7 +788,7 @@ public class IndexCreator {
 		MapRenderingTypesEncoder rt = MapRenderingTypesEncoder.getDefault();
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 
-		String file = "/home/victor/projects/osmand/temp/route.osm";
+		String file = "/home/victor/projects/osmand/temp/.osm";
 
 		generateRegionsFile(creator, rt);
 //		int st = file.lastIndexOf('/');
