@@ -27,7 +27,7 @@ public class FixBasemapRoads {
 	public static void main(String[] args) throws IOException, SAXException, XMLStreamException {
 		String fileToRead = args != null && args.length > 0 ? args[0] : null; 
 		if(fileToRead == null) {
-			fileToRead = "/home/victor/projects/osmand/temp/line_railway.osm";
+			fileToRead = "/home/victor/projects/osmand/temp/line_railway_blr.osm";
 		}
 		File read = new File(fileToRead);
 		File write ;
@@ -474,7 +474,7 @@ public class FixBasemapRoads {
 	    }
 	    if(ref == null || ref.isEmpty()) {
 		    LatLon lt = way.getLatLon();
-		    ref = MapUtils.getTileNumberY(3, lt.getLatitude()) + " " + MapUtils.getTileNumberX(3, lt.getLongitude());
+		    ref = ((int)MapUtils.getTileNumberY(4, lt.getLatitude())) + " " + ((int)MapUtils.getTileNumberX(4, lt.getLongitude()));
 	    }
 
         if(ref != null && !ref.isEmpty()) {
