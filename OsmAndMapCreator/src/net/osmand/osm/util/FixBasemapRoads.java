@@ -472,9 +472,9 @@ public class FixBasemapRoads {
 			    ref = ref.substring(0, ref.indexOf(';'));
 		    }
 	    }
-	    if(ref == null) {
+	    if(ref == null || ref.isEmpty()) {
 		    LatLon lt = way.getLatLon();
-		    ref = MapUtils.getTileNumberY(4, lt.getLatitude()) + " " + MapUtils.getTileNumberX(4, lt.getLongitude());
+		    ref = MapUtils.getTileNumberY(3, lt.getLatitude()) + " " + MapUtils.getTileNumberX(3, lt.getLongitude());
 	    }
 
         if(ref != null && !ref.isEmpty()) {
