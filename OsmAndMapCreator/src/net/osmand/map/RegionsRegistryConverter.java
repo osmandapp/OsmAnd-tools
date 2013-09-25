@@ -43,13 +43,15 @@ import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 
 public class RegionsRegistryConverter {
-    static String REPO_PATH = "./"; //"../../"  ;
+    static String REPO_PATH = "../"; //"../../"  ;
 	static String COUNTRIES_FILE = "resources/countries-info/countries.xml";
 	static String COUNTRIES_OPT_FILE = "resources/countries-info/opt-countries.xml";
 	static String OUTPUT_BINARY_FILE = "resources/countries-info/"+RegionRegistry.fileName;
 	
 	public static List<RegionCountry> parseRegions(boolean withNoValidated) throws IllegalStateException, FileNotFoundException {
-		InputStream is = new FileInputStream(REPO_PATH+COUNTRIES_FILE);
+		final File f = new File(REPO_PATH + COUNTRIES_FILE);
+		System.out.println("Parse " + f.getAbsolutePath());
+		InputStream is = new FileInputStream(f);
 		try {
 			SAXParser parser = SAXParserFactory.newInstance().newSAXParser();
 			RegionsHandler h = new RegionsHandler(parser, withNoValidated);
@@ -255,7 +257,7 @@ public class RegionsRegistryConverter {
 			Element item = (Element) r.item(i);
 			String name = parentName + item.getAttribute("name");
 			if(elements.containsKey(name)) {
-				throw new IllegalStateException();
+				throw new IllegalStateException(name);
 			} else {
 				elements.put(name, item);
 			}
