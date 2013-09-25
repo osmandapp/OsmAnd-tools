@@ -424,7 +424,7 @@ public class IndexUploader {
 		summary = " data for ";
 		boolean fir = true;
 		if(fileName.contains(".srtm")) {
-			summary = "SRTM " + summary;
+			summary = "SRTM" + summary;
 		} else {
 			if (reader.containsAddressData()) {
 				summary = "Address" + (fir ? "" : ", ") + summary;
