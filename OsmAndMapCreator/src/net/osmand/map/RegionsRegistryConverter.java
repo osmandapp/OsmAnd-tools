@@ -68,7 +68,7 @@ public class RegionsRegistryConverter {
 	
 	public static void main(String[] args) throws Exception {
 		validate(true);
-//		optimizeBoxes();
+		optimizeBoxes();
 		List<RegionCountry> countries = recreateReginfo();
 		checkFileRead(countries);
 		

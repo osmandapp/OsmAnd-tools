@@ -421,27 +421,31 @@ public class IndexUploader {
 
 	private String getDescription(BinaryMapIndexReader reader, String fileName) {
 		String summary;
-		summary = " index for ";
+		summary = " data for ";
 		boolean fir = true;
-		if (reader.containsAddressData()) {
-			summary = "Address" + (fir ? "" : ", ") + summary;
-			fir = false;
-		}
-		if (reader.hasTransportData()) {
-			summary = "Transport" + (fir ? "" : ", ") + summary;
-			fir = false;
-		}
-		if (reader.containsPoiData()) {
-			summary = "POI" + (fir ? "" : ", ") + summary;
-			fir = false;
-		}
-		if (reader.containsRouteData()) {
-			summary = "Roads" + (fir ? "" : ", ") + summary;
-			fir = false;
-		}
-		if (reader.containsMapData()) {
-			summary = "Map" + (fir ? "" : ", ") + summary;
-			fir = false;
+		if(fileName.contains(".srtm")) {
+			summary = "SRTM " + summary;
+		} else {
+			if (reader.containsAddressData()) {
+				summary = "Address" + (fir ? "" : ", ") + summary;
+				fir = false;
+			}
+			if (reader.hasTransportData()) {
+				summary = "Transport" + (fir ? "" : ", ") + summary;
+				fir = false;
+			}
+			if (reader.containsPoiData()) {
+				summary = "POI" + (fir ? "" : ", ") + summary;
+				fir = false;
+			}
+			if (reader.containsRouteData()) {
+				summary = "Roads" + (fir ? "" : ", ") + summary;
+				fir = false;
+			}
+			if (reader.containsMapData()) {
+				summary = "Map" + (fir ? "" : ", ") + summary;
+				fir = false;
+			}
 		}
 		int last = fileName.lastIndexOf('_', fileName.indexOf('.'));
 		if (last == -1) {
