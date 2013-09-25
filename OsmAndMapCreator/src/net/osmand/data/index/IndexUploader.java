@@ -543,7 +543,14 @@ public class IndexUploader {
 				if (toBackup.exists()) {
 					toBackup.delete();
 				}
-				toUpload.renameTo(toBackup);
+				if(!toUpload.renameTo(toBackup)) {
+					FileOutputStream fout = new FileOutputStream(toBackup);
+					FileInputStream fin = new FileInputStream(toUpload);
+					Algorithms.streamCopy(fin, fout);
+					fin.close();
+					fout.close();
+					toUpload.delete();
+				}
 				if(srcFile.equals(zipFile)){
 					srcFile.delete();
 				}
