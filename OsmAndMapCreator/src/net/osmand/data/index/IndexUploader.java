@@ -389,9 +389,6 @@ public class IndexUploader {
 		if(srtmFile != this.srtmProcess) {
 			return null;
 		}
-		if(srtmFile) {
-			return getDescription(null, fileName);
-		}
 		if (fileName.endsWith(IndexConstants.BINARY_MAP_INDEX_EXT) || fileName.endsWith(IndexConstants.BINARY_MAP_INDEX_EXT_ZIP)) {
 			RandomAccessFile raf = null;
 			try {
