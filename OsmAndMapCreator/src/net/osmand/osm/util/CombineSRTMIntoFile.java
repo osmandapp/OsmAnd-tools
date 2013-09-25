@@ -65,12 +65,18 @@ public class CombineSRTMIntoFile {
 		if(parent != null){
 			continentName = parent.continentName;
 		}
-		final String suffix = "_" + IndexConstants.BINARY_MAP_VERSION + IndexConstants.BINARY_MAP_INDEX_EXT;
+		final String suffix = "_" + IndexConstants.BINARY_MAP_VERSION + IndexConstants.BINARY_SRTM_MAP_INDEX_EXT;
 		String name = country.name + "_" + continentName + suffix;
 		if(parent != null) {
 			name = parent.name+"_"+name;
 		}
 		name = Algorithms.capitalizeFirstLetterAndLowercase(name);
+		final File targetFile = new File(directoryWithTargetFiles, name);
+		if(targetFile.exists()) {
+			System.out.println("Already processed "+ name);
+			return;
+		}
+
 		Set<String> srtmFileNames = new TreeSet<String>();
 		final TIntArrayList singleTiles = country.getSingleTiles();
 		for (int j = 0; j < singleTiles.size(); j+=2) {
@@ -102,7 +108,7 @@ public class CombineSRTMIntoFile {
 				return;
 			}
 		}
-		BinaryInspector.combineParts(new File(directoryWithTargetFiles, name), mp);
+		BinaryInspector.combineParts(targetFile, mp);
 		for(String file : srtmFileNames) {
 			final File fl = new File(work, file);
 			fl.delete();
