@@ -65,8 +65,9 @@ public class CombineSRTMIntoFile {
 		if(parent != null){
 			continentName = parent.continentName;
 		}
-		final String suffix = "_" + IndexConstants.BINARY_MAP_VERSION + IndexConstants.BINARY_SRTM_MAP_INDEX_EXT;
-		String name = country.name + "_" + continentName + suffix;
+
+		String name = country.name + "_" + continentName + IndexConstants.BINARY_MAP_VERSION + IndexConstants.BINARY_SRTM_MAP_INDEX_EXT;
+		final String suffix = "_" + IndexConstants.BINARY_MAP_VERSION + IndexConstants.BINARY_MAP_INDEX_EXT;
 		if(parent != null) {
 			name = parent.name+"_"+name;
 		}
@@ -88,7 +89,7 @@ public class CombineSRTMIntoFile {
 		for(String file : srtmFileNames) {
 			final File fl = new File(directoryWithSRTMFiles, file + ".zip");
 			if(!fl.exists()) {
-				System.err.println("!! Can't process " + name + " because " + file + "doesn't exist");
+				System.err.println("!! Can't process " + name + " because " + file + " doesn't exist");
 				return;
 			}
 			ZipFile zipFile = new ZipFile(fl);
