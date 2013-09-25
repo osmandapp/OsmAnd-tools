@@ -109,6 +109,7 @@ public class IndexUploader {
 	private FileFilter fileFilter = new FileFilter();
 	private FileFilter deleteFileFilter = null;
 	private boolean roadProcess;
+	private boolean srtmProcess;
 
 	public IndexUploader(String path, String targetPath) throws IndexUploadException {
 		directory = new File(path);
@@ -179,6 +180,9 @@ public class IndexUploader {
 			} else if (args[start].startsWith("--roads")) {
 				roadProcess = true;
 				start++;
+			} else if (args[start].startsWith("--srtm")) {
+				srtmProcess = true;
+				start++
 			}
 		} while(p != start);
 		if(fileFilter != null) {
@@ -390,6 +394,10 @@ public class IndexUploader {
 					throw new OneFileException("Uploader version is not compatible " + reader.getVersion() + " to current " + IndexConstants.BINARY_MAP_VERSION);
 				}
 				boolean roadFile = reader.containsRouteData() && !reader.containsMapData();
+				boolean srtmFile = f.getName().contains(".srtm");
+				if(srtmFile != this.srtmProcess) {
+					return null;
+				}
 				if(roadFile != this.roadProcess) {
 					return null;
 				}
