@@ -38,10 +38,9 @@ public class CombineSRTMIntoFile {
 		File directoryWithTargetFiles = new File(args[1]);
 //		File directoryWithSRTMFiles = null;
 //		File directoryWithTargetFiles = null;
-
-		OsmandRegions or = new OsmandRegions();
-		or.prepareFile("/home/victor/projects/osmand/osm-gen/Osmand_regions.obf");
-		or.cacheAllCountries();
+//		OsmandRegions or = new OsmandRegions();
+//		or.prepareFile("/home/victor/projects/osmand/osm-gen/Osmand_regions.obf");
+//		or.cacheAllCountries();
 
 
 		final RegionRegistry rr = RegionRegistry.getRegionRegistry();
