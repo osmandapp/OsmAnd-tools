@@ -89,25 +89,25 @@ public class CombineSRTMIntoFile {
 		for(String file : srtmFileNames) {
 			final File fl = new File(directoryWithSRTMFiles, file + ".zip");
 			if(!fl.exists()) {
-				System.err.println("!! Can't process " + name + " because " + file + " doesn't exist");
-				return;
-			}
-			ZipFile zipFile = new ZipFile(fl);
-			Enumeration<? extends ZipEntry> entries = zipFile.entries();
-			if (entries.hasMoreElements()) {
-				ZipEntry entry = entries.nextElement();
-				File entryDestination = new File(work,  file);
-				mp.put(entryDestination, null);
-				entryDestination.getParentFile().mkdirs();
-				InputStream in = zipFile.getInputStream(entry);
-				OutputStream out = new FileOutputStream(entryDestination);
-				Algorithms.streamCopy(in, out);
-				in.close();
-				out.close();
-				zipFile.close();
-			}  else {
-				System.err.println("!! Can't process " + name + " because " + file + " nothing found");
-				return;
+				System.err.println("!! Missing " + name + " because " + file + " doesn't exist");
+			} else {
+				ZipFile zipFile = new ZipFile(fl);
+				Enumeration<? extends ZipEntry> entries = zipFile.entries();
+				if (entries.hasMoreElements()) {
+					ZipEntry entry = entries.nextElement();
+					File entryDestination = new File(work, file);
+					mp.put(entryDestination, null);
+					entryDestination.getParentFile().mkdirs();
+					InputStream in = zipFile.getInputStream(entry);
+					OutputStream out = new FileOutputStream(entryDestination);
+					Algorithms.streamCopy(in, out);
+					in.close();
+					out.close();
+					zipFile.close();
+				} else {
+					System.err.println("!! Can't process " + name + " because " + file + " nothing found");
+					return;
+				}
 			}
 		}
 		BinaryInspector.combineParts(targetFile, mp);
