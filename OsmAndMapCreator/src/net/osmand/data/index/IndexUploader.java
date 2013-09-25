@@ -182,7 +182,7 @@ public class IndexUploader {
 				start++;
 			} else if (args[start].startsWith("--srtm")) {
 				srtmProcess = true;
-				start++
+				start++;
 			}
 		} while(p != start);
 		if(fileFilter != null) {

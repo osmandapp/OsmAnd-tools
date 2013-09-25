@@ -104,6 +104,7 @@ public class CombineSRTMIntoFile {
 				Algorithms.streamCopy(in, out);
 				in.close();
 				out.close();
+				zipFile.close();
 			}  else {
 				System.err.println("!! Can't process " + name + " because " + file + " nothing found");
 				return;
