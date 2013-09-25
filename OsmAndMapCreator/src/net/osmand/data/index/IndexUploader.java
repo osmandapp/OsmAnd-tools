@@ -385,6 +385,13 @@ public class IndexUploader {
 
 	private String checkfileAndGetDescription(File f) throws OneFileException {
 		String fileName = f.getName();
+		boolean srtmFile = f.getName().contains(".srtm");
+		if(srtmFile != this.srtmProcess) {
+			return null;
+		}
+		if(srtmFile) {
+			return getDescription(null, fileName);
+		}
 		if (fileName.endsWith(IndexConstants.BINARY_MAP_INDEX_EXT) || fileName.endsWith(IndexConstants.BINARY_MAP_INDEX_EXT_ZIP)) {
 			RandomAccessFile raf = null;
 			try {
@@ -394,10 +401,6 @@ public class IndexUploader {
 					throw new OneFileException("Uploader version is not compatible " + reader.getVersion() + " to current " + IndexConstants.BINARY_MAP_VERSION);
 				}
 				boolean roadFile = reader.containsRouteData() && !reader.containsMapData();
-				boolean srtmFile = f.getName().contains(".srtm");
-				if(srtmFile != this.srtmProcess) {
-					return null;
-				}
 				if(roadFile != this.roadProcess) {
 					return null;
 				}
