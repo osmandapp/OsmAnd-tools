@@ -32,10 +32,12 @@
 #include <QMutex>
 
 #include <OsmAndCore.h>
+#include <OsmAndCore/Concurrent.h>
 #include <OsmAndCore/Common.h>
 #include <OsmAndCore/Utilities.h>
 #include <OsmAndCore/Logging.h>
 #include <OsmAndCore/Data/ObfsCollection.h>
+#include <OsmAndCore/Data/ObfDataInterface.h>
 #include <OsmAndCore/Map/Rasterizer.h>
 #include <OsmAndCore/Map/RasterizerEnvironment.h>
 #include <OsmAndCore/Map/MapStyles.h>
@@ -46,7 +48,8 @@
 #include <OsmAndCore/Map/IMapElevationDataProvider.h>
 #include <OsmAndCore/Map/HeightmapTileProvider.h>
 #include <OsmAndCore/Map/OfflineMapDataProvider.h>
-#include <OsmAndCore/Map/OfflineMapRasterTileProvider.h>
+#include <OsmAndCore/Map/OfflineMapRasterTileProvider_Software.h>
+#include <OsmAndCore/Map/OfflineMapRasterTileProvider_GPU.h>
 
 bool glutWasInitialized = false;
 QMutex glutWasInitializedFlagMutex;
@@ -170,7 +173,7 @@ int main(int argc, char** argv)
         glutInit(&argc, argv);
 
         glutSetOption(GLUT_ACTION_ON_WINDOW_CLOSE, GLUT_ACTION_CONTINUE_EXECUTION);
-        glutInitWindowSize(800, 600);
+        glutInitWindowSize(1024, 768);
         glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA | GLUT_DEPTH);
         if(!use43)
             glutInitContextVersion(3, 0);
@@ -580,10 +583,15 @@ void activateProvider(OsmAnd::RasterMapLayerId layerId, int idx)
     }
     else if(idx == 3)
     {
-        auto tileProvider = new OsmAnd::OfflineMapRasterTileProvider(offlineMapDataProvider, 1.0f);
+        auto tileProvider = new OsmAnd::OfflineMapRasterTileProvider_Software(offlineMapDataProvider, 1.0f);
         renderer->setRasterLayerProvider(layerId, std::shared_ptr<OsmAnd::IMapBitmapTileProvider>(tileProvider));
     }
     else if(idx == 4)
+    {
+        auto tileProvider = new OsmAnd::OfflineMapRasterTileProvider_GPU(offlineMapDataProvider, 1.0f);
+        renderer->setRasterLayerProvider(layerId, std::shared_ptr<OsmAnd::IMapBitmapTileProvider>(tileProvider));
+    }
+    else if(idx == 5)
     {
 //        auto hillshadeTileProvider = new OsmAnd::HillshadeTileProvider();
 //        renderer->setTileProvider(layerId, hillshadeTileProvider);
@@ -721,54 +729,59 @@ void displayHandler()
 
         glColor4f(0.5f, 0.5f, 0.5f, 0.6f);
         glBegin(GL_QUADS);
-            glVertex2f(0.0f, 16*9);
-            glVertex2f(   w, 16*9);
+            glVertex2f(0.0f, 16*10);
+            glVertex2f(   w, 16*10);
             glVertex2f(   w, 0.0f);
             glVertex2f(0.0f, 0.0f);
         glEnd();
         verifyOpenGL();
 
         glColor3f(0.0f, 1.0f, 0.0f);
-        glRasterPos2f(8, 16 * 8);
+        glRasterPos2f(8, 16 * 9);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("Last clicked tile: (%1, %2)@%3").arg(lastClickedLocation31.x >> (31 - renderer->state.zoomBase)).arg(lastClickedLocation31.y >> (31 - renderer->state.zoomBase)).arg(renderer->state.zoomBase)));
         verifyOpenGL();
 
         glColor3f(0.0f, 1.0f, 0.0f);
-        glRasterPos2f(8, 16 * 7);
+        glRasterPos2f(8, 16 * 8);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("Last clicked location: %1 %2").arg(lastClickedLocation31.x).arg(lastClickedLocation31.y)));
         verifyOpenGL();
 
         glColor3f(0.0f, 1.0f, 0.0f);
-        glRasterPos2f(8, 16 * 6);
+        glRasterPos2f(8, 16 * 7);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("Tile providers (holding alt controls overlay0):")));
         verifyOpenGL();
 
-        glRasterPos2f(8, 16 * 5);
+        glRasterPos2f(8, 16 * 6);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("0 - disable")));
         verifyOpenGL();
 
-        glRasterPos2f(8, 16 * 4);
+        glRasterPos2f(8, 16 * 5);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("1 - Mapnik")));
         verifyOpenGL();
 
-        glRasterPos2f(8, 16 * 3);
+        glRasterPos2f(8, 16 * 4);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("2 - CycleMap")));
         verifyOpenGL();
 
+        glRasterPos2f(8, 16 * 3);
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
+            QString("3 - Offline maps (Software)")));
+        verifyOpenGL();
+
         glRasterPos2f(8, 16 * 2);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("3 - Offline maps")));
+            QString("4 - Offline maps (GPU)")));
         verifyOpenGL();
 
         glRasterPos2f(8, 16 * 1);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("4 - Hillshade")));
+            QString("5 - Hillshade")));
         verifyOpenGL();
     }
     
