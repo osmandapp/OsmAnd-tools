@@ -66,12 +66,13 @@ public class CombineSRTMIntoFile {
 			continentName = parent.continentName;
 		}
 
-		String name = country.name + "_" + continentName + "_"+ IndexConstants.BINARY_MAP_VERSION + IndexConstants.BINARY_SRTM_MAP_INDEX_EXT;
+		final String continentSuffix = "_" + continentName + "_" + IndexConstants.BINARY_MAP_VERSION + IndexConstants.BINARY_SRTM_MAP_INDEX_EXT;
 		final String suffix = "_" + IndexConstants.BINARY_MAP_VERSION + IndexConstants.BINARY_MAP_INDEX_EXT;
+		String countryName = country.name + continentSuffix;
 		if(parent != null) {
-			name = parent.name+"_"+name;
+			countryName = parent.name + "_" + countryName;
 		}
-		name = Algorithms.capitalizeFirstLetterAndLowercase(name);
+		String name = Algorithms.capitalizeFirstLetterAndLowercase(countryName) + continentSuffix;
 		final File targetFile = new File(directoryWithTargetFiles, name);
 		if(targetFile.exists()) {
 			System.out.println("Already processed "+ name);
@@ -79,13 +80,43 @@ public class CombineSRTMIntoFile {
 		}
 
 		Set<String> srtmFileNames = new TreeSet<String>();
+		Set<String> NESrtmFileNames = new TreeSet<String>();
+		Set<String> NWSrtmFileNames = new TreeSet<String>();
+		Set<String> SESrtmFileNames = new TreeSet<String>();
+		Set<String> SWSrtmFileNames = new TreeSet<String>();
 		final TIntArrayList singleTiles = country.getSingleTiles();
+		int cx = 0;
+		int cy = 0;
 		for (int j = 0; j < singleTiles.size(); j+=2) {
-			srtmFileNames.add(getFileName(singleTiles.get(j), singleTiles.get(j + 1)) + suffix);
+			cx += singleTiles.get(j);
+			cy += singleTiles.get(j + 1);
+		}
+		cx /= (singleTiles.size()/2);
+		cy /= (singleTiles.size()/2);
+
+		for (int j = 0; j < singleTiles.size(); j+=2) {
+			final int lon = singleTiles.get(j);
+			final int lat = singleTiles.get(j + 1);
+			final String filename = getFileName(lon, lat) + suffix;
+			srtmFileNames.add(filename);
+			if(lon <= cx) {
+				if(lat <= cy) {
+					SWSrtmFileNames.add(filename);
+				} else {
+					NWSrtmFileNames.add(filename);
+				}
+			} else {
+				if(lat <= cy) {
+					SESrtmFileNames.add(filename);
+				} else {
+					NESrtmFileNames.add(filename);
+				}
+			}
 		}
 		final File work = new File(directoryWithTargetFiles, "work");
 		System.out.println("Process "+ name);
 		Map<File, String> mp = new HashMap<File, String>();
+		long length = 0;
 		for(String file : srtmFileNames) {
 			final File fl = new File(directoryWithSRTMFiles, file + ".zip");
 			if(!fl.exists()) {
@@ -96,7 +127,6 @@ public class CombineSRTMIntoFile {
 				if (entries.hasMoreElements()) {
 					ZipEntry entry = entries.nextElement();
 					File entryDestination = new File(work, file);
-					mp.put(entryDestination, null);
 					entryDestination.getParentFile().mkdirs();
 					InputStream in = zipFile.getInputStream(entry);
 					OutputStream out = new FileOutputStream(entryDestination);
@@ -104,19 +134,41 @@ public class CombineSRTMIntoFile {
 					in.close();
 					out.close();
 					zipFile.close();
+					length += entryDestination.length();
+					mp.put(entryDestination, null);
 				} else {
 					System.err.println("!! Can't process " + name + " because " + file + " nothing found");
 					return;
 				}
 			}
 		}
-		BinaryInspector.combineParts(targetFile, mp);
+		if(length > Integer.MAX_VALUE) {
+			splitAndCombineParts(new File(directoryWithTargetFiles, countryName + "-NE"+continentSuffix), NESrtmFileNames, work);
+			splitAndCombineParts(new File(directoryWithTargetFiles, countryName + "-NW"+continentSuffix), NWSrtmFileNames, work);
+			splitAndCombineParts(new File(directoryWithTargetFiles, countryName + "-SE"+continentSuffix), SESrtmFileNames, work);
+			splitAndCombineParts(new File(directoryWithTargetFiles, countryName + "-SW"+continentSuffix), SWSrtmFileNames, work);
+		} else {
+			BinaryInspector.combineParts(targetFile, mp);
+		}
 		for(String file : srtmFileNames) {
 			final File fl = new File(work, file);
 			fl.delete();
 		}
 
 	}
+
+	private static void splitAndCombineParts(File targetFile, Set<String> srtmFileNames, File work) throws IOException {
+		if(targetFile.exists()) {
+			System.out.println("Already processed "+ targetFile.getName());
+			return;
+		}
+		Map<File, String> mp = new HashMap<File, String>();
+		for(String s : srtmFileNames) {
+			mp.put(new File(work, s), null);
+		}
+		BinaryInspector.combineParts(targetFile, mp);
+	}
+
 	private static String getFileName(int lon, int lat) {
 		String fn = lat >= 0 ? "N" : "S";
 		if(Math.abs(lat) < 10) {
