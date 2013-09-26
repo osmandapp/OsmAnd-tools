@@ -68,7 +68,7 @@ public class CombineSRTMIntoFile {
 
 		final String continentSuffix = "_" + continentName + "_" + IndexConstants.BINARY_MAP_VERSION + IndexConstants.BINARY_SRTM_MAP_INDEX_EXT;
 		final String suffix = "_" + IndexConstants.BINARY_MAP_VERSION + IndexConstants.BINARY_MAP_INDEX_EXT;
-		String countryName = country.name + continentSuffix;
+		String countryName = country.name;
 		if(parent != null) {
 			countryName = parent.name + "_" + countryName;
 		}
