@@ -143,10 +143,10 @@ public class CombineSRTMIntoFile {
 			}
 		}
 		if(length > Integer.MAX_VALUE) {
-			splitAndCombineParts(getFile(directoryWithTargetFiles, continentSuffix, countryName, "NE"), NESrtmFileNames, work);
-			splitAndCombineParts(getFile(directoryWithTargetFiles, continentSuffix, countryName, "NW"), NWSrtmFileNames, work);
-			splitAndCombineParts(getFile(directoryWithTargetFiles, continentSuffix, countryName, "SE"), SESrtmFileNames, work);
-			splitAndCombineParts(getFile(directoryWithTargetFiles, continentSuffix, countryName, "SW"), SWSrtmFileNames, work);
+			splitAndCombineParts(getFile(directoryWithTargetFiles, continentSuffix, countryName, "-NE"), NESrtmFileNames, work);
+			splitAndCombineParts(getFile(directoryWithTargetFiles, continentSuffix, countryName, "-NW"), NWSrtmFileNames, work);
+			splitAndCombineParts(getFile(directoryWithTargetFiles, continentSuffix, countryName, "-SE"), SESrtmFileNames, work);
+			splitAndCombineParts(getFile(directoryWithTargetFiles, continentSuffix, countryName, "-SW"), SWSrtmFileNames, work);
 		} else {
 			BinaryInspector.combineParts(targetFile, mp);
 		}
@@ -158,7 +158,7 @@ public class CombineSRTMIntoFile {
 	}
 
 	private static File getFile(File directoryWithTargetFiles, String continentSuffix, String countryName, String middle) {
-		return new File(directoryWithTargetFiles, Algorithms.capitalizeFirstLetterAndLowercase(countryName + middle + continentSuffix));
+		return new File(directoryWithTargetFiles, Algorithms.capitalizeFirstLetterAndLowercase(countryName) + middle + continentSuffix.toLowerCase()));
 	}
 
 	private static void splitAndCombineParts(File targetFile, Set<String> srtmFileNames, File work) throws IOException {
