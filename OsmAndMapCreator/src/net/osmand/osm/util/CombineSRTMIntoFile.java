@@ -72,7 +72,7 @@ public class CombineSRTMIntoFile {
 		if(parent != null) {
 			countryName = parent.name + "_" + countryName;
 		}
-		String name = Algorithms.capitalizeFirstLetterAndLowercase(countryName) + continentSuffix;
+		String name = Algorithms.capitalizeFirstLetterAndLowercase(countryName + continentSuffix);
 		final File targetFile = new File(directoryWithTargetFiles, name);
 		if(targetFile.exists()) {
 			System.out.println("Already processed "+ name);
@@ -143,10 +143,10 @@ public class CombineSRTMIntoFile {
 			}
 		}
 		if(length > Integer.MAX_VALUE) {
-			splitAndCombineParts(new File(directoryWithTargetFiles, countryName + "-NE"+continentSuffix), NESrtmFileNames, work);
-			splitAndCombineParts(new File(directoryWithTargetFiles, countryName + "-NW"+continentSuffix), NWSrtmFileNames, work);
-			splitAndCombineParts(new File(directoryWithTargetFiles, countryName + "-SE"+continentSuffix), SESrtmFileNames, work);
-			splitAndCombineParts(new File(directoryWithTargetFiles, countryName + "-SW"+continentSuffix), SWSrtmFileNames, work);
+			splitAndCombineParts(getFile(directoryWithTargetFiles, continentSuffix, countryName, "NE"), NESrtmFileNames, work);
+			splitAndCombineParts(getFile(directoryWithTargetFiles, continentSuffix, countryName, "NW"), NWSrtmFileNames, work);
+			splitAndCombineParts(getFile(directoryWithTargetFiles, continentSuffix, countryName, "SE"), SESrtmFileNames, work);
+			splitAndCombineParts(getFile(directoryWithTargetFiles, continentSuffix, countryName, "SW"), SWSrtmFileNames, work);
 		} else {
 			BinaryInspector.combineParts(targetFile, mp);
 		}
@@ -155,6 +155,10 @@ public class CombineSRTMIntoFile {
 			fl.delete();
 		}
 
+	}
+
+	private static File getFile(File directoryWithTargetFiles, String continentSuffix, String countryName, String middle) {
+		return new File(directoryWithTargetFiles, Algorithms.capitalizeFirstLetterAndLowercase(countryName + middle + continentSuffix));
 	}
 
 	private static void splitAndCombineParts(File targetFile, Set<String> srtmFileNames, File work) throws IOException {
