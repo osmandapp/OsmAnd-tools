@@ -158,7 +158,7 @@ public class CombineSRTMIntoFile {
 	}
 
 	private static File getFile(File directoryWithTargetFiles, String continentSuffix, String countryName, String middle) {
-		return new File(directoryWithTargetFiles, Algorithms.capitalizeFirstLetterAndLowercase(countryName) + middle + continentSuffix.toLowerCase()));
+		return new File(directoryWithTargetFiles, Algorithms.capitalizeFirstLetterAndLowercase(countryName) + middle + continentSuffix.toLowerCase());
 	}
 
 	private static void splitAndCombineParts(File targetFile, Set<String> srtmFileNames, File work) throws IOException {
