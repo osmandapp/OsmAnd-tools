@@ -583,12 +583,12 @@ void activateProvider(OsmAnd::RasterMapLayerId layerId, int idx)
     }
     else if(idx == 3)
     {
-        auto tileProvider = new OsmAnd::OfflineMapRasterTileProvider_Software(offlineMapDataProvider, 1.0f);
+        auto tileProvider = new OsmAnd::OfflineMapRasterTileProvider_Software(offlineMapDataProvider);
         renderer->setRasterLayerProvider(layerId, std::shared_ptr<OsmAnd::IMapBitmapTileProvider>(tileProvider));
     }
     else if(idx == 4)
     {
-        auto tileProvider = new OsmAnd::OfflineMapRasterTileProvider_GPU(offlineMapDataProvider, 1.0f);
+        auto tileProvider = new OsmAnd::OfflineMapRasterTileProvider_GPU(offlineMapDataProvider);
         renderer->setRasterLayerProvider(layerId, std::shared_ptr<OsmAnd::IMapBitmapTileProvider>(tileProvider));
     }
     else if(idx == 5)
