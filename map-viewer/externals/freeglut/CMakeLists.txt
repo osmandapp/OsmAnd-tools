@@ -1,5 +1,9 @@
 project(freeglut)
 
+#include_directories(BEFORE SYSTEM
+#	"upstream.patched/include"
+#)
+
 add_library(freeglut_static STATIC
 	"config.h"
 	"upstream.patched/include/GL/freeglut.h"
@@ -81,9 +85,9 @@ target_include_directories(freeglut_static
 	PRIVATE
 		"."
 	PUBLIC
+		"upstream.patched/include"
 		${OPENGL_INCLUDE_DIRS}
 		${target_specific_public_includes}
-		"upstream.patched/include"
 )
 target_link_libraries(freeglut_static
 	LINK_PUBLIC

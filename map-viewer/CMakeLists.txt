@@ -1,6 +1,21 @@
 project(bird)
 
-add_subdirectory("${OSMAND_ROOT}/tools/map-viewer/externals/freeglut" "tools/map-viewer/externals/freeglut")
+find_library(FREEGLUT_LIBRARY freeglut)
+set(extra_dependencies "")
+set(extra_libraries "")
+if(FREEGLUT_LIBRARY STREQUAL "FREEGLUT_LIBRARY-NOTFOUND")
+	add_subdirectory("${OSMAND_ROOT}/tools/map-viewer/externals/freeglut" "tools/map-viewer/externals/freeglut")
+	set(extra_dependencies ${extra_dependencies}
+		freeglut_static
+	)
+	set(extra_libraries ${extra_libraries}
+		freeglut_static
+	)
+else()
+	set(extra_libraries ${extra_libraries}
+		${FREEGLUT_LIBRARY}
+	)
+endif()
 
 if(CMAKE_SHARED_LIBS_ALLOWED_ON_TARGET)
 	add_executable(bird
@@ -9,11 +24,11 @@ if(CMAKE_SHARED_LIBS_ALLOWED_ON_TARGET)
 
 	add_dependencies(bird
 		OsmAndCore_shared
-		freeglut_static
+		${extra_dependencies}
 	)
 	target_link_libraries(bird
 		OsmAndCore_shared
-		freeglut_static
+		${extra_libraries}
 	)
 endif()
 
@@ -24,10 +39,10 @@ if(CMAKE_STATIC_LIBS_ALLOWED_ON_TARGET)
 
 	add_dependencies(bird_standalone
 		OsmAndCore_static
-		freeglut_static
+		${extra_dependencies}
 	)
 	target_link_libraries(bird_standalone
 		OsmAndCore_static
-		freeglut_static
+		${extra_libraries}
 	)
 endif()
