@@ -43,8 +43,29 @@ if(CMAKE_TARGET_OS STREQUAL "linux" OR CMAKE_TARGET_OS STREQUAL "darwin")
 	set(target_specific_public_includes ${target_specific_public_includes}
 		${X11_INCLUDE_DIR}
 	)
+	find_library(X11_Xxf86vm "Xxf86vm" PATHS ${X11_LIBRARY_DIR})
+	find_library(X11_Xi "Xi" PATHS ${X11_LIBRARY_DIR})
+	find_library(X11_Xrandr "Xrandr" PATHS ${X11_LIBRARY_DIR})
 	set(target_specific_public_libraries ${target_specific_public_libraries}
 		${X11_LIBRARIES}
+		${X11_Xxf86vm}
+		${X11_Xi}
+		${X11_Xrandr}
+	)
+endif()
+if(CMAKE_TARGET_OS STREQUAL "darwin")
+	find_package(GLUT REQUIRED)
+	set(target_specific_public_includes ${target_specific_public_includes}
+		${GLUT_INCLUDE_DIR}
+	)
+	set(target_specific_public_libraries ${target_specific_public_libraries}
+		${GLUT_LIBRARIES}
+	)
+endif()
+if(CMAKE_TARGET_OS STREQUAL "darwin")
+	find_library(X11_GL "GL" PATHS ${X11_LIBRARY_DIR})
+	set(target_specific_public_libraries ${target_specific_public_libraries}
+		${X11_GL}
 	)
 endif()
 
