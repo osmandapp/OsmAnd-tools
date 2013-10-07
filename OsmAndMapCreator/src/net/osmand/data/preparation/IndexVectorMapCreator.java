@@ -305,18 +305,66 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			ArrayList<Float> wayNodes = new ArrayList<Float>(list);
 
 			// combine startPoint with EndPoint
-			CombineStartNodeWithEndNodes combineStartNodeWithEndNodes =
-					new CombineStartNodeWithEndNodes(endStat, visitedWays, list, temp, tempAdd, (short) level, startNode, name).
-							invoke(wayNodes);
-			name = combineStartNodeWithEndNodes.getName();
-			startNode = combineStartNodeWithEndNodes.getStartNode();
+			boolean combined = true;
+			while (combined) {
+				combined = false;
+				endStat.setLong(1, startNode);
+				endStat.setShort(2, (short) level);
+				ResultSet fs = endStat.executeQuery();
+				// search by exact name
+				while (fs.next() && !combined) {
+					if (!visitedWays.contains(fs.getLong(1))) {
+						parseAndSort(temp, fs.getBytes(6));
+						parseAndSort(tempAdd, fs.getBytes(7));
+						if(temp.equals(typeUse) && tempAdd.equals(addtypeUse)){
+							combined = true;
+							long lid = fs.getLong(1);
+							startNode = fs.getLong(2);
+							visitedWays.add(lid);
+							loadNodes(fs.getBytes(4), list);
+							if(!Algorithms.objectEquals(fs.getString(5), name)){
+								name = null;
+							}
+							ArrayList<Float> li = new ArrayList<Float>(list);
+							// remove first lat/lon point
+							wayNodes.remove(0);
+							wayNodes.remove(0);
+							li.addAll(wayNodes);
+							wayNodes = li;
+						}
+					}
+				}
+				fs.close();
+			}
 
 			// combined end point
-			CombineEndNodeWithStartNodes combineEndNodeWithStartNodes =
-					new CombineEndNodeWithStartNodes(startStat, visitedWays, list, temp, tempAdd, (short) level, endNode, name).
-							invoke(wayNodes);
-			endNode = combineEndNodeWithStartNodes.getEndNode();
-			name = combineEndNodeWithStartNodes.getName();
+			combined = true;
+			while (combined) {
+				combined = false;
+				startStat.setLong(1, endNode);
+				startStat.setShort(2, (short) level);
+				ResultSet fs = startStat.executeQuery();
+				while (fs.next() && !combined) {
+					if (!visitedWays.contains(fs.getLong(1))) {
+						parseAndSort(temp, fs.getBytes(6));
+						parseAndSort(tempAdd, fs.getBytes(7));
+						if(temp.equals(typeUse) && tempAdd.equals(addtypeUse)){
+							combined = true;
+							long lid = fs.getLong(1);
+							if (!Algorithms.objectEquals(fs.getString(5), name)) {
+								name = null;
+							}
+							endNode = fs.getLong(3);
+							visitedWays.add(lid);
+							loadNodes(fs.getBytes(4), list);
+							for (int i = 2; i < list.size(); i++) {
+								wayNodes.add(list.get(i));
+							}
+						}
+					}
+				}
+				fs.close();
+			}
 
 			List<Node> wNodes = new ArrayList<Node>();
 			int wNsize = wayNodes.size();
