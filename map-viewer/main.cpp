@@ -679,7 +679,7 @@ void displayHandler()
 
         glRasterPos2f(8, t - 16 * 9);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("visible tiles          : %1").arg(renderer->visibleTiles.size())));
+            QString("visible tiles          : %1").arg(renderer->getVisibleTilesCount())));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * 10);
