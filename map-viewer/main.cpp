@@ -22,6 +22,7 @@
 
 #include <stdlib.h>
 #include <memory>
+#include <chrono>
 
 #include <GL/glew.h>
 #include <GL/freeglut.h>
@@ -50,6 +51,7 @@
 #include <OsmAndCore/Map/OfflineMapDataProvider.h>
 #include <OsmAndCore/Map/OfflineMapRasterTileProvider_Software.h>
 #include <OsmAndCore/Map/OfflineMapRasterTileProvider_GPU.h>
+#include <OsmAndCore/Map/MapAnimator.h>
 
 bool glutWasInitialized = false;
 QMutex glutWasInitializedFlagMutex;
@@ -59,6 +61,7 @@ std::shared_ptr<OsmAnd::IMapRenderer> renderer;
 std::shared_ptr<OsmAnd::ObfsCollection> obfsCollection;
 std::shared_ptr<OsmAnd::OfflineMapDataProvider> offlineMapDataProvider;
 std::shared_ptr<OsmAnd::MapStyles> stylesCollection;
+std::shared_ptr<OsmAnd::MapAnimator> animator;
 
 QDir obfRoot(QDir::current());
 QDir cacheDir(QDir::current());
@@ -77,6 +80,7 @@ void mouseWheelHandler(int button, int dir, int x, int y);
 void keyboardHandler(unsigned char key, int x, int y);
 void specialHandler(int key, int x, int y);
 void displayHandler(void);
+void idleHandler(void);
 void closeHandler(void);
 void activateProvider(OsmAnd::RasterMapLayerId layerId, int idx);
 void verifyOpenGL();
@@ -163,6 +167,8 @@ int main(int argc, char** argv)
         OsmAnd::ReleaseCore();
         return EXIT_FAILURE;
     }
+    animator.reset(new OsmAnd::MapAnimator());
+    animator->setMapRenderer(renderer);
 
     //////////////////////////////////////////////////////////////////////////
 
@@ -190,6 +196,7 @@ int main(int argc, char** argv)
         glutKeyboardFunc(&keyboardHandler);
         glutSpecialFunc(&specialHandler);
         glutDisplayFunc(&displayHandler);
+        glutIdleFunc(&idleHandler);
         glutCloseFunc(&closeHandler);
         verifyOpenGL();
 
@@ -295,8 +302,15 @@ void mouseHandler(int button, int state, int x, int y)
     {
         if(state == GLUT_DOWN)
         {
-            renderer->getLocationFromScreenPoint(OsmAnd::PointI(x, y), lastClickedLocation31);
-            //renderer->setTarget(lastClickedLocation31);
+            OsmAnd::PointI64 clickedLocation;
+            renderer->getLocationFromScreenPoint(OsmAnd::PointI(x, y), clickedLocation);
+            lastClickedLocation31 = OsmAnd::Utilities::normalizeCoordinates(clickedLocation, OsmAnd::ZoomLevel31);
+            
+            auto delta = clickedLocation - OsmAnd::PointI64(renderer->state.target31.x, renderer->state.target31.y);
+
+            animator->cancelAnimation();
+            animator->animateTargetBy(delta, 1.0f, OsmAnd::MapAnimatorEasingType::None, OsmAnd::MapAnimatorEasingType::Quadratic);
+            animator->resumeAnimation();
         }
     }
 }
@@ -596,6 +610,26 @@ void activateProvider(OsmAnd::RasterMapLayerId layerId, int idx)
 //        auto hillshadeTileProvider = new OsmAnd::HillshadeTileProvider();
 //        renderer->setTileProvider(layerId, hillshadeTileProvider);
     }
+}
+
+void idleHandler(void)
+{
+    static std::chrono::time_point<std::chrono::high_resolution_clock> lastTimeStamp;
+    static bool lastTimeStampInitialized = false;
+
+    if(!lastTimeStampInitialized)
+    {
+        lastTimeStamp = std::chrono::high_resolution_clock::now();
+        lastTimeStampInitialized = true;
+        return;
+    }
+
+    auto currentTimeStamp = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<float> elapsedSeconds = currentTimeStamp - lastTimeStamp;
+
+    animator->update(elapsedSeconds.count());
+
+    lastTimeStamp = currentTimeStamp;
 }
 
 void displayHandler()
