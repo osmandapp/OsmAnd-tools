@@ -181,7 +181,7 @@
 		</regions>
 
 		<!-- 1.5 ITALY [SOURCE: GFOSS.it] -->		
-		<regions siteToDownload="http://download.gfoss.it/osm/osm/regioni/{0}.pbf" region_prefix="Italy_" skip="false" region_suffix="_Europe">
+		<regions siteToDownload="http://geodati.fmach.it/gfoss_geodata/osm/output_osm_regioni/{0}.pbf" region_prefix="Italy_" skip="false" region_suffix="_Europe">
 			<region name="abruzzo"  cityAdminLevel="4"/>
 			<region name="basilicata"  cityAdminLevel="4"/>
 			<region name="calabria"  cityAdminLevel="4"/>
