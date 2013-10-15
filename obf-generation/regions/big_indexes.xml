@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <regions_list>
 
-	<regions siteToDownload="http://download.geofabrik.de/europe/{0}.osm.pbf" skip="true" region_suffix="_europe">
-		<region name="british-isles" downloadname="british-isles-latest"/>
+	<regions siteToDownload="http://download.geofabrik.de/europe/{0}.osm.pbf" skip="false" region_suffix="_europe">
+		<region name="british-isles" downloadName="british-isles-latest"/>
 	</regions>
 
 	<regions siteToDownload="http://download.geofabrik.de/europe/{0}.osm.pbf" skip="false" region_suffix="_europe">
-		<region name="france" downloadname="france-latest"/>
+		<region name="france" downloadName="france-latest"/>
 	</regions>
 
 	<regions siteToDownload="http://download.geofabrik.de/europe/{0}.osm.pbf" skip="false" region_suffix="_europe">
-		<region name="germany" downloadname="germany-latest"/>
+		<region name="germany" downloadName="germany-latest"/>
 	</regions> 
 
 </regions_list> 
