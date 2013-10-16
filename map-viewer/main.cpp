@@ -309,7 +309,7 @@ void mouseHandler(int button, int state, int x, int y)
             auto delta = clickedLocation - OsmAnd::PointI64(renderer->state.target31.x, renderer->state.target31.y);
 
             animator->cancelAnimation();
-            animator->animateTargetBy(delta, 1.0f, OsmAnd::MapAnimatorEasingType::None, OsmAnd::MapAnimatorEasingType::Quadratic);
+            animator->animateTargetBy(delta, 1.0f);
             animator->resumeAnimation();
         }
     }
