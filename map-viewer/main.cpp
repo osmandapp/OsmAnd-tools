@@ -330,9 +330,7 @@ void mouseMotion(int x, int y)
         auto nx = deltaX * cosAngle - deltaY * sinAngle;
         auto ny = deltaX * sinAngle + deltaY * cosAngle;
 
-        int32_t tileSize31 = 1;
-        if(renderer->state.zoomBase != OsmAnd::ZoomLevel31)
-            tileSize31 = (1u << (31 - renderer->state.zoomBase)) - 1;
+        const auto tileSize31 = (1u << (31 - renderer->state.zoomBase));
         auto scale31 = static_cast<double>(tileSize31) / renderer->getScaledTileSizeOnScreen();
 
         OsmAnd::PointI newTarget;
