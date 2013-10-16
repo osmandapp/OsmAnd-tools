@@ -37,17 +37,18 @@ public class SQLiteBigPlanetIndex {
 		Statement statement = conn.createStatement();
 		statement.execute("CREATE TABLE tiles (x int, y int, z int, s int, image blob, time long, PRIMARY KEY (x,y,z,s))");
 		statement.execute("CREATE INDEX IND on tiles (x,y,z,s)");
-		statement.execute("CREATE TABLE info(tilenumbering,minzoom,maxzoom,url)");
+		statement.execute("CREATE TABLE info(tilenumbering,minzoom,maxzoom,timecolumn,url)");
 		statement.execute("CREATE TABLE android_metadata (locale TEXT)");
 		statement.close();
 		
 
-		PreparedStatement pStatement = conn.prepareStatement("INSERT INTO INFO VALUES(?,?,?,?)");
+		PreparedStatement pStatement = conn.prepareStatement("INSERT INTO INFO VALUES(?,?,?,?,?)");
 		if (template instanceof TileSourceTemplate && !(template instanceof BeanShellTileSourceTemplate)) {
 			pStatement.setString(1, bigPlanet ? "BigPlanet" : "simple");
 			pStatement.setInt(2, bigPlanet? 17 - template.getMaximumZoomSupported() : template.getMinimumZoomSupported());
 			pStatement.setInt(3, bigPlanet? 17 - template.getMinimumZoomSupported() : template.getMaximumZoomSupported());
-			pStatement.setString(4, ((TileSourceTemplate) template).getUrlTemplate());
+			pStatement.setString(4, "yes");
+			pStatement.setString(5, ((TileSourceTemplate) template).getUrlTemplate());
 			pStatement.execute();
 		}
 		pStatement.close();
