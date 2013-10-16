@@ -515,6 +515,12 @@ void keyboardHandler(unsigned char key, int x, int y)
             renderer->setConfiguration(config);
         }
         break;*/
+    case 'q':
+        {
+            animator->cancelAnimation();
+            animator->animateAzimuthBy(-renderer->state.azimuth, 1.0f);
+            animator->resumeAnimation();
+        }
     case '0':
         {
             auto layerId = (modifiers & GLUT_ACTIVE_ALT) ? OsmAnd::RasterMapLayerId::Overlay0 : OsmAnd::RasterMapLayerId::BaseLayer;
