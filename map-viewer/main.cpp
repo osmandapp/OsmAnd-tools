@@ -546,6 +546,18 @@ void keyboardHandler(unsigned char key, int x, int y)
             activateProvider(layerId, 3);
         }
         break;
+    case '4':
+        {
+            auto layerId = (modifiers & GLUT_ACTIVE_ALT) ? OsmAnd::RasterMapLayerId::Overlay0 : OsmAnd::RasterMapLayerId::BaseLayer;
+            activateProvider(layerId, 4);
+        }
+        break;
+    case '5':
+        {
+            auto layerId = (modifiers & GLUT_ACTIVE_ALT) ? OsmAnd::RasterMapLayerId::Overlay0 : OsmAnd::RasterMapLayerId::BaseLayer;
+            activateProvider(layerId, 5);
+        }
+        break;
     }
 }
 
