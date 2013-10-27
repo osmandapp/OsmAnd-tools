@@ -51,6 +51,7 @@
 #include <OsmAndCore/Map/OfflineMapDataProvider.h>
 #include <OsmAndCore/Map/OfflineMapRasterTileProvider_Software.h>
 #include <OsmAndCore/Map/OfflineMapRasterTileProvider_GPU.h>
+#include <OsmAndCore/Map/OfflineMapSymbolProvider.h>
 #include <OsmAndCore/Map/MapAnimator.h>
 
 bool glutWasInitialized = false;
@@ -515,6 +516,17 @@ void keyboardHandler(unsigned char key, int x, int y)
             renderer->setConfiguration(config);
         }
         break;*/
+    case 'z':
+        {
+            if(!renderer->state.symbolProviders.isEmpty())
+                renderer->removeAllSymbolProviders();
+            else
+            {
+                auto symbolProvider = new OsmAnd::OfflineMapSymbolProvider(offlineMapDataProvider);
+                renderer->addSymbolProvider(std::shared_ptr<OsmAnd::IMapSymbolProvider>(symbolProvider));
+            }
+        }
+        break;
     case 'q':
         {
             animator->cancelAnimation();
@@ -656,12 +668,10 @@ void displayHandler()
     verifyOpenGL();
     //////////////////////////////////////////////////////////////////////////
 
-    //OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Debug, "-FS{-\n");
     if(renderer->prepareFrame())
         renderer->renderFrame();
     renderer->processRendering();
     verifyOpenGL();
-    //OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Debug, "-}FS-\n");
     
     //////////////////////////////////////////////////////////////////////////
     if(!use43)
@@ -676,7 +686,7 @@ void displayHandler()
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
         auto w = 390;
-        auto h1 = 16*19;
+        auto h1 = 16*20;
         auto t = viewport.height();
         glColor4f(0.5f, 0.5f, 0.5f, 0.6f);
         glBegin(GL_QUADS);
@@ -776,6 +786,11 @@ void displayHandler()
         glRasterPos2f(8, t - 16 * 18);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("palette textures(key p): %1").arg(renderer->configuration.paletteTexturesAllowed)));
+        verifyOpenGL();
+
+        glRasterPos2f(8, t - 16 * 19);
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
+            QString("symbols (key z)        : %1").arg(!renderer->state.symbolProviders.isEmpty())));
         verifyOpenGL();
 
         glColor4f(0.5f, 0.5f, 0.5f, 0.6f);
