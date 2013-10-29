@@ -230,7 +230,7 @@ int main(int argc, char** argv)
     renderer->setAzimuth(69.4f);
     renderer->setElevationAngle(35.0f);
     renderer->setFogColor(OsmAnd::FColorRGB(1.0f, 1.0f, 1.0f));
-    offlineMapDataProvider.reset(new OsmAnd::OfflineMapDataProvider(obfsCollection, style));
+    offlineMapDataProvider.reset(new OsmAnd::OfflineMapDataProvider(obfsCollection, style, 1.0f));
 
     /// Amsterdam
     renderer->setTarget(OsmAnd::PointI(
