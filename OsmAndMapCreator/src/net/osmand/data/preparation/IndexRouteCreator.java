@@ -878,7 +878,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		String ref1 = gw.names.get(routeTypes.getRefRuleType());
 		String ref2 = gn.names.get(routeTypes.getRefRuleType());
 		String name1 = gw.names.get(routeTypes.getNameRuleType());
-		String name2 = gn.names.get(routeTypes.getRefRuleType());
+		String name2 = gn.names.get(routeTypes.getNameRuleType());
 		return equalsIfNotEmpty(ref1, ref2) && equalsIfNotEmpty(name1, name2);
 	}
 	
@@ -893,7 +893,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		String rfFrom = from.names.get(rt);
 		String rfTo = to.names.get(rt);
 		if (rfFrom != null) {
-			if (!rfFrom.equalsIgnoreCase(rfTo) && Algorithms.isEmpty(rfTo)) {
+			if (!rfFrom.equalsIgnoreCase(rfTo) && !Algorithms.isEmpty(rfTo)) {
 				to.names.put(rt, CONFLICT_NAME);
 			} else {
 				to.names.put(rt, from.names.get(rt));
