@@ -548,9 +548,13 @@
 
 		<!-- 8. AFRICA  -->
 		<!-- 8.1 AFRICA [SOURCE: GEOFABRIK.DE] -->
-		<regions siteToDownload="http://download.geofabrik.de/{0}.osm.pbf" region_prefix="" region_suffix="" skip="false">
+		<!-- <regions siteToDownload="http://download.geofabrik.de/{0}.osm.pbf" region_prefix="" region_suffix="" skip="false">
 			<region name="africa" downloadName="africa-latest"/>
+		</regions> -->
+		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.osm.pbf" region_prefix="" region_suffix="" skip="false">
+			<region name="africa"/>
 		</regions>
+		
 
 		<regions siteToDownload="http://download.geofabrik.de/africa/{0}.osm.pbf" region_prefix="" region_suffix="_Africa"  skip="false">
 			<region name="burkina-faso" downloadName="burkina-faso-latest"/>
