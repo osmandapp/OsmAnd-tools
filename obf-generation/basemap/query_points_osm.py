@@ -7,7 +7,7 @@ import re
 def esc(s):
 	return s.replace("\"", "&quot;").replace("<", "&lt;").replace(">", "&gt;").replace("&", "&amp;").replace("'","&apos;")
 
-def process_points(filename):
+def process_points(cond, filename, array):
 	f = open(filename,'w')
 	conn_string = "host='127.0.0.1' dbname='gis' user='gisuser' password='gisuser' port='5433'"
 	f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
@@ -16,12 +16,11 @@ def process_points(filename):
 	conn = psycopg2.connect(conn_string)
 	cursor = conn.cursor()
 	shift = 2
-	array = ['name', 'ref', 'ele', 'place','natural', 'aeroway', 'tourism']
-	cursor.execute("select ST_AsText(ST_Transform(way,4326)), osm_id, name, ref, ele, place, \"natural\", aeroway, tourism"
-				   " from planet_osm_point where place in ('sea','ocean','state', 'country') "
-				   " or \"natural\" in ('peak', 'cave_entrance', 'rock', 'waterfall', 'cape', 'volcano', 'stream')"
-				   " or tourism in ('alpine_hut') "
-				   " or aeroway in ('aerodrome', 'airport')"
+	queryFields = ""
+	for tag in array:
+		queryFields += ", " + tag
+	cursor.execute("select ST_AsText(ST_Transform(way,4326)), osm_id " + queryFields +
+				   " from planet_osm_point where " + cond + 
 				   # "LIMIT 2"
 				   ";")
  
@@ -41,4 +40,9 @@ def process_points(filename):
 	f.write('</osm>')
 
 if __name__ == "__main__":
-	process_points('points.osm')
+	process_points("place in ('sea','ocean','state', 'country') "
+				   " or \"natural\" in ('peak', 'cave_entrance', 'rock', 'waterfall', 'cape', 'volcano', 'stream')"
+				   " or tourism in ('alpine_hut') "
+				   " or aeroway in ('aerodrome', 'airport')", 'points.osm', 
+				   ['name', 'ref', 'ele', 'place','\"natural\"', 'aeroway', 'tourism'])
+	process_points("place in ('city','town') ", 'cities.osm', ['name', '"name:en"', 'ele', 'place'])
