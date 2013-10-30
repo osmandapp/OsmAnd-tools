@@ -136,7 +136,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	
 	public MapRulType getNameEnRuleType() {
 		getEncodingRuleTypes();
-		return nameRuleType;
+		return nameEnRuleType;
 	}
 	
 	public MapRulType getCoastlineRuleType() {
