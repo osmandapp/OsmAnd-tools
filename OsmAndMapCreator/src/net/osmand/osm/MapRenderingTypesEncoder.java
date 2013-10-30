@@ -7,6 +7,7 @@ import java.util.Map.Entry;
 
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Relation;
+import net.osmand.util.Algorithms;
 
 import org.xmlpull.v1.XmlPullParser;
 
@@ -17,6 +18,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	private List<MapRulType> typeList = new ArrayList<MapRulType>();
 	private List<MapRouteTag> routeTags = new ArrayList<MapRouteTag>();
 	private MapRulType nameRuleType;
+	private MapRulType nameEnRuleType;
 	private MapRulType coastlineRuleType;
 	
 	public MapRenderingTypesEncoder(String fileName) {
@@ -47,6 +49,11 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			nameRuleType.onlyNameRef = true;
 			nameRuleType.additional = false; 
 			registerRuleType("name", null, nameRuleType);
+			nameEnRuleType = new MapRulType();
+			nameEnRuleType.tag = "name:en";
+			nameEnRuleType.onlyNameRef = true;
+			nameEnRuleType.additional = false; 
+			registerRuleType("name:en", null, nameRuleType);
 			super.checkIfInitNeeded();
 		}
 	}
@@ -123,6 +130,11 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	}
 	
 	public MapRulType getNameRuleType() {
+		getEncodingRuleTypes();
+		return nameRuleType;
+	}
+	
+	public MapRulType getNameEnRuleType() {
 		getEncodingRuleTypes();
 		return nameRuleType;
 	}
@@ -236,6 +248,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		namesToEncode.clear();
 		tempList.clear();
 		tempList.add(getNameRuleType());
+		tempList.add(getNameEnRuleType());
 
 		boolean area = "yes".equals(e.getTag("area")) || "true".equals(e.getTag("area"));
 
@@ -272,6 +285,9 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
         outaddTypes.sort();
 		for(MapRulType mt : tempList){
 			String val = e.getTag(mt.tag);
+			if(mt == nameEnRuleType && Algorithms.objectEquals(val, e.getTag(nameRuleType.tag))) {
+				continue;
+			}
 			if(val != null && val.length() > 0){
 				namesToEncode.put(mt, val);
 			}
