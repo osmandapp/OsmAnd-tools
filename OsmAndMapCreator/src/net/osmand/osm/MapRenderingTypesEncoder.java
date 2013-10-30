@@ -53,7 +53,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			nameEnRuleType.tag = "name:en";
 			nameEnRuleType.onlyNameRef = true;
 			nameEnRuleType.additional = false; 
-			registerRuleType("name:en", null, nameRuleType);
+			registerRuleType("name:en", null, nameEnRuleType);
 			super.checkIfInitNeeded();
 		}
 	}
