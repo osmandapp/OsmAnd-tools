@@ -48,12 +48,12 @@ import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.MapRoutingTypes;
 import net.osmand.osm.MapRoutingTypes.MapRouteType;
 import net.osmand.osm.edit.Entity;
-import net.osmand.osm.edit.Node;
-import net.osmand.osm.edit.Relation;
-import net.osmand.osm.edit.Way;
 import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.Entity.EntityType;
+import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
+import net.osmand.osm.edit.Relation;
+import net.osmand.osm.edit.Way;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
@@ -62,7 +62,6 @@ import org.apache.commons.logging.Log;
 import rtree.Element;
 import rtree.IllegalValueException;
 import rtree.LeafElement;
-import rtree.NonLeafElement;
 import rtree.RTree;
 import rtree.RTreeException;
 import rtree.RTreeInsertException;
@@ -76,6 +75,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 	private final Log logMapDataWarn;
 	private final static boolean WRITE_POINT_ID = false;
 	private final static int CLUSTER_ZOOM = 15;
+	private final static String CONFLICT_NAME = "#CONFLICT";
 	private RTree routeTree = null;
 	private RTree baserouteTree = null;
 	private MapRoutingTypes routeTypes;
@@ -668,7 +668,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 				Iterator<Entry<MapRouteType, String>> its = gw.names.entrySet().iterator();
 				while (its.hasNext()) {
 					Entry<MapRouteType, String> e = its.next();
-					if (e.getValue() != null) {
+					if (e.getValue() != null && !e.getValue().equals(CONFLICT_NAME)) {
 						names.put(e.getKey(), e.getValue());
 					}
 				}
@@ -875,21 +875,29 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 	}
 	
 	private boolean compareRefs(GeneralizedWay gw, GeneralizedWay gn){
-		String rf = gw.names.get(routeTypes.getRefRuleType());
-		String rf2 = gn.names.get(routeTypes.getRefRuleType());
-		if(rf != null && rf2 != null && !rf.equals(rf2)){
-			return false;
+		String ref1 = gw.names.get(routeTypes.getRefRuleType());
+		String ref2 = gn.names.get(routeTypes.getRefRuleType());
+		String name1 = gw.names.get(routeTypes.getNameRuleType());
+		String name2 = gn.names.get(routeTypes.getRefRuleType());
+		return equalsIfNotEmpty(ref1, ref2) && equalsIfNotEmpty(name1, name2);
+	}
+	
+	private boolean equalsIfNotEmpty(String s1, String s2) {
+		if(Algorithms.isEmpty(s1) || Algorithms.isEmpty(s2)) {
+			return true;
 		}
-		return true;
+		return s1.equalsIgnoreCase(s2);
 	}
 	
 	private void mergeName(MapRouteType rt, GeneralizedWay from, GeneralizedWay to){
-		String rf = from.names.get(rt);
-		String rf2 = to.names.get(rt);
-		if(rf != null && rf2 != null && !rf.equals(rf2)){
-			to.names.remove(rt);
-		} else if(rf != null) {
-			to.names.put(rt, from.names.get(rt));			
+		String rfFrom = from.names.get(rt);
+		String rfTo = to.names.get(rt);
+		if (rfFrom != null) {
+			if (!rfFrom.equalsIgnoreCase(rfTo) && Algorithms.isEmpty(rfTo)) {
+				to.names.put(rt, CONFLICT_NAME);
+			} else {
+				to.names.put(rt, from.names.get(rt));
+			}
 		}
 	}
 	
