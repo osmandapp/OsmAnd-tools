@@ -551,7 +551,7 @@
 		<!-- <regions siteToDownload="http://download.geofabrik.de/{0}.osm.pbf" region_prefix="" region_suffix="" skip="false">
 			<region name="africa" downloadName="africa-latest"/>
 		</regions> -->
-		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.osm.pbf" region_prefix="" region_suffix="" skip="false">
+		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" region_suffix="" skip="false">
 			<region name="africa"/>
 		</regions>
 		
