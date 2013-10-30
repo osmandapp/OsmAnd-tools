@@ -175,6 +175,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		}
 		registerRuleType(rtype.tag, rtype.value, rtype);
 		rtype.additional = Boolean.parseBoolean(parser.getAttributeValue("", "additional")); //$NON-NLS-1$
+		rtype.onlyPoint = Boolean.parseBoolean(parser.getAttributeValue("", "point")); //$NON-NLS-1$
 		rtype.relation = Boolean.parseBoolean(parser.getAttributeValue("", "relation")); //$NON-NLS-1$
 		rtype.namePrefix = parser.getAttributeValue("", "namePrefix"); //$NON-NLS-1$
 		rtype.nameCombinator = parser.getAttributeValue("", "nameCombinator"); //$NON-NLS-1$
@@ -244,6 +245,9 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			MapRulType rType = getRuleType(tag, val);
 			if (rType != null) {
 				if (rType.minzoom > zoom) {
+					continue;
+				}
+				if (rType.onlyPoint && !(e instanceof net.osmand.osm.edit.Node)) {
 					continue;
 				}
 				if(rType.targetTagValue != null) {
@@ -323,6 +327,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		protected boolean relation;
 		protected MapRulType targetTagValue;
 		protected boolean onlyNameRef;
+		protected boolean onlyPoint;
 		
 		// inner id
 		protected int id;
@@ -372,6 +377,10 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		
 		public boolean isOnlyNameRef() {
 			return onlyNameRef;
+		}
+		
+		public boolean isOnlyPoint() {
+			return onlyPoint;
 		}
 		
 		public boolean isRelation() {
