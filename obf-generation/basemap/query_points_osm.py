@@ -4,6 +4,17 @@ import sys
 import pprint
 import re
 
+def num(s, df):
+	if s is None:
+		return df
+	try:
+		return int(s)
+	except ValueError:
+		try:
+			return float(s)
+		except ValueError:
+			return df
+
 def esc(s):
 	return s.replace("\"", "&quot;").replace("<", "&lt;").replace(">", "&gt;").replace("&", "&amp;").replace("'","&apos;")
 
@@ -15,11 +26,16 @@ def process_points(cond, filename, array):
  
 	conn = psycopg2.connect(conn_string)
 	cursor = conn.cursor()
-	shift = 2
+	shift = 3
 	queryFields = ""
 	for tag in array:
+		if tag == 'name:en':
+			tag = '"name:en"'
+		if tag == 'natural':
+			tag = '"natural"'
+
 		queryFields += ", " + tag
-	cursor.execute("select ST_AsText(ST_Transform(way,4326)), osm_id " + queryFields +
+	cursor.execute("select ST_AsText(ST_Transform(way,4326)), osm_id, population " + queryFields +
 				   " from planet_osm_point where " + cond + 
 				   # "LIMIT 2"
 				   ";")
@@ -33,7 +49,20 @@ def process_points(cond, filename, array):
 		base = shift
 		while base - shift < len(array):
 			if row[base] is not None:
-				xml += '\t<tag k="%s" v="%s" />\n' % (array[base - shift], esc(row[base]))
+				tagName = array[base - shift]
+				value = esc(row[base])
+				if tagName == "place" and value == "city" :
+					pop = num(row[2], 0)
+					if pop > 500000	:
+						xml += '\t<tag k="%s" v="%s" />\n' % ("osmand_place_basemap", "city")
+				if tagName == 'name' and row[base+1] is not None and len(row[base+1]) > 0 :
+					value = '' # write name:en instead of name
+				if tagName == 'name:en' and len(value) > 0 :
+					tagName = 'name'
+				
+
+				if len(value) > 0 :
+					xml += '\t<tag k="%s" v="%s" />\n' % (tagName, value)
 			base = base + 1
 		xml += '</node>'	
 		f.write(xml)
@@ -44,5 +73,5 @@ if __name__ == "__main__":
 				   " or \"natural\" in ('peak', 'cave_entrance', 'rock', 'waterfall', 'cape', 'volcano', 'stream')"
 				   " or tourism in ('alpine_hut') "
 				   " or aeroway in ('aerodrome', 'airport')", 'points.osm', 
-				   ['name', 'ref', 'ele', 'place','\"natural\"', 'aeroway', 'tourism'])
-	process_points("place in ('city','town') ", 'cities.osm', ['name', '"name:en"', 'ele', 'place'])
+				   ['name', 'name:en', 'ref', 'ele', 'place','natural', 'aeroway', 'tourism'])
+	process_points("place in ('city','town') ", 'cities.osm', ['name', 'name:en', 'place'])
