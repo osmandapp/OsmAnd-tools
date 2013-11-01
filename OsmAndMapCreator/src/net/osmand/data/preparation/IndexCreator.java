@@ -562,7 +562,11 @@ public class IndexCreator {
 								indexRouteCreator.indexRelations(e, ctx);
 							}
 							if (indexPOI) {
-								indexPoiCreator.iterateRelation((Relation) e, ctx);
+								if (((Relation) e).isMultiPolygon()) {
+									indexPoiCreator.iterateMultipolygonRelation((Relation) e, ctx);
+								} else {
+									indexPoiCreator.iterateRelation((Relation) e, ctx);									
+								}
 							}
 							if (indexTransport) {
 								indexTransportCreator.indexRelations((Relation) e, ctx);
