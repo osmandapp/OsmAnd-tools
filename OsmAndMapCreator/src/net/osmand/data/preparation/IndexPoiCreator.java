@@ -26,6 +26,7 @@ import net.osmand.IndexConstants;
 import net.osmand.binary.BinaryMapPoiReaderAdapter;
 import net.osmand.data.Amenity;
 import net.osmand.data.AmenityType;
+import net.osmand.data.LatLon;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.osm.MapRenderingTypes;
 import net.osmand.osm.edit.Entity;
@@ -111,6 +112,29 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				}
 			}
 		}		
+	}
+
+	public void iterateMultipolygonRelation(Relation e, OsmDbAccessorContext ctx)
+			throws SQLException {
+		tempAmenityList.clear();
+		tempAmenityList = EntityParser.parseAmenities(renderingTypes, e,
+				tempAmenityList);
+
+		if (!tempAmenityList.isEmpty() && poiPreparedStatement != null) {
+			for (Amenity a : tempAmenityList) {
+				EntityParser.parseAmenity(a, e);
+				// set location - use different approach than
+				// EntityParser#parseAmenities()
+				LatLon relationCentre = e.getLatLon();
+				if (relationCentre != null) {
+					a.setLocation(relationCentre.getLatitude(),
+							relationCentre.getLongitude());
+				}
+				if (a.getLocation() != null) {
+					insertAmenityIntoPoi(a);
+				}
+			}
+		}
 	}
 
 	public void commitAndClosePoiFile(Long lastModifiedDate) throws SQLException {
