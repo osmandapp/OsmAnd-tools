@@ -99,8 +99,10 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	}
 	
 	public void iterateRelation(Relation e, OsmDbAccessorContext ctx) throws SQLException {
+		boolean multipolygon = "multipolygon".equals(e.getTag("type"));
 		for (String t : e.getTagKeySet()) {
-			AmenityType type = renderingTypes.getAmenityType(t, e.getTag(t), true);
+			AmenityType type = multipolygon? renderingTypes.getAmenityType(t, e.getTag(t)) :
+				renderingTypes.getAmenityTypeForRelation(t, e.getTag(t));
 			if (type != null) {
 				ctx.loadEntityRelation(e);
 				for(EntityId id : ((Relation) e).getMembersMap().keySet()) {
