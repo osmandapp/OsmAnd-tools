@@ -99,20 +99,18 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	}
 	
 	public void iterateRelation(Relation e, OsmDbAccessorContext ctx) throws SQLException {
-		boolean multipolygon = "multipolygon".equals(e.getTag("type"));
 		for (String t : e.getTagKeySet()) {
-			AmenityType type = multipolygon? renderingTypes.getAmenityType(t, e.getTag(t)) :
-				renderingTypes.getAmenityTypeForRelation(t, e.getTag(t));
+			AmenityType type = renderingTypes.getAmenityTypeForRelation(t, e.getTag(t));
 			if (type != null) {
 				ctx.loadEntityRelation(e);
-				for(EntityId id : ((Relation) e).getMembersMap().keySet()) {
-					if(!propogatedTags.containsKey(id)) {
+				for (EntityId id : ((Relation) e).getMembersMap().keySet()) {
+					if (!propogatedTags.containsKey(id)) {
 						propogatedTags.put(id, new LinkedHashMap<String, String>());
 					}
 					propogatedTags.get(id).put(t, e.getTag(t));
 				}
 			}
-		}		
+		}
 	}
 
 	public void commitAndClosePoiFile(Long lastModifiedDate) throws SQLException {
