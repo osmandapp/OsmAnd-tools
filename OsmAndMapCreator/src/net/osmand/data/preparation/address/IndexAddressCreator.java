@@ -754,16 +754,14 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 						hname = houseNumber;
 					}
 					int i = hname.indexOf('-');
-					if(i != -1) {
+					if (i != -1 && interpolation != null) {
 						building.setInterpolationInterval(1);
-						if(interpolation != null) {
+						try {
+							building.setInterpolationType(BuildingInterpolation.valueOf(interpolation.toUpperCase()));
+						} catch (RuntimeException ex) {
 							try {
-								building.setInterpolationType(BuildingInterpolation.valueOf(interpolation.toUpperCase()));
-							} catch (RuntimeException ex) {
-								try {
-									building.setInterpolationInterval(Integer.parseInt(interpolation));
-								} catch(NumberFormatException ex2) {
-								}
+								building.setInterpolationInterval(Integer.parseInt(interpolation));
+							} catch (NumberFormatException ex2) {
 							}
 						}
 						building.setName(hname.substring(0, i));
