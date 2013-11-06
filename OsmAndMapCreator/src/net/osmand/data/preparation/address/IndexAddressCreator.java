@@ -1138,6 +1138,12 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 	private double getDistance(Street s, Street c, Map<Street, List<Node>> streetNodes) {
 		List<Node> thisWayNodes = streetNodes.get(s);
 		List<Node> oppositeStreetNodes = streetNodes.get(c);
+		if(thisWayNodes.size() == 0) {
+			thisWayNodes = Collections.singletonList(new Node(s.getLocation().getLatitude(), s.getLocation().getLongitude(), -1));
+		}
+		if(oppositeStreetNodes.size() == 0) {
+			oppositeStreetNodes = Collections.singletonList(new Node(c.getLocation().getLatitude(), c.getLocation().getLongitude(), -1));
+		}
 		double md = Double.POSITIVE_INFINITY;
 		for(Node n : thisWayNodes) {
 			for(Node d : oppositeStreetNodes) {
