@@ -422,7 +422,7 @@ void keyboardHandler(unsigned char key, int x, int y)
         {
             if(renderer->state.elevationDataProvider)
             {
-                renderer->setElevationDataProvider(std::shared_ptr<OsmAnd::IMapElevationDataProvider>());
+                renderer->resetElevationDataProvider();
             }
             else
             {
@@ -612,7 +612,7 @@ void activateProvider(OsmAnd::RasterMapLayerId layerId, int idx)
 {
     if(idx == 0)
     {
-        renderer->setRasterLayerProvider(layerId, std::shared_ptr<OsmAnd::IMapBitmapTileProvider>());
+        renderer->resetRasterLayerProvider(layerId);
     }
     else if(idx == 1)
     {
