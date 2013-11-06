@@ -80,6 +80,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		boolean privateReg = "private".equals(e.getTag("access")); 
 		tempAmenityList = EntityParser.parseAmenities(renderingTypes, e, tempAmenityList);
 		if (!tempAmenityList.isEmpty() && poiPreparedStatement != null) {
+			if(e instanceof Relation) {
+				ctx.loadEntityRelation((Relation) e);
+			}
 			for (Amenity a : tempAmenityList) {
 				if(a.getType() == AmenityType.LEISURE && privateReg) {
 					// don't index private swimming pools 

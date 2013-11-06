@@ -17,12 +17,11 @@ import net.osmand.IndexConstants;
 import net.osmand.data.preparation.OsmDbAccessor.OsmDbVisitor;
 import net.osmand.data.preparation.address.IndexAddressCreator;
 import net.osmand.impl.ConsoleProgressImplementation;
-import net.osmand.osm.MapRenderingTypes;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.edit.Entity;
-import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.Entity.EntityType;
+import net.osmand.osm.edit.Relation;
 import net.osmand.osm.io.IOsmStorageFilter;
 import net.osmand.osm.io.OsmBaseStorage;
 import net.osmand.osm.io.OsmBaseStoragePbf;
@@ -773,12 +772,16 @@ public class IndexCreator {
 
 	public static void main(String[] args) throws IOException, SAXException, SQLException, InterruptedException {
 		long time = System.currentTimeMillis();
+		
+		//if(true){ generateRegionsFile(); return;}
+		
+		
 		IndexCreator creator = new IndexCreator(new File("/home/victor/projects/osmand/osm-gen/")); //$NON-NLS-1$
-		creator.setIndexMap(true);
-		creator.setIndexAddress(true);
+//		creator.setIndexMap(true);
+//		creator.setIndexAddress(true);
 		creator.setIndexPOI(true);
-		creator.setIndexTransport(true);
-		creator.setIndexRouting(true);
+//		creator.setIndexTransport(true);
+//		creator.setIndexRouting(true);
 
 //		creator.deleteDatabaseIndexes = false;
 //		creator.recreateOnlyBinaryFile = true;
@@ -788,14 +791,13 @@ public class IndexCreator {
 		MapRenderingTypesEncoder rt = MapRenderingTypesEncoder.getDefault();
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 
-		String file = "/home/victor/projects/osmand/temp/.osm";
+		String file = "/home/victor/projects/osmand/temp/golfThal_Steinfeld.osm";
 
-		generateRegionsFile(creator, rt);
-//		int st = file.lastIndexOf('/');
-//		int e = file.indexOf('.', st);
-//		creator.setNodesDBFile(new File("/home/victor/projects/osmand/osm-gen/"+file.substring(st, e) + ".tmp.odb"));
-//		creator.generateIndexes(new File(file),
-//				new ConsoleProgressImplementation(1), null, zooms, rt, log);
+		int st = file.lastIndexOf('/');
+		int e = file.indexOf('.', st);
+		creator.setNodesDBFile(new File("/home/victor/projects/osmand/osm-gen/"+file.substring(st, e) + ".tmp.odb"));
+		creator.generateIndexes(new File(file),
+				new ConsoleProgressImplementation(1), null, zooms, rt, log);
 		
 		
 
@@ -811,18 +813,22 @@ public class IndexCreator {
 
 	}
 
-	private static void generateRegionsFile(IndexCreator creator, MapRenderingTypesEncoder rt) throws IOException, SAXException, SQLException, InterruptedException {
-		MapZooms zooms;
-		String file = "/home/victor/projects/osmand/temp/osmand_regions.osm";
+	public static void generateRegionsFile() throws IOException, SAXException, SQLException, InterruptedException {
+		MapRenderingTypesEncoder rt = MapRenderingTypesEncoder.getDefault();
+		String file = "/home/victor/projects/osmand/repo/resources/osmand_regions.osm";
+		String folder = "/home/victor/projects/osmand/repo/resources/countries-info/";
+		IndexCreator creator = new IndexCreator(new File(folder)); //$NON-NLS-1$
+
+		creator.setMapFileName("regions.ocbf");
 		creator.setIndexMap(true);
 		creator.setIndexAddress(false);
 		creator.setIndexPOI(false);
 		creator.setIndexTransport(false);
 		creator.setIndexRouting(false);
-		zooms = MapZooms.parseZooms("5-6");
+		MapZooms zooms = MapZooms.parseZooms("5-6");
 		int st = file.lastIndexOf('/');
 		int e = file.indexOf('.', st);
-		creator.setNodesDBFile(new File("/home/victor/projects/osmand/osm-gen/"+file.substring(st, e) + ".tmp.odb"));
+		creator.setNodesDBFile(new File(folder+file.substring(st, e) + ".tmp.odb"));
 		creator.generateIndexes(new File(file),
 				new ConsoleProgressImplementation(1), null, zooms, rt, log);
 	}
