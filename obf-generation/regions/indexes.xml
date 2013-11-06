@@ -181,7 +181,9 @@
 		</regions>
 
 		<!-- 1.5 ITALY [SOURCE: GFOSS.it] -->		
-		<regions siteToDownload="http://geodati.fmach.it/gfoss_geodata/osm/output_osm_regioni/{0}.pbf" region_prefix="Italy_" skip="false" region_suffix="_Europe">
+		<!-- leave download server in for the moment in case something is not entirely correct -->
+		<!-- <regions siteToDownload="http://geodati.fmach.it/gfoss_geodata/osm/output_osm_regioni/{0}.pbf" region_prefix="Italy_" skip="false" region_suffix="_Europe"> -->
+		<regions siteToDownload="http://download.osmand.net/osm-downloads/Italy-{0}.pbf" region_prefix="Italy_" skip="false" region_suffix="_Europe">	
 			<region name="abruzzo"  cityAdminLevel="4"/>
 			<region name="basilicata"  cityAdminLevel="4"/>
 			<region name="calabria"  cityAdminLevel="4"/>
@@ -201,7 +203,7 @@
 			<region name="trentino-alto-adige"  cityAdminLevel="4"/>
 			<region name="umbria"  cityAdminLevel="4"/>
 			<region name="valle-aosta"  cityAdminLevel="4"/>
-			<region name="veneto"  cityAdminLevel="4"/>
+			<!--<region name="veneto"  cityAdminLevel="4"/> -->
 		</regions>
 
 
