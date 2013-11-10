@@ -79,6 +79,8 @@ import com.google.protobuf.WireFormat.FieldType;
 
 public class BinaryMapIndexWriter {
 
+	private static final boolean USE_DEPRECATED_POI_NAME_STRUCTURE = true;
+	
 	private RandomAccessFile raf;
 	private CodedOutputStream codedOutStream;
 	protected static final int SHIFT_COORDINATES = BinaryMapIndexReader.SHIFT_COORDINATES;
@@ -128,6 +130,7 @@ public class BinaryMapIndexWriter {
 	private final static int ROUTE_INDEX_INIT = 15;
 	private final static int ROUTE_TREE = 16;
 	private final static int ROUTE_BORDER_BOX = 17;
+	
 
 	public BinaryMapIndexWriter(final RandomAccessFile raf) throws IOException {
 		this.raf = raf;
@@ -1295,8 +1298,7 @@ public class BinaryMapIndexWriter {
 		return res;
 	}
 
-	public void writePoiDataAtom(long id, int x24shift, int y24shift, String nameEn, String name, TIntArrayList types, String openingHours,
-			String site, String phone, String description) throws IOException {
+	public void writePoiDataAtom(long id, int x24shift, int y24shift, String nameEn, String name, TIntArrayList types, Map<String, String> additionalNames) throws IOException {
 		checkPeekState(POI_DATA);
 
 		OsmAndPoiBoxDataAtom.Builder builder = OsmandOdb.OsmAndPoiBoxDataAtom.newBuilder();
@@ -1314,17 +1316,25 @@ public class BinaryMapIndexWriter {
 		}
 		builder.setId(id);
 
-		if (!Algorithms.isEmpty(openingHours)) {
-			builder.setOpeningHours(openingHours);
-		}
-		if (!Algorithms.isEmpty(site)) {
-			builder.setSite(site);
-		}
-		if (!Algorithms.isEmpty(phone)) {
-			builder.setPhone(phone);
-		}
-		if (!Algorithms.isEmpty(description)) {
-			builder.setNote(description);
+		
+		if (USE_DEPRECATED_POI_NAME_STRUCTURE) {
+			String openingHours = additionalNames.get("opening_hours");
+			String site = additionalNames.get("website");
+			String phone = additionalNames.get("phone");
+			String description = additionalNames.get("description");
+
+			if (!Algorithms.isEmpty(openingHours)) {
+				builder.setOpeningHours(openingHours);
+			}
+			if (!Algorithms.isEmpty(site)) {
+				builder.setSite(site);
+			}
+			if (!Algorithms.isEmpty(phone)) {
+				builder.setPhone(phone);
+			}
+			if (!Algorithms.isEmpty(description)) {
+				builder.setNote(description);
+			}
 		}
 
 		codedOutStream.writeMessage(OsmandOdb.OsmAndPoiBoxData.POIDATA_FIELD_NUMBER, builder.build());
