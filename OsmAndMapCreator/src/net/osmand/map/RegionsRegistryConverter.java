@@ -5,7 +5,6 @@ import gnu.trove.list.array.TIntArrayList;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -30,9 +29,6 @@ import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 
-import net.osmand.map.OsmandRegionInfo.OsmAndRegionInfo;
-import net.osmand.map.OsmandRegionInfo.OsmAndRegions;
-
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -46,7 +42,6 @@ public class RegionsRegistryConverter {
     static String REPO_PATH = "../"; //"../../"  ;
 	static String COUNTRIES_FILE = "resources/countries-info/countries.xml";
 	static String COUNTRIES_OPT_FILE = "resources/countries-info/opt-countries.xml";
-	static String OUTPUT_BINARY_FILE = "resources/countries-info/"+RegionRegistry.fileName;
 	
 	public static List<RegionCountry> parseRegions(boolean withNoValidated) throws IllegalStateException, FileNotFoundException {
 		final File f = new File(REPO_PATH + COUNTRIES_FILE);
@@ -69,9 +64,8 @@ public class RegionsRegistryConverter {
 	public static void main(String[] args) throws Exception {
 		validate(true);
 		optimizeBoxes();
-		List<RegionCountry> countries = recreateReginfo();
-		checkFileRead(countries);
-		
+//		List<RegionCountry> countries = recreateReginfo();
+//		checkFileRead(countries);
 		
 //		makeFlat();
 		
@@ -264,40 +258,8 @@ public class RegionsRegistryConverter {
 		}
 	}
 
-	public static List<RegionCountry> recreateReginfo() throws FileNotFoundException, IOException {
-		List<RegionCountry> countries = parseRegions(false);
-		OsmAndRegions.Builder regions = OsmAndRegions.newBuilder();
-		for (RegionCountry c : countries) {
-			regions.addRegions(c.convert());
-		}
-		FileOutputStream out = new FileOutputStream(REPO_PATH + OUTPUT_BINARY_FILE);
-		OsmAndRegionInfo.newBuilder().setRegionInfo(regions).build().writeTo(out);
-		out.close();
-		return countries;
-	}
 
 
-	public  static void checkFileRead(List<RegionCountry> originalcountries) throws IOException {
-		long t = -System.currentTimeMillis();
-		InputStream in = RegionRegistry.class.getResourceAsStream(RegionRegistry.fileName);
-		OsmAndRegionInfo regInfo = OsmAndRegionInfo.newBuilder().mergeFrom(in).build();
-		t += System.currentTimeMillis();
-		for (int j = 0; j < regInfo.getRegionInfo().getRegionsCount(); j++) {
-			RegionCountry.construct(regInfo.getRegionInfo().getRegions(j));
-		}
-		int subregions = 0;
-		for(int i = 0; i < regInfo.getRegionInfo().getRegionsCount(); i++) {
-			subregions += regInfo.getRegionInfo().getRegions(i).getSubregionsCount();
-		}
-		int subregionsOrig = 0;
-		for(RegionCountry c : originalcountries) {
-			subregionsOrig += c.getSubRegions().size();
-		}
-		System.out.println("Read countries " + regInfo.getRegionInfo().getRegionsCount() + " " + originalcountries.size());
-		System.out.println("Read countries " + subregions + " " + subregionsOrig );
-		System.out.println("Timing " + t);
-	}
-	
 	
 	private static class RegionsHandler extends DefaultHandler {
 		

@@ -1,35 +1,30 @@
 package net.osmand.osm.util;
 
 import gnu.trove.list.array.TIntArrayList;
-import gnu.trove.list.array.TLongArrayList;
-import gnu.trove.map.hash.TLongObjectHashMap;
-import net.osmand.IndexConstants;
-import net.osmand.binary.BinaryInspector;
-import net.osmand.data.LatLon;
-import net.osmand.data.index.IndexBatchCreator;
-import net.osmand.impl.ConsoleProgressImplementation;
-import net.osmand.map.OsmandRegions;
-import net.osmand.map.RegionCountry;
-import net.osmand.map.RegionRegistry;
-import net.osmand.osm.edit.Entity;
-import net.osmand.osm.edit.Entity.EntityId;
-import net.osmand.osm.edit.Entity.EntityType;
-import net.osmand.osm.edit.Node;
-import net.osmand.osm.edit.OsmMapUtils;
-import net.osmand.osm.edit.Way;
-import net.osmand.osm.io.OsmBaseStorage;
-import net.osmand.osm.io.OsmStorageWriter;
-import net.osmand.util.Algorithms;
-import net.osmand.util.MapUtils;
-import org.apache.tools.bzip2.CBZip2InputStream;
-import org.xml.sax.SAXException;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 
 import javax.xml.stream.XMLStreamException;
-import java.io.*;
-import java.util.*;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipException;
-import java.util.zip.ZipFile;
+
+import net.osmand.IndexConstants;
+import net.osmand.binary.BinaryInspector;
+import net.osmand.map.RegionCountry;
+import net.osmand.map.RegionsRegistryConverter;
+import net.osmand.util.Algorithms;
+
+import org.xml.sax.SAXException;
 
 public class CombineSRTMIntoFile {
 
@@ -42,9 +37,7 @@ public class CombineSRTMIntoFile {
 //		or.prepareFile("/home/victor/projects/osmand/osm-gen/Osmand_regions.obf");
 //		or.cacheAllCountries();
 
-
-		final RegionRegistry rr = RegionRegistry.getRegionRegistry();
-		final List<RegionCountry> rcs = rr.getCountries();
+		final List<RegionCountry> rcs = RegionsRegistryConverter.parseRegions(false);
 		for(RegionCountry rc : rcs) {
 //			final String stdname = rc.name.toLowerCase() + '_' + rc.continentName.toLowerCase();
 //			if(!or.containsCountry(stdname)){
