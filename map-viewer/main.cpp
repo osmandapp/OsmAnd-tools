@@ -27,10 +27,12 @@
 #include <GL/glew.h>
 #include <GL/freeglut.h>
 
+#include <OsmAndCore/QtExtensions.h>
 #include <QString>
 #include <QList>
 #include <QFile>
 #include <QMutex>
+#include <QElapsedTimer>
 
 #include <OsmAndCore.h>
 #include <OsmAndCore/Concurrent.h>
@@ -62,6 +64,7 @@ std::shared_ptr<OsmAnd::IMapRenderer> renderer;
 std::shared_ptr<OsmAnd::ObfsCollection> obfsCollection;
 std::shared_ptr<OsmAnd::OfflineMapDataProvider> offlineMapDataProvider;
 std::shared_ptr<OsmAnd::MapStyles> stylesCollection;
+std::shared_ptr<const OsmAnd::MapStyle> style;
 std::shared_ptr<OsmAnd::MapAnimator> animator;
 
 QDir obfRoot(QDir::current());
@@ -137,7 +140,6 @@ int main(int argc, char** argv)
     }
     
     // Obtain and configure rasterization style context
-    std::shared_ptr<const OsmAnd::MapStyle> style;
     if(!styleName.isEmpty())
     {
         stylesCollection.reset(new OsmAnd::MapStyles());
@@ -230,14 +232,13 @@ int main(int argc, char** argv)
     renderer->setAzimuth(69.4f);
     renderer->setElevationAngle(35.0f);
     renderer->setFogColor(OsmAnd::FColorRGB(1.0f, 1.0f, 1.0f));
-    offlineMapDataProvider.reset(new OsmAnd::OfflineMapDataProvider(obfsCollection, style, 1.0f));
 
     /// Amsterdam
     renderer->setTarget(OsmAnd::PointI(
         1102430866,
         704978668));
-    //renderer->setZoom(10.0f);
-    renderer->setZoom(4.0f);
+    renderer->setZoom(10.0f);
+    //renderer->setZoom(4.0f);
     
     // Kiev
     /*renderer->setTarget(OsmAnd::PointI(
@@ -616,21 +617,29 @@ void activateProvider(OsmAnd::RasterMapLayerId layerId, int idx)
     }
     else if(idx == 1)
     {
+        offlineMapDataProvider.reset(new OsmAnd::OfflineMapDataProvider(obfsCollection, style, 1.0f));
+
         auto tileProvider = OsmAnd::OnlineMapRasterTileProvider::createCycleMapProvider();
         renderer->setRasterLayerProvider(layerId, tileProvider);
     }
     else if(idx == 2)
     {
+        offlineMapDataProvider.reset(new OsmAnd::OfflineMapDataProvider(obfsCollection, style, 1.0f));
+
         auto tileProvider = OsmAnd::OnlineMapRasterTileProvider::createMapnikProvider();
         renderer->setRasterLayerProvider(layerId, tileProvider);
     }
     else if(idx == 3)
     {
+        offlineMapDataProvider.reset(new OsmAnd::OfflineMapDataProvider(obfsCollection, style, 1.0f));
+
         auto tileProvider = new OsmAnd::OfflineMapRasterTileProvider_Software(offlineMapDataProvider);
         renderer->setRasterLayerProvider(layerId, std::shared_ptr<OsmAnd::IMapBitmapTileProvider>(tileProvider));
     }
     else if(idx == 4)
     {
+        offlineMapDataProvider.reset(new OsmAnd::OfflineMapDataProvider(obfsCollection, style, 1.0f));
+
         auto tileProvider = new OsmAnd::OfflineMapRasterTileProvider_GPU(offlineMapDataProvider);
         renderer->setRasterLayerProvider(layerId, std::shared_ptr<OsmAnd::IMapBitmapTileProvider>(tileProvider));
     }
@@ -671,8 +680,9 @@ void displayHandler()
     if(renderer->prepareFrame())
         renderer->renderFrame();
     renderer->processRendering();
+
     verifyOpenGL();
-    
+
     //////////////////////////////////////////////////////////////////////////
     if(!use43)
     {

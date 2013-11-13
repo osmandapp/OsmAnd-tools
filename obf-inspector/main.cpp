@@ -30,7 +30,7 @@
 #   include <fcntl.h>
 #endif
 
-
+#include <OsmAndCore/QtExtensions.h>
 #include <QStringList>
 #include <QFile>
 
