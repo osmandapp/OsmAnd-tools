@@ -83,15 +83,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	}
 	
 	private MapRulType getMapRuleType(String tag, String val) {
-		Map<String, MapRulType> types = getEncodingRuleTypes();
-		MapRulType rType = types.get(constructRuleKey(tag, val));
-		if (rType == null || !rType.isMap()) {
-			rType = types.get(constructRuleKey(tag, null));
-		}
-		if(!rType.isMap()) {
-			return null;
-		}
-		return rType;
+		return getRuleType(tag, val, false);
 	}
 	
 	public MapRulType getCoastlineRuleType() {
