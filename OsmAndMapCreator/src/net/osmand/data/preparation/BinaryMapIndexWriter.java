@@ -1,5 +1,6 @@
 package net.osmand.data.preparation;
 
+
 import gnu.trove.list.array.TByteArrayList;
 import gnu.trove.list.array.TIntArrayList;
 
@@ -61,8 +62,10 @@ import net.osmand.data.LatLon;
 import net.osmand.data.MapObject;
 import net.osmand.data.Street;
 import net.osmand.data.TransportStop;
+import net.osmand.data.preparation.IndexPoiCreator.PoiCreatorCategories;
 import net.osmand.data.preparation.IndexPoiCreator.PoiTileBox;
-import net.osmand.osm.MapRenderingTypesEncoder.MapRulType;
+import net.osmand.osm.MapRenderingTypes;
+import net.osmand.osm.MapRenderingTypes.MapRulType;
 import net.osmand.osm.MapRoutingTypes.MapRouteType;
 import net.osmand.osm.edit.Node;
 import net.osmand.util.Algorithms;
@@ -79,6 +82,7 @@ import com.google.protobuf.WireFormat.FieldType;
 
 public class BinaryMapIndexWriter {
 
+	private static final boolean USE_DEPRECATED_POI_NAME_ADD_INFO_STRUCTURE = true;
 	private static final boolean USE_DEPRECATED_POI_NAME_STRUCTURE = true;
 	
 	private RandomAccessFile raf;
@@ -257,7 +261,7 @@ public class BinaryMapIndexWriter {
 		int highestTargetId = types.size();
 		// 1. prepare map rule type to write
 		for (MapRulType t : types.values()) {
-			if (t.getTargetTagValue() != null || t.getFreq() == 0) {
+			if (t.getTargetTagValue() != null || t.getFreq() == 0 || !t.isMap()) {
 				t.setTargetId(highestTargetId++);
 			} else {
 				out.add(t);
@@ -284,7 +288,7 @@ public class BinaryMapIndexWriter {
 			builder.setMinZoom(rule.getMinzoom());
 			if (rule.isAdditional()) {
 				builder.setType(1);
-			} else if(rule.isOnlyNameRef()) {
+			} else if(rule.isText()) {
 				builder.setType(2);
 			}
 			MapEncodingRule rulet = builder.build();
@@ -1195,14 +1199,14 @@ public class BinaryMapIndexWriter {
 		log.info("POI INDEX SIZE : " + len);
 	}
 
-	public Map<String, Integer> writePoiCategoriesTable(Map<String, Map<String, Integer>> categories) throws IOException {
+	public void writePoiCategoriesTable(PoiCreatorCategories cs) throws IOException {
 		checkPeekState(POI_INDEX_INIT);
-		Map<String, Integer> catIndexes = new LinkedHashMap<String, Integer>();
+		cs.catIndexes = new LinkedHashMap<String, Integer>();
 		int i = 0;
-		for (String cat : categories.keySet()) {
+		for (String cat : cs.categories.keySet()) {
 			Builder builder = OsmandOdb.OsmAndCategoryTable.newBuilder();
 			builder.setCategory(cat);
-			Map<String, Integer> subcatSource = categories.get(cat);
+			Map<String, Integer> subcatSource = cs.categories.get(cat);
 			Map<String, Integer> subcats = new LinkedHashMap<String, Integer>(subcatSource);
 			int j = 0;
 			for (String s : subcats.keySet()) {
@@ -1210,24 +1214,34 @@ public class BinaryMapIndexWriter {
 				subcatSource.put(s, j);
 				j++;
 			}
-			catIndexes.put(cat, i);
+			builder.addAllTextSubtypes(TODO);
+			builder.addAllSubtypes(TODO);
+			cs.catIndexes.put(cat, i);
 			codedOutStream.writeMessage(OsmandOdb.OsmAndPoiIndex.CATEGORIESTABLE_FIELD_NUMBER, builder.build());
 			i++;
 		}
 
-		return catIndexes;
 	}
 
-	public void writePoiCategories(TIntArrayList categories) throws IOException {
+	public void writePoiCategories(PoiCreatorCategories poiCats) throws IOException {
 		checkPeekState(POI_BOX);
 		OsmandOdb.OsmAndPoiCategories.Builder builder = OsmandOdb.OsmAndPoiCategories.newBuilder();
 		int prev = -1;
-		categories.sort();
-		for (int i = 0; i < categories.size(); i++) {
+		poiCats.cachedCategoriesIds.sort();
+		for (int i = 0; i < poiCats.cachedCategoriesIds.size(); i++) {
 			// avoid duplicates
-			if (i == 0 || prev != categories.get(i)) {
-				builder.addCategories(categories.get(i));
-				prev = categories.get(i);
+			if (i == 0 || prev != poiCats.cachedCategoriesIds.get(i)) {
+				builder.addCategories(poiCats.cachedCategoriesIds.get(i));
+				prev = poiCats.cachedCategoriesIds.get(i);
+			}
+		}
+		prev = -1;
+		poiCats.cachedAdditionalIds.sort();
+		for (int i = 0; i < poiCats.cachedAdditionalIds.size(); i++) {
+			// avoid duplicates
+			if (i == 0 || prev != poiCats.cachedAdditionalIds.get(i)) {
+				builder.addSubcategories(poiCats.cachedAdditionalIds.get(i));
+				prev = poiCats.cachedAdditionalIds.get(i);
 			}
 		}
 		codedOutStream.writeMessage(OsmandOdb.OsmAndPoiBox.CATEGORIES_FIELD_NUMBER, builder.build());
@@ -1298,9 +1312,11 @@ public class BinaryMapIndexWriter {
 		return res;
 	}
 
-	public void writePoiDataAtom(long id, int x24shift, int y24shift, String nameEn, String name, TIntArrayList types, Map<String, String> additionalNames) throws IOException {
+	public void writePoiDataAtom(long id, int x24shift, int y24shift, 
+			String type, String subtype, Map<MapRulType, String> additionalNames, MapRenderingTypes rtypes, 
+			PoiCreatorCategories globalCategories) throws IOException {
 		checkPeekState(POI_DATA);
-
+		TIntArrayList types = globalCategories.buildTypeIds(type, subtype);
 		OsmAndPoiBoxDataAtom.Builder builder = OsmandOdb.OsmAndPoiBoxDataAtom.newBuilder();
 		builder.setDx(x24shift);
 		builder.setDy(y24shift);
@@ -1308,20 +1324,25 @@ public class BinaryMapIndexWriter {
 			int j = types.get(i);
 			builder.addCategories(j);
 		}
-		if (!Algorithms.isEmpty(name)) {
-			builder.setName(name);
-		}
-		if (!Algorithms.isEmpty(nameEn)) {
-			builder.setNameEn(nameEn);
-		}
+		
 		builder.setId(id);
 
-		
 		if (USE_DEPRECATED_POI_NAME_STRUCTURE) {
-			String openingHours = additionalNames.get("opening_hours");
-			String site = additionalNames.get("website");
-			String phone = additionalNames.get("phone");
-			String description = additionalNames.get("description");
+			String name = additionalNames.remove(rtypes.getNameRuleType());
+			if (!Algorithms.isEmpty(name)) {
+				builder.setName(name);
+			}
+			String nameEn = additionalNames.remove(rtypes.getNameEnRuleType());
+			if (!Algorithms.isEmpty(nameEn)) {
+				builder.setNameEn(nameEn);
+			}	
+		}
+		
+		if (USE_DEPRECATED_POI_NAME_ADD_INFO_STRUCTURE) {
+			String openingHours = additionalNames.remove(rtypes.getAmenityRuleType("opening_hours", null));
+			String site = additionalNames.remove(rtypes.getAmenityRuleType("website", null));
+			String phone = additionalNames.remove(rtypes.getAmenityRuleType("phone", null));
+			String description = additionalNames.remove(rtypes.getAmenityRuleType("description", null));
 
 			if (!Algorithms.isEmpty(openingHours)) {
 				builder.setOpeningHours(openingHours);
@@ -1336,6 +1357,26 @@ public class BinaryMapIndexWriter {
 				builder.setNote(description);
 			}
 		}
+		
+		for(Map.Entry<MapRulType, String> rt : additionalNames.entrySet()) {
+			if(rt.getKey().isAdditional()) {
+				int targetPoiId = rt.getKey().getTargetPoiId();
+				if(targetPoiId < 0) {
+					throw new IllegalStateException("Illegal target poi id");
+				}
+				builder.addSubcategories(targetPoiId);
+			} else {
+				
+			}
+		}
+		TIntArrayList subcats = globalCategories.buildTypeIds(type, subtype);
+		for (int i = 0; i < subcats.size(); i++) {
+			int j = subcats.get(i);
+			builder.addSubcategories(j);
+		}
+		builder.addAllSubcategories(TODO);
+		builder.addAllTextCategories(TODO);
+		builder.addAllTextValues(TODO);
 
 		codedOutStream.writeMessage(OsmandOdb.OsmAndPoiBoxData.POIDATA_FIELD_NUMBER, builder.build());
 

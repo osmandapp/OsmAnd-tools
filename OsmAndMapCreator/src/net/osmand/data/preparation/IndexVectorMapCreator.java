@@ -1,5 +1,6 @@
 package net.osmand.data.preparation;
 
+
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.hash.TLongObjectHashMap;
 import gnu.trove.set.hash.TLongHashSet;
@@ -29,8 +30,8 @@ import net.osmand.data.Multipolygon;
 import net.osmand.data.MultipolygonBuilder;
 import net.osmand.data.Ring;
 import net.osmand.data.preparation.MapZooms.MapZoomPair;
+import net.osmand.osm.MapRenderingTypes.MapRulType;
 import net.osmand.osm.MapRenderingTypesEncoder;
-import net.osmand.osm.MapRenderingTypesEncoder.MapRulType;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.Node;
@@ -103,7 +104,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 					while(it.hasNext()) {
 						Entry<MapRulType, String> es = it.next();
 						String key = es.getKey().getTag();
-						if(es.getKey().isOnlyNameRef() && map.containsKey(key)) {
+						if(es.getKey().isText() && map.containsKey(key)) {
 							map.put(key, map.get(key) + ", " +  es.getValue());
 						} else {
 							map.put(key, es.getValue());

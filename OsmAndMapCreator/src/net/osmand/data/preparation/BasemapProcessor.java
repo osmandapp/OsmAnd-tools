@@ -1,5 +1,6 @@
 package net.osmand.data.preparation;
 
+
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.hash.TLongObjectHashMap;
 import net.osmand.PlatformUtil;
@@ -8,8 +9,8 @@ import net.osmand.binary.OsmandOdb.MapDataBlock;
 import net.osmand.data.QuadRect;
 import net.osmand.data.preparation.MapZooms.MapZoomPair;
 import net.osmand.impl.ConsoleProgressImplementation;
+import net.osmand.osm.MapRenderingTypes.MapRulType;
 import net.osmand.osm.MapRenderingTypesEncoder;
-import net.osmand.osm.MapRenderingTypesEncoder.MapRulType;
 import net.osmand.osm.WayChain;
 import net.osmand.osm.edit.*;
 import net.osmand.util.Algorithms;
