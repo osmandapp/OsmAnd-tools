@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -40,6 +41,7 @@ import net.osmand.binary.OsmandOdb.OsmAndMapIndex.MapRootLevel;
 import net.osmand.binary.OsmandOdb.OsmAndPoiBoxDataAtom;
 import net.osmand.binary.OsmandOdb.OsmAndPoiNameIndex;
 import net.osmand.binary.OsmandOdb.OsmAndPoiNameIndexDataAtom;
+import net.osmand.binary.OsmandOdb.OsmAndPoiSubtype;
 import net.osmand.binary.OsmandOdb.OsmAndRoutingIndex;
 import net.osmand.binary.OsmandOdb.OsmAndRoutingIndex.RouteBorderBox;
 import net.osmand.binary.OsmandOdb.OsmAndRoutingIndex.RouteBorderLine;
@@ -48,6 +50,7 @@ import net.osmand.binary.OsmandOdb.OsmAndRoutingIndex.RouteBorderPointsBlock;
 import net.osmand.binary.OsmandOdb.OsmAndRoutingIndex.RouteDataBlock;
 import net.osmand.binary.OsmandOdb.OsmAndRoutingIndex.RouteDataBox;
 import net.osmand.binary.OsmandOdb.OsmAndRoutingIndex.RouteEncodingRule;
+import net.osmand.binary.OsmandOdb.OsmAndSubtypesTable;
 import net.osmand.binary.OsmandOdb.OsmAndTransportIndex;
 import net.osmand.binary.OsmandOdb.RouteData;
 import net.osmand.binary.OsmandOdb.StreetIndex;
@@ -1201,26 +1204,59 @@ public class BinaryMapIndexWriter {
 
 	public void writePoiCategoriesTable(PoiCreatorCategories cs) throws IOException {
 		checkPeekState(POI_INDEX_INIT);
-		cs.catIndexes = new LinkedHashMap<String, Integer>();
 		int i = 0;
 		for (String cat : cs.categories.keySet()) {
 			Builder builder = OsmandOdb.OsmAndCategoryTable.newBuilder();
 			builder.setCategory(cat);
-			Map<String, Integer> subcatSource = cs.categories.get(cat);
-			Map<String, Integer> subcats = new LinkedHashMap<String, Integer>(subcatSource);
+			Set<String> subcatSource = cs.categories.get(cat);
+			cs.setCategoryIndex(cat, i);
 			int j = 0;
-			for (String s : subcats.keySet()) {
+			for (String s : subcatSource) {
+				cs.setSubcategoryIndex(cat, s, j);
 				builder.addSubcategories(s);
-				subcatSource.put(s, j);
 				j++;
 			}
-			builder.addAllTextSubtypes(TODO);
-			builder.addAllSubtypes(TODO);
-			cs.catIndexes.put(cat, i);
 			codedOutStream.writeMessage(OsmandOdb.OsmAndPoiIndex.CATEGORIESTABLE_FIELD_NUMBER, builder.build());
 			i++;
 		}
 
+	}
+	
+	public void writePoiSubtypesTable(PoiCreatorCategories cs) throws IOException {
+		checkPeekState(POI_INDEX_INIT);
+		int subcatId = 0;
+		OsmAndSubtypesTable.Builder builder = OsmandOdb.OsmAndSubtypesTable.newBuilder();
+		Map<String, List<MapRulType>> groupAdditionalByTagName = new HashMap<String, List<MapRulType>>();
+		for(MapRulType rt : cs.additionalAttributes) {
+			if(rt.isAdditional()) {
+				if(!groupAdditionalByTagName.containsKey(rt.getTag())) {
+					groupAdditionalByTagName.put(rt.getTag(), new ArrayList<MapRenderingTypes.MapRulType>());
+				}
+				groupAdditionalByTagName.get(rt.getTag()).add(rt);
+			} else {
+				rt.setTargetPoiId(subcatId++, 0);
+				OsmAndPoiSubtype.Builder subType = OsmandOdb.OsmAndPoiSubtype.newBuilder();
+				subType.setName(rt.getTag());
+				subType.setIsText(true);
+				builder.addSubtypes(subType);
+			}
+		}
+		
+		for(String tag : groupAdditionalByTagName.keySet()) {
+			int cInd = subcatId++;
+			OsmAndPoiSubtype.Builder subType = OsmandOdb.OsmAndPoiSubtype.newBuilder();
+			subType.setName(tag);
+			subType.setIsText(false);
+			List<MapRulType> list = groupAdditionalByTagName.get(tag);
+			subType.setSubtypeValuesSize(list.size());
+			int subcInd = 0;
+			for(MapRulType subtypeVal :  list){
+				subtypeVal.setTargetPoiId(cInd, subcInd++);
+				subType.addSubtypeValue(subtypeVal.getValue());
+			}
+			builder.addSubtypes(subType);
+		}
+		codedOutStream.writeMessage(OsmandOdb.OsmAndPoiIndex.SUBTYPESTABLE_FIELD_NUMBER, builder.build());
 	}
 
 	public void writePoiCategories(PoiCreatorCategories poiCats) throws IOException {
@@ -1358,26 +1394,18 @@ public class BinaryMapIndexWriter {
 			}
 		}
 		
-		for(Map.Entry<MapRulType, String> rt : additionalNames.entrySet()) {
-			if(rt.getKey().isAdditional()) {
-				int targetPoiId = rt.getKey().getTargetPoiId();
-				if(targetPoiId < 0) {
-					throw new IllegalStateException("Illegal target poi id");
-				}
+		for (Map.Entry<MapRulType, String> rt : additionalNames.entrySet()) {
+			int targetPoiId = rt.getKey().getTargetPoiId();
+			if (targetPoiId < 0) {
+				throw new IllegalStateException("Illegal target poi id");
+			}
+			if (rt.getKey().isAdditional()) {
 				builder.addSubcategories(targetPoiId);
 			} else {
-				
+				builder.addTextCategories(targetPoiId);
+				builder.addTextValues(rt.getValue());
 			}
 		}
-		TIntArrayList subcats = globalCategories.buildTypeIds(type, subtype);
-		for (int i = 0; i < subcats.size(); i++) {
-			int j = subcats.get(i);
-			builder.addSubcategories(j);
-		}
-		builder.addAllSubcategories(TODO);
-		builder.addAllTextCategories(TODO);
-		builder.addAllTextValues(TODO);
-
 		codedOutStream.writeMessage(OsmandOdb.OsmAndPoiBoxData.POIDATA_FIELD_NUMBER, builder.build());
 
 	}

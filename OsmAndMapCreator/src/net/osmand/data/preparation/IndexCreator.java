@@ -791,7 +791,7 @@ public class IndexCreator {
 		MapRenderingTypesEncoder rt = MapRenderingTypesEncoder.getDefault();
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 
-		String file = "/home/victor/projects/osmand/temp/golfThal_Steinfeld.osm";
+		String file = "/home/victor/projects/osmand/temp/map.osm";
 
 		int st = file.lastIndexOf('/');
 		int e = file.indexOf('.', st);
@@ -800,8 +800,6 @@ public class IndexCreator {
 				new ConsoleProgressImplementation(1), null, zooms, rt, log);
 		
 		
-
-
 		log.info("WHOLE GENERATION TIME :  " + (System.currentTimeMillis() - time)); //$NON-NLS-1$
 		log.info("COORDINATES_SIZE " + BinaryMapIndexWriter.COORDINATES_SIZE + " count " + BinaryMapIndexWriter.COORDINATES_COUNT); //$NON-NLS-1$ //$NON-NLS-2$
 		log.info("TYPES_SIZE " + BinaryMapIndexWriter.TYPES_SIZE); //$NON-NLS-1$

@@ -169,7 +169,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		addBatch(poiPreparedStatement);
 	}
 	
-	private static final char SPECIAL_CHAR = ((char) 0x60000);
+	private static final char SPECIAL_CHAR = ((char) -1);
 	private String encodeAdditionalInfo(Map<String, String> tempNames, String name, String nameEn) {
 		if(!Algorithms.isEmpty(name)) {
 			tempNames.put("name", name);
@@ -187,7 +187,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				if(b.length() > 0){
 					b.append(SPECIAL_CHAR);
 				}
-				b.append((char)(rulType.getInternalId()) ).append(SPECIAL_CHAR).append(e.getValue());
+				b.append((char)(rulType.getInternalId()) ).append(e.getValue());
 			}
 		}
 		return b.toString();
@@ -196,10 +196,19 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	private Map<MapRulType, String> decodeAdditionalInfo(String name, 
 			Map<MapRulType, String> tempNames) {
 		tempNames.clear();
-		String[] split = name.split(SPECIAL_CHAR + "");
-		for (int i = 0; i < split.length; i += 2) {
-			MapRulType rulType = renderingTypes.getTypeByInternalId(split[i].charAt(0));
-			tempNames.put(rulType, split[i + 1]);
+		if(name.length() == 0) {
+			return tempNames;
+		}
+		int i, p = 0;
+		while(true) {
+			i = name.indexOf(SPECIAL_CHAR, p);
+			String t = i == -1 ? name.substring(p) : name.substring(p, i);
+			MapRulType rulType = renderingTypes.getTypeByInternalId(t.charAt(0));
+			tempNames.put(rulType, t.substring(1));
+			if(i == -1) {
+				break;
+			}
+			p = i + 1;
 		}
 		return tempNames;
 	}
@@ -251,6 +260,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		// build indexes to write  
 		Map<String, Integer> catIndexes;
 		Map<String, Integer> subcatIndexes;
+		
 		TIntArrayList cachedCategoriesIds;
 		TIntArrayList cachedAdditionalIds;
 		
@@ -267,10 +277,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		}
 		
 		public void addCategory(String cat, String subCat, Map<MapRulType, String> additionalTags){
-			for(MapRulType rt : additionalTags.keySet()) {
-				if(rt.isAdditional()) {
-					additionalAttributes.add(rt);
-				}
+			for (MapRulType rt : additionalTags.keySet()) {
+				additionalAttributes.add(rt);
 			}
 			if(!categories.containsKey(cat)){
 				categories.put(cat, new TreeSet<String>());
@@ -291,7 +299,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			internalBuildType(category, subcategory, types);
 			return types;
 		}
-
+		
 		private void internalBuildType(String category, String subcategory, TIntArrayList types) {
 			int catInd = catIndexes.get(category);
 			if (toSplit(subcategory)) {
@@ -313,10 +321,11 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 		public void buildCategoriesToWrite(PoiCreatorCategories globalCategories) {
 			cachedCategoriesIds = new TIntArrayList();
+			cachedAdditionalIds = new TIntArrayList();
 			for(Map.Entry<String, Set<String>> cats : categories.entrySet()) {
 				for(String subcat : cats.getValue()){
 					String cat = cats.getKey();
-					internalBuildType(cat, subcat, cachedCategoriesIds);
+					globalCategories.internalBuildType(cat, subcat, cachedCategoriesIds);
 				}
 			}
 			for(MapRulType rt : additionalAttributes){
@@ -325,6 +334,20 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				}
 				cachedAdditionalIds.add(rt.getTargetPoiId());
 			}
+		}
+
+		public void setSubcategoryIndex(String cat, String sub, int j) {
+			if(subcatIndexes == null) {
+				subcatIndexes = new HashMap<String, Integer>();
+			}
+			subcatIndexes.put(cat + SPECIAL_CHAR + sub, j);
+		}
+
+		public void setCategoryIndex(String cat, int i) {
+			if(catIndexes == null) {
+				catIndexes = new HashMap<String, Integer>();
+			}
+			catIndexes.put(cat, i);			
 		}
 	}
 	
@@ -348,6 +371,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		// 2. write categories table
 		PoiCreatorCategories globalCategories = rootZoomsTree.node.categories;
 		writer.writePoiCategoriesTable(globalCategories);
+		writer.writePoiSubtypesTable(globalCategories);
 		
 		// 2.5 write names table
 		Map<PoiTileBox, List<BinaryFileReference>> fpToWriteSeeks = writer.writePoiNameIndex(namesIndex, startFpPoiIndex);
@@ -393,7 +417,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					String subtype = poi.subtype;
 					int x24shift = (x31 >> 7) - (x << (24 - z));
 					int y24shift = (y31 >> 7) - (y << (24 - z));
-					writer.writePoiDataAtom(poi.id, x24shift, y24shift, type, subtype, poi.additionalTags, 
+					writer.writePoiDataAtom(poi.id, x24shift, y24shift, type, subtype, poi.additionalTags, renderingTypes, 
 							globalCategories);	
 				}
 				
@@ -413,7 +437,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					String type = rset.getString(4);
 					String subtype = rset.getString(5);
 					writer.writePoiDataAtom(id, x24shift, y24shift,  type, subtype, 
-							decodeAdditionalInfo(rset.getString(6), mp), globalCategories);
+							decodeAdditionalInfo(rset.getString(6), mp), renderingTypes, globalCategories);
 				}
 				rset.close();
 			}
@@ -430,9 +454,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			Tree<PoiTileBox> rootZoomsTree) throws SQLException {
 		ResultSet rs;
 		if(useInMemoryCreator) {
-			rs = poiConnection.createStatement().executeQuery("SELECT x,y,name,name_en,type,subtype,id,additionalTags from poi");
+			rs = poiConnection.createStatement().executeQuery("SELECT x,y,type,subtype,id,additionalTags from poi");
 		} else {
-			rs = poiConnection.createStatement().executeQuery("SELECT x,y,name,name_en,type,subtype from poi");
+			rs = poiConnection.createStatement().executeQuery("SELECT x,y,type,subtype from poi");
 		}
 		rootZoomsTree.setNode(new PoiTileBox());
 		
@@ -495,7 +519,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				poiData.y = y;
 				poiData.type = type;
 				poiData.subtype = subtype;
-				poiData.id = rs.getLong(4); 
+				poiData.id = rs.getLong(5); 
 				poiData.additionalTags.putAll(additionalTags);
 				prevTree.getNode().poiData.add(poiData);
 				

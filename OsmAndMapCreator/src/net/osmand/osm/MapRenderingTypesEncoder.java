@@ -128,8 +128,8 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	@Override
 	protected MapRulType parseTypeFromXML(XmlPullParser parser, String poiParentCategory, String poiParentPrefix) {
 		MapRulType rtype = super.parseTypeFromXML(parser, poiParentCategory, poiParentPrefix);
-		boolean onlyPoi = "true".equals(parser.getAttributeValue("", "only_poi"));
-		if(!onlyPoi) {
+		rtype.onlyPoi = "true".equals(parser.getAttributeValue("", "only_poi"));
+		if(!rtype.onlyPoi) {
 			String val = parser.getAttributeValue("", "minzoom"); //$NON-NLS-1$
 			rtype.minzoom = 15;
 			if (val != null) {
@@ -140,7 +140,9 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			if (val != null) {
 				rtype.maxzoom = Integer.parseInt(val);
 			}
-			registerRuleType(rtype);
+			if(rtype.onlyMap) {
+				registerRuleType(rtype);
+			}
 		}
 		return rtype;
 	}
