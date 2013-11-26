@@ -278,6 +278,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		
 		public void addCategory(String cat, String subCat, Map<MapRulType, String> additionalTags){
 			for (MapRulType rt : additionalTags.keySet()) {
+				if(rt.isAdditional() && rt.getValue() == null) {
+					throw new NullPointerException("Null value for additional tag =" + rt.getTag());
+				}
 				additionalAttributes.add(rt);
 			}
 			if(!categories.containsKey(cat)){
