@@ -187,6 +187,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				if(b.length() > 0){
 					b.append(SPECIAL_CHAR);
 				}
+				if(rulType.isAdditional() && rulType.getValue() == null) {
+					throw new IllegalStateException("Additional rule type '" + rulType.getTag() + "' should be encoded with value '"+e.getValue() +"'");
+				}
 				b.append((char)(rulType.getInternalId()) ).append(e.getValue());
 			}
 		}
