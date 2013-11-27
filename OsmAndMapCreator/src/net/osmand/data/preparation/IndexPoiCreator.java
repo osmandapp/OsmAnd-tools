@@ -208,6 +208,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			String t = i == -1 ? name.substring(p) : name.substring(p, i);
 			MapRulType rulType = renderingTypes.getTypeByInternalId(t.charAt(0));
 			tempNames.put(rulType, t.substring(1));
+			if(rulType.isAdditional() && rulType.getValue() == null) {
+				throw new IllegalStateException("Additional rule type '" + rulType.getTag() + "' should be encoded with value '"+t.substring(1) +"'");
+			}
 			if(i == -1) {
 				break;
 			}
