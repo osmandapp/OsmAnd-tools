@@ -40,6 +40,7 @@ add_library(freeglut_static STATIC
 find_package(OpenGL REQUIRED)
 
 set(target_specific_public_definitions "")
+set(target_specific_private_definitions "")
 set(target_specific_public_includes "")
 set(target_specific_public_libraries "")
 if(CMAKE_TARGET_OS STREQUAL "linux" OR CMAKE_TARGET_OS STREQUAL "darwin")
@@ -72,10 +73,18 @@ if(CMAKE_TARGET_OS STREQUAL "darwin")
 		${X11_GL}
 	)
 endif()
+if(CMAKE_TARGET_OS STREQUAL "windows")
+	if(MSVC)
+		set(target_specific_private_definitions ${target_specific_private_definitions}
+			-D_CRT_SECURE_NO_WARNINGS
+		)
+	endif()
+endif()
 
 target_compile_definitions(freeglut_static
 	PRIVATE
 		-DHAVE_CONFIG_H
+		${target_specific_private_definitions}
 	PUBLIC
 		-DFREEGLUT_STATIC
 		${OPENGL_DEFINITIONS}

@@ -1,3 +1,88 @@
+diff -rupN upstream.original/src/freeglut_gamemode.c upstream.patched/src/freeglut_gamemode.c
+--- upstream.original/src/freeglut_gamemode.c	2012-11-20 04:28:54.000000000 +0200
++++ upstream.patched/src/freeglut_gamemode.c	2013-11-29 12:07:55.504409700 +0200
+@@ -158,15 +158,15 @@ static int xrandr_resize(int xsz, int ys
+ /*
+  * Changes to requested devmode, if it doesn't match current mode
+  */
+-GLboolean fghPlatformChangeDisplayMode(GLboolean haveToTest, DEVMODE *devModeRequested)
++GLboolean fghPlatformChangeDisplayMode(GLboolean haveToTest, DEVMODEA *devModeRequested)
+ {
+     GLboolean success = GL_FALSE;
+-    DEVMODE  devModeCurrent;
++    DEVMODEA  devModeCurrent;
+     char *fggmstr = NULL;
+     char displayMode[300];
+ 
+     /* Get current display mode */
+-    EnumDisplaySettings( fgDisplay.DisplayName, ENUM_CURRENT_SETTINGS, &devModeCurrent );
++    EnumDisplaySettingsA( fgDisplay.DisplayName, ENUM_CURRENT_SETTINGS, &devModeCurrent );
+     /* Now see if requested matches current mode, then we're done
+      * There's only four fields we touch:
+      * - dmPelsWidth
+@@ -182,7 +182,7 @@ GLboolean fghPlatformChangeDisplayMode(G
+         if (!haveToTest)
+         {
+             /* update vars in case if actual switch was requested */
+-            EnumDisplaySettings( fgDisplay.DisplayName, ENUM_CURRENT_SETTINGS, &devModeCurrent );
++            EnumDisplaySettingsA( fgDisplay.DisplayName, ENUM_CURRENT_SETTINGS, &devModeCurrent );
+             fgState.GameModeSize.X  = devModeCurrent.dmPelsWidth;        
+             fgState.GameModeSize.Y  = devModeCurrent.dmPelsHeight;
+             fgState.GameModeDepth   = devModeCurrent.dmBitsPerPel;
+@@ -195,7 +195,7 @@ GLboolean fghPlatformChangeDisplayMode(G
+ 
+ 
+     /* Ok, we do have a mode switch to perform/test */
+-    switch ( ChangeDisplaySettingsEx(fgDisplay.DisplayName, devModeRequested, NULL, haveToTest ? CDS_TEST : CDS_FULLSCREEN , NULL) )
++    switch ( ChangeDisplaySettingsExA(fgDisplay.DisplayName, devModeRequested, NULL, haveToTest ? CDS_TEST : CDS_FULLSCREEN , NULL) )
+     {
+     case DISP_CHANGE_SUCCESSFUL:
+         success = GL_TRUE;
+@@ -203,7 +203,7 @@ GLboolean fghPlatformChangeDisplayMode(G
+         if (!haveToTest)
+         {
+             /* update vars in case if windows switched to proper mode */
+-            EnumDisplaySettings( fgDisplay.DisplayName, ENUM_CURRENT_SETTINGS, &devModeCurrent );
++            EnumDisplaySettingsA( fgDisplay.DisplayName, ENUM_CURRENT_SETTINGS, &devModeCurrent );
+             fgState.GameModeSize.X  = devModeCurrent.dmPelsWidth;        
+             fgState.GameModeSize.Y  = devModeCurrent.dmPelsHeight;
+             fgState.GameModeDepth   = devModeCurrent.dmBitsPerPel;
+@@ -336,7 +336,7 @@ static void fghRememberState( void )
+ /* hack to get around my stupid cross-gcc headers */
+ #define FREEGLUT_ENUM_CURRENT_SETTINGS -1
+ 
+-    EnumDisplaySettings( fgDisplay.DisplayName, FREEGLUT_ENUM_CURRENT_SETTINGS,
++    EnumDisplaySettingsA( fgDisplay.DisplayName, FREEGLUT_ENUM_CURRENT_SETTINGS,
+                          &fgDisplay.DisplayMode );
+ 
+     /* Make sure we will be restoring all settings needed */
+@@ -605,12 +605,12 @@ static GLboolean fghChangeDisplayMode( G
+ 
+ #elif TARGET_HOST_MS_WINDOWS
+ 
+-    DEVMODE  devMode;
++    DEVMODEA  devMode;
+ 
+     success = GL_FALSE;
+ 
+     /* Get current display mode */
+-    EnumDisplaySettings( fgDisplay.DisplayName, -1, &devMode ); 
++    EnumDisplaySettingsA( fgDisplay.DisplayName, -1, &devMode ); 
+     devMode.dmFields = 0;
+ 
+     if (fgState.GameModeSize.X!=-1)
+diff -rupN upstream.original/src/freeglut_init.c upstream.patched/src/freeglut_init.c
+--- upstream.original/src/freeglut_init.c	2012-11-21 06:26:55.000000000 +0200
++++ upstream.patched/src/freeglut_init.c	2013-11-29 12:06:00.230019200 +0200
+@@ -370,7 +370,7 @@ static void fghInitialize( const char* d
+     /* If we have a DisplayName try to use it for metrics */
+     if( fgDisplay.DisplayName )
+     {
+-        HDC context = CreateDC(fgDisplay.DisplayName,0,0,0);
++        HDC context = CreateDCA(fgDisplay.DisplayName,0,0,0);
+         if( context )
+         {
+ 	    fgDisplay.ScreenWidth  = GetDeviceCaps( context, HORZRES );
 diff -rupN upstream.original/src/freeglut_input_devices.c upstream.patched/src/freeglut_input_devices.c
 --- upstream.original/src/freeglut_input_devices.c	2009-12-13 07:06:44.000000000 +0200
 +++ upstream.patched/src/freeglut_input_devices.c	2013-06-11 21:59:24.322600300 +0300
@@ -24,3 +109,132 @@ diff -rupN upstream.original/src/freeglut_input_devices.c upstream.patched/src/f
      SetCommState(fh,&dcb);
  
      ZeroMemory(&timeouts,sizeof(timeouts));
+diff -rupN upstream.original/src/freeglut_internal.h upstream.patched/src/freeglut_internal.h
+--- upstream.original/src/freeglut_internal.h	2012-11-19 15:14:16.000000000 +0200
++++ upstream.patched/src/freeglut_internal.h	2013-11-29 12:07:04.340756500 +0200
+@@ -390,7 +390,7 @@ struct tagSFG_Display
+ 
+ #elif TARGET_HOST_MS_WINDOWS
+     HINSTANCE       Instance;           /* The application's instance        */
+-    DEVMODE         DisplayMode;        /* Desktop's display settings        */
++    DEVMODEA        DisplayMode;        /* Desktop's display settings        */
+     char           *DisplayName;        /* Display name for multi display support*/ 
+ 
+ #endif
+diff -rupN upstream.original/src/freeglut_joystick.c upstream.patched/src/freeglut_joystick.c
+--- upstream.original/src/freeglut_joystick.c	2011-09-28 04:37:26.000000000 +0300
++++ upstream.patched/src/freeglut_joystick.c	2013-11-29 12:04:59.104091800 +0200
+@@ -398,7 +398,7 @@ struct tagSFG_Joystick
+ #endif
+ 
+ #if TARGET_HOST_MS_WINDOWS && !defined(_WIN32_WCE)
+-    JOYCAPS     jsCaps;
++    JOYCAPSA    jsCaps;
+     JOYINFOEX   js;
+     UINT        js_id;
+ #endif
+@@ -1019,7 +1019,7 @@ static int fghJoystickGetOEMProductName
+                 REGSTR_PATH_JOYCONFIG, joy->jsCaps.szRegKey,
+                 REGSTR_KEY_JOYCURR );
+ 
+-    lr = RegOpenKeyEx ( HKEY_LOCAL_MACHINE, buffer, 0, KEY_QUERY_VALUE, &hKey);
++    lr = RegOpenKeyExA ( HKEY_LOCAL_MACHINE, buffer, 0, KEY_QUERY_VALUE, &hKey);
+ 
+     if ( lr != ERROR_SUCCESS ) return 0;
+ 
+@@ -1029,7 +1029,7 @@ static int fghJoystickGetOEMProductName
+     /* JOYSTICKID1-16 is zero-based; registry entries for VJOYD are 1-based. */
+     _snprintf ( buffer, sizeof(buffer), "Joystick%d%s", joy->js_id + 1, REGSTR_VAL_JOYOEMNAME );
+ 
+-    lr = RegQueryValueEx ( hKey, buffer, 0, 0, (LPBYTE) OEMKey, &dwcb);
++    lr = RegQueryValueExA ( hKey, buffer, 0, 0, (LPBYTE) OEMKey, &dwcb);
+     RegCloseKey ( hKey );
+ 
+     if ( lr != ERROR_SUCCESS ) return 0;
+@@ -1037,7 +1037,7 @@ static int fghJoystickGetOEMProductName
+     /* Open OEM Key from ...MediaProperties */
+     _snprintf ( buffer, sizeof(buffer), "%s\\%s", REGSTR_PATH_JOYOEM, OEMKey );
+ 
+-    lr = RegOpenKeyEx ( HKEY_LOCAL_MACHINE, buffer, 0, KEY_QUERY_VALUE, &hKey );
++    lr = RegOpenKeyExA ( HKEY_LOCAL_MACHINE, buffer, 0, KEY_QUERY_VALUE, &hKey );
+ 
+     if ( lr != ERROR_SUCCESS ) return 0;
+ 
+@@ -1252,7 +1252,7 @@ static void fghJoystickOpen( SFG_Joystic
+     memset( &joy->jsCaps, 0, sizeof( joy->jsCaps ) );
+ 
+     joy->error =
+-        ( joyGetDevCaps( joy->js_id, &joy->jsCaps, sizeof( joy->jsCaps ) ) !=
++        ( joyGetDevCapsA( joy->js_id, &joy->jsCaps, sizeof( joy->jsCaps ) ) !=
+           JOYERR_NOERROR );
+ 
+     if( joy->jsCaps.wNumAxes == 0 )
+diff -rupN upstream.original/src/freeglut_main.c upstream.patched/src/freeglut_main.c
+--- upstream.original/src/freeglut_main.c	2013-01-17 16:57:06.000000000 +0200
++++ upstream.patched/src/freeglut_main.c	2013-11-29 12:06:00.216011300 +0200
+@@ -2553,8 +2553,8 @@ LRESULT CALLBACK fgWindowProc( HWND hWnd
+ 		TOUCHINPUT* ti = (TOUCHINPUT*)malloc( sizeof(TOUCHINPUT)*numInputs);
+ 
+ 		if (fghGetTouchInputInfo == (pGetTouchInputInfo)0xDEADBEEF) {
+-		    fghGetTouchInputInfo = (pGetTouchInputInfo)GetProcAddress(GetModuleHandle("user32"),"GetTouchInputInfo");
+-		    fghCloseTouchInputHandle = (pCloseTouchInputHandle)GetProcAddress(GetModuleHandle("user32"),"CloseTouchInputHandle");
++		    fghGetTouchInputInfo = (pGetTouchInputInfo)GetProcAddress(GetModuleHandleA("user32"),"GetTouchInputInfo");
++		    fghCloseTouchInputHandle = (pCloseTouchInputHandle)GetProcAddress(GetModuleHandleA("user32"),"CloseTouchInputHandle");
+ 		}
+ 
+ 		if (!fghGetTouchInputInfo) { 
+diff -rupN upstream.original/src/freeglut_window.c upstream.patched/src/freeglut_window.c
+--- upstream.original/src/freeglut_window.c	2012-11-21 06:26:55.000000000 +0200
++++ upstream.patched/src/freeglut_window.c	2013-11-29 12:05:21.681366000 +0200
+@@ -988,10 +988,10 @@ static BOOL CALLBACK m_proc(HMONITOR mon
+ 			    LPARAM data)
+ {
+       m_proc_t *dp=(m_proc_t *)data;
+-      MONITORINFOEX info;
++      MONITORINFOEXA info;
+       BOOL res;
+       info.cbSize=sizeof(info);
+-      res=GetMonitorInfo(mon,(LPMONITORINFO)&info);
++      res=GetMonitorInfoA(mon,(LPMONITORINFO)&info);
+       if( res )
+       {
+           if( strcmp(dp->name,info.szDevice)==0 )
+@@ -1415,9 +1415,9 @@ void fgOpenWindow( SFG_Window* window, c
+         UpdateWindow(window->Window.Handle);
+     }
+ #else
+-    window->Window.Handle = CreateWindowEx(
++    window->Window.Handle = CreateWindowExA(
+         exFlags,
+-        _T("FREEGLUT"),
++        "FREEGLUT",
+         title,
+         flags,
+         x, y, w, h,
+@@ -1449,7 +1449,7 @@ void fgOpenWindow( SFG_Window* window, c
+     /* Enable multitouch: additional flag TWF_FINETOUCH, TWF_WANTPALM */
+     #ifdef WM_TOUCH
+         if (fghRegisterTouchWindow == (pRegisterTouchWindow)0xDEADBEEF) 
+-			fghRegisterTouchWindow = (pRegisterTouchWindow)GetProcAddress(GetModuleHandle("user32"),"RegisterTouchWindow");
++			fghRegisterTouchWindow = (pRegisterTouchWindow)GetProcAddress(GetModuleHandleA("user32"),"RegisterTouchWindow");
+ 		if (fghRegisterTouchWindow)
+              fghRegisterTouchWindow( window->Window.Handle, TWF_FINETOUCH | TWF_WANTPALM );
+     #endif
+@@ -1771,7 +1771,7 @@ void FGAPIENTRY glutSetWindowTitle( cons
+             free(wstr);
+         }
+ #    else
+-        SetWindowText( fgStructure.CurrentWindow->Window.Handle, title );
++        SetWindowTextA( fgStructure.CurrentWindow->Window.Handle, title );
+ #    endif
+ 
+ #endif
+@@ -1813,7 +1813,7 @@ void FGAPIENTRY glutSetIconTitle( const
+             free(wstr);
+         }
+ #    else
+-        SetWindowText( fgStructure.CurrentWindow->Window.Handle, title );
++        SetWindowTextA( fgStructure.CurrentWindow->Window.Handle, title );
+ #    endif
+ 
+ #endif
