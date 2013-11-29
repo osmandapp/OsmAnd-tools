@@ -144,6 +144,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 
 			City cityFound = null;
 			String boundaryName = boundary.getName().toLowerCase();
+			String altBoundaryName = Algorithms.isEmpty(boundary.getAltName()) ? "" : boundary.getAltName().toLowerCase();
 			if(boundary.hasAdminCenterId()) {
 				for (City c : citiesToSearch) {
 					if (c.getId() == boundary.getAdminCenterId()) {
@@ -154,7 +155,8 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 			}
 			if(cityFound == null) {
 				for (City c : citiesToSearch) {
-					if (boundaryName.equalsIgnoreCase(c.getName()) && boundary.containsPoint(c.getLocation())) {
+					if ((boundaryName.equalsIgnoreCase(c.getName()) || altBoundaryName.equalsIgnoreCase(c.getName())) 
+							&& boundary.containsPoint(c.getLocation())) {
 						cityFound = c;
 						break;
 					}
@@ -166,8 +168,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 			if (cityFound == null) {
 				for (City c : citiesToSearch) {
 					String lower = c.getName().toLowerCase();
-					if (boundaryName.startsWith(lower + " ") || boundaryName.endsWith(" " + lower)
-							|| boundaryName.contains(" " + lower + " ")) {
+					if (nameContains(boundaryName, lower) || nameContains(altBoundaryName, lower)) {
 						if (boundary.containsPoint(c.getLocation())) {
 							cityFound = c;
 							break;
@@ -203,6 +204,15 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 				log.info("Not using boundary: " + boundary + " " + boundary.getBoundaryId());
 			}
 		}
+	}
+
+
+	private boolean nameContains(String boundaryName, String lower) {
+		if(Algorithms.isEmpty(boundaryName)) {
+			return false;
+		}
+		return boundaryName.startsWith(lower + " ") || boundaryName.endsWith(" " + lower)
+				|| boundaryName.contains(" " + lower + " ");
 	}
 
 
@@ -272,6 +282,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 //  5. Bucurest admin_level = 4 win nothing
 	private int getCityBoundaryImportance(Boundary b, City c) {
 		boolean nameEq = b.getName().equalsIgnoreCase(c.getName());
+		if(!Algorithms.isEmpty(b.getAltName()) && !nameEq) {
+			nameEq = b.getAltName().equalsIgnoreCase(c.getName());
+		}
 		boolean cityBoundary = b.getCityType() != null;
 		// max 10
 		int adminLevelImportance = getAdminLevelImportance(b);
@@ -397,6 +410,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 			}
 			Boundary boundary = new Boundary(m); 
 			boundary.setName(bname);
+			boundary.setAltName(e.getTag("short_name")); // Goteborg
 			boundary.setAdminLevel(extractBoundaryAdminLevel(e));
 			boundary.setBoundaryId(e.getId());
 			boundary.setCityType(ct);
@@ -548,7 +562,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 		return newName.trim();
 	}
 
-	public Set<Long> getStreetInCity(Set<String> isInNames, String name, String nameEn, LatLon location) throws SQLException {
+	public Set<Long> getStreetInCity(Set<String> isInNames, String name, String nameEn, final LatLon location) throws SQLException {
 		if (name == null || location == null) {
 			return Collections.emptySet();
 		
@@ -565,10 +579,27 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 				result.add(c);
 			}
 		}
-		//or we need to find closest city
-		City city = getClosestCity(location, isInNames, nearestObjects);
-		if (city != null && !cityBoundaries.containsKey(city) && !result.contains(city)) {
-			result.add(city);
+		// or we need to find closest city
+		Collections.sort(nearestObjects, new Comparator<City>() {
+			@Override
+			public int compare(City c1, City c2) {
+				double r1 = relativeDistance(location, c1);
+				double r2 = relativeDistance(location, c2);
+				return Double.compare(r1, r2);
+			}
+		});
+		for(City c : nearestObjects) {
+			if(relativeDistance(location, c) > 0.2) {
+				if(result.isEmpty()) {
+					result.add(c);
+				}
+				break;
+			} else if(!result.contains(c)) {
+				// city doesn't have boundary or there is a mistake in boundaries and we found nothing before
+				if(!cityBoundaries.containsKey(c) || result.isEmpty()) {
+					result.add(c);
+				}
+			}
 		}
 		return registerStreetInCities(name, nameEn, location, result);
 	}
@@ -660,27 +691,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 	}
 
 
-	public City getClosestCity(LatLon point, Set<String> isInNames, Collection<City> nearCitiesAndVillages) {
-		if (point == null) {
-			return null;
-		}
-		// search by distance considering is_in names 
-		City closest = null;
-		double relDist = Double.POSITIVE_INFINITY;
-		for (City c : nearCitiesAndVillages) {
-			if(isInNames.contains(c.getName())){
-				return c;
-			}
-			double rel = MapUtils.getDistance(c.getLocation(), point) / c.getType().getRadius();
-			if (rel < relDist) {
-				closest = c;
-				relDist = rel;
-				if (relDist < 0.2d && isInNames.isEmpty()) {
-					return closest;
-				}
-			}
-		}
-		return closest;
+
+	private double relativeDistance(LatLon point, City c) {
+		return MapUtils.getDistance(c.getLocation(), point) / c.getType().getRadius();
 	}
 	
 	public void iterateMainEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {

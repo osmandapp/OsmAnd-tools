@@ -187,6 +187,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				if(b.length() > 0){
 					b.append(SPECIAL_CHAR);
 				}
+				if(rulType.isAdditional() && rulType.getValue() == null) {
+					throw new IllegalStateException("Additional rule type '" + rulType.getTag() + "' should be encoded with value '"+e.getValue() +"'");
+				}
 				b.append((char)(rulType.getInternalId()) ).append(e.getValue());
 			}
 		}
@@ -205,6 +208,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			String t = i == -1 ? name.substring(p) : name.substring(p, i);
 			MapRulType rulType = renderingTypes.getTypeByInternalId(t.charAt(0));
 			tempNames.put(rulType, t.substring(1));
+			if(rulType.isAdditional() && rulType.getValue() == null) {
+				throw new IllegalStateException("Additional rule type '" + rulType.getTag() + "' should be encoded with value '"+t.substring(1) +"'");
+			}
 			if(i == -1) {
 				break;
 			}
@@ -278,6 +284,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		
 		public void addCategory(String cat, String subCat, Map<MapRulType, String> additionalTags){
 			for (MapRulType rt : additionalTags.keySet()) {
+				if(rt.isAdditional() && rt.getValue() == null) {
+					throw new NullPointerException("Null value for additional tag =" + rt.getTag());
+				}
 				additionalAttributes.add(rt);
 			}
 			if(!categories.containsKey(cat)){

@@ -496,9 +496,10 @@
 
 		<!-- 6.3 SOUTH-EASTERN ASIA [SOURCE: OSMAND:NET] -->
 		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" region_suffix="_Asia" skip="false">
-			<!-- <region name="brunei"/>
+			<!-- Keep generating for alternative -->
+			<region name="brunei"/>
 			<region name="malaysia"/>
-			<region name="singapore"/> -->
+			<region name="singapore"/>
 			<region name="cambodia"/>
 			<region name="christmas-island"/>
 			<region name="east-timor"/>

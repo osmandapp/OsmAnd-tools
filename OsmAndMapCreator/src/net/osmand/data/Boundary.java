@@ -6,6 +6,7 @@ public class Boundary {
 	
 	private long boundaryId;
 	private String name;
+	private String altName;
 	private int adminLevel;
 	
 	private long adminCenterId;
@@ -42,6 +43,14 @@ public class Boundary {
 
 	public void setName(String name) {
 		this.name = name;
+	}
+	
+	public void setAltName(String altName) {
+		this.altName = altName;
+	}
+	
+	public String getAltName() {
+		return altName;
 	}
 
 	public int getAdminLevel() {
