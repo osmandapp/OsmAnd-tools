@@ -190,7 +190,7 @@ int main(int argc, char** argv)
             glutInitContextVersion(4, 3);
         glutInitContextProfile(GLUT_CORE_PROFILE);
         assert(glutCreateWindow != nullptr);
-        glutCreateWindow((const char*)xT("OsmAnd Bird : 3D map render tool"));
+        glutCreateWindow("OsmAnd Bird : 3D map render tool");
 
         glutReshapeFunc(&reshapeHandler);
         glutMouseFunc(&mouseHandler);
