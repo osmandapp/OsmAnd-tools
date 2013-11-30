@@ -67,7 +67,7 @@ public class IndexCreator {
 	private boolean indexPOI;
 	private boolean indexTransport;
 	private boolean indexAddress;
-	private boolean indexRouting = true;
+	private boolean indexRouting;
 
 	private boolean normalizeStreets = true; // true by default
 	private int zoomWaySmothness = 2;
@@ -791,7 +791,7 @@ public class IndexCreator {
 		MapRenderingTypesEncoder rt = MapRenderingTypesEncoder.getDefault();
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 
-		String file = "/home/victor/projects/osmand/temp/map.osm";
+		String file = "/home/victor/projects/osmand/temp/World_sea_map.osm";
 
 		int st = file.lastIndexOf('/');
 		int e = file.indexOf('.', st);
