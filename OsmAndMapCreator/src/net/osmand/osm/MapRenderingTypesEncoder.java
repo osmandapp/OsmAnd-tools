@@ -174,7 +174,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 						Iterator<TagValuePattern> it = rType.applyToTagValue.iterator();
 						while(!applied && it.hasNext()) {
 							TagValuePattern nv = it.next();
-							applied = nv.isApplicable(e);
+							applied = nv.isApplicable(e.getTags());
 						}
 					}
 					if (applied) {
