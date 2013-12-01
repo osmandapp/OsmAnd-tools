@@ -791,7 +791,7 @@ public class IndexCreator {
 		MapRenderingTypesEncoder rt = MapRenderingTypesEncoder.getDefault();
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 
-		String file = "/home/victor/projects/osmand/temp/World_sea_map.osm";
+		String file = "/home/victor/projects/osmand/temp/World_seamarks_2.osm";
 
 		int st = file.lastIndexOf('/');
 		int e = file.indexOf('.', st);

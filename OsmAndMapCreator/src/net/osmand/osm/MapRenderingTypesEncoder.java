@@ -6,6 +6,7 @@ import java.util.*;
 import java.util.Map.Entry;
 
 import net.osmand.osm.edit.Entity;
+import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.util.Algorithms;
@@ -139,27 +140,35 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		return rtype;
 	}
 
-
-	
 	public boolean encodeEntityWithType(Entity e, int zoom, TIntArrayList outTypes, 
+			TIntArrayList outAddTypes, Map<MapRulType, String> namesToEncode, List<MapRulType> tempListNotUsed) {
+		if(splitIsNeeded(e.getTags())) {
+			if(splitTagsIntoDifferentObjects(e.getTags()).size() > 1) {
+				throw new UnsupportedOperationException("Split is needed for tag/values " + e.getTags() );
+			}
+		}
+		return encodeEntityWithType(e instanceof Node, 
+				e.getTags(), zoom, outTypes, outAddTypes, namesToEncode, tempListNotUsed);
+	}
+	
+	public boolean encodeEntityWithType(boolean node, Map<String, String> tags, int zoom, TIntArrayList outTypes, 
 			TIntArrayList outAddTypes, Map<MapRulType, String> namesToEncode, List<MapRulType> tempListNotUsed) {
 		outTypes.clear();
 		outAddTypes.clear();
 		namesToEncode.clear();
-		boolean area = "yes".equals(e.getTag("area")) || "true".equals(e.getTag("area"));
+		boolean area = "yes".equals(tags.get("area")) || "true".equals(tags.get("area"));
 
-		Collection<String> tagKeySet = e.getTagKeySet();
-		for (String tag : tagKeySet) {
-			String val = e.getTag(tag);
+		for (String tag : tags.keySet()) {
+			String val = tags.get(tag);
 			MapRulType rType = getMapRuleType(tag, val);
 			if (rType != null) {
 				if (rType.minzoom > zoom || rType.maxzoom < zoom) {
 					continue;
 				}
-				if (rType.onlyPoint && !(e instanceof net.osmand.osm.edit.Node)) {
+				if (rType.onlyPoint && !node) {
 					continue;
 				}
-				if(rType == nameEnRuleType && Algorithms.objectEquals(val, e.getTag(OSMTagKey.NAME))) {
+				if(rType == nameEnRuleType && Algorithms.objectEquals(val, tags.get(OSMTagKey.NAME.getValue()))) {
 					continue;
 				}
 				if(rType.targetTagValue != null) {
@@ -174,7 +183,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 						Iterator<TagValuePattern> it = rType.applyToTagValue.iterator();
 						while(!applied && it.hasNext()) {
 							TagValuePattern nv = it.next();
-							applied = nv.isApplicable(e.getTags());
+							applied = nv.isApplicable(tags);
 						}
 					}
 					if (applied) {
