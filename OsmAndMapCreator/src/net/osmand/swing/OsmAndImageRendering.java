@@ -27,15 +27,15 @@ public class OsmAndImageRendering {
 	
 	
 	public static void main(String[] args) throws IOException, XmlPullParserException, SAXException, ParserConfigurationException {
-		String nativeLib = "/home/victor/projects/osmand/repo/core/binaries/linux/amd64/";
-		String dirWithObf = "/home/victor/projects/osmand/osm-gen";
-		String outputFiles = "/home/victor/projects/osmand/repo/rendering-tests/Publish/";
-		String gpxFile = "/home/victor/projects/osmand/repo/rendering-tests/Publish.gpx";
+//		String nativeLib = "/home/victor/projects/osmand/repo/core/binaries/linux/amd64/";
+//		String dirWithObf = "/home/victor/projects/osmand/osm-gen";
+//		String outputFiles = "/home/victor/projects/osmand/repo/rendering-tests/Publish/";
+//		String gpxFile = "/home/victor/projects/osmand/repo/rendering-tests/Publish.gpx";
 		
-//		String nativeLib = args[0];
-//		String dirWithObf = args[1];
-//		String gpxFile = args[2];
-//		String outputFiles = args[3];
+		String nativeLib = args[0];
+		String dirWithObf = args[1];
+		String gpxFile = args[2];
+		String outputFiles = args[3];
 		boolean old = NativeLibrary.loadOldLib(nativeLib);
 		if(!old) {
 			throw new UnsupportedOperationException("Not supported"); 
