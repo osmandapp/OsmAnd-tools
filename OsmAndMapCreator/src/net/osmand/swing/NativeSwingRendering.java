@@ -19,6 +19,10 @@ import javax.xml.parsers.SAXParserFactory;
 
 import net.osmand.NativeLibrary;
 import net.osmand.RenderingContext;
+import net.osmand.data.QuadPointDouble;
+import net.osmand.data.QuadRect;
+import net.osmand.data.RotatedTileBox;
+import net.osmand.data.RotatedTileBox.RotatedTileBoxBuilder;
 import net.osmand.render.RenderingRuleProperty;
 import net.osmand.render.RenderingRuleSearchRequest;
 import net.osmand.render.RenderingRuleStorageProperties;
@@ -114,8 +118,59 @@ public class NativeSwingRendering extends NativeLibrary {
 	
 	
 	
+	public static class RenderingImageContext {
+		public int zoom;
+		public double zoomDelta;
+		public int sleft;
+		public int sright;
+		public int stop;
+		public int sbottom;
+		private double leftX;
+		private double topY;
+		private int width;
+		private int height;
+		public long searchTime;
+		public long renderingTime;
+		
+		public RenderingImageContext(int sleft, int sright, int stop, int sbottom, int zoom) {
+			this.sleft = sleft;
+			this.sright = sright;
+			this.stop = stop;
+			this.sbottom = sbottom;
+			this.zoom = zoom;
+			leftX =  (((double) sleft) / MapUtils.getPowZoom(31 - zoom));
+			topY = (((double) stop) / MapUtils.getPowZoom(31 - zoom));
+			width = (int) ((sright - sleft) / MapUtils.getPowZoom(31 - zoom - 8));
+			height = (int) ((sbottom - stop) / MapUtils.getPowZoom(31 - zoom - 8));
+		}
+		
+		public RenderingImageContext(double lat, double lon, int width, int height, int zoom, 
+				double zoomDelta) {
+			this.width = width;
+			this.height = height;
+			this.zoomDelta = zoomDelta;
+			this.zoom = zoom;
+			RotatedTileBoxBuilder bld = new RotatedTileBox.RotatedTileBoxBuilder();
+			RotatedTileBox tb = bld.setPixelDimensions(width, height).setZoomAndScale(zoom, (float) zoomDelta).
+				setLocation(lat, lon).build();
+			final QuadPointDouble lt = tb.getLeftTopTile(tb.getZoom());
+			
+			
+			this.leftX = lt.x /** MapUtils.getPowZoom(tb.getZoomScale())*/;
+			this.topY = lt.y /** MapUtils.getPowZoom(tb.getZoomScale())*/;
+			QuadRect ll = tb.getLatLonBounds();
+			this.sleft = MapUtils.get31TileNumberX(ll.left);
+			this.sright = MapUtils.get31TileNumberX(ll.right);
+			this.sbottom = MapUtils.get31TileNumberY(ll.bottom);
+			this.stop = MapUtils.get31TileNumberY(ll.top);
+		}
+	}
 	
 	public BufferedImage renderImage(int sleft, int sright, int stop, int sbottom, int zoom) throws IOException {
+		return renderImage(new RenderingImageContext(sleft, sright, stop, sbottom, zoom));	
+	}
+	
+	public BufferedImage renderImage(RenderingImageContext ctx) throws IOException {
 		long time = -System.currentTimeMillis();
 		RenderingContext rctx = new RenderingContext() {
 			@Override
@@ -142,31 +197,34 @@ public class NativeSwingRendering extends NativeLibrary {
 				}
 			}
 		}
-		request.setIntFilter(request.ALL.R_MINZOOM, zoom);
+		request.setIntFilter(request.ALL.R_MINZOOM, ctx.zoom);
 		request.saveState();
 		
-		NativeSearchResult res = searchObjectsForRendering(sleft, sright, stop, sbottom, zoom, request, true, 
+		NativeSearchResult res = searchObjectsForRendering(ctx.sleft, ctx.sright, ctx.stop, ctx.sbottom, ctx.zoom, request, true, 
 					rctx, "Nothing found");
 		
-		rctx.leftX = (float) (((double)sleft)/ MapUtils.getPowZoom(31-zoom));
-		rctx.topY = (float) (((double)stop)/ MapUtils.getPowZoom(31-zoom));
-		rctx.width = (int) ((sright - sleft) / MapUtils.getPowZoom(31 - zoom - 8));
-		rctx.height = (int) ((sbottom - stop) / MapUtils.getPowZoom(31 - zoom - 8));
-		
+		rctx.leftX = ctx.leftX * MapUtils.getPowZoom((float) ctx.zoomDelta);
+		rctx.topY = ctx.topY * MapUtils.getPowZoom((float) ctx.zoomDelta);
+		rctx.width = ctx.width;
+		rctx.height = ctx.height;
+		final float mapDensity = (float) Math.pow(2,  ctx.zoomDelta);
+		rctx.setDensityValue(mapDensity);
+		rctx.screenDensityRatio = mapDensity / Math.max(1, 1/*requestedBox.getDensity()*/) ;
+		final double tileDivisor = MapUtils.getPowZoom((float) (31 - ctx.zoom - ctx.zoomDelta));
 		request.clearState();
 		
 		if(request.searchRenderingAttribute(RenderingRuleStorageProperties.A_DEFAULT_COLOR)) {
 			rctx.defaultColor = request.getIntPropertyValue(request.ALL.R_ATTR_COLOR_VALUE);
 		}
 		request.clearState();
-		request.setIntFilter(request.ALL.R_MINZOOM, zoom);
+		request.setIntFilter(request.ALL.R_MINZOOM, ctx.zoom);
 		if(request.searchRenderingAttribute(RenderingRuleStorageProperties.A_SHADOW_RENDERING)) {
 			rctx.shadowRenderingMode = request.getIntPropertyValue(request.ALL.R_ATTR_INT_VALUE);
 			rctx.shadowRenderingColor = request.getIntPropertyValue(request.ALL.R_SHADOW_COLOR);
 			
 		}
-		rctx.zoom = zoom;
-		rctx.tileDivisor = (float) MapUtils.getPowZoom(31 - zoom);
+		rctx.zoom = ctx.zoom;
+		rctx.tileDivisor = tileDivisor;
 		long search = time + System.currentTimeMillis();
 		final RenderingGenerationResult rres = NativeSwingRendering.generateRenderingIndirect(rctx, res.nativeHandler,  
 				false, request, true);
@@ -190,6 +248,8 @@ public class NativeSwingRendering extends NativeLibrary {
 		ImageReader reader = readers.next();
 		reader.setInput(new MemoryCacheImageInputStream(inputStream), true);
 		BufferedImage img = reader.read(0);
+		ctx.searchTime = search;
+		ctx.renderingTime = rendering;
 		long last = time + System.currentTimeMillis() - rendering;
 		System.out.println(" TIMES search - " + search + " rendering - " + rendering + " unpack - " + last);
 		return img;
