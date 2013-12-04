@@ -61,6 +61,7 @@ public class OsmAndImageRendering {
 		String dirWithObf = args[1];
 		String gpxFile = args[2];
 		String outputFiles = args[3];
+		String backup = args.length > 4 ? args[4] : null;
 		boolean old = NativeLibrary.loadOldLib(nativeLib);
 		if(!old) {
 			throw new UnsupportedOperationException("Not supported"); 
@@ -96,7 +97,7 @@ public class OsmAndImageRendering {
 			}
 			NativeSwingRendering nsr = new NativeSwingRendering(false);
 //			nsr.initFilesInDir(new File(dirWithObf));
-			initMaps(dirWithObf, gpxFile, maps, nsr);
+			initMaps(dirWithObf, backup, gpxFile, maps, nsr);
 			List<ImageCombination> ls = getCombinations(name, zooms, zoomScales, renderingNames, renderingProperties) ;
 			
 			for (ImageCombination ic : ls) {
@@ -152,11 +153,14 @@ public class OsmAndImageRendering {
 		return r + vl.replace('=', '_').replace(',', '-');
 	}
 
-	private static void initMaps(String dirWithObf, String gpxFile, String maps, NativeSwingRendering nsr)
+	private static void initMaps(String dirWithObf, String backup, String gpxFile, String maps, NativeSwingRendering nsr)
 			throws FileNotFoundException, IOException {
 		for(String map : maps.split(",")) {
 			File f = new File(dirWithObf + "/" + map+".obf");
 			File fzip = new File(dirWithObf + "/" + map+".obf.zip");
+			if(!fzip.exists()) {
+				 fzip = new File(backup + "/" + map+".obf.zip");
+			}
 			if(!f.exists() && !fzip.exists()){
 				throw new IllegalStateException("File "+f.getAbsolutePath()+ " is not found");
 			} else if(!f.exists()) {
