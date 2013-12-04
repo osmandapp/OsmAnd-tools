@@ -161,10 +161,13 @@ public class OsmAndImageRendering {
 			throws FileNotFoundException, IOException {
 		for(String map : maps.split(",")) {
 			map = map.trim();
-			File f = new File(dirWithObf + "/" + map+".obf");
-			File fzip = new File(dirWithObf + "/" + map+".obf.zip");
+			File f = new File(dirWithObf + "/" + map + ".obf");
+			File fzip = new File(dirWithObf + "/" + map + ".obf.zip");
 			if(!fzip.exists()) {
 				fzip = new File(backup + "/" + map + ".obf.zip");
+			}
+			if(!f.exists()) {
+				f = new File(backup + "/" + map + ".obf");
 			}
 			if(!f.exists() && !fzip.exists()){
 				throw new IllegalStateException("File "+f.getAbsolutePath()+ " is not found");
