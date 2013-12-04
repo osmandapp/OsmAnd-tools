@@ -208,7 +208,7 @@ int main(int argc, char** argv)
     
     //////////////////////////////////////////////////////////////////////////
     OsmAnd::MapRendererSetupOptions rendererSetup;
-    rendererSetup.frameRequestCallback = []()
+    rendererSetup.frameUpdateRequestCallback = []()
     {
         //QMutexLocker scopedLocker(&glutWasInitializedFlagMutex);
 
