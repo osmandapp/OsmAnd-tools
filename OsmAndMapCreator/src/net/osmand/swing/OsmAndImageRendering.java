@@ -146,11 +146,15 @@ public class OsmAndImageRendering {
 		if (vl.length() > 10) {
 			vl = vl.substring(0, 10);
 		}
-		String r = name + "-";
+		String r = "";
 		if (key.length() > 0) {
 			r += key + "_";
 		}
-		return r + vl.replace('=', '_').replace(',', '-');
+		r +=  vl.replace('=', '_').replace(',', '-');
+		if(r.length() > 0){
+			return name + "-" + r;
+		}
+		return name;
 	}
 
 	private static void initMaps(String dirWithObf, String backup, String gpxFile, String maps, NativeSwingRendering nsr)
