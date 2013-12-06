@@ -805,7 +805,7 @@ void displayHandler()
             QString("symbols (key z)        : %1").arg(!renderer->state.symbolProviders.isEmpty())));
         verifyOpenGL();
 
-        glRasterPos2f(8, t - 16 * 21);
+        glRasterPos2f(8, t - 16 * 20);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("symbols loaded         : %1").arg(renderer->getSymbolsCount())));
         verifyOpenGL();
