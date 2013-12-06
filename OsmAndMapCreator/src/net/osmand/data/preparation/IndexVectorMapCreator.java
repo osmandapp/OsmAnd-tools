@@ -26,6 +26,7 @@ import java.util.Map.Entry;
 import net.osmand.IProgress;
 import net.osmand.binary.OsmandOdb.MapData;
 import net.osmand.binary.OsmandOdb.MapDataBlock;
+import net.osmand.data.LatLon;
 import net.osmand.data.Multipolygon;
 import net.osmand.data.MultipolygonBuilder;
 import net.osmand.data.Ring;
@@ -428,9 +429,9 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	public void iterateMainEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 		if (e instanceof Way || e instanceof Node) {
 			EntityId eid = EntityId.valueOf(e);
-			Map<String, String> tags = propogatedTags.get(eid);
-			if (tags != null) {
-				Iterator<Entry<String, String>> iterator = tags.entrySet().iterator();
+			Map<String, String> proptags = propogatedTags.get(eid);
+			if (proptags != null) {
+				Iterator<Entry<String, String>> iterator = proptags.entrySet().iterator();
 				while (iterator.hasNext()) {
 					Entry<String, String> ts = iterator.next();
 					if (e.getTag(ts.getKey()) == null) {
@@ -439,45 +440,68 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 				}
 			}
 			// manipulate what kind of way to load
-			for (int level = 0; level < mapZooms.size(); level++) {
-				boolean area = renderingTypes.encodeEntityWithType(e, mapZooms.getLevel(level).getMaxZoom(), typeUse, addtypeUse, namesUse,
-						tempNameUse);
-				if (typeUse.isEmpty()) {
-					continue;
-				}
-				boolean hasMulti = e instanceof Way && multiPolygonsWays.containsKey(e.getId());
-				if (hasMulti) {
-					TIntArrayList set = multiPolygonsWays.get(e.getId());
-					typeUse.removeAll(set);
-				}
-				if (typeUse.isEmpty()) {
-					continue;
-				}
-				long id = convertBaseIdToGeneratedId(e.getId(), level);
-				List<Node> res = null;
-				if (e instanceof Node) {
-					res = Collections.singletonList((Node) e);
-				} else {
-					id |= 1;
-
-					// simplify route id>>1
-					boolean mostDetailedLevel = level == 0;
-					if (!mostDetailedLevel) {
-						int zoomToSimplify = mapZooms.getLevel(level).getMaxZoom() - 1;
-						boolean cycle = ((Way) e).getFirstNodeId() == ((Way) e).getLastNodeId();
-						if (cycle) {
-							res = simplifyCycleWay(((Way) e).getNodes(), zoomToSimplify, zoomWaySmothness);
-						} else {
-							String ename = namesUse.get(renderingTypes.getNameRuleType());
-							insertLowLevelMapBinaryObject(level, zoomToSimplify, typeUse, addtypeUse, id, ((Way) e).getNodes(), ename);
-						}
+			Collection<Map<String, String>> split = renderingTypes.splitTagsIntoDifferentObjects(e.getTags());
+			if(split.size() > 1) {
+				LatLon ll = e.getLatLon(); 
+				boolean first = true;
+				for(Map<String, String> inst : split) {
+					if(first) {
+						e.replaceTags(inst);
+						first = false;
+						iterateMainEntityPost(e);
 					} else {
-						res = ((Way) e).getNodes();
+						Node ns = new Node(ll.getLatitude(), ll.getLongitude(), notUsedId--);
+						ns.replaceTags(inst);
+						iterateMainEntityPost(ns);
 					}
 				}
-				if (res != null) {
-					insertBinaryMapRenderObjectIndex(mapTree[level], res, null, namesUse, id, area, typeUse, addtypeUse, true);
+				
+			} else {			
+				iterateMainEntityPost(e);
+			}
+		}
+	}
+
+	private void iterateMainEntityPost(Entity e) throws SQLException {
+		for (int level = 0; level < mapZooms.size(); level++) {
+			boolean area = renderingTypes.encodeEntityWithType(e instanceof Node, 
+					e.getTags(), mapZooms.getLevel(level).getMaxZoom(), typeUse, addtypeUse, namesUse,
+					tempNameUse);
+			if (typeUse.isEmpty()) {
+				continue;
+			}
+			boolean hasMulti = e instanceof Way && multiPolygonsWays.containsKey(e.getId());
+			if (hasMulti) {
+				TIntArrayList set = multiPolygonsWays.get(e.getId());
+				typeUse.removeAll(set);
+			}
+			if (typeUse.isEmpty()) {
+				continue;
+			}
+			long id = convertBaseIdToGeneratedId(e.getId(), level);
+			List<Node> res = null;
+			if (e instanceof Node) {
+				res = Collections.singletonList((Node) e);
+			} else {
+				id |= 1;
+
+				// simplify route id>>1
+				boolean mostDetailedLevel = level == 0;
+				if (!mostDetailedLevel) {
+					int zoomToSimplify = mapZooms.getLevel(level).getMaxZoom() - 1;
+					boolean cycle = ((Way) e).getFirstNodeId() == ((Way) e).getLastNodeId();
+					if (cycle) {
+						res = simplifyCycleWay(((Way) e).getNodes(), zoomToSimplify, zoomWaySmothness);
+					} else {
+						String ename = namesUse.get(renderingTypes.getNameRuleType());
+						insertLowLevelMapBinaryObject(level, zoomToSimplify, typeUse, addtypeUse, id, ((Way) e).getNodes(), ename);
+					}
+				} else {
+					res = ((Way) e).getNodes();
 				}
+			}
+			if (res != null) {
+				insertBinaryMapRenderObjectIndex(mapTree[level], res, null, namesUse, id, area, typeUse, addtypeUse, true);
 			}
 		}
 	}
