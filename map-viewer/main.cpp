@@ -74,7 +74,7 @@ bool wasHeightsDirSpecified = false;
 QFileInfoList styleFiles;
 QString styleName = "default";
 
-bool use43 = true;
+bool use43 = false;
 
 bool renderWireframe = false;
 void reshapeHandler(int newWidth, int newHeight);
@@ -698,7 +698,7 @@ void displayHandler()
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
         auto w = 390;
-        auto h1 = 16*20;
+        auto h1 = 16*21;
         auto t = viewport.height();
         glColor4f(0.5f, 0.5f, 0.5f, 0.6f);
         glBegin(GL_QUADS);
@@ -803,6 +803,11 @@ void displayHandler()
         glRasterPos2f(8, t - 16 * 19);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("symbols (key z)        : %1").arg(!renderer->state.symbolProviders.isEmpty())));
+        verifyOpenGL();
+
+        glRasterPos2f(8, t - 16 * 29);
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
+            QString("symbols loaded         : %1").arg(renderer->getSymbolsCount())));
         verifyOpenGL();
 
         glColor4f(0.5f, 0.5f, 0.5f, 0.6f);
