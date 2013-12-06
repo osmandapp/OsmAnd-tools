@@ -74,7 +74,7 @@ bool wasHeightsDirSpecified = false;
 QFileInfoList styleFiles;
 QString styleName = "default";
 
-bool use43 = false;
+bool use43 = true;
 
 bool renderWireframe = false;
 void reshapeHandler(int newWidth, int newHeight);
@@ -98,6 +98,8 @@ int main(int argc, char** argv)
 
     for(int argIdx = 1; argIdx < argc; argIdx++)
     {
+        std::cout << "Arg: " << argv[argIdx] << std::endl;
+
         const QString arg(argv[argIdx]);
 
         if (arg.startsWith("-stylesPath="))
@@ -864,7 +866,8 @@ void displayHandler()
     glFlush();
     glutSwapBuffers();
 
-    //glutPostRedisplay();
+    if(use43) // Assume an nVidia nSight debugger is attached: it needs constant refresh
+        glutPostRedisplay();
 }
 
 void verifyOpenGL()
