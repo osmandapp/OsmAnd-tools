@@ -84,6 +84,8 @@
 		 	<region  name="south-west-england"/>
 		 	<region  name="west-midlands"/>
 		 	<region  name="yorkshire-and-the-humber"/>
+		 	<!-- The channel islands are not really a defined region, but they are hard to put elsewehere -->
+		 	<region  name="channel-islands"/>
 		</regions>
 
 
