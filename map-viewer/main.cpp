@@ -75,6 +75,7 @@ QFileInfoList styleFiles;
 QString styleName = "default";
 
 bool use43 = false;
+float density = 1.0f;
 
 bool renderWireframe = false;
 void reshapeHandler(int newWidth, int newHeight);
@@ -217,6 +218,7 @@ int main(int argc, char** argv)
         if(glutWasInitialized)
             glutPostRedisplay();
     };
+    rendererSetup.displayDensityFactor = density;
     renderer->setup(rendererSetup);
     viewport.top = 0;
     viewport.left = 0;
@@ -477,13 +479,6 @@ void keyboardHandler(unsigned char key, int x, int y)
             renderer->setElevationDataScaleFactor(renderer->state.elevationDataScaleFactor - 0.1f);
         }
         break;
-    case 'v':
-        {
-            auto config = renderer->configuration;
-            config.altasTexturesAllowed = !config.altasTexturesAllowed;
-            renderer->setConfiguration(config);
-        }
-        break;
     case 'c':
         {
             auto config = renderer->configuration;
@@ -619,28 +614,28 @@ void activateProvider(OsmAnd::RasterMapLayerId layerId, int idx)
     }
     else if(idx == 1)
     {
-        offlineMapDataProvider.reset(new OsmAnd::OfflineMapDataProvider(obfsCollection, style, 1.0f));
+        offlineMapDataProvider.reset(new OsmAnd::OfflineMapDataProvider(obfsCollection, style, density));
 
         auto tileProvider = OsmAnd::OnlineMapRasterTileProvider::createCycleMapProvider();
         renderer->setRasterLayerProvider(layerId, tileProvider);
     }
     else if(idx == 2)
     {
-        offlineMapDataProvider.reset(new OsmAnd::OfflineMapDataProvider(obfsCollection, style, 1.0f));
+        offlineMapDataProvider.reset(new OsmAnd::OfflineMapDataProvider(obfsCollection, style, density));
 
         auto tileProvider = OsmAnd::OnlineMapRasterTileProvider::createMapnikProvider();
         renderer->setRasterLayerProvider(layerId, tileProvider);
     }
     else if(idx == 3)
     {
-        offlineMapDataProvider.reset(new OsmAnd::OfflineMapDataProvider(obfsCollection, style, 1.0f));
+        offlineMapDataProvider.reset(new OsmAnd::OfflineMapDataProvider(obfsCollection, style, density));
 
         auto tileProvider = new OsmAnd::OfflineMapRasterTileProvider_Software(offlineMapDataProvider);
         renderer->setRasterLayerProvider(layerId, std::shared_ptr<OsmAnd::IMapBitmapTileProvider>(tileProvider));
     }
     else if(idx == 4)
     {
-        offlineMapDataProvider.reset(new OsmAnd::OfflineMapDataProvider(obfsCollection, style, 1.0f));
+        offlineMapDataProvider.reset(new OsmAnd::OfflineMapDataProvider(obfsCollection, style, density));
 
         auto tileProvider = new OsmAnd::OfflineMapRasterTileProvider_GPU(offlineMapDataProvider);
         renderer->setRasterLayerProvider(layerId, std::shared_ptr<OsmAnd::IMapBitmapTileProvider>(tileProvider));
@@ -698,7 +693,7 @@ void displayHandler()
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
         auto w = 390;
-        auto h1 = 16*21;
+        auto h1 = 16*20;
         auto t = viewport.height();
         glColor4f(0.5f, 0.5f, 0.5f, 0.6f);
         glBegin(GL_QUADS);
@@ -782,30 +777,25 @@ void displayHandler()
 
         glRasterPos2f(8, t - 16 * 15);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("atlas textures (key v) : %1").arg(renderer->configuration.altasTexturesAllowed)));
+            QString("16-bit textures (key c): %1").arg(renderer->configuration.limitTextureColorDepthBy16bits)));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * 16);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("16-bit textures (key c): %1").arg(renderer->configuration.limitTextureColorDepthBy16bits)));
+            QString("tex-filtering (b,n,m)  : %1").arg(static_cast<int>(renderer->configuration.texturesFilteringQuality))));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * 17);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("tex-filtering (b,n,m)  : %1").arg(static_cast<int>(renderer->configuration.texturesFilteringQuality))));
+            QString("palette textures(key p): %1").arg(renderer->configuration.paletteTexturesAllowed)));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * 18);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("palette textures(key p): %1").arg(renderer->configuration.paletteTexturesAllowed)));
-        verifyOpenGL();
-
-        glRasterPos2f(8, t - 16 * 19);
-        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("symbols (key z)        : %1").arg(!renderer->state.symbolProviders.isEmpty())));
         verifyOpenGL();
 
-        glRasterPos2f(8, t - 16 * 20);
+        glRasterPos2f(8, t - 16 * 19);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("symbols loaded         : %1").arg(renderer->getSymbolsCount())));
         verifyOpenGL();
