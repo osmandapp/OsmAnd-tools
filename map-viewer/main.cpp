@@ -74,8 +74,13 @@ bool wasHeightsDirSpecified = false;
 QFileInfoList styleFiles;
 QString styleName = "default";
 
-bool use43 = false;
-float density = 1.0f;
+#if defined(WIN32)
+const bool useGpuWorker = true;
+#else
+const bool useGpuWorker = false;
+#endif
+const bool use43 = false;
+const float density = 1.0f;
 
 bool renderWireframe = false;
 void reshapeHandler(int newWidth, int newHeight);
@@ -219,6 +224,29 @@ int main(int argc, char** argv)
             glutPostRedisplay();
     };
     rendererSetup.displayDensityFactor = density;
+    rendererSetup.gpuWorkerThread.enabled = useGpuWorker;
+    if(rendererSetup.gpuWorkerThread.enabled)
+    {
+#if defined(WIN32)
+        const auto currentDC = wglGetCurrentDC();
+        const auto currentContext = wglGetCurrentContext();
+        const auto workerContext = wglCreateContext(currentDC);
+
+        rendererSetup.gpuWorkerThread.enabled = (wglShareLists(currentContext, workerContext) == TRUE);
+        assert(currentContext == wglGetCurrentContext());
+        
+        rendererSetup.gpuWorkerThread.prologue = [currentDC, workerContext]()
+        {
+            const auto result = (wglMakeCurrent(currentDC, workerContext) == TRUE);
+            verifyOpenGL();
+        };
+
+        rendererSetup.gpuWorkerThread.epilogue = []()
+        {
+            glFinish();
+        };
+#endif
+    }
     renderer->setup(rendererSetup);
     viewport.top = 0;
     viewport.left = 0;
