@@ -341,7 +341,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			PreparedStatement selectTransportStop = mapConnection.prepareStatement(
 					"SELECT A.id,  A.latitude,  A.longitude, A.name, A.name_en FROM transport_stop A where A.id = ?"); //$NON-NLS-1$
 			PreparedStatement selectTransportRouteStop = mapConnection.prepareStatement(
-					"SELECT DISTINCT S.route FROM transport_route_stop S WHERE S.stop = ? "); //$NON-NLS-1$
+					"SELECT DISTINCT S.route FROM transport_route_stop S join transport_route R  on R.id = S.route WHERE S.stop = ? ORDER BY R.type, R.ref "); //$NON-NLS-1$
 			long rootIndex = transportStopsTree.getFileHdr().getRootIndex();
 			rtree.Node root = transportStopsTree.getReadNode(rootIndex);
 			Rect rootBounds = calcBounds(root);
