@@ -653,7 +653,7 @@ public class MapRouterLayer implements MapPanelLayer {
 				String m = DataExtractionSettings.getSettings().getRouteMode();
 				String[] props = m.split("\\,");
 				RoutePlannerFrontEnd router = new RoutePlannerFrontEnd(USE_OLD_ROUTING);
-				RoutingConfiguration config = builder.build(props[0], /*RoutingConfiguration.DEFAULT_MEMORY_LIMIT*/ 500, props);
+				RoutingConfiguration config = builder.build(props[0], /*RoutingConfiguration.DEFAULT_MEMORY_LIMIT*/ 1000, props);
 //				config.initialDirection = 90d / 180d * Math.PI; // EAST
 //				config.initialDirection = 180d / 180d * Math.PI; // SOUTH
 //				config.initialDirection = -90d / 180d * Math.PI; // WEST
