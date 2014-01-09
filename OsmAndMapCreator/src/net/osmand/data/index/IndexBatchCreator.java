@@ -287,8 +287,8 @@ public class IndexBatchCreator {
 			String site = regionCountries.siteToDownload;
 			String suffix = regionCountries.nameSuffix;
 			for(String name : regionCountries.regionNames.keySet()){
-				name = name.toLowerCase();
 				RegionSpecificData regionSpecificData = regionCountries.regionNames.get(name);
+				name = name.toLowerCase();
 				String url = MessageFormat.format(site, regionSpecificData.downloadName);
 				
 				String regionName = prefix + name;
