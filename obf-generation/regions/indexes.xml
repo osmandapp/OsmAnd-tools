@@ -608,4 +608,9 @@
 			<region name="zambia"/>
 			<region name="zimbabwe"/>
 		</regions>
+		<!-- 9 SPECIAL MAPS -->
+		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.osm.bz2" region_prefix="" skip="false" region_suffix="">	
+		 	<region  name="world_seamarks"/>
+		 	<region  name="world_bitcoin_payments"/>
+		</regions>
 </regions_list> 
