@@ -225,6 +225,25 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 				}
 			}
 		}
+		if ("color".equals(ev.getKey()) || "colour".equals(ev.getKey())) {
+			String vl = ev.getValue().toLowerCase();
+			if(vl.equals("#ffff00")){
+				vl = "yellow";
+			} else if(vl.equals("#ff0000")){
+				vl = "red";
+			} else if(vl.equals("#00ff00")){
+				vl = "green";
+			} else if(vl.equals("#0000ff")){
+				vl = "blue";
+			} else if(vl.equals("#000000")){
+				vl = "black";
+			}
+			String nm = "color_"+vl;
+			MapRulType rt = getMapRuleType(nm, "");
+			if(rt != null) {
+				propogated.put(rt, "");
+			}
+		}
 	}
 	
 	public static class MapRouteTag {
