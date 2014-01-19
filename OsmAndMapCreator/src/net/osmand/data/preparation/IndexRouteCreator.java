@@ -46,9 +46,11 @@ import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
+import net.osmand.osm.edit.OsmMapUtils;
 import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Way;
 import net.osmand.util.Algorithms;
+import net.osmand.util.MapAlgorithms;
 import net.osmand.util.MapUtils;
 
 import org.apache.commons.logging.Log;
@@ -135,7 +137,10 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 			}
 			encoded = routeTypes.encodeBaseEntity(e, outTypes, names) && e.getNodes().size() >= 2;
 			if (encoded ) {
-				generalizeWay(e);
+				ArrayList<Node> result = new ArrayList<Node>();
+				OsmMapUtils.simplifyDouglasPeucker(e.getNodes(), 11 /*zoom*/+ 8 + 1 /*smoothness*/, 3, result, false);
+				addWayToIndex(e.getId(), result, basemapRouteInsertStat, baserouteTree);
+				//generalizeWay(e);
 
 			}
 		}
