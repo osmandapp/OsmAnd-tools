@@ -41,6 +41,7 @@ import net.osmand.osm.edit.Way;
 import net.osmand.router.BinaryRoutePlanner.RouteSegment;
 import net.osmand.router.BinaryRoutePlanner.RouteSegmentVisitor;
 import net.osmand.router.RoutePlannerFrontEnd;
+import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
 import net.osmand.router.RouteSegmentResult;
 import net.osmand.router.RoutingConfiguration;
 import net.osmand.router.RoutingConfiguration.Builder;
@@ -177,7 +178,7 @@ public class MapRouterLayer implements MapPanelLayer {
 			@Override
 			public void actionPerformed(ActionEvent e) {
 				previousRoute = null;
-				calcRoute(false);
+				calcRoute(RouteCalculationMode.NORMAL);
 			}
 		};
 		menu.add(selfRoute);
@@ -188,10 +189,21 @@ public class MapRouterLayer implements MapPanelLayer {
 			@Override
 			public void actionPerformed(ActionEvent e) {
 				previousRoute = null;
-				calcRoute(true);
+				calcRoute(RouteCalculationMode.BASE);
 			}
 		};
 		menu.add(selfBaseRoute);
+		
+		Action complexRoute = new AbstractAction("Calculate OsmAnd complex route") {
+			private static final long serialVersionUID = 8049785829806139142L;
+
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				previousRoute = null;
+				calcRoute(RouteCalculationMode.COMPLEX);
+			}
+		};
+		menu.add(complexRoute);
 		
 		Action recalculate = new AbstractAction("Recalculate OsmAnd route") {
 			private static final long serialVersionUID = 507156107455281238L;
@@ -204,7 +216,7 @@ public class MapRouterLayer implements MapPanelLayer {
 
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				calcRoute(false);
+				calcRoute(RouteCalculationMode.NORMAL);
 			}
 		};
 		
@@ -317,11 +329,12 @@ public class MapRouterLayer implements MapPanelLayer {
 	}
 	
 	
-	private void calcRoute(final boolean useBasemap) {
+	
+	private void calcRoute(final RouteCalculationMode m) {
 		new Thread() {
 			@Override
 			public void run() {
-				List<Way> ways = selfRoute(startRoute, endRoute, intermediates, previousRoute, useBasemap);
+				List<Way> ways = selfRoute(startRoute, endRoute, intermediates, previousRoute, m);
 				if (ways != null) {
 					DataTileManager<Way> points = new DataTileManager<Way>(11);
 					for (Way w : ways) {
@@ -605,7 +618,7 @@ public class MapRouterLayer implements MapPanelLayer {
 		return res;
 	}
 	
-	public List<Way> selfRoute(LatLon start, LatLon end, List<LatLon> intermediates, List<RouteSegmentResult> previousRoute, boolean useBasemap) {
+	public List<Way> selfRoute(LatLon start, LatLon end, List<LatLon> intermediates, List<RouteSegmentResult> previousRoute, RouteCalculationMode rm) {
 		List<Way> res = new ArrayList<Way>();
 		long time = System.currentTimeMillis();
 		List<File> files = new ArrayList<File>();
@@ -660,61 +673,20 @@ public class MapRouterLayer implements MapPanelLayer {
 //				config.initialDirection = 0 / 180d * Math.PI; // NORTH
 				// config.NUMBER_OF_DESIRABLE_TILES_IN_MEMORY = 300;
 				// config.ZOOM_TO_LOAD_TILES = 14;
-				final RoutingContext ctx = new RoutingContext(config, 
-						USE_NATIVE_ROUTING ? NativeSwingRendering.getDefaultFromSettings() :
-						null
-						, rs, useBasemap);
+				final RoutingContext ctx = router.buildRoutingContext(config, USE_NATIVE_ROUTING ? NativeSwingRendering.getDefaultFromSettings() :
+					null, rs, rm);
+				ctx.leftSideNavigation = false;
 				ctx.previouslyCalculatedRoute = previousRoute;
 				log.info("Use " + config.routerName + "mode for routing");
-				
-				
 				final DataTileManager<Entity> points = new DataTileManager<Entity>(11);
 				map.setPoints(points);
 				ctx.setVisitor(createSegmentVisitor(animateRoutingCalculation, points));
 				// Choose native or not native
 				long nt = System.nanoTime();
-				new Thread(){
-					@Override
-					public void run() {
-						while(ctx.calculationProgress != null && !ctx.calculationProgress.isCancelled) {
-							float p = ctx.calculationProgress.distanceFromBegin + ctx.calculationProgress.distanceFromEnd;
-							float all = ctx.calculationProgress.totalEstimatedDistance;
-//							while (p > all * 0.9) {
-//								all *= 1.2;
-//							}
-							if(all > 0 ) {
-								int  t = (int) (p*p/(all*all)* 100.0f);
-//								int  t = (int) (p/all*100f);
-								System.out.println("Progress " + t + " % " + 
-								ctx.calculationProgress.distanceFromBegin + " " + ctx.calculationProgress.distanceFromEnd+" " + all);
-							}
-							try {
-								sleep(100);
-							} catch (InterruptedException e) {
-								// TODO Auto-generated catch block
-								e.printStackTrace();
-							}
-						}
-					};
-				}.start();
+				startProgressThread(ctx);
 				try {
-					List<RouteSegmentResult> searchRoute = router.searchRoute(ctx, start, end, intermediates, false);
-					if (searchRoute == null) {
-						String reason = "unknown";
-						if (ctx.calculationProgress.segmentNotFound >= 0) {
-							if (ctx.calculationProgress.segmentNotFound == 0) {
-								reason = " start point is too far from road";
-							} else {
-								reason = " target point " + ctx.calculationProgress.segmentNotFound + " is too far from road";
-							}
-						} else if (ctx.calculationProgress.directSegmentQueueSize == 0) {
-							reason = " route can not be found from start point (" + ctx.calculationProgress.distanceFromBegin / 1000.0f
-									+ " km)";
-						} else if (ctx.calculationProgress.reverseSegmentQueueSize == 0) {
-							reason = " route can not be found from end point (" + ctx.calculationProgress.distanceFromEnd / 1000.0f + " km)";
-						}
-						throw new RuntimeException("Route not found : " + reason);
-					}
+					List<RouteSegmentResult> searchRoute = router.searchRoute(ctx, start, end, intermediates);
+					throwExceptionIfRouteNotFound(ctx, searchRoute);
 
 					System.out.println("External native time " + (System.nanoTime() - nt) / 1.0e9f);
 					if (animateRoutingCalculation) {
@@ -740,6 +712,51 @@ public class MapRouterLayer implements MapPanelLayer {
 			System.out.println("Finding self routes " + res.size() + " " + (System.currentTimeMillis() - time) + " ms");
 		}
 		return res;
+	}
+
+	private void throwExceptionIfRouteNotFound(final RoutingContext ctx, List<RouteSegmentResult> searchRoute) {
+		if (searchRoute == null) {
+			String reason = "unknown";
+			if (ctx.calculationProgress.segmentNotFound >= 0) {
+				if (ctx.calculationProgress.segmentNotFound == 0) {
+					reason = " start point is too far from road";
+				} else {
+					reason = " target point " + ctx.calculationProgress.segmentNotFound + " is too far from road";
+				}
+			} else if (ctx.calculationProgress.directSegmentQueueSize == 0) {
+				reason = " route can not be found from start point (" + ctx.calculationProgress.distanceFromBegin / 1000.0f
+						+ " km)";
+			} else if (ctx.calculationProgress.reverseSegmentQueueSize == 0) {
+				reason = " route can not be found from end point (" + ctx.calculationProgress.distanceFromEnd / 1000.0f + " km)";
+			}
+			throw new RuntimeException("Route not found : " + reason);
+		}
+	}
+
+	private void startProgressThread(final RoutingContext ctx) {
+		new Thread(){
+			@Override
+			public void run() {
+				while(ctx.calculationProgress != null && !ctx.calculationProgress.isCancelled) {
+					float p = ctx.calculationProgress.distanceFromBegin + ctx.calculationProgress.distanceFromEnd;
+					float all = ctx.calculationProgress.totalEstimatedDistance;
+//							while (p > all * 0.9) {
+//								all *= 1.2;
+//							}
+					if(all > 0 ) {
+						int  t = (int) (p*p/(all*all)* 100.0f);
+//								int  t = (int) (p/all*100f);
+						System.out.println("Progress " + t + " % " + 
+						ctx.calculationProgress.distanceFromBegin + " " + ctx.calculationProgress.distanceFromEnd+" " + all);
+					}
+					try {
+						sleep(100);
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					}
+				}
+			};
+		}.start();
 	}
 
 	private void calculateResult(List<Way> res, List<RouteSegmentResult> searchRoute) {

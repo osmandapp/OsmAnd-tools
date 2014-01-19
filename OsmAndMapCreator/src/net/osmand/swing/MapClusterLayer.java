@@ -29,6 +29,7 @@ import net.osmand.router.BinaryRoutePlanner;
 import net.osmand.router.BinaryRoutePlanner.RouteSegment;
 import net.osmand.router.BinaryRoutePlanner.RouteSegmentVisitor;
 import net.osmand.router.RoutePlannerFrontEnd;
+import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
 import net.osmand.router.RoutingConfiguration;
 import net.osmand.router.RoutingConfiguration.Builder;
 import net.osmand.router.RoutingContext;
@@ -144,8 +145,9 @@ public class MapClusterLayer implements MapPanelLayer {
 		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd(true);
 		Builder builder = RoutingConfiguration.getDefault();
 		RoutingConfiguration config = builder.build("car", RoutingConfiguration.DEFAULT_MEMORY_LIMIT * 3);
-		RoutingContext ctx = new RoutingContext(config, NativeSwingRendering.getDefaultFromSettings(),
-				rs.toArray(new BinaryMapIndexReader[rs.size()]), clusterCtx.BASEMAP_CLUSTERING);
+		RoutingContext ctx = router.buildRoutingContext(config, NativeSwingRendering.getDefaultFromSettings(), rs
+				.toArray(new BinaryMapIndexReader[rs.size()]),
+				clusterCtx.BASEMAP_CLUSTERING ? RouteCalculationMode.BASE : RouteCalculationMode.NORMAL);
 		// find closest way
 		RouteSegment st = router.findRouteSegment(lat, lon, ctx);
 		if (st != null) {

@@ -282,7 +282,7 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 	private int xStartingImage = 0;
 	private int yStartingImage = 0;
 	
-	private MapTileDownloader downloader = MapTileDownloader.getInstance(MapCreatorVersion.APP_MAP_CREATOR_VERSION);
+	private MapTileDownloader downloader = MapTileDownloader.getInstance(MapCreatorVersion.APP_MAP_CREATOR_VERSION); // FIXME no commit
 	Map<String, Image> cache = new HashMap<String, Image>();
 
 	private JPopupMenu popupMenu;
