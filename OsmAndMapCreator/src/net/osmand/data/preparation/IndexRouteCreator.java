@@ -210,6 +210,9 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 	
 	private void putIntersection(long point, long wayNodeId) {
 		if(wayNodeId != -1){
+
+			System.out.println("Put intersection at " + (float)MapUtils.get31LongitudeX((int) (point >> 31)) + " " +
+					(float) MapUtils.get31LatitudeY((int) (point &  ((1l<< 31) -1))));
 			int ind = (int) (wayNodeId & ((1 << 24) - 1));
 			long wayId = wayNodeId >> 16;
 			if(!basemapNodesToReinsert.containsKey(wayId)) {
