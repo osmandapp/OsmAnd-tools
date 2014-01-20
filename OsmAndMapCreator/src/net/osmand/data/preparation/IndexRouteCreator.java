@@ -1047,7 +1047,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 						typeUse[j / 2] = routeTypes.getTypeByInternalId(ids).getTargetId();
 					}
 					TLongArrayList restrictions = highwayRestrictions.get(id);
-					if(restrictions != null){
+					if(!basemap && restrictions != null){
 						for(int li = 0; li<restrictions.size(); li++){
 							Builder restriction = RestrictionData.newBuilder();
 							restriction.setFrom(cid);
