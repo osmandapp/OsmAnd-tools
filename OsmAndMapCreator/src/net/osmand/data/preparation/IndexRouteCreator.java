@@ -196,7 +196,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		if(wayId > (1l << 40)) {
 			throw new IllegalStateException("Way id too big");
 		}
-		long genKey = register ? (wayId << 24l) + (originalInd << 8) + insertAt : -1l; 
+		long genKey = register ? ((wayId << 24l) + (originalInd << 8) + insertAt) : -1l; 
 		if(exNode == null) {
 			basemapRemovedNodes.put(pointLoc, genKey);
 		} else {
@@ -217,7 +217,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 //			long y = point - (x << 31);
 //			System.out.println("Put intersection at " + (float) MapUtils.get31LatitudeY((int) y) + " " + (float)MapUtils.get31LongitudeX((int) x));
 			int ind = (int) (wayNodeId & ((1 << 24) - 1));
-			long wayId = wayNodeId >> 16;
+			long wayId = wayNodeId >> 24;
 			if(!basemapNodesToReinsert.containsKey(wayId)) {
 				basemapNodesToReinsert.put(wayId, new RouteMissingPoints());
 			}
