@@ -212,7 +212,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		if(wayNodeId != -1){
 			int ind = (int) (wayNodeId & ((1 << 24) - 1));
 			long wayId = wayNodeId >> 16;
-			if(basemapNodesToReinsert.containsKey(wayId)) {
+			if(!basemapNodesToReinsert.containsKey(wayId)) {
 				basemapNodesToReinsert.put(wayId, new RouteMissingPoints());
 			}
 			RouteMissingPoints mp = basemapNodesToReinsert.get(wayId);
