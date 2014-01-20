@@ -106,8 +106,10 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 					pointsXToInsert[insertAfter] = new TIntArrayList();
 					pointsYToInsert[insertAfter] = new TIntArrayList();
 				}
-				pointsXToInsert[insertAfter].add((int)(p.getValue() >> 31));
-				pointsYToInsert[insertAfter].add((int)(p.getValue() &  ((1l<< 31) -1) ));
+				long x = p.getValue() >> 31;
+				long y = p.getValue() - (x << 31);
+				pointsXToInsert[insertAfter].add((int) x);
+				pointsYToInsert[insertAfter].add((int) y);
 			}
 		}
 	}
@@ -168,7 +170,8 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 					if(n != null) {
 						long y31 = MapUtils.get31TileNumberY(n.getLatitude());
 						long x31 = MapUtils.get31TileNumberX(n.getLongitude());
-						registerBaseIntersectionPoint((x31) << 31l + y31, !kept[i], e.getId(), indexToInsertAt, originalInd);
+						long point = (x31 << 31) + y31;
+						registerBaseIntersectionPoint(point, !kept[i], e.getId(), indexToInsertAt, originalInd);
 						originalInd++;
 						if(kept[i]) {
 							indexToInsertAt ++;
@@ -210,9 +213,9 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 	
 	private void putIntersection(long point, long wayNodeId) {
 		if(wayNodeId != -1){
-
-			System.out.println("Put intersection at " + (float)MapUtils.get31LongitudeX((int) (point >> 31)) + " " +
-					(float) MapUtils.get31LatitudeY((int) (point &  ((1l<< 31) -1))));
+			long x = point >> 31;
+			long y = point - (x << 31);
+			System.out.println("Put intersection at " + (float) MapUtils.get31LatitudeY((int) y) + " " + (float)MapUtils.get31LongitudeX((int) x));
 			int ind = (int) (wayNodeId & ((1 << 24) - 1));
 			long wayId = wayNodeId >> 16;
 			if(!basemapNodesToReinsert.containsKey(wayId)) {
