@@ -187,10 +187,10 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 
 	private void registerBaseIntersectionPoint(long pointLoc, boolean register, long wayId, int insertAt, int originalInd) {
 		Long exNode = basemapRemovedNodes.get(pointLoc);
-		if(insertAt > 1 << 8 || originalInd > 1 << 16) {
+		if(insertAt > (1l << 8) || originalInd > (1l << 16)) {
 			throw new IllegalStateException("Way index too big");
 		}
-		if(wayId > 1 << 40) {
+		if(wayId > (1l << 40)) {
 			throw new IllegalStateException("Way id too big");
 		}
 		long genKey = register ? (wayId << 24l) + (originalInd << 8) + insertAt : -1l; 
