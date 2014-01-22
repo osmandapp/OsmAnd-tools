@@ -101,7 +101,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 			pointsXToInsert = new TIntArrayList[targetLength];
 			pointsYToInsert = new TIntArrayList[targetLength];
 			for(Map.Entry<Integer, Long> p : pointsMap.entrySet()) {
-				int insertAfter = p.getKey() & ((1 << 8) -1);
+				int insertAfter = p.getKey() & ((1 << SHIFT_INSERT_AT) -1);
 				if(pointsXToInsert[insertAfter] == null ) {
 					pointsXToInsert[insertAfter] = new TIntArrayList();
 					pointsYToInsert[insertAfter] = new TIntArrayList();
@@ -187,16 +187,23 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		}
 		
 	}
+	
+	private static long SHIFT_INSERT_AT = 12;
+	private static long SHIFT_ORIGINAL = 16;
+	private static long SHIFT_ID = 64 - (SHIFT_INSERT_AT + SHIFT_ORIGINAL);
 
 	private void registerBaseIntersectionPoint(long pointLoc, boolean register, long wayId, int insertAt, int originalInd) {
 		Long exNode = basemapRemovedNodes.get(pointLoc);
-		if(insertAt > (1l << 8) || originalInd > (1l << 16)) {
+		if(insertAt > (1l << SHIFT_INSERT_AT)) {
 			throw new IllegalStateException("Way index too big");
 		}
-		if(wayId > (1l << 40)) {
+		if(originalInd > (1l << SHIFT_ORIGINAL)) {
+			throw new IllegalStateException("Way index 2 too big");
+		}
+		if(wayId > (1l << SHIFT_ID)) {
 			throw new IllegalStateException("Way id too big");
 		}
-		long genKey = register ? ((wayId << 24l) + (originalInd << 8) + insertAt) : -1l; 
+		long genKey = register ? ((wayId << (SHIFT_ORIGINAL+SHIFT_INSERT_AT)) + (originalInd << SHIFT_INSERT_AT) + insertAt) : -1l; 
 		if(exNode == null) {
 			basemapRemovedNodes.put(pointLoc, genKey);
 		} else {
@@ -216,8 +223,9 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 //			long x = point >> 31;
 //			long y = point - (x << 31);
 //			System.out.println("Put intersection at " + (float) MapUtils.get31LatitudeY((int) y) + " " + (float)MapUtils.get31LongitudeX((int) x));
-			int ind = (int) (wayNodeId & ((1 << 24) - 1));
-			long wayId = wayNodeId >> 24;
+			long SHIFT = SHIFT_INSERT_AT + SHIFT_ORIGINAL;
+			int ind = (int) (wayNodeId & ((1 << SHIFT) - 1));
+			long wayId = wayNodeId >> SHIFT;
 			if(!basemapNodesToReinsert.containsKey(wayId)) {
 				basemapNodesToReinsert.put(wayId, new RouteMissingPoints());
 			}
