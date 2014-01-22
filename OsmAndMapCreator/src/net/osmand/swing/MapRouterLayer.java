@@ -66,7 +66,6 @@ public class MapRouterLayer implements MapPanelLayer {
 	
 	private final static Log log = PlatformUtil.getLog(MapRouterLayer.class);
 	private boolean USE_OLD_ROUTING = false;
-	private boolean USE_NATIVE_ROUTING = false;
 
 	private MapPanel map;
 	private LatLon startRoute ;
@@ -673,7 +672,7 @@ public class MapRouterLayer implements MapPanelLayer {
 //				config.initialDirection = 0 / 180d * Math.PI; // NORTH
 				// config.NUMBER_OF_DESIRABLE_TILES_IN_MEMORY = 300;
 				// config.ZOOM_TO_LOAD_TILES = 14;
-				final RoutingContext ctx = router.buildRoutingContext(config, USE_NATIVE_ROUTING ? NativeSwingRendering.getDefaultFromSettings() :
+				final RoutingContext ctx = router.buildRoutingContext(config, DataExtractionSettings.getSettings().useNativeRouting() ? NativeSwingRendering.getDefaultFromSettings() :
 					null, rs, rm);
 				ctx.leftSideNavigation = false;
 				ctx.previouslyCalculatedRoute = previousRoute;

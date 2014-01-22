@@ -230,8 +230,16 @@ public class DataExtractionSettings {
 		return preferences.getBoolean("animate_routing", false);
 	}
 	
+	public boolean useNativeRouting(){
+		return preferences.getBoolean("native_routing", false);
+	}
+	
 	public void setAnimateRouting(boolean b){
 		preferences.putBoolean("animate_routing", b);
+	}
+	
+	public void setNativeRouting(boolean b){
+		preferences.putBoolean("native_routing", b);
 	}
 	
 	

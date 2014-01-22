@@ -40,6 +40,7 @@ public class OsmExtractionPreferencesDialog extends JDialog {
 
 	private JCheckBox useInternet;
 	private JCheckBox animateRouting;
+	private JCheckBox nativeRouting;
 
 	
 
@@ -95,33 +96,18 @@ public class OsmExtractionPreferencesDialog extends JDialog {
 		panel.setBorder(BorderFactory.createTitledBorder(Messages.getString("OsmExtractionPreferencesDialog.GENERAL"))); //$NON-NLS-1$
 		root.add(panel);
 		
-		useInternet = new JCheckBox();
-		useInternet.setText(Messages.getString("OsmExtractionPreferencesDialog.INTERNET.TO.DOWNLOAD.FILES")); //$NON-NLS-1$
-		useInternet.setSelected(DataExtractionSettings.getSettings().useInternetToLoadImages());
-		panel.add(useInternet);
-		GridBagConstraints constr = new GridBagConstraints();
-		constr.ipadx = 5;
-		constr.gridx = 0;
-		constr.gridy = gridY++;
-		constr.gridwidth = 2;
-		constr.anchor = GridBagConstraints.WEST;
-		l.setConstraints(useInternet, constr);
 		
-		animateRouting = new JCheckBox();
-		animateRouting.setText("Animate routing"); //$NON-NLS-1$
-		animateRouting.setSelected(DataExtractionSettings.getSettings().isAnimateRouting());
-		panel.add(animateRouting);
-		constr = new GridBagConstraints();
-		constr.ipadx = 5;
-		constr.gridx = 0;
-		constr.gridy = gridY++;
-		constr.gridwidth = 2;
-		constr.anchor = GridBagConstraints.WEST;
-		l.setConstraints(animateRouting, constr);
+		useInternet = createCheckBox(panel, gridY++, 
+				DataExtractionSettings.getSettings().useInternetToLoadImages(), 
+				Messages.getString("OsmExtractionPreferencesDialog.INTERNET.TO.DOWNLOAD.FILES"), l);
+		animateRouting = createCheckBox(panel, gridY++, 
+				DataExtractionSettings.getSettings().isAnimateRouting(), "Animate routing", l);
+		nativeRouting = createCheckBox(panel, gridY++, 
+				DataExtractionSettings.getSettings().useNativeRouting(), "Native routing", l);
 		
 		JLabel label = new JLabel("Directory with obf binary files (routing, rendering): ");
 		panel.add(label);
-		constr = new GridBagConstraints();
+		GridBagConstraints constr = new GridBagConstraints();
 		constr.ipadx = 5;
 		constr.gridx = 0;
 		constr.gridy = gridY;
@@ -224,6 +210,22 @@ public class OsmExtractionPreferencesDialog extends JDialog {
 		
 		panel.setMaximumSize(new Dimension(Short.MAX_VALUE, panel.getPreferredSize().height));
 		
+	}
+
+	private JCheckBox createCheckBox(JPanel panel, int gridY, boolean value, String text, GridBagLayout l) {
+		GridBagConstraints constr;
+		JCheckBox checkBox = new JCheckBox();
+		checkBox.setText(text); //$NON-NLS-1$
+		checkBox.setSelected(value);
+		panel.add(checkBox);
+		constr = new GridBagConstraints();
+		constr.ipadx = 5;
+		constr.gridx = 0;
+		constr.gridy = gridY++;
+		constr.gridwidth = 2;
+		constr.anchor = GridBagConstraints.WEST;
+		l.setConstraints(checkBox, constr);
+		return checkBox;
 	}
 
 	private void createNormalizingStreetSection(JPanel root) {
@@ -368,6 +370,9 @@ public class OsmExtractionPreferencesDialog extends JDialog {
 		}
 		if(settings.isAnimateRouting() != animateRouting.isSelected()){
 			settings.setAnimateRouting(animateRouting.isSelected());
+		}
+		if(settings.useNativeRouting() != nativeRouting.isSelected()){
+			settings.setNativeRouting(nativeRouting.isSelected());
 		}
 		if(!settings.getNativeLibFile().equals(nativeLibFile.getText())){
 			settings.setNativeLibFile(nativeLibFile.getText());
