@@ -79,7 +79,10 @@ const bool useGpuWorker = true;
 #else
 const bool useGpuWorker = false;
 #endif
-const bool use43 = false;
+bool use43 = false;
+bool constantRefresh = false;
+bool nSight = false;
+bool gDEBugger = false;
 const float density = 1.0f;
 
 bool renderWireframe = false;
@@ -144,6 +147,20 @@ int main(int argc, char** argv)
         {
             heightsDir = QDir(arg.mid(strlen("-heightsDir=")));
             wasHeightsDirSpecified = true;
+        }
+        else if(arg == "-nsight")
+        {
+            use43 = true;
+            constantRefresh = true;
+            nSight = true;
+            gDEBugger = false;
+        }
+        else if(arg == "-gdebugger")
+        {
+            use43 = false;
+            constantRefresh = true;
+            nSight = false;
+            gDEBugger = true;
         }
     }
     
@@ -709,8 +726,10 @@ void displayHandler()
     verifyOpenGL();
 
     //////////////////////////////////////////////////////////////////////////
-    if(!use43)
+    if(!use43 && !nSight)
     {
+        glClear(GL_DEPTH_BUFFER_BIT);
+
         glMatrixMode(GL_PROJECTION);
         glLoadIdentity();
         gluOrtho2D(0, viewport.width(), 0, viewport.height());
@@ -889,8 +908,10 @@ void displayHandler()
     glFlush();
     glutSwapBuffers();
 
-    if(use43) // Assume an nVidia nSight debugger is attached: it needs constant refresh
+    if(nSight || gDEBugger || constantRefresh)
         glutPostRedisplay();
+    if(gDEBugger)
+        glFrameTerminatorGREMEDY();
 }
 
 void verifyOpenGL()
