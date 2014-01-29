@@ -728,7 +728,7 @@ void displayHandler()
     //////////////////////////////////////////////////////////////////////////
     if(!use43 && !nSight)
     {
-        glClear(GL_DEPTH_BUFFER_BIT);
+        glDisable(GL_DEPTH_TEST);
 
         glMatrixMode(GL_PROJECTION);
         glLoadIdentity();
