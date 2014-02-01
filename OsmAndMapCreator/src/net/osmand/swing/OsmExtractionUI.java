@@ -48,6 +48,7 @@ import net.osmand.osm.io.IOsmStorageFilter;
 import net.osmand.osm.io.OsmBaseStorage;
 import net.osmand.osm.io.OsmBoundsFilter;
 import net.osmand.osm.io.OsmStorageWriter;
+import net.osmand.router.RouteResultPreparation;
 import net.osmand.swing.MapPanel.MapSelectionArea;
 
 import org.apache.commons.logging.Log;
@@ -97,7 +98,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 				}
 			}
 		});
-		
+		RouteResultPreparation.PRINT_TO_CONSOLE_ROUTE_INFORMATION_TO_TEST = true;
         MAIN_APP = new OsmExtractionUI();
         MAIN_APP.frame.setBounds(DataExtractionSettings.getSettings().getWindowBounds());
         MAIN_APP.frame.setVisible(true);
