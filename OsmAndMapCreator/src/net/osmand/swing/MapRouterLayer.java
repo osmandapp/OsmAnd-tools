@@ -17,7 +17,9 @@ import java.lang.reflect.InvocationTargetException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import javax.swing.AbstractAction;
 import javax.swing.Action;
@@ -665,7 +667,11 @@ public class MapRouterLayer implements MapPanelLayer {
 				String m = DataExtractionSettings.getSettings().getRouteMode();
 				String[] props = m.split("\\,");
 				RoutePlannerFrontEnd router = new RoutePlannerFrontEnd(USE_OLD_ROUTING);
-				RoutingConfiguration config = builder.build(props[0], /*RoutingConfiguration.DEFAULT_MEMORY_LIMIT*/ 1000, props);
+				Map<String, String> paramsR = new LinkedHashMap<String, String>(); 
+				for(String p : props) {
+					paramsR.put(p, "true");
+				}
+				RoutingConfiguration config = builder.build(props[0], /*RoutingConfiguration.DEFAULT_MEMORY_LIMIT*/ 1000, paramsR);
 //				config.initialDirection = 90d / 180d * Math.PI; // EAST
 //				config.initialDirection = 180d / 180d * Math.PI; // SOUTH
 //				config.initialDirection = -90d / 180d * Math.PI; // WEST
