@@ -36,7 +36,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	
 	@Override
 	protected MapRulType registerRuleType(MapRulType rt){
-		super.registerRuleType(rt);
+		rt = super.registerRuleType(rt);
 		String tag = rt.tagValuePattern.tag;
 		String val = rt.tagValuePattern.value;
 		if("natural".equals(tag) && "coastline".equals(val)) {
@@ -175,9 +175,10 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 					rType = rType.targetTagValue;
 				}
 				rType.updateFreq();
-				if (!rType.isAdditionalOrText()) {
+				if (rType.isMain()) {
 					outTypes.add(rType.id);
-				} else {
+				}
+				if (rType.isAdditionalOrText()) {
 					boolean applied = rType.applyToTagValue == null;
 					if(!applied) {
 						Iterator<TagValuePattern> it = rType.applyToTagValue.iterator();
