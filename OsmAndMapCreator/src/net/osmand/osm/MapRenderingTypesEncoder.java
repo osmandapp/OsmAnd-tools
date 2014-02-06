@@ -124,7 +124,9 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		rtype.onlyPoi = "true".equals(parser.getAttributeValue("", "only_poi"));
 		if(!rtype.onlyPoi) {
 			String val = parser.getAttributeValue("", "minzoom"); //$NON-NLS-1$
-			rtype.minzoom = 15;
+			if(rtype.isMain()) {
+				rtype.minzoom = 15;
+			}
 			if (val != null) {
 				rtype.minzoom = Integer.parseInt(val);
 			}
