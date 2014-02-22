@@ -111,7 +111,7 @@ int main(int argc, char** argv)
 
         const QString arg(argv[argIdx]);
 
-        if (arg.startsWith("-stylesPath="))
+        if(arg.startsWith("-stylesPath="))
         {
             auto path = arg.mid(strlen("-stylesPath="));
             QDir dir(path);
@@ -124,11 +124,11 @@ int main(int argc, char** argv)
 
             OsmAnd::Utilities::findFiles(dir, QStringList() << "*.render.xml", styleFiles);
         }
-        else if (arg.startsWith("-style="))
+        else if(arg.startsWith("-style="))
         {
             styleName = arg.mid(strlen("-style="));
         }
-        else if (arg.startsWith("-obfsDir="))
+        else if(arg.startsWith("-obfsDir="))
         {
             auto obfRootPath = arg.mid(strlen("-obfsDir="));
             obfRoot = QDir(obfRootPath);
@@ -139,11 +139,11 @@ int main(int argc, char** argv)
                 return EXIT_FAILURE;
             }
         }
-        else if (arg.startsWith("-cacheDir="))
+        else if(arg.startsWith("-cacheDir="))
         {
             cacheDir = QDir(arg.mid(strlen("-cacheDir=")));
         }
-        else if (arg.startsWith("-heightsDir="))
+        else if(arg.startsWith("-heightsDir="))
         {
             heightsDir = QDir(arg.mid(strlen("-heightsDir=")));
             wasHeightsDirSpecified = true;
@@ -163,7 +163,7 @@ int main(int argc, char** argv)
             gDEBugger = true;
         }
     }
-    
+
     // Obtain and configure rasterization style context
     if(!styleName.isEmpty())
     {
@@ -182,7 +182,7 @@ int main(int argc, char** argv)
             return EXIT_FAILURE;
         }
     }
-    
+
     obfsCollection.reset(new OsmAnd::ObfsCollection());
     obfsCollection->watchDirectory(obfRoot);
 
@@ -230,7 +230,7 @@ int main(int argc, char** argv)
 
         glutWasInitialized = true;
     }
-    
+
     //////////////////////////////////////////////////////////////////////////
     OsmAnd::MapRendererSetupOptions rendererSetup;
     rendererSetup.frameUpdateRequestCallback = []()
@@ -251,7 +251,7 @@ int main(int argc, char** argv)
 
         rendererSetup.gpuWorkerThread.enabled = (wglShareLists(currentContext, workerContext) == TRUE);
         assert(currentContext == wglGetCurrentContext());
-        
+
         rendererSetup.gpuWorkerThread.prologue = [currentDC, workerContext]()
         {
             const auto result = (wglMakeCurrent(currentDC, workerContext) == TRUE);
@@ -275,33 +275,47 @@ int main(int argc, char** argv)
         OsmAnd::Utilities::get31TileNumberX(34.0062),
         OsmAnd::Utilities::get31TileNumberY(44.4039)
         ));
-    renderer->setZoom(18.0f);*/
+        renderer->setZoom(18.0f);*/
     renderer->setZoom(1.5f);
     //renderer->setAzimuth(137.6f);
     renderer->setAzimuth(69.4f);
     renderer->setElevationAngle(35.0f);
     renderer->setFogColor(OsmAnd::FColorRGB(1.0f, 1.0f, 1.0f));
 
-    /// Amsterdam
+    // Amsterdam
     renderer->setTarget(OsmAnd::PointI(
         1102430866,
         704978668));
-    renderer->setZoom(10.0f);
+    //renderer->setZoom(10.0f);
+    renderer->setZoom(16.0f);
     //renderer->setZoom(4.0f);
-    
+
     // Kiev
+    //renderer->setTarget(OsmAnd::PointI(
+    //    1255337783,
+    //    724166131));
+    ////renderer->setZoom(10.0f);
+    //renderer->setZoom(16.0f);
+
+    // Tokyo
     /*renderer->setTarget(OsmAnd::PointI(
-        1254096891,
-        723769130));
-    renderer->setZoom(10.0f);*/
-    
+        OsmAnd::Utilities::get31TileNumberX(139.6917),
+        OsmAnd::Utilities::get31TileNumberY(35.689506)));
+        renderer->setZoom(14.0f);*/
+
+    // Netanya
+    /*renderer->setTarget(OsmAnd::PointI(
+        OsmAnd::Utilities::get31TileNumberX(34.85320),
+        OsmAnd::Utilities::get31TileNumberY(32.32288)));
+        renderer->setZoom(14.0f);*/
+
     renderer->setAzimuth(0.0f);
     //renderer->setDisplayDensityFactor(2.0f);
-    
+
     auto renderConfig = renderer->configuration;
     renderConfig.heixelsPerTileSide = 32;
     renderer->setConfiguration(renderConfig);
-    
+
     renderer->initializeRendering();
     //////////////////////////////////////////////////////////////////////////
 
@@ -356,7 +370,7 @@ void mouseHandler(int button, int state, int x, int y)
             OsmAnd::PointI64 clickedLocation;
             renderer->getLocationFromScreenPoint(OsmAnd::PointI(x, y), clickedLocation);
             lastClickedLocation31 = OsmAnd::Utilities::normalizeCoordinates(clickedLocation, OsmAnd::ZoomLevel31);
-            
+
             auto delta = clickedLocation - OsmAnd::PointI64(renderer->state.target31.x, renderer->state.target31.y);
 
             animator->cancelAnimation();
@@ -413,12 +427,10 @@ void keyboardHandler(unsigned char key, int x, int y)
     const auto wasdZoom = static_cast<int>(renderer->state.requestedZoom);
     const auto wasdStep = (1 << (31 - wasdZoom));
 
-    switch (key)
+    switch(key)
     {
     case '\x1B':
-        {
-            glutLeaveMainLoop();
-        }
+        glutLeaveMainLoop();
         break;
     case 'W':
     case 'w':
@@ -447,26 +459,20 @@ void keyboardHandler(unsigned char key, int x, int y)
     case 'D':
     case 'd':
         {
-            auto newTarget = renderer->state.target31;
-            newTarget.x += wasdStep / (key == 'd' ? 50 : 10);
-            renderer->setTarget(newTarget);
+        auto newTarget = renderer->state.target31;
+        newTarget.x += wasdStep / (key == 'd' ? 50 : 10);
+        renderer->setTarget(newTarget);
         }
         break;
     case 'r':
-        {
-            renderer->setDistanceToFog(renderer->state.fogDistance + 1.0f);
-        }
+        renderer->setDistanceToFog(renderer->state.fogDistance + 1.0f);
         break;
     case 'f':
-        {
-            renderer->setDistanceToFog(renderer->state.fogDistance - 1.0f);
-        }
+        renderer->setDistanceToFog(renderer->state.fogDistance - 1.0f);
         break;
     case 'x':
-        {
-            renderWireframe = !renderWireframe;
-            glutPostRedisplay();
-        }
+        renderWireframe = !renderWireframe;
+        glutPostRedisplay();
         break;
     case 'e':
         {
@@ -485,44 +491,28 @@ void keyboardHandler(unsigned char key, int x, int y)
         }
         break;
     case 't':
-        {
-            renderer->setFogDensity(renderer->state.fogDensity + 0.01f);
-        }
+        renderer->setFogDensity(renderer->state.fogDensity + 0.01f);
         break;
     case 'g':
-        {
-            renderer->setFogDensity(renderer->state.fogDensity - 0.01f);
-        }
+        renderer->setFogDensity(renderer->state.fogDensity - 0.01f);
         break;
     case 'u':
-        {
-            renderer->setFogOriginFactor(renderer->state.fogOriginFactor + 0.01f);
-        }
+        renderer->setFogOriginFactor(renderer->state.fogOriginFactor + 0.01f);
         break;
     case 'j':
-        {
-            renderer->setFogOriginFactor(renderer->state.fogOriginFactor - 0.01f);
-        }
+        renderer->setFogOriginFactor(renderer->state.fogOriginFactor - 0.01f);
         break;
     case 'i':
-        {
-            renderer->setFieldOfView(renderer->state.fieldOfView + 0.5f);
-        }
+        renderer->setFieldOfView(renderer->state.fieldOfView + 0.5f);
         break;
     case 'k':
-        {
-            renderer->setFieldOfView(renderer->state.fieldOfView - 0.5f);
-        }
+        renderer->setFieldOfView(renderer->state.fieldOfView - 0.5f);
         break;
     case 'o':
-        {
-            renderer->setElevationDataScaleFactor(renderer->state.elevationDataScaleFactor + 0.1f);
-        }
+        renderer->setElevationDataScaleFactor(renderer->state.elevationDataScaleFactor + 0.1f);
         break;
     case 'l':
-        {
-            renderer->setElevationDataScaleFactor(renderer->state.elevationDataScaleFactor - 0.1f);
-        }
+        renderer->setElevationDataScaleFactor(renderer->state.elevationDataScaleFactor - 0.1f);
         break;
     case 'c':
         {
@@ -532,11 +522,11 @@ void keyboardHandler(unsigned char key, int x, int y)
         }
         break;
     case 'b':
-        {
-            auto config = renderer->configuration;
-            config.texturesFilteringQuality = OsmAnd::TextureFilteringQuality::Normal;
-            renderer->setConfiguration(config);
-        }
+    {
+        auto config = renderer->configuration;
+        config.texturesFilteringQuality = OsmAnd::TextureFilteringQuality::Normal;
+        renderer->setConfiguration(config);
+    }
         break;
     case 'n':
         {
@@ -552,13 +542,13 @@ void keyboardHandler(unsigned char key, int x, int y)
             renderer->setConfiguration(config);
         }
         break;
-    /*case 'p':
-        {
+        /*case 'p':
+            {
             auto config = renderer->configuration;
             config.paletteTexturesAllowed = !config.paletteTexturesAllowed;
             renderer->setConfiguration(config);
-        }
-        break;*/
+            }
+            break;*/
     case 'z':
         {
             if(!renderer->state.symbolProviders.isEmpty())
@@ -571,11 +561,9 @@ void keyboardHandler(unsigned char key, int x, int y)
         }
         break;
     case 'q':
-        {
-            animator->cancelAnimation();
-            animator->animateAzimuthBy(-renderer->state.azimuth, 1.0f);
-            animator->resumeAnimation();
-        }
+        animator->cancelAnimation();
+        animator->animateAzimuthBy(-renderer->state.azimuth, 1.0f);
+        animator->resumeAnimation();
         break;
     case '0':
         {
@@ -590,10 +578,10 @@ void keyboardHandler(unsigned char key, int x, int y)
         }
         break;
     case '2':
-        {
-            auto layerId = (modifiers & GLUT_ACTIVE_ALT) ? OsmAnd::RasterMapLayerId::Overlay0 : OsmAnd::RasterMapLayerId::BaseLayer;
-            activateProvider(layerId, 2);
-        }
+    {
+        auto layerId = (modifiers & GLUT_ACTIVE_ALT) ? OsmAnd::RasterMapLayerId::Overlay0 : OsmAnd::RasterMapLayerId::BaseLayer;
+        activateProvider(layerId, 2);
+    }
         break;
     case '3':
         {
@@ -621,27 +609,25 @@ void specialHandler(int key, int x, int y)
     const auto modifiers = glutGetModifiers();
     const auto step = (modifiers & GLUT_ACTIVE_SHIFT) ? 1.0f : 0.1f;
 
-    switch (key)
+    switch(key)
     {
+    case GLUT_KEY_F5:
+        renderer->forcedFrameInvalidate();
+        break;
+    case GLUT_KEY_F2:
+        renderer->dumpResourcesInfo();
+        break;
     case GLUT_KEY_LEFT:
-        {
-            renderer->setAzimuth(renderer->state.azimuth + step);
-        }
+        renderer->setAzimuth(renderer->state.azimuth + step);
         break;
     case GLUT_KEY_RIGHT:
-        {
-            renderer->setAzimuth(renderer->state.azimuth - step);
-        }
+        renderer->setAzimuth(renderer->state.azimuth - step);
         break;
     case GLUT_KEY_UP:
-        {
-            renderer->setElevationAngle(renderer->state.elevationAngle + step);
-        }
+        renderer->setElevationAngle(renderer->state.elevationAngle + step);
         break;
     case GLUT_KEY_DOWN:
-        {
-            renderer->setElevationAngle(renderer->state.elevationAngle - step);
-        }
+        renderer->setElevationAngle(renderer->state.elevationAngle - step);
         break;
     }
 }
@@ -687,8 +673,8 @@ void activateProvider(OsmAnd::RasterMapLayerId layerId, int idx)
     }
     else if(idx == 5)
     {
-//        auto hillshadeTileProvider = new OsmAnd::HillshadeTileProvider();
-//        renderer->setTileProvider(layerId, hillshadeTileProvider);
+        //        auto hillshadeTileProvider = new OsmAnd::HillshadeTileProvider();
+        //        renderer->setTileProvider(layerId, hillshadeTileProvider);
     }
 }
 
@@ -740,14 +726,14 @@ void displayHandler()
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
         auto w = 390;
-        auto h1 = 16*20;
+        auto h1 = 16 * 20;
         auto t = viewport.height();
         glColor4f(0.5f, 0.5f, 0.5f, 0.6f);
         glBegin(GL_QUADS);
-            glVertex2f(0.0f,    t);
-            glVertex2f(   w,    t);
-            glVertex2f(   w, t-h1);
-            glVertex2f(0.0f, t-h1);
+        glVertex2f(0.0f, t);
+        glVertex2f(w, t);
+        glVertex2f(w, t - h1);
+        glVertex2f(0.0f, t - h1);
         glEnd();
         verifyOpenGL();
 
@@ -849,10 +835,10 @@ void displayHandler()
 
         glColor4f(0.5f, 0.5f, 0.5f, 0.6f);
         glBegin(GL_QUADS);
-            glVertex2f(0.0f, 16*10);
-            glVertex2f(   w, 16*10);
-            glVertex2f(   w, 0.0f);
-            glVertex2f(0.0f, 0.0f);
+        glVertex2f(0.0f, 16 * 10);
+        glVertex2f(w, 16 * 10);
+        glVertex2f(w, 0.0f);
+        glVertex2f(0.0f, 0.0f);
         glEnd();
         verifyOpenGL();
 
@@ -904,7 +890,7 @@ void displayHandler()
             QString("5 - Hillshade")));
         verifyOpenGL();
     }
-    
+
     glFlush();
     glutSwapBuffers();
 
