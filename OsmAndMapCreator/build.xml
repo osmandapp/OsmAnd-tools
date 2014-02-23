@@ -137,8 +137,9 @@
 	</target>
 
 	<target name="native-libs">
+		<!-- DISABLE NATIVE BUILDS
 		<ant antfile="${osmand-jni.dir}/build.xml" target="native-libs-jar" dir="${osmand-jni.dir}" inheritAll="false" inheritRefs="false">
-		</ant>
+		</ant> -->
 	</target>
 
 	<target name="build" depends="jar, native-libs, junits">
