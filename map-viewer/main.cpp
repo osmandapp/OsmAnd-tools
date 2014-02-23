@@ -614,6 +614,9 @@ void specialHandler(int key, int x, int y)
     case GLUT_KEY_F5:
         renderer->forcedFrameInvalidate();
         break;
+    case GLUT_KEY_F6:
+        renderer->forcedGpuProcessingCycle();
+        break;
     case GLUT_KEY_F2:
         renderer->dumpResourcesInfo();
         break;
