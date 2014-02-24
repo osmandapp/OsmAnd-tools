@@ -125,7 +125,10 @@ public class WikiIndexer {
 					log.info("About to process " + f.getName());
 					File outFile = process(f, conn);
 					if (outFile != null) {
-						f.renameTo(new File(srcDone, f.getName()));
+						boolean rename = f.renameTo(new File(srcDone, f.getName()));
+						if(!rename) {
+							System.out.println("Moving to done folder failed.");
+						}
 
 						IndexCreator ic = new IndexCreator(workPath);
 						ic.setIndexPOI(true);
@@ -585,6 +588,9 @@ public class WikiIndexer {
 			}
 			int st = i + start.length();
 			int en = text.length();
+			if(st >= en) {
+				return -1;
+			}
 			boolean colon = false;
 			for (int j = i + start.length(); j < text.length(); j++) {
 				if (text.charAt(j) == '|') {
