@@ -125,9 +125,22 @@ public class WikiIndexer {
 					log.info("About to process " + f.getName());
 					File outFile = process(f, conn);
 					if (outFile != null) {
-						boolean rename = f.renameTo(new File(srcDone, f.getName()));
+						File toRename = new File(srcDone, f.getName());
+						boolean rename = f.renameTo(toRename);
 						if(!rename) {
-							System.out.println("Moving to done folder failed.");
+							FileOutputStream fout = new FileOutputStream(toRename);
+							FileInputStream fin = new FileInputStream(f);
+							Algorithms.streamCopy(fin, fout);
+							fin.close();
+							fout.close();
+							boolean del = f.delete();
+							if(del) {
+								System.out.println("Moving to done folder successful.");
+							} else {
+								System.out.println("Moving to done folder failed.");
+							}
+						} else {
+							System.out.println("Moving to done folder successful.");
 						}
 
 						IndexCreator ic = new IndexCreator(workPath);
