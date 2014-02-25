@@ -459,9 +459,9 @@ void keyboardHandler(unsigned char key, int x, int y)
     case 'D':
     case 'd':
         {
-        auto newTarget = renderer->state.target31;
-        newTarget.x += wasdStep / (key == 'd' ? 50 : 10);
-        renderer->setTarget(newTarget);
+            auto newTarget = renderer->state.target31;
+            newTarget.x += wasdStep / (key == 'd' ? 50 : 10);
+            renderer->setTarget(newTarget);
         }
         break;
     case 'r':
@@ -522,11 +522,11 @@ void keyboardHandler(unsigned char key, int x, int y)
         }
         break;
     case 'b':
-    {
-        auto config = renderer->configuration;
-        config.texturesFilteringQuality = OsmAnd::TextureFilteringQuality::Normal;
-        renderer->setConfiguration(config);
-    }
+        {
+            auto config = renderer->configuration;
+            config.texturesFilteringQuality = OsmAnd::TextureFilteringQuality::Normal;
+            renderer->setConfiguration(config);
+        }
         break;
     case 'n':
         {
@@ -578,10 +578,10 @@ void keyboardHandler(unsigned char key, int x, int y)
         }
         break;
     case '2':
-    {
-        auto layerId = (modifiers & GLUT_ACTIVE_ALT) ? OsmAnd::RasterMapLayerId::Overlay0 : OsmAnd::RasterMapLayerId::BaseLayer;
-        activateProvider(layerId, 2);
-    }
+        {
+            auto layerId = (modifiers & GLUT_ACTIVE_ALT) ? OsmAnd::RasterMapLayerId::Overlay0 : OsmAnd::RasterMapLayerId::BaseLayer;
+            activateProvider(layerId, 2);
+        }
         break;
     case '3':
         {
