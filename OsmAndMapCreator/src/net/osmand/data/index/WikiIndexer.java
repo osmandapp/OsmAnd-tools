@@ -449,6 +449,10 @@ public class WikiIndexer {
 				if (startComment != -1 && startComment < h) {
 					i = text.indexOf("-->", startComment);
 					h = text.indexOf("{{", i);
+					if(i == -1) {
+						h = text.indexOf("{{", startComment);
+						return h;
+					}
 					check = true;
 				}
 			}
