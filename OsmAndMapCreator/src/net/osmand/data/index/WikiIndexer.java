@@ -74,7 +74,7 @@ public class WikiIndexer {
 			File srcDone = srcPath;
 			for (int i = 3; i < args.length; i++) {
 				if(args[i].startsWith("--source-done=")){
-					srcDone = new File(srcPath, args[i].substring("--source-done=".length()));
+					srcDone = new File(args[i].substring("--source-done=".length()));
 //				} else if(args[i].startsWith("--description=")){
 				}
 			}
