@@ -74,7 +74,7 @@ public class WikiIndexer {
 			File srcDone = srcPath;
 			for (int i = 3; i < args.length; i++) {
 				if(args[i].startsWith("--source-done=")){
-					srcDone = new File(srcPath, args[i].substring("--source-done=".length()));
+					srcDone = new File(args[i].substring("--source-done=".length()));
 //				} else if(args[i].startsWith("--description=")){
 				}
 			}
@@ -125,7 +125,23 @@ public class WikiIndexer {
 					log.info("About to process " + f.getName());
 					File outFile = process(f, conn);
 					if (outFile != null) {
-						f.renameTo(new File(srcDone, f.getName()));
+						File toRename = new File(srcDone, f.getName());
+						boolean rename = f.renameTo(toRename);
+						if(!rename) {
+							FileOutputStream fout = new FileOutputStream(toRename);
+							FileInputStream fin = new FileInputStream(f);
+							Algorithms.streamCopy(fin, fout);
+							fin.close();
+							fout.close();
+							boolean del = f.delete();
+							if(del) {
+								System.out.println("Moving to done folder successful.");
+							} else {
+								System.out.println("Moving to done folder failed.");
+							}
+						} else {
+							System.out.println("Moving to done folder successful.");
+						}
 
 						IndexCreator ic = new IndexCreator(workPath);
 						ic.setIndexPOI(true);
@@ -433,6 +449,10 @@ public class WikiIndexer {
 				if (startComment != -1 && startComment < h) {
 					i = text.indexOf("-->", startComment);
 					h = text.indexOf("{{", i);
+					if(i == -1) {
+						h = text.indexOf("{{", startComment);
+						return h;
+					}
 					check = true;
 				}
 			}
@@ -585,6 +605,9 @@ public class WikiIndexer {
 			}
 			int st = i + start.length();
 			int en = text.length();
+			if(st >= en) {
+				return -1;
+			}
 			boolean colon = false;
 			for (int j = i + start.length(); j < text.length(); j++) {
 				if (text.charAt(j) == '|') {
