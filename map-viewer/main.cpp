@@ -286,8 +286,8 @@ int main(int argc, char** argv)
     renderer->setTarget(OsmAnd::PointI(
         1102430866,
         704978668));
-    //renderer->setZoom(10.0f);
-    renderer->setZoom(16.0f);
+    renderer->setZoom(10.0f);
+    //renderer->setZoom(16.0f);
     //renderer->setZoom(4.0f);
 
     // Kiev
@@ -371,10 +371,11 @@ void mouseHandler(int button, int state, int x, int y)
             renderer->getLocationFromScreenPoint(OsmAnd::PointI(x, y), clickedLocation);
             lastClickedLocation31 = OsmAnd::Utilities::normalizeCoordinates(clickedLocation, OsmAnd::ZoomLevel31);
 
-            auto delta = clickedLocation - OsmAnd::PointI64(renderer->state.target31.x, renderer->state.target31.y);
+            auto delta = clickedLocation - OsmAnd::PointI64(renderer->state.target31);
 
             animator->cancelAnimation();
-            animator->animateTargetBy(delta, 1.0f);
+            //animator->animateTargetBy(delta, 1.0f, OsmAnd::MapAnimatorTimingFunction::EaseInOutQuadratic);
+            animator->parabolicAnimateTargetBy(delta, 1.0f, OsmAnd::MapAnimatorTimingFunction::EaseInOutQuadratic, OsmAnd::MapAnimatorTimingFunction::EaseOutInQuadratic);
             animator->resumeAnimation();
         }
     }
@@ -562,7 +563,7 @@ void keyboardHandler(unsigned char key, int x, int y)
         break;
     case 'q':
         animator->cancelAnimation();
-        animator->animateAzimuthBy(-renderer->state.azimuth, 1.0f);
+        animator->animateAzimuthBy(-renderer->state.azimuth, 1.0f, OsmAnd::MapAnimatorTimingFunction::EaseInOutQuadratic);
         animator->resumeAnimation();
         break;
     case '0':
@@ -599,6 +600,25 @@ void keyboardHandler(unsigned char key, int x, int y)
         {
             auto layerId = (modifiers & GLUT_ACTIVE_ALT) ? OsmAnd::RasterMapLayerId::Overlay0 : OsmAnd::RasterMapLayerId::BaseLayer;
             activateProvider(layerId, 5);
+        }
+        break;
+    case ' ':
+        {
+            const OsmAnd::PointI amsterdam(
+                1102430866,
+                704978668);
+            const OsmAnd::PointI kiev(
+                1255337783,
+                724166131);
+            static bool flag = false;
+            const auto& target = flag ? amsterdam : kiev;
+            flag = !flag;
+
+            const auto delta = target - OsmAnd::PointI64(renderer->state.target31);
+
+            animator->cancelAnimation();
+            animator->animateMoveBy(delta, /*1.0f*/10, false, false, OsmAnd::MapAnimatorTimingFunction::EaseInOutQuadratic);
+            animator->resumeAnimation();
         }
         break;
     }
