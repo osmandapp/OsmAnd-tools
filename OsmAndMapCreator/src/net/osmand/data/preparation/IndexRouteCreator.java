@@ -84,7 +84,8 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 	TIntArrayList outTypes = new TIntArrayList();
 	TLongObjectHashMap<TIntArrayList> pointTypes = new TLongObjectHashMap<TIntArrayList>();
 	Map<MapRoutingTypes.MapRouteType, String> names = new HashMap<MapRoutingTypes.MapRouteType, String>();
-	
+
+	private TLongHashSet genSpeedCameras = new TLongHashSet();
 	
 	TLongObjectHashMap<GeneralizedCluster> generalClusters = new TLongObjectHashMap<GeneralizedCluster>();
 	private PreparedStatement mapRouteInsertStat;
@@ -131,6 +132,19 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 					propogatedTags.get(id).putAll(propogated);
 				}
 			}
+			if("enforcement".equals(e.getTag("type")) && "maxspeed".equals(e.getTag("enforcement"))) {
+				ctx.loadEntityRelation((Relation) e);
+				Iterator<Entity> from = ((Relation) e).getMembers("from").iterator();
+				// mark as speed cameras
+				while(from.hasNext()) {
+					Entity n = from.next();
+					if(n instanceof Node) {
+						genSpeedCameras.add(n.getId());
+					}
+				}
+				
+			}
+			
 		}
 	}
 	
@@ -153,6 +167,11 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 			if (encoded) {
 				// Load point with  tags!
 				ctx.loadEntityWay(e);
+				for(Node n : e.getNodes()) {
+					if(n != null && genSpeedCameras.contains(n.getId())) {
+						n.putTag("highway", "speed_camera");
+					}
+				}
 				routeTypes.encodePointTypes(e, pointTypes);
 				if(e.getNodes().size() >= 2) {
 				    addWayToIndex(e.getId(), e.getNodes(), mapRouteInsertStat, routeTree);
