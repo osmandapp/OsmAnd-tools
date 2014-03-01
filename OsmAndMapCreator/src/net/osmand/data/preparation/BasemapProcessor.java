@@ -668,7 +668,7 @@ public class BasemapProcessor {
             // BASEMAP generation
             File folder = new File(p[0]);
 //            MapZooms zooms = MapZooms.parseZooms("1-2;3;4-5;6-7;8-9;10-");
-            int zoomSmoothness = mini ? 2 : 2;
+            int zoomSmoothness = mini ? 5 : 2;
 	        MapZooms zooms = mini ? MapZooms.parseZooms("1-2;3;4-5;6-") : MapZooms.parseZooms("1-2;3;4-5;6-7;8;9-");
 	        MOST_DETAILED_APPROXIMATION = mini ? 6 : 11; 
             IndexCreator creator = new IndexCreator(folder); //$NON-NLS-1$
