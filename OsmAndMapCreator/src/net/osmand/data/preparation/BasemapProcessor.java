@@ -40,6 +40,7 @@ public class BasemapProcessor {
     public static final byte TILE_ZOOMLEVEL = 12;
     private static final byte BITMASK = 0x3;
     private static final int BITS_COUNT = (1 << TILE_ZOOMLEVEL) * (1 << TILE_ZOOMLEVEL);
+	
     private BitSet seaTileInfo = new BitSet(BITS_COUNT);
     private BitSet landTileInfo = new BitSet(BITS_COUNT);
     private TIntArrayList typeUse = new TIntArrayList();
@@ -52,6 +53,7 @@ public class BasemapProcessor {
     private final MapZooms mapZooms;
     private final Log logMapDataWarn;
     private SimplisticQuadTree[] quadTrees;
+    private static int MOST_DETAILED_APPROXIMATION = 11;
 
     protected static class SimplisticQuadTree {
         int zoom;
@@ -410,7 +412,7 @@ public class BasemapProcessor {
 		for (int level = 0; level < mapZooms.getLevels().size(); level++) {
 			boolean mostDetailed = level == 0;
 			MapZoomPair zoomPair = mapZooms.getLevel(level);
-			int zoomToEncode = mostDetailed ? Math.max(11, zoomPair.getMinZoom() + 1) : zoomPair.getMaxZoom();
+			int zoomToEncode = mostDetailed ? Math.max(MOST_DETAILED_APPROXIMATION, zoomPair.getMinZoom() + 1) : zoomPair.getMaxZoom();
 			if (mostDetailed && zoomPair.getMaxZoom() < 10) {
 				throw new IllegalStateException("Zoom pair is not detailed " + zoomPair);
 			}
@@ -456,7 +458,6 @@ public class BasemapProcessor {
 							zoomPair, zoomToEncode, quadTrees[level], refId);
 				} else {
 					List<Node> ns = ((Way) e).getNodes();
-					List<Node> polygonToMeasure = ns;
 					if (!polygon) {
 						QuadRect qr = ((Way) e).getLatLonBBox();
 						if(qr == null) {
@@ -667,11 +668,13 @@ public class BasemapProcessor {
             // BASEMAP generation
             File folder = new File(p[0]);
 //            MapZooms zooms = MapZooms.parseZooms("1-2;3;4-5;6-7;8-9;10-");
+            int zoomSmoothness = mini ? 4 : 2;
 	        MapZooms zooms = mini ? MapZooms.parseZooms("1-2;3;4-5;6-7;8-") : MapZooms.parseZooms("1-2;3;4-5;6-7;8;9-");
+	        MOST_DETAILED_APPROXIMATION = mini ? 8 : 11; 
             IndexCreator creator = new IndexCreator(folder); //$NON-NLS-1$
 	        creator.setDialects(DBDialect.SQLITE_IN_MEMORY, DBDialect.SQLITE_IN_MEMORY);
             creator.setIndexMap(true);
-			creator.setZoomWaySmothness(mini ? 2 : 2);
+			creator.setZoomWaySmothness(zoomSmoothness);
             creator.setMapFileName(mini?"World_basemap_mini_2.obf":"World_basemap_2.obf");
             ArrayList<File> src = new ArrayList<File>();
             for (File f : folder.listFiles()) {
