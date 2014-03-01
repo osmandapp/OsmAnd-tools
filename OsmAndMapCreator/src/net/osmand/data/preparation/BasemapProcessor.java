@@ -668,9 +668,9 @@ public class BasemapProcessor {
             // BASEMAP generation
             File folder = new File(p[0]);
 //            MapZooms zooms = MapZooms.parseZooms("1-2;3;4-5;6-7;8-9;10-");
-            int zoomSmoothness = mini ? 4 : 2;
+            int zoomSmoothness = mini ? 3 : 2;
 	        MapZooms zooms = mini ? MapZooms.parseZooms("1-2;3;4-5;6-7;8-") : MapZooms.parseZooms("1-2;3;4-5;6-7;8;9-");
-	        MOST_DETAILED_APPROXIMATION = mini ? 8 : 11; 
+	        MOST_DETAILED_APPROXIMATION = mini ? 9 : 11; 
             IndexCreator creator = new IndexCreator(folder); //$NON-NLS-1$
 	        creator.setDialects(DBDialect.SQLITE_IN_MEMORY, DBDialect.SQLITE_IN_MEMORY);
             creator.setIndexMap(true);
