@@ -676,10 +676,12 @@ public class MapRouterLayer implements MapPanelLayer {
 				RoutingConfiguration config = builder.build(props[0], /*RoutingConfiguration.DEFAULT_MEMORY_LIMIT*/ 1000, paramsR);
 				PrecalculatedRouteDirection precalculatedRouteDirection = null;
 				// Test gpx precalculation
-//				LatLon[] lts = parseGPXDocument("/home/victor/projects/osmand/temp/short20km.gpx");
+//				LatLon[] lts = parseGPXDocument("/home/victor/projects/osmand/temp/esya.gpx");
 //				start = lts[0];
 //				end = lts[lts.length - 1];
+//				System.out.println("Start " + start + " end " + end);
 //				precalculatedRouteDirection = PrecalculatedRouteDirection.build(lts, config.router.getMaxDefaultSpeed());
+//				precalculatedRouteDirection.setFollowNext(true);
 //				config.planRoadDirection = 1;
 				
 				// Test initial direction
@@ -691,9 +693,6 @@ public class MapRouterLayer implements MapPanelLayer {
 				// config.ZOOM_TO_LOAD_TILES = 14;
 				final RoutingContext ctx = router.buildRoutingContext(config, DataExtractionSettings.getSettings().useNativeRouting() ? NativeSwingRendering.getDefaultFromSettings() :
 					null, rs, rm);
-				if(ctx.precalculatedRouteDirection != null) {
-					ctx.precalculatedRouteDirection = precalculatedRouteDirection.adopt(ctx);
-				}
 				ctx.leftSideNavigation = false;
 				ctx.previouslyCalculatedRoute = previousRoute;
 				log.info("Use " + config.routerName + "mode for routing");
@@ -704,7 +703,8 @@ public class MapRouterLayer implements MapPanelLayer {
 				long nt = System.nanoTime();
 				startProgressThread(ctx);
 				try {
-					List<RouteSegmentResult> searchRoute = router.searchRoute(ctx, start, end, intermediates);
+					List<RouteSegmentResult> searchRoute = router.searchRoute(ctx, start, end, 
+							intermediates, precalculatedRouteDirection);
 					throwExceptionIfRouteNotFound(ctx, searchRoute);
 
 					System.out.println("External native time " + (System.nanoTime() - nt) / 1.0e9f);
