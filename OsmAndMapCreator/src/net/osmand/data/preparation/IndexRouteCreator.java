@@ -550,17 +550,15 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		try {
 			writer.startWriteRouteIndex(regionName);
 			// write map encoding rules
-
+			// save position
 			writer.writeRouteEncodingRules(routeTypes.getEncodingRuleTypes());
-			TLongObjectHashMap<BinaryFileReference> route = writeBinaryRouteIndexHeader(writer, 
-					routeTree, false);
-			TLongObjectHashMap<BinaryFileReference> base = writeBinaryRouteIndexHeader(writer,  
-					baserouteTree, true);
-			writeBinaryRouteIndexBlocks(writer, routeTree, false, route);
-			writer.flush();
 			RandomAccessFile raf = writer.getRaf();
+			writer.flush();
 			long fp = raf.getFilePointer();
-			writeBinaryRouteIndexBlocks(writer, baserouteTree, true, base);
+			
+			// 1st write
+			writeRouteSections(writer);
+			
 			// prewrite end of file to read it
 			writer.simulateWriteEndRouteIndex();
 			writer.preclose();
@@ -574,13 +572,24 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 			raf.seek(fp);
 			raf.getChannel().truncate(fp);
 
-			// write base route tree again
-			writeBinaryRouteIndexBlocks(writer, baserouteTree, true, base);
+			// 2nd write
+			writeRouteSections(writer);
+			
 			writer.endWriteRouteIndex();
 			writer.flush();
 		} catch (RTreeException e) {
 			throw new IllegalStateException(e);
 		}
+	}
+	private TLongObjectHashMap<BinaryFileReference> writeRouteSections(BinaryMapIndexWriter writer) throws IOException,
+			SQLException, RTreeException {
+		TLongObjectHashMap<BinaryFileReference> route = writeBinaryRouteIndexHeader(writer, 
+				routeTree, false);
+		TLongObjectHashMap<BinaryFileReference> base = writeBinaryRouteIndexHeader(writer,  
+				baserouteTree, true);
+		writeBinaryRouteIndexBlocks(writer, routeTree, false, route);
+		writeBinaryRouteIndexBlocks(writer, baserouteTree, true, base);
+		return base;
 	}
 	
 	private void appendMissingRoadsForBaseMap(Connection conn, BinaryMapIndexReader reader) throws IOException, SQLException {
