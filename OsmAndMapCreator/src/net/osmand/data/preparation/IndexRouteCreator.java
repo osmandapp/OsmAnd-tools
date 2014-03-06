@@ -567,6 +567,9 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 			// use file to recalulate tree
 			raf.seek(0);
 			appendMissingRoadsForBaseMap(mapConnection, new BinaryMapIndexReader(raf));
+			// repack
+			String fname = baserouteTree.getFileName();
+			baserouteTree = packRtreeFile(baserouteTree, fname, fname+"p");
 			
 			// seek to previous position
 			raf.seek(fp);
@@ -577,6 +580,8 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 			
 			writer.endWriteRouteIndex();
 			writer.flush();
+			baserouteTree = null;
+			new File(fname+"p").delete();
 		} catch (RTreeException e) {
 			throw new IllegalStateException(e);
 		}
