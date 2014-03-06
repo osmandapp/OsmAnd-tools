@@ -9,6 +9,7 @@ import java.awt.event.ActionListener;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.RandomAccessFile;
@@ -44,6 +45,7 @@ import net.osmand.router.BinaryRoutePlanner.RouteSegment;
 import net.osmand.router.BinaryRoutePlanner.RouteSegmentVisitor;
 import net.osmand.router.RoutePlannerFrontEnd;
 import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
+import net.osmand.router.PrecalculatedRouteDirection;
 import net.osmand.router.RouteSegmentResult;
 import net.osmand.router.RoutingConfiguration;
 import net.osmand.router.RoutingConfiguration.Builder;
@@ -672,6 +674,17 @@ public class MapRouterLayer implements MapPanelLayer {
 					paramsR.put(p, "true");
 				}
 				RoutingConfiguration config = builder.build(props[0], /*RoutingConfiguration.DEFAULT_MEMORY_LIMIT*/ 1000, paramsR);
+				PrecalculatedRouteDirection precalculatedRouteDirection = null;
+				// Test gpx precalculation
+//				LatLon[] lts = parseGPXDocument("/home/victor/projects/osmand/temp/esya.gpx");
+//				start = lts[0];
+//				end = lts[lts.length - 1];
+//				System.out.println("Start " + start + " end " + end);
+//				precalculatedRouteDirection = PrecalculatedRouteDirection.build(lts, config.router.getMaxDefaultSpeed());
+//				precalculatedRouteDirection.setFollowNext(true);
+//				config.planRoadDirection = 1;
+				
+				// Test initial direction
 //				config.initialDirection = 90d / 180d * Math.PI; // EAST
 //				config.initialDirection = 180d / 180d * Math.PI; // SOUTH
 //				config.initialDirection = -90d / 180d * Math.PI; // WEST
@@ -690,7 +703,8 @@ public class MapRouterLayer implements MapPanelLayer {
 				long nt = System.nanoTime();
 				startProgressThread(ctx);
 				try {
-					List<RouteSegmentResult> searchRoute = router.searchRoute(ctx, start, end, intermediates);
+					List<RouteSegmentResult> searchRoute = router.searchRoute(ctx, start, end, 
+							intermediates, precalculatedRouteDirection);
 					throwExceptionIfRouteNotFound(ctx, searchRoute);
 
 					System.out.println("External native time " + (System.nanoTime() - nt) / 1.0e9f);
@@ -937,6 +951,19 @@ public class MapRouterLayer implements MapPanelLayer {
 			g.drawOval(x, y, 12, 12);
 			g.fillOval(x, y, 12, 12);
 		}
+	}
+	
+	public LatLon[] parseGPXDocument(String fileName) throws SAXException, IOException, ParserConfigurationException {
+		DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+		DocumentBuilder dom = factory.newDocumentBuilder();
+		Document doc = dom.parse(new InputSource(new FileInputStream(fileName)));
+		NodeList list = doc.getElementsByTagName("trkpt");
+		LatLon[] x = new LatLon[list.getLength()];
+		for(int i=0; i<list.getLength(); i++){
+			Element item = (Element) list.item(i);
+			x[i] = new LatLon(Double.parseDouble(item.getAttribute("lat")), Double.parseDouble(item.getAttribute("lon")));
+		}
+		return x;
 	}
 
 }

@@ -176,9 +176,9 @@ public class BinaryMapIndexWriter {
 	}
 
 	public long getFilePointer() throws IOException {
-		// codedOutStream.flush();
-		// return raf.getFilePointer();
-		return codedOutStream.getWrittenBytes();
+		codedOutStream.flush();
+		return raf.getFilePointer();
+		// return codedOutStream.getWrittenBytes(); // doesn't work with route section rewrite (should not take into account)
 	}
 
 //	private void writeFixed32(long posToWrite, int value, long currentPosition) throws IOException {
@@ -190,6 +190,14 @@ public class BinaryMapIndexWriter {
 	private int writeInt32Size() throws IOException {
 		long filePointer = getFilePointer();
 		BinaryFileReference ref = stackSizes.pop();
+		codedOutStream.flush();
+		int length = ref.writeReference(raf, filePointer);
+		return length;
+	}
+	
+	private int prewriteInt32Size() throws IOException {
+		long filePointer = getFilePointer();
+		BinaryFileReference ref = stackSizes.peek();
 		codedOutStream.flush();
 		int length = ref.writeReference(raf, filePointer);
 		return length;
@@ -232,6 +240,16 @@ public class BinaryMapIndexWriter {
 		ROUTE_TYPES_SIZE = ROUTE_DATA_SIZE = ROUTE_POINTS_SIZE = ROUTE_ID_SIZE = 
 				ROUTE_COORDINATES_COUNT = ROUTE_COORDINATES_SIZE = 0;
 		log.info("ROUTE INDEX SIZE : " + len);
+	}
+	
+	public void simulateWriteEndRouteIndex() throws IOException {
+		checkPeekState(ROUTE_INDEX_INIT);
+		int len = prewriteInt32Size();
+		log.info("PREROUTE INDEX SIZE : " + len);
+	}
+	
+	public RandomAccessFile getRaf() {
+		return raf;
 	}
 	
 
@@ -1413,7 +1431,7 @@ public class BinaryMapIndexWriter {
 	public void startWritePoiData(int zoom, int x, int y, List<BinaryFileReference> fpPoiBox) throws IOException {
 		pushState(POI_DATA, POI_INDEX_INIT);
 		codedOutStream.writeTag(OsmandOdb.OsmAndPoiIndex.POIDATA_FIELD_NUMBER, WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
-		long pointer = codedOutStream.getWrittenBytes();
+		long pointer = getFilePointer();
 		preserveInt32Size();
 		codedOutStream.flush();
 		// write shift to that data
@@ -1499,6 +1517,11 @@ public class BinaryMapIndexWriter {
 
 	public void close() throws IOException {
 		checkPeekState(OSMAND_STRUCTURE_INIT);
+		codedOutStream.writeInt32(OsmandOdb.OsmAndStructure.VERSIONCONFIRM_FIELD_NUMBER, IndexConstants.BINARY_MAP_VERSION);
+		codedOutStream.flush();
+	}
+	
+	public void preclose() throws IOException {
 		codedOutStream.writeInt32(OsmandOdb.OsmAndStructure.VERSIONCONFIRM_FIELD_NUMBER, IndexConstants.BINARY_MAP_VERSION);
 		codedOutStream.flush();
 	}
