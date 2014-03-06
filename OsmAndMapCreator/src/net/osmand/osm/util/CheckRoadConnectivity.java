@@ -74,12 +74,14 @@ public class CheckRoadConnectivity {
 	public TLongObjectHashMap<RouteDataObject> collectDisconnectedRoads(BinaryMapIndexReader reader) throws IOException {
 		TLongObjectHashMap<List<RouteDataObject>> all = new TLongObjectHashMap<List<RouteDataObject>>();
 		TLongObjectHashMap<List<RouteDataObject>> onlyRoads = new TLongObjectHashMap<List<RouteDataObject>>();
-		findAllBaseRoadIntersections(reader, all, onlyRoads);
-		return calculateDisconnectedRoadsToAddAndDelete(onlyRoads, all, reader, null);
+		TLongHashSet registeredRoadIds = new TLongHashSet();
+		findAllBaseRoadIntersections(reader, all, onlyRoads, registeredRoadIds);
+		return calculateDisconnectedRoadsToAddAndDelete(onlyRoads, all, reader, null, registeredRoadIds);
 	}
 
 	private void findAllBaseRoadIntersections(BinaryMapIndexReader reader,
-			TLongObjectHashMap<List<RouteDataObject>> all, TLongObjectHashMap<List<RouteDataObject>> onlyRoads)
+			TLongObjectHashMap<List<RouteDataObject>> all, TLongObjectHashMap<List<RouteDataObject>> onlyRoads, 
+			TLongHashSet registeredRoadIds)
 			throws IOException {
 		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd(false);
 		Builder builder = RoutingConfiguration.getDefault();
@@ -102,6 +104,7 @@ public class CheckRoadConnectivity {
 			ArrayList<RouteDataObject> dataObjects = new ArrayList<RouteDataObject>();
 			ctx.loadSubregionTile(tile, false, dataObjects);
 			for(RouteDataObject o : dataObjects) {
+				registeredRoadIds.add(o.getId());
 				int len = o.getPointsLength() - 1;
 				double dist = MapUtils.squareRootDist31(o.getPoint31XTile(0), o.getPoint31YTile(0),
 						o.getPoint31XTile(len), o.getPoint31YTile(len));
@@ -132,7 +135,7 @@ public class CheckRoadConnectivity {
 	}
 
 	private TLongObjectHashMap<RouteDataObject> calculateDisconnectedRoadsToAddAndDelete(TLongObjectHashMap<List<RouteDataObject>> mapOfObjectToCheck,
-			TLongObjectHashMap<List<RouteDataObject>> all, BinaryMapIndexReader reader, TLongHashSet setToRemove) {
+			TLongObjectHashMap<List<RouteDataObject>> all, BinaryMapIndexReader reader, TLongHashSet setToRemove, TLongHashSet registeredIds) {
 		RoutePlannerFrontEnd frontEnd = new RoutePlannerFrontEnd(false);
 		RoutingConfiguration config = RoutingConfiguration.getDefault().build("car", 1000);
 		
@@ -155,7 +158,9 @@ public class CheckRoadConnectivity {
 					}
 				} else {
 					for(RouteDataObject obj : result) {
-						toAdd.put(obj.id, obj);
+						if(!registeredIds.contains(obj.id)) {
+							toAdd.put(obj.id, obj);
+						}
 					}
 				}
 			}
@@ -172,7 +177,8 @@ public class CheckRoadConnectivity {
 		return toAdd;
 	}
 	
-	private List<RouteDataObject> findConnectedRoads(RoutingContext ctx, RouteDataObject initial, boolean begin, TLongObjectHashMap<List<RouteDataObject>> all) {
+	private List<RouteDataObject> findConnectedRoads(RoutingContext ctx, RouteDataObject initial, boolean begin, 
+			TLongObjectHashMap<List<RouteDataObject>> all) {
 		PriorityQueue<RouteSegment> queue = new PriorityQueue<RouteSegment>(10, new Comparator<RouteSegment>() {
 
 			@Override
@@ -247,13 +253,6 @@ public class CheckRoadConnectivity {
 				break;
 			}
 			if(all.contains(calcPointId(segment.getRoad(), ind)) && !start) {
-				List<RouteDataObject> list = all.get(calcPointId(segment.getRoad(), ind));
-				// check if we joined target route in the middle
-				for(RouteDataObject o : list) {
-					if(o.getId() == segment.getRoad().getId()) {
-						return segment.getParentRoute();
-					}
-				}
 				return segment;
 			}
 			visited.add(calcPointIdUnique(segment.getRoad(), ind));

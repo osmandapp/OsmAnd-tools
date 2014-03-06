@@ -182,25 +182,9 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 			}
 			encoded = routeTypes.encodeBaseEntity(e, outTypes, names) && e.getNodes().size() >= 2;
 			if (encoded ) {
-				ArrayList<Node> result = new ArrayList<Node>();
 				List<Node> source = e.getNodes();
-				boolean[] kept = OsmMapUtils.simplifyDouglasPeucker(source, 11 /*zoom*/+ 8 + 1 /*smoothness*/, 3, result, false);
-				int indexToInsertAt = 0;
-				int originalInd = 0;				
-				for(int i = 0; i < kept.length; i ++) {
-					Node n = source.get(i);
-					if(n != null) {
-						long y31 = MapUtils.get31TileNumberY(n.getLatitude());
-						long x31 = MapUtils.get31TileNumberX(n.getLongitude());
-						long point = (x31 << 31) + y31;
-						registerBaseIntersectionPoint(point, !kept[i], e.getId(), indexToInsertAt, originalInd);
-						originalInd++;
-						if(kept[i]) {
-							indexToInsertAt ++;
-						}
-					}
-				}
-				
+				long id = e.getId();
+				List<Node> result = simplifyRouteForBaseSection(source, id);
 				
 				addWayToIndex(e.getId(), result, basemapRouteInsertStat, baserouteTree);
 				//generalizeWay(e);
@@ -208,6 +192,26 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 			}
 		}
 		
+	}
+	private List<Node> simplifyRouteForBaseSection(List<Node> source, long id) {
+		ArrayList<Node> result = new ArrayList<Node>();
+		boolean[] kept = OsmMapUtils.simplifyDouglasPeucker(source, 11 /*zoom*/+ 8 + 1 /*smoothness*/, 3, result, false);
+		int indexToInsertAt = 0;
+		int originalInd = 0;				
+		for(int i = 0; i < kept.length; i ++) {
+			Node n = source.get(i);
+			if(n != null) {
+				long y31 = MapUtils.get31TileNumberY(n.getLatitude());
+				long x31 = MapUtils.get31TileNumberX(n.getLongitude());
+				long point = (x31 << 31) + y31;
+				registerBaseIntersectionPoint(point, !kept[i], id, indexToInsertAt, originalInd);
+				originalInd++;
+				if(kept[i]) {
+					indexToInsertAt ++;
+				}
+			}
+		}
+		return result;
 	}
 	
 	private static long SHIFT_INSERT_AT = 12;
@@ -564,7 +568,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 
 			// use file to recalulate tree
 			raf.seek(0);
-			appendMissingRoads(mapConnection, new BinaryMapIndexReader(raf));
+			appendMissingRoadsForBaseMap(mapConnection, new BinaryMapIndexReader(raf));
 			
 			// seek to previous position
 			raf.seek(fp);
@@ -579,7 +583,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		}
 	}
 	
-	private void appendMissingRoads(Connection conn, BinaryMapIndexReader reader) throws IOException, SQLException {
+	private void appendMissingRoadsForBaseMap(Connection conn, BinaryMapIndexReader reader) throws IOException, SQLException {
 		TLongObjectHashMap<RouteDataObject> map = new CheckRoadConnectivity().collectDisconnectedRoads(reader);
 		// to add 
 		PreparedStatement ps = conn.prepareStatement(COPY_BASE);
@@ -597,6 +601,8 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 				maxX = Math.max(maxX, x);
 				minY = Math.min(minY, y);
 				maxY = Math.max(maxY, y);
+				long point = (x << 31) + y;
+				registerBaseIntersectionPoint(point, false, id, i, i);
 			}
 			ps.setLong(1, id);
 			ps.execute();
