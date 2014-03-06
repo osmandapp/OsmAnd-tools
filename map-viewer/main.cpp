@@ -241,24 +241,24 @@ int main(int argc, char** argv)
             glutPostRedisplay();
     };
     rendererSetup.displayDensityFactor = density;
-    rendererSetup.gpuWorkerThread.enabled = useGpuWorker;
-    if(rendererSetup.gpuWorkerThread.enabled)
+    rendererSetup.gpuWorkerThreadEnabled = useGpuWorker;
+    if(rendererSetup.gpuWorkerThreadEnabled)
     {
 #if defined(WIN32)
         const auto currentDC = wglGetCurrentDC();
         const auto currentContext = wglGetCurrentContext();
         const auto workerContext = wglCreateContext(currentDC);
 
-        rendererSetup.gpuWorkerThread.enabled = (wglShareLists(currentContext, workerContext) == TRUE);
+        rendererSetup.gpuWorkerThreadEnabled = (wglShareLists(currentContext, workerContext) == TRUE);
         assert(currentContext == wglGetCurrentContext());
 
-        rendererSetup.gpuWorkerThread.prologue = [currentDC, workerContext]()
+        rendererSetup.gpuWorkerThreadPrologue = [currentDC, workerContext]()
         {
             const auto result = (wglMakeCurrent(currentDC, workerContext) == TRUE);
             verifyOpenGL();
         };
 
-        rendererSetup.gpuWorkerThread.epilogue = []()
+        rendererSetup.gpuWorkerThreadEpilogue = []()
         {
             glFinish();
         };
