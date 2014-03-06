@@ -34,7 +34,7 @@ public class CheckRoadConnectivity {
 	public static void main(String[] args) throws IOException {
 		
 		CheckRoadConnectivity crc = new CheckRoadConnectivity();
-		RandomAccessFile raf = new RandomAccessFile("/home/victor/projects/osmand/osm-gen/Netherlands_europe_2.obf", "r"); //$NON-NLS-1$ //$NON-NLS-2$
+		RandomAccessFile raf = new RandomAccessFile("/home/victor/projects/osmand/osm-gen/Brazil_southamerica_2.obf", "r"); //$NON-NLS-1$ //$NON-NLS-2$
 		
 		crc.collectDisconnectedRoads(new BinaryMapIndexReader(raf));
 //		ClusteringContext ctx = new ClusteringContext();
@@ -247,6 +247,13 @@ public class CheckRoadConnectivity {
 				break;
 			}
 			if(all.contains(calcPointId(segment.getRoad(), ind)) && !start) {
+				List<RouteDataObject> list = all.get(calcPointId(segment.getRoad(), ind));
+				// check if we joined target route in the middle
+				for(RouteDataObject o : list) {
+					if(o.getId() == segment.getRoad().getId()) {
+						return segment.getParentRoute();
+					}
+				}
 				return segment;
 			}
 			visited.add(calcPointIdUnique(segment.getRoad(), ind));

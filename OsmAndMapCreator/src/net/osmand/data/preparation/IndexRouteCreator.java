@@ -31,11 +31,13 @@ import java.util.Set;
 import java.util.TreeMap;
 
 import net.osmand.IProgress;
+import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.OsmandOdb.IdTable;
 import net.osmand.binary.OsmandOdb.OsmAndRoutingIndex.RouteDataBlock;
 import net.osmand.binary.OsmandOdb.RestrictionData;
 import net.osmand.binary.OsmandOdb.RestrictionData.Builder;
 import net.osmand.binary.OsmandOdb.RouteData;
+import net.osmand.binary.RouteDataObject;
 import net.osmand.data.LatLon;
 import net.osmand.data.preparation.BinaryMapIndexWriter.RoutePointToWrite;
 import net.osmand.osm.MapRenderingTypes;
@@ -50,6 +52,7 @@ import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.osm.edit.OsmMapUtils;
 import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Way;
+import net.osmand.osm.util.CheckRoadConnectivity;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
@@ -428,6 +431,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 	private static final String SELECT_STAT = "SELECT types, pointTypes, pointIds, pointCoordinates, name FROM " +TABLE_ROUTE+" WHERE id = ?";
 	private static final String SELECT_BASE_STAT = "SELECT types, pointTypes, pointIds, pointCoordinates, name FROM "+TABLE_BASEROUTE+" WHERE id = ?";
 	private static final String INSERT_STAT = "(id, types, pointTypes, pointIds, pointCoordinates, name) values(?, ?, ?, ?, ?, ?)";
+	private static final String COPY_BASE = "INSERT INTO " + TABLE_BASEROUTE + " SELECT id, types, pointTypes, pointIds, pointCoordinates, name FROM "+TABLE_ROUTE+" WHERE id = ?";
 
 	public void createDatabaseStructure(Connection mapConnection, DBDialect dialect, String rtreeMapIndexNonPackFileName)
 			throws SQLException, IOException {
@@ -549,8 +553,25 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 			TLongObjectHashMap<BinaryFileReference> base = writeBinaryRouteIndexHeader(writer,  
 					baserouteTree, true);
 			writeBinaryRouteIndexBlocks(writer, routeTree, false, route);
+			writer.flush();
+			RandomAccessFile raf = writer.getRaf();
+			long fp = raf.getFilePointer();
 			writeBinaryRouteIndexBlocks(writer, baserouteTree, true, base);
+			// prewrite end of file to read it
+			writer.simulateWriteEndRouteIndex();
+			writer.preclose();
+			writer.flush();
+
+			// use file to recalulate tree
+			raf.seek(0);
+			appendMissingRoads(mapConnection, new BinaryMapIndexReader(raf));
 			
+			// seek to previous position
+			raf.seek(fp);
+			raf.getChannel().truncate(fp);
+
+			// write base route tree again
+			writeBinaryRouteIndexBlocks(writer, baserouteTree, true, base);
 			writer.endWriteRouteIndex();
 			writer.flush();
 		} catch (RTreeException e) {
@@ -558,8 +579,37 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		}
 	}
 	
-
-	
+	private void appendMissingRoads(Connection conn, BinaryMapIndexReader reader) throws IOException, SQLException {
+		TLongObjectHashMap<RouteDataObject> map = new CheckRoadConnectivity().collectDisconnectedRoads(reader);
+		// to add 
+		PreparedStatement ps = conn.prepareStatement(COPY_BASE);
+		for(RouteDataObject rdo : map.valueCollection()) {
+			//addWayToIndex(id, nodes, insertStat, rTree)
+			int minX = Integer.MAX_VALUE;
+			int maxX = 0;
+			int minY = Integer.MAX_VALUE;
+			int maxY = 0;
+			long id = rdo.getId();
+			for(int i = 0; i < rdo.getPointsLength(); i++) {
+				int x = rdo.getPoint31XTile(i);
+				int y = rdo.getPoint31YTile(i);
+				minX = Math.min(minX, x);
+				maxX = Math.max(maxX, x);
+				minY = Math.min(minY, y);
+				maxY = Math.max(maxY, y);
+			}
+			ps.setLong(1, id);
+			ps.execute();
+			try {
+				baserouteTree.insert(new LeafElement(new Rect(minX, minY, maxX, maxY), id));
+			} catch (RTreeInsertException e1) {
+				throw new IllegalArgumentException(e1);
+			} catch (IllegalValueException e1) {
+				throw new IllegalArgumentException(e1);
+			}
+		}
+		ps.close();
+	}
 	
 	private Node convertBaseToNode(long s) {
 		long x = s >> 31;
