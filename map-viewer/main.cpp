@@ -186,9 +186,7 @@ int main(int argc, char** argv)
     obfsCollection.reset(new OsmAnd::ObfsCollection());
     obfsCollection->watchDirectory(obfRoot);
 
-#if defined(OSMAND_OPENGL3_RENDERER_SUPPORTED)
-    renderer = OsmAnd::createAtlasMapRenderer_OpenGL3();
-#endif
+    renderer = OsmAnd::createMapRenderer(OsmAnd::MapRendererClass::AtlasMapRenderer_OpenGL3);
     if(!renderer)
     {
         std::cout << "No supported renderer" << std::endl;
