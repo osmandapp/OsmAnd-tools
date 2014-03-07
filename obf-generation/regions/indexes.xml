@@ -562,6 +562,7 @@
 		
 
 		<regions siteToDownload="http://download.geofabrik.de/africa/{0}.osm.pbf" region_prefix="" region_suffix="_Africa"  skip="false">
+			<region name="botswana" downloadName="botswana-latest"/>
 			<region name="burkina-faso" downloadName="burkina-faso-latest"/>
 			<region name="canary-islands" downloadName="canary-islands-latest"/>
 			<region name="congo-democratic-republic" downloadName="congo-democratic-republic-latest"/>
@@ -596,6 +597,7 @@
 			<region name="mali"/>
 			<region name="mauritania"/>
 			<region name="mauritius"/>
+			<region name="mozambique"/>
 			<region name="namibia"/>
 			<region name="niger"/>
 			<region name="rwanda"/>
