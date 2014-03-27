@@ -184,7 +184,7 @@ int main(int argc, char** argv)
     }
 
     obfsCollection.reset(new OsmAnd::ObfsCollection());
-    obfsCollection->watchDirectory(obfRoot);
+    obfsCollection->registerDirectory(obfRoot);
 
     renderer = OsmAnd::createMapRenderer(OsmAnd::MapRendererClass::AtlasMapRenderer_OpenGL3);
     if(!renderer)
@@ -565,39 +565,16 @@ void keyboardHandler(unsigned char key, int x, int y)
         animator->resumeAnimation();
         break;
     case '0':
-        {
-            auto layerId = (modifiers & GLUT_ACTIVE_ALT) ? OsmAnd::RasterMapLayerId::Overlay0 : OsmAnd::RasterMapLayerId::BaseLayer;
-            activateProvider(layerId, 0);
-        }
-        break;
     case '1':
-        {
-            auto layerId = (modifiers & GLUT_ACTIVE_ALT) ? OsmAnd::RasterMapLayerId::Overlay0 : OsmAnd::RasterMapLayerId::BaseLayer;
-            activateProvider(layerId, 1);
-        }
-        break;
     case '2':
-        {
-            auto layerId = (modifiers & GLUT_ACTIVE_ALT) ? OsmAnd::RasterMapLayerId::Overlay0 : OsmAnd::RasterMapLayerId::BaseLayer;
-            activateProvider(layerId, 2);
-        }
-        break;
     case '3':
-        {
-            auto layerId = (modifiers & GLUT_ACTIVE_ALT) ? OsmAnd::RasterMapLayerId::Overlay0 : OsmAnd::RasterMapLayerId::BaseLayer;
-            activateProvider(layerId, 3);
-        }
-        break;
     case '4':
-        {
-            auto layerId = (modifiers & GLUT_ACTIVE_ALT) ? OsmAnd::RasterMapLayerId::Overlay0 : OsmAnd::RasterMapLayerId::BaseLayer;
-            activateProvider(layerId, 4);
-        }
-        break;
     case '5':
+    case '6':
+    case '7':
         {
             auto layerId = (modifiers & GLUT_ACTIVE_ALT) ? OsmAnd::RasterMapLayerId::Overlay0 : OsmAnd::RasterMapLayerId::BaseLayer;
-            activateProvider(layerId, 5);
+            activateProvider(layerId, key - '0');
         }
         break;
     case ' ':
@@ -615,9 +592,19 @@ void keyboardHandler(unsigned char key, int x, int y)
             const auto delta = target - OsmAnd::PointI64(renderer->state.target31);
 
             animator->cancelAnimation();
-            animator->animateMoveBy(delta, /*1.0f*/10, false, false, OsmAnd::MapAnimatorTimingFunction::EaseInOutQuadratic);
+            animator->animateMoveBy(delta, 1.0f, false, false, OsmAnd::MapAnimatorTimingFunction::EaseInOutQuadratic);
             animator->resumeAnimation();
         }
+        break;
+    case '-':
+        animator->cancelAnimation();
+        animator->animateZoomBy(-1.0f, 1.0f, OsmAnd::MapAnimatorTimingFunction::EaseInOutQuadratic);
+        animator->resumeAnimation();
+        break;
+    case '+':
+        animator->cancelAnimation();
+        animator->animateZoomBy(+1.0f, 1.0f, OsmAnd::MapAnimatorTimingFunction::EaseInOutQuadratic);
+        animator->resumeAnimation();
         break;
     }
 }
@@ -666,33 +653,75 @@ void activateProvider(OsmAnd::RasterMapLayerId layerId, int idx)
     }
     else if(idx == 1)
     {
-        offlineMapDataProvider.reset(new OsmAnd::OfflineMapDataProvider(obfsCollection, style, density));
-
         auto tileProvider = OsmAnd::OnlineMapRasterTileProvider::createCycleMapProvider();
         renderer->setRasterLayerProvider(layerId, tileProvider);
     }
     else if(idx == 2)
     {
-        offlineMapDataProvider.reset(new OsmAnd::OfflineMapDataProvider(obfsCollection, style, density));
-
         auto tileProvider = OsmAnd::OnlineMapRasterTileProvider::createMapnikProvider();
         renderer->setRasterLayerProvider(layerId, tileProvider);
     }
     else if(idx == 3)
     {
+        //test:
+        stylesCollection->obtainStyle(styleName, style);
+
         offlineMapDataProvider.reset(new OsmAnd::OfflineMapDataProvider(obfsCollection, style, density));
+
+        // general
+        QHash< QString, QString > settings;
+        settings.insert("appMode", "browse map");
+        offlineMapDataProvider->rasterizerEnvironment->setSettings(settings);
 
         auto tileProvider = new OsmAnd::OfflineMapRasterTileProvider_Software(offlineMapDataProvider);
         renderer->setRasterLayerProvider(layerId, std::shared_ptr<OsmAnd::IMapBitmapTileProvider>(tileProvider));
     }
     else if(idx == 4)
     {
+        //test:
+        stylesCollection->obtainStyle(styleName, style);
+
         offlineMapDataProvider.reset(new OsmAnd::OfflineMapDataProvider(obfsCollection, style, density));
 
-        auto tileProvider = new OsmAnd::OfflineMapRasterTileProvider_GPU(offlineMapDataProvider);
+        // car
+        QHash< QString, QString > settings;
+        settings.insert("appMode", "car");
+        offlineMapDataProvider->rasterizerEnvironment->setSettings(settings);
+
+        auto tileProvider = new OsmAnd::OfflineMapRasterTileProvider_Software(offlineMapDataProvider);
         renderer->setRasterLayerProvider(layerId, std::shared_ptr<OsmAnd::IMapBitmapTileProvider>(tileProvider));
     }
     else if(idx == 5)
+    {
+        //test:
+        stylesCollection->obtainStyle(styleName, style);
+
+        offlineMapDataProvider.reset(new OsmAnd::OfflineMapDataProvider(obfsCollection, style, density));
+
+        // bicycle
+        QHash< QString, QString > settings;
+        settings.insert("appMode", "bicycle");
+        offlineMapDataProvider->rasterizerEnvironment->setSettings(settings);
+
+        auto tileProvider = new OsmAnd::OfflineMapRasterTileProvider_Software(offlineMapDataProvider);
+        renderer->setRasterLayerProvider(layerId, std::shared_ptr<OsmAnd::IMapBitmapTileProvider>(tileProvider));
+    }
+    else if(idx == 6)
+    {
+        //test:
+        stylesCollection->obtainStyle(styleName, style);
+
+        offlineMapDataProvider.reset(new OsmAnd::OfflineMapDataProvider(obfsCollection, style, density));
+        
+        // pedestrian
+        QHash< QString, QString > settings;
+        settings.insert("appMode", "pedestrian");
+        offlineMapDataProvider->rasterizerEnvironment->setSettings(settings);
+
+        auto tileProvider = new OsmAnd::OfflineMapRasterTileProvider_Software(offlineMapDataProvider);
+        renderer->setRasterLayerProvider(layerId, std::shared_ptr<OsmAnd::IMapBitmapTileProvider>(tileProvider));
+    }
+    else if(idx == 7)
     {
         //        auto hillshadeTileProvider = new OsmAnd::HillshadeTileProvider();
         //        renderer->setTileProvider(layerId, hillshadeTileProvider);
@@ -856,59 +885,69 @@ void displayHandler()
 
         glColor4f(0.5f, 0.5f, 0.5f, 0.6f);
         glBegin(GL_QUADS);
-        glVertex2f(0.0f, 16 * 10);
-        glVertex2f(w, 16 * 10);
+        glVertex2f(0.0f, 16 * 12);
+        glVertex2f(w, 16 * 12);
         glVertex2f(w, 0.0f);
         glVertex2f(0.0f, 0.0f);
         glEnd();
         verifyOpenGL();
 
         glColor3f(0.0f, 1.0f, 0.0f);
-        glRasterPos2f(8, 16 * 9);
+        glRasterPos2f(8, 16 * 11);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("Last clicked tile: (%1, %2)@%3").arg(lastClickedLocation31.x >> (31 - renderer->state.zoomBase)).arg(lastClickedLocation31.y >> (31 - renderer->state.zoomBase)).arg(renderer->state.zoomBase)));
         verifyOpenGL();
 
         glColor3f(0.0f, 1.0f, 0.0f);
-        glRasterPos2f(8, 16 * 8);
+        glRasterPos2f(8, 16 * 10);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("Last clicked location: %1 %2").arg(lastClickedLocation31.x).arg(lastClickedLocation31.y)));
         verifyOpenGL();
 
         glColor3f(0.0f, 1.0f, 0.0f);
-        glRasterPos2f(8, 16 * 7);
+        glRasterPos2f(8, 16 * 9);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("Tile providers (holding alt controls overlay0):")));
         verifyOpenGL();
 
-        glRasterPos2f(8, 16 * 6);
+        glRasterPos2f(8, 16 * 8);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("0 - disable")));
         verifyOpenGL();
 
-        glRasterPos2f(8, 16 * 5);
+        glRasterPos2f(8, 16 * 7);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("1 - Mapnik")));
         verifyOpenGL();
 
-        glRasterPos2f(8, 16 * 4);
+        glRasterPos2f(8, 16 * 6);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("2 - CycleMap")));
         verifyOpenGL();
 
+        glRasterPos2f(8, 16 * 5);
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
+            QString("3 - Offline maps [General]")));
+        verifyOpenGL();
+
+        glRasterPos2f(8, 16 * 4);
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
+            QString("4 - Offline maps [Car]")));
+        verifyOpenGL();
+
         glRasterPos2f(8, 16 * 3);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("3 - Offline maps (Software)")));
+            QString("5 - Offline maps [Bicycle]")));
         verifyOpenGL();
 
         glRasterPos2f(8, 16 * 2);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("4 - Offline maps (GPU)")));
+            QString("6 - Offline maps [Pedestrian]")));
         verifyOpenGL();
 
         glRasterPos2f(8, 16 * 1);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("5 - Hillshade")));
+            QString("7 - Hillshade")));
         verifyOpenGL();
     }
 
