@@ -47,6 +47,7 @@
 #include <OsmAndCore/Map/MapStyleEvaluator.h>
 #include <OsmAndCore/Map/IMapRenderer.h>
 #include <OsmAndCore/Map/OnlineMapRasterTileProvider.h>
+#include <OsmAndCore/Map/OnlineMapRasterTileProvidersDB.h>
 #include <OsmAndCore/Map/HillshadeTileProvider.h>
 #include <OsmAndCore/Map/IMapElevationDataProvider.h>
 #include <OsmAndCore/Map/HeightmapTileProvider.h>
@@ -653,15 +654,10 @@ void activateProvider(OsmAnd::RasterMapLayerId layerId, int idx)
     }
     else if(idx == 1)
     {
-        auto tileProvider = OsmAnd::OnlineMapRasterTileProvider::createCycleMapProvider();
+        auto tileProvider = OsmAnd::OnlineMapRasterTileProvidersDB::createDefaultDB()->createProvider(QLatin1String("mapnik_osmand"));
         renderer->setRasterLayerProvider(layerId, tileProvider);
     }
     else if(idx == 2)
-    {
-        auto tileProvider = OsmAnd::OnlineMapRasterTileProvider::createMapnikProvider();
-        renderer->setRasterLayerProvider(layerId, tileProvider);
-    }
-    else if(idx == 3)
     {
         //test:
         stylesCollection->obtainStyle(styleName, style);
@@ -676,7 +672,7 @@ void activateProvider(OsmAnd::RasterMapLayerId layerId, int idx)
         auto tileProvider = new OsmAnd::OfflineMapRasterTileProvider_Software(offlineMapDataProvider);
         renderer->setRasterLayerProvider(layerId, std::shared_ptr<OsmAnd::IMapBitmapTileProvider>(tileProvider));
     }
-    else if(idx == 4)
+    else if(idx == 3)
     {
         //test:
         stylesCollection->obtainStyle(styleName, style);
@@ -691,7 +687,7 @@ void activateProvider(OsmAnd::RasterMapLayerId layerId, int idx)
         auto tileProvider = new OsmAnd::OfflineMapRasterTileProvider_Software(offlineMapDataProvider);
         renderer->setRasterLayerProvider(layerId, std::shared_ptr<OsmAnd::IMapBitmapTileProvider>(tileProvider));
     }
-    else if(idx == 5)
+    else if(idx == 4)
     {
         //test:
         stylesCollection->obtainStyle(styleName, style);
@@ -706,7 +702,7 @@ void activateProvider(OsmAnd::RasterMapLayerId layerId, int idx)
         auto tileProvider = new OsmAnd::OfflineMapRasterTileProvider_Software(offlineMapDataProvider);
         renderer->setRasterLayerProvider(layerId, std::shared_ptr<OsmAnd::IMapBitmapTileProvider>(tileProvider));
     }
-    else if(idx == 6)
+    else if(idx == 5)
     {
         //test:
         stylesCollection->obtainStyle(styleName, style);
@@ -721,7 +717,7 @@ void activateProvider(OsmAnd::RasterMapLayerId layerId, int idx)
         auto tileProvider = new OsmAnd::OfflineMapRasterTileProvider_Software(offlineMapDataProvider);
         renderer->setRasterLayerProvider(layerId, std::shared_ptr<OsmAnd::IMapBitmapTileProvider>(tileProvider));
     }
-    else if(idx == 7)
+    else if(idx == 6)
     {
         //        auto hillshadeTileProvider = new OsmAnd::HillshadeTileProvider();
         //        renderer->setTileProvider(layerId, hillshadeTileProvider);
@@ -885,44 +881,39 @@ void displayHandler()
 
         glColor4f(0.5f, 0.5f, 0.5f, 0.6f);
         glBegin(GL_QUADS);
-        glVertex2f(0.0f, 16 * 12);
-        glVertex2f(w, 16 * 12);
+        glVertex2f(0.0f, 16 * 11);
+        glVertex2f(w, 16 * 11);
         glVertex2f(w, 0.0f);
         glVertex2f(0.0f, 0.0f);
         glEnd();
         verifyOpenGL();
 
         glColor3f(0.0f, 1.0f, 0.0f);
-        glRasterPos2f(8, 16 * 11);
+        glRasterPos2f(8, 16 * 10);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("Last clicked tile: (%1, %2)@%3").arg(lastClickedLocation31.x >> (31 - renderer->state.zoomBase)).arg(lastClickedLocation31.y >> (31 - renderer->state.zoomBase)).arg(renderer->state.zoomBase)));
         verifyOpenGL();
 
         glColor3f(0.0f, 1.0f, 0.0f);
-        glRasterPos2f(8, 16 * 10);
+        glRasterPos2f(8, 16 * 9);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("Last clicked location: %1 %2").arg(lastClickedLocation31.x).arg(lastClickedLocation31.y)));
         verifyOpenGL();
 
         glColor3f(0.0f, 1.0f, 0.0f);
-        glRasterPos2f(8, 16 * 9);
+        glRasterPos2f(8, 16 * 8);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("Tile providers (holding alt controls overlay0):")));
         verifyOpenGL();
 
-        glRasterPos2f(8, 16 * 8);
+        glRasterPos2f(8, 16 * 7);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("0 - disable")));
         verifyOpenGL();
 
-        glRasterPos2f(8, 16 * 7);
-        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("1 - Mapnik")));
-        verifyOpenGL();
-
         glRasterPos2f(8, 16 * 6);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("2 - CycleMap")));
+            QString("1 - Mapnik (OsmAnd)")));
         verifyOpenGL();
 
         glRasterPos2f(8, 16 * 5);
