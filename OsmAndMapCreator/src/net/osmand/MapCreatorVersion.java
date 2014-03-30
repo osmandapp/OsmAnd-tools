@@ -5,8 +5,8 @@ import java.net.URLEncoder;
 
 public class MapCreatorVersion {
 	
-	public static String APP_VERSION = "1.1.0"; //$NON-NLS-1$
-	public static final String APP_DESCRIPTION = "alpha"; //$NON-NLS-1$
+	public static String APP_VERSION = "1.8"; //$NON-NLS-1$
+	public static final String APP_DESCRIPTION = ""; //$NON-NLS-1$
 
 	public static final String APP_MAP_CREATOR_NAME = "OsmAndMapCreator"; //$NON-NLS-1$
 	public static final String APP_MAP_CREATOR_VERSION = APP_MAP_CREATOR_NAME + " " + APP_VERSION; //$NON-NLS-1$
