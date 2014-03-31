@@ -366,7 +366,7 @@ public class BasemapProcessor {
                         wats[j] = renderingTypes.getTypeByInternalId(w.addTypes[j]).getTargetId();
                     }
                 }
-                MapData mapData = writer.writeMapData(w.id,
+                MapData mapData = writer.writeMapData(w.id - baseId,
                         quad.x << (31 - quad.zoom), quad.y << (31 - quad.zoom), false,
                         w.coordinates, w.innerCoordinates, wts, wats, w.names, stringTable, dataBlock, level.getMaxZoom() > 15);
                 if (mapData != null) {
