@@ -9,3 +9,6 @@ add_subdirectory("${OSMAND_ROOT}/tools/map-rasterizer" "tools/map-rasterizer")
 
 # 3D Map renderer (development)
 add_subdirectory("${OSMAND_ROOT}/tools/map-viewer" "tools/map-viewer")
+
+# OBF verifier tool
+add_subdirectory("${OSMAND_ROOT}/tools/obf-verifier" "tools/obf-verifier")

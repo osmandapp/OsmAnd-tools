@@ -12,7 +12,7 @@
 #include <QStringList>
 #include <QFile>
 
-#include <OsmAndCoreUtils/Inspector.h>
+#include <OsmAndCoreUtils/Verifier.h>
 
 void printUsage(const std::string& warning = std::string());
 
@@ -25,19 +25,19 @@ int main(int argc, char* argv[])
     std::locale::global(std::locale(""));
 #   endif
 #endif
-    OsmAnd::Inspector::Configuration cfg;
+    OsmAnd::Verifier::Configuration cfg;
 
     QString error;
     QStringList args;
     for (int idx = 1; idx < argc; idx++)
         args.push_back(argv[idx]);
 
-    if(!OsmAnd::Inspector::parseCommandLineArguments(args, cfg, error))
+    if(!OsmAnd::Verifier::parseCommandLineArguments(args, cfg, error))
     {
         printUsage(error.toStdString());
         return -1;
     }
-    OsmAnd::Inspector::dumpToStdOut(cfg);
+    OsmAnd::Verifier::dumpToStdOut(cfg);
     return 0;
 }
 
@@ -45,20 +45,14 @@ void printUsage(const std::string& warning)
 {
     if(!warning.empty())
         std::cout << warning << std::endl;
-    std::cout << "Inspector is console utility for working with binary indexes of OsmAnd." << std::endl;
+    std::cout << "Verifier is console utility for working with OsmAnd OBF files." << std::endl;
     std::cout << std::endl
         << "Usage: inspector "
+        << "-obfsDir=path "
+        << "[-obfsDir=path] "
         << "-obf=path "
-        << "[-vaddress] "
-        << "[-vstreetgroups] "
-        << "[-vstreets] "
-        << "[-vbuildings] "
-        << "[-vintersections] "
-        << "[-vmap] "
-        << "[-vmapObjects] "
-        << "[-vpoi] "
-        << "[-vtransport] "
-        << "[-zoom=Zoom] "
-        << "[-bbox=LeftLon,TopLat,RightLon,BottomLan]" << std::endl;
+        << "[-obf=path] "
+        << "-uniqueMapObjectIds"
+        << std::endl;
 }
 

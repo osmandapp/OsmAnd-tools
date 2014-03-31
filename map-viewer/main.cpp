@@ -1,25 +1,3 @@
-/**
-  * @file
-  *
-  * @section LICENSE
-  *
-  * OsmAnd - Android navigation software based on OSM maps.
-  * Copyright (C) 2010-2014  OsmAnd Authors listed in AUTHORS file
-  *
-  * This program is free software: you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License as published by
-  * the Free Software Foundation, either version 3 of the License, or
-  * (at your option) any later version.
-  *
-  * This program is distributed in the hope that it will be useful,
-  * but WITHOUT ANY WARRANTY; without even the implied warranty of
-  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  * GNU General Public License for more details.
-
-  * You should have received a copy of the GNU General Public License
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
-
 #include <stdlib.h>
 #include <memory>
 #include <chrono>
@@ -74,6 +52,8 @@ QDir heightsDir;
 bool wasHeightsDirSpecified = false;
 QFileInfoList styleFiles;
 QString styleName = "default";
+
+#define USE_GREEN_TEXT_COLOR 1
 
 #if defined(WIN32)
 const bool useGpuWorker = true;
@@ -572,7 +552,6 @@ void keyboardHandler(unsigned char key, int x, int y)
     case '4':
     case '5':
     case '6':
-    case '7':
         {
             auto layerId = (modifiers & GLUT_ACTIVE_ALT) ? OsmAnd::RasterMapLayerId::Overlay0 : OsmAnd::RasterMapLayerId::BaseLayer;
             activateProvider(layerId, key - '0');
@@ -606,6 +585,8 @@ void keyboardHandler(unsigned char key, int x, int y)
         animator->cancelAnimation();
         animator->animateZoomBy(+1.0f, 1.0f, OsmAnd::MapAnimatorTimingFunction::EaseInOutQuadratic);
         animator->resumeAnimation();
+        break;
+    case '*':
         break;
     }
 }
@@ -783,7 +764,11 @@ void displayHandler()
         glEnd();
         verifyOpenGL();
 
+#if USE_GREEN_TEXT_COLOR
         glColor3f(0.0f, 1.0f, 0.0f);
+#else
+        glColor3f(0.2f, 0.2f, 0.2f);
+#endif
         glRasterPos2f(8, t - 16 * 1);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("fov (keys i,k)         : %1").arg(renderer->state.fieldOfView)));
@@ -888,19 +873,21 @@ void displayHandler()
         glEnd();
         verifyOpenGL();
 
+#if USE_GREEN_TEXT_COLOR
         glColor3f(0.0f, 1.0f, 0.0f);
+#else
+        glColor3f(0.2f, 0.2f, 0.2f);
+#endif
         glRasterPos2f(8, 16 * 10);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("Last clicked tile: (%1, %2)@%3").arg(lastClickedLocation31.x >> (31 - renderer->state.zoomBase)).arg(lastClickedLocation31.y >> (31 - renderer->state.zoomBase)).arg(renderer->state.zoomBase)));
         verifyOpenGL();
 
-        glColor3f(0.0f, 1.0f, 0.0f);
         glRasterPos2f(8, 16 * 9);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("Last clicked location: %1 %2").arg(lastClickedLocation31.x).arg(lastClickedLocation31.y)));
         verifyOpenGL();
 
-        glColor3f(0.0f, 1.0f, 0.0f);
         glRasterPos2f(8, 16 * 8);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("Tile providers (holding alt controls overlay0):")));
@@ -918,27 +905,27 @@ void displayHandler()
 
         glRasterPos2f(8, 16 * 5);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("3 - Offline maps [General]")));
+            QString("2 - Offline maps [General]")));
         verifyOpenGL();
 
         glRasterPos2f(8, 16 * 4);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("4 - Offline maps [Car]")));
+            QString("3 - Offline maps [Car]")));
         verifyOpenGL();
 
         glRasterPos2f(8, 16 * 3);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("5 - Offline maps [Bicycle]")));
+            QString("4 - Offline maps [Bicycle]")));
         verifyOpenGL();
 
         glRasterPos2f(8, 16 * 2);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("6 - Offline maps [Pedestrian]")));
+            QString("5 - Offline maps [Pedestrian]")));
         verifyOpenGL();
 
         glRasterPos2f(8, 16 * 1);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("7 - Hillshade")));
+            QString("6 - Hillshade")));
         verifyOpenGL();
     }
 
