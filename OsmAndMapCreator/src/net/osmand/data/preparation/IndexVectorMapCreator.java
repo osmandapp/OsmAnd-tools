@@ -131,7 +131,12 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 				! "multipolygon".equals(e.getTag(OSMTagKey.TYPE)) || 
 				e.getTag(OSMTagKey.ADMIN_LEVEL) != null ) return;
 		MultipolygonBuilder original = createMultipolygonBuilder(e, ctx);
-		renderingTypes.encodeEntityWithType(e, mapZooms.getLevel(0).getMaxZoom(), typeUse, addtypeUse, namesUse, tempNameUse);
+		try {
+			renderingTypes.encodeEntityWithType(e, mapZooms.getLevel(0).getMaxZoom(), typeUse, addtypeUse, namesUse, tempNameUse);
+		} catch (RuntimeException es) {
+			es.printStackTrace();
+			return;
+		}
 
 		//Don't add multipolygons with an unknown type
 		if (typeUse.size() == 0) return;
