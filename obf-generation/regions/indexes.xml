@@ -580,7 +580,7 @@
 			<region name="sierra-leone" downloadName="sierra-leone-latest"/>
 			<region name="somalia" downloadName="somalia-latest"/>
 			<region name="south-africa-and-lesotho" downloadName="south-africa-and-lesotho-latest"/>
-			<region name="tanzania-faso" downloadName="tanzania-latest"/>
+			<region name="tanzania" downloadName="tanzania-latest"/>
 		</regions>
 
 		<!-- 8.2 AFRICA [SOURCE: OSMAND:NET] -->
