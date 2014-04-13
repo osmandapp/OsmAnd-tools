@@ -89,15 +89,14 @@
 		</regions>
 
 
-		<!-- TODO delete shires? -->
+		
 		<!-- 1.2.1 GREAT BRITAIN - ENGLAND [SOURCE: GEOFABRIK.DE] -->
+		<!-- Disable shires
 		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" skip="false" region_suffix="_Europe">	
 		 	<region  name="gb_england_bedfordshire"/>
 		 	<region  name="gb_england_berkshire"/>
 		 	<region  name="gb_england_hertfordshire"/>
 		</regions>
-
-
 		<regions siteToDownload="http://download.geofabrik.de/europe/great-britain/england/{0}.osm.pbf" region_prefix="GB_England_" skip="false" region_suffix="_Europe">
 			<region name="buckinghamshire" downloadName="buckinghamshire-latest"/>
 			<region name="cambridgeshire" downloadName="cambridgeshire-latest"/>
@@ -130,7 +129,7 @@
 			<region name="west-sussex" downloadName="west-sussex-latest"/>
 			<region name="wiltshire" downloadName="wiltshire-latest"/>
 		</regions>
-
+ 		-->
 		<!-- 1.3 FRANCE [SOURCE: GEOFABRIK.DE] -->
 		<regions siteToDownload="http://download.geofabrik.de/europe/france/{0}.osm.pbf" region_prefix="France_" skip="false" region_suffix="_Europe">
 			<region name="alsace" downloadName="alsace-latest"/>
