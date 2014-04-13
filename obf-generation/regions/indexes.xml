@@ -88,6 +88,10 @@
 		 	<region  name="channel-islands"/>
 		</regions>
 
+		<regions siteToDownload="http://download.geofabrik.de/europe/great-britain/england/{0}.osm.pbf" region_prefix="GB_England_" skip="false" region_suffix="_Europe">
+			<region name="greater-london" downloadName="greater-london-latest"/>
+		</regions>
+
 
 		
 		<!-- 1.2.1 GREAT BRITAIN - ENGLAND [SOURCE: GEOFABRIK.DE] -->
