@@ -36,7 +36,6 @@ import net.osmand.data.preparation.DBDialect;
 import net.osmand.data.preparation.IndexCreator;
 import net.osmand.data.preparation.MapZooms;
 import net.osmand.impl.ConsoleProgressImplementation;
-import net.osmand.osm.MapRenderingTypes;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.swing.OsmExtractionUI;
 import net.osmand.util.Algorithms;
@@ -70,6 +69,11 @@ public class IndexBatchCreator {
 	private static class RegionSpecificData {
 		public String cityAdminLevel;
 		public String downloadName;
+		public boolean indexPOI = true;
+		public boolean indexTransport = true;
+		public boolean indexAddress = true;
+		public boolean indexMap = true;
+		public boolean indexRouting = true;
 	}
 	
 	
@@ -119,7 +123,7 @@ public class IndexBatchCreator {
 					File regionsFile = new File(args[1]);
 					regionsStream = new FileInputStream(regionsFile);
 				} catch (FileNotFoundException e) {
-					throw new IllegalArgumentException("Please specify xml-file with regions to download", e); //$NON-NLS-1$
+					throw new IllegalArgumentException("Please specify xml-file with regions to download", e); 
 				}
 			}
 		}
@@ -217,6 +221,14 @@ public class IndexBatchCreator {
 					String name = ncountry.getAttribute("name");
 					RegionSpecificData data = new RegionSpecificData();
 					data.cityAdminLevel = ncountry.getAttribute("cityAdminLevel");
+					String index = ncountry.getAttribute("index");
+					if(index != null && index.length() > 0) {
+						data.indexAddress = index.contains("address");
+						data.indexMap = index.contains("map");
+						data.indexTransport = index.contains("transport");
+						data.indexRouting = index.contains("routing");
+						data.indexPOI = index.contains("poi");
+					}
 					String dname = ncountry.getAttribute("downloadName");
 					data.downloadName = dname == null || dname.length() == 0 ? name : dname;
 					if(name != null && !Boolean.parseBoolean(ncountry.getAttribute("skip"))){
@@ -432,7 +444,7 @@ public class IndexBatchCreator {
 	
 	
 	
-	protected void generateIndex(File f, String rName, RegionSpecificData regionSpecificData, Set<String> alreadyGeneratedFiles) {
+	protected void generateIndex(File f, String rName, RegionSpecificData rdata, Set<String> alreadyGeneratedFiles) {
 		try {
 			// be independent of previous results
 			RTree.clearCache();
@@ -456,16 +468,16 @@ public class IndexBatchCreator {
 			}
 			IndexCreator indexCreator = new IndexCreator(workDir);
 			indexCreator.setDialects(osmDb, osmDb);
-			indexCreator.setIndexAddress(indexAddress);
-			indexCreator.setIndexPOI(indexPOI);
-			indexCreator.setIndexTransport(indexTransport);
-			indexCreator.setIndexMap(indexMap);
-			indexCreator.setIndexRouting(indexRouting);
+			indexCreator.setIndexAddress(indexAddress && (rdata == null || rdata.indexAddress));
+			indexCreator.setIndexPOI(indexPOI && (rdata == null || rdata.indexPOI));
+			indexCreator.setIndexTransport(indexTransport && (rdata == null || rdata.indexTransport));
+			indexCreator.setIndexMap(indexMap && (rdata == null || rdata.indexMap));
+			indexCreator.setIndexRouting(indexRouting && (rdata == null || rdata.indexRouting));
 			indexCreator.setLastModifiedDate(f.lastModified());
 			indexCreator.setNormalizeStreets(true);
 			indexCreator.setRegionName(rName);
-			if (regionSpecificData != null && regionSpecificData.cityAdminLevel != null) {
-				indexCreator.setCityAdminLevel(regionSpecificData.cityAdminLevel);
+			if (rdata != null && rdata.cityAdminLevel != null) {
+				indexCreator.setCityAdminLevel(rdata.cityAdminLevel);
 			}
 			if(zoomWaySmoothness != null){
 				indexCreator.setZoomWaySmothness(zoomWaySmoothness);

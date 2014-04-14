@@ -618,7 +618,7 @@
 		</regions>
 		<!-- 9 SPECIAL MAPS -->
 		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.osm.bz2" region_prefix="" skip="false" region_suffix="">	
-		 	<region name="World_seamarks"/>
-		 	<region name="World_bitcoin_payments"/>
+		 	<region name="World_seamarks" index="map,poi"/>
+		 	<region name="World_bitcoin_payments" index="map,poi"/>
 		</regions>
 </regions_list> 
