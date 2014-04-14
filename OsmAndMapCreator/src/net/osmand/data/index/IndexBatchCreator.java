@@ -468,11 +468,20 @@ public class IndexBatchCreator {
 			}
 			IndexCreator indexCreator = new IndexCreator(workDir);
 			indexCreator.setDialects(osmDb, osmDb);
-			indexCreator.setIndexAddress(indexAddress && (rdata == null || rdata.indexAddress));
-			indexCreator.setIndexPOI(indexPOI && (rdata == null || rdata.indexPOI));
-			indexCreator.setIndexTransport(indexTransport && (rdata == null || rdata.indexTransport));
-			indexCreator.setIndexMap(indexMap && (rdata == null || rdata.indexMap));
-			indexCreator.setIndexRouting(indexRouting && (rdata == null || rdata.indexRouting));
+			final boolean indAddr = indexAddress && (rdata == null || rdata.indexAddress);
+			final boolean indPoi = indexPOI && (rdata == null || rdata.indexPOI);
+			final boolean indTransport = indexTransport && (rdata == null || rdata.indexTransport);
+			final boolean indMap = indexMap && (rdata == null || rdata.indexMap);
+			final boolean indRouting = indexRouting && (rdata == null || rdata.indexRouting);
+			if(!indAddr && !indPoi && !indTransport && !indMap && !indRouting) {
+				log.warn("! Skip country because nothing to index !");
+				return;
+			}
+			indexCreator.setIndexAddress(indAddr);
+			indexCreator.setIndexPOI(indPoi);
+			indexCreator.setIndexTransport(indTransport);
+			indexCreator.setIndexMap(indMap);
+			indexCreator.setIndexRouting(indRouting);
 			indexCreator.setLastModifiedDate(f.lastModified());
 			indexCreator.setNormalizeStreets(true);
 			indexCreator.setRegionName(rName);
