@@ -3,6 +3,7 @@ package net.osmand.data.index;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
@@ -24,7 +25,6 @@ import java.util.zip.ZipOutputStream;
 import net.osmand.IndexConstants;
 import net.osmand.PlatformUtil;
 import net.osmand.binary.BinaryMapIndexReader;
-import net.osmand.data.preparation.IndexCreator;
 import net.osmand.util.Algorithms;
 
 import org.apache.commons.logging.Log;
@@ -350,16 +350,14 @@ public class IndexUploader {
 			ZipOutputStream zout = new ZipOutputStream(new FileOutputStream(zFile));
 			zout.setLevel(9);
 			for (File f : fs) {
-				log.info("Zipping to file: " + zFile.getName() + " file:" + f.getName() + " with desc:" + description);
-
-				ZipEntry zEntry = new ZipEntry(f.getName());
-				zEntry.setSize(f.length());
-				zEntry.setComment(description);
-				zEntry.setTime(lastModifiedTime);
-				zout.putNextEntry(zEntry);
-				FileInputStream is = new FileInputStream(f);
-				Algorithms.streamCopy(is, zout);
-				Algorithms.closeStream(is);
+				log.info("Zipping to file:" + zFile.getName() + " with desc:" + description);
+				if(f.isDirectory()) {
+					for (File lf : f.listFiles()) {
+						putZipEntry(description, "", lastModifiedTime, zout, lf);
+					}
+				} else {
+					putZipEntry(description,"",lastModifiedTime, zout, f);
+				}
 			}
 			Algorithms.closeStream(zout);
 			zFile.setLastModified(lastModifiedTime);
@@ -367,6 +365,25 @@ public class IndexUploader {
 			throw new OneFileException("cannot zip file:" + e.getMessage());
 		}
 		return zFile;
+	}
+
+	private static void putZipEntry( String description, String parentEntry, long lastModifiedTime, ZipOutputStream zout, File f)
+			throws IOException, FileNotFoundException {
+		if(f.isDirectory()) {
+			for (File lf : f.listFiles()) {
+				putZipEntry(description, parentEntry + f.getName() + "/", lastModifiedTime, zout, lf);
+			}
+		} else {
+			log.info("Zipping file:" + f.getName() + " with desc:" + description);
+			ZipEntry zEntry = new ZipEntry(parentEntry + f.getName());
+			zEntry.setSize(f.length());
+			zEntry.setComment(description);
+			zEntry.setTime(lastModifiedTime);
+			zout.putNextEntry(zEntry);
+			FileInputStream is = new FileInputStream(f);
+			Algorithms.streamCopy(is, zout);
+			Algorithms.closeStream(is);
+		}
 	}
 
 	private String checkfileAndGetDescription(File f) throws OneFileException {
