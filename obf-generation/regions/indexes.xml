@@ -493,7 +493,7 @@
 			<region name="vietnam" downloadName="vietnam-latest"/>
 		</regions>
 
-		<!--  5.2 ASIA [SOURCE: OSMAND:NET] -->
+		<!--  6.2 ASIA [SOURCE: OSMAND:NET] -->
 		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix=""  skip="false" region_suffix="_Asia">
 			<region name="israel"/>
 			<region name="palestine"/>
