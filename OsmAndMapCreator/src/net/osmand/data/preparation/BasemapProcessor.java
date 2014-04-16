@@ -659,14 +659,17 @@ public class BasemapProcessor {
 
 
     public static void main(String[] p) throws InterruptedException, SAXException, SQLException, IOException, XMLStreamException {
-    	boolean mini = true;
         if (p.length == 0) {
 	        System.out.println("Please specify folder with basemap *.osm or *.osm.bz2 files");
         } else {
+            boolean mini = false;
             long time = System.currentTimeMillis();
             MapRenderingTypesEncoder rt = MapRenderingTypesEncoder.getDefault();
             // BASEMAP generation
             File folder = new File(p[0]);
+            if (p.length >= 2 && p[1].equals("mini")) {
+            	mini = true;
+            }
 //            MapZooms zooms = MapZooms.parseZooms("1-2;3;4-5;6-7;8-9;10-");
             int zoomSmoothness = mini ? 2 : 2;
 	        MapZooms zooms = mini ? MapZooms.parseZooms("1-2;3;4-5;6-") : MapZooms.parseZooms("1-2;3;4-5;6-7;8;9-");
