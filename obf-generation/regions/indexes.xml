@@ -33,6 +33,7 @@
 			<region  name="greece" downloadName="greece-latest"/>
 			<region  name="hungary" downloadName="hungary-latest"/>
 			<region  name="iceland" downloadName="iceland-latest"/>
+			<!-- ireland-and-northern-ireland to be removed in due time -->
 			<region  name="ireland-and-northern-ireland" downloadName="ireland-and-northern-ireland-latest"/>
 			<region  name="isle-of-man" downloadName="isle-of-man-latest"/>
 			<region  name="italy" downloadName="italy-latest"/>
@@ -64,6 +65,8 @@
 		 	<region  name="portugal"/>
 		 	<region  name="switzerland"/>
 		 	<region  name="germany_baden-wuerttemberg"/>
+		 	<region  name="ireland"/>
+		 	<region  name="nothern ireland"/>
 		</regions>
 
 		<!-- 1.2 GREAT BRITAIN [SOURCE: GEOFABRIK.DE] -->
@@ -472,6 +475,7 @@
 			<region name="indonesia" downloadName="indonesia-latest"/>
 			<region name="iran" downloadName="iran-latest"/>
 			<region name="iraq" downloadName="iraq-latest"/>
+			<!-- israel-and-palestine to be removed in due time -->
 			<region name="israel-and-palestine" downloadName="israel-and-palestine-latest"/>
 		    <region name="japan" downloadName="japan-latest"/>
 		    <region name="jordan" downloadName="jordan-latest"/>
@@ -489,6 +493,12 @@
 			<region name="vietnam" downloadName="vietnam-latest"/>
 		</regions>
 
+		<!--  5.2 ASIA [SOURCE: OSMAND:NET] -->
+		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix=""  skip="false" region_suffix="_Asia">
+			<region name="israel"/>
+			<region name="palestine"/>
+		</regions>
+		
 		<!-- 6.3 EASTERN ASIA [SOURCE: OSMAND:NET] -->
 		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" region_suffix="_Asia" skip="false">
 			<region name="hong-kong"/>
