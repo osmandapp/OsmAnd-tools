@@ -773,7 +773,7 @@ public class IndexCreator {
 	public static void main(String[] args) throws IOException, SAXException, SQLException, InterruptedException {
 		long time = System.currentTimeMillis();
 		
-		//if(true){ generateRegionsFile(); return;}
+//		if(true){ generateRegionsFile(); return;}
 		
 		
 		IndexCreator creator = new IndexCreator(new File("/home/victor/projects/osmand/osm-gen/")); //$NON-NLS-1$

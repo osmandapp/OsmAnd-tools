@@ -11,14 +11,10 @@ import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.text.MessageFormat;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Date;
 import java.util.Enumeration;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipException;
@@ -28,7 +24,6 @@ import java.util.zip.ZipOutputStream;
 import net.osmand.IndexConstants;
 import net.osmand.PlatformUtil;
 import net.osmand.binary.BinaryMapIndexReader;
-import net.osmand.data.index.ExtractGooglecodeAuthorization.GooglecodeUploadTokens;
 import net.osmand.util.Algorithms;
 
 import org.apache.commons.logging.Log;
@@ -67,8 +62,6 @@ public class IndexUploader {
 
 	protected static final Log log = PlatformUtil.getLog(IndexUploader.class);
 	private final static double MIN_SIZE_TO_UPLOAD = 0.001d;
-	private final static double MAX_SIZE_TO_NOT_SPLIT = 190.0d;
-	private final static double MAX_UPLOAD_SIZE = 195.0d;
 
 	private final static int BUFFER_SIZE = 1 << 15;
 	private final static int MB = 1 << 20;
@@ -100,6 +93,10 @@ public class IndexUploader {
 		public OneFileException(String message) {
 			super(message);
 		}
+		
+		public OneFileException(String message, Exception e) {
+			super(message, e);
+		}
 
 	}
 
@@ -110,6 +107,7 @@ public class IndexUploader {
 	private FileFilter deleteFileFilter = null;
 	private boolean roadProcess;
 	private boolean srtmProcess;
+	private boolean tourProcess;
 
 	public IndexUploader(String path, String targetPath) throws IndexUploadException {
 		directory = new File(path);
@@ -183,6 +181,9 @@ public class IndexUploader {
 			} else if (args[start].startsWith("--srtm")) {
 				srtmProcess = true;
 				start++;
+			} else if (args[start].startsWith("--tour")) {
+				tourProcess = true;
+				start++;
 			}
 		} while(p != start);
 		if(fileFilter != null) {
@@ -196,8 +197,6 @@ public class IndexUploader {
 			uploadCredentials = new UploadSSHCredentials();
 		} else if ("-ftp".equals(args[start])) {
 			uploadCredentials = new UploadFTPCredentials();
-		} else if ("-google".equals(args[start])){
-			uploadCredentials = new UploadToGoogleCodeCredentials();
 		} else {
 			return;
 		}
@@ -335,23 +334,8 @@ public class IndexUploader {
 					log.error(f.getName() + ": " + e.getMessage(), e);
 				}
 			}
-			if(deleteFileFilter != null) {
-				if(uploadCredentials instanceof UploadToGoogleCodeCredentials) {
-					log.info("About to delete files from googlecode");
-					Map<String, String> files = DownloaderIndexFromGoogleCode.getIndexFiles(new LinkedHashMap<String, String>());
-					for (String f : files.keySet()) {
-						if (deleteFileFilter.patternMatches(f)) {							
-							log.info("About to delete " + f);
-							try {
-								DownloaderIndexFromGoogleCode.deleteFileFromGoogleDownloads(f, ((UploadToGoogleCodeCredentials)uploadCredentials).ggtokens);
-							} catch (IOException e) {
-								throw new IndexUploadException("Delete " + f + " was failed", e);
-							}
-						}
-					}
-				} else {
-					log.error("Delete file filter is not supported with this credentions (method) " + uploadCredentials);
-				}
+			if (deleteFileFilter != null) {
+				log.error("Delete file filter is not supported with this credentions (method) " + uploadCredentials);
 			}
 			
 		} finally {
@@ -388,6 +372,27 @@ public class IndexUploader {
 		boolean srtmFile = f.getName().contains(".srtm");
 		if(srtmFile != this.srtmProcess) {
 			return null;
+		}
+		if (fileName.endsWith(IndexConstants.TOUR_INDEX_EXT) || fileName.endsWith(IndexConstants.TOUR_INDEX_EXT_ZIP)) {
+			if(!this.tourProcess) {
+				return null;
+			}
+			File fl = new File(fileName, "description.txt");
+			if(!fl.exists()) {
+				return null;
+			}
+			try {
+				BufferedReader reader = new BufferedReader(new FileReader(fl));
+				StringBuilder summary = new StringBuilder();
+				String s;
+				while((s = reader.readLine()) != null) {
+					summary.append(s).append("\n");
+				}
+				reader.close();
+				return summary.toString().trim();
+			} catch (IOException e) {
+				throw new OneFileException("Not supported file format " + fileName ,e );
+			} 
 		}
 		if (fileName.endsWith(IndexConstants.BINARY_MAP_INDEX_EXT) || fileName.endsWith(IndexConstants.BINARY_MAP_INDEX_EXT_ZIP)) {
 			RandomAccessFile raf = null;
@@ -493,38 +498,6 @@ public class IndexUploader {
 		}
 	}
 
-
-	private List<File> splitFiles(File f) throws IOException {
-		double mbLengh = (double) f.length() / MB;
-		if (mbLengh < MAX_SIZE_TO_NOT_SPLIT) {
-			return Collections.singletonList(f);
-		} else {
-			ArrayList<File> arrayList = new ArrayList<File>();
-			FileInputStream in = new FileInputStream(f);
-			byte[] buffer = new byte[BUFFER_SIZE];
-
-			int i = 1;
-			int read = 0;
-			while (read != -1) {
-				File fout = new File(f.getParent(), f.getName() + "-" + i);
-				arrayList.add(fout);
-				FileOutputStream fo = new FileOutputStream(fout);
-				int limit = (int) (MAX_SIZE_TO_NOT_SPLIT * MB);
-				while (limit > 0 && ((read = in.read(buffer)) != -1)) {
-					fo.write(buffer, 0, read);
-					limit -= read;
-				}
-				fo.flush();
-				fo.close();
-				i++;
-			}
-
-			in.close();
-
-			return arrayList;
-		}
-
-	}
 
 	private void uploadIndex(File srcFile, File zipFile, String summary, UploadCredentials uc) {
 		double mbLengh = (double) zipFile.length() / MB;
@@ -645,125 +618,8 @@ public class IndexUploader {
 		}
 	}
 	
-	public static class UploadToGoogleCodeCredentials extends UploadCredentials {
-		GooglecodeUploadTokens ggtokens;
-		String gpassword;
-		private Map<String, String> uploaded = new HashMap<String, String>();
-		
-		@Override
-		protected void parseParameter(String param) throws IndexUploadException {
-			super.parseParameter(param);
-
-			if (param.startsWith("--gpassword=")) {
-				gpassword = param.substring("--gpassword=".length());
-			}
-			if (gpassword != null && user != null && ggtokens == null) {
-				ExtractGooglecodeAuthorization tool = new ExtractGooglecodeAuthorization();
-				try {
-					ggtokens = tool.getGooglecodeTokensForUpload(user, gpassword);
-				} catch (IOException e) {
-					throw new IndexUploadException(e.getMessage());
-				}
-			}
-		}
-		
-		@Override
-		public void connect() throws IndexUploadException {
-			if (ggtokens == null || user == null || password == null) {
-				throw new IndexUploadException("Not enought googlecode credentials entered!");
-			}
-			Map<String, String> uploadedDes = DownloaderIndexFromGoogleCode.getIndexFiles(new HashMap<String, String>());
-			for(String fileName : uploadedDes.keySet()) {
-				String description = uploadedDes.get(fileName);
-				int o = description.indexOf('{');
-				if(o != -1 && description.length() > o + 11) {
-					uploaded.put(fileName, description.substring(o+1, o+11));
-				}
-			}
-		}
-		
-		@Override
-		public boolean checkIfUploadNeededByTimestamp(String filename, long time) {
-			String date = new MessageFormat("{0,date,dd.MM.yyyy}", Locale.US).format(new Object[]{new Date(time)});
-			if (uploaded.containsKey(filename) && date.equals(uploaded.get(filename))) {
-				return false;
-			}
-			filename += "-1";
-			if (uploaded.containsKey(filename) && date.equals(uploaded.get(filename))) {
-				return false; 
-			}
-			return true;
-		}
-		
-		@Override
-		public void upload(IndexUploader uploader, File toUpload,
-				String summary, String size, String date) throws IOException,
-				JSchException {
-			if (uploaded.containsKey(toUpload.getName()) && date.equals(uploaded.get(toUpload.getName()))) {
-				return;
-			}
-			String descriptionFile = "{" + date + " : " + size + " MB}";
-			summary += " " + descriptionFile;
-
-			List<File> splittedFiles = Collections.emptyList();
-			try {
-				splittedFiles = uploader.splitFiles(toUpload);
-				for (File fs : splittedFiles) {
-					if (uploaded.containsKey(fs.getName()) && date.equals(uploaded.get(fs.getName()))) {
-						return;
-					}
-					uploader.uploadToGoogleCode(fs, summary, this);
-				}
-			} finally {
-				// remove all splitted files
-				for (File fs : splittedFiles) {
-					if (!fs.equals(toUpload)) {
-						fs.delete();
-					}
-				}
-			}
-		}
-	}
 	
-
-	public void uploadToGoogleCode(File f, String summary, UploadToGoogleCodeCredentials gc) throws IOException {
-		if (f.length() / MB > MAX_UPLOAD_SIZE) {
-			System.err.println("ERROR : file " + f.getName() + " exceeded 200 mb!!! Could not be uploaded.");
-			throw new IOException("ERROR : file " + f.getName() + " exceeded 200 mb!!! Could not be uploaded.");
-			// restriction for google code
-		}
-		try {
-			DownloaderIndexFromGoogleCode.deleteFileFromGoogleDownloads(f.getName(), gc.ggtokens);
-			if (f.getName().endsWith("obf.zip") && f.length() / MB < 5) {
-				// try to delete without .zip part
-				DownloaderIndexFromGoogleCode.deleteFileFromGoogleDownloads(f.getName().substring(0, f.getName().length() - 4), gc.ggtokens);
-			} else if (f.getName().endsWith("poi.zip") && f.length() / MB < 5) {
-				// try to delete without .zip part
-				DownloaderIndexFromGoogleCode.deleteFileFromGoogleDownloads(f.getName().substring(0, f.getName().length() - 3) + "odb", gc.ggtokens);
-			} else if (f.getName().endsWith(".zip-1")) {
-				DownloaderIndexFromGoogleCode.deleteFileFromGoogleDownloads(f.getName().substring(0, f.getName().length() - 2), gc.ggtokens);
-			}
-			try {
-				Thread.sleep(4000);
-			} catch (InterruptedException e) {
-				// wait 5 seconds
-			}
-		} catch (IOException e) {
-			log.warn("Deleting file from downloads" + f.getName() + " " + e.getMessage());
-		}
-
-		GoogleCodeUploadIndex uploader = new GoogleCodeUploadIndex();
-		uploader.setFileName(f.getAbsolutePath());
-		uploader.setTargetFileName(f.getName());
-		uploader.setProjectName("osmand");
-		uploader.setUserName(gc.user);
-		uploader.setPassword(gc.password);
-		uploader.setLabels("Type-Archive, Testdata");
-		uploader.setSummary(summary);
-		uploader.setDescription(summary);
-		uploader.upload();
-	}
-
+	
 	public boolean uploadFileToServer(File toUpload, String summary, UploadCredentials credentials) throws IOException {
 		double originalLength = (double) toUpload.length() / MB;
 		MessageFormat dateFormat = new MessageFormat("{0,date,dd.MM.yyyy}", Locale.US);
