@@ -381,6 +381,7 @@ public class IndexUploader {
 			}
 			File fl = new File(fileName, "description.txt");
 			if(!fl.exists()) {
+				System.err.println("Description doesn't exist " + fl.getAbsolutePath());
 				return null;
 			}
 			try {
