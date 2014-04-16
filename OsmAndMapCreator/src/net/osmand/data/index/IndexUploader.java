@@ -24,6 +24,7 @@ import java.util.zip.ZipOutputStream;
 import net.osmand.IndexConstants;
 import net.osmand.PlatformUtil;
 import net.osmand.binary.BinaryMapIndexReader;
+import net.osmand.data.preparation.IndexCreator;
 import net.osmand.util.Algorithms;
 
 import org.apache.commons.logging.Log;
@@ -272,7 +273,8 @@ public class IndexUploader {
 		}
 		
 		protected boolean fileCanBeUploaded(File f) {
-			if (!f.isFile() || f.getName().endsWith(IndexBatchCreator.GEN_LOG_EXT)) {
+			if ((!f.isFile() && !f.getName().contains(IndexConstants.TOUR_INDEX_EXT))
+					|| f.getName().endsWith(IndexBatchCreator.GEN_LOG_EXT)) {
 				return false;
 			}
 			boolean matches = internalPatternMatches(f.getName(), matchers);
