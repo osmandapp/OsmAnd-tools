@@ -323,7 +323,7 @@ public class IndexUploader {
 					} finally {
 						if (!skip) {
 							if (!f.getName().equals(unzipped.getName()) || (targetDirectory != null && !targetDirectory.equals(directory))) {
-								unzipped.delete(); // delete the unzipped file
+								Algorithms.removeAllFiles(unzipped);
 							}
 							if (logFile.exists()) {
 								logFile.delete();
