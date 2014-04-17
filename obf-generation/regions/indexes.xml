@@ -33,7 +33,7 @@
 			<region  name="greece" downloadName="greece-latest"/>
 			<region  name="hungary" downloadName="hungary-latest"/>
 			<region  name="iceland" downloadName="iceland-latest"/>
-			<region  name="ireland-and-northern-ireland" downloadName="ireland-and-northern-ireland-latest"/>
+			<!-- <region  name="ireland-and-northern-ireland" downloadName="ireland-and-northern-ireland-latest"/> -->
 			<region  name="isle-of-man" downloadName="isle-of-man-latest"/>
 			<region  name="italy" downloadName="italy-latest"/>
 			<region  name="kosovo" downloadName="kosovo-latest"/>
@@ -64,6 +64,8 @@
 		 	<region  name="portugal"/>
 		 	<region  name="switzerland"/>
 		 	<region  name="germany_baden-wuerttemberg"/>
+		 	<region  name="ireland"/>
+		 	<region  name="nothern ireland"/>
 		</regions>
 
 		<!-- 1.2 GREAT BRITAIN [SOURCE: GEOFABRIK.DE] -->
@@ -429,7 +431,7 @@
 		<regions siteToDownload="http://download.geofabrik.de/central-america/{0}.osm.pbf" region_prefix=""  skip="false" region_suffix="_CentralAmerica">
 			<region name="belize" downloadName="belize-latest"/>
 			<region name="guatemala" downloadName="guatemala-latest"/>
-			<region name="haiti-and-domrep" downloadName="haiti-and-domrep-latest"/>
+			<!-- <region name="haiti-and-domrep" downloadName="haiti-and-domrep-latest"/> -->
 			<region name="mexico" downloadName="mexico-latest"/>	
 		</regions>
 
@@ -445,9 +447,11 @@
 			<region name="costa-rica" />
 			<region name="cuba" />
 			<region name="dominica" />
+			<region name="dominican republic"/>
 			<region name="el-salvador" />
 			<region name="grenada" />
 			<region name="guadeloupe" />
+			<region name="haiti"/>
 			<region name="honduras" />
 			<region name="jamaica" />
 			<region name="martinique" />
@@ -475,9 +479,9 @@
 			<region name="indonesia" downloadName="indonesia-latest"/>
 			<region name="iran" downloadName="iran-latest"/>
 			<region name="iraq" downloadName="iraq-latest"/>
-			<region name="israel-and-palestine" downloadName="israel-and-palestine-latest"/>
-		    <region name="japan" downloadName="japan-latest"/>
-		    <region name="jordan" downloadName="jordan-latest"/>
+			<!-- <region name="israel-and-palestine" downloadName="israel-and-palestine-latest"/> -->
+			<region name="japan" downloadName="japan-latest"/>
+			<region name="jordan" downloadName="jordan-latest"/>
 			<region name="kazakhstan" downloadName="kazakhstan-latest"/>
 			<region name="kyrgyzstan" downloadName="kyrgyzstan-latest"/>
 			<region name="malaysia-singapore-brunei" downloadName="malaysia-singapore-brunei-latest"/>
@@ -490,6 +494,12 @@
 			<region name="turkmenistan" downloadName="turkmenistan-latest"/>
 			<region name="uzbekistan" downloadName="uzbekistan-latest"/>
 			<region name="vietnam" downloadName="vietnam-latest"/>
+		</regions>
+
+		<!--  6.2 ASIA [SOURCE: OSMAND:NET] -->
+		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix=""  skip="false" region_suffix="_Asia">
+			<region name="israel"/>
+			<region name="palestine"/>
 		</regions>
 
 		<!-- 6.3 EASTERN ASIA [SOURCE: OSMAND:NET] -->
@@ -582,7 +592,7 @@
 			<region name="nigeria" downloadName="nigeria-latest"/>
 			<region name="sierra-leone" downloadName="sierra-leone-latest"/>
 			<region name="somalia" downloadName="somalia-latest"/>
-			<region name="south-africa-and-lesotho" downloadName="south-africa-and-lesotho-latest"/>
+			<!-- <region name="south-africa-and-lesotho" downloadName="south-africa-and-lesotho-latest"/> -->
 			<region name="tanzania" downloadName="tanzania-latest"/>
 		</regions>
 
@@ -597,6 +607,7 @@
 			<region name="chad"/>
 			<region name="guinea"/>
 			<region name="kenya"/>
+			<region name="lesotho"/>
 			<region name="malawi"/>
 			<region name="mali"/>
 			<region name="mauritania"/>
@@ -607,9 +618,10 @@
 			<region name="rwanda"/>
 			<region name="senegal"/>
 			<region name="seychelles"/>
+			<region name="south africa"
+			<region name="south-sudan"/>
 			<region name="sudan"/>
 			<region name="swaziland"/>
-			<region name="south-sudan"/>
 			<region name="togo"/>
 			<region name="tunisia"/>
 			<region name="uganda"/>
