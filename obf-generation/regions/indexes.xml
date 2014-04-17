@@ -66,7 +66,7 @@
 		 	<region  name="germany_baden-wuerttemberg"/>
 		 	<region  name="ireland"/>
 		 	<region  name="nothern ireland"/>
-	</regions>
+		</regions>
 
 		<!-- 1.2 GREAT BRITAIN [SOURCE: GEOFABRIK.DE] -->
 		<regions siteToDownload="http://download.geofabrik.de/europe/great-britain/{0}.osm.pbf" region_prefix="GB_" skip="false" region_suffix="_Europe">
