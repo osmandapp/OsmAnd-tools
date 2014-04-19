@@ -14,10 +14,11 @@
 
 #include <OsmAndCoreUtils/Inspector.h>
 
-void printUsage(const std::string& warning = std::string());
+void printUsage(const QString& warning = QString());
 
 int main(int argc, char* argv[])
 {
+    OsmAnd::InitializeCore();
 #if defined(UNICODE) || defined(_UNICODE)
 #   if defined(_WIN32)
     _setmode(_fileno(stdout), _O_U16TEXT);
@@ -34,17 +35,40 @@ int main(int argc, char* argv[])
 
     if(!OsmAnd::Inspector::parseCommandLineArguments(args, cfg, error))
     {
-        printUsage(error.toStdString());
+        printUsage(error);
+
+        OsmAnd::ReleaseCore();
         return -1;
     }
     OsmAnd::Inspector::dumpToStdOut(cfg);
+
+    OsmAnd::ReleaseCore();
     return 0;
 }
 
-void printUsage(const std::string& warning)
+void printUsage(const QString& warning)
 {
+#if defined(UNICODE) || defined(_UNICODE)
+    if(!warning.isEmpty())
+        std::wcout << warning.toStdWString() << std::endl;
+    std::wcout << "Inspector is console utility for working with binary indexes of OsmAnd." << std::endl;
+    std::wcout << std::endl
+        << "Usage: inspector "
+        << "-obf=path "
+        << "[-vaddress] "
+        << "[-vstreetgroups] "
+        << "[-vstreets] "
+        << "[-vbuildings] "
+        << "[-vintersections] "
+        << "[-vmap] "
+        << "[-vmapObjects] "
+        << "[-vpoi] "
+        << "[-vtransport] "
+        << "[-zoom=Zoom] "
+        << "[-bbox=LeftLon,TopLat,RightLon,BottomLan]" << std::endl;
+#else
     if(!warning.empty())
-        std::cout << warning << std::endl;
+        std::cout << warning.toStdString() << std::endl;
     std::cout << "Inspector is console utility for working with binary indexes of OsmAnd." << std::endl;
     std::cout << std::endl
         << "Usage: inspector "
@@ -60,5 +84,6 @@ void printUsage(const std::string& warning)
         << "[-vtransport] "
         << "[-zoom=Zoom] "
         << "[-bbox=LeftLon,TopLat,RightLon,BottomLan]" << std::endl;
+#endif
 }
 

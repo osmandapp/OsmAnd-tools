@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <memory>
 #include <chrono>
+#include <future>
 
 #include <GL/glew.h>
 #include <GL/freeglut.h>
@@ -17,15 +18,17 @@
 #include <OsmAndCore/Common.h>
 #include <OsmAndCore/Utilities.h>
 #include <OsmAndCore/Logging.h>
-#include <OsmAndCore/Data/ObfsCollection.h>
-#include <OsmAndCore/Data/ObfDataInterface.h>
+#include <OsmAndCore/ResourcesManager.h>
+#include <OsmAndCore/ObfsCollection.h>
+#include <OsmAndCore/ObfDataInterface.h>
+#include <OsmAndCore/WorldRegions.h>
 #include <OsmAndCore/Map/Rasterizer.h>
 #include <OsmAndCore/Map/RasterizerEnvironment.h>
 #include <OsmAndCore/Map/MapStyles.h>
 #include <OsmAndCore/Map/MapStyleEvaluator.h>
 #include <OsmAndCore/Map/IMapRenderer.h>
 #include <OsmAndCore/Map/OnlineMapRasterTileProvider.h>
-#include <OsmAndCore/Map/OnlineMapRasterTileProvidersDB.h>
+#include <OsmAndCore/Map/OnlineTileSources.h>
 #include <OsmAndCore/Map/HillshadeTileProvider.h>
 #include <OsmAndCore/Map/IMapElevationDataProvider.h>
 #include <OsmAndCore/Map/HeightmapTileProvider.h>
@@ -40,13 +43,17 @@ QMutex glutWasInitializedFlagMutex;
 
 OsmAnd::AreaI viewport;
 std::shared_ptr<OsmAnd::IMapRenderer> renderer;
-std::shared_ptr<OsmAnd::ObfsCollection> obfsCollection;
+std::shared_ptr<OsmAnd::ResourcesManager> resourcesManager;
+std::shared_ptr<const OsmAnd::IObfsCollection> obfsCollection;
 std::shared_ptr<OsmAnd::OfflineMapDataProvider> offlineMapDataProvider;
 std::shared_ptr<OsmAnd::MapStyles> stylesCollection;
 std::shared_ptr<const OsmAnd::MapStyle> style;
 std::shared_ptr<OsmAnd::MapAnimator> animator;
 
-QDir obfRoot(QDir::current());
+bool obfsDirSpecified = false;
+QDir obfsDir;
+bool dataDirSpecified = false;
+QDir dataDir;
 QDir cacheDir(QDir::current());
 QDir heightsDir;
 bool wasHeightsDirSpecified = false;
@@ -111,14 +118,15 @@ int main(int argc, char** argv)
         }
         else if(arg.startsWith("-obfsDir="))
         {
-            auto obfRootPath = arg.mid(strlen("-obfsDir="));
-            obfRoot = QDir(obfRootPath);
-            if(!obfRoot.exists())
-            {
-                std::cerr << "OBF directory does not exist" << std::endl;
-                OsmAnd::ReleaseCore();
-                return EXIT_FAILURE;
-            }
+            auto obfsDirPath = arg.mid(strlen("-obfsDir="));
+            obfsDir = QDir(obfsDirPath);
+            obfsDirSpecified = true;
+        }
+        else if(arg.startsWith("-dataDir="))
+        {
+            auto dataDirPath = arg.mid(strlen("-dataDir="));
+            dataDir = QDir(dataDirPath);
+            dataDirSpecified = true;
         }
         else if(arg.startsWith("-cacheDir="))
         {
@@ -145,6 +153,19 @@ int main(int argc, char** argv)
         }
     }
 
+    if(!obfsDirSpecified && !dataDirSpecified)
+    {
+        std::cerr << "Nor OBFs directory nor data directory was specified" << std::endl;
+        OsmAnd::ReleaseCore();
+        return EXIT_FAILURE;
+    }
+    if(obfsDirSpecified && !obfsDir.exists())
+    {
+        std::cerr << "OBFs directory does not exist" << std::endl;
+        OsmAnd::ReleaseCore();
+        return EXIT_FAILURE;
+    }
+
     // Obtain and configure rasterization style context
     if(!styleName.isEmpty())
     {
@@ -162,10 +183,8 @@ int main(int argc, char** argv)
             OsmAnd::ReleaseCore();
             return EXIT_FAILURE;
         }
+        //style->dump();
     }
-
-    obfsCollection.reset(new OsmAnd::ObfsCollection());
-    obfsCollection->registerDirectory(obfRoot);
 
     renderer = OsmAnd::createMapRenderer(OsmAnd::MapRendererClass::AtlasMapRenderer_OpenGL3);
     if(!renderer)
@@ -176,6 +195,32 @@ int main(int argc, char** argv)
     }
     animator.reset(new OsmAnd::MapAnimator());
     animator->setMapRenderer(renderer);
+
+    if(dataDirSpecified)
+    {
+        resourcesManager.reset(new OsmAnd::ResourcesManager(
+            dataDir.absoluteFilePath(QLatin1String("storage")),
+            QList<QString>() << dataDir.absoluteFilePath(QLatin1String("storage_ext")),
+            dataDir.absoluteFilePath(QLatin1String("World_basemap_mini_2.obf")),
+            dataDir.absoluteFilePath(QLatin1String("tmp"))));
+
+        const auto renderer_ = renderer;
+        resourcesManager->localResourcesChangeObservable.attach(nullptr,
+            [renderer_]
+            (const OsmAnd::ResourcesManager* const resourcesManager)
+            {
+                renderer_->reloadEverything();
+            });
+        
+        obfsCollection = resourcesManager->obfsCollection;
+    }
+    else if(obfsDirSpecified)
+    {
+        const auto manualObfsCollection = new OsmAnd::ObfsCollection();
+        manualObfsCollection->addDirectory(obfsDir);
+
+        obfsCollection.reset(manualObfsCollection);
+    }
 
     //////////////////////////////////////////////////////////////////////////
 
@@ -212,13 +257,15 @@ int main(int argc, char** argv)
 
     //////////////////////////////////////////////////////////////////////////
     OsmAnd::MapRendererSetupOptions rendererSetup;
-    rendererSetup.frameUpdateRequestCallback = []()
-    {
-        //QMutexLocker scopedLocker(&glutWasInitializedFlagMutex);
+    rendererSetup.frameUpdateRequestCallback =
+        []
+        (const OsmAnd::IMapRenderer* const mapRenderer)
+        {
+            //QMutexLocker scopedLocker(&glutWasInitializedFlagMutex);
 
-        if(glutWasInitialized)
-            glutPostRedisplay();
-    };
+            if(glutWasInitialized)
+                glutPostRedisplay();
+        };
     rendererSetup.displayDensityFactor = density;
     rendererSetup.gpuWorkerThreadEnabled = useGpuWorker;
     if(rendererSetup.gpuWorkerThreadEnabled)
@@ -231,16 +278,20 @@ int main(int argc, char** argv)
         rendererSetup.gpuWorkerThreadEnabled = (wglShareLists(currentContext, workerContext) == TRUE);
         assert(currentContext == wglGetCurrentContext());
 
-        rendererSetup.gpuWorkerThreadPrologue = [currentDC, workerContext]()
-        {
-            const auto result = (wglMakeCurrent(currentDC, workerContext) == TRUE);
-            verifyOpenGL();
-        };
+        rendererSetup.gpuWorkerThreadPrologue =
+            [currentDC, workerContext]
+            (const OsmAnd::IMapRenderer* const mapRenderer)
+            {
+                const auto result = (wglMakeCurrent(currentDC, workerContext) == TRUE);
+                verifyOpenGL();
+            };
 
-        rendererSetup.gpuWorkerThreadEpilogue = []()
-        {
-            glFinish();
-        };
+        rendererSetup.gpuWorkerThreadEpilogue =
+            []
+            (const OsmAnd::IMapRenderer* const mapRenderer)
+            {
+                glFinish();
+            };
 #endif
     }
     renderer->setup(rendererSetup);
@@ -305,6 +356,14 @@ int main(int argc, char** argv)
 
         glutWasInitialized = false;
     }
+
+    renderer.reset();
+    resourcesManager.reset();
+    obfsCollection.reset();
+    offlineMapDataProvider.reset();
+    stylesCollection.reset();
+    style.reset();
+    animator.reset();
 
     OsmAnd::ReleaseCore();
     return EXIT_SUCCESS;
@@ -522,13 +581,32 @@ void keyboardHandler(unsigned char key, int x, int y)
             renderer->setConfiguration(config);
         }
         break;
-        /*case 'p':
-            {
-            auto config = renderer->configuration;
-            config.paletteTexturesAllowed = !config.paletteTexturesAllowed;
-            renderer->setConfiguration(config);
-            }
-            break;*/
+     case 'p':
+        {
+             std::async(std::launch::async,
+                 [=]
+                 {
+                     const auto downloadProgress =
+                         []
+                         (const uint64_t bytesDownloaded, const uint64_t bytesTotal)
+                         {
+                             std::cout << "... downloaded " << bytesDownloaded << " of " << bytesTotal << std::endl;
+                         };
+
+                     resourcesManager->updateRepository();
+
+                     if(!resourcesManager->isResourceInstalled(QLatin1String("Ukraine_europe_2.obf")))
+                         resourcesManager->installFromRepository(QLatin1String("Ukraine_europe_2.obf"), downloadProgress);
+                     else if(resourcesManager->isInstalledResourceOutdated(QLatin1String("Ukraine_europe_2.obf")))
+                         resourcesManager->updateFromRepository(QLatin1String("Ukraine_europe_2.obf"), downloadProgress);
+
+                     if(!resourcesManager->isResourceInstalled(QLatin1String("Netherlands_europe_2.obf")))
+                         resourcesManager->installFromRepository(QLatin1String("Netherlands_europe_2.obf"), downloadProgress);
+                     else if(resourcesManager->isInstalledResourceOutdated(QLatin1String("Netherlands_europe_2.obf")))
+                         resourcesManager->updateFromRepository(QLatin1String("Netherlands_europe_2.obf"), downloadProgress);
+                 });
+        }
+        break;
     case 'z':
         {
             if(!renderer->state.symbolProviders.isEmpty())
@@ -635,7 +713,7 @@ void activateProvider(OsmAnd::RasterMapLayerId layerId, int idx)
     }
     else if(idx == 1)
     {
-        auto tileProvider = OsmAnd::OnlineMapRasterTileProvidersDB::createDefaultDB()->createProvider(QLatin1String("mapnik_osmand"));
+        auto tileProvider = OsmAnd::OnlineTileSources::getBuiltIn()->createProviderFor(QLatin1String("Mapnik (OsmAnd)"));
         renderer->setRasterLayerProvider(layerId, tileProvider);
     }
     else if(idx == 2)
@@ -753,7 +831,7 @@ void displayHandler()
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
         auto w = 390;
-        auto h1 = 16 * 20;
+        auto h1 = 16 * 19;
         auto t = viewport.height();
         glColor4f(0.5f, 0.5f, 0.5f, 0.6f);
         glBegin(GL_QUADS);
@@ -851,15 +929,10 @@ void displayHandler()
 
         glRasterPos2f(8, t - 16 * 17);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("palette textures(key p): %1").arg(renderer->configuration.paletteTexturesAllowed)));
-        verifyOpenGL();
-
-        glRasterPos2f(8, t - 16 * 18);
-        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("symbols (key z)        : %1").arg(!renderer->state.symbolProviders.isEmpty())));
         verifyOpenGL();
 
-        glRasterPos2f(8, t - 16 * 19);
+        glRasterPos2f(8, t - 16 * 18);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("symbols loaded         : %1").arg(renderer->getSymbolsCount())));
         verifyOpenGL();
