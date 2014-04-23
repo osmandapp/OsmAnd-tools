@@ -200,14 +200,18 @@ int main(int argc, char** argv)
     {
         resourcesManager.reset(new OsmAnd::ResourcesManager(
             dataDir.absoluteFilePath(QLatin1String("storage")),
-            QList<QString>() << dataDir.absoluteFilePath(QLatin1String("storage_ext")),
+            dataDir.absoluteFilePath(QLatin1String("storage_ext")),
+            QList<QString>(),
             dataDir.absoluteFilePath(QLatin1String("World_basemap_mini_2.obf")),
             dataDir.absoluteFilePath(QLatin1String("tmp"))));
 
         const auto renderer_ = renderer;
         resourcesManager->localResourcesChangeObservable.attach(nullptr,
             [renderer_]
-            (const OsmAnd::ResourcesManager* const resourcesManager)
+            (const OsmAnd::ResourcesManager* const resourcesManager,
+                const QList<QString>& added,
+                const QList<QString>& removed,
+                const QList<QString>& updated)
             {
                 renderer_->reloadEverything();
             });
