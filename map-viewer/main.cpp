@@ -24,7 +24,8 @@
 #include <OsmAndCore/WorldRegions.h>
 #include <OsmAndCore/Map/Rasterizer.h>
 #include <OsmAndCore/Map/RasterizerEnvironment.h>
-#include <OsmAndCore/Map/MapStyles.h>
+#include <OsmAndCore/Map/IMapStylesCollection.h>
+#include <OsmAndCore/Map/MapStylesCollection.h>
 #include <OsmAndCore/Map/MapStyleEvaluator.h>
 #include <OsmAndCore/Map/IMapRenderer.h>
 #include <OsmAndCore/Map/OnlineMapRasterTileProvider.h>
@@ -46,7 +47,7 @@ std::shared_ptr<OsmAnd::IMapRenderer> renderer;
 std::shared_ptr<OsmAnd::ResourcesManager> resourcesManager;
 std::shared_ptr<const OsmAnd::IObfsCollection> obfsCollection;
 std::shared_ptr<OsmAnd::OfflineMapDataProvider> offlineMapDataProvider;
-std::shared_ptr<OsmAnd::MapStyles> stylesCollection;
+std::shared_ptr<const OsmAnd::IMapStylesCollection> stylesCollection;
 std::shared_ptr<const OsmAnd::MapStyle> style;
 std::shared_ptr<OsmAnd::MapAnimator> animator;
 
@@ -166,26 +167,6 @@ int main(int argc, char** argv)
         return EXIT_FAILURE;
     }
 
-    // Obtain and configure rasterization style context
-    if(!styleName.isEmpty())
-    {
-        stylesCollection.reset(new OsmAnd::MapStyles());
-        for(auto itStyleFile = styleFiles.begin(); itStyleFile != styleFiles.end(); ++itStyleFile)
-        {
-            const auto& styleFile = *itStyleFile;
-
-            if(!stylesCollection->registerStyle(styleFile.absoluteFilePath()))
-                std::cout << "Failed to parse metadata of '" << styleFile.fileName().toStdString() << "' or duplicate style" << std::endl;
-        }
-        if(!stylesCollection->obtainStyle(styleName, style))
-        {
-            std::cout << "Failed to resolve style '" << styleName.toStdString() << "'" << std::endl;
-            OsmAnd::ReleaseCore();
-            return EXIT_FAILURE;
-        }
-        //style->dump();
-    }
-
     renderer = OsmAnd::createMapRenderer(OsmAnd::MapRendererClass::AtlasMapRenderer_OpenGL3);
     if(!renderer)
     {
@@ -217,6 +198,7 @@ int main(int argc, char** argv)
             });
         
         obfsCollection = resourcesManager->obfsCollection;
+        stylesCollection = resourcesManager->mapStylesCollection;
     }
     else if(obfsDirSpecified)
     {
@@ -224,6 +206,27 @@ int main(int argc, char** argv)
         manualObfsCollection->addDirectory(obfsDir);
 
         obfsCollection.reset(manualObfsCollection);
+
+        const auto pMapStylesCollection = new OsmAnd::MapStylesCollection();
+        for(auto itStyleFile = styleFiles.begin(); itStyleFile != styleFiles.end(); ++itStyleFile)
+        {
+            const auto& styleFile = *itStyleFile;
+
+            if(!pMapStylesCollection->registerStyle(styleFile.absoluteFilePath()))
+                std::cout << "Failed to parse metadata of '" << styleFile.fileName().toStdString() << "' or duplicate style" << std::endl;
+        }
+        stylesCollection.reset(pMapStylesCollection);
+    }
+
+    if(!styleName.isEmpty())
+    {
+        if(!stylesCollection->obtainStyle(styleName, style))
+        {
+            std::cout << "Failed to resolve style '" << styleName.toStdString() << "'" << std::endl;
+            OsmAnd::ReleaseCore();
+            return EXIT_FAILURE;
+        }
+        //style->dump();
     }
 
     //////////////////////////////////////////////////////////////////////////

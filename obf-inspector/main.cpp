@@ -14,7 +14,7 @@
 
 #include <OsmAndCoreUtils/Inspector.h>
 
-void printUsage(const QString& warning = QString());
+void printUsage(const QString& warning = QString::null);
 
 int main(int argc, char* argv[])
 {
