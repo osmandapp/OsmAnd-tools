@@ -220,7 +220,7 @@ int main(int argc, char** argv)
 
     if(!styleName.isEmpty())
     {
-        if(!stylesCollection->obtainStyle(styleName, style))
+        if(!stylesCollection->obtainBakedStyle(styleName, style))
         {
             std::cout << "Failed to resolve style '" << styleName.toStdString() << "'" << std::endl;
             OsmAnd::ReleaseCore();
@@ -725,9 +725,6 @@ void activateProvider(OsmAnd::RasterMapLayerId layerId, int idx)
     }
     else if(idx == 2)
     {
-        //test:
-        stylesCollection->obtainStyle(styleName, style);
-
         offlineMapDataProvider.reset(new OsmAnd::OfflineMapDataProvider(obfsCollection, style, density));
 
         // general
@@ -740,9 +737,6 @@ void activateProvider(OsmAnd::RasterMapLayerId layerId, int idx)
     }
     else if(idx == 3)
     {
-        //test:
-        stylesCollection->obtainStyle(styleName, style);
-
         offlineMapDataProvider.reset(new OsmAnd::OfflineMapDataProvider(obfsCollection, style, density));
 
         // car
@@ -755,9 +749,6 @@ void activateProvider(OsmAnd::RasterMapLayerId layerId, int idx)
     }
     else if(idx == 4)
     {
-        //test:
-        stylesCollection->obtainStyle(styleName, style);
-
         offlineMapDataProvider.reset(new OsmAnd::OfflineMapDataProvider(obfsCollection, style, density));
 
         // bicycle
@@ -770,9 +761,6 @@ void activateProvider(OsmAnd::RasterMapLayerId layerId, int idx)
     }
     else if(idx == 5)
     {
-        //test:
-        stylesCollection->obtainStyle(styleName, style);
-
         offlineMapDataProvider.reset(new OsmAnd::OfflineMapDataProvider(obfsCollection, style, density));
         
         // pedestrian
