@@ -65,7 +65,7 @@
 		 	<region  name="switzerland"/>
 		 	<region  name="germany_baden-wuerttemberg"/>
 		 	<region  name="ireland"/>
-		 	<region  name="nothern_ireland"/>
+		 	<region  name="northern_ireland"/>
 		</regions>
 
 		<!-- 1.2 GREAT BRITAIN [SOURCE: GEOFABRIK.DE] -->
@@ -447,7 +447,7 @@
 			<region name="costa-rica" />
 			<region name="cuba" />
 			<region name="dominica" />
-			<region name="dominican-republic"/>
+			<region name="dominican_republic"/>
 			<region name="el-salvador" />
 			<region name="grenada" />
 			<region name="guadeloupe" />
