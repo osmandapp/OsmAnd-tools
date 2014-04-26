@@ -65,7 +65,7 @@
 		 	<region  name="switzerland"/>
 		 	<region  name="germany_baden-wuerttemberg"/>
 		 	<region  name="ireland"/>
-		 	<region  name="nothern ireland"/>
+		 	<region  name="nothern_ireland"/>
 		</regions>
 
 		<!-- 1.2 GREAT BRITAIN [SOURCE: GEOFABRIK.DE] -->
@@ -447,7 +447,7 @@
 			<region name="costa-rica" />
 			<region name="cuba" />
 			<region name="dominica" />
-			<region name="dominican republic"/>
+			<region name="dominican-republic"/>
 			<region name="el-salvador" />
 			<region name="grenada" />
 			<region name="guadeloupe" />
@@ -484,7 +484,7 @@
 			<region name="jordan" downloadName="jordan-latest"/>
 			<region name="kazakhstan" downloadName="kazakhstan-latest"/>
 			<region name="kyrgyzstan" downloadName="kyrgyzstan-latest"/>
-			<region name="malaysia-singapore-brunei" downloadName="malaysia-singapore-brunei-latest"/>
+			<!-- <region name="malaysia-singapore-brunei" downloadName="malaysia-singapore-brunei-latest"/> -->
 			<region name="mongolia" downloadName="mongolia-latest"/>
 			<region name="pakistan" downloadName="pakistan-latest"/>
 			<region name="philippines" downloadName="philippines-latest"/>
@@ -618,7 +618,7 @@
 			<region name="rwanda"/>
 			<region name="senegal"/>
 			<region name="seychelles"/>
-			<region name="south africa"
+			<region name="south-africa"/>
 			<region name="south-sudan"/>
 			<region name="sudan"/>
 			<region name="swaziland"/>
