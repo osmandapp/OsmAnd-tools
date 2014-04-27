@@ -65,14 +65,17 @@
 		 	<region  name="switzerland"/>
 		 	<region  name="germany_baden-wuerttemberg"/>
 		 	<region  name="ireland"/>
-		 	<region  name="northern_ireland"/>
 		</regions>
+
 
 		<!-- 1.2 GREAT BRITAIN [SOURCE: GEOFABRIK.DE] -->
 		<regions siteToDownload="http://download.geofabrik.de/europe/great-britain/{0}.osm.pbf" region_prefix="GB_" skip="false" region_suffix="_Europe">
 			<region name="scotland" downloadName="scotland-latest"/>
 			<region name="wales" downloadName="wales-latest"/>
 			<region name="england" downloadName="england-latest"/>
+		</regions>
+		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="GB_" skip="false" region_suffix="_Europe">	
+			<region  name="northern_ireland"/>
 		</regions>
 
 		<!-- REGION division -->
@@ -555,7 +558,7 @@
 			<region name="australia-oceania" downloadName="australia-oceania-latest"/>
 		</regions>
 
-		<regions siteToDownload="http://download.geofabrik.de/australia-oceania/{0}.osm.pbf" region_prefix="" region_suffix="_Australia"  skip="false">
+		<regions siteToDownload="http://download.geofabrik.de/australia-oceania/{0}.osm.pbf" region_prefix="" region_suffix="_Australia-oceania"  skip="false">
 		<!-- 	<region name="australia" downloadName="australia-latest"/> -->
 			<region name="new-caledonia" downloadName="new-caledonia-latest"/>
 			<region name="new-zealand" downloadName="new-zealand-latest"/>
