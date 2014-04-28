@@ -477,7 +477,7 @@
 			<region name="azerbaijan" downloadName="azerbaijan-latest"/>
 			<region name="bangladesh" downloadName="bangladesh-latest"/>
 			<region name="china" downloadName="china-latest"/>
-			<region name="gcc-states" downloadName="gcc-states-latest"/>
+			<!-- <region name="gcc-states" downloadName="gcc-states-latest"/> -->
 			<region name="india" downloadName="india-latest"/>
 			<region name="indonesia" downloadName="indonesia-latest"/>
 			<region name="iran" downloadName="iran-latest"/>
