@@ -603,20 +603,20 @@ void keyboardHandler(unsigned char key, int x, int y)
                          []
                          (const uint64_t bytesDownloaded, const uint64_t bytesTotal)
                          {
-                             std::cout << "... downloaded " << bytesDownloaded << " of " << bytesTotal << std::endl;
+                            std::cout << "... downloaded " << bytesDownloaded << " of " << bytesTotal << " (" << ((bytesDownloaded * 100) / bytesTotal) << "%)" << std::endl;
                          };
 
                      resourcesManager->updateRepository();
 
-                     if(!resourcesManager->isResourceInstalled(QLatin1String("Ukraine_europe_2.obf")))
-                         resourcesManager->installFromRepository(QLatin1String("Ukraine_europe_2.obf"), downloadProgress);
-                     else if(resourcesManager->isInstalledResourceOutdated(QLatin1String("Ukraine_europe_2.obf")))
-                         resourcesManager->updateFromRepository(QLatin1String("Ukraine_europe_2.obf"), downloadProgress);
+                     if(!resourcesManager->isResourceInstalled(QLatin1String("ukraine_europe.map.obf")))
+                         resourcesManager->installFromRepository(QLatin1String("ukraine_europe.map.obf"), downloadProgress);
+                     else if(resourcesManager->isInstalledResourceOutdated(QLatin1String("ukraine_europe.map.obf")))
+                         resourcesManager->updateFromRepository(QLatin1String("ukraine_europe.map.obf"), downloadProgress);
 
-                     if(!resourcesManager->isResourceInstalled(QLatin1String("Netherlands_europe_2.obf")))
-                         resourcesManager->installFromRepository(QLatin1String("Netherlands_europe_2.obf"), downloadProgress);
-                     else if(resourcesManager->isInstalledResourceOutdated(QLatin1String("Netherlands_europe_2.obf")))
-                         resourcesManager->updateFromRepository(QLatin1String("Netherlands_europe_2.obf"), downloadProgress);
+                     if(!resourcesManager->isResourceInstalled(QLatin1String("netherlands_europe.map.obf")))
+                         resourcesManager->installFromRepository(QLatin1String("netherlands_europe.map.obf"), downloadProgress);
+                     else if(resourcesManager->isInstalledResourceOutdated(QLatin1String("netherlands_europe.map.obf")))
+                         resourcesManager->updateFromRepository(QLatin1String("netherlands_europe.map.obf"), downloadProgress);
                  });
         }
         break;

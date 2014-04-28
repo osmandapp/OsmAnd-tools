@@ -57,7 +57,7 @@ if (CMAKE_TARGET_OS STREQUAL "linux" OR CMAKE_TARGET_OS STREQUAL "darwin")
 		${X11_Xi}
 		${X11_Xrandr}
 	)
-endif()
+endif ()
 if (CMAKE_TARGET_OS STREQUAL "darwin")
 	find_package(GLUT REQUIRED)
 	set(target_specific_public_includes ${target_specific_public_includes}
@@ -66,20 +66,20 @@ if (CMAKE_TARGET_OS STREQUAL "darwin")
 	set(target_specific_public_libraries ${target_specific_public_libraries}
 		${GLUT_LIBRARIES}
 	)
-endif()
+endif ()
 if (CMAKE_TARGET_OS STREQUAL "darwin")
 	find_library(X11_GL "GL" PATHS ${X11_LIBRARY_DIR})
 	set(target_specific_public_libraries ${target_specific_public_libraries}
 		${X11_GL}
 	)
-endif()
+endif ()
 if (CMAKE_TARGET_OS STREQUAL "windows")
 	if (CMAKE_COMPILER_FAMILY STREQUAL "msvc")
 		set(target_specific_private_definitions ${target_specific_private_definitions}
 			-D_CRT_SECURE_NO_WARNINGS
 		)
-	endif()
-endif()
+	endif ()
+endif ()
 
 target_compile_definitions(freeglut_static
 	PRIVATE

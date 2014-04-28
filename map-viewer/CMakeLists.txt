@@ -15,7 +15,7 @@ else()
 	set(extra_libraries ${extra_libraries}
 		${FREEGLUT_LIBRARY}
 	)
-endif()
+endif ()
 
 if (CMAKE_SHARED_LIBS_ALLOWED_ON_TARGET)
 	add_executable(bird
@@ -30,7 +30,7 @@ if (CMAKE_SHARED_LIBS_ALLOWED_ON_TARGET)
 		OsmAndCore_shared
 		${extra_libraries}
 	)
-endif()
+endif ()
 
 if (CMAKE_STATIC_LIBS_ALLOWED_ON_TARGET)
 	add_executable(bird_standalone
@@ -45,4 +45,4 @@ if (CMAKE_STATIC_LIBS_ALLOWED_ON_TARGET)
 		OsmAndCore_static
 		${extra_libraries}
 	)
-endif()
+endif ()
