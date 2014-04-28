@@ -75,7 +75,7 @@
 			<region name="england" downloadName="england-latest"/>
 		</regions>
 		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="GB_" skip="false" region_suffix="_Europe">	
-			<region  name="northern_ireland"/>
+			<region  name="northern_ireland" downloadName="gb_northern_ireland"/>
 		</regions>
 
 		<!-- REGION division -->
