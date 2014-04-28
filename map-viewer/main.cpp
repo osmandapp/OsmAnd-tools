@@ -26,6 +26,7 @@
 #include <OsmAndCore/Map/RasterizerEnvironment.h>
 #include <OsmAndCore/Map/IMapStylesCollection.h>
 #include <OsmAndCore/Map/MapStylesCollection.h>
+#include <OsmAndCore/Map/IMapStylesPresetsCollection.h>
 #include <OsmAndCore/Map/MapStyleEvaluator.h>
 #include <OsmAndCore/Map/IMapRenderer.h>
 #include <OsmAndCore/Map/OnlineMapRasterTileProvider.h>
@@ -177,6 +178,11 @@ int main(int argc, char** argv)
     animator.reset(new OsmAnd::MapAnimator());
     animator->setMapRenderer(renderer);
 
+    //////////////////////////////////////////////////////////////////////////
+    //QHash< QString, std::shared_ptr<const OsmAnd::WorldRegions::WorldRegion> > worldRegions;
+    //OsmAnd::WorldRegions("d:\\OpenSource\\OsmAnd\\OsmAnd\\resources\\countries-info\\regions.ocbf").loadWorldRegions(worldRegions);
+    //////////////////////////////////////////////////////////////////////////
+    
     if(dataDirSpecified)
     {
         resourcesManager.reset(new OsmAnd::ResourcesManager(

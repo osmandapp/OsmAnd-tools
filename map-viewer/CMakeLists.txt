@@ -3,7 +3,7 @@ project(bird)
 find_library(FREEGLUT_LIBRARY freeglut)
 set(extra_dependencies "")
 set(extra_libraries "")
-if(FREEGLUT_LIBRARY STREQUAL "FREEGLUT_LIBRARY-NOTFOUND")
+if (FREEGLUT_LIBRARY STREQUAL "FREEGLUT_LIBRARY-NOTFOUND")
 	add_subdirectory("${OSMAND_ROOT}/tools/map-viewer/externals/freeglut" "tools/map-viewer/externals/freeglut")
 	set(extra_dependencies ${extra_dependencies}
 		freeglut_static
@@ -17,7 +17,7 @@ else()
 	)
 endif()
 
-if(CMAKE_SHARED_LIBS_ALLOWED_ON_TARGET)
+if (CMAKE_SHARED_LIBS_ALLOWED_ON_TARGET)
 	add_executable(bird
 		"main.cpp"
 	)
@@ -32,7 +32,7 @@ if(CMAKE_SHARED_LIBS_ALLOWED_ON_TARGET)
 	)
 endif()
 
-if(CMAKE_STATIC_LIBS_ALLOWED_ON_TARGET)
+if (CMAKE_STATIC_LIBS_ALLOWED_ON_TARGET)
 	add_executable(bird_standalone
 		"main.cpp"
 	)

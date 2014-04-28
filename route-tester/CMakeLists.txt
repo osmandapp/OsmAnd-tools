@@ -1,6 +1,6 @@
 project(voyager)
 
-if(CMAKE_SHARED_LIBS_ALLOWED_ON_TARGET)
+if (CMAKE_SHARED_LIBS_ALLOWED_ON_TARGET)
 	add_executable(voyager
 		"main.cpp"
 	)
@@ -12,7 +12,7 @@ if(CMAKE_SHARED_LIBS_ALLOWED_ON_TARGET)
 	)
 endif()
 
-if(CMAKE_STATIC_LIBS_ALLOWED_ON_TARGET)
+if (CMAKE_STATIC_LIBS_ALLOWED_ON_TARGET)
 	add_executable(voyager_standalone
 		"main.cpp"
 	)

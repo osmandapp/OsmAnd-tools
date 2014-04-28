@@ -43,7 +43,7 @@ set(target_specific_public_definitions "")
 set(target_specific_private_definitions "")
 set(target_specific_public_includes "")
 set(target_specific_public_libraries "")
-if(CMAKE_TARGET_OS STREQUAL "linux" OR CMAKE_TARGET_OS STREQUAL "darwin")
+if (CMAKE_TARGET_OS STREQUAL "linux" OR CMAKE_TARGET_OS STREQUAL "darwin")
 	find_package(X11 REQUIRED)
 	set(target_specific_public_includes ${target_specific_public_includes}
 		${X11_INCLUDE_DIR}
@@ -58,7 +58,7 @@ if(CMAKE_TARGET_OS STREQUAL "linux" OR CMAKE_TARGET_OS STREQUAL "darwin")
 		${X11_Xrandr}
 	)
 endif()
-if(CMAKE_TARGET_OS STREQUAL "darwin")
+if (CMAKE_TARGET_OS STREQUAL "darwin")
 	find_package(GLUT REQUIRED)
 	set(target_specific_public_includes ${target_specific_public_includes}
 		${GLUT_INCLUDE_DIR}
@@ -67,14 +67,14 @@ if(CMAKE_TARGET_OS STREQUAL "darwin")
 		${GLUT_LIBRARIES}
 	)
 endif()
-if(CMAKE_TARGET_OS STREQUAL "darwin")
+if (CMAKE_TARGET_OS STREQUAL "darwin")
 	find_library(X11_GL "GL" PATHS ${X11_LIBRARY_DIR})
 	set(target_specific_public_libraries ${target_specific_public_libraries}
 		${X11_GL}
 	)
 endif()
-if(CMAKE_TARGET_OS STREQUAL "windows")
-	if(CMAKE_COMPILER_FAMILY STREQUAL "msvc")
+if (CMAKE_TARGET_OS STREQUAL "windows")
+	if (CMAKE_COMPILER_FAMILY STREQUAL "msvc")
 		set(target_specific_private_definitions ${target_specific_private_definitions}
 			-D_CRT_SECURE_NO_WARNINGS
 		)

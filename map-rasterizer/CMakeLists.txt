@@ -1,6 +1,6 @@
 project(eyepiece)
 
-if(CMAKE_SHARED_LIBS_ALLOWED_ON_TARGET)
+if (CMAKE_SHARED_LIBS_ALLOWED_ON_TARGET)
 	add_executable(eyepiece
 		"main.cpp"
 	)
@@ -12,7 +12,7 @@ if(CMAKE_SHARED_LIBS_ALLOWED_ON_TARGET)
 	)
 endif()
 
-if(CMAKE_STATIC_LIBS_ALLOWED_ON_TARGET)
+if (CMAKE_STATIC_LIBS_ALLOWED_ON_TARGET)
 	add_executable(eyepiece_standalone
 		"main.cpp"
 	)
