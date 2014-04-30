@@ -389,13 +389,14 @@ public class IndexUploader {
 	private String checkfileAndGetDescription(File f) throws OneFileException {
 		String fileName = f.getName();
 		boolean srtmFile = f.getName().contains(".srtm");
+		boolean tourFile = fileName.endsWith(IndexConstants.TOUR_INDEX_EXT) || fileName.endsWith(IndexConstants.TOUR_INDEX_EXT_ZIP);
 		if(srtmFile != this.srtmProcess) {
 			return null;
 		}
-		if (fileName.endsWith(IndexConstants.TOUR_INDEX_EXT) || fileName.endsWith(IndexConstants.TOUR_INDEX_EXT_ZIP)) {
-			if(!this.tourProcess) {
-				return null;
-			}
+		if(tourFile != this.tourProcess) {
+			return null;
+		}
+		if (tourFile) {
 			File fl = new File(f, "description.txt");
 			if(!fl.exists()) {
 				System.err.println("Description doesn't exist " + fl.getAbsolutePath());
@@ -413,8 +414,7 @@ public class IndexUploader {
 			} catch (IOException e) {
 				throw new OneFileException("Not supported file format " + fileName ,e );
 			} 
-		}
-		if (fileName.endsWith(IndexConstants.BINARY_MAP_INDEX_EXT) || fileName.endsWith(IndexConstants.BINARY_MAP_INDEX_EXT_ZIP)) {
+		} else if (fileName.endsWith(IndexConstants.BINARY_MAP_INDEX_EXT) || fileName.endsWith(IndexConstants.BINARY_MAP_INDEX_EXT_ZIP)) {
 			RandomAccessFile raf = null;
 			try {
 				raf = new RandomAccessFile(f, "r");
