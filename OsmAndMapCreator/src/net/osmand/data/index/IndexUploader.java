@@ -22,12 +22,18 @@ import java.util.zip.ZipException;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
 
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+
 import net.osmand.IndexConstants;
 import net.osmand.PlatformUtil;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.util.Algorithms;
 
 import org.apache.commons.logging.Log;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.xml.sax.SAXException;
 
 import com.jcraft.jsch.Channel;
 import com.jcraft.jsch.ChannelExec;
@@ -397,21 +403,15 @@ public class IndexUploader {
 			return null;
 		}
 		if (tourFile) {
-			File fl = new File(f, "description.txt");
+			File fl = new File(f, "inventory.xml");
 			if(!fl.exists()) {
-				System.err.println("Description doesn't exist " + fl.getAbsolutePath());
+				System.err.println("inventory.xml doesn't exist " + fl.getAbsolutePath());
 				return null;
 			}
 			try {
-				BufferedReader reader = new BufferedReader(new FileReader(fl));
-				StringBuilder summary = new StringBuilder();
-				String s;
-				while((s = reader.readLine()) != null) {
-					summary.append(s).append("\n");
-				}
-				reader.close();
-				return summary.toString().trim();
-			} catch (IOException e) {
+				Document doc = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(fl);
+				return ((Element)doc.getElementsByTagName("shortDescription").item(0)).getTextContent();
+			} catch (Exception e) {
 				throw new OneFileException("Not supported file format " + fileName ,e );
 			} 
 		} else if (fileName.endsWith(IndexConstants.BINARY_MAP_INDEX_EXT) || fileName.endsWith(IndexConstants.BINARY_MAP_INDEX_EXT_ZIP)) {
