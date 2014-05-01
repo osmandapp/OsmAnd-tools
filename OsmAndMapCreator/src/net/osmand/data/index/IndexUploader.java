@@ -702,7 +702,7 @@ public class IndexUploader {
 		session.connect();
 
 		// exec 'scp -t rfile' remotely
-		String command = "scp -p -t " + rfile;
+		String command = "scp -p -t \"" + rfile+"\"";
 		Channel channel = session.openChannel("exec");
 		((ChannelExec) channel).setCommand(command);
 
