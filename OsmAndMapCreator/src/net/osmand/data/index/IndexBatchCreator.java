@@ -52,7 +52,7 @@ import rtree.RTree;
 
 public class IndexBatchCreator {
 	
-	private static final int INMEM_LIMIT = 600;
+	private static final int INMEM_LIMIT = 2000;
 
 	protected static final Log log = PlatformUtil.getLog(IndexBatchCreator.class);
 	
