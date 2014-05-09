@@ -18,7 +18,7 @@ def esc(s):
 	return s.replace("\"", "&quot;").replace("<", "&lt;").replace(">", "&gt;").replace("&", "&amp;").replace("'","&apos;")
 
 def process_roads(cond, filename, fields):
-	conn_string = "host='127.0.0.1' dbname='gis' user='gisuser' password='gisuser' port='5433'"
+	conn_string = "host='127.0.0.1' dbname='gis' user='gisuser' password='gisuser' port='5432'"
 	f = open(filename,'w')
 	f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
 	f.write('<osm version="0.5">\n')
