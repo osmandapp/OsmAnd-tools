@@ -32,7 +32,7 @@ def process_roads(cond, filename, fields):
 		selectFields += ", " + field
 	shift = 2
 	cursor.execute("select osm_id, ST_AsText(ST_Transform(ST_Simplify(way,50),4326)),"
-				   " name, ref, int_ref " + selectFields +
+				   " name, ref, tags->int_ref int_ref " + selectFields +
 				   # roads faster but doesn't contain ferry & river
 				   " from planet_osm_line where " + cond + # ST_Length(way) > 100 and
 				  # "LIMIT 1000"
