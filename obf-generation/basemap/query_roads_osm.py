@@ -31,10 +31,10 @@ def process_roads(cond, filename, fields):
 		array.append(field)
 		selectFields += ", " + field
 	shift = 2
-	sql = "select osm_id, ST_AsText(ST_Transform(ST_Simplify(way,50),4326)),"
-	      " name, ref, tags->'int_ref' as int_ref " + selectFields +
+	sql = "select osm_id, ST_AsText(ST_Transform(ST_Simplify(way,50),4326))," + \
+	      " name, ref, tags->'int_ref' as int_ref " + selectFields + \
 	      # roads faster but doesn't contain ferry & river
-	      " from planet_osm_line where " + cond + # ST_Length(way) > 100 and
+	      " from planet_osm_line where " + cond + \
 	      # "LIMIT 1000"
 	      ";"
 	print sql

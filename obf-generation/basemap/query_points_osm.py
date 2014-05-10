@@ -35,9 +35,9 @@ def process_points(cond, filename, array):
 			tag = '"natural"'
 
 		queryFields += ", " + tag
-	sql = "select ST_AsText(ST_Transform(way,4326)), osm_id, population " + queryFields +
-	      " from planet_osm_point where " + cond + 
-	      # "LIMIT 2"
+	sql = "select ST_AsText(ST_Transform(way,4326)), osm_id, population " + queryFields + \
+	      " from planet_osm_point where " + cond + \
+	      # "LIMIT 2" + \
 	      ";"
 	print sql
 	cursor.execute(sql)
