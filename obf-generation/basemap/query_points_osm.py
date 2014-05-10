@@ -35,10 +35,12 @@ def process_points(cond, filename, array):
 			tag = '"natural"'
 
 		queryFields += ", " + tag
-	cursor.execute("select ST_AsText(ST_Transform(way,4326)), osm_id, population " + queryFields +
-				   " from planet_osm_point where " + cond + 
-				   # "LIMIT 2"
-				   ";")
+	sql = "select ST_AsText(ST_Transform(way,4326)), osm_id, population " + queryFields +
+				" from planet_osm_point where " + cond + 
+				# "LIMIT 2"
+				";"
+	print sql
+	cursor.execute(sql)
  
 	node_id =-1000
 	parse = re.compile('(-?[\d|\.]+)\s(-?[\d|\.]+)')
