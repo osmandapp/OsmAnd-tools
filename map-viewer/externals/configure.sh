@@ -7,6 +7,9 @@ fi
 
 SRCLOC="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
+# Fail on any error
+set -e
+
 for external in $SRCLOC/* ; do
 	if [ -d "$external" ]; then
 		if [ -e "$external/configure.sh" ]; then

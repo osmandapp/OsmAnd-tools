@@ -179,8 +179,8 @@ int main(int argc, char** argv)
     animator->setMapRenderer(renderer);
 
     //////////////////////////////////////////////////////////////////////////
-    //QHash< QString, std::shared_ptr<const OsmAnd::WorldRegions::WorldRegion> > worldRegions;
-    //OsmAnd::WorldRegions("d:\\OpenSource\\OsmAnd\\OsmAnd\\resources\\countries-info\\regions.ocbf").loadWorldRegions(worldRegions);
+    QHash< QString, std::shared_ptr<const OsmAnd::WorldRegions::WorldRegion> > worldRegions;
+    OsmAnd::WorldRegions("d:\\OpenSource\\OsmAnd\\OsmAnd\\resources\\countries-info\\regions.ocbf").loadWorldRegions(worldRegions);
     //////////////////////////////////////////////////////////////////////////
     
     if(dataDirSpecified)

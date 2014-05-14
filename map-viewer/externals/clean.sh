@@ -7,6 +7,9 @@ fi
 
 SRCLOC="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
+# Fail on any error
+set -e
+
 for external in $SRCLOC/* ; do
 	if ls -1 $external/upstream.* >/dev/null 2>&1
 	then
