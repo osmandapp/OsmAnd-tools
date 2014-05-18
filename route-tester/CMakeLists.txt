@@ -10,7 +10,7 @@ if (CMAKE_SHARED_LIBS_ALLOWED_ON_TARGET)
 	target_link_libraries(voyager
 		OsmAndCoreUtils_shared
 	)
-endif ()
+endif()
 
 if (CMAKE_STATIC_LIBS_ALLOWED_ON_TARGET)
 	add_executable(voyager_standalone
@@ -22,4 +22,4 @@ if (CMAKE_STATIC_LIBS_ALLOWED_ON_TARGET)
 	target_link_libraries(voyager_standalone
 		OsmAndCoreUtils_static
 	)
-endif ()
+endif()

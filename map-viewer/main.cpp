@@ -179,8 +179,8 @@ int main(int argc, char** argv)
     animator->setMapRenderer(renderer);
 
     //////////////////////////////////////////////////////////////////////////
-    QHash< QString, std::shared_ptr<const OsmAnd::WorldRegions::WorldRegion> > worldRegions;
-    OsmAnd::WorldRegions("d:\\OpenSource\\OsmAnd\\OsmAnd\\resources\\countries-info\\regions.ocbf").loadWorldRegions(worldRegions);
+    //QHash< QString, std::shared_ptr<const OsmAnd::WorldRegions::WorldRegion> > worldRegions;
+    //OsmAnd::WorldRegions("d:\\OpenSource\\OsmAnd\\OsmAnd\\resources\\countries-info\\regions.ocbf").loadWorldRegions(worldRegions);
     //////////////////////////////////////////////////////////////////////////
     
     if(dataDirSpecified)
@@ -608,6 +608,11 @@ void keyboardHandler(unsigned char key, int x, int y)
 
                      resourcesManager->updateRepository();
 
+                     if (!resourcesManager->isResourceInstalled(QLatin1String("world_basemap.map.obf")))
+                         resourcesManager->installFromRepository(QLatin1String("world_basemap.map.obf"), downloadProgress);
+                     else if (resourcesManager->isInstalledResourceOutdated(QLatin1String("world_basemap.map.obf")))
+                         resourcesManager->updateFromRepository(QLatin1String("world_basemap.map.obf"), downloadProgress);
+
                      if(!resourcesManager->isResourceInstalled(QLatin1String("ukraine_europe.map.obf")))
                          resourcesManager->installFromRepository(QLatin1String("ukraine_europe.map.obf"), downloadProgress);
                      else if(resourcesManager->isInstalledResourceOutdated(QLatin1String("ukraine_europe.map.obf")))
@@ -626,6 +631,8 @@ void keyboardHandler(unsigned char key, int x, int y)
                 renderer->removeAllSymbolProviders();
             else
             {
+                if (!offlineMapDataProvider)
+                    offlineMapDataProvider.reset(new OsmAnd::OfflineMapDataProvider(obfsCollection, style, density));
                 auto symbolProvider = new OsmAnd::OfflineMapSymbolProvider(offlineMapDataProvider);
                 renderer->addSymbolProvider(std::shared_ptr<OsmAnd::IMapSymbolProvider>(symbolProvider));
             }
