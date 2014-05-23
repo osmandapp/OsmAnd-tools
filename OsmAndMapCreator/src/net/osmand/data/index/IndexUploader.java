@@ -307,32 +307,32 @@ public class IndexUploader {
 						continue;
 					}
 					log.info("Process file " + f.getName());
-					File unzipped = unzip(f);
+					File unzippedFolder = unzip(f);
+					File mainFile = unzippedFolder;
+					File logFile = null;
+					if(!unzippedFolder.getName().endsWith(IndexConstants.TOUR_INDEX_EXT)) {
+						for(File fs : unzippedFolder.listFiles()) {
+							if(!fs.getName().endsWith(IndexBatchCreator.GEN_LOG_EXT)) {
+								mainFile = fs; 
+							}
+						}
+					}
 					boolean skip = false;
-					File logFile = new File(f.getParentFile(), unzipped.getName() + IndexBatchCreator.GEN_LOG_EXT);
 					try {
-						String description = checkfileAndGetDescription(unzipped);
-						timestampCreated = unzipped.lastModified();
+						String description = checkfileAndGetDescription(mainFile);
+						timestampCreated = mainFile.lastModified();
 						if(description == null) {
 							log.info("Skip file " + f.getName());
 							skip = true;
 						} else {
-							List<File> files = new ArrayList<File>();
-							files.add(unzipped);
-							if (logFile.exists()) {
-								files.add(logFile);
-							}
-							File zFile = new File(f.getParentFile(), unzipped.getName() + ".zip");
-							zip(files, zFile, description, timestampCreated);
+							File zFile = new File(f.getParentFile(), unzippedFolder.getName() + ".zip");
+							zip(unzippedFolder, zFile, description, timestampCreated);
 							uploadIndex(f, zFile, description, uploadCredentials);
 						}
 					} finally {
 						if (!skip) {
-							if (!f.getName().equals(unzipped.getName()) || (targetDirectory != null && !targetDirectory.equals(directory))) {
-								Algorithms.removeAllFiles(unzipped);
-							}
-							if (logFile.exists()) {
-								logFile.delete();
+							if (!f.getName().equals(unzippedFolder.getName()) || (targetDirectory != null && !targetDirectory.equals(directory))) {
+								Algorithms.removeAllFiles(unzippedFolder);
 							}
 						}
 					}
@@ -351,11 +351,11 @@ public class IndexUploader {
 		}
 	}
 
-	public static File zip(List<File> fs, File zFile, String description, long lastModifiedTime) throws OneFileException {
+	public static File zip(File folder, File zFile, String description, long lastModifiedTime) throws OneFileException {
 		try {
 			ZipOutputStream zout = new ZipOutputStream(new FileOutputStream(zFile));
 			zout.setLevel(9);
-			for (File f : fs) {
+			for (File f : folder.listFiles()) {
 				log.info("Zipping to file:" + zFile.getName() + " with desc:" + description);
 				if(f.isDirectory()) {
 					for (File lf : f.listFiles()) {
@@ -392,9 +392,9 @@ public class IndexUploader {
 		}
 	}
 
-	private String checkfileAndGetDescription(File f) throws OneFileException {
-		String fileName = f.getName();
-		boolean srtmFile = f.getName().contains(".srtm");
+	private String checkfileAndGetDescription(File mainFile) throws OneFileException {
+		String fileName = mainFile.getName();
+		boolean srtmFile = mainFile.getName().contains(".srtm");
 		boolean tourFile = fileName.endsWith(IndexConstants.TOUR_INDEX_EXT) || fileName.endsWith(IndexConstants.TOUR_INDEX_EXT_ZIP);
 		if(srtmFile != this.srtmProcess) {
 			return null;
@@ -403,7 +403,7 @@ public class IndexUploader {
 			return null;
 		}
 		if (tourFile) {
-			File fl = new File(f, "inventory.xml");
+			File fl = new File(mainFile, "inventory.xml");
 			if(!fl.exists()) {
 				System.err.println("inventory.xml doesn't exist " + fl.getAbsolutePath());
 				return null;
@@ -417,7 +417,7 @@ public class IndexUploader {
 		} else if (fileName.endsWith(IndexConstants.BINARY_MAP_INDEX_EXT) || fileName.endsWith(IndexConstants.BINARY_MAP_INDEX_EXT_ZIP)) {
 			RandomAccessFile raf = null;
 			try {
-				raf = new RandomAccessFile(f, "r");
+				raf = new RandomAccessFile(mainFile, "r");
 				BinaryMapIndexReader reader = new BinaryMapIndexReader(raf);
 				if(reader.getVersion() != IndexConstants.BINARY_MAP_VERSION) {
 					throw new OneFileException("Uploader version is not compatible " + reader.getVersion() + " to current " + IndexConstants.BINARY_MAP_VERSION);
@@ -428,7 +428,7 @@ public class IndexUploader {
 				}
 				String summary = getDescription(reader, fileName);
 				reader.close();
-				f.setLastModified(reader.getDateCreated());
+				mainFile.setLastModified(reader.getDateCreated());
 				return summary;
 			} catch (IOException e) {
 				if (raf != null) {
@@ -491,26 +491,26 @@ public class IndexUploader {
 			ZipFile zipFile;
 			zipFile = new ZipFile(f);
 			Enumeration<? extends ZipEntry> entries = zipFile.entries();
-			File mainFile = null;
 			long slastModified = f.lastModified();
+			String folderName = f.getName().substring(f.getName().length() - 4);
+			File unzipFolder = new File(f.getParentFile(), folderName );
+			unzipFolder.mkdirs();
 			while (entries.hasMoreElements()) {
 				ZipEntry entry = entries.nextElement();
 				long lastModified = slastModified;
 				if(entry.getTime() < lastModified) {
 					lastModified = entry.getTime();
 				}
-				File tempFile = new File(f.getParentFile(), entry.getName());
+				File tempFile = new File(unzipFolder, entry.getName());
+				tempFile.getParentFile().mkdirs();
 				InputStream zin = zipFile.getInputStream(entry);
 				FileOutputStream out = new FileOutputStream(tempFile);
 				Algorithms.streamCopy(zin, out);
 				Algorithms.closeStream(zin);
 				Algorithms.closeStream(out);
-				if (!tempFile.getName().endsWith(IndexConstants.GEN_LOG_EXT)) {
-					mainFile = tempFile;
-				}
 				tempFile.setLastModified(lastModified);
 			}
-			return mainFile;
+			return unzipFolder;
 		} catch (ZipException e) {
 			throw new OneFileException("cannot unzip:" + e.getMessage());
 		} catch (IOException e) {
