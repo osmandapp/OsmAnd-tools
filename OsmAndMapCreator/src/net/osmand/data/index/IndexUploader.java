@@ -12,6 +12,9 @@ import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.text.MessageFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Date;
 import java.util.Enumeration;
 import java.util.List;
@@ -309,7 +312,7 @@ public class IndexUploader {
 					log.info("Process file " + f.getName());
 					File unzippedFolder = unzip(f);
 					File mainFile = unzippedFolder;
-					if(!unzippedFolder.getName().endsWith(IndexConstants.TOUR_INDEX_EXT)) {
+					if(!unzippedFolder.getName().endsWith(IndexConstants.TOUR_INDEX_EXT) && unzippedFolder.isDirectory()) {
 						for(File fs : unzippedFolder.listFiles()) {
 							if(!fs.getName().endsWith(IndexBatchCreator.GEN_LOG_EXT)) {
 								mainFile = fs; 
@@ -354,7 +357,8 @@ public class IndexUploader {
 		try {
 			ZipOutputStream zout = new ZipOutputStream(new FileOutputStream(zFile));
 			zout.setLevel(9);
-			for (File f : folder.listFiles()) {
+			Collection<File> lfs = folder.isFile()?Collections.singleton(folder) : Arrays.asList(folder.listFiles()); 
+			for (File f : lfs) {
 				log.info("Zipping to file:" + zFile.getName() + " with desc:" + description);
 				if(f.isDirectory()) {
 					for (File lf : f.listFiles()) {
