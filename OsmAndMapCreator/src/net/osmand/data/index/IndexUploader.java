@@ -309,7 +309,6 @@ public class IndexUploader {
 					log.info("Process file " + f.getName());
 					File unzippedFolder = unzip(f);
 					File mainFile = unzippedFolder;
-					File logFile = null;
 					if(!unzippedFolder.getName().endsWith(IndexConstants.TOUR_INDEX_EXT)) {
 						for(File fs : unzippedFolder.listFiles()) {
 							if(!fs.getName().endsWith(IndexBatchCreator.GEN_LOG_EXT)) {
@@ -498,6 +497,9 @@ public class IndexUploader {
 			while (entries.hasMoreElements()) {
 				ZipEntry entry = entries.nextElement();
 				long lastModified = slastModified;
+				if(entry.isDirectory()) {
+					continue;
+				}
 				if(entry.getTime() < lastModified) {
 					lastModified = entry.getTime();
 				}
