@@ -492,7 +492,7 @@ public class IndexUploader {
 			zipFile = new ZipFile(f);
 			Enumeration<? extends ZipEntry> entries = zipFile.entries();
 			long slastModified = f.lastModified();
-			String folderName = f.getName().substring(f.getName().length() - 4);
+			String folderName = f.getName().substring(0, f.getName().length() - 4);
 			File unzipFolder = new File(f.getParentFile(), folderName );
 			unzipFolder.mkdirs();
 			while (entries.hasMoreElements()) {
@@ -512,9 +512,9 @@ public class IndexUploader {
 			}
 			return unzipFolder;
 		} catch (ZipException e) {
-			throw new OneFileException("cannot unzip:" + e.getMessage());
+			throw new OneFileException("cannot unzip:" + e.getMessage(), e);
 		} catch (IOException e) {
-			throw new OneFileException("cannot unzip:" + e.getMessage());
+			throw new OneFileException("cannot unzip:" + e.getMessage(), e);
 		}
 	}
 
