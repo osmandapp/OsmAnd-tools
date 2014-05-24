@@ -37,7 +37,8 @@
 #include <OsmAndCore/Map/OfflineMapDataProvider.h>
 #include <OsmAndCore/Map/OfflineMapRasterTileProvider_Software.h>
 #include <OsmAndCore/Map/OfflineMapRasterTileProvider_GPU.h>
-#include <OsmAndCore/Map/OfflineMapSymbolProvider.h>
+#include <OsmAndCore/Map/OfflineMapStaticSymbolProvider.h>
+#include <OsmAndCore/Map/MarkersSymbolProvider.h>
 #include <OsmAndCore/Map/MapAnimator.h>
 
 bool glutWasInitialized = false;
@@ -51,6 +52,8 @@ std::shared_ptr<OsmAnd::OfflineMapDataProvider> offlineMapDataProvider;
 std::shared_ptr<const OsmAnd::IMapStylesCollection> stylesCollection;
 std::shared_ptr<const OsmAnd::MapStyle> style;
 std::shared_ptr<OsmAnd::MapAnimator> animator;
+std::shared_ptr<OsmAnd::OfflineMapStaticSymbolProvider> offlineMapStaticSymbolProvider;
+std::shared_ptr<OsmAnd::MarkersSymbolProvider> markersSymbolProvider;
 
 bool obfsDirSpecified = false;
 QDir obfsDir;
@@ -177,6 +180,9 @@ int main(int argc, char** argv)
     }
     animator.reset(new OsmAnd::MapAnimator());
     animator->setMapRenderer(renderer);
+
+    markersSymbolProvider.reset(new OsmAnd::MarkersSymbolProvider());
+    renderer->addSymbolProvider(markersSymbolProvider);
 
     //////////////////////////////////////////////////////////////////////////
     //QHash< QString, std::shared_ptr<const OsmAnd::WorldRegions::WorldRegion> > worldRegions;
@@ -627,14 +633,18 @@ void keyboardHandler(unsigned char key, int x, int y)
         break;
     case 'z':
         {
-            if(!renderer->state.symbolProviders.isEmpty())
-                renderer->removeAllSymbolProviders();
+            if (renderer->state.symbolProviders.contains(offlineMapStaticSymbolProvider))
+            {
+                renderer->removeSymbolProvider(offlineMapStaticSymbolProvider);
+                offlineMapStaticSymbolProvider.reset();
+            }
             else
             {
                 if (!offlineMapDataProvider)
                     offlineMapDataProvider.reset(new OsmAnd::OfflineMapDataProvider(obfsCollection, style, density));
-                auto symbolProvider = new OsmAnd::OfflineMapSymbolProvider(offlineMapDataProvider);
-                renderer->addSymbolProvider(std::shared_ptr<OsmAnd::IMapSymbolProvider>(symbolProvider));
+
+                offlineMapStaticSymbolProvider.reset(new OsmAnd::OfflineMapStaticSymbolProvider(offlineMapDataProvider));
+                renderer->addSymbolProvider(offlineMapStaticSymbolProvider);
             }
         }
         break;
