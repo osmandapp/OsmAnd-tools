@@ -218,6 +218,10 @@
 
 
 		<!-- 2 Russia [SOURCE: GIS-LAB.INFO] -->
+		<regions siteToDownload="http://download.osmand.net/osm-downloads/russia-{0}.pbf" region_prefix="Russia_"  skip="false" region_suffix="_Asia">	
+			<region name="crimea"/>
+		</regions>
+		
 		<regions siteToDownload="http://be.gis-lab.info/data/osm_dump/dump/latest/RU-{0}.osm.pbf" region_prefix="Russia_"  skip="false" region_suffix="_Asia">
 			<region name="adygeya" downloadName="AD"/>
 			<region name="altay" downloadName="AL"/>
