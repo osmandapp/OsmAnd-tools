@@ -182,6 +182,7 @@ int main(int argc, char** argv)
     animator->setMapRenderer(renderer);
 
     markersSymbolProvider.reset(new OsmAnd::MarkersSymbolProvider());
+    //markersSymbolProvider->createMarker(QString::null, )
     renderer->addSymbolProvider(markersSymbolProvider);
 
     //////////////////////////////////////////////////////////////////////////
@@ -428,11 +429,9 @@ void mouseHandler(int button, int state, int x, int y)
             renderer->getLocationFromScreenPoint(OsmAnd::PointI(x, y), clickedLocation);
             lastClickedLocation31 = OsmAnd::Utilities::normalizeCoordinates(clickedLocation, OsmAnd::ZoomLevel31);
 
-            auto delta = clickedLocation - OsmAnd::PointI64(renderer->state.target31);
-
             animator->cancelAnimation();
-            //animator->animateTargetBy(delta, 1.0f, OsmAnd::MapAnimatorTimingFunction::EaseInOutQuadratic);
-            animator->parabolicAnimateTargetBy(delta, 1.0f, OsmAnd::MapAnimatorTimingFunction::EaseInOutQuadratic, OsmAnd::MapAnimatorTimingFunction::EaseOutInQuadratic);
+            //animator->animateTargetTo(clickedLocation, 1.0f, OsmAnd::MapAnimator::TimingFunction::EaseInOutQuadratic);
+            animator->parabolicAnimateTargetTo(clickedLocation, 1.0f, OsmAnd::MapAnimator::TimingFunction::EaseInOutQuadratic, OsmAnd::MapAnimator::TimingFunction::EaseOutInQuadratic);
             animator->resumeAnimation();
         }
     }
@@ -650,7 +649,7 @@ void keyboardHandler(unsigned char key, int x, int y)
         break;
     case 'q':
         animator->cancelAnimation();
-        animator->animateAzimuthBy(-renderer->state.azimuth, 1.0f, OsmAnd::MapAnimatorTimingFunction::EaseInOutQuadratic);
+        animator->animateAzimuthTo(0.0f, 1.0f, OsmAnd::MapAnimator::TimingFunction::EaseInOutQuadratic);
         animator->resumeAnimation();
         break;
     case '0':
@@ -677,21 +676,19 @@ void keyboardHandler(unsigned char key, int x, int y)
             const auto& target = flag ? amsterdam : kiev;
             flag = !flag;
 
-            const auto delta = target - OsmAnd::PointI64(renderer->state.target31);
-
             animator->cancelAnimation();
-            animator->animateMoveBy(delta, 1.0f, false, false, OsmAnd::MapAnimatorTimingFunction::EaseInOutQuadratic);
+            animator->animateMoveTo(target, 1.0f, false, false, OsmAnd::MapAnimator::TimingFunction::EaseInOutQuadratic);
             animator->resumeAnimation();
         }
         break;
     case '-':
         animator->cancelAnimation();
-        animator->animateZoomBy(-1.0f, 1.0f, OsmAnd::MapAnimatorTimingFunction::EaseInOutQuadratic);
+        animator->animateZoomBy(-1.0f, 1.0f, OsmAnd::MapAnimator::TimingFunction::EaseInOutQuadratic);
         animator->resumeAnimation();
         break;
     case '+':
         animator->cancelAnimation();
-        animator->animateZoomBy(+1.0f, 1.0f, OsmAnd::MapAnimatorTimingFunction::EaseInOutQuadratic);
+        animator->animateZoomBy(+1.0f, 1.0f, OsmAnd::MapAnimator::TimingFunction::EaseInOutQuadratic);
         animator->resumeAnimation();
         break;
     case '*':
