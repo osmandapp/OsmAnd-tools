@@ -36,7 +36,7 @@ def process_roads(cond, filename, fields):
 	      " name, ref, tags->'int_ref' as int_ref " + selectFields + \
 	      " from planet_osm_line where " + cond + ";"
 	      # "LIMIT 1000"
-	print sql
+	#print sql
 	cursor.execute(sql)
  
 	node_id =-1000000000
