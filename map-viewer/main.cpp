@@ -6,6 +6,8 @@
 #include <GL/glew.h>
 #include <GL/freeglut.h>
 
+#include <SkImageDecoder.h>
+
 #include <OsmAndCore/QtExtensions.h>
 #include <QString>
 #include <QList>
@@ -29,16 +31,18 @@
 #include <OsmAndCore/Map/IMapStylesPresetsCollection.h>
 #include <OsmAndCore/Map/MapStyleEvaluator.h>
 #include <OsmAndCore/Map/IMapRenderer.h>
-#include <OsmAndCore/Map/OnlineMapRasterTileProvider.h>
+#include <OsmAndCore/Map/OnlineRasterMapTileProvider.h>
 #include <OsmAndCore/Map/OnlineTileSources.h>
 #include <OsmAndCore/Map/HillshadeTileProvider.h>
 #include <OsmAndCore/Map/IMapElevationDataProvider.h>
 #include <OsmAndCore/Map/HeightmapTileProvider.h>
-#include <OsmAndCore/Map/OfflineMapDataProvider.h>
-#include <OsmAndCore/Map/OfflineMapRasterTileProvider_Software.h>
-#include <OsmAndCore/Map/OfflineMapRasterTileProvider_GPU.h>
-#include <OsmAndCore/Map/OfflineMapStaticSymbolProvider.h>
-#include <OsmAndCore/Map/MarkersSymbolProvider.h>
+#include <OsmAndCore/Map/BinaryMapDataProvider.h>
+#include <OsmAndCore/Map/BinaryMapRasterBitmapTileProvider_Software.h>
+#include <OsmAndCore/Map/BinaryMapRasterBitmapTileProvider_GPU.h>
+#include <OsmAndCore/Map/BinaryMapStaticSymbolsProvider.h>
+#include <OsmAndCore/Map/MapMarkersCollection.h>
+#include <OsmAndCore/Map/MapMarkerBuilder.h>
+#include <OsmAndCore/Map/MapMarker.h>
 #include <OsmAndCore/Map/MapAnimator.h>
 
 bool glutWasInitialized = false;
@@ -48,12 +52,13 @@ OsmAnd::AreaI viewport;
 std::shared_ptr<OsmAnd::IMapRenderer> renderer;
 std::shared_ptr<OsmAnd::ResourcesManager> resourcesManager;
 std::shared_ptr<const OsmAnd::IObfsCollection> obfsCollection;
-std::shared_ptr<OsmAnd::OfflineMapDataProvider> offlineMapDataProvider;
+std::shared_ptr<OsmAnd::BinaryMapDataProvider> binaryMapDataProvider;
 std::shared_ptr<const OsmAnd::IMapStylesCollection> stylesCollection;
 std::shared_ptr<const OsmAnd::MapStyle> style;
 std::shared_ptr<OsmAnd::MapAnimator> animator;
-std::shared_ptr<OsmAnd::OfflineMapStaticSymbolProvider> offlineMapStaticSymbolProvider;
-std::shared_ptr<OsmAnd::MarkersSymbolProvider> markersSymbolProvider;
+std::shared_ptr<OsmAnd::BinaryMapStaticSymbolsProvider> binaryMapStaticSymbolProvider;
+std::shared_ptr<OsmAnd::MapMarkersCollection> markers;
+std::shared_ptr<OsmAnd::MapMarker> lastClickedLocationMarker;
 
 bool obfsDirSpecified = false;
 QDir obfsDir;
@@ -97,6 +102,8 @@ int main(int argc, char** argv)
 {
     //////////////////////////////////////////////////////////////////////////
     OsmAnd::InitializeCore();
+
+    const std::unique_ptr<SkImageDecoder> pngDecoder(CreatePNGImageDecoder());
 
     for(int argIdx = 1; argIdx < argc; argIdx++)
     {
@@ -181,9 +188,13 @@ int main(int argc, char** argv)
     animator.reset(new OsmAnd::MapAnimator());
     animator->setMapRenderer(renderer);
 
-    markersSymbolProvider.reset(new OsmAnd::MarkersSymbolProvider());
-    //markersSymbolProvider->createMarker(QString::null, )
-    renderer->addSymbolProvider(markersSymbolProvider);
+    markers.reset(new OsmAnd::MapMarkersCollection());
+    std::shared_ptr<OsmAnd::MapMarkerBuilder> markerBuilder(new OsmAnd::MapMarkerBuilder());
+    std::shared_ptr<SkBitmap> locationPinImage(new SkBitmap());
+    pngDecoder->DecodeFile("d:\\OpenSource\\OsmAnd\\iOS7_icons_extended\\PNG\\Maps\\location\\location-32.png", locationPinImage.get());
+    markerBuilder->setPinIcon(locationPinImage);
+    lastClickedLocationMarker = markerBuilder->buildAndAddToCollection(markers);
+    renderer->addSymbolProvider(markers);
 
     //////////////////////////////////////////////////////////////////////////
     //QHash< QString, std::shared_ptr<const OsmAnd::WorldRegions::WorldRegion> > worldRegions;
@@ -366,6 +377,8 @@ int main(int argc, char** argv)
     renderConfig.heixelsPerTileSide = 32;
     renderer->setConfiguration(renderConfig);
 
+    lastClickedLocationMarker->setPosition(renderer->state.target31);
+
     renderer->initializeRendering();
     //////////////////////////////////////////////////////////////////////////
 
@@ -380,7 +393,7 @@ int main(int argc, char** argv)
     renderer.reset();
     resourcesManager.reset();
     obfsCollection.reset();
-    offlineMapDataProvider.reset();
+    binaryMapDataProvider.reset();
     stylesCollection.reset();
     style.reset();
     animator.reset();
@@ -428,6 +441,7 @@ void mouseHandler(int button, int state, int x, int y)
             OsmAnd::PointI64 clickedLocation;
             renderer->getLocationFromScreenPoint(OsmAnd::PointI(x, y), clickedLocation);
             lastClickedLocation31 = OsmAnd::Utilities::normalizeCoordinates(clickedLocation, OsmAnd::ZoomLevel31);
+            lastClickedLocationMarker->setPosition(lastClickedLocation31);
 
             animator->cancelAnimation();
             //animator->animateTargetTo(clickedLocation, 1.0f, OsmAnd::MapAnimator::TimingFunction::EaseInOutQuadratic);
@@ -460,6 +474,7 @@ void mouseMotion(int x, int y)
         newTarget.y = dragInitTarget.y - static_cast<int32_t>(ny * scale31);
 
         renderer->setTarget(newTarget);
+        lastClickedLocationMarker->setPosition(newTarget);
     }
 }
 
@@ -541,8 +556,8 @@ void keyboardHandler(unsigned char key, int x, int y)
             {
                 if(wasHeightsDirSpecified)
                 {
-                    auto provider = new OsmAnd::HeightmapTileProvider(heightsDir, cacheDir.absoluteFilePath(OsmAnd::HeightmapTileProvider::defaultIndexFilename));
-                    renderer->setElevationDataProvider(std::shared_ptr<OsmAnd::IMapElevationDataProvider>(provider));
+                    //auto provider = new OsmAnd::HeightmapTileProvider(heightsDir, cacheDir.absoluteFilePath(OsmAnd::HeightmapTileProvider::defaultIndexFilename));
+                    //renderer->setElevationDataProvider(std::shared_ptr<OsmAnd::IMapElevationDataProvider>(provider));
                 }
             }
         }
@@ -632,18 +647,18 @@ void keyboardHandler(unsigned char key, int x, int y)
         break;
     case 'z':
         {
-            if (renderer->state.symbolProviders.contains(offlineMapStaticSymbolProvider))
+            if (renderer->state.symbolProviders.contains(binaryMapStaticSymbolProvider))
             {
-                renderer->removeSymbolProvider(offlineMapStaticSymbolProvider);
-                offlineMapStaticSymbolProvider.reset();
+                renderer->removeSymbolProvider(binaryMapStaticSymbolProvider);
+                binaryMapStaticSymbolProvider.reset();
             }
             else
             {
-                if (!offlineMapDataProvider)
-                    offlineMapDataProvider.reset(new OsmAnd::OfflineMapDataProvider(obfsCollection, style, density));
+                if (!binaryMapDataProvider)
+                    binaryMapDataProvider.reset(new OsmAnd::BinaryMapDataProvider(obfsCollection, style, density));
 
-                offlineMapStaticSymbolProvider.reset(new OsmAnd::OfflineMapStaticSymbolProvider(offlineMapDataProvider));
-                renderer->addSymbolProvider(offlineMapStaticSymbolProvider);
+                binaryMapStaticSymbolProvider.reset(new OsmAnd::BinaryMapStaticSymbolsProvider(binaryMapDataProvider));
+                renderer->addSymbolProvider(binaryMapStaticSymbolProvider);
             }
         }
         break;
@@ -745,51 +760,51 @@ void activateProvider(OsmAnd::RasterMapLayerId layerId, int idx)
     }
     else if(idx == 2)
     {
-        offlineMapDataProvider.reset(new OsmAnd::OfflineMapDataProvider(obfsCollection, style, density));
+        binaryMapDataProvider.reset(new OsmAnd::BinaryMapDataProvider(obfsCollection, style, density));
 
         // general
         QHash< QString, QString > settings;
         settings.insert("appMode", "browse map");
-        offlineMapDataProvider->rasterizerEnvironment->setSettings(settings);
+        binaryMapDataProvider->rasterizerEnvironment->setSettings(settings);
 
-        auto tileProvider = new OsmAnd::OfflineMapRasterTileProvider_Software(offlineMapDataProvider);
-        renderer->setRasterLayerProvider(layerId, std::shared_ptr<OsmAnd::IMapBitmapTileProvider>(tileProvider));
+        auto tileProvider = new OsmAnd::BinaryMapRasterBitmapTileProvider_Software(binaryMapDataProvider);
+        renderer->setRasterLayerProvider(layerId, std::shared_ptr<OsmAnd::IMapRasterBitmapTileProvider>(tileProvider));
     }
     else if(idx == 3)
     {
-        offlineMapDataProvider.reset(new OsmAnd::OfflineMapDataProvider(obfsCollection, style, density));
+        binaryMapDataProvider.reset(new OsmAnd::BinaryMapDataProvider(obfsCollection, style, density));
 
         // car
         QHash< QString, QString > settings;
         settings.insert("appMode", "car");
-        offlineMapDataProvider->rasterizerEnvironment->setSettings(settings);
+        binaryMapDataProvider->rasterizerEnvironment->setSettings(settings);
 
-        auto tileProvider = new OsmAnd::OfflineMapRasterTileProvider_Software(offlineMapDataProvider);
-        renderer->setRasterLayerProvider(layerId, std::shared_ptr<OsmAnd::IMapBitmapTileProvider>(tileProvider));
+        auto tileProvider = new OsmAnd::BinaryMapRasterBitmapTileProvider_Software(binaryMapDataProvider);
+        renderer->setRasterLayerProvider(layerId, std::shared_ptr<OsmAnd::IMapRasterBitmapTileProvider>(tileProvider));
     }
     else if(idx == 4)
     {
-        offlineMapDataProvider.reset(new OsmAnd::OfflineMapDataProvider(obfsCollection, style, density));
+        binaryMapDataProvider.reset(new OsmAnd::BinaryMapDataProvider(obfsCollection, style, density));
 
         // bicycle
         QHash< QString, QString > settings;
         settings.insert("appMode", "bicycle");
-        offlineMapDataProvider->rasterizerEnvironment->setSettings(settings);
+        binaryMapDataProvider->rasterizerEnvironment->setSettings(settings);
 
-        auto tileProvider = new OsmAnd::OfflineMapRasterTileProvider_Software(offlineMapDataProvider);
-        renderer->setRasterLayerProvider(layerId, std::shared_ptr<OsmAnd::IMapBitmapTileProvider>(tileProvider));
+        auto tileProvider = new OsmAnd::BinaryMapRasterBitmapTileProvider_Software(binaryMapDataProvider);
+        renderer->setRasterLayerProvider(layerId, std::shared_ptr<OsmAnd::IMapRasterBitmapTileProvider>(tileProvider));
     }
     else if(idx == 5)
     {
-        offlineMapDataProvider.reset(new OsmAnd::OfflineMapDataProvider(obfsCollection, style, density));
+        binaryMapDataProvider.reset(new OsmAnd::BinaryMapDataProvider(obfsCollection, style, density));
         
         // pedestrian
         QHash< QString, QString > settings;
         settings.insert("appMode", "pedestrian");
-        offlineMapDataProvider->rasterizerEnvironment->setSettings(settings);
+        binaryMapDataProvider->rasterizerEnvironment->setSettings(settings);
 
-        auto tileProvider = new OsmAnd::OfflineMapRasterTileProvider_Software(offlineMapDataProvider);
-        renderer->setRasterLayerProvider(layerId, std::shared_ptr<OsmAnd::IMapBitmapTileProvider>(tileProvider));
+        auto tileProvider = new OsmAnd::BinaryMapRasterBitmapTileProvider_Software(binaryMapDataProvider);
+        renderer->setRasterLayerProvider(layerId, std::shared_ptr<OsmAnd::IMapRasterBitmapTileProvider>(tileProvider));
     }
     else if(idx == 6)
     {
