@@ -190,10 +190,21 @@ int main(int argc, char** argv)
 
     markers.reset(new OsmAnd::MapMarkersCollection());
     std::shared_ptr<OsmAnd::MapMarkerBuilder> markerBuilder(new OsmAnd::MapMarkerBuilder());
-    std::shared_ptr<SkBitmap> locationPinImage(new SkBitmap());
-    pngDecoder->DecodeFile("d:\\OpenSource\\OsmAnd\\iOS7_icons_extended\\PNG\\Maps\\location\\location-32.png", locationPinImage.get());
-    markerBuilder->setPinIcon(locationPinImage);
+    {
+        std::shared_ptr<SkBitmap> locationPinImage(new SkBitmap());
+        pngDecoder->DecodeFile("d:\\OpenSource\\OsmAnd\\iOS7_icons_extended\\PNG\\Maps\\location\\location-32.png", locationPinImage.get());
+        markerBuilder->setPinIcon(locationPinImage);
+    }
+    {
+        std::shared_ptr<SkBitmap> locationOnMapSurfaceImage(new SkBitmap());
+        pngDecoder->DecodeFile("d:\\OpenSource\\OsmAnd\\iOS7_icons_extended\\PNG\\Camping_Equipment\\campfire\\campfire-32.png", locationOnMapSurfaceImage.get());
+        markerBuilder->addOnMapSurfaceIcon(reinterpret_cast<OsmAnd::MapMarker::OnSurfaceIconKey>(1), locationOnMapSurfaceImage);
+    }
+    markerBuilder->setPrecisionCircleBaseColor(OsmAnd::FColorRGB(1.0f, 0.0f, 0.0f));
     lastClickedLocationMarker = markerBuilder->buildAndAddToCollection(markers);
+    lastClickedLocationMarker->setOnMapSurfaceIconDirection(reinterpret_cast<OsmAnd::MapMarker::OnSurfaceIconKey>(1), Q_QNAN);
+    lastClickedLocationMarker->setIsPrecisionCircleEnabled(true);
+    lastClickedLocationMarker->setPrecisionCircleRadius(2000.0);
     renderer->addSymbolProvider(markers);
 
     //////////////////////////////////////////////////////////////////////////
