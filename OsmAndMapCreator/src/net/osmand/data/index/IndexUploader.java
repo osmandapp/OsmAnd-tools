@@ -360,13 +360,7 @@ public class IndexUploader {
 			Collection<File> lfs = folder.isFile()?Collections.singleton(folder) : Arrays.asList(folder.listFiles()); 
 			for (File f : lfs) {
 				log.info("Zipping to file:" + zFile.getName() + " with desc:" + description);
-				if(f.isDirectory()) {
-					for (File lf : f.listFiles()) {
-						putZipEntry(description, "", lastModifiedTime, zout, lf);
-					}
-				} else {
-					putZipEntry(description,"",lastModifiedTime, zout, f);
-				}
+				putZipEntry(description,"",lastModifiedTime, zout, f);
 			}
 			Algorithms.closeStream(zout);
 			zFile.setLastModified(lastModifiedTime);
