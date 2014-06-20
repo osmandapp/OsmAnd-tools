@@ -10,6 +10,8 @@
 	<property name="src.absolute.dir" location="${src.dir}" />
 	<property name="icons.dir" value="icons/resources"/>
 	<property name="icons.absolute.dir" location="${icons.dir}" />
+	<property name="fonts.dir" value="fonts"/>
+	<property name="fonts.absolute.dir" location="${fonts.dir}" />
 	<property name="bin.dir" value="bin"/>
 	<property name="bintests.dir" value="bin-tests"/>
 	<property name="bin.absolute.dir" location="${bin.dir}" />
@@ -27,6 +29,46 @@
 
 	<target name="copy_resources">
 		<mkdir dir="${icons.absolute.dir}"/>
+		<mkdir dir="${fonts.absolute.dir}"/>
+		<copy todir="${fonts.absolute.dir}">
+			<fileset dir="../../resources/rendering_styles/fonts/OpenSans">
+				<include name="OpenSans-Regular.ttf" />
+				<include name="OpenSans-Italic.ttf"/>
+				<include name="OpenSans-Semibold.ttf"/>
+				<include name="OpenSans-SemiboldItalic.ttf"/>
+			</fileset>
+		</copy>
+		<copy todir="${fonts.absolute.dir}">
+			<fileset dir="../../resources/rendering_styles/fonts">				
+				<include name="DroidSansEthiopic-Regular.ttf"/>
+				<include name="DroidSansEthiopic-Bold.ttf"/>
+				<include name="DroidSansArabic.ttf"/>
+				<include name="DroidSansHebrew-Regular.ttf"/>
+				<include name="DroidSansHebrew-Bold.ttf"/>
+				<include name="NotoSansThai-Regular.ttf"/>
+				<include name="NotoSansThai-Bold.ttf"/>
+				<include name="DroidSansArmenian.ttf"/>
+				<include name="DroidSansGeorgian.ttf"/>
+				<include name="NotoSansDevanagari-Regular.ttf"/>
+				<include name="NotoSansDevanagari-Bold.ttf"/>
+				<include name="NotoSansTamil-Regular.ttf"/>
+				<include name="NotoSansTamil-Bold.ttf"/>
+				<include name="NotoSansMalayalam.ttf"/>
+				<include name="NotoSansMalayalam-Bold.ttf"/>
+				<include name="NotoSansBengali-Regular.ttf"/>
+				<include name="NotoSansBengali-Bold.ttf"/>
+				<include name="NotoSansTelugu-Regular.ttf"/>
+				<include name="NotoSansTelugu-Bold.ttf"/>
+				<include name="NotoSansKannada-Regular.ttf"/>
+				<include name="NotoSansKannada-Bold.ttf"/>
+				<include name="NotoSansKhmer-Regular.ttf"/>
+				<include name="NotoSansKhmer-Bold.ttf"/>
+				<include name="NotoSansLao-Regular.ttf"/>
+				<include name="NotoSansLao-Bold.ttf"/>
+				<include name="DroidSansFallback.ttf"/>
+				<include name="MTLmr3m.ttf"/>
+			</fileset>
+		</copy>
 		<copy todir="${icons.absolute.dir}">
 			<fileset dir="../../resources/rendering_styles/style-icons/drawable-mdpi/">
 				<include name="*"/>
@@ -127,6 +169,9 @@
 			</fileset>
 			<fileset dir="${icons.absolute.dir}/..">
 				<include name="**/*" />
+			</fileset>
+			<fileset dir="${fonts.absolute.dir}/..">
+				<include name="fonts/*" />
 			</fileset>
 			<fileset dir="${src.absolute.dir}">
 				<include name="**/*.java" />
