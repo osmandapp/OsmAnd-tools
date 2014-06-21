@@ -103,6 +103,7 @@ public class OsmAndImageRendering {
 			
 			for (ImageCombination ic : ls) {
 				nsr.loadRuleStorage(ic.renderingStyle, ic.renderingProperties);
+				System.out.println("Generate " + ic.generateName + " style " + ic.renderingStyle);
 				BufferedImage mg = nsr.renderImage(new RenderingImageContext(lat, lon, imageWidth, imageHeight,
 						ic.zoom, ic.zoomScale));
 
