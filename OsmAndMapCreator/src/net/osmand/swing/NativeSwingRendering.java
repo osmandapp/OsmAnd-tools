@@ -294,67 +294,6 @@ public class NativeSwingRendering extends NativeLibrary {
 		}
 		return defaultLoadedLibrary;
 	}
-	/**
-     * Compares two {@code int} values.
-     * @return 0 if lhs = rhs, less than 0 if lhs &lt; rhs, and greater than 0 if lhs &gt; rhs.
-     * @since 1.7
-     */
-    public static int ccmp(int lhs, int rhs) {
-        return lhs < rhs ? -1 : (lhs == rhs ? 0 : 1);
-    }
-	private void loadFontData(String dir) {
-		File dr = new File(dir);
-		if (dr.listFiles() == null) {
-			System.err.println("No fonts loaded from " + dr.getAbsolutePath());
-			return;
-		}
-		ArrayList<File> lst = new ArrayList<File>(Arrays.asList(dr.listFiles()));
-		Collections.sort(lst, new Comparator<File>() {
-			
-
-			@Override
-			public int compare(File arg0, File arg1) {
-				return ccmp(order(arg0), order(arg1));
-			}
-
-			private int order(File a) {
-				final String nm = a.getName().toLowerCase();
-				if(nm.contains("OpenSans".toLowerCase())) {
-					if(nm.contains("Regular".toLowerCase())) {
-						return 0;
-					}
-					return 1;
-				}
-				if(nm.contains("Fallback".toLowerCase())) {
-					return 3;
-				}
-				if(nm.contains("MTLmr3m".toLowerCase())) {
-					return 5;
-				}
-				return 2;
-			}
-		});
-		for(File f : lst) {
-			final String name = f.getName();
-			if(!name.endsWith(".ttf")) {
-				continue;
-			}
-			try {
-				ByteArrayOutputStream ous = new ByteArrayOutputStream();
-				FileInputStream fis = new FileInputStream(f);
-				Algorithms.streamCopy(fis, ous);
-				fis.close();
-				initFontType(ous.toByteArray(), name.substring(0, name.length() - 4), name.toLowerCase().contains("bold"),
-						name.toLowerCase().contains("italic"));
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-		}
-		
-	}
-	
-
-
 	
 
 }
