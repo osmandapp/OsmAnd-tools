@@ -1,16 +1,10 @@
 package net.osmand.swing;
 
 import java.awt.image.BufferedImage;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URL;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -74,6 +68,7 @@ public class NativeSwingRendering extends NativeLibrary {
 		}
 	}
 	
+	@SuppressWarnings("resource")
 	public void loadRuleStorage(String path, String renderingProperties) throws IOException, XmlPullParserException, SAXException{
 		final LinkedHashMap<String, String> renderingConstants = new LinkedHashMap<String, String>();
 		
@@ -92,9 +87,23 @@ public class NativeSwingRendering extends NativeLibrary {
 			storage = new RenderingRulesStorage("default", renderingConstants);
 			storage.parseRulesFromXmlInputStream(RenderingRulesStorage.class.getResourceAsStream("default.render.xml"), resolver);
 		} else {
-			loadRenderingAttributes(new FileInputStream(path),renderingConstants);
+			InputStream is = null;
+			InputStream is2 = null;
+			if (new File(path).exists()) {
+				is = new FileInputStream(new File(path));
+				is2 = new FileInputStream(new File(path));
+			} else {
+				is = RenderingRulesStorage.class.getResourceAsStream(path + ".render.xml");
+				is2 = RenderingRulesStorage.class.getResourceAsStream(path + ".render.xml");
+			}
+			if(is == null) {
+				throw new IllegalArgumentException("Can't find rendering style '" + path + "'");
+			}
+			loadRenderingAttributes(is, renderingConstants);
 			storage = new RenderingRulesStorage("default", renderingConstants);
-			storage.parseRulesFromXmlInputStream(new FileInputStream(path), resolver);
+			storage.parseRulesFromXmlInputStream(is2, resolver);
+			is.close();
+			is2.close();
 		}
 		renderingProps = new HashMap<String, String>();
 		String[] props = renderingProperties.split(",");
