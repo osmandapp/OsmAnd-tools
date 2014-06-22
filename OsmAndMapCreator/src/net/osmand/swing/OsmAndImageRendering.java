@@ -160,7 +160,7 @@ public class OsmAndImageRendering {
 			transformer.setOutputProperty(OutputKeys.ENCODING, "UTF-8");
 			transformer.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "yes");
 			transformer.setOutputProperty("{http://xml.apache.org/xslt}indent-amount", "4");
-			transformer.transform(new DOMSource(gen.item(0).getFirstChild()), new StreamResult(sw));
+			transformer.transform(new DOMSource(gen.item(0)), new StreamResult(sw));
 			html.setContent(sw.toString());
 		}
 		for (int i = 0; i < nl.getLength(); i++) {
