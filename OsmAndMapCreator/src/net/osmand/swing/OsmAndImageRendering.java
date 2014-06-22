@@ -146,7 +146,7 @@ public class OsmAndImageRendering {
 		String defHeight = getAttribute(de, "height", "768");
 		
 		NodeList nl = doc.getElementsByTagName("wpt");
-		NodeList gen = doc.getElementsByTagName("html_gen");
+		NodeList gen = doc.getElementsByTagName("html");
 		File gpx = new File(gpxFile);
 		HTMLContent html = null;
 		if (gen.getLength() > 0) {
