@@ -112,8 +112,8 @@ public class OsmAndImageRendering {
 			String row = textContent.substring(rw + 4, erw);
 			footer = textContent.substring(erw + 4);
 			
-			int crw = row.indexOf("<ROWELEMENT>");
-			int cerw = row.indexOf("</ROWELEMENT>");
+			int crw = row.indexOf("<ROW_ELEMENT>");
+			int cerw = row.indexOf("</ROW_ELEMENT>");
 			rowheader = row.substring(0, crw);
 			rowContent = row.substring(crw + 4, cerw);
 			rowfooter = row.substring(cerw + 4);
@@ -160,7 +160,7 @@ public class OsmAndImageRendering {
 			transformer.setOutputProperty(OutputKeys.ENCODING, "UTF-8");
 			transformer.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "yes");
 			transformer.setOutputProperty("{http://xml.apache.org/xslt}indent-amount", "4");
-			transformer.transform(new DOMSource(gen.item(0)), new StreamResult(sw));
+			transformer.transform(new DOMSource(gen.item(0).getFirstChild()), new StreamResult(sw));
 			html.setContent(sw.toString());
 		}
 		for (int i = 0; i < nl.getLength(); i++) {
