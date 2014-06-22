@@ -98,6 +98,7 @@ public class OsmAndImageRendering {
 		}
 
 		public void setContent(String textContent) {
+			System.out.println("Generate html page " + textContent);
 			int rw = textContent.indexOf("<ROW>");
 			int erw = textContent.indexOf("</ROW>");
 			header = textContent.substring(0, rw);
@@ -182,7 +183,9 @@ public class OsmAndImageRendering {
 				writer.write(mg);
 			}
 		}
-		html.write();
+		if(html != null) {
+			html.write();
+		}
 	}
 
 	private static List<ImageCombination> getCombinations(String name, String zooms, String zoomScales,
