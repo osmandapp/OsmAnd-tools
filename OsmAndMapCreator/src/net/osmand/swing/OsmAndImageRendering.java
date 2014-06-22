@@ -1,10 +1,12 @@
 package net.osmand.swing;
 
 import java.awt.image.BufferedImage;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -54,6 +56,64 @@ public class OsmAndImageRendering {
 		String generateName;
 	}
 	
+	public static class HTMLContent {
+
+		private File file;
+		private List<String> descriptions = new ArrayList<String>();
+		private List<List<String>> files = new ArrayList<List<String>>();
+		private String header;
+		private String footer;
+		private String rowheader;
+		private String rowfooter;
+		private String rowContent;
+		
+
+		public HTMLContent(File file) {
+			this.file = file;
+		}
+		
+		public void addFile(String file) {
+			files.get(files.size() - 1).add(file);
+		}
+		
+		public void newRow(String description) {
+			descriptions.add(description);
+			files.add(new ArrayList<String>());
+		}
+		
+		public void write() throws IOException {
+			BufferedWriter w = new BufferedWriter(new FileWriter(file));
+			w.write(header);
+			for(int i = 0; i< descriptions.size();i++){
+				String desc = descriptions.get(i);
+				List<String> fs = files.get(i);
+				w.write(rowheader.replace("$DESCRIPTION", desc));
+				for(String f : fs) {
+					w.write(rowContent.replace("$FILENAME", f));
+				}
+				w.write(rowfooter.replace("$DESCRIPTION", desc));
+			}
+			w.write(footer);
+			w.close();
+		}
+
+		public void setContent(String textContent) {
+			int rw = textContent.indexOf("<ROW>");
+			int erw = textContent.indexOf("</ROW>");
+			header = textContent.substring(0, rw);
+			String row = textContent.substring(rw + 4, erw);
+			footer = textContent.substring(erw + 4);
+			
+			int crw = row.indexOf("<ROWELEMENT>");
+			int cerw = row.indexOf("</ROWELEMENT>");
+			rowheader = row.substring(0, crw);
+			rowContent = row.substring(crw + 4, cerw);
+			rowfooter = row.substring(cerw + 4);
+
+		}
+		
+	}
+	
 	public static void main(String[] args) throws IOException, XmlPullParserException, SAXException, ParserConfigurationException {
 		args = setupDefaultAttrs(args);
 //		
@@ -78,7 +138,15 @@ public class OsmAndImageRendering {
 		String defHeight = getAttribute(de, "height", "768");
 		
 		NodeList nl = doc.getElementsByTagName("wpt");
-		
+		NodeList gen = doc.getElementsByTagName("html_gen");
+		File gpx = new File(gpxFile);
+		HTMLContent html = null;
+		if(gen.getLength() > 0) {
+			html= new HTMLContent(new File(gpx.getParentFile(), gpx.getName().substring(0,
+					gpx.getName().length() - 4)
+					+ ".html"));
+			html.setContent(gen.item(0).getTextContent());
+		}
 		for (int i = 0; i < nl.getLength(); i++) {
 			Element e = (Element) nl.item(i);
 			double lat = Double.parseDouble(e.getAttribute("lat"));
@@ -100,7 +168,7 @@ public class OsmAndImageRendering {
 //			nsr.initFilesInDir(new File(dirWithObf));
 			initMaps(dirWithObf, backup, gpxFile, maps, nsr);
 			List<ImageCombination> ls = getCombinations(name, zooms, zoomScales, renderingNames, renderingProperties) ;
-			
+			html.newRow(getSubAttr(e, "desc", ""));
 			for (ImageCombination ic : ls) {
 				nsr.loadRuleStorage(ic.renderingStyle, ic.renderingProperties);
 				System.out.println("Generate " + ic.generateName + " style " + ic.renderingStyle);
@@ -108,10 +176,13 @@ public class OsmAndImageRendering {
 						ic.zoom, ic.zoomScale));
 
 				ImageWriter writer = ImageIO.getImageWritersBySuffix("png").next();
-				writer.setOutput(new FileImageOutputStream(new File(outputFiles, ic.generateName + ".png")));
+				final String fileName = ic.generateName + ".png";
+				html.addFile(fileName);
+				writer.setOutput(new FileImageOutputStream(new File(outputFiles, fileName)));
 				writer.write(mg);
 			}
 		}
+		html.write();
 	}
 
 	private static List<ImageCombination> getCombinations(String name, String zooms, String zoomScales,
