@@ -109,14 +109,14 @@ public class OsmAndImageRendering {
 			int rw = textContent.indexOf("<ROW>");
 			int erw = textContent.indexOf("</ROW>");
 			header = textContent.substring(0, rw);
-			String row = textContent.substring(rw + 4, erw);
-			footer = textContent.substring(erw + 4);
+			String row = textContent.substring(rw + "<ROW>".length(), erw);
+			footer = textContent.substring(erw + "</ROW>".length());
 			
 			int crw = row.indexOf("<ROW_ELEMENT>");
 			int cerw = row.indexOf("</ROW_ELEMENT>");
 			rowheader = row.substring(0, crw);
-			rowContent = row.substring(crw + 4, cerw);
-			rowfooter = row.substring(cerw + 4);
+			rowContent = row.substring(crw + "<ROW_ELEMENT>".length(), cerw);
+			rowfooter = row.substring(cerw + "</ROW_ELEMENT>".length());
 
 		}
 		
@@ -184,7 +184,9 @@ public class OsmAndImageRendering {
 //			nsr.initFilesInDir(new File(dirWithObf));
 			initMaps(dirWithObf, backup, gpxFile, maps, nsr);
 			List<ImageCombination> ls = getCombinations(name, zooms, zoomScales, renderingNames, renderingProperties) ;
-			html.newRow(getSubAttr(e, "desc", ""));
+			if(html != null) {
+				html.newRow(getSubAttr(e, "desc", ""));
+			}
 			for (ImageCombination ic : ls) {
 				nsr.loadRuleStorage(ic.renderingStyle, ic.renderingProperties);
 				System.out.println("Generate " + ic.generateName + " style " + ic.renderingStyle);
@@ -193,7 +195,9 @@ public class OsmAndImageRendering {
 
 				ImageWriter writer = ImageIO.getImageWritersBySuffix("png").next();
 				final String fileName = ic.generateName + ".png";
-				html.addFile(fileName);
+				if(html != null) {
+					html.addFile(fileName);
+				}
 				writer.setOutput(new FileImageOutputStream(new File(outputFiles, fileName)));
 				writer.write(mg);
 			}
