@@ -8,6 +8,7 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.zip.ZipEntry;
@@ -19,6 +20,12 @@ import javax.imageio.stream.FileImageOutputStream;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.transform.OutputKeys;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerException;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
 
 import net.osmand.NativeLibrary;
 import net.osmand.swing.NativeSwingRendering.RenderingImageContext;
@@ -115,7 +122,7 @@ public class OsmAndImageRendering {
 		
 	}
 	
-	public static void main(String[] args) throws IOException, XmlPullParserException, SAXException, ParserConfigurationException {
+	public static void main(String[] args) throws IOException, XmlPullParserException, SAXException, ParserConfigurationException, TransformerException {
 		args = setupDefaultAttrs(args);
 //		
 		String nativeLib = args[0];
@@ -142,11 +149,19 @@ public class OsmAndImageRendering {
 		NodeList gen = doc.getElementsByTagName("html_gen");
 		File gpx = new File(gpxFile);
 		HTMLContent html = null;
-		if(gen.getLength() > 0) {
-			html= new HTMLContent(new File(gpx.getParentFile(), gpx.getName().substring(0,
-					gpx.getName().length() - 4)
+		if (gen.getLength() > 0) {
+			html = new HTMLContent(new File(gpx.getParentFile(), gpx.getName().substring(0, gpx.getName().length() - 4)
 					+ ".html"));
-			html.setContent(gen.item(0).getTextContent());
+			StringWriter sw = new StringWriter();
+			TransformerFactory tf = TransformerFactory.newInstance();
+			Transformer transformer = tf.newTransformer();
+			transformer.setOutputProperty(OutputKeys.METHOD, "xml");
+			transformer.setOutputProperty(OutputKeys.INDENT, "yes");
+			transformer.setOutputProperty(OutputKeys.ENCODING, "UTF-8");
+			transformer.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "yes");
+			transformer.setOutputProperty("{http://xml.apache.org/xslt}indent-amount", "4");
+			transformer.transform(new DOMSource(gen.item(0)), new StreamResult(sw));
+			html.setContent(sw.toString());
 		}
 		for (int i = 0; i < nl.getLength(); i++) {
 			Element e = (Element) nl.item(i);
