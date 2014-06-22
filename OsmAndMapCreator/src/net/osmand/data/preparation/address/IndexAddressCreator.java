@@ -716,8 +716,14 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 			if (type != null || interpolationInterval > 0) {
 				List<Node> nodesWithHno = new ArrayList<Node>();
 				for (Node n : ((Way) e).getNodes()) {
-					if (n.getTag(OSMTagKey.ADDR_HOUSE_NUMBER) != null && n.getTag(OSMTagKey.ADDR_STREET) != null) {
-						nodesWithHno.add(n);
+					if (n.getTag(OSMTagKey.ADDR_HOUSE_NUMBER) != null) {
+						String strt = n.getTag(OSMTagKey.ADDR_STREET);
+						if (strt == null) {
+							strt = n.getTag(OSMTagKey.ADDR_PLACE);
+						}
+						if (strt != null) {
+							nodesWithHno.add(n);
+						}
 					}
 				}
 				if (nodesWithHno.size() > 1) {
@@ -729,7 +735,11 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 							streetDAO.removeBuilding(first);
 						}
 						LatLon l = e.getLatLon();
-						Set<Long> idsOfStreet = getStreetInCity(first.getIsInNames(), first.getTag(OSMTagKey.ADDR_STREET), null, l);
+						String strt = first.getTag(OSMTagKey.ADDR_STREET);
+						if (strt == null) {
+							strt = first.getTag(OSMTagKey.ADDR_PLACE);
+						}
+						Set<Long> idsOfStreet = getStreetInCity(first, strt, null, l);
 						if (!idsOfStreet.isEmpty()) {
 							Building building = EntityParser.parseBuilding(first);
 							building.setInterpolationInterval(interpolationInterval);
@@ -742,10 +752,16 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 					}
 				}
 			}
-		} 
+		}
 		String houseName = e.getTag(OSMTagKey.ADDR_HOUSE_NAME);
 		String houseNumber = e.getTag(OSMTagKey.ADDR_HOUSE_NUMBER);
-		String street = e.getTag(OSMTagKey.ADDR_STREET);
+		String street = null;
+		if (houseNumber != null) {
+			street = e.getTag(OSMTagKey.ADDR_STREET);
+			if (street == null) {
+				street = e.getTag(OSMTagKey.ADDR_PLACE);
+			}
+		}
 		String street2 = e.getTag(OSMTagKey.ADDR_STREET2);
 		if ((houseName != null || houseNumber != null) && street != null) {
 			if(e instanceof Relation) {
@@ -756,7 +772,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 				}
 			}
 			// skip relations
-			boolean exist = e instanceof Relation ||  streetDAO.findBuilding(e);
+			boolean exist = e instanceof Relation || streetDAO.findBuilding(e);
 			if (!exist) {
 				LatLon l = e.getLatLon();
 				Set<Long> idsOfStreet = getStreetInCity(e.getIsInNames(), street, null, l);
@@ -840,7 +856,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 	
 	public void writeCitiesIntoDb() throws SQLException {
 		for (City c : cities.values()) {
-			if(c.getType() != CityType.DISTRICT){
+			if(c.getType() != CityType.DISTRICT &&
+					c.getType() != CityType.SUBURB &&
+					c.getType() != CityType.NEIGHBOURHOOD){
 				writeCity(c);
 			}
 		}
