@@ -93,8 +93,8 @@ public class NativeSwingRendering extends NativeLibrary {
 				is = new FileInputStream(new File(path));
 				is2 = new FileInputStream(new File(path));
 			} else {
-				is = RenderingRulesStorage.class.getResourceAsStream(path + ".render.xml");
-				is2 = RenderingRulesStorage.class.getResourceAsStream(path + ".render.xml");
+				is = RenderingRulesStorage.class.getResourceAsStream(path );
+				is2 = RenderingRulesStorage.class.getResourceAsStream(path);
 			}
 			if(is == null) {
 				throw new IllegalArgumentException("Can't find rendering style '" + path + "'");

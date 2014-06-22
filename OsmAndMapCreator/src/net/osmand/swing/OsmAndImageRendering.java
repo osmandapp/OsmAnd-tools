@@ -91,7 +91,7 @@ public class OsmAndImageRendering {
 			
 			String zoomScales = getSubAttr(e, "zoomScale", defZoomScale);
 			String zooms = getSubAttr(e, "zoom", defZoom);
-			String renderingNames = getSubAttr(e, "renderingName", defRenderingName) + ".render.xml";
+			String renderingNames = getSubAttr(e, "renderingName", defRenderingName) ;
 			String renderingProperties = getSubAttr(e, "renderingProperties", defRenderingProps) ;
 			if(maps.isEmpty()) {
 				throw new UnsupportedOperationException("No maps element found for wpt "+ name);
@@ -138,7 +138,7 @@ public class OsmAndImageRendering {
 							rst += "noPolygons=false";
 						}
 						list.add(new ImageCombination(name4, zoomsStr[i1], zoomScalesStr[i2],
-								renderingNamesStr[i3], rst));
+								renderingNamesStr[i3] + ".render.xml", rst));
 
 					}
 				}
