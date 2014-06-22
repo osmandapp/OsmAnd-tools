@@ -127,7 +127,7 @@ public class OsmAndImageRendering {
 			for (int i2 = 0; i2 < zoomScalesStr.length; i2++) {
 				String name2 = append(name1, "zScale", zoomScalesStr, i2);
 				for (int i3 = 0; i3 < renderingNamesStr.length; i3++) {
-					String name3 = append(name2, "render", renderingNamesStr, i3);
+					String name3 = append(name2, "", renderingNamesStr, i3);
 					for (int i4 = 0; i4 < renderingPropertiesStr.length; i4++) {
 						String name4 = append(name3, "", renderingPropertiesStr, i4);
 						String rst = renderingPropertiesStr[i4];
