@@ -739,7 +739,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 						if (strt == null) {
 							strt = first.getTag(OSMTagKey.ADDR_PLACE);
 						}
-						Set<Long> idsOfStreet = getStreetInCity(first, strt, null, l);
+						Set<Long> idsOfStreet = getStreetInCity(first.getIsInNames(), strt, null, l);
 						if (!idsOfStreet.isEmpty()) {
 							Building building = EntityParser.parseBuilding(first);
 							building.setInterpolationInterval(interpolationInterval);
