@@ -290,11 +290,12 @@ public class NativeSwingRendering extends NativeLibrary {
 			filename = null;
 		}
 		boolean loaded;
-        boolean newLib = !f.isFile() || f.getName().contains("JNI");
+        boolean newLib = (!f.isFile() || f.getName().contains("JNI")) && f.exists();
+        String path =  filename == null ? null : f.getParentFile().getAbsolutePath();
 		if(!newLib){
-			loaded = NativeLibrary.loadOldLib(f.getParentFile().getAbsolutePath());
+			loaded = NativeLibrary.loadOldLib(path);
 		} else {
-			loaded = NativeLibrary.loadNewLib(f.getParentFile().getAbsolutePath());
+			loaded = NativeLibrary.loadNewLib(path);
 		}
 		if (loaded) {
 			defaultLoadedLibrary = new NativeSwingRendering(newLib);
