@@ -237,6 +237,7 @@
 			<region name="cheliabinsk" downloadName="CHE"/>
 			<region name="chukotka" downloadName="CHU"/>
 			<region name="chuvashia" downloadName="CU"/>
+			<region name="crimea" downloadName="CR"/>
 			<region name="dagestan" downloadName="DA"/>
 			<region name="evreyskaya" downloadName="YEV"/>
 			<region name="ingushetia" downloadName="IN"/>
