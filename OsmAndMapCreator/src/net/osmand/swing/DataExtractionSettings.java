@@ -314,4 +314,12 @@ public class DataExtractionSettings {
 		preferences.put("suffixes_normalize_streets", s);
 	}
 	
+	public void setRenderingProperties(String renderingProperties) {
+		preferences.put("rendering_props", renderingProperties);
+	}
+
+	public String getRenderingProperties() {
+		return preferences.get("rendering_props", "nightMode=false, appMode=default, noPolygons=false, hmRendered=false");
+	}
+	
 }

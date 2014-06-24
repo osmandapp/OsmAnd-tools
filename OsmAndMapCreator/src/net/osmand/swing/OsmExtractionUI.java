@@ -233,7 +233,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 					NativePreferencesDialog dlg = new NativePreferencesDialog(frame);
 					dlg.showDialog();
 					if(dlg.isOkPressed()) {
-						initNativeRendering(NativePreferencesDialog.getRenderingProperties());
+						initNativeRendering(DataExtractionSettings.getSettings().getRenderingProperties());
 					} else {
 						showOfflineIndex.setSelected(false);
 					}

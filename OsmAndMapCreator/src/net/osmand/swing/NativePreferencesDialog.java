@@ -30,7 +30,6 @@ public class NativePreferencesDialog extends JDialog {
 	private boolean okPressed;
 
 	private JTextField renderingPropertiesTxt;
-	private static String renderingProperties = "nightMode=false, appMode=default, noPolygons=false, hmRendered=false";
 
 	
 	public NativePreferencesDialog(Component parent){
@@ -130,7 +129,7 @@ public class NativePreferencesDialog extends JDialog {
         l.setConstraints(label, constr);
         
         renderingPropertiesTxt = new JTextField();
-        renderingPropertiesTxt.setText(renderingProperties);
+        renderingPropertiesTxt.setText(DataExtractionSettings.getSettings().getRenderingProperties());
         panel.add(renderingPropertiesTxt);
         constr = new GridBagConstraints();
         constr.weightx = 1;
@@ -145,9 +144,7 @@ public class NativePreferencesDialog extends JDialog {
 	}
 
 
-	public static String getRenderingProperties() {
-		return renderingProperties;
-	}
+	
 	
 	private void addListeners(){
 		okButton.addActionListener(new ActionListener(){
@@ -155,7 +152,7 @@ public class NativePreferencesDialog extends JDialog {
 			public void actionPerformed(ActionEvent e) {
 				saveProperties();
 				okPressed = true;
-				renderingProperties = renderingPropertiesTxt.getText();
+				DataExtractionSettings.getSettings().setRenderingProperties(renderingPropertiesTxt.getText());
 				setVisible(false);
 			}
 			
