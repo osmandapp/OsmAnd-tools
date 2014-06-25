@@ -143,7 +143,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	}
 
 	public boolean encodeEntityWithType(Entity e, int zoom, TIntArrayList outTypes, 
-			TIntArrayList outAddTypes, Map<MapRulType, String> namesToEncode, List<MapRulType> tempListNotUsed) {
+			TIntArrayList outAddTypes, TreeMap<MapRulType, String> namesToEncode, List<MapRulType> tempListNotUsed) {
 		if(splitIsNeeded(e.getTags())) {
 			if(splitTagsIntoDifferentObjects(e.getTags()).size() > 1) {
 				throw new UnsupportedOperationException("Split is needed for tag/values " + e.getTags() );
@@ -154,7 +154,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	}
 	
 	public boolean encodeEntityWithType(boolean node, Map<String, String> tags, int zoom, TIntArrayList outTypes, 
-			TIntArrayList outAddTypes, Map<MapRulType, String> namesToEncode, List<MapRulType> tempListNotUsed) {
+			TIntArrayList outAddTypes, TreeMap<MapRulType, String> namesToEncode, List<MapRulType> tempListNotUsed) {
 		outTypes.clear();
 		outAddTypes.clear();
 		namesToEncode.clear();

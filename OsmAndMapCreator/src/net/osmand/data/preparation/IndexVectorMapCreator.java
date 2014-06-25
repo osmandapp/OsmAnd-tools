@@ -17,11 +17,13 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.TreeMap;
 
 import net.osmand.IProgress;
 import net.osmand.binary.OsmandOdb.MapData;
@@ -66,7 +68,19 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	// local purpose to speed up processing cache allocation
 	TIntArrayList typeUse = new TIntArrayList(8);
 	List<MapRulType> tempNameUse = new ArrayList<MapRulType>();
-	Map<MapRulType, String> namesUse = new LinkedHashMap<MapRulType, String>();
+	TreeMap<MapRulType, String> namesUse = new TreeMap<MapRulType, String>(new Comparator<MapRulType>() {
+
+		@Override
+		public int compare(MapRulType o1, MapRulType o2) {
+			int lhs = o1.getOrder();
+			int rhs = o2.getOrder();
+			if(lhs == rhs) {
+				lhs = o1.getInternalId();
+				rhs = o2.getInternalId();
+			}
+			return lhs < rhs ? -1 : (lhs == rhs ? 0 : 1);
+		}
+	});
 	Map<EntityId, Map<String, String>> propogatedTags = new LinkedHashMap<Entity.EntityId, Map<String, String>>();
 	TIntArrayList addtypeUse = new TIntArrayList(8);
 
@@ -594,7 +608,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	}
 
 	public void writeBinaryMapBlock(rtree.Node parent, Rect parentBounds, RTree r, BinaryMapIndexWriter writer, PreparedStatement selectData,
-			TLongObjectHashMap<BinaryFileReference> bounds, Map<String, Integer> tempStringTable, Map<MapRulType, String> tempNames, MapZoomPair level)
+			TLongObjectHashMap<BinaryFileReference> bounds, Map<String, Integer> tempStringTable, LinkedHashMap<MapRulType, String> tempNames, MapZoomPair level)
 			throws IOException, RTreeException, SQLException {
 		Element[] e = parent.getAllElements();
 

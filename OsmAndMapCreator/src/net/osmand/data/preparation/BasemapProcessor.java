@@ -46,7 +46,19 @@ public class BasemapProcessor {
     private TIntArrayList typeUse = new TIntArrayList();
     List<MapRulType> tempNameUse = new ArrayList<MapRulType>();
     TIntArrayList addtypeUse = new TIntArrayList(8);
-    Map<MapRulType, String> namesUse = new LinkedHashMap<MapRulType, String>();
+    TreeMap<MapRulType, String> namesUse = new TreeMap<MapRulType, String>(new Comparator<MapRulType>() {
+
+		@Override
+		public int compare(MapRulType o1, MapRulType o2) {
+			int lhs = o1.getOrder();
+			int rhs = o2.getOrder();
+			if(lhs == rhs) {
+				lhs = o1.getInternalId();
+				rhs = o2.getInternalId();
+			}
+			return lhs < rhs ? -1 : (lhs == rhs ? 0 : 1);
+		}
+	});
 
     private final int zoomWaySmothness;
     private final MapRenderingTypesEncoder renderingTypes;
