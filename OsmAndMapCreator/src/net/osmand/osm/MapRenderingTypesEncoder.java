@@ -119,8 +119,8 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 
 
 	@Override
-	protected MapRulType parseTypeFromXML(XmlPullParser parser, String poiParentCategory, String poiParentPrefix) {
-		MapRulType rtype = parseBaseRuleType(parser, poiParentCategory, poiParentPrefix, false);
+	protected MapRulType parseTypeFromXML(XmlPullParser parser, String poiParentCategory, String poiParentPrefix, String order) {
+		MapRulType rtype = parseBaseRuleType(parser, poiParentCategory, poiParentPrefix, order, false);
 		rtype.onlyPoi = "true".equals(parser.getAttributeValue("", "only_poi"));
 		if(!rtype.onlyPoi) {
 			String val = parser.getAttributeValue("", "minzoom"); //$NON-NLS-1$
@@ -178,7 +178,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 				}
 				rType.updateFreq();
 				if (rType.isMain()) {
-					outTypes.add(rType.id);
+					outTypes.add(combineOrderAndId(rType));
 				}
 				if (rType.isAdditionalOrText()) {
 					boolean applied = rType.applyToTagValue == null;
@@ -191,7 +191,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 					}
 					if (applied) {
 						if (rType.isAdditional()) {
-							outAddTypes.add(rType.id);
+							outAddTypes.add(combineOrderAndId(rType));
 						} else if (rType.isText()) {
 							namesToEncode.put(rType, val);
 						}
@@ -200,9 +200,28 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			}
 		}
         // sort to get most important features as first type (important for rendering)
-        outTypes.sort();
-        outAddTypes.sort();
+        sortAndUpdateTypes(outTypes);
+        sortAndUpdateTypes(outAddTypes);
 		return area;
+	}
+
+
+
+	private void sortAndUpdateTypes(TIntArrayList outTypes) {
+		outTypes.sort();
+        for(int i = 0; i < outTypes.size(); i++) {
+        	int k = outTypes.get(i) & ((1 << 15) - 1);
+        	outTypes.set(i, k);
+        }
+	}
+
+
+
+	private int combineOrderAndId(MapRulType rType) {
+		if(rType.id > 1<<15) {
+			throw new UnsupportedOperationException();
+		}
+		return (rType.order << 15) | rType.id;
 	}
 	
 	public void addOSMCSymbolsSpecialTags(Map<MapRulType,String> propogated, Entry<String,String> ev) {
