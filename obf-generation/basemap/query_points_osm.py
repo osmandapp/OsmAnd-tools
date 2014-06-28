@@ -33,15 +33,17 @@ def process_points(cond, filename, array):
 				    'name:hu',	'name:it',	'name:ja',	'name:ko',	'name:lv',	'name:nl',	
 				    'name:pl',	'name:ro',	'name:ru',	'name:sk',	'name:sl',	'name:sv',	
 				    'name:sw',	'name:zh']
-	for nm in names:
-		queryFields += ", tags->\'" + nm + "\' as \"" + nm + "\""
 	for tag in array:
 		if tag == 'name:en':
 			tag = 'tags->\'name:en\' as "name:en"'
 		if tag == 'natural':
 			tag = '"natural"'
-
 		queryFields += ", " + tag
+
+	for nm in names:
+		array.append(nm)
+		queryFields += ", tags->\'" + nm + "\' as \"" + nm + "\""
+		
 	sql = "select ST_AsText(ST_Transform(way,94326)), osm_id, population " + queryFields + \
 	      " from planet_osm_point where " + cond + ";"
 	      # "LIMIT 2"
