@@ -25,12 +25,16 @@ def process_roads(cond, filename, fields):
  
 	conn = psycopg2.connect(conn_string)
 	cursor = conn.cursor()
-	array = ['name', 'ref', 'int_ref', 'name:en',
-					'name:be',	'name:ca',	'name:cs',	'name:da',	'name:de',	'name:el',	
-				    'name:es',	'name:fi',	'name:fr',	'name:he',	'name:hi',	'name:hr',	
-				    'name:hu',	'name:it',	'name:ja',	'name:ko',	'name:lv',	'name:nl',	
-				    'name:pl',	'name:ro',	'name:ru',	'name:sk',	'name:sl',	'name:sv',	
-				    'name:sw',	'name:zh']
+	array = ['name', 'ref', 'int_ref']
+	names = ['name:en', 'name:be',	'name:ca',	'name:cs',	'name:da',	'name:de',	'name:el',	
+				'name:es',	'name:fi',	'name:fr',	'name:he',	'name:hi',	'name:hr',	
+				'name:hu',	'name:it',	'name:ja',	'name:ko',	'name:lv',	'name:nl',	
+				'name:pl',	'name:ro',	'name:ru',	'name:sk',	'name:sl',	'name:sv',	
+				'name:sw',	'name:zh']
+	for nm in names:
+		array.append( "\"" + nm +  "\"")
+		queryFields += ", tags->\'" + nm + "\' as \"" + nm + "\""
+		
 	selectFields = ""
 	for field in fields:
 		array.append(field)

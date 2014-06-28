@@ -28,6 +28,13 @@ def process_points(cond, filename, array):
 	cursor = conn.cursor()
 	shift = 3
 	queryFields = ""
+	names = ['name:be',	'name:ca',	'name:cs',	'name:da',	'name:de',	'name:el',	
+				    'name:es',	'name:fi',	'name:fr',	'name:he',	'name:hi',	'name:hr',	
+				    'name:hu',	'name:it',	'name:ja',	'name:ko',	'name:lv',	'name:nl',	
+				    'name:pl',	'name:ro',	'name:ru',	'name:sk',	'name:sl',	'name:sv',	
+				    'name:sw',	'name:zh']
+	for nm in names:
+		queryFields += ", tags->\'" + nm + "\' as \"" + nm + "\""
 	for tag in array:
 		if tag == 'name:en':
 			tag = 'tags->\'name:en\' as "name:en"'
@@ -75,16 +82,5 @@ if __name__ == "__main__":
 				   " or tourism in ('alpine_hut') "
 				   " or aeroway in ('aerodrome', 'airport')", 'points.osm', 
 				   ['name', 'name:en',
-				    'ref', 'ele', 'place','natural', 'aeroway', 'tourism',
-				    'name:be',	'name:ca',	'name:cs',	'name:da',	'name:de',	'name:el',	
-				    'name:es',	'name:fi',	'name:fr',	'name:he',	'name:hi',	'name:hr',	
-				    'name:hu',	'name:it',	'name:ja',	'name:ko',	'name:lv',	'name:nl',	
-				    'name:pl',	'name:ro',	'name:ru',	'name:sk',	'name:sl',	'name:sv',	
-				    'name:sw',	'name:zh'
-				    ])
-	process_points("place in ('city','town') ", 'cities.osm', ['name', 'name:en', 'place',
-					'name:be',	'name:ca',	'name:cs',	'name:da',	'name:de',	'name:el',	
-				    'name:es',	'name:fi',	'name:fr',	'name:he',	'name:hi',	'name:hr',	
-				    'name:hu',	'name:it',	'name:ja',	'name:ko',	'name:lv',	'name:nl',	
-				    'name:pl',	'name:ro',	'name:ru',	'name:sk',	'name:sl',	'name:sv',	
-				    'name:sw',	'name:zh'])
+				    'ref', 'ele', 'place','natural', 'aeroway', 'tourism'])
+	process_points("place in ('city','town') ", 'cities.osm', ['name', 'name:en', 'place'])

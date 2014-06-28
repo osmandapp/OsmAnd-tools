@@ -27,16 +27,16 @@ def process_polygons(tags, filename):
 	conn = psycopg2.connect(conn_string)
 	cursor = conn.cursor()
 	shift = 2
-	array = ['name','name:en']
-	queryFields = ", name, name:en"
-	names = ['name:be',	'name:ca',	'name:cs',	'name:da',	'name:de',	'name:el',	
+	array = ['name']
+	queryFields = ", name"
+	names = ['name:en', 'name:be',	'name:ca',	'name:cs',	'name:da',	'name:de',	'name:el',	
 				    'name:es',	'name:fi',	'name:fr',	'name:he',	'name:hi',	'name:hr',	
 				    'name:hu',	'name:it',	'name:ja',	'name:ko',	'name:lv',	'name:nl',	
 				    'name:pl',	'name:ro',	'name:ru',	'name:sk',	'name:sl',	'name:sv',	
 				    'name:sw',	'name:zh']
 	for nm in names:
-		array.append(nm)
-		queryFields += ", " + nm
+		array.append( "\"" + nm +  "\"")
+		queryFields += ", tags->\'" + nm + "\' as \"" + nm + "\""
 
 	conditions = " 1=0"
 	admin_level = False
