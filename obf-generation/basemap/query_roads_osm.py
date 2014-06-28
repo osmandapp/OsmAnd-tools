@@ -25,14 +25,19 @@ def process_roads(cond, filename, fields):
  
 	conn = psycopg2.connect(conn_string)
 	cursor = conn.cursor()
-	array = ['name', 'ref', 'int_ref']
+	array = ['name', 'ref', 'int_ref', 'name:en',
+					'name:be',	'name:ca',	'name:cs',	'name:da',	'name:de',	'name:el',	
+				    'name:es',	'name:fi',	'name:fr',	'name:he',	'name:hi',	'name:hr',	
+				    'name:hu',	'name:it',	'name:ja',	'name:ko',	'name:lv',	'name:nl',	
+				    'name:pl',	'name:ro',	'name:ru',	'name:sk',	'name:sl',	'name:sv',	
+				    'name:sw',	'name:zh']
 	selectFields = ""
 	for field in fields:
 		array.append(field)
 		selectFields += ", " + field
 	shift = 2
 	# roads faster but doesn't contain ferry & river
-	sql = "select osm_id, ST_AsText(ST_Transform(ST_Simplify(way,50),900913))," + \
+	sql = "select osm_id, ST_AsText(ST_Transform(ST_Simplify(way,50),94326))," + \
 	      " name, ref, tags->'int_ref' as int_ref " + selectFields + \
 	      " from planet_osm_line where " + cond + ";"
 	      # "LIMIT 1000"

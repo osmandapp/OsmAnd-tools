@@ -35,7 +35,7 @@ def process_points(cond, filename, array):
 			tag = '"natural"'
 
 		queryFields += ", " + tag
-	sql = "select ST_AsText(ST_Transform(way,900913)), osm_id, population " + queryFields + \
+	sql = "select ST_AsText(ST_Transform(way,94326)), osm_id, population " + queryFields + \
 	      " from planet_osm_point where " + cond + ";"
 	      # "LIMIT 2"
 	#print sql
@@ -74,5 +74,17 @@ if __name__ == "__main__":
 				   " or \"natural\" in ('peak', 'cave_entrance', 'rock', 'waterfall', 'cape', 'volcano', 'stream')"
 				   " or tourism in ('alpine_hut') "
 				   " or aeroway in ('aerodrome', 'airport')", 'points.osm', 
-				   ['name', 'name:en', 'ref', 'ele', 'place','natural', 'aeroway', 'tourism'])
-	process_points("place in ('city','town') ", 'cities.osm', ['name', 'name:en', 'place'])
+				   ['name', 'name:en',
+				    'ref', 'ele', 'place','natural', 'aeroway', 'tourism',
+				    'name:be',	'name:ca',	'name:cs',	'name:da',	'name:de',	'name:el',	
+				    'name:es',	'name:fi',	'name:fr',	'name:he',	'name:hi',	'name:hr',	
+				    'name:hu',	'name:it',	'name:ja',	'name:ko',	'name:lv',	'name:nl',	
+				    'name:pl',	'name:ro',	'name:ru',	'name:sk',	'name:sl',	'name:sv',	
+				    'name:sw',	'name:zh'
+				    ])
+	process_points("place in ('city','town') ", 'cities.osm', ['name', 'name:en', 'place',
+					'name:be',	'name:ca',	'name:cs',	'name:da',	'name:de',	'name:el',	
+				    'name:es',	'name:fi',	'name:fr',	'name:he',	'name:hi',	'name:hr',	
+				    'name:hu',	'name:it',	'name:ja',	'name:ko',	'name:lv',	'name:nl',	
+				    'name:pl',	'name:ro',	'name:ru',	'name:sk',	'name:sl',	'name:sv',	
+				    'name:sw',	'name:zh'])

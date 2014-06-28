@@ -27,8 +27,17 @@ def process_polygons(tags, filename):
 	conn = psycopg2.connect(conn_string)
 	cursor = conn.cursor()
 	shift = 2
-	array = ['name']
-	queryFields = ", name"
+	array = ['name','name:en']
+	queryFields = ", name, name:en"
+	names = ['name:be',	'name:ca',	'name:cs',	'name:da',	'name:de',	'name:el',	
+				    'name:es',	'name:fi',	'name:fr',	'name:he',	'name:hi',	'name:hr',	
+				    'name:hu',	'name:it',	'name:ja',	'name:ko',	'name:lv',	'name:nl',	
+				    'name:pl',	'name:ro',	'name:ru',	'name:sk',	'name:sl',	'name:sv',	
+				    'name:sw',	'name:zh']
+	for nm in names:
+		array.append(nm)
+		queryFields += ", " + nm
+
 	conditions = " 1=0"
 	admin_level = False
 	for tag in tags:
@@ -50,7 +59,7 @@ def process_polygons(tags, filename):
 			queryFields += ", " + tag
 			conditions += " or "+tag+" <> ''"
 
-	cursor.execute("select osm_id, ST_AsText(ST_Transform(ST_Simplify(way,500),900913)) " + queryFields +
+	cursor.execute("select osm_id, ST_AsText(ST_Transform(ST_Simplify(way,500),94326)) " + queryFields +
 				   " from planet_osm_polygon where way_area > 10000000"
 				   " and ("+conditions+") "
 				  # "LIMIT 1000"
