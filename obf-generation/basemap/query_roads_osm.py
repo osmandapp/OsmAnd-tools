@@ -31,14 +31,14 @@ def process_roads(cond, filename, fields):
 				'name:hu',	'name:it',	'name:ja',	'name:ko',	'name:lv',	'name:nl',	
 				'name:pl',	'name:ro',	'name:ru',	'name:sk',	'name:sl',	'name:sv',	
 				'name:sw',	'name:zh']
+	selectFields = ""
 	for nm in names:
 		array.append( "\"" + nm +  "\"")
-		queryFields += ", tags->\'" + nm + "\' as \"" + nm + "\""
-		
-	selectFields = ""
+		selectFields += ", tags->\'" + nm + "\' as \"" + nm + "\""
+	
 	for field in fields:
 		array.append(field)
-		selectFields += ", " + field
+		selectFields += ", " + field	
 	shift = 2
 	# roads faster but doesn't contain ferry & river
 	sql = "select osm_id, ST_AsText(ST_Transform(ST_Simplify(way,50),94326))," + \
