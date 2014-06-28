@@ -33,7 +33,7 @@ def process_roads(cond, filename, fields):
 				'name:sw',	'name:zh']
 	selectFields = ""
 	for nm in names:
-		array.append( "\"" + nm +  "\"")
+		array.append(nm)
 		selectFields += ", tags->\'" + nm + "\' as \"" + nm + "\""
 	
 	for field in fields:
