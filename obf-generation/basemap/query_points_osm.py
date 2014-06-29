@@ -65,10 +65,10 @@ def process_points(cond, filename, array):
 					pop = num(row[2], 0)
 					if pop > 500000	:
 						xml += '\t<tag k="%s" v="%s" />\n' % ("osmand_place_basemap", "city")
-				if tagName == 'name' and row[base+1] is not None and len(row[base+1]) > 0 :
-					value = '' # write name:en instead of name
-				if tagName == 'name:en' and len(value) > 0 :
-					tagName = 'name'
+				# if tagName == 'name' and row[base+1] is not None and len(row[base+1]) > 0 :
+					# value = '' # write name:en instead of name
+				# if tagName == 'name:en' and len(value) > 0 :
+					# tagName = 'name'
 				
 
 				if len(value) > 0 :
