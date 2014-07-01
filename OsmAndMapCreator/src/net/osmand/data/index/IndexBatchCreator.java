@@ -216,13 +216,13 @@ public class IndexBatchCreator {
 				}
 				NodeList ncountries = el.getElementsByTagName("region");
 				log.info("Region to download " +countries.siteToDownload);
-				for(int j=0; j< ncountries.getLength(); j++){
+				for (int j = 0; j < ncountries.getLength(); j++) {
 					Element ncountry = (Element) ncountries.item(j);
 					String name = ncountry.getAttribute("name");
 					RegionSpecificData data = new RegionSpecificData();
 					data.cityAdminLevel = ncountry.getAttribute("cityAdminLevel");
 					String index = ncountry.getAttribute("index");
-					if(index != null && index.length() > 0) {
+					if (index != null && index.length() > 0) {
 						data.indexAddress = index.contains("address");
 						data.indexMap = index.contains("map");
 						data.indexTransport = index.contains("transport");
@@ -231,7 +231,7 @@ public class IndexBatchCreator {
 					}
 					String dname = ncountry.getAttribute("downloadName");
 					data.downloadName = dname == null || dname.length() == 0 ? name : dname;
-					if(name != null && !Boolean.parseBoolean(ncountry.getAttribute("skip"))){
+					if (name != null && !Boolean.parseBoolean(ncountry.getAttribute("skip"))) {
 						countries.regionNames.put(name, data);
 					}
 				}
@@ -468,13 +468,14 @@ public class IndexBatchCreator {
 			}
 			IndexCreator indexCreator = new IndexCreator(workDir);
 			indexCreator.setDialects(osmDb, osmDb);
-			final boolean indAddr = indexAddress && (rdata == null || rdata.indexAddress);
-			final boolean indPoi = indexPOI && (rdata == null || rdata.indexPOI);
-			final boolean indTransport = indexTransport && (rdata == null || rdata.indexTransport);
-			final boolean indMap = indexMap && (rdata == null || rdata.indexMap);
-			final boolean indRouting = indexRouting && (rdata == null || rdata.indexRouting);
+			final boolean indAddr = indexAddress && rdata.indexAddress;
+			final boolean indPoi = indexPOI && rdata.indexPOI;
+			final boolean indTransport = indexTransport && rdata.indexTransport;
+			final boolean indMap = indexMap && rdata.indexMap;
+			final boolean indRouting = indexRouting && rdata.indexRouting;
 			if(!indAddr && !indPoi && !indTransport && !indMap && !indRouting) {
 				log.warn("! Skip country because nothing to index !");
+				f.delete();
 				return;
 			}
 			indexCreator.setIndexAddress(indAddr);
