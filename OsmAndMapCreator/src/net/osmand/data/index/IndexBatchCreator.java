@@ -468,11 +468,11 @@ public class IndexBatchCreator {
 			}
 			IndexCreator indexCreator = new IndexCreator(workDir);
 			indexCreator.setDialects(osmDb, osmDb);
-			final boolean indAddr = indexAddress && rdata.indexAddress;
-			final boolean indPoi = indexPOI && rdata.indexPOI;
-			final boolean indTransport = indexTransport && rdata.indexTransport;
-			final boolean indMap = indexMap && rdata.indexMap;
-			final boolean indRouting = indexRouting && rdata.indexRouting;
+			final boolean indAddr = indexAddress && (rdata == null || rdata.indexAddress);
+			final boolean indPoi = indexPOI && (rdata == null || rdata.indexPOI);
+			final boolean indTransport = indexTransport && (rdata == null || rdata.indexTransport);
+			final boolean indMap = indexMap && (rdata == null || rdata.indexMap);
+			final boolean indRouting = indexRouting && (rdata == null || rdata.indexRouting);
 			if(!indAddr && !indPoi && !indTransport && !indMap && !indRouting) {
 				log.warn("! Skip country because nothing to index !");
 				f.delete();
