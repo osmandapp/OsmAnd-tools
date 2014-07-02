@@ -8,7 +8,7 @@ function download_coord {
   echo "create index name_$1_ind USING HASH ON coord_$1wiki (gc_name);" | mysql wiki
 }
 
-cd /var/lib/jenkins/wiki/src_sql;
+cd /home/wiki/src_sql;
 download_coord en;
 download_coord de;
 download_coord nl;
