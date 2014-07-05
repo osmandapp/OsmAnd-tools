@@ -204,11 +204,12 @@ int main(int argc, char** argv)
         pngDecoder->DecodeFile("d:\\OpenSource\\OsmAnd\\iOS7_icons_extended\\PNG\\Camping_Equipment\\campfire\\campfire-32.png", locationOnMapSurfaceImage.get());
         markerBuilder->addOnMapSurfaceIcon(reinterpret_cast<OsmAnd::MapMarker::OnSurfaceIconKey>(1), locationOnMapSurfaceImage);
     }
-    markerBuilder->setPrecisionCircleBaseColor(OsmAnd::FColorRGB(1.0f, 0.0f, 0.0f));
+    markerBuilder->setIsAccuracyCircleSupported(true);
+    markerBuilder->setAccuracyCircleBaseColor(OsmAnd::FColorRGB(1.0f, 0.0f, 0.0f));
     lastClickedLocationMarker = markerBuilder->buildAndAddToCollection(markers);
     lastClickedLocationMarker->setOnMapSurfaceIconDirection(reinterpret_cast<OsmAnd::MapMarker::OnSurfaceIconKey>(1), Q_QNAN);
-    lastClickedLocationMarker->setIsPrecisionCircleEnabled(true);
-    lastClickedLocationMarker->setPrecisionCircleRadius(2000.0);
+    lastClickedLocationMarker->setIsAccuracyCircleVisible(true);
+    lastClickedLocationMarker->setAccuracyCircleRadius(20000.0);
     renderer->addSymbolProvider(markers);
 
     favorites.reset(new OsmAnd::FavoriteLocationsGpxCollection());
@@ -312,13 +313,13 @@ int main(int argc, char** argv)
     OsmAnd::MapRendererSetupOptions rendererSetup;
     rendererSetup.frameUpdateRequestCallback =
         []
-    (const OsmAnd::IMapRenderer* const mapRenderer)
-    {
-        //QMutexLocker scopedLocker(&glutWasInitializedFlagMutex);
+        (const OsmAnd::IMapRenderer* const mapRenderer)
+        {
+            //QMutexLocker scopedLocker(&glutWasInitializedFlagMutex);
 
-        if (glutWasInitialized)
-            glutPostRedisplay();
-    };
+            if (glutWasInitialized)
+                glutPostRedisplay();
+        };
     rendererSetup.displayDensityFactor = density;
     rendererSetup.gpuWorkerThreadEnabled = useGpuWorker;
     if (rendererSetup.gpuWorkerThreadEnabled)
