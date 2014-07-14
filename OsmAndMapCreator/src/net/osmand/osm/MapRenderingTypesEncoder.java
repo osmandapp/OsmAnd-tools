@@ -158,7 +158,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		outTypes.clear();
 		outAddTypes.clear();
 		namesToEncode.clear();
-		boolean area = "yes".equals(tags.get("area")) || "true".equals(tags.get("area"));
+		boolean area = "yes".equals(tags.get("area")) || "true".equals(tags.get("area")) || tags.containsKey("area:highway");
 
 		for (String tag : tags.keySet()) {
 			String val = tags.get(tag);

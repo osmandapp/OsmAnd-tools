@@ -44,6 +44,8 @@
 #include <OsmAndCore/Map/MapMarkerBuilder.h>
 #include <OsmAndCore/Map/MapMarker.h>
 #include <OsmAndCore/Map/MapAnimator.h>
+#include <OsmAndCore/Map/FavoriteLocationsGpxCollection.h>
+#include <OsmAndCore/Map/FavoriteLocationsPresenter.h>
 
 bool glutWasInitialized = false;
 QMutex glutWasInitializedFlagMutex;
@@ -58,6 +60,8 @@ std::shared_ptr<const OsmAnd::MapStyle> style;
 std::shared_ptr<OsmAnd::MapAnimator> animator;
 std::shared_ptr<OsmAnd::BinaryMapStaticSymbolsProvider> binaryMapStaticSymbolProvider;
 std::shared_ptr<OsmAnd::MapMarkersCollection> markers;
+std::shared_ptr<OsmAnd::FavoriteLocationsGpxCollection> favorites;
+std::shared_ptr<OsmAnd::FavoriteLocationsPresenter> favoritesPresenter;
 std::shared_ptr<OsmAnd::MapMarker> lastClickedLocationMarker;
 
 bool obfsDirSpecified = false;
@@ -105,17 +109,17 @@ int main(int argc, char** argv)
 
     const std::unique_ptr<SkImageDecoder> pngDecoder(CreatePNGImageDecoder());
 
-    for(int argIdx = 1; argIdx < argc; argIdx++)
+    for (int argIdx = 1; argIdx < argc; argIdx++)
     {
         std::cout << "Arg: " << argv[argIdx] << std::endl;
 
         const QString arg(argv[argIdx]);
 
-        if(arg.startsWith("-stylesPath="))
+        if (arg.startsWith("-stylesPath="))
         {
             auto path = arg.mid(strlen("-stylesPath="));
             QDir dir(path);
-            if(!dir.exists())
+            if (!dir.exists())
             {
                 std::cerr << "Style directory '" << path.toStdString() << "' does not exist" << std::endl;
                 OsmAnd::ReleaseCore();
@@ -124,39 +128,39 @@ int main(int argc, char** argv)
 
             OsmAnd::Utilities::findFiles(dir, QStringList() << "*.render.xml", styleFiles);
         }
-        else if(arg.startsWith("-style="))
+        else if (arg.startsWith("-style="))
         {
             styleName = arg.mid(strlen("-style="));
         }
-        else if(arg.startsWith("-obfsDir="))
+        else if (arg.startsWith("-obfsDir="))
         {
             auto obfsDirPath = arg.mid(strlen("-obfsDir="));
             obfsDir = QDir(obfsDirPath);
             obfsDirSpecified = true;
         }
-        else if(arg.startsWith("-dataDir="))
+        else if (arg.startsWith("-dataDir="))
         {
             auto dataDirPath = arg.mid(strlen("-dataDir="));
             dataDir = QDir(dataDirPath);
             dataDirSpecified = true;
         }
-        else if(arg.startsWith("-cacheDir="))
+        else if (arg.startsWith("-cacheDir="))
         {
             cacheDir = QDir(arg.mid(strlen("-cacheDir=")));
         }
-        else if(arg.startsWith("-heightsDir="))
+        else if (arg.startsWith("-heightsDir="))
         {
             heightsDir = QDir(arg.mid(strlen("-heightsDir=")));
             wasHeightsDirSpecified = true;
         }
-        else if(arg == "-nsight")
+        else if (arg == "-nsight")
         {
             use43 = true;
             constantRefresh = true;
             nSight = true;
             gDEBugger = false;
         }
-        else if(arg == "-gdebugger")
+        else if (arg == "-gdebugger")
         {
             use43 = false;
             constantRefresh = true;
@@ -165,13 +169,13 @@ int main(int argc, char** argv)
         }
     }
 
-    if(!obfsDirSpecified && !dataDirSpecified)
+    if (!obfsDirSpecified && !dataDirSpecified)
     {
         std::cerr << "Nor OBFs directory nor data directory was specified" << std::endl;
         OsmAnd::ReleaseCore();
         return EXIT_FAILURE;
     }
-    if(obfsDirSpecified && !obfsDir.exists())
+    if (obfsDirSpecified && !obfsDir.exists())
     {
         std::cerr << "OBFs directory does not exist" << std::endl;
         OsmAnd::ReleaseCore();
@@ -179,7 +183,7 @@ int main(int argc, char** argv)
     }
 
     renderer = OsmAnd::createMapRenderer(OsmAnd::MapRendererClass::AtlasMapRenderer_OpenGL3);
-    if(!renderer)
+    if (!renderer)
     {
         std::cout << "No supported renderer" << std::endl;
         OsmAnd::ReleaseCore();
@@ -200,19 +204,27 @@ int main(int argc, char** argv)
         pngDecoder->DecodeFile("d:\\OpenSource\\OsmAnd\\iOS7_icons_extended\\PNG\\Camping_Equipment\\campfire\\campfire-32.png", locationOnMapSurfaceImage.get());
         markerBuilder->addOnMapSurfaceIcon(reinterpret_cast<OsmAnd::MapMarker::OnSurfaceIconKey>(1), locationOnMapSurfaceImage);
     }
-    markerBuilder->setPrecisionCircleBaseColor(OsmAnd::FColorRGB(1.0f, 0.0f, 0.0f));
+    markerBuilder->setIsAccuracyCircleSupported(true);
+    markerBuilder->setAccuracyCircleBaseColor(OsmAnd::FColorRGB(1.0f, 0.0f, 0.0f));
     lastClickedLocationMarker = markerBuilder->buildAndAddToCollection(markers);
     lastClickedLocationMarker->setOnMapSurfaceIconDirection(reinterpret_cast<OsmAnd::MapMarker::OnSurfaceIconKey>(1), Q_QNAN);
-    lastClickedLocationMarker->setIsPrecisionCircleEnabled(true);
-    lastClickedLocationMarker->setPrecisionCircleRadius(2000.0);
+    lastClickedLocationMarker->setIsAccuracyCircleVisible(true);
+    lastClickedLocationMarker->setAccuracyCircleRadius(20000.0);
     renderer->addSymbolProvider(markers);
 
-    //////////////////////////////////////////////////////////////////////////
-    //QHash< QString, std::shared_ptr<const OsmAnd::WorldRegions::WorldRegion> > worldRegions;
-    //OsmAnd::WorldRegions("d:\\OpenSource\\OsmAnd\\OsmAnd\\resources\\countries-info\\regions.ocbf").loadWorldRegions(worldRegions);
-    //////////////////////////////////////////////////////////////////////////
+    favorites.reset(new OsmAnd::FavoriteLocationsGpxCollection());
+    if (favorites->loadFrom(QLatin1String("d:\\OpenSource\\OsmAnd\\favorites.gpx")))
+    {
+        favoritesPresenter.reset(new OsmAnd::FavoriteLocationsPresenter(favorites));
+        renderer->addSymbolProvider(favoritesPresenter);
+    }
     
-    if(dataDirSpecified)
+    //////////////////////////////////////////////////////////////////////////
+    QHash< QString, std::shared_ptr<const OsmAnd::WorldRegions::WorldRegion> > worldRegions;
+    OsmAnd::WorldRegions("d:\\OpenSource\\OsmAnd\\OsmAnd\\resources\\countries-info\\regions.ocbf").loadWorldRegions(worldRegions);
+    //////////////////////////////////////////////////////////////////////////
+
+    if (dataDirSpecified)
     {
         resourcesManager.reset(new OsmAnd::ResourcesManager(
             dataDir.absoluteFilePath(QLatin1String("storage")),
@@ -225,17 +237,17 @@ int main(int argc, char** argv)
         resourcesManager->localResourcesChangeObservable.attach(nullptr,
             [renderer_]
             (const OsmAnd::ResourcesManager* const resourcesManager,
-                const QList<QString>& added,
-                const QList<QString>& removed,
-                const QList<QString>& updated)
+            const QList<QString>& added,
+            const QList<QString>& removed,
+            const QList<QString>& updated)
             {
                 renderer_->reloadEverything();
             });
-        
+
         obfsCollection = resourcesManager->obfsCollection;
         stylesCollection = resourcesManager->mapStylesCollection;
     }
-    else if(obfsDirSpecified)
+    else if (obfsDirSpecified)
     {
         const auto manualObfsCollection = new OsmAnd::ObfsCollection();
         manualObfsCollection->addDirectory(obfsDir);
@@ -243,19 +255,19 @@ int main(int argc, char** argv)
         obfsCollection.reset(manualObfsCollection);
 
         const auto pMapStylesCollection = new OsmAnd::MapStylesCollection();
-        for(auto itStyleFile = styleFiles.begin(); itStyleFile != styleFiles.end(); ++itStyleFile)
+        for (auto itStyleFile = styleFiles.begin(); itStyleFile != styleFiles.end(); ++itStyleFile)
         {
             const auto& styleFile = *itStyleFile;
 
-            if(!pMapStylesCollection->registerStyle(styleFile.absoluteFilePath()))
+            if (!pMapStylesCollection->registerStyle(styleFile.absoluteFilePath()))
                 std::cout << "Failed to parse metadata of '" << styleFile.fileName().toStdString() << "' or duplicate style" << std::endl;
         }
         stylesCollection.reset(pMapStylesCollection);
     }
 
-    if(!styleName.isEmpty())
+    if (!styleName.isEmpty())
     {
-        if(!stylesCollection->obtainBakedStyle(styleName, style))
+        if (!stylesCollection->obtainBakedStyle(styleName, style))
         {
             std::cout << "Failed to resolve style '" << styleName.toStdString() << "'" << std::endl;
             OsmAnd::ReleaseCore();
@@ -275,7 +287,7 @@ int main(int argc, char** argv)
         glutSetOption(GLUT_ACTION_ON_WINDOW_CLOSE, GLUT_ACTION_CONTINUE_EXECUTION);
         glutInitWindowSize(1024, 768);
         glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA | GLUT_DEPTH);
-        if(!use43)
+        if (!use43)
             glutInitContextVersion(3, 0);
         else
             glutInitContextVersion(4, 3);
@@ -305,12 +317,12 @@ int main(int argc, char** argv)
         {
             //QMutexLocker scopedLocker(&glutWasInitializedFlagMutex);
 
-            if(glutWasInitialized)
+            if (glutWasInitialized)
                 glutPostRedisplay();
         };
     rendererSetup.displayDensityFactor = density;
     rendererSetup.gpuWorkerThreadEnabled = useGpuWorker;
-    if(rendererSetup.gpuWorkerThreadEnabled)
+    if (rendererSetup.gpuWorkerThreadEnabled)
     {
 #if defined(WIN32)
         const auto currentDC = wglGetCurrentDC();
@@ -322,18 +334,18 @@ int main(int argc, char** argv)
 
         rendererSetup.gpuWorkerThreadPrologue =
             [currentDC, workerContext]
-            (const OsmAnd::IMapRenderer* const mapRenderer)
-            {
-                const auto result = (wglMakeCurrent(currentDC, workerContext) == TRUE);
-                verifyOpenGL();
-            };
+        (const OsmAnd::IMapRenderer* const mapRenderer)
+        {
+            const auto result = (wglMakeCurrent(currentDC, workerContext) == TRUE);
+            verifyOpenGL();
+        };
 
         rendererSetup.gpuWorkerThreadEpilogue =
             []
-            (const OsmAnd::IMapRenderer* const mapRenderer)
-            {
-                glFinish();
-            };
+        (const OsmAnd::IMapRenderer* const mapRenderer)
+        {
+            glFinish();
+        };
 #endif
     }
     renderer->setup(rendererSetup);
@@ -430,9 +442,9 @@ OsmAnd::PointI dragInitTarget;
 
 void mouseHandler(int button, int state, int x, int y)
 {
-    if(button == GLUT_LEFT_BUTTON)
+    if (button == GLUT_LEFT_BUTTON)
     {
-        if(state == GLUT_DOWN && !dragInitialized)
+        if (state == GLUT_DOWN && !dragInitialized)
         {
             dragInitX = x;
             dragInitY = y;
@@ -440,14 +452,14 @@ void mouseHandler(int button, int state, int x, int y)
 
             dragInitialized = true;
         }
-        else if(state == GLUT_UP && dragInitialized)
+        else if (state == GLUT_UP && dragInitialized)
         {
             dragInitialized = false;
         }
     }
-    else if(button == GLUT_RIGHT_BUTTON)
+    else if (button == GLUT_RIGHT_BUTTON)
     {
-        if(state == GLUT_DOWN)
+        if (state == GLUT_DOWN)
         {
             OsmAnd::PointI64 clickedLocation;
             renderer->getLocationFromScreenPoint(OsmAnd::PointI(x, y), clickedLocation);
@@ -464,7 +476,7 @@ void mouseHandler(int button, int state, int x, int y)
 
 void mouseMotion(int x, int y)
 {
-    if(dragInitialized)
+    if (dragInitialized)
     {
         auto deltaX = x - dragInitX;
         auto deltaY = y - dragInitY;
@@ -494,7 +506,7 @@ void mouseWheelHandler(int button, int dir, int x, int y)
     const auto modifiers = glutGetModifiers();
     const auto step = (modifiers & GLUT_ACTIVE_SHIFT) ? 0.1f : 0.01f;
 
-    if(dir > 0)
+    if (dir > 0)
     {
         renderer->setZoom(renderer->state.requestedZoom + step);
     }
@@ -510,42 +522,42 @@ void keyboardHandler(unsigned char key, int x, int y)
     const auto wasdZoom = static_cast<int>(renderer->state.requestedZoom);
     const auto wasdStep = (1 << (31 - wasdZoom));
 
-    switch(key)
+    switch (key)
     {
     case '\x1B':
         glutLeaveMainLoop();
         break;
     case 'W':
     case 'w':
-        {
-            auto newTarget = renderer->state.target31;
-            newTarget.y -= wasdStep / (key == 'w' ? 50 : 10);
-            renderer->setTarget(newTarget);
-        }
+    {
+        auto newTarget = renderer->state.target31;
+        newTarget.y -= wasdStep / (key == 'w' ? 50 : 10);
+        renderer->setTarget(newTarget);
+    }
         break;
     case 'S':
     case 's':
-        {
-            auto newTarget = renderer->state.target31;
-            newTarget.y += wasdStep / (key == 's' ? 50 : 10);
-            renderer->setTarget(newTarget);
-        }
+    {
+        auto newTarget = renderer->state.target31;
+        newTarget.y += wasdStep / (key == 's' ? 50 : 10);
+        renderer->setTarget(newTarget);
+    }
         break;
     case 'A':
     case 'a':
-        {
-            auto newTarget = renderer->state.target31;
-            newTarget.x -= wasdStep / (key == 'a' ? 50 : 10);
-            renderer->setTarget(newTarget);
-        }
+    {
+        auto newTarget = renderer->state.target31;
+        newTarget.x -= wasdStep / (key == 'a' ? 50 : 10);
+        renderer->setTarget(newTarget);
+    }
         break;
     case 'D':
     case 'd':
-        {
-            auto newTarget = renderer->state.target31;
-            newTarget.x += wasdStep / (key == 'd' ? 50 : 10);
-            renderer->setTarget(newTarget);
-        }
+    {
+        auto newTarget = renderer->state.target31;
+        newTarget.x += wasdStep / (key == 'd' ? 50 : 10);
+        renderer->setTarget(newTarget);
+    }
         break;
     case 'r':
         renderer->setDistanceToFog(renderer->state.fogDistance + 1.0f);
@@ -558,20 +570,20 @@ void keyboardHandler(unsigned char key, int x, int y)
         glutPostRedisplay();
         break;
     case 'e':
+    {
+        if (renderer->state.elevationDataProvider)
         {
-            if(renderer->state.elevationDataProvider)
+            renderer->resetElevationDataProvider();
+        }
+        else
+        {
+            if (wasHeightsDirSpecified)
             {
-                renderer->resetElevationDataProvider();
-            }
-            else
-            {
-                if(wasHeightsDirSpecified)
-                {
-                    //auto provider = new OsmAnd::HeightmapTileProvider(heightsDir, cacheDir.absoluteFilePath(OsmAnd::HeightmapTileProvider::defaultIndexFilename));
-                    //renderer->setElevationDataProvider(std::shared_ptr<OsmAnd::IMapElevationDataProvider>(provider));
-                }
+                //auto provider = new OsmAnd::HeightmapTileProvider(heightsDir, cacheDir.absoluteFilePath(OsmAnd::HeightmapTileProvider::defaultIndexFilename));
+                //renderer->setElevationDataProvider(std::shared_ptr<OsmAnd::IMapElevationDataProvider>(provider));
             }
         }
+    }
         break;
     case 't':
         renderer->setFogDensity(renderer->state.fogDensity + 0.01f);
@@ -598,80 +610,80 @@ void keyboardHandler(unsigned char key, int x, int y)
         renderer->setElevationDataScaleFactor(renderer->state.elevationDataScaleFactor - 0.1f);
         break;
     case 'c':
-        {
-            auto config = renderer->configuration;
-            config.limitTextureColorDepthBy16bits = !config.limitTextureColorDepthBy16bits;
-            renderer->setConfiguration(config);
-        }
+    {
+        auto config = renderer->configuration;
+        config.limitTextureColorDepthBy16bits = !config.limitTextureColorDepthBy16bits;
+        renderer->setConfiguration(config);
+    }
         break;
     case 'b':
-        {
-            auto config = renderer->configuration;
-            config.texturesFilteringQuality = OsmAnd::TextureFilteringQuality::Normal;
-            renderer->setConfiguration(config);
-        }
+    {
+        auto config = renderer->configuration;
+        config.texturesFilteringQuality = OsmAnd::TextureFilteringQuality::Normal;
+        renderer->setConfiguration(config);
+    }
         break;
     case 'n':
-        {
-            auto config = renderer->configuration;
-            config.texturesFilteringQuality = OsmAnd::TextureFilteringQuality::Good;
-            renderer->setConfiguration(config);
-        }
+    {
+        auto config = renderer->configuration;
+        config.texturesFilteringQuality = OsmAnd::TextureFilteringQuality::Good;
+        renderer->setConfiguration(config);
+    }
         break;
     case 'm':
-        {
-            auto config = renderer->configuration;
-            config.texturesFilteringQuality = OsmAnd::TextureFilteringQuality::Best;
-            renderer->setConfiguration(config);
-        }
+    {
+        auto config = renderer->configuration;
+        config.texturesFilteringQuality = OsmAnd::TextureFilteringQuality::Best;
+        renderer->setConfiguration(config);
+    }
         break;
-     case 'p':
+    case 'p':
+    {
+        std::async(std::launch::async,
+            [=]
         {
-             std::async(std::launch::async,
-                 [=]
-                 {
-                     const auto downloadProgress =
-                         []
-                         (const uint64_t bytesDownloaded, const uint64_t bytesTotal)
-                         {
-                            std::cout << "... downloaded " << bytesDownloaded << " of " << bytesTotal << " (" << ((bytesDownloaded * 100) / bytesTotal) << "%)" << std::endl;
-                         };
+            const auto downloadProgress =
+                []
+            (const uint64_t bytesDownloaded, const uint64_t bytesTotal)
+            {
+                std::cout << "... downloaded " << bytesDownloaded << " of " << bytesTotal << " (" << ((bytesDownloaded * 100) / bytesTotal) << "%)" << std::endl;
+            };
 
-                     resourcesManager->updateRepository();
+            resourcesManager->updateRepository();
 
-                     if (!resourcesManager->isResourceInstalled(QLatin1String("world_basemap.map.obf")))
-                         resourcesManager->installFromRepository(QLatin1String("world_basemap.map.obf"), downloadProgress);
-                     else if (resourcesManager->isInstalledResourceOutdated(QLatin1String("world_basemap.map.obf")))
-                         resourcesManager->updateFromRepository(QLatin1String("world_basemap.map.obf"), downloadProgress);
+            if (!resourcesManager->isResourceInstalled(QLatin1String("world_basemap.map.obf")))
+                resourcesManager->installFromRepository(QLatin1String("world_basemap.map.obf"), downloadProgress);
+            else if (resourcesManager->isInstalledResourceOutdated(QLatin1String("world_basemap.map.obf")))
+                resourcesManager->updateFromRepository(QLatin1String("world_basemap.map.obf"), downloadProgress);
 
-                     if(!resourcesManager->isResourceInstalled(QLatin1String("ukraine_europe.map.obf")))
-                         resourcesManager->installFromRepository(QLatin1String("ukraine_europe.map.obf"), downloadProgress);
-                     else if(resourcesManager->isInstalledResourceOutdated(QLatin1String("ukraine_europe.map.obf")))
-                         resourcesManager->updateFromRepository(QLatin1String("ukraine_europe.map.obf"), downloadProgress);
+            if (!resourcesManager->isResourceInstalled(QLatin1String("ukraine_europe.map.obf")))
+                resourcesManager->installFromRepository(QLatin1String("ukraine_europe.map.obf"), downloadProgress);
+            else if (resourcesManager->isInstalledResourceOutdated(QLatin1String("ukraine_europe.map.obf")))
+                resourcesManager->updateFromRepository(QLatin1String("ukraine_europe.map.obf"), downloadProgress);
 
-                     if(!resourcesManager->isResourceInstalled(QLatin1String("netherlands_europe.map.obf")))
-                         resourcesManager->installFromRepository(QLatin1String("netherlands_europe.map.obf"), downloadProgress);
-                     else if(resourcesManager->isInstalledResourceOutdated(QLatin1String("netherlands_europe.map.obf")))
-                         resourcesManager->updateFromRepository(QLatin1String("netherlands_europe.map.obf"), downloadProgress);
-                 });
-        }
+            if (!resourcesManager->isResourceInstalled(QLatin1String("netherlands_europe.map.obf")))
+                resourcesManager->installFromRepository(QLatin1String("netherlands_europe.map.obf"), downloadProgress);
+            else if (resourcesManager->isInstalledResourceOutdated(QLatin1String("netherlands_europe.map.obf")))
+                resourcesManager->updateFromRepository(QLatin1String("netherlands_europe.map.obf"), downloadProgress);
+        });
+    }
         break;
     case 'z':
+    {
+        if (renderer->state.symbolProviders.contains(binaryMapStaticSymbolProvider))
         {
-            if (renderer->state.symbolProviders.contains(binaryMapStaticSymbolProvider))
-            {
-                renderer->removeSymbolProvider(binaryMapStaticSymbolProvider);
-                binaryMapStaticSymbolProvider.reset();
-            }
-            else
-            {
-                if (!binaryMapDataProvider)
-                    binaryMapDataProvider.reset(new OsmAnd::BinaryMapDataProvider(obfsCollection, style, density));
-
-                binaryMapStaticSymbolProvider.reset(new OsmAnd::BinaryMapStaticSymbolsProvider(binaryMapDataProvider));
-                renderer->addSymbolProvider(binaryMapStaticSymbolProvider);
-            }
+            renderer->removeSymbolProvider(binaryMapStaticSymbolProvider);
+            binaryMapStaticSymbolProvider.reset();
         }
+        else
+        {
+            if (!binaryMapDataProvider)
+                binaryMapDataProvider.reset(new OsmAnd::BinaryMapDataProvider(obfsCollection, style, density));
+
+            binaryMapStaticSymbolProvider.reset(new OsmAnd::BinaryMapStaticSymbolsProvider(binaryMapDataProvider));
+            renderer->addSymbolProvider(binaryMapStaticSymbolProvider);
+        }
+    }
         break;
     case 'q':
         animator->cancelAnimation();
@@ -685,27 +697,27 @@ void keyboardHandler(unsigned char key, int x, int y)
     case '4':
     case '5':
     case '6':
-        {
-            auto layerId = (modifiers & GLUT_ACTIVE_ALT) ? OsmAnd::RasterMapLayerId::Overlay0 : OsmAnd::RasterMapLayerId::BaseLayer;
-            activateProvider(layerId, key - '0');
-        }
+    {
+        auto layerId = (modifiers & GLUT_ACTIVE_ALT) ? OsmAnd::RasterMapLayerId::Overlay0 : OsmAnd::RasterMapLayerId::BaseLayer;
+        activateProvider(layerId, key - '0');
+    }
         break;
     case ' ':
-        {
-            const OsmAnd::PointI amsterdam(
-                1102430866,
-                704978668);
-            const OsmAnd::PointI kiev(
-                1255337783,
-                724166131);
-            static bool flag = false;
-            const auto& target = flag ? amsterdam : kiev;
-            flag = !flag;
+    {
+        const OsmAnd::PointI amsterdam(
+            1102430866,
+            704978668);
+        const OsmAnd::PointI kiev(
+            1255337783,
+            724166131);
+        static bool flag = false;
+        const auto& target = flag ? amsterdam : kiev;
+        flag = !flag;
 
-            animator->cancelAnimation();
-            animator->animateMoveTo(target, 1.0f, false, false, OsmAnd::MapAnimator::TimingFunction::EaseInOutQuadratic);
-            animator->resumeAnimation();
-        }
+        animator->cancelAnimation();
+        animator->animateMoveTo(target, 1.0f, false, false, OsmAnd::MapAnimator::TimingFunction::EaseInOutQuadratic);
+        animator->resumeAnimation();
+    }
         break;
     case '-':
         animator->cancelAnimation();
@@ -727,7 +739,7 @@ void specialHandler(int key, int x, int y)
     const auto modifiers = glutGetModifiers();
     const auto step = (modifiers & GLUT_ACTIVE_SHIFT) ? 1.0f : 0.1f;
 
-    switch(key)
+    switch (key)
     {
     case GLUT_KEY_F5:
         renderer->forcedFrameInvalidate();
@@ -760,16 +772,16 @@ void closeHandler(void)
 
 void activateProvider(OsmAnd::RasterMapLayerId layerId, int idx)
 {
-    if(idx == 0)
+    if (idx == 0)
     {
         renderer->resetRasterLayerProvider(layerId);
     }
-    else if(idx == 1)
+    else if (idx == 1)
     {
         auto tileProvider = OsmAnd::OnlineTileSources::getBuiltIn()->createProviderFor(QLatin1String("Mapnik (OsmAnd)"));
         renderer->setRasterLayerProvider(layerId, tileProvider);
     }
-    else if(idx == 2)
+    else if (idx == 2)
     {
         binaryMapDataProvider.reset(new OsmAnd::BinaryMapDataProvider(obfsCollection, style, density));
 
@@ -781,7 +793,7 @@ void activateProvider(OsmAnd::RasterMapLayerId layerId, int idx)
         auto tileProvider = new OsmAnd::BinaryMapRasterBitmapTileProvider_Software(binaryMapDataProvider);
         renderer->setRasterLayerProvider(layerId, std::shared_ptr<OsmAnd::IMapRasterBitmapTileProvider>(tileProvider));
     }
-    else if(idx == 3)
+    else if (idx == 3)
     {
         binaryMapDataProvider.reset(new OsmAnd::BinaryMapDataProvider(obfsCollection, style, density));
 
@@ -793,7 +805,7 @@ void activateProvider(OsmAnd::RasterMapLayerId layerId, int idx)
         auto tileProvider = new OsmAnd::BinaryMapRasterBitmapTileProvider_Software(binaryMapDataProvider);
         renderer->setRasterLayerProvider(layerId, std::shared_ptr<OsmAnd::IMapRasterBitmapTileProvider>(tileProvider));
     }
-    else if(idx == 4)
+    else if (idx == 4)
     {
         binaryMapDataProvider.reset(new OsmAnd::BinaryMapDataProvider(obfsCollection, style, density));
 
@@ -805,10 +817,10 @@ void activateProvider(OsmAnd::RasterMapLayerId layerId, int idx)
         auto tileProvider = new OsmAnd::BinaryMapRasterBitmapTileProvider_Software(binaryMapDataProvider);
         renderer->setRasterLayerProvider(layerId, std::shared_ptr<OsmAnd::IMapRasterBitmapTileProvider>(tileProvider));
     }
-    else if(idx == 5)
+    else if (idx == 5)
     {
         binaryMapDataProvider.reset(new OsmAnd::BinaryMapDataProvider(obfsCollection, style, density));
-        
+
         // pedestrian
         QHash< QString, QString > settings;
         settings.insert("appMode", "pedestrian");
@@ -817,7 +829,7 @@ void activateProvider(OsmAnd::RasterMapLayerId layerId, int idx)
         auto tileProvider = new OsmAnd::BinaryMapRasterBitmapTileProvider_Software(binaryMapDataProvider);
         renderer->setRasterLayerProvider(layerId, std::shared_ptr<OsmAnd::IMapRasterBitmapTileProvider>(tileProvider));
     }
-    else if(idx == 6)
+    else if (idx == 6)
     {
         //        auto hillshadeTileProvider = new OsmAnd::HillshadeTileProvider();
         //        renderer->setTileProvider(layerId, hillshadeTileProvider);
@@ -829,7 +841,7 @@ void idleHandler(void)
     static std::chrono::time_point<std::chrono::high_resolution_clock> lastTimeStamp;
     static bool lastTimeStampInitialized = false;
 
-    if(!lastTimeStampInitialized)
+    if (!lastTimeStampInitialized)
     {
         lastTimeStamp = std::chrono::high_resolution_clock::now();
         lastTimeStampInitialized = true;
@@ -851,15 +863,18 @@ void displayHandler()
     verifyOpenGL();
     //////////////////////////////////////////////////////////////////////////
 
-    if(renderer->prepareFrame())
+    if (renderer->prepareFrame())
         renderer->renderFrame();
     renderer->processRendering();
 
     verifyOpenGL();
 
     //////////////////////////////////////////////////////////////////////////
-    if(!use43 && !nSight)
+    if (!use43 && !nSight)
     {
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
         glDisable(GL_DEPTH_TEST);
 
         glMatrixMode(GL_PROJECTION);
@@ -1046,16 +1061,16 @@ void displayHandler()
     glFlush();
     glutSwapBuffers();
 
-    if(nSight || gDEBugger || constantRefresh)
+    if (nSight || gDEBugger || constantRefresh)
         glutPostRedisplay();
-    if(gDEBugger)
+    if (gDEBugger)
         glFrameTerminatorGREMEDY();
 }
 
 void verifyOpenGL()
 {
     auto result = glGetError();
-    if(result == GL_NO_ERROR)
+    if (result == GL_NO_ERROR)
         return;
 
     OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Error, "Host OpenGL error 0x%08x : %s\n", result, gluErrorString(result));
