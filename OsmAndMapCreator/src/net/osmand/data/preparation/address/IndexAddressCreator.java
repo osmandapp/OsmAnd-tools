@@ -491,6 +491,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 	
 
 	public String normalizeStreetName(String name) {
+		if(name == null) {
+			return null;
+		}
 		name = name.trim();
 		if (normalizeStreets) {
 			String newName = name;
@@ -563,7 +566,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 	}
 
 	public Set<Long> getStreetInCity(Set<String> isInNames, String name, String nameEn, final LatLon location) throws SQLException {
-		if (name == null || location == null) {
+		if (location == null) {
 			return Collections.emptySet();
 		
 		}
@@ -609,13 +612,19 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 		if (result.isEmpty()) {
 			return Collections.emptySet();
 		}
-		if (Algorithms.isEmpty(nameEn)) {
+		if (Algorithms.isEmpty(nameEn) && name != null) {
 			nameEn = Junidecode.unidecode(name);
 		}
 
 		Set<Long> values = new TreeSet<Long>();
 		for (City city : result) {
-			long streetId = getOrRegisterStreetIdForCity(name, nameEn, location, city);
+			String nameInCity = name;
+			String nameEnInCity = nameEn;
+			if(nameInCity == null ||  nameEnInCity == null) {
+				nameInCity = "<" +city.getName()+">";
+				nameEnInCity = "<" +city.getEnName()+">";
+			}
+			long streetId = getOrRegisterStreetIdForCity(nameInCity, nameEnInCity, location, city);
 			values.add(streetId);
 		}
 		return values;
@@ -763,7 +772,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 			}
 		}
 		String street2 = e.getTag(OSMTagKey.ADDR_STREET2);
-		if ((houseName != null || houseNumber != null) && street != null) {
+		if ((houseName != null || houseNumber != null) ) {
 			if(e instanceof Relation) {
 				ctx.loadEntityRelation((Relation) e);
 				Collection<Entity> outs = ((Relation) e).getMembers("outer");
