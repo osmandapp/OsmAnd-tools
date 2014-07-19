@@ -242,20 +242,20 @@ public class MapRoutingTypes {
 		return value;
 	}
 	
-	public void encodePointTypes(Way e, TLongObjectHashMap<TIntArrayList> pointTypes){
+	public void encodePointTypes(Way e, TLongObjectHashMap<TIntArrayList> pointTypes, boolean base){
 		pointTypes.clear();
 		for(Node nd : e.getNodes() ) {
 			if (nd != null) {
 				for (Entry<String, String> es : nd.getTags().entrySet()) {
 					String tag = es.getKey();
 					String value = converBooleanValue(es.getValue());
-					String tvl = getMap(TAGS_TO_REPLACE, tag, value);
+					String tvl = getMap(base ? BASE_TAGS_TO_REPLACE : TAGS_TO_REPLACE, tag, value);
 					if(tvl != null) {
 						int i = tvl.indexOf(TAG_DELIMETER);
 						tag = tvl.substring(0, i);
 						value = tvl.substring(i + 1);
 					}
-					if (contains(TAGS_TO_ACCEPT, tag, value) || startsWith(TAGS_TO_SAVE, tag, value)) {
+					if (contains(TAGS_TO_ACCEPT, tag, value) || startsWith(base? BASE_TAGS_TO_SAVE : TAGS_TO_SAVE, tag, value)) {
 						if (!pointTypes.containsKey(nd.getId())) {
 							pointTypes.put(nd.getId(), new TIntArrayList());
 						}
