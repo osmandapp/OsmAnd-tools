@@ -757,8 +757,8 @@ public class MapRouterLayer implements MapPanelLayer {
 			@Override
 			public void run() {
 				while(ctx.calculationProgress != null && !ctx.calculationProgress.isCancelled) {
-					float p = ctx.calculationProgress.distanceFromBegin + ctx.calculationProgress.distanceFromEnd;
-					float all = ctx.calculationProgress.totalEstimatedDistance;
+					float p = Math.max(ctx.calculationProgress.distanceFromBegin, ctx.calculationProgress.distanceFromEnd);
+					float all = 1.25f * ctx.calculationProgress.totalEstimatedDistance;
 //							while (p > all * 0.9) {
 //								all *= 1.2;
 //							}
