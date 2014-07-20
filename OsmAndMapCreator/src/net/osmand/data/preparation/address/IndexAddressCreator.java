@@ -866,7 +866,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 	public void writeCitiesIntoDb() throws SQLException {
 		for (City c : cities.values()) {
 			if(c.getType() != CityType.DISTRICT &&
-					c.getType() != CityType.SUBURB &&
+					//c.getType() != CityType.SUBURB &&
 					c.getType() != CityType.NEIGHBOURHOOD){
 				writeCity(c);
 			}
