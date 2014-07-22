@@ -166,27 +166,27 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 				}
 			}
 			
-			boolean encoded = routeTypes.encodeEntity(e, outTypes, names) ;
+			boolean encoded = routeTypes.encodeEntity(e, outTypes, names) 
+					&& e.getNodes().size() >= 2;
 			if (encoded) {
-				// Load point with  tags!
+				// Load point with tags!
 				ctx.loadEntityWay(e);
-				for(Node n : e.getNodes()) {
-					if(n != null && genSpeedCameras.contains(n.getId())) {
+				for (Node n : e.getNodes()) {
+					if (n != null && genSpeedCameras.contains(n.getId())) {
 						n.putTag("highway", "speed_camera");
 					}
 				}
-				routeTypes.encodePointTypes(e, pointTypes);
-				if(e.getNodes().size() >= 2) {
-				    addWayToIndex(e.getId(), e.getNodes(), mapRouteInsertStat, routeTree);
-				}
+				routeTypes.encodePointTypes(e, pointTypes, false);
+				addWayToIndex(e.getId(), e.getNodes(), mapRouteInsertStat, routeTree, outTypes, pointTypes, names);
 			}
-			encoded = routeTypes.encodeBaseEntity(e, outTypes, names) && e.getNodes().size() >= 2;
+			encoded = routeTypes.encodeBaseEntity(e, outTypes, names) 
+					&& e.getNodes().size() >= 2;
 			if (encoded ) {
 				List<Node> source = e.getNodes();
 				long id = e.getId();
 				List<Node> result = simplifyRouteForBaseSection(source, id);
-				
-				addWayToIndex(e.getId(), result, basemapRouteInsertStat, baserouteTree);
+				routeTypes.encodePointTypes(e, pointTypes, true);
+				addWayToIndex(e.getId(), result, basemapRouteInsertStat, baserouteTree, outTypes, pointTypes, names);
 				//generalizeWay(e);
 
 			}
@@ -260,7 +260,9 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		}
 		
 	}
-	private void addWayToIndex(long id, List<Node> nodes, PreparedStatement insertStat, RTree rTree) throws SQLException {
+	private void addWayToIndex(long id, List<Node> nodes, PreparedStatement insertStat, RTree rTree,
+			TIntArrayList outTypes,	TLongObjectHashMap<TIntArrayList> pointTypes,	
+			Map<MapRoutingTypes.MapRouteType, String> names ) throws SQLException {
 		boolean init = false;
 		int minX = Integer.MAX_VALUE;
 		int maxX = 0;
@@ -769,7 +771,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 				outTypes.add(gw.mainType);
 				outTypes.addAll(gw.addtypes);
 				try {
-					addWayToIndex(gw.id, nodes, basemapRouteInsertStat, baserouteTree);
+					addWayToIndex(gw.id, nodes, basemapRouteInsertStat, baserouteTree, outTypes, pointTypes, names);
 				} catch (SQLException e) {
 					throw new IllegalStateException(e);
 				}

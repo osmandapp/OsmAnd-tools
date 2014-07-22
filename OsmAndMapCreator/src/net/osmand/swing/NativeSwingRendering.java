@@ -193,6 +193,7 @@ public class NativeSwingRendering extends NativeLibrary {
 				return _R.getIconData(data);
 			}
 		};
+		rctx.preferredLocale = renderingProps.get("lang") != null ?renderingProps.get("lang") : "";
 		rctx.nightMode = "true".equals(renderingProps.get("nightMode"));
 		RenderingRuleSearchRequest request = new RenderingRuleSearchRequest(storage);
 		request.setBooleanFilter(request.ALL.R_NIGHT_MODE, rctx.nightMode);
