@@ -44,7 +44,7 @@
 #include <OsmAndCore/Map/MapMarkerBuilder.h>
 #include <OsmAndCore/Map/MapMarker.h>
 #include <OsmAndCore/Map/MapAnimator.h>
-#include <OsmAndCore/Map/FavoriteLocationsGpxCollection.h>
+#include <OsmAndCore/FavoriteLocationsGpxCollection.h>
 #include <OsmAndCore/Map/FavoriteLocationsPresenter.h>
 
 bool glutWasInitialized = false;
@@ -461,15 +461,14 @@ void mouseHandler(int button, int state, int x, int y)
     {
         if (state == GLUT_DOWN)
         {
-            OsmAnd::PointI64 clickedLocation;
-            renderer->getLocationFromScreenPoint(OsmAnd::PointI(x, y), clickedLocation);
-            lastClickedLocation31 = OsmAnd::Utilities::normalizeCoordinates(clickedLocation, OsmAnd::ZoomLevel31);
+            renderer->getLocationFromScreenPoint(OsmAnd::PointI(x, y), lastClickedLocation31);
             lastClickedLocationMarker->setPosition(lastClickedLocation31);
 
-            animator->cancelAnimation();
-            //animator->animateTargetTo(clickedLocation, 1.0f, OsmAnd::MapAnimator::TimingFunction::EaseInOutQuadratic);
-            animator->parabolicAnimateTargetTo(clickedLocation, 1.0f, OsmAnd::MapAnimator::TimingFunction::EaseInOutQuadratic, OsmAnd::MapAnimator::TimingFunction::EaseOutInQuadratic);
-            animator->resumeAnimation();
+            animator->pause();
+            animator->cancelAllAnimations();
+            //animator->animateTargetTo(lastClickedLocation31, 1.0f, OsmAnd::MapAnimator::TimingFunction::EaseInOutQuadratic);
+            animator->parabolicAnimateTargetTo(lastClickedLocation31, 1.0f, OsmAnd::MapAnimator::TimingFunction::EaseInOutQuadratic, OsmAnd::MapAnimator::TimingFunction::EaseOutInQuadratic);
+            animator->resume();
         }
     }
 }
@@ -686,9 +685,10 @@ void keyboardHandler(unsigned char key, int x, int y)
     }
         break;
     case 'q':
-        animator->cancelAnimation();
+        animator->pause();
+        animator->cancelAllAnimations();
         animator->animateAzimuthTo(0.0f, 1.0f, OsmAnd::MapAnimator::TimingFunction::EaseInOutQuadratic);
-        animator->resumeAnimation();
+        animator->resume();
         break;
     case '0':
     case '1':
@@ -714,20 +714,23 @@ void keyboardHandler(unsigned char key, int x, int y)
         const auto& target = flag ? amsterdam : kiev;
         flag = !flag;
 
-        animator->cancelAnimation();
+        animator->pause();
+        animator->cancelAllAnimations();
         animator->animateMoveTo(target, 1.0f, false, false, OsmAnd::MapAnimator::TimingFunction::EaseInOutQuadratic);
-        animator->resumeAnimation();
+        animator->resume();
     }
         break;
     case '-':
-        animator->cancelAnimation();
+        animator->pause();
+        animator->cancelAllAnimations();
         animator->animateZoomBy(-1.0f, 1.0f, OsmAnd::MapAnimator::TimingFunction::EaseInOutQuadratic);
-        animator->resumeAnimation();
+        animator->resume();
         break;
     case '+':
-        animator->cancelAnimation();
+        animator->pause();
+        animator->cancelAllAnimations();
         animator->animateZoomBy(+1.0f, 1.0f, OsmAnd::MapAnimator::TimingFunction::EaseInOutQuadratic);
-        animator->resumeAnimation();
+        animator->resume();
         break;
     case '*':
         break;
@@ -863,10 +866,11 @@ void displayHandler()
     verifyOpenGL();
     //////////////////////////////////////////////////////////////////////////
 
+    renderer->update();
+
     if (renderer->prepareFrame())
         renderer->renderFrame();
-    renderer->processRendering();
-
+    
     verifyOpenGL();
 
     //////////////////////////////////////////////////////////////////////////
