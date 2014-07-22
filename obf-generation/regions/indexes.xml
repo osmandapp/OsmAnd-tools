@@ -439,7 +439,13 @@
 			<region name="belize" downloadName="belize-latest"/>
 			<region name="guatemala" downloadName="guatemala-latest"/>
 			<!-- <region name="haiti-and-domrep" downloadName="haiti-and-domrep-latest"/> -->
-			<region name="mexico" downloadName="mexico-latest"/>	
+			<!-- download.geofabrik.de maintains mexico under central america but it belongs to north-america
+			<region name="mexico" downloadName="mexico-latest"/>	-->
+		</regions>
+		
+		<regions siteToDownload="http://download.geofabrik.de/central-america/{0}.osm.pbf" skip="false" region_prefix="" region_suffix="_NorthAmerica">
+			<!-- download.geofabrik.de maintains mexico under central america but it belongs to north-america -->
+			<region name="mexico" downloadName="mexico-latest"/>
 		</regions>
 
 		<!--  5.2 CENTRAL AMERICA [SOURCE: OSMAND:NET] -->
