@@ -39,6 +39,7 @@
 #include <OsmAndCore/Map/BinaryMapDataProvider.h>
 #include <OsmAndCore/Map/BinaryMapRasterBitmapTileProvider_Software.h>
 #include <OsmAndCore/Map/BinaryMapRasterBitmapTileProvider_GPU.h>
+#include <OsmAndCore/Map/BinaryMapMetricsBitmapTileProvider.h>
 #include <OsmAndCore/Map/BinaryMapStaticSymbolsProvider.h>
 #include <OsmAndCore/Map/MapMarkersCollection.h>
 #include <OsmAndCore/Map/MapMarkerBuilder.h>
@@ -210,18 +211,22 @@ int main(int argc, char** argv)
     lastClickedLocationMarker->setOnMapSurfaceIconDirection(reinterpret_cast<OsmAnd::MapMarker::OnSurfaceIconKey>(1), Q_QNAN);
     lastClickedLocationMarker->setIsAccuracyCircleVisible(true);
     lastClickedLocationMarker->setAccuracyCircleRadius(20000.0);
+    /*
     renderer->addSymbolProvider(markers);
+    */
 
     favorites.reset(new OsmAnd::FavoriteLocationsGpxCollection());
+    /*
     if (favorites->loadFrom(QLatin1String("d:\\OpenSource\\OsmAnd\\favorites.gpx")))
     {
         favoritesPresenter.reset(new OsmAnd::FavoriteLocationsPresenter(favorites));
         renderer->addSymbolProvider(favoritesPresenter);
     }
+    */
     
     //////////////////////////////////////////////////////////////////////////
-    QHash< QString, std::shared_ptr<const OsmAnd::WorldRegions::WorldRegion> > worldRegions;
-    OsmAnd::WorldRegions("d:\\OpenSource\\OsmAnd\\OsmAnd\\resources\\countries-info\\regions.ocbf").loadWorldRegions(worldRegions);
+    //QHash< QString, std::shared_ptr<const OsmAnd::WorldRegions::WorldRegion> > worldRegions;
+    //OsmAnd::WorldRegions("d:\\OpenSource\\OsmAnd\\OsmAnd\\resources\\countries-info\\regions.ocbf").loadWorldRegions(worldRegions);
     //////////////////////////////////////////////////////////////////////////
 
     if (dataDirSpecified)
@@ -370,7 +375,7 @@ int main(int argc, char** argv)
     renderer->setTarget(OsmAnd::PointI(
         1102430866,
         704978668));
-    renderer->setZoom(10.0f);
+    renderer->setZoom(11.0f);
     //renderer->setZoom(16.0f);
     //renderer->setZoom(4.0f);
 
@@ -834,6 +839,13 @@ void activateProvider(OsmAnd::RasterMapLayerId layerId, int idx)
     }
     else if (idx == 6)
     {
+        binaryMapDataProvider.reset(new OsmAnd::BinaryMapDataProvider(obfsCollection, style, density));
+
+        auto tileProvider = new OsmAnd::BinaryMapMetricsBitmapTileProvider(binaryMapDataProvider);
+        renderer->setRasterLayerProvider(layerId, std::shared_ptr<OsmAnd::IMapRasterBitmapTileProvider>(tileProvider));
+    }
+    else if (idx == 7)
+    {
         //        auto hillshadeTileProvider = new OsmAnd::HillshadeTileProvider();
         //        renderer->setTileProvider(layerId, hillshadeTileProvider);
     }
@@ -1058,7 +1070,7 @@ void displayHandler()
 
         glRasterPos2f(8, 16 * 1);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("6 - Hillshade")));
+            QString("6 - Metrics [Binary Map Data Provider]")));
         verifyOpenGL();
     }
 
