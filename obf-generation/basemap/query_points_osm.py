@@ -85,4 +85,4 @@ if __name__ == "__main__":
 				   " or aeroway in ('aerodrome', 'airport')", 'points.osm', 
 				   ['name', 'name:en',
 				    'ref', 'ele', 'place','natural', 'aeroway', 'tourism'])
-	process_points("place in ('city','town') ", 'cities.osm', ['name', 'name:en', 'place'])
+	process_points("place in ('city','town') ", 'cities.osm', ['name', 'name:en', 'place', 'capital'])
