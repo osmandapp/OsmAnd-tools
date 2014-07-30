@@ -826,7 +826,8 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 				}
 			}
 		} else if (e instanceof Way /* && OSMSettings.wayForCar(e.getTag(OSMTagKey.HIGHWAY)) */
-				&& e.getTag(OSMTagKey.HIGHWAY) != null && e.getTag(OSMTagKey.NAME) != null) {
+				&& e.getTag(OSMTagKey.HIGHWAY) != null && e.getTag(OSMTagKey.NAME) != null &&
+				isStreetTag(e.getTag(OSMTagKey.HIGHWAY))) {
 			// suppose that streets with names are ways for car
 			// Ignore all ways that have house numbers and highway type
 			
@@ -852,6 +853,11 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 		}
 	}
 	
+	private boolean isStreetTag(String highwayValue) {
+		return !"platform".equals(highwayValue);
+	}
+
+
 	private void writeCity(City city) throws SQLException {
 		addressCityStat.setLong(1, city.getId());
 		addressCityStat.setDouble(2, city.getLocation().getLatitude());
