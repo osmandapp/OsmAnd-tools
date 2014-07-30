@@ -150,7 +150,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			}
 		}
 		return encodeEntityWithType(e instanceof Node, 
-				e.getTags(), zoom, outTypes, outAddTypes, namesToEncode, tempListNotUsed);
+				e.getModifiableTags(), zoom, outTypes, outAddTypes, namesToEncode, tempListNotUsed);
 	}
 	
 	public boolean encodeEntityWithType(boolean node, Map<String, String> tags, int zoom, TIntArrayList outTypes, 

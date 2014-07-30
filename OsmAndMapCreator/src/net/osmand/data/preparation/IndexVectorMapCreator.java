@@ -484,7 +484,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	private void iterateMainEntityPost(Entity e) throws SQLException {
 		for (int level = 0; level < mapZooms.size(); level++) {
 			boolean area = renderingTypes.encodeEntityWithType(e instanceof Node, 
-					e.getTags(), mapZooms.getLevel(level).getMaxZoom(), typeUse, addtypeUse, namesUse,
+					e.getModifiableTags(), mapZooms.getLevel(level).getMaxZoom(), typeUse, addtypeUse, namesUse,
 					tempNameUse);
 			if (typeUse.isEmpty()) {
 				continue;
