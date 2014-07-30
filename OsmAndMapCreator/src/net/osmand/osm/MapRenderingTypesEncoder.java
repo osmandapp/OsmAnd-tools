@@ -273,7 +273,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			vl = palette6 ? "blue" : "purple";
 		} else if ((color != -1 & r < 0x4 && g < 0x4 && b < 0x4) || vl.equals("black")) {
 			vl = "black";
-		} else if ((r == g && g == b && 0xE > b > 0x4) || vl.equals("gray") || vl.equals("grey") || vl.equals("silver")) {
+		} else if ((r == g && g == b && 0xE > b && b > 0x4) || vl.equals("gray") || vl.equals("grey") || vl.equals("silver")) {
 			vl = palette6 ? "white" : "gray";
 		} else if ((r == g && g == b && b > 0xE1) || vl.equals("white")) {
 			vl = "white";
