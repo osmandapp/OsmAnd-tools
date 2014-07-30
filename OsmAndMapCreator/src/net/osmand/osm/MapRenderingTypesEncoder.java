@@ -255,19 +255,19 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		if ((r > 0x45 && g < 0x8 && b < 0x4) || vl.equals("pink")
 				|| vl.equals("red")) {
 			vl = "red";
-		} else if ((0xD > r > 0x5 && 0x3 < g < 0x85 && b < 0x02) || vl.equals("brown")) {
+		} else if ((0xD > r && r > 0x5 && 0x3 < g && g < 0x85 && b < 0x02) || vl.equals("brown")) {
 			vl = palette6 ? "red" : "brown";
-		} else if ((r > 0xB && 0x3 < g < 0xC && b < 0x6) || vl.equals("orange")) {
+		} else if ((r > 0xB && 0x3 < g && g < 0xC && b < 0x6) || vl.equals("orange")) {
 			vl = palette6 ? "red" : "orange";
-		} else if ((r > 0xB && 0xF5 > g > 0xA && b < 0x8) || vl.equals("yellow") || vl.equals("tan")) {
+		} else if ((r > 0xB && 0xF5 > g && g > 0xA && b < 0x8) || vl.equals("yellow") || vl.equals("tan")) {
 			vl = "yellow";
 		} else if ((r < 0xB && g < 0xF && b < 0xF9) || vl.equals("lightgreen") || vl.equals("lime")) {
 			vl = palette6 ? "green" : "lightgreen";
-		} else if ((r < 0x9 && 0xFE > g > 0x6 && b < 0x6) || vl.equals("green") || vl.equals("darkgreen")) {
+		} else if ((r < 0x9 && 0xFE > g && g > 0x6 && b < 0x6) || vl.equals("green") || vl.equals("darkgreen")) {
 			vl = "green";
-		} else if ((r < 0xA && 0xC < g < 0xFE && 0xF7 > b > 0x9) || (0x7 < r < 0xB && 0xA < g < 0xE && 0xFC > b > 0xF8) || vl.equals("lightblue") || vl.equals("aqua")  || vl.equals("cyan")) {
+		} else if ((r < 0xA && 0xC < g && g < 0xFE && 0xF7 > b && b > 0x9) || (0x7 < r && r < 0xB && 0xA < g && g < 0xE && 0xFC > b && b > 0xF8) || vl.equals("lightblue") || vl.equals("aqua")  || vl.equals("cyan")) {
 			vl = palette6 ? "blue" : "lightblue";
-		} else if ((r < 0x6 && 0x1 < g < 0xA && b > 0x5) || vl.equals("blue")) {
+		} else if ((r < 0x6 && 0x1 < g && g < 0xA && b > 0x5) || vl.equals("blue")) {
 			vl = "blue";
 		} else if ((0x4 < r && g < 0xB && b > 0x5) || vl.equals("purple") || vl.equals("violet") || vl.equals("magenta") || vl.equals("maroon")) {
 			vl = palette6 ? "blue" : "purple";
