@@ -804,7 +804,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 						}
 						building.setName(hname.substring(0, i));
 						building.setName2(hname.substring(i + 1));
-					} else {
+					} else if ((street2 != null) && !street2.isEmpty()) {
 						int secondNumber = hname.indexOf('/');
 						if(secondNumber == -1 || !(secondNumber < hname.length() - 1)) {
 							building.setName(hname);
@@ -820,6 +820,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 								building.setName2(building2.getName());
 							}
 						}
+					}
+					else {
+						building.setName(hname);
 					}
 					
 					streetDAO.writeBuilding(idsOfStreet, building);
