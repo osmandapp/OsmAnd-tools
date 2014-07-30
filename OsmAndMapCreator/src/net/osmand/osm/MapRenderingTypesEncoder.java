@@ -261,7 +261,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			vl = palette6 ? "red" : "orange";
 		} else if ((r > 0xB && 0xF5 > g && g > 0xA && b < 0x8) || vl.equals("yellow") || vl.equals("tan")) {
 			vl = "yellow";
-		} else if ((r < 0xB && g < 0xF && b < 0xF9) || vl.equals("lightgreen") || vl.equals("lime")) {
+		} else if ((r < 0xB && g > 0xF && b < 0xF9) || vl.equals("lightgreen") || vl.equals("lime")) {
 			vl = palette6 ? "green" : "lightgreen";
 		} else if ((r < 0x9 && 0xFE > g && g > 0x6 && b < 0x6) || vl.equals("green") || vl.equals("darkgreen")) {
 			vl = "green";
