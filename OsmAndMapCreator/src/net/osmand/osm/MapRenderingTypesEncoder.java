@@ -159,6 +159,12 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		outAddTypes.clear();
 		namesToEncode.clear();
 		boolean area = "yes".equals(tags.get("area")) || "true".equals(tags.get("area")) || tags.containsKey("area:highway");
+		if(tags.containsKey("color")) {
+			prepareColorTag(tags, "color");
+		}
+		if(tags.containsKey("colour")) {
+			prepareColorTag(tags, "colour");
+		}
 
 		for (String tag : tags.keySet()) {
 			String val = tags.get(tag);
@@ -207,6 +213,13 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 
 
 
+	private void prepareColorTag(Map<String, String> tags, String tag) {
+		String vl = tags.get(tag);
+		vl = formatColorToPalette(vl, false);
+		tags.put("colour_"+vl, "");
+		tags.put("color_"+vl, "");
+	}
+
 	private void sortAndUpdateTypes(TIntArrayList outTypes) {
 		outTypes.sort();
         for(int i = 0; i < outTypes.size(); i++) {
@@ -224,16 +237,48 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		return (rType.order << 15) | rType.id;
 	}
 	
+	public String formatColorToPalette(String vl, boolean palette6){
+		vl = vl.toLowerCase();
+		int color = -1;
+		int r = 0;
+		int g = 0;
+		int b = 0;
+		if (vl.charAt(0) == '#') {
+			try {
+				color = Algorithms.parseColor(vl);
+				r = (color >> 16) & 0xFF;
+				g = (color >> 8) & 0xFF;
+				b = (color >> 0) & 0xFF;
+			} catch (RuntimeException e) {
+			}
+		}
+		if ((r > 0xb && g < 0x4 && b < 0x4) || vl.equals("pink") 
+				|| vl.equals("red")) {
+			vl = "red";
+		} else if ((r > 0xb && g < 0x4 && b < 0x4) || vl.equals("brown")) {
+				vl = palette6 ? "red": "brown";
+		} else if ((r > 0xb && g > 0xb && b < 0x4) || vl.equals("yellow")) {
+			vl = "yellow";
+		} else if ((r < 0x4 && g > 0xb && b < 0x4) || vl.equals("green")) {
+			vl = "green";
+		} else if ((r < 0x4 && g < 0x4 && b > 0xb) || vl.equals("blue")) {
+			vl = "blue";
+		} else if ((color != -1 & r < 0x4 && g < 0x4 && b < 0x4) || vl.equals("black")) {
+			vl = "black";
+		}
+		return vl;
+	}
+	
 	public void addOSMCSymbolsSpecialTags(Map<MapRulType,String> propogated, Entry<String,String> ev) {
 		if ("osmc:symbol".equals(ev.getKey())) {
 			String[] tokens = ev.getValue().split(":", 6);
 			if (tokens.length > 0) {
-				String symbol_name = "osmc_symbol_" + tokens[0];
+				String symbol_name = "osmc_symbol_" + formatColorToPalette(tokens[0], true);
 				MapRulType rt = getMapRuleType(symbol_name, "");
 				if(rt != null) {
 					propogated.put(rt, "");
 					if (tokens.length > 2 && rt.names != null) {
-						String symbol = "osmc_symbol_" + tokens[1] + "_" + tokens[2] + "_name";
+						String symbol = "osmc_symbol_" + formatColorToPalette(tokens[1], true) + "_" + formatColorToPalette(tokens[2], true) + "_name";
 						String name = "\u00A0";
 						if (tokens.length > 3 && tokens[3].trim().length() > 0) {
 							name = tokens[3];
@@ -249,19 +294,13 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		}
 		if ("color".equals(ev.getKey()) || "colour".equals(ev.getKey())) {
 			String vl = ev.getValue().toLowerCase();
-			if(vl.equals("#ffff00")){
-				vl = "yellow";
-			} else if(vl.equals("#ff0000")){
-				vl = "red";
-			} else if(vl.equals("#00ff00")){
-				vl = "green";
-			} else if(vl.equals("#0000ff")){
-				vl = "blue";
-			} else if(vl.equals("#000000")){
-				vl = "black";
-			}
-			String nm = "color_"+vl;
+			String nm = "color_"+formatColorToPalette(vl, false);
 			MapRulType rt = getMapRuleType(nm, "");
+			if(rt != null) {
+				propogated.put(rt, "");
+			}
+			nm = "colour_"+formatColorToPalette(vl, false);
+			rt = getMapRuleType(nm, "");
 			if(rt != null) {
 				propogated.put(rt, "");
 			}
