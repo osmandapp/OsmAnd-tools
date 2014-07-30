@@ -25,7 +25,7 @@
 #include <OsmAndCore/ObfDataInterface.h>
 #include <OsmAndCore/WorldRegions.h>
 #include <OsmAndCore/Map/Rasterizer.h>
-#include <OsmAndCore/Map/RasterizerEnvironment.h>
+#include <OsmAndCore/Map/MapPresentationEnvironment.h>
 #include <OsmAndCore/Map/IMapStylesCollection.h>
 #include <OsmAndCore/Map/MapStylesCollection.h>
 #include <OsmAndCore/Map/IMapStylesPresetsCollection.h>
@@ -37,14 +37,18 @@
 #include <OsmAndCore/Map/IMapElevationDataProvider.h>
 #include <OsmAndCore/Map/HeightmapTileProvider.h>
 #include <OsmAndCore/Map/BinaryMapDataProvider.h>
+#include <OsmAndCore/Map/BinaryMapPrimitivesProvider.h>
 #include <OsmAndCore/Map/BinaryMapRasterBitmapTileProvider_Software.h>
 #include <OsmAndCore/Map/BinaryMapRasterBitmapTileProvider_GPU.h>
+#include <OsmAndCore/Map/BinaryMapDataMetricsBitmapTileProvider.h>
+#include <OsmAndCore/Map/BinaryMapPrimitivesProvider.h>
+#include <OsmAndCore/Map/BinaryMapPrimitivesMetricsBitmapTileProvider.h>
 #include <OsmAndCore/Map/BinaryMapStaticSymbolsProvider.h>
 #include <OsmAndCore/Map/MapMarkersCollection.h>
 #include <OsmAndCore/Map/MapMarkerBuilder.h>
 #include <OsmAndCore/Map/MapMarker.h>
 #include <OsmAndCore/Map/MapAnimator.h>
-#include <OsmAndCore/Map/FavoriteLocationsGpxCollection.h>
+#include <OsmAndCore/FavoriteLocationsGpxCollection.h>
 #include <OsmAndCore/Map/FavoriteLocationsPresenter.h>
 
 bool glutWasInitialized = false;
@@ -55,6 +59,9 @@ std::shared_ptr<OsmAnd::IMapRenderer> renderer;
 std::shared_ptr<OsmAnd::ResourcesManager> resourcesManager;
 std::shared_ptr<const OsmAnd::IObfsCollection> obfsCollection;
 std::shared_ptr<OsmAnd::BinaryMapDataProvider> binaryMapDataProvider;
+std::shared_ptr<OsmAnd::MapPresentationEnvironment> mapPresentationEnvironment;
+std::shared_ptr<OsmAnd::Primitiviser> primitivizer;
+std::shared_ptr<OsmAnd::BinaryMapPrimitivesProvider> binaryMapPrimitivesProvider;
 std::shared_ptr<const OsmAnd::IMapStylesCollection> stylesCollection;
 std::shared_ptr<const OsmAnd::MapStyle> style;
 std::shared_ptr<OsmAnd::MapAnimator> animator;
@@ -210,18 +217,22 @@ int main(int argc, char** argv)
     lastClickedLocationMarker->setOnMapSurfaceIconDirection(reinterpret_cast<OsmAnd::MapMarker::OnSurfaceIconKey>(1), Q_QNAN);
     lastClickedLocationMarker->setIsAccuracyCircleVisible(true);
     lastClickedLocationMarker->setAccuracyCircleRadius(20000.0);
+    /*
     renderer->addSymbolProvider(markers);
+    */
 
     favorites.reset(new OsmAnd::FavoriteLocationsGpxCollection());
+    /*
     if (favorites->loadFrom(QLatin1String("d:\\OpenSource\\OsmAnd\\favorites.gpx")))
     {
         favoritesPresenter.reset(new OsmAnd::FavoriteLocationsPresenter(favorites));
         renderer->addSymbolProvider(favoritesPresenter);
     }
+    */
     
     //////////////////////////////////////////////////////////////////////////
-    QHash< QString, std::shared_ptr<const OsmAnd::WorldRegions::WorldRegion> > worldRegions;
-    OsmAnd::WorldRegions("d:\\OpenSource\\OsmAnd\\OsmAnd\\resources\\countries-info\\regions.ocbf").loadWorldRegions(worldRegions);
+    //QHash< QString, std::shared_ptr<const OsmAnd::WorldRegions::WorldRegion> > worldRegions;
+    //OsmAnd::WorldRegions("d:\\OpenSource\\OsmAnd\\OsmAnd\\resources\\countries-info\\regions.ocbf").loadWorldRegions(worldRegions);
     //////////////////////////////////////////////////////////////////////////
 
     if (dataDirSpecified)
@@ -275,6 +286,9 @@ int main(int argc, char** argv)
         }
         //style->dump();
     }
+
+    mapPresentationEnvironment.reset(new OsmAnd::MapPresentationEnvironment(style));
+    primitivizer.reset(new OsmAnd::Primitiviser(mapPresentationEnvironment));
 
     //////////////////////////////////////////////////////////////////////////
 
@@ -363,14 +377,15 @@ int main(int argc, char** argv)
     renderer->setZoom(1.5f);
     //renderer->setAzimuth(137.6f);
     renderer->setAzimuth(69.4f);
-    renderer->setElevationAngle(35.0f);
+    //renderer->setElevationAngle(35.0f);
+    renderer->setElevationAngle(90.0f);
     renderer->setFogColor(OsmAnd::FColorRGB(1.0f, 1.0f, 1.0f));
 
     // Amsterdam
     renderer->setTarget(OsmAnd::PointI(
         1102430866,
         704978668));
-    renderer->setZoom(10.0f);
+    renderer->setZoom(11.0f);
     //renderer->setZoom(16.0f);
     //renderer->setZoom(4.0f);
 
@@ -417,6 +432,7 @@ int main(int argc, char** argv)
     resourcesManager.reset();
     obfsCollection.reset();
     binaryMapDataProvider.reset();
+    binaryMapPrimitivesProvider.reset();
     stylesCollection.reset();
     style.reset();
     animator.reset();
@@ -461,15 +477,14 @@ void mouseHandler(int button, int state, int x, int y)
     {
         if (state == GLUT_DOWN)
         {
-            OsmAnd::PointI64 clickedLocation;
-            renderer->getLocationFromScreenPoint(OsmAnd::PointI(x, y), clickedLocation);
-            lastClickedLocation31 = OsmAnd::Utilities::normalizeCoordinates(clickedLocation, OsmAnd::ZoomLevel31);
+            renderer->getLocationFromScreenPoint(OsmAnd::PointI(x, y), lastClickedLocation31);
             lastClickedLocationMarker->setPosition(lastClickedLocation31);
 
-            animator->cancelAnimation();
-            //animator->animateTargetTo(clickedLocation, 1.0f, OsmAnd::MapAnimator::TimingFunction::EaseInOutQuadratic);
-            animator->parabolicAnimateTargetTo(clickedLocation, 1.0f, OsmAnd::MapAnimator::TimingFunction::EaseInOutQuadratic, OsmAnd::MapAnimator::TimingFunction::EaseOutInQuadratic);
-            animator->resumeAnimation();
+            animator->pause();
+            animator->cancelAllAnimations();
+            //animator->animateTargetTo(lastClickedLocation31, 1.0f, OsmAnd::MapAnimator::TimingFunction::EaseInOutQuadratic);
+            animator->parabolicAnimateTargetTo(lastClickedLocation31, 1.0f, OsmAnd::MapAnimator::TimingFunction::EaseInOutQuadratic, OsmAnd::MapAnimator::TimingFunction::EaseOutInQuadratic);
+            animator->resume();
         }
     }
 }
@@ -678,17 +693,20 @@ void keyboardHandler(unsigned char key, int x, int y)
         else
         {
             if (!binaryMapDataProvider)
-                binaryMapDataProvider.reset(new OsmAnd::BinaryMapDataProvider(obfsCollection, style, density));
+                binaryMapDataProvider.reset(new OsmAnd::BinaryMapDataProvider(obfsCollection));
+            if (!binaryMapPrimitivesProvider)
+                binaryMapPrimitivesProvider.reset(new OsmAnd::BinaryMapPrimitivesProvider(binaryMapDataProvider, primitivizer));
 
-            binaryMapStaticSymbolProvider.reset(new OsmAnd::BinaryMapStaticSymbolsProvider(binaryMapDataProvider));
+            binaryMapStaticSymbolProvider.reset(new OsmAnd::BinaryMapStaticSymbolsProvider(binaryMapPrimitivesProvider));
             renderer->addSymbolProvider(binaryMapStaticSymbolProvider);
         }
     }
         break;
     case 'q':
-        animator->cancelAnimation();
+        animator->pause();
+        animator->cancelAllAnimations();
         animator->animateAzimuthTo(0.0f, 1.0f, OsmAnd::MapAnimator::TimingFunction::EaseInOutQuadratic);
-        animator->resumeAnimation();
+        animator->resume();
         break;
     case '0':
     case '1':
@@ -697,6 +715,9 @@ void keyboardHandler(unsigned char key, int x, int y)
     case '4':
     case '5':
     case '6':
+    case '7':
+    case '8':
+    case '9':
     {
         auto layerId = (modifiers & GLUT_ACTIVE_ALT) ? OsmAnd::RasterMapLayerId::Overlay0 : OsmAnd::RasterMapLayerId::BaseLayer;
         activateProvider(layerId, key - '0');
@@ -714,20 +735,23 @@ void keyboardHandler(unsigned char key, int x, int y)
         const auto& target = flag ? amsterdam : kiev;
         flag = !flag;
 
-        animator->cancelAnimation();
+        animator->pause();
+        animator->cancelAllAnimations();
         animator->animateMoveTo(target, 1.0f, false, false, OsmAnd::MapAnimator::TimingFunction::EaseInOutQuadratic);
-        animator->resumeAnimation();
+        animator->resume();
     }
         break;
     case '-':
-        animator->cancelAnimation();
+        animator->pause();
+        animator->cancelAllAnimations();
         animator->animateZoomBy(-1.0f, 1.0f, OsmAnd::MapAnimator::TimingFunction::EaseInOutQuadratic);
-        animator->resumeAnimation();
+        animator->resume();
         break;
     case '+':
-        animator->cancelAnimation();
+        animator->pause();
+        animator->cancelAllAnimations();
         animator->animateZoomBy(+1.0f, 1.0f, OsmAnd::MapAnimator::TimingFunction::EaseInOutQuadratic);
-        animator->resumeAnimation();
+        animator->resume();
         break;
     case '*':
         break;
@@ -783,57 +807,87 @@ void activateProvider(OsmAnd::RasterMapLayerId layerId, int idx)
     }
     else if (idx == 2)
     {
-        binaryMapDataProvider.reset(new OsmAnd::BinaryMapDataProvider(obfsCollection, style, density));
+        if (!binaryMapDataProvider)
+            binaryMapDataProvider.reset(new OsmAnd::BinaryMapDataProvider(obfsCollection));
+        if (!binaryMapPrimitivesProvider)
+            binaryMapPrimitivesProvider.reset(new OsmAnd::BinaryMapPrimitivesProvider(binaryMapDataProvider, primitivizer));
 
         // general
         QHash< QString, QString > settings;
         settings.insert("appMode", "browse map");
-        binaryMapDataProvider->rasterizerEnvironment->setSettings(settings);
+        mapPresentationEnvironment->setSettings(settings);
 
-        auto tileProvider = new OsmAnd::BinaryMapRasterBitmapTileProvider_Software(binaryMapDataProvider);
+        auto tileProvider = new OsmAnd::BinaryMapRasterBitmapTileProvider_Software(binaryMapPrimitivesProvider);
         renderer->setRasterLayerProvider(layerId, std::shared_ptr<OsmAnd::IMapRasterBitmapTileProvider>(tileProvider));
     }
     else if (idx == 3)
     {
-        binaryMapDataProvider.reset(new OsmAnd::BinaryMapDataProvider(obfsCollection, style, density));
+        if (!binaryMapDataProvider)
+            binaryMapDataProvider.reset(new OsmAnd::BinaryMapDataProvider(obfsCollection));
+        if (!binaryMapPrimitivesProvider)
+            binaryMapPrimitivesProvider.reset(new OsmAnd::BinaryMapPrimitivesProvider(binaryMapDataProvider, primitivizer));
 
         // car
         QHash< QString, QString > settings;
         settings.insert("appMode", "car");
-        binaryMapDataProvider->rasterizerEnvironment->setSettings(settings);
+        mapPresentationEnvironment->setSettings(settings);
 
-        auto tileProvider = new OsmAnd::BinaryMapRasterBitmapTileProvider_Software(binaryMapDataProvider);
+        auto tileProvider = new OsmAnd::BinaryMapRasterBitmapTileProvider_Software(binaryMapPrimitivesProvider);
         renderer->setRasterLayerProvider(layerId, std::shared_ptr<OsmAnd::IMapRasterBitmapTileProvider>(tileProvider));
     }
     else if (idx == 4)
     {
-        binaryMapDataProvider.reset(new OsmAnd::BinaryMapDataProvider(obfsCollection, style, density));
+        if (!binaryMapDataProvider)
+            binaryMapDataProvider.reset(new OsmAnd::BinaryMapDataProvider(obfsCollection));
+        if (!binaryMapPrimitivesProvider)
+            binaryMapPrimitivesProvider.reset(new OsmAnd::BinaryMapPrimitivesProvider(binaryMapDataProvider, primitivizer));
 
         // bicycle
         QHash< QString, QString > settings;
         settings.insert("appMode", "bicycle");
-        binaryMapDataProvider->rasterizerEnvironment->setSettings(settings);
+        mapPresentationEnvironment->setSettings(settings);
 
-        auto tileProvider = new OsmAnd::BinaryMapRasterBitmapTileProvider_Software(binaryMapDataProvider);
+        auto tileProvider = new OsmAnd::BinaryMapRasterBitmapTileProvider_Software(binaryMapPrimitivesProvider);
         renderer->setRasterLayerProvider(layerId, std::shared_ptr<OsmAnd::IMapRasterBitmapTileProvider>(tileProvider));
     }
     else if (idx == 5)
     {
-        binaryMapDataProvider.reset(new OsmAnd::BinaryMapDataProvider(obfsCollection, style, density));
+        if (!binaryMapDataProvider)
+            binaryMapDataProvider.reset(new OsmAnd::BinaryMapDataProvider(obfsCollection));
+        if (!binaryMapPrimitivesProvider)
+            binaryMapPrimitivesProvider.reset(new OsmAnd::BinaryMapPrimitivesProvider(binaryMapDataProvider, primitivizer));
 
         // pedestrian
         QHash< QString, QString > settings;
         settings.insert("appMode", "pedestrian");
-        binaryMapDataProvider->rasterizerEnvironment->setSettings(settings);
+        mapPresentationEnvironment->setSettings(settings);
 
-        auto tileProvider = new OsmAnd::BinaryMapRasterBitmapTileProvider_Software(binaryMapDataProvider);
+        auto tileProvider = new OsmAnd::BinaryMapRasterBitmapTileProvider_Software(binaryMapPrimitivesProvider);
         renderer->setRasterLayerProvider(layerId, std::shared_ptr<OsmAnd::IMapRasterBitmapTileProvider>(tileProvider));
     }
     else if (idx == 6)
     {
-        //        auto hillshadeTileProvider = new OsmAnd::HillshadeTileProvider();
-        //        renderer->setTileProvider(layerId, hillshadeTileProvider);
+        if (!binaryMapDataProvider)
+            binaryMapDataProvider.reset(new OsmAnd::BinaryMapDataProvider(obfsCollection));
+
+        auto tileProvider = new OsmAnd::BinaryMapDataMetricsBitmapTileProvider(binaryMapDataProvider);
+        renderer->setRasterLayerProvider(layerId, std::shared_ptr<OsmAnd::IMapRasterBitmapTileProvider>(tileProvider));
     }
+    else if (idx == 7)
+    {
+        if (!binaryMapDataProvider)
+            binaryMapDataProvider.reset(new OsmAnd::BinaryMapDataProvider(obfsCollection));
+        if (!binaryMapPrimitivesProvider)
+            binaryMapPrimitivesProvider.reset(new OsmAnd::BinaryMapPrimitivesProvider(binaryMapDataProvider, primitivizer));
+
+        auto tileProvider = new OsmAnd::BinaryMapPrimitivesMetricsBitmapTileProvider(binaryMapPrimitivesProvider);
+        renderer->setRasterLayerProvider(layerId, std::shared_ptr<OsmAnd::IMapRasterBitmapTileProvider>(tileProvider));
+    }
+    //else if (idx == 7)
+    //{
+    //    //        auto hillshadeTileProvider = new OsmAnd::HillshadeTileProvider();
+    //    //        renderer->setTileProvider(layerId, hillshadeTileProvider);
+    //}
 }
 
 void idleHandler(void)
@@ -863,10 +917,11 @@ void displayHandler()
     verifyOpenGL();
     //////////////////////////////////////////////////////////////////////////
 
+    renderer->update();
+
     if (renderer->prepareFrame())
         renderer->renderFrame();
-    renderer->processRendering();
-
+    
     verifyOpenGL();
 
     //////////////////////////////////////////////////////////////////////////
@@ -995,8 +1050,8 @@ void displayHandler()
 
         glColor4f(0.5f, 0.5f, 0.5f, 0.6f);
         glBegin(GL_QUADS);
-        glVertex2f(0.0f, 16 * 11);
-        glVertex2f(w, 16 * 11);
+        glVertex2f(0.0f, 16 * 13);
+        glVertex2f(w, 16 * 13);
         glVertex2f(w, 0.0f);
         glVertex2f(0.0f, 0.0f);
         glEnd();
@@ -1007,54 +1062,64 @@ void displayHandler()
 #else
         glColor3f(0.2f, 0.2f, 0.2f);
 #endif
-        glRasterPos2f(8, 16 * 10);
+        glRasterPos2f(8, 16 * 12);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("Last clicked tile: (%1, %2)@%3").arg(lastClickedLocation31.x >> (31 - renderer->state.zoomBase)).arg(lastClickedLocation31.y >> (31 - renderer->state.zoomBase)).arg(renderer->state.zoomBase)));
         verifyOpenGL();
 
-        glRasterPos2f(8, 16 * 9);
+        glRasterPos2f(8, 16 * 11);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("Last clicked location: %1 %2").arg(lastClickedLocation31.x).arg(lastClickedLocation31.y)));
         verifyOpenGL();
 
-        glRasterPos2f(8, 16 * 8);
+        glRasterPos2f(8, 16 * 10);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("Tile providers (holding alt controls overlay0):")));
         verifyOpenGL();
 
-        glRasterPos2f(8, 16 * 7);
+        glRasterPos2f(8, 16 * 9);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("0 - disable")));
         verifyOpenGL();
 
-        glRasterPos2f(8, 16 * 6);
+        glRasterPos2f(8, 16 * 8);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("1 - Mapnik (OsmAnd)")));
         verifyOpenGL();
 
-        glRasterPos2f(8, 16 * 5);
+        glRasterPos2f(8, 16 * 7);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("2 - Offline maps [General]")));
         verifyOpenGL();
 
-        glRasterPos2f(8, 16 * 4);
+        glRasterPos2f(8, 16 * 6);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("3 - Offline maps [Car]")));
         verifyOpenGL();
 
-        glRasterPos2f(8, 16 * 3);
+        glRasterPos2f(8, 16 * 5);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("4 - Offline maps [Bicycle]")));
         verifyOpenGL();
 
-        glRasterPos2f(8, 16 * 2);
+        glRasterPos2f(8, 16 * 4);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("5 - Offline maps [Pedestrian]")));
         verifyOpenGL();
 
+        glRasterPos2f(8, 16 * 3);
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
+            QString("6 - Metrics [Binary Map Data Provider]")));
+        verifyOpenGL();
+
+        glRasterPos2f(8, 16 * 2);
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
+            QString("7 - Metrics [Binary Map Primitives Provider]")));
+        verifyOpenGL();
+
         glRasterPos2f(8, 16 * 1);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("6 - Hillshade")));
+            QString("8 - Metrics [Binary Map Raster Tile Provider]")));
         verifyOpenGL();
     }
 
