@@ -243,7 +243,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		int r = 0;
 		int g = 0;
 		int b = 0;
-		if (vl.charAt(0) == '#') {
+		if (vl.length() > 1 && vl.charAt(0) == '#') {
 			try {
 				color = Algorithms.parseColor(vl);
 				r = (color >> 16) & 0xFF;
