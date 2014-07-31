@@ -267,7 +267,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			vl = "green";
 		} else if ((r < 0xA && 0xC < g && g < 0xFE && 0xF7 > b && b > 0x9) || (0x7 < r && r < 0xB && 0xA < g && g < 0xE && 0xFC > b && b > 0xF8) || vl.equals("lightblue") || vl.equals("aqua")  || vl.equals("cyan")) {
 			vl = palette6 ? "blue" : "lightblue";
-		} else if ((r < 0x6 && 0x1 < g && g < 0xA && b > 0x5) || vl.equals("blue")) {
+		} else if ((r < 0x6 && g < 0xA && b > 0x5) || vl.equals("blue")) {
 			vl = "blue";
 		} else if ((0x4 < r && g < 0xB && b > 0x5) || vl.equals("purple") || vl.equals("violet") || vl.equals("magenta") || vl.equals("maroon")) {
 			vl = palette6 ? "blue" : "purple";
@@ -277,7 +277,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			vl = palette6 ? "white" : "gray";
 		} else if ((r == g && g == b && b > 0xE1) || vl.equals("white")) {
 			vl = "white";
-		} else vl = "gray";
+		}
 		return vl;
 	}
 	
