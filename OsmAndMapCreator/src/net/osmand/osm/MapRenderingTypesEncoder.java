@@ -291,6 +291,9 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		float h = hsv[0];
 		float s = hsv[1];
 		float v = hsv[2];
+		h *= 360;
+		s *= 100;
+		v *= 100;
 
 		if ((h < 16 && s > 25 && v > 30) || (h > 326 && s > 25 && v > 30) || (h < 16 && s > 10 && s < 25 && v > 90) || (h > 326 && s > 10 && s < 25 && v > 90) || vl.equals("pink") || vl.equals("red") || vl.equals("red;white") || vl.equals("red/white") || vl.equals("white/red") || vl.equals("pink/white") || vl.equals("white-red") || vl.equals("ff0000") || vl.equals("800000") || vl.equals("red/tan") || vl.equals("tan/red") || vl.equals("rose")) {
 			vl = "red";
