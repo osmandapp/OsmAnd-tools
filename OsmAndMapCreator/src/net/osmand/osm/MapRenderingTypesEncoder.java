@@ -274,9 +274,9 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	public String formatColorToPalette(String vl, boolean palette6){
 		vl = vl.toLowerCase();
 		int color = -1;
-		int r = 0;
-		int g = 0;
-		int b = 0;
+		int r = -1;
+		int g = -1;
+		int b = -1;
 		if (vl.length() > 1 && vl.charAt(0) == '#') {
 			try {
 				color = Algorithms.parseColor(vl);
@@ -305,13 +305,13 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			vl = "yellow";
 		} else if ((h > 74 && h < 150 && s > 30 && v > 77) || vl.equals("lightgreen") || vl.equals("lime") || vl.equals("seagreen") || vl.equals("00ff00") || vl.equals("yellow/green")) {
 			vl = palette6 ? "green" : "lightgreen";
-		} else if ((h > 74 && h < 150 && s > 30 && v > 30 && v < 77) || vl.equals("green") || vl.equals("darkgreen") || vl.equals("natural") || vl.equals("natur") || vl.equals("mediumseagreen") || vl.equals("green/white") || vl.equals("white/green") || vl.equals("blue/yellow") || vl.equals("vert") || vl.equals("green/blue")) {
+		} else if ((h > 74 && h < 165 && s > 30 && v > 30 && v < 77) || vl.equals("green") || vl.equals("darkgreen") || vl.equals("natural") || vl.equals("natur") || vl.equals("mediumseagreen") || vl.equals("green/white") || vl.equals("white/green") || vl.equals("blue/yellow") || vl.equals("vert") || vl.equals("green/blue")) {
 			vl = "green";
-		} else if ((h > 151 && h < 250 && s > 15 && s < 60 && v > 90) || vl.equals("lightblue") || vl.equals("aqua") || vl.equals("cyan") || vl.equals("87ceeb") || vl.equals("turquoise")) {
+		} else if ((h > 166 && h < 250 && s > 15 && s < 60 && v > 70) || vl.equals("lightblue") || vl.equals("aqua") || vl.equals("cyan") || vl.equals("87ceeb") || vl.equals("turquoise")) {
 			vl = palette6 ? "blue" : "lightblue";
-		} else if ((h > 193 && h < 250 && s > 60 && v > 30 && v < 90) || vl.equals("blue") || vl.equals("blue/white") || vl.equals("blue/tan") || vl.equals("0000ff") || vl.equals("teal") || vl.equals("darkblue") || vl.equals("blu") || vl.equals("navy")) {
+		} else if ((h > 193 && h < 250 && s > 60 && v > 30 && v < 70) || vl.equals("blue") || vl.equals("blue/white") || vl.equals("blue/tan") || vl.equals("0000ff") || vl.equals("teal") || vl.equals("darkblue") || vl.equals("blu") || vl.equals("navy")) {
 			vl = "blue";
-		} else if ((h > 250 && h < 325 && s > 20 && v > 45) || (h > 250 && h < 325 && s > 10 && s < 25 && v > 90) || vl.equals("purple") || vl.equals("violet") || vl.equals("magenta") || vl.equals("maroon") || vl.equals("fuchsia") || vl.equals("800080")) {
+		} else if ((h > 250 && h < 325 && s > 15 && v > 45) || (h > 250 && h < 325 && s > 10 && s < 25 && v > 90) || vl.equals("purple") || vl.equals("violet") || vl.equals("magenta") || vl.equals("maroon") || vl.equals("fuchsia") || vl.equals("800080")) {
 			vl = palette6 ? "blue" : "purple";
 		} else if ((color != -1 & v < 20) || vl.equals("black") || vl.equals("darkgrey")) {
 			vl = "black";
@@ -319,7 +319,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			vl = palette6 ? "white" : "gray";
 		} else if ((s < 5 && v > 95) || vl.equals("white") || vl.equals("white/tan")) {
 			vl = "white";
-		} else if (r != 0 && g != 0 && b != 0) {
+		} else if (r != -1 && g != -1 && b != -1) {
 			vl = "gray";
 		}
 		return vl;
