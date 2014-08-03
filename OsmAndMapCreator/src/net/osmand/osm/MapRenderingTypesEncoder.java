@@ -246,13 +246,47 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		return (rType.order << 15) | rType.id;
 	}
 	
+	public static double[] RGBtoHSV(double r, double g, double b){
+		double h, s, v;
+		double min, max, delta;
+		min = Math.min(Math.min(r, g), b);
+		max = Math.max(Math.max(r, g), b);
+
+		// V
+		v = max;
+		delta = max - min;
+
+		// S
+		if( max != 0 )
+			s = delta / max;
+			else {
+				s = 0;
+				h = -1;
+			return new double[]{h,s,v};
+			}
+
+		// H
+		if( r == max )
+			h = ( g - b ) / delta; // between yellow & magenta
+			else if( g == max )
+				h = 2 + ( b - r ) / delta; // between cyan & yellow
+				else
+				h = 4 + ( r - g ) / delta; // between magenta & cyan
+			h *= 60;    // degrees
+
+			if( h < 0 )
+				h += 360;
+
+		return new double[]{h,s,v};
+	}
+
 	public String formatColorToPalette(String vl, boolean palette6){
 		vl = vl.toLowerCase();
 		int color = -1;
-		int r = 0;
-		int g = 0;
-		int b = 0;
-		if (vl.charAt(0) == '#') {
+		int r = -1;
+		int g = -1;
+		int b = -1;
+		if (vl.length() > 1 && vl.charAt(0) == '#') {
 			try {
 				color = Algorithms.parseColor(vl);
 				r = (color >> 16) & 0xFF;
@@ -261,35 +295,45 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			} catch (RuntimeException e) {
 			}
 		}
-		if ((r > 0x45 && g < 0x8 && b < 0x4) || vl.equals("pink")
-				|| vl.equals("red")) {
+		float[] hsv = new float[3];
+		java.awt.Color.RGBtoHSB(r,g,b,hsv);
+		float h = hsv[0];
+		float s = hsv[1];
+		float v = hsv[2];
+		h *= 360;
+		s *= 100;
+		v *= 100;
+
+		if ((h < 16 && s > 25 && v > 30) || (h > 326 && s > 25 && v > 30) || (h < 16 && s > 10 && s < 25 && v > 90) || (h > 326 && s > 10 && s < 25 && v > 90) || vl.equals("pink") || vl.equals("red") || vl.equals("red;white") || vl.equals("red/white") || vl.equals("white/red") || vl.equals("pink/white") || vl.equals("white-red") || vl.equals("ff0000") || vl.equals("800000") || vl.equals("red/tan") || vl.equals("tan/red") || vl.equals("rose")) {
 			vl = "red";
-		} else if ((0xD > r && r > 0x5 && 0x3 < g && g < 0x85 && b < 0x02) || vl.equals("brown")) {
+		} else if ((h > 16 && h < 50 && s > 25 && v > 20 && v < 60) || vl.equals("brown") || vl.equals("darkbrown") || vl.equals("tan/brown") || vl.equals("tan_brown") || vl.equals("brown/tan") || vl.equals("light_brown") || vl.equals("brown/white")) {
 			vl = palette6 ? "red" : "brown";
-		} else if ((r > 0xB && 0x3 < g && g < 0xC && b < 0x6) || vl.equals("orange")) {
+		} else if ((h > 16 && h < 45 && v > 60) || vl.equals("orange") || vl.equals("cream") || vl.equals("gold") || vl.equals("yellow-red") || vl.equals("ff8c00") || vl.equals("peach")) {
 			vl = palette6 ? "red" : "orange";
-		} else if ((r > 0xB && 0xF5 > g && g > 0xA && b < 0x8) || vl.equals("yellow") || vl.equals("tan")) {
+		} else if ((h > 46 && h < 73 && s > 30 && v > 60) || vl.equals("yellow") || vl.equals("tan") || vl.equals("gelb") || vl.equals("ffff00") || vl.equals("beige") || vl.equals("lightyellow") || vl.equals("jaune") || vl.equals("olive")) {
 			vl = "yellow";
-		} else if ((r < 0xB && g > 0xF && b < 0xF9) || vl.equals("lightgreen") || vl.equals("lime")) {
+		} else if ((h > 74 && h < 150 && s > 30 && v > 77) || vl.equals("lightgreen") || vl.equals("lime") || vl.equals("seagreen") || vl.equals("00ff00") || vl.equals("yellow/green")) {
 			vl = palette6 ? "green" : "lightgreen";
-		} else if ((r < 0x9 && 0xFE > g && g > 0x6 && b < 0x6) || vl.equals("green") || vl.equals("darkgreen")) {
+		} else if ((h > 74 && h < 174 && s > 30 && v > 30 && v < 77) || vl.equals("green") || vl.equals("darkgreen") || vl.equals("natural") || vl.equals("natur") || vl.equals("mediumseagreen") || vl.equals("green/white") || vl.equals("white/green") || vl.equals("blue/yellow") || vl.equals("vert") || vl.equals("green/blue")) {
 			vl = "green";
-		} else if ((r < 0xA && 0xC < g && g < 0xFE && 0xF7 > b && b > 0x9) || (0x7 < r && r < 0xB && 0xA < g && g < 0xE && 0xFC > b && b > 0xF8) || vl.equals("lightblue") || vl.equals("aqua")  || vl.equals("cyan")) {
+		} else if ((h > 174 && h < 215 && s > 15 && v > 50) || vl.equals("lightblue") || vl.equals("aqua") || vl.equals("cyan") || vl.equals("87ceeb") || vl.equals("turquoise")) {
 			vl = palette6 ? "blue" : "lightblue";
-		} else if ((r < 0x6 && 0x1 < g && g < 0xA && b > 0x5) || vl.equals("blue")) {
+		} else if ((h > 215 && h < 250 && s > 40 && v > 30) || vl.equals("blue") || vl.equals("blue/white") || vl.equals("blue/tan") || vl.equals("0000ff") || vl.equals("teal") || vl.equals("darkblue") || vl.equals("blu") || vl.equals("navy")) {
 			vl = "blue";
-		} else if ((0x4 < r && g < 0xB && b > 0x5) || vl.equals("purple") || vl.equals("violet") || vl.equals("magenta") || vl.equals("maroon")) {
+		} else if ((h > 250 && h < 325 && s > 15 && v > 45) || (h > 250 && h < 325 && s > 10 && s < 25 && v > 90) || vl.equals("purple") || vl.equals("violet") || vl.equals("magenta") || vl.equals("maroon") || vl.equals("fuchsia") || vl.equals("800080")) {
 			vl = palette6 ? "blue" : "purple";
-		} else if ((color != -1 & r < 0x4 && g < 0x4 && b < 0x4) || vl.equals("black")) {
+		} else if ((color != -1 & v < 20) || vl.equals("black") || vl.equals("darkgrey")) {
 			vl = "black";
-		} else if ((r == g && g == b && 0xE > b && b > 0x4) || vl.equals("gray") || vl.equals("grey") || vl.equals("silver")) {
+		} else if ((s < 5 && v > 30 && v < 90) || vl.equals("gray") || vl.equals("grey") || vl.equals("grey/tan") || vl.equals("silver") || vl.equals("srebrny") || vl.equals("lightgrey") || vl.equals("lightgray") || vl.equals("metal")) {
 			vl = palette6 ? "white" : "gray";
-		} else if ((r == g && g == b && b > 0xE1) || vl.equals("white")) {
+		} else if ((s < 5 && v > 95) || vl.equals("white") || vl.equals("white/tan")) {
 			vl = "white";
-		} else vl = "gray";
+		} else if (r != -1 && g != -1 && b != -1) {
+			vl = "gray";
+		}
 		return vl;
 	}
-	
+
 	public void addOSMCSymbolsSpecialTags(Map<MapRulType,String> propogated, Entry<String,String> ev) {
 		if ("osmc:symbol".equals(ev.getKey())) {
 			String[] tokens = ev.getValue().split(":", 6);
