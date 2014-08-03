@@ -242,6 +242,21 @@ public class DataExtractionSettings {
 		preferences.putBoolean("native_routing", b);
 	}
 	
+	public void preferHousenumber(boolean b){
+		preferences.putBoolean("prefer_housenumber", b);
+	}
+	
+	public boolean isHousenumberPrefered(){
+		return preferences.getBoolean("prefer_housenumber", false);
+	}
+	
+	public void AdditionalInfo(boolean b){
+		preferences.putBoolean("additional_address_info", b);
+	}
+	
+	public boolean isAdditionalInfo(){
+		return preferences.getBoolean("additional_address_info", false);
+	}
 	
 	
 	String[] SUFFIXES = new String[] {"av.", "avenue", "просп.", "пер.", "пр.","заул.", "проспект", "переул.", "бул.", "бульвар", "тракт"};
