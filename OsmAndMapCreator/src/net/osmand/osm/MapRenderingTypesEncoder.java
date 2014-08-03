@@ -103,10 +103,10 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		super.parseRouteTagFromXML(parser);
 		MapRouteTag rtype = new MapRouteTag();
 		String mode = parser.getAttributeValue("", "mode"); //$NON-NLS-1$
-		rtype.tag = parser.getAttributeValue("", "tag"); //$NON-NLS-1$
-		rtype.value = parser.getAttributeValue("", "value"); //$NON-NLS-1$
-		rtype.tag2 = parser.getAttributeValue("", "tag2"); //$NON-NLS-1$
-		rtype.value2 = parser.getAttributeValue("", "value2"); //$NON-NLS-1$
+		rtype.tag = lc(parser.getAttributeValue("", "tag")); //$NON-NLS-1$
+		rtype.value = lc(parser.getAttributeValue("", "value")); //$NON-NLS-1$
+		rtype.tag2 = lc(parser.getAttributeValue("", "tag2")); //$NON-NLS-1$
+		rtype.value2 = lc(parser.getAttributeValue("", "value2")); //$NON-NLS-1$
 		rtype.base = Boolean.parseBoolean(parser.getAttributeValue("", "base"));
 		rtype.replace = "replace".equalsIgnoreCase(mode);
 		rtype.register = "register".equalsIgnoreCase(mode);
@@ -116,6 +116,15 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		routeTags.add(rtype);
 	}
 		
+
+
+	private String lc(String a) {
+		if(a != null) {
+			return a.toLowerCase();
+		}
+		return a;
+	}
+
 
 
 	@Override
