@@ -406,7 +406,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		}
 
 		// 4. write poi data
-		// not so effictive probably better to load in memory one time
+		// not so effective probably better to load in memory one time
 		PreparedStatement prepareStatement = poiConnection
 				.prepareStatement("SELECT id, x, y, type, subtype, additionalTags from poi "
 						+ "where x >= ? AND x < ? AND y >= ? AND y < ?");
