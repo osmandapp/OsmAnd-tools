@@ -24,7 +24,10 @@
 #include <OsmAndCore/ObfsCollection.h>
 #include <OsmAndCore/ObfDataInterface.h>
 #include <OsmAndCore/WorldRegions.h>
-#include <OsmAndCore/Map/Rasterizer.h>
+#include <OsmAndCore/RoadLocator.h>
+#include <OsmAndCore/Data/Model/Road.h>
+#include <OsmAndCore/Data/ObfRoutingSectionInfo.h>
+#include <OsmAndCore/Map/MapRasterizer.h>
 #include <OsmAndCore/Map/MapPresentationEnvironment.h>
 #include <OsmAndCore/Map/IMapStylesCollection.h>
 #include <OsmAndCore/Map/MapStylesCollection.h>
@@ -40,6 +43,7 @@
 #include <OsmAndCore/Map/BinaryMapPrimitivesProvider.h>
 #include <OsmAndCore/Map/BinaryMapRasterBitmapTileProvider_Software.h>
 #include <OsmAndCore/Map/BinaryMapRasterBitmapTileProvider_GPU.h>
+#include <OsmAndCore/Map/BinaryMapRasterMetricsBitmapTileProvider.h>
 #include <OsmAndCore/Map/BinaryMapDataMetricsBitmapTileProvider.h>
 #include <OsmAndCore/Map/BinaryMapPrimitivesProvider.h>
 #include <OsmAndCore/Map/BinaryMapPrimitivesMetricsBitmapTileProvider.h>
@@ -70,6 +74,7 @@ std::shared_ptr<OsmAnd::MapMarkersCollection> markers;
 std::shared_ptr<OsmAnd::FavoriteLocationsGpxCollection> favorites;
 std::shared_ptr<OsmAnd::FavoriteLocationsPresenter> favoritesPresenter;
 std::shared_ptr<OsmAnd::MapMarker> lastClickedLocationMarker;
+std::shared_ptr<OsmAnd::RoadLocator> roadLocator;
 
 bool obfsDirSpecified = false;
 QDir obfsDir;
@@ -287,7 +292,8 @@ int main(int argc, char** argv)
         //style->dump();
     }
 
-    mapPresentationEnvironment.reset(new OsmAnd::MapPresentationEnvironment(style));
+    roadLocator.reset(new OsmAnd::RoadLocator(obfsCollection));
+    mapPresentationEnvironment.reset(new OsmAnd::MapPresentationEnvironment(style, 1.0f, "ru"));
     primitivizer.reset(new OsmAnd::Primitiviser(mapPresentationEnvironment));
 
     //////////////////////////////////////////////////////////////////////////
@@ -485,6 +491,22 @@ void mouseHandler(int button, int state, int x, int y)
             //animator->animateTargetTo(lastClickedLocation31, 1.0f, OsmAnd::MapAnimator::TimingFunction::EaseInOutQuadratic);
             animator->parabolicAnimateTargetTo(lastClickedLocation31, 1.0f, OsmAnd::MapAnimator::TimingFunction::EaseInOutQuadratic, OsmAnd::MapAnimator::TimingFunction::EaseOutInQuadratic);
             animator->resume();
+
+            const auto road = roadLocator->findNearestRoad(lastClickedLocation31, 500.0, OsmAnd::RoutingDataLevel::Detailed);
+            if (road)
+            {
+                if (road->names.isEmpty())
+                    OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, "Found unnamed road");
+                else
+                {
+                    const auto name = road->names[road->section->encodingDecodingRules->name_encodingRuleId];
+                    OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, "Found road: %s", qPrintable(name));
+                }
+            }
+            else
+            {
+                OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, "No road found!");
+            }
         }
     }
 }
@@ -881,6 +903,17 @@ void activateProvider(OsmAnd::RasterMapLayerId layerId, int idx)
             binaryMapPrimitivesProvider.reset(new OsmAnd::BinaryMapPrimitivesProvider(binaryMapDataProvider, primitivizer));
 
         auto tileProvider = new OsmAnd::BinaryMapPrimitivesMetricsBitmapTileProvider(binaryMapPrimitivesProvider);
+        renderer->setRasterLayerProvider(layerId, std::shared_ptr<OsmAnd::IMapRasterBitmapTileProvider>(tileProvider));
+    }
+    else if (idx == 8)
+    {
+        if (!binaryMapDataProvider)
+            binaryMapDataProvider.reset(new OsmAnd::BinaryMapDataProvider(obfsCollection));
+        if (!binaryMapPrimitivesProvider)
+            binaryMapPrimitivesProvider.reset(new OsmAnd::BinaryMapPrimitivesProvider(binaryMapDataProvider, primitivizer));
+
+        auto tileProvider = new OsmAnd::BinaryMapRasterMetricsBitmapTileProvider(
+            std::shared_ptr<OsmAnd::BinaryMapRasterBitmapTileProvider>(new OsmAnd::BinaryMapRasterBitmapTileProvider_Software(binaryMapPrimitivesProvider)));
         renderer->setRasterLayerProvider(layerId, std::shared_ptr<OsmAnd::IMapRasterBitmapTileProvider>(tileProvider));
     }
     //else if (idx == 7)
