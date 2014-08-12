@@ -276,7 +276,7 @@ public class OsmAndImageRendering {
 			}
 			if(sourceFile.exists()) {
 				targetFile = sourceFile;
-			} else if(!sourceFile.exists() && !sourceZip.exists()){
+			} else if(!sourceFile.exists() && !sourceZip.exists() && !targetFile.exists()){
 				throw new IllegalStateException("File "+sourceFile.getAbsolutePath()+ " is not found");
 			} else if(sourceZip.exists()) {
 				if(!targetFile.exists() || (targetFile.lastModified() != sourceZip.lastModified())) {
