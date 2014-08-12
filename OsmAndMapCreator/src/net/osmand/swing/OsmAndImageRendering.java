@@ -265,7 +265,7 @@ public class OsmAndImageRendering {
 			map = map.trim();
 			File f = new File(dirWithObf + "/" + map + ".obf");
 			File fzip = new File(dirWithObf + "/" + map + ".obf.zip");
-			if(!fzip.exists()) {
+			if(!fzip.exists() && !f.exists()) {
 				fzip = new File(backup + "/" + map + ".obf.zip");
 			}
 			if(!f.exists()) {
