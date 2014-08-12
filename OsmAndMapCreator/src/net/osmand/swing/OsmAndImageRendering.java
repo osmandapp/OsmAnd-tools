@@ -265,11 +265,13 @@ public class OsmAndImageRendering {
 			map = map.trim();
 			File f = new File(dirWithObf + "/" + map + ".obf");
 			File fzip = new File(dirWithObf + "/" + map + ".obf.zip");
-			if(!fzip.exists() && !f.exists()) {
-				fzip = new File(backup + "/" + map + ".obf.zip");
-			}
-			if(!f.exists()) {
-				f = new File(backup + "/" + map + ".obf");
+			if (backup != null) {
+				if (!fzip.exists() && !f.exists()) {
+					fzip = new File(backup + "/" + map + ".obf.zip");
+				}
+				if (!f.exists()) {
+					f = new File(backup + "/" + map + ".obf");
+				}
 			}
 			if(!f.exists() && !fzip.exists()){
 				throw new IllegalStateException("File "+f.getAbsolutePath()+ " is not found");
