@@ -177,9 +177,6 @@ public class OsmAndImageRendering {
 			String zooms = getSubAttr(e, "zoom", defZoom);
 			String renderingNames = getSubAttr(e, "renderingName", defRenderingName) ;
 			String renderingProperties = getSubAttr(e, "renderingProperties", defRenderingProps) ;
-			if(maps.isEmpty()) {
-				throw new UnsupportedOperationException("No maps element found for wpt "+ name);
-			}
 			NativeSwingRendering nsr = new NativeSwingRendering(false);
 //			nsr.initFilesInDir(new File(dirWithObf));
 			initMaps(dirWithObf, backup, gpxFile, maps, nsr);
