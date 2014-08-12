@@ -180,7 +180,6 @@ public class OsmAndImageRendering {
 			if(maps.isEmpty()) {
                 throw new UnsupportedOperationException("No maps element found for wpt "+ name);
             }
-
 			NativeSwingRendering nsr = new NativeSwingRendering(false);
 //			nsr.initFilesInDir(new File(dirWithObf));
 			initMaps(dirWithObf, backup, gpxFile, maps, nsr);
