@@ -245,9 +245,9 @@ public class OsmAndImageRendering {
 			return name;
 		}
 		String vl = ar[ind];
-		if (vl.length() > 10) {
-			vl = vl.substring(0, 10);
-		}
+//		if (vl.length() > 10) {
+//			vl = vl.substring(0, 10);
+//		}
 		String r = "";
 		if (key.length() > 0) {
 			r += key + "_";
