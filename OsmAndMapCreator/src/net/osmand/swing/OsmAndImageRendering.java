@@ -263,27 +263,29 @@ public class OsmAndImageRendering {
 			throws FileNotFoundException, IOException {
 		for(String map : maps.split(",")) {
 			map = map.trim();
-			File f = new File(dirWithObf + "/" + map + ".obf");
-			File fzip = new File(dirWithObf + "/" + map + ".obf.zip");
+			File targetFile = new File(new File(gpxFile).getParentFile(), map + ".obf");
+			File sourceFile = new File(dirWithObf + "/" + map + ".obf");
+			File sourceZip = new File(dirWithObf + "/" + map + ".obf.zip");
 			if (backup != null) {
-				if (!fzip.exists() && !f.exists()) {
-					fzip = new File(backup + "/" + map + ".obf.zip");
+				if (!sourceZip.exists() && !sourceFile.exists()) {
+					sourceZip = new File(backup + "/" + map + ".obf.zip");
 				}
-				if (!f.exists()) {
-					f = new File(backup + "/" + map + ".obf");
+				if (!sourceFile.exists()) {
+					sourceFile = new File(backup + "/" + map + ".obf");
 				}
 			}
-			if(!f.exists() && !fzip.exists()){
-				throw new IllegalStateException("File "+f.getAbsolutePath()+ " is not found");
-			} else if(fzip.exists()) {
-				f = new File(new File(gpxFile).getParentFile(), f.getName());
-				if(!f.exists() || (f.lastModified() != fzip.lastModified())) {
-					ZipInputStream zipIn = new ZipInputStream(new FileInputStream(fzip));
+			if(sourceFile.exists()) {
+				targetFile = sourceFile;
+			} else if(!sourceFile.exists() && !sourceZip.exists()){
+				throw new IllegalStateException("File "+sourceFile.getAbsolutePath()+ " is not found");
+			} else if(sourceZip.exists()) {
+				if(!targetFile.exists() || (targetFile.lastModified() != sourceZip.lastModified())) {
+					ZipInputStream zipIn = new ZipInputStream(new FileInputStream(sourceZip));
 					ZipEntry entry = null;
 					while((entry = zipIn.getNextEntry()) != null) {
 						byte[] bs = new byte[1024];
 						if(entry.getName().endsWith(".obf")) {
-							FileOutputStream fout = new FileOutputStream(f);
+							FileOutputStream fout = new FileOutputStream(targetFile);
 							int l = 0;
 							while ((l = zipIn.read(bs)) >= 0) {
 								fout.write(bs, 0, l);
@@ -294,10 +296,10 @@ public class OsmAndImageRendering {
 					}
 					zipIn.close();
 						
-					f.setLastModified(fzip.lastModified());
+					targetFile.setLastModified(sourceZip.lastModified());
 				}
 			}
-			nsr.initMapFile(f.getAbsolutePath());
+			nsr.initMapFile(targetFile.getAbsolutePath());
 		}
 	}
 	
