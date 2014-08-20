@@ -376,7 +376,7 @@ int main(int argc, char** argv)
     renderer->setup(rendererSetup);
 
     const auto debugSettings = renderer->getDebugSettings();
-    debugSettings->debugStageEnabled = true;
+    //debugSettings->debugStageEnabled = true;
     //debugSettings->excludeBillboardSymbolsFromProcessing = true;
     //debugSettings->excludeOnSurfaceSymbolsFromProcessing = true;
     //debugSettings->excludeOnPathSymbolsFromProcessing = true;
@@ -390,8 +390,8 @@ int main(int argc, char** argv)
     ////debugSettings->showOnPath2dSymbolGlyphDetails = true;
     ////debugSettings->showOnPath3dSymbolGlyphDetails = true;
     //debugSettings->allSymbolsTransparentForIntersectionLookup = true;
-    //debugSettings->showTooShortOnPathSymbolsRenderablesPaths = true;
-    //debugSettings->showAllPaths = true;
+    debugSettings->showTooShortOnPathSymbolsRenderablesPaths = true;
+    debugSettings->showAllPaths = true;
     renderer->setDebugSettings(debugSettings);
     
     viewport.top() = 0;
