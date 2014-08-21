@@ -4,7 +4,7 @@ find_library(FREEGLUT_LIBRARY freeglut)
 set(extra_dependencies "")
 set(extra_libraries "")
 if (FREEGLUT_LIBRARY STREQUAL "FREEGLUT_LIBRARY-NOTFOUND")
-	add_subdirectory("${OSMAND_ROOT}/tools/map-viewer/externals/freeglut" "tools/map-viewer/externals/freeglut")
+	add_subdirectory("${OSMAND_ROOT}/tools/map-viewer/externals/freeglut" "externals/freeglut")
 	set(extra_dependencies ${extra_dependencies}
 		freeglut_static
 	)

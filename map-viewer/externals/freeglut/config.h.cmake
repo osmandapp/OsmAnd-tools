@@ -1,108 +1,108 @@
 /* Define to 1 if you have the <dlfcn.h> header file. */
-#cmakedefine01 HAVE_DLFCN_H
+#cmakedefine HAVE_DLFCN_H 1
 
 /* Define to 1 if you don't have `vprintf' but do have `_doprnt.' */
-#cmakedefine01 HAVE_DOPRNT
+#cmakedefine HAVE_DOPRNT 1
 
 /* Define to 1 if you have the <errno.h> header file. */
-#cmakedefine01 HAVE_ERRNO_H
+#cmakedefine HAVE_ERRNO_H 1
 
 /* Define to 1 if you have the <fcntl.h> header file. */
-#cmakedefine01 HAVE_FCNTL_H
+#cmakedefine HAVE_FCNTL_H 1
 
 /* Define to 1 if you have the `gettimeofday' function. */
-#cmakedefine01 HAVE_GETTIMEOFDAY
+#cmakedefine HAVE_GETTIMEOFDAY 1
 
 /* Define to 1 if you have the <GL/glu.h> header file. */
-#cmakedefine01 HAVE_GL_GLU_H
+#cmakedefine HAVE_GL_GLU_H 1
 
 /* Define to 1 if you have the <GL/glx.h> header file. */
-#cmakedefine01 HAVE_GL_GLX_H
+#cmakedefine HAVE_GL_GLX_H 1
 
 /* Define to 1 if you have the <GL/gl.h> header file. */
-#cmakedefine01 HAVE_GL_GL_H
+#cmakedefine HAVE_GL_GL_H 1
 
 /* Define to 1 if you have the <inttypes.h> header file. */
-#cmakedefine01 HAVE_INTTYPES_H
+#cmakedefine HAVE_INTTYPES_H 1
 
 /* Define to 1 if you have the <libusbhid.h> header file. */
-#cmakedefine01 HAVE_LIBUSBHID_H
+#cmakedefine HAVE_LIBUSBHID_H 1
 
 /* Define to 1 if you have the `Xi' library (-lXi). */
-#cmakedefine01 HAVE_LIBXI
+#cmakedefine HAVE_LIBXI 1
 
 /* Define to 1 if you have the `Xrandr' library (-lXrandr). */
-#cmakedefine01 HAVE_LIBXRANDR
+#cmakedefine HAVE_LIBXRANDR 1
 
 /* Define to 1 if you have the `Xxf86vm' library (-lXxf86vm). */
-#cmakedefine01 HAVE_LIBXXF86VM
+#cmakedefine HAVE_LIBXXF86VM 1
 
 /* Define to 1 if you have the <limits.h> header file. */
-#cmakedefine01 HAVE_LIMITS_H
+#cmakedefine HAVE_LIMITS_H 1
 
 /* Define to 1 if you have the <memory.h> header file. */
-#cmakedefine01 HAVE_MEMORY_H
+#cmakedefine HAVE_MEMORY_H 1
 
 /* Define to 1 if you have the <stdint.h> header file. */
-#cmakedefine01 HAVE_STDINT_H
+#cmakedefine HAVE_STDINT_H 1
 
 /* Define to 1 if you have the <stdlib.h> header file. */
-#cmakedefine01 HAVE_STDLIB_H
+#cmakedefine HAVE_STDLIB_H 1
 
 /* Define to 1 if you have the <strings.h> header file. */
-#cmakedefine01 HAVE_STRINGS_H
+#cmakedefine HAVE_STRINGS_H 1
 
 /* Define to 1 if you have the <string.h> header file. */
-#cmakedefine01 HAVE_STRING_H
+#cmakedefine HAVE_STRING_H 1
 
 /* Define to 1 if you have the <sys/ioctl.h> header file. */
-#cmakedefine01 HAVE_SYS_IOCTL_H
+#cmakedefine HAVE_SYS_IOCTL_H 1
 
 /* Define to 1 if you have the <sys/param.h> header file. */
-#cmakedefine01 HAVE_SYS_PARAM_H
+#cmakedefine HAVE_SYS_PARAM_H 1
 
 /* Define to 1 if you have the <sys/stat.h> header file. */
-#cmakedefine01 HAVE_SYS_STAT_H
+#cmakedefine HAVE_SYS_STAT_H 1
 
 /* Define to 1 if you have the <sys/time.h> header file. */
-#cmakedefine01 HAVE_SYS_TIME_H
+#cmakedefine HAVE_SYS_TIME_H 1
 
 /* Define to 1 if you have the <sys/types.h> header file. */
-#cmakedefine01 HAVE_SYS_TYPES_H
+#cmakedefine HAVE_SYS_TYPES_H 1
 
 /* Define to 1 if you have the <unistd.h> header file. */
-#cmakedefine01 HAVE_UNISTD_H
+#cmakedefine HAVE_UNISTD_H 1
 
 /* Define to 1 if you have the <usbhid.h> header file. */
-#cmakedefine01 HAVE_USBHID_H
+#cmakedefine HAVE_USBHID_H 1
 
 /* Define to 1 if you have the `vfprintf' function. */
-#cmakedefine01 HAVE_VFPRINTF
+#cmakedefine HAVE_VFPRINTF 1
 
 /* Define to 1 if you have the `vprintf' function. */
-#cmakedefine01 HAVE_VPRINTF
+#cmakedefine HAVE_VPRINTF 1
 
 /* Define to 1 if you have the <X11/extensions/xf86vmode.h> header file. */
-#cmakedefine01 HAVE_X11_EXTENSIONS_XF86VMODE_H
+#cmakedefine HAVE_X11_EXTENSIONS_XF86VMODE_H 1
 
 /* Define to 1 if you have the <X11/extensions/XInput2.h> header file. */
-#cmakedefine01 HAVE_X11_EXTENSIONS_XINPUT2_H
+#cmakedefine HAVE_X11_EXTENSIONS_XINPUT2_H 1
 
 /* Define to 1 if you have the <X11/extensions/XInput.h> header file. */
-#cmakedefine01 HAVE_X11_EXTENSIONS_XINPUT_H
+#cmakedefine HAVE_X11_EXTENSIONS_XINPUT_H 1
 
 /* Define to 1 if you have the <X11/extensions/XI.h> header file. */
-#cmakedefine01 HAVE_X11_EXTENSIONS_XI_H
+#cmakedefine HAVE_X11_EXTENSIONS_XI_H 1
 
 /* Define to 1 if you have the <X11/extensions/Xrandr.h> header file. */
-#cmakedefine01 HAVE_X11_EXTENSIONS_XRANDR_H
+#cmakedefine HAVE_X11_EXTENSIONS_XRANDR_H 1
 
 /* Define to the sub-directory in which libtool stores uninstalled libraries.
    */
 #cmakedefine LT_OBJDIR
 
 /* Define to 1 if your C compiler doesn't accept -c and -o together. */
-#cmakedefine01 NO_MINUS_C_MINUS_O
+#cmakedefine NO_MINUS_C_MINUS_O 1
 
 /* Name of package */
 #cmakedefine PACKAGE
@@ -126,19 +126,19 @@
 #cmakedefine PACKAGE_VERSION
 
 /* Define to 1 if you have the ANSI C header files. */
-#cmakedefine01 STDC_HEADERS
+#cmakedefine STDC_HEADERS 1
 
 /* Define to 1 if you can safely include both <sys/time.h> and <time.h>. */
-#cmakedefine01 TIME_WITH_SYS_TIME
+#cmakedefine TIME_WITH_SYS_TIME 1
 
 /* Version number of package */
 #cmakedefine VERSION
 
 /* Define to 1 if the X Window System is missing or not being used. */
-#cmakedefine01 X_DISPLAY_MISSING
+#cmakedefine X_DISPLAY_MISSING 1
 
 /* Define to 1 if you want to include debugging code. */
-#cmakedefine01 _DEBUG
+#cmakedefine _DEBUG 1
 
 /* Define to empty if `const' does not conform to ANSI C. */
 #cmakedefine const
