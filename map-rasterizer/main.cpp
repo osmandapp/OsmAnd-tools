@@ -12,7 +12,7 @@
 #include <QFile>
 #include <QStringList>
 
-#include <OsmAndCoreUtils/EyePiece.h>
+#include <OsmAndCoreTools/EyePiece.h>
 
 void printUsage(std::string warning = std::string());
 

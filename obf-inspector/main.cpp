@@ -12,7 +12,7 @@
 #include <QStringList>
 #include <QFile>
 
-#include <OsmAndCoreUtils/Inspector.h>
+#include <OsmAndCoreTools/Inspector.h>
 
 void printUsage(const QString& warning = QString::null);
 

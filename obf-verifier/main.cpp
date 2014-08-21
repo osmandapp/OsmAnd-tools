@@ -12,7 +12,7 @@
 #include <QStringList>
 #include <QFile>
 
-#include <OsmAndCoreUtils/Verifier.h>
+#include <OsmAndCoreTools/Verifier.h>
 
 void printUsage(const std::string& warning = std::string());
 

@@ -5,10 +5,10 @@ if (CMAKE_SHARED_LIBS_ALLOWED_ON_TARGET)
 		"main.cpp"
 	)
 	add_dependencies(verifier
-		OsmAndCoreUtils_shared
+		OsmAndCoreTools_shared
 	)
 	target_link_libraries(verifier
-		OsmAndCoreUtils_shared
+		OsmAndCoreTools_shared
 	)
 endif()
 
@@ -17,9 +17,9 @@ if (CMAKE_STATIC_LIBS_ALLOWED_ON_TARGET)
 		"main.cpp"
 	)
 	add_dependencies(verifier_standalone
-		OsmAndCoreUtils_static
+		OsmAndCoreTools_static
 	)
 	target_link_libraries(verifier_standalone
-		OsmAndCoreUtils_static
+		OsmAndCoreTools_static
 	)
 endif()

@@ -200,6 +200,42 @@ int main(int argc, char** argv)
         return EXIT_FAILURE;
     }
 
+    //////////////////////////////////////////////////////////////////////////
+
+    {
+        QMutexLocker scopedLocker(&glutWasInitializedFlagMutex);
+
+        assert(glutInit != nullptr);
+        glutInit(&argc, argv);
+
+        glutSetOption(GLUT_ACTION_ON_WINDOW_CLOSE, GLUT_ACTION_CONTINUE_EXECUTION);
+        glutInitWindowSize(1024, 768);
+        glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA | GLUT_DEPTH);
+        if (!use43)
+            glutInitContextVersion(3, 0);
+        else
+            glutInitContextVersion(4, 3);
+        glutInitContextProfile(GLUT_CORE_PROFILE);
+        assert(glutCreateWindow != nullptr);
+        glutCreateWindow("OsmAnd Bird : 3D map render tool");
+
+        glutReshapeFunc(&reshapeHandler);
+        glutMouseFunc(&mouseHandler);
+        glutMotionFunc(&mouseMotion);
+        glutMouseWheelFunc(&mouseWheelHandler);
+        glutKeyboardFunc(&keyboardHandler);
+        glutSpecialFunc(&specialHandler);
+        glutDisplayFunc(&displayHandler);
+        glutIdleFunc(&idleHandler);
+        glutCloseFunc(&closeHandler);
+        verifyOpenGL();
+
+        glutWasInitialized = true;
+    }
+
+    //////////////////////////////////////////////////////////////////////////
+
+
     renderer = OsmAnd::createMapRenderer(OsmAnd::MapRendererClass::AtlasMapRenderer_OpenGL3);
     if (!renderer)
     {
@@ -236,11 +272,11 @@ int main(int argc, char** argv)
     /*
     if (favorites->loadFrom(QLatin1String("d:\\OpenSource\\OsmAnd\\favorites.gpx")))
     {
-        favoritesPresenter.reset(new OsmAnd::FavoriteLocationsPresenter(favorites));
-        renderer->addSymbolProvider(favoritesPresenter);
+    favoritesPresenter.reset(new OsmAnd::FavoriteLocationsPresenter(favorites));
+    renderer->addSymbolProvider(favoritesPresenter);
     }
     */
-    
+
     //////////////////////////////////////////////////////////////////////////
     //QHash< QString, std::shared_ptr<const OsmAnd::WorldRegions::WorldRegion> > worldRegions;
     //OsmAnd::WorldRegions("d:\\OpenSource\\OsmAnd\\OsmAnd\\resources\\countries-info\\regions.ocbf").loadWorldRegions(worldRegions);
@@ -258,13 +294,13 @@ int main(int argc, char** argv)
         const auto renderer_ = renderer;
         resourcesManager->localResourcesChangeObservable.attach(nullptr,
             [renderer_]
-            (const OsmAnd::ResourcesManager* const resourcesManager,
+        (const OsmAnd::ResourcesManager* const resourcesManager,
             const QList<QString>& added,
             const QList<QString>& removed,
             const QList<QString>& updated)
-            {
-                renderer_->reloadEverything();
-            });
+        {
+            renderer_->reloadEverything();
+        });
 
         obfsCollection = resourcesManager->obfsCollection;
         stylesCollection = resourcesManager->mapStylesCollection;
@@ -302,40 +338,6 @@ int main(int argc, char** argv)
     mapPresentationEnvironment.reset(new OsmAnd::MapPresentationEnvironment(style, density, "ru"));
     primitivizer.reset(new OsmAnd::Primitiviser(mapPresentationEnvironment));
 
-    //////////////////////////////////////////////////////////////////////////
-
-    {
-        QMutexLocker scopedLocker(&glutWasInitializedFlagMutex);
-
-        assert(glutInit != nullptr);
-        glutInit(&argc, argv);
-
-        glutSetOption(GLUT_ACTION_ON_WINDOW_CLOSE, GLUT_ACTION_CONTINUE_EXECUTION);
-        glutInitWindowSize(1024, 768);
-        glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA | GLUT_DEPTH);
-        if (!use43)
-            glutInitContextVersion(3, 0);
-        else
-            glutInitContextVersion(4, 3);
-        glutInitContextProfile(GLUT_CORE_PROFILE);
-        assert(glutCreateWindow != nullptr);
-        glutCreateWindow("OsmAnd Bird : 3D map render tool");
-
-        glutReshapeFunc(&reshapeHandler);
-        glutMouseFunc(&mouseHandler);
-        glutMotionFunc(&mouseMotion);
-        glutMouseWheelFunc(&mouseWheelHandler);
-        glutKeyboardFunc(&keyboardHandler);
-        glutSpecialFunc(&specialHandler);
-        glutDisplayFunc(&displayHandler);
-        glutIdleFunc(&idleHandler);
-        glutCloseFunc(&closeHandler);
-        verifyOpenGL();
-
-        glutWasInitialized = true;
-    }
-
-    //////////////////////////////////////////////////////////////////////////
     OsmAnd::MapRendererSetupOptions rendererSetup;
     rendererSetup.frameUpdateRequestCallback =
         []
