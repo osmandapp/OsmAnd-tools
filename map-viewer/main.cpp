@@ -99,6 +99,7 @@ const bool useGpuWorker = true;
 #else
 const bool useGpuWorker = false;
 #endif
+bool useSpecificOpenGL = false;
 bool use43 = false;
 bool constantRefresh = false;
 bool nSight = false;
@@ -173,6 +174,7 @@ int main(int argc, char** argv)
         }
         else if (arg == "-nsight")
         {
+            useSpecificOpenGL = true;
             use43 = true;
             constantRefresh = true;
             nSight = true;
@@ -180,6 +182,7 @@ int main(int argc, char** argv)
         }
         else if (arg == "-gdebugger")
         {
+            useSpecificOpenGL = true;
             use43 = false;
             constantRefresh = true;
             nSight = false;
@@ -211,11 +214,14 @@ int main(int argc, char** argv)
         glutSetOption(GLUT_ACTION_ON_WINDOW_CLOSE, GLUT_ACTION_CONTINUE_EXECUTION);
         glutInitWindowSize(1024, 768);
         glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA | GLUT_DEPTH);
-        if (!use43)
-            glutInitContextVersion(3, 0);
-        else
-            glutInitContextVersion(4, 3);
-        glutInitContextProfile(GLUT_CORE_PROFILE);
+        if (useSpecificOpenGL)
+        {
+            if (!use43)
+                glutInitContextVersion(3, 0);
+            else
+                glutInitContextVersion(4, 3);
+            glutInitContextProfile(GLUT_CORE_PROFILE);
+        }
         assert(glutCreateWindow != nullptr);
         glutCreateWindow("OsmAnd Bird : 3D map render tool");
 
