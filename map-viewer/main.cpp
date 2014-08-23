@@ -242,7 +242,7 @@ int main(int argc, char** argv)
     //////////////////////////////////////////////////////////////////////////
 
 
-    renderer = OsmAnd::createMapRenderer(OsmAnd::MapRendererClass::AtlasMapRenderer_OpenGL3);
+    renderer = OsmAnd::createMapRenderer(OsmAnd::MapRendererClass::AtlasMapRenderer_OpenGL2plus);
     if (!renderer)
     {
         std::cout << "No supported renderer" << std::endl;
