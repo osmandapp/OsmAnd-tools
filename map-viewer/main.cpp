@@ -220,6 +220,7 @@ int main(int argc, char** argv)
                 glutInitContextVersion(3, 0);
             else
                 glutInitContextVersion(4, 3);
+            //glutInitContextFlags(GLUT_DEBUG);
             glutInitContextProfile(GLUT_CORE_PROFILE);
         }
         assert(glutCreateWindow != nullptr);

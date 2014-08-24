@@ -14,7 +14,11 @@
 
 #include <OsmAndCoreTools/EyePiece.h>
 
-void printUsage(std::string warning = std::string());
+#if defined(UNICODE) || defined(_UNICODE)
+void printUsage(const std::wstring& warning = std::wstring());
+#else
+void printUsage(const std::string& warning = std::string());
+#endif
 
 int main(int argc, char* argv[])
 {
@@ -26,42 +30,54 @@ int main(int argc, char* argv[])
 #   endif
 #endif
 
-    OsmAnd::EyePiece::Configuration cfg;
-
+    // Parse configuration
+    OsmAndTools::EyePiece::Configuration configuration;
     QString error;
-    QStringList args;
+    QStringList commandLineArgs;
     for (int idx = 1; idx < argc; idx++)
-        args.push_back(argv[idx]);
-
-    if(!OsmAnd::EyePiece::parseCommandLineArguments(args, cfg, error))
+        commandLineArgs.push_back(argv[idx]);
+    if (!OsmAndTools::EyePiece::Configuration::parseFromCommandLineArguments(commandLineArgs, configuration, error))
     {
-        printUsage(error.toStdString());
+        printUsage(QStringToStlString(error));
         return -1;
     }
-    OsmAnd::EyePiece::rasterizeToStdOut(cfg);
-    return 0;
+
+    // Process rasterization request
+    const auto success = OsmAndTools::EyePiece(configuration).rasterize();
+    return (success ? 0 : -1);
 }
 
-void printUsage(std::string warning)
+#if defined(UNICODE) || defined(_UNICODE)
+void printUsage(const std::wstring& warning /*= std::wstring()*/)
+#else
+void printUsage(const std::string& warning /*= std::string()*/)
+#endif
 {
+#if defined(UNICODE) || defined(_UNICODE)
+    auto& tout = std::wcout;
+#else
+    auto& tout = std::cout;
+#endif
     if(!warning.empty())
-        std::cout << warning << std::endl;
-    std::cout << "EyePiece is console utility to rasterize OsmAnd map tile." << std::endl;
-    std::cout << std::endl << "Usage: eyepiece -stylesPath=path/to/styles1";
-    std::cout << " [-stylesPath=path/to/styles2]";
-    std::cout << " -style=style";
-    std::cout << " [-obfsDir=path/to/obf/collection]";
-    std::cout << " [-verbose]";
-    std::cout << " [-dumpRules]";
-    std::cout << " [-zoom=15]";
-    std::cout << " [-32bit]";
-    std::cout << " [-tileSide=256]";
-    std::cout << " [-density=1.0]";
-    std::cout << " [-bbox=LeftLon,TopLat,RightLon,BottomLan]";
-    std::cout << " [-output=path/to/image.png]";
-    std::cout << " [-map]";
-    std::cout << " [-text]";
-    std::cout << " [-icons]";
-    std::cout << std::endl;
+        tout << warning << std::endl;
+    tout << xT("OsmAnd EyePiece tool is a console utility to rasterize part of map.") << std::endl;
+    tout << std::endl;
+    tout << xT("Arguments:") << std::endl;
+    //std::cout << "\t-stylesPath=path/to/main/styles";
+    //std::cout << "\t[-stylesPath=path/to/extra/styles]";
+    //std::cout << "\t-style=styleName";
+    //std::cout << "\t[-obfsPath=path/to/OBFs/collection]";
+    //std::cout << "\t[-obfFile=OBF/file/path/with/name]";
+    /*std::cout << "\t[-verbose]";
+    std::cout << "\t[-dumpRules]";
+    std::cout << "\t[-zoom=15]";
+    std::cout << "\t[-32bit]";
+    std::cout << "\t[-tileSide=256]";
+    std::cout << "\t[-density=1.0]";
+    std::cout << "\t[-bbox=LeftLon,TopLat,RightLon,BottomLan]";
+    std::cout << "\t[-output=path/to/image.png]";
+    std::cout << "\t[-map]";
+    std::cout << "\t[-text]";
+    std::cout << "\t[-icons]";*/
 }
 
