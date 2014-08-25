@@ -405,9 +405,9 @@ int main(int argc, char** argv)
     
     viewport.top() = 0;
     viewport.left() = 0;
-    viewport.bottom() = 600;
-    viewport.right() = 800;
-    renderer->setWindowSize(OsmAnd::PointI(800, 600));
+    viewport.bottom() = 768;
+    viewport.right() = 1024;
+    renderer->setWindowSize(OsmAnd::PointI(1024, 768));
     renderer->setViewport(viewport);
     /*renderer->setTarget(OsmAnd::PointI(
         OsmAnd::Utilities::get31TileNumberX(34.0062),

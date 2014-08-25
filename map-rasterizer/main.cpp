@@ -54,30 +54,30 @@ void printUsage(const std::string& warning /*= std::string()*/)
 #endif
 {
 #if defined(UNICODE) || defined(_UNICODE)
-    auto& tout = std::wcout;
+    auto& tcout = std::wcout;
 #else
-    auto& tout = std::cout;
+    auto& tcout = std::cout;
 #endif
     if(!warning.empty())
-        tout << warning << std::endl;
-    tout << xT("OsmAnd EyePiece tool is a console utility to rasterize part of map.") << std::endl;
-    tout << std::endl;
-    tout << xT("Arguments:") << std::endl;
-    //std::cout << "\t-stylesPath=path/to/main/styles";
-    //std::cout << "\t[-stylesPath=path/to/extra/styles]";
-    //std::cout << "\t-style=styleName";
-    //std::cout << "\t[-obfsPath=path/to/OBFs/collection]";
-    //std::cout << "\t[-obfFile=OBF/file/path/with/name]";
-    /*std::cout << "\t[-verbose]";
-    std::cout << "\t[-dumpRules]";
-    std::cout << "\t[-zoom=15]";
-    std::cout << "\t[-32bit]";
-    std::cout << "\t[-tileSide=256]";
-    std::cout << "\t[-density=1.0]";
-    std::cout << "\t[-bbox=LeftLon,TopLat,RightLon,BottomLan]";
-    std::cout << "\t[-output=path/to/image.png]";
-    std::cout << "\t[-map]";
-    std::cout << "\t[-text]";
-    std::cout << "\t[-icons]";*/
+        tcout << warning << std::endl;
+    tcout << xT("OsmAnd EyePiece tool is a console utility to rasterize part of map.") << std::endl;
+    tcout << std::endl;
+    tcout << xT("Arguments:") << std::endl;
+    tcout << xT("\t-obfsPath=path/to/OBFs/collection or -obfsRecursivePath=path/to/OBFs/collection or -obfFile=OBF/file/path/with/name.obf ...") << std::endl;
+    tcout << xT("\t[-stylesPath=path/to/main/styles or -stylesRecursivePath=path/to/main/styles ...]") << std::endl;
+    tcout << xT("\t[-styleName=default]") << std::endl;
+    tcout << xT("\t[-styleSetting:name=value ...]") << std::endl;
+    tcout << xT("\t-outputImageWidth=size_in_pixels") << std::endl;
+    tcout << xT("\t-outputImageHeight=size_in_pixels") << std::endl;
+    tcout << xT("\t-outputImageFilename=path/with/file.name") << std::endl;
+    tcout << xT("\t[-latLon=0;0 or -target31=x;y]") << std::endl;
+    tcout << xT("\t[-zoom=15]") << std::endl;
+    tcout << xT("\t[-azimuth=0]") << std::endl;
+    tcout << xT("\t[-elevationAngle=90]") << std::endl;
+    tcout << xT("\t[-fov=16.5]") << std::endl;
+    tcout << xT("\t[-referenceTileSize=256]") << std::endl;
+    tcout << xT("\t[-displayDensityFactor=1.0]") << std::endl;
+    tcout << xT("\t[-outputImageFormat=png|jpeg]") << std::endl;
+    tcout << xT("\t[-locale=en]") << std::endl;
+    tcout << xT("\t[-verbose]") << std::endl;
 }
-
