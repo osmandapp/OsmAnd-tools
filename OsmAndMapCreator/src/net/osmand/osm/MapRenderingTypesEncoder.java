@@ -353,7 +353,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			"wolfshook",
 			"rectangle_line",
 	}));
-	final java.util.Map<String> precolors = new java.util.HashMap<String>();
+	final java.util.Map<String, String> precolors = new java.util.HashMap<String, String>();
 	{
             precolors.put("shell_modern","yellow");
             precolors.put("shell","yellow");
