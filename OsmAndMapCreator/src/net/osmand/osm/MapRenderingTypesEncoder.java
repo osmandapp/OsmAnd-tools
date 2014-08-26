@@ -381,7 +381,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 						if(precolors.containsKey(fgColor)) {
 							shape = fgColor;
 							fgColor = precolors.get(fgColor);
-						} else	if (fgColor.indexOf('_') != -1) {
+						} else	if (fgColor.indexOf('_') >= 0) {
 							final int i = fgColor.indexOf('_');
 							fgColor = fgColor.substring(0, i);
 							shape = fgColor.substring(i + 1).toLowerCase();
