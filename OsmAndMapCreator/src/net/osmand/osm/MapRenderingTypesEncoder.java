@@ -383,8 +383,8 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 							fgColor = precolors.get(fgColor);
 						} else	if (fgColor.indexOf('_') >= 0) {
 							final int i = fgColor.indexOf('_');
-							fgColor = fgColor.substring(0, i);
 							shape = fgColor.substring(i + 1).toLowerCase();
+							fgColor = fgColor.substring(0, i);
 						}
 						String vl = barValues.contains(shape) ? "bar" : "circle";
 						MapRulType shp = getMapRuleType("osmc_shape", vl);
