@@ -370,8 +370,8 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		if ("osmc:symbol".equals(ev.getKey())) {
 			String[] tokens = ev.getValue().split(":", 6);
 			if (tokens.length > 0) {
-				String symbol_name = "osmc_symbol_" + formatColorToPalette(tokens[0], true);
-				MapRulType rt = getMapRuleType(symbol_name, "");
+				String wayColor = formatColorToPalette(tokens[0], true);
+				MapRulType rt = getMapRuleType("osmc_symbol", wayColor);
 				if(rt != null) {
 					propogated.put(rt, "");
 					if (tokens.length > 2 && rt.names != null) {
