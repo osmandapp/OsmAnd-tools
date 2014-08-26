@@ -18,6 +18,7 @@
 #include <OsmAndCore.h>
 #include <OsmAndCore/Concurrent.h>
 #include <OsmAndCore/Common.h>
+#include <OsmAndCore/QuadTree.h>
 #include <OsmAndCore/Utilities.h>
 #include <OsmAndCore/Logging.h>
 #include <OsmAndCore/ResourcesManager.h>
@@ -34,6 +35,8 @@
 #include <OsmAndCore/Map/IMapStylesPresetsCollection.h>
 #include <OsmAndCore/Map/MapStyleEvaluator.h>
 #include <OsmAndCore/Map/IMapRenderer.h>
+#include <OsmAndCore/Map/IAtlasMapRenderer.h>
+#include <OsmAndCore/Map/AtlasMapRendererConfiguration.h>
 #include <OsmAndCore/Map/OnlineRasterMapTileProvider.h>
 #include <OsmAndCore/Map/OnlineTileSources.h>
 #include <OsmAndCore/Map/HillshadeTileProvider.h>
@@ -48,10 +51,13 @@
 #include <OsmAndCore/Map/BinaryMapPrimitivesProvider.h>
 #include <OsmAndCore/Map/BinaryMapPrimitivesMetricsBitmapTileProvider.h>
 #include <OsmAndCore/Map/BinaryMapStaticSymbolsProvider.h>
+#include <OsmAndCore/Map/BinaryMapObjectSymbolsGroup.h>
 #include <OsmAndCore/Map/MapMarkersCollection.h>
 #include <OsmAndCore/Map/MapMarkerBuilder.h>
 #include <OsmAndCore/Map/MapMarker.h>
 #include <OsmAndCore/Map/MapAnimator.h>
+#include <OsmAndCore/Map/RasterMapSymbol.h>
+#include <OsmAndCore/Map/IBillboardMapSymbol.h>
 #include <OsmAndCore/FavoriteLocationsGpxCollection.h>
 #include <OsmAndCore/Map/FavoriteLocationsPresenter.h>
 
@@ -93,6 +99,7 @@ const bool useGpuWorker = true;
 #else
 const bool useGpuWorker = false;
 #endif
+bool useSpecificOpenGL = false;
 bool use43 = false;
 bool constantRefresh = false;
 bool nSight = false;
@@ -167,6 +174,7 @@ int main(int argc, char** argv)
         }
         else if (arg == "-nsight")
         {
+            useSpecificOpenGL = true;
             use43 = true;
             constantRefresh = true;
             nSight = true;
@@ -174,6 +182,7 @@ int main(int argc, char** argv)
         }
         else if (arg == "-gdebugger")
         {
+            useSpecificOpenGL = true;
             use43 = false;
             constantRefresh = true;
             nSight = false;
@@ -194,7 +203,47 @@ int main(int argc, char** argv)
         return EXIT_FAILURE;
     }
 
-    renderer = OsmAnd::createMapRenderer(OsmAnd::MapRendererClass::AtlasMapRenderer_OpenGL3);
+    //////////////////////////////////////////////////////////////////////////
+
+    {
+        QMutexLocker scopedLocker(&glutWasInitializedFlagMutex);
+
+        assert(glutInit != nullptr);
+        glutInit(&argc, argv);
+
+        glutSetOption(GLUT_ACTION_ON_WINDOW_CLOSE, GLUT_ACTION_CONTINUE_EXECUTION);
+        glutInitWindowSize(1024, 768);
+        glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA | GLUT_DEPTH);
+        if (useSpecificOpenGL)
+        {
+            if (!use43)
+                glutInitContextVersion(3, 0);
+            else
+                glutInitContextVersion(4, 3);
+            //glutInitContextFlags(GLUT_DEBUG);
+            glutInitContextProfile(GLUT_CORE_PROFILE);
+        }
+        assert(glutCreateWindow != nullptr);
+        glutCreateWindow("OsmAnd Bird : 3D map render tool");
+
+        glutReshapeFunc(&reshapeHandler);
+        glutMouseFunc(&mouseHandler);
+        glutMotionFunc(&mouseMotion);
+        glutMouseWheelFunc(&mouseWheelHandler);
+        glutKeyboardFunc(&keyboardHandler);
+        glutSpecialFunc(&specialHandler);
+        glutDisplayFunc(&displayHandler);
+        glutIdleFunc(&idleHandler);
+        glutCloseFunc(&closeHandler);
+        verifyOpenGL();
+
+        glutWasInitialized = true;
+    }
+
+    //////////////////////////////////////////////////////////////////////////
+
+
+    renderer = OsmAnd::createMapRenderer(OsmAnd::MapRendererClass::AtlasMapRenderer_OpenGL2plus);
     if (!renderer)
     {
         std::cout << "No supported renderer" << std::endl;
@@ -230,11 +279,11 @@ int main(int argc, char** argv)
     /*
     if (favorites->loadFrom(QLatin1String("d:\\OpenSource\\OsmAnd\\favorites.gpx")))
     {
-        favoritesPresenter.reset(new OsmAnd::FavoriteLocationsPresenter(favorites));
-        renderer->addSymbolProvider(favoritesPresenter);
+    favoritesPresenter.reset(new OsmAnd::FavoriteLocationsPresenter(favorites));
+    renderer->addSymbolProvider(favoritesPresenter);
     }
     */
-    
+
     //////////////////////////////////////////////////////////////////////////
     //QHash< QString, std::shared_ptr<const OsmAnd::WorldRegions::WorldRegion> > worldRegions;
     //OsmAnd::WorldRegions("d:\\OpenSource\\OsmAnd\\OsmAnd\\resources\\countries-info\\regions.ocbf").loadWorldRegions(worldRegions);
@@ -252,13 +301,13 @@ int main(int argc, char** argv)
         const auto renderer_ = renderer;
         resourcesManager->localResourcesChangeObservable.attach(nullptr,
             [renderer_]
-            (const OsmAnd::ResourcesManager* const resourcesManager,
+        (const OsmAnd::ResourcesManager* const resourcesManager,
             const QList<QString>& added,
             const QList<QString>& removed,
             const QList<QString>& updated)
-            {
-                renderer_->reloadEverything();
-            });
+        {
+            renderer_->reloadEverything();
+        });
 
         obfsCollection = resourcesManager->obfsCollection;
         stylesCollection = resourcesManager->mapStylesCollection;
@@ -293,43 +342,9 @@ int main(int argc, char** argv)
     }
 
     roadLocator.reset(new OsmAnd::RoadLocator(obfsCollection));
-    mapPresentationEnvironment.reset(new OsmAnd::MapPresentationEnvironment(style, 1.0f, "ru"));
+    mapPresentationEnvironment.reset(new OsmAnd::MapPresentationEnvironment(style, density, "ru"));
     primitivizer.reset(new OsmAnd::Primitiviser(mapPresentationEnvironment));
 
-    //////////////////////////////////////////////////////////////////////////
-
-    {
-        QMutexLocker scopedLocker(&glutWasInitializedFlagMutex);
-
-        assert(glutInit != nullptr);
-        glutInit(&argc, argv);
-
-        glutSetOption(GLUT_ACTION_ON_WINDOW_CLOSE, GLUT_ACTION_CONTINUE_EXECUTION);
-        glutInitWindowSize(1024, 768);
-        glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA | GLUT_DEPTH);
-        if (!use43)
-            glutInitContextVersion(3, 0);
-        else
-            glutInitContextVersion(4, 3);
-        glutInitContextProfile(GLUT_CORE_PROFILE);
-        assert(glutCreateWindow != nullptr);
-        glutCreateWindow("OsmAnd Bird : 3D map render tool");
-
-        glutReshapeFunc(&reshapeHandler);
-        glutMouseFunc(&mouseHandler);
-        glutMotionFunc(&mouseMotion);
-        glutMouseWheelFunc(&mouseWheelHandler);
-        glutKeyboardFunc(&keyboardHandler);
-        glutSpecialFunc(&specialHandler);
-        glutDisplayFunc(&displayHandler);
-        glutIdleFunc(&idleHandler);
-        glutCloseFunc(&closeHandler);
-        verifyOpenGL();
-
-        glutWasInitialized = true;
-    }
-
-    //////////////////////////////////////////////////////////////////////////
     OsmAnd::MapRendererSetupOptions rendererSetup;
     rendererSetup.frameUpdateRequestCallback =
         []
@@ -340,7 +355,6 @@ int main(int argc, char** argv)
             if (glutWasInitialized)
                 glutPostRedisplay();
         };
-    rendererSetup.displayDensityFactor = density;
     rendererSetup.gpuWorkerThreadEnabled = useGpuWorker;
     if (rendererSetup.gpuWorkerThreadEnabled)
     {
@@ -369,11 +383,31 @@ int main(int argc, char** argv)
 #endif
     }
     renderer->setup(rendererSetup);
-    viewport.top = 0;
-    viewport.left = 0;
-    viewport.bottom = 600;
-    viewport.right = 800;
-    renderer->setWindowSize(OsmAnd::PointI(800, 600));
+
+    const auto debugSettings = renderer->getDebugSettings();
+    //debugSettings->debugStageEnabled = true;
+    //debugSettings->excludeBillboardSymbolsFromProcessing = true;
+    //debugSettings->excludeOnSurfaceSymbolsFromProcessing = true;
+    //debugSettings->excludeOnPathSymbolsFromProcessing = true;
+    //debugSettings->skipSymbolsMinDistanceToSameContentFromOtherSymbolCheck = true;
+    //debugSettings->skipSymbolsIntersectionCheck = true;
+    //debugSettings->showSymbolsBBoxesAcceptedByIntersectionCheck = true;
+    //debugSettings->showSymbolsBBoxesRejectedByMinDistanceToSameContentFromOtherSymbolCheck = true;
+    //debugSettings->showSymbolsBBoxesRejectedByIntersectionCheck = true;
+    //debugSettings->showSymbolsBBoxesRejectedByPresentationMode = true;
+    //debugSettings->showOnPathSymbolsRenderablesPaths = true;
+    ////debugSettings->showOnPath2dSymbolGlyphDetails = true;
+    ////debugSettings->showOnPath3dSymbolGlyphDetails = true;
+    //debugSettings->allSymbolsTransparentForIntersectionLookup = true;
+    debugSettings->showTooShortOnPathSymbolsRenderablesPaths = true;
+    debugSettings->showAllPaths = true;
+    renderer->setDebugSettings(debugSettings);
+    
+    viewport.top() = 0;
+    viewport.left() = 0;
+    viewport.bottom() = 768;
+    viewport.right() = 1024;
+    renderer->setWindowSize(OsmAnd::PointI(1024, 768));
     renderer->setViewport(viewport);
     /*renderer->setTarget(OsmAnd::PointI(
         OsmAnd::Utilities::get31TileNumberX(34.0062),
@@ -388,19 +422,19 @@ int main(int argc, char** argv)
     renderer->setFogColor(OsmAnd::FColorRGB(1.0f, 1.0f, 1.0f));
 
     // Amsterdam
-    renderer->setTarget(OsmAnd::PointI(
-        1102430866,
-        704978668));
-    renderer->setZoom(11.0f);
+    //renderer->setTarget(OsmAnd::PointI(
+    //    1102430866,
+    //    704978668));
+    //renderer->setZoom(11.0f);
     //renderer->setZoom(16.0f);
     //renderer->setZoom(4.0f);
 
     // Kiev
-    //renderer->setTarget(OsmAnd::PointI(
-    //    1255337783,
-    //    724166131));
-    ////renderer->setZoom(10.0f);
-    //renderer->setZoom(16.0f);
+    renderer->setTarget(OsmAnd::PointI(
+        1255337783,
+        724166131));
+    //renderer->setZoom(10.0f);
+    renderer->setZoom(16.0f);
 
     // Tokyo
     /*renderer->setTarget(OsmAnd::PointI(
@@ -415,13 +449,12 @@ int main(int argc, char** argv)
         renderer->setZoom(14.0f);*/
 
     renderer->setAzimuth(0.0f);
-    //renderer->setDisplayDensityFactor(2.0f);
 
-    auto renderConfig = renderer->configuration;
-    renderConfig.heixelsPerTileSide = 32;
+    auto renderConfig = renderer->getConfiguration();
+    renderConfig->heixelsPerTileSide = 32;
     renderer->setConfiguration(renderConfig);
 
-    lastClickedLocationMarker->setPosition(renderer->state.target31);
+    lastClickedLocationMarker->setPosition(renderer->getState().target31);
 
     renderer->initializeRendering();
     //////////////////////////////////////////////////////////////////////////
@@ -449,8 +482,8 @@ int main(int argc, char** argv)
 
 void reshapeHandler(int newWidth, int newHeight)
 {
-    viewport.right = newWidth;
-    viewport.bottom = newHeight;
+    viewport.right() = newWidth;
+    viewport.bottom() = newHeight;
     renderer->setWindowSize(OsmAnd::PointI(newWidth, newHeight));
     renderer->setViewport(viewport);
 
@@ -464,13 +497,15 @@ OsmAnd::PointI dragInitTarget;
 
 void mouseHandler(int button, int state, int x, int y)
 {
+    const auto modifiers = glutGetModifiers();
+
     if (button == GLUT_LEFT_BUTTON)
     {
         if (state == GLUT_DOWN && !dragInitialized)
         {
             dragInitX = x;
             dragInitY = y;
-            dragInitTarget = renderer->state.target31;
+            dragInitTarget = renderer->getState().target31;
 
             dragInitialized = true;
         }
@@ -483,29 +518,63 @@ void mouseHandler(int button, int state, int x, int y)
     {
         if (state == GLUT_DOWN)
         {
+            OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, "--------------- click (%d, %d) -------------------", x, y);
+
             renderer->getLocationFromScreenPoint(OsmAnd::PointI(x, y), lastClickedLocation31);
             lastClickedLocationMarker->setPosition(lastClickedLocation31);
 
-            animator->pause();
-            animator->cancelAllAnimations();
-            //animator->animateTargetTo(lastClickedLocation31, 1.0f, OsmAnd::MapAnimator::TimingFunction::EaseInOutQuadratic);
-            animator->parabolicAnimateTargetTo(lastClickedLocation31, 1.0f, OsmAnd::MapAnimator::TimingFunction::EaseInOutQuadratic, OsmAnd::MapAnimator::TimingFunction::EaseOutInQuadratic);
-            animator->resume();
+            if (modifiers & GLUT_ACTIVE_CTRL)
+            {
+                animator->pause();
+                animator->cancelAllAnimations();
+                //animator->animateTargetTo(lastClickedLocation31, 1.0f, OsmAnd::MapAnimator::TimingFunction::EaseInOutQuadratic);
+                animator->parabolicAnimateTargetTo(lastClickedLocation31, 1.0f, OsmAnd::MapAnimator::TimingFunction::EaseInOutQuadratic, OsmAnd::MapAnimator::TimingFunction::EaseOutInQuadratic);
+                animator->resume();
+            }
 
+            // Road:
             const auto road = roadLocator->findNearestRoad(lastClickedLocation31, 500.0, OsmAnd::RoutingDataLevel::Detailed);
             if (road)
             {
-                if (road->names.isEmpty())
+                if (road->captions.isEmpty())
                     OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, "Found unnamed road");
                 else
                 {
-                    const auto name = road->names[road->section->encodingDecodingRules->name_encodingRuleId];
+                    const auto name = road->captions[road->section->encodingDecodingRules->name_encodingRuleId];
                     OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, "Found road: %s", qPrintable(name));
                 }
             }
             else
             {
                 OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, "No road found!");
+            }
+
+            // Map symbol
+            const auto mapSymbols = renderer->getSymbolsAt(OsmAnd::PointI(x, y));
+            if (mapSymbols.isEmpty())
+                OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, "No symbols found!");
+            for (const auto& mapSymbol : constOf(mapSymbols))
+            {
+                OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, "Clicked on map symbol %p", mapSymbol.get());
+                if (const auto rasterMapSymbol = std::dynamic_pointer_cast<const OsmAnd::RasterMapSymbol>(mapSymbol))
+                {
+                    OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, " - content = %s", qPrintable(rasterMapSymbol->content));
+                    OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, " - size = %d %d", rasterMapSymbol->size.x, rasterMapSymbol->size.y);
+                    OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, " - minDistance = %d %d", rasterMapSymbol->minDistance.x, rasterMapSymbol->minDistance.y);
+                }
+                if (const auto billboardMapSymbol = std::dynamic_pointer_cast<const OsmAnd::IBillboardMapSymbol>(mapSymbol))
+                {
+                    OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, " - offset = %d %d", billboardMapSymbol->getOffset().x, billboardMapSymbol->getOffset().y);
+                    OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, " - position31 = %d %d", billboardMapSymbol->getPosition31().x, billboardMapSymbol->getPosition31().y);
+                }
+                if (const auto group = mapSymbol->group.lock())
+                {
+                    OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, " - symbols in group %d", group->symbols.size());
+                    if (const auto binaryMapObjectSymbolsGroup = std::dynamic_pointer_cast<const OsmAnd::BinaryMapObjectSymbolsGroup>(group))
+                    {
+                        OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, " - from OSM #%" PRIu64, binaryMapObjectSymbolsGroup->id >> 1);
+                    }
+                }
             }
         }
     }
@@ -518,16 +587,18 @@ void mouseMotion(int x, int y)
         auto deltaX = x - dragInitX;
         auto deltaY = y - dragInitY;
 
+        const auto state = renderer->getState();
+
         // Azimuth
-        auto angle = qDegreesToRadians(renderer->state.azimuth);
+        auto angle = qDegreesToRadians(state.azimuth);
         auto cosAngle = cosf(angle);
         auto sinAngle = sinf(angle);
 
         auto nx = deltaX * cosAngle - deltaY * sinAngle;
         auto ny = deltaX * sinAngle + deltaY * cosAngle;
 
-        const auto tileSize31 = (1u << (31 - renderer->state.zoomBase));
-        auto scale31 = static_cast<double>(tileSize31) / renderer->getScaledTileSizeOnScreen();
+        const auto tileSize31 = (1u << (31 - state.zoomBase));
+        auto scale31 = static_cast<double>(tileSize31) / std::dynamic_pointer_cast<OsmAnd::IAtlasMapRenderer>(renderer)->getCurrentTileSizeOnScreenInPixels();
 
         OsmAnd::PointI newTarget;
         newTarget.x = dragInitTarget.x - static_cast<int32_t>(nx * scale31);
@@ -541,22 +612,43 @@ void mouseMotion(int x, int y)
 void mouseWheelHandler(int button, int dir, int x, int y)
 {
     const auto modifiers = glutGetModifiers();
-    const auto step = (modifiers & GLUT_ACTIVE_SHIFT) ? 0.1f : 0.01f;
-
-    if (dir > 0)
+    if (modifiers & GLUT_ACTIVE_CTRL)
     {
-        renderer->setZoom(renderer->state.requestedZoom + step);
+        const auto step = (modifiers & GLUT_ACTIVE_SHIFT) ? 100 : 10;
+
+        const auto configuration = std::dynamic_pointer_cast<OsmAnd::AtlasMapRendererConfiguration>(renderer->getConfiguration());
+        if (dir > 0)
+            configuration->referenceTileSizeOnScreenInPixels += step;
+        else
+            configuration->referenceTileSizeOnScreenInPixels -= step;
+        if (configuration->referenceTileSizeOnScreenInPixels <= 0)
+            configuration->referenceTileSizeOnScreenInPixels = 10;
+        renderer->setConfiguration(configuration);
+
+        if (binaryMapStaticSymbolProvider)
+            binaryMapStaticSymbolProvider->referenceTileSizeInPixels = configuration->referenceTileSizeOnScreenInPixels;
     }
     else
     {
-        renderer->setZoom(renderer->state.requestedZoom - step);
+        const auto step = (modifiers & GLUT_ACTIVE_SHIFT) ? 0.1f : 0.01f;
+        const auto state = renderer->getState();
+
+        if (dir > 0)
+        {
+            renderer->setZoom(state.requestedZoom + step);
+        }
+        else
+        {
+            renderer->setZoom(state.requestedZoom - step);
+        }
     }
 }
 
 void keyboardHandler(unsigned char key, int x, int y)
 {
     const auto modifiers = glutGetModifiers();
-    const auto wasdZoom = static_cast<int>(renderer->state.requestedZoom);
+    const auto state = renderer->getState();
+    const auto wasdZoom = static_cast<int>(state.requestedZoom);
     const auto wasdStep = (1 << (31 - wasdZoom));
 
     switch (key)
@@ -567,7 +659,7 @@ void keyboardHandler(unsigned char key, int x, int y)
     case 'W':
     case 'w':
     {
-        auto newTarget = renderer->state.target31;
+        auto newTarget = state.target31;
         newTarget.y -= wasdStep / (key == 'w' ? 50 : 10);
         renderer->setTarget(newTarget);
     }
@@ -575,7 +667,7 @@ void keyboardHandler(unsigned char key, int x, int y)
     case 'S':
     case 's':
     {
-        auto newTarget = renderer->state.target31;
+        auto newTarget = state.target31;
         newTarget.y += wasdStep / (key == 's' ? 50 : 10);
         renderer->setTarget(newTarget);
     }
@@ -583,7 +675,7 @@ void keyboardHandler(unsigned char key, int x, int y)
     case 'A':
     case 'a':
     {
-        auto newTarget = renderer->state.target31;
+        auto newTarget = state.target31;
         newTarget.x -= wasdStep / (key == 'a' ? 50 : 10);
         renderer->setTarget(newTarget);
     }
@@ -591,16 +683,16 @@ void keyboardHandler(unsigned char key, int x, int y)
     case 'D':
     case 'd':
     {
-        auto newTarget = renderer->state.target31;
+        auto newTarget = state.target31;
         newTarget.x += wasdStep / (key == 'd' ? 50 : 10);
         renderer->setTarget(newTarget);
     }
         break;
     case 'r':
-        renderer->setDistanceToFog(renderer->state.fogDistance + 1.0f);
+        renderer->setDistanceToFog(state.fogDistance + 1.0f);
         break;
     case 'f':
-        renderer->setDistanceToFog(renderer->state.fogDistance - 1.0f);
+        renderer->setDistanceToFog(state.fogDistance - 1.0f);
         break;
     case 'x':
         renderWireframe = !renderWireframe;
@@ -608,7 +700,7 @@ void keyboardHandler(unsigned char key, int x, int y)
         break;
     case 'e':
     {
-        if (renderer->state.elevationDataProvider)
+        if (state.elevationDataProvider)
         {
             renderer->resetElevationDataProvider();
         }
@@ -623,54 +715,54 @@ void keyboardHandler(unsigned char key, int x, int y)
     }
         break;
     case 't':
-        renderer->setFogDensity(renderer->state.fogDensity + 0.01f);
+        renderer->setFogDensity(state.fogDensity + 0.01f);
         break;
     case 'g':
-        renderer->setFogDensity(renderer->state.fogDensity - 0.01f);
+        renderer->setFogDensity(state.fogDensity - 0.01f);
         break;
     case 'u':
-        renderer->setFogOriginFactor(renderer->state.fogOriginFactor + 0.01f);
+        renderer->setFogOriginFactor(state.fogOriginFactor + 0.01f);
         break;
     case 'j':
-        renderer->setFogOriginFactor(renderer->state.fogOriginFactor - 0.01f);
+        renderer->setFogOriginFactor(state.fogOriginFactor - 0.01f);
         break;
     case 'i':
-        renderer->setFieldOfView(renderer->state.fieldOfView + 0.5f);
+        renderer->setFieldOfView(state.fieldOfView + 0.5f);
         break;
     case 'k':
-        renderer->setFieldOfView(renderer->state.fieldOfView - 0.5f);
+        renderer->setFieldOfView(state.fieldOfView - 0.5f);
         break;
     case 'o':
-        renderer->setElevationDataScaleFactor(renderer->state.elevationDataScaleFactor + 0.1f);
+        renderer->setElevationDataScaleFactor(state.elevationDataScaleFactor + 0.1f);
         break;
     case 'l':
-        renderer->setElevationDataScaleFactor(renderer->state.elevationDataScaleFactor - 0.1f);
+        renderer->setElevationDataScaleFactor(state.elevationDataScaleFactor - 0.1f);
         break;
     case 'c':
     {
-        auto config = renderer->configuration;
-        config.limitTextureColorDepthBy16bits = !config.limitTextureColorDepthBy16bits;
+        auto config = renderer->getConfiguration();
+        config->limitTextureColorDepthBy16bits = !config->limitTextureColorDepthBy16bits;
         renderer->setConfiguration(config);
     }
         break;
     case 'b':
     {
-        auto config = renderer->configuration;
-        config.texturesFilteringQuality = OsmAnd::TextureFilteringQuality::Normal;
+        auto config = renderer->getConfiguration();
+        config->texturesFilteringQuality = OsmAnd::TextureFilteringQuality::Normal;
         renderer->setConfiguration(config);
     }
         break;
     case 'n':
     {
-        auto config = renderer->configuration;
-        config.texturesFilteringQuality = OsmAnd::TextureFilteringQuality::Good;
+        auto config = renderer->getConfiguration();
+        config->texturesFilteringQuality = OsmAnd::TextureFilteringQuality::Good;
         renderer->setConfiguration(config);
     }
         break;
     case 'm':
     {
-        auto config = renderer->configuration;
-        config.texturesFilteringQuality = OsmAnd::TextureFilteringQuality::Best;
+        auto config = renderer->getConfiguration();
+        config->texturesFilteringQuality = OsmAnd::TextureFilteringQuality::Best;
         renderer->setConfiguration(config);
     }
         break;
@@ -707,7 +799,7 @@ void keyboardHandler(unsigned char key, int x, int y)
         break;
     case 'z':
     {
-        if (renderer->state.symbolProviders.contains(binaryMapStaticSymbolProvider))
+        if (state.symbolProviders.contains(binaryMapStaticSymbolProvider))
         {
             renderer->removeSymbolProvider(binaryMapStaticSymbolProvider);
             binaryMapStaticSymbolProvider.reset();
@@ -719,7 +811,7 @@ void keyboardHandler(unsigned char key, int x, int y)
             if (!binaryMapPrimitivesProvider)
                 binaryMapPrimitivesProvider.reset(new OsmAnd::BinaryMapPrimitivesProvider(binaryMapDataProvider, primitivizer));
 
-            binaryMapStaticSymbolProvider.reset(new OsmAnd::BinaryMapStaticSymbolsProvider(binaryMapPrimitivesProvider));
+            binaryMapStaticSymbolProvider.reset(new OsmAnd::BinaryMapStaticSymbolsProvider(binaryMapPrimitivesProvider, 256u));
             renderer->addSymbolProvider(binaryMapStaticSymbolProvider);
         }
     }
@@ -783,6 +875,7 @@ void keyboardHandler(unsigned char key, int x, int y)
 void specialHandler(int key, int x, int y)
 {
     const auto modifiers = glutGetModifiers();
+    const auto state = renderer->getState();
     const auto step = (modifiers & GLUT_ACTIVE_SHIFT) ? 1.0f : 0.1f;
 
     switch (key)
@@ -797,16 +890,16 @@ void specialHandler(int key, int x, int y)
         renderer->dumpResourcesInfo();
         break;
     case GLUT_KEY_LEFT:
-        renderer->setAzimuth(renderer->state.azimuth + step);
+        renderer->setAzimuth(state.azimuth + step);
         break;
     case GLUT_KEY_RIGHT:
-        renderer->setAzimuth(renderer->state.azimuth - step);
+        renderer->setAzimuth(state.azimuth - step);
         break;
     case GLUT_KEY_UP:
-        renderer->setElevationAngle(renderer->state.elevationAngle + step);
+        renderer->setElevationAngle(state.elevationAngle + step);
         break;
     case GLUT_KEY_DOWN:
-        renderer->setElevationAngle(renderer->state.elevationAngle - step);
+        renderer->setElevationAngle(state.elevationAngle - step);
         break;
     }
 }
@@ -960,6 +1053,9 @@ void displayHandler()
     //////////////////////////////////////////////////////////////////////////
     if (!use43 && !nSight)
     {
+        const auto state = renderer->getState();
+        const auto configuration = renderer->getConfiguration();
+
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
@@ -993,47 +1089,47 @@ void displayHandler()
 #endif
         glRasterPos2f(8, t - 16 * 1);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("fov (keys i,k)         : %1").arg(renderer->state.fieldOfView)));
+            QString("fov (keys i,k)         : %1").arg(state.fieldOfView)));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * 2);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("fog distance (keys r,f): %1").arg(renderer->state.fogDistance)));
+            QString("fog distance (keys r,f): %1").arg(state.fogDistance)));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * 3);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("azimuth (arrows l,r)   : %1").arg(renderer->state.azimuth)));
+            QString("azimuth (arrows l,r)   : %1").arg(state.azimuth)));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * 4);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("pitch (arrows u,d)     : %1").arg(renderer->state.elevationAngle)));
+            QString("pitch (arrows u,d)     : %1").arg(state.elevationAngle)));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * 5);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("target (keys w,a,s,d)  : %1 %2").arg(renderer->state.target31.x).arg(renderer->state.target31.y)));
+            QString("target (keys w,a,s,d)  : %1 %2").arg(state.target31.x).arg(state.target31.y)));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * 6);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("zoom (mouse wheel)     : %1").arg(renderer->state.requestedZoom)));
+            QString("zoom (mouse wheel)     : %1").arg(state.requestedZoom)));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * 7);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("zoom base              : %1").arg(renderer->state.zoomBase)));
+            QString("zoom base              : %1").arg(state.zoomBase)));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * 8);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("zoom fraction          : %1").arg(renderer->state.zoomFraction)));
+            QString("zoom fraction          : %1").arg(state.zoomFraction)));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * 9);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("visible tiles          : %1").arg(renderer->getVisibleTilesCount())));
+            QString("visible tiles          : %1").arg(std::dynamic_pointer_cast<OsmAnd::IAtlasMapRenderer>(renderer)->getVisibleTilesCount())));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * 10);
@@ -1043,37 +1139,37 @@ void displayHandler()
 
         glRasterPos2f(8, t - 16 * 11);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("elevation data (key e) : %1").arg((bool)renderer->state.elevationDataProvider)));
+            QString("elevation data (key e) : %1").arg((bool)state.elevationDataProvider)));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * 12);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("fog density (keys t,g) : %1").arg(renderer->state.fogDensity)));
+            QString("fog density (keys t,g) : %1").arg(state.fogDensity)));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * 13);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("fog origin F (keys u,j): %1").arg(renderer->state.fogOriginFactor)));
+            QString("fog origin F (keys u,j): %1").arg(state.fogOriginFactor)));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * 14);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("height scale (keys o,l): %1").arg(renderer->state.elevationDataScaleFactor)));
+            QString("height scale (keys o,l): %1").arg(state.elevationDataScaleFactor)));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * 15);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("16-bit textures (key c): %1").arg(renderer->configuration.limitTextureColorDepthBy16bits)));
+            QString("16-bit textures (key c): %1").arg(configuration->limitTextureColorDepthBy16bits)));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * 16);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("tex-filtering (b,n,m)  : %1").arg(static_cast<int>(renderer->configuration.texturesFilteringQuality))));
+            QString("tex-filtering (b,n,m)  : %1").arg(static_cast<int>(configuration->texturesFilteringQuality))));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * 17);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("symbols (key z)        : %1").arg(!renderer->state.symbolProviders.isEmpty())));
+            QString("symbols (key z)        : %1").arg(!state.symbolProviders.isEmpty())));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * 18);
@@ -1097,7 +1193,7 @@ void displayHandler()
 #endif
         glRasterPos2f(8, 16 * 12);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("Last clicked tile: (%1, %2)@%3").arg(lastClickedLocation31.x >> (31 - renderer->state.zoomBase)).arg(lastClickedLocation31.y >> (31 - renderer->state.zoomBase)).arg(renderer->state.zoomBase)));
+            QString("Last clicked tile: (%1, %2)@%3").arg(lastClickedLocation31.x >> (31 - state.zoomBase)).arg(lastClickedLocation31.y >> (31 - state.zoomBase)).arg(state.zoomBase)));
         verifyOpenGL();
 
         glRasterPos2f(8, 16 * 11);

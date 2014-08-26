@@ -12,7 +12,7 @@
 #include <QFile>
 #include <QStringList>
 
-#include <OsmAndCoreUtils/Voyager.h>
+#include <OsmAndCoreTools/Voyager.h>
 
 void printUsage(std::string warning = std::string());
 

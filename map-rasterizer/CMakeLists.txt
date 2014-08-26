@@ -5,10 +5,10 @@ if (CMAKE_SHARED_LIBS_ALLOWED_ON_TARGET)
 		"main.cpp"
 	)
 	add_dependencies(eyepiece
-		OsmAndCoreUtils_shared
+		OsmAndCoreTools_shared
 	)
 	target_link_libraries(eyepiece
-		OsmAndCoreUtils_shared
+		OsmAndCoreTools_shared
 	)
 endif()
 
@@ -17,9 +17,9 @@ if (CMAKE_STATIC_LIBS_ALLOWED_ON_TARGET)
 		"main.cpp"
 	)
 	add_dependencies(eyepiece_standalone
-		OsmAndCoreUtils_static
+		OsmAndCoreTools_static
 	)
 	target_link_libraries(eyepiece_standalone
-		OsmAndCoreUtils_static
+		OsmAndCoreTools_static
 	)
 endif()

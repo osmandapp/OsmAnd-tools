@@ -12,9 +12,13 @@
 #include <QFile>
 #include <QStringList>
 
-#include <OsmAndCoreUtils/EyePiece.h>
+#include <OsmAndCoreTools/EyePiece.h>
 
-void printUsage(std::string warning = std::string());
+#if defined(UNICODE) || defined(_UNICODE)
+void printUsage(const std::wstring& warning = std::wstring());
+#else
+void printUsage(const std::string& warning = std::string());
+#endif
 
 int main(int argc, char* argv[])
 {
@@ -26,42 +30,54 @@ int main(int argc, char* argv[])
 #   endif
 #endif
 
-    OsmAnd::EyePiece::Configuration cfg;
-
+    // Parse configuration
+    OsmAndTools::EyePiece::Configuration configuration;
     QString error;
-    QStringList args;
+    QStringList commandLineArgs;
     for (int idx = 1; idx < argc; idx++)
-        args.push_back(argv[idx]);
-
-    if(!OsmAnd::EyePiece::parseCommandLineArguments(args, cfg, error))
+        commandLineArgs.push_back(argv[idx]);
+    if (!OsmAndTools::EyePiece::Configuration::parseFromCommandLineArguments(commandLineArgs, configuration, error))
     {
-        printUsage(error.toStdString());
+        printUsage(QStringToStlString(error));
         return -1;
     }
-    OsmAnd::EyePiece::rasterizeToStdOut(cfg);
-    return 0;
+
+    // Process rasterization request
+    const auto success = OsmAndTools::EyePiece(configuration).rasterize();
+    return (success ? 0 : -1);
 }
 
-void printUsage(std::string warning)
+#if defined(UNICODE) || defined(_UNICODE)
+void printUsage(const std::wstring& warning /*= std::wstring()*/)
+#else
+void printUsage(const std::string& warning /*= std::string()*/)
+#endif
 {
+#if defined(UNICODE) || defined(_UNICODE)
+    auto& tcout = std::wcout;
+#else
+    auto& tcout = std::cout;
+#endif
     if(!warning.empty())
-        std::cout << warning << std::endl;
-    std::cout << "EyePiece is console utility to rasterize OsmAnd map tile." << std::endl;
-    std::cout << std::endl << "Usage: eyepiece -stylesPath=path/to/styles1";
-    std::cout << " [-stylesPath=path/to/styles2]";
-    std::cout << " -style=style";
-    std::cout << " [-obfsDir=path/to/obf/collection]";
-    std::cout << " [-verbose]";
-    std::cout << " [-dumpRules]";
-    std::cout << " [-zoom=15]";
-    std::cout << " [-32bit]";
-    std::cout << " [-tileSide=256]";
-    std::cout << " [-density=1.0]";
-    std::cout << " [-bbox=LeftLon,TopLat,RightLon,BottomLan]";
-    std::cout << " [-output=path/to/image.png]";
-    std::cout << " [-map]";
-    std::cout << " [-text]";
-    std::cout << " [-icons]";
-    std::cout << std::endl;
+        tcout << warning << std::endl;
+    tcout << xT("OsmAnd EyePiece tool is a console utility to rasterize part of map.") << std::endl;
+    tcout << std::endl;
+    tcout << xT("Arguments:") << std::endl;
+    tcout << xT("\t-obfsPath=path/to/OBFs/collection or -obfsRecursivePath=path/to/OBFs/collection or -obfFile=OBF/file/path/with/name.obf ...") << std::endl;
+    tcout << xT("\t[-stylesPath=path/to/main/styles or -stylesRecursivePath=path/to/main/styles ...]") << std::endl;
+    tcout << xT("\t[-styleName=default]") << std::endl;
+    tcout << xT("\t[-styleSetting:name=value ...]") << std::endl;
+    tcout << xT("\t-outputImageWidth=size_in_pixels") << std::endl;
+    tcout << xT("\t-outputImageHeight=size_in_pixels") << std::endl;
+    tcout << xT("\t-outputImageFilename=path/with/file.name") << std::endl;
+    tcout << xT("\t[-latLon=0;0 or -target31=x;y]") << std::endl;
+    tcout << xT("\t[-zoom=15]") << std::endl;
+    tcout << xT("\t[-azimuth=0]") << std::endl;
+    tcout << xT("\t[-elevationAngle=90]") << std::endl;
+    tcout << xT("\t[-fov=16.5]") << std::endl;
+    tcout << xT("\t[-referenceTileSize=256]") << std::endl;
+    tcout << xT("\t[-displayDensityFactor=1.0]") << std::endl;
+    tcout << xT("\t[-outputImageFormat=png|jpeg]") << std::endl;
+    tcout << xT("\t[-locale=en]") << std::endl;
+    tcout << xT("\t[-verbose]") << std::endl;
 }
-
