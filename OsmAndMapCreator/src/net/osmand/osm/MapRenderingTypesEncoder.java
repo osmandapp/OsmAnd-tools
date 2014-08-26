@@ -350,8 +350,21 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			"lower",
 			"corner",
 			"backslash",
+			"wolfshook",
 			"rectangle_line",
 	}));
+	final java.util.Map<String> precolors = new java.util.HashMap<String>();
+	{
+            precolors.put("shell_modern","yellow");
+            precolors.put("shell","yellow");
+            precolors.put("wolfshook","white");
+            precolors.put("ammonit","white");
+            precolors.put("mine","white");
+            precolors.put("hiker","black");
+            precolors.put("heart","red");
+            precolors.put("tower","black");
+            precolors.put("bridleway","white");
+	}
 
 	public void addOSMCSymbolsSpecialTags(Map<MapRulType,String> propogated, Entry<String,String> ev) {
 		if ("osmc:symbol".equals(ev.getKey())) {
@@ -365,7 +378,10 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 						String bgColor = tokens[1];
 						String fgColor = tokens[2];
 						String shape = "";
-						if (fgColor.indexOf('_') != -1) {
+						if(precolors.containsKey(fgColor)) {
+							shape = fgColor;
+							fgColor = precolors.get(fgColor);
+						} else	if (fgColor.indexOf('_') != -1) {
 							final int i = fgColor.indexOf('_');
 							fgColor = fgColor.substring(0, i);
 							shape = fgColor.substring(i + 1).toLowerCase();
