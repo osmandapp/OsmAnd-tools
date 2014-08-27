@@ -68,7 +68,7 @@ public class DataExtractionSettings {
 	public void saveStartLocation(double lat, double lon){
 		preferences.putDouble("start_lat",  lat);
 		preferences.putDouble("start_lon",  lon);
-	}
+	}us
 	public void saveEndLocation(double lat, double lon){
 		preferences.putDouble("end_lat",  lat);
 		preferences.putDouble("end_lon",  lon);
@@ -247,7 +247,7 @@ public class DataExtractionSettings {
 	}
 	
 	public boolean isHousenumberPrefered(){
-		return preferences.getBoolean("prefer_housenumber", false);
+		return preferences.getBoolean("prefer_housenumber", true);
 	}
 	
 	public void AdditionalInfo(boolean b){
@@ -255,7 +255,7 @@ public class DataExtractionSettings {
 	}
 	
 	public boolean isAdditionalInfo(){
-		return preferences.getBoolean("additional_address_info", false);
+		return preferences.getBoolean("additional_address_info", true);
 	}
 	
 	
