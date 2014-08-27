@@ -82,7 +82,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 	private String[] normalizeSuffixes;
 	
 	//TODO make it an option
-	private boolean DEBUG_FULL_NAMES = false; //true to see atached cityPart and boundaries to the street names
+	private boolean DEBUG_FULL_NAMES = false; //true to see attached cityPart and boundaries to the street names
 	
 	private static final int ADDRESS_NAME_CHARACTERS_TO_INDEX = 4;
 	
@@ -928,7 +928,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 				"SELECT A.id, A.name, A.name_en, A.latitude, A.longitude, "+ //$NON-NLS-1$
 				"B.id, B.name, B.name_en, B.latitude, B.longitude, B.postcode, A.cityPart, "+ //$NON-NLS-1$
 				" B.name2, B.name_en2, B.lat2, B.lon2, B.interval, B.interpolateType, A.cityPart == C.name as MainTown " +
-				"FROM street A left JOIN building B ON B.street = A.id JOIN city C ON A.city = C.id " + //$NON-NLS-1$
+				"FROM street A LEFT JOIN building B ON B.street = A.id JOIN city C ON A.city = C.id " + //$NON-NLS-1$
 				"WHERE A.city = ? ORDER BY MainTown DESC, A.name ASC"); //$NON-NLS-1$
 		PreparedStatement waynodesStat =
 			 mapConnection.prepareStatement("SELECT A.id, A.latitude, A.longitude FROM street_node A WHERE A.street = ? "); //$NON-NLS-1$
@@ -1048,7 +1048,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 			List<City> listSuburbs = null;
 			if (suburbs != null) {
 				for (City suburb : suburbs) {
-					if (suburb.getIsInValue().contains(city.getName().toLowerCase())) {
+					if (suburb.getIsInValue().toLowerCase().contains(city.getName().toLowerCase())) {
 						if (listSuburbs == null) {
 							listSuburbs = new ArrayList<City>();
 						}
