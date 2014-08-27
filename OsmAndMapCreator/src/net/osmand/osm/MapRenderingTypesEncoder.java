@@ -374,7 +374,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 				MapRulType rt = getMapRuleType("osmc_symbol", wayColor);
 				if(rt != null) {
 					propogated.put(rt, "");
-					if (tokens.length > 2 && rt.names != null) {
+					if (tokens.length > 2) {
 						String bgColor = tokens[1];
 						String fgColor = tokens[2];
 						String shape = "";
@@ -397,10 +397,9 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 							name = tokens[3];
 						}
 
-						for (int k = 0; k < rt.names.length; k++) {
-							if (rt.names[k].tagValuePattern.tag.equals(symbol)) {
-								propogated.put(rt.names[k], name);
-							}
+						MapRulType textRule = getMapRuleType(symbol, "");
+						if (textRule != null) {
+							propogated.put(textRule, name);
 						}
 					}
 				}
