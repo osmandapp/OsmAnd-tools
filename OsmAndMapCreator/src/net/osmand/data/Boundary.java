@@ -10,6 +10,7 @@ public class Boundary {
 	private int adminLevel;
 	
 	private long adminCenterId;
+	private City city;
 	private CityType cityType;
 	private Multipolygon multipolygon;
 	
@@ -94,6 +95,15 @@ public class Boundary {
 
 	public LatLon getCenterPoint() {
 		return multipolygon.getCenterPoint();
+	}
+
+	public City getCity() {
+		return city;
+	}
+
+	public void setCity(City city) {
+		this.city = city;
+		this.cityType = city.getType();
 	}
 
 }
