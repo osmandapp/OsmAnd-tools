@@ -395,10 +395,10 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 							propogated.put(shp, shpValue);
 						}
 						String symbol = "osmc_symbol_" + formatColorToPalette(bgColor, true) + "_" + fgColor + "_name";
-						String name = "\u00A0";
-						if (tokens.length > 3 && tokens[3].trim().length() > 0) {
-							name = tokens[3];
-						}
+						String name = "."; //"\u00A0";
+//						if (tokens.length > 3 && tokens[3].trim().length() > 0) {
+//							name = tokens[3];
+//						}
 
 						MapRulType textRule = getMapRuleType(symbol, "");
 						if (textRule != null) {
