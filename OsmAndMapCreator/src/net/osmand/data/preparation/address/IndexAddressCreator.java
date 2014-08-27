@@ -15,6 +15,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -149,6 +150,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 				for (City c : citiesToSearch) {
 					if (c.getId() == boundary.getAdminCenterId()) {
 						cityFound = c;
+						boundary.setCity(c);
 						break;
 					}
 				}
@@ -158,6 +160,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 					if ((boundaryName.equalsIgnoreCase(c.getName()) || altBoundaryName.equalsIgnoreCase(c.getName())) 
 							&& boundary.containsPoint(c.getLocation())) {
 						cityFound = c;
+						boundary.setCity(c);
 						break;
 					}
 				}
@@ -217,9 +220,19 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 
 
 	private void attachAllCitiesToBoundary(Boundary boundary) {
+		String boundaryName = boundary.getName();
 		List<City> list = new ArrayList<City>(1);
 		for (City c : cities.values()) {
 			if (boundary.containsPoint(c.getLocation())) {
+				if (!c.getName().equals(boundaryName)) {
+					String isin = c.getIsInValue();
+					if(isin == null || isin.isEmpty()) {
+						c.setIsin(boundaryName);
+					}
+					if(c.getClosestCity() == null) {
+						c.setClosestCity(boundary.getCity());
+					}
+				}
 				list.add(c);
 			}
 		}
@@ -257,8 +270,6 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 			}
 		}
 	}
-
-
 
 	private int extractBoundaryAdminLevel(Entity e) {
 		int adminLevel = -1;
@@ -459,7 +470,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 			}
 			
 			if (streetName != null) {
-				Set<Long> idsOfStreet = getStreetInCity(isInNames, streetName, null, l);
+				Set<Long> idsOfStreet = getStreetInCity(isInNames, streetName, null, null, l);
 				if (!idsOfStreet.isEmpty()) {
 					Collection<Entity> houses = i.getMembers("house"); // both house and address roles can have address
 					houses.addAll(i.getMembers("address"));
@@ -565,12 +576,17 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 		return newName.trim();
 	}
 
-	public Set<Long> getStreetInCity(Set<String> isInNames, String name, String nameEn, final LatLon location) throws SQLException {
+	public Set<Long> getStreetInCity(Set<String> isInNames, String name, String nameEn, String ref, final LatLon location) throws SQLException {
 		if (location == null) {
 			return Collections.emptySet();
 		
 		}
-		name = normalizeStreetName(name);
+		if (name != null) {
+			name = normalizeStreetName(name);
+		}
+		else {
+			name = normalizeStreetName(ref);
+		}
 		Set<City> result = new LinkedHashSet<City>();
 		List<City> nearestObjects = new ArrayList<City>();
 		nearestObjects.addAll(cityManager.getClosestObjects(location.getLatitude(),location.getLongitude()));
@@ -665,6 +681,13 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 								break;	
 							}
 						}
+						else if(cityBoundary != null && cityBoundary.containsPoint(subpart.getLocation())
+								&& (subpart.getType() == CityType.HAMLET
+										|| subpart.getType() == CityType.NEIGHBOURHOOD
+										|| subpart.getType() == CityType.ISOLATED_DWELLING
+										|| subpart.getType() == CityType.LOCALITY)) {
+							subpart.setIsin(cityBoundary.getName());
+						}
 					}
 				}
 			}
@@ -748,7 +771,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 						if (strt == null) {
 							strt = first.getTag(OSMTagKey.ADDR_PLACE);
 						}
-						Set<Long> idsOfStreet = getStreetInCity(first.getIsInNames(), strt, null, l);
+						Set<Long> idsOfStreet = getStreetInCity(first.getIsInNames(), strt, null, null, l);
 						if (!idsOfStreet.isEmpty()) {
 							Building building = EntityParser.parseBuilding(first);
 							building.setInterpolationInterval(interpolationInterval);
@@ -784,7 +807,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 			boolean exist = e instanceof Relation || streetDAO.findBuilding(e);
 			if (!exist) {
 				LatLon l = e.getLatLon();
-				Set<Long> idsOfStreet = getStreetInCity(e.getIsInNames(), street, null, l);
+				Set<Long> idsOfStreet = getStreetInCity(e.getIsInNames(), street, null, null, l);
 				if (!idsOfStreet.isEmpty()) {
 					Building building = EntityParser.parseBuilding(e);
 					String hname = houseName;
@@ -812,7 +835,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 							building.setName(hname.substring(0, secondNumber));
 							Building building2 = EntityParser.parseBuilding(e);
 							building2.setName(hname.substring(secondNumber + 1));
-							Set<Long> ids2OfStreet = getStreetInCity(e.getIsInNames(), street2, null, l);
+							Set<Long> ids2OfStreet = getStreetInCity(e.getIsInNames(), street2, null, null, l);
 							ids2OfStreet.removeAll(idsOfStreet); //remove duplicated entries!
 							if(!ids2OfStreet.isEmpty()) {
 								streetDAO.writeBuilding(ids2OfStreet, building2);
@@ -829,26 +852,36 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 				}
 			}
 		} else if (e instanceof Way /* && OSMSettings.wayForCar(e.getTag(OSMTagKey.HIGHWAY)) */
-				&& e.getTag(OSMTagKey.HIGHWAY) != null && e.getTag(OSMTagKey.NAME) != null &&
-				isStreetTag(e.getTag(OSMTagKey.HIGHWAY))) {
+				&& e.getTag(OSMTagKey.HIGHWAY) != null
+				&& (e.getTag(OSMTagKey.NAME) != null || e.getTag(OSMTagKey.REF) != null)
+				&& isStreetTag(e.getTag(OSMTagKey.HIGHWAY))) {
 			// suppose that streets with names are ways for car
 			// Ignore all ways that have house numbers and highway type
 			
 			// if we saved address ways we could checked that we registered before
 			boolean exist = streetDAO.findStreetNode(e);
 
-
+			Set<String> isInNames = e.getIsInNames();
+			if(isInNames.isEmpty()) {
+				isInNames = new HashSet<String>();
+				for(Boundary b: boundaryToContainingCities.keySet()) {
+					if(b.containsPoint(e.getLatLon())) {
+						isInNames.add(b.getName());
+					}
+				}
+			}
 
 			// check that street way is not registered already
 			if (!exist) {
 				LatLon l = e.getLatLon();
-				Set<Long> idsOfStreet = getStreetInCity(e.getIsInNames(), e.getTag(OSMTagKey.NAME), e.getTag(OSMTagKey.NAME_EN), l);
+				Set<Long> idsOfStreet = getStreetInCity(isInNames,
+						e.getTag(OSMTagKey.NAME), e.getTag(OSMTagKey.NAME_EN),
+						e.getTag(OSMTagKey.REF), l);
 				if (!idsOfStreet.isEmpty()) {
 					streetDAO.writeStreetWayNodes(idsOfStreet, (Way) e);
 				}
 			}
-		}
-		if (e instanceof Relation) {
+		} else if (e instanceof Relation) {
 			if (e.getTag(OSMTagKey.POSTAL_CODE) != null) {
 				ctx.loadEntityRelation((Relation) e);
 				postalCodeRelations.add((Relation) e);
@@ -876,7 +909,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 		for (City c : cities.values()) {
 			if(c.getType() != CityType.DISTRICT &&
 					//c.getType() != CityType.SUBURB &&
-					c.getType() != CityType.NEIGHBOURHOOD){
+					c.getType() != CityType.NEIGHBOURHOOD &&
+					c.getType() != CityType.ISOLATED_DWELLING &&
+					c.getType() != CityType.LOCALITY){
 				writeCity(c);
 			}
 		}
@@ -937,28 +972,46 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 		List<City> suburbs = new ArrayList<City>();
 		List<City> cityTowns = new ArrayList<City>();
 		List<City> villages = new ArrayList<City>();
+		List<City> hamlet_iso_dwelling_loc = new ArrayList<City>();
 		for(CityType t : cities.keySet()) {
 			if(t == CityType.CITY || t == CityType.TOWN){
 				cityTowns.addAll(cities.get(t));
-			} else {
+			} else if(t == CityType.VILLAGE || t == CityType.HAMLET) {
 				villages.addAll(cities.get(t));
-			}
-			if(t == CityType.SUBURB){
+			} else if(t == CityType.SUBURB) {
 				for(City c : cities.get(t)){
 					if(c.getIsInValue() != null) {
 						suburbs.add(c);
 					}
 				}
 			}
+			if(t == CityType.HAMLET
+			|| t == CityType.ISOLATED_DWELLING
+			|| t == CityType.LOCALITY) {
+				for(City small_city: cities.get(t)) {
+					Boundary smallestBoundary = null;
+					for(Boundary b: boundaryToContainingCities.keySet()) {
+						if(b.containsPoint(small_city.getLocation())
+							&& b.getAdminLevel() <= 9) {
+							if(smallestBoundary == null
+							|| smallestBoundary.getAdminLevel() < b.getAdminLevel())
+								smallestBoundary = b;
+						}
+					}
+					if (smallestBoundary != null) {
+						small_city.setIsin(smallestBoundary.getName());
+						hamlet_iso_dwelling_loc.add(small_city);
+					}
+				}
+			}
 		}
-
 		
 		progress.startTask(Messages.getString("IndexCreator.SERIALIZING_ADRESS"), cityTowns.size() + villages.size() / 100 + 1); //$NON-NLS-1$
 		
 		Map<String, List<MapObject>> namesIndex = new TreeMap<String, List<MapObject>>(Collator.getInstance());
 		Map<String, City> postcodes = new TreeMap<String, City>();
 		writeCityBlockIndex(writer, CITIES_TYPE,  streetstat, waynodesStat, suburbs, cityTowns, postcodes, namesIndex, progress);
-		writeCityBlockIndex(writer, VILLAGES_TYPE,  streetstat, waynodesStat, null, villages, postcodes, namesIndex, progress);
+		writeCityBlockIndex(writer, VILLAGES_TYPE,  streetstat, waynodesStat, hamlet_iso_dwelling_loc, villages, postcodes, namesIndex, progress);
 		
 		// write postcodes		
 		List<BinaryFileReference> refs = new ArrayList<BinaryFileReference>();		
