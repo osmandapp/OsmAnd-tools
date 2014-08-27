@@ -39,7 +39,6 @@ import org.xmlpull.v1.XmlPullParserException;
 
 public class OsmAndImageRendering {
 
-	public static final boolean USE_EYEPIECE = true;
 	
 	private static String[] setupDefaultAttrs(String[] args) {
 		if (args.length < 1) {
@@ -237,6 +236,7 @@ public class OsmAndImageRendering {
 								line += " -styleSetting:"+p;
 							}
 						}
+//						line += " -useLegacyContext";
 						line += " -outputImageWidth=" + imageWidth;
 						line += " -outputImageHeight=" + imageHeight;
 						final String fileName = ic.generateName + ".png";

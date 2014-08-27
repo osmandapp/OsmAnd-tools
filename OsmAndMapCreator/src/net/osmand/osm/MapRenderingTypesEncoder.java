@@ -373,7 +373,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 				String wayColor = formatColorToPalette(tokens[0], true);
 				MapRulType rt = getMapRuleType("osmc_symbol", wayColor);
 				if(rt != null) {
-					propogated.put(rt, "");
+					propogated.put(rt, wayColor);
 					if (tokens.length > 2) {
 						String bgColor = tokens[1];
 						String fgColor = tokens[2];
@@ -386,10 +386,13 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 							shape = fgColor.substring(i + 1).toLowerCase();
 							fgColor = fgColor.substring(0, i);
 						}
-						String vl = barValues.contains(shape) ? "bar" : "circle";
-						MapRulType shp = getMapRuleType("osmc_shape", vl);
+						String shpValue ="default";
+						if(shape.length() != 0) {
+							shpValue = barValues.contains(shape) ? "bar" : "circle";
+						}
+						MapRulType shp = getMapRuleType("osmc_shape", shpValue);
 						if (shp != null) {
-							propogated.put(shp, vl);
+							propogated.put(shp, shpValue);
 						}
 						String symbol = "osmc_symbol_" + formatColorToPalette(bgColor, true) + "_" + fgColor + "_name";
 						String name = "\u00A0";

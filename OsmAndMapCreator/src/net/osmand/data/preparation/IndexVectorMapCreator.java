@@ -93,7 +93,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	private int zoomWaySmothness = 0;
 	private final Log logMapDataWarn;
 
-	private static long notUsedId = - 1 << 40; // million million  
+	private static long notUsedId = - (1l << 15l); // million million  
 
 	public IndexVectorMapCreator(Log logMapDataWarn, MapZooms mapZooms, MapRenderingTypesEncoder renderingTypes,
 	                             int zoomWaySmothness) {
@@ -878,7 +878,6 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			mapBinaryStat.setBytes(5, btypes.toByteArray());
 			mapBinaryStat.setBytes(6, badditionalTypes.toByteArray());
 			mapBinaryStat.setString(7, encodeNames(names));
-
 			addBatch(mapBinaryStat, commit);
 			try {
 				mapTree.insert(new LeafElement(new Rect(minX, minY, maxX, maxY), id));
