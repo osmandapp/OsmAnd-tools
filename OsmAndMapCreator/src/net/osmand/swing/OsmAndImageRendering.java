@@ -172,9 +172,13 @@ public class OsmAndImageRendering {
 		NodeList gen = doc.getElementsByTagName("html");
 		File gpx = new File(gpxFile);
 		HTMLContent html = null;
+		
 		if (gen.getLength() > 0) {
-			html = new HTMLContent(new File(gpx.getParentFile(), gpx.getName().substring(0, gpx.getName().length() - 4)
-					+ ".html"));
+			String outputFName = gpx.getName().substring(0, gpx.getName().length() - 4);
+			if(eyepiece != null) {
+				outputFName += "_eye";
+			}
+			html = new HTMLContent(new File(gpx.getParentFile(), outputFName  + ".html"));
 			StringWriter sw = new StringWriter();
 			TransformerFactory tf = TransformerFactory.newInstance();
 			Transformer transformer = tf.newTransformer();
@@ -235,7 +239,8 @@ public class OsmAndImageRendering {
 						}
 						line += " -outputImageWidth=" + imageWidth;
 						line += " -outputImageHeight=" + imageHeight;
-						line += " -outputImageFilename=" + outputFiles + "/" + ic.generateName + ".png";
+						final String fileName = ic.generateName + ".png";
+						line += " -outputImageFilename=" + outputFiles + "/" + fileName;
 						line += " -referenceTileSize="+(int)(dx*256);
 						line += " -displayDensityFactor="+dx;
 						line += " -zoom="+ic.zoom;
@@ -247,6 +252,9 @@ public class OsmAndImageRendering {
 							System.out.println(line);
 						}
 						input.close();
+						if (html != null) {
+							html.addFile(fileName);
+						}
 					} catch (Exception err) {
 						err.printStackTrace();
 					}
