@@ -41,6 +41,8 @@ public class OsmExtractionPreferencesDialog extends JDialog {
 	private JCheckBox useInternet;
 	private JCheckBox animateRouting;
 	private JCheckBox nativeRouting;
+	private JCheckBox preferHousenumber;
+	private JCheckBox additionalAddressinfo;
 
 	
 
@@ -72,6 +74,7 @@ public class OsmExtractionPreferencesDialog extends JDialog {
         
         createGeneralSection(pane);
         createNormalizingStreetSection(pane);
+        createAddressSection(pane);
         pane.add(Box.createVerticalGlue());	
         
         FlowLayout l = new FlowLayout(FlowLayout.RIGHT);
@@ -337,7 +340,26 @@ public class OsmExtractionPreferencesDialog extends JDialog {
 		
 		panel.setMaximumSize(new Dimension(Short.MAX_VALUE, panel.getPreferredSize().height));
 	}
-
+	
+	private void createAddressSection(JPanel root) {
+		JPanel panel = new JPanel();
+		int gridY = 0;
+		GridBagLayout l = new GridBagLayout();
+		panel.setLayout(l);
+		panel.setBorder(BorderFactory.createTitledBorder(Messages.getString("OsmExtractionPreferencesDialog.ADDRESS")));
+		root.add(panel);
+		
+		preferHousenumber = createCheckBox(panel, gridY++, 
+				DataExtractionSettings.getSettings().isHousenumberPrefered(), 
+				Messages.getString("OsmExtractionPreferencesDialog.PREFER.NUMBER"), l);
+		
+		additionalAddressinfo = createCheckBox(panel, gridY++, 
+				DataExtractionSettings.getSettings().isAdditionalInfo(), 
+				Messages.getString("OsmExtractionPreferencesDialog.ADDITIONAL.INFO"), l);
+		
+		panel.setMaximumSize(new Dimension(Short.MAX_VALUE, panel.getPreferredSize().height));
+	}
+	
 	private void addListeners(){
 		okButton.addActionListener(new ActionListener(){
 			@Override
@@ -401,6 +423,12 @@ public class OsmExtractionPreferencesDialog extends JDialog {
 			settings.setRouteMode(routingMode.getText());
 		}
 		
+		if(settings.isHousenumberPrefered() != preferHousenumber.isSelected()){
+			settings.preferHousenumber(preferHousenumber.isSelected());
+		}
+		if(settings.isAdditionalInfo() != additionalAddressinfo.isSelected()){
+			settings.AdditionalInfo(additionalAddressinfo.isSelected());
+		}
 	}
 	
 

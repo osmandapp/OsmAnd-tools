@@ -69,6 +69,7 @@ public class DataExtractionSettings {
 		preferences.putDouble("start_lat",  lat);
 		preferences.putDouble("start_lon",  lon);
 	}
+	
 	public void saveEndLocation(double lat, double lon){
 		preferences.putDouble("end_lat",  lat);
 		preferences.putDouble("end_lon",  lon);
@@ -242,6 +243,21 @@ public class DataExtractionSettings {
 		preferences.putBoolean("native_routing", b);
 	}
 	
+	public void preferHousenumber(boolean b){
+		preferences.putBoolean("prefer_housenumber", b);
+	}
+	
+	public boolean isHousenumberPrefered(){
+		return preferences.getBoolean("prefer_housenumber", true);
+	}
+	
+	public void AdditionalInfo(boolean b){
+		preferences.putBoolean("additional_address_info", b);
+	}
+	
+	public boolean isAdditionalInfo(){
+		return preferences.getBoolean("additional_address_info", true);
+	}
 	
 	
 	String[] SUFFIXES = new String[] {"av.", "avenue", "просп.", "пер.", "пр.","заул.", "проспект", "переул.", "бул.", "бульвар", "тракт"};

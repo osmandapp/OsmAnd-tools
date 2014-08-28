@@ -48,6 +48,7 @@ import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.osm.edit.OsmMapUtils;
 import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Way;
+import net.osmand.swing.DataExtractionSettings;
 import net.osmand.swing.Messages;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
@@ -464,12 +465,24 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 					Collection<Entity> houses = i.getMembers("house"); // both house and address roles can have address
 					houses.addAll(i.getMembers("address"));
 					for (Entity house : houses) {
-						String hname = house.getTag(OSMTagKey.ADDR_HOUSE_NAME);
-						if(hname == null) {
+						String hname = null;
+						String second = null;
+						
+						if (DataExtractionSettings.getSettings().isHousenumberPrefered()) {
 							hname = house.getTag(OSMTagKey.ADDR_HOUSE_NUMBER);
+							second = house.getTag(OSMTagKey.ADDR_HOUSE_NAME);
+						} else {
+							hname = house.getTag(OSMTagKey.ADDR_HOUSE_NAME);
+							second = house.getTag(OSMTagKey.ADDR_HOUSE_NUMBER);
+						}
+						if (hname == null) {
+							hname = second;
+							second = null;
 						}
 						if (hname == null)
 							continue;
+						if (DataExtractionSettings.getSettings().isAdditionalInfo() && second != null)
+							hname += " - [" + second + "]";
 						
 						if (!streetDAO.findBuilding(house)) {
 							// process multipolygon (relation) houses - preload members to create building with correct latlon
@@ -787,10 +800,24 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 				Set<Long> idsOfStreet = getStreetInCity(e.getIsInNames(), street, null, l);
 				if (!idsOfStreet.isEmpty()) {
 					Building building = EntityParser.parseBuilding(e);
-					String hname = houseName;
-					if(hname == null) {
+					String hname = null;
+					String second = null;
+					
+					if (DataExtractionSettings.getSettings().isHousenumberPrefered()) {
 						hname = houseNumber;
+						second = houseName;
+					} else {
+						hname = houseName;
+						second = houseNumber;
 					}
+					if (hname == null) {
+						hname = second;
+						second = null;
+					}
+					String additionalHname = "";
+					if (DataExtractionSettings.getSettings().isAdditionalInfo() && second != null)
+						additionalHname = " - [" + second + "]";
+					
 					int i = hname.indexOf('-');
 					if (i != -1 && interpolation != null) {
 						building.setInterpolationInterval(1);
@@ -807,22 +834,22 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 					} else if ((street2 != null) && !street2.isEmpty()) {
 						int secondNumber = hname.indexOf('/');
 						if(secondNumber == -1 || !(secondNumber < hname.length() - 1)) {
-							building.setName(hname);
+							building.setName(hname + additionalHname);
 						} else {
-							building.setName(hname.substring(0, secondNumber));
+							building.setName(hname.substring(0, secondNumber) + additionalHname);
 							Building building2 = EntityParser.parseBuilding(e);
-							building2.setName(hname.substring(secondNumber + 1));
+							building2.setName(hname.substring(secondNumber + 1) + additionalHname);
 							Set<Long> ids2OfStreet = getStreetInCity(e.getIsInNames(), street2, null, l);
 							ids2OfStreet.removeAll(idsOfStreet); //remove duplicated entries!
 							if(!ids2OfStreet.isEmpty()) {
 								streetDAO.writeBuilding(ids2OfStreet, building2);
 							} else {
-								building.setName2(building2.getName());
+								building.setName2(building2.getName() + additionalHname);
 							}
 						}
 					}
 					else {
-						building.setName(hname);
+						building.setName(hname + additionalHname);
 					}
 					
 					streetDAO.writeBuilding(idsOfStreet, building);
