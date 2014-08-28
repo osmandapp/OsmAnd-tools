@@ -68,7 +68,8 @@ public class DataExtractionSettings {
 	public void saveStartLocation(double lat, double lon){
 		preferences.putDouble("start_lat",  lat);
 		preferences.putDouble("start_lon",  lon);
-	}us
+	}
+	
 	public void saveEndLocation(double lat, double lon){
 		preferences.putDouble("end_lat",  lat);
 		preferences.putDouble("end_lon",  lon);
