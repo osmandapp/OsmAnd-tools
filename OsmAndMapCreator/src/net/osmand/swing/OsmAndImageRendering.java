@@ -1,6 +1,7 @@
 package net.osmand.swing;
 
 import java.awt.image.BufferedImage;
+import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
@@ -8,6 +9,7 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.List;
@@ -37,13 +39,16 @@ import org.xmlpull.v1.XmlPullParserException;
 
 public class OsmAndImageRendering {
 
+	
 	private static String[] setupDefaultAttrs(String[] args) {
-		if (args.length < 4) {
-			args = new String[4];
-			/* String nativeLib */args[0] = "/home/victor/projects/osmand/repo/core/binaries/linux/amd64/";
-			/* String dirWithObf */args[1] = "/home/victor/projects/osmand/osm-gen";
-			/* String gpxFile */args[2] = "/home/victor/projects/osmand/repo/rendering-tests/Generate.gpx";
-			/* String outputFiles */args[3] = "/home/victor/projects/osmand/repo/rendering-tests/Generate/";
+		if (args.length < 1) {
+			args = new String[6];
+			args[0] = "-native=/home/victor/projects/osmand/repo/core/binaries/linux/amd64/";
+			args[1] = "-obfFiles=/home/victor/projects/osmand/osm-gen";
+			args[2] = "-gpxFile=/home/victor/projects/osmand/repo/rendering-tests/VictorTest.gpx";
+			args[3] = "-output=/home/victor/projects/osmand/repo/rendering-tests/Victor/";
+			args[4] = "-eyepiece=/home/victor/projects/osmand/temp/eyepiece-linux-clang-amd64-release";
+			args[5] = "-stylesPath=/home/victor/projects/osmand/repo/resources/rendering_styles/";
 		}
 		return args;
 	}
@@ -123,13 +128,30 @@ public class OsmAndImageRendering {
 	}
 	
 	public static void main(String[] args) throws IOException, XmlPullParserException, SAXException, ParserConfigurationException, TransformerException {
+		String nativeLib = null;
+		String eyepiece = null;
+		String dirWithObf = null;
+		String gpxFile = null;
+		String outputFiles = null;
+		String stylesPath = null;
 		args = setupDefaultAttrs(args);
-//		
-		String nativeLib = args[0];
-		String dirWithObf = args[1];
-		String gpxFile = args[2];
-		String outputFiles = args[3];
-		String backup = args.length > 4 ? args[4] : null;
+		for (String a : args) {
+			if (a.startsWith("-native=")) {
+				nativeLib = a.substring("-native=".length());
+			} else if (a.startsWith("-obfFiles=")) {
+				dirWithObf = a.substring("-obfFiles=".length());
+			} else if (a.startsWith("-gpxFile=")) {
+				gpxFile = a.substring("-gpxFile=".length());
+			} else if (a.startsWith("-output=")) {
+				outputFiles = a.substring("-output=".length());
+			} else if (a.startsWith("-eyepiece=")) {
+				eyepiece = a.substring("-eyepiece=".length());
+			} else if (a.startsWith("-stylesPath=")) {
+				stylesPath = a.substring("-stylesPath=".length());
+			}
+		}
+				
+		String backup = null;
 		boolean old = NativeLibrary.loadOldLib(nativeLib);
 		NativeLibrary.loadFontData("fonts");
 		if(!old) {
@@ -149,9 +171,13 @@ public class OsmAndImageRendering {
 		NodeList gen = doc.getElementsByTagName("html");
 		File gpx = new File(gpxFile);
 		HTMLContent html = null;
+		
 		if (gen.getLength() > 0) {
-			html = new HTMLContent(new File(gpx.getParentFile(), gpx.getName().substring(0, gpx.getName().length() - 4)
-					+ ".html"));
+			String outputFName = gpx.getName().substring(0, gpx.getName().length() - 4);
+			if(eyepiece != null) {
+				outputFName += "_eye";
+			}
+			html = new HTMLContent(new File(gpx.getParentFile(), outputFName  + ".html"));
 			StringWriter sw = new StringWriter();
 			TransformerFactory tf = TransformerFactory.newInstance();
 			Transformer transformer = tf.newTransformer();
@@ -182,24 +208,71 @@ public class OsmAndImageRendering {
             }
 			NativeSwingRendering nsr = new NativeSwingRendering(false);
 //			nsr.initFilesInDir(new File(dirWithObf));
-			initMaps(dirWithObf, backup, gpxFile, maps, nsr);
+			ArrayList<File> obfFiles = new ArrayList<File>();
+			initMaps(dirWithObf, backup, gpxFile, maps, nsr, obfFiles);
 			List<ImageCombination> ls = getCombinations(name, zooms, zoomScales, renderingNames, renderingProperties) ;
 			if(html != null) {
 				html.newRow(getSubAttr(e, "desc", ""));
 			}
 			for (ImageCombination ic : ls) {
-				nsr.loadRuleStorage(ic.renderingStyle, ic.renderingProperties);
 				System.out.println("Generate " + ic.generateName + " style " + ic.renderingStyle);
-				BufferedImage mg = nsr.renderImage(new RenderingImageContext(lat, lon, imageWidth, imageHeight,
-						ic.zoom, ic.zoomScale));
+				if (eyepiece != null) {
+					try {
+						String line = eyepiece;
+						double dx = ic.zoomScale + 1;
+						line += " -latLon=" + lat+";"+lon;
+						line += " -stylesPath="+stylesPath;
+						String styleName = ic.renderingStyle;
+						if(styleName.endsWith(".render.xml")) {
+							styleName = styleName.substring(0, styleName.length() - ".render.xml".length());
+						}
+						line += " -styleName="+styleName;
+						for(File f : obfFiles) {
+							line += " -obfFile="+f.getAbsolutePath();
+						}
+						String[] listProps = ic.renderingProperties.split(",");
+						for(String p : listProps) {
+							if(p.trim().length() > 0) {
+								line += " -styleSetting:"+p;
+							}
+						}
+//						line += " -useLegacyContext";
+						line += " -outputImageWidth=" + imageWidth;
+						line += " -outputImageHeight=" + imageHeight;
+						final String fileName = ic.generateName + ".png";
+						line += " -outputImageFilename=" + outputFiles + "/" + fileName;
+						line += " -referenceTileSize="+(int)(dx*256);
+						line += " -displayDensityFactor="+dx;
+						line += " -zoom="+ic.zoom;
+						line += " -outputImageFormat=png";
+						System.out.println(line);
+						Process p = Runtime.getRuntime().exec(line);
+						BufferedReader input = new BufferedReader(new InputStreamReader(p.getInputStream()));
+						while ((line = input.readLine()) != null) {
+							System.out.println(line);
+						}
+						input.close();
+						if (html != null) {
+							html.addFile(fileName);
+						}
+					} catch (Exception err) {
+						err.printStackTrace();
+					}
 
-				ImageWriter writer = ImageIO.getImageWritersBySuffix("png").next();
-				final String fileName = ic.generateName + ".png";
-				if(html != null) {
-					html.addFile(fileName);
+				} 
+				if(nativeLib != null){
+					nsr.loadRuleStorage(ic.renderingStyle, ic.renderingProperties);
+					BufferedImage mg = nsr.renderImage(new RenderingImageContext(lat, lon, imageWidth, imageHeight,
+							ic.zoom, ic.zoomScale));
+
+					ImageWriter writer = ImageIO.getImageWritersBySuffix("png").next();
+					final String fileName = ic.generateName + ".png";
+					if (html != null) {
+						html.addFile(fileName);
+					}
+					writer.setOutput(new FileImageOutputStream(new File(outputFiles, fileName)));
+					writer.write(mg);
 				}
-				writer.setOutput(new FileImageOutputStream(new File(outputFiles, fileName)));
-				writer.write(mg);
 			}
 		}
 		if(html != null) {
@@ -259,7 +332,8 @@ public class OsmAndImageRendering {
 		return name;
 	}
 
-	private static void initMaps(String dirWithObf, String backup, String gpxFile, String maps, NativeSwingRendering nsr)
+	private static void initMaps(String dirWithObf, String backup, String gpxFile, String maps, NativeSwingRendering nsr,
+			List<File> initFiles)
 			throws FileNotFoundException, IOException {
 		for(String map : maps.split(",")) {
 			map = map.trim();
@@ -300,6 +374,7 @@ public class OsmAndImageRendering {
 				}
 			}
 			nsr.initMapFile(targetFile.getAbsolutePath());
+			initFiles.add(targetFile);
 		}
 	}
 	

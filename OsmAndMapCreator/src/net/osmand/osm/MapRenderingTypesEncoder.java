@@ -304,7 +304,8 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		s *= 100;
 		v *= 100;
 
-		if ((h < 16 && s > 25 && v > 30) || (h > 326 && s > 25 && v > 30) || (h < 16 && s > 10 && s < 25 && v > 90) || (h > 326 && s > 10 && s < 25 && v > 90) || vl.equals("pink") || vl.equals("red") || vl.equals("red;white") || vl.equals("red/white") || vl.equals("white/red") || vl.equals("pink/white") || vl.equals("white-red") || vl.equals("ff0000") || vl.equals("800000") || vl.equals("red/tan") || vl.equals("tan/red") || vl.equals("rose")) {
+		if ((h < 16 && s > 25 && v > 30) || (h > 326 && s > 25 && v > 30) || (h < 16 && s > 10 && s < 25 && v > 90) || (h > 326 && s > 10 && s < 25 && v > 90) || 
+				vl.equals("pink") || vl.contains("red") || vl.equals("pink/white") || vl.equals("white-red") || vl.equals("ff0000") || vl.equals("800000") || vl.equals("red/tan") || vl.equals("tan/red") || vl.equals("rose")) {
 			vl = "red";
 		} else if ((h >= 16 && h < 50 && s > 25 && v > 20 && v < 60) || vl.equals("brown") || vl.equals("darkbrown") || vl.equals("tan/brown") || vl.equals("tan_brown") || vl.equals("brown/tan") || vl.equals("light_brown") || vl.equals("brown/white")) {
 			vl = palette6 ? "red" : "brown";
@@ -314,44 +315,102 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			vl = "yellow";
 		} else if ((h >= 74 && h < 150 && s > 30 && v > 77) || vl.equals("lightgreen") || vl.equals("lime") || vl.equals("seagreen") || vl.equals("00ff00") || vl.equals("yellow/green")) {
 			vl = palette6 ? "green" : "lightgreen";
-		} else if ((h >= 74 && h < 174 && s > 30 && v > 30 && v < 77) || vl.equals("green") || vl.equals("darkgreen") || vl.equals("natural") || vl.equals("natur") || vl.equals("mediumseagreen") || vl.equals("green/white") || vl.equals("white/green") || vl.equals("blue/yellow") || vl.equals("vert") || vl.equals("green/blue")) {
+		} else if ((h >= 74 && h < 174 && s > 30 && v > 30 && v < 77) || vl.contains("green") || vl.equals("darkgreen") || vl.equals("natural") || vl.equals("natur") || vl.equals("mediumseagreen") || vl.equals("green/white") || vl.equals("white/green") || vl.equals("blue/yellow") || vl.equals("vert") || vl.equals("green/blue")) {
 			vl = "green";
 		} else if ((h >= 174 && h < 215 && s > 15 && v > 50) || vl.equals("lightblue") || vl.equals("aqua") || vl.equals("cyan") || vl.equals("87ceeb") || vl.equals("turquoise")) {
 			vl = palette6 ? "blue" : "lightblue";
-		} else if ((h >= 215 && h < 239 && s > 40 && v > 30) || vl.equals("blue") || vl.equals("blue/white") || vl.equals("blue/tan") || vl.equals("0000ff") || vl.equals("teal") || vl.equals("darkblue") || vl.equals("blu") || vl.equals("navy")) {
+		} else if ((h >= 215 && h < 239 && s > 40 && v > 30) || vl.contains("blue") || vl.equals("0000ff") || vl.equals("teal") || vl.equals("darkblue") || vl.equals("blu") || vl.equals("navy")) {
 			vl = "blue";
 		} else if ((h >= 239 && h < 325 && s > 15 && v > 45) || (h > 250 && h < 325 && s > 10 && s < 25 && v > 90) || vl.equals("purple") || vl.equals("violet") || vl.equals("magenta") || vl.equals("maroon") || vl.equals("fuchsia") || vl.equals("800080")) {
 			vl = palette6 ? "blue" : "purple";
-		} else if ((color != -1 & v < 20) || vl.equals("black") || vl.equals("darkgrey")) {
+		} else if ((color != -1 & v < 20) || vl.contains("black") || vl.equals("darkgrey")) {
 			vl = "black";
 		} else if ((s < 5 && v > 30 && v < 90) || vl.equals("gray") || vl.equals("grey") || vl.equals("grey/tan") || vl.equals("silver") || vl.equals("srebrny") || vl.equals("lightgrey") || vl.equals("lightgray") || vl.equals("metal")) {
 			vl = palette6 ? "white" : "gray";
-		} else if ((s < 5 && v > 95) || vl.equals("white") || vl.equals("white/tan")) {
+		} else if ((s < 5 && v > 95) || vl.contains("white") /*|| vl.equals("white/tan")*/) {
 			vl = "white";
 		} else if (r != -1 && g != -1 && b != -1) {
 			vl = "gray";
 		}
 		return vl;
 	}
+	
+	final Set<String> barValues = new HashSet<String>(Arrays.asList(
+		new String[]{
+			"",
+			"bar",
+			"stripe",
+			"cross",
+			"x",
+			"slash",
+			"rectangle",
+			"fork",
+			"turned_t",
+			"l",
+			"lower",
+			"corner",
+			"backslash",
+			"wolfshook",
+			"rectangle_line",
+	}));
+	final java.util.Map<String, String> precolors = new java.util.HashMap<String, String>();
+	{
+            precolors.put("white_red_diamond","red");
+            precolors.put("black_red_diamond","red");
+            precolors.put("shell_modern","yellow");
+            precolors.put("shell","yellow");
+            precolors.put("wolfshook","white");
+            precolors.put("ammonit","white");
+            precolors.put("mine","white");
+            precolors.put("hiker","black");
+            precolors.put("heart","red");
+            precolors.put("tower","black");
+            precolors.put("bridleway","white");
+	}
 
 	public void addOSMCSymbolsSpecialTags(Map<MapRulType,String> propogated, Entry<String,String> ev) {
 		if ("osmc:symbol".equals(ev.getKey())) {
 			String[] tokens = ev.getValue().split(":", 6);
 			if (tokens.length > 0) {
-				String symbol_name = "osmc_symbol_" + formatColorToPalette(tokens[0], true);
-				MapRulType rt = getMapRuleType(symbol_name, "");
+				String wayColor = formatColorToPalette(tokens[0], true);
+				MapRulType rt = getMapRuleType("osmc_symbol_" + wayColor, "");
 				if(rt != null) {
-					propogated.put(rt, "");
-					if (tokens.length > 2 && rt.names != null) {
-						String symbol = "osmc_symbol_" + formatColorToPalette(tokens[1], true) + "_" + formatColorToPalette(tokens[2], true) + "_name";
-						String name = "\u00A0";
-						if (tokens.length > 3 && tokens[3].trim().length() > 0) {
-							name = tokens[3];
+					propogated.put(rt, wayColor);
+				}
+				rt = getMapRuleType("osmc_symbol", wayColor);
+				if(rt != null) {
+					propogated.put(rt, wayColor);
+				}
+				if(rt != null) {
+					if (tokens.length > 2) {
+						String bgColor = tokens[1];
+						String fgColor = tokens[2];
+						String shape = "";
+						if(precolors.containsKey(fgColor)) {
+							shape = fgColor;
+							fgColor = precolors.get(fgColor);
+						} else	if (fgColor.indexOf('_') >= 0) {
+							final int i = fgColor.indexOf('_');
+							shape = fgColor.substring(i + 1).toLowerCase();
+							fgColor = fgColor.substring(0, i);
 						}
-						for(int k = 0; k < rt.names.length; k++) {
-							if(rt.names[k].tagValuePattern.tag.equals(symbol)) {
-								propogated.put(rt.names[k], name);
-							}
+						String shpValue ="none";
+						if(shape.length() != 0) {
+							shpValue = barValues.contains(shape) ? "bar" : "circle";
+						}
+						MapRulType shp = getMapRuleType("osmc_shape", shpValue);
+						if (shp != null) {
+							propogated.put(shp, shpValue);
+						}
+						String symbol = "osmc_symbol_" + formatColorToPalette(bgColor, true) + "_" + fgColor + "_name";
+						String name = "."; //"\u00A0";
+//						if (tokens.length > 3 && tokens[3].trim().length() > 0) {
+//							name = tokens[3];
+//						}
+
+						MapRulType textRule = getMapRuleType(symbol, "");
+						if (textRule != null) {
+							propogated.put(textRule, name);
 						}
 					}
 				}

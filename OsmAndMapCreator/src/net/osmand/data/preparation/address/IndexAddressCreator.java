@@ -48,6 +48,7 @@ import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.osm.edit.OsmMapUtils;
 import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Way;
+import net.osmand.swing.DataExtractionSettings;
 import net.osmand.swing.Messages;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
@@ -82,7 +83,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 	private String[] normalizeSuffixes;
 	
 	//TODO make it an option
-	private boolean DEBUG_FULL_NAMES = false; //true to see atached cityPart and boundaries to the street names
+	private boolean DEBUG_FULL_NAMES = false; //true to see attached cityPart and boundaries to the street names
 	
 	private static final int ADDRESS_NAME_CHARACTERS_TO_INDEX = 4;
 	
@@ -464,12 +465,24 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 					Collection<Entity> houses = i.getMembers("house"); // both house and address roles can have address
 					houses.addAll(i.getMembers("address"));
 					for (Entity house : houses) {
-						String hname = house.getTag(OSMTagKey.ADDR_HOUSE_NAME);
-						if(hname == null) {
+						String hname = null;
+						String second = null;
+						
+						if (DataExtractionSettings.getSettings().isHousenumberPrefered()) {
 							hname = house.getTag(OSMTagKey.ADDR_HOUSE_NUMBER);
+							second = house.getTag(OSMTagKey.ADDR_HOUSE_NAME);
+						} else {
+							hname = house.getTag(OSMTagKey.ADDR_HOUSE_NAME);
+							second = house.getTag(OSMTagKey.ADDR_HOUSE_NUMBER);
+						}
+						if (hname == null) {
+							hname = second;
+							second = null;
 						}
 						if (hname == null)
 							continue;
+						if (DataExtractionSettings.getSettings().isAdditionalInfo() && second != null)
+							hname += " - [" + second + "]";
 						
 						if (!streetDAO.findBuilding(house)) {
 							// process multipolygon (relation) houses - preload members to create building with correct latlon
@@ -787,10 +800,24 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 				Set<Long> idsOfStreet = getStreetInCity(e.getIsInNames(), street, null, l);
 				if (!idsOfStreet.isEmpty()) {
 					Building building = EntityParser.parseBuilding(e);
-					String hname = houseName;
-					if(hname == null) {
+					String hname = null;
+					String second = null;
+					
+					if (DataExtractionSettings.getSettings().isHousenumberPrefered()) {
 						hname = houseNumber;
+						second = houseName;
+					} else {
+						hname = houseName;
+						second = houseNumber;
 					}
+					if (hname == null) {
+						hname = second;
+						second = null;
+					}
+					String additionalHname = "";
+					if (DataExtractionSettings.getSettings().isAdditionalInfo() && second != null)
+						additionalHname = " - [" + second + "]";
+					
 					int i = hname.indexOf('-');
 					if (i != -1 && interpolation != null) {
 						building.setInterpolationInterval(1);
@@ -807,22 +834,22 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 					} else if ((street2 != null) && !street2.isEmpty()) {
 						int secondNumber = hname.indexOf('/');
 						if(secondNumber == -1 || !(secondNumber < hname.length() - 1)) {
-							building.setName(hname);
+							building.setName(hname + additionalHname);
 						} else {
-							building.setName(hname.substring(0, secondNumber));
+							building.setName(hname.substring(0, secondNumber) + additionalHname);
 							Building building2 = EntityParser.parseBuilding(e);
-							building2.setName(hname.substring(secondNumber + 1));
+							building2.setName(hname.substring(secondNumber + 1) + additionalHname);
 							Set<Long> ids2OfStreet = getStreetInCity(e.getIsInNames(), street2, null, l);
 							ids2OfStreet.removeAll(idsOfStreet); //remove duplicated entries!
 							if(!ids2OfStreet.isEmpty()) {
 								streetDAO.writeBuilding(ids2OfStreet, building2);
 							} else {
-								building.setName2(building2.getName());
+								building.setName2(building2.getName() + additionalHname);
 							}
 						}
 					}
 					else {
-						building.setName(hname);
+						building.setName(hname + additionalHname);
 					}
 					
 					streetDAO.writeBuilding(idsOfStreet, building);
@@ -928,7 +955,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 				"SELECT A.id, A.name, A.name_en, A.latitude, A.longitude, "+ //$NON-NLS-1$
 				"B.id, B.name, B.name_en, B.latitude, B.longitude, B.postcode, A.cityPart, "+ //$NON-NLS-1$
 				" B.name2, B.name_en2, B.lat2, B.lon2, B.interval, B.interpolateType, A.cityPart == C.name as MainTown " +
-				"FROM street A left JOIN building B ON B.street = A.id JOIN city C ON A.city = C.id " + //$NON-NLS-1$
+				"FROM street A LEFT JOIN building B ON B.street = A.id JOIN city C ON A.city = C.id " + //$NON-NLS-1$
 				"WHERE A.city = ? ORDER BY MainTown DESC, A.name ASC"); //$NON-NLS-1$
 		PreparedStatement waynodesStat =
 			 mapConnection.prepareStatement("SELECT A.id, A.latitude, A.longitude FROM street_node A WHERE A.street = ? "); //$NON-NLS-1$
@@ -1048,7 +1075,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 			List<City> listSuburbs = null;
 			if (suburbs != null) {
 				for (City suburb : suburbs) {
-					if (suburb.getIsInValue().contains(city.getName().toLowerCase())) {
+					if (suburb.getIsInValue().toLowerCase().contains(city.getName().toLowerCase())) {
 						if (listSuburbs == null) {
 							listSuburbs = new ArrayList<City>();
 						}
