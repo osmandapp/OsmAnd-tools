@@ -392,7 +392,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 							shape = fgColor.substring(i + 1).toLowerCase();
 							fgColor = fgColor.substring(0, i);
 						}
-						String shpValue ="default";
+						String shpValue ="none";
 						if(shape.length() != 0) {
 							shpValue = barValues.contains(shape) ? "bar" : "circle";
 						}
