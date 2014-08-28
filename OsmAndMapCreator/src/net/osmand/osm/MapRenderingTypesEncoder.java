@@ -355,6 +355,8 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	}));
 	final java.util.Map<String, String> precolors = new java.util.HashMap<String, String>();
 	{
+            precolors.put("white_red_diamond","red");
+            precolors.put("black_red_diamond","red");
             precolors.put("shell_modern","yellow");
             precolors.put("shell","yellow");
             precolors.put("wolfshook","white");
