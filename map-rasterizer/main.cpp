@@ -80,4 +80,7 @@ void printUsage(const std::string& warning /*= std::string()*/)
     tcout << xT("\t[-outputImageFormat=png|jpeg]") << std::endl;
     tcout << xT("\t[-locale=en]") << std::endl;
     tcout << xT("\t[-verbose]") << std::endl;
+#if defined(OSMAND_TARGET_OS_linux)
+    tcout << xT("\t[-useLegacyContext]") << std::endl;
+#endif
 }

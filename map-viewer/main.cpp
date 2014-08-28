@@ -96,6 +96,7 @@ QString styleName = "default";
 
 #if defined(WIN32)
 const bool useGpuWorker = true;
+//const bool useGpuWorker = false;
 #else
 const bool useGpuWorker = false;
 #endif
