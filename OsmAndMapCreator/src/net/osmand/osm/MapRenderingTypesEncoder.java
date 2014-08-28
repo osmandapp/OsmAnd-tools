@@ -380,17 +380,21 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 					propogated.put(rt, wayColor);
 				}
 				if(rt != null) {
-					if (tokens.length > 2) {
+					if (tokens.length > 1) {
 						String bgColor = tokens[1];
-						String fgColor = tokens[2];
+						String fgColorPrefix = "";
 						String shape = "";
-						if(precolors.containsKey(fgColor)) {
-							shape = fgColor;
-							fgColor = precolors.get(fgColor);
-						} else	if (fgColor.indexOf('_') >= 0) {
-							final int i = fgColor.indexOf('_');
-							shape = fgColor.substring(i + 1).toLowerCase();
-							fgColor = fgColor.substring(0, i);
+						if (tokens.length > 1) {
+							String fgColor = tokens[2];
+							if (precolors.containsKey(fgColor)) {
+								shape = fgColor;
+								fgColor = precolors.get(fgColor);
+							} else if (fgColor.indexOf('_') >= 0) {
+								final int i = fgColor.indexOf('_');
+								shape = fgColor.substring(i + 1).toLowerCase();
+								fgColor = fgColor.substring(0, i);
+							}
+							fgColorPrefix = "_" + fgColor;
 						}
 						String shpValue ="default";
 						if(shape.length() != 0) {
@@ -400,7 +404,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 						if (shp != null) {
 							propogated.put(shp, shpValue);
 						}
-						String symbol = "osmc_symbol_" + formatColorToPalette(bgColor, true) + "_" + fgColor + "_name";
+						String symbol = "osmc_symbol_" + formatColorToPalette(bgColor, true) +  fgColorPrefix + "_name";
 						String name = "."; //"\u00A0";
 //						if (tokens.length > 3 && tokens[3].trim().length() > 0) {
 //							name = tokens[3];
