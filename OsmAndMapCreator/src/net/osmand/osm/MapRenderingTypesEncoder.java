@@ -390,7 +390,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 						String bgColor = tokens[1];
 						String fgColorPrefix = "";
 						String shape = "";
-						if (tokens.length > 1) {
+						if (tokens.length > 2) {
 							String fgColor = tokens[2];
 							if (precolors.containsKey(fgColor)) {
 								shape = fgColor;
