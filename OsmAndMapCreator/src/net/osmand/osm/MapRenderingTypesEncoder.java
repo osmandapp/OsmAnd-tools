@@ -56,6 +56,10 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	public Map<MapRulType, String> getRelationPropogatedTags(Relation relation) {
 		Map<MapRulType, String> propogated = new LinkedHashMap<MapRulType, String>();
 		Map<String, String> ts = relation.getTags();
+		if(ts.containsKey("osmc:symbol")) {
+			ts = new HashMap<String, String>(ts);
+			ts.put("route", "hiking");
+		}
 		Iterator<Entry<String, String>> its = ts.entrySet().iterator();
 		while(its.hasNext()) {
 			Entry<String, String> ev = its.next();
