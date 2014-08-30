@@ -67,5 +67,6 @@ download hi Hindi;
 download hu Hungarian;
 download te Telugu;
 download ht Haitian;
+download sc Sardinian;
 
 
