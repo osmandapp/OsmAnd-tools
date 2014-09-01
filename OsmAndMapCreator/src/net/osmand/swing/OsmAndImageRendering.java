@@ -133,7 +133,7 @@ public class OsmAndImageRendering {
 		String nativeLib = null;
 		String eyepiece = null;
 		String dirWithObf = null;
-		String websiteUrl = null;
+		String websiteUrl = "";
 		String gpxFile = null;
 		String outputFiles = null;
 		String stylesPath = null;
