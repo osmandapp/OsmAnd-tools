@@ -78,10 +78,12 @@ public class OsmAndImageRendering {
 		private String rowheader;
 		private String rowfooter;
 		private String rowContent;
+		private String webSiteUrl;
 		
 
-		public HTMLContent(File file) {
+		public HTMLContent(File file, String webSite) {
 			this.file = file;
+			this.webSiteUrl = webSite;
 		}
 		
 		public void addFile(String file) {
@@ -101,7 +103,7 @@ public class OsmAndImageRendering {
 				List<String> fs = files.get(i);
 				w.write(rowheader.replace("$DESCRIPTION", desc));
 				for(String f : fs) {
-					w.write(rowContent.replace("$FILENAME", f));
+					w.write(rowContent.replace("$FILENAME", f).replace("$PWD", webSiteUrl));
 				}
 				w.write(rowfooter.replace("$DESCRIPTION", desc));
 			}
@@ -131,6 +133,7 @@ public class OsmAndImageRendering {
 		String nativeLib = null;
 		String eyepiece = null;
 		String dirWithObf = null;
+		String websiteUrl = null;
 		String gpxFile = null;
 		String outputFiles = null;
 		String stylesPath = null;
@@ -138,6 +141,9 @@ public class OsmAndImageRendering {
 		for (String a : args) {
 			if (a.startsWith("-native=")) {
 				nativeLib = a.substring("-native=".length());
+			} else if (a.startsWith("-websiteUrl=")) {
+				// https://jenkins.osmand.net/job/OsmAndTestRendering/ws/rendering-tests/
+				websiteUrl = a.substring("-websiteUrl=".length());
 			} else if (a.startsWith("-obfFiles=")) {
 				dirWithObf = a.substring("-obfFiles=".length());
 			} else if (a.startsWith("-gpxFile=")) {
@@ -175,11 +181,12 @@ public class OsmAndImageRendering {
 		HTMLContent html = null;
 		
 		if (gen.getLength() > 0) {
-			String outputFName = gpx.getName().substring(0, gpx.getName().length() - 4);
+			String gpxName = gpx.getName().substring(0, gpx.getName().length() - 4);
+			String outputFName = gpxName;
 			if(eyepiece != null) {
 				outputFName += "_eye";
 			}
-			html = new HTMLContent(new File(gpx.getParentFile(), outputFName  + ".html"));
+			html = new HTMLContent(new File(gpx.getParentFile(), outputFName  + ".html"), websiteUrl+ gpxName);
 			StringWriter sw = new StringWriter();
 			TransformerFactory tf = TransformerFactory.newInstance();
 			Transformer transformer = tf.newTransformer();
