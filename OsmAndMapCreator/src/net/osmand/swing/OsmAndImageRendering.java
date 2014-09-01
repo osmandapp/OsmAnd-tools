@@ -152,7 +152,7 @@ public class OsmAndImageRendering {
 		}
 				
 		String backup = null;
-		if (eyepiece == null) {
+		if (nativeLib != null) {
 			boolean old = NativeLibrary.loadOldLib(nativeLib);
 			NativeLibrary.loadFontData("fonts");
 			if (!old) {
@@ -208,7 +208,7 @@ public class OsmAndImageRendering {
 			if(maps.isEmpty()) {
                 throw new UnsupportedOperationException("No maps element found for wpt "+ name);
             }
-			NativeSwingRendering nsr = new NativeSwingRendering(false);
+			NativeSwingRendering nsr = nativeLib != null ? new NativeSwingRendering(false) : null;
 //			nsr.initFilesInDir(new File(dirWithObf));
 			ArrayList<File> obfFiles = new ArrayList<File>();
 			initMaps(dirWithObf, backup, gpxFile, maps, nsr, obfFiles);
@@ -375,7 +375,9 @@ public class OsmAndImageRendering {
 					targetFile.setLastModified(sourceZip.lastModified());
 				}
 			}
-			nsr.initMapFile(targetFile.getAbsolutePath());
+			if(nsr != null) {
+				nsr.initMapFile(targetFile.getAbsolutePath());
+			}
 			initFiles.add(targetFile);
 		}
 	}
