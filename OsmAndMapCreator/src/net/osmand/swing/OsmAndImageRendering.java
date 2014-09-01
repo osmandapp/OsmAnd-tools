@@ -152,10 +152,12 @@ public class OsmAndImageRendering {
 		}
 				
 		String backup = null;
-		boolean old = NativeLibrary.loadOldLib(nativeLib);
-		NativeLibrary.loadFontData("fonts");
-		if(!old) {
-			throw new UnsupportedOperationException("Not supported"); 
+		if (eyepiece == null) {
+			boolean old = NativeLibrary.loadOldLib(nativeLib);
+			NativeLibrary.loadFontData("fonts");
+			if (!old) {
+				throw new UnsupportedOperationException("Not supported");
+			}
 		}
 		DocumentBuilder docBuilder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
 		org.w3c.dom.Document doc = docBuilder.parse(new File(gpxFile));
