@@ -56,6 +56,10 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	public Map<MapRulType, String> getRelationPropogatedTags(Relation relation) {
 		Map<MapRulType, String> propogated = new LinkedHashMap<MapRulType, String>();
 		Map<String, String> ts = relation.getTags();
+		if(ts.containsKey("osmc:symbol")) {
+			ts = new HashMap<String, String>(ts);
+			ts.put("route", "hiking");
+		}
 		Iterator<Entry<String, String>> its = ts.entrySet().iterator();
 		while(its.hasNext()) {
 			Entry<String, String> ev = its.next();
@@ -167,7 +171,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		outTypes.clear();
 		outAddTypes.clear();
 		namesToEncode.clear();
-		boolean area = "yes".equals(tags.get("area")) || "true".equals(tags.get("area")) || tags.containsKey("area:highway");
+		boolean area = "yes".equals(tags.get("area")) || "true".equals(tags.get("area")) || tags.containsKey("area:highway") || "pedestrian".equals(tags.get("landuse"));
 		if(tags.containsKey("color")) {
 			prepareColorTag(tags, "color");
 		}
@@ -386,7 +390,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 						String bgColor = tokens[1];
 						String fgColorPrefix = "";
 						String shape = "";
-						if (tokens.length > 1) {
+						if (tokens.length > 2) {
 							String fgColor = tokens[2];
 							if (precolors.containsKey(fgColor)) {
 								shape = fgColor;
