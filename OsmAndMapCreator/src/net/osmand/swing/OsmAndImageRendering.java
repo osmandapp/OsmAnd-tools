@@ -184,7 +184,7 @@ public class OsmAndImageRendering {
 			String gpxName = gpx.getName().substring(0, gpx.getName().length() - 4);
 			String outputFName = gpxName;
 			if(eyepiece != null) {
-				outputFName += "_eye";
+			//	outputFName += "_eye";
 			}
 			html = new HTMLContent(new File(gpx.getParentFile(), outputFName  + ".html"), websiteUrl+ gpxName);
 			StringWriter sw = new StringWriter();
