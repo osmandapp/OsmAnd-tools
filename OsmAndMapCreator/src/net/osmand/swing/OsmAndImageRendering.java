@@ -254,6 +254,7 @@ public class OsmAndImageRendering {
 						line += " -displayDensityFactor="+dx;
 						line += " -zoom="+ic.zoom;
 						line += " -outputImageFormat=png";
+						line += " -verbose";
 						System.out.println(line);
 						Process p = Runtime.getRuntime().exec(line);
 						BufferedReader input = new BufferedReader(new InputStreamReader(p.getInputStream()));
