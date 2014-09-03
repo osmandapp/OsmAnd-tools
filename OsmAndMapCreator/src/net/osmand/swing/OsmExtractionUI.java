@@ -249,6 +249,9 @@ public class OsmExtractionUI implements IMapLocationListener {
 		String genFile = DataExtractionSettings.getSettings().getRenderGenXmlPath();
 		String templateFile = DataExtractionSettings.getSettings().getRenderXmlPath();
 		String targetFile = templateFile;
+		if(genFile.equals("") && templateFile.contains("_template")) {
+			genFile = templateFile.replace("_template", "");
+		}
 		if(!genFile.equals("")) {
 			try {
 				RenderingRulesTransformer.main(new String[]{templateFile, genFile});
