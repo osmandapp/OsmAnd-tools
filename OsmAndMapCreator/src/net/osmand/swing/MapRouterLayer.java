@@ -784,8 +784,8 @@ public class MapRouterLayer implements MapPanelLayer {
 					if(all > 0 ) {
 						int  t = (int) (p*p/(all*all)* 100.0f);
 //								int  t = (int) (p/all*100f);
-						System.out.println("Progress " + t + " % " + 
-						ctx.calculationProgress.distanceFromBegin + " " + ctx.calculationProgress.distanceFromEnd+" " + all);
+//						System.out.println("Progress " + t + " % " + 
+//								ctx.calculationProgress.distanceFromBegin + " " + ctx.calculationProgress.distanceFromEnd+" " + all);
 					}
 					try {
 						sleep(100);

@@ -48,6 +48,7 @@ import net.osmand.osm.io.IOsmStorageFilter;
 import net.osmand.osm.io.OsmBaseStorage;
 import net.osmand.osm.io.OsmBoundsFilter;
 import net.osmand.osm.io.OsmStorageWriter;
+import net.osmand.render.RenderingRulesTransformer;
 import net.osmand.router.RouteResultPreparation;
 import net.osmand.swing.MapPanel.MapSelectionArea;
 
@@ -245,11 +246,22 @@ public class OsmExtractionUI implements IMapLocationListener {
 	}
 	
 	private void initNativeRendering(String renderingProperties) {
+		String genFile = DataExtractionSettings.getSettings().getRenderGenXmlPath();
+		String templateFile = DataExtractionSettings.getSettings().getRenderXmlPath();
+		String targetFile = templateFile;
+		if(!genFile.equals("")) {
+			try {
+				RenderingRulesTransformer.main(new String[]{templateFile, genFile});
+			} catch (Exception e) {
+				throw new RuntimeException(e.getMessage());
+			}
+			targetFile = genFile;
+		}
 		NativeSwingRendering lib = NativeSwingRendering.getDefaultFromSettings();
 		if (lib != null) {
 			try {
 				lib.initFilesInDir(new File(DataExtractionSettings.getSettings().getBinaryFilesDir()));
-				lib.loadRuleStorage(DataExtractionSettings.getSettings().getRenderXmlPath(), renderingProperties);
+				lib.loadRuleStorage(targetFile, renderingProperties);
 				mapPanel.setNativeLibrary(lib);
 				mapPanel.repaint();
 			} catch (SAXException e) {

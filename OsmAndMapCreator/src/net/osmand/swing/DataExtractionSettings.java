@@ -188,6 +188,14 @@ public class DataExtractionSettings {
 		preferences.put("renderXmlPath", file);
 	}
 	
+	public String getRenderGenXmlPath(){
+		return preferences.get("renderGenXmlPath", "");
+	}
+	
+	public void setRenderGenXmlPath(String path){
+		preferences.put("renderGenXmlPath", path);
+	}
+	
 	public String getRoutingXmlPath(){
 		return preferences.get("routingXmlPath", "routing.xml");
 	}

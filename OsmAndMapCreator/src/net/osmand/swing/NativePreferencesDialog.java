@@ -27,6 +27,7 @@ public class NativePreferencesDialog extends JDialog {
 
 	private JTextField nativeFilesDirectory;
 	private JTextField renderingStyleFile;
+	private JTextField renderingGenStyleFile;
 	private boolean okPressed;
 
 	private JTextField renderingPropertiesTxt;
@@ -99,48 +100,40 @@ public class NativePreferencesDialog extends JDialog {
 		l.setConstraints(nativeFilesDirectory, constr);
 		
         
-        label = new JLabel("Rendering style file : ");
-        panel.add(label);
-        constr = new GridBagConstraints();
-        constr.ipadx = 5;
-        constr.gridx = 0;
-        constr.gridy = 3;
-        constr.anchor = GridBagConstraints.WEST;
-        l.setConstraints(label, constr);
-        
-        renderingStyleFile = new JTextField();
-        renderingStyleFile.setText(DataExtractionSettings.getSettings().getRenderXmlPath());
-        panel.add(renderingStyleFile);
-        constr = new GridBagConstraints();
-        constr.weightx = 1;
-        constr.fill = GridBagConstraints.HORIZONTAL;
-        constr.ipadx = 5;
-        constr.gridx = 1;
-        constr.gridy = 3;
-        l.setConstraints(renderingStyleFile, constr);
-        
-        label = new JLabel("Rendering properties : ");
-        panel.add(label);
-        constr = new GridBagConstraints();
-        constr.ipadx = 5;
-        constr.gridx = 0;
-        constr.gridy = 4;
-        constr.anchor = GridBagConstraints.WEST;
-        l.setConstraints(label, constr);
-        
-        renderingPropertiesTxt = new JTextField();
-        renderingPropertiesTxt.setText(DataExtractionSettings.getSettings().getRenderingProperties());
-        panel.add(renderingPropertiesTxt);
-        constr = new GridBagConstraints();
-        constr.weightx = 1;
-        constr.fill = GridBagConstraints.HORIZONTAL;
-        constr.ipadx = 5;
-        constr.gridx = 1;
-        constr.gridy = 4;
-        l.setConstraints(renderingPropertiesTxt, constr);
+		renderingStyleFile = addTextField(panel, l, "Rendering style file : ", 
+				3, DataExtractionSettings.getSettings().getRenderXmlPath());
+		renderingGenStyleFile = addTextField(panel, l, "Rendering gen file: ", 
+				4, DataExtractionSettings.getSettings().getRenderGenXmlPath());
+		renderingPropertiesTxt = addTextField(panel, l, "Rendering properties : ", 
+				5, DataExtractionSettings.getSettings().getRenderingProperties());
 		
 		panel.setMaximumSize(new Dimension(Short.MAX_VALUE, panel.getPreferredSize().height));
 		
+	}
+
+	protected JTextField addTextField(JPanel panel, GridBagLayout l, String labelText, int rowId, String value) {
+		JLabel label;
+		GridBagConstraints constr;
+		label = new JLabel(labelText);
+        panel.add(label);
+        constr = new GridBagConstraints();
+        constr.ipadx = 5;
+        constr.gridx = 0;
+        constr.gridy = rowId;
+        constr.anchor = GridBagConstraints.WEST;
+        l.setConstraints(label, constr);
+        
+        JTextField textField = new JTextField();
+        textField.setText(value);
+        panel.add(textField);
+        constr = new GridBagConstraints();
+        constr.weightx = 1;
+        constr.fill = GridBagConstraints.HORIZONTAL;
+        constr.ipadx = 5;
+        constr.gridx = 1;
+        constr.gridy = rowId;
+        l.setConstraints(textField, constr);
+        return textField;
 	}
 
 
@@ -175,6 +168,10 @@ public class NativePreferencesDialog extends JDialog {
 		
 		if(!settings.getRenderXmlPath().equals(renderingStyleFile.getText())){
 			settings.setRenderXmlPath(renderingStyleFile.getText());
+		}
+		
+		if(!settings.getRenderGenXmlPath().equals(renderingGenStyleFile.getText())){
+			settings.setRenderGenXmlPath(renderingGenStyleFile.getText());
 		}
 		
 	}
