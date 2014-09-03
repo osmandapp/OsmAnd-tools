@@ -45,7 +45,7 @@ public class NativePreferencesDialog extends JDialog {
     }
 	
 	public void showDialog(){
-		setSize(700, 500);
+		setSize(800, 700);
         double x = getParent().getBounds().getCenterX();
         double y = getParent().getBounds().getCenterY();
         setLocation((int) x - getWidth() / 2, (int) y - getHeight() / 2);
