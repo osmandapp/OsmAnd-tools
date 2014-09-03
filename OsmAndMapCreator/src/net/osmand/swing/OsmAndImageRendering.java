@@ -184,7 +184,7 @@ public class OsmAndImageRendering {
 			String gpxName = gpx.getName().substring(0, gpx.getName().length() - 4);
 			String outputFName = gpxName;
 			if(eyepiece != null) {
-				outputFName += "_eye";
+			//	outputFName += "_eye";
 			}
 			html = new HTMLContent(new File(gpx.getParentFile(), outputFName  + ".html"), websiteUrl+ gpxName);
 			StringWriter sw = new StringWriter();
@@ -230,14 +230,14 @@ public class OsmAndImageRendering {
 						String line = eyepiece;
 						double dx = ic.zoomScale + 1;
 						line += " -latLon=" + lat+";"+lon;
-						line += " -stylesPath="+stylesPath;
+						line += " -stylesPath=\""+stylesPath+"\"";
 						String styleName = ic.renderingStyle;
 						if(styleName.endsWith(".render.xml")) {
 							styleName = styleName.substring(0, styleName.length() - ".render.xml".length());
 						}
 						line += " -styleName="+styleName;
 						for(File f : obfFiles) {
-							line += " -obfFile="+f.getAbsolutePath();
+							line += " -obfFile=\""+f.getAbsolutePath()+"\"";
 						}
 						String[] listProps = ic.renderingProperties.split(",");
 						for(String p : listProps) {
@@ -249,11 +249,12 @@ public class OsmAndImageRendering {
 						line += " -outputImageWidth=" + imageWidth;
 						line += " -outputImageHeight=" + imageHeight;
 						final String fileName = ic.generateName + ".png";
-						line += " -outputImageFilename=" + outputFiles + "/" + fileName;
+						line += " -outputImageFilename=\"" + outputFiles + "/" + fileName+"\"";
 						line += " -referenceTileSize="+(int)(dx*256);
 						line += " -displayDensityFactor="+dx;
 						line += " -zoom="+ic.zoom;
 						line += " -outputImageFormat=png";
+						line += " -verbose";
 						System.out.println(line);
 						Process p = Runtime.getRuntime().exec(line);
 						BufferedReader input = new BufferedReader(new InputStreamReader(p.getInputStream()));
