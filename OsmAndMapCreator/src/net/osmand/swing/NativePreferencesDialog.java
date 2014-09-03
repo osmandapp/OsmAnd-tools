@@ -45,7 +45,7 @@ public class NativePreferencesDialog extends JDialog {
     }
 	
 	public void showDialog(){
-		setSize(700, 380);
+		setSize(700, 500);
         double x = getParent().getBounds().getCenterX();
         double y = getParent().getBounds().getCenterY();
         setLocation((int) x - getWidth() / 2, (int) y - getHeight() / 2);
@@ -134,7 +134,7 @@ public class NativePreferencesDialog extends JDialog {
         check.setSelected(value);
         panel.add(check);
         constr = new GridBagConstraints();
-        constr.weightx = 1;
+        constr.weightx = 0;
         constr.fill = GridBagConstraints.HORIZONTAL;
         constr.ipadx = 5;
         constr.gridx = 0;
