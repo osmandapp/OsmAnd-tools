@@ -23,7 +23,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 
 import net.osmand.IProgress;
 import net.osmand.binary.OsmandOdb.MapData;
@@ -120,7 +122,8 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 						Entry<MapRulType, String> es = it.next();
 						String key = es.getKey().getTag();
 						if(es.getKey().isText() && map.containsKey(key)) {
-							map.put(key, map.get(key) + ", " +  es.getValue());
+							String res = sortAndAttachUniqueValue(map.get(key), es.getValue());
+							map.put(key, res);
 						} else {
 							map.put(key, es.getValue());
 						}
@@ -128,6 +131,36 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 				}
 			}
 		}
+	}
+
+	private String sortAndAttachUniqueValue(String list, String value) {
+		String[] ls = list.split(",");
+		Set<String> set = new TreeSet<String>(new Comparator<String>() {
+
+			@Override
+			public int compare(String s1, String s2) {
+				int i1 = Algorithms.extractFirstIntegerNumber(s1);
+				int i2 = Algorithms.extractFirstIntegerNumber(s2);
+				if(i1 == i2) {
+					String t1 = Algorithms.extractIntegerSuffix(s1);
+					String t2 = Algorithms.extractIntegerSuffix(s2);
+					return t1.compareTo(t2);
+				}
+				return i1 - i2;
+			}
+		});
+		set.add(value);
+		for(String l : ls) {
+			set.add(l.trim());
+		}
+		String r = "";
+		for(String a : set) {
+			if(r.length() > 0) {
+				r += ", ";
+			}
+			r+= a;
+		}
+		return r;
 	}
 
 	/**
