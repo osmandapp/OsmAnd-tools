@@ -24,6 +24,6 @@ if (CMAKE_STATIC_LIBS_ALLOWED_ON_TARGET)
 	)
 	target_link_libraries(inspector_standalone
 		OsmAndCoreTools_static
-		${CMAKE_WHOLE_ARCHIVE_PREFIX}OsmAndCore_ResourcesBundle_static${CMAKE_WHOLE_ARCHIVE_SUFFIX}
 	)
+	link_entire_static_library(inspector_standalone OsmAndCore_ResourcesBundle_static)
 endif()

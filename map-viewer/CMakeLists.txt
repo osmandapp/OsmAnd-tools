@@ -46,7 +46,7 @@ if (CMAKE_STATIC_LIBS_ALLOWED_ON_TARGET)
 	)
 	target_link_libraries(bird_standalone
 		OsmAndCore_static
-		${CMAKE_WHOLE_ARCHIVE_PREFIX}OsmAndCore_ResourcesBundle_static${CMAKE_WHOLE_ARCHIVE_SUFFIX}
 		${extra_libraries}
 	)
+	link_entire_static_library(bird_standalone OsmAndCore_ResourcesBundle_static)
 endif()
