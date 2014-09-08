@@ -128,9 +128,9 @@ int main(int argc, char** argv)
     //////////////////////////////////////////////////////////////////////////
     std::shared_ptr<OsmAnd::CoreResourcesEmbeddedBundle> coreResourcesEmbeddedBundle;
 #if defined(OSMAND_CORE_STATIC)
-    coreResourcesEmbeddedBundle.reset(new OsmAnd::CoreResourcesEmbeddedBundle());
+    coreResourcesEmbeddedBundle = OsmAnd::CoreResourcesEmbeddedBundle::loadFromCurrentExecutable();
 #else
-    coreResourcesEmbeddedBundle.reset(new OsmAnd::CoreResourcesEmbeddedBundle(QLatin1String("OsmAndCore_ResourcesBundle_shared")));
+    coreResourcesEmbeddedBundle = OsmAnd::CoreResourcesEmbeddedBundle::loadFromLibrary(QLatin1String("OsmAndCore_ResourcesBundle_shared"));
 #endif // defined(OSMAND_CORE_STATIC)
     OsmAnd::InitializeCore(coreResourcesEmbeddedBundle);
 
