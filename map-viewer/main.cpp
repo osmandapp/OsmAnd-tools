@@ -126,7 +126,7 @@ OsmAnd::PointI lastClickedLocation31;
 int main(int argc, char** argv)
 {
     //////////////////////////////////////////////////////////////////////////
-    std::shared_ptr<OsmAnd::CoreResourcesEmbeddedBundle> coreResourcesEmbeddedBundle;
+    std::shared_ptr<const OsmAnd::CoreResourcesEmbeddedBundle> coreResourcesEmbeddedBundle;
 #if defined(OSMAND_CORE_STATIC)
     coreResourcesEmbeddedBundle = OsmAnd::CoreResourcesEmbeddedBundle::loadFromCurrentExecutable();
 #else
