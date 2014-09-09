@@ -75,7 +75,7 @@ public class MapInformationLayer implements MapPanelLayer {
 				if(folder.equals("")){
 					folder = new File("lib-gl").getAbsolutePath();
 				}
-				QtCorePanel.loadNative(DataExtractionSettings.getSettings().getQtLibFolder());
+				QtCorePanel.loadNative(folder);
 				MapPanel mp = MapInformationLayer.this.map;
 				final QtCorePanel sample = new QtCorePanel(new LatLon(mp.getLatitude(), mp.getLongitude()), mp
 							.getZoom());
