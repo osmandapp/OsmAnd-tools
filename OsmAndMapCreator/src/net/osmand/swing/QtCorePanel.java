@@ -43,6 +43,7 @@ public class QtCorePanel implements GLEventListener {
 	private static CoreResourcesEmbeddedBundle coreResourcesEmbeddedBundle;
 	public static Boolean loaded = null;
 	private static String OS = System.getProperty("os.name").toLowerCase();
+
 	public static boolean isWindows() {
 		return (OS.indexOf("win") >= 0);
 	}
@@ -74,38 +75,13 @@ public class QtCorePanel implements GLEventListener {
 
 	}
 
-	public static void main(String[] args) {
-		// load QT
-		// System.load("/home/victor/temp/test/libOsmAndCore_shared.so");
-		// System.load("/home/victor/temp/test/libOsmAndCoreJNI.so");
-		String nativePath = "/home/victor/temp/test/";
-		if(args.length > 0){
-			nativePath = args[0];
-		}
-		loadNative(nativePath);
-		final QtCorePanel sample = new QtCorePanel(DataExtractionSettings.getSettings().getDefaultLocation(),
-				DataExtractionSettings.getSettings().getDefaultZoom());
-		Frame frame = sample.showFrame(800, 600);
-		frame.addWindowListener(new java.awt.event.WindowAdapter() {
-			@Override
-			public void windowClosing(java.awt.event.WindowEvent e) {
-				new Thread(new Runnable() {
-					@Override
-					public void run() {
-//						sample.saveDefaultSettings();
-						OsmAndCore.ReleaseCore();
-						System.exit(0);
-					}
-				}).start();
-			}
-		});
-	}
 
 	private MapCanvas mapCanvas;
 	private IMapRenderer mapRenderer;
-
+	private RenderRequestCallback callback;
 	public QtCorePanel(LatLon location, int zoom) {
 		this.mapCanvas = new MapCanvas(location, zoom);
+		callback = new RenderRequestCallback();
 	}
 
 	public Frame showFrame(int w, int h) {
@@ -171,7 +147,7 @@ public class QtCorePanel implements GLEventListener {
 
 		MapRendererSetupOptions rendererSetupOptions = new MapRendererSetupOptions();
 		rendererSetupOptions.setGpuWorkerThreadEnabled(false);
-		rendererSetupOptions.setFrameUpdateRequestCallback(new RenderRequestCallback().getBinding());
+		rendererSetupOptions.setFrameUpdateRequestCallback(callback.getBinding());
 		mapRenderer.setup(rendererSetupOptions);
 
 		AtlasMapRendererConfiguration atlasRendererConfiguration = AtlasMapRendererConfiguration.Casts
@@ -397,6 +373,33 @@ public class QtCorePanel implements GLEventListener {
 	}
 
 	private void release() {
+	}
+	
+	public static void main(String[] args) {
+		// load QT
+		// System.load("/home/victor/temp/test/libOsmAndCore_shared.so");
+		// System.load("/home/victor/temp/test/libOsmAndCoreJNI.so");
+		String nativePath = "/home/victor/temp/test/";
+		if(args.length > 0){
+			nativePath = args[0];
+		}
+		loadNative(nativePath);
+		final QtCorePanel sample = new QtCorePanel(DataExtractionSettings.getSettings().getDefaultLocation(),
+				DataExtractionSettings.getSettings().getDefaultZoom());
+		Frame frame = sample.showFrame(800, 600);
+		frame.addWindowListener(new java.awt.event.WindowAdapter() {
+			@Override
+			public void windowClosing(java.awt.event.WindowEvent e) {
+				new Thread(new Runnable() {
+					@Override
+					public void run() {
+//						sample.saveDefaultSettings();
+						OsmAndCore.ReleaseCore();
+						System.exit(0);
+					}
+				}).start();
+			}
+		});
 	}
 
 }
