@@ -17,6 +17,8 @@
 	<property name="bin.absolute.dir" location="${bin.dir}" />
 	<property name="lib.dir" value="lib"/>
 	<property name="lib.absolute.dir" location="${lib.dir}" />
+	<property name="lib-gl.dir" value="lib-gl"/>
+	<property name="lib-gl.absolute.dir" location="${lib-gl.dir}" />
 	<property name="java.encoding" value="UTF-8" />
 	<property name="srctests.dir" value="src-tests"/>
 	<property name="reports.tests" value="${basedir}/test-results" />
@@ -83,6 +85,9 @@
 	<path id="build.path">
 		<fileset dir="${osmand-jni.dir}">
 			<include name="${osmand-core.jar}"/>
+		</fileset>
+		<fileset dir="${lib-gl.absolute.dir}">
+		    <include name="*.jar"/>
 		</fileset>
 		<fileset dir="${lib.absolute.dir}">
 			<include name="*.jar"/>
@@ -192,6 +197,7 @@
 			<fileset dir=".">
 				<include name="OsmAndMapCreator.jar"/>
 				<include name="lib/**"/>
+				<include name="lib-gl/**"/>
 				<include name="logging.properties"/>
 				<include name="*.bat"/>
 				<include name="*.sh"/>

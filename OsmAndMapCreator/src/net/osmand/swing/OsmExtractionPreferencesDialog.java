@@ -34,6 +34,7 @@ public class OsmExtractionPreferencesDialog extends JDialog {
 	private JTextField lineSmoothness;
 	private JTextField renderingTypesFile;
 	private JTextField nativeLibFile;
+	private JTextField nativeQtLib;
 	private JTextField nativeFilesDirectory;
 	private JTextField renderingStyleFile;
 	private JTextField routingConfigFile;
@@ -191,7 +192,17 @@ public class OsmExtractionPreferencesDialog extends JDialog {
         constr.gridy = gridY++;
         l.setConstraints(renderingStyleFile, constr);
         
-        label = new JLabel("Native lib file (osmand.lib): ");
+        nativeLibFile = addTextField(panel, gridY++, l, "Native lib file (osmand.lib): ", DataExtractionSettings.getSettings().getNativeLibFile());
+        nativeQtLib = addTextField(panel, gridY++, l, "Native lib folder (qt core): ", DataExtractionSettings.getSettings().getQtLibFolder());
+		
+		panel.setMaximumSize(new Dimension(Short.MAX_VALUE, panel.getPreferredSize().height));
+		
+	}
+
+	protected JTextField addTextField(JPanel panel, int gridY, GridBagLayout l, String labelTxt, String value) {
+		JLabel label;
+		GridBagConstraints constr;
+		label = new JLabel(labelTxt);
         panel.add(label);
         constr = new GridBagConstraints();
         constr.ipadx = 5;
@@ -200,19 +211,17 @@ public class OsmExtractionPreferencesDialog extends JDialog {
         constr.anchor = GridBagConstraints.WEST;
         l.setConstraints(label, constr);
         
-        nativeLibFile = new JTextField();
-        nativeLibFile.setText(DataExtractionSettings.getSettings().getNativeLibFile());
-        panel.add(nativeLibFile);
+        JTextField textField = new JTextField();
+        textField.setText(value);
+        panel.add(textField);
         constr = new GridBagConstraints();
         constr.weightx = 1;
         constr.fill = GridBagConstraints.HORIZONTAL;
         constr.ipadx = 5;
         constr.gridx = 1;
-        constr.gridy = gridY++;
-        l.setConstraints(nativeLibFile, constr);
-		
-		panel.setMaximumSize(new Dimension(Short.MAX_VALUE, panel.getPreferredSize().height));
-		
+        constr.gridy = gridY;
+        l.setConstraints(textField, constr);
+        return textField;
 	}
 
 	private JCheckBox createCheckBox(JPanel panel, int gridY, boolean value, String text, GridBagLayout l) {
@@ -398,6 +407,9 @@ public class OsmExtractionPreferencesDialog extends JDialog {
 		}
 		if(!settings.getNativeLibFile().equals(nativeLibFile.getText())){
 			settings.setNativeLibFile(nativeLibFile.getText());
+		}
+		if(!settings.getQtLibFolder().equals(nativeQtLib.getText())){
+			settings.setQtLibFolder(nativeQtLib.getText());
 		}
 		
 		if(!settings.getLineSmoothness().equals(lineSmoothness.getText())){

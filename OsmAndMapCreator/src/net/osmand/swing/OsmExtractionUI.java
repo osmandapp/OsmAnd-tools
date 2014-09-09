@@ -172,11 +172,13 @@ public class OsmExtractionUI implements IMapLocationListener {
 	    statusBarLabel.setText(workingDir == null ? Messages.getString("OsmExtractionUI.WORKING_DIR_UNSPECIFIED") : Messages.getString("OsmExtractionUI.WORKING_DIRECTORY") + workingDir.getAbsolutePath()); //$NON-NLS-1$ //$NON-NLS-2$
 	    
 	   
-	    treePlaces = new JTree();
-		treePlaces.setModel(new DefaultTreeModel(new DefaultMutableTreeNode(Messages.getString("OsmExtractionUI.REGION")), false)); 	     //$NON-NLS-1$
-	    JSplitPane panelForTreeAndMap = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, new JScrollPane(treePlaces), mapPanel);
-	    panelForTreeAndMap.setResizeWeight(0.2);
-	    content.add(panelForTreeAndMap, BorderLayout.CENTER);
+//	    treePlaces = new JTree();
+//		treePlaces.setModel(new DefaultTreeModel(new DefaultMutableTreeNode(Messages.getString("OsmExtractionUI.REGION")), false)); 	     //$NON-NLS-1$
+//	    JSplitPane panelForTreeAndMap = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, new JScrollPane(treePlaces), mapPanel);
+//	    panelForTreeAndMap.setResizeWeight(0.2);
+//	    content.add(panelForTreeAndMap, BorderLayout.CENTER);
+	    
+	    content.add(mapPanel, BorderLayout.CENTER);
 	    
 	    createButtonsBar(content);
 	   

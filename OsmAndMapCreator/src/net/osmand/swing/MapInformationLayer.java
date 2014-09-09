@@ -43,6 +43,7 @@ public class MapInformationLayer implements MapPanelLayer {
 		
 		JButton zoomIn = new JButton("+"); //$NON-NLS-1$
 		JButton zoomOut = new JButton("-"); //$NON-NLS-1$
+		JButton offline = new JButton("*"); //$NON-NLS-1$
 		areaButton = new JButton();
 		areaButton.setAction(new AbstractAction(Messages.getString("MapInformationLayer.PRELOAD.AREA")){ //$NON-NLS-1$
 			private static final long serialVersionUID = -5512220294374994021L;
@@ -65,17 +66,34 @@ public class MapInformationLayer implements MapPanelLayer {
 				map.setZoom(map.getZoom() - 1);
 			}
 		});
+		offline.addActionListener(new ActionListener() {
+			
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				if(DataExtractionSettings.getSettings().getQtLibFolder().equals("")){
+					
+				} else {
+					QtCorePanel.loadNative(DataExtractionSettings.getSettings().getQtLibFolder());
+					MapPanel mp = MapInformationLayer.this.map;
+					final QtCorePanel sample = new QtCorePanel(new LatLon(mp.getLatitude(), mp.getLongitude()), mp
+							.getZoom());
+					sample.showFrame(800, 600);
+				}
+			}
+		});
 		
 		map.add(gpsLocation);
 		map.add(Box.createHorizontalGlue());
 		map.add(areaButton);
 		map.add(zoomIn);
 		map.add(zoomOut);
+		map.add(offline);
 		gpsLocation.setAlignmentY(Component.TOP_ALIGNMENT);
 		areaButton.setVisible(false);
 		areaButton.setAlignmentY(Component.TOP_ALIGNMENT);
 		zoomOut.setAlignmentY(Component.TOP_ALIGNMENT);
 		zoomIn.setAlignmentY(Component.TOP_ALIGNMENT);
+		offline.setAlignmentY(Component.TOP_ALIGNMENT);
 		
 		JPopupMenu popupMenu = map.getPopupMenu();
 		Action selectMenu= new AbstractAction("Select point...") {

@@ -176,9 +176,23 @@ public class DataExtractionSettings {
 		return "";
 	}
 	
+	public String getQtLibFolder(){
+		String fl = preferences.get("qtLibFolder", null);
+		if(fl != null) {
+			return fl;
+		}
+		return "";
+	}
+	
 	public void setNativeLibFile(String file){
 		preferences.put("nativeLibFile", file);
 	}
+	
+	public void setQtLibFolder(String file){
+		preferences.put("qtLibFolder", file);
+	}
+	
+	
 	
 	public String getRenderXmlPath(){
 		return preferences.get("renderXmlPath", "default.render.xml");
