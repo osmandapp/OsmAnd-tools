@@ -15,6 +15,7 @@ import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JLabel;
+import javax.swing.JOptionPane;
 import javax.swing.JPopupMenu;
 
 import net.osmand.data.LatLon;
@@ -71,6 +72,10 @@ public class MapInformationLayer implements MapPanelLayer {
 			
 			@Override
 			public void actionPerformed(ActionEvent e) {
+				if(!QtCorePanel.isUnix()) {
+					JOptionPane.showMessageDialog(OsmExtractionUI.MAIN_APP.getFrame(), "Native rendering supported only on Linux", "Info", JOptionPane.ERROR_MESSAGE);
+					return;
+				}
 				String folder = DataExtractionSettings.getSettings().getQtLibFolder();
 				if(folder.equals("")){
 					folder = new File("lib-gl").getAbsolutePath();
