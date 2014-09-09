@@ -21,6 +21,7 @@
 #include <OsmAndCore/QuadTree.h>
 #include <OsmAndCore/Utilities.h>
 #include <OsmAndCore/Logging.h>
+#include <OsmAndCore/CoreResourcesEmbeddedBundle.h>
 #include <OsmAndCore/ResourcesManager.h>
 #include <OsmAndCore/ObfsCollection.h>
 #include <OsmAndCore/ObfDataInterface.h>
@@ -125,7 +126,13 @@ OsmAnd::PointI lastClickedLocation31;
 int main(int argc, char** argv)
 {
     //////////////////////////////////////////////////////////////////////////
-    OsmAnd::InitializeCore();
+    std::shared_ptr<const OsmAnd::CoreResourcesEmbeddedBundle> coreResourcesEmbeddedBundle;
+#if defined(OSMAND_CORE_STATIC)
+    coreResourcesEmbeddedBundle = OsmAnd::CoreResourcesEmbeddedBundle::loadFromCurrentExecutable();
+#else
+    coreResourcesEmbeddedBundle = OsmAnd::CoreResourcesEmbeddedBundle::loadFromLibrary(QLatin1String("OsmAndCore_ResourcesBundle_shared"));
+#endif // defined(OSMAND_CORE_STATIC)
+    OsmAnd::InitializeCore(coreResourcesEmbeddedBundle);
 
     const std::unique_ptr<SkImageDecoder> pngDecoder(CreatePNGImageDecoder());
 

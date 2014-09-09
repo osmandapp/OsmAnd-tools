@@ -24,10 +24,12 @@ if (CMAKE_SHARED_LIBS_ALLOWED_ON_TARGET)
 
 	add_dependencies(bird
 		OsmAndCore_shared
+		OsmAndCore_ResourcesBundle_shared
 		${extra_dependencies}
 	)
 	target_link_libraries(bird
 		OsmAndCore_shared
+		OsmAndCore_ResourcesBundle_shared
 		${extra_libraries}
 	)
 endif()
@@ -39,10 +41,12 @@ if (CMAKE_STATIC_LIBS_ALLOWED_ON_TARGET)
 
 	add_dependencies(bird_standalone
 		OsmAndCore_static
+		OsmAndCore_ResourcesBundle_static
 		${extra_dependencies}
 	)
 	target_link_libraries(bird_standalone
 		OsmAndCore_static
 		${extra_libraries}
 	)
+	link_entire_static_library(bird_standalone OsmAndCore_ResourcesBundle_static)
 endif()
