@@ -5,6 +5,7 @@ import java.awt.Component;
 import java.awt.Graphics2D;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.io.File;
 import java.text.MessageFormat;
 
 import javax.swing.AbstractAction;
@@ -70,15 +71,15 @@ public class MapInformationLayer implements MapPanelLayer {
 			
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				if(DataExtractionSettings.getSettings().getQtLibFolder().equals("")){
-					
-				} else {
-					QtCorePanel.loadNative(DataExtractionSettings.getSettings().getQtLibFolder());
-					MapPanel mp = MapInformationLayer.this.map;
-					final QtCorePanel sample = new QtCorePanel(new LatLon(mp.getLatitude(), mp.getLongitude()), mp
-							.getZoom());
-					sample.showFrame(800, 600);
+				String folder = DataExtractionSettings.getSettings().getQtLibFolder();
+				if(folder.equals("")){
+					folder = new File("lib-gl").getAbsolutePath();
 				}
+				QtCorePanel.loadNative(DataExtractionSettings.getSettings().getQtLibFolder());
+				MapPanel mp = MapInformationLayer.this.map;
+				final QtCorePanel sample = new QtCorePanel(new LatLon(mp.getLatitude(), mp.getLongitude()), mp
+							.getZoom());
+				sample.showFrame(800, 600);
 			}
 		});
 		
