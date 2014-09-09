@@ -88,6 +88,7 @@
 		</fileset>
 		<fileset dir="${lib-gl.absolute.dir}">
 		    <include name="*.jar"/>
+		    <include name="*.so"/>
 		</fileset>
 		<fileset dir="${lib.absolute.dir}">
 			<include name="*.jar"/>
