@@ -61,7 +61,7 @@ public class QtCorePanel implements GLEventListener {
 			try {
 
 				System.load(folder + "/" + System.mapLibraryName("OsmAndCoreWithJNI"));
-				coreResourcesEmbeddedBundle = CoreResourcesEmbeddedBundle.loadFromLibrary(folder
+				coreResourcesEmbeddedBundle = CoreResourcesEmbeddedBundle.loadFromLibrary(folder + "/"
 						+ System.mapLibraryName("OsmAndCore_ResourcesBundle_shared"));
 				OsmAndCore.InitializeCore(coreResourcesEmbeddedBundle);
 				loaded = true;
@@ -379,7 +379,7 @@ public class QtCorePanel implements GLEventListener {
 		// load QT
 		// System.load("/home/victor/temp/test/libOsmAndCore_shared.so");
 		// System.load("/home/victor/temp/test/libOsmAndCoreJNI.so");
-		String nativePath = "/home/victor/temp/test/";
+		String nativePath = "/home/victor/temp/OsmAndMapCreator-main/lib-gl";
 		if(args.length > 0){
 			nativePath = args[0];
 		}
