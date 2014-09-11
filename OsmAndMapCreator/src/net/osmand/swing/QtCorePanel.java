@@ -60,7 +60,7 @@ public class QtCorePanel implements GLEventListener {
 		if (loaded == null) {
 			try {
 
-				System.load(folder + "/" + System.mapLibraryName("OsmAndCoreWithJNI"));
+				System.load(folder + "/" + System.mapLibraryName("OsmAndCoreWithJNI_standalone"));
 				coreResourcesEmbeddedBundle = CoreResourcesEmbeddedBundle.loadFromLibrary(folder + "/"
 						+ System.mapLibraryName("OsmAndCore_ResourcesBundle_shared"));
 				OsmAndCore.InitializeCore(coreResourcesEmbeddedBundle);
