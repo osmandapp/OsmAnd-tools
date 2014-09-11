@@ -393,22 +393,22 @@ int main(int argc, char** argv)
     renderer->setup(rendererSetup);
 
     const auto debugSettings = renderer->getDebugSettings();
-    //debugSettings->debugStageEnabled = true;
+    debugSettings->debugStageEnabled = true;
     //debugSettings->excludeBillboardSymbolsFromProcessing = true;
     //debugSettings->excludeOnSurfaceSymbolsFromProcessing = true;
     //debugSettings->excludeOnPathSymbolsFromProcessing = true;
-    //debugSettings->skipSymbolsMinDistanceToSameContentFromOtherSymbolCheck = true;
-    //debugSettings->skipSymbolsIntersectionCheck = true;
-    //debugSettings->showSymbolsBBoxesAcceptedByIntersectionCheck = true;
-    //debugSettings->showSymbolsBBoxesRejectedByMinDistanceToSameContentFromOtherSymbolCheck = true;
-    //debugSettings->showSymbolsBBoxesRejectedByIntersectionCheck = true;
-    //debugSettings->showSymbolsBBoxesRejectedByPresentationMode = true;
+    /*debugSettings->skipSymbolsMinDistanceToSameContentFromOtherSymbolCheck = true;
+    debugSettings->skipSymbolsIntersectionCheck = true;
+    debugSettings->showSymbolsBBoxesAcceptedByIntersectionCheck = true;
+    debugSettings->showSymbolsBBoxesRejectedByMinDistanceToSameContentFromOtherSymbolCheck = true;
+    debugSettings->showSymbolsBBoxesRejectedByIntersectionCheck = true;
+    debugSettings->showSymbolsBBoxesRejectedByPresentationMode = true;*/
     //debugSettings->showOnPathSymbolsRenderablesPaths = true;
     ////debugSettings->showOnPath2dSymbolGlyphDetails = true;
     ////debugSettings->showOnPath3dSymbolGlyphDetails = true;
     //debugSettings->allSymbolsTransparentForIntersectionLookup = true;
-    debugSettings->showTooShortOnPathSymbolsRenderablesPaths = true;
-    debugSettings->showAllPaths = true;
+    //debugSettings->showTooShortOnPathSymbolsRenderablesPaths = true;
+    //debugSettings->showAllPaths = true;
     renderer->setDebugSettings(debugSettings);
     
     viewport.top() = 0;
@@ -443,6 +443,12 @@ int main(int argc, char** argv)
         724166131));
     //renderer->setZoom(10.0f);
     renderer->setZoom(16.0f);
+
+    // Bug1
+    renderer->setTarget(OsmAnd::Utilities::convertLatLonTo31(OsmAnd::LatLon(
+        52.3272,
+        4.875)));
+    renderer->setZoom(15.0f);
 
     // Tokyo
     /*renderer->setTarget(OsmAnd::PointI(

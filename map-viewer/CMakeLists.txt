@@ -34,18 +34,18 @@ if (CMAKE_SHARED_LIBS_ALLOWED_ON_TARGET)
 	)
 endif()
 
-if (CMAKE_STATIC_LIBS_ALLOWED_ON_TARGET)
+if (TARGET OsmAndCore_static_standalone)
 	add_executable(bird_standalone
 		"main.cpp"
 	)
 
 	add_dependencies(bird_standalone
-		OsmAndCore_static
+		OsmAndCore_static_standalone
 		OsmAndCore_ResourcesBundle_static
 		${extra_dependencies}
 	)
 	target_link_libraries(bird_standalone
-		OsmAndCore_static
+		OsmAndCore_static_standalone
 		${extra_libraries}
 	)
 	link_entire_static_library(bird_standalone OsmAndCore_ResourcesBundle_static)
