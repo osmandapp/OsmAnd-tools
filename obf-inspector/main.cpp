@@ -18,6 +18,7 @@ void printUsage(const QString& warning = QString::null);
 
 int main(int argc, char* argv[])
 {
+    /*
     OsmAnd::InitializeCore();
 #if defined(UNICODE) || defined(_UNICODE)
 #   if defined(_WIN32)
@@ -44,6 +45,7 @@ int main(int argc, char* argv[])
 
     OsmAnd::ReleaseCore();
     return 0;
+    */
 }
 
 void printUsage(const QString& warning)
