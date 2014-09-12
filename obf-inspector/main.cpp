@@ -69,7 +69,7 @@ void printUsage(const QString& warning)
         << "[-zoom=Zoom] "
         << "[-bbox=LeftLon,TopLat,RightLon,BottomLan]" << std::endl;
 #else
-    if(!warning.empty())
+    if(!warning.isEmpty())
         std::cout << warning.toStdString() << std::endl;
     std::cout << "Inspector is console utility for working with binary indexes of OsmAnd." << std::endl;
     std::cout << std::endl
