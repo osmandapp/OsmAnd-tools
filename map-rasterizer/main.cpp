@@ -13,6 +13,7 @@
 #include <QStringList>
 
 #include <OsmAndCoreTools/EyePiece.h>
+#include <OsmAndCore/CoreResourcesEmbeddedBundle.h>
 
 #if defined(UNICODE) || defined(_UNICODE)
 void printUsage(const std::wstring& warning = std::wstring());
@@ -30,6 +31,15 @@ int main(int argc, char* argv[])
 #   endif
 #endif
 
+    // Initialize OsmAnd core
+    std::shared_ptr<const OsmAnd::CoreResourcesEmbeddedBundle> coreResourcesEmbeddedBundle;
+#if defined(OSMAND_CORE_STATIC)
+    coreResourcesEmbeddedBundle = OsmAnd::CoreResourcesEmbeddedBundle::loadFromCurrentExecutable();
+#else
+    coreResourcesEmbeddedBundle = OsmAnd::CoreResourcesEmbeddedBundle::loadFromLibrary(QLatin1String("OsmAndCore_ResourcesBundle_shared"));
+#endif // defined(OSMAND_CORE_STATIC)
+    OsmAnd::InitializeCore(coreResourcesEmbeddedBundle);
+
     // Parse configuration
     OsmAndTools::EyePiece::Configuration configuration;
     QString error;
@@ -39,11 +49,15 @@ int main(int argc, char* argv[])
     if (!OsmAndTools::EyePiece::Configuration::parseFromCommandLineArguments(commandLineArgs, configuration, error))
     {
         printUsage(QStringToStlString(error));
+        OsmAnd::ReleaseCore();
         return -1;
     }
 
     // Process rasterization request
     const auto success = OsmAndTools::EyePiece(configuration).rasterize();
+
+    OsmAnd::ReleaseCore();
+
     return (success ? 0 : -1);
 }
 
