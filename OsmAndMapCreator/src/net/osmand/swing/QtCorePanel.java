@@ -115,7 +115,7 @@ public class QtCorePanel implements GLEventListener {
 	public void init(GLAutoDrawable drawable) {
 
 		IMapStylesCollection mapStylesCollection = new MapStylesCollection();
-		MapStyle mapStyle = mapStylesCollection.getBakedStyle("default");
+		ResolvedMapStyle mapStyle = mapStylesCollection.getResolvedStyleByName("default");
 		if (mapStyle == null) {
 			System.err.println("Failed to resolve style 'default'");
 			release();
