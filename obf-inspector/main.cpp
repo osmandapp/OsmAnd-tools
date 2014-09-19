@@ -18,6 +18,7 @@ void printUsage(const QString& warning = QString::null);
 
 int main(int argc, char* argv[])
 {
+    /*
     OsmAnd::InitializeCore();
 #if defined(UNICODE) || defined(_UNICODE)
 #   if defined(_WIN32)
@@ -44,6 +45,7 @@ int main(int argc, char* argv[])
 
     OsmAnd::ReleaseCore();
     return 0;
+    */
 }
 
 void printUsage(const QString& warning)
@@ -67,7 +69,7 @@ void printUsage(const QString& warning)
         << "[-zoom=Zoom] "
         << "[-bbox=LeftLon,TopLat,RightLon,BottomLan]" << std::endl;
 #else
-    if(!warning.empty())
+    if(!warning.isEmpty())
         std::cout << warning.toStdString() << std::endl;
     std::cout << "Inspector is console utility for working with binary indexes of OsmAnd." << std::endl;
     std::cout << std::endl

@@ -74,7 +74,7 @@ std::shared_ptr<OsmAnd::MapPresentationEnvironment> mapPresentationEnvironment;
 std::shared_ptr<OsmAnd::Primitiviser> primitivizer;
 std::shared_ptr<OsmAnd::BinaryMapPrimitivesProvider> binaryMapPrimitivesProvider;
 std::shared_ptr<const OsmAnd::IMapStylesCollection> stylesCollection;
-std::shared_ptr<const OsmAnd::MapStyle> style;
+std::shared_ptr<const OsmAnd::ResolvedMapStyle> style;
 std::shared_ptr<OsmAnd::MapAnimator> animator;
 std::shared_ptr<OsmAnd::BinaryMapStaticSymbolsProvider> binaryMapStaticSymbolProvider;
 std::shared_ptr<OsmAnd::MapMarkersCollection> markers;
@@ -332,7 +332,7 @@ int main(int argc, char** argv)
         {
             const auto& styleFile = *itStyleFile;
 
-            if (!pMapStylesCollection->registerStyle(styleFile.absoluteFilePath()))
+            if (!pMapStylesCollection->addStyleFromFile(styleFile.absoluteFilePath()))
                 std::cout << "Failed to parse metadata of '" << styleFile.fileName().toStdString() << "' or duplicate style" << std::endl;
         }
         stylesCollection.reset(pMapStylesCollection);
@@ -340,7 +340,8 @@ int main(int argc, char** argv)
 
     if (!styleName.isEmpty())
     {
-        if (!stylesCollection->obtainBakedStyle(styleName, style))
+        style = stylesCollection->getResolvedStyleByName(styleName);
+        if (!style)
         {
             std::cout << "Failed to resolve style '" << styleName.toStdString() << "'" << std::endl;
             OsmAnd::ReleaseCore();
@@ -393,22 +394,22 @@ int main(int argc, char** argv)
     renderer->setup(rendererSetup);
 
     const auto debugSettings = renderer->getDebugSettings();
-    //debugSettings->debugStageEnabled = true;
+    debugSettings->debugStageEnabled = true;
     //debugSettings->excludeBillboardSymbolsFromProcessing = true;
     //debugSettings->excludeOnSurfaceSymbolsFromProcessing = true;
     //debugSettings->excludeOnPathSymbolsFromProcessing = true;
-    //debugSettings->skipSymbolsMinDistanceToSameContentFromOtherSymbolCheck = true;
-    //debugSettings->skipSymbolsIntersectionCheck = true;
-    //debugSettings->showSymbolsBBoxesAcceptedByIntersectionCheck = true;
-    //debugSettings->showSymbolsBBoxesRejectedByMinDistanceToSameContentFromOtherSymbolCheck = true;
-    //debugSettings->showSymbolsBBoxesRejectedByIntersectionCheck = true;
-    //debugSettings->showSymbolsBBoxesRejectedByPresentationMode = true;
+    /*debugSettings->skipSymbolsMinDistanceToSameContentFromOtherSymbolCheck = true;
+    debugSettings->skipSymbolsIntersectionCheck = true;
+    debugSettings->showSymbolsBBoxesAcceptedByIntersectionCheck = true;
+    debugSettings->showSymbolsBBoxesRejectedByMinDistanceToSameContentFromOtherSymbolCheck = true;
+    debugSettings->showSymbolsBBoxesRejectedByIntersectionCheck = true;
+    debugSettings->showSymbolsBBoxesRejectedByPresentationMode = true;*/
     //debugSettings->showOnPathSymbolsRenderablesPaths = true;
     ////debugSettings->showOnPath2dSymbolGlyphDetails = true;
     ////debugSettings->showOnPath3dSymbolGlyphDetails = true;
     //debugSettings->allSymbolsTransparentForIntersectionLookup = true;
-    debugSettings->showTooShortOnPathSymbolsRenderablesPaths = true;
-    debugSettings->showAllPaths = true;
+    //debugSettings->showTooShortOnPathSymbolsRenderablesPaths = true;
+    //debugSettings->showAllPaths = true;
     renderer->setDebugSettings(debugSettings);
     
     viewport.top() = 0;
@@ -443,6 +444,12 @@ int main(int argc, char** argv)
         724166131));
     //renderer->setZoom(10.0f);
     renderer->setZoom(16.0f);
+
+    // Bug1
+    renderer->setTarget(OsmAnd::Utilities::convertLatLonTo31(OsmAnd::LatLon(
+        52.3272,
+        4.875)));
+    renderer->setZoom(15.0f);
 
     // Tokyo
     /*renderer->setTarget(OsmAnd::PointI(

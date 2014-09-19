@@ -25,7 +25,7 @@ int main(int argc, char* argv[])
     std::locale::global(std::locale(""));
 #   endif
 #endif
-
+/*
     OsmAnd::Voyager::Configuration cfg;
 
     QString error;
@@ -39,6 +39,7 @@ int main(int argc, char* argv[])
         return -1;
     }
     OsmAnd::Voyager::logJourneyToStdOut(cfg);
+    */
     return 0;
 }
 

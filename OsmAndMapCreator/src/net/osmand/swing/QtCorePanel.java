@@ -23,7 +23,7 @@ import net.osmand.core.jni.IMapStylesCollection;
 import net.osmand.core.jni.MapPresentationEnvironment;
 import net.osmand.core.jni.MapRendererClass;
 import net.osmand.core.jni.MapRendererSetupOptions;
-import net.osmand.core.jni.MapStyle;
+import net.osmand.core.jni.ResolvedMapStyle;
 import net.osmand.core.jni.MapStylesCollection;
 import net.osmand.core.jni.ObfsCollection;
 import net.osmand.core.jni.OsmAndCore;
@@ -60,7 +60,7 @@ public class QtCorePanel implements GLEventListener {
 		if (loaded == null) {
 			try {
 
-				System.load(folder + "/" + System.mapLibraryName("OsmAndCoreWithJNI"));
+				System.load(folder + "/" + System.mapLibraryName("OsmAndCoreWithJNI_standalone"));
 				coreResourcesEmbeddedBundle = CoreResourcesEmbeddedBundle.loadFromLibrary(folder + "/"
 						+ System.mapLibraryName("OsmAndCore_ResourcesBundle_shared"));
 				OsmAndCore.InitializeCore(coreResourcesEmbeddedBundle);
@@ -115,7 +115,7 @@ public class QtCorePanel implements GLEventListener {
 	public void init(GLAutoDrawable drawable) {
 
 		IMapStylesCollection mapStylesCollection = new MapStylesCollection();
-		MapStyle mapStyle = mapStylesCollection.getBakedStyle("default");
+		ResolvedMapStyle mapStyle = mapStylesCollection.getResolvedStyleByName("default");
 		if (mapStyle == null) {
 			System.err.println("Failed to resolve style 'default'");
 			release();
