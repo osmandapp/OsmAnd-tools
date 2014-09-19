@@ -21,7 +21,7 @@
 	<classpathentry kind="lib" path="lib-gl/gluegen-rt.jar"/>
 	<classpathentry kind="lib" path="lib-gl/gluegen.jar"/>
 	<classpathentry kind="lib" path="lib-gl/jogl-all.jar"/>
-	<classpathentry kind="lib" path="lib-gl/OsmAndCore_jni.jar"/>
 	<classpathentry combineaccessrules="false" kind="src" path="/OsmAnd-java"/>
+	<classpathentry kind="lib" path="lib-gl/OsmAndCore_jni.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

@@ -176,7 +176,7 @@ public class MapRoutingTypes {
 		for(Entry<String, String> es : e.getTags().entrySet()) {
 			String tag = es.getKey();
 			String value = converBooleanValue(es.getValue());
-			String tvl = getMap(TAGS_TO_REPLACE, tag, value);
+			String tvl = getMap(TAGS_TO_REPLACE, tag.toLowerCase(), value.toLowerCase());
 			if(tvl != null) {
 				int i = tvl.indexOf(TAG_DELIMETER);
 				tag = tvl.substring(0, i);

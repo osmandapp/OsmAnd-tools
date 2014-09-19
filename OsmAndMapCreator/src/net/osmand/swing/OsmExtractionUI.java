@@ -30,13 +30,9 @@ import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
-import javax.swing.JScrollPane;
-import javax.swing.JSplitPane;
 import javax.swing.JTree;
 import javax.swing.UIManager;
 import javax.swing.filechooser.FileFilter;
-import javax.swing.tree.DefaultMutableTreeNode;
-import javax.swing.tree.DefaultTreeModel;
 import javax.xml.stream.XMLStreamException;
 
 import net.osmand.MapCreatorVersion;
