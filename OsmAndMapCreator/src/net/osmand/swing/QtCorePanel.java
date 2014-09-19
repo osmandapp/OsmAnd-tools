@@ -23,7 +23,7 @@ import net.osmand.core.jni.IMapStylesCollection;
 import net.osmand.core.jni.MapPresentationEnvironment;
 import net.osmand.core.jni.MapRendererClass;
 import net.osmand.core.jni.MapRendererSetupOptions;
-import net.osmand.core.jni.MapStyle;
+import net.osmand.core.jni.ResolvedMapStyle;
 import net.osmand.core.jni.MapStylesCollection;
 import net.osmand.core.jni.ObfsCollection;
 import net.osmand.core.jni.OsmAndCore;
