@@ -777,8 +777,8 @@ public class IndexCreator {
 		
 		
 		IndexCreator creator = new IndexCreator(new File("/home/victor/projects/osmand/osm-gen/")); //$NON-NLS-1$
-//		creator.setIndexMap(true);
-		creator.setIndexAddress(true);
+		creator.setIndexMap(true);
+//		creator.setIndexAddress(true);
 //		creator.setIndexPOI(true);
 //		creator.setIndexTransport(true);
 		creator.setIndexRouting(true);

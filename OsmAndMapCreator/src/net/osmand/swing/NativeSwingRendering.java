@@ -215,17 +215,20 @@ public class NativeSwingRendering extends NativeLibrary {
 		}
 		request.setIntFilter(request.ALL.R_MINZOOM, ctx.zoom);
 		request.saveState();
-		
 		NativeSearchResult res = searchObjectsForRendering(ctx.sleft, ctx.sright, ctx.stop, ctx.sbottom, ctx.zoom, request, true, 
 					rctx, "Nothing found");
-		
+		ctx.zoomDelta =  0;
 		rctx.leftX = ctx.leftX * MapUtils.getPowZoom((float) ctx.zoomDelta);
 		rctx.topY = ctx.topY * MapUtils.getPowZoom((float) ctx.zoomDelta);
 		rctx.width = ctx.width;
 		rctx.height = ctx.height;
+		// map density scales corresponding to zoom delta 
+		// (so the distance between the road is the same)
 		final float mapDensity = (float) Math.pow(2,  ctx.zoomDelta);
 		rctx.setDensityValue(mapDensity);
-		rctx.screenDensityRatio = mapDensity / Math.max(1, 1/*requestedBox.getDensity()*/) ;
+		rctx.textScale = 2f;//Text/icon scales according to mapDensity 
+//		rctx.textScale = 1 / mapDensity; //Text/icon stays same for all sizes
+		rctx.screenDensityRatio = 1 / Math.max(1, 1f /*requestedBox.getDensity()*/);
 		final double tileDivisor = MapUtils.getPowZoom((float) (31 - ctx.zoom - ctx.zoomDelta));
 		request.clearState();
 		
