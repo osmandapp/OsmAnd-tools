@@ -226,8 +226,8 @@ public class NativeSwingRendering extends NativeLibrary {
 		// (so the distance between the road is the same)
 		final float mapDensity = (float) Math.pow(2,  ctx.zoomDelta);
 		rctx.setDensityValue(mapDensity);
-		rctx.textScale = 2f;//Text/icon scales according to mapDensity 
-//		rctx.textScale = 1 / mapDensity; //Text/icon stays same for all sizes
+		//rctx.textScale = 1f;//Text/icon scales according to mapDensity 
+		rctx.textScale = 1 / mapDensity; //Text/icon stays same for all sizes
 		rctx.screenDensityRatio = 1 / Math.max(1, 1f /*requestedBox.getDensity()*/);
 		final double tileDivisor = MapUtils.getPowZoom((float) (31 - ctx.zoom - ctx.zoomDelta));
 		request.clearState();
