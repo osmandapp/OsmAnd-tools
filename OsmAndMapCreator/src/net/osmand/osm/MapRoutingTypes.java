@@ -108,6 +108,7 @@ public class MapRoutingTypes {
 			String value = converBooleanValue(es.getValue());
 			if(contains(TAGS_RELATION_TO_ACCEPT, tag, value)) {
 				propogated = new LinkedHashMap<String, String>();
+				propogated.put(tag, value);
 				break;
 			}
 		}
@@ -118,9 +119,10 @@ public class MapRoutingTypes {
 		for(Entry<String, String> es : e.getTags().entrySet()) {
 			String tag = es.getKey();
 			String value = converBooleanValue(es.getValue());
-			if(TAGS_TEXT.contains(tag)) {
-				propogated.put(tag, value);
-			}
+			// do not propogate text tags they could be wrong
+//			if(TAGS_TEXT.contains(tag)) {
+//				propogated.put(tag, value);
+//			}
 			if(contains(TAGS_TO_ACCEPT, tag, value) ||
 					startsWith(TAGS_TO_SAVE, tag, value)) {
 				propogated.put(tag, value);
