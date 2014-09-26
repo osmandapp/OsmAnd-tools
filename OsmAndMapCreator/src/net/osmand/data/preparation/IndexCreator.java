@@ -544,7 +544,7 @@ public class IndexCreator {
 				}
 
 				// 3.2 index address relations
-				if (indexAddress || indexMap || indexRouting || indexPOI) {
+				if (indexAddress || indexMap || indexRouting || indexPOI || indexTransport) {
 					setGeneralProgress(progress,"[30 / 100]"); //$NON-NLS-1$
 					progress.startTask(Messages.getString("IndexCreator.PREINDEX_BOUNDARIES_RELATIONS"), accessor.getAllRelations()); //$NON-NLS-1$
 					accessor.iterateOverEntities(progress, EntityType.RELATION, new OsmDbVisitor() {
@@ -777,18 +777,19 @@ public class IndexCreator {
 		
 		
 		IndexCreator creator = new IndexCreator(new File("/home/victor/projects/osmand/osm-gen/")); //$NON-NLS-1$
-		creator.setIndexMap(true);
+//		creator.setIndexMap(true);
 //		creator.setIndexAddress(true);
 //		creator.setIndexPOI(true);
-//		creator.setIndexTransport(true);
-		creator.setIndexRouting(true);
+		creator.setIndexTransport(true);
+//		creator.setIndexRouting(true);
 
 //		creator.deleteDatabaseIndexes = false;
 //		creator.recreateOnlyBinaryFile = true;
 //		creator.deleteOsmDB = true;
 				
 		creator.setZoomWaySmothness(2);
-		MapRenderingTypesEncoder rt = MapRenderingTypesEncoder.getDefault();
+		MapRenderingTypesEncoder rt = //MapRenderingTypesEncoder.getDefault();
+				new MapRenderingTypesEncoder("/home/victor/projects/osmand/repo/resources/obf_creation/rendering_types.xml");
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 
 		String file = "/home/victor/projects/osmand/temp/map.osm";

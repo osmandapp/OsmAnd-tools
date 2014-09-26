@@ -147,12 +147,13 @@ public class NativeSwingRendering extends NativeLibrary {
 		public long searchTime;
 		public long renderingTime;
 		
-		public RenderingImageContext(int sleft, int sright, int stop, int sbottom, int zoom) {
+		public RenderingImageContext(int sleft, int sright, int stop, int sbottom, int zoom, double zoomDelta) {
 			this.sleft = sleft;
 			this.sright = sright;
 			this.stop = stop;
 			this.sbottom = sbottom;
 			this.zoom = zoom;
+			this.zoomDelta = zoomDelta;
 			leftX =  (((double) sleft) / MapUtils.getPowZoom(31 - zoom));
 			topY = (((double) stop) / MapUtils.getPowZoom(31 - zoom));
 			width = (int) ((sright - sleft) / MapUtils.getPowZoom(31 - zoom - 8));
@@ -181,8 +182,8 @@ public class NativeSwingRendering extends NativeLibrary {
 		}
 	}
 	
-	public BufferedImage renderImage(int sleft, int sright, int stop, int sbottom, int zoom) throws IOException {
-		return renderImage(new RenderingImageContext(sleft, sright, stop, sbottom, zoom));	
+	public BufferedImage renderImage(int sleft, int sright, int stop, int sbottom, int zoom, float zoomDelta) throws IOException {
+		return renderImage(new RenderingImageContext(sleft, sright, stop, sbottom, zoom, zoomDelta));	
 	}
 	
 	public BufferedImage renderImage(RenderingImageContext ctx) throws IOException {
@@ -217,11 +218,11 @@ public class NativeSwingRendering extends NativeLibrary {
 		request.saveState();
 		NativeSearchResult res = searchObjectsForRendering(ctx.sleft, ctx.sright, ctx.stop, ctx.sbottom, ctx.zoom, request, true, 
 					rctx, "Nothing found");
-		ctx.zoomDelta =  0;
+		//	ctx.zoomDelta =  1.5;
 		rctx.leftX = ctx.leftX * MapUtils.getPowZoom((float) ctx.zoomDelta);
 		rctx.topY = ctx.topY * MapUtils.getPowZoom((float) ctx.zoomDelta);
-		rctx.width = ctx.width;
-		rctx.height = ctx.height;
+		rctx.width = (int) (ctx.width * MapUtils.getPowZoom((float) ctx.zoomDelta));
+		rctx.height = (int) (ctx.height * MapUtils.getPowZoom((float) ctx.zoomDelta));
 		// map density scales corresponding to zoom delta 
 		// (so the distance between the road is the same)
 		final float mapDensity = (float) Math.pow(2,  ctx.zoomDelta);
