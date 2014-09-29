@@ -127,7 +127,7 @@ public class QtCorePanel implements GLEventListener {
 		String filesDir = DataExtractionSettings.getSettings().getBinaryFilesDir();
 		obfsCollection.addDirectory(filesDir, false);
 		MapPresentationEnvironment mapPresentationEnvironment = new MapPresentationEnvironment(mapStyle,
-				displayDensityFactor, "en");
+				displayDensityFactor, "en", MapPresentationEnvironment.LanguagePreference.NativeOnly);
 		Primitiviser primitiviser = new Primitiviser(mapPresentationEnvironment);
 		BinaryMapDataProvider binaryMapDataProvider = new BinaryMapDataProvider(obfsCollection);
 		BinaryMapPrimitivesProvider binaryMapPrimitivesProvider = new BinaryMapPrimitivesProvider(
