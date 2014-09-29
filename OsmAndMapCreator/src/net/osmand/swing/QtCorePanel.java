@@ -6,6 +6,8 @@ import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseWheelEvent;
+import java.util.HashMap;
+import java.util.Map;
 
 import javax.media.opengl.GLAutoDrawable;
 import javax.media.opengl.GLEventListener;
@@ -79,11 +81,22 @@ public class QtCorePanel implements GLEventListener {
 	private MapCanvas mapCanvas;
 	private IMapRenderer mapRenderer;
 	private RenderRequestCallback callback;
+	private String styleFile;
+	private String renderingProperties;
+	
 	public QtCorePanel(LatLon location, int zoom) {
 		this.mapCanvas = new MapCanvas(location, zoom);
 		callback = new RenderRequestCallback();
 	}
 
+	public void setRenderingStyleFile(String styleFile) {
+		this.styleFile = styleFile;
+	}
+	
+	public void setRenderingProperties(String renderingProperties) {
+		this.renderingProperties = renderingProperties;
+	}
+	
 	public Frame showFrame(int w, int h) {
 		final Frame frame = new Frame("OsmAnd Core");
 		frame.setSize(w, h);
@@ -114,7 +127,21 @@ public class QtCorePanel implements GLEventListener {
 	@Override
 	public void init(GLAutoDrawable drawable) {
 
-		IMapStylesCollection mapStylesCollection = new MapStylesCollection();
+		HashMap<String, String> renderingProps = new HashMap<String, String>();
+		if (renderingProperties != null) {
+			String[] props = renderingProperties.split(",");
+			for (String s : props) {
+				int i = s.indexOf('=');
+				if (i > 0) {
+					renderingProps.put(s.substring(0, i).trim(), s.substring(i + 1).trim());
+				}
+			}
+		}
+		MapStylesCollection mapStylesCollection = new MapStylesCollection();
+		if(this.styleFile != null) {
+			mapStylesCollection.addStyleFromFile(this.styleFile);
+		}
+		// TODO set rendering props
 		ResolvedMapStyle mapStyle = mapStylesCollection.getResolvedStyleByName("default");
 		if (mapStyle == null) {
 			System.err.println("Failed to resolve style 'default'");
@@ -128,6 +155,7 @@ public class QtCorePanel implements GLEventListener {
 		obfsCollection.addDirectory(filesDir, false);
 		MapPresentationEnvironment mapPresentationEnvironment = new MapPresentationEnvironment(mapStyle,
 				displayDensityFactor, "en");
+//		mapPresentationEnvironment.setSettings(arg0)
 		Primitiviser primitiviser = new Primitiviser(mapPresentationEnvironment);
 		BinaryMapDataProvider binaryMapDataProvider = new BinaryMapDataProvider(obfsCollection);
 		BinaryMapPrimitivesProvider binaryMapPrimitivesProvider = new BinaryMapPrimitivesProvider(
@@ -401,5 +429,8 @@ public class QtCorePanel implements GLEventListener {
 			}
 		});
 	}
+
+	
+
 
 }
