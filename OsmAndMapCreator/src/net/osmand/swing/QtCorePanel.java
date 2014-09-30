@@ -32,6 +32,7 @@ import net.osmand.core.jni.OsmAndCore;
 import net.osmand.core.jni.PointI;
 import net.osmand.core.jni.Primitiviser;
 import net.osmand.core.jni.RasterMapLayerId;
+import net.osmand.core.jni.QStringStringHash;
 import net.osmand.data.LatLon;
 import net.osmand.util.MapUtils;
 
@@ -127,13 +128,15 @@ public class QtCorePanel implements GLEventListener {
 	@Override
 	public void init(GLAutoDrawable drawable) {
 
-		HashMap<String, String> renderingProps = new HashMap<String, String>();
+		QStringStringHash renderingProps = new QStringStringHash();
 		if (renderingProperties != null) {
 			String[] props = renderingProperties.split(",");
 			for (String s : props) {
 				int i = s.indexOf('=');
 				if (i > 0) {
-					renderingProps.put(s.substring(0, i).trim(), s.substring(i + 1).trim());
+					String name = s.substring(0, i).trim();
+					String value = s.substring(i + 1).trim();
+					renderingProps.set(name, value);
 				}
 			}
 		}
@@ -141,7 +144,6 @@ public class QtCorePanel implements GLEventListener {
 		if(this.styleFile != null) {
 			mapStylesCollection.addStyleFromFile(this.styleFile);
 		}
-		// TODO set rendering props
 		ResolvedMapStyle mapStyle = mapStylesCollection.getResolvedStyleByName("default");
 		if (mapStyle == null) {
 			System.err.println("Failed to resolve style 'default'");
@@ -155,6 +157,7 @@ public class QtCorePanel implements GLEventListener {
 		obfsCollection.addDirectory(filesDir, false);
 		MapPresentationEnvironment mapPresentationEnvironment = new MapPresentationEnvironment(mapStyle,
 				displayDensityFactor, "en", MapPresentationEnvironment.LanguagePreference.NativeOnly);
+		mapPresentationEnvironment.setSettings(renderingProps);
 		Primitiviser primitiviser = new Primitiviser(mapPresentationEnvironment);
 		BinaryMapDataProvider binaryMapDataProvider = new BinaryMapDataProvider(obfsCollection);
 		BinaryMapPrimitivesProvider binaryMapPrimitivesProvider = new BinaryMapPrimitivesProvider(
