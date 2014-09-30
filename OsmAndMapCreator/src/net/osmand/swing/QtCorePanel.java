@@ -139,7 +139,7 @@ public class QtCorePanel implements GLEventListener {
 					String value = s.substring(i + 1).trim();
 					renderingProps.set(name, value);
 
-					System.out.println("'" + name + "' = '" + value + "'";
+					System.out.println("'" + name + "' = '" + value + "'");
 				}
 			}
 		} else {
