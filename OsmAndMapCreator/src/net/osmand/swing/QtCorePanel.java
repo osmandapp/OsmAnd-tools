@@ -130,6 +130,7 @@ public class QtCorePanel implements GLEventListener {
 
 		QStringStringHash renderingProps = new QStringStringHash();
 		if (renderingProperties != null) {
+			System.out.println("Going to set settings: " + renderingProperties);
 			String[] props = renderingProperties.split(",");
 			for (String s : props) {
 				int i = s.indexOf('=');
@@ -137,12 +138,19 @@ public class QtCorePanel implements GLEventListener {
 					String name = s.substring(0, i).trim();
 					String value = s.substring(i + 1).trim();
 					renderingProps.set(name, value);
+
+					System.out.println("'" + name + "' = '" + value + "'";
 				}
 			}
+		} else {
+			System.out.println("No settings to set");
 		}
 		MapStylesCollection mapStylesCollection = new MapStylesCollection();
 		if(this.styleFile != null) {
 			mapStylesCollection.addStyleFromFile(this.styleFile);
+			System.out.println("Going to use map style from: " + this.styleFile);
+		} else {
+			System.out.println("Going to use embedded map style");
 		}
 		ResolvedMapStyle mapStyle = mapStylesCollection.getResolvedStyleByName("default");
 		if (mapStyle == null) {
