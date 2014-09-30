@@ -84,6 +84,8 @@ public class MapInformationLayer implements MapPanelLayer {
 				MapPanel mp = MapInformationLayer.this.map;
 				final QtCorePanel sample = new QtCorePanel(new LatLon(mp.getLatitude(), mp.getLongitude()), mp
 							.getZoom());
+				sample.setRenderingProperties(DataExtractionSettings.getSettings().getRenderingProperties());
+				sample.setRenderingStyleFile(DataExtractionSettings.getSettings().getRenderXmlPath());
 				sample.showFrame(800, 600);
 			}
 		});
