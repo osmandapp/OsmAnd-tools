@@ -146,15 +146,17 @@ public class QtCorePanel implements GLEventListener {
 			System.out.println("No settings to set");
 		}
 		MapStylesCollection mapStylesCollection = new MapStylesCollection();
+		ResolvedMapStyle mapStyle = null;
 		if(this.styleFile != null) {
 			mapStylesCollection.addStyleFromFile(this.styleFile);
 			System.out.println("Going to use map style from: " + this.styleFile);
+			mapStyle = mapStylesCollection.getResolvedStyleByName((new File(this.styleFile)).getName());
 		} else {
 			System.out.println("Going to use embedded map style");
+			mapStyle = mapStylesCollection.getResolvedStyleByName("default");
 		}
-		ResolvedMapStyle mapStyle = mapStylesCollection.getResolvedStyleByName("default");
 		if (mapStyle == null) {
-			System.err.println("Failed to resolve style 'default'");
+			System.err.println("Failed to resolve style");
 			release();
 			OsmAndCore.ReleaseCore();
 			System.exit(0);
