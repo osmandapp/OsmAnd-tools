@@ -246,6 +246,7 @@ public class QtCorePanel implements GLEventListener {
 		if (mapRenderer != null && mapRenderer.isRenderingInitialized())
 			mapRenderer.releaseRendering();
 		release();
+		saveDefaultSettings();
 	}
 
 	protected void saveDefaultSettings() {
