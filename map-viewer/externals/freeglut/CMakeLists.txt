@@ -2,6 +2,8 @@ project(freeglut)
 
 prepare_upstream()
 
+save_and_set(CMAKE_REQUIRED_FLAGS "${CMAKE_REQUIRED_FLAGS} ${CMAKE_C_FLAGS}")
+
 include(CheckIncludeFile)
 include(CheckIncludeFiles)
 include(CheckFunctionExists)
@@ -60,6 +62,9 @@ unset(VERSION)
 unset(X_DISPLAY_MISSING)
 unset(_DEBUG)
 unset(const)
+
+restore(CMAKE_REQUIRED_FLAGS)
+
 configure_file("config.h.cmake" "${CMAKE_CURRENT_BINARY_DIR}/config.h")
 
 add_library(freeglut_static STATIC
@@ -115,6 +120,7 @@ if (CMAKE_TARGET_OS STREQUAL "linux" OR CMAKE_TARGET_OS STREQUAL "macosx")
 		${X11_Xrandr}
 	)
 endif()
+
 if (CMAKE_TARGET_OS STREQUAL "macosx")
 	find_package(GLUT REQUIRED)
 	set(target_specific_public_includes ${target_specific_public_includes}
@@ -123,14 +129,16 @@ if (CMAKE_TARGET_OS STREQUAL "macosx")
 	set(target_specific_public_libraries ${target_specific_public_libraries}
 		${GLUT_LIBRARIES}
 	)
-endif()
-if (CMAKE_TARGET_OS STREQUAL "macosx")
+
 	find_library(X11_GL "GL" PATHS ${X11_LIBRARY_DIR})
 	set(target_specific_public_libraries ${target_specific_public_libraries}
 		${X11_GL}
 	)
-endif()
-if (CMAKE_TARGET_OS STREQUAL "windows")
+elseif (CMAKE_TARGET_OS STREQUAL "windows")
+	set(target_specific_public_libraries ${target_specific_public_libraries}
+		winmm
+	)
+
 	if (CMAKE_COMPILER_FAMILY STREQUAL "msvc")
 		set(target_specific_private_definitions ${target_specific_private_definitions}
 			-D_CRT_SECURE_NO_WARNINGS
