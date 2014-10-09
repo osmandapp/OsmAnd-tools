@@ -246,6 +246,8 @@ public class QtCorePanel implements GLEventListener {
 		if (mapRenderer != null && mapRenderer.isRenderingInitialized())
 			mapRenderer.releaseRendering();
 		release();
+		saveDefaultSettings();
+		System.out.println("GL window is disposed.");
 	}
 
 	protected void saveDefaultSettings() {
