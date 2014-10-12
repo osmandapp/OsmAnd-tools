@@ -66,27 +66,37 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			MapRulType rule = getRelationalTagValue(ev.getKey(), ev.getValue());
 			if(rule != null) {
 				String value = ev.getValue();
-				if(rule.targetTagValue != null) {
-					rule = rule.targetTagValue;
-					if(rule.getValue() != null) {
-						value = rule.getValue();
-					}
-				}
-				if (rule.names != null) {
-					for (int i = 0; i < rule.names.length; i++) {
-						String tag = rule.names[i].tagValuePattern.tag.substring(rule.namePrefix.length());
-						if(ts.containsKey(tag)) {
-							propogated.put(rule.names[i], ts.get(tag));
-						}
-					}
-				}
-				propogated.put(rule, value);
+				addRuleToPropogated(propogated, ts, rule, value);
 			}
 			addOSMCSymbolsSpecialTags(propogated, ev);
 		}
 		return propogated;
 	}
+
+
+
+	protected void addRuleToPropogated(Map<MapRulType, String> propogated, Map<String, String> ts, MapRulType rule,
+			String value) {
+		if(rule.targetTagValue != null) {
+			rule = rule.targetTagValue;
+			if(rule.getValue() != null) {
+				value = rule.getValue();
+			}
+		}
+		if (rule.names != null) {
+			for (int i = 0; i < rule.names.length; i++) {
+				String tag = rule.names[i].tagValuePattern.tag.substring(rule.namePrefix.length());
+				if(ts.containsKey(tag)) {
+					propogated.put(rule.names[i], ts.get(tag));
+				}
+			}
+		}
+		propogated.put(rule, value);
+	}
 	
+
+
+
 	private MapRulType getMapRuleType(String tag, String val) {
 		return getRuleType(tag, val, false);
 	}
@@ -181,6 +191,9 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 
 		for (String tag : tags.keySet()) {
 			String val = tags.get(tag);
+			if(area && tag.equals("highway")){
+				tag = "area:highway";
+			}
 			MapRulType rType = getMapRuleType(tag, val);
 			if (rType != null) {
 				if (rType.minzoom > zoom || rType.maxzoom < zoom) {
