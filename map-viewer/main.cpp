@@ -1,7 +1,9 @@
 #include <stdlib.h>
+#include <inttypes.h>
 #include <memory>
 #include <chrono>
 #include <future>
+#include <fstream>
 
 #include <GL/glew.h>
 #include <GL/freeglut.h>
@@ -21,6 +23,7 @@
 #include <OsmAndCore/QuadTree.h>
 #include <OsmAndCore/Utilities.h>
 #include <OsmAndCore/Logging.h>
+#include <OsmAndCore/Stopwatch.h>
 #include <OsmAndCore/CoreResourcesEmbeddedBundle.h>
 #include <OsmAndCore/ResourcesManager.h>
 #include <OsmAndCore/ObfsCollection.h>
@@ -36,21 +39,23 @@
 #include <OsmAndCore/Map/IMapStylesPresetsCollection.h>
 #include <OsmAndCore/Map/MapStyleEvaluator.h>
 #include <OsmAndCore/Map/IMapRenderer.h>
+#include <OsmAndCore/Map/IMapRenderer_Metrics.h>
 #include <OsmAndCore/Map/IAtlasMapRenderer.h>
 #include <OsmAndCore/Map/AtlasMapRendererConfiguration.h>
-#include <OsmAndCore/Map/OnlineRasterMapTileProvider.h>
+#include <OsmAndCore/Map/AtlasMapRenderer_Metrics.h>
+#include <OsmAndCore/Map/OnlineRasterMapLayerProvider.h>
 #include <OsmAndCore/Map/OnlineTileSources.h>
 #include <OsmAndCore/Map/HillshadeTileProvider.h>
 #include <OsmAndCore/Map/IMapElevationDataProvider.h>
 #include <OsmAndCore/Map/HeightmapTileProvider.h>
 #include <OsmAndCore/Map/BinaryMapDataProvider.h>
 #include <OsmAndCore/Map/BinaryMapPrimitivesProvider.h>
-#include <OsmAndCore/Map/BinaryMapRasterBitmapTileProvider_Software.h>
-#include <OsmAndCore/Map/BinaryMapRasterBitmapTileProvider_GPU.h>
-#include <OsmAndCore/Map/BinaryMapRasterMetricsBitmapTileProvider.h>
-#include <OsmAndCore/Map/BinaryMapDataMetricsBitmapTileProvider.h>
+#include <OsmAndCore/Map/BinaryMapRasterLayerProvider_Software.h>
+#include <OsmAndCore/Map/BinaryMapRasterLayerProvider_GPU.h>
+#include <OsmAndCore/Map/BinaryMapRasterMetricsLayerProvider.h>
+#include <OsmAndCore/Map/BinaryMapDataMetricsLayerProvider.h>
 #include <OsmAndCore/Map/BinaryMapPrimitivesProvider.h>
-#include <OsmAndCore/Map/BinaryMapPrimitivesMetricsBitmapTileProvider.h>
+#include <OsmAndCore/Map/BinaryMapPrimitivesMetricsLayerProvider.h>
 #include <OsmAndCore/Map/BinaryMapStaticSymbolsProvider.h>
 #include <OsmAndCore/Map/BinaryMapObjectSymbolsGroup.h>
 #include <OsmAndCore/Map/MapMarkersCollection.h>
@@ -61,6 +66,9 @@
 #include <OsmAndCore/Map/IBillboardMapSymbol.h>
 #include <OsmAndCore/FavoriteLocationsGpxCollection.h>
 #include <OsmAndCore/Map/FavoriteLocationsPresenter.h>
+#include <OsmAndCore/Search/InAreaSearchEngine.h>
+#include <OsmAndCore/Search/InAreaSearchSession.h>
+#include <OsmAndCore/Search/PoiSearchDataSource.h>
 
 bool glutWasInitialized = false;
 QMutex glutWasInitializedFlagMutex;
@@ -118,7 +126,7 @@ void specialHandler(int key, int x, int y);
 void displayHandler(void);
 void idleHandler(void);
 void closeHandler(void);
-void activateProvider(OsmAnd::RasterMapLayerId layerId, int idx);
+void activateProvider(int layerIdx, int idx);
 void verifyOpenGL();
 
 OsmAnd::PointI lastClickedLocation31;
@@ -128,11 +136,19 @@ int main(int argc, char** argv)
     //////////////////////////////////////////////////////////////////////////
     std::shared_ptr<const OsmAnd::CoreResourcesEmbeddedBundle> coreResourcesEmbeddedBundle;
 #if defined(OSMAND_CORE_STATIC)
+    std::cout << "Loading symbols from this executable" << std::endl;
     coreResourcesEmbeddedBundle = OsmAnd::CoreResourcesEmbeddedBundle::loadFromCurrentExecutable();
 #else
+    std::cout << "Loading symbols from 'OsmAndCore_ResourcesBundle_shared'" << std::endl;
     coreResourcesEmbeddedBundle = OsmAnd::CoreResourcesEmbeddedBundle::loadFromLibrary(QLatin1String("OsmAndCore_ResourcesBundle_shared"));
 #endif // defined(OSMAND_CORE_STATIC)
-    OsmAnd::InitializeCore(coreResourcesEmbeddedBundle);
+    if (!OsmAnd::InitializeCore(coreResourcesEmbeddedBundle))
+    {
+        std::cerr << "Failed to initialize core" << std::endl;
+        OsmAnd::ReleaseCore();
+        return EXIT_FAILURE;
+    }
+    std::cout << "Initialized Core" << std::endl;
 
     const std::unique_ptr<SkImageDecoder> pngDecoder(CreatePNGImageDecoder());
 
@@ -250,7 +266,6 @@ int main(int argc, char** argv)
 
     //////////////////////////////////////////////////////////////////////////
 
-
     renderer = OsmAnd::createMapRenderer(OsmAnd::MapRendererClass::AtlasMapRenderer_OpenGL2plus);
     if (!renderer)
     {
@@ -347,8 +362,28 @@ int main(int argc, char** argv)
             OsmAnd::ReleaseCore();
             return EXIT_FAILURE;
         }
-        //style->dump();
+
+        std::ofstream rulesOutput("rules.txt");
+        if (rulesOutput)
+        {
+            rulesOutput << style->dump().toStdString() << std::endl;
+            rulesOutput.close();
+        }
     }
+
+    //////////////////////////////////////////////////////////////////////////
+    const std::shared_ptr<OsmAnd::InAreaSearchEngine> inAreaSearchEngine(new OsmAnd::InAreaSearchEngine());
+    const std::shared_ptr<OsmAnd::PoiSearchDataSource> poiSearchDataSource(new OsmAnd::PoiSearchDataSource(obfsCollection));
+    inAreaSearchEngine->addDataSource(poiSearchDataSource);
+
+    const auto searchSession = std::static_pointer_cast<OsmAnd::InAreaSearchSession>(inAreaSearchEngine->createSession());
+
+    searchSession->setArea(OsmAnd::AreaI64(OsmAnd::Utilities::boundingBox31FromAreaInMeters(5000, OsmAnd::PointI(
+        1255337783,
+        724166131))));
+    searchSession->setQuery("Vadima");
+    searchSession->startSearch();
+    //////////////////////////////////////////////////////////////////////////
 
     roadLocator.reset(new OsmAnd::RoadLocator(obfsCollection));
     mapPresentationEnvironment.reset(new OsmAnd::MapPresentationEnvironment(style, density, "ru"));
@@ -394,7 +429,7 @@ int main(int argc, char** argv)
     renderer->setup(rendererSetup);
 
     const auto debugSettings = renderer->getDebugSettings();
-    debugSettings->debugStageEnabled = true;
+    //debugSettings->debugStageEnabled = true;
     //debugSettings->excludeBillboardSymbolsFromProcessing = true;
     //debugSettings->excludeOnSurfaceSymbolsFromProcessing = true;
     //debugSettings->excludeOnPathSymbolsFromProcessing = true;
@@ -403,6 +438,7 @@ int main(int argc, char** argv)
     debugSettings->showSymbolsBBoxesAcceptedByIntersectionCheck = true;
     debugSettings->showSymbolsBBoxesRejectedByMinDistanceToSameContentFromOtherSymbolCheck = true;
     debugSettings->showSymbolsBBoxesRejectedByIntersectionCheck = true;
+    debugSettings->skipSymbolsPresentationModeCheck = true;
     debugSettings->showSymbolsBBoxesRejectedByPresentationMode = true;*/
     //debugSettings->showOnPathSymbolsRenderablesPaths = true;
     ////debugSettings->showOnPath2dSymbolGlyphDetails = true;
@@ -428,28 +464,51 @@ int main(int argc, char** argv)
     renderer->setAzimuth(69.4f);
     //renderer->setElevationAngle(35.0f);
     renderer->setElevationAngle(90.0f);
-    renderer->setFogColor(OsmAnd::FColorRGB(1.0f, 1.0f, 1.0f));
 
     // Amsterdam
-    //renderer->setTarget(OsmAnd::PointI(
-    //    1102430866,
-    //    704978668));
-    //renderer->setZoom(11.0f);
-    //renderer->setZoom(16.0f);
+    renderer->setTarget(OsmAnd::PointI(
+        1102430866,
+        704978668));
+        renderer->setZoom(11.0f);
+    renderer->setZoom(10.0f);
     //renderer->setZoom(4.0f);
 
     // Kiev
-    renderer->setTarget(OsmAnd::PointI(
-        1255337783,
-        724166131));
-    //renderer->setZoom(10.0f);
-    renderer->setZoom(16.0f);
+    //renderer->setTarget(OsmAnd::PointI(
+    //    1255337783,
+    //    724166131));
+    //renderer->setZoom(11.0f);
+    //renderer->setZoom(16.0f);
 
-    // Bug1
+    //// Bug1
+    //renderer->setTarget(OsmAnd::Utilities::convertLatLonTo31(OsmAnd::LatLon(
+    //    52.3272,
+    //    4.875)));
+    //renderer->setZoom(15.0f);
+
+    //// Bug2
+    //renderer->setTarget(OsmAnd::Utilities::convertLatLonTo31(OsmAnd::LatLon(
+    //    52.0780,
+    //    4.2941)));
+    //renderer->setZoom(17.0f);
+
+    //// Bug3
+    //renderer->setTarget(OsmAnd::Utilities::convertLatLonTo31(OsmAnd::LatLon(
+    //    47.5423,
+    //    18.951)));
+    //renderer->setZoom(15.0f);
+
+    // Bug3
     renderer->setTarget(OsmAnd::Utilities::convertLatLonTo31(OsmAnd::LatLon(
-        52.3272,
-        4.875)));
-    renderer->setZoom(15.0f);
+        50.1324,
+        14.3951)));
+    renderer->setZoom(14.0f);
+    
+    // Synthetic
+    /*renderer->setTarget(OsmAnd::Utilities::convertLatLonTo31(OsmAnd::LatLon(
+        45.7169,
+        36.5488)));
+    renderer->setZoom(15.0f);*/
 
     // Tokyo
     /*renderer->setTarget(OsmAnd::PointI(
@@ -704,11 +763,19 @@ void keyboardHandler(unsigned char key, int x, int y)
     }
         break;
     case 'r':
-        renderer->setDistanceToFog(state.fogDistance + 1.0f);
+    {
+        auto fogConfiguration = state.fogConfiguration;
+        fogConfiguration.distanceToFog += 1.0f;
+        renderer->setFogConfiguration(fogConfiguration);
         break;
+    }
     case 'f':
-        renderer->setDistanceToFog(state.fogDistance - 1.0f);
+    {
+        auto fogConfiguration = state.fogConfiguration;
+        fogConfiguration.distanceToFog += 1.0f;
+        renderer->setFogConfiguration(fogConfiguration);
         break;
+    }
     case 'x':
         renderWireframe = !renderWireframe;
         glutPostRedisplay();
@@ -730,29 +797,45 @@ void keyboardHandler(unsigned char key, int x, int y)
     }
         break;
     case 't':
-        renderer->setFogDensity(state.fogDensity + 0.01f);
+    {
+        auto fogConfiguration = state.fogConfiguration;
+        fogConfiguration.density += 0.01f;
+        renderer->setFogConfiguration(fogConfiguration);
         break;
+    }
     case 'g':
-        renderer->setFogDensity(state.fogDensity - 0.01f);
+    {
+        auto fogConfiguration = state.fogConfiguration;
+        fogConfiguration.density -= 0.01f;
+        renderer->setFogConfiguration(fogConfiguration);
         break;
+    }
     case 'u':
-        renderer->setFogOriginFactor(state.fogOriginFactor + 0.01f);
+    {
+        auto fogConfiguration = state.fogConfiguration;
+        fogConfiguration.originFactor += 0.01f;
+        renderer->setFogConfiguration(fogConfiguration);
         break;
+    }
     case 'j':
-        renderer->setFogOriginFactor(state.fogOriginFactor - 0.01f);
+    {
+        auto fogConfiguration = state.fogConfiguration;
+        fogConfiguration.originFactor -= 0.01f;
+        renderer->setFogConfiguration(fogConfiguration);
         break;
+    }
     case 'i':
         renderer->setFieldOfView(state.fieldOfView + 0.5f);
         break;
     case 'k':
         renderer->setFieldOfView(state.fieldOfView - 0.5f);
         break;
-    case 'o':
-        renderer->setElevationDataScaleFactor(state.elevationDataScaleFactor + 0.1f);
-        break;
-    case 'l':
-        renderer->setElevationDataScaleFactor(state.elevationDataScaleFactor - 0.1f);
-        break;
+    //case 'o':
+    //    renderer->setElevationDataScaleFactor(state.elevationDataScaleFactor + 0.1f);
+    //    break;
+    //case 'l':
+    //    renderer->setElevationDataScaleFactor(state.elevationDataScaleFactor - 0.1f);
+    //    break;
     case 'c':
     {
         auto config = renderer->getConfiguration();
@@ -814,20 +897,18 @@ void keyboardHandler(unsigned char key, int x, int y)
         break;
     case 'z':
     {
-        if (state.symbolProviders.contains(binaryMapStaticSymbolProvider))
+        if (binaryMapStaticSymbolProvider && renderer->removeSymbolsProvider(binaryMapStaticSymbolProvider))
         {
-            renderer->removeSymbolProvider(binaryMapStaticSymbolProvider);
             binaryMapStaticSymbolProvider.reset();
         }
         else
         {
             if (!binaryMapDataProvider)
                 binaryMapDataProvider.reset(new OsmAnd::BinaryMapDataProvider(obfsCollection));
-            if (!binaryMapPrimitivesProvider)
-                binaryMapPrimitivesProvider.reset(new OsmAnd::BinaryMapPrimitivesProvider(binaryMapDataProvider, primitivizer));
+            binaryMapPrimitivesProvider.reset(new OsmAnd::BinaryMapPrimitivesProvider(binaryMapDataProvider, primitivizer));
 
             binaryMapStaticSymbolProvider.reset(new OsmAnd::BinaryMapStaticSymbolsProvider(binaryMapPrimitivesProvider, 256u));
-            renderer->addSymbolProvider(binaryMapStaticSymbolProvider);
+            renderer->addSymbolsProvider(binaryMapStaticSymbolProvider);
         }
     }
         break;
@@ -848,7 +929,7 @@ void keyboardHandler(unsigned char key, int x, int y)
     case '8':
     case '9':
     {
-        auto layerId = (modifiers & GLUT_ACTIVE_ALT) ? OsmAnd::RasterMapLayerId::Overlay0 : OsmAnd::RasterMapLayerId::BaseLayer;
+        auto layerId = (modifiers & GLUT_ACTIVE_ALT) ? 1 : 0;
         activateProvider(layerId, key - '0');
     }
         break;
@@ -924,105 +1005,99 @@ void closeHandler(void)
     renderer->releaseRendering();
 }
 
-void activateProvider(OsmAnd::RasterMapLayerId layerId, int idx)
+void activateProvider(int layerIdx, int idx)
 {
     if (idx == 0)
     {
-        renderer->resetRasterLayerProvider(layerId);
+        renderer->resetMapLayerProvider(layerIdx);
     }
     else if (idx == 1)
     {
         auto tileProvider = OsmAnd::OnlineTileSources::getBuiltIn()->createProviderFor(QLatin1String("Mapnik (OsmAnd)"));
-        renderer->setRasterLayerProvider(layerId, tileProvider);
+        renderer->setMapLayerProvider(layerIdx, tileProvider);
     }
     else if (idx == 2)
     {
         if (!binaryMapDataProvider)
             binaryMapDataProvider.reset(new OsmAnd::BinaryMapDataProvider(obfsCollection));
-        if (!binaryMapPrimitivesProvider)
-            binaryMapPrimitivesProvider.reset(new OsmAnd::BinaryMapPrimitivesProvider(binaryMapDataProvider, primitivizer));
+        binaryMapPrimitivesProvider.reset(new OsmAnd::BinaryMapPrimitivesProvider(binaryMapDataProvider, primitivizer));
 
         // general
         QHash< QString, QString > settings;
         settings.insert("appMode", "browse map");
         mapPresentationEnvironment->setSettings(settings);
 
-        auto tileProvider = new OsmAnd::BinaryMapRasterBitmapTileProvider_Software(binaryMapPrimitivesProvider);
-        renderer->setRasterLayerProvider(layerId, std::shared_ptr<OsmAnd::IMapRasterBitmapTileProvider>(tileProvider));
+        auto tileProvider = new OsmAnd::BinaryMapRasterLayerProvider_Software(binaryMapPrimitivesProvider);
+        renderer->setMapLayerProvider(layerIdx, std::shared_ptr<OsmAnd::IMapLayerProvider>(tileProvider));
     }
     else if (idx == 3)
     {
         if (!binaryMapDataProvider)
             binaryMapDataProvider.reset(new OsmAnd::BinaryMapDataProvider(obfsCollection));
-        if (!binaryMapPrimitivesProvider)
-            binaryMapPrimitivesProvider.reset(new OsmAnd::BinaryMapPrimitivesProvider(binaryMapDataProvider, primitivizer));
+        binaryMapPrimitivesProvider.reset(new OsmAnd::BinaryMapPrimitivesProvider(binaryMapDataProvider, primitivizer));
 
         // car
         QHash< QString, QString > settings;
         settings.insert("appMode", "car");
         mapPresentationEnvironment->setSettings(settings);
 
-        auto tileProvider = new OsmAnd::BinaryMapRasterBitmapTileProvider_Software(binaryMapPrimitivesProvider);
-        renderer->setRasterLayerProvider(layerId, std::shared_ptr<OsmAnd::IMapRasterBitmapTileProvider>(tileProvider));
+        auto tileProvider = new OsmAnd::BinaryMapRasterLayerProvider_Software(binaryMapPrimitivesProvider);
+        renderer->setMapLayerProvider(layerIdx, std::shared_ptr<OsmAnd::IMapLayerProvider>(tileProvider));
     }
     else if (idx == 4)
     {
         if (!binaryMapDataProvider)
             binaryMapDataProvider.reset(new OsmAnd::BinaryMapDataProvider(obfsCollection));
-        if (!binaryMapPrimitivesProvider)
-            binaryMapPrimitivesProvider.reset(new OsmAnd::BinaryMapPrimitivesProvider(binaryMapDataProvider, primitivizer));
+        binaryMapPrimitivesProvider.reset(new OsmAnd::BinaryMapPrimitivesProvider(binaryMapDataProvider, primitivizer));
 
         // bicycle
         QHash< QString, QString > settings;
         settings.insert("appMode", "bicycle");
         mapPresentationEnvironment->setSettings(settings);
 
-        auto tileProvider = new OsmAnd::BinaryMapRasterBitmapTileProvider_Software(binaryMapPrimitivesProvider);
-        renderer->setRasterLayerProvider(layerId, std::shared_ptr<OsmAnd::IMapRasterBitmapTileProvider>(tileProvider));
+        auto tileProvider = new OsmAnd::BinaryMapRasterLayerProvider_Software(binaryMapPrimitivesProvider);
+        renderer->setMapLayerProvider(layerIdx, std::shared_ptr<OsmAnd::IMapLayerProvider>(tileProvider));
     }
     else if (idx == 5)
     {
         if (!binaryMapDataProvider)
             binaryMapDataProvider.reset(new OsmAnd::BinaryMapDataProvider(obfsCollection));
-        if (!binaryMapPrimitivesProvider)
-            binaryMapPrimitivesProvider.reset(new OsmAnd::BinaryMapPrimitivesProvider(binaryMapDataProvider, primitivizer));
+        binaryMapPrimitivesProvider.reset(new OsmAnd::BinaryMapPrimitivesProvider(binaryMapDataProvider, primitivizer));
 
         // pedestrian
         QHash< QString, QString > settings;
         settings.insert("appMode", "pedestrian");
         mapPresentationEnvironment->setSettings(settings);
 
-        auto tileProvider = new OsmAnd::BinaryMapRasterBitmapTileProvider_Software(binaryMapPrimitivesProvider);
-        renderer->setRasterLayerProvider(layerId, std::shared_ptr<OsmAnd::IMapRasterBitmapTileProvider>(tileProvider));
+        auto tileProvider = new OsmAnd::BinaryMapRasterLayerProvider_Software(binaryMapPrimitivesProvider);
+        renderer->setMapLayerProvider(layerIdx, std::shared_ptr<OsmAnd::IMapLayerProvider>(tileProvider));
     }
     else if (idx == 6)
     {
         if (!binaryMapDataProvider)
             binaryMapDataProvider.reset(new OsmAnd::BinaryMapDataProvider(obfsCollection));
 
-        auto tileProvider = new OsmAnd::BinaryMapDataMetricsBitmapTileProvider(binaryMapDataProvider);
-        renderer->setRasterLayerProvider(layerId, std::shared_ptr<OsmAnd::IMapRasterBitmapTileProvider>(tileProvider));
+        auto tileProvider = new OsmAnd::BinaryMapDataMetricsLayerProvider(binaryMapDataProvider);
+        renderer->setMapLayerProvider(layerIdx, std::shared_ptr<OsmAnd::IMapLayerProvider>(tileProvider));
     }
     else if (idx == 7)
     {
         if (!binaryMapDataProvider)
             binaryMapDataProvider.reset(new OsmAnd::BinaryMapDataProvider(obfsCollection));
-        if (!binaryMapPrimitivesProvider)
-            binaryMapPrimitivesProvider.reset(new OsmAnd::BinaryMapPrimitivesProvider(binaryMapDataProvider, primitivizer));
+        binaryMapPrimitivesProvider.reset(new OsmAnd::BinaryMapPrimitivesProvider(binaryMapDataProvider, primitivizer));
 
-        auto tileProvider = new OsmAnd::BinaryMapPrimitivesMetricsBitmapTileProvider(binaryMapPrimitivesProvider);
-        renderer->setRasterLayerProvider(layerId, std::shared_ptr<OsmAnd::IMapRasterBitmapTileProvider>(tileProvider));
+        auto tileProvider = new OsmAnd::BinaryMapPrimitivesMetricsLayerProvider(binaryMapPrimitivesProvider);
+        renderer->setMapLayerProvider(layerIdx, std::shared_ptr<OsmAnd::IMapLayerProvider>(tileProvider));
     }
     else if (idx == 8)
     {
         if (!binaryMapDataProvider)
             binaryMapDataProvider.reset(new OsmAnd::BinaryMapDataProvider(obfsCollection));
-        if (!binaryMapPrimitivesProvider)
-            binaryMapPrimitivesProvider.reset(new OsmAnd::BinaryMapPrimitivesProvider(binaryMapDataProvider, primitivizer));
+        binaryMapPrimitivesProvider.reset(new OsmAnd::BinaryMapPrimitivesProvider(binaryMapDataProvider, primitivizer));
 
-        auto tileProvider = new OsmAnd::BinaryMapRasterMetricsBitmapTileProvider(
-            std::shared_ptr<OsmAnd::BinaryMapRasterBitmapTileProvider>(new OsmAnd::BinaryMapRasterBitmapTileProvider_Software(binaryMapPrimitivesProvider)));
-        renderer->setRasterLayerProvider(layerId, std::shared_ptr<OsmAnd::IMapRasterBitmapTileProvider>(tileProvider));
+        auto tileProvider = new OsmAnd::BinaryMapRasterMetricsLayerProvider(
+            std::shared_ptr<OsmAnd::BinaryMapRasterLayerProvider>(new OsmAnd::BinaryMapRasterLayerProvider_Software(binaryMapPrimitivesProvider)));
+        renderer->setMapLayerProvider(layerIdx, std::shared_ptr<OsmAnd::IMapLayerProvider>(tileProvider));
     }
     //else if (idx == 7)
     //{
@@ -1058,10 +1133,27 @@ void displayHandler()
     verifyOpenGL();
     //////////////////////////////////////////////////////////////////////////
 
-    renderer->update();
+    OsmAnd::Stopwatch totalStopwatch(true);
 
-    if (renderer->prepareFrame())
-        renderer->renderFrame();
+    OsmAnd::IMapRenderer_Metrics::Metric_update updateMetrics;
+    OsmAnd::IMapRenderer_Metrics::Metric_prepareFrame prepareMetrics;
+    OsmAnd::AtlasMapRenderer_Metrics::Metric_renderFrame renderMetrics;
+
+    renderer->update(&updateMetrics);
+    if (renderer->prepareFrame(&prepareMetrics))
+        renderer->renderFrame(&renderMetrics);
+
+    const auto totalElapsed = totalStopwatch.elapsed();
+    OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info,
+        "Frame time %fs%s: update %d%%, prepare %d%%, render %d%%:\n%s\n%s\n%s",
+        totalElapsed,
+        totalElapsed > 0.033f ? qPrintable(QString(QLatin1String(" (%1 < 60fps)")).arg(static_cast<unsigned int>(1.0f / totalElapsed))) : "",
+        static_cast<unsigned int>((updateMetrics.elapsedTime / totalElapsed) * 100),
+        static_cast<unsigned int>((prepareMetrics.elapsedTime / totalElapsed) * 100),
+        static_cast<unsigned int>((renderMetrics.elapsedTime / totalElapsed) * 100),
+        qPrintable(updateMetrics.toString(QString(QLatin1String("update.")))),
+        qPrintable(prepareMetrics.toString(QString(QLatin1String("prepare.")))),
+        qPrintable(renderMetrics.toString(QString(QLatin1String("render.")))));
     
     verifyOpenGL();
 
@@ -1109,7 +1201,7 @@ void displayHandler()
 
         glRasterPos2f(8, t - 16 * 2);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("fog distance (keys r,f): %1").arg(state.fogDistance)));
+            QString("fog distance (keys r,f): %1").arg(state.fogConfiguration.distanceToFog)));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * 3);
@@ -1159,17 +1251,17 @@ void displayHandler()
 
         glRasterPos2f(8, t - 16 * 12);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("fog density (keys t,g) : %1").arg(state.fogDensity)));
+            QString("fog density (keys t,g) : %1").arg(state.fogConfiguration.density)));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * 13);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("fog origin F (keys u,j): %1").arg(state.fogOriginFactor)));
+            QString("fog origin F (keys u,j): %1").arg(state.fogConfiguration.originFactor)));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * 14);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("height scale (keys o,l): %1").arg(state.elevationDataScaleFactor)));
+            QString("height scale (keys o,l): %1").arg(state.elevationDataConfiguration.scaleFactor)));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * 15);
@@ -1184,7 +1276,7 @@ void displayHandler()
 
         glRasterPos2f(8, t - 16 * 17);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("symbols (key z)        : %1").arg(!state.symbolProviders.isEmpty())));
+            QString("symbols (key z)        : %1").arg(!state.keyedSymbolsProviders.isEmpty() || !state.tiledSymbolsProviders.isEmpty())));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * 18);
