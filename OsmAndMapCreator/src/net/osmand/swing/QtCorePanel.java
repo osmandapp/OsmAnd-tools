@@ -197,7 +197,7 @@ public class QtCorePanel implements GLEventListener {
 		mapRenderer.setConfiguration(AtlasMapRendererConfiguration.Casts
 				.downcastTo_MapRendererConfiguration(atlasRendererConfiguration));
 
-		mapRenderer.addSymbolProvider(binaryMapStaticSymbolsProvider);
+		mapRenderer.addSymbolsProvider(binaryMapStaticSymbolsProvider);
 		mapRenderer.setAzimuth(0.0f);
 		mapRenderer.setElevationAngle(90);
 
@@ -206,7 +206,7 @@ public class QtCorePanel implements GLEventListener {
 		 * IMapRasterLayerProvider mapnik = OnlineTileSources.getBuiltIn().createProviderFor("Mapnik (OsmAnd)"); if
 		 * (mapnik == null) Log.e(TAG, "Failed to create mapnik");
 		 */
-		mapRenderer.setRasterLayerProvider(RasterMapLayerId.BaseLayer, binaryMapRasterLayerProvider);
+		mapRenderer.setMapLayerProvider(0, binaryMapRasterLayerProvider);
 	}
 
 	private class RenderRequestCallback extends MapRendererSetupOptions.IFrameUpdateRequestCallback {
