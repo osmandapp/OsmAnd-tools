@@ -18,7 +18,7 @@ import net.osmand.core.jni.AreaI;
 import net.osmand.core.jni.AtlasMapRendererConfiguration;
 import net.osmand.core.jni.BinaryMapDataProvider;
 import net.osmand.core.jni.BinaryMapPrimitivesProvider;
-import net.osmand.core.jni.BinaryMapRasterBitmapTileProvider_Software;
+import net.osmand.core.jni.BinaryMapRasterLayerProvider_Software;
 import net.osmand.core.jni.BinaryMapStaticSymbolsProvider;
 import net.osmand.core.jni.CoreResourcesEmbeddedBundle;
 import net.osmand.core.jni.IMapRenderer;
@@ -175,7 +175,7 @@ public class QtCorePanel implements GLEventListener {
 				binaryMapDataProvider, primitiviser, rasterTileSize);
 		BinaryMapStaticSymbolsProvider binaryMapStaticSymbolsProvider = new BinaryMapStaticSymbolsProvider(
 				binaryMapPrimitivesProvider, rasterTileSize);
-		BinaryMapRasterBitmapTileProvider_Software binaryMapRasterBitmapTileProvider = new BinaryMapRasterBitmapTileProvider_Software(
+		BinaryMapRasterLayerProvider_Software binaryMapRasterLayerProvider = new BinaryMapRasterLayerProvider_Software(
 				binaryMapPrimitivesProvider);
 
 		mapRenderer = OsmAndCore.createMapRenderer(MapRendererClass.AtlasMapRenderer_OpenGL2plus);
@@ -203,10 +203,10 @@ public class QtCorePanel implements GLEventListener {
 
 		mapCanvas.updateRenderer();
 		/*
-		 * IMapRasterBitmapTileProvider mapnik = OnlineTileSources.getBuiltIn().createProviderFor("Mapnik (OsmAnd)"); if
+		 * IMapRasterLayerProvider mapnik = OnlineTileSources.getBuiltIn().createProviderFor("Mapnik (OsmAnd)"); if
 		 * (mapnik == null) Log.e(TAG, "Failed to create mapnik");
 		 */
-		mapRenderer.setRasterLayerProvider(RasterMapLayerId.BaseLayer, binaryMapRasterBitmapTileProvider);
+		mapRenderer.setRasterLayerProvider(RasterMapLayerId.BaseLayer, binaryMapRasterLayerProvider);
 	}
 
 	private class RenderRequestCallback extends MapRendererSetupOptions.IFrameUpdateRequestCallback {
