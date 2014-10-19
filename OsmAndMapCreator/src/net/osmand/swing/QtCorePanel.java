@@ -6,8 +6,6 @@ import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseWheelEvent;
-import java.util.HashMap;
-import java.util.Map;
 import java.io.File;
 
 import javax.media.opengl.GLAutoDrawable;
@@ -18,22 +16,19 @@ import net.osmand.core.jni.AreaI;
 import net.osmand.core.jni.AtlasMapRendererConfiguration;
 import net.osmand.core.jni.BinaryMapDataProvider;
 import net.osmand.core.jni.BinaryMapPrimitivesProvider;
-import net.osmand.core.jni.BinaryMapRasterLayerProvider_Software;
 import net.osmand.core.jni.BinaryMapStaticSymbolsProvider;
 import net.osmand.core.jni.CoreResourcesEmbeddedBundle;
 import net.osmand.core.jni.IMapRenderer;
-import net.osmand.core.jni.IMapStylesCollection;
 import net.osmand.core.jni.MapPresentationEnvironment;
 import net.osmand.core.jni.MapRendererClass;
 import net.osmand.core.jni.MapRendererSetupOptions;
-import net.osmand.core.jni.ResolvedMapStyle;
 import net.osmand.core.jni.MapStylesCollection;
 import net.osmand.core.jni.ObfsCollection;
 import net.osmand.core.jni.OsmAndCore;
 import net.osmand.core.jni.PointI;
 import net.osmand.core.jni.Primitiviser;
-import net.osmand.core.jni.RasterMapLayerId;
 import net.osmand.core.jni.QStringStringHash;
+import net.osmand.core.jni.ResolvedMapStyle;
 import net.osmand.data.LatLon;
 import net.osmand.util.MapUtils;
 
@@ -175,8 +170,8 @@ public class QtCorePanel implements GLEventListener {
 				binaryMapDataProvider, primitiviser, rasterTileSize);
 		BinaryMapStaticSymbolsProvider binaryMapStaticSymbolsProvider = new BinaryMapStaticSymbolsProvider(
 				binaryMapPrimitivesProvider, rasterTileSize);
-		BinaryMapRasterLayerProvider_Software binaryMapRasterLayerProvider = new BinaryMapRasterLayerProvider_Software(
-				binaryMapPrimitivesProvider);
+//		binaryMapRasterLayerProvider binaryMapRasterLayerProvider = new BinaryMapRasterLayerProvider_Software(
+//				binaryMapPrimitivesProvider);
 
 		mapRenderer = OsmAndCore.createMapRenderer(MapRendererClass.AtlasMapRenderer_OpenGL2plus);
 		if (mapRenderer == null) {
@@ -197,7 +192,7 @@ public class QtCorePanel implements GLEventListener {
 		mapRenderer.setConfiguration(AtlasMapRendererConfiguration.Casts
 				.downcastTo_MapRendererConfiguration(atlasRendererConfiguration));
 
-		mapRenderer.addSymbolsProvider(binaryMapStaticSymbolsProvider);
+		mapRenderer.addSymbolProvider(binaryMapStaticSymbolsProvider);
 		mapRenderer.setAzimuth(0.0f);
 		mapRenderer.setElevationAngle(90);
 
@@ -206,7 +201,7 @@ public class QtCorePanel implements GLEventListener {
 		 * IMapRasterLayerProvider mapnik = OnlineTileSources.getBuiltIn().createProviderFor("Mapnik (OsmAnd)"); if
 		 * (mapnik == null) Log.e(TAG, "Failed to create mapnik");
 		 */
-		mapRenderer.setMapLayerProvider(0, binaryMapRasterLayerProvider);
+//		mapRenderer.setMapLayerProvider(0, binaryMapRasterLayerProvider);
 	}
 
 	private class RenderRequestCallback extends MapRendererSetupOptions.IFrameUpdateRequestCallback {
