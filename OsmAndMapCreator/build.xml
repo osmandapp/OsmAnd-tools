@@ -28,6 +28,11 @@
 		<mkdir dir="${bin.absolute.dir}"/>
 		<mkdir dir="${bintests.dir}"/>
 	</target>
+	
+	<target name="download_resources">
+	    <get src="http://builder.osmand.net:81/binaries/amd64-linux-clang/OsmAndCore_JavaSample1.jar"
+	        dest="lib-gl/OsmAndCore_jni.jar"  usetimestamp="true"/>
+	</target>
 
 	<target name="copy_resources">
 		<mkdir dir="${icons.absolute.dir}"/>
@@ -103,7 +108,7 @@
 		<delete dir="${bin.absolute.dir}"/>
 	</target>
 
-	<target name="compile" depends="copy_resources,-dirs,-version">
+	<target name="compile" depends="copy_resources,download_resources,-dirs,-version">
 		<copy todir="${bin.absolute.dir}">
 			<fileset dir="${src.absolute.dir}">
 				<exclude name="**/*.java" />

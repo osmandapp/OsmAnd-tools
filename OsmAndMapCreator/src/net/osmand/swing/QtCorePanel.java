@@ -16,6 +16,7 @@ import net.osmand.core.jni.AreaI;
 import net.osmand.core.jni.AtlasMapRendererConfiguration;
 import net.osmand.core.jni.BinaryMapDataProvider;
 import net.osmand.core.jni.BinaryMapPrimitivesProvider;
+import net.osmand.core.jni.BinaryMapRasterLayerProvider_Software;
 import net.osmand.core.jni.BinaryMapStaticSymbolsProvider;
 import net.osmand.core.jni.CoreResourcesEmbeddedBundle;
 import net.osmand.core.jni.IMapRenderer;
@@ -170,8 +171,8 @@ public class QtCorePanel implements GLEventListener {
 				binaryMapDataProvider, primitiviser, rasterTileSize);
 		BinaryMapStaticSymbolsProvider binaryMapStaticSymbolsProvider = new BinaryMapStaticSymbolsProvider(
 				binaryMapPrimitivesProvider, rasterTileSize);
-//		binaryMapRasterLayerProvider binaryMapRasterLayerProvider = new BinaryMapRasterLayerProvider_Software(
-//				binaryMapPrimitivesProvider);
+		BinaryMapRasterLayerProvider_Software binaryMapRasterLayerProvider = new BinaryMapRasterLayerProvider_Software(
+				binaryMapPrimitivesProvider);
 
 		mapRenderer = OsmAndCore.createMapRenderer(MapRendererClass.AtlasMapRenderer_OpenGL2plus);
 		if (mapRenderer == null) {
@@ -192,7 +193,7 @@ public class QtCorePanel implements GLEventListener {
 		mapRenderer.setConfiguration(AtlasMapRendererConfiguration.Casts
 				.downcastTo_MapRendererConfiguration(atlasRendererConfiguration));
 
-		mapRenderer.addSymbolProvider(binaryMapStaticSymbolsProvider);
+		mapRenderer.addSymbolsProvider(binaryMapStaticSymbolsProvider);
 		mapRenderer.setAzimuth(0.0f);
 		mapRenderer.setElevationAngle(90);
 
@@ -201,7 +202,7 @@ public class QtCorePanel implements GLEventListener {
 		 * IMapRasterLayerProvider mapnik = OnlineTileSources.getBuiltIn().createProviderFor("Mapnik (OsmAnd)"); if
 		 * (mapnik == null) Log.e(TAG, "Failed to create mapnik");
 		 */
-//		mapRenderer.setMapLayerProvider(0, binaryMapRasterLayerProvider);
+		mapRenderer.setMapLayerProvider(0, binaryMapRasterLayerProvider);
 	}
 
 	private class RenderRequestCallback extends MapRendererSetupOptions.IFrameUpdateRequestCallback {
