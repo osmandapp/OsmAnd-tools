@@ -12,3 +12,6 @@ add_subdirectory("${OSMAND_ROOT}/tools/style-evaluator" "tools/style-evaluator")
 
 # 3D Map renderer (development)
 add_subdirectory("${OSMAND_ROOT}/tools/map-viewer" "tools/map-viewer")
+
+# InApp-Purchase product generator
+add_subdirectory("${OSMAND_ROOT}/tools/iap-generator" "tools/iap-generator")

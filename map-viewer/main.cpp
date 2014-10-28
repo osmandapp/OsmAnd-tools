@@ -309,8 +309,8 @@ int main(int argc, char** argv)
     */
 
     //////////////////////////////////////////////////////////////////////////
-    //QHash< QString, std::shared_ptr<const OsmAnd::WorldRegions::WorldRegion> > worldRegions;
-    //OsmAnd::WorldRegions("d:\\OpenSource\\OsmAnd\\OsmAnd\\resources\\countries-info\\regions.ocbf").loadWorldRegions(worldRegions);
+    QHash< QString, std::shared_ptr<const OsmAnd::WorldRegions::WorldRegion> > worldRegions;
+    OsmAnd::WorldRegions("d:\\OpenSource\\OsmAnd\\OsmAnd\\resources\\countries-info\\regions.ocbf").loadWorldRegions(worldRegions);
     //////////////////////////////////////////////////////////////////////////
 
     if (dataDirSpecified)
@@ -645,10 +645,7 @@ void mouseHandler(int button, int state, int x, int y)
                 if (const auto group = mapSymbol->group.lock())
                 {
                     OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, " - symbols in group %d", group->symbols.size());
-                    if (const auto binaryMapObjectSymbolsGroup = std::dynamic_pointer_cast<const OsmAnd::BinaryMapObjectSymbolsGroup>(group))
-                    {
-                        OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, " - from OSM #%" PRIu64, binaryMapObjectSymbolsGroup->id >> 1);
-                    }
+                    OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, " - from %s", qPrintable(group->getDebugTitle()));
                 }
             }
         }
