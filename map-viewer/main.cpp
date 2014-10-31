@@ -309,8 +309,8 @@ int main(int argc, char** argv)
     */
 
     //////////////////////////////////////////////////////////////////////////
-    QHash< QString, std::shared_ptr<const OsmAnd::WorldRegions::WorldRegion> > worldRegions;
-    OsmAnd::WorldRegions("d:\\OpenSource\\OsmAnd\\OsmAnd\\resources\\countries-info\\regions.ocbf").loadWorldRegions(worldRegions);
+    //QHash< QString, std::shared_ptr<const OsmAnd::WorldRegions::WorldRegion> > worldRegions;
+    //OsmAnd::WorldRegions("d:\\OpenSource\\OsmAnd\\OsmAnd\\resources\\countries-info\\regions.ocbf").loadWorldRegions(worldRegions);
     //////////////////////////////////////////////////////////////////////////
 
     if (dataDirSpecified)
@@ -472,7 +472,7 @@ int main(int argc, char** argv)
         704978668));
         renderer->setZoom(11.0f);
     renderer->setZoom(10.0f);
-    //renderer->setZoom(4.0f);
+    renderer->setZoom(4.0f);
 
     // Kiev
     //renderer->setTarget(OsmAnd::PointI(
@@ -500,10 +500,10 @@ int main(int argc, char** argv)
     //renderer->setZoom(15.0f);
 
     // Bug3
-    renderer->setTarget(OsmAnd::Utilities::convertLatLonTo31(OsmAnd::LatLon(
+    /*renderer->setTarget(OsmAnd::Utilities::convertLatLonTo31(OsmAnd::LatLon(
         50.1324,
         14.3951)));
-    renderer->setZoom(14.0f);
+        renderer->setZoom(14.0f);*/
     
     // Synthetic
     /*renderer->setTarget(OsmAnd::Utilities::convertLatLonTo31(OsmAnd::LatLon(

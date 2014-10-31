@@ -53,10 +53,9 @@ int main(int argc, char* argv[])
         return -1;
     }
 
-    // Evaluate style
-    bool rejected = true;
-    QHash<QString, QString> evaluatedValues;
-    const auto success = OsmAndTools::Styler(configuration).evaluate(rejected, evaluatedValues);
+    // Evaluate map objects
+    OsmAndTools::Styler::EvaluatedMapObjects evaluatedMapObjects;
+    const auto success = OsmAndTools::Styler(configuration).evaluate(evaluatedMapObjects);
 
     OsmAnd::ReleaseCore();
 
@@ -80,11 +79,13 @@ void printUsage(const std::string& warning /*= std::string()*/)
     tcout << std::endl;
     tcout << xT("Arguments:") << std::endl;
     tcout << xT("\t-obfsPath=path/to/OBFs/collection or -obfsRecursivePath=path/to/OBFs/collection or -obfFile=OBF/file/path/with/name.obf ...") << std::endl;
-    tcout << xT("\t-mapObject=id ...") << std::endl;
+    tcout << xT("\t[-mapObject=id ...]") << std::endl;
     tcout << xT("\t[-stylesPath=path/to/main/styles or -stylesRecursivePath=path/to/main/styles ...]") << std::endl;
     tcout << xT("\t[-styleName=default]") << std::endl;
     tcout << xT("\t[-styleSetting:name=value ...]") << std::endl;
     tcout << xT("\t[-zoom=15]") << std::endl;
     tcout << xT("\t[-displayDensityFactor=1.0]") << std::endl;
+    tcout << xT("\t[-locale=en]") << std::endl;
+    tcout << xT("\t[-excludeCoastlines]") << std::endl;
     tcout << xT("\t[-verbose]") << std::endl;
 }
