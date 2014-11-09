@@ -80,7 +80,7 @@ def process_points(cond, filename, array):
 
 if __name__ == "__main__":
 	process_points("place in ('sea','ocean','state', 'country') "
-				   " or \"natural\" in ('peak', 'cave_entrance', 'rock', 'waterfall', 'cape', 'volcano', 'stream')"
+				   " or \"natural\" in ('peak', 'cave_entrance', 'rock', 'waterfall', 'cape', 'volcano', 'stream', 'strait', 'reef')"
 				   " or tourism in ('alpine_hut') "
 				   " or aeroway in ('aerodrome', 'airport')", 'points.osm', 
 				   ['name', 'name:en',
