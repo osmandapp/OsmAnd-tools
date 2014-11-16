@@ -86,6 +86,6 @@ void printUsage(const std::string& warning /*= std::string()*/)
     tcout << xT("\t[-zoom=15]") << std::endl;
     tcout << xT("\t[-displayDensityFactor=1.0]") << std::endl;
     tcout << xT("\t[-locale=en]") << std::endl;
-    tcout << xT("\t[-excludeCoastlines]") << std::endl;
+    tcout << xT("\t[-styleDump=path/to/dump.txt]") << std::endl;
     tcout << xT("\t[-verbose]") << std::endl;
 }

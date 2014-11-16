@@ -31,7 +31,7 @@
 #include <OsmAndCore/ObfDataInterface.h>
 #include <OsmAndCore/WorldRegions.h>
 #include <OsmAndCore/RoadLocator.h>
-#include <OsmAndCore/Data/Model/Road.h>
+#include <OsmAndCore/Data/Road.h>
 #include <OsmAndCore/Data/ObfRoutingSectionInfo.h>
 #include <OsmAndCore/Map/MapRasterizer.h>
 #include <OsmAndCore/Map/MapPresentationEnvironment.h>
@@ -49,16 +49,15 @@
 #include <OsmAndCore/Map/HillshadeTileProvider.h>
 #include <OsmAndCore/Map/IMapElevationDataProvider.h>
 #include <OsmAndCore/Map/HeightmapTileProvider.h>
-#include <OsmAndCore/Map/BinaryMapDataProvider.h>
-#include <OsmAndCore/Map/BinaryMapPrimitivesProvider.h>
-#include <OsmAndCore/Map/BinaryMapRasterLayerProvider_Software.h>
-#include <OsmAndCore/Map/BinaryMapRasterLayerProvider_GPU.h>
-#include <OsmAndCore/Map/BinaryMapRasterMetricsLayerProvider.h>
-#include <OsmAndCore/Map/BinaryMapDataMetricsLayerProvider.h>
-#include <OsmAndCore/Map/BinaryMapPrimitivesProvider.h>
-#include <OsmAndCore/Map/BinaryMapPrimitivesMetricsLayerProvider.h>
-#include <OsmAndCore/Map/BinaryMapStaticSymbolsProvider.h>
-#include <OsmAndCore/Map/BinaryMapObjectSymbolsGroup.h>
+#include <OsmAndCore/Map/BinaryMapObjectsProvider.h>
+#include <OsmAndCore/Map/MapPrimitivesProvider.h>
+#include <OsmAndCore/Map/MapRasterLayerProvider_Software.h>
+#include <OsmAndCore/Map/MapRasterLayerProvider_GPU.h>
+#include <OsmAndCore/Map/MapRasterMetricsLayerProvider.h>
+#include <OsmAndCore/Map/BinaryMapObjectsMetricsLayerProvider.h>
+#include <OsmAndCore/Map/MapPrimitivesProvider.h>
+#include <OsmAndCore/Map/MapPrimitivesMetricsLayerProvider.h>
+#include <OsmAndCore/Map/MapObjectsSymbolsProvider.h>
 #include <OsmAndCore/Map/MapMarkersCollection.h>
 #include <OsmAndCore/Map/MapMarkerBuilder.h>
 #include <OsmAndCore/Map/MapMarker.h>
@@ -67,6 +66,9 @@
 #include <OsmAndCore/Map/IBillboardMapSymbol.h>
 #include <OsmAndCore/FavoriteLocationsGpxCollection.h>
 #include <OsmAndCore/Map/FavoriteLocationsPresenter.h>
+#include <OsmAndCore/GeoInfoDocument.h>
+#include <OsmAndCore/GpxDocument.h>
+#include <OsmAndCore/Map/GeoInfoPresenter.h>
 #include <OsmAndCore/Search/InAreaSearchEngine.h>
 #include <OsmAndCore/Search/InAreaSearchSession.h>
 #include <OsmAndCore/Search/PoiSearchDataSource.h>
@@ -78,19 +80,20 @@ OsmAnd::AreaI viewport;
 std::shared_ptr<OsmAnd::IMapRenderer> renderer;
 std::shared_ptr<OsmAnd::ResourcesManager> resourcesManager;
 std::shared_ptr<const OsmAnd::IObfsCollection> obfsCollection;
-std::shared_ptr<OsmAnd::BinaryMapDataProvider> binaryMapDataProvider;
+std::shared_ptr<OsmAnd::BinaryMapObjectsProvider> binaryMapObjectsProvider;
 std::shared_ptr<OsmAnd::MapPresentationEnvironment> mapPresentationEnvironment;
-std::shared_ptr<OsmAnd::Primitiviser> primitivizer;
-std::shared_ptr<OsmAnd::BinaryMapPrimitivesProvider> binaryMapPrimitivesProvider;
+std::shared_ptr<OsmAnd::MapPrimitiviser> primitivizer;
+std::shared_ptr<OsmAnd::MapPrimitivesProvider> mapPrimitivesProvider;
 std::shared_ptr<const OsmAnd::IMapStylesCollection> stylesCollection;
 std::shared_ptr<const OsmAnd::ResolvedMapStyle> style;
 std::shared_ptr<OsmAnd::MapAnimator> animator;
-std::shared_ptr<OsmAnd::BinaryMapStaticSymbolsProvider> binaryMapStaticSymbolProvider;
+std::shared_ptr<OsmAnd::MapObjectsSymbolsProvider> mapObjectsSymbolsProvider;
 std::shared_ptr<OsmAnd::MapMarkersCollection> markers;
 std::shared_ptr<OsmAnd::FavoriteLocationsGpxCollection> favorites;
 std::shared_ptr<OsmAnd::FavoriteLocationsPresenter> favoritesPresenter;
 std::shared_ptr<OsmAnd::MapMarker> lastClickedLocationMarker;
 std::shared_ptr<OsmAnd::RoadLocator> roadLocator;
+std::shared_ptr<OsmAnd::GeoInfoPresenter> gpxPresenter;
 
 bool obfsDirSpecified = false;
 QDir obfsDir;
@@ -150,6 +153,8 @@ int main(int argc, char** argv)
         return EXIT_FAILURE;
     }
     std::cout << "Initialized Core" << std::endl;
+    
+    //////////////////////////////////////////////////////////////////////////
 
     const std::unique_ptr<SkImageDecoder> pngDecoder(CreatePNGImageDecoder());
 
@@ -309,6 +314,16 @@ int main(int argc, char** argv)
     */
 
     //////////////////////////////////////////////////////////////////////////
+
+    QList< std::shared_ptr<const OsmAnd::GeoInfoDocument> > geoInfoDocs;
+    if (QFile::exists(QLatin1String("osmand.gpx")))
+        geoInfoDocs.append(OsmAnd::GpxDocument::loadFrom("osmand.gpx"));
+    gpxPresenter.reset(new OsmAnd::GeoInfoPresenter(geoInfoDocs));
+    
+    //////////////////////////////////////////////////////////////////////////
+
+   
+    //////////////////////////////////////////////////////////////////////////
     //QHash< QString, std::shared_ptr<const OsmAnd::WorldRegions::WorldRegion> > worldRegions;
     //OsmAnd::WorldRegions("d:\\OpenSource\\OsmAnd\\OsmAnd\\resources\\countries-info\\regions.ocbf").loadWorldRegions(worldRegions);
     //////////////////////////////////////////////////////////////////////////
@@ -388,7 +403,7 @@ int main(int argc, char** argv)
 
     roadLocator.reset(new OsmAnd::RoadLocator(obfsCollection));
     mapPresentationEnvironment.reset(new OsmAnd::MapPresentationEnvironment(style, density, "ru"));
-    primitivizer.reset(new OsmAnd::Primitiviser(mapPresentationEnvironment));
+    primitivizer.reset(new OsmAnd::MapPrimitiviser(mapPresentationEnvironment));
 
     OsmAnd::MapRendererSetupOptions rendererSetup;
     rendererSetup.frameUpdateRequestCallback =
@@ -470,9 +485,9 @@ int main(int argc, char** argv)
     renderer->setTarget(OsmAnd::PointI(
         1102430866,
         704978668));
-        renderer->setZoom(11.0f);
-    renderer->setZoom(10.0f);
-    renderer->setZoom(4.0f);
+    renderer->setZoom(13.0f);
+    //renderer->setZoom(10.0f);
+    //renderer->setZoom(4.0f);
 
     // Kiev
     //renderer->setTarget(OsmAnd::PointI(
@@ -545,8 +560,8 @@ int main(int argc, char** argv)
     renderer.reset();
     resourcesManager.reset();
     obfsCollection.reset();
-    binaryMapDataProvider.reset();
-    binaryMapPrimitivesProvider.reset();
+    binaryMapObjectsProvider.reset();
+    mapPrimitivesProvider.reset();
     stylesCollection.reset();
     style.reset();
     animator.reset();
@@ -615,7 +630,7 @@ void mouseHandler(int button, int state, int x, int y)
                     OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, "Found unnamed road");
                 else
                 {
-                    const auto name = road->captions[road->section->encodingDecodingRules->name_encodingRuleId];
+                    const auto name = road->captions[road->encodingDecodingRules->name_encodingRuleId];
                     OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, "Found road: %s", qPrintable(name));
                 }
             }
@@ -645,7 +660,7 @@ void mouseHandler(int button, int state, int x, int y)
                 if (const auto group = mapSymbol->group.lock())
                 {
                     OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, " - symbols in group %d", group->symbols.size());
-                    OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, " - from %s", qPrintable(group->getDebugTitle()));
+                    OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, " - from %s", qPrintable(group->toString()));
                 }
             }
         }
@@ -697,8 +712,8 @@ void mouseWheelHandler(int button, int dir, int x, int y)
             configuration->referenceTileSizeOnScreenInPixels = 10;
         renderer->setConfiguration(configuration);
 
-        if (binaryMapStaticSymbolProvider)
-            binaryMapStaticSymbolProvider->referenceTileSizeInPixels = configuration->referenceTileSizeOnScreenInPixels;
+        if (mapObjectsSymbolsProvider)
+            mapObjectsSymbolsProvider->referenceTileSizeInPixels = configuration->referenceTileSizeOnScreenInPixels;
     }
     else
     {
@@ -895,18 +910,18 @@ void keyboardHandler(unsigned char key, int x, int y)
         break;
     case 'z':
     {
-        if (binaryMapStaticSymbolProvider && renderer->removeSymbolsProvider(binaryMapStaticSymbolProvider))
+        if (mapObjectsSymbolsProvider && renderer->removeSymbolsProvider(mapObjectsSymbolsProvider))
         {
-            binaryMapStaticSymbolProvider.reset();
+            mapObjectsSymbolsProvider.reset();
         }
         else
         {
-            if (!binaryMapDataProvider)
-                binaryMapDataProvider.reset(new OsmAnd::BinaryMapDataProvider(obfsCollection));
-            binaryMapPrimitivesProvider.reset(new OsmAnd::BinaryMapPrimitivesProvider(binaryMapDataProvider, primitivizer));
+            if (!binaryMapObjectsProvider)
+                binaryMapObjectsProvider.reset(new OsmAnd::BinaryMapObjectsProvider(obfsCollection));
+            mapPrimitivesProvider.reset(new OsmAnd::MapPrimitivesProvider(binaryMapObjectsProvider, primitivizer));
 
-            binaryMapStaticSymbolProvider.reset(new OsmAnd::BinaryMapStaticSymbolsProvider(binaryMapPrimitivesProvider, 256u));
-            renderer->addSymbolsProvider(binaryMapStaticSymbolProvider);
+            mapObjectsSymbolsProvider.reset(new OsmAnd::MapObjectsSymbolsProvider(mapPrimitivesProvider, 256u));
+            renderer->addSymbolsProvider(mapObjectsSymbolsProvider);
         }
     }
         break;
@@ -1016,85 +1031,97 @@ void activateProvider(int layerIdx, int idx)
     }
     else if (idx == 2)
     {
-        if (!binaryMapDataProvider)
-            binaryMapDataProvider.reset(new OsmAnd::BinaryMapDataProvider(obfsCollection));
-        binaryMapPrimitivesProvider.reset(new OsmAnd::BinaryMapPrimitivesProvider(binaryMapDataProvider, primitivizer));
+        if (!binaryMapObjectsProvider)
+            binaryMapObjectsProvider.reset(new OsmAnd::BinaryMapObjectsProvider(obfsCollection));
+        mapPrimitivesProvider.reset(new OsmAnd::MapPrimitivesProvider(binaryMapObjectsProvider, primitivizer));
 
         // general
         QHash< QString, QString > settings;
         settings.insert("appMode", "browse map");
         mapPresentationEnvironment->setSettings(settings);
 
-        auto tileProvider = new OsmAnd::BinaryMapRasterLayerProvider_Software(binaryMapPrimitivesProvider);
+        auto tileProvider = new OsmAnd::MapRasterLayerProvider_Software(mapPrimitivesProvider);
         renderer->setMapLayerProvider(layerIdx, std::shared_ptr<OsmAnd::IMapLayerProvider>(tileProvider));
+
+        //
+        {
+            const std::shared_ptr<OsmAnd::MapPrimitivesProvider> gpxPrimitivesProvider(new OsmAnd::MapPrimitivesProvider(
+                gpxPresenter->createMapObjectsProvider(),
+                primitivizer,
+                256,
+                OsmAnd::MapPrimitivesProvider::Mode::AllObjectsWithPolygonFiltering));
+            auto tileProvider = new OsmAnd::MapRasterLayerProvider_Software(gpxPrimitivesProvider, false);
+            renderer->setMapLayerProvider(10, std::shared_ptr<OsmAnd::IMapLayerProvider>(tileProvider));
+        }
+        //
     }
     else if (idx == 3)
     {
-        if (!binaryMapDataProvider)
-            binaryMapDataProvider.reset(new OsmAnd::BinaryMapDataProvider(obfsCollection));
-        binaryMapPrimitivesProvider.reset(new OsmAnd::BinaryMapPrimitivesProvider(binaryMapDataProvider, primitivizer));
+        if (!binaryMapObjectsProvider)
+            binaryMapObjectsProvider.reset(new OsmAnd::BinaryMapObjectsProvider(obfsCollection));
+        mapPrimitivesProvider.reset(new OsmAnd::MapPrimitivesProvider(binaryMapObjectsProvider, primitivizer));
 
         // car
         QHash< QString, QString > settings;
         settings.insert("appMode", "car");
         mapPresentationEnvironment->setSettings(settings);
 
-        auto tileProvider = new OsmAnd::BinaryMapRasterLayerProvider_Software(binaryMapPrimitivesProvider);
+        auto tileProvider = new OsmAnd::MapRasterLayerProvider_Software(mapPrimitivesProvider);
         renderer->setMapLayerProvider(layerIdx, std::shared_ptr<OsmAnd::IMapLayerProvider>(tileProvider));
     }
     else if (idx == 4)
     {
-        if (!binaryMapDataProvider)
-            binaryMapDataProvider.reset(new OsmAnd::BinaryMapDataProvider(obfsCollection));
-        binaryMapPrimitivesProvider.reset(new OsmAnd::BinaryMapPrimitivesProvider(binaryMapDataProvider, primitivizer));
+        if (!binaryMapObjectsProvider)
+            binaryMapObjectsProvider.reset(new OsmAnd::BinaryMapObjectsProvider(obfsCollection));
+        mapPrimitivesProvider.reset(new OsmAnd::MapPrimitivesProvider(binaryMapObjectsProvider, primitivizer));
 
         // bicycle
         QHash< QString, QString > settings;
         settings.insert("appMode", "bicycle");
         mapPresentationEnvironment->setSettings(settings);
 
-        auto tileProvider = new OsmAnd::BinaryMapRasterLayerProvider_Software(binaryMapPrimitivesProvider);
+        auto tileProvider = new OsmAnd::MapRasterLayerProvider_Software(mapPrimitivesProvider);
         renderer->setMapLayerProvider(layerIdx, std::shared_ptr<OsmAnd::IMapLayerProvider>(tileProvider));
     }
     else if (idx == 5)
     {
-        if (!binaryMapDataProvider)
-            binaryMapDataProvider.reset(new OsmAnd::BinaryMapDataProvider(obfsCollection));
-        binaryMapPrimitivesProvider.reset(new OsmAnd::BinaryMapPrimitivesProvider(binaryMapDataProvider, primitivizer));
+        if (!binaryMapObjectsProvider)
+            binaryMapObjectsProvider.reset(new OsmAnd::BinaryMapObjectsProvider(obfsCollection));
+        mapPrimitivesProvider.reset(new OsmAnd::MapPrimitivesProvider(binaryMapObjectsProvider, primitivizer));
 
         // pedestrian
         QHash< QString, QString > settings;
         settings.insert("appMode", "pedestrian");
         mapPresentationEnvironment->setSettings(settings);
 
-        auto tileProvider = new OsmAnd::BinaryMapRasterLayerProvider_Software(binaryMapPrimitivesProvider);
+        auto tileProvider = new OsmAnd::MapRasterLayerProvider_Software(mapPrimitivesProvider);
         renderer->setMapLayerProvider(layerIdx, std::shared_ptr<OsmAnd::IMapLayerProvider>(tileProvider));
     }
     else if (idx == 6)
     {
-        if (!binaryMapDataProvider)
-            binaryMapDataProvider.reset(new OsmAnd::BinaryMapDataProvider(obfsCollection));
+        if (!binaryMapObjectsProvider)
+            binaryMapObjectsProvider.reset(new OsmAnd::BinaryMapObjectsProvider(obfsCollection));
 
-        auto tileProvider = new OsmAnd::BinaryMapDataMetricsLayerProvider(binaryMapDataProvider);
+        auto tileProvider = new OsmAnd::BinaryMapObjectsMetricsLayerProvider(binaryMapObjectsProvider);
         renderer->setMapLayerProvider(layerIdx, std::shared_ptr<OsmAnd::IMapLayerProvider>(tileProvider));
     }
     else if (idx == 7)
     {
-        if (!binaryMapDataProvider)
-            binaryMapDataProvider.reset(new OsmAnd::BinaryMapDataProvider(obfsCollection));
-        binaryMapPrimitivesProvider.reset(new OsmAnd::BinaryMapPrimitivesProvider(binaryMapDataProvider, primitivizer));
+        if (!binaryMapObjectsProvider)
+            binaryMapObjectsProvider.reset(new OsmAnd::BinaryMapObjectsProvider(obfsCollection));
+        mapPrimitivesProvider.reset(new OsmAnd::MapPrimitivesProvider(binaryMapObjectsProvider, primitivizer));
 
-        auto tileProvider = new OsmAnd::BinaryMapPrimitivesMetricsLayerProvider(binaryMapPrimitivesProvider);
+        auto tileProvider = new OsmAnd::MapPrimitivesMetricsLayerProvider(mapPrimitivesProvider);
         renderer->setMapLayerProvider(layerIdx, std::shared_ptr<OsmAnd::IMapLayerProvider>(tileProvider));
     }
     else if (idx == 8)
     {
-        if (!binaryMapDataProvider)
-            binaryMapDataProvider.reset(new OsmAnd::BinaryMapDataProvider(obfsCollection));
-        binaryMapPrimitivesProvider.reset(new OsmAnd::BinaryMapPrimitivesProvider(binaryMapDataProvider, primitivizer));
+        if (!binaryMapObjectsProvider)
+            binaryMapObjectsProvider.reset(new OsmAnd::BinaryMapObjectsProvider(obfsCollection));
+        mapPrimitivesProvider.reset(new OsmAnd::MapPrimitivesProvider(binaryMapObjectsProvider, primitivizer));
 
-        auto tileProvider = new OsmAnd::BinaryMapRasterMetricsLayerProvider(
-            std::shared_ptr<OsmAnd::BinaryMapRasterLayerProvider>(new OsmAnd::BinaryMapRasterLayerProvider_Software(binaryMapPrimitivesProvider)));
+        auto tileProvider = new OsmAnd::MapRasterMetricsLayerProvider(
+            std::shared_ptr<OsmAnd::MapRasterLayerProvider>(new OsmAnd::MapRasterLayerProvider_Software(mapPrimitivesProvider)));
         renderer->setMapLayerProvider(layerIdx, std::shared_ptr<OsmAnd::IMapLayerProvider>(tileProvider));
     }
     //else if (idx == 7)
@@ -1149,9 +1176,9 @@ void displayHandler()
         static_cast<unsigned int>((updateMetrics.elapsedTime / totalElapsed) * 100),
         static_cast<unsigned int>((prepareMetrics.elapsedTime / totalElapsed) * 100),
         static_cast<unsigned int>((renderMetrics.elapsedTime / totalElapsed) * 100),
-        qPrintable(updateMetrics.toString(QString(QLatin1String("update.")))),
-        qPrintable(prepareMetrics.toString(QString(QLatin1String("prepare.")))),
-        qPrintable(renderMetrics.toString(QString(QLatin1String("render.")))));
+        qPrintable(updateMetrics.toString(false, QString(QLatin1String("update.")))),
+        qPrintable(prepareMetrics.toString(false, QString(QLatin1String("prepare.")))),
+        qPrintable(renderMetrics.toString(false, QString(QLatin1String("render.")))));
     
     verifyOpenGL();
 

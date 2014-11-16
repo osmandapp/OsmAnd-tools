@@ -13,13 +13,12 @@
 #include <QFile>
 
 #include <OsmAndCoreTools/Inspector.h>
+#include <OsmAndCore/CoreResourcesEmbeddedBundle.h>
 
 void printUsage(const QString& warning = QString::null);
 
 int main(int argc, char* argv[])
 {
-    /*
-    OsmAnd::InitializeCore();
 #if defined(UNICODE) || defined(_UNICODE)
 #   if defined(_WIN32)
     _setmode(_fileno(stdout), _O_U16TEXT);
@@ -27,25 +26,36 @@ int main(int argc, char* argv[])
     std::locale::global(std::locale(""));
 #   endif
 #endif
-    OsmAnd::Inspector::Configuration cfg;
 
+    // Initialize OsmAnd core
+    std::shared_ptr<const OsmAnd::CoreResourcesEmbeddedBundle> coreResourcesEmbeddedBundle;
+#if defined(OSMAND_CORE_STATIC)
+    coreResourcesEmbeddedBundle = OsmAnd::CoreResourcesEmbeddedBundle::loadFromCurrentExecutable();
+#else
+    coreResourcesEmbeddedBundle = OsmAnd::CoreResourcesEmbeddedBundle::loadFromLibrary(QLatin1String("OsmAndCore_ResourcesBundle_shared"));
+#endif // defined(OSMAND_CORE_STATIC)
+    OsmAnd::InitializeCore(coreResourcesEmbeddedBundle);
+
+    // Parse configuration
+    OsmAndTools ::Inspector::Configuration cfg;
     QString error;
     QStringList args;
     for (int idx = 1; idx < argc; idx++)
         args.push_back(argv[idx]);
-
-    if(!OsmAnd::Inspector::parseCommandLineArguments(args, cfg, error))
+    if (!OsmAndTools::Inspector::parseCommandLineArguments(args, cfg, error))
     {
         printUsage(error);
 
         OsmAnd::ReleaseCore();
         return -1;
     }
-    OsmAnd::Inspector::dumpToStdOut(cfg);
+
+    // Process
+    OsmAndTools::Inspector::dumpToStdOut(cfg);
 
     OsmAnd::ReleaseCore();
+
     return 0;
-    */
 }
 
 void printUsage(const QString& warning)
@@ -88,4 +98,3 @@ void printUsage(const QString& warning)
         << "[-bbox=LeftLon,TopLat,RightLon,BottomLan]" << std::endl;
 #endif
 }
-
