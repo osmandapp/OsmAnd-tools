@@ -1052,6 +1052,9 @@ void activateProvider(int layerIdx, int idx)
                 OsmAnd::MapPrimitivesProvider::Mode::AllObjectsWithPolygonFiltering));
             auto tileProvider = new OsmAnd::MapRasterLayerProvider_Software(gpxPrimitivesProvider, false);
             renderer->setMapLayerProvider(10, std::shared_ptr<OsmAnd::IMapLayerProvider>(tileProvider));
+
+            mapObjectsSymbolsProvider.reset(new OsmAnd::MapObjectsSymbolsProvider(gpxPrimitivesProvider, 256u));
+            renderer->addSymbolsProvider(mapObjectsSymbolsProvider);
         }
         //
     }
