@@ -14,10 +14,10 @@ import javax.media.opengl.awt.GLCanvas;
 
 import net.osmand.core.jni.AreaI;
 import net.osmand.core.jni.AtlasMapRendererConfiguration;
-import net.osmand.core.jni.BinaryMapDataProvider;
-import net.osmand.core.jni.BinaryMapPrimitivesProvider;
-import net.osmand.core.jni.BinaryMapRasterLayerProvider_Software;
-import net.osmand.core.jni.BinaryMapStaticSymbolsProvider;
+import net.osmand.core.jni.ObfMapObjectsProvider;
+import net.osmand.core.jni.MapPrimitivesProvider;
+import net.osmand.core.jni.MapRasterLayerProvider_Software;
+import net.osmand.core.jni.MapObjectsSymbolsProvider;
 import net.osmand.core.jni.CoreResourcesEmbeddedBundle;
 import net.osmand.core.jni.IMapRenderer;
 import net.osmand.core.jni.MapPresentationEnvironment;
@@ -27,7 +27,7 @@ import net.osmand.core.jni.MapStylesCollection;
 import net.osmand.core.jni.ObfsCollection;
 import net.osmand.core.jni.OsmAndCore;
 import net.osmand.core.jni.PointI;
-import net.osmand.core.jni.Primitiviser;
+import net.osmand.core.jni.MapPrimitiviser;
 import net.osmand.core.jni.QStringStringHash;
 import net.osmand.core.jni.ResolvedMapStyle;
 import net.osmand.data.LatLon;
@@ -165,14 +165,14 @@ public class QtCorePanel implements GLEventListener {
 		MapPresentationEnvironment mapPresentationEnvironment = new MapPresentationEnvironment(mapStyle,
 				displayDensityFactor, "en", MapPresentationEnvironment.LanguagePreference.NativeOnly);
 		mapPresentationEnvironment.setSettings(renderingProps);
-		Primitiviser primitiviser = new Primitiviser(mapPresentationEnvironment);
-		BinaryMapDataProvider binaryMapDataProvider = new BinaryMapDataProvider(obfsCollection);
-		BinaryMapPrimitivesProvider binaryMapPrimitivesProvider = new BinaryMapPrimitivesProvider(
-				binaryMapDataProvider, primitiviser, rasterTileSize);
-		BinaryMapStaticSymbolsProvider binaryMapStaticSymbolsProvider = new BinaryMapStaticSymbolsProvider(
-				binaryMapPrimitivesProvider, rasterTileSize);
-		BinaryMapRasterLayerProvider_Software binaryMapRasterLayerProvider = new BinaryMapRasterLayerProvider_Software(
-				binaryMapPrimitivesProvider);
+		MapPrimitiviser mapPrimitiviser = new MapPrimitiviser(mapPresentationEnvironment);
+		ObfMapObjectsProvider obfMapObjectsProvider = new ObfMapObjectsProvider(obfsCollection);
+		MapPrimitivesProvider mapPrimitivesProvider = new MapPrimitivesProvider(
+				obfMapObjectsProvider, mapPrimitiviser, rasterTileSize);
+		MapObjectsSymbolsProvider mapObjectsSymbolsProvider = new MapObjectsSymbolsProvider(
+				mapPrimitivesProvider, rasterTileSize);
+		MapRasterLayerProvider_Software mapRasterLayerProvider = new MapRasterLayerProvider_Software(
+				mapPrimitivesProvider);
 
 		mapRenderer = OsmAndCore.createMapRenderer(MapRendererClass.AtlasMapRenderer_OpenGL2plus);
 		if (mapRenderer == null) {
@@ -193,7 +193,7 @@ public class QtCorePanel implements GLEventListener {
 		mapRenderer.setConfiguration(AtlasMapRendererConfiguration.Casts
 				.downcastTo_MapRendererConfiguration(atlasRendererConfiguration));
 
-		mapRenderer.addSymbolsProvider(binaryMapStaticSymbolsProvider);
+		mapRenderer.addSymbolsProvider(mapObjectsSymbolsProvider);
 		mapRenderer.setAzimuth(0.0f);
 		mapRenderer.setElevationAngle(90);
 
@@ -202,7 +202,7 @@ public class QtCorePanel implements GLEventListener {
 		 * IMapRasterLayerProvider mapnik = OnlineTileSources.getBuiltIn().createProviderFor("Mapnik (OsmAnd)"); if
 		 * (mapnik == null) Log.e(TAG, "Failed to create mapnik");
 		 */
-		mapRenderer.setMapLayerProvider(0, binaryMapRasterLayerProvider);
+		mapRenderer.setMapLayerProvider(0, mapRasterLayerProvider);
 	}
 
 	private class RenderRequestCallback extends MapRendererSetupOptions.IFrameUpdateRequestCallback {
