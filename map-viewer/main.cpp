@@ -49,12 +49,12 @@
 #include <OsmAndCore/Map/HillshadeTileProvider.h>
 #include <OsmAndCore/Map/IMapElevationDataProvider.h>
 #include <OsmAndCore/Map/HeightmapTileProvider.h>
-#include <OsmAndCore/Map/BinaryMapObjectsProvider.h>
+#include <OsmAndCore/Map/ObfMapObjectsProvider.h>
 #include <OsmAndCore/Map/MapPrimitivesProvider.h>
 #include <OsmAndCore/Map/MapRasterLayerProvider_Software.h>
 #include <OsmAndCore/Map/MapRasterLayerProvider_GPU.h>
 #include <OsmAndCore/Map/MapRasterMetricsLayerProvider.h>
-#include <OsmAndCore/Map/BinaryMapObjectsMetricsLayerProvider.h>
+#include <OsmAndCore/Map/ObfMapObjectsMetricsLayerProvider.h>
 #include <OsmAndCore/Map/MapPrimitivesProvider.h>
 #include <OsmAndCore/Map/MapPrimitivesMetricsLayerProvider.h>
 #include <OsmAndCore/Map/MapObjectsSymbolsProvider.h>
@@ -80,7 +80,7 @@ OsmAnd::AreaI viewport;
 std::shared_ptr<OsmAnd::IMapRenderer> renderer;
 std::shared_ptr<OsmAnd::ResourcesManager> resourcesManager;
 std::shared_ptr<const OsmAnd::IObfsCollection> obfsCollection;
-std::shared_ptr<OsmAnd::BinaryMapObjectsProvider> binaryMapObjectsProvider;
+std::shared_ptr<OsmAnd::ObfMapObjectsProvider> binaryMapObjectsProvider;
 std::shared_ptr<OsmAnd::MapPresentationEnvironment> mapPresentationEnvironment;
 std::shared_ptr<OsmAnd::MapPrimitiviser> primitivizer;
 std::shared_ptr<OsmAnd::MapPrimitivesProvider> mapPrimitivesProvider;
@@ -917,7 +917,7 @@ void keyboardHandler(unsigned char key, int x, int y)
         else
         {
             if (!binaryMapObjectsProvider)
-                binaryMapObjectsProvider.reset(new OsmAnd::BinaryMapObjectsProvider(obfsCollection));
+                binaryMapObjectsProvider.reset(new OsmAnd::ObfMapObjectsProvider(obfsCollection));
             mapPrimitivesProvider.reset(new OsmAnd::MapPrimitivesProvider(binaryMapObjectsProvider, primitivizer));
 
             mapObjectsSymbolsProvider.reset(new OsmAnd::MapObjectsSymbolsProvider(mapPrimitivesProvider, 256u));
@@ -1032,7 +1032,7 @@ void activateProvider(int layerIdx, int idx)
     else if (idx == 2)
     {
         if (!binaryMapObjectsProvider)
-            binaryMapObjectsProvider.reset(new OsmAnd::BinaryMapObjectsProvider(obfsCollection));
+            binaryMapObjectsProvider.reset(new OsmAnd::ObfMapObjectsProvider(obfsCollection));
         mapPrimitivesProvider.reset(new OsmAnd::MapPrimitivesProvider(binaryMapObjectsProvider, primitivizer));
 
         // general
@@ -1058,7 +1058,7 @@ void activateProvider(int layerIdx, int idx)
     else if (idx == 3)
     {
         if (!binaryMapObjectsProvider)
-            binaryMapObjectsProvider.reset(new OsmAnd::BinaryMapObjectsProvider(obfsCollection));
+            binaryMapObjectsProvider.reset(new OsmAnd::ObfMapObjectsProvider(obfsCollection));
         mapPrimitivesProvider.reset(new OsmAnd::MapPrimitivesProvider(binaryMapObjectsProvider, primitivizer));
 
         // car
@@ -1072,7 +1072,7 @@ void activateProvider(int layerIdx, int idx)
     else if (idx == 4)
     {
         if (!binaryMapObjectsProvider)
-            binaryMapObjectsProvider.reset(new OsmAnd::BinaryMapObjectsProvider(obfsCollection));
+            binaryMapObjectsProvider.reset(new OsmAnd::ObfMapObjectsProvider(obfsCollection));
         mapPrimitivesProvider.reset(new OsmAnd::MapPrimitivesProvider(binaryMapObjectsProvider, primitivizer));
 
         // bicycle
@@ -1086,7 +1086,7 @@ void activateProvider(int layerIdx, int idx)
     else if (idx == 5)
     {
         if (!binaryMapObjectsProvider)
-            binaryMapObjectsProvider.reset(new OsmAnd::BinaryMapObjectsProvider(obfsCollection));
+            binaryMapObjectsProvider.reset(new OsmAnd::ObfMapObjectsProvider(obfsCollection));
         mapPrimitivesProvider.reset(new OsmAnd::MapPrimitivesProvider(binaryMapObjectsProvider, primitivizer));
 
         // pedestrian
@@ -1100,15 +1100,15 @@ void activateProvider(int layerIdx, int idx)
     else if (idx == 6)
     {
         if (!binaryMapObjectsProvider)
-            binaryMapObjectsProvider.reset(new OsmAnd::BinaryMapObjectsProvider(obfsCollection));
+            binaryMapObjectsProvider.reset(new OsmAnd::ObfMapObjectsProvider(obfsCollection));
 
-        auto tileProvider = new OsmAnd::BinaryMapObjectsMetricsLayerProvider(binaryMapObjectsProvider);
+        auto tileProvider = new OsmAnd::ObfMapObjectsMetricsLayerProvider(binaryMapObjectsProvider);
         renderer->setMapLayerProvider(layerIdx, std::shared_ptr<OsmAnd::IMapLayerProvider>(tileProvider));
     }
     else if (idx == 7)
     {
         if (!binaryMapObjectsProvider)
-            binaryMapObjectsProvider.reset(new OsmAnd::BinaryMapObjectsProvider(obfsCollection));
+            binaryMapObjectsProvider.reset(new OsmAnd::ObfMapObjectsProvider(obfsCollection));
         mapPrimitivesProvider.reset(new OsmAnd::MapPrimitivesProvider(binaryMapObjectsProvider, primitivizer));
 
         auto tileProvider = new OsmAnd::MapPrimitivesMetricsLayerProvider(mapPrimitivesProvider);
@@ -1117,7 +1117,7 @@ void activateProvider(int layerIdx, int idx)
     else if (idx == 8)
     {
         if (!binaryMapObjectsProvider)
-            binaryMapObjectsProvider.reset(new OsmAnd::BinaryMapObjectsProvider(obfsCollection));
+            binaryMapObjectsProvider.reset(new OsmAnd::ObfMapObjectsProvider(obfsCollection));
         mapPrimitivesProvider.reset(new OsmAnd::MapPrimitivesProvider(binaryMapObjectsProvider, primitivizer));
 
         auto tileProvider = new OsmAnd::MapRasterMetricsLayerProvider(
