@@ -514,17 +514,19 @@ int main(int argc, char** argv)
     //    18.951)));
     //renderer->setZoom(15.0f);
 
+    /*
     // Bug3
-    /*renderer->setTarget(OsmAnd::Utilities::convertLatLonTo31(OsmAnd::LatLon(
-        50.1324,
-        14.3951)));
-        renderer->setZoom(14.0f);*/
+    renderer->setTarget(OsmAnd::Utilities::convertLatLonTo31(OsmAnd::LatLon(
+        40.853653,
+        -72.900955)));
+    renderer->setZoom(17.0f);
+    */
     
     // Synthetic
     /*renderer->setTarget(OsmAnd::Utilities::convertLatLonTo31(OsmAnd::LatLon(
-        45.7169,
-        36.5488)));
-    renderer->setZoom(15.0f);*/
+        45.731606,
+        36.528217)));
+    renderer->setZoom(17.0f);*/
 
     // Tokyo
     /*renderer->setTarget(OsmAnd::PointI(
@@ -650,7 +652,7 @@ void mouseHandler(int button, int state, int x, int y)
                 {
                     OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, " - content = %s", qPrintable(rasterMapSymbol->content));
                     OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, " - size = %d %d", rasterMapSymbol->size.x, rasterMapSymbol->size.y);
-                    OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, " - minDistance = %d %d", rasterMapSymbol->minDistance.x, rasterMapSymbol->minDistance.y);
+                    OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, " - minDistance = %d", rasterMapSymbol->minDistance);
                 }
                 if (const auto billboardMapSymbol = std::dynamic_pointer_cast<const OsmAnd::IBillboardMapSymbol>(mapSymbol))
                 {
@@ -1038,6 +1040,7 @@ void activateProvider(int layerIdx, int idx)
         // general
         QHash< QString, QString > settings;
         settings.insert("appMode", "browse map");
+        //settings.insert("contourLines", "11");
         mapPresentationEnvironment->setSettings(settings);
 
         auto tileProvider = new OsmAnd::MapRasterLayerProvider_Software(mapPrimitivesProvider);
