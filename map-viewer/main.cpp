@@ -94,6 +94,8 @@ std::shared_ptr<OsmAnd::FavoriteLocationsPresenter> favoritesPresenter;
 std::shared_ptr<OsmAnd::MapMarker> lastClickedLocationMarker;
 std::shared_ptr<OsmAnd::RoadLocator> roadLocator;
 std::shared_ptr<OsmAnd::GeoInfoPresenter> gpxPresenter;
+//const auto obfMapObjectsProviderMode = OsmAnd::ObfMapObjectsProvider::Mode::OnlyBinaryMapObjects;
+const auto obfMapObjectsProviderMode = OsmAnd::ObfMapObjectsProvider::Mode::BinaryMapObjectsAndRoads;
 
 bool obfsDirSpecified = false;
 QDir obfsDir;
@@ -489,44 +491,34 @@ int main(int argc, char** argv)
     //renderer->setZoom(10.0f);
     //renderer->setZoom(4.0f);
 
-    // Kiev
+    renderer->setTarget(OsmAnd::Utilities::convertLatLonTo31(OsmAnd::LatLon(
+        55.75369,
+        37.62030)));
+    renderer->setZoom(19.0f);
+
+    //// Kiev
     //renderer->setTarget(OsmAnd::PointI(
     //    1255337783,
     //    724166131));
     //renderer->setZoom(11.0f);
     //renderer->setZoom(16.0f);
 
-    //// Bug1
+    //// Bug
     //renderer->setTarget(OsmAnd::Utilities::convertLatLonTo31(OsmAnd::LatLon(
-    //    52.3272,
-    //    4.875)));
-    //renderer->setZoom(15.0f);
+    //    55.7286,
+    //    37.6409)));
+    //renderer->setZoom(16.0f);
 
-    //// Bug2
+    //renderer->setTarget(OsmAnd::PointI(
+    //    1102425455,
+    //    706223457));
+    //renderer->setZoom(11.787f);
+    //
+    //// Synthetic
     //renderer->setTarget(OsmAnd::Utilities::convertLatLonTo31(OsmAnd::LatLon(
-    //    52.0780,
-    //    4.2941)));
+    //    45.731606,
+    //    36.528217)));
     //renderer->setZoom(17.0f);
-
-    //// Bug3
-    //renderer->setTarget(OsmAnd::Utilities::convertLatLonTo31(OsmAnd::LatLon(
-    //    47.5423,
-    //    18.951)));
-    //renderer->setZoom(15.0f);
-
-    /*
-    // Bug3
-    renderer->setTarget(OsmAnd::Utilities::convertLatLonTo31(OsmAnd::LatLon(
-        40.853653,
-        -72.900955)));
-    renderer->setZoom(17.0f);
-    */
-    
-    // Synthetic
-    /*renderer->setTarget(OsmAnd::Utilities::convertLatLonTo31(OsmAnd::LatLon(
-        45.731606,
-        36.528217)));
-    renderer->setZoom(17.0f);*/
 
     // Tokyo
     /*renderer->setTarget(OsmAnd::PointI(
@@ -701,35 +693,16 @@ void mouseMotion(int x, int y)
 void mouseWheelHandler(int button, int dir, int x, int y)
 {
     const auto modifiers = glutGetModifiers();
-    if (modifiers & GLUT_ACTIVE_CTRL)
+    const auto step = (modifiers & GLUT_ACTIVE_SHIFT) ? 0.1f : 0.01f;
+    const auto state = renderer->getState();
+
+    if (dir > 0)
     {
-        const auto step = (modifiers & GLUT_ACTIVE_SHIFT) ? 100 : 10;
-
-        const auto configuration = std::dynamic_pointer_cast<OsmAnd::AtlasMapRendererConfiguration>(renderer->getConfiguration());
-        if (dir > 0)
-            configuration->referenceTileSizeOnScreenInPixels += step;
-        else
-            configuration->referenceTileSizeOnScreenInPixels -= step;
-        if (configuration->referenceTileSizeOnScreenInPixels <= 0)
-            configuration->referenceTileSizeOnScreenInPixels = 10;
-        renderer->setConfiguration(configuration);
-
-        if (mapObjectsSymbolsProvider)
-            mapObjectsSymbolsProvider->referenceTileSizeInPixels = configuration->referenceTileSizeOnScreenInPixels;
+        renderer->setZoom(state.requestedZoom + step);
     }
     else
     {
-        const auto step = (modifiers & GLUT_ACTIVE_SHIFT) ? 0.1f : 0.01f;
-        const auto state = renderer->getState();
-
-        if (dir > 0)
-        {
-            renderer->setZoom(state.requestedZoom + step);
-        }
-        else
-        {
-            renderer->setZoom(state.requestedZoom - step);
-        }
+        renderer->setZoom(state.requestedZoom - step);
     }
 }
 
@@ -919,7 +892,7 @@ void keyboardHandler(unsigned char key, int x, int y)
         else
         {
             if (!binaryMapObjectsProvider)
-                binaryMapObjectsProvider.reset(new OsmAnd::ObfMapObjectsProvider(obfsCollection));
+                binaryMapObjectsProvider.reset(new OsmAnd::ObfMapObjectsProvider(obfsCollection, obfMapObjectsProviderMode));
             mapPrimitivesProvider.reset(new OsmAnd::MapPrimitivesProvider(binaryMapObjectsProvider, primitivizer));
 
             mapObjectsSymbolsProvider.reset(new OsmAnd::MapObjectsSymbolsProvider(mapPrimitivesProvider, 256u));
@@ -947,6 +920,12 @@ void keyboardHandler(unsigned char key, int x, int y)
         auto layerId = (modifiers & GLUT_ACTIVE_ALT) ? 1 : 0;
         activateProvider(layerId, key - '0');
     }
+        break;
+    case '[':
+        if (renderer->isSymbolsUpdateSuspended())
+            while (!renderer->resumeSymbolsUpdate());
+        else
+            while (!renderer->suspendSymbolsUpdate());
         break;
     case ' ':
     {
@@ -1034,7 +1013,7 @@ void activateProvider(int layerIdx, int idx)
     else if (idx == 2)
     {
         if (!binaryMapObjectsProvider)
-            binaryMapObjectsProvider.reset(new OsmAnd::ObfMapObjectsProvider(obfsCollection));
+            binaryMapObjectsProvider.reset(new OsmAnd::ObfMapObjectsProvider(obfsCollection, obfMapObjectsProviderMode));
         mapPrimitivesProvider.reset(new OsmAnd::MapPrimitivesProvider(binaryMapObjectsProvider, primitivizer));
 
         // general
@@ -1064,7 +1043,7 @@ void activateProvider(int layerIdx, int idx)
     else if (idx == 3)
     {
         if (!binaryMapObjectsProvider)
-            binaryMapObjectsProvider.reset(new OsmAnd::ObfMapObjectsProvider(obfsCollection));
+            binaryMapObjectsProvider.reset(new OsmAnd::ObfMapObjectsProvider(obfsCollection, obfMapObjectsProviderMode));
         mapPrimitivesProvider.reset(new OsmAnd::MapPrimitivesProvider(binaryMapObjectsProvider, primitivizer));
 
         // car
@@ -1078,7 +1057,7 @@ void activateProvider(int layerIdx, int idx)
     else if (idx == 4)
     {
         if (!binaryMapObjectsProvider)
-            binaryMapObjectsProvider.reset(new OsmAnd::ObfMapObjectsProvider(obfsCollection));
+            binaryMapObjectsProvider.reset(new OsmAnd::ObfMapObjectsProvider(obfsCollection, obfMapObjectsProviderMode));
         mapPrimitivesProvider.reset(new OsmAnd::MapPrimitivesProvider(binaryMapObjectsProvider, primitivizer));
 
         // bicycle
@@ -1092,7 +1071,7 @@ void activateProvider(int layerIdx, int idx)
     else if (idx == 5)
     {
         if (!binaryMapObjectsProvider)
-            binaryMapObjectsProvider.reset(new OsmAnd::ObfMapObjectsProvider(obfsCollection));
+            binaryMapObjectsProvider.reset(new OsmAnd::ObfMapObjectsProvider(obfsCollection, obfMapObjectsProviderMode));
         mapPrimitivesProvider.reset(new OsmAnd::MapPrimitivesProvider(binaryMapObjectsProvider, primitivizer));
 
         // pedestrian
@@ -1106,7 +1085,7 @@ void activateProvider(int layerIdx, int idx)
     else if (idx == 6)
     {
         if (!binaryMapObjectsProvider)
-            binaryMapObjectsProvider.reset(new OsmAnd::ObfMapObjectsProvider(obfsCollection));
+            binaryMapObjectsProvider.reset(new OsmAnd::ObfMapObjectsProvider(obfsCollection, obfMapObjectsProviderMode));
 
         auto tileProvider = new OsmAnd::ObfMapObjectsMetricsLayerProvider(binaryMapObjectsProvider);
         renderer->setMapLayerProvider(layerIdx, std::shared_ptr<OsmAnd::IMapLayerProvider>(tileProvider));
@@ -1114,7 +1093,7 @@ void activateProvider(int layerIdx, int idx)
     else if (idx == 7)
     {
         if (!binaryMapObjectsProvider)
-            binaryMapObjectsProvider.reset(new OsmAnd::ObfMapObjectsProvider(obfsCollection));
+            binaryMapObjectsProvider.reset(new OsmAnd::ObfMapObjectsProvider(obfsCollection, obfMapObjectsProviderMode));
         mapPrimitivesProvider.reset(new OsmAnd::MapPrimitivesProvider(binaryMapObjectsProvider, primitivizer));
 
         auto tileProvider = new OsmAnd::MapPrimitivesMetricsLayerProvider(mapPrimitivesProvider);
@@ -1123,7 +1102,7 @@ void activateProvider(int layerIdx, int idx)
     else if (idx == 8)
     {
         if (!binaryMapObjectsProvider)
-            binaryMapObjectsProvider.reset(new OsmAnd::ObfMapObjectsProvider(obfsCollection));
+            binaryMapObjectsProvider.reset(new OsmAnd::ObfMapObjectsProvider(obfsCollection, obfMapObjectsProviderMode));
         mapPrimitivesProvider.reset(new OsmAnd::MapPrimitivesProvider(binaryMapObjectsProvider, primitivizer));
 
         auto tileProvider = new OsmAnd::MapRasterMetricsLayerProvider(
@@ -1209,7 +1188,7 @@ void displayHandler()
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
         auto w = 390;
-        auto h1 = 16 * 19;
+        auto h1 = 16 * 20;
         auto t = viewport.height();
         glColor4f(0.5f, 0.5f, 0.5f, 0.6f);
         glBegin(GL_QUADS);
@@ -1313,6 +1292,11 @@ void displayHandler()
         glRasterPos2f(8, t - 16 * 18);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("symbols loaded         : %1").arg(renderer->getSymbolsCount())));
+        verifyOpenGL();
+
+        glRasterPos2f(8, t - 16 * 19);
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
+            QString("symbols suspended ([)  : %1").arg(renderer->isSymbolsUpdateSuspended())));
         verifyOpenGL();
 
         glColor4f(0.5f, 0.5f, 0.5f, 0.6f);
