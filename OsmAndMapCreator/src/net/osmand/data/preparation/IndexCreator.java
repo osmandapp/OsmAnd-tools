@@ -781,7 +781,7 @@ public class IndexCreator {
 //		creator.setIndexAddress(true);
 //		creator.setIndexPOI(true);
 //		creator.setIndexTransport(true);
-//		creator.setIndexRouting(true);
+		creator.setIndexRouting(true);
 
 //		creator.deleteDatabaseIndexes = false;
 //		creator.recreateOnlyBinaryFile = true;

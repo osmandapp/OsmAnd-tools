@@ -36,9 +36,9 @@ import net.osmand.util.MapUtils;
 import com.jogamp.opengl.util.Animator;
 
 public class QtCorePanel implements GLEventListener {
-	private static final float displayDensityFactor = 1.0f;
-	private static final int referenceTileSize = 256;
-	private static final int rasterTileSize = 256;
+	private static final float displayDensityFactor = 2f;
+	private static final int referenceTileSize = 512;
+	private static final int rasterTileSize = 512;
 	
 	private static CoreResourcesEmbeddedBundle coreResourcesEmbeddedBundle;
 	public static Boolean loaded = null;
@@ -126,6 +126,7 @@ public class QtCorePanel implements GLEventListener {
 	public void init(GLAutoDrawable drawable) {
 
 		QStringStringHash renderingProps = new QStringStringHash();
+		String lang = "en";
 		if (renderingProperties != null) {
 			System.out.println("Going to set settings: " + renderingProperties);
 			String[] props = renderingProperties.split(",");
@@ -134,6 +135,9 @@ public class QtCorePanel implements GLEventListener {
 				if (i > 0) {
 					String name = s.substring(0, i).trim();
 					String value = s.substring(i + 1).trim();
+					if(name.equals("lang")) {
+						lang = value;
+					}
 					renderingProps.set(name, value);
 
 					System.out.println("'" + name + "' = '" + value + "'");
@@ -163,7 +167,7 @@ public class QtCorePanel implements GLEventListener {
 		String filesDir = DataExtractionSettings.getSettings().getBinaryFilesDir();
 		obfsCollection.addDirectory(filesDir, false);
 		MapPresentationEnvironment mapPresentationEnvironment = new MapPresentationEnvironment(mapStyle,
-				displayDensityFactor, "en", MapPresentationEnvironment.LanguagePreference.NativeOnly);
+				displayDensityFactor, lang, MapPresentationEnvironment.LanguagePreference.NativeOnly);
 		mapPresentationEnvironment.setSettings(renderingProps);
 		MapPrimitiviser mapPrimitiviser = new MapPrimitiviser(mapPresentationEnvironment);
 		ObfMapObjectsProvider obfMapObjectsProvider = new ObfMapObjectsProvider(obfsCollection);
