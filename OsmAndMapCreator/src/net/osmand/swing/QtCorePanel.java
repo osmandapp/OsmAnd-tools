@@ -126,7 +126,7 @@ public class QtCorePanel implements GLEventListener {
 	public void init(GLAutoDrawable drawable) {
 
 		QStringStringHash renderingProps = new QStringStringHash();
-		String lang = "en";
+		String lang = null;
 		if (renderingProperties != null) {
 			System.out.println("Going to set settings: " + renderingProperties);
 			String[] props = renderingProperties.split(",");
@@ -167,7 +167,9 @@ public class QtCorePanel implements GLEventListener {
 		String filesDir = DataExtractionSettings.getSettings().getBinaryFilesDir();
 		obfsCollection.addDirectory(filesDir, false);
 		MapPresentationEnvironment mapPresentationEnvironment = new MapPresentationEnvironment(mapStyle,
-				displayDensityFactor, lang, MapPresentationEnvironment.LanguagePreference.NativeOnly);
+				displayDensityFactor, lang == null ? "en":lang,
+						lang == null ? MapPresentationEnvironment.LanguagePreference.NativeOnly:
+						MapPresentationEnvironment.LanguagePreference.LocalizedOrNative);
 		mapPresentationEnvironment.setSettings(renderingProps);
 		MapPrimitiviser mapPrimitiviser = new MapPrimitiviser(mapPresentationEnvironment);
 		ObfMapObjectsProvider obfMapObjectsProvider = new ObfMapObjectsProvider(obfsCollection);
