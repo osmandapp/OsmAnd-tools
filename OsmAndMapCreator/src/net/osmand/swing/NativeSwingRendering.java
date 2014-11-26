@@ -218,7 +218,7 @@ public class NativeSwingRendering extends NativeLibrary {
 		request.saveState();
 		NativeSearchResult res = searchObjectsForRendering(ctx.sleft, ctx.sright, ctx.stop, ctx.sbottom, ctx.zoom, request, true, 
 					rctx, "Nothing found");
-			ctx.zoomDelta =  1;
+		// ctx.zoomDelta =  1;
 		rctx.leftX = ctx.leftX * MapUtils.getPowZoom((float) ctx.zoomDelta);
 		rctx.topY = ctx.topY * MapUtils.getPowZoom((float) ctx.zoomDelta);
 		rctx.width = (int) (ctx.width * MapUtils.getPowZoom((float) ctx.zoomDelta));

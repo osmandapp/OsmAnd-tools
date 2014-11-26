@@ -36,9 +36,9 @@ import net.osmand.util.MapUtils;
 import com.jogamp.opengl.util.Animator;
 
 public class QtCorePanel implements GLEventListener {
-	private static final float displayDensityFactor = 2f;
-	private static final int referenceTileSize = 512;
-	private static final int rasterTileSize = 512;
+	private static final float displayDensityFactor = 1f;
+	private static final int referenceTileSize = 256;
+	private static final int rasterTileSize = 256;
 	
 	private static CoreResourcesEmbeddedBundle coreResourcesEmbeddedBundle;
 	public static Boolean loaded = null;
