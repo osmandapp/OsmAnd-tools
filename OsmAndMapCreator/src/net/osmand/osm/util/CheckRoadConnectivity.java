@@ -259,7 +259,7 @@ public class CheckRoadConnectivity {
 			if(all.contains(calcPointId(segment.getRoad(), ind)) && !start) {
 				return segment;
 			}
-			visited.add(pid);
+			visited.add(calcPointIdUnique(segment.getRoad(), ind));
 			int x = road.getPoint31XTile(ind);
 			int y = road.getPoint31YTile(ind);
 			distFromStart += MapUtils.squareDist31TileMetric(px, py, x, y) / 
