@@ -239,7 +239,11 @@ public class CheckRoadConnectivity {
 			TLongObjectHashMap<List<RouteDataObject>> all, boolean direction, boolean start) {
 		int ind = segment.getSegmentStart();
 		RouteDataObject road = segment.getRoad();
-		visited.add(calcPointIdUnique(segment.getRoad(), ind));
+		final long pid = calcPointIdUnique(segment.getRoad(), ind);
+		if(visited.contains(pid)) {
+			return null;
+		}
+		visited.add(pid);
 		double distFromStart = segment.getDistanceFromStart();
 		while(true) {
 			int py = road.getPoint31YTile(ind);
@@ -255,7 +259,7 @@ public class CheckRoadConnectivity {
 			if(all.contains(calcPointId(segment.getRoad(), ind)) && !start) {
 				return segment;
 			}
-			visited.add(calcPointIdUnique(segment.getRoad(), ind));
+			visited.add(pid);
 			int x = road.getPoint31XTile(ind);
 			int y = road.getPoint31YTile(ind);
 			distFromStart += MapUtils.squareDist31TileMetric(px, py, x, y) / 
@@ -274,6 +278,11 @@ public class CheckRoadConnectivity {
 				rs = rs.getNext();
 			}
 		}
+		Set<Long> l = new HashSet<Long>();
+		for(RouteSegment rts : queue) {
+			l.add(rts.getRoad().id);
+		}
+		System.out.println(l.size() + " " + visited.size());
 		return null;
 	}
 
