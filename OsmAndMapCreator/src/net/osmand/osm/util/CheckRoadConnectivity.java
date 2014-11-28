@@ -278,11 +278,6 @@ public class CheckRoadConnectivity {
 				rs = rs.getNext();
 			}
 		}
-		Set<Long> l = new HashSet<Long>();
-		for(RouteSegment rts : queue) {
-			l.add(rts.getRoad().id);
-		}
-		System.out.println(l.size() + " " + visited.size());
 		return null;
 	}
 
