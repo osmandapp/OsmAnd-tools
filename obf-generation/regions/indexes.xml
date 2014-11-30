@@ -215,6 +215,27 @@
 			<region name="valle-aosta"  cityAdminLevel="4"/>
 			<region name="veneto"  cityAdminLevel="4"/>
 		</regions>
+		
+		<!-- 1.6 SPAIN [SOURCE: GEOFABRIK.DE] -->
+		<regions siteToDownload="http://download.geofabrik.de/europe/spain{0}.osm.pbf" region_prefix="Spain_" skip="false" region_suffix="_Europe">
+			<region name="andalucia" downloadName="andalucia-latest"/>
+			<region name="aragon" downloadName="aragon-latest"/>
+			<region name="asturias" downloadName="asturias-latest"/>
+			<region name="baleares" downloadName="baleares-latest"/>
+			<region name="canarias" downloadName="canarias-latest"/>
+			<region name="cantabria" downloadName="cantabria-latest"/>
+			<region name="castilla-la-mancha" downloadName="castilla-la-mancha-latest"/>
+			<region name="castilla-leon" downloadName="castilla-leon-latest"/>
+			<region name="cataluña" downloadName="cataluña-latest"/>
+			<region name="ceuta" downloadName="ceuta-latest"/>
+			<region name="extremadura" downloadName="extremadura-latest"/>
+			<region name="galicia" downloadName="galicia-latest"/>
+			<region name="madrid" downloadName="madrid-latest"/>
+			<region name="melilla" downloadName="melilla-latest"/>
+			<region name="murcia" downloadName="murcia-latest"/>
+			<region name="navarra" downloadName="navarra-latest"/>
+			<region name="valencia" downloadName="valencia-latest"/>
+		</regions>
 
 
 		<!-- 2 Russia [SOURCE: GIS-LAB.INFO] -->
