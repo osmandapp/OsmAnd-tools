@@ -284,6 +284,7 @@ int main(int argc, char** argv)
     animator.reset(new OsmAnd::MapAnimator());
     animator->setMapRenderer(renderer);
 
+    /*
     markers.reset(new OsmAnd::MapMarkersCollection());
     std::shared_ptr<OsmAnd::MapMarkerBuilder> markerBuilder(new OsmAnd::MapMarkerBuilder());
     {
@@ -301,20 +302,19 @@ int main(int argc, char** argv)
     lastClickedLocationMarker = markerBuilder->buildAndAddToCollection(markers);
     lastClickedLocationMarker->setOnMapSurfaceIconDirection(reinterpret_cast<OsmAnd::MapMarker::OnSurfaceIconKey>(1), Q_QNAN);
     lastClickedLocationMarker->setIsAccuracyCircleVisible(true);
-    lastClickedLocationMarker->setAccuracyCircleRadius(20000.0);
-    /*
-    renderer->addSymbolProvider(markers);
+    lastClickedLocationMarker->setAccuracyCircleRadius(2000.0);
+    renderer->addSymbolsProvider(markers);
     */
 
     favorites.reset(new OsmAnd::FavoriteLocationsGpxCollection());
-    /*
     if (favorites->loadFrom(QLatin1String("d:\\OpenSource\\OsmAnd\\favorites.gpx")))
     {
-    favoritesPresenter.reset(new OsmAnd::FavoriteLocationsPresenter(favorites));
-    renderer->addSymbolProvider(favoritesPresenter);
+        favoritesPresenter.reset(new OsmAnd::FavoriteLocationsPresenter(favorites));
+        renderer->addSymbolsProvider(favoritesPresenter);
     }
-    */
-
+    else
+        favorites.reset();
+    
     //////////////////////////////////////////////////////////////////////////
 
     QList< std::shared_ptr<const OsmAnd::GeoInfoDocument> > geoInfoDocs;
@@ -538,7 +538,8 @@ int main(int argc, char** argv)
     renderConfig->heixelsPerTileSide = 32;
     renderer->setConfiguration(renderConfig);
 
-    lastClickedLocationMarker->setPosition(renderer->getState().target31);
+    if (lastClickedLocationMarker)
+        lastClickedLocationMarker->setPosition(renderer->getState().target31);
 
     renderer->initializeRendering();
     //////////////////////////////////////////////////////////////////////////
@@ -605,7 +606,11 @@ void mouseHandler(int button, int state, int x, int y)
             OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, "--------------- click (%d, %d) -------------------", x, y);
 
             renderer->getLocationFromScreenPoint(OsmAnd::PointI(x, y), lastClickedLocation31);
-            lastClickedLocationMarker->setPosition(lastClickedLocation31);
+
+            if (lastClickedLocationMarker)
+                lastClickedLocationMarker->setPosition(lastClickedLocation31);
+            if (favorites)
+                favorites->createFavoriteLocation(lastClickedLocation31);
 
             if (modifiers & GLUT_ACTIVE_CTRL)
             {
@@ -686,7 +691,8 @@ void mouseMotion(int x, int y)
         newTarget.y = dragInitTarget.y - static_cast<int32_t>(ny * scale31);
 
         renderer->setTarget(newTarget);
-        lastClickedLocationMarker->setPosition(newTarget);
+        if (lastClickedLocationMarker)
+            lastClickedLocationMarker->setPosition(newTarget);
     }
 }
 
