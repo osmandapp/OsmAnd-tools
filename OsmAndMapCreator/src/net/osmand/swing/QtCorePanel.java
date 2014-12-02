@@ -140,11 +140,64 @@ public class QtCorePanel implements GLEventListener {
 				if (i > 0) {
 					String name = s.substring(0, i).trim();
 					String value = s.substring(i + 1).trim();
-					if(name.equals("lang")) {
+					if (name.equals("lang")) {
 						localeLanguageId = value;
-						continue;
+					} else if (name.equals("languagePreference")) {
+						if (value.equals("nativeOnly")) {
+							languagePreference = MapPresentationEnvironment.LanguagePreference.NativeOnly;
+						} else if (value.equals("localizedOrNative")) {
+							languagePreference = MapPresentationEnvironment.LanguagePreference.LocalizedOrNative;
+						} else if (value.equals("nativeAndLocalized")) {
+							languagePreference = MapPresentationEnvironment.LanguagePreference.NativeAndLocalized;
+						} else if (value.equals("nativeAndLocalizedOrTransliterated")) {
+							languagePreference = MapPresentationEnvironment.LanguagePreference.NativeAndLocalizedOrTransliterated;
+						} else if (value.equals("localizedAndNative")) {
+							languagePreference = MapPresentationEnvironment.LanguagePreference.LocalizedAndNative;
+						} else if (value.equals("localizedOrTransliteratedAndNative")) {
+							languagePreference = MapPresentationEnvironment.LanguagePreference.LocalizedOrTransliteratedAndNative;
+						}
+					} else if (name.equals("debugStageEnabled")) {
+						debugSettings.setDebugStageEnabled(value.equals("true"));
+					} else if (name.equals("excludeOnPathSymbols")) {
+						debugSettings.setExcludeOnPathSymbolsFromProcessing(value.equals("true"));
+					} else if (name.equals("excludeBillboardSymbols")) {
+						debugSettings.setExcludeBillboardSymbolsFromProcessing(value.equals("true"));
+					} else if (name.equals("excludeOnSurfaceSymbols")) {
+						debugSettings.setExcludeOnSurfaceSymbolsFromProcessing(value.equals("true"));
+					} else if (name.equals("skipSymbolsIntersection")) {
+						debugSettings.setSkipSymbolsIntersectionCheck(value.equals("true"));
+					} else if (name.equals("showSymbolsBBoxesAccByIntersection")) {
+						debugSettings.setShowSymbolsBBoxesAcceptedByIntersectionCheck(value.equals("true"));
+					} else if (name.equals("showSymbolsBBoxesRejByIntersection")) {
+						debugSettings.setShowSymbolsBBoxesRejectedByIntersectionCheck(value.equals("true"));
+					} else if (name.equals("skipSymbolsMinDistance")) {
+						debugSettings.setSkipSymbolsMinDistanceToSameContentFromOtherSymbolCheck(value.equals("true"));
+					} else if (name.equals("showSymbolsBBoxesRejectedByMinDist")) {
+						debugSettings.setShowSymbolsBBoxesRejectedByMinDistanceToSameContentFromOtherSymbolCheck(value
+								.equals("true"));
+					} else if (name.equals("showSymbolsCheckBBoxesRejectedByMinDist")) {
+						debugSettings
+								.setShowSymbolsCheckBBoxesRejectedByMinDistanceToSameContentFromOtherSymbolCheck(value
+										.equals("true"));
+					} else if (name.equals("skipSymbolsPresentationModeCheck")) {
+						debugSettings.setSkipSymbolsPresentationModeCheck(value.equals("true"));
+					} else if (name.equals("showSymbolsBBoxesRejectedByPresentationMode")) {
+						debugSettings.setShowSymbolsBBoxesRejectedByPresentationMode(value.equals("true"));
+					} else if (name.equals("showOnPathSymbolsRenderablesPaths")) {
+						debugSettings.setShowOnPathSymbolsRenderablesPaths(value.equals("true"));
+					} else if (name.equals("showOnPath2dSymbolGlyphDetails")) {
+						debugSettings.setShowOnPath2dSymbolGlyphDetails(value.equals("true"));
+					} else if (name.equals("showOnPath3dSymbolGlyphDetails")) {
+						debugSettings.setShowOnPath3dSymbolGlyphDetails(value.equals("true"));
+					} else if (name.equals("allSymbolsTransparentForIntersectionLookup")) {
+						debugSettings.setAllSymbolsTransparentForIntersectionLookup(value.equals("true"));
+					} else if (name.equals("showTooShortOnPathSymbolsRenderablesPaths")) {
+						debugSettings.setShowTooShortOnPathSymbolsRenderablesPaths(value.equals("true"));
+					} else if (name.equals("showAllPaths")) {
+						debugSettings.setShowAllPaths(value.equals("true"));
+					} else {
+						styleSettings.set(name, value);
 					}
-					styleSettings.set(name, value);
 				}
 			}
 		}
