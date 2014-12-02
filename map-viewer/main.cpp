@@ -121,6 +121,7 @@ bool constantRefresh = false;
 bool nSight = false;
 bool gDEBugger = false;
 const float density = 1.0f;
+const float symbolsScale = 1.0f;
 
 bool renderWireframe = false;
 void reshapeHandler(int newWidth, int newHeight);
@@ -284,6 +285,7 @@ int main(int argc, char** argv)
     animator.reset(new OsmAnd::MapAnimator());
     animator->setMapRenderer(renderer);
 
+    /*
     markers.reset(new OsmAnd::MapMarkersCollection());
     std::shared_ptr<OsmAnd::MapMarkerBuilder> markerBuilder(new OsmAnd::MapMarkerBuilder());
     {
@@ -301,20 +303,19 @@ int main(int argc, char** argv)
     lastClickedLocationMarker = markerBuilder->buildAndAddToCollection(markers);
     lastClickedLocationMarker->setOnMapSurfaceIconDirection(reinterpret_cast<OsmAnd::MapMarker::OnSurfaceIconKey>(1), Q_QNAN);
     lastClickedLocationMarker->setIsAccuracyCircleVisible(true);
-    lastClickedLocationMarker->setAccuracyCircleRadius(20000.0);
-    /*
-    renderer->addSymbolProvider(markers);
+    lastClickedLocationMarker->setAccuracyCircleRadius(2000.0);
+    renderer->addSymbolsProvider(markers);
     */
 
     favorites.reset(new OsmAnd::FavoriteLocationsGpxCollection());
-    /*
     if (favorites->loadFrom(QLatin1String("d:\\OpenSource\\OsmAnd\\favorites.gpx")))
     {
-    favoritesPresenter.reset(new OsmAnd::FavoriteLocationsPresenter(favorites));
-    renderer->addSymbolProvider(favoritesPresenter);
+        favoritesPresenter.reset(new OsmAnd::FavoriteLocationsPresenter(favorites));
+        renderer->addSymbolsProvider(favoritesPresenter);
     }
-    */
-
+    else
+        favorites.reset();
+    
     //////////////////////////////////////////////////////////////////////////
 
     QList< std::shared_ptr<const OsmAnd::GeoInfoDocument> > geoInfoDocs;
@@ -447,17 +448,18 @@ int main(int argc, char** argv)
     renderer->setup(rendererSetup);
 
     const auto debugSettings = renderer->getDebugSettings();
-    //debugSettings->debugStageEnabled = true;
+    debugSettings->debugStageEnabled = true;
     //debugSettings->excludeBillboardSymbolsFromProcessing = true;
     //debugSettings->excludeOnSurfaceSymbolsFromProcessing = true;
     //debugSettings->excludeOnPathSymbolsFromProcessing = true;
     /*debugSettings->skipSymbolsMinDistanceToSameContentFromOtherSymbolCheck = true;
     debugSettings->skipSymbolsIntersectionCheck = true;
-    debugSettings->showSymbolsBBoxesAcceptedByIntersectionCheck = true;
+    
     debugSettings->showSymbolsBBoxesRejectedByMinDistanceToSameContentFromOtherSymbolCheck = true;
     debugSettings->showSymbolsBBoxesRejectedByIntersectionCheck = true;
-    debugSettings->skipSymbolsPresentationModeCheck = true;
     debugSettings->showSymbolsBBoxesRejectedByPresentationMode = true;*/
+    debugSettings->showSymbolsBBoxesAcceptedByIntersectionCheck = true;
+    //debugSettings->skipSymbolsPresentationModeCheck = true;
     //debugSettings->showOnPathSymbolsRenderablesPaths = true;
     ////debugSettings->showOnPath2dSymbolGlyphDetails = true;
     ////debugSettings->showOnPath3dSymbolGlyphDetails = true;
@@ -538,7 +540,8 @@ int main(int argc, char** argv)
     renderConfig->heixelsPerTileSide = 32;
     renderer->setConfiguration(renderConfig);
 
-    lastClickedLocationMarker->setPosition(renderer->getState().target31);
+    if (lastClickedLocationMarker)
+        lastClickedLocationMarker->setPosition(renderer->getState().target31);
 
     renderer->initializeRendering();
     //////////////////////////////////////////////////////////////////////////
@@ -605,7 +608,11 @@ void mouseHandler(int button, int state, int x, int y)
             OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, "--------------- click (%d, %d) -------------------", x, y);
 
             renderer->getLocationFromScreenPoint(OsmAnd::PointI(x, y), lastClickedLocation31);
-            lastClickedLocationMarker->setPosition(lastClickedLocation31);
+
+            if (lastClickedLocationMarker)
+                lastClickedLocationMarker->setPosition(lastClickedLocation31);
+            if (favorites)
+                favorites->createFavoriteLocation(lastClickedLocation31);
 
             if (modifiers & GLUT_ACTIVE_CTRL)
             {
@@ -686,7 +693,8 @@ void mouseMotion(int x, int y)
         newTarget.y = dragInitTarget.y - static_cast<int32_t>(ny * scale31);
 
         renderer->setTarget(newTarget);
-        lastClickedLocationMarker->setPosition(newTarget);
+        if (lastClickedLocationMarker)
+            lastClickedLocationMarker->setPosition(newTarget);
     }
 }
 
@@ -895,7 +903,7 @@ void keyboardHandler(unsigned char key, int x, int y)
                 binaryMapObjectsProvider.reset(new OsmAnd::ObfMapObjectsProvider(obfsCollection, obfMapObjectsProviderMode));
             mapPrimitivesProvider.reset(new OsmAnd::MapPrimitivesProvider(binaryMapObjectsProvider, primitivizer));
 
-            mapObjectsSymbolsProvider.reset(new OsmAnd::MapObjectsSymbolsProvider(mapPrimitivesProvider, 256u));
+            mapObjectsSymbolsProvider.reset(new OsmAnd::MapObjectsSymbolsProvider(mapPrimitivesProvider, 256u, symbolsScale));
             renderer->addSymbolsProvider(mapObjectsSymbolsProvider);
         }
     }
@@ -1035,7 +1043,7 @@ void activateProvider(int layerIdx, int idx)
             auto tileProvider = new OsmAnd::MapRasterLayerProvider_Software(gpxPrimitivesProvider, false);
             renderer->setMapLayerProvider(10, std::shared_ptr<OsmAnd::IMapLayerProvider>(tileProvider));
 
-            mapObjectsSymbolsProvider.reset(new OsmAnd::MapObjectsSymbolsProvider(gpxPrimitivesProvider, 256u));
+            mapObjectsSymbolsProvider.reset(new OsmAnd::MapObjectsSymbolsProvider(gpxPrimitivesProvider, 256u, symbolsScale));
             renderer->addSymbolsProvider(mapObjectsSymbolsProvider);
         }
         //
