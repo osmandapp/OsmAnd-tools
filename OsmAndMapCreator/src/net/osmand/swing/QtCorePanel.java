@@ -14,6 +14,7 @@ import javax.media.opengl.awt.GLCanvas;
 
 import net.osmand.core.jni.AreaI;
 import net.osmand.core.jni.AtlasMapRendererConfiguration;
+import net.osmand.core.jni.MapRendererDebugSettings;
 import net.osmand.core.jni.ObfMapObjectsProvider;
 import net.osmand.core.jni.MapPrimitivesProvider;
 import net.osmand.core.jni.MapRasterLayerProvider_Software;
@@ -121,31 +122,55 @@ public class QtCorePanel implements GLEventListener {
 		animator.start();
 		return frame;
 	}
-
-	@Override
-	public void init(GLAutoDrawable drawable) {
-
-		QStringStringHash renderingProps = new QStringStringHash();
-		String lang = null;
-		if (renderingProperties != null) {
-			System.out.println("Going to set settings: " + renderingProperties);
-			String[] props = renderingProperties.split(",");
-			for (String s : props) {
+	
+	private class NativeEngineOptions {
+		private MapRendererDebugSettings debugSettings = new MapRendererDebugSettings();
+		private String localeLanguageId = "en";
+		private MapPresentationEnvironment.LanguagePreference languagePreference =
+				MapPresentationEnvironment.LanguagePreference.LocalizedOrNative;
+		private final QStringStringHash styleSettings = new QStringStringHash();
+		
+		public void parseRenderingProperties(String renderingProperties) {
+			styleSettings.clear();
+			localeLanguageId = "en";
+			if (renderingProperties == null)
+				return;
+			for (String s : renderingProperties.split(",")) {
 				int i = s.indexOf('=');
 				if (i > 0) {
 					String name = s.substring(0, i).trim();
 					String value = s.substring(i + 1).trim();
 					if(name.equals("lang")) {
-						lang = value;
+						localeLanguageId = value;
+						continue;
 					}
-					renderingProps.set(name, value);
-
-					System.out.println("'" + name + "' = '" + value + "'");
+					styleSettings.set(name, value);
 				}
 			}
-		} else {
-			System.out.println("No settings to set");
 		}
+		
+		public MapRendererDebugSettings getDebugSettings() {
+			return debugSettings;
+		}
+		
+		public String getLocaleLanguageId() {
+			return localeLanguageId;
+		}
+		
+		public MapPresentationEnvironment.LanguagePreference getLanguagePreference() {
+			return languagePreference;
+		}
+		
+		public QStringStringHash getStyleSettings() {
+			return styleSettings;
+		}
+	}
+	
+
+	@Override
+	public void init(GLAutoDrawable drawable) {
+		NativeEngineOptions options = new NativeEngineOptions();
+		options.parseRenderingProperties(renderingProperties);
 		MapStylesCollection mapStylesCollection = new MapStylesCollection();
 		ResolvedMapStyle mapStyle = null;
 		if(this.styleFile != null) {
@@ -167,10 +192,8 @@ public class QtCorePanel implements GLEventListener {
 		String filesDir = DataExtractionSettings.getSettings().getBinaryFilesDir();
 		obfsCollection.addDirectory(filesDir, false);
 		MapPresentationEnvironment mapPresentationEnvironment = new MapPresentationEnvironment(mapStyle,
-				displayDensityFactor, lang == null ? "en":lang,
-						lang == null ? MapPresentationEnvironment.LanguagePreference.NativeOnly:
-						MapPresentationEnvironment.LanguagePreference.LocalizedOrNative);
-		mapPresentationEnvironment.setSettings(renderingProps);
+				displayDensityFactor, options.getLocaleLanguageId(), options.getLanguagePreference());
+		mapPresentationEnvironment.setSettings(options.getStyleSettings());
 		MapPrimitiviser mapPrimitiviser = new MapPrimitiviser(mapPresentationEnvironment);
 		ObfMapObjectsProvider obfMapObjectsProvider = new ObfMapObjectsProvider(obfsCollection);
 		MapPrimitivesProvider mapPrimitivesProvider = new MapPrimitivesProvider(
@@ -202,6 +225,7 @@ public class QtCorePanel implements GLEventListener {
 		mapRenderer.addSymbolsProvider(mapObjectsSymbolsProvider);
 		mapRenderer.setAzimuth(0.0f);
 		mapRenderer.setElevationAngle(90);
+		mapRenderer.setDebugSettings(options.getDebugSettings());
 
 		mapCanvas.updateRenderer();
 		/*

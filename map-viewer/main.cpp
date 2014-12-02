@@ -121,6 +121,7 @@ bool constantRefresh = false;
 bool nSight = false;
 bool gDEBugger = false;
 const float density = 1.0f;
+const float symbolsScale = 1.0f;
 
 bool renderWireframe = false;
 void reshapeHandler(int newWidth, int newHeight);
@@ -447,17 +448,18 @@ int main(int argc, char** argv)
     renderer->setup(rendererSetup);
 
     const auto debugSettings = renderer->getDebugSettings();
-    //debugSettings->debugStageEnabled = true;
+    debugSettings->debugStageEnabled = true;
     //debugSettings->excludeBillboardSymbolsFromProcessing = true;
     //debugSettings->excludeOnSurfaceSymbolsFromProcessing = true;
     //debugSettings->excludeOnPathSymbolsFromProcessing = true;
     /*debugSettings->skipSymbolsMinDistanceToSameContentFromOtherSymbolCheck = true;
     debugSettings->skipSymbolsIntersectionCheck = true;
-    debugSettings->showSymbolsBBoxesAcceptedByIntersectionCheck = true;
+    
     debugSettings->showSymbolsBBoxesRejectedByMinDistanceToSameContentFromOtherSymbolCheck = true;
     debugSettings->showSymbolsBBoxesRejectedByIntersectionCheck = true;
-    debugSettings->skipSymbolsPresentationModeCheck = true;
     debugSettings->showSymbolsBBoxesRejectedByPresentationMode = true;*/
+    debugSettings->showSymbolsBBoxesAcceptedByIntersectionCheck = true;
+    //debugSettings->skipSymbolsPresentationModeCheck = true;
     //debugSettings->showOnPathSymbolsRenderablesPaths = true;
     ////debugSettings->showOnPath2dSymbolGlyphDetails = true;
     ////debugSettings->showOnPath3dSymbolGlyphDetails = true;
@@ -901,7 +903,7 @@ void keyboardHandler(unsigned char key, int x, int y)
                 binaryMapObjectsProvider.reset(new OsmAnd::ObfMapObjectsProvider(obfsCollection, obfMapObjectsProviderMode));
             mapPrimitivesProvider.reset(new OsmAnd::MapPrimitivesProvider(binaryMapObjectsProvider, primitivizer));
 
-            mapObjectsSymbolsProvider.reset(new OsmAnd::MapObjectsSymbolsProvider(mapPrimitivesProvider, 256u));
+            mapObjectsSymbolsProvider.reset(new OsmAnd::MapObjectsSymbolsProvider(mapPrimitivesProvider, 256u, symbolsScale));
             renderer->addSymbolsProvider(mapObjectsSymbolsProvider);
         }
     }
@@ -1041,7 +1043,7 @@ void activateProvider(int layerIdx, int idx)
             auto tileProvider = new OsmAnd::MapRasterLayerProvider_Software(gpxPrimitivesProvider, false);
             renderer->setMapLayerProvider(10, std::shared_ptr<OsmAnd::IMapLayerProvider>(tileProvider));
 
-            mapObjectsSymbolsProvider.reset(new OsmAnd::MapObjectsSymbolsProvider(gpxPrimitivesProvider, 256u));
+            mapObjectsSymbolsProvider.reset(new OsmAnd::MapObjectsSymbolsProvider(gpxPrimitivesProvider, 256u, symbolsScale));
             renderer->addSymbolsProvider(mapObjectsSymbolsProvider);
         }
         //
