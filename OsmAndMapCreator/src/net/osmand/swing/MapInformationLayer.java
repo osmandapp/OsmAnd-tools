@@ -76,17 +76,22 @@ public class MapInformationLayer implements MapPanelLayer {
 					JOptionPane.showMessageDialog(OsmExtractionUI.MAIN_APP.getFrame(), "Native rendering supported only on Linux", "Info", JOptionPane.ERROR_MESSAGE);
 					return;
 				}
-				String folder = DataExtractionSettings.getSettings().getQtLibFolder();
-				if(folder.equals("")){
-					folder = new File("lib-gl").getAbsolutePath();
-				}
-				QtCorePanel.loadNative(folder);
 				MapPanel mp = MapInformationLayer.this.map;
-				final QtCorePanel sample = new QtCorePanel(new LatLon(mp.getLatitude(), mp.getLongitude()), mp
+				NativePreferencesDialog dlg = new NativePreferencesDialog(mp);
+				dlg.showDialog();
+				if (dlg.isOkPressed()) {
+					String folder = DataExtractionSettings.getSettings().getQtLibFolder();
+					if (folder.equals("")) {
+						folder = new File("lib-gl").getAbsolutePath();
+					}
+					QtCorePanel.loadNative(folder);
+					
+					final QtCorePanel sample = new QtCorePanel(new LatLon(mp.getLatitude(), mp.getLongitude()), mp
 							.getZoom());
-				sample.setRenderingProperties(DataExtractionSettings.getSettings().getRenderingProperties());
-				sample.setRenderingStyleFile(DataExtractionSettings.getSettings().getRenderXmlPath());
-				sample.showFrame(800, 600);
+					sample.setRenderingProperties(DataExtractionSettings.getSettings().getRenderingProperties());
+					sample.setRenderingStyleFile(DataExtractionSettings.getSettings().getRenderXmlPath());
+					sample.showFrame(800, 600);
+				}
 			}
 		});
 		

@@ -9,6 +9,7 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.TreeMap;
 
 import javax.swing.BorderFactory;
 import javax.swing.Box;
@@ -31,7 +32,7 @@ public class NativePreferencesDialog extends JDialog {
 	private JTextField nativeFilesDirectory;
 	private JTextField renderingStyleFile;
 	private JTextField renderingGenStyleFile;
-	private Map<String, JCheckBox> checks = new HashMap<String, JCheckBox>();
+	private Map<String, JCheckBox> checks = new TreeMap<String, JCheckBox>();
 	private boolean okPressed;
 
 	private JTextField renderingPropertiesTxt;
@@ -111,19 +112,24 @@ public class NativePreferencesDialog extends JDialog {
 		String prps = DataExtractionSettings.getSettings().getRenderingProperties();
 		renderingPropertiesTxt = addTextField(panel, l, "Rendering properties : ", 
 				5, prps);
+		String cutPrps = "";
 		String[] vls = prps.split(",");
 		int k = 6;
 		for(String v : vls) {
 			String[] spl = v.split("=");
 			String name = spl[0].trim();
-			String vl = spl[1].trim().toLowerCase();
-			if(vl.equals("true") || vl.equals("false")) {
+			String vl = spl[1].trim();
+			if(vl.toLowerCase().equals("true") || vl.toLowerCase().equals("false")) {
 				boolean value = Boolean.parseBoolean(vl);
 				JCheckBox box = addCheckBox(panel, l, name, k++, value);
 				checks.put(name, box);
+			} else {
+				cutPrps = name + "=" + vl + ",";
 			}
 		}
+		renderingPropertiesTxt.setText(cutPrps);
 		
+	
 		panel.setMaximumSize(new Dimension(Short.MAX_VALUE, panel.getPreferredSize().height));
 	}
 	
@@ -210,7 +216,8 @@ public class NativePreferencesDialog extends JDialog {
 		final String txt = renderingPropertiesTxt.getText();
 		String res = "";
 		String[] vls = txt.split(",");
-		for(int i = 0; i < vls.length; i++) {
+		int i = 0;
+		for(i = 0; i < vls.length; i++) {
 			if(i > 0) {
 				res +=",";
 			}
@@ -220,6 +227,16 @@ public class NativePreferencesDialog extends JDialog {
 				rep = nm +"="+checks.get(nm).isSelected();
 			}
 			res += rep;
+		}
+		for(String s : checks.keySet()) {
+			if(i > 0) {
+				res +=",";
+			}
+			i++;
+			JCheckBox cb = checks.get(s);
+			if(!res.contains(s+"=")) {
+				res += s +"="+cb.isSelected();
+			}
 		}
 		DataExtractionSettings.getSettings().setRenderingProperties(res);
 	}
