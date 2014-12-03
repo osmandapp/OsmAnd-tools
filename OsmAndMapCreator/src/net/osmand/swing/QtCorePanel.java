@@ -37,9 +37,7 @@ import net.osmand.util.MapUtils;
 import com.jogamp.opengl.util.Animator;
 
 public class QtCorePanel implements GLEventListener {
-	private static final float displayDensityFactor = 1f;
-	private static final int referenceTileSize = 256;
-	private static final int rasterTileSize = 256;
+	
 	
 	private static CoreResourcesEmbeddedBundle coreResourcesEmbeddedBundle;
 	public static Boolean loaded = null;
@@ -126,6 +124,7 @@ public class QtCorePanel implements GLEventListener {
 	private class NativeEngineOptions {
 		private MapRendererDebugSettings debugSettings = new MapRendererDebugSettings();
 		private String localeLanguageId = "en";
+		private float density = 1;
 		private MapPresentationEnvironment.LanguagePreference languagePreference =
 				MapPresentationEnvironment.LanguagePreference.LocalizedOrNative;
 		private final QStringStringHash styleSettings = new QStringStringHash();
@@ -145,6 +144,8 @@ public class QtCorePanel implements GLEventListener {
 					}
 					if (name.equals("lang")) {
 						localeLanguageId = value;
+					} else if (name.equals("density")) {
+						density = Float.parseFloat(value);
 					} else if (name.equals("languagePreference")) {
 						if (value.equals("nativeOnly")) {
 							languagePreference = MapPresentationEnvironment.LanguagePreference.NativeOnly;
@@ -248,7 +249,9 @@ public class QtCorePanel implements GLEventListener {
 		String filesDir = DataExtractionSettings.getSettings().getBinaryFilesDir();
 		obfsCollection.addDirectory(filesDir, false);
 		MapPresentationEnvironment mapPresentationEnvironment = new MapPresentationEnvironment(mapStyle,
-				displayDensityFactor, options.getLocaleLanguageId(), options.getLanguagePreference());
+				options.density, options.getLocaleLanguageId(), options.getLanguagePreference());
+		float referenceTileSize = 256 * options.density;
+		int rasterTileSize = Integer.highestOneBit((int) referenceTileSize - 1) * 2;
 		mapPresentationEnvironment.setSettings(options.getStyleSettings());
 		MapPrimitiviser mapPrimitiviser = new MapPrimitiviser(mapPresentationEnvironment);
 		ObfMapObjectsProvider obfMapObjectsProvider = new ObfMapObjectsProvider(obfsCollection);

@@ -199,7 +199,7 @@ public class NativeSwingRendering extends NativeLibrary {
 				return _R.getIconData(data);
 			}
 		};
-		rctx.preferredLocale = renderingProps.get("lang") != null ?renderingProps.get("lang") : "";
+		rctx.preferredLocale = renderingProps.get("lang") != null ? renderingProps.get("lang") : "";
 		rctx.nightMode = "true".equals(renderingProps.get("nightMode"));
 		RenderingRuleSearchRequest request = new RenderingRuleSearchRequest(storage);
 		request.setBooleanFilter(request.ALL.R_NIGHT_MODE, rctx.nightMode);
@@ -230,10 +230,16 @@ public class NativeSwingRendering extends NativeLibrary {
 		rctx.height = (int) (ctx.height * MapUtils.getPowZoom((float) ctx.zoomDelta));
 		// map density scales corresponding to zoom delta 
 		// (so the distance between the road is the same)
-		final float mapDensity = (float) Math.pow(2,  ctx.zoomDelta);
+		float mapDensity = (float) Math.pow(2,  ctx.zoomDelta);
+		if(renderingProps.get("density") != null ) {
+			mapDensity *= Float.parseFloat(renderingProps.get("density"));
+		}
 		rctx.setDensityValue(mapDensity);
 		//rctx.textScale = 1f;//Text/icon scales according to mapDensity 
 		rctx.textScale = 1 / mapDensity; //Text/icon stays same for all sizes
+		if(renderingProps.get("textScale") != null ) {
+			rctx.textScale *= Float.parseFloat(renderingProps.get("textScale"));
+		}
 		rctx.screenDensityRatio = 1 / Math.max(1, 1f /*requestedBox.getDensity()*/);
 		final double tileDivisor = MapUtils.getPowZoom((float) (31 - ctx.zoom - ctx.zoomDelta));
 		request.clearState();
