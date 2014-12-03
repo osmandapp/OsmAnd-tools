@@ -271,10 +271,8 @@ public class NativePreferencesDialog extends JDialog {
 		if (!settings.getRenderGenXmlPath().equals(renderingGenStyleFile.getText())) {
 			settings.setRenderGenXmlPath(renderingGenStyleFile.getText());
 		}
-		final String txt = renderingPropertiesTxt.getText();
-		String res = "";
-		String[] vls = txt.split(",");
-		int i = vls.length;
+		String res = renderingPropertiesTxt.getText();
+		int i = res.length();
 		for (String s : checks.keySet()) {
 			if (i > 0) {
 				res += ",";
