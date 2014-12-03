@@ -210,23 +210,23 @@ public class MapRouterLayer implements MapPanelLayer {
 		};
 		menu.add(complexRoute);
 		
-		Action recalculate = new AbstractAction("Recalculate OsmAnd route") {
-			private static final long serialVersionUID = 507156107455281238L;
-			
-			@Override
-			public boolean isEnabled() {
-//				return previousRoute != null;
-				return true;
-			}
-
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				calcRoute(RouteCalculationMode.NORMAL);
-			}
-		};
-		
-		
-		menu.add(recalculate);
+//		Action recalculate = new AbstractAction("Recalculate OsmAnd route") {
+//			private static final long serialVersionUID = 507156107455281238L;
+//			
+//			@Override
+//			public boolean isEnabled() {
+////				return previousRoute != null;
+//				return true;
+//			}
+//
+//			@Override
+//			public void actionPerformed(ActionEvent e) {
+//				calcRoute(RouteCalculationMode.NORMAL);
+//			}
+//		};
+//		
+//		
+//		menu.add(recalculate);
 		Action route_YOURS = new AbstractAction("Calculate YOURS route") {
 			private static final long serialVersionUID = 507156107455281238L;
 
@@ -272,27 +272,7 @@ public class MapRouterLayer implements MapPanelLayer {
 			}
 		};
 		menu.add(loadGPXFile);
-		Action route_CloudMate = new AbstractAction("Calculate CloudMade route") {
-			private static final long serialVersionUID = 507156107455281238L;
-
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				new Thread() {
-					@Override
-					public void run() {
-						List<Way> ways = route_CloudMate(startRoute, endRoute);
-						DataTileManager<Way> points = new DataTileManager<Way>(11);
-						for (Way w : ways) {
-							LatLon n = w.getLatLon();
-							points.registerObject(n.getLatitude(), n.getLongitude(), w);
-						}
-						map.setPoints(points);
-					}
-				}.start();
-			}
-		};
-		menu.add(route_CloudMate);
-		Action swapLocations = new AbstractAction("Swap locations") {
+			Action swapLocations = new AbstractAction("Swap locations") {
 			private static final long serialVersionUID = 507156107455281238L;
 
 			@Override

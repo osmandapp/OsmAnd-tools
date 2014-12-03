@@ -371,6 +371,18 @@ public class QtCorePanel implements GLEventListener {
 		public float getZoom() {
 			return zoom;
 		}
+		
+		public double getCenterPointX() {
+			return getWidth() / 2;
+		}
+
+		public double getCenterPointY() {
+			return getHeight() / 2;
+		}
+		
+		public double getTileSize(){
+			return referenceTileSize;
+		}
 
 		private void setLatLon(double lat, double lon) {
 			latitude = lat;
@@ -465,11 +477,19 @@ public class QtCorePanel implements GLEventListener {
 
 			@Override
 			public void mouseWheelMoved(MouseWheelEvent e) {
-				if (e.getWheelRotation() < 0) {
+				double dy = e.getPoint().y - getCenterPointY();
+				double dx = e.getPoint().x - getCenterPointX();
+				double lat = MapUtils.getLatitudeFromTile(zoom, getYTile() + dy / getTileSize());
+				double lon = MapUtils.getLongitudeFromTile(zoom, getXTile() + dx / getTileSize());
+				setLatLon(lat, lon);
+				if(e.getWheelRotation() < 0){
 					setZoom(getZoom() + 1);
-				} else if (e.getWheelRotation() > 0) {
+				} else if(e.getWheelRotation() > 0) {
 					setZoom(getZoom() - 1);
 				}
+				lat = MapUtils.getLatitudeFromTile(zoom, getYTile() - dy / getTileSize());
+				lon = MapUtils.getLongitudeFromTile(zoom, getXTile() - dx / getTileSize());
+				setLatLon(lat, lon);
 				super.mouseWheelMoved(e);
 			}
 

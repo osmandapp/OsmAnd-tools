@@ -70,9 +70,11 @@ public class NativePreferencesDialog extends JDialog {
 	private boolean okPressed;
 
 	private JTextField renderingPropertiesTxt;
+	private MapPanel mapPanel;
 
-	public NativePreferencesDialog(Component parent) {
-		super(JOptionPane.getFrameForComponent(parent), true);
+	public NativePreferencesDialog(MapPanel mapPanel) {
+		super(JOptionPane.getFrameForComponent(mapPanel), true);
+		this.mapPanel = mapPanel;
 		setTitle(Messages.getString("OsmExtractionPreferencesDialog.PREFERENCES")); //$NON-NLS-1$
 		initDialog();
 
@@ -300,6 +302,9 @@ public class NativePreferencesDialog extends JDialog {
 						res += ";" + kk;
 					}
 				}
+			}
+			if(s.equals("density")) {
+				mapPanel.setZoomDelta((float) (Math.log(Float.parseFloat(item)) / Math.log(2)));
 			}
 		}
 		DataExtractionSettings.getSettings().setRenderingProperties(res);

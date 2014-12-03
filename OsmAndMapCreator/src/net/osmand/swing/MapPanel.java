@@ -132,7 +132,7 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 	
 	// zoom level
 	private int zoom = 1;
-	private float zoomDelta = 0.0f;
+	private float zoomDelta = 0;
 	
 	// degree measurements (-180, 180)
 	private double longitude;
@@ -355,7 +355,7 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 	
 	
 	public int getMapXForPoint(double longitude){
-		double tileX = MapUtils.getTileNumberX(zoom + zoomDelta, longitude);
+		double tileX = MapUtils.getTileNumberX(zoom , longitude);
 		return (int) ((tileX - getXTile()) * getTileSize() + getCenterPointX());
 	}
 	
@@ -365,7 +365,7 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 
 
 	public int getMapYForPoint(double latitude){
-		double tileY = MapUtils.getTileNumberY(zoom + zoomDelta, latitude);
+		double tileY = MapUtils.getTileNumberY(zoom , latitude);
 		return (int) ((tileY - getYTile()) * getTileSize() + getCenterPointY());
 	}
 
@@ -592,6 +592,11 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 			return 1;
 		}
 		return map.getMinimumZoomSupported();
+	}
+	
+	public void setZoomDelta(float zoomDelta) {
+		this.zoomDelta = zoomDelta;
+		prepareImage();
 	}
 	
 	public void setZoom(int zoom){
@@ -856,11 +861,19 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 		
 		@Override
 		public void mouseWheelMoved(MouseWheelEvent e) {
+			double dy = e.getPoint().y - getCenterPointY();
+			double dx = e.getPoint().x - getCenterPointX();
+			double lat = MapUtils.getLatitudeFromTile(zoom, getYTile() + dy / getTileSize());
+			double lon = MapUtils.getLongitudeFromTile(zoom, getXTile() + dx / getTileSize());
+			setLatLon(lat, lon);
 			if(e.getWheelRotation() < 0){
 				setZoom(getZoom() + 1);
 			} else if(e.getWheelRotation() > 0) {
 				setZoom(getZoom() - 1);
 			}
+			lat = MapUtils.getLatitudeFromTile(zoom, getYTile() - dy / getTileSize());
+			lon = MapUtils.getLongitudeFromTile(zoom, getXTile() - dx / getTileSize());
+			setLatLon(lat, lon);
 			super.mouseWheelMoved(e);
 		}
 		@Override

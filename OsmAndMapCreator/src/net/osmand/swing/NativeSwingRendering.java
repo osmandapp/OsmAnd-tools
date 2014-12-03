@@ -230,6 +230,7 @@ public class NativeSwingRendering extends NativeLibrary {
 		float scale = 1;
 		if(renderingProps.get("density") != null ) {
 			scale *= Float.parseFloat(renderingProps.get("density"));
+			
 		}
 		rctx.leftX = ctx.leftX * scale;
 		rctx.topY = ctx.topY * scale;
