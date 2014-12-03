@@ -80,6 +80,7 @@ public class QtCorePanel implements GLEventListener {
 	private RenderRequestCallback callback;
 	private String styleFile;
 	private String renderingProperties;
+	private float referenceTileSize;
 	
 	public QtCorePanel(LatLon location, int zoom) {
 		this.mapCanvas = new MapCanvas(location, zoom);
@@ -250,7 +251,7 @@ public class QtCorePanel implements GLEventListener {
 		obfsCollection.addDirectory(filesDir, false);
 		MapPresentationEnvironment mapPresentationEnvironment = new MapPresentationEnvironment(mapStyle,
 				options.density, options.getLocaleLanguageId(), options.getLanguagePreference());
-		float referenceTileSize = 256 * options.density;
+		referenceTileSize = 256 * options.density;
 		int rasterTileSize = Integer.highestOneBit((int) referenceTileSize - 1) * 2;
 		mapPresentationEnvironment.setSettings(options.getStyleSettings());
 		MapPrimitiviser mapPrimitiviser = new MapPrimitiviser(mapPresentationEnvironment);
