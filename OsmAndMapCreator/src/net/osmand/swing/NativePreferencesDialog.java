@@ -7,7 +7,6 @@ import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -16,6 +15,7 @@ import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
+import javax.swing.JComboBox;
 import javax.swing.JDialog;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
@@ -33,6 +33,7 @@ public class NativePreferencesDialog extends JDialog {
 	private JTextField renderingStyleFile;
 	private JTextField renderingGenStyleFile;
 	private Map<String, JCheckBox> checks = new TreeMap<String, JCheckBox>();
+	private Map<String, JComboBox<String>> combos = new TreeMap<String, JComboBox<String>>();
 	private boolean okPressed;
 
 	private JTextField renderingPropertiesTxt;
@@ -117,6 +118,9 @@ public class NativePreferencesDialog extends JDialog {
 		int k = 6;
 		for(String v : vls) {
 			String[] spl = v.split("=");
+			if(spl.length < 2) {
+				continue;
+			}
 			String name = spl[0].trim();
 			String vl = spl[1].trim();
 			if(vl.toLowerCase().equals("true") || vl.toLowerCase().equals("false")) {
@@ -124,9 +128,12 @@ public class NativePreferencesDialog extends JDialog {
 				JCheckBox box = addCheckBox(panel, l, name, k++, value);
 				checks.put(name, box);
 			} else {
-				cutPrps = name + "=" + vl + ",";
+				String[] vs = vl.split(";");
+				JComboBox<String> cb = addComboBox(panel, l, name, k++, vs[0], vs);
+				combos.put(name, cb);
 			}
 		}
+		
 		renderingPropertiesTxt.setText(cutPrps);
 		
 	
@@ -149,6 +156,34 @@ public class NativePreferencesDialog extends JDialog {
         l.setConstraints(check, constr);
         return check;
 	}
+	
+	protected JComboBox<String> addComboBox(JPanel panel, GridBagLayout l, String labelText, int rowId, String value, String[] otherValues) {
+		JLabel label;
+		GridBagConstraints constr;
+		label = new JLabel(labelText);
+        panel.add(label);
+        constr = new GridBagConstraints();
+        constr.ipadx = 5;
+        constr.gridx = 0;
+        constr.gridy = rowId;
+        constr.anchor = GridBagConstraints.WEST;
+        l.setConstraints(label, constr);
+        
+        JComboBox<String> textField = new JComboBox<String>(otherValues);
+        textField.setEditable(true);
+        textField.setSelectedItem(value);
+        panel.add(textField);
+        constr = new GridBagConstraints();
+        constr.weightx = 1;
+        constr.fill = GridBagConstraints.HORIZONTAL;
+        constr.ipadx = 5;
+        constr.gridx = 1;
+        constr.gridy = rowId;
+        l.setConstraints(textField, constr);
+        return textField;
+	}
+	
+	
 
 	protected JTextField addTextField(JPanel panel, GridBagLayout l, String labelText, int rowId, String value) {
 		JLabel label;
@@ -216,26 +251,30 @@ public class NativePreferencesDialog extends JDialog {
 		final String txt = renderingPropertiesTxt.getText();
 		String res = "";
 		String[] vls = txt.split(",");
-		int i = 0;
-		for(i = 0; i < vls.length; i++) {
-			if(i > 0) {
-				res +=",";
-			}
-			String nm = vls[i].split("=")[0].trim();
-			String rep = vls[i] ;
-			if(checks.containsKey(nm)) {
-				rep = nm +"="+checks.get(nm).isSelected();
-			}
-			res += rep;
-		}
-		for(String s : checks.keySet()) {
-			if(i > 0) {
-				res +=",";
+		int i = vls.length;
+		for (String s : checks.keySet()) {
+			if (i > 0) {
+				res += ",";
 			}
 			i++;
 			JCheckBox cb = checks.get(s);
-			if(!res.contains(s+"=")) {
-				res += s +"="+cb.isSelected();
+			if (!res.contains(s + "=")) {
+				res += s + "=" + cb.isSelected();
+			}
+		}
+		for (String s : combos.keySet()) {
+			if (i > 0) {
+				res += ",";
+			}
+			i++;
+			JComboBox<String> cb = combos.get(s);
+			String item = cb.getSelectedItem().toString();
+			res += s + "=" + item;
+			for(int ij = 0; ij < cb.getItemCount(); ij++) {
+				String kk = cb.getItemAt(ij);
+				if(!item.equals(kk)) {
+					res += ";" + kk;
+				}
 			}
 		}
 		DataExtractionSettings.getSettings().setRenderingProperties(res);

@@ -110,7 +110,12 @@ public class NativeSwingRendering extends NativeLibrary {
 		for (String s : props) {
 			int i = s.indexOf('=');
 			if (i > 0) {
-				renderingProps.put(s.substring(0, i).trim(), s.substring(i + 1).trim());
+				String key = s.substring(0, i).trim();
+				String value = s.substring(i + 1).trim();
+				if(value.contains(";")) {
+					value = value.substring(0, value.indexOf(';'));
+				}
+				renderingProps.put(key, value);
 			}
 		}
 		initRenderingRulesStorage(storage);

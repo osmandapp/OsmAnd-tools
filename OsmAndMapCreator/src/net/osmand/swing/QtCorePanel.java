@@ -140,6 +140,9 @@ public class QtCorePanel implements GLEventListener {
 				if (i > 0) {
 					String name = s.substring(0, i).trim();
 					String value = s.substring(i + 1).trim();
+					if(value.contains(";")) {
+						value = value.substring(0, value.indexOf(';'));
+					}
 					if (name.equals("lang")) {
 						localeLanguageId = value;
 					} else if (name.equals("languagePreference")) {
