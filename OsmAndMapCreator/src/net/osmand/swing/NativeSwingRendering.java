@@ -205,7 +205,9 @@ public class NativeSwingRendering extends NativeLibrary {
 		request.setBooleanFilter(request.ALL.R_NIGHT_MODE, rctx.nightMode);
 		for (RenderingRuleProperty customProp : storage.PROPS.getCustomRules()) {
 			String res = renderingProps.get(customProp.getAttrName());
-			if (!Algorithms.isEmpty(res)) {
+			if(customProp.getAttrName().equals(RenderingRuleStorageProperties.A_ENGINE_V1)){
+				request.setBooleanFilter(customProp, true);
+			} else if (!Algorithms.isEmpty(res)) {
 				if (customProp.isString()) {
 					request.setStringFilter(customProp, res);
 				} else if (customProp.isBoolean()) {
