@@ -226,24 +226,25 @@ public class NativeSwingRendering extends NativeLibrary {
 		NativeSearchResult res = searchObjectsForRendering(ctx.sleft, ctx.sright, ctx.stop, ctx.sbottom, ctx.zoom, request, true, 
 					rctx, "Nothing found");
 		// ctx.zoomDelta =  1;
-		rctx.leftX = ctx.leftX * MapUtils.getPowZoom((float) ctx.zoomDelta);
-		rctx.topY = ctx.topY * MapUtils.getPowZoom((float) ctx.zoomDelta);
-		rctx.width = (int) (ctx.width * MapUtils.getPowZoom((float) ctx.zoomDelta));
-		rctx.height = (int) (ctx.height * MapUtils.getPowZoom((float) ctx.zoomDelta));
+//		double scale = MapUtils.getPowZoom((float) ctx.zoomDelta);
+		float scale = 1;
+		if(renderingProps.get("density") != null ) {
+			scale *= Float.parseFloat(renderingProps.get("density"));
+		}
+		rctx.leftX = ctx.leftX * scale;
+		rctx.topY = ctx.topY * scale;
+		rctx.width = (int) (ctx.width * scale);
+		rctx.height = (int) (ctx.height * scale);
 		// map density scales corresponding to zoom delta 
 		// (so the distance between the road is the same)
-		float mapDensity = (float) Math.pow(2,  ctx.zoomDelta);
-		if(renderingProps.get("density") != null ) {
-			mapDensity *= Float.parseFloat(renderingProps.get("density"));
-		}
-		rctx.setDensityValue(mapDensity);
+		rctx.setDensityValue(scale);
 		//rctx.textScale = 1f;//Text/icon scales according to mapDensity 
-		rctx.textScale = 1 / mapDensity; //Text/icon stays same for all sizes
+		rctx.textScale = 1 / scale; //Text/icon stays same for all sizes
 		if(renderingProps.get("textScale") != null ) {
 			rctx.textScale *= Float.parseFloat(renderingProps.get("textScale"));
 		}
 		rctx.screenDensityRatio = 1 / Math.max(1, 1f /*requestedBox.getDensity()*/);
-		final double tileDivisor = MapUtils.getPowZoom((float) (31 - ctx.zoom - ctx.zoomDelta));
+		final double tileDivisor = MapUtils.getPowZoom((float) (31 - ctx.zoom)) / scale;
 		request.clearState();
 		
 		if(request.searchRenderingAttribute(RenderingRuleStorageProperties.A_DEFAULT_COLOR)) {
