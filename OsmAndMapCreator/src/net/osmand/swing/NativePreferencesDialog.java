@@ -6,6 +6,7 @@ import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
+import java.awt.Panel;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.Map;
@@ -97,6 +98,7 @@ public class NativePreferencesDialog extends JDialog {
 		JPanel buttonsPane = new JPanel(l);
 		okButton = new JButton(Messages.getString("OsmExtractionPreferencesDialog.OK")); //$NON-NLS-1$
 		buttonsPane.add(okButton);
+		pane.getRootPane().setDefaultButton(okButton);
 		cancelButton = new JButton(Messages.getString("OsmExtractionPreferencesDialog.CANCEL")); //$NON-NLS-1$
 		buttonsPane.add(cancelButton);
 
