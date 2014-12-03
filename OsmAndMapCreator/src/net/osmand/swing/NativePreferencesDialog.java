@@ -29,7 +29,7 @@ import javax.swing.JTextField;
  * Base parameters:
  * density
  * lang
- * textSize
+ * textScale
  * nightMode
  * languagePreference
  * 
@@ -290,11 +290,13 @@ public class NativePreferencesDialog extends JDialog {
 			i++;
 			JComboBox<String> cb = combos.get(s);
 			String item = cb.getSelectedItem().toString();
-			res += s + "=" + item;
-			for (int ij = 0; ij < cb.getItemCount(); ij++) {
-				String kk = cb.getItemAt(ij);
-				if (!item.equals(kk)) {
-					res += ";" + kk;
+			if (!res.contains(s + "=")) {
+				res += s + "=" + item;
+				for (int ij = 0; ij < cb.getItemCount(); ij++) {
+					String kk = cb.getItemAt(ij);
+					if (!item.equals(kk)) {
+						res += ";" + kk;
+					}
 				}
 			}
 		}
