@@ -11,6 +11,7 @@ import java.io.File;
 import javax.media.opengl.GLAutoDrawable;
 import javax.media.opengl.GLEventListener;
 import javax.media.opengl.awt.GLCanvas;
+import javax.swing.JTextField;
 
 import net.osmand.core.jni.AreaI;
 import net.osmand.core.jni.AtlasMapRendererConfiguration;
@@ -76,6 +77,7 @@ public class QtCorePanel implements GLEventListener {
 
 
 	private MapCanvas mapCanvas;
+	private JTextField zoomField;
 	private IMapRenderer mapRenderer;
 	private RenderRequestCallback callback;
 	private String styleFile;
@@ -115,6 +117,9 @@ public class QtCorePanel implements GLEventListener {
 			}
 		});
 		frame.add(mapCanvas, java.awt.BorderLayout.CENTER);
+		zoomField = new JTextField();
+		zoomField.setEditable(false);
+		frame.add(zoomField, java.awt.BorderLayout.NORTH);
 		frame.setBounds(DataExtractionSettings.getSettings().getWindowBounds());
 		frame.validate();
 		frame.setVisible(true);
@@ -358,6 +363,8 @@ public class QtCorePanel implements GLEventListener {
 			mapRenderer
 					.setTarget(new PointI(MapUtils.get31TileNumberX(longitude), MapUtils.get31TileNumberY(latitude)));
 			mapRenderer.setZoom(zoom);
+			zoomField.setText("http://www.openstreetmap.org/#map=" + zoom + "/" + ((float) latitude) + "/"
+					+ ((float) longitude));
 		}
 
 		public void registerListeners() {
