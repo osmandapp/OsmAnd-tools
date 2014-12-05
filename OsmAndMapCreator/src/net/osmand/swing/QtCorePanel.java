@@ -180,7 +180,7 @@ public class QtCorePanel implements GLEventListener {
 						} else if (value.equals("localizedOrTransliteratedAndNative")) {
 							languagePreference = MapPresentationEnvironment.LanguagePreference.LocalizedOrTransliteratedAndNative;
 						}
-					} else if (name.equals("symbolsScale")) {
+					} else if (name.equals("textScale")) {
 						symbolsScale = Float.parseFloat(value);
 					} else if (name.equals("debugStageEnabled")) {
 						debugSettings.setDebugStageEnabled(value.equals("true"));
