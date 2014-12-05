@@ -144,6 +144,7 @@ public class QtCorePanel implements GLEventListener {
 		private MapRendererDebugSettings debugSettings = new MapRendererDebugSettings();
 		private String localeLanguageId = "en";
 		private float density = 1;
+		private float symbolsScale = 1;
 		private MapPresentationEnvironment.LanguagePreference languagePreference =
 				MapPresentationEnvironment.LanguagePreference.LocalizedOrNative;
 		private final QStringStringHash styleSettings = new QStringStringHash();
@@ -179,6 +180,8 @@ public class QtCorePanel implements GLEventListener {
 						} else if (value.equals("localizedOrTransliteratedAndNative")) {
 							languagePreference = MapPresentationEnvironment.LanguagePreference.LocalizedOrTransliteratedAndNative;
 						}
+					} else if (name.equals("symbolsScale")) {
+						symbolsScale = Float.parseFloat(value);
 					} else if (name.equals("debugStageEnabled")) {
 						debugSettings.setDebugStageEnabled(value.equals("true"));
 					} else if (name.equals("excludeOnPathSymbols")) {
@@ -277,7 +280,7 @@ public class QtCorePanel implements GLEventListener {
 		MapPrimitivesProvider mapPrimitivesProvider = new MapPrimitivesProvider(
 				obfMapObjectsProvider, mapPrimitiviser, rasterTileSize);
 		MapObjectsSymbolsProvider mapObjectsSymbolsProvider = new MapObjectsSymbolsProvider(
-				mapPrimitivesProvider, rasterTileSize);
+				mapPrimitivesProvider, rasterTileSize, options.symbolsScale);
 		MapRasterLayerProvider_Software mapRasterLayerProvider = new MapRasterLayerProvider_Software(
 				mapPrimitivesProvider);
 
