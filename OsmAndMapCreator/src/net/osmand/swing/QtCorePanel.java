@@ -2,6 +2,8 @@ package net.osmand.swing;
 
 import java.awt.Frame;
 import java.awt.Point;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
@@ -118,7 +120,18 @@ public class QtCorePanel implements GLEventListener {
 		});
 		frame.add(mapCanvas, java.awt.BorderLayout.CENTER);
 		zoomField = new JTextField();
-		zoomField.setEditable(false);
+		zoomField.addActionListener(new ActionListener() {
+
+			@Override
+			public void actionPerformed(ActionEvent arg0) {
+				String txt = zoomField.getText();
+				int i = txt.indexOf("#map=");
+				String[] vs = txt.substring(i + "#map=".length()).split("/");
+				mapCanvas.setLatLon(Float.parseFloat(vs[1]), Float.parseFloat(vs[2]));
+				mapCanvas.setZoom(Integer.parseInt(vs[0]));
+
+			}
+		});
 		frame.add(zoomField, java.awt.BorderLayout.NORTH);
 		frame.setBounds(DataExtractionSettings.getSettings().getWindowBounds());
 		frame.validate();
@@ -363,7 +376,7 @@ public class QtCorePanel implements GLEventListener {
 			mapRenderer
 					.setTarget(new PointI(MapUtils.get31TileNumberX(longitude), MapUtils.get31TileNumberY(latitude)));
 			mapRenderer.setZoom(zoom);
-			zoomField.setText("http://www.openstreetmap.org/#map=" + zoom + "/" + ((float) latitude) + "/"
+			zoomField.setText("http://www.openstreetmap.org/#map=" + ((int)zoom) + "/" + ((float) latitude) + "/"
 					+ ((float) longitude));
 		}
 

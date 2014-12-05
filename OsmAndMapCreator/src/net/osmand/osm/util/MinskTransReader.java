@@ -177,7 +177,7 @@ public class MinskTransReader {
 			e.printStackTrace();
 		}
 		
-		final MapPanel panel = new MapPanel(DataExtractionSettings.getSettings().getTilesDirectory());
+		final MapPanel panel = new MapPanel(DataExtractionSettings.getSettings().getTilesDirectory(), null);
 		panel.setPoints(points);
 	    frame.addWindowListener(new WindowAdapter(){
 	    	@Override

@@ -141,7 +141,7 @@ public class MapInformationLayer implements MapPanelLayer {
 		double latitude = map.getLatitude();
 		double longitude = map.getLongitude();
 		int zoom = map.getZoom();
-		gpsLocation.setText(MessageFormat.format("Lat : {0,number,#.####}, lon : {1,number,#.####}, zoom : {2}", latitude, longitude, zoom)); //$NON-NLS-1$
+//		gpsLocation.setText(MessageFormat.format("Lat : {0,number,#.####}, lon : {1,number,#.####}, zoom : {2}", latitude, longitude, zoom)); //$NON-NLS-1$
 	}
 	@Override
 	public void prepareToDraw() {

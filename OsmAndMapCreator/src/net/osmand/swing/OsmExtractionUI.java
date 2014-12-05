@@ -20,6 +20,7 @@ import java.util.logging.LogManager;
 import java.util.logging.SimpleFormatter;
 
 import javax.swing.AbstractAction;
+import javax.swing.BoxLayout;
 import javax.swing.JCheckBox;
 import javax.swing.JDialog;
 import javax.swing.JFileChooser;
@@ -30,7 +31,7 @@ import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
-import javax.swing.JTree;
+import javax.swing.JTextField;
 import javax.swing.UIManager;
 import javax.swing.filechooser.FileFilter;
 import javax.xml.stream.XMLStreamException;
@@ -115,13 +116,6 @@ public class OsmExtractionUI implements IMapLocationListener {
 	}
 	
 	
-	
-	
-	private JTree treePlaces;
-//	private DataExtractionTreeNode amenitiesTree;
-//	private TreeModelListener treeModelListener;
-	
-	
 	private MapPanel mapPanel;
 	private JFrame frame;
 	private JLabel statusBarLabel;
@@ -136,6 +130,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 	private JCheckBox showOfflineIndex;
 
 	private String regionName;
+	private JTextField statusField;
 	
 	public OsmExtractionUI(){
 		createUI();
@@ -157,11 +152,25 @@ public class OsmExtractionUI implements IMapLocationListener {
 	    frame.addWindowListener(new ExitListener());
 	    Container content = frame.getContentPane();
 	    frame.setFocusable(true);
-	    
-	    mapPanel = new MapPanel(DataExtractionSettings.getSettings().getTilesDirectory());
+	    statusField = new JTextField();
+	    mapPanel = new MapPanel(DataExtractionSettings.getSettings().getTilesDirectory(), statusField);
 	    mapPanel.setFocusable(true);
 	    mapPanel.addMapLocationListener(this);
 	    
+	    
+		statusField.addActionListener(new ActionListener() {
+
+			@Override
+			public void actionPerformed(ActionEvent arg0) {
+				String txt = statusField.getText();
+				int i = txt.indexOf("#map=");
+				String[] vs = txt.substring(i + "#map=".length()).split("/");
+				mapPanel.setLatLon(Float.parseFloat(vs[1]), Float.parseFloat(vs[2]));
+				mapPanel.setZoom(Integer.parseInt(vs[0]));
+
+			}
+		});
+		
 	    statusBarLabel = new JLabel();
 	    content.add(statusBarLabel, BorderLayout.SOUTH);
 	    File workingDir = DataExtractionSettings.getSettings().getDefaultWorkingDir();
@@ -175,11 +184,18 @@ public class OsmExtractionUI implements IMapLocationListener {
 //	    content.add(panelForTreeAndMap, BorderLayout.CENTER);
 	    
 	    content.add(mapPanel, BorderLayout.CENTER);
-	    
-	    createButtonsBar(content);
+	    JPanel bl = new JPanel();
+	    bl.setLayout(new BoxLayout(bl, BoxLayout.PAGE_AXIS));
+	    JPanel buttonsBar = createButtonsBar();
+	    content.add(buttonsBar, BorderLayout.NORTH
+	    		);
+	    content.add(bl, BorderLayout.NORTH);
+	    bl.add(buttonsBar);
+	    bl.add(statusField);
 	   
 	    JMenuBar bar = new JMenuBar();
 	    fillMenuWithActions(bar);
+	    
 
 	    frame.setJMenuBar(bar);
 	}
@@ -187,9 +203,8 @@ public class OsmExtractionUI implements IMapLocationListener {
 	
 	
 	
-	public void createButtonsBar(Container content){
+	public JPanel createButtonsBar(){
 		JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-		content.add(panel, BorderLayout.NORTH);
 		
 		buildMapIndex = new JCheckBox();
 		buildMapIndex.setText(Messages.getString("OsmExtractionUI.BUILD_MAP")); //$NON-NLS-1$
@@ -241,6 +256,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 				}
 			}
 		});
+		return panel;
 	}
 	
 	private void initNativeRendering(String renderingProperties) {
@@ -422,7 +438,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 		        if (answer == JFileChooser.APPROVE_OPTION && fc.getSelectedFile() != null){
 		        	final JDialog dlg = new JDialog(frame, true);
 		        	dlg.setTitle(Messages.getString("OsmExtractionUI.SELECT_AREA_TO_FILTER")); //$NON-NLS-1$
-		        	MapPanel panel = new MapPanel(DataExtractionSettings.getSettings().getTilesDirectory());
+		        	MapPanel panel = new MapPanel(DataExtractionSettings.getSettings().getTilesDirectory(), null);
 		        	panel.setLatLon(mapPanel.getLatitude(), mapPanel.getLongitude());
 		        	panel.setZoom(mapPanel.getZoom());
 		        	final StringBuilder res = new StringBuilder();

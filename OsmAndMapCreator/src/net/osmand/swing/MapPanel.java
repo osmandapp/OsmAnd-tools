@@ -41,6 +41,7 @@ import javax.swing.JMenuBar;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
+import javax.swing.JTextField;
 import javax.swing.UIManager;
 
 import net.osmand.MapCreatorVersion;
@@ -71,6 +72,7 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 	
 	protected static final Log log = PlatformUtil.getLog(MapPanel.class);
 	public static final int divNonLoadedImage = 16;
+
 	
 	
 	public static void main(String[] args) throws IOException {
@@ -86,7 +88,8 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 			e.printStackTrace();
 		}
 		
-		final MapPanel panel = new MapPanel(DataExtractionSettings.getSettings().getTilesDirectory());
+		final MapPanel panel = new MapPanel(DataExtractionSettings.getSettings().getTilesDirectory(), 
+				null);
 		panel.nativeLibRendering = nativeLib;
 //		panel.longitude = longitude;
 //		panel.latitude = latitude;
@@ -102,6 +105,7 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 	    });
 	    Container content = frame.getContentPane();
 	    content.add(panel, BorderLayout.CENTER);
+		
 
 	    JMenuBar bar = new JMenuBar();
 	    bar.add(getMenuToChooseSource(panel));
@@ -156,11 +160,14 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 	private JPopupMenu popupMenu;
 	private Point popupMenuPoint;
 	private boolean willBePopupShown = false;
+
+	private JTextField statusField;
 	
 	
 	
-	public MapPanel(File fileWithTiles) {
+	public MapPanel(File fileWithTiles, JTextField statusField) {
 		ImageIO.setUseCache(false);
+		this.statusField = statusField;
 		
 		tilesLocation = fileWithTiles;
 		LatLon defaultLocation = DataExtractionSettings.getSettings().getDefaultLocation();
@@ -513,9 +520,12 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 	}
 	
 	public void prepareImage(){
+		if (statusField != null) {
+			statusField.setText("http://www.openstreetmap.org/#map=" + zoom + "/" + ((float) latitude) + "/"
+					+ ((float) longitude));
+		}
 		if(nativeLibRendering != null) {
 			prepareNativeImage();
-			
 		} else {
 			prepareRasterImage(DataExtractionSettings.getSettings().useInternetToLoadImages());
 		}
