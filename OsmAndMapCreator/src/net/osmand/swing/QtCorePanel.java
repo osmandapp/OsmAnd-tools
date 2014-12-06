@@ -280,7 +280,7 @@ public class QtCorePanel implements GLEventListener {
 		MapPrimitivesProvider mapPrimitivesProvider = new MapPrimitivesProvider(
 				obfMapObjectsProvider, mapPrimitiviser, rasterTileSize);
 		MapObjectsSymbolsProvider mapObjectsSymbolsProvider = new MapObjectsSymbolsProvider(
-				mapPrimitivesProvider, rasterTileSize, options.symbolsScale);
+				mapPrimitivesProvider, rasterTileSize, options.symbolsScale / options.density);
 		MapRasterLayerProvider_Software mapRasterLayerProvider = new MapRasterLayerProvider_Software(
 				mapPrimitivesProvider);
 
