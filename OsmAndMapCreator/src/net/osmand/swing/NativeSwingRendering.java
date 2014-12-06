@@ -140,7 +140,6 @@ public class NativeSwingRendering extends NativeLibrary {
 	
 	public static class RenderingImageContext {
 		public int zoom;
-		public double zoomDelta;
 		public int sleft;
 		public int sright;
 		public int stop;
@@ -152,13 +151,12 @@ public class NativeSwingRendering extends NativeLibrary {
 		public long searchTime;
 		public long renderingTime;
 		
-		public RenderingImageContext(int sleft, int sright, int stop, int sbottom, int zoom, double zoomDelta) {
+		public RenderingImageContext(int sleft, int sright, int stop, int sbottom, int zoom) {
 			this.sleft = sleft;
 			this.sright = sright;
 			this.stop = stop;
 			this.sbottom = sbottom;
 			this.zoom = zoom;
-			this.zoomDelta = zoomDelta;
 			leftX =  (((double) sleft) / MapUtils.getPowZoom(31 - zoom));
 			topY = (((double) stop) / MapUtils.getPowZoom(31 - zoom));
 			width = (int) ((sright - sleft) / MapUtils.getPowZoom(31 - zoom - 8));
@@ -169,10 +167,9 @@ public class NativeSwingRendering extends NativeLibrary {
 				double zoomDelta) {
 			this.width = width;
 			this.height = height;
-			this.zoomDelta = zoomDelta;
 			this.zoom = zoom;
 			RotatedTileBoxBuilder bld = new RotatedTileBox.RotatedTileBoxBuilder();
-			RotatedTileBox tb = bld.setPixelDimensions(width, height).setZoomAndScale(zoom, (float) zoomDelta).
+			RotatedTileBox tb = bld.setPixelDimensions(width, height).setZoom(zoom).
 				setLocation(lat, lon).build();
 			final QuadPointDouble lt = tb.getLeftTopTile(tb.getZoom());
 			
