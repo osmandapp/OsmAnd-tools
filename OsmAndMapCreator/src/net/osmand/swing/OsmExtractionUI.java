@@ -130,7 +130,6 @@ public class OsmExtractionUI implements IMapLocationListener {
 	private JCheckBox showOfflineIndex;
 
 	private String regionName;
-	private JTextField statusField;
 	
 	public OsmExtractionUI(){
 		createUI();
@@ -152,25 +151,13 @@ public class OsmExtractionUI implements IMapLocationListener {
 	    frame.addWindowListener(new ExitListener());
 	    Container content = frame.getContentPane();
 	    frame.setFocusable(true);
-	    statusField = new JTextField();
+	    
 	    mapPanel = new MapPanel(DataExtractionSettings.getSettings().getTilesDirectory());
-	    mapPanel.setStatusField(statusField);
 	    mapPanel.setFocusable(true);
 	    mapPanel.addMapLocationListener(this);
 	    
 	    
-		statusField.addActionListener(new ActionListener() {
-
-			@Override
-			public void actionPerformed(ActionEvent arg0) {
-				String txt = statusField.getText();
-				int i = txt.indexOf("#map=");
-				String[] vs = txt.substring(i + "#map=".length()).split("/");
-				mapPanel.setLatLon(Float.parseFloat(vs[1]), Float.parseFloat(vs[2]));
-				mapPanel.setZoom(Integer.parseInt(vs[0]));
-
-			}
-		});
+		
 		
 	    statusBarLabel = new JLabel();
 	    content.add(statusBarLabel, BorderLayout.SOUTH);
@@ -189,7 +176,22 @@ public class OsmExtractionUI implements IMapLocationListener {
 	    bl.setLayout(new BoxLayout(bl, BoxLayout.PAGE_AXIS));
 	    JPanel buttonsBar = createButtonsBar();
 	    bl.add(buttonsBar);
+	    final JTextField statusField = new JTextField();
+	    mapPanel.setStatusField(statusField);
 	    bl.add(statusField);
+	    
+	    statusField.addActionListener(new ActionListener() {
+
+			@Override
+			public void actionPerformed(ActionEvent arg0) {
+				String txt = statusField.getText();
+				int i = txt.indexOf("#map=");
+				String[] vs = txt.substring(i + "#map=".length()).split("/");
+				mapPanel.setLatLon(Float.parseFloat(vs[1]), Float.parseFloat(vs[2]));
+				mapPanel.setZoom(Integer.parseInt(vs[0]));
+
+			}
+		});
 	    
 	    content.add(bl, BorderLayout.NORTH);
 	    JMenuBar bar = new JMenuBar();
