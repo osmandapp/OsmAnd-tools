@@ -618,7 +618,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		int forwardStop = 0;
 		int backwardStop = 0;
 		for (Entry<Entity, String> e : rel.getMemberEntities().entrySet()) {
-			if (e.getValue().contains("stop")) { //$NON-NLS-1$
+			if (e.getValue().contains("stop") || e.getValue().contains("platform")) { //$NON-NLS-1$
 				if (e.getKey() instanceof Node) {
 					TransportStop stop = EntityParser.parseTransportStop(e.getKey());
 					// add stop name if there was no name on the point, but was name on the corresponding stop_area relation
