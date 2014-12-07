@@ -188,12 +188,10 @@ public class OsmExtractionUI implements IMapLocationListener {
 	    JPanel bl = new JPanel();
 	    bl.setLayout(new BoxLayout(bl, BoxLayout.PAGE_AXIS));
 	    JPanel buttonsBar = createButtonsBar();
-	    content.add(buttonsBar, BorderLayout.NORTH
-	    		);
-	    content.add(bl, BorderLayout.NORTH);
 	    bl.add(buttonsBar);
 	    bl.add(statusField);
-	   
+	    
+	    content.add(bl, BorderLayout.NORTH);
 	    JMenuBar bar = new JMenuBar();
 	    fillMenuWithActions(bar);
 	    
