@@ -255,7 +255,7 @@ public class AHSupermarketResolver {
 				e.printStackTrace();
 			}
 			
-			final MapPanel panel = new MapPanel(DataExtractionSettings.getSettings().getTilesDirectory(), null);
+			final MapPanel panel = new MapPanel(DataExtractionSettings.getSettings().getTilesDirectory());
 			panel.setFocusable(true);
 			MapPointsLayer toAdd = panel.getLayer(MapPointsLayer.class);
 			toAdd.setPoints(notShown);

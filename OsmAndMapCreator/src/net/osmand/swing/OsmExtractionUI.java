@@ -153,7 +153,8 @@ public class OsmExtractionUI implements IMapLocationListener {
 	    Container content = frame.getContentPane();
 	    frame.setFocusable(true);
 	    statusField = new JTextField();
-	    mapPanel = new MapPanel(DataExtractionSettings.getSettings().getTilesDirectory(), statusField);
+	    mapPanel = new MapPanel(DataExtractionSettings.getSettings().getTilesDirectory());
+	    mapPanel.setStatusField(statusField);
 	    mapPanel.setFocusable(true);
 	    mapPanel.addMapLocationListener(this);
 	    
@@ -438,7 +439,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 		        if (answer == JFileChooser.APPROVE_OPTION && fc.getSelectedFile() != null){
 		        	final JDialog dlg = new JDialog(frame, true);
 		        	dlg.setTitle(Messages.getString("OsmExtractionUI.SELECT_AREA_TO_FILTER")); //$NON-NLS-1$
-		        	MapPanel panel = new MapPanel(DataExtractionSettings.getSettings().getTilesDirectory(), null);
+		        	MapPanel panel = new MapPanel(DataExtractionSettings.getSettings().getTilesDirectory());
 		        	panel.setLatLon(mapPanel.getLatitude(), mapPanel.getLongitude());
 		        	panel.setZoom(mapPanel.getZoom());
 		        	final StringBuilder res = new StringBuilder();

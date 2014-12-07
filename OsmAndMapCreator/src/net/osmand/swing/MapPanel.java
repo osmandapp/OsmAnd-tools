@@ -88,8 +88,7 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 			e.printStackTrace();
 		}
 		
-		final MapPanel panel = new MapPanel(DataExtractionSettings.getSettings().getTilesDirectory(), 
-				null);
+		final MapPanel panel = new MapPanel(DataExtractionSettings.getSettings().getTilesDirectory());
 		panel.nativeLibRendering = nativeLib;
 //		panel.longitude = longitude;
 //		panel.latitude = latitude;
@@ -165,9 +164,8 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 	
 	
 	
-	public MapPanel(File fileWithTiles, JTextField statusField) {
+	public MapPanel(File fileWithTiles) {
 		ImageIO.setUseCache(false);
-		this.statusField = statusField;
 		
 		tilesLocation = fileWithTiles;
 		LatLon defaultLocation = DataExtractionSettings.getSettings().getDefaultLocation();
@@ -199,6 +197,10 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 		addMouseWheelListener(mouse);
 		
 		initDefaultLayers();
+	}
+	
+	public void setStatusField(JTextField statusField) {
+		this.statusField = statusField;
 	}
 	
 	private static Map<String, TileSourceTemplate> getCommonTemplates(File dir){
