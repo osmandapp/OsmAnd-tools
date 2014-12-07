@@ -21,6 +21,7 @@ import java.awt.event.WindowEvent;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
@@ -42,6 +43,7 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.JTextField;
+import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 
 import net.osmand.MapCreatorVersion;
@@ -523,8 +525,20 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 	
 	public void prepareImage(){
 		if (statusField != null) {
-			statusField.setText("http://www.openstreetmap.org/#map=" + zoom + "/" + ((float) latitude) + "/"
-					+ ((float) longitude));
+			try {
+				SwingUtilities.invokeAndWait(new Runnable() {
+					
+					@Override
+					public void run() {
+						statusField.setText("http://www.openstreetmap.org/#map=" + zoom + "/" + ((float) latitude) + "/"
+								+ ((float) longitude));					
+					}
+				});
+			} catch (InvocationTargetException e) {
+				e.printStackTrace();
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
 		}
 		if(nativeLibRendering != null) {
 			prepareNativeImage();
