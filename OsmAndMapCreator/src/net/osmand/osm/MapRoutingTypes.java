@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
+import net.osmand.binary.RouteDataObject;
 import net.osmand.osm.MapRenderingTypesEncoder.MapRouteTag;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Node;
@@ -158,6 +159,18 @@ public class MapRoutingTypes {
 		return false;
 	}
 	
+	private boolean testNonParseableRules(String tag, String value) {
+		// fix possible issues (i.e. non arabic digits)
+		if(tag.equals("maxspeed") && value != null) {
+			try {
+				RouteDataObject.parseSpeed(value, 0);
+			} catch (Exception e) {
+				return false;
+			}
+		}
+		return true;
+	}
+	
 	
 	public boolean encodeEntity(Way et, TIntArrayList outTypes, Map<MapRouteType, String> names){
 		Way e = et;
@@ -165,6 +178,9 @@ public class MapRoutingTypes {
 		for(Entry<String, String> es : e.getTags().entrySet()) {
 			String tag = es.getKey();
 			String value = es.getValue();
+			if(!testNonParseableRules(tag, value)){
+				continue;
+			}
 			if (contains(TAGS_TO_ACCEPT, tag, value)) {
 				init = true;
 				break;
@@ -178,6 +194,9 @@ public class MapRoutingTypes {
 		for(Entry<String, String> es : e.getTags().entrySet()) {
 			String tag = es.getKey();
 			String value = converBooleanValue(es.getValue());
+			if(!testNonParseableRules(tag, value)){
+				continue;
+			}
 			String tvl = getMap(TAGS_TO_REPLACE, tag.toLowerCase(), value.toLowerCase());
 			if(tvl != null) {
 				int i = tvl.indexOf(TAG_DELIMETER);
