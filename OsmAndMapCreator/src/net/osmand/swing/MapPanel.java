@@ -438,6 +438,11 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 			g.fillRect(r.x, r.y, r.width, r.height);
 		}
 		super.paintComponent(g);
+		if (statusField != null) {
+			statusField.setText("http://www.openstreetmap.org/#map=" + zoom + "/" + ((float) latitude) + "/"
+							+ ((float) longitude));					
+				
+		}
 	}
 	
 	public File getTilesLocation() {
@@ -524,22 +529,6 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 	}
 	
 	public void prepareImage(){
-		if (statusField != null) {
-			try {
-				SwingUtilities.invokeAndWait(new Runnable() {
-					
-					@Override
-					public void run() {
-						statusField.setText("http://www.openstreetmap.org/#map=" + zoom + "/" + ((float) latitude) + "/"
-								+ ((float) longitude));					
-					}
-				});
-			} catch (InvocationTargetException e) {
-				e.printStackTrace();
-			} catch (InterruptedException e) {
-				e.printStackTrace();
-			}
-		}
 		if(nativeLibRendering != null) {
 			prepareNativeImage();
 		} else {
