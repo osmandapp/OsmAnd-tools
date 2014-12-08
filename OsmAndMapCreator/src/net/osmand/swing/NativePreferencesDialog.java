@@ -304,7 +304,7 @@ public class NativePreferencesDialog extends JDialog {
 				}
 			}
 			if(s.equals("density")) {
-				mapPanel.setZoomDelta((float) (Math.log(Float.parseFloat(item)) / Math.log(2)));
+				mapPanel.setMapDensity(Float.parseFloat(item));
 			}
 		}
 		DataExtractionSettings.getSettings().setRenderingProperties(res);

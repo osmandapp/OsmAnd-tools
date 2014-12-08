@@ -54,15 +54,15 @@ public class OsmAndImageRendering {
 	}
 	
 	static class ImageCombination {
-		public ImageCombination(String nm, String zoom, String zoomScale, String rendering, String props) {
+		public ImageCombination(String nm, String zoom, String mapDensity, String rendering, String props) {
 			generateName = nm;
 			renderingStyle = rendering;
 			renderingProperties = props;
 			this.zoom = Integer.parseInt(zoom);
-			this.zoomScale = Double.parseDouble(zoomScale);
+			this.mapDensity = Double.parseDouble(mapDensity);
 		}
 		int zoom;
-		double zoomScale;
+		double mapDensity;
 		String renderingStyle;
 		String renderingProperties;
 		String generateName;
@@ -169,7 +169,7 @@ public class OsmAndImageRendering {
 		org.w3c.dom.Document doc = docBuilder.parse(new File(gpxFile));
 		Element de = doc.getDocumentElement();
 		String defZoom = getAttribute(de, "zoom", "11");
-		String defZoomScale = getAttribute(de, "zoomScale", "0");
+		String defMapDensity = getAttribute(de, "mapDensity", "1");
 		String defRenderingName = getAttribute(de, "renderingName", "default");
 		String defRenderingProps = getAttribute(de, "renderingProperties", "");
 		String defWidth = getAttribute(de, "width", "1366");
@@ -208,7 +208,7 @@ public class OsmAndImageRendering {
 			String name = getSubAttr(e, "name", (lat+"!"+lon).replace('.', '_'));
 			String maps = getSubAttr(e, "maps", "") ;
 			
-			String zoomScales = getSubAttr(e, "zoomScale", defZoomScale);
+			String mapDensities = getSubAttr(e, "mapDensity", defMapDensity);
 			String zooms = getSubAttr(e, "zoom", defZoom);
 			String renderingNames = getSubAttr(e, "renderingName", defRenderingName) ;
 			String renderingProperties = getSubAttr(e, "renderingProperties", defRenderingProps) ;
@@ -219,7 +219,7 @@ public class OsmAndImageRendering {
 //			nsr.initFilesInDir(new File(dirWithObf));
 			ArrayList<File> obfFiles = new ArrayList<File>();
 			initMaps(dirWithObf, backup, gpxFile, maps, nsr, obfFiles);
-			List<ImageCombination> ls = getCombinations(name, zooms, zoomScales, renderingNames, renderingProperties) ;
+			List<ImageCombination> ls = getCombinations(name, zooms, mapDensities, renderingNames, renderingProperties) ;
 			if(html != null) {
 				html.newRow(getSubAttr(e, "desc", ""));
 			}
@@ -228,7 +228,7 @@ public class OsmAndImageRendering {
 				if (eyepiece != null) {
 					try {
 						String line = eyepiece;
-						double dx = ic.zoomScale + 1;
+						double dx = ic.mapDensity;
 						line += " -latLon=" + lat+";"+lon;
 						line += " -stylesPath=\""+stylesPath+"\"";
 						String styleName = ic.renderingStyle;
@@ -273,7 +273,7 @@ public class OsmAndImageRendering {
 				if(nativeLib != null){
 					nsr.loadRuleStorage(ic.renderingStyle, ic.renderingProperties);
 					BufferedImage mg = nsr.renderImage(new RenderingImageContext(lat, lon, imageWidth, imageHeight,
-							ic.zoom, ic.zoomScale));
+							ic.zoom, ic.mapDensity));
 
 					ImageWriter writer = ImageIO.getImageWritersBySuffix("png").next();
 					final String fileName = ic.generateName + ".png";
@@ -290,18 +290,18 @@ public class OsmAndImageRendering {
 		}
 	}
 
-	private static List<ImageCombination> getCombinations(String name, String zooms, String zoomScales,
+	private static List<ImageCombination> getCombinations(String name, String zooms, String mapDensities,
 			String renderingNames, String renderingProperties) {
 		String[] zoomsStr = zooms.split(",");
-		String[] zoomScalesStr = zoomScales.split(",");
+		String[] mapDenses = mapDensities.split(",");
 		String[] renderingNamesStr = renderingNames.split(",");
 		String[] renderingPropertiesStr = renderingProperties.split(";");
 		List<ImageCombination> list = new ArrayList<OsmAndImageRendering.ImageCombination>();
 		
 		for (int i1 = 0; i1 < zoomsStr.length; i1++) {
 			String name1 = append(name, "z", zoomsStr, i1);
-			for (int i2 = 0; i2 < zoomScalesStr.length; i2++) {
-				String name2 = append(name1, "zScale", zoomScalesStr, i2);
+			for (int i2 = 0; i2 < mapDenses.length; i2++) {
+				String name2 = append(name1, "mapDens", mapDenses, i2);
 				for (int i3 = 0; i3 < renderingNamesStr.length; i3++) {
 					String name3 = append(name2, "", renderingNamesStr, i3);
 					for (int i4 = 0; i4 < renderingPropertiesStr.length; i4++) {
@@ -313,7 +313,7 @@ public class OsmAndImageRendering {
 							}
 							rst += "noPolygons=false";
 						}
-						list.add(new ImageCombination(name4, zoomsStr[i1], zoomScalesStr[i2],
+						list.add(new ImageCombination(name4, zoomsStr[i1], mapDenses[i2],
 								renderingNamesStr[i3] + ".render.xml", rst));
 
 					}

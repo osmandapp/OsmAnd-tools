@@ -21,7 +21,6 @@ import java.awt.event.WindowEvent;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
@@ -43,7 +42,6 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.JTextField;
-import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 
 import net.osmand.MapCreatorVersion;
@@ -137,7 +135,7 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 	
 	// zoom level
 	private int zoom = 1;
-	private float zoomDelta = 0;
+	private float mapDensity = 1;
 	
 	// degree measurements (-180, 180)
 	private double longitude;
@@ -361,7 +359,7 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 	}
 	
 	public double getTileSize(){
-		return (map == null ?  256 : map.getTileSize()) * MapUtils.getPowZoom(zoomDelta);
+		return (map == null ?  256 : map.getTileSize()) * mapDensity;
 	}
 	
 	
@@ -398,8 +396,8 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 			if (nativeRect != null && zoom == nativeRect.nativeZoom) {
                 double xTileLeft = getXTile() - getWidth() / (2.0d * getTileSize());
                 double yTileUp = getYTile() - getHeight() / (2.0d * getTileSize());
-				int shx = (int) (-xTileLeft * getTileSize()+ ((float)nativeRect.left31)/ MapUtils.getPowZoom(31 - zoom - 8 - zoomDelta)) ;
-				int shy = (int) (-yTileUp * getTileSize() + ((float)nativeRect.top31) / MapUtils.getPowZoom(31 - zoom - 8 - zoomDelta))  ;
+				int shx = (int) (-xTileLeft * getTileSize()+ ((float)nativeRect.left31)/ (MapUtils.getPowZoom(31 - zoom - 8) /mapDensity)) ;
+				int shy = (int) (-yTileUp * getTileSize() + ((float)nativeRect.top31) / (MapUtils.getPowZoom(31 - zoom - 8) /mapDensity))  ;
 				g.drawImage(nativeRenderingImg, shx, shy, this);
 			}
 		} else if (images != null) {
@@ -609,8 +607,8 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 		return map.getMinimumZoomSupported();
 	}
 	
-	public void setZoomDelta(float zoomDelta) {
-		this.zoomDelta = zoomDelta;
+	public void setMapDensity(float mapDensity) {
+		this.mapDensity = mapDensity;
 		prepareImage();
 	}
 	
@@ -721,19 +719,19 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 		if (e.getID() == KeyEvent.KEY_RELEASED) {
 			if (e.getKeyCode() == 37) {
 				// LEFT button
-				longitude = MapUtils.getLongitudeFromTile(zoom + zoomDelta, getXTile()-0.5); 
+				longitude = MapUtils.getLongitudeFromTile(zoom + Math.log(mapDensity) / Math.log(2), getXTile()-0.5); 
 				processed = true;
 			} else if (e.getKeyCode() == 39) {
 				// RIGHT button
-				longitude = MapUtils.getLongitudeFromTile(zoom + zoomDelta, getXTile()+0.5);
+				longitude = MapUtils.getLongitudeFromTile(zoom + Math.log(mapDensity) / Math.log(2), getXTile()+0.5);
 				processed = true;
 			} else if (e.getKeyCode() == 38) {
 				// UP button
-				latitude = MapUtils.getLatitudeFromTile(zoom + zoomDelta, getYTile()-0.5);
+				latitude = MapUtils.getLatitudeFromTile((float) (zoom + Math.log(mapDensity) / Math.log(2)), getYTile()-0.5);
 				processed = true;
 			} else if (e.getKeyCode() == 40) {
 				// DOWN button
-				latitude = MapUtils.getLatitudeFromTile(zoom + zoomDelta, getYTile()+0.5);
+				latitude = MapUtils.getLatitudeFromTile((float) (zoom + Math.log(mapDensity) / Math.log(2)), getYTile()+0.5);
 				processed = true;
 			}
 		}
@@ -801,10 +799,10 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 		
 		public Rectangle getSelectedArea(){
 			Rectangle r = new Rectangle();
-			r.x = getWidth() / 2 + MapUtils.getPixelShiftX(zoom + zoomDelta, lon1, getLongitude(), getTileSize());
-			r.y = getHeight() / 2 + MapUtils.getPixelShiftY(zoom + zoomDelta, lat1, getLatitude(), getTileSize());
-			r.width = getWidth() / 2 + MapUtils.getPixelShiftX(zoom + zoomDelta, lon2, getLongitude(), getTileSize()) - r.x;
-			r.height = getHeight() / 2 + MapUtils.getPixelShiftY(zoom + zoomDelta, lat2, getLatitude(), getTileSize()) - r.y;
+			r.x = getWidth() / 2 + MapUtils.getPixelShiftX((float) (zoom + Math.log(mapDensity) / Math.log(2)), lon1, getLongitude(), getTileSize());
+			r.y = getHeight() / 2 + MapUtils.getPixelShiftY((float) (zoom + Math.log(mapDensity) / Math.log(2)), lat1, getLatitude(), getTileSize());
+			r.width = getWidth() / 2 + MapUtils.getPixelShiftX((float) (zoom + Math.log(mapDensity) / Math.log(2)), lon2, getLongitude(), getTileSize()) - r.x;
+			r.height = getHeight() / 2 + MapUtils.getPixelShiftY((float) (zoom + Math.log(mapDensity) / Math.log(2)), lat2, getLatitude(), getTileSize()) - r.y;
 			return r;
 		}
 		
@@ -945,7 +943,7 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 		public NativeRendererRunnable(int w, int h) {
             LatLon latLon = new LatLon(latitude, longitude);
 			this.z = zoom;
-			cf = (int) MapUtils.getPowZoom(31 - z - 8 - zoomDelta);
+			cf = (int) (MapUtils.getPowZoom(31 - z - 8) / mapDensity);
             int minTile =  1;//1000;
             int mxTile = (1 << 31) - 1;// (1<<26);
             oleft = MapUtils.get31TileNumberX(latLon.getLongitude()) - (w / 2) * cf  ;
@@ -990,7 +988,7 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 			if (nativeRenderer.getQueue().isEmpty()) {
 				try {
 					nativeRenderingImg = nativeLibRendering.renderImage(sleft,
-							sright , stop , sbottom , z, zoomDelta);
+							sright , stop , sbottom , z, mapDensity);
                     Rect rect = new Rect();
                     rect.left31 = sleft;
                     rect.top31 = stop;

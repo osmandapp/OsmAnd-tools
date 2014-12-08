@@ -164,13 +164,14 @@ public class NativeSwingRendering extends NativeLibrary {
 		}
 		
 		public RenderingImageContext(double lat, double lon, int width, int height, int zoom, 
-				double zoomDelta) {
+				double mapDensity) {
 			this.width = width;
 			this.height = height;
 			this.zoom = zoom;
 			RotatedTileBoxBuilder bld = new RotatedTileBox.RotatedTileBoxBuilder();
 			RotatedTileBox tb = bld.setPixelDimensions(width, height).setZoom(zoom).
 				setLocation(lat, lon).build();
+			tb.setMapDensity(mapDensity);
 			final QuadPointDouble lt = tb.getLeftTopTile(tb.getZoom());
 			
 			
@@ -184,8 +185,8 @@ public class NativeSwingRendering extends NativeLibrary {
 		}
 	}
 	
-	public BufferedImage renderImage(int sleft, int sright, int stop, int sbottom, int zoom, float zoomDelta) throws IOException {
-		return renderImage(new RenderingImageContext(sleft, sright, stop, sbottom, zoom, zoomDelta));	
+	public BufferedImage renderImage(int sleft, int sright, int stop, int sbottom, int zoom, float mapDensity) throws IOException {
+		return renderImage(new RenderingImageContext(sleft, sright, stop, sbottom, zoom, mapDensity));	
 	}
 	
 	public BufferedImage renderImage(RenderingImageContext ctx) throws IOException {
