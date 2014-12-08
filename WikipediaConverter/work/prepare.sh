@@ -3,7 +3,9 @@ function download {
       echo "Start download $1";
       wget --quiet -N http://dumps.wikimedia.org/"$1"wiki/latest/"$1"wiki-latest-pages-articles.xml.bz2
       wget --quiet -N http://dumps.wikimedia.org/"$1"wiki/latest/"$1"wiki-latest-externallinks.sql.gz
-      java -Xms256M -Xmx3200M -cp "../build/WikiConverter.jar:../build/lib/*.jar" net.osmand.osm.util.WikiDatabasePreparation $1
+      if [ ! -f  "$1"wiki.sqlite ]; then
+      	java -Xms256M -Xmx3200M -cp "../build/WikiConverter.jar:../build/lib/*.jar" net.osmand.osm.util.WikiDatabasePreparation $1
+      fi
 }
 
 
