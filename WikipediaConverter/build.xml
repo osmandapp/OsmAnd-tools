@@ -2,7 +2,7 @@
 <project name="WikiConverter" default="build" basedir=".">
 
 	<property file="local.properties" />
-
+	<property name="java.encoding" value="UTF-8" />
 	<property name="src.dir" value="src"/>
 
 	<target name="-dirs">
