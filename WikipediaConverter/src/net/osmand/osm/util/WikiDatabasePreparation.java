@@ -306,8 +306,6 @@ public class WikiDatabasePreparation {
 		private Map<Long, LatLon> pages = new HashMap<Long, LatLon>(); 
 
 		private final InputStream progIS;
-		private final HTMLConverter converter = new HTMLConverter(false);
-		private WikiModel wikiModel ;
 		private ConsoleProgressImplementation progress = new ConsoleProgressImplementation();
 		private DBDialect dialect = DBDialect.SQLITE;
 		private Connection conn;
@@ -315,11 +313,13 @@ public class WikiDatabasePreparation {
 		private int batch = 0;
 		private final static int BATCH_SIZE = 500;
 		final ByteArrayOutputStream bous = new ByteArrayOutputStream(64000);
+		private String lang;
 		
 
 		WikiOsmHandler(SAXParser saxParser, InputStream progIS, String lang,
 				Map<Long, LatLon> pages, File sqliteFile)
 				throws IOException, SQLException{
+			this.lang = lang;
 			this.pages = pages;
 			this.saxParser = saxParser;
 			this.progIS = progIS;
@@ -329,7 +329,6 @@ public class WikiDatabasePreparation {
 			prep = conn.prepareStatement("INSERT INTO wiki VALUES (?, ?, ?, ?, ?)");
 			
 			
-			this.wikiModel = new WikiModel("http://"+lang+".wikipedia.com/wiki/${image}", "http://"+lang+".wikipedia.com/wiki/${title}");
 			progress.startTask("Parse wiki xml", progIS.available());
 		}
 		
@@ -407,8 +406,10 @@ public class WikiDatabasePreparation {
 						if (parseText) {
 							LatLon ll = pages.get(cid);
 							if(id++ % 500 == 0) {
-								log.debug("Article accepted " + cid + " " + title.toString() + " " + ll.getLatitude() + " " + ll.getLongitude());
+								log.debug("Article accepted " + cid + " " + title.toString() + " " + ll.getLatitude() + " " + ll.getLongitude() + " free: " + (Runtime.getRuntime().freeMemory() / (1024 * 1024)) );
 							}
+							final HTMLConverter converter = new HTMLConverter(false);
+							WikiModel wikiModel = new WikiModel("http://"+lang+".wikipedia.com/wiki/${image}", "http://"+lang+".wikipedia.com/wiki/${title}");
 							String plainStr = wikiModel.render(converter, ctext.toString());
 							try {
 								prep.setLong(1, cid);
