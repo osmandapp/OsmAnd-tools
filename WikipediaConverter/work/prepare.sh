@@ -3,14 +3,10 @@ function download {
       echo "Start download $1";
       wget --quiet -N http://dumps.wikimedia.org/"$1"wiki/latest/"$1"wiki-latest-pages-articles.xml.bz2
       wget --quiet -N http://dumps.wikimedia.org/"$1"wiki/latest/"$1"wiki-latest-externallinks.sql.gz
-      java -Xms64M -Xmx720M -cp "../build/WikiConverter.jar:../build/lib/*.jar" net.osmand.osm.util.WikiDatabasePreparation $1
+      java -Xms256M -Xmx3200M -cp "../build/WikiConverter.jar:../build/lib/*.jar" net.osmand.osm.util.WikiDatabasePreparation $1
 }
 
-download nn NorwegianNynorsk;
-download ko Korean;
-download sl Slovene;
-download el Greek;
-download he Hebrew;
+
 
 download en English;
 download de German;
@@ -43,7 +39,11 @@ download fi Finnish;
 download bg Bulgarian;
 download et Estonian;
 download hr Croatian;
-
+download nn NorwegianNynorsk;
+download ko Korean;
+download sl Slovene;
+download el Greek;
+download he Hebrew;
 download ar Arabic ;
 download tr Turkish;
 download th Thai;

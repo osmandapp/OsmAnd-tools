@@ -148,8 +148,8 @@ public class WikiDatabasePreparation {
  					if (pages.containsKey(key)) {
 						final double dist = getDistance(pages.get(key).latitude, pages.get(key).longitude, lat, lon);
 						if (dist > 10000) {
-							System.err.println(key + " ? " + " dist = " + dist + " " + pages.get(key).latitude + "=="
-									+ lat + " " + pages.get(key).longitude + "==" + lon);
+//							System.err.println(key + " ? " + " dist = " + dist + " " + pages.get(key).latitude + "=="
+//									+ lat + " " + pages.get(key).longitude + "==" + lon);
 							pages.remove(key);
 						}
 					} else {
@@ -270,7 +270,7 @@ public class WikiDatabasePreparation {
     						try {
 								p.process(insValues);
 							} catch (Exception e) {
-								System.err.println(insValues);
+								System.err.println(e.getMessage() + " " +insValues);
 //								e.printStackTrace();
 							}
     						last = k + 1;
