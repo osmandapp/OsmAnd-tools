@@ -71,7 +71,7 @@ public class WikiDatabasePreparation {
 //		String lang = "be";
 //		String folder = "/home/victor/projects/osmand/wiki/";
 		String lang = args[0];
-		String folder  = new File(".").getAbsolutePath();
+		String folder  = "";
 		if(args.length > 1){
 			folder = args[1];
 		}
