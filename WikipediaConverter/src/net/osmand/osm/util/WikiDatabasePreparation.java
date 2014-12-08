@@ -4,26 +4,34 @@ import info.bliki.wiki.filter.HTMLConverter;
 import info.bliki.wiki.model.WikiModel;
 
 import java.io.BufferedInputStream;
-import java.io.BufferedWriter;
+import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 
 import net.osmand.PlatformUtil;
+import net.osmand.data.preparation.DBDialect;
 import net.osmand.impl.ConsoleProgressImplementation;
 
 import org.apache.commons.logging.Log;
@@ -59,20 +67,44 @@ public class WikiDatabasePreparation {
 	}
     
     
-	public static void main(String[] args) throws IOException, ParserConfigurationException, SAXException {
-    	final String fileName = "/home/victor/projects/osmand/wiki/bewiki-latest-externallinks.sql.gz";
-    	final String wikiPg = "/home/victor/projects/osmand/wiki/bewiki-latest-pages-articles.xml.bz2";
-    	String lang = "be";
-    	final WikiDatabasePreparation prep = new WikiDatabasePreparation();
+	public static void main(String[] args) throws IOException, ParserConfigurationException, SAXException, SQLException {
+//		String lang = "be";
+//		String folder = "/home/victor/projects/osmand/wiki/";
+		String lang = args[0];
+		String folder  = new File(".").getAbsolutePath();
+		if(args.length > 1){
+			folder = args[1];
+		}
+		final String fileName = folder + lang + "wiki-latest-externallinks.sql.gz";
+		final String wikiPg = folder + lang + "wiki-latest-pages-articles.xml.bz2";
+		final String sqliteFileName = folder + lang + "wiki.sqlite";
+		final WikiDatabasePreparation prep = new WikiDatabasePreparation();
     	
 		Map<Long, LatLon> links = prep.parseExternalLinks(fileName);
-		BufferedWriter bw = new BufferedWriter(new FileWriter("/home/victor/projects/osmand/wiki/beresult.txt"));
-		processWikipedia(wikiPg, lang, links, bw);
-		bw.close();
+		processWikipedia(wikiPg, lang, links, sqliteFileName);
+//		testContent(lang, folder);
     }
 
-	protected static void processWikipedia(final String wikiPg, String lang, Map<Long, LatLon> links, BufferedWriter bw)
-			throws ParserConfigurationException, SAXException, FileNotFoundException, IOException {
+	protected static void testContent(String lang, String folder) throws SQLException, IOException {
+		Connection conn = DBDialect.SQLITE.getDatabaseConnection(folder + lang + "wiki.sqlite", log);
+		ResultSet rs = conn.createStatement().executeQuery("SELECT * from wiki");
+		while(rs.next()) {
+			double lat = rs.getDouble("lat");
+			double lon = rs.getDouble("lon");
+			byte[] zp = rs.getBytes("zipContent");
+			String title = rs.getString("title");
+			BufferedReader rd = new BufferedReader(new InputStreamReader(
+					new GZIPInputStream(new ByteArrayInputStream(zp))));
+			System.out.println(title + " " + lat + " " + lon + " " + zp.length);
+			String s ;
+			while((s = rd.readLine()) != null) {
+				System.out.println(s);
+			}
+		}
+	}
+
+	protected static void processWikipedia(final String wikiPg, String lang, Map<Long, LatLon> links, String sqliteFileName)
+			throws ParserConfigurationException, SAXException, FileNotFoundException, IOException, SQLException {
 		SAXParser sx = SAXParserFactory.newInstance().newSAXParser();
 		InputStream streamFile = new BufferedInputStream(new FileInputStream(wikiPg), 8192 * 4);
 		InputStream stream = streamFile;
@@ -81,7 +113,9 @@ public class WikiDatabasePreparation {
 					"The source stream must start with the characters BZ if it is to be read as a BZip2 stream."); //$NON-NLS-1$
 		} 
 		
-		sx.parse(new CBZip2InputStream(stream), new WikiOsmHandler(sx, streamFile, lang, links, bw));
+		final WikiOsmHandler handler = new WikiOsmHandler(sx, streamFile, lang, links,  new File(sqliteFileName));
+		sx.parse(new CBZip2InputStream(stream), handler);
+		handler.finish();
 	}
 
 	protected Map<Long, LatLon> parseExternalLinks(final String fileName) throws IOException {
@@ -112,12 +146,11 @@ public class WikiDatabasePreparation {
 					}
 					counts.put(key, cnt);
  					if (pages.containsKey(key)) {
-						if (pages.get(key).latitude != lat || pages.get(key).longitude != lon) {
-							System.err.println(key + "? " + pages.get(key).latitude + "==" + lat + " "
-									+ pages.get(key).longitude + "==" + lon);
-							if(cnt >= 3) {
-								pages.remove(key);
-							}
+						final double dist = getDistance(pages.get(key).latitude, pages.get(key).longitude, lat, lon);
+						if (dist > 10000) {
+							System.err.println(key + " ? " + " dist = " + dist + " " + pages.get(key).latitude + "=="
+									+ lat + " " + pages.get(key).longitude + "==" + lon);
+							pages.remove(key);
 						}
 					} else {
 						if(cnt == 1) {
@@ -238,7 +271,7 @@ public class WikiDatabasePreparation {
 								p.process(insValues);
 							} catch (Exception e) {
 								System.err.println(insValues);
-//								e.printStacoutkTrace();
+//								e.printStackTrace();
 							}
     						last = k + 1;
     						word = -1;
@@ -276,18 +309,45 @@ public class WikiDatabasePreparation {
 		private final HTMLConverter converter = new HTMLConverter(false);
 		private WikiModel wikiModel ;
 		private ConsoleProgressImplementation progress = new ConsoleProgressImplementation();
-		private BufferedWriter bw;
+		private DBDialect dialect = DBDialect.SQLITE;
+		private Connection conn;
+		private PreparedStatement prep;
+		private int batch = 0;
+		private final static int BATCH_SIZE = 500;
+		final ByteArrayOutputStream bous = new ByteArrayOutputStream(64000);
 		
 
 		WikiOsmHandler(SAXParser saxParser, InputStream progIS, String lang,
-				Map<Long, LatLon> pages, BufferedWriter bw)
-				throws IOException{
+				Map<Long, LatLon> pages, File sqliteFile)
+				throws IOException, SQLException{
 			this.pages = pages;
 			this.saxParser = saxParser;
 			this.progIS = progIS;
-			this.bw = bw;
+			dialect.removeDatabase(sqliteFile);
+			conn = (Connection) dialect.getDatabaseConnection(sqliteFile.getAbsolutePath(), log);
+			conn.createStatement().execute("CREATE TABLE wiki(id long, lat double, lon double, title text, zipContent blob)");
+			prep = conn.prepareStatement("INSERT INTO wiki VALUES (?, ?, ?, ?, ?)");
+			
+			
 			this.wikiModel = new WikiModel("http://"+lang+".wikipedia.com/wiki/${image}", "http://"+lang+".wikipedia.com/wiki/${title}");
 			progress.startTask("Parse wiki xml", progIS.available());
+		}
+		
+		public void addBatch() throws SQLException {
+			prep.addBatch();
+			if(batch++ > BATCH_SIZE) {
+				prep.executeBatch();
+				batch = 0;
+			}
+		}
+		
+		public void finish() throws SQLException {
+			prep.executeBatch();
+			if(!conn.getAutoCommit()) {
+				conn.commit();
+			}
+			prep.close();
+			conn.close();
 		}
 
 		public int getCount() {
@@ -346,12 +406,25 @@ public class WikiDatabasePreparation {
 					} else if (name.equals("text")) {
 						if (parseText) {
 							LatLon ll = pages.get(cid);
-							if(id % 500 == 0) {
+							if(id++ % 500 == 0) {
 								log.debug("Article accepted " + cid + " " + title.toString() + " " + ll.getLatitude() + " " + ll.getLongitude());
 							}
 							String plainStr = wikiModel.render(converter, ctext.toString());
-							bw.write("\n\n --- Article " + cid + " " + title.toString() + " " + ll.getLatitude() + " " + ll.getLongitude());
-							bw.write(plainStr);
+							try {
+								prep.setLong(1, cid);
+								prep.setDouble(2, ll.getLatitude());
+								prep.setDouble(3, ll.getLongitude());
+								prep.setString(4, title.toString());
+								bous.reset();
+								GZIPOutputStream gzout = new GZIPOutputStream(bous);
+								gzout.write(plainStr.getBytes("UTF-8"));
+								gzout.close();
+								final byte[] byteArray = bous.toByteArray();
+								prep.setBytes(5, byteArray);
+								addBatch();
+							} catch (SQLException e) {
+								throw new SAXException(e);
+							}
 						}
 						ctext = null;
 					}
@@ -362,16 +435,28 @@ public class WikiDatabasePreparation {
 		}
 		
 		
-
-		
-		
-		
-
-		
-
-		
 	}
-
-		
+	
+	
+	/**
+	 * Gets distance in meters
+	 */
+	public static double getDistance(double lat1, double lon1, double lat2, double lon2){
+		double R = 6372.8; // for haversine use R = 6372.8 km instead of 6371 km
+		double dLat = toRadians(lat2-lat1);
+		double dLon = toRadians(lon2-lon1); 
+		double a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+		        Math.cos(toRadians(lat1)) * Math.cos(toRadians(lat2)) * 
+		        Math.sin(dLon/2) * Math.sin(dLon/2); 
+		//double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+		//return R * c * 1000;
+		// simplyfy haversine:
+		return (2 * R * 1000 * Math.asin(Math.sqrt(a)));
+	}
+	
+	private static double toRadians(double angdeg) {
+//		return Math.toRadians(angdeg);
+		return angdeg / 180.0 * Math.PI;
+	}
 		
 }

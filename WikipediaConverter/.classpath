@@ -5,5 +5,6 @@
 	<classpathentry combineaccessrules="false" kind="src" path="/bliki-core"/>
 	<classpathentry kind="lib" path="lib/commons-logging-1.1.1.jar"/>
 	<classpathentry kind="lib" path="lib/bzip2-20090327.jar"/>
+	<classpathentry kind="lib" path="lib/sqlite-jdbc-3.7.6.3-20110609.081603-3.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

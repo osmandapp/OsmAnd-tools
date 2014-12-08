@@ -1,0 +1,70 @@
+<!--  build JAR libraty -->
+<project name="WikiConverter" default="build" basedir=".">
+
+	<property file="local.properties" />
+
+	<property name="src.dir" value="src"/>
+
+	<target name="-dirs">
+		<mkdir dir="bin"/>
+	</target>
+	
+
+	<path id="build.path">
+		<fileset dir="lib">
+		    <include name="*.jar"/>
+		</fileset>
+	</path>
+
+
+	<target name="clean">
+		<delete dir="build"/>
+	</target>
+
+	<target name="compile" depends="-dirs">
+		<javac  srcdir="${src.dir}"
+			
+		 destdir="bin"
+		 encoding="${java.encoding}"
+		 classpathref="build.path"
+		 debug="on"
+		 source="1.6"
+	  />
+	</target>
+
+	<target name="jar" depends="-dirs, compile">
+		<manifestclasspath property="lib.list" jarfile="WikiConverter.jar">
+			<classpath refid="build.path"/>
+		</manifestclasspath>
+		<echo>list is  ${lib.list}</echo>
+
+		<delete file="WikiConverter.jar" />
+		<delete file="MANIFEST.MF" />
+		<manifest file="MANIFEST.MF">
+			<attribute name="Built-By" value="${user.name}" />
+			<attribute name="Main-Class" value="net.osmand.swing.OsmExtractionUI" />
+			<attribute name="Class-Path" value="${lib.list}"/>
+		</manifest>
+
+		<jar destfile="WikiConverter.jar" manifest="MANIFEST.MF">
+			<fileset dir="bin">
+				<include name="**/*" />
+			</fileset>
+		</jar>
+
+		<delete file="MANIFEST.MF" />
+	</target>
+
+
+	<target name="build" depends="jar">
+		<delete dir="build"/>
+		<copy todir="build">
+			<fileset dir=".">
+				<include name="WikiConverter.jar"/>
+				<include name="lib/**"/>
+			</fileset>
+		</copy>
+		<delete file="WikiConverter.jar" />
+	</target>
+
+</project>
