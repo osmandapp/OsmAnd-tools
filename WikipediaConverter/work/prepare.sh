@@ -4,7 +4,9 @@ function download {
       if [ ! -f  "$1"wiki-latest-pages-articles.xml.bz2 ]; then
       	wget --quiet -N http://dumps.wikimedia.org/"$1"wiki/latest/"$1"wiki-latest-pages-articles.xml.bz2
       fi
-      wget --quiet -N http://dumps.wikimedia.org/"$1"wiki/latest/"$1"wiki-latest-externallinks.sql.gz      
+      if [ ! -f  "$1"wiki-latest-externallinks.sql.gz ]; then
+      	wget --quiet -N http://dumps.wikimedia.org/"$1"wiki/latest/"$1"wiki-latest-externallinks.sql.gz      
+      fi
       if [ ! -f  "$1"wiki.sqlite ]; then
       	java -Xms256M -Xmx3200M -cp "../build/WikiConverter.jar:../build/lib/*.jar" net.osmand.osm.util.WikiDatabasePreparation $1
       fi
