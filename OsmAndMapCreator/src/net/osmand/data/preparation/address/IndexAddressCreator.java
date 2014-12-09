@@ -372,8 +372,11 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 			if(e instanceof Relation) {
 				ctx.loadEntityRelation((Relation) e);
 			}
-			centerId = createMissingCity(e, CityType.SUBURB).getId();
-			ct = CityType.SUBURB;
+			final City city = createMissingCity(e, CityType.SUBURB);
+			if (city != null) {
+				centerId = city.getId();
+				ct = CityType.SUBURB;
+			}
 		}
 		boolean administrative = "administrative".equals(e.getTag(OSMTagKey.BOUNDARY));
 		if (administrative || ct != null) {
@@ -427,6 +430,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 
 	private City createMissingCity(Entity e, CityType t) throws SQLException {
 		City c = EntityParser.parseCity(e, t);
+		if(c.getLocation() == null) {
+			return null;
+		}
 //		long centerId = e.getId();
 		regCity(c, e);
 		writeCity(c);
