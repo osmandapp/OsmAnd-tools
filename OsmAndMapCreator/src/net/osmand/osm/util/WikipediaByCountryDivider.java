@@ -211,7 +211,7 @@ public class WikipediaByCountryDivider {
 //		String cmd = "inspect";
 		String cmd = args[0];
 		String regionsFile = args[1];
-		String folder = new File(".").getParentFile().getAbsolutePath();
+		String folder = args[2];
 		if(cmd.equals("inspect")) {
 			inspectWikiFile(folder);
 		} else if(cmd.equals("regenerate")) {
