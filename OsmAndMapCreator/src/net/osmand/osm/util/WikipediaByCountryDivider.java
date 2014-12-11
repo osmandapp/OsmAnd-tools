@@ -251,8 +251,8 @@ public class WikipediaByCountryDivider {
 		File fl = new File(folder);
 		List<String> langs = new ArrayList<String>();
 		for (File f : fl.listFiles()) {
-			if (f.getName().endsWith("wiki.sqlite") && f.getName().length() == "wiki.sqlite".length() + 2) {
-				langs.add(f.getName().substring(0, 2));
+			if (f.getName().endsWith("wiki.sqlite") && f.getName().length() > "wiki.sqlite".length()) {
+				langs.add(f.getName().substring(0, f.getName().length() - "wiki.sqlite".length()));
 			}
 		}
 		for (String lang : langs) {
