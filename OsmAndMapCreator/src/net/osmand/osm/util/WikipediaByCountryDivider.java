@@ -96,6 +96,27 @@ public class WikipediaByCountryDivider {
 			}
 		}
 		
+		public void updateRegions() throws SQLException, IOException {
+			c.createStatement().execute("DELETE FROM wiki_region");
+			c.createStatement().execute("VACUUM");
+			insertWikiRegion = c.prepareStatement("INSERT INTO wiki_region VALUES(?, ?)");
+			ResultSet rs = c.createStatement().executeQuery("SELECT id, lat, lon from wiki_content order by id");
+			long pid = -1;
+			while(rs.next()) {
+				long id = rs.getLong(1);
+				if(id != pid) {
+					pid = id;
+					List<String> rgs = getRegions(rs.getDouble(2), rs.getDouble(3));
+					for (String reg : rgs) {
+						insertWikiRegion.setLong(1, id);
+						insertWikiRegion.setString(2, reg);
+						addBatch(insertWikiRegion);
+					}
+				}
+			}
+			
+		}
+		
 		public void prepareToInsert() throws SQLException {
 			createTables();
 			prepareStatetements();
@@ -176,12 +197,13 @@ public class WikipediaByCountryDivider {
 			insertWikiContent.setString(6, title);
 			insertWikiContent.setBytes(7, zipContent);
 			addBatch(insertWikiContent);
-			
-			List<String> rgs = getRegions(lat, lon);
-			for(String k : rgs) {
-				insertWikiRegion.setLong(1, id);
-				insertWikiRegion.setString(2, k);
-				addBatch(insertWikiRegion);
+			if (genId) {
+				List<String> rgs = getRegions(lat, lon);
+				for (String k : rgs) {
+					insertWikiRegion.setLong(1, id);
+					insertWikiRegion.setString(2, k);
+					addBatch(insertWikiRegion);
+				}
 			}
 			return id;
 			
@@ -206,17 +228,29 @@ public class WikipediaByCountryDivider {
 	}
 
 	public static void main(String[] args) throws IOException, SQLException {
-//		String folder = "/home/victor/projects/osmand/wiki/";
-//		String regionsFile = "/home/victor/projects/osmand/repo/resources/countries-info/regions.ocbf";
-//		String cmd = "inspect";
-		String cmd = args[0];
-		String regionsFile = args[1];
-		String folder = args[2];
+		String folder = "/home/victor/projects/osmand/wiki/";
+		String regionsFile = "/home/victor/projects/osmand/repo/resources/countries-info/regions.ocbf";
+		String cmd = "regenerate";
+//		String cmd = args[0];
+//		String regionsFile = args[1];
+//		String folder = args[2];
 		if(cmd.equals("inspect")) {
 			inspectWikiFile(folder);
+		} else if(cmd.equals("update_countries")) {
+			updateCountries(folder, regionsFile);
 		} else if(cmd.equals("regenerate")) {
 			generateGlobalWikiFile(folder, regionsFile);
 		}
+	}
+	
+	protected static void updateCountries(String folder, String regionsFile) throws IOException, SQLException {
+		OsmandRegions regions = new OsmandRegions();
+		regions.prepareFile(regionsFile);
+		regions.cacheAllCountries();
+		final GlobalWikiStructure wikiStructure = new GlobalWikiStructure(folder + "wiki.sqlite", regions, false);
+		wikiStructure.updateRegions();
+		wikiStructure.closeConnnection();
+		System.out.println("Generation finished");
 	}
 
 	protected static void inspectWikiFile(String folder) throws SQLException {
@@ -276,7 +310,7 @@ public class WikipediaByCountryDivider {
 		}
 		ifl.closeConnnection();
 		System.out.println("Insert translation " + lang);
-		insertTranslationMapping(wikiStructure, langLinks, idMapping);
+//		insertTranslationMapping(wikiStructure, langLinks, idMapping);
 	}
 
 	protected static void insertTranslationMapping(final GlobalWikiStructure wikiStructure, String langLinks,
