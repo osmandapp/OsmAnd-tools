@@ -27,7 +27,7 @@ import org.apache.commons.logging.Log;
 
 public class WikipediaByCountryDivider {
 	private static final Log log = PlatformUtil.getLog(WikipediaByCountryDivider.class);
-	
+	private static final long BATCH_SIZE = 500;	
 	
 	private static class LanguageSqliteFile {
 		private Connection conn;
@@ -71,7 +71,6 @@ public class WikipediaByCountryDivider {
 	}
 	
 	private static class GlobalWikiStructure {
-		private static final long BATCH_SIZE = 500;
 
 		private long idGen = 100;
 
@@ -229,6 +228,8 @@ public class WikipediaByCountryDivider {
 			inspectWikiFile(folder);
 		} else if(cmd.equals("update_countries")) {
 			updateCountries(folder, regionsFile);
+		} else if(cmd.equals("generate_country_sqlite")) {
+			generateCountrySqlite(folder);
 		} else if(cmd.equals("regenerate")) {
 			generateGlobalWikiFile(folder, regionsFile);
 		}
@@ -242,6 +243,47 @@ public class WikipediaByCountryDivider {
 		wikiStructure.updateRegions();
 		wikiStructure.closeConnnection();
 		System.out.println("Generation finished");
+	}
+	
+	protected static void generateCountrySqlite(String folder) throws SQLException {
+		Connection conn = (Connection) DBDialect.SQLITE.getDatabaseConnection(folder + "wiki.sqlite", log);
+		File rgns = new File(folder, "regions");
+		rgns.mkdirs();
+		ResultSet rs = conn.createStatement().executeQuery("SELECT DISTINCT regionName  FROM wiki_region");
+		while (rs.next()) {
+			String regionName = rs.getString(1);
+			File fl = new File(rgns, regionName + ".sqlite");
+			fl.delete();
+			System.out.println("Generate " +fl.getName());
+			Connection loc = (Connection) DBDialect.SQLITE.getDatabaseConnection(fl.getAbsolutePath(), log);
+			loc.createStatement()
+					.execute(
+							"CREATE TABLE wiki_content(id long, lat double, lon double, lang text, wikiId long, title text, zipContent blob)");
+			PreparedStatement insertWikiContent = loc
+					.prepareStatement("INSERT INTO wiki_content VALUES(?, ?, ?, ?, ?, ?, ?)");
+			ResultSet rps = conn.createStatement().executeQuery(
+					"SELECT WC.id, WC.lat, WC.lon, WC.lang, WC.wikiId, WC.title, WC.zipContent "
+							+ " FROM wiki_content WC INNER JOIN wikiRegion WR "
+							+ " ON WC.id = WR.id AND WR.regionName = '" + regionName + "' ORDER BY id");
+			int cnt = 1;
+			while (rps.next()) {
+				insertWikiContent.setLong(1, rps.getLong(1));
+				insertWikiContent.setDouble(2, rps.getDouble(2));
+				insertWikiContent.setDouble(3, rps.getDouble(3));
+				insertWikiContent.setString(4, rps.getString(4));
+				insertWikiContent.setLong(5, rps.getLong(5));
+				insertWikiContent.setString(6, rps.getString(6));
+				insertWikiContent.setBytes(7, rps.getBytes(7));
+				insertWikiContent.addBatch();
+				if (cnt++ % BATCH_SIZE == 0) {
+					insertWikiContent.executeBatch();
+				}
+			}
+			insertWikiContent.executeBatch();
+			loc.close();
+			System.out.println("Processed " + cnt + " pois");
+		}
+		conn.close();
 	}
 
 	protected static void inspectWikiFile(String folder) throws SQLException {
