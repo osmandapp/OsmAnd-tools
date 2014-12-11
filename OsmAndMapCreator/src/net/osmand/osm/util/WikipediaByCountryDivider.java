@@ -77,7 +77,6 @@ public class WikipediaByCountryDivider {
 
 		private PreparedStatement getIdByTitle;
 		private PreparedStatement insertWikiContent;
-		private PreparedStatement insertWikiRegion;
 		private PreparedStatement insertWikiTranslation;
 		private Map<PreparedStatement, Long> statements = new LinkedHashMap<PreparedStatement, Long>();
 		private Connection c;
@@ -98,8 +97,9 @@ public class WikipediaByCountryDivider {
 		
 		public void updateRegions() throws SQLException, IOException {
 			c.createStatement().execute("DELETE FROM wiki_region");
+			c.createStatement().execute("DELETE FROM wiki_translation"); // not needed any more
 			c.createStatement().execute("VACUUM");
-			insertWikiRegion = c.prepareStatement("INSERT INTO wiki_region VALUES(?, ?)");
+			PreparedStatement insertWikiRegion = c.prepareStatement("INSERT INTO wiki_region VALUES(?, ?)");
 			ResultSet rs = c.createStatement().executeQuery("SELECT id, lat, lon from wiki_content order by id");
 			long pid = -1;
 			while(rs.next()) {
@@ -157,7 +157,6 @@ public class WikipediaByCountryDivider {
 		public void prepareStatetements() throws SQLException {
 			getIdByTitle = c.prepareStatement("SELECT ID FROM wiki_translation WHERE lang = ? and title = ? ");
 			insertWikiContent = c.prepareStatement("INSERT INTO wiki_content VALUES(?, ?, ?, ?, ?, ?, ?)");
-			insertWikiRegion = c.prepareStatement("INSERT INTO wiki_region VALUES(?, ?)");
 			insertWikiTranslation = c.prepareStatement("INSERT INTO wiki_translation VALUES(?, ?, ?)");
 		}
 
@@ -197,14 +196,6 @@ public class WikipediaByCountryDivider {
 			insertWikiContent.setString(6, title);
 			insertWikiContent.setBytes(7, zipContent);
 			addBatch(insertWikiContent);
-			if (genId) {
-				List<String> rgs = getRegions(lat, lon);
-				for (String k : rgs) {
-					insertWikiRegion.setLong(1, id);
-					insertWikiRegion.setString(2, k);
-					addBatch(insertWikiRegion);
-				}
-			}
 			return id;
 			
 		}
@@ -228,12 +219,12 @@ public class WikipediaByCountryDivider {
 	}
 
 	public static void main(String[] args) throws IOException, SQLException {
-		String folder = "/home/victor/projects/osmand/wiki/";
-		String regionsFile = "/home/victor/projects/osmand/repo/resources/countries-info/regions.ocbf";
-		String cmd = "regenerate";
-//		String cmd = args[0];
-//		String regionsFile = args[1];
-//		String folder = args[2];
+//		String folder = "/home/victor/projects/osmand/wiki/";
+//		String regionsFile = "/home/victor/projects/osmand/repo/resources/countries-info/regions.ocbf";
+//		String cmd = "regenerate";
+		String cmd = args[0];
+		String regionsFile = args[1];
+		String folder = args[2];
 		if(cmd.equals("inspect")) {
 			inspectWikiFile(folder);
 		} else if(cmd.equals("update_countries")) {
@@ -310,7 +301,7 @@ public class WikipediaByCountryDivider {
 		}
 		ifl.closeConnnection();
 		System.out.println("Insert translation " + lang);
-//		insertTranslationMapping(wikiStructure, langLinks, idMapping);
+		insertTranslationMapping(wikiStructure, langLinks, idMapping);
 	}
 
 	protected static void insertTranslationMapping(final GlobalWikiStructure wikiStructure, String langLinks,
