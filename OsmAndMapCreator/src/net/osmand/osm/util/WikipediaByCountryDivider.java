@@ -263,7 +263,7 @@ public class WikipediaByCountryDivider {
 					.prepareStatement("INSERT INTO wiki_content VALUES(?, ?, ?, ?, ?, ?, ?)");
 			ResultSet rps = conn.createStatement().executeQuery(
 					"SELECT WC.id, WC.lat, WC.lon, WC.lang, WC.wikiId, WC.title, WC.zipContent "
-							+ " FROM wiki_content WC INNER JOIN wikiRegion WR "
+							+ " FROM wiki_content WC INNER JOIN wiki_region WR "
 							+ " ON WC.id = WR.id AND WR.regionName = '" + regionName + "' ORDER BY id");
 			int cnt = 1;
 			while (rps.next()) {
