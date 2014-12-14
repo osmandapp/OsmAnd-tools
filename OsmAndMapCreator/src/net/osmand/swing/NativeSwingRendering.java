@@ -5,6 +5,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -150,13 +151,15 @@ public class NativeSwingRendering extends NativeLibrary {
 		private int height;
 		public long searchTime;
 		public long renderingTime;
+		public double mapDensity;
 		
-		public RenderingImageContext(int sleft, int sright, int stop, int sbottom, int zoom) {
+		public RenderingImageContext(int sleft, int sright, int stop, int sbottom, int zoom, double mapDensity) {
 			this.sleft = sleft;
 			this.sright = sright;
 			this.stop = stop;
 			this.sbottom = sbottom;
 			this.zoom = zoom;
+			this.mapDensity = mapDensity;
 			leftX =  (((double) sleft) / MapUtils.getPowZoom(31 - zoom));
 			topY = (((double) stop) / MapUtils.getPowZoom(31 - zoom));
 			width = (int) ((sright - sleft) / MapUtils.getPowZoom(31 - zoom - 8));
