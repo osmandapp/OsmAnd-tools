@@ -492,25 +492,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 				}
 			}
 			// manipulate what kind of way to load
-			Collection<Map<String, String>> split = renderingTypes.splitTagsIntoDifferentObjects(e.getTags());
-			if(split.size() > 1) {
-				LatLon ll = e.getLatLon(); 
-				boolean first = true;
-				for(Map<String, String> inst : split) {
-					if(first) {
-						e.replaceTags(inst);
-						first = false;
-						iterateMainEntityPost(e);
-					} else {
-						Node ns = new Node(ll.getLatitude(), ll.getLongitude(), notUsedId--);
-						ns.replaceTags(inst);
-						iterateMainEntityPost(ns);
-					}
-				}
-				
-			} else {			
-				iterateMainEntityPost(e);
-			}
+			iterateMainEntityPost(e);
 		}
 	}
 
