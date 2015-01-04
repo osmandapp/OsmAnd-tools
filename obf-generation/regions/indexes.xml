@@ -216,6 +216,25 @@
 			<region name="veneto"  cityAdminLevel="4"/>
 		</regions>
 
+	<regions siteToDownload="http://download.osmand.net/osm-downloads/Spain-{0}.pbf" region_prefix="Spain_" skip="false" region_suffix="_Europe">	
+			<region name="andalucia"/>
+			<region name="aragon"/>
+			<region name="asturias"/>
+			<region name="baleares"/>
+			<region name="canarias"/>
+			<region name="cantabria"/>
+			<region name="castilla-la"/>
+			<region name="castilla-leon"/>
+			<region name="cataluna"/>
+			<region name="ceuta"/>
+			<region name="extremadura"/>
+			<region name="galicia"/>
+			<region name="madrid"/>
+			<region name="melilla"/>
+			<region name="murcia"/>
+			<region name="navarra"/>
+			<region name="valencia"/>
+		</regions>
 
 		<!-- 2 Russia [SOURCE: GIS-LAB.INFO] -->
 		<regions siteToDownload="http://download.osmand.net/osm-downloads/russia-{0}.pbf" region_prefix="Russia_"  skip="false" region_suffix="_Asia">	
