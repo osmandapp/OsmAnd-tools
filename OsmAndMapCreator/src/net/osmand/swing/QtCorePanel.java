@@ -8,6 +8,8 @@ import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseWheelEvent;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.io.File;
 
 import javax.media.opengl.GLAutoDrawable;
@@ -99,6 +101,11 @@ public class QtCorePanel implements GLEventListener {
 		this.renderingProperties = renderingProperties;
 	}
 	
+	protected void saveLocation(boolean save) {
+		DataExtractionSettings settings = DataExtractionSettings.getSettings();
+		settings.saveLocation(mapCanvas.latitude, mapCanvas.longitude, mapCanvas.zoom, save);
+	}
+	
 	public Frame showFrame(int w, int h) {
 		final Frame frame = new Frame("OsmAnd Core");
 		frame.setSize(w, h);
@@ -109,12 +116,14 @@ public class QtCorePanel implements GLEventListener {
 		frame.addWindowListener(new java.awt.event.WindowAdapter() {
 			@Override
 			public void windowClosing(java.awt.event.WindowEvent e) {
+				saveLocation(true);
 				new Thread(new Runnable() {
 					@Override
 					public void run() {
 						animator.stop();
 						frame.dispose();
 					}
+
 				}).start();
 			}
 		});
@@ -365,7 +374,7 @@ public class QtCorePanel implements GLEventListener {
 	}
 
 	private class MapCanvas extends GLCanvas {
-		private float zoom;
+		private int zoom;
 		private double longitude;
 		private double latitude;
 
@@ -391,7 +400,7 @@ public class QtCorePanel implements GLEventListener {
 			mapCanvas.addGLEventListener(QtCorePanel.this);
 		}
 
-		public float getZoom() {
+		public int getZoom() {
 			return zoom;
 		}
 		
@@ -411,6 +420,7 @@ public class QtCorePanel implements GLEventListener {
 			latitude = lat;
 			longitude = lon;
 			updateRenderer();
+			saveLocation(false);
 
 		}
 
@@ -538,7 +548,7 @@ public class QtCorePanel implements GLEventListener {
 
 		}
 
-		public void setZoom(float f) {
+		public void setZoom(int f) {
 			zoom = f;
 			updateRenderer();
 		}

@@ -96,9 +96,7 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 	    frame.addWindowListener(new WindowAdapter(){
 	    	@Override
 	    	public void windowClosing(WindowEvent e) {
-	    		DataExtractionSettings settings = DataExtractionSettings.getSettings();
-				settings.saveDefaultLocation(panel.getLatitude(), panel.getLongitude());
-				settings.saveDefaultZoom(panel.getZoom());
+	    		DataExtractionSettings.getSettings().saveLocation(panel.getLatitude(), panel.getLongitude(), panel.getZoom(), true);
 	    		System.exit(0);
 	    	}
 	    });
@@ -168,10 +166,7 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 		ImageIO.setUseCache(false);
 		
 		tilesLocation = fileWithTiles;
-		LatLon defaultLocation = DataExtractionSettings.getSettings().getDefaultLocation();
-		latitude = defaultLocation.getLatitude();
-		longitude = defaultLocation.getLongitude();
-		zoom = DataExtractionSettings.getSettings().getDefaultZoom();
+		loadSettingsLocation();
 		if(map != null){
 			if(zoom > map.getMaximumZoomSupported()){
 				zoom = map.getMaximumZoomSupported();
@@ -197,6 +192,20 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 		addMouseWheelListener(mouse);
 		
 		initDefaultLayers();
+	}
+
+
+	public void loadSettingsLocation() {
+		LatLon defaultLocation = DataExtractionSettings.getSettings().getDefaultLocation();
+		latitude = defaultLocation.getLatitude();
+		longitude = defaultLocation.getLongitude();
+		zoom = DataExtractionSettings.getSettings().getDefaultZoom();
+	}
+
+
+	public void refresh() {
+		prepareImage();
+		fireMapLocationListeners();
 	}
 	
 	public void setStatusField(JTextField statusField) {
@@ -617,14 +626,14 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 			return;
 		}
 		this.zoom = zoom;
-		prepareImage();
+		refresh();
 	}
 
 	public void setLatLon(double latitude, double longitude){
 		this.latitude = latitude;
 		this.longitude = longitude;
-		prepareImage();
-		fireMapLocationListeners();
+		refresh();
+		DataExtractionSettings.getSettings().saveLocation(latitude, longitude, zoom, false);
 	}
 	
 	public double getLatitude() {
@@ -751,8 +760,7 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 		
 		if(processed){
 			e.consume();
-			prepareImage();
-			fireMapLocationListeners();
+			refresh();
 		}
 		super.processKeyEvent(e);
 	}

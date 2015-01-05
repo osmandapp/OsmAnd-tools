@@ -2,11 +2,11 @@ package net.osmand.swing;
 
 import java.awt.Color;
 import java.awt.Component;
+import java.awt.Frame;
 import java.awt.Graphics2D;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.File;
-import java.text.MessageFormat;
 
 import javax.swing.AbstractAction;
 import javax.swing.Action;
@@ -76,8 +76,7 @@ public class MapInformationLayer implements MapPanelLayer {
 					JOptionPane.showMessageDialog(OsmExtractionUI.MAIN_APP.getFrame(), "Native rendering supported only on Linux", "Info", JOptionPane.ERROR_MESSAGE);
 					return;
 				}
-				MapPanel mp = MapInformationLayer.this.map;
-				NativePreferencesDialog dlg = new NativePreferencesDialog(mp);
+				NativePreferencesDialog dlg = new NativePreferencesDialog(map);
 				dlg.showDialog();
 				if (dlg.isOkPressed()) {
 					String folder = DataExtractionSettings.getSettings().getQtLibFolder();
@@ -86,11 +85,19 @@ public class MapInformationLayer implements MapPanelLayer {
 					}
 					QtCorePanel.loadNative(folder);
 					
-					final QtCorePanel sample = new QtCorePanel(new LatLon(mp.getLatitude(), mp.getLongitude()), mp
+					final QtCorePanel sample = new QtCorePanel(new LatLon(map.getLatitude(), map.getLongitude()), map
 							.getZoom());
 					sample.setRenderingProperties(DataExtractionSettings.getSettings().getRenderingProperties());
 					sample.setRenderingStyleFile(DataExtractionSettings.getSettings().getRenderXmlPath());
-					sample.showFrame(800, 600);
+					Frame frame = sample.showFrame(800, 600);
+					frame.addWindowListener(new java.awt.event.WindowAdapter() {
+						@Override
+						public void windowClosing(java.awt.event.WindowEvent e) {
+							map.loadSettingsLocation();
+							map.refresh();
+						}
+					});
+					
 				}
 			}
 		});

@@ -24,6 +24,16 @@ public class DataExtractionSettings {
 	
 	Preferences preferences = Preferences.userRoot();
 
+	private long lastSaved = 0;
+	
+	public void saveLocation(double lat, double lon, int zoom, boolean save) {
+		long ms = System.currentTimeMillis();
+		if (ms - lastSaved > 5000 || save) {
+			saveDefaultLocation(lat, lon);
+			saveDefaultZoom(zoom);
+			lastSaved = ms;
+		}
+	}
 	
 	public File getTilesDirectory(){
 		return new File(getDefaultWorkingDir(), "tiles");
