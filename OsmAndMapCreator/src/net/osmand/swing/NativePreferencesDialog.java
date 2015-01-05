@@ -148,7 +148,8 @@ public class NativePreferencesDialog extends JDialog {
 		renderingPropertiesTxt = addTextField(panel, l, "Rendering properties : ", 5, prps);
 		String cutPrps = "";
 		String[] vls = prps.split(",");
-		int k = 6;
+		int rowId = 5;
+		int colId = 0;
 		for (String v : vls) {
 			String[] spl = v.split("=");
 			if (spl.length < 2) {
@@ -158,13 +159,22 @@ public class NativePreferencesDialog extends JDialog {
 			String vl = spl[1].trim();
 			if (vl.toLowerCase().equals("true") || vl.toLowerCase().equals("false")) {
 				boolean value = Boolean.parseBoolean(vl);
-				JCheckBox box = addCheckBox(panel, l, name, k++, value);
+				if(colId == 0) {
+					colId ++;
+				} else {
+					colId = 0;
+					rowId ++;
+				}
+				JCheckBox box = addCheckBox(panel, l, name, rowId, colId, value);
 				checks.put(name, box);
 			} else {
 				String[] vs = vl.split(";");
-				JComboBox<String> cb = addComboBox(panel, l, name, k++, vs[0], vs);
-				combos.put(name, cb);
-			}
+				if (vs.length > 0) {
+					rowId++;
+					JComboBox<String> cb = addComboBox(panel, l, name, rowId, vs[0], vs);
+					combos.put(name, cb);
+				}
+	}
 		}
 
 		renderingPropertiesTxt.setText(cutPrps);
@@ -172,7 +182,7 @@ public class NativePreferencesDialog extends JDialog {
 		panel.setMaximumSize(new Dimension(Short.MAX_VALUE, panel.getPreferredSize().height));
 	}
 
-	protected JCheckBox addCheckBox(JPanel panel, GridBagLayout l, String labelText, int rowId, boolean value) {
+	protected JCheckBox addCheckBox(JPanel panel, GridBagLayout l, String labelText, int rowId, int colId, boolean value) {
 		GridBagConstraints constr;
 		JCheckBox check = new JCheckBox();
 		check.setText(labelText);
@@ -182,7 +192,7 @@ public class NativePreferencesDialog extends JDialog {
 		constr.weightx = 0;
 		constr.fill = GridBagConstraints.HORIZONTAL;
 		constr.ipadx = 5;
-		constr.gridx = 0;
+		constr.gridx = colId;
 		constr.anchor = GridBagConstraints.WEST;
 		constr.gridy = rowId;
 		l.setConstraints(check, constr);
