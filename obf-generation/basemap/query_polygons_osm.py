@@ -53,7 +53,8 @@ def process_polygons(tags, filename):
 		elif tag == "lake" :
 			array.append("natural")
 			array.append("seamark:type")
-			queryFields += ", \"natural\", tags->'seamark:type' as \"seamark:type\""
+			array.append("seamark:wetland")
+			queryFields += ", \"natural\", tags->'seamark:type' as \"seamark:type\", tags->'wetland' as \"wetland\""
 			conditions += " or \"natural\" = 'water' or tags->'seamark:type' in ('separation_zone') or tags->'wetland' in ('tidalflat')"
 		else :
 			array.append(tag)
