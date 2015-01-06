@@ -52,8 +52,9 @@ def process_polygons(tags, filename):
 			conditions += " or ((admin_level = '4' or admin_level = '2') and boundary <> 'national_park')"
 		elif tag == "lake" :
 			array.append("natural")
-			queryFields += ", \"natural\""
-			conditions += " or \"natural\" = 'water'"
+			array.append("seamark:type")
+			queryFields += ", \"natural\", tags->'seamark:type' as \"seamark:type\""
+			conditions += " or \"natural\" = 'water' or tags->'seamark:type' in ('separation_zone') or tags->'wetland' in ('tidalflat')"
 		else :
 			array.append(tag)
 			queryFields += ", " + tag
@@ -139,6 +140,7 @@ def process_polygons(tags, filename):
 if __name__ == "__main__":
 		#process_polygons(['landuse', 'natural', 'historic','leisure'], 'polygon_natural_landuse.osm')
 		process_polygons(['lake'], 'polygon_lake_water.osm')
+		process_polygons(['lake'], 'polygon_seamark.osm')
 		#process_polygons(['aeroway', 'military', 'power', 'tourism'], 'polygon_aeroway_military_tourism.osm')
 		#-1175256, -1751158 causing troubles 
 		#process_polygons(['admin_level'], 'polygon_admin_level.osm') 
