@@ -37,7 +37,7 @@ def process_roads(cond, filename, fields):
 		selectFields += ", tags->\'" + nm + "\' as \"" + nm + "\""
 	
 	for field in fields:
-		if field = 'seamark:type':
+		if field == 'seamark:type':
 			field = "tags->'seamark:type' as 'seamark:type'"
 		array.append(field)
 		selectFields += ", " + field	
