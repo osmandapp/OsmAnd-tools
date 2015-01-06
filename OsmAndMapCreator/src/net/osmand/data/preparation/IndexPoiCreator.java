@@ -106,7 +106,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	
 	public void iterateRelation(Relation e, OsmDbAccessorContext ctx) throws SQLException {
 		for (String t : e.getTagKeySet()) {
-			AmenityType type = renderingTypes.getAmenityTypeForRelation(t, e.getTag(t));
+			AmenityType type = renderingTypes.getAmenityTypeForRelation(t, e.getTag(t), Algorithms.isEmpty(e.getTag("name")));
 			if (type != null) {
 				ctx.loadEntityRelation(e);
 				for (EntityId id : ((Relation) e).getMembersMap().keySet()) {
