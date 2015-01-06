@@ -149,7 +149,7 @@ public class NativePreferencesDialog extends JDialog {
 		String cutPrps = "";
 		String[] vls = prps.split(",");
 		int rowId = 5;
-		int colId = 0;
+		int colId = 1;
 		for (String v : vls) {
 			String[] spl = v.split("=");
 			if (spl.length < 2) {
@@ -174,7 +174,7 @@ public class NativePreferencesDialog extends JDialog {
 					JComboBox<String> cb = addComboBox(panel, l, name, rowId, vs[0], vs);
 					combos.put(name, cb);
 				}
-	}
+			}
 		}
 
 		renderingPropertiesTxt.setText(cutPrps);

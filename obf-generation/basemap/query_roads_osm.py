@@ -38,6 +38,8 @@ def process_roads(cond, filename, fields):
 	
 	for field in fields:
 		array.append(field)
+		if field == 'seamark:type':
+			field = "tags->'seamark:type' as \"seamark:type\""
 		selectFields += ", " + field	
 	shift = 2
 	# roads faster but doesn't contain ferry & river
@@ -76,12 +78,14 @@ def process_roads(cond, filename, fields):
 	f.write('</osm>')
 
 if __name__ == "__main__":
-	#process_roads("(admin_level = '4' or admin_level = '2')", "line_admin_level.osm", ['admin_level'])
 	process_roads("highway='motorway'", "line_motorway.osm", ['highway', 'junction', 'route'])
 	process_roads("highway='trunk'", "line_trunk.osm", ['highway', 'junction', 'route'])
 	process_roads("highway='primary'", "line_primary.osm", ['highway', 'junction', 'route'])
 	process_roads("highway='secondary'", "line_secondary.osm", ['highway', 'junction', 'route'])
 	process_roads("railway='rail'", "line_railway.osm", ['railway'])
-	process_roads("route='ferry'", "line_ferry.osm", ['route'])
 	process_roads("highway='tertiary'", "line_tertiary.osm", ['highway', 'junction', 'route'])
+	process_roads("route='ferry' or (tags->'seamark:type' in ('separation_line', 'separation_lane', 'separation_boundary', 'light_major'))", "line_ferry.osm", ['route', 'seamark:type'])
+	
+	# not used
+	#process_roads("(admin_level = '4' or admin_level = '2')", "line_admin_level.osm", ['admin_level'])
 	#process_roads("waterway='river' or waterway='canal' ", "line_rivers.osm", ['waterway'])
