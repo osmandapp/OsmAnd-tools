@@ -36,6 +36,8 @@ def process_points(cond, filename, array):
 	for tag in array:
 		if tag == 'name:en':
 			tag = 'tags->\'name:en\' as "name:en"'
+		if tag == 'iata':
+			tag = 'tags->\'iata\' as "iata"'
 		if tag == 'natural':
 			tag = '"natural"'
 		queryFields += ", " + tag
