@@ -37,9 +37,9 @@ def process_roads(cond, filename, fields):
 		selectFields += ", tags->\'" + nm + "\' as \"" + nm + "\""
 	
 	for field in fields:
+		array.append(field)
 		if field == 'seamark:type':
 			field = "tags->'seamark:type' as \"seamark:type\""
-		array.append(field)
 		selectFields += ", " + field	
 	shift = 2
 	# roads faster but doesn't contain ferry & river
