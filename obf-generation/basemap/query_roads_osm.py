@@ -84,7 +84,7 @@ if __name__ == "__main__":
 	#process_roads("highway='secondary'", "line_secondary.osm", ['highway', 'junction', 'route'])
 	#process_roads("railway='rail'", "line_railway.osm", ['railway'])
 	#process_roads("highway='tertiary'", "line_tertiary.osm", ['highway', 'junction', 'route'])
-	process_roads("route='ferry' or (tags->'seamark:type' in ('separation_line', 'separation_lane', 'separation_boundary', 'light_major'))", "proc_line_ferry.osm", ['route', 'seamark:type'])
+	process_roads("route='ferry' or (tags->'seamark:type' in ('separation_line', 'separation_lane', 'separation_boundary', 'light_major'))", "proc_line_ferry_out.osm", ['route', 'seamark:type'])
 	
 	# not used
 	#process_roads("(admin_level = '4' or admin_level = '2')", "line_admin_level.osm", ['admin_level'])
