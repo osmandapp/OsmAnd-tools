@@ -194,6 +194,10 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			if(area && tag.equals("highway")){
 				tag = "area:highway";
 			}
+			if(tag.equals("seamark:notice:orientation")){
+				val = simplifyValueTo45(val);
+				
+			}
 			MapRulType rType = getMapRuleType(tag, val);
 			if (rType != null) {
 				if (rType.minzoom > zoom || rType.maxzoom < zoom) {
@@ -235,6 +239,26 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
         sortAndUpdateTypes(outTypes);
         sortAndUpdateTypes(outAddTypes);
 		return area;
+	}
+
+
+
+	protected String simplifyValueTo45(String val) {
+		try {
+			double simple01 = Double.parseDouble(val) / 360;
+			while (simple01 < 0) {
+				simple01++;
+			}
+			while (simple01 >= 1) {
+				simple01--;
+			}
+			int rnd = (int) (simple01 * 8);
+			//0, 45, 90, 135, 180, 225, 270, 315
+			val = "" + (rnd * 45);
+		} catch (NumberFormatException e) {
+			System.err.println("Wrong value of \"seamark:notice:orientation\" " + val);
+		}
+		return val;
 	}
 
 
