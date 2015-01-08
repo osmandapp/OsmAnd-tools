@@ -42,8 +42,9 @@ def process_polygons(tags, filename):
 	admin_level = False
 	for tag in tags:
 		if tag == "natural" :
-			queryFields += ", \"natural\""
-			conditions += " or (\"natural\" <> '' and \"natural\" <> 'water')"
+			array.append("wetland")
+			queryFields += ", \"natural\", wetland"
+			conditions += " or (\"natural\" <> '' and \"natural\" <> 'water') or wetland in ('tidalflat')"
 			array.append(tag)
 		elif tag == "admin_level" :
 			array.append("admin_level")
@@ -53,9 +54,8 @@ def process_polygons(tags, filename):
 		elif tag == "lake" :
 			array.append("natural")
 			array.append("seamark:type")
-			array.append("wetland")
-			queryFields += ", \"natural\", tags->'seamark:type' as \"seamark:type\", wetland"
-			conditions += " or \"natural\" = 'water' or tags->'seamark:type' in ('separation_zone') or wetland in ('tidalflat')"
+			queryFields += ", \"natural\", tags->'seamark:type' as \"seamark:type\""
+			conditions += " or \"natural\" = 'water' or tags->'seamark:type' in ('separation_zone')"
 		else :
 			array.append(tag)
 			queryFields += ", " + tag
@@ -139,8 +139,8 @@ def process_polygons(tags, filename):
 	f.write('</osm>')
 
 if __name__ == "__main__":
-		process_polygons(['lake'], 'polygon_lake_water.osm')
+		#process_polygons(['lake'], 'polygon_lake_water.osm')
 		process_polygons(['landuse', 'natural', 'historic','leisure'], 'polygon_natural_landuse.osm')
-		process_polygons(['aeroway', 'military', 'power', 'tourism'], 'polygon_aeroway_military_tourism.osm')
+		#process_polygons(['aeroway', 'military', 'power', 'tourism'], 'polygon_aeroway_military_tourism.osm')
 		#-1175256, -1751158 causing troubles 
-		process_polygons(['admin_level'], 'polygon_admin_level.osm') 
+		#process_polygons(['admin_level'], 'polygon_admin_level.osm') 
