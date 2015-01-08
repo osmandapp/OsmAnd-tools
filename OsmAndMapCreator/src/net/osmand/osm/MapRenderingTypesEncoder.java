@@ -244,17 +244,19 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 
 
 	protected String simplifyValueTo45(String val) {
+		int rad = 8;
+		//0, 45, 90, 135, 180, 225, 270, 315
+		double circle = 360;
 		try {
-			double simple01 = Double.parseDouble(val) / 360;
+			double simple01 = Double.parseDouble(val) / circle;
 			while (simple01 < 0) {
 				simple01++;
 			}
 			while (simple01 >= 1) {
 				simple01--;
 			}
-			int rnd = (int) (simple01 * 8);
-			//0, 45, 90, 135, 180, 225, 270, 315
-			val = "" + (rnd * 45);
+			int rnd = (int) (Math.round(simple01 * rad));
+			val = "" + (rnd * circle / rad);
 		} catch (NumberFormatException e) {
 			System.err.println("Wrong value of \"seamark:notice:orientation\" " + val);
 		}
