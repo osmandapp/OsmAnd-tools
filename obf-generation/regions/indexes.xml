@@ -216,6 +216,21 @@
 			<region name="veneto"  cityAdminLevel="4"/>
 		</regions>
 
+	<regions siteToDownload="http://download.osmand.net/osm-downloads/Netherlands-{0}.pbf" region_prefix="Netherlands_" skip="false" region_suffix="_Europe">	
+			<region name="drenthe"/>
+			<region name="flevoland"/>
+			<region name="friesland"/>
+			<region name="gelderland"/>
+			<region name="groningen"/>
+			<region name="limburg"/>
+			<region name="noord-brabant"/>
+			<region name="noord-holland"/>
+			<region name="overijssel"/>
+			<region name="utrecht"/>
+			<region name="zeeland"/>
+			<region name="zuid-holland"/>
+		</regions>
+
 	<regions siteToDownload="http://download.osmand.net/osm-downloads/Spain-{0}.pbf" region_prefix="Spain_" skip="false" region_suffix="_Europe">	
 			<region name="andalusia"/>
 			<region name="aragon"/>
