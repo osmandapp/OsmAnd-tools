@@ -131,6 +131,7 @@ public class BasemapProcessor {
                 for (int i = 0; i < 2; i++) {
                     for (int j = 0; j < 2; j++) {
                         children[i * 2 + j] = new SimplisticQuadTree(((this.x << 1) + i), ((this.y << 1) + j), zoom + 1);
+                        children[i * 2 + j].seaCharacteristic = seaCharacteristic;
                     }
                 }
             }
@@ -294,7 +295,7 @@ public class BasemapProcessor {
 
         int baseZoom = 2;
         int tiles = 1 << baseZoom;
-        ArrayList<SimplisticQuadTree> toVisit = new ArrayList<SimplisticQuadTree>();
+        LinkedList<SimplisticQuadTree> toVisit = new LinkedList<SimplisticQuadTree>();
         for (int x = 0; x < tiles; x++) {
             for (int y = 0; y < tiles; y++) {
                 toVisit.add(rootTree.getOrCreateSubTree(x, y, baseZoom));
@@ -305,24 +306,21 @@ public class BasemapProcessor {
 
     }
 
-    protected ArrayList<SimplisticQuadTree> initializeQuadTree(SimplisticQuadTree rootTree, int baseZoom, int maxZoom,
-                                                               ArrayList<SimplisticQuadTree> toVisit) {
-        for (int zoom = baseZoom; zoom <= maxZoom && !toVisit.isEmpty(); zoom++) {
-            ArrayList<SimplisticQuadTree> newToVisit = new ArrayList<SimplisticQuadTree>();
-            for (SimplisticQuadTree subtree : toVisit) {
-                int x = subtree.x;
-                int y = subtree.y;
-                SimplisticQuadTree st = rootTree.getOrCreateSubTree(x, y, zoom);
-                st.seaCharacteristic = getSeaTile(x, y, zoom);
-                if (zoom < maxZoom && !isWaterTile(x, y, zoom) && !isLandTile(x, y, zoom)) {
-                    SimplisticQuadTree[] vis = st.getAllChildren();
-                    Collections.addAll(newToVisit, vis);
-                }
-            }
-            toVisit = newToVisit;
-        }
-        return toVisit;
-    }
+    protected void initializeQuadTree(SimplisticQuadTree rootTree, int baseZoom, int maxZoom,
+			LinkedList<SimplisticQuadTree> toVisit) {
+		while (!toVisit.isEmpty()) {
+			SimplisticQuadTree subtree = toVisit.poll();
+			int x = subtree.x;
+			int y = subtree.y;
+			int zoom = subtree.zoom;
+			SimplisticQuadTree st = rootTree.getOrCreateSubTree(x, y, zoom);
+			st.seaCharacteristic = getSeaTile(x, y, zoom);
+			if (zoom < maxZoom && !isWaterTile(x, y, zoom) && !isLandTile(x, y, zoom)) {
+				SimplisticQuadTree[] vis = st.getAllChildren();
+				Collections.addAll(toVisit, vis);
+			}
+		}
+	}
 
 
     public void writeBasemapFile(BinaryMapIndexWriter writer, String regionName) throws IOException {
@@ -397,7 +395,11 @@ public class BasemapProcessor {
         int yT = (quadTree.y) << (31 - quadTree.zoom);
         int yB = ((quadTree.y + 1) << (31 - quadTree.zoom)) - 1;
         boolean defined = quadTree.dataIsDefined(p);
-        BinaryFileReference ref = writer.startMapTreeElement(xL, xR, yT, yB, defined, quadTree.seaCharacteristic > 0.5 ? -1 : 1);
+        int sea = 0;
+        if(!quadTree.areChildrenDefined()) {
+        	sea = quadTree.seaCharacteristic > 0.5 ? -1 : 1;
+        }
+        BinaryFileReference ref = writer.startMapTreeElement(xL, xR, yT, yB, defined, sea);
         if (ref != null) {
             refs.put(quadTree, ref);
         }
