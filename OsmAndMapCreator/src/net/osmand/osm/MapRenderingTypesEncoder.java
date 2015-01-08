@@ -17,6 +17,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	
 	// stored information to convert from osm tags to int type
 	private List<MapRouteTag> routeTags = new ArrayList<MapRouteTag>();
+	private Map<String, List<EntityConvert>> convertTags = new HashMap<String, List<EntityConvert>>();
 	private MapRulType coastlineRuleType;
 	
 	public MapRenderingTypesEncoder(String fileName) {
@@ -111,6 +112,35 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		return routeTags;
 	}
 	
+	
+	@Override
+	protected void parseEntityConvertXML(XmlPullParser parser) {
+		EntityConvert ec = new EntityConvert();
+		parseConvertCol(parser, ec.ifTags, "if_");
+		parseConvertCol(parser, ec.ifNotTags, "if_not_");
+		parseConvertCol(parser, ec.toTags, "to_");
+		String tg = parser.getAttributeValue("", "from_tag" ); //$NON-NLS-1$
+		String value = parser.getAttributeValue("", "from_value"); //$NON-NLS-1$
+		if (tg != null) {
+			ec.fromTag = new TagValuePattern(tg, "".equals(value) ? null : value);
+			if(!convertTags.containsKey(ec.fromTag.tag)) {
+				convertTags.put(ec.fromTag.tag, new ArrayList<MapRenderingTypesEncoder.EntityConvert>());
+			}
+			convertTags.get(ec.fromTag.tag).add(ec);
+		}
+	}
+
+
+
+	protected void parseConvertCol(XmlPullParser parser, List<TagValuePattern> col, String prefix) {
+		for (int i = 1; i <= 5; i++) {
+			String tg = parser.getAttributeValue("", prefix +"tag" + i); //$NON-NLS-1$
+			String value = parser.getAttributeValue("", prefix +"value" + i); //$NON-NLS-1$
+			if (tg != null) {
+				col.add(new TagValuePattern(tg, "".equals(value) ? null : value));
+			}
+		}
+	}
 
 	@Override
 	protected void parseRouteTagFromXML(XmlPullParser parser) {
@@ -167,11 +197,6 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 
 	public boolean encodeEntityWithType(Entity e, int zoom, TIntArrayList outTypes, 
 			TIntArrayList outAddTypes, TreeMap<MapRulType, String> namesToEncode, List<MapRulType> tempListNotUsed) {
-		if(splitIsNeeded(e.getTags())) {
-			if(splitTagsIntoDifferentObjects(e.getTags()).size() > 1) {
-				throw new UnsupportedOperationException("Split is needed for tag/values " + e.getTags() );
-			}
-		}
 		return encodeEntityWithType(e instanceof Node, 
 				e.getModifiableTags(), zoom, outTypes, outAddTypes, namesToEncode, tempListNotUsed);
 	}
@@ -182,6 +207,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		outAddTypes.clear();
 		namesToEncode.clear();
 		boolean area = "yes".equals(tags.get("area")) || "true".equals(tags.get("area")) || tags.containsKey("area:highway") || "pedestrian".equals(tags.get("landuse"));
+		tags = transformTags(tags);
 		if(tags.containsKey("color")) {
 			prepareColorTag(tags, "color");
 		}
@@ -239,6 +265,72 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
         sortAndUpdateTypes(outTypes);
         sortAndUpdateTypes(outAddTypes);
 		return area;
+	}
+
+
+
+	private Map<String, String> transformTags(Map<String, String> tags) {
+		List<EntityConvert> listToConvert = null;
+		for(Map.Entry<String, String> e : tags.entrySet()) {
+			List<EntityConvert> list = convertTags.get(e.getKey());
+			if(list != null ){
+				for(EntityConvert ec : list) {
+					if(checkConvertValue(ec.fromTag, e.getValue())) {
+						if(listToConvert == null){
+							listToConvert = new ArrayList<EntityConvert>();
+						}
+						listToConvert.add(ec);
+					}
+				}
+			}
+		}
+		if(listToConvert == null) {
+			return tags;
+		} 
+		tags = new LinkedHashMap<String, String>(tags);
+		for(EntityConvert ec : listToConvert){
+			applyConvert(tags, ec);
+		}
+		return tags;
+	}
+
+
+
+	private boolean applyConvert(Map<String, String> tags, EntityConvert ec) {
+		for(TagValuePattern ift : ec.ifTags) {
+			String val = tags.get(ift.tag);
+			if(!checkConvertValue(ift, val)) {
+				return false;
+			}
+		}
+		for(TagValuePattern ift : ec.ifNotTags) {
+			String val = tags.get(ift.tag);
+			if(checkConvertValue(ift, val)) {
+				return false;
+			}
+		}
+		String fromValue = tags.remove(ec.fromTag);
+		for(TagValuePattern ift : ec.toTags) {
+			String vl = ift.value;
+			if(vl == null) {
+				vl = fromValue;
+			}
+			tags.put(ift.tag, vl);
+		}
+		return true;
+		
+	}
+
+
+
+	private boolean checkConvertValue(TagValuePattern fromTag, String value) {
+		if(value == null) {
+			return false;
+		}
+		if(fromTag.value == null) {
+			return true;
+		}
+		return fromTag.value.equals(value);
 	}
 
 
@@ -496,6 +588,12 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	
 	
 	
-	
+
+	public static class EntityConvert {
+		public TagValuePattern fromTag ;
+		public List<TagValuePattern> ifTags = new ArrayList<MapRenderingTypes.TagValuePattern>();
+		public List<TagValuePattern> ifNotTags = new ArrayList<MapRenderingTypes.TagValuePattern>();
+		public List<TagValuePattern> toTags = new ArrayList<MapRenderingTypes.TagValuePattern>();
+	}
 
 }
