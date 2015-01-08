@@ -537,7 +537,6 @@ int main(int argc, char** argv)
     renderer->setAzimuth(0.0f);
 
     auto renderConfig = renderer->getConfiguration();
-    renderConfig->heixelsPerTileSide = 32;
     renderer->setConfiguration(renderConfig);
 
     if (lastClickedLocationMarker)
