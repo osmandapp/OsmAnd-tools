@@ -142,8 +142,8 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 
 
 	@Override
-	protected MapRulType parseTypeFromXML(XmlPullParser parser, String parentCategory, String poiParentCategory, String poiParentPrefix, String order) {
-		MapRulType rtype = parseBaseRuleType(parser, parentCategory, poiParentCategory, poiParentPrefix, order, false);
+	protected MapRulType parseTypeFromXML(XmlPullParser parser, MapRulType parent) {
+		MapRulType rtype = parseBaseRuleType(parser, parent, false);
 		rtype.onlyPoi = "true".equals(parser.getAttributeValue("", "only_poi"));
 		if(!rtype.onlyPoi) {
 			String val = parser.getAttributeValue("", "minzoom"); //$NON-NLS-1$
