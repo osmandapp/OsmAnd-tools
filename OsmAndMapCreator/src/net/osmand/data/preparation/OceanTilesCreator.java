@@ -32,9 +32,15 @@ public class OceanTilesCreator {
 
         BasemapProcessor bmp = new BasemapProcessor();
         bmp.constructBitSetInfo();
-        BasemapProcessor.SimplisticQuadTree quadTree = bmp.constructTilesQuadTree(7);
-        BasemapProcessor.SimplisticQuadTree ts = quadTree.getOrCreateSubTree(43, 113, 7);
-        System.out.println(ts.seaCharacteristic);
+        BasemapProcessor.SimplisticQuadTree quadTree = bmp.constructTilesQuadTree(11);
+//        int x = (int) MapUtils.getTileNumberX(11, 3.14424);
+//        int y = (int) MapUtils.getTileNumberY(11, 52.960808);
+        int x = (int) MapUtils.getTileNumberX(11, 3.417527);
+        int y = (int) MapUtils.getTileNumberY(11, 53.042625);
+        System.out.println(x + " " + y);
+//        BasemapProcessor.SimplisticQuadTree ts = quadTree.getOrCreateSubTree(x, y, 11);
+//        System.out.println(ts.seaCharacteristic);
+//        System.out.println(bmp.getSeaTile(x, y, 11));
 
 //        createTilesFile();
 
