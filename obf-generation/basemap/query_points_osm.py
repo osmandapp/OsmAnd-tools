@@ -38,6 +38,10 @@ def process_points(cond, filename, array):
 			tag = 'tags->\'name:en\' as "name:en"'
 		if tag == 'iata':
 			tag = 'tags->\'iata\' as "iata"'
+		if tag == 'icao':
+			tag = 'tags->\'icao\' as "icao"'
+		if tag == 'faa':
+			tag = 'tags->\'faa\' as "faa"'
 		if tag == 'natural':
 			tag = '"natural"'
 		queryFields += ", " + tag
@@ -86,5 +90,5 @@ if __name__ == "__main__":
 				   " or tourism in ('alpine_hut') "
 				   " or aeroway in ('aerodrome', 'airport')", 'points.osm', 
 				   ['name', 'name:en',
-				    'ref', 'ele', 'place','natural', 'aeroway', 'tourism', 'iata'])
+				    'ref', 'ele', 'place','natural', 'aeroway', 'tourism', 'iata', 'icao', 'faa'])
 	process_points("place in ('city','town') ", 'cities.osm', ['name', 'name:en', 'place', 'capital'])
