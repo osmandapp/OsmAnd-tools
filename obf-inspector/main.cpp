@@ -77,7 +77,7 @@ void printUsage(const QString& warning)
         << "[-vpoi] "
         << "[-vtransport] "
         << "[-zoom=Zoom] "
-        << "[-bbox=LeftLon,TopLat,RightLon,BottomLan]" << std::endl;
+        << "[-bbox=LeftLon,TopLat,RightLon,BottomLat]" << std::endl;
 #else
     if(!warning.isEmpty())
         std::cout << warning.toStdString() << std::endl;
@@ -95,6 +95,6 @@ void printUsage(const QString& warning)
         << "[-vpoi] "
         << "[-vtransport] "
         << "[-zoom=Zoom] "
-        << "[-bbox=LeftLon,TopLat,RightLon,BottomLan]" << std::endl;
+        << "[-bbox=LeftLon,TopLat,RightLon,BottomLat]" << std::endl;
 #endif
 }
