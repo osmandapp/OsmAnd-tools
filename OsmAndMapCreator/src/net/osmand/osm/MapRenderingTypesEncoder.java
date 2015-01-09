@@ -309,7 +309,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 				return false;
 			}
 		}
-		String fromValue = tags.remove(ec.fromTag);
+		String fromValue = tags.remove(ec.fromTag.tag);
 		for(TagValuePattern ift : ec.toTags) {
 			String vl = ift.value;
 			if(vl == null) {
