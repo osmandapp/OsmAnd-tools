@@ -2,13 +2,23 @@ package net.osmand.osm;
 
 import gnu.trove.list.array.TIntArrayList;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
+import java.util.TreeMap;
 
 import net.osmand.osm.edit.Entity;
+import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.Node;
-import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
+import net.osmand.osm.edit.Relation;
 import net.osmand.util.Algorithms;
 
 import org.xmlpull.v1.XmlPullParser;
@@ -57,10 +67,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	public Map<MapRulType, String> getRelationPropogatedTags(Relation relation) {
 		Map<MapRulType, String> propogated = new LinkedHashMap<MapRulType, String>();
 		Map<String, String> ts = relation.getTags();
-		if(ts.containsKey("osmc:symbol")) {
-			ts = new HashMap<String, String>(ts);
-			ts.put("route", "hiking");
-		}
+		ts = transformTags(ts, EntityType.RELATION);
 		Iterator<Entry<String, String>> its = ts.entrySet().iterator();
 		while(its.hasNext()) {
 			Entry<String, String> ev = its.next();
@@ -127,6 +134,15 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 				convertTags.put(ec.fromTag.tag, new ArrayList<MapRenderingTypesEncoder.EntityConvert>());
 			}
 			convertTags.get(ec.fromTag.tag).add(ec);
+		}
+		String appTo = parser.getAttributeValue("", "apply_to" ); //$NON-NLS-1$
+		if(appTo != null) {
+			ec.applyTo = new HashSet<Entity.EntityType>();
+			String[] tps = appTo.split(",");
+			for(String t : tps) {
+				EntityType et = EntityType.valueOf(t.toUpperCase());
+				ec.applyTo.add(et);
+			}
 		}
 	}
 
@@ -206,8 +222,8 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		outTypes.clear();
 		outAddTypes.clear();
 		namesToEncode.clear();
-		boolean area = "yes".equals(tags.get("area")) || "true".equals(tags.get("area")) || tags.containsKey("area:highway") || "pedestrian".equals(tags.get("landuse"));
-		tags = transformTags(tags);
+		tags = transformTags(tags, node ? EntityType.NODE : EntityType.WAY);
+		boolean area = "yes".equals(tags.get("area"));
 		if(tags.containsKey("color")) {
 			prepareColorTag(tags, "color");
 		}
@@ -217,12 +233,8 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 
 		for (String tag : tags.keySet()) {
 			String val = tags.get(tag);
-			if(area && tag.equals("highway")){
-				tag = "area:highway";
-			}
 			if(tag.equals("seamark:notice:orientation")){
 				val = simplifyValueTo45(val);
-				
 			}
 			MapRulType rType = getMapRuleType(tag, val);
 			if (rType != null) {
@@ -269,7 +281,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 
 
 
-	private Map<String, String> transformTags(Map<String, String> tags) {
+	private Map<String, String> transformTags(Map<String, String> tags, EntityType entity) {
 		List<EntityConvert> listToConvert = null;
 		for(Map.Entry<String, String> e : tags.entrySet()) {
 			List<EntityConvert> list = convertTags.get(e.getKey());
@@ -289,14 +301,19 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		} 
 		tags = new LinkedHashMap<String, String>(tags);
 		for(EntityConvert ec : listToConvert){
-			applyConvert(tags, ec);
+			applyConvert(tags, ec, entity);
 		}
 		return tags;
 	}
 
 
 
-	private boolean applyConvert(Map<String, String> tags, EntityConvert ec) {
+	private boolean applyConvert(Map<String, String> tags, EntityConvert ec, EntityType entity) {
+		if(ec.applyTo != null) {
+			if(!ec.applyTo.contains(entity)) {
+				return false;
+			}
+		}
 		for(TagValuePattern ift : ec.ifTags) {
 			String val = tags.get(ift.tag);
 			if(!checkConvertValue(ift, val)) {
@@ -591,6 +608,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 
 	public static class EntityConvert {
 		public TagValuePattern fromTag ;
+		public Set<EntityType> applyTo ;
 		public List<TagValuePattern> ifTags = new ArrayList<MapRenderingTypes.TagValuePattern>();
 		public List<TagValuePattern> ifNotTags = new ArrayList<MapRenderingTypes.TagValuePattern>();
 		public List<TagValuePattern> toTags = new ArrayList<MapRenderingTypes.TagValuePattern>();
