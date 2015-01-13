@@ -21,9 +21,9 @@
 			<region  name="azores" downloadName="azores-latest"/>			
 			<region  name="belarus" downloadName="belarus-latest"/>
 			<region  name="belgium" downloadName="belgium-latest"/>
-			<region  name="bosnia-herzegovina" downloadName="bosnia-herzegovina-latest"/>
+<!--			<region  name="bosnia-herzegovina" downloadName="bosnia-herzegovina-latest"/>-->
 			<region  name="bulgaria" downloadName="bulgaria-latest"/>
-			<region  name="croatia" downloadName="croatia-latest"/>
+<!--			<region  name="croatia" downloadName="croatia-latest"/>-->
 			<region  name="cyprus" downloadName="cyprus-latest"/>
 			<region  name="czech-republic" downloadName="czech-republic-latest"/>
 			<region  name="denmark" downloadName="denmark-latest"/>
@@ -60,11 +60,13 @@
 			<region  name="ukraine" downloadName="ukraine-latest"/>
 		</regions>
 		
-		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" skip="false" region_suffix="_Europe">	
+		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" skip="false" region_suffix="_Europe">
 		 	<region  name="portugal"/>
 		 	<region  name="switzerland"/>
 		 	<region  name="germany_baden-wuerttemberg"/>
 		 	<region  name="ireland"/>
+			<region  name="bosnia-herzegovina"/>
+			<region  name="croatia"/>
 		</regions>
 
 
