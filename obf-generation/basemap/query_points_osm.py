@@ -92,5 +92,5 @@ if __name__ == "__main__":
 				   " or \"seamark:type\" in ('harbour') "
 				   " or aeroway in ('aerodrome', 'airport')", 'points.osm', 
 				   ['name', 'name:en',
-				    'ref', 'ele', 'place','natural', 'aeroway', 'tourism', 'iata', 'icao', 'faa'])
+				    'ref', 'ele', 'place','natural', 'seamark:type', 'aeroway', 'tourism', 'iata', 'icao', 'faa'])
 	process_points("place in ('city','town') ", 'cities.osm', ['name', 'name:en', 'place', 'capital'])
