@@ -88,6 +88,8 @@ if __name__ == "__main__":
 	process_points("place in ('sea','ocean','state', 'country') "
 				   " or \"natural\" in ('peak', 'cave_entrance', 'rock', 'waterfall', 'cape', 'volcano', 'stream', 'strait', 'reef')"
 				   " or tourism in ('alpine_hut') "
+				   " or seamark:type in ('light_major') "
+				   " or seamark:type in ('harbour') "
 				   " or aeroway in ('aerodrome', 'airport')", 'points.osm', 
 				   ['name', 'name:en',
 				    'ref', 'ele', 'place','natural', 'aeroway', 'tourism', 'iata', 'icao', 'faa'])
