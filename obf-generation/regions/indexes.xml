@@ -519,7 +519,7 @@
 
 
 		<!-- 6. ASIA  -->
-		<!-- 6.2 ASIA [SOURCE: GEOFABRIK.DE] (REST OF ASIA IS BELOW ) -->
+		<!-- 6.1 ASIA [SOURCE: GEOFABRIK.DE] (REST OF ASIA IS BELOW ) -->
 		<regions siteToDownload="http://download.geofabrik.de/asia/{0}.osm.pbf" region_prefix="" region_suffix="_Asia" skip="false">
 			<region name="azerbaijan" downloadName="azerbaijan-latest"/>
 			<region name="bangladesh" downloadName="bangladesh-latest"/>
@@ -551,6 +551,48 @@
 			<region name="israel"/>
 			<region name="palestine"/>
 		</regions>
+		
+		<!--  6.3 ASIA-INDIA [SOURCE: OSMAND:NET] -->
+		<regions siteToDownload="http://download.osmand.net/osm-downloads/India-{0}.pbf" region_prefix="India_" skip="false" region_suffix="_Asia">	
+			<region name="andaman-and-nicobar-islands"  cityAdminLevel="4"/>
+			<region name="andhra-pradesh"  cityAdminLevel="4"/>
+			<region name="arunachal-pradesh"  cityAdminLevel="4"/>
+			<region name="assam"  cityAdminLevel="4"/>
+			<region name="bihar"  cityAdminLevel="4"/>
+			<region name="chandigarh"  cityAdminLevel="4"/>
+			<region name="chhattisgarh"  cityAdminLevel="4"/>
+			<region name="dadra-and-nagar-haveli"  cityAdminLevel="4"/>
+			<region name="daman-and-diu"  cityAdminLevel="4"/>
+			<region name="delhi"  cityAdminLevel="4"/>
+			<region name="goa"  cityAdminLevel="4"/>
+			<region name="gujarat"  cityAdminLevel="4"/>
+			<region name="haryana"  cityAdminLevel="4"/>
+			<region name="himachal-pradesh"  cityAdminLevel="4"/>
+			<region name="jammu-and-kashmir"  cityAdminLevel="4"/>
+			<region name="jharkhand"  cityAdminLevel="4"/>
+			<region name="karnataka"  cityAdminLevel="4"/>
+			<region name="kerala"  cityAdminLevel="4"/>
+			<region name="lakshadweep"  cityAdminLevel="4"/>
+			<region name="madhya-pradesh"  cityAdminLevel="4"/>
+			<region name="maharashtra"  cityAdminLevel="4"/>
+			<region name="manipur"  cityAdminLevel="4"/>
+			<region name="meghalaya"  cityAdminLevel="4"/>
+			<region name="mizoram"  cityAdminLevel="4"/>
+			<region name="nagaland"  cityAdminLevel="4"/>
+			<region name="odisha"  cityAdminLevel="4"/>
+			<region name="puducherry"  cityAdminLevel="4"/>
+			<region name="punjab"  cityAdminLevel="4"/>
+			<region name="rajasthan"  cityAdminLevel="4"/>
+			<region name="sikkim"  cityAdminLevel="4"/>
+			<region name="tamil-nadu"  cityAdminLevel="4"/>
+			<region name="telangana"  cityAdminLevel="4"/>
+			<region name="tripura"  cityAdminLevel="4"/>
+			<region name="uttarakhand"  cityAdminLevel="4"/>
+			<region name="uttar-pradesh"  cityAdminLevel="4"/>
+			<region name="west-bengal"  cityAdminLevel="4"/>
+		</regions>
+
+
 
 		<!-- 6.3 EASTERN ASIA [SOURCE: OSMAND:NET] -->
 		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" region_suffix="_Asia" skip="false">
