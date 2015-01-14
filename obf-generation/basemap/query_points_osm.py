@@ -45,7 +45,7 @@ def process_points(cond, filename, array):
 		if tag == 'natural':
 			tag = '"natural"'
 		if tag == 'seamark:type':
-			tag = '"seamark:type"'
+			tag = 'tags->\'seamark:type\' as "seamark:type"'
 		queryFields += ", " + tag
 
 	for nm in names:
