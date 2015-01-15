@@ -21,9 +21,9 @@
 			<region  name="azores" downloadName="azores-latest"/>			
 			<region  name="belarus" downloadName="belarus-latest"/>
 			<region  name="belgium" downloadName="belgium-latest"/>
-			<region  name="bosnia-herzegovina" downloadName="bosnia-herzegovina-latest"/>
+<!--			<region  name="bosnia-herzegovina" downloadName="bosnia-herzegovina-latest"/>-->
 			<region  name="bulgaria" downloadName="bulgaria-latest"/>
-			<region  name="croatia" downloadName="croatia-latest"/>
+<!--			<region  name="croatia" downloadName="croatia-latest"/>-->
 			<region  name="cyprus" downloadName="cyprus-latest"/>
 			<region  name="czech-republic" downloadName="czech-republic-latest"/>
 			<region  name="denmark" downloadName="denmark-latest"/>
@@ -60,13 +60,26 @@
 			<region  name="ukraine" downloadName="ukraine-latest"/>
 		</regions>
 		
-		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" skip="false" region_suffix="_Europe">	
+		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" skip="false" region_suffix="_Europe">
 		 	<region  name="portugal"/>
 		 	<region  name="switzerland"/>
 		 	<region  name="germany_baden-wuerttemberg"/>
 		 	<region  name="ireland"/>
+			<region  name="bosnia-herzegovina"/>
+			<region  name="croatia"/>
 		</regions>
 
+		<!-- JAPAN -->
+		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="Japan_" skip="false" region_suffix="_Ocean-asia">
+		 	<region  name="chubu"/>
+		 	<region  name="chugoku"/>
+		 	<region  name="hokkaido"/>
+		 	<region  name="kanto"/>
+		 	<region  name="kinki"/>
+		 	<region  name="kyushu"/>
+		 	<region  name="shikoku"/>
+		 	<region  name="tohoku"/>
+		</regions>
 
 		<!-- 1.2 GREAT BRITAIN [SOURCE: GEOFABRIK.DE] -->
 		<regions siteToDownload="http://download.geofabrik.de/europe/great-britain/{0}.osm.pbf" region_prefix="GB_" skip="false" region_suffix="_Europe">
@@ -528,7 +541,7 @@
 			<region name="iran" downloadName="iran-latest"/>
 			<region name="iraq" downloadName="iraq-latest"/>
 			<!-- <region name="israel-and-palestine" downloadName="israel-and-palestine-latest"/> -->
-			<region name="japan" downloadName="japan-latest"/>
+<!--			<region name="japan" downloadName="japan-latest"/>-->
 			<region name="jordan" downloadName="jordan-latest"/>
 			<region name="kazakhstan" downloadName="kazakhstan-latest"/>
 			<region name="kyrgyzstan" downloadName="kyrgyzstan-latest"/>
