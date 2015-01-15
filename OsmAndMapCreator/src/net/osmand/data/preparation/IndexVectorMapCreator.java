@@ -526,7 +526,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 				tags, mapZooms.getLevel(level).getMaxZoom(), typeUse, addtypeUse, namesUse,
 				tempNameUse);
 		if (typeUse.isEmpty()) {
-			//break;
+			return;
 		}
 		boolean hasMulti = e instanceof Way && multiPolygonsWays.containsKey(originalId);
 		if (hasMulti) {
@@ -534,7 +534,8 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			typeUse.removeAll(set);
 		}
 		if (typeUse.isEmpty()) {
-			//break;
+
+			return;
 		}
 		long id = convertBaseIdToGeneratedId(assignedId, level);
 		List<Node> res = null;

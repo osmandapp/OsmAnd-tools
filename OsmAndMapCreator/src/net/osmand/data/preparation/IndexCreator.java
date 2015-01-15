@@ -792,8 +792,7 @@ public class IndexCreator {
 				new MapRenderingTypesEncoder("/home/victor/projects/osmand/repo/resources/obf_creation/rendering_types.xml");
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 
-		//String file = "/home/victor/projects/osmand/temp/map.osm";
-		String file = "/home/victor/projects/osmand/temp/test_sweden.osm";
+		String file = "/home/victor/projects/osmand/temp/map.osm";
 
 		int st = file.lastIndexOf('/');
 		int e = file.indexOf('.', st);
