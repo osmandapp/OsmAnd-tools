@@ -69,6 +69,17 @@
 			<region  name="croatia"/>
 		</regions>
 
+		<!-- JAPAN -->
+		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="Japan_" skip="false" region_suffix="_Ocean-asia">
+		 	<region  name="chubu"/>
+		 	<region  name="chugoku"/>
+		 	<region  name="hokkaido"/>
+		 	<region  name="kanto"/>
+		 	<region  name="kinki"/>
+		 	<region  name="kyushu"/>
+		 	<region  name="shikoku"/>
+		 	<region  name="tohoku"/>
+		</regions>
 
 		<!-- 1.2 GREAT BRITAIN [SOURCE: GEOFABRIK.DE] -->
 		<regions siteToDownload="http://download.geofabrik.de/europe/great-britain/{0}.osm.pbf" region_prefix="GB_" skip="false" region_suffix="_Europe">
@@ -530,7 +541,7 @@
 			<region name="iran" downloadName="iran-latest"/>
 			<region name="iraq" downloadName="iraq-latest"/>
 			<!-- <region name="israel-and-palestine" downloadName="israel-and-palestine-latest"/> -->
-			<region name="japan" downloadName="japan-latest"/>
+<!--			<region name="japan" downloadName="japan-latest"/>-->
 			<region name="jordan" downloadName="jordan-latest"/>
 			<region name="kazakhstan" downloadName="kazakhstan-latest"/>
 			<region name="kyrgyzstan" downloadName="kyrgyzstan-latest"/>
