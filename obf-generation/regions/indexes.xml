@@ -70,7 +70,7 @@
 		</regions>
 
 		<!-- JAPAN -->
-		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="Japan_" skip="false" region_suffix="_Asia">
+		<regions siteToDownload="http://download.osmand.net/osm-downloads/Japan-{0}.pbf" region_prefix="Japan_" skip="false" region_suffix="_Asia">
 		 	<region  name="chubu"/>
 		 	<region  name="chugoku"/>
 		 	<region  name="hokkaido"/>
