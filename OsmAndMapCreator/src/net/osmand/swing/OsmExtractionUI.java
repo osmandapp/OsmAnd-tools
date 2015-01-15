@@ -96,7 +96,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 				}
 			}
 		});
-//		RouteResultPreparation.PRINT_TO_CONSOLE_ROUTE_INFORMATION_TO_TEST = true;
+		RouteResultPreparation.PRINT_TO_CONSOLE_ROUTE_INFORMATION_TO_TEST = true;
         MAIN_APP = new OsmExtractionUI();
         MAIN_APP.frame.setBounds(DataExtractionSettings.getSettings().getWindowBounds());
         MAIN_APP.frame.setVisible(true);
