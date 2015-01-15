@@ -77,7 +77,7 @@ public class NativeSwingRendering extends NativeLibrary {
 			@Override
 			public RenderingRulesStorage resolve(String name, RenderingRulesStorageResolver ref) throws XmlPullParserException, IOException {
 				RenderingRulesStorage depends = new RenderingRulesStorage(name, renderingConstants);
-					depends.parseRulesFromXmlInputStream(RenderingRulesStorage.class.getResourceAsStream(name+".render.xml"),
+				depends.parseRulesFromXmlInputStream(RenderingRulesStorage.class.getResourceAsStream(name+".render.xml"),
 							ref);
 				return depends;
 			}
