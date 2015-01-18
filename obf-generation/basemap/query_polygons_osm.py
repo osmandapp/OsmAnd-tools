@@ -55,8 +55,8 @@ def process_polygons(tags, filename):
 			array.append("natural")
 			array.append("seamark:type")
 			array.append("seamark:restricted_area:category")
-			queryFields += ", \"natural\", tags->'seamark:type' as \"seamark:type\", tags->'seamark:restricted_area:category' as \"seamark:restricted_area:category\""
-			conditions += " or \"natural\" = 'water' or tags->'seamark:type' in ('separation_zone') or tags->'seamark:type' in ('production_area') or tags->'seamark:type' in ('restricted_area') or tags->'seamark:restricted_area:category' in ('military')"
+			queryFields += ", \"natural\", tags->'seamark:type' as \"seamark:type\", tags->'abandoned' as \"abandoned\", tags->'seamark:restricted_area:category' as \"seamark:restricted_area:category\""
+			conditions += " or \"natural\" = 'water' or tags->'seamark:type' in ('separation_zone') or tags->'seamark:type' in ('production_area') or tags->'seamark:type' in ('restricted_area') or tags->'seamark:restricted_area:category' in ('military') or tags->'abandoned' in ('yes')"
 		else :
 			array.append(tag)
 			queryFields += ", " + tag
