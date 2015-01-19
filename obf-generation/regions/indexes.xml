@@ -270,7 +270,7 @@
 			<region name="crimea"/>
 		</regions>
 		
-		<regions siteToDownload="http://be.gis-lab.info/data/osm_dump/dump/latest/RU-{0}.osm.pbf" region_prefix="Russia_"  skip="false" region_suffix="_Asia">
+<!--		<regions siteToDownload="http://be.gis-lab.info/data/osm_dump/dump/latest/RU-{0}.osm.pbf" region_prefix="Russia_"  skip="false" region_suffix="_Asia">
 			<region name="adygeya" downloadName="AD"/>
 			<region name="altay" downloadName="AL"/>
 			<region name="altayskiy" downloadName="ALT"/>
@@ -321,8 +321,8 @@
 			<region name="novgorod" downloadName="NGR"/>
 			<region name="novosibirsk" downloadName="NVS"/>
 			<region name="omsk" downloadName="OMS"/>
-			<region name="orenburg" downloadName="ORE"/>
 			<region name="orel" downloadName="ORL"/>
+			<region name="orenburg" downloadName="ORE"/>
 			<region name="osetiya" downloadName="SE"/>
 			<region name="penza" downloadName="PNZ"/>
 			<region name="perm" downloadName="PER"/>
@@ -332,10 +332,10 @@
 			<region name="ryazan" downloadName="RYA"/>
 			<region name="sakhalin" downloadName="SAK"/>
 			<region name="samara" downloadName="SAM"/>
+			<region name="sankt-peterburg" downloadName="SPE"/>
 			<region name="saratov" downloadName="SAR"/>
 			<region name="smolensk" downloadName="SMO"/>
 			<region name="stavropol" downloadName="STA"/>
-			<region name="sankt-peterburg" downloadName="SPE"/>
 			<region name="sverdlovsk" downloadName="SVE"/>
 			<region name="tambov" downloadName="TAM"/>
 			<region name="tatarstan" downloadName="TA"/>
@@ -354,6 +354,92 @@
 			<region name="yamal" downloadName="YAN"/>
 			<region name="yaroslavl" downloadName="YAR"/>
 			<region name="zabaikalie" downloadName="ZAB"/>
+		</regions>-->
+
+		<regions siteToDownload="http://download.osmand.net/osm-downloads/russia-{0}.pbf" region_prefix="Russia_"  skip="false" region_suffix="_Asia">
+			<region name="adygeya"/>
+			<region name="altay"/>
+			<region name="altayskiy"/>
+			<region name="amur"/>
+			<region name="arkhangelsk"/>
+			<region name="astrakhan"/>
+			<region name="bashkiria"/>
+			<region name="belgorod"/>
+			<region name="bryansk"/>
+			<region name="buryatia"/>
+			<region name="chechenskaya"/>
+			<region name="cheliabinsk"/>
+			<region name="chukotka"/>
+			<region name="chuvashia"/>
+			<region name="dagestan"/>
+			<region name="evreyskaya"/>
+			<region name="ingushetia"/>
+			<region name="irkutsk"/>
+			<region name="ivanov"/>
+			<region name="kabardino-balkaria"/>
+			<region name="kaliningrad"/>
+			<region name="kalmykia"/>
+			<region name="kaluga"/>
+			<region name="kamchatka"/>
+			<region name="karachaevo"/>
+			<region name="karelia"/>
+			<region name="kemerovo"/>
+			<region name="khabarovsk"/>
+			<region name="khakasia"/>
+			<region name="khanty-mansiisk"/>
+			<region name="kirov"/>
+			<region name="komi"/>
+			<region name="kostroma"/>
+			<region name="krasnodar"/>
+			<region name="krasnoyarsk"/>
+			<region name="kurgan"/>
+			<region name="kursk"/>
+			<region name="leningradskaya"/>
+			<region name="lipetsk"/>
+			<region name="magadan"/>
+			<region name="mariyel"/>
+			<region name="mordovia"/>
+			<region name="moscow"/>
+			<region name="moskovskaya-oblast"/>
+			<region name="murmansk"/>
+			<region name="neneckaya"/>
+			<region name="nizhegorod"/>
+			<region name="novgorod"/>
+			<region name="novosibirsk"/>
+			<region name="omsk"/>
+			<region name="orel"/>
+			<region name="orenburg"/>
+			<region name="osetiya"/>
+			<region name="penza"/>
+			<region name="perm"/>
+			<region name="primorskii"/>
+			<region name="pskov"/>
+			<region name="rostovskaya"/>
+			<region name="ryazan"/>
+			<region name="sakhalin"/>
+			<region name="samara"/>
+			<region name="sankt-peterburg"/>
+			<region name="saratov"/>
+			<region name="smolensk"/>
+			<region name="stavropol"/>
+			<region name="sverdlovsk"/>
+			<region name="tambov"/>
+			<region name="tatarstan"/>
+			<region name="tomsk"/>
+			<region name="tula"/>
+			<region name="tumen"/>
+			<region name="tver"/>
+			<region name="tyva"/>
+			<region name="udmurtia"/>
+			<region name="ulyanovsk"/>
+			<region name="vladimir"/>
+			<region name="volgograd"/>
+			<region name="vologda"/>
+			<region name="voronezh"/>
+			<region name="yakutia"/>
+			<region name="yamal"/>
+			<region name="yaroslavl"/>
+			<region name="zabaikalie"/>
 		</regions>
 
 		<!-- russia federal district -->
