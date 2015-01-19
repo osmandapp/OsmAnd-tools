@@ -70,6 +70,18 @@ def process_polygons(tags, filename):
 			array.append("abandoned")
 			queryFields += ", tags->'abandoned' as \"abandoned\""
 			conditions += " or tags->'abandoned' in ('yes')"
+		elif tag == "iata" :
+			array.append("iata")
+			queryFields += ", tags->'iata' as \"iata\""
+			conditions += " or tags->'iata'"
+		elif tag == "icao" :
+			array.append("icao")
+			queryFields += ", tags->'icao' as \"icao\""
+			conditions += " or tags->'icao'"
+		elif tag == "faa" :
+			array.append("faa")
+			queryFields += ", tags->'faa' as \"faa\""
+			conditions += " or tags->'faa'"
 		else :
 			array.append(tag)
 			queryFields += ", " + tag
@@ -154,8 +166,8 @@ def process_polygons(tags, filename):
 	f.write('</osm>')
 
 if __name__ == "__main__":
-		process_polygons(['lake', 'seamark:type', 'abandoned', 'seamark:restricted_area:category'], 'polygon_lake_water.osm')
+		process_polygons(['lake', 'seamark:type', 'seamark:restricted_area:category'], 'polygon_lake_water.osm')
 		process_polygons(['landuse', 'natural', 'wetland', 'historic','leisure'], 'polygon_natural_landuse.osm')
-		process_polygons(['aeroway', 'military', 'power', 'tourism'], 'polygon_aeroway_military_tourism.osm')
+		process_polygons(['aeroway', 'military', 'abandoned', 'iata', 'icao', 'faa', 'power', 'tourism'], 'polygon_aeroway_military_tourism.osm')
 		#-1175256, -1751158 causing troubles 
 		#process_polygons(['admin_level'], 'polygon_admin_level.osm') 
