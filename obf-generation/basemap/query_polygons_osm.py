@@ -42,6 +42,7 @@ def process_polygons(tags, filename):
 	admin_level = False
 	for tag in tags:
 		if tag == "natural" :
+			array.append("natural")
 			array.append("wetland")
 			queryFields += ", \"natural\", wetland"
 			conditions += " or (\"natural\" <> '' and \"natural\" <> 'water') or wetland in ('tidalflat')"
