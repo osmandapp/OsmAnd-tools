@@ -66,7 +66,7 @@ def process_polygons(tags, filename):
 	       " and ("+conditions+") "+
 	       # "LIMIT 1000"
 	       ";" )
-	println("SQL : " + sql)
+	print("SQL : " + sql)
 	cursor.execute(sql)
  
 	# retrieve the records from the database
