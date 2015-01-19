@@ -61,12 +61,13 @@ def process_polygons(tags, filename):
 			array.append(tag)
 			queryFields += ", " + tag
 			conditions += " or "+tag+" <> ''"
-
-	cursor.execute("select osm_id, ST_AsText(ST_Transform(ST_Simplify(way,500),94326)) " + queryFields +
+	sql = "select osm_id, ST_AsText(ST_Transform(ST_Simplify(way,500),94326)) " + queryFields +
 				   " from planet_osm_polygon where way_area > 10000000"
 				   " and ("+conditions+") "
-				  # "LIMIT 1000"
-				   ";")
+				   # "LIMIT 1000"
+				   ";"
+	print "SQL : " + sql
+	cursor.execute(sql)
  
 	# retrieve the records from the database
 	parenComma = re.compile('\)\s*,\s*\(')
