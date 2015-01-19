@@ -43,21 +43,33 @@ def process_polygons(tags, filename):
 	for tag in tags:
 		if tag == "natural" :
 			array.append("natural")
+			queryFields += ", \"natural\""
+			conditions += " or (\"natural\" <> '' and \"natural\" <> 'water')"
+		elif tag == "wetland" :
 			array.append("wetland")
-			queryFields += ", \"natural\", wetland"
-			conditions += " or (\"natural\" <> '' and \"natural\" <> 'water') or wetland in ('tidalflat')"
-			array.append(tag)
+			queryFields += ",  wetland"
+			conditions += " or wetland in ('tidalflat')"
 		elif tag == "admin_level" :
 			array.append("admin_level")
 			queryFields += ", admin_level"
 			admin_level = True
 			conditions += " or ((admin_level = '4' or admin_level = '2') and boundary <> 'national_park')"
+		elif tag == "seamark:type" :
+			array.append("seamark:type")
+			queryFields += ",  tags->'seamark:type' as \"seamark:type\""
+			conditions += " or tags->'seamark:type' in ('separation_zone') or tags->'seamark:type' in ('production_area') or tags->'seamark:type' in ('restricted_area') "
+		elif tag == "seamark:restricted_area:category" :
+			array.append("seamark:restricted_area:category")
+			queryFields += ", tags->'seamark:restricted_area:category' as \"seamark:restricted_area:category\""
+			conditions += " or tags->'seamark:restricted_area:category' in ('military')"
 		elif tag == "lake" :
 			array.append("natural")
-			array.append("seamark:type")
-			array.append("seamark:restricted_area:category")
-			queryFields += ", \"natural\", tags->'seamark:type' as \"seamark:type\", tags->'abandoned' as \"abandoned\", tags->'seamark:restricted_area:category' as \"seamark:restricted_area:category\""
-			conditions += " or \"natural\" = 'water' or tags->'seamark:type' in ('separation_zone') or tags->'seamark:type' in ('production_area') or tags->'seamark:type' in ('restricted_area') or tags->'seamark:restricted_area:category' in ('military') or tags->'abandoned' in ('yes')"
+			queryFields += ", \"natural\""
+			conditions += " or \"natural\" = 'water' "
+		elif tag == "abandoned" :
+			array.append("abandoned")
+			queryFields += ", tags->'abandoned' as \"abandoned\""
+			conditions += " or tags->'abandoned' in ('yes')"
 		else :
 			array.append(tag)
 			queryFields += ", " + tag
@@ -142,8 +154,8 @@ def process_polygons(tags, filename):
 	f.write('</osm>')
 
 if __name__ == "__main__":
-		process_polygons(['lake'], 'polygon_lake_water.osm')
-		process_polygons(['landuse', 'natural', 'historic','leisure'], 'polygon_natural_landuse.osm')
+		process_polygons(['lake', 'seamark:type', 'abandoned', 'seamark:restricted_area:category'], 'polygon_lake_water.osm')
+		process_polygons(['landuse', 'natural', 'wetland', 'historic','leisure'], 'polygon_natural_landuse.osm')
 		process_polygons(['aeroway', 'military', 'power', 'tourism'], 'polygon_aeroway_military_tourism.osm')
 		#-1175256, -1751158 causing troubles 
 		#process_polygons(['admin_level'], 'polygon_admin_level.osm') 
