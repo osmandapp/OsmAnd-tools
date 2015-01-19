@@ -125,6 +125,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		EntityConvert ec = new EntityConvert();
 		parseConvertCol(parser, ec.ifTags, "if_");
 		parseConvertCol(parser, ec.ifNotTags, "if_not_");
+		ec.type = EntityConverType.valueOf(parser.getAttributeValue("", "pattern" ).toUpperCase()); //$NON-NLS-1$
 		parseConvertCol(parser, ec.toTags, "to_");
 		String tg = parser.getAttributeValue("", "from_tag" ); //$NON-NLS-1$
 		String value = parser.getAttributeValue("", "from_value"); //$NON-NLS-1$
@@ -282,33 +283,82 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 
 
 	private Map<String, String> transformTags(Map<String, String> tags, EntityType entity) {
-		List<EntityConvert> listToConvert = null;
-		for(Map.Entry<String, String> e : tags.entrySet()) {
-			List<EntityConvert> list = convertTags.get(e.getKey());
-			if(list != null ){
-				for(EntityConvert ec : list) {
-					if(checkConvertValue(ec.fromTag, e.getValue())) {
-						if(listToConvert == null){
-							listToConvert = new ArrayList<EntityConvert>();
-						}
-						listToConvert.add(ec);
-					}
-				}
-			}
-		}
+		EntityConverType filter = EntityConverType.TAG_TRANSFORM;
+		List<EntityConvert> listToConvert = getApplicableConverts(tags, entity, filter);
 		if(listToConvert == null) {
 			return tags;
 		} 
 		tags = new LinkedHashMap<String, String>(tags);
 		for(EntityConvert ec : listToConvert){
-			applyConvert(tags, ec, entity);
+			applyTagTransforms(tags, ec, entity);
 		}
 		return tags;
+	}
+	
+	
+	public List<Map<String, String>> splitTags(Map<String, String> tags, EntityType entity) {
+		EntityConverType filter = EntityConverType.SPLIT;
+		List<EntityConvert> listToConvert = getApplicableConverts(tags, entity, filter);
+		List<Map<String, String>> result = null;
+		if(listToConvert == null) {
+			return result;
+		}
+		result = new ArrayList<Map<String,String>>();
+		for (EntityConvert ec : listToConvert) {
+			LinkedHashMap<String, String> mp = new LinkedHashMap<String, String>();
+			for (TagValuePattern ift : ec.toTags) {
+				String vl = ift.value;
+				if (vl == null) {
+					vl = tags.get(ift.tag);
+				}
+				if(vl != null) {
+					mp.put(ift.tag, vl);
+				}
+			}
+			result.add(mp);
+		}
+		return result;
 	}
 
 
 
-	private boolean applyConvert(Map<String, String> tags, EntityConvert ec, EntityType entity) {
+	protected List<EntityConvert> getApplicableConverts(Map<String, String> tags, EntityType entity,
+			EntityConverType filter) {
+		List<EntityConvert> listToConvert = null;
+		for(Map.Entry<String, String> e : tags.entrySet()) {
+			List<EntityConvert> list = convertTags.get(e.getKey());
+			if (list != null) {
+				for (EntityConvert ec : list) {
+					if (checkConvertValue(ec.fromTag, e.getValue())) {
+						if (checkConvert(tags, ec, entity) && ec.type == filter) {
+							if (listToConvert == null) {
+								listToConvert = new ArrayList<EntityConvert>();
+							}
+							listToConvert.add(ec);
+						}
+					}
+				}
+			}
+		}
+		return listToConvert;
+	}
+
+
+
+	private void applyTagTransforms(Map<String, String> tags, EntityConvert ec, EntityType entity) {
+		String fromValue = tags.remove(ec.fromTag.tag);
+		for(TagValuePattern ift : ec.toTags) {
+			String vl = ift.value;
+			if(vl == null) {
+				vl = fromValue;
+			}
+			tags.put(ift.tag, vl);
+		}
+	}
+
+
+
+	protected boolean checkConvert(Map<String, String> tags, EntityConvert ec, EntityType entity) {
 		if(ec.applyTo != null) {
 			if(!ec.applyTo.contains(entity)) {
 				return false;
@@ -326,16 +376,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 				return false;
 			}
 		}
-		String fromValue = tags.remove(ec.fromTag.tag);
-		for(TagValuePattern ift : ec.toTags) {
-			String vl = ift.value;
-			if(vl == null) {
-				vl = fromValue;
-			}
-			tags.put(ift.tag, vl);
-		}
 		return true;
-		
 	}
 
 
@@ -606,8 +647,13 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	
 	
 
+	private enum EntityConverType {
+		TAG_TRANSFORM,
+		SPLIT
+	}
 	public static class EntityConvert {
 		public TagValuePattern fromTag ;
+		public EntityConverType type;
 		public Set<EntityType> applyTo ;
 		public List<TagValuePattern> ifTags = new ArrayList<MapRenderingTypes.TagValuePattern>();
 		public List<TagValuePattern> ifNotTags = new ArrayList<MapRenderingTypes.TagValuePattern>();

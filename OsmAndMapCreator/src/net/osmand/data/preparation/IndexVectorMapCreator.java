@@ -30,7 +30,6 @@ import java.util.TreeSet;
 import net.osmand.IProgress;
 import net.osmand.binary.OsmandOdb.MapData;
 import net.osmand.binary.OsmandOdb.MapDataBlock;
-import net.osmand.data.LatLon;
 import net.osmand.data.Multipolygon;
 import net.osmand.data.MultipolygonBuilder;
 import net.osmand.data.Ring;
@@ -39,6 +38,7 @@ import net.osmand.osm.MapRenderingTypes.MapRulType;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
+import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.osm.edit.OsmMapUtils;
@@ -95,7 +95,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	private int zoomWaySmothness = 0;
 	private final Log logMapDataWarn;
 
-	private static long notUsedId = - (1l << 15l); // million million  
+	public static long GENERATE_OBJ_ID = - (1l << 15l); // million million  
 
 	public IndexVectorMapCreator(Log logMapDataWarn, MapZooms mapZooms, MapRenderingTypesEncoder renderingTypes,
 	                             int zoomWaySmothness) {
@@ -174,19 +174,21 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	 */
 	private void indexMultiPolygon(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 		// Don't handle things that aren't multipolygon, and nothing administrative
-		if (! (e instanceof Relation) || 
-				! "multipolygon".equals(e.getTag(OSMTagKey.TYPE)) || 
-				e.getTag(OSMTagKey.ADMIN_LEVEL) != null ) return;
+		if (!(e instanceof Relation) || !"multipolygon".equals(e.getTag(OSMTagKey.TYPE))
+				|| e.getTag(OSMTagKey.ADMIN_LEVEL) != null)
+			return;
 		MultipolygonBuilder original = createMultipolygonBuilder(e, ctx);
 		try {
-			renderingTypes.encodeEntityWithType(e, mapZooms.getLevel(0).getMaxZoom(), typeUse, addtypeUse, namesUse, tempNameUse);
+			renderingTypes.encodeEntityWithType(false, e.getModifiableTags(), mapZooms.getLevel(0).getMaxZoom(), typeUse, addtypeUse, namesUse, tempNameUse);
 		} catch (RuntimeException es) {
 			es.printStackTrace();
 			return;
 		}
+		List<Map<String, String>> splitEntities = renderingTypes.splitTags(e.getTags(), EntityType.valueOf(e));
 
-		//Don't add multipolygons with an unknown type
-		if (typeUse.size() == 0) return;
+		// Don't add multipolygons with an unknown type
+		if (typeUse.size() == 0)
+			return;
 		excludeFromMainIteration(original.getOuterWays());
 		excludeFromMainIteration(original.getInnerWays());
 
@@ -217,34 +219,43 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			}
 
 			// don't use the relation ids. Create new onesgetInnerRings
-			long baseId = notUsedId --;
-			nextZoom: for (int level = 0; level < mapZooms.size(); level++) {
-				renderingTypes.encodeEntityWithType(e, mapZooms.getLevel(level).getMaxZoom(), typeUse, addtypeUse, namesUse,
-						tempNameUse);
-				if (typeUse.isEmpty()) {
-					continue;
+			createMultipolygonObject(e.getModifiableTags(), out, innerWays, GENERATE_OBJ_ID --);
+			if(splitEntities != null) {
+				for(Map<String, String> tags : splitEntities) {
+					createMultipolygonObject(tags, out, innerWays, GENERATE_OBJ_ID --);
 				}
-				long id = convertBaseIdToGeneratedId(baseId, level);
-				// simplify route
-				List<Node> outerWay = out.getBorder();
-				int zoomToSimplify = mapZooms.getLevel(level).getMaxZoom() - 1;
-				if (zoomToSimplify < 15) {
-					outerWay = simplifyCycleWay(outerWay, zoomToSimplify, zoomWaySmothness);
-					if (outerWay == null) {
-						continue nextZoom;
-					}
-					List<List<Node>> newinnerWays = new ArrayList<List<Node>>();
-					for (List<Node> ls : innerWays) {
-						ls = simplifyCycleWay(ls, zoomToSimplify, zoomWaySmothness);
-						if (ls != null) {
-							newinnerWays.add(ls);
-						}
-					}
-					innerWays = newinnerWays;
-				}
-				insertBinaryMapRenderObjectIndex(mapTree[level], outerWay, innerWays, namesUse, id, true, typeUse, addtypeUse, true);
-
 			}
+		}
+	}
+
+	protected void createMultipolygonObject(Map<String, String> tags, Ring out, List<List<Node>> innerWays, long baseId)
+			throws SQLException {
+		nextZoom: for (int level = 0; level < mapZooms.size(); level++) {
+			renderingTypes.encodeEntityWithType(false,  tags, mapZooms.getLevel(level).getMaxZoom(), typeUse, addtypeUse, namesUse,
+					tempNameUse);
+			if (typeUse.isEmpty()) {
+				continue;
+			}
+			long id = convertBaseIdToGeneratedId(baseId, level);
+			// simplify route
+			List<Node> outerWay = out.getBorder();
+			int zoomToSimplify = mapZooms.getLevel(level).getMaxZoom() - 1;
+			if (zoomToSimplify < 15) {
+				outerWay = simplifyCycleWay(outerWay, zoomToSimplify, zoomWaySmothness);
+				if (outerWay == null) {
+					continue nextZoom;
+				}
+				List<List<Node>> newinnerWays = new ArrayList<List<Node>>();
+				for (List<Node> ls : innerWays) {
+					ls = simplifyCycleWay(ls, zoomToSimplify, zoomWaySmothness);
+					if (ls != null) {
+						newinnerWays.add(ls);
+					}
+				}
+				innerWays = newinnerWays;
+			}
+			insertBinaryMapRenderObjectIndex(mapTree[level], outerWay, innerWays, namesUse, id, true, typeUse, addtypeUse, true);
+
 		}
 	}
 
@@ -492,51 +503,64 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 				}
 			}
 			// manipulate what kind of way to load
-			iterateMainEntityPost(e);
+			long originalId = e.getId();
+			long assignedId = e.getId();
+			List<Map<String, String>> splitTags = renderingTypes.splitTags(e.getModifiableTags(), EntityType.valueOf(e));
+			for (int level = 0; level < mapZooms.size(); level++) {
+				processMainEntity(e, originalId, assignedId, level, e.getModifiableTags());
+			}
+			if (splitTags != null) {
+				assignedId = GENERATE_OBJ_ID--;
+				for (Map<String, String> stags : splitTags) {
+					for (int level = 0; level < mapZooms.size(); level++) {
+						processMainEntity(e, originalId, assignedId, level, stags);
+					}
+				}
+			}
 		}
 	}
 
-	private void iterateMainEntityPost(Entity e) throws SQLException {
-		for (int level = 0; level < mapZooms.size(); level++) {
-			boolean area = renderingTypes.encodeEntityWithType(e instanceof Node, 
-					e.getModifiableTags(), mapZooms.getLevel(level).getMaxZoom(), typeUse, addtypeUse, namesUse,
-					tempNameUse);
-			if (typeUse.isEmpty()) {
-				continue;
-			}
-			boolean hasMulti = e instanceof Way && multiPolygonsWays.containsKey(e.getId());
-			if (hasMulti) {
-				TIntArrayList set = multiPolygonsWays.get(e.getId());
-				typeUse.removeAll(set);
-			}
-			if (typeUse.isEmpty()) {
-				continue;
-			}
-			long id = convertBaseIdToGeneratedId(e.getId(), level);
-			List<Node> res = null;
-			if (e instanceof Node) {
-				res = Collections.singletonList((Node) e);
-			} else {
-				id |= 1;
+	protected void processMainEntity(Entity e, long originalId, long assignedId, int level, Map<String, String> tags)
+			throws SQLException {
+		boolean area = renderingTypes.encodeEntityWithType(e instanceof Node, 
+				tags, mapZooms.getLevel(level).getMaxZoom(), typeUse, addtypeUse, namesUse,
+				tempNameUse);
+		if (typeUse.isEmpty()) {
+			return;
+		}
+		boolean hasMulti = e instanceof Way && multiPolygonsWays.containsKey(originalId);
+		if (hasMulti) {
+			TIntArrayList set = multiPolygonsWays.get(originalId);
+			typeUse.removeAll(set);
+		}
+		if (typeUse.isEmpty()) {
 
-				// simplify route id>>1
-				boolean mostDetailedLevel = level == 0;
-				if (!mostDetailedLevel) {
-					int zoomToSimplify = mapZooms.getLevel(level).getMaxZoom() - 1;
-					boolean cycle = ((Way) e).getFirstNodeId() == ((Way) e).getLastNodeId();
-					if (cycle) {
-						res = simplifyCycleWay(((Way) e).getNodes(), zoomToSimplify, zoomWaySmothness);
-					} else {
-						String ename = namesUse.get(renderingTypes.getNameRuleType());
-						insertLowLevelMapBinaryObject(level, zoomToSimplify, typeUse, addtypeUse, id, ((Way) e).getNodes(), ename);
-					}
+			return;
+		}
+		long id = convertBaseIdToGeneratedId(assignedId, level);
+		List<Node> res = null;
+		if (e instanceof Node) {
+			res = Collections.singletonList((Node) e);
+		} else {
+			id |= 1;
+
+			// simplify route id>>1
+			boolean mostDetailedLevel = level == 0;
+			if (!mostDetailedLevel) {
+				int zoomToSimplify = mapZooms.getLevel(level).getMaxZoom() - 1;
+				boolean cycle = ((Way) e).getFirstNodeId() == ((Way) e).getLastNodeId();
+				if (cycle) {
+					res = simplifyCycleWay(((Way) e).getNodes(), zoomToSimplify, zoomWaySmothness);
 				} else {
-					res = ((Way) e).getNodes();
+					String ename = namesUse.get(renderingTypes.getNameRuleType());
+					insertLowLevelMapBinaryObject(level, zoomToSimplify, typeUse, addtypeUse, id, ((Way) e).getNodes(), ename);
 				}
+			} else {
+				res = ((Way) e).getNodes();
 			}
-			if (res != null) {
-				insertBinaryMapRenderObjectIndex(mapTree[level], res, null, namesUse, id, area, typeUse, addtypeUse, true);
-			}
+		}
+		if (res != null) {
+			insertBinaryMapRenderObjectIndex(mapTree[level], res, null, namesUse, id, area, typeUse, addtypeUse, true);
 		}
 	}
 

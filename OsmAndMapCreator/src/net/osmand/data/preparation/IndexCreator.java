@@ -777,9 +777,9 @@ public class IndexCreator {
 		
 		
 		IndexCreator creator = new IndexCreator(new File("/home/victor/projects/osmand/osm-gen/")); //$NON-NLS-1$
-//		creator.setIndexMap(true);
+		creator.setIndexMap(true);
 //		creator.setIndexAddress(true);
-//		creator.setIndexPOI(true);
+		creator.setIndexPOI(true);
 //		creator.setIndexTransport(true);
 		creator.setIndexRouting(true);
 
@@ -792,8 +792,7 @@ public class IndexCreator {
 				new MapRenderingTypesEncoder("/home/victor/projects/osmand/repo/resources/obf_creation/rendering_types.xml");
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 
-//		String file = "/home/victor/projects/osmand/temp/map.osm";
-		String file = "/home/victor/projects/osmand/temp/utah-latest.osm.pbf";
+		String file = "/home/victor/projects/osmand/temp/map.osm";
 
 		int st = file.lastIndexOf('/');
 		int e = file.indexOf('.', st);

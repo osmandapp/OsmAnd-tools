@@ -55,18 +55,19 @@ def process_polygons(tags, filename):
 			array.append("natural")
 			array.append("seamark:type")
 			array.append("seamark:restricted_area:category")
-			queryFields += ", \"natural\", tags->'seamark:type' as \"seamark:type\", tags->'seamark:restricted_area:category' as \"seamark:restricted_area:category\""
-			conditions += " or \"natural\" = 'water' or tags->'seamark:type' in ('separation_zone') or tags->'seamark:type' in ('production_area') or tags->'seamark:type' in ('restricted_area') or tags->'seamark:restricted_area:category' in ('military')"
+			queryFields += ", \"natural\", tags->'seamark:type' as \"seamark:type\", tags->'abandoned' as \"abandoned\", tags->'seamark:restricted_area:category' as \"seamark:restricted_area:category\""
+			conditions += " or \"natural\" = 'water' or tags->'seamark:type' in ('separation_zone') or tags->'seamark:type' in ('production_area') or tags->'seamark:type' in ('restricted_area') or tags->'seamark:restricted_area:category' in ('military') or tags->'abandoned' in ('yes')"
 		else :
 			array.append(tag)
 			queryFields += ", " + tag
 			conditions += " or "+tag+" <> ''"
-
-	cursor.execute("select osm_id, ST_AsText(ST_Transform(ST_Simplify(way,500),94326)) " + queryFields +
-				   " from planet_osm_polygon where way_area > 10000000"
-				   " and ("+conditions+") "
-				  # "LIMIT 1000"
-				   ";")
+	sql = "select osm_id, ST_AsText(ST_Transform(ST_Simplify(way,500),94326)) " + queryFields +
+				   " from planet_osm_polygon where way_area > 10000000" +
+				   " and ("+conditions+") " +
+				   # "LIMIT 1000"
+				   ";"
+	print "SQL : " + sql
+	cursor.execute(sql)
  
 	# retrieve the records from the database
 	parenComma = re.compile('\)\s*,\s*\(')
