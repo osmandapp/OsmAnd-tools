@@ -73,15 +73,15 @@ def process_polygons(tags, filename):
 		elif tag == "iata" :
 			array.append("iata")
 			queryFields += ", tags->'iata' as \"iata\""
-			conditions += " or tags->'iata'"
+			conditions += " or tags->'iata' <> ''"
 		elif tag == "icao" :
 			array.append("icao")
 			queryFields += ", tags->'icao' as \"icao\""
-			conditions += " or tags->'icao'"
+			conditions += " or tags->'icao' <> ''"
 		elif tag == "faa" :
 			array.append("faa")
 			queryFields += ", tags->'faa' as \"faa\""
-			conditions += " or tags->'faa'"
+			conditions += " or tags->'faa' <> ''"
 		else :
 			array.append(tag)
 			queryFields += ", " + tag
