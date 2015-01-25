@@ -30,7 +30,7 @@
 	</target>
 	
 	<target name="download_resources">
-	    <get src="http://builder.osmand.net:81/binaries/amd64-linux-clang/OsmAndCore_JavaSample1.jar"
+	    <get src="http://builder.osmand.net/binaries/amd64-linux-clang/OsmAndCore_JavaSample1.jar"
 	        dest="lib-gl/OsmAndCore_jni.jar"  usetimestamp="true"/>
 	</target>
 
@@ -198,7 +198,7 @@
 	</target>
 	
 	<target name="update-jni">
-	    <get src="http://builder.osmand.net:81/binaries/amd64-linux-clang/OsmAndCore_JavaSample1.jar"
+	    <get src="http://builder.osmand.net/binaries/amd64-linux-clang/OsmAndCore_JavaSample1.jar"
 	        dest="lib-gl/OsmAndCore_jni.jar"  usetimestamp="true"/>
 	</target>
 
