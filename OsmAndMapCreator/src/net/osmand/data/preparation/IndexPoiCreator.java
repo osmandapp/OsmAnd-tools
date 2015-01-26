@@ -107,7 +107,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	public void iterateRelation(Relation e, OsmDbAccessorContext ctx) throws SQLException {
 		for (String t : e.getTagKeySet()) {
 			AmenityType type = renderingTypes.getAmenityTypeForRelation(t, e.getTag(t), Algorithms.isEmpty(e.getTag("name")));
-			if (type != null) {
+			if (type != null) {	
 				ctx.loadEntityRelation(e);
 				for (EntityId id : ((Relation) e).getMembersMap().keySet()) {
 					if (!propogatedTags.containsKey(id)) {
@@ -190,7 +190,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				if(rulType.isAdditional() && rulType.getValue() == null) {
 					throw new IllegalStateException("Additional rule type '" + rulType.getTag() + "' should be encoded with value '"+e.getValue() +"'");
 				}
-				b.append((char)(rulType.getInternalId()) ).append(e.getValue());
+				// avoid 0 (bug in jdk on macos)
+				b.append((char)(rulType.getInternalId()) + 1 ).append(e.getValue());
 			}
 		}
 		return b.toString();
@@ -206,7 +207,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		while(true) {
 			i = name.indexOf(SPECIAL_CHAR, p);
 			String t = i == -1 ? name.substring(p) : name.substring(p, i);
-			MapRulType rulType = renderingTypes.getTypeByInternalId(t.charAt(0));
+			MapRulType rulType = renderingTypes.getTypeByInternalId(t.charAt(0)-1);
 			tempNames.put(rulType, t.substring(1));
 			if(rulType.isAdditional() && rulType.getValue() == null) {
 				throw new IllegalStateException("Additional rule type '" + rulType.getTag() + "' should be encoded with value '"+t.substring(1) +"'");
