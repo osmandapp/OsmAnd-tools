@@ -183,6 +183,7 @@
 			<region name="rhone-alpes" downloadName="rhone-alpes-latest"/>
 		</regions>
 
+
 		<!-- 1.4 GERMANY [SOURCE: GEOFABRIK.DE] -->
 		<regions siteToDownload="http://download.geofabrik.de/europe/germany/{0}.osm.pbf" region_prefix="Germany_" skip="false" region_suffix="_Europe">
 			<!-- <region name="baden-wuerttemberg" downloadName="baden-wuerttemberg-latest" cityAdminLevel="7"/>-->
@@ -748,14 +749,21 @@
 		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" region_suffix="_Africa"  skip="false">
 			<region name="algeria"/>
 			<region name="angola"/>
+			<region name="benin"/>
 			<region name="burundi"/>
 			<region name="cameroon"/>
 			<region name="cape-verde"/>
 			<region name="central-african-republic"/>
 			<region name="chad"/>
+			<region name="congo-brazzaville"/>
+			<region name="eritrea"/>
+			<region name="equatorial-guinea"/>
+			<region name="french-southern-and-antarctic-lands"/>
+			<region name="gabon"/>
 			<region name="ghana"/>
 			<region name="guinea"/>
 			<region name="kenya"/>
+			<region name="komori"/>
 			<region name="lesotho"/>
 			<region name="malawi"/>
 			<region name="mali"/>
@@ -765,6 +773,8 @@
 			<region name="namibia"/>
 			<region name="niger"/>
 			<region name="rwanda"/>
+			<region name="saint-helena-ascension-and-tristan-da-cunha"/>
+			<region name="sao-tome-and-principe"/>
 			<region name="senegal"/>
 			<region name="seychelles"/>
 			<region name="south-africa"/>
@@ -779,7 +789,7 @@
 			<region name="zimbabwe"/>
 		</regions>
 		<!-- 9 SPECIAL MAPS -->
-		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.osm.bz2" region_prefix="" skip="false" region_suffix="">	
+		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.osm.bz2" region_prefix="" skip="false" region_suffix="">
 		 	<region name="World_seamarks" index="map,poi"/>
 		 	<region name="World_bitcoin_payments" index="map,poi"/>
 		</regions>
