@@ -640,13 +640,14 @@
 			<region name="thailand" downloadName="thailand-latest"/>
 			<region name="turkmenistan" downloadName="turkmenistan-latest"/>
 			<region name="uzbekistan" downloadName="uzbekistan-latest"/>
-			<region name="vietnam" downloadName="vietnam-latest"/>
 		</regions>
 
 		<!--  6.2 ASIA [SOURCE: OSMAND:NET] -->
 		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix=""  skip="false" region_suffix="_Asia">
 			<region name="israel"/>
 			<region name="palestine"/>
+			<region name="jordan"/>
+			<region name="vietnam"/>
 		</regions>
 
 		<!-- 6.3 EASTERN ASIA [SOURCE: OSMAND:NET] -->
@@ -773,6 +774,7 @@
 			<region name="togo"/>
 			<region name="tunisia"/>
 			<region name="uganda"/>
+			<region name="western-sahara"/>
 			<region name="zambia"/>
 			<region name="zimbabwe"/>
 		</regions>
