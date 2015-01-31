@@ -69,6 +69,39 @@
 			<region  name="croatia"/>
 		</regions>
 
+		<!-- NORTH EUROPE  [SOURCE: download.osmand.net] -->
+<!--		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" skip="false" region_suffix="_Europe">
+			<region name="denmark"/>
+			<region name="estonia"/>
+			<region name="faroe-islands"/>
+			<region name="finland"/>
+			<region name="iceland"/>
+			<region name="latvia"/>
+			<region name="lithuania"/>
+			<region name="norway"/>
+			<region name="sweden"/>
+		</regions>-->
+
+		<!-- EAST EUROPE  [SOURCE: download.osmand.net] -->
+<!--		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" skip="false" region_suffix="_Europe">
+			<region name="albania"/>
+			<region name="belarus"/>
+			<region name="bosnia-herzegovina"/>
+			<region name="bulgaria"/>
+			<region name="croatia"/>
+			<region name="czech-republic"/>
+			<region name="hungary"/>
+			<region name="kosovo"/>
+			<region name="macedonia"/>
+			<region name="moldova"/>
+			<region name="montenegro"/>
+			<region name="poland"/>
+			<region name="romania"/>
+			<region name="serbia"/>
+			<region name="slovenia"/>
+			<region name="ukraine"/>
+		</regions>-->
+
 		<!-- JAPAN -->
 		<regions siteToDownload="http://download.osmand.net/osm-downloads/Japan-{0}.pbf" region_prefix="Japan_" skip="false" region_suffix="_Asia">
 		 	<region  name="chubu"/>
@@ -265,12 +298,12 @@
 			<region name="navarra"/>
 			<region name="valencia"/>
 		</regions>
+		
+		<regions siteToDownload="http://download.osmand.net/osm-downloads/russia-{0}.pbf" region_prefix="Russia_"  skip="false" region_suffix="_Asia">
+			<region name="crimea"/> <!-- Delete after map generation -->
+		</regions>
 
 		<!-- 2 Russia [SOURCE: GIS-LAB.INFO] -->
-		<regions siteToDownload="http://download.osmand.net/osm-downloads/russia-{0}.pbf" region_prefix="Russia_"  skip="false" region_suffix="_Asia">	
-			<region name="crimea"/>
-		</regions>
-		
 <!--		<regions siteToDownload="http://be.gis-lab.info/data/osm_dump/dump/latest/RU-{0}.osm.pbf" region_prefix="Russia_"  skip="false" region_suffix="_Asia">
 			<region name="adygeya" downloadName="AD"/>
 			<region name="altay" downloadName="AL"/>
@@ -357,6 +390,8 @@
 			<region name="zabaikalie" downloadName="ZAB"/>
 		</regions>-->
 
+		<!-- 2.1 Russia [SOURCE: download.osmand.net] -->
+
 		<regions siteToDownload="http://download.osmand.net/osm-downloads/russia-{0}.pbf" region_prefix="Russia_"  skip="false" region_suffix="_Asia">
 			<region name="adygeya"/>
 			<region name="altay"/>
@@ -372,6 +407,7 @@
 			<region name="cheliabinsk"/>
 			<region name="chukotka"/>
 			<region name="chuvashia"/>
+<!--			<region name="crimea"/> Uncomment after map generation-->
 			<region name="dagestan"/>
 			<region name="evreyskaya"/>
 			<region name="ingushetia"/>
@@ -554,10 +590,12 @@
 			<region name="peru" downloadName="peru-latest"/>
 		</regions>
 
-		<!--  4.2 SOUTH AMERICA [SOURCE: OSMAND:NET] --> 
-		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" skip="false" region_suffix="_SouthAmerica">	
+		<!--  4.2 SOUTH AMERICA [SOURCE: OSMAND:NET] -->
+		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" skip="false" region_suffix="_SouthAmerica">
+<!--			<region name="falkland-islands"/> Uncomment after map generation-->
 			<region name="guyana"/>
 			<region name="paraguay"/>
+<!--			<region name="south-georgia-and-south-sandwich-islands"/> Uncomment after map generation-->
 			<region name="suriname"/>
 			<region name="venezuela"/>
 		</regions>	
