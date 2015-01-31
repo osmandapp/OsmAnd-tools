@@ -191,7 +191,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					throw new IllegalStateException("Additional rule type '" + rulType.getTag() + "' should be encoded with value '"+e.getValue() +"'");
 				}
 				// avoid 0 (bug in jdk on macos)
-				b.append((char)(rulType.getInternalId()) + 1 ).append(e.getValue());
+				b.append((char)((rulType.getInternalId()) + 1) ).append(e.getValue());
 			}
 		}
 		return b.toString();

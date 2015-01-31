@@ -459,7 +459,7 @@ public class IndexCreator {
 //		if(LevelDBAccess.load()){
 //			dialect = DBDialect.NOSQL;
 //		}
-		if(logMapDataWarn == null) {
+ 		if(logMapDataWarn == null) {
 			logMapDataWarn = log ;
 		}
 		
@@ -774,9 +774,9 @@ public class IndexCreator {
 		long time = System.currentTimeMillis();
 		
 //		if(true){ generateRegionsFile(); return;}
+		String rootFolder = "/Users/victorshcherb/osmand/";
 		
-		
-		IndexCreator creator = new IndexCreator(new File("/home/victor/projects/osmand/osm-gen/")); //$NON-NLS-1$
+		IndexCreator creator = new IndexCreator(new File(rootFolder + "/osm-gen/")); //$NON-NLS-1$
 		creator.setIndexMap(true);
 //		creator.setIndexAddress(true);
 		creator.setIndexPOI(true);
@@ -789,14 +789,15 @@ public class IndexCreator {
 				
 		creator.setZoomWaySmothness(2);
 		MapRenderingTypesEncoder rt = //MapRenderingTypesEncoder.getDefault();
-				new MapRenderingTypesEncoder("/home/victor/projects/osmand/repo/resources/obf_creation/rendering_types.xml");
+				new MapRenderingTypesEncoder(rootFolder + "/repos//resources/obf_creation/rendering_types.xml");
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 
-		String file = "/home/victor/projects/osmand/temp/map.osm";
+//		String file = rootFolder + "/temp/map.osm";
+		String file = rootFolder + "/repos/resources/synthetic_test_rendering.osm";
 
 		int st = file.lastIndexOf('/');
 		int e = file.indexOf('.', st);
-		creator.setNodesDBFile(new File("/home/victor/projects/osmand/osm-gen/"+file.substring(st, e) + ".tmp.odb"));
+		creator.setNodesDBFile(new File(rootFolder + "/osm-gen/"+file.substring(st, e) + ".tmp.odb"));
 		creator.generateIndexes(new File(file),
 				new ConsoleProgressImplementation(1), null, zooms, rt, log);
 		
