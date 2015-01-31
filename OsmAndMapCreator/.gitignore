@@ -6,4 +6,5 @@ OsmAnd-core.jar
 /bin-tests
 *.lib
 fonts/
+OsmAndMapCreator.jar
 lib-gl/OsmAndCore_jni.jar
