@@ -237,7 +237,7 @@
 			<region name="thueringen" downloadName="thueringen-latest" cityAdminLevel="7"/>
 		</regions>
 
-		<!-- 1.5 ITALY [SOURCE: GFOSS.it] -->		
+		<!-- 1.5 ITALY [SOURCE: download.osmand.net] -->
 		<!-- leave download server in for the moment in case something is not entirely correct -->
 		<!-- <regions siteToDownload="http://geodati.fmach.it/gfoss_geodata/osm/output_osm_regioni/{0}.pbf" region_prefix="Italy_" skip="false" region_suffix="_Europe"> -->
 		<regions siteToDownload="http://download.osmand.net/osm-downloads/Italy-{0}.pbf" region_prefix="Italy_" skip="false" region_suffix="_Europe">	
@@ -279,14 +279,15 @@
 			<region name="zuid-holland"/>
 		</regions> -->
 
-	<regions siteToDownload="http://download.osmand.net/osm-downloads/Spain-{0}.pbf" region_prefix="Spain_" skip="false" region_suffix="_Europe">	
+		<regions siteToDownload="http://download.osmand.net/osm-downloads/Spain-{0}.pbf" region_prefix="Spain_" skip="false" region_suffix="_Europe">
 			<region name="andalusia"/>
 			<region name="aragon"/>
 			<region name="asturias"/>
 			<region name="baleares"/>
+<!--			<region name="basque-country"/> Uncomment after map generation-->
 			<region name="canarias"/>
 			<region name="cantabria"/>
-			<region name="castilla-la"/>
+			<region name="castilla-la-mancha"/>
 			<region name="castilla-leon"/>
 			<region name="catalunya"/>
 			<region name="ceuta"/>
@@ -296,6 +297,7 @@
 			<region name="melilla"/>
 			<region name="murcia"/>
 			<region name="navarra"/>
+<!--			<region name="rioja"/> Uncomment after map generation-->
 			<region name="valencia"/>
 		</regions>
 		
@@ -765,7 +767,7 @@
 		<regions siteToDownload="http://download.geofabrik.de/africa/{0}.osm.pbf" region_prefix="" region_suffix="_Africa"  skip="false">
 			<region name="botswana" downloadName="botswana-latest"/>
 			<region name="burkina-faso" downloadName="burkina-faso-latest"/>
-			<region name="canary-islands" downloadName="canary-islands-latest"/>
+<!--			<region name="canary-islands" downloadName="canary-islands-latest"/>-->
 			<region name="congo-democratic-republic" downloadName="congo-democratic-republic-latest"/>
 			<region name="egypt" downloadName="egypt-latest"/>
 			<region name="ethiopia" downloadName="ethiopia-latest"/>
