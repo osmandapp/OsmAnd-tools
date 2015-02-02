@@ -186,6 +186,7 @@
 			<region name="monaco"/>
 			<region name="switzerland"/>
 			<region name="isle-of-man"/>
+			<region name="ireland"/>
 		</regions> -->
 <!--		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="GB_" skip="false" region_suffix="_Europe">
 			<region name="scotland"/>
