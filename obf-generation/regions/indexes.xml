@@ -14,63 +14,63 @@
 
  		<!-- 1 EUROPE -->
 		<!-- 1.1 EUROPE [SOURCE: GEOFABRIK.DE] -->
-		<regions siteToDownload="http://download.geofabrik.de/europe/{0}.osm.pbf" region_prefix="" skip="false" region_suffix="_Europe">
-			<region  name="albania" downloadName="albania-latest"/>
-			<region  name="andorra" downloadName="andorra-latest"/>
-			<region  name="austria" downloadName="austria-latest"/>
-			<region  name="azores" downloadName="azores-latest"/>			
-			<region  name="belarus" downloadName="belarus-latest"/>
-			<region  name="belgium" downloadName="belgium-latest"/>
+<!--		<regions siteToDownload="http://download.geofabrik.de/europe/{0}.osm.pbf" region_prefix="" skip="false" region_suffix="_Europe">-->
+<!--			<region  name="albania" downloadName="albania-latest"/>-->
+<!--			<region  name="andorra" downloadName="andorra-latest"/>-->
+<!--			<region  name="austria" downloadName="austria-latest"/>-->
+<!--			<region  name="azores" downloadName="azores-latest"/>			-->
+<!--			<region  name="belarus" downloadName="belarus-latest"/>-->
+<!--			<region  name="belgium" downloadName="belgium-latest"/>-->
 <!--			<region  name="bosnia-herzegovina" downloadName="bosnia-herzegovina-latest"/>-->
-			<region  name="bulgaria" downloadName="bulgaria-latest"/>
+<!--			<region  name="bulgaria" downloadName="bulgaria-latest"/>-->
 <!--			<region  name="croatia" downloadName="croatia-latest"/>-->
-			<region  name="cyprus" downloadName="cyprus-latest"/>
-			<region  name="czech-republic" downloadName="czech-republic-latest"/>
-			<region  name="denmark" downloadName="denmark-latest"/>
-			<region  name="estonia" downloadName="estonia-latest"/>
-			<region  name="faroe-islands" downloadName="faroe-islands-latest"/>
-			<region  name="finland" downloadName="finland-latest"/>
-			<region  name="greece" downloadName="greece-latest"/>
-			<region  name="hungary" downloadName="hungary-latest"/>
-			<region  name="iceland" downloadName="iceland-latest"/>
+<!--			<region  name="cyprus" downloadName="cyprus-latest"/>-->
+<!--			<region  name="czech-republic" downloadName="czech-republic-latest"/>-->
+<!--			<region  name="denmark" downloadName="denmark-latest"/>-->
+<!--			<region  name="estonia" downloadName="estonia-latest"/>-->
+<!--			<region  name="faroe-islands" downloadName="faroe-islands-latest"/>-->
+<!--			<region  name="finland" downloadName="finland-latest"/>-->
+<!--			<region  name="greece" downloadName="greece-latest"/>-->
+<!--			<region  name="hungary" downloadName="hungary-latest"/>-->
+<!--			<region  name="iceland" downloadName="iceland-latest"/>-->
 			<!-- <region  name="ireland-and-northern-ireland" downloadName="ireland-and-northern-ireland-latest"/> -->
-			<region  name="isle-of-man" downloadName="isle-of-man-latest"/>
-			<region  name="italy" downloadName="italy-latest"/>
-			<region  name="kosovo" downloadName="kosovo-latest"/>
-			<region  name="latvia" downloadName="latvia-latest"/>
-			<region  name="liechtenstein" downloadName="liechtenstein-latest"/>
-			<region  name="lithuania" downloadName="lithuania-latest"/>
-			<region  name="luxembourg" downloadName="luxembourg-latest"/>
-			<region  name="macedonia" downloadName="macedonia-latest"/>
-			<region  name="malta" downloadName="malta-latest"/>
-			<region  name="moldova" downloadName="moldova-latest"/>
-			<region  name="monaco" downloadName="monaco-latest"/>
-			<region  name="montenegro" downloadName="montenegro-latest"/>
-			<region  name="netherlands" downloadName="netherlands-latest" cityAdminLevel="10"/>
-			<region  name="norway" downloadName="norway-latest"/>
-			<region  name="poland" downloadName="poland-latest"/>
+<!--			<region  name="isle-of-man" downloadName="isle-of-man-latest"/>-->
+<!--			<region  name="italy" downloadName="italy-latest"/>-->
+<!--			<region  name="kosovo" downloadName="kosovo-latest"/>-->
+<!--			<region  name="latvia" downloadName="latvia-latest"/>-->
+<!--			<region  name="liechtenstein" downloadName="liechtenstein-latest"/>-->
+<!--			<region  name="lithuania" downloadName="lithuania-latest"/>-->
+<!--			<region  name="luxembourg" downloadName="luxembourg-latest"/>-->
+<!--			<region  name="macedonia" downloadName="macedonia-latest"/>-->
+<!--			<region  name="malta" downloadName="malta-latest"/>-->
+<!--			<region  name="moldova" downloadName="moldova-latest"/>-->
+<!--			<region  name="monaco" downloadName="monaco-latest"/>-->
+<!--			<region  name="montenegro" downloadName="montenegro-latest"/>-->
+<!--			<region  name="netherlands" downloadName="netherlands-latest" cityAdminLevel="10"/>-->
+<!--			<region  name="norway" downloadName="norway-latest"/>-->
+<!--			<region  name="poland" downloadName="poland-latest"/>-->
 			<!-- region  name="portugal" downloadName="portugal-latest" -->
-			<region  name="romania" downloadName="romania-latest"/>
-			<region  name="serbia" downloadName="serbia-latest"/>
-			<region  name="slovakia" downloadName="slovakia-latest" cityAdminLevel="6"/>
-			<region  name="slovenia" downloadName="slovenia-latest"/>
-			<region  name="spain" downloadName="spain-latest"/>
-			<region  name="sweden"  downloadName="sweden-latest" />
-			<region  name="turkey" downloadName="turkey-latest"/>
-			<region  name="ukraine" downloadName="ukraine-latest"/>
-		</regions>
+<!--			<region  name="romania" downloadName="romania-latest"/>-->
+<!--			<region  name="serbia" downloadName="serbia-latest"/>-->
+<!--			<region  name="slovakia" downloadName="slovakia-latest" cityAdminLevel="6"/>-->
+<!--			<region  name="slovenia" downloadName="slovenia-latest"/>-->
+<!--			<region  name="spain" downloadName="spain-latest"/>-->
+<!--			<region  name="sweden"  downloadName="sweden-latest" />-->
+<!--			<region  name="turkey" downloadName="turkey-latest"/>-->
+<!--			<region  name="ukraine" downloadName="ukraine-latest"/>-->
+<!--		</regions>-->
 		
-		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" skip="false" region_suffix="_Europe">
-		 	<region  name="portugal"/>
-		 	<region  name="switzerland"/>
-		 	<region  name="germany_baden-wuerttemberg"/>
-		 	<region  name="ireland"/>
-			<region  name="bosnia-herzegovina"/>
-			<region  name="croatia"/>
-		</regions>
+<!--		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" skip="false" region_suffix="_Europe">-->
+<!--		 	<region  name="portugal"/>-->
+<!--		 	<region  name="switzerland"/>-->
+<!--		 	<region  name="germany_baden-wuerttemberg"/>-->
+<!--		 	<region  name="ireland"/>-->
+<!--			<region  name="bosnia-herzegovina"/>-->
+<!--			<region  name="croatia"/>-->
+<!--		</regions>-->
 
 		<!-- NORTH EUROPE  [SOURCE: download.osmand.net] -->
-<!--		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" skip="false" region_suffix="_Europe">
+		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" skip="false" region_suffix="_Europe">
 			<region name="denmark"/>
 			<region name="estonia"/>
 			<region name="faroe-islands"/>
@@ -80,10 +80,10 @@
 			<region name="lithuania"/>
 			<region name="norway"/>
 			<region name="sweden"/>
-		</regions>-->
+		</regions>
 
 		<!-- EAST EUROPE  [SOURCE: download.osmand.net] -->
-<!--		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" skip="false" region_suffix="_Europe">
+		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" skip="false" region_suffix="_Europe">
 			<region name="belarus"/>
 			<region name="bulgaria"/>
 			<region name="czech-republic"/>
@@ -91,12 +91,13 @@
 			<region name="moldova"/>
 			<region name="poland"/>
 			<region name="romania"/>
+			<region name="slovakia"/>
 			<region name="transnistria"/>
 			<region name="ukraine"/>
-		</regions>-->
+		</regions>
 
 		<!-- SOUTH EUROPE  [SOURCE: download.osmand.net] -->
-<!--		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" skip="false" region_suffix="_Europe">
+		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" skip="false" region_suffix="_Europe">
 			<region name="albania"/>
 			<region name="andorra"/>
 			<region name="bosnia-herzegovina"/>
@@ -104,6 +105,7 @@
 			<region name="cyprus"/>
 			<region name="greece"/>
 			<region name="kosovo"/>
+			<region name="italy"/>
 			<region name="macedonia"/>
 			<region name="malta"/>
 			<region name="montenegro"/>
@@ -111,12 +113,24 @@
 			<region name="san-marino"/>
 			<region name="serbia"/>
 			<region name="slovenia"/>
+			<region name="spain"/>
 			<region name="turkey"/>
 			<region name="vatican-city"/>
-		</regions>-->
+		</regions>
 
 		<!-- WEST EUROPE  [SOURCE: download.osmand.net] -->
-<!--		<regions siteToDownload="http://download.osmand.net/osm-downloads/Germany-{0}.pbf" region_prefix="Germany_" skip="false" region_suffix="_Europe">  Uncomment after map generation
+		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" skip="false" region_suffix="_Europe">
+			<region name="austria"/>
+			<region name="azores"/>
+			<region name="belgium"/>
+			<region name="liechtenstein"/>
+			<region name="luxembourg"/>
+			<region name="monaco"/>
+			<region name="switzerland"/>
+			<region name="isle-of-man"/>
+			<region name="ireland"/>
+		</regions>
+		<regions siteToDownload="http://download.osmand.net/osm-downloads/Germany-{0}.pbf" region_prefix="Germany_" skip="false" region_suffix="_Europe">
 			<region name="baden-wuerttemberg"/>
 			<region name="bayern"/>
 			<region name="berlin"/>
@@ -133,8 +147,8 @@
 			<region name="sachsen-anhalt"/>
 			<region name="schleswig-holstein"/>
 			<region name="thueringen"/>
-		</regions>-->
-<!--		<regions siteToDownload="http://download.osmand.net/osm-downloads/France-{0}.osm.pbf" region_prefix="France_" skip="false" region_suffix="_Europe">  Uncomment after map generation
+		</regions>
+		<regions siteToDownload="http://download.osmand.net/osm-downloads/France-{0}.osm.pbf" region_prefix="France_" skip="false" region_suffix="_Europe">
 			<region name="alsace"/>
 			<region name="aquitaine"/>
 			<region name="auvergne"/>
@@ -162,9 +176,8 @@
 			<region name="provence-alpes-cote-d-azur"/>
 			<region name="reunion"/>
 			<region name="rhone-alpes"/>
-		</regions>-->
-<!--Temporary disable to be able to activate it at any time
-		<regions siteToDownload="http://download.osmand.net/osm-downloads/Netherlands-{0}.pbf" region_prefix="Netherlands_" skip="false" region_suffix="_Europe">	
+		</regions>
+		<regions siteToDownload="http://download.osmand.net/osm-downloads/Netherlands-{0}.pbf" region_prefix="Netherlands_" skip="false" region_suffix="_Europe">
 			<region name="drenthe"/>
 			<region name="flevoland"/>
 			<region name="friesland"/>
@@ -177,23 +190,39 @@
 			<region name="utrecht"/>
 			<region name="zeeland"/>
 			<region name="zuid-holland"/>
-		</regions> -->
-<!--		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" skip="false" region_suffix="_Europe">
-			<region name="austria"/>
-			<region name="belgium"/>
-			<region name="liechtenstein"/>
-			<region name="luxembourg"/>
-			<region name="monaco"/>
-			<region name="switzerland"/>
-			<region name="isle-of-man"/>
-			<region name="ireland"/>
-		</regions> -->
-<!--		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="GB_" skip="false" region_suffix="_Europe">
+		</regions>
+		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="GB_" skip="false" region_suffix="_Europe">
 			<region name="scotland"/>
 			<region name="wales"/>
 			<region name="england"/>
 			<region name="northern-ireland"/>
-		</regions> -->
+		</regions>
+		<regions siteToDownload="http://download.osmand.net/osm-downloads/gb_england-{0}.pbf" region_prefix="GB_England_" skip="false" region_suffix="_Europe">
+		 	<region name="east-midlands"/>
+		 	<region name="east-of-england"/>
+		 	<region name="north-east-england"/>
+		 	<region name="north-west-england"/>
+		 	<region name="south-east-england"/>
+		 	<region name="south-west-england"/>
+		 	<region name="west-midlands"/>
+		 	<region name="yorkshire-and-the-humber"/>
+		 	<!-- The channel islands are not really a defined region, but they are hard to put elsewhere -->
+		 	<region name="channel-islands"/>
+			<region name="greater-london"/>
+		</regions>
+
+		<!-- 1.2 GREAT BRITAIN [SOURCE: GEOFABRIK.DE] -->
+<!--		<regions siteToDownload="http://download.geofabrik.de/europe/great-britain/{0}.osm.pbf" region_prefix="GB_" skip="false" region_suffix="_Europe">
+			<region name="scotland" downloadName="scotland-latest"/>
+			<region name="wales" downloadName="wales-latest"/>
+			<region name="england" downloadName="england-latest"/>
+		</regions>-->
+<!--		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="GB_" skip="false" region_suffix="_Europe">	
+			<region  name="northern_ireland" downloadName="gb_northern_ireland"/>
+		</regions>-->
+
+		<!-- REGION division -->
+		<!-- plus  greater-london -->
 <!--		<regions siteToDownload="http://download.osmand.net/osm-downloads/gb_england-{0}.pbf" region_prefix="GB_England_" skip="false" region_suffix="_Europe">
 		 	<region  name="east-midlands"/>
 		 	<region  name="east-of-england"/>
@@ -204,49 +233,11 @@
 		 	<region  name="west-midlands"/>
 		 	<region  name="yorkshire-and-the-humber"/>
 		 	<region  name="channel-islands"/>
-			<region  name="greater-london"/>
 		</regions>-->
 
-		<!-- JAPAN -->
-		<regions siteToDownload="http://download.osmand.net/osm-downloads/Japan-{0}.pbf" region_prefix="Japan_" skip="false" region_suffix="_Asia">
-		 	<region  name="chubu"/>
-		 	<region  name="chugoku"/>
-		 	<region  name="hokkaido"/>
-		 	<region  name="kanto"/>
-		 	<region  name="kinki"/>
-		 	<region  name="kyushu"/>
-		 	<region  name="shikoku"/>
-		 	<region  name="tohoku"/>
-		</regions>
-
-		<!-- 1.2 GREAT BRITAIN [SOURCE: GEOFABRIK.DE] -->
-		<regions siteToDownload="http://download.geofabrik.de/europe/great-britain/{0}.osm.pbf" region_prefix="GB_" skip="false" region_suffix="_Europe">
-			<region name="scotland" downloadName="scotland-latest"/>
-			<region name="wales" downloadName="wales-latest"/>
-			<region name="england" downloadName="england-latest"/>
-		</regions>
-		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="GB_" skip="false" region_suffix="_Europe">	
-			<region  name="northern_ireland" downloadName="gb_northern_ireland"/>
-		</regions>
-
-		<!-- REGION division -->
-		<!-- plus  greater-london -->
-		<regions siteToDownload="http://download.osmand.net/osm-downloads/gb_england-{0}.pbf" region_prefix="GB_England_" skip="false" region_suffix="_Europe">	
-		 	<region  name="east-midlands"/>
-		 	<region  name="east-of-england"/>
-		 	<region  name="north-east-england"/>
-		 	<region  name="north-west-england"/>
-		 	<region  name="south-east-england"/>
-		 	<region  name="south-west-england"/>
-		 	<region  name="west-midlands"/>
-		 	<region  name="yorkshire-and-the-humber"/>
-		 	<!-- The channel islands are not really a defined region, but they are hard to put elsewehere -->
-		 	<region  name="channel-islands"/>
-		</regions>
-
-		<regions siteToDownload="http://download.geofabrik.de/europe/great-britain/england/{0}.osm.pbf" region_prefix="GB_England_" skip="false" region_suffix="_Europe">
+<!--		<regions siteToDownload="http://download.geofabrik.de/europe/great-britain/england/{0}.osm.pbf" region_prefix="GB_England_" skip="false" region_suffix="_Europe">
 			<region name="greater-london" downloadName="greater-london-latest"/>
-		</regions>
+		</regions>-->
 
 
 		
@@ -291,55 +282,55 @@
 		</regions>
  		-->
 		<!-- 1.3 FRANCE [SOURCE: GEOFABRIK.DE] -->
-		<regions siteToDownload="http://download.geofabrik.de/europe/france/{0}.osm.pbf" region_prefix="France_" skip="false" region_suffix="_Europe">
-			<region name="alsace" downloadName="alsace-latest"/>
-			<region name="aquitaine" downloadName="aquitaine-latest"/>
-			<region name="auvergne" downloadName="auvergne-latest"/>
-			<region name="basse-normandie" downloadName="basse-normandie-latest"/>
-			<region name="bourgogne" downloadName="bourgogne-latest"/>
-			<region name="bretagne" downloadName="bretagne-latest"/>
-			<region name="centre" downloadName="centre-latest"/>
-			<region name="champagne-ardenne" downloadName="champagne-ardenne-latest"/>
-			<region name="corse" downloadName="corse-latest"/>
-			<region name="franche-comte" downloadName="franche-comte-latest"/>
-			<region name="guadeloupe" downloadName="guadeloupe-latest"/>
-			<region name="guyane" downloadName="guyane-latest"/>
-			<region name="haute-normandie" downloadName="haute-normandie-latest"/>
-			<region name="ile-de-france" downloadName="ile-de-france-latest"/>
-			<region name="languedoc-roussillon" downloadName="languedoc-roussillon-latest"/>
-			<region name="limousin" downloadName="limousin-latest"/>
-			<region name="lorraine" downloadName="lorraine-latest"/>
-			<region name="martinique" downloadName="martinique-latest"/>
-			<region name="mayotte" downloadName="mayotte-latest"/>
-			<region name="midi-pyrenees" downloadName="midi-pyrenees-latest"/>
-			<region name="nord-pas-de-calais" downloadName="nord-pas-de-calais-latest"/>
-			<region name="pays-de-la-loire" downloadName="pays-de-la-loire-latest"/>
-			<region name="picardie" downloadName="picardie-latest"/>
-			<region name="poitou-charentes" downloadName="poitou-charentes-latest"/>
-			<region name="provence-alpes-cote-d-azur" downloadName="provence-alpes-cote-d-azur-latest"/>
-			<region name="reunion" downloadName="reunion-latest"/>
-			<region name="rhone-alpes" downloadName="rhone-alpes-latest"/>
-		</regions>
+<!--		<regions siteToDownload="http://download.geofabrik.de/europe/france/{0}.osm.pbf" region_prefix="France_" skip="false" region_suffix="_Europe">-->
+<!--			<region name="alsace" downloadName="alsace-latest"/>-->
+<!--			<region name="aquitaine" downloaaquitainedName="aquitaine-latest"/>-->
+<!--			<region name="auvergne" downloadName="auvergne-latest"/>-->
+<!--			<region name="basse-normandie" downloadName="basse-normandie-latest"/>-->
+<!--			<region name="bourgogne" downloadName="bourgogne-latest"/>-->
+<!--			<region name="bretagne" downloadName="bretagne-latest"/>-->
+<!--			<region name="centre" downloadName="centre-latest"/>-->
+<!--			<region name="champagne-ardenne" downloadName="champagne-ardenne-latest"/>-->
+<!--			<region name="corse" downloadName="corse-latest"/>-->
+<!--			<region name="franche-comte" downloadName="franche-comte-latest"/>-->
+<!--			<region name="guadeloupe" downloadName="guadeloupe-latest"/>-->
+<!--			<region name="guyane" downloadName="guyane-latest"/>-->
+<!--			<region name="haute-normandie" downloadName="haute-normandie-latest"/>-->
+<!--			<region name="ile-de-france" downloadName="ile-de-france-latest"/>-->
+<!--			<region name="languedoc-roussillon" downloadName="languedoc-roussillon-latest"/>-->
+<!--			<region name="limousin" downloadName="limousin-latest"/>-->
+<!--			<region name="lorraine" downloadName="lorraine-latest"/>-->
+<!--			<region name="martinique" downloadName="martinique-latest"/>-->
+<!--			<region name="mayotte" downloadName="mayotte-latest"/>-->
+<!--			<region name="midi-pyrenees" downloadName="midi-pyrenees-latest"/>-->
+<!--			<region name="nord-pas-de-calais" downloadName="nord-pas-de-calais-latest"/>-->
+<!--			<region name="pays-de-la-loire" downloadName="pays-de-la-loire-latest"/>-->
+<!--			<region name="picardie" downloadName="picardie-latest"/>-->
+<!--			<region name="poitou-charentes" downloadName="poitou-charentes-latest"/>-->
+<!--			<region name="provence-alpes-cote-d-azur" downloadName="provence-alpes-cote-d-azur-latest"/>-->
+<!--			<region name="reunion" downloadName="reunion-latest"/>-->
+<!--			<region name="rhone-alpes" downloadName="rhone-alpes-latest"/>-->
+<!--<!--		</regions>-->-->
 
 		<!-- 1.4 GERMANY [SOURCE: GEOFABRIK.DE] -->
-		<regions siteToDownload="http://download.geofabrik.de/europe/germany/{0}.osm.pbf" region_prefix="Germany_" skip="false" region_suffix="_Europe">
+<!--		<regions siteToDownload="http://download.geofabrik.de/europe/germany/{0}.osm.pbf" region_prefix="Germany_" skip="false" region_suffix="_Europe">-->
 			<!-- <region name="baden-wuerttemberg" downloadName="baden-wuerttemberg-latest" cityAdminLevel="7"/>-->
-			<region name="bayern" downloadName="bayern-latest" cityAdminLevel="7"/>
-			<region name="berlin" downloadName="berlin-latest" cityAdminLevel="7"/>
-			<region name="brandenburg" downloadName="brandenburg-latest" cityAdminLevel="7"/>
-			<region name="bremen" downloadName="bremen-latest" cityAdminLevel="7"/>
-			<region name="hamburg" downloadName="hamburg-latest" cityAdminLevel="7"/>
-			<region name="hessen" downloadName="hessen-latest" cityAdminLevel="7"/>
-			<region name="mecklenburg-vorpommern" downloadName="mecklenburg-vorpommern-latest" cityAdminLevel="7"/>
-			<region name="niedersachsen" downloadName="niedersachsen-latest" cityAdminLevel="7"/>
-			<region name="nordrhein-westfalen" downloadName="nordrhein-westfalen-latest" cityAdminLevel="7"/>
-			<region name="rheinland-pfalz" downloadName="rheinland-pfalz-latest" cityAdminLevel="7"/>
-			<region name="saarland" downloadName="saarland-latest" cityAdminLevel="7"/>
-			<region name="sachsen" downloadName="sachsen-latest" cityAdminLevel="7"/>
-			<region name="sachsen-anhalt" downloadName="sachsen-anhalt-latest" cityAdminLevel="7"/>
-			<region name="schleswig-holstein" downloadName="schleswig-holstein-latest" cityAdminLevel="7"/>
-			<region name="thueringen" downloadName="thueringen-latest" cityAdminLevel="7"/>
-		</regions>
+<!--			<region name="bayern" downloadName="bayern-latest" cityAdminLevel="7"/>-->
+<!--			<region name="berlin" downloadName="berlin-latest" cityAdminLevel="7"/>-->
+<!--			<region name="brandenburg" downloadName="brandenburg-latest" cityAdminLevel="7"/>-->
+<!--			<region name="bremen" downloadName="bremen-latest" cityAdminLevel="7"/>-->
+<!--			<region name="hamburg" downloadName="hamburg-latest" cityAdminLevel="7"/>-->
+<!--			<region name="hessen" downloadName="hessen-latest" cityAdminLevel="7"/>-->
+<!--			<region name="mecklenburg-vorpommern" downloadName="mecklenburg-vorpommern-latest" cityAdminLevel="7"/>-->
+<!--			<region name="niedersachsen" downloadName="niedersachsen-latest" cityAdminLevel="7"/>-->
+<!--			<region name="nordrhein-westfalen" downloadName="nordrhein-westfalen-latest" cityAdminLevel="7"/>-->
+<!--			<region name="rheinland-pfalz" downloadName="rheinland-pfalz-latest" cityAdminLevel="7"/>-->
+<!--			<region name="saarland" downloadName="saarland-latest" cityAdminLevel="7"/>-->
+<!--			<region name="sachsen" downloadName="sachsen-latest" cityAdminLevel="7"/>-->
+<!--			<region name="sachsen-anhalt" downloadName="sachsen-anhalt-latest" cityAdminLevel="7"/>-->
+<!--			<region name="schleswig-holstein" downloadName="schleswig-holstein-latest" cityAdminLevel="7"/>-->
+<!--			<region name="thueringen" downloadName="thueringen-latest" cityAdminLevel="7"/>-->
+<!--		</regions>-->
 
 		<!-- 1.5 ITALY [SOURCE: download.osmand.net] -->
 		<!-- leave download server in for the moment in case something is not entirely correct -->
@@ -372,7 +363,7 @@
 			<region name="aragon"/>
 			<region name="asturias"/>
 			<region name="baleares"/>
-<!--			<region name="basque-country"/> Uncomment after map generation-->
+			<region name="basque-country"/>
 			<region name="canarias"/>
 			<region name="cantabria"/>
 			<region name="castilla-la-mancha"/>
@@ -385,13 +376,13 @@
 			<region name="melilla"/>
 			<region name="murcia"/>
 			<region name="navarra"/>
-<!--			<region name="rioja"/> Uncomment after map generation-->
+			<region name="rioja"/>
 			<region name="valencia"/>
 		</regions>
 		
-		<regions siteToDownload="http://download.osmand.net/osm-downloads/russia-{0}.pbf" region_prefix="Russia_"  skip="false" region_suffix="_Asia">
-			<region name="crimea"/> <!-- Delete after map generation -->
-		</regions>
+<!--		<regions siteToDownload="http://download.osmand.net/osm-downloads/russia-{0}.pbf" region_prefix="Russia_"  skip="false" region_suffix="_Asia">
+			<region name="crimea"/>
+		</regions>-->
 
 		<!-- 2 Russia [SOURCE: GIS-LAB.INFO] -->
 <!--		<regions siteToDownload="http://be.gis-lab.info/data/osm_dump/dump/latest/RU-{0}.osm.pbf" region_prefix="Russia_"  skip="false" region_suffix="_Asia">
@@ -497,7 +488,7 @@
 			<region name="cheliabinsk"/>
 			<region name="chukotka"/>
 			<region name="chuvashia"/>
-<!--			<region name="crimea"/> Uncomment after map generation-->
+			<region name="crimea"/>
 			<region name="dagestan"/>
 			<region name="evreyskaya"/>
 			<region name="ingushetia"/>
@@ -682,10 +673,10 @@
 
 		<!--  4.2 SOUTH AMERICA [SOURCE: OSMAND:NET] -->
 		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" skip="false" region_suffix="_SouthAmerica">
-<!--			<region name="falkland-islands"/> Uncomment after map generation-->
+			<region name="falkland-islands"/>
 			<region name="guyana"/>
 			<region name="paraguay"/>
-<!--			<region name="south-georgia-and-south-sandwich-islands"/> Uncomment after map generation-->
+			<region name="south-georgia-and-south-sandwich-islands"/>
 			<region name="suriname"/>
 			<region name="venezuela"/>
 		</regions>	
@@ -771,7 +762,7 @@
 			<region name="uzbekistan" downloadName="uzbekistan-latest"/>
 		</regions>
 
-		<!--  6.2 ASIA [SOURCE: OSMAND:NET] -->
+		<!--  6.3 ASIA [SOURCE: OSMAND:NET] -->
 		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix=""  skip="false" region_suffix="_Asia">
 			<region name="israel"/>
 			<region name="palestine"/>
@@ -779,15 +770,27 @@
 			<region name="vietnam"/>
 		</regions>
 
-		<!-- 6.3 EASTERN ASIA [SOURCE: OSMAND:NET] -->
+		<!-- 6.4 EASTERN ASIA [SOURCE: OSMAND:NET] -->
 		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" region_suffix="_Asia" skip="false">
 			<region name="hong-kong"/>
 			<region name="macao"/>
 			<region name="north-korea"/>
 			<region name="south-korea"/>
-		</regions>	
+		</regions>
 
-		<!-- 6.3 SOUTH-EASTERN ASIA [SOURCE: OSMAND:NET] -->
+		<!-- 6.5 JAPAN [SOURCE: OSMAND:NET] -->
+		<regions siteToDownload="http://download.osmand.net/osm-downloads/Japan-{0}.pbf" region_prefix="Japan_" skip="false" region_suffix="_Asia">
+		 	<region  name="chubu"/>
+		 	<region  name="chugoku"/>
+		 	<region  name="hokkaido"/>
+		 	<region  name="kanto"/>
+		 	<region  name="kinki"/>
+		 	<region  name="kyushu"/>
+		 	<region  name="shikoku"/>
+		 	<region  name="tohoku"/>
+		</regions>
+
+		<!-- 6.6 SOUTH-EASTERN ASIA [SOURCE: OSMAND:NET] -->
 		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" region_suffix="_Asia" skip="false">
 			<!-- Keep generating for alternative -->
 			<region name="brunei"/>
@@ -801,17 +804,17 @@
 			<region name="spratly-islands"/>
 		</regions>	
 
-		<!-- 6.3 SOUTHERN ASIA [SOURCE: OSMAND:NET] -->
+		<!-- 6.7 SOUTHERN ASIA [SOURCE: OSMAND:NET] -->
 		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" region_suffix="_Asia" skip="false">
 			<region name="afghanistan"/>
 			<region name="bhutan"/>
-			<region name="british-indian-ocean-territory"/>  
+			<region name="british-indian-ocean-territory"/>
 			<region name="maldives"/>
 			<region name="nepal"/>
-			<region name="sri-lanka"/>			
+			<region name="sri-lanka"/>
 		</regions>		
 
-		<!-- 6.3 WESTERN ASIA [SOURCE: OSMAND:NET] -->
+		<!-- 6.8 WESTERN ASIA [SOURCE: OSMAND:NET] -->
 		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" region_suffix="_Asia" skip="false">
 			<region name="armenia"/>
 			<region name="bahrain"/>
