@@ -115,7 +115,7 @@
 			<region name="slovenia"/>
 			<region name="spain"/>
 			<region name="turkey"/>
-			<region name="vatican-city"/>
+<!--			<region name="vatican-city"/>-->
 		</regions>
 
 		<!-- WEST EUROPE  [SOURCE: download.osmand.net] -->
@@ -126,6 +126,7 @@
 			<region name="liechtenstein"/>
 			<region name="luxembourg"/>
 			<region name="monaco"/>
+			<region name="netherlands"/>
 			<region name="switzerland"/>
 			<region name="isle-of-man"/>
 			<region name="ireland"/>
@@ -193,7 +194,7 @@
 			<region name="zuid-holland"/>
 		</regions>
 		-->
-		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="GB_" skip="false" region_suffix="_Europe">
+		<regions siteToDownload="http://download.osmand.net/osm-downloads/gb-{0}.pbf" region_prefix="GB_" skip="false" region_suffix="_Europe">
 			<region name="scotland"/>
 			<region name="wales"/>
 			<region name="england"/>
