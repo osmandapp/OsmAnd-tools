@@ -310,7 +310,7 @@
 <!--			<region name="provence-alpes-cote-d-azur" downloadName="provence-alpes-cote-d-azur-latest"/>-->
 <!--			<region name="reunion" downloadName="reunion-latest"/>-->
 <!--			<region name="rhone-alpes" downloadName="rhone-alpes-latest"/>-->
-<!--<!--		</regions>-->-->
+<!--		</regions>-->
 
 		<!-- 1.4 GERMANY [SOURCE: GEOFABRIK.DE] -->
 <!--		<regions siteToDownload="http://download.geofabrik.de/europe/germany/{0}.osm.pbf" region_prefix="Germany_" skip="false" region_suffix="_Europe">-->
