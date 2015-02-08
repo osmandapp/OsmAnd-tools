@@ -198,7 +198,7 @@
 			<region name="scotland"/>
 			<region name="wales"/>
 			<region name="england"/>
-			<region name="northern-ireland"/>
+			<region name="northern_ireland"/>
 		</regions>
 		<regions siteToDownload="http://download.osmand.net/osm-downloads/gb_england-{0}.pbf" region_prefix="GB_England_" skip="false" region_suffix="_Europe">
 		 	<region name="east-midlands"/>
