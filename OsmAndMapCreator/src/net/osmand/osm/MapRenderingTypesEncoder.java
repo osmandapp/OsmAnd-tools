@@ -315,6 +315,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 					mp.put(ift.tag, vl);
 				}
 			}
+			tags.remove(ec.fromTag.tag);
 			result.add(mp);
 		}
 		return result;

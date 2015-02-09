@@ -184,7 +184,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			es.printStackTrace();
 			return;
 		}
-		List<Map<String, String>> splitEntities = renderingTypes.splitTags(e.getTags(), EntityType.valueOf(e));
+		List<Map<String, String>> splitEntities = renderingTypes.splitTags(e.getModifiableTags(), EntityType.valueOf(e));
 
 		// Don't add multipolygons with an unknown type
 		if (typeUse.size() == 0)
