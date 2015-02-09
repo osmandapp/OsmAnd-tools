@@ -542,7 +542,8 @@ int main(int argc, char** argv)
     if (lastClickedLocationMarker)
         lastClickedLocationMarker->setPosition(renderer->getState().target31);
 
-    renderer->initializeRendering();
+    bool ok = renderer->initializeRendering();
+    assert(ok);
     //////////////////////////////////////////////////////////////////////////
 
     glutMainLoop();
@@ -934,6 +935,12 @@ void keyboardHandler(unsigned char key, int x, int y)
         else
             while (!renderer->suspendSymbolsUpdate());
         break;
+    case ']':
+        if (renderer->isGpuWorkerPaused())
+            while (!renderer->resumeGpuWorker());
+        else
+            while (!renderer->suspendGpuWorker());
+        break;
     case ' ':
     {
         const OsmAnd::PointI amsterdam(
@@ -1195,7 +1202,7 @@ void displayHandler()
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
         auto w = 390;
-        auto h1 = 16 * 20;
+        auto h1 = 16 * 21;
         auto t = viewport.height();
         glColor4f(0.5f, 0.5f, 0.5f, 0.6f);
         glBegin(GL_QUADS);
@@ -1304,6 +1311,11 @@ void displayHandler()
         glRasterPos2f(8, t - 16 * 19);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("symbols suspended ([)  : %1").arg(renderer->isSymbolsUpdateSuspended())));
+        verifyOpenGL();
+
+        glRasterPos2f(8, t - 16 * 20);
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
+            QString("GPU worker paused (])  : %1").arg(renderer->isGpuWorkerPaused())));
         verifyOpenGL();
 
         glColor4f(0.5f, 0.5f, 0.5f, 0.6f);
