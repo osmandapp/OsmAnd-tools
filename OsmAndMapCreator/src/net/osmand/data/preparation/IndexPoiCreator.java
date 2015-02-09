@@ -56,6 +56,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	private static final int ZOOM_TO_WRITE_CATEGORIES_END = 16;
 	private static final int CHARACTERS_TO_BUILD = 4;
 	private boolean useInMemoryCreator = true; 
+	public static long GENERATE_OBJ_ID = - (1l << 10l); 
+
 	
 
 	private List<Amenity> tempAmenityList = new ArrayList<Amenity>();
@@ -94,7 +96,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				// do not add that check because it is too much printing for batch creation
 				// by statistic < 1% creates maps manually
 				// checkEntity(e);
-				EntityParser.parseMapObject(a, e);
+				EntityParser.parseMapObject(a, e, e instanceof Relation? GENERATE_OBJ_ID-- : e.getId());
 				if (a.getLocation() != null) {
 					// do not convert english name
 					// convertEnglishName(a);
