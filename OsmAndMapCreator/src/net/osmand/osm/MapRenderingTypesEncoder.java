@@ -304,18 +304,20 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			return result;
 		}
 		result = new ArrayList<Map<String,String>>();
+		Map<String, String> ctags = new LinkedHashMap<String, String>(tags);
+		result.add(ctags);
 		for (EntityConvert ec : listToConvert) {
 			LinkedHashMap<String, String> mp = new LinkedHashMap<String, String>();
 			for (TagValuePattern ift : ec.toTags) {
 				String vl = ift.value;
 				if (vl == null) {
-					vl = tags.get(ift.tag);
+					vl = ctags.get(ift.tag);
 				}
 				if(vl != null) {
 					mp.put(ift.tag, vl);
 				}
 			}
-			tags.remove(ec.fromTag.tag);
+			ctags.remove(ec.fromTag.tag);
 			result.add(mp);
 		}
 		return result;
