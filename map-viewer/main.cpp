@@ -308,20 +308,20 @@ int main(int argc, char** argv)
     */
 
     favorites.reset(new OsmAnd::FavoriteLocationsGpxCollection());
-    if (favorites->loadFrom(QLatin1String("d:\\OpenSource\\OsmAnd\\favorites.gpx")))
+    /*if (favorites->loadFrom(QLatin1String("d:\\OpenSource\\OsmAnd\\favorites.gpx")))
     {
         favoritesPresenter.reset(new OsmAnd::FavoriteLocationsPresenter(favorites));
         renderer->addSymbolsProvider(favoritesPresenter);
     }
     else
-        favorites.reset();
+        favorites.reset();*/
     
     //////////////////////////////////////////////////////////////////////////
 
-    QList< std::shared_ptr<const OsmAnd::GeoInfoDocument> > geoInfoDocs;
+    /*QList< std::shared_ptr<const OsmAnd::GeoInfoDocument> > geoInfoDocs;
     if (QFile::exists(QLatin1String("osmand.gpx")))
         geoInfoDocs.append(OsmAnd::GpxDocument::loadFrom("osmand.gpx"));
-    gpxPresenter.reset(new OsmAnd::GeoInfoPresenter(geoInfoDocs));
+    gpxPresenter.reset(new OsmAnd::GeoInfoPresenter(geoInfoDocs));*/
     
     //////////////////////////////////////////////////////////////////////////
 
@@ -448,7 +448,7 @@ int main(int argc, char** argv)
     renderer->setup(rendererSetup);
 
     const auto debugSettings = renderer->getDebugSettings();
-    debugSettings->debugStageEnabled = true;
+    //debugSettings->debugStageEnabled = true;
     //debugSettings->excludeBillboardSymbolsFromProcessing = true;
     //debugSettings->excludeOnSurfaceSymbolsFromProcessing = true;
     //debugSettings->excludeOnPathSymbolsFromProcessing = true;
@@ -458,7 +458,7 @@ int main(int argc, char** argv)
     debugSettings->showSymbolsBBoxesRejectedByMinDistanceToSameContentFromOtherSymbolCheck = true;
     debugSettings->showSymbolsBBoxesRejectedByIntersectionCheck = true;
     debugSettings->showSymbolsBBoxesRejectedByPresentationMode = true;*/
-    debugSettings->showSymbolsBBoxesAcceptedByIntersectionCheck = true;
+    //debugSettings->showSymbolsBBoxesAcceptedByIntersectionCheck = true;
     //debugSettings->skipSymbolsPresentationModeCheck = true;
     //debugSettings->showOnPathSymbolsRenderablesPaths = true;
     ////debugSettings->showOnPath2dSymbolGlyphDetails = true;
@@ -927,8 +927,8 @@ void keyboardHandler(unsigned char key, int x, int y)
     {
         auto layerId = (modifiers & GLUT_ACTIVE_ALT) ? 1 : 0;
         activateProvider(layerId, key - '0');
-    }
         break;
+    }
     case '[':
         if (renderer->isSymbolsUpdateSuspended())
             while (!renderer->resumeSymbolsUpdate());
@@ -1039,7 +1039,11 @@ void activateProvider(int layerIdx, int idx)
         auto tileProvider = new OsmAnd::MapRasterLayerProvider_Software(mapPrimitivesProvider);
         renderer->setMapLayerProvider(layerIdx, std::shared_ptr<OsmAnd::IMapLayerProvider>(tileProvider));
 
+        //OsmAnd::MapLayerConfiguration mapLayerConfiguration;
+        //mapLayerConfiguration.opacity = 0.5f;
+        //renderer->setMapLayerConfiguration(layerIdx, mapLayerConfiguration);
         //
+        if (gpxPresenter)
         {
             const std::shared_ptr<OsmAnd::MapPrimitivesProvider> gpxPrimitivesProvider(new OsmAnd::MapPrimitivesProvider(
                 gpxPresenter->createMapObjectsProvider(),
