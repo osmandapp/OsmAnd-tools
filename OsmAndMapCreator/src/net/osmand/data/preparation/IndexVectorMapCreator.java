@@ -184,7 +184,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			es.printStackTrace();
 			return;
 		}
-		List<Map<String, String>> splitEntities = renderingTypes.splitTags(e.getTags(), EntityType.valueOf(e));
+		List<Map<String, String>> splitEntities = renderingTypes.splitTags(e.getModifiableTags(), EntityType.valueOf(e));
 
 		// Don't add multipolygons with an unknown type
 		if (typeUse.size() == 0)
@@ -219,10 +219,12 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			}
 
 			// don't use the relation ids. Create new onesgetInnerRings
-			createMultipolygonObject(e.getModifiableTags(), out, innerWays, GENERATE_OBJ_ID --);
-			if(splitEntities != null) {
-				for(Map<String, String> tags : splitEntities) {
-					createMultipolygonObject(tags, out, innerWays, GENERATE_OBJ_ID --);
+			Map<String, String> stags  = splitEntities == null ? e.getModifiableTags() : splitEntities.get(0);
+			createMultipolygonObject(stags, out, innerWays, GENERATE_OBJ_ID --);
+			if (splitEntities != null) {
+				for (int i = 1; i < splitEntities.size(); i++) {
+					Map<String, String> tags = splitEntities.get(i);
+					createMultipolygonObject(tags, out, innerWays,	GENERATE_OBJ_ID--);
 				}
 			}
 		}
@@ -505,13 +507,15 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			// manipulate what kind of way to load
 			long originalId = e.getId();
 			long assignedId = e.getId();
-			List<Map<String, String>> splitTags = renderingTypes.splitTags(e.getModifiableTags(), EntityType.valueOf(e));
+			List<Map<String, String>> splitTags = renderingTypes.splitTags(e.getTags(), EntityType.valueOf(e));
+			Map<String, String> tags = splitTags == null ?  e.getModifiableTags() : splitTags.get(0);
 			for (int level = 0; level < mapZooms.size(); level++) {
-				processMainEntity(e, originalId, assignedId, level, e.getModifiableTags());
+				processMainEntity(e, originalId, assignedId, level, tags);
 			}
 			if (splitTags != null) {
-				assignedId = GENERATE_OBJ_ID--;
-				for (Map<String, String> stags : splitTags) {
+				for (int i = 1; i < splitTags.size(); i++) {
+					assignedId = GENERATE_OBJ_ID--;
+					Map<String, String> stags = splitTags.get(i);
 					for (int level = 0; level < mapZooms.size(); level++) {
 						processMainEntity(e, originalId, assignedId, level, stags);
 					}
