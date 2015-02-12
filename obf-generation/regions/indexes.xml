@@ -69,7 +69,22 @@
 <!--			<region  name="croatia"/>-->
 <!--		</regions>-->
 
-		<!-- NORTH EUROPE  [SOURCE: download.osmand.net] -->
+		<!-- EUROPE FROM CROATIA SERVER [SOURCE: data.osm-hr.org] -->
+		<regions siteToDownload="http://data.osm-hr.org/osm/{0}.osm.pbf" region_prefix="" skip="false" region_suffix="_Europe">
+			<region name="albania"/>
+			<region name="bosnia-herzegovina"/>
+			<region name="bulgaria"/>
+			<region name="croatia"/>
+			<region name="hungary"/>
+			<region name="kosovo"/>
+			<region name="macedonia"/>
+			<region name="montenegro"/>
+			<region name="romania"/>
+			<region name="serbia"/>
+			<region name="slovenia"/>
+		</regions>
+
+		<!-- NORTH EUROPE [SOURCE: download.osmand.net] -->
 		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" skip="false" region_suffix="_Europe">
 			<region name="denmark"/>
 			<region name="estonia"/>
@@ -85,12 +100,12 @@
 		<!-- EAST EUROPE  [SOURCE: download.osmand.net] -->
 		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" skip="false" region_suffix="_Europe">
 			<region name="belarus"/>
-			<region name="bulgaria"/>
+<!--		<region name="bulgaria"/> -->
 			<region name="czech-republic"/>
-			<region name="hungary"/>
+<!--		<region name="hungary"/> -->
 			<region name="moldova"/>
 			<region name="poland"/>
-			<region name="romania"/>
+<!--		<region name="romania"/> -->
 			<region name="slovakia"/>
 			<region name="transnistria"/>
 			<region name="ukraine"/>
@@ -98,21 +113,21 @@
 
 		<!-- SOUTH EUROPE  [SOURCE: download.osmand.net] -->
 		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" skip="false" region_suffix="_Europe">
-			<region name="albania"/>
+<!-- 		<region name="albania"/> -->
 			<region name="andorra"/>
-			<region name="bosnia-herzegovina"/>
-			<region name="croatia"/>
+<!-- 		<region name="bosnia-herzegovina"/> -->
+<!--		<region name="croatia"/> -->
 			<region name="cyprus"/>
-			<region name="greece"/>
-			<region name="kosovo"/>
+			<region name="greece"/> -->
+<!--		<region name="kosovo"/> -->
 			<region name="italy"/>
-			<region name="macedonia"/>
+<!-- 		<region name="macedonia"/> -->
 			<region name="malta"/>
-			<region name="montenegro"/>
+<!-- 		<region name="montenegro"/> -->
 			<region name="portugal"/>
 			<region name="san-marino"/>
-			<region name="serbia"/>
-			<region name="slovenia"/>
+<!-- 		<region name="serbia"/> -->
+<!-- 		<region name="slovenia"/> -->
 			<region name="spain"/>
 			<region name="turkey"/>
 <!--			<region name="vatican-city"/>-->
