@@ -98,6 +98,7 @@
 
 		<!-- SOUTH EUROPE  [SOURCE: download.osmand.net] -->
 		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" skip="false" region_suffix="_Europe">
+			<region name="azores"/>
 			<region name="albania"/>
 			<region name="andorra"/>
 			<region name="bosnia-herzegovina"/>
@@ -121,7 +122,6 @@
 		<!-- WEST EUROPE  [SOURCE: download.osmand.net] -->
 		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" skip="false" region_suffix="_Europe">
 			<region name="austria"/>
-			<region name="azores"/>
 			<region name="belgium"/>
 			<region name="liechtenstein"/>
 			<region name="luxembourg"/>
