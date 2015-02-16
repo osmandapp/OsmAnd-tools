@@ -96,8 +96,11 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				// do not add that check because it is too much printing for batch creation
 				// by statistic < 1% creates maps manually
 				// checkEntity(e);
-				EntityParser.parseMapObject(a, e, e instanceof Relation? GENERATE_OBJ_ID-- : e.getId());
+				EntityParser.parseMapObject(a, e);
 				if (a.getLocation() != null) {
+					if(e instanceof Relation) {
+						a.setId(GENERATE_OBJ_ID -- );
+					}
 					// do not convert english name
 					// convertEnglishName(a);
 					if(e instanceof Relation) {
