@@ -308,14 +308,10 @@ int main(int argc, char** argv)
     */
 
     favorites.reset(new OsmAnd::FavoriteLocationsGpxCollection());
-    /*if (favorites->loadFrom(QLatin1String("d:\\OpenSource\\OsmAnd\\favorites.gpx")))
-    {
-        favoritesPresenter.reset(new OsmAnd::FavoriteLocationsPresenter(favorites));
-        renderer->addSymbolsProvider(favoritesPresenter);
-    }
-    else
-        favorites.reset();*/
-    
+    favoritesPresenter.reset(new OsmAnd::FavoriteLocationsPresenter(favorites));
+    renderer->addSymbolsProvider(favoritesPresenter);
+    //favorites->loadFrom(QLatin1String("d:\\OpenSource\\OsmAnd\\favorites.gpx"));
+
     //////////////////////////////////////////////////////////////////////////
 
     /*QList< std::shared_ptr<const OsmAnd::GeoInfoDocument> > geoInfoDocs;
@@ -609,11 +605,6 @@ void mouseHandler(int button, int state, int x, int y)
 
             renderer->getLocationFromScreenPoint(OsmAnd::PointI(x, y), lastClickedLocation31);
 
-            if (lastClickedLocationMarker)
-                lastClickedLocationMarker->setPosition(lastClickedLocation31);
-            if (favorites)
-                favorites->createFavoriteLocation(lastClickedLocation31);
-
             if (modifiers & GLUT_ACTIVE_CTRL)
             {
                 animator->pause();
@@ -621,6 +612,16 @@ void mouseHandler(int button, int state, int x, int y)
                 //animator->animateTargetTo(lastClickedLocation31, 1.0f, OsmAnd::MapAnimator::TimingFunction::EaseInOutQuadratic);
                 animator->parabolicAnimateTargetTo(lastClickedLocation31, 1.0f, OsmAnd::MapAnimator::TimingFunction::EaseInOutQuadratic, OsmAnd::MapAnimator::TimingFunction::EaseOutInQuadratic);
                 animator->resume();
+            }
+            else if (modifiers & GLUT_ACTIVE_SHIFT)
+            {
+                if (favorites)
+                    favorites->createFavoriteLocation(lastClickedLocation31);
+            }
+            else if (modifiers & GLUT_ACTIVE_ALT)
+            {
+                if (lastClickedLocationMarker)
+                    lastClickedLocationMarker->setPosition(lastClickedLocation31);
             }
 
             // Road:
@@ -941,6 +942,13 @@ void keyboardHandler(unsigned char key, int x, int y)
         else
             while (!renderer->suspendGpuWorker());
         break;
+    case '\\':
+    {
+        auto settings = renderer->getDebugSettings();
+        settings->mapLayersBatchingForbidden = !settings->mapLayersBatchingForbidden;
+        renderer->setDebugSettings(settings);
+        break;
+    }
     case ' ':
     {
         const OsmAnd::PointI amsterdam(
@@ -1010,7 +1018,7 @@ void specialHandler(int key, int x, int y)
 
 void closeHandler(void)
 {
-    renderer->releaseRendering();
+    renderer->releaseRendering(true);
 }
 
 void activateProvider(int layerIdx, int idx)
@@ -1021,7 +1029,7 @@ void activateProvider(int layerIdx, int idx)
     }
     else if (idx == 1)
     {
-        auto tileProvider = OsmAnd::OnlineTileSources::getBuiltIn()->createProviderFor(QLatin1String("Mapnik (OsmAnd)"));
+        auto tileProvider = OsmAnd::OnlineTileSources::getBuiltIn()->createProviderFor(OsmAnd::OnlineTileSources::BuiltInOsmAndSD);
         renderer->setMapLayerProvider(layerIdx, tileProvider);
     }
     else if (idx == 2)
@@ -1206,7 +1214,7 @@ void displayHandler()
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
         auto w = 390;
-        auto h1 = 16 * 21;
+        auto h1 = 16 * 22;
         auto t = viewport.height();
         glColor4f(0.5f, 0.5f, 0.5f, 0.6f);
         glBegin(GL_QUADS);
@@ -1320,6 +1328,11 @@ void displayHandler()
         glRasterPos2f(8, t - 16 * 20);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("GPU worker paused (])  : %1").arg(renderer->isGpuWorkerPaused())));
+        verifyOpenGL();
+
+        glRasterPos2f(8, t - 16 * 21);
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
+            QString("Raster batching on (\\) : %1").arg(renderer->getDebugSettings()->mapLayersBatchingForbidden)));
         verifyOpenGL();
 
         glColor4f(0.5f, 0.5f, 0.5f, 0.6f);

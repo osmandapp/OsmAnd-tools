@@ -9,5 +9,5 @@ fi
 SRCLOC="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source "$SRCLOC/../../../../build/utils/functions.sh"
 
-prepareUpstreamFromTarArchive "$SRCLOC" "http://prdownloads.sourceforge.net/freeglut/freeglut-2.8.1.tar.gz?download"
+prepareUpstreamFromTarArchive "$SRCLOC" "http://builder.osmand.net/dependencies-mirror/freeglut-2.8.1.tar.gz"
 patchUpstream "$SRCLOC"
