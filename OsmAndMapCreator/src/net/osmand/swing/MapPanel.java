@@ -368,7 +368,8 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 	}
 	
 	public double getTileSize(){
-		return (map == null ?  256 : map.getTileSize()) * mapDensity;
+//		return (map == null ?  256 : map.getTileSize()) * mapDensity;
+		return 256 * mapDensity;
 	}
 	
 	

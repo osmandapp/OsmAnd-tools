@@ -29,6 +29,7 @@ import net.osmand.binary.BinaryMapPoiReaderAdapter;
 import net.osmand.data.Amenity;
 import net.osmand.data.AmenityType;
 import net.osmand.impl.ConsoleProgressImplementation;
+import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.MapRenderingTypes;
 import net.osmand.osm.MapRenderingTypes.MapRulType;
 import net.osmand.osm.edit.Entity;
@@ -64,9 +65,11 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	private Map<EntityId, Map<String, String>> propogatedTags = new LinkedHashMap<Entity.EntityId, Map<String, String>>();
 
 	private final MapRenderingTypes renderingTypes;
+	private MapPoiTypes poiTypes;
 
 	public IndexPoiCreator(MapRenderingTypes renderingTypes) {
 		this.renderingTypes = renderingTypes;
+		this.poiTypes = MapPoiTypes.getDefault();
 	}
 
 	public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
@@ -83,13 +86,13 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			}
 		}
 		boolean privateReg = "private".equals(e.getTag("access")); 
-		tempAmenityList = EntityParser.parseAmenities(renderingTypes, e, tempAmenityList);
+		tempAmenityList = EntityParser.parseAmenities(renderingTypes, poiTypes, e, tempAmenityList);
 		if (!tempAmenityList.isEmpty() && poiPreparedStatement != null) {
 			if(e instanceof Relation) {
 				ctx.loadEntityRelation((Relation) e);
 			}
 			for (Amenity a : tempAmenityList) {
-				if(a.getType() == AmenityType.LEISURE && privateReg) {
+				if(a.getType().getKey().equals("leisure") && privateReg) {
 					// don't index private swimming pools 
 					continue;
 				}
@@ -171,7 +174,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		poiPreparedStatement.setLong(1, amenity.getId());
 		poiPreparedStatement.setInt(2, MapUtils.get31TileNumberX(amenity.getLocation().getLongitude()));
 		poiPreparedStatement.setInt(3, MapUtils.get31TileNumberY(amenity.getLocation().getLatitude()));
-		poiPreparedStatement.setString(4, AmenityType.valueToString(amenity.getType()));
+		poiPreparedStatement.setString(4, amenity.getType().getKey());
 		poiPreparedStatement.setString(5, amenity.getSubType());
 		poiPreparedStatement.setString(6, encodeAdditionalInfo(amenity.getAdditionalInfo(), amenity.getName(), amenity.getEnName()));
 		addBatch(poiPreparedStatement);
