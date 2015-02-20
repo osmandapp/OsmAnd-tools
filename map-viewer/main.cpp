@@ -314,10 +314,10 @@ int main(int argc, char** argv)
 
     //////////////////////////////////////////////////////////////////////////
 
-    /*QList< std::shared_ptr<const OsmAnd::GeoInfoDocument> > geoInfoDocs;
-    if (QFile::exists(QLatin1String("osmand.gpx")))
-        geoInfoDocs.append(OsmAnd::GpxDocument::loadFrom("osmand.gpx"));
-    gpxPresenter.reset(new OsmAnd::GeoInfoPresenter(geoInfoDocs));*/
+    QList< std::shared_ptr<const OsmAnd::GeoInfoDocument> > geoInfoDocs;
+    if (QFile::exists(QLatin1String("track.gpx")))
+        geoInfoDocs.append(OsmAnd::GpxDocument::loadFrom("track.gpx"));
+    gpxPresenter.reset(new OsmAnd::GeoInfoPresenter(geoInfoDocs));
     
     //////////////////////////////////////////////////////////////////////////
 
