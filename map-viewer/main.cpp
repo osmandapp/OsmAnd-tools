@@ -686,8 +686,9 @@ void mouseMotion(int x, int y)
         auto nx = deltaX * cosAngle - deltaY * sinAngle;
         auto ny = deltaX * sinAngle + deltaY * cosAngle;
 
-        const auto tileSize31 = (1u << (31 - state.zoomBase));
-        auto scale31 = static_cast<double>(tileSize31) / std::dynamic_pointer_cast<OsmAnd::IAtlasMapRenderer>(renderer)->getCurrentTileSizeOnScreenInPixels();
+        const auto tileSize31 = (1u << (31 - state.zoomLevel));
+        auto scale31 = static_cast<double>(tileSize31) /
+            std::dynamic_pointer_cast<OsmAnd::IAtlasMapRenderer>(renderer)->getCurrentTileSizeOnScreenInPixels();
 
         OsmAnd::PointI newTarget;
         newTarget.x = dragInitTarget.x - static_cast<int32_t>(nx * scale31);
@@ -702,16 +703,34 @@ void mouseMotion(int x, int y)
 void mouseWheelHandler(int button, int dir, int x, int y)
 {
     const auto modifiers = glutGetModifiers();
-    const auto step = (modifiers & GLUT_ACTIVE_SHIFT) ? 0.1f : 0.01f;
-    const auto state = renderer->getState();
-
-    if (dir > 0)
+    if (modifiers & GLUT_ACTIVE_ALT)
     {
-        renderer->setZoom(state.requestedZoom + step);
+        const auto step = (modifiers & GLUT_ACTIVE_SHIFT) ? 1.0f : 0.1f;
+        const auto state = renderer->getState();
+
+        if (dir > 0)
+        {
+            renderer->setVisualZoomShift(state.visualZoomShift + step);
+        }
+        else
+        {
+            renderer->setVisualZoomShift(state.visualZoomShift - step);
+        }
     }
     else
     {
-        renderer->setZoom(state.requestedZoom - step);
+        const auto step = (modifiers & GLUT_ACTIVE_SHIFT) ? 0.1f : 0.01f;
+        const auto state = renderer->getState();
+
+        const auto zoom = state.zoomLevel + (state.visualZoom >= 1.0f ? state.visualZoom - 1.0f : (state.visualZoom - 1.0f) * 2.0f);
+        if (dir > 0)
+        {
+            renderer->setZoom(zoom + step);
+        }
+        else
+        {
+            renderer->setZoom(zoom - step);
+        }
     }
 }
 
@@ -719,7 +738,8 @@ void keyboardHandler(unsigned char key, int x, int y)
 {
     const auto modifiers = glutGetModifiers();
     const auto state = renderer->getState();
-    const auto wasdZoom = static_cast<int>(state.requestedZoom);
+    const auto wasdZoom = static_cast<int>(
+        state.zoomLevel + (state.visualZoom >= 1.0f ? state.visualZoom - 1.0f : (state.visualZoom - 1.0f) * 2.0f));
     const auto wasdStep = (1 << (31 - wasdZoom));
 
     switch (key)
@@ -1257,17 +1277,17 @@ void displayHandler()
 
         glRasterPos2f(8, t - 16 * 6);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("zoom (mouse wheel)     : %1").arg(state.requestedZoom)));
+            QString("zoom (mouse wheel)     : %1").arg(state.zoomLevel + (state.visualZoom >= 1.0f ? state.visualZoom - 1.0f : (state.visualZoom - 1.0f) * 2.0f))));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * 7);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("zoom base              : %1").arg(state.zoomBase)));
+            QString("zoom level             : %1").arg(state.zoomLevel)));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * 8);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("zoom fraction          : %1").arg(state.zoomFraction)));
+            QString("visual zoom (+ shift)  : %1 + %2").arg(state.visualZoom).arg(state.visualZoomShift)));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * 9);
@@ -1351,7 +1371,7 @@ void displayHandler()
 #endif
         glRasterPos2f(8, 16 * 12);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("Last clicked tile: (%1, %2)@%3").arg(lastClickedLocation31.x >> (31 - state.zoomBase)).arg(lastClickedLocation31.y >> (31 - state.zoomBase)).arg(state.zoomBase)));
+            QString("Last clicked tile: (%1, %2)@%3").arg(lastClickedLocation31.x >> (31 - state.zoomLevel)).arg(lastClickedLocation31.y >> (31 - state.zoomLevel)).arg(state.zoomLevel)));
         verifyOpenGL();
 
         glRasterPos2f(8, 16 * 11);
