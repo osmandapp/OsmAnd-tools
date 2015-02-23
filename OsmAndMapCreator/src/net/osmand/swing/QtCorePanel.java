@@ -280,7 +280,7 @@ public class QtCorePanel implements GLEventListener {
 		String filesDir = DataExtractionSettings.getSettings().getBinaryFilesDir();
 		obfsCollection.addDirectory(filesDir, false);
 		MapPresentationEnvironment mapPresentationEnvironment = new MapPresentationEnvironment(mapStyle,
-				options.density, options.getLocaleLanguageId(), options.getLanguagePreference());
+				options.density, 1.0f, 1.0f, options.getLocaleLanguageId(), options.getLanguagePreference());
 		referenceTileSize = 256 * options.density;
 		int rasterTileSize = Integer.highestOneBit((int) referenceTileSize - 1) * 2;
 		mapPresentationEnvironment.setSettings(options.getStyleSettings());
