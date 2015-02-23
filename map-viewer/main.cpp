@@ -121,6 +121,7 @@ bool constantRefresh = false;
 bool nSight = false;
 bool gDEBugger = false;
 const float density = 1.0f;
+const float mapScale = 1.0f;
 const float symbolsScale = 1.0f;
 
 bool renderWireframe = false;
@@ -401,7 +402,7 @@ int main(int argc, char** argv)
     //////////////////////////////////////////////////////////////////////////
 
     roadLocator.reset(new OsmAnd::RoadLocator(obfsCollection));
-    mapPresentationEnvironment.reset(new OsmAnd::MapPresentationEnvironment(style, density, "ru"));
+    mapPresentationEnvironment.reset(new OsmAnd::MapPresentationEnvironment(style, density, mapScale, symbolsScale, "ru"));
     primitivizer.reset(new OsmAnd::MapPrimitiviser(mapPresentationEnvironment));
 
     OsmAnd::MapRendererSetupOptions rendererSetup;
@@ -924,7 +925,7 @@ void keyboardHandler(unsigned char key, int x, int y)
                 binaryMapObjectsProvider.reset(new OsmAnd::ObfMapObjectsProvider(obfsCollection, obfMapObjectsProviderMode));
             mapPrimitivesProvider.reset(new OsmAnd::MapPrimitivesProvider(binaryMapObjectsProvider, primitivizer));
 
-            mapObjectsSymbolsProvider.reset(new OsmAnd::MapObjectsSymbolsProvider(mapPrimitivesProvider, 256u, symbolsScale));
+            mapObjectsSymbolsProvider.reset(new OsmAnd::MapObjectsSymbolsProvider(mapPrimitivesProvider, 256u));
             renderer->addSymbolsProvider(mapObjectsSymbolsProvider);
         }
     }
@@ -1081,7 +1082,7 @@ void activateProvider(int layerIdx, int idx)
             auto tileProvider = new OsmAnd::MapRasterLayerProvider_Software(gpxPrimitivesProvider, false);
             renderer->setMapLayerProvider(10, std::shared_ptr<OsmAnd::IMapLayerProvider>(tileProvider));
 
-            mapObjectsSymbolsProvider.reset(new OsmAnd::MapObjectsSymbolsProvider(gpxPrimitivesProvider, 256u, symbolsScale));
+            mapObjectsSymbolsProvider.reset(new OsmAnd::MapObjectsSymbolsProvider(gpxPrimitivesProvider, 256u));
             renderer->addSymbolsProvider(mapObjectsSymbolsProvider);
         }
         //
