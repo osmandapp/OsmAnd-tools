@@ -280,7 +280,8 @@ public class QtCorePanel implements GLEventListener {
 		String filesDir = DataExtractionSettings.getSettings().getBinaryFilesDir();
 		obfsCollection.addDirectory(filesDir, false);
 		MapPresentationEnvironment mapPresentationEnvironment = new MapPresentationEnvironment(mapStyle,
-				options.density, 1.0f, 1.0f, options.getLocaleLanguageId(), options.getLanguagePreference());
+				options.density, 1.0f, options.symbolsScale / options.density, options.getLocaleLanguageId(),
+				options.getLanguagePreference());
 		referenceTileSize = 256 * options.density;
 		int rasterTileSize = Integer.highestOneBit((int) referenceTileSize - 1) * 2;
 		mapPresentationEnvironment.setSettings(options.getStyleSettings());
@@ -289,7 +290,7 @@ public class QtCorePanel implements GLEventListener {
 		MapPrimitivesProvider mapPrimitivesProvider = new MapPrimitivesProvider(
 				obfMapObjectsProvider, mapPrimitiviser, rasterTileSize);
 		MapObjectsSymbolsProvider mapObjectsSymbolsProvider = new MapObjectsSymbolsProvider(
-				mapPrimitivesProvider, rasterTileSize, options.symbolsScale / options.density);
+				mapPrimitivesProvider, rasterTileSize);
 		MapRasterLayerProvider_Software mapRasterLayerProvider = new MapRasterLayerProvider_Software(
 				mapPrimitivesProvider);
 
