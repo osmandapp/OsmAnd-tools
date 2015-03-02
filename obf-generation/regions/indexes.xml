@@ -745,7 +745,7 @@
 			<region name="bangladesh" downloadName="bangladesh-latest"/>
 			<region name="china" downloadName="china-latest"/>
 			<!-- <region name="gcc-states" downloadName="gcc-states-latest"/> -->
-			<region name="india" downloadName="india-latest"/>
+<!--			<region name="india" downloadName="india-latest"/>-->
 			<region name="indonesia" downloadName="indonesia-latest"/>
 			<region name="iran" downloadName="iran-latest"/>
 			<region name="iraq" downloadName="iraq-latest"/>
@@ -814,8 +814,9 @@
 			<region name="british-indian-ocean-territory"/>
 			<region name="maldives"/>
 			<region name="nepal"/>
+			<region name="india"/>
 			<region name="sri-lanka"/>
-		</regions>		
+		</regions>
 
 		<!-- 6.8 WESTERN ASIA [SOURCE: OSMAND:NET] -->
 		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" region_suffix="_Asia" skip="false">
