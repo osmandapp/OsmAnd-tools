@@ -491,9 +491,9 @@ int main(int argc, char** argv)
     //renderer->setZoom(4.0f);
 
     renderer->setTarget(OsmAnd::Utilities::convertLatLonTo31(OsmAnd::LatLon(
-        55.75369,
-        37.62030)));
-    renderer->setZoom(19.0f);
+        55.718666,37.717857201
+        )));
+    renderer->setZoom(17.0f);
 
     //// Kiev
     //renderer->setTarget(OsmAnd::PointI(
@@ -1050,7 +1050,7 @@ void activateProvider(int layerIdx, int idx)
     }
     else if (idx == 1)
     {
-        auto tileProvider = OsmAnd::OnlineTileSources::getBuiltIn()->createProviderFor(OsmAnd::OnlineTileSources::BuiltInOsmAndSD);
+        auto tileProvider = OsmAnd::OnlineTileSources::getBuiltIn()->createProviderFor(OsmAnd::OnlineTileSources::BuiltInOsmAndHD);
         renderer->setMapLayerProvider(layerIdx, tileProvider);
     }
     else if (idx == 2)

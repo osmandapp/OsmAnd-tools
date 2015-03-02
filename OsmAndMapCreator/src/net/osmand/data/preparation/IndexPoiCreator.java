@@ -106,9 +106,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					}
 					// do not convert english name
 					// convertEnglishName(a);
-					if(e instanceof Relation) {
-						System.out.println(a.getId() + " " + a.getType() + " " + a.getSubType() + " " + e.getId());
-					}
 					insertAmenityIntoPoi(a);
 				}
 			}
