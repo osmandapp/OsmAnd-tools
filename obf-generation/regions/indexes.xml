@@ -866,7 +866,7 @@
 			<region name="congo-democratic-republic" downloadName="congo-democratic-republic-latest"/>
 			<region name="egypt" downloadName="egypt-latest"/>
 			<region name="ethiopia" downloadName="ethiopia-latest"/>
-			<region name="guinea" downloadName="guinea-latest"/>
+<!--			<region name="guinea" downloadName="guinea-latest"/>-->
 			<region name="guinea-bissau" downloadName="guinea-bissau-latest"/>
 			<region name="ivory-coast" downloadName="ivory-coast-latest"/>
 			<region name="liberia" downloadName="liberia-latest"/>
