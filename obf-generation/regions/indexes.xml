@@ -161,21 +161,17 @@
 			<region name="corse"/>
 			<region name="franche-comte"/>
 			<region name="guadeloupe"/>
-			<region name="guyane"/>
 			<region name="haute-normandie"/>
 			<region name="ile-de-france"/>
 			<region name="languedoc-roussillon"/>
 			<region name="limousin"/>
 			<region name="lorraine"/>
-			<region name="martinique"/>
-			<region name="mayotte"/>
 			<region name="midi-pyrenees"/>
 			<region name="nord-pas-de-calais"/>
 			<region name="pays-de-la-loire"/>
 			<region name="picardie"/>
 			<region name="poitou-charentes"/>
 			<region name="provence-alpes-cote-d-azur"/>
-			<region name="reunion"/>
 			<region name="rhone-alpes"/>
 		</regions>
 		<!--
@@ -678,6 +674,7 @@
 		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" skip="false" region_suffix="_SouthAmerica">
 			<region name="falkland-islands"/>
 			<region name="guyana"/>
+			<region name="guyane"/>
 			<region name="paraguay"/>
 			<region name="south-georgia-and-south-sandwich-islands"/>
 			<region name="suriname"/>
@@ -783,14 +780,14 @@
 
 		<!-- 6.5 JAPAN [SOURCE: OSMAND:NET] -->
 		<regions siteToDownload="http://download.osmand.net/osm-downloads/Japan-{0}.pbf" region_prefix="Japan_" skip="false" region_suffix="_Asia">
-		 	<region  name="chubu"/>
-		 	<region  name="chugoku"/>
-		 	<region  name="hokkaido"/>
-		 	<region  name="kanto"/>
-		 	<region  name="kinki"/>
-		 	<region  name="kyushu"/>
-		 	<region  name="shikoku"/>
-		 	<region  name="tohoku"/>
+		 	<region name="chubu"/>
+		 	<region name="chugoku"/>
+		 	<region name="hokkaido"/>
+		 	<region name="kanto"/>
+		 	<region name="kinki"/>
+		 	<region name="kyushu"/>
+		 	<region name="shikoku"/>
+		 	<region name="tohoku"/>
 		</regions>
 
 		<!-- 6.6 SOUTH-EASTERN ASIA [SOURCE: OSMAND:NET] -->
@@ -905,9 +902,11 @@
 			<region name="mali"/>
 			<region name="mauritania"/>
 			<region name="mauritius"/>
+			<region name="mayotte"/>
 			<region name="mozambique"/>
 			<region name="namibia"/>
 			<region name="niger"/>
+			<region name="reunion"/>
 			<region name="rwanda"/>
 			<region name="saint-helena-ascension-and-tristan-da-cunha"/>
 			<region name="sao-tome-and-principe"/>
