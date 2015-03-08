@@ -215,7 +215,7 @@ public class OsmAndImageRendering {
 			if(maps.isEmpty()) {
                 throw new UnsupportedOperationException("No maps element found for wpt "+ name);
             }
-			NativeSwingRendering nsr = nativeLib != null ? new NativeSwingRendering(false) : null;
+			NativeSwingRendering nsr = nativeLib != null ? new NativeSwingRendering() : null;
 //			nsr.initFilesInDir(new File(dirWithObf));
 			ArrayList<File> obfFiles = new ArrayList<File>();
 			initMaps(dirWithObf, backup, gpxFile, maps, nsr, obfFiles);

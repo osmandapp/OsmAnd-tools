@@ -122,20 +122,18 @@ public class NativeSwingRendering extends NativeLibrary {
 		initRenderingRulesStorage(storage);
 	}
 	
-	public NativeSwingRendering(boolean newLibrary){
-        super(newLibrary);
-        if (!newLibrary) {
-            try {
-                loadRuleStorage(null, "");
-            } catch (SAXException e) {
-                throw new RuntimeException(e);
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            } catch (XmlPullParserException e) {
-                throw new RuntimeException(e);
-            }
-        }
-    }
+	public NativeSwingRendering() {
+		super();
+		try {
+			loadRuleStorage(null, "");
+		} catch (SAXException e) {
+			throw new RuntimeException(e);
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		} catch (XmlPullParserException e) {
+			throw new RuntimeException(e);
+		}
+	}
 	
 	
 	
@@ -311,15 +309,10 @@ public class NativeSwingRendering extends NativeLibrary {
 			filename = null;
 		}
 		boolean loaded;
-        boolean newLib = (!f.isFile() || f.getName().contains("JNI")) && f.exists();
         String path =  filename == null ? null : f.getParentFile().getAbsolutePath();
-		if(!newLib){
-			loaded = NativeLibrary.loadOldLib(path);
-		} else {
-			loaded = NativeLibrary.loadNewLib(path);
-		}
+		loaded = NativeLibrary.loadOldLib(path);
 		if (loaded) {
-			defaultLoadedLibrary = new NativeSwingRendering(newLib);
+			defaultLoadedLibrary = new NativeSwingRendering();
 			defaultLoadedLibrary.initFilesInDir(new File(DataExtractionSettings.getSettings().getBinaryFilesDir()));
 			loadFontData("fonts");
 		}
