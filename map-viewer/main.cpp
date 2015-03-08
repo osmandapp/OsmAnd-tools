@@ -643,11 +643,13 @@ void mouseHandler(int button, int state, int x, int y)
             }
 
             // Map symbol
-            const auto mapSymbols = renderer->getSymbolsAt(OsmAnd::PointI(x, y));
-            if (mapSymbols.isEmpty())
+            const auto mapSymbolInfos = renderer->getSymbolsAt(OsmAnd::PointI(x, y));
+            if (mapSymbolInfos.isEmpty())
                 OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, "No symbols found!");
-            for (const auto& mapSymbol : constOf(mapSymbols))
+            for (const auto& mapSymbolInfo : constOf(mapSymbolInfos))
             {
+                const auto& mapSymbol = mapSymbolInfo.mapSymbol;
+
                 OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, "Clicked on map symbol %p", mapSymbol.get());
                 if (const auto rasterMapSymbol = std::dynamic_pointer_cast<const OsmAnd::RasterMapSymbol>(mapSymbol))
                 {

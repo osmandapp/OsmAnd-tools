@@ -161,21 +161,17 @@
 			<region name="corse"/>
 			<region name="franche-comte"/>
 			<region name="guadeloupe"/>
-			<region name="guyane"/>
 			<region name="haute-normandie"/>
 			<region name="ile-de-france"/>
 			<region name="languedoc-roussillon"/>
 			<region name="limousin"/>
 			<region name="lorraine"/>
-			<region name="martinique"/>
-			<region name="mayotte"/>
 			<region name="midi-pyrenees"/>
 			<region name="nord-pas-de-calais"/>
 			<region name="pays-de-la-loire"/>
 			<region name="picardie"/>
 			<region name="poitou-charentes"/>
 			<region name="provence-alpes-cote-d-azur"/>
-			<region name="reunion"/>
 			<region name="rhone-alpes"/>
 		</regions>
 		<!--
@@ -678,6 +674,7 @@
 		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" skip="false" region_suffix="_SouthAmerica">
 			<region name="falkland-islands"/>
 			<region name="guyana"/>
+			<region name="guyane"/>
 			<region name="paraguay"/>
 			<region name="south-georgia-and-south-sandwich-islands"/>
 			<region name="suriname"/>
@@ -745,13 +742,13 @@
 			<region name="bangladesh" downloadName="bangladesh-latest"/>
 			<region name="china" downloadName="china-latest"/>
 			<!-- <region name="gcc-states" downloadName="gcc-states-latest"/> -->
-			<region name="india" downloadName="india-latest"/>
+<!--			<region name="india" downloadName="india-latest"/>-->
 			<region name="indonesia" downloadName="indonesia-latest"/>
 			<region name="iran" downloadName="iran-latest"/>
 			<region name="iraq" downloadName="iraq-latest"/>
 			<!-- <region name="israel-and-palestine" downloadName="israel-and-palestine-latest"/> -->
 <!--			<region name="japan" downloadName="japan-latest"/>-->
-			<region name="jordan" downloadName="jordan-latest"/>
+<!--			<region name="jordan" downloadName="jordan-latest"/>-->
 			<region name="kazakhstan" downloadName="kazakhstan-latest"/>
 			<region name="kyrgyzstan" downloadName="kyrgyzstan-latest"/>
 			<!-- <region name="malaysia-singapore-brunei" downloadName="malaysia-singapore-brunei-latest"/> -->
@@ -783,14 +780,14 @@
 
 		<!-- 6.5 JAPAN [SOURCE: OSMAND:NET] -->
 		<regions siteToDownload="http://download.osmand.net/osm-downloads/Japan-{0}.pbf" region_prefix="Japan_" skip="false" region_suffix="_Asia">
-		 	<region  name="chubu"/>
-		 	<region  name="chugoku"/>
-		 	<region  name="hokkaido"/>
-		 	<region  name="kanto"/>
-		 	<region  name="kinki"/>
-		 	<region  name="kyushu"/>
-		 	<region  name="shikoku"/>
-		 	<region  name="tohoku"/>
+		 	<region name="chubu"/>
+		 	<region name="chugoku"/>
+		 	<region name="hokkaido"/>
+		 	<region name="kanto"/>
+		 	<region name="kinki"/>
+		 	<region name="kyushu"/>
+		 	<region name="shikoku"/>
+		 	<region name="tohoku"/>
 		</regions>
 
 		<!-- 6.6 SOUTH-EASTERN ASIA [SOURCE: OSMAND:NET] -->
@@ -814,8 +811,9 @@
 			<region name="british-indian-ocean-territory"/>
 			<region name="maldives"/>
 			<region name="nepal"/>
+			<region name="india"/>
 			<region name="sri-lanka"/>
-		</regions>		
+		</regions>
 
 		<!-- 6.8 WESTERN ASIA [SOURCE: OSMAND:NET] -->
 		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" region_suffix="_Asia" skip="false">
@@ -865,7 +863,7 @@
 			<region name="congo-democratic-republic" downloadName="congo-democratic-republic-latest"/>
 			<region name="egypt" downloadName="egypt-latest"/>
 			<region name="ethiopia" downloadName="ethiopia-latest"/>
-			<region name="guinea" downloadName="guinea-latest"/>
+<!--			<region name="guinea" downloadName="guinea-latest"/>-->
 			<region name="guinea-bissau" downloadName="guinea-bissau-latest"/>
 			<region name="ivory-coast" downloadName="ivory-coast-latest"/>
 			<region name="liberia" downloadName="liberia-latest"/>
@@ -904,9 +902,11 @@
 			<region name="mali"/>
 			<region name="mauritania"/>
 			<region name="mauritius"/>
+			<region name="mayotte"/>
 			<region name="mozambique"/>
 			<region name="namibia"/>
 			<region name="niger"/>
+			<region name="reunion"/>
 			<region name="rwanda"/>
 			<region name="saint-helena-ascension-and-tristan-da-cunha"/>
 			<region name="sao-tome-and-principe"/>
@@ -925,6 +925,6 @@
 		</regions>
 		<!-- 9 SPECIAL MAPS -->
 		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.osm.bz2" region_prefix="" skip="false" region_suffix="">
-		 	<region name="World_basemap_seamarks" index="map,poi" downloadName="World_basemap_seamarks"/>
+		 	<region name="World_seamarks_basemap" index="map,poi" downloadName="World_seamarks_basemap"/>
 		</regions>
 </regions_list> 
