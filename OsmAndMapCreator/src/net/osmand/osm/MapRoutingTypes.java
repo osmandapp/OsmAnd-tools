@@ -23,7 +23,7 @@ import org.apache.commons.logging.LogFactory;
 
 
 public class MapRoutingTypes {
-	private static final Log log = LogFactory.getLog(IndexCreator.class);
+	private static final Log log = LogFactory.getLog(MapRoutingTypes.class);
 	private static Set<String> TAGS_TO_SAVE = new HashSet<String>();
 	private static Set<String> TAGS_TO_ACCEPT = new HashSet<String>();
 	private static Map<String, String> TAGS_TO_REPLACE = new HashMap<String, String>();
