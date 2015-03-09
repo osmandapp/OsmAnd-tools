@@ -28,6 +28,18 @@ public class OceanTilesCreator {
     private static final byte LAND = 0x1;
 
 
+    /**
+     * @param args
+     * @throws IOException
+     * @throws XMLStreamException
+     * @throws SAXException
+     */
+    /**
+     * @param args
+     * @throws IOException
+     * @throws XMLStreamException
+     * @throws SAXException
+     */
     public static void main(String[] args) throws IOException, XMLStreamException, SAXException {
 
         BasemapProcessor bmp = new BasemapProcessor();
@@ -35,16 +47,20 @@ public class OceanTilesCreator {
         BasemapProcessor.SimplisticQuadTree quadTree = bmp.constructTilesQuadTree(11);
 //        int x = (int) MapUtils.getTileNumberX(11, 3.14424);
 //        int y = (int) MapUtils.getTileNumberY(11, 52.960808);
-        int x = (int) MapUtils.getTileNumberX(11, 3.417527);
-        int y = (int) MapUtils.getTileNumberY(11, 53.042625);
+//        int x = (int) MapUtils.getTileNumberX(11, 3.417527);
+//        int y = (int) MapUtils.getTileNumberY(11, 53.042625);
+        int x = (int) MapUtils.getTileNumberX(11, 41.45811);
+        int y = (int) MapUtils.getTileNumberY(11, 41.4537);
         System.out.println(x + " " + y);
+        System.out.println((x +1)<< 20);
+        System.out.println((y +1)<< 20);
 //        BasemapProcessor.SimplisticQuadTree ts = quadTree.getOrCreateSubTree(x, y, 11);
 //        System.out.println(ts.seaCharacteristic);
-//        System.out.println(bmp.getSeaTile(x, y, 11));
+        System.out.println(bmp.getSeaTile(x, y, 11));
 
 //        createTilesFile();
 
-        createJOSMFile(bmp);
+//        createJOSMFile(bmp);
     }
 
     static class OceanTileInfo {

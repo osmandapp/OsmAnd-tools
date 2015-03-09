@@ -108,6 +108,11 @@ QFileInfoList styleFiles;
 QString styleName = "default";
 
 #define USE_GREEN_TEXT_COLOR 1
+#define SCREEN_WIDTH 1024
+#define SCREEN_HEIGHT 760
+//#define SCREEN_WIDTH 256
+//#define SCREEN_HEIGHT 256
+
 
 #if defined(WIN32)
 const bool useGpuWorker = true;
@@ -157,6 +162,8 @@ int main(int argc, char** argv)
         return EXIT_FAILURE;
     }
     std::cout << "Initialized Core" << std::endl;
+    
+    OsmAnd::Logger::get()->setSeverityLevelThreshold(OsmAnd::LogSeverityLevel::Error);
     
     //////////////////////////////////////////////////////////////////////////
 
@@ -246,7 +253,7 @@ int main(int argc, char** argv)
         glutInit(&argc, argv);
 
         glutSetOption(GLUT_ACTION_ON_WINDOW_CLOSE, GLUT_ACTION_CONTINUE_EXECUTION);
-        glutInitWindowSize(1024, 768);
+        glutInitWindowSize(SCREEN_WIDTH, SCREEN_HEIGHT);
         glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA | GLUT_DEPTH);
         if (useSpecificOpenGL)
         {
@@ -445,16 +452,17 @@ int main(int argc, char** argv)
     renderer->setup(rendererSetup);
 
     const auto debugSettings = renderer->getDebugSettings();
-    //debugSettings->debugStageEnabled = true;
+    // debugSettings->debugStageEnabled = true;
     //debugSettings->excludeBillboardSymbolsFromProcessing = true;
     //debugSettings->excludeOnSurfaceSymbolsFromProcessing = true;
     //debugSettings->excludeOnPathSymbolsFromProcessing = true;
-    /*debugSettings->skipSymbolsMinDistanceToSameContentFromOtherSymbolCheck = true;
+//    debugSettings->skipSymbolsMinDistanceToSameContentFromOtherSymbolCheck = true;
+//    debugSettings->showSymbolsBBoxesRejectedByMinDistanceToSameContentFromOtherSymbolCheck = true;
+//    debugSettings->showSymbolsBBoxesRejectedByIntersectionCheck = true;
+//    debugSettings->showSymbolsBBoxesRejectedByPresentationMode = true;
+    /*
     debugSettings->skipSymbolsIntersectionCheck = true;
-    
-    debugSettings->showSymbolsBBoxesRejectedByMinDistanceToSameContentFromOtherSymbolCheck = true;
-    debugSettings->showSymbolsBBoxesRejectedByIntersectionCheck = true;
-    debugSettings->showSymbolsBBoxesRejectedByPresentationMode = true;*/
+    */
     //debugSettings->showSymbolsBBoxesAcceptedByIntersectionCheck = true;
     //debugSettings->skipSymbolsPresentationModeCheck = true;
     //debugSettings->showOnPathSymbolsRenderablesPaths = true;
@@ -467,9 +475,9 @@ int main(int argc, char** argv)
     
     viewport.top() = 0;
     viewport.left() = 0;
-    viewport.bottom() = 768;
-    viewport.right() = 1024;
-    renderer->setWindowSize(OsmAnd::PointI(1024, 768));
+    viewport.bottom() = SCREEN_HEIGHT;
+    viewport.right() = SCREEN_WIDTH;
+    renderer->setWindowSize(OsmAnd::PointI(SCREEN_WIDTH, SCREEN_HEIGHT));
     renderer->setViewport(viewport);
     /*renderer->setTarget(OsmAnd::PointI(
         OsmAnd::Utilities::get31TileNumberX(34.0062),
@@ -483,17 +491,18 @@ int main(int argc, char** argv)
     renderer->setElevationAngle(90.0f);
 
     // Amsterdam
-    renderer->setTarget(OsmAnd::PointI(
-        1102430866,
-        704978668));
-    renderer->setZoom(13.0f);
+//    renderer->setTarget(OsmAnd::PointI(
+//        1100178688,
+//        704925203));
+//    renderer->setZoom(12.0f);
+
     //renderer->setZoom(10.0f);
     //renderer->setZoom(4.0f);
 
-    renderer->setTarget(OsmAnd::Utilities::convertLatLonTo31(OsmAnd::LatLon(
-        55.718666,37.717857201
-        )));
-    renderer->setZoom(17.0f);
+//    renderer->setTarget(OsmAnd::Utilities::convertLatLonTo31(OsmAnd::LatLon(
+//41.45811, 41.4537
+//        )));
+//    renderer->setZoom(12.0f);
 
     //// Kiev
     //renderer->setTarget(OsmAnd::PointI(
@@ -503,10 +512,10 @@ int main(int argc, char** argv)
     //renderer->setZoom(16.0f);
 
     //// Bug
-    //renderer->setTarget(OsmAnd::Utilities::convertLatLonTo31(OsmAnd::LatLon(
-    //    55.7286,
-    //    37.6409)));
-    //renderer->setZoom(16.0f);
+    renderer->setTarget(OsmAnd::Utilities::convertLatLonTo31(OsmAnd::LatLon(
+        10.7999,
+        -64.409)));
+    renderer->setZoom(12.0f);
 
     //renderer->setTarget(OsmAnd::PointI(
     //    1102425455,

@@ -37,7 +37,7 @@ public class ResourceDeleter {
 	}
 	
 	public static void main(String[] args) throws SAXException, IOException, ParserConfigurationException, TransformerException {
-		File f = new File("/home/victor/projects/osmand/repo/android/OsmAnd/res");
+		File f = new File("/Users/victorshcherb/osmand/repos/android/OsmAnd/res");
 		Set<String> mainkeys = new LinkedHashSet<String>();
 		parseResources(new File(f, "values/strings.xml"), mainkeys);
 		File[] lf = f.listFiles();
