@@ -193,6 +193,7 @@ public class MapRoutingTypes {
 		names.clear();
 		for(Entry<String, String> es : e.getTags().entrySet()) {
 			String tag = es.getKey();
+			System.out.println(tag + " ");
 			String value = converBooleanValue(es.getValue());
 			if(!testNonParseableRules(tag, value)){
 				continue;
