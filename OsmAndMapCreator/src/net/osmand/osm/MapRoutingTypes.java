@@ -18,9 +18,12 @@ import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Way;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
 
 public class MapRoutingTypes {
-
+	private static final Log log = LogFactory.getLog(MapRoutingTypes.class);
 	private static Set<String> TAGS_TO_SAVE = new HashSet<String>();
 	private static Set<String> TAGS_TO_ACCEPT = new HashSet<String>();
 	private static Map<String, String> TAGS_TO_REPLACE = new HashMap<String, String>();
