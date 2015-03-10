@@ -290,7 +290,10 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		} 
 		tags = new LinkedHashMap<String, String>(tags);
 		for(EntityConvert ec : listToConvert){
-			applyTagTransforms(tags, ec, entity);
+			applyTagTransforms(tags, ec, entity, false);
+		}
+		for(EntityConvert ec : listToConvert){
+			tags.remove(ec.fromTag.tag);
 		}
 		return tags;
 	}
@@ -348,8 +351,10 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 
 
 
-	private void applyTagTransforms(Map<String, String> tags, EntityConvert ec, EntityType entity) {
-		String fromValue = tags.remove(ec.fromTag.tag);
+	private void applyTagTransforms(Map<String, String> tags, EntityConvert ec, EntityType entity, 
+			boolean delete) {
+		String fromValue =  delete? tags.remove(ec.fromTag.tag) :
+			tags.get(ec.fromTag.tag);
 		for(TagValuePattern ift : ec.toTags) {
 			String vl = ift.value;
 			if(vl == null) {
@@ -358,6 +363,9 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			tags.put(ift.tag, vl);
 		}
 	}
+	
+	
+	
 
 
 
@@ -385,7 +393,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 
 
 	private boolean checkConvertValue(TagValuePattern fromTag, String value) {
-		if(value == null) {
+		if(value == null ) {
 			return false;
 		}
 		if(fromTag.value == null) {
