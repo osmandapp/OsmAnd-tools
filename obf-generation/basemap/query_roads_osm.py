@@ -26,7 +26,7 @@ def process_roads(cond, filename, fields):
 	conn = psycopg2.connect(conn_string)
 	cursor = conn.cursor()
 	array = ['name', 'ref', 'int_ref']
-	names = ['name:en', 'name:be',	'name:ca',	'name:cs',	'name:da',	'name:de',	'name:el',	
+	names = ['name:en',	'name:ar',	'name:be',	'name:ca',	'name:cs',	'name:da',	'name:de',	'name:el',	
 				'name:es',	'name:fi',	'name:fr',	'name:he',	'name:hi',	'name:hr',	
 				'name:hu',	'name:it',	'name:ja',	'name:ko',	'name:lv',	'name:nl',	
 				'name:pl',	'name:ro',	'name:ru',	'name:sk',	'name:sl',	'name:sv',	
