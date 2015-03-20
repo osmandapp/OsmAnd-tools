@@ -33,6 +33,7 @@
 #include <OsmAndCore/RoadLocator.h>
 #include <OsmAndCore/Data/Road.h>
 #include <OsmAndCore/Data/ObfRoutingSectionInfo.h>
+#include <OsmAndCore/Data/Amenity.h>
 #include <OsmAndCore/Map/MapRasterizer.h>
 #include <OsmAndCore/Map/MapPresentationEnvironment.h>
 #include <OsmAndCore/Map/IMapStylesCollection.h>
@@ -69,9 +70,8 @@
 #include <OsmAndCore/GeoInfoDocument.h>
 #include <OsmAndCore/GpxDocument.h>
 #include <OsmAndCore/Map/GeoInfoPresenter.h>
-#include <OsmAndCore/Search/InAreaSearchEngine.h>
-#include <OsmAndCore/Search/InAreaSearchSession.h>
-#include <OsmAndCore/Search/PoiSearchDataSource.h>
+#include <OsmAndCore/Search/AmenitiesByNameSearch.h>
+#include <OsmAndCore/ValueAnimator.h>
 
 bool glutWasInitialized = false;
 QMutex glutWasInitializedFlagMutex;
@@ -163,8 +163,17 @@ int main(int argc, char** argv)
     }
     std::cout << "Initialized Core" << std::endl;
     
-    OsmAnd::Logger::get()->setSeverityLevelThreshold(OsmAnd::LogSeverityLevel::Error);
+    //OsmAnd::Logger::get()->setSeverityLevelThreshold(OsmAnd::LogSeverityLevel::Error);
     
+    //////////////////////////////////////////////////////////////////////////
+    OsmAnd::ValueAnimator valueAnimator;
+    valueAnimator.animateValueTo<float>(
+        1.0f,
+        0.0f,
+        OsmAnd::ValueAnimator::TimingFunction::EaseInOutQuadratic,
+        1.0f,
+        nullptr,
+        nullptr);
     //////////////////////////////////////////////////////////////////////////
 
     const std::unique_ptr<SkImageDecoder> pngDecoder(CreatePNGImageDecoder());
@@ -318,7 +327,7 @@ int main(int argc, char** argv)
     favorites.reset(new OsmAnd::FavoriteLocationsGpxCollection());
     favoritesPresenter.reset(new OsmAnd::FavoriteLocationsPresenter(favorites));
     renderer->addSymbolsProvider(favoritesPresenter);
-    //favorites->loadFrom(QLatin1String("d:\\OpenSource\\OsmAnd\\favorites.gpx"));
+    favorites->loadFrom(QLatin1String("d:\\OpenSource\\OsmAnd\\favorites.gpx"));
 
     //////////////////////////////////////////////////////////////////////////
 
@@ -395,7 +404,27 @@ int main(int argc, char** argv)
     }
 
     //////////////////////////////////////////////////////////////////////////
-    const std::shared_ptr<OsmAnd::InAreaSearchEngine> inAreaSearchEngine(new OsmAnd::InAreaSearchEngine());
+
+    /*QList< std::shared_ptr<const OsmAnd::Amenity> > amenities;
+    obfsCollection->obtainDataInterface()->scanAmenitiesByName("Brood", &amenities);
+    for (const auto& amenity : amenities)
+        OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, "%s", qPrintable(amenity->nativeName));*/
+
+    /*OsmAnd::AmenitiesByNameSearch amenitiesByNameSearch(obfsCollection);
+    OsmAnd::AmenitiesByNameSearch::Criteria amenitiesByNameSearchCriteria;
+    amenitiesByNameSearchCriteria.name = "Broodbar";
+    amenitiesByNameSearch.performSearch(amenitiesByNameSearchCriteria,
+        []
+        (const OsmAnd::ISearch::Criteria& criteria, const OsmAnd::ISearch::IResultEntry& resultEntry_)
+        {
+            const auto& resultEntry = *dynamic_cast<const OsmAnd::AmenitiesByNameSearch::ResultEntry*>(&resultEntry_);
+
+            OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, "%s", qPrintable(resultEntry.amenity->nativeName));
+        });*/
+
+    //////////////////////////////////////////////////////////////////////////
+
+    /*const std::shared_ptr<OsmAnd::InAreaSearchEngine> inAreaSearchEngine(new OsmAnd::InAreaSearchEngine());
     const std::shared_ptr<OsmAnd::PoiSearchDataSource> poiSearchDataSource(new OsmAnd::PoiSearchDataSource(obfsCollection));
     inAreaSearchEngine->addDataSource(poiSearchDataSource);
 
@@ -405,7 +434,7 @@ int main(int argc, char** argv)
         1255337783,
         724166131))));
     searchSession->setQuery("Vadima");
-    searchSession->startSearch();
+    searchSession->startSearch();*/
     //////////////////////////////////////////////////////////////////////////
 
     roadLocator.reset(new OsmAnd::RoadLocator(obfsCollection));
@@ -504,18 +533,18 @@ int main(int argc, char** argv)
 //        )));
 //    renderer->setZoom(12.0f);
 
-    //// Kiev
-    //renderer->setTarget(OsmAnd::PointI(
-    //    1255337783,
-    //    724166131));
+    // Kiev
+    renderer->setTarget(OsmAnd::PointI(
+        1255337783,
+        724166131));
     //renderer->setZoom(11.0f);
-    //renderer->setZoom(16.0f);
+    renderer->setZoom(16.0f);
 
     //// Bug
-    renderer->setTarget(OsmAnd::Utilities::convertLatLonTo31(OsmAnd::LatLon(
+    /*renderer->setTarget(OsmAnd::Utilities::convertLatLonTo31(OsmAnd::LatLon(
         10.7999,
         -64.409)));
-    renderer->setZoom(12.0f);
+    renderer->setZoom(12.0f);*/
 
     //renderer->setTarget(OsmAnd::PointI(
     //    1102425455,
