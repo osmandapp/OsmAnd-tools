@@ -396,7 +396,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		if(fromTag.value == null) {
 			return true;
 		}
-		return fromTag.value.equals(value);
+		return fromTag.value.toLowerCase().equals(value.toLowerCase());
 	}
 
 
