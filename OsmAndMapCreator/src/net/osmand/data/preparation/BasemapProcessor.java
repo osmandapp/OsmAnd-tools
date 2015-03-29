@@ -419,7 +419,13 @@ public class BasemapProcessor {
 
 	private static long ID = -20; 
 	public void processEntity(Entity e) {
-
+		if (e instanceof Way) {
+			if ("reverse_coastline".equals(((Way) e).getModifiableTags().get("natural"))) {
+				((Way) e).putTag("natural", "coastline");
+				Collections.reverse(((Way) e).getNodes());
+				((Way) e).getNodeIds().reverse();
+			}
+		}
 		long refId = -Math.abs(e.getId());
 		// save space with ids
 		
