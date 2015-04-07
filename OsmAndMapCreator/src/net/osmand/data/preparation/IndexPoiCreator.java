@@ -92,7 +92,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				ctx.loadEntityRelation((Relation) e);
 			}
 			for (Amenity a : tempAmenityList) {
-				if(a.getType().getKey().equals("leisure") && privateReg) {
+				if(a.getType().getKeyName().equals("entertainment") && privateReg) {
 					// don't index private swimming pools 
 					continue;
 				}
@@ -171,7 +171,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		poiPreparedStatement.setLong(1, amenity.getId());
 		poiPreparedStatement.setInt(2, MapUtils.get31TileNumberX(amenity.getLocation().getLongitude()));
 		poiPreparedStatement.setInt(3, MapUtils.get31TileNumberY(amenity.getLocation().getLatitude()));
-		poiPreparedStatement.setString(4, amenity.getType().getKey());
+		poiPreparedStatement.setString(4, amenity.getType().getKeyName());
 		poiPreparedStatement.setString(5, amenity.getSubType());
 		poiPreparedStatement.setString(6, encodeAdditionalInfo(amenity.getAdditionalInfo(), amenity.getName(), amenity.getEnName()));
 		addBatch(poiPreparedStatement);
