@@ -19,7 +19,6 @@
 #include <QElapsedTimer>
 
 #include <OsmAndCore.h>
-#include <OsmAndCore/Concurrent.h>
 #include <OsmAndCore/Common.h>
 #include <OsmAndCore/QuadTree.h>
 #include <OsmAndCore/Utilities.h>
@@ -338,7 +337,6 @@ int main(int argc, char** argv)
     
     //////////////////////////////////////////////////////////////////////////
 
-   
     //////////////////////////////////////////////////////////////////////////
     //QHash< QString, std::shared_ptr<const OsmAnd::WorldRegions::WorldRegion> > worldRegions;
     //OsmAnd::WorldRegions("d:\\OpenSource\\OsmAnd\\OsmAnd\\resources\\countries-info\\regions.ocbf").loadWorldRegions(worldRegions);
@@ -405,23 +403,19 @@ int main(int argc, char** argv)
 
     //////////////////////////////////////////////////////////////////////////
 
-    /*QList< std::shared_ptr<const OsmAnd::Amenity> > amenities;
-    obfsCollection->obtainDataInterface()->scanAmenitiesByName("Brood", &amenities);
-    for (const auto& amenity : amenities)
-        OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, "%s", qPrintable(amenity->nativeName));*/
+    //OsmAnd::AmenitiesByNameSearch amenitiesByNameSearch(obfsCollection);
+    //OsmAnd::AmenitiesByNameSearch::Criteria amenitiesByNameSearchCriteria;
+    //amenitiesByNameSearchCriteria.name = "b";
+    //amenitiesByNameSearchCriteria.bbox31 = (OsmAnd::AreaI)OsmAnd::Utilities::boundingBox31FromAreaInMeters(10000, OsmAnd::PointI(1277170718, 772908411));
+    //amenitiesByNameSearch.performSearch(amenitiesByNameSearchCriteria,
+    //    []
+    //    (const OsmAnd::ISearch::Criteria& criteria, const OsmAnd::ISearch::IResultEntry& resultEntry_)
+    //    {
+    //        const auto& resultEntry = *dynamic_cast<const OsmAnd::AmenitiesByNameSearch::ResultEntry*>(&resultEntry_);
 
-    /*OsmAnd::AmenitiesByNameSearch amenitiesByNameSearch(obfsCollection);
-    OsmAnd::AmenitiesByNameSearch::Criteria amenitiesByNameSearchCriteria;
-    amenitiesByNameSearchCriteria.name = "Broodbar";
-    amenitiesByNameSearch.performSearch(amenitiesByNameSearchCriteria,
-        []
-        (const OsmAnd::ISearch::Criteria& criteria, const OsmAnd::ISearch::IResultEntry& resultEntry_)
-        {
-            const auto& resultEntry = *dynamic_cast<const OsmAnd::AmenitiesByNameSearch::ResultEntry*>(&resultEntry_);
-
-            OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, "%s", qPrintable(resultEntry.amenity->nativeName));
-        });*/
-
+    //        OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, "%s (%s)", qPrintable(resultEntry.amenity->nativeName), qPrintable(resultEntry.amenity->id.toString()));
+    //    });
+    //int i = 5;
     //////////////////////////////////////////////////////////////////////////
 
     /*const std::shared_ptr<OsmAnd::InAreaSearchEngine> inAreaSearchEngine(new OsmAnd::InAreaSearchEngine());
@@ -481,7 +475,7 @@ int main(int argc, char** argv)
     renderer->setup(rendererSetup);
 
     const auto debugSettings = renderer->getDebugSettings();
-    // debugSettings->debugStageEnabled = true;
+    debugSettings->debugStageEnabled = true;
     //debugSettings->excludeBillboardSymbolsFromProcessing = true;
     //debugSettings->excludeOnSurfaceSymbolsFromProcessing = true;
     //debugSettings->excludeOnPathSymbolsFromProcessing = true;
@@ -537,14 +531,14 @@ int main(int argc, char** argv)
     renderer->setTarget(OsmAnd::PointI(
         1255337783,
         724166131));
-    //renderer->setZoom(11.0f);
+    ////renderer->setZoom(11.0f);
     renderer->setZoom(16.0f);
 
-    //// Bug
-    /*renderer->setTarget(OsmAnd::Utilities::convertLatLonTo31(OsmAnd::LatLon(
-        10.7999,
-        -64.409)));
-    renderer->setZoom(12.0f);*/
+    // Bug
+    /*renderer->setTarget(OsmAnd::PointI(
+        1087672308,
+        738739261));
+    renderer->setZoom(18.0f);*/
 
     //renderer->setTarget(OsmAnd::PointI(
     //    1102425455,
@@ -641,8 +635,11 @@ void mouseHandler(int button, int state, int x, int y)
         if (state == GLUT_DOWN)
         {
             OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, "--------------- click (%d, %d) -------------------", x, y);
-
+            
             renderer->getLocationFromScreenPoint(OsmAnd::PointI(x, y), lastClickedLocation31);
+            const auto delta = lastClickedLocation31 - renderer->getState().target31;
+            OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, "@ %d %d (offset from target %d %d)", lastClickedLocation31.x, lastClickedLocation31.y, delta.x, delta.y);
+
 
             if (modifiers & GLUT_ACTIVE_CTRL)
             {
@@ -703,6 +700,7 @@ void mouseHandler(int button, int state, int x, int y)
                 if (const auto group = mapSymbol->group.lock())
                 {
                     OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, " - symbols in group %d", group->symbols.size());
+                    OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, " - presentation mode %u", static_cast<unsigned int>(group->presentationMode));
                     OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, " - from %s", qPrintable(group->toString()));
                 }
             }
@@ -1240,7 +1238,7 @@ void displayHandler()
     if (renderer->prepareFrame(&prepareMetrics))
         renderer->renderFrame(&renderMetrics);
 
-    const auto totalElapsed = totalStopwatch.elapsed();
+    /*const auto totalElapsed = totalStopwatch.elapsed();
     OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info,
         "Frame time %fs%s: update %d%%, prepare %d%%, render %d%%:\n%s\n%s\n%s",
         totalElapsed,
@@ -1250,7 +1248,7 @@ void displayHandler()
         static_cast<unsigned int>((renderMetrics.elapsedTime / totalElapsed) * 100),
         qPrintable(updateMetrics.toString(false, QString(QLatin1String("update.")))),
         qPrintable(prepareMetrics.toString(false, QString(QLatin1String("prepare.")))),
-        qPrintable(renderMetrics.toString(false, QString(QLatin1String("render.")))));
+        qPrintable(renderMetrics.toString(false, QString(QLatin1String("render.")))));*/
     
     verifyOpenGL();
 
@@ -1275,7 +1273,7 @@ void displayHandler()
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
         auto w = 390;
-        auto h1 = 16 * 22;
+        auto h1 = 16 * 23;
         auto t = viewport.height();
         glColor4f(0.5f, 0.5f, 0.5f, 0.6f);
         glBegin(GL_QUADS);
@@ -1393,7 +1391,12 @@ void displayHandler()
 
         glRasterPos2f(8, t - 16 * 21);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("Raster batching on (\\) : %1").arg(renderer->getDebugSettings()->mapLayersBatchingForbidden)));
+            QString("Raster batching off (\\): %1").arg(renderer->getDebugSettings()->mapLayersBatchingForbidden)));
+        verifyOpenGL();
+
+        glRasterPos2f(8, t - 16 * 22);
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
+            QString("# of resource tasks    : %1").arg(renderer->getActiveResourceRequestsCount())));
         verifyOpenGL();
 
         glColor4f(0.5f, 0.5f, 0.5f, 0.6f);
@@ -1412,7 +1415,10 @@ void displayHandler()
 #endif
         glRasterPos2f(8, 16 * 12);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("Last clicked tile: (%1, %2)@%3").arg(lastClickedLocation31.x >> (31 - state.zoomLevel)).arg(lastClickedLocation31.y >> (31 - state.zoomLevel)).arg(state.zoomLevel)));
+            QString("Last clicked tile: (%1, %2)@%3")
+                .arg(lastClickedLocation31.x >> (31 - state.zoomLevel))
+                .arg(lastClickedLocation31.y >> (31 - state.zoomLevel))
+                .arg(state.zoomLevel)));
         verifyOpenGL();
 
         glRasterPos2f(8, 16 * 11);
