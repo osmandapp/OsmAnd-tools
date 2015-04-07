@@ -527,18 +527,18 @@ int main(int argc, char** argv)
 //        )));
 //    renderer->setZoom(12.0f);
 
-    //// Kiev
-    //renderer->setTarget(OsmAnd::PointI(
-    //    1255337783,
-    //    724166131));
+    // Kiev
+    renderer->setTarget(OsmAnd::PointI(
+        1255337783,
+        724166131));
     ////renderer->setZoom(11.0f);
-    //renderer->setZoom(16.0f);
+    renderer->setZoom(16.0f);
 
     // Bug
-    renderer->setTarget(OsmAnd::PointI(
+    /*renderer->setTarget(OsmAnd::PointI(
         1087672308,
         738739261));
-    renderer->setZoom(18.0f);
+    renderer->setZoom(18.0f);*/
 
     //renderer->setTarget(OsmAnd::PointI(
     //    1102425455,
@@ -700,7 +700,7 @@ void mouseHandler(int button, int state, int x, int y)
                 if (const auto group = mapSymbol->group.lock())
                 {
                     OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, " - symbols in group %d", group->symbols.size());
-                    OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, " - presentation mode %d", group->presentationMode);
+                    OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, " - presentation mode %u", static_cast<unsigned int>(group->presentationMode));
                     OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, " - from %s", qPrintable(group->toString()));
                 }
             }
@@ -1391,7 +1391,7 @@ void displayHandler()
 
         glRasterPos2f(8, t - 16 * 21);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("Raster batching on (\\) : %1").arg(renderer->getDebugSettings()->mapLayersBatchingForbidden)));
+            QString("Raster batching off (\\): %1").arg(renderer->getDebugSettings()->mapLayersBatchingForbidden)));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * 22);
