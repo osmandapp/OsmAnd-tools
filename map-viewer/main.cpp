@@ -393,12 +393,6 @@ int main(int argc, char** argv)
             return EXIT_FAILURE;
         }
 
-        std::ofstream rulesOutput("rules.txt");
-        if (rulesOutput)
-        {
-            rulesOutput << style->dump().toStdString() << std::endl;
-            rulesOutput.close();
-        }
     }
 
     //////////////////////////////////////////////////////////////////////////
