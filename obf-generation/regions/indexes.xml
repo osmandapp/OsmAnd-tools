@@ -174,7 +174,7 @@
 			<region name="provence-alpes-cote-d-azur"/>
 			<region name="rhone-alpes"/>
 		</regions>
-		<!--
+		
 		<regions siteToDownload="http://download.osmand.net/osm-downloads/Netherlands-{0}.pbf" region_prefix="Netherlands_" skip="false" region_suffix="_Europe">
 			<region name="drenthe"/>
 			<region name="flevoland"/>
@@ -189,7 +189,7 @@
 			<region name="zeeland"/>
 			<region name="zuid-holland"/>
 		</regions>
-		-->
+		
 		<regions siteToDownload="http://download.osmand.net/osm-downloads/gb-{0}.pbf" region_prefix="GB_" skip="false" region_suffix="_Europe">
 			<region name="scotland"/>
 			<region name="wales"/>
@@ -767,6 +767,7 @@
 			<region name="israel"/>
 			<region name="palestine"/>
 			<region name="jordan"/>
+			<region name="japan"/>
 			<region name="vietnam"/>
 		</regions>
 
