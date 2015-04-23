@@ -10,6 +10,9 @@ add_subdirectory("${OSMAND_ROOT}/tools/map-rasterizer" "tools/map-rasterizer")
 # Map style evaluator
 add_subdirectory("${OSMAND_ROOT}/tools/style-evaluator" "tools/style-evaluator")
 
+# Map style compiler
+add_subdirectory("${OSMAND_ROOT}/tools/style-compiler" "tools/style-compiler")
+
 # 3D Map renderer (development)
 add_subdirectory("${OSMAND_ROOT}/tools/map-viewer" "tools/map-viewer")
 
