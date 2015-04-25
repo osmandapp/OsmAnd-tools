@@ -698,7 +698,7 @@ public class BasemapProcessor {
 	        creator.setDialects(DBDialect.SQLITE_IN_MEMORY, DBDialect.SQLITE_IN_MEMORY);
             creator.setIndexMap(true);
 			creator.setZoomWaySmothness(zoomSmoothness);
-            creator.setMapFileName(mini?"World_basemap_mini_2.obf":"World_basemap_2.obf");
+            creator.setMapFileName(mini?"World_basemap_mini_test_2.obf":"World_basemap_2.obf");
             ArrayList<File> src = new ArrayList<File>();
             for (File f : folder.listFiles()) {
                 if (f.getName().endsWith(".osm") || f.getName().endsWith(".osm.bz2")) {

@@ -12,7 +12,7 @@
 #include <QFile>
 #include <QStringList>
 
-#include <OsmAndCoreTools/Styler.h>
+#include <OsmAndCoreTools/CStyle.h>
 #include <OsmAndCore/CoreResourcesEmbeddedBundle.h>
 
 #if defined(UNICODE) || defined(_UNICODE)
@@ -36,27 +36,25 @@ int main(int argc, char* argv[])
 #if defined(OSMAND_CORE_STATIC)
     coreResourcesEmbeddedBundle = OsmAnd::CoreResourcesEmbeddedBundle::loadFromCurrentExecutable();
 #else
-    coreResourcesEmbeddedBundle = OsmAnd::CoreResourcesEmbeddedBundle::loadFromLibrary(
-        QLatin1String("OsmAndCore_ResourcesBundle_shared"));
+    coreResourcesEmbeddedBundle = OsmAnd::CoreResourcesEmbeddedBundle::loadFromLibrary(QLatin1String("OsmAndCore_ResourcesBundle_shared"));
 #endif // defined(OSMAND_CORE_STATIC)
     OsmAnd::InitializeCore(coreResourcesEmbeddedBundle);
 
     // Parse configuration
-    OsmAndTools::Styler::Configuration configuration;
+    OsmAndTools::CStyle::Configuration configuration;
     QString error;
     QStringList commandLineArgs;
     for (int idx = 1; idx < argc; idx++)
         commandLineArgs.push_back(argv[idx]);
-    if (!OsmAndTools::Styler::Configuration::parseFromCommandLineArguments(commandLineArgs, configuration, error))
+    if (!OsmAndTools::CStyle::Configuration::parseFromCommandLineArguments(commandLineArgs, configuration, error))
     {
         printUsage(QStringToStlString(error));
         OsmAnd::ReleaseCore();
         return -1;
     }
 
-    // Evaluate map objects
-    OsmAndTools::Styler::EvaluatedMapObjects evaluatedMapObjects;
-    const auto success = OsmAndTools::Styler(configuration).evaluate(evaluatedMapObjects);
+    // Compile map style
+    const auto success = OsmAndTools::CStyle(configuration).compile();
 
     OsmAnd::ReleaseCore();
 
@@ -76,16 +74,11 @@ void printUsage(const std::string& warning /*= std::string()*/)
 #endif
     if(!warning.empty())
         tcout << warning << std::endl;
-    tcout << xT("OsmAnd Styler tool is a console utility to evaluate map style using specified objects and input arguments.") << std::endl;
+    tcout << xT("OsmAnd CStyle tool is a console utility to compile map style using specified emitter.") << std::endl;
     tcout << std::endl;
     tcout << xT("Arguments:") << std::endl;
-    tcout << xT("\t-obfsPath=path/to/OBFs/collection or -obfsRecursivePath=path/to/OBFs/collection or -obfFile=OBF/file/path/with/name.obf ...") << std::endl;
-    tcout << xT("\t[-mapObject=id ...]") << std::endl;
     tcout << xT("\t[-stylesPath=path/to/main/styles or -stylesRecursivePath=path/to/main/styles ...]") << std::endl;
     tcout << xT("\t[-styleName=default]") << std::endl;
-    tcout << xT("\t[-styleSetting:name=value ...]") << std::endl;
-    tcout << xT("\t[-zoom=15]") << std::endl;
-    tcout << xT("\t[-displayDensityFactor=1.0]") << std::endl;
-    tcout << xT("\t[-locale=en]") << std::endl;
+    tcout << xT("\t[-emitter=debug]") << std::endl;
     tcout << xT("\t[-verbose]") << std::endl;
 }
