@@ -898,9 +898,9 @@ public class BinaryMapIndexWriter {
 			BinaryFileReference ref) throws IOException {
 		checkPeekState(CITY_INDEX_INIT);
 		codedOutStream.writeTag(CitiesIndex.BLOCKS_FIELD_NUMBER, FieldType.MESSAGE.getWireType());
+		codedOutStream.flush();
 		long startMessage = getFilePointer();
 		long startCityBlock = ref.getStartPointer();
-		codedOutStream.flush();
 		ref.writeReference(raf, startMessage);
 		CityBlockIndex.Builder cityInd = OsmandOdb.CityBlockIndex.newBuilder();
 		cityInd.setShiftToCityIndex((int) (startMessage - startCityBlock));
@@ -932,7 +932,7 @@ public class BinaryMapIndexWriter {
 			
 		}
 		CityBlockIndex block = cityInd.build();
-		int size = CodedOutputStream.computeRawVarint32Size( CodedOutputStream.computeMessageSizeNoTag(block));
+		int size = CodedOutputStream.computeRawVarint32Size( block.getSerializedSize());
 		codedOutStream.writeMessageNoTag(block);
 		for (Street s : streets) {
 			s.setFileOffset(s.getFileOffset() + size);

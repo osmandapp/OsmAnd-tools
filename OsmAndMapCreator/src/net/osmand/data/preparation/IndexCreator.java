@@ -778,14 +778,14 @@ public class IndexCreator {
 		
 		IndexCreator creator = new IndexCreator(new File(rootFolder + "/osm-gen/")); //$NON-NLS-1$
 		creator.setIndexMap(true);
-//		creator.setIndexAddress(true);
+		creator.setIndexAddress(true);
 		creator.setIndexPOI(true);
 //		creator.setIndexTransport(true);
 		creator.setIndexRouting(true);
 
 //		creator.deleteDatabaseIndexes = false;
 //		creator.recreateOnlyBinaryFile = true;
-//		creator.deleteOsmDB = true;
+//		creator.deleteOsmDB = false;
 				
 		creator.setZoomWaySmothness(2);
 		MapRenderingTypesEncoder rt = //MapRenderingTypesEncoder.getDefault();
