@@ -3,7 +3,7 @@
 		
 
 		<!-- 6.7 SOUTHERN ASIA [SOURCE: OSMAND:NET] -->
-		<regions siteToDownload="http://builder.osmand.net/ci-maps/regions/{0}.pbf" region_prefix="" region_suffix="_Asia" skip="false">
+		<regions siteToDownload="http://builder.osmand.net/ci-maps/regions/{0}.osm.pbf" region_prefix="" region_suffix="_Asia" skip="false">
 			<region name="nepal"/>
 		</regions>
 
