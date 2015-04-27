@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<regions_list>
+		
+
+		<!-- 6.7 SOUTHERN ASIA [SOURCE: OSMAND:NET] -->
+		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" region_suffix="_Asia" skip="false">
+			<!-- <region name="afghanistan"/>
+			<region name="bhutan"/>
+			<region name="british-indian-ocean-territory"/>
+			<region name="maldives"/> -->
+			<region name="nepal"/>
+			<!-- <region name="india"/>
+			<region name="sri-lanka"/> -->
+		</regions>
+
+</regions_list> 
