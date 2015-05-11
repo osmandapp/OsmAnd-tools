@@ -181,6 +181,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 			// It could be wrong if the boundary doesn't match center point
 			if(cityFound == null /*&& !boundary.hasAdminLevel() */&& 
 					(boundary.getCityType() == CityType.TOWN ||
+					// boundary.getCityType() == CityType.CITY || 
 					boundary.getCityType() == CityType.HAMLET || 
 					boundary.getCityType() == CityType.SUBURB || 
 					boundary.getCityType() == CityType.VILLAGE)) {
