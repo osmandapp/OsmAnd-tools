@@ -210,23 +210,22 @@ public class MapRouterLayer implements MapPanelLayer {
 		};
 		menu.add(complexRoute);
 		
-//		Action recalculate = new AbstractAction("Recalculate OsmAnd route") {
-//			private static final long serialVersionUID = 507156107455281238L;
-//			
-//			@Override
-//			public boolean isEnabled() {
-////				return previousRoute != null;
-//				return true;
-//			}
-//
-//			@Override
-//			public void actionPerformed(ActionEvent e) {
-//				calcRoute(RouteCalculationMode.NORMAL);
-//			}
-//		};
-//		
-//		
-//		menu.add(recalculate);
+		Action recalculate = new AbstractAction("Recalculate OsmAnd route") {
+			private static final long serialVersionUID = 507156107455281238L;
+			
+			@Override
+			public boolean isEnabled() {
+//				return previousRoute != null;
+				return true;
+			}
+
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				calcRoute(RouteCalculationMode.NORMAL);
+			}
+		};
+		menu.add(recalculate);
+		
 		Action route_YOURS = new AbstractAction("Calculate YOURS route") {
 			private static final long serialVersionUID = 507156107455281238L;
 
@@ -705,6 +704,7 @@ public class MapRouterLayer implements MapPanelLayer {
 					List<RouteSegmentResult> searchRoute = router.searchRoute(ctx, start, end, 
 							intermediates, precalculatedRouteDirection);
 					throwExceptionIfRouteNotFound(ctx, searchRoute);
+					
 
 					System.out.println("External native time " + (System.nanoTime() - nt) / 1.0e9f);
 					if (animateRoutingCalculation) {
@@ -713,6 +713,7 @@ public class MapRouterLayer implements MapPanelLayer {
 						waitNextPress();
 						nextTurn.setText(">>");
 					}
+					this.previousRoute = searchRoute;
 					calculateResult(res, searchRoute);
 				} finally {
 					ctx.calculationProgress.isCancelled = true;

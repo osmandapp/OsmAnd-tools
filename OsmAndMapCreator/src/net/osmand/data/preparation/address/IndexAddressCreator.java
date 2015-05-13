@@ -725,6 +725,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 	}
 	
 	public void iterateMainEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
+		Map<String, String> tags = e.getTags();
 		// index not only buildings but also nodes that belongs to addr:interpolation ways
 		// currently not supported because nodes are indexed first with buildings 
 		String interpolation = e.getTag(OSMTagKey.ADDR_INTERPOLATION);
