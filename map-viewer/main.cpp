@@ -301,7 +301,7 @@ int main(int argc, char** argv)
     animator.reset(new OsmAnd::MapAnimator());
     animator->setMapRenderer(renderer);
 
-    /*
+    //////////////////////////////////////////////////////////////////////////
     markers.reset(new OsmAnd::MapMarkersCollection());
     std::shared_ptr<OsmAnd::MapMarkerBuilder> markerBuilder(new OsmAnd::MapMarkerBuilder());
     {
@@ -321,7 +321,7 @@ int main(int argc, char** argv)
     lastClickedLocationMarker->setIsAccuracyCircleVisible(true);
     lastClickedLocationMarker->setAccuracyCircleRadius(2000.0);
     renderer->addSymbolsProvider(markers);
-    */
+    //////////////////////////////////////////////////////////////////////////
 
     favorites.reset(new OsmAnd::FavoriteLocationsGpxCollection());
     favoritesPresenter.reset(new OsmAnd::FavoriteLocationsPresenter(favorites));
@@ -476,7 +476,8 @@ int main(int argc, char** argv)
 //    debugSettings->skipSymbolsMinDistanceToSameContentFromOtherSymbolCheck = true;
 //    debugSettings->showSymbolsBBoxesRejectedByMinDistanceToSameContentFromOtherSymbolCheck = true;
 //    debugSettings->showSymbolsBBoxesRejectedByIntersectionCheck = true;
-//    debugSettings->showSymbolsBBoxesRejectedByPresentationMode = true;
+    //debugSettings->showSymbolsBBoxesRejectedByPresentationMode = true;
+    //debugSettings->disableFastSymbolsCheckByFrustum = true;
     /*
     debugSettings->skipSymbolsIntersectionCheck = true;
     */
@@ -662,7 +663,7 @@ void mouseHandler(int button, int state, int x, int y)
                     OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, "Found unnamed road");
                 else
                 {
-                    const auto name = road->captions[road->encodingDecodingRules->name_encodingRuleId];
+                    const auto name = road->captions[road->attributeMapping->nativeNameAttributeId];
                     OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, "Found road: %s", qPrintable(name));
                 }
             }
@@ -728,8 +729,6 @@ void mouseMotion(int x, int y)
         newTarget.y = dragInitTarget.y - static_cast<int32_t>(ny * scale31);
 
         renderer->setTarget(newTarget);
-        if (lastClickedLocationMarker)
-            lastClickedLocationMarker->setPosition(newTarget);
     }
 }
 
@@ -1232,17 +1231,17 @@ void displayHandler()
     if (renderer->prepareFrame(&prepareMetrics))
         renderer->renderFrame(&renderMetrics);
 
-    /*const auto totalElapsed = totalStopwatch.elapsed();
-    OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info,
-        "Frame time %fs%s: update %d%%, prepare %d%%, render %d%%:\n%s\n%s\n%s",
-        totalElapsed,
-        totalElapsed > 0.033f ? qPrintable(QString(QLatin1String(" (%1 < 60fps)")).arg(static_cast<unsigned int>(1.0f / totalElapsed))) : "",
-        static_cast<unsigned int>((updateMetrics.elapsedTime / totalElapsed) * 100),
-        static_cast<unsigned int>((prepareMetrics.elapsedTime / totalElapsed) * 100),
-        static_cast<unsigned int>((renderMetrics.elapsedTime / totalElapsed) * 100),
-        qPrintable(updateMetrics.toString(false, QString(QLatin1String("update.")))),
-        qPrintable(prepareMetrics.toString(false, QString(QLatin1String("prepare.")))),
-        qPrintable(renderMetrics.toString(false, QString(QLatin1String("render.")))));*/
+    //const auto totalElapsed = totalStopwatch.elapsed();
+    //OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info,
+    //    "Frame time %fs%s: update %d%%, prepare %d%%, render %d%%:\n%s\n%s\n%s",
+    //    totalElapsed,
+    //    totalElapsed > 0.033f ? qPrintable(QString(QLatin1String(" (%1 < 60fps)")).arg(static_cast<unsigned int>(1.0f / totalElapsed))) : "",
+    //    static_cast<unsigned int>((updateMetrics.elapsedTime / totalElapsed) * 100),
+    //    static_cast<unsigned int>((prepareMetrics.elapsedTime / totalElapsed) * 100),
+    //    static_cast<unsigned int>((renderMetrics.elapsedTime / totalElapsed) * 100),
+    //    qPrintable(updateMetrics.toString(false, QString(QLatin1String("update.")))),
+    //    qPrintable(prepareMetrics.toString(false, QString(QLatin1String("prepare.")))),
+    //    qPrintable(renderMetrics.toString(false, QString(QLatin1String("render.")))));
     
     verifyOpenGL();
 

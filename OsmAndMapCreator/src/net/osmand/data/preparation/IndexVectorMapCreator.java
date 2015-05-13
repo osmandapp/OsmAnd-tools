@@ -95,7 +95,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	private int zoomWaySmothness = 0;
 	private final Log logMapDataWarn;
 
-	public static long GENERATE_OBJ_ID = - (1l << 15l); // million million  
+	public static long GENERATE_OBJ_ID = - (1l << 20l); // million million  
 
 	public IndexVectorMapCreator(Log logMapDataWarn, MapZooms mapZooms, MapRenderingTypesEncoder renderingTypes,
 	                             int zoomWaySmothness) {
