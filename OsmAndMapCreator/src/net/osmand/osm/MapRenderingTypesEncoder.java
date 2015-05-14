@@ -573,51 +573,32 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 
 	public void addOSMCSymbolsSpecialTags(Map<MapRulType,String> propogated, Entry<String,String> ev) {
 		if ("osmc:symbol".equals(ev.getKey())) {
+			// osmc:symbol=black:red:blue_rectangle ->
+//			1.For backwards compatibility (already done) - osmc_shape=bar, osmc_symbol=black, osmc_symbol_red_blue_name=.
+//			2.New tags: osmc_route_color=black, osmc_background=red, osmc_foreground=blue_rectangle, osmc_stub_name=. ,
 			String[] tokens = ev.getValue().split(":", 6);
+			osmcBackwardCompatility(propogated, tokens);
 			if (tokens.length > 0) {
-				String wayColor = formatColorToPalette(tokens[0], true);
-				MapRulType rt = getMapRuleType("osmc_symbol_" + wayColor, "");
-				if(rt != null) {
+				String wayColor = tokens[0]; // formatColorToPalette(tokens[0], true);
+				MapRulType rt = getMapRuleType("osmc_route_color", wayColor);
+				if (rt != null) {
 					propogated.put(rt, wayColor);
 				}
-				rt = getMapRuleType("osmc_symbol", wayColor);
-				if(rt != null) {
-					propogated.put(rt, wayColor);
-				}
-				if(rt != null) {
-					if (tokens.length > 1) {
-						String bgColor = tokens[1];
-						String fgColorPrefix = "";
-						String shape = "";
-						if (tokens.length > 2) {
-							String fgColor = tokens[2];
-							if (precolors.containsKey(fgColor)) {
-								shape = fgColor;
-								fgColor = precolors.get(fgColor);
-							} else if (fgColor.indexOf('_') >= 0) {
-								final int i = fgColor.indexOf('_');
-								shape = fgColor.substring(i + 1).toLowerCase();
-								fgColor = fgColor.substring(0, i);
-							}
-							fgColorPrefix = "_" + fgColor;
+				if (tokens.length > 1) {
+					String bgColor = tokens[1]; // formatColorToPalette(tokens[1], true);
+					rt = getMapRuleType("osmc_background", bgColor);
+					if (rt != null) {
+						propogated.put(rt, bgColor);
+						rt = getMapRuleType("osmc_stub_name", "");
+						if(rt != null) {
+							propogated.put(rt, ".");
 						}
-						String shpValue ="none";
-						if(shape.length() != 0) {
-							shpValue = barValues.contains(shape) ? "bar" : "circle";
-						}
-						MapRulType shp = getMapRuleType("osmc_shape", shpValue);
-						if (shp != null) {
-							propogated.put(shp, shpValue);
-						}
-						String symbol = "osmc_symbol_" + formatColorToPalette(bgColor, true) +  fgColorPrefix + "_name";
-						String name = "."; //"\u00A0";
-//						if (tokens.length > 3 && tokens[3].trim().length() > 0) {
-//							name = tokens[3];
-//						}
-
-						MapRulType textRule = getMapRuleType(symbol, "");
-						if (textRule != null) {
-							propogated.put(textRule, name);
+					}
+					if (tokens.length > 2) {
+						String shpVl = tokens[2]; // formatColorToPalette(tokens[1], true);
+						rt = getMapRuleType("osmc_foreground", shpVl);
+						if (rt != null) {
+							propogated.put(rt, shpVl);
 						}
 					}
 				}
@@ -634,6 +615,59 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			rt = getMapRuleType(nm, "");
 			if(rt != null) {
 				propogated.put(rt, "");
+			}
+		}
+	}
+
+
+
+	private void osmcBackwardCompatility(Map<MapRulType, String> propogated, String[] tokens) {
+		if (tokens.length > 0) {
+			String wayColor = formatColorToPalette(tokens[0], true);
+			MapRulType rt = getMapRuleType("osmc_symbol_" + wayColor, "");
+			if(rt != null) {
+				propogated.put(rt, wayColor);
+			}
+			rt = getMapRuleType("osmc_symbol", wayColor);
+			if(rt != null) {
+				propogated.put(rt, wayColor);
+			}
+			if(rt != null) {
+				if (tokens.length > 1) {
+					String bgColor = tokens[1];
+					String fgColorPrefix = "";
+					String shape = "";
+					if (tokens.length > 2) {
+						String fgColor = tokens[2];
+						if (precolors.containsKey(fgColor)) {
+							shape = fgColor;
+							fgColor = precolors.get(fgColor);
+						} else if (fgColor.indexOf('_') >= 0) {
+							final int i = fgColor.indexOf('_');
+							shape = fgColor.substring(i + 1).toLowerCase();
+							fgColor = fgColor.substring(0, i);
+						}
+						fgColorPrefix = "_" + fgColor;
+					}
+					String shpValue ="none";
+					if(shape.length() != 0) {
+						shpValue = barValues.contains(shape) ? "bar" : "circle";
+					}
+					MapRulType shp = getMapRuleType("osmc_shape", shpValue);
+					if (shp != null) {
+						propogated.put(shp, shpValue);
+					}
+					String symbol = "osmc_symbol_" + formatColorToPalette(bgColor, true) +  fgColorPrefix + "_name";
+					String name = "."; //"\u00A0";
+//						if (tokens.length > 3 && tokens[3].trim().length() > 0) {
+//							name = tokens[3];
+//						}
+
+					MapRulType textRule = getMapRuleType(symbol, "");
+					if (textRule != null) {
+						propogated.put(textRule, name);
+					}
+				}
 			}
 		}
 	}
