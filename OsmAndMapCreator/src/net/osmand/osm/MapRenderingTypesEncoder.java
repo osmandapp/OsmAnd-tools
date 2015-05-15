@@ -601,19 +601,19 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 							propogated.put(rt, shpVl);
 						}
 						if (tokens.length > 3) {
-							String shp2Vl = tokens[2];
+							String shp2Vl = tokens[3];
 							rt = getMapRuleType("osmc_foreground2", shp2Vl);
 							if (rt != null) {
 								propogated.put(rt, shp2Vl);
 							}
 							if (tokens.length > 4) {
-								String txtVl = tokens[2];
+								String txtVl = tokens[4];
 								rt = getMapRuleType("osmc_text", txtVl);
 								if (rt != null) {
 									propogated.put(rt, txtVl);
 								}
 								if (tokens.length > 5) {
-									String txtcolorVl = tokens[2];
+									String txtcolorVl = tokens[5];
 									rt = getMapRuleType("osmc_textcolor", txtcolorVl);
 									if (rt != null) {
 										propogated.put(rt, txtcolorVl);
