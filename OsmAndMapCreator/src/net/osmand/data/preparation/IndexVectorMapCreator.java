@@ -64,6 +64,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	private static final int MAP_LEVELS_MAX = 1 << MAP_LEVELS_POWER;
 	private MapRenderingTypesEncoder renderingTypes;
 	private MapZooms mapZooms;
+	private static String SPLIT_VALUE= "SPLITVL";
 
 	Map<Long, TIntArrayList> multiPolygonsWays = new LinkedHashMap<Long, TIntArrayList>();
 	
@@ -134,7 +135,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	}
 
 	private String sortAndAttachUniqueValue(String list, String value) {
-		String[] ls = list.split(",");
+		String[] ls = list.split(SPLIT_VALUE);
 		Set<String> set = new TreeSet<String>(new Comparator<String>() {
 
 			@Override
@@ -156,7 +157,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		String r = "";
 		for(String a : set) {
 			if(r.length() > 0) {
-				r += ", ";
+				r += SPLIT_VALUE;
 			}
 			r+= a;
 		}
@@ -500,7 +501,11 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 				while (iterator.hasNext()) {
 					Entry<String, String> ts = iterator.next();
 					if (e.getTag(ts.getKey()) == null) {
-						e.putTag(ts.getKey(), ts.getValue());
+						String vl = ts.getValue();
+						if(vl != null) {
+							vl = vl.replaceAll(SPLIT_VALUE, ", ");
+						}
+						e.putTag(ts.getKey(), vl);
 					}
 				}
 			}
