@@ -575,12 +575,12 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		if ("osmc:symbol".equals(ev.getKey())) {
 			// osmc:symbol=black:red:blue_rectangle ->
 //			1.For backwards compatibility (already done) - osmc_shape=bar, osmc_symbol=black, osmc_symbol_red_blue_name=.
-//			2.New tags: osmc_route_color=black, osmc_background=red, osmc_foreground=blue_rectangle, osmc_stub_name=. ,
+//			2.New tags: osmc_waycolor=black, osmc_background=red, osmc_foreground=blue_rectangle, osmc_foreground2, osmc_text, osmc_textcolor, osmc_stub_name=. ,
 			String[] tokens = ev.getValue().split(":", 6);
 			osmcBackwardCompatility(propogated, tokens);
 			if (tokens.length > 0) {
 				String wayColor = tokens[0]; // formatColorToPalette(tokens[0], true);
-				MapRulType rt = getMapRuleType("osmc_route_color", wayColor);
+				MapRulType rt = getMapRuleType("osmc_waycolor", wayColor);
 				if (rt != null) {
 					propogated.put(rt, wayColor);
 				}
@@ -599,6 +599,27 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 						rt = getMapRuleType("osmc_foreground", shpVl);
 						if (rt != null) {
 							propogated.put(rt, shpVl);
+						}
+						if (tokens.length > 3) {
+							String shp2Vl = tokens[2];
+							rt = getMapRuleType("osmc_foreground2", shp2Vl);
+							if (rt != null) {
+								propogated.put(rt, shp2Vl);
+							}
+							if (tokens.length > 4) {
+								String txtVl = tokens[2];
+								rt = getMapRuleType("osmc_text", txtVl);
+								if (rt != null) {
+									propogated.put(rt, txtVl);
+								}
+								if (tokens.length > 5) {
+									String txtcolorVl = tokens[2];
+									rt = getMapRuleType("osmc_textcolor", txtcolorVl);
+									if (rt != null) {
+										propogated.put(rt, txtcolorVl);
+									}
+								}
+							}
 						}
 					}
 				}
