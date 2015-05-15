@@ -602,9 +602,9 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 						}
 						if (tokens.length > 3) {
 							String shp2Vl = tokens[3];
-							rt = getMapRuleType("osmc_foreground2", shp2Vl);
+							rt = getMapRuleType("osmc_foreground", shpVl);
 							if (rt != null) {
-								propogated.put(rt, shp2Vl);
+								propogated.put(rt, shpVl);
 							}
 							if (tokens.length > 4) {
 								String txtVl = tokens[4];
