@@ -609,8 +609,10 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 							if (tokens.length > 4) {
 								String txtVl = tokens[4];
 								rt = getMapRuleType("osmc_text", txtVl);
+								rt2 = getMapRuleType("osmc_text_symbol", txtVl);
 								if (rt != null) {
 									propogated.put(rt, txtVl);
+									propogated.put(rt2, txtVl);
 								}
 								if (tokens.length > 5) {
 									String txtcolorVl = tokens[5];
