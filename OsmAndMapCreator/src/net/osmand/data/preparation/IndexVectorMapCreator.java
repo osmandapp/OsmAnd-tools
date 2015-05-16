@@ -349,6 +349,8 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		ArrayList<Float> list = new ArrayList<Float>(100);
 		TIntArrayList temp = new TIntArrayList();
 		TIntArrayList tempAdd = new TIntArrayList();
+		TreeMap<MapRulType, String> names = new TreeMap<MapRulType, String>();
+		TreeMap<MapRulType, String> names2 = new TreeMap<MapRulType, String>();
 		while (rs.next()) {
 			if (lowLevelWays != -1) {
 				progress.progress(1);
@@ -365,7 +367,9 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			long startNode = rs.getLong(2);
 			long endNode = rs.getLong(3);
 
-			String name = rs.getString(5);
+			names.clear();
+			decodeNames(rs.getString(5), names);
+			String name = names.get(renderingTypes.getNameRuleType());
 			parseAndSort(typeUse, rs.getBytes(6));
 			parseAndSort(addtypeUse, rs.getBytes(7));
 			
@@ -390,7 +394,10 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 							startNode = fs.getLong(2);
 							visitedWays.add(lid);
 							loadNodes(fs.getBytes(4), list);
-							if(!Algorithms.objectEquals(fs.getString(5), name)){
+							names2.clear();
+							decodeNames(fs.getString(5), names2);
+							String name2 = names2.get(renderingTypes.getNameRuleType());
+							if(!Algorithms.objectEquals(name2, name)){
 								name = null;
 							}
 							ArrayList<Float> li = new ArrayList<Float>(list);
@@ -419,7 +426,10 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 						if(temp.equals(typeUse) && tempAdd.equals(addtypeUse)){
 							combined = true;
 							long lid = fs.getLong(1);
-							if (!Algorithms.objectEquals(fs.getString(5), name)) {
+							names2.clear();
+							decodeNames(fs.getString(5), names2);
+							String name2 = names2.get(renderingTypes.getNameRuleType());
+							if (!Algorithms.objectEquals(name2, name)) {
 								name = null;
 							}
 							endNode = fs.getLong(3);
@@ -455,7 +465,11 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 				if (res.size() > 0) {
 					namesUse.clear();
 					if (name != null && name.length() > 0) {
-						namesUse.put(renderingTypes.getNameRuleType(), name);
+						for (MapRulType rt : names.keySet()) {
+							if(rt.getTag().startsWith("name")) {
+								namesUse.put(rt, names.get(rt));
+							}
+						}
 					}
 					insertBinaryMapRenderObjectIndex(mapTree[level], res, null, namesUse, id, false, typeUse, addtypeUse, false);
 				}
@@ -561,8 +575,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 				if (cycle) {
 					res = simplifyCycleWay(((Way) e).getNodes(), zoomToSimplify, zoomWaySmothness);
 				} else {
-					String ename = namesUse.get(renderingTypes.getNameRuleType());
-					insertLowLevelMapBinaryObject(level, zoomToSimplify, typeUse, addtypeUse, id, ((Way) e).getNodes(), ename);
+					insertLowLevelMapBinaryObject(level, zoomToSimplify, typeUse, addtypeUse, id, ((Way) e).getNodes(), namesUse);
 				}
 			} else {
 				res = ((Way) e).getNodes();
@@ -805,7 +818,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 				.prepareStatement("insert into low_level_map_objects(id, start_node, end_node, name, nodes, type, addType, level) values(?, ?, ?, ?, ?, ?, ?, ?)");
 	}
 
-	private void insertLowLevelMapBinaryObject(int level, int zoom, TIntArrayList types, TIntArrayList addTypes, long id, List<Node> in, String name)
+	private void insertLowLevelMapBinaryObject(int level, int zoom, TIntArrayList types, TIntArrayList addTypes, long id, List<Node> in, TreeMap<MapRulType, String> namesUse)
 			throws SQLException {
 		lowLevelWays++;
 		List<Node> nodes = new ArrayList<Node>();
@@ -849,7 +862,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		mapLowLevelBinaryStat.setLong(1, id);
 		mapLowLevelBinaryStat.setLong(2, firstId);
 		mapLowLevelBinaryStat.setLong(3, lastId);
-		mapLowLevelBinaryStat.setString(4, name);
+		mapLowLevelBinaryStat.setString(4, encodeNames(namesUse));
 		mapLowLevelBinaryStat.setBytes(5, bNodes.toByteArray());
 		mapLowLevelBinaryStat.setBytes(6, bTypes.toByteArray());
 		mapLowLevelBinaryStat.setBytes(7, bAddtTypes.toByteArray());
