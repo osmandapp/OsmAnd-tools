@@ -351,6 +351,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		TIntArrayList tempAdd = new TIntArrayList();
 		TreeMap<MapRulType, String> names = new TreeMap<MapRulType, String>();
 		TreeMap<MapRulType, String> names2 = new TreeMap<MapRulType, String>();
+		MapRulType refRuleType = renderingTypes.getEncodingRuleTypes().get("ref");
 		while (rs.next()) {
 			if (lowLevelWays != -1) {
 				progress.progress(1);
@@ -370,6 +371,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			names.clear();
 			decodeNames(rs.getString(5), names);
 			String name = names.get(renderingTypes.getNameRuleType());
+			String ref = names.get(refRuleType);
 			parseAndSort(typeUse, rs.getBytes(6));
 			parseAndSort(addtypeUse, rs.getBytes(7));
 			
@@ -399,6 +401,10 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 							String name2 = names2.get(renderingTypes.getNameRuleType());
 							if(!Algorithms.objectEquals(name2, name)){
 								name = null;
+							}
+							String ref2 = names2.get(refRuleType);
+							if(!Algorithms.objectEquals(ref2, name)){
+								ref = null;
 							}
 							ArrayList<Float> li = new ArrayList<Float>(list);
 							// remove first lat/lon point
@@ -432,6 +438,10 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 							if (!Algorithms.objectEquals(name2, name)) {
 								name = null;
 							}
+							String ref2 = names2.get(refRuleType);
+							if(!Algorithms.objectEquals(ref2, name)){
+								ref = null;
+							}
 							endNode = fs.getLong(3);
 							visitedWays.add(lid);
 							loadNodes(fs.getBytes(4), list);
@@ -464,9 +474,13 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 				OsmMapUtils.simplifyDouglasPeucker(wNodes, zoom - 1 + 8 + zoomWaySmothness, 3, res, false);
 				if (res.size() > 0) {
 					namesUse.clear();
-					if (name != null && name.length() > 0) {
-						for (MapRulType rt : names.keySet()) {
-							if(rt.getTag().startsWith("name")) {
+					for (MapRulType rt : names.keySet()) {
+						if (rt.getTag().startsWith("name")) {
+							if (name != null && name.length() > 0) {
+								namesUse.put(rt, names.get(rt));
+							}
+						} else if (rt.getTag().equals("ref")) {
+							if (ref != null && ref.length() > 0) {
 								namesUse.put(rt, names.get(rt));
 							}
 						}
