@@ -71,7 +71,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	// local purpose to speed up processing cache allocation
 	TIntArrayList typeUse = new TIntArrayList(8);
 	List<MapRulType> tempNameUse = new ArrayList<MapRulType>();
-	TreeMap<MapRulType, String> namesUse = new TreeMap<MapRulType, String>(new Comparator<MapRulType>() {
+	Comparator<MapRulType> comparator = new Comparator<MapRulType>() {
 
 		@Override
 		public int compare(MapRulType o1, MapRulType o2) {
@@ -83,7 +83,8 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			}
 			return lhs < rhs ? -1 : (lhs == rhs ? 0 : 1);
 		}
-	});
+	};
+	TreeMap<MapRulType, String> namesUse = new TreeMap<MapRulType, String>(comparator);
 	Map<EntityId, Map<String, String>> propogatedTags = new LinkedHashMap<Entity.EntityId, Map<String, String>>();
 	TIntArrayList addtypeUse = new TIntArrayList(8);
 
@@ -349,8 +350,8 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		ArrayList<Float> list = new ArrayList<Float>(100);
 		TIntArrayList temp = new TIntArrayList();
 		TIntArrayList tempAdd = new TIntArrayList();
-		TreeMap<MapRulType, String> names = new TreeMap<MapRulType, String>();
-		TreeMap<MapRulType, String> names2 = new TreeMap<MapRulType, String>();
+		TreeMap<MapRulType, String> names = new TreeMap<MapRulType, String>(comparator);
+		TreeMap<MapRulType, String> names2 = new TreeMap<MapRulType, String>(comparator);
 		MapRulType refRuleType = renderingTypes.getEncodingRuleTypes().get("ref");
 		while (rs.next()) {
 			if (lowLevelWays != -1) {
