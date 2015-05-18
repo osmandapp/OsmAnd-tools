@@ -570,6 +570,18 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
             precolors.put("tower","black");
             precolors.put("bridleway","white");
 	}
+	
+	private boolean isColor(String s) {
+		return s.equals("black")
+				|| s.equals("blue")
+				|| s.equals("green")
+				|| s.equals("red")
+				|| s.equals("white")
+				|| s.equals("yellow")
+				|| s.equals("orange")
+				|| s.equals("purple")
+				|| s.equals("brown");
+	}
 
 	public void addOSMCSymbolsSpecialTags(Map<MapRulType,String> propogated, Entry<String,String> ev) {
 		if ("osmc:symbol".equals(ev.getKey())) {
@@ -578,55 +590,17 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 //			2.New tags: osmc_waycolor=black, osmc_background=red, osmc_foreground=blue_rectangle, osmc_foreground2, osmc_text, osmc_textcolor, osmc_stub_name=. ,
 			String[] tokens = ev.getValue().split(":", 6);
 			osmcBackwardCompatility(propogated, tokens);
-			if (tokens.length > 0) {
-				String wayColor = tokens[0]; // formatColorToPalette(tokens[0], true);
-				MapRulType rt = getMapRuleType("osmc_waycolor", wayColor);
-				if (rt != null) {
-					propogated.put(rt, wayColor);
-				}
-				if (tokens.length > 1) {
-					String bgColor = tokens[1]; // formatColorToPalette(tokens[1], true);
-					rt = getMapRuleType("osmc_background", bgColor);
-					if (rt != null) {
-						propogated.put(rt, bgColor);
-						rt = getMapRuleType("osmc_stub_name", "");
-						if(rt != null) {
-							propogated.put(rt, ".");
-						}
-					}
-					if (tokens.length > 2) {
-						String shpVl = tokens[2]; // formatColorToPalette(tokens[1], true);
-						rt = getMapRuleType("osmc_foreground", shpVl);
-						if (rt != null) {
-							propogated.put(rt, shpVl);
-						}
-						if (tokens.length > 3) {
-							String shp2Vl = tokens[3];
-							rt = getMapRuleType("osmc_foreground2", shp2Vl);
-							if (rt != null) {
-								propogated.put(rt, shp2Vl);
-							}
-							if (tokens.length > 4) {
-								String txtVl = tokens[4];
-								rt = getMapRuleType("osmc_text", txtVl);
-								if (rt != null) {
-									propogated.put(rt, txtVl);
-								}
-								rt = getMapRuleType("osmc_text_symbol", txtVl);
-								if (rt != null) {
-									propogated.put(rt, txtVl);
-								}
-								if (tokens.length > 5) {
-									String txtcolorVl = tokens[5];
-									rt = getMapRuleType("osmc_textcolor", txtcolorVl);
-									if (rt != null) {
-										propogated.put(rt, txtcolorVl);
-									}
-								}
-							}
-						}
+			if(tokens != null) {
+				if(tokens.length >= 5) {
+					if(isColor(tokens[2])) {
+						tokens[2] = tokens[4];
+						tokens[1] = tokens[3];
+					} else if(isColor(tokens[3])) {
+						tokens[2] = tokens[3];
+						tokens[3] = tokens[4];
 					}
 				}
+				addOsmcNewTags(propogated, tokens);
 			}
 		}
 		if ("color".equals(ev.getKey()) || "colour".equals(ev.getKey())) {
@@ -640,6 +614,61 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			rt = getMapRuleType(nm, "");
 			if(rt != null) {
 				propogated.put(rt, "");
+			}
+		}
+	}
+
+
+
+	private void addOsmcNewTags(Map<MapRulType, String> propogated, String[] tokens) {
+		if (tokens.length > 0) {
+			String wayColor = tokens[0]; // formatColorToPalette(tokens[0], true);
+			MapRulType rt = getMapRuleType("osmc_waycolor", wayColor);
+			if (rt != null) {
+				propogated.put(rt, wayColor);
+			}
+			if (tokens.length > 1) {
+				String bgColor = tokens[1]; // formatColorToPalette(tokens[1], true);
+				rt = getMapRuleType("osmc_background", bgColor);
+				if (rt != null) {
+					propogated.put(rt, bgColor);
+					rt = getMapRuleType("osmc_stub_name", "");
+					if(rt != null) {
+						propogated.put(rt, ".");
+					}
+				}
+				if (tokens.length > 2) {
+					String shpVl = tokens[2]; // formatColorToPalette(tokens[1], true);
+					rt = getMapRuleType("osmc_foreground", shpVl);
+					if (rt != null) {
+						propogated.put(rt, shpVl);
+					}
+					if (tokens.length > 3) {
+						String shp2Vl = tokens[3];
+						rt = getMapRuleType("osmc_foreground2", shp2Vl);
+						if (rt != null) {
+							propogated.put(rt, shp2Vl);
+						}
+						if (tokens.length > 4) {
+							String txtVl = tokens[4];
+							rt = getMapRuleType("osmc_text", txtVl);
+							if (rt != null) {
+								propogated.put(rt, txtVl);
+							}
+							rt = getMapRuleType("osmc_text_symbol", txtVl);
+							if (rt != null) {
+								propogated.put(rt, txtVl);
+							}
+							if (tokens.length > 5) {
+								String txtcolorVl = tokens[5];
+								rt = getMapRuleType("osmc_textcolor", txtcolorVl);
+								if (rt != null) {
+									propogated.put(rt, txtcolorVl);
+								}
+							}
+						}
+					}
+				}
 			}
 		}
 	}
