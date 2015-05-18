@@ -841,6 +841,7 @@
 		<!-- 	<region name="australia" downloadName="australia-latest"/> -->
 			<region name="new-caledonia" downloadName="new-caledonia-latest"/>
 			<region name="new-zealand" downloadName="new-zealand-latest"/>
+			<region name="papua-new-guinea"/>
 		</regions>
 
 		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" skip="false" region_suffix="_Australia-oceania">
