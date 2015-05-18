@@ -592,12 +592,15 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			osmcBackwardCompatility(propogated, tokens);
 			if(tokens != null) {
 				if(tokens.length >= 5) {
-					if(isColor(tokens[2])) {
+					if(isColor(tokens[3])) {
+						tokens[3] = tokens[5];
 						tokens[2] = tokens[4];
-						tokens[1] = tokens[3];
-					} else if(isColor(tokens[3])) {
-						tokens[2] = tokens[3];
+						tokens[2] = "";
+						tokens[3] = "";
+					} else if(isColor(tokens[4])) {
+						tokens[4] = tokens[5];
 						tokens[3] = tokens[4];
+						tokens[3] = "";
 					}
 				}
 				addOsmcNewTags(propogated, tokens);
