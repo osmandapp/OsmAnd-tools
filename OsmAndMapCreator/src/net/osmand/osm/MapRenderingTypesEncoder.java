@@ -590,15 +590,6 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 //			2.New tags: osmc_waycolor=black, osmc_background=red, osmc_foreground=blue_rectangle, osmc_foreground2, osmc_text, osmc_textcolor, osmc_stub_name=. ,
 			String[] tokens = ev.getValue().split(":", 6);
 			osmcBackwardCompatility(propogated, tokens);
-			if(tokens[3] == null) {
-				tokens[3] = "";
-			}
-			if(tokens[4] == null) {
-				tokens[4] = "";
-			}
-			if(tokens[5] == null) {
-				tokens[5] = "";
-			}
 			if(tokens != null) {
 				if(tokens.length > 3) {
 					if(isColor(tokens[3])) {
