@@ -591,16 +591,19 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			String[] tokens = ev.getValue().split(":", 6);
 			osmcBackwardCompatility(propogated, tokens);
 			if(tokens != null) {
- 				if(tokens.length > 5) {
- 					if(isColor(tokens[3])) {
- 						tokens[3] = tokens[5];
- 						tokens[2] = tokens[4];
- 					} else if(isColor(tokens[4])) {
- 						tokens[3] = tokens[4];
- 						tokens[4] = tokens[5];
- 					}
+ 				if(tokens.length > 3 && tokens.length < 6) {
+ 					String[] ntokens = new String[] {
+ 						tokens[0], 
+ 						tokens[1],
+ 						tokens.length == 4 ? "" : tokens[2], 
+ 						"",
+ 						tokens.length == 4 ? tokens[2] : tokens[3],
+ 						tokens.length == 4 ? tokens[3] : tokens[4]
+ 					};
+ 					addOsmcNewTags(propogated, ntokens);
+ 				} else {
+ 					addOsmcNewTags(propogated, tokens);
  				}
-				addOsmcNewTags(propogated, tokens);
 			}
 		}
 		if ("color".equals(ev.getKey()) || "colour".equals(ev.getKey())) {
