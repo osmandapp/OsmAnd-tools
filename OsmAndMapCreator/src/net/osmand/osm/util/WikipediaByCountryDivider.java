@@ -260,16 +260,22 @@ public class WikipediaByCountryDivider {
 		while (rs.next()) {
 			String regionName = rs.getString(1);
 			File fl = new File(rgns, regionName + ".sqlite");
-			FileOutputStream osmBz2FileOut = new FileOutputStream(new File(rgns, regionName + ".osm.bz2"));
-			osmBz2FileOut.write('B');
-			osmBz2FileOut.write('Z');
-			CBZip2OutputStream bzipStream = new CBZip2OutputStream(osmBz2FileOut);
+			FileOutputStream out = new FileOutputStream(new File(rgns, regionName + ".osm.bz2"));
+			out.write('B');
+			out.write('Z');
+			CBZip2OutputStream bzipStream = new CBZip2OutputStream(out);
 			XmlSerializer serializer = new org.kxml2.io.KXmlSerializer();
-			serializer.setOutput(osmBz2FileOut, "UTF-8");
+			serializer.setOutput(bzipStream, "UTF-8");
 			serializer.startDocument("UTF-8", true);
 			serializer.startTag(null, "osm");
 			serializer.attribute(null, "version", "0.6");
 			serializer.attribute(null, "generator", "OsmAnd6");
+			// indentation as 3 spaces
+			serializer.setProperty(
+			   "http://xmlpull.org/v1/doc/properties.html#serializer-indentation", "   ");
+			// also set the line separator
+			serializer.setProperty(
+			   "http://xmlpull.org/v1/doc/properties.html#serializer-line-separator", "\n");
 			fl.delete();
 			System.out.println("Generate " +fl.getName());
 			Connection loc = (Connection) DBDialect.SQLITE.getDatabaseConnection(fl.getAbsolutePath(), log);
@@ -293,12 +299,12 @@ public class WikipediaByCountryDivider {
 				String title = rps.getString(6);
 				byte[] bytes = rps.getBytes(7);
 				GZIPInputStream gzin = new GZIPInputStream(new ByteArrayInputStream(bytes));
-				 BufferedReader br = new BufferedReader(new InputStreamReader(gzin));
-				  content.setLength(0);
-				  String s;
-				  while((s = br.readLine()) != null) {
-					  content.append(s);
-				  }
+				BufferedReader br = new BufferedReader(new InputStreamReader(gzin));
+				content.setLength(0);
+				String s;
+				while ((s = br.readLine()) != null) {
+					content.append(s);
+				}
 				insertWikiContent.setLong(1, osmId);
 				insertWikiContent.setDouble(2, lat);
 				insertWikiContent.setDouble(3, lon);
