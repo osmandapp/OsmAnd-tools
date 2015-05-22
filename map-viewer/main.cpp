@@ -302,7 +302,7 @@ int main(int argc, char** argv)
     animator->setMapRenderer(renderer);
 
     //////////////////////////////////////////////////////////////////////////
-    markers.reset(new OsmAnd::MapMarkersCollection());
+    /*markers.reset(new OsmAnd::MapMarkersCollection());
     std::shared_ptr<OsmAnd::MapMarkerBuilder> markerBuilder(new OsmAnd::MapMarkerBuilder());
     {
         std::shared_ptr<SkBitmap> locationPinImage(new SkBitmap());
@@ -320,7 +320,7 @@ int main(int argc, char** argv)
     lastClickedLocationMarker->setOnMapSurfaceIconDirection(reinterpret_cast<OsmAnd::MapMarker::OnSurfaceIconKey>(1), Q_QNAN);
     lastClickedLocationMarker->setIsAccuracyCircleVisible(true);
     lastClickedLocationMarker->setAccuracyCircleRadius(2000.0);
-    renderer->addSymbolsProvider(markers);
+    renderer->addSymbolsProvider(markers);*/
     //////////////////////////////////////////////////////////////////////////
 
     favorites.reset(new OsmAnd::FavoriteLocationsGpxCollection());
@@ -396,18 +396,24 @@ int main(int argc, char** argv)
     }
 
     //////////////////////////////////////////////////////////////////////////
-
     //OsmAnd::AmenitiesByNameSearch amenitiesByNameSearch(obfsCollection);
     //OsmAnd::AmenitiesByNameSearch::Criteria amenitiesByNameSearchCriteria;
-    //amenitiesByNameSearchCriteria.name = "b";
-    //amenitiesByNameSearchCriteria.bbox31 = (OsmAnd::AreaI)OsmAnd::Utilities::boundingBox31FromAreaInMeters(10000, OsmAnd::PointI(1277170718, 772908411));
     //amenitiesByNameSearch.performSearch(amenitiesByNameSearchCriteria,
     //    []
     //    (const OsmAnd::ISearch::Criteria& criteria, const OsmAnd::ISearch::IResultEntry& resultEntry_)
     //    {
     //        const auto& resultEntry = *dynamic_cast<const OsmAnd::AmenitiesByNameSearch::ResultEntry*>(&resultEntry_);
 
-    //        OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, "%s (%s)", qPrintable(resultEntry.amenity->nativeName), qPrintable(resultEntry.amenity->id.toString()));
+    //        OsmAnd::LogPrintf(
+    //            OsmAnd::LogSeverityLevel::Info, "%s (%s)",
+    //            qPrintable(resultEntry.amenity->nativeName),
+    //            qPrintable(resultEntry.amenity->id.toString()));
+
+    //        const auto& values = resultEntry.amenity->getDecodedValues();
+    //        for (const auto& entry : OsmAnd::rangeOf(values))
+    //        {
+    //            int i = 5;
+    //        }
     //    });
     //int i = 5;
     //////////////////////////////////////////////////////////////////////////
@@ -540,11 +546,11 @@ int main(int argc, char** argv)
     //    706223457));
     //renderer->setZoom(11.787f);
     //
-    //// Synthetic
-    //renderer->setTarget(OsmAnd::Utilities::convertLatLonTo31(OsmAnd::LatLon(
-    //    45.731606,
-    //    36.528217)));
-    //renderer->setZoom(17.0f);
+    // Synthetic
+    renderer->setTarget(OsmAnd::Utilities::convertLatLonTo31(OsmAnd::LatLon(
+        45.731606,
+        36.528217)));
+    renderer->setZoom(17.0f);
 
     // Tokyo
     /*renderer->setTarget(OsmAnd::PointI(
@@ -697,6 +703,19 @@ void mouseHandler(int button, int state, int x, int y)
                     OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, " - symbols in group %d", group->symbols.size());
                     OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, " - presentation mode %u", static_cast<unsigned int>(group->presentationMode));
                     OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, " - from %s", qPrintable(group->toString()));
+
+                    if (const auto mapObjectGroup = std::dynamic_pointer_cast<const OsmAnd::MapObjectsSymbolsProvider::MapObjectSymbolsGroup>(group))
+                    {
+                        if (const auto obfMapObject = std::dynamic_pointer_cast<const OsmAnd::ObfMapObject>(mapObjectGroup->mapObject))
+                        {
+                            std::shared_ptr<const OsmAnd::Amenity> amenity;
+                            obfsCollection->obtainDataInterface()->findAmenityForObfMapObject(obfMapObject, &amenity);
+                            if (amenity)
+                            {
+                                OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, " - has amenity");
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -1094,6 +1113,7 @@ void activateProvider(int layerIdx, int idx)
         QHash< QString, QString > settings;
         settings.insert("appMode", "browse map");
         //settings.insert("contourLines", "11");
+        settings.insert("osmcTraces", "true");
         mapPresentationEnvironment->setSettings(settings);
 
         auto tileProvider = new OsmAnd::MapRasterLayerProvider_Software(mapPrimitivesProvider);
