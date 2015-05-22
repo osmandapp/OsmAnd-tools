@@ -1,8 +1,11 @@
 package net.osmand.osm.util;
 
+import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -24,6 +27,8 @@ import net.osmand.map.OsmandRegions;
 import net.osmand.util.MapUtils;
 
 import org.apache.commons.logging.Log;
+import org.apache.tools.bzip2.CBZip2OutputStream;
+import org.xmlpull.v1.XmlSerializer;
 
 public class WikipediaByCountryDivider {
 	private static final Log log = PlatformUtil.getLog(WikipediaByCountryDivider.class);
@@ -245,7 +250,9 @@ public class WikipediaByCountryDivider {
 		System.out.println("Generation finished");
 	}
 	
-	protected static void generateCountrySqlite(String folder) throws SQLException {
+	
+	
+	protected static void generateCountrySqlite(String folder) throws SQLException, IOException {
 		Connection conn = (Connection) DBDialect.SQLITE.getDatabaseConnection(folder + "wiki.sqlite", log);
 		File rgns = new File(folder, "regions");
 		rgns.mkdirs();
@@ -253,6 +260,15 @@ public class WikipediaByCountryDivider {
 		while (rs.next()) {
 			String regionName = rs.getString(1);
 			File fl = new File(rgns, regionName + ".sqlite");
+			FileOutputStream osmBz2FileOut = new FileOutputStream(new File(rgns, regionName + ".osm.bz2"));
+			osmBz2FileOut.write('B');
+			osmBz2FileOut.write('Z');
+			CBZip2OutputStream bzipStream = new CBZip2OutputStream(osmBz2FileOut);
+			XmlSerializer serializer = new org.kxml2.io.KXmlSerializer();
+			serializer.setOutput(osmBz2FileOut, "UTF-8");
+			serializer.startDocument("osm", null);
+			serializer.attribute(null, "version", "0.6");
+			serializer.attribute(null, "generator", "OsmAnd6");
 			fl.delete();
 			System.out.println("Generate " +fl.getName());
 			Connection loc = (Connection) DBDialect.SQLITE.getDatabaseConnection(fl.getAbsolutePath(), log);
@@ -266,24 +282,71 @@ public class WikipediaByCountryDivider {
 							+ " FROM wiki_content WC INNER JOIN wiki_region WR "
 							+ " ON WC.id = WR.id AND WR.regionName = '" + regionName + "' ORDER BY WC.id");
 			int cnt = 1;
+			long prevOsmId = -1;
+			StringBuilder content = new StringBuilder(); 
 			while (rps.next()) {
-				insertWikiContent.setLong(1, rps.getLong(1));
-				insertWikiContent.setDouble(2, rps.getDouble(2));
-				insertWikiContent.setDouble(3, rps.getDouble(3));
-				insertWikiContent.setString(4, rps.getString(4));
+				long osmId = rps.getLong(1);
+				double lat = rps.getDouble(2);
+				double lon = rps.getDouble(3);
+				String wikiLang = rps.getString(4);
+				String title = rps.getString(6);
+				byte[] bytes = rps.getBytes(7);
+				GZIPInputStream gzin = new GZIPInputStream(new ByteArrayInputStream(bytes));
+				 BufferedReader br = new BufferedReader(new InputStreamReader(gzin));
+				  content.setLength(0);
+				  String s;
+				  while((s = br.readLine()) != null) {
+					  content.append(s);
+				  }
+				insertWikiContent.setLong(1, osmId);
+				insertWikiContent.setDouble(2, lat);
+				insertWikiContent.setDouble(3, lon);
+				insertWikiContent.setString(4, wikiLang);
 				insertWikiContent.setLong(5, rps.getLong(5));
-				insertWikiContent.setString(6, rps.getString(6));
-				insertWikiContent.setBytes(7, rps.getBytes(7));
+				insertWikiContent.setString(6, title);
+				insertWikiContent.setBytes(7, bytes);
 				insertWikiContent.addBatch();
 				if (cnt++ % BATCH_SIZE == 0) {
 					insertWikiContent.executeBatch();
 				}
+				if(osmId != prevOsmId) {
+					if(prevOsmId != -1) {
+						serializer.endTag(null, "node");
+					}
+					prevOsmId = osmId;
+					serializer.startTag(null, "node");
+					serializer.attribute(null, "visible", "true");
+					serializer.attribute(null, "id", osmId+"");
+					serializer.attribute(null, "lat", lat+"");
+					serializer.attribute(null, "lon", lon+"");
+					addTag(serializer, "osmwiki", "place");
+				}
+				if(wikiLang.equals("en")) {
+					addTag(serializer, "name", title);
+					addTag(serializer, "content", content.toString());
+				} else {
+					addTag(serializer, "name:"+wikiLang, title);
+					addTag(serializer, "content:"+wikiLang, content.toString());
+				}
+			}
+			if(prevOsmId != -1) {
+				serializer.endTag(null, "node");
 			}
 			insertWikiContent.executeBatch();
 			loc.close();
+			serializer.endDocument();
+			serializer.flush();
+			bzipStream.close();
 			System.out.println("Processed " + cnt + " pois");
 		}
 		conn.close();
+	}
+
+	private static void addTag(XmlSerializer serializer, String key, String value) throws IOException {
+		serializer.startTag(null, "tag");
+		serializer.attribute(null, "k", key);
+		serializer.attribute(null, "v", value);
+		serializer.endTag(null, "tag");
 	}
 
 	protected static void inspectWikiFile(String folder) throws SQLException {
