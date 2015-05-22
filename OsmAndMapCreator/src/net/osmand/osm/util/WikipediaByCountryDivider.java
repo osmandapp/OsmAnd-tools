@@ -270,12 +270,14 @@ public class WikipediaByCountryDivider {
 			serializer.startTag(null, "osm");
 			serializer.attribute(null, "version", "0.6");
 			serializer.attribute(null, "generator", "OsmAnd6");
+			serializer.setFeature(
+					"http://xmlpull.org/v1/doc/features.html#indent-output", true);
 			// indentation as 3 spaces
-			serializer.setProperty(
-			   "http://xmlpull.org/v1/doc/properties.html#serializer-indentation", "   ");
-			// also set the line separator
-			serializer.setProperty(
-			   "http://xmlpull.org/v1/doc/properties.html#serializer-line-separator", "\n");
+//			serializer.setProperty(
+//			   "http://xmlpull.org/v1/doc/properties.html#serializer-indentation", "   ");
+//			// also set the line separator
+//			serializer.setProperty(
+//			   "http://xmlpull.org/v1/doc/properties.html#serializer-line-separator", "\n");
 			fl.delete();
 			System.out.println("Generate " +fl.getName());
 			Connection loc = (Connection) DBDialect.SQLITE.getDatabaseConnection(fl.getAbsolutePath(), log);
