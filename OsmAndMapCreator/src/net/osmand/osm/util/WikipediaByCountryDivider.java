@@ -266,7 +266,8 @@ public class WikipediaByCountryDivider {
 			CBZip2OutputStream bzipStream = new CBZip2OutputStream(osmBz2FileOut);
 			XmlSerializer serializer = new org.kxml2.io.KXmlSerializer();
 			serializer.setOutput(osmBz2FileOut, "UTF-8");
-			serializer.startDocument("osm", null);
+			serializer.startDocument("UTF-8", true);
+			serializer.startTag(null, "osm");
 			serializer.attribute(null, "version", "0.6");
 			serializer.attribute(null, "generator", "OsmAnd6");
 			fl.delete();
