@@ -4,9 +4,14 @@ package net.osmand.data.preparation;
 import gnu.trove.list.array.TByteArrayList;
 import gnu.trove.list.array.TIntArrayList;
 
+import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
+import java.nio.charset.CharsetDecoder;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -20,6 +25,8 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.Stack;
 import java.util.TreeSet;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 
 import net.osmand.IndexConstants;
 import net.osmand.binary.BinaryMapIndexReader;
@@ -1368,7 +1375,7 @@ public class BinaryMapIndexWriter {
 
 	public void writePoiDataAtom(long id, int x24shift, int y24shift, 
 			String type, String subtype, Map<MapRulType, String> additionalNames, MapRenderingTypes rtypes, 
-			PoiCreatorCategories globalCategories) throws IOException {
+			PoiCreatorCategories globalCategories, int limitZip) throws IOException {
 		checkPeekState(POI_DATA);
 		TIntArrayList types = globalCategories.buildTypeIds(type, subtype);
 		OsmAndPoiBoxDataAtom.Builder builder = OsmandOdb.OsmAndPoiBoxDataAtom.newBuilder();
@@ -1421,7 +1428,27 @@ public class BinaryMapIndexWriter {
 				builder.addSubcategories(targetPoiId);
 			} else {
 				builder.addTextCategories(targetPoiId);
-				builder.addTextValues(rt.getValue());
+				String vl = rt.getValue();
+				if(vl != null && limitZip != -1 && vl.length() >= limitZip) {
+					ByteArrayOutputStream bous = new ByteArrayOutputStream(vl.length());
+					bous.write(' ');
+					bous.write('g');
+					bous.write('z');
+					bous.write(' ');
+					GZIPOutputStream gz = new GZIPOutputStream(bous);
+					byte[] bts = vl.getBytes("UTF-8");
+					gz.write(bts);
+					gz.close();
+					byte[] res = bous.toByteArray();
+					StringBuilder sb = new StringBuilder(res.length);
+					for(int i = 0; i < res.length; i++) {
+						sb.append((char) (res[i] < 0 ? ((int)res[i]) + 256 : res[i]));
+					}
+					vl = sb.toString();
+				} else if (vl != null) {
+					vl = vl.trim();
+				}
+				builder.addTextValues(vl);
 			}
 		}
 		codedOutStream.writeMessage(OsmandOdb.OsmAndPoiBoxData.POIDATA_FIELD_NUMBER, builder.build());

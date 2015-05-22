@@ -30,6 +30,9 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	private Map<String, List<EntityConvert>> convertTags = new HashMap<String, List<EntityConvert>>();
 	private MapRulType coastlineRuleType;
 	
+	private String[] langs = new String[] { "ar", "be", "ca", "cs", "da", "de", "el", "es", "fi", "fr", "he", "hi",
+			"hr", "hu", "it", "ja", "ko", "lt", "lv", "nl", "pl", "ro", "ru", "sk", "sl", "sv", "sw", "zh" };
+	
 	public MapRenderingTypesEncoder(String fileName) {
 		super(fileName);
 	}
@@ -189,9 +192,23 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 
 
 	@Override
-	protected MapRulType parseTypeFromXML(XmlPullParser parser, MapRulType parent) {
+	protected void parseAndRegisterTypeFromXML(XmlPullParser parser, MapRulType parent) {
 		MapRulType rtype = parseBaseRuleType(parser, parent, false);
 		rtype.onlyPoi = "true".equals(parser.getAttributeValue("", "only_poi"));
+		registerOnlyMap(parser, rtype);
+		if("true".equals(parser.getAttributeValue("", "lang"))) {
+			for (String lng : langs) {
+				String tag = lc(parser.getAttributeValue("", "tag")) + ":" + lng;
+				MapRulType retype = parseBaseRuleType(parser, parent, false, tag);
+				retype.onlyPoi = "true".equals(parser.getAttributeValue("", "only_poi"));
+				registerOnlyMap(parser, retype);
+			}
+		}
+	}
+
+
+
+	private void registerOnlyMap(XmlPullParser parser, MapRulType rtype) {
 		if(!rtype.onlyPoi) {
 			String val = parser.getAttributeValue("", "minzoom"); //$NON-NLS-1$
 			if(rtype.isMain()) {
@@ -209,7 +226,6 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 				registerRuleType(rtype);
 			}
 		}
-		return rtype;
 	}
 
 	public boolean encodeEntityWithType(Entity e, int zoom, TIntArrayList outTypes, 

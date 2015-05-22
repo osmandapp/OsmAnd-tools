@@ -58,6 +58,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	private static final int CHARACTERS_TO_BUILD = 4;
 	private boolean useInMemoryCreator = true; 
 	public static long GENERATE_OBJ_ID = - (1l << 10l); 
+	public static boolean ZIP_LONG_STRINGS = false;
+	public static int ZIP_STRING_LIMIT = 100;
 
 	
 
@@ -436,7 +438,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					int x24shift = (x31 >> 7) - (x << (24 - z));
 					int y24shift = (y31 >> 7) - (y << (24 - z));
 					writer.writePoiDataAtom(poi.id, x24shift, y24shift, type, subtype, poi.additionalTags, renderingTypes, 
-							globalCategories);	
+							globalCategories, ZIP_LONG_STRINGS ? ZIP_STRING_LIMIT : -1);	
 				}
 				
 			} else {
@@ -455,7 +457,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					String type = rset.getString(4);
 					String subtype = rset.getString(5);
 					writer.writePoiDataAtom(id, x24shift, y24shift,  type, subtype, 
-							decodeAdditionalInfo(rset.getString(6), mp), renderingTypes, globalCategories);
+							decodeAdditionalInfo(rset.getString(6), mp), renderingTypes, globalCategories,
+							ZIP_LONG_STRINGS ? ZIP_STRING_LIMIT : -1);
 				}
 				rset.close();
 			}

@@ -775,9 +775,9 @@ public class IndexCreator {
 		
 //		if(true){ generateRegionsFile(); return;}
 		String rootFolder = "/Users/victorshcherb/osmand/";
-		
+//		IndexPoiCreator.ZIP_LONG_STRINGS = true;
 		IndexCreator creator = new IndexCreator(new File(rootFolder + "/osm-gen/")); //$NON-NLS-1$
-		creator.setIndexMap(true);
+//		creator.setIndexMap(true);
 		creator.setIndexAddress(true);
 		creator.setIndexPOI(true);
 //		creator.setIndexTransport(true);
@@ -793,7 +793,8 @@ public class IndexCreator {
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 
 //		String file = rootFolder + "/temp/map.osm";
-		String file = rootFolder + "/repos/resources/synthetic_test_rendering.osm";
+//		String file = rootFolder + "/repos/resources/synthetic_test_rendering.osm";
+		String file = rootFolder + "/maps/adygeya.osm.bz2";
 
 		int st = file.lastIndexOf('/');
 		int e = file.indexOf('.', st);
