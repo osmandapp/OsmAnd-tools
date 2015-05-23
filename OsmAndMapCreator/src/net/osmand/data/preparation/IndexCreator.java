@@ -775,7 +775,7 @@ public class IndexCreator {
 		
 //		if(true){ generateRegionsFile(); return;}
 		String rootFolder = "/Users/victorshcherb/osmand/";
-//		IndexPoiCreator.ZIP_LONG_STRINGS = true;
+		IndexPoiCreator.ZIP_LONG_STRINGS = true;
 		IndexCreator creator = new IndexCreator(new File(rootFolder + "/osm-gen/")); //$NON-NLS-1$
 //		creator.setIndexMap(true);
 		creator.setIndexAddress(true);

@@ -1431,18 +1431,15 @@ public class BinaryMapIndexWriter {
 				String vl = rt.getValue();
 				if(vl != null && limitZip != -1 && vl.length() >= limitZip) {
 					ByteArrayOutputStream bous = new ByteArrayOutputStream(vl.length());
-					bous.write(' ');
-					bous.write('g');
-					bous.write('z');
-					bous.write(' ');
 					GZIPOutputStream gz = new GZIPOutputStream(bous);
 					byte[] bts = vl.getBytes("UTF-8");
 					gz.write(bts);
 					gz.close();
 					byte[] res = bous.toByteArray();
 					StringBuilder sb = new StringBuilder(res.length);
+					sb.append(" gz ");
 					for(int i = 0; i < res.length; i++) {
-						sb.append((char) (res[i] < 0 ? ((int)res[i]) + 256 : res[i]));
+						sb.append((char) ((int)res[i] + 128 + 32));
 					}
 					vl = sb.toString();
 				} else if (vl != null) {
