@@ -23,11 +23,17 @@ import java.util.zip.GZIPInputStream;
 import net.osmand.PlatformUtil;
 import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.data.preparation.DBDialect;
+import net.osmand.data.preparation.IndexCreator;
+import net.osmand.data.preparation.IndexPoiCreator;
+import net.osmand.data.preparation.MapZooms;
+import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.map.OsmandRegions;
+import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.util.MapUtils;
 
 import org.apache.commons.logging.Log;
 import org.apache.tools.bzip2.CBZip2OutputStream;
+import org.xml.sax.SAXException;
 import org.xmlpull.v1.XmlSerializer;
 
 public class WikipediaByCountryDivider {
@@ -222,7 +228,7 @@ public class WikipediaByCountryDivider {
 
 	}
 
-	public static void main(String[] args) throws IOException, SQLException {
+	public static void main(String[] args) throws IOException, SQLException, SAXException, InterruptedException {
 //		String folder = "/home/victor/projects/osmand/wiki/";
 //		String regionsFile = "/home/victor/projects/osmand/repo/resources/countries-info/regions.ocbf";
 //		String cmd = "regenerate";
@@ -252,7 +258,7 @@ public class WikipediaByCountryDivider {
 	
 	
 	
-	protected static void generateCountrySqlite(String folder) throws SQLException, IOException {
+	protected static void generateCountrySqlite(String folder) throws SQLException, IOException, SAXException, InterruptedException {
 		Connection conn = (Connection) DBDialect.SQLITE.getDatabaseConnection(folder + "wiki.sqlite", log);
 		File rgns = new File(folder, "regions");
 		rgns.mkdirs();
@@ -260,7 +266,21 @@ public class WikipediaByCountryDivider {
 		while (rs.next()) {
 			String regionName = rs.getString(1);
 			File fl = new File(rgns, regionName + ".sqlite");
-			FileOutputStream out = new FileOutputStream(new File(rgns, regionName + ".osm.bz2"));
+			
+			fl.delete();
+			System.out.println("Generate " +fl.getName());
+			Connection loc = (Connection) DBDialect.SQLITE.getDatabaseConnection(fl.getAbsolutePath(), log);
+			loc.createStatement()
+					.execute(
+							"CREATE TABLE wiki_content(id long, lat double, lon double, lang text, wikiId long, title text, zipContent blob)");
+			PreparedStatement insertWikiContent = loc
+					.prepareStatement("INSERT INTO wiki_content VALUES(?, ?, ?, ?, ?, ?, ?)");
+			ResultSet rps = conn.createStatement().executeQuery(
+					"SELECT WC.id, WC.lat, WC.lon, WC.lang, WC.wikiId, WC.title, WC.zipContent "
+							+ " FROM wiki_content WC INNER JOIN wiki_region WR "
+							+ " ON WC.id = WR.id AND WR.regionName = '" + regionName + "' ORDER BY WC.id");
+			File osmBz2 = new File(rgns, regionName + "_wiki.osm.bz2");
+			FileOutputStream out = new FileOutputStream(osmBz2);
 			out.write('B');
 			out.write('Z');
 			CBZip2OutputStream bzipStream = new CBZip2OutputStream(out);
@@ -278,18 +298,6 @@ public class WikipediaByCountryDivider {
 //			// also set the line separator
 //			serializer.setProperty(
 //			   "http://xmlpull.org/v1/doc/properties.html#serializer-line-separator", "\n");
-			fl.delete();
-			System.out.println("Generate " +fl.getName());
-			Connection loc = (Connection) DBDialect.SQLITE.getDatabaseConnection(fl.getAbsolutePath(), log);
-			loc.createStatement()
-					.execute(
-							"CREATE TABLE wiki_content(id long, lat double, lon double, lang text, wikiId long, title text, zipContent blob)");
-			PreparedStatement insertWikiContent = loc
-					.prepareStatement("INSERT INTO wiki_content VALUES(?, ?, ?, ?, ?, ?, ?)");
-			ResultSet rps = conn.createStatement().executeQuery(
-					"SELECT WC.id, WC.lat, WC.lon, WC.lang, WC.wikiId, WC.title, WC.zipContent "
-							+ " FROM wiki_content WC INNER JOIN wiki_region WR "
-							+ " ON WC.id = WR.id AND WR.regionName = '" + regionName + "' ORDER BY WC.id");
 			int cnt = 1;
 			long prevOsmId = -1;
 			StringBuilder content = new StringBuilder(); 
@@ -347,8 +355,23 @@ public class WikipediaByCountryDivider {
 			serializer.flush();
 			bzipStream.close();
 			System.out.println("Processed " + cnt + " pois");
+			generateObf(osmBz2);
 		}
 		conn.close();
+	}
+
+	private static void generateObf(File osmBz2) throws IOException, SAXException, SQLException, InterruptedException {
+		IndexPoiCreator.ZIP_LONG_STRINGS = true;
+		IndexCreator creator = new IndexCreator(osmBz2.getParentFile()); //$NON-NLS-1$
+		creator.setIndexMap(false);
+		creator.setIndexAddress(false);
+		creator.setIndexPOI(true);
+		creator.setIndexTransport(false);
+		creator.setIndexRouting(false);
+		creator.generateIndexes(osmBz2,
+				new ConsoleProgressImplementation(1), null, MapZooms.getDefault(), MapRenderingTypesEncoder.getDefault(), log);
+
+		
 	}
 
 	private static void addTag(XmlSerializer serializer, String key, String value) throws IOException {
