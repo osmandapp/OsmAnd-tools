@@ -145,7 +145,7 @@ public class WikipediaByCountryDivider {
 			keyNames.clear();
 			List<BinaryMapDataObject> cs = regions.query(MapUtils.get31TileNumberX(lon), MapUtils.get31TileNumberY(lat));
 			for (BinaryMapDataObject b : cs) {
-				keyNames.add(regions.getKeyName(b));
+				keyNames.add(regions.getDownloadName(b));
 			}
 			return keyNames;
 		}
@@ -269,7 +269,7 @@ public class WikipediaByCountryDivider {
 			serializer.startDocument("UTF-8", true);
 			serializer.startTag(null, "osm");
 			serializer.attribute(null, "version", "0.6");
-			serializer.attribute(null, "generator", "OsmAnd6");
+			serializer.attribute(null, "generator", "OsmAnd");
 			serializer.setFeature(
 					"http://xmlpull.org/v1/doc/features.html#indent-output", true);
 			// indentation as 3 spaces
