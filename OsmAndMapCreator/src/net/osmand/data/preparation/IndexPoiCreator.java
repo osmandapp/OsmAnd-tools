@@ -529,7 +529,18 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 				prevTree = subtree;
 			}
-			addNamePrefix(additionalTags.get(nameRuleType), additionalTags.get(nameEnRuleType), prevTree.getNode(), namesIndex);
+			Set<String> otherNames = null;
+			Iterator<Entry<MapRulType, String>> it = additionalTags.entrySet().iterator();
+			while (it.hasNext()) {
+				Entry<MapRulType, String> e = it.next();
+				if (e.getKey().getTag().startsWith("name:") && !"name:en".equals(e.getKey().getTag())) {
+					if (otherNames == null) {
+						otherNames = new TreeSet<String>();
+					}
+					otherNames.add(e.getValue());
+				}
+			}
+			addNamePrefix(additionalTags.get(nameRuleType), additionalTags.get(nameEnRuleType), prevTree.getNode(), namesIndex, otherNames);
 			
 			if (useInMemoryCreator) {
 				if (prevTree.getNode().poiData == null) {
@@ -549,7 +560,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		log.info("Poi processing finished");
 	}
 	
-	public void addNamePrefix(String name, String nameEn, PoiTileBox data, Map<String, Set<PoiTileBox>> poiData) {
+	public void addNamePrefix(String name, String nameEn, PoiTileBox data, Map<String, Set<PoiTileBox>> poiData, Set<String> names) {
 		if (name != null) {
 			parsePrefix(name, data, poiData);
 			if (Algorithms.isEmpty(nameEn)) {
@@ -557,6 +568,13 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			}
 			if (!Algorithms.objectEquals(nameEn, name)) {
 				parsePrefix(nameEn, data, poiData);
+			}
+			if (names != null) {
+				for (String nk : names) {
+					if (!Algorithms.objectEquals(nk, name) && !Algorithms.isEmpty(nk)) {
+						parsePrefix(nk, data, poiData);
+					}
+				}
 			}
 		}
 	}
