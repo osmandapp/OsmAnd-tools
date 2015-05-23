@@ -88,12 +88,6 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 
 	protected void addRuleToPropogated(Map<MapRulType, String> propogated, Map<String, String> ts, MapRulType rule,
 			String value) {
-		if(rule.targetTagValue != null) {
-			rule = rule.targetTagValue;
-			if(rule.getValue() != null) {
-				value = rule.getValue();
-			}
-		}
 		if (rule.names != null) {
 			for (int i = 0; i < rule.names.length; i++) {
 				String tag = rule.names[i].tagValuePattern.tag.substring(rule.namePrefix.length());
@@ -264,28 +258,15 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 				if(rType == nameEnRuleType && Algorithms.objectEquals(val, tags.get(OSMTagKey.NAME.getValue()))) {
 					continue;
 				}
-				if(rType.targetTagValue != null) {
-					rType = rType.targetTagValue;
-				}
 				rType.updateFreq();
 				if (rType.isMain()) {
 					outTypes.add(combineOrderAndId(rType));
 				}
 				if (rType.isAdditionalOrText()) {
-					boolean applied = rType.applyToTagValue == null;
-					if(!applied) {
-						Iterator<TagValuePattern> it = rType.applyToTagValue.iterator();
-						while(!applied && it.hasNext()) {
-							TagValuePattern nv = it.next();
-							applied = nv.isApplicable(tags);
-						}
-					}
-					if (applied) {
-						if (rType.isAdditional()) {
-							outAddTypes.add(combineOrderAndId(rType));
-						} else if (rType.isText()) {
-							namesToEncode.put(rType, val);
-						}
+					if (rType.isAdditional()) {
+						outAddTypes.add(combineOrderAndId(rType));
+					} else if (rType.isText()) {
+						namesToEncode.put(rType, val);
 					}
 				}
 			}

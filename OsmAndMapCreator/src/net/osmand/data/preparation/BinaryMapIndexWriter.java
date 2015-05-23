@@ -289,7 +289,7 @@ public class BinaryMapIndexWriter {
 		int highestTargetId = types.size();
 		// 1. prepare map rule type to write
 		for (MapRulType t : types.values()) {
-			if (t.getTargetTagValue() != null || t.getFreq() == 0 || !t.isMap()) {
+			if (t.getFreq() == 0 || !t.isMap()) {
 				t.setTargetId(highestTargetId++);
 			} else {
 				out.add(t);
