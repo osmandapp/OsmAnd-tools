@@ -31,7 +31,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	private MapRulType coastlineRuleType;
 	
 	private String[] langs = new String[] { "ar", "be", "ca", "cs", "da", "de", "el", "es", "fi", "fr", "he", "hi",
-			"hr", "hu", "it", "ja", "ko", "lt", "lv", "nl", "pl", "ro", "ru", "sk", "sl", "sv", "sw", "zh" };
+			"hr", "hu", "it", "ja", "ko", "lt", "lv", "nl", "pl", "pt", "ro", "ru", "sk", "sl", "sr", "sv", "sw", "zh" };
 	
 	public MapRenderingTypesEncoder(String fileName) {
 		super(fileName);
