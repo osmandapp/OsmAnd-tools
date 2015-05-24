@@ -32,7 +32,7 @@ def process_polygons(tags, filename):
 	names = ['name:en', 'name:ar', 'name:be',	'name:ca',	'name:cs',	'name:da',	'name:de',	'name:el',	
 				'name:es',	'name:fi',	'name:fr',	'name:he',	'name:hi',	'name:hr',	
 				'name:hu',	'name:it',	'name:ja',	'name:ko',	'name:lt',	'name:lv',	'name:nl',	
-				'name:pl',	'name:ro',	'name:ru',	'name:sk',	'name:sl',	'name:sv',	
+				'name:pl',	'name:pt',	'name:ro',	'name:ru',	'name:sk',	'name:sl',	'name:sr',	'name:sv',	
 				'name:sw',	'name:zh']
 	for nm in names:
 		array.append(nm)
