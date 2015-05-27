@@ -538,7 +538,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 						otherNames = new TreeSet<String>();
 					}
 					otherNames.add(e.getValue());
-					System.out.println("Other "+e.getKey().getTag()+" test " + e.getValue());
 				}
 			}
 			addNamePrefix(additionalTags.get(nameRuleType), additionalTags.get(nameEnRuleType), prevTree.getNode(), namesIndex, otherNames);
@@ -573,6 +572,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			if (names != null) {
 				for (String nk : names) {
 					if (!Algorithms.objectEquals(nk, name) && !Algorithms.isEmpty(nk)) {
+						System.out.println(nk  + " ? ");
 						parsePrefix(nk, data, poiData);
 					}
 				}
