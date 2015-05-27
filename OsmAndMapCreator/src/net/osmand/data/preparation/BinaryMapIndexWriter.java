@@ -1363,6 +1363,7 @@ public class BinaryMapIndexWriter {
 		Map<String, BinaryFileReference> res = new LinkedHashMap<String, BinaryFileReference>();
 		long init = getFilePointer();
 		for (String e : indexedTable) {
+			System.out.println(" Index " + e);
 			codedOutStream.writeString(OsmandOdb.IndexedStringTable.KEY_FIELD_NUMBER, e);
 			codedOutStream.writeTag(OsmandOdb.IndexedStringTable.VAL_FIELD_NUMBER, WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
 			BinaryFileReference ref = BinaryFileReference.createShiftReference(getFilePointer(), init);

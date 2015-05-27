@@ -572,7 +572,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			if (names != null) {
 				for (String nk : names) {
 					if (!Algorithms.objectEquals(nk, name) && !Algorithms.isEmpty(nk)) {
-						System.out.println(nk  + " ? ");
 						parsePrefix(nk, data, poiData);
 					}
 				}
