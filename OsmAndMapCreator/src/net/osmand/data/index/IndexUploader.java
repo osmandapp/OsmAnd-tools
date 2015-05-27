@@ -116,6 +116,7 @@ public class IndexUploader {
 	private FileFilter fileFilter = new FileFilter();
 	private FileFilter deleteFileFilter = null;
 	private boolean roadProcess;
+	private boolean wikiProcess;
 	private boolean srtmProcess;
 	private boolean tourProcess;
 
@@ -187,6 +188,9 @@ public class IndexUploader {
 				start++;
 			} else if (args[start].startsWith("--roads")) {
 				roadProcess = true;
+				start++;
+			} else if (args[start].startsWith("--wiki")) {
+				wikiProcess = true;
 				start++;
 			} else if (args[start].startsWith("--srtm")) {
 				srtmProcess = true;
@@ -420,7 +424,11 @@ public class IndexUploader {
 					throw new OneFileException("Uploader version is not compatible " + reader.getVersion() + " to current " + IndexConstants.BINARY_MAP_VERSION);
 				}
 				boolean roadFile = reader.containsRouteData() && !reader.containsMapData();
+				boolean wikiFile = mainFile.getName().contains("_wiki");
 				if(roadFile != this.roadProcess) {
+					return null;
+				}
+				if(wikiFile != this.wikiProcess) {
 					return null;
 				}
 				String summary = getDescription(reader, fileName);
@@ -447,6 +455,8 @@ public class IndexUploader {
 		boolean fir = true;
 		if(fileName.contains(".srtm")) {
 			summary = "SRTM" + summary;
+		} else if(fileName.contains("_wiki")) {
+			summary = "Wikipedia " + summary;
 		} else {
 			if (reader.containsAddressData()) {
 				summary = "Address" + (fir ? "" : ", ") + summary;
