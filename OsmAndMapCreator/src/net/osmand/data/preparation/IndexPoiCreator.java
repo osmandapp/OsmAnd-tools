@@ -560,20 +560,22 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		log.info("Poi processing finished");
 	}
 	
-	public void addNamePrefix(String name, String nameEn, PoiTileBox data, Map<String, Set<PoiTileBox>> poiData, Set<String> names) {
+	public void addNamePrefix(String name, String nameEn, PoiTileBox data, Map<String, Set<PoiTileBox>> poiData,
+			Set<String> names) {
 		if (name != null) {
 			parsePrefix(name, data, poiData);
 			if (Algorithms.isEmpty(nameEn)) {
 				nameEn = Junidecode.unidecode(name);
 			}
-			if (!Algorithms.objectEquals(nameEn, name)) {
-				parsePrefix(nameEn, data, poiData);
-			}
-			if (names != null) {
-				for (String nk : names) {
-					if (!Algorithms.objectEquals(nk, name) && !Algorithms.isEmpty(nk)) {
-						parsePrefix(nk, data, poiData);
-					}
+
+		}
+		if (!Algorithms.objectEquals(nameEn, name) && !Algorithms.isEmpty(nameEn)) {
+			parsePrefix(nameEn, data, poiData);
+		}
+		if (names != null) {
+			for (String nk : names) {
+				if (!Algorithms.objectEquals(nk, name) && !Algorithms.isEmpty(nk)) {
+					parsePrefix(nk, data, poiData);
 				}
 			}
 		}

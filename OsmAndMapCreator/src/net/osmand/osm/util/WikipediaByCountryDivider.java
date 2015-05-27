@@ -301,10 +301,13 @@ public class WikipediaByCountryDivider {
 			int cnt = 1;
 			long prevOsmId = -1;
 			StringBuilder content = new StringBuilder(); 
+			String nameUnique = null;
+			boolean nameAdded = false;
 			while (rps.next()) {
 				long osmId = rps.getLong(1);
 				double lat = rps.getDouble(2);
 				double lon = rps.getDouble(3);
+				long wikiId = rps.getLong(5);
 				String wikiLang = rps.getString(4);
 				String title = rps.getString(6);
 				byte[] bytes = rps.getBytes(7);
@@ -319,7 +322,7 @@ public class WikipediaByCountryDivider {
 				insertWikiContent.setDouble(2, lat);
 				insertWikiContent.setDouble(3, lon);
 				insertWikiContent.setString(4, wikiLang);
-				insertWikiContent.setLong(5, rps.getLong(5));
+				insertWikiContent.setLong(5, wikiId);
 				insertWikiContent.setString(6, title);
 				insertWikiContent.setBytes(7, bytes);
 				insertWikiContent.addBatch();
@@ -328,26 +331,32 @@ public class WikipediaByCountryDivider {
 				}
 				if(osmId != prevOsmId) {
 					if(prevOsmId != -1) {
-						serializer.endTag(null, "node");
+						closeOsmWikiNode(serializer, nameUnique, nameAdded);
 					}
 					prevOsmId = osmId;
+					nameAdded = false;
+					nameUnique = null;
 					serializer.startTag(null, "node");
 					serializer.attribute(null, "visible", "true");
 					serializer.attribute(null, "id", osmId+"");
 					serializer.attribute(null, "lat", lat+"");
 					serializer.attribute(null, "lon", lon+"");
-					addTag(serializer, "osmwiki", "place");
+					
 				}
 				if(wikiLang.equals("en")) {
+					nameAdded = true;
 					addTag(serializer, "name", title);
+					addTag(serializer, "wiki_id", wikiId +"");
 					addTag(serializer, "content", content.toString());
 				} else {
 					addTag(serializer, "name:"+wikiLang, title);
+					addTag(serializer, "wiki_id:"+wikiLang, wikiId +"");
+					nameUnique = title;
 					addTag(serializer, "content:"+wikiLang, content.toString());
 				}
 			}
 			if(prevOsmId != -1) {
-				serializer.endTag(null, "node");
+				closeOsmWikiNode(serializer, nameUnique, nameAdded);
 			}
 			insertWikiContent.executeBatch();
 			loc.close();
@@ -358,6 +367,17 @@ public class WikipediaByCountryDivider {
 			generateObf(osmBz2);
 		}
 		conn.close();
+	}
+
+	private static void closeOsmWikiNode(XmlSerializer serializer, String nameUnique, boolean nameAdded)
+			throws IOException {
+		if(!nameAdded && nameUnique != null) {
+			addTag(serializer, "name", nameUnique);
+		}
+		if(nameAdded || nameUnique != null) {
+			addTag(serializer, "osmwiki", "place");
+		}
+		serializer.endTag(null, "node");
 	}
 
 	private static void generateObf(File osmBz2) throws IOException, SAXException, SQLException, InterruptedException {
