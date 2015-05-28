@@ -10,15 +10,20 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.StringReader;
 import java.io.UnsupportedEncodingException;
+import java.net.URL;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -39,6 +44,22 @@ import org.apache.tools.bzip2.CBZip2InputStream;
 import org.xml.sax.Attributes;
 import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
+import org.xwiki.component.embed.EmbeddableComponentManager;
+import org.xwiki.component.manager.ComponentLookupException;
+import org.xwiki.rendering.block.Block;
+import org.xwiki.rendering.block.FormatBlock;
+import org.xwiki.rendering.block.LinkBlock;
+import org.xwiki.rendering.block.XDOM;
+import org.xwiki.rendering.block.match.ClassBlockMatcher;
+import org.xwiki.rendering.converter.ConversionException;
+import org.xwiki.rendering.converter.Converter;
+import org.xwiki.rendering.listener.Format;
+import org.xwiki.rendering.parser.ParseException;
+import org.xwiki.rendering.parser.Parser;
+import org.xwiki.rendering.renderer.BlockRenderer;
+import org.xwiki.rendering.renderer.printer.DefaultWikiPrinter;
+import org.xwiki.rendering.renderer.printer.WikiPrinter;
+import org.xwiki.rendering.syntax.Syntax;
 
 public class WikiDatabasePreparation {
 	private static final Log log = PlatformUtil.getLog(WikiDatabasePreparation.class);
@@ -46,6 +67,7 @@ public class WikiDatabasePreparation {
 	public interface InsertValueProcessor {
     	public void process(List<String> vs);
     }
+	
 	
 	public static class LatLon {
 		private final double longitude;
@@ -65,13 +87,91 @@ public class WikiDatabasePreparation {
 		}
 
 	}
+
+	
     
-    
-	public static void main(String[] args) throws IOException, ParserConfigurationException, SAXException, SQLException {
-//		String lang = "be";
-//		String folder = "/home/victor/projects/osmand/wiki/";
-		String lang = args[0];
-		String folder  = "";
+	public static String removeMacroBlocks(String s) {
+		StringBuilder bld = new StringBuilder();
+		int openCnt = 0;
+		for (int i = 0; i < s.length(); i++) {
+			int nt = s.length() - i - 1;
+			if (nt > 0 && s.charAt(i) == '{' && s.charAt(i + 1) == '{') {
+				openCnt++;
+				i++;
+			} else if (nt > 0 && s.charAt(i) == '}' && s.charAt(i + 1) == '}') {
+				if (openCnt > 0) {
+					openCnt--;
+				}
+				i++;
+			} else {
+				if (openCnt == 0) {
+					bld.append(s.charAt(i));
+				}
+			}
+		}
+		return bld.toString();
+	}
+	
+	public static void main(String[] args) throws ConversionException, ComponentLookupException, ParseException, IOException {
+		EmbeddableComponentManager cm = new EmbeddableComponentManager();
+		cm.initialize(WikiDatabasePreparation.class.getClassLoader());
+		Parser parser = cm.getInstance(Parser.class, Syntax.MEDIAWIKI_1_0.toIdString());
+		FileReader fr = new FileReader(new File("/Users/victorshcherb/Documents/b.src.html"));
+		BufferedReader br = new BufferedReader(fr);
+		String content = "";
+		String s;
+		while((s = br.readLine()) != null) {
+			content += s;
+		}
+		content = removeMacroBlocks(content);
+		
+		XDOM xdom = parser.parse(new StringReader(content));
+		        
+		// Find all links and make them italic
+		for (Block block : xdom.getBlocks(new ClassBlockMatcher(LinkBlock.class), Block.Axes.DESCENDANT)) {
+		    Block parentBlock = block.getParent();
+		    Block newBlock = new FormatBlock(Collections.<Block>singletonList(block), Format.ITALIC);
+		    parentBlock.replaceChild(newBlock, block);
+		}
+//		for (Block block : xdom.getBlocks(new ClassBlockMatcher(ParagraphBlock.class), Block.Axes.DESCENDANT)) {
+//			ParagraphBlock b = (ParagraphBlock) block;
+//			block.getParent().removeBlock(block);
+//		}
+		WikiPrinter printer = new DefaultWikiPrinter();
+//		BlockRenderer renderer = cm.getInstance(BlockRenderer.class, Syntax.XHTML_1_0.toIdString());
+//		renderer.render(xdom, printer);
+//		System.out.println(printer.toString());
+		
+		Converter converter = cm.getInstance(Converter.class);
+
+		// Convert input in XWiki Syntax 2.1 into XHTML. The result is stored in the printer.
+		printer = new DefaultWikiPrinter();
+		converter.convert(new FileReader(new File("/Users/victorshcherb/Documents/a.src.html")), Syntax.MEDIAWIKI_1_0, Syntax.XHTML_1_0, printer);
+
+		System.out.println(printer.toString());
+		
+		final HTMLConverter nconverter = new HTMLConverter(false);
+		String lang = "be";
+		WikiModel wikiModel = new WikiModel("http://"+lang+".wikipedia.com/wiki/${image}", "http://"+lang+".wikipedia.com/wiki/${title}");
+//		String plainStr = wikiModel.render(nconverter, content);
+//		System.out.println(plainStr);
+//		downloadPage("https://be.m.wikipedia.org/wiki/%D0%93%D0%BE%D1%80%D0%B0%D0%B4_%D0%9C%D1%96%D0%BD%D1%81%D0%BA",
+//		"/Users/victorshcherb/Documents/a.wiki.html");
+
+	}
+	
+	
+	
+	public static void main2(String[] args) throws IOException, ParserConfigurationException, SAXException, SQLException, ComponentLookupException {
+		String lang = "";
+		String folder = "";
+		if(args.length == 0) {
+			lang = "be";
+			folder = "/Users/victorshcherb/osmand/wiki/";
+		}
+		if(args.length > 0) {
+			lang = args[0];
+		}
 		if(args.length > 1){
 			folder = args[1];
 		}
@@ -79,11 +179,27 @@ public class WikiDatabasePreparation {
 		final String wikiPg = folder + lang + "wiki-latest-pages-articles.xml.bz2";
 		final String sqliteFileName = folder + lang + "wiki.sqlite";
 		final WikiDatabasePreparation prep = new WikiDatabasePreparation();
+		
+		
     	
 		Map<Long, LatLon> links = prep.parseExternalLinks(fileName);
 		processWikipedia(wikiPg, lang, links, sqliteFileName);
-//		testContent(lang, folder);
+		testContent(lang, folder);
     }
+	
+	public static void downloadPage(String page, String fl) throws IOException {
+		URL url = new URL(page);
+		FileOutputStream fout = new FileOutputStream(new File(fl));
+		InputStream in = url.openStream();
+		byte[] buf = new byte[1024];
+		int read;
+		while((read = in.read(buf)) != -1) {
+			fout.write(buf, 0, read);
+		}
+		in.close();
+		fout.close();
+		
+	}
 
 	protected static void testContent(String lang, String folder) throws SQLException, IOException {
 		Connection conn = DBDialect.SQLITE.getDatabaseConnection(folder + lang + "wiki.sqlite", log);
@@ -104,7 +220,7 @@ public class WikiDatabasePreparation {
 	}
 
 	protected static void processWikipedia(final String wikiPg, String lang, Map<Long, LatLon> links, String sqliteFileName)
-			throws ParserConfigurationException, SAXException, FileNotFoundException, IOException, SQLException {
+			throws ParserConfigurationException, SAXException, FileNotFoundException, IOException, SQLException, ComponentLookupException {
 		SAXParser sx = SAXParserFactory.newInstance().newSAXParser();
 		InputStream streamFile = new BufferedInputStream(new FileInputStream(wikiPg), 8192 * 4);
 		InputStream stream = streamFile;
@@ -126,8 +242,8 @@ public class WikiDatabasePreparation {
 
 			@Override
 			public void process(List<String> vs) {
-				final String link = vs.get(2);
-				if (link.contains("geohack.php?")) {
+				final String link = vs.get(3);
+				if (link.contains("geohack.php")) {
 					total[0]++;
 					String paramsStr = link.substring(link.indexOf("params=") + "params=".length());
 					paramsStr = strip(paramsStr, '&');
@@ -314,11 +430,12 @@ public class WikiDatabasePreparation {
 		private final static int BATCH_SIZE = 500;
 		final ByteArrayOutputStream bous = new ByteArrayOutputStream(64000);
 		private String lang;
+		private Converter converter;
 		
 
 		WikiOsmHandler(SAXParser saxParser, InputStream progIS, String lang,
 				Map<Long, LatLon> pages, File sqliteFile)
-				throws IOException, SQLException{
+				throws IOException, SQLException, ComponentLookupException{
 			this.lang = lang;
 			this.pages = pages;
 			this.saxParser = saxParser;
@@ -330,6 +447,9 @@ public class WikiDatabasePreparation {
 			
 			
 			progress.startTask("Parse wiki xml", progIS.available());
+			EmbeddableComponentManager cm = new EmbeddableComponentManager();
+			cm.initialize(WikiDatabasePreparation.class.getClassLoader());
+			converter = cm.getInstance(Converter.class);
 		}
 		
 		public void addBatch() throws SQLException {
@@ -405,12 +525,21 @@ public class WikiDatabasePreparation {
 					} else if (name.equals("text")) {
 						if (parseText) {
 							LatLon ll = pages.get(cid);
-							if(id++ % 500 == 0) {
-								log.debug("Article accepted " + cid + " " + title.toString() + " " + ll.getLatitude() + " " + ll.getLongitude() + " free: " + (Runtime.getRuntime().freeMemory() / (1024 * 1024)) );
-							}
+							String text = removeMacroBlocks(ctext.toString());
 							final HTMLConverter converter = new HTMLConverter(false);
 							WikiModel wikiModel = new WikiModel("http://"+lang+".wikipedia.com/wiki/${image}", "http://"+lang+".wikipedia.com/wiki/${title}");
-							String plainStr = wikiModel.render(converter, ctext.toString());
+							String plainStr = wikiModel.render(converter, text);
+//							WikiPrinter printer = new DefaultWikiPrinter();
+//							System.out.println(text);
+//							System.out.println("\n\n");
+//							converter.convert(new StringReader(text), Syntax.MEDIAWIKI_1_0, Syntax.XHTML_1_0, printer);
+//							String plainStr = printer.toString();
+							if (id++ % 500 == 0) {
+								log.debug("Article accepted " + cid + " " + title.toString() + " " + ll.getLatitude()
+										+ " " + ll.getLongitude() + " free: "
+										+ (Runtime.getRuntime().freeMemory() / (1024 * 1024)));
+//								System.out.println(plainStr);
+							}
 							try {
 								prep.setLong(1, cid);
 								prep.setDouble(2, ll.getLatitude());
