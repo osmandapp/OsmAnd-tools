@@ -456,7 +456,7 @@ public class IndexUploader {
 		if(fileName.contains(".srtm")) {
 			summary = "SRTM" + summary;
 		} else if(fileName.contains("_wiki")) {
-			summary = "Wikipedia " + summary;
+			summary = "Wikipedia" + summary;
 		} else {
 			if (reader.containsAddressData()) {
 				summary = "Address" + (fir ? "" : ", ") + summary;
