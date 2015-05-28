@@ -112,7 +112,7 @@ public class WikiDatabasePreparation {
 		return bld.toString();
 	}
 	
-	public static void main(String[] args) throws ConversionException, ComponentLookupException, ParseException, IOException {
+	public static void mainTest(String[] args) throws ConversionException, ComponentLookupException, ParseException, IOException {
 		EmbeddableComponentManager cm = new EmbeddableComponentManager();
 		cm.initialize(WikiDatabasePreparation.class.getClassLoader());
 		Parser parser = cm.getInstance(Parser.class, Syntax.MEDIAWIKI_1_0.toIdString());
@@ -162,12 +162,12 @@ public class WikiDatabasePreparation {
 	
 	
 	
-	public static void main2(String[] args) throws IOException, ParserConfigurationException, SAXException, SQLException, ComponentLookupException {
+	public static void main(String[] args) throws IOException, ParserConfigurationException, SAXException, SQLException, ComponentLookupException {
 		String lang = "";
 		String folder = "";
 		if(args.length == 0) {
-			lang = "be";
-			folder = "/Users/victorshcherb/osmand/wiki/";
+//			lang = "be";
+//			folder = "/Users/victorshcherb/osmand/wiki/";
 		}
 		if(args.length > 0) {
 			lang = args[0];
