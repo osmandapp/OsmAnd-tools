@@ -45,10 +45,6 @@ import net.osmand.binary.OsmandOdb.OsmAndPoiNameIndex;
 import net.osmand.binary.OsmandOdb.OsmAndPoiNameIndexDataAtom;
 import net.osmand.binary.OsmandOdb.OsmAndPoiSubtype;
 import net.osmand.binary.OsmandOdb.OsmAndRoutingIndex;
-import net.osmand.binary.OsmandOdb.OsmAndRoutingIndex.RouteBorderBox;
-import net.osmand.binary.OsmandOdb.OsmAndRoutingIndex.RouteBorderLine;
-import net.osmand.binary.OsmandOdb.OsmAndRoutingIndex.RouteBorderPoint;
-import net.osmand.binary.OsmandOdb.OsmAndRoutingIndex.RouteBorderPointsBlock;
 import net.osmand.binary.OsmandOdb.OsmAndRoutingIndex.RouteDataBlock;
 import net.osmand.binary.OsmandOdb.OsmAndRoutingIndex.RouteDataBox;
 import net.osmand.binary.OsmandOdb.OsmAndRoutingIndex.RouteEncodingRule;
@@ -138,7 +134,6 @@ public class BinaryMapIndexWriter {
 	
 	private final static int ROUTE_INDEX_INIT = 15;
 	private final static int ROUTE_TREE = 16;
-	private final static int ROUTE_BORDER_BOX = 17;
 	
 
 	public BinaryMapIndexWriter(final RandomAccessFile raf) throws IOException {
@@ -345,63 +340,6 @@ public class BinaryMapIndexWriter {
 			RouteEncodingRule rulet = builder.build();
 			codedOutStream.writeMessage(OsmandOdb.OsmAndRoutingIndex.RULES_FIELD_NUMBER, rulet);
 		}
-	}
-	
-	public void startWriteRouteBorderBox(int leftX, int rightX, int topY, int bottomY, 	int zoomToSplit, boolean basemap) throws IOException {
-		pushState(ROUTE_BORDER_BOX, ROUTE_INDEX_INIT);
-		if(basemap) {
-			codedOutStream.writeTag(OsmAndRoutingIndex.BASEBORDERBOX_FIELD_NUMBER, WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
-		} else {
-			codedOutStream.writeTag(OsmAndRoutingIndex.BORDERBOX_FIELD_NUMBER, WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
-		}
-		preserveInt32Size();
-		OsmandOdb.OsmAndTileBox.Builder builder = OsmandOdb.OsmAndTileBox.newBuilder();
-		builder.setLeft(leftX);
-		builder.setRight(rightX);
-		builder.setTop(topY);
-		builder.setBottom(bottomY);
-		codedOutStream.writeMessage(RouteBorderBox.BOUNDARIES_FIELD_NUMBER, builder.build());
-		codedOutStream.writeInt32(RouteBorderBox.TILEZOOMTOSPLIT_FIELD_NUMBER, zoomToSplit);
-		stackBounds.push(new Bounds(leftX, rightX, topY, bottomY));
-	}
-	
-	public BinaryFileReference writeRouteBorderLine(int fromX, int fromY, int toX, int toY) throws IOException {
-		codedOutStream.writeTag(RouteBorderBox.BORDERLINES_FIELD_NUMBER, FieldType.MESSAGE.getWireType());
-		long startMessage = getFilePointer();
-		RouteBorderLine.Builder builder = RouteBorderLine.newBuilder();
-//		Bounds p = stackBounds.peek();
-		builder.setX(fromX /*- p.leftX*/);
-		builder.setY(fromY /*- p.topY*/);
-		if (toX != -1) {
-			builder.setTox(toX /*- p.leftX*/);
-		}
-		if (toY != -1) {
-			builder.setToy(toY /*- p.topY*/);
-		}
-		builder.setShiftToPointsBlock(0);
-		codedOutStream.writeMessageNoTag(builder.build());
-		codedOutStream.flush();
-		return BinaryFileReference.createShiftReference(getFilePointer() - 4, startMessage);
-	}
-	
-	public void writeRouteBorderPointBlock(int x, int y, long baseId,  List<RouteBorderPoint> points, BinaryFileReference ref) throws IOException {
-		codedOutStream.writeTag(RouteBorderBox.BLOCKS_FIELD_NUMBER, FieldType.MESSAGE.getWireType());
-		codedOutStream.flush();
-		ref.writeReference(raf, getFilePointer());
-		RouteBorderPointsBlock.Builder builder = RouteBorderPointsBlock.newBuilder();
-		builder.setX(x);
-		builder.setY(y);
-		builder.setBaseId(baseId);
-		for(RouteBorderPoint p : points) {
-			builder.addPoints(p);
-		}
-		codedOutStream.writeMessageNoTag(builder.build());
-	}
-	
-	public void endWriteRouteBorderBox() throws IOException {
-		stackBounds.pop();
-		popState(ROUTE_BORDER_BOX);
-		writeInt32Size();
 	}
 	
 	public BinaryFileReference startRouteTreeElement(int leftX, int rightX, int topY, int bottomY, boolean containsObjects,
