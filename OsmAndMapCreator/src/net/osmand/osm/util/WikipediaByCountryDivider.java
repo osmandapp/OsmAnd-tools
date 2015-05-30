@@ -6,6 +6,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import net.osmand.IndexConstants;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
