@@ -289,7 +289,7 @@ public class WikipediaByCountryDivider {
 			ResultSet rps = conn.createStatement().executeQuery(
 					"SELECT WC.id, WC.lat, WC.lon, WC.lang, WC.wikiId, WC.title, WC.zipContent "
 							+ " FROM wiki_content WC INNER JOIN wiki_region WR "
-							+ " ON WC.id = WR.id AND WR.regionName = '" + regionName + "' ORDER BY WC.id");
+							+ " ON WC.id = WR.id AND WR.regionName = '" + rs.getString(1) + "' ORDER BY WC.id");
 			
 			FileOutputStream out = new FileOutputStream(osmBz2);
 			out.write('B');
@@ -386,7 +386,7 @@ public class WikipediaByCountryDivider {
 			addTag(serializer, "name", nameUnique);
 		}
 		if(nameAdded || nameUnique != null) {
-			addTag(serializer, "osmwiki", "place");
+			addTag(serializer, "osmwiki", "wiki_place");
 		}
 		serializer.endTag(null, "node");
 	}
