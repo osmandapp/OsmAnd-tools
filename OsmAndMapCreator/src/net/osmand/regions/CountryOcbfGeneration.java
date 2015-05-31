@@ -61,6 +61,11 @@ public class CountryOcbfGeneration {
 	
 	private static class TranslateEntity {
 		private Map<String, String> tm = new TreeMap<String, String>();
+		private String name;
+
+		public TranslateEntity(String name) {
+			this.name = name;
+		}
 
 		public boolean isEmpty() {
 			return tm.isEmpty();
@@ -186,7 +191,7 @@ public class CountryOcbfGeneration {
 			if (tok == XmlPullParser.START_TAG) {
 				String name = parser.getName();
 				if (name.equals("way") || name.equals("node") || name.equals("relation")) {
-					te = new TranslateEntity();
+					te = new TranslateEntity(name);
 				} else if(name.equals("tag") && te != null) {
 					Map<String, String> attrs = new LinkedHashMap<String, String>();
 					for (int i = 0; i < parser.getAttributeCount(); i++) {
@@ -199,6 +204,7 @@ public class CountryOcbfGeneration {
 				if (name.equals("way") || name.equals("node") || name.equals("relation")) {
 					if(!te.isEmpty()) {
 						Iterator<Entry<String, String>> it = te.tm.entrySet().iterator();
+						addTranslate(translates, te, "entity="+te.name);
 						while(it.hasNext()) {
 							Entry<String, String> e = it.next();
 							addTranslate(translates, te, e.getKey().toLowerCase() +"="+e.getValue().toLowerCase());
@@ -538,7 +544,7 @@ public class CountryOcbfGeneration {
 				reg.translate = null;
 			}
 		} else {
-			reg.translate = reg.name;
+			reg.translate = "entity=node;"+reg.name;
 		}
 		if(attrs.containsKey("boundary")) {
 			reg.boundary = attrs.get("boundary");
