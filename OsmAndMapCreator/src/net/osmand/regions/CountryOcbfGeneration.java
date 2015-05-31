@@ -5,6 +5,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -16,22 +17,32 @@ import java.util.Set;
 import java.util.TreeMap;
 
 import net.osmand.PlatformUtil;
+import net.osmand.data.preparation.IndexCreator;
+import net.osmand.data.preparation.MapZooms;
+import net.osmand.impl.ConsoleProgressImplementation;
+import net.osmand.osm.MapRenderingTypesEncoder;
+import net.osmand.osm.util.WikipediaByCountryDivider;
 import net.osmand.util.Algorithms;
 
+import org.apache.commons.logging.Log;
+import org.xml.sax.SAXException;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 import org.xmlpull.v1.XmlSerializer;
 
 public class CountryOcbfGeneration {
 	private int OSM_ID=-1000;
+	private static final Log log = PlatformUtil.getLog(CountryOcbfGeneration.class);
 
-	public static void main(String[] args) throws XmlPullParserException, IOException {
+	public static void main(String[] args) throws XmlPullParserException, IOException, SAXException, SQLException, InterruptedException {
 		String repo =  "/Users/victorshcherb/osmand/repos/";
 		if(args != null && args.length > 0) {
 			repo = args[0];
 		}
 		String regionsXml = repo+"resources/countries-info/regions.xml";
-		String targetObf = repo+"resources/countries-info/countries.reginfo";
+//		String targetObf = repo+"resources/countries-info/countries.reginfo";
+		String targetObf = repo+"regions.ocbf";
+		
 		String targetOsmXml = repo+"resources/countries-info/countries.osm";
 		String[] polygonFolders = new String[] {
 				repo +"misc/osm-planet/polygons",
@@ -208,7 +219,7 @@ public class CountryOcbfGeneration {
 	}
 
 	private void generate(String regionsXml, String[] polygonFolders, 
-			String[] translations, String targetObf, String targetOsmXml) throws XmlPullParserException, IOException {
+			String[] translations, String targetObf, String targetOsmXml) throws XmlPullParserException, IOException, SAXException, SQLException, InterruptedException {
 		Map<String, File> polygonFiles = new LinkedHashMap<String, File>();
 		for (String folder : polygonFolders) {
 			scanPolygons(new File(folder), polygonFiles);
@@ -251,9 +262,11 @@ public class CountryOcbfGeneration {
 	
 
 	private void createFile(CountryRegion global, Map<String, Set<TranslateEntity>> translates, Map<String, File> polygonFiles,
-			String targetObf, String targetOsmXml) throws IOException {
+			String targetObf, String targetOsmXml) throws IOException, SAXException, SQLException, InterruptedException {
+		File osm = new File(targetOsmXml);
 		XmlSerializer serializer = new org.kxml2.io.KXmlSerializer();
-		serializer.setOutput(new FileOutputStream(targetOsmXml), "UTF-8");
+		FileOutputStream fous = new FileOutputStream(osm);
+		serializer.setOutput(fous, "UTF-8");
 		serializer.startDocument("UTF-8", true);
 		serializer.startTag(null, "osm");
 		serializer.attribute(null, "version", "0.6");
@@ -268,6 +281,19 @@ public class CountryOcbfGeneration {
 		
 		serializer.endDocument();
 		serializer.flush();
+		fous.close();
+
+		IndexCreator creator = new IndexCreator(new File(targetOsmXml).getParentFile()); //$NON-NLS-1$
+		creator.setMapFileName(new File(targetOsmXml).getName());
+		creator.setIndexMap(true);
+		creator.setIndexAddress(false);
+		creator.setIndexPOI(false);
+		creator.setIndexTransport(false);
+		creator.setIndexRouting(false);
+		MapZooms zooms = MapZooms.parseZooms("5-6");
+		creator.generateIndexes(osm,
+				new ConsoleProgressImplementation(1), null, zooms, MapRenderingTypesEncoder.getDefault(), log);
+
 		
 	}
 	
@@ -384,7 +410,7 @@ public class CountryOcbfGeneration {
 		}
 		
 		// COMMENT TO SEE ONLY WARNINGS
-		System.out.println(indent + line);
+//		System.out.println(indent + line);
 		
 		
 		if(boundary != null) {
