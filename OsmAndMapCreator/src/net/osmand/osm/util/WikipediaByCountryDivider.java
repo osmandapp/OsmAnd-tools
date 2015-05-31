@@ -375,7 +375,7 @@ public class WikipediaByCountryDivider {
 			serializer.flush();
 			bzipStream.close();
 			System.out.println("Processed " + cnt + " pois");
-			generateObf(osmBz2);
+			generateObf(osmBz2, obfFile);
 		}
 		conn.close();
 	}
@@ -391,14 +391,15 @@ public class WikipediaByCountryDivider {
 		serializer.endTag(null, "node");
 	}
 
-	private static void generateObf(File osmBz2) throws IOException, SAXException, SQLException, InterruptedException {
+	private static void generateObf(File osmBz2, File obf) throws IOException, SAXException, SQLException, InterruptedException {
 		IndexPoiCreator.ZIP_LONG_STRINGS = true;
-		IndexCreator creator = new IndexCreator(osmBz2.getParentFile()); //$NON-NLS-1$
+		IndexCreator creator = new IndexCreator(obf.getParentFile()); //$NON-NLS-1$
 		creator.setIndexMap(false);
 		creator.setIndexAddress(false);
 		creator.setIndexPOI(true);
 		creator.setIndexTransport(false);
 		creator.setIndexRouting(false);
+		creator.setMapFileName(obf.getName());
 		creator.generateIndexes(osmBz2,
 				new ConsoleProgressImplementation(1), null, MapZooms.getDefault(), MapRenderingTypesEncoder.getDefault(), log);
 
