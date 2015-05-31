@@ -409,7 +409,7 @@ public class CountryOcbfGeneration {
 					}
 				}
 			}
-			if(set == null) {
+			if(set == null || set.size() == 0) {
 				System.out.println("!!! Couldn't find translation name " + r.translate);
 			} else if(set.size() > 1) {
 				System.out.println("!!! More than 1 translation " + r.translate);
