@@ -7,6 +7,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -315,19 +316,20 @@ public class CountryOcbfGeneration {
 				line += " boundary="+boundary.getName();
 			}
 		}
+		List<List<String>> boundaryPoints = Collections.emptyList();
 		if(boundary != null) {
-			List<List<String>> boundaryPoints = readBoundaryPoints(boundary, serializer);
-			serializer.startTag(null, "way");
-			serializer.attribute(null, "id", OSM_ID-- +"");
-			serializer.attribute(null, "visible", "true");
-			// TODO relation
-			for (List<String> ls : boundaryPoints) {
-				for (String bnd : ls) {
-					serializer.startTag(null, "nd");
-					serializer.attribute(null, "ref", bnd);
-					serializer.endTag(null, "nd");
-				}
+			boundaryPoints = readBoundaryPoints(boundary, serializer);
+		}
+		if (boundaryPoints.size() > 0) {
+			for (int i = 1; i < boundaryPoints.size(); i++) {
+				writeWay(serializer, boundaryPoints.get(i));
+				addTag(serializer, "osmand_region", "boundary");
+				addTag(serializer, "key_name", r.name);
+				addTag(serializer, "region_full_name", r.getFullName());
+				serializer.endTag(null, "way");
 			}
+			List<String> ls = boundaryPoints.get(0);
+			writeWay(serializer, ls);
 		} else {
 			serializer.startTag(null, "node");
 			serializer.attribute(null, "id", OSM_ID-- +"");
@@ -335,7 +337,7 @@ public class CountryOcbfGeneration {
 			serializer.attribute(null, "lat", "0");
 			serializer.attribute(null, "lon", "0");
 		}
-		
+		addTag(serializer, "osmand_region", "yes");
 		addTag(serializer, "key_name", r.name);
 		addTag(serializer, "region_full_name", r.getFullName());
 		if(r.parent != null) {
@@ -411,7 +413,7 @@ public class CountryOcbfGeneration {
 //		System.out.println(indent + line);
 		
 		
-		if(boundary != null) {
+		if(boundaryPoints.size() > 0) {
 			serializer.endTag(null, "way");
 		} else {
 			serializer.endTag(null, "node");
@@ -421,6 +423,17 @@ public class CountryOcbfGeneration {
 		for(CountryRegion c : r.children) {
 			processRegion(c, translates, polygonFiles, targetObf, targetOsmXml, indent + "  ", serializer);
 		}		
+	}
+
+	private void writeWay(XmlSerializer serializer, List<String> ls) throws IOException {
+		serializer.startTag(null, "way");
+		serializer.attribute(null, "id", OSM_ID-- + "");
+		serializer.attribute(null, "visible", "true");
+		for (String bnd : ls) {
+			serializer.startTag(null, "nd");
+			serializer.attribute(null, "ref", bnd);
+			serializer.endTag(null, "nd");
+		}
 	}
 
 	private List<List<String>> readBoundaryPoints(File boundary, XmlSerializer serializer) throws IOException {
