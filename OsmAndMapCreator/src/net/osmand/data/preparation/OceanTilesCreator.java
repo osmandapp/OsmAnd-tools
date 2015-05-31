@@ -151,8 +151,8 @@ public class OceanTilesCreator {
     private static void writeResult(TLongObjectHashMap<OceanTileInfo> map, String result) throws IOException {
         int currentByte = 0;
         FileOutputStream rf = new FileOutputStream(result);
-        int[] cs = new int[4];
-        int[] vs = new int[4];
+//        int[] cs = new int[4];
+//        int[] vs = new int[4];
 
         int maxT = 1 << TILE_ZOOMLEVEL;
         double antarcticaStart = MapUtils.getTileNumberY(TILE_ZOOMLEVEL, -84.35);
@@ -182,6 +182,7 @@ public class OceanTilesCreator {
                 }
             }
         }
+        rf.close();
 
 
     }
