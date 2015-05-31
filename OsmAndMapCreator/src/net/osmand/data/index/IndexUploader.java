@@ -424,7 +424,7 @@ public class IndexUploader {
 					throw new OneFileException("Uploader version is not compatible " + reader.getVersion() + " to current " + IndexConstants.BINARY_MAP_VERSION);
 				}
 				boolean roadFile = reader.containsRouteData() && !reader.containsMapData();
-				boolean wikiFile = mainFile.getName().contains("_wiki");
+				boolean wikiFile = mainFile.getName().contains(".wiki");
 				if(roadFile != this.roadProcess) {
 					return null;
 				}

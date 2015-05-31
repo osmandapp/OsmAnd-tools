@@ -6,7 +6,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
-import net.osmand.IndexConstants;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -31,6 +30,7 @@ import net.osmand.data.preparation.MapZooms;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.map.OsmandRegions;
 import net.osmand.osm.MapRenderingTypesEncoder;
+import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
 import org.apache.commons.logging.Log;
@@ -237,12 +237,16 @@ public class WikipediaByCountryDivider {
 		String cmd = args[0];
 		String regionsFile = args[1];
 		String folder = args[2];
+		boolean skip = false;
+		if (args.length > 3) {
+			skip = args[3].equals("-skip-existing");
+		}
 		if(cmd.equals("inspect")) {
 			inspectWikiFile(folder);
 		} else if(cmd.equals("update_countries")) {
 			updateCountries(folder, regionsFile);
 		} else if(cmd.equals("generate_country_sqlite")) {
-			generateCountrySqlite(folder);
+			generateCountrySqlite(folder, skip);
 		} else if(cmd.equals("regenerate")) {
 			generateGlobalWikiFile(folder, regionsFile);
 		}
@@ -260,14 +264,19 @@ public class WikipediaByCountryDivider {
 	
 	
 	
-	protected static void generateCountrySqlite(String folder) throws SQLException, IOException, SAXException, InterruptedException {
+	protected static void generateCountrySqlite(String folder, boolean skip) throws SQLException, IOException, SAXException, InterruptedException {
 		Connection conn = (Connection) DBDialect.SQLITE.getDatabaseConnection(folder + "wiki.sqlite", log);
 		File rgns = new File(folder, "regions");
 		rgns.mkdirs();
 		ResultSet rs = conn.createStatement().executeQuery("SELECT DISTINCT regionName  FROM wiki_region");
 		while (rs.next()) {
-			String regionName = rs.getString(1);
+			String regionName = Algorithms.capitalizeFirstLetterAndLowercase(rs.getString(1));
 			File fl = new File(rgns, regionName + ".sqlite");
+			File osmBz2 = new File(rgns, regionName + "_" + IndexConstants.BINARY_MAP_VERSION + ".wiki.osm.bz2");
+			File obfFile = new File(rgns, regionName + "_" + IndexConstants.BINARY_MAP_VERSION + ".wiki.obf");
+			if(obfFile.exists() && skip) {
+				continue;
+			}
 			
 			fl.delete();
 			System.out.println("Generate " +fl.getName());
@@ -281,7 +290,7 @@ public class WikipediaByCountryDivider {
 					"SELECT WC.id, WC.lat, WC.lon, WC.lang, WC.wikiId, WC.title, WC.zipContent "
 							+ " FROM wiki_content WC INNER JOIN wiki_region WR "
 							+ " ON WC.id = WR.id AND WR.regionName = '" + regionName + "' ORDER BY WC.id");
-			File osmBz2 = new File(rgns, regionName + "_wiki_" + IndexConstants.BINARY_MAP_VERSION + ".osm.bz2");
+			
 			FileOutputStream out = new FileOutputStream(osmBz2);
 			out.write('B');
 			out.write('Z');

@@ -321,14 +321,23 @@ public class CountryOcbfGeneration {
 			boundaryPoints = readBoundaryPoints(boundary, serializer);
 		}
 		if (boundaryPoints.size() > 0) {
-			for (int i = 1; i < boundaryPoints.size(); i++) {
+			// find the biggest with points
+			List<String> ls = boundaryPoints.get(0);
+			for (int i = 0; i < boundaryPoints.size(); i++) {
+				if(ls.size() < boundaryPoints.get(i).size()) {
+					ls = boundaryPoints.get(i);
+				}
+			}
+			for (int i = 0; i < boundaryPoints.size(); i++) {
+				if(boundaryPoints.get(i) == ls) {
+					continue;
+				}
 				writeWay(serializer, boundaryPoints.get(i));
 				addTag(serializer, "osmand_region", "boundary");
 				addTag(serializer, "key_name", r.name);
 				addTag(serializer, "region_full_name", r.getFullName());
 				serializer.endTag(null, "way");
 			}
-			List<String> ls = boundaryPoints.get(0);
 			writeWay(serializer, ls);
 		} else {
 			serializer.startTag(null, "node");
