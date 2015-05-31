@@ -2,7 +2,20 @@ package net.osmand.data.preparation;
 
 
 import gnu.trove.map.hash.TLongObjectHashMap;
-import gnu.trove.set.hash.TLongHashSet;
+
+import java.io.BufferedInputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.RandomAccessFile;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+
+import javax.xml.stream.XMLStreamException;
+
 import net.osmand.IProgress;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Node;
@@ -10,15 +23,9 @@ import net.osmand.osm.edit.Way;
 import net.osmand.osm.io.OsmBaseStorage;
 import net.osmand.osm.io.OsmStorageWriter;
 import net.osmand.util.MapUtils;
+
 import org.apache.tools.bzip2.CBZip2InputStream;
 import org.xml.sax.SAXException;
-
-import javax.xml.stream.XMLStreamException;
-import java.io.*;
-import java.util.ArrayList;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Set;
 
 public class OceanTilesCreator {
     public static final byte TILE_ZOOMLEVEL = 12;
@@ -44,15 +51,18 @@ public class OceanTilesCreator {
 
         BasemapProcessor bmp = new BasemapProcessor();
         bmp.constructBitSetInfo();
-        double[] lat = new double[]{41.4537, 33.4};
-        double[] lon = new double[]{41.45, 15.5};
-        int zoom = 11;
-		for (int i = 0; i < lat.length && i < lon.length; i++) {
-			int x = (int) MapUtils.getTileNumberX(zoom, lon[i]);
-			int y = (int) MapUtils.getTileNumberY(zoom, lat[i]);
-			System.out.println(bmp.getSeaTile(x, y, zoom));
+        if(args[0].equals("generate")) {
+        	createTilesFile(args[1], args[2]);
+		} else {
+			double[] lat = new double[] { 41.4537, 33.4 };
+			double[] lon = new double[] { 41.45, 15.5 };
+			int zoom = 11;
+			for (int i = 0; i < lat.length && i < lon.length; i++) {
+				int x = (int) MapUtils.getTileNumberX(zoom, lon[i]);
+				int y = (int) MapUtils.getTileNumberY(zoom, lat[i]);
+				System.out.println(bmp.getSeaTile(x, y, zoom));
+			}
 		}
-		createTilesFile(args[0], args[1]);
         
 //        BasemapProcessor.SimplisticQuadTree quadTree = bmp.constructTilesQuadTree(11);
 //        BasemapProcessor.SimplisticQuadTree ts = quadTree.getOrCreateSubTree(x, y, 11);
