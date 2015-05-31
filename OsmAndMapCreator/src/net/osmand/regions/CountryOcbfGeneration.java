@@ -421,6 +421,9 @@ public class CountryOcbfGeneration {
 				s = s.trim();
 				int i = s.indexOf(' ');
 				if(i == -1) {
+					i = s.indexOf('\t');
+				}
+				if(i == -1) {
 					System.err.println("? " +s);
 				}
 				String lat = s.substring(i, s.length()).trim();
