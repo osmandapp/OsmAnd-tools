@@ -403,6 +403,9 @@ public class CountryOcbfGeneration {
 				}
 				if(set == null) {
 					set = translates.get(t);
+					if(set == null) {
+						break;
+					}
 				} else {
 					Set<TranslateEntity> st2 = translates.get(t);
 					if(st2 != null) {
