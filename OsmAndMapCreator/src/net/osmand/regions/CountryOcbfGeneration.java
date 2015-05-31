@@ -294,6 +294,8 @@ public class CountryOcbfGeneration {
 		if(boundary != null) {
 			List<String> boundaryPoints = readBoundaryPoints(boundary, serializer);
 			serializer.startTag(null, "way");
+			serializer.attribute(null, "id", OSM_ID-- +"");
+			serializer.attribute(null, "visible", "true");
 			for(String bnd : boundaryPoints) {
 				serializer.startTag(null, "nd");
 				serializer.attribute(null, "ref", bnd);
@@ -301,11 +303,12 @@ public class CountryOcbfGeneration {
 			}
 		} else {
 			serializer.startTag(null, "node");
+			serializer.attribute(null, "id", OSM_ID-- +"");
+			serializer.attribute(null, "visible", "true");
 			serializer.attribute(null, "lat", "0");
 			serializer.attribute(null, "lon", "0");
 		}
-		serializer.attribute(null, "id", OSM_ID-- +"");
-		serializer.attribute(null, "visible", "true");
+		
 		addTag(serializer, "key_name", r.name);
 		addTag(serializer, "region_full_name", r.getFullName());
 		if(r.parent != null) {
@@ -386,6 +389,8 @@ public class CountryOcbfGeneration {
 		} else {
 			serializer.endTag(null, "node");
 		}
+		
+		
 		for(CountryRegion c : r.children) {
 			processRegion(c, translates, polygonFiles, targetObf, targetOsmXml, indent + "  ", serializer);
 		}		
