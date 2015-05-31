@@ -39,7 +39,7 @@ public class CountryOcbfGeneration {
 		if(args != null && args.length > 0) {
 			repo = args[0];
 		}
-		String regionsXml = repo+"resources/countries-info/regions.xml";
+		String regionsXml = repo+"regions.osm.xml";
 //		String targetObf = repo+"resources/countries-info/countries.reginfo";
 		String targetObf = repo+"regions.ocbf";
 		
