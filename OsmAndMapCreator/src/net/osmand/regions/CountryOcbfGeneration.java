@@ -1,6 +1,8 @@
 package net.osmand.regions;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -18,8 +20,10 @@ import net.osmand.util.Algorithms;
 
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
+import org.xmlpull.v1.XmlSerializer;
 
 public class CountryOcbfGeneration {
+	private int OSM_ID=-1000;
 
 	public static void main(String[] args) throws XmlPullParserException, IOException {
 		String repo =  "/Users/victorshcherb/osmand/repos/";
@@ -72,17 +76,25 @@ public class CountryOcbfGeneration {
 		public boolean hillshade ;
 		public boolean srtm ;
 		
+		public String getFullName() {
+			if(parent == null) {
+				return name;
+			} else {
+				return parent.getFullName() + "_" + name;
+			}
+		}
+		
 		public String getDownloadName() {
 			String s = name;
 			String p = getDownloadPrefix();
-			if (p != null) {
+			if (p != null && p.length() > 0) {
 				s = p + "_" + s;
 			}
 			String suf = getDownloadSuffix();
-			if (s != null) {
+			if (s != null && s.length() > 0) {
 				s = s + "_" + suf;
 			}
-			return Algorithms.capitalizeFirstLetterAndLowercase(s);
+			return s;
 		}
 		
 		
@@ -97,7 +109,7 @@ public class CountryOcbfGeneration {
 			if(downloadPrefix == null && parent != null) {
 				return parent.getInnerDownloadPrefix();
 			}
-			return downloadPrefix;
+			return downloadPrefix == null ? "" : downloadPrefix;
 		}
 		
 		public String getInnerDownloadSuffix() {
@@ -111,7 +123,7 @@ public class CountryOcbfGeneration {
 			if(downloadSuffix == null && parent != null) {
 				return parent.getInnerDownloadSuffix();
 			}
-			return downloadSuffix;
+			return downloadSuffix == null ? "" : downloadSuffix;
 		}
 
 		public void setInnerDownloadSuffix(String string) {
@@ -239,32 +251,89 @@ public class CountryOcbfGeneration {
 	
 
 	private void createFile(CountryRegion global, Map<String, Set<TranslateEntity>> translates, Map<String, File> polygonFiles,
-			String targetObf, String targetOsmXml) {
+			String targetObf, String targetOsmXml) throws IOException {
+		XmlSerializer serializer = new org.kxml2.io.KXmlSerializer();
+		serializer.setOutput(new FileOutputStream(targetOsmXml), "UTF-8");
+		serializer.startDocument("UTF-8", true);
+		serializer.startTag(null, "osm");
+		serializer.attribute(null, "version", "0.6");
+		serializer.attribute(null, "generator", "OsmAnd");
+		serializer.setFeature(
+				"http://xmlpull.org/v1/doc/features.html#indent-output", true);
+
 		for(CountryRegion r : global.children) {
-			processRegion(r, translates, polygonFiles, targetObf, targetOsmXml, "");
+			processRegion(r, translates, polygonFiles, targetObf, targetOsmXml, "", serializer);
 		}
 		
+		serializer.endDocument();
+		serializer.flush();
+		
+	}
+	
+	private static void addTag(XmlSerializer serializer, String key, String value) throws IOException {
+		serializer.startTag(null, "tag");
+		serializer.attribute(null, "k", key);
+		serializer.attribute(null, "v", value);
+		serializer.endTag(null, "tag");
 	}
 
 	private void processRegion(CountryRegion r, Map<String, Set<TranslateEntity>> translates,
-			Map<String, File> polygonFiles, String targetObf, String targetOsmXml, String indent) {
+			Map<String, File> polygonFiles, String targetObf, String targetOsmXml, String indent, XmlSerializer serializer) 
+					throws IOException {
 		String line = "key= " + r.name;
+		File boundary = null;
+		if (r.boundary != null) {
+			if (!polygonFiles.containsKey(r.boundary)) {
+				System.out.println("!!! Missing boundary " + r.boundary);
+			} else {
+				boundary = polygonFiles.get(r.boundary);
+				line += " boundary="+boundary.getName();
+			}
+		}
+		if(boundary != null) {
+			List<String> boundaryPoints = readBoundaryPoints(boundary, serializer);
+			serializer.startTag(null, "way");
+			for(String bnd : boundaryPoints) {
+				serializer.startTag(null, "nd");
+				serializer.attribute(null, "ref", bnd);
+				serializer.endTag(null, "nd");
+			}
+		} else {
+			serializer.startTag(null, "node");
+			serializer.attribute(null, "lat", "0");
+			serializer.attribute(null, "lon", "0");
+		}
+		serializer.attribute(null, "id", OSM_ID-- +"");
+		serializer.attribute(null, "visible", "true");
+		addTag(serializer, "key_name", r.name);
+		addTag(serializer, "region_full_name", r.getFullName());
+		if(r.parent != null) {
+			addTag(serializer, "region_parent_name", r.parent.getFullName());
+		}
 		if(r.map || r.roads || r.wiki || r.srtm || r.hillshade) {
 			line += " download=" + r.getDownloadName();
+			addTag(serializer, "download_name", r.getDownloadName());
+			addTag(serializer, "region_prefix", r.getDownloadPrefix());
+			addTag(serializer, "region_suffix", r.getDownloadSuffix()); // add exception for Russia for BW?
 			if(r.map) {
 				line += " map=yes";
+				addTag(serializer, "region_map", "yes");
 			}
 			if(r.wiki) {
 				line += " wiki=yes";
+				addTag(serializer, "region_wiki", "yes");
 			}
 			if(r.roads) {
 				line += " roads=yes";
+				addTag(serializer, "region_roads", "yes");
 			}
 			if(r.srtm) {
 				line += " srtm=yes";
+				addTag(serializer, "region_srtm", "yes");
 			}
 			if(r.hillshade) {
 				line += " hillshade=yes";
+				addTag(serializer, "region_hillshade", "yes");
 			}
 		}
 		if(r.translate == null) {
@@ -299,19 +368,62 @@ public class CountryOcbfGeneration {
 			} else {
 				TranslateEntity nt = set.iterator().next();
 				line += " translate-" + nt.tm.size() + "=" + nt.tm.get("name");
+				Iterator<Entry<String, String>> it = nt.tm.entrySet().iterator();
+				while(it.hasNext()) {
+					Entry<String, String> e = it.next();
+					addTag(serializer, e.getKey(), e.getValue());
+				}
 			}
 		}
-		if (r.boundary != null) {
-			if (!polygonFiles.containsKey(r.boundary)) {
-				System.out.println("!!! Missing boundary " + r.boundary);
-			} else {
-				line += " boundary="+polygonFiles.get(r.boundary).getName();
-			}
-		}
+		
+		// COMMENT TO SEE ONLY WARNINGS
 		System.out.println(indent + line);
+		
+		
+		if(boundary != null) {
+			serializer.endTag(null, "way");
+		} else {
+			serializer.endTag(null, "node");
+		}
 		for(CountryRegion c : r.children) {
-			processRegion(c, translates, polygonFiles, targetObf, targetOsmXml, indent + "  ");
+			processRegion(c, translates, polygonFiles, targetObf, targetOsmXml, indent + "  ", serializer);
 		}		
+	}
+
+	private List<String> readBoundaryPoints(File boundary, XmlSerializer serializer) throws IOException {
+		List<String> l = new ArrayList<String>();
+		BufferedReader br = new BufferedReader(new FileReader(boundary));
+		br.readLine(); // name
+		boolean newContour = true;
+		String s;
+		// TODO new contour
+		while ((s = br.readLine()) != null) {
+			if (newContour) {
+				// skip
+				newContour = false;
+			} else if (s.trim().equals("END")) {
+				newContour = true;
+			} else {
+				s = s.trim();
+				int i = s.indexOf(' ');
+				String lat = s.substring(i, s.length()).trim();
+				String lon = s.substring(0, i).trim();
+				serializer.startTag(null, "node");
+				try {
+					serializer.attribute(null, "lat", Double.parseDouble(lat)+"");
+					serializer.attribute(null, "lon", Double.parseDouble(lon)+"");
+				} catch (NumberFormatException e) {
+					System.err.println(lat + " " + lon);
+					e.printStackTrace();
+				}
+				long id = OSM_ID--;
+				l.add(id + "");
+				serializer.attribute(null, "id", id + "");
+				serializer.endTag(null, "node");
+			}
+		}
+		br.close();
+		return l;
 	}
 
 	private CountryRegion createRegion(CountryRegion parent, Map<String, String> attrs) {
