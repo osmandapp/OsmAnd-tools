@@ -292,14 +292,17 @@ public class CountryOcbfGeneration {
 			}
 		}
 		if(boundary != null) {
-			List<String> boundaryPoints = readBoundaryPoints(boundary, serializer);
+			List<List<String>> boundaryPoints = readBoundaryPoints(boundary, serializer);
 			serializer.startTag(null, "way");
 			serializer.attribute(null, "id", OSM_ID-- +"");
 			serializer.attribute(null, "visible", "true");
-			for(String bnd : boundaryPoints) {
-				serializer.startTag(null, "nd");
-				serializer.attribute(null, "ref", bnd);
-				serializer.endTag(null, "nd");
+			// TODO relation
+			for (List<String> ls : boundaryPoints) {
+				for (String bnd : ls) {
+					serializer.startTag(null, "nd");
+					serializer.attribute(null, "ref", bnd);
+					serializer.endTag(null, "nd");
+				}
 			}
 		} else {
 			serializer.startTag(null, "node");
@@ -396,22 +399,30 @@ public class CountryOcbfGeneration {
 		}		
 	}
 
-	private List<String> readBoundaryPoints(File boundary, XmlSerializer serializer) throws IOException {
+	private List<List<String>> readBoundaryPoints(File boundary, XmlSerializer serializer) throws IOException {
+		List<List<String>> res = new ArrayList<List<String>>();
 		List<String> l = new ArrayList<String>();
 		BufferedReader br = new BufferedReader(new FileReader(boundary));
 		br.readLine(); // name
 		boolean newContour = true;
 		String s;
-		// TODO new contour
 		while ((s = br.readLine()) != null) {
 			if (newContour) {
 				// skip
 				newContour = false;
+				if(l.size()  >0) {
+					res.add(l);
+				}
+				l = new ArrayList<String>();
+			} else if (s.trim().length() == 0) {
 			} else if (s.trim().equals("END")) {
 				newContour = true;
 			} else {
 				s = s.trim();
 				int i = s.indexOf(' ');
+				if(i == -1) {
+					System.err.println("? " +s);
+				}
 				String lat = s.substring(i, s.length()).trim();
 				String lon = s.substring(0, i).trim();
 				serializer.startTag(null, "node");
@@ -428,8 +439,11 @@ public class CountryOcbfGeneration {
 				serializer.endTag(null, "node");
 			}
 		}
+		if(l.size()  >0) {
+			res.add(l);
+		}
 		br.close();
-		return l;
+		return res;
 	}
 
 	private CountryRegion createRegion(CountryRegion parent, Map<String, String> attrs) {
