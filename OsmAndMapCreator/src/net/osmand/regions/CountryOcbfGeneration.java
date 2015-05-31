@@ -397,6 +397,8 @@ public class CountryOcbfGeneration {
 						t = "name=" +t;	
 					} else if(translates.containsKey("name:en="+t)) {
 						t = "name:en=" + t;
+					} else {
+						break;
 					}
 				}
 				if(set == null) {
