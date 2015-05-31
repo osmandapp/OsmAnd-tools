@@ -397,8 +397,6 @@ public class CountryOcbfGeneration {
 						t = "name=" +t;	
 					} else if(translates.containsKey("name:en="+t)) {
 						t = "name:en=" + t;
-					} else {
-						break;
 					}
 				}
 				if(set == null) {
@@ -411,6 +409,9 @@ public class CountryOcbfGeneration {
 					if(st2 != null) {
 						set = new HashSet<TranslateEntity>(set);
 						set.retainAll(st2);
+					} else {
+						set = null;
+						break;
 					}
 				}
 			}
