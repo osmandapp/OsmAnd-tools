@@ -22,7 +22,6 @@ import net.osmand.data.preparation.IndexCreator;
 import net.osmand.data.preparation.MapZooms;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.osm.MapRenderingTypesEncoder;
-import net.osmand.osm.util.WikipediaByCountryDivider;
 import net.osmand.util.Algorithms;
 
 import org.apache.commons.logging.Log;

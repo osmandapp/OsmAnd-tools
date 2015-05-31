@@ -44,23 +44,22 @@ public class OceanTilesCreator {
 
         BasemapProcessor bmp = new BasemapProcessor();
         bmp.constructBitSetInfo();
-        BasemapProcessor.SimplisticQuadTree quadTree = bmp.constructTilesQuadTree(11);
-//        int x = (int) MapUtils.getTileNumberX(11, 3.14424);
-//        int y = (int) MapUtils.getTileNumberY(11, 52.960808);
-//        int x = (int) MapUtils.getTileNumberX(11, 3.417527);
-//        int y = (int) MapUtils.getTileNumberY(11, 53.042625);
-        int x = (int) MapUtils.getTileNumberX(11, 41.45811);
-        int y = (int) MapUtils.getTileNumberY(11, 41.4537);
-        System.out.println(x + " " + y);
-        System.out.println((x +1)<< 20);
-        System.out.println((y +1)<< 20);
+        double[] lat = new double[]{41.4537, 33.4};
+        double[] lon = new double[]{41.45, 15.5};
+        int zoom = 11;
+		for (int i = 0; i < lat.length && i < lon.length; i++) {
+			int x = (int) MapUtils.getTileNumberX(zoom, lon[i]);
+			int y = (int) MapUtils.getTileNumberY(zoom, lat[i]);
+			System.out.println(bmp.getSeaTile(x, y, zoom));
+		}
+		createTilesFile(args[0], args[1]);
+        
+//        BasemapProcessor.SimplisticQuadTree quadTree = bmp.constructTilesQuadTree(11);
 //        BasemapProcessor.SimplisticQuadTree ts = quadTree.getOrCreateSubTree(x, y, 11);
 //        System.out.println(ts.seaCharacteristic);
-        System.out.println(bmp.getSeaTile(x, y, 11));
 
-//        createTilesFile();
 
-//        createJOSMFile(bmp);
+//        createJOSMFile(bmp, args[1]);
     }
 
     static class OceanTileInfo {
@@ -83,8 +82,8 @@ public class OceanTilesCreator {
     }
 
 
-    private static void createTilesFile() throws IOException, SAXException {
-        File readFile = new File("/home/victor/projects/osmand/data/basemap/ready/coastline.osm.bz2");
+    private static void createTilesFile(String coastlinesInput, String result) throws IOException, SAXException {
+        File readFile = new File(coastlinesInput);
         InputStream stream = new BufferedInputStream(new FileInputStream(readFile), 8192 * 4);
         InputStream streamFile = stream;
         long st = System.currentTimeMillis();
@@ -134,14 +133,14 @@ public class OceanTilesCreator {
                 ns += w.getNodeIds().size();
             }
         }
-        writeResult(map);
+        writeResult(map, result);
 
         System.out.println(c + " " + ns + " coastlines " + map.size());
     }
 
-    private static void writeResult(TLongObjectHashMap<OceanTileInfo> map) throws IOException {
+    private static void writeResult(TLongObjectHashMap<OceanTileInfo> map, String result) throws IOException {
         int currentByte = 0;
-        FileOutputStream rf = new FileOutputStream("../tools/OsmAndMapCreator/oceantiles_12.dat.u");
+        FileOutputStream rf = new FileOutputStream(result);
         int[] cs = new int[4];
         int[] vs = new int[4];
 
@@ -184,7 +183,7 @@ public class OceanTilesCreator {
         return map.get(key );
     }
 
-    private static void createJOSMFile(BasemapProcessor bmp ) throws XMLStreamException, IOException {
+    private static void createJOSMFile(String fileLocation , BasemapProcessor bmp ) throws XMLStreamException, IOException {
         int z = 8;
         BasemapProcessor.SimplisticQuadTree quadTree = bmp.constructTilesQuadTree(z);
         int pz = 1 << z;
@@ -215,7 +214,7 @@ public class OceanTilesCreator {
 
             }
         }
-        new OsmStorageWriter().saveStorage(new FileOutputStream("/home/victor/projects/osmand/temp/grid.osm"),
+        new OsmStorageWriter().saveStorage(new FileOutputStream(fileLocation),
                 st, s, true);
     }
 
