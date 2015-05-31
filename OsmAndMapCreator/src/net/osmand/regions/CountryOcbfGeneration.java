@@ -39,11 +39,9 @@ public class CountryOcbfGeneration {
 		if(args != null && args.length > 0) {
 			repo = args[0];
 		}
-		String regionsXml = repo+"regions.osm.xml";
-//		String targetObf = repo+"resources/countries-info/countries.reginfo";
+		String regionsXml = repo+"resources/countries-info/regions.xml";
 		String targetObf = repo+"regions.ocbf";
-		
-		String targetOsmXml = repo+"resources/countries-info/countries.osm";
+		String targetOsmXml = repo+"regions.osm.xml";
 		String[] polygonFolders = new String[] {
 				repo +"misc/osm-planet/polygons",
 //				repo +"misc/osm-planet/gislab-polygons",
