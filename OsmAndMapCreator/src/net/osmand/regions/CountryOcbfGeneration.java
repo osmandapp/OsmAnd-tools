@@ -539,12 +539,12 @@ public class CountryOcbfGeneration {
 			reg.wiki = reg.map;
 		}
 		if(attrs.containsKey("translate")) {
-			reg.translate = attrs.get("translate");
+			reg.translate = attrs.get("translate").toLowerCase();
 			if(reg.translate.equals("no")) {
 				reg.translate = null;
 			}
 		} else {
-			reg.translate = "entity=node;"+reg.name;
+			reg.translate = "entity=node;"+reg.name.toLowerCase();
 		}
 		if(attrs.containsKey("boundary")) {
 			reg.boundary = attrs.get("boundary");
