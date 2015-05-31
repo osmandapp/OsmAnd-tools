@@ -32,7 +32,7 @@ public class CountryOcbfGeneration {
 		String[] polygonFolders = new String[] {
 				repo +"misc/osm-planet/polygons",
 				repo +"misc/osm-planet/gislab-polygons",
-				repo +"misc/osm-planet/geo-polygons",	
+//				repo +"misc/osm-planet/geo-polygons",	
 				repo +"misc/osm-planet/srtm-polygons"
 		};
 		String[] translations = new String[] {
@@ -186,9 +186,6 @@ public class CountryOcbfGeneration {
 				}
 			}
 		}
-
-		// TODO Auto-generated method stub
-		
 	}
 
 	private void addTranslate(Map<String, Set<TranslateEntity>> translates, TranslateEntity te, String k) {
