@@ -262,6 +262,7 @@ public class CountryOcbfGeneration {
 				"http://xmlpull.org/v1/doc/features.html#indent-output", true);
 
 		for(CountryRegion r : global.children) {
+			r.parent = null;
 			processRegion(r, translates, polygonFiles, targetObf, targetOsmXml, "", serializer);
 		}
 		
