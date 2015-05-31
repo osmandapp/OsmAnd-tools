@@ -283,8 +283,8 @@ public class CountryOcbfGeneration {
 		serializer.flush();
 		fous.close();
 
-		IndexCreator creator = new IndexCreator(new File(targetOsmXml).getParentFile()); //$NON-NLS-1$
-		creator.setMapFileName(new File(targetOsmXml).getName());
+		IndexCreator creator = new IndexCreator(new File(targetObf).getParentFile()); //$NON-NLS-1$
+		creator.setMapFileName(new File(targetObf).getName());
 		creator.setIndexMap(true);
 		creator.setIndexAddress(false);
 		creator.setIndexPOI(false);
