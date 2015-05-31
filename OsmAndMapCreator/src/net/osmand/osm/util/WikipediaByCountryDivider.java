@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.zip.GZIPInputStream;
 
+import net.osmand.IndexConstants;
 import net.osmand.PlatformUtil;
 import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.data.preparation.DBDialect;
@@ -279,7 +280,7 @@ public class WikipediaByCountryDivider {
 					"SELECT WC.id, WC.lat, WC.lon, WC.lang, WC.wikiId, WC.title, WC.zipContent "
 							+ " FROM wiki_content WC INNER JOIN wiki_region WR "
 							+ " ON WC.id = WR.id AND WR.regionName = '" + regionName + "' ORDER BY WC.id");
-			File osmBz2 = new File(rgns, regionName + "_wiki.osm.bz2");
+			File osmBz2 = new File(rgns, regionName + "_wiki_" + IndexConstants.BINARY_MAP_VERSION + ".osm.bz2");
 			FileOutputStream out = new FileOutputStream(osmBz2);
 			out.write('B');
 			out.write('Z');
