@@ -35,7 +35,7 @@ public class CountryOcbfGeneration {
 		String targetOsmXml = repo+"resources/countries-info/countries.osm";
 		String[] polygonFolders = new String[] {
 				repo +"misc/osm-planet/polygons",
-				repo +"misc/osm-planet/gislab-polygons",
+//				repo +"misc/osm-planet/gislab-polygons",
 //				repo +"misc/osm-planet/geo-polygons",	
 				repo +"misc/osm-planet/srtm-polygons"
 		};
