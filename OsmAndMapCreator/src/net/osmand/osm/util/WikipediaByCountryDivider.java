@@ -279,6 +279,8 @@ public class WikipediaByCountryDivider {
 			}
 			
 			fl.delete();
+			osmBz2.delete();
+			obfFile.delete();
 			System.out.println("Generate " +fl.getName());
 			Connection loc = (Connection) DBDialect.SQLITE.getDatabaseConnection(fl.getAbsolutePath(), log);
 			loc.createStatement()
@@ -331,6 +333,9 @@ public class WikipediaByCountryDivider {
 				}
 				String contentStr = content.toString();
 				contentStr = contentStr.replace((char) 9, ' ');
+				contentStr = contentStr.replace((char) 0, ' ');
+				contentStr = contentStr.replace((char) 22, ' ');
+				contentStr = contentStr.replace((char) 27, ' ');
 				insertWikiContent.setLong(1, osmId);
 				insertWikiContent.setDouble(2, lat);
 				insertWikiContent.setDouble(3, lon);
@@ -396,6 +401,7 @@ public class WikipediaByCountryDivider {
 	private static void generateObf(File osmBz2, File obf) throws IOException, SAXException, SQLException, InterruptedException {
 		IndexPoiCreator.ZIP_LONG_STRINGS = true;
 		IndexCreator creator = new IndexCreator(obf.getParentFile()); //$NON-NLS-1$
+		new File(obf.getParentFile(), IndexCreator.TEMP_NODES_DB).delete();
 		creator.setIndexMap(false);
 		creator.setIndexAddress(false);
 		creator.setIndexPOI(true);
