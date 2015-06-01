@@ -329,6 +329,8 @@ public class WikipediaByCountryDivider {
 				while ((s = br.readLine()) != null) {
 					content.append(s);
 				}
+				String contentStr = content.toString();
+				contentStr = contentStr.replace((char) 9, ' ');
 				insertWikiContent.setLong(1, osmId);
 				insertWikiContent.setDouble(2, lat);
 				insertWikiContent.setDouble(3, lon);
@@ -358,12 +360,12 @@ public class WikipediaByCountryDivider {
 					nameAdded = true;
 					addTag(serializer, "name", title);
 					addTag(serializer, "wiki_id", wikiId +"");
-					addTag(serializer, "content", content.toString());
+					addTag(serializer, "content", contentStr);
 				} else {
 					addTag(serializer, "name:"+wikiLang, title);
 					addTag(serializer, "wiki_id:"+wikiLang, wikiId +"");
 					nameUnique = title;
-					addTag(serializer, "content:"+wikiLang, content.toString());
+					addTag(serializer, "content:"+wikiLang, contentStr);
 				}
 			}
 			if(prevOsmId != -1) {
