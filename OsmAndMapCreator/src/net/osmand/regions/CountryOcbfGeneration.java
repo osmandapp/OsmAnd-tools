@@ -219,6 +219,7 @@ public class CountryOcbfGeneration {
 		if(!translates.containsKey(k)) {
 			translates.put(k, new HashSet<CountryOcbfGeneration.TranslateEntity>());
 		}
+		System.out.println("TAG " + k);
 		translates.get(k).add(te);
 	}
 
