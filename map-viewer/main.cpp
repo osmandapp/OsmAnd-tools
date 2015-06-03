@@ -28,6 +28,7 @@
 #include <OsmAndCore/ResourcesManager.h>
 #include <OsmAndCore/ObfsCollection.h>
 #include <OsmAndCore/ObfDataInterface.h>
+#include <OsmAndCore/WorldRegion.h>
 #include <OsmAndCore/WorldRegions.h>
 #include <OsmAndCore/RoadLocator.h>
 #include <OsmAndCore/Data/Road.h>
@@ -338,8 +339,9 @@ int main(int argc, char** argv)
     //////////////////////////////////////////////////////////////////////////
 
     //////////////////////////////////////////////////////////////////////////
-    //QHash< QString, std::shared_ptr<const OsmAnd::WorldRegions::WorldRegion> > worldRegions;
-    //OsmAnd::WorldRegions("d:\\OpenSource\\OsmAnd\\OsmAnd\\resources\\countries-info\\regions.ocbf").loadWorldRegions(worldRegions);
+    //QList< std::shared_ptr<const OsmAnd::WorldRegion> > worldRegions;
+    //OsmAnd::WorldRegions("d:\\OpenSource\\OsmAnd\\OsmAnd\\resources\\countries-info\\regions.ocbf").loadWorldRegions(&worldRegions);
+    //OsmAnd::WorldRegions("d:\\OpenSource\\OsmAnd\\regions.ocbf").loadWorldRegions(&worldRegions);
     //////////////////////////////////////////////////////////////////////////
 
     if (dataDirSpecified)
@@ -418,21 +420,14 @@ int main(int argc, char** argv)
     //int i = 5;
     //////////////////////////////////////////////////////////////////////////
 
-    /*const std::shared_ptr<OsmAnd::InAreaSearchEngine> inAreaSearchEngine(new OsmAnd::InAreaSearchEngine());
-    const std::shared_ptr<OsmAnd::PoiSearchDataSource> poiSearchDataSource(new OsmAnd::PoiSearchDataSource(obfsCollection));
-    inAreaSearchEngine->addDataSource(poiSearchDataSource);
-
-    const auto searchSession = std::static_pointer_cast<OsmAnd::InAreaSearchSession>(inAreaSearchEngine->createSession());
-
-    searchSession->setArea(OsmAnd::AreaI64(OsmAnd::Utilities::boundingBox31FromAreaInMeters(5000, OsmAnd::PointI(
-        1255337783,
-        724166131))));
-    searchSession->setQuery("Vadima");
-    searchSession->startSearch();*/
-    //////////////////////////////////////////////////////////////////////////
-
     roadLocator.reset(new OsmAnd::RoadLocator(obfsCollection));
-    mapPresentationEnvironment.reset(new OsmAnd::MapPresentationEnvironment(style, density, mapScale, symbolsScale, "ru"));
+    mapPresentationEnvironment.reset(new OsmAnd::MapPresentationEnvironment(
+        style,
+        density,
+        mapScale,
+        symbolsScale,
+        "ru",
+        OsmAnd::MapPresentationEnvironment::LanguagePreference::LocalizedOrTransliterated));
     primitivizer.reset(new OsmAnd::MapPrimitiviser(mapPresentationEnvironment));
 
     OsmAnd::MapRendererSetupOptions rendererSetup;
@@ -669,7 +664,7 @@ void mouseHandler(int button, int state, int x, int y)
                     OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, "Found unnamed road");
                 else
                 {
-                    const auto name = road->captions[road->attributeMapping->nativeNameAttributeId];
+                    const auto name = road->getCaptionInNativeLanguage();
                     OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, "Found road: %s", qPrintable(name));
                 }
             }
