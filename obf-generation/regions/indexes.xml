@@ -846,6 +846,7 @@
 		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" skip="false" region_suffix="_australia-oceania">
 			<region name="oceania"/>
 			<region name="new-zealand"/>
+			<region name="papua-new-guinea"/>
 		</regions>
 
 		<!-- 8. AFRICA  -->
