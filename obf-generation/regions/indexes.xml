@@ -833,18 +833,20 @@
 
 		<!-- 7. AUSTRALIA-OCEANIA -->
 		<!-- 7.1 AUSTRALIA-OCEANIA [SOURCE: GEOFABRIK.DE] -->
-		<regions siteToDownload="http://download.geofabrik.de/{0}.osm.pbf" region_prefix="" region_suffix="" skip="false">
-			<region name="australia-oceania" downloadName="australia-oceania-latest"/>
+		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" region_suffix="" skip="false">
+			<region name="australia-oceania"/>
 		</regions>
 
-		<regions siteToDownload="http://download.geofabrik.de/australia-oceania/{0}.osm.pbf" region_prefix="" region_suffix="_Australia-oceania"  skip="false">
+<!--		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" region_suffix="_Australia-oceania"  skip="false">-->
 		<!-- 	<region name="australia" downloadName="australia-latest"/> -->
-			<region name="new-caledonia" downloadName="new-caledonia-latest"/>
+<!--			<region name="new-caledonia" downloadName="new-caledonia-latest"/>
 			<region name="new-zealand" downloadName="new-zealand-latest"/>
-		</regions>
+		</regions>-->
 
-		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" skip="false" region_suffix="_Australia-oceania">
-			<region  name="oceania"/>
+		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" skip="false" region_suffix="_australia-oceania">
+			<region name="oceania"/>
+			<region name="new-zealand"/>
+			<region name="papua-new-guinea"/>
 		</regions>
 
 		<!-- 8. AFRICA  -->
