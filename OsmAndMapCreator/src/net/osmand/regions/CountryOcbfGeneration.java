@@ -431,7 +431,7 @@ public class CountryOcbfGeneration {
 		}
 		
 		// COMMENT TO SEE ONLY WARNINGS
-//		System.out.println(indent + line);
+		System.out.println(indent + line);
 		
 		
 		if(boundaryPoints.size() > 0) {
