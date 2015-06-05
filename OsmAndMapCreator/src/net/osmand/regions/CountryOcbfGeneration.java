@@ -519,27 +519,27 @@ public class CountryOcbfGeneration {
 		reg.setInnerDownloadSuffix(attrs.get("inner_download_suffix"));
 		reg.setInnerDownloadPrefix(attrs.get("inner_download_prefix"));
 		if(attrs.containsKey("hillshade")) {
-			reg.hillshade = Boolean.parseBoolean(attrs.get("hillshade"));
+			reg.hillshade = parseBoolean(attrs.get("hillshade"));
 		} else {
 			reg.hillshade = type == null || type.equals("hillshade"); 
 		}
 		if(attrs.containsKey("srtm")) {
-			reg.srtm = Boolean.parseBoolean(attrs.get("srtm"));
+			reg.srtm = parseBoolean(attrs.get("srtm"));
 		} else {
 			reg.srtm = type == null || type.equals("srtm"); 
 		}
 		if(attrs.containsKey("map")) {
-			reg.map = Boolean.parseBoolean(attrs.get("map"));
+			reg.map = parseBoolean(attrs.get("map"));
 		} else {
 			reg.map = type == null || type.equals("map"); 
 		}
 		if(attrs.containsKey("roads")) {
-			reg.roads = Boolean.parseBoolean(attrs.get("roads"));
+			reg.roads = parseBoolean(attrs.get("roads"));
 		} else {
 			reg.roads = reg.map;
 		}
 		if(attrs.containsKey("wiki")) {
-			reg.wiki = Boolean.parseBoolean(attrs.get("wiki"));
+			reg.wiki = parseBoolean(attrs.get("wiki"));
 		} else {
 			reg.wiki = reg.map;
 		}
@@ -560,6 +560,10 @@ public class CountryOcbfGeneration {
 			reg.boundary = reg.name;
 		}
 		return reg;
+	}
+
+	private boolean parseBoolean(String string) {
+		return Boolean.parseBoolean(string) || "yes".equalsIgnoreCase(string);
 	}
 
 	private void scanPolygons(File file, Map<String, File> polygonFiles) {
