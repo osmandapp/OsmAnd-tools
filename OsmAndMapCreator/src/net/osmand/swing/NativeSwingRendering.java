@@ -218,6 +218,14 @@ public class NativeSwingRendering extends NativeLibrary {
 						e.printStackTrace();
 					}
 				}
+			} else {
+				if (customProp.isString()) {
+					request.setStringFilter(customProp, "");
+				} else if (customProp.isBoolean()) {
+					request.setBooleanFilter(customProp, false);
+				} else {
+					request.setIntFilter(customProp, -1);
+				}
 			}
 		}
 		request.setIntFilter(request.ALL.R_MINZOOM, ctx.zoom);
