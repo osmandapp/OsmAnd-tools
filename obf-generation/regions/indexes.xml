@@ -762,6 +762,46 @@
 			<region name="uzbekistan" downloadName="uzbekistan-latest"/>
 		</regions>
 
+		<!--  6.2.1 INDIA [SOURCE: OSMAND:NET] -->
+		<regions siteToDownload="http://download.osmand.net/osm-downloads/India-{0}.pbf" region_prefix="India_" skip="false" region_suffix="_Asia">
+			<region name="andaman-and-nicobar-islands"/>
+			<region name="andhra-pradesh"/>
+			<region name="arunachal-pradesh"/>
+			<region name="assam"/>
+			<region name="bihar"/>
+			<region name="chandigarh"/>
+			<region name="chhattisgarh"/>
+			<region name="dadra-and-nagar-haveli"/>
+			<region name="daman-and-diu"/>
+			<region name="delhi"/>
+			<region name="goa"/>
+			<region name="gujarat"/>
+			<region name="haryana"/>
+			<region name="himachal-pradesh"/>
+			<region name="jammu-and-kashmir"/>
+			<region name="jharkhand"/>
+			<region name="karnataka"/>
+			<region name="kerala"/>
+			<region name="lakshadweep"/>
+			<region name="madhya-pradesh"/>
+			<region name="maharashtra"/>
+			<region name="manipur"/>
+			<region name="meghalaya"/>
+			<region name="mizoram"/>
+			<region name="nagaland"/>
+			<region name="odisha"/>
+			<region name="puducherry"/>
+			<region name="punjab"/>
+			<region name="rajasthan"/>
+			<region name="sikkim"/>
+			<region name="tamil-nadu"/>
+			<region name="telangana"/>
+			<region name="tripura"/>
+			<region name="uttarakhand"/>
+			<region name="uttar-pradesh"/>
+			<region name="west-bengal"/>
+		</regions>
+
 		<!--  6.3 ASIA [SOURCE: OSMAND:NET] -->
 		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix=""  skip="false" region_suffix="_Asia">
 			<region name="israel"/>
@@ -832,9 +872,9 @@
 		</regions>
 
 		<!-- 7. AUSTRALIA-OCEANIA -->
-		<!-- 7.1 AUSTRALIA-OCEANIA [SOURCE: GEOFABRIK.DE] -->
+		<!-- 7.1 AUSTRALIA-OCEANIA [SOURCE: download.osmand.net] -->
 		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" region_suffix="" skip="false">
-			<region name="australia-oceania"/>
+			<region name="australia-oceania"/> <!-- Australia only -->
 		</regions>
 
 <!--		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" region_suffix="_Australia-oceania"  skip="false">-->
