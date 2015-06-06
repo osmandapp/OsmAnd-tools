@@ -311,7 +311,7 @@ public class CountryOcbfGeneration {
 	private void processRegion(CountryRegion r, Map<String, Set<TranslateEntity>> translates,
 			Map<String, File> polygonFiles, String targetObf, String targetOsmXml, String indent, XmlSerializer serializer) 
 					throws IOException {
-		String line = "key= " + r.name;
+		String line = "key=" + r.name;
 		File boundary = null;
 		if (r.boundary != null) {
 			if (!polygonFiles.containsKey(r.boundary)) {
