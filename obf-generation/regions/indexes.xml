@@ -160,7 +160,7 @@
 			<region name="champagne-ardenne"/>
 			<region name="corse"/>
 			<region name="franche-comte"/>
-			<region name="guadeloupe"/>
+<!--			<region name="guadeloupe"/>-->
 			<region name="haute-normandie"/>
 			<region name="ile-de-france"/>
 			<region name="languedoc-roussillon"/>
