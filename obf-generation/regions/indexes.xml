@@ -807,7 +807,7 @@
 			<region name="israel"/>
 			<region name="palestine"/>
 			<region name="jordan"/>
-			<region name="japan"/>
+<!--			<region name="japan"/>-->
 			<region name="vietnam"/>
 		</regions>
 
