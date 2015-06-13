@@ -105,7 +105,7 @@ public class CountryOcbfGeneration {
 				s = p + "_" + s;
 			}
 			String suf = getDownloadSuffix();
-			if (s != null && s.length() > 0) {
+			if (suf != null && suf.length() > 0) {
 				s = s + "_" + suf;
 			}
 			return s;
