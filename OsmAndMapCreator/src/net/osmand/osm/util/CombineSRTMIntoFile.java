@@ -72,9 +72,7 @@ public class CombineSRTMIntoFile {
 			if(rc.containsAdditionalType(srtm)) {
 				String dw = rc.getNameByType(downloadName);
 				String fullName = rc.getNameByType(regionFullName);
-				if(fullName.contains("etherland")) {
-					process(rc, bnds.get(fullName), dw, directoryWithSRTMFiles, directoryWithTargetFiles);
-				}
+				process(rc, bnds.get(fullName), dw, directoryWithSRTMFiles, directoryWithTargetFiles);
 			}
 		}
 	}
