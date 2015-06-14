@@ -38,6 +38,8 @@ import org.apache.tools.bzip2.CBZip2OutputStream;
 import org.xml.sax.SAXException;
 import org.xmlpull.v1.XmlSerializer;
 
+import rtree.RTree;
+
 public class WikipediaByCountryDivider {
 	private static final Log log = PlatformUtil.getLog(WikipediaByCountryDivider.class);
 	private static final long BATCH_SIZE = 500;	
@@ -400,6 +402,8 @@ public class WikipediaByCountryDivider {
 
 	private static void generateObf(File osmBz2, File obf) throws IOException, SAXException, SQLException, InterruptedException {
 		IndexPoiCreator.ZIP_LONG_STRINGS = true;
+		// be independent of previous results
+		RTree.clearCache();
 		IndexCreator creator = new IndexCreator(obf.getParentFile()); //$NON-NLS-1$
 		new File(obf.getParentFile(), IndexCreator.TEMP_NODES_DB).delete();
 		creator.setIndexMap(false);

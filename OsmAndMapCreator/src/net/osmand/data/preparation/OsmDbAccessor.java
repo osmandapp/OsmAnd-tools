@@ -43,13 +43,12 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 	private PreparedStatement iterateWays;
 	private PreparedStatement iterateRelations;
 	private PreparedStatement iterateWayBoundaries;
+	
 
 	public interface OsmDbVisitor {
 		public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException;
 	}
 	
-	public OsmDbAccessor(){
-	}
 	
 	public void initDatabase(Object dbConnection, DBDialect dialect, int allNodes, int allWays, int allRelations) throws SQLException {
 		
@@ -75,6 +74,10 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 					"from ways w left join node n on w.node = n.id  where w.boundary > 0 order by w.id, w.ord"); //$NON-NLS-1$
 			iterateRelations = dbConn.prepareStatement("select r.id, r.tags from relations r where length(r.tags) > 0"); //$NON-NLS-1$
 		}
+	}
+	
+	public Connection getDbConn() {
+		return dbConn;
 	}
 	
 	public int getAllNodes() {
@@ -375,6 +378,10 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 			}
 		}
 		
+	}
+
+	public void setDbConn(Object dbConnection) {
+		this.dbConn = (Connection) dbConnection;
 	}
 
 

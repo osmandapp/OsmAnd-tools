@@ -57,10 +57,35 @@ public class OsmDbCreator implements IOsmStorageFilter {
 	private DBAccessor database;
 	private DBWriteBatch batch;
 	private WriteOptions options;
+	
+	private final int shiftId;
+	private final int additionId;
 
 
-	public OsmDbCreator() {
+	public OsmDbCreator(int additionId, int shiftId) {
+		this.additionId = additionId;
+		this.shiftId = shiftId;
 	}
+	
+	public OsmDbCreator() {
+		this(0, 0);
+	}
+	
+	private long convertId(Long id) {
+		return convertId(id.longValue());
+	}
+	
+	private long convertId(long id) {
+		if(shiftId <= 0) {
+			return id;
+		}
+		return (id << shiftId) + additionId;
+	}
+	
+	private long getId(Entity e) {
+		return convertId(e.getId());
+	}
+		
 
 	public void initDatabase(DBDialect dialect, Object databaseConn) throws SQLException {
 		
@@ -110,7 +135,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 		}
 	}
 	
-	public static String serializeEntityWOId(Entity e){
+	public String serializeEntityWOId(Entity e){
 		StringBuilder builder = new StringBuilder();
 		
 		ArraySerializer.startArray(builder, true);
@@ -143,7 +168,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 			boolean f = true;
 			for(Entry<EntityId, String> l : ((Relation) e).getMembersMap().entrySet()) {
 				String k = l.getKey().getType() == EntityType.NODE ? "0" : (l.getKey().getType() == EntityType.WAY ? "1" : "2");
-				ArraySerializer.value(builder, k + l.getKey().getId(), f);
+				ArraySerializer.value(builder, k + convertId(l.getKey().getId()), f);
 				f = false;
 				ArraySerializer.value(builder, l.getValue(), f);
 			}
@@ -166,13 +191,13 @@ public class OsmDbCreator implements IOsmStorageFilter {
 				if (!e.getTags().isEmpty()) {
 					allNodes++;
 				}
-				key = "0" + e.getId();
+				key = "0" + getId(e);
 			} else if (e instanceof Way) {
 				allWays++;
-				key = "1" + e.getId();
+				key = "1" + getId(e);
 			} else {
 				allRelations++;
-				key = "2" + e.getId();
+				key = "2" + getId(e);
 			}
 			batch.Put(key, serializeEntityWOId(e));
 			if (currentCountNode > BATCH_SIZE_OSM) {
@@ -202,7 +227,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 					if (!e.getTags().isEmpty()) {
 						allNodes++;
 					}
-					prepNode.setLong(1, e.getId());
+					prepNode.setLong(1, getId(e));
 					prepNode.setDouble(2, ((Node) e).getLatitude());
 					prepNode.setDouble(3, ((Node) e).getLongitude());
 					prepNode.setBytes(4, tags.toByteArray());
@@ -223,8 +248,8 @@ public class OsmDbCreator implements IOsmStorageFilter {
 						if (ord == 0) {
 							prepWays.setBytes(4, tags.toByteArray());
 						}
-						prepWays.setLong(1, e.getId());
-						prepWays.setLong(2, nodeIds.get(j));
+						prepWays.setLong(1, getId(e));
+						prepWays.setLong(2, convertId(nodeIds.get(j)));
 						prepWays.setLong(3, ord++);
 						prepWays.setInt(5, boundary);
 						prepWays.addBatch();
@@ -242,8 +267,8 @@ public class OsmDbCreator implements IOsmStorageFilter {
 						if (ord == 0) {
 							prepRelations.setBytes(6, tags.toByteArray());
 						}
-						prepRelations.setLong(1, e.getId());
-						prepRelations.setLong(2, i.getKey().getId());
+						prepRelations.setLong(1, getId(e));
+						prepRelations.setLong(2, convertId(i.getKey().getId()));
 						prepRelations.setLong(3, i.getKey().getType().ordinal());
 						prepRelations.setString(4, i.getValue());
 						prepRelations.setLong(5, ord++);
@@ -263,6 +288,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 		// do not add to storage
 		return false;
 	}
+
 
 	public int getAllNodes() {
 		return allNodes;
