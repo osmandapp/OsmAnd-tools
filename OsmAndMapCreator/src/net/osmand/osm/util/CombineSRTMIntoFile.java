@@ -128,6 +128,7 @@ public class CombineSRTMIntoFile {
 		RTree.clearCache();
 		IndexCreator ic = new IndexCreator(targetFile.getParentFile());
 		ic.setIndexMap(true);
+		ic.setRegionName(name +" contour lines");
 		ic.setMapFileName(targetFile.getName());
 		ic.setBoundary(polygon);
 		ic.generateIndexes(files.toArray(new File[files.size()]), new ConsoleProgressImplementation(1), null, MapZooms.getDefault(),
