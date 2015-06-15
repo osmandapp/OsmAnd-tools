@@ -154,8 +154,11 @@ public class MapRoutingTypes {
 	
 	
 	private boolean startsWith(Set<String> s, String tag, String value) {
+		if (s.contains(tag) || s.contains(tag + TAG_DELIMETER + value)) {
+			return true;
+		}
 		for(String st : s) {
-			if(tag.startsWith(st)) {
+			if(tag.startsWith(st+":")) {
 				return true;
 			}
 		}
@@ -206,7 +209,7 @@ public class MapRoutingTypes {
 				tag = tvl.substring(0, i);
 				value = tvl.substring(i + 1);
 			}
-            if(TAGS_TEXT.contains(tag)) {
+            if(TAGS_TEXT.contains(tag) || startsWith(TAGS_TEXT, tag, value)) {
                 names.put(registerRule(tag, null), value);
             } else if(contains(TAGS_TO_ACCEPT, tag, value) || startsWith(TAGS_TO_SAVE, tag, value) || getMap(TAGS_TO_REPLACE, tag, value) != null) {
 				outTypes.add(registerRule(tag, value).id);
