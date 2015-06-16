@@ -193,9 +193,11 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		if("true".equals(parser.getAttributeValue("", "lang"))) {
 			for (String lng : langs) {
 				String tag = lc(parser.getAttributeValue("", "tag")) + ":" + lng;
-				MapRulType retype = parseBaseRuleType(parser, parent, false, tag);
-				retype.onlyPoi = "true".equals(parser.getAttributeValue("", "only_poi"));
-				registerOnlyMap(parser, retype);
+				if(!types.containsKey(constructRuleKey(tag, null))){
+					MapRulType retype = parseBaseRuleType(parser, parent, false, tag);
+					retype.onlyPoi = "true".equals(parser.getAttributeValue("", "only_poi"));
+					registerOnlyMap(parser, retype);
+				}
 			}
 		}
 	}
