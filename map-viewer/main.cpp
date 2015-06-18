@@ -38,7 +38,6 @@
 #include <OsmAndCore/Map/MapPresentationEnvironment.h>
 #include <OsmAndCore/Map/IMapStylesCollection.h>
 #include <OsmAndCore/Map/MapStylesCollection.h>
-#include <OsmAndCore/Map/IMapStylesPresetsCollection.h>
 #include <OsmAndCore/Map/MapStyleEvaluator.h>
 #include <OsmAndCore/Map/IMapRenderer.h>
 #include <OsmAndCore/Map/IMapRenderer_Metrics.h>
@@ -400,6 +399,8 @@ int main(int argc, char** argv)
     //////////////////////////////////////////////////////////////////////////
     //OsmAnd::AmenitiesByNameSearch amenitiesByNameSearch(obfsCollection);
     //OsmAnd::AmenitiesByNameSearch::Criteria amenitiesByNameSearchCriteria;
+    //amenitiesByNameSearchCriteria.name = QString::fromWCharArray(L"эрмитаж");
+    ////amenitiesByNameSearchCriteria.name = QString::fromWCharArray(L"hermitage amsterdam");
     //amenitiesByNameSearch.performSearch(amenitiesByNameSearchCriteria,
     //    []
     //    (const OsmAnd::ISearch::Criteria& criteria, const OsmAnd::ISearch::IResultEntry& resultEntry_)
@@ -417,6 +418,29 @@ int main(int argc, char** argv)
     //            int i = 5;
     //        }
     //    });
+    //int i = 5;
+
+    //OsmAnd::AmenitiesByNameSearch amenitiesByNameSearch(obfsCollection);
+    //OsmAnd::AmenitiesByNameSearch::Criteria amenitiesByNameSearchCriteria;
+    //amenitiesByNameSearchCriteria.name = QString::fromWCharArray(L"эрмитаж");
+    ////amenitiesByNameSearchCriteria.name = QString::fromWCharArray(L"hermitage amsterdam");
+    //amenitiesByNameSearch.performSearch(amenitiesByNameSearchCriteria,
+    //    []
+    //(const OsmAnd::ISearch::Criteria& criteria, const OsmAnd::ISearch::IResultEntry& resultEntry_)
+    //{
+    //    const auto& resultEntry = *dynamic_cast<const OsmAnd::AmenitiesByNameSearch::ResultEntry*>(&resultEntry_);
+
+    //    OsmAnd::LogPrintf(
+    //        OsmAnd::LogSeverityLevel::Info, "%s (%s)",
+    //        qPrintable(resultEntry.amenity->nativeName),
+    //        qPrintable(resultEntry.amenity->id.toString()));
+
+    //    const auto& values = resultEntry.amenity->getDecodedValues();
+    //    for (const auto& entry : OsmAnd::rangeOf(values))
+    //    {
+    //        int i = 5;
+    //    }
+    //});
     //int i = 5;
     //////////////////////////////////////////////////////////////////////////
 
