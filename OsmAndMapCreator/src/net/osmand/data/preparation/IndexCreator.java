@@ -877,6 +877,7 @@ public class IndexCreator {
 		creator.setIndexTransport(false);
 		creator.setIndexRouting(false);
 		MapZooms zooms = MapZooms.parseZooms("5-6");
+		creator.zoomWaySmothness = 1;
 		int st = file.lastIndexOf('/');
 		int e = file.indexOf('.', st);
 		creator.setNodesDBFile(new File(folder+file.substring(st, e) + ".tmp.odb"));
