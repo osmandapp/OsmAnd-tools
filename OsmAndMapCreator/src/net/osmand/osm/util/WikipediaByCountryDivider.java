@@ -319,7 +319,7 @@ public class WikipediaByCountryDivider {
 			String nameUnique = null;
 			boolean nameAdded = false;
 			while (rps.next()) {
-				long osmId = rps.getLong(1);
+				long osmId = -rps.getLong(1);
 				double lat = rps.getDouble(2);
 				double lon = rps.getDouble(3);
 				long wikiId = rps.getLong(5);
@@ -358,7 +358,7 @@ public class WikipediaByCountryDivider {
 					nameUnique = null;
 					serializer.startTag(null, "node");
 					serializer.attribute(null, "visible", "true");
-					serializer.attribute(null, "id", osmId+"");
+					serializer.attribute(null, "id", (osmId)+"");
 					serializer.attribute(null, "lat", lat+"");
 					serializer.attribute(null, "lon", lon+"");
 					
@@ -368,9 +368,11 @@ public class WikipediaByCountryDivider {
 					addTag(serializer, "name", title);
 					addTag(serializer, "wiki_id", wikiId +"");
 					addTag(serializer, "content", contentStr);
+					addTag(serializer, "wiki_lang:en", "yes");
 				} else {
 					addTag(serializer, "name:"+wikiLang, title);
 					addTag(serializer, "wiki_id:"+wikiLang, wikiId +"");
+					addTag(serializer, "wiki_lang:"+wikiLang, "yes");
 					nameUnique = title;
 					addTag(serializer, "content:"+wikiLang, contentStr);
 				}

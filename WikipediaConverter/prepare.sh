@@ -82,5 +82,17 @@ download hu Hungarian;
 download te Telugu;
 download ht Haitian;
 download sc Sardinian;
-
-
+download new Newar;
+download ceb Cebuano;
+download bs Bosnian;
+download bpy Bishnupriya;
+download is Icelandic;
+download sq Albanian;
+download br Breton;
+download mr Marathi;
+download az Azeri;
+download sh Serbo-Croatian;
+download tl Filipino;
+download cy Welsh;
+download bn Bengali;
+download pms Piedmontese;
