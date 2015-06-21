@@ -71,6 +71,22 @@ public class OceanTilesCreator {
 
 //        createJOSMFile(bmp, args[1]);
     }
+    
+    public static void checkOceanTile(String[] args) {
+    	double[] lat = new double[] { Double.parseDouble(args[0])};
+    	double[] lon = new double[] { Double.parseDouble(args[1])};
+    	int zoom = 11;
+    	if(args.length > 2) {
+    		zoom = Integer.parseInt(args[2]);
+    	}
+    	BasemapProcessor bmp = new BasemapProcessor();
+        bmp.constructBitSetInfo();
+		for (int i = 0; i < lat.length && i < lon.length; i++) {
+			int x = (int) MapUtils.getTileNumberX(zoom, lon[i]);
+			int y = (int) MapUtils.getTileNumberY(zoom, lat[i]);
+			System.out.println("Tile is sea (1) or land (0): " + bmp.getSeaTile(x, y, zoom));
+		}
+    }
 
     static class OceanTileInfo {
         int linesIntersectMedian = 0;
@@ -92,7 +108,10 @@ public class OceanTilesCreator {
     }
 
 
-    private static void createTilesFile(String coastlinesInput, String result) throws IOException, SAXException {
+    public static void createTilesFile(String coastlinesInput, String result) throws IOException, SAXException {
+    	if(result == null ) {
+    		result = "oceantiles_12.dat";
+    	}
         File readFile = new File(coastlinesInput);
         InputStream stream = new BufferedInputStream(new FileInputStream(readFile), 8192 * 4);
         InputStream streamFile = stream;
