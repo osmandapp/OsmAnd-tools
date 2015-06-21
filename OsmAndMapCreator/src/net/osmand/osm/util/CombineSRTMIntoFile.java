@@ -100,16 +100,23 @@ public class CombineSRTMIntoFile {
 		}
 		Multipolygon polygon  = bld.build();
 		System.out.println(polygon.areRingsComplete());
-		for(int lon = (int) Math.floor(qr.left); lon <= (int) Math.floor(qr.right); lon++) {
-			for(int lat = (int) Math.floor(qr.bottom); lat <= (int) Math.floor(qr.top); lat++) {
+		int rightLon = (int) Math.floor(qr.right);
+		int leftLon = (int) Math.floor(qr.left);
+		int bottomLat = (int) Math.floor(qr.bottom);
+		int topLat = (int) Math.floor(qr.top);
+		for(int lon = leftLon; lon <= rightLon; lon++) {
+			for(int lat = bottomLat; lat <= topLat; lat++) {
 				final String filename = getFileName(lon, lat);
 				srtmFileNames.add(filename);
 			}
 		}
+		System.out.println();
+		System.out.println("PROCESSING "+name + " lon [" + leftLon + " - " + rightLon + "] lat [" + bottomLat + " - " + topLat
+				+ "] TOTAL " + srtmFileNames.size() + " files");
+		System.out.println("-----------------------------");
 //		final File work = new File(directoryWithTargetFiles, "work");
 //		Map<File, String> mp = new HashMap<File, String>();
 //		long length = 0;
-		System.out.println("Process "+ name);
 		List<File> files = new ArrayList<File>();
 		for(String file : srtmFileNames) {
 			final File fl = new File(directoryWithSRTMFiles, file + ".osm.bz2");

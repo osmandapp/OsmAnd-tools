@@ -554,6 +554,9 @@ public class IndexCreator {
 					OsmDbAccessor accessor = new OsmDbAccessor();
 					boolean loadFromExistingFile = createPlainOsmDb(accessor, progress, read, addFilter, readFile.length > 1,
 							ind++, readFile.length == 1 ? 0 : shift);
+					if(readFile.length > 1) {
+						log.info("Processing " + ind + " file out of " + readFile.length);
+					}
 
 					// 3. Processing all entries
 					// 3.1 write all cities
