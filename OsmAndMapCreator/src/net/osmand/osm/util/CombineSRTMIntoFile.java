@@ -100,8 +100,8 @@ public class CombineSRTMIntoFile {
 		}
 		Multipolygon polygon  = bld.build();
 		System.out.println(polygon.areRingsComplete());
-		for(int lon = (int) qr.left; lon <= (int) qr.right; lon++) {
-			for(int lat = (int) qr.bottom; lat <= (int) qr.top; lat++) {
+		for(int lon = (int) Math.floor(qr.left); lon <= (int) Math.floor(qr.right); lon++) {
+			for(int lat = (int) Math.floor(qr.bottom); lat <= (int) Math.floor(qr.top); lat++) {
 				final String filename = getFileName(lon, lat);
 				srtmFileNames.add(filename);
 			}

@@ -368,9 +368,11 @@ public class WikipediaByCountryDivider {
 					addTag(serializer, "name", title);
 					addTag(serializer, "wiki_id", wikiId +"");
 					addTag(serializer, "content", contentStr);
+					addTag(serializer, "wiki_lang:en", "yes");
 				} else {
 					addTag(serializer, "name:"+wikiLang, title);
 					addTag(serializer, "wiki_id:"+wikiLang, wikiId +"");
+					addTag(serializer, "wiki_lang:"+wikiLang, "yes");
 					nameUnique = title;
 					addTag(serializer, "content:"+wikiLang, contentStr);
 				}

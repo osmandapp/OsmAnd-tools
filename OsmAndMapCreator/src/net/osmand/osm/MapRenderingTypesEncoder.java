@@ -30,8 +30,8 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	private Map<String, List<EntityConvert>> convertTags = new HashMap<String, List<EntityConvert>>();
 	private MapRulType coastlineRuleType;
 	
-	private String[] langs = new String[] { "ar", "be", "ca", "cs", "da", "de", "el", "es", "fi", "fr", "he", "hi",
-			"hr", "hu", "it", "ja", "ko", "lt", "lv", "nl", "pl", "pt", "ro", "ru", "sk", "sl", "sr", "sv", "sw", "zh" };
+	private String[] langs = new String[] { "af", "ar", "az", "be", "bg", "bn", "bpy", "br", "bs", "ca", "ceb", "cs", "cy", "da", "de", "el", "eo", "es", "et", "eu", "id", "fa", "fi", "fr", "fy", "ga", "gl", "he", "hi",
+			"hr", "ht", "hu", "hy", "is", "it", "ja", "ka", "ko", "ku", "la", "lb", "lt", "lv", "mk", "ml", "mr", "ms", "nds", "new", "nl", "nn", "no", "nv", "os", "pl", "pms", "pt", "ro", "ru", "sc", "sh", "sk", "sl", "sq", "sr", "sv", "sw", "ta", "te", "th", "tl", "tr", "uk", "vi", "vo", "zh" };
 	
 	public MapRenderingTypesEncoder(String fileName) {
 		super(fileName);
@@ -193,9 +193,11 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		if("true".equals(parser.getAttributeValue("", "lang"))) {
 			for (String lng : langs) {
 				String tag = lc(parser.getAttributeValue("", "tag")) + ":" + lng;
-				MapRulType retype = parseBaseRuleType(parser, parent, false, tag);
-				retype.onlyPoi = "true".equals(parser.getAttributeValue("", "only_poi"));
-				registerOnlyMap(parser, retype);
+				if(!types.containsKey(constructRuleKey(tag, null))){
+					MapRulType retype = parseBaseRuleType(parser, parent, false, tag);
+					retype.onlyPoi = "true".equals(parser.getAttributeValue("", "only_poi"));
+					registerOnlyMap(parser, retype);
+				}
 			}
 		}
 	}
