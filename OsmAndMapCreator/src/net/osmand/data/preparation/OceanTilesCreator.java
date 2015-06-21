@@ -56,6 +56,7 @@ public class OceanTilesCreator {
 		} else {
 			double[] lat = new double[] { 41.4537, 33.4 };
 			double[] lon = new double[] { 41.45, 15.5 };
+			double[] lon = new double[] { -35.25105, -56.79536 };
 			int zoom = 11;
 			for (int i = 0; i < lat.length && i < lon.length; i++) {
 				int x = (int) MapUtils.getTileNumberX(zoom, lon[i]);
