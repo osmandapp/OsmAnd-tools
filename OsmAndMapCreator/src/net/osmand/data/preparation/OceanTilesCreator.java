@@ -54,8 +54,8 @@ public class OceanTilesCreator {
         if(args[0].equals("generate")) {
         	createTilesFile(args[1], args[2]);
 		} else {
-			double[] lat = new double[] { 41.4537, 33.4, -35.25105 };
-			double[] lon = new double[] { 41.45, 15.5, -56.79536 };
+			double[] lat = new double[] { 41.4537, 33.4, -35.25105, -34.4068 };
+			double[] lon = new double[] { 41.45, 15.5, -56.79536, -58.2409 };
 			int zoom = 11;
 			for (int i = 0; i < lat.length && i < lon.length; i++) {
 				int x = (int) MapUtils.getTileNumberX(zoom, lon[i]);
