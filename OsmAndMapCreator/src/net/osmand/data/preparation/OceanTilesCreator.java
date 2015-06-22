@@ -2,10 +2,12 @@ package net.osmand.data.preparation;
 
 
 import gnu.trove.map.hash.TLongObjectHashMap;
+import gnu.trove.set.hash.TLongHashSet;
 
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -17,6 +19,7 @@ import java.util.Set;
 import javax.xml.stream.XMLStreamException;
 
 import net.osmand.IProgress;
+import net.osmand.data.QuadRect;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Way;
@@ -48,28 +51,13 @@ public class OceanTilesCreator {
      * @throws SAXException
      */
     public static void main(String[] args) throws IOException, XMLStreamException, SAXException {
-
-        BasemapProcessor bmp = new BasemapProcessor();
-        bmp.constructBitSetInfo();
-        if(args[0].equals("generate")) {
+        if(args.length > 0 && args[0].equals("generate")) {
         	createTilesFile(args[1], args[2]);
 		} else {
-			double[] lat = new double[] { 41.4537, 33.4, -35.25105 };
-			double[] lon = new double[] { 41.45, 15.5, -56.79536 };
-			int zoom = 11;
-			for (int i = 0; i < lat.length && i < lon.length; i++) {
-				int x = (int) MapUtils.getTileNumberX(zoom, lon[i]);
-				int y = (int) MapUtils.getTileNumberY(zoom, lat[i]);
-				System.out.println(bmp.getSeaTile(x, y, zoom));
-			}
+			createJOSMFile(args);
 		}
         
-//        BasemapProcessor.SimplisticQuadTree quadTree = bmp.constructTilesQuadTree(11);
-//        BasemapProcessor.SimplisticQuadTree ts = quadTree.getOrCreateSubTree(x, y, 11);
-//        System.out.println(ts.seaCharacteristic);
 
-
-//        createJOSMFile(bmp, args[1]);
     }
     
     public static void checkOceanTile(String[] args) {
@@ -212,44 +200,89 @@ public class OceanTilesCreator {
         }
         return map.get(key );
     }
+    
+    public static long getNodeId(int x, int y, int z) {
+    	return (((long) x) << 25) | ((long)y << 5) | z;
+    }
+    
+    public static Node getNode(long id) {
+    	int x = (int) (id >> 25);
+    	int y = (int) ((id - getNodeId(x, 0, 0)) >> 5);
+    	int z = (int) (id - getNodeId(x, y, 0));
+    	Node nod = new Node(
+                MapUtils.getLatitudeFromTile(z, y), MapUtils.getLongitudeFromTile(z, x),
+                id);
+    	return nod;
+    }
 
-    private static void createJOSMFile(String fileLocation , BasemapProcessor bmp ) throws XMLStreamException, IOException {
-        int z = 8;
-        BasemapProcessor.SimplisticQuadTree quadTree = bmp.constructTilesQuadTree(z);
-        int pz = 1 << z;
+    public static void createJOSMFile(String[] args) throws XMLStreamException, IOException {
+        String fileLocation = args.length == 0 ? "oceanTiles.osm" : args[0];
+        
+        int z = args.length > 1 ? Integer.parseInt(args[1]) : 12;
+        BasemapProcessor bmp = new BasemapProcessor();
+        bmp.constructBitSetInfo();
+        
         OsmBaseStorage st = new OsmBaseStorage();
         Set<Entity.EntityId> s = new LinkedHashSet();
-        for(int i = 0; i < pz; i++) {
-            for(int j = 0; j < pz; j++) {
-//                if((quadTree.getOrCreateSubTree(i, j, z).seaCharacteristic < 0.9 && !bmp.isWaterTile(i, j, z))||
-//                        bmp.isLandTile(i, j, z) ) {
-                if((quadTree.getOrCreateSubTree(i, j, z).seaCharacteristic > 0.8 || bmp.isWaterTile(i, j, z))) {
-                    Way w = new Way(-(i * pz + j + 1));
-                    w.addNode(i * pz + j + 1);
-                    w.addNode((i + 1) * pz + j + 1);
-                    w.addNode((i + 1) * pz + j + 1 + 1);
-                    w.addNode(i * pz + j + 1 + 1);
-                    w.addNode(i * pz + j + 1);
-                    w.putTag("place", "island");
-                    w.putTag("name", i+" " + j + " " + z + " " + quadTree.getOrCreateSubTree(i, j, z).seaCharacteristic);
-                    s.addAll(w.getEntityIds());
+        TLongHashSet nodeIds = new TLongHashSet();
 
-                    s.add(Entity.EntityId.valueOf(w));
-                    st.registerEntity(w, null);
-                }
-                Node nod = new Node(
-                        MapUtils.getLatitudeFromTile(z, j), MapUtils.getLongitudeFromTile(z, i),
-                        i * pz + j + 1);
-                st.registerEntity(nod, null);
+        int minzoom = 4;
+        BasemapProcessor.SimplisticQuadTree quadTree = bmp.constructTilesQuadTree(z);
+		for (int zm = minzoom; zm <= z; zm++) {
+			int pz = 1 << zm;
+			for (int x = 0; x < pz; x++) {
+				for (int y = 0; y < pz; y++) {
+					// if((quadTree.getOrCreateSubTree(i, j, z).seaCharacteristic < 0.9 && !bmp.isWaterTile(i, j, z))||
+					// bmp.isLandTile(i, j, z) ) {
+					boolean parentWater = bmp.isWaterTile(x >> 1, y >> 1, zm - 1);
+					boolean parentLand = bmp.isLandTile(x >> 1, y >> 1, zm - 1);
+					if(zm > minzoom && (parentLand || parentWater)) {
+						continue;
+					}
+					boolean landTile = bmp.isLandTile(x, y, zm);
+					boolean waterTile = bmp.isWaterTile(x, y, zm);
+					if (waterTile || landTile) {
+						if (zm > minzoom && bmp.isWaterTile(x >> 1, y >> 1, zm - 1) || bmp.isLandTile(x >> 1, y >> 1, zm - 1)) {
+							continue;
+						}
+						Way w = new Way(-(x * pz + y + 1));
+						addNode(w, nodeIds, x, y, zm);
+						addNode(w, nodeIds, x, y + 1, zm);
+						addNode(w, nodeIds, x + 1, y + 1, zm);
+						addNode(w, nodeIds, x + 1, y, zm);
+						addNode(w, nodeIds, x, y, zm);
+						
+						if(waterTile) {
+							w.putTag("natural", "water");
+						} else if(landTile){
+							w.putTag("landuse", "grass");
+						}
+						w.putTag("name", x + " " + y + " " + z + " " + 
+								(waterTile  ? 1 : 0));
+						s.addAll(w.getEntityIds());
 
-            }
+						s.add(Entity.EntityId.valueOf(w));
+						st.registerEntity(w, null);
+					}
+				}
+			}
+		}
+        for(long l : nodeIds.toArray()) {
+            st.registerEntity(getNode(l), null);
         }
+        
         new OsmStorageWriter().saveStorage(new FileOutputStream(fileLocation),
                 st, s, true);
     }
 
 
-    private static void runFixOceanTiles() throws IOException {
+    private static void addNode(Way w, TLongHashSet nodeIds, int x, int y, int zm) {
+    	long nodeId = getNodeId(x, y, zm);
+    	w.addNode(nodeId);
+    	nodeIds.add(nodeId);
+	}
+
+	private static void runFixOceanTiles() throws IOException {
         final int land[]  = new int[] {};
         fixOceanTiles(new FixTileData() {
             int c = 0;

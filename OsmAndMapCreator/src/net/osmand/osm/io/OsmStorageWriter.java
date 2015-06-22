@@ -96,7 +96,7 @@ public class OsmStorageWriter {
 		streamWriter.writeStartDocument();
 		
 		writeStartElement(streamWriter, ELEM_OSM, "");
-		streamWriter.writeAttribute(ATTR_VERSION, "0.5");
+		streamWriter.writeAttribute(ATTR_VERSION, "0.6");
 		for(Node n : nodes){
 			writeStartElement(streamWriter, ELEM_NODE, INDENT);
 			streamWriter.writeAttribute(ATTR_LAT, String.valueOf(n.getLatitude()));
@@ -172,6 +172,9 @@ public class OsmStorageWriter {
 			if(info.getVersion() != null){
 				writer.writeAttribute(ATTR_VERSION, info.getVersion());
 			}
+		} else {
+			// josm compatibility
+			writer.writeAttribute(ATTR_VERSION, "1");
 		}
 	}
 	
