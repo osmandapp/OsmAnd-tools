@@ -5,4 +5,4 @@
 # will range from 64 megabyte up to 512 megabyte.
 
 # Pass full paths to route_tests.xml files. All routing.xml configuration should be configured by OsmAndMapCreator  
-java -Djava.util.logging.config.file=logging.properties -Xms64M -Xmx512M -cp "./OsmAndMapCreator.jar:./lib/*.jar" net.osmand.net.osmand.MainUtilities $@
+java -Djava.util.logging.config.file=logging.properties -Xms64M -Xmx512M -cp "./OsmAndMapCreator.jar:./lib/*.jar" net.osmand.MainUtilities $@
