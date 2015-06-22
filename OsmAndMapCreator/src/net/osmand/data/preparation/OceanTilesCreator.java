@@ -51,13 +51,16 @@ public class OceanTilesCreator {
      * @throws SAXException
      */
     public static void main(String[] args) throws IOException, XMLStreamException, SAXException {
-        if(args.length > 0 && args[0].equals("generate")) {
-        	createTilesFile(args[1], args[2]);
-		} else {
-			createJOSMFile(args);
-		}
-        
-
+//    	createTilesFile("/Users/victorshcherb/osmand/maps/coastline.osm.bz2", 
+//    			"/Users/victorshcherb/osmand/maps/oceantiles_12.dat");
+//    	System.out.println("Tiles generated ");
+    	createJOSMFile(new String[] {
+    			"/Users/victorshcherb/osmand/maps/oceantiles.osm",
+    			"/Users/victorshcherb/osmand/maps/oceantiles_12.dat"
+    	});
+//        if(args.length > 0 && args[0].equals("generate")) {
+//        	createTilesFile(args[1], args[2]);
+//        }        
     }
     
     public static void checkOceanTile(String[] args) {
@@ -81,7 +84,6 @@ public class OceanTilesCreator {
         static int UNDEFINED = 0;
         static int MIXED = 1;
         int type = UNDEFINED;
-        boolean rightMedianSea ;
     }
 
     public static boolean ccw(double ax, double ay, double bx, double by, double cx, double cy) {
@@ -131,17 +133,17 @@ public class OceanTilesCreator {
                         for(int y = (int) Math.min(ty, py); y <= Math.max(ty, py); y++){
                             // check if intersects (x-1,y+0.5) & (x,y+0.5)
                             long key = ((long) x << TILE_ZOOMLEVEL) + (long)y;
-                            if(intersect2Segments(tx, ty, px, py, x, y+0.5d, x+1, y+0.5d)) {
-                                getOrCreate(map, key).linesIntersectMedian ++;
-                                getOrCreate(map, key).type = OceanTileInfo.MIXED;
-                            } else if(intersect2Segments(tx, ty, px, py, x, y, x+1, y)) {
-                                getOrCreate(map, key).type = OceanTileInfo.MIXED;
-                            } else if(intersect2Segments(tx, ty, px, py, x, y+1, x+1, y+1)) {
-                                getOrCreate(map, key).type = OceanTileInfo.MIXED;
-                            } else if(intersect2Segments(tx, ty, px, py, x, y, x, y+1)) {
-                                getOrCreate(map, key).type = OceanTileInfo.MIXED;
-                            } else if(intersect2Segments(tx, ty, px, py, x+1, y, x+1, y+1)) {
-                                getOrCreate(map, key).type = OceanTileInfo.MIXED;
+							if (intersect2Segments(tx, ty, px, py, x, y + 0.5d, x + 1, y + 0.5d)) {
+								getOrCreate(map, key).linesIntersectMedian++;
+								getOrCreate(map, key).type = OceanTileInfo.MIXED;
+							} else if (intersect2Segments(tx, ty, px, py, x, y, x + 1, y)) {
+								getOrCreate(map, key).type = OceanTileInfo.MIXED;
+							} else if (intersect2Segments(tx, ty, px, py, x, y + 1, x + 1, y + 1)) {
+								getOrCreate(map, key).type = OceanTileInfo.MIXED;
+							} else if (intersect2Segments(tx, ty, px, py, x, y, x, y + 1)) {
+								getOrCreate(map, key).type = OceanTileInfo.MIXED;
+							} else if (intersect2Segments(tx, ty, px, py, x + 1, y, x + 1, y + 1)) {
+								getOrCreate(map, key).type = OceanTileInfo.MIXED;
                             }
                         }
                     }
@@ -227,7 +229,7 @@ public class OceanTilesCreator {
 
         int minzoom = 4;
         BasemapProcessor.SimplisticQuadTree quadTree = bmp.constructTilesQuadTree(z);
-		for (int zm = minzoom; zm <= z; zm++) {
+        for (int zm = minzoom; zm <= z; zm++) {
 			int pz = 1 << zm;
 			for (int x = 0; x < pz; x++) {
 				for (int y = 0; y < pz; y++) {
@@ -241,10 +243,7 @@ public class OceanTilesCreator {
 					boolean landTile = bmp.isLandTile(x, y, zm);
 					boolean waterTile = bmp.isWaterTile(x, y, zm);
 					if (waterTile || landTile) {
-						if (zm > minzoom && bmp.isWaterTile(x >> 1, y >> 1, zm - 1) || bmp.isLandTile(x >> 1, y >> 1, zm - 1)) {
-							continue;
-						}
-						Way w = new Way(-(x * pz + y + 1));
+						Way w = new Way(-getNodeId(x, y, zm));
 						addNode(w, nodeIds, x, y, zm);
 						addNode(w, nodeIds, x, y + 1, zm);
 						addNode(w, nodeIds, x + 1, y + 1, zm);
