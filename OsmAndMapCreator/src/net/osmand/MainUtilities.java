@@ -32,6 +32,8 @@ public class MainUtilities {
 			String[] subArgsArray = subArgs.toArray(new String[args.length -1]);
 			if(utl.equals("check-ocean-tile")) {
 				OceanTilesCreator.checkOceanTile(subArgsArray);
+			} else if (utl.equals("generate-ocean-tile-osm")) {
+				OceanTilesCreator.createJOSMFile(subArgsArray);
 			} else if (utl.equals("generate-ocean-tile")) {
 				OceanTilesCreator.createTilesFile(subArgsArray[0], subArgsArray.length > 1 ? args[1] : null);
 			} else if(utl.equals("test-routing")) {
@@ -85,7 +87,7 @@ public class MainUtilities {
 		System.out.println("\t\t test-routing <own list of parameters>: helps to run routing test for specific locations");
 		System.out.println("\t\t generate-ocbf <path to osmand/repos/ repository>: generates regions.ocbf file, this path should contain folders 'misc', 'tools', 'resources'");
 		System.out.println("\t\t delete-unused-strings <path to repos/android/OsmAnd/res>: deletes unused translation in git repository (transforms all strings.xml)");
-		System.out.println("\t\t generate-ocean-tile-osm <optional path to osm file to write> <optional zoom>: generates ocean tiles osm file to check in JOSM ");
+		System.out.println("\t\t generate-ocean-tile-osm <optional path to osm file to write> <optional path to oceantiles_12.dat file>: generates ocean tiles osm file to check in JOSM ");
 		System.out.println("\t\t generate-obf <path to osm file>: simple way to generate obf file in place. "
 				+ "\t\t\t	Another supported options generate-map, generate-address, generate-poi, generate-roads (generate obf partially)");
 	}

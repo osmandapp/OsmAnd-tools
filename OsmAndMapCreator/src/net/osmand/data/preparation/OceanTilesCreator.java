@@ -68,7 +68,7 @@ public class OceanTilesCreator {
     		zoom = Integer.parseInt(args[2]);
     	}
     	BasemapProcessor bmp = new BasemapProcessor();
-        bmp.constructBitSetInfo();
+        bmp.constructBitSetInfo(null);
 		for (int i = 0; i < lat.length && i < lon.length; i++) {
 			int x = (int) MapUtils.getTileNumberX(zoom, lon[i]);
 			int y = (int) MapUtils.getTileNumberY(zoom, lat[i]);
@@ -217,10 +217,9 @@ public class OceanTilesCreator {
 
     public static void createJOSMFile(String[] args) throws XMLStreamException, IOException {
         String fileLocation = args.length == 0 ? "oceanTiles.osm" : args[0];
-        
-        int z = args.length > 1 ? Integer.parseInt(args[1]) : 12;
+        int z = 12;
         BasemapProcessor bmp = new BasemapProcessor();
-        bmp.constructBitSetInfo();
+        bmp.constructBitSetInfo(args.length > 1 ? args[1] : null);
         
         OsmBaseStorage st = new OsmBaseStorage();
         Set<Entity.EntityId> s = new LinkedHashSet();
@@ -257,7 +256,7 @@ public class OceanTilesCreator {
 						} else if(landTile){
 							w.putTag("landuse", "grass");
 						}
-						w.putTag("name", x + " " + y + " " + z + " " + 
+						w.putTag("name", x + " " + y + " " + zm + " " + 
 								(waterTile  ? 1 : 0));
 						s.addAll(w.getEntityIds());
 

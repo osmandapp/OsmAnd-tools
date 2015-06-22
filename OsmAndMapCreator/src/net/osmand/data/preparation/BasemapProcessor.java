@@ -16,11 +16,13 @@ import net.osmand.osm.edit.*;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapAlgorithms;
 import net.osmand.util.MapUtils;
+
 import org.apache.commons.logging.Log;
 import org.apache.tools.bzip2.CBZip2InputStream;
 import org.xml.sax.SAXException;
 
 import javax.xml.stream.XMLStreamException;
+
 import java.io.*;
 import java.sql.SQLException;
 import java.util.*;
@@ -161,7 +163,7 @@ public class BasemapProcessor {
         this.mapZooms = mapZooms;
         this.renderingTypes = renderingTypes;
         this.zoomWaySmothness = zoomWaySmothness;
-        constructBitSetInfo();
+        constructBitSetInfo(null);
         quadTrees = new SimplisticQuadTree[mapZooms.getLevels().size()];
         for (int i = 0; i < mapZooms.getLevels().size(); i++) {
             MapZoomPair p = mapZooms.getLevels().get(i);
@@ -169,14 +171,19 @@ public class BasemapProcessor {
         }
     }
 
-    protected void constructBitSetInfo() {
+    protected void constructBitSetInfo(String datFile) {
         try {
-
-            InputStream stream = BasemapProcessor.class.getResourceAsStream("oceantiles_12.dat.bz2");
-            if (stream.read() != 'B' || stream.read() != 'Z') {
-                throw new RuntimeException("The source stream must start with the characters BZ if it is to be read as a BZip2 stream."); //$NON-NLS-1$
-            }
-            InputStream dis = new CBZip2InputStream(stream);
+        	InputStream dis;
+			if (datFile == null) {
+				InputStream stream = BasemapProcessor.class.getResourceAsStream("oceantiles_12.dat.bz2");
+				if (stream.read() != 'B' || stream.read() != 'Z') {
+					throw new RuntimeException(
+							"The source stream must start with the characters BZ if it is to be read as a BZip2 stream."); //$NON-NLS-1$
+				}
+				dis = new CBZip2InputStream(stream);
+			} else {
+        		dis = new FileInputStream(datFile);
+        	}
             int currentByte;
             for (int i = 0; i < BITS_COUNT / 4; i++) {
                 currentByte = dis.read();
