@@ -133,7 +133,7 @@ public class CombineSRTMIntoFile {
 		new File(targetFile.getParentFile(), IndexCreator.TEMP_NODES_DB).delete();
 		RTree.clearCache();
 		IndexCreator ic = new IndexCreator(targetFile.getParentFile());
-		ic.setDialects(DBDialect.SQLITE_IN_MEMORY, DBDialect.SQLITE);
+		ic.setDialects(DBDialect.SQLITE, DBDialect.SQLITE);
 		ic.setIndexMap(true);
 		ic.setRegionName(name +" contour lines");
 		ic.setMapFileName(targetFile.getName());
