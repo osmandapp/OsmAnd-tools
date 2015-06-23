@@ -18,6 +18,7 @@ import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.data.Multipolygon;
 import net.osmand.data.MultipolygonBuilder;
 import net.osmand.data.QuadRect;
+import net.osmand.data.preparation.DBDialect;
 import net.osmand.data.preparation.IndexCreator;
 import net.osmand.data.preparation.MapZooms;
 import net.osmand.impl.ConsoleProgressImplementation;
@@ -132,6 +133,7 @@ public class CombineSRTMIntoFile {
 		new File(targetFile.getParentFile(), IndexCreator.TEMP_NODES_DB).delete();
 		RTree.clearCache();
 		IndexCreator ic = new IndexCreator(targetFile.getParentFile());
+		ic.setDialects(DBDialect.SQLITE_IN_MEMORY, DBDialect.SQLITE);
 		ic.setIndexMap(true);
 		ic.setRegionName(name +" contour lines");
 		ic.setMapFileName(targetFile.getName());
