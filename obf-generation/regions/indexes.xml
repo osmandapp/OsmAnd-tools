@@ -660,26 +660,26 @@
 		</regions> -->
 
 		<regions siteToDownload="http://download.geofabrik.de/south-america/{0}.osm.pbf" region_prefix="" skip="false" region_suffix="_SouthAmerica">
-			<region name="argentina" downloadName="argentina-latest"/>
 			<region name="bolivia" downloadName="bolivia-latest"/>
 			<region name="brazil" downloadName="brazil-latest"/>
 			<region name="chile" downloadName="chile-latest"/>
 			<region name="colombia" downloadName="colombia-latest"/>
 			<region name="ecuador" downloadName="ecuador-latest"/>
-			<region name="uruguay" downloadName="uruguay-latest"/>
 			<region name="peru" downloadName="peru-latest"/>
 		</regions>
 
 		<!--  4.2 SOUTH AMERICA [SOURCE: OSMAND:NET] -->
 		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" skip="false" region_suffix="_SouthAmerica">
+			<region name="argentina"/>
 			<region name="falkland-islands"/>
 			<region name="guyana"/>
 			<region name="guyane"/>
 			<region name="paraguay"/>
 			<region name="south-georgia-and-south-sandwich-islands"/>
 			<region name="suriname"/>
+			<region name="uruguay"/>
 			<region name="venezuela"/>
-		</regions>	
+		</regions>
 
 
 
@@ -697,7 +697,7 @@
 			<region name="mexico" downloadName="mexico-latest"/>	-->
 		</regions>
 		
-		<regions siteToDownload="http://download.geofabrik.de/central-america/{0}.osm.pbf" skip="false" region_prefix="" region_suffix="_NorthAmerica">
+		<regions siteToDownload="http://download.geofabrik.de/north-america/{0}.osm.pbf" skip="false" region_prefix="" region_suffix="_NorthAmerica">
 			<!-- download.geofabrik.de maintains mexico under central america but it belongs to north-america -->
 			<region name="mexico" downloadName="mexico-latest"/>
 		</regions>
