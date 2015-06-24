@@ -138,7 +138,8 @@ public class CombineSRTMIntoFile {
 		ic.setRegionName(name +" contour lines");
 		ic.setMapFileName(targetFile.getName());
 		ic.setBoundary(polygon);
-		ic.generateIndexes(files.toArray(new File[files.size()]), new ConsoleProgressImplementation(1), null, MapZooms.getDefault(),
+		ic.setZoomWaySmothness(2);
+		ic.generateIndexes(files.toArray(new File[files.size()]), new ConsoleProgressImplementation(1), null, MapZooms.parseZooms("11-12;13-"),
 				MapRenderingTypesEncoder.getDefault(), log);
 //		if(length > Integer.MAX_VALUE) {
 //			System.err.println("!! Can't process " + name + " because too big");
