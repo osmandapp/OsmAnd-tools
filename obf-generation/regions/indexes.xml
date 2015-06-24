@@ -697,7 +697,7 @@
 			<region name="mexico" downloadName="mexico-latest"/>	-->
 		</regions>
 		
-		<regions siteToDownload="http://download.geofabrik.de/central-america/{0}.osm.pbf" skip="false" region_prefix="" region_suffix="_NorthAmerica">
+		<regions siteToDownload="http://download.geofabrik.de/north-america/{0}.osm.pbf" skip="false" region_prefix="" region_suffix="_NorthAmerica">
 			<!-- download.geofabrik.de maintains mexico under central america but it belongs to north-america -->
 			<region name="mexico" downloadName="mexico-latest"/>
 		</regions>
