@@ -799,10 +799,10 @@ public class BinaryMapIndexWriter {
 	}
 
 	private boolean checkEnNameToWrite(MapObject obj) {
-		if (obj.getEnName() == null || obj.getEnName().length() == 0) {
+		if (obj.getEnName(false) == null || obj.getEnName(false).length() == 0) {
 			return false;
 		}
-		return !obj.getEnName().equals(Junidecode.unidecode(obj.getName()));
+		return true;
 	}
 
 	public BinaryFileReference writeCityHeader(MapObject city, int cityType) throws IOException {
@@ -820,8 +820,9 @@ public class BinaryMapIndexWriter {
 		}
 		
 		cityInd.setName(city.getName());
+		// FIXME TODOGEN;
 		if(checkEnNameToWrite(city)){
-			cityInd.setNameEn(city.getEnName());
+			cityInd.setNameEn(city.getEnName(false));
 		}
 		int cx = MapUtils.get31TileNumberX(city.getLocation().getLongitude());
 		int cy = MapUtils.get31TileNumberY(city.getLocation().getLatitude());
@@ -897,8 +898,9 @@ public class BinaryMapIndexWriter {
 		checkPeekState(CITY_INDEX_INIT);
 		StreetIndex.Builder streetBuilder = OsmandOdb.StreetIndex.newBuilder();
 		streetBuilder.setName(street.getName());
+		// FIXME TODOGEN;
 		if (checkEnNameToWrite(street)) {
-			streetBuilder.setNameEn(street.getEnName());
+			streetBuilder.setNameEn(street.getEnName(false));
 		}
 		streetBuilder.setId(street.getId());
 
@@ -941,8 +943,9 @@ public class BinaryMapIndexWriter {
 			}
 			bbuilder.setId(b.getId());
 			bbuilder.setName(b.getName());
+			// FIXME TODOGEN;
 			if (checkEnNameToWrite(b)) {
-				bbuilder.setNameEn(b.getEnName());
+				bbuilder.setNameEn(b.getEnName(false));
 			}
 			if (postcodeFilter == null && b.getPostcode() != null) {
 				bbuilder.setPostcode(b.getPostcode());
@@ -964,8 +967,9 @@ public class BinaryMapIndexWriter {
 					builder.setIntersectedX((ix - sx) >> 7);
 					builder.setIntersectedY((iy - sy) >> 7);
 					builder.setName(streetJ.getName());
+					// FIXME TODOGEN;
 					if(checkEnNameToWrite(streetJ)){
-						builder.setNameEn(streetJ.getEnName());
+						builder.setNameEn(streetJ.getEnName(false));
 					}
 					streetBuilder.addIntersections(builder.build());
 				}
@@ -1046,8 +1050,8 @@ public class BinaryMapIndexWriter {
 				x24 = x;
 				y24 = y;
 				tStop.setName(registerString(stringTable, st.getName()));
-				if (st.getEnName() != null) {
-					tStop.setNameEn(registerString(stringTable, st.getEnName()));
+				if (st.getEnName(false) != null) {
+					tStop.setNameEn(registerString(stringTable, st.getEnName(false)));
 				}
 				if (i == 0) {
 					tRoute.addDirectStops(tStop.build());

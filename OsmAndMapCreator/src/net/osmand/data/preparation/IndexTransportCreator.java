@@ -217,7 +217,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		transRouteStat.setString(3, route.getOperator());
 		transRouteStat.setString(4, route.getRef());
 		transRouteStat.setString(5, route.getName());
-		transRouteStat.setString(6, route.getEnName());
+		transRouteStat.setString(6, route.getEnName(false));
 		transRouteStat.setInt(7, route.getAvgBothDistance());
 		addBatch(transRouteStat);
 		
@@ -241,7 +241,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 				transStopsStat.setDouble(2, s.getLocation().getLatitude());
 				transStopsStat.setDouble(3, s.getLocation().getLongitude());
 				transStopsStat.setString(4, s.getName());
-				transStopsStat.setString(5, s.getEnName());
+				transStopsStat.setString(5, s.getEnName(false));
 				int x = (int) MapUtils.getTileNumberX(24, s.getLocation().getLongitude());
 				int y = (int) MapUtils.getTileNumberY(24, s.getLocation().getLatitude());
 				addBatch(transStopsStat);

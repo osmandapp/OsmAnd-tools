@@ -831,9 +831,9 @@ public class IndexCreator {
 		IndexCreator creator = new IndexCreator(new File(rootFolder + "/osm-gen/")); //$NON-NLS-1$
 //		creator.setIndexMap(true);
 		creator.setIndexAddress(true);
-		creator.setIndexPOI(true);
+//		creator.setIndexPOI(true);
 //		creator.setIndexTransport(true);
-		creator.setIndexRouting(true);
+//		creator.setIndexRouting(true);
 
 //		creator.deleteDatabaseIndexes = false;
 //		creator.recreateOnlyBinaryFile = true;
@@ -844,9 +844,8 @@ public class IndexCreator {
 				new MapRenderingTypesEncoder(rootFolder + "/repos//resources/obf_creation/rendering_types.xml");
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 
-//		String file = rootFolder + "/temp/map.osm";
+		String file = rootFolder + "/temp/map.osm";
 //		String file = rootFolder + "/repos/resources/synthetic_test_rendering.osm";
-		String file = rootFolder + "/maps/adygeya.osm.bz2";
 
 		int st = file.lastIndexOf('/');
 		int e = file.indexOf('.', st);

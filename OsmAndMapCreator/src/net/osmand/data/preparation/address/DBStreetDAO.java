@@ -116,7 +116,8 @@ public class DBStreetDAO extends AbstractIndexPartCreator
 			addressBuildingStat.setDouble(2, building.getLocation().getLatitude());
 			addressBuildingStat.setDouble(3, building.getLocation().getLongitude());
 			addressBuildingStat.setString(4, building.getName());
-			addressBuildingStat.setString(5, building.getEnName());
+			// FIXME TODOGEN;
+			addressBuildingStat.setString(5, building.getEnName(false));
 			addressBuildingStat.setLong(6, streetId);
 			addressBuildingStat.setString(7, building.getPostcode() == null ? null : building.getPostcode().toUpperCase());
 			addressBuildingStat.setString(8, building.getName2());
@@ -178,6 +179,7 @@ public class DBStreetDAO extends AbstractIndexPartCreator
 	protected long fillInsertStreetStatement(String name, String nameEn,
 			LatLon location, City city, String cityPart)
 			throws SQLException {
+		// FIXME TODOGEN;
 		long streetId = streetIdSequence++;
 		addressStreetStat.setLong(1, streetId);
 		addressStreetStat.setString(4, name);

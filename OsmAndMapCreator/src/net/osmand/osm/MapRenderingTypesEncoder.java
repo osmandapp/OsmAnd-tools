@@ -191,6 +191,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		rtype.onlyPoi = "true".equals(parser.getAttributeValue("", "only_poi"));
 		registerOnlyMap(parser, rtype);
 		if("true".equals(parser.getAttributeValue("", "lang"))) {
+			System.out.println(rtype.tagValuePattern.tag);
 			for (String lng : langs) {
 				String tag = lc(parser.getAttributeValue("", "tag")) + ":" + lng;
 				if(!types.containsKey(constructRuleKey(tag, null))){

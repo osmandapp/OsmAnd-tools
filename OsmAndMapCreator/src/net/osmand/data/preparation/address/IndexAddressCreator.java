@@ -24,6 +24,8 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 
 import net.osmand.IProgress;
+import net.osmand.OsmAndCollator;
+import net.osmand.PlatformUtil;
 import net.osmand.data.Boundary;
 import net.osmand.data.Building;
 import net.osmand.data.Building.BuildingInterpolation;
@@ -640,9 +642,10 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 		for (City city : result) {
 			String nameInCity = name;
 			String nameEnInCity = nameEn;
+			// FIXME TODOGEN;
 			if(nameInCity == null ||  nameEnInCity == null) {
 				nameInCity = "<" +city.getName()+">";
-				nameEnInCity = "<" +city.getEnName()+">";
+				nameEnInCity = "<" +city.getEnName(false)+">";
 			}
 			long streetId = getOrRegisterStreetIdForCity(nameInCity, nameEnInCity, location, city);
 			values.add(streetId);
@@ -901,7 +904,8 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 		addressCityStat.setDouble(2, city.getLocation().getLatitude());
 		addressCityStat.setDouble(3, city.getLocation().getLongitude());
 		addressCityStat.setString(4, city.getName());
-		addressCityStat.setString(5, city.getEnName());
+		// FIXME TODOGEN; add all city translations
+		addressCityStat.setString(5, city.getEnName(false));
 		addressCityStat.setString(6, CityType.valueToString(city.getType()));
 		addBatch(addressCityStat);
 	}
@@ -1006,7 +1010,17 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 			City postCode = posts.get(i);
 			BinaryFileReference ref = refs.get(i);
 			putNamedMapObject(namesIndex, postCode, ref.getStartPointer());
-			writer.writeCityIndex(postCode, new ArrayList<Street>(postCode.getStreets()), null, ref);
+			ArrayList<Street> list = new ArrayList<Street>(postCode.getStreets());
+			Collections.sort(list, new Comparator<Street>() {
+				final net.osmand.Collator clt = OsmAndCollator.primaryCollator();
+				
+				@Override
+				public int compare(Street o1, Street o2) {
+					return clt.compare(o1.getName(), o2.getName());
+				}
+				
+			});
+			writer.writeCityIndex(postCode, list, null, ref);
 		}
 		writer.endCityBlockIndex();
 
@@ -1112,11 +1126,10 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 							postcodes.put(b.getPostcode(), p);
 						}
 						City post = postcodes.get(b.getPostcode());
-						Street newS = post.getStreet(s.getName());
+						Street newS = post.getStreetByName(s.getName());
 						if(newS == null) {
 							newS = new Street(post);
-							newS.setName(s.getName());
-							newS.setEnName(s.getEnName());
+							newS.copyNames(s);
 							newS.setLocation(s.getLocation().getLatitude(), s.getLocation().getLongitude());
 							//newS.getWayNodes().addAll(s.getWayNodes());
 							newS.setId(s.getId());
@@ -1203,9 +1216,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 					//logMapDataWarn.info("City : " + s.getCity() + 
 					//	" combine 2 district streets '" + s.getName() + "' with '" + candidate.getName() + "'");
 					s.mergeWith(candidate);
-					if(!candidate.getName().equals(s.getName())) {
-						candidate.getCity().unregisterStreet(candidate.getName());
-					}
+					candidate.getCity().unregisterStreet(candidate);
 					List<Node> old = streetNodes.remove(candidate);
 					streetNodes.get(s).addAll(old);
 					streets.remove(j);
@@ -1268,6 +1279,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 				street.setName(streetName + cityPart);
 				street.setEnName(streetEnName + cityPart);
 				streetNodes.put(street, thisWayNodes);
+				city.registerStreet(street);
 
 				visitedStreets.put(streetId, street); // mark the street as visited
 			}
