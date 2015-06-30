@@ -10,8 +10,10 @@ import java.util.Set;
 import net.osmand.data.Building;
 import net.osmand.data.City;
 import net.osmand.data.LatLon;
+import net.osmand.data.preparation.address.DBStreetDAO.SimpleStreet;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Way;
+import net.osmand.util.Algorithms;
 
 public class CachedDBStreetDAO extends DBStreetDAO
 {
@@ -21,20 +23,20 @@ public class CachedDBStreetDAO extends DBStreetDAO
 
 	@Override
 	public SimpleStreet findStreet(String name, City city, String cityPart) {
-		return addressStreetLocalMap.get(createStreetUniqueName(name, city, cityPart)); //$NON-NLS-1$
+		return addressStreetLocalMap.get(createStreetUniqueName(name, city.getId(), cityPart)); //$NON-NLS-1$
 	}
 
 	@Override
 	public SimpleStreet findStreet(String name, City city) {
-		return addressStreetLocalMap.get(createStreetUniqueName(name, city)); //$NON-NLS-1$
+		return addressStreetLocalMap.get(createStreetUniqueName(name, city.getId())); //$NON-NLS-1$
 	}
 
-	private String createStreetUniqueName(String name, City city, String cityPart) {
-		return name + '_' + city.getId() + '_' + cityPart;
+	private String createStreetUniqueName(String name, Long cityId, String cityPart) {
+		return name + '_' + cityId + '_' + cityPart;
 	}
 
-	private String createStreetUniqueName(String name, City city) {
-		return name + '_' + city.getId();
+	private String createStreetUniqueName(String name, Long cityId) {
+		return name + '_' + cityId;
 	}
 
 	@Override
@@ -52,23 +54,34 @@ public class CachedDBStreetDAO extends DBStreetDAO
 	}
 	
 	@Override
-	public long insertStreet(String name, String nameEn, LatLon location, City city, String cityPart) throws SQLException {
+	public long insertStreet(String name, Map<String, String> names, LatLon location, City city, String cityPart) throws SQLException {
+		String langs = constructLangs(names);
 		//batch the insert
-		long streetId = fillInsertStreetStatement(name, nameEn, location, city, cityPart);
+		long streetId = fillInsertStreetStatement(name, names, location, city, cityPart, langs);
 		addBatch(addressStreetStat);
-		SimpleStreet ss = new SimpleStreet(streetId,name,cityPart,location);
-		addressStreetLocalMap.put(createStreetUniqueName(name, city, cityPart), ss); 
-		addressStreetLocalMap.put(createStreetUniqueName(name, city), ss);
+		SimpleStreet ss = new SimpleStreet(streetId,name, city.getId(), cityPart,location, langs);
+		addressStreetLocalMap.put(createStreetUniqueName(name, city.getId(), cityPart), ss); 
+		addressStreetLocalMap.put(createStreetUniqueName(name, city.getId()), ss);
 		return streetId;
+	}
+
+	
+	
+	@Override
+	public SimpleStreet updateStreetCityPart(SimpleStreet street, String cityPart) throws SQLException {
+		commit(); //we are doing batch updates, so we must commit before this update
+		SimpleStreet updatedSS = super.updateStreetCityPart(street, cityPart);
+		addressStreetLocalMap.put(createStreetUniqueName(street.getName(), street.getCityId()), updatedSS);
+		addressStreetLocalMap.put(createStreetUniqueName(street.getName(), street.getCityId(), cityPart), updatedSS);
+		return updatedSS;
 	}
 	
 	@Override
-	public SimpleStreet updateStreetCityPart(SimpleStreet street, City city, String cityPart) throws SQLException {
+	public DBStreetDAO.SimpleStreet updateStreetLangs(DBStreetDAO.SimpleStreet street, Map<String, String> newNames) throws SQLException {
 		commit(); //we are doing batch updates, so we must commit before this update
-		super.updateStreetCityPart(street, city, cityPart);
-		SimpleStreet updatedSS = new SimpleStreet(street.getId(),street.getName(),cityPart,street.getLocation());
-		addressStreetLocalMap.put(createStreetUniqueName(street.getName(), city), updatedSS);
-		addressStreetLocalMap.put(createStreetUniqueName(street.getName(), city, cityPart), updatedSS);
+		SimpleStreet updatedSS = super.updateStreetLangs(street, newNames);
+		addressStreetLocalMap.put(createStreetUniqueName(street.getName(), street.getCityId()), updatedSS);
+		addressStreetLocalMap.put(createStreetUniqueName(street.getName(), street.getCityId(), street.getCityPart()), updatedSS);
 		return updatedSS;
 	}
 	

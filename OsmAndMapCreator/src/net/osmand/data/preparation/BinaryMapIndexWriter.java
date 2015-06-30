@@ -13,6 +13,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -729,7 +730,7 @@ public class BinaryMapIndexWriter {
 		return delta;
 	}
 
-	public void startWriteAddressIndex(String name) throws IOException {
+	public void startWriteAddressIndex(String name, Collection<String> additionalTags) throws IOException {
 		pushState(ADDRESS_INDEX_INIT, OSMAND_STRUCTURE_INIT);
 		codedOutStream.writeTag(OsmandOdb.OsmAndStructure.ADDRESSINDEX_FIELD_NUMBER, WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
 		preserveInt32Size();
@@ -738,6 +739,12 @@ public class BinaryMapIndexWriter {
 		codedOutStream.writeString(OsmandOdb.OsmAndAddressIndex.NAME_EN_FIELD_NUMBER, Junidecode.unidecode(name));
 
 		// skip boundaries
+		StringTable.Builder bs = OsmandOdb.StringTable.newBuilder();
+		for (String s : additionalTags) {
+			bs.addS(s);
+		}
+		codedOutStream.writeTag(OsmandOdb.OsmAndAddressIndex.ATTRIBUTETAGSTABLE_FIELD_NUMBER, FieldType.MESSAGE.getWireType());
+		codedOutStream.writeMessageNoTag(bs.build());
 	}
 
 	public void endWriteAddressIndex() throws IOException {
@@ -805,7 +812,7 @@ public class BinaryMapIndexWriter {
 		return true;
 	}
 
-	public BinaryFileReference writeCityHeader(MapObject city, int cityType) throws IOException {
+	public BinaryFileReference writeCityHeader(MapObject city, int cityType, Map<String, Integer> tagRules) throws IOException {
 		checkPeekState(CITY_INDEX_INIT);
 		codedOutStream.writeTag(CitiesIndex.CITIES_FIELD_NUMBER, FieldType.MESSAGE.getWireType());
 		long startMessage = getFilePointer();
@@ -820,10 +827,20 @@ public class BinaryMapIndexWriter {
 		}
 		
 		cityInd.setName(city.getName());
-		// FIXME TODOGEN;
 		if(checkEnNameToWrite(city)){
 			cityInd.setNameEn(city.getEnName(false));
 		}
+		Iterator<Entry<String, String>> it = city.getNamesMap(false).entrySet().iterator();
+		while(it.hasNext()) {
+			Entry<String, String> next = it.next();
+			Integer intg = tagRules.get("name:"+next.getKey());
+			if(intg != null) {
+				cityInd.addAttributeTagIds(intg);
+				cityInd.addAttributeValues(next.getValue());
+			}
+		}
+		
+		
 		int cx = MapUtils.get31TileNumberX(city.getLocation().getLongitude());
 		int cy = MapUtils.get31TileNumberY(city.getLocation().getLatitude());
 		cityInd.setX(cx);
@@ -836,7 +853,7 @@ public class BinaryMapIndexWriter {
 	}
 	
 	public void writeCityIndex(City cityOrPostcode, List<Street> streets, Map<Street, List<Node>> wayNodes, 
-			BinaryFileReference ref) throws IOException {
+			BinaryFileReference ref, Map<String, Integer> tagRules) throws IOException {
 		checkPeekState(CITY_INDEX_INIT);
 		codedOutStream.writeTag(CitiesIndex.BLOCKS_FIELD_NUMBER, FieldType.MESSAGE.getWireType());
 		codedOutStream.flush();
@@ -862,7 +879,7 @@ public class BinaryMapIndexWriter {
 		}
 		String postcodeFilter = cityOrPostcode.isPostcode() ? cityOrPostcode.getName() : null;
 		for (Street s : streets) {
-			StreetIndex streetInd = createStreetAndBuildings(s, cx, cy, postcodeFilter, mapNodeToStreet, wayNodes);
+			StreetIndex streetInd = createStreetAndBuildings(s, cx, cy, postcodeFilter, mapNodeToStreet, wayNodes, tagRules);
 			currentPointer += CodedOutputStream.computeTagSize(CityBlockIndex.STREETS_FIELD_NUMBER);
 			if(currentPointer > Integer.MAX_VALUE) {
 				throw new IllegalArgumentException("File offset > 2 GB.");
@@ -894,13 +911,22 @@ public class BinaryMapIndexWriter {
 	}
 
 	protected StreetIndex createStreetAndBuildings(Street street, int cx, int cy, String postcodeFilter, 
-			Map<Long, Set<Street>> mapNodeToStreet, Map<Street, List<Node>> wayNodes) throws IOException {
+			Map<Long, Set<Street>> mapNodeToStreet, Map<Street, List<Node>> wayNodes, 
+			Map<String, Integer> tagRules) throws IOException {
 		checkPeekState(CITY_INDEX_INIT);
 		StreetIndex.Builder streetBuilder = OsmandOdb.StreetIndex.newBuilder();
 		streetBuilder.setName(street.getName());
-		// FIXME TODOGEN;
 		if (checkEnNameToWrite(street)) {
 			streetBuilder.setNameEn(street.getEnName(false));
+		}
+		Iterator<Entry<String, String>> it = street.getNamesMap(false).entrySet().iterator();
+		while(it.hasNext()) {
+			Entry<String, String> next = it.next();
+			Integer intg = tagRules.get("name:"+next.getKey());
+			if(intg != null) {
+				streetBuilder.addAttributeTagIds(intg);
+				streetBuilder.addAttributeValues(next.getValue());
+			}
 		}
 		streetBuilder.setId(street.getId());
 
@@ -943,7 +969,16 @@ public class BinaryMapIndexWriter {
 			}
 			bbuilder.setId(b.getId());
 			bbuilder.setName(b.getName());
-			// FIXME TODOGEN;
+			it = b.getNamesMap(false).entrySet().iterator();
+			while(it.hasNext()) {
+				Entry<String, String> next = it.next();
+				Integer intg = tagRules.get("name:"+next.getKey());
+				if(intg != null) {
+					bbuilder.addAttributeTagIds(intg);
+					bbuilder.addAttributeValues(next.getValue());
+				}
+			}
+
 			if (checkEnNameToWrite(b)) {
 				bbuilder.setNameEn(b.getEnName(false));
 			}
@@ -967,10 +1002,19 @@ public class BinaryMapIndexWriter {
 					builder.setIntersectedX((ix - sx) >> 7);
 					builder.setIntersectedY((iy - sy) >> 7);
 					builder.setName(streetJ.getName());
-					// FIXME TODOGEN;
 					if(checkEnNameToWrite(streetJ)){
 						builder.setNameEn(streetJ.getEnName(false));
 					}
+					it = streetJ.getNamesMap(false).entrySet().iterator();
+					while(it.hasNext()) {
+						Entry<String, String> next = it.next();
+						Integer intg = tagRules.get("name:"+next.getKey());
+						if(intg != null) {
+							builder.addAttributeTagIds(intg);
+							builder.addAttributeValues(next.getValue());
+						}
+					}
+
 					streetBuilder.addIntersections(builder.build());
 				}
 			}
