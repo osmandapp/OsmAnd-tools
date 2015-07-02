@@ -503,10 +503,10 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 							Building building = EntityParser.parseBuilding(house);
 							if (building.getLocation() == null) {
 								log.warn("building with empty location! id: " + house.getId());
+							} else {
+								building.setName(hname);
+								streetDAO.writeBuilding(idsOfStreet, building);
 							}
-							building.setName(hname);
-							
-							streetDAO.writeBuilding(idsOfStreet, building);
 						}
 					}
 				}
