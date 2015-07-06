@@ -2,8 +2,10 @@ package net.osmand.data.preparation;
 
 import gnu.trove.TIntCollection;
 import gnu.trove.iterator.TIntIterator;
+import gnu.trove.iterator.TIntObjectIterator;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.list.array.TLongArrayList;
+import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.map.hash.TLongObjectHashMap;
 import gnu.trove.set.hash.TIntHashSet;
 import gnu.trove.set.hash.TLongHashSet;
@@ -43,6 +45,7 @@ import net.osmand.data.preparation.BinaryMapIndexWriter.RoutePointToWrite;
 import net.osmand.osm.MapRenderingTypes;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.MapRoutingTypes;
+import net.osmand.osm.MapRoutingTypes.MapPointName;
 import net.osmand.osm.MapRoutingTypes.MapRouteType;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
@@ -86,6 +89,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 	// local purpose to speed up processing cache allocation
 	TIntArrayList outTypes = new TIntArrayList();
 	TLongObjectHashMap<TIntArrayList> pointTypes = new TLongObjectHashMap<TIntArrayList>();
+	TLongObjectHashMap<TIntObjectHashMap<String> >  pointNames = new TLongObjectHashMap<TIntObjectHashMap<String> > ();
 	Map<MapRoutingTypes.MapRouteType, String> names = new HashMap<MapRoutingTypes.MapRouteType, String>();
 
 	private TLongHashSet genSpeedCameras = new TLongHashSet();
@@ -176,8 +180,8 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 						n.putTag("highway", "speed_camera");
 					}
 				}
-				routeTypes.encodePointTypes(e, pointTypes, false);
-				addWayToIndex(e.getId(), e.getNodes(), mapRouteInsertStat, routeTree, outTypes, pointTypes, names);
+				routeTypes.encodePointTypes(e, pointTypes, pointNames, false);
+				addWayToIndex(e.getId(), e.getNodes(), mapRouteInsertStat, routeTree, outTypes, pointTypes, pointNames, names);
 			}
 			encoded = routeTypes.encodeBaseEntity(e, outTypes, names) 
 					&& e.getNodes().size() >= 2;
@@ -185,8 +189,8 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 				List<Node> source = e.getNodes();
 				long id = e.getId();
 				List<Node> result = simplifyRouteForBaseSection(source, id);
-				routeTypes.encodePointTypes(e, pointTypes, true);
-				addWayToIndex(e.getId(), result, basemapRouteInsertStat, baserouteTree, outTypes, pointTypes, names);
+				routeTypes.encodePointTypes(e, pointTypes, pointNames, true);
+				addWayToIndex(e.getId(), result, basemapRouteInsertStat, baserouteTree, outTypes, pointTypes, pointNames, names);
 				//generalizeWay(e);
 
 			}
@@ -262,7 +266,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 	}
 	private void addWayToIndex(long id, List<Node> nodes, PreparedStatement insertStat, RTree rTree,
 			TIntArrayList outTypes,	TLongObjectHashMap<TIntArrayList> pointTypes,	
-			Map<MapRoutingTypes.MapRouteType, String> names ) throws SQLException {
+			TLongObjectHashMap<TIntObjectHashMap<String>> pointNamesRaw, Map<MapRoutingTypes.MapRouteType, String> names ) throws SQLException {
 		boolean init = false;
 		int minX = Integer.MAX_VALUE;
 		int maxX = 0;
@@ -274,11 +278,12 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		ByteArrayOutputStream bpointIds = new ByteArrayOutputStream();
 		ByteArrayOutputStream bpointTypes = new ByteArrayOutputStream();
 		ByteArrayOutputStream btypes = new ByteArrayOutputStream();
-
+		List<MapPointName> pointNamesEmp = new ArrayList<MapPointName>();
 		try {
 			for (int j = 0; j < outTypes.size(); j++) {
 				Algorithms.writeSmallInt(btypes, outTypes.get(j));
 			}
+			int pointIndex = 0;
 
 			for (Node n : nodes) {
 				if (n != null) {
@@ -289,6 +294,15 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 					if (types != null) {
 						for (int j = 0; j < types.size(); j++) {
 							Algorithms.writeSmallInt(bpointTypes, types.get(j));
+						}
+					}
+					TIntObjectHashMap<String> namesP = pointNamesRaw.get(n.getId());
+					if (namesP != null) {
+						TIntObjectIterator<String> it = namesP.iterator();
+						while (it.hasNext()) {
+							it.advance();
+							MapPointName obj = new MapPointName(it.key(), pointIndex, it.value());
+							pointNamesEmp.add(obj);
 						}
 					}
 					Algorithms.writeSmallInt(bpointTypes, 0);
@@ -302,6 +316,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 					init = true;
 					Algorithms.writeInt(bcoordinates, x);
 					Algorithms.writeInt(bcoordinates, y);
+					pointIndex++;
 				}
 			}
 
@@ -316,6 +331,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 			insertStat.setBytes(4, bpointIds.toByteArray());
 			insertStat.setBytes(5, bcoordinates.toByteArray());
 			insertStat.setString(6, encodeNames(names));
+			insertStat.setString(7, encodeListNames(pointNamesEmp));
 
 			addBatch(insertStat, false);
 			try {
@@ -394,6 +410,28 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		}
 		return b.toString();
 	}
+	
+	protected String encodeListNames(List<MapPointName> tempNames) {
+		StringBuilder b = new StringBuilder();
+		for (MapPointName e : tempNames) {
+				b.append(SPECIAL_CHAR).append((char)e.nameTypeInternalId).append((char) e.pointIndex).append(e.name);
+		}
+		return b.toString();
+	}
+	
+	protected void decodeListNames(String name, List<MapPointName> tempNames) {
+		int i = name.indexOf(SPECIAL_CHAR);
+		while (i != -1) {
+			int n = name.indexOf(SPECIAL_CHAR, i + 3);
+			int ch = (short) name.charAt(i + 1);
+			int index = (short) name.charAt(i + 2);
+			String pointName = n == -1 ? name.substring(i + 3) : name.substring(i + 2, n);
+			MapPointName pn = new MapPointName(ch, index, pointName);
+			pn.nameTypeTargetId = routeTypes.getTypeByInternalId(ch).getTargetId();
+			tempNames.add(pn);
+			i = n;
+		}
+	}
 
 	protected void decodeNames(String name, Map<MapRouteType, String> tempNames) {
 		int i = name.indexOf(SPECIAL_CHAR);
@@ -432,12 +470,12 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 	private static final String TABLE_ROUTE = "route_objects";
 	private static final String TABLE_BASEROUTE = "baseroute_objects";
 	private static final String CREATETABLE = "(id bigint primary key, "
-			+ "types binary, pointTypes binary, pointIds binary, pointCoordinates binary, name varchar(4096))";
+			+ "types binary, pointTypes binary, pointIds binary, pointCoordinates binary, name varchar(4096), pointNames binary)";
 	private static final String CREATE_IND = "_ind on route_objects (id)";
-	private static final String SELECT_STAT = "SELECT types, pointTypes, pointIds, pointCoordinates, name FROM " +TABLE_ROUTE+" WHERE id = ?";
-	private static final String SELECT_BASE_STAT = "SELECT types, pointTypes, pointIds, pointCoordinates, name FROM "+TABLE_BASEROUTE+" WHERE id = ?";
-	private static final String INSERT_STAT = "(id, types, pointTypes, pointIds, pointCoordinates, name) values(?, ?, ?, ?, ?, ?)";
-	private static final String COPY_BASE = "INSERT INTO " + TABLE_BASEROUTE + " SELECT id, types, pointTypes, pointIds, pointCoordinates, name FROM "+TABLE_ROUTE+" WHERE id = ?";
+	private static final String SELECT_STAT = "SELECT types, pointTypes, pointIds, pointCoordinates, name, pointNames FROM " +TABLE_ROUTE+" WHERE id = ?";
+	private static final String SELECT_BASE_STAT = "SELECT types, pointTypes, pointIds, pointCoordinates, name, pointNames FROM "+TABLE_BASEROUTE+" WHERE id = ?";
+	private static final String INSERT_STAT = "(id, types, pointTypes, pointIds, pointCoordinates, name, pointNames) values(?, ?, ?, ?, ?, ?, ?)";
+	private static final String COPY_BASE = "INSERT INTO " + TABLE_BASEROUTE + " SELECT id, types, pointTypes, pointIds, pointCoordinates, name, pointNames FROM "+TABLE_ROUTE+" WHERE id = ?";
 
 	public void createDatabaseStructure(Connection mapConnection, DBDialect dialect, String rtreeMapIndexNonPackFileName)
 			throws SQLException, IOException {
@@ -714,6 +752,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 	
 	public void processingLowLevelWays(IProgress progress) {
 		pointTypes.clear();
+		pointNames.clear();
 		Collection<GeneralizedCluster> clusters = 
 				new ArrayList<IndexRouteCreator.GeneralizedCluster>(generalClusters.valueCollection());
 		// 1. roundabouts 
@@ -771,7 +810,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 				outTypes.add(gw.mainType);
 				outTypes.addAll(gw.addtypes);
 				try {
-					addWayToIndex(gw.id, nodes, basemapRouteInsertStat, baserouteTree, outTypes, pointTypes, names);
+					addWayToIndex(gw.id, nodes, basemapRouteInsertStat, baserouteTree, outTypes, pointTypes, pointNames, names);
 				} catch (SQLException e) {
 					throw new IllegalStateException(e);
 				}
@@ -1079,6 +1118,15 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		}
 	}
 
+	private static class RouteWriteContext {
+		PreparedStatement selectData ;
+		TLongObjectHashMap<BinaryFileReference> treeHeader;
+		Map<String, Integer> tempStringTable = new LinkedHashMap<String, Integer>();
+		Map<MapRouteType, String> tempNames = new LinkedHashMap<MapRoutingTypes.MapRouteType, String>();
+		List<MapPointName> tempPointNames = new ArrayList<MapRoutingTypes.MapPointName>();
+		TLongArrayList wayMapIds = new TLongArrayList();
+		TLongArrayList pointMapIds = new TLongArrayList();
+	}
 
 	private void writeBinaryRouteIndexBlocks(BinaryMapIndexWriter writer, RTree rte, boolean basemap,
 			TLongObjectHashMap<BinaryFileReference> treeHeader) throws IOException, SQLException, RTreeException {
@@ -1089,8 +1137,10 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		Rect rootBounds = calcBounds(root);
 		if (rootBounds != null) {
 				PreparedStatement selectData = mapConnection.prepareStatement(basemap ? SELECT_BASE_STAT : SELECT_STAT);
-				writeBinaryMapBlock(root, rootBounds, rte, writer, selectData, treeHeader, new LinkedHashMap<String, Integer>(),
-						new LinkedHashMap<MapRouteType, String>(), basemap);
+				RouteWriteContext wc = new RouteWriteContext();
+				wc.selectData = selectData;
+				wc.treeHeader = treeHeader;
+				writeBinaryMapBlock(root, rootBounds, rte, writer, wc, basemap);
 				selectData.close();
 		}
 	}
@@ -1118,33 +1168,32 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		return ids.size() - 1;
 	}
 	
-	private void writeBinaryMapBlock(rtree.Node parent, Rect parentBounds, RTree r, BinaryMapIndexWriter writer, PreparedStatement selectData,
-			TLongObjectHashMap<BinaryFileReference> bounds, Map<String, Integer> tempStringTable, Map<MapRouteType, String> tempNames, boolean basemap)
+	private void writeBinaryMapBlock(rtree.Node parent, Rect parentBounds, RTree r, BinaryMapIndexWriter writer, RouteWriteContext wc, boolean basemap)
 					throws IOException, RTreeException, SQLException {
 		Element[] e = parent.getAllElements();
 
 		RouteDataBlock.Builder dataBlock = null;
-		BinaryFileReference ref = bounds.get(parent.getNodeIndex());
-		TLongArrayList wayMapIds = new TLongArrayList();
-		TLongArrayList pointMapIds = new TLongArrayList();
+		BinaryFileReference ref = wc.treeHeader.get(parent.getNodeIndex());
+		wc.wayMapIds.clear();
+		wc.pointMapIds.clear();
 		for (int i = 0; i < parent.getTotalElements(); i++) {
 			if (e[i].getElementType() == rtree.Node.LEAF_NODE) {
 				long id = e[i].getPtr();
 				// IndexRouteCreator.SELECT_STAT;
 				// "SELECT types, pointTypes, pointIds, pointCoordinates, name FROM route_objects WHERE id = ?"
-				selectData.setLong(1, id);
+				wc.selectData.setLong(1, id);
 
-				ResultSet rs = selectData.executeQuery();
+				ResultSet rs = wc.selectData.executeQuery();
 				if (rs.next()) {
 					if (dataBlock == null) {
 						dataBlock = RouteDataBlock.newBuilder();
-						tempStringTable.clear();
-						wayMapIds.clear();
-						pointMapIds.clear();
+						wc.tempStringTable.clear();
+						wc.wayMapIds.clear();
+						wc.pointMapIds.clear();
 					}
-					int cid = registerId(wayMapIds, id);
-					tempNames.clear();
-					decodeNames(rs.getString(5), tempNames);
+					int cid = registerId(wc.wayMapIds, id);
+					wc.tempNames.clear();
+					decodeNames(rs.getString(5), wc.tempNames);
 					byte[] types = rs.getBytes(1);
 					int[] typeUse = new int[types.length / 2];
 					for (int j = 0; j < types.length; j += 2) {
@@ -1156,7 +1205,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 						for(int li = 0; li<restrictions.size(); li++){
 							Builder restriction = RestrictionData.newBuilder();
 							restriction.setFrom(cid);
-							int toId = registerId(wayMapIds, restrictions.get(li) >> 3);
+							int toId = registerId(wc.wayMapIds, restrictions.get(li) >> 3);
 							restriction.setTo(toId);
 							restriction.setType((int) (restrictions.get(li) & 0x7));
 							dataBlock.addRestrictions(restriction.build());
@@ -1165,6 +1214,10 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 					byte[] pointTypes = rs.getBytes(2);
 					//byte[] pointIds = rs.getBytes(3);
 					byte[] pointCoordinates = rs.getBytes(4);
+					String pointNames = rs.getString(6);
+					wc.tempPointNames.clear();
+					decodeListNames(pointNames, wc.tempPointNames);
+					
 					int pointsLength = pointCoordinates.length / 8;
 					RouteMissingPoints missingPoints = null;
 					if(basemap && basemapNodesToReinsert.containsKey(id) ) {
@@ -1203,7 +1256,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 
 					RouteData routeData = writer.writeRouteData(cid, parentBounds.getMinX(), parentBounds.getMinY(), typeUse, 
 							points.toArray(new RoutePointToWrite[points.size()]),
-							tempNames, tempStringTable, dataBlock, true, false);
+							wc.tempNames, wc.tempStringTable, wc.tempPointNames, dataBlock, true, false);
 					if (routeData != null) {
 						dataBlock.addDataObjects(routeData);
 					}
@@ -1215,9 +1268,9 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		if (dataBlock != null) {
 			IdTable.Builder idTable = IdTable.newBuilder();
 			long prev = 0;
-			for (int i = 0; i < wayMapIds.size(); i++) {
-				idTable.addRouteId(wayMapIds.getQuick(i) - prev);
-				prev = wayMapIds.getQuick(i);
+			for (int i = 0; i < wc.wayMapIds.size(); i++) {
+				idTable.addRouteId(wc.wayMapIds.getQuick(i) - prev);
+				prev = wc.wayMapIds.getQuick(i);
 			}
 //			if (WRITE_POINT_ID) {
 //				prev = 0;
@@ -1226,13 +1279,13 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 //				}
 //			}
 			dataBlock.setIdTable(idTable.build());
-			writer.writeRouteDataBlock(dataBlock, tempStringTable, ref);
+			writer.writeRouteDataBlock(dataBlock, wc.tempStringTable, ref);
 		}
 		for (int i = 0; i < parent.getTotalElements(); i++) {
 			if (e[i].getElementType() != rtree.Node.LEAF_NODE) {
 				long ptr = e[i].getPtr();
 				rtree.Node ns = r.getReadNode(ptr);
-				writeBinaryMapBlock(ns, e[i].getRect(), r, writer, selectData, bounds, tempStringTable, tempNames, basemap);
+				writeBinaryMapBlock(ns, e[i].getRect(), r, writer, wc, basemap);
 			}
 		}
 	}
@@ -1417,4 +1470,6 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 			return -Math.atan2( x - px, y - py );
 		}
 	}
+	
+	
 }

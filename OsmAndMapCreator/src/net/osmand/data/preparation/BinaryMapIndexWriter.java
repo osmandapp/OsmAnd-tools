@@ -68,6 +68,7 @@ import net.osmand.data.preparation.IndexPoiCreator.PoiCreatorCategories;
 import net.osmand.data.preparation.IndexPoiCreator.PoiTileBox;
 import net.osmand.osm.MapRenderingTypes;
 import net.osmand.osm.MapRenderingTypes.MapRulType;
+import net.osmand.osm.MapRoutingTypes.MapPointName;
 import net.osmand.osm.MapRoutingTypes.MapRouteType;
 import net.osmand.osm.edit.Node;
 import net.osmand.util.Algorithms;
@@ -497,7 +498,7 @@ public class BinaryMapIndexWriter {
 	}
 	
 	public RouteData writeRouteData(int diffId, int pleft, int ptop, int[] types, RoutePointToWrite[] points, 
-			Map<MapRouteType, String> names, Map<String, Integer> stringTable, RouteDataBlock.Builder dataBlock,
+			Map<MapRouteType, String> names, Map<String, Integer> stringTable, List<MapPointName> pointNames, RouteDataBlock.Builder dataBlock,
 			boolean allowCoordinateSimplification, boolean writePointId)
 			throws IOException {
 		RouteData.Builder builder = RouteData.newBuilder();
@@ -542,6 +543,24 @@ public class BinaryMapIndexWriter {
 		ROUTE_TYPES_SIZE += CodedOutputStream.computeTagSize(RouteData.POINTTYPES_FIELD_NUMBER)
 						+ CodedOutputStream.computeRawVarint32Size(typesDataBuf.size()) + typesDataBuf.size();
 
+		if (pointNames.size() > 0) {
+			mapDataBuf.clear();
+			if (names != null) {
+				for(MapPointName p : pointNames){
+					writeRawVarint32(mapDataBuf, p.pointIndex);
+					writeRawVarint32(mapDataBuf, p.nameTypeTargetId);
+					Integer ls = stringTable.get(p.name);
+					if (ls == null) {
+						ls = stringTable.size();
+						stringTable.put(p.name, ls);
+					}
+					writeRawVarint32(mapDataBuf, ls);
+				}
+			}
+			ROUTE_STRING_DATA_SIZE += mapDataBuf.size();
+			builder.setPointNames(ByteString.copyFrom(mapDataBuf.toArray()));
+		}
+		
 		if (names.size() > 0) {
 			mapDataBuf.clear();
 			if (names != null) {
@@ -694,6 +713,8 @@ public class BinaryMapIndexWriter {
 	
 	public static class RoutePointToWrite {
 		public TIntArrayList types = new TIntArrayList();
+		public TIntArrayList nameTypes = new TIntArrayList();
+		public List<String> names = new ArrayList<String>();
 		public int id;
 		public int x;
 		public int y;
