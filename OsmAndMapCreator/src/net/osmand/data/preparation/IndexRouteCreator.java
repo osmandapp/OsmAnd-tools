@@ -425,7 +425,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 			int n = name.indexOf(SPECIAL_CHAR, i + 3);
 			int ch = (short) name.charAt(i + 1);
 			int index = (short) name.charAt(i + 2);
-			String pointName = n == -1 ? name.substring(i + 3) : name.substring(i + 2, n);
+			String pointName = n == -1 ? name.substring(i + 3) : name.substring(i + 3, n);
 			MapPointName pn = new MapPointName(ch, index, pointName);
 			pn.nameTypeTargetId = routeTypes.getTypeByInternalId(ch).getTargetId();
 			tempNames.add(pn);

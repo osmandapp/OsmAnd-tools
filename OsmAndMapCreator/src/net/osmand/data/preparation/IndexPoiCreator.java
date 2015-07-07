@@ -31,9 +31,12 @@ import net.osmand.data.AmenityType;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.MapRenderingTypes;
+import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.MapRenderingTypes.MapRulType;
+import net.osmand.osm.MapRenderingTypesEncoder.EntityConvertApplyType;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
+import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.EntityParser;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.osm.edit.Relation;
@@ -66,10 +69,10 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	private List<Amenity> tempAmenityList = new ArrayList<Amenity>();
 	private Map<EntityId, Map<String, String>> propogatedTags = new LinkedHashMap<Entity.EntityId, Map<String, String>>();
 
-	private final MapRenderingTypes renderingTypes;
+	private final MapRenderingTypesEncoder renderingTypes;
 	private MapPoiTypes poiTypes;
 
-	public IndexPoiCreator(MapRenderingTypes renderingTypes) {
+	public IndexPoiCreator(MapRenderingTypesEncoder renderingTypes) {
 		this.renderingTypes = renderingTypes;
 		this.poiTypes = MapPoiTypes.getDefault();
 	}
@@ -77,18 +80,20 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 		tempAmenityList.clear();
 		EntityId eid = EntityId.valueOf(e);
+		Map<String, String> etags = renderingTypes.transformTags(e.getTags(), EntityType.valueOf(e), EntityConvertApplyType.POI);
 		Map<String, String> tags = propogatedTags.get(eid);
 		if (tags != null) {
+			etags = new LinkedHashMap<String, String>(etags);
 			Iterator<Entry<String, String>> iterator = tags.entrySet().iterator();
 			while (iterator.hasNext()) {
 				Entry<String, String> ts = iterator.next();
-				if (e.getTag(ts.getKey()) == null) {
-					e.putTag(ts.getKey(), ts.getValue());
+				if (etags.get(ts.getKey()) == null) {
+					etags.put(ts.getKey(), ts.getValue());
 				}
 			}
 		}
 		boolean privateReg = "private".equals(e.getTag("access")); 
-		tempAmenityList = EntityParser.parseAmenities(renderingTypes, poiTypes, e, tempAmenityList);
+		tempAmenityList = EntityParser.parseAmenities(renderingTypes, poiTypes, e, etags,  tempAmenityList);
 		if (!tempAmenityList.isEmpty() && poiPreparedStatement != null) {
 			if(e instanceof Relation) {
 				ctx.loadEntityRelation((Relation) e);
@@ -101,7 +106,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				// do not add that check because it is too much printing for batch creation
 				// by statistic < 1% creates maps manually
 				// checkEntity(e);
-				EntityParser.parseMapObject(a, e);
+				EntityParser.parseMapObject(a, e, etags);
 				if (a.getLocation() != null) {
 					if(e instanceof Relation) {
 						a.setId(GENERATE_OBJ_ID -- );
@@ -115,15 +120,16 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	}
 	
 	public void iterateRelation(Relation e, OsmDbAccessorContext ctx) throws SQLException {
-		for (String t : e.getTagKeySet()) {
-			AmenityType type = renderingTypes.getAmenityTypeForRelation(t, e.getTag(t), Algorithms.isEmpty(e.getTag("name")));
+		Map<String, String> tags = renderingTypes.transformTags(e.getTags(), EntityType.RELATION, EntityConvertApplyType.POI);
+		for (String t : tags.keySet()) {
+			AmenityType type = renderingTypes.getAmenityTypeForRelation(t, tags.get(t), Algorithms.isEmpty(tags.get("name")));
 			if (type != null) {	
 				ctx.loadEntityRelation(e);
 				for (EntityId id : ((Relation) e).getMembersMap().keySet()) {
 					if (!propogatedTags.containsKey(id)) {
 						propogatedTags.put(id, new LinkedHashMap<String, String>());
 					}
-					propogatedTags.get(id).put(t, e.getTag(t));
+					propogatedTags.get(id).put(t, tags.get(t));
 				}
 			}
 		}

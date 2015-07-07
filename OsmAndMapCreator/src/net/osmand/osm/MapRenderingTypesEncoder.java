@@ -4,6 +4,7 @@ import gnu.trove.list.array.TIntArrayList;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -70,7 +71,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	public Map<MapRulType, String> getRelationPropogatedTags(Relation relation) {
 		Map<MapRulType, String> propogated = new LinkedHashMap<MapRulType, String>();
 		Map<String, String> ts = relation.getTags();
-		ts = transformTags(ts, EntityType.RELATION);
+		ts = transformTags(ts, EntityType.RELATION, EntityConvertApplyType.MAP);
 		Iterator<Entry<String, String>> its = ts.entrySet().iterator();
 		while(its.hasNext()) {
 			Entry<String, String> ev = its.next();
@@ -122,7 +123,8 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		EntityConvert ec = new EntityConvert();
 		parseConvertCol(parser, ec.ifTags, "if_");
 		parseConvertCol(parser, ec.ifNotTags, "if_not_");
-		ec.type = EntityConverType.valueOf(parser.getAttributeValue("", "pattern" ).toUpperCase()); //$NON-NLS-1$
+		ec.type = EntityConvertType.valueOf(parser.getAttributeValue("", "pattern" ).toUpperCase()); //$NON-NLS-1$
+		ec.applyToType = EnumSet.allOf(EntityConvertApplyType.class);
 		parseConvertCol(parser, ec.toTags, "to_");
 		String tg = parser.getAttributeValue("", "from_tag" ); //$NON-NLS-1$
 		String value = parser.getAttributeValue("", "from_value"); //$NON-NLS-1$
@@ -135,7 +137,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		}
 		String appTo = parser.getAttributeValue("", "apply_to" ); //$NON-NLS-1$
 		if(appTo != null) {
-			ec.applyTo = new HashSet<Entity.EntityType>();
+			ec.applyTo = EnumSet.noneOf(EntityType.class);
 			String[] tps = appTo.split(",");
 			for(String t : tps) {
 				EntityType et = EntityType.valueOf(t.toUpperCase());
@@ -236,7 +238,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		outTypes.clear();
 		outAddTypes.clear();
 		namesToEncode.clear();
-		tags = transformTags(tags, node ? EntityType.NODE : EntityType.WAY);
+		tags = transformTags(tags, node ? EntityType.NODE : EntityType.WAY, EntityConvertApplyType.MAP);
 		boolean area = "yes".equals(tags.get("area"));
 		if(tags.containsKey("color")) {
 			prepareColorTag(tags, "color");
@@ -282,9 +284,10 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 
 
 
-	private Map<String, String> transformTags(Map<String, String> tags, EntityType entity) {
-		EntityConverType filter = EntityConverType.TAG_TRANSFORM;
-		List<EntityConvert> listToConvert = getApplicableConverts(tags, entity, filter);
+	public Map<String, String> transformTags(Map<String, String> tags, EntityType entity, 
+			EntityConvertApplyType appType) {
+		EntityConvertType filter = EntityConvertType.TAG_TRANSFORM;
+		List<EntityConvert> listToConvert = getApplicableConverts(tags, entity, filter, appType);
 		if(listToConvert == null) {
 			return tags;
 		} 
@@ -297,8 +300,9 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	
 	
 	public List<Map<String, String>> splitTags(Map<String, String> tags, EntityType entity) {
-		EntityConverType filter = EntityConverType.SPLIT;
-		List<EntityConvert> listToConvert = getApplicableConverts(tags, entity, filter);
+		EntityConvertType filter = EntityConvertType.SPLIT;
+		List<EntityConvert> listToConvert = getApplicableConverts(tags, entity, filter, 
+				EntityConvertApplyType.MAP);
 		List<Map<String, String>> result = null;
 		if(listToConvert == null) {
 			return result;
@@ -326,14 +330,15 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 
 
 	protected List<EntityConvert> getApplicableConverts(Map<String, String> tags, EntityType entity,
-			EntityConverType filter) {
+			EntityConvertType filter, EntityConvertApplyType appFilter) {
 		List<EntityConvert> listToConvert = null;
 		for(Map.Entry<String, String> e : tags.entrySet()) {
 			List<EntityConvert> list = convertTags.get(e.getKey());
 			if (list != null) {
 				for (EntityConvert ec : list) {
 					if (checkConvertValue(ec.fromTag, e.getValue())) {
-						if (checkConvert(tags, ec, entity) && ec.type == filter) {
+						if (checkConvert(tags, ec, entity) && ec.type == filter && 
+								ec.applyToType.contains(appFilter)) {
 							if (listToConvert == null) {
 								listToConvert = new ArrayList<EntityConvert>();
 							}
@@ -745,16 +750,21 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	}
 	
 	
-	
+	public enum EntityConvertApplyType {
+		MAP,
+		ROUTING,
+		POI
+	}
 
-	private enum EntityConverType {
+	private enum EntityConvertType {
 		TAG_TRANSFORM,
 		SPLIT
 	}
 	public static class EntityConvert {
 		public TagValuePattern fromTag ;
-		public EntityConverType type;
-		public Set<EntityType> applyTo ;
+		public EntityConvertType type;
+		public EnumSet<EntityConvertApplyType> applyToType;
+		public EnumSet<EntityType> applyTo ;
 		public List<TagValuePattern> ifTags = new ArrayList<MapRenderingTypes.TagValuePattern>();
 		public List<TagValuePattern> ifNotTags = new ArrayList<MapRenderingTypes.TagValuePattern>();
 		public List<TagValuePattern> toTags = new ArrayList<MapRenderingTypes.TagValuePattern>();
