@@ -45,6 +45,7 @@ import net.osmand.data.preparation.BinaryMapIndexWriter.RoutePointToWrite;
 import net.osmand.osm.MapRenderingTypes;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.MapRoutingTypes;
+import net.osmand.osm.MapRenderingTypesEncoder.EntityConvertApplyType;
 import net.osmand.osm.MapRoutingTypes.MapPointName;
 import net.osmand.osm.MapRoutingTypes.MapRouteType;
 import net.osmand.osm.edit.Entity;
@@ -98,6 +99,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 	private PreparedStatement mapRouteInsertStat;
 	private PreparedStatement basemapRouteInsertStat;
 	private Map<EntityId, Map<String, String>> propogatedTags = new LinkedHashMap<Entity.EntityId, Map<String, String>>();
+	private MapRenderingTypesEncoder renderingTypes;
 
 
 	private class RouteMissingPoints {
@@ -123,13 +125,15 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 	}
 	
 	public IndexRouteCreator(MapRenderingTypesEncoder renderingTypes, Log logMapDataWarn) {
+		this.renderingTypes = renderingTypes;
 		this.logMapDataWarn = logMapDataWarn;
 		this.routeTypes = new MapRoutingTypes(renderingTypes);
 	}
 	public void indexRelations(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 		indexHighwayRestrictions(e, ctx);
 		if(e instanceof Relation) {
-			Map<String, String> propogated = routeTypes.getRouteRelationPropogatedTags(e);
+			Map<String, String> tags = renderingTypes.transformTags(e.getTags(), EntityType.RELATION, EntityConvertApplyType.ROUTING);
+			Map<String, String> propogated = routeTypes.getRouteRelationPropogatedTags(tags);
 			if(propogated != null) {
 				ctx.loadEntityRelation((Relation) e);
 				for(EntityId id : ((Relation) e).getMembersMap().keySet()) {
@@ -139,7 +143,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 					propogatedTags.get(id).putAll(propogated);
 				}
 			}
-			if("enforcement".equals(e.getTag("type")) && "maxspeed".equals(e.getTag("enforcement"))) {
+			if("enforcement".equals(tags.get("type")) && "maxspeed".equals(tags.get("enforcement"))) {
 				ctx.loadEntityRelation((Relation) e);
 				Iterator<Entity> from = ((Relation) e).getMembers("from").iterator();
 				// mark as speed cameras
@@ -159,18 +163,19 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 	public void iterateMainEntity(Entity es, OsmDbAccessorContext ctx) throws SQLException {
 		if (es instanceof Way) {
 			Way e = (Way) es;
-			Map<String, String> tags = propogatedTags.get(EntityId.valueOf(e));
-			if (tags != null) {
-				Iterator<Entry<String, String>> iterator = tags.entrySet().iterator();
+			Map<String, String> tags = renderingTypes.transformTags(e.getTags(), EntityType.WAY, EntityConvertApplyType.ROUTING);
+			Map<String, String> ptags = propogatedTags.get(EntityId.valueOf(e));
+			if (ptags != null) {
+				Iterator<Entry<String, String>> iterator = ptags.entrySet().iterator();
 				while (iterator.hasNext()) {
 					Entry<String, String> ts = iterator.next();
-					if (e.getTag(ts.getKey()) == null) {
-						e.putTag(ts.getKey(), ts.getValue());
+					if (tags.get(ts.getKey()) == null) {
+						tags.put(ts.getKey(), ts.getValue());
 					}
 				}
 			}
 			
-			boolean encoded = routeTypes.encodeEntity(e, outTypes, names) 
+			boolean encoded = routeTypes.encodeEntity(tags, outTypes, names) 
 					&& e.getNodes().size() >= 2;
 			if (encoded) {
 				// Load point with tags!
@@ -183,7 +188,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 				routeTypes.encodePointTypes(e, pointTypes, pointNames, false);
 				addWayToIndex(e.getId(), e.getNodes(), mapRouteInsertStat, routeTree, outTypes, pointTypes, pointNames, names);
 			}
-			encoded = routeTypes.encodeBaseEntity(e, outTypes, names) 
+			encoded = routeTypes.encodeBaseEntity(tags, outTypes, names) 
 					&& e.getNodes().size() >= 2;
 			if (encoded ) {
 				List<Node> source = e.getNodes();

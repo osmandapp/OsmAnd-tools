@@ -14,8 +14,9 @@ import java.util.Map.Entry;
 import java.util.Set;
 
 import net.osmand.binary.RouteDataObject;
+import net.osmand.osm.MapRenderingTypesEncoder.EntityConvertApplyType;
 import net.osmand.osm.MapRenderingTypesEncoder.MapRouteTag;
-import net.osmand.osm.edit.Entity;
+import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Way;
 
@@ -38,9 +39,11 @@ public class MapRoutingTypes {
 	private Map<String, MapRouteType> types = new LinkedHashMap<String, MapRoutingTypes.MapRouteType>();
 	private List<MapRouteType> listTypes = new ArrayList<MapRoutingTypes.MapRouteType>();
 	private MapRouteType refRuleType;
-	private MapRouteType nameRuleType; 
+	private MapRouteType nameRuleType;
+	private MapRenderingTypesEncoder encoder; 
 	
 	public MapRoutingTypes(MapRenderingTypesEncoder baseTypes) {
+		this.encoder = baseTypes;
 		for(MapRouteTag tg :  baseTypes.getRouteTags() ) {
 			String t = tg.tag;
 			if(tg.value != null) {
@@ -106,9 +109,9 @@ public class MapRoutingTypes {
 		return nameRuleType;
 	}
 	
-	public Map<String, String> getRouteRelationPropogatedTags(Entity e) {
+	public Map<String, String> getRouteRelationPropogatedTags(Map<String, String> tags) {
 		Map<String, String> propogated = null; 
-		for(Entry<String, String> es : e.getTags().entrySet()) {
+		for(Entry<String, String> es : tags.entrySet()) {
 			String tag = es.getKey();
 			String value = converBooleanValue(es.getValue());
 			if(contains(TAGS_RELATION_TO_ACCEPT, tag, value)) {
@@ -121,7 +124,7 @@ public class MapRoutingTypes {
 			return propogated;
 		}
 		
-		for(Entry<String, String> es : e.getTags().entrySet()) {
+		for(Entry<String, String> es : tags.entrySet()) {
 			String tag = es.getKey();
 			String value = converBooleanValue(es.getValue());
 			// do not propogate text tags they could be wrong
@@ -179,10 +182,9 @@ public class MapRoutingTypes {
 	}
 	
 	
-	public boolean encodeEntity(Way et, TIntArrayList outTypes, Map<MapRouteType, String> names){
-		Way e = et;
+	public boolean encodeEntity(Map<String, String> tags, TIntArrayList outTypes, Map<MapRouteType, String> names){
 		boolean init = false;
-		for(Entry<String, String> es : e.getTags().entrySet()) {
+		for(Entry<String, String> es : tags.entrySet()) {
 			String tag = es.getKey();
 			String value = es.getValue();
 			if(!testNonParseableRules(tag, value)){
@@ -198,7 +200,7 @@ public class MapRoutingTypes {
 		}
 		outTypes.clear();
 		names.clear();
-		for(Entry<String, String> es : e.getTags().entrySet()) {
+		for(Entry<String, String> es : tags.entrySet()) {
 			String tag = es.getKey();
 			String value = converBooleanValue(es.getValue());
 			if(!testNonParseableRules(tag, value)){
@@ -219,10 +221,9 @@ public class MapRoutingTypes {
 		return true;
 	}
 	
-	public boolean encodeBaseEntity(Way et, TIntArrayList outTypes, Map<MapRouteType, String> names){
-		Way e = et;
+	public boolean encodeBaseEntity(Map<String, String> tags, TIntArrayList outTypes, Map<MapRouteType, String> names){
 		boolean init = false;
-		for(Entry<String, String> es : e.getTags().entrySet()) {
+		for(Entry<String, String> es : tags.entrySet()) {
 			String tag = es.getKey();
 			String value = es.getValue();
 			if (contains(TAGS_TO_ACCEPT, tag, value)) {
@@ -241,7 +242,7 @@ public class MapRoutingTypes {
 		}
 		outTypes.clear();
 		names.clear();
-		for(Entry<String, String> es : e.getTags().entrySet()) {
+		for(Entry<String, String> es : tags.entrySet()) {
 			String tag = es.getKey();
 			String value = converBooleanValue(es.getValue());
 			String tvl = getMap(BASE_TAGS_TO_REPLACE, tag, value);
@@ -276,7 +277,8 @@ public class MapRoutingTypes {
 		for(Node nd : e.getNodes() ) {
 			if (nd != null) {
 				boolean accept = false;
-				for (Entry<String, String> es : nd.getTags().entrySet()) {
+				Map<String, String> ntags = encoder.transformTags(nd.getTags(), EntityType.NODE, EntityConvertApplyType.ROUTING);
+				for (Entry<String, String> es : ntags.entrySet()) {
 					String tag = es.getKey();
 					String value = converBooleanValue(es.getValue());
 					String tvl = getMap(base ? BASE_TAGS_TO_REPLACE : TAGS_TO_REPLACE, tag, value);
@@ -295,7 +297,7 @@ public class MapRoutingTypes {
 				}
 				
 				if (accept) {
-					for (Entry<String, String> es : nd.getTags().entrySet()) {
+					for (Entry<String, String> es : ntags.entrySet()) {
 						String tag = es.getKey();
 						String value = converBooleanValue(es.getValue());
 						if (TAGS_TEXT.contains(tag) || startsWith(TAGS_TEXT, tag, value)) {
