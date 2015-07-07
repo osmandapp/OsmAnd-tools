@@ -146,12 +146,13 @@ public class Multipolygon {
 	 */
 	public LatLon getCenterPoint() {
 		List<Node> points = new ArrayList<Node>();
-		for (Ring w : innerRings) {
-			points.addAll(w.getBorder());
-		}
-		
 		for (Ring w : outerRings) {
 			points.addAll(w.getBorder());
+		}
+		if(points.isEmpty()) {
+			for (Ring w : innerRings) {
+				points.addAll(w.getBorder());
+			}
 		}
 		
 		return OsmMapUtils.getWeightCenterForNodes(points);

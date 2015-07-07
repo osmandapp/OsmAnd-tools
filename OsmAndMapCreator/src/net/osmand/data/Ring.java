@@ -70,32 +70,8 @@ public class Ring implements Comparable<Ring> {
 	 * @return yes if the point is inside the ring
 	 */
 	public boolean containsPoint(double latitude, double longitude){
-		return  countIntersections(latitude, longitude) % 2 == 1;
+		return  MapAlgorithms.containsPoint(getBorder(), latitude, longitude);
 	}
-	
-	/**
-	 * count the intersections when going from lat, lon to outside the ring
-	 */
-	private int countIntersections(double latitude, double longitude) {
-		int intersections = 0;
-		
-		List<Node> polyNodes = getBorder();
-		if (polyNodes.size() == 0) return 0;
-		for (int i = 0; i < polyNodes.size() - 1; i++) {
-			if (OsmMapUtils.ray_intersect_lon(polyNodes.get(i),
-					polyNodes.get(i + 1), latitude, longitude) != -360.0d) {
-				intersections++;
-			}
-		}
-		// special handling, also count first and last, might not be closed, but
-		// we want this!
-		if (OsmMapUtils.ray_intersect_lon(polyNodes.get(0),
-				polyNodes.get(polyNodes.size() - 1), latitude, longitude) != -360.0d) {
-			intersections++;
-		}
-		return intersections;
-	}
-	
 	
 	/**
 	 * Check if this is in Ring r
