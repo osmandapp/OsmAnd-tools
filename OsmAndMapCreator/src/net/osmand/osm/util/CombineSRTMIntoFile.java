@@ -69,10 +69,12 @@ public class CombineSRTMIntoFile {
 				bnds.get(fullName).add(rc);
 			}
 		}
+		int cnt = 1;
 		for(BinaryMapDataObject rc : r) {
 			if(rc.containsAdditionalType(srtm)) {
 				String dw = rc.getNameByType(downloadName);
 				String fullName = rc.getNameByType(regionFullName);
+				System.out.println("Region " + fullName +" " + cnt++ + " out of " + r.size());
 				process(rc, bnds.get(fullName), dw, directoryWithSRTMFiles, directoryWithTargetFiles);
 			}
 		}
