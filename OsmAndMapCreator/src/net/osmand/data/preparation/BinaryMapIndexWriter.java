@@ -64,6 +64,7 @@ import net.osmand.data.LatLon;
 import net.osmand.data.MapObject;
 import net.osmand.data.Street;
 import net.osmand.data.TransportStop;
+import net.osmand.data.preparation.IndexPoiCreator.PoiAdditionalType;
 import net.osmand.data.preparation.IndexPoiCreator.PoiCreatorCategories;
 import net.osmand.data.preparation.IndexPoiCreator.PoiTileBox;
 import net.osmand.osm.MapRenderingTypes;
@@ -1253,11 +1254,11 @@ public class BinaryMapIndexWriter {
 		checkPeekState(POI_INDEX_INIT);
 		int subcatId = 0;
 		OsmAndSubtypesTable.Builder builder = OsmandOdb.OsmAndSubtypesTable.newBuilder();
-		Map<String, List<MapRulType>> groupAdditionalByTagName = new HashMap<String, List<MapRulType>>();
-		for(MapRulType rt : cs.additionalAttributes) {
-			if(rt.isAdditional()) {
+		Map<String, List<PoiAdditionalType>> groupAdditionalByTagName = new HashMap<String, List<PoiAdditionalType>>();
+		for(PoiAdditionalType rt : cs.additionalAttributes) {
+			if(!rt.isText()) {
 				if(!groupAdditionalByTagName.containsKey(rt.getTag())) {
-					groupAdditionalByTagName.put(rt.getTag(), new ArrayList<MapRenderingTypes.MapRulType>());
+					groupAdditionalByTagName.put(rt.getTag(), new ArrayList<PoiAdditionalType>());
 				}
 				groupAdditionalByTagName.get(rt.getTag()).add(rt);
 			} else {
@@ -1274,10 +1275,10 @@ public class BinaryMapIndexWriter {
 			OsmAndPoiSubtype.Builder subType = OsmandOdb.OsmAndPoiSubtype.newBuilder();
 			subType.setName(tag);
 			subType.setIsText(false);
-			List<MapRulType> list = groupAdditionalByTagName.get(tag);
+			List<PoiAdditionalType> list = groupAdditionalByTagName.get(tag);
 			subType.setSubtypeValuesSize(list.size());
 			int subcInd = 0;
-			for(MapRulType subtypeVal :  list){
+			for(PoiAdditionalType subtypeVal : list){
 				subtypeVal.setTargetPoiId(cInd, subcInd++);
 				subType.addSubtypeValue(subtypeVal.getValue());
 			}
@@ -1374,9 +1375,23 @@ public class BinaryMapIndexWriter {
 		writeInt32Size();
 		return res;
 	}
+	
+	private String retrieveAdditionalType(String key, Map<PoiAdditionalType, String> additionalNames) {
+		PoiAdditionalType k = null;
+		for(PoiAdditionalType t : additionalNames.keySet()) {
+			if(Algorithms.objectEquals(t.getTag(), key)) {
+				k = t;
+				break;
+			}
+		}
+		if(k == null) {
+			return null;
+		}
+		return additionalNames.remove(k);
+	}
 
 	public void writePoiDataAtom(long id, int x24shift, int y24shift, 
-			String type, String subtype, Map<MapRulType, String> additionalNames, MapRenderingTypes rtypes, 
+			String type, String subtype, Map<PoiAdditionalType, String> additionalNames, 
 			PoiCreatorCategories globalCategories, int limitZip) throws IOException {
 		checkPeekState(POI_DATA);
 		TIntArrayList types = globalCategories.buildTypeIds(type, subtype);
@@ -1391,21 +1406,21 @@ public class BinaryMapIndexWriter {
 		builder.setId(id);
 
 		if (USE_DEPRECATED_POI_NAME_STRUCTURE) {
-			String name = additionalNames.remove(rtypes.getNameRuleType());
+			String name = retrieveAdditionalType("name", additionalNames);
 			if (!Algorithms.isEmpty(name)) {
 				builder.setName(name);
 			}
-			String nameEn = additionalNames.remove(rtypes.getNameEnRuleType());
+			String nameEn = retrieveAdditionalType("name:en", additionalNames);
 			if (!Algorithms.isEmpty(nameEn)) {
 				builder.setNameEn(nameEn);
 			}	
 		}
 		
 		if (USE_DEPRECATED_POI_NAME_ADD_INFO_STRUCTURE) {
-			String openingHours = additionalNames.remove(rtypes.getAmenityRuleType("opening_hours", null));
-			String site = additionalNames.remove(rtypes.getAmenityRuleType("website", null));
-			String phone = additionalNames.remove(rtypes.getAmenityRuleType("phone", null));
-			String description = additionalNames.remove(rtypes.getAmenityRuleType("description", null));
+			String openingHours = retrieveAdditionalType("opening_hours", additionalNames);
+			String site = retrieveAdditionalType("website", additionalNames);
+			String phone = retrieveAdditionalType("phone", additionalNames); 
+			String description = retrieveAdditionalType("description", additionalNames);
 
 			if (!Algorithms.isEmpty(openingHours)) {
 				builder.setOpeningHours(openingHours);
@@ -1421,12 +1436,12 @@ public class BinaryMapIndexWriter {
 			}
 		}
 		
-		for (Map.Entry<MapRulType, String> rt : additionalNames.entrySet()) {
-			int targetPoiId = rt.getKey().getTargetPoiId();
+		for (Map.Entry<PoiAdditionalType, String> rt : additionalNames.entrySet()) {
+			int targetPoiId = rt.getKey().getTargetId();
 			if (targetPoiId < 0) {
 				throw new IllegalStateException("Illegal target poi id");
 			}
-			if (rt.getKey().isAdditional()) {
+			if (!rt.getKey().isText()) {
 				builder.addSubcategories(targetPoiId);
 			} else {
 				builder.addTextCategories(targetPoiId);

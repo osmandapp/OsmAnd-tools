@@ -30,9 +30,8 @@ import net.osmand.data.Amenity;
 import net.osmand.data.AmenityType;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.osm.MapPoiTypes;
-import net.osmand.osm.MapRenderingTypes;
-import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.MapRenderingTypes.MapRulType;
+import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.MapRenderingTypesEncoder.EntityConvertApplyType;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
@@ -50,6 +49,7 @@ import org.apache.commons.logging.LogFactory;
 public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 	private static final Log log = LogFactory.getLog(IndexPoiCreator.class);
+	public static final boolean USE_POI_TYPES_TO_PARSE = false;
 
 	private Connection poiConnection;
 	private File poiIndexFile;
@@ -71,11 +71,14 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 	private final MapRenderingTypesEncoder renderingTypes;
 	private MapPoiTypes poiTypes;
+	private List<PoiAdditionalType> additionalTypesId = new ArrayList<PoiAdditionalType>();
+	private Map<String, PoiAdditionalType> additionalTypesByTag = new HashMap<String, PoiAdditionalType>();
 
 	public IndexPoiCreator(MapRenderingTypesEncoder renderingTypes) {
 		this.renderingTypes = renderingTypes;
 		this.poiTypes = MapPoiTypes.getDefault();
 	}
+	
 
 	public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 		tempAmenityList.clear();
@@ -93,7 +96,10 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			}
 		}
 		boolean privateReg = "private".equals(e.getTag("access")); 
-		tempAmenityList = EntityParser.parseAmenities(renderingTypes, poiTypes, e, etags,  tempAmenityList);
+		tempAmenityList =
+				USE_POI_TYPES_TO_PARSE ?  
+					EntityParser.parseAmenities(poiTypes, e, etags,  tempAmenityList) : 
+					EntityParser.parseAmenities(renderingTypes, poiTypes, e, etags,  tempAmenityList);
 		if (!tempAmenityList.isEmpty() && poiPreparedStatement != null) {
 			if(e instanceof Relation) {
 				ctx.loadEntityRelation((Relation) e);
@@ -122,7 +128,10 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	public void iterateRelation(Relation e, OsmDbAccessorContext ctx) throws SQLException {
 		Map<String, String> tags = renderingTypes.transformTags(e.getTags(), EntityType.RELATION, EntityConvertApplyType.POI);
 		for (String t : tags.keySet()) {
-			AmenityType type = renderingTypes.getAmenityTypeForRelation(t, tags.get(t), Algorithms.isEmpty(tags.get("name")));
+			AmenityType type =
+					USE_POI_TYPES_TO_PARSE ? 
+						poiTypes.getAmenityTypeForRelation(t, tags.get(t), Algorithms.isEmpty(tags.get("name"))) :
+						renderingTypes.getAmenityTypeForRelation(t, tags.get(t), Algorithms.isEmpty(tags.get("name")));
 			if (type != null) {	
 				ctx.loadEntityRelation(e);
 				for (EntityId id : ((Relation) e).getMembersMap().keySet()) {
@@ -185,6 +194,18 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		addBatch(poiPreparedStatement);
 	}
 	
+	private PoiAdditionalType getOrCreate(String tag, String value, boolean text) {
+		String ks = PoiAdditionalType.getKey(tag, value, text);
+		if(additionalTypesByTag.containsKey(ks)) {
+			return additionalTypesByTag.get(ks);
+		}
+		int sz = additionalTypesId.size();
+		PoiAdditionalType tp = new PoiAdditionalType(sz, tag, value, text);
+		additionalTypesId.add(tp);
+		additionalTypesByTag.put(ks, tp);
+		return tp;
+	}
+	
 	private static final char SPECIAL_CHAR = ((char) -1);
 	private String encodeAdditionalInfo(Amenity amenity, Map<String, String> tempNames, String name, String nameEn) {
 		tempNames = new HashMap<String, String>(tempNames);
@@ -197,33 +218,42 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		Iterator<Entry<String, String>> it = amenity.getNamesMap(false).entrySet().iterator();
 		while (it.hasNext()) {
 			Entry<String, String> next = it.next();
-			MapRulType rulType = renderingTypes.getAmenityRuleType("name:" + next.getKey(), null);
-			if(rulType != null) {
-				tempNames.put("name:" + next.getKey(), next.getValue());
-			}
+			tempNames.put("name:" + next.getKey(), next.getValue());
 		}
 		StringBuilder b = new StringBuilder();
 		for (Map.Entry<String, String> e : tempNames.entrySet()) {
-			MapRulType rulType = renderingTypes.getAmenityRuleType(e.getKey(), e.getValue());
-			if(rulType == null) {
-				throw new IllegalStateException("Can't retrieve amenity rule type " + e.getKey() + " " + e.getValue());
+			boolean text = true;
+			if(USE_POI_TYPES_TO_PARSE) {
+				text = poiTypes.isTextAdditionalInfo(e.getKey(), e.getValue()) ;
+			} else {
+				MapRulType rt = renderingTypes.getAmenityRuleType(e.getKey(), e.getValue());
+				if(rt == null && e.getKey().startsWith("name:")) {
+					continue;
+				} else if (rt == null) {
+					System.out.println(e.getKey() + " " + e.getValue());
+				}
+				text = !rt.isAdditional() ;
 			}
+			PoiAdditionalType rulType = getOrCreate(e.getKey(), e.getValue(), text);
 			if(!rulType.isText() ||  !Algorithms.isEmpty(e.getValue())) {
 				if(b.length() > 0){
 					b.append(SPECIAL_CHAR);
 				}
-				if(rulType.isAdditional() && rulType.getValue() == null) {
+				if(!rulType.isText() && rulType.getValue() == null) {
 					throw new IllegalStateException("Additional rule type '" + rulType.getTag() + "' should be encoded with value '"+e.getValue() +"'");
 				}
 				// avoid 0 (bug in jdk on macos)
-				b.append((char)((rulType.getInternalId()) + 1) ).append(e.getValue());
+				b.append((char)((rulType.getId()) + 1) ).append(e.getValue());
 			}
 		}
 		return b.toString();
 	}
 
-	private Map<MapRulType, String> decodeAdditionalInfo(String name, 
-			Map<MapRulType, String> tempNames) {
+	
+
+
+	private Map<PoiAdditionalType, String> decodeAdditionalInfo(String name, 
+			Map<PoiAdditionalType, String> tempNames) {
 		tempNames.clear();
 		if(name.length() == 0) {
 			return tempNames;
@@ -232,9 +262,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		while(true) {
 			i = name.indexOf(SPECIAL_CHAR, p);
 			String t = i == -1 ? name.substring(p) : name.substring(p, i);
-			MapRulType rulType = renderingTypes.getTypeByInternalId(t.charAt(0)-1);
+			PoiAdditionalType rulType = additionalTypesId.get(t.charAt(0)-1);
 			tempNames.put(rulType, t.substring(1));
-			if(rulType.isAdditional() && rulType.getValue() == null) {
+			if(!rulType.isText() && rulType.getValue() == null) {
 				throw new IllegalStateException("Additional rule type '" + rulType.getTag() + "' should be encoded with value '"+t.substring(1) +"'");
 			}
 			if(i == -1) {
@@ -286,7 +316,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	
 	public static class PoiCreatorCategories {
 		Map<String, Set<String>> categories = new HashMap<String, Set<String>>();
-		Set<MapRulType> additionalAttributes = new HashSet<MapRenderingTypes.MapRulType>();
+		Set<PoiAdditionalType> additionalAttributes = new HashSet<PoiAdditionalType>();
 		
 		
 		// build indexes to write  
@@ -308,9 +338,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			return subCat.contains(";") || subCat.contains(",");
 		}
 		
-		public void addCategory(String cat, String subCat, Map<MapRulType, String> additionalTags){
-			for (MapRulType rt : additionalTags.keySet()) {
-				if(rt.isAdditional() && rt.getValue() == null) {
+		public void addCategory(String cat, String subCat, Map<PoiAdditionalType, String> additionalTags){
+			for (PoiAdditionalType rt : additionalTags.keySet()) {
+				if(!rt.isText() && rt.getValue() == null) {
 					throw new NullPointerException("Null value for additional tag =" + rt.getTag());
 				}
 				additionalAttributes.add(rt);
@@ -363,11 +393,11 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					globalCategories.internalBuildType(cat, subcat, cachedCategoriesIds);
 				}
 			}
-			for(MapRulType rt : additionalAttributes){
-				if(rt.getTargetPoiId() == -1) {
+			for(PoiAdditionalType rt : additionalAttributes){
+				if(rt.getTargetId() == -1) {
 					throw new IllegalStateException("Map rule type is not registered for poi : " + rt);
 				}
-				cachedAdditionalIds.add(rt.getTargetPoiId());
+				cachedAdditionalIds.add(rt.getTargetId());
 			}
 		}
 
@@ -452,7 +482,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					String subtype = poi.subtype;
 					int x24shift = (x31 >> 7) - (x << (24 - z));
 					int y24shift = (y31 >> 7) - (y << (24 - z));
-					writer.writePoiDataAtom(poi.id, x24shift, y24shift, type, subtype, poi.additionalTags, renderingTypes, 
+					writer.writePoiDataAtom(poi.id, x24shift, y24shift, type, subtype, poi.additionalTags,  
 							globalCategories, ZIP_LONG_STRINGS ? ZIP_STRING_LIMIT : -1);	
 				}
 				
@@ -462,7 +492,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				prepareStatement.setInt(3, y << (31 - z));
 				prepareStatement.setInt(4, (y + 1) << (31 - z));
 				ResultSet rset = prepareStatement.executeQuery();
-				Map<MapRulType, String> mp = new HashMap<MapRulType, String>();
+				Map<PoiAdditionalType, String> mp = new HashMap<PoiAdditionalType, String>();
 				while (rset.next()) {
 					long id = rset.getLong(1);
 					int x31 = rset.getInt(2);
@@ -472,7 +502,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					String type = rset.getString(4);
 					String subtype = rset.getString(5);
 					writer.writePoiDataAtom(id, x24shift, y24shift,  type, subtype, 
-							decodeAdditionalInfo(rset.getString(6), mp), renderingTypes, globalCategories,
+							decodeAdditionalInfo(rset.getString(6), mp), globalCategories,
 							ZIP_LONG_STRINGS ? ZIP_STRING_LIMIT : -1);
 				}
 				rset.close();
@@ -484,6 +514,15 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 		writer.endWritePoiIndex();
 
+	}
+	
+	private PoiAdditionalType retrieveAdditionalType(String key) {
+		for (PoiAdditionalType t : additionalTypesId) {
+			if (Algorithms.objectEquals(t.getTag(), key)) {
+				return t;
+			}
+		}
+		return null;
 	}
 
 	private void processPOIIntoTree(Map<String, Set<PoiTileBox>> namesIndex, int zoomToStart, IntBbox bbox,
@@ -499,9 +538,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		int count = 0;
 		ConsoleProgressImplementation console = new ConsoleProgressImplementation();
 		console.startWork(1000000);
-		Map<MapRulType, String> additionalTags = new LinkedHashMap<MapRulType, String>();
-		MapRulType nameRuleType = renderingTypes.getNameRuleType();
-		MapRulType nameEnRuleType = renderingTypes.getNameEnRuleType();
+		Map<PoiAdditionalType, String> additionalTags = new LinkedHashMap<PoiAdditionalType, String>();
+		PoiAdditionalType nameRuleType = retrieveAdditionalType("name");
+		PoiAdditionalType nameEnRuleType = retrieveAdditionalType("name:en");
 		while (rs.next()) {
 			int x = rs.getInt(1);
 			int y = rs.getInt(2);
@@ -545,9 +584,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				prevTree = subtree;
 			}
 			Set<String> otherNames = null;
-			Iterator<Entry<MapRulType, String>> it = additionalTags.entrySet().iterator();
+			Iterator<Entry<PoiAdditionalType, String>> it = additionalTags.entrySet().iterator();
 			while (it.hasNext()) {
-				Entry<MapRulType, String> e = it.next();
+				Entry<PoiAdditionalType, String> e = it.next();
 				if (e.getKey().getTag().startsWith("name:") && !"name:en".equals(e.getKey().getTag())) {
 					if (otherNames == null) {
 						otherNames = new TreeSet<String>();
@@ -655,7 +694,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		String type;
 		String subtype;
 		long id;
-		Map<MapRulType, String> additionalTags = new HashMap<MapRulType, String>() ;
+		Map<PoiAdditionalType, String> additionalTags = new HashMap<PoiAdditionalType, String>() ;
 	}
 	
 	public static class PoiTileBox {
@@ -745,4 +784,64 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 	}
 
+	public static class PoiAdditionalType {
+		
+		private String tag;
+		private String value;
+		private boolean text;
+		private int usage;
+		private int targetId;
+		private int id;
+
+		public PoiAdditionalType(int id, String tag, String value, boolean text) {
+			this.id = id;
+			this.tag = tag;
+			this.text = text;
+			this.value = text ? null : value;
+		}
+		
+		public int getId() {
+			return id;
+		}
+
+		public boolean isText() {
+			return text;
+		}
+		
+		public void increment() {
+			usage++;
+		}
+		
+		public int getTargetId() {
+			return targetId;
+		}
+		
+		public int getUsage() {
+			return usage;
+		}
+		
+		public String getTag() {
+			return tag;
+		}
+		
+		public String getValue() {
+			return value;
+		}
+		
+		
+		public static String getKey(String tag, String value, boolean text) {
+			return text ? tag : tag +"/" + value;
+		}
+
+		public void setTargetPoiId(int catId, int valueId) {
+			if(catId <= 31) {
+				this.targetId  = (valueId << 6) | (catId << 1) ; 
+			} else {
+				if(catId > (1 << 15)) {
+					throw new IllegalArgumentException("Refer source code");
+				}
+				this.targetId  = (valueId << 16) | (catId << 1) | 1;
+			}
+		}
+	}
 }
