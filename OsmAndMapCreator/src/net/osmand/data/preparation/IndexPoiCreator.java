@@ -27,7 +27,6 @@ import net.osmand.IProgress;
 import net.osmand.IndexConstants;
 import net.osmand.binary.BinaryMapPoiReaderAdapter;
 import net.osmand.data.Amenity;
-import net.osmand.data.AmenityType;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.MapRenderingTypes.MapRulType;
@@ -49,7 +48,7 @@ import org.apache.commons.logging.LogFactory;
 public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 	private static final Log log = LogFactory.getLog(IndexPoiCreator.class);
-	public static final boolean USE_POI_TYPES_TO_PARSE = false;
+	public static final boolean USE_POI_TYPES_TO_PARSE = true;
 
 	private Connection poiConnection;
 	private File poiIndexFile;
@@ -128,11 +127,13 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	public void iterateRelation(Relation e, OsmDbAccessorContext ctx) throws SQLException {
 		Map<String, String> tags = renderingTypes.transformTags(e.getTags(), EntityType.RELATION, EntityConvertApplyType.POI);
 		for (String t : tags.keySet()) {
-			AmenityType type =
-					USE_POI_TYPES_TO_PARSE ? 
-						poiTypes.getAmenityTypeForRelation(t, tags.get(t), Algorithms.isEmpty(tags.get("name"))) :
-						renderingTypes.getAmenityTypeForRelation(t, tags.get(t), Algorithms.isEmpty(tags.get("name")));
-			if (type != null) {	
+			boolean index = false;
+			if(USE_POI_TYPES_TO_PARSE) {
+				index = poiTypes.parseAmenity(t, tags.get(t), true, tags) != null;
+			} else {
+				index = renderingTypes.getAmenityTypeForRelation(t, tags.get(t), Algorithms.isEmpty(tags.get("name"))) != null;
+			}
+			if (index) {	
 				ctx.loadEntityRelation(e);
 				for (EntityId id : ((Relation) e).getMembersMap().keySet()) {
 					if (!propogatedTags.containsKey(id)) {
