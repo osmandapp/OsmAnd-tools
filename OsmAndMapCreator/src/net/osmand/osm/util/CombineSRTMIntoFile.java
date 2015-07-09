@@ -15,9 +15,11 @@ import javax.xml.stream.XMLStreamException;
 import net.osmand.IndexConstants;
 import net.osmand.PlatformUtil;
 import net.osmand.binary.BinaryMapDataObject;
+import net.osmand.data.LatLon;
 import net.osmand.data.Multipolygon;
 import net.osmand.data.MultipolygonBuilder;
 import net.osmand.data.QuadRect;
+import net.osmand.data.Ring;
 import net.osmand.data.preparation.DBDialect;
 import net.osmand.data.preparation.IndexCreator;
 import net.osmand.data.preparation.MapZooms;
@@ -27,6 +29,7 @@ import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Way;
 import net.osmand.util.Algorithms;
+import net.osmand.util.MapAlgorithms;
 import net.osmand.util.MapUtils;
 
 import org.apache.commons.logging.Log;
@@ -69,10 +72,12 @@ public class CombineSRTMIntoFile {
 				bnds.get(fullName).add(rc);
 			}
 		}
+		int cnt = 1;
 		for(BinaryMapDataObject rc : r) {
 			if(rc.containsAdditionalType(srtm)) {
 				String dw = rc.getNameByType(downloadName);
 				String fullName = rc.getNameByType(regionFullName);
+				System.out.println("Region " + fullName +" " + cnt++ + " out of " + r.size());
 				process(rc, bnds.get(fullName), dw, directoryWithSRTMFiles, directoryWithTargetFiles);
 			}
 		}
@@ -100,15 +105,44 @@ public class CombineSRTMIntoFile {
 			}
 		}
 		Multipolygon polygon  = bld.build();
-		System.out.println(polygon.areRingsComplete());
+		System.out.println("RINGS OF MULTIPOLYGON ARE " + polygon.areRingsComplete());
 		int rightLon = (int) Math.floor(qr.right);
 		int leftLon = (int) Math.floor(qr.left);
 		int bottomLat = (int) Math.floor(qr.bottom);
 		int topLat = (int) Math.floor(qr.top);
 		for(int lon = leftLon; lon <= rightLon; lon++) {
 			for(int lat = bottomLat; lat <= topLat; lat++) {
-				final String filename = getFileName(lon, lat);
-				srtmFileNames.add(filename);
+				boolean isOut = !polygon.containsPoint(lat + 0.5, lon + 0.5);
+				if (isOut) {
+					LatLon bl = new LatLon(lat, lon);
+					LatLon br = new LatLon(lat, lon + 1);
+					LatLon tr = new LatLon(lat + 1, lon + 1);
+					LatLon tl = new LatLon(lat + 1, lon);
+					for (Ring r : polygon.getOuterRings()) {
+						List<Node> border = r.getBorder();
+						Node prev = border.get(border.size() - 1);
+						for (int i = 0; i < border.size() && isOut; i++) {
+							Node n = border.get(i);
+							if(MapAlgorithms.linesIntersect(prev.getLatLon(), n.getLatLon(), tr, tl)) {
+								isOut = false;
+							} else if(MapAlgorithms.linesIntersect(prev.getLatLon(), n.getLatLon(), tr, br)) {
+								isOut = false;
+							} else if(MapAlgorithms.linesIntersect(prev.getLatLon(), n.getLatLon(), bl, tl)) {
+								isOut = false;
+							} else if(MapAlgorithms.linesIntersect(prev.getLatLon(), n.getLatLon(), br, bl)) {
+								isOut = false;
+							} 
+							prev = n;
+						}
+						if(!isOut) {
+							break;
+						}
+					}
+				}
+				if(!isOut) {
+					final String filename = getFileName(lon, lat);
+					srtmFileNames.add(filename);
+				}
 			}
 		}
 		System.out.println();
