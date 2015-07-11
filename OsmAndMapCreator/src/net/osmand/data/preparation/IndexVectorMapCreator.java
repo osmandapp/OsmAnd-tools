@@ -427,24 +427,21 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 				ResultSet fs = endStat.executeQuery();
 				readLowLevelCandidates(fs, candidates, temp, tempAdd, visitedWays);
 				fs.close();
-				if(candidates.size() > 0) {
-					Collections.sort(candidates, cmpCandidates);
-					LowLevelWayCandidate cand = candidates.get(0);
-					if(cand.namesCount > 0) {
-						combined = true;
-						startNode = cand.otherNodeId;
-						visitedWays.add(cand.wayId);
-						loadNodes(cand.nodes, list);
-						ArrayList<Float> li = new ArrayList<Float>(list);
-						// remove first lat/lon point
-						wayNodes.remove(0);
-						wayNodes.remove(0);
-						li.addAll(wayNodes);
-						wayNodes = li;
-						for (MapRulType rt : new ArrayList<MapRulType>(namesUse.keySet())) {
-							if(!Algorithms.objectEquals(namesUse.get(rt), cand.names.get(rt))){
-								namesUse.remove(rt);
-							}
+				LowLevelWayCandidate cand = getCandidate(candidates, cmpCandidates);
+				if (cand != null) {
+					combined = true;
+					startNode = cand.otherNodeId;
+					visitedWays.add(cand.wayId);
+					loadNodes(cand.nodes, list);
+					ArrayList<Float> li = new ArrayList<Float>(list);
+					// remove first lat/lon point
+					wayNodes.remove(0);
+					wayNodes.remove(0);
+					li.addAll(wayNodes);
+					wayNodes = li;
+					for (MapRulType rt : new ArrayList<MapRulType>(namesUse.keySet())) {
+						if (!Algorithms.objectEquals(namesUse.get(rt), cand.names.get(rt))) {
+							namesUse.remove(rt);
 						}
 					}
 				}
@@ -459,21 +456,18 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 				ResultSet fs = startStat.executeQuery();
 				readLowLevelCandidates(fs, candidates, temp, tempAdd, visitedWays);
 				fs.close();
-				if(candidates.size() > 0) {
-					Collections.sort(candidates, cmpCandidates);
-					LowLevelWayCandidate cand = candidates.get(0);
-					if(cand.namesCount > 0) {
-						combined = true;
-						endNode = cand.otherNodeId;
-						visitedWays.add(cand.wayId);
-						loadNodes(cand.nodes, list);
-						for (int i = 2; i < list.size(); i++) {
-							wayNodes.add(list.get(i));
-						}
-						for (MapRulType rt : new ArrayList<MapRulType>(namesUse.keySet())) {
-							if(!Algorithms.objectEquals(namesUse.get(rt), cand.names.get(rt))){
-								namesUse.remove(rt);
-							}
+				LowLevelWayCandidate cand = getCandidate(candidates, cmpCandidates);
+				if (cand != null) {
+					combined = true;
+					endNode = cand.otherNodeId;
+					visitedWays.add(cand.wayId);
+					loadNodes(cand.nodes, list);
+					for (int i = 2; i < list.size(); i++) {
+						wayNodes.add(list.get(i));
+					}
+					for (MapRulType rt : new ArrayList<MapRulType>(namesUse.keySet())) {
+						if (!Algorithms.objectEquals(namesUse.get(rt), cand.names.get(rt))) {
+							namesUse.remove(rt);
 						}
 					}
 				}
@@ -506,6 +500,22 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 
 		}
 
+	}
+
+	private LowLevelWayCandidate getCandidate(List<LowLevelWayCandidate> candidates,
+			Comparator<LowLevelWayCandidate> cmpCandidates) {
+		if(candidates.size() > 0) {
+			Collections.sort(candidates, cmpCandidates);
+			LowLevelWayCandidate cand = candidates.get(0);
+			if(cand.namesCount > 0) {
+				return cand;
+			}
+			if(cand.names.isEmpty() && namesUse.isEmpty()) {
+				return cand;
+			}
+			
+		}
+		return null;
 	}
 
 	public static boolean checkForSmallAreas(List<Node> nodes, int zoom, int minz, int maxz) {
