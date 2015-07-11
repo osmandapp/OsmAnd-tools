@@ -844,8 +844,8 @@ public class IndexCreator {
 				new MapRenderingTypesEncoder(rootFolder + "/repos//resources/obf_creation/rendering_types.xml");
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 
-//		String file = rootFolder + "/temp/map.osm";
-		String file = rootFolder + "/temp/andorra-latest.osm.pbf";
+		String file = rootFolder + "/temp/map.osm";
+//		String file = rootFolder + "/temp/andorra-latest.osm.pbf";
 //		String file = rootFolder + "/repos/resources/synthetic_test_rendering.osm";
 
 		int st = file.lastIndexOf('/');

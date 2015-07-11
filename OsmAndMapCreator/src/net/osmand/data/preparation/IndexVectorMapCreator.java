@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -332,6 +333,41 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		}
 		ts.sort();
 	}
+	
+	private static class LowLevelWayCandidate {
+		public byte[] nodes;
+		public long wayId;
+		public long otherNodeId;
+		public Map<MapRulType, String> names;
+		public int namesCount = 0;
+		
+		
+	}
+	
+	public List<LowLevelWayCandidate> readLowLevelCandidates(ResultSet fs, 
+			List<LowLevelWayCandidate> l, TIntArrayList temp, TIntArrayList tempAdd, TLongHashSet visitedWays) throws SQLException {
+		l.clear();
+		while (fs.next()) {
+			if (!visitedWays.contains(fs.getLong(1))) {
+				parseAndSort(temp, fs.getBytes(6));
+				parseAndSort(tempAdd, fs.getBytes(7));
+				if(temp.equals(typeUse) && tempAdd.equals(addtypeUse)){
+					LowLevelWayCandidate llwc = new LowLevelWayCandidate();
+					llwc.wayId = fs.getLong(1);
+					llwc.names = decodeNames(fs.getString(5), new HashMap<MapRulType, String>());
+					llwc.nodes = fs.getBytes(4);
+					llwc.otherNodeId = fs.getLong(2);
+					for(MapRulType mr : namesUse.keySet()) {
+						if(Algorithms.objectEquals(namesUse.get(mr), llwc.names.get(mr))) {
+							llwc.namesCount++;
+						}
+					}
+					l.add(llwc);
+				}
+			}
+		}	
+		return l;
+	}
 
 	public void processingLowLevelWays(IProgress progress) throws SQLException {
 		mapLowLevelBinaryStat.executeBatch();
@@ -350,9 +386,6 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		ArrayList<Float> list = new ArrayList<Float>(100);
 		TIntArrayList temp = new TIntArrayList();
 		TIntArrayList tempAdd = new TIntArrayList();
-		TreeMap<MapRulType, String> names = new TreeMap<MapRulType, String>(comparator);
-		TreeMap<MapRulType, String> names2 = new TreeMap<MapRulType, String>(comparator);
-		MapRulType refRuleType = renderingTypes.getEncodingRuleTypes().get("ref");
 		while (rs.next()) {
 			if (lowLevelWays != -1) {
 				progress.progress(1);
@@ -369,10 +402,8 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			long startNode = rs.getLong(2);
 			long endNode = rs.getLong(3);
 
-			names.clear();
-			decodeNames(rs.getString(5), names);
-			String name = names.get(renderingTypes.getNameRuleType());
-			String ref = names.get(refRuleType);
+			namesUse.clear();
+			decodeNames(rs.getString(5), namesUse);
 			parseAndSort(typeUse, rs.getBytes(6));
 			parseAndSort(addtypeUse, rs.getBytes(7));
 			
@@ -381,42 +412,42 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 
 			// combine startPoint with EndPoint
 			boolean combined = true;
+			List<LowLevelWayCandidate> candidates = new ArrayList<LowLevelWayCandidate>();
+			Comparator<LowLevelWayCandidate> cmpCandidates = new Comparator<LowLevelWayCandidate>() {
+				@Override
+				public int compare(LowLevelWayCandidate o1, LowLevelWayCandidate o2) {
+					return -Integer.compare(o1.namesCount, o2.namesCount);
+				}
+			};
+			
 			while (combined) {
 				combined = false;
 				endStat.setLong(1, startNode);
 				endStat.setShort(2, (short) level);
 				ResultSet fs = endStat.executeQuery();
-				// search by exact name
-				while (fs.next() && !combined) {
-					if (!visitedWays.contains(fs.getLong(1))) {
-						parseAndSort(temp, fs.getBytes(6));
-						parseAndSort(tempAdd, fs.getBytes(7));
-						if(temp.equals(typeUse) && tempAdd.equals(addtypeUse)){
-							combined = true;
-							long lid = fs.getLong(1);
-							startNode = fs.getLong(2);
-							visitedWays.add(lid);
-							loadNodes(fs.getBytes(4), list);
-							names2.clear();
-							decodeNames(fs.getString(5), names2);
-							String name2 = names2.get(renderingTypes.getNameRuleType());
-							if(!Algorithms.objectEquals(name2, name)){
-								name = null;
+				readLowLevelCandidates(fs, candidates, temp, tempAdd, visitedWays);
+				fs.close();
+				if(candidates.size() > 0) {
+					Collections.sort(candidates, cmpCandidates);
+					LowLevelWayCandidate cand = candidates.get(0);
+					if(cand.namesCount > 0) {
+						combined = true;
+						startNode = cand.otherNodeId;
+						visitedWays.add(cand.wayId);
+						loadNodes(cand.nodes, list);
+						ArrayList<Float> li = new ArrayList<Float>(list);
+						// remove first lat/lon point
+						wayNodes.remove(0);
+						wayNodes.remove(0);
+						li.addAll(wayNodes);
+						wayNodes = li;
+						for (MapRulType rt : new ArrayList<MapRulType>(namesUse.keySet())) {
+							if(!Algorithms.objectEquals(namesUse.get(rt), cand.names.get(rt))){
+								namesUse.remove(rt);
 							}
-							String ref2 = names2.get(refRuleType);
-							if(!Algorithms.objectEquals(ref2, name)){
-								ref = null;
-							}
-							ArrayList<Float> li = new ArrayList<Float>(list);
-							// remove first lat/lon point
-							wayNodes.remove(0);
-							wayNodes.remove(0);
-							li.addAll(wayNodes);
-							wayNodes = li;
 						}
 					}
 				}
-				fs.close();
 			}
 
 			// combined end point
@@ -426,33 +457,26 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 				startStat.setLong(1, endNode);
 				startStat.setShort(2, (short) level);
 				ResultSet fs = startStat.executeQuery();
-				while (fs.next() && !combined) {
-					if (!visitedWays.contains(fs.getLong(1))) {
-						parseAndSort(temp, fs.getBytes(6));
-						parseAndSort(tempAdd, fs.getBytes(7));
-						if(temp.equals(typeUse) && tempAdd.equals(addtypeUse)){
-							combined = true;
-							long lid = fs.getLong(1);
-							names2.clear();
-							decodeNames(fs.getString(5), names2);
-							String name2 = names2.get(renderingTypes.getNameRuleType());
-							if (!Algorithms.objectEquals(name2, name)) {
-								name = null;
-							}
-							String ref2 = names2.get(refRuleType);
-							if(!Algorithms.objectEquals(ref2, name)){
-								ref = null;
-							}
-							endNode = fs.getLong(3);
-							visitedWays.add(lid);
-							loadNodes(fs.getBytes(4), list);
-							for (int i = 2; i < list.size(); i++) {
-								wayNodes.add(list.get(i));
+				readLowLevelCandidates(fs, candidates, temp, tempAdd, visitedWays);
+				fs.close();
+				if(candidates.size() > 0) {
+					Collections.sort(candidates, cmpCandidates);
+					LowLevelWayCandidate cand = candidates.get(0);
+					if(cand.namesCount > 0) {
+						combined = true;
+						endNode = cand.otherNodeId;
+						visitedWays.add(cand.wayId);
+						loadNodes(cand.nodes, list);
+						for (int i = 2; i < list.size(); i++) {
+							wayNodes.add(list.get(i));
+						}
+						for (MapRulType rt : new ArrayList<MapRulType>(namesUse.keySet())) {
+							if(!Algorithms.objectEquals(namesUse.get(rt), cand.names.get(rt))){
+								namesUse.remove(rt);
 							}
 						}
 					}
 				}
-				fs.close();
 			}
 
 			List<Node> wNodes = new ArrayList<Node>();
@@ -474,18 +498,6 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 				List<Node> res = new ArrayList<Node>();
 				OsmMapUtils.simplifyDouglasPeucker(wNodes, zoom - 1 + 8 + zoomWaySmothness, 3, res, false);
 				if (res.size() > 0) {
-					namesUse.clear();
-					for (MapRulType rt : names.keySet()) {
-						if (rt.getTag().startsWith("name")) {
-							if (name != null && name.length() > 0) {
-								namesUse.put(rt, names.get(rt));
-							}
-						} else if (rt.getTag().equals("ref")) {
-							if (ref != null && ref.length() > 0) {
-								namesUse.put(rt, names.get(rt));
-							}
-						}
-					}
 					insertBinaryMapRenderObjectIndex(mapTree[level], res, null, namesUse, id, false, typeUse, addtypeUse, false);
 				}
 			}
@@ -668,7 +680,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		return b.toString();
 	}
 
-	private void decodeNames(String name, Map<MapRulType, String> tempNames) {
+	private Map<MapRulType, String> decodeNames(String name, Map<MapRulType, String> tempNames) {
 		int i = name.indexOf(SPECIAL_CHAR);
 		while (i != -1) {
 			int n = name.indexOf(SPECIAL_CHAR, i + 2);
@@ -681,6 +693,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			}
 			i = n;
 		}
+		return tempNames;
 	}
 
 	public void writeBinaryMapBlock(rtree.Node parent, Rect parentBounds, RTree r, BinaryMapIndexWriter writer, PreparedStatement selectData,
