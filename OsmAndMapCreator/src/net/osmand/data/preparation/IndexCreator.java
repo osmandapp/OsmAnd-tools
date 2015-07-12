@@ -11,6 +11,7 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.zip.GZIPInputStream;
 
 import net.osmand.IProgress;
 import net.osmand.IndexConstants;
@@ -272,6 +273,8 @@ public class IndexCreator {
 			} else {
 				stream = new CBZip2InputStream(stream);
 			}
+		} else if (readFile.getName().endsWith(".gz")) { //$NON-NLS-1$
+			stream = new GZIPInputStream(stream);
 		} else if (readFile.getName().endsWith(".pbf")) { //$NON-NLS-1$
 			pbfFile = true;
 		}
@@ -408,7 +411,10 @@ public class IndexCreator {
 		try {
 			
 			final BasemapProcessor processor = new BasemapProcessor(logMapDataWarn, mapZooms, renderingTypes, zoomWaySmothness);
-			
+			final IndexPoiCreator poiCreator = indexPOI ? new IndexPoiCreator(renderingTypes) : null;
+			if(indexPOI) {
+				poiCreator.createDatabaseStructure(new File(workingDir, getPoiFileName()));
+			}
 			for (File readFile : readFiles) {
 				OsmDbAccessor accessor = new OsmDbAccessor();
 				createPlainOsmDb(accessor, progress, readFile, addFilter, true, 0, 0);
@@ -420,6 +426,9 @@ public class IndexCreator {
 					@Override
 					public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 						processor.processEntity(e);
+						if(indexPOI) {
+							poiCreator.iterateEntity(e, ctx);
+						}
 					}
 				});
 				setGeneralProgress(progress,"[70 / 100]");
@@ -428,6 +437,9 @@ public class IndexCreator {
 					@Override
 					public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 						processor.processEntity(e);
+						if(indexPOI) {
+							poiCreator.iterateEntity(e, ctx);
+						}
 					}
 				});
 				setGeneralProgress(progress,"[90 / 100]");
@@ -438,6 +450,9 @@ public class IndexCreator {
 					public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 						ctx.loadEntityRelation((Relation) e);
 						processor.processEntity(e);
+						if(indexPOI) {
+							poiCreator.iterateEntity(e, ctx);
+						}
 					}
 				});
 				accessor.closeReadingConnection();
@@ -456,6 +471,9 @@ public class IndexCreator {
 			setGeneralProgress(progress,"[95 of 100]");
 			progress.startTask("Writing map index to binary file...", -1);
 			processor.writeBasemapFile(writer, regionName);
+			if(indexPOI) {
+				poiCreator.writeBinaryPoiIndex(writer, regionName, progress);
+			}
 			progress.finishTask();
 			writer.close();
 			mapRAFile.close();
@@ -830,9 +848,9 @@ public class IndexCreator {
 		IndexPoiCreator.ZIP_LONG_STRINGS = false;
 		IndexCreator creator = new IndexCreator(new File(rootFolder + "/osm-gen/")); //$NON-NLS-1$
 		creator.setIndexMap(true);
-		creator.setIndexAddress(true);
+//		creator.setIndexAddress(true);
 		creator.setIndexPOI(true);
-		creator.setIndexTransport(true);
+//		creator.setIndexTransport(true);
 		creator.setIndexRouting(true);
 
 //		creator.deleteDatabaseIndexes = false;
@@ -844,7 +862,8 @@ public class IndexCreator {
 				new MapRenderingTypesEncoder(rootFolder + "/repos//resources/obf_creation/rendering_types.xml");
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 
-		String file = rootFolder + "/temp/map.osm";
+//		String file = rootFolder + "/temp/map.osm";
+		String file = rootFolder + "/temp/032.osc.gz";
 //		String file = rootFolder + "/temp/andorra-latest.osm.pbf";
 //		String file = rootFolder + "/repos/resources/synthetic_test_rendering.osm";
 

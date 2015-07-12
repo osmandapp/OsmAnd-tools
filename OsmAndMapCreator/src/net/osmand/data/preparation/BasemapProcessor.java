@@ -688,46 +688,45 @@ public class BasemapProcessor {
     public static void main(String[] p) throws InterruptedException, SAXException, SQLException, IOException, XMLStreamException {
         if (p.length == 0) {
 	        System.out.println("Please specify folder with basemap *.osm or *.osm.bz2 files");
-        } else {
-            boolean mini = false;
-            long time = System.currentTimeMillis();
-            MapRenderingTypesEncoder rt = MapRenderingTypesEncoder.getDefault();
-            // BASEMAP generation
-            File folder = new File(p[0]);
-            if (p.length >= 2 && p[1].equals("mini")) {
-            	mini = true;
-            }
-//            MapZooms zooms = MapZooms.parseZooms("1-2;3;4-5;6-7;8-9;10-");
-            int zoomSmoothness = mini ? 2 : 2;
-	        MapZooms zooms = mini ? MapZooms.parseZooms("1-2;3;4-5;6-") : MapZooms.parseZooms("1-2;3;4-5;6-7;8;9-");
-	        MOST_DETAILED_APPROXIMATION = mini ? 6 : 11; 
-            IndexCreator creator = new IndexCreator(folder); //$NON-NLS-1$
-	    creator.setDialects(DBDialect.SQLITE_IN_MEMORY, DBDialect.SQLITE_IN_MEMORY);
-            creator.setIndexMap(true);
-            creator.setIndexPOI(mini ? false : true);
-	    creator.setZoomWaySmothness(zoomSmoothness);
-            creator.setMapFileName(mini?"World_basemap_mini_test_2.obf":"World_basemap_2.obf");
-            ArrayList<File> src = new ArrayList<File>();
-            for (File f : folder.listFiles()) {
-                if (f.getName().endsWith(".osm") || f.getName().endsWith(".osm.bz2")) {
-                    src.add(f);
-                }
-            }
+		} else {
+			boolean mini = false;
+			long time = System.currentTimeMillis();
+			MapRenderingTypesEncoder rt = MapRenderingTypesEncoder.getDefault();
+			// BASEMAP generation
+			File folder = new File(p[0]);
+			if (p.length >= 2 && p[1].equals("mini")) {
+				mini = true;
+			}
+			// MapZooms zooms = MapZooms.parseZooms("1-2;3;4-5;6-7;8-9;10-");
+			int zoomSmoothness = mini ? 2 : 2;
+			MapZooms zooms = mini ? MapZooms.parseZooms("1-2;3;4-5;6-") : MapZooms.parseZooms("1-2;3;4-5;6-7;8;9-");
+			MOST_DETAILED_APPROXIMATION = mini ? 6 : 11;
+			IndexCreator creator = new IndexCreator(folder); //$NON-NLS-1$
+			creator.setDialects(DBDialect.SQLITE_IN_MEMORY, DBDialect.SQLITE_IN_MEMORY);
+			creator.setIndexMap(true);
+			creator.setIndexPOI(mini ? false : true);
+			creator.setZoomWaySmothness(zoomSmoothness);
+			creator.setMapFileName(mini ? "World_basemap_mini_test_2.obf" : "World_basemap_2.obf");
+			ArrayList<File> src = new ArrayList<File>();
+			for (File f : folder.listFiles()) {
+				if (f.getName().endsWith(".osm") || f.getName().endsWith(".osm.bz2")) {
+					src.add(f);
+				}
+			}
 
-            // BASEMAP generation
-            //		creator.generateBasemapIndex(new ConsoleProgressImplementation(1), null, zooms, rt, log, "basemap",
-            //				new File(basemapParent, "10m_coastline_out_fix_caspean_arctic.osm")
-            //                ,new File(basemapParent, "roads_gen.osm")
-            //				,new File(basemapParent, "10m_admin_level.osm")
-            //				,new File(basemapParent, "10m_rivers.osm")
-            //				,new File(basemapParent, "10m_lakes.osm")
-            //				,new File(basemapParent, "10m_populated_places.osm")
-            //		);
+			// BASEMAP generation
+			// creator.generateBasemapIndex(new ConsoleProgressImplementation(1), null, zooms, rt, log, "basemap",
+			// new File(basemapParent, "10m_coastline_out_fix_caspean_arctic.osm")
+			// ,new File(basemapParent, "roads_gen.osm")
+			// ,new File(basemapParent, "10m_admin_level.osm")
+			// ,new File(basemapParent, "10m_rivers.osm")
+			// ,new File(basemapParent, "10m_lakes.osm")
+			// ,new File(basemapParent, "10m_populated_places.osm")
+			// );
 
-            creator.generateBasemapIndex(new ConsoleProgressImplementation(1), null, zooms, rt, log, "basemap",
-                    src.toArray(new File[src.size()])
-            );
-        }
+			creator.generateBasemapIndex(new ConsoleProgressImplementation(1), null, zooms, rt, log, "basemap",
+					src.toArray(new File[src.size()]));
+		}
     }
 
 

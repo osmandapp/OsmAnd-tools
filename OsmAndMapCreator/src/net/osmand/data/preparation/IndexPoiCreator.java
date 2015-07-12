@@ -161,28 +161,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		Algorithms.removeAllFiles(poiIndexFile);
 	}
 
-	public void checkEntity(Entity e) {
-		String name = e.getTag(OSMTagKey.NAME);
-		if (name == null) {
-			String msg = "";
-			Collection<String> keys = e.getTagKeySet();
-			int cnt = 0;
-			for (Iterator<String> iter = keys.iterator(); iter.hasNext();) {
-				String key = iter.next();
-				if (key.startsWith("name:") && key.length() <= 8) {
-					// ignore specialties like name:botanical
-					if (cnt == 0)
-						msg += "Entity misses default name tag, but it has localized name tag(s):\n";
-					msg += key + "=" + e.getTag(key) + "\n";
-					cnt++;
-				}
-			}
-			if (cnt > 0) {
-				msg += "Consider adding the name tag at " + e.getOsmUrl();
-				log.warn(msg);
-			}
-		}
-	}
 
 	private void insertAmenityIntoPoi(Amenity amenity) throws SQLException {
 		assert IndexConstants.POI_TABLE != null : "use constants here to show table usage "; //$NON-NLS-1$
@@ -615,7 +593,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		log.info("Poi processing finished");
 	}
 	
-	public void addNamePrefix(String name, String nameEn, PoiTileBox data, Map<String, Set<PoiTileBox>> poiData,
+	private void addNamePrefix(String name, String nameEn, PoiTileBox data, Map<String, Set<PoiTileBox>> poiData,
 			Set<String> names) {
 		if (name != null) {
 			parsePrefix(name, data, poiData);

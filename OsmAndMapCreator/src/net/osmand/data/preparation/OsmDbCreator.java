@@ -34,7 +34,8 @@ public class OsmDbCreator implements IOsmStorageFilter {
 
 	private static final Log log = LogFactory.getLog(OsmDbCreator.class);
 
-	public static final int BATCH_SIZE_OSM = 100000;
+	//public static final int BATCH_SIZE_OSM = 100000;
+	public static final int BATCH_SIZE_OSM = 1;
 
 	// do not store these tags in the database, just ignore them
 	final String[] tagsToIgnore= {"created_by","source","converted_by"};

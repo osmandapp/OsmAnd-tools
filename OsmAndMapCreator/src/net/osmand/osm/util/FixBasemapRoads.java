@@ -295,17 +295,12 @@ public class FixBasemapRoads {
         for(String ref : roadInfoMap.keySet()){
             RoadInfo ri = roadInfoMap.get(ref);
             // combine unique roads
-
             combineUniqueIdentifyRoads(ri);
             reverseWrongPositionedRoads(ri);
             combineUniqueIdentifyRoads(ri);
-
             // last step not definite
             combineIntoLongestRoad(ri);
-
             combineRoadsWithCut(ri);
-
-
             for(RoadLine ls :  ri.roadLines) {
                 if(ls.distance > MINIMAL_DISTANCE ){
                     ls.combineWaysIntoOneWay();
@@ -454,38 +449,35 @@ public class FixBasemapRoads {
     }
 
 
-    private void processWay(Way way) {
-        String ref = way.getTag("ref");
-        if(way.getFirstNodeId() == way.getLastNodeId()) {
-            TLongArrayList connectionIds = new TLongArrayList(way.getNodeIds());
-            for(int i = 0; i <connectionIds.size(); i++) {
-                roundabouts.put(connectionIds.get(i), connectionIds);
-            }
-            return;
-        }
-	    if(ref == null || ref.isEmpty()) {
-		    ref = way.getTag("name");
-	    } else {
-		    // fix road inconsistency
-		    ref = ref.replace('-', ' ');
-		    if(ref.indexOf(';') != -1) {
-			    ref = ref.substring(0, ref.indexOf(';'));
-		    }
-	    }
-	    if(ref == null || ref.isEmpty()) {
-		    LatLon lt = way.getLatLon();
-		    ref = ((int)MapUtils.getTileNumberY(4, lt.getLatitude())) + " " + ((int)MapUtils.getTileNumberX(4, lt.getLongitude()));
-	    }
+	private void processWay(Way way) {
+		String ref = way.getTag("ref");
+		if (way.getFirstNodeId() == way.getLastNodeId()) {
+			TLongArrayList connectionIds = new TLongArrayList(way.getNodeIds());
+			for (int i = 0; i < connectionIds.size(); i++) {
+				roundabouts.put(connectionIds.get(i), connectionIds);
+			}
+			return;
+		}
+		if (ref == null || ref.isEmpty()) {
+			ref = way.getTag("name");
+		} else {
+			// fix road inconsistency
+			ref = ref.replace('-', ' ');
+			if (ref.indexOf(';') != -1) {
+				ref = ref.substring(0, ref.indexOf(';'));
+			}
+		}
+		if (ref == null || ref.isEmpty()) {
+			LatLon lt = way.getLatLon();
+			ref = ((int) MapUtils.getTileNumberY(4, lt.getLatitude())) + " "
+					+ ((int) MapUtils.getTileNumberX(4, lt.getLongitude()));
+		}
 
-        if(ref != null && !ref.isEmpty()) {
-            if(!roadInfoMap.containsKey(ref)) {
-                roadInfoMap.put(ref, new RoadInfo());
-            }
-	        RoadInfo ri = roadInfoMap.get(ref);
-	        ri.registerRoadLine(new RoadLine(way));
-        }
-
-
-    }
+		if (!roadInfoMap.containsKey(ref)) {
+			roadInfoMap.put(ref, new RoadInfo());
+		}
+		RoadInfo ri = roadInfoMap.get(ref);
+		ri.registerRoadLine(new RoadLine(way));
+	}
 
 }
