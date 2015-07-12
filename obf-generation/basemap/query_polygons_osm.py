@@ -22,7 +22,7 @@ def process_polygons(tags, filename):
 	conn_string = "host='127.0.0.1' dbname='gis' user='gisuser' password='gisuser' port='5432'"
 	f = open(filename,'w')
 	f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
-	f.write('<osm version="0.5">\n')
+	f.write('<osm version="0.6">\n')
  
 	conn = psycopg2.connect(conn_string)
 	cursor = conn.cursor()
@@ -135,7 +135,7 @@ def process_polygons(tags, filename):
 				else:
 					xml += '\t<member type="way" ref="%s" role="inner" />\n' % (way_id)
 	
-				way_xml += '\n<way id="%s" >\n' % (way_id)
+				way_xml += '\n<way version="1" id="%s" >\n' % (way_id)
 				if admin_level:
 					way_xml += tags_xml
 				first_node_id = 0

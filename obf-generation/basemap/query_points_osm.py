@@ -22,7 +22,7 @@ def process_points(cond, filename, array):
 	f = open(filename,'w')
 	conn_string = "host='127.0.0.1' dbname='gis' user='gisuser' password='gisuser' port='5432'"
 	f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
-	f.write('<osm version="0.5">\n')
+	f.write('<osm version="0.6">\n')
  
 	conn = psycopg2.connect(conn_string)
 	cursor = conn.cursor()
@@ -61,7 +61,7 @@ def process_points(cond, filename, array):
 	for row in cursor:
 		node_id = row[1] #node_id - 1
 		match = parse.search(row[0])
-		xml = '\n<node id="%s" lat="%s" lon="%s">\n' % (node_id, match.groups()[1], match.groups()[0])
+		xml = '\n<node version="1" id="%s" lat="%s" lon="%s">\n' % (node_id, match.groups()[1], match.groups()[0])
 		base = shift
 		while base - shift < len(array):
 			if row[base] is not None:
