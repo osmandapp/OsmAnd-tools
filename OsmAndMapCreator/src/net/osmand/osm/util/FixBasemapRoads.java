@@ -463,9 +463,12 @@ public class FixBasemapRoads {
             }
             return;
         }
-	    if(ref == null || ref.isEmpty()) {
-		    ref = way.getTag("name");
-	    } else {
+        if(ref == null || ref.isEmpty()) {
+		ref = way.getTag("int_ref");
+        }
+	if(ref == null || ref.isEmpty()) {
+		ref = way.getTag("name");
+	} else {
 		    // fix road inconsistency
 		    ref = ref.replace('-', ' ');
 		    if(ref.indexOf(';') != -1) {

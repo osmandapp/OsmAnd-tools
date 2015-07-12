@@ -74,7 +74,7 @@ public class MainUtilities {
 
 	private static void generateObf(String[] subArgsArray, IndexCreator ic) throws IOException, SAXException,
 			SQLException, InterruptedException {
-		ic.generateIndexes(new File(subArgsArray[1]),
+		ic.generateIndexes(new File(subArgsArray[0]),
 				new ConsoleProgressImplementation(), null, MapZooms.getDefault(), MapRenderingTypesEncoder.getDefault(),
 				log);
 	}
