@@ -459,6 +459,9 @@ public class FixBasemapRoads {
 			return;
 		}
 		if (ref == null || ref.isEmpty()) {
+			ref = way.getTag("int_ref");
+		}
+		if (ref == null || ref.isEmpty()) {
 			ref = way.getTag("name");
 		} else {
 			// fix road inconsistency
@@ -471,6 +474,14 @@ public class FixBasemapRoads {
 			LatLon lt = way.getLatLon();
 			ref = ((int) MapUtils.getTileNumberY(4, lt.getLatitude())) + " "
 					+ ((int) MapUtils.getTileNumberX(4, lt.getLongitude()));
+		}
+
+		if (ref != null && !ref.isEmpty()) {
+			if (!roadInfoMap.containsKey(ref)) {
+				roadInfoMap.put(ref, new RoadInfo());
+			}
+			RoadInfo ri = roadInfoMap.get(ref);
+			ri.registerRoadLine(new RoadLine(way));
 		}
 
 		if (!roadInfoMap.containsKey(ref)) {

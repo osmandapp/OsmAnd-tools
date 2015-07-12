@@ -21,7 +21,7 @@ def process_roads(cond, filename, fields):
 	conn_string = "host='127.0.0.1' dbname='gis' user='gisuser' password='gisuser' port='5432'"
 	f = open(filename,'w')
 	f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
-	f.write('<osm version="0.5">\n')
+	f.write('<osm version="0.6">\n')
  
 	conn = psycopg2.connect(conn_string)
 	cursor = conn.cursor()
@@ -52,7 +52,7 @@ def process_roads(cond, filename, fields):
 		node_xml = ""
 		way_xml = ""
 		way_id = way_id + 1
-		way_xml = '\n<way id="%s" >\n' % (row[0] + way_id * 10000000000)		
+		way_xml = '\n<way version="1" id="%s" >\n' % (row[0] + way_id * 10000000000)
 		base = shift
 		while base - shift < len(array):
 			if row[base] is not None:
