@@ -1,6 +1,7 @@
 package net.osmand.data.preparation;
 
 import gnu.trove.list.array.TLongArrayList;
+import gnu.trove.set.hash.TLongHashSet;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -8,8 +9,10 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import net.osmand.data.City.CityType;
 import net.osmand.osm.edit.Entity;
@@ -34,8 +37,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 
 	private static final Log log = LogFactory.getLog(OsmDbCreator.class);
 
-	//public static final int BATCH_SIZE_OSM = 100000;
-	public static final int BATCH_SIZE_OSM = 1;
+	public static final int BATCH_SIZE_OSM = 100000;
 
 	// do not store these tags in the database, just ignore them
 	final String[] tagsToIgnore= {"created_by","source","converted_by"};
@@ -52,6 +54,14 @@ public class OsmDbCreator implements IOsmStorageFilter {
 	int currentWaysCount = 0;
 	private PreparedStatement prepWays;
 	int allWays = 0;
+	
+	private PreparedStatement delNode;
+	private PreparedStatement delRelations;
+	private PreparedStatement delWays;
+	private TLongHashSet nodeIds;
+	private TLongHashSet wayIds;
+	private TLongHashSet wayNodeIds;
+	private TLongHashSet relationIds;
 
 	private Connection dbConn;
 
@@ -131,9 +141,24 @@ public class OsmDbCreator implements IOsmStorageFilter {
 				prepRelations.executeBatch();
 			}
 			prepRelations.close();
+			if(delNode != null) {
+				delNode.close();
+			}
+			if(delWays != null) {
+				delWays.close();
+			}
+			if(delRelations != null) {
+				delRelations.close();
+			}
+			if(wayNodeIds != null) {
+				System.out.println("!!! " +wayNodeIds.size());
+				wayNodeIds.removeAll(nodeIds);
+				System.out.println("Missing " +wayNodeIds.size());
+			}
 		} else {
 			database.write(options, batch);
 		}
+		
 	}
 	
 	public String serializeEntityWOId(Entity e){
@@ -181,10 +206,49 @@ public class OsmDbCreator implements IOsmStorageFilter {
 		
 		return builder.toString();
 	}
+	
+	private void checkEntityExists(Entity e) throws SQLException {
+		if (nodeIds == null) {
+			nodeIds = new TLongHashSet();
+			wayIds = new TLongHashSet();
+			wayNodeIds = new TLongHashSet();
+			relationIds = new TLongHashSet();
+			delNode = dbConn.prepareStatement("delete from node where id = ?"); //$NON-NLS-1$
+			delWays = dbConn.prepareStatement("delete from ways where id = ?"); //$NON-NLS-1$
+			delRelations = dbConn.prepareStatement("delete from relations where id = ?"); //$NON-NLS-1$
+		}
+		long id = e.getId();
+		boolean changed = true;
+		if (e instanceof Node) {
+			changed = nodeIds.add(id);
+		} else if (e instanceof Way) {
+			changed = wayIds.add(id);
+			TLongArrayList nid = ((Way) e).getNodeIds();
+			wayNodeIds.addAll(nid);
+		} else if (e instanceof Relation) {
+			changed = relationIds.add(id);
+		}
+		if (!changed) {
+			prepNode.executeBatch();
+			prepWays.executeBatch();
+			prepRelations.executeBatch();
+			if (e instanceof Node) {
+				delNode.setLong(1, id);
+				delNode.execute();
+			} else if (e instanceof Way) {
+				delWays.setLong(1, id);
+				delWays.execute();
+			} else if (e instanceof Relation) {
+				delRelations.setLong(1, id);
+				delRelations.execute();
+			}
+		}
+	}
 
 	@Override
 	public boolean acceptEntityToLoad(OsmBaseStorage storage, EntityId entityId, Entity e) {
 		// put all nodes into temporary db to get only required nodes after loading all data
+		boolean osmChange = storage.isOsmChange();
 		if (dialect == DBDialect.NOSQL) {
 			String key;
 			currentCountNode++;
@@ -223,6 +287,9 @@ public class OsmDbCreator implements IOsmStorageFilter {
 				} catch (IOException es) {
 					throw new RuntimeException(es);
 				}
+				if(osmChange) {
+					checkEntityExists(e);
+				}
 				if (e instanceof Node) {
 					currentCountNode++;
 					if (!e.getTags().isEmpty()) {
@@ -260,7 +327,8 @@ public class OsmDbCreator implements IOsmStorageFilter {
 						dbConn.commit(); // clear memory
 						currentWaysCount = 0;
 					}
-				} else {
+				} else if (!osmChange) {
+					// osm change can't handle relations properly
 					allRelations++;
 					short ord = 0;
 					for (Entry<EntityId, String> i : ((Relation) e).getMembersMap().entrySet()) {
@@ -289,6 +357,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 		// do not add to storage
 		return false;
 	}
+
 
 
 	public int getAllNodes() {

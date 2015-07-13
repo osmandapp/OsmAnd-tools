@@ -79,7 +79,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	}
 	
 
-	public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
+	public void iterateEntity(Entity e, OsmDbAccessorContext ctx, boolean basemap) throws SQLException {
 		tempAmenityList.clear();
 		EntityId eid = EntityId.valueOf(e);
 		Map<String, String> etags = renderingTypes.transformTags(e.getTags(), EntityType.valueOf(e), EntityConvertApplyType.POI);
@@ -113,7 +113,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				// checkEntity(e);
 				EntityParser.parseMapObject(a, e, etags);
 				if (a.getLocation() != null) {
-					if(e instanceof Relation) {
+					if(e instanceof Relation || basemap) {
 						a.setId(GENERATE_OBJ_ID -- );
 					}
 					// do not convert english name

@@ -228,7 +228,7 @@ public class IndexCreator {
 	
 	private void iterateMainEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 		if (indexPOI) {
-			indexPoiCreator.iterateEntity(e, ctx);
+			indexPoiCreator.iterateEntity(e, ctx, false);
 		}
 		if (indexTransport) {
 			indexTransportCreator.visitEntityMainStep(e, ctx);
@@ -327,7 +327,7 @@ public class IndexCreator {
 	
 	private boolean createPlainOsmDb(OsmDbAccessor accessor,
 			IProgress progress, File readFile, IOsmStorageFilter addFilter, boolean deletePrevious,
-			int additionId, int shiftId) throws SQLException, FileNotFoundException, IOException, SAXException{
+			int additionId, int shiftId) throws SQLException, IOException, SAXException{
 //		dbFile = new File(workingDir, TEMP_NODES_DB);
 		// initialize db file
 		boolean loadFromExistingFile = dbFile != null && osmDBdialect.databaseFileExists(dbFile) && !deletePrevious;
@@ -427,7 +427,7 @@ public class IndexCreator {
 					public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 						processor.processEntity(e);
 						if(indexPOI) {
-							poiCreator.iterateEntity(e, ctx);
+							poiCreator.iterateEntity(e, ctx, true);
 						}
 					}
 				});
@@ -438,7 +438,7 @@ public class IndexCreator {
 					public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 						processor.processEntity(e);
 						if(indexPOI) {
-							poiCreator.iterateEntity(e, ctx);
+							poiCreator.iterateEntity(e, ctx, true);
 						}
 					}
 				});
@@ -450,9 +450,6 @@ public class IndexCreator {
 					public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 						ctx.loadEntityRelation((Relation) e);
 						processor.processEntity(e);
-						if(indexPOI) {
-							poiCreator.iterateEntity(e, ctx);
-						}
 					}
 				});
 				accessor.closeReadingConnection();
