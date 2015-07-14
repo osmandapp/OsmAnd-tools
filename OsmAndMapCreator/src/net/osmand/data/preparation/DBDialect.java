@@ -11,15 +11,10 @@ import net.osmand.util.Algorithms;
 import org.apache.commons.logging.Log;
 import org.sqlite.SQLiteJDBCLoader;
 
-import com.anvisics.jleveldb.LevelDBAccess;
-import com.anvisics.jleveldb.ext.DBAccessor;
-import com.anvisics.jleveldb.ext.Options;
-import com.anvisics.jleveldb.ext.Status;
 
 public enum DBDialect {
 	DERBY,
 	H2,
-	NOSQL,
 	SQLITE,
 	SQLITE_IN_MEMORY;
 	
@@ -58,37 +53,20 @@ public enum DBDialect {
 	}
 	
 	public void commitDatabase(Object connection) throws SQLException {
-		if(DBDialect.NOSQL != this){
-			if (!((Connection) connection).getAutoCommit()) {
-				((Connection) connection).commit();
-			}
-		} else {
-			
+		if (!((Connection) connection).getAutoCommit()) {
+			((Connection) connection).commit();
 		}
 	}
 	
 	public void closeDatabase(Object dbConn) throws SQLException {
-		if(DBDialect.NOSQL != this){
-			if (DBDialect.H2 == this) {
-				((Connection) dbConn).createStatement().execute("SHUTDOWN COMPACT"); //$NON-NLS-1$
-			}
-			((Connection) dbConn).close();
-		} else {
-//			((DBAccessor) dbConn).close();
+		if (DBDialect.H2 == this) {
+			((Connection) dbConn).createStatement().execute("SHUTDOWN COMPACT"); //$NON-NLS-1$
 		}
+		((Connection) dbConn).close();
 	}
 	
     public Object getDatabaseConnection(String fileName, Log log) throws SQLException {
-		if (DBDialect.NOSQL == this) {
-			DBAccessor dbAccessor = LevelDBAccess.getDBAcessor();
-			Options opts = new Options();
-			opts.setCreateIfMissing(true);
-			Status status = dbAccessor.open(opts, fileName);
-			if(!status.ok()){
-				throw new SQLException(status.ToString());
-			}
-			return dbAccessor;
-		} else if (DBDialect.SQLITE == this || DBDialect.SQLITE_IN_MEMORY == this) {
+		if (DBDialect.SQLITE == this || DBDialect.SQLITE_IN_MEMORY == this) {
 			try {
 				Class.forName("org.sqlite.JDBC");
 			} catch (ClassNotFoundException e) {

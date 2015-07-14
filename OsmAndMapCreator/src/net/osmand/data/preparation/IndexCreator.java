@@ -353,15 +353,13 @@ public class IndexCreator {
 				allRelations = dbCreator.getAllRelations();
 			}
 		} else {
-			if (DBDialect.NOSQL != osmDBdialect) {
-				Connection dbc = (Connection) dbConn;
-				final Statement stmt = dbc.createStatement();
-				accessor.computeRealCounts(stmt);
-				allRelations = accessor.getAllRelations();
-				allNodes = accessor.getAllNodes();
-				allWays = accessor.getAllWays();
-				stmt.close();
-			}
+			Connection dbc = (Connection) dbConn;
+			final Statement stmt = dbc.createStatement();
+			accessor.computeRealCounts(stmt);
+			allRelations = accessor.getAllRelations();
+			allNodes = accessor.getAllNodes();
+			allWays = accessor.getAllWays();
+			stmt.close();
 		}
 		accessor.initDatabase(dbConn, osmDBdialect, allNodes, allWays, allRelations);
 		return loadFromExistingFile;
@@ -860,8 +858,8 @@ public class IndexCreator {
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 
 //		String file = rootFolder + "/temp/map.osm";
-		String file = rootFolder + "/temp/032.osc.gz";
-//		String file = rootFolder + "/temp/andorra-latest.osm.pbf";
+//		String file = rootFolder + "/temp/032.osc.gz";
+		String file = rootFolder + "/temp/Netherlands-noord-holland.pbf";
 //		String file = rootFolder + "/repos/resources/synthetic_test_rendering.osm";
 
 		int st = file.lastIndexOf('/');

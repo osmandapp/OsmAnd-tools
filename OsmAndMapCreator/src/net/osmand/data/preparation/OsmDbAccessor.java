@@ -17,11 +17,11 @@ import java.util.concurrent.BlockingQueue;
 
 import net.osmand.IProgress;
 import net.osmand.osm.edit.Entity;
+import net.osmand.osm.edit.Entity.EntityId;
+import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Way;
-import net.osmand.osm.edit.Entity.EntityId;
-import net.osmand.osm.edit.Entity.EntityType;
 
 
 public class OsmDbAccessor implements OsmDbAccessorContext {
@@ -50,30 +50,29 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 	}
 	
 	
-	public void initDatabase(Object dbConnection, DBDialect dialect, int allNodes, int allWays, int allRelations) throws SQLException {
-		
+	public void initDatabase(Object dbConnection, DBDialect dialect, int allNodes, int allWays, int allRelations)
+			throws SQLException {
+
 		this.dialect = dialect;
 		this.allNodes = allNodes;
 		this.allWays = allWays;
 		this.allRelations = allRelations;
-		if(this.dialect == DBDialect.NOSQL){
-			throw new UnsupportedOperationException();
-		} else {
-			this.dbConn = (Connection) dbConnection;
-			
-			pselectNode = dbConn.prepareStatement("select n.latitude, n.longitude, n.tags from node n where n.id = ?"); //$NON-NLS-1$
-			pselectWay = dbConn.prepareStatement("select w.node, w.ord, w.tags, n.latitude, n.longitude, n.tags " + //$NON-NLS-1$
-					"from ways w left join node n on w.node = n.id where w.id = ? order by w.ord"); //$NON-NLS-1$
-			pselectRelation = dbConn.prepareStatement("select r.member, r.type, r.role, r.ord, r.tags " + //$NON-NLS-1$
-					"from relations r where r.id = ? order by r.ord"); //$NON-NLS-1$
-		
-			iterateNodes = dbConn.prepareStatement("select n.id, n.latitude, n.longitude, n.tags from node n where length(n.tags) > 0"); //$NON-NLS-1$
-			iterateWays  = dbConn.prepareStatement("select w.id, w.node, w.ord, w.tags, n.latitude, n.longitude, n.tags " + //$NON-NLS-1$
-					"from ways w left join node n on w.node = n.id order by w.id, w.ord"); //$NON-NLS-1$
-			iterateWayBoundaries  = dbConn.prepareStatement("select w.id, w.node, w.ord, w.tags, n.latitude, n.longitude, n.tags " + //$NON-NLS-1$
-					"from ways w left join node n on w.node = n.id  where w.boundary > 0 order by w.id, w.ord"); //$NON-NLS-1$
-			iterateRelations = dbConn.prepareStatement("select r.id, r.tags from relations r where length(r.tags) > 0"); //$NON-NLS-1$
-		}
+		this.dbConn = (Connection) dbConnection;
+
+		pselectNode = dbConn.prepareStatement("select n.latitude, n.longitude, n.tags from node n where n.id = ?"); //$NON-NLS-1$
+		pselectWay = dbConn.prepareStatement("select w.node, w.ord, w.tags, n.latitude, n.longitude, n.tags " + //$NON-NLS-1$
+				"from ways w left join node n on w.node = n.id where w.id = ? order by w.ord"); //$NON-NLS-1$
+		pselectRelation = dbConn.prepareStatement("select r.member, r.type, r.role, r.ord, r.tags " + //$NON-NLS-1$
+				"from relations r where r.id = ? order by r.ord"); //$NON-NLS-1$
+
+		iterateNodes = dbConn
+				.prepareStatement("select n.id, n.latitude, n.longitude, n.tags from node n where length(n.tags) > 0"); //$NON-NLS-1$
+		iterateWays = dbConn.prepareStatement("select w.id, w.node, w.ord, w.tags, n.latitude, n.longitude, n.tags " + //$NON-NLS-1$
+				"from ways w left join node n on w.node = n.id order by w.id, w.ord"); //$NON-NLS-1$
+		iterateWayBoundaries = dbConn
+				.prepareStatement("select w.id, w.node, w.ord, w.tags, n.latitude, n.longitude, n.tags " + //$NON-NLS-1$
+						"from ways w left join node n on w.node = n.id  where w.boundary > 0 order by w.id, w.ord"); //$NON-NLS-1$
+		iterateRelations = dbConn.prepareStatement("select r.id, r.tags from relations r where length(r.tags) > 0"); //$NON-NLS-1$
 	}
 	
 	public Connection getDbConn() {
@@ -261,30 +260,28 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 	
 	
 	public void closeReadingConnection() throws SQLException {
-		if (dialect != DBDialect.NOSQL) {
-			if (pselectNode != null) {
-				pselectNode.close();
-			}
-			if (pselectWay != null) {
-				pselectWay.close();
-			}
-			if (pselectRelation != null) {
-				pselectRelation.close();
-			}
-			if (iterateNodes != null) {
-				iterateNodes.close();
-			}
-			if (iterateRelations != null) {
-				iterateRelations.close();
-			}
-			if (iterateWays != null) {
-				iterateWays.close();
-			}
-			if (iterateWayBoundaries != null) {
-				iterateWayBoundaries.close();
-			}
+		if (pselectNode != null) {
+			pselectNode.close();
 		}
-		
+		if (pselectWay != null) {
+			pselectWay.close();
+		}
+		if (pselectRelation != null) {
+			pselectRelation.close();
+		}
+		if (iterateNodes != null) {
+			iterateNodes.close();
+		}
+		if (iterateRelations != null) {
+			iterateRelations.close();
+		}
+		if (iterateWays != null) {
+			iterateWays.close();
+		}
+		if (iterateWayBoundaries != null) {
+			iterateWayBoundaries.close();
+		}
+
 	}
 
 	public class AbstractProducer extends Thread {
