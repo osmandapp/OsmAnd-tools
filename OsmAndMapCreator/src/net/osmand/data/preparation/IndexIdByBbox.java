@@ -228,7 +228,7 @@ public class IndexIdByBbox {
 			if(CREATE) {
 				target.delete();
 			}
-			boolean createTables = target.exists();
+			boolean createTables = !target.exists();
 			db = (Connection) sqlite.getDatabaseConnection(target.getAbsolutePath(), log);
 			if(createTables) {
 				Statement stat = db.createStatement();
