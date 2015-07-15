@@ -228,15 +228,16 @@ public class IndexIdByBbox {
 			if(CREATE) {
 				target.delete();
 			}
+			boolean createTables = target.exists();
 			db = (Connection) sqlite.getDatabaseConnection(target.getAbsolutePath(), log);
-			if(CREATE) {
+			if(createTables) {
 				Statement stat = db.createStatement();
 				stat.executeUpdate("create table node (id bigint primary key, bbox bytes)"); //$NON-NLS-1$
 				stat.executeUpdate("create index IdIndex ON node (id)"); //$NON-NLS-1$
 				stat.close();
 			}
-			ps = db.prepareStatement("insert or replace into node(id, bbox) values (?, ?)");
 			queryById = db.prepareStatement("select bbox from node where id = ?");
+			ps = db.prepareStatement("insert or ignore into node(id, bbox) values (?, ?)");
 			db.setAutoCommit(false);
 		}
 
@@ -445,10 +446,7 @@ public class IndexIdByBbox {
 				}
 				try {
 					if(entity instanceof Node) {
-						if(CREATE) {
-							// TODO
-							processor.put( nodeId(entity.getId()), entity.getLatLon(), qd );
-						}
+						processor.put( nodeId(entity.getId()), entity.getLatLon(), qd );
 						progress++;
 						count ++;
 					} else if(entity instanceof Way) {
