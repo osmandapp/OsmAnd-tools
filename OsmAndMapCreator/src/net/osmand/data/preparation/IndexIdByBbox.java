@@ -2,21 +2,30 @@ package net.osmand.data.preparation;
 
 import gnu.trove.list.array.TLongArrayList;
 
+import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.zip.GZIPInputStream;
 
 import net.osmand.data.LatLon;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
+import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.Node;
+import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Way;
 import net.osmand.osm.io.IOsmStorageFilter;
 import net.osmand.osm.io.OsmBaseStorage;
@@ -25,6 +34,7 @@ import net.osmand.util.MapUtils;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.tools.bzip2.CBZip2InputStream;
 import org.fusesource.leveldbjni.internal.NativeComparator;
 import org.fusesource.leveldbjni.internal.NativeCompressionType;
 import org.fusesource.leveldbjni.internal.NativeDB;
@@ -54,57 +64,77 @@ public class IndexIdByBbox {
 	    return result;
 	}
 	
-	abstract static class DatabaseTest {
+	public static class QueryData {
+		ByteBuffer buf8 = ByteBuffer.allocate(8);
+		ByteBuffer buf16 = ByteBuffer.allocate(16);
+		TLongArrayList missing = new TLongArrayList();
+		TLongArrayList ids = new TLongArrayList();
+		
+		double top = 0;
+		double left = 0;
+		double right = 0;
+		double bottom = 0;
+	}
+	
+	abstract static class DatabaseAdapter {
 		File target;
 
-		public DatabaseTest(File target) {
+		public DatabaseAdapter(File target) {
 			this.target = target;
 		}
-		public abstract void prepare() throws Exception;
+		public abstract void prepareToCreate() throws Exception;
+		
+		public abstract void prepareToRead() throws Exception;
 		
 		public abstract void putBbox(long key, byte[] bbox) throws Exception;
 		
-		public abstract void close() throws Exception;
-		
 		public abstract void commitBatch() throws Exception;
 		
+		public abstract void close() throws Exception;
 		
-		public byte[] getBbox(TLongArrayList ids, ByteBuffer buf8, ByteBuffer buf16) throws Exception {
+		public abstract byte[] query(long id) throws Exception;
+		
+		public byte[] getBbox(QueryData qd) throws Exception {
 			int top = 0;
 			int left = 0;
 			int right = 0;
 			int bottom = 0;
 			boolean first = true;
-			for(int i = 0; i < ids.size(); i++){
-				byte[] bbox = query(ids.get(i));
+			qd.missing.clear();
+			for(int i = 0; i < qd.ids.size(); i++){
+				long id = qd.ids.get(i);
+				byte[] bbox = query(id);
 				if(bbox == null) {
+					qd.missing.add(id);
 					continue;
 				}
+				System.out.println(id >> 2);
 				if(bbox.length == 8) {
-					buf8.clear();
-					buf8.put(bbox);
-					buf8.position(0);
+					qd.buf8.clear();
+					qd.buf8.put(bbox);
+					qd.buf8.position(0);
 					if(first) {
 						first = false;
-						top = bottom = buf8.getInt();
-						left = right = buf8.getInt();
+						top = bottom = qd.buf8.getInt();
+						left = right = qd.buf8.getInt();
 					} else {
-						int y = buf8.getInt();
-						int x = buf8.getInt();
+						int y = qd.buf8.getInt();
+						int x = qd.buf8.getInt();
 						top = Math.max(y, top);
 						bottom = Math.min(y, bottom);
 						left = Math.min(x, left);
-						right = Math.max(y, right);
+						right = Math.max(x, right);
 					}
 				} else if(bbox.length == 16) {
-					buf16.clear();
-					buf16.put(bbox);
-					buf16.position(0);
-					int t = buf8.getInt();
-					int l = buf8.getInt();
-					int r = buf8.getInt();
-					int b = buf8.getInt();
+					qd.buf16.clear();
+					qd.buf16.put(bbox);
+					qd.buf16.position(0);
+					int t = qd.buf16.getInt();
+					int l = qd.buf16.getInt();
+					int r = qd.buf16.getInt();
+					int b = qd.buf16.getInt();
 					if(first) {
+						first = false;
 						bottom = b;
 						top = t;
 						left = l;
@@ -123,23 +153,33 @@ public class IndexIdByBbox {
 			if(first) {
 				return null;
 			}
-			buf16.clear();
-			buf16.putInt(top);
-			buf16.putInt(left);
-			buf16.putInt(right);
-			buf16.putInt(bottom);
-			return buf16.array();
+			qd.top = top / 10000000.0;
+			qd.bottom = bottom / 10000000.0;
+			qd.left = left / 10000000.0;
+			qd.right = right / 10000000.0;
+			qd.buf16.clear();
+			qd.buf16.putInt(top);
+			qd.buf16.putInt(left);
+			qd.buf16.putInt(right);
+			qd.buf16.putInt(bottom);
+			return qd.buf16.array();
 		}
-		public abstract byte[] query(long id) throws Exception; 
+		
+		public void put(long id, LatLon ll, QueryData qd) throws Exception {
+			qd.buf8.clear();
+			qd.buf8.putInt((int) (MapUtils.checkLatitude(ll.getLatitude()) * 10000000));
+			qd.buf8.putInt((int) (MapUtils.checkLongitude(ll.getLongitude()) * 10000000));
+			putBbox(id, qd.buf8.array());			
+		} 
 	}
 	
-	static class NullDatabaseTest extends DatabaseTest {
+	static class NullDatabaseTest extends DatabaseAdapter {
 		public NullDatabaseTest(File target) {
 			super(target);
 		}
 		
 		@Override
-		public void prepare() throws DBException, IOException, SQLException {
+		public void prepareToCreate() throws DBException, IOException, SQLException {
 		}
 
 		@Override
@@ -158,21 +198,33 @@ public class IndexIdByBbox {
 		public byte[] query(long id) {
 			return null;
 		}
+
+		@Override
+		public void prepareToRead() throws Exception {
+			
+		}
 	}
 	
-	static class SqliteDatabaseTest extends DatabaseTest {
+	static class SqliteDatabaseAdapter extends DatabaseAdapter {
 		private int count;
 		private DBDialect sqlite = DBDialect.SQLITE;
 		private Connection db;
 		private PreparedStatement ps;
 		private PreparedStatement queryById;
 
-		public SqliteDatabaseTest(File target) {
+		public SqliteDatabaseAdapter(File target) {
 			super(target);
 		}
 		
+
 		@Override
-		public void prepare() throws DBException, IOException, SQLException {
+		public void prepareToRead() throws Exception {
+			db = (Connection) sqlite.getDatabaseConnection(target.getAbsolutePath(), log);
+			queryById = db.prepareStatement("select bbox from node where id = ?");
+		}
+		
+		@Override
+		public void prepareToCreate() throws DBException, IOException, SQLException {
 			target.delete();
 			db = (Connection) sqlite.getDatabaseConnection(target.getAbsolutePath(), log);
 			Statement stat = db.createStatement();
@@ -187,7 +239,9 @@ public class IndexIdByBbox {
 		@Override
 		public void putBbox(long key, byte[] value) throws DBException, SQLException {
 			ps.setLong(1, key);
-			ps.setBytes(2, value);
+			byte[] bs = new byte[value.length];
+			System.arraycopy(value, 0, bs, 0, bs.length);
+			ps.setBytes(2, bs);
 			ps.addBatch();
 			count++;
 			if (count >= BATCH_SIZE) {
@@ -204,11 +258,15 @@ public class IndexIdByBbox {
 
 		@Override
 		public void close() throws Exception {
-			commitBatch();
-			ps.close();
+			if (ps != null) {
+				commitBatch();
+				ps.close();
+			}
 			queryById.close();
-			db.setAutoCommit(true);
-			db.createStatement().execute("VACUUM");
+			if(ps != null) {
+				db.setAutoCommit(true);
+				db.createStatement().execute("VACUUM");
+			}
 			db.close();
 		}
 
@@ -221,21 +279,22 @@ public class IndexIdByBbox {
 			}
 			return null;
 		}
+
 	}
 	
-	static class LevelDbDatabaseTest extends DatabaseTest {
+	static class LevelDbDatabaseAdapter extends DatabaseAdapter {
 
 		private NativeDB open;
 		private NativeWriteBatch updates;
 		private int count;
 		private ByteBuffer buffer;
 
-		public LevelDbDatabaseTest(File target) {
+		public LevelDbDatabaseAdapter(File target) {
 			super(target);
 		}
 		
 		@Override
-		public void prepare() throws DBException, IOException {
+		public void prepareToCreate() throws DBException, IOException {
 			NativeOptions no = new NativeOptions().
 					createIfMissing(true).
 					compression(NativeCompressionType.kSnappyCompression).
@@ -296,31 +355,85 @@ public class IndexIdByBbox {
 		public byte[] query(long id) {
 			return null;
 		}
+
+		@Override
+		public void prepareToRead() throws Exception {
+		}
+	}
+	
+	private static long nodeId(long id) {
+		return id << 2;
+	}
+	
+	private static long wayId(long id) {
+		return (id << 2) | 1;
+	}
+	
+	private static long relationId(long id) {
+		return (id << 2) | 2;
+	}
+	
+	private static long convertId(EntityId eid) {
+		if(eid.getType() == EntityType.NODE) {
+			return nodeId(eid.getId());
+		} else if(eid.getType() == EntityType.WAY) {
+			return wayId(eid.getId());
+		} else {
+			return relationId(eid.getId());
+		}
 	}
 	
 	
-	
-	public static void main(String[] args) throws Exception {
-		String location = "/Users/victorshcherb/osmand/temp/Netherlands-noord-holland.pbf";
-		if(args.length > 0) {
-			location = args[0];
+	public void splitRegionsOsc(String oscFile, String indexFile) throws Exception {
+		OsmBaseStorage reader = new OsmBaseStorage();
+		final DatabaseAdapter adapter = new SqliteDatabaseAdapter(new File(indexFile));
+		adapter.prepareToRead();
+		final QueryData qd = new QueryData();
+		reader.getFilters().add(new IOsmStorageFilter() {
+
+			@Override
+			public boolean acceptEntityToLoad(OsmBaseStorage storage, EntityId entityId, Entity entity) {
+				qd.ids.add(convertId(entityId));
+				return false;
+			}
+		});
+		InputStream stream = new BufferedInputStream(new FileInputStream(oscFile), 8192 * 4);
+		InputStream streamFile = stream;
+		long st = System.currentTimeMillis();
+		if (oscFile.endsWith(".bz2")) { //$NON-NLS-1$
+			if (stream.read() != 'B' || stream.read() != 'Z') {
+//				throw new RuntimeException("The source stream must start with the characters BZ if it is to be read as a BZip2 stream."); //$NON-NLS-1$
+			} else {
+				stream = new CBZip2InputStream(stream);
+			}
+		} else if (oscFile.endsWith(".gz")) { //$NON-NLS-1$
+			stream = new GZIPInputStream(stream);
 		}
-		File folder = new File(location).getParentFile();
+		reader.parseOSM(stream, new ConsoleProgressImplementation(), streamFile, false);
+		adapter.getBbox(qd);
+		System.out.println("Bbox " + qd.top + ", " + qd.left + " - " + qd.bottom + ", " + qd.right);
+		adapter.close();
+	}
+
+
+	public void createIdToBBoxIndex(String location, String filename) throws FileNotFoundException, Exception,
+			IOException {
 		FileInputStream fis = new FileInputStream(location);
-//		final DatabaseTest test = new NullDatabaseTest(new File(folder, "bboxbyid.leveldb"));
-//		final DatabaseTest test = new LevelDbDatabaseTest(new File(folder, "bboxbyid.leveldb"));
-		final DatabaseTest processor = new SqliteDatabaseTest(new File(folder, "bboxbyid.sqlite"));
+		// 1 null bbox for ways, 2 relation null bbox, 3 relations not processed because of loop
+		final int[] stats = new int[] {0, 0, 0};
+//		final DatabaseTest test = new NullDatabaseTest(new File(folder, filename + ".leveldb"));
+//		final DatabaseTest test = new LevelDbDatabaseTest(new File(folder, filename + ".leveldb"));
+		final DatabaseAdapter processor = new SqliteDatabaseAdapter(new File(filename));
 		OsmBaseStoragePbf pbfReader = new OsmBaseStoragePbf();
-		processor.prepare();
+		processor.prepareToCreate();
+		final QueryData qd = new QueryData();
+		final List<Relation> pendingRelations = new ArrayList<Relation>();
 		pbfReader.getFilters().add(new IOsmStorageFilter() {
 			long time = 0;
 			int count = 0;
 			int progress = 0;
-			ByteBuffer buf8 = ByteBuffer.allocate(8);
-			ByteBuffer buf16 = ByteBuffer.allocate(16);
-			TLongArrayList ids = new TLongArrayList();
 			private boolean firstWay = true;
-			
+			private boolean firstRelation = true;
 			@Override
 			public boolean acceptEntityToLoad(OsmBaseStorage storage, EntityId entityId, Entity entity) {
 				if(time == 0) {
@@ -328,11 +441,7 @@ public class IndexIdByBbox {
 				}
 				try {
 					if(entity instanceof Node) {
-						LatLon ll = entity.getLatLon();
-						buf8.clear();
-						buf8.putInt((int) (MapUtils.checkLatitude(ll.getLatitude()) * 10000000));
-						buf8.putInt((int) (MapUtils.checkLatitude(ll.getLongitude()) * 10000000));
-						processor.putBbox(entity.getId() << 2, buf8.array());
+						processor.put( nodeId(entity.getId()), entity.getLatLon(), qd );
 						progress++;
 						count ++;
 					} else if(entity instanceof Way) {
@@ -340,16 +449,29 @@ public class IndexIdByBbox {
 							time = System.currentTimeMillis();
 							firstWay = false;
 							processor.commitBatch();
+							progress = 0;
 						}
 						Way w = (Way) entity;
-						ids.clear();
+						qd.ids.clear();
 						for(int i = 0; i < w.getNodeIds().size(); i++) {
-							ids.add(w.getNodeIds().get(i) << 2);
+							qd.ids.add(nodeId(w.getNodeIds().get(i)));
 						}
-						byte[] bbox = processor.getBbox(ids, buf8, buf16);
-						processor.putBbox((w.getId() << 2) | 1, bbox);
+						byte[] bbox = processor.getBbox(qd);
+						if(bbox != null) {
+							processor.putBbox(wayId(w.getId()), bbox);
+						} else {
+							stats[0]++;
+						}
 						progress++;
 						count ++;
+					} else if(entity instanceof Relation) {
+						if(firstRelation) {
+							time = System.currentTimeMillis();
+							firstRelation = false;
+							processor.commitBatch();
+							progress = 0;
+						}
+						processRelations(stats, processor, pendingRelations, entity, qd);
 					}
 					if (count >= BATCH_SIZE) {
 						count = 0;
@@ -361,13 +483,105 @@ public class IndexIdByBbox {
 					throw new RuntimeException(e);
 				}
 			}
+
+			
 		});
 		
 		((OsmBaseStoragePbf) pbfReader).parseOSMPbf(fis, new ConsoleProgressImplementation(), false);
 		fis.close();
+		while(!pendingRelations.isEmpty()) {
+			processor.commitBatch();
+			int sz = pendingRelations.size();
+			ArrayList<Relation> npendingRelations = new ArrayList<Relation>(sz);
+			for(Relation r : pendingRelations) {
+				processRelations(stats, processor, npendingRelations, r, qd);
+			}
+			if(npendingRelations.size() == sz) {
+				for(Relation r : pendingRelations) {
+					processRelations(stats, processor, null, r, qd);
+				}	
+				break;
+			}
+			pendingRelations.clear();
+			pendingRelations.addAll(npendingRelations);
+		}
+		System.out.println("Error stats: " + stats[0] + " way null bbox, " + 
+				stats[1] + " relation null bbox, " + stats[2] + " relation in cycle");
 		System.out.println("Comitting");
 		processor.close();
 		System.out.println("Done");
+	}
+	
+	private void processRelations(final int[] stats, final DatabaseAdapter processor,
+			final List<Relation> pendingRelations, Entity entity, QueryData qd) throws Exception {
+		Relation r = (Relation) entity;
+		Iterator<EntityId> iterator = r.getMemberIds().iterator();
+		qd.ids.clear();
+		while(iterator.hasNext()) {
+			EntityId nid = iterator.next();
+			qd.ids.add(convertId(nid));
+		}
+		byte[] bbox = processor.getBbox(qd);
+		boolean relationMissing = false;
+		for(long l : qd.missing.toArray()) {
+			if(l % 4 == 2) {
+				relationMissing = true;
+				break;
+			}
+		}
+		if(!relationMissing) {
+			if(bbox != null) {
+				processor.putBbox(relationId(r.getId()), bbox);
+			} else {
+				stats[1]++;
+			}
+		} else {
+			if(pendingRelations == null) {
+				if(bbox != null) {
+					processor.putBbox(relationId(r.getId()), bbox);
+				} else {
+					stats[1]++;
+				}
+				stats[2]++;
+			} else {
+				pendingRelations.add(r)	;
+			}
+		}
+	}
+	
+	public static void main(String[] args) throws Exception {
+		String operation = "";
+//		operation = "query";
+		operation = "osc";
+		if(args.length > 0) {
+			operation = args[0];
+		}
+//		String location = "/Users/victorshcherb/osmand/temp/Netherlands-noord-holland.pbf";
+		String location = "/Users/victorshcherb/osmand/temp/Netherlands-noord-holland.osc";
+//		String location = "/Users/victorshcherb/osmand/temp/010.osc.gz";
 		
+		if (args.length > 1) {
+			location = args[1];
+		}
+		String dbPath = new File(location).getParentFile() + "/bboxbyid.sqlite";
+		if (args.length > 2) {
+			location = args[2];
+		}
+		// create
+		if (operation.equals("create")) {
+			new IndexIdByBbox().createIdToBBoxIndex(location, dbPath);
+		} else if (operation.equals("osc")) {
+			new IndexIdByBbox().splitRegionsOsc(location, dbPath);
+		} else if (operation.equals("")) {
+			final DatabaseAdapter processor = new SqliteDatabaseAdapter(new File(dbPath));
+			processor.prepareToRead();
+			QueryData qd = new QueryData();
+//			qd.ids.add(relationId(271110));
+//			qd.ids.add(wayId(93368155l));
+//			qd.ids.add(nodeId(2042972578l));
+			processor.getBbox(qd);
+			System.out.println("Bbox " + qd.top + ", " + qd.left + " - " + qd.bottom + ", " + qd.right);
+			processor.close();
+		}
 	}
 }
