@@ -46,7 +46,7 @@ import org.fusesource.leveldbjni.internal.NativeWriteOptions;
 public class IndexIdByBbox {
 	private static final Log log = LogFactory.getLog(IndexIdByBbox.class);
 	private static final int BATCH_SIZE = 100000;
-	private static final boolean CREATE = true;
+	private static final boolean CREATE = false;
 	public static byte[] longToBytes(long l) {
 	    byte[] result = new byte[8];
 	    for (int i = 7; i >= 0; i--) {
