@@ -46,6 +46,7 @@ import org.fusesource.leveldbjni.internal.NativeWriteOptions;
 public class IndexIdByBbox {
 	private static final Log log = LogFactory.getLog(IndexIdByBbox.class);
 	private static final int BATCH_SIZE = 100000;
+	private static final boolean CREATE = true;
 	public static byte[] longToBytes(long l) {
 	    byte[] result = new byte[8];
 	    for (int i = 7; i >= 0; i--) {
@@ -108,7 +109,6 @@ public class IndexIdByBbox {
 					qd.missing.add(id);
 					continue;
 				}
-				System.out.println(id >> 2);
 				if(bbox.length == 8) {
 					qd.buf8.clear();
 					qd.buf8.put(bbox);
@@ -225,13 +225,17 @@ public class IndexIdByBbox {
 		
 		@Override
 		public void prepareToCreate() throws DBException, IOException, SQLException {
-			target.delete();
+			if(CREATE) {
+				target.delete();
+			}
 			db = (Connection) sqlite.getDatabaseConnection(target.getAbsolutePath(), log);
-			Statement stat = db.createStatement();
-			stat.executeUpdate("create table node (id bigint primary key, bbox bytes)"); //$NON-NLS-1$
-			stat.executeUpdate("create index IdIndex ON node (id)"); //$NON-NLS-1$
-			stat.close();
-			ps = db.prepareStatement("insert into node(id, bbox) values (?, ?)");
+			if(CREATE) {
+				Statement stat = db.createStatement();
+				stat.executeUpdate("create table node (id bigint primary key, bbox bytes)"); //$NON-NLS-1$
+				stat.executeUpdate("create index IdIndex ON node (id)"); //$NON-NLS-1$
+				stat.close();
+			}
+			ps = db.prepareStatement("insert or replace into node(id, bbox) values (?, ?)");
 			queryById = db.prepareStatement("select bbox from node where id = ?");
 			db.setAutoCommit(false);
 		}
@@ -430,8 +434,8 @@ public class IndexIdByBbox {
 		final List<Relation> pendingRelations = new ArrayList<Relation>();
 		pbfReader.getFilters().add(new IOsmStorageFilter() {
 			long time = 0;
+			long progress = 0;
 			int count = 0;
-			int progress = 0;
 			private boolean firstWay = true;
 			private boolean firstRelation = true;
 			@Override
@@ -441,7 +445,10 @@ public class IndexIdByBbox {
 				}
 				try {
 					if(entity instanceof Node) {
-						processor.put( nodeId(entity.getId()), entity.getLatLon(), qd );
+						if(CREATE) {
+							// TODO
+							processor.put( nodeId(entity.getId()), entity.getLatLon(), qd );
+						}
 						progress++;
 						count ++;
 					} else if(entity instanceof Way) {
