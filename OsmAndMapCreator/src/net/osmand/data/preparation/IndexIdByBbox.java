@@ -1,6 +1,5 @@
 package net.osmand.data.preparation;
 
-import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.list.array.TLongArrayList;
 
 import java.io.File;
@@ -14,7 +13,6 @@ import java.sql.SQLException;
 import java.sql.Statement;
 
 import net.osmand.data.LatLon;
-import net.osmand.data.QuadRect;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;

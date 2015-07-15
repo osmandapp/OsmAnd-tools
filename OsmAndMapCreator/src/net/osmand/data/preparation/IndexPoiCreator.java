@@ -32,6 +32,7 @@ import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.MapRenderingTypes.MapRulType;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.MapRenderingTypesEncoder.EntityConvertApplyType;
+import net.osmand.osm.PoiType;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.Entity.EntityType;
@@ -107,6 +108,12 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				if(a.getType().getKeyName().equals("entertainment") && privateReg) {
 					// don't index private swimming pools 
 					continue;
+				}
+				if(basemap) {
+					PoiType st = a.getType().getPoiTypeByKeyName(a.getSubType());
+					if(st == null || !a.getType().containsBasemapPoi(st)) {
+						continue;
+					}
 				}
 				// do not add that check because it is too much printing for batch creation
 				// by statistic < 1% creates maps manually
