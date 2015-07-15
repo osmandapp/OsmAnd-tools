@@ -64,12 +64,15 @@
 #include <OsmAndCore/Map/MapAnimator.h>
 #include <OsmAndCore/Map/RasterMapSymbol.h>
 #include <OsmAndCore/Map/IBillboardMapSymbol.h>
+#include <OsmAndCore/Map/AmenitySymbolsProvider.h>
 #include <OsmAndCore/FavoriteLocationsGpxCollection.h>
 #include <OsmAndCore/Map/FavoriteLocationsPresenter.h>
 #include <OsmAndCore/GeoInfoDocument.h>
 #include <OsmAndCore/GpxDocument.h>
 #include <OsmAndCore/Map/GeoInfoPresenter.h>
 #include <OsmAndCore/Search/AmenitiesByNameSearch.h>
+#include <OsmAndCore/Search/AmenitiesInAreaSearch.h>
+#include <OsmAndCore/Search/AddressesByNameSearch.h>
 #include <OsmAndCore/ValueAnimator.h>
 
 bool glutWasInitialized = false;
@@ -87,6 +90,7 @@ std::shared_ptr<const OsmAnd::IMapStylesCollection> stylesCollection;
 std::shared_ptr<const OsmAnd::ResolvedMapStyle> style;
 std::shared_ptr<OsmAnd::MapAnimator> animator;
 std::shared_ptr<OsmAnd::MapObjectsSymbolsProvider> mapObjectsSymbolsProvider;
+std::shared_ptr<OsmAnd::AmenitySymbolsProvider> amenitySymbolsProvider;
 std::shared_ptr<OsmAnd::MapMarkersCollection> markers;
 std::shared_ptr<OsmAnd::FavoriteLocationsGpxCollection> favorites;
 std::shared_ptr<OsmAnd::FavoriteLocationsPresenter> favoritesPresenter;
@@ -420,27 +424,40 @@ int main(int argc, char** argv)
     //    });
     //int i = 5;
 
-    //OsmAnd::AmenitiesByNameSearch amenitiesByNameSearch(obfsCollection);
-    //OsmAnd::AmenitiesByNameSearch::Criteria amenitiesByNameSearchCriteria;
-    //amenitiesByNameSearchCriteria.name = QString::fromWCharArray(L"эрмитаж");
-    ////amenitiesByNameSearchCriteria.name = QString::fromWCharArray(L"hermitage amsterdam");
-    //amenitiesByNameSearch.performSearch(amenitiesByNameSearchCriteria,
+    //OsmAnd::AmenitiesInAreaSearch amenitiesInAreaSearch(obfsCollection);
+    //OsmAnd::AmenitiesInAreaSearch::Criteria amenitiesInAreaSearchCriteria;
+    //amenitiesInAreaSearchCriteria.zoomFilter = OsmAnd::ZoomLevel11;
+    //amenitiesInAreaSearch.performSearch(amenitiesInAreaSearchCriteria,
     //    []
-    //(const OsmAnd::ISearch::Criteria& criteria, const OsmAnd::ISearch::IResultEntry& resultEntry_)
-    //{
-    //    const auto& resultEntry = *dynamic_cast<const OsmAnd::AmenitiesByNameSearch::ResultEntry*>(&resultEntry_);
-
-    //    OsmAnd::LogPrintf(
-    //        OsmAnd::LogSeverityLevel::Info, "%s (%s)",
-    //        qPrintable(resultEntry.amenity->nativeName),
-    //        qPrintable(resultEntry.amenity->id.toString()));
-
-    //    const auto& values = resultEntry.amenity->getDecodedValues();
-    //    for (const auto& entry : OsmAnd::rangeOf(values))
+    //    (const OsmAnd::ISearch::Criteria& criteria, const OsmAnd::ISearch::IResultEntry& resultEntry_)
     //    {
-    //        int i = 5;
-    //    }
-    //});
+    //        const auto& resultEntry = *dynamic_cast<const OsmAnd::AmenitiesInAreaSearch::ResultEntry*>(&resultEntry_);
+
+    //        OsmAnd::LogPrintf(
+    //            OsmAnd::LogSeverityLevel::Info, "%s (%s)",
+    //            qPrintable(resultEntry.amenity->nativeName),
+    //            qPrintable(resultEntry.amenity->id.toString()));
+
+    //        const auto& values = resultEntry.amenity->getDecodedValues();
+    //        for (const auto& entry : OsmAnd::rangeOf(values))
+    //        {
+    //            int i = 5;
+    //        }
+    //    });
+    //int j = 5;
+
+    //OsmAnd::AddressesByNameSearch addressesByNameSearch(obfsCollection);
+    //OsmAnd::AddressesByNameSearch::Criteria addressesByNameSearchCriteria;
+    //addressesByNameSearchCriteria.name = QString::fromWCharArray(L"В");
+    ////amenitiesByNameSearchCriteria.name = QString::fromWCharArray(L"hermitage amsterdam");
+    //addressesByNameSearch.performSearch(addressesByNameSearchCriteria,
+    //    []
+    //    (const OsmAnd::ISearch::Criteria& criteria, const OsmAnd::ISearch::IResultEntry& resultEntry_)
+    //    {
+    //        const auto& resultEntry = *dynamic_cast<const OsmAnd::AddressesByNameSearch::ResultEntry*>(&resultEntry_);
+
+    //            int i = 5;
+    //    });
     //int i = 5;
     //////////////////////////////////////////////////////////////////////////
 
@@ -997,8 +1014,21 @@ void keyboardHandler(unsigned char key, int x, int y)
             mapObjectsSymbolsProvider.reset(new OsmAnd::MapObjectsSymbolsProvider(mapPrimitivesProvider, 256u));
             renderer->addSymbolsProvider(mapObjectsSymbolsProvider);
         }
-    }
         break;
+    }
+    case '.':
+    {
+        if (amenitySymbolsProvider && renderer->removeSymbolsProvider(amenitySymbolsProvider))
+        {
+            amenitySymbolsProvider.reset();
+        }
+        else
+        {
+            amenitySymbolsProvider.reset(new OsmAnd::AmenitySymbolsProvider(obfsCollection));
+            renderer->addSymbolsProvider(amenitySymbolsProvider);
+        }
+        break;
+    }
     case 'q':
         animator->pause();
         animator->cancelAllAnimations();
@@ -1058,16 +1088,32 @@ void keyboardHandler(unsigned char key, int x, int y)
     }
         break;
     case '-':
-        animator->pause();
-        animator->cancelAllAnimations();
-        animator->animateZoomBy(-1.0f, 1.0f, OsmAnd::MapAnimator::TimingFunction::EaseInOutQuadratic);
-        animator->resume();
+        if (modifiers & GLUT_ACTIVE_SHIFT)
+        {
+            const auto zoom = state.zoomLevel + (state.visualZoom >= 1.0f ? state.visualZoom - 1.0f : (state.visualZoom - 1.0f) * 2.0f);
+            renderer->setZoom(zoom - 1.0f);
+        }
+        else
+        {
+            animator->pause();
+            animator->cancelAllAnimations();
+            animator->animateZoomBy(-1.0f, 1.0f, OsmAnd::MapAnimator::TimingFunction::EaseInOutQuadratic);
+            animator->resume();
+        }
         break;
     case '+':
-        animator->pause();
-        animator->cancelAllAnimations();
-        animator->animateZoomBy(+1.0f, 1.0f, OsmAnd::MapAnimator::TimingFunction::EaseInOutQuadratic);
-        animator->resume();
+        if (modifiers & GLUT_ACTIVE_SHIFT)
+        {
+            const auto zoom = state.zoomLevel + (state.visualZoom >= 1.0f ? state.visualZoom - 1.0f : (state.visualZoom - 1.0f) * 2.0f);
+            renderer->setZoom(zoom + 1.0f);
+        }
+        else
+        {
+            animator->pause();
+            animator->cancelAllAnimations();
+            animator->animateZoomBy(+1.0f, 1.0f, OsmAnd::MapAnimator::TimingFunction::EaseInOutQuadratic);
+            animator->resume();
+        }
         break;
     case '*':
         break;
