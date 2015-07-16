@@ -15,6 +15,8 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.zip.GZIPInputStream;
@@ -42,6 +44,7 @@ import org.fusesource.leveldbjni.internal.NativeDB.DBException;
 import org.fusesource.leveldbjni.internal.NativeOptions;
 import org.fusesource.leveldbjni.internal.NativeWriteBatch;
 import org.fusesource.leveldbjni.internal.NativeWriteOptions;
+import org.xml.sax.SAXException;
 
 public class IndexIdByBbox {
 	private static final Log log = LogFactory.getLog(IndexIdByBbox.class);
@@ -65,16 +68,147 @@ public class IndexIdByBbox {
 	    return result;
 	}
 	
+	
+	static class Boundary {
+		int top;
+		int left;
+		int right;
+		int bottom;
+		final int VL = -500; 
+		Boundary next;
+		
+		public void clear() {
+			next = null;
+			top = left = right = bottom = VL;
+		}
+		
+		public void update(int x, int y) {
+			update(y, x, y, x);
+		}
+		
+		public void update(int t, int l, int b, int r) {
+			if(VL == left && VL == bottom  && top == VL && right == VL) {
+				this.left = l;
+				this.bottom = b;
+				this.top = t;
+				this.right = r;
+			} else {
+				top = Math.max(t, top);
+				bottom = Math.min(b, bottom);
+				left = Math.min(l, left);
+				right = Math.max(r, right);
+			}
+		}
+		
+		public int depth() {
+			if(next == null) {
+				return 1;
+			}
+			return next.depth() + 1;
+		}
+
+		public boolean isEmpty() {
+			return VL == left && VL == bottom  && top == VL && right == VL;
+		}
+
+		public void update(LatLon ll) {
+			update(convertLon(ll.getLongitude()), convertLat(ll.getLatitude()));
+		}
+		
+		public int getTop() {
+			if(next == null) {
+				return top;
+			}
+			return Math.max(top, next.getTop());
+		}
+		
+		
+		public int getRight() {
+			if(next == null) {
+				return right;
+			}
+			return Math.max(right, next.getRight());
+		}
+		
+		public int getLeft() {
+			if(next == null) {
+				return left;
+			}
+			return Math.min(left, next.getLeft());
+		}
+		
+		public int getBottom() {
+			if(next == null) {
+				return bottom;
+			}
+			return Math.min(bottom, next.getBottom());
+		}
+		
+		public double getTopLat() {
+			return convertToLat(getTop());
+		}
+		
+		public double getBottomLat() {
+			return convertToLat(getBottom());
+		}
+		
+		public double getRightLon() {
+			return convertToLon(getRight());
+		}
+		
+		public double getLeftLon() {
+			return convertToLon(getLeft());
+		}
+
+		public double convertToLat(int y) {
+			return y / 10000000.0;
+		}
+		
+		public double convertToLon(int x) {
+			return x / 10000000.0;
+		}
+		
+		public int convertLat(double latitude) {
+			return (int) (MapUtils.checkLatitude(latitude) * 10000000);
+		}
+		
+		public int convertLon(double longitude) {
+			return (int) (MapUtils.checkLongitude(longitude) * 10000000);
+		}
+
+		public byte[] getBytes(ByteBuffer buf16) {
+			if (next == null) {
+				buf16.clear();
+				buf16.putInt(top);
+				buf16.putInt(left);
+				buf16.putInt(right);
+				buf16.putInt(bottom);
+				return buf16.array();
+			}
+			byte[] l = new byte[depth() * 16];
+			int sh = 0;
+			Boundary b = this;
+			while (b != null) {
+				buf16.clear();
+				buf16.putInt(top);
+				buf16.putInt(left);
+				buf16.putInt(right);
+				buf16.putInt(bottom);
+				System.arraycopy(buf16.array(), 0, l, sh, 16);
+				b = b.next;
+				sh += 16;
+			}
+			return l;
+		}
+		
+	}
+	
 	public static class QueryData {
 		ByteBuffer buf8 = ByteBuffer.allocate(8);
 		ByteBuffer buf16 = ByteBuffer.allocate(16);
 		TLongArrayList missing = new TLongArrayList();
 		TLongArrayList ids = new TLongArrayList();
-		
-		double top = 0;
-		double left = 0;
-		double right = 0;
-		double bottom = 0;
+		Boundary boundary = new Boundary();
 	}
 	
 	abstract static class DatabaseAdapter {
@@ -96,12 +230,8 @@ public class IndexIdByBbox {
 		public abstract byte[] query(long id) throws Exception;
 		
 		public byte[] getBbox(QueryData qd) throws Exception {
-			int top = 0;
-			int left = 0;
-			int right = 0;
-			int bottom = 0;
-			boolean first = true;
 			qd.missing.clear();
+			qd.boundary.clear();
 			for(int i = 0; i < qd.ids.size(); i++){
 				long id = qd.ids.get(i);
 				byte[] bbox = query(id);
@@ -109,22 +239,13 @@ public class IndexIdByBbox {
 					qd.missing.add(id);
 					continue;
 				}
-				if(bbox.length == 8) {
+				if (bbox.length == 8) {
 					qd.buf8.clear();
 					qd.buf8.put(bbox);
 					qd.buf8.position(0);
-					if(first) {
-						first = false;
-						top = bottom = qd.buf8.getInt();
-						left = right = qd.buf8.getInt();
-					} else {
-						int y = qd.buf8.getInt();
-						int x = qd.buf8.getInt();
-						top = Math.max(y, top);
-						bottom = Math.min(y, bottom);
-						left = Math.min(x, left);
-						right = Math.max(x, right);
-					}
+					int y = qd.buf8.getInt();
+					int x = qd.buf8.getInt();
+					qd.boundary.update(x, y);
 				} else if(bbox.length == 16) {
 					qd.buf16.clear();
 					qd.buf16.put(bbox);
@@ -133,42 +254,30 @@ public class IndexIdByBbox {
 					int l = qd.buf16.getInt();
 					int r = qd.buf16.getInt();
 					int b = qd.buf16.getInt();
-					if(first) {
-						first = false;
-						bottom = b;
-						top = t;
-						left = l;
-						right = r;
-					} else {
-						top = Math.max(t, top);
-						bottom = Math.min(b, bottom);
-						left = Math.min(l, left);
-						right = Math.max(r, right);
-					}
+					qd.boundary.update(t, l, b, r);
 				} else {
-					throw new UnsupportedOperationException();
+					for (int h = 0; h < bbox.length; h += 16) {
+						qd.buf16.clear();
+						qd.buf16.put(bbox, h, 16);
+						qd.buf16.position(0);
+						int t = qd.buf16.getInt();
+						int l = qd.buf16.getInt();
+						int r = qd.buf16.getInt();
+						int b = qd.buf16.getInt();
+						qd.boundary.update(t, l, b, r);
+					}
 				}
-				
 			}
-			if(first) {
+			if(qd.boundary.isEmpty()) {
 				return null;
 			}
-			qd.top = top / 10000000.0;
-			qd.bottom = bottom / 10000000.0;
-			qd.left = left / 10000000.0;
-			qd.right = right / 10000000.0;
-			qd.buf16.clear();
-			qd.buf16.putInt(top);
-			qd.buf16.putInt(left);
-			qd.buf16.putInt(right);
-			qd.buf16.putInt(bottom);
-			return qd.buf16.array();
+			return qd.boundary.getBytes(qd.buf16);
 		}
 		
 		public void put(long id, LatLon ll, QueryData qd) throws Exception {
 			qd.buf8.clear();
-			qd.buf8.putInt((int) (MapUtils.checkLatitude(ll.getLatitude()) * 10000000));
-			qd.buf8.putInt((int) (MapUtils.checkLongitude(ll.getLongitude()) * 10000000));
+			qd.buf8.putInt(qd.boundary.convertLat(ll.getLatitude()));
+			qd.buf8.putInt(qd.boundary.convertLon(ll.getLongitude()));
 			putBbox(id, qd.buf8.array());			
 		} 
 	}
@@ -205,12 +314,13 @@ public class IndexIdByBbox {
 		}
 	}
 	
-	static class SqliteDatabaseAdapter extends DatabaseAdapter {
+	class SqliteDatabaseAdapter extends DatabaseAdapter {
 		private int count;
 		private DBDialect sqlite = DBDialect.SQLITE;
 		private Connection db;
 		private PreparedStatement ps;
 		private PreparedStatement queryById;
+		private boolean createTables;
 
 		public SqliteDatabaseAdapter(File target) {
 			super(target);
@@ -221,6 +331,8 @@ public class IndexIdByBbox {
 		public void prepareToRead() throws Exception {
 			db = (Connection) sqlite.getDatabaseConnection(target.getAbsolutePath(), log);
 			queryById = db.prepareStatement("select bbox from node where id = ?");
+			ps = db.prepareStatement("insert or replace into node(id, bbox) values (?, ?)");
+			db.setAutoCommit(false);
 		}
 		
 		@Override
@@ -228,7 +340,7 @@ public class IndexIdByBbox {
 			if(CREATE) {
 				target.delete();
 			}
-			boolean createTables = !target.exists();
+			createTables = !target.exists();
 			db = (Connection) sqlite.getDatabaseConnection(target.getAbsolutePath(), log);
 			if(createTables) {
 				Statement stat = db.createStatement();
@@ -263,13 +375,11 @@ public class IndexIdByBbox {
 
 		@Override
 		public void close() throws Exception {
-			if (ps != null) {
-				commitBatch();
-				ps.close();
-			}
+			commitBatch();
+			ps.close();
 			queryById.close();
-			if(ps != null) {
-				db.setAutoCommit(true);
+			db.setAutoCommit(true);
+			if(createTables) {
 				db.createStatement().execute("VACUUM");
 			}
 			db.close();
@@ -370,6 +480,8 @@ public class IndexIdByBbox {
 		return id << 2;
 	}
 	
+	
+
 	private static long wayId(long id) {
 		return (id << 2) | 1;
 	}
@@ -377,6 +489,8 @@ public class IndexIdByBbox {
 	private static long relationId(long id) {
 		return (id << 2) | 2;
 	}
+	
+	
 	
 	private static long convertId(EntityId eid) {
 		if(eid.getType() == EntityType.NODE) {
@@ -388,36 +502,102 @@ public class IndexIdByBbox {
 		}
 	}
 	
+	protected File[] getSortedFiles(File dir){
+		File[] listFiles = dir.listFiles();
+		Arrays.sort(listFiles, new Comparator<File>(){
+			@Override
+			public int compare(File o1, File o2) {
+				return o1.getName().compareTo(o2.getName());
+			}
+		});
+		return listFiles;
+	}
 	
-	public void splitRegionsOsc(String oscFile, String indexFile) throws Exception {
+	public void splitRegionsOsc(String oscFolder, String indexFile, String planetFile) throws Exception {
 		OsmBaseStorage reader = new OsmBaseStorage();
-		final DatabaseAdapter adapter = new SqliteDatabaseAdapter(new File(indexFile));
+		File index = new File(indexFile);
+		if(!index.exists()) {
+			createIdToBBoxIndex(indexFile, planetFile);
+		}
+		final DatabaseAdapter adapter = new SqliteDatabaseAdapter(index);
 		adapter.prepareToRead();
+		for(File f : getSortedFiles(new File(oscFolder))) {
+			if(f.getName().endsWith("osc.gz") && (System.currentTimeMillis() - f.lastModified() > 30000)) {
+				updateOsmFile(f, reader, adapter);
+			}
+		}
+		adapter.close();
+	}
+
+	private void updateOsmFile(File oscFile, OsmBaseStorage reader, final DatabaseAdapter adapter) throws FileNotFoundException,
+			IOException, SAXException, Exception {
 		final QueryData qd = new QueryData();
+		final TLongArrayList included = new TLongArrayList();
 		reader.getFilters().add(new IOsmStorageFilter() {
 
 			@Override
 			public boolean acceptEntityToLoad(OsmBaseStorage storage, EntityId entityId, Entity entity) {
-				qd.ids.add(convertId(entityId));
+				try {
+					long key = convertId(entityId);
+					included.add(key);
+					if(entity instanceof Node) {
+						LatLon ll = ((Node) entity).getLatLon();
+						if (ll != null && ll.getLatitude() != 0 && ll.getLongitude() != 0) {
+							qd.ids.clear();
+							qd.ids.add(key);
+							adapter.getBbox(qd);
+							qd.boundary.update(ll);
+							adapter.putBbox(key, qd.boundary.getBytes(qd.buf16));
+						}
+					} else if(entity instanceof Way) {
+						adapter.commitBatch();
+						qd.ids.clear();
+						for(int i = 0; i < ((Way) entity).getNodeIds().size(); i++) {
+							qd.ids.add(nodeId(((Way) entity).getNodeIds().get(i)));
+						}
+						byte[] bbox = adapter.getBbox(qd);
+						if(bbox != null) {
+							adapter.putBbox(key, bbox);
+						}
+					} else if (entity instanceof Relation) {
+						adapter.commitBatch();
+						Iterator<EntityId> iterator = ((Relation) entity).getMemberIds().iterator();
+						qd.ids.clear();
+						while(iterator.hasNext()) {
+							EntityId nid = iterator.next();
+							qd.ids.add(convertId(nid));
+						}
+						byte[] bbox = adapter.getBbox(qd);
+						if(bbox != null) {
+							adapter.putBbox(key, bbox);
+						}
+					}
+					
+				} catch (Exception e) {
+					throw new RuntimeException(e);
+				}
 				return false;
 			}
 		});
 		InputStream stream = new BufferedInputStream(new FileInputStream(oscFile), 8192 * 4);
 		InputStream streamFile = stream;
-		long st = System.currentTimeMillis();
-		if (oscFile.endsWith(".bz2")) { //$NON-NLS-1$
+		if (oscFile.getName().endsWith(".bz2")) { //$NON-NLS-1$
 			if (stream.read() != 'B' || stream.read() != 'Z') {
 //				throw new RuntimeException("The source stream must start with the characters BZ if it is to be read as a BZip2 stream."); //$NON-NLS-1$
 			} else {
 				stream = new CBZip2InputStream(stream);
 			}
-		} else if (oscFile.endsWith(".gz")) { //$NON-NLS-1$
+		} else if (oscFile.getName().endsWith(".gz")) { //$NON-NLS-1$
 			stream = new GZIPInputStream(stream);
 		}
 		reader.parseOSM(stream, new ConsoleProgressImplementation(), streamFile, false);
+		adapter.commitBatch();
+		qd.ids.clear();
+		qd.ids.addAll(included);
 		adapter.getBbox(qd);
-		System.out.println("Bbox " + qd.top + ", " + qd.left + " - " + qd.bottom + ", " + qd.right);
-		adapter.close();
+		System.out.println(oscFile.getName());
+		System.out.println( "Bbox " + qd.boundary.getTopLat() + ", " + qd.boundary.getLeftLon() + " - "
+				+ qd.boundary.getBottomLat() + ", " + qd.boundary.getRightLon());
 	}
 
 
@@ -561,8 +741,8 @@ public class IndexIdByBbox {
 		if(args.length > 0) {
 			operation = args[0];
 		}
-//		String location = "/Users/victorshcherb/osmand/temp/Netherlands-noord-holland.pbf";
-		String location = "/Users/victorshcherb/osmand/temp/Netherlands-noord-holland.osc";
+		String location = "/Users/victorshcherb/osmand/temp/minutes/";
+//		String location = "/Users/victorshcherb/osmand/temp/Netherlands-noord-holland.osc";
 //		String location = "/Users/victorshcherb/osmand/temp/010.osc.gz";
 		
 		if (args.length > 1) {
@@ -572,20 +752,26 @@ public class IndexIdByBbox {
 		if (args.length > 2) {
 			location = args[2];
 		}
+		String planetFile = "/Users/victorshcherb/osmand/temp/Netherlands-noord-holland.pbf";;
+		if (args.length > 3) {
+			location = args[3];
+		}
 		// create
 		if (operation.equals("create")) {
 			new IndexIdByBbox().createIdToBBoxIndex(location, dbPath);
 		} else if (operation.equals("osc")) {
-			new IndexIdByBbox().splitRegionsOsc(location, dbPath);
+			new IndexIdByBbox().splitRegionsOsc(location, dbPath, planetFile);
 		} else if (operation.equals("")) {
-			final DatabaseAdapter processor = new SqliteDatabaseAdapter(new File(dbPath));
+			IndexIdByBbox ib = new IndexIdByBbox();
+			final DatabaseAdapter processor = ib.new SqliteDatabaseAdapter(new File(dbPath));
 			processor.prepareToRead();
 			QueryData qd = new QueryData();
 //			qd.ids.add(relationId(271110));
 //			qd.ids.add(wayId(93368155l));
 //			qd.ids.add(nodeId(2042972578l));
 			processor.getBbox(qd);
-			System.out.println("Bbox " + qd.top + ", " + qd.left + " - " + qd.bottom + ", " + qd.right);
+			System.out.println("Bbox " + qd.boundary.getTopLat() + ", " + qd.boundary.getLeftLon() + " - " 
+					+ qd.boundary.getBottomLat() + ", " + qd.boundary.getRightLon());
 			processor.close();
 		}
 	}

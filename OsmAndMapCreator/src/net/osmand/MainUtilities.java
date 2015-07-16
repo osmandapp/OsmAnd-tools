@@ -18,6 +18,7 @@ import net.osmand.osm.MapRenderingTypes;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.util.ResourceDeleter;
 import net.osmand.regions.CountryOcbfGeneration;
+import net.osmand.swing.DataExtractionSettings;
 
 public class MainUtilities {
 	private static Log log = PlatformUtil.getLog(MainUtilities.class);
@@ -74,8 +75,15 @@ public class MainUtilities {
 
 	private static void generateObf(String[] subArgsArray, IndexCreator ic) throws IOException, SAXException,
 			SQLException, InterruptedException {
+		String fn = DataExtractionSettings.getSettings().getMapRenderingTypesFile();
+		MapRenderingTypesEncoder types;
+		if(fn == null || fn.length() == 0){
+			types = MapRenderingTypesEncoder.getDefault();
+		} else {
+			types = new MapRenderingTypesEncoder(fn);
+		}
 		ic.generateIndexes(new File(subArgsArray[0]),
-				new ConsoleProgressImplementation(), null, MapZooms.getDefault(), MapRenderingTypesEncoder.getDefault(),
+				new ConsoleProgressImplementation(), null, MapZooms.getDefault(), types,
 				log);
 	}
 
