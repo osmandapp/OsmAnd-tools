@@ -804,15 +804,15 @@ public class IndexIdByBbox {
 		}
 		String dbPath = new File(location).getParentFile() + "/bboxbyid.sqlite";
 		if (args.length > 2) {
-			location = args[2];
+			dbPath = args[2];
 		}
 		String planetFile = "/Users/victorshcherb/osmand/temp/Netherlands-noord-holland.pbf";
 		if (args.length > 3) {
-			location = args[3];
+			planetFile = args[3];
 		}
 		String ocbfFile = "/Users/victorshcherb/osmand/repos/resources/countries-info/regions.ocbf";
 		if (args.length > 4) {
-			location = args[4];
+			ocbfFile = args[4];
 		}
 		// create
 		if (operation.equals("create")) {
