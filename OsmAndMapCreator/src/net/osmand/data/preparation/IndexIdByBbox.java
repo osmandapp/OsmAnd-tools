@@ -54,7 +54,6 @@ import org.xml.sax.SAXException;
 public class IndexIdByBbox {
 	private static final Log log = LogFactory.getLog(IndexIdByBbox.class);
 	private static final int BATCH_SIZE = 100000;
-	private static final boolean CREATE = false;
 	public static byte[] longToBytes(long l) {
 	    byte[] result = new byte[8];
 	    for (int i = 7; i >= 0; i--) {
@@ -397,9 +396,6 @@ public class IndexIdByBbox {
 		
 		@Override
 		public void prepareToCreate() throws DBException, IOException, SQLException {
-			if(CREATE) {
-				target.delete();
-			}
 			createTables = !target.exists();
 			db = (Connection) sqlite.getDatabaseConnection(target.getAbsolutePath(), log);
 			if(createTables) {
@@ -614,7 +610,7 @@ public class IndexIdByBbox {
 	public void splitRegionsOsc(String oscFolder, String indexFile, String planetFile, String ocbfFile) throws Exception {
 		File index = new File(indexFile);
 		if(!index.exists()) {
-			createIdToBBoxIndex(indexFile, planetFile);
+			createIdToBBoxIndex(indexFile, planetFile, true);
 		}
 		final DatabaseAdapter adapter = new SqliteDatabaseAdapter(index);
 		adapter.prepareToRead();
@@ -735,7 +731,7 @@ public class IndexIdByBbox {
 	}
 
 
-	public void createIdToBBoxIndex(String location, String filename) throws FileNotFoundException, Exception,
+	public void createIdToBBoxIndex(String location, String filename, final boolean recreateNodes) throws FileNotFoundException, Exception,
 			IOException {
 		FileInputStream fis = new FileInputStream(location);
 		// 1 null bbox for ways, 2 relation null bbox, 3 relations not processed because of loop
@@ -760,7 +756,9 @@ public class IndexIdByBbox {
 				}
 				try {
 					if(entity instanceof Node) {
-						processor.put( nodeId(entity.getId()), entity.getLatLon(), qd );
+						if(recreateNodes) {
+							processor.put(nodeId(entity.getId()), entity.getLatLon(), qd);
+						}
 						progress++;
 						count ++;
 					} else if(entity instanceof Way) {
@@ -794,8 +792,16 @@ public class IndexIdByBbox {
 					}
 					if (count >= BATCH_SIZE) {
 						count = 0;
-						System.out.println("Progress " + progress + " "
-								+ (progress * 1000l / (System.currentTimeMillis() - time)) + " rec/second");
+						long ms = System.currentTimeMillis();
+						if (ms > time) {
+							System.out.println("Progress " + progress + " "
+									+ (progress * 1000l / (ms - time)) + " rec/second");
+							if (qd.queried > 0) {
+								System.out.println("Query speed "
+										+ +(qd.queried * 1000l / (ms - time)) + " rec/second");
+								qd.queried = 0;
+							}
+						}
 					}
 					return false;
 				} catch (Exception e) {
@@ -896,7 +902,9 @@ public class IndexIdByBbox {
 		}
 		// create
 		if (operation.equals("create")) {
-			new IndexIdByBbox().createIdToBBoxIndex(location, dbPath);
+			new IndexIdByBbox().createIdToBBoxIndex(location, dbPath, true);
+		} else if (operation.equals("create-ways")) {
+			new IndexIdByBbox().createIdToBBoxIndex(location, dbPath, false);
 		} else if (operation.equals("osc")) {
 			new IndexIdByBbox().splitRegionsOsc(location, dbPath, planetFile, ocbfFile);
 		} else if (operation.equals("")) {
