@@ -237,6 +237,8 @@ public class IndexIdByBbox {
 		TLongArrayList missing = new TLongArrayList();
 		TLongArrayList ids = new TLongArrayList();
 		Boundary boundary = new Boundary();
+		long queried;
+		long written;
 	}
 	
 	abstract static class DatabaseAdapter {
@@ -257,11 +259,13 @@ public class IndexIdByBbox {
 		
 		public abstract byte[] query(long id) throws Exception;
 		
+		
 		public byte[] getBbox(QueryData qd) throws Exception {
 			qd.missing.clear();
 			qd.boundary.clear();
 			for(int i = 0; i < qd.ids.size(); i++){
 				long id = qd.ids.get(i);
+				qd.queried ++;
 				byte[] bbox = query(id);
 				if(bbox == null) {
 					qd.missing.add(id);
@@ -564,7 +568,9 @@ public class IndexIdByBbox {
 		OsmBaseStorage reader = new OsmBaseStorage();
 		final QueryData qd = new QueryData();
 		final TLongArrayList included = new TLongArrayList();
+		long ms = System.currentTimeMillis();
 		reader.getFilters().add(new IOsmStorageFilter() {
+
 
 			@Override
 			public boolean acceptEntityToLoad(OsmBaseStorage storage, EntityId entityId, Entity entity) {
@@ -578,6 +584,7 @@ public class IndexIdByBbox {
 							qd.ids.add(key);
 							adapter.getBbox(qd);
 							qd.boundary.update(ll);
+							qd.written ++;
 							adapter.putBbox(key, qd.boundary.getBytes(qd.buf16));
 						}
 					} else if(entity instanceof Way) {
@@ -588,6 +595,7 @@ public class IndexIdByBbox {
 						}
 						byte[] bbox = adapter.getBbox(qd);
 						if(bbox != null) {
+							qd.written ++;
 							adapter.putBbox(key, bbox);
 						}
 					} else if (entity instanceof Relation) {
@@ -600,6 +608,7 @@ public class IndexIdByBbox {
 						}
 						byte[] bbox = adapter.getBbox(qd);
 						if(bbox != null) {
+							qd.written ++;
 							adapter.putBbox(key, bbox);
 						}
 					}
@@ -610,6 +619,7 @@ public class IndexIdByBbox {
 				return false;
 			}
 		});
+		
 		InputStream stream = new BufferedInputStream(new FileInputStream(oscFile), 8192 * 4);
 		InputStream streamFile = stream;
 		if (oscFile.getName().endsWith(".bz2")) { //$NON-NLS-1$
@@ -623,9 +633,13 @@ public class IndexIdByBbox {
 		}
 		reader.parseOSM(stream, new ConsoleProgressImplementation(), streamFile, false);
 		adapter.commitBatch();
+		System.out.println("Queried " + (qd.queried * 1000l) / (System.currentTimeMillis() - ms + 1) + " rec/s");
 		qd.ids.clear();
 		qd.ids.addAll(included);
+		ms = System.currentTimeMillis();
+		qd.queried = 0;
 		adapter.getBbox(qd);
+		System.out.println("Final queried " + (qd.queried * 1000l) / (System.currentTimeMillis() - ms + 1) + " rec/s");
 		System.out.println(oscFile.getName());
 		System.out.println("BBOX " + qd.boundary.depth() + " " + qd.boundary.getBoundaryString());
 		Set<String> keyNames = new HashSet<String>();
