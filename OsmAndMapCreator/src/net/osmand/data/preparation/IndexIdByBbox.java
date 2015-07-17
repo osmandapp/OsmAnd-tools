@@ -239,6 +239,43 @@ public class IndexIdByBbox {
 		Boundary boundary = new Boundary();
 		long queried;
 		long written;
+		
+		
+		public void updateBoundary(long id, byte[] bbox) {
+			queried ++;
+			if(bbox == null) {
+				missing.add(id);
+				return;
+			}
+			if (bbox.length == 8) {
+				buf8.clear();
+				buf8.put(bbox);
+				buf8.position(0);
+				int y = buf8.getInt();
+				int x = buf8.getInt();
+				boundary.update(x, y);
+			} else if(bbox.length == 16) {
+				buf16.clear();
+				buf16.put(bbox);
+				buf16.position(0);
+				int t = buf16.getInt();
+				int l = buf16.getInt();
+				int r = buf16.getInt();
+				int b = buf16.getInt();
+				boundary.update(t, l, b, r);
+			} else {
+				for (int h = 0; h < bbox.length; h += 16) {
+					buf16.clear();
+					buf16.put(bbox, h, 16);
+					buf16.position(0);
+					int t = buf16.getInt();
+					int l = buf16.getInt();
+					int r = buf16.getInt();
+					int b = buf16.getInt();
+					boundary.update(t, l, b, r);
+				}
+			}			
+		}
 	}
 	
 	abstract static class DatabaseAdapter {
@@ -259,46 +296,13 @@ public class IndexIdByBbox {
 		
 		public abstract byte[] query(long id) throws Exception;
 		
-		
 		public byte[] getBbox(QueryData qd) throws Exception {
 			qd.missing.clear();
 			qd.boundary.clear();
 			for(int i = 0; i < qd.ids.size(); i++){
 				long id = qd.ids.get(i);
-				qd.queried ++;
 				byte[] bbox = query(id);
-				if(bbox == null) {
-					qd.missing.add(id);
-					continue;
-				}
-				if (bbox.length == 8) {
-					qd.buf8.clear();
-					qd.buf8.put(bbox);
-					qd.buf8.position(0);
-					int y = qd.buf8.getInt();
-					int x = qd.buf8.getInt();
-					qd.boundary.update(x, y);
-				} else if(bbox.length == 16) {
-					qd.buf16.clear();
-					qd.buf16.put(bbox);
-					qd.buf16.position(0);
-					int t = qd.buf16.getInt();
-					int l = qd.buf16.getInt();
-					int r = qd.buf16.getInt();
-					int b = qd.buf16.getInt();
-					qd.boundary.update(t, l, b, r);
-				} else {
-					for (int h = 0; h < bbox.length; h += 16) {
-						qd.buf16.clear();
-						qd.buf16.put(bbox, h, 16);
-						qd.buf16.position(0);
-						int t = qd.buf16.getInt();
-						int l = qd.buf16.getInt();
-						int r = qd.buf16.getInt();
-						int b = qd.buf16.getInt();
-						qd.boundary.update(t, l, b, r);
-					}
-				}
+				qd.updateBoundary(id, bbox);
 			}
 			if(qd.boundary.isEmpty()) {
 				return null;
@@ -352,6 +356,8 @@ public class IndexIdByBbox {
 		private Connection db;
 		private PreparedStatement ps;
 		private PreparedStatement queryById;
+		private PreparedStatement queryByIdIn10;
+		private PreparedStatement queryByIdIn100;
 		private boolean createTables;
 
 		public SqliteDatabaseAdapter(File target) {
@@ -362,9 +368,31 @@ public class IndexIdByBbox {
 		@Override
 		public void prepareToRead() throws Exception {
 			db = (Connection) sqlite.getDatabaseConnection(target.getAbsolutePath(), log);
-			queryById = db.prepareStatement("select bbox from node where id = ?");
+			prepareQueryStats();
 			ps = db.prepareStatement("insert or replace into node(id, bbox) values (?, ?)");
 			db.setAutoCommit(false);
+		}
+
+
+		private void prepareQueryStats() throws SQLException {
+			queryById = db.prepareStatement("select bbox from node where id = ?");
+			String b = "select id, bbox from node where id in (";
+			String b100 = b;
+			String b10 = b;
+			for (int i = 0; i < 100; i++) {
+				if (i > 0) {
+					b100 += ", ";
+				}
+				b100 += "?";
+			}
+			for (int i = 0; i < 10; i++) {
+				if (i > 0) {
+					b10 += ", ";
+				}
+				b10 += "?";
+			}
+			queryByIdIn100 = db.prepareStatement(b100 + ")");
+			queryByIdIn10 = db.prepareStatement(b10 + ")");
 		}
 		
 		@Override
@@ -380,7 +408,7 @@ public class IndexIdByBbox {
 				stat.executeUpdate("create index IdIndex ON node (id)"); //$NON-NLS-1$
 				stat.close();
 			}
-			queryById = db.prepareStatement("select bbox from node where id = ?");
+			prepareQueryStats();
 			ps = db.prepareStatement("insert or ignore into node(id, bbox) values (?, ?)");
 			db.setAutoCommit(false);
 		}
@@ -410,11 +438,49 @@ public class IndexIdByBbox {
 			commitBatch();
 			ps.close();
 			queryById.close();
+			queryByIdIn10.close();
+			queryByIdIn100.close();
 			db.setAutoCommit(true);
 			if(createTables) {
 				db.createStatement().execute("VACUUM");
 			}
 			db.close();
+		}
+		
+		@Override
+		public byte[] getBbox(QueryData qd) throws Exception {
+			qd.missing.clear();
+			qd.boundary.clear();
+			int begin = 0;
+			while(begin < qd.ids.size()) {
+				int ind = 0;
+				PreparedStatement p = queryByIdIn100;
+				if(qd.ids.size() - begin > 100) {
+					while(ind < 100) {
+						long l = qd.ids.get(begin + ind);
+						queryByIdIn100.setLong(ind + 1, l);
+						ind++;
+					}
+				} else {
+					p = queryByIdIn10;
+					while(ind < 10) {
+						long l = qd.ids.get(begin + ind >= qd.ids.size() ? qd.ids.size() - 1 : begin + ind);
+						queryByIdIn10.setLong(ind + 1, l);
+						ind++;
+					}
+				}
+				ResultSet rs = p.executeQuery();
+				while(rs.next()) {
+					byte[] bbox =  rs.getBytes(2);
+					long id = rs.getLong(1);
+					qd.updateBoundary(id, bbox);
+				}
+				begin += ind;
+			}
+			if(qd.boundary.isEmpty()) {
+				return null;
+			}
+			return qd.boundary.getBytes(qd.buf16);
 		}
 
 		@Override
