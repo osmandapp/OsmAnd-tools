@@ -799,7 +799,6 @@ public class IndexIdByBbox {
 							if (qd.queried > 0) {
 								System.out.println("Query speed "
 										+ +(qd.queried * 1000l / (ms - time)) + " rec/second");
-								qd.queried = 0;
 							}
 						}
 					}
