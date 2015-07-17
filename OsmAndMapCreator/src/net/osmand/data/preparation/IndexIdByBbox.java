@@ -902,9 +902,9 @@ public class IndexIdByBbox {
 		}
 		// create
 		if (operation.equals("create")) {
-			new IndexIdByBbox().createIdToBBoxIndex(location, dbPath, true);
+			new IndexIdByBbox().createIdToBBoxIndex(planetFile, dbPath, true);
 		} else if (operation.equals("create-ways")) {
-			new IndexIdByBbox().createIdToBBoxIndex(location, dbPath, false);
+			new IndexIdByBbox().createIdToBBoxIndex(planetFile, dbPath, false);
 		} else if (operation.equals("osc")) {
 			new IndexIdByBbox().splitRegionsOsc(location, dbPath, planetFile, ocbfFile);
 		} else if (operation.equals("")) {
