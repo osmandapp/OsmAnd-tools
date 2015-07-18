@@ -610,23 +610,28 @@ public class IndexIdByBbox {
 	public void splitRegionsOsc(String oscFolder, String indexFile, String planetFile, String ocbfFile) throws Exception {
 		File index = new File(indexFile);
 		if(!index.exists()) {
-			createIdToBBoxIndex(indexFile, planetFile, true);
+			createIdToBBoxIndex(planetFile, indexFile , true);
 		}
 		final DatabaseAdapter adapter = new SqliteDatabaseAdapter(index);
 		adapter.prepareToRead();
 		OsmandRegions regs = new OsmandRegions();
 		regs.prepareFile(ocbfFile);
 		regs.cacheAllCountries();
-		for(File f : getSortedFiles(new File(oscFolder))) {
+		File diffFolder = new File(oscFolder);
+		File procFolder = new File(oscFolder, "processed");
+		procFolder.mkdirs();
+		for(File f : getSortedFiles(diffFolder)) {
 			if(f.getName().endsWith("osc.gz") && (System.currentTimeMillis() - f.lastModified() > 30000)) {
-				updateOsmFile(f, adapter, regs);
+				updateOsmFile(f, adapter, regs, procFolder);
 			}
 		}
 		adapter.close();
 	}
 
-	private void updateOsmFile(File oscFile, final DatabaseAdapter adapter, OsmandRegions regs) throws FileNotFoundException,
+	private void updateOsmFile(File oscFile, final DatabaseAdapter adapter, OsmandRegions regs, File procFolder) throws 
 			IOException, SAXException, Exception {
+		String baseFile = oscFile.getName().substring(0, oscFile.getName().length() - "osc.gz".length());
+		File oscFileTxt = new File(oscFile.getParentFile(), baseFile + "txt");
 		OsmBaseStorage reader = new OsmBaseStorage();
 		final QueryData qd = new QueryData();
 		final TLongArrayList included = new TLongArrayList();
@@ -725,20 +730,22 @@ public class IndexIdByBbox {
 		for(String s : keyNames) {
 			File folder = new File(oscFile.getParentFile(), s);
 			folder.mkdirs();
-			File dst = new File(folder, oscFile.getName());
-			Algorithms.fileCopy(oscFile, dst);
+			Algorithms.fileCopy(oscFile, new File(folder, oscFile.getName()));
+			Algorithms.fileCopy(oscFileTxt, new File(folder, oscFileTxt.getName()));
 		}
+		oscFile.renameTo(new File(procFolder, oscFile.getName()));
+		oscFileTxt.renameTo(new File(procFolder, oscFileTxt.getName()));
 	}
 
 
-	public void createIdToBBoxIndex(String location, String filename, final boolean recreateNodes) throws FileNotFoundException, Exception,
+	public void createIdToBBoxIndex(String planetFile, String index, final boolean recreateNodes) throws FileNotFoundException, Exception,
 			IOException {
-		FileInputStream fis = new FileInputStream(location);
+		FileInputStream fis = new FileInputStream(planetFile);
 		// 1 null bbox for ways, 2 relation null bbox, 3 relations not processed because of loop
 		final int[] stats = new int[] {0, 0, 0};
 //		final DatabaseTest test = new NullDatabaseTest(new File(folder, filename + ".leveldb"));
 //		final DatabaseTest test = new LevelDbDatabaseTest(new File(folder, filename + ".leveldb"));
-		final DatabaseAdapter processor = new SqliteDatabaseAdapter(new File(filename));
+		final DatabaseAdapter processor = new SqliteDatabaseAdapter(new File(index));
 		OsmBaseStoragePbf pbfReader = new OsmBaseStoragePbf();
 		processor.prepareToCreate();
 		final QueryData qd = new QueryData();
@@ -911,7 +918,7 @@ public class IndexIdByBbox {
 			final DatabaseAdapter processor = ib.new SqliteDatabaseAdapter(new File(dbPath));
 			processor.prepareToRead();
 			QueryData qd = new QueryData();
-//			qd.ids.add(relationId(271110));
+			qd.ids.add(relationId(271110));
 //			qd.ids.add(wayId(93368155l));
 //			qd.ids.add(nodeId(2042972578l));
 			processor.getBbox(qd);
