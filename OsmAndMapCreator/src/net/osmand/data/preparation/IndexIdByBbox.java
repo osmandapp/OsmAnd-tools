@@ -1,11 +1,13 @@
 package net.osmand.data.preparation;
 
 import gnu.trove.list.array.TLongArrayList;
+import gnu.trove.map.hash.TLongObjectHashMap;
 
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
@@ -17,11 +19,14 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 
 import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.data.LatLon;
@@ -632,61 +637,15 @@ public class IndexIdByBbox {
 			IOException, SAXException, Exception {
 		String baseFile = oscFile.getName().substring(0, oscFile.getName().length() - "osc.gz".length());
 		File oscFileTxt = new File(oscFile.getParentFile(), baseFile + "txt");
+		if(!oscFileTxt.exists()) {
+			System.err.println("Osc file is not complete " + oscFileTxt.getName());
+			return;
+		}
 		OsmBaseStorage reader = new OsmBaseStorage();
 		final QueryData qd = new QueryData();
-		final TLongArrayList included = new TLongArrayList();
+		Map<String, TLongArrayList> countryUpdates = new HashMap<String, TLongArrayList>();
 		long ms = System.currentTimeMillis();
-		reader.getFilters().add(new IOsmStorageFilter() {
-
-
-			@Override
-			public boolean acceptEntityToLoad(OsmBaseStorage storage, EntityId entityId, Entity entity) {
-				try {
-					long key = convertId(entityId);
-					included.add(key);
-					if(entity instanceof Node) {
-						LatLon ll = ((Node) entity).getLatLon();
-						if (ll != null && ll.getLatitude() != 0 && ll.getLongitude() != 0) {
-							qd.ids.clear();
-							qd.ids.add(key);
-							adapter.getBbox(qd);
-							qd.boundary.update(ll);
-							qd.written ++;
-							adapter.putBbox(key, qd.boundary.getBytes(qd.buf16));
-						}
-					} else if(entity instanceof Way) {
-						adapter.commitBatch();
-						qd.ids.clear();
-						for(int i = 0; i < ((Way) entity).getNodeIds().size(); i++) {
-							qd.ids.add(nodeId(((Way) entity).getNodeIds().get(i)));
-						}
-						byte[] bbox = adapter.getBbox(qd);
-						if(bbox != null) {
-							qd.written ++;
-							adapter.putBbox(key, bbox);
-						}
-					} else if (entity instanceof Relation) {
-						adapter.commitBatch();
-						Iterator<EntityId> iterator = ((Relation) entity).getMemberIds().iterator();
-						qd.ids.clear();
-						while(iterator.hasNext()) {
-							EntityId nid = iterator.next();
-							qd.ids.add(convertId(nid));
-						}
-						byte[] bbox = adapter.getBbox(qd);
-						if(bbox != null) {
-							qd.written ++;
-							adapter.putBbox(key, bbox);
-						}
-					}
-					
-				} catch (Exception e) {
-					throw new RuntimeException(e);
-				}
-				return false;
-			}
-		});
-		
+		reader.getFilters().add(updateBbboxIncrementally(regs, adapter, qd, countryUpdates));
 		InputStream stream = new BufferedInputStream(new FileInputStream(oscFile), 8192 * 4);
 		InputStream streamFile = stream;
 		if (oscFile.getName().endsWith(".bz2")) { //$NON-NLS-1$
@@ -701,16 +660,43 @@ public class IndexIdByBbox {
 		reader.parseOSM(stream, new ConsoleProgressImplementation(), streamFile, false);
 		adapter.commitBatch();
 		System.out.println("Queried " + (qd.queried * 1000l) / (System.currentTimeMillis() - ms + 1) + " rec/s");
-		qd.ids.clear();
-		qd.ids.addAll(included);
-		ms = System.currentTimeMillis();
-		qd.queried = 0;
-		adapter.getBbox(qd);
-		System.out.println("Final queried " + (qd.queried * 1000l) / (System.currentTimeMillis() - ms + 1) + " rec/s");
-		System.out.println(oscFile.getName());
-		System.out.println("BBOX " + qd.boundary.depth() + " " + qd.boundary.getBoundaryString());
-		Set<String> keyNames = new HashSet<String>();
+		System.out.println(countryUpdates);
+		for(String country : countryUpdates.keySet()) {
+			File folder = new File(oscFile.getParentFile(), country);
+			folder.mkdirs();
+			
+			Algorithms.fileCopy(oscFile, new File(folder, oscFile.getName()));
+			Algorithms.fileCopy(oscFileTxt, new File(folder, oscFileTxt.getName()));
+			File ids = new File(folder, baseFile + ".ids.txt");
+			FileOutputStream fous = new FileOutputStream(ids);
+			GZIPOutputStream gzout = new GZIPOutputStream(fous);
+			for (long id : countryUpdates.get(country).toArray()) {
+				long nid = id >> 2;
+				if(id % 4 == 0) {
+					gzout.write("N ".getBytes());
+				} else if(id % 4 == 1) {
+					gzout.write("W ".getBytes());
+				} else if(id % 4 == 2) {
+					gzout.write("R ".getBytes());
+				} else {
+					gzout.write("? ".getBytes());
+				}
+				gzout.write((nid+"\n").getBytes());
+			}
+			gzout.close();
+			fous.close();
+		}
+		oscFile.renameTo(new File(procFolder, oscFile.getName()));
+		oscFileTxt.renameTo(new File(procFolder, oscFileTxt.getName()));
+	}
+
+	private void updateDownloadList(OsmandRegions regs, final QueryData qd, Map<String, TLongArrayList> keyNames,
+			long id) throws IOException {
 		Boundary  b = qd.boundary;
+		if(qd.boundary.isEmpty()) {
+			System.err.println("Empty boundary " + (id >> 2) + " " + (id % 4));
+			return;
+		}
 		while(b != null) {
 			List<BinaryMapDataObject> bbox = regs.queryBbox(
 					MapUtils.get31TileNumberX(b.getLeftLon()), 
@@ -721,20 +707,65 @@ public class IndexIdByBbox {
 				String fn = regs.getFullName(bo);
 				String downloadName = regs.getMapDownloadType(fn);
 				if(!Algorithms.isEmpty(downloadName)) {
-					keyNames.add(downloadName);
+					if(!keyNames.containsKey(downloadName) ) {
+						keyNames.put(downloadName, new TLongArrayList());	
+					}
+					keyNames.get(downloadName).add(id);
 				}
 			}
 			b = b.next;
 		}
-		System.out.println(keyNames);
-		for(String s : keyNames) {
-			File folder = new File(oscFile.getParentFile(), s);
-			folder.mkdirs();
-			Algorithms.fileCopy(oscFile, new File(folder, oscFile.getName()));
-			Algorithms.fileCopy(oscFileTxt, new File(folder, oscFileTxt.getName()));
-		}
-		oscFile.renameTo(new File(procFolder, oscFile.getName()));
-		oscFileTxt.renameTo(new File(procFolder, oscFileTxt.getName()));
+	}
+
+	private IOsmStorageFilter updateBbboxIncrementally(final OsmandRegions regs, final DatabaseAdapter adapter, final QueryData qd,
+			final Map<String, TLongArrayList> included) {
+		return new IOsmStorageFilter() {
+			@Override
+			public boolean acceptEntityToLoad(OsmBaseStorage storage, EntityId entityId, Entity entity) {
+				try {
+					long key = convertId(entityId);
+					qd.ids.clear();
+					qd.boundary.clear();
+					if(entity instanceof Node) {
+						LatLon ll = ((Node) entity).getLatLon();
+						if (ll != null && ll.getLatitude() != 0 && ll.getLongitude() != 0) {
+							qd.ids.add(key);
+							adapter.getBbox(qd);
+							qd.boundary.update(ll);
+							qd.written ++;
+							adapter.putBbox(key, qd.boundary.getBytes(qd.buf16));
+						}
+					} else if(entity instanceof Way) {
+						adapter.commitBatch();
+						for(int i = 0; i < ((Way) entity).getNodeIds().size(); i++) {
+							qd.ids.add(nodeId(((Way) entity).getNodeIds().get(i)));
+						}
+						byte[] bbox = adapter.getBbox(qd);
+						if(bbox != null) {
+							qd.written ++;
+							adapter.putBbox(key, bbox);
+						}
+					} else if (entity instanceof Relation) {
+						adapter.commitBatch();
+						Iterator<EntityId> iterator = ((Relation) entity).getMemberIds().iterator();
+						while(iterator.hasNext()) {
+							EntityId nid = iterator.next();
+							qd.ids.add(convertId(nid));
+						}
+						byte[] bbox = adapter.getBbox(qd);
+						if(bbox != null) {
+							qd.written ++;
+							adapter.putBbox(key, bbox);
+						}
+					}
+					updateDownloadList(regs, qd, included, key);
+					
+				} catch (Exception e) {
+					throw new RuntimeException(e);
+				}
+				return false;
+			}
+		};
 	}
 
 
