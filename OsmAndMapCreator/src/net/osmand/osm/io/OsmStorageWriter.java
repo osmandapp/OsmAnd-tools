@@ -35,6 +35,7 @@ import java.util.LinkedHashSet;
 import java.util.Map.Entry;
 import java.util.Stack;
 
+import javax.xml.stream.FactoryConfigurationError;
 import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamWriter;
@@ -58,46 +59,53 @@ public class OsmStorageWriter {
 	}
 	
 	
-	public void saveStorage(OutputStream output, OsmBaseStorage storage, Collection<EntityId> interestedObjects, boolean includeLinks) throws XMLStreamException, IOException {
+	public void saveStorage(OutputStream output, OsmBaseStorage storage, Collection<EntityId> interestedObjects,
+			boolean includeLinks) throws XMLStreamException, IOException {
 		Map<EntityId, Entity> entities = storage.getRegisteredEntities();
 		Map<EntityId, EntityInfo> entityInfo = storage.getRegisteredEntityInfo();
-//		transformer.setOutputProperty(OutputKeys.INDENT, "yes");
-//        String indent = "{http://xml.apache.org/xslt}indent-amount";
-//        transformer.setOutputProperty(indent, "4");
-                XMLOutputFactory xof = XMLOutputFactory.newInstance();
-                XMLStreamWriter streamWriter = xof.createXMLStreamWriter(new OutputStreamWriter(output));
- 
+
 		Set<Node> nodes = new LinkedHashSet<Node>();
 		Set<Way> ways = new LinkedHashSet<Way>();
 		Set<Relation> relations = new LinkedHashSet<Relation>();
-		if(interestedObjects == null){
+		if (interestedObjects == null) {
 			interestedObjects = entities.keySet();
 		}
 		Stack<EntityId> toResolve = new Stack<EntityId>();
 		toResolve.addAll(interestedObjects);
-		while(!toResolve.isEmpty()){
+		while (!toResolve.isEmpty()) {
 			EntityId l = toResolve.pop();
-			if(entities.get(l) instanceof Node){
+			if (entities.get(l) instanceof Node) {
 				nodes.add((Node) entities.get(l));
-			} else if(entities.get(l) instanceof Way){
+			} else if (entities.get(l) instanceof Way) {
 				ways.add((Way) entities.get(l));
-				if(includeLinks){
-					toResolve.addAll(((Way)entities.get(l)).getEntityIds());
+				if (includeLinks) {
+					toResolve.addAll(((Way) entities.get(l)).getEntityIds());
 				}
-			} else if(entities.get(l) instanceof Relation){
+			} else if (entities.get(l) instanceof Relation) {
 				relations.add((Relation) entities.get(l));
-				if(includeLinks){
-					toResolve.addAll(((Relation)entities.get(l)).getMemberIds());
+				if (includeLinks) {
+					toResolve.addAll(((Relation) entities.get(l)).getMemberIds());
 				}
 			}
 		}
-		
-		
+
+		writeOSM(output, entityInfo, nodes, ways, relations);
+	}
+
+
+	public void writeOSM(OutputStream output, Map<EntityId, EntityInfo> entityInfo, Collection<Node> nodes,
+			Collection<Way> ways, Collection<Relation> relations) throws FactoryConfigurationError, XMLStreamException {
+		// transformer.setOutputProperty(OutputKeys.INDENT, "yes");
+		// String indent = "{http://xml.apache.org/xslt}indent-amount";
+		// transformer.setOutputProperty(indent, "4");
+		XMLOutputFactory xof = XMLOutputFactory.newInstance();
+		XMLStreamWriter streamWriter = xof.createXMLStreamWriter(new OutputStreamWriter(output));
+
 		streamWriter.writeStartDocument();
-		
+
 		writeStartElement(streamWriter, ELEM_OSM, "");
 		streamWriter.writeAttribute(ATTR_VERSION, "0.6");
-		for(Node n : nodes){
+		for (Node n : nodes) {
 			writeStartElement(streamWriter, ELEM_NODE, INDENT);
 			streamWriter.writeAttribute(ATTR_LAT, String.valueOf(n.getLatitude()));
 			streamWriter.writeAttribute(ATTR_LON, String.valueOf(n.getLongitude()));
@@ -106,13 +114,13 @@ public class OsmStorageWriter {
 			writeTags(streamWriter, n);
 			writeEndElement(streamWriter, INDENT);
 		}
-		
-		for(Way w : ways){
+
+		for (Way w : ways) {
 			writeStartElement(streamWriter, ELEM_WAY, INDENT);
 			streamWriter.writeAttribute(ATTR_ID, String.valueOf(w.getId()));
 			writeEntityAttributes(streamWriter, w, entityInfo.get(EntityId.valueOf(w)));
 			TLongArrayList ids = w.getNodeIds();
-			for(int i=0; i< ids.size(); i++){
+			for (int i = 0; i < ids.size(); i++) {
 				writeStartElement(streamWriter, ELEM_ND, INDENT2);
 				streamWriter.writeAttribute(ATTR_REF, String.valueOf(ids.get(i)));
 				writeEndElement(streamWriter, INDENT2);
@@ -120,17 +128,17 @@ public class OsmStorageWriter {
 			writeTags(streamWriter, w);
 			writeEndElement(streamWriter, INDENT);
 		}
-		
-		for(Relation r : relations){
+
+		for (Relation r : relations) {
 			writeStartElement(streamWriter, ELEM_RELATION, INDENT);
 			streamWriter.writeAttribute(ATTR_ID, String.valueOf(r.getId()));
 			writeEntityAttributes(streamWriter, r, entityInfo.get(EntityId.valueOf(r)));
-			for(Entry<EntityId, String> e : r.getMembersMap().entrySet()){
+			for (Entry<EntityId, String> e : r.getMembersMap().entrySet()) {
 				writeStartElement(streamWriter, ELEM_MEMBER, INDENT2);
 				streamWriter.writeAttribute(ATTR_REF, String.valueOf(e.getKey().getId()));
 				String s = e.getValue();
-				if(s == null){
-					s = ""; 
+				if (s == null) {
+					s = "";
 				}
 				streamWriter.writeAttribute(ATTR_ROLE, s);
 				streamWriter.writeAttribute(ATTR_TYPE, e.getKey().getType().toString().toLowerCase());
@@ -139,7 +147,7 @@ public class OsmStorageWriter {
 			writeTags(streamWriter, r);
 			writeEndElement(streamWriter, INDENT);
 		}
-		
+
 		writeEndElement(streamWriter, ""); // osm
 		streamWriter.writeEndDocument();
 		streamWriter.flush();

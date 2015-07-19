@@ -1,7 +1,6 @@
 package net.osmand.data.preparation;
 
 import gnu.trove.list.array.TLongArrayList;
-import gnu.trove.map.hash.TLongObjectHashMap;
 
 import java.io.BufferedInputStream;
 import java.io.File;
@@ -10,6 +9,7 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -20,13 +20,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.zip.GZIPInputStream;
-import java.util.zip.GZIPOutputStream;
 
 import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.data.LatLon;
@@ -575,23 +572,21 @@ public class IndexIdByBbox {
 		}
 	}
 	
-	private static long nodeId(long id) {
+	public static long nodeId(long id) {
 		return id << 2;
 	}
-	
-	
 
-	private static long wayId(long id) {
+	public static long wayId(long id) {
 		return (id << 2) | 1;
 	}
 	
-	private static long relationId(long id) {
+	public static long relationId(long id) {
 		return (id << 2) | 2;
 	}
 	
 	
 	
-	private static long convertId(EntityId eid) {
+	public static long convertId(EntityId eid) {
 		if(eid.getType() == EntityType.NODE) {
 			return nodeId(eid.getId());
 		} else if(eid.getType() == EntityType.WAY) {
@@ -612,7 +607,7 @@ public class IndexIdByBbox {
 		return listFiles;
 	}
 	
-	public void splitRegionsOsc(String oscFolder, String indexFile, String planetFile, String ocbfFile) throws Exception {
+	public void splitRegionsOsc(String mainFolder, String indexFile, String planetFile, String ocbfFile) throws Exception {
 		File index = new File(indexFile);
 		if(!index.exists()) {
 			createIdToBBoxIndex(planetFile, indexFile , true);
@@ -622,10 +617,10 @@ public class IndexIdByBbox {
 		OsmandRegions regs = new OsmandRegions();
 		regs.prepareFile(ocbfFile);
 		regs.cacheAllCountries();
-		File diffFolder = new File(oscFolder);
-		File procFolder = new File(oscFolder, "processed");
+		File diffSrcFolder = new File(mainFolder, "_minutes");
+		File procFolder = new File(mainFolder, "_proc");
 		procFolder.mkdirs();
-		for(File f : getSortedFiles(diffFolder)) {
+		for(File f : getSortedFiles(diffSrcFolder)) {
 			if(f.getName().endsWith("osc.gz") && (System.currentTimeMillis() - f.lastModified() > 30000)) {
 				updateOsmFile(f, adapter, regs, procFolder);
 			}
@@ -662,14 +657,15 @@ public class IndexIdByBbox {
 		System.out.println("Queried " + (qd.queried * 1000l) / (System.currentTimeMillis() - ms + 1) + " rec/s");
 		System.out.println(countryUpdates);
 		for(String country : countryUpdates.keySet()) {
-			File folder = new File(oscFile.getParentFile(), country);
+			File folder = new File(procFolder.getParentFile(), country);
 			folder.mkdirs();
 			
 			Algorithms.fileCopy(oscFile, new File(folder, oscFile.getName()));
 			Algorithms.fileCopy(oscFileTxt, new File(folder, oscFileTxt.getName()));
-			File ids = new File(folder, baseFile + ".ids.txt");
+			File ids = new File(folder, baseFile + "ids.txt");
 			FileOutputStream fous = new FileOutputStream(ids);
-			GZIPOutputStream gzout = new GZIPOutputStream(fous);
+//			GZIPOutputStream gzout = new GZIPOutputStream(fous);
+			OutputStream gzout = fous;
 			for (long id : countryUpdates.get(country).toArray()) {
 				long nid = id >> 2;
 				if(id % 4 == 0) {
@@ -698,13 +694,17 @@ public class IndexIdByBbox {
 			return;
 		}
 		while(b != null) {
-			List<BinaryMapDataObject> bbox = regs.queryBbox(
-					MapUtils.get31TileNumberX(b.getLeftLon()), 
-					MapUtils.get31TileNumberX(b.getRightLon()), 
-					MapUtils.get31TileNumberY(b.getTopLat()), 
-					MapUtils.get31TileNumberY(b.getBottomLat()));
+			int lx = MapUtils.get31TileNumberX(b.getLeftLon());
+			int rx = MapUtils.get31TileNumberX(b.getRightLon());
+			int ty = MapUtils.get31TileNumberY(b.getTopLat());
+			int by = MapUtils.get31TileNumberY(b.getBottomLat());
+			List<BinaryMapDataObject> bbox = regs.queryBbox(lx,	rx, ty, by);
 			for(BinaryMapDataObject bo : bbox) {
+				if (!regs.intersect(bo, lx, ty, rx, by)) {
+					continue;
+				}
 				String fn = regs.getFullName(bo);
+				
 				String downloadName = regs.getMapDownloadType(fn);
 				if(!Algorithms.isEmpty(downloadName)) {
 					if(!keyNames.containsKey(downloadName) ) {
@@ -774,7 +774,7 @@ public class IndexIdByBbox {
 		FileInputStream fis = new FileInputStream(planetFile);
 		// 1 null bbox for ways, 2 relation null bbox, 3 relations not processed because of loop
 		final int[] stats = new int[] {0, 0, 0};
-//		final DatabaseTest test = new NullDatabaseTest(new File(folder, filename + ".leveldb"));
+//		final DatabaseAdapter processor = new NullDatabaseTest(new File(index));
 //		final DatabaseTest test = new LevelDbDatabaseTest(new File(folder, filename + ".leveldb"));
 		final DatabaseAdapter processor = new SqliteDatabaseAdapter(new File(index));
 		OsmBaseStoragePbf pbfReader = new OsmBaseStoragePbf();
@@ -915,10 +915,11 @@ public class IndexIdByBbox {
 		String operation = "";
 //		operation = "query";
 		operation = "osc";
+//		operation = "create";
 		if(args.length > 0) {
 			operation = args[0];
 		}
-		String location = "/Users/victorshcherb/osmand/temp/minutes/";
+		String location = "/Users/victorshcherb/osmand/temp/osmc/";
 //		String location = "/Users/victorshcherb/osmand/temp/Netherlands-noord-holland.osc";
 //		String location = "/Users/victorshcherb/osmand/temp/010.osc.gz";
 		

@@ -11,6 +11,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -39,26 +40,71 @@ public class CountryOcbfGeneration {
 		if(args != null && args.length > 0) {
 			repo = args[0];
 		}
-		String regionsXml = repo+"resources/countries-info/regions.xml";
-		String targetObf = repo+"regions.ocbf";
-		String targetOsmXml = repo+"regions.osm.xml";
+		new CountryOcbfGeneration().generate(repo);
+	}
+	
+	
+	public Map<String, File> getPolygons(String repo) {
 		String[] polygonFolders = new String[] {
 				repo +"misc/osm-planet/polygons",
 //				repo +"misc/osm-planet/gislab-polygons",
 				repo +"misc/osm-planet/geo-polygons",	
 				repo +"misc/osm-planet/srtm-polygons"
 		};
+		Map<String, File> polygonFiles = new LinkedHashMap<String, File>();
+		for (String folder : polygonFolders) {
+			scanPolygons(new File(folder), polygonFiles);
+		}
+		return polygonFiles;
+	}
+	
+	public Map<String, Set<TranslateEntity>> getTranslates(String repo) throws XmlPullParserException, IOException {
 		String[] translations = new String[] {
 				repo +"misc/osm-planet/osm-data/states_places.osm",
 				repo +"misc/osm-planet/osm-data/states_regions.osm",
 				repo +"misc/osm-planet/osm-data/countries_places.osm",
 				repo +"misc/osm-planet/osm-data/countries_admin_level_2.osm"
 		};
-		new CountryOcbfGeneration().generate(regionsXml, polygonFolders,
-				translations, targetObf, targetOsmXml);
+		Map<String, Set<TranslateEntity>> translates = new TreeMap<String, Set<TranslateEntity>>();
+		for (String t : translations) {
+			scanTranslates(new File(t), translates);
+		}
+		return translates;
 	}
 	
-	private static class TranslateEntity {
+	public CountryRegion parseRegionStructure(String repo) throws XmlPullParserException, IOException {
+		String regionsXml = repo + "resources/countries-info/regions.xml";
+		XmlPullParser parser = PlatformUtil.newXMLPullParser();
+		parser.setInput(new FileReader(regionsXml));
+		int tok;
+		CountryRegion global = new CountryRegion();
+		List<CountryRegion> stack = new ArrayList<CountryOcbfGeneration.CountryRegion>();
+		stack.add(global);
+		CountryRegion current = global;
+		while ((tok = parser.next()) != XmlPullParser.END_DOCUMENT) {
+			if (tok == XmlPullParser.START_TAG) {
+				String name = parser.getName();
+				if (name.equals("region")) {
+					Map<String, String> attrs = new LinkedHashMap<String, String>();
+					for (int i = 0; i < parser.getAttributeCount(); i++) {
+						attrs.put(parser.getAttributeName(i), parser.getAttributeValue(i));
+					}
+					CountryRegion cr = createRegion(current, attrs);
+					stack.add(cr);
+					current = cr;
+				}
+			} else if (tok == XmlPullParser.END_TAG) {
+				String name = parser.getName();
+				if (name.equals("region")) {
+					stack.remove(stack.size() - 1);
+					current = stack.get(stack.size() - 1);
+				}
+			}
+		}
+		return global;
+	}
+	
+	public static class TranslateEntity {
 		private Map<String, String> tm = new TreeMap<String, String>();
 		private String name;
 
@@ -71,7 +117,7 @@ public class CountryOcbfGeneration {
 		}
 	}
 	
-	private static class CountryRegion {
+	public static class CountryRegion {
 		CountryRegion parent = null;
 		List<CountryRegion> children = new ArrayList<CountryRegion>();
 		String name;
@@ -80,8 +126,8 @@ public class CountryOcbfGeneration {
 		String downloadPrefix;
 		String innerDownloadPrefix;
 		
-		String boundary;
-		String translate;
+		public String boundary;
+		public String translate;
 		
 		
 		public boolean map ;
@@ -89,6 +135,30 @@ public class CountryOcbfGeneration {
 		public boolean roads ;
 		public boolean hillshade ;
 		public boolean srtm ;
+		
+		public Iterator<CountryRegion> iterator() {
+			final LinkedList<CountryRegion> stack = new LinkedList<CountryRegion>(children);
+			return new Iterator<CountryRegion>() {
+
+				
+				@Override
+				public boolean hasNext() {
+					return !stack.isEmpty();
+				}
+
+				@Override
+				public CountryRegion next() {
+					CountryRegion reg = stack.pollLast();
+					stack.addAll(reg.children);
+					return reg;
+				}
+
+				@Override
+				public void remove() {
+					throw new UnsupportedOperationException();
+				}
+			};
+		}
 		
 		public String getFullName() {
 			if(parent == null) {
@@ -222,48 +292,16 @@ public class CountryOcbfGeneration {
 		translates.get(k).add(te);
 	}
 
-	private void generate(String regionsXml, String[] polygonFolders, 
-			String[] translations, String targetObf, String targetOsmXml) throws XmlPullParserException, IOException, SAXException, SQLException, InterruptedException {
-		Map<String, File> polygonFiles = new LinkedHashMap<String, File>();
-		for (String folder : polygonFolders) {
-			scanPolygons(new File(folder), polygonFiles);
-		}
-		Map<String, Set<TranslateEntity>> translates = new TreeMap<String, Set<TranslateEntity>>();
-		for (String t : translations) {
-			scanTranslates(new File(t), translates);
-		}
-		XmlPullParser parser = PlatformUtil.newXMLPullParser();
-		parser.setInput(new FileReader(regionsXml));
-		int tok;
-		CountryRegion global = new CountryRegion();
-		List<CountryRegion> stack = new ArrayList<CountryOcbfGeneration.CountryRegion>();
-		stack.add(global);
-		CountryRegion current = global;
-		while ((tok = parser.next()) != XmlPullParser.END_DOCUMENT) {
-			if (tok == XmlPullParser.START_TAG) {
-				String name = parser.getName();
-				if (name.equals("region")) {
-					Map<String, String> attrs = new LinkedHashMap<String, String>();
-					for (int i = 0; i < parser.getAttributeCount(); i++) {
-						attrs.put(parser.getAttributeName(i), parser.getAttributeValue(i));
-					}
-					CountryRegion cr = createRegion(current, attrs);
-					stack.add(cr);
-					current = cr;
-				}
-			} else if (tok == XmlPullParser.END_TAG) {
-				String name = parser.getName();
-				if (name.equals("region")) {
-					stack.remove(stack.size() - 1);
-					current = stack.get(stack.size() - 1);
-				}
-			}
-		}
+	private void generate(String repo) throws XmlPullParserException, IOException, SAXException, SQLException, InterruptedException {
+		String targetObf = repo + "regions.ocbf";
+		String targetOsmXml = repo + "regions.osm.xml";
+		Map<String, Set<TranslateEntity>> translates = getTranslates(repo);
+		Map<String, File> polygonFiles = getPolygons(repo);
+		CountryRegion global = parseRegionStructure(repo);
 		createFile(global, translates, polygonFiles, targetObf, targetOsmXml);
-
 	}
 
-	
+
 
 	private void createFile(CountryRegion global, Map<String, Set<TranslateEntity>> translates, Map<String, File> polygonFiles,
 			String targetObf, String targetOsmXml) throws IOException, SAXException, SQLException, InterruptedException {
@@ -277,12 +315,10 @@ public class CountryOcbfGeneration {
 		serializer.attribute(null, "generator", "OsmAnd");
 		serializer.setFeature(
 				"http://xmlpull.org/v1/doc/features.html#indent-output", true);
-
 		for(CountryRegion r : global.children) {
 			r.parent = null;
 			processRegion(r, translates, polygonFiles, targetObf, targetOsmXml, "", serializer);
 		}
-		
 		serializer.endDocument();
 		serializer.flush();
 		fous.close();
@@ -314,10 +350,10 @@ public class CountryOcbfGeneration {
 		String line = "key=" + r.name;
 		File boundary = null;
 		if (r.boundary != null) {
-			if (!polygonFiles.containsKey(r.boundary)) {
+			boundary = polygonFiles.get(r.boundary);
+			if (boundary == null) {
 				System.out.println("!!! Missing boundary " + r.boundary);
 			} else {
-				boundary = polygonFiles.get(r.boundary);
 				line += " boundary="+boundary.getName();
 			}
 		}
@@ -576,12 +612,11 @@ public class CountryOcbfGeneration {
 					if(!polygonFiles.containsKey(name)) {
 						polygonFiles.put(name, c);
 					} else {
-						File rm = polygonFiles.get(name);
+						File rm = polygonFiles.remove(name);
 						System.out.println("Polygon duplicate -> " + rm.getParentFile().getName() + "/" + name + " and " + 
 								c.getParentFile().getName() + "/" + name);
-						polygonFiles.put(rm.getParentFile().getName() + "/" + name, rm);
-						polygonFiles.put(c.getParentFile().getName() + "/" + name, c);
 					}
+					polygonFiles.put(c.getParentFile().getName() + "/" + name, c);
 				}
 			}
 		}
