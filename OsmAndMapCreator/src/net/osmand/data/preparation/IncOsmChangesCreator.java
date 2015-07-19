@@ -392,7 +392,7 @@ public class IncOsmChangesCreator {
 		
 		String binaryFolder = "/Users/victorshcherb/bin/";
 		if (args.length > 2) {
-			repo = args[2];
+			binaryFolder = args[2];
 		}
 		
 		new IncOsmChangesCreator().process(location, repo, binaryFolder);
