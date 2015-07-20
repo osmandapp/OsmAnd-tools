@@ -49,6 +49,7 @@ import org.apache.commons.logging.LogFactory;
 
 public class IncOsmChangesCreator {
 	private static final Log log = LogFactory.getLog(IncOsmChangesCreator.class);
+	private static final int OSC_FILES_TO_COMBINE = 100;
 	
 	private void process(String location, String repo, String binaryFolder) throws Exception {
 		CountryOcbfGeneration ocbfGeneration = new CountryOcbfGeneration();
@@ -91,7 +92,7 @@ public class IncOsmChangesCreator {
 				oscTxtFiles.add(oscFileTxt);
 				oscFilesIds.add(oscFileIdsTxt);
 			}
-			if(oscFiles.size() > 60) {
+			if(oscFiles.size() > OSC_FILES_TO_COMBINE) {
 				process(binaryFolder, pbfFile, polygonFile, oscFiles, oscTxtFiles, oscFilesIds);
 				oscFiles.clear();
 				oscTxtFiles.clear();
