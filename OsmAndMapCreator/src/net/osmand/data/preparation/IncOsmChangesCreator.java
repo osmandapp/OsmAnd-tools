@@ -134,6 +134,7 @@ public class IncOsmChangesCreator {
 						}
 						if(loadRelation) {
 							found.put(key, entity);
+							ids.remove(key);
 							Iterator<EntityId> it = r.getMemberIds().iterator();
 							while(it.hasNext()) {
 								// load next iteration other nodes
@@ -147,6 +148,7 @@ public class IncOsmChangesCreator {
 						if(search.contains(key)) {
 //							System.out.println("F" + (key >> 2));
 							found.put(key, entity);
+							ids.remove(key);
 						}
 					} else if (entity instanceof Way) {
 						boolean loadWay = search.contains(key);
@@ -163,6 +165,7 @@ public class IncOsmChangesCreator {
 						if (loadWay) {
 							// always load all nodes for way if changed or needed
 							found.put(key, entity);
+							ids.remove(key);
 							for (int i = 0; i < w.getNodeIds().size(); i++) {
 								// load next iteration other nodes
 								long toLoadNode = IndexIdByBbox.nodeId(w.getNodeIds().get(i));
