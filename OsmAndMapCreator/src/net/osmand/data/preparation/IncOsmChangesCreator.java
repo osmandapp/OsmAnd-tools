@@ -282,7 +282,8 @@ public class IncOsmChangesCreator {
 
 	private File getOutputOsmFile(File parentFile, int ind) {
 		SimpleDateFormat sdf = new SimpleDateFormat("yy_MM_dd");
-		File f = new File(parentFile, sdf.format(new Date()) + "_"+ind+".osm.gz");
+		String nd = ind < 10 ? "0"+ind : ind+"";
+		File f = new File(parentFile, sdf.format(new Date()) + "_" + nd + ".osm.gz");
 		return f;
 	}
 
