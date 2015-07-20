@@ -93,6 +93,9 @@ public class IncOsmChangesCreator {
 			}
 			if(oscFiles.size() > 20) {
 				process(binaryFolder, pbfFile, polygonFile, oscFiles, oscTxtFiles, oscFilesIds);
+				oscFiles.clear();
+				oscTxtFiles.clear();
+				oscFilesIds.clear();
 			}
 		}	
 		if(oscFiles.size() > 0) {
