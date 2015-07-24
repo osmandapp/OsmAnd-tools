@@ -49,7 +49,7 @@ import org.apache.commons.logging.LogFactory;
 
 public class IncOsmChangesCreator {
 	private static final Log log = LogFactory.getLog(IncOsmChangesCreator.class);
-	private static final int OSC_FILES_TO_COMBINE = 100;
+	private static final int OSC_FILES_TO_COMBINE = 150;
 	
 	private void process(String location, String repo, String binaryFolder) throws Exception {
 		CountryOcbfGeneration ocbfGeneration = new CountryOcbfGeneration();
@@ -69,6 +69,9 @@ public class IncOsmChangesCreator {
 					continue;
 				}
 				File pbfFile = new File(countryFolder, reg.getDownloadName() + ".pbf");
+				if(!pbfFile.exists()) {
+					extractPbf(pbfFile, reg, binaryFolder, polygonFile);
+				}
 				if(pbfFile.exists()) {
 					updatePbfFile(countryFolder, pbfFile, polygonFile, binaryFolder);
 				}
@@ -76,6 +79,24 @@ public class IncOsmChangesCreator {
 		}
 	}
 	
+	private void extractPbf(File pbfFile, CountryRegion reg, String binaryFolder, File polygonFile) {
+		if(!Algorithms.isEmpty(reg.getPolyExtract())) {
+			File fromExtract = new File(pbfFile.getParentFile().getParentFile(), reg.getPolyExtract() +".pbf");
+			if(fromExtract.exists()) {
+				List<String> args = new ArrayList<String>();
+				args.add(fromExtract.getAbsolutePath());
+				args.add("-B=" + polygonFile.getName());
+				args.add("--complex-ways");
+				args.add("--complete-ways");
+				args.add("--drop-author");
+				args.add("-o=" + pbfFile.getName());
+				exec(pbfFile.getParentFile(), "osmconvert", args);
+			} else {
+				System.err.println("Extract file doesn't exist " + fromExtract.getName());
+			}
+		}
+	}
+
 	private void updatePbfFile(File countryFolder, File pbfFile, File polygonFile, String binaryFolder) throws Exception {
 		List<File> oscFiles = new ArrayList<File>();
 		List<File> oscTxtFiles = new ArrayList<File>();
@@ -188,22 +209,22 @@ public class IncOsmChangesCreator {
 		};
 	}
 	
-	private void process(String binaryFolder, File pbfFile, File polygonFile, List<File> oscFiles, List<File> oscTxtFiles,
-			List<File> oscFilesIds) throws Exception {
-		File outPbf = new File(pbfFile.getParentFile(), pbfFile.getName()+".o.pbf");
+	private void process(String binaryFolder, File pbfFile, File polygonFile, List<File> oscFiles,
+			List<File> oscTxtFiles, List<File> oscFilesIds) throws Exception {
+		File outPbf = new File(pbfFile.getParentFile(), pbfFile.getName() + ".o.pbf");
 		List<String> args = new ArrayList<String>();
 		args.add(pbfFile.getName());
-		args.add("-B="+polygonFile.getName());
+		args.add("-B=" + polygonFile.getName());
 		args.add("--complex-ways");
-		for(File f : oscFiles) {
+		for (File f : oscFiles) {
 			args.add(f.getName());
 		}
-		args.add("-o="+outPbf.getName());
-		boolean res = exec(pbfFile.getParentFile(), binaryFolder+"osmconvert", args);
-		if(!res) {
+		args.add("-o=" + outPbf.getName());
+		boolean res = exec(pbfFile.getParentFile(), binaryFolder + "osmconvert", args);
+		if (!res) {
 			throw new IllegalStateException(pbfFile.getName() + " convert failed");
 		}
-		
+	
 		TLongObjectHashMap<Entity> found = new TLongObjectHashMap<Entity>();
 		TLongHashSet toFind = getIds(oscFilesIds);
 		boolean changes = true;
@@ -402,7 +423,6 @@ public class IncOsmChangesCreator {
 		if (args.length > 2) {
 			binaryFolder = args[2];
 		}
-		
 		new IncOsmChangesCreator().process(location, repo, binaryFolder);
 	}
 

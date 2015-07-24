@@ -128,6 +128,7 @@ public class CountryOcbfGeneration {
 		
 		public String boundary;
 		public String translate;
+		public String polyExtract;
 		
 		
 		public boolean map ;
@@ -158,6 +159,13 @@ public class CountryOcbfGeneration {
 					throw new UnsupportedOperationException();
 				}
 			};
+		}
+		
+		public String getPolyExtract() {
+			if(!Algorithms.isEmpty(polyExtract) || parent == null) {
+				return polyExtract;
+			}
+			return parent.getPolyExtract();
 		}
 		
 		public String getFullName() {
