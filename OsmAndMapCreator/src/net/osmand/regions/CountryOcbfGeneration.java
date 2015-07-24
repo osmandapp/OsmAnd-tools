@@ -587,6 +587,9 @@ public class CountryOcbfGeneration {
 		} else {
 			reg.wiki = reg.map;
 		}
+		if(attrs.containsKey("poly_extract")) {
+			reg.polyExtract = attrs.get("poly_extract");
+		}
 		if(attrs.containsKey("translate")) {
 			reg.translate = attrs.get("translate").toLowerCase();
 			if(reg.translate.equals("no")) {
