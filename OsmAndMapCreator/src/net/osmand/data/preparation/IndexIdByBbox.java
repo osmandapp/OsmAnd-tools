@@ -29,7 +29,6 @@ import java.util.zip.GZIPInputStream;
 
 import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.data.LatLon;
-import net.osmand.data.QuadRect;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.map.OsmandRegions;
 import net.osmand.osm.edit.Entity;
@@ -631,6 +630,13 @@ public class IndexIdByBbox {
 		adapter.close();
 	}
 	
+	private static class IdRect {
+		public double left;
+		public double right;
+		public double top;
+		public double bottom;
+		public String action = "";
+	}
 
 	private void updateOsmFile(File oscFile, final DatabaseAdapter adapter, OsmandRegions regs, File procFolder) throws 
 			IOException, SAXException, Exception {
@@ -642,7 +648,7 @@ public class IndexIdByBbox {
 		}
 		OsmBaseStorage reader = new OsmBaseStorage();
 		final QueryData qd = new QueryData();
-		Map<String, TLongObjectHashMap<QuadRect>> countryUpdates = new HashMap<String, TLongObjectHashMap<QuadRect>>();
+		Map<String, TLongObjectHashMap<IdRect>> countryUpdates = new HashMap<String, TLongObjectHashMap<IdRect>>();
 		long ms = System.currentTimeMillis();
 		reader.getFilters().add(updateBbboxIncrementally(regs, adapter, qd, countryUpdates));
 		InputStream stream = new BufferedInputStream(new FileInputStream(oscFile), 8192 * 4);
@@ -670,22 +676,22 @@ public class IndexIdByBbox {
 			FileOutputStream fous = new FileOutputStream(ids);
 //			GZIPOutputStream gzout = new GZIPOutputStream(fous);
 			OutputStream gzout = fous;
-			TLongObjectIterator<QuadRect> it = countryUpdates.get(country).iterator();
+			TLongObjectIterator<IdRect> it = countryUpdates.get(country).iterator();
 			while(it.hasNext()) {
 				it.advance();
 				long id = it.key();
-				QuadRect rct = it.value();
+				IdRect rct = it.value();
 				long nid = id >> 2;
 				if(id % 4 == 0) {
-					gzout.write("N ".getBytes());
+					gzout.write(("N"+rct.action).getBytes());
 				} else if(id % 4 == 1) {
-					gzout.write("W ".getBytes());
+					gzout.write(("W"+rct.action).getBytes());
 				} else if(id % 4 == 2) {
-					gzout.write("R ".getBytes());
+					gzout.write(("R"+rct.action).getBytes());
 				} else {
-					gzout.write("? ".getBytes());
+					gzout.write(("?"+rct.action).getBytes());
 				}
-				gzout.write((nid+"").getBytes());
+				gzout.write((" " + nid).getBytes());
 				if(id % 4 != 2) {
 					gzout.write((" " + rct.top).getBytes());
 					gzout.write((" " + rct.left).getBytes());
@@ -702,13 +708,20 @@ public class IndexIdByBbox {
 	}
 
 	private void updateDownloadList(OsmandRegions regs, final QueryData qd,
-			Map<String, TLongObjectHashMap<QuadRect>> keyNames, long id, Entity e) throws IOException {
+			Map<String, TLongObjectHashMap<IdRect>> keyNames, long id, Entity e) throws IOException {
 		Boundary b = qd.boundary;
 		if (qd.boundary.isEmpty()) {
 			System.err.println("Empty boundary " + (id >> 2) + " " + (id % 4));
 			return;
 		}
-		QuadRect r = new QuadRect();
+		IdRect r = new IdRect();
+		if(e.getModify() == Entity.MODIFY_MODIFIED) {
+			r.action = "U";
+		} else if(e.getModify() == Entity.MODIFY_CREATED) {
+			r.action = "A";
+		} else if(e.getModify() == Entity.MODIFY_DELETED) {
+			r.action = "D";
+		}
 		if(e instanceof Node) {
 			r.left = r.right = ((Node) e).getLongitude();
 			r.top = r.bottom = ((Node) e).getLatitude();
@@ -733,7 +746,7 @@ public class IndexIdByBbox {
 				String downloadName = regs.getMapDownloadType(fn);
 				if (!Algorithms.isEmpty(downloadName)) {
 					if (!keyNames.containsKey(downloadName)) {
-						keyNames.put(downloadName, new TLongObjectHashMap<QuadRect>());
+						keyNames.put(downloadName, new TLongObjectHashMap<IdRect>());
 					}
 					keyNames.get(downloadName).put(id, r);
 				}
@@ -743,7 +756,7 @@ public class IndexIdByBbox {
 	}
 
 	private IOsmStorageFilter updateBbboxIncrementally(final OsmandRegions regs, final DatabaseAdapter adapter, final QueryData qd,
-			final Map<String, TLongObjectHashMap<QuadRect>> included) {
+			final Map<String, TLongObjectHashMap<IdRect>> included) {
 		return new IOsmStorageFilter() {
 			@Override
 			public boolean acceptEntityToLoad(OsmBaseStorage storage, EntityId entityId, Entity entity) {
