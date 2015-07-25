@@ -354,12 +354,13 @@ public class IncOsmChangesCreator {
 			BufferedReader br = new BufferedReader(new FileReader(f));
 			String l;
 			while ((l = br.readLine()) != null) {
+				String[] lns = l.split(" ");
 				if(l.charAt(0) == 'W') {
-					ids.add(IndexIdByBbox.wayId(Long.parseLong(l.substring(2))));
+					ids.add(IndexIdByBbox.wayId(Long.parseLong(lns[1])));
 				} else if(l.charAt(0) == 'N') {
-					ids.add(IndexIdByBbox.nodeId(Long.parseLong(l.substring(2))));
+					ids.add(IndexIdByBbox.nodeId(Long.parseLong(lns[1])));
 				} else if(l.charAt(0) == 'R') {
-					ids.add(IndexIdByBbox.relationId(Long.parseLong(l.substring(2))));
+					ids.add(IndexIdByBbox.relationId(Long.parseLong(lns[1])));
 				}
 			}
 			br.close();
