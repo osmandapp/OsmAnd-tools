@@ -335,7 +335,7 @@ public class IndexCreator {
 	}
 	
 	private OsmDbAccessor initDbAccessor(File[] readFile, IProgress progress, IOsmStorageFilter addFilter,
-			boolean generateUniqueIds) throws FileNotFoundException, IOException, SQLException, SAXException, InterruptedException {
+			boolean generateUniqueIds) throws IOException, SQLException, SAXException, InterruptedException {
 		OsmDbAccessor accessor = new OsmDbAccessor();
 //		boolean loadFromExistingFile = dbFile != null && osmDBdialect.databaseFileExists(dbFile) && generateUniqueIds;
 		boolean loadFromExistingFile = false; // deprecate feature

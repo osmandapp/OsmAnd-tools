@@ -154,30 +154,27 @@ public class OsmDbCreator implements IOsmStorageFilter {
 			delRelations = dbConn.prepareStatement("delete from relations where id = ?"); //$NON-NLS-1$
 		}
 		long id = e.getId();
-		boolean changed = true;
 		if (e instanceof Node) {
-			changed = nodeIds.add(id);
+			nodeIds.add(id);
 		} else if (e instanceof Way) {
-			changed = wayIds.add(id);
+			wayIds.add(id);
 			TLongArrayList nid = ((Way) e).getNodeIds();
 			wayNodeIds.addAll(nid);
 		} else if (e instanceof Relation) {
-			changed = relationIds.add(id);
+			relationIds.add(id);
 		}
-		if (!changed) {
-			prepNode.executeBatch();
-			prepWays.executeBatch();
-			prepRelations.executeBatch();
-			if (e instanceof Node) {
-				delNode.setLong(1, id);
-				delNode.execute();
-			} else if (e instanceof Way) {
-				delWays.setLong(1, id);
-				delWays.execute();
-			} else if (e instanceof Relation) {
-				delRelations.setLong(1, id);
-				delRelations.execute();
-			}
+		prepNode.executeBatch();
+		prepWays.executeBatch();
+		prepRelations.executeBatch();
+		if (e instanceof Node) {
+			delNode.setLong(1, id);
+			delNode.execute();
+		} else if (e instanceof Way) {
+			delWays.setLong(1, id);
+			delWays.execute();
+		} else if (e instanceof Relation) {
+			delRelations.setLong(1, id);
+			delRelations.execute();
 		}
 	}
 
