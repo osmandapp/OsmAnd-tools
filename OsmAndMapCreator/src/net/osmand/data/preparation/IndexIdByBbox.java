@@ -659,7 +659,7 @@ public class IndexIdByBbox {
 		reader.parseOSM(stream, new ConsoleProgressImplementation(), streamFile, false);
 		adapter.commitBatch();
 		System.out.println("Queried " + (qd.queried * 1000l) / (System.currentTimeMillis() - ms + 1) + " rec/s");
-		System.out.println(countryUpdates);
+		System.out.println(countryUpdates.keySet());
 		for(String country : countryUpdates.keySet()) {
 			File folder = new File(procFolder.getParentFile(), country);
 			folder.mkdirs();
