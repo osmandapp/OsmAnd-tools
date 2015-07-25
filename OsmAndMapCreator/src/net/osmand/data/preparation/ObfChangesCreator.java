@@ -97,7 +97,7 @@ public class ObfChangesCreator {
 		if (changes != null) {
 			for (File fileChange : changes) {
 				if (fileChange.getName().endsWith("osm.gz")) {
-					String basename = fileChange.getName().substring(0, 8);
+					String basename = country.getName() + "_" + fileChange.getName().substring(0, 8);
 					if (!gf.containsKey(basename)) {
 						gf.put(basename, new GroupFiles(basename));
 					}
