@@ -51,6 +51,7 @@ public class IncOsmChangesCreator {
 	private static final Log log = LogFactory.getLog(IncOsmChangesCreator.class);
 	private static final int OSC_FILES_TO_COMBINE = 300;
 	private static final long INTERVAL_TO_UPDATE_PBF = 1000 * 60 * 15;
+	private static final long MB = 1024 * 1024;
 	
 	private void process(String location, String repo, String binaryFolder) throws Exception {
 		CountryOcbfGeneration ocbfGeneration = new CountryOcbfGeneration();
@@ -246,7 +247,7 @@ public class IncOsmChangesCreator {
 		}
 	
 		TLongObjectHashMap<Entity> found = new TLongObjectHashMap<Entity>();
-		TLongObjectHashMap<Entity> cache = new TLongObjectHashMap<Entity>();
+		TLongObjectHashMap<Entity> cache = outPbf.length() > 100 * MB ? null : new TLongObjectHashMap<Entity>();
 		TLongHashSet toFind = getIds(oscFilesIds);
 		boolean changes = true;
 		int iteration = 0;
