@@ -14,6 +14,8 @@ import net.osmand.osm.MapRenderingTypesEncoder;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
+import rtree.RTree;
+
 public class ObfChangesCreator {
 	private static final Log log = LogFactory.getLog(ObfChangesCreator.class);
 
@@ -69,6 +71,7 @@ public class ObfChangesCreator {
 	private void createObfFiles(File country, GroupFiles g) throws Exception {
 		File obf = g.getObfFileName(country);
 		if (!obf.exists() || obf.lastModified() < g.maxTimestamp) {
+			RTree.clearCache();
 			IndexCreator ic = new IndexCreator(country);
 			ic.setIndexAddress(false);
 			ic.setIndexPOI(true);
