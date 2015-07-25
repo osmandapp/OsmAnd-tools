@@ -253,7 +253,8 @@ public class IncOsmChangesCreator {
 		TLongObjectHashMap<Entity> found = new TLongObjectHashMap<Entity>();
 		TLongObjectHashMap<Entity> cache = outPbf.length() > 100 * MB ? null : new TLongObjectHashMap<Entity>();
 		TLongHashSet toFind = getIds(oscFilesIds);
-		final byte[] allBytes = Files.readAllBytes(Paths.get(outPbf.getAbsolutePath()));
+		// doesn't give any reasonable performance
+//		final byte[] allBytes = Files.readAllBytes(Paths.get(outPbf.getAbsolutePath()));
 		boolean changes = true;
 		int iteration = 0;
 		while (!toFind.isEmpty()) {
@@ -262,8 +263,8 @@ public class IncOsmChangesCreator {
 			IOsmStorageFilter filter = iteratePbf(toFind, found, changes, cache);
 			if (filter != null) {
 				OsmBaseStoragePbf pbfReader = new OsmBaseStoragePbf();
-				//InputStream fis = new FileInputStream(outPbf);
-				InputStream fis = new ByteArrayInputStream(allBytes);
+				InputStream fis = new FileInputStream(outPbf);
+//				InputStream fis = new ByteArrayInputStream(allBytes);
 				pbfReader.getFilters().add(filter);
 				pbfReader.parseOSMPbf(fis, null, false);
 				fis.close();
