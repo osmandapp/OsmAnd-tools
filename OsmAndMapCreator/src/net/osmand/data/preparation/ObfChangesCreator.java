@@ -44,6 +44,9 @@ public class ObfChangesCreator {
 	private void process(String location) throws Exception {
 		File mainDir = new File(location);
 		for (File country : mainDir.listFiles()) {
+			if(country.getName().startsWith("_")) {
+				continue;
+			}
 			Map<String, GroupFiles> gf = combineChanges(country);
 			for (GroupFiles g : gf.values()) {
 				createObfFiles(country, g);
@@ -75,13 +78,15 @@ public class ObfChangesCreator {
 	private Map<String, GroupFiles> combineChanges(File country) {
 		Map<String, GroupFiles> gf = new TreeMap<String, ObfChangesCreator.GroupFiles>();
 		File[] changes = country.listFiles();
-		for (File fileChange : changes) {
-			if (fileChange.getName().endsWith("osm.gz")) {
-				String basename = fileChange.getName().substring(0, 8);
-				if (!gf.containsKey(basename)) {
-					gf.put(basename, new GroupFiles(basename));
+		if (changes != null) {
+			for (File fileChange : changes) {
+				if (fileChange.getName().endsWith("osm.gz")) {
+					String basename = fileChange.getName().substring(0, 8);
+					if (!gf.containsKey(basename)) {
+						gf.put(basename, new GroupFiles(basename));
+					}
+					gf.get(basename).addOsmFile(fileChange);
 				}
-				gf.get(basename).addOsmFile(fileChange);
 			}
 		}
 		return gf;
