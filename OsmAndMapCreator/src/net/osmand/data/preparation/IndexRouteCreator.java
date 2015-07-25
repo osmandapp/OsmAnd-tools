@@ -100,6 +100,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 	private PreparedStatement basemapRouteInsertStat;
 	private Map<EntityId, Map<String, String>> propogatedTags = new LinkedHashMap<Entity.EntityId, Map<String, String>>();
 	private MapRenderingTypesEncoder renderingTypes;
+	private boolean generateLowLevel;
 
 
 	private class RouteMissingPoints {
@@ -124,9 +125,10 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		}
 	}
 	
-	public IndexRouteCreator(MapRenderingTypesEncoder renderingTypes, Log logMapDataWarn) {
+	public IndexRouteCreator(MapRenderingTypesEncoder renderingTypes, Log logMapDataWarn, boolean generateLowLevel) {
 		this.renderingTypes = renderingTypes;
 		this.logMapDataWarn = logMapDataWarn;
+		this.generateLowLevel = generateLowLevel;
 		this.routeTypes = new MapRoutingTypes(renderingTypes);
 	}
 	public void indexRelations(Entity e, OsmDbAccessorContext ctx) throws SQLException {
@@ -188,16 +190,18 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 				routeTypes.encodePointTypes(e, pointTypes, pointNames, false);
 				addWayToIndex(e.getId(), e.getNodes(), mapRouteInsertStat, routeTree, outTypes, pointTypes, pointNames, names);
 			}
-			encoded = routeTypes.encodeBaseEntity(tags, outTypes, names) 
-					&& e.getNodes().size() >= 2;
-			if (encoded ) {
-				List<Node> source = e.getNodes();
-				long id = e.getId();
-				List<Node> result = simplifyRouteForBaseSection(source, id);
-				routeTypes.encodePointTypes(e, pointTypes, pointNames, true);
-				addWayToIndex(e.getId(), result, basemapRouteInsertStat, baserouteTree, outTypes, pointTypes, pointNames, names);
-				//generalizeWay(e);
+			if (generateLowLevel) {
+				encoded = routeTypes.encodeBaseEntity(tags, outTypes, names) && e.getNodes().size() >= 2;
+				if (encoded) {
+					List<Node> source = e.getNodes();
+					long id = e.getId();
+					List<Node> result = simplifyRouteForBaseSection(source, id);
+					routeTypes.encodePointTypes(e, pointTypes, pointNames, true);
+					addWayToIndex(e.getId(), result, basemapRouteInsertStat, baserouteTree, outTypes, pointTypes,
+							pointNames, names);
+					// generalizeWay(e);
 
+				}
 			}
 		}
 		
@@ -492,15 +496,21 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		stat.executeUpdate("create index " +TABLE_BASEROUTE + CREATE_IND);
 		stat.close();
 		mapRouteInsertStat = createStatementRouteObjInsert(mapConnection, false);
-		basemapRouteInsertStat = createStatementRouteObjInsert(mapConnection, true);
 		try {
 			routeTree = new RTree(rtreeMapIndexNonPackFileName);
-			baserouteTree = new RTree(rtreeMapIndexNonPackFileName+"b");
 		} catch (RTreeException e) {
 			throw new IOException(e);
 		}
 		pStatements.put(mapRouteInsertStat, 0);
-		pStatements.put(basemapRouteInsertStat, 0);
+		if (generateLowLevel) {
+			basemapRouteInsertStat = createStatementRouteObjInsert(mapConnection, true);
+			try {
+				baserouteTree = new RTree(rtreeMapIndexNonPackFileName + "b");
+			} catch (RTreeException e) {
+				throw new IOException(e);
+			}
+			pStatements.put(basemapRouteInsertStat, 0);
+		}		
 	}
 	
 	
@@ -513,7 +523,9 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 			throws IOException, SQLException {
 		// delete map rtree files
 		deleteRouteTreeFiles(rTreeMapIndexNonPackFileName, rTreeMapIndexPackFileName, deleteDatabaseIndexes, routeTree);
-		deleteRouteTreeFiles(rTreeMapIndexNonPackFileName+"b", rTreeMapIndexPackFileName+"b", deleteDatabaseIndexes, baserouteTree);
+		if(generateLowLevel) {
+			deleteRouteTreeFiles(rTreeMapIndexNonPackFileName+"b", rTreeMapIndexPackFileName+"b", deleteDatabaseIndexes, baserouteTree);
+		}
 		closeAllPreparedStatements();
 	}
 
@@ -579,17 +591,24 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 
 	public void createRTreeFiles(String rTreeRouteIndexPackFileName) throws RTreeException {
 		routeTree = new RTree(rTreeRouteIndexPackFileName);
-		baserouteTree = new RTree(rTreeRouteIndexPackFileName+"b");
+		if(generateLowLevel) {
+			baserouteTree = new RTree(rTreeRouteIndexPackFileName+"b");
+		}
 	}
 
 	public void packRtreeFiles(String rTreeRouteIndexNonPackFileName, String rTreeRouteIndexPackFileName) throws IOException {
 		routeTree = packRtreeFile(routeTree, rTreeRouteIndexNonPackFileName, rTreeRouteIndexPackFileName);
-		baserouteTree = packRtreeFile(baserouteTree, rTreeRouteIndexNonPackFileName+"b", rTreeRouteIndexPackFileName+"b");
+		if (generateLowLevel) {
+			baserouteTree = packRtreeFile(baserouteTree, rTreeRouteIndexNonPackFileName + "b",
+					rTreeRouteIndexPackFileName + "b");
+		}
 	}
 	
-	public void writeBinaryRouteIndex(BinaryMapIndexWriter writer, String regionName) throws IOException, SQLException {
+	public void writeBinaryRouteIndex(BinaryMapIndexWriter writer, String regionName, boolean generateLowLevel) throws IOException, SQLException {
 		closePreparedStatements(mapRouteInsertStat);
-		closePreparedStatements(basemapRouteInsertStat);
+		if(basemapRouteInsertStat != null) {
+			closePreparedStatements(basemapRouteInsertStat);
+		}
 		mapConnection.commit();
 		
 		try {
@@ -603,42 +622,48 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 			
 			// 1st write
 			writeRouteSections(writer);
-			
-			// prewrite end of file to read it
-			writer.simulateWriteEndRouteIndex();
-			writer.preclose();
-			writer.flush();
+			String fname = null;
+			if (baserouteTree != null) {
+				// prewrite end of file to read it
+				writer.simulateWriteEndRouteIndex();
+				writer.preclose();
+				writer.flush();
 
-			// use file to recalulate tree
-			raf.seek(0);
-			appendMissingRoadsForBaseMap(mapConnection, new BinaryMapIndexReader(raf));
-			// repack
-			String fname = baserouteTree.getFileName();
-			baserouteTree = packRtreeFile(baserouteTree, fname, fname+"p");
-			
-			// seek to previous position
-			raf.seek(fp);
-			raf.getChannel().truncate(fp);
+				// use file to recalulate tree
+				raf.seek(0);
+				appendMissingRoadsForBaseMap(mapConnection, new BinaryMapIndexReader(raf));
+				// repack
+				fname = baserouteTree.getFileName();
+				baserouteTree = packRtreeFile(baserouteTree, fname, fname + "p");
 
-			// 2nd write
-			writeRouteSections(writer);
-			
+				// seek to previous position
+				raf.seek(fp);
+				raf.getChannel().truncate(fp);
+
+				// 2nd write
+				writeRouteSections(writer);
+			}
 			writer.endWriteRouteIndex();
 			writer.flush();
-			baserouteTree = null;
-			new File(fname+"p").delete();
+			if (generateLowLevel) {
+				baserouteTree = null;
+				new File(fname + "p").delete();
+			}
 		} catch (RTreeException e) {
 			throw new IllegalStateException(e);
 		}
 	}
 	private TLongObjectHashMap<BinaryFileReference> writeRouteSections(BinaryMapIndexWriter writer) throws IOException,
 			SQLException, RTreeException {
-		TLongObjectHashMap<BinaryFileReference> route = writeBinaryRouteIndexHeader(writer, 
-				routeTree, false);
-		TLongObjectHashMap<BinaryFileReference> base = writeBinaryRouteIndexHeader(writer,  
-				baserouteTree, true);
+		TLongObjectHashMap<BinaryFileReference> route = writeBinaryRouteIndexHeader(writer, routeTree, false);
+		TLongObjectHashMap<BinaryFileReference> base = null;
+		if (baserouteTree != null) {
+			base = writeBinaryRouteIndexHeader(writer, baserouteTree, true);
+		}
 		writeBinaryRouteIndexBlocks(writer, routeTree, false, route);
-		writeBinaryRouteIndexBlocks(writer, baserouteTree, true, base);
+		if (baserouteTree != null) {
+			writeBinaryRouteIndexBlocks(writer, baserouteTree, true, base);
+		}
 		return base;
 	}
 	
@@ -756,36 +781,37 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 	
 	
 	public void processingLowLevelWays(IProgress progress) {
+		if(!generateLowLevel) {
+			return;
+		}
 		pointTypes.clear();
 		pointNames.clear();
-		Collection<GeneralizedCluster> clusters = 
-				new ArrayList<IndexRouteCreator.GeneralizedCluster>(generalClusters.valueCollection());
-		// 1. roundabouts 
-		 processRoundabouts(clusters);
-		
-		// 2. way combination based 
-		for(GeneralizedCluster cluster : clusters) {
+		Collection<GeneralizedCluster> clusters = new ArrayList<IndexRouteCreator.GeneralizedCluster>(
+				generalClusters.valueCollection());
+		// 1. roundabouts
+		processRoundabouts(clusters);
+
+		// 2. way combination based
+		for (GeneralizedCluster cluster : clusters) {
 			ArrayList<GeneralizedWay> copy = new ArrayList<GeneralizedWay>(cluster.ways);
-			for(GeneralizedWay gw : copy) {
+			for (GeneralizedWay gw : copy) {
 				// already deleted
-				if(!cluster.ways.contains(gw)){
+				if (!cluster.ways.contains(gw)) {
 					continue;
 				}
 				attachWays(gw, true);
 				attachWays(gw, false);
 			}
 		}
-		
-		
+
 		// 3. Douglas peuker simplifications
 		douglasPeukerSimplificationStep(clusters);
-		
-		
+
 		// 5. write to db
 		TLongHashSet ids = new TLongHashSet();
 		for (GeneralizedCluster cluster : clusters) {
 			for (GeneralizedWay gw : cluster.ways) {
-				if(ids.contains(gw.id)) {
+				if (ids.contains(gw.id)) {
 					continue;
 				}
 				ids.add(gw.id);
@@ -798,14 +824,14 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 					}
 				}
 				ArrayList<Node> nodes = new ArrayList<Node>();
-				if(gw.size() == 0) {
+				if (gw.size() == 0) {
 					System.err.println(gw.id + " empty ? ");
 					continue;
 				}
 				long prev = 0;
 				for (int i = 0; i < gw.size(); i++) {
 					long loc = gw.getLocation(i);
-					if(loc != prev) {
+					if (loc != prev) {
 						Node c = convertBaseToNode(loc);
 						prev = loc;
 						nodes.add(c);
@@ -815,7 +841,8 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 				outTypes.add(gw.mainType);
 				outTypes.addAll(gw.addtypes);
 				try {
-					addWayToIndex(gw.id, nodes, basemapRouteInsertStat, baserouteTree, outTypes, pointTypes, pointNames, names);
+					addWayToIndex(gw.id, nodes, basemapRouteInsertStat, baserouteTree, outTypes, pointTypes,
+							pointNames, names);
 				} catch (SQLException e) {
 					throw new IllegalStateException(e);
 				}

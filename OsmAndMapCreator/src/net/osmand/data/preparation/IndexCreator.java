@@ -72,6 +72,7 @@ public class IndexCreator {
 	private boolean indexAddress;
 	private boolean indexRouting;
 
+	private boolean generateLowLevel = true;
 	private boolean normalizeStreets = true; // true by default
 	private int zoomWaySmothness = 2;
 
@@ -120,6 +121,14 @@ public class IndexCreator {
 
 	public void setIndexPOI(boolean indexPOI) {
 		this.indexPOI = indexPOI;
+	}
+	
+	public void setGenerateLowLevelIndexes(boolean param) {
+		generateLowLevel = param;
+	}
+	
+	public boolean isGenerateLowLevelIndexes() {
+		return generateLowLevel;
 	}
 
 	public void setIndexTransport(boolean indexTransport) {
@@ -341,7 +350,7 @@ public class IndexCreator {
 		int ind = 0;
 		for (File read : readFile) {
 			OsmDbCreator dbCreator = extractOsmToNodesDB(accessor, read, progress, addFilter,
-					generateUniqueIds? 0 : ind++, generateUniqueIds ? 0 : shift);
+					generateUniqueIds? ind++ : 0, generateUniqueIds ? shift : 0);
 			accessor.updateCounts(dbCreator);
 			if (readFile.length > 1) {
 				log.info("Processing " + ind + " file out of " + readFile.length);
@@ -502,7 +511,7 @@ public class IndexCreator {
 	}
 	public void generateIndexes(File readFile, IProgress progress, IOsmStorageFilter addFilter, MapZooms mapZooms,
 			MapRenderingTypesEncoder renderingTypes, Log logMapDataWarn) throws IOException, SAXException, SQLException, InterruptedException {
-		generateIndexes(new File[]{readFile}, progress, addFilter, mapZooms, renderingTypes, logMapDataWarn, true);
+		generateIndexes(new File[]{readFile}, progress, addFilter, mapZooms, renderingTypes, logMapDataWarn, false);
 	}
 	
 	public void generateIndexes(File[] readFile, IProgress progress, IOsmStorageFilter addFilter, MapZooms mapZooms,
@@ -533,7 +542,7 @@ public class IndexCreator {
 		this.indexAddressCreator = new IndexAddressCreator(logMapDataWarn);
 		this.indexMapCreator = new IndexVectorMapCreator(logMapDataWarn, mapZooms, renderingTypes,
 				 zoomWaySmothness);
-		this.indexRouteCreator = new IndexRouteCreator(renderingTypes, logMapDataWarn);
+		this.indexRouteCreator = new IndexRouteCreator(renderingTypes, logMapDataWarn, generateLowLevel);
 
 		// init address
 		String[] normalizeDefaultSuffixes = null;
@@ -652,7 +661,7 @@ public class IndexCreator {
 				if (indexRouting) {
 					setGeneralProgress(progress,"[95 of 100]");
 					progress.startTask("Writing route index to binary file...", -1);
-					indexRouteCreator.writeBinaryRouteIndex(writer, regionName);
+					indexRouteCreator.writeBinaryRouteIndex(writer, regionName, generateLowLevel);
 				}
 
 				if (indexAddress) {
@@ -898,5 +907,7 @@ public class IndexCreator {
 		creator.generateIndexes(new File(file),
 				new ConsoleProgressImplementation(1), null, zooms, rt, log);
 	}
+
+	
 
 }

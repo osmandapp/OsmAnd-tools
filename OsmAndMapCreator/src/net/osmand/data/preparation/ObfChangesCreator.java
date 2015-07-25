@@ -74,6 +74,7 @@ public class ObfChangesCreator {
 			ic.setIndexPOI(true);
 			ic.setIndexRouting(true);
 			ic.setIndexMap(true);
+			ic.setGenerateLowLevelIndexes(false);
 			ic.setDialects(DBDialect.SQLITE_IN_MEMORY, DBDialect.SQLITE_IN_MEMORY);
 			File tmpFile = new File(g.basedate + ".tmp.odb");
 			tmpFile.delete();
