@@ -49,7 +49,7 @@ import org.apache.commons.logging.LogFactory;
 
 public class IncOsmChangesCreator {
 	private static final Log log = LogFactory.getLog(IncOsmChangesCreator.class);
-	private static final int OSC_FILES_TO_COMBINE = 220;
+	private static final int OSC_FILES_TO_COMBINE = 300;
 	
 	private void process(String location, String repo, String binaryFolder) throws Exception {
 		CountryOcbfGeneration ocbfGeneration = new CountryOcbfGeneration();
@@ -125,7 +125,71 @@ public class IncOsmChangesCreator {
 		}
 	}
 	
-	private IOsmStorageFilter iteratePbf(final TLongSet ids, final TLongObjectHashMap<Entity> found, final boolean changes) {
+	private void iterateEntity(final TLongSet ids, final TLongObjectHashMap<Entity> found,
+			final boolean changes, final TLongHashSet search, Entity entity, TLongObjectHashMap<Entity> cache) {
+		long key = IndexIdByBbox.convertId(EntityId.valueOf(entity));
+		if(entity instanceof Relation) {
+			boolean loadRelation = search.contains(key);
+			// 1. if relation changed, we need to load all members (multipolygon case)
+			// 2. if any member of relation changed, we need to load all members (multipolygon case)
+			Relation r = (Relation) entity;
+			if (changes) {
+				Iterator<EntityId> it = r.getMemberIds().iterator();
+				while(it.hasNext()) {
+					// load next iteration other nodes
+					long toLoadNode = IndexIdByBbox.convertId(it.next());
+					if (search.contains(toLoadNode)) {
+						loadRelation = true;
+					}
+				}
+			}
+			if(loadRelation) {
+				found.put(key, entity);
+				ids.remove(key);
+				Iterator<EntityId> it = r.getMemberIds().iterator();
+				while(it.hasNext()) {
+					// load next iteration other nodes
+					long toLoadNode = IndexIdByBbox.convertId(it.next());
+					if (!found.contains(toLoadNode)) {
+						ids.add(toLoadNode);
+					}
+				}
+			}
+		} else if(entity instanceof Node){
+			if(search.contains(key)) {
+//					System.out.println("F" + (key >> 2));
+				found.put(key, entity);
+				ids.remove(key);
+			}
+		} else if (entity instanceof Way) {
+			boolean loadWay = search.contains(key);
+			Way w = (Way) entity;
+			if (changes) {
+				for (int i = 0; i < w.getNodeIds().size(); i++) {
+					// load next iteration other nodes
+					long toLoadNode = IndexIdByBbox.nodeId(w.getNodeIds().get(i));
+					if (search.contains(toLoadNode)) {
+						loadWay = true;
+					}
+				}
+			}
+			if (loadWay) {
+				// always load all nodes for way if changed or needed
+				found.put(key, entity);
+				ids.remove(key);
+				for (int i = 0; i < w.getNodeIds().size(); i++) {
+					// load next iteration other nodes
+					long toLoadNode = IndexIdByBbox.nodeId(w.getNodeIds().get(i));
+					if (!found.contains(toLoadNode)) {
+						ids.add(toLoadNode);
+					}
+				}
+			}
+		}
+	}
+	
+	private IOsmStorageFilter iteratePbf(final TLongSet ids, final TLongObjectHashMap<Entity> found, final boolean changes, 
+			final TLongObjectHashMap<Entity> cache) {
 		final TLongHashSet search = new TLongHashSet(ids);
 		ids.clear();
 		TLongIterator it = search.iterator();
@@ -137,75 +201,28 @@ public class IncOsmChangesCreator {
 //			System.out.println("S" + (toSearch >> 2));
 			found.put(toSearch, null);
 		}
+		if(cache != null && !cache.isEmpty()) {
+			for(Entity e : cache.valueCollection()) {
+				iterateEntity(ids, found, changes, search, e, cache);
+			}
+			return null;
+		}
 		return new IOsmStorageFilter() {
 			@Override
 			public boolean acceptEntityToLoad(OsmBaseStorage storage, EntityId entityId, Entity entity) {
 				try {
+					iterateEntity(ids, found, changes, search, entity, cache);
 					long key = IndexIdByBbox.convertId(entityId);
-					if(entity instanceof Relation) {
-						boolean loadRelation = search.contains(key);
-						// 1. if relation changed, we need to load all members (multipolygon case)
-						// 2. if any member of relation changed, we need to load all members (multipolygon case)
-						Relation r = (Relation) entity;
-						if (changes) {
-							Iterator<EntityId> it = r.getMemberIds().iterator();
-							while(it.hasNext()) {
-								// load next iteration other nodes
-								long toLoadNode = IndexIdByBbox.convertId(it.next());
-								if (search.contains(toLoadNode)) {
-									loadRelation = true;
-								}
-							}
-						}
-						if(loadRelation) {
-							found.put(key, entity);
-							ids.remove(key);
-							Iterator<EntityId> it = r.getMemberIds().iterator();
-							while(it.hasNext()) {
-								// load next iteration other nodes
-								long toLoadNode = IndexIdByBbox.convertId(it.next());
-								if (!found.contains(toLoadNode)) {
-									ids.add(toLoadNode);
-								}
-							}
-						}
-					} else if(entity instanceof Node){
-						if(search.contains(key)) {
-//							System.out.println("F" + (key >> 2));
-							found.put(key, entity);
-							ids.remove(key);
-						}
-					} else if (entity instanceof Way) {
-						boolean loadWay = search.contains(key);
-						Way w = (Way) entity;
-						if (changes) {
-							for (int i = 0; i < w.getNodeIds().size(); i++) {
-								// load next iteration other nodes
-								long toLoadNode = IndexIdByBbox.nodeId(w.getNodeIds().get(i));
-								if (search.contains(toLoadNode)) {
-									loadWay = true;
-								}
-							}
-						}
-						if (loadWay) {
-							// always load all nodes for way if changed or needed
-							found.put(key, entity);
-							ids.remove(key);
-							for (int i = 0; i < w.getNodeIds().size(); i++) {
-								// load next iteration other nodes
-								long toLoadNode = IndexIdByBbox.nodeId(w.getNodeIds().get(i));
-								if (!found.contains(toLoadNode)) {
-									ids.add(toLoadNode);
-								}
-							}
-						}
+					if(cache != null && !cache.contains(key)) {
+						cache.put(key, entity);
 					}
-					
 				} catch (Exception e) {
 					throw new RuntimeException(e);
 				}
 				return false;
 			}
+
+			
 		};
 	}
 	
@@ -226,22 +243,27 @@ public class IncOsmChangesCreator {
 		}
 	
 		TLongObjectHashMap<Entity> found = new TLongObjectHashMap<Entity>();
+		TLongObjectHashMap<Entity> cache = new TLongObjectHashMap<Entity>();
 		TLongHashSet toFind = getIds(oscFilesIds);
 		boolean changes = true;
 		int iteration = 0;
 		while (!toFind.isEmpty()) {
 			iteration++;
 			log.info("Iterate pbf to find " + toFind.size() + " ids (" + iteration + ")");
-			OsmBaseStoragePbf pbfReader = new OsmBaseStoragePbf();
-			FileInputStream fis = new FileInputStream(outPbf);
-			pbfReader.getFilters().add(iteratePbf(toFind, found, changes));
-			pbfReader.parseOSMPbf(fis, null, false);
-			fis.close();
+			IOsmStorageFilter filter = iteratePbf(toFind, found, changes, cache);
+			if (filter != null) {
+				OsmBaseStoragePbf pbfReader = new OsmBaseStoragePbf();
+				FileInputStream fis = new FileInputStream(outPbf);
+				pbfReader.getFilters().add(filter);
+				pbfReader.parseOSMPbf(fis, null, false);
+				fis.close();
+			}
 			changes = false;
 			if(iteration > 30) {
 				 throw new RuntimeException("Too many iterations");
 			}
 		}
+		cache.clear();
 		writeOsmFile(pbfFile.getParentFile(), found);
 		if(true) {
 			// delete files
