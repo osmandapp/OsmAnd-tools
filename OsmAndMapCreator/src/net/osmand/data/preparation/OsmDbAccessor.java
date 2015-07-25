@@ -50,14 +50,15 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 	}
 	
 	
-	public void initDatabase(Object dbConnection, DBDialect dialect, int allNodes, int allWays, int allRelations)
+	public void initDatabase(OsmDbCreator dbCreator)
 			throws SQLException {
-
-		this.dialect = dialect;
-		this.allNodes = allNodes;
-		this.allWays = allWays;
-		this.allRelations = allRelations;
-		this.dbConn = (Connection) dbConnection;
+		updateCounts(dbCreator);
+		if(this.allNodes == 0) {
+			final Statement stmt = dbConn.createStatement();
+			computeRealCounts(stmt);
+			stmt.close();
+		}
+		
 
 		pselectNode = dbConn.prepareStatement("select n.latitude, n.longitude, n.tags from node n where n.id = ?"); //$NON-NLS-1$
 		pselectWay = dbConn.prepareStatement("select w.node, w.ord, w.tags, n.latitude, n.longitude, n.tags " + //$NON-NLS-1$
@@ -73,6 +74,14 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 				.prepareStatement("select w.id, w.node, w.ord, w.tags, n.latitude, n.longitude, n.tags " + //$NON-NLS-1$
 						"from ways w left join node n on w.node = n.id  where w.boundary > 0 order by w.id, w.ord"); //$NON-NLS-1$
 		iterateRelations = dbConn.prepareStatement("select r.id, r.tags from relations r where length(r.tags) > 0"); //$NON-NLS-1$
+	}
+
+	public void updateCounts(OsmDbCreator dbCreator) {
+		if(dbCreator != null)  {
+			allNodes += dbCreator.getAllNodes();
+			allRelations += dbCreator.getAllRelations() ;
+			allWays += dbCreator.getAllWays();
+		}
 	}
 	
 	public Connection getDbConn() {
@@ -377,8 +386,9 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 		
 	}
 
-	public void setDbConn(Object dbConnection) {
+	public void setDbConn(Object dbConnection, DBDialect dialect) {
 		this.dbConn = (Connection) dbConnection;
+		this.dialect = dialect;
 	}
 
 

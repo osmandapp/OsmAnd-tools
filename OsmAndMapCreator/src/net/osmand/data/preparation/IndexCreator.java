@@ -10,7 +10,6 @@ import java.io.RandomAccessFile;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.zip.GZIPInputStream;
 
 import net.osmand.IProgress;
@@ -325,44 +324,42 @@ public class IndexCreator {
 		}
 	}
 	
-	private boolean createPlainOsmDb(OsmDbAccessor accessor,
-			IProgress progress, File readFile, IOsmStorageFilter addFilter, boolean deletePrevious,
-			int additionId, int shiftId) throws SQLException, IOException, SAXException{
-//		dbFile = new File(workingDir, TEMP_NODES_DB);
-		// initialize db file
-		boolean loadFromExistingFile = dbFile != null && osmDBdialect.databaseFileExists(dbFile) && !deletePrevious;
-		if (dbFile == null || deletePrevious) {
+	private OsmDbAccessor initDbAccessor(File[] readFile, IProgress progress, IOsmStorageFilter addFilter,
+			boolean generateUniqueIds) throws FileNotFoundException, IOException, SQLException, SAXException, InterruptedException {
+		OsmDbAccessor accessor = new OsmDbAccessor();
+//		boolean loadFromExistingFile = dbFile != null && osmDBdialect.databaseFileExists(dbFile) && generateUniqueIds;
+		boolean loadFromExistingFile = false; // deprecate feature
+		if (dbFile == null) {
 			dbFile = new File(workingDir, TEMP_NODES_DB);
-			// to save space
 			if (osmDBdialect.databaseFileExists(dbFile)) {
 				osmDBdialect.removeDatabase(dbFile);
 			}
 		}
 		Object dbConn = getDatabaseConnection(dbFile.getAbsolutePath(), osmDBdialect);
-		accessor.setDbConn(dbConn);
-		
-		int allRelations = 100000;
-		int allWays = 1000000;
-		int allNodes = 10000000;
-		if (!loadFromExistingFile) {
-			OsmDbCreator dbCreator = extractOsmToNodesDB(accessor, readFile, progress, addFilter,
-					additionId, shiftId);
-			if (dbCreator != null) {
-				allNodes = dbCreator.getAllNodes();
-				allWays = dbCreator.getAllWays();
-				allRelations = dbCreator.getAllRelations();
+		accessor.setDbConn(dbConn, osmDBdialect);
+		int shift = readFile.length < 16 ? 4 : (readFile.length < 256 ? 8 : 10);
+		int ind = 0;
+		for (File read : readFile) {
+			OsmDbCreator dbCreator = extractOsmToNodesDB(accessor, read, progress, addFilter,
+					generateUniqueIds? 0 : ind++, generateUniqueIds ? 0 : shift);
+			accessor.updateCounts(dbCreator);
+			if (readFile.length > 1) {
+				log.info("Processing " + ind + " file out of " + readFile.length);
 			}
-		} else {
-			Connection dbc = (Connection) dbConn;
-			final Statement stmt = dbc.createStatement();
-			accessor.computeRealCounts(stmt);
-			allRelations = accessor.getAllRelations();
-			allNodes = accessor.getAllNodes();
-			allWays = accessor.getAllWays();
-			stmt.close();
 		}
-		accessor.initDatabase(dbConn, osmDBdialect, allNodes, allWays, allRelations);
-		return loadFromExistingFile;
+		if(loadFromExistingFile) {
+			if (indexAddress) {
+				// load cities names
+				accessor.iterateOverEntities(progress, EntityType.NODE,  new OsmDbVisitor() {
+					@Override
+					public void iterateEntity(Entity e, OsmDbAccessorContext ctx) {
+						indexAddressCreator.registerCityIfNeeded(e);
+					}
+				});
+			}
+		}
+		accessor.initDatabase(null);
+		return accessor;
 	}
 	
 	private void createDatabaseIndexesStructure() throws SQLException, IOException {
@@ -393,6 +390,22 @@ public class IndexCreator {
 		}
 	}
 	
+
+	
+	private void createPlainOsmDbBasemap(OsmDbAccessor accessor,
+			IProgress progress, File readFile, IOsmStorageFilter addFilter) throws SQLException, IOException, SAXException{
+		dbFile = new File(workingDir, TEMP_NODES_DB);
+		if (osmDBdialect.databaseFileExists(dbFile)) {
+			osmDBdialect.removeDatabase(dbFile);
+		}
+		Object dbConn = getDatabaseConnection(dbFile.getAbsolutePath(), osmDBdialect);
+		accessor.setDbConn(dbConn, osmDBdialect);
+		OsmDbCreator dbCreator = null;
+		dbCreator = extractOsmToNodesDB(accessor, readFile, progress, addFilter, 0, 0);
+		accessor.initDatabase(dbCreator);
+	}
+	
+	
 	
 	public void generateBasemapIndex(IProgress progress, IOsmStorageFilter addFilter, MapZooms mapZooms,
 			MapRenderingTypesEncoder renderingTypes, Log logMapDataWarn, String regionName, File... readFiles) throws IOException, SAXException, SQLException, InterruptedException {
@@ -415,7 +428,7 @@ public class IndexCreator {
 			}
 			for (File readFile : readFiles) {
 				OsmDbAccessor accessor = new OsmDbAccessor();
-				createPlainOsmDb(accessor, progress, readFile, addFilter, true, 0, 0);
+				createPlainOsmDbBasemap(accessor, progress, readFile, addFilter);
 				// 2. Create index connections and index structure
 
 				setGeneralProgress(progress,"[50 / 100]");
@@ -489,11 +502,11 @@ public class IndexCreator {
 	}
 	public void generateIndexes(File readFile, IProgress progress, IOsmStorageFilter addFilter, MapZooms mapZooms,
 			MapRenderingTypesEncoder renderingTypes, Log logMapDataWarn) throws IOException, SAXException, SQLException, InterruptedException {
-		generateIndexes(new File[]{readFile}, progress, addFilter, mapZooms, renderingTypes, logMapDataWarn);
+		generateIndexes(new File[]{readFile}, progress, addFilter, mapZooms, renderingTypes, logMapDataWarn, true);
 	}
 	
 	public void generateIndexes(File[] readFile, IProgress progress, IOsmStorageFilter addFilter, MapZooms mapZooms,
-			MapRenderingTypesEncoder renderingTypes, Log logMapDataWarn) throws IOException, SAXException, SQLException, InterruptedException {
+			MapRenderingTypesEncoder renderingTypes, Log logMapDataWarn, boolean generateUniqueIds) throws IOException, SAXException, SQLException, InterruptedException {
 //		if(LevelDBAccess.load()){
 //			dialect = DBDialect.NOSQL;
 //		}
@@ -559,41 +572,30 @@ public class IndexCreator {
 			} else {
 				// 2. Create index connections and index structure
 				createDatabaseIndexesStructure();
-				
-				int length = readFile.length;
-				int shift = readFile.length < 16 ? 4 : (readFile.length < 256 ? 8 : 10);
-				int ind = 0;
-				for (File read : readFile) {
-					OsmDbAccessor accessor = new OsmDbAccessor();
-					boolean loadFromExistingFile = createPlainOsmDb(accessor, progress, read, addFilter, readFile.length > 1,
-							ind++, readFile.length == 1 ? 0 : shift);
-					if(readFile.length > 1) {
-						log.info("Processing " + ind + " file out of " + readFile.length);
-					}
+				OsmDbAccessor accessor = initDbAccessor(readFile, progress, addFilter, generateUniqueIds);
 
-					// 3. Processing all entries
-					// 3.1 write all cities
-					writeAllCities(accessor, progress, loadFromExistingFile);
-					// 3.2 index address relations
-					indexRelations(accessor, progress);
-					// 3.3 MAIN iterate over all entities
-					iterateMainEntities(accessor, progress);
-					accessor.closeReadingConnection();
-					// do not delete first db connection
-					if (accessor.getDbConn() != null) {
-						osmDBdialect.commitDatabase(accessor.getDbConn());
-						osmDBdialect.closeDatabase(accessor.getDbConn());
-					}
-					if (deleteOsmDB) {
-						if (DBDialect.DERBY == osmDBdialect) {
-							try {
-								DriverManager.getConnection("jdbc:derby:;shutdown=true"); //$NON-NLS-1$
-							} catch (SQLException e) {
-								// ignore exception
-							}
+				// 3. Processing all entries
+				// 3.1 write all cities
+				writeAllCities(accessor, progress);
+				// 3.2 index address relations
+				indexRelations(accessor, progress);
+				// 3.3 MAIN iterate over all entities
+				iterateMainEntities(accessor, progress);
+				accessor.closeReadingConnection();
+				// do not delete first db connection
+				if (accessor.getDbConn() != null) {
+					osmDBdialect.commitDatabase(accessor.getDbConn());
+					osmDBdialect.closeDatabase(accessor.getDbConn());
+				}
+				if (deleteOsmDB) {
+					if (DBDialect.DERBY == osmDBdialect) {
+						try {
+							DriverManager.getConnection("jdbc:derby:;shutdown=true"); //$NON-NLS-1$
+						} catch (SQLException e) {
+							// ignore exception
 						}
-						osmDBdialect.removeDatabase(dbFile);
 					}
+					osmDBdialect.removeDatabase(dbFile);
 				}
 				
 				// 3.4 combine all low level ways and simplify them
@@ -721,6 +723,10 @@ public class IndexCreator {
 		}
 	}
 
+	
+
+	
+
 	private void iterateMainEntities(OsmDbAccessor accessor, IProgress progress) throws SQLException, InterruptedException {
 		setGeneralProgress(progress,"[50 / 100]");
 		progress.startTask(Messages.getString("IndexCreator.PROCESS_OSM_NODES"), accessor.getAllNodes());
@@ -802,20 +808,11 @@ public class IndexCreator {
 		}
 	}
 
-	private void writeAllCities(OsmDbAccessor accessor, IProgress progress, boolean loadFromExistingFile) throws SQLException,
+	private void writeAllCities(OsmDbAccessor accessor, IProgress progress) throws SQLException,
 			InterruptedException {
 		if (indexAddress) {
 			setGeneralProgress(progress,"[20 / 100]"); //$NON-NLS-1$
 			progress.startTask(Messages.getString("IndexCreator.INDEX_CITIES"), accessor.getAllNodes()); //$NON-NLS-1$
-			if (loadFromExistingFile) {
-				// load cities names
-				accessor.iterateOverEntities(progress, EntityType.NODE,  new OsmDbVisitor() {
-					@Override
-					public void iterateEntity(Entity e, OsmDbAccessorContext ctx) {
-						indexAddressCreator.registerCityIfNeeded(e);
-					}
-				});
-			}
 			indexAddressCreator.writeCitiesIntoDb();
 		}
 	}
