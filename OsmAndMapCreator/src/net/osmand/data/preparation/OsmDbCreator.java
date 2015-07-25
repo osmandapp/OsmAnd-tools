@@ -87,23 +87,24 @@ public class OsmDbCreator implements IOsmStorageFilter {
 	}
 		
 
-	public void initDatabase(DBDialect dialect, Object databaseConn) throws SQLException {
+	public void initDatabase(DBDialect dialect, Object databaseConn, boolean create) throws SQLException {
 
 		this.dialect = dialect;
 		this.dbConn = (Connection) databaseConn;
 		// prepare tables
 		Statement stat = dbConn.createStatement();
-		dialect.deleteTableIfExists("node", stat);
-		stat.executeUpdate("create table node (id bigint primary key, latitude double, longitude double, tags blob)"); //$NON-NLS-1$
-		stat.executeUpdate("create index IdIndex ON node (id)"); //$NON-NLS-1$
-		dialect.deleteTableIfExists("ways", stat);
-		stat.executeUpdate("create table ways (id bigint, node bigint, ord smallint, tags blob, boundary smallint, primary key (id, ord))"); //$NON-NLS-1$
-		stat.executeUpdate("create index IdWIndex ON ways (id)"); //$NON-NLS-1$
-		dialect.deleteTableIfExists("relations", stat);
-		stat.executeUpdate("create table relations (id bigint, member bigint, type smallint, role varchar(1024), ord smallint, tags blob, primary key (id, ord))"); //$NON-NLS-1$
-		stat.executeUpdate("create index IdRIndex ON relations (id)"); //$NON-NLS-1$
-		stat.close();
-
+		if (create) {
+			dialect.deleteTableIfExists("node", stat);
+			stat.executeUpdate("create table node (id bigint primary key, latitude double, longitude double, tags blob)"); //$NON-NLS-1$
+			stat.executeUpdate("create index IdIndex ON node (id)"); //$NON-NLS-1$
+			dialect.deleteTableIfExists("ways", stat);
+			stat.executeUpdate("create table ways (id bigint, node bigint, ord smallint, tags blob, boundary smallint, primary key (id, ord))"); //$NON-NLS-1$
+			stat.executeUpdate("create index IdWIndex ON ways (id)"); //$NON-NLS-1$
+			dialect.deleteTableIfExists("relations", stat);
+			stat.executeUpdate("create table relations (id bigint, member bigint, type smallint, role varchar(1024), ord smallint, tags blob, primary key (id, ord))"); //$NON-NLS-1$
+			stat.executeUpdate("create index IdRIndex ON relations (id)"); //$NON-NLS-1$
+			stat.close();
+		}
 		prepNode = dbConn.prepareStatement("insert into node values (?, ?, ?, ?)"); //$NON-NLS-1$
 		prepWays = dbConn.prepareStatement("insert into ways values (?, ?, ?, ?, ?)"); //$NON-NLS-1$
 		prepRelations = dbConn.prepareStatement("insert into relations values (?, ?, ?, ?, ?, ?)"); //$NON-NLS-1$

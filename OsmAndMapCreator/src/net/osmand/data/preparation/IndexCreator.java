@@ -270,7 +270,7 @@ public class IndexCreator {
 
 	private OsmDbCreator extractOsmToNodesDB(OsmDbAccessor accessor, 
 			File readFile, IProgress progress, IOsmStorageFilter addFilter, int additionId, int shiftId, 
-			boolean ovewriteIds) throws FileNotFoundException,
+			boolean ovewriteIds, boolean createTables) throws
 			IOException, SQLException, SAXException {
 		boolean pbfFile = false;
 		InputStream stream = new BufferedInputStream(new FileInputStream(readFile), 8192 * 4);
@@ -312,7 +312,7 @@ public class IndexCreator {
 			setGeneralProgress(progress,"[15 / 100]"); //$NON-NLS-1$
 			progress.startTask(Messages.getString("IndexCreator.LOADING_FILE") + readFile.getAbsolutePath(), -1); //$NON-NLS-1$
 			// 1 init database to store temporary data
-			dbCreator.initDatabase(osmDBdialect, accessor.getDbConn());
+			dbCreator.initDatabase(osmDBdialect, accessor.getDbConn(), createTables);
 			storage.getFilters().add(dbCreator);
 			if (pbfFile) {
 				((OsmBaseStoragePbf) storage).parseOSMPbf(stream, progress, false);
@@ -350,12 +350,14 @@ public class IndexCreator {
 		accessor.setDbConn(dbConn, osmDBdialect);
 		int shift = readFile.length < 16 ? 4 : (readFile.length < 256 ? 8 : 10);
 		int ind = 0;
+		int mapInd = 1;
 		for (File read : readFile) {
 			OsmDbCreator dbCreator = extractOsmToNodesDB(accessor, read, progress, addFilter,
-					generateUniqueIds? ind++ : 0, generateUniqueIds ? shift : 0, ovewriteIds);
+					generateUniqueIds? ind++ : 0, generateUniqueIds ? shift : 0, ovewriteIds, mapInd == 1);
+			mapInd++;
 			accessor.updateCounts(dbCreator);
 			if (readFile.length > 1) {
-				log.info("Processing " + ind + " file out of " + readFile.length);
+				log.info("Processing " + mapInd + " file out of " + readFile.length);
 			}
 		}
 		if(loadFromExistingFile) {
@@ -412,7 +414,7 @@ public class IndexCreator {
 		Object dbConn = getDatabaseConnection(dbFile.getAbsolutePath(), osmDBdialect);
 		accessor.setDbConn(dbConn, osmDBdialect);
 		OsmDbCreator dbCreator = null;
-		dbCreator = extractOsmToNodesDB(accessor, readFile, progress, addFilter, 0, 0, false);
+		dbCreator = extractOsmToNodesDB(accessor, readFile, progress, addFilter, 0, 0, false, true);
 		accessor.initDatabase(dbCreator);
 	}
 	
