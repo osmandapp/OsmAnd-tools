@@ -249,7 +249,7 @@ public class IncOsmChangesCreator {
 	
 		TLongObjectHashMap<Entity> found = new TLongObjectHashMap<Entity>();
 		TLongObjectHashMap<Entity> cache = outPbf.length() > 100 * MB ? null : new TLongObjectHashMap<Entity>();
-		TLongHashSet toFind = getIds(oscFilesIds);
+		TLongHashSet toFind = getIds(oscFilesIds, found);
 		// doesn't give any reasonable performance
 //		final byte[] allBytes = Files.readAllBytes(Paths.get(outPbf.getAbsolutePath()));
 		boolean changes = true;
@@ -348,7 +348,7 @@ public class IncOsmChangesCreator {
 		return f;
 	}
 
-	private TLongHashSet getIds(List<File> oscFilesIds) throws IOException {
+	private TLongHashSet getIds(List<File> oscFilesIds, TLongObjectHashMap<Entity> found) throws IOException {
 		TLongHashSet ids = new TLongHashSet();
 		for(File f : oscFilesIds) {
 			BufferedReader br = new BufferedReader(new FileReader(f));
@@ -356,11 +356,35 @@ public class IncOsmChangesCreator {
 			while ((l = br.readLine()) != null) {
 				String[] lns = l.split(" ");
 				if(l.charAt(0) == 'W') {
-					ids.add(IndexIdByBbox.wayId(Long.parseLong(lns[1])));
+					long oid = Long.parseLong(lns[1]);
+					long wayId = IndexIdByBbox.wayId(oid);
+					if (l.charAt(1) == 'D') {
+						Way wd = new Way(oid);
+						long baseForNodeIds = ((oid << 4) + 5) << 8;
+						Node tln = new Node(Double.parseDouble(lns[2]), Double.parseDouble(lns[3]), -(baseForNodeIds++));
+						Node brn = new Node(Double.parseDouble(lns[3]), Double.parseDouble(lns[4]), -(baseForNodeIds++));
+						wd.addNode(tln);
+						wd.addNode(brn);
+						wd.putTag("osmand_change", "delete");
+						found.put(wayId, wd);
+						found.put(IndexIdByBbox.nodeId(tln.getId()), tln);
+						found.put(IndexIdByBbox.nodeId(brn.getId()), brn);
+					} else {
+						ids.add(wayId);
+					}
 				} else if(l.charAt(0) == 'N') {
-					ids.add(IndexIdByBbox.nodeId(Long.parseLong(lns[1])));
+					long oid = Long.parseLong(lns[1]);
+					long nodeId = IndexIdByBbox.nodeId(oid);
+					if (l.charAt(1) == 'D') {
+						Node node = new Node(Double.parseDouble(lns[2]), Double.parseDouble(lns[3]), oid);
+						node.putTag("osmand_change", "delete");
+						found.put(nodeId, node);
+					} else {
+						ids.add(nodeId);
+					}
 				} else if(l.charAt(0) == 'R') {
-					ids.add(IndexIdByBbox.relationId(Long.parseLong(lns[1])));
+					long relationId = IndexIdByBbox.relationId(Long.parseLong(lns[1]));
+					ids.add(relationId);
 				}
 			}
 			br.close();
