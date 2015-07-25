@@ -267,7 +267,9 @@ public class IncOsmChangesCreator {
 				 throw new RuntimeException("Too many iterations");
 			}
 		}
-		cache.clear();
+		if(cache != null) {
+			cache.clear();
+		}
 		writeOsmFile(pbfFile.getParentFile(), found);
 		if(true) {
 			// delete files
