@@ -2,6 +2,8 @@ package net.osmand.data.preparation;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -39,6 +41,16 @@ public class ObfChangesCreator {
 			return basedate.compareTo(o.basedate);
 		}
 
+		public File[] getSortedFiles() {
+			Collections.sort(osmGzFiles, new Comparator<File>(){
+				@Override
+				public int compare(File o1, File o2) {
+					return o1.getName().compareTo(o2.getName());
+				}
+			});
+			return osmGzFiles.toArray(new File[0]);
+		}
+
 	}
 
 	private void process(String location) throws Exception {
@@ -68,7 +80,7 @@ public class ObfChangesCreator {
 			ic.setRegionName(g.basedate);
 			ic.setNodesDBFile(tmpFile);
 			log.info("Processing " + country.getName() + " " + g.basedate + " " + g.osmGzFiles.size() + " files");
-			ic.generateIndexes(g.osmGzFiles.toArray(new File[0]), new ConsoleProgressImplementation(), null,
+			ic.generateIndexes(g.getSortedFiles(), new ConsoleProgressImplementation(), null,
 					MapZooms.parseZooms("13-14;15-"), MapRenderingTypesEncoder.getDefault(), log, false);
 			File targetFile = new File(country, ic.getMapFileName());
 			targetFile.setLastModified(g.maxTimestamp);
