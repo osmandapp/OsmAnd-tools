@@ -149,8 +149,8 @@ public class CountryOcbfGeneration {
 
 				@Override
 				public CountryRegion next() {
-					CountryRegion reg = stack.pollLast();
-					stack.addAll(reg.children);
+					CountryRegion reg = stack.pollFirst();
+					stack.addAll(0, reg.children);
 					return reg;
 				}
 
