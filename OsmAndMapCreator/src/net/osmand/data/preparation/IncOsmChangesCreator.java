@@ -7,14 +7,18 @@ import gnu.trove.set.TLongSet;
 import gnu.trove.set.hash.TLongHashSet;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
 import java.io.Closeable;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -249,6 +253,7 @@ public class IncOsmChangesCreator {
 		TLongObjectHashMap<Entity> found = new TLongObjectHashMap<Entity>();
 		TLongObjectHashMap<Entity> cache = outPbf.length() > 100 * MB ? null : new TLongObjectHashMap<Entity>();
 		TLongHashSet toFind = getIds(oscFilesIds);
+		final byte[] allBytes = Files.readAllBytes(Paths.get(outPbf.getAbsolutePath()));
 		boolean changes = true;
 		int iteration = 0;
 		while (!toFind.isEmpty()) {
@@ -257,7 +262,8 @@ public class IncOsmChangesCreator {
 			IOsmStorageFilter filter = iteratePbf(toFind, found, changes, cache);
 			if (filter != null) {
 				OsmBaseStoragePbf pbfReader = new OsmBaseStoragePbf();
-				FileInputStream fis = new FileInputStream(outPbf);
+				//InputStream fis = new FileInputStream(outPbf);
+				InputStream fis = new ByteArrayInputStream(allBytes);
 				pbfReader.getFilters().add(filter);
 				pbfReader.parseOSMPbf(fis, null, false);
 				fis.close();
@@ -267,6 +273,7 @@ public class IncOsmChangesCreator {
 				 throw new RuntimeException("Too many iterations");
 			}
 		}
+		System.gc();
 		if(cache != null) {
 			cache.clear();
 		}
