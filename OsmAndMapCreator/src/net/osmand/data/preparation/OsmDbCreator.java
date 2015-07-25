@@ -58,15 +58,17 @@ public class OsmDbCreator implements IOsmStorageFilter {
 
 	private final int shiftId;
 	private final int additionId;
+	private boolean ovewriteIds;
 
 
-	public OsmDbCreator(int additionId, int shiftId) {
+	public OsmDbCreator(int additionId, int shiftId, boolean ovewriteIds) {
 		this.additionId = additionId;
 		this.shiftId = shiftId;
+		this.ovewriteIds = ovewriteIds;
 	}
 	
 	public OsmDbCreator() {
-		this(0, 0);
+		this(0, 0, false);
 	}
 	
 	private long convertId(Long id) {
@@ -196,7 +198,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 			} catch (IOException es) {
 				throw new RuntimeException(es);
 			}
-			if (osmChange) {
+			if (osmChange || ovewriteIds) {
 				checkEntityExists(e);
 			}
 			if (e instanceof Node) {
