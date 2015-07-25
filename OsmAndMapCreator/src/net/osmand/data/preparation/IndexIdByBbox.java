@@ -1,6 +1,8 @@
 package net.osmand.data.preparation;
 
+import gnu.trove.iterator.TLongObjectIterator;
 import gnu.trove.list.array.TLongArrayList;
+import gnu.trove.map.hash.TLongObjectHashMap;
 
 import java.io.BufferedInputStream;
 import java.io.File;
@@ -27,6 +29,7 @@ import java.util.zip.GZIPInputStream;
 
 import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.data.LatLon;
+import net.osmand.data.QuadRect;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.map.OsmandRegions;
 import net.osmand.osm.edit.Entity;
@@ -164,20 +167,20 @@ public class IndexIdByBbox {
 			return Math.min(bottom, next.getBottom(all));
 		}
 		
-		public double getTopLat() {
-			return convertToLat(getTop(false));
+		public double getTopLat(boolean all) {
+			return convertToLat(getTop(all));
 		}
 		
-		public double getBottomLat() {
-			return convertToLat(getBottom(false));
+		public double getBottomLat(boolean all) {
+			return convertToLat(getBottom(all));
 		}
 		
-		public double getRightLon() {
-			return convertToLon(getRight(false));
+		public double getRightLon(boolean all) {
+			return convertToLon(getRight(all));
 		}
 		
-		public double getLeftLon() {
-			return convertToLon(getLeft(false));
+		public double getLeftLon(boolean all) {
+			return convertToLon(getLeft(all));
 		}
 
 		public double convertToLat(int y) {
@@ -222,8 +225,8 @@ public class IndexIdByBbox {
 		}
 
 		public String getBoundaryString() {
-			String s = getTopLat() + ", " + getLeftLon() + " - "
-					+ getBottomLat() + ", " + getRightLon();
+			String s = getTopLat(false) + ", " + getLeftLon(false) + " - "
+					+ getBottomLat(false) + ", " + getRightLon(false);
 			if(next != null) {
 				s += "; " + next.getBoundaryString();
 			}
@@ -627,6 +630,7 @@ public class IndexIdByBbox {
 		}
 		adapter.close();
 	}
+	
 
 	private void updateOsmFile(File oscFile, final DatabaseAdapter adapter, OsmandRegions regs, File procFolder) throws 
 			IOException, SAXException, Exception {
@@ -638,7 +642,7 @@ public class IndexIdByBbox {
 		}
 		OsmBaseStorage reader = new OsmBaseStorage();
 		final QueryData qd = new QueryData();
-		Map<String, TLongArrayList> countryUpdates = new HashMap<String, TLongArrayList>();
+		Map<String, TLongObjectHashMap<QuadRect>> countryUpdates = new HashMap<String, TLongObjectHashMap<QuadRect>>();
 		long ms = System.currentTimeMillis();
 		reader.getFilters().add(updateBbboxIncrementally(regs, adapter, qd, countryUpdates));
 		InputStream stream = new BufferedInputStream(new FileInputStream(oscFile), 8192 * 4);
@@ -666,7 +670,11 @@ public class IndexIdByBbox {
 			FileOutputStream fous = new FileOutputStream(ids);
 //			GZIPOutputStream gzout = new GZIPOutputStream(fous);
 			OutputStream gzout = fous;
-			for (long id : countryUpdates.get(country).toArray()) {
+			TLongObjectIterator<QuadRect> it = countryUpdates.get(country).iterator();
+			while(it.hasNext()) {
+				it.advance();
+				long id = it.key();
+				QuadRect rct = it.value();
 				long nid = id >> 2;
 				if(id % 4 == 0) {
 					gzout.write("N ".getBytes());
@@ -677,6 +685,13 @@ public class IndexIdByBbox {
 				} else {
 					gzout.write("? ".getBytes());
 				}
+				gzout.write((nid+"").getBytes());
+				if(id % 4 != 2) {
+					gzout.write((" " + rct.top).getBytes());
+					gzout.write((" " + rct.left).getBytes());
+					gzout.write((" " + rct.bottom).getBytes());
+					gzout.write((" " + rct.right).getBytes());
+				}
 				gzout.write((nid+"\n").getBytes());
 			}
 			gzout.close();
@@ -686,31 +701,41 @@ public class IndexIdByBbox {
 		oscFileTxt.renameTo(new File(procFolder, oscFileTxt.getName()));
 	}
 
-	private void updateDownloadList(OsmandRegions regs, final QueryData qd, Map<String, TLongArrayList> keyNames,
-			long id) throws IOException {
-		Boundary  b = qd.boundary;
-		if(qd.boundary.isEmpty()) {
+	private void updateDownloadList(OsmandRegions regs, final QueryData qd,
+			Map<String, TLongObjectHashMap<QuadRect>> keyNames, long id, Entity e) throws IOException {
+		Boundary b = qd.boundary;
+		if (qd.boundary.isEmpty()) {
 			System.err.println("Empty boundary " + (id >> 2) + " " + (id % 4));
 			return;
 		}
-		while(b != null) {
-			int lx = MapUtils.get31TileNumberX(b.getLeftLon());
-			int rx = MapUtils.get31TileNumberX(b.getRightLon());
-			int ty = MapUtils.get31TileNumberY(b.getTopLat());
-			int by = MapUtils.get31TileNumberY(b.getBottomLat());
-			List<BinaryMapDataObject> bbox = regs.queryBbox(lx,	rx, ty, by);
-			for(BinaryMapDataObject bo : bbox) {
+		QuadRect r = new QuadRect();
+		if(e instanceof Node) {
+			r.left = r.right = ((Node) e).getLongitude();
+			r.top = r.bottom = ((Node) e).getLatitude();
+		} else if(e instanceof Way) {
+			r.left = qd.boundary.getLeftLon(true);
+			r.right = qd.boundary.getRightLon(true);
+			r.bottom = qd.boundary.getBottomLat(true);
+			r.top = qd.boundary.getTopLat(true);
+		}
+		while (b != null) {
+			int lx = MapUtils.get31TileNumberX(b.getLeftLon(false));
+			int rx = MapUtils.get31TileNumberX(b.getRightLon(false));
+			int ty = MapUtils.get31TileNumberY(b.getTopLat(false));
+			int by = MapUtils.get31TileNumberY(b.getBottomLat(false));
+			List<BinaryMapDataObject> bbox = regs.queryBbox(lx, rx, ty, by);
+			for (BinaryMapDataObject bo : bbox) {
 				if (!regs.intersect(bo, lx, ty, rx, by)) {
 					continue;
 				}
 				String fn = regs.getFullName(bo);
-				
+
 				String downloadName = regs.getMapDownloadType(fn);
-				if(!Algorithms.isEmpty(downloadName)) {
-					if(!keyNames.containsKey(downloadName) ) {
-						keyNames.put(downloadName, new TLongArrayList());	
+				if (!Algorithms.isEmpty(downloadName)) {
+					if (!keyNames.containsKey(downloadName)) {
+						keyNames.put(downloadName, new TLongObjectHashMap<QuadRect>());
 					}
-					keyNames.get(downloadName).add(id);
+					keyNames.get(downloadName).put(id, r);
 				}
 			}
 			b = b.next;
@@ -718,7 +743,7 @@ public class IndexIdByBbox {
 	}
 
 	private IOsmStorageFilter updateBbboxIncrementally(final OsmandRegions regs, final DatabaseAdapter adapter, final QueryData qd,
-			final Map<String, TLongArrayList> included) {
+			final Map<String, TLongObjectHashMap<QuadRect>> included) {
 		return new IOsmStorageFilter() {
 			@Override
 			public boolean acceptEntityToLoad(OsmBaseStorage storage, EntityId entityId, Entity entity) {
@@ -758,7 +783,7 @@ public class IndexIdByBbox {
 							adapter.putBbox(key, bbox);
 						}
 					}
-					updateDownloadList(regs, qd, included, key);
+					updateDownloadList(regs, qd, included, key, entity);
 					
 				} catch (Exception e) {
 					throw new RuntimeException(e);
@@ -954,8 +979,8 @@ public class IndexIdByBbox {
 //			qd.ids.add(wayId(93368155l));
 //			qd.ids.add(nodeId(2042972578l));
 			processor.getBbox(qd);
-			System.out.println("Bbox " + qd.boundary.getTopLat() + ", " + qd.boundary.getLeftLon() + " - " 
-					+ qd.boundary.getBottomLat() + ", " + qd.boundary.getRightLon());
+			System.out.println("Bbox " + qd.boundary.getTopLat(false) + ", " + qd.boundary.getLeftLon(false) + " - " 
+					+ qd.boundary.getBottomLat(false) + ", " + qd.boundary.getRightLon(false));
 			processor.close();
 		}
 	}
