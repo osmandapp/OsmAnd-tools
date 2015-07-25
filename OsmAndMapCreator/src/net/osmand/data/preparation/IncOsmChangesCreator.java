@@ -51,7 +51,7 @@ import org.apache.commons.logging.LogFactory;
 public class IncOsmChangesCreator {
 	private static final Log log = LogFactory.getLog(IncOsmChangesCreator.class);
 	private static final int OSC_FILES_TO_COMBINE = 300;
-	private static final long INTERVAL_TO_UPDATE_PBF = 1000 * 60 * 60;
+	private static final long INTERVAL_TO_UPDATE_PBF = 1000 * 60 * 60 * 2;
 	private static final long MB = 1024 * 1024;
 	
 	private void process(String location, String repo, String binaryFolder) throws Exception {
