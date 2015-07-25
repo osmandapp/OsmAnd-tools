@@ -50,6 +50,7 @@ import org.apache.commons.logging.LogFactory;
 public class IncOsmChangesCreator {
 	private static final Log log = LogFactory.getLog(IncOsmChangesCreator.class);
 	private static final int OSC_FILES_TO_COMBINE = 300;
+	private static final long INTERVAL_TO_UPDATE_PBF = 1000 * 60 * 15;
 	
 	private void process(String location, String repo, String binaryFolder) throws Exception {
 		CountryOcbfGeneration ocbfGeneration = new CountryOcbfGeneration();
@@ -101,6 +102,7 @@ public class IncOsmChangesCreator {
 		List<File> oscFiles = new ArrayList<File>();
 		List<File> oscTxtFiles = new ArrayList<File>();
 		List<File> oscFilesIds = new ArrayList<File>();
+		long minTimestamp = Long.MAX_VALUE;
 		for(File oscFile : getSortedFiles(countryFolder)) {
 			if(oscFile.getName().endsWith("osc.gz")) {
 				String baseFile = oscFile.getName().substring(0, oscFile.getName().length() - "osc.gz".length());
@@ -112,6 +114,7 @@ public class IncOsmChangesCreator {
 				oscFiles.add(oscFile);
 				oscTxtFiles.add(oscFileTxt);
 				oscFilesIds.add(oscFileIdsTxt);
+				minTimestamp = Math.min(oscFile.lastModified(), minTimestamp);
 			}
 			if(oscFiles.size() > OSC_FILES_TO_COMBINE) {
 				process(binaryFolder, pbfFile, polygonFile, oscFiles, oscTxtFiles, oscFilesIds);
@@ -120,7 +123,7 @@ public class IncOsmChangesCreator {
 				oscFilesIds.clear();
 			}
 		}	
-		if(oscFiles.size() > 0) {
+		if(oscFiles.size() > 0 && System.currentTimeMillis() - INTERVAL_TO_UPDATE_PBF > minTimestamp) {
 			process(binaryFolder, pbfFile, polygonFile, oscFiles, oscTxtFiles, oscFilesIds);
 		}
 	}
