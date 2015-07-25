@@ -64,6 +64,7 @@ public class ObfChangesCreator {
 			tmpFile.delete();
 			ic.setRegionName(g.basedate);
 			ic.setNodesDBFile(tmpFile);
+			log.info("Processing " + country.getName() + " " + g.basedate + " " + g.osmGzFiles.size() + " files");
 			ic.generateIndexes(g.osmGzFiles.toArray(new File[0]), new ConsoleProgressImplementation(), null,
 					MapZooms.parseZooms("13-14;15-"), MapRenderingTypesEncoder.getDefault(), log, false);
 			File targetFile = new File(country, ic.getMapFileName());
