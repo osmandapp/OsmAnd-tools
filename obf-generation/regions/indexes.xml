@@ -830,6 +830,13 @@
 		 	<region name="shikoku"/>
 		 	<region name="tohoku"/>
 		</regions>
+		
+		<!-- 6.5 PHILIPPINES [SOURCE: OSMAND:NET] -->
+		<regions siteToDownload="http://download.osmand.net/osm-downloads/philippines-latest.pbf" region_prefix="Philippines_" skip="false" region_suffix="_Asia">
+		 	<region name="luzon"/>
+		 	<region name="visayas"/>
+		 	<region name="mindanao"/>
+		 </regions>
 
 		<!-- 6.6 SOUTH-EASTERN ASIA [SOURCE: OSMAND:NET] -->
 		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.pbf" region_prefix="" region_suffix="_Asia" skip="false">
