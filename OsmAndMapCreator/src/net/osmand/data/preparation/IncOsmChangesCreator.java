@@ -49,7 +49,7 @@ import org.apache.commons.logging.LogFactory;
 
 public class IncOsmChangesCreator {
 	private static final Log log = LogFactory.getLog(IncOsmChangesCreator.class);
-	private static final int OSC_FILES_TO_COMBINE = 150;
+	private static final int OSC_FILES_TO_COMBINE = 220;
 	
 	private void process(String location, String repo, String binaryFolder) throws Exception {
 		CountryOcbfGeneration ocbfGeneration = new CountryOcbfGeneration();
