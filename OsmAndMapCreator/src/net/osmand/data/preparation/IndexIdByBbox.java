@@ -698,7 +698,7 @@ public class IndexIdByBbox {
 					gzout.write((" " + rct.bottom).getBytes());
 					gzout.write((" " + rct.right).getBytes());
 				}
-				gzout.write((nid+"\n").getBytes());
+				gzout.write(("\n").getBytes());
 			}
 			gzout.close();
 			fous.close();
