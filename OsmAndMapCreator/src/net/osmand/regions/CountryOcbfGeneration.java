@@ -73,7 +73,7 @@ public class CountryOcbfGeneration {
 	}
 	
 	public CountryRegion parseRegionStructure(String repo) throws XmlPullParserException, IOException {
-		String regionsXml = repo + "resources/countries-info/regions.xml";
+		String regionsXml = repo + "/resources/countries-info/regions.xml";
 		XmlPullParser parser = PlatformUtil.newXMLPullParser();
 		parser.setInput(new FileReader(regionsXml));
 		int tok;
