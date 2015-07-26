@@ -496,7 +496,11 @@ public class IncOsmChangesCreator {
 					}
 				} else if(l.charAt(0) == 'R') {
 					long relationId = IndexIdByBbox.relationId(Long.parseLong(lns[1]));
-					ids.add(relationId);
+					if (l.charAt(1) == 'D') {
+						ids.remove(relationId);
+					} else {
+						ids.add(relationId);
+					}
 				}
 			}
 			br.close();
