@@ -156,6 +156,7 @@ public class IndexBatchCreator {
 						rc.regionNames.put(cr.getDownloadName(), null);
 					}
 				}
+				countriesToDownload.add(rc);
 			}
 			creator.runBatch(countriesToDownload);
 		} catch (Exception e) {
