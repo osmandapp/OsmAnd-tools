@@ -499,6 +499,7 @@ public class IncOsmChangesCreator {
 					if (l.charAt(1) == 'D') {
 						ids.remove(relationId);
 					} else {
+						found.put(relationId, null);
 						ids.add(relationId);
 					}
 				}
