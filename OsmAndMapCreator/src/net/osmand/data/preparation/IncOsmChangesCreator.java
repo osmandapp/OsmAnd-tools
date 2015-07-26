@@ -10,12 +10,14 @@ import java.io.BufferedReader;
 import java.io.Closeable;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.sql.SQLException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -30,14 +32,14 @@ import java.util.zip.GZIPOutputStream;
 import javax.xml.stream.FactoryConfigurationError;
 import javax.xml.stream.XMLStreamException;
 
+import net.osmand.IProgress;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
+import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.EntityInfo;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Way;
-import net.osmand.osm.io.IOsmStorageFilter;
-import net.osmand.osm.io.OsmBaseStorage;
 import net.osmand.osm.io.OsmBaseStoragePbf;
 import net.osmand.osm.io.OsmStorageWriter;
 import net.osmand.regions.CountryOcbfGeneration;
@@ -50,9 +52,11 @@ import org.apache.commons.logging.LogFactory;
 
 public class IncOsmChangesCreator {
 	private static final Log log = LogFactory.getLog(IncOsmChangesCreator.class);
-	private static final int OSC_FILES_TO_COMBINE = 300;
+	private static final int OSC_FILES_TO_COMBINE = 500;
 	private static final long INTERVAL_TO_UPDATE_PBF = 1000 * 60 * 60 * 2;
 	private static final long MB = 1024 * 1024;
+	private static final long LIMIT_TO_LOAD_IN_MEMORY = 100 * MB;
+	
 	
 	private void process(String location, String repo, String binaryFolder) throws Exception {
 		CountryOcbfGeneration ocbfGeneration = new CountryOcbfGeneration();
@@ -130,7 +134,7 @@ public class IncOsmChangesCreator {
 		}
 	}
 	
-	private void iterateEntity(final TLongSet ids, final TLongObjectHashMap<Entity> found,
+	private void iterateOsmEntity(final TLongSet ids, final TLongObjectHashMap<Entity> found,
 			final boolean changes, final TLongHashSet search, Entity entity, TLongObjectHashMap<Entity> cache) {
 		long key = IndexIdByBbox.convertId(EntityId.valueOf(entity));
 		if(entity instanceof Relation) {
@@ -193,8 +197,8 @@ public class IncOsmChangesCreator {
 		}
 	}
 	
-	private IOsmStorageFilter iteratePbf(final TLongSet ids, final TLongObjectHashMap<Entity> found, final boolean changes, 
-			final TLongObjectHashMap<Entity> cache) {
+	private void iteratePbf(final TLongSet ids, final TLongObjectHashMap<Entity> found, final boolean changes, 
+			OsmDbAccessor acessor, final TLongObjectHashMap<Entity> cache) throws SQLException, InterruptedException {
 		final TLongHashSet search = new TLongHashSet(ids);
 		ids.clear();
 		TLongIterator it = search.iterator();
@@ -208,27 +212,28 @@ public class IncOsmChangesCreator {
 		}
 		if(cache != null && !cache.isEmpty()) {
 			for(Entity e : cache.valueCollection()) {
-				iterateEntity(ids, found, changes, search, e, cache);
+				iterateOsmEntity(ids, found, changes, search, e, cache);
 			}
-			return null;
-		}
-		return new IOsmStorageFilter() {
-			@Override
-			public boolean acceptEntityToLoad(OsmBaseStorage storage, EntityId entityId, Entity entity) {
-				try {
-					iterateEntity(ids, found, changes, search, entity, cache);
-					long key = IndexIdByBbox.convertId(entityId);
-					if(cache != null && !cache.contains(key)) {
-						cache.put(key, entity);
-					}
-				} catch (Exception e) {
-					throw new RuntimeException(e);
+		} else {
+			OsmDbAccessor.OsmDbVisitor vis = new OsmDbAccessor.OsmDbVisitor() {
+				
+				@Override
+				public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
+					try {
+						iterateOsmEntity(ids, found, changes, search, e, cache);
+						long key = IndexIdByBbox.convertId(EntityId.valueOf(e));
+						if(cache != null && !cache.contains(key)) {
+							cache.put(key, e);
+						}
+					} catch (Exception es) {
+						throw new RuntimeException(es);
+					}					
 				}
-				return false;
-			}
-
-			
-		};
+			};
+			acessor.iterateOverEntities(IProgress.EMPTY_PROGRESS, EntityType.NODE, vis);
+			acessor.iterateOverEntities(IProgress.EMPTY_PROGRESS, EntityType.WAY, vis);
+			acessor.iterateOverEntities(IProgress.EMPTY_PROGRESS, EntityType.RELATION, vis);
+		}
 	}
 	
 	private void process(String binaryFolder, File pbfFile, File polygonFile, List<File> oscFiles,
@@ -248,28 +253,30 @@ public class IncOsmChangesCreator {
 		}
 	
 		TLongObjectHashMap<Entity> found = new TLongObjectHashMap<Entity>();
-		TLongObjectHashMap<Entity> cache = outPbf.length() > 100 * MB ? null : new TLongObjectHashMap<Entity>();
+		TLongObjectHashMap<Entity> cache = outPbf.length() > LIMIT_TO_LOAD_IN_MEMORY ? null : new TLongObjectHashMap<Entity>();
 		TLongHashSet toFind = getIds(oscFilesIds, found);
-		// doesn't give any reasonable performance
-//		final byte[] allBytes = Files.readAllBytes(Paths.get(outPbf.getAbsolutePath()));
-		boolean changes = true;
-		int iteration = 0;
-		while (!toFind.isEmpty()) {
-			iteration++;
-			log.info("Iterate pbf to find " + toFind.size() + " ids (" + iteration + ")");
-			IOsmStorageFilter filter = iteratePbf(toFind, found, changes, cache);
-			if (filter != null) {
-				OsmBaseStoragePbf pbfReader = new OsmBaseStoragePbf();
-				InputStream fis = new FileInputStream(outPbf);
-//				InputStream fis = new ByteArrayInputStream(allBytes);
-				pbfReader.getFilters().add(filter);
-				pbfReader.parseOSMPbf(fis, null, false);
-				fis.close();
+		
+		if (!toFind.isEmpty()) {
+			// doesn't give any reasonable performance
+			// final byte[] allBytes = Files.readAllBytes(Paths.get(outPbf.getAbsolutePath()));
+			boolean changes = true;
+			int iteration = 0;
+			File dbFile = new File(outPbf.getParentFile(), outPbf.getName() + ".db");
+			DBDialect dlct = DBDialect.SQLITE;
+			OsmDbAccessor accessor = createDbAcessor(outPbf, dbFile, dlct);
+			
+			
+			while (!toFind.isEmpty()) {
+				iteration++;
+				log.info("Iterate pbf to find " + toFind.size() + " ids (" + iteration + ")");
+				iteratePbf(toFind, found, changes, accessor, cache);
+				changes = false;
+				if (iteration > 30) {
+					throw new RuntimeException("Too many iterations");
+				}
 			}
-			changes = false;
-			if(iteration > 30) {
-				 throw new RuntimeException("Too many iterations");
-			}
+			dlct.closeDatabase(accessor.getDbConn());
+			dlct.removeDatabase(dbFile);
 		}
 		System.gc();
 		if(cache != null) {
@@ -289,6 +296,27 @@ public class IncOsmChangesCreator {
 				f.delete();
 			}
 		}
+	}
+
+	private OsmDbAccessor createDbAcessor(File outPbf, File dbFile, DBDialect dlct) throws SQLException,
+			FileNotFoundException, IOException {
+		OsmDbAccessor accessor = new OsmDbAccessor();
+		if (dlct.databaseFileExists(dbFile)) {
+			dlct.removeDatabase(dbFile);
+		}
+		log.info("Load pbf into sqlite ");
+		Object dbConn = dlct.getDatabaseConnection(dbFile.getAbsolutePath(), log);
+		accessor.setDbConn(dbConn, dlct);
+		OsmDbCreator dbCreator = new OsmDbCreator(0, 0, false);
+		accessor.initDatabase(dbCreator);
+		OsmBaseStoragePbf pbfReader = new OsmBaseStoragePbf();
+		InputStream fis = new FileInputStream(outPbf);
+		// InputStream fis = new ByteArrayInputStream(allBytes);
+		pbfReader.getFilters().add(dbCreator);
+		pbfReader.parseOSMPbf(fis, null, false);
+		fis.close();
+		dlct.commitDatabase(dbConn);
+		return accessor;
 	}
 
 	private void writeOsmFile(File parentFile, TLongObjectHashMap<Entity> found) throws FactoryConfigurationError, XMLStreamException, IOException {
