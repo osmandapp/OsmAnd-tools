@@ -349,8 +349,8 @@ public class IncOsmChangesCreator {
 		for (File f : currentList) {
 			args.add(f.getName());
 		}
-		args.add("-B=" + polygonFile.getName());
-		args.add("--complex-ways");
+//		args.add("-B=" + polygonFile.getName());
+//		args.add("--complex-ways");
 		args.add("-o=" + osc.getName());
 		boolean res = exec(parentFile, binaryFolder + "osmconvert", args);
 		if (!res) {
