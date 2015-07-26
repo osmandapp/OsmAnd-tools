@@ -97,6 +97,9 @@ public class IncOsmChangesCreator {
 			} else {
 				fromExtract = new File(pbfFile.getParentFile().getParentFile(), reg.getPolyExtract() +".pbf");
 			}
+			if(!fromExtract.exists()) {
+				fromExtract = new File(fromExtract.getParentFile(), fromExtract.getName().replace(".pbf", ".o5m"));
+			}
 			if(fromExtract.exists()) {
 				List<String> args = new ArrayList<String>();
 				args.add(fromExtract.getAbsolutePath());
