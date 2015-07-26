@@ -153,7 +153,9 @@ public class IndexBatchCreator {
 				while(it.hasNext()) {
 					CountryRegion cr = it.next();
 					if(cr.map) {
-						rc.regionNames.put(cr.getDownloadName(), null);
+						RegionSpecificData dt = new RegionSpecificData();
+						dt.downloadName = cr.getDownloadName();
+						rc.regionNames.put(cr.getDownloadName(), dt);
 					}
 				}
 				countriesToDownload.add(rc);
