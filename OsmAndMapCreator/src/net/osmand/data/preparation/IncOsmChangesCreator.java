@@ -482,6 +482,7 @@ public class IncOsmChangesCreator {
 						ids.remove(wayId);
 					} else {
 						ids.add(wayId);
+						found.remove(wayId);
 					}
 				} else if(l.charAt(0) == 'N') {
 					long oid = Long.parseLong(lns[1]);
@@ -493,14 +494,16 @@ public class IncOsmChangesCreator {
 						ids.remove(nodeId);
 					} else {
 						ids.add(nodeId);
+						found.remove(nodeId);
 					}
 				} else if(l.charAt(0) == 'R') {
 					long relationId = IndexIdByBbox.relationId(Long.parseLong(lns[1]));
 					if (l.charAt(1) == 'D') {
 						ids.remove(relationId);
-					} else {
 						found.put(relationId, null);
+					} else {
 						ids.add(relationId);
+						found.remove(relationId);
 					}
 				}
 			}
