@@ -778,6 +778,7 @@ public class IndexIdByBbox {
 						for(int i = 0; i < ((Way) entity).getNodeIds().size(); i++) {
 							qd.ids.add(nodeId(((Way) entity).getNodeIds().get(i)));
 						}
+						qd.ids.add(key);
 						byte[] bbox = adapter.getBbox(qd);
 						if(bbox != null) {
 							qd.written ++;
@@ -790,6 +791,7 @@ public class IndexIdByBbox {
 							EntityId nid = iterator.next();
 							qd.ids.add(convertId(nid));
 						}
+						qd.ids.add(key);
 						byte[] bbox = adapter.getBbox(qd);
 						if(bbox != null) {
 							qd.written ++;
