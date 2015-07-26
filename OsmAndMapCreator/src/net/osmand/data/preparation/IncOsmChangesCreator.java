@@ -25,6 +25,7 @@ import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.zip.GZIPOutputStream;
@@ -44,6 +45,7 @@ import net.osmand.osm.io.IOsmStorageFilter;
 import net.osmand.osm.io.OsmBaseStorage;
 import net.osmand.osm.io.OsmBaseStoragePbf;
 import net.osmand.osm.io.OsmStorageWriter;
+import net.osmand.osm.util.CombineSRTMIntoFile;
 import net.osmand.regions.CountryOcbfGeneration;
 import net.osmand.regions.CountryOcbfGeneration.CountryRegion;
 import net.osmand.util.Algorithms;
@@ -54,7 +56,7 @@ import org.apache.commons.logging.LogFactory;
 
 public class IncOsmChangesCreator {
 	private static final Log log = LogFactory.getLog(IncOsmChangesCreator.class);
-	private static final int OSC_FILES_TO_COMBINE = 500;
+	private static final int OSC_FILES_TO_COMBINE_OSMCONVERT = 400;
 	private static final long INTERVAL_TO_UPDATE_PBF = 1000 * 60 * 60 * 2;
 	private static final long MB = 1024 * 1024;
 	private static final long LIMIT_TO_LOAD_IN_MEMORY = 100 * MB;
@@ -123,12 +125,6 @@ public class IncOsmChangesCreator {
 				oscTxtFiles.add(oscFileTxt);
 				oscFilesIds.add(oscFileIdsTxt);
 				minTimestamp = Math.min(oscFile.lastModified(), minTimestamp);
-			}
-			if(oscFiles.size() > OSC_FILES_TO_COMBINE) {
-				process(binaryFolder, pbfFile, polygonFile, oscFiles, oscTxtFiles, oscFilesIds);
-				oscFiles.clear();
-				oscTxtFiles.clear();
-				oscFilesIds.clear();
 			}
 		}	
 		if(oscFiles.size() > 0 && System.currentTimeMillis() - INTERVAL_TO_UPDATE_PBF > minTimestamp) {
@@ -264,65 +260,102 @@ public class IncOsmChangesCreator {
 			List<File> oscTxtFiles, List<File> oscFilesIds) throws Exception {
 		File outPbf = new File(pbfFile.getParentFile(), pbfFile.getName() + ".o.pbf");
 		List<String> args = new ArrayList<String>();
+		List<File> additionalOsc = new ArrayList<File>();
 		args.add(pbfFile.getName());
 		args.add("-B=" + polygonFile.getName());
 		args.add("--complex-ways");
+		int currentOsc = 0;
+		int currentOscInd = 1;
+		File osc = new File(pbfFile.getParentFile(), pbfFile.getName() +"."+currentOscInd++ + ".osc.gz");
+		additionalOsc.add(osc);
+		List<File> currentList = new ArrayList<File>();
 		for (File f : oscFiles) {
-			args.add(f.getName());
+			currentOsc++;
+			currentList.add(f);
+			if (currentOsc > OSC_FILES_TO_COMBINE_OSMCONVERT) {
+				combineOscs(pbfFile.getParentFile(), binaryFolder, polygonFile, osc, currentList);
+				args.add(osc.getName());
+				// start over
+				currentOsc = 0;
+				currentList.clear();
+				osc = new File(pbfFile.getParentFile(), pbfFile.getName() + "." + currentOscInd++ + ".osc.gz");
+				additionalOsc.add(osc);
+			}
 		}
+		combineOscs(pbfFile.getParentFile(), binaryFolder, polygonFile, osc, currentList);
+		args.add(osc.getName());
 		args.add("-o=" + outPbf.getName());
 		boolean res = exec(pbfFile.getParentFile(), binaryFolder + "osmconvert", args);
 		if (!res) {
 			throw new IllegalStateException(pbfFile.getName() + " convert failed");
 		}
-	
-		TLongObjectHashMap<Entity> found = new TLongObjectHashMap<Entity>();
-		TLongObjectHashMap<Entity> cache = outPbf.length() > LIMIT_TO_LOAD_IN_MEMORY ? null : new TLongObjectHashMap<Entity>();
-		TLongHashSet toFind = getIds(oscFilesIds, found);
-		
-		if (!toFind.isEmpty()) {
-			// doesn't give any reasonable performance
-			// final byte[] allBytes = Files.readAllBytes(Paths.get(outPbf.getAbsolutePath()));
-			boolean changes = true;
-			int iteration = 0;
-			File dbFile = new File(outPbf.getParentFile(), outPbf.getName() + ".db");
-			DBDialect dlct = DBDialect.SQLITE;
-			// OsmDbAccessor accessor = createDbAcessor(outPbf, dbFile, dlct);
-			// not fast enough
-			OsmDbAccessor accessor = null;
-			
-			while (!toFind.isEmpty()) {
-				iteration++;
-				log.info("Iterate pbf to find " + toFind.size() + " ids (" + iteration + ")");
-				iteratePbf(toFind, found, changes, accessor, cache, outPbf);
-				changes = false;
-				if (iteration > 30) {
-					throw new RuntimeException("Too many iterations");
+		try {
+			TLongObjectHashMap<Entity> found = new TLongObjectHashMap<Entity>();
+			TLongObjectHashMap<Entity> cache = outPbf.length() > LIMIT_TO_LOAD_IN_MEMORY ? null
+					: new TLongObjectHashMap<Entity>();
+			TLongHashSet toFind = getIds(oscFilesIds, found);
+
+			if (!toFind.isEmpty()) {
+				// doesn't give any reasonable performance
+				// final byte[] allBytes = Files.readAllBytes(Paths.get(outPbf.getAbsolutePath()));
+				boolean changes = true;
+				int iteration = 0;
+				File dbFile = new File(outPbf.getParentFile(), outPbf.getName() + ".db");
+				DBDialect dlct = DBDialect.SQLITE;
+				// OsmDbAccessor accessor = createDbAcessor(outPbf, dbFile, dlct);
+				// not fast enough
+				OsmDbAccessor accessor = null;
+
+				while (!toFind.isEmpty()) {
+					iteration++;
+					log.info("Iterate pbf to find " + toFind.size() + " ids (" + iteration + ")");
+					iteratePbf(toFind, found, changes, accessor, cache, outPbf);
+					changes = false;
+					if (iteration > 30) {
+						throw new RuntimeException("Too many iterations");
+					}
+				}
+				if (accessor != null) {
+					dlct.closeDatabase(accessor.getDbConn());
+					dlct.removeDatabase(dbFile);
 				}
 			}
-			if (accessor != null) {
-				dlct.closeDatabase(accessor.getDbConn());
-				dlct.removeDatabase(dbFile);
+			System.gc();
+			if (cache != null) {
+				cache.clear();
 			}
-		}
-		System.gc();
-		if(cache != null) {
-			cache.clear();
-		}
-		writeOsmFile(pbfFile.getParentFile(), found);
-		if(true) {
+			writeOsmFile(pbfFile.getParentFile(), found);
+
 			// delete files
 			outPbf.renameTo(pbfFile);
-			for(File f : oscFilesIds) {
+			for (File f : oscFilesIds) {
 				f.delete();
 			}
-			for(File f : oscFiles) {
+			for (File f : oscFiles) {
 				f.delete();
 			}
-			for(File f : oscTxtFiles) {
+			for (File f : oscTxtFiles) {
+				f.delete();
+			}
+		} finally {
+			for (File f : additionalOsc) {
 				f.delete();
 			}
 		}
+	}
+
+	private void combineOscs(File parentFile, String binaryFolder, File polygonFile, File osc, List<File> currentList) {
+		List<String> args = new ArrayList<String>();
+		for (File f : currentList) {
+			args.add(f.getName());
+		}
+		args.add("-B=" + polygonFile.getName());
+		args.add("--complex-ways");
+		args.add("-o=" + osc.getName());
+		boolean res = exec(parentFile, binaryFolder + "osmconvert", args);
+		if (!res) {
+			throw new IllegalStateException(osc.getName() + " convert failed");
+		}		
 	}
 
 	private OsmDbAccessor createDbAcessor(File outPbf, File dbFile, DBDialect dlct) throws SQLException,
