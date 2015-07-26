@@ -207,10 +207,15 @@ public class OsmStorageWriter {
 	private void writeTags(XMLStreamWriter writer, Entity e) throws XMLStreamException{
 		for(Entry<String, String> en : e.getTags().entrySet()){
 			writeStartElement(writer, ELEM_TAG, INDENT2);
-			writer.writeAttribute(ATTR_K, en.getKey());
-			writer.writeAttribute(ATTR_V, en.getValue());
+			writer.writeAttribute(ATTR_K, replaceInvalid(en.getKey()));
+			writer.writeAttribute(ATTR_V, replaceInvalid(en.getValue()));
 			writer.writeEndElement();
 		}
+	}
+
+
+	private String replaceInvalid(String value) {
+		return value.replace((char) 0xdd62, ' ');
 	}
 }
 

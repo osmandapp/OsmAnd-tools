@@ -354,11 +354,11 @@ public class IndexCreator {
 		for (File read : readFile) {
 			OsmDbCreator dbCreator = extractOsmToNodesDB(accessor, read, progress, addFilter,
 					generateUniqueIds? ind++ : 0, generateUniqueIds ? shift : 0, ovewriteIds, mapInd == 1);
-			mapInd++;
 			accessor.updateCounts(dbCreator);
 			if (readFile.length > 1) {
 				log.info("Processing " + mapInd + " file out of " + readFile.length);
 			}
+			mapInd++;
 		}
 		if(loadFromExistingFile) {
 			if (indexAddress) {
@@ -860,7 +860,7 @@ public class IndexCreator {
 
 //		creator.deleteDatabaseIndexes = false;
 //		creator.recreateOnlyBinaryFile = true;
-//		creator.deleteOsmDB = false;
+		creator.deleteOsmDB = false;
 				
 		creator.setZoomWaySmothness(2);
 		MapRenderingTypesEncoder rt = //MapRenderingTypesEncoder.getDefault();
@@ -869,7 +869,8 @@ public class IndexCreator {
 
 //		String file = rootFolder + "/temp/map.osm";
 //		String file = rootFolder + "/temp/032.osc.gz";
-		String file = rootFolder + "/temp/Netherlands-noord-holland.pbf";
+//		String file = rootFolder + "/temp/Netherlands-noord-holland.pbf";
+		String file = rootFolder + "/temp/lithuania_europe.pbf";
 //		String file = rootFolder + "/repos/resources/synthetic_test_rendering.osm";
 
 		int st = file.lastIndexOf('/');
@@ -877,7 +878,6 @@ public class IndexCreator {
 		creator.setNodesDBFile(new File(rootFolder + "/osm-gen/"+file.substring(st, e) + ".tmp.odb"));
 		creator.generateIndexes(new File(file),
 				new ConsoleProgressImplementation(1), null, zooms, rt, log);
-		
 		
 		log.info("WHOLE GENERATION TIME :  " + (System.currentTimeMillis() - time)); //$NON-NLS-1$
 		log.info("COORDINATES_SIZE " + BinaryMapIndexWriter.COORDINATES_SIZE + " count " + BinaryMapIndexWriter.COORDINATES_COUNT); //$NON-NLS-1$ //$NON-NLS-2$
