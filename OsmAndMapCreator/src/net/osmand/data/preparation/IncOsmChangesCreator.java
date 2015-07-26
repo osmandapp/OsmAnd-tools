@@ -288,7 +288,7 @@ public class IncOsmChangesCreator {
 			File dbFile = new File(outPbf.getParentFile(), outPbf.getName() + ".db");
 			DBDialect dlct = DBDialect.SQLITE;
 			// OsmDbAccessor accessor = createDbAcessor(outPbf, dbFile, dlct);
-			// not fast
+			// not fast enough
 			OsmDbAccessor accessor = null;
 			
 			while (!toFind.isEmpty()) {
