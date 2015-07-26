@@ -101,6 +101,14 @@ public class IncOsmChangesCreator {
 				fromExtract = new File(fromExtract.getParentFile(), fromExtract.getName().replace(".pbf", ".o5m"));
 			}
 			if(fromExtract.exists()) {
+				if(fromExtract.lastModified() < getMinTimestamp(pbfFile.getParentFile(), "osc.gz")) {
+					SimpleDateFormat sdf = new SimpleDateFormat();
+					System.err.println("Extract file is older than any osc.gz change available that means that extract file should be updated: " + fromExtract.getName() + 
+							" " + sdf.format(new Date(fromExtract.lastModified())) + 
+							" polygon " + sdf.format(new Date(getMinTimestamp(pbfFile.getParentFile(), "osc.gz"))));
+					
+					return;
+				}
 				List<String> args = new ArrayList<String>();
 				args.add(fromExtract.getAbsolutePath());
 				args.add("-B=" + polygonFile.getName());
@@ -113,6 +121,19 @@ public class IncOsmChangesCreator {
 				System.err.println("Extract file doesn't exist " + fromExtract.getName());
 			}
 		}
+	}
+
+	private long getMinTimestamp(File parentFile, String ext) {
+		long l = Long.MAX_VALUE;
+		File[] fls = parentFile.listFiles();
+		if (fls != null) {
+			for (File f : fls) {
+				if (f.getName().endsWith(ext)) {
+					l = Math.min(l, f.lastModified());
+				}
+			}
+		}
+		return l;
 	}
 
 	private void updatePbfFile(File countryFolder, File pbfFile, File polygonFile, String binaryFolder) throws Exception {
