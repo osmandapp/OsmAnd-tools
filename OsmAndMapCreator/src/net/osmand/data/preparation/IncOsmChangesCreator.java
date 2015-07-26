@@ -40,6 +40,8 @@ import net.osmand.osm.edit.EntityInfo;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Way;
+import net.osmand.osm.io.IOsmStorageFilter;
+import net.osmand.osm.io.OsmBaseStorage;
 import net.osmand.osm.io.OsmBaseStoragePbf;
 import net.osmand.osm.io.OsmStorageWriter;
 import net.osmand.regions.CountryOcbfGeneration;
@@ -198,7 +200,7 @@ public class IncOsmChangesCreator {
 	}
 	
 	private void iteratePbf(final TLongSet ids, final TLongObjectHashMap<Entity> found, final boolean changes, 
-			OsmDbAccessor acessor, final TLongObjectHashMap<Entity> cache) throws SQLException, InterruptedException {
+			OsmDbAccessor acessor, final TLongObjectHashMap<Entity> cache, File outPbf) throws SQLException, InterruptedException, IOException {
 		final TLongHashSet search = new TLongHashSet(ids);
 		ids.clear();
 		TLongIterator it = search.iterator();
@@ -214,7 +216,7 @@ public class IncOsmChangesCreator {
 			for(Entity e : cache.valueCollection()) {
 				iterateOsmEntity(ids, found, changes, search, e, cache);
 			}
-		} else {
+		} else if (acessor != null){
 			OsmDbAccessor.OsmDbVisitor vis = new OsmDbAccessor.OsmDbVisitor() {
 				
 				@Override
@@ -233,6 +235,28 @@ public class IncOsmChangesCreator {
 			acessor.iterateOverEntities(IProgress.EMPTY_PROGRESS, EntityType.NODE, vis);
 			acessor.iterateOverEntities(IProgress.EMPTY_PROGRESS, EntityType.WAY, vis);
 			acessor.iterateOverEntities(IProgress.EMPTY_PROGRESS, EntityType.RELATION, vis);
+		} else {
+			OsmBaseStoragePbf pbfReader = new OsmBaseStoragePbf();
+			InputStream fis = new FileInputStream(outPbf);
+			// InputStream fis = new ByteArrayInputStream(allBytes);
+			pbfReader.getFilters().add(new IOsmStorageFilter() {
+				
+				@Override
+				public boolean acceptEntityToLoad(OsmBaseStorage storage, EntityId entityId, Entity e) {
+					try {
+						iterateOsmEntity(ids, found, changes, search, e, cache);
+						long key = IndexIdByBbox.convertId(EntityId.valueOf(e));
+						if(cache != null && !cache.contains(key)) {
+							cache.put(key, e);
+						}
+					} catch (Exception es) {
+						throw new RuntimeException(es);
+					}	
+					return false;
+				}
+			});
+			pbfReader.parseOSMPbf(fis, null, false);
+			fis.close();
 		}
 	}
 	
@@ -263,20 +287,23 @@ public class IncOsmChangesCreator {
 			int iteration = 0;
 			File dbFile = new File(outPbf.getParentFile(), outPbf.getName() + ".db");
 			DBDialect dlct = DBDialect.SQLITE;
-			OsmDbAccessor accessor = createDbAcessor(outPbf, dbFile, dlct);
-			
+			// OsmDbAccessor accessor = createDbAcessor(outPbf, dbFile, dlct);
+			// not fast
+			OsmDbAccessor accessor = null;
 			
 			while (!toFind.isEmpty()) {
 				iteration++;
 				log.info("Iterate pbf to find " + toFind.size() + " ids (" + iteration + ")");
-				iteratePbf(toFind, found, changes, accessor, cache);
+				iteratePbf(toFind, found, changes, accessor, cache, outPbf);
 				changes = false;
 				if (iteration > 30) {
 					throw new RuntimeException("Too many iterations");
 				}
 			}
-			dlct.closeDatabase(accessor.getDbConn());
-			dlct.removeDatabase(dbFile);
+			if (accessor != null) {
+				dlct.closeDatabase(accessor.getDbConn());
+				dlct.removeDatabase(dbFile);
+			}
 		}
 		System.gc();
 		if(cache != null) {
