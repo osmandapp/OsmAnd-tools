@@ -308,7 +308,7 @@ public class IncOsmChangesCreator {
 		Object dbConn = dlct.getDatabaseConnection(dbFile.getAbsolutePath(), log);
 		accessor.setDbConn(dbConn, dlct);
 		OsmDbCreator dbCreator = new OsmDbCreator(0, 0, false);
-		accessor.initDatabase(dbCreator);
+		dbCreator.initDatabase(dlct, dbConn, true);
 		OsmBaseStoragePbf pbfReader = new OsmBaseStoragePbf();
 		InputStream fis = new FileInputStream(outPbf);
 		// InputStream fis = new ByteArrayInputStream(allBytes);
@@ -317,6 +317,7 @@ public class IncOsmChangesCreator {
 		fis.close();
 		dbCreator.finishLoading();
 		dlct.commitDatabase(dbConn);
+		accessor.initDatabase(dbCreator);
 		return accessor;
 	}
 
