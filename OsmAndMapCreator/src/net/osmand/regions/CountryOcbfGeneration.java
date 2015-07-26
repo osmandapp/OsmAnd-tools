@@ -137,6 +137,10 @@ public class CountryOcbfGeneration {
 		public boolean hillshade ;
 		public boolean srtm ;
 		
+		public CountryRegion getParent() {
+			return parent;
+		}
+		
 		public Iterator<CountryRegion> iterator() {
 			final LinkedList<CountryRegion> stack = new LinkedList<CountryRegion>(children);
 			return new Iterator<CountryRegion>() {

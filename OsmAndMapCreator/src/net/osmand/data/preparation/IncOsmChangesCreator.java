@@ -92,7 +92,13 @@ public class IncOsmChangesCreator {
 	
 	private void extractPbf(File pbfFile, CountryRegion reg, String binaryFolder, File polygonFile) {
 		if(!Algorithms.isEmpty(reg.getPolyExtract())) {
-			File fromExtract = new File(pbfFile.getParentFile().getParentFile(), reg.getPolyExtract() +".pbf");
+			File fromExtract ;
+			if (reg.getParent() != null && reg.getParent().map) {
+				fromExtract = new File(pbfFile.getParentFile().getParentFile(), reg.getParent().getDownloadName() + "/"
+						+ reg.getParent().getDownloadName() + ".pbf");
+			} else {
+				fromExtract = new File(pbfFile.getParentFile().getParentFile(), reg.getPolyExtract() +".pbf");
+			}
 			if(fromExtract.exists()) {
 				List<String> args = new ArrayList<String>();
 				args.add(fromExtract.getAbsolutePath());
@@ -344,7 +350,7 @@ public class IncOsmChangesCreator {
 		}
 	}
 
-	private void combineOscs(File parentFile, String binaryFolder, File polygonFile, File osc, List<File> currentList) {
+	protected void combineOscs(File parentFile, String binaryFolder, File polygonFile, File osc, List<File> currentList) {
 		List<String> args = new ArrayList<String>();
 		for (File f : currentList) {
 			args.add(f.getName());
@@ -358,7 +364,7 @@ public class IncOsmChangesCreator {
 		}		
 	}
 
-	private OsmDbAccessor createDbAcessor(File outPbf, File dbFile, DBDialect dlct) throws SQLException,
+	protected OsmDbAccessor createDbAcessor(File outPbf, File dbFile, DBDialect dlct) throws SQLException,
 			FileNotFoundException, IOException {
 		OsmDbAccessor accessor = new OsmDbAccessor();
 		if (dlct.databaseFileExists(dbFile)) {
