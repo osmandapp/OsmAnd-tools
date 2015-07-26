@@ -369,6 +369,7 @@ public class IncOsmChangesCreator {
 						found.put(wayId, wd);
 						found.put(IndexIdByBbox.nodeId(tln.getId()), tln);
 						found.put(IndexIdByBbox.nodeId(brn.getId()), brn);
+						ids.remove(wayId);
 					} else {
 						ids.add(wayId);
 					}
@@ -379,6 +380,7 @@ public class IncOsmChangesCreator {
 						Node node = new Node(Double.parseDouble(lns[2]), Double.parseDouble(lns[3]), oid);
 						node.putTag("osmand_change", "delete");
 						found.put(nodeId, node);
+						ids.remove(nodeId);
 					} else {
 						ids.add(nodeId);
 					}
