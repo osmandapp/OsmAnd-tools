@@ -25,7 +25,6 @@ import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.zip.GZIPOutputStream;
@@ -45,7 +44,6 @@ import net.osmand.osm.io.IOsmStorageFilter;
 import net.osmand.osm.io.OsmBaseStorage;
 import net.osmand.osm.io.OsmBaseStoragePbf;
 import net.osmand.osm.io.OsmStorageWriter;
-import net.osmand.osm.util.CombineSRTMIntoFile;
 import net.osmand.regions.CountryOcbfGeneration;
 import net.osmand.regions.CountryOcbfGeneration.CountryRegion;
 import net.osmand.util.Algorithms;
@@ -314,7 +312,7 @@ public class IncOsmChangesCreator {
 
 				while (!toFind.isEmpty()) {
 					iteration++;
-					log.info("Iterate pbf to find " + toFind.size() + " ids (" + iteration + ")");
+					log.info("Iterate pbf to find " + toFind.size() + " ids (" + iteration + ") " + stat(toFind) );
 					iteratePbf(toFind, found, changes, accessor, cache, outPbf);
 					changes = false;
 					if (iteration > 30) {
@@ -348,6 +346,22 @@ public class IncOsmChangesCreator {
 				f.delete();
 			}
 		}
+	}
+
+	private String stat(TLongHashSet toFind) {
+		int relations = 0;
+		int ways = 0;
+		int nodes = 0;
+		for (long l : toFind.toArray()) {
+			if (l % 4 == 0) {
+				nodes++;
+			} else if (l % 4 == 1) {
+				ways++;
+			} else {
+				relations++;
+			}
+		}
+		return " " + nodes + " nodes, " + ways + " ways, " + relations + " relations";
 	}
 
 	protected void combineOscs(File parentFile, String binaryFolder, File polygonFile, File osc, List<File> currentList) {

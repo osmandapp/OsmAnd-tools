@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -37,6 +38,8 @@ import net.osmand.data.preparation.IndexCreator;
 import net.osmand.data.preparation.MapZooms;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.osm.MapRenderingTypesEncoder;
+import net.osmand.regions.CountryOcbfGeneration;
+import net.osmand.regions.CountryOcbfGeneration.CountryRegion;
 import net.osmand.swing.OsmExtractionUI;
 import net.osmand.util.Algorithms;
 
@@ -108,6 +111,7 @@ public class IndexBatchCreator {
 		String name = args[0];
 		InputStream stream;
 		InputStream regionsStream = null;
+		String internalRegionsList = null;
 		if(name.equals("-local")){
 			stream = IndexBatchCreator.class.getResourceAsStream("batch.xml");
 			regionsStream = IndexBatchCreator.class.getResourceAsStream("regions.xml");
@@ -119,11 +123,15 @@ public class IndexBatchCreator {
 				throw new IllegalArgumentException("XML configuration file not found : " + name, e);
 			}
 			if (args.length > 1) {
-				try {
-					File regionsFile = new File(args[1]);
-					regionsStream = new FileInputStream(regionsFile);
-				} catch (FileNotFoundException e) {
-					throw new IllegalArgumentException("Please specify xml-file with regions to download", e); 
+				if(args[1].startsWith("internal:")) {
+					internalRegionsList = args[1].substring("internal:".length());
+				} else {
+					try {
+						File regionsFile = new File(args[1]);
+						regionsStream = new FileInputStream(regionsFile);
+					} catch (FileNotFoundException e) {
+						throw new IllegalArgumentException("Please specify xml-file with regions to download", e);
+					}
 				}
 			}
 		}
@@ -135,7 +143,21 @@ public class IndexBatchCreator {
 				name = args[1];
 				regions = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(regionsStream);
 			}
-			creator.runBatch(doc, regions);
+			List<RegionCountries> countriesToDownload = creator.setupProcess(doc, regions);
+			if(internalRegionsList != null) {
+				RegionCountries rc = new RegionCountries();
+				rc.siteToDownload = "http://builder.osmand.net/osmc/{0}/{0}.pbf";
+				CountryOcbfGeneration ocbfGeneration = new CountryOcbfGeneration();
+				CountryRegion regionStructure = ocbfGeneration.parseRegionStructure(internalRegionsList);
+				Iterator<CountryRegion> it = regionStructure.iterator();
+				while(it.hasNext()) {
+					CountryRegion cr = it.next();
+					if(cr.map) {
+						rc.regionNames.put(cr.getDownloadName(), null);
+					}
+				}
+			}
+			creator.runBatch(countriesToDownload);
 		} catch (Exception e) {
 			System.out.println("XML configuration file could not be read from " + name);
 			e.printStackTrace();
@@ -145,7 +167,7 @@ public class IndexBatchCreator {
 		}
 	}
 	
-	public void runBatch(Document doc, Document regions) throws SAXException, IOException, ParserConfigurationException{
+	public List<RegionCountries> setupProcess(Document doc, Document regions) throws SAXException, IOException, ParserConfigurationException{
 		NodeList list = doc.getElementsByTagName("process");
 		if(list.getLength() != 1){
 			 throw new IllegalArgumentException("You should specify exactly 1 process element!");
@@ -193,7 +215,7 @@ public class IndexBatchCreator {
 			parseCountriesToDownload(regions, countriesToDownload);
 		}
 		
-		runBatch(countriesToDownload);
+		return countriesToDownload;
 	}
 
 	private void parseCountriesToDownload(Document doc, List<RegionCountries> countriesToDownload) {

@@ -1,6 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <regions_list>
+	<!-- 9 SPECIAL MAPS -->
+		<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.osm.bz2" region_prefix="" skip="false" region_suffix="">
+		 	<region name="World_seamarks_basemap" index="map,poi" downloadName="World_seamarks_basemap"/>
+		</regions>
+		
 	<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.osm.pbf" region_prefix="" skip="false" region_suffix="">	
+
 	 		<!-- Takes too long to index should be reorganized
 		 	<region  name="france_addresses-nationwide_europe"/>
 		 	<region  name="germany_addresses-nationwide_europe"/>

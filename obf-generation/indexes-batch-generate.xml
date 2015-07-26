@@ -21,4 +21,8 @@
 		-->
 					
 	</process>
+		<!-- 9 SPECIAL MAPS -->
+	<regions siteToDownload="http://download.osmand.net/osm-downloads/{0}.osm.bz2" region_prefix="" skip="false" region_suffix="">
+		 <region name="World_seamarks_basemap" index="map,poi" downloadName="World_seamarks_basemap"/>
+	</regions>
 </batch_process> 
