@@ -304,7 +304,7 @@ public class IncOsmChangesCreator {
 		if (dlct.databaseFileExists(dbFile)) {
 			dlct.removeDatabase(dbFile);
 		}
-		log.info("Load pbf into sqlite ");
+		log.info("Load pbf into sqlite " + dbFile.getAbsolutePath());
 		Object dbConn = dlct.getDatabaseConnection(dbFile.getAbsolutePath(), log);
 		accessor.setDbConn(dbConn, dlct);
 		OsmDbCreator dbCreator = new OsmDbCreator(0, 0, false);
@@ -315,6 +315,7 @@ public class IncOsmChangesCreator {
 		pbfReader.getFilters().add(dbCreator);
 		pbfReader.parseOSMPbf(fis, null, false);
 		fis.close();
+		dbCreator.finishLoading();
 		dlct.commitDatabase(dbConn);
 		return accessor;
 	}
