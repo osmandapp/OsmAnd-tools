@@ -36,6 +36,7 @@ import net.osmand.IProgress;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.Entity.EntityType;
+import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.osm.edit.EntityInfo;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Relation;
@@ -165,6 +166,7 @@ public class IncOsmChangesCreator {
 		long key = IndexIdByBbox.convertId(EntityId.valueOf(entity));
 		if(entity instanceof Relation) {
 			boolean loadRelation = search.contains(key);
+			
 			// 1. if relation changed, we need to load all members (multipolygon case)
 			// 2. if any member of relation changed, we need to load all members (multipolygon case)
 			Relation r = (Relation) entity;
@@ -178,15 +180,23 @@ public class IncOsmChangesCreator {
 					}
 				}
 			}
+			
 			if(loadRelation) {
 				found.put(key, entity);
 				ids.remove(key);
-				Iterator<EntityId> it = r.getMemberIds().iterator();
-				while(it.hasNext()) {
-					// load next iteration other nodes
-					long toLoadNode = IndexIdByBbox.convertId(it.next());
-					if (!found.contains(toLoadNode)) {
-						ids.add(toLoadNode);
+				boolean loadFullRelation = changes
+						|| entity.getTag("restriction") != null
+						|| entity.getTag("area") != null
+						|| ("multipolygon".equals(entity.getTag(OSMTagKey.TYPE)) && entity
+								.getTag(OSMTagKey.ADMIN_LEVEL) == null);
+				if (loadFullRelation) {
+					Iterator<EntityId> it = r.getMemberIds().iterator();
+					while (it.hasNext()) {
+						// load next iteration other nodes
+						long toLoadNode = IndexIdByBbox.convertId(it.next());
+						if (!found.contains(toLoadNode)) {
+							ids.add(toLoadNode);
+						}
 					}
 				}
 			}
