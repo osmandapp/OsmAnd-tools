@@ -54,6 +54,7 @@ import net.osmand.router.RouteSegmentResult;
 import net.osmand.router.RoutingConfiguration;
 import net.osmand.router.RoutingConfiguration.Builder;
 import net.osmand.router.RoutingContext;
+import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
 import org.apache.commons.logging.Log;
@@ -620,33 +621,13 @@ public class MapRouterLayer implements MapPanelLayer {
 		return res;
 	}
 	
-	protected File[] getSortedFiles(File dir){
-		File[] listFiles = dir.listFiles();
-		Arrays.sort(listFiles, new Comparator<File>(){
-			@Override
-			public int compare(File o1, File o2) {
-				return -simplifyName(o1).compareTo(simplifyName(o2));
-			}
-
-			private String simplifyName(File o1) {
-				String lc = o1.getName().toLowerCase();
-				if(lc.endsWith(".obf")) {
-					lc = lc.substring(0, lc.length() - ".obf".length());
-				}
-				if(lc.endsWith("_2")) {
-					lc = lc.substring(0, lc.length() - "_2".length()) + "_00_00_00";
-				}
-				return lc;
-			}
-		});
-		return listFiles;
-	}
+	
 	
 	public List<Way> selfRoute(LatLon start, LatLon end, List<LatLon> intermediates, List<RouteSegmentResult> previousRoute, RouteCalculationMode rm) {
 		List<Way> res = new ArrayList<Way>();
 		long time = System.currentTimeMillis();
 		List<File> files = new ArrayList<File>();
-		for (File f : getSortedFiles(new File(DataExtractionSettings.getSettings().getBinaryFilesDir()))) {
+		for (File f : Algorithms.getSortedFilesVersions(new File(DataExtractionSettings.getSettings().getBinaryFilesDir()))) {
 			if(f.getName().endsWith(".obf")){
 				files.add(f);
 			}
