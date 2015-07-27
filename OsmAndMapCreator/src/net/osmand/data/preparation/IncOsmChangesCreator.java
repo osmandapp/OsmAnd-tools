@@ -158,6 +158,8 @@ public class IncOsmChangesCreator {
 		}	
 		if(oscFiles.size() > 0 && System.currentTimeMillis() - INTERVAL_TO_UPDATE_PBF > minTimestamp) {
 			process(binaryFolder, pbfFile, polygonFile, oscFiles, oscTxtFiles, oscFilesIds);
+		} else {
+			log.info("Skip " + countryFolder.getName());
 		}
 	}
 	
