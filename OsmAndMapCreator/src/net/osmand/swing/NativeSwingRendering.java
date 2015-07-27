@@ -6,6 +6,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -298,12 +299,23 @@ public class NativeSwingRendering extends NativeLibrary {
 	}
 	
 	public void initFilesInDir(File filesDir){
-		File[] lf = filesDir.listFiles();
+		File[] lf = getSortedFiles(filesDir);
 		for(File f : lf){
 			if(f.getName().endsWith(".obf")) {
 				initMapFile(f.getAbsolutePath());
 			}
 		}
+	}
+	
+	protected File[] getSortedFiles(File dir){
+		File[] listFiles = dir.listFiles();
+		Arrays.sort(listFiles, new Comparator<File>(){
+			@Override
+			public int compare(File o1, File o2) {
+				return o1.getName().compareTo(o2.getName());
+			}
+		});
+		return listFiles;
 	}
 	
 	
