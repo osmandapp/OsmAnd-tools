@@ -160,7 +160,7 @@ public class IncOsmChangesCreator {
 		List<File> oscFilesIds = new ArrayList<File>();
 		long minTimestamp = getMinTimestamp(countryFolder, "osc.gz");
 		for(File oscFile : getSortedFiles(countryFolder)) {
-			if(oscFile.getName().endsWith("osc.gz")) {
+			if(oscFile.getName().endsWith("osc.gz") && !oscFile.getName().contains(".pbf")) {
 				String baseFile = oscFile.getName().substring(0, oscFile.getName().length() - "osc.gz".length());
 				File oscFileTxt = new File(oscFile.getParentFile(), baseFile + "txt");
 				File oscFileIdsTxt = new File(oscFile.getParentFile(), baseFile + "ids.txt");
