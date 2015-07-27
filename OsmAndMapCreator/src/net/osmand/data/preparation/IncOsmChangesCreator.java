@@ -181,10 +181,11 @@ public class IncOsmChangesCreator {
 				break;
 			}
 		}
-		log.info("Region " + countryFolder.getName() + " waiting time " + (waited / 60000) + " minutes");
-		if(oscFiles.size() > 0 && waited > INTERVAL_TO_UPDATE_PBF_GENERIC && 
-				(!hasMapSubRegions && waited > INTERVAL_TO_UPDATE_PBF)) {
-			process(binaryFolder, pbfFile, polygonFile, oscFiles, oscTxtFiles, oscFilesIds);
+		if (oscFiles.size() > 0) {
+			log.info("Region " + countryFolder.getName() + " waiting time " + (waited / 60000) + " minutes");
+			if (waited > INTERVAL_TO_UPDATE_PBF_GENERIC || (!hasMapSubRegions && waited > INTERVAL_TO_UPDATE_PBF)) {
+				process(binaryFolder, pbfFile, polygonFile, oscFiles, oscTxtFiles, oscFilesIds);
+			}
 		}
 	}
 	
