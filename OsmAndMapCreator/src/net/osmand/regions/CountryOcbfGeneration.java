@@ -137,6 +137,8 @@ public class CountryOcbfGeneration {
 		public boolean hillshade ;
 		public boolean srtm ;
 		
+		public long timestampToUpdate;
+		
 		public CountryRegion getParent() {
 			return parent;
 		}
