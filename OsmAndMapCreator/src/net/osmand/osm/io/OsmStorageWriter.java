@@ -215,7 +215,9 @@ public class OsmStorageWriter {
 
 
 	private String replaceInvalid(String value) {
-		return value.replace((char) 0xdd62, ' ').replace((char) 0xd855, ' ');
+		value = value.replace((char) 0xdd62, ' ').replace((char) 0xd855, ' ');
+		return value.replace((char) 0xd83d, ' ').replace((char) 0xdeb2, ' ');
+		
 	}
 }
 
