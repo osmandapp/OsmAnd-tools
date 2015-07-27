@@ -10,6 +10,7 @@ import java.util.TreeMap;
 
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.osm.MapRenderingTypesEncoder;
+import net.osmand.util.Algorithms;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -81,7 +82,7 @@ public class ObfChangesCreator {
 			ic.setDialects(DBDialect.SQLITE_IN_MEMORY, DBDialect.SQLITE_IN_MEMORY);
 			File tmpFile = new File(g.basedate + ".tmp.odb");
 			tmpFile.delete();
-			ic.setRegionName(g.basedate);
+			ic.setRegionName(Algorithms.capitalizeFirstLetterAndLowercase(g.basedate));
 			ic.setNodesDBFile(tmpFile);
 			log.info("Processing " + country.getName() + " " + g.basedate + " " + g.osmGzFiles.size() + " files");
 			ic.generateIndexes(g.getSortedFiles(), new ConsoleProgressImplementation(), null,
