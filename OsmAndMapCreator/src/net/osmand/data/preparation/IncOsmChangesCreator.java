@@ -21,6 +21,7 @@ import java.sql.SQLException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
@@ -56,7 +57,8 @@ import org.apache.commons.logging.LogFactory;
 public class IncOsmChangesCreator {
 	private static final Log log = LogFactory.getLog(IncOsmChangesCreator.class);
 	private static final int OSC_FILES_TO_COMBINE_OSMCONVERT = 400;
-	private static final long INTERVAL_TO_UPDATE_PBF = 1000 * 60 * 60 * 2;
+	private static final long INTERVAL_TO_UPDATE_PBF = 1000 * 60 * 60 * 3 / 2;
+	private static final long INTERVAL_TO_UPDATE_PBF_GENERIC = 1000 * 60 * 60 * 8;
 	private static final long MB = 1024 * 1024;
 	private static final long LIMIT_TO_LOAD_IN_MEMORY = 100 * MB;
 	
@@ -65,26 +67,40 @@ public class IncOsmChangesCreator {
 		CountryOcbfGeneration ocbfGeneration = new CountryOcbfGeneration();
 		CountryRegion regionStructure = ocbfGeneration.parseRegionStructure(repo);
 		Map<String, File> polygons = ocbfGeneration.getPolygons(repo);
+		List<CountryRegion> rt = new ArrayList<CountryRegion>();
 		Iterator<CountryRegion> it = regionStructure.iterator();
 		while(it.hasNext()) {
 			CountryRegion reg = it.next();
 			if (reg.map) {
 				File countryFolder = new File(location, reg.getDownloadName());
-				if (!countryFolder.exists()) {
-					continue;
-				}
-				File polygonFile = getPolygonFile(polygons, reg, countryFolder);
-				if (polygonFile == null) {
-					System.err.println("Boundary doesn't exist " + reg.getDownloadName());
-					continue;
-				}
-				File pbfFile = new File(countryFolder, reg.getDownloadName() + ".pbf");
-				if(!pbfFile.exists()) {
-					extractPbf(pbfFile, reg, binaryFolder, polygonFile);
-				}
-				if(pbfFile.exists()) {
-					updatePbfFile(countryFolder, pbfFile, polygonFile, binaryFolder);
-				}
+				reg.timestampToUpdate = getMinTimestamp(countryFolder, "osc.gz");
+				rt.add(reg);
+			}
+		}
+		Collections.sort(rt, new Comparator<CountryRegion>() {
+
+			@Override
+			public int compare(CountryRegion o1, CountryRegion o2) {
+				return Long.compare(o1.timestampToUpdate, o2.timestampToUpdate);
+			}
+		});
+		for (CountryRegion reg : rt) {
+			File countryFolder = new File(location, reg.getDownloadName());
+			if (!countryFolder.exists()) {
+				System.out.println("Country pbf doesn't exist " + reg.getDownloadName());
+				continue;
+			}
+			File polygonFile = getPolygonFile(polygons, reg, countryFolder);
+			if (polygonFile == null) {
+				System.err.println("Boundary doesn't exist " + reg.getDownloadName());
+				continue;
+			}
+			File pbfFile = new File(countryFolder, reg.getDownloadName() + ".pbf");
+			if (!pbfFile.exists()) {
+				extractPbf(pbfFile, reg, binaryFolder, polygonFile);
+			}
+			if (pbfFile.exists()) {
+				updatePbfFile(reg, countryFolder, pbfFile, polygonFile, binaryFolder);
 			}
 		}
 	}
@@ -137,11 +153,12 @@ public class IncOsmChangesCreator {
 		return l;
 	}
 
-	private void updatePbfFile(File countryFolder, File pbfFile, File polygonFile, String binaryFolder) throws Exception {
+	private void updatePbfFile(CountryRegion reg,
+			File countryFolder, File pbfFile, File polygonFile, String binaryFolder) throws Exception {
 		List<File> oscFiles = new ArrayList<File>();
 		List<File> oscTxtFiles = new ArrayList<File>();
 		List<File> oscFilesIds = new ArrayList<File>();
-		long minTimestamp = Long.MAX_VALUE;
+		long minTimestamp = getMinTimestamp(countryFolder, "osc.gz");
 		for(File oscFile : getSortedFiles(countryFolder)) {
 			if(oscFile.getName().endsWith("osc.gz")) {
 				String baseFile = oscFile.getName().substring(0, oscFile.getName().length() - "osc.gz".length());
@@ -153,13 +170,21 @@ public class IncOsmChangesCreator {
 				oscFiles.add(oscFile);
 				oscTxtFiles.add(oscFileTxt);
 				oscFilesIds.add(oscFileIdsTxt);
-				minTimestamp = Math.min(oscFile.lastModified(), minTimestamp);
 			}
 		}	
-		if(oscFiles.size() > 0 && System.currentTimeMillis() - INTERVAL_TO_UPDATE_PBF > minTimestamp) {
+		long waited = System.currentTimeMillis() - minTimestamp;
+		boolean hasMapSubRegions = false;
+		Iterator<CountryRegion> it = reg.iterator();
+		while(it.hasNext()) {
+			if(it.next().map) {
+				hasMapSubRegions = true;
+				break;
+			}
+		}
+		log.info("Region " + countryFolder.getName() + " waiting time " + (waited / 60000) + " minutes");
+		if(oscFiles.size() > 0 && waited > INTERVAL_TO_UPDATE_PBF_GENERIC && 
+				(!hasMapSubRegions && waited > INTERVAL_TO_UPDATE_PBF)) {
 			process(binaryFolder, pbfFile, polygonFile, oscFiles, oscTxtFiles, oscFilesIds);
-		} else {
-			log.info("Skip " + countryFolder.getName());
 		}
 	}
 	
