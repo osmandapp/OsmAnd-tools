@@ -60,7 +60,7 @@ public class IncOsmChangesCreator {
 	private static final long INTERVAL_TO_UPDATE_PBF = 1000 * 60 * 60 * 3 / 2;
 	private static final long INTERVAL_TO_UPDATE_PBF_GENERIC = 1000 * 60 * 60 * 7;
 	private static final long MB = 1024 * 1024;
-	private static final long LIMIT_TO_LOAD_IN_MEMORY = 100 * MB;
+	private static final long LIMIT_TO_LOAD_IN_MEMORY = 200 * MB;
 	
 	
 	private void process(String location, String repo, String binaryFolder) throws Exception {
