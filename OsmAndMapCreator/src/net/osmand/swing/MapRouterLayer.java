@@ -20,6 +20,8 @@ import java.lang.reflect.InvocationTargetException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -618,11 +620,33 @@ public class MapRouterLayer implements MapPanelLayer {
 		return res;
 	}
 	
+	protected File[] getSortedFiles(File dir){
+		File[] listFiles = dir.listFiles();
+		Arrays.sort(listFiles, new Comparator<File>(){
+			@Override
+			public int compare(File o1, File o2) {
+				return -simplifyName(o1).compareTo(simplifyName(o2));
+			}
+
+			private String simplifyName(File o1) {
+				String lc = o1.getName().toLowerCase();
+				if(lc.endsWith(".obf")) {
+					lc = lc.substring(0, lc.length() - ".obf".length());
+				}
+				if(lc.endsWith("_2")) {
+					lc = lc.substring(0, lc.length() - "_2".length()) + "_00_00_00";
+				}
+				return lc;
+			}
+		});
+		return listFiles;
+	}
+	
 	public List<Way> selfRoute(LatLon start, LatLon end, List<LatLon> intermediates, List<RouteSegmentResult> previousRoute, RouteCalculationMode rm) {
 		List<Way> res = new ArrayList<Way>();
 		long time = System.currentTimeMillis();
 		List<File> files = new ArrayList<File>();
-		for(File f :new File(DataExtractionSettings.getSettings().getBinaryFilesDir()).listFiles()){
+		for (File f : getSortedFiles(new File(DataExtractionSettings.getSettings().getBinaryFilesDir()))) {
 			if(f.getName().endsWith(".obf")){
 				files.add(f);
 			}
