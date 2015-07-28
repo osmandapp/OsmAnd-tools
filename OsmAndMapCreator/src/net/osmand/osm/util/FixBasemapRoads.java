@@ -188,7 +188,7 @@ public class FixBasemapRoads {
                 boolean f = true;
                 for(Node n : combinedWays.get(i).getNodes()) {
                     if(n != null && !f){
-                        first.addNode(n);;
+                        first.addNode(n);
                     }
                     f = false;
                 }
