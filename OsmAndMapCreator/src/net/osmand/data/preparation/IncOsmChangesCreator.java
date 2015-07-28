@@ -74,7 +74,11 @@ public class IncOsmChangesCreator {
 			if (reg.map) {
 				File countryFolder = new File(location, reg.getDownloadName());
 				reg.timestampToUpdate = getMinTimestamp(countryFolder, "osc.gz");
-				rt.add(reg);
+				if(reg.timestampToUpdate == Long.MAX_VALUE) {
+					System.out.println("Skip " + countryFolder.getName() + " because no changes");
+				} else {
+					rt.add(reg);
+				}
 			}
 		}
 		Collections.sort(rt, new Comparator<CountryRegion>() {
