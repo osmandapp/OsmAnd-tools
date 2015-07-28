@@ -1,9 +1,11 @@
 package net.osmand.data.preparation;
 
 import java.io.File;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -55,6 +57,11 @@ public class ObfChangesCreator {
 		}
 
 	}
+	
+//	private class CombineCountryContext {
+//		Map<String, GroupFiles> dayChange = new TreeMap<String, ObfChangesCreator.GroupFiles>();
+//		Map<String, GroupFiles> monthChange = new TreeMap<String, ObfChangesCreator.GroupFiles>();
+//	}
 
 	private void process(String location) throws Exception {
 		File mainDir = new File(location);
@@ -62,6 +69,7 @@ public class ObfChangesCreator {
 			if(country.getName().startsWith("_")) {
 				continue;
 			}
+			
 			Map<String, GroupFiles> gf = combineChanges(country);
 			for (GroupFiles g : gf.values()) {
 				createObfFiles(country, g);
@@ -71,7 +79,11 @@ public class ObfChangesCreator {
 
 	private void createObfFiles(File country, GroupFiles g) throws Exception {
 		File obf = g.getObfFileName(country);
-		if (!obf.exists() || obf.lastModified() < g.maxTimestamp) {
+		if (!obf.exists() || g.maxTimestamp - obf.lastModified() > 1000) {
+			if (obf.exists()) {
+				System.out.println("The file was updated for " + (g.maxTimestamp - obf.lastModified()) / 1000
+						+ " seconds");
+			}
 			RTree.clearCache();
 			IndexCreator ic = new IndexCreator(country);
 			ic.setIndexAddress(false);
@@ -93,20 +105,31 @@ public class ObfChangesCreator {
 	}
 
 	private Map<String, GroupFiles> combineChanges(File country) {
-		Map<String, GroupFiles> gf = new TreeMap<String, ObfChangesCreator.GroupFiles>();
+		Map<String, GroupFiles> change = new TreeMap<String, ObfChangesCreator.GroupFiles>();
+		SimpleDateFormat sdf = new SimpleDateFormat("yy_MM_dd");
+		String today = sdf.format(new Date());
 		File[] changes = country.listFiles();
 		if (changes != null) {
 			for (File fileChange : changes) {
 				if (fileChange.getName().endsWith("osm.gz")) {
-					String basename = country.getName() + "_" + fileChange.getName().substring(0, 8);
-					if (!gf.containsKey(basename)) {
-						gf.put(basename, new GroupFiles(basename));
+					String date = fileChange.getName().substring(0, 8);
+					String dayName = country.getName() + "_" + date;
+					add(change, fileChange, dayName);
+					if(!today.equals(date)) {
+						String monthName = country.getName() + "_" + date + "00";
+						add(change, fileChange, monthName);
 					}
-					gf.get(basename).addOsmFile(fileChange);
 				}
 			}
 		}
-		return gf;
+		return change;
+	}
+
+	private void add(Map<String, GroupFiles> dayChange, File fileChange, String dayName) {
+		if (!dayChange.containsKey(dayName)) {
+			dayChange.put(dayName, new GroupFiles(dayName));
+		}
+		dayChange.get(dayName).addOsmFile(fileChange);
 	}
 
 	public static void main(String[] args) throws Exception {
