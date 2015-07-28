@@ -38,7 +38,8 @@ public class ObfChangesCreator {
 		}
 
 		public File getObfFileName(File country) {
-			return new File(country, basedate + ".obf");
+			return new File(country, Algorithms.capitalizeFirstLetterAndLowercase(country.getName() +"_"+
+						basedate + ".obf"));
 		}
 
 		@Override
