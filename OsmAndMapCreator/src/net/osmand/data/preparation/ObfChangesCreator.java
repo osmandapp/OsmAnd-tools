@@ -81,8 +81,10 @@ public class ObfChangesCreator {
 		File obf = g.getObfFileName(country);
 		if (!obf.exists() || g.maxTimestamp - obf.lastModified() > 1000) {
 			if (obf.exists()) {
-				System.out.println("The file was updated for " + (g.maxTimestamp - obf.lastModified()) / 1000
+				log.info("The file " + obf.getName() + " was updated for " + (g.maxTimestamp - obf.lastModified()) / 1000
 						+ " seconds");
+			} else {
+				log.info("The file " + obf.getName() + " doesn't exist");
 			}
 			RTree.clearCache();
 			IndexCreator ic = new IndexCreator(country);
