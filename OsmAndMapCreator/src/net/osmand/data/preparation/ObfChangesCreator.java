@@ -25,10 +25,10 @@ public class ObfChangesCreator {
 	private class GroupFiles implements Comparable<GroupFiles> {
 		List<File> osmGzFiles = new ArrayList<File>();
 		long maxTimestamp = 0;
-		String basedate;
+		String combineName;
 
-		GroupFiles(String basedate) {
-			this.basedate = basedate;
+		GroupFiles(String combineName) {
+			this.combineName = combineName;
 
 		}
 
@@ -39,13 +39,13 @@ public class ObfChangesCreator {
 
 		public File getObfFileName(File country) {
 			return new File(country, 
-					Algorithms.capitalizeFirstLetterAndLowercase(country.getName() + "_" + basedate
+					Algorithms.capitalizeFirstLetterAndLowercase(combineName
 					+ ".obf"));
 		}
 
 		@Override
 		public int compareTo(GroupFiles o) {
-			return basedate.compareTo(o.basedate);
+			return combineName.compareTo(o.combineName);
 		}
 
 		public File[] getSortedFiles() {
@@ -96,11 +96,11 @@ public class ObfChangesCreator {
 			ic.setIndexMap(true);
 			ic.setGenerateLowLevelIndexes(false);
 			ic.setDialects(DBDialect.SQLITE_IN_MEMORY, DBDialect.SQLITE_IN_MEMORY);
-			File tmpFile = new File(g.basedate + ".tmp.odb");
+			File tmpFile = new File(g.combineName + ".tmp.odb");
 			tmpFile.delete();
-			ic.setRegionName(Algorithms.capitalizeFirstLetterAndLowercase(g.basedate));
+			ic.setRegionName(Algorithms.capitalizeFirstLetterAndLowercase(g.combineName));
 			ic.setNodesDBFile(tmpFile);
-			log.info("Processing " + country.getName() + " " + g.basedate + " " + g.osmGzFiles.size() + " files");
+			log.info("Processing "  + g.combineName + " " + g.osmGzFiles.size() + " files");
 			ic.generateIndexes(g.getSortedFiles(), new ConsoleProgressImplementation(), null,
 					MapZooms.parseZooms("13-14;15-"), MapRenderingTypesEncoder.getDefault(), log, false);
 			File targetFile = new File(country, ic.getMapFileName());
