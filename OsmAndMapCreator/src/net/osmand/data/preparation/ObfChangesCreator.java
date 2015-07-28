@@ -116,7 +116,7 @@ public class ObfChangesCreator {
 					String dayName = country.getName() + "_" + date;
 					add(change, fileChange, dayName);
 					if(!today.equals(date)) {
-						String monthName = country.getName() + "_" + date + "00";
+						String monthName = country.getName() + "_" + date.substring(0, 6) + "00";
 						add(change, fileChange, monthName);
 					}
 				}
