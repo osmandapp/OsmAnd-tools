@@ -187,7 +187,7 @@ public class FixBasemapRoads {
             for(int i = 1; i < combinedWays.size(); i++) {
                 boolean f = true;
                 if(combinedWays.get(i) == first ) {
-                	continue;
+                	return;
                 }
                 for(Node n : combinedWays.get(i).getNodes()) {
                     if(n != null && !f){
