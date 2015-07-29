@@ -851,7 +851,7 @@ public class IndexCreator {
 //		if(true){ generateRegionsFile(); return;}
 		String rootFolder = "/Users/victorshcherb/osmand/";
 		IndexPoiCreator.ZIP_LONG_STRINGS = false;
-		IndexCreator creator = new IndexCreator(new File(rootFolder + "/osm-gen/")); //$NON-NLS-1$
+		IndexCreator creator = new IndexCreator(new File(rootFolder + "/maps/")); //$NON-NLS-1$
 		creator.setIndexMap(true);
 //		creator.setIndexAddress(true);
 		creator.setIndexPOI(true);
@@ -867,10 +867,10 @@ public class IndexCreator {
 				new MapRenderingTypesEncoder(rootFolder + "/repos//resources/obf_creation/rendering_types.xml");
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 
-//		String file = rootFolder + "/temp/map.osm";
+		String file = rootFolder + "/temp/map.osm";
 //		String file = rootFolder + "/temp/032.osc.gz";
 //		String file = rootFolder + "/temp/Netherlands-noord-holland.pbf";
-		String file = rootFolder + "/temp/lithuania_europe.pbf";
+//		String file = rootFolder + "/temp/lithuania_europe.pbf";
 //		String file = rootFolder + "/repos/resources/synthetic_test_rendering.osm";
 
 		int st = file.lastIndexOf('/');

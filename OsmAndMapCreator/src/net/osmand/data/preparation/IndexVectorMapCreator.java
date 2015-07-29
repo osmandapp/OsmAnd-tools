@@ -349,13 +349,13 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		l.clear();
 		while (fs.next()) {
 			if (!visitedWays.contains(fs.getLong(1))) {
-				parseAndSort(temp, fs.getBytes(6));
-				parseAndSort(tempAdd, fs.getBytes(7));
+				parseAndSort(temp, fs.getBytes(5));
+				parseAndSort(tempAdd, fs.getBytes(6));
 				if(temp.equals(typeUse) && tempAdd.equals(addtypeUse)){
 					LowLevelWayCandidate llwc = new LowLevelWayCandidate();
 					llwc.wayId = fs.getLong(1);
-					llwc.names = decodeNames(fs.getString(5), new HashMap<MapRulType, String>());
-					llwc.nodes = fs.getBytes(4);
+					llwc.names = decodeNames(fs.getString(4), new HashMap<MapRulType, String>());
+					llwc.nodes = fs.getBytes(3);
 					llwc.otherNodeId = fs.getLong(2);
 					for(MapRulType mr : namesUse.keySet()) {
 						if(Algorithms.objectEquals(namesUse.get(mr), llwc.names.get(mr))) {
@@ -376,9 +376,9 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		mapLowLevelBinaryStat = null;
 		mapConnection.commit();
 
-		PreparedStatement startStat = mapConnection.prepareStatement("SELECT id, start_node, end_node, nodes, name, type, addType FROM low_level_map_objects"
+		PreparedStatement startStat = mapConnection.prepareStatement("SELECT id, end_node, nodes, name, type, addType FROM low_level_map_objects"
 				+ " WHERE start_node = ? AND level = ?");
-		PreparedStatement endStat = mapConnection.prepareStatement("SELECT id, start_node, end_node, nodes, name, type, addType FROM low_level_map_objects"
+		PreparedStatement endStat = mapConnection.prepareStatement("SELECT id, start_node, nodes, name, type, addType FROM low_level_map_objects"
 				+ " WHERE end_node = ? AND level = ?");
 		Statement selectStatement = mapConnection.createStatement();
 		ResultSet rs = selectStatement.executeQuery("SELECT id, start_node, end_node, nodes, name, type, addType, level FROM low_level_map_objects");
