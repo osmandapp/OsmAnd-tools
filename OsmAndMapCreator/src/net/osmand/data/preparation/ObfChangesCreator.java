@@ -1,6 +1,8 @@
 package net.osmand.data.preparation;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -9,6 +11,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.zip.GZIPOutputStream;
 
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.osm.MapRenderingTypesEncoder;
@@ -39,8 +42,7 @@ public class ObfChangesCreator {
 
 		public File getObfFileName(File country) {
 			return new File(country, 
-					Algorithms.capitalizeFirstLetterAndLowercase(combineName
-					+ ".obf"));
+					Algorithms.capitalizeFirstLetterAndLowercase(combineName + ".obf.gz"));
 		}
 
 		@Override
@@ -105,6 +107,12 @@ public class ObfChangesCreator {
 					MapZooms.parseZooms("13-14;15-"), MapRenderingTypesEncoder.getDefault(), log, false);
 			File targetFile = new File(country, ic.getMapFileName());
 			targetFile.setLastModified(g.maxTimestamp);
+			FileInputStream fis = new FileInputStream(targetFile);
+			GZIPOutputStream gzout = new GZIPOutputStream(new FileOutputStream(obf));
+			Algorithms.streamCopy(fis, gzout);
+			fis.close();
+			gzout.close();
+			obf.setLastModified(g.maxTimestamp);
 		}
 	}
 
