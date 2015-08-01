@@ -547,7 +547,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 						creator.generateIndexes(f, dlg, filter, DataExtractionSettings.getSettings().getMapZooms(), types, log);
 					} catch (IOException e) {
 						throw new IllegalArgumentException(e);
-					} catch (SAXException e) {
+					} catch (XmlPullParserException e) {
 						throw new IllegalStateException(e);
 					} catch (SQLException e) {
 						throw new IllegalStateException(e);

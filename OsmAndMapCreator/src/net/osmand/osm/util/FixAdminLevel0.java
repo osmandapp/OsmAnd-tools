@@ -25,10 +25,11 @@ import net.osmand.osm.io.OsmBaseStorage;
 import net.osmand.osm.io.OsmStorageWriter;
 
 import org.xml.sax.SAXException;
+import org.xmlpull.v1.XmlPullParserException;
 
 public class FixAdminLevel0 {
 	
-	public static void main(String[] args) throws IOException, SAXException, XMLStreamException {
+	public static void main(String[] args) throws IOException, SAXException, XMLStreamException, XmlPullParserException {
 		String fileToRead = args != null && args.length > 0 ? args[0] : null; 
 		if(fileToRead == null) {
 			fileToRead = "/home/victor/projects/OsmAnd/download/basemap/10m_admin_level.osm";
@@ -51,7 +52,7 @@ public class FixAdminLevel0 {
 		process(read, write);
 	}
 	
-	private static void process(File read, File write) throws  IOException, SAXException, XMLStreamException {
+	private static void process(File read, File write) throws  IOException, XMLStreamException, XmlPullParserException {
 		OsmBaseStorage storage = new OsmBaseStorage();
 		storage.parseOSM(new FileInputStream(read), new ConsoleProgressImplementation());
 		

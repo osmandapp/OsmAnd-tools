@@ -20,6 +20,7 @@ import net.osmand.util.MapUtils;
 import org.apache.commons.logging.Log;
 import org.apache.tools.bzip2.CBZip2InputStream;
 import org.xml.sax.SAXException;
+import org.xmlpull.v1.XmlPullParserException;
 
 import javax.xml.stream.XMLStreamException;
 
@@ -685,7 +686,7 @@ public class BasemapProcessor {
     }
 
 
-    public static void main(String[] p) throws InterruptedException, SAXException, SQLException, IOException, XMLStreamException {
+    public static void main(String[] p) throws InterruptedException, SQLException, IOException, XMLStreamException, XmlPullParserException {
         if (p.length == 0) {
 	        System.out.println("Please specify folder with basemap *.osm or *.osm.bz2 files");
 		} else {

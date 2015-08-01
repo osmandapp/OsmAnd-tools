@@ -22,10 +22,11 @@ import net.osmand.osm.io.OsmStorageWriter;
 import net.osmand.util.MapUtils;
 
 import org.xml.sax.SAXException;
+import org.xmlpull.v1.XmlPullParserException;
 
 public class FixLinkedCoastline {
 	
-	public static void main(String[] args) throws IOException, SAXException, XMLStreamException {
+	public static void main(String[] args) throws IOException, XMLStreamException, XmlPullParserException {
 		String fileToRead = args != null && args.length > 0 ? args[0] : null; 
 		if(fileToRead == null) {
 			fileToRead = "/home/victor/projects/osmand/data/basemap/ready/10m_coastline.osm";
@@ -48,7 +49,7 @@ public class FixLinkedCoastline {
 		process(read, write);
 	}
 	
-	private static void process(File read, File write) throws  IOException, SAXException, XMLStreamException {
+	private static void process(File read, File write) throws  IOException, XMLStreamException, XmlPullParserException {
 		OsmBaseStorage storage = new OsmBaseStorage();
 		storage.parseOSM(new FileInputStream(read), new ConsoleProgressImplementation());
 		

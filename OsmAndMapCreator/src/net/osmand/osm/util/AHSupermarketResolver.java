@@ -27,9 +27,9 @@ import net.osmand.data.DataTileManager;
 import net.osmand.data.LatLon;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.osm.edit.Entity;
+import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.EntityInfo;
 import net.osmand.osm.edit.Node;
-import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.io.IOsmStorageFilter;
 import net.osmand.osm.io.OsmBaseStorage;
 import net.osmand.osm.io.OsmStorageWriter;
@@ -47,7 +47,7 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.json.JSONTokener;
-import org.xml.sax.SAXException;
+import org.xmlpull.v1.XmlPullParserException;
 
 
 /**
@@ -133,7 +133,7 @@ public class AHSupermarketResolver {
 	
 	// this file could be retrieved using xapi
 	// http://xapi.openstreetmap.org/api/0.6/*[shop=supermarket][bbox=2.5,50,7.8,53.5]
-	public void updateOSMFile(String pathToOsmFile, String pathToModifiedFile, boolean show) throws IOException, SAXException, XMLStreamException, JSONException{
+	public void updateOSMFile(String pathToOsmFile, String pathToModifiedFile, boolean show) throws IOException, XMLStreamException, JSONException, XmlPullParserException{
 		OsmBaseStorage storage = new OsmBaseStorage();
 		final Map<String, EntityId> winkelNumbers = new LinkedHashMap<String, EntityId>();
 		
@@ -300,7 +300,7 @@ public class AHSupermarketResolver {
 		}
 	}
 	
-	public static void main(String[] args) throws IOException, SAXException, XMLStreamException, JSONException {
+	public static void main(String[] args) throws IOException, XMLStreamException, JSONException, XmlPullParserException {
 		AHSupermarketResolver resolver = new AHSupermarketResolver();
 		resolver.updateOSMFile("e:/Information/OSM maps/osm_map/holl_supermarket.osm", "e:/Information/OSM maps/osm_map/ams_poi_mod.osm",
 				true);

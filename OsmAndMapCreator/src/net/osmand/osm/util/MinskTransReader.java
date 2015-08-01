@@ -7,7 +7,6 @@ import java.awt.event.WindowEvent;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -47,7 +46,7 @@ import net.osmand.swing.DataExtractionSettings;
 import net.osmand.swing.MapPanel;
 import net.osmand.util.MapUtils;
 
-import org.xml.sax.SAXException;
+import org.xmlpull.v1.XmlPullParserException;
 
 
 public class MinskTransReader {
@@ -76,7 +75,7 @@ public class MinskTransReader {
 	public static final String pathToMinsk = "E:\\Information\\OSM maps\\minsk_streets.osm";
 	public static final String pathToSave = "E:\\Information\\OSM maps\\data_edit.osm";
 	
-	public static void main(String[] args) throws IOException, SAXException, XMLStreamException {
+	public static void main(String[] args) throws IOException, XMLStreamException, XmlPullParserException {
 		FileInputStream fis = new FileInputStream(new File(pathToRoutes));
 		BufferedReader reader = new BufferedReader(new InputStreamReader(fis, Charset.forName("UTF-8")));
 		List<TransportRoute> routes = readRoutes(reader);
@@ -219,7 +218,7 @@ public class MinskTransReader {
 		
 	}
 	
-	protected static OsmBaseStorage filterBusStops(Map<String, TransportStop> stopsMap, List<TransportRoute> routes) throws FileNotFoundException, IOException, SAXException{
+	protected static OsmBaseStorage filterBusStops(Map<String, TransportStop> stopsMap, List<TransportRoute> routes) throws IOException, XmlPullParserException{
 		long time = System.currentTimeMillis();
 		System.out.println("Start : ");
 		OsmBaseStorage storage = new OsmBaseStorage();

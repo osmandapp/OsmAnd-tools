@@ -318,7 +318,7 @@ public class CountryOcbfGeneration {
 
 
 	private void createFile(CountryRegion global, Map<String, Set<TranslateEntity>> translates, Map<String, File> polygonFiles,
-			String targetObf, String targetOsmXml) throws IOException, SAXException, SQLException, InterruptedException {
+			String targetObf, String targetOsmXml) throws IOException, SQLException, InterruptedException, XmlPullParserException {
 		File osm = new File(targetOsmXml);
 		XmlSerializer serializer = new org.kxml2.io.KXmlSerializer();
 		FileOutputStream fous = new FileOutputStream(osm);

@@ -33,14 +33,14 @@ import net.osmand.util.MapAlgorithms;
 import net.osmand.util.MapUtils;
 
 import org.apache.commons.logging.Log;
-import org.xml.sax.SAXException;
+import org.xmlpull.v1.XmlPullParserException;
 
 import rtree.RTree;
 
 public class CombineSRTMIntoFile {
 	private static final Log log = PlatformUtil.getLog(CombineSRTMIntoFile.class);
 
-	public static void main(String[] args) throws IOException, SAXException, XMLStreamException, SQLException, InterruptedException {
+	public static void main(String[] args) throws IOException, XMLStreamException, SQLException, InterruptedException, IllegalArgumentException, XmlPullParserException {
 		File directoryWithSRTMFiles = new File(args[0]);
 		File directoryWithTargetFiles = new File(args[1]);
 		String ocbfFile = args[2];
@@ -84,7 +84,7 @@ public class CombineSRTMIntoFile {
 	}
 
 	private static void process(BinaryMapDataObject country, List<BinaryMapDataObject> boundaries,
-			String downloadName, File directoryWithSRTMFiles, File directoryWithTargetFiles) throws IOException, SAXException, SQLException, InterruptedException {
+			String downloadName, File directoryWithSRTMFiles, File directoryWithTargetFiles) throws IOException, SQLException, InterruptedException, IllegalArgumentException, XmlPullParserException {
 		final String suffix = "_" + IndexConstants.BINARY_MAP_VERSION + IndexConstants.BINARY_SRTM_MAP_INDEX_EXT;
 		String name = country.getName();
 		final File targetFile = new File(directoryWithTargetFiles, Algorithms.capitalizeFirstLetterAndLowercase(downloadName+suffix));

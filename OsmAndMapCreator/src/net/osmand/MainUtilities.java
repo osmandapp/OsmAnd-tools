@@ -7,18 +7,17 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import org.apache.commons.logging.Log;
-import org.xml.sax.SAXException;
-
 import net.osmand.data.preparation.IndexCreator;
 import net.osmand.data.preparation.MapZooms;
 import net.osmand.data.preparation.OceanTilesCreator;
 import net.osmand.impl.ConsoleProgressImplementation;
-import net.osmand.osm.MapRenderingTypes;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.util.ResourceDeleter;
 import net.osmand.regions.CountryOcbfGeneration;
 import net.osmand.swing.DataExtractionSettings;
+
+import org.apache.commons.logging.Log;
+import org.xmlpull.v1.XmlPullParserException;
 
 public class MainUtilities {
 	private static Log log = PlatformUtil.getLog(MainUtilities.class);
@@ -73,8 +72,8 @@ public class MainUtilities {
 		}
 	}
 
-	private static void generateObf(String[] subArgsArray, IndexCreator ic) throws IOException, SAXException,
-			SQLException, InterruptedException {
+	private static void generateObf(String[] subArgsArray, IndexCreator ic) throws IOException, 
+			SQLException, InterruptedException, XmlPullParserException {
 		String fn = DataExtractionSettings.getSettings().getMapRenderingTypesFile();
 		MapRenderingTypesEncoder types;
 		if(fn == null || fn.length() == 0){

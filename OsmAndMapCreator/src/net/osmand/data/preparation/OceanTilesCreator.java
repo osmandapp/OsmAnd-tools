@@ -7,7 +7,6 @@ import gnu.trove.set.hash.TLongHashSet;
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -19,7 +18,6 @@ import java.util.Set;
 import javax.xml.stream.XMLStreamException;
 
 import net.osmand.IProgress;
-import net.osmand.data.QuadRect;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Way;
@@ -29,6 +27,7 @@ import net.osmand.util.MapUtils;
 
 import org.apache.tools.bzip2.CBZip2InputStream;
 import org.xml.sax.SAXException;
+import org.xmlpull.v1.XmlPullParserException;
 
 public class OceanTilesCreator {
     public static final byte TILE_ZOOMLEVEL = 12;
@@ -98,7 +97,7 @@ public class OceanTilesCreator {
     }
 
 
-    public static void createTilesFile(String coastlinesInput, String result) throws IOException, SAXException {
+    public static void createTilesFile(String coastlinesInput, String result) throws IOException, XmlPullParserException {
     	if(result == null ) {
     		result = "oceantiles_12.dat";
     	}

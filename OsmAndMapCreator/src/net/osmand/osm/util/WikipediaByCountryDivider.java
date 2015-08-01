@@ -36,6 +36,7 @@ import net.osmand.util.MapUtils;
 import org.apache.commons.logging.Log;
 import org.apache.tools.bzip2.CBZip2OutputStream;
 import org.xml.sax.SAXException;
+import org.xmlpull.v1.XmlPullParserException;
 import org.xmlpull.v1.XmlSerializer;
 
 import rtree.RTree;
@@ -232,7 +233,7 @@ public class WikipediaByCountryDivider {
 
 	}
 
-	public static void main(String[] args) throws IOException, SQLException, SAXException, InterruptedException {
+	public static void main(String[] args) throws IOException, SQLException, InterruptedException, XmlPullParserException {
 //		String folder = "/home/victor/projects/osmand/wiki/";
 //		String regionsFile = "/home/victor/projects/osmand/repo/resources/countries-info/regions.ocbf";
 //		String cmd = "regenerate";
@@ -266,7 +267,7 @@ public class WikipediaByCountryDivider {
 	
 	
 	
-	protected static void generateCountrySqlite(String folder, boolean skip) throws SQLException, IOException, SAXException, InterruptedException {
+	protected static void generateCountrySqlite(String folder, boolean skip) throws SQLException, IOException, InterruptedException, XmlPullParserException {
 		Connection conn = (Connection) DBDialect.SQLITE.getDatabaseConnection(folder + "wiki.sqlite", log);
 		File rgns = new File(folder, "regions");
 		rgns.mkdirs();
@@ -402,7 +403,7 @@ public class WikipediaByCountryDivider {
 		serializer.endTag(null, "node");
 	}
 
-	private static void generateObf(File osmBz2, File obf) throws IOException, SAXException, SQLException, InterruptedException {
+	private static void generateObf(File osmBz2, File obf) throws IOException, SQLException, InterruptedException, XmlPullParserException {
 		IndexPoiCreator.ZIP_LONG_STRINGS = true;
 		// be independent of previous results
 		RTree.clearCache();

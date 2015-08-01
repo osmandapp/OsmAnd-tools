@@ -13,10 +13,13 @@ import net.osmand.osm.edit.Way;
 import net.osmand.osm.io.OsmBaseStorage;
 import net.osmand.osm.io.OsmStorageWriter;
 import net.osmand.util.MapUtils;
+
 import org.apache.tools.bzip2.CBZip2InputStream;
 import org.xml.sax.SAXException;
+import org.xmlpull.v1.XmlPullParserException;
 
 import javax.xml.stream.XMLStreamException;
+
 import java.io.*;
 import java.util.*;
 
@@ -24,7 +27,7 @@ public class FixBasemapRoads {
     private static float MINIMAL_DISTANCE= 500;
     private static float MAXIMAL_DISTANCE_CUT = 3000;
 	
-	public static void main(String[] args) throws IOException, SAXException, XMLStreamException {
+	public static void main(String[] args) throws Exception {
 		String fileToRead = args != null && args.length > 0 ? args[0] : null; 
 		if(fileToRead == null) {
 			fileToRead = "/home/victor/projects/osmand/temp/line_railway_blr.osm";
@@ -47,7 +50,7 @@ public class FixBasemapRoads {
         new FixBasemapRoads().process(read, write);
 	}
 	
-	private void process(File read, File write) throws  IOException, SAXException, XMLStreamException {
+	private void process(File read, File write) throws  IOException, XMLStreamException, XmlPullParserException {
 		OsmBaseStorage storage = new OsmBaseStorage();
         InputStream stream = new BufferedInputStream(new FileInputStream(read), 8192 * 4);
         InputStream streamFile = stream;

@@ -3,7 +3,6 @@ package net.osmand.data.preparation;
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.RandomAccessFile;
@@ -36,7 +35,7 @@ import net.osmand.util.Algorithms;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.tools.bzip2.CBZip2InputStream;
-import org.xml.sax.SAXException;
+import org.xmlpull.v1.XmlPullParserException;
 
 import rtree.RTreeException;
 
@@ -271,7 +270,7 @@ public class IndexCreator {
 	private OsmDbCreator extractOsmToNodesDB(OsmDbAccessor accessor, 
 			File readFile, IProgress progress, IOsmStorageFilter addFilter, int additionId, int shiftId, 
 			boolean ovewriteIds, boolean createTables) throws
-			IOException, SQLException, SAXException {
+			IOException, SQLException, XmlPullParserException {
 		boolean pbfFile = false;
 		InputStream stream = new BufferedInputStream(new FileInputStream(readFile), 8192 * 4);
 		InputStream streamFile = stream;
@@ -335,7 +334,7 @@ public class IndexCreator {
 	}
 	
 	private OsmDbAccessor initDbAccessor(File[] readFile, IProgress progress, IOsmStorageFilter addFilter,
-			boolean generateUniqueIds) throws IOException, SQLException, SAXException, InterruptedException {
+			boolean generateUniqueIds) throws IOException, SQLException, InterruptedException, XmlPullParserException {
 		OsmDbAccessor accessor = new OsmDbAccessor();
 //		boolean loadFromExistingFile = dbFile != null && osmDBdialect.databaseFileExists(dbFile) && generateUniqueIds;
 		boolean loadFromExistingFile = false; // deprecate feature
@@ -406,7 +405,7 @@ public class IndexCreator {
 
 	
 	private void createPlainOsmDbBasemap(OsmDbAccessor accessor,
-			IProgress progress, File readFile, IOsmStorageFilter addFilter) throws SQLException, IOException, SAXException{
+			IProgress progress, File readFile, IOsmStorageFilter addFilter) throws SQLException, IOException, XmlPullParserException{
 		dbFile = new File(workingDir, TEMP_NODES_DB);
 		if (osmDBdialect.databaseFileExists(dbFile)) {
 			osmDBdialect.removeDatabase(dbFile);
@@ -421,7 +420,7 @@ public class IndexCreator {
 	
 	
 	public void generateBasemapIndex(IProgress progress, IOsmStorageFilter addFilter, MapZooms mapZooms,
-			MapRenderingTypesEncoder renderingTypes, Log logMapDataWarn, String regionName, File... readFiles) throws IOException, SAXException, SQLException, InterruptedException {
+			MapRenderingTypesEncoder renderingTypes, Log logMapDataWarn, String regionName, File... readFiles) throws IOException, SQLException, InterruptedException, XmlPullParserException {
 		if (logMapDataWarn == null) {
 			logMapDataWarn = log;
 		}
@@ -508,18 +507,18 @@ public class IndexCreator {
 		} catch (IOException e) {
 			log.error("Log exception", e); //$NON-NLS-1$
 			throw e;
-		} catch (SAXException e) {
+		} catch (XmlPullParserException e) {
 			log.error("Log exception", e); //$NON-NLS-1$
 			throw e;
 		}
 	}
 	public void generateIndexes(File readFile, IProgress progress, IOsmStorageFilter addFilter, MapZooms mapZooms,
-			MapRenderingTypesEncoder renderingTypes, Log logMapDataWarn) throws IOException, SAXException, SQLException, InterruptedException {
+			MapRenderingTypesEncoder renderingTypes, Log logMapDataWarn) throws IOException, SQLException, InterruptedException, XmlPullParserException {
 		generateIndexes(new File[]{readFile}, progress, addFilter, mapZooms, renderingTypes, logMapDataWarn, false);
 	}
 	
 	public void generateIndexes(File[] readFile, IProgress progress, IOsmStorageFilter addFilter, MapZooms mapZooms,
-			MapRenderingTypesEncoder renderingTypes, Log logMapDataWarn, boolean generateUniqueIds) throws IOException, SAXException, SQLException, InterruptedException {
+			MapRenderingTypesEncoder renderingTypes, Log logMapDataWarn, boolean generateUniqueIds) throws IOException, SQLException, InterruptedException, XmlPullParserException {
 //		if(LevelDBAccess.load()){
 //			dialect = DBDialect.NOSQL;
 //		}
@@ -699,7 +698,7 @@ public class IndexCreator {
 		} catch (IOException e) {
 			log.error("Log exception", e); //$NON-NLS-1$
 			throw e;
-		} catch (SAXException e) {
+		} catch (XmlPullParserException e) {
 			log.error("Log exception", e); //$NON-NLS-1$
 			throw e;
 		} finally {
@@ -845,7 +844,7 @@ public class IndexCreator {
 		return boundary;
 	}
 
-	public static void main(String[] args) throws IOException, SAXException, SQLException, InterruptedException {
+	public static void main(String[] args) throws IOException, SQLException, InterruptedException, XmlPullParserException {
 		long time = System.currentTimeMillis();
 		
 //		if(true){ generateRegionsFile(); return;}
@@ -891,7 +890,7 @@ public class IndexCreator {
 	}
 	
 
-	public static void generateRegionsFile() throws IOException, SAXException, SQLException, InterruptedException {
+	public static void generateRegionsFile() throws IOException, SQLException, InterruptedException, XmlPullParserException {
 		MapRenderingTypesEncoder rt = MapRenderingTypesEncoder.getDefault();
 		String file = "/home/victor/projects/osmand/repo/resources/osmand_regions.osm";
 		String folder = "/home/victor/projects/osmand/repo/resources/countries-info/";
