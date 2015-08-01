@@ -85,6 +85,7 @@ def process_points(cond, filename, array):
 	f.write('</osm>')
 
 if __name__ == "__main__":
+	print "Process points"
 #	process_points("place in ('sea','ocean','state', 'country') "
 				   " or \"natural\" in ('peak', 'cave_entrance', 'rock', 'waterfall', 'cape', 'volcano', 'stream', 'strait', 'reef')"
 				   " or tourism in ('alpine_hut') "
