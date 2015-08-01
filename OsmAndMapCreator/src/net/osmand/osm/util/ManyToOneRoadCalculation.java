@@ -4,6 +4,7 @@ import gnu.trove.list.array.TLongArrayList;
 import gnu.trove.map.hash.TLongObjectHashMap;
 import gnu.trove.set.hash.TLongHashSet;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.util.ArrayList;
@@ -50,8 +51,9 @@ public class ManyToOneRoadCalculation {
 	}
 	
 	public static void main(String[] args) throws IOException, InterruptedException {
-		RandomAccessFile raf = new RandomAccessFile("/home/victor/projects/osmand/osm-gen/Netherlands_europe_2.obf", "r"); //$NON-NLS-1$ //$NON-NLS-2$
-		BinaryMapIndexReader reader = new BinaryMapIndexReader(raf);
+		File fl = new File("/home/victor/projects/osmand/osm-gen/Netherlands_europe_2.obf");
+		RandomAccessFile raf = new RandomAccessFile(fl, "r"); //$NON-NLS-1$ //$NON-NLS-2$
+		BinaryMapIndexReader reader = new BinaryMapIndexReader(raf, fl);
 		int zoom = 9;
 		double top = 53.2949;
 		double bottom = MapUtils.getLatitudeFromTile(zoom, (MapUtils.getTileNumberY(zoom, top) + 1));

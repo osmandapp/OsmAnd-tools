@@ -4,6 +4,7 @@ import gnu.trove.iterator.TLongIterator;
 import gnu.trove.map.hash.TLongObjectHashMap;
 import gnu.trove.set.hash.TLongHashSet;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.util.ArrayList;
@@ -34,9 +35,10 @@ public class CheckRoadConnectivity {
 	public static void main(String[] args) throws IOException {
 		
 		CheckRoadConnectivity crc = new CheckRoadConnectivity();
-		RandomAccessFile raf = new RandomAccessFile("/home/victor/projects/osmand/osm-gen/Brazil_southamerica_2.obf", "r"); //$NON-NLS-1$ //$NON-NLS-2$
+		File fl = new File("/home/victor/projects/osmand/osm-gen/Brazil_southamerica_2.obf");
+		RandomAccessFile raf = new RandomAccessFile(fl, "r"); //$NON-NLS-1$ //$NON-NLS-2$
 		
-		crc.collectDisconnectedRoads(new BinaryMapIndexReader(raf));
+		crc.collectDisconnectedRoads(new BinaryMapIndexReader(raf, fl));
 //		ClusteringContext ctx = new ClusteringContext();
 //		crc.clustering(ctx, new BinaryMapIndexReader(raf));
 	}

@@ -665,7 +665,7 @@ public class IndexCreator {
 				if (indexRouting) {
 					setGeneralProgress(progress,"[95 of 100]");
 					progress.startTask("Writing route index to binary file...", -1);
-					indexRouteCreator.writeBinaryRouteIndex(writer, regionName, generateLowLevel);
+					indexRouteCreator.writeBinaryRouteIndex(mapFile, writer, regionName, generateLowLevel);
 				}
 
 				if (indexAddress) {

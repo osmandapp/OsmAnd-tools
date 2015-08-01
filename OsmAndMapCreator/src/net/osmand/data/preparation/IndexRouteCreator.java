@@ -604,7 +604,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		}
 	}
 	
-	public void writeBinaryRouteIndex(BinaryMapIndexWriter writer, String regionName, boolean generateLowLevel) throws IOException, SQLException {
+	public void writeBinaryRouteIndex(File fl, BinaryMapIndexWriter writer, String regionName, boolean generateLowLevel) throws IOException, SQLException {
 		closePreparedStatements(mapRouteInsertStat);
 		if(basemapRouteInsertStat != null) {
 			closePreparedStatements(basemapRouteInsertStat);
@@ -631,7 +631,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 
 				// use file to recalulate tree
 				raf.seek(0);
-				appendMissingRoadsForBaseMap(mapConnection, new BinaryMapIndexReader(raf));
+				appendMissingRoadsForBaseMap(mapConnection, new BinaryMapIndexReader(raf, fl));
 				// repack
 				fname = baserouteTree.getFileName();
 				baserouteTree = packRtreeFile(baserouteTree, fname, fname + "p");

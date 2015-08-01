@@ -98,7 +98,7 @@ public class MapAddressLayer implements MapPanelLayer {
 		for (File f : new File(DataExtractionSettings.getSettings().getBinaryFilesDir()).listFiles()) {
 			if (f.getName().endsWith(".obf")) {
 				RandomAccessFile raf = new RandomAccessFile(f, "r"); //$NON-NLS-1$ //$NON-NLS-2$
-				BinaryMapIndexReader rd = new BinaryMapIndexReader(raf);
+				BinaryMapIndexReader rd = new BinaryMapIndexReader(raf, f);
 				if(rd.containsAddressData() && (!rd.containsPoiData() || rd.containsPoiData(lat, lon))){
 					searchAddressDetailedInfo(rd, lat, lon, results);
 				}
@@ -111,14 +111,13 @@ public class MapAddressLayer implements MapPanelLayer {
 	
 	private void searchAddressDetailedInfo(BinaryMapIndexReader index, double lat, double lon, List<Entity> results) throws IOException {
 		Map<String, List<Street>> streets = new LinkedHashMap<String, List<Street>>();
-		for(String region : index.getRegionNames()){
-			log.info("Searching region " + region);
+			log.info("Searching region ");
 			int[] cityType = new int[] {BinaryMapAddressReaderAdapter.CITY_TOWN_TYPE,
 					BinaryMapAddressReaderAdapter.POSTCODES_TYPE, 
 					BinaryMapAddressReaderAdapter.VILLAGES_TYPE};
 			for (int j = 0; j < cityType.length; j++) {
 				int type = cityType[j];
-				for (City c : index.getCities(region, null, type)) {
+				for (City c : index.getCities(null, type)) {
 					if (MapUtils.getDistance(c.getLocation(), lat, lon) < distance) {
 						log.info("Searching city " + c.getName());
 						index.preloadStreets(c, null);
@@ -139,7 +138,6 @@ public class MapAddressLayer implements MapPanelLayer {
 					}
 				}
 			}
-		}
 		
 		for(List<Street> l : streets.values()) {
 			while(l.size() > 0){
