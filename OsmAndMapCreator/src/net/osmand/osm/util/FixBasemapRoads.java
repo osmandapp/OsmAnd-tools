@@ -305,14 +305,14 @@ public class FixBasemapRoads {
             reverseWrongPositionedRoads(ri);
             combineUniqueIdentifyRoads(ri);
             // last step not definite
-            combineIntoLongestRoad(ri);
+//            combineIntoLongestRoad(ri);
 //            combineRoadsWithCut(ri);
-//            for(RoadLine ls :  ri.roadLines) {
-//                if(ls.distance > MINIMAL_DISTANCE ){
-//                    ls.combineWaysIntoOneWay();
-//                    toWrite.add(ls.getFirstWayId());
-//                }
-//            }
+            for(RoadLine ls :  ri.roadLines) {
+                if(ls.distance > MINIMAL_DISTANCE ){
+                    ls.combineWaysIntoOneWay();
+                    toWrite.add(ls.getFirstWayId());
+                }
+            }
         }
     }
 
