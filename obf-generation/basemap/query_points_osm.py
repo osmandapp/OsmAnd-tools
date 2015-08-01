@@ -87,12 +87,12 @@ def process_points(cond, filename, array):
 if __name__ == "__main__":
 	print "Process points"
 #	process_points("place in ('sea','ocean','state', 'country') "
-				   " or \"natural\" in ('peak', 'cave_entrance', 'rock', 'waterfall', 'cape', 'volcano', 'stream', 'strait', 'reef')"
-				   " or tourism in ('alpine_hut') "
-				   " or tags->'seamark:type' in ('light_major') "
-				   " or tags->'seamark:type' in ('harbour') "
-				   " or tags->'abandoned' in ('yes') "
-				   " or aeroway in ('aerodrome', 'airport')", 'points.osm', 
-				   ['name', 'name:en',
-				    'ref', 'ele', 'place','natural', 'seamark:type', 'abandoned', 'aeroway', 'tourism', 'iata', 'icao', 'faa'])
+				   # " or \"natural\" in ('peak', 'cave_entrance', 'rock', 'waterfall', 'cape', 'volcano', 'stream', 'strait', 'reef')"
+				   # " or tourism in ('alpine_hut') "
+				   # " or tags->'seamark:type' in ('light_major') "
+				   # " or tags->'seamark:type' in ('harbour') "
+				   # " or tags->'abandoned' in ('yes') "
+				   # " or aeroway in ('aerodrome', 'airport')", 'points.osm', 
+				   # ['name', 'name:en',
+				   #  'ref', 'ele', 'place','natural', 'seamark:type', 'abandoned', 'aeroway', 'tourism', 'iata', 'icao', 'faa'])
 #	process_points("place in ('city','town') ", 'cities.osm', ['name', 'name:en', 'place', 'capital'])
