@@ -306,13 +306,13 @@ public class FixBasemapRoads {
             combineUniqueIdentifyRoads(ri);
             // last step not definite
             combineIntoLongestRoad(ri);
-            combineRoadsWithCut(ri);
-            for(RoadLine ls :  ri.roadLines) {
-                if(ls.distance > MINIMAL_DISTANCE ){
-                    ls.combineWaysIntoOneWay();
-                    toWrite.add(ls.getFirstWayId());
-                }
-            }
+//            combineRoadsWithCut(ri);
+//            for(RoadLine ls :  ri.roadLines) {
+//                if(ls.distance > MINIMAL_DISTANCE ){
+//                    ls.combineWaysIntoOneWay();
+//                    toWrite.add(ls.getFirstWayId());
+//                }
+//            }
         }
     }
 
