@@ -113,6 +113,7 @@ public class ObfChangesCreator {
 			fis.close();
 			gzout.close();
 			obf.setLastModified(g.maxTimestamp);
+			targetFile.delete();
 		}
 	}
 
