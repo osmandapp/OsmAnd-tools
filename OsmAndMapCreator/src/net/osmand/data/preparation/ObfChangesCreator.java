@@ -28,11 +28,19 @@ public class ObfChangesCreator {
 	private class GroupFiles implements Comparable<GroupFiles> {
 		List<File> osmGzFiles = new ArrayList<File>();
 		long maxTimestamp = 0;
-		String combineName;
+		String dayName;
 
-		GroupFiles(String combineName) {
-			this.combineName = combineName;
-
+		GroupFiles(String dayName) {
+			this.dayName = dayName;
+		}
+		
+		public boolean isMonth() {
+			return dayName.endsWith("00");
+		}
+		
+		public long getTimestamp() {
+			// month is always later than last day
+			return isMonth() ? maxTimestamp + 60000 : maxTimestamp;
 		}
 
 		public void addOsmFile(File f) {
@@ -42,12 +50,12 @@ public class ObfChangesCreator {
 
 		public File getObfFileName(File country) {
 			return new File(country, 
-					Algorithms.capitalizeFirstLetterAndLowercase(combineName + ".obf.gz"));
+					Algorithms.capitalizeFirstLetterAndLowercase(dayName + ".obf.gz"));
 		}
 
 		@Override
 		public int compareTo(GroupFiles o) {
-			return combineName.compareTo(o.combineName);
+			return dayName.compareTo(o.dayName);
 		}
 
 		public File[] getSortedFiles() {
@@ -98,11 +106,12 @@ public class ObfChangesCreator {
 			ic.setIndexMap(true);
 			ic.setGenerateLowLevelIndexes(false);
 			ic.setDialects(DBDialect.SQLITE_IN_MEMORY, DBDialect.SQLITE_IN_MEMORY);
-			File tmpFile = new File(g.combineName + ".tmp.odb");
+			ic.setLastModifiedDate(g.maxTimestamp);
+			File tmpFile = new File(g.dayName + ".tmp.odb");
 			tmpFile.delete();
-			ic.setRegionName(Algorithms.capitalizeFirstLetterAndLowercase(g.combineName));
+			ic.setRegionName(Algorithms.capitalizeFirstLetterAndLowercase(g.dayName));
 			ic.setNodesDBFile(tmpFile);
-			log.info("Processing "  + g.combineName + " " + g.osmGzFiles.size() + " files");
+			log.info("Processing "  + g.dayName + " " + g.osmGzFiles.size() + " files");
 			ic.generateIndexes(g.getSortedFiles(), new ConsoleProgressImplementation(), null,
 					MapZooms.parseZooms("13-14;15-"), MapRenderingTypesEncoder.getDefault(), log, false);
 			File targetFile = new File(country, ic.getMapFileName());

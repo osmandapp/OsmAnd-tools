@@ -139,7 +139,7 @@ public class BinaryMapIndexWriter {
 	private final static int ROUTE_TREE = 16;
 	
 
-	public BinaryMapIndexWriter(final RandomAccessFile raf) throws IOException {
+	public BinaryMapIndexWriter(final RandomAccessFile raf, long timestamp) throws IOException {
 		this.raf = raf;
 		codedOutStream = CodedOutputStream.newInstance(new OutputStream() {
 			@Override
@@ -159,7 +159,7 @@ public class BinaryMapIndexWriter {
 
 		});
 		codedOutStream.writeUInt32(OsmandOdb.OsmAndStructure.VERSION_FIELD_NUMBER, IndexConstants.BINARY_MAP_VERSION);
-		codedOutStream.writeInt64(OsmandOdb.OsmAndStructure.DATECREATED_FIELD_NUMBER, System.currentTimeMillis());
+		codedOutStream.writeInt64(OsmandOdb.OsmAndStructure.DATECREATED_FIELD_NUMBER, timestamp);
 		state.push(OSMAND_STRUCTURE_INIT);
 	}
 

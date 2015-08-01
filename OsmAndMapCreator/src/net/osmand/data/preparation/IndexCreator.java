@@ -486,7 +486,8 @@ public class IndexCreator {
 				mapFile.delete();
 			}
 			mapRAFile = new RandomAccessFile(mapFile, "rw");
-			BinaryMapIndexWriter writer = new BinaryMapIndexWriter(mapRAFile);
+			BinaryMapIndexWriter writer = new BinaryMapIndexWriter(mapRAFile, lastModifiedDate == null ? System.currentTimeMillis() : 
+				lastModifiedDate.longValue());
 
 			setGeneralProgress(progress,"[95 of 100]");
 			progress.startTask("Writing map index to binary file...", -1);
@@ -655,7 +656,8 @@ public class IndexCreator {
 					mapFile.delete();
 				}
 				mapRAFile = new RandomAccessFile(mapFile, "rw");
-				BinaryMapIndexWriter writer = new BinaryMapIndexWriter(mapRAFile);
+				BinaryMapIndexWriter writer = new BinaryMapIndexWriter(mapRAFile, lastModifiedDate == null ? System.currentTimeMillis() : 
+					lastModifiedDate.longValue());
 				if (indexMap) {
 					setGeneralProgress(progress,"[95 of 100]");
 					progress.startTask("Writing map index to binary file...", -1);
