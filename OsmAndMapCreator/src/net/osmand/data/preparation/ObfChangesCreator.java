@@ -91,9 +91,9 @@ public class ObfChangesCreator {
 
 	private void createObfFiles(File country, GroupFiles g) throws Exception {
 		File obf = g.getObfFileName(country);
-		if (!obf.exists() || g.maxTimestamp - obf.lastModified() > 1000) {
+		if (!obf.exists() || g.getTimestamp() - obf.lastModified() > 1000) {
 			if (obf.exists()) {
-				log.info("The file " + obf.getName() + " was updated for " + (g.maxTimestamp - obf.lastModified()) / 1000
+				log.info("The file " + obf.getName() + " was updated for " + (g.getTimestamp() - obf.lastModified()) / 1000
 						+ " seconds");
 			} else {
 				log.info("The file " + obf.getName() + " doesn't exist");
@@ -106,7 +106,7 @@ public class ObfChangesCreator {
 			ic.setIndexMap(true);
 			ic.setGenerateLowLevelIndexes(false);
 			ic.setDialects(DBDialect.SQLITE_IN_MEMORY, DBDialect.SQLITE_IN_MEMORY);
-			ic.setLastModifiedDate(g.maxTimestamp);
+			ic.setLastModifiedDate(g.getTimestamp());
 			File tmpFile = new File(g.dayName + ".tmp.odb");
 			tmpFile.delete();
 			ic.setRegionName(Algorithms.capitalizeFirstLetterAndLowercase(g.dayName));
@@ -115,13 +115,13 @@ public class ObfChangesCreator {
 			ic.generateIndexes(g.getSortedFiles(), new ConsoleProgressImplementation(), null,
 					MapZooms.parseZooms("13-14;15-"), MapRenderingTypesEncoder.getDefault(), log, false);
 			File targetFile = new File(country, ic.getMapFileName());
-			targetFile.setLastModified(g.maxTimestamp);
+			targetFile.setLastModified(g.getTimestamp());
 			FileInputStream fis = new FileInputStream(targetFile);
 			GZIPOutputStream gzout = new GZIPOutputStream(new FileOutputStream(obf));
 			Algorithms.streamCopy(fis, gzout);
 			fis.close();
 			gzout.close();
-			obf.setLastModified(g.maxTimestamp);
+			obf.setLastModified(g.getTimestamp());
 			targetFile.delete();
 		}
 	}
