@@ -624,6 +624,7 @@ public class IndexIdByBbox {
 		procFolder.mkdirs();
 		for(File f : getSortedFiles(diffSrcFolder)) {
 			if(f.getName().endsWith("osc.gz") && (System.currentTimeMillis() - f.lastModified() > 30000)) {
+				log.info("Process " + f.getName());
 				updateOsmFile(f, adapter, regs, procFolder);
 			}
 		}
