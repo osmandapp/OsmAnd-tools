@@ -2,6 +2,24 @@ package net.osmand.osm.util;
 
 import gnu.trove.list.array.TLongArrayList;
 import gnu.trove.map.hash.TLongObjectHashMap;
+
+import java.io.BufferedInputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+
+import javax.xml.stream.XMLStreamException;
+
 import net.osmand.data.LatLon;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.osm.edit.Entity;
@@ -15,13 +33,7 @@ import net.osmand.osm.io.OsmStorageWriter;
 import net.osmand.util.MapUtils;
 
 import org.apache.tools.bzip2.CBZip2InputStream;
-import org.xml.sax.SAXException;
 import org.xmlpull.v1.XmlPullParserException;
-
-import javax.xml.stream.XMLStreamException;
-
-import java.io.*;
-import java.util.*;
 
 public class FixBasemapRoads {
     private static float MINIMAL_DISTANCE= 500;
@@ -30,7 +42,7 @@ public class FixBasemapRoads {
 	public static void main(String[] args) throws Exception {
 		String fileToRead = args != null && args.length > 0 ? args[0] : null; 
 		if(fileToRead == null) {
-			fileToRead = "/home/victor/projects/osmand/temp/line_railway_blr.osm";
+			fileToRead = "/Users/victorshcherb/osmand/temp/line_trunk.osm.bz2";
 		}
 		File read = new File(fileToRead);
 		File write ;
@@ -189,9 +201,6 @@ public class FixBasemapRoads {
             Way first = combinedWays.get(0);
             for(int i = 1; i < combinedWays.size(); i++) {
                 boolean f = true;
-                if(combinedWays.get(i) == first ) {
-                	return;
-                }
                 for(Node n : combinedWays.get(i).getNodes()) {
                     if(n != null && !f){
                         first.addNode(n);
@@ -306,7 +315,7 @@ public class FixBasemapRoads {
             combineUniqueIdentifyRoads(ri);
             // last step not definite
             combineIntoLongestRoad(ri);
-//            combineRoadsWithCut(ri);
+            combineRoadsWithCut(ri);
             for(RoadLine ls :  ri.roadLines) {
                 if(ls.distance > MINIMAL_DISTANCE ){
                     ls.combineWaysIntoOneWay();
@@ -480,14 +489,6 @@ public class FixBasemapRoads {
 			LatLon lt = way.getLatLon();
 			ref = ((int) MapUtils.getTileNumberY(4, lt.getLatitude())) + " "
 					+ ((int) MapUtils.getTileNumberX(4, lt.getLongitude()));
-		}
-
-		if (ref != null && !ref.isEmpty()) {
-			if (!roadInfoMap.containsKey(ref)) {
-				roadInfoMap.put(ref, new RoadInfo());
-			}
-			RoadInfo ri = roadInfoMap.get(ref);
-			ri.registerRoadLine(new RoadLine(way));
 		}
 
 		if (!roadInfoMap.containsKey(ref)) {
