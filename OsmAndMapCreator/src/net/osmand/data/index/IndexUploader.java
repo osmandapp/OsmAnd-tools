@@ -26,18 +26,26 @@ import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
 
 import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.parsers.ParserConfigurationException;
 
 import net.osmand.IndexConstants;
 import net.osmand.PlatformUtil;
+import net.osmand.binary.BinaryIndexPart;
+import net.osmand.binary.BinaryInspector;
+import net.osmand.binary.BinaryMapAddressReaderAdapter.AddressRegion;
 import net.osmand.binary.BinaryMapIndexReader;
+import net.osmand.binary.BinaryMapIndexReader.MapIndex;
+import net.osmand.binary.BinaryMapPoiReaderAdapter.PoiRegion;
+import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
+import net.osmand.binary.BinaryMapTransportReaderAdapter.TransportIndex;
+import net.osmand.binary.OsmandOdb;
 import net.osmand.util.Algorithms;
 
 import org.apache.commons.logging.Log;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
-import org.xml.sax.SAXException;
 
+import com.google.protobuf.CodedOutputStream;
+import com.google.protobuf.WireFormat;
 import com.jcraft.jsch.Channel;
 import com.jcraft.jsch.ChannelExec;
 import com.jcraft.jsch.JSch;
@@ -131,7 +139,7 @@ public class IndexUploader {
 		}
 	}
 	
-	public static void main(String[] args) {
+	public static void main(String[] args) throws IOException {
 		try {
 			String srcPath = extractDirectory(args, 0);
 			String targetPath = srcPath;
@@ -298,7 +306,7 @@ public class IndexUploader {
 		}
 	}
 	
-	public void run() throws IndexUploadException {
+	public void run() throws IndexUploadException, IOException {
 		// take files before whole upload process
 		try {
 			uploadCredentials.connect();
@@ -393,16 +401,31 @@ public class IndexUploader {
 		}
 	}
 
-	private String checkfileAndGetDescription(File mainFile) throws OneFileException {
+	private String checkfileAndGetDescription(File mainFile) throws OneFileException, IOException {
 		String fileName = mainFile.getName();
 		boolean srtmFile = mainFile.getName().contains(".srtm");
+		boolean roadFile = mainFile.getName().contains(".road");
+		boolean wikiFile = mainFile.getName().contains(".wiki");
 		boolean tourFile = fileName.endsWith(IndexConstants.TOUR_INDEX_EXT) || fileName.endsWith(IndexConstants.TOUR_INDEX_EXT_ZIP);
+		boolean basemapFile = mainFile.getName().contains("basemap");
+		boolean regionFile = !srtmFile && !roadFile && !wikiFile && !tourFile && !basemapFile;
+		if(regionFile) {
+			extractRoadOnlyFile(mainFile, new File(mainFile.getParentFile(), mainFile.getName().replace(
+					IndexConstants.BINARY_MAP_INDEX_EXT, IndexConstants.BINARY_ROAD_MAP_INDEX_EXT)));
+		}
 		if(srtmFile != this.srtmProcess) {
 			return null;
 		}
 		if(tourFile != this.tourProcess) {
 			return null;
 		}
+		if(roadFile != this.roadProcess) {
+			return null;
+		}
+		if(wikiFile != this.wikiProcess) {
+			return null;
+		}
+
 		if (tourFile) {
 			File fl = new File(mainFile, "inventory.xml");
 			if(!fl.exists()) {
@@ -423,14 +446,6 @@ public class IndexUploader {
 				if(reader.getVersion() != IndexConstants.BINARY_MAP_VERSION) {
 					throw new OneFileException("Uploader version is not compatible " + reader.getVersion() + " to current " + IndexConstants.BINARY_MAP_VERSION);
 				}
-				boolean roadFile = reader.containsRouteData() && !reader.containsMapData();
-				boolean wikiFile = mainFile.getName().contains(".wiki");
-				if(roadFile != this.roadProcess) {
-					return null;
-				}
-				if(wikiFile != this.wikiProcess) {
-					return null;
-				}
 				String summary = getDescription(reader, fileName);
 				reader.close();
 				mainFile.setLastModified(reader.getDateCreated());
@@ -447,6 +462,49 @@ public class IndexUploader {
 		} else {
 			throw new OneFileException("Not supported file format " + fileName);
 		}
+	}
+
+
+	public void extractRoadOnlyFile(File mainFile, File roadOnlyFile) throws IOException {
+		RandomAccessFile raf = new RandomAccessFile(mainFile, "r");
+		BinaryMapIndexReader index = new BinaryMapIndexReader(raf, mainFile);
+		
+		FileOutputStream fout = new FileOutputStream(roadOnlyFile);
+		CodedOutputStream ous = CodedOutputStream.newInstance(fout, BUFFER_SIZE);
+		byte[] BUFFER_TO_READ = new byte[BUFFER_SIZE];
+		ous.writeInt32(OsmandOdb.OsmAndStructure.VERSION_FIELD_NUMBER, index.getVersion());
+		ous.writeInt64(OsmandOdb.OsmAndStructure.DATECREATED_FIELD_NUMBER, index.getDateCreated());
+		
+		for (int i = 0; i < index.getIndexes().size(); i++) {
+			BinaryIndexPart part = index.getIndexes().get(i);
+			if (part instanceof MapIndex) {
+				// skip map part
+				continue;
+//				ous.writeTag(OsmandOdb.OsmAndStructure.MAPINDEX_FIELD_NUMBER,
+//						WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
+			} else if (part instanceof AddressRegion) {
+				ous.writeTag(OsmandOdb.OsmAndStructure.ADDRESSINDEX_FIELD_NUMBER,
+						WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
+			} else if (part instanceof TransportIndex) {
+				ous.writeTag(OsmandOdb.OsmAndStructure.TRANSPORTINDEX_FIELD_NUMBER,
+						WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
+			} else if (part instanceof PoiRegion) {
+				ous.writeTag(OsmandOdb.OsmAndStructure.POIINDEX_FIELD_NUMBER,
+						WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
+			} else if (part instanceof RouteRegion) {
+				ous.writeTag(OsmandOdb.OsmAndStructure.ROUTINGINDEX_FIELD_NUMBER,
+						WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
+			} else {
+				throw new UnsupportedOperationException();
+			}
+			BinaryInspector.writeInt(ous, part.getLength());
+			BinaryInspector.copyBinaryPart(ous, BUFFER_TO_READ, raf, part.getFilePointer(), part.getLength());
+		}
+		
+		ous.writeInt32(OsmandOdb.OsmAndStructure.VERSIONCONFIRM_FIELD_NUMBER, index.getVersion());
+		ous.flush();
+		fout.close();
+		raf.close();
 	}
 
 	private String getDescription(BinaryMapIndexReader reader, String fileName) {
