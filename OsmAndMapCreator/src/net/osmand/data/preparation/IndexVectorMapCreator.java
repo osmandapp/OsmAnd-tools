@@ -748,7 +748,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 					
 					
 					MapData mapData = writer.writeMapData(cid - baseId, parentBounds.getMinX(), parentBounds.getMinY(), rs.getBoolean(1), rs.getBytes(2), rs.getBytes(3),
-							typeUse, addtypeUse, tempNames, tempStringTable, dataBlock, level.getMaxZoom() > 15);
+							typeUse, addtypeUse, tempNames, null, tempStringTable, dataBlock, level.getMaxZoom() > 15);
 					if(mapData != null) {
 						dataBlock.addDataObjects(mapData);
 					}
@@ -769,7 +769,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		}
 	}
 
-	public void writeBinaryMapTree(rtree.Node parent, Rect re, RTree r, BinaryMapIndexWriter writer, TLongObjectHashMap<BinaryFileReference> bounds)
+	public static void writeBinaryMapTree(rtree.Node parent, Rect re, RTree r, BinaryMapIndexWriter writer, TLongObjectHashMap<BinaryFileReference> bounds)
 			throws IOException, RTreeException {
 		Element[] e = parent.getAllElements();
 		boolean containsLeaf = false;

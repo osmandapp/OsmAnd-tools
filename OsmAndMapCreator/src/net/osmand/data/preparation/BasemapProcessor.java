@@ -386,7 +386,7 @@ public class BasemapProcessor {
                 }
                 MapData mapData = writer.writeMapData(w.id - baseId,
                         quad.x << (31 - quad.zoom), quad.y << (31 - quad.zoom), false,
-                        w.coordinates, w.innerCoordinates, wts, wats, w.names, stringTable, dataBlock, level.getMaxZoom() > 15);
+                        w.coordinates, w.innerCoordinates, wts, wats, w.names, null, stringTable, dataBlock, level.getMaxZoom() > 15);
                 if (mapData != null) {
                     dataBlock.addDataObjects(mapData);
                 }

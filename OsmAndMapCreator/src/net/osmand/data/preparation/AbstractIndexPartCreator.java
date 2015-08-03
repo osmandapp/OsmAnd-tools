@@ -82,7 +82,7 @@ public class AbstractIndexPartCreator {
 		}
 	}
 	
-	protected boolean nodeIsLastSubTree(RTree tree, long ptr) throws RTreeException {
+	protected static boolean nodeIsLastSubTree(RTree tree, long ptr) throws RTreeException {
 		rtree.Node parent = tree.getReadNode(ptr);
 		Element[] e = parent.getAllElements();
 		for (int i = 0; i < parent.getTotalElements(); i++) {
@@ -94,7 +94,7 @@ public class AbstractIndexPartCreator {
 
 	}
 	
-	protected RTree packRtreeFile(RTree tree, String nonPackFileName, String packFileName) throws IOException {
+	public static RTree packRtreeFile(RTree tree, String nonPackFileName, String packFileName) throws IOException {
 		try {
 			assert rtree.Node.MAX < 50 : "It is better for search performance"; //$NON-NLS-1$
 			tree.flush();

@@ -1,6 +1,11 @@
 package net.osmand.data.index;
 
+
+import gnu.trove.list.array.TIntArrayList;
+import gnu.trove.map.hash.TLongObjectHashMap;
+
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -17,8 +22,10 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
 import java.util.Enumeration;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipException;
@@ -29,20 +36,40 @@ import javax.xml.parsers.DocumentBuilderFactory;
 
 import net.osmand.IndexConstants;
 import net.osmand.PlatformUtil;
+import net.osmand.ResultMatcher;
 import net.osmand.binary.BinaryIndexPart;
 import net.osmand.binary.BinaryInspector;
 import net.osmand.binary.BinaryMapAddressReaderAdapter.AddressRegion;
+import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.BinaryMapIndexReader.MapIndex;
+import net.osmand.binary.BinaryMapIndexReader.MapRoot;
+import net.osmand.binary.BinaryMapIndexReader.SearchFilter;
+import net.osmand.binary.BinaryMapIndexReader.SearchRequest;
+import net.osmand.binary.BinaryMapIndexReader.TagValuePair;
 import net.osmand.binary.BinaryMapPoiReaderAdapter.PoiRegion;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
 import net.osmand.binary.BinaryMapTransportReaderAdapter.TransportIndex;
 import net.osmand.binary.OsmandOdb;
+import net.osmand.binary.OsmandOdb.MapData;
+import net.osmand.binary.OsmandOdb.MapDataBlock;
+import net.osmand.data.preparation.AbstractIndexPartCreator;
+import net.osmand.data.preparation.BinaryFileReference;
+import net.osmand.data.preparation.BinaryMapIndexWriter;
+import net.osmand.data.preparation.IndexVectorMapCreator;
 import net.osmand.util.Algorithms;
+import net.osmand.util.MapUtils;
 
 import org.apache.commons.logging.Log;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
+
+import rtree.IllegalValueException;
+import rtree.LeafElement;
+import rtree.Node;
+import rtree.RTree;
+import rtree.RTreeException;
+import rtree.Rect;
 
 import com.google.protobuf.CodedOutputStream;
 import com.google.protobuf.WireFormat;
@@ -53,26 +80,18 @@ import com.jcraft.jsch.JSchException;
 import com.jcraft.jsch.Session;
 
 /**
- * This helper will find obf and zip files, create description for them, and zip them, or update the description. 
- * This helper also can upload files through ssh,ftp or to googlecode.
+ * This helper will find obf and zip files, create description for them, and zip them, or update the description. This
+ * helper also can upload files through ssh,ftp or to googlecode.
  * 
- * IndexUploader dir targetDir [--ff=file] [--fp=ptns] [--ep=ptns] [--dp=ptns] [-ssh|-ftp|-google] [--password=|--user=|--url=|--path=|--gpassword=|--privKey=|--knownHosts=]
- *    --ff     file with names of files to be uploaded from the dir, supporting regexp
- *    --fp     comma separated names of files to be uploaded from the dir, supporting regexp  
- *    --ep     comma separated names of files to be excluded from upload, supporting regexp
- *    --dp     comma separated names of files to be delete on remote system, supporting regexp
- *    One of:
- *    -ssh    to upload to ssh site
- *    -fpt    to upload to ftp site
- *    -google to upload to googlecode of osmand
- *    Additional params:
- *    --user       user to use for ftp,ssh,google
- *    --password   password to use for ftp,ssh,google (gmail password to retrieve tokens for deleting files)
- *    --url        url to use for ssh,ftp
- *    --path       path in url to use for ssh,ftp
- *    --gpassword  googlecode password to use for google
- *    --privKey    priv key for ssh
- *    --knownHosts known hosts for ssh
+ * IndexUploader dir targetDir [--ff=file] [--fp=ptns] [--ep=ptns] [--dp=ptns] [-ssh|-ftp|-google]
+ * [--password=|--user=|--url=|--path=|--gpassword=|--privKey=|--knownHosts=] --ff file with names of files to be
+ * uploaded from the dir, supporting regexp --fp comma separated names of files to be uploaded from the dir, supporting
+ * regexp --ep comma separated names of files to be excluded from upload, supporting regexp --dp comma separated names
+ * of files to be delete on remote system, supporting regexp One of: -ssh to upload to ssh site -fpt to upload to ftp
+ * site -google to upload to googlecode of osmand Additional params: --user user to use for ftp,ssh,google --password
+ * password to use for ftp,ssh,google (gmail password to retrieve tokens for deleting files) --url url to use for
+ * ssh,ftp --path path in url to use for ssh,ftp --gpassword googlecode password to use for google --privKey priv key
+ * for ssh --knownHosts known hosts for ssh
  * 
  * @author Pavol Zibrita <pavol.zibrita@gmail.com>
  */
@@ -94,7 +113,7 @@ public class IndexUploader {
 		public IndexUploadException(String message) {
 			super(message);
 		}
-		
+
 		public IndexUploadException(String message, Throwable e) {
 			super(message, e);
 		}
@@ -111,7 +130,7 @@ public class IndexUploader {
 		public OneFileException(String message) {
 			super(message);
 		}
-		
+
 		public OneFileException(String message, Exception e) {
 			super(message, e);
 		}
@@ -138,8 +157,14 @@ public class IndexUploader {
 			throw new IndexUploadException("Not a directory:" + targetPath);
 		}
 	}
-	
-	public static void main(String[] args) throws IOException {
+
+	public static void main(String[] args) throws IOException, IndexUploadException, RTreeException {
+//		if (true) {
+//			File src = new File("/Users/victorshcherb/osmand/temp/Luxembourg_europe_2.obf");
+//			File dest = new File("/Users/victorshcherb/osmand/maps/Luxembourg_europe_2.road.obf");
+//			IndexUploader.extractRoadOnlyFile(src, dest);
+//			return;
+//		}
 		try {
 			String srcPath = extractDirectory(args, 0);
 			String targetPath = srcPath;
@@ -147,7 +172,7 @@ public class IndexUploader {
 				targetPath = extractDirectory(args, 1);
 			}
 			IndexUploader indexUploader = new IndexUploader(srcPath, targetPath);
-			if(args.length > 2) {
+			if (args.length > 2) {
 				indexUploader.parseParameters(args, 2);
 			}
 			indexUploader.run();
@@ -155,14 +180,14 @@ public class IndexUploader {
 			log.error(e.getMessage());
 		}
 	}
-	
+
 	private void parseParameters(String[] args, int start) throws IndexUploadException {
 		int idx = parseFilter(args, start);
 		if (args.length > idx) {
 			parseUploadCredentials(args, idx);
 		}
 	}
-	
+
 	private int parseFilter(String[] args, int start) throws IndexUploadException {
 		FileFilter fileFilter = null;
 		int p;
@@ -207,8 +232,8 @@ public class IndexUploader {
 				tourProcess = true;
 				start++;
 			}
-		} while(p != start);
-		if(fileFilter != null) {
+		} while (p != start);
+		if (fileFilter != null) {
 			this.fileFilter = fileFilter;
 		}
 		return start;
@@ -232,31 +257,31 @@ public class IndexUploader {
 	}
 
 	protected static class FileFilter {
-		
+
 		private List<Pattern> matchers = null;
 		private List<Pattern> exculdeMatchers = null;
-		
-		public void parseCSV(String patterns){
+
+		public void parseCSV(String patterns) {
 			String[] s = patterns.split(",");
-			if(matchers == null) {
+			if (matchers == null) {
 				matchers = new ArrayList<Pattern>();
 			}
-			for(String p : s) {
+			for (String p : s) {
 				matchers.add(Pattern.compile(p.trim()));
 			}
 		}
-		
-		public void parseExcludeCSV(String patterns){
+
+		public void parseExcludeCSV(String patterns) {
 			String[] s = patterns.split(",");
-			if(exculdeMatchers == null) {
+			if (exculdeMatchers == null) {
 				exculdeMatchers = new ArrayList<Pattern>();
 			}
-			for(String p : s) {
+			for (String p : s) {
 				exculdeMatchers.add(Pattern.compile(p.trim()));
 			}
 		}
-		
-		public void parseFile(String file) throws IOException{
+
+		public void parseFile(String file) throws IOException {
 			File f = new File(file);
 			if (f.exists()) {
 				readPatterns(f);
@@ -267,7 +292,7 @@ public class IndexUploader {
 			BufferedReader reader = new BufferedReader(new FileReader(f));
 			try {
 				String line;
-				if(matchers == null) {
+				if (matchers == null) {
 					matchers = new ArrayList<Pattern>();
 				}
 				while ((line = reader.readLine()) != null) {
@@ -277,36 +302,37 @@ public class IndexUploader {
 				Algorithms.closeStream(reader);
 			}
 		}
-		
-		public boolean patternMatches(String name){
+
+		public boolean patternMatches(String name) {
 			return internalPatternMatches(name, matchers);
 		}
-		public boolean internalPatternMatches(String name, List<Pattern> matchers ){
-			if(matchers == null) {
+
+		public boolean internalPatternMatches(String name, List<Pattern> matchers) {
+			if (matchers == null) {
 				return true;
 			}
-			for (Pattern p : matchers)  {
+			for (Pattern p : matchers) {
 				if (p.matcher(name).matches()) {
 					return true;
 				}
 			}
 			return false;
 		}
-		
+
 		protected boolean fileCanBeUploaded(File f) {
 			if ((!f.isFile() && !f.getName().contains(IndexConstants.TOUR_INDEX_EXT))
 					|| f.getName().endsWith(IndexBatchCreator.GEN_LOG_EXT)) {
 				return false;
 			}
 			boolean matches = internalPatternMatches(f.getName(), matchers);
-			if(matches && exculdeMatchers != null && internalPatternMatches(f.getName(), exculdeMatchers)) {
+			if (matches && exculdeMatchers != null && internalPatternMatches(f.getName(), exculdeMatchers)) {
 				return false;
 			}
 			return matches;
 		}
 	}
-	
-	public void run() throws IndexUploadException, IOException {
+
+	public void run() throws IndexUploadException, IOException, RTreeException {
 		// take files before whole upload process
 		try {
 			uploadCredentials.connect();
@@ -317,17 +343,18 @@ public class IndexUploader {
 						continue;
 					}
 					long timestampCreated = f.lastModified();
-					if(!uploadCredentials.checkIfUploadNeededByTimestamp(f.getName(), timestampCreated)) {
-						log.info("File skipped because timestamp was not changed " + f.getName() );
+					if (!uploadCredentials.checkIfUploadNeededByTimestamp(f.getName(), timestampCreated)) {
+						log.info("File skipped because timestamp was not changed " + f.getName());
 						continue;
 					}
 					log.info("Process file " + f.getName());
 					File unzippedFolder = unzip(f);
 					File mainFile = unzippedFolder;
-					if(!unzippedFolder.getName().endsWith(IndexConstants.TOUR_INDEX_EXT) && unzippedFolder.isDirectory()) {
-						for(File fs : unzippedFolder.listFiles()) {
-							if(!fs.getName().endsWith(IndexBatchCreator.GEN_LOG_EXT)) {
-								mainFile = fs; 
+					if (!unzippedFolder.getName().endsWith(IndexConstants.TOUR_INDEX_EXT)
+							&& unzippedFolder.isDirectory()) {
+						for (File fs : unzippedFolder.listFiles()) {
+							if (!fs.getName().endsWith(IndexBatchCreator.GEN_LOG_EXT)) {
+								mainFile = fs;
 							}
 						}
 					}
@@ -335,7 +362,7 @@ public class IndexUploader {
 					try {
 						String description = checkfileAndGetDescription(mainFile);
 						timestampCreated = mainFile.lastModified();
-						if(description == null) {
+						if (description == null) {
 							log.info("Skip file " + f.getName());
 							skip = true;
 						} else {
@@ -345,7 +372,8 @@ public class IndexUploader {
 						}
 					} finally {
 						if (!skip) {
-							if (!f.getName().equals(unzippedFolder.getName()) || (targetDirectory != null && !targetDirectory.equals(directory))) {
+							if (!f.getName().equals(unzippedFolder.getName())
+									|| (targetDirectory != null && !targetDirectory.equals(directory))) {
 								Algorithms.removeAllFiles(unzippedFolder);
 							}
 						}
@@ -359,7 +387,7 @@ public class IndexUploader {
 			if (deleteFileFilter != null) {
 				log.error("Delete file filter is not supported with this credentions (method) " + uploadCredentials);
 			}
-			
+
 		} finally {
 			uploadCredentials.disconnect();
 		}
@@ -369,10 +397,10 @@ public class IndexUploader {
 		try {
 			ZipOutputStream zout = new ZipOutputStream(new FileOutputStream(zFile));
 			zout.setLevel(9);
-			Collection<File> lfs = folder.isFile()?Collections.singleton(folder) : Arrays.asList(folder.listFiles()); 
+			Collection<File> lfs = folder.isFile() ? Collections.singleton(folder) : Arrays.asList(folder.listFiles());
 			for (File f : lfs) {
 				log.info("Zipping to file:" + zFile.getName() + " with desc:" + description);
-				putZipEntry(description,"",lastModifiedTime, zout, f);
+				putZipEntry(description, "", lastModifiedTime, zout, f);
 			}
 			Algorithms.closeStream(zout);
 			zFile.setLastModified(lastModifiedTime);
@@ -382,9 +410,9 @@ public class IndexUploader {
 		return zFile;
 	}
 
-	private static void putZipEntry( String description, String parentEntry, long lastModifiedTime, ZipOutputStream zout, File f)
-			throws IOException, FileNotFoundException {
-		if(f.isDirectory()) {
+	private static void putZipEntry(String description, String parentEntry, long lastModifiedTime,
+			ZipOutputStream zout, File f) throws IOException, FileNotFoundException {
+		if (f.isDirectory()) {
 			for (File lf : f.listFiles()) {
 				putZipEntry(description, parentEntry + f.getName() + "/", lastModifiedTime, zout, lf);
 			}
@@ -401,50 +429,55 @@ public class IndexUploader {
 		}
 	}
 
-	private String checkfileAndGetDescription(File mainFile) throws OneFileException, IOException {
+	private String checkfileAndGetDescription(File mainFile) throws OneFileException, IOException, RTreeException {
 		String fileName = mainFile.getName();
 		boolean srtmFile = mainFile.getName().contains(".srtm");
 		boolean roadFile = mainFile.getName().contains(".road");
 		boolean wikiFile = mainFile.getName().contains(".wiki");
-		boolean tourFile = fileName.endsWith(IndexConstants.TOUR_INDEX_EXT) || fileName.endsWith(IndexConstants.TOUR_INDEX_EXT_ZIP);
+		boolean tourFile = fileName.endsWith(IndexConstants.TOUR_INDEX_EXT)
+				|| fileName.endsWith(IndexConstants.TOUR_INDEX_EXT_ZIP);
 		boolean basemapFile = mainFile.getName().contains("basemap");
 		boolean regionFile = !srtmFile && !roadFile && !wikiFile && !tourFile && !basemapFile;
-		if(regionFile) {
-			extractRoadOnlyFile(mainFile, new File(mainFile.getParentFile(), mainFile.getName().replace(
-					IndexConstants.BINARY_MAP_INDEX_EXT, IndexConstants.BINARY_ROAD_MAP_INDEX_EXT)));
+		if (regionFile) {
+			extractRoadOnlyFile(
+					mainFile,
+					new File(mainFile.getParentFile(), mainFile.getName().replace(IndexConstants.BINARY_MAP_INDEX_EXT,
+							IndexConstants.BINARY_ROAD_MAP_INDEX_EXT)));
 		}
-		if(srtmFile != this.srtmProcess) {
+		if (srtmFile != this.srtmProcess) {
 			return null;
 		}
-		if(tourFile != this.tourProcess) {
+		if (tourFile != this.tourProcess) {
 			return null;
 		}
-		if(roadFile != this.roadProcess) {
+		if (roadFile != this.roadProcess) {
 			return null;
 		}
-		if(wikiFile != this.wikiProcess) {
+		if (wikiFile != this.wikiProcess) {
 			return null;
 		}
 
 		if (tourFile) {
 			File fl = new File(mainFile, "inventory.xml");
-			if(!fl.exists()) {
+			if (!fl.exists()) {
 				System.err.println("inventory.xml doesn't exist " + fl.getAbsolutePath());
 				return null;
 			}
 			try {
 				Document doc = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(fl);
-				return ((Element)doc.getElementsByTagName("shortDescription").item(0)).getTextContent();
+				return ((Element) doc.getElementsByTagName("shortDescription").item(0)).getTextContent();
 			} catch (Exception e) {
-				throw new OneFileException("Not supported file format " + fileName ,e );
-			} 
-		} else if (fileName.endsWith(IndexConstants.BINARY_MAP_INDEX_EXT) || fileName.endsWith(IndexConstants.BINARY_MAP_INDEX_EXT_ZIP)) {
+				throw new OneFileException("Not supported file format " + fileName, e);
+			}
+		} else if (fileName.endsWith(IndexConstants.BINARY_MAP_INDEX_EXT)
+				|| fileName.endsWith(IndexConstants.BINARY_MAP_INDEX_EXT_ZIP)) {
 			RandomAccessFile raf = null;
 			try {
 				raf = new RandomAccessFile(mainFile, "r");
 				BinaryMapIndexReader reader = new BinaryMapIndexReader(raf, mainFile);
-				if(reader.getVersion() != IndexConstants.BINARY_MAP_VERSION) {
-					throw new OneFileException("Uploader version is not compatible " + reader.getVersion() + " to current " + IndexConstants.BINARY_MAP_VERSION);
+				if (reader.getVersion() != IndexConstants.BINARY_MAP_VERSION) {
+					throw new OneFileException("Uploader version is not compatible " + reader.getVersion()
+							+ " to current " + IndexConstants.BINARY_MAP_VERSION);
 				}
 				String summary = getDescription(reader, fileName);
 				reader.close();
@@ -464,24 +497,38 @@ public class IndexUploader {
 		}
 	}
 
-
-	public void extractRoadOnlyFile(File mainFile, File roadOnlyFile) throws IOException {
+	public static void extractRoadOnlyFile(File mainFile, File roadOnlyFile) throws IOException, RTreeException {
 		RandomAccessFile raf = new RandomAccessFile(mainFile, "r");
 		BinaryMapIndexReader index = new BinaryMapIndexReader(raf, mainFile);
-		
-		FileOutputStream fout = new FileOutputStream(roadOnlyFile);
-		CodedOutputStream ous = CodedOutputStream.newInstance(fout, BUFFER_SIZE);
+		final RandomAccessFile routf = new RandomAccessFile(roadOnlyFile, "rw");
+		routf.setLength(0);
+		CodedOutputStream ous = CodedOutputStream.newInstance(new OutputStream() {
+			@Override
+			public void write(int b) throws IOException {
+				routf.write(b);
+			}
+
+			@Override
+			public void write(byte[] b) throws IOException {
+				routf.write(b);
+			}
+
+			@Override
+			public void write(byte[] b, int off, int len) throws IOException {
+				routf.write(b, off, len);
+			}
+
+		});
 		byte[] BUFFER_TO_READ = new byte[BUFFER_SIZE];
 		ous.writeInt32(OsmandOdb.OsmAndStructure.VERSION_FIELD_NUMBER, index.getVersion());
 		ous.writeInt64(OsmandOdb.OsmAndStructure.DATECREATED_FIELD_NUMBER, index.getDateCreated());
-		
+
 		for (int i = 0; i < index.getIndexes().size(); i++) {
 			BinaryIndexPart part = index.getIndexes().get(i);
 			if (part instanceof MapIndex) {
 				// skip map part
+				copyMapIndex(roadOnlyFile, (MapIndex) part, index, ous, routf);
 				continue;
-//				ous.writeTag(OsmandOdb.OsmAndStructure.MAPINDEX_FIELD_NUMBER,
-//						WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
 			} else if (part instanceof AddressRegion) {
 				ous.writeTag(OsmandOdb.OsmAndStructure.ADDRESSINDEX_FIELD_NUMBER,
 						WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
@@ -500,20 +547,234 @@ public class IndexUploader {
 			BinaryInspector.writeInt(ous, part.getLength());
 			BinaryInspector.copyBinaryPart(ous, BUFFER_TO_READ, raf, part.getFilePointer(), part.getLength());
 		}
-		
+
 		ous.writeInt32(OsmandOdb.OsmAndStructure.VERSIONCONFIRM_FIELD_NUMBER, index.getVersion());
 		ous.flush();
-		fout.close();
+		routf.close();
 		raf.close();
 	}
+
+	private static void copyMapIndex(File roadOnlyFile, MapIndex part, BinaryMapIndexReader index,
+			CodedOutputStream ous, RandomAccessFile routf) throws IOException, RTreeException {
+		final List<MapRoot> rts = part.getRoots();
+		BinaryMapIndexWriter writer = new BinaryMapIndexWriter(routf, ous);
+		writer.startWriteMapIndex(part.getName());
+		boolean first = true;
+		for (MapRoot r : rts) {
+			final TLongObjectHashMap<BinaryMapDataObject> objects = new TLongObjectHashMap<BinaryMapDataObject>();
+			File nonpackRtree = new File(roadOnlyFile.getParentFile(), "nonpack"+r.getMinZoom()+".rtree");
+			File  packRtree = new File(roadOnlyFile.getParentFile(), "pack"+r.getMinZoom()+".rtree");
+			RTree rtree = null;
+			try {
+				rtree = new RTree(nonpackRtree.getAbsolutePath());
+				final SearchRequest<BinaryMapDataObject> req = buildSearchRequest(r, objects, rtree);
+				index.searchMapIndex(req);
+				rtree = AbstractIndexPartCreator.packRtreeFile(rtree, nonpackRtree.getAbsolutePath(),
+						packRtree.getAbsolutePath());
+				TLongObjectHashMap<BinaryFileReference> treeHeader = new TLongObjectHashMap<BinaryFileReference>();
+
+				long rootIndex = rtree.getFileHdr().getRootIndex();
+				rtree.Node root = rtree.getReadNode(rootIndex);
+				Rect rootBounds = calcBounds(root);
+				if (rootBounds != null) {
+					if(first) {
+						writer.writeMapEncodingRules(index, part);
+						first = false;
+					}
+					writer.startWriteMapLevelIndex(r.getMinZoom(), r.getMaxZoom(), rootBounds.getMinX(),
+							rootBounds.getMaxX(), rootBounds.getMinY(), rootBounds.getMaxY());
+					IndexVectorMapCreator.writeBinaryMapTree(root, rootBounds, rtree, writer, treeHeader);
+					writeBinaryMapBlock(root, rootBounds, rtree, writer, treeHeader, objects, r);
+
+					writer.endWriteMapLevelIndex();
+				}
+			} finally {
+				if (rtree != null) {
+					RandomAccessFile file = rtree.getFileHdr().getFile();
+					file.close();
+				}
+				nonpackRtree.delete();
+				packRtree.delete();
+			}
+		}
+		writer.endWriteMapIndex();
+	}
+	
+	private static double polygonArea(BinaryMapDataObject obj) {
+		int zoom = 16;
+		float mult = (float) (1. / MapUtils.getPowZoom(Math.max(31 - (zoom + 8), 0)));
+		double area = 0.;
+		int j = obj.getPointsLength() - 1;
+		for (int i = 0; i < obj.getPointsLength(); i++) {
+			int px = obj.getPoint31XTile(i);
+			int py = obj.getPoint31YTile(i);
+			int sx = obj.getPoint31XTile(j);
+			int sy = obj.getPoint31YTile(j);
+			area += (sx + ((float) px)) * (sy - ((float) py));
+			j = i;
+		}
+		return Math.abs(area) * mult * mult * .5;
+	}
+
+	private static SearchRequest<BinaryMapDataObject> buildSearchRequest(MapRoot r,
+			final TLongObjectHashMap<BinaryMapDataObject> objects, final RTree urTree) {
+		final SearchRequest<BinaryMapDataObject> req = BinaryMapIndexReader.buildSearchRequest(0,
+				Integer.MAX_VALUE, 0, Integer.MAX_VALUE, r.getMinZoom(), new SearchFilter() {
+					@Override
+					public boolean accept(TIntArrayList types, MapIndex index) {
+						return true;
+					}
+				}, new ResultMatcher<BinaryMapDataObject>() {
+					@Override
+					public boolean publish(BinaryMapDataObject obj) {
+						int minX = obj.getPoint31XTile(0);
+						int maxX = obj.getPoint31XTile(0);
+						int maxY = obj.getPoint31YTile(0);
+						int minY = obj.getPoint31YTile(0);
+						for (int i = 1; i < obj.getPointsLength(); i++) {
+							minX = Math.min(minX, obj.getPoint31XTile(i));
+							minY = Math.min(minY, obj.getPoint31YTile(i));
+							maxX = Math.max(maxX, obj.getPoint31XTile(i));
+							maxY = Math.max(maxY, obj.getPoint31YTile(i));
+						}
+						
+						if (accept(obj, minX, maxX, minY, maxY)) {
+							objects.put(obj.getId(), obj);
+							try {
+								urTree.insert(new LeafElement(new Rect(minX, minY, maxX, maxY), obj.getId()));
+							} catch (Exception e) {
+								throw new RuntimeException(e);
+							}
+						}
+						return false;
+					}
+
+					@Override
+					public boolean isCancelled() {
+						return false;
+					}
+				});
+		return req;
+	}
+	
+
+	protected static boolean accept(BinaryMapDataObject obj, int minX, int maxX, int minY, int maxY) {
+//		double l = MapUtils.convert31XToMeters(minX, maxX);
+//		double h = MapUtils.convert31YToMeters(minY, maxY);
+//		if(obj.isArea() && (l >= 100 || h >= 100)) {
+		if(obj.isArea()) {
+			// pixels on 16 zoom
+			if(polygonArea(obj) > 1000){
+				return true;
+			}
+		}
+		if(obj.getPointsLength() == 1) {
+			for(int i = 0; i < obj.getTypes().length; i++) {
+				TagValuePair tv = obj.getMapIndex().decodeType(obj.getTypes()[i]);
+				if(tv.tag.equals("place")) {
+					return true;
+				} else if(tv.tag.equals("highway")) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
+	public static Rect calcBounds(rtree.Node n) {
+		Rect r = null;
+		rtree.Element[] e = n.getAllElements();
+		for (int i = 0; i < n.getTotalElements(); i++) {
+			Rect re = e[i].getRect();
+			if (r == null) {
+				try {
+					r = new Rect(re.getMinX(), re.getMinY(), re.getMaxX(), re.getMaxY());
+				} catch (IllegalValueException ex) {
+				}
+			} else {
+				r.expandToInclude(re);
+			}
+		}
+		return r;
+	}
+
+	public static void writeBinaryMapBlock(Node parent, Rect parentBounds, RTree r, BinaryMapIndexWriter writer,
+			TLongObjectHashMap<BinaryFileReference> bounds, TLongObjectHashMap<BinaryMapDataObject> objects,
+			MapRoot mr) throws IOException, RTreeException {
+		rtree.Element[] e = parent.getAllElements();
+
+		MapDataBlock.Builder dataBlock = null;
+		BinaryFileReference ref = bounds.get(parent.getNodeIndex());
+		long baseId = 0;
+		Map<String, Integer> tempStringTable = new LinkedHashMap<String, Integer>();
+		for (int i = 0; i < parent.getTotalElements(); i++) {
+			if (e[i].getElementType() == rtree.Node.LEAF_NODE) {
+				long id = e[i].getPtr();
+				if (objects.containsKey(id)) {
+					long cid = id;
+					BinaryMapDataObject mdo = objects.get(id);
+					if (dataBlock == null) {
+						baseId = cid;
+						dataBlock = writer.createWriteMapDataBlock(baseId);
+						tempStringTable.clear();
+
+					}
+					
+					int[] typeUse = mdo.getTypes();
+					int[] addtypeUse = mdo.getAdditionalTypes();
+					byte[] coordinates = new byte[8 * mdo.getPointsLength()];
+					for (int t = 0; t < mdo.getPointsLength(); t++) {
+						Algorithms.putIntToBytes(coordinates, 8 * t, mdo.getPoint31XTile(t));
+						Algorithms.putIntToBytes(coordinates, 8 * t + 4, mdo.getPoint31YTile(t));
+					}
+					
+					byte[] innerPolygonTypes = new byte[0];
+					int[][] pip = mdo.getPolygonInnerCoordinates();
+					if(pip != null && pip.length > 0) {
+						ByteArrayOutputStream bous = new ByteArrayOutputStream();
+						for (int s = 0; s < pip.length; s++) {
+							int[] st = pip[s];
+							for (int t = 0; t < st.length; t++) {
+								Algorithms.writeInt(bous, st[t]);
+							}
+							Algorithms.writeInt(bous, 0);
+							Algorithms.writeInt(bous, 0);
+						}
+						innerPolygonTypes = bous.toByteArray();
+					}
+					MapData mapData = writer.writeMapData(cid - baseId, parentBounds.getMinX(), parentBounds.getMinY(),
+							mdo.isArea(), coordinates, innerPolygonTypes, 
+							typeUse, addtypeUse, null, mdo.getObjectNames(),
+							tempStringTable, dataBlock, mr.getMaxZoom() > 15);
+					if (mapData != null) {
+						dataBlock.addDataObjects(mapData);
+					}
+				} else {
+					log.error("Something goes wrong with id = " + id); //$NON-NLS-1$
+				}
+			}
+		}
+		if (dataBlock != null) {
+			writer.writeMapDataBlock(dataBlock, tempStringTable, ref);
+		}
+		for (int i = 0; i < parent.getTotalElements(); i++) {
+			if (e[i].getElementType() != rtree.Node.LEAF_NODE) {
+				long ptr = e[i].getPtr();
+				rtree.Node ns = r.getReadNode(ptr);
+				writeBinaryMapBlock(ns, e[i].getRect(), r, writer, bounds, objects, mr);
+			}
+		}
+	}
+
+	
 
 	private String getDescription(BinaryMapIndexReader reader, String fileName) {
 		String summary;
 		summary = " data for ";
 		boolean fir = true;
-		if(fileName.contains(".srtm")) {
+		if (fileName.contains(".srtm")) {
 			summary = "SRTM" + summary;
-		} else if(fileName.contains("_wiki")) {
+		} else if (fileName.contains("_wiki")) {
 			summary = "Wikipedia" + summary;
 		} else {
 			if (reader.containsAddressData()) {
@@ -558,15 +819,15 @@ public class IndexUploader {
 			Enumeration<? extends ZipEntry> entries = zipFile.entries();
 			long slastModified = f.lastModified();
 			String folderName = f.getName().substring(0, f.getName().length() - 4);
-			File unzipFolder = new File(f.getParentFile(), folderName );
+			File unzipFolder = new File(f.getParentFile(), folderName);
 			unzipFolder.mkdirs();
 			while (entries.hasMoreElements()) {
 				ZipEntry entry = entries.nextElement();
 				long lastModified = slastModified;
-				if(entry.isDirectory()) {
+				if (entry.isDirectory()) {
 					continue;
 				}
-				if(entry.getTime() < lastModified) {
+				if (entry.getTime() < lastModified) {
 					lastModified = entry.getTime();
 				}
 				File tempFile = new File(unzipFolder, entry.getName());
@@ -586,7 +847,6 @@ public class IndexUploader {
 		}
 	}
 
-
 	private void uploadIndex(File srcFile, File zipFile, String summary, UploadCredentials uc) {
 		double mbLengh = (double) zipFile.length() / MB;
 		String fileName = zipFile.getName();
@@ -604,7 +864,7 @@ public class IndexUploader {
 				if (toBackup.exists()) {
 					toBackup.delete();
 				}
-				if(!toUpload.renameTo(toBackup)) {
+				if (!toUpload.renameTo(toBackup)) {
 					FileOutputStream fout = new FileOutputStream(toBackup);
 					FileInputStream fin = new FileInputStream(toUpload);
 					Algorithms.streamCopy(fin, fout);
@@ -612,7 +872,7 @@ public class IndexUploader {
 					fout.close();
 					toUpload.delete();
 				}
-				if(srcFile.equals(zipFile)){
+				if (srcFile.equals(zipFile)) {
 					srcFile.delete();
 				}
 			}
@@ -624,21 +884,21 @@ public class IndexUploader {
 	private static String extractDirectory(String[] args, int ind) throws IndexUploadException {
 		if (args.length > ind) {
 			if ("-h".equals(args[0])) {
-				throw new IndexUploadException("Usage: IndexZipper [directory] (if not specified, the current one will be taken)");
+				throw new IndexUploadException(
+						"Usage: IndexZipper [directory] (if not specified, the current one will be taken)");
 			} else {
 				return args[ind];
 			}
 		}
 		return ".";
 	}
-	
-	
+
 	public abstract static class UploadCredentials {
 		String password;
 		String user;
 		String url;
 		String path;
-		
+
 		protected void parseParameter(String param) throws IndexUploadException {
 			if (param.startsWith("--url=")) {
 				url = param.substring("--url=".length());
@@ -650,64 +910,61 @@ public class IndexUploader {
 				path = param.substring("--path=".length());
 			}
 		}
-		
+
 		public boolean checkIfUploadNeededByTimestamp(String filename, long time) {
 			return true;
 		}
 
 		public void disconnect() {
-			//if the uploading needs to close a session
+			// if the uploading needs to close a session
 		}
 
 		public void connect() throws IndexUploadException {
-			//if the uploading needs to open a session
+			// if the uploading needs to open a session
 		}
 
-		public abstract void upload(IndexUploader uploader, File toUpload, String summary, String size,	String date) throws IOException, JSchException;
+		public abstract void upload(IndexUploader uploader, File toUpload, String summary, String size, String date)
+				throws IOException, JSchException;
 	}
-	
+
 	public static class DummyCredentials extends UploadCredentials {
 		@Override
-		public void upload(IndexUploader uploader, File toUpload,
-				String summary, String size, String date) throws IOException,
-				JSchException {
-			//do nothing
-		}	
+		public void upload(IndexUploader uploader, File toUpload, String summary, String size, String date)
+				throws IOException, JSchException {
+			// do nothing
+		}
 	}
-	
+
 	public static class UploadFTPCredentials extends UploadCredentials {
 		@Override
-		public void upload(IndexUploader uploader, File toUpload,
-				String summary, String size, String date) throws IOException,
-				JSchException {
+		public void upload(IndexUploader uploader, File toUpload, String summary, String size, String date)
+				throws IOException, JSchException {
 			uploader.uploadToFTP(toUpload, summary, size, date, this);
 		}
 	}
-	
+
 	public static class UploadSSHCredentials extends UploadCredentials {
 		String privateKey;
 		String knownHosts;
-		
+
 		@Override
 		protected void parseParameter(String param) throws IndexUploadException {
 			super.parseParameter(param);
-			
+
 			if (param.startsWith("--privKey=")) {
 				privateKey = param.substring("--privKey=".length());
 			} else if (param.startsWith("--knownHosts=")) {
 				knownHosts = param.substring("--knownHosts=".length());
 			}
 		}
-		
+
 		@Override
-		public void upload(IndexUploader uploader, File toUpload,
-				String summary, String size, String date) throws IOException, JSchException {
+		public void upload(IndexUploader uploader, File toUpload, String summary, String size, String date)
+				throws IOException, JSchException {
 			uploader.uploadToSSH(toUpload, summary, size, date, this);
 		}
 	}
-	
-	
-	
+
 	public boolean uploadFileToServer(File toUpload, String summary, UploadCredentials credentials) throws IOException {
 		double originalLength = (double) toUpload.length() / MB;
 		MessageFormat dateFormat = new MessageFormat("{0,date,dd.MM.yyyy}", Locale.US);
@@ -715,7 +972,7 @@ public class IndexUploader {
 		String size = numberFormat.format(new Object[] { originalLength });
 		String date = dateFormat.format(new Object[] { new Date(toUpload.lastModified()) });
 		try {
-			credentials.upload(this,toUpload,summary,size,date);
+			credentials.upload(this, toUpload, summary, size, date);
 		} catch (IOException e) {
 			log.error("Input/output exception uploading " + toUpload.getName(), e);
 			return false;
@@ -732,15 +989,16 @@ public class IndexUploader {
 		// Upload to ftp
 		FTPFileUpload upload = new FTPFileUpload();
 		String serverName = credentials.url;
-		if(serverName.startsWith("ftp://")){
+		if (serverName.startsWith("ftp://")) {
 			serverName = serverName.substring("ftp://".length());
 		}
-		upload.upload(serverName, credentials.password, credentials.password, credentials.path + f.getName(), f, 1 << 15);
+		upload.upload(serverName, credentials.password, credentials.password, credentials.path + f.getName(), f,
+				1 << 15);
 		log.info("Finish uploading file index");
 	}
-	
-	public void uploadToSSH(File f, String description, String size, String date, UploadSSHCredentials cred) throws IOException,
-			JSchException {
+
+	public void uploadToSSH(File f, String description, String size, String date, UploadSSHCredentials cred)
+			throws IOException, JSchException {
 		log.info("Uploading file " + f.getName() + " " + size + " MB " + date + " of " + description);
 		// Upload to ftp
 		JSch jSch = new JSch();
@@ -760,17 +1018,17 @@ public class IndexUploader {
 		if (cred.password != null) {
 			session.setPassword(cred.password);
 		}
-		if(!knownHosts) {
-			java.util.Properties config = new java.util.Properties(); 
+		if (!knownHosts) {
+			java.util.Properties config = new java.util.Properties();
 			config.put("StrictHostKeyChecking", "no");
 			session.setConfig(config);
 		}
-		String rfile = cred.path + "/"+ f.getName();
+		String rfile = cred.path + "/" + f.getName();
 		String lfile = f.getAbsolutePath();
 		session.connect();
 
 		// exec 'scp -t rfile' remotely
-		String command = "scp -p -t \"" + rfile+"\"";
+		String command = "scp -p -t \"" + rfile + "\"";
 		Channel channel = session.openChannel("exec");
 		((ChannelExec) channel).setCommand(command);
 

@@ -1,8 +1,11 @@
 package net.osmand.data.preparation;
 
 
+import gnu.trove.iterator.TIntObjectIterator;
 import gnu.trove.list.array.TByteArrayList;
 import gnu.trove.list.array.TIntArrayList;
+import gnu.trove.map.TIntObjectMap;
+import gnu.trove.map.hash.TIntObjectHashMap;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -26,6 +29,8 @@ import java.util.zip.GZIPOutputStream;
 
 import net.osmand.IndexConstants;
 import net.osmand.binary.BinaryMapIndexReader;
+import net.osmand.binary.BinaryMapIndexReader.MapIndex;
+import net.osmand.binary.BinaryMapIndexReader.TagValuePair;
 import net.osmand.binary.OsmandOdb;
 import net.osmand.binary.OsmandOdb.AddressNameIndexDataAtom;
 import net.osmand.binary.OsmandOdb.CityBlockIndex;
@@ -67,7 +72,6 @@ import net.osmand.data.TransportStop;
 import net.osmand.data.preparation.IndexPoiCreator.PoiAdditionalType;
 import net.osmand.data.preparation.IndexPoiCreator.PoiCreatorCategories;
 import net.osmand.data.preparation.IndexPoiCreator.PoiTileBox;
-import net.osmand.osm.MapRenderingTypes;
 import net.osmand.osm.MapRenderingTypes.MapRulType;
 import net.osmand.osm.MapRoutingTypes.MapPointName;
 import net.osmand.osm.MapRoutingTypes.MapRouteType;
@@ -160,6 +164,13 @@ public class BinaryMapIndexWriter {
 		});
 		codedOutStream.writeUInt32(OsmandOdb.OsmAndStructure.VERSION_FIELD_NUMBER, IndexConstants.BINARY_MAP_VERSION);
 		codedOutStream.writeInt64(OsmandOdb.OsmAndStructure.DATECREATED_FIELD_NUMBER, timestamp);
+		state.push(OSMAND_STRUCTURE_INIT);
+	}
+	
+	
+	public BinaryMapIndexWriter(final RandomAccessFile raf, CodedOutputStream cos) throws IOException {
+		this.raf = raf;
+		codedOutStream = cos;
 		state.push(OSMAND_STRUCTURE_INIT);
 	}
 
@@ -273,6 +284,23 @@ public class BinaryMapIndexWriter {
 		stackBounds.pop();
 		int len = writeInt32Size();
 		log.info("MAP level SIZE : " + len);
+	}
+	
+	public void writeMapEncodingRules(BinaryMapIndexReader reader, MapIndex part) throws IOException {
+		for(int i = 1; i <= part.decodingRules.size(); i++) {
+			TagValuePair value = part.decodingRules.get(i);
+			MapEncodingRule.Builder builder = OsmandOdb.OsmAndMapIndex.MapEncodingRule.newBuilder();
+			if(value == null) {
+				break;
+			}
+			builder.setTag(value.tag);
+			if (value.value != null) {
+				builder.setValue(value.value);
+			}
+			builder.setType(value.additionalAttribute);
+			MapEncodingRule rulet = builder.build();
+			codedOutStream.writeMessage(OsmandOdb.OsmAndMapIndex.RULES_FIELD_NUMBER, rulet);
+		}
 	}
 
 	public void writeMapEncodingRules(Map<String, MapRulType> types) throws IOException {
@@ -612,7 +640,7 @@ public class BinaryMapIndexWriter {
 	private TByteArrayList typesAddDataBuf = new TByteArrayList();
 
 	public MapData writeMapData(long diffId, int pleft, int ptop, boolean area, byte[] coordinates, byte[] innerPolygonTypes, int[] typeUse,
-			int[] addtypeUse, Map<MapRulType, String> names, Map<String, Integer> stringTable, MapDataBlock.Builder dataBlock,
+			int[] addtypeUse, Map<MapRulType, String> names, TIntObjectHashMap<String> namesDiff, Map<String, Integer> stringTable, MapDataBlock.Builder dataBlock,
 			boolean allowCoordinateSimplification)
 			throws IOException {
 		MapData.Builder data = MapData.newBuilder();
@@ -700,6 +728,19 @@ public class BinaryMapIndexWriter {
 				if (ls == null) {
 					ls = stringTable.size();
 					stringTable.put(s.getValue(), ls);
+				}
+				writeRawVarint32(mapDataBuf, ls);
+			}
+		}
+		if (namesDiff != null) {
+			TIntObjectIterator<String> it = namesDiff.iterator();
+			while(it.hasNext()) {
+				it.advance();
+				writeRawVarint32(mapDataBuf, it.key());
+				Integer ls = stringTable.get(it.value());
+				if (ls == null) {
+					ls = stringTable.size();
+					stringTable.put(it.value(), ls);
 				}
 				writeRawVarint32(mapDataBuf, ls);
 			}
