@@ -668,16 +668,22 @@ public class IndexUploader {
 				return true;
 			}
 		}
-		if(obj.getPointsLength() == 1) {
+		boolean point = obj.getPointsLength() == 1;
 			for(int i = 0; i < obj.getTypes().length; i++) {
 				TagValuePair tv = obj.getMapIndex().decodeType(obj.getTypes()[i]);
-				if(tv.tag.equals("place")) {
+				if(tv.tag.equals("waterway") ) {
 					return true;
-				} else if(tv.tag.equals("highway")) {
+				}
+				if(tv.tag.equals("place") && point) {
+					return true;
+				} else if(tv.tag.equals("highway") && point) {
+					return true;
+				} else if(tv.tag.equals("crossing") && point) {
+					return true;
+				} else if(tv.tag.equals("public_transport") && point) {
 					return true;
 				}
 			}
-		}
 		return false;
 	}
 
