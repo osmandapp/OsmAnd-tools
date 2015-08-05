@@ -121,6 +121,8 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		EntityConvert ec = new EntityConvert();
 		parseConvertCol(parser, ec.ifTags, "if_");
 		parseConvertCol(parser, ec.ifNotTags, "if_not_");
+		parseConvertCol(parser, ec.ifTagsNotLess, "if_not_less_");
+		parseConvertCol(parser, ec.ifTagsLess, "if_less_");
 		ec.type = EntityConvertType.valueOf(parser.getAttributeValue("", "pattern" ).toUpperCase()); //$NON-NLS-1$
 		ec.applyToType = EnumSet.allOf(EntityConvertApplyType.class);
 		if("no".equals(parser.getAttributeValue("", "routing" ))) {
@@ -393,6 +395,22 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		for(TagValuePattern ift : ec.ifNotTags) {
 			String val = tags.get(ift.tag);
 			if(checkConvertValue(ift, val)) {
+				return false;
+			}
+		}
+		for(TagValuePattern ift : ec.ifTagsNotLess) {
+			String val = tags.get(ift.tag);
+			double nt = Double.parseDouble(ift.value);
+			long vl = Algorithms.parseLongSilently(val, 0);
+			if(vl < nt) {
+				return false;
+			}
+		}
+		for(TagValuePattern ift : ec.ifTagsLess) {
+			String val = tags.get(ift.tag);
+			double nt = Double.parseDouble(ift.value);
+			long vl = Algorithms.parseLongSilently(val, 0);
+			if(vl >= nt) {
 				return false;
 			}
 		}
@@ -773,6 +791,8 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		public EnumSet<EntityConvertApplyType> applyToType;
 		public EnumSet<EntityType> applyTo ;
 		public List<TagValuePattern> ifTags = new ArrayList<MapRenderingTypes.TagValuePattern>();
+		public List<TagValuePattern> ifTagsLess = new ArrayList<MapRenderingTypes.TagValuePattern>();
+		public List<TagValuePattern> ifTagsNotLess = new ArrayList<MapRenderingTypes.TagValuePattern>();
 		public List<TagValuePattern> ifNotTags = new ArrayList<MapRenderingTypes.TagValuePattern>();
 		public List<TagValuePattern> toTags = new ArrayList<MapRenderingTypes.TagValuePattern>();
 	}
