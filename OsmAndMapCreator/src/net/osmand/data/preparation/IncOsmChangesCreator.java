@@ -341,7 +341,7 @@ public class IncOsmChangesCreator {
 		
 		int currentOsc = 0;
 		int currentOscInd = 1;
-		File osc = new File(pbfFile.getParentFile(), pbfFile.getName() +"."+currentOscInd++ + ".osc.gz");
+		File osc = new File(pbfFile.getParentFile(), pbfFile.getName() +"."+currentOscInd++ + ".osc");
 		additionalOsc.add(osc);
 		List<File> currentList = new ArrayList<File>();
 		for (File f : oscFiles) {
@@ -353,7 +353,7 @@ public class IncOsmChangesCreator {
 				// start over
 				currentOsc = 0;
 				currentList.clear();
-				osc = new File(pbfFile.getParentFile(), pbfFile.getName() + "." + currentOscInd++ + ".osc.gz");
+				osc = new File(pbfFile.getParentFile(), pbfFile.getName() + "." + currentOscInd++ + ".osc");
 				additionalOsc.add(osc);
 			}
 		}
