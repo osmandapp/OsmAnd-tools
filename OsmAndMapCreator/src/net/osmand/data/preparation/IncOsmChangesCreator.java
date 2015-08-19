@@ -57,9 +57,8 @@ import org.apache.commons.logging.LogFactory;
 public class IncOsmChangesCreator {
 	private static final Log log = LogFactory.getLog(IncOsmChangesCreator.class);
 	private static final int OSC_FILES_TO_COMBINE_OSMCONVERT = 400;
-//	private static final long INTERVAL_TO_UPDATE_PBF = 1000 * 60 * 60 * 3 / 2;
-	// FIXME
-	private static final long INTERVAL_TO_UPDATE_PBF = 1000 ;
+	private static final long INTERVAL_TO_UPDATE_PBF = 1000 * 60 * 60 * 3 / 2;
+//	private static final long INTERVAL_TO_UPDATE_PBF = 1000 ;
 	private static final long INTERVAL_TO_UPDATE_PBF_GENERIC = 1000 * 60 * 60 * 7;
 	private static final long MB = 1024 * 1024;
 	private static final long LIMIT_TO_LOAD_IN_MEMORY = 200 * MB;
@@ -76,8 +75,7 @@ public class IncOsmChangesCreator {
 			if (reg.map) {
 				File countryFolder = new File(location, reg.getDownloadName());
 				reg.timestampToUpdate = getMinTimestamp(countryFolder, "osc.gz");
-				// FIXME test
-				if(reg.timestampToUpdate == Long.MAX_VALUE || !countryFolder.getName().contains("vladimir")) {
+				if(reg.timestampToUpdate == Long.MAX_VALUE) {
 					System.out.println("Skip " + countryFolder.getName() + " because no changes");
 				} else {
 					rt.add(reg);
