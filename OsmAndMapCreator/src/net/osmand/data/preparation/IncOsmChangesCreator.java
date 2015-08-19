@@ -57,7 +57,9 @@ import org.apache.commons.logging.LogFactory;
 public class IncOsmChangesCreator {
 	private static final Log log = LogFactory.getLog(IncOsmChangesCreator.class);
 	private static final int OSC_FILES_TO_COMBINE_OSMCONVERT = 400;
-	private static final long INTERVAL_TO_UPDATE_PBF = 1000 * 60 * 60 * 3 / 2;
+//	private static final long INTERVAL_TO_UPDATE_PBF = 1000 * 60 * 60 * 3 / 2;
+	// FIXME
+	private static final long INTERVAL_TO_UPDATE_PBF = 1000 ;
 	private static final long INTERVAL_TO_UPDATE_PBF_GENERIC = 1000 * 60 * 60 * 7;
 	private static final long MB = 1024 * 1024;
 	private static final long LIMIT_TO_LOAD_IN_MEMORY = 200 * MB;
@@ -125,7 +127,7 @@ public class IncOsmChangesCreator {
 			if(fromExtract.exists()) {
 				if(fromExtract.lastModified() < getMinTimestamp(pbfFile.getParentFile(), "osc.gz")) {
 					SimpleDateFormat sdf = new SimpleDateFormat();
-					System.err.println("Extract file is older than any osc.gz change available that means that extract file should be updated: " + fromExtract.getName() + 
+					System.err.println("!! Extract file is older than any osc.gz change available that means that extract file should be updated: " + fromExtract.getName() + 
 							" " + sdf.format(new Date(fromExtract.lastModified())) + 
 							" polygon " + sdf.format(new Date(getMinTimestamp(pbfFile.getParentFile(), "osc.gz"))));
 					
