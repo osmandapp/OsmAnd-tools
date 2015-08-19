@@ -74,7 +74,8 @@ public class IncOsmChangesCreator {
 			if (reg.map) {
 				File countryFolder = new File(location, reg.getDownloadName());
 				reg.timestampToUpdate = getMinTimestamp(countryFolder, "osc.gz");
-				if(reg.timestampToUpdate == Long.MAX_VALUE) {
+				// FIXME test
+				if(reg.timestampToUpdate == Long.MAX_VALUE || !countryFolder.getName().contains("vladimir")) {
 					System.out.println("Skip " + countryFolder.getName() + " because no changes");
 				} else {
 					rt.add(reg);
