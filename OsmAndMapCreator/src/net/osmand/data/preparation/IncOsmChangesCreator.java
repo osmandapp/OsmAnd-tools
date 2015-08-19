@@ -337,7 +337,7 @@ public class IncOsmChangesCreator {
 		args.add(pbfFile.getName());
 		args.add("-B=" + polygonFile.getName());
 		args.add("--complex-ways");
-		args.add("--merge-versions");
+//		args.add("--merge-versions"); // doesn't finish in reasonable time
 		
 		int currentOsc = 0;
 		int currentOscInd = 1;
