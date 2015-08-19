@@ -334,6 +334,8 @@ public class IncOsmChangesCreator {
 		args.add(pbfFile.getName());
 		args.add("-B=" + polygonFile.getName());
 		args.add("--complex-ways");
+		args.add("--merge-versions");
+		
 		int currentOsc = 0;
 		int currentOscInd = 1;
 		File osc = new File(pbfFile.getParentFile(), pbfFile.getName() +"."+currentOscInd++ + ".osc.gz");
@@ -353,6 +355,7 @@ public class IncOsmChangesCreator {
 			}
 		}
 		combineOscs(pbfFile.getParentFile(), binaryFolder, polygonFile, osc, currentList);
+		args.add(osc.getName());
 		args.add(osc.getName());
 		args.add("-o=" + outPbf.getName());
 		boolean res = exec(pbfFile.getParentFile(), binaryFolder + "osmconvert", args);
@@ -437,7 +440,9 @@ public class IncOsmChangesCreator {
 		}
 //		args.add("-B=" + polygonFile.getName());
 //		args.add("--complex-ways");
+		args.add("--merge-versions");
 		args.add("-o=" + osc.getName());
+		
 		boolean res = exec(parentFile, binaryFolder + "osmconvert", args);
 		if (!res) {
 			throw new IllegalStateException(osc.getName() + " convert failed");
