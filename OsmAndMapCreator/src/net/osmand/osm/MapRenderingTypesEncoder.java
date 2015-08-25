@@ -540,11 +540,11 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			vl = "red";
 		} else if ((h >= 16 && h < 50 && s > 25 && v > 20 && v < 60) || vl.equals("brown") || vl.equals("darkbrown") || vl.equals("tan/brown") || vl.equals("tan_brown") || vl.equals("brown/tan") || vl.equals("light_brown") || vl.equals("brown/white") || vl.equals("tan")) {
 			vl = palette6 ? "red" : "brown";
-		} else if ((h >= 14 && h < 45 && v > 60) || vl.equals("orange") || vl.equals("cream") || vl.equals("gold") || vl.equals("yellow-red") || vl.equals("ff8c00") || vl.equals("peach")) {
+		} else if ((h >= 14 && h < 42 && v > 60) || vl.equals("orange") || vl.equals("cream") || vl.equals("gold") || vl.equals("yellow-red") || vl.equals("ff8c00") || vl.equals("peach")) {
 			vl = palette6 ? "red" : "orange";
-		} else if ((h >= 46 && h < 73 && s > 30 && v > 80) || vl.equals("yellow") || vl.equals("gelb") || vl.equals("ffff00") || vl.equals("beige") || vl.equals("lightyellow") || vl.equals("jaune")) {
+		} else if ((h >= 42 && h < 73 && s > 30 && v > 80) || vl.equals("yellow") || vl.equals("gelb") || vl.equals("ffff00") || vl.equals("beige") || vl.equals("lightyellow") || vl.equals("jaune")) {
 			vl = "yellow";
-		} else if ((h >= 46 && h < 73 && s > 30 && v > 60 && v < 80)) {
+		} else if ((h >= 42 && h < 73 && s > 30 && v > 60 && v < 80)) {
 			vl = palette6 ? "yellow" : "darkyellow";
 		} else if ((h >= 74 && h < 150 && s > 30 && v > 77) || vl.equals("lightgreen") || vl.equals("lime") || vl.equals("seagreen") || vl.equals("00ff00") || vl.equals("yellow/green")) {
 			vl = palette6 ? "green" : "lightgreen";
