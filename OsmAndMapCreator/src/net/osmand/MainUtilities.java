@@ -14,6 +14,7 @@ import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.util.ResourceDeleter;
 import net.osmand.regions.CountryOcbfGeneration;
+import net.osmand.render.RenderingRulesStorage;
 import net.osmand.render.RenderingRulesStoragePrinter;
 import net.osmand.swing.DataExtractionSettings;
 
@@ -35,8 +36,10 @@ public class MainUtilities {
 				OceanTilesCreator.checkOceanTile(subArgsArray);
 			} else if (utl.equals("generate-ocean-tile-osm")) {
 				OceanTilesCreator.createJOSMFile(subArgsArray);
-			} else if (utl.equals("print-java-style")) {
+			} else if (utl.equals("generate-java-style")) {
 				RenderingRulesStoragePrinter.main(subArgsArray);
+			} else if (utl.equals("explain-rendering-style")) {
+				RenderingRulesStorage.main(subArgsArray);
 			} else if (utl.equals("generate-ocean-tile")) {
 				OceanTilesCreator.createTilesFile(subArgsArray[0], subArgsArray.length > 1 ? args[1] : null);
 			} else if(utl.equals("test-routing")) {
@@ -94,7 +97,8 @@ public class MainUtilities {
 		System.out.println("each utility has own argument list and own synopsys. Here is the list:");
 		System.out.println("\t\t check-ocean-tile <lat> <lon> <zoom=11>: checks ocean or land tile is in bz2 list");
 		System.out.println("\t\t generate-ocean-tile <coastline osm file> <optional output file>: creates ocean tiles 12 zoom");
-		System.out.println("\t\t print-java-style <pathtostyle> <pathtooutputfolder>");
+		System.out.println("\t\t generate-java-style <pathtostyle> <pathtooutputfolder>: prints rendering style as java interpreted code");
+		System.out.println("\t\t explain-rendering-style <pathtostyle>: prints explanation of the style");
 		System.out.println("\t\t test-routing <own list of parameters>: helps to run routing test for specific locations");
 		System.out.println("\t\t generate-ocbf <path to osmand/repos/ repository>: generates regions.ocbf file, this path should contain folders 'misc', 'tools', 'resources'");
 		System.out.println("\t\t delete-unused-strings <path to repos/android/OsmAnd/res>: deletes unused translation in git repository (transforms all strings.xml)");
