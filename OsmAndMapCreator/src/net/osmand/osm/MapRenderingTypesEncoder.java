@@ -70,7 +70,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		Map<MapRulType, String> propogated = new LinkedHashMap<MapRulType, String>();
 		Map<String, String> ts = relation.getTags();
 		ts = transformTags(ts, EntityType.RELATION, EntityConvertApplyType.MAP);
-		processExtraTags(ts);
+		ts = processExtraTags(ts);
 		Iterator<Entry<String, String>> its = ts.entrySet().iterator();
 		while(its.hasNext()) {
 			Entry<String, String> ev = its.next();
@@ -249,7 +249,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		namesToEncode.clear();
 		tags = transformTags(tags, node ? EntityType.NODE : EntityType.WAY, EntityConvertApplyType.MAP);
 		boolean area = "yes".equals(tags.get("area"));
-		processExtraTags(tags);
+		tags = processExtraTags(tags);
 		
 
 		for (String tag : tags.keySet()) {
@@ -614,8 +614,9 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	}
 	
 	
-	private void processExtraTags(Map<String, String> tags) {
+	private Map<String, String> processExtraTags(Map<String, String> tags) {
 		if(tags.containsKey("osmc:symbol")) {
+			tags = new LinkedHashMap<String, String>(tags);
 			// osmc:symbol=black:red:blue_rectangle ->
 			// 1.For backwards compatibility (already done) - osmc_shape=bar, osmc_symbol=black, osmc_symbol_red_blue_name=.
 			// 2.New tags: osmc_waycolor=black, osmc_background=red, osmc_foreground=blue_rectangle, osmc_foreground2,
@@ -634,11 +635,14 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			}
 		}
 		if(tags.containsKey("color")) {
+			tags = new LinkedHashMap<String, String>(tags);
 			prepareColorTag(tags, "color");
 		}
 		if(tags.containsKey("colour")) {
+			tags = new LinkedHashMap<String, String>(tags);
 			prepareColorTag(tags, "colour");
-		}		
+		}
+		return tags;
 	}
 
 
