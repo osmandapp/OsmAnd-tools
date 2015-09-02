@@ -94,7 +94,7 @@ if __name__ == "__main__":
 				   " or tags->'seamark:type' in ('light_major') "
 				   " or tags->'seamark:type' in ('harbour') "
 				   " or tags->'abandoned' in ('yes') "
-				   " or tags->'population' "
+				   " or (tags->'population' is not null and tags->'population' <> ‘’)"
 				   " or aeroway in ('aerodrome', 'airport')", 'points.osm', 
 				   ['name', 'name:en',
 				    'ref', 'ele', 'place','natural', 'seamark:type', 'abandoned', 'aeroway', 'tourism', 'iata', 'icao', 'faa', 'rank'])
