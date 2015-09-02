@@ -45,7 +45,7 @@ def process_points(cond, filename, array):
 		if tag == 'abandoned':
 			tag = 'tags->\'abandoned\' as "abandoned"'
 		if tag == 'rank':
-			tag = 'tags->\'rank\' as "rank"'
+			tag = 'tags->\'population\' as "population"'
 		queryFields += ", " + tag
 
 	for nm in names:
@@ -94,10 +94,7 @@ if __name__ == "__main__":
 				   " or tags->'seamark:type' in ('light_major') "
 				   " or tags->'seamark:type' in ('harbour') "
 				   " or tags->'abandoned' in ('yes') "
-				   " or tags->'rank' in ('0') "
-				   " or tags->'rank' in ('10') "
-				   " or tags->'rank' in ('20') "
-				   " or tags->'rank' in ('30') "
+				   " or tags->'population' "
 				   " or aeroway in ('aerodrome', 'airport')", 'points.osm', 
 				   ['name', 'name:en',
 				    'ref', 'ele', 'place','natural', 'seamark:type', 'abandoned', 'aeroway', 'tourism', 'iata', 'icao', 'faa', 'rank'])
