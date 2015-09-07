@@ -562,8 +562,10 @@ public class IndexUploader {
 		boolean first = true;
 		for (MapRoot r : rts) {
 			final TLongObjectHashMap<BinaryMapDataObject> objects = new TLongObjectHashMap<BinaryMapDataObject>();
-			File nonpackRtree = new File(roadOnlyFile.getParentFile(), "nonpack"+r.getMinZoom()+".rtree");
-			File  packRtree = new File(roadOnlyFile.getParentFile(), "pack"+r.getMinZoom()+".rtree");
+			File nonpackRtree = new File(roadOnlyFile.getParentFile(), "nonpack" + r.getMinZoom() + "."
+					+ roadOnlyFile.getName() + ".rtree");
+			File packRtree = new File(roadOnlyFile.getParentFile(), "pack" + r.getMinZoom() + "."
+					+ roadOnlyFile.getName() + ".rtree");
 			RTree rtree = null;
 			try {
 				rtree = new RTree(nonpackRtree.getAbsolutePath());
