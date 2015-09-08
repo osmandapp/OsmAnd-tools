@@ -95,5 +95,5 @@ if __name__ == "__main__":
 				   " or (tags->'population' <> '')"
 				   " or aeroway in ('aerodrome', 'airport')", 'points.osm', 
 				   ['name', 'name:en',
-				    'ref', 'ele', 'place','natural', 'seamark:type', 'abandoned', 'aeroway', 'tourism', 'iata', 'icao', 'faa', 'rank'])
+				    'ref', 'ele', 'place','natural', 'seamark:type', 'abandoned', 'aeroway', 'tourism', 'iata', 'icao', 'faa'])
 	process_points("place in ('city','town') ", 'cities.osm', ['name', 'name:en', 'place', 'capital', 'population'])
