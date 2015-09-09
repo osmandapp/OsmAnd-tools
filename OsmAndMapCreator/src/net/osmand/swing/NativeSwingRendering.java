@@ -325,7 +325,7 @@ public class NativeSwingRendering extends NativeLibrary {
 		if (loaded) {
 			defaultLoadedLibrary = new NativeSwingRendering();
 			defaultLoadedLibrary.initFilesInDir(new File(DataExtractionSettings.getSettings().getBinaryFilesDir()));
-			loadFontData("fonts");
+			defaultLoadedLibrary.loadFontData(new File("fonts"));
 		}
 		return defaultLoadedLibrary;
 	}

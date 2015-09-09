@@ -160,7 +160,8 @@ public class OsmAndImageRendering {
 		String backup = null;
 		if (nativeLib != null) {
 			boolean old = NativeLibrary.loadOldLib(nativeLib);
-			NativeLibrary.loadFontData("fonts");
+			NativeLibrary nl = new NativeLibrary();
+			nl.loadFontData(new File("fonts"));
 			if (!old) {
 				throw new UnsupportedOperationException("Not supported");
 			}
