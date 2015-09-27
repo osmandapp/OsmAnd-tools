@@ -386,14 +386,14 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		}
 		boolean empty = ec.ifRegionName.isEmpty();
 		if (!empty) {
-			empty = true;
+			boolean found = false;
 			for (String s : ec.ifRegionName) {
 				if (regionName.contains(s)) {
-					empty = false;
+					found = true;
 					break;
 				}
 			}
-			if (empty) {
+			if (!found) {
 				return false;
 			}
 		}
