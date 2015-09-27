@@ -391,6 +391,7 @@ public class CountryOcbfGeneration {
 				writeWay(serializer, boundaryPoints.get(i));
 				addTag(serializer, "osmand_region", "boundary");
 				addTag(serializer, "key_name", r.name);
+				addTag(serializer, "download_name", r.getDownloadName());
 				addTag(serializer, "region_full_name", r.getFullName());
 				serializer.endTag(null, "way");
 			}
