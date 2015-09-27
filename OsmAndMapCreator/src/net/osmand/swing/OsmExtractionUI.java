@@ -532,11 +532,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 						creator.setCityAdminLevel(DataExtractionSettings.getSettings().getCityAdminLevel());
 						String fn = DataExtractionSettings.getSettings().getMapRenderingTypesFile();
 						MapRenderingTypesEncoder types;
-						if(fn == null || fn.length() == 0){
-							types = MapRenderingTypesEncoder.getDefault();
-						} else {
-							types = new MapRenderingTypesEncoder(fn);
-						}
+						types = new MapRenderingTypesEncoder(fn, f.getName());
 						RTree.clearCache();
 						int smoothness = 0;
 						try {

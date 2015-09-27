@@ -81,12 +81,8 @@ public class MainUtilities {
 	private static void generateObf(String[] subArgsArray, IndexCreator ic) throws IOException, 
 			SQLException, InterruptedException, XmlPullParserException {
 		String fn = DataExtractionSettings.getSettings().getMapRenderingTypesFile();
-		MapRenderingTypesEncoder types;
-		if(fn == null || fn.length() == 0){
-			types = MapRenderingTypesEncoder.getDefault();
-		} else {
-			types = new MapRenderingTypesEncoder(fn);
-		}
+		String regionName = subArgsArray[0];
+		MapRenderingTypesEncoder types = new MapRenderingTypesEncoder(fn, regionName);
 		ic.generateIndexes(new File(subArgsArray[0]),
 				new ConsoleProgressImplementation(), null, MapZooms.getDefault(), types,
 				log);

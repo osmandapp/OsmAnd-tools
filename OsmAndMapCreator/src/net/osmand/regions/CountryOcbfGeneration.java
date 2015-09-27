@@ -346,7 +346,8 @@ public class CountryOcbfGeneration {
 		creator.setIndexRouting(false);
 		MapZooms zooms = MapZooms.parseZooms("5-6");
 		creator.generateIndexes(osm,
-				new ConsoleProgressImplementation(1), null, zooms, MapRenderingTypesEncoder.getDefault(), log);
+				new ConsoleProgressImplementation(1), null, zooms, 
+				new MapRenderingTypesEncoder("regions"), log);
 
 		
 	}

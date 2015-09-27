@@ -84,7 +84,6 @@ public class IndexBatchCreator {
 	File skipExistingIndexes;
 	MapZooms mapZooms = null;
 	Integer zoomWaySmoothness = null; 
-	MapRenderingTypesEncoder types = MapRenderingTypesEncoder.getDefault();
 	
 	File osmDirFiles;
 	File indexDirFiles;
@@ -100,6 +99,8 @@ public class IndexBatchCreator {
 
 	private DBDialect osmDbDialect;
 	private DBDialect mapDBDialect;
+
+	private String renderingTypesFile;
 	
 	public static void main(String[] args) {
 		IndexBatchCreator creator = new IndexBatchCreator();
@@ -278,12 +279,7 @@ public class IndexBatchCreator {
 		if(szoomWaySmoothness != null && !szoomWaySmoothness.isEmpty()){
 			zoomWaySmoothness = Integer.parseInt(szoomWaySmoothness);
 		}
-		String f = process.getAttribute("renderingTypesFile");
-		if(f == null || f.length() == 0){
-			types = MapRenderingTypesEncoder.getDefault();
-		} else {
-			types = new MapRenderingTypesEncoder(f);
-		}
+		renderingTypesFile = process.getAttribute("renderingTypesFile");
 		
 		String osmDbDialect = process.getAttribute("osmDbDialect");
 		if(osmDbDialect != null && osmDbDialect.length() > 0){
@@ -549,7 +545,8 @@ public class IndexBatchCreator {
 					LogManager.getLogManager().getLogger("").addHandler(fh);
 				}
 				try {
-					indexCreator.generateIndexes(f, new ConsoleProgressImplementation(1), null, mapZooms, types, warningsAboutMapData);
+					indexCreator.generateIndexes(f, new ConsoleProgressImplementation(1), null, mapZooms,
+							new MapRenderingTypesEncoder(renderingTypesFile, f.getName()), warningsAboutMapData);
 				} finally {
 					if (fh != null) {
 						fh.close();

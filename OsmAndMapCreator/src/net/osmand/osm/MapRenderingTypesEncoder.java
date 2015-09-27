@@ -30,19 +30,17 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	private List<MapRouteTag> routeTags = new ArrayList<MapRouteTag>();
 	private Map<String, List<EntityConvert>> convertTags = new HashMap<String, List<EntityConvert>>();
 	private MapRulType coastlineRuleType;
+	private String regionName;
 	
 	
-	public MapRenderingTypesEncoder(String fileName) {
-		super(fileName);
+	public MapRenderingTypesEncoder(String fileName, String regionName) {
+		super(fileName != null && fileName.length() == 0 ? null : fileName);
+		this.regionName = regionName.toLowerCase();
 	}
 	
-	private static MapRenderingTypesEncoder DEFAULT_INSTANCE = null;
-	
-	public static MapRenderingTypesEncoder getDefault() {
-		if(DEFAULT_INSTANCE == null){
-			DEFAULT_INSTANCE = new MapRenderingTypesEncoder(null);
-		}
-		return DEFAULT_INSTANCE;
+	public MapRenderingTypesEncoder(String regionName) {
+		super(null);
+		this.regionName = regionName.toLowerCase();
 	}
 	
 	
@@ -119,6 +117,10 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	@Override
 	protected void parseEntityConvertXML(XmlPullParser parser) {
 		EntityConvert ec = new EntityConvert();
+		String tg = parser.getAttributeValue("", "if_region_name"); //$NON-NLS-1$
+		if(tg != null) {
+			ec.ifRegionName.addAll(Arrays.asList(tg.split("\\,")));
+		}
 		parseConvertCol(parser, ec.ifTags, "if_");
 		parseConvertCol(parser, ec.ifNotTags, "if_not_");
 		parseConvertCol(parser, ec.ifTagsNotLess, "if_not_less_");
@@ -135,7 +137,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			ec.applyToType.remove(EntityConvertApplyType.POI);
 		}
 		parseConvertCol(parser, ec.toTags, "to_");
-		String tg = parser.getAttributeValue("", "from_tag" ); //$NON-NLS-1$
+		tg = parser.getAttributeValue("", "from_tag" ); //$NON-NLS-1$
 		String value = parser.getAttributeValue("", "from_value"); //$NON-NLS-1$
 		if (tg != null) {
 			ec.fromTag = new TagValuePattern(tg, "".equals(value) ? null : value);
@@ -376,16 +378,26 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	}
 	
 	
-	
-
-
-
 	protected boolean checkConvert(Map<String, String> tags, EntityConvert ec, EntityType entity) {
 		if(ec.applyTo != null) {
 			if(!ec.applyTo.contains(entity)) {
 				return false;
 			}
 		}
+		boolean empty = ec.ifRegionName.isEmpty();
+		if (!empty) {
+			empty = true;
+			for (String s : ec.ifRegionName) {
+				if (regionName.contains(s)) {
+					empty = false;
+					break;
+				}
+			}
+			if (empty) {
+				return false;
+			}
+		}
+		
 		for(TagValuePattern ift : ec.ifTags) {
 			String val = tags.get(ift.tag);
 			if(!checkConvertValue(ift, val)) {
@@ -744,6 +756,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		public EntityConvertType type;
 		public EnumSet<EntityConvertApplyType> applyToType;
 		public EnumSet<EntityType> applyTo ;
+		public List<String> ifRegionName = new ArrayList<String>();
 		public List<TagValuePattern> ifTags = new ArrayList<MapRenderingTypes.TagValuePattern>();
 		public List<TagValuePattern> ifTagsLess = new ArrayList<MapRenderingTypes.TagValuePattern>();
 		public List<TagValuePattern> ifTagsNotLess = new ArrayList<MapRenderingTypes.TagValuePattern>();

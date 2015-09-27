@@ -35,7 +35,8 @@ public class CoastlinesLayer implements MapPanelLayer {
 	@Override
 	public void initLayer(MapPanel map) {
 		this.map = map;
-		basemapProcessor = new BasemapProcessor(null, MapZooms.getDefault(), MapRenderingTypesEncoder.getDefault(), 0);
+		basemapProcessor = new BasemapProcessor(null, MapZooms.getDefault(), 
+				new MapRenderingTypesEncoder("basemap"), 0);
 		fillPopupMenuWithActions(map.getPopupMenu());
 	}
 	

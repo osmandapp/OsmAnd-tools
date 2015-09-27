@@ -425,7 +425,7 @@ public class IndexCreator {
 			logMapDataWarn = log;
 		}
 		if (renderingTypes == null) {
-			renderingTypes = MapRenderingTypesEncoder.getDefault();
+			renderingTypes = new MapRenderingTypesEncoder("basemap");
 		}
 		if (mapZooms == null) {
 			mapZooms = MapZooms.getDefault();
@@ -527,9 +527,7 @@ public class IndexCreator {
 			logMapDataWarn = log ;
 		}
 		
-		if (renderingTypes == null) {
-			renderingTypes = MapRenderingTypesEncoder.getDefault();
-		}
+		
 		if (mapZooms == null) {
 			mapZooms = MapZooms.getDefault();
 		}
@@ -540,6 +538,9 @@ public class IndexCreator {
 			if (i > -1) {
 				regionName = Algorithms.capitalizeFirstLetterAndLowercase(readFile[0].getName().substring(0, i));
 			}
+		}
+		if (renderingTypes == null) {
+			renderingTypes = new MapRenderingTypesEncoder(null, regionName);
 		}
 		this.indexTransportCreator = new IndexTransportCreator();
 		this.indexPoiCreator = new IndexPoiCreator(renderingTypes);
@@ -864,8 +865,7 @@ public class IndexCreator {
 		creator.deleteOsmDB = false;
 				
 		creator.setZoomWaySmothness(2);
-		MapRenderingTypesEncoder rt = //MapRenderingTypesEncoder.getDefault();
-				new MapRenderingTypesEncoder(rootFolder + "/repos//resources/obf_creation/rendering_types.xml");
+		
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 
 		String file = rootFolder + "/temp/map.osm";
@@ -874,6 +874,9 @@ public class IndexCreator {
 		int st = file.lastIndexOf('/');
 		int e = file.indexOf('.', st);
 		creator.setNodesDBFile(new File(rootFolder + "/osm-gen/"+file.substring(st, e) + ".tmp.odb"));
+		MapRenderingTypesEncoder rt = 
+				new MapRenderingTypesEncoder(rootFolder + "/repos//resources/obf_creation/rendering_types.xml", 
+						file);
 		creator.generateIndexes(new File(file),
 				new ConsoleProgressImplementation(1), null, zooms, rt, log);
 		
@@ -890,7 +893,7 @@ public class IndexCreator {
 	
 
 	public static void generateRegionsFile() throws IOException, SQLException, InterruptedException, XmlPullParserException {
-		MapRenderingTypesEncoder rt = MapRenderingTypesEncoder.getDefault();
+		MapRenderingTypesEncoder rt = new MapRenderingTypesEncoder("regions");
 		String file = "/home/victor/projects/osmand/repo/resources/osmand_regions.osm";
 		String folder = "/home/victor/projects/osmand/repo/resources/countries-info/";
 		IndexCreator creator = new IndexCreator(new File(folder)); //$NON-NLS-1$

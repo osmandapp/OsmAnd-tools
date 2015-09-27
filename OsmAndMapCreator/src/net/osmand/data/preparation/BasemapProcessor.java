@@ -692,7 +692,7 @@ public class BasemapProcessor {
 		} else {
 			boolean mini = false;
 			long time = System.currentTimeMillis();
-			MapRenderingTypesEncoder rt = MapRenderingTypesEncoder.getDefault();
+			MapRenderingTypesEncoder rt = new MapRenderingTypesEncoder("basemap");
 			// BASEMAP generation
 			File folder = new File(p[0]);
 			if (p.length >= 2 && p[1].equals("mini")) {

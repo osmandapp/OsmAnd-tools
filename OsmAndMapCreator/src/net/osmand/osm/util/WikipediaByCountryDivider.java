@@ -416,7 +416,8 @@ public class WikipediaByCountryDivider {
 		creator.setIndexRouting(false);
 		creator.setMapFileName(obf.getName());
 		creator.generateIndexes(osmBz2,
-				new ConsoleProgressImplementation(1), null, MapZooms.getDefault(), MapRenderingTypesEncoder.getDefault(), log);
+				new ConsoleProgressImplementation(1), null, MapZooms.getDefault(), 
+				new MapRenderingTypesEncoder(obf.getName()), log);
 
 		
 	}
