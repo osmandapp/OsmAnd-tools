@@ -35,12 +35,12 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	
 	public MapRenderingTypesEncoder(String fileName, String regionName) {
 		super(fileName != null && fileName.length() == 0 ? null : fileName);
-		this.regionName = regionName.toLowerCase();
+		this.regionName = "$" + regionName.toLowerCase();
 	}
 	
 	public MapRenderingTypesEncoder(String regionName) {
 		super(null);
-		this.regionName = regionName.toLowerCase();
+		this.regionName = "$" + regionName.toLowerCase();
 	}
 	
 	
