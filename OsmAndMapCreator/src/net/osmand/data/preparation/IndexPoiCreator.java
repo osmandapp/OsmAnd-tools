@@ -10,7 +10,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -37,7 +36,6 @@ import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.EntityParser;
-import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.osm.edit.Relation;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
@@ -208,7 +206,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		}
 		StringBuilder b = new StringBuilder();
 		for (Map.Entry<String, String> e : tempNames.entrySet()) {
-			boolean text = true;
+			boolean text ;
 			if(USE_POI_TYPES_TO_PARSE) {
 				text = poiTypes.isTextAdditionalInfo(e.getKey(), e.getValue()) ;
 			} else {
