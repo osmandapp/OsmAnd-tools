@@ -21,6 +21,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -91,7 +92,28 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 	TIntArrayList outTypes = new TIntArrayList();
 	TLongObjectHashMap<TIntArrayList> pointTypes = new TLongObjectHashMap<TIntArrayList>();
 	TLongObjectHashMap<TIntObjectHashMap<String> >  pointNames = new TLongObjectHashMap<TIntObjectHashMap<String> > ();
-	Map<MapRoutingTypes.MapRouteType, String> names = new HashMap<MapRoutingTypes.MapRouteType, String>();
+	Map<MapRoutingTypes.MapRouteType, String> names = createTreeMap();
+	
+	static TreeMap<MapRoutingTypes.MapRouteType, String> createTreeMap() {
+		return new TreeMap<MapRoutingTypes.MapRouteType, String>(new Comparator<MapRoutingTypes.MapRouteType>() {
+
+			@Override
+			public int compare(MapRouteType o1, MapRouteType o2) {
+				int x = value(o1);
+				int y = value(o2);
+				return (x < y) ? -1 : ((x == y) ? 0 : 1);
+			}
+
+			private int value(MapRouteType o1) {
+				if(o1.getTag().endsWith(":en")) {
+					return 1;
+				} else if(o1.getTag().contains(":")) {
+					return 2;
+				}
+				return 0;
+			}
+		});
+	}
 
 	private TLongHashSet genSpeedCameras = new TLongHashSet();
 	
@@ -1154,7 +1176,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		PreparedStatement selectData ;
 		TLongObjectHashMap<BinaryFileReference> treeHeader;
 		Map<String, Integer> tempStringTable = new LinkedHashMap<String, Integer>();
-		Map<MapRouteType, String> tempNames = new LinkedHashMap<MapRoutingTypes.MapRouteType, String>();
+		Map<MapRouteType, String> tempNames = createTreeMap();
 		List<MapPointName> tempPointNames = new ArrayList<MapRoutingTypes.MapPointName>();
 		TLongArrayList wayMapIds = new TLongArrayList();
 		TLongArrayList pointMapIds = new TLongArrayList();

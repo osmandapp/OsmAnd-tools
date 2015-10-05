@@ -574,17 +574,15 @@ public class BinaryMapIndexWriter {
 
 		if (pointNames.size() > 0) {
 			mapDataBuf.clear();
-			if (names != null) {
-				for(MapPointName p : pointNames){
-					writeRawVarint32(mapDataBuf, p.pointIndex);
-					writeRawVarint32(mapDataBuf, p.nameTypeTargetId);
-					Integer ls = stringTable.get(p.name);
-					if (ls == null) {
-						ls = stringTable.size();
-						stringTable.put(p.name, ls);
-					}
-					writeRawVarint32(mapDataBuf, ls);
+			for (MapPointName p : pointNames) {
+				writeRawVarint32(mapDataBuf, p.pointIndex);
+				writeRawVarint32(mapDataBuf, p.nameTypeTargetId);
+				Integer ls = stringTable.get(p.name);
+				if (ls == null) {
+					ls = stringTable.size();
+					stringTable.put(p.name, ls);
 				}
+				writeRawVarint32(mapDataBuf, ls);
 			}
 			ROUTE_STRING_DATA_SIZE += mapDataBuf.size();
 			builder.setPointNames(ByteString.copyFrom(mapDataBuf.toArray()));
@@ -592,16 +590,14 @@ public class BinaryMapIndexWriter {
 		
 		if (names.size() > 0) {
 			mapDataBuf.clear();
-			if (names != null) {
-				for (Entry<MapRouteType, String> s : names.entrySet()) {
-					writeRawVarint32(mapDataBuf, s.getKey().getTargetId());
-					Integer ls = stringTable.get(s.getValue());
-					if (ls == null) {
-						ls = stringTable.size();
-						stringTable.put(s.getValue(), ls);
-					}
-					writeRawVarint32(mapDataBuf, ls);
+			for (Entry<MapRouteType, String> s : names.entrySet()) {
+				writeRawVarint32(mapDataBuf, s.getKey().getTargetId());
+				Integer ls = stringTable.get(s.getValue());
+				if (ls == null) {
+					ls = stringTable.size();
+					stringTable.put(s.getValue(), ls);
 				}
+				writeRawVarint32(mapDataBuf, ls);
 			}
 			ROUTE_STRING_DATA_SIZE += mapDataBuf.size();
 			builder.setStringNames(ByteString.copyFrom(mapDataBuf.toArray()));
