@@ -93,8 +93,7 @@ if __name__ == "__main__":
 				   " or tags->'seamark:type' in ('harbour') "
 				   " or tags->'abandoned' in ('yes') "
 				   " or (tags->'population' <> '')"
-				   " or (tags->'website' <> '')"
 				   " or aeroway in ('aerodrome', 'airport')", 'points.osm', 
 				   ['name', 'name:en',
-				    'ref', 'ele', 'place','natural', 'seamark:type', 'abandoned', 'aeroway', 'tourism', 'iata', 'icao', 'faa', 'population', 'website'])
-	process_points("place in ('city','town') ", 'cities.osm', ['name', 'name:en', 'place', 'capital', 'population', 'website'])
+				    'ref', 'ele', 'place','natural', 'seamark:type', 'abandoned', 'aeroway', 'tourism', 'iata', 'icao', 'faa', 'population'])
+	process_points("place in ('city','town') ", 'cities.osm', ['name', 'name:en', 'place', 'capital', 'population'])
