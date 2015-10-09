@@ -600,6 +600,9 @@ public class IndexIdByBbox {
 	
 	protected File[] getSortedFiles(File dir){
 		File[] listFiles = dir.listFiles();
+		if(listFiles == null) {
+			listFiles = new File[0];
+		}
 		Arrays.sort(listFiles, new Comparator<File>(){
 			@Override
 			public int compare(File o1, File o2) {
