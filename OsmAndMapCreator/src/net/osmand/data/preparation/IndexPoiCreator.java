@@ -157,7 +157,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				}
 				Map<String, String> mp = propogatedTags.get(id);
 				while(it.hasNext()) {
-					mp.put(it.next().getKey().getTag(), it.next().getValue());
+					Entry<MapRulType, String> entry = it.next();
+					mp.put(entry.getKey().getTag(), entry.getValue());
 				}
 			}
 		}
