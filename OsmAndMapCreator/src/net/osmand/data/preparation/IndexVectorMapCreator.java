@@ -35,6 +35,7 @@ import net.osmand.data.Multipolygon;
 import net.osmand.data.MultipolygonBuilder;
 import net.osmand.data.Ring;
 import net.osmand.data.preparation.MapZooms.MapZoomPair;
+import net.osmand.osm.MapRenderingTypes;
 import net.osmand.osm.MapRenderingTypes.MapRulType;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.edit.Entity;
@@ -111,6 +112,10 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 
 	public void indexMapRelationsAndMultiPolygons(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 		indexMultiPolygon(e, ctx);
+		addPropogatedTags(propogatedTags, renderingTypes, e, ctx);
+	}
+
+	public static void addPropogatedTags(Map<EntityId, Map<String, String>> propogatedTags, MapRenderingTypesEncoder renderingTypes, Entity e, OsmDbAccessorContext ctx) throws SQLException {
 		if(e instanceof Relation) {
 			Map<MapRulType, String> propogated = renderingTypes.getRelationPropogatedTags(((Relation)e));
 			if(propogated != null && propogated.size() > 0) {
@@ -136,7 +141,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		}
 	}
 
-	private String sortAndAttachUniqueValue(String list, String value) {
+	private static String sortAndAttachUniqueValue(String list, String value) {
 		String[] ls = list.split(SPLIT_VALUE);
 		Set<String> set = new TreeSet<String>(new Comparator<String>() {
 

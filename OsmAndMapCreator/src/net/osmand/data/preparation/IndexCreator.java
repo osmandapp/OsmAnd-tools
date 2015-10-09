@@ -868,8 +868,8 @@ public class IndexCreator {
 		
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 
-		String file = rootFolder + "/temp/map.osm";
-//		String file = rootFolder + "/repos/resources/synthetic_test_rendering.osm";
+//		String file = rootFolder + "/temp/map.osm";
+		String file = rootFolder + "/repos/resources/synthetic_test_rendering.osm";
 
 		int st = file.lastIndexOf('/');
 		int e = file.indexOf('.', st);

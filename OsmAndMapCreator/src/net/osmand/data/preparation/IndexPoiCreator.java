@@ -130,6 +130,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	}
 	
 	public void iterateRelation(Relation e, OsmDbAccessorContext ctx) throws SQLException {
+		
 		Map<String, String> tags = renderingTypes.transformTags(e.getTags(), EntityType.RELATION, EntityConvertApplyType.POI);
 		for (String t : tags.keySet()) {
 			boolean index = false;
@@ -148,20 +149,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				}
 			}
 		}
-		Map<MapRulType, String> propogated = renderingTypes.getRelationPropogatedTags(e);
-		if (propogated != null && propogated.size() > 0) {
-			for (EntityId id : ((Relation) e).getMembersMap().keySet()) {
-				Iterator<Entry<MapRulType, String>> it = propogated.entrySet().iterator();
-				if (!propogatedTags.containsKey(id)) {
-					propogatedTags.put(id, new LinkedHashMap<String, String>());
-				}
-				Map<String, String> mp = propogatedTags.get(id);
-				while(it.hasNext()) {
-					Entry<MapRulType, String> entry = it.next();
-					mp.put(entry.getKey().getTag(), entry.getValue());
-				}
-			}
-		}
+		IndexVectorMapCreator.addPropogatedTags(propogatedTags, renderingTypes, e, ctx);
 	}
 
 	public void commitAndClosePoiFile(Long lastModifiedDate) throws SQLException {
