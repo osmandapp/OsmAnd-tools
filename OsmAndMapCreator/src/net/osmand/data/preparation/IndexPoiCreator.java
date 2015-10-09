@@ -148,6 +148,19 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				}
 			}
 		}
+		Map<MapRulType, String> propogated = renderingTypes.getRelationPropogatedTags(e);
+		if (propogated != null && propogated.size() > 0) {
+			for (EntityId id : ((Relation) e).getMembersMap().keySet()) {
+				Iterator<Entry<MapRulType, String>> it = propogated.entrySet().iterator();
+				if (!propogatedTags.containsKey(id)) {
+					propogatedTags.put(id, new LinkedHashMap<String, String>());
+				}
+				Map<String, String> mp = propogatedTags.get(id);
+				while(it.hasNext()) {
+					mp.put(it.next().getKey().getTag(), it.next().getValue());
+				}
+			}
+		}
 	}
 
 	public void commitAndClosePoiFile(Long lastModifiedDate) throws SQLException {
@@ -641,7 +654,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				}
 			}
 		}
-		
 	}
 
 	private void writePoiBoxes(BinaryMapIndexWriter writer, Tree<PoiTileBox> tree, 
