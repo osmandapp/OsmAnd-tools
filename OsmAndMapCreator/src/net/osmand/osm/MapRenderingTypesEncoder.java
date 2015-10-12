@@ -15,6 +15,7 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
 
+import net.osmand.PlatformUtil;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.Node;
@@ -22,10 +23,12 @@ import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.osm.edit.Relation;
 import net.osmand.util.Algorithms;
 
+import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlPullParser;
 
 public class MapRenderingTypesEncoder extends MapRenderingTypes {
-	
+
+	private static Log log = PlatformUtil.getLog(MapRenderingTypesEncoder.class);
 	// stored information to convert from osm tags to int type
 	private List<MapRouteTag> routeTags = new ArrayList<MapRouteTag>();
 	private Map<String, List<EntityConvert>> convertTags = new HashMap<String, List<EntityConvert>>();
@@ -121,6 +124,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		if(tg != null) {
 			ec.ifRegionName.addAll(Arrays.asList(tg.split("\\,")));
 		}
+		ec.verbose = "true".equals(parser.getAttributeValue("", "verbose")); //$NON-NLS-1$
 		parseConvertCol(parser, ec.ifTags, "if_");
 		parseConvertCol(parser, ec.ifNotTags, "if_not_");
 		parseConvertCol(parser, ec.ifTagsNotLess, "if_not_less_");
@@ -348,12 +352,27 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			if (list != null) {
 				for (EntityConvert ec : list) {
 					if (checkConvertValue(ec.fromTag, e.getValue())) {
+						String verbose = null;
+						if(ec.verbose) {
+							verbose = "Apply entity convert from '"+ec.fromTag+"' to " + tags + " in " + 
+									appFilter;
+						}
 						if (checkConvert(tags, ec, entity) && ec.type == filter && 
 								ec.applyToType.contains(appFilter)) {
 							if (listToConvert == null) {
 								listToConvert = new ArrayList<EntityConvert>();
 							}
 							listToConvert.add(ec);
+							if (verbose != null) {
+								verbose += " - has succeeded";
+							}
+						} else {
+							if (verbose != null) {
+								verbose += " - has failed due to if conditions";
+							}
+						}
+						if(verbose != null) {
+							log.info(verbose);
 						}
 					}
 				}
@@ -752,6 +771,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		SPLIT
 	}
 	public static class EntityConvert {
+		public boolean verbose;
 		public TagValuePattern fromTag ;
 		public EntityConvertType type;
 		public EnumSet<EntityConvertApplyType> applyToType;
