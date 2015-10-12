@@ -81,18 +81,19 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	public void iterateEntity(Entity e, OsmDbAccessorContext ctx, boolean basemap) throws SQLException {
 		tempAmenityList.clear();
 		EntityId eid = EntityId.valueOf(e);
-		Map<String, String> etags = renderingTypes.transformTags(e.getTags(), EntityType.valueOf(e), EntityConvertApplyType.POI);
-		Map<String, String> tags = propogatedTags.get(eid);
-		if (tags != null) {
-			etags = new LinkedHashMap<String, String>(etags);
-			Iterator<Entry<String, String>> iterator = tags.entrySet().iterator();
+		Map<String, String> tags = e.getTags();
+		Map<String, String> ptags = propogatedTags.get(eid);
+		if (ptags != null) {
+			tags = new LinkedHashMap<String, String>(tags);
+			Iterator<Entry<String, String>> iterator = ptags.entrySet().iterator();
 			while (iterator.hasNext()) {
 				Entry<String, String> ts = iterator.next();
-				if (etags.get(ts.getKey()) == null) {
-					etags.put(ts.getKey(), ts.getValue());
+				if (tags.get(ts.getKey()) == null) {
+					tags.put(ts.getKey(), ts.getValue());
 				}
 			}
 		}
+		Map<String, String> etags = renderingTypes.transformTags(tags, EntityType.valueOf(e), EntityConvertApplyType.POI);
 		boolean privateReg = "private".equals(e.getTag("access")); 
 		tempAmenityList =
 				USE_POI_TYPES_TO_PARSE ?  
