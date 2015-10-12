@@ -368,7 +368,17 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 							}
 						} else {
 							if (verbose != null) {
-								verbose += " - has failed due to if conditions";
+								verbose += " - has failed due to ";
+								if(!checkConvert(tags, ec, entity)) {
+									verbose += "if conditions;";
+								}
+								if(ec.type != filter ) {
+									verbose += " transform " + filter + "!= " + ec.type + ";";
+								}
+								if(!ec.applyToType.contains(appFilter)) {
+									verbose += " appFilter "+appFilter+";";
+								}
+								
 							}
 						}
 						if(verbose != null) {
