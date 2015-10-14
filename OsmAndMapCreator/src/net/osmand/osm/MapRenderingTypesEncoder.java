@@ -60,7 +60,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	}
 
 	private MapRulType getRelationalTagValue(String tag, String val) {
-		MapRulType rType = getMapRuleType(tag, val);
+		MapRulType rType = getRuleType(tag, val);
 		if(rType != null && rType.relation) {
 			return rType;
 		}
@@ -100,10 +100,12 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	}
 	
 
-
+	private MapRulType getRuleType(String tag, String val) {
+		return getRuleType(tag, val, false, false);
+	}
 
 	private MapRulType getMapRuleType(String tag, String val) {
-		return getRuleType(tag, val, false);
+		return getRuleType(tag, val, false, true);
 	}
 	
 	public MapRulType getCoastlineRuleType() {
