@@ -28,7 +28,6 @@ import net.osmand.binary.BinaryMapPoiReaderAdapter;
 import net.osmand.data.Amenity;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.osm.MapPoiTypes;
-import net.osmand.osm.MapRenderingTypes.MapRulType;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.MapRenderingTypesEncoder.EntityConvertApplyType;
 import net.osmand.osm.PoiType;
@@ -47,7 +46,6 @@ import org.apache.commons.logging.LogFactory;
 public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 	private static final Log log = LogFactory.getLog(IndexPoiCreator.class);
-	public static final boolean USE_POI_TYPES_TO_PARSE = true;
 
 	private Connection poiConnection;
 	private File poiIndexFile;
@@ -103,10 +101,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		}
 		Map<String, String> etags = renderingTypes.transformTags(tags, EntityType.valueOf(e), EntityConvertApplyType.POI);
 		boolean privateReg = "private".equals(e.getTag("access")); 
-		tempAmenityList =
-				USE_POI_TYPES_TO_PARSE ?  
-					EntityParser.parseAmenities(poiTypes, e, etags,  tempAmenityList) : 
-					EntityParser.parseAmenities(renderingTypes, poiTypes, e, etags,  tempAmenityList);
+		tempAmenityList = EntityParser.parseAmenities(poiTypes, e, etags,  tempAmenityList);
 		if (!tempAmenityList.isEmpty() && poiPreparedStatement != null) {
 			if(e instanceof Relation) {
 				ctx.loadEntityRelation((Relation) e);
@@ -143,11 +138,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		Map<String, String> tags = renderingTypes.transformTags(e.getTags(), EntityType.RELATION, EntityConvertApplyType.POI);
 		for (String t : tags.keySet()) {
 			boolean index = false;
-			if(USE_POI_TYPES_TO_PARSE) {
-				index = poiTypes.parseAmenity(t, tags.get(t), true, tags) != null;
-			} else {
-				index = renderingTypes.getAmenityTypeForRelation(t, tags.get(t), Algorithms.isEmpty(tags.get("name"))) != null;
-			}
+			index = poiTypes.parseAmenity(t, tags.get(t), true, tags) != null;
 			if (index) {	
 				ctx.loadEntityRelation(e);
 				for (EntityId id : ((Relation) e).getMembersMap().keySet()) {
@@ -217,18 +208,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		}
 		StringBuilder b = new StringBuilder();
 		for (Map.Entry<String, String> e : tempNames.entrySet()) {
-			boolean text ;
-			if(USE_POI_TYPES_TO_PARSE) {
-				text = poiTypes.isTextAdditionalInfo(e.getKey(), e.getValue()) ;
-			} else {
-				MapRulType rt = renderingTypes.getAmenityRuleType(e.getKey(), e.getValue());
-				if(rt == null && e.getKey().startsWith("name:")) {
-					continue;
-				} else if (rt == null) {
-					System.out.println(e.getKey() + " " + e.getValue());
-				}
-				text = !rt.isAdditional() ;
-			}
+			boolean text  = poiTypes.isTextAdditionalInfo(e.getKey(), e.getValue()) ;
 			PoiAdditionalType rulType = getOrCreate(e.getKey(), e.getValue(), text);
 			if(!rulType.isText() ||  !Algorithms.isEmpty(e.getValue())) {
 				if(b.length() > 0){

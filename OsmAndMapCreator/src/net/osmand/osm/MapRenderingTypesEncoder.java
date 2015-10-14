@@ -175,7 +175,6 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 
 	@Override
 	protected void parseRouteTagFromXML(XmlPullParser parser) {
-		super.parseRouteTagFromXML(parser);
 		MapRouteTag rtype = new MapRouteTag();
 		String mode = parser.getAttributeValue("", "mode"); //$NON-NLS-1$
 		rtype.tag = lc(parser.getAttributeValue("", "tag")); //$NON-NLS-1$
@@ -204,16 +203,14 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 
 	@Override
 	protected void parseAndRegisterTypeFromXML(XmlPullParser parser, MapRulType parent) {
-		MapRulType rtype = parseBaseRuleType(parser, parent, false);
-		rtype.onlyPoi = "true".equals(parser.getAttributeValue("", "only_poi"));
+		String tag = lc(parser.getAttributeValue("", "tag"));
+		MapRulType rtype = parseBaseRuleType(parser, parent, tag);
 		registerOnlyMap(parser, rtype);
 		if("true".equals(parser.getAttributeValue("", "lang"))) {
-			System.out.println(rtype.tagValuePattern.tag);
 			for (String lng : langs) {
-				String tag = lc(parser.getAttributeValue("", "tag")) + ":" + lng;
+				tag = lc(parser.getAttributeValue("", "tag")) + ":" + lng;
 				if(!types.containsKey(constructRuleKey(tag, null))){
-					MapRulType retype = parseBaseRuleType(parser, parent, false, tag);
-					retype.onlyPoi = "true".equals(parser.getAttributeValue("", "only_poi"));
+					MapRulType retype = parseBaseRuleType(parser, parent, tag);
 					registerOnlyMap(parser, retype);
 				}
 			}
@@ -223,23 +220,19 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 
 
 	private void registerOnlyMap(XmlPullParser parser, MapRulType rtype) {
-		if(!rtype.onlyPoi) {
-			String val = parser.getAttributeValue("", "minzoom"); //$NON-NLS-1$
-			if(rtype.isMain()) {
-				rtype.minzoom = 15;
-			}
-			if (val != null) {
-				rtype.minzoom = Integer.parseInt(val);
-			}
-			val = parser.getAttributeValue("", "maxzoom"); //$NON-NLS-1$
-			rtype.maxzoom = 31;
-			if (val != null) {
-				rtype.maxzoom = Integer.parseInt(val);
-			}
-			if(rtype.onlyMap) {
-				registerRuleType(rtype);
-			}
+		String val = parser.getAttributeValue("", "minzoom"); //$NON-NLS-1$
+		if (rtype.isMain()) {
+			rtype.minzoom = 15;
 		}
+		if (val != null) {
+			rtype.minzoom = Integer.parseInt(val);
+		}
+		val = parser.getAttributeValue("", "maxzoom"); //$NON-NLS-1$
+		rtype.maxzoom = 31;
+		if (val != null) {
+			rtype.maxzoom = Integer.parseInt(val);
+		}
+		registerRuleType(rtype);
 	}
 
 	public boolean encodeEntityWithType(Entity e, int zoom, TIntArrayList outTypes, 
@@ -278,7 +271,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 				if (rType.isMain()) {
 					outTypes.add(combineOrderAndId(rType));
 				}
-				if (rType.isAdditionalOrText()) {
+				if (rType.isAdditionalOrText() && rType.isMap()) {
 					if (rType.isAdditional()) {
 						outAddTypes.add(combineOrderAndId(rType));
 					} else if (rType.isText()) {

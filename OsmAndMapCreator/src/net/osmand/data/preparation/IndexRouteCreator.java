@@ -189,7 +189,8 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 			Way e = (Way) es;
 			Map<String, String> tags = renderingTypes.transformTags(e.getTags(), EntityType.WAY, EntityConvertApplyType.ROUTING);
 			Map<String, String> ptags = propogatedTags.get(EntityId.valueOf(e));
-			if (ptags != null) {
+			if (ptags != null && !ptags.isEmpty()) {
+				tags = new LinkedHashMap<String, String>(tags);
 				Iterator<Entry<String, String>> iterator = ptags.entrySet().iterator();
 				while (iterator.hasNext()) {
 					Entry<String, String> ts = iterator.next();
