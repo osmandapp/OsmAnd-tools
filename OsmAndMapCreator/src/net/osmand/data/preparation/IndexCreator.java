@@ -17,6 +17,7 @@ import net.osmand.data.Multipolygon;
 import net.osmand.data.preparation.OsmDbAccessor.OsmDbVisitor;
 import net.osmand.data.preparation.address.IndexAddressCreator;
 import net.osmand.impl.ConsoleProgressImplementation;
+import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
@@ -874,6 +875,7 @@ public class IndexCreator {
 		int st = file.lastIndexOf('/');
 		int e = file.indexOf('.', st);
 		creator.setNodesDBFile(new File(rootFolder + "/osm-gen/"+file.substring(st, e) + ".tmp.odb"));
+		MapPoiTypes.setDefault(new MapPoiTypes(rootFolder + "/repos//resources/poi/poi_types.xml"));
 		MapRenderingTypesEncoder rt = 
 				new MapRenderingTypesEncoder(rootFolder + "/repos//resources/obf_creation/rendering_types.xml", 
 						file);

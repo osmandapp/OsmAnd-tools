@@ -77,6 +77,10 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		this.poiTypes = MapPoiTypes.getDefault();
 	}
 	
+	public void setPoiTypes(MapPoiTypes poiTypes) {
+		this.poiTypes = poiTypes;
+	}
+	
 
 	public void iterateEntity(Entity e, OsmDbAccessorContext ctx, boolean basemap) throws SQLException {
 		tempAmenityList.clear();
@@ -89,7 +93,11 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			while (iterator.hasNext()) {
 				Entry<String, String> ts = iterator.next();
 				if (tags.get(ts.getKey()) == null) {
-					tags.put(ts.getKey(), ts.getValue());
+					String vl = ts.getValue();
+					if(vl != null) {
+						vl = vl.replaceAll(IndexVectorMapCreator.SPLIT_VALUE, ", ");
+					}
+					tags.put(ts.getKey(), vl);
 				}
 			}
 		}
@@ -830,4 +838,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			}
 		}
 	}
+
+	
 }

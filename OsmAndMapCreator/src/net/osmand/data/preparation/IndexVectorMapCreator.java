@@ -66,7 +66,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	private static final int MAP_LEVELS_MAX = 1 << MAP_LEVELS_POWER;
 	private MapRenderingTypesEncoder renderingTypes;
 	private MapZooms mapZooms;
-	private static String SPLIT_VALUE= "SPLITVL";
+	final static String SPLIT_VALUE= "SPLITVL";
 
 	Map<Long, TIntArrayList> multiPolygonsWays = new LinkedHashMap<Long, TIntArrayList>();
 	
