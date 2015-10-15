@@ -35,7 +35,6 @@ import net.osmand.data.Multipolygon;
 import net.osmand.data.MultipolygonBuilder;
 import net.osmand.data.Ring;
 import net.osmand.data.preparation.MapZooms.MapZoomPair;
-import net.osmand.osm.MapRenderingTypes;
 import net.osmand.osm.MapRenderingTypes.MapRulType;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.edit.Entity;
@@ -99,7 +98,17 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	private int zoomWaySmothness = 0;
 	private final Log logMapDataWarn;
 
-	public static long GENERATE_OBJ_ID = - (1l << 20l); // million million  
+	public TLongHashSet generatedIds = new TLongHashSet();
+	private static int SHIFT_NON_EXISTING_IDS = 40;
+	
+	private  long assignIdBasedOnOriginal(long originalId) {
+		long gen = (originalId << SHIFT_NON_EXISTING_IDS);
+		while(generatedIds.contains(gen)) {
+			gen++;
+		}
+		generatedIds.add(gen);
+		return gen;
+	}
 
 	public IndexVectorMapCreator(Log logMapDataWarn, MapZooms mapZooms, MapRenderingTypesEncoder renderingTypes,
 	                             int zoomWaySmothness) {
@@ -228,11 +237,13 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 
 			// don't use the relation ids. Create new onesgetInnerRings
 			Map<String, String> stags  = splitEntities == null ? e.getModifiableTags() : splitEntities.get(0);
-			createMultipolygonObject(stags, out, innerWays, GENERATE_OBJ_ID --);
+			createMultipolygonObject(stags, out, innerWays, 
+					assignIdBasedOnOriginal(e.getId()));
 			if (splitEntities != null) {
 				for (int i = 1; i < splitEntities.size(); i++) {
 					Map<String, String> tags = splitEntities.get(i);
-					createMultipolygonObject(tags, out, innerWays,	GENERATE_OBJ_ID--);
+					createMultipolygonObject(tags, out, innerWays,	
+							assignIdBasedOnOriginal(e.getId()));
 				}
 			}
 		}
@@ -575,7 +586,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			}
 			if (splitTags != null) {
 				for (int i = 1; i < splitTags.size(); i++) {
-					assignedId = GENERATE_OBJ_ID--;
+					assignedId = assignIdBasedOnOriginal(originalId);
 					Map<String, String> stags = splitTags.get(i);
 					for (int level = 0; level < mapZooms.size(); level++) {
 						processMainEntity(e, originalId, assignedId, level, stags);
@@ -584,6 +595,8 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			}
 		}
 	}
+
+	
 
 	protected void processMainEntity(Entity e, long originalId, long assignedId, int level, Map<String, String> tags)
 			throws SQLException {
