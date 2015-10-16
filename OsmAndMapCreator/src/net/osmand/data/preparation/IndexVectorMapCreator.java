@@ -111,7 +111,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	}
 	
 	private long assignIdBasedOnOriginalSplit(long originalId) {
-		long gen = (1 << (SHIFT_NON_EXISTING_IDS - 1));
+		long gen = (1l << (SHIFT_NON_EXISTING_IDS - 1));
 		gen += originalId;
 		while(generatedIds.contains(gen)) {
 			gen++;
