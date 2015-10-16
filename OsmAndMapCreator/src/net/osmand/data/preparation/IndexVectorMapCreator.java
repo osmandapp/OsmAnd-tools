@@ -101,8 +101,18 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	public TLongHashSet generatedIds = new TLongHashSet();
 	private static int SHIFT_NON_EXISTING_IDS = 40;
 	
-	private  long assignIdBasedOnOriginal(long originalId) {
+	private long assignIdBasedOnOriginal(long originalId) {
 		long gen = (originalId << SHIFT_NON_EXISTING_IDS);
+		while(generatedIds.contains(gen)) {
+			gen++;
+		}
+		generatedIds.add(gen);
+		return gen;
+	}
+	
+	private long assignIdBasedOnOriginalSplit(long originalId) {
+		long gen = (1 << (SHIFT_NON_EXISTING_IDS - 1));
+		gen += originalId;
 		while(generatedIds.contains(gen)) {
 			gen++;
 		}
@@ -586,7 +596,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			}
 			if (splitTags != null) {
 				for (int i = 1; i < splitTags.size(); i++) {
-					assignedId = assignIdBasedOnOriginal(originalId);
+					assignedId = assignIdBasedOnOriginalSplit(originalId);
 					Map<String, String> stags = splitTags.get(i);
 					for (int level = 0; level < mapZooms.size(); level++) {
 						processMainEntity(e, originalId, assignedId, level, stags);
