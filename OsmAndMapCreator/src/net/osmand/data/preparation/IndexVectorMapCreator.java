@@ -99,9 +99,14 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	private final Log logMapDataWarn;
 
 	public TLongHashSet generatedIds = new TLongHashSet();
+	private static boolean USE_OLD_GEN_ID = true;
+	public static long GENERATE_OBJ_ID = - (1l << 20l); // million million  
 	private static int SHIFT_NON_EXISTING_IDS = 40;
 	
 	private long assignIdBasedOnOriginal(long originalId) {
+		if(USE_OLD_GEN_ID) {
+			return GENERATE_OBJ_ID--;
+		}
 		long gen = (originalId << SHIFT_NON_EXISTING_IDS);
 		while(generatedIds.contains(gen)) {
 			gen++;
@@ -111,6 +116,9 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	}
 	
 	private long assignIdBasedOnOriginalSplit(long originalId) {
+		if(USE_OLD_GEN_ID) {
+			return GENERATE_OBJ_ID--;
+		}
 		long gen = (1l << (SHIFT_NON_EXISTING_IDS - 1));
 		gen += originalId;
 		while(generatedIds.contains(gen)) {
