@@ -179,7 +179,7 @@ public class CountryOcbfGeneration {
 		}
 		
 		public String getAdditionalTag(String tg) {
-			if(!Algorithms.isEmpty(additionalTags.get(tg) || parent == null) {
+			if(!Algorithms.isEmpty(additionalTags.get(tg)) || parent == null) {
 				return additionalTags.get(tg);
 			}
 			return parent.getAdditionalTag(tg);
