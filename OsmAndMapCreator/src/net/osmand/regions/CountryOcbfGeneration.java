@@ -130,6 +130,10 @@ public class CountryOcbfGeneration {
 		public String translate;
 		public String polyExtract;
 		
+		public String lang;
+		public String leftHandNavigation;
+		public String metric;
+		
 		
 		public boolean map ;
 		public boolean wiki;
@@ -172,6 +176,27 @@ public class CountryOcbfGeneration {
 				return polyExtract;
 			}
 			return parent.getPolyExtract();
+		}
+		
+		public String getLeftHandNavigation() {
+			if(!Algorithms.isEmpty(leftHandNavigation) || parent == null) {
+				return leftHandNavigation;
+			}
+			return parent.getLeftHandNavigation();
+		}
+		
+		public String getMetric() {
+			if(!Algorithms.isEmpty(metric) || parent == null) {
+				return metric;
+			}
+			return parent.getMetric();
+		}
+		
+		public String getLang() {
+			if(!Algorithms.isEmpty(lang) || parent == null) {
+				return lang;
+			}
+			return parent.getLang();
 		}
 		
 		public String getFullName() {
@@ -409,6 +434,15 @@ public class CountryOcbfGeneration {
 		if(r.parent != null) {
 			addTag(serializer, "region_parent_name", r.parent.getFullName());
 		}
+		if(!Algorithms.isEmpty(r.getLang())) {
+			addTag(serializer, "lang", r.getLang());
+		}
+		if(!Algorithms.isEmpty(r.getMetric())) {
+			addTag(serializer, "metric", r.getMetric());
+		}
+		if(!Algorithms.isEmpty(r.getLeftHandNavigation())) {
+			addTag(serializer, "left_hand_navigation", r.getLeftHandNavigation());
+		}
 		if(r.map || r.roads || r.wiki || r.srtm || r.hillshade) {
 			line += " download=" + r.getDownloadName();
 			addTag(serializer, "download_name", r.getDownloadName());
@@ -570,6 +604,9 @@ public class CountryOcbfGeneration {
 		reg.setDownloadPrefix(attrs.get("download_prefix"));
 		reg.setInnerDownloadSuffix(attrs.get("inner_download_suffix"));
 		reg.setInnerDownloadPrefix(attrs.get("inner_download_prefix"));
+		reg.lang = attrs.get("lang");
+		reg.metric = attrs.get("metric");
+		reg.leftHandNavigation = attrs.get("left_hand_navigation");
 		if(attrs.containsKey("hillshade")) {
 			reg.hillshade = parseBoolean(attrs.get("hillshade"));
 		} else {
@@ -585,6 +622,7 @@ public class CountryOcbfGeneration {
 		} else {
 			reg.map = type == null || type.equals("map"); 
 		}
+		
 		if(attrs.containsKey("roads")) {
 			reg.roads = parseBoolean(attrs.get("roads"));
 		} else {
