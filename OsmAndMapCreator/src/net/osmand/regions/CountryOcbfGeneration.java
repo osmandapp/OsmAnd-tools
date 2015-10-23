@@ -185,26 +185,6 @@ public class CountryOcbfGeneration {
 			return parent.getAdditionalTag(tg);
 		}
 		
-		public String getMetric() {
-			if(!Algorithms.isEmpty(metric) || parent == null) {
-				return metric;
-			}
-			return parent.getMetric();
-		}
-		
-		public String getRoadSigns() {
-			if(!Algorithms.isEmpty(roadSigns) || parent == null) {
-				return roadSigns;
-			}
-			return parent.getRoadSigns();
-		}
-		
-		public String getLang() {
-			if(!Algorithms.isEmpty(lang) || parent == null) {
-				return lang;
-			}
-			return parent.getLang();
-		}
 		
 		public String getFullName() {
 			if(parent == null) {
