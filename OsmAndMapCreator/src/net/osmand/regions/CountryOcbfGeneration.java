@@ -133,6 +133,7 @@ public class CountryOcbfGeneration {
 		public String lang;
 		public String leftHandNavigation;
 		public String metric;
+		public String roadSigns;
 		
 		
 		public boolean map ;
@@ -190,6 +191,13 @@ public class CountryOcbfGeneration {
 				return metric;
 			}
 			return parent.getMetric();
+		}
+		
+		public String getRoadSigns() {
+			if(!Algorithms.isEmpty(roadSigns) || parent == null) {
+				return roadSigns;
+			}
+			return parent.getRoadSigns();
 		}
 		
 		public String getLang() {
@@ -443,6 +451,9 @@ public class CountryOcbfGeneration {
 		if(!Algorithms.isEmpty(r.getLeftHandNavigation())) {
 			addTag(serializer, "left_hand_navigation", r.getLeftHandNavigation());
 		}
+		if(!Algorithms.isEmpty(r.getRoadSigns())) {
+			addTag(serializer, "road_signs", r.getRoadSigns());
+		}
 		if(r.map || r.roads || r.wiki || r.srtm || r.hillshade) {
 			line += " download=" + r.getDownloadName();
 			addTag(serializer, "download_name", r.getDownloadName());
@@ -607,6 +618,7 @@ public class CountryOcbfGeneration {
 		reg.lang = attrs.get("lang");
 		reg.metric = attrs.get("metric");
 		reg.leftHandNavigation = attrs.get("left_hand_navigation");
+		reg.roadSigns = attrs.get("road_signs");
 		if(attrs.containsKey("hillshade")) {
 			reg.hillshade = parseBoolean(attrs.get("hillshade"));
 		} else {
