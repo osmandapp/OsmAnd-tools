@@ -120,6 +120,10 @@ public class CountryOcbfGeneration {
 	public static class CountryRegion {
 		CountryRegion parent = null;
 		List<CountryRegion> children = new ArrayList<CountryRegion>();
+		 static final String[] tagsPropagate = new String[] {
+			"lang", "left_hand_navigation", "metric", "road_signs", "maxspeed", "maxspeed_urban", "maxspeed_rural"
+		}
+		Map<String, String> additionalTags = new LinkedHashMap<String, String>();
 		String name;
 		String downloadSuffix;
 		String innerDownloadSuffix;
@@ -129,11 +133,6 @@ public class CountryOcbfGeneration {
 		public String boundary;
 		public String translate;
 		public String polyExtract;
-		
-		public String lang;
-		public String leftHandNavigation;
-		public String metric;
-		public String roadSigns;
 		
 		
 		public boolean map ;
@@ -179,11 +178,11 @@ public class CountryOcbfGeneration {
 			return parent.getPolyExtract();
 		}
 		
-		public String getLeftHandNavigation() {
-			if(!Algorithms.isEmpty(leftHandNavigation) || parent == null) {
-				return leftHandNavigation;
+		public String getAdditionalTag(String tg) {
+			if(!Algorithms.isEmpty(additionalTags.get(tg) || parent == null) {
+				return additionalTags.get(tg);
 			}
-			return parent.getLeftHandNavigation();
+			return parent.getAdditionalTag(tg);
 		}
 		
 		public String getMetric() {
@@ -442,17 +441,10 @@ public class CountryOcbfGeneration {
 		if(r.parent != null) {
 			addTag(serializer, "region_parent_name", r.parent.getFullName());
 		}
-		if(!Algorithms.isEmpty(r.getLang())) {
-			addTag(serializer, "lang", r.getLang());
-		}
-		if(!Algorithms.isEmpty(r.getMetric())) {
-			addTag(serializer, "metric", r.getMetric());
-		}
-		if(!Algorithms.isEmpty(r.getLeftHandNavigation())) {
-			addTag(serializer, "left_hand_navigation", r.getLeftHandNavigation());
-		}
-		if(!Algorithms.isEmpty(r.getRoadSigns())) {
-			addTag(serializer, "road_signs", r.getRoadSigns());
+		for(String tg : CountryRegion.tagsPropagate) {
+			if(!Algorithms.isEmpty(r.getAdditionalTag(tg))) {
+		 		addTag(serializer, "region_" + tg, r.getAdditionalTag(tg));
+			}
 		}
 		if(r.map || r.roads || r.wiki || r.srtm || r.hillshade) {
 			line += " download=" + r.getDownloadName();
@@ -615,10 +607,9 @@ public class CountryOcbfGeneration {
 		reg.setDownloadPrefix(attrs.get("download_prefix"));
 		reg.setInnerDownloadSuffix(attrs.get("inner_download_suffix"));
 		reg.setInnerDownloadPrefix(attrs.get("inner_download_prefix"));
-		reg.lang = attrs.get("lang");
-		reg.metric = attrs.get("metric");
-		reg.leftHandNavigation = attrs.get("left_hand_navigation");
-		reg.roadSigns = attrs.get("road_signs");
+		for(String tg : CountryRegion.tagsPropagate) {
+			reg.additionalTags.put(tg, attrs.get("metric"));
+		}
 		if(attrs.containsKey("hillshade")) {
 			reg.hillshade = parseBoolean(attrs.get("hillshade"));
 		} else {
