@@ -120,9 +120,9 @@ public class CountryOcbfGeneration {
 	public static class CountryRegion {
 		CountryRegion parent = null;
 		List<CountryRegion> children = new ArrayList<CountryRegion>();
-		 static final String[] tagsPropagate = new String[] {
+		static final String[] tagsPropagate = new String[] {
 			"lang", "left_hand_navigation", "metric", "road_signs", "maxspeed", "maxspeed_urban", "maxspeed_rural"
-		}
+		};
 		Map<String, String> additionalTags = new LinkedHashMap<String, String>();
 		String name;
 		String downloadSuffix;
