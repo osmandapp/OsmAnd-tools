@@ -588,7 +588,7 @@ public class CountryOcbfGeneration {
 		reg.setInnerDownloadSuffix(attrs.get("inner_download_suffix"));
 		reg.setInnerDownloadPrefix(attrs.get("inner_download_prefix"));
 		for(String tg : CountryRegion.tagsPropagate) {
-			reg.additionalTags.put(tg, attrs.get("metric"));
+			reg.additionalTags.put(tg, attrs.get(tg));
 		}
 		if(attrs.containsKey("hillshade")) {
 			reg.hillshade = parseBoolean(attrs.get("hillshade"));
