@@ -16,6 +16,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.zip.GZIPInputStream;
@@ -30,6 +31,8 @@ import net.osmand.data.preparation.MapZooms;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.map.OsmandRegions;
 import net.osmand.osm.MapRenderingTypesEncoder;
+import net.osmand.regions.CountryOcbfGeneration;
+import net.osmand.regions.CountryOcbfGeneration.CountryRegion;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
@@ -269,11 +272,27 @@ public class WikipediaByCountryDivider {
 	
 	protected static void generateCountrySqlite(String folder, boolean skip) throws SQLException, IOException, InterruptedException, XmlPullParserException {
 		Connection conn = (Connection) DBDialect.SQLITE.getDatabaseConnection(folder + "wiki.sqlite", log);
+		OsmandRegions regs = new OsmandRegions();
+		Map<String, LinkedList<BinaryMapDataObject>> mapObjects = regs.cacheAllCountries();
 		File rgns = new File(folder, "regions");
 		rgns.mkdirs();
 		ResultSet rs = conn.createStatement().executeQuery("SELECT DISTINCT regionName  FROM wiki_region");
 		while (rs.next()) {
 			String regionName = Algorithms.capitalizeFirstLetterAndLowercase(rs.getString(1));
+			LinkedList<BinaryMapDataObject> list = mapObjects.get(regionName);
+			boolean hasWiki = false;
+			if(list != null) {
+				for(BinaryMapDataObject o : list) {
+					Integer rl = o.getMapIndex().getRule("region_wiki", "yes");
+					if(o.containsAdditionalType(rl)) {
+						hasWiki = true;
+						break;
+					}
+				}
+			}
+			if(!hasWiki) {
+				continue;
+			}
 			File fl = new File(rgns, regionName + ".sqlite");
 			File osmBz2 = new File(rgns, regionName + "_" + IndexConstants.BINARY_MAP_VERSION + ".wiki.osm.bz2");
 			File obfFile = new File(rgns, regionName + "_" + IndexConstants.BINARY_MAP_VERSION + ".wiki.obf");
