@@ -278,8 +278,9 @@ public class WikipediaByCountryDivider {
 		rgns.mkdirs();
 		ResultSet rs = conn.createStatement().executeQuery("SELECT DISTINCT regionName  FROM wiki_region");
 		while (rs.next()) {
-			String regionName = Algorithms.capitalizeFirstLetterAndLowercase(rs.getString(1));
-			LinkedList<BinaryMapDataObject> list = mapObjects.get(regionName);
+			String lcRegionName = rs.getString(1);
+			String regionName = Algorithms.capitalizeFirstLetterAndLowercase(lcRegionName);
+			LinkedList<BinaryMapDataObject> list = mapObjects.get(lcRegionName);
 			boolean hasWiki = false;
 			if(list != null) {
 				for(BinaryMapDataObject o : list) {
@@ -291,6 +292,7 @@ public class WikipediaByCountryDivider {
 				}
 			}
 			if(!hasWiki) {
+				System.out.println("Skip " + regionName + " doesn't generate wiki");
 				continue;
 			}
 			File fl = new File(rgns, regionName + ".sqlite");
