@@ -274,6 +274,7 @@ public class WikipediaByCountryDivider {
 		Connection conn = (Connection) DBDialect.SQLITE.getDatabaseConnection(folder + "wiki.sqlite", log);
 		OsmandRegions regs = new OsmandRegions();
 		Map<String, LinkedList<BinaryMapDataObject>> mapObjects = regs.cacheAllCountries();
+		System.out.println(mapObjects);
 		File rgns = new File(folder, "regions");
 		rgns.mkdirs();
 		ResultSet rs = conn.createStatement().executeQuery("SELECT DISTINCT regionName  FROM wiki_region");
