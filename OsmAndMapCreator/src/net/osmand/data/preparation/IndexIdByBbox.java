@@ -745,10 +745,8 @@ public class IndexIdByBbox {
 				if (!regs.intersect(bo, lx, ty, rx, by)) {
 					continue;
 				}
-				String fn = regs.getFullName(bo);
-
-				String downloadName = regs.getMapDownloadType(fn);
-				if (!Algorithms.isEmpty(downloadName)) {
+				String downloadName = regs.getDownloadName(bo);
+				if (!Algorithms.isEmpty(downloadName) && regs.isDownloadOfType(bo, OsmandRegions.MAP_TYPE)) {
 					if (!keyNames.containsKey(downloadName)) {
 						keyNames.put(downloadName, new TLongObjectHashMap<IdRect>());
 					}
