@@ -273,6 +273,7 @@ public class WikipediaByCountryDivider {
 	protected static void generateCountrySqlite(String folder, boolean skip) throws SQLException, IOException, InterruptedException, XmlPullParserException {
 		Connection conn = (Connection) DBDialect.SQLITE.getDatabaseConnection(folder + "wiki.sqlite", log);
 		OsmandRegions regs = new OsmandRegions();
+		regs.prepareFile(new File("resources/countries-info/regions.ocbf").getAbsolutePath());
 		Map<String, LinkedList<BinaryMapDataObject>> mapObjects = regs.cacheAllCountries();
 		System.out.println(mapObjects);
 		File rgns = new File(folder, "regions");
