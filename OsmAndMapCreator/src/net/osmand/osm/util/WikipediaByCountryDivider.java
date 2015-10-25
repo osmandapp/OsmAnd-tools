@@ -279,6 +279,9 @@ public class WikipediaByCountryDivider {
 		ResultSet rs = conn.createStatement().executeQuery("SELECT DISTINCT regionName  FROM wiki_region");
 		while (rs.next()) {
 			String lcRegionName = rs.getString(1);
+			if(lcRegionName == null) {
+				continue;
+			}
 			String regionName = Algorithms.capitalizeFirstLetterAndLowercase(lcRegionName);
 			LinkedList<BinaryMapDataObject> list = mapObjects.get(lcRegionName.toLowerCase());
 			boolean hasWiki = false;
