@@ -295,7 +295,7 @@ public class WikipediaByCountryDivider {
 				}
 			}
 			if(!hasWiki) {
-				System.out.println("Skip " + regionName + " doesn't generate wiki");
+				System.out.println("Skip " + lcRegionName.toLowerCase() + " doesn't generate wiki");
 				continue;
 			}
 			File fl = new File(rgns, regionName + ".sqlite");
