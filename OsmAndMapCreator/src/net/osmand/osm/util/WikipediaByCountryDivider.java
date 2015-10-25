@@ -275,7 +275,6 @@ public class WikipediaByCountryDivider {
 		OsmandRegions regs = new OsmandRegions();
 		regs.prepareFile(new File("resources/countries-info/regions.ocbf").getAbsolutePath());
 		Map<String, LinkedList<BinaryMapDataObject>> mapObjects = regs.cacheAllCountries();
-		System.out.println(mapObjects);
 		File rgns = new File(folder, "regions");
 		rgns.mkdirs();
 		ResultSet rs = conn.createStatement().executeQuery("SELECT DISTINCT regionName  FROM wiki_region");
