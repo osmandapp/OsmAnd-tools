@@ -280,7 +280,7 @@ public class WikipediaByCountryDivider {
 		while (rs.next()) {
 			String lcRegionName = rs.getString(1);
 			String regionName = Algorithms.capitalizeFirstLetterAndLowercase(lcRegionName);
-			LinkedList<BinaryMapDataObject> list = mapObjects.get(lcRegionName);
+			LinkedList<BinaryMapDataObject> list = mapObjects.get(lcRegionName.toLowerCase());
 			boolean hasWiki = false;
 			if(list != null) {
 				for(BinaryMapDataObject o : list) {
