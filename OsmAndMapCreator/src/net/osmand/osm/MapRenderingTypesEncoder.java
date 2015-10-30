@@ -166,7 +166,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 
 
 	protected void parseConvertCol(XmlPullParser parser, List<TagValuePattern> col, String prefix) {
-		for (int i = 1; i <= 5; i++) {
+		for (int i = 1; i <= 10; i++) {
 			String tg = parser.getAttributeValue("", prefix +"tag" + i); //$NON-NLS-1$
 			String value = parser.getAttributeValue("", prefix +"value" + i); //$NON-NLS-1$
 			if (tg != null) {
