@@ -37,12 +37,12 @@ public class SQLiteBigPlanetIndex {
 		Statement statement = conn.createStatement();
 		statement.execute("CREATE TABLE tiles (x int, y int, z int, s int, image blob, time long, PRIMARY KEY (x,y,z,s))");
 		statement.execute("CREATE INDEX IND on tiles (x,y,z,s)");
-		statement.execute("CREATE TABLE info(tilenumbering,minzoom,maxzoom,timecolumn,url)");
+		statement.execute("CREATE TABLE info(tilenumbering,minzoom,maxzoom,timecolumn,url,rule,referer)");
 		statement.execute("CREATE TABLE android_metadata (locale TEXT)");
 		statement.close();
 		
 
-		PreparedStatement pStatement = conn.prepareStatement("INSERT INTO INFO VALUES(?,?,?,?,?)");
+		PreparedStatement pStatement = conn.prepareStatement("INSERT INTO INFO VALUES(?,?,?,?,?,?,?)");
 		String tileNumbering = bigPlanet ? "BigPlanet" : "simple";
 		pStatement.setString(1, tileNumbering);
 		int maxzoom = bigPlanet ? 17 - template.getMaximumZoomSupported() : template.getMinimumZoomSupported();
@@ -50,11 +50,9 @@ public class SQLiteBigPlanetIndex {
 		pStatement.setInt(2, maxzoom);
 		pStatement.setInt(3, minzoom);
 		pStatement.setString(4, "yes");
-		if (!(template instanceof BeanShellTileSourceTemplate)) {
-			pStatement.setString(5, ((TileSourceTemplate) template).getUrlTemplate());
-		} else {
-			pStatement.setString(5, "");
-		}
+		pStatement.setString(5, ((TileSourceTemplate) template).getUrlTemplate());
+		pStatement.setString(6, ((TileSourceTemplate) template).getRule());
+		pStatement.setString(7, ((TileSourceTemplate) template).getReferer());
 		pStatement.execute();
 		log.info("Info table" + tileNumbering + "maxzoom = " + maxzoom + " minzoom = " + minzoom + " timecolumn = yes"
 				+ " url = " + ((TileSourceTemplate) template).getUrlTemplate());
