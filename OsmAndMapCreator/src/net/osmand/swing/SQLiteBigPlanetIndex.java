@@ -43,18 +43,21 @@ public class SQLiteBigPlanetIndex {
 		
 
 		PreparedStatement pStatement = conn.prepareStatement("INSERT INTO INFO VALUES(?,?,?,?,?)");
-		if (template instanceof TileSourceTemplate && !(template instanceof BeanShellTileSourceTemplate)) {
-			String tileNumbering = bigPlanet ? "BigPlanet" : "simple";
-			pStatement.setString(1, tileNumbering);
-			int maxzoom = bigPlanet? 17 - template.getMaximumZoomSupported() : template.getMinimumZoomSupported();
-			int minzoom = bigPlanet? 17 - template.getMinimumZoomSupported() : template.getMaximumZoomSupported();
-			pStatement.setInt(2, maxzoom);
-			pStatement.setInt(3, minzoom);
-			pStatement.setString(4, "yes");
+		String tileNumbering = bigPlanet ? "BigPlanet" : "simple";
+		pStatement.setString(1, tileNumbering);
+		int maxzoom = bigPlanet ? 17 - template.getMaximumZoomSupported() : template.getMinimumZoomSupported();
+		int minzoom = bigPlanet ? 17 - template.getMinimumZoomSupported() : template.getMaximumZoomSupported();
+		pStatement.setInt(2, maxzoom);
+		pStatement.setInt(3, minzoom);
+		pStatement.setString(4, "yes");
+		if (!(template instanceof BeanShellTileSourceTemplate)) {
 			pStatement.setString(5, ((TileSourceTemplate) template).getUrlTemplate());
-			pStatement.execute();
-			log.info("Info table" + tileNumbering + "maxzoom = " + maxzoom + " minzoom = " + minzoom +" timecolumn = yes" + " url = " + ((TileSourceTemplate) template).getUrlTemplate()) ;
+		} else {
+			pStatement.setString(5, "");
 		}
+		pStatement.execute();
+		log.info("Info table" + tileNumbering + "maxzoom = " + maxzoom + " minzoom = " + minzoom + " timecolumn = yes"
+				+ " url = " + ((TileSourceTemplate) template).getUrlTemplate());
 		pStatement.close();
 		
 
