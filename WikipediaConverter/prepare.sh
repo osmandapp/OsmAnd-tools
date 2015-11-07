@@ -96,3 +96,4 @@ download tl Filipino;
 download cy Welsh;
 download bn Bengali;
 download pms Piedmontese;
+download sk Slovak;
