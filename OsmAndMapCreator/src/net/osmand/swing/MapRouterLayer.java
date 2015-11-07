@@ -674,7 +674,11 @@ public class MapRouterLayer implements MapPanelLayer {
 				
 				Map<String, String> paramsR = new LinkedHashMap<String, String>(); 
 				for(String p : props) {
-					paramsR.put(p, "true");
+					if(p.contains("=")) {
+						paramsR.put(p.split("=")[0], p.split("=")[1]);	
+					} else {
+						paramsR.put(p, "true");
+					}
 				}
 				RoutingConfiguration config = builder.build(props[0], /*RoutingConfiguration.DEFAULT_MEMORY_LIMIT*/ 1000, paramsR);
 				PrecalculatedRouteDirection precalculatedRouteDirection = null;
