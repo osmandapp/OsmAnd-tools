@@ -101,7 +101,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 			public int compare(MapRouteType o1, MapRouteType o2) {
 				int x = value(o1);
 				int y = value(o2);
-				return (x < y) ? -1 : ((x == y) ? 0 : 1);
+				return (x < y) ? -1 : ((x == y) ? o1.getTag().compareTo(o2.getTag()) : 1);
 			}
 
 			private int value(MapRouteType o1) {
