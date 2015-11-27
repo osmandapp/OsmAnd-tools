@@ -149,7 +149,7 @@ public class MapClusterLayer implements MapPanelLayer {
 				.toArray(new BinaryMapIndexReader[rs.size()]),
 				clusterCtx.BASEMAP_CLUSTERING ? RouteCalculationMode.BASE : RouteCalculationMode.NORMAL);
 		// find closest way
-		RouteSegment st = router.findRouteSegment(lat, lon, ctx, false);
+		RouteSegment st = router.findRouteSegment(lat, lon, false, ctx);
 		if (st != null) {
 			RouteDataObject road = st.getRoad();
 			String highway = getHighway(road);
