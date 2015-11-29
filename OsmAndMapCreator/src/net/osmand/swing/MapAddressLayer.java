@@ -7,6 +7,8 @@ import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -17,6 +19,9 @@ import javax.swing.JPopupMenu;
 
 import net.osmand.binary.BinaryMapAddressReaderAdapter;
 import net.osmand.binary.BinaryMapIndexReader;
+import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
+import net.osmand.binary.GeocodingUtilities;
+import net.osmand.binary.GeocodingUtilities.GeocodingResult;
 import net.osmand.data.City;
 import net.osmand.data.DataTileManager;
 import net.osmand.data.LatLon;
@@ -24,6 +29,9 @@ import net.osmand.data.Street;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
+import net.osmand.router.RoutePlannerFrontEnd;
+import net.osmand.router.RoutingConfiguration;
+import net.osmand.router.RoutingContext;
 import net.osmand.util.MapUtils;
 
 import org.apache.commons.logging.Log;
@@ -49,6 +57,17 @@ public class MapAddressLayer implements MapPanelLayer {
 	}
 
 	public void fillPopupMenuWithActions(JPopupMenu menu) {
+		Action where= new AbstractAction("Where am I?") {
+			private static final long serialVersionUID = 7477484340246483239L;
+
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				whereAmI();
+			}
+
+			
+		};
+		menu.add(where);
 		Action add= new AbstractAction("Show address") {
 			private static final long serialVersionUID = 7477484340246483239L;
 
@@ -63,7 +82,32 @@ public class MapAddressLayer implements MapPanelLayer {
 	}
 	
 	
-	
+	private void whereAmI() {
+		Point popupMenuPoint = map.getPopupMenuPoint();
+		double fy = (popupMenuPoint.y - map.getCenterPointY()) / map.getTileSize();
+		double fx = (popupMenuPoint.x - map.getCenterPointX()) / map.getTileSize();
+		final double latitude = MapUtils.getLatitudeFromTile(map.getZoom(), map.getYTile() + fy);
+		final double longitude = MapUtils.getLongitudeFromTile(map.getZoom(), map.getXTile() + fx);
+		new Thread(new Runnable() {
+			@Override
+			public void run() {
+				try {
+					DataTileManager<Entity> points = new DataTileManager<Entity>(15);
+					List<Entity> os = whereAmI(latitude, longitude, points);
+					for (Entity w : os) {
+						LatLon n = w.getLatLon();
+						points.registerObject(n.getLatitude(), n.getLongitude(), w);
+					}
+					map.setPoints(points);
+					map.repaint();
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+			}
+
+		}).start();
+	}
 	
 	private void showCurrentCityActions() {
 		Point popupMenuPoint = map.getPopupMenuPoint();
@@ -105,6 +149,81 @@ public class MapAddressLayer implements MapPanelLayer {
 				rd.close();
 				raf.close();
 			}
+		}
+		return results;
+	}
+	
+	private List<Entity> whereAmI(double lat, double lon,
+			final DataTileManager<Entity> points ) throws IOException{
+		List<Entity> results = new ArrayList<Entity>(); 
+		int x = MapUtils.get31TileNumberX(lon);
+		int y = MapUtils.get31TileNumberY(lat);
+		List<BinaryMapIndexReader> list = new ArrayList<BinaryMapIndexReader>();
+		for (File f : new File(DataExtractionSettings.getSettings().getBinaryFilesDir()).listFiles()) {
+			if (f.getName().endsWith(".obf")) {
+				RandomAccessFile raf = new RandomAccessFile(f, "r"); //$NON-NLS-1$ //$NON-NLS-2$
+				BinaryMapIndexReader rd = new BinaryMapIndexReader(raf, f);
+				if(rd.containsAddressData() && rd.containsRouteData(x, y, x, y, 15)){
+					list.add(rd);
+				} else {
+					rd.close();
+					raf.close();
+				}
+			}
+		}
+		RoutingConfiguration cfg = RoutingConfiguration.getDefault().build("pedestrian", 100, 
+				new HashMap<String, String>());
+		RoutingContext ctx = new RoutePlannerFrontEnd(false).buildRoutingContext(cfg, null, list.toArray(new BinaryMapIndexReader[list.size()]));
+		GeocodingUtilities su = new GeocodingUtilities();
+		List<GeocodingResult> complete = new ArrayList<GeocodingUtilities.GeocodingResult>();
+		List<GeocodingResult> res = su.reverseGeocodingSearch(ctx, lat, lon);
+		double minBuildingDistance = 0;
+		for (GeocodingResult r : res) {
+			if (minBuildingDistance > 0
+					&& r.getDistance() > GeocodingUtilities.THRESHOLD_MULTIPLIER_SKIP_STREETS_AFTER * minBuildingDistance) {
+				break;
+			}
+			BinaryMapIndexReader reader = null;
+			for (BinaryMapIndexReader b : list) {
+				for (RouteRegion rb : b.getRoutingIndexes()) {
+					if (r.regionFP == rb.getFilePointer() && r.regionLen == rb.getLength()) {
+						reader = b;
+						break;
+
+					}
+				}
+				if (reader != null) {
+					break;
+				}
+			}
+			if (reader != null) {
+				List<GeocodingResult> justified = su.justifyReverseGeocodingSearch(r, reader, minBuildingDistance);
+				if(!justified.isEmpty()) {
+					double md = justified.get(0).getDistance();
+					if(minBuildingDistance == 0){
+						minBuildingDistance = md;
+					} else {
+						minBuildingDistance = Math.min(md, minBuildingDistance);
+					}
+					complete.addAll(justified);
+				}
+			} else {
+				complete.add(r);
+			}
+		}
+		Collections.sort(complete, GeocodingUtilities.DISTANCE_COMPARATOR);
+		long lid = -1;
+		for(GeocodingResult r : complete) {
+			if(r.building != null && 
+					r.getDistance() > minBuildingDistance * GeocodingUtilities.THRESHOLD_MULTIPLIER_SKIP_BUILDINGS_AFTER) {
+				continue;
+			}
+			Node n = new Node(r.getLocation().getLatitude(), r.getLocation().getLongitude(), lid--);
+			n.putTag(OSMTagKey.NAME.getValue(), r.toString());
+			results.add(n);
+		}
+		for(BinaryMapIndexReader l : list) {
+			l.close();
 		}
 		return results;
 	}
