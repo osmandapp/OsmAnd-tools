@@ -171,12 +171,34 @@ public class MapAddressLayer implements MapPanelLayer {
 				}
 			}
 		}
-		RoutingConfiguration cfg = RoutingConfiguration.getDefault().build("pedestrian", 100, 
+		RoutingConfiguration cfg = RoutingConfiguration.getDefault().build("car", 100, 
 				new HashMap<String, String>());
 		RoutingContext ctx = new RoutePlannerFrontEnd(false).buildRoutingContext(cfg, null, list.toArray(new BinaryMapIndexReader[list.size()]));
 		GeocodingUtilities su = new GeocodingUtilities();
+		double minBuildingDistance = 0;
 		List<GeocodingResult> complete = new ArrayList<GeocodingUtilities.GeocodingResult>();
 		List<GeocodingResult> res = su.reverseGeocodingSearch(ctx, lat, lon);
+		minBuildingDistance = justifyResults(list, su, complete, res);
+//		complete.addAll(res);
+		Collections.sort(complete, GeocodingUtilities.DISTANCE_COMPARATOR);
+		long lid = -1;
+		for(GeocodingResult r : complete) {
+			if(r.building != null && 
+					r.getDistance() > minBuildingDistance * GeocodingUtilities.THRESHOLD_MULTIPLIER_SKIP_BUILDINGS_AFTER) {
+				continue;
+			}
+			Node n = new Node(r.getLocation().getLatitude(), r.getLocation().getLongitude(), lid--);
+			n.putTag(OSMTagKey.NAME.getValue(), r.toString());
+			results.add(n);
+		}
+		for(BinaryMapIndexReader l : list) {
+			l.close();
+		}
+		return results;
+	}
+
+	private double justifyResults(List<BinaryMapIndexReader> list, GeocodingUtilities su,
+			List<GeocodingResult> complete, List<GeocodingResult> res) throws IOException {
 		double minBuildingDistance = 0;
 		for (GeocodingResult r : res) {
 			if (minBuildingDistance > 0
@@ -211,21 +233,7 @@ public class MapAddressLayer implements MapPanelLayer {
 				complete.add(r);
 			}
 		}
-		Collections.sort(complete, GeocodingUtilities.DISTANCE_COMPARATOR);
-		long lid = -1;
-		for(GeocodingResult r : complete) {
-			if(r.building != null && 
-					r.getDistance() > minBuildingDistance * GeocodingUtilities.THRESHOLD_MULTIPLIER_SKIP_BUILDINGS_AFTER) {
-				continue;
-			}
-			Node n = new Node(r.getLocation().getLatitude(), r.getLocation().getLongitude(), lid--);
-			n.putTag(OSMTagKey.NAME.getValue(), r.toString());
-			results.add(n);
-		}
-		for(BinaryMapIndexReader l : list) {
-			l.close();
-		}
-		return results;
+		return minBuildingDistance;
 	}
 	
 	private void searchAddressDetailedInfo(BinaryMapIndexReader index, double lat, double lon, List<Entity> results) throws IOException {

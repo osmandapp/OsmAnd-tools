@@ -6,6 +6,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.prefs.Preferences;
 
+import net.osmand.binary.GeocodingUtilities;
+import net.osmand.binary.GeocodingUtilities.GeocodingResult;
 import net.osmand.data.LatLon;
 import net.osmand.data.preparation.IndexCreator;
 import net.osmand.data.preparation.MapZooms;
@@ -292,8 +294,8 @@ public class DataExtractionSettings {
 	}
 	
 	
-	String[] SUFFIXES = new String[] {"av.", "avenue", "просп.", "пер.", "пр.","заул.", "проспект", "переул.", "бул.", "бульвар", "тракт"};
-	String[] DEFAUTL_SUFFIXES = new String[] {"str.", "street", "улица", "ул."};
+	String[] SUFFIXES = GeocodingUtilities.SUFFIXES;
+	String[] DEFAULT_SUFFIXES = GeocodingUtilities.DEFAULT_SUFFIXES;
 	public String[] getSuffixesToNormalizeStreets(){
 		String s = preferences.get("suffixes_normalize_streets", null);
 		if(s == null){
@@ -315,7 +317,7 @@ public class DataExtractionSettings {
 	public String[] getDefaultSuffixesToNormalizeStreets() {
 		String s = preferences.get("default_suffixes_normalize_streets", null);
 		if (s == null) {
-			return DEFAUTL_SUFFIXES;
+			return DEFAULT_SUFFIXES;
 		}
 		List<String> l = new ArrayList<String>();
 		int i = 0;
@@ -346,7 +348,7 @@ public class DataExtractionSettings {
 		String s = preferences.get("default_suffixes_normalize_streets", null);
 		if(s == null){
 			StringBuilder b = new StringBuilder();
-			for(String st : DEFAUTL_SUFFIXES){
+			for(String st : DEFAULT_SUFFIXES){
 				b.append(st).append(", ");
 			}
 			return b.toString();
