@@ -312,17 +312,17 @@ public class DataExtractionSettings {
 		return l.toArray(new String[l.size()]);
 	}
 	
-	public String[] getDefaultSuffixesToNormalizeStreets(){
+	public String[] getDefaultSuffixesToNormalizeStreets() {
 		String s = preferences.get("default_suffixes_normalize_streets", null);
-		if(s == null){
+		if (s == null) {
 			return DEFAUTL_SUFFIXES;
 		}
 		List<String> l = new ArrayList<String>();
 		int i = 0;
 		int nextI = 0;
-		while((nextI=s.indexOf(',',i)) >= 0){
+		while ((nextI = s.indexOf(',', i)) >= 0) {
 			String t = s.substring(i, nextI).trim();
-			if(t.length() > 0){
+			if (t.length() > 0) {
 				l.add(t);
 			}
 			i = nextI + 1;

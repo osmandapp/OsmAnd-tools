@@ -567,8 +567,8 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 
 	private String cutSuffix(String name, int ind, int suffixLength) {
 		String newName = name.substring(0, ind);
-		if (name.length() > ind + suffixLength + 1) {
-			newName += name.substring(ind + suffixLength + 1);
+		if (name.length() > ind + suffixLength) {
+			newName += name.substring(ind + suffixLength);
 		}
 		return newName.trim();
 	}
