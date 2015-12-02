@@ -200,15 +200,7 @@ public class MapAddressLayer implements MapPanelLayer {
 	private double justifyResults(List<BinaryMapIndexReader> list, GeocodingUtilities su,
 			List<GeocodingResult> complete, List<GeocodingResult> res) throws IOException {
 		double minBuildingDistance = 0;
-		double minStreetDistance = 0;
 		for (GeocodingResult r : res) {
-			double streetDistance = r.getDistance();
-			if(minStreetDistance == 0) {
-				minStreetDistance = streetDistance;
-			} else if(streetDistance > GeocodingUtilities.THRESHOLD_MULTIPLIER_SKIP_STREETS_AFTER * minStreetDistance || 
-					streetDistance > minStreetDistance + GeocodingUtilities.DISTANCE_STREET_FROM_CLOSEST) {
-				break;
-			}
 			BinaryMapIndexReader reader = null;
 			for (BinaryMapIndexReader b : list) {
 				for (RouteRegion rb : b.getRoutingIndexes()) {
