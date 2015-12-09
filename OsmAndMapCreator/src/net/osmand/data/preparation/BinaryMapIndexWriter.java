@@ -636,7 +636,7 @@ public class BinaryMapIndexWriter {
 	private TByteArrayList typesAddDataBuf = new TByteArrayList();
 
 	public MapData writeMapData(long diffId, int pleft, int ptop, boolean area, byte[] coordinates, byte[] innerPolygonTypes, int[] typeUse,
-			int[] addtypeUse, Map<MapRulType, String> names, TIntObjectHashMap<String> namesDiff, Map<String, Integer> stringTable, MapDataBlock.Builder dataBlock,
+			int[] addtypeUse, Map<MapRulType, String> names, Map<Integer, String> namesDiff, Map<String, Integer> stringTable, MapDataBlock.Builder dataBlock,
 			boolean allowCoordinateSimplification)
 			throws IOException {
 		MapData.Builder data = MapData.newBuilder();
@@ -729,14 +729,12 @@ public class BinaryMapIndexWriter {
 			}
 		}
 		if (namesDiff != null) {
-			TIntObjectIterator<String> it = namesDiff.iterator();
-			while(it.hasNext()) {
-				it.advance();
-				writeRawVarint32(mapDataBuf, it.key());
-				Integer ls = stringTable.get(it.value());
+			for (Entry<Integer, String> it : namesDiff.entrySet()) {
+				writeRawVarint32(mapDataBuf, it.getKey());
+				Integer ls = stringTable.get(it.getValue());
 				if (ls == null) {
 					ls = stringTable.size();
-					stringTable.put(it.value(), ls);
+					stringTable.put(it.getValue(), ls);
 				}
 				writeRawVarint32(mapDataBuf, ls);
 			}

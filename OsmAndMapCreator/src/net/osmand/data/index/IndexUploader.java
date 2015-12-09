@@ -752,7 +752,7 @@ public class IndexUploader {
 					}
 					MapData mapData = writer.writeMapData(cid - baseId, parentBounds.getMinX(), parentBounds.getMinY(),
 							mdo.isArea(), coordinates, innerPolygonTypes, 
-							typeUse, addtypeUse, null, mdo.getObjectNames(),
+							typeUse, addtypeUse, null, mdo.getOrderedObjectNames(),
 							tempStringTable, dataBlock, mr.getMaxZoom() > 15);
 					if (mapData != null) {
 						dataBlock.addDataObjects(mapData);
