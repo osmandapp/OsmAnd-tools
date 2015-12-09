@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import net.osmand.data.index.IndexUploader;
 import net.osmand.data.preparation.IndexCreator;
 import net.osmand.data.preparation.MapZooms;
 import net.osmand.data.preparation.OceanTilesCreator;
@@ -61,6 +62,12 @@ public class MainUtilities {
 				IndexCreator ic = new IndexCreator(new File("."));
 				ic.setIndexAddress(true);
 				generateObf(subArgsArray, ic);
+			} else if(utl.equals("extract-roads-only")) {
+				File mainFile = new File(subArgsArray[0]);
+				IndexUploader.extractRoadOnlyFile(
+						mainFile,
+						new File(mainFile.getParentFile(), mainFile.getName().replace(IndexConstants.BINARY_MAP_INDEX_EXT,
+								IndexConstants.BINARY_ROAD_MAP_INDEX_EXT)));
 			} else if(utl.equals("generate-poi")) {
 				IndexCreator ic = new IndexCreator(new File("."));
 				ic.setIndexPOI(true);
@@ -98,6 +105,7 @@ public class MainUtilities {
 		System.out.println("\t\t test-routing <own list of parameters>: helps to run routing test for specific locations");
 		System.out.println("\t\t generate-ocbf <path to osmand/repos/ repository>: generates regions.ocbf file, this path should contain folders 'misc', 'tools', 'resources'");
 		System.out.println("\t\t delete-unused-strings <path to repos/android/OsmAnd/res>: deletes unused translation in git repository (transforms all strings.xml)");
+		System.out.println("\t\t extract-roads-only <path to full map obf file> : extracts .road.obf (road-only map) file from full .obf");
 		System.out.println("\t\t generate-ocean-tile-osm <optional path to osm file to write> <optional path to oceantiles_12.dat file>: generates ocean tiles osm file to check in JOSM ");
 		System.out.println("\t\t generate-obf <path to osm file>: simple way to generate obf file in place. "
 				+ "\t\t\t	Another supported options generate-map, generate-address, generate-poi, generate-roads (generate obf partially)");
