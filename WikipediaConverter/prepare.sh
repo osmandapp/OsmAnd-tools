@@ -97,3 +97,37 @@ download cy Welsh;
 download bn Bengali;
 download pms Piedmontese;
 download sk Slovak;
+
+download war Waray;
+download min Minangkabau;
+download kk Kazakh;
+download uz Uzbek;
+download ce Chechen;
+download ur Urdu;
+download oc Occitan;
+download zhminnan SouthernMin;
+download mg Malagasy;
+download tt Tatar;
+download jv Javanese;
+download ky Kyrgyz;
+download zhyue Cantonese;
+download ast AsturLeonese;
+download tg Tajik;
+download ba Bashkir;
+download sco Scots;
+download pnb Punjabi;
+download cv Chuvash;
+download lmo Lombard;
+download my Burmese;
+download yo Yoruba;
+download an Aragonese;
+download ne Nepali;
+download gu Gujarati;
+download scn Sicilian;
+download bar Bavarian;
+download mn Mongolian;
+download nap Neapolitan;
+
+
+
+
