@@ -215,7 +215,7 @@ public class MapAddressLayer implements MapPanelLayer {
 				}
 			}
 			if (reader != null) {
-				List<GeocodingResult> justified = su.justifyReverseGeocodingSearch(r, reader, minBuildingDistance);
+				List<GeocodingResult> justified = su.justifyReverseGeocodingSearch(r, reader, minBuildingDistance, null);
 				if(!justified.isEmpty()) {
 					double md = justified.get(0).getDistance();
 					if(minBuildingDistance == 0){
