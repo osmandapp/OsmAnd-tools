@@ -18,7 +18,16 @@ public class AugmentedDiffsInspector {
 
 	public static void main(String[] args) throws XmlPullParserException, IOException {
 		String file = args[0];
-		new AugmentedDiffsInspector().process(new File(file));
+		File f = new File(file);
+		if(f.isDirectory()) {
+			for(File d : f.listFiles()) {
+				if(d.getName().endsWith("gz")) {
+					new AugmentedDiffsInspector().process(d);
+				}
+			}
+		} else if(f.getName().endsWith("gz")){
+			new AugmentedDiffsInspector().process(f);
+		}
 	}
 	
 	private static class Context {
@@ -55,6 +64,7 @@ public class AugmentedDiffsInspector {
 				}
 			}
 		}
+		System.out.println(ctx);
 	}
 
 	private void processElement(XmlPullParser parser, Context ctx, String name, int modify, boolean old) {
