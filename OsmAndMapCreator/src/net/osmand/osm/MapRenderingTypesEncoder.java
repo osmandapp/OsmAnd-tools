@@ -133,13 +133,13 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		parseConvertCol(parser, ec.ifTagsLess, "if_less_");
 		ec.type = EntityConvertType.valueOf(parser.getAttributeValue("", "pattern" ).toUpperCase()); //$NON-NLS-1$
 		ec.applyToType = EnumSet.allOf(EntityConvertApplyType.class);
-		if("no".equals(parser.getAttributeValue("", "routing" ))) {
+		if("no".equals(parser.getAttributeValue("", "routing" )) || "false".equals(parser.getAttributeValue("", "routing" ))) {
 			ec.applyToType.remove(EntityConvertApplyType.ROUTING);
 		}
-		if("no".equals(parser.getAttributeValue("", "map" ))) {
+		if("no".equals(parser.getAttributeValue("", "map" )) || "false".equals(parser.getAttributeValue("", "map" ))) {
 			ec.applyToType.remove(EntityConvertApplyType.MAP);
 		}
-		if("no".equals(parser.getAttributeValue("", "poi" ))) {
+		if("no".equals(parser.getAttributeValue("", "poi" )) || "false".equals(parser.getAttributeValue("", "poi" ))) {
 			ec.applyToType.remove(EntityConvertApplyType.POI);
 		}
 		parseConvertCol(parser, ec.toTags, "to_");
