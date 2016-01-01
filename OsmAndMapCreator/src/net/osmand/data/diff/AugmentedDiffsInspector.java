@@ -2,17 +2,16 @@ package net.osmand.data.diff;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.zip.GZIPInputStream;
 
-import org.xmlpull.v1.XmlPullParser;
-import org.xmlpull.v1.XmlPullParserException;
-
 import net.osmand.PlatformUtil;
 import net.osmand.osm.edit.Entity;
+
+import org.xmlpull.v1.XmlPullParser;
+import org.xmlpull.v1.XmlPullParserException;
 
 public class AugmentedDiffsInspector {
 
@@ -64,7 +63,8 @@ public class AugmentedDiffsInspector {
 				}
 			}
 		}
-		System.out.println(ctx);
+		System.out.println(file.getName());
+		System.out.println(ctx.changesets);
 	}
 
 	private void processElement(XmlPullParser parser, Context ctx, String name, int modify, boolean old) {
