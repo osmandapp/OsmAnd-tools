@@ -78,12 +78,13 @@ for line in lines:
 				                        	" VALUES (%s, %s, %s, %s, %s, %s, %s)", 
 				                        	(vl['@id'],0,vl['@created_at'].replace('T', ' '),
 				                         	vl['@closed_at'].replace('T', ' '),vl['@closed_at'][0:10],vl['@user'],vl['@uid']))
-					v =  u' - '.join([vl['@id'], vl['@user'], vl['@closed_at']])
+					#v =  u' - '.join([vl['@id'], vl['@user'], vl['@closed_at']])
+					#print v;
 					if maxdate is None:
 						maxdate = vl['@closed_at']
 					else:
 						maxdate = max(maxdate, vl['@closed_at'])
-					print v;
+					
 	conn.commit()
 print 'Max date ' + maxdate
 
