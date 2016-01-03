@@ -15,7 +15,7 @@ import psycopg2
 # CREATE TABLE pending_changesets (id text, created_at text);
 # CREATE TABLE changesets (id text, bot int, created_at timestamp, closed_at timestamp, username text, closed_at_day text, uid text);
 # GRANT ALL privileges ON ALL TABLES IN SCHEMA public to ;
-max_query_changeset = 150
+max_query_changeset = 99
 begin_query = 36347200
 conn_string = "host='localhost' dbname='changeset' user='"+os.environ['DB_USER']+"' password='"+os.environ['DB_PWD']+"'"
 conn = psycopg2.connect(conn_string)
