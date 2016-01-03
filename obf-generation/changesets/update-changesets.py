@@ -46,7 +46,7 @@ if values < max_query_changeset:
 	c.execute("SELECT max(id) from changesets")
 	res = c.fetchall()
 	if res is not None and len(res) > 0 and res[0][0] is not None:
-		start = max(int(res[0][0]), start);
+		start = max(int(res[0][0]) + 1, start);
 	while values < max_query_changeset:
 		if len(lines[lndind]) > 0:
 			lines[lndind] = lines[lndind] + ','
@@ -73,6 +73,7 @@ for line in lines:
 				#if '@bot'
 				if '@closed_at' in vl:
 					c.execute("DELETE FROM pending_changesets where id = %s", (vl['@id'], ))
+					# c.execute("DELETE FROM changesets where id = %s", (vl['@id'], ))
 					c.execute("INSERT INTO changesets(id, bot,created_at,closed_at,closed_at_day,username,uid)" +
 				                        	" VALUES (%s, %s, %s, %s, %s, %s, %s)", 
 				                        	(vl['@id'],0,vl['@created_at'].replace('T', ' '),
