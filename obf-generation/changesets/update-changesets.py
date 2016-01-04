@@ -13,7 +13,7 @@ import psycopg2
 
 # DDL
 # CREATE TABLE pending_changesets (id text, created_at text);
-# CREATE TABLE changesets (id text, bot int, created_at timestamp, closed_at timestamp, username text, closed_at_day text, uid text);
+# CREATE TABLE changesets (id text, bot int, created_at timestamp, closed_at timestamp, username text, closed_at_day text, uid text, minlat double, minlon double, maxlat double, maxlon double);
 # GRANT ALL privileges ON ALL TABLES IN SCHEMA public to ;
 
 begin_query = 33500000
@@ -41,6 +41,7 @@ if res is not None:
 			lndind = lndind + 1
 		start = max(start, int(row[0]))
 
+c.execute("truncate table pending_changesets")
 
 if values < max_query_changeset:
 	c.execute("SELECT max(id) from changesets")
@@ -54,9 +55,9 @@ if values < max_query_changeset:
 		values = values + 1;
 		if values % max_query_1 == 0:
 			lndind = lndind + 1
-		c.execute("INSERT INTO pending_changesets VALUES (%s, %s)", (str(start), ''))
 		start = start + 1
 conn.commit()
+
 
 maxdate = None
 for line in lines:
@@ -74,16 +75,21 @@ for line in lines:
 				if '@closed_at' in vl:
 					c.execute("DELETE FROM pending_changesets where id = %s", (vl['@id'], ))
 					# c.execute("DELETE FROM changesets where id = %s", (vl['@id'], ))
-					c.execute("INSERT INTO changesets(id, bot,created_at,closed_at,closed_at_day,username,uid)" +
-				                        	" VALUES (%s, %s, %s, %s, %s, %s, %s)", 
+					c.execute("INSERT INTO changesets(id, bot, created_at, closed_at, closed_at_day, "+
+											"minlat, minlon, maxlat, maxlon, username, uid)" +
+				                        	" VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", 
 				                        	(vl['@id'],0,vl['@created_at'].replace('T', ' '),
-				                         	vl['@closed_at'].replace('T', ' '),vl['@closed_at'][0:10],vl['@user'],vl['@uid']))
+				                         	vl['@closed_at'].replace('T', ' '),vl['@closed_at'][0:10],
+				                         	vl['@minlat'], vl['@minlon'], vl['@maxlat'], vl['@maxlon'],
+				                         	vl['@user'], vl['@uid']))
 					#v =  u' - '.join([vl['@id'], vl['@user'], vl['@closed_at']])
 					#print v;
 					if maxdate is None:
 						maxdate = vl['@closed_at']
 					else:
 						maxdate = max(maxdate, vl['@closed_at'])
+				else:
+					c.execute("INSERT INTO pending_changesets VALUES (%s, %s)", (vl['@id'], ''))
 					
 	conn.commit()
 print 'Max date ' + maxdate
