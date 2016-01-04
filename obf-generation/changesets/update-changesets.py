@@ -13,7 +13,7 @@ import psycopg2
 
 # DDL
 # CREATE TABLE pending_changesets (id text, created_at text);
-# CREATE TABLE changesets (id text, bot int, created_at timestamp, closed_at timestamp, username text, closed_at_day text, uid text, minlat double, minlon double, maxlat double, maxlon double);
+# CREATE TABLE changesets (id text, bot int, created_at timestamp, closed_at timestamp, username text, closed_at_day text, uid text, minlat float, minlon float, maxlat float, maxlon float);
 # GRANT ALL privileges ON ALL TABLES IN SCHEMA public to ;
 
 begin_query = 33500000
@@ -80,7 +80,7 @@ for line in lines:
 				                        	" VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", 
 				                        	(vl['@id'],0,vl['@created_at'].replace('T', ' '),
 				                         	vl['@closed_at'].replace('T', ' '),vl['@closed_at'][0:10],
-				                         	vl['@minlat'], vl['@minlon'], vl['@maxlat'], vl['@maxlon'],
+				                         	vl['@min_lat'], vl['@min_lon'], vl['@max_lat'], vl['@max_lon'],
 				                         	vl['@user'], vl['@uid']))
 					#v =  u' - '.join([vl['@id'], vl['@user'], vl['@closed_at']])
 					#print v;
