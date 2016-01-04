@@ -90,7 +90,7 @@ for line in lines:
 				                        	" VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", 
 				                        	(vl['@id'],0,vl['@created_at'].replace('T', ' '),
 				                         	vl['@closed_at'].replace('T', ' '),vl['@closed_at'][0:10],
-				                         	vl['@min_lat'], vl['@min_lon'], vl['@max_lat'], vl['@max_lon'],
+				                         	min_lat, min_lon, max_lat, max_lon,
 				                         	vl['@user'], vl['@uid']))
 					#v =  u' - '.join([vl['@id'], vl['@user'], vl['@closed_at']])
 					#print v;
