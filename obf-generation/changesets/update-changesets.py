@@ -72,9 +72,19 @@ for line in lines:
 		if key == 'changeset':
 			for vl in value:
 				#if '@bot'
-				if '@closed_at' in vl and '@min_lat' in vl:
+				if '@closed_at' in vl:
 					c.execute("DELETE FROM pending_changesets where id = %s", (vl['@id'], ))
 					# c.execute("DELETE FROM changesets where id = %s", (vl['@id'], ))
+					if '@min_lat' in vl:
+						min_lat = vl['@min_lat']
+						min_lon = vl['@min_lon']
+						max_lat = vl['@max_lat']
+						max_lon = vl['@max_lon']
+					else:
+						min_lat = '0'
+						min_lon = '0'
+						max_lat = '0'
+						max_lon = '0'
 					c.execute("INSERT INTO changesets(id, bot, created_at, closed_at, closed_at_day, "+
 											"minlat, minlon, maxlat, maxlon, username, uid)" +
 				                        	" VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", 
