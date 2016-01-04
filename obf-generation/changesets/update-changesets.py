@@ -92,7 +92,8 @@ for line in lines:
 					c.execute("INSERT INTO pending_changesets VALUES (%s, %s)", (vl['@id'], ''))
 					
 	conn.commit()
-print 'Max date ' + maxdate
+if maxdate is not None:
+	print 'Max date ' + maxdate
 
 
 # OLD CODE
