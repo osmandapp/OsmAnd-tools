@@ -72,7 +72,7 @@ for line in lines:
 		if key == 'changeset':
 			for vl in value:
 				#if '@bot'
-				if '@closed_at' in vl:
+				if '@closed_at' in vl and '@min_lat' in vl:
 					c.execute("DELETE FROM pending_changesets where id = %s", (vl['@id'], ))
 					# c.execute("DELETE FROM changesets where id = %s", (vl['@id'], ))
 					c.execute("INSERT INTO changesets(id, bot, created_at, closed_at, closed_at_day, "+
