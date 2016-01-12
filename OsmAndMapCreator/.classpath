@@ -21,6 +21,7 @@
 	<classpathentry kind="lib" path="lib-gl/jogl-all.jar"/>
 	<classpathentry kind="lib" path="lib/sqlite-jdbc-3.8.7.jar"/>
 	<classpathentry kind="lib" path="lib/leveldbjni-all-1.8.jar"/>
+	<classpathentry kind="lib" path="lib/postgresql-9.4.1207.jre6.jar"/>
 	<classpathentry combineaccessrules="false" kind="src" path="/OsmAnd-java"/>
 	<classpathentry kind="lib" path="lib-gl/OsmAndCore_jni.jar"/>
 	<classpathentry kind="output" path="bin"/>
