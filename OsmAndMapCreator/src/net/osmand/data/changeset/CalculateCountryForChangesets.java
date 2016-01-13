@@ -16,8 +16,9 @@ public class CalculateCountryForChangesets {
 
 	private static void calculateCountries() throws SQLException {
 		System.out.println("Connect " + System.getenv("DB_USER"));
+		// jdbc:postgresql://user:secret@localhost
 		Connection conn = DriverManager.getConnection("jdbc:postgresql://localhost:5432/changeset",
-				System.getProperty("DB_USER"), System.getenv("DB_PWD"));
+				System.getenv("DB_USER"), System.getenv("DB_PWD"));
 		try {
 			Statement stat = conn.createStatement();
 			ResultSet rs = stat.executeQuery("SELECT COUNT(*) FROM changesets");
