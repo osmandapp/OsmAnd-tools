@@ -11,13 +11,6 @@ import re
 import gzip
 import psycopg2
 
-# DDL
-# CREATE TABLE pending_changesets (id text, created_at text);
-# CREATE TABLE changesets (id text, bot int, created_at timestamp, closed_at timestamp, username text, closed_at_day text, uid text, minlat float, minlon float, maxlat float, maxlon float);
-# GRANT ALL privileges ON ALL TABLES IN SCHEMA public to ;
-# CREATE INDEX changesets_id_idx on changesets(id)
-# CREATE INDEX changesets_closed_at_day_idx on changesets(closed_at_day)
-# CREATE INDEX changesets_username_idx on changesets(username)
 
 begin_query = 33500000
 conn_string = "host='localhost' dbname='changeset' user='"+os.environ['DB_USER']+"' password='"+os.environ['DB_PWD']+"'"

@@ -8,6 +8,7 @@
 	<property name="osmand-jni.absolute.dir" location="${osmand-core.dir}" />
 	<property name="osmand-core.jar" value="OsmAnd-core.jar"/>
 	<property name="src.absolute.dir" location="${src.dir}" />
+	<property name="main.absolute.dir" location="." />
 	<property name="icons.dir" value="icons/resources"/>
 	<property name="icons.absolute.dir" location="${icons.dir}" />
 	<property name="fonts.dir" value="fonts"/>
@@ -37,6 +38,11 @@
 	<target name="copy_resources">
 		<mkdir dir="${icons.absolute.dir}"/>
 		<mkdir dir="${fonts.absolute.dir}"/>
+		<copy todir="${main.absolute.dir}">
+		    <fileset dir="../../resources/countries-info/">
+				<include name="regions.ocbf" />
+			</fileset>
+		</copy>
 		<copy todir="${fonts.absolute.dir}">
 			<fileset dir="../../resources/rendering_styles/fonts/OpenSans">
 				<include name="OpenSans-Regular.ttf" />
@@ -212,6 +218,8 @@
 				<include name="logging.properties"/>
 				<include name="*.bat"/>
 				<include name="*.sh"/>
+				<include name="regions.ocbf"/>
+				
 				<exclude name="lib/h2*"/>
 				<exclude name="native-build.sh"/>
 			</fileset>
@@ -221,7 +229,6 @@
 			<fileset dir="src/net/osmand/osm/">
 				<include name="rendering_types.xml"/>
 			</fileset>
-
 			<fileset dir=".">
 				<include name="../obf-generation/regions/indexes.xml" />
 			</fileset>
