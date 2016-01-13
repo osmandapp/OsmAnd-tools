@@ -116,7 +116,12 @@ public class CalculateCountryForChangesets {
 		ResultSet rs = conn.createStatement().executeQuery("select id, fullname from countries");
 		while(rs.next()) {
 			int id = rs.getInt(1);
-			WorldRegion rd = or.getRegionData(rs.getString(2));
+			WorldRegion rd ;
+			if(rs.getString(2).equals("world")) {
+				rd = worldRegion;
+			} else { 
+				rd = or.getRegionData(rs.getString(2));
+			}
 			if(rd == null) {
 				throw new UnsupportedOperationException(rs.getString(2) + " not found");
 			}
