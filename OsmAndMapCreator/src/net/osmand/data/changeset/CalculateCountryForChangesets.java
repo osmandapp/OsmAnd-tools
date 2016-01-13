@@ -39,8 +39,11 @@ public class CalculateCountryForChangesets {
 			rs.close();
 			Map<WorldRegion, Integer> map = new LinkedHashMap<WorldRegion, Integer>();
 			OsmandRegions or = initCountriesTable(conn, empty, map);
-			
-			rs = stat.executeQuery("select id, minlat, minlon, maxlat, maxlon from changesets where id not in (select changesetid from changeset_country) limit 1000;");
+			PreparedStatement ps = conn
+					.prepareStatement("INSERT INTO changeset_country(changesetid, countryid, small)"
+							+ " VALUES(?, ?, ?)");
+			rs = stat.executeQuery("select id, minlat, minlon, maxlat, maxlon from changesets where id not in (select changesetid from changeset_country) limit 100000;");
+			int batch = 0;
 			while(rs.next()) {
 				double minlat = rs.getDouble(2);
 				double minlon = rs.getDouble(3);
@@ -58,9 +61,34 @@ public class CalculateCountryForChangesets {
 					}
 					String full = or.getFullName(o);
 					WorldRegion reg = or.getRegionData(full);
-					System.out.println(changesetId  + " " + full + " " + reg.getLocaleName() + " " + map.get(reg));
+					if(reg.isRegionMapDownload()) {
+						System.out.println(changesetId  + " " + full + " " + reg.getLocaleName() + " " + map.get(reg));
+						if(map.get(reg) == null) {
+							throw new UnsupportedOperationException("Not found " + changesetId + " " + full);
+						}
+						boolean small = true;
+						List<WorldRegion> subs = reg.getSubregions();
+						if(subs != null) {
+							for(WorldRegion sub : subs) {
+								if(sub.isRegionMapDownload()) {
+									small = false;
+									break;
+								}
+							}
+						}
+						ps.setString(1, changesetId);
+						ps.setInt(2, map.get(reg));
+						ps.setInt(3, small ? 1 : 0);
+						ps.addBatch();
+					}
+					
+				}
+				if(batch ++ > 1000) {
+					ps.executeBatch();
+					batch = 0;
 				}
 			}
+			ps.executeBatch();
 			
 			
 			
