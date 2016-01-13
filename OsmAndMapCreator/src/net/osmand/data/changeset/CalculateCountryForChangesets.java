@@ -61,7 +61,7 @@ public class CalculateCountryForChangesets {
 					}
 					String full = or.getFullName(o);
 					WorldRegion reg = or.getRegionData(full);
-					if(reg.isRegionMapDownload()) {
+					if(reg.isRegionMapDownload() && !full.toLowerCase().startsWith("world_")) {
 						System.out.println(changesetId  + " " + full + " " + reg.getLocaleName() + " " + map.get(reg));
 						if(map.get(reg) == null) {
 							throw new UnsupportedOperationException("Not found " + changesetId + " " + full);
