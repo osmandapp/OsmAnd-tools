@@ -109,7 +109,7 @@ public class CalculateCountryForChangesets {
 					queue.addAll(lst);
 				}
 			}
-			ps.executeUpdate();
+			ps.executeBatch();
 			ps.close();
 		}
 		map.clear();
