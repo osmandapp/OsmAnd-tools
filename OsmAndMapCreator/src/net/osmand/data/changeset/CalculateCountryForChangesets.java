@@ -15,6 +15,7 @@ public class CalculateCountryForChangesets {
 	}
 
 	private static void calculateCountries() throws SQLException {
+		System.out.println("Connect " + System.getProperty("DB_USER"));
 		Connection conn = DriverManager.getConnection("jdbc:postgresql://localhost:5432/changeset",
 				System.getProperty("DB_USER"), System.getProperty("DB_PWD"));
 		try {
