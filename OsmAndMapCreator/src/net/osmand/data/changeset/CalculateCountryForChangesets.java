@@ -42,8 +42,9 @@ public class CalculateCountryForChangesets {
 			PreparedStatement ps = conn
 					.prepareStatement("INSERT INTO changeset_country(changesetid, countryid, small)"
 							+ " VALUES(?, ?, ?)");
-			rs = stat.executeQuery("select id, minlat, minlon, maxlat, maxlon from changesets C where "
-					+ "not exists (select 1 from changeset_country CC where CC.changesetid=C.id);");
+			rs = stat.executeQuery("select id, minlat, minlon, maxlat, maxlon from changesets C "
+					+ " where (maxlat <> 0 or minlat <> 0 or maxlon <> 0 or minlon <> 0) and "
+					+ "not exists (select 1 from changeset_country CC where CC.changesetid=C.id)");
 			int batch = 0;
 			while(rs.next()) {
 				double minlat = rs.getDouble(2);

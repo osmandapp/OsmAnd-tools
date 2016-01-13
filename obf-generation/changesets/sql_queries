@@ -26,6 +26,16 @@ for t in $(seq 1 9); do rm $i/*_15_*_0$t.obf.gz; done; for t in $(seq 10 31); do
 
 # EXAMPLES
 # SQL report
+# Total changes by country, month
+select c.name, changes.changes, changes.users, changes.month from (
+select cc.countryid country, count(distinct ch.id) changes, substr(ch.closed_at_day, 0, 8) month, count(distinct ch.username) users from changesets ch, changeset_country cc
+where ch.id = cc.changesetid and 
+
+group by cc.countryid, substr(ch.closed_at_day, 0, 8)
+) changes join countries c on c.id = changes.country
+order by changes.month desc, changes.changes desc;
+
+
   SELECT username, count(*) changes,  
     ntile(10) over (order by count(*) desc) rank, sum(1) over () contributors,
     ntile(100) over (order by count(*) asc) ,
