@@ -57,6 +57,7 @@ public class CalculateCountryForChangesets {
 				int ty = MapUtils.get31TileNumberY(maxlat);
 				int by = MapUtils.get31TileNumberY(minlat);
 				List<BinaryMapDataObject> objs = or.queryBbox(lx, rx, ty, by);
+				int cid = 0;
 				for(BinaryMapDataObject o : objs) {
 					if (!or.intersect(o, lx, ty, rx, by)) {
 						continue;
@@ -64,6 +65,10 @@ public class CalculateCountryForChangesets {
 					String full = or.getFullName(o);
 					WorldRegion reg = or.getRegionData(full);
 					if(reg.isRegionMapDownload() && !full.toLowerCase().startsWith("world_")) {
+						cid++;
+						if (cid > 5) {
+							continue;
+						}
 						System.out.println(changesetId  + " " + full + " " + reg.getLocaleName() + " " + map.get(reg));
 						if(map.get(reg) == null) {
 							throw new UnsupportedOperationException("Not found " + changesetId + " " + full);
