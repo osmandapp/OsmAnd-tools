@@ -107,7 +107,6 @@ public class CalculateCountryForChangesets {
 			}
 			ps.executeUpdate();
 			ps.close();
-			conn.commit();
 		}
 		map.clear();
 		ResultSet rs = conn.createStatement().executeQuery("select id, fullname from countries");
