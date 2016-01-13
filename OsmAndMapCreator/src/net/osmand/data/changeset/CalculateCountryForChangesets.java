@@ -47,12 +47,18 @@ public class CalculateCountryForChangesets {
 				double maxlat = rs.getDouble(4);
 				double maxlon = rs.getDouble(5);
 				String changesetId = rs.getString(1);
-				List<BinaryMapDataObject> objs = or.queryBbox(MapUtils.get31TileNumberX(minlon), MapUtils.get31TileNumberX(maxlon), 
-						MapUtils.get31TileNumberY(maxlat), MapUtils.get31TileNumberY(minlat));
+				int lx = MapUtils.get31TileNumberX(minlon);
+				int rx = MapUtils.get31TileNumberX(maxlon);
+				int ty = MapUtils.get31TileNumberY(maxlat);
+				int by = MapUtils.get31TileNumberY(minlat);
+				List<BinaryMapDataObject> objs = or.queryBbox(lx, rx, ty, by);
 				for(BinaryMapDataObject o : objs) {
+					if (!or.intersect(o, lx, ty, rx, by)) {
+						continue;
+					}
 					String full = or.getFullName(o);
 					WorldRegion reg = or.getRegionData(full);
-					System.out.println(changesetId  + " " + full + " " + reg + " " + map.get(reg));
+					System.out.println(changesetId  + " " + full + " " + reg.getLocaleName() + " " + map.get(reg));
 				}
 			}
 			
@@ -77,8 +83,8 @@ public class CalculateCountryForChangesets {
 		if (empty) {
 			int id = 0;
 			PreparedStatement ps = conn
-					.prepareStatement("INSERT INTO countries(id, parentid, name, fullname, downloadname, clat, clon)"
-							+ " VALUES(?, ?, ?, ?, ?, ?, ?)");
+					.prepareStatement("INSERT INTO countries(id, parentid, name, fullname, downloadname, clat, clon, map)"
+							+ " VALUES(?, ?, ?, ?, ?, ?, ?, ?)");
 			LinkedList<WorldRegion> queue = new LinkedList<WorldRegion>();
 			queue.add(worldRegion);
 			while (!queue.isEmpty()) {
@@ -103,6 +109,7 @@ public class CalculateCountryForChangesets {
 					ps.setDouble(6, 0);
 					ps.setDouble(7, 0);
 				}
+				ps.setInt(8, wr.isRegionMapDownload() ? 1 : 0);
 				ps.addBatch();
 				List<WorldRegion> lst = wr.getSubregions();
 				if(lst != null) {
@@ -128,11 +135,10 @@ public class CalculateCountryForChangesets {
 			map.put(rd, id);
 		}
 		
-		Iterator<Entry<WorldRegion, Integer>> it = map.entrySet().iterator();
-		while(it.hasNext()){
-			Entry<WorldRegion, Integer> e = it.next();
-			System.out.println(e.getKey().getLocaleName() + " " + e.getValue());
-		}
+//		Iterator<Entry<WorldRegion, Integer>> it = map.entrySet().iterator();
+//		while(it.hasNext()){
+//			Entry<WorldRegion, Integer> e = it.next();
+//		}
 			
 		return or;
 	}
