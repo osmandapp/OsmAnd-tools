@@ -16,7 +16,7 @@ def num(s, df):
 			return df
 
 def esc(s):
-	return s.replace("\"", "&quot;").replace("<", "&lt;").replace(">", "&gt;").replace("&", "&amp;").replace("'","&apos;")
+	return s.replace("&", "&amp;").replace("\"", "&quot;").replace("<", "&lt;").replace(">", "&gt;").replace("'","&apos;")
 
 def process_points(cond, filename, array):
 	f = open(filename,'w')
