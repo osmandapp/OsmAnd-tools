@@ -104,6 +104,10 @@ public class CalculateCountryForChangesets {
 					ps.setDouble(7, 0);
 				}
 				ps.addBatch();
+				List<WorldRegion> lst = wr.getSubregions();
+				if(lst != null) {
+					queue.addAll(lst);
+				}
 			}
 			ps.executeUpdate();
 			ps.close();
