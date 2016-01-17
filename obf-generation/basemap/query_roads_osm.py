@@ -83,5 +83,5 @@ if __name__ == "__main__":
 	process_roads("route='ferry' or (tags->'seamark:type' in ('separation_line', 'separation_lane', 'separation_boundary'))", "proc_line_ferry_out.osm", ['route', 'seamark:type'])
 	
 	# not used
-	#process_roads("(admin_level = '4' or admin_level = '2')", "line_admin_level.osm", ['admin_level'])
+	process_roads("(admin_level = '4' or admin_level = '2')", "line_admin_level.osm", ['admin_level'])
 	#process_roads("waterway='river' or waterway='canal' ", "line_rivers.osm", ['waterway'])
