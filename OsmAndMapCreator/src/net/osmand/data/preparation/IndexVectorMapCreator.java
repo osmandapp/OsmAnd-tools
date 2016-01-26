@@ -209,7 +209,8 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	 */
 	private void indexMultiPolygon(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 		// Don't handle things that aren't multipolygon, and nothing administrative
-		if (!(e instanceof Relation) || !"multipolygon".equals(e.getTag(OSMTagKey.TYPE))
+		if (!(e instanceof Relation) || 
+		    (!"multipolygon".equals(e.getTag(OSMTagKey.TYPE)) &&  !"protected_area".equals(e.getTag("boundary")))) 
 				|| e.getTag(OSMTagKey.ADMIN_LEVEL) != null)
 			return;
 		MultipolygonBuilder original = createMultipolygonBuilder(e, ctx);
