@@ -42,7 +42,7 @@ public class FixBasemapRoads {
 	public static void main(String[] args) throws Exception {
 		String fileToRead = args != null && args.length > 0 ? args[0] : null; 
 		if(fileToRead == null) {
-			fileToRead = "/Users/victorshcherb/osmand/temp/line_trunk.osm.bz2";
+			fileToRead = "/Users/victorshcherb/temp/test_fixbasemaproads.osm";
 		}
 		File read = new File(fileToRead);
 		File write ;
