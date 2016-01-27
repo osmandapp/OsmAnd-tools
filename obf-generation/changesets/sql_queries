@@ -4,7 +4,7 @@ CREATE TABLE pending_changesets (id text, created_at text) ;
 CREATE TABLE changesets (id text, bot int, created_at timestamp, closed_at timestamp, username text, closed_at_day ext, uid text, minlat float, minlon float, maxlat float, maxlon float, PRIMARY KEY(id));
 CREATE TABLE countries(id int, parentid int, name text, fullname text, downloadname text, clat float, clon float,  map int, PRIMARY KEY(id));
 CREATE TABLE changeset_country(changesetid text, countryid int, small int);
-CREATE TABLE supporters(userid text, visiblename text, useremail text, preferred_region text);
+CREATE TABLE supporters(userid text, visiblename text, useremail text, preferred_region text, disable int);
 CREATE SEQUENCE supporters_seq START 1000;
 ALTER TABLE supporters ADD PRIMARY KEY (userid);
 CREATE TABLE supporters_subscription(userid text, sku text, purchasetoken text, time text, checktime bigint,
