@@ -72,7 +72,7 @@ public class UpdateSubscriptionImpl {
 	private static void queryPurchases(AndroidPublisher publisher, Connection conn, ResultSet rs) throws SQLException {
 		try {
 			PreparedStatement ps = conn.prepareStatement(
-					"INSERT INTO supporters_subscription(userid, sku, purchasetToken, checktime, autorenewing, starttime, expiretime, kind) "
+					"INSERT INTO supporters_subscription(userid, sku, purchaseToken, checktime, autorenewing, starttime, expiretime, kind) "
 					+ " VALUES(?, ?, ?, ?, ?, ?, ?, ?)");
 			
 			AndroidPublisher.Purchases purchases = publisher.purchases();
