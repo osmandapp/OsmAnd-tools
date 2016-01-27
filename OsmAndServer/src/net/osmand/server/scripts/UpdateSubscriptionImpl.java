@@ -50,7 +50,8 @@ public class UpdateSubscriptionImpl {
 	private static HttpTransport HTTP_TRANSPORT = new NetHttpTransport();
 	private static JsonFactory JSON_FACTORY = new com.google.api.client.json.jackson2.JacksonFactory();
 
-	public static void main(String[] args) throws JSONException, IOException, SQLException {
+	public static void main(String[] args) throws JSONException, IOException, SQLException, ClassNotFoundException {
+		Class.forName("org.postgresql.Driver");
 		Connection conn = DriverManager.getConnection("jdbc:postgresql://localhost:5432/changeset",
 						System.getenv("DB_USER"), System.getenv("DB_PWD"));
 		ResultSet rs = conn.createStatement().executeQuery("SELECT * FROM ( " +
