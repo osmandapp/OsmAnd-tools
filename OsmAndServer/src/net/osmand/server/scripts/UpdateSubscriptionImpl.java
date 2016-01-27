@@ -51,6 +51,12 @@ public class UpdateSubscriptionImpl {
 	private static JsonFactory JSON_FACTORY = new com.google.api.client.json.jackson2.JacksonFactory();
 
 	public static void main(String[] args) throws JSONException, IOException, SQLException, ClassNotFoundException {
+		AndroidPublisher publisher = getPublisherApi(args[0]);
+//		if(true ){
+//			test(publisher, "","");
+//			return;
+//		}
+		
 		Class.forName("org.postgresql.Driver");
 		Connection conn = DriverManager.getConnection("jdbc:postgresql://localhost:5432/changeset",
 				System.getenv("DB_USER"), System.getenv("DB_PWD"));
@@ -60,6 +66,7 @@ public class UpdateSubscriptionImpl {
 				verifyAll = true;
 			}
 		}
+		
 
 		ResultSet rs = conn.createStatement().executeQuery(
 				"SELECT * FROM ( " +
@@ -73,45 +80,47 @@ public class UpdateSubscriptionImpl {
 				"	first_value(expiretime) over (partition by userid, sku order by checktime desc) expiretime " +
 				"  FROM supporters_subscription ) a " +
 				(verifyAll? ";" : "WHERE kind = '' or kind is null;"));
-		AndroidPublisher publisher = getPublisherApi(args[0]);
+		
 		queryPurchases(publisher, conn, rs);
 	}
 	
 	private static void queryPurchases(AndroidPublisher publisher, Connection conn, ResultSet rs) throws SQLException {
-		try {
-			PreparedStatement ps = conn.prepareStatement(
-					"INSERT INTO supporters_subscription(userid, sku, purchaseToken, checktime, autorenewing, starttime, expiretime, kind) "
-					+ " VALUES(?, ?, ?, ?, ?, ?, ?, ?)");
-			
-			AndroidPublisher.Purchases purchases = publisher.purchases();
-			int changes = 0; 
-			while(rs.next()) {
-				String userid = rs.getString("userid");
-				String pt = rs.getString("purchasetoken");
-				String subscriptionId = rs.getString("sku");
-				SubscriptionPurchase subscription = purchases.subscriptions().get(GOOGLE_PACKAGE_NAME, subscriptionId, pt).execute();
-				long tm = System.currentTimeMillis();
-				ps.setString(1, userid);
-				ps.setString(2, subscriptionId);
-				ps.setString(3, pt);
-				ps.setLong(4, tm);
-				ps.setString(5, subscription.getAutoRenewing() + "");
-				ps.setLong(6, subscription.getStartTimeMillis() );
-				ps.setLong(7, subscription.getExpiryTimeMillis() );
-				ps.setString(8, subscription.getKind());
-				System.out.println("Update " + userid + " time " + tm + " expire " + subscription.getExpiryTimeMillis());
-				ps.addBatch();
-				changes ++;
-			}
-			if (changes > 0) {
-				ps.executeBatch();
-				if (!conn.getAutoCommit()) {
-					conn.commit();
-				}
-			}
+		PreparedStatement ps = conn
+				.prepareStatement("INSERT INTO supporters_subscription(userid, sku, purchaseToken, checktime, autorenewing, starttime, expiretime, kind) "
+						+ " VALUES(?, ?, ?, ?, ?, ?, ?, ?)");
 
-		} catch (IOException e) {
-			e.printStackTrace();
+		AndroidPublisher.Purchases purchases = publisher.purchases();
+		int changes = 0;
+		while (rs.next()) {
+			String userid = rs.getString("userid");
+			String pt = rs.getString("purchasetoken");
+			String subscriptionId = rs.getString("sku");
+			SubscriptionPurchase subscription;
+			try {
+				subscription = purchases.subscriptions().get(GOOGLE_PACKAGE_NAME, subscriptionId, pt).execute();
+			} catch (Exception e) {
+				System.err.println("Error updating userid " + userid + " and sku " + subscriptionId);
+				e.printStackTrace();
+				continue;
+			}
+			long tm = System.currentTimeMillis();
+			ps.setString(1, userid);
+			ps.setString(2, subscriptionId);
+			ps.setString(3, pt);
+			ps.setLong(4, tm);
+			ps.setString(5, subscription.getAutoRenewing() + "");
+			ps.setLong(6, subscription.getStartTimeMillis());
+			ps.setLong(7, subscription.getExpiryTimeMillis());
+			ps.setString(8, subscription.getKind());
+			System.out.println("Update " + userid + " time " + tm + " expire " + subscription.getExpiryTimeMillis());
+			ps.addBatch();
+			changes++;
+		}
+		if (changes > 0) {
+			ps.executeBatch();
+			if (!conn.getAutoCommit()) {
+				conn.commit();
+			}
 		}
 	}
 
