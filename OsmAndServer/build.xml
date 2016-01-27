@@ -74,10 +74,12 @@
 			<fileset dir=".">
 				<include name="OsmAndServer.jar"/>
 				<include name="lib/**"/>
-				<include name="lib-google/**"/>
-				<include name="logging.properties"/>
-				<include name="*.bat"/>
-				<include name="*.sh"/>
+				
+			</fileset>
+		</copy>
+		<copy todir="build/lib">
+			<fileset dir="lib-google">
+			    <include name="*.jar"/>
 			</fileset>
 		</copy>
 		<delete file="OsmAndServer.jar"/>
