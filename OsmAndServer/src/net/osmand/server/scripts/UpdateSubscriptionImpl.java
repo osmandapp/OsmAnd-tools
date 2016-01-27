@@ -53,7 +53,14 @@ public class UpdateSubscriptionImpl {
 	public static void main(String[] args) throws JSONException, IOException, SQLException, ClassNotFoundException {
 		Class.forName("org.postgresql.Driver");
 		Connection conn = DriverManager.getConnection("jdbc:postgresql://localhost:5432/changeset",
-						System.getenv("DB_USER"), System.getenv("DB_PWD"));
+				System.getenv("DB_USER"), System.getenv("DB_PWD"));
+		boolean verifyAll = false;
+		for (int i = 1; i < args.length; i++) {
+			if ("-verifyall".equals(args[i])) {
+				verifyAll = true;
+			}
+		}
+
 		ResultSet rs = conn.createStatement().executeQuery("SELECT * FROM ( " +
 				"  SELECT DISTINCT userid, sku,  " +
 				"	first_value(purchaseToken) over (partition by userid, sku order by checktime desc) purchaseToken, " +
@@ -64,7 +71,7 @@ public class UpdateSubscriptionImpl {
 				"	first_value(kind) over (partition by userid, sku order by checktime desc) kind, " +
 				"	first_value(expiretime) over (partition by userid, sku order by checktime desc) expiretime " +
 				"  FROM supporters_subscription ) a " +
-				"WHERE kind = '' or kind is null;");
+				(verifyAll? ";" : "WHERE kind = '' or kind is null;"));
 		AndroidPublisher publisher = getPublisherApi(args[0]);
 		queryPurchases(publisher, conn, rs);
 	}
@@ -76,6 +83,7 @@ public class UpdateSubscriptionImpl {
 					+ " VALUES(?, ?, ?, ?, ?, ?, ?, ?)");
 			
 			AndroidPublisher.Purchases purchases = publisher.purchases();
+			int changes = 0; 
 			while(rs.next()) {
 				String userid = rs.getString("userid");
 				String pt = rs.getString("purchasetoken");
@@ -91,10 +99,13 @@ public class UpdateSubscriptionImpl {
 				ps.setLong(7, subscription.getExpiryTimeMillis() );
 				ps.setString(8, subscription.getKind());
 				ps.addBatch();
+				changes ++;
 			}
-			ps.executeUpdate();
-			if(!conn.getAutoCommit()) {
-				conn.commit();
+			if (changes > 0) {
+				ps.executeUpdate();
+				if (!conn.getAutoCommit()) {
+					conn.commit();
+				}
 			}
 
 		} catch (IOException e) {
