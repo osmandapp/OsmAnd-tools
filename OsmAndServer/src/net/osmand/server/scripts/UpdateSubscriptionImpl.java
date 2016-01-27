@@ -115,8 +115,10 @@ public class UpdateSubscriptionImpl {
 		String token = TOKEN;//getRefreshToken();
 		String accessToken = getAccessToken(token);
 		TokenResponse tokenResponse = new TokenResponse();
-		System.out.println("refresh token=" + token);
-		System.out.println("access token=" + accessToken);
+		
+//		System.out.println("refresh token=" + token);
+//		System.out.println("access token=" + accessToken);
+		
 		tokenResponse.setAccessToken(accessToken);
 		tokenResponse.setRefreshToken(token);
 		tokenResponse.setExpiresInSeconds(3600L);
