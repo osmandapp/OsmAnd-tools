@@ -61,7 +61,8 @@ public class UpdateSubscriptionImpl {
 			}
 		}
 
-		ResultSet rs = conn.createStatement().executeQuery("SELECT * FROM ( " +
+		ResultSet rs = conn.createStatement().executeQuery(
+				"SELECT * FROM ( " +
 				"  SELECT DISTINCT userid, sku,  " +
 				"	first_value(purchaseToken) over (partition by userid, sku order by checktime desc) purchaseToken, " +
 				"	first_value(checktime) over (partition by userid, sku order by checktime desc) checktime, " +
@@ -88,21 +89,22 @@ public class UpdateSubscriptionImpl {
 				String userid = rs.getString("userid");
 				String pt = rs.getString("purchasetoken");
 				String subscriptionId = rs.getString("sku");
-				System.out.println("Query for " + userid);
 				SubscriptionPurchase subscription = purchases.subscriptions().get(GOOGLE_PACKAGE_NAME, subscriptionId, pt).execute();
+				long tm = System.currentTimeMillis();
 				ps.setString(1, userid);
 				ps.setString(2, subscriptionId);
 				ps.setString(3, pt);
-				ps.setLong(4, System.currentTimeMillis());
+				ps.setLong(4, tm);
 				ps.setString(5, subscription.getAutoRenewing() + "");
 				ps.setLong(6, subscription.getStartTimeMillis() );
 				ps.setLong(7, subscription.getExpiryTimeMillis() );
 				ps.setString(8, subscription.getKind());
+				System.out.println("Update " + userid + " time " + tm + " expire " + subscription.getExpiryTimeMillis());
 				ps.addBatch();
 				changes ++;
 			}
 			if (changes > 0) {
-				ps.executeUpdate();
+				ps.executeBatch();
 				if (!conn.getAutoCommit()) {
 					conn.commit();
 				}
