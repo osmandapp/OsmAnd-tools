@@ -46,16 +46,20 @@ public class UpdateSubscriptionImpl {
 	
 	
 	private static final String GOOGLE_PRODUCT_NAME = "OsmAnd+";
+	private static final String GOOGLE_PRODUCT_NAME_FREE = "OsmAnd";
+	
 	private static final String GOOGLE_PACKAGE_NAME = "net.osmand.plus";
+	private static final String GOOGLE_PACKAGE_NAME_FREE = "net.osmand";
+	
 	private static HttpTransport HTTP_TRANSPORT = new NetHttpTransport();
 	private static JsonFactory JSON_FACTORY = new com.google.api.client.json.jackson2.JacksonFactory();
 
 	public static void main(String[] args) throws JSONException, IOException, SQLException, ClassNotFoundException {
 		AndroidPublisher publisher = getPublisherApi(args[0]);
-//		if(true ){
-//			test(publisher, "","");
-//			return;
-//		}
+		if(true ){
+			test(publisher, "osm_free_live_subscription_2","");
+			return;
+		}
 		
 		Class.forName("org.postgresql.Driver");
 		Connection conn = DriverManager.getConnection("jdbc:postgresql://localhost:5432/changeset",
@@ -97,7 +101,11 @@ public class UpdateSubscriptionImpl {
 			String subscriptionId = rs.getString("sku");
 			SubscriptionPurchase subscription;
 			try {
-				subscription = purchases.subscriptions().get(GOOGLE_PACKAGE_NAME, subscriptionId, pt).execute();
+				if(subscriptionId.startsWith("osm_free")) {
+					subscription = purchases.subscriptions().get(GOOGLE_PACKAGE_NAME_FREE, subscriptionId, pt).execute();
+				} else {
+					subscription = purchases.subscriptions().get(GOOGLE_PACKAGE_NAME, subscriptionId, pt).execute();
+				}
 			} catch (Exception e) {
 				System.err.println("Error updating userid " + userid + " and sku " + subscriptionId);
 				e.printStackTrace();
@@ -152,7 +160,8 @@ public class UpdateSubscriptionImpl {
 				.setFromTokenResponse(tokenResponse);
 
 		AndroidPublisher publisher = new AndroidPublisher.Builder(HTTP_TRANSPORT, JSON_FACTORY, credential)
-				.setApplicationName(GOOGLE_PRODUCT_NAME).build();
+//				.setApplicationName(GOOGLE_PRODUCT_NAME)
+				.build();
 		return publisher;
 	}
 	
@@ -160,7 +169,7 @@ public class UpdateSubscriptionImpl {
 	private static void test(AndroidPublisher publisher, String subscriptionId,String purchaseToken) {
 		try {
 
-			com.google.api.services.androidpublisher.AndroidPublisher.Inappproducts.List lst = publisher.inappproducts().list(GOOGLE_PACKAGE_NAME);
+			com.google.api.services.androidpublisher.AndroidPublisher.Inappproducts.List lst = publisher.inappproducts().list(GOOGLE_PACKAGE_NAME_FREE);
 			InappproductsListResponse response = lst.execute();
 			for(InAppProduct p : response.getInappproduct()) {
 				System.out.println("SKU="+p.getSku() +
@@ -170,7 +179,7 @@ public class UpdateSubscriptionImpl {
 						" Period=" +p.getSubscriptionPeriod() + " Status="+p.getStatus());
 			}
 			AndroidPublisher.Purchases purchases = publisher.purchases();
-			SubscriptionPurchase subscription = purchases.subscriptions().get(GOOGLE_PACKAGE_NAME, subscriptionId, purchaseToken).execute();
+			SubscriptionPurchase subscription = purchases.subscriptions().get(GOOGLE_PACKAGE_NAME_FREE, subscriptionId, purchaseToken).execute();
 			System.out.println(subscription.getUnknownKeys());
 			System.out.println(subscription.getAutoRenewing());
 			System.out.println(subscription.getKind());
