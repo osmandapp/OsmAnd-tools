@@ -56,10 +56,10 @@ public class UpdateSubscriptionImpl {
 
 	public static void main(String[] args) throws JSONException, IOException, SQLException, ClassNotFoundException {
 		AndroidPublisher publisher = getPublisherApi(args[0]);
-		if(true ){
-			test(publisher, "osm_free_live_subscription_2","");
-			return;
-		}
+//		if(true ){
+//			test(publisher, "","");
+//			return;
+//		}
 		
 		Class.forName("org.postgresql.Driver");
 		Connection conn = DriverManager.getConnection("jdbc:postgresql://localhost:5432/changeset",
