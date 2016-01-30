@@ -160,8 +160,7 @@ public class UpdateSubscriptionImpl {
 				.setFromTokenResponse(tokenResponse);
 
 		AndroidPublisher publisher = new AndroidPublisher.Builder(HTTP_TRANSPORT, JSON_FACTORY, credential)
-//				.setApplicationName(GOOGLE_PRODUCT_NAME)
-				.build();
+				.setApplicationName(GOOGLE_PRODUCT_NAME).build();
 		return publisher;
 	}
 	
