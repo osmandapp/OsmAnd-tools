@@ -20,8 +20,11 @@ import java.util.Map;
 
 import javax.xml.stream.XMLStreamException;
 
+import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.data.LatLon;
+import net.osmand.data.QuadRect;
 import net.osmand.impl.ConsoleProgressImplementation;
+import net.osmand.map.OsmandRegions;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.Entity.EntityType;
@@ -66,6 +69,13 @@ public class FixBasemapRoads {
 		OsmBaseStorage storage = new OsmBaseStorage();
         InputStream stream = new BufferedInputStream(new FileInputStream(read), 8192 * 4);
         InputStream streamFile = stream;
+        OsmandRegions or = new OsmandRegions();
+		File regions = new File("OsmAndMapCreator/regions.ocbf");
+		if(!regions.exists()) {
+			 regions = new File("regions.ocbf");
+		}
+		or.prepareFile(regions.getAbsolutePath());
+		or.cacheAllCountries();
         long st = System.currentTimeMillis();
         if (read.getName().endsWith(".bz2")) { //$NON-NLS-1$
             if (stream.read() != 'B' || stream.read() != 'Z') {
@@ -84,7 +94,8 @@ public class FixBasemapRoads {
 			}
 		}
         List<EntityId> toWrite = new ArrayList<EntityId>();
-		processRegion(toWrite);
+        
+		processRegion(toWrite, or);
 		OsmStorageWriter writer = new OsmStorageWriter();
 		writer.saveStorage(new FileOutputStream(write), storage, toWrite, true);
 	}
@@ -306,24 +317,43 @@ public class FixBasemapRoads {
 
 
     // TODO try reverse?
-    private void processRegion(List<EntityId> toWrite) {
-        for(String ref : roadInfoMap.keySet()){
-            RoadInfo ri = roadInfoMap.get(ref);
-            // combine unique roads
-            combineUniqueIdentifyRoads(ri);
-            reverseWrongPositionedRoads(ri);
-            combineUniqueIdentifyRoads(ri);
-            // last step not definite
-            combineIntoLongestRoad(ri);
-            combineRoadsWithCut(ri);
-            for(RoadLine ls :  ri.roadLines) {
-                if(ls.distance > MINIMAL_DISTANCE ){
-                    ls.combineWaysIntoOneWay();
-                    toWrite.add(ls.getFirstWayId());
-                }
-            }
-        }
-    }
+	private void processRegion(List<EntityId> toWrite, OsmandRegions or) throws IOException {
+		for (String ref : roadInfoMap.keySet()) {
+			RoadInfo ri = roadInfoMap.get(ref);
+			// combine unique roads
+			combineUniqueIdentifyRoads(ri);
+			reverseWrongPositionedRoads(ri);
+			combineUniqueIdentifyRoads(ri);
+			// last step not definite
+			combineIntoLongestRoad(ri);
+			combineRoadsWithCut(ri);
+			for (RoadLine ls : ri.roadLines) {
+				if (ls.distance > MINIMAL_DISTANCE) {
+					ls.combineWaysIntoOneWay();
+					toWrite.add(ls.getFirstWayId());
+					Way firstWay = ls.getFirstWay();
+					QuadRect qr = firstWay.getLatLonBBox();
+					int lx = MapUtils.get31TileNumberX(qr.left);
+					int rx = MapUtils.get31TileNumberX(qr.right);
+					int by = MapUtils.get31TileNumberY(qr.bottom);
+					int ty = MapUtils.get31TileNumberY(qr.top);
+					List<BinaryMapDataObject> bbox = or.queryBbox(lx, rx, ty, by);
+					String regionName = "";
+					for (BinaryMapDataObject bo : bbox) {
+						if (!or.intersect(bo, lx, ty, rx, by)) {
+							continue;
+						}
+						String downloadName = or.getDownloadName(bo);
+						if (regionName.length() > 0) {
+							regionName += ",";
+						}
+						regionName += downloadName;
+					}
+					firstWay.putTag("regionName", regionName);
+				}
+			}
+		}
+	}
 
     private void reverseWrongPositionedRoads(RoadInfo ri) {
         for (RoadLine roadLine : ri.roadLines) {
