@@ -23,63 +23,9 @@ CREATE INDEX changesets_country_changeset_idx on changeset_country(changesetid);
 GRANT ALL privileges ON ALL TABLES IN SCHEMA public to <user>;
 GRANT ALL privileges ON supporters_seq to <user>;
 
-# ROTATE queries <period>
-#!/bin/bash
-set -e
-cd /home/changesets/dumps
-if [ -z "$PERIOD" ]; then 
-  PERIOD=$(date -d "$(date +%Y-%m-01) -1 day" "+%Y-%m")
-fi
-DB_NAME=changeset_${PERIOD//-/_}
-psql -d changeset -U $DB_USER -c "CREATE DATABASE $DB_NAME OWNER $DB_USER";
-pg_dump -U $DB_USER -v -F t -f $DB_NAME.tar changeset
-pg_restore -n public -U $DB_USER -v $DB_NAME.tar -d $DB_NAME
-psql -d $DB_NAME -U $DB_USER -c "DELETE FROM changesets where substr(closed_at_day, 0, 8) <> '$PERIOD'";
-psql -d $DB_NAME -U $DB_USER -c "DELETE FROM changeset_country c where not exists (select 1 from changesets d where d.id = c.changesetid)";
-psql -d $DB_NAME -U $DB_USER -c "VACUUM FULL";
-# set everything
-pg_dump -U $DB_USER -v -F t -f $DB_NAME.tar $DB_NAME
-gzip $DB_NAME.tar 
-
-
 
 # SCHEDULE BASH !
 for i in $(ls -d */); do echo $i; rm $i/15_*.osm.gz; done
 for i in $(ls -d */); do echo $i; for t in $(seq 1 9); do rm $i/*_15_*_0$t.obf.gz; done; for t in $(seq 10 31); do rm $i/*_15_*_$t.obf.gz; done; done
 # download
 for t in $(seq 1 9); do rm $i/*_15_*_0$t.obf.gz; done; for t in $(seq 10 31); do rm $i/*_15_*_$t.obf.gz; done
-
-
-
-
-# EXAMPLES
-# SQL report
-# Total changes by country, month
-select c.name, changes.changes, changes.users, changes."month" from (
-select cc.countryid country, count(distinct ch.id) changes, substr(ch.closed_at_day, 0, 8) "month", count(distinct ch.username) users from changesets ch, changeset_country cc
-where ch.id = cc.changesetid 
-group by cc.countryid, substr(ch.closed_at_day, 0, 8)
-) changes join countries c on c.id = changes.country
-order by changes."month" desc, changes.changes desc;
-
-
-  SELECT username, count(*) changes,  
-    ntile(10) over (order by count(*) desc) rank, sum(1) over () contributors,
-    ntile(100) over (order by count(*) asc) ,
-	100 * ntile(100) over (order by count(*) asc) / (sum(1) over () * 50.5) value_percent
-	   FROM changesets 
-	where substr(closed_at_day, 0, 8) = '2015-11'
-	group by username
-	having count(*) >= 3
-	order by count(*) desc;
-
-
-SELECT username,  changes, nt rank, (100. * nt / (sum(nt) over () )) percent FROM (
-    SELECT username, count(*) changes,  ntile(100) over (order by count(*) asc) nt FROM changesets 
-	where substr(closed_at_day, 0, 8) = '2015-11'
-	group by username
-	having count(*) >= 3
-	order by nt desc, changes desc
-) data where username like 'v%';
-
-
