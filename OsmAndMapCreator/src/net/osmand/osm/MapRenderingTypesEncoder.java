@@ -128,6 +128,8 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		}
 		ec.verbose = "true".equals(parser.getAttributeValue("", "verbose")); //$NON-NLS-1$
 		parseConvertCol(parser, ec.ifTags, "if_");
+		parseConvertCol(parser, ec.ifStartsTags, "if_starts_with_");
+		parseConvertCol(parser, ec.ifNotStartsTags, "if_not_starts_with_");
 		parseConvertCol(parser, ec.ifNotTags, "if_not_");
 		parseConvertCol(parser, ec.ifTagsNotLess, "if_not_less_");
 		parseConvertCol(parser, ec.ifTagsLess, "if_less_");
@@ -289,11 +291,6 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	}
 
 
-
-	
-
-
-
 	public Map<String, String> transformTags(Map<String, String> tags, EntityType entity, 
 			EntityConvertApplyType appType) {
 		EntityConvertType filter = EntityConvertType.TAG_TRANSFORM;
@@ -421,7 +418,6 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 				return false;
 			}
 		}
-		
 		for(TagValuePattern ift : ec.ifTags) {
 			String val = tags.get(ift.tag);
 			if(!checkConvertValue(ift, val)) {
@@ -431,6 +427,18 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		for(TagValuePattern ift : ec.ifNotTags) {
 			String val = tags.get(ift.tag);
 			if(checkConvertValue(ift, val)) {
+				return false;
+			}
+		}
+		for(TagValuePattern ift : ec.ifStartsTags) {
+			String val = tags.get(ift.tag);
+			if(!checkStartsWithValue(ift, val)) {
+				return false;
+			}
+		}
+		for(TagValuePattern ift : ec.ifNotStartsTags) {
+			String val = tags.get(ift.tag);
+			if(checkStartsWithValue(ift, val)) {
 				return false;
 			}
 		}
@@ -463,6 +471,16 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			return true;
 		}
 		return fromTag.value.toLowerCase().equals(value.toLowerCase());
+	}
+	
+	private boolean checkStartsWithValue(TagValuePattern fromTag, String value) {
+		if(value == null) {
+			return false;
+		}
+		if(fromTag.value == null) {
+			return true;
+		}
+		return value.toLowerCase().startsWith(fromTag.value.toLowerCase());
 	}
 
 
@@ -782,6 +800,8 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		public EnumSet<EntityConvertApplyType> applyToType;
 		public EnumSet<EntityType> applyTo ;
 		public List<String> ifRegionName = new ArrayList<String>();
+		public List<TagValuePattern> ifStartsTags = new ArrayList<MapRenderingTypes.TagValuePattern>();
+		public List<TagValuePattern> ifNotStartsTags = new ArrayList<MapRenderingTypes.TagValuePattern>();
 		public List<TagValuePattern> ifTags = new ArrayList<MapRenderingTypes.TagValuePattern>();
 		public List<TagValuePattern> ifTagsLess = new ArrayList<MapRenderingTypes.TagValuePattern>();
 		public List<TagValuePattern> ifTagsNotLess = new ArrayList<MapRenderingTypes.TagValuePattern>();
