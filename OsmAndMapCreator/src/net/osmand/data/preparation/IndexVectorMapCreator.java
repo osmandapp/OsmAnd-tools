@@ -169,7 +169,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 							while (it.hasNext()) {
 								Entry<MapRulType, String> es = it.next();
 								String key = es.getKey().getTag();
-								map.put(key + "_" + modifier, es.getValue());
+								map.put(key + modifier, es.getValue());
 							}
 						} else {
 							Iterator<Entry<MapRulType, String>> it = pr.entrySet().iterator();
