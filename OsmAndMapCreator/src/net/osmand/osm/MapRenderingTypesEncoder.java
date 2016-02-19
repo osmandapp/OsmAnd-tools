@@ -67,8 +67,8 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		return null;
 	}
 	
-	public Map<MapRulType, String> getRelationPropogatedTags(Relation relation) {
-		Map<MapRulType, String> propogated = new LinkedHashMap<MapRulType, String>();
+	public Map<MapRulType, Map<MapRulType, String>> getRelationPropogatedTags(Relation relation) {
+		Map<MapRulType, Map<MapRulType, String>> propogated = new LinkedHashMap<MapRulType, Map<MapRulType, String>>();
 		Map<String, String> ts = relation.getTags();
 		ts = transformTags(ts, EntityType.RELATION, EntityConvertApplyType.MAP);
 		ts = processExtraTags(ts);
@@ -78,7 +78,12 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			MapRulType rule = getRelationalTagValue(ev.getKey(), ev.getValue());
 			if(rule != null) {
 				String value = ev.getValue();
-				addRuleToPropogated(propogated, ts, rule, value);
+				LinkedHashMap<MapRulType, String> pr = new LinkedHashMap<MapRulType, String>();
+				
+				addRuleToPropogated(pr, ts, rule, value);
+				if(pr.size() > 0) {
+					propogated.put(rule, pr);
+				}
 			}
 		}
 		return propogated;
@@ -93,6 +98,8 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 				String tag = rule.names[i].tagValuePattern.tag.substring(rule.namePrefix.length());
 				if(ts.containsKey(tag)) {
 					propogated.put(rule.names[i], ts.get(tag));
+				} else if(rule.relationGroup) {
+					propogated.put(rule.names[i], "");
 				}
 			}
 		}

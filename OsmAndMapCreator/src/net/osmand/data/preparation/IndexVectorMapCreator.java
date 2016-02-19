@@ -144,7 +144,8 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 
 	public static void addPropogatedTags(Map<EntityId, Map<String, String>> propogatedTags, MapRenderingTypesEncoder renderingTypes, Entity e, OsmDbAccessorContext ctx) throws SQLException {
 		if(e instanceof Relation) {
-			Map<MapRulType, String> propogated = renderingTypes.getRelationPropogatedTags(((Relation)e));
+			Map<MapRulType, Map<MapRulType, String>> propogated = 
+					renderingTypes.getRelationPropogatedTags((Relation)e);
 			if(propogated != null && propogated.size() > 0) {
 				ctx.loadEntityRelation((Relation) e);
 				for(EntityId id : ((Relation) e).getMembersMap().keySet()) {
@@ -152,15 +153,36 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 						propogatedTags.put(id, new LinkedHashMap<String, String>());
 					}
 					Map<String, String> map = propogatedTags.get(id);
-					Iterator<Entry<MapRulType, String>> it = propogated.entrySet().iterator();
-					while(it.hasNext()) {
-						Entry<MapRulType, String> es = it.next();
-						String key = es.getKey().getTag();
-						if(es.getKey().isText() && map.containsKey(key)) {
-							String res = sortAndAttachUniqueValue(map.get(key), es.getValue());
-							map.put(key, res);
+					Iterator<Entry<MapRulType, Map<MapRulType, String>>> itMain = propogated.entrySet().iterator();
+					while (itMain.hasNext()) {
+						Entry<MapRulType, Map<MapRulType, String>> ev = itMain.next();
+						Map<MapRulType, String> pr = ev.getValue();
+						MapRulType propagateRule = ev.getKey();
+						if (propagateRule.isRelationGroup()) {
+							Iterator<Entry<MapRulType, String>> it = pr.entrySet().iterator();
+							int modifier = 1;
+							String s = propagateRule.getTag() + "__" + propagateRule.getValue() + "_";
+							while (map.containsKey(s + modifier)) {
+								modifier++;
+							}
+							map.put(s + modifier, s);
+							while (it.hasNext()) {
+								Entry<MapRulType, String> es = it.next();
+								String key = es.getKey().getTag();
+								map.put(key + "_" + modifier, es.getValue());
+							}
 						} else {
-							map.put(key, es.getValue());
+							Iterator<Entry<MapRulType, String>> it = pr.entrySet().iterator();
+							while (it.hasNext()) {
+								Entry<MapRulType, String> es = it.next();
+								String key = es.getKey().getTag();
+								if (es.getKey().isText() && map.containsKey(key)) {
+									String res = sortAndAttachUniqueValue(map.get(key), es.getValue());
+									map.put(key, res);
+								} else {
+									map.put(key, es.getValue());
+								}
+							}
 						}
 					}
 				}
