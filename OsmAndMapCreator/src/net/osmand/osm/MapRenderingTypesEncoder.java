@@ -300,6 +300,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 
 	public Map<String, String> transformTags(Map<String, String> tags, EntityType entity, 
 			EntityConvertApplyType appType) {
+		tags = transformShieldTags(tags, entity, appType);
 		EntityConvertType filter = EntityConvertType.TAG_TRANSFORM;
 		List<EntityConvert> listToConvert = getApplicableConverts(tags, entity, filter, appType);
 		if(listToConvert == null) {
@@ -313,6 +314,97 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	}
 	
 	
+	private Map<String, String> transformShieldTags(Map<String, String> tags, EntityType entity,
+			EntityConvertApplyType appType) {
+		if(entity == EntityType.WAY && !Algorithms.isEmpty(tags.get("ref"))) {
+			String ref = tags.get("ref");
+			boolean modify = false;
+			List<String> rfs = new ArrayList<String>(Arrays.asList(ref.split(";")));
+			Iterator<Entry<String, String>> it = tags.entrySet().iterator();
+			while(it.hasNext()) {
+				Entry<String, String> e = it.next();
+				String tag = e.getKey();
+				String vl = e.getValue();
+				if(tag.startsWith("road_ref_")) {
+					modify |= rfs.remove(vl);
+					modify |= rfs.remove("I " +vl);
+					modify |= rfs.remove("US " +vl);
+					modify |= rfs.remove("US " + vl + " Business");
+				}
+			}
+			if (modify) {
+				tags = new LinkedHashMap<String, String>(tags);
+				String rf = "";
+				for(String r : rfs) {
+					if(rf.length() == 0) {
+						rf += r;
+					} else {
+						rf += ", " + r; 
+					}
+				}
+				tags.put("ref", rf);
+			}
+			
+		}
+		tags = transformRouteRoadTags(tags);
+		return tags;
+	}
+
+	private Map<String, String> transformRouteRoadTags(Map<String, String> tags) {
+		if(!tags.containsKey("route") && !"road".equals(tags.get("route"))) {
+			return tags;
+		}
+		Map<String, String> rtags = new LinkedHashMap<String, String>(tags);
+		if(rtags.containsKey("network")) {
+			String network = rtags.get("network");
+			if (network.startsWith("US:")) {
+				if (!network.equalsIgnoreCase("US: I") && !network.equalsIgnoreCase("US:US")) {
+					rtags.put("us_state_network", "yes");
+				}
+				if (network.length() > 5) {
+					network = network.substring(0, 5);
+					rtags.put("network", network);
+				}
+			}
+		} else {
+			String rf = rtags.get("ref");
+			if(!Algorithms.isEmpty(rf)) {
+				rf = rf.trim();
+				boolean allnumbers = true;
+				for(int i = 0; i < rf.length(); i++) {
+					if(!Character.isDigit(rf.charAt(i))) {
+						allnumbers = false;
+						break;
+					}
+				}
+				if(allnumbers) {
+					rtags.put("network", "#");
+				} else{
+					int ind = 0;
+					for(; ind < rf.length(); ind++) {
+						if(Character.isDigit(rf.charAt(ind)) || 
+								rf.charAt(ind) == ' ' || rf.charAt(ind) == '-') {
+							break;
+						}
+					}	
+					rtags.put("network", "#");
+				}
+				
+			}
+		}
+
+		if(rtags.containsKey("network")) {
+			rtags.put("network", rtags.get("network").toLowerCase());
+		}
+		if(rtags.containsKey("modifier")) {
+			rtags.put("modifier", rtags.get("modifier").toLowerCase());
+		}
+		if(rtags.containsKey("ref")) {
+			rtags.put("ref", rtags.get("ref").toLowerCase());
+		}
+		return rtags;
+	}
+
 	public List<Map<String, String>> splitTags(Map<String, String> tags, EntityType entity) {
 		EntityConvertType filter = EntityConvertType.SPLIT;
 		List<EntityConvert> listToConvert = getApplicableConverts(tags, entity, filter, 
