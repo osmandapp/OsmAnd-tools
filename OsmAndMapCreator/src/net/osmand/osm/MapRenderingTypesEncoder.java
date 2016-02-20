@@ -387,7 +387,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 							break;
 						}
 					}	
-					rtags.put("network", "#");
+					rtags.put("network", rf.substring(0, ind).trim());
 				}
 				
 			}
