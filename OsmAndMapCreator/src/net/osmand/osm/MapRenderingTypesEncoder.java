@@ -358,7 +358,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		if(rtags.containsKey("network")) {
 			String network = rtags.get("network");
 			if (network.startsWith("US:")) {
-				if (!network.equalsIgnoreCase("US: I") && !network.equalsIgnoreCase("US:US")) {
+				if (!network.equalsIgnoreCase("US:I") && !network.equalsIgnoreCase("US:US")) {
 					rtags.put("us_state_network", "yes");
 				}
 				if (network.length() > 5) {
