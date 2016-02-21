@@ -325,11 +325,19 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			boolean modify = false;
 			List<String> rfs = new ArrayList<String>(Arrays.asList(ref.split(";")));
 			Iterator<Entry<String, String>> it = tags.entrySet().iterator();
+			int maxModifier = 1;
 			while(it.hasNext()) {
 				Entry<String, String> e = it.next();
 				String tag = e.getKey();
 				String vl = e.getValue();
 				if(tag.startsWith("road_ref_")) {
+					String sf = Algorithms.extractIntegerSuffix(tag);
+					if(sf.length() > 0) {
+						try {
+							maxModifier = Math.max(maxModifier, 1 + Integer.parseInt(sf));
+						} catch (NumberFormatException e1) {
+						}
+					}
 					modify |= rfs.remove(vl);
 					modify |= rfs.remove(vl.replace('-', ' ')); // E-17, E 17
 					modify |= rfs.remove(vl.replace(' ', '-')); // E 17, E-17
@@ -340,24 +348,27 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 					modify |= rfs.remove("US " + vl + " Business"); // US 5 Business
 				}
 			}
-			if (modify) {
+			boolean SPLIT_REFS_TO_DIFFERENT_SHIELDS = true;
+			// TODO THES LINE SHOULD NOT BE USED UNTIL MAJOR UPGRADE HAPPENS
+			boolean MAJOR_UPGRADE_2_3_FINISHED = true;
+			if ((modify || rfs.size() > 0) && MAJOR_UPGRADE_2_3_FINISHED) {
 				tags = new LinkedHashMap<String, String>(tags);
 				String rf = "";
-				for(String r : rfs) {
-					if(rf.length() == 0) {
+				for (String r : rfs) {
+					if (rf.length() == 0) {
 						rf += r;
 					} else {
-						rf += ", " + r; 
+						if(SPLIT_REFS_TO_DIFFERENT_SHIELDS) {
+							tags.put("road_ref_"+maxModifier++, r);
+						} else {
+							rf += ", " + r;
+						}
 					}
 				}
-				// TODO THES LINE SHOULD NOT BE USED UNTIL MAJOR UPGRADE HAPPENS
-				boolean MAJOR_UPGRADE_2_3_FINISHED = true;
-				if (MAJOR_UPGRADE_2_3_FINISHED) {
-					if (rf.length() == 0) {
-						tags.remove("ref");
-					} else {
-						tags.put("ref", rf);
-					}
+				if (rf.length() == 0) {
+					tags.remove("ref");
+				} else {
+					tags.put("ref", rf);
 				}
 			}
 			
