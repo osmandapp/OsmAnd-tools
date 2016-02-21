@@ -133,6 +133,10 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		if(tg != null) {
 			ec.ifRegionName.addAll(Arrays.asList(tg.split("\\,")));
 		}
+		tg = parser.getAttributeValue("", "if_not_region_name"); //$NON-NLS-1$
+		if(tg != null) {
+			ec.ifNotRegionName.addAll(Arrays.asList(tg.split("\\,")));
+		}
 		ec.verbose = "true".equals(parser.getAttributeValue("", "verbose")); //$NON-NLS-1$
 		parseConvertCol(parser, ec.ifTags, "if_");
 		parseConvertCol(parser, ec.ifStartsTags, "if_starts_with_");
@@ -342,7 +346,11 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 						rf += ", " + r; 
 					}
 				}
-				tags.put("ref", rf);
+				if(rf.length() == 0) {
+					tags.remove("ref");
+				} else {
+					tags.put("ref", rf);
+				}
 			}
 			
 		}
@@ -514,6 +522,11 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 				}
 			}
 			if (!found) {
+				return false;
+			}
+		}
+		for (String s : ec.ifNotRegionName) {
+			if (regionName.contains(s)) {
 				return false;
 			}
 		}
@@ -899,6 +912,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		public EnumSet<EntityConvertApplyType> applyToType;
 		public EnumSet<EntityType> applyTo ;
 		public List<String> ifRegionName = new ArrayList<String>();
+		public List<String> ifNotRegionName = new ArrayList<String>();
 		public List<TagValuePattern> ifStartsTags = new ArrayList<MapRenderingTypes.TagValuePattern>();
 		public List<TagValuePattern> ifNotStartsTags = new ArrayList<MapRenderingTypes.TagValuePattern>();
 		public List<TagValuePattern> ifTags = new ArrayList<MapRenderingTypes.TagValuePattern>();
