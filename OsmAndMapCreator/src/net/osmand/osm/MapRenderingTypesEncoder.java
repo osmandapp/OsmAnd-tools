@@ -323,7 +323,10 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		if(entity == EntityType.WAY && !Algorithms.isEmpty(tags.get("ref"))) {
 			String ref = tags.get("ref");
 			boolean modify = false;
-			List<String> rfs = new ArrayList<String>(Arrays.asList(ref.split(";")));
+			List<String> rfs = new ArrayList<String>();
+			for(String r : Arrays.asList(ref.split(";"))) {
+				rfs.add(r.trim());
+			}
 			Iterator<Entry<String, String>> it = tags.entrySet().iterator();
 			int maxModifier = 1;
 			while(it.hasNext()) {
@@ -360,16 +363,16 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 						rf += r;
 					} else {
 						if(SPLIT_REFS_TO_DIFFERENT_SHIELDS) {
-							tags.put("road_ref_"+maxModifier++, r.trim());
+							tags.put("road_ref_"+maxModifier++, r);
 						} else {
-							rf += ", " + r.trim();
+							rf += ", " + r;
 						}
 					}
 				}
 				if (rf.length() == 0) {
 					tags.remove("ref");
 				} else {
-					tags.put("ref", rf.trim());
+					tags.put("ref", rf);
 				}
 			}
 			
