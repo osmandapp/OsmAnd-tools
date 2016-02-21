@@ -350,10 +350,14 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 						rf += ", " + r; 
 					}
 				}
-				if(rf.length() == 0) {
-					tags.remove("ref");
-				} else {
-					tags.put("ref", rf);
+				// TODO THES LINE SHOULD NOT BE USED UNTIL MAJOR UPGRADE HAPPENS
+				boolean MAJOR_UPGRADE_2_3_FINISHED = true;
+				if (MAJOR_UPGRADE_2_3_FINISHED) {
+					if (rf.length() == 0) {
+						tags.remove("ref");
+					} else {
+						tags.put("ref", rf);
+					}
 				}
 			}
 			
