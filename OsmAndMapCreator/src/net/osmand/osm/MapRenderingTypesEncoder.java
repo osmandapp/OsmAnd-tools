@@ -360,16 +360,16 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 						rf += r;
 					} else {
 						if(SPLIT_REFS_TO_DIFFERENT_SHIELDS) {
-							tags.put("road_ref_"+maxModifier++, r);
+							tags.put("road_ref_"+maxModifier++, r.trim());
 						} else {
-							rf += ", " + r;
+							rf += ", " + r.trim();
 						}
 					}
 				}
 				if (rf.length() == 0) {
 					tags.remove("ref");
 				} else {
-					tags.put("ref", rf);
+					tags.put("ref", rf.trim());
 				}
 			}
 			
