@@ -331,9 +331,13 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 				String vl = e.getValue();
 				if(tag.startsWith("road_ref_")) {
 					modify |= rfs.remove(vl);
-					modify |= rfs.remove("I " +vl);
-					modify |= rfs.remove("US " +vl);
-					modify |= rfs.remove("US " + vl + " Business");
+					modify |= rfs.remove(vl.replace('-', ' ')); // E-17, E 17
+					modify |= rfs.remove(vl.replace(' ', '-')); // E 17, E-17
+					modify |= rfs.remove(vl.replaceAll(" ", "")); // E 17, E17
+					modify |= rfs.remove(vl.replaceAll("-", "")); // E-17, E17
+					modify |= rfs.remove("I " +vl); // I 5, 5
+					modify |= rfs.remove("US " +vl); // US 5, 5
+					modify |= rfs.remove("US " + vl + " Business"); // US 5 Business
 				}
 			}
 			if (modify) {
