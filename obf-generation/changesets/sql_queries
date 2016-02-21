@@ -5,7 +5,7 @@ CREATE TABLE changesets (id text, bot int, created_at timestamp, closed_at times
 CREATE TABLE countries(id int, parentid int, name text, fullname text, downloadname text, clat float, clon float,  map int, PRIMARY KEY(id));
 CREATE TABLE changeset_country(changesetid text, countryid int, small int);
 CREATE TABLE supporters(userid text, token text, visiblename text, useremail text, preferred_region text, disable int);
-CREATE TABLE osm_recipients(osmid text, btcaddr text, updatetime bigint);
+CREATE TABLE osm_recipients(osmid text, email text, btcaddr text, updatetime bigint);
 CREATE SEQUENCE supporters_seq START 1000;
 ALTER TABLE supporters ADD PRIMARY KEY (userid);
 CREATE TABLE supporters_subscription(userid text, sku text, purchasetoken text, time text, checktime bigint,
