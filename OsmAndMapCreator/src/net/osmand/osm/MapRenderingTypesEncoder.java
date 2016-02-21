@@ -331,11 +331,12 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 				String tag = e.getKey();
 				String vl = e.getValue();
 				if(tag.startsWith("road_ref_")) {
-					String sf = Algorithms.extractIntegerSuffix(tag);
+					String sf = Algorithms.extractOnlyIntegerSuffix(tag);
 					if(sf.length() > 0) {
 						try {
 							maxModifier = Math.max(maxModifier, 1 + Integer.parseInt(sf));
 						} catch (NumberFormatException e1) {
+							e1.printStackTrace();
 						}
 					}
 					modify |= rfs.remove(vl);
