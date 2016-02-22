@@ -359,6 +359,9 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 				tags = new LinkedHashMap<String, String>(tags);
 				String rf = "";
 				for (String r : rfs) {
+					if(r.length() == 0) {
+						continue;
+					}
 					if (rf.length() == 0) {
 						rf += r;
 					} else {
@@ -423,14 +426,13 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 				
 			}
 		}
-
 		if(rtags.containsKey("network")) {
 			rtags.put("network", rtags.get("network").toLowerCase());
 		}
 		if(rtags.containsKey("modifier")) {
 			rtags.put("modifier", rtags.get("modifier").toLowerCase());
 		}
-		if(rtags.containsKey("ref")) {
+		if(rtags.containsKey("ref") && !Algorithms.isEmpty(rtags.get("ref"))) {
 			rtags.put("ref", rtags.get("ref").toUpperCase());
 		}
 		return rtags;
