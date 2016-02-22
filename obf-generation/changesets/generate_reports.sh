@@ -10,6 +10,7 @@ else
   curl -X POST "http://builder.osmand.net/reports/all_reports.php?month=${PERIOD}&eurValue=${EUR_VALUE}&btcValue=${BTC_VALUE}"
   DB_NAME=changeset_${PERIOD//-/_}
   DUMPNAME=${DB_NAME}_$(date +%s)
-  pg_dump -U $DB_USER -v -F t -f $DUMPNAME.tar $DB_NAME
+  #-U $DB_USER
+  pg_dump -v -F t -f $DUMPNAME.tar $DB_NAME
   gzip $DUMPNAME.tar 
 fi
