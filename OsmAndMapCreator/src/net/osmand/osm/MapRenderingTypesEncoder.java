@@ -9,6 +9,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -322,13 +323,13 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			EntityConvertApplyType appType) {
 		if(entity == EntityType.WAY && !Algorithms.isEmpty(tags.get("ref"))) {
 			String ref = tags.get("ref");
-			boolean modify = false;
-			List<String> rfs = new ArrayList<String>();
+			Set<String> rfs = new LinkedHashSet<String>();
 			for(String r : Arrays.asList(ref.split(";"))) {
 				rfs.add(r.trim());
 			}
 			Iterator<Entry<String, String>> it = tags.entrySet().iterator();
 			int maxModifier = 1;
+			Set<String> exisitingRefs = new LinkedHashSet<String>();
 			while(it.hasNext()) {
 				Entry<String, String> e = it.next();
 				String tag = e.getKey();
@@ -342,40 +343,27 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 							e1.printStackTrace();
 						}
 					}
-					modify |= rfs.remove(vl);
-					modify |= rfs.remove(vl.replace('-', ' ')); // E-17, E 17
-					modify |= rfs.remove(vl.replace(' ', '-')); // E 17, E-17
-					modify |= rfs.remove(vl.replaceAll(" ", "")); // E 17, E17
-					modify |= rfs.remove(vl.replaceAll("-", "")); // E-17, E17
-					modify |= rfs.remove("I " +vl); // I 5, 5
-					modify |= rfs.remove("US " +vl); // US 5, 5
-					modify |= rfs.remove("US " + vl + " Business"); // US 5 Business
+					exisitingRefs.add(vl);
+					exisitingRefs.add("I " + vl); // I 5, 5
+					exisitingRefs.add("US " + vl ); // US 5, 5
+					exisitingRefs.add("US " + vl + " Business"); // US 5 Business
+					exisitingRefs.add(vl.replaceAll("-", "").replaceAll(" ", "")); // E 17, E-17, E17
 				}
 			}
-			boolean SPLIT_REFS_TO_DIFFERENT_SHIELDS = true;
-			// TODO THES LINE SHOULD NOT BE USED UNTIL MAJOR UPGRADE HAPPENS
-			boolean MAJOR_UPGRADE_2_3_FINISHED = true;
-			if ((modify || rfs.size() > 0) && MAJOR_UPGRADE_2_3_FINISHED) {
+			rfs.removeAll(exisitingRefs);
+			if (rfs.size() > 0) {
 				tags = new LinkedHashMap<String, String>(tags);
-				String rf = "";
 				for (String r : rfs) {
-					if(r.length() == 0) {
+					String s = r.replaceAll("-", "").replaceAll(" ", "");
+					if(r.length() == 0 || exisitingRefs.contains(s)) {
 						continue;
 					}
-					if (rf.length() == 0) {
-						rf += r;
-					} else {
-						if(SPLIT_REFS_TO_DIFFERENT_SHIELDS) {
-							tags.put("road_ref_"+maxModifier++, r);
-						} else {
-							rf += ", " + r;
-						}
+					tags.put("road_ref_"+maxModifier, r);
+					String network = getNetwork(r);
+					if(!Algorithms.isEmpty(network)) {
+						tags.put("road_network_"+maxModifier, network);
 					}
-				}
-				if (rf.length() == 0) {
-					tags.remove("ref");
-				} else {
-					tags.put("ref", rf);
+					maxModifier++;
 				}
 			}
 			
@@ -404,26 +392,8 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			String rf = rtags.get("ref");
 			if(!Algorithms.isEmpty(rf)) {
 				rf = rf.trim();
-				boolean allnumbers = true;
-				for(int i = 0; i < rf.length(); i++) {
-					if(!Character.isDigit(rf.charAt(i))) {
-						allnumbers = false;
-						break;
-					}
-				}
-				if(allnumbers) {
-					rtags.put("network", "#");
-				} else{
-					int ind = 0;
-					for(; ind < rf.length(); ind++) {
-						if(Character.isDigit(rf.charAt(ind)) || 
-								rf.charAt(ind) == ' ' || rf.charAt(ind) == '-') {
-							break;
-						}
-					}	
-					rtags.put("network", rf.substring(0, ind).trim());
-				}
-				
+				String network = getNetwork(rf);
+				rtags.put("network", network);
 			}
 		}
 		if(rtags.containsKey("network")) {
@@ -436,6 +406,30 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			rtags.put("ref", rtags.get("ref").toUpperCase());
 		}
 		return rtags;
+	}
+
+	private String getNetwork(String rf) {
+		boolean allnumbers = true;
+		String network = "";
+		for(int i = 0; i < rf.length(); i++) {
+			if(!Character.isDigit(rf.charAt(i))) {
+				allnumbers = false;
+				break;
+			}
+		}
+		if(allnumbers) {
+			network = "#";
+		} else{
+			int ind = 0;
+			for(; ind < rf.length(); ind++) {
+				if(Character.isDigit(rf.charAt(ind)) || 
+						rf.charAt(ind) == ' ' || rf.charAt(ind) == '-') {
+					break;
+				}
+			}	
+			network = rf.substring(0, ind).trim();
+		}
+		return network;
 	}
 
 	public List<Map<String, String>> splitTags(Map<String, String> tags, EntityType entity) {
