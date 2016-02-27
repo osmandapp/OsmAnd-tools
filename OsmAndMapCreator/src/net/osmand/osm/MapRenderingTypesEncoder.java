@@ -336,7 +336,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	
 	private Map<String, String> transformShieldTags(Map<String, String> tags, EntityType entity,
 			EntityConvertApplyType appType) {
-		if(entity == EntityType.WAY && !Algorithms.isEmpty(tags.get("ref"))) {
+		if(entity == EntityType.WAY && !Algorithms.isEmpty(tags.get("ref")) && tags.containsKey("highway")) {
 			String ref = tags.get("ref");
 			Set<String> rfs = new LinkedHashSet<String>();
 			for(String r : Arrays.asList(ref.split(";"))) {
