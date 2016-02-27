@@ -142,6 +142,10 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		parseConvertCol(parser, ec.ifTags, "if_");
 		parseConvertCol(parser, ec.ifStartsTags, "if_starts_with_");
 		parseConvertCol(parser, ec.ifNotStartsTags, "if_not_starts_with_");
+		parseConvertCol(parser, ec.ifEndsTags, "if_ends_with_");
+		parseConvertCol(parser, ec.ifNotEndsTags, "if_not_ends_with_");
+		parseConvertCol(parser, ec.ifContainsTags, "if_contains_");
+		parseConvertCol(parser, ec.ifNotContainsTags, "if_not_contains_");
 		parseConvertCol(parser, ec.ifNotTags, "if_not_");
 		parseConvertCol(parser, ec.ifTagsNotLess, "if_not_less_");
 		parseConvertCol(parser, ec.ifTagsLess, "if_less_");
@@ -184,7 +188,18 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			String tg = parser.getAttributeValue("", prefix +"tag" + i); //$NON-NLS-1$
 			String value = parser.getAttributeValue("", prefix +"value" + i); //$NON-NLS-1$
 			if (tg != null) {
-				col.add(new TagValuePattern(tg, "".equals(value) ? null : value));
+				TagValuePattern pt = new TagValuePattern(tg, "".equals(value) ? null : value);
+				col.add(pt);
+				String substr = parser.getAttributeValue("", prefix +"substr" + i); //$NON-NLS-1$
+				if(substr != null) {
+					String[] ls = substr.split(":");
+					if(ls.length > 0) {
+						pt.substrSt = Integer.parseInt(ls[0]);
+					}
+					if(ls.length > 1) {
+						pt.substrEnd = Integer.parseInt(ls[0]);
+					}
+				}
 			}
 		}
 	}
@@ -456,6 +471,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 				if (vl == null) {
 					vl = ctags.get(ift.tag);
 				}
+				vl = processSubstr(ift, vl);
 				if(vl != null) {
 					mp.put(ift.tag, vl);
 				}
@@ -526,8 +542,41 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			if(vl == null) {
 				vl = fromValue;
 			}
+			vl = processSubstr(ift, vl);
 			tags.put(ift.tag, vl);
 		}
+	}
+
+	private String processSubstr(TagValuePattern ift, String vl) {
+		if (ift.substrSt != 0) {
+			int s = ift.substrSt;
+			if (s > 0) {
+				if (vl.length() < s) {
+					vl = "";
+				} else {
+					vl = vl.substring(s);
+				}
+			} else {
+				if (vl.length() > -s) {
+					vl = vl.substring(vl.length() + s);
+				}
+			}
+		}
+		if(ift.substrEnd != -1) {
+			int s = ift.substrEnd;
+			if (s > 0) {
+				if (vl.length() > s) {
+					vl = vl.substring(0, s);
+				}
+			} else {
+				if (vl.length() < -s) {
+					vl = "";
+				} else {
+					vl = vl.substring(0, vl.length() + s);
+				}
+			}
+		}
+		return vl;
 	}
 	
 	
@@ -579,6 +628,31 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 				return false;
 			}
 		}
+		
+		for(TagValuePattern ift : ec.ifEndsTags) {
+			String val = tags.get(ift.tag);
+			if(!checkEndsWithValue(ift, val)) {
+				return false;
+			}
+		}
+		for(TagValuePattern ift : ec.ifNotEndsTags) {
+			String val = tags.get(ift.tag);
+			if(checkEndsWithValue(ift, val)) {
+				return false;
+			}
+		}
+		for(TagValuePattern ift : ec.ifContainsTags) {
+			String val = tags.get(ift.tag);
+			if(!checkContainsValue(ift, val)) {
+				return false;
+			}
+		}
+		for(TagValuePattern ift : ec.ifNotContainsTags) {
+			String val = tags.get(ift.tag);
+			if(checkContainsValue(ift, val)) {
+				return false;
+			}
+		}
 		for(TagValuePattern ift : ec.ifTagsNotLess) {
 			String val = tags.get(ift.tag);
 			double nt = Double.parseDouble(ift.value);
@@ -618,6 +692,27 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			return true;
 		}
 		return value.toLowerCase().startsWith(fromTag.value.toLowerCase());
+	}
+	
+	
+	private boolean checkContainsValue(TagValuePattern fromTag, String value) {
+		if(value == null) {
+			return false;
+		}
+		if(fromTag.value == null) {
+			return true;
+		}
+		return value.toLowerCase().contains(fromTag.value.toLowerCase());
+	}
+	
+	private boolean checkEndsWithValue(TagValuePattern fromTag, String value) {
+		if(value == null) {
+			return false;
+		}
+		if(fromTag.value == null) {
+			return true;
+		}
+		return value.toLowerCase().endsWith(fromTag.value.toLowerCase());
 	}
 
 
@@ -940,6 +1035,10 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		public List<String> ifNotRegionName = new ArrayList<String>();
 		public List<TagValuePattern> ifStartsTags = new ArrayList<MapRenderingTypes.TagValuePattern>();
 		public List<TagValuePattern> ifNotStartsTags = new ArrayList<MapRenderingTypes.TagValuePattern>();
+		public List<TagValuePattern> ifEndsTags = new ArrayList<MapRenderingTypes.TagValuePattern>();
+		public List<TagValuePattern> ifNotEndsTags = new ArrayList<MapRenderingTypes.TagValuePattern>();
+		public List<TagValuePattern> ifContainsTags = new ArrayList<MapRenderingTypes.TagValuePattern>();
+		public List<TagValuePattern> ifNotContainsTags = new ArrayList<MapRenderingTypes.TagValuePattern>();
 		public List<TagValuePattern> ifTags = new ArrayList<MapRenderingTypes.TagValuePattern>();
 		public List<TagValuePattern> ifTagsLess = new ArrayList<MapRenderingTypes.TagValuePattern>();
 		public List<TagValuePattern> ifTagsNotLess = new ArrayList<MapRenderingTypes.TagValuePattern>();
