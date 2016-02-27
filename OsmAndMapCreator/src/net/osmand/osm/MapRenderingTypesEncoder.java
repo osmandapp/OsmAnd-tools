@@ -359,9 +359,9 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 						}
 					}
 					exisitingRefs.add(vl);
-					exisitingRefs.add("I " + vl); // I 5, 5
-					exisitingRefs.add("US " + vl ); // US 5, 5
-					exisitingRefs.add("US " + vl + " Business"); // US 5 Business
+//					exisitingRefs.add("I " + vl); // I 5, 5
+//					exisitingRefs.add("US " + vl ); // US 5, 5
+//					exisitingRefs.add("US " + vl + " Business"); // US 5 Business
 					exisitingRefs.add(vl.replaceAll("-", "").replaceAll(" ", "")); // E 17, E-17, E17
 				}
 			}
@@ -373,6 +373,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 					if(r.length() == 0 || exisitingRefs.contains(s)) {
 						continue;
 					}
+					tags.put("route_road", "route_road");
 					tags.put("road_ref_"+maxModifier, r);
 					String network = getNetwork(r);
 					if(!Algorithms.isEmpty(network)) {
@@ -554,11 +555,11 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 				if (vl.length() < s) {
 					vl = "";
 				} else {
-					vl = vl.substring(s);
+					vl = vl.substring(s).trim();
 				}
 			} else {
 				if (vl.length() > -s) {
-					vl = vl.substring(vl.length() + s);
+					vl = vl.substring(vl.length() + s).trim();
 				}
 			}
 		}
@@ -566,13 +567,13 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			int s = ift.substrEnd;
 			if (s > 0) {
 				if (vl.length() > s) {
-					vl = vl.substring(0, s);
+					vl = vl.substring(0, s).trim();
 				}
 			} else {
 				if (vl.length() < -s) {
 					vl = "";
 				} else {
-					vl = vl.substring(0, vl.length() + s);
+					vl = vl.substring(0, vl.length() + s).trim();
 				}
 			}
 		}
