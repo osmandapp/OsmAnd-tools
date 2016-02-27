@@ -380,12 +380,18 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		if(rtags.containsKey("network")) {
 			String network = rtags.get("network");
 			if (network.startsWith("US:")) {
-				if (!network.equalsIgnoreCase("US:I") && !network.equalsIgnoreCase("US:US")) {
+				if (!network.equalsIgnoreCase("US:I") && !network.toUpperCase().startsWith("US:I") && !network.equalsIgnoreCase("US:US") && !network.toUpperCase().startsWith("US:US")) {
 					rtags.put("us_state_network", "yes");
+					if (network.length() > 5) {
+						network = network.substring(0, 5);
+						rtags.put("network", network);
+					}
 				}
-				if (network.length() > 5) {
-					network = network.substring(0, 5);
-					rtags.put("network", network);
+				if (network.toUpperCase().startsWith("US:I")) {
+					rtags.put("network", "us:i");
+				}
+				if (network.toUpperCase().startsWith("US:US")) {
+					rtags.put("network", "us:us");
 				}
 			}
 		} else {
