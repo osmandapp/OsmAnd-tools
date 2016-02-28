@@ -373,7 +373,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 					if(r.length() == 0 || exisitingRefs.contains(s)) {
 						continue;
 					}
-					tags.put("route_road", "route_road");
+					tags.put("route_road", "");
 					tags.put("road_ref_"+maxModifier, r);
 					String network = getNetwork(r);
 					if(!Algorithms.isEmpty(network)) {
