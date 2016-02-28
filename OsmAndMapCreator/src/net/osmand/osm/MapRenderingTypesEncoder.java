@@ -129,68 +129,82 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	
 	@Override
 	protected void parseEntityConvertXML(XmlPullParser parser) {
-		EntityConvert ec = new EntityConvert();
-		String tg = parser.getAttributeValue("", "if_region_name"); //$NON-NLS-1$
-		if(tg != null) {
-			ec.ifRegionName.addAll(Arrays.asList(tg.split("\\,")));
+		
+		String seq = parser.getAttributeValue("", "seq");
+		if(Algorithms.isEmpty(seq)) {
+			seq = "1:1";
 		}
-		tg = parser.getAttributeValue("", "if_not_region_name"); //$NON-NLS-1$
-		if(tg != null) {
-			ec.ifNotRegionName.addAll(Arrays.asList(tg.split("\\,")));
-		}
-		ec.verbose = "true".equals(parser.getAttributeValue("", "verbose")); //$NON-NLS-1$
-		parseConvertCol(parser, ec.ifTags, "if_");
-		parseConvertCol(parser, ec.ifStartsTags, "if_starts_with_");
-		parseConvertCol(parser, ec.ifNotStartsTags, "if_not_starts_with_");
-		parseConvertCol(parser, ec.ifEndsTags, "if_ends_with_");
-		parseConvertCol(parser, ec.ifNotEndsTags, "if_not_ends_with_");
-		parseConvertCol(parser, ec.ifContainsTags, "if_contains_");
-		parseConvertCol(parser, ec.ifNotContainsTags, "if_not_contains_");
-		parseConvertCol(parser, ec.ifNotTags, "if_not_");
-		parseConvertCol(parser, ec.ifTagsNotLess, "if_not_less_");
-		parseConvertCol(parser, ec.ifTagsLess, "if_less_");
-		ec.type = EntityConvertType.valueOf(parser.getAttributeValue("", "pattern" ).toUpperCase()); //$NON-NLS-1$
-		ec.applyToType = EnumSet.allOf(EntityConvertApplyType.class);
-		if("no".equals(parser.getAttributeValue("", "routing" )) || "false".equals(parser.getAttributeValue("", "routing" ))) {
-			ec.applyToType.remove(EntityConvertApplyType.ROUTING);
-		}
-		if("no".equals(parser.getAttributeValue("", "map" )) || "false".equals(parser.getAttributeValue("", "map" ))) {
-			ec.applyToType.remove(EntityConvertApplyType.MAP);
-		}
-		if("no".equals(parser.getAttributeValue("", "poi" )) || "false".equals(parser.getAttributeValue("", "poi" ))) {
-			ec.applyToType.remove(EntityConvertApplyType.POI);
-		}
-		parseConvertCol(parser, ec.toTags, "to_");
-		tg = parser.getAttributeValue("", "from_tag" ); //$NON-NLS-1$
-		String value = parser.getAttributeValue("", "from_value"); //$NON-NLS-1$
-		if (tg != null) {
-			ec.fromTag = new TagValuePattern(tg, "".equals(value) ? null : value);
-			if(!convertTags.containsKey(ec.fromTag.tag)) {
-				convertTags.put(ec.fromTag.tag, new ArrayList<MapRenderingTypesEncoder.EntityConvert>());
+		String[] ls = seq.split(":");
+		for (int ind = Integer.parseInt(ls[0]); ind <= Integer.parseInt(ls[1]); ind++) {
+			Map<String, String> mp = new HashMap<String, String>();
+			for (int i = 0; i < parser.getAttributeCount(); i++) {
+				String at = parser.getAttributeName(i);
+				mp.put(at, parser.getAttributeValue("", at).replace("*", ind+""));
 			}
-			convertTags.get(ec.fromTag.tag).add(ec);
-		}
-		String appTo = parser.getAttributeValue("", "apply_to" ); //$NON-NLS-1$
-		if(appTo != null) {
-			ec.applyTo = EnumSet.noneOf(EntityType.class);
-			String[] tps = appTo.split(",");
-			for(String t : tps) {
-				EntityType et = EntityType.valueOf(t.toUpperCase());
-				ec.applyTo.add(et);
+			EntityConvert ec = new EntityConvert();
+			String tg = mp.get("if_region_name"); //$NON-NLS-1$
+			if (tg != null) {
+				ec.ifRegionName.addAll(Arrays.asList(tg.split("\\,")));
+			}
+			tg = mp.get("if_not_region_name"); //$NON-NLS-1$
+			if (tg != null) {
+				ec.ifNotRegionName.addAll(Arrays.asList(tg.split("\\,")));
+			}
+			ec.verbose = "true".equals(mp.get("verbose")); //$NON-NLS-1$
+			parseConvertCol(mp, ec.ifTags, "if_");
+			parseConvertCol(mp, ec.ifStartsTags, "if_starts_with_");
+			parseConvertCol(mp, ec.ifNotStartsTags, "if_not_starts_with_");
+			parseConvertCol(mp, ec.ifEndsTags, "if_ends_with_");
+			parseConvertCol(mp, ec.ifNotEndsTags, "if_not_ends_with_");
+			parseConvertCol(mp, ec.ifContainsTags, "if_contains_");
+			parseConvertCol(mp, ec.ifNotContainsTags, "if_not_contains_");
+			parseConvertCol(mp, ec.ifNotTags, "if_not_");
+			parseConvertCol(mp, ec.ifTagsNotLess, "if_not_less_");
+			parseConvertCol(mp, ec.ifTagsLess, "if_less_");
+			ec.type = EntityConvertType.valueOf(mp.get("pattern").toUpperCase()); //$NON-NLS-1$
+			ec.applyToType = EnumSet.allOf(EntityConvertApplyType.class);
+			if ("no".equals(mp.get("routing"))
+					|| "false".equals(mp.get("routing"))) {
+				ec.applyToType.remove(EntityConvertApplyType.ROUTING);
+			}
+			if ("no".equals(mp.get("map")) || "false".equals(mp.get("map"))) {
+				ec.applyToType.remove(EntityConvertApplyType.MAP);
+			}
+			if ("no".equals(mp.get("poi")) || "false".equals(mp.get("poi"))) {
+				ec.applyToType.remove(EntityConvertApplyType.POI);
+			}
+			parseConvertCol(mp, ec.toTags, "to_");
+			tg = mp.get("from_tag"); //$NON-NLS-1$
+			String value = mp.get("from_value"); //$NON-NLS-1$
+			if (tg != null) {
+				ec.fromTag = new TagValuePattern(tg, "".equals(value) ? null : value);
+				if (!convertTags.containsKey(ec.fromTag.tag)) {
+					convertTags.put(ec.fromTag.tag, new ArrayList<MapRenderingTypesEncoder.EntityConvert>());
+				}
+				convertTags.get(ec.fromTag.tag).add(ec);
+			}
+			String appTo = mp.get("apply_to"); //$NON-NLS-1$
+			if (appTo != null) {
+				ec.applyTo = EnumSet.noneOf(EntityType.class);
+				String[] tps = appTo.split(",");
+				for (String t : tps) {
+					EntityType et = EntityType.valueOf(t.toUpperCase());
+					ec.applyTo.add(et);
+				}
 			}
 		}
 	}
 
 
 
-	protected void parseConvertCol(XmlPullParser parser, List<TagValuePattern> col, String prefix) {
+	protected void parseConvertCol(Map<String, String> mp, List<TagValuePattern> col, String prefix) {
 		for (int i = 1; i <= 15; i++) {
-			String tg = parser.getAttributeValue("", prefix +"tag" + i); //$NON-NLS-1$
-			String value = parser.getAttributeValue("", prefix +"value" + i); //$NON-NLS-1$
+			String tg = mp.get(prefix +"tag" + i); //$NON-NLS-1$
+			String value = mp.get(prefix +"value" + i); //$NON-NLS-1$
 			if (tg != null) {
 				TagValuePattern pt = new TagValuePattern(tg, "".equals(value) ? null : value);
 				col.add(pt);
-				String substr = parser.getAttributeValue("", prefix +"substr" + i); //$NON-NLS-1$
+				String substr = mp.get(prefix +"substr" + i); //$NON-NLS-1$
 				if(substr != null) {
 					String[] ls = substr.split(":");
 					if(ls.length > 0) {
