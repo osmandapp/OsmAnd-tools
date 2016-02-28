@@ -139,7 +139,8 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			Map<String, String> mp = new HashMap<String, String>();
 			for (int i = 0; i < parser.getAttributeCount(); i++) {
 				String at = parser.getAttributeName(i);
-				mp.put(at, parser.getAttributeValue("", at).replace("*", ind+""));
+				mp.put(at, parser.getAttributeValue("", at
+						).replace("*", ind+""));
 			}
 			EntityConvert ec = new EntityConvert();
 			String tg = mp.get("if_region_name"); //$NON-NLS-1$
