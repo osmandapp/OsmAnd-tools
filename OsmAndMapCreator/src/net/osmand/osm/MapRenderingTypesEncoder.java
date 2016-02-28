@@ -99,8 +99,8 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 				String tag = rule.names[i].tagValuePattern.tag.substring(rule.namePrefix.length());
 				if(ts.containsKey(tag)) {
 					propogated.put(rule.names[i], ts.get(tag));
-				} else if(rule.relationGroup) {
-					propogated.put(rule.names[i], "");
+//				} else if(rule.relationGroup) {
+//					propogated.put(rule.names[i], "");
 				}
 			}
 		}
