@@ -415,13 +415,15 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			if(!Algorithms.isEmpty(rf)) {
 				rf = rf.trim();
 				String network = getNetwork(rf);
-				rtags.put("network", network);
+				if(!Algorithms.isEmpty(network)) {
+					rtags.put("network", network);
+				}
 			}
 		}
-		if(rtags.containsKey("network")) {
+		if(rtags.containsKey("network") && !Algorithms.isEmpty(rtags.get("network"))) {
 			rtags.put("network", rtags.get("network").toLowerCase());
 		}
-		if(rtags.containsKey("modifier")) {
+		if(rtags.containsKey("modifier") && !Algorithms.isEmpty(rtags.get("modifier"))) {
 			rtags.put("modifier", rtags.get("modifier").toLowerCase());
 		}
 		if(rtags.containsKey("ref") && !Algorithms.isEmpty(rtags.get("ref"))) {
