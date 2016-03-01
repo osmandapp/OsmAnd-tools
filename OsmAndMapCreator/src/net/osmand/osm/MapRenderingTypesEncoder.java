@@ -452,7 +452,6 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		String network = "";
 		if(!Character.isDigit(rf.charAt(0))) {
 			numbers = false;
-			break;
 		}
 		if(numbers) {
 			network = "#";
