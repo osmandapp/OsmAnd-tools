@@ -102,7 +102,7 @@ public class IncOsmChangesCreator {
 			}
 			File pbfFile = new File(countryFolder, reg.getDownloadName() + ".pbf");
 			if (!pbfFile.exists()) {
-				extractPbf(pbfFile, reg, binaryFolder, polygonFile);
+				extractPbf(pbfFile, reg, polygonFile);
 			}
 			if (pbfFile.exists()) {
 				updatePbfFile(reg, countryFolder, pbfFile, polygonFile, binaryFolder);
@@ -110,7 +110,7 @@ public class IncOsmChangesCreator {
 		}
 	}
 	
-	private void extractPbf(File pbfFile, CountryRegion reg, String binaryFolder, File polygonFile) {
+	private void extractPbf(File pbfFile, CountryRegion reg,  File polygonFile) {
 		if(!Algorithms.isEmpty(reg.getPolyExtract())) {
 			File fromExtract ;
 			if (reg.getParent() != null && reg.getParent().map) {
