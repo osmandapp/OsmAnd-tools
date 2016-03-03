@@ -448,15 +448,12 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	}
 
 	private String getNetwork(String rf) {
-		boolean allnumbers = true;
+		boolean numbers = true;
 		String network = "";
-		for(int i = 0; i < rf.length(); i++) {
-			if(!Character.isDigit(rf.charAt(i))) {
-				allnumbers = false;
-				break;
-			}
+		if(!Character.isDigit(rf.charAt(0))) {
+			numbers = false;
 		}
-		if(allnumbers) {
+		if(numbers) {
 			network = "#";
 		} else{
 			int ind = 0;
