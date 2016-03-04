@@ -69,6 +69,7 @@ public class GenerateExtractScript {
 			if(reg.getParent() != null) {
 				if(depth > 1) {
 					writeToFile(countryFolder, ".parent", reg.getParent().getDownloadName());
+					writeToFile(countryFolder, ".polyextract", reg.getPolyExtract());
 				}
 			}
 			System.out.println("Extract from " + reg.getPolyExtract());
@@ -79,7 +80,9 @@ public class GenerateExtractScript {
 	private void writeToFile(File countryFolder, String fn, String cont) throws IOException {
 		File fl = new File(countryFolder, fn);
 		FileOutputStream fous = new FileOutputStream(fl);
-		fous.write(cont.getBytes());
+		if(cont != null) {
+			fous.write(cont.getBytes());
+		}
 		fous.close();
 	}
 
