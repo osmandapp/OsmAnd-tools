@@ -522,7 +522,9 @@ public class WikiDatabasePreparation {
 						cid = Long.parseLong(pageId.toString());
 						parseText = pages.containsKey(cid);
 					} else if (name.equals("text")) {
-						if (parseText) {
+						if (parseText  
+								&& !title.toString().toLowerCase().contains("template")
+								) {
 							LatLon ll = pages.get(cid);
 							String text = removeMacroBlocks(ctext.toString());
 							final HTMLConverter converter = new HTMLConverter(false);
