@@ -99,7 +99,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	private final Log logMapDataWarn;
 
 	public TLongHashSet generatedIds = new TLongHashSet();
-	private static boolean USE_OLD_GEN_ID = true;
+	private static boolean USE_OLD_GEN_ID = false;
 	public static long GENERATE_OBJ_ID = - (1l << 20l); // million million  
 	private static int SHIFT_NON_EXISTING_IDS = 40;
 	
