@@ -399,6 +399,24 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			}
 			
 		}
+		if(entity == EntityType.WAY && tags.containsKey("highway") && tags.containsKey("name")) {
+			tags = new LinkedHashMap<String, String>(tags);
+			String name = tags.get("name");
+			if (name.toLowerCase().contains("transcanad") || name.toLowerCase().contains("trans canad") || name.toLowerCase().contains("trans-canad") || name.toLowerCase().contains("yellowhead")) {
+				tags.put("tch", "yes");
+			}
+		}
+		if(entity == EntityType.WAY && tags.containsKey("highway")) {
+			tags = new LinkedHashMap<String, String>(tags);
+			int i = 1;
+			while (i < 10) {
+				String name = tags.get("road_name_" + i);
+				if (name != null && (name.toLowerCase().contains("transcanad") || name.toLowerCase().contains("trans canad") || name.toLowerCase().contains("trans-canad") || name.toLowerCase().contains("yellowhead"))) {
+					tags.put("tch", "yes");
+				}
+				i++;
+			}
+		}
 		tags = transformRouteRoadTags(tags);
 		return tags;
 	}
