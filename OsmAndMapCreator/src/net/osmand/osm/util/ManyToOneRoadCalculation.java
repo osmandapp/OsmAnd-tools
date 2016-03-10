@@ -356,7 +356,7 @@ public class ManyToOneRoadCalculation {
 		List<RouteDataObject> startObjects = new ArrayList<RouteDataObject>();
 		for (RoutingSubregionTile st : tiles) {
 			if (st.subregion.top <= sbottom && st.subregion.bottom >= stop) {
-				ctx.loadSubregionTile(st, false, startObjects);
+				ctx.loadSubregionTile(st, false, startObjects, null);
 			}
 		}
 		System.out.println("Roads in layer " + startObjects.size());
@@ -452,7 +452,7 @@ public class ManyToOneRoadCalculation {
 			if(st.subregion.left <= sx && st.subregion.right >= px &&
 					st.subregion.top <= sy && st.subregion.bottom >= py){
 				List<RouteDataObject> startObjects = new ArrayList<RouteDataObject>();
-				ctx.loadSubregionTile(st, false, startObjects);
+				ctx.loadSubregionTile(st, false, startObjects, null);
 				
 				List<RouteSegment> res = filterIntersections(px, sx, sy, sy, startObjects);
 				bc += res.size();

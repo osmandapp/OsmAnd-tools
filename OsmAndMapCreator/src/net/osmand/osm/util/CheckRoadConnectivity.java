@@ -104,7 +104,7 @@ public class CheckRoadConnectivity {
 		
 		for(RoutingSubregionTile tile : tiles) {
 			ArrayList<RouteDataObject> dataObjects = new ArrayList<RouteDataObject>();
-			ctx.loadSubregionTile(tile, false, dataObjects);
+			ctx.loadSubregionTile(tile, false, dataObjects, null);
 			for(RouteDataObject o : dataObjects) {
 				registeredRoadIds.add(o.getId());
 				int len = o.getPointsLength() - 1;
@@ -347,7 +347,7 @@ public class CheckRoadConnectivity {
 
 	private List<Cluster> processDataObjects(RoutingContext ctx, RoutingSubregionTile tl) {
 		ArrayList<RouteDataObject> dataObjects = new ArrayList<RouteDataObject>();
-		ctx.loadSubregionTile(tl, false, dataObjects);
+		ctx.loadSubregionTile(tl, false, dataObjects, null);
 		TLongObjectHashMap<List<RouteDataObject>> clusterPoints = new TLongObjectHashMap<List<RouteDataObject>>();
 		for(RouteDataObject rdo : dataObjects) {
 			for(int i = 0 ; i < rdo.getPointsLength(); i++) {

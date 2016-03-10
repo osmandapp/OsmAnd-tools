@@ -102,6 +102,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	private static boolean USE_OLD_GEN_ID = false;
 	public static long GENERATE_OBJ_ID = - (1l << 20l); // million million  
 	private static int SHIFT_NON_EXISTING_IDS = 40;
+	private static int SHIFT_NON_SPLIT_EXISTING_IDS = 38;
 	
 	private long assignIdBasedOnOriginal(long originalId) {
 		if(USE_OLD_GEN_ID) {
@@ -119,7 +120,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		if(USE_OLD_GEN_ID) {
 			return GENERATE_OBJ_ID--;
 		}
-		long gen = (1l << (SHIFT_NON_EXISTING_IDS - 1));
+		long gen = (1l << (SHIFT_NON_SPLIT_EXISTING_IDS - 1));
 		gen += originalId;
 		while(generatedIds.contains(gen)) {
 			gen++;
