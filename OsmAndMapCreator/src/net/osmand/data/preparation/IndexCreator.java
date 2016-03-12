@@ -869,8 +869,8 @@ public class IndexCreator {
 		
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 
-//		String file = rootFolder + "/temp/osmc/C_11_03_06.osm";
-		String file = rootFolder + "/temp/map.osm";
+		String file = rootFolder + "/temp/Brasil-SP42-cut17-clean.osm";
+//		String file = rootFolder + "/temp/map.osm";
 //		String file = rootFolder + "/temp/russia_vladimir_asia.pbf";
 //		String file = rootFolder + "/repos/resources/synthetic_test_rendering.osm";
 
