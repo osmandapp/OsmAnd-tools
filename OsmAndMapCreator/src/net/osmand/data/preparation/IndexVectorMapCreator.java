@@ -102,34 +102,38 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	public TLongHashSet generatedIds = new TLongHashSet();
 	private static boolean USE_OLD_GEN_ID = false;
 	public static long GENERATE_OBJ_ID = - (1l << 20l); // million million  
-	private static int SHIFT_NON_EXISTING_IDS = 35;
+	private static int SHIFT_MULTIPOLYGON_IDS = 43;
+	private static int SHIFT_NON_SPLIT_EXISTING_IDS = 41;
+	private static int DUPLICATE_SPLIT = 5;
 	private static boolean VALIDATE_DUPLICATE = true;
 	private TLongObjectHashMap<Long> duplicateIds = new TLongObjectHashMap<Long>();
-	private long validateOriginalId = 0;
 	
-	private long assignIdBasedOnOriginal(long originalId) {
-		validateOriginalId = originalId;
+	private long assignIdBasedOnOriginal(EntityId originalId) {
 		if(USE_OLD_GEN_ID) {
 			return GENERATE_OBJ_ID--;
 		}
-		long gen = (originalId << SHIFT_NON_EXISTING_IDS);
-		while (generatedIds.contains(gen)) {
-			gen += 2;
-		}
-		generatedIds.add(gen);
-		return gen;
+		return genId(SHIFT_MULTIPOLYGON_IDS, originalId);
 	}
 	
-	private long assignIdBasedOnOriginalSplit(long originalId) {
-		validateOriginalId = originalId;
+	private long assignIdBasedOnOriginalSplit(EntityId originalId) {
 		if(USE_OLD_GEN_ID) {
 			return GENERATE_OBJ_ID--;
 		}
-		long gen = (originalId << SHIFT_NON_EXISTING_IDS) + 1;
-//		long gen = (1l << (SHIFT_NON_SPLIT_EXISTING_IDS - 1));
-//		gen += originalId;
-		while (generatedIds.contains(gen)) {
+		return genId(SHIFT_NON_SPLIT_EXISTING_IDS, originalId);
+	}
+
+	private long genId(int baseShift, EntityId originalId) {
+		long gen = (originalId.getId() << DUPLICATE_SPLIT) + 
+				(1l << (baseShift - 1));
+		if(originalId.getType() == EntityType.NODE) {
+			gen += 1;
+		} else if(originalId.getType() == EntityType.WAY) {
 			gen += 2;
+		} else if(originalId.getType() == EntityType.RELATION) {
+			gen += 3;
+		}
+		while (generatedIds.contains(gen)) {
+			gen += 4;
 		}
 		generatedIds.add(gen);
 		return gen;
@@ -286,12 +290,12 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			// don't use the relation ids. Create new onesgetInnerRings
 			Map<String, String> stags  = splitEntities == null ? e.getModifiableTags() : splitEntities.get(0);
 			createMultipolygonObject(stags, out, innerWays, 
-					assignIdBasedOnOriginal(e.getId()));
+					assignIdBasedOnOriginal(EntityId.valueOf(e)));
 			if (splitEntities != null) {
 				for (int i = 1; i < splitEntities.size(); i++) {
 					Map<String, String> tags = splitEntities.get(i);
 					createMultipolygonObject(tags, out, innerWays,	
-							assignIdBasedOnOriginal(e.getId()));
+							assignIdBasedOnOriginal(EntityId.valueOf(e)));
 				}
 			}
 		}
@@ -634,7 +638,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			}
 			if (splitTags != null) {
 				for (int i = 1; i < splitTags.size(); i++) {
-					assignedId = assignIdBasedOnOriginalSplit(originalId);
+					assignedId = assignIdBasedOnOriginalSplit(eid);
 					Map<String, String> stags = splitTags.get(i);
 					for (int level = 0; level < mapZooms.size(); level++) {
 						processMainEntity(e, originalId, assignedId, level, stags);
