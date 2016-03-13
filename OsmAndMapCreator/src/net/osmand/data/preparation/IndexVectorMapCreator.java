@@ -105,7 +105,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	private static int SHIFT_MULTIPOLYGON_IDS = 43;
 	private static int SHIFT_NON_SPLIT_EXISTING_IDS = 41;
 	private static int DUPLICATE_SPLIT = 5;
-	private static boolean VALIDATE_DUPLICATE = true;
+	private static boolean VALIDATE_DUPLICATE = false;
 	private TLongObjectHashMap<Long> duplicateIds = new TLongObjectHashMap<Long>();
 	
 	private long assignIdBasedOnOriginal(EntityId originalId) {
