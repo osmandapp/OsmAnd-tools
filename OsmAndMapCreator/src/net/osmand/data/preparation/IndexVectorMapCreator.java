@@ -66,6 +66,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	private MapRenderingTypesEncoder renderingTypes;
 	private MapZooms mapZooms;
 	final static String SPLIT_VALUE= "SPLITVL";
+	
 
 	Map<Long, TIntArrayList> multiPolygonsWays = new LinkedHashMap<Long, TIntArrayList>();
 	
@@ -102,9 +103,12 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	private static boolean USE_OLD_GEN_ID = false;
 	public static long GENERATE_OBJ_ID = - (1l << 20l); // million million  
 	private static int SHIFT_NON_EXISTING_IDS = 35;
-	private static int SHIFT_NON_SPLIT_EXISTING_IDS = 35;
+	private static boolean VALIDATE_DUPLICATE = true;
+	private TLongObjectHashMap<Long> duplicateIds = new TLongObjectHashMap<Long>();
+	private long validateOriginalId = 0;
 	
 	private long assignIdBasedOnOriginal(long originalId) {
+		validateOriginalId = originalId;
 		if(USE_OLD_GEN_ID) {
 			return GENERATE_OBJ_ID--;
 		}
@@ -117,6 +121,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	}
 	
 	private long assignIdBasedOnOriginalSplit(long originalId) {
+		validateOriginalId = originalId;
 		if(USE_OLD_GEN_ID) {
 			return GENERATE_OBJ_ID--;
 		}
@@ -655,9 +660,9 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			typeUse.removeAll(set);
 		}
 		if (typeUse.isEmpty()) {
-
 			return;
 		}
+		
 		long id = convertBaseIdToGeneratedId(assignedId, level);
 		List<Node> res = null;
 		if (e instanceof Node) {
@@ -673,6 +678,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 				if (cycle) {
 					res = simplifyCycleWay(((Way) e).getNodes(), zoomToSimplify, zoomWaySmothness);
 				} else {
+					validateDuplicate(originalId, id);
 					insertLowLevelMapBinaryObject(level, zoomToSimplify, typeUse, addtypeUse, id, ((Way) e).getNodes(), namesUse);
 				}
 			} else {
@@ -680,7 +686,19 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			}
 		}
 		if (res != null) {
+			validateDuplicate(originalId, id);
 			insertBinaryMapRenderObjectIndex(mapTree[level], res, null, namesUse, id, area, typeUse, addtypeUse, true);
+		}
+	}
+
+	private void validateDuplicate(long originalId, long assignedId) {
+		if(VALIDATE_DUPLICATE) {
+			if(duplicateIds.contains(assignedId)) {
+				throw new IllegalStateException("Duplicate id='"+assignedId + 
+						"' from '" + duplicateIds.get(assignedId) + "' and '" + originalId + "'");
+				
+			}
+			duplicateIds.put(assignedId, originalId);
 		}
 	}
 
