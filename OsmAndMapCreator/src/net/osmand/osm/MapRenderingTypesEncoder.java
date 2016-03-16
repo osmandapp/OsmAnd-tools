@@ -468,7 +468,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	private String getNetwork(String rf) {
 		boolean numbers = true;
 		String network = "";
-		if(!Character.isDigit(rf.charAt(0))) {
+		if(rf.length() != 0 && !Character.isDigit(rf.charAt(0))) {
 			numbers = false;
 		}
 		if(numbers) {
