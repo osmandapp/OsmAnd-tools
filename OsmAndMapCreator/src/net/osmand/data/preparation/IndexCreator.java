@@ -869,8 +869,8 @@ public class IndexCreator {
 		
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 
-		String file = rootFolder + "/temp/Brasil-SP42-cut17-clean.osm";
-//		String file = rootFolder + "/temp/map.osm";
+//		String file = rootFolder + "/temp/S08W071.osm.bz2";
+		String file = rootFolder + "/temp/map.osm";
 //		String file = rootFolder + "/temp/russia_vladimir_asia.pbf";
 //		String file = rootFolder + "/repos/resources/synthetic_test_rendering.osm";
 
@@ -883,6 +883,7 @@ public class IndexCreator {
 						file);
 		creator.generateIndexes(new File(file),
 				new ConsoleProgressImplementation(1), null, zooms, rt, log);
+		//new File(file), 
 		
 		log.info("WHOLE GENERATION TIME :  " + (System.currentTimeMillis() - time)); //$NON-NLS-1$
 		log.info("COORDINATES_SIZE " + BinaryMapIndexWriter.COORDINATES_SIZE + " count " + BinaryMapIndexWriter.COORDINATES_COUNT); //$NON-NLS-1$ //$NON-NLS-2$

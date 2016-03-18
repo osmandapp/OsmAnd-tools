@@ -216,7 +216,8 @@ public class OsmDbCreator implements IOsmStorageFilter {
 				}
 			} else if (e instanceof Way) {
 				allWays++;
-				short ord = 0;
+				int ord = 0;
+				long lid = getId(e);
 				TLongArrayList nodeIds = ((Way) e).getNodeIds();
 				boolean city = CityType.valueFromString(((Way) e).getTag(OSMTagKey.PLACE)) != null;
 				int boundary = ((Way) e).getTag(OSMTagKey.BOUNDARY) != null || city ? 1 : 0;
