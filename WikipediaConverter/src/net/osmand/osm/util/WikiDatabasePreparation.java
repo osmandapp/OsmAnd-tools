@@ -183,7 +183,7 @@ public class WikiDatabasePreparation {
     	
 		Map<Long, LatLon> links = prep.parseExternalLinks(fileName);
 		processWikipedia(wikiPg, lang, links, sqliteFileName);
-		testContent(lang, folder);
+		// testContent(lang, folder);
     }
 	
 	public static void downloadPage(String page, String fl) throws IOException {
