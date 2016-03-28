@@ -65,6 +65,9 @@ public class GenerateExtractScript {
 			}
 			md = Math.max(md, depth);
 			writeToFile(countryFolder, ".depth", depth+"");
+			if(reg.map) {
+				writeToFile(countryFolder, ".map", "1");
+			}
 			System.out.println(reg.getDownloadName());
 			if(reg.getParent() != null) {
 				if(depth > 1) {
