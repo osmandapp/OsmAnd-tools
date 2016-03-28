@@ -49,9 +49,6 @@ public class GenerateExtractScript {
 		int md = 0;
 		for (CountryRegion reg : rt) {
 			File countryFolder = new File(location, reg.getDownloadName());
-			if (!countryFolder.exists()) {
-				countryFolder.mkdirs();
-			}
 			File polygonFile = getPolygonFile(polygons, reg, countryFolder, reg.getDownloadName());
 			if (polygonFile == null) {
 				System.err.println("Boundary doesn't exist " + reg.getDownloadName());
@@ -72,7 +69,9 @@ public class GenerateExtractScript {
 			if(reg.getParent() != null) {
 				if(depth > 1) {
 					writeToFile(countryFolder, ".parent", reg.getParent().getDownloadName());
-					writeToFile(countryFolder, ".polyextract", reg.getPolyExtract());
+					if(!Algorithms.isEmpty(reg.getSinglePolyExtract())) {
+						writeToFile(countryFolder, ".polyextract", reg.getSinglePolyExtract());
+					}
 				}
 			}
 			System.out.println("Extract from " + reg.getPolyExtract());
@@ -93,6 +92,7 @@ public class GenerateExtractScript {
 		File file = polygons.get(reg.boundary);
 		if(file != null) {
 			File polygonFile = new File(countryFolder, regFile);
+			countryFolder.mkdirs();
 			if(!polygonFile.exists() || polygonFile.length() != file.length()) {
 				Algorithms.fileCopy(file, polygonFile);
 			}

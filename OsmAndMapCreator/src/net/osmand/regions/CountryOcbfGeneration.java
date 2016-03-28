@@ -178,6 +178,10 @@ public class CountryOcbfGeneration {
 			return parent.getPolyExtract();
 		}
 		
+		public String getSinglePolyExtract() {
+			return polyExtract;
+		}
+		
 		public String getAdditionalTag(String tg) {
 			if(!Algorithms.isEmpty(additionalTags.get(tg)) || parent == null) {
 				return additionalTags.get(tg);
