@@ -52,7 +52,7 @@ public class GenerateExtractScript {
 			if (!countryFolder.exists()) {
 				countryFolder.mkdirs();
 			}
-			File polygonFile = getPolygonFile(polygons, reg, countryFolder);
+			File polygonFile = getPolygonFile(polygons, reg, countryFolder, reg.getDownloadName());
 			if (polygonFile == null) {
 				System.err.println("Boundary doesn't exist " + reg.getDownloadName());
 				continue;
@@ -89,10 +89,10 @@ public class GenerateExtractScript {
 		fous.close();
 	}
 
-	private File getPolygonFile(Map<String, File> polygons, CountryRegion reg, File countryFolder) throws IOException {
+	private File getPolygonFile(Map<String, File> polygons, CountryRegion reg, File countryFolder, String regFile) throws IOException {
 		File file = polygons.get(reg.boundary);
 		if(file != null) {
-			File polygonFile = new File(countryFolder, file.getName());
+			File polygonFile = new File(countryFolder, regFile);
 			if(!polygonFile.exists() || polygonFile.length() != file.length()) {
 				Algorithms.fileCopy(file, polygonFile);
 			}
