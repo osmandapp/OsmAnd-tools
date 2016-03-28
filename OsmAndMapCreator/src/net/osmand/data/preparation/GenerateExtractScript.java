@@ -91,7 +91,7 @@ public class GenerateExtractScript {
 	private File getPolygonFile(Map<String, File> polygons, CountryRegion reg, File countryFolder, String regFile) throws IOException {
 		File file = polygons.get(reg.boundary);
 		if(file != null) {
-			File polygonFile = new File(countryFolder, regFile);
+			File polygonFile = new File(countryFolder, regFile + ".poly");
 			countryFolder.mkdirs();
 			if(!polygonFile.exists() || polygonFile.length() != file.length()) {
 				Algorithms.fileCopy(file, polygonFile);
