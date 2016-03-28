@@ -279,6 +279,18 @@ public class CountryOcbfGeneration {
 				}
 			}
 		}
+
+		public boolean hasMapFiles() {
+			if(map) {
+				return true;
+			}
+			for(CountryRegion c : children) {
+				if(c.hasMapFiles()) {
+					return true;
+				}
+			}
+			return false;
+		}
 	}
 	
 	private void scanTranslates(File file, Map<String, Set<TranslateEntity>> translates) throws XmlPullParserException, IOException {
