@@ -66,13 +66,11 @@ public class GenerateExtractScript {
 				writeToFile(countryFolder, ".map", "1");
 			}
 			System.out.println(reg.getDownloadName());
-			if(reg.getParent() != null) {
-				if(depth > 1) {
-					writeToFile(countryFolder, ".parent", reg.getParent().getDownloadName());
-					if(!Algorithms.isEmpty(reg.getSinglePolyExtract())) {
-						writeToFile(countryFolder, ".polyextract", reg.getSinglePolyExtract());
-					}
-				}
+			if (reg.getParent() != null) {
+				writeToFile(countryFolder, ".parent", reg.getParent().getDownloadName());
+			}
+			if (!Algorithms.isEmpty(reg.getSinglePolyExtract())) {
+				writeToFile(countryFolder, ".polyextract", reg.getSinglePolyExtract());
 			}
 			System.out.println("Extract from " + reg.getPolyExtract());
 		}
