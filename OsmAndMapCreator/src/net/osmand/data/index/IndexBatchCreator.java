@@ -147,7 +147,7 @@ public class IndexBatchCreator {
 			List<RegionCountries> countriesToDownload = creator.setupProcess(doc, regions);
 			if(internalRegionsList != null) {
 				RegionCountries rc = new RegionCountries();
-				rc.siteToDownload = "http://builder.osmand.net/osmc/{0}/{0}.pbf";
+				rc.siteToDownload = "http://builder.osmand.net/osm-extract/{0}/{0}.pbf";
 				CountryOcbfGeneration ocbfGeneration = new CountryOcbfGeneration();
 				CountryRegion regionStructure = ocbfGeneration.parseRegionStructure(internalRegionsList);
 				Iterator<CountryRegion> it = regionStructure.iterator();
