@@ -65,14 +65,17 @@ public class GenerateExtractScript {
 			if(reg.hasMapFiles()) {
 				writeToFile(countryFolder, ".map", "1");
 			}
-			System.out.println(reg.getDownloadName());
+			System.out.print(reg.getDownloadName());
 			if (reg.getParent() != null) {
 				writeToFile(countryFolder, ".parent", reg.getParent().getDownloadName());
 			}
-			if (!Algorithms.isEmpty(reg.getSinglePolyExtract())) {
-				writeToFile(countryFolder, ".polyextract", reg.getSinglePolyExtract());
+			if (!Algorithms.isEmpty(reg.getSinglePolyExtract()) || "no".equals(reg.getParent().boundary)) {
+				writeToFile(countryFolder, ".polyextract", reg.getPolyExtract());
+				System.out.println(" - extract from " + reg.getPolyExtract());
+			} else {
+				System.out.println(" - extract from " + reg.getParent().getDownloadName());
 			}
-			System.out.println("Extract from " + reg.getPolyExtract());
+			
 		}
 		// System.out.println("Max depth " + md); // 5
 	}
