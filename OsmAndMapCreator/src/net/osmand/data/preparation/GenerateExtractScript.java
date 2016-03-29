@@ -69,7 +69,7 @@ public class GenerateExtractScript {
 			if (reg.getParent() != null) {
 				writeToFile(countryFolder, ".parent", reg.getParent().getDownloadName());
 			}
-			if (!Algorithms.isEmpty(reg.getSinglePolyExtract()) || "no".equals(reg.getParent().boundary)) {
+			if (!Algorithms.isEmpty(reg.getSinglePolyExtract()) || reg.getParent().boundary == null) {
 				writeToFile(countryFolder, ".polyextract", reg.getPolyExtract());
 				System.out.println(" - extract from " + reg.getPolyExtract());
 			} else {
