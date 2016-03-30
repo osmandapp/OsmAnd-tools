@@ -152,7 +152,7 @@
 		</fileset>
 	</path>
 
-	<target name="junits" depends="compile,common_junits">
+	<target name="junits" depends="compile">
 		<junit fork="false">
 			<sysproperty key="basedir" value="${basedir}"/>
 			<!-- <sysproperty key="OBF_DIR" value="${obfdir}"/> -->
