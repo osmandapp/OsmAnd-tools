@@ -15,6 +15,7 @@ import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
 
+@Ignore
 public class JUnitRouteTest  {
 
 	static BinaryMapIndexReader[]  rs;

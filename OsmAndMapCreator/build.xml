@@ -90,6 +90,9 @@
 		<ant antfile="${osmand-jni.dir}/build.xml" target="jar" dir="${osmand-jni.dir}"
                          inheritAll="false" inheritRefs="false">
 		</ant>
+		<ant antfile="${osmand-jni.dir}/build.xml" target="junits" dir="${osmand-jni.dir}"
+                         inheritAll="false" inheritRefs="false">
+		</ant>
 	</target>
 
 
@@ -149,7 +152,7 @@
 		</fileset>
 	</path>
 
-	<target name="junits" depends="compile">
+	<target name="junits" depends="compile,common_junits">
 		<junit fork="false">
 			<sysproperty key="basedir" value="${basedir}"/>
 			<!-- <sysproperty key="OBF_DIR" value="${obfdir}"/> -->
