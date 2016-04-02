@@ -426,17 +426,24 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			return tags;
 		}
 		Map<String, String> rtags = new LinkedHashMap<String, String>(tags);
+		String[] countyArray= new String[]{"berkeley","luc","herkimer","montgomery","guadalupe","cumberland","cass","koochiching","bergen","saint lawrence","schenectady","log","sullivan","wil","oneida","le sueur","way","tus","kandiyohi","beltrami","becker","madison","passaic","douglas","clay","rensselaer","dutchess","freeborn","ful","crow wing","hennepin","orange","clearwater","sum","hubbard","hol","otsego","stearns","carlton","itasca","anoka","kanabec","cook","atlantic","benton","saratoga","albany","essex","aitkin","mah","isanti","faribault","washington","rockland","cape_may","ramsey","lac qui parle","warren","greene","chisago","blue earth","jackson","ulster","somerset","ott","sussex","morris","kittson","car","pine","big stone","fillmore","dakota","monmouth","col","grant","kane","goodhue","vin","med","putnam","middlesex","lake","columbia","dodge","hoc","yellow medicine","rice","murray","per","steele","outagamie","asd","mercer","lake of the woods","mchenry","fulton","cottonwood","carver","ocean","mille lacs","redwood","meeker","winona","renville","brown","swift","pope","martin","delaware","fay","houston","union","chippewa","nobles","lyon","wright","sibley","nicollet","jef","watonwan","schoharie","mcleod","chenango","hudson","winnipeg","pipestone","mrw","woodbury","gue","lincoln","moe","preston","uni","stevens","wilkin","traverse","leelanau","sen","cook","woo","camden","sta","lic","h","cth","ath","burlington","gonzales","hamilton","sauk","colorado","westchester","story","bel","pau","san","lor","ozaukee","jasper","waupaca","dane","belt","oswego","erie","floyd","bremer","fond du lac","sheboygan","har","macon","chickasaw","boone","hays","caldwell","wya","cos","wayne","shelby","monona","harrison","clayton","monongalia","winnebago","langlade","hen","gea","eri","chp","but","dupage","ida","hardin","buena vista","hancock","waushara","walworth","shawano","saint croix","rock","portage","milwaukee","door","put","pre","por","odnr","mei","jac","hur","ham","gac","fra","cli","ash","onondaga","gloucester","cape may","charlotte","waseca","olmsted","marquette","fulton","champaign","worth","sac","pottawattamie","polk","marshall","lucas","keokuk","franklin","cedar","adams","escambia","kent","santa clara"};
 		if(rtags.containsKey("network")) {
 			String network = rtags.get("network");
 			if (network.startsWith("US:")) {
-				if (!network.equalsIgnoreCase("US:I") && !network.toUpperCase().startsWith("US:I") && !network.equalsIgnoreCase("US:US") && !network.toUpperCase().startsWith("US:US")) {
-					rtags.put("us_state_network", "yes");
+				if (!network.equalsIgnoreCase("US:I") && !network.startsWith("US:I:") && !network.toUpperCase().startsWith("US:US")) {
+					if (((network.length() > 7) && network.substring(6,8).equals("CR")) || network.toLowerCase().contains("county") ||
+						((network.length() > 7) && Arrays.asList(countyArray).contains((network.substring(6)).toLowerCase())) && ((network.split(":", -1).length-1) < 3))
+					{
+						rtags.put("us_county_network", "yes");
+					} else {
+						rtags.put("us_state_network", "yes");
+					}
 					if (network.length() > 5) {
 						network = network.substring(0, 5);
 						rtags.put("network", network);
 					}
 				}
-				if (network.toUpperCase().startsWith("US:I")) {
+				if (network.equalsIgnoreCase("US:I")) {
 					rtags.put("network", "us:i");
 				}
 				if (network.toUpperCase().startsWith("US:US")) {
@@ -473,18 +480,20 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		}
 		if(numbers) {
 			network = "#";
-		} else{
-			int ind = 0;
-			for(; ind < rf.length(); ind++) {
-				if(Character.isDigit(rf.charAt(ind)) || 
-						rf.charAt(ind) == ' ' || rf.charAt(ind) == '-') {
-					break;
-				}
-			}	
-			network = rf.substring(0, ind).trim();
 		}
+// 		 else{
+// 			int ind = 0;
+// 			for(; ind < rf.length(); ind++) {
+// 				if(Character.isDigit(rf.charAt(ind)) || 
+// 						rf.charAt(ind) == ' ' || rf.charAt(ind) == '-') {
+// 					break;
+// 				}
+// 			}	
+// 			network = rf.substring(0, ind).trim();
+// 		}
 		return network;
 	}
+
 
 	public List<Map<String, String>> splitTags(Map<String, String> tags, EntityType entity) {
 		EntityConvertType filter = EntityConvertType.SPLIT;
