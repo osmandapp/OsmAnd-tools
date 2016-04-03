@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -40,7 +41,7 @@ import rtree.RTree;
 public class CombineSRTMIntoFile {
 	private static final Log log = PlatformUtil.getLog(CombineSRTMIntoFile.class);
 
-	public static void main(String[] args) throws IOException, XMLStreamException, SQLException, InterruptedException, IllegalArgumentException, XmlPullParserException {
+	public static void main(String[] args) throws IOException {
 		File directoryWithSRTMFiles = new File(args[0]);
 		File directoryWithTargetFiles = new File(args[1]);
 		String ocbfFile = args[2];
@@ -73,13 +74,22 @@ public class CombineSRTMIntoFile {
 			}
 		}
 		int cnt = 1;
+		Set<String> failedCountries = new HashSet<String>();
 		for(BinaryMapDataObject rc : r) {
 			if(rc.containsAdditionalType(srtm)) {
 				String dw = rc.getNameByType(downloadName);
 				String fullName = rc.getNameByType(regionFullName);
 				System.out.println("Region " + fullName +" " + cnt++ + " out of " + r.size());
-				process(rc, bnds.get(fullName), dw, directoryWithSRTMFiles, directoryWithTargetFiles);
+				try {
+					process(rc, bnds.get(fullName), dw, directoryWithSRTMFiles, directoryWithTargetFiles);
+				} catch(Exception e) {
+					failedCountries.add(fullName);
+					e.printStackTrace();
+				}
 			}
+		}
+		if(!failedCountries.isEmpty()) {
+			throw new IllegalStateException("Failed countries " + failedCountries);
 		}
 	}
 

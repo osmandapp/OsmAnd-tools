@@ -182,7 +182,8 @@ public class OsmStorageWriter {
 			}
 		} else {
 			// josm compatibility
-			writer.writeAttribute(ATTR_VERSION, "1");
+			
+			writer.writeAttribute(ATTR_VERSION, i.getVersion() == 0 ? "1" : i.getVersion() +"");
 		}
 	}
 	
