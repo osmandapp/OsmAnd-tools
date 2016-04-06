@@ -390,7 +390,6 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 					}
 					tags.put("route_road", "");
 					tags.put("road_ref_"+maxModifier, r);
-					tags.put("road_ref:colour_"+maxModifier, tags.get("ref:colour"));
 					String network = getNetwork(r);
 					if(!Algorithms.isEmpty(network)) {
 						tags.put("road_network_"+maxModifier, network);
