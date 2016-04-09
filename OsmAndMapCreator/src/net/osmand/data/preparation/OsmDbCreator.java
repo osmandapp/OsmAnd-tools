@@ -196,7 +196,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 			} catch (IOException es) {
 				throw new RuntimeException(es);
 			}
-			if (osmChange || ovewriteIds) {
+			if (osmChange || ovewriteIds ) {
 				checkEntityExists(e);
 			}
 			if (e instanceof Node) {

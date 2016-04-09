@@ -459,7 +459,7 @@ public class IncOsmChangesCreator {
 		log.info("Load pbf into sqlite " + dbFile.getAbsolutePath());
 		Object dbConn = dlct.getDatabaseConnection(dbFile.getAbsolutePath(), log);
 		accessor.setDbConn(dbConn, dlct);
-		OsmDbCreator dbCreator = new OsmDbCreator(0, 0, false);
+		OsmDbCreator dbCreator = new OsmDbCreator();
 		dbCreator.initDatabase(dlct, dbConn, true);
 		OsmBaseStoragePbf pbfReader = new OsmBaseStoragePbf();
 		InputStream fis = new FileInputStream(outPbf);
