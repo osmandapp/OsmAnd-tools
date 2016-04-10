@@ -24,6 +24,8 @@ public class MapInformationLayer implements MapPanelLayer {
 
 	private MapPanel map;
 	
+	private JButton setStart;
+	private JButton setEnd;
 	private JLabel gpsLocation;
 	private JButton areaButton;
 	
@@ -32,17 +34,27 @@ public class MapInformationLayer implements MapPanelLayer {
 	public void destroyLayer() {
 	}
 
+	public void addSetStartActionListener(ActionListener listener) {
+		this.setStart.addActionListener(listener);
+	};
+
+	public void addSetEndActionListener(ActionListener listener) {
+		this.setEnd.addActionListener(listener);
+	};
+
 	@Override
 	public void initLayer(final MapPanel map) {
 		this.map = map;
 		BoxLayout layout = new BoxLayout(map, BoxLayout.LINE_AXIS);
 		map.setLayout(layout);
 		map.setBorder(BorderFactory.createEmptyBorder(2, 10, 10, 10));
-		
+
 		gpsLocation = new JLabel();
 		gpsLocation.setOpaque(false);
 		updateLocationLabel();
-		
+
+		this.setStart = new JButton("S"); //$NON-NLS-1$
+		this.setEnd = new JButton("E"); //$NON-NLS-1$
 		JButton zoomIn = new JButton("+"); //$NON-NLS-1$
 		JButton zoomOut = new JButton("-"); //$NON-NLS-1$
 		JButton offline = new JButton("*"); //$NON-NLS-1$
@@ -105,12 +117,16 @@ public class MapInformationLayer implements MapPanelLayer {
 		map.add(gpsLocation);
 		map.add(Box.createHorizontalGlue());
 		map.add(areaButton);
+		map.add(setStart);
+		map.add(setEnd);
 		map.add(zoomIn);
 		map.add(zoomOut);
 		map.add(offline);
 		gpsLocation.setAlignmentY(Component.TOP_ALIGNMENT);
 		areaButton.setVisible(false);
 		areaButton.setAlignmentY(Component.TOP_ALIGNMENT);
+		setStart.setAlignmentY(Component.TOP_ALIGNMENT);
+		setEnd.setAlignmentY(Component.TOP_ALIGNMENT);
 		zoomOut.setAlignmentY(Component.TOP_ALIGNMENT);
 		zoomIn.setAlignmentY(Component.TOP_ALIGNMENT);
 		offline.setAlignmentY(Component.TOP_ALIGNMENT);

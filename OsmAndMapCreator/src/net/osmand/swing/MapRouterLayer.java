@@ -89,11 +89,37 @@ public class MapRouterLayer implements MapPanelLayer {
 	private JButton stopButton;
 
 	private List<RouteSegmentResult> previousRoute;
+	public ActionListener setStartActionListener = new ActionListener(){
+		@Override
+		public void actionPerformed(ActionEvent e) {
+			setStart(new LatLon(map.getLatitude(), map.getLongitude()));
+		}
+	};
+
+	public ActionListener setEndActionListener = new ActionListener(){
+		@Override
+		public void actionPerformed(ActionEvent e) {
+			setEnd(new LatLon(map.getLatitude(), map.getLongitude()));
+		}
+	};
+
 	
 	
 	@Override
 	public void destroyLayer() {
 		
+	}
+
+	public void setStart(LatLon start) {
+		startRoute = start;
+		DataExtractionSettings.getSettings().saveStartLocation(start.getLatitude(), start.getLongitude());
+		map.repaint();
+	}
+
+	public void setEnd(LatLon end) {
+		endRoute = end;
+		DataExtractionSettings.getSettings().saveEndLocation(end.getLatitude(), end.getLongitude());
+		map.repaint();
 	}
 
 	@Override
@@ -158,9 +184,7 @@ public class MapRouterLayer implements MapPanelLayer {
 				double fx = (popupMenuPoint.x - map.getCenterPointX()) / map.getTileSize();
 				double latitude = MapUtils.getLatitudeFromTile(map.getZoom(), map.getYTile() + fy);
 				double longitude = MapUtils.getLongitudeFromTile(map.getZoom(), map.getXTile() + fx);
-				startRoute = new LatLon(latitude, longitude);
-				DataExtractionSettings.getSettings().saveStartLocation(latitude, longitude);
-				map.repaint();
+				setStart(new LatLon(latitude, longitude));
 			}
 		};
 		menu.add(start);
@@ -174,9 +198,7 @@ public class MapRouterLayer implements MapPanelLayer {
 				double fx = (popupMenuPoint.x - map.getCenterPointX()) / map.getTileSize();
 				double latitude = MapUtils.getLatitudeFromTile(map.getZoom(), map.getYTile() + fy);
 				double longitude = MapUtils.getLongitudeFromTile(map.getZoom(), map.getXTile() + fx);
-				endRoute = new LatLon(latitude, longitude);
-				DataExtractionSettings.getSettings().saveEndLocation(latitude, longitude);
-				map.repaint();
+				setEnd(new LatLon(latitude, longitude));
 			}
 		};
 		menu.add(end);

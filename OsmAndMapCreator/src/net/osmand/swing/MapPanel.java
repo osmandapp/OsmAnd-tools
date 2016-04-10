@@ -691,12 +691,16 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 	}
 	
 	protected void initDefaultLayers() {
-		addLayer(new MapInformationLayer());
-		addLayer(new MapRouterLayer());
+		MapInformationLayer mapInformationLayer = new MapInformationLayer();
+		MapRouterLayer mapRouterLayer = new MapRouterLayer();
+		addLayer(mapInformationLayer);
+		addLayer(mapRouterLayer);
 		addLayer(new MapPointsLayer());
 		addLayer(new MapAddressLayer());
 		addLayer(new MapClusterLayer());
 //		addLayer(new CoastlinesLayer());
+		mapInformationLayer.addSetStartActionListener(mapRouterLayer.setStartActionListener);
+		mapInformationLayer.addSetEndActionListener(mapRouterLayer.setEndActionListener);
 	}
 	
 	public void addLayer(MapPanelLayer l){
