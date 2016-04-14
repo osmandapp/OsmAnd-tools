@@ -869,9 +869,7 @@ public class IndexCreator {
 		
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 
-//		String file = rootFolder + "/temp/S08W071.osm.bz2";
 		String file = rootFolder + "/temp/map.osm";
-//		String file = rootFolder + "/temp/russia_vladimir_asia.pbf";
 //		String file = rootFolder + "/repos/resources/synthetic_test_rendering.osm";
 
 		int st = file.lastIndexOf('/');

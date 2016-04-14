@@ -147,7 +147,8 @@ public class IndexBatchCreator {
 			List<RegionCountries> countriesToDownload = creator.setupProcess(doc, regions);
 			if(internalRegionsList != null) {
 				RegionCountries rc = new RegionCountries();
-				rc.siteToDownload = "http://builder.osmand.net/osm-extract/{0}/{0}.pbf";
+				//rc.siteToDownload = "http://builder.osmand.net/osm-extract/{0}/{0}.pbf";
+				rc.siteToDownload = "/home/osm-planet/osm-extract/{0}/{0}.pbf";
 				CountryOcbfGeneration ocbfGeneration = new CountryOcbfGeneration();
 				CountryRegion regionStructure = ocbfGeneration.parseRegionStructure(internalRegionsList);
 				Iterator<CountryRegion> it = regionStructure.iterator();
@@ -343,6 +344,9 @@ public class IndexBatchCreator {
 	}
 	
 	protected File downloadFile(String url, String regionName) {
+		if(!url.startsWith("http")) {
+			return new File(url);
+		}
 		String ext = ".osm";
 		if(url.endsWith(".osm.bz2")){
 			ext = ".osm.bz2";
@@ -465,17 +469,17 @@ public class IndexBatchCreator {
 	
 	
 	
-	protected void generateIndex(File f, String rName, RegionSpecificData rdata, Set<String> alreadyGeneratedFiles) {
+	protected void generateIndex(File file, String rName, RegionSpecificData rdata, Set<String> alreadyGeneratedFiles) {
 		try {
 			// be independent of previous results
 			RTree.clearCache();
 			
-			String regionName = f.getName();
+			String regionName = file.getName();
 			log.warn("-------------------------------------------");
-			log.warn("----------- Generate " + f.getName() + "\n\n\n");
-			int i = f.getName().indexOf('.');
+			log.warn("----------- Generate " + file.getName() + "\n\n\n");
+			int i = file.getName().indexOf('.');
 			if (i > -1) {
-				regionName = Algorithms.capitalizeFirstLetterAndLowercase(f.getName().substring(0, i));
+				regionName = Algorithms.capitalizeFirstLetterAndLowercase(file.getName().substring(0, i));
 			}
 			if(Algorithms.isEmpty(rName)){
 				rName = regionName;
@@ -483,7 +487,7 @@ public class IndexBatchCreator {
 				rName = Algorithms.capitalizeFirstLetterAndLowercase(rName);
 			}
 			DBDialect osmDb = this.osmDbDialect;
-			if(f.length() / 1024 / 1024 > INMEM_LIMIT && osmDb == DBDialect.SQLITE_IN_MEMORY) {
+			if(file.length() / 1024 / 1024 > INMEM_LIMIT && osmDb == DBDialect.SQLITE_IN_MEMORY) {
 				log.warn("Switching SQLITE in memory dialect to SQLITE");
 				osmDb = DBDialect.SQLITE;
 			}
@@ -496,7 +500,7 @@ public class IndexBatchCreator {
 			final boolean indRouting = indexRouting && (rdata == null || rdata.indexRouting);
 			if(!indAddr && !indPoi && !indTransport && !indMap && !indRouting) {
 				log.warn("! Skip country because nothing to index !");
-				f.delete();
+				file.delete();
 				return;
 			}
 			indexCreator.setIndexAddress(indAddr);
@@ -504,7 +508,7 @@ public class IndexBatchCreator {
 			indexCreator.setIndexTransport(indTransport);
 			indexCreator.setIndexMap(indMap);
 			indexCreator.setIndexRouting(indRouting);
-			indexCreator.setLastModifiedDate(f.lastModified());
+			indexCreator.setLastModifiedDate(file.lastModified());
 			indexCreator.setNormalizeStreets(true);
 			indexCreator.setRegionName(rName);
 			if (rdata != null && rdata.cityAdminLevel != null) {
@@ -517,7 +521,7 @@ public class IndexBatchCreator {
 			String mapFileName = regionName + "_" + IndexConstants.BINARY_MAP_VERSION + IndexConstants.BINARY_MAP_INDEX_EXT;
 			indexCreator.setMapFileName(mapFileName);
 			try {
-				alreadyGeneratedFiles.add(f.getName());
+				alreadyGeneratedFiles.add(file.getName());
 				Log warningsAboutMapData = null;
 				File logFileName = new File(workDir, mapFileName + GEN_LOG_EXT);
 				FileHandler fh = null;
@@ -545,8 +549,8 @@ public class IndexBatchCreator {
 					LogManager.getLogManager().getLogger("").addHandler(fh);
 				}
 				try {
-					indexCreator.generateIndexes(f, new ConsoleProgressImplementation(1), null, mapZooms,
-							new MapRenderingTypesEncoder(renderingTypesFile, f.getName()), warningsAboutMapData);
+					indexCreator.generateIndexes(file, new ConsoleProgressImplementation(1), null, mapZooms,
+							new MapRenderingTypesEncoder(renderingTypesFile, file.getName()), warningsAboutMapData);
 				} finally {
 					if (fh != null) {
 						fh.close();
@@ -571,7 +575,7 @@ public class IndexBatchCreator {
 				//	logFileName.renameTo(new File(indexDirFiles, logFileName.getName()));
 				
 			} catch (Exception e) {
-				log.error("Exception generating indexes for " + f.getName(), e); //$NON-NLS-1$ 
+				log.error("Exception generating indexes for " + file.getName(), e); //$NON-NLS-1$ 
 			}
 		} catch (OutOfMemoryError e) {
 			System.gc();

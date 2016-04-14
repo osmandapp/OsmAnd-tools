@@ -134,9 +134,6 @@ public class OsmExtractionUI implements IMapLocationListener {
 	public OsmExtractionUI(){
 		createUI();
 	}
-
-	
-        
 	
 	
 	public void createUI(){
@@ -156,9 +153,6 @@ public class OsmExtractionUI implements IMapLocationListener {
 	    mapPanel.setFocusable(true);
 	    mapPanel.addMapLocationListener(this);
 	    
-	    
-		
-		
 	    statusBarLabel = new JLabel();
 	    content.add(statusBarLabel, BorderLayout.SOUTH);
 	    File workingDir = DataExtractionSettings.getSettings().getDefaultWorkingDir();

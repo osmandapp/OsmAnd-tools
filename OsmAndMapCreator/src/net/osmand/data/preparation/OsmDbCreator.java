@@ -14,6 +14,7 @@ import java.util.Map.Entry;
 import net.osmand.data.City.CityType;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
+import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.osm.edit.Relation;
@@ -59,6 +60,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 	private final int shiftId;
 	private final int additionId;
 	private boolean ovewriteIds;
+	private boolean augmentedDiffs;
 
 
 	public OsmDbCreator(int additionId, int shiftId, boolean ovewriteIds) {
@@ -71,11 +73,9 @@ public class OsmDbCreator implements IOsmStorageFilter {
 		this(0, 0, false);
 	}
 	
-	private long convertId(Long id) {
-		return convertId(id.longValue());
-	}
-	
-	private long convertId(long id) {
+	private long convertId(long id, EntityType tp) {
+//		FIXME OSM_CHANGE;
+//		FIXME GEOMETRY_ID;
 		if(shiftId <= 0) {
 			return id;
 		}
@@ -83,7 +83,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 	}
 	
 	private long getId(Entity e) {
-		return convertId(e.getId());
+		return convertId(e.getId(), EntityType.valueOf(e));
 	}
 		
 
@@ -217,7 +217,6 @@ public class OsmDbCreator implements IOsmStorageFilter {
 			} else if (e instanceof Way) {
 				allWays++;
 				int ord = 0;
-				long lid = getId(e);
 				TLongArrayList nodeIds = ((Way) e).getNodeIds();
 				boolean city = CityType.valueFromString(((Way) e).getTag(OSMTagKey.PLACE)) != null;
 				int boundary = ((Way) e).getTag(OSMTagKey.BOUNDARY) != null || city ? 1 : 0;
@@ -227,7 +226,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 						prepWays.setBytes(4, tags.toByteArray());
 					}
 					prepWays.setLong(1, getId(e));
-					prepWays.setLong(2, convertId(nodeIds.get(j)));
+					prepWays.setLong(2, convertId(nodeIds.get(j), EntityType.NODE));
 					prepWays.setLong(3, ord++);
 					prepWays.setInt(5, boundary);
 					prepWays.addBatch();
@@ -247,7 +246,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 						prepRelations.setBytes(6, tags.toByteArray());
 					}
 					prepRelations.setLong(1, getId(e));
-					prepRelations.setLong(2, convertId(i.getKey().getId()));
+					prepRelations.setLong(2, convertId(i.getKey().getId(), i.getKey().getType()));
 					prepRelations.setLong(3, i.getKey().getType().ordinal());
 					prepRelations.setString(4, i.getValue());
 					prepRelations.setLong(5, ord++);
