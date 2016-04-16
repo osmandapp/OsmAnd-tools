@@ -21,9 +21,9 @@ import javax.swing.JTextField;
 
 
 public class OsmExtractionPreferencesDialog extends JDialog {
-	
+
 	private static final long serialVersionUID = -4862884032977071296L;
-	
+
 	private JButton okButton;
 	private JButton cancelButton;
 
@@ -39,15 +39,16 @@ public class OsmExtractionPreferencesDialog extends JDialog {
 	private JTextField renderingStyleFile;
 	private JTextField routingConfigFile;
 
+	private JCheckBox advancedRoutingUI;
 	private JCheckBox useInternet;
 	private JCheckBox animateRouting;
 	private JCheckBox nativeRouting;
 	private JCheckBox preferHousenumber;
 	private JCheckBox additionalAddressinfo;
 
-	
 
-	
+
+
 //	private JCheckBox supressWarning;
 //	private JCheckBox loadWholeOsmInfo;
 
@@ -55,9 +56,9 @@ public class OsmExtractionPreferencesDialog extends JDialog {
     	super(JOptionPane.getFrameForComponent(parent), true);
     	setTitle(Messages.getString("OsmExtractionPreferencesDialog.PREFERENCES")); //$NON-NLS-1$
         initDialog();
-        
+
     }
-	
+
 	public void showDialog(){
 		setSize(700, 570);
         double x = getParent().getBounds().getCenterX();
@@ -65,32 +66,32 @@ public class OsmExtractionPreferencesDialog extends JDialog {
         setLocation((int) x - getWidth() / 2, (int) y - getHeight() / 2);
         setVisible(true);
 	}
-	
+
 	private void initDialog() {
 		JPanel pane = new JPanel();
 		pane.setLayout(new BoxLayout(pane, BoxLayout.Y_AXIS));
         pane.setBorder(BorderFactory.createEmptyBorder(10, 10, 5, 10));
         add(pane);
-        
-        
+
+
         createGeneralSection(pane);
         createNormalizingStreetSection(pane);
         createAddressSection(pane);
-        pane.add(Box.createVerticalGlue());	
-        
+        pane.add(Box.createVerticalGlue());
+
         FlowLayout l = new FlowLayout(FlowLayout.RIGHT);
         JPanel buttonsPane = new JPanel(l);
         okButton = new JButton(Messages.getString("OsmExtractionPreferencesDialog.OK")); //$NON-NLS-1$
         buttonsPane.add(okButton);
         cancelButton = new JButton(Messages.getString("OsmExtractionPreferencesDialog.CANCEL")); //$NON-NLS-1$
         buttonsPane.add(cancelButton);
-        
+
         buttonsPane.setMaximumSize(new Dimension(Short.MAX_VALUE, (int) l.preferredLayoutSize(buttonsPane).getHeight()));
         pane.add(buttonsPane);
-        
+
         addListeners();
 	}
-	
+
 	private void createGeneralSection(JPanel root) {
 		JPanel panel = new JPanel();
 		int gridY = 0;
@@ -99,16 +100,20 @@ public class OsmExtractionPreferencesDialog extends JDialog {
 		panel.setLayout(l);
 		panel.setBorder(BorderFactory.createTitledBorder(Messages.getString("OsmExtractionPreferencesDialog.GENERAL"))); //$NON-NLS-1$
 		root.add(panel);
-		
-		
-		useInternet = createCheckBox(panel, gridY++, 
-				DataExtractionSettings.getSettings().useInternetToLoadImages(), 
+
+
+		advancedRoutingUI = createCheckBox(panel, gridY++,
+				DataExtractionSettings.getSettings().useAdvancedRoutingUI(),
+				Messages.getString("OsmExtractionPreferencesDialog.ADVANCED.ROUTING.UI"), l);
+//				Messages.getString("OsmExtractionPreferencesDialog.ADVANCED.ROUTING.UI"), l);
+		useInternet = createCheckBox(panel, gridY++,
+				DataExtractionSettings.getSettings().useInternetToLoadImages(),
 				Messages.getString("OsmExtractionPreferencesDialog.INTERNET.TO.DOWNLOAD.FILES"), l);
-		animateRouting = createCheckBox(panel, gridY++, 
+		animateRouting = createCheckBox(panel, gridY++,
 				DataExtractionSettings.getSettings().isAnimateRouting(), "Animate routing", l);
-		nativeRouting = createCheckBox(panel, gridY++, 
+		nativeRouting = createCheckBox(panel, gridY++,
 				DataExtractionSettings.getSettings().useNativeRouting(), "Native routing", l);
-		
+
 		JLabel label = new JLabel("Directory with obf binary files (routing, rendering): ");
 		panel.add(label);
 		GridBagConstraints constr = new GridBagConstraints();
@@ -117,9 +122,9 @@ public class OsmExtractionPreferencesDialog extends JDialog {
 		constr.gridy = gridY;
 		constr.anchor = GridBagConstraints.WEST;
 		l.setConstraints(label, constr);
-		
+
 		nativeFilesDirectory = new JTextField();
-		
+
 		nativeFilesDirectory.setText(DataExtractionSettings.getSettings().getBinaryFilesDir());
 		panel.add(nativeFilesDirectory);
 		constr = new GridBagConstraints();
@@ -129,7 +134,7 @@ public class OsmExtractionPreferencesDialog extends JDialog {
 		constr.gridx = 1;
 		constr.gridy = gridY++;
 		l.setConstraints(nativeFilesDirectory, constr);
-		
+
 		label = new JLabel("Routing (car|bicycle|pedestrian,[short_way],[avoid_ferries]...) : ");
         panel.add(label);
         constr = new GridBagConstraints();
@@ -138,9 +143,9 @@ public class OsmExtractionPreferencesDialog extends JDialog {
         constr.gridy = gridY;
         constr.anchor = GridBagConstraints.WEST;
         l.setConstraints(label, constr);
-        
+
         routingMode = new JTextField();
-        
+
         routingMode.setText(DataExtractionSettings.getSettings().getRouteMode());
         panel.add(routingMode);
         constr = new GridBagConstraints();
@@ -150,7 +155,7 @@ public class OsmExtractionPreferencesDialog extends JDialog {
         constr.gridx = 1;
         constr.gridy = gridY++;
         l.setConstraints(routingMode, constr);
-		
+
         label = new JLabel("Routing config file (path : ");
         panel.add(label);
         constr = new GridBagConstraints();
@@ -159,7 +164,7 @@ public class OsmExtractionPreferencesDialog extends JDialog {
         constr.gridy = gridY;
         constr.anchor = GridBagConstraints.WEST;
         l.setConstraints(label, constr);
-        
+
         routingConfigFile = new JTextField();
         routingConfigFile.setText(DataExtractionSettings.getSettings().getRoutingXmlPath());
         panel.add(routingConfigFile);
@@ -170,8 +175,8 @@ public class OsmExtractionPreferencesDialog extends JDialog {
         constr.gridx = 1;
         constr.gridy = gridY++;
         l.setConstraints(routingConfigFile, constr);
-		
-        
+
+
         label = new JLabel("Rendering style file (path) : ");
         panel.add(label);
         constr = new GridBagConstraints();
@@ -180,7 +185,7 @@ public class OsmExtractionPreferencesDialog extends JDialog {
         constr.gridy = gridY;
         constr.anchor = GridBagConstraints.WEST;
         l.setConstraints(label, constr);
-        
+
         renderingStyleFile = new JTextField();
         renderingStyleFile.setText(DataExtractionSettings.getSettings().getRenderXmlPath());
         panel.add(renderingStyleFile);
@@ -191,12 +196,12 @@ public class OsmExtractionPreferencesDialog extends JDialog {
         constr.gridx = 1;
         constr.gridy = gridY++;
         l.setConstraints(renderingStyleFile, constr);
-        
+
         nativeLibFile = addTextField(panel, gridY++, l, "Native lib file (osmand.lib): ", DataExtractionSettings.getSettings().getNativeLibFile());
         nativeQtLib = addTextField(panel, gridY++, l, "Native lib folder (qt core): ", DataExtractionSettings.getSettings().getQtLibFolder());
-		
+
 		panel.setMaximumSize(new Dimension(Short.MAX_VALUE, panel.getPreferredSize().height));
-		
+
 	}
 
 	protected JTextField addTextField(JPanel panel, int gridY, GridBagLayout l, String labelTxt, String value) {
@@ -210,7 +215,7 @@ public class OsmExtractionPreferencesDialog extends JDialog {
         constr.gridy = gridY;
         constr.anchor = GridBagConstraints.WEST;
         l.setConstraints(label, constr);
-        
+
         JTextField textField = new JTextField();
         textField.setText(value);
         panel.add(textField);
@@ -255,7 +260,7 @@ public class OsmExtractionPreferencesDialog extends JDialog {
 		constr.gridx = 0;
 		constr.gridy = 0;
 		l.setConstraints(label, constr);
-		
+
 		streetSuffixes = new JTextField();
 		streetSuffixes.setText(DataExtractionSettings.getSettings().getSuffixesToNormalizeStreetsString());
 		panel.add(streetSuffixes);
@@ -265,7 +270,7 @@ public class OsmExtractionPreferencesDialog extends JDialog {
 		constr.gridx = 1;
 		constr.gridy = 0;
 		l.setConstraints(streetSuffixes, constr);
-		
+
 		label = new JLabel(Messages.getString("OsmExtractionPreferencesDialog.DEFAULT.SUFFIXES")); //$NON-NLS-1$
 		panel.add(label);
 		constr = new GridBagConstraints();
@@ -274,7 +279,7 @@ public class OsmExtractionPreferencesDialog extends JDialog {
 		constr.gridy = 1;
 		constr.anchor = GridBagConstraints.WEST;
 		l.setConstraints(label, constr);
-		
+
 		streetDefaultSuffixes = new JTextField();
 		streetDefaultSuffixes.setText(DataExtractionSettings.getSettings().getDefaultSuffixesToNormalizeStreetsString());
 		panel.add(streetDefaultSuffixes);
@@ -285,8 +290,8 @@ public class OsmExtractionPreferencesDialog extends JDialog {
 		constr.gridx = 1;
 		constr.gridy = 1;
 		l.setConstraints(streetDefaultSuffixes, constr);
-		
-		label = new JLabel("Map zooms (specify zoom levels in binary map) "); 
+
+		label = new JLabel("Map zooms (specify zoom levels in binary map) ");
 		panel.add(label);
 		constr = new GridBagConstraints();
 		constr.ipadx = 5;
@@ -294,7 +299,7 @@ public class OsmExtractionPreferencesDialog extends JDialog {
 		constr.gridy = 2;
 		constr.anchor = GridBagConstraints.WEST;
 		l.setConstraints(label, constr);
-		
+
 		mapZooms = new JTextField();
 		mapZooms.setText(DataExtractionSettings.getSettings().getMapZoomsValue());
 		panel.add(mapZooms);
@@ -305,8 +310,8 @@ public class OsmExtractionPreferencesDialog extends JDialog {
 		constr.gridx = 1;
 		constr.gridy = 2;
 		l.setConstraints(mapZooms, constr);
-		
-		label = new JLabel("Line smoothness for low zooms (value 0-3) : "); 
+
+		label = new JLabel("Line smoothness for low zooms (value 0-3) : ");
 		panel.add(label);
 		constr = new GridBagConstraints();
 		constr.ipadx = 5;
@@ -314,7 +319,7 @@ public class OsmExtractionPreferencesDialog extends JDialog {
 		constr.gridy = 3;
 		constr.anchor = GridBagConstraints.WEST;
 		l.setConstraints(label, constr);
-		
+
 		lineSmoothness = new JTextField();
 		lineSmoothness.setText(DataExtractionSettings.getSettings().getLineSmoothness());
 		panel.add(lineSmoothness);
@@ -325,9 +330,9 @@ public class OsmExtractionPreferencesDialog extends JDialog {
 		constr.gridx = 1;
 		constr.gridy = 3;
 		l.setConstraints(lineSmoothness, constr);
-		
-		
-		label = new JLabel("Rendering types (xml config to extract osm data) file path"); 
+
+
+		label = new JLabel("Rendering types (xml config to extract osm data) file path");
 		panel.add(label);
 		constr = new GridBagConstraints();
 		constr.ipadx = 5;
@@ -335,7 +340,7 @@ public class OsmExtractionPreferencesDialog extends JDialog {
 		constr.gridy = 4;
 		constr.anchor = GridBagConstraints.WEST;
 		l.setConstraints(label, constr);
-		
+
 		renderingTypesFile = new JTextField();
 		renderingTypesFile.setText(DataExtractionSettings.getSettings().getMapRenderingTypesFile());
 		panel.add(renderingTypesFile);
@@ -346,10 +351,10 @@ public class OsmExtractionPreferencesDialog extends JDialog {
 		constr.gridx = 1;
 		constr.gridy = 4;
 		l.setConstraints(renderingTypesFile, constr);
-		
+
 		panel.setMaximumSize(new Dimension(Short.MAX_VALUE, panel.getPreferredSize().height));
 	}
-	
+
 	private void createAddressSection(JPanel root) {
 		JPanel panel = new JPanel();
 		int gridY = 0;
@@ -357,18 +362,18 @@ public class OsmExtractionPreferencesDialog extends JDialog {
 		panel.setLayout(l);
 		panel.setBorder(BorderFactory.createTitledBorder(Messages.getString("OsmExtractionPreferencesDialog.ADDRESS")));
 		root.add(panel);
-		
-		preferHousenumber = createCheckBox(panel, gridY++, 
-				DataExtractionSettings.getSettings().isHousenumberPrefered(), 
+
+		preferHousenumber = createCheckBox(panel, gridY++,
+				DataExtractionSettings.getSettings().isHousenumberPrefered(),
 				Messages.getString("OsmExtractionPreferencesDialog.PREFER.NUMBER"), l);
-		
-		additionalAddressinfo = createCheckBox(panel, gridY++, 
-				DataExtractionSettings.getSettings().isAdditionalInfo(), 
+
+		additionalAddressinfo = createCheckBox(panel, gridY++,
+				DataExtractionSettings.getSettings().isAdditionalInfo(),
 				Messages.getString("OsmExtractionPreferencesDialog.ADDITIONAL.INFO"), l);
-		
+
 		panel.setMaximumSize(new Dimension(Short.MAX_VALUE, panel.getPreferredSize().height));
 	}
-	
+
 	private void addListeners(){
 		okButton.addActionListener(new ActionListener(){
 			@Override
@@ -376,7 +381,7 @@ public class OsmExtractionPreferencesDialog extends JDialog {
 				saveProperties();
 				setVisible(false);
 			}
-			
+
 		});
 		cancelButton.addActionListener(new ActionListener(){
 			@Override
@@ -384,10 +389,9 @@ public class OsmExtractionPreferencesDialog extends JDialog {
 				setVisible(false);
 			}
 		});
-				
+
 	}
-	
-	
+
 	public void saveProperties(){
 		DataExtractionSettings settings = DataExtractionSettings.getSettings();
 		if(!settings.getSuffixesToNormalizeStreetsString().equals(streetSuffixes.getText())){
@@ -395,6 +399,9 @@ public class OsmExtractionPreferencesDialog extends JDialog {
 		}
 		if(!settings.getDefaultSuffixesToNormalizeStreetsString().equals(streetDefaultSuffixes.getText())){
 			settings.setDefaultSuffixesToNormalizeStreets(streetDefaultSuffixes.getText());
+		}
+		if(settings.useAdvancedRoutingUI() != advancedRoutingUI.isSelected()){
+			settings.setUseAdvancedRoutingUI(advancedRoutingUI.isSelected());
 		}
 		if(settings.useInternetToLoadImages() != useInternet.isSelected()){
 			settings.setUseInterentToLoadImages(useInternet.isSelected());
@@ -411,7 +418,7 @@ public class OsmExtractionPreferencesDialog extends JDialog {
 		if(!settings.getQtLibFolder().equals(nativeQtLib.getText())){
 			settings.setQtLibFolder(nativeQtLib.getText());
 		}
-		
+
 		if(!settings.getLineSmoothness().equals(lineSmoothness.getText())){
 			settings.setLineSmoothness(lineSmoothness.getText());
 		}
@@ -424,7 +431,7 @@ public class OsmExtractionPreferencesDialog extends JDialog {
 		if(!settings.getBinaryFilesDir().equals(nativeFilesDirectory.getText())){
 			settings.setBinaryFilesDir(nativeFilesDirectory.getText());
 		}
-		
+
 		if(!settings.getRenderXmlPath().equals(renderingStyleFile.getText())){
 			settings.setRenderXmlPath(renderingStyleFile.getText());
 		}
@@ -434,7 +441,7 @@ public class OsmExtractionPreferencesDialog extends JDialog {
 		if(!settings.getRouteMode().equals(routingMode.getText())){
 			settings.setRouteMode(routingMode.getText());
 		}
-		
+
 		if(settings.isHousenumberPrefered() != preferHousenumber.isSelected()){
 			settings.preferHousenumber(preferHousenumber.isSelected());
 		}
@@ -442,7 +449,7 @@ public class OsmExtractionPreferencesDialog extends JDialog {
 			settings.AdditionalInfo(additionalAddressinfo.isSelected());
 		}
 	}
-	
+
 
 
 }

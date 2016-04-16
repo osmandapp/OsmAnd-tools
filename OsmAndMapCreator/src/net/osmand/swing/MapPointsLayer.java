@@ -24,20 +24,20 @@ import net.osmand.util.MapUtils;
 public class MapPointsLayer implements MapPanelLayer {
 
 	private MapPanel map;
-	
+
 	// special points to draw
 	private DataTileManager<? extends Entity> points;
-	
-	
+
+
 	private Color color = Color.black;
 	private int size = 3;
 	private String tagToShow = OSMTagKey.NAME.getValue();
-	
+
 	private Map<Point, String> pointsToDraw = new LinkedHashMap<Point, String>();
 	private List<LineObject> linesToDraw = new ArrayList<LineObject>();
 
 	private Font whiteFont;
-	
+
 	private static class LineObject {
 		Way w;
 		Line2D line;
@@ -48,9 +48,9 @@ public class MapPointsLayer implements MapPanelLayer {
 			this.line = line;
 			this.middle = middle;
 		}
-		
+
 	}
-	
+
 	@Override
 	public void destroyLayer() {
 	}
@@ -59,20 +59,20 @@ public class MapPointsLayer implements MapPanelLayer {
 	public void initLayer(MapPanel map) {
 		this.map = map;
 	}
-	
+
 	public void setColor(Color color){
 		this.color = color;
 	}
-	
+
 	public void setPointSize(int size){
 		this.size  = size;
 	}
-	
+
 	public void setTagToShow(String tag) {
 		this.tagToShow = tag;
 	}
-	
-	
+
+
 
 	@Override
 	public void paintLayer(Graphics2D g) {
@@ -97,7 +97,7 @@ public class MapPointsLayer implements MapPanelLayer {
 				g.drawString(s, p.x, (p.y + i++ * 15));
 			}
 		}
-		
+
 		// draw user points
 		int[] xPoints = new int[4];
 		int[] yPoints = new int[4];
@@ -120,7 +120,7 @@ public class MapPointsLayer implements MapPanelLayer {
 			transform.translate(p.getX1(), p.getY1());
 			transform.rotate(p.getX2() - p.getX1(), p.getY2() - p.getY1());
 			xPoints[1] = xPoints[0] = 0;
-			xPoints[2] = xPoints[3] = (int) Math.sqrt((p.getX2() - p.getX1())*(p.getX2() - p.getX1()) + 
+			xPoints[2] = xPoints[3] = (int) Math.sqrt((p.getX2() - p.getX1())*(p.getX2() - p.getX1()) +
 					(p.getY2() - p.getY1())*(p.getY2() - p.getY1())) +1;
 			yPoints[3] = yPoints[0] = 0;
 			yPoints[2] = yPoints[1] = 2;
@@ -137,7 +137,7 @@ public class MapPointsLayer implements MapPanelLayer {
 				AffineTransform prev = g.getTransform();
 
 				double flt = Math.atan2(p.getX2() - p.getX1(), p.getY2() - p.getY1());
-				
+
 				AffineTransform ps = new AffineTransform(prev);
 				ps.translate((p.getX2() + p.getX1()) / 2, (int)(p.getY2() + p.getY1()) / 2);
 				if(flt < Math.PI && flt > 0) {
@@ -146,26 +146,26 @@ public class MapPointsLayer implements MapPanelLayer {
 					ps.rotate(-(p.getX2() - p.getX1()), -(p.getY2() - p.getY1()));
 				}
 				g.setTransform(ps);
-				
+
 				g.setFont(whiteFont);
 				g.setColor(Color.white);
 				float c = 1.3f;
 				g.scale(c, c);
 				g.drawString(name, -15, (int) (-10/c));
 				g.scale(1/c, 1/c);
-				
+
 				if(white) {
 					g.setColor(Color.lightGray);
 				} else {
 					g.setColor(Color.DARK_GRAY);
 				}
 				g.drawString(name, -15, -10);
-				
+
 				g.setColor(prevColor);
 				g.setTransform(prev);
 				g.setFont(prevFont);
 			}
-		}		
+		}
 	}
 
 	@Override
@@ -175,7 +175,7 @@ public class MapPointsLayer implements MapPanelLayer {
 			double xTileRight = map.getXTile() + map.getCenterPointX() / map.getTileSize();
 			double yTileUp = map.getYTile() - map.getCenterPointY() / map.getTileSize();
 			double yTileDown = map.getYTile() + map.getCenterPointY() / map.getTileSize();
-			
+
 			double latDown = MapUtils.getLatitudeFromTile(map.getZoom(), yTileDown);
 			double longDown = MapUtils.getLongitudeFromTile(map.getZoom(), xTileRight);
 			double latUp = MapUtils.getLatitudeFromTile(map.getZoom(), yTileUp);
@@ -200,7 +200,7 @@ public class MapPointsLayer implements MapPanelLayer {
 							prevPixY = pixY;
 						}
 					}
-					
+
 				} else if(e instanceof Node){
 					Node n = (Node) e;
 					int pixX = (int) (MapUtils.getPixelShiftX(map.getZoom(), n.getLongitude(), map.getLongitude(), map.getTileSize()) + map.getCenterPointX());
@@ -209,17 +209,21 @@ public class MapPointsLayer implements MapPanelLayer {
 						pointsToDraw.put(new Point(pixX, pixY), n.getTag(tagToShow));
 					}
 				} else {
-				} 
+				}
 			}
-		}		
+		}
 	}
-	
+
 	public DataTileManager<? extends Entity> getPoints() {
 		return points;
 	}
-	
+
 	public void setPoints(DataTileManager<? extends Entity> points) {
 		this.points = points;
+	}
+
+	@Override
+	public void applySettings() {
 	}
 
 }

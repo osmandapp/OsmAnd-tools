@@ -21,13 +21,13 @@ import net.osmand.util.MapUtils;
 public class CoastlinesLayer implements MapPanelLayer {
 
 	private MapPanel map;
-	
+
 	private BasemapProcessor basemapProcessor;
 
 	private ArrayList<Polygon> lands = new ArrayList<Polygon>();
 	private ArrayList<Polygon> waters = new ArrayList<Polygon>();
-	
-	
+
+
 	@Override
 	public void destroyLayer() {
 	}
@@ -35,17 +35,17 @@ public class CoastlinesLayer implements MapPanelLayer {
 	@Override
 	public void initLayer(MapPanel map) {
 		this.map = map;
-		basemapProcessor = new BasemapProcessor(null, MapZooms.getDefault(), 
+		basemapProcessor = new BasemapProcessor(null, MapZooms.getDefault(),
 				new MapRenderingTypesEncoder("basemap"), 0);
 		fillPopupMenuWithActions(map.getPopupMenu());
 	}
-	
+
 
 	@Override
 	public void paintLayer(Graphics2D g) {
 		g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
 		g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
-		
+
 		g.setColor(new Color(0, 0, 255, 120));
 		for(Polygon w : waters) {
 			g.drawPolygon(w);
@@ -57,7 +57,7 @@ public class CoastlinesLayer implements MapPanelLayer {
 			g.fillPolygon(l);
 		}
 	}
-	
+
 	public Polygon getPolygon(int tileX, int tileY, int z) {
 		int pixX = (int) (MapUtils.getPixelShiftX(map.getZoom(), MapUtils.getLongitudeFromTile(z, tileX), map.getLongitude(),
 				map.getTileSize()) + map.getCenterPointX());
@@ -69,7 +69,7 @@ public class CoastlinesLayer implements MapPanelLayer {
 				map.getTileSize()) + map.getCenterPointY());
 		return new Polygon(new int[] { pixX, pixsX, pixsX, pixX, pixX }, new int[] { pixY, pixY, pixsY, pixsY, pixY }, 5);
 	}
-	
+
 	public void fillPopupMenuWithActions(JPopupMenu menu) {
 		Action print = new AbstractAction("Print tile coastline info") {
 			private static final long serialVersionUID = 507156107455281238L;
@@ -141,8 +141,12 @@ public class CoastlinesLayer implements MapPanelLayer {
 					}
 				}
 			}
-			
+
 		}
 	}
-	
+
+	@Override
+	public void applySettings() {
+	}
+
 }
