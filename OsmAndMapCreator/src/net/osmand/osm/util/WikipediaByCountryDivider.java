@@ -46,8 +46,8 @@ import rtree.RTree;
 
 public class WikipediaByCountryDivider {
 	private static final Log log = PlatformUtil.getLog(WikipediaByCountryDivider.class);
-	private static final long BATCH_SIZE = 500;	
-	
+	private static final long BATCH_SIZE = 500;
+
 	private static class LanguageSqliteFile {
 		private Connection conn;
 		private ResultSet rs;
@@ -56,39 +56,39 @@ public class WikipediaByCountryDivider {
 			conn = (Connection) DBDialect.SQLITE.getDatabaseConnection(fileName, log);
 //			conn.createStatement().execute("CREATE INDEX IF NOT EXISTS ID_INDEX ON WIKI(ID)");
 		}
-		
+
 		public long getId() throws SQLException {
 			return rs.getLong(1);
 		}
-		
+
 		public double getLat() throws SQLException {
 			return rs.getDouble(2);
 		}
-		
+
 		public double getLon() throws SQLException {
 			return rs.getDouble(3);
 		}
-		
+
 		public String getTitle() throws SQLException {
 			return rs.getString(4);
 		}
-		
+
 		public byte[] getContent() throws SQLException {
 			return rs.getBytes(5);
 		}
-		
+
 		public boolean next() throws SQLException {
 			if(rs == null) {
 				rs = conn.createStatement().executeQuery("SELECT id, lat, lon, title, zipContent FROM wiki");
 			}
 			return rs.next();
 		}
-		
+
 		public void closeConnnection() throws SQLException {
 			conn.close();
 		}
 	}
-	
+
 	private static class GlobalWikiStructure {
 
 		private long idGen = 100;
@@ -100,7 +100,7 @@ public class WikipediaByCountryDivider {
 		private Connection c;
 		private OsmandRegions regions;
 		private List<String> keyNames = new ArrayList<String>();
-		
+
 		public GlobalWikiStructure(String fileName, OsmandRegions regions, boolean regenerate) throws SQLException {
 			this.regions = regions;
 			if(regenerate) {
@@ -112,7 +112,7 @@ public class WikipediaByCountryDivider {
 				prepareToInsert();
 			}
 		}
-		
+
 		public void updateRegions() throws SQLException, IOException {
 			c.createStatement().execute("DELETE FROM wiki_region");
 			c.createStatement().execute("DELETE FROM wiki_translation"); // not needed any more
@@ -132,9 +132,9 @@ public class WikipediaByCountryDivider {
 					}
 				}
 			}
-			
+
 		}
-		
+
 		public void prepareToInsert() throws SQLException {
 			createTables();
 			prepareStatetements();
@@ -154,7 +154,7 @@ public class WikipediaByCountryDivider {
 			statements.put(p, lt);
 
 		}
-		
+
 		private List<String> getRegions(double lat, double lon) throws IOException {
 			keyNames.clear();
 			List<BinaryMapDataObject> cs = regions.query(MapUtils.get31TileNumberX(lon), MapUtils.get31TileNumberY(lat));
@@ -163,7 +163,7 @@ public class WikipediaByCountryDivider {
 			}
 			return keyNames;
 		}
-		
+
 		public void closeConnnection() throws SQLException {
 			for(PreparedStatement s : statements.keySet()) {
 				s.executeBatch();
@@ -194,12 +194,12 @@ public class WikipediaByCountryDivider {
 			insertWikiTranslation.setString(3, title);
 			addBatch(insertWikiTranslation);
 		}
-		
+
 		public void commitTranslationInsert() throws SQLException {
 			insertWikiTranslation.executeBatch();
 		}
 
-		public long insertArticle(double lat, double lon, String lang, long wikiId, String title, byte[] zipContent) 
+		public long insertArticle(double lat, double lon, String lang, long wikiId, String title, byte[] zipContent)
 				throws SQLException, IOException {
 			long id = getIdForArticle(lang, title);
 			boolean genId = id < 0;
@@ -215,7 +215,7 @@ public class WikipediaByCountryDivider {
 			insertWikiContent.setBytes(7, zipContent);
 			addBatch(insertWikiContent);
 			return id;
-			
+
 		}
 
 		public void createTables() throws SQLException {
@@ -257,7 +257,7 @@ public class WikipediaByCountryDivider {
 			generateGlobalWikiFile(folder, regionsFile);
 		}
 	}
-	
+
 	protected static void updateCountries(String folder, String regionsFile) throws IOException, SQLException {
 		OsmandRegions regions = new OsmandRegions();
 		regions.prepareFile(regionsFile);
@@ -267,9 +267,9 @@ public class WikipediaByCountryDivider {
 		wikiStructure.closeConnnection();
 		System.out.println("Generation finished");
 	}
-	
-	
-	
+
+
+
 	protected static void generateCountrySqlite(String folder, boolean skip) throws SQLException, IOException, InterruptedException, XmlPullParserException {
 		Connection conn = (Connection) DBDialect.SQLITE.getDatabaseConnection(folder + "wiki.sqlite", log);
 		OsmandRegions regs = new OsmandRegions();
@@ -305,7 +305,7 @@ public class WikipediaByCountryDivider {
 			if(obfFile.exists() && skip) {
 				continue;
 			}
-			
+
 			fl.delete();
 			osmBz2.delete();
 			obfFile.delete();
@@ -320,7 +320,7 @@ public class WikipediaByCountryDivider {
 					"SELECT WC.id, WC.lat, WC.lon, WC.lang, WC.wikiId, WC.title, WC.zipContent "
 							+ " FROM wiki_content WC INNER JOIN wiki_region WR "
 							+ " ON WC.id = WR.id AND WR.regionName = '" + rs.getString(1) + "' ORDER BY WC.id");
-			
+
 			FileOutputStream out = new FileOutputStream(osmBz2);
 			out.write('B');
 			out.write('Z');
@@ -341,7 +341,7 @@ public class WikipediaByCountryDivider {
 //			   "http://xmlpull.org/v1/doc/properties.html#serializer-line-separator", "\n");
 			int cnt = 1;
 			long prevOsmId = -1;
-			StringBuilder content = new StringBuilder(); 
+			StringBuilder content = new StringBuilder();
 			String nameUnique = null;
 			boolean nameAdded = false;
 			while (rps.next()) {
@@ -387,7 +387,7 @@ public class WikipediaByCountryDivider {
 					serializer.attribute(null, "id", (osmId)+"");
 					serializer.attribute(null, "lat", lat+"");
 					serializer.attribute(null, "lon", lon+"");
-					
+
 				}
 				if(wikiLang.equals("en")) {
 					nameAdded = true;
@@ -441,10 +441,10 @@ public class WikipediaByCountryDivider {
 		creator.setIndexRouting(false);
 		creator.setMapFileName(obf.getName());
 		creator.generateIndexes(osmBz2,
-				new ConsoleProgressImplementation(1), null, MapZooms.getDefault(), 
+				new ConsoleProgressImplementation(1), null, MapZooms.getDefault(),
 				new MapRenderingTypesEncoder(obf.getName()), log);
 
-		
+
 	}
 
 	private static void addTag(XmlSerializer serializer, String key, String value) throws IOException {
@@ -535,11 +535,11 @@ public class WikipediaByCountryDivider {
 		wikiStructure.commitTranslationInsert();
 	}
 
-	
+
 	public interface InsertValueProcessor {
     	public void process(List<String> vs);
     }
-	
+
 	protected static void readInsertValuesFile(final String fileName, InsertValueProcessor p)
 			throws FileNotFoundException, UnsupportedEncodingException, IOException {
 		InputStream fis = new FileInputStream(fileName);
@@ -557,7 +557,7 @@ public class WikipediaByCountryDivider {
     		buf += str;
     		if(!values) {
     			if(buf.contains("VALUES")) {
-    				buf = buf.substring(buf.indexOf("VALUES") + "VALUES".length()); 
+    				buf = buf.substring(buf.indexOf("VALUES") + "VALUES".length());
     				values = true;
     			}
     		} else {
@@ -566,7 +566,7 @@ public class WikipediaByCountryDivider {
     			int last = 0;
     			for(int k = 0; k < buf.length(); k++) {
     				if(openString ) {
-						if (buf.charAt(k) == '\'' && (buf.charAt(k - 1) != '\\' 
+						if (buf.charAt(k) == '\'' && (buf.charAt(k - 1) != '\\'
 								|| buf.charAt(k - 2) == '\\')) {
     						openString = false;
     					}
@@ -602,10 +602,10 @@ public class WikipediaByCountryDivider {
     				}
     			}
     			buf = buf.substring(last);
-    			
-    			
+
+
     		}
-    		
+
     	}
     	read.close();
 	}

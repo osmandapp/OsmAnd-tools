@@ -12,9 +12,9 @@ import crosby.binary.Fileformat;
  * Intermediate representation of the header of a fileblock when a set of
  * fileblocks is read as in a stream. The data in the fileblock must be either
  * skipped (where the returned value is a reference to the fileblock) or parsed.
- * 
+ *
  * @author crosby
- * 
+ *
  */
 public class FileBlockHead extends FileBlockReference {
     protected FileBlockHead(String type, ByteString indexdata) {
@@ -32,7 +32,7 @@ public class FileBlockHead extends FileBlockReference {
         if (headersize > MAX_HEADER_SIZE) {
           throw new FileFormatException("Unexpectedly long header "+MAX_HEADER_SIZE+ " bytes. Possibly corrupt file.");
         }
-        
+
         byte buf[] = new byte[headersize];
         datinput.readFully(buf);
         // System.out.format("Read buffer for header of %d bytes\n",buf.length);
@@ -45,7 +45,7 @@ public class FileBlockHead extends FileBlockReference {
         if (header.getDatasize() > MAX_BODY_SIZE) {
           throw new FileFormatException("Unexpectedly long body "+MAX_BODY_SIZE+ " bytes. Possibly corrupt file.");
         }
-        
+
         fileblock.input = input;
         if (input instanceof FileInputStream)
             fileblock.data_offset = ((FileInputStream) input).getChannel()
@@ -57,7 +57,7 @@ public class FileBlockHead extends FileBlockReference {
     /**
      * Assumes the stream is positioned over at the start of the data, skip over
      * it.
-     * 
+     *
      * @throws IOException
      */
     void skipContents(InputStream input) throws IOException {
@@ -68,7 +68,7 @@ public class FileBlockHead extends FileBlockReference {
     /**
      * Assumes the stream is positioned over at the start of the data, read it
      * and return the complete FileBlock
-     * 
+     *
      * @throws IOException
      */
     FileBlock readContents(InputStream input) throws IOException {

@@ -12,7 +12,7 @@ import java.net.URLConnection;
 
 /**
  * This class is used to upload a file to a FTP server.
- * 
+ *
  * @author Muthu
  */
 public class FTPFileUpload
@@ -22,7 +22,7 @@ public class FTPFileUpload
     * Upload a file to a FTP server. A FTP URL is generated with the
     * following syntax:
     * ftp://user:password@host:port/filePath;type=i.
-    * 
+    *
     * @param ftpServer , FTP server address (optional port ':portNumber').
     * @param user , Optional user name to login.
     * @param password , Optional password for user.
@@ -104,7 +104,7 @@ public class FTPFileUpload
     * Download a file from a FTP server. A FTP URL is generated with the
     * following syntax:
     * ftp://user:password@host:port/filePath;type=i.
-    * 
+    *
     * @param ftpServer , FTP server address (optional port ':portNumber').
     * @param user , Optional user name to login.
     * @param password , Optional password for user.

@@ -1,10 +1,10 @@
 //FileHdr.java
-//  
+//
 //This library is free software; you can redistribute it and/or
 //modify it under the terms of the GNU Lesser General Public
 //License as published by the Free Software Foundation; either
 //version 2.1 of the License, or (at your option) any later version.
-//  
+//
 //This library is distributed in the hope that it will be useful,
 //but WITHOUT ANY WARRANTY; without even the implied warranty of
 //MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
@@ -38,9 +38,9 @@ public class FileHdr
   private RandomAccessFile file;
   private String fileName;
   private boolean dirty = false;/*Tells whethet this is a dirty filehdr or not*/
-  /**If any write thread is interested then increment this. This variable 
-     results in the fact that writes will always have the preference. 
-     Even when the JVM chooses a READ thread to run, it would have to wait 
+  /**If any write thread is interested then increment this. This variable
+     results in the fact that writes will always have the preference.
+     Even when the JVM chooses a READ thread to run, it would have to wait
      till <b>one</b> of all the waiting WRITE threads run. After one of the WRITE
      thread runs, the situation is open for all. Again, if any of the WRITE
      thread sets <tt>interested</tt>, then on next  <tt>notifyAll</tt> it is
@@ -50,13 +50,13 @@ public class FileHdr
   /**The wait thread queue*/
   private Vector waiters;
   /**
-     Although this 'stack' is part of the file header but it acts totally 
+     Although this 'stack' is part of the file header but it acts totally
      independently of the rest of the file header. All of the file reads and
      writes are handled by the 'Node' class but the free node list('stack') is
-     maintained by this class independently. Therefore all the 'Node' class 
+     maintained by this class independently. Therefore all the 'Node' class
      needs to do is call the 'push' and 'pop' method to read and write to the
      file regarding the free node list.<br>
-     Note:- This class will work well with 150 element delets at one go but 
+     Note:- This class will work well with 150 element delets at one go but
      beyond that it will not maintain the list of nodes that have been
      deleted. This is not fatal but the size of the file will increase and the
      deleted nodes that did not register with the stack will be lost forever.
@@ -146,7 +146,7 @@ public class FileHdr
         DataInputStream ds = new DataInputStream(new ByteArrayInputStream(data));
         totalNodes = ds.readInt();
         rootIndex = ds.readLong();//rootIndex = ds.readInt();
-        while((topIdx<stkLimit) 
+        while((topIdx<stkLimit)
               && ((frNode = ds.readInt()) != Node.NOT_DEFINED))
           S[++topIdx] = frNode;
         ds.close();
@@ -222,7 +222,7 @@ public class FileHdr
       throw new IllegalValueException("FileHdr.peep: Index out of bound");
     return S[index];
   }
-  
+
   private synchronized void writeFileHeader()
     throws IOException
   {
@@ -244,7 +244,7 @@ public class FileHdr
       file.write(bs.toByteArray());
     }
     dirty = false;
-  }     
+  }
   /**this function writes to file header as well as to  the local variables
      an atomic function.Does not concern itself with the stack info.
   */
@@ -266,13 +266,13 @@ public class FileHdr
     //update local variables
     totalNodes = totNodes;
     rootIndex = rootIdx;
-  }     
+  }
   /**
      This method does a file IO. Can we make another method which is not static.
      @return root index for any file.
      @deprecated Use the non static one.
   */
-  public static long getRootIndex(String fileName) 
+  public static long getRootIndex(String fileName)
     throws FileNotFoundException
   {
     RandomAccessFile fl = new RandomAccessFile(fileName,"r");
@@ -285,7 +285,7 @@ public class FileHdr
       return rootIndx;
     }
     catch(IOException e){
-      System.out.println("Node.getRootIndex: Couldn't get root index"); 
+      System.out.println("Node.getRootIndex: Couldn't get root index");
       return  Node.NOT_DEFINED;
     }
   }
@@ -297,7 +297,7 @@ public class FileHdr
     return this.file;
   }
   /**
-     Will return the total nodes in the tree. This does not include the nodes that are deleted and are 
+     Will return the total nodes in the tree. This does not include the nodes that are deleted and are
      in the stack.
   */
   public int getTotalNodes()
@@ -312,7 +312,7 @@ public class FileHdr
     return rootIndex;
   }
   @Override
-protected void finalize() throws Throwable 
+protected void finalize() throws Throwable
   {
     try {
       flush();
@@ -348,7 +348,7 @@ protected void finalize() throws Throwable
   private int firstWriter()
   {
     Enumeration e=waiters.elements();
-        
+
     for(int index=0;e.hasMoreElements();index++)
       {
         ThreadInfo threadinfo = (ThreadInfo) e.nextElement();
@@ -360,16 +360,16 @@ protected void finalize() throws Throwable
   private int getIndex(Thread t)
   {
     Enumeration e=waiters.elements();
-        
-    /**  If thread is in the vector then 
-     *          return it's index 
-     *    else 
+
+    /**  If thread is in the vector then
+     *          return it's index
+     *    else
      *          return -1
      */
     for(int index=0;e.hasMoreElements();index++)
       {
         ThreadInfo threadinfo = (ThreadInfo) e.nextElement();
-        /**  If Thread is already in the vector then 
+        /**  If Thread is already in the vector then
          *   return it's Index
          */
         if(threadinfo.t == t)
@@ -379,7 +379,7 @@ protected void finalize() throws Throwable
       }
     return -1;
   }
-    
+
   public synchronized void lockRead()
   {
     ThreadInfo threadinfo;
@@ -400,7 +400,7 @@ protected void finalize() throws Throwable
       {
         threadinfo = (ThreadInfo) waiters.elementAt(index);
       }
-        
+
     /**  If the currentThread has come after a Write Thread then
      *   make it wait() until WRITE thread is serviced
      */
@@ -418,7 +418,7 @@ protected void finalize() throws Throwable
     //System.out.println("FileHdr.lockRead : read locked for thread " + Thread.currentThread());
     //+" when "+this.toString());
   }
-    
+
   public synchronized void lockWrite() throws IllegalArgumentException
   {
     ThreadInfo threadinfo;
@@ -456,18 +456,18 @@ protected void finalize() throws Throwable
     ThreadInfo threadinfo;
     Thread me = Thread.currentThread();
     int index = getIndex(me);
-        
+
     /** if the index is greater than first WRITE thread then
      *          lock  is not held by the thread so throw Exception
      else
-         
+
     */
     if(index > firstWriter())
       throw new IllegalArgumentException("FileHdr.unlock: Lock not Held for the thread");
-        
+
     threadinfo = (ThreadInfo) waiters.elementAt(index);
     threadinfo.nAcquired--;
-        
+
     if(threadinfo.nAcquired==0)
       {
         waiters.removeElementAt(index);
@@ -511,7 +511,7 @@ public String toString()
 }
 
 
-/** 
+/**
  *   The class helps to store the details of a thread, like lockType
  */
 class ThreadInfo
@@ -530,8 +530,8 @@ public String toString()
   {
     String str = "\nThreadInfo";
     str += "\n lockType : "+ lockType;
-    str += "\n nAcquired : "+ nAcquired;    
-    str += "\n Thread : "+ t;    
+    str += "\n nAcquired : "+ nAcquired;
+    str += "\n Thread : "+ t;
     return str;
   }
 }

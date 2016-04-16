@@ -26,7 +26,7 @@ import org.xmlpull.v1.XmlPullParserException;
 
 
 public class InitiativeOsmIndexer {
-	
+
 	private static int CHARACTERS_TO_BUILD = 5;
 	private static int TAG_VARIETY = 5;
 	private static int ZOOM_SPLIT =  2;
@@ -35,7 +35,7 @@ public class InitiativeOsmIndexer {
 		TreeMap<String, Frequency> values = new TreeMap<String, Frequency>();
 		int freq = 0;
 		int unique = 0;
-		
+
 		public TagDictionary(String tag) {
 			this.tag = tag;
 		}
@@ -44,7 +44,7 @@ public class InitiativeOsmIndexer {
 			freq += ti.freq;
 			unique ++;
 		}
-		
+
 		private void parsePrefix(String name, Frequency ti) {
 			int prev = -1;
 			for (int i = 0; i <= name.length(); i++) {
@@ -75,24 +75,24 @@ public class InitiativeOsmIndexer {
 				}
 			}
 		}
-		
+
 	}
-	
+
 	private static class Frequency {
 		int freq;
 		int uniqueFreq;
-		Set<String> values = new HashSet<String>(); 
+		Set<String> values = new HashSet<String>();
 	}
-	
+
 	private static class InitiativeTagValue {
 		String tag;
 		String value;
-		
+
 		@Override
 		public String toString() {
 			return tag+"/" + value;
 		}
-		
+
 		public InitiativeTagValue(String tag, String value) {
 			this.tag = tag;
 			this.value = value;
@@ -105,7 +105,7 @@ public class InitiativeOsmIndexer {
 			result = prime * result + ((value == null) ? 0 : value.hashCode());
 			return result;
 		}
-		
+
 		@Override
 		public boolean equals(Object obj) {
 			if (this == obj)
@@ -127,9 +127,9 @@ public class InitiativeOsmIndexer {
 				return false;
 			return true;
 		}
-		
+
 	}
-	
+
 	/**
 	 * @param args
 	 * @throws IOException
@@ -167,7 +167,7 @@ public class InitiativeOsmIndexer {
 		int startZoom = 0;
 		int tileX = 0;
 		int tileY = 0;
-		boolean equal = true; 
+		boolean equal = true;
 		while(equal) {
 			int ty = (int) MapUtils.getTileNumberY(startZoom + 1, minlat);
 			int my = (int) MapUtils.getTileNumberY(startZoom + 1, maxlat);
@@ -181,7 +181,7 @@ public class InitiativeOsmIndexer {
 			}
 		}
 		MapUtils.getTileNumberX(startZoom, minlat);
-		System.out.println("{tile:0 "+ 
+		System.out.println("{tile:0 "+
 				", zoom: " +startZoom +", tilex: "+ tileX +", tiley: " + tileY+
 				", zoomsplit: " + ZOOM_SPLIT+
 				", minlat: "+(float)minlat+", " +"minlon: " +(float)minlon +
@@ -196,17 +196,17 @@ public class InitiativeOsmIndexer {
 				int tilex = (splitTileX + x);
 				int tiley = (splitTileY + y);
 				int zoom = (startZoom + ZOOM_SPLIT);
-				System.out.println("{subtile: " + tileId + ", zoom: " + zoom + 
+				System.out.println("{subtile: " + tileId + ", zoom: " + zoom +
 						", tilex:" + tilex + ", tiley:" + tiley
-						+ ", minlat: " + (float)MapUtils.getLatitudeFromTile(zoom, tiley) 
+						+ ", minlat: " + (float)MapUtils.getLatitudeFromTile(zoom, tiley)
 						+ ", minlon: " + (float)MapUtils.getLongitudeFromTile(zoom, tilex)
-						+ ", maxlat: " + (float)MapUtils.getLatitudeFromTile(zoom, tiley + 0.99999) 
+						+ ", maxlat: " + (float)MapUtils.getLatitudeFromTile(zoom, tiley + 0.99999)
 						+ ", maxlon: " + (float)MapUtils.getLongitudeFromTile(zoom, tilex + 0.99999)
 						+ "}");
 			}
 		}
-		
-		
+
+
 		List<String> sortTags  = sortMap(possibleTags);
 		List<InitiativeTagValue> sortTagValues  = sortByKey(possibleTagValues);
 		System.out.println("\n[TAGS]");
@@ -245,7 +245,7 @@ public class InitiativeOsmIndexer {
 				System.out.println("{texttagvalue:'" + td.tag + "', "+
 						"index:'" + ab + "', freq:'" + fa.freq+ "', "+
 						"unique:'" + fa.uniqueFreq + "', "+
-						"subtiles: {4,18}}");	
+						"subtiles: {4,18}}");
 			}
 		}
 	}
@@ -276,9 +276,9 @@ public class InitiativeOsmIndexer {
 		});
 		return lst;
 	}
-	
-	
-	
+
+
+
 	private static <K> List<K> sortMap(final Map<K, Frequency> possibleTags) {
 		final List<K> lst = new ArrayList<K>(possibleTags.keySet());
 		Collections.sort(lst, new Comparator<K>() {

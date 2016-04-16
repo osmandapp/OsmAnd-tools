@@ -55,12 +55,12 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	private static final int ZOOM_TO_WRITE_CATEGORIES_START = 12;
 	private static final int ZOOM_TO_WRITE_CATEGORIES_END = 16;
 	private static final int CHARACTERS_TO_BUILD = 4;
-	private boolean useInMemoryCreator = true; 
-	public static long GENERATE_OBJ_ID = - (1l << 10l); 
+	private boolean useInMemoryCreator = true;
+	public static long GENERATE_OBJ_ID = - (1l << 10l);
 	public static boolean ZIP_LONG_STRINGS = false;
 	public static int ZIP_STRING_LIMIT = 100;
 
-	
+
 
 	private List<Amenity> tempAmenityList = new ArrayList<Amenity>();
 	private Map<EntityId, Map<String, String>> propogatedTags = new LinkedHashMap<Entity.EntityId, Map<String, String>>();
@@ -74,11 +74,11 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		this.renderingTypes = renderingTypes;
 		this.poiTypes = MapPoiTypes.getDefault();
 	}
-	
+
 	public void setPoiTypes(MapPoiTypes poiTypes) {
 		this.poiTypes = poiTypes;
 	}
-	
+
 
 	public void iterateEntity(Entity e, OsmDbAccessorContext ctx, boolean basemap) throws SQLException {
 		tempAmenityList.clear();
@@ -100,7 +100,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			}
 		}
 		Map<String, String> etags = renderingTypes.transformTags(tags, EntityType.valueOf(e), EntityConvertApplyType.POI);
-		boolean privateReg = "private".equals(e.getTag("access")); 
+		boolean privateReg = "private".equals(e.getTag("access"));
 		tempAmenityList = EntityParser.parseAmenities(poiTypes, e, etags,  tempAmenityList);
 		if (!tempAmenityList.isEmpty() && poiPreparedStatement != null) {
 			if(e instanceof Relation) {
@@ -108,7 +108,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			}
 			for (Amenity a : tempAmenityList) {
 				if(a.getType().getKeyName().equals("entertainment") && privateReg) {
-					// don't index private swimming pools 
+					// don't index private swimming pools
 					continue;
 				}
 				if(basemap) {
@@ -132,14 +132,14 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			}
 		}
 	}
-	
+
 	public void iterateRelation(Relation e, OsmDbAccessorContext ctx) throws SQLException {
-		
+
 		Map<String, String> tags = renderingTypes.transformTags(e.getTags(), EntityType.RELATION, EntityConvertApplyType.POI);
 		for (String t : tags.keySet()) {
 			boolean index = false;
 			index = poiTypes.parseAmenity(t, tags.get(t), true, tags) != null;
-			if (index) {	
+			if (index) {
 				ctx.loadEntityRelation(e);
 				for (EntityId id : ((Relation) e).getMembersMap().keySet()) {
 					if (!propogatedTags.containsKey(id)) {
@@ -163,7 +163,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			}
 		}
 	}
-	
+
 	public void removePoiFile(){
 		Algorithms.removeAllFiles(poiIndexFile);
 	}
@@ -179,7 +179,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		poiPreparedStatement.setString(6, encodeAdditionalInfo(amenity, amenity.getAdditionalInfo(), amenity.getName(), amenity.getEnName(false)));
 		addBatch(poiPreparedStatement);
 	}
-	
+
 	private PoiAdditionalType getOrCreate(String tag, String value, boolean text) {
 		String ks = PoiAdditionalType.getKey(tag, value, text);
 		if(additionalTypesByTag.containsKey(ks)) {
@@ -191,7 +191,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		additionalTypesByTag.put(ks, tp);
 		return tp;
 	}
-	
+
 	private static final char SPECIAL_CHAR = ((char) -1);
 	private String encodeAdditionalInfo(Amenity amenity, Map<String, String> tempNames, String name, String nameEn) {
 		tempNames = new HashMap<String, String>(tempNames);
@@ -224,10 +224,10 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		return b.toString();
 	}
 
-	
 
 
-	private Map<PoiAdditionalType, String> decodeAdditionalInfo(String name, 
+
+	private Map<PoiAdditionalType, String> decodeAdditionalInfo(String name,
 			Map<PoiAdditionalType, String> tempNames) {
 		tempNames.clear();
 		if(name.length() == 0) {
@@ -249,7 +249,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		}
 		return tempNames;
 	}
-	
+
 	public void createDatabaseStructure(File poiIndexFile) throws SQLException {
 		this.poiIndexFile = poiIndexFile;
 		// delete previous file to save space
@@ -280,31 +280,31 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		poiConnection.setAutoCommit(false);
 	}
 
-	
-	
+
+
 	private class IntBbox {
 		int minX = Integer.MAX_VALUE;
 		int maxX = 0;
 		int minY = Integer.MAX_VALUE;
 		int maxY = 0;
 	}
-	
+
 	public static class PoiCreatorCategories {
 		Map<String, Set<String>> categories = new HashMap<String, Set<String>>();
 		Set<PoiAdditionalType> additionalAttributes = new HashSet<PoiAdditionalType>();
-		
-		
-		// build indexes to write  
+
+
+		// build indexes to write
 		Map<String, Integer> catIndexes;
 		Map<String, Integer> subcatIndexes;
-		
+
 		TIntArrayList cachedCategoriesIds;
 		TIntArrayList cachedAdditionalIds;
-		
+
 		// cache for single thread
 		TIntArrayList singleThreadVarTypes = new TIntArrayList();
-		
-		
+
+
 		private String[] split(String subCat) {
 			return subCat.split(",|;");
 		}
@@ -312,7 +312,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		private boolean toSplit(String subCat) {
 			return subCat.contains(";") || subCat.contains(",");
 		}
-		
+
 		public void addCategory(String cat, String subCat, Map<PoiAdditionalType, String> additionalTags){
 			for (PoiAdditionalType rt : additionalTags.keySet()) {
 				if(!rt.isText() && rt.getValue() == null) {
@@ -339,7 +339,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			internalBuildType(category, subcategory, types);
 			return types;
 		}
-		
+
 		private void internalBuildType(String category, String subcategory, TIntArrayList types) {
 			int catInd = catIndexes.get(category);
 			if (toSplit(subcategory)) {
@@ -387,24 +387,24 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			if(catIndexes == null) {
 				catIndexes = new HashMap<String, Integer>();
 			}
-			catIndexes.put(cat, i);			
+			catIndexes.put(cat, i);
 		}
 	}
-	
+
 	public void writeBinaryPoiIndex(BinaryMapIndexWriter writer, String regionName, IProgress progress) throws SQLException, IOException {
 		if (poiPreparedStatement != null) {
 			closePreparedStatements(poiPreparedStatement);
 		}
 		poiConnection.commit();
-		
+
 		Map<String, Set<PoiTileBox>> namesIndex = new TreeMap<String, Set<PoiTileBox>>();
-		
+
 		int zoomToStart = ZOOM_TO_SAVE_START;
 		IntBbox bbox = new IntBbox();
 		Tree<PoiTileBox> rootZoomsTree = new Tree<PoiTileBox>();
 		// 0. process all entities
 		processPOIIntoTree(namesIndex, zoomToStart, bbox, rootZoomsTree);
-		
+
 		// 1. write header
 		long startFpPoiIndex = writer.startWritePoiIndex(regionName, bbox.minX, bbox.maxX, bbox.maxY, bbox.minY);
 
@@ -412,7 +412,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		PoiCreatorCategories globalCategories = rootZoomsTree.node.categories;
 		writer.writePoiCategoriesTable(globalCategories);
 		writer.writePoiSubtypesTable(globalCategories);
-		
+
 		// 2.5 write names table
 		Map<PoiTileBox, List<BinaryFileReference>> fpToWriteSeeks = writer.writePoiNameIndex(namesIndex, startFpPoiIndex);
 
@@ -449,7 +449,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 			if(useInMemoryCreator){
 				List<PoiData> poiData = entry.getKey().poiData;
-				
+
 				for(PoiData poi : poiData){
 					int x31 = poi.x;
 					int y31 = poi.y;
@@ -457,10 +457,10 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					String subtype = poi.subtype;
 					int x24shift = (x31 >> 7) - (x << (24 - z));
 					int y24shift = (y31 >> 7) - (y << (24 - z));
-					writer.writePoiDataAtom(poi.id, x24shift, y24shift, type, subtype, poi.additionalTags,  
-							globalCategories, ZIP_LONG_STRINGS ? ZIP_STRING_LIMIT : -1);	
+					writer.writePoiDataAtom(poi.id, x24shift, y24shift, type, subtype, poi.additionalTags,
+							globalCategories, ZIP_LONG_STRINGS ? ZIP_STRING_LIMIT : -1);
 				}
-				
+
 			} else {
 				prepareStatement.setInt(1, x << (31 - z));
 				prepareStatement.setInt(2, (x + 1) << (31 - z));
@@ -476,7 +476,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					int y24shift = (y31 >> 7) - (y << (24 - z));
 					String type = rset.getString(4);
 					String subtype = rset.getString(5);
-					writer.writePoiDataAtom(id, x24shift, y24shift,  type, subtype, 
+					writer.writePoiDataAtom(id, x24shift, y24shift,  type, subtype,
 							decodeAdditionalInfo(rset.getString(6), mp), globalCategories,
 							ZIP_LONG_STRINGS ? ZIP_STRING_LIMIT : -1);
 				}
@@ -490,7 +490,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		writer.endWritePoiIndex();
 
 	}
-	
+
 	private PoiAdditionalType retrieveAdditionalType(String key) {
 		for (PoiAdditionalType t : additionalTypesId) {
 			if (Algorithms.objectEquals(t.getTag(), key)) {
@@ -509,7 +509,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			rs = poiConnection.createStatement().executeQuery("SELECT x,y,type,subtype from poi");
 		}
 		rootZoomsTree.setNode(new PoiTileBox());
-		
+
 		int count = 0;
 		ConsoleProgressImplementation console = new ConsoleProgressImplementation();
 		console.startWork(1000000);
@@ -570,7 +570,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				}
 			}
 			addNamePrefix(additionalTags.get(nameRuleType), additionalTags.get(nameEnRuleType), prevTree.getNode(), namesIndex, otherNames);
-			
+
 			if (useInMemoryCreator) {
 				if (prevTree.getNode().poiData == null) {
 					prevTree.getNode().poiData = new ArrayList<PoiData>();
@@ -580,15 +580,15 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				poiData.y = y;
 				poiData.type = type;
 				poiData.subtype = subtype;
-				poiData.id = rs.getLong(5); 
+				poiData.id = rs.getLong(5);
 				poiData.additionalTags.putAll(additionalTags);
 				prevTree.getNode().poiData.add(poiData);
-				
+
 			}
 		}
 		log.info("Poi processing finished");
 	}
-	
+
 	private void addNamePrefix(String name, String nameEn, PoiTileBox data, Map<String, Set<PoiTileBox>> poiData,
 			Set<String> names) {
 		if (name != null) {
@@ -634,7 +634,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		}
 	}
 
-	private void writePoiBoxes(BinaryMapIndexWriter writer, Tree<PoiTileBox> tree, 
+	private void writePoiBoxes(BinaryMapIndexWriter writer, Tree<PoiTileBox> tree,
 			long startFpPoiIndex, Map<PoiTileBox, List<BinaryFileReference>> fpToWriteSeeks,
 			PoiCreatorCategories globalCategories) throws IOException, SQLException {
 		int x = tree.getNode().x;
@@ -653,7 +653,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			boxCats.buildCategoriesToWrite(globalCategories);
 			writer.writePoiCategories(boxCats);
 		}
-		
+
 		if (!end) {
 			for (Tree<PoiTileBox> subTree : tree.getSubtrees()) {
 				writePoiBoxes(writer, subTree, startFpPoiIndex, fpToWriteSeeks, globalCategories);
@@ -661,7 +661,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		}
 		writer.endWritePoiBox();
 	}
-	
+
 	private static class PoiData {
 		int x;
 		int y;
@@ -670,18 +670,18 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		long id;
 		Map<PoiAdditionalType, String> additionalTags = new HashMap<PoiAdditionalType, String>() ;
 	}
-	
+
 	public static class PoiTileBox {
 		int x;
 		int y;
 		int zoom;
 		PoiCreatorCategories categories = new PoiCreatorCategories();
 		List<PoiData> poiData = null;
-		
+
 		public int getX() {
 			return x;
 		}
-		
+
 
 		public int getY() {
 			return y;
@@ -689,8 +689,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		public int getZoom() {
 			return zoom;
 		}
-		
-		
+
+
 
 	}
 
@@ -759,7 +759,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	}
 
 	public static class PoiAdditionalType {
-		
+
 		private String tag;
 		private String value;
 		private boolean text;
@@ -773,7 +773,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			this.text = text;
 			this.value = text ? null : value;
 		}
-		
+
 		public int getId() {
 			return id;
 		}
@@ -781,35 +781,35 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		public boolean isText() {
 			return text;
 		}
-		
+
 		public void increment() {
 			usage++;
 		}
-		
+
 		public int getTargetId() {
 			return targetId;
 		}
-		
+
 		public int getUsage() {
 			return usage;
 		}
-		
+
 		public String getTag() {
 			return tag;
 		}
-		
+
 		public String getValue() {
 			return value;
 		}
-		
-		
+
+
 		public static String getKey(String tag, String value, boolean text) {
 			return text ? tag : tag +"/" + value;
 		}
 
 		public void setTargetPoiId(int catId, int valueId) {
 			if(catId <= 31) {
-				this.targetId  = (valueId << 6) | (catId << 1) ; 
+				this.targetId  = (valueId << 6) | (catId << 1) ;
 			} else {
 				if(catId > (1 << 15)) {
 					throw new IllegalArgumentException("Refer source code");
@@ -819,5 +819,5 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		}
 	}
 
-	
+
 }

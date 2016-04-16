@@ -1,10 +1,10 @@
 //Pack.java
-//  
+//
 //This library is free software; you can redistribute it and/or
 //modify it under the terms of the GNU Lesser General Public
 //License as published by the Free Software Foundation; either
 //version 2.1 of the License, or (at your option) any later version.
-//  
+//
 //This library is distributed in the hope that it will be useful,
 //but WITHOUT ANY WARRANTY; without even the implied warranty of
 //MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
@@ -19,7 +19,7 @@ import java.util.*;
    <p>Original comments
    A utility class that packs a rtree.
    <br>Pack is a special utility class. This class can also be used to maintain
-   a R-Tree after many insertions and deletions.(Just like defragmentation 
+   a R-Tree after many insertions and deletions.(Just like defragmentation
    in windows).
    <p><b> Never create more than one instance of this class.
    <br>Never run the methods of this class in any other thread except the main
@@ -63,7 +63,7 @@ public class Pack
      @param rtree the rtree object to pack
      @param newFile the new rtree file after packing
      @return <b>0</b> if successfully created a new file,
-     <br><b>1</b> if there is no need to pack the file, in this case a new 
+     <br><b>1</b> if there is no need to pack the file, in this case a new
      file is not created and the old file is left untouched,
      <br> Greater than zero if all fail.
   */
@@ -81,7 +81,7 @@ public class Pack
       return 2;
     }
   }
-  
+
   public static final int BUFFER_SIZE = 8192*8;
   private int packTree(Element[] elmts, RTree rtree, String newFile)
   {
@@ -105,7 +105,7 @@ public class Pack
       packRec(rFile,tmpPckFile,elmts,elmts.length);
 
       //craete the new file
-      File fo = new File(newFile); 
+      File fo = new File(newFile);
       //delete the new file if it exists !!
       if(fo.exists()){
         fo.delete();
@@ -165,7 +165,7 @@ public class Pack
 
     //sort all the rectangles on X axis
     NonLeafElement.twoWayMerge(elmts,0,length-1,0);
-        
+
     //divide into slices
     int start = 0;
     int end;
@@ -208,7 +208,7 @@ public class Pack
       totNodes = new Double(length);
       totNodes= new Double(Math.ceil(totNodes.doubleValue()/Node.MAX));
       netNodes += totNodes.intValue();
-      //make nodes of the elements in the slice 
+      //make nodes of the elements in the slice
       for(int j=0; j<totNodes.intValue(); j++){//loop for each new node
         Node node = new Node(rFile,tmpPckFile.getAbsolutePath(), Node.NOT_DEFINED,
                              elmts[sls[i].start].getElementType(), hdr);
@@ -219,10 +219,10 @@ public class Pack
           list.add(elmts[sls[i].start++]);
         }
         node.insertElement((Element[])list.toArray(new Element[list.size()]), true);
-        
+
         //create the new nonleaf element - always nonleaf
         NonLeafElement nlf = new NonLeafElement(node.getNodeMBR(),node.getNodeIndex());
-                
+
         elmts[l++] = (NonLeafElement)nlf.clone();
       }
     }

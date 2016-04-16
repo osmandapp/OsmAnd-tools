@@ -59,7 +59,7 @@ public class MinskTransReader {
 		public String routeId; // 12
 		public List<String> routeStops = new ArrayList<String>(); // 14
 	}
-	
+
 	// ID;City;Area;Street;Name;Lng;Lat;Stops
 	public static class TransportStop {
 		public String stopId; // 0
@@ -67,19 +67,19 @@ public class MinskTransReader {
 		public double latitude; // 6
 		public String name ; //4
 	}
-	
+
 	public static final int default_dist_to_stop = 60;
-	
+
 	public static final String pathToRoutes = "E:/routes.txt";
 	public static final String pathToStops = "E:/stops.txt";
 	public static final String pathToMinsk = "E:\\Information\\OSM maps\\minsk_streets.osm";
 	public static final String pathToSave = "E:\\Information\\OSM maps\\data_edit.osm";
-	
+
 	public static void main(String[] args) throws IOException, XMLStreamException, XmlPullParserException {
 		FileInputStream fis = new FileInputStream(new File(pathToRoutes));
 		BufferedReader reader = new BufferedReader(new InputStreamReader(fis, Charset.forName("UTF-8")));
 		List<TransportRoute> routes = readRoutes(reader);
-		
+
 		fis = new FileInputStream(new File(pathToStops));
 		reader = new BufferedReader(new InputStreamReader(fis, Charset.forName("UTF-8")));
 		List<TransportStop> stops = readStopes(reader);
@@ -96,7 +96,7 @@ public class MinskTransReader {
 			}
 		}
 //		showMapPanelWithCorrelatedBusStops(stopsMap, busStops);
-		
+
 		OsmBaseStorage storage = filterBusStops(stopsMap, routes);
 		OsmStorageWriter writer = new OsmStorageWriter();
 		writer.saveStorage(new FileOutputStream(pathToSave), storage, null, true);
@@ -121,7 +121,7 @@ public class MinskTransReader {
 		}
 		showMapPanel(nodes);
 	}
-	
+
 	public static Map<String, Node>  correlateExistingBusStopsWithImported(DataTileManager<Node> busStops, Map<String, TransportStop> stopsMap){
 		Map<String, Node> correlated = new LinkedHashMap<String, Node>();
 		Map<Node, String> reverse = new LinkedHashMap<Node, String>();
@@ -138,7 +138,7 @@ public class MinskTransReader {
 				}
 			}
 			OsmMapUtils.sortListOfEntities(closestObjects, r.latitude, r.longitude);
-			int ind = 0; 
+			int ind = 0;
 			boolean ccorrelated = false;
 			int cOsize = closestObjects.size();
 			while(ind < cOsize && !ccorrelated){
@@ -165,9 +165,9 @@ public class MinskTransReader {
 			}
 		}
 		return correlated;
-		
+
 	}
-	
+
 	public static  void showMapPanel(DataTileManager<? extends Entity> points){
 		JFrame frame = new JFrame("Map view");
 	    try {
@@ -175,7 +175,7 @@ public class MinskTransReader {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-		
+
 		final MapPanel panel = new MapPanel(DataExtractionSettings.getSettings().getTilesDirectory());
 		panel.setPoints(points);
 	    frame.addWindowListener(new WindowAdapter(){
@@ -197,8 +197,8 @@ public class MinskTransReader {
 	    frame.setVisible(true);
 
 	}
-	
-	protected static void removeGeneratedNotUsedBusStops(Map<String, Node> correlated, 
+
+	protected static void removeGeneratedNotUsedBusStops(Map<String, Node> correlated,
 			Map<String, Relation> definedRoutes, DataTileManager<Node> busStops, OsmBaseStorage storage){
 		Set<Node> usedNodes = new LinkedHashSet<Node>(correlated.values());
 		for(Relation r : definedRoutes.values()){
@@ -215,14 +215,14 @@ public class MinskTransReader {
 				System.out.println("[DEL] Remove generated not used stop " + stop.getId() + " " + stop.getTag("name"));
 			}
 		}
-		
+
 	}
-	
+
 	protected static OsmBaseStorage filterBusStops(Map<String, TransportStop> stopsMap, List<TransportRoute> routes) throws IOException, XmlPullParserException{
 		long time = System.currentTimeMillis();
 		System.out.println("Start : ");
 		OsmBaseStorage storage = new OsmBaseStorage();
-		
+
 		final Map<String, Relation> definedRoutes = new HashMap<String, Relation>();
 		final DataTileManager<Node> busStops = new DataTileManager<Node>(17);
 		storage.getFilters().add(new IOsmStorageFilter(){
@@ -242,20 +242,20 @@ public class MinskTransReader {
 				}
 				return entity instanceof Node;
 			}
-			
+
 		});
 		storage.parseOSM(new FileInputStream(pathToMinsk), new ConsoleProgressImplementation());
-		
+
 		Map<String, Node> correlated = correlateExistingBusStopsWithImported(busStops, stopsMap);
 		removeGeneratedNotUsedBusStops(correlated, definedRoutes, busStops, storage);
-		
-	
-		
+
+
+
 		registerNewRoutesAndEditExisting(stopsMap, routes, storage, definedRoutes, correlated);
 		System.out.println("End time : " + (System.currentTimeMillis() - time));
 		return storage;
 	}
-	
+
 	protected static boolean validateRoute(String routeStr, Map<String, TransportStop> trStops, Map<String, Node> correlated, Relation relation, TransportRoute route, boolean direct){
 		Collection<Entity> stops = relation.getMembers("stop");
 		routeStr += direct ? "_forward" : "_backward";
@@ -265,7 +265,7 @@ public class MinskTransReader {
 		}
 		List<Entity> list = new ArrayList<Entity>(relation.getMembers(direct?"forward:stop" : "backward:stop"));
 		if((list.size() + 2) != route.routeStops.size()){
-			System.out.println("[INVALID ] " + routeStr + " number of stops isn't equal (" +  
+			System.out.println("[INVALID ] " + routeStr + " number of stops isn't equal (" +
 					((list.size() + 2)) + " relation != " + route.routeStops.size() + " route) ");
 			return false;
 		}
@@ -292,20 +292,20 @@ public class MinskTransReader {
 					System.out.println("[INVALID ]" + routeStr + " stop " + (i+1) + " was not correlated " + stStr + " distance = " + dist);
 					return false;
 				}
-				
+
 			} else if(correlatedNode.getId() != e.getId()){
 				double dist = OsmMapUtils.getDistance(correlatedNode, e.getLatLon());
 				if(i==lsize - 1 && !direct && dist < 150){
 					continue;
-				} 
+				}
 				String eStop = e.getId() + " " + e.getTag(OSMTagKey.NAME);
-				System.out.println("[INVALID ] " + routeStr + " stop " + (i+1) + " wrong : " + stStr + " != "  + eStop + " dist = " + dist + 
+				System.out.println("[INVALID ] " + routeStr + " stop " + (i+1) + " wrong : " + stStr + " != "  + eStop + " dist = " + dist +
 						" current correlated to " + correlatedNode.getId());
 				return false;
 			}
-			
+
 		}
-		
+
 		return true;
 	}
 
@@ -315,7 +315,7 @@ public class MinskTransReader {
 		Map<String, Relation> checkedRoutes = new LinkedHashMap<String, Relation>();
 		// because routes can changed on schedule that's  why for 1 relation many routes.
 		Set<String> visitedRoutes = new HashSet<String>();
-		
+
 		for (TransportRoute r : routes) {
 			// register only bus/trolleybus
 			if (!r.transport.equals("bus") && !r.transport.equals("trolleybus")) {
@@ -357,7 +357,7 @@ public class MinskTransReader {
 					checkedRoutes.put(s, relation);
 					storage.getRegisteredEntities().put(new EntityId(EntityType.RELATION, relation.getId()), relation);
 					System.out.println("[ADD] Registered new route " + s);
-				} 
+				}
 				Relation relation = checkedRoutes.get(s);
 
 				// correlating stops
@@ -396,14 +396,14 @@ public class MinskTransReader {
 				}
 			}
 		}
-		
+
 		// check relations that are not exist
 		for(String s : definedRoutes.keySet()){
 			if(!checkedRoutes.containsKey(s)){
 				Relation rel = definedRoutes.get(s);
 				storage.getRegisteredEntityInfo().get(rel.getId()).setAction("delete");
 				System.out.println("[DEL] Route is deprecated : " + rel.getTag("route")+"_"+rel.getTag("ref") + "  " + rel.getTag("name"));
-				
+
 			}
 		}
 	}
@@ -412,18 +412,18 @@ public class MinskTransReader {
 		String st = null;
 		int line = 0;
 		TransportRoute previous = null;
-		List<TransportRoute> routes = new ArrayList<TransportRoute>(); 
+		List<TransportRoute> routes = new ArrayList<TransportRoute>();
 		while((st = reader.readLine()) != null){
 			if(line++ == 0){
 				continue;
 			}
-			
+
 			TransportRoute current = new TransportRoute();
 			int stI=0;
 			int endI = 0;
 			int i=0;
 			while ((endI = st.indexOf(';', stI)) != -1) {
-				
+
 				String newS = st.substring(stI, endI);
 				if(i==0){
 					if(newS.length() > 0){
@@ -448,7 +448,7 @@ public class MinskTransReader {
 						current.routeName = newS;
 					} else if(previous != null){
 						current.routeName  = previous.routeName ;
-					}		
+					}
 				} else if(i==12){
 					current.routeId = newS;
 				} else if(i==14){
@@ -468,7 +468,7 @@ public class MinskTransReader {
 		}
 		return routes;
 	}
-	
+
 	protected static List<TransportStop> readStopes(BufferedReader reader) throws IOException {
 		String st = null;
 		int line = 0;
@@ -478,13 +478,13 @@ public class MinskTransReader {
 			if(line++ == 0){
 				continue;
 			}
-			
+
 			TransportStop current = new TransportStop();
 			int stI=0;
 			int endI = 0;
 			int i=0;
 			while ((endI = st.indexOf(';', stI)) != -1) {
-				
+
 				String newS = st.substring(stI, endI);
 				if(i==0){
 					current.stopId = newS.trim();
@@ -507,5 +507,5 @@ public class MinskTransReader {
 		}
 		return stopes;
 	}
-	
+
 }

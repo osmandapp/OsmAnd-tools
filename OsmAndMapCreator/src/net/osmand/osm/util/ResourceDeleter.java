@@ -35,7 +35,7 @@ public class ResourceDeleter {
 		}
 		return doc;
 	}
-	
+
 	public static void main(String[] args) throws SAXException, IOException, ParserConfigurationException, TransformerException {
 		if (args.length == 0) {
 			args = new String[] { "/Users/victorshcherb/osmand/repos/android/OsmAnd/res" };
@@ -48,12 +48,12 @@ public class ResourceDeleter {
 			File file = new File(lf[i], "strings.xml");
 			if(lf[i].getName().startsWith("values-") && file.exists()) {
 				Set<String> keys = new LinkedHashSet<String>();
-				
-				
+
+
 				Document doc = parseResources(file, keys);
 				keys.removeAll(mainkeys);
 				System.out.println(lf[i].getName() + " - " + keys);
-				
+
 				NodeList list = doc.getElementsByTagName("string");
 				for (int j = 0; j < list.getLength(); j++) {
 					Element item = (Element) list.item(j);
@@ -61,12 +61,12 @@ public class ResourceDeleter {
 						item.getParentNode().removeChild(item);
 					}
 				}
-				
+
 				TransformerFactory transformerFactory = TransformerFactory.newInstance();
 				Transformer transformer = transformerFactory.newTransformer();
 				DOMSource source = new DOMSource(doc);
 				StreamResult result = new StreamResult(file);
-		 
+
 				// Output to console for testing
 				// StreamResult result = new StreamResult(System.out);
 				transformer.transform(source, result);

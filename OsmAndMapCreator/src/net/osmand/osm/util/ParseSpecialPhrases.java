@@ -29,7 +29,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 public class ParseSpecialPhrases {
-	
+
 	static Map<String, String > mapping =new LinkedHashMap<String, String>();
 	private static void map(String a, String b) {
 		mapping.put(a, b);
@@ -59,7 +59,7 @@ public class ParseSpecialPhrases {
 	 * @param args
 	 * @throws IOException
 	 * @throws XMLStreamException
-	 * @throws JSONException 
+	 * @throws JSONException
 	 */
 	public static void main(String[] args) throws IOException, XMLStreamException, JSONException {
 		InputStream is = ParseSpecialPhrases.class.getResourceAsStream("catalog.json");
@@ -71,9 +71,9 @@ public class ParseSpecialPhrases {
 			processMap(map.values(), cats);
 			writePhrasesXML(map, output);
 		}
-		
+
 	}
-	
+
 	private static void processMap(Collection<Map<String, String>> values, Map<String, PoiCategory> cats) throws JSONException {
 		Collection<PoiCategory> categories = cats.values();
 		for(Map<String, String> m : values){
@@ -81,7 +81,7 @@ public class ParseSpecialPhrases {
 				process(pc, m);
 			}
 		}
-		
+
 	}
 
 	private static void process(PoiCategory pc, Map<String, String> m) throws JSONException {
@@ -105,7 +105,7 @@ public class ParseSpecialPhrases {
 		public List<PoiCategory> subtypes = new ArrayList<ParseSpecialPhrases.PoiCategory>();
 		public List<JSONObject> poiTypes = new ArrayList<JSONObject>();
 	}
-	
+
 
 	private static Map<String, PoiCategory> parseJson(InputStream is, boolean write) throws IOException, JSONException, XMLStreamException {
 		BufferedReader br = new BufferedReader(new InputStreamReader(is));
@@ -148,7 +148,7 @@ public class ParseSpecialPhrases {
 					if (parentCategory == null) {
 						throw new UnsupportedOperationException(parentName);
 					}
-					
+
 					if(pc != null){
 						parentCategory.subtypes.add(pc);
 					} else {
@@ -156,7 +156,7 @@ public class ParseSpecialPhrases {
 					}
 				}
 			}
-			
+
 		}
 		String indent = "";
 		for (PoiCategory c : categories.values()) {
@@ -208,7 +208,7 @@ public class ParseSpecialPhrases {
 		}
 		return map;
 	}
-	
+
 	public static Map<String, String> loadFile(File f) throws IOException {
 		TreeMap<String, String> m = new TreeMap<String, String>();
 		// The InputStream opens the resourceId and sends it to the buffer
@@ -233,7 +233,7 @@ public class ParseSpecialPhrases {
 		}
 		return m;
 	}
-	
+
 	private static void writeCategories(Map<String, PoiCategory> fs, String fileName) throws FileNotFoundException, XMLStreamException, JSONException {
 		XMLOutputFactory xof = XMLOutputFactory.newInstance();
 		File fl = new File(fileName);
@@ -305,15 +305,15 @@ public class ParseSpecialPhrases {
 		streamWriter.writeEndDocument();
 		streamWriter.flush();
 	}
-	
+
 	private static void writeStartElement(XMLStreamWriter writer, String name, String indent) throws XMLStreamException{
 		writer.writeCharacters("\n"+indent);
 		writer.writeStartElement(name);
 	}
-	
+
 	private static void writeEndElement(XMLStreamWriter writer, String indent) throws XMLStreamException{
 		writer.writeCharacters(""+indent);
 		writer.writeEndElement();
 	}
-	
+
 }

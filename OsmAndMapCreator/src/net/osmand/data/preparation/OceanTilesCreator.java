@@ -50,7 +50,7 @@ public class OceanTilesCreator {
      * @throws SAXException
      */
     public static void main(String[] args) throws IOException, XMLStreamException, SAXException {
-//    	createTilesFile("/Users/victorshcherb/osmand/maps/coastline.osm.bz2", 
+//    	createTilesFile("/Users/victorshcherb/osmand/maps/coastline.osm.bz2",
 //    			"/Users/victorshcherb/osmand/maps/oceantiles_12.dat");
 //    	System.out.println("Tiles generated ");
     	createJOSMFile(new String[] {
@@ -59,9 +59,9 @@ public class OceanTilesCreator {
     	});
 //        if(args.length > 0 && args[0].equals("generate")) {
 //        	createTilesFile(args[1], args[2]);
-//        }        
+//        }
     }
-    
+
     public static void checkOceanTile(String[] args) {
     	double[] lat = new double[] { Double.parseDouble(args[0])};
     	double[] lon = new double[] { Double.parseDouble(args[1])};
@@ -201,11 +201,11 @@ public class OceanTilesCreator {
         }
         return map.get(key );
     }
-    
+
     public static long getNodeId(int x, int y, int z) {
     	return (((long) x) << 25) | ((long)y << 5) | z;
     }
-    
+
     public static Node getNode(long id) {
     	int x = (int) (id >> 25);
     	int y = (int) ((id - getNodeId(x, 0, 0)) >> 5);
@@ -221,7 +221,7 @@ public class OceanTilesCreator {
         int z = 12;
         BasemapProcessor bmp = new BasemapProcessor();
         bmp.constructBitSetInfo(args.length > 1 ? args[1] : null);
-        
+
         OsmBaseStorage st = new OsmBaseStorage();
         Set<Entity.EntityId> s = new LinkedHashSet();
         TLongHashSet nodeIds = new TLongHashSet();
@@ -248,13 +248,13 @@ public class OceanTilesCreator {
 						addNode(w, nodeIds, x + 1, y + 1, zm);
 						addNode(w, nodeIds, x + 1, y, zm);
 						addNode(w, nodeIds, x, y, zm);
-						
+
 						if(waterTile) {
 							w.putTag("natural", "water");
 						} else if(landTile){
 							w.putTag("landuse", "grass");
 						}
-						w.putTag("name", x + " " + y + " " + zm + " " + 
+						w.putTag("name", x + " " + y + " " + zm + " " +
 								(waterTile  ? 1 : 0));
 						s.addAll(w.getEntityIds());
 
@@ -267,7 +267,7 @@ public class OceanTilesCreator {
         for(long l : nodeIds.toArray()) {
             st.registerEntity(getNode(l), null);
         }
-        
+
         new OsmStorageWriter().saveStorage(new FileOutputStream(fileLocation),
                 st, s, true);
     }

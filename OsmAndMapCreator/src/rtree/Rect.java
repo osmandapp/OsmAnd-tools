@@ -1,10 +1,10 @@
 //Rect.java
-//  
+//
 //This library is free software; you can redistribute it and/or
 //modify it under the terms of the GNU Lesser General Public
 //License as published by the Free Software Foundation; either
 //version 2.1 of the License, or (at your option) any later version.
-//  
+//
 //This library is distributed in the hope that it will be useful,
 //but WITHOUT ANY WARRANTY; without even the implied warranty of
 //MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
@@ -12,20 +12,20 @@
 package rtree;
 
 /**
-   It is very easy to extend this program to n dimensions. Here every thing is 
+   It is very easy to extend this program to n dimensions. Here every thing is
    hard coaded for 2 dim. To convert to more than 2 dim. :-
-   <br>make the point class to hold the required dimensions.(keep an array of 
+   <br>make the point class to hold the required dimensions.(keep an array of
    dimensions)
    <br>The rect class needs the four points directly, instead of that make it to
    accept Point as its argument in the constructor.
-   <br>Then on deal with the point class directly instead of the four points 
+   <br>Then on deal with the point class directly instead of the four points
    directly.
    <p>The methods of relational topology(equals,contains etc.) are from various
-   papers by <b>D. Papadias</b> and mainly from Modeling Topological Spatial 
+   papers by <b>D. Papadias</b> and mainly from Modeling Topological Spatial
    Relation: Strategies for Query Processing.- <b>Egenhofer</b>
    <br>The methods are nothing but set theories.
    <p>In GIS there can be many types of combinations of the topological relations.
-   The theories of these combinations are given in the above said papers. If 
+   The theories of these combinations are given in the above said papers. If
    required this class can be improved for those conditions.
    @author Prachuryya Barua
 */
@@ -39,7 +39,7 @@ public class Rect implements java.io.Serializable
   {
     initNull();
   }
-  
+
   public Rect(int topX,int topY,int botX, int botY)
     throws IllegalValueException
   {
@@ -154,7 +154,7 @@ public class Rect implements java.io.Serializable
   {
     if(rect == null || rect.isNull())
       return;
-    
+
     if(this.isNull()){
       init(rect.getMinX(),rect.getMinY(), rect.getMaxX(), rect.getMaxY());
       return;
@@ -231,7 +231,7 @@ public class Rect implements java.io.Serializable
   */
   public boolean contains(Rect rect)
     throws IllegalValueException
-  { 
+  {
     if(rect == null)
       throw new IllegalValueException("rtree.Rect.contains: null argument");
     boolean ret = true;
@@ -246,10 +246,10 @@ public class Rect implements java.io.Serializable
   }
   /**
      The difference betn. this method and <code>contains</code> is that this method returns true
-     even if the <code>covers</code> condition if true. 
+     even if the <code>covers</code> condition if true.
      @return true if this rectangle completely encloses 'rect'.
   */
-    
+
   public boolean encloses(Rect rect)
     throws IllegalValueException
   {
@@ -270,7 +270,7 @@ public class Rect implements java.io.Serializable
   */
   public boolean containedBy(Rect rect)
     throws IllegalValueException
-  { 
+  {
     if(rect == null)
       throw new IllegalValueException("rtree.Rect.containedBy:null argument");
     boolean ret = true;
@@ -303,7 +303,7 @@ public class Rect implements java.io.Serializable
     if((minX == rectMinX) && (minY == rectMinY) && (maxX == rectMaxX) && (maxY == rectMaxY))
       return true;
     //if you do not want this much precision then comment above written line.
-        
+
     //X dim.
     if((minX < rectMaxX) && (maxX > rectMinX))
       ret = true;
@@ -324,7 +324,7 @@ public class Rect implements java.io.Serializable
   */
   public boolean disjoint(Rect rect)
     throws IllegalValueException
-  { 
+  {
     if(rect == null)
       throw new IllegalValueException("rtree.Rect.disjoint: null argument");
     boolean ret = true;
@@ -337,7 +337,7 @@ public class Rect implements java.io.Serializable
     //Y dim.
     if((minY <= rect.getMaxY()) && (maxY >= rect.getMinY()))
       ret = false;
-    else 
+    else
       ret = true;
     return ret;
 
@@ -347,7 +347,7 @@ public class Rect implements java.io.Serializable
   */
   public boolean meet(Rect rect)
     throws IllegalValueException
-  { 
+  {
     if(rect == null)
       throw new IllegalValueException("rtree.Rect.meet: null argument");
     boolean ret = true;
@@ -370,9 +370,9 @@ public class Rect implements java.io.Serializable
 
   }//meet
   /**
-     Checks if this rectangle contains 'rect'. This method is incomplete. It can 
+     Checks if this rectangle contains 'rect'. This method is incomplete. It can
      be finished if required.(Depends on query requirements)
-  
+
      <pre>
      ---------------
      |             |
@@ -385,7 +385,7 @@ public class Rect implements java.io.Serializable
   */
   public boolean covers(Rect rect)
     throws IllegalValueException
-  { 
+  {
     if(rect == null)
       throw new IllegalValueException("rtree.Rect.covers: null argument");
     boolean ret = true;
@@ -411,7 +411,7 @@ public class Rect implements java.io.Serializable
   */
   public boolean equals(Rect rect)
     throws IllegalValueException
-  { 
+  {
     if(rect == null)
       throw new IllegalValueException("rtree.Rect.equals: null argument");
     //m21=false && m23=false
@@ -435,9 +435,9 @@ public String toString()
   }
   /**
      Calculate the Euclidean distance between the point and the MBR.
-     To calculate the distance(MINDIST) betn. a Point and Rectangle in 
+     To calculate the distance(MINDIST) betn. a Point and Rectangle in
      n dimension. In our case we consider only 2 dimensions.
-     <br><b>Note:-</b> The distance is the square of the actual distance. To find the actual 
+     <br><b>Note:-</b> The distance is the square of the actual distance. To find the actual
      distance, square root the returned value.
   */
   public static long minDist(Point p, Rect rect)

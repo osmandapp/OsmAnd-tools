@@ -17,12 +17,12 @@ import rtree.RTree;
 import rtree.RTreeException;
 
 public class AbstractIndexPartCreator {
-	
+
 	private final static Log log = LogFactory.getLog(AbstractIndexPartCreator.class);
 	protected int BATCH_SIZE = 1000;
-	
+
 	protected Map<PreparedStatement, Integer> pStatements = new LinkedHashMap<PreparedStatement, Integer>();
-	
+
 	public PreparedStatement createPrepareStatement(Connection mapConnection,
 			String string) throws SQLException {
 		PreparedStatement prepareStatement = mapConnection.prepareStatement(string);
@@ -39,7 +39,7 @@ public class AbstractIndexPartCreator {
 			}
 		}
 	}
-	
+
 	protected void closeAllPreparedStatements() throws SQLException {
 		for (PreparedStatement p : pStatements.keySet()) {
 			if (pStatements.get(p) > 0) {
@@ -48,7 +48,7 @@ public class AbstractIndexPartCreator {
 			p.close();
 		}
 	}
-	
+
 	protected boolean executePendingPreparedStatements() throws SQLException {
 		boolean exec = false;
 		for (PreparedStatement p : pStatements.keySet()) {
@@ -60,15 +60,15 @@ public class AbstractIndexPartCreator {
 		}
 		return exec;
 	}
-	
+
 	protected void addBatch(PreparedStatement p) throws SQLException {
 		addBatch(p, BATCH_SIZE, true);
 	}
-	
+
 	protected void addBatch(PreparedStatement p, boolean commit) throws SQLException{
 		addBatch(p, BATCH_SIZE, commit);
 	}
-	
+
 	protected void addBatch(PreparedStatement p, int batchSize, boolean commit) throws SQLException{
 		p.addBatch();
 		if(pStatements.get(p) >= batchSize){
@@ -81,7 +81,7 @@ public class AbstractIndexPartCreator {
 			pStatements.put(p, pStatements.get(p) + 1);
 		}
 	}
-	
+
 	protected static boolean nodeIsLastSubTree(RTree tree, long ptr) throws RTreeException {
 		rtree.Node parent = tree.getReadNode(ptr);
 		Element[] e = parent.getAllElements();
@@ -93,7 +93,7 @@ public class AbstractIndexPartCreator {
 		return true;
 
 	}
-	
+
 	public static RTree packRtreeFile(RTree tree, String nonPackFileName, String packFileName) throws IOException {
 		try {
 			assert rtree.Node.MAX < 50 : "It is better for search performance"; //$NON-NLS-1$

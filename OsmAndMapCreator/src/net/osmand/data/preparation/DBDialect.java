@@ -17,7 +17,7 @@ public enum DBDialect {
 	H2,
 	SQLITE,
 	SQLITE_IN_MEMORY;
-	
+
 	public void deleteTableIfExists(String table, Statement stat) throws SQLException {
 		if(this == DERBY){
 			try {
@@ -28,9 +28,9 @@ public enum DBDialect {
 		} else {
 			stat.executeUpdate("drop table if exists " + table); //$NON-NLS-1$
 		}
-		
+
 	}
-	
+
 	public boolean databaseFileExists(File dbFile) {
 		if (DBDialect.H2 == this) {
 			return new File(dbFile.getAbsolutePath() + ".h2.db").exists(); //$NON-NLS-1$
@@ -38,7 +38,7 @@ public enum DBDialect {
 			return dbFile.exists();
 		}
 	}
-	
+
 	public void removeDatabase(File file) {
 		if (DBDialect.H2 == this) {
 			File[] list = file.getParentFile().listFiles();
@@ -51,20 +51,20 @@ public enum DBDialect {
 			Algorithms.removeAllFiles(file);
 		}
 	}
-	
+
 	public void commitDatabase(Object connection) throws SQLException {
 		if (!((Connection) connection).getAutoCommit()) {
 			((Connection) connection).commit();
 		}
 	}
-	
+
 	public void closeDatabase(Object dbConn) throws SQLException {
 		if (DBDialect.H2 == this) {
 			((Connection) dbConn).createStatement().execute("SHUTDOWN COMPACT"); //$NON-NLS-1$
 		}
 		((Connection) dbConn).close();
 	}
-	
+
     public Object getDatabaseConnection(String fileName, Log log) throws SQLException {
 		if (DBDialect.SQLITE == this || DBDialect.SQLITE_IN_MEMORY == this) {
 			try {
@@ -73,7 +73,7 @@ public enum DBDialect {
 				log.error("Illegal configuration", e);
 				throw new IllegalStateException(e);
 			}
-			Connection connection = DriverManager.getConnection("jdbc:sqlite:" + (DBDialect.SQLITE_IN_MEMORY == this? ":memory:": 
+			Connection connection = DriverManager.getConnection("jdbc:sqlite:" + (DBDialect.SQLITE_IN_MEMORY == this? ":memory:":
 					fileName));
 			Statement statement = connection.createStatement();
 			statement.executeUpdate("PRAGMA synchronous = 0");

@@ -34,9 +34,9 @@ import net.osmand.util.MapUtils;
 
 
 public class TileBundleDownloadDialog extends JDialog {
-	
+
 	private static final long serialVersionUID = -4862884032977071296L;
-	
+
 	private JLabel label;
 	private ITileSource map;
 	private MapSelectionArea selectionArea;
@@ -58,9 +58,9 @@ public class TileBundleDownloadDialog extends JDialog {
     	tilesLocation = panel.getTilesLocation();
     	setTitle(Messages.getString("TileBundleDownloadDialog.DOWNLOAD.BUNDLE.TILES")); //$NON-NLS-1$
         initDialog();
-        
+
     }
-	
+
 	public void showDialog(){
 		setSize(550, 150);
         double x = getParent().getBounds().getCenterX();
@@ -68,7 +68,7 @@ public class TileBundleDownloadDialog extends JDialog {
         setLocation((int) x - getWidth() / 2, (int) y - getHeight() / 2);
         setVisible(true);
 	}
-	
+
 	protected SpinnerNumberModel getSpinnerModel(int minimum, int maximum){
 		SpinnerNumberModel model = new SpinnerNumberModel();
 		model.setStepSize(1);
@@ -82,19 +82,19 @@ public class TileBundleDownloadDialog extends JDialog {
 		JPanel pane = new JPanel(new BorderLayout());
         pane.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
         add(pane);
-        
+
         label = new JLabel();
         pane.add(label, BorderLayout.CENTER);
-        
+
         JPanel zoomControls = new JPanel();
         zoomControls.setLayout(new BoxLayout(zoomControls, BoxLayout.X_AXIS));
-        
+
         JLabel lab = new JLabel(Messages.getString("TileBundleDownloadDialog.START.ZOOM.LEVEL")); //$NON-NLS-1$
         zoomControls.add(lab);
         startSpinner = new JSpinner(getSpinnerModel(map.getMinimumZoomSupported(), zoom));
         zoomControls.add(startSpinner);
         startSpinner.setMaximumSize(new Dimension(15, startSpinner.getMaximumSize().height));
-        
+
         zoomControls.add(Box.createHorizontalStrut(15));
         lab = new JLabel(Messages.getString("TileBundleDownloadDialog.END.ZOOM.LEVEL")); //$NON-NLS-1$
         zoomControls.add(lab);
@@ -103,8 +103,8 @@ public class TileBundleDownloadDialog extends JDialog {
         endSpinner.setMaximumSize(new Dimension(15, endSpinner.getMaximumSize().height));
         zoomControls.add(Box.createHorizontalGlue());
         pane.add(zoomControls, BorderLayout.NORTH);
-        
-        
+
+
         JPanel buttonControls = new JPanel();
         buttonControls.setLayout(new BoxLayout(buttonControls, BoxLayout.X_AXIS));
         buttonControls.add(Box.createHorizontalGlue());
@@ -117,11 +117,11 @@ public class TileBundleDownloadDialog extends JDialog {
         cancelButton = new JButton(Messages.getString("TileBundleDownloadDialog.CANCEL")); //$NON-NLS-1$
         buttonControls.add(cancelButton);
         pane.add(buttonControls, BorderLayout.SOUTH);
-        
+
         updateLabel();
         addListeners();
 	}
-	
+
 	private void addListeners(){
 		cancelButton.addActionListener(new ActionListener(){
 			@Override
@@ -149,7 +149,7 @@ public class TileBundleDownloadDialog extends JDialog {
 			public void actionPerformed(ActionEvent e) {
 				downloadTiles();
 			}
-			
+
 		});
 		specifyFolder.addActionListener(new ActionListener(){
 
@@ -161,16 +161,16 @@ public class TileBundleDownloadDialog extends JDialog {
 		        if(tilesLocation != null){
 		        	fc.setCurrentDirectory(tilesLocation);
 		        }
-		        if(fc.showOpenDialog(TileBundleDownloadDialog.this) == JFileChooser.APPROVE_OPTION && fc.getSelectedFile() != null && 
+		        if(fc.showOpenDialog(TileBundleDownloadDialog.this) == JFileChooser.APPROVE_OPTION && fc.getSelectedFile() != null &&
 		        		fc.getSelectedFile().isDirectory()){
 		        	tilesLocation = fc.getSelectedFile();
 		        }
 			}
-			
+
 		});
-		
+
 	}
-	
+
 	public void downloadTiles(){
 		setVisible(false);
 		final ProgressDialog progressDialog = new ProgressDialog(this, Messages.getString("TileBundleDownloadDialog.DOWNLOADING.TILES")); //$NON-NLS-1$
@@ -202,7 +202,7 @@ public class TileBundleDownloadDialog extends JDialog {
 							if(new File(tilesLocation, file).exists()){
 								progressDialog.progress(1);
 							} else {
-								DownloadRequest req = new DownloadRequest(map.getUrlToLoad(x, y, zoom), 
+								DownloadRequest req = new DownloadRequest(map.getUrlToLoad(x, y, zoom),
 										new File(tilesLocation, file), x, y, zoom);
 								instance.requestToDownload(req);
 							}
@@ -217,11 +217,11 @@ public class TileBundleDownloadDialog extends JDialog {
 						}
 					}
 				}
-				
+
 			}
-			
+
 		});
-		ArrayList<IMapDownloaderCallback> previousCallbacks = 
+		ArrayList<IMapDownloaderCallback> previousCallbacks =
 			new ArrayList<IMapDownloaderCallback>(instance.getDownloaderCallbacks());
 		instance.getDownloaderCallbacks().clear();
 		instance.addDownloaderCallback(new IMapDownloaderCallback(){
@@ -230,10 +230,10 @@ public class TileBundleDownloadDialog extends JDialog {
 				// TODO request could be null if bundle loading?
 				progressDialog.progress(1);
 			}
-			
+
 		});
-		
-		
+
+
 		try {
 			progressDialog.run();
 			instance.refuseAllPreviousRequests();
@@ -245,14 +245,14 @@ public class TileBundleDownloadDialog extends JDialog {
 			instance.getDownloaderCallbacks().clear();
 			instance.getDownloaderCallbacks().addAll(previousCallbacks);
 		}
-		
+
 	}
-	
+
 	public String getFileForImage (int x, int y, int zoom, String ext){
 		return map.getName() +"/"+zoom+"/"+(x) +"/"+y+ext+".tile"; //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$
 	}
-	
-	
+
+
 	protected void updateLabel(){
 		int numberTiles = 0;
 		for (int zoom = (Integer) startSpinner.getValue(); zoom <= (Integer) endSpinner.getValue(); zoom++) {
@@ -262,7 +262,7 @@ public class TileBundleDownloadDialog extends JDialog {
 			int y2 = (int) MapUtils.getTileNumberY(zoom, selectionArea.getLat2());
 			numberTiles += (x2 - x1 + 1) * (y2 - y1 + 1);
 		}
-		
+
 		String text = MessageFormat.format(Messages.getString("TileBundleDownloadDialog.REQUEST.DOWNLOAD"),  //$NON-NLS-1$
 				numberTiles, map.getName(),	(double)numberTiles*12/1000);
 		label.setText(text);

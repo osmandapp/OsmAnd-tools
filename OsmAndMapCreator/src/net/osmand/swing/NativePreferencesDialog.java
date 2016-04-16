@@ -26,33 +26,33 @@ import javax.swing.JTextField;
 
 /*
  * Currently supported rendering params
- * 
+ *
  * Base parameters:
  * density
  * lang
  * textScale
  * nightMode
  * languagePreference
- * 
- * 
+ *
+ *
  * New Core params
- * debugStageEnabled					
- * excludeOnPathSymbols					
- * excludeBillboardSymbols					
- * excludeOnSurfaceSymbols					
- * skipSymbolsIntersection					
- * showSymbolsBBoxesAccByIntersection					
- * showSymbolsBBoxesRejByIntersection					
- * skipSymbolsMinDistance					
- * showSymbolsBBoxesRejectedByMinDist					
- * showSymbolsCheckBBoxesRejectedByMinDist					
- * skipSymbolsPresentationModeCheck					
- * showSymbolsBBoxesRejectedByPresentationMode					
- * showOnPathSymbolsRenderablesPaths					
- * showOnPath2dSymbolGlyphDetails					
- * showOnPath3dSymbolGlyphDetails					
- * allSymbolsTransparentForIntersectionLookup					
- * showTooShortOnPathSymbolsRenderablesPaths					
+ * debugStageEnabled
+ * excludeOnPathSymbols
+ * excludeBillboardSymbols
+ * excludeOnSurfaceSymbols
+ * skipSymbolsIntersection
+ * showSymbolsBBoxesAccByIntersection
+ * showSymbolsBBoxesRejByIntersection
+ * skipSymbolsMinDistance
+ * showSymbolsBBoxesRejectedByMinDist
+ * showSymbolsCheckBBoxesRejectedByMinDist
+ * skipSymbolsPresentationModeCheck
+ * showSymbolsBBoxesRejectedByPresentationMode
+ * showOnPathSymbolsRenderablesPaths
+ * showOnPath2dSymbolGlyphDetails
+ * showOnPath3dSymbolGlyphDetails
+ * allSymbolsTransparentForIntersectionLookup
+ * showTooShortOnPathSymbolsRenderablesPaths
  * showAllPaths
  */
 public class NativePreferencesDialog extends JDialog {

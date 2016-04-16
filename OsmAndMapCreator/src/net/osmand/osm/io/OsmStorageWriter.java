@@ -57,8 +57,8 @@ public class OsmStorageWriter {
 
 	public OsmStorageWriter(){
 	}
-	
-	
+
+
 	public void saveStorage(OutputStream output, OsmBaseStorage storage, Collection<EntityId> interestedObjects,
 			boolean includeLinks) throws XMLStreamException, IOException {
 		Map<EntityId, Entity> entities = storage.getRegisteredEntities();
@@ -152,7 +152,7 @@ public class OsmStorageWriter {
 		streamWriter.writeEndDocument();
 		streamWriter.flush();
 	}
-	
+
 	private void writeEntityAttributes(XMLStreamWriter writer, Entity i, EntityInfo info) throws XMLStreamException{
 		if(i.getId() < 0 && (info == null || info.getAction() == null)){
 			writer.writeAttribute("action", "modify");
@@ -182,11 +182,11 @@ public class OsmStorageWriter {
 			}
 		} else {
 			// josm compatibility
-			
+
 			writer.writeAttribute(ATTR_VERSION, i.getVersion() == 0 ? "1" : i.getVersion() +"");
 		}
 	}
-	
+
 	public boolean couldBeWrited(MapObject e){
 		if(!Algorithms.isEmpty(e.getName()) && e.getLocation() != null){
 			return true;
@@ -194,17 +194,17 @@ public class OsmStorageWriter {
 		return false;
 	}
 
-	
+
 	private void writeStartElement(XMLStreamWriter writer, String name, String indent) throws XMLStreamException{
 		writer.writeCharacters("\n"+indent);
 		writer.writeStartElement(name);
 	}
-	
+
 	private void writeEndElement(XMLStreamWriter writer, String indent) throws XMLStreamException{
 		writer.writeCharacters("\n"+indent);
 		writer.writeEndElement();
 	}
-	
+
 	private void writeTags(XMLStreamWriter writer, Entity e) throws XMLStreamException{
 		for(Entry<String, String> en : e.getTags().entrySet()){
 			writeStartElement(writer, ELEM_TAG, INDENT2);
@@ -219,7 +219,7 @@ public class OsmStorageWriter {
 		// xdeb2 xd83d xdc86 xdebd
 		value = value.replace((char) 0xdd62, ' ').replace((char) 0xd855, ' ');
 		return value.replace((char) 0xd83d, ' ').replace((char) 0xdeb2, ' ');
-		
+
 	}
 }
 

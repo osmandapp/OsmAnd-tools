@@ -20,8 +20,8 @@ public class JUnitRouteTest  {
 
 	static BinaryMapIndexReader[]  rs;
 	static NativeSwingRendering lib;
-	
-	
+
+
 	@Before
 	public void setupFiles() throws IOException {
 		if(rs != null){
@@ -34,8 +34,8 @@ public class JUnitRouteTest  {
 		if(Algorithms.isEmpty(obfdir)){
 			obfdir = DataExtractionSettings.getSettings().getBinaryFilesDir();
 		}
-		
-		List<File> files = new ArrayList<File>();  
+
+		List<File> files = new ArrayList<File>();
 		for (File f : new File(obfdir).listFiles()) {
 			if (f.getName().endsWith(".obf")) {
 				files.add(f);
@@ -48,17 +48,17 @@ public class JUnitRouteTest  {
 			rs[it++] = new BinaryMapIndexReader(raf, f);
 		}
 	}
-	
+
 	@Test
 	public void runCZ() throws Exception {
 		TestRouting.test(lib, getClass().getResourceAsStream("cz.test.xml"), rs, RoutingConfiguration.getDefault());
 	}
-	
+
 	@Test
 	public void runUk() throws Exception {
 		TestRouting.test(lib, getClass().getResourceAsStream("uk.test.xml"), rs, RoutingConfiguration.getDefault());
 	}
-	
+
 	@Test
 	@Ignore
 	public void runNL() throws Exception {
@@ -70,16 +70,16 @@ public class JUnitRouteTest  {
 	public void runNL2() throws Exception {
 		TestRouting.test(lib, getClass().getResourceAsStream("nl2.test.xml"), rs, RoutingConfiguration.getDefault());
 	}
-	
+
 	@Test
 	@Ignore
 	public void runNLLeid() throws Exception {
 		TestRouting.test(lib, getClass().getResourceAsStream("nl_leid.test.xml"), rs, RoutingConfiguration.getDefault());
 	}
-	
+
 	@Test
 	public void runBLR() throws Exception {
 		TestRouting.test(lib, getClass().getResourceAsStream("blr.test.xml"), rs, RoutingConfiguration.getDefault());
 	}
-	
+
 }

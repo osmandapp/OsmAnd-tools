@@ -15,21 +15,21 @@ import net.osmand.osm.edit.OsmMapUtils;
 public class Multipolygon {
 	private List<Ring> innerRings, outerRings;
 	private Map<Ring, Set<Ring>> containedInnerInOuter = new LinkedHashMap<Ring, Set<Ring>>();
-	
+
 	private float maxLat = -90;
 	private float minLat = 90;
 	private float maxLon = -180;
 	private float minLon = 180;
 	private long id;
 
-	
+
 	public Multipolygon(List<Ring> outer, List<Ring> inner, long id) {
 		outerRings = outer;
 		innerRings = inner;
 		this.id = id;
 		updateRings();
 	}
-	
+
 	public Multipolygon(Ring outer, List<Ring> inner, long id) {
 		outerRings = new ArrayList<Ring>();
 		outerRings.add(outer);
@@ -37,7 +37,7 @@ public class Multipolygon {
 		this.id = id;
 		updateRings();
 	}
-	
+
 	public long getId() {
 		return id;
 	}
@@ -70,7 +70,7 @@ public class Multipolygon {
 		// keep sorted
 		Collections.sort(innerRings);
 	}
-	
+
 	/**
 	 * check if this multipolygon contains a point
 	 * @param latitude lat to check
@@ -79,11 +79,11 @@ public class Multipolygon {
 	 */
 	public boolean containsPoint(double latitude, double longitude) {
 		// fast check
-		if(maxLat + 0.3 < latitude || minLat - 0.3 > latitude || 
+		if(maxLat + 0.3 < latitude || minLat - 0.3 > latitude ||
 				maxLon + 0.3 < longitude || minLon - 0.3 > longitude) {
 			return false;
 		}
-		
+
 		Ring containedInOuter = null;
 		// use a sortedset to get the smallest outer containing the point
 		for (Ring outer : outerRings) {
@@ -92,11 +92,11 @@ public class Multipolygon {
 				break;
 			}
 		}
-		
+
 		if (containedInOuter == null) {
 			return false;
 		}
-		
+
 		//use a sortedSet to get the smallest inner Ring
 		Ring containedInInner = null;
 		for (Ring inner : innerRings) {
@@ -108,10 +108,10 @@ public class Multipolygon {
 
 		if (containedInInner == null) return true;
 		if (outerRings.size() == 1) {
-			// return immediately false 
+			// return immediately false
 			return false;
 		}
-		
+
 		// if it is both, in an inner and in an outer, check if the inner is indeed the smallest one
 		Set<Ring> s = containedInnerInOuter.get(containedInInner);
 		if(s == null) {
@@ -119,26 +119,26 @@ public class Multipolygon {
 		}
 		return !s.contains(containedInOuter);
 	}
-	
+
 	/**
 	 * check if this multipolygon contains a point
 	 * @param point point to check
 	 * @return true if this multipolygon is correct and contains the point
 	 */
 	public boolean containsPoint(LatLon point) {
-		
+
 		return containsPoint(point.getLatitude(), point.getLongitude());
-		
+
 	}
 
 	public int countOuterPolygons() {
 		return zeroSizeIfNull(outerRings);
 	}
-	
+
 	private int zeroSizeIfNull(Collection<?> l) {
 		return l != null ? l.size() : 0;
 	}
-	
+
 	/**
 	 * Get the weighted center of all nodes in this multiPolygon <br />
 	 * This only works when the ways have initialized nodes
@@ -154,7 +154,7 @@ public class Multipolygon {
 				points.addAll(w.getBorder());
 			}
 		}
-		
+
 		return OsmMapUtils.getWeightCenterForNodes(points);
 	}
 
@@ -167,7 +167,7 @@ public class Multipolygon {
 	public boolean hasOpenedPolygons() {
 	    return !areRingsComplete();
 	}
-	
+
 	public boolean areRingsComplete() {
 		List<Ring> l = outerRings;
 		for (Ring r : l) {
@@ -188,7 +188,7 @@ public class Multipolygon {
 	public List<Ring> getInnerRings() {
 		return innerRings;
 	}
-	
+
 	public List<Ring> getOuterRings() {
 		return outerRings;
 	}

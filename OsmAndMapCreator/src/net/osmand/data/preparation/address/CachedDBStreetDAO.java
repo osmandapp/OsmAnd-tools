@@ -45,14 +45,14 @@ public class CachedDBStreetDAO extends DBStreetDAO
 		super.writeStreetWayNodes(streetId, way);
 		addressStreetNodeLocalSet.add(way.getId());
 	}
-	
+
 	@Override
 	protected void writeBuilding(Set<Long> streetId, Building building)
 			throws SQLException {
 		super.writeBuilding(streetId, building);
 		addressBuildingLocalSet.add(building.getId());
 	}
-	
+
 	@Override
 	public long insertStreet(String name, Map<String, String> names, LatLon location, City city, String cityPart) throws SQLException {
 		String langs = constructLangs(names);
@@ -60,13 +60,13 @@ public class CachedDBStreetDAO extends DBStreetDAO
 		long streetId = fillInsertStreetStatement(name, names, location, city, cityPart, langs);
 		addBatch(addressStreetStat);
 		SimpleStreet ss = new SimpleStreet(streetId,name, city.getId(), cityPart,location, langs);
-		addressStreetLocalMap.put(createStreetUniqueName(name, city.getId(), cityPart), ss); 
+		addressStreetLocalMap.put(createStreetUniqueName(name, city.getId(), cityPart), ss);
 		addressStreetLocalMap.put(createStreetUniqueName(name, city.getId()), ss);
 		return streetId;
 	}
 
-	
-	
+
+
 	@Override
 	public SimpleStreet updateStreetCityPart(SimpleStreet street, String cityPart) throws SQLException {
 		commit(); //we are doing batch updates, so we must commit before this update
@@ -75,7 +75,7 @@ public class CachedDBStreetDAO extends DBStreetDAO
 		addressStreetLocalMap.put(createStreetUniqueName(street.getName(), street.getCityId(), cityPart), updatedSS);
 		return updatedSS;
 	}
-	
+
 	@Override
 	public DBStreetDAO.SimpleStreet updateStreetLangs(DBStreetDAO.SimpleStreet street, Map<String, String> newNames) throws SQLException {
 		commit(); //we are doing batch updates, so we must commit before this update
@@ -84,12 +84,12 @@ public class CachedDBStreetDAO extends DBStreetDAO
 		addressStreetLocalMap.put(createStreetUniqueName(street.getName(), street.getCityId(), street.getCityPart()), updatedSS);
 		return updatedSS;
 	}
-	
+
 	@Override
 	public boolean findBuilding(Entity e) {
 		return addressBuildingLocalSet.contains(e.getId());
 	}
-	
+
 	@Override
 	public boolean removeBuilding(Entity e) throws SQLException {
 		addressBuildingLocalSet.remove(e.getId());

@@ -5,11 +5,11 @@ import com.ibm.icu.text.ArabicShapingException;
 import com.ibm.icu.text.Bidi;
 
 public class ArabicShaper {
-	
-	
+
+
 	public static void main(String[] args) throws ArabicShapingException {
 
-		ArabicShaping as = new ArabicShaping(ArabicShaping.LETTERS_SHAPE | 
+		ArabicShaping as = new ArabicShaping(ArabicShaping.LETTERS_SHAPE |
 				ArabicShaping.LENGTH_GROW_SHRINK);
 		String s = "אנשים 12";
 //		for (int i = 0; i < s.length(); i++) {

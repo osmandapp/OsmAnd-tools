@@ -1,10 +1,10 @@
 //SdTree.java
-//  
+//
 //This library is free software; you can redistribute it and/or
 //modify it under the terms of the GNU Lesser General Public
 //License as published by the Free Software Foundation; either
 //version 2.1 of the License, or (at your option) any later version.
-//  
+//
 //This library is distributed in the hope that it will be useful,
 //but WITHOUT ANY WARRANTY; without even the implied warranty of
 //MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
@@ -26,7 +26,7 @@ import rtree.RTreeException;
 import rtree.Rect;
 
 /**
-   This is a seeded class is good only for joining with the seeding class and not for window 
+   This is a seeded class is good only for joining with the seeding class and not for window
    queries.
    How to use:
    1) Call the constructor.
@@ -94,7 +94,7 @@ public class SdTree extends RTree
       long sdingRoot = sdingTree.getFileHdr().getRootIndex();
       //somehow remove all the nodes of this tree from the cache and since we have a write lock
       //nobody can get this tree's nodes on to the buufer if we don't
-      
+
       Node sdingNode = sdingTree.getReadNode(sdingRoot);
       seedRec(sdingNode, chdNodes.getNode(fileHdr.getFile(), fileName, Node.NOT_DEFINED,//sd
                                           sdingNode.getElementType(), fileHdr), 0);
@@ -117,7 +117,7 @@ public class SdTree extends RTree
     Node[] chNodes = null;//sd
     if(level != slotLvl)//we do not need to alocate new nodes if we are at slot level
       chNodes = new Node[sdingNode.getTotalElements()];//sd
-      
+
     Element[] elmts = sdingNode.getAllElements();
     Element[] newElmts;//elements for non-slot levels
 
@@ -162,7 +162,7 @@ public class SdTree extends RTree
         //Long slotIndex = null;
         LongWraper slotIndex = new LongWraper();
         Node node = this.chooseLeaf(elmt, slotIndex);//sd
-        
+
         if(slotIndex == null)
           throw new NullPointerException();
         long nodeParent = node.getParent();
@@ -190,9 +190,9 @@ public class SdTree extends RTree
   }
   /**
      This method is a copy of <code>RTree.chooseLeaf</code> with minor modifications.
-     In fact there are number of changes , most important is that this method will just not get the new 
+     In fact there are number of changes , most important is that this method will just not get the new
      Node, but also change the parent's (slot node) child pointer.
-     Remeber that if there are no leaf node associated with a slot selected, this method creates one 
+     Remeber that if there are no leaf node associated with a slot selected, this method creates one
      returns this new Node after doing the process described above.
      but if there is a leaf node present then that node is returned just as in simple rtrees.
   */
@@ -244,7 +244,7 @@ public class SdTree extends RTree
     }catch(Exception e){
       e.printStackTrace();
       throw new RTreeException(e.getMessage());
-    }  
+    }
   }
 
   /**
@@ -278,26 +278,26 @@ public class SdTree extends RTree
     RTreeException
   {
     Element[] elmts = node.getAllElements();
-    if(level == slotLvl){//if level is the slot 
+    if(level == slotLvl){//if level is the slot
       if(elmts[0].getPtr() == Node.NOT_DEFINED){//this slot was never supplied a child node
         node.deleteNode();
-        return new Rect();//a null rect 
+        return new Rect();//a null rect
       }else{//a slot that does have child node
         //remove this slot node and make the parent element point to the child of this slot node
-        
+
         Node parentNode = chdNodes.getNode(fileHdr.getFile(), fileName, node.getParent(), fileHdr);//sd
         int index = parentNode.getElementIndex(node.getNodeIndex());
         parentNode.modifyElement(index, elmts[0].getPtr());
-        
+
         Node subRoot = chdNodes.getNode(fileHdr.getFile(), fileName, elmts[0].getPtr(), fileHdr);//sd
-        
+
         subRoot.setParent(node.getParent());
         node.deleteNode();
-        
+
         return(subRoot.getNodeMBR());
       }//else
     }else{//it is not slot node but a seed node
-      //remebeer we may have a situation where we do not get any Rect from down below this node...we delete 
+      //remebeer we may have a situation where we do not get any Rect from down below this node...we delete
       //this node as well.
       Rect rect = new Rect();
       for(int i=node.getTotalElements()-1; i>-1; i--){//for each element in this seed node
@@ -313,7 +313,7 @@ public class SdTree extends RTree
       if(rect.isNull()){//situation where there are no grown subtrees underneath this node
         node.deleteNode();
       }
-      return rect;      
+      return rect;
     }//else
   }
   class LongWraper

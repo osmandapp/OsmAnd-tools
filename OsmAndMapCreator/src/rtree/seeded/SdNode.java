@@ -1,10 +1,10 @@
 //SdNode.java
-//  
+//
 //This library is free software; you can redistribute it and/or
 //modify it under the terms of the GNU Lesser General Public
 //License as published by the Free Software Foundation; either
 //version 2.1 of the License, or (at your option) any later version.
-//  
+//
 //This library is distributed in the hope that it will be useful,
 //but WITHOUT ANY WARRANTY; without even the implied warranty of
 //MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
@@ -41,7 +41,7 @@ public class SdNode extends Node
 
   SdNode(Node node)
   {
-    
+
   }
   @Override
 public int getElementIndex(long param1)
@@ -65,7 +65,7 @@ public Element getLeastEnlargement(Element elmt)
   {
     return super.getLeastEnlargement(elmt);
   }
-  
+
   /**
    * Overriden so that this package can use it.
    * @param param1 <description>
@@ -78,23 +78,23 @@ public Node[] splitNode(Element param1, long slotIndex) throws RTreeException, N
     Node[] nodes = super.splitNode(param1, slotIndex);
     return nodes;
   }
-  
+
   /**
    * Overriden so that this package can use it.
    */
   @Override
-public void modifyElement(int index,long pointer) 
+public void modifyElement(int index,long pointer)
     throws IllegalValueException, IOException, NodeWriteException
   {
     super.modifyElement(index, pointer);
   }
-  
+
   @Override
 public void deleteNode() throws NodeWriteException
   {
     super.deleteNode();
   }
-  
+
   @Override
 public void modifyElement(int param1, Rect param2)
     throws IllegalValueException, IOException, NodeWriteException

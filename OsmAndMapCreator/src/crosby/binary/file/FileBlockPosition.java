@@ -15,10 +15,10 @@ import crosby.binary.Fileformat;
 /**
  * Stores the position in the stream of a fileblock so that it can be easily
  * read in a random-access fashion.
- * 
+ *
  * We can turn this into a 'real' block by appropriately seeking into the file
  * and doing a 'read'.
- * 
+ *
  * */
 public class FileBlockPosition extends FileBlockBase {
     protected FileBlockPosition(String type, ByteString indexdata) {

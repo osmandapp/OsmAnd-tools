@@ -42,13 +42,13 @@ import resources._R;
 
 public class NativeSwingRendering extends NativeLibrary {
 
-	
+
 	RenderingRulesStorage storage;
 	private HashMap<String, String> renderingProps;
-	
+
 	public static Boolean loaded = null;
-	private static NativeSwingRendering defaultLoadedLibrary; 
-	
+	private static NativeSwingRendering defaultLoadedLibrary;
+
 	private void loadRenderingAttributes(InputStream is, final Map<String, String> renderingConstants) throws SAXException, IOException{
 		try {
 			final SAXParser saxParser = SAXParserFactory.newInstance().newSAXParser();
@@ -69,11 +69,11 @@ public class NativeSwingRendering extends NativeLibrary {
 			is.close();
 		}
 	}
-	
+
 	@SuppressWarnings("resource")
 	public void loadRuleStorage(String path, String renderingProperties) throws IOException, XmlPullParserException, SAXException{
 		final LinkedHashMap<String, String> renderingConstants = new LinkedHashMap<String, String>();
-		
+
 		final RenderingRulesStorageResolver resolver = new RenderingRulesStorageResolver() {
 			@Override
 			public RenderingRulesStorage resolve(String name, RenderingRulesStorageResolver ref) throws XmlPullParserException, IOException {
@@ -84,7 +84,7 @@ public class NativeSwingRendering extends NativeLibrary {
 			}
 		};
 		if(path == null || path.equals("default.render.xml")) {
-			loadRenderingAttributes(RenderingRulesStorage.class.getResourceAsStream("default.render.xml"), 
+			loadRenderingAttributes(RenderingRulesStorage.class.getResourceAsStream("default.render.xml"),
 					renderingConstants);
 			storage = new RenderingRulesStorage("default", renderingConstants);
 			storage.parseRulesFromXmlInputStream(RenderingRulesStorage.class.getResourceAsStream("default.render.xml"), resolver);
@@ -122,7 +122,7 @@ public class NativeSwingRendering extends NativeLibrary {
 		}
 		initRenderingRulesStorage(storage);
 	}
-	
+
 	public NativeSwingRendering() {
 		super();
 		try {
@@ -135,9 +135,9 @@ public class NativeSwingRendering extends NativeLibrary {
 			throw new RuntimeException(e);
 		}
 	}
-	
-	
-	
+
+
+
 	public static class RenderingImageContext {
 		public int zoom;
 		public int sleft;
@@ -151,7 +151,7 @@ public class NativeSwingRendering extends NativeLibrary {
 		public long searchTime;
 		public long renderingTime;
 		public double mapDensity;
-		
+
 		public RenderingImageContext(int sleft, int sright, int stop, int sbottom, int zoom, double mapDensity) {
 			this.sleft = sleft;
 			this.sright = sright;
@@ -164,8 +164,8 @@ public class NativeSwingRendering extends NativeLibrary {
 			width = (int) ((sright - sleft) / MapUtils.getPowZoom(31 - zoom - 8));
 			height = (int) ((sbottom - stop) / MapUtils.getPowZoom(31 - zoom - 8));
 		}
-		
-		public RenderingImageContext(double lat, double lon, int width, int height, int zoom, 
+
+		public RenderingImageContext(double lat, double lon, int width, int height, int zoom,
 				double mapDensity) {
 			this.width = width;
 			this.height = height;
@@ -175,8 +175,8 @@ public class NativeSwingRendering extends NativeLibrary {
 				setLocation(lat, lon).build();
 			tb.setMapDensity(mapDensity);
 			final QuadPointDouble lt = tb.getLeftTopTile(tb.getZoom());
-			
-			
+
+
 			this.leftX = lt.x /** MapUtils.getPowZoom(tb.getZoomScale())*/;
 			this.topY = lt.y /** MapUtils.getPowZoom(tb.getZoomScale())*/;
 			QuadRect ll = tb.getLatLonBounds();
@@ -186,11 +186,11 @@ public class NativeSwingRendering extends NativeLibrary {
 			this.stop = MapUtils.get31TileNumberY(ll.top);
 		}
 	}
-	
+
 	public BufferedImage renderImage(int sleft, int sright, int stop, int sbottom, int zoom, float mapDensity) throws IOException {
-		return renderImage(new RenderingImageContext(sleft, sright, stop, sbottom, zoom, mapDensity));	
+		return renderImage(new RenderingImageContext(sleft, sright, stop, sbottom, zoom, mapDensity));
 	}
-	
+
 	public BufferedImage renderImage(RenderingImageContext ctx) throws IOException {
 		long time = -System.currentTimeMillis();
 		RenderingContext rctx = new RenderingContext() {
@@ -231,23 +231,23 @@ public class NativeSwingRendering extends NativeLibrary {
 		}
 		request.setIntFilter(request.ALL.R_MINZOOM, ctx.zoom);
 		request.saveState();
-		NativeSearchResult res = searchObjectsForRendering(ctx.sleft, ctx.sright, ctx.stop, ctx.sbottom, ctx.zoom, request, true, 
+		NativeSearchResult res = searchObjectsForRendering(ctx.sleft, ctx.sright, ctx.stop, ctx.sbottom, ctx.zoom, request, true,
 					rctx, "Nothing found");
 		// ctx.zoomDelta =  1;
 //		double scale = MapUtils.getPowZoom((float) ctx.zoomDelta);
 		float scale = 1;
 		if(renderingProps.get("density") != null ) {
 			scale *= Float.parseFloat(renderingProps.get("density"));
-			
+
 		}
 		rctx.leftX = ctx.leftX * scale;
 		rctx.topY = ctx.topY * scale;
 		rctx.width = (int) (ctx.width * scale);
 		rctx.height = (int) (ctx.height * scale);
-		// map density scales corresponding to zoom delta 
+		// map density scales corresponding to zoom delta
 		// (so the distance between the road is the same)
 		rctx.setDensityValue(scale);
-		//rctx.textScale = 1f;//Text/icon scales according to mapDensity 
+		//rctx.textScale = 1f;//Text/icon scales according to mapDensity
 		rctx.textScale = 1 / scale; //Text/icon stays same for all sizes
 		if(renderingProps.get("textScale") != null ) {
 			rctx.textScale *= Float.parseFloat(renderingProps.get("textScale"));
@@ -255,7 +255,7 @@ public class NativeSwingRendering extends NativeLibrary {
 		rctx.screenDensityRatio = 1 / Math.max(1, 1f /*requestedBox.getDensity()*/);
 		final double tileDivisor = MapUtils.getPowZoom((float) (31 - ctx.zoom)) / scale;
 		request.clearState();
-		
+
 		if(request.searchRenderingAttribute(RenderingRuleStorageProperties.A_DEFAULT_COLOR)) {
 			rctx.defaultColor = request.getIntPropertyValue(request.ALL.R_ATTR_COLOR_VALUE);
 		}
@@ -264,12 +264,12 @@ public class NativeSwingRendering extends NativeLibrary {
 		if(request.searchRenderingAttribute(RenderingRuleStorageProperties.A_SHADOW_RENDERING)) {
 			rctx.shadowRenderingMode = request.getIntPropertyValue(request.ALL.R_ATTR_INT_VALUE);
 			rctx.shadowRenderingColor = request.getIntPropertyValue(request.ALL.R_SHADOW_COLOR);
-			
+
 		}
 		rctx.zoom = ctx.zoom;
 		rctx.tileDivisor = tileDivisor;
 		long search = time + System.currentTimeMillis();
-		final RenderingGenerationResult rres = NativeSwingRendering.generateRenderingIndirect(rctx, res.nativeHandler,  
+		final RenderingGenerationResult rres = NativeSwingRendering.generateRenderingIndirect(rctx, res.nativeHandler,
 				false, request, true);
 		long rendering = time + System.currentTimeMillis() - search;
 		InputStream inputStream = new InputStream() {
@@ -297,7 +297,7 @@ public class NativeSwingRendering extends NativeLibrary {
 		System.out.println(" TIMES search - " + search + " rendering - " + rendering + " unpack - " + last);
 		return img;
 	}
-	
+
 	public void initFilesInDir(File filesDir){
 		File[] lf = Algorithms.getSortedFilesVersions(filesDir);
 		for(File f : lf){
@@ -306,10 +306,10 @@ public class NativeSwingRendering extends NativeLibrary {
 			}
 		}
 	}
-	
-	
-	
-	
+
+
+
+
 	public static NativeSwingRendering getDefaultFromSettings() {
 		if (defaultLoadedLibrary != null) {
 			return defaultLoadedLibrary;
@@ -329,6 +329,6 @@ public class NativeSwingRendering extends NativeLibrary {
 		}
 		return defaultLoadedLibrary;
 	}
-	
+
 
 }

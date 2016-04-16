@@ -27,11 +27,11 @@ public class ProgressDialog extends JDialog implements IProgress {
 	private JLabel label;
 	private Runnable run;
 	private InvocationTargetException exception = null;
-	 
-	
+
+
 	private Object result;
-	
-	
+
+
 
 	// Progress variables
 	private static final float deltaToChange = 0.001f;
@@ -39,21 +39,21 @@ public class ProgressDialog extends JDialog implements IProgress {
 	private int deltaWork;
 	private WorkerThread workerThread;
 	private String genProgress;
-	
+
 	private long previousTaskStarted = 0;
 
-    
+
     public ProgressDialog(Component parent, String name){
     	super(JOptionPane.getFrameForComponent(parent), true);
     	setTitle(name);
         initDialog();
     }
-    
+
     @Override
 	public boolean isInterrupted(){
     	return !isVisible();
     }
-    
+
     @SuppressWarnings("deprecation")
 	public Object run() throws InvocationTargetException, InterruptedException {
 		result = null;
@@ -72,11 +72,11 @@ public class ProgressDialog extends JDialog implements IProgress {
 		}
 		return result;
 	}
-    
+
     private class WorkerThread extends Thread {
     	private boolean isLive = true;
-    	
-    	
+
+
     	public boolean checkIsLive(){
     		return isLive;
     	}
@@ -98,9 +98,9 @@ public class ProgressDialog extends JDialog implements IProgress {
 				}
 			});
     	}
-    	
+
     }
-    
+
     private void initDialog() {
         JPanel pane = new JPanel(new BorderLayout());
         pane.setBorder(BorderFactory.createEmptyBorder(10,10,10,10));
@@ -109,7 +109,7 @@ public class ProgressDialog extends JDialog implements IProgress {
         label = new JLabel();
         pane.add(label, BorderLayout.CENTER);
         add(pane);
-        
+
         label.setText(Messages.getString("OsmExtractionUI.PLEASE.WAIT")); //$NON-NLS-1$
         progressBar.setIndeterminate(true);
         setSize(550, 100);
@@ -117,15 +117,15 @@ public class ProgressDialog extends JDialog implements IProgress {
         double y = getParent().getBounds().getCenterY();
         setLocation((int) x - getWidth() / 2, (int) y - getHeight() / 2);
     }
-    
+
     public Object getResult() {
 		return result;
 	}
-    
+
     public void setResult(Object result) {
 		this.result = result;
 	}
-    
+
     public void setRunnable(Runnable run) {
 		this.run = run;
 	}
@@ -139,7 +139,7 @@ public class ProgressDialog extends JDialog implements IProgress {
 			updateMessage();
 		}
 	}
-	
+
 	private void updateMessage() {
 		if(!progressBar.isIndeterminate()){
 			String format = String.format("\t %.1f %%", progressBar.getValue() * 100.0f / ((float) progressBar.getMaximum())); //$NON-NLS-1$
@@ -164,15 +164,15 @@ public class ProgressDialog extends JDialog implements IProgress {
 		}
 		deltaWork = progressBar.getMaximum() - remainingWork - this.progressBar.getValue();
 	}
-	
+
 	@Override
 	public boolean isIndeterminate(){
 		return progressBar.isIndeterminate();
 	}
-	
+
 	public void setGeneralProgress(String genProgress) {
 		this.genProgress = genProgress;
-		
+
 	}
 
 	@Override
@@ -184,7 +184,7 @@ public class ProgressDialog extends JDialog implements IProgress {
 			} else {
 				log.debug(taskName + " started after " + (System.currentTimeMillis() - previousTaskStarted) + " ms"); //$NON-NLS-1$ //$NON-NLS-2$
 			}
-			
+
 		}
 		previousTaskStarted = System.currentTimeMillis();
 		if(taskName == null){
@@ -203,7 +203,7 @@ public class ProgressDialog extends JDialog implements IProgress {
 		progressBar.setIndeterminate(true);
 	}
 
-	
+
 
 	@Override
 	public void startWork(int work) {
@@ -223,10 +223,10 @@ public class ProgressDialog extends JDialog implements IProgress {
 				} else {
 					progressBar.setIndeterminate(true);
 				}
-				
-			} 
+
+			}
 		});
-		
+
 		deltaWork = 0;
 	}
 }

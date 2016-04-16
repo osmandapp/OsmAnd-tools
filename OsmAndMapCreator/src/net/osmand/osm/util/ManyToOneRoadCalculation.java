@@ -31,25 +31,25 @@ import net.osmand.router.RoutingContext.RoutingSubregionTile;
 import net.osmand.util.MapUtils;
 
 public class ManyToOneRoadCalculation {
-	
+
 	private static final int THRESHOLD_DISCONNECTED = 200;
 
 
 	public class ManyToManySegment {
 		public RouteDataObject road;
 		public int segmentIndex;
-		
+
 		public double distanceFromStart = Double.POSITIVE_INFINITY;
-		
+
 		public ManyToManySegment next;
 		public ManyToManySegment parentSegment;
 		public int parentEndIndex;
-		
+
 		public double estimateDistanceEnd(GeneralRouter router, int sbottom) {
 			return squareRootDist(0, road.getPoint31YTile(segmentIndex), 0, sbottom) / router.getMaxDefaultSpeed();
 		}
 	}
-	
+
 	public static void main(String[] args) throws IOException, InterruptedException {
 		File fl = new File("/home/victor/projects/osmand/osm-gen/Netherlands_europe_2.obf");
 		RandomAccessFile raf = new RandomAccessFile(fl, "r"); //$NON-NLS-1$ //$NON-NLS-2$
@@ -59,7 +59,7 @@ public class ManyToOneRoadCalculation {
 		double bottom = MapUtils.getLatitudeFromTile(zoom, (MapUtils.getTileNumberY(zoom, top) + 1));
 		System.out.println(top +" - " + bottom);
 		new ManyToOneRoadCalculation().manyToManyCalculation(reader, top, bottom/*, 51.48*/);
-		
+
 	}
 
 	private void manyToManyCalculation(BinaryMapIndexReader reader, double top, double bottom) throws IOException {
@@ -67,7 +67,7 @@ public class ManyToOneRoadCalculation {
 		RoutingConfiguration config = RoutingConfiguration.getDefault().build("car", 1000);
 		RouteCalculationMode mode = RouteCalculationMode.BASE;
 		RoutingContext ctx = frontEnd.buildRoutingContext(config, null, new BinaryMapIndexReader[] {reader}, mode);
-		
+
 		RouteRegion reg = reader.getRoutingIndexes().get(0);
 		List<RouteSubregion> baseSubregions = reg.getBaseSubregions();
 		List<RoutingSubregionTile> tiles = new ArrayList<RoutingContext.RoutingSubregionTile>();
@@ -85,11 +85,11 @@ public class ManyToOneRoadCalculation {
 		filterDisconnected(ctx, allSegments, topIntersects);
 		System.out.println("TOP " + topIntersects.size());
 		System.out.println("BOTTOM " + bottomIntersects.size());
-		
+
 		calculateManyToMany(ctx, allSegments, topIntersects, bottomIntersects, st, sb);
 
 	}
-	
+
 	private void filterDisconnected(RoutingContext ctx, TLongObjectHashMap<ManyToManySegment> allSegments,
 			List<ManyToManySegment> initialSegments) {
 		Iterator<ManyToManySegment> it = initialSegments.iterator();
@@ -146,15 +146,15 @@ public class ManyToOneRoadCalculation {
 				combineWithLocal(sets, set);
 			}
 			System.out.println(oneTop.road.getHighway() + " " + oneTop.road.id + " " + oneTop.segmentIndex + " common ways="+sets.size());
-			
+
 		}
-		
-		
+
+
 		System.out.println(sets.size());
 		for(TLongArrayList s : sets) {
 			System.out.println(s);
 		}
-		
+
 	}
 
 	private void combineWithLocal(List<TLongArrayList> sets, TLongArrayList source) {
@@ -198,9 +198,9 @@ public class ManyToOneRoadCalculation {
 				mp = mp.next;
 			}
 		}
-		
+
 	}
-	
+
 
 	private List<ManyToManySegment> calculateOneToMany(TLongObjectHashMap<ManyToManySegment> allSegments,
 			List<ManyToManySegment> bottomIntersects, final int sbottom, final GeneralRouter router,
@@ -219,7 +219,7 @@ public class ManyToOneRoadCalculation {
 			@Override
 			public int compare(ManyToManySegment arg0, ManyToManySegment arg1) {
 //				return Double.compare(arg0.distanceFromStart , arg1.distanceFromStart );
-//				return Double.compare(arg0.distanceFromStart + arg0.estimateDistanceEnd(router, sbottom), 
+//				return Double.compare(arg0.distanceFromStart + arg0.estimateDistanceEnd(router, sbottom),
 //						arg1.distanceFromStart + arg1.estimateDistanceEnd(router, sbottom));
 				return Double.compare(arg0.distanceFromStart, arg1.distanceFromStart);
 			}
@@ -253,7 +253,7 @@ public class ManyToOneRoadCalculation {
 			}
 			//visitedRoads++;
 		}
-		
+
 		return finalSegmentResult;
 	}
 
@@ -278,11 +278,11 @@ public class ManyToOneRoadCalculation {
 
 		return set;
 	}
-	
+
 
 	private void processRoadSegment(PriorityQueue<ManyToManySegment> queue, GeneralRouter router, int sbottom,
 			ManyToManySegment seg, boolean direction, TLongObjectHashMap<ManyToManySegment> allSegments, TLongHashSet visitedSegments) {
-		int p = seg.segmentIndex;  
+		int p = seg.segmentIndex;
 		double dist = 0;
 		double speed = router.defineRoutingSpeed(seg.road);
 		boolean continueMovement = true;
@@ -325,7 +325,7 @@ public class ManyToOneRoadCalculation {
 							sgs.parentSegment = seg;
 							queue.add(sgs);
 						}
-					} 
+					}
 				} else {
 					// same road id
 					if (sgs.distanceFromStart > distFromStart) {
@@ -390,7 +390,7 @@ public class ManyToOneRoadCalculation {
 				} else {
 					res.put(key, sg);
 				}
-				
+
 			}
 		}
 		return res;
@@ -410,18 +410,18 @@ public class ManyToOneRoadCalculation {
 		}
 		return false;
 	}
-	
+
 	private long calcLong(int x31, int y31) {
 		return (((long) x31) << 31) + (long) y31;
 	}
 
-	
+
 	private void cut(BinaryMapIndexReader reader) throws IOException {
 		RoutePlannerFrontEnd frontEnd = new RoutePlannerFrontEnd(false);
 		RoutingConfiguration config = RoutingConfiguration.getDefault().build("car", 1000);
 		RouteCalculationMode mode = RouteCalculationMode.BASE;
 		RoutingContext ctx = frontEnd.buildRoutingContext(config, null, new BinaryMapIndexReader[] {reader}, mode);
-		
+
 		RouteRegion reg = reader.getRoutingIndexes().get(0);
 		List<RouteSubregion> baseSubregions = reg.getBaseSubregions();
 		List<RoutingSubregionTile> tiles = new ArrayList<RoutingContext.RoutingSubregionTile>();
@@ -436,13 +436,13 @@ public class ManyToOneRoadCalculation {
 		int rx = (int) MapUtils.getTileNumberX(zoom, reg.getRightLongitude()) + 1;
 		for(int ky = ty + 1; ky < by; ky++) {
 			for(int kx = lx + 1 ; kx < rx; kx++) {
-				cutByQuadrant((kx - 1) << (31 - zoom), 
+				cutByQuadrant((kx - 1) << (31 - zoom),
 						(ky - 1) << (31 - zoom), kx << (31 - zoom) , ky << (31 - zoom) , ctx, tiles);
 			}
 		}
 	}
-	
-	
+
+
 
 	private void cutByQuadrant(int px, int py, int sx, int sy, RoutingContext ctx, List<RoutingSubregionTile> tiles) {
 		int bc = 0;
@@ -453,7 +453,7 @@ public class ManyToOneRoadCalculation {
 					st.subregion.top <= sy && st.subregion.bottom >= py){
 				List<RouteDataObject> startObjects = new ArrayList<RouteDataObject>();
 				ctx.loadSubregionTile(st, false, startObjects, null);
-				
+
 				List<RouteSegment> res = filterIntersections(px, sx, sy, sy, startObjects);
 				bc += res.size();
 				updateCounts(counts, res);
@@ -462,7 +462,7 @@ public class ManyToOneRoadCalculation {
 				updateCounts(counts, res);
 			}
 		}
-		
+
 		if (bc + rc > 0) {
 			System.out.println("Q "
 					+ ((float) MapUtils.get31LatitudeY(sy) + " " + (float) MapUtils.get31LongitudeX(sx)) + " \t  B="
@@ -499,7 +499,7 @@ public class ManyToOneRoadCalculation {
 				int xin = x <= l ? -1 : (x >= r ? 1 : 0);
 				int yin = y <= t ? -1 : (y >= b ? 1 : 0);
 				if(i > 0) {
-					// this check could give wrong intersections 
+					// this check could give wrong intersections
 					// when the segment is out of the box imagenary crosses diagonal
 					boolean intersectX = xin != pxin && (yin != pyin || yin == 0 );
 					boolean intersectY = yin != pyin && (xin != pxin || xin == 0 );
@@ -514,8 +514,8 @@ public class ManyToOneRoadCalculation {
 		}
 		return intersections;
 	}
-	
-	
+
+
 	private List<ManyToManySegment> filterIntersectionSegments(int l, int r, int t, int b, List<RouteDataObject> startObjects) {
 		List<ManyToManySegment> intersections = new ArrayList<ManyToManySegment>();
 		for(RouteDataObject rdo : startObjects) {
@@ -529,7 +529,7 @@ public class ManyToOneRoadCalculation {
 				int xin = x <= l ? -1 : (x >= r ? 1 : 0);
 				int yin = y <= t ? -1 : (y >= b ? 1 : 0);
 				if(i > 0) {
-					// this check could give wrong intersections 
+					// this check could give wrong intersections
 					// when the segment is out of the box imagenary crosses diagonal
 					boolean intersectX = xin != pxin && (yin != pyin || yin == 0 );
 					boolean intersectY = yin != pyin && (xin != pxin || xin == 0 );
@@ -548,6 +548,6 @@ public class ManyToOneRoadCalculation {
 		return intersections;
 	}
 
-	
+
 
 }

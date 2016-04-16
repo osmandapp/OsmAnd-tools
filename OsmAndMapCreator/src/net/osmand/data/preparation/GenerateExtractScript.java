@@ -21,12 +21,12 @@ public class GenerateExtractScript {
 		if (args.length > 0) {
 			location = args[0];
 		}
-		
+
 		String repo = "/Users/victorshcherb/osmand/repos/";
 		if (args.length > 1) {
 			repo = args[1];
 		}
-		
+
 		String binaryFolder = "/Users/victorshcherb/bin/";
 		if (args.length > 2) {
 			binaryFolder = args[2];
@@ -55,7 +55,7 @@ public class GenerateExtractScript {
 				continue;
 			}
 			int depth = 0;
-			CountryRegion r = reg; 
+			CountryRegion r = reg;
 			while(r.getParent() != null) {
 				depth++;
 				r = r.getParent();
@@ -75,11 +75,11 @@ public class GenerateExtractScript {
 			} else {
 				System.out.println(" - extract from " + reg.getParent().getDownloadName());
 			}
-			
+
 		}
 		// System.out.println("Max depth " + md); // 5
 	}
-	
+
 	private void writeToFile(File countryFolder, String fn, String cont) throws IOException {
 		File fl = new File(countryFolder, fn);
 		FileOutputStream fous = new FileOutputStream(fl);

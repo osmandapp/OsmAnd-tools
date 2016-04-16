@@ -43,7 +43,7 @@ public class BasemapProcessor {
     public static final byte TILE_ZOOMLEVEL = 12;
     private static final byte BITMASK = 0x3;
     private static final int BITS_COUNT = (1 << TILE_ZOOMLEVEL) * (1 << TILE_ZOOMLEVEL);
-	
+
     private BitSet seaTileInfo = new BitSet(BITS_COUNT);
     private BitSet landTileInfo = new BitSet(BITS_COUNT);
     private TIntArrayList typeUse = new TIntArrayList();
@@ -425,7 +425,7 @@ public class BasemapProcessor {
 
 	final int PIXELS_THRESHOLD_AREA = 24;
 
-	private static long ID = -20; 
+	private static long ID = -20;
 	public void processEntity(Entity e) {
 		if (e instanceof Way) {
 			if ("reverse_coastline".equals(((Way) e).getModifiableTags().get("natural"))) {
@@ -436,7 +436,7 @@ public class BasemapProcessor {
 		}
 		long refId = -Math.abs(e.getId());
 		// save space with ids
-		
+
 		for (int level = 0; level < mapZooms.getLevels().size(); level++) {
 			boolean mostDetailed = level == 0;
 			MapZoomPair zoomPair = mapZooms.getLevel(level);

@@ -52,17 +52,17 @@ import org.xmlpull.v1.XmlPullParserException;
 
 /**
  * Downloads list of Albert Heijn supermarkets and converts them to a map.
- * 
+ *
  * Source for json is:
  * http://www.ah.nl/albertheijn/winkelinformatie/winkels
- * 
+ *
  * @author Andrei Adamian
  *
  */
 public class AHSupermarketResolver {
-	
+
 	private Log log = LogFactory.getLog(AHSupermarketResolver.class);
-	
+
 	public Map<String, Map<String, Object>> getSupermarkets() throws IOException {
 		InputStream stream = openStream();
 		try {
@@ -77,7 +77,7 @@ public class AHSupermarketResolver {
 			}
 		}
 	}
-	
+
 	@SuppressWarnings("unchecked")
 	private Map<String, Map<String, Object>> parseJSON(JSONArray array) {
 		HashMap<String,Map<String, Object>> map = new LinkedHashMap<String, Map<String, Object>>();
@@ -107,8 +107,8 @@ public class AHSupermarketResolver {
 		URL url = new URL("http://www.ah.nl/albertheijn/winkelinformatie/winkels");
 		return url.openStream();
 	}
-	
-	
+
+
 	public static void selfTest() throws IOException {
 		final String json = "[{city:'Eindhoven',lat:51.443278,format:'TOGO',lng:5.480161,sunday:true,street:'Neckerspoel',hours:[{F:'0630',U:'2300',D:'09-08-2010'},{F:'0630',U:'2300',D:'10-08-2010'},{F:'0630',U:'2300',D:'11-08-2010'},{F:'0630',U:'2300',D:'12-08-2010'},{F:'0630',U:'2330',D:'13-08-2010'},{F:'0700',U:'2330',D:'14-08-2010'},{F:'0800',U:'2300',D:'15-08-2010'},{F:'0630',U:'2300',D:'16-08-2010'},{F:'0630',U:'2300',D:'17-08-2010'},{F:'0630',U:'2300',D:'18-08-2010'},{F:'0630',U:'2300',D:'19-08-2010'},{F:'0630',U:'2330',D:'20-08-2010'},{F:'0700',U:'2330',D:'21-08-2010'},{F:'0800',U:'2300',D:'22-08-2010'}],no:5816,phone:'040-2376060',zip:'5611 AD',housenr:'10'},{city:'Amsterdam',lat:52.346837,format:'TOGO',lng:4.918422,sunday:true,street:'Julianaplein',hours:[{F:'0630',U:'2359',D:'09-08-2010'},{F:'0630',U:'2359',D:'10-08-2010'},{F:'0630',U:'2359',D:'11-08-2010'},{F:'0630',U:'2359',D:'12-08-2010'},{F:'0630',U:'2359',D:'13-08-2010'},{F:'0700',U:'2359',D:'14-08-2010'},{F:'0900',U:'2359',D:'15-08-2010'},{F:'0630',U:'2359',D:'16-08-2010'},{F:'0630',U:'2359',D:'17-08-2010'},{F:'0630',U:'2359',D:'18-08-2010'},{F:'0630',U:'2359',D:'19-08-2010'},{F:'0630',U:'2359',D:'20-08-2010'},{F:'0700',U:'2359',D:'21-08-2010'},{F:'0900',U:'2359',D:'22-08-2010'}],no:5817,phone:'020-4689944',zip:'1097 DN',housenr:'1'}]";
 		AHSupermarketResolver resolver = new AHSupermarketResolver() {
@@ -122,21 +122,21 @@ public class AHSupermarketResolver {
 		assert map.containsKey("5816");
 		assert map.containsKey("5817");
 		// further  checks
-		
+
 		Map<String, Object> shop = map.get("5816");
 		assert "Eindhoven".equals(shop.get("city"));
-		
+
 		shop = map.get("5817");
 		assert "Amsterdam".equals(shop.get("city"));
 	}
-	
-	
+
+
 	// this file could be retrieved using xapi
 	// http://xapi.openstreetmap.org/api/0.6/*[shop=supermarket][bbox=2.5,50,7.8,53.5]
 	public void updateOSMFile(String pathToOsmFile, String pathToModifiedFile, boolean show) throws IOException, XMLStreamException, JSONException, XmlPullParserException{
 		OsmBaseStorage storage = new OsmBaseStorage();
 		final Map<String, EntityId> winkelNumbers = new LinkedHashMap<String, EntityId>();
-		
+
 		storage.getFilters().add(new IOsmStorageFilter(){
 
 			@Override
@@ -148,26 +148,26 @@ public class AHSupermarketResolver {
 				// register all nodes in order to operate with ways
 				return true;
 			}
-			
+
 		});
 		storage.parseOSM(new FileInputStream(pathToOsmFile), new ConsoleProgressImplementation(2), null, true);
 		Map<String, Map<String, Object>> supermarkets = getSupermarkets();
-		
+
 		DataTileManager<Entity> deleted = new DataTileManager<Entity>();
-		
+
 		for(String s : winkelNumbers.keySet()){
 			if(!supermarkets.containsKey(s)){
 				System.err.println("Shop " + s + " id=" +winkelNumbers.get(s) + " doesn't present on the site.");
 				EntityId e = winkelNumbers.get(s);
 				Entity en = storage.getRegisteredEntities().get(e);
-				deleted.registerObject(en.getLatLon().getLatitude(), en.getLatLon().getLongitude(), 
+				deleted.registerObject(en.getLatLon().getLatitude(), en.getLatLon().getLongitude(),
 						en);
 			}
 		}
-		
+
 		DataTileManager<Entity> notCorrelated = new DataTileManager<Entity>();
 		DataTileManager<Entity> notShown = new DataTileManager<Entity>();
-		
+
 		for(String s : supermarkets.keySet()){
 			Map<String, Object> props = supermarkets.get(s);
 			if(winkelNumbers.get(s) != null){
@@ -187,13 +187,13 @@ public class AHSupermarketResolver {
 				newTags.put("addr:street", String.valueOf(props.get("street")));
 				newTags.put("addr:housenumber", String.valueOf(props.get("housenr")));
 				newTags.put("addr:postcode", String.valueOf(props.get("zip")));
-				
+
 				JSONArray o = (JSONArray) props.get("hours");
 				OpeningHoursParser.OpeningHours rules = new OpeningHoursParser.OpeningHours();
 				BasicOpeningHourRule prev = null;
 				for(int i=0; i<7; i++){
 					JSONObject obj = o.getJSONObject(i);
-					
+
 					if(!obj.isNull("C") && obj.getBoolean("C")){
 					} else {
 						String opened  = String.valueOf(obj.get("F"));
@@ -210,10 +210,10 @@ public class AHSupermarketResolver {
 							rules.addRule(rule);
 						}
 					}
-					
+
 				}
 				newTags.put("opening_hours", rules.toString());
-				
+
 				// Check distance to info
 				LatLon real = new LatLon((Double)props.get("lat"), (Double) props.get("lng"));
 				double dist = MapUtils.getDistance(e.getLatLon(), real);
@@ -243,9 +243,9 @@ public class AHSupermarketResolver {
 				n.putTag("winkelnummer", "REG : " + s);
 				notShown.registerObject(real.getLatitude(), real.getLongitude(), n);
 			}
-			
+
 		}
-		
+
 		OsmStorageWriter writer = new OsmStorageWriter();
 		writer.saveStorage(new FileOutputStream(pathToModifiedFile), storage, null, true);
 		if(show){
@@ -254,31 +254,31 @@ public class AHSupermarketResolver {
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
-			
+
 			final MapPanel panel = new MapPanel(DataExtractionSettings.getSettings().getTilesDirectory());
 			panel.setFocusable(true);
 			MapPointsLayer toAdd = panel.getLayer(MapPointsLayer.class);
 			toAdd.setPoints(notShown);
 			toAdd.setPointSize(5);
 			toAdd.setTagToShow("winkelnummer");
-			
-			
+
+
 			MapPointsLayer red = new MapPointsLayer();
 			red.setPoints(deleted);
 			red.setColor(Color.red);
 			red.setPointSize(5);
 			panel.addLayer(red);
-			
+
 			MapPointsLayer blue = new MapPointsLayer();
 			blue.setPoints(notCorrelated);
 			blue.setColor(Color.blue);
 			blue.setPointSize(4);
 			panel.addLayer(blue);
-			
-			
+
+
 			JFrame frame = new JFrame("Map view");
-		    
-			
+
+
 		    frame.addWindowListener(new WindowAdapter(){
 		    	@Override
 		    	public void windowClosing(WindowEvent e) {
@@ -296,10 +296,10 @@ public class AHSupermarketResolver {
 		    frame.setJMenuBar(bar);
 		    frame.setSize(512, 512);
 		    frame.setVisible(true);
-			
+
 		}
 	}
-	
+
 	public static void main(String[] args) throws IOException, XMLStreamException, JSONException, XmlPullParserException {
 		AHSupermarketResolver resolver = new AHSupermarketResolver();
 		resolver.updateOSMFile("e:/Information/OSM maps/osm_map/holl_supermarket.osm", "e:/Information/OSM maps/osm_map/ams_poi_mod.osm",

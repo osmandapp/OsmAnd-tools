@@ -50,13 +50,13 @@ public class FileBlock extends FileBlockBase {
         deflater.finish();
         byte out[] = new byte[size];
         deflater.deflate(out);
-        
+
         if (!deflater.finished()) {
             // Buffer wasn't long enough. Be noisy.
           ++warncount;
           if (warncount > 10 && warncount%100 == 0)
              System.out.println("Compressed buffers are too short, causing extra copy");
-          
+
 			int newLength = size + size / 64 + 16;
 			byte[] copy = new byte[newLength];
 			System.arraycopy(out, 0, copy, 0, Math.min(out.length, newLength));

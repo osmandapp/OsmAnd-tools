@@ -31,22 +31,22 @@ import net.osmand.util.MapUtils;
 
 public class CheckRoadConnectivity {
 	public static boolean TRACE = false;
-	
+
 	public static void main(String[] args) throws IOException {
-		
+
 		CheckRoadConnectivity crc = new CheckRoadConnectivity();
 		File fl = new File("/home/victor/projects/osmand/osm-gen/Brazil_southamerica_2.obf");
 		RandomAccessFile raf = new RandomAccessFile(fl, "r"); //$NON-NLS-1$ //$NON-NLS-2$
-		
+
 		crc.collectDisconnectedRoads(new BinaryMapIndexReader(raf, fl));
 //		ClusteringContext ctx = new ClusteringContext();
 //		crc.clustering(ctx, new BinaryMapIndexReader(raf));
 	}
-	
+
 	private static class ClusteringContext {
 	}
 
-	
+
 	public void clustering(final ClusteringContext clusterCtx, BinaryMapIndexReader reader)
 			throws IOException {
 		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd(false);
@@ -64,7 +64,7 @@ public class CheckRoadConnectivity {
 			List<RoutingSubregionTile> loadTiles = ctx.loadAllSubregionTiles(reader, s);
 			tiles.addAll(loadTiles);
 		}
-		
+
 		List<Cluster> allClusters = new ArrayList<CheckRoadConnectivity.Cluster>();
 		for(RoutingSubregionTile tile : tiles) {
 			List<Cluster> clusters = processDataObjects(ctx, tile);
@@ -82,7 +82,7 @@ public class CheckRoadConnectivity {
 	}
 
 	private void findAllBaseRoadIntersections(BinaryMapIndexReader reader,
-			TLongObjectHashMap<List<RouteDataObject>> all, TLongObjectHashMap<List<RouteDataObject>> onlyRoads, 
+			TLongObjectHashMap<List<RouteDataObject>> all, TLongObjectHashMap<List<RouteDataObject>> onlyRoads,
 			TLongHashSet registeredRoadIds)
 			throws IOException {
 		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd(false);
@@ -100,8 +100,8 @@ public class CheckRoadConnectivity {
 			List<RoutingSubregionTile> loadTiles = ctx.loadAllSubregionTiles(reader, s);
 			tiles.addAll(loadTiles);
 		}
-		
-		
+
+
 		for(RoutingSubregionTile tile : tiles) {
 			ArrayList<RouteDataObject> dataObjects = new ArrayList<RouteDataObject>();
 			ctx.loadSubregionTile(tile, false, dataObjects, null);
@@ -114,7 +114,7 @@ public class CheckRoadConnectivity {
 				if(shortFerry) {
 					continue;
 				}
-				boolean link = o.getHighway() != null && (o.getHighway().endsWith("link") /*|| 
+				boolean link = o.getHighway() != null && (o.getHighway().endsWith("link") /*||
 						o.getHighway().equals("tertiary")*/);
 				long b = calcPointId(o, 0);
 				long e = calcPointId(o, len);
@@ -140,7 +140,7 @@ public class CheckRoadConnectivity {
 			TLongObjectHashMap<List<RouteDataObject>> all, BinaryMapIndexReader reader, TLongHashSet setToRemove, TLongHashSet registeredIds) {
 		RoutePlannerFrontEnd frontEnd = new RoutePlannerFrontEnd(false);
 		RoutingConfiguration config = RoutingConfiguration.getDefault().build("car", 1000);
-		
+
 		long[] keys = mapOfObjectToCheck.keys();
 		TLongObjectHashMap<RouteDataObject> toAdd = new TLongObjectHashMap<RouteDataObject>();
 		TLongHashSet beginIsolated = new TLongHashSet();
@@ -151,7 +151,7 @@ public class CheckRoadConnectivity {
 				RouteDataObject rdo = all.get(keys[k]).get(0);
 				boolean begin = calcPointId(rdo, 0) == point;
 				RoutingContext ctx = frontEnd.buildRoutingContext(config, null, new BinaryMapIndexReader[] {reader}, RouteCalculationMode.NORMAL);
-				List<RouteDataObject> result = findConnectedRoads(ctx, rdo, begin, all); 
+				List<RouteDataObject> result = findConnectedRoads(ctx, rdo, begin, all);
 				if(result == null) {
 					if(begin) {
 						beginIsolated.add(rdo.getId());
@@ -172,14 +172,14 @@ public class CheckRoadConnectivity {
 		beginIsolated.retainAll(endIsolated);
 		int intersectionSize = beginIsolated.size();
 		if(setToRemove != null) {
-			setToRemove.addAll(beginIsolated);	
+			setToRemove.addAll(beginIsolated);
 		}
 		System.out.println("All objects in base file " + mapOfObjectToCheck.size() + " to keep isolated " + (begSize + endSize - 2 * intersectionSize) +
 				" to add " + toAdd.size() + " to remove " + beginIsolated.size());
 		return toAdd;
 	}
-	
-	private List<RouteDataObject> findConnectedRoads(RoutingContext ctx, RouteDataObject initial, boolean begin, 
+
+	private List<RouteDataObject> findConnectedRoads(RoutingContext ctx, RouteDataObject initial, boolean begin,
 			TLongObjectHashMap<List<RouteDataObject>> all) {
 		PriorityQueue<RouteSegment> queue = new PriorityQueue<RouteSegment>(10, new Comparator<RouteSegment>() {
 
@@ -199,7 +199,7 @@ public class CheckRoadConnectivity {
 		}
 		queue.add(new RouteSegment(initial, begin ? 1 : initial.getPointsLength() - 2));
 		TLongHashSet visited = new TLongHashSet();
-		RouteSegment finalSegment = null; 
+		RouteSegment finalSegment = null;
 		while(!queue.isEmpty() && finalSegment == null){
 			RouteSegment segment = queue.poll();
 			int oneWay = router.isOneWay(segment.getRoad());
@@ -237,7 +237,7 @@ public class CheckRoadConnectivity {
 		return null;
 	}
 
-	private RouteSegment processSegment(RoutingContext ctx, RouteSegment segment, PriorityQueue<RouteSegment> queue, TLongHashSet visited, 
+	private RouteSegment processSegment(RoutingContext ctx, RouteSegment segment, PriorityQueue<RouteSegment> queue, TLongHashSet visited,
 			TLongObjectHashMap<List<RouteDataObject>> all, boolean direction, boolean start) {
 		int ind = segment.getSegmentStart();
 		RouteDataObject road = segment.getRoad();
@@ -264,7 +264,7 @@ public class CheckRoadConnectivity {
 			visited.add(calcPointIdUnique(segment.getRoad(), ind));
 			int x = road.getPoint31XTile(ind);
 			int y = road.getPoint31YTile(ind);
-			distFromStart += MapUtils.squareDist31TileMetric(px, py, x, y) / 
+			distFromStart += MapUtils.squareDist31TileMetric(px, py, x, y) /
 					ctx.getRouter().defineRoutingSpeed(road) * ctx.getRouter().defineSpeedPriority(road);
 			RouteSegment rs = ctx.loadRouteSegment(x, y, 0);
 			while(rs != null) {
@@ -274,7 +274,7 @@ public class CheckRoadConnectivity {
 						rs.setParentSegmentEnd(ind);
 						rs.setParentRoute(segment);
 						queue.remove(rs);
-						queue.add(rs);	
+						queue.add(rs);
 					}
 				}
 				rs = rs.getNext();
@@ -305,7 +305,7 @@ public class CheckRoadConnectivity {
 				}
 			}
 		}
-		
+
 		System.out.println("Tiles " + tiles.size() + " clusters " +allClusters.size());
 		for(Cluster c : allClusters) {
 			if(c.roadsIncluded > 100) {
@@ -314,7 +314,7 @@ public class CheckRoadConnectivity {
 				System.out.println("Cluster roads = " + c.roadsIncluded + " id = "+ c.initalRoadId + " " + c.highways + " " + c.roadIds);
 			}
 		}
-		
+
 	}
 
 	private boolean mergeable(Cluster a, Cluster b) {
@@ -341,7 +341,7 @@ public class CheckRoadConnectivity {
 			points.addAll(toMerge.points);
 			roadIds.addAll(toMerge.roadIds);
 			highways.addAll(toMerge.highways);
-			
+
 		}
 	}
 
@@ -360,7 +360,7 @@ public class CheckRoadConnectivity {
 				list.add(rdo);
 			}
 		}
-		
+
 		HashSet<RouteDataObject> toVisit = new HashSet<RouteDataObject>(dataObjects);
 		List<Cluster> clusters = new ArrayList<Cluster>();
 		while(!toVisit.isEmpty()) {
@@ -401,10 +401,10 @@ public class CheckRoadConnectivity {
 	private long calcPointId(RouteDataObject rdo, int i) {
 		return ((long)rdo.getPoint31XTile(i) << 31l) + (long)rdo.getPoint31YTile(i);
 	}
-	
+
 	private long calcPointIdUnique(RouteDataObject rdo, int i) {
 		return ((long)rdo.getId() << 20l) + i;
 	}
-	
-}	
+
+}
 

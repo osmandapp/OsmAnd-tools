@@ -42,13 +42,13 @@ public class CountryOcbfGeneration {
 		}
 		new CountryOcbfGeneration().generate(repo);
 	}
-	
-	
+
+
 	public Map<String, File> getPolygons(String repo) {
 		String[] polygonFolders = new String[] {
 				repo +"misc/osm-planet/polygons",
 //				repo +"misc/osm-planet/gislab-polygons",
-				repo +"misc/osm-planet/geo-polygons",	
+				repo +"misc/osm-planet/geo-polygons",
 				repo +"misc/osm-planet/srtm-polygons"
 		};
 		Map<String, File> polygonFiles = new LinkedHashMap<String, File>();
@@ -57,7 +57,7 @@ public class CountryOcbfGeneration {
 		}
 		return polygonFiles;
 	}
-	
+
 	public Map<String, Set<TranslateEntity>> getTranslates(String repo) throws XmlPullParserException, IOException {
 		String[] translations = new String[] {
 				repo +"misc/osm-planet/osm-data/states_places.osm",
@@ -71,7 +71,7 @@ public class CountryOcbfGeneration {
 		}
 		return translates;
 	}
-	
+
 	public CountryRegion parseRegionStructure(String repo) throws XmlPullParserException, IOException {
 		String regionsXml = repo + "/resources/countries-info/regions.xml";
 		XmlPullParser parser = PlatformUtil.newXMLPullParser();
@@ -103,7 +103,7 @@ public class CountryOcbfGeneration {
 		}
 		return global;
 	}
-	
+
 	public static class TranslateEntity {
 		private Map<String, String> tm = new TreeMap<String, String>();
 		private String name;
@@ -116,7 +116,7 @@ public class CountryOcbfGeneration {
 			return tm.isEmpty();
 		}
 	}
-	
+
 	public static class CountryRegion {
 		CountryRegion parent = null;
 		List<CountryRegion> children = new ArrayList<CountryRegion>();
@@ -129,29 +129,29 @@ public class CountryOcbfGeneration {
 		String innerDownloadSuffix;
 		String downloadPrefix;
 		String innerDownloadPrefix;
-		
+
 		public String boundary;
 		public String translate;
 		public String polyExtract;
-		
-		
+
+
 		public boolean map ;
 		public boolean wiki;
 		public boolean roads ;
 		public boolean hillshade ;
 		public boolean srtm ;
-		
+
 		public long timestampToUpdate;
-		
+
 		public CountryRegion getParent() {
 			return parent;
 		}
-		
+
 		public Iterator<CountryRegion> iterator() {
 			final LinkedList<CountryRegion> stack = new LinkedList<CountryRegion>(children);
 			return new Iterator<CountryRegion>() {
 
-				
+
 				@Override
 				public boolean hasNext() {
 					return !stack.isEmpty();
@@ -170,26 +170,26 @@ public class CountryOcbfGeneration {
 				}
 			};
 		}
-		
+
 		public String getPolyExtract() {
 			if(!Algorithms.isEmpty(polyExtract) || parent == null) {
 				return polyExtract;
 			}
 			return parent.getPolyExtract();
 		}
-		
+
 		public String getSinglePolyExtract() {
 			return polyExtract;
 		}
-		
+
 		public String getAdditionalTag(String tg) {
 			if(!Algorithms.isEmpty(additionalTags.get(tg)) || parent == null) {
 				return additionalTags.get(tg);
 			}
 			return parent.getAdditionalTag(tg);
 		}
-		
-		
+
+
 		public String getFullName() {
 			if(parent == null) {
 				return name;
@@ -197,7 +197,7 @@ public class CountryOcbfGeneration {
 				return parent.getFullName() + "_" + name;
 			}
 		}
-		
+
 		public String getDownloadName() {
 			String s = name;
 			String p = getDownloadPrefix();
@@ -210,29 +210,29 @@ public class CountryOcbfGeneration {
 			}
 			return s;
 		}
-		
-		
+
+
 		public String getInnerDownloadPrefix() {
 			if(innerDownloadPrefix != null) {
 				return innerDownloadPrefix;
 			}
 			return getDownloadPrefix();
 		}
-		
+
 		public String getDownloadPrefix() {
 			if(downloadPrefix == null && parent != null) {
 				return parent.getInnerDownloadPrefix();
 			}
 			return downloadPrefix == null ? "" : downloadPrefix;
 		}
-		
+
 		public String getInnerDownloadSuffix() {
 			if(innerDownloadSuffix != null) {
 				return innerDownloadSuffix;
 			}
 			return getDownloadSuffix();
 		}
-		
+
 		public String getDownloadSuffix() {
 			if(downloadSuffix == null && parent != null) {
 				return parent.getInnerDownloadSuffix();
@@ -292,7 +292,7 @@ public class CountryOcbfGeneration {
 			return false;
 		}
 	}
-	
+
 	private void scanTranslates(File file, Map<String, Set<TranslateEntity>> translates) throws XmlPullParserException, IOException {
 		XmlPullParser parser = PlatformUtil.newXMLPullParser();
 		parser.setInput(new FileReader(file));
@@ -374,12 +374,12 @@ public class CountryOcbfGeneration {
 		creator.setIndexRouting(false);
 		MapZooms zooms = MapZooms.parseZooms("5-6");
 		creator.generateIndexes(osm,
-				new ConsoleProgressImplementation(1), null, zooms, 
+				new ConsoleProgressImplementation(1), null, zooms,
 				new MapRenderingTypesEncoder("regions"), log);
 
-		
+
 	}
-	
+
 	private static void addTag(XmlSerializer serializer, String key, String value) throws IOException {
 		serializer.startTag(null, "tag");
 		serializer.attribute(null, "k", key);
@@ -388,7 +388,7 @@ public class CountryOcbfGeneration {
 	}
 
 	private void processRegion(CountryRegion r, Map<String, Set<TranslateEntity>> translates,
-			Map<String, File> polygonFiles, String targetObf, String targetOsmXml, String indent, XmlSerializer serializer) 
+			Map<String, File> polygonFiles, String targetObf, String targetOsmXml, String indent, XmlSerializer serializer)
 					throws IOException {
 		String line = "key=" + r.name;
 		File boundary = null;
@@ -478,7 +478,7 @@ public class CountryOcbfGeneration {
 			for(String t : tags) {
 				if(!t.contains("=")) {
 					if(translates.containsKey("name="+t)) {
-						t = "name=" +t;	
+						t = "name=" +t;
 					} else if(translates.containsKey("name:en="+t)) {
 						t = "name:en=" + t;
 					}
@@ -513,21 +513,21 @@ public class CountryOcbfGeneration {
 				}
 			}
 		}
-		
+
 		// COMMENT TO SEE ONLY WARNINGS
 		System.out.println(indent + line);
-		
-		
+
+
 		if(boundaryPoints.size() > 0) {
 			serializer.endTag(null, "way");
 		} else {
 			serializer.endTag(null, "node");
 		}
-		
-		
+
+
 		for(CountryRegion c : r.children) {
 			processRegion(c, translates, polygonFiles, targetObf, targetOsmXml, indent + "  ", serializer);
-		}		
+		}
 	}
 
 	private void writeWay(XmlSerializer serializer, List<String> ls) throws IOException {
@@ -609,19 +609,19 @@ public class CountryOcbfGeneration {
 		if(attrs.containsKey("hillshade")) {
 			reg.hillshade = parseBoolean(attrs.get("hillshade"));
 		} else {
-			reg.hillshade = type == null || type.equals("hillshade"); 
+			reg.hillshade = type == null || type.equals("hillshade");
 		}
 		if(attrs.containsKey("srtm")) {
 			reg.srtm = parseBoolean(attrs.get("srtm"));
 		} else {
-			reg.srtm = type == null || type.equals("srtm"); 
+			reg.srtm = type == null || type.equals("srtm");
 		}
 		if(attrs.containsKey("map")) {
 			reg.map = parseBoolean(attrs.get("map"));
 		} else {
-			reg.map = type == null || type.equals("map"); 
+			reg.map = type == null || type.equals("map");
 		}
-		
+
 		if(attrs.containsKey("roads")) {
 			reg.roads = parseBoolean(attrs.get("roads"));
 		} else {
@@ -669,13 +669,13 @@ public class CountryOcbfGeneration {
 						polygonFiles.put(name, c);
 					} else {
 						File rm = polygonFiles.remove(name);
-						System.out.println("Polygon duplicate -> " + rm.getParentFile().getName() + "/" + name + " and " + 
+						System.out.println("Polygon duplicate -> " + rm.getParentFile().getName() + "/" + name + " and " +
 								c.getParentFile().getName() + "/" + name);
 					}
 					polygonFiles.put(c.getParentFile().getName() + "/" + name, c);
 				}
 			}
 		}
-		
+
 	}
 }

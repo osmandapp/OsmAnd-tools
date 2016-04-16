@@ -12,7 +12,7 @@ import java.io.*;
 import java.net.*;
 import java.util.List;
 
-public class RTreeClient 
+public class RTreeClient
 {
   private Socket socket;
   public RTreeClient(String host,int port)
@@ -178,7 +178,7 @@ public class RTreeClient
                 abl[i]=(ABL)response[i];
               }
             return abl;
-          }     
+          }
         else
           return null;
 
@@ -268,12 +268,12 @@ public class RTreeClient
           Thread.sleep(10);
           }
 
-          
+
         */
-        
-        
+
+
         InputStream in=socket.getInputStream();
-        //System.out.println("RTreeClient.sendRequest : time to receive response " 
+        //System.out.println("RTreeClient.sendRequest : time to receive response "
         //+ (System.currentTimeMillis() - time));
         //time = System.currentTimeMillis();
 
@@ -321,9 +321,9 @@ public class RTreeClient
                 obj[j]=oIn.readObject();
               }
             //                              oIn.close();
-            //System.out.println("RTreeClient.sendRequest : time to process input data " 
+            //System.out.println("RTreeClient.sendRequest : time to process input data "
             //         + (System.currentTimeMillis() - time));
-            
+
             return obj;
           }
         else

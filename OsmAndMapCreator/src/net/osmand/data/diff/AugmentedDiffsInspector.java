@@ -36,7 +36,7 @@ import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 
 public class AugmentedDiffsInspector {
-	//  cat query | osm3s/bin/osm3s_query > result.xml 
+	//  cat query | osm3s/bin/osm3s_query > result.xml
 // overpass query example
 //	[adiff:"2016-03-01T07:00:00Z","2016-03-01T07:03:00Z"];
 //	(
@@ -53,7 +53,7 @@ public class AugmentedDiffsInspector {
 		File f = new File(args[0]);
 		File targetDir = new File(args[1]);
 		File ocbfFile = new File(args[2]);
-		
+
 		AugmentedDiffsInspector inspector = new AugmentedDiffsInspector();
 		Context ctx = inspector.parseFile(f);
 		OsmandRegions or = new OsmandRegions();
@@ -61,12 +61,12 @@ public class AugmentedDiffsInspector {
 		or.cacheAllCountries();
 		inspector.prepareRegions(ctx, ctx.newIds, ctx.regionsNew, or);
 		inspector.prepareRegions(ctx, ctx.oldIds, ctx.regionsOld, or);
-		
+
 		inspector.write(ctx, targetDir);
-			
+
 	}
 
-	private void prepareRegions(Context ctx, Map<EntityId, Entity> ids, Map<String, Set<EntityId>> regionsMap, 
+	private void prepareRegions(Context ctx, Map<EntityId, Entity> ids, Map<String, Set<EntityId>> regionsMap,
 			OsmandRegions or) throws IOException {
 		Map<EntityId, Set<String>> mp = new HashMap<Entity.EntityId, Set<String>>();
 		for(Entity e : ids.values()) {
@@ -295,7 +295,7 @@ public class AugmentedDiffsInspector {
 		if(!Algorithms.isEmpty(v)) {
 			currentEntity.setVersion(Integer.parseInt(v));
 		}
-		
+
 	}
 
 	private Node registerNewNode(XmlPullParser parser, Context ctx, boolean old) {
@@ -314,5 +314,5 @@ public class AugmentedDiffsInspector {
 		}
 	}
 
-	
+
 }

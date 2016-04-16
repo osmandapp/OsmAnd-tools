@@ -25,57 +25,57 @@ import org.apache.commons.logging.Log;
  * Initially was taken from GoogleCodeUploadTask
  */
 public class GoogleCodeUploadIndex {
-    
+
 	private final static Log log = PlatformUtil.getLog(GoogleCodeUploadIndex.class);
-	
+
     /**
-     * Google user name to authenticate as (this is just the username part; 
+     * Google user name to authenticate as (this is just the username part;
      * don't include the @gmail.com part).
      */
     private String userName;
-    
+
     /**
      * Coogle Code password (not the same as the gmail password) !!!!
      */
     private String password;
-    
+
     /**
      * Google Code project name to upload to.
      */
     private String projectName;
 
     /**
-     * The local path of the file to upload. 
+     * The local path of the file to upload.
      */
     private String fileName;
-    
+
     /**
      * The file name that this file will be given on Google Code.
      */
     private String targetFileName;
-    
+
     /**
      * Summary of the upload.
      */
     private String summary;
-    
+
     /**
      * Description of the upload.
      */
     private String description;
-    
-    
+
+
     /**
      * The labels that the download should have, separated by commas. Extra
      * whitespace before and after each label name will not be considered part
      * of the label name.
      */
     private String labels;
-    
+
     private void log(String e){
     	log.info(e);
     }
-    
+
 
     /**
      * Uploads the contents of the file {@link #fileName} to the project's
@@ -85,38 +85,38 @@ public class GoogleCodeUploadIndex {
     public void upload() throws IOException {
         System.clearProperty("javax.net.ssl.trustStoreProvider"); // fixes open-jdk-issue //$NON-NLS-1$
         System.clearProperty("javax.net.ssl.trustStoreType"); //$NON-NLS-1$
-        
+
         final String BOUNDARY = "CowMooCowMooCowCowCow"; //$NON-NLS-1$
         URL url = createUploadURL();
-        
+
         log("The upload URL is " + url); //$NON-NLS-1$
-        
+
         InputStream in = new BufferedInputStream(new FileInputStream(fileName));
-        
+
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         conn.setDoOutput(true);
         conn.setDoInput(true);
         conn.setRequestProperty("Authorization", "Basic " + createAuthToken(userName, password)); //$NON-NLS-1$ //$NON-NLS-2$
         conn.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + BOUNDARY); //$NON-NLS-1$ //$NON-NLS-2$
         conn.setRequestProperty("User-Agent", "Google Code Upload Ant Task 0.1"); //$NON-NLS-1$ //$NON-NLS-2$
-        
+
         log("Attempting to connect (username is " + userName + ")..."); //$NON-NLS-1$ //$NON-NLS-2$
         conn.connect();
-        
+
         //log("Sending request parameters..."); //$NON-NLS-1$
         OutputStream out = conn.getOutputStream();
         sendLine(out, "--" + BOUNDARY); //$NON-NLS-1$
         sendLine(out, "content-disposition: form-data; name=\"summary\""); //$NON-NLS-1$
         sendLine(out, ""); //$NON-NLS-1$
         sendLine(out, summary);
-        
+
 
         if (labels != null) {
             String[] labelArray = labels.split("\\,"); //$NON-NLS-1$
-            
+
             if (labelArray != null && labelArray.length > 0) {
                 // log("Setting "+labelArray.length+" label(s)"); //$NON-NLS-1$ //$NON-NLS-2$
-                
+
                 for (int n = 0, i = labelArray.length; n < i; n++) {
                     sendLine(out, "--" + BOUNDARY); //$NON-NLS-1$
                     sendLine(out, "content-disposition: form-data; name=\"label\""); //$NON-NLS-1$
@@ -125,7 +125,7 @@ public class GoogleCodeUploadIndex {
                 }
             }
         }
-        
+
         log("Sending file... "+targetFileName); //$NON-NLS-1$
         sendLine(out, "--" + BOUNDARY); //$NON-NLS-1$
         sendLine(out, "content-disposition: form-data; name=\"filename\"; filename=\"" + targetFileName + "\""); //$NON-NLS-1$ //$NON-NLS-2$
@@ -139,10 +139,10 @@ public class GoogleCodeUploadIndex {
         in.close();
         sendLine(out, ""); //$NON-NLS-1$
         sendLine(out, "--" + BOUNDARY + "--"); //$NON-NLS-1$ //$NON-NLS-2$
-        
+
         out.flush();
         out.close();
-        
+
         log("Response code " + conn.getResponseCode());
         in = conn.getErrorStream();
 		if (in != null) {
@@ -155,19 +155,19 @@ public class GoogleCodeUploadIndex {
 			}
 			in.close();
 		}
-        
-        
+
+
         // For whatever reason, you have to read from the input stream before
         // the url connection will start sending
         in = conn.getInputStream();
-        
+
         StringBuilder responseBody = new StringBuilder();
         while ( (count = in.read(buf)) >= 0 ) {
             responseBody.append(new String(buf, 0, count, "ascii")); //$NON-NLS-1$
         }
         log("Upload finished response " + responseBody.toString());
         in.close();
-        
+
         conn.disconnect();
     }
 
@@ -207,7 +207,7 @@ public class GoogleCodeUploadIndex {
 		return new URL("https", projectName + ".googlecode.com", "/files"); //$NON-NLS-1$//$NON-NLS-2$ //$NON-NLS-3$
 	}
 
-    
+
     // ============ Getters and Setters ==============
 
     public String getFileName() {
@@ -266,9 +266,9 @@ public class GoogleCodeUploadIndex {
     public void setLabels(String labels) {
         this.labels = labels;
     }
-    
-    
-    
+
+
+
     public String getDescription() {
 		return description;
 	}
@@ -290,5 +290,5 @@ public class GoogleCodeUploadIndex {
 //		uploadIndex.setPassword(_);
 		uploadIndex.upload();
 	}
-    
+
 }

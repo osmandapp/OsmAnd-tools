@@ -42,8 +42,8 @@ import net.osmand.util.MapUtils;
 import com.jogamp.opengl.util.Animator;
 
 public class QtCorePanel implements GLEventListener {
-	
-	
+
+
 	private static CoreResourcesEmbeddedBundle coreResourcesEmbeddedBundle;
 	public static Boolean loaded = null;
 	private static String OS = System.getProperty("os.name").toLowerCase();
@@ -51,11 +51,11 @@ public class QtCorePanel implements GLEventListener {
 	public static boolean isWindows() {
 		return (OS.indexOf("win") >= 0);
 	}
- 
+
 	public static boolean isMac() {
 		return (OS.indexOf("mac") >= 0);
 	}
- 
+
 	public static boolean isUnix() {
 		return (OS.indexOf("nix") >= 0 || OS.indexOf("nux") >= 0 || OS.indexOf("aix") > 0 );
 	}
@@ -74,7 +74,7 @@ public class QtCorePanel implements GLEventListener {
 				System.exit(0);
 				loaded = false;
 			}
-			
+
 		}
 
 	}
@@ -87,7 +87,7 @@ public class QtCorePanel implements GLEventListener {
 	private String styleFile;
 	private String renderingProperties;
 	private float referenceTileSize;
-	
+
 	public QtCorePanel(LatLon location, int zoom) {
 		this.mapCanvas = new MapCanvas(location, zoom);
 		callback = new RenderRequestCallback();
@@ -96,16 +96,16 @@ public class QtCorePanel implements GLEventListener {
 	public void setRenderingStyleFile(String styleFile) {
 		this.styleFile = styleFile;
 	}
-	
+
 	public void setRenderingProperties(String renderingProperties) {
 		this.renderingProperties = renderingProperties;
 	}
-	
+
 	protected void saveLocation(boolean save) {
 		DataExtractionSettings settings = DataExtractionSettings.getSettings();
 		settings.saveLocation(mapCanvas.latitude, mapCanvas.longitude, mapCanvas.zoom, save);
 	}
-	
+
 	public Frame showFrame(int w, int h) {
 		final Frame frame = new Frame("OsmAnd Core");
 		frame.setSize(w, h);
@@ -148,7 +148,7 @@ public class QtCorePanel implements GLEventListener {
 		animator.start();
 		return frame;
 	}
-	
+
 	private class NativeEngineOptions {
 		private MapRendererDebugSettings debugSettings = new MapRendererDebugSettings();
 		private String localeLanguageId = "en";
@@ -157,7 +157,7 @@ public class QtCorePanel implements GLEventListener {
 		private MapPresentationEnvironment.LanguagePreference languagePreference =
 				MapPresentationEnvironment.LanguagePreference.LocalizedOrNative;
 		private final QStringStringHash styleSettings = new QStringStringHash();
-		
+
 		public void parseRenderingProperties(String renderingProperties) {
 			styleSettings.clear();
 			localeLanguageId = "en";
@@ -236,24 +236,24 @@ public class QtCorePanel implements GLEventListener {
 				}
 			}
 		}
-		
+
 		public MapRendererDebugSettings getDebugSettings() {
 			return debugSettings;
 		}
-		
+
 		public String getLocaleLanguageId() {
 			return localeLanguageId;
 		}
-		
+
 		public MapPresentationEnvironment.LanguagePreference getLanguagePreference() {
 			return languagePreference;
 		}
-		
+
 		public QStringStringHash getStyleSettings() {
 			return styleSettings;
 		}
 	}
-	
+
 
 	@Override
 	public void init(GLAutoDrawable drawable) {
@@ -404,7 +404,7 @@ public class QtCorePanel implements GLEventListener {
 		public int getZoom() {
 			return zoom;
 		}
-		
+
 		public double getCenterPointX() {
 			return getWidth() / 2;
 		}
@@ -412,7 +412,7 @@ public class QtCorePanel implements GLEventListener {
 		public double getCenterPointY() {
 			return getHeight() / 2;
 		}
-		
+
 		public double getTileSize(){
 			return referenceTileSize;
 		}
@@ -557,7 +557,7 @@ public class QtCorePanel implements GLEventListener {
 
 	private void release() {
 	}
-	
+
 	public static void main(String[] args) {
 		// load QT
 		// System.load("/home/victor/temp/test/libOsmAndCore_shared.so");
@@ -585,7 +585,7 @@ public class QtCorePanel implements GLEventListener {
 		});
 	}
 
-	
+
 
 
 }

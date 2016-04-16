@@ -27,16 +27,16 @@ public abstract class BinaryParser implements BlockReaderAdapter {
     }
     public static final Date NODATE = new Date();
 
-    /** Get a string based on the index used. 
-     * 
-     * Index 0 is reserved to use as a delimiter, therefore, index 1 corresponds to the first string in the table 
+    /** Get a string based on the index used.
+     *
+     * Index 0 is reserved to use as a delimiter, therefore, index 1 corresponds to the first string in the table
      * @param id
      * @return
      */
     protected String getStringById(int id) {
       return strings[id];
     }
-    
+
     @Override
     public void handleBlock(FileBlock message) {
         // TODO Auto-generated method stub
@@ -69,8 +69,8 @@ public abstract class BinaryParser implements BlockReaderAdapter {
         System.out.println("Skipped block of type: " + block.getType());
         return true;
     }
-    
-    
+
+
     /** Convert a latitude value stored in a protobuf into a double, compensating for granularity and latitude offset */
     public double parseLat(long degree) {
       // Support non-zero offsets. (We don't currently generate them)
@@ -82,7 +82,7 @@ public abstract class BinaryParser implements BlockReaderAdapter {
       // Support non-zero offsets. (We don't currently generate them)
        return (granularity * degree + lon_offset) * 0.000000001;
     }
-   
+
     /** Parse a Primitive block (containing a string table, other paramaters, and PrimitiveGroups */
     public void parse(Osmformat.PrimitiveBlock block) {
         Osmformat.StringTable stablemessage = block.getStringtable();
@@ -107,7 +107,7 @@ public abstract class BinaryParser implements BlockReaderAdapter {
                 parseDense(groupmessage.getDense());
         }
     }
-    
+
     /** Parse a list of Relation protocol buffers and send the resulting relations to a sink.  */
     protected abstract void parseRelations(List<Osmformat.Relation> rels);
     /** Parse a DenseNode protocol buffer and send the resulting nodes to a sink.  */

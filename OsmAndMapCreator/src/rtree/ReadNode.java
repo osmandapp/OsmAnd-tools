@@ -1,10 +1,10 @@
 //ReadNode.java
-//  
+//
 //This library is free software; you can redistribute it and/or
 //modify it under the terms of the GNU Lesser General Public
 //License as published by the Free Software Foundation; either
 //version 2.1 of the License, or (at your option) any later version.
-//  
+//
 //This library is distributed in the hope that it will be useful,
 //but WITHOUT ANY WARRANTY; without even the implied warranty of
 //MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
@@ -47,19 +47,19 @@ class ReadNode extends Node
       rdNode.elements = new Element[node.elements.length];
       if(node.elementType == LEAF_NODE){
         for(int i=0; i<node.totalElements; i++)
-          rdNode.elements[i] = new LeafElement(new Rect(node.elements[i].getRect()), 
+          rdNode.elements[i] = new LeafElement(new Rect(node.elements[i].getRect()),
                                                node.elements[i].getPtr());
       }else{
         for(int i=0; i<node.totalElements; i++)
-          rdNode.elements[i] = new NonLeafElement(new Rect(node.elements[i].getRect()), 
+          rdNode.elements[i] = new NonLeafElement(new Rect(node.elements[i].getRect()),
                                                   node.elements[i].getPtr());
       }
       //  for(int i=0; i<node.totalElements; i++){
       //          if(node.elementType == LEAF_NODE)
-      //            rdNode.elements[i] = new LeafElement(new Rect(node.elements[i].getRect()), 
+      //            rdNode.elements[i] = new LeafElement(new Rect(node.elements[i].getRect()),
       //                                               node.elements[i].getPtr());
       //          else
-      //            rdNode.elements[i] = new NonLeafElement(new Rect(node.elements[i].getRect()), 
+      //            rdNode.elements[i] = new NonLeafElement(new Rect(node.elements[i].getRect()),
       //                                                  node.elements[i].getPtr());
       //        }//if
       //  }//for
@@ -81,7 +81,7 @@ class ReadNode extends Node
      It rewrites the node.
      This method now also being used to write the whole node to the file.
      @param index The element to delete. Give -1 if the whole node is to be flushed.
-     @param force Whether to force IO. As this method is also used to write the whole node, this was 
+     @param force Whether to force IO. As this method is also used to write the whole node, this was
      required.
      @return thengaa!
      XXX : This is till not correct.
@@ -93,7 +93,7 @@ public void deleteElement(int index, boolean force)
     throw new UnsupportedOperationException("operation not supported");
   }
   @Override
-public void insertElement(Element elmt) 
+public void insertElement(Element elmt)
     throws NodeWriteException, NodeFullException
   {
     throw new UnsupportedOperationException("operation not supported");
@@ -261,7 +261,7 @@ public boolean isDirty()
   {
     throw new UnsupportedOperationException("operation not supported");
   }
-  
+
 }
 
 

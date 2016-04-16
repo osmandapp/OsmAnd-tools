@@ -41,9 +41,9 @@ import org.xmlpull.v1.XmlPullParserException;
 public class FixBasemapRoads {
     private static float MINIMAL_DISTANCE= 500;
     private static float MAXIMAL_DISTANCE_CUT = 3000;
-	
+
 	public static void main(String[] args) throws Exception {
-		String fileToRead = args != null && args.length > 0 ? args[0] : null; 
+		String fileToRead = args != null && args.length > 0 ? args[0] : null;
 		if(fileToRead == null) {
 			fileToRead = "/Users/victorshcherb/temp/test_fixbasemaproads.osm";
 		}
@@ -52,19 +52,19 @@ public class FixBasemapRoads {
 		String fileToWrite =  args != null && args.length > 1 ? args[1] : null;
 		if(fileToWrite != null){
 			write = new File(fileToWrite);
-			 
+
 		} else {
 			String fileName = read.getName();
 			int i = fileName.indexOf('.');
 			fileName = fileName.substring(0, i) + "_out.osm";
 			write = new File(read.getParentFile(), fileName);
 		}
-		
+
 		write.createNewFile();
 
         new FixBasemapRoads().process(read, write);
 	}
-	
+
 	private void process(File read, File write) throws  IOException, XMLStreamException, XmlPullParserException {
 		OsmBaseStorage storage = new OsmBaseStorage();
         InputStream stream = new BufferedInputStream(new FileInputStream(read), 8192 * 4);
@@ -85,7 +85,7 @@ public class FixBasemapRoads {
             }
         }
 		storage.parseOSM(stream, new ConsoleProgressImplementation(), streamFile, true);
-		
+
 		Map<EntityId, Entity> entities = new HashMap<EntityId, Entity>( storage.getRegisteredEntities());
 		for(EntityId e : entities.keySet()){
 			Entity es = storage.getRegisteredEntities().get(e);
@@ -94,7 +94,7 @@ public class FixBasemapRoads {
 			}
 		}
         List<EntityId> toWrite = new ArrayList<EntityId>();
-        
+
 		processRegion(toWrite, or);
 		OsmStorageWriter writer = new OsmStorageWriter();
 		writer.saveStorage(new FileOutputStream(write), storage, toWrite, true);

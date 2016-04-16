@@ -21,7 +21,7 @@ import net.osmand.map.WorldRegion;
 import net.osmand.util.MapUtils;
 
 public class CalculateCountryForChangesets {
-	
+
 	public static void main(String[] args) throws Exception {
 		if(args[0].equals("calculate_countries")) {
 			calculateCountries();
@@ -88,7 +88,7 @@ public class CalculateCountryForChangesets {
 						ps.setInt(3, small ? 1 : 0);
 						ps.addBatch();
 					}
-					
+
 				}
 				if(batch ++ > 1000) {
 					ps.executeBatch();
@@ -96,17 +96,17 @@ public class CalculateCountryForChangesets {
 				}
 			}
 			ps.executeBatch();
-			
-			
-			
+
+
+
 		} finally {
 			conn.close();
 		}
-		
+
 	}
 
 	private static OsmandRegions initCountriesTable(Connection conn, boolean empty, Map<WorldRegion, Integer> map) throws IOException, SQLException {
-		
+
 		OsmandRegions or = new OsmandRegions();
 		File regions = new File("OsmAndMapCreator/regions.ocbf");
 		if(!regions.exists()) {
@@ -133,7 +133,7 @@ public class CalculateCountryForChangesets {
 				} else {
 					ps.setInt(2, 0);
 				}
-				
+
 				ps.setString(3, wr.getLocaleName());
 				ps.setString(4, wr.getRegionId());
 				ps.setString(5, wr.getRegionDownloadName());
@@ -161,7 +161,7 @@ public class CalculateCountryForChangesets {
 			WorldRegion rd ;
 			if(rs.getString(2).equals("world")) {
 				rd = worldRegion;
-			} else { 
+			} else {
 				rd = or.getRegionData(rs.getString(2));
 			}
 			if(rd == null) {
@@ -169,12 +169,12 @@ public class CalculateCountryForChangesets {
 			}
 			map.put(rd, id);
 		}
-		
+
 //		Iterator<Entry<WorldRegion, Integer>> it = map.entrySet().iterator();
 //		while(it.hasNext()){
 //			Entry<WorldRegion, Integer> e = it.next();
 //		}
-			
+
 		return or;
 	}
 

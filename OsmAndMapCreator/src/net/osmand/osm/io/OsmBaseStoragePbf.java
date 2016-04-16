@@ -23,7 +23,7 @@ import crosby.binary.Osmformat.Relation.MemberType;
 import crosby.binary.file.BlockInputStream;
 
 public class OsmBaseStoragePbf extends OsmBaseStorage {
-	
+
 	public synchronized void parseOSMPbf(final InputStream stream, final IProgress progress, final boolean entityInfo) throws IOException {
 		BinaryParser parser = new BinaryParser() {
 			public void updateProgress(int count) {
@@ -202,17 +202,17 @@ public class OsmBaseStoragePbf extends OsmBaseStorage {
 			}
 
 		};
-		
+
 		this.progressEntity = 0;
 		this.entities.clear();
 		this.entityInfo.clear();
 		if(progress != null){
 			progress.startWork(stream.available());
 		}
-		
+
 		BlockInputStream bis = new BlockInputStream(stream, parser);
 		bis.process();
-		
+
 		if(progress != null){
 			progress.finishTask();
 		}

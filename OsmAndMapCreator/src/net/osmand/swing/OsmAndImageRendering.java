@@ -39,7 +39,7 @@ import org.xmlpull.v1.XmlPullParserException;
 
 public class OsmAndImageRendering {
 
-	
+
 	private static String[] setupDefaultAttrs(String[] args) {
 		if (args.length < 1) {
 			args = new String[6];
@@ -52,7 +52,7 @@ public class OsmAndImageRendering {
 		}
 		return args;
 	}
-	
+
 	static class ImageCombination {
 		public ImageCombination(String nm, String zoom, String mapDensity, String rendering, String props) {
 			generateName = nm;
@@ -67,7 +67,7 @@ public class OsmAndImageRendering {
 		String renderingProperties;
 		String generateName;
 	}
-	
+
 	public static class HTMLContent {
 
 		private File file;
@@ -79,22 +79,22 @@ public class OsmAndImageRendering {
 		private String rowfooter;
 		private String rowContent;
 		private String webSiteUrl;
-		
+
 
 		public HTMLContent(File file, String webSite) {
 			this.file = file;
 			this.webSiteUrl = webSite;
 		}
-		
+
 		public void addFile(String file) {
 			files.get(files.size() - 1).add(file);
 		}
-		
+
 		public void newRow(String description) {
 			descriptions.add(description);
 			files.add(new ArrayList<String>());
 		}
-		
+
 		public void write() throws IOException {
 			BufferedWriter w = new BufferedWriter(new FileWriter(file));
 			w.write(header);
@@ -118,7 +118,7 @@ public class OsmAndImageRendering {
 			header = textContent.substring(0, rw);
 			String row = textContent.substring(rw + "<ROW>".length(), erw);
 			footer = textContent.substring(erw + "</ROW>".length());
-			
+
 			int crw = row.indexOf("<ROW_ELEMENT>");
 			int cerw = row.indexOf("</ROW_ELEMENT>");
 			rowheader = row.substring(0, crw);
@@ -126,9 +126,9 @@ public class OsmAndImageRendering {
 			rowfooter = row.substring(cerw + "</ROW_ELEMENT>".length());
 
 		}
-		
+
 	}
-	
+
 	public static void main(String[] args) throws IOException, XmlPullParserException, SAXException, ParserConfigurationException, TransformerException {
 		String nativeLib = null;
 		String eyepiece = null;
@@ -156,7 +156,7 @@ public class OsmAndImageRendering {
 				stylesPath = a.substring("-stylesPath=".length());
 			}
 		}
-				
+
 		String backup = null;
 		if (nativeLib != null) {
 			boolean old = NativeLibrary.loadOldLib(nativeLib);
@@ -175,12 +175,12 @@ public class OsmAndImageRendering {
 		String defRenderingProps = getAttribute(de, "renderingProperties", "");
 		String defWidth = getAttribute(de, "width", "1366");
 		String defHeight = getAttribute(de, "height", "768");
-		
+
 		NodeList nl = doc.getElementsByTagName("wpt");
 		NodeList gen = doc.getElementsByTagName("html");
 		File gpx = new File(gpxFile);
 		HTMLContent html = null;
-		
+
 		if (gen.getLength() > 0) {
 			String gpxName = gpx.getName().substring(0, gpx.getName().length() - 4);
 			String outputFName = gpxName;
@@ -203,12 +203,12 @@ public class OsmAndImageRendering {
 			Element e = (Element) nl.item(i);
 			double lat = Double.parseDouble(e.getAttribute("lat"));
 			double lon = Double.parseDouble(e.getAttribute("lon"));
-			
+
 			int imageHeight = Integer.parseInt(getSubAttr(e, "height", defHeight));
 			int imageWidth = Integer.parseInt(getSubAttr(e, "width", defWidth));
 			String name = getSubAttr(e, "name", (lat+"!"+lon).replace('.', '_'));
 			String maps = getSubAttr(e, "maps", "") ;
-			
+
 			String mapDensities = getSubAttr(e, "mapDensity", defMapDensity);
 			String zooms = getSubAttr(e, "zoom", defZoom);
 			String renderingNames = getSubAttr(e, "renderingName", defRenderingName) ;
@@ -270,7 +270,7 @@ public class OsmAndImageRendering {
 						err.printStackTrace();
 					}
 
-				} 
+				}
 				if(nativeLib != null){
 					nsr.loadRuleStorage(ic.renderingStyle, ic.renderingProperties);
 					BufferedImage mg = nsr.renderImage(new RenderingImageContext(lat, lon, imageWidth, imageHeight,
@@ -298,7 +298,7 @@ public class OsmAndImageRendering {
 		String[] renderingNamesStr = renderingNames.split(",");
 		String[] renderingPropertiesStr = renderingProperties.split(";");
 		List<ImageCombination> list = new ArrayList<OsmAndImageRendering.ImageCombination>();
-		
+
 		for (int i1 = 0; i1 < zoomsStr.length; i1++) {
 			String name1 = append(name, "z", zoomsStr, i1);
 			for (int i2 = 0; i2 < mapDenses.length; i2++) {
@@ -380,7 +380,7 @@ public class OsmAndImageRendering {
 						}
 					}
 					zipIn.close();
-						
+
 					targetFile.setLastModified(sourceZip.lastModified());
 				}
 			}
@@ -390,7 +390,7 @@ public class OsmAndImageRendering {
 			initFiles.add(targetFile);
 		}
 	}
-	
+
 	private static String getSubAttr(Element e, String attrName, String def) {
 		NodeList ns = e.getElementsByTagName(attrName);
 		if(ns.getLength() > 0) {
@@ -401,7 +401,7 @@ public class OsmAndImageRendering {
 		}
 		return def;
 	}
-	
+
 	private static String getAttribute(Element e, String attrName, String def) {
 		String vl = e.getAttribute(attrName);
 		if(vl != null && vl.length() > 0) {
@@ -409,5 +409,5 @@ public class OsmAndImageRendering {
 		}
 		return def;
 	}
-	
+
 }
