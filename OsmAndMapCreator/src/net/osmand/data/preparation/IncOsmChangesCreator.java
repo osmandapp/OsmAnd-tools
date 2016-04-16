@@ -62,8 +62,8 @@ public class IncOsmChangesCreator {
 	private static final long INTERVAL_TO_UPDATE_PBF_GENERIC = 1000 * 60 * 60 * 7;
 	private static final long MB = 1024 * 1024;
 	private static final long LIMIT_TO_LOAD_IN_MEMORY = 200 * MB;
-	
-	
+
+
 	private void process(String location, String repo, String binaryFolder) throws Exception {
 		CountryOcbfGeneration ocbfGeneration = new CountryOcbfGeneration();
 		CountryRegion regionStructure = ocbfGeneration.parseRegionStructure(repo);
@@ -109,7 +109,7 @@ public class IncOsmChangesCreator {
 			}
 		}
 	}
-	
+
 	private void extractPbf(File pbfFile, CountryRegion reg,  File polygonFile) {
 		if(!Algorithms.isEmpty(reg.getPolyExtract())) {
 			File fromExtract ;
@@ -125,10 +125,10 @@ public class IncOsmChangesCreator {
 			if(fromExtract.exists()) {
 				if(fromExtract.lastModified() < getMinTimestamp(pbfFile.getParentFile(), "osc.gz")) {
 					SimpleDateFormat sdf = new SimpleDateFormat();
-					System.err.println("!! Extract file is older than any osc.gz change available that means that extract file should be updated: " + fromExtract.getName() + 
-							" " + sdf.format(new Date(fromExtract.lastModified())) + 
+					System.err.println("!! Extract file is older than any osc.gz change available that means that extract file should be updated: " + fromExtract.getName() +
+							" " + sdf.format(new Date(fromExtract.lastModified())) +
 							" polygon " + sdf.format(new Date(getMinTimestamp(pbfFile.getParentFile(), "osc.gz"))));
-					
+
 					return;
 				}
 				List<String> args = new ArrayList<String>();
@@ -176,7 +176,7 @@ public class IncOsmChangesCreator {
 				oscTxtFiles.add(oscFileTxt);
 				oscFilesIds.add(oscFileIdsTxt);
 			}
-		}	
+		}
 		long waited = System.currentTimeMillis() - minTimestamp;
 		boolean hasMapSubRegions = false;
 		Iterator<CountryRegion> it = reg.iterator();
@@ -193,13 +193,13 @@ public class IncOsmChangesCreator {
 			}
 		}
 	}
-	
+
 	private void iterateOsmEntity(final TLongSet ids, final TLongObjectHashMap<Entity> found,
 			final boolean changes, final TLongHashSet search, Entity entity, TLongObjectHashMap<Entity> cache) {
 		long key = IndexIdByBbox.convertId(EntityId.valueOf(entity));
 		if(entity instanceof Relation) {
 			boolean loadRelation = search.contains(key);
-			
+
 			// 1. if relation changed, we need to load all members (multipolygon case)
 			// 2. if any member of relation changed, we need to load all members (multipolygon case)
 			Relation r = (Relation) entity;
@@ -213,7 +213,7 @@ public class IncOsmChangesCreator {
 					}
 				}
 			}
-			
+
 			if(loadRelation) {
 				found.put(key, entity);
 				ids.remove(key);
@@ -265,8 +265,8 @@ public class IncOsmChangesCreator {
 			}
 		}
 	}
-	
-	private void iteratePbf(final TLongSet ids, final TLongObjectHashMap<Entity> found, final boolean changes, 
+
+	private void iteratePbf(final TLongSet ids, final TLongObjectHashMap<Entity> found, final boolean changes,
 			OsmDbAccessor acessor, final TLongObjectHashMap<Entity> cache, File outPbf) throws SQLException, InterruptedException, IOException {
 		final TLongHashSet search = new TLongHashSet(ids);
 		ids.clear();
@@ -285,7 +285,7 @@ public class IncOsmChangesCreator {
 			}
 		} else if (acessor != null){
 			OsmDbAccessor.OsmDbVisitor vis = new OsmDbAccessor.OsmDbVisitor() {
-				
+
 				@Override
 				public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 					try {
@@ -296,7 +296,7 @@ public class IncOsmChangesCreator {
 						}
 					} catch (Exception es) {
 						throw new RuntimeException(es);
-					}					
+					}
 				}
 			};
 			acessor.iterateOverEntities(IProgress.EMPTY_PROGRESS, EntityType.NODE, vis);
@@ -307,7 +307,7 @@ public class IncOsmChangesCreator {
 			InputStream fis = new FileInputStream(outPbf);
 			// InputStream fis = new ByteArrayInputStream(allBytes);
 			pbfReader.getFilters().add(new IOsmStorageFilter() {
-				
+
 				@Override
 				public boolean acceptEntityToLoad(OsmBaseStorage storage, EntityId entityId, Entity e) {
 					try {
@@ -318,7 +318,7 @@ public class IncOsmChangesCreator {
 						}
 					} catch (Exception es) {
 						throw new RuntimeException(es);
-					}	
+					}
 					return false;
 				}
 			});
@@ -326,7 +326,7 @@ public class IncOsmChangesCreator {
 			fis.close();
 		}
 	}
-	
+
 	private void process(String binaryFolder, File pbfFile, File polygonFile, List<File> oscFiles,
 			List<File> oscTxtFiles, List<File> oscFilesIds) throws Exception {
 		File outPbf = new File(pbfFile.getParentFile(), pbfFile.getName() + ".o.pbf");
@@ -336,7 +336,7 @@ public class IncOsmChangesCreator {
 		args.add("-B=" + polygonFile.getName());
 		args.add("--complex-ways");
 //		args.add("--merge-versions"); // doesn't finish in reasonable time
-		
+
 		int currentOsc = 0;
 		int currentOscInd = 1;
 		File osc = new File(pbfFile.getParentFile(), pbfFile.getName() +"."+currentOscInd++ + ".osc");
@@ -443,11 +443,11 @@ public class IncOsmChangesCreator {
 //		args.add("--complex-ways");
 		args.add("--merge-versions");
 		args.add("-o=" + osc.getName());
-		
+
 		boolean res = exec(parentFile, binaryFolder + "osmconvert", args);
 		if (!res) {
 			throw new IllegalStateException(osc.getName() + " convert failed");
-		}		
+		}
 	}
 
 	protected OsmDbAccessor createDbAcessor(File outPbf, File dbFile, DBDialect dlct) throws SQLException,
@@ -474,14 +474,14 @@ public class IncOsmChangesCreator {
 	}
 
 	private void writeOsmFile(File parentFile, TLongObjectHashMap<Entity> found) throws FactoryConfigurationError, XMLStreamException, IOException {
-		
+
 		int ind = 1;
 		File f = getOutputOsmFile(parentFile, ind);
 		while(f.exists()) {
 			ind++;
 			f = getOutputOsmFile(parentFile, ind);
 		}
-		
+
 		OsmStorageWriter writer = new OsmStorageWriter();
 		FileOutputStream fous = new FileOutputStream(f);
 		GZIPOutputStream gzout = new GZIPOutputStream (fous);
@@ -633,7 +633,7 @@ public class IncOsmChangesCreator {
 		}
 		return false;
 	}
-	
+
 	private static void safeClose(Closeable ostream, String message) {
 		if (ostream != null) {
 			try {
@@ -656,19 +656,19 @@ public class IncOsmChangesCreator {
 		}
 		return null;
 	}
-	
-	
+
+
 	public static void main(String[] args) throws Exception {
 		String location = "/Users/victorshcherb/osmand/temp/osmc/";
 		if (args.length > 0) {
 			location = args[0];
 		}
-		
+
 		String repo = "/Users/victorshcherb/osmand/repos/";
 		if (args.length > 1) {
 			repo = args[1];
 		}
-		
+
 		String binaryFolder = "/Users/victorshcherb/bin/";
 		if (args.length > 2) {
 			binaryFolder = args[2];
@@ -676,5 +676,5 @@ public class IncOsmChangesCreator {
 		new IncOsmChangesCreator().process(location, repo, binaryFolder);
 	}
 
-	
+
 }

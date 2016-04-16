@@ -44,19 +44,19 @@ import rtree.RTreeException;
  * http://wiki.openstreetmap.org/wiki/OSM_tags_for_routing#Is_inside.2Foutside
  * http://wiki.openstreetmap.org/wiki/Relations/Proposed/Postal_Addresses
  * http://wiki.openstreetmap.org/wiki/Proposed_features/House_numbers/Karlsruhe_Schema#Tags (node, way)
- * 
+ *
  * That data extraction has aim, save runtime memory and generate indexes on the fly. It will be longer than load in memory (needed part)
  * and save into index.
  */
 public class IndexCreator {
 	private static final Log log = LogFactory.getLog(IndexCreator.class);
 
-	// ONLY derby.jar needed for derby dialect 
+	// ONLY derby.jar needed for derby dialect
 	// (NOSQL is the fastest but is supported only on linux 32)
-	// Sqlite better to use only for 32-bit machines 
+	// Sqlite better to use only for 32-bit machines
 	private DBDialect osmDBdialect = DBDialect.SQLITE;
 	private DBDialect mapIndexDBDialect = DBDialect.SQLITE;
-	public static boolean REMOVE_POI_DB = true; 
+	public static boolean REMOVE_POI_DB = true;
 
 	public static final int BATCH_SIZE = 5000;
 	public static final int BATCH_SIZE_OSM = 10000;
@@ -79,8 +79,8 @@ public class IndexCreator {
 	private String regionName;
 	private String mapFileName = null;
 	private Long lastModifiedDate = null;
-	
-	
+
+
 	private IndexTransportCreator indexTransportCreator;
 	private IndexPoiCreator indexPoiCreator;
 	private IndexAddressCreator indexAddressCreator;
@@ -110,7 +110,7 @@ public class IndexCreator {
 	public void setIndexAddress(boolean indexAddress) {
 		this.indexAddress = indexAddress;
 	}
-	
+
 	public void setIndexRouting(boolean indexRouting) {
 		this.indexRouting = indexRouting;
 	}
@@ -122,11 +122,11 @@ public class IndexCreator {
 	public void setIndexPOI(boolean indexPOI) {
 		this.indexPOI = indexPOI;
 	}
-	
+
 	public void setGenerateLowLevelIndexes(boolean param) {
 		generateLowLevel = param;
 	}
-	
+
 	public boolean isGenerateLowLevelIndexes() {
 		return generateLowLevel;
 	}
@@ -138,7 +138,7 @@ public class IndexCreator {
 	public void setNormalizeStreets(boolean normalizeStreets) {
 		this.normalizeStreets = normalizeStreets;
 	}
-	
+
 	public void setZoomWaySmothness(int zoomWaySmothness) {
 		this.zoomWaySmothness = zoomWaySmothness;
 	}
@@ -177,7 +177,7 @@ public class IndexCreator {
 	public String getTempMapDBFileName() {
 		return getMapFileName() + ".tmp"; //$NON-NLS-1$
 	}
-	
+
 	public void setDialects(DBDialect osmDBdialect, DBDialect mapIndexDBDialect) {
 		if(osmDBdialect != null) {
 			this.osmDBdialect = osmDBdialect;
@@ -199,23 +199,23 @@ public class IndexCreator {
 	public String getPoiFileName() {
 		return getRegionName() + IndexConstants.POI_INDEX_EXT;
 	}
-	
+
 	public String getCityAdminLevel() {
 		return cityAdminLevel;
 	}
-	
+
 	public void setCityAdminLevel(String cityAdminLevel) {
 		this.cityAdminLevel = cityAdminLevel;
 	}
-	
+
 	public String getRTreeMapIndexNonPackFileName() {
 		return mapFile.getAbsolutePath() + ".rtree"; //$NON-NLS-1$
 	}
-	
+
 	public String getRTreeRouteIndexNonPackFileName() {
 		return mapFile.getAbsolutePath() + ".rte"; //$NON-NLS-1$
 	}
-	
+
 	public String getRTreeRouteIndexPackFileName() {
 		return mapFile.getAbsolutePath() + ".prte"; //$NON-NLS-1$
 	}
@@ -231,9 +231,9 @@ public class IndexCreator {
 	public String getRTreeMapIndexPackFileName() {
 		return mapFile.getAbsolutePath() + ".prtree"; //$NON-NLS-1$
 	}
-	
+
 	/* ***** END OF GETTERS/SETTERS ***** */
-	
+
 	private void iterateMainEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 		if (indexPOI) {
 			indexPoiCreator.iterateEntity(e, ctx, false);
@@ -261,15 +261,15 @@ public class IndexCreator {
 					return true;
 				}
 			}
-			return false; 
+			return false;
 		} else if(e instanceof Node) {
 			return boundary.containsPoint(((Node) e).getLatitude(), ((Node) e).getLongitude());
 		}
 		return true;
 	}
 
-	private OsmDbCreator extractOsmToNodesDB(OsmDbAccessor accessor, 
-			File readFile, IProgress progress, IOsmStorageFilter addFilter, int additionId, int shiftId, 
+	private OsmDbCreator extractOsmToNodesDB(OsmDbAccessor accessor,
+			File readFile, IProgress progress, IOsmStorageFilter addFilter, int additionId, int shiftId,
 			boolean ovewriteIds, boolean createTables) throws
 			IOException, SQLException, XmlPullParserException {
 		boolean pbfFile = false;
@@ -293,9 +293,9 @@ public class IndexCreator {
 		if (addFilter != null) {
 			storage.getFilters().add(addFilter);
 		}
-		
+
 		storage.getFilters().add(new IOsmStorageFilter() {
-			
+
 			@Override
 			public boolean acceptEntityToLoad(OsmBaseStorage storage, EntityId entityId, Entity entity) {
 				if(indexAddressCreator != null) {
@@ -333,7 +333,7 @@ public class IndexCreator {
 			}
 		}
 	}
-	
+
 	private OsmDbAccessor initDbAccessor(File[] readFile, IProgress progress, IOsmStorageFilter addFilter,
 			boolean generateUniqueIds) throws IOException, SQLException, InterruptedException, XmlPullParserException {
 		OsmDbAccessor accessor = new OsmDbAccessor();
@@ -374,7 +374,7 @@ public class IndexCreator {
 		accessor.initDatabase(null);
 		return accessor;
 	}
-	
+
 	private void createDatabaseIndexesStructure() throws SQLException, IOException {
 		// 2.1 create temporary sqlite database to put temporary results to it
 		mapFile = new File(workingDir, getMapFileName());
@@ -402,9 +402,9 @@ public class IndexCreator {
 			indexTransportCreator.createDatabaseStructure(mapConnection, mapIndexDBDialect, getRTreeTransportStopsFileName());
 		}
 	}
-	
 
-	
+
+
 	private void createPlainOsmDbBasemap(OsmDbAccessor accessor,
 			IProgress progress, File readFile, IOsmStorageFilter addFilter) throws SQLException, IOException, XmlPullParserException{
 		dbFile = new File(workingDir, TEMP_NODES_DB);
@@ -417,9 +417,9 @@ public class IndexCreator {
 		dbCreator = extractOsmToNodesDB(accessor, readFile, progress, addFilter, 0, 0, false, true);
 		accessor.initDatabase(dbCreator);
 	}
-	
-	
-	
+
+
+
 	public void generateBasemapIndex(IProgress progress, IOsmStorageFilter addFilter, MapZooms mapZooms,
 			MapRenderingTypesEncoder renderingTypes, Log logMapDataWarn, String regionName, File... readFiles) throws IOException, SQLException, InterruptedException, XmlPullParserException {
 		if (logMapDataWarn == null) {
@@ -433,7 +433,7 @@ public class IndexCreator {
 		}
 		// clear previous results and setting variables
 		try {
-			
+
 			final BasemapProcessor processor = new BasemapProcessor(logMapDataWarn, mapZooms, renderingTypes, zoomWaySmothness);
 			final IndexPoiCreator poiCreator = indexPOI ? new IndexPoiCreator(renderingTypes) : null;
 			if(indexPOI) {
@@ -478,8 +478,8 @@ public class IndexCreator {
 				});
 				accessor.closeReadingConnection();
 			}
-			
-			
+
+
 			mapFile = new File(workingDir, getMapFileName());
 			// to save space
 			mapFile.getParentFile().mkdirs();
@@ -487,7 +487,7 @@ public class IndexCreator {
 				mapFile.delete();
 			}
 			mapRAFile = new RandomAccessFile(mapFile, "rw");
-			BinaryMapIndexWriter writer = new BinaryMapIndexWriter(mapRAFile, lastModifiedDate == null ? System.currentTimeMillis() : 
+			BinaryMapIndexWriter writer = new BinaryMapIndexWriter(mapRAFile, lastModifiedDate == null ? System.currentTimeMillis() :
 				lastModifiedDate.longValue());
 
 			setGeneralProgress(progress,"[95 of 100]");
@@ -518,7 +518,7 @@ public class IndexCreator {
 			MapRenderingTypesEncoder renderingTypes, Log logMapDataWarn) throws IOException, SQLException, InterruptedException, XmlPullParserException {
 		generateIndexes(new File[] { readFile }, progress, addFilter, mapZooms, renderingTypes, logMapDataWarn, false);
 	}
-	
+
 	public void generateIndexes(File[] readFile, IProgress progress, IOsmStorageFilter addFilter, MapZooms mapZooms,
 			MapRenderingTypesEncoder renderingTypes, Log logMapDataWarn, boolean generateUniqueIds) throws IOException, SQLException, InterruptedException, XmlPullParserException {
 //		if(LevelDBAccess.load()){
@@ -527,8 +527,8 @@ public class IndexCreator {
  		if(logMapDataWarn == null) {
 			logMapDataWarn = log ;
 		}
-		
-		
+
+
 		if (mapZooms == null) {
 			mapZooms = MapZooms.getDefault();
 		}
@@ -563,7 +563,7 @@ public class IndexCreator {
 		try {
 			// ////////////////////////////////////////////////////////////////////////
 			// 1. creating nodes db to fast access for all nodes and simply import all relations, ways, nodes to it
-			
+
 			// do not create temp map file and rtree files
 			if (recreateOnlyBinaryFile) {
 				mapFile = new File(workingDir, getMapFileName());
@@ -612,7 +612,7 @@ public class IndexCreator {
 					}
 					osmDBdialect.removeDatabase(dbFile);
 				}
-				
+
 				// 3.4 combine all low level ways and simplify them
 				if (indexMap || indexRouting) {
 					setGeneralProgress(progress, "[90 / 100]");
@@ -658,7 +658,7 @@ public class IndexCreator {
 					mapFile.delete();
 				}
 				mapRAFile = new RandomAccessFile(mapFile, "rw");
-				BinaryMapIndexWriter writer = new BinaryMapIndexWriter(mapRAFile, lastModifiedDate == null ? System.currentTimeMillis() : 
+				BinaryMapIndexWriter writer = new BinaryMapIndexWriter(mapRAFile, lastModifiedDate == null ? System.currentTimeMillis() :
 					lastModifiedDate.longValue());
 				if (indexMap) {
 					setGeneralProgress(progress,"[95 of 100]");
@@ -676,7 +676,7 @@ public class IndexCreator {
 					progress.startTask("Writing address index to binary file...", -1);
 					indexAddressCreator.writeBinaryAddressIndex(writer, regionName, progress);
 				}
-				
+
 				if (indexPOI) {
 					setGeneralProgress(progress,"[95 of 100]");
 					progress.startTask("Writing poi index to binary file...", -1);
@@ -730,7 +730,7 @@ public class IndexCreator {
 					}
 				}
 
-				
+
 			} catch (SQLException e) {
 				e.printStackTrace();
 			} catch (RuntimeException e) {
@@ -739,9 +739,9 @@ public class IndexCreator {
 		}
 	}
 
-	
 
-	
+
+
 
 	private void iterateMainEntities(OsmDbAccessor accessor, IProgress progress) throws SQLException, InterruptedException {
 		setGeneralProgress(progress,"[50 / 100]");
@@ -809,7 +809,7 @@ public class IndexCreator {
 				progress.startTask(Messages.getString("IndexCreator.BIND_CITIES_AND_BOUNDARIES"), 100); //$NON-NLS-1$
 				//finish up the boundaries and cities
 				indexAddressCreator.tryToAssignBoundaryToFreeCities(progress);
-				
+
 				setGeneralProgress(progress,"[45 / 100]"); //$NON-NLS-1$
 				progress.startTask(Messages.getString("IndexCreator.PREINDEX_ADRESS_MAP"), accessor.getAllRelations()); //$NON-NLS-1$
 				accessor.iterateOverEntities(progress, EntityType.RELATION, new OsmDbVisitor() {
@@ -818,7 +818,7 @@ public class IndexCreator {
 						indexAddressCreator.indexAddressRelation((Relation) e, ctx);
 					}
 				});
-				
+
 				indexAddressCreator.commitToPutAllCities();
 			}
 		}
@@ -839,18 +839,18 @@ public class IndexCreator {
 			((ProgressDialog) progress).setGeneralProgress(genProgress);
 		}
 	}
-	
+
 	public void setBoundary(Multipolygon polygon) {
 		this.boundary = polygon;
 	}
-	
+
 	public Multipolygon getBoundary() {
 		return boundary;
 	}
 
 	public static void main(String[] args) throws IOException, SQLException, InterruptedException, XmlPullParserException {
 		long time = System.currentTimeMillis();
-		
+
 //		if(true){ generateRegionsFile(); return;}
 		String rootFolder = "/Users/victorshcherb/osmand/";
 		IndexPoiCreator.ZIP_LONG_STRINGS = false;
@@ -864,9 +864,9 @@ public class IndexCreator {
 //		creator.deleteDatabaseIndexes = false;
 //		creator.recreateOnlyBinaryFile = true;
 		creator.deleteOsmDB = false;
-				
+
 		creator.setZoomWaySmothness(2);
-		
+
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 
 		String file = rootFolder + "/temp/map.osm";
@@ -876,13 +876,13 @@ public class IndexCreator {
 		int e = file.indexOf('.', st);
 		creator.setNodesDBFile(new File(rootFolder + "/osm-gen/"+file.substring(st, e) + ".tmp.odb"));
 		MapPoiTypes.setDefault(new MapPoiTypes(rootFolder + "/repos//resources/poi/poi_types.xml"));
-		MapRenderingTypesEncoder rt = 
-				new MapRenderingTypesEncoder(rootFolder + "/repos//resources/obf_creation/rendering_types.xml", 
+		MapRenderingTypesEncoder rt =
+				new MapRenderingTypesEncoder(rootFolder + "/repos//resources/obf_creation/rendering_types.xml",
 						file);
 		creator.generateIndexes(new File(file),
 				new ConsoleProgressImplementation(1), null, zooms, rt, log);
-		//new File(file), 
-		
+		//new File(file),
+
 		log.info("WHOLE GENERATION TIME :  " + (System.currentTimeMillis() - time)); //$NON-NLS-1$
 		log.info("COORDINATES_SIZE " + BinaryMapIndexWriter.COORDINATES_SIZE + " count " + BinaryMapIndexWriter.COORDINATES_COUNT); //$NON-NLS-1$ //$NON-NLS-2$
 		log.info("TYPES_SIZE " + BinaryMapIndexWriter.TYPES_SIZE); //$NON-NLS-1$
@@ -893,7 +893,7 @@ public class IndexCreator {
 		log.info("-- MAP_DATA_AND_STRINGS SIZE " + (BinaryMapIndexWriter.MAP_DATA_SIZE + BinaryMapIndexWriter.STRING_TABLE_SIZE)); //$NON-NLS-1$
 
 	}
-	
+
 
 	public static void generateRegionsFile() throws IOException, SQLException, InterruptedException, XmlPullParserException {
 		MapRenderingTypesEncoder rt = new MapRenderingTypesEncoder("regions");
@@ -916,6 +916,6 @@ public class IndexCreator {
 				new ConsoleProgressImplementation(1), null, zooms, rt, log);
 	}
 
-	
+
 
 }

@@ -1,10 +1,10 @@
 //ContainedByPred.java
-//  
+//
 //This library is free software; you can redistribute it and/or
 //modify it under the terms of the GNU Lesser General Public
 //License as published by the Free Software Foundation; either
 //version 2.1 of the License, or (at your option) any later version.
-//  
+//
 //This library is distributed in the hope that it will be useful,
 //but WITHOUT ANY WARRANTY; without even the implied warranty of
 //MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
@@ -27,8 +27,8 @@ public void relate(Element event, int from, Element[] others, List pairs, int ev
   {
     //System.out.println("SweepLine.internalLoop : before pairs size : " + pairs.size());
     if(evtSide == Join.RIGHT){
-      for(int i=from; 
-          (i<others.length) && (others[i] != null) && 
+      for(int i=from;
+          (i<others.length) && (others[i] != null) &&
             (others[i].getRect().getMaxX() < event.getRect().getMaxX());
           i++){//while others are still intersecting with the event
         if(event.getRect().getMinX() < others[i].getRect().getMinX() &&//check x as well

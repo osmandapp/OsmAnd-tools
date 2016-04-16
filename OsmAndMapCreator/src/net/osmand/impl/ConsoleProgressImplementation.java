@@ -13,7 +13,7 @@ public class ConsoleProgressImplementation implements IProgress {
 	public static double deltaPercentsToPrint = 3.5;
 	public static long deltaTimeToPrint = 1000;
 	private static Log log = PlatformUtil.getLog(ConsoleProgressImplementation.class);
-	
+
 	String currentTask;
 	int work;
 	int currentDone;
@@ -21,26 +21,26 @@ public class ConsoleProgressImplementation implements IProgress {
 	long deltaTime = deltaTimeToPrint;
 	private long previousTaskStarted = 0;
 	private long lastTimePrinted = 0;
-	
+
 	double lastPercentPrint = 0;
 	public ConsoleProgressImplementation(){
 		delta = deltaPercentsToPrint;
 	}
-	
+
 	public ConsoleProgressImplementation(double deltaToPrint){
 		delta = deltaToPrint;
 	}
-	
+
 	public ConsoleProgressImplementation(double deltaToPrint, int deltaTime){
 		delta = deltaToPrint;
 		deltaToPrint = deltaTime;
 	}
-	
+
 	@Override
 	public void finishTask() {
 		log.info("Task " + currentTask + " is finished "); //$NON-NLS-1$ //$NON-NLS-2$
 		this.currentTask = null;
-		
+
 	}
 
 	@Override
@@ -53,7 +53,7 @@ public class ConsoleProgressImplementation implements IProgress {
 		this.currentDone += deltaWork;
 		printIfNeeded();
 	}
-	
+
 	private void printIfNeeded() {
 		if(getCurrentPercent() - lastPercentPrint >= delta){
 			this.lastPercentPrint = getCurrentPercent();
@@ -62,7 +62,7 @@ public class ConsoleProgressImplementation implements IProgress {
 				log.info(MessageFormat.format("Done {0} %.", getCurrentPercent())); //$NON-NLS-1$
 				lastTimePrinted = now;
 			}
-			
+
 		}
 	}
 

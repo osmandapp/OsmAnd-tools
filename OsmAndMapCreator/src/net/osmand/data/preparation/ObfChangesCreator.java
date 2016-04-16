@@ -33,11 +33,11 @@ public class ObfChangesCreator {
 		GroupFiles(String dayName) {
 			this.dayName = dayName;
 		}
-		
+
 		public boolean isMonth() {
 			return dayName.endsWith("00");
 		}
-		
+
 		public long getTimestamp() {
 			// month is always later than last day
 			return isMonth() ? maxTimestamp + 60000 : maxTimestamp;
@@ -49,7 +49,7 @@ public class ObfChangesCreator {
 		}
 
 		public File getObfFileName(File country) {
-			return new File(country, 
+			return new File(country,
 					Algorithms.capitalizeFirstLetterAndLowercase(dayName + ".obf.gz"));
 		}
 
@@ -69,7 +69,7 @@ public class ObfChangesCreator {
 		}
 
 	}
-	
+
 //	private class CombineCountryContext {
 //		Map<String, GroupFiles> dayChange = new TreeMap<String, ObfChangesCreator.GroupFiles>();
 //		Map<String, GroupFiles> monthChange = new TreeMap<String, ObfChangesCreator.GroupFiles>();
@@ -81,7 +81,7 @@ public class ObfChangesCreator {
 			if(country.getName().startsWith("_")) {
 				continue;
 			}
-			
+
 			Map<String, GroupFiles> gf = combineChanges(country);
 			for (GroupFiles g : gf.values()) {
 				createObfFiles(country, g);

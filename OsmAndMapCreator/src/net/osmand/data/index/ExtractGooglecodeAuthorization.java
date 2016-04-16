@@ -57,7 +57,7 @@ public class ExtractGooglecodeAuthorization {
 	}
 
 	boolean debug = false;
-	
+
 	public ExtractGooglecodeAuthorization()	{
 		this(false);
 	}
@@ -73,14 +73,14 @@ public class ExtractGooglecodeAuthorization {
 		//first try to delete file
 		HttpURLConnection conn = connectTo("http://code.google.com/p/osmand/downloads/delete?name=en-tts_0.voice.zip");
 		StringBuilder responseBody = readAnswer(conn.getInputStream());
-		
+
 		//then we are redirect to login page
 		conn = connectTo("https://www.google.com/accounts/ServiceLogin?service=code&ltmpl=phosting&continue=http%3A%2F%2Fcode.google.com%2Fp%2Fosmand%2Fdownloads%2Fdelete%3Fname%3Den-tts_0.voice.zip");
 		responseBody = readAnswer(conn.getInputStream());
 
 		String dsh = matchResponseBody(".*id=\"dsh\"[^\"]*value=\"([^\"]*)\".*", responseBody);
 		String galx = matchResponseBody(".*name=\"GALX\"[^\"]*value=\"([^\"]*)\".*", responseBody);
-		
+
 		if (dsh == null || galx == null) {
 			throw new IOException("Failed to retrieve dsh or galx from login page!");
 		}
@@ -117,7 +117,7 @@ public class ExtractGooglecodeAuthorization {
 		// Get the response
 		responseBody = readAnswer(conn.getInputStream());
 		writer.close();
-		
+
 		//try again the delete page, we should be now connected
 		conn = connectTo("http://code.google.com/p/osmand/downloads/delete?name=en-tts_0.voice.zip");
 		responseBody = readAnswer(conn.getInputStream());
@@ -211,7 +211,7 @@ public class ExtractGooglecodeAuthorization {
 		}
 		return responseBody;
 	}
-	
+
 	public static void main(String[] args) throws IOException
 	{
 		if (args.length < 2) {

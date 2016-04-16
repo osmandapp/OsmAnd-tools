@@ -66,10 +66,10 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	private MapRenderingTypesEncoder renderingTypes;
 	private MapZooms mapZooms;
 	final static String SPLIT_VALUE= "SPLITVL";
-	
+
 
 	Map<Long, TIntArrayList> multiPolygonsWays = new LinkedHashMap<Long, TIntArrayList>();
-	
+
 	// local purpose to speed up processing cache allocation
 	TIntArrayList typeUse = new TIntArrayList(8);
 	List<MapRulType> tempNameUse = new ArrayList<MapRulType>();
@@ -101,20 +101,20 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 
 	public TLongHashSet generatedIds = new TLongHashSet();
 	private static boolean USE_OLD_GEN_ID = false;
-	public static long GENERATE_OBJ_ID = - (1l << 20l); // million million  
+	public static long GENERATE_OBJ_ID = - (1l << 20l); // million million
 	private static int SHIFT_MULTIPOLYGON_IDS = 43;
 	private static int SHIFT_NON_SPLIT_EXISTING_IDS = 41;
 	private static int DUPLICATE_SPLIT = 5;
 	private static boolean VALIDATE_DUPLICATE = false;
 	private TLongObjectHashMap<Long> duplicateIds = new TLongObjectHashMap<Long>();
-	
+
 	private long assignIdBasedOnOriginal(EntityId originalId) {
 		if(USE_OLD_GEN_ID) {
 			return GENERATE_OBJ_ID--;
 		}
 		return genId(SHIFT_MULTIPOLYGON_IDS, originalId);
 	}
-	
+
 	private long assignIdBasedOnOriginalSplit(EntityId originalId) {
 		if(USE_OLD_GEN_ID) {
 			return GENERATE_OBJ_ID--;
@@ -123,7 +123,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	}
 
 	private long genId(int baseShift, EntityId originalId) {
-		long gen = (originalId.getId() << DUPLICATE_SPLIT) + 
+		long gen = (originalId.getId() << DUPLICATE_SPLIT) +
 				(1l << (baseShift - 1));
 		if(originalId.getType() == EntityType.NODE) {
 			gen += 1;
@@ -155,7 +155,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 
 	public static void addPropogatedTags(Map<EntityId, Map<String, String>> propogatedTags, MapRenderingTypesEncoder renderingTypes, Entity e, OsmDbAccessorContext ctx) throws SQLException {
 		if(e instanceof Relation) {
-			Map<MapRulType, Map<MapRulType, String>> propogated = 
+			Map<MapRulType, Map<MapRulType, String>> propogated =
 					renderingTypes.getRelationPropogatedTags((Relation)e);
 			if(propogated != null && propogated.size() > 0) {
 				ctx.loadEntityRelation((Relation) e);
@@ -242,7 +242,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	 */
 	private void indexMultiPolygon(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 		// Don't handle things that aren't multipolygon, and nothing administrative
-		if (!(e instanceof Relation) || 
+		if (!(e instanceof Relation) ||
 		    (!"multipolygon".equals(e.getTag(OSMTagKey.TYPE)) &&  !"protected_area".equals(e.getTag("boundary")))
 				|| e.getTag(OSMTagKey.ADMIN_LEVEL) != null)
 			return;
@@ -261,7 +261,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		excludeFromMainIteration(original.getOuterWays());
 		excludeFromMainIteration(original.getInnerWays());
 
-		
+
 		// Rings with different types (inner or outer) in one ring will be logged in the previous case
 		// The Rings are only composed by type, so if one way gets in a different Ring, the rings will be incomplete
 		List<Multipolygon> multipolygons = original.splitPerOuterRing(logMapDataWarn);
@@ -280,7 +280,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 				continue;
 			}
 
-			// innerWays are new closed ways 
+			// innerWays are new closed ways
 			List<List<Node>> innerWays = new ArrayList<List<Node>>();
 
 			for (Ring r : m.getInnerRings()) {
@@ -289,12 +289,12 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 
 			// don't use the relation ids. Create new onesgetInnerRings
 			Map<String, String> stags  = splitEntities == null ? e.getModifiableTags() : splitEntities.get(0);
-			createMultipolygonObject(stags, out, innerWays, 
+			createMultipolygonObject(stags, out, innerWays,
 					assignIdBasedOnOriginal(EntityId.valueOf(e)));
 			if (splitEntities != null) {
 				for (int i = 1; i < splitEntities.size(); i++) {
 					Map<String, String> tags = splitEntities.get(i);
-					createMultipolygonObject(tags, out, innerWays,	
+					createMultipolygonObject(tags, out, innerWays,
 							assignIdBasedOnOriginal(EntityId.valueOf(e)));
 				}
 			}
@@ -362,7 +362,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			multiPolygonsWays.get(w.getId()).addAll(typeUse);
 		}
 	}
-	
+
 	public static List<Node> simplifyCycleWay(List<Node> ns, int zoom, int zoomWaySmothness) throws SQLException {
 		if (checkForSmallAreas(ns, zoom + Math.min(zoomWaySmothness / 2, 3), 2, 4)) {
 			return null;
@@ -391,7 +391,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			toPut.add(Float.intBitsToFloat(lon));
 		}
 	}
-	
+
 	private void parseAndSort(TIntArrayList ts, byte[] bs) {
 		ts.clear();
 		if (bs != null && bs.length > 0) {
@@ -401,18 +401,18 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		}
 		ts.sort();
 	}
-	
+
 	private static class LowLevelWayCandidate {
 		public byte[] nodes;
 		public long wayId;
 		public long otherNodeId;
 		public Map<MapRulType, String> names;
 		public int namesCount = 0;
-		
-		
+
+
 	}
-	
-	public List<LowLevelWayCandidate> readLowLevelCandidates(ResultSet fs, 
+
+	public List<LowLevelWayCandidate> readLowLevelCandidates(ResultSet fs,
 			List<LowLevelWayCandidate> l, TIntArrayList temp, TIntArrayList tempAdd, TLongHashSet visitedWays) throws SQLException {
 		l.clear();
 		while (fs.next()) {
@@ -433,7 +433,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 					l.add(llwc);
 				}
 			}
-		}	
+		}
 		return l;
 	}
 
@@ -463,7 +463,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 				continue;
 			}
 			visitedWays.add(id);
-			
+
 			int level = rs.getInt(8);
 			int zoom = mapZooms.getLevel(level).getMaxZoom();
 
@@ -474,7 +474,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			decodeNames(rs.getString(5), namesUse);
 			parseAndSort(typeUse, rs.getBytes(6));
 			parseAndSort(addtypeUse, rs.getBytes(7));
-			
+
 			loadNodes(rs.getBytes(4), list);
 			ArrayList<Float> wayNodes = new ArrayList<Float>(list);
 
@@ -487,7 +487,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 					return -Integer.compare(o1.namesCount, o2.namesCount);
 				}
 			};
-			
+
 			while (combined) {
 				combined = false;
 				endStat.setLong(1, startNode);
@@ -563,8 +563,8 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 					insertBinaryMapRenderObjectIndex(mapTree[level], res, null, namesUse, id, false, typeUse, addtypeUse, false);
 				}
 			}
-			
-			// end cycle 
+
+			// end cycle
 
 		}
 
@@ -581,7 +581,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			if(cand.names.isEmpty() && namesUse.isEmpty()) {
 				return cand;
 			}
-			
+
 		}
 		return null;
 	}
@@ -648,11 +648,11 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		}
 	}
 
-	
+
 
 	protected void processMainEntity(Entity e, long originalId, long assignedId, int level, Map<String, String> tags)
 			throws SQLException {
-		boolean area = renderingTypes.encodeEntityWithType(e instanceof Node, 
+		boolean area = renderingTypes.encodeEntityWithType(e instanceof Node,
 				tags, mapZooms.getLevel(level).getMaxZoom(), typeUse, addtypeUse, namesUse,
 				tempNameUse);
 		if (typeUse.isEmpty()) {
@@ -666,7 +666,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		if (typeUse.isEmpty()) {
 			return;
 		}
-		
+
 		long id = convertBaseIdToGeneratedId(assignedId, level);
 		List<Node> res = null;
 		if (e instanceof Node) {
@@ -698,15 +698,15 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	private void validateDuplicate(long originalId, long assignedId) {
 		if(VALIDATE_DUPLICATE) {
 			if(duplicateIds.contains(assignedId)) {
-				throw new IllegalStateException("Duplicate id='"+assignedId + 
+				throw new IllegalStateException("Duplicate id='"+assignedId +
 						"' from '" + duplicateIds.get(assignedId) + "' and '" + originalId + "'");
-				
+
 			}
 			duplicateIds.put(assignedId, originalId);
 		}
 	}
 
-	
+
 
 	public void writeBinaryMapIndex(BinaryMapIndexWriter writer, String regionName) throws IOException, SQLException {
 		closePreparedStatements(mapBinaryStat, mapLowLevelBinaryStat);
@@ -715,7 +715,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			writer.startWriteMapIndex(regionName);
 			// write map encoding rules
 			writer.writeMapEncodingRules(renderingTypes.getEncodingRuleTypes());
-			
+
 			PreparedStatement selectData = mapConnection
 					.prepareStatement("SELECT area, coordinates, innerPolygons, types, additionalTypes, name FROM binary_map_objects WHERE id = ?");
 
@@ -730,7 +730,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 					writer.startWriteMapLevelIndex(mapZooms.getLevel(i).getMinZoom(), mapZooms.getLevel(i).getMaxZoom(),
 							rootBounds.getMinX(), rootBounds.getMaxX(), rootBounds.getMinY(), rootBounds.getMaxY());
 					writeBinaryMapTree(root, rootBounds, rtree, writer, treeHeader);
-					
+
 					writeBinaryMapBlock(root,  rootBounds, rtree, writer, selectData, treeHeader, new LinkedHashMap<String, Integer>(),
 								new LinkedHashMap<MapRulType, String>(), mapZooms.getLevel(i));
 
@@ -748,7 +748,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		}
 	}
 
-	
+
 
 	private long convertBaseIdToGeneratedId(long baseId, int level) {
 		if (level >= MAP_LEVELS_MAX) {
@@ -828,8 +828,8 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 							addtypeUse[j / 2] = renderingTypes.getTypeByInternalId(ids).getTargetId();
 						}
 					}
-					
-					
+
+
 					MapData mapData = writer.writeMapData(cid - baseId, parentBounds.getMinX(), parentBounds.getMinY(), rs.getBoolean(1), rs.getBytes(2), rs.getBytes(3),
 							typeUse, addtypeUse, tempNames, null, tempStringTable, dataBlock, level.getMaxZoom() > 15);
 					if(mapData != null) {

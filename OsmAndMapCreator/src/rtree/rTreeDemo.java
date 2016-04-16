@@ -1,10 +1,10 @@
 //RTreeDemo.java
-//  
+//
 //This library is free software; you can redistribute it and/or
 //modify it under the terms of the GNU Lesser General Public
 //License as published by the Free Software Foundation; either
 //version 2.1 of the License, or (at your option) any later version.
-//  
+//
 //This library is distributed in the hope that it will be useful,
 //but WITHOUT ANY WARRANTY; without even the implied warranty of
 //MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
@@ -32,7 +32,7 @@ public class rTreeDemo
   }
   public List tryJoin()
   {
-    TreeThread tr = new TreeThread();    
+    TreeThread tr = new TreeThread();
     return tr.tryJoin();
   }
   public void setName(String name)
@@ -67,10 +67,10 @@ public void run()
       //  entry(fileName);
       //entryRand(fileName);
       //  rt.flush();
-      
+
       //  HashSet set = new HashSet(list);
       //  System.out.println("rTreeDemo.run : size of set " + set.size());
-      
+
       //rt.printTree();
       //overlapRR(fileName);
 
@@ -80,16 +80,16 @@ public void run()
       //System.out.println("rTreeDemo : rt has after " + rt.getAllElements().size());
       //rt.printTree();
       //pck.packTree(rt, fileName);
-      
+
       //pck.packTree(new RTree(fileName+"2"), fileName+"2");
       //trySeed("/tmp/seed.dat", new RTree(fileName));
       //System.out.println("rTreeDemo : height " + rt.getHeight());
-      
+
       RTreeRead rd = new RTreeRead(fileName+"1");
       rd.readSeq();
       rd = new RTreeRead(fileName+"2");
       rd.readSeq();
-       
+
       //tryJoin();
     }
     catch(Exception e){
@@ -124,7 +124,7 @@ public void run()
       //rect.expandToInclude(lf.getRect());
       //vct.add((LeafElement)lf.clone());
     }
-    
+
     //rectangles
     for(int i=0;i<30000; i++){
       iy = rnd.nextInt(h-2);//height
@@ -136,7 +136,7 @@ public void run()
       //rect.expandToInclude(lf.getRect());
       //vct.add((LeafElement)lf.clone());
     }
-    
+
     for(int i=0;i<20000; i++){
       iy = rnd.nextInt(h);//height
       ix = rnd.nextInt(w);//width
@@ -162,7 +162,7 @@ public void run()
     //}
     //  RTreeRead rd = new RTreeRead(fileName);
     //  rd.readSeq();
-    
+
     System.out.println("Entry over in ms : " +(System.currentTimeMillis()-start)
                        + " for thread " + Thread.currentThread());
   }
@@ -173,11 +173,11 @@ public void run()
       //Point data
       /*
         RTree rtree = new RTree(fileName);
-        LeafElement lf1 = 
+        LeafElement lf1 =
         new LeafElement(new Rect(4,3,4,3),218);
-        LeafElement lf2 = 
+        LeafElement lf2 =
         new LeafElement(new Rect(6,5,6,5),218);
-        LeafElement lf3 = 
+        LeafElement lf3 =
         new LeafElement(new Rect(5,6,5,6),218);
         LeafElement lf4 =
         new LeafElement(new Rect(7,2,7,2),218);
@@ -187,7 +187,7 @@ public void run()
         rtree.insert(lf4);
       */
       //BOXES
-      long start = System.currentTimeMillis();      
+      long start = System.currentTimeMillis();
       RTree rtree = new RTree(fileName);
       LeafElement lf1 = new LeafElement(new Rect(3,2,4,3),3243);//keep for join
       rtree.insert(lf1);
@@ -197,11 +197,11 @@ public void run()
       RTree rtree1 = new RTree(fileName);
       LeafElement lf2 = new LeafElement(new Rect(5,4,6,5),5465);
       //rtree1.insert(lf2);
-            
+
       RTree rtree2 = new RTree(fileName);
       LeafElement lf3 = new LeafElement(new Rect(9,6,10,7),96107);
       //rtree2.insert(lf3);
-            
+
       RTree rtree3 = new RTree(fileName);
       LeafElement lf4 = new LeafElement(new Rect(6,1,7,3),6173);//keep for join
       rtree3.insert(lf4);
@@ -213,11 +213,11 @@ public void run()
       RTree rtree5 = new RTree(fileName);
       LeafElement lf6 = new LeafElement(new Rect(4,4,5,6),4456);
       //rtree5.insert(lf6);
-      
+
       RTree rtree6 = new RTree(fileName);
       LeafElement lf7 = new LeafElement(new Rect(5,3,7,4),5374);
       //rtree6.insert(lf7);
-                    
+
       RTree rtree7 = new RTree(fileName);
       LeafElement lf8 = new LeafElement(new Rect(9,5,10,6),95106);//keep for join
       rtree2.insert(lf8);
@@ -256,7 +256,7 @@ public void run()
       start4 = System.currentTimeMillis();
       elmts = rt.overlapsSweep(new Rect(ix,iy,ix+xx,iy+xy));
       System.out.println("Time in ms:" + (System.currentTimeMillis()-start4));
-      System.out.println("Search result-Total elements:"+elmts.size()); 
+      System.out.println("Search result-Total elements:"+elmts.size());
     }
   }
   /*
@@ -290,14 +290,14 @@ public void run()
     try{
       //get All elements
       RTree rt = new RTree(name);
-            
+
       long start1 = System.currentTimeMillis();
       List elmts1 = rt.getAllElements();
       System.out.println("Time in ms:" +
                          (System.currentTimeMillis()-start1));
       System.out.println("Record fetched by "+
                          Thread.currentThread().getName()+
-                         ": " + elmts1.size()); 
+                         ": " + elmts1.size());
       /*
         start1 = System.currentTimeMillis();
         LinkedList elmts2 = rt.testgetAllElements();
@@ -343,13 +343,13 @@ public void run()
       //for(int i=0;i<10;i++){
       iy = rnd.nextInt(h);//height
       ix = rnd.nextInt(w);//width
-      Point pt = 
+      Point pt =
         new Point(ix,iy);
-      //Point pt = 
+      //Point pt =
       //new Point(2618917,1264511);
       //limited number
       long start5 = System.currentTimeMillis();
-            
+
       ABL[] nrst = rt.nearestSearch(pt,50000000000L,10);
       System.out.println("Time in ms for NNSearch(Limited):"+ (System.currentTimeMillis()-start5));
       /*
@@ -361,19 +361,19 @@ public void run()
         +"\tMINDIST:" + nrst[i].minDist);
       */
       //unlimited
-            
+
       System.out.println("List");
       start5 = System.currentTimeMillis();
       List vec = rt.nearestSearch(pt,10000000000L);
       System.out.println("Time in ms for NNSearch(Unlimited):"+ (System.currentTimeMillis()-start5));
       System.out.println("Retrieved: "+vec.size());
-            
+
       //for(int i=0;i<vec.size();i++)
       //        System.out.println("Result" + ((ABL)(vec.elementAt(i)))
       //                           .element.toString()
       //                   +"\tMINDIST:" + ((ABL)(vec.elementAt(i)))
       //                   .minDist);
-            
+
     }
     catch(Exception e){
       e.printStackTrace();
@@ -388,7 +388,7 @@ public void run()
       rt.delete(element);
       //for(int i=0;i<150;i++)
       //rt.delete(element);
-      
+
     }
     catch(Exception e){
       e.printStackTrace();
@@ -447,7 +447,7 @@ public void run()
   {
     try{
       Rect rect1 = new Rect(3,2,5,4);
-      Rect rect2 = new Rect(3,2,4,4);//true 
+      Rect rect2 = new Rect(3,2,4,4);//true
       //Rect rect2 = new Rect(6,2,6,2);//false
       System.out.println(rect1.toString()+" \nand\n"+rect2.toString()
                          +"\nDoes first Eclose second? \n\tAns- "
@@ -486,18 +486,18 @@ public void run()
       //now grow
       int ix,iy,xx,xy;//mIn,maX
       Random rnd = new Random(seed);
-      long start = System.currentTimeMillis();      
+      long start = System.currentTimeMillis();
       //  LeafElement llf = new LeafElement(new Rect(1752, 2179, 5999888, 14999646),218);
       //  sdt.growLeaf(llf);
-      
+
       for(int i=0;i<2000000; i++){
-        iy = rnd.nextInt(h-2);//height 
+        iy = rnd.nextInt(h-2);//height
         ix = rnd.nextInt(w-2);//width
         xy = rnd.nextInt(h - iy);
         xx = rnd.nextInt(w - ix);
         LeafElement lf = new LeafElement(new Rect(ix,iy,ix+xx,iy+xy),218);
         sdt.growLeaf(lf);
-      } 
+      }
       sdt.cleanUp();
       (new RTree(sdTree)).flush();
       //  RTreeRead rd = new RTreeRead(sdTree);
@@ -522,10 +522,10 @@ public void run()
       System.out.println("rTreeDemo : left tree size " + ltTree.getAllElements().size()
                          +"\nright tree size " + rtTree.getAllElements().size()
                          +"\n join size " + join.relate().size());
-      
+
       long t = System.currentTimeMillis();
       List list = join.relate();
-      System.out.println("Join returned " + list.size() + " pointers in " 
+      System.out.println("Join returned " + list.size() + " pointers in "
                          + (System.currentTimeMillis() - t) + " ms" );
       return list;
     }catch(Exception e){
@@ -564,7 +564,7 @@ class RTreeRead
       for(int i=0;i<kbytes+1;i++)
         {
           byte[] data = new byte[Node.NODE_SIZE];
-          file.read(data);              
+          file.read(data);
           if(i==0)
             printFlHdr(data);
           else
@@ -581,7 +581,7 @@ class RTreeRead
   {
     try{
       int frNode;
-      DataInputStream ds = 
+      DataInputStream ds =
         new DataInputStream(new ByteArrayInputStream(data));
       System.out.println("\t***The File Header***");
       System.out.println("TotalNodes:(includes unused ones):"+ds.readInt());
@@ -603,7 +603,7 @@ class RTreeRead
   {
     int mx,my,xx,xy;
     try{
-      DataInputStream ds = 
+      DataInputStream ds =
         new DataInputStream(new ByteArrayInputStream(data));
       System.out.println("\t***Node at Index: "+index+"***");
       System.out.println("Node Header");
@@ -628,7 +628,7 @@ class RTreeRead
         my = ds.readInt();
         if(my < minY)
           minY = my;
-        System.out.println("MinY: "+my);            
+        System.out.println("MinY: "+my);
 
         xx = ds.readInt();
         if(xx > maxX)

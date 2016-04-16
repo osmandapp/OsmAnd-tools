@@ -19,7 +19,7 @@ import net.osmand.router.RoutingContext;
 import org.xmlpull.v1.XmlPullParserException;
 
 public class DijkstraAlgorithm {
-	
+
 	public static void main(String[] args) throws IOException, InterruptedException, XmlPullParserException {
 		File fl = new File("/Users/victorshcherb/osmand/maps/Netherlands_europe_2.obf");
 		RandomAccessFile raf = new RandomAccessFile(fl, "r"); //$NON-NLS-1$ //$NON-NLS-2$
@@ -31,5 +31,5 @@ public class DijkstraAlgorithm {
 				RouteCalculationMode.NORMAL);
 		RouteResultPreparation.PRINT_TO_CONSOLE_ROUTE_INFORMATION_TO_TEST = true;
 		List<RouteSegmentResult> route = fe.searchRoute(ctx, new LatLon(52.28283, 4.8622713), new LatLon(52.326496, 4.8753176), null);
-	}	
+	}
 }

@@ -73,7 +73,7 @@ public class RTree //the tree that would be made
 	  fileList = new HashMap();
 	  CachedNodes.clearFileNamesMap();
   }
-  
+
   public RTree(String fileName)
     throws  RTreeException
   {

@@ -29,10 +29,10 @@ import org.apache.commons.logging.Log;
 
 
 public class NewTileSourceDialog extends JDialog {
-	
+
 	private static final long serialVersionUID = -4862884032977071296L;
 	private static final Log log = PlatformUtil.getLog(NewTileSourceDialog.class);
-	
+
 	private JButton okButton;
 	private JButton cancelButton;
 
@@ -45,9 +45,9 @@ public class NewTileSourceDialog extends JDialog {
     	super(JOptionPane.getFrameForComponent(parent), true);
     	setTitle(Messages.getString("NewTileSourceDialog.CREATE.NEW.TILE")); //$NON-NLS-1$
         initDialog();
-        
+
     }
-	
+
 	public void showDialog(){
 		setSize(800, 200);
         double x = getParent().getBounds().getCenterX();
@@ -55,38 +55,38 @@ public class NewTileSourceDialog extends JDialog {
         setLocation((int) x - getWidth() / 2, (int) y - getHeight() / 2);
         setVisible(true);
 	}
-	
+
 	private void initDialog() {
 		JPanel pane = new JPanel();
 		pane.setLayout(new BoxLayout(pane, BoxLayout.Y_AXIS));
         pane.setBorder(BorderFactory.createEmptyBorder(10, 10, 5, 10));
         add(pane);
-        
-        
+
+
         createInputSourceSection(pane);
-        pane.add(Box.createVerticalGlue());	
-        
+        pane.add(Box.createVerticalGlue());
+
         FlowLayout l = new FlowLayout(FlowLayout.RIGHT);
         JPanel buttonsPane = new JPanel(l);
         okButton = new JButton("OK"); //$NON-NLS-1$
         buttonsPane.add(okButton);
         cancelButton = new JButton(Messages.getString("NewTileSourceDialog.CANCEL")); //$NON-NLS-1$
         buttonsPane.add(cancelButton);
-        
+
         buttonsPane.setMaximumSize(new Dimension(Short.MAX_VALUE, (int) l.preferredLayoutSize(buttonsPane).getHeight()));
         pane.add(buttonsPane);
-        
+
         addListeners();
 	}
-	
-	
+
+
 	private void createInputSourceSection(JPanel root) {
 		JPanel panel = new JPanel();
 		GridBagLayout l = new GridBagLayout();
 		panel.setLayout(l);
 		panel.setBorder(BorderFactory.createTitledBorder(Messages.getString("NewTileSourceDialog.INPUT.SOURCE"))); //$NON-NLS-1$
 		root.add(panel);
-		
+
 
 		JLabel label = new JLabel(Messages.getString("NewTileSourceDialog.NAME")); //$NON-NLS-1$
 		panel.add(label);
@@ -118,7 +118,7 @@ public class NewTileSourceDialog extends JDialog {
 		l.setConstraints(label, constr);
 
 		templateUrl = new JTextField();
-		// Give hint about wms 
+		// Give hint about wms
 		templateUrl.setText("http://tile.openstreetmap.org/{$z}/{$x}/{$y}.png"); //$NON-NLS-1$
 		panel.add(templateUrl);
 		constr = new GridBagConstraints();
@@ -128,8 +128,8 @@ public class NewTileSourceDialog extends JDialog {
 		constr.gridx = 1;
 		constr.gridy = 1;
 		l.setConstraints(templateUrl, constr);
-		
-		
+
+
 		label = new JLabel(Messages.getString("NewTileSourceDialog.ADD.WMS.SERVICE")); //$NON-NLS-1$
 		panel.add(label);
 		constr = new GridBagConstraints();
@@ -141,7 +141,7 @@ public class NewTileSourceDialog extends JDialog {
 		l.setConstraints(label, constr);
 
 		label = new JLabel();
-		// Give hint about wms 
+		// Give hint about wms
 		label.setText("http://whoots.mapwarper.net/tms/{$z}/{$x}/{$y}/{layer}/http://path.to.wms.server"); //$NON-NLS-1$
 		panel.add(label);
 		constr = new GridBagConstraints();
@@ -163,7 +163,7 @@ public class NewTileSourceDialog extends JDialog {
 					setVisible(false);
 				}
 			}
-			
+
 		});
 		cancelButton.addActionListener(new ActionListener(){
 			@Override
@@ -171,10 +171,10 @@ public class NewTileSourceDialog extends JDialog {
 				setVisible(false);
 			}
 		});
-				
+
 	}
-	
-	
+
+
 	public boolean okPressed(){
 		if(Algorithms.isEmpty(templateName.getText())){
 			JOptionPane.showMessageDialog(this, Messages.getString("NewTileSourceDialog.SPECIFY.TEMPLATE.NAME") , Messages.getString("NewTileSourceDialog.ERROR.CREATING.NEW.TILE.SRC"), JOptionPane.ERROR_MESSAGE); //$NON-NLS-1$ //$NON-NLS-2$
@@ -195,7 +195,7 @@ public class NewTileSourceDialog extends JDialog {
 			if(dir.mkdirs()){
 				try {
 					url = url.replace("{$x}", "{1}").replace("{$y}", "{2}").replace("{$z}", "{0}");
-					tileSourceTemplate = new TileSourceManager.TileSourceTemplate(templateName.getText(), 
+					tileSourceTemplate = new TileSourceManager.TileSourceTemplate(templateName.getText(),
 							url, ".jpg", 18, 1, 256, 16, 20000);
 					TileSourceManager.createMetaInfoFile(dir, tileSourceTemplate, true);
 				} catch (IOException e) {
@@ -203,10 +203,10 @@ public class NewTileSourceDialog extends JDialog {
 				}
 			}
 		}
-		
+
 		return true;
 	}
-	
+
 
 	public TileSourceTemplate getTileSourceTemplate() {
 		return tileSourceTemplate;

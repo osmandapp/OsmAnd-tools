@@ -33,7 +33,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 
 	// do not store these tags in the database, just ignore them
 	final String[] tagsToIgnore= {"created_by","source","converted_by"};
-	
+
 	DBDialect dialect;
 	int currentCountNode = 0;
 	private PreparedStatement prepNode;
@@ -46,7 +46,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 	int currentWaysCount = 0;
 	private PreparedStatement prepWays;
 	int allWays = 0;
-	
+
 	private PreparedStatement delNode;
 	private PreparedStatement delRelations;
 	private PreparedStatement delWays;
@@ -68,11 +68,11 @@ public class OsmDbCreator implements IOsmStorageFilter {
 		this.shiftId = shiftId;
 		this.ovewriteIds = ovewriteIds;
 	}
-	
+
 	public OsmDbCreator() {
 		this(0, 0, false);
 	}
-	
+
 	private long convertId(long id, EntityType tp) {
 //		FIXME OSM_CHANGE;
 //		FIXME GEOMETRY_ID;
@@ -81,11 +81,11 @@ public class OsmDbCreator implements IOsmStorageFilter {
 		}
 		return (id << shiftId) + additionId;
 	}
-	
+
 	private long getId(Entity e) {
 		return convertId(e.getId(), EntityType.valueOf(e));
 	}
-		
+
 
 	public void initDatabase(DBDialect dialect, Object databaseConn, boolean create) throws SQLException {
 
@@ -140,9 +140,9 @@ public class OsmDbCreator implements IOsmStorageFilter {
 		}
 
 	}
-	
-	
-	
+
+
+
 	private void checkEntityExists(Entity e) throws SQLException {
 		if (nodeIds == null) {
 			nodeIds = new TLongHashSet();
@@ -279,6 +279,6 @@ public class OsmDbCreator implements IOsmStorageFilter {
 	public int getAllWays() {
 		return allWays;
 	}
-	
+
 
 }

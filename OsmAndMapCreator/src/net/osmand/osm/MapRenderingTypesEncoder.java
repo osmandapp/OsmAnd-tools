@@ -35,20 +35,20 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	private Map<String, List<EntityConvert>> convertTags = new HashMap<String, List<EntityConvert>>();
 	private MapRulType coastlineRuleType;
 	private String regionName;
-	
-	
+
+
 	public MapRenderingTypesEncoder(String fileName, String regionName) {
 		super(fileName != null && fileName.length() == 0 ? null : fileName);
 		this.regionName = "$" + regionName.toLowerCase();
 	}
-	
+
 	public MapRenderingTypesEncoder(String regionName) {
 		super(null);
 		this.regionName = "$" + regionName.toLowerCase();
 	}
-	
-	
-	
+
+
+
 	@Override
 	protected MapRulType registerRuleType(MapRulType rt){
 		rt = super.registerRuleType(rt);
@@ -67,7 +67,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		}
 		return null;
 	}
-	
+
 	public Map<MapRulType, Map<MapRulType, String>> getRelationPropogatedTags(Relation relation) {
 		Map<MapRulType, Map<MapRulType, String>> propogated = new LinkedHashMap<MapRulType, Map<MapRulType, String>>();
 		Map<String, String> ts = relation.getTags();
@@ -80,7 +80,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			if(rule != null) {
 				String value = ev.getValue();
 				LinkedHashMap<MapRulType, String> pr = new LinkedHashMap<MapRulType, String>();
-				
+
 				addRuleToPropogated(pr, ts, rule, value);
 				if(pr.size() > 0) {
 					propogated.put(rule, pr);
@@ -106,7 +106,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		}
 		propogated.put(rule, value);
 	}
-	
+
 
 	private MapRulType getRuleType(String tag, String val) {
 		return getRuleType(tag, val, false, false);
@@ -115,7 +115,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	private MapRulType getMapRuleType(String tag, String val) {
 		return getRuleType(tag, val, false, true);
 	}
-	
+
 	public MapRulType getCoastlineRuleType() {
 		getEncodingRuleTypes();
 		return coastlineRuleType;
@@ -125,11 +125,11 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		checkIfInitNeeded();
 		return routeTags;
 	}
-	
-	
+
+
 	@Override
 	protected void parseEntityConvertXML(XmlPullParser parser) {
-		
+
 		String seq = parser.getAttributeValue("", "seq");
 		if(Algorithms.isEmpty(seq)) {
 			seq = "1:1";
@@ -235,7 +235,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		rtype.relation = Boolean.parseBoolean(parser.getAttributeValue("", "relation"));
 		routeTags.add(rtype);
 	}
-		
+
 
 
 	private String lc(String a) {
@@ -281,13 +281,13 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		registerRuleType(rtype);
 	}
 
-	public boolean encodeEntityWithType(Entity e, int zoom, TIntArrayList outTypes, 
+	public boolean encodeEntityWithType(Entity e, int zoom, TIntArrayList outTypes,
 			TIntArrayList outAddTypes, TreeMap<MapRulType, String> namesToEncode, List<MapRulType> tempListNotUsed) {
-		return encodeEntityWithType(e instanceof Node, 
+		return encodeEntityWithType(e instanceof Node,
 				e.getModifiableTags(), zoom, outTypes, outAddTypes, namesToEncode, tempListNotUsed);
 	}
-	
-	public boolean encodeEntityWithType(boolean node, Map<String, String> tags, int zoom, TIntArrayList outTypes, 
+
+	public boolean encodeEntityWithType(boolean node, Map<String, String> tags, int zoom, TIntArrayList outTypes,
 			TIntArrayList outAddTypes, TreeMap<MapRulType, String> namesToEncode, List<MapRulType> tempListNotUsed) {
 		outTypes.clear();
 		outAddTypes.clear();
@@ -295,7 +295,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		tags = transformTags(tags, node ? EntityType.NODE : EntityType.WAY, EntityConvertApplyType.MAP);
 		boolean area = "yes".equals(tags.get("area"));
 		tags = processExtraTags(tags);
-		
+
 
 		for (String tag : tags.keySet()) {
 			String val = tags.get(tag);
@@ -333,22 +333,22 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	}
 
 
-	public Map<String, String> transformTags(Map<String, String> tags, EntityType entity, 
+	public Map<String, String> transformTags(Map<String, String> tags, EntityType entity,
 			EntityConvertApplyType appType) {
 		tags = transformShieldTags(tags, entity, appType);
 		EntityConvertType filter = EntityConvertType.TAG_TRANSFORM;
 		List<EntityConvert> listToConvert = getApplicableConverts(tags, entity, filter, appType);
 		if(listToConvert == null) {
 			return tags;
-		} 
+		}
 		Map<String, String> rtags = new LinkedHashMap<String, String>(tags);
 		for(EntityConvert ec : listToConvert){
 			applyTagTransforms(rtags, ec, entity, tags);
 		}
 		return rtags;
 	}
-	
-	
+
+
 	private Map<String, String> transformShieldTags(Map<String, String> tags, EntityType entity,
 			EntityConvertApplyType appType) {
 		if(entity == EntityType.WAY && !Algorithms.isEmpty(tags.get("ref")) && tags.containsKey("highway")) {
@@ -400,7 +400,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 					maxModifier++;
 				}
 			}
-			
+
 		}
 		if(entity == EntityType.WAY && tags.containsKey("highway") && tags.containsKey("name")) {
 			tags = new LinkedHashMap<String, String>(tags);
@@ -487,11 +487,11 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 // 		 else{
 // 			int ind = 0;
 // 			for(; ind < rf.length(); ind++) {
-// 				if(Character.isDigit(rf.charAt(ind)) || 
+// 				if(Character.isDigit(rf.charAt(ind)) ||
 // 						rf.charAt(ind) == ' ' || rf.charAt(ind) == '-') {
 // 					break;
 // 				}
-// 			}	
+// 			}
 // 			network = rf.substring(0, ind).trim();
 // 		}
 		return network;
@@ -500,7 +500,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 
 	public List<Map<String, String>> splitTags(Map<String, String> tags, EntityType entity) {
 		EntityConvertType filter = EntityConvertType.SPLIT;
-		List<EntityConvert> listToConvert = getApplicableConverts(tags, entity, filter, 
+		List<EntityConvert> listToConvert = getApplicableConverts(tags, entity, filter,
 				EntityConvertApplyType.MAP);
 		List<Map<String, String>> result = null;
 		if(listToConvert == null) {
@@ -539,10 +539,10 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 					if (checkConvertValue(ec.fromTag, e.getValue())) {
 						String verbose = null;
 						if(ec.verbose) {
-							verbose = "Apply entity convert from '"+ec.fromTag+"' to " + tags + " in " + 
+							verbose = "Apply entity convert from '"+ec.fromTag+"' to " + tags + " in " +
 									appFilter;
 						}
-						if (checkConvert(tags, ec, entity) && ec.type == filter && 
+						if (checkConvert(tags, ec, entity) && ec.type == filter &&
 								ec.applyToType.contains(appFilter)) {
 							if (listToConvert == null) {
 								listToConvert = new ArrayList<EntityConvert>();
@@ -563,7 +563,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 								if(!ec.applyToType.contains(appFilter)) {
 									verbose += " appFilter "+appFilter+";";
 								}
-								
+
 							}
 						}
 						if(verbose != null) {
@@ -623,8 +623,8 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		}
 		return vl;
 	}
-	
-	
+
+
 	protected boolean checkConvert(Map<String, String> tags, EntityConvert ec, EntityType entity) {
 		if(ec.applyTo != null) {
 			if(!ec.applyTo.contains(entity)) {
@@ -673,7 +673,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 				return false;
 			}
 		}
-		
+
 		for(TagValuePattern ift : ec.ifEndsTags) {
 			String val = tags.get(ift.tag);
 			if(!checkEndsWithValue(ift, val)) {
@@ -728,7 +728,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		}
 		return fromTag.value.toLowerCase().equals(value.toLowerCase());
 	}
-	
+
 	private boolean checkStartsWithValue(TagValuePattern fromTag, String value) {
 		if(value == null) {
 			return false;
@@ -738,8 +738,8 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		}
 		return value.toLowerCase().startsWith(fromTag.value.toLowerCase());
 	}
-	
-	
+
+
 	private boolean checkContainsValue(TagValuePattern fromTag, String value) {
 		if(value == null) {
 			return false;
@@ -749,7 +749,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		}
 		return value.toLowerCase().contains(fromTag.value.toLowerCase());
 	}
-	
+
 	private boolean checkEndsWithValue(TagValuePattern fromTag, String value) {
 		if(value == null) {
 			return false;
@@ -807,7 +807,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		}
 		return (rType.order << 15) | rType.id;
 	}
-	
+
 	public static double[] RGBtoHSV(double r, double g, double b){
 		double h, s, v;
 		double min, max, delta;
@@ -866,7 +866,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		s *= 100;
 		v *= 100;
 
-		if ((h < 16 && s > 25 && v > 30) || (h > 326 && s > 25 && v > 30) || (h < 16 && s > 10 && s < 25 && v > 90) || (h > 326 && s > 10 && s < 25 && v > 90) || 
+		if ((h < 16 && s > 25 && v > 30) || (h > 326 && s > 25 && v > 30) || (h < 16 && s > 10 && s < 25 && v > 90) || (h > 326 && s > 10 && s < 25 && v > 90) ||
 				vl.equals("pink") || vl.contains("red") || vl.equals("pink/white") || vl.equals("white-red") || vl.equals("ff0000") || vl.equals("800000") || vl.equals("red/tan") || vl.equals("tan/red") || vl.equals("rose")) {
 			vl = "red";
 		} else if ((h >= 16 && h < 50 && s > 25 && v > 20 && v < 60) || vl.equals("brown") || vl.equals("darkbrown") || vl.equals("tan/brown") || vl.equals("tan_brown") || vl.equals("brown/tan") || vl.equals("light_brown") || vl.equals("brown/white") || vl.equals("tan")) {
@@ -898,7 +898,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		}
 		return vl;
 	}
-	
+
 	final Set<String> barValues = new HashSet<String>(Arrays.asList(
 		new String[]{
 			"",
@@ -931,7 +931,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
             precolors.put("tower","black");
             precolors.put("bridleway","white");
 	}
-	
+
 	private boolean isColor(String s) {
 		return s.equals("black")
 				|| s.equals("blue")
@@ -943,8 +943,8 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 				|| s.equals("purple")
 				|| s.equals("brown");
 	}
-	
-	
+
+
 	private Map<String, String> processExtraTags(Map<String, String> tags) {
 		if(tags.containsKey("osmc:symbol")) {
 			tags = new LinkedHashMap<String, String>(tags);
@@ -1044,7 +1044,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			}
 		}
 	}
-	
+
 	public static class MapRouteTag {
 		boolean relation;
 		String tag;
@@ -1053,13 +1053,13 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		String value2;
 		boolean register;
 		boolean amend;
-		boolean base; 
+		boolean base;
 		boolean text;
 		boolean replace;
-		
+
 	}
-	
-	
+
+
 	public enum EntityConvertApplyType {
 		MAP,
 		ROUTING,

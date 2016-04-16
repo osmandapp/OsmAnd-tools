@@ -1,10 +1,10 @@
 //Element.java
-//  
+//
 //This library is free software; you can redistribute it and/or
 //modify it under the terms of the GNU Lesser General Public
 //License as published by the Free Software Foundation; either
 //version 2.1 of the License, or (at your option) any later version.
-//  
+//
 //This library is distributed in the hope that it will be useful,
 //but WITHOUT ANY WARRANTY; without even the implied warranty of
 //MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
@@ -13,12 +13,12 @@ package rtree;
 
 /**baap of all elemetns
   @author Prachuryya Barua
- * 
+ *
  **/
 public abstract class Element implements Cloneable, java.io.Serializable
 {
   Rect Rectangle;
-  
+
   Element(){};
   public Element( Rect Rectangle)
   {
@@ -50,7 +50,7 @@ public abstract class Element implements Cloneable, java.io.Serializable
   //abstract void setPtr(Object ptr) //old
   //throws IllegalValueException;
   public abstract void setPtr(long ptr);
-  public abstract int getElementType(); 
+  public abstract int getElementType();
   @Override
 public String toString()
   {

@@ -1,10 +1,10 @@
 //Node.java
-//  
+//
 //This library is free software; you can redistribute it and/or
 //modify it under the terms of the GNU Lesser General Public
 //License as published by the Free Software Foundation; either
 //version 2.1 of the License, or (at your option) any later version.
-//  
+//
 //This library is distributed in the hope that it will be useful,
 //but WITHOUT ANY WARRANTY; without even the implied warranty of
 //MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
@@ -21,11 +21,11 @@ import java.util.Arrays;
 
 /**
    This class will contain one node at a time in memory.
-   This class along with FileHdr are the only two classes that handle the 
+   This class along with FileHdr are the only two classes that handle the
    rtree file. No other class handles the rtree file. Therefore be very careful
    when modifying this class, you may corrupt the file in the process.
    </p><b>CHANGELOG</b> See the projects/ChangeLog file
-   
+
    @author Prachuryya Barua
    @version Node.NOT_DEFINED
 */
@@ -43,7 +43,7 @@ public class Node implements Cloneable //can be made abstract if leaf and non le
      <br>Maximum cache size should be 70%, beyound that there may not be major improvements but the
      overheads will increase.
      <br>Eg: 1 lakh packed records - Total nodes in tree - 597: Height 3, 1 root,4 nonleaf, 129 leaf
-     and should have a cache size of 250(sufficient for normal casses) to 400(good for queries). 
+     and should have a cache size of 250(sufficient for normal casses) to 400(good for queries).
      <br>Multiply the cache size by 4kbytes and you get the cache size in MBytes.
      <br><b>These observations are for a packed tree only. An unpacked tree
      needs a 100% buffer size - thererore don't use unpacked tree.</b>
@@ -81,7 +81,7 @@ public class Node implements Cloneable //can be made abstract if leaf and non le
   final static int WRITE = 1;
   /**No threads reading or writing*/
   final static int NONE = 2;
-    
+
   /**-------------local variables-----------------------*/
   protected RandomAccessFile file;
   protected String fileName;
@@ -114,12 +114,12 @@ public class Node implements Cloneable //can be made abstract if leaf and non le
    *maxY
    *pointer
    */
-  
+
   /**This is only for subclasses*/
   protected Node(){}
 
   /**for a new node
-     Remember if the file is new this constructor will overwrite the 
+     Remember if the file is new this constructor will overwrite the
      <code>parent</code> parameter with 'NOT_DEFINED' as it will be the root node.
      If the <code>prnt</code> parameter is given as NOT_DEFINED then it is understood
      that a new root is required.The file will then have a new root.
@@ -139,7 +139,7 @@ public class Node implements Cloneable //can be made abstract if leaf and non le
        But again then again to incorporate such change we must make MAX dynamic with the type of the element
        we have.
     */
-    if(elmtType == NONLEAF_NODE) 
+    if(elmtType == NONLEAF_NODE)
       size = NonLeafElement.sizeInBytes();
     else
       size = LeafElement.sizeInBytes();
@@ -180,7 +180,7 @@ public class Node implements Cloneable //can be made abstract if leaf and non le
     }
   }
   /**
-     Reading existing nodes. But if this a new file then it will create the 
+     Reading existing nodes. But if this a new file then it will create the
      file and make a new root node.
   */
   protected Node(RandomAccessFile file,String fileName,long ndIndex,FileHdr flHdr)
@@ -220,7 +220,7 @@ public class Node implements Cloneable //can be made abstract if leaf and non le
       refreshNode();
     }
   }
-    
+
   /**
      A stupid internal constructor for the clone method.
   */
@@ -306,7 +306,7 @@ public Object clone()
      It rewrites the node.
      This method now also being used to write the whole node to the file.
      @param index The element to delete. Give -1 if the whole node is to be flushed.
-     @param force Whether to force IO. As this method is also used to write the whole node, this was 
+     @param force Whether to force IO. As this method is also used to write the whole node, this was
      required.
      @return thengaa!
      XXX : This is till not correct.
@@ -388,13 +388,13 @@ public Object clone()
     }
   }
   /**to add an element at the end
-     As elements are allocated to this node, each allocated 
+     As elements are allocated to this node, each allocated
      element's children node's parent are reset. This is simply because the
      new node index(for <code>elmt</code>) would be different from the old
-     ones(if any). 
+     ones(if any).
      <br>Note:-This again is for non leaf node only.
   */
-  public void insertElement(Element elmt) 
+  public void insertElement(Element elmt)
     throws NodeWriteException, NodeFullException
   {
     //check for space
@@ -438,7 +438,7 @@ public Object clone()
      Also updates the local variables.
      Also takes care whether it is the first element in the node or not.
      If it is the first element then it sets the node header accordingly.
-      
+
      Least error checking - use it with care.
      If the node is old and the new element type is of different type then it
      will change the node header to the new type - so be very very careful!
@@ -476,7 +476,7 @@ public Object clone()
         ds.writeInt(elmt.getRect().getMaxX());
         ds.writeInt(elmt.getRect().getMaxY());
         ds.writeLong(elmt.getPtr());//see [2] - replace elements with elmt
-        
+
         bs.flush();
         ds.flush();
         //write to the file
@@ -500,8 +500,8 @@ public Object clone()
       elementType = oldElementType;
       totalElements = oldTotalElements;
       //isNodeEmpty = oldIsNodeEmpty;
-      throw new 
-        NodeWriteException("Node.writeLastElement: Can't write element to file"); 
+      throw new
+        NodeWriteException("Node.writeLastElement: Can't write element to file");
     }
   }
 
@@ -554,7 +554,7 @@ public Object clone()
         }
       }catch(Exception e){
         e.printStackTrace();
-        
+
         throw new NodeWriteException("Node.insertElement: " + e.getMessage());
       }
     }
@@ -650,7 +650,7 @@ public Object clone()
       try{
         writeNodeHeader(nodeIndex, totalElements+elmts.length, parent, elementSize, elementType);
       }catch(Exception ex){throw new NodeWriteException(ex.getMessage());}
-      throw new NodeWriteException("Node.writeLastElement: Can't write element to file"); 
+      throw new NodeWriteException("Node.writeLastElement: Can't write element to file");
     }
   }
 
@@ -670,19 +670,19 @@ public Object clone()
   /**Seek the last element of the node. No checking*/
   private void seekLastElement() throws IOException
   {
-    file.seek(FILE_HDR_SIZE + (nodeIndex * NODE_SIZE) 
+    file.seek(FILE_HDR_SIZE + (nodeIndex * NODE_SIZE)
               + (NODE_HDR_SIZE) +(elementSize * totalElements));
   }
   /**seek the specified element.No checking*/
   private void seekElement(int elmtIndex) throws IOException
   {
-    file.seek(FILE_HDR_SIZE + (nodeIndex * NODE_SIZE) 
+    file.seek(FILE_HDR_SIZE + (nodeIndex * NODE_SIZE)
               + (NODE_HDR_SIZE) + (elementSize * elmtIndex));
   }
   /**seek the specified element's pointer.No checking*/
   private void seekElementPtr(int elmtIndex) throws IOException
   {
-    file.seek(FILE_HDR_SIZE + (nodeIndex * NODE_SIZE) 
+    file.seek(FILE_HDR_SIZE + (nodeIndex * NODE_SIZE)
               + (NODE_HDR_SIZE) + (elementSize * elmtIndex)
               + Rect.sizeInBytes());
   }
@@ -703,9 +703,9 @@ public Object clone()
       DataOutputStream ds =  new DataOutputStream(bs);
       ds.writeInt(totElmt);//total elements
       ds.writeLong(prnt);//parent
-      ds.writeInt(elmtSz);//element size 
-      ds.writeInt(elmtTp);//element type 
-      
+      ds.writeInt(elmtSz);//element size
+      ds.writeInt(elmtTp);//element type
+
       bs.flush();
       ds.flush();
       //write to the file
@@ -724,7 +724,7 @@ public Object clone()
      This method will write the node header into the <code>ds</code>. Will also update the local variables.
      It is assumed that the write pointer is correctly set in the o/p stream.
   */
-  private void writeNodeHeader(long nodeIdx, int totElmt,long prnt,int elmtSz,int elmtTp, 
+  private void writeNodeHeader(long nodeIdx, int totElmt,long prnt,int elmtSz,int elmtTp,
                                DataOutputStream ds)
     throws IOException, NodeWriteException
   {
@@ -733,8 +733,8 @@ public Object clone()
     if(fileHdr.isWriteThr()){
       ds.writeInt(totElmt);//total elements
       ds.writeLong(prnt);//parent
-      ds.writeInt(elmtSz);//element size 
-      ds.writeInt(elmtTp);//element type 
+      ds.writeInt(elmtSz);//element size
+      ds.writeInt(elmtTp);//element type
       ds.flush();
       setDirty(true);
     }else
@@ -796,7 +796,7 @@ public Object clone()
     catch(Exception e){
       throw new IOException("Node.refreshNode : Can't read from node header " + e.getMessage());
     }
-        
+
   }
   Rect[] getAllRectangles()
     throws  IllegalValueException
@@ -810,7 +810,7 @@ public Object clone()
     return rects;
   }
   /**
-     Returns the element(of the current node) whose rectangle needs the least 
+     Returns the element(of the current node) whose rectangle needs the least
      enlargment to include <code>elmt</code>.
      The logic assumes that the elements are not sorted.
      See the documentation for least enlargement logic.
@@ -826,18 +826,18 @@ public Object clone()
     }
     if(fileHdr.isWriteThr())
       RTree.chdNodes.remove(fileName,nodeIndex);
-    Element retElmt;//initialize with first element         
+    Element retElmt;//initialize with first element
     int area;
-        
+
     //get area of first MBR and call it the least area
     int leastArea=(elements[0].getRect().getResultingMBR(elmt.getRect())).getArea();
-    leastArea -= elements[0].getRect().getArea(); 
+    leastArea -= elements[0].getRect().getArea();
     if(elementType == Node.LEAF_NODE)
       //Integer intVal = (Integer)elements[0].getPtr();//the org. code
       retElmt = new LeafElement(elements[0].getRect(), elements[0].getPtr() );
     else
       retElmt = new NonLeafElement(elements[0].getRect(), elements[0].getPtr());
-        
+
     //now check each of the elements
     for(int i=1; i < totalElements; ++i){
       //get area of the MBR of the two rects.
@@ -890,11 +890,11 @@ public Object clone()
       throw new RTreeException("Node.splitNode: Node is not full or new element is of wrong type");
     if(fileHdr.isWriteThr())
       RTree.chdNodes.remove(fileName,nodeIndex);
-    try{        
+    try{
       int rem = totalElements+1;//no. of elements remaining + the new element
       Element[] elmtPlusOne = new Element[rem];
         System.arraycopy(elements, 0, elmtPlusOne, 0, rem - 1);
-      elmtPlusOne[totalElements] = elmtM1; 
+      elmtPlusOne[totalElements] = elmtM1;
       //the elements which have been allocated: 1 - present, 0 - absent
       int[] elmtsGone = new int[rem];
       for(int i=0; i<elmtsGone.length; ++i)
@@ -974,7 +974,7 @@ public Object clone()
             System.out.println("Node.splitNode: trouble in paradise");
             //System.exit(1);
           }
-          /*Above statement can be troublesome, in that case use the 
+          /*Above statement can be troublesome, in that case use the
             below logic
             for(int i=0; i < elmtsGone.length; i++)
             if(elmtsGone[i] == 0)
@@ -1019,7 +1019,7 @@ public Object clone()
             rem--;
             mbrB = newMBRB;
           }
-          //also equal in area elmts. in A are less 
+          //also equal in area elmts. in A are less
           else if(elmtsInA < elmtsInB){
             nodeA.insertElement(elmtPlusOne[i]);//read local variable
             elmtsGone[i] = 0;//element now is absent
@@ -1122,52 +1122,52 @@ public Object clone()
     //"Normalize the separations" - Guttman
     //divide the separations along each dimensions by the width of the MBR
     int[] retIdx = new int[2];
-    int Xpair = (Math.abs(lhsX - hlsX))/mbr.getWidth(); 
+    int Xpair = (Math.abs(lhsX - hlsX))/mbr.getWidth();
     int Ypair = (Math.abs(lhsY - hlsY))/mbr.getHeight();
     if(Xpair > Ypair){
       //if both are the same rect then choose randomly
       if(hlsIdxX == lhsIdxX){
-        if(hlsIdxX != 0) 
+        if(hlsIdxX != 0)
           hlsIdxX = 0;
         else
           hlsIdxX = 1;
       }
       retIdx[0] = hlsIdxX;
-      retIdx[1] = lhsIdxX;   
+      retIdx[1] = lhsIdxX;
     }
     else if(Xpair < Ypair){
-      /*if both are the same rect then choose randomly - an accidental 
+      /*if both are the same rect then choose randomly - an accidental
         discovery*/
       if(hlsIdxY == lhsIdxY){
-        if(hlsIdxY != 0) 
+        if(hlsIdxY != 0)
           hlsIdxY = 0;
         else
           hlsIdxY = 1;
       }
       retIdx[0] = hlsIdxY;
-      retIdx[1] = lhsIdxY;          
+      retIdx[1] = lhsIdxY;
     }
     else{//if normalized values are equal
       //choose the pair with the least separation(not normalized sap.)
       if((Math.abs(lhsX - hlsX)) >= (Math.abs(lhsY - hlsY))){
         if(hlsIdxX == lhsIdxX){
-          if(hlsIdxX != 0) 
+          if(hlsIdxX != 0)
             hlsIdxX = 0;
           else
             hlsIdxX = 1;
         }
         retIdx[0] = hlsIdxX;
-        retIdx[1] = lhsIdxX;        
+        retIdx[1] = lhsIdxX;
       }
       else{
         if(hlsIdxY == lhsIdxY){
-          if(hlsIdxY != 0) 
+          if(hlsIdxY != 0)
             hlsIdxY = 0;
           else
             hlsIdxY = 1;
         }
         retIdx[0] = hlsIdxY;
-        retIdx[1] = lhsIdxY;        
+        retIdx[1] = lhsIdxY;
       }
     }
     return(retIdx);
@@ -1229,7 +1229,7 @@ public Object clone()
   {
     if((index > totalElements) || (index < 0) || (elmt == null))
       throw new  IllegalValueException("Node.modifyElmtMBR : index out of bound or MBR is null");
-        
+
     if(elmt.getElementType() != elementType)
       throw new  IllegalValueException("Node.modifyElmtMBR : Element of wrong type");
     if(fileHdr.isWriteThr())
@@ -1242,14 +1242,14 @@ public Object clone()
       ds.writeInt(elmt.getRect().getMaxX());
       ds.writeInt(elmt.getRect().getMaxY());
       ds.writeLong(elmt.getPtr());//see [2]
-      
+
       bs.flush();
       ds.flush();
       //write to the file
       seekElement(index);
       file.write(bs.toByteArray());
       setDirty(false);
-    }else     
+    }else
       setDirty(true);
     //adjsut in the local variable
     elements[index].setRect(elmt.getRect());
@@ -1478,5 +1478,5 @@ public String toString()
   {
     return dirty;
   }
-  
+
 }

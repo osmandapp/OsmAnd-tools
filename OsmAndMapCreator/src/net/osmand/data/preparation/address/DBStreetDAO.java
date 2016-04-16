@@ -22,7 +22,7 @@ import net.osmand.util.Algorithms;
 
 public class DBStreetDAO extends AbstractIndexPartCreator
 {
-	
+
 	public static class SimpleStreet {
 		private final long id;
 		private final long cityId;
@@ -69,7 +69,7 @@ public class DBStreetDAO extends AbstractIndexPartCreator
 			return location;
 		}
 	}
-	
+
 	protected PreparedStatement addressStreetStat;
 	private PreparedStatement addressStreetNodeStat;
 	private PreparedStatement addressBuildingStat;
@@ -91,7 +91,7 @@ public class DBStreetDAO extends AbstractIndexPartCreator
 	    stat.executeUpdate("create index street_cnp on street (city,citypart,name,id)");
         stat.executeUpdate("create index street_city on street (city)");
         stat.executeUpdate("create index street_id on street (id)");
-        
+
         // create index on name ?
         stat.executeUpdate("create table building (id bigint, latitude double, longitude double, " +
                          "name2 varchar(1024), name_en2 varchar(1024), lat2 double, lon2 double, interval int, interpolateType varchar(50), " +
@@ -99,13 +99,13 @@ public class DBStreetDAO extends AbstractIndexPartCreator
         stat.executeUpdate("create index building_postcode on building (postcode)");
         stat.executeUpdate("create index building_street on building (street)");
         stat.executeUpdate("create index building_id on building (id)");
-        
+
         stat.executeUpdate("create table street_node (id bigint, latitude double, longitude double, " +
 						"street bigint, way bigint)");
         stat.executeUpdate("create index street_node_street on street_node (street)");
         stat.executeUpdate("create index street_node_way on street_node (way)");
         stat.close();
-        
+
 		addressStreetStat = createPrepareStatement(mapConnection,"insert into street (id, latitude, longitude, name, name_en, city, citypart, langs) values (?, ?, ?, ?, ?, ?, ?, ?)");
 		addressStreetNodeStat = createPrepareStatement(mapConnection,"insert into street_node (id, latitude, longitude, street, way) values (?, ?, ?, ?, ?)");
 		addressBuildingStat = createPrepareStatement(mapConnection,"insert into building (id, latitude, longitude, name, name_en, street, postcode, name2, name_en2, lat2, lon2, interval, interpolateType) values (?, ?, ?, ?, ?, ?, ?, ?, ? ,? ,? ,? ,?)");
@@ -117,7 +117,7 @@ public class DBStreetDAO extends AbstractIndexPartCreator
 		addressRemoveBuildingStat = createPrepareStatement(mapConnection,"DELETE FROM building where ? = id");
 		addressSearchStreetNodeStat = createPrepareStatement(mapConnection,"SELECT way FROM street_node WHERE ? = way");
 	}
-	
+
 	protected void writeStreetWayNodes(Set<Long> streetIds, Way way) throws SQLException {
 		for (Long streetId : streetIds) {
 			for (Node n : way.getNodes()) {
@@ -133,7 +133,7 @@ public class DBStreetDAO extends AbstractIndexPartCreator
 			}
 		}
 	}
-	
+
 	protected void writeBuilding(Set<Long> streetIds, Building building) throws SQLException {
 		for (Long streetId : streetIds) {
 			addressBuildingStat.setLong(1, building.getId());
@@ -198,10 +198,10 @@ public class DBStreetDAO extends AbstractIndexPartCreator
 		}
 		return langs;
 	}
-	
+
 	public long insertStreet(String name, Map<String, String> names, LatLon location,
 			City city, String cityPart) throws SQLException {
-		long streetId = fillInsertStreetStatement(name, names, location, city, cityPart, 
+		long streetId = fillInsertStreetStatement(name, names, location, city, cityPart,
 				constructLangs(names));
 		// execute the insert statement
 		addressStreetStat.execute();
@@ -210,7 +210,7 @@ public class DBStreetDAO extends AbstractIndexPartCreator
 
 		return streetId;
 	}
-	
+
 
 	protected long fillInsertStreetStatement(String name, Map<String, String> names,
 			LatLon location, City city, String cityPart, String langs)
@@ -235,7 +235,7 @@ public class DBStreetDAO extends AbstractIndexPartCreator
 		rs.close();
 		return exist;
 	}
-	
+
 	public boolean removeBuilding(Entity e) throws SQLException {
 		executePendingPreparedStatements(); //ala flush
 		addressRemoveBuildingStat.setLong(1, e.getId());
@@ -262,7 +262,7 @@ public class DBStreetDAO extends AbstractIndexPartCreator
 	public void close() throws SQLException {
 		closePreparedStatements(addressStreetStat, addressStreetNodeStat, addressBuildingStat);
 	}
-	
+
 	public DBStreetDAO.SimpleStreet updateStreetCityPart(DBStreetDAO.SimpleStreet street, String cityPart) throws SQLException {
 		addressStreetUpdateCityPart.setString(1, cityPart);
 		addressStreetUpdateCityPart.setLong(2, street.getId());

@@ -1,10 +1,10 @@
 //SweepLine.java
-//  
+//
 //This library is free software; you can redistribute it and/or
 //modify it under the terms of the GNU Lesser General Public
 //License as published by the Free Software Foundation; either
 //version 2.1 of the License, or (at your option) any later version.
-//  
+//
 //This library is distributed in the hope that it will be useful,
 //but WITHOUT ANY WARRANTY; without even the implied warranty of
 //MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
@@ -81,7 +81,7 @@ public class SweepLine
     sort(rtElmts);
     return sortedIntersectionTest(ltElmts, rtElmts);
   }
-  
+
   /**
      Does the sweep sort on the two sets. Assumes that both the set of elements are of the same type.
      @param ltElmts The sorted elements(by minX) of the left node.
@@ -93,7 +93,7 @@ public class SweepLine
     int i = 0;//loop cntr for left
     int j = 0;//loop cntr for right
     List pairs = new ArrayList();
-    while((i < ltElmts.length) && (ltElmts[i] != null) && 
+    while((i < ltElmts.length) && (ltElmts[i] != null) &&
           (j < rtElmts.length) && (rtElmts[j] != null)){
       if(ltElmts[i].getRect().getMinX() < rtElmts[j].getRect().getMinX()){//event at left
 
@@ -116,15 +116,15 @@ public class SweepLine
     }
     return pairs;
   }
-  
+
   /**
      @param evtSide tells whether <code>event</code> is from left tree or right tree.
-  
+
      private void internalLoop(Element event, int from, Element[] others, List pairs, int evtSide)
      {
      //System.out.println("SweepLine.internalLoop : before pairs size : " + pairs.size());
-     for(int i=from; 
-     (i<others.length) && (others[i] != null) && 
+     for(int i=from;
+     (i<others.length) && (others[i] != null) &&
      (others[i].getRect().getMinX() <= event.getRect().getMaxX());
      i++){//while others are still intersecting with the event
      if(event.getRect().getMinY() < others[i].getRect().getMaxY() &&
@@ -160,7 +160,7 @@ public int compare(Object o1, Object o2)
     }
     else
       throw new ClassCastException("Rect.compareTo : wrong object(s) passed");
-      
+
   }
   @Override
 public boolean equals(Object o)

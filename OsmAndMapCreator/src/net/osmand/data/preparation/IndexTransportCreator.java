@@ -47,7 +47,7 @@ import rtree.RTreeInsertException;
 import rtree.Rect;
 
 public class IndexTransportCreator extends AbstractIndexPartCreator {
-	
+
 	private static final Log log = LogFactory.getLog(IndexTransportCreator.class);
 
 	private Set<Long> visitedStops = new HashSet<Long>();
@@ -60,7 +60,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	// now we need only specific names of stops and platforms
 	private Map<EntityId, Relation> stopAreas = new HashMap<EntityId, Relation>();
 
-	
+
 	private static Set<String> acceptedRoutes = new HashSet<String>();
 	static {
 		acceptedRoutes.add("bus"); //$NON-NLS-1$
@@ -77,14 +77,14 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 
 	public IndexTransportCreator(){
 	}
-	
-	
+
+
 	public void createRTreeFile(String rtreeTransportStopFile) throws RTreeException{
 		transportStopsTree = new RTree(rtreeTransportStopFile);
 	}
-	
-	public void writeBinaryTransportTree(rtree.Node parent, RTree r, BinaryMapIndexWriter writer, 
-			PreparedStatement selectTransportStop, PreparedStatement selectTransportRouteStop, 
+
+	public void writeBinaryTransportTree(rtree.Node parent, RTree r, BinaryMapIndexWriter writer,
+			PreparedStatement selectTransportStop, PreparedStatement selectTransportRouteStop,
 			Map<Long, Long> transportRoutes, Map<String, Integer> stringTable) throws IOException, RTreeException, SQLException {
 		Element[] e = parent.getAllElements();
 		List<Long> routes = null;
@@ -132,12 +132,12 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			}
 		}
 	}
-	
+
 
 	public void packRTree(String rtreeTransportStopsFileName, String rtreeTransportStopsPackFileName) throws IOException {
 		transportStopsTree = packRtreeFile(transportStopsTree, rtreeTransportStopsFileName, rtreeTransportStopsPackFileName);
 	}
-	
+
 	public void indexRelations(Relation e, OsmDbAccessorContext ctx) throws SQLException {
 		if (e.getTag(OSMTagKey.ROUTE_MASTER) != null) {
 			ctx.loadEntityRelation(e);
@@ -162,7 +162,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			}
 		}
 	}
-	
+
 	public void visitEntityMainStep(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 		if (e instanceof Relation && e.getTag(OSMTagKey.ROUTE) != null) {
 			ctx.loadEntityRelation((Relation) e);
@@ -172,27 +172,27 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			}
 		}
 	}
-	
+
 	public void createDatabaseStructure(Connection conn, DBDialect dialect, String rtreeStopsFileName) throws SQLException, IOException{
 		Statement stat = conn.createStatement();
-		
+
         stat.executeUpdate("create table transport_route (id bigint primary key, type varchar(1024), operator varchar(1024)," +
         		"ref varchar(1024), name varchar(1024), name_en varchar(1024), dist int)");
         stat.executeUpdate("create index transport_route_id on transport_route (id)");
-        
+
         stat.executeUpdate("create table transport_route_stop (stop bigint, route bigint, ord int, direction smallint, primary key (route, ord, direction))");
         stat.executeUpdate("create index transport_route_stop_stop on transport_route_stop (stop)");
         stat.executeUpdate("create index transport_route_stop_route on transport_route_stop (route)");
-        
+
         stat.executeUpdate("create table transport_stop (id bigint primary key, latitude double, longitude double, name varchar(1024), name_en varchar(1024))");
         stat.executeUpdate("create index transport_stop_id on transport_stop (id)");
         stat.executeUpdate("create index transport_stop_location on transport_stop (latitude, longitude)");
-        
+
 //        if(dialect == DBDialect.SQLITE){
 //        	stat.execute("PRAGMA user_version = " + IndexConstants.TRANSPORT_TABLE_VERSION); //$NON-NLS-1$
 //        }
         stat.close();
-        
+
         try {
 			File file = new File(rtreeStopsFileName);
 			if (file.exists()) {
@@ -209,8 +209,8 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		pStatements.put(transRouteStopsStat, 0);
 		pStatements.put(transStopsStat, 0);
 	}
-	
-	
+
+
 	private void insertTransportIntoIndex(TransportRoute route) throws SQLException {
 		transRouteStat.setLong(1, route.getId());
 		transRouteStat.setString(2, route.getType());
@@ -220,19 +220,19 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		transRouteStat.setString(6, route.getEnName(false));
 		transRouteStat.setInt(7, route.getAvgBothDistance());
 		addBatch(transRouteStat);
-		
+
 		writeRouteStops(route, route.getForwardStops(), true);
 		writeRouteStops(route, route.getBackwardStops(), false);
-		
+
 	}
-	
+
 	private PreparedStatement createStatementTransportStopInsert(Connection conn) throws SQLException{
         return conn.prepareStatement("insert into transport_stop(id, latitude, longitude, name, name_en) values(?, ?, ?, ?, ?)");
 	}
 	private PreparedStatement createStatementTransportRouteStopInsert(Connection conn) throws SQLException{
         return conn.prepareStatement("insert into transport_route_stop(route, stop, direction, ord) values(?, ?, ?, ?)");
 	}
-	
+
 	private void writeRouteStops(TransportRoute r, List<TransportStop> stops, boolean direction) throws SQLException {
 		int i = 0;
 		for(TransportStop s : stops){
@@ -261,19 +261,19 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			addBatch(transRouteStopsStat);
 		}
 	}
-	
+
 	private PreparedStatement createStatementTransportRouteInsert(Connection conn) throws SQLException{
         return conn.prepareStatement("insert into transport_route(id, type, operator, ref, name, name_en, dist) values(?, ?, ?, ?, ?, ?, ?)");
 	}
-	
-	
+
+
 	public void writeBinaryTransportIndex(BinaryMapIndexWriter writer, String regionName,
 			Connection mapConnection) throws IOException, SQLException {
 		try {
 			closePreparedStatements(transRouteStat, transRouteStopsStat, transStopsStat);
 			mapConnection.commit();
 			transportStopsTree.flush();
-			
+
 			visitedStops = null; // allow gc to collect it
 			PreparedStatement selectTransportRouteData = mapConnection.prepareStatement(
 					"SELECT id, dist, name, name_en, ref, operator, type FROM transport_route"); //$NON-NLS-1$
@@ -347,7 +347,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			Rect rootBounds = calcBounds(root);
 			if (rootBounds != null) {
 				writer.startTransportTreeElement(rootBounds.getMinX(), rootBounds.getMaxX(), rootBounds.getMinY(), rootBounds.getMaxY());
-				writeBinaryTransportTree(root, transportStopsTree, writer, selectTransportStop, selectTransportRouteStop, 
+				writeBinaryTransportTree(root, transportStopsTree, writer, selectTransportStop, selectTransportRouteStop,
 						transportRoutes, stringTable);
 				writer.endWriteTransportTreeElement();
 			}
@@ -361,7 +361,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		} catch (RTreeException e) {
 			throw new IllegalStateException(e);
 		}
-	}	
+	}
 	private Rect calcBounds(rtree.Node n) {
 		Rect r = null;
 		Element[] e = n.getAllElements();
@@ -378,7 +378,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		}
 		return r;
 	}
-	
+
 	private int registerString(Map<String, Integer> stringTable, String s) {
 		if (stringTable.containsKey(s)) {
 			return stringTable.get(s);
@@ -401,7 +401,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		return stringTable;
 	}
 
-	
+
 	public void commitAndCloseFiles(String rtreeStopsFileName, String rtreeStopsPackFileName, boolean deleteDatabaseIndexes) throws IOException, SQLException {
 		// delete transport rtree files
 		if (transportStopsTree != null) {
@@ -417,15 +417,15 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		}
 		closeAllPreparedStatements();
 	}
-	
 
-	
-	
+
+
+
 	private TransportRoute indexTransportRoute(Relation rel) {
 		String ref = rel.getTag(OSMTagKey.REF);
 		String route = rel.getTag(OSMTagKey.ROUTE);
 		String operator = rel.getTag(OSMTagKey.OPERATOR);
-		
+
 		Relation master = masterRoutes.get(rel.getId());
 		if (master != null) {
 			if (ref == null)
@@ -435,7 +435,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			if (operator == null)
 				operator = master.getTag(OSMTagKey.OPERATOR);
 		}
-		
+
 		if (route == null || ref == null) {
 			return null;
 		}
@@ -692,5 +692,5 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		});
 		return true;
 	}
-	
+
 }

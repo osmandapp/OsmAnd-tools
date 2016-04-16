@@ -26,16 +26,16 @@ import org.apache.commons.logging.Log;
 
 
 public class SelectPointDialog extends JDialog {
-	
+
 	private static final long serialVersionUID = -4862884032977071296L;
 	private static final Log log = PlatformUtil.getLog(SelectPointDialog.class);
-	
+
 	private JButton okButton;
 	private JButton cancelButton;
 
 	private JTextField latPosition;
 	private JTextField lonPosition;
-	
+
 	private LatLon result;
 
 
@@ -43,13 +43,13 @@ public class SelectPointDialog extends JDialog {
     	super(JOptionPane.getFrameForComponent(parent), true);
     	setTitle("Select point"); //$NON-NLS-1$
         initDialog(position);
-        
+
     }
-	
+
 	public LatLon getResult() {
 		return result;
 	}
-	
+
 	public void showDialog(){
 		setSize(800, 200);
         double x = getParent().getBounds().getCenterX();
@@ -57,38 +57,38 @@ public class SelectPointDialog extends JDialog {
         setLocation((int) x - getWidth() / 2, (int) y - getHeight() / 2);
         setVisible(true);
 	}
-	
+
 	private void initDialog(LatLon position) {
 		JPanel pane = new JPanel();
 		pane.setLayout(new BoxLayout(pane, BoxLayout.Y_AXIS));
         pane.setBorder(BorderFactory.createEmptyBorder(10, 10, 5, 10));
         add(pane);
-        
-        
+
+
         createInputSourceSection(pane, position);
-        pane.add(Box.createVerticalGlue());	
-        
+        pane.add(Box.createVerticalGlue());
+
         FlowLayout l = new FlowLayout(FlowLayout.RIGHT);
         JPanel buttonsPane = new JPanel(l);
         okButton = new JButton("OK"); //$NON-NLS-1$
         buttonsPane.add(okButton);
         cancelButton = new JButton(Messages.getString("NewTileSourceDialog.CANCEL")); //$NON-NLS-1$
         buttonsPane.add(cancelButton);
-        
+
         buttonsPane.setMaximumSize(new Dimension(Short.MAX_VALUE, (int) l.preferredLayoutSize(buttonsPane).getHeight()));
         pane.add(buttonsPane);
-        
+
         addListeners();
 	}
-	
-	
+
+
 	private void createInputSourceSection(JPanel root, LatLon position) {
 		JPanel panel = new JPanel();
 		GridBagLayout l = new GridBagLayout();
 		panel.setLayout(l);
 		panel.setBorder(BorderFactory.createTitledBorder(Messages.getString("NewTileSourceDialog.INPUT.SOURCE"))); //$NON-NLS-1$
 		root.add(panel);
-		
+
 
 		JLabel label = new JLabel("Latitude :"); //$NON-NLS-1$
 		panel.add(label);
@@ -120,7 +120,7 @@ public class SelectPointDialog extends JDialog {
 		l.setConstraints(label, constr);
 
 		lonPosition = new JTextField();
-		// Give hint about wms 
+		// Give hint about wms
 		lonPosition.setText(String.valueOf((float) position.getLongitude())); //$NON-NLS-1$
 		panel.add(lonPosition);
 		constr = new GridBagConstraints();
@@ -130,8 +130,8 @@ public class SelectPointDialog extends JDialog {
 		constr.gridx = 1;
 		constr.gridy = 1;
 		l.setConstraints(lonPosition, constr);
-		
-		
+
+
 		panel.setMaximumSize(new Dimension(Short.MAX_VALUE, panel.getPreferredSize().height));
 	}
 
@@ -143,7 +143,7 @@ public class SelectPointDialog extends JDialog {
 					setVisible(false);
 				}
 			}
-			
+
 		});
 		cancelButton.addActionListener(new ActionListener(){
 			@Override
@@ -151,9 +151,9 @@ public class SelectPointDialog extends JDialog {
 				setVisible(false);
 			}
 		});
-				
+
 	}
-	
+
 	private double parseDouble(String s) {
 		if (Algorithms.isEmpty(s)) {
 			return Double.NaN;
@@ -164,8 +164,8 @@ public class SelectPointDialog extends JDialog {
 			return Double.NaN;
 		}
 	}
-	
-	
+
+
 	public boolean okPressed() {
 		if (Double.isNaN(parseDouble(latPosition.getText()))) {
 			JOptionPane.showMessageDialog(this, "Lat coordinate is not a number", "Wrong position", JOptionPane.ERROR_MESSAGE); //$NON-NLS-1$ //$NON-NLS-2$

@@ -82,7 +82,7 @@ import com.jcraft.jsch.Session;
 /**
  * This helper will find obf and zip files, create description for them, and zip them, or update the description. This
  * helper also can upload files through ssh,ftp or to googlecode.
- * 
+ *
  * IndexUploader dir targetDir [--ff=file] [--fp=ptns] [--ep=ptns] [--dp=ptns] [-ssh|-ftp|-google]
  * [--password=|--user=|--url=|--path=|--gpassword=|--privKey=|--knownHosts=] --ff file with names of files to be
  * uploaded from the dir, supporting regexp --fp comma separated names of files to be uploaded from the dir, supporting
@@ -92,7 +92,7 @@ import com.jcraft.jsch.Session;
  * password to use for ftp,ssh,google (gmail password to retrieve tokens for deleting files) --url url to use for
  * ssh,ftp --path path in url to use for ssh,ftp --gpassword googlecode password to use for google --privKey priv key
  * for ssh --knownHosts known hosts for ssh
- * 
+ *
  * @author Pavol Zibrita <pavol.zibrita@gmail.com>
  */
 public class IndexUploader {
@@ -601,7 +601,7 @@ public class IndexUploader {
 		}
 		writer.endWriteMapIndex();
 	}
-	
+
 	private static double polygonArea(BinaryMapDataObject obj) {
 		int zoom = 16;
 		float mult = (float) (1. / MapUtils.getPowZoom(Math.max(31 - (zoom + 8), 0)));
@@ -639,7 +639,7 @@ public class IndexUploader {
 							maxX = Math.max(maxX, obj.getPoint31XTile(i));
 							maxY = Math.max(maxY, obj.getPoint31YTile(i));
 						}
-						
+
 						if (accept(obj, minX, maxX, minY, maxY)) {
 							objects.put(obj.getId(), obj);
 							try {
@@ -658,7 +658,7 @@ public class IndexUploader {
 				});
 		return req;
 	}
-	
+
 
 	protected static boolean accept(BinaryMapDataObject obj, int minX, int maxX, int minY, int maxY) {
 //		double l = MapUtils.convert31XToMeters(minX, maxX);
@@ -727,7 +727,7 @@ public class IndexUploader {
 						tempStringTable.clear();
 
 					}
-					
+
 					int[] typeUse = mdo.getTypes();
 					int[] addtypeUse = mdo.getAdditionalTypes();
 					byte[] coordinates = new byte[8 * mdo.getPointsLength()];
@@ -735,7 +735,7 @@ public class IndexUploader {
 						Algorithms.putIntToBytes(coordinates, 8 * t, mdo.getPoint31XTile(t));
 						Algorithms.putIntToBytes(coordinates, 8 * t + 4, mdo.getPoint31YTile(t));
 					}
-					
+
 					byte[] innerPolygonTypes = new byte[0];
 					int[][] pip = mdo.getPolygonInnerCoordinates();
 					if(pip != null && pip.length > 0) {
@@ -751,7 +751,7 @@ public class IndexUploader {
 						innerPolygonTypes = bous.toByteArray();
 					}
 					MapData mapData = writer.writeMapData(cid - baseId, parentBounds.getMinX(), parentBounds.getMinY(),
-							mdo.isArea(), coordinates, innerPolygonTypes, 
+							mdo.isArea(), coordinates, innerPolygonTypes,
 							typeUse, addtypeUse, null, mdo.getOrderedObjectNames(),
 							tempStringTable, dataBlock, mr.getMaxZoom() > 15);
 					if (mapData != null) {
@@ -774,7 +774,7 @@ public class IndexUploader {
 		}
 	}
 
-	
+
 
 	private String getDescription(BinaryMapIndexReader reader, String fileName) {
 		String summary;

@@ -29,7 +29,7 @@
 		<mkdir dir="${bin.absolute.dir}"/>
 		<mkdir dir="${bintests.dir}"/>
 	</target>
-	
+
 	<target name="download_resources">
 	    <get src="http://builder.osmand.net/binaries/amd64-linux-clang/OsmAndCore_JavaSample1.jar"
 	        dest="lib-gl/OsmAndCore_jni.jar"  usetimestamp="true"/>
@@ -52,7 +52,7 @@
 			</fileset>
 		</copy>
 		<copy todir="${fonts.absolute.dir}">
-			<fileset dir="../../resources/rendering_styles/fonts">				
+			<fileset dir="../../resources/rendering_styles/fonts">
 				<include name="DroidSansEthiopic-Regular.ttf"/>
 				<include name="DroidSansEthiopic-Bold.ttf"/>
 				<include name="DroidSansArabic.ttf"/>
@@ -124,7 +124,7 @@
 			</fileset>
 		</copy>
 		<javac  srcdir="${src.absolute.dir}"
-			
+
 		 destdir="${bin.absolute.dir}"
 		 encoding="${java.encoding}"
 		 classpathref="build.path"
@@ -189,7 +189,7 @@
 			</fileset>
 			<fileset dir="${icons.absolute.dir}/..">
 				<include name="**/*" />
-			</fileset>			
+			</fileset>
 			<fileset dir="${src.absolute.dir}">
 				<include name="**/*.java" />
 			</fileset>
@@ -205,7 +205,7 @@
 		<ant antfile="${osmand-jni.dir}/build.xml" target="native-legacy-libs-jar" dir="${osmand-jni.dir}" inheritAll="false" inheritRefs="false">
 		</ant>
 	</target>
-	
+
 	<target name="update-jni">
 	    <get src="http://builder.osmand.net/binaries/amd64-linux-clang/OsmAndCore_JavaSample1.jar"
 	        dest="lib-gl/OsmAndCore_jni.jar"  usetimestamp="true"/>
@@ -222,7 +222,7 @@
 				<include name="*.bat"/>
 				<include name="*.sh"/>
 				<include name="regions.ocbf"/>
-				
+
 				<exclude name="lib/h2*"/>
 				<exclude name="native-build.sh"/>
 			</fileset>

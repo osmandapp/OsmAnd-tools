@@ -72,7 +72,7 @@ import rtree.RTreeInsertException;
 import rtree.Rect;
 
 public class IndexRouteCreator extends AbstractIndexPartCreator {
-	
+
 	private Connection mapConnection;
 	private final Log logMapDataWarn;
 	private final static int CLUSTER_ZOOM = 15;
@@ -80,10 +80,10 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 	private RTree routeTree = null;
 	private RTree baserouteTree = null;
 	private MapRoutingTypes routeTypes;
-	
+
 	private final static float DOUGLAS_PEUKER_DISTANCE = 15;
-	
-	
+
+
 	private TLongObjectHashMap<TLongArrayList> highwayRestrictions = new TLongObjectHashMap<TLongArrayList>();
 	private TLongObjectHashMap<Long> basemapRemovedNodes = new TLongObjectHashMap<Long>();
 	private TLongObjectHashMap<RouteMissingPoints> basemapNodesToReinsert = new TLongObjectHashMap<RouteMissingPoints> ();
@@ -93,7 +93,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 	TLongObjectHashMap<TIntArrayList> pointTypes = new TLongObjectHashMap<TIntArrayList>();
 	TLongObjectHashMap<TIntObjectHashMap<String> >  pointNames = new TLongObjectHashMap<TIntObjectHashMap<String> > ();
 	Map<MapRoutingTypes.MapRouteType, String> names = createTreeMap();
-	
+
 	static TreeMap<MapRoutingTypes.MapRouteType, String> createTreeMap() {
 		return new TreeMap<MapRoutingTypes.MapRouteType, String>(new Comparator<MapRoutingTypes.MapRouteType>() {
 
@@ -116,7 +116,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 	}
 
 	private TLongHashSet genSpeedCameras = new TLongHashSet();
-	
+
 	TLongObjectHashMap<GeneralizedCluster> generalClusters = new TLongObjectHashMap<GeneralizedCluster>();
 	private PreparedStatement mapRouteInsertStat;
 	private PreparedStatement basemapRouteInsertStat;
@@ -129,7 +129,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		Map<Integer, Long> pointsMap = new TreeMap<Integer, Long>();
 		TIntArrayList[] pointsXToInsert = null;
 		TIntArrayList[] pointsYToInsert = null;
-		
+
 		void buildPointsToInsert(int targetLength){
 			pointsXToInsert = new TIntArrayList[targetLength];
 			pointsYToInsert = new TIntArrayList[targetLength];
@@ -146,7 +146,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 			}
 		}
 	}
-	
+
 	public IndexRouteCreator(MapRenderingTypesEncoder renderingTypes, Log logMapDataWarn, boolean generateLowLevel) {
 		this.renderingTypes = renderingTypes;
 		this.logMapDataWarn = logMapDataWarn;
@@ -177,12 +177,12 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 						genSpeedCameras.add(n.getId());
 					}
 				}
-				
+
 			}
-			
+
 		}
 	}
-	
+
 
 	public void iterateMainEntity(Entity es, OsmDbAccessorContext ctx) throws SQLException {
 		if (es instanceof Way) {
@@ -199,8 +199,8 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 					}
 				}
 			}
-			
-			boolean encoded = routeTypes.encodeEntity(tags, outTypes, names) 
+
+			boolean encoded = routeTypes.encodeEntity(tags, outTypes, names)
 					&& e.getNodes().size() >= 2;
 			if (encoded) {
 				// Load point with tags!
@@ -227,13 +227,13 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 				}
 			}
 		}
-		
+
 	}
 	private List<Node> simplifyRouteForBaseSection(List<Node> source, long id) {
 		ArrayList<Node> result = new ArrayList<Node>();
 		boolean[] kept = OsmMapUtils.simplifyDouglasPeucker(source, 11 /*zoom*/+ 8 + 1 /*smoothness*/, 3, result, false);
 		int indexToInsertAt = 0;
-		int originalInd = 0;				
+		int originalInd = 0;
 		for(int i = 0; i < kept.length; i ++) {
 			Node n = source.get(i);
 			if(n != null) {
@@ -249,7 +249,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		}
 		return result;
 	}
-	
+
 	private static long SHIFT_INSERT_AT = 12;
 	private static long SHIFT_ORIGINAL = 16;
 	private static long SHIFT_ID = 64 - (SHIFT_INSERT_AT + SHIFT_ORIGINAL);
@@ -265,7 +265,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		if(wayId > (1l << SHIFT_ID)) {
 			throw new IllegalStateException("Way id too big");
 		}
-		long genKey = register ? ((wayId << (SHIFT_ORIGINAL+SHIFT_INSERT_AT)) + (originalInd << SHIFT_INSERT_AT) + insertAt) : -1l; 
+		long genKey = register ? ((wayId << (SHIFT_ORIGINAL+SHIFT_INSERT_AT)) + (originalInd << SHIFT_INSERT_AT) + insertAt) : -1l;
 		if(exNode == null) {
 			basemapRemovedNodes.put(pointLoc, genKey);
 		} else {
@@ -277,9 +277,9 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 				putIntersection(pointLoc, genKey);
 			}
 		}
-		
+
 	}
-	
+
 	private void putIntersection(long point, long wayNodeId) {
 		if(wayNodeId != -1){
 //			long x = point >> 31;
@@ -294,17 +294,17 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 			RouteMissingPoints mp = basemapNodesToReinsert.get(wayId);
 			mp.pointsMap.put(ind, point);
 		}
-		
+
 	}
 	private void addWayToIndex(long id, List<Node> nodes, PreparedStatement insertStat, RTree rTree,
-			TIntArrayList outTypes,	TLongObjectHashMap<TIntArrayList> pointTypes,	
+			TIntArrayList outTypes,	TLongObjectHashMap<TIntArrayList> pointTypes,
 			TLongObjectHashMap<TIntObjectHashMap<String>> pointNamesRaw, Map<MapRoutingTypes.MapRouteType, String> names ) throws SQLException {
 		boolean init = false;
 		int minX = Integer.MAX_VALUE;
 		int maxX = 0;
 		int minY = Integer.MAX_VALUE;
 		int maxY = 0;
-		
+
 
 		ByteArrayOutputStream bcoordinates = new ByteArrayOutputStream();
 		ByteArrayOutputStream bpointIds = new ByteArrayOutputStream();
@@ -375,13 +375,13 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 			}
 		}
 	}
-	
+
 	private static long getBaseId(int x31, int y31) {
 		long x = x31;
 		long y = y31;
 		return (x << 31) + y;
 	}
-	
+
 	private GeneralizedCluster getCluster(GeneralizedWay gw, int ind, GeneralizedCluster helper) {
 		int x31 = gw.px.get(ind);
 		int y31 = gw.py.get(ind);
@@ -397,11 +397,11 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		}
 		return generalClusters.get(l);
 	}
-	
-	
+
+
 	public void generalizeWay(Way e) throws SQLException {
 		List<Node> ns = e.getNodes();
-		
+
 		GeneralizedWay w = new GeneralizedWay(e.getId());
 		TIntArrayList px = w.px;
 		TIntArrayList py = w.py;
@@ -442,7 +442,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		}
 		return b.toString();
 	}
-	
+
 	protected String encodeListNames(List<MapPointName> tempNames) {
 		StringBuilder b = new StringBuilder();
 		for (MapPointName e : tempNames) {
@@ -450,7 +450,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		}
 		return b.toString();
 	}
-	
+
 	protected void decodeListNames(String name, List<MapPointName> tempNames) {
 		int i = name.indexOf(SPECIAL_CHAR);
 		while (i != -1) {
@@ -533,10 +533,10 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 				throw new IOException(e);
 			}
 			pStatements.put(basemapRouteInsertStat, 0);
-		}		
+		}
 	}
-	
-	
+
+
 
 	private PreparedStatement createStatementRouteObjInsert(Connection conn, boolean basemap) throws SQLException {
 		return conn.prepareStatement("insert into " + ( basemap ? TABLE_BASEROUTE : TABLE_ROUTE) + INSERT_STAT);
@@ -626,14 +626,14 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 					rTreeRouteIndexPackFileName + "b");
 		}
 	}
-	
+
 	public void writeBinaryRouteIndex(File fl, BinaryMapIndexWriter writer, String regionName, boolean generateLowLevel) throws IOException, SQLException {
 		closePreparedStatements(mapRouteInsertStat);
 		if(basemapRouteInsertStat != null) {
 			closePreparedStatements(basemapRouteInsertStat);
 		}
 		mapConnection.commit();
-		
+
 		try {
 			writer.startWriteRouteIndex(regionName);
 			// write map encoding rules
@@ -642,7 +642,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 			RandomAccessFile raf = writer.getRaf();
 			writer.flush();
 			long fp = raf.getFilePointer();
-			
+
 			// 1st write
 			writeRouteSections(writer);
 			String fname = null;
@@ -689,10 +689,10 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		}
 		return base;
 	}
-	
+
 	private void appendMissingRoadsForBaseMap(Connection conn, BinaryMapIndexReader reader) throws IOException, SQLException {
 		TLongObjectHashMap<RouteDataObject> map = new CheckRoadConnectivity().collectDisconnectedRoads(reader);
-		// to add 
+		// to add
 		PreparedStatement ps = conn.prepareStatement(COPY_BASE);
 		for(RouteDataObject rdo : map.valueCollection()) {
 			//addWayToIndex(id, nodes, insertStat, rTree)
@@ -723,17 +723,17 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		}
 		ps.close();
 	}
-	
+
 	private Node convertBaseToNode(long s) {
 		long x = s >> 31;
 		long y = s - (x << 31);
-		return new Node(MapUtils.get31LatitudeY((int) y), 
+		return new Node(MapUtils.get31LatitudeY((int) y),
 				MapUtils.get31LongitudeX((int) x), -1);
 	}
-	
+
 	private String baseOrderValues[] = new String[] { "trunk", "motorway", "ferry", "primary", "secondary", "tertiary", "residential",
 			"road", "cycleway", "living_street" };
-	
+
 	private int getBaseOrderForType(int intType) {
 		if (intType == -1) {
 			return Integer.MAX_VALUE;
@@ -747,7 +747,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		}
 		return i;
 	}
-	
+
 	private int getMainType(TIntCollection types){
 		if(types.isEmpty()){
 			return -1;
@@ -762,7 +762,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		}
 		return main;
 	}
-	
+
 	@SuppressWarnings("rawtypes")
 	public void getAdjacentRoads(GeneralizedCluster gcluster, GeneralizedWay gw, int i, Collection<GeneralizedWay> collection){
 		gcluster = getCluster(gw, i, gcluster);
@@ -777,13 +777,13 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 			}
 		}
 	}
-	
+
 	@SuppressWarnings("rawtypes")
 	public int countAdjacentRoads(GeneralizedCluster gcluster, GeneralizedWay gw, int i){
 		gcluster = getCluster(gw, i, gcluster);
 		Object o = gcluster.map.get(gw.getLocation(i));
 		if (o instanceof LinkedList) {
-			
+
 			Iterator it = ((LinkedList) o).iterator();
 			int cnt = 0;
 			while (it.hasNext()) {
@@ -800,9 +800,9 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		}
 		return 0;
 	}
-	
-	
-	
+
+
+
 	public void processingLowLevelWays(IProgress progress) {
 		if(!generateLowLevel) {
 			return;
@@ -874,14 +874,14 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 	}
 
 
-	
-	
+
+
 	private static double scalarMultiplication(double xA, double yA, double xB, double yB, double xC, double yC) {
 		// Scalar multiplication between (AB, AC)
 		double multiple = (xB - xA) * (xC - xA) + (yB- yA) * (yC -yA);
 		return multiple;
 	}
-	
+
 	public static LatLon getProjection(float y31, float x31, float fromy31, float fromx31, float toy31, float tox31) {
 		// not very accurate computation on sphere but for distances < 1000m it is ok
 		float mDist = (fromy31 - toy31) * (fromy31 - toy31) + (fromx31 - tox31) * (fromx31 - tox31);
@@ -900,7 +900,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		}
 		return new LatLon(prlat, prlon);
 	}
-	
+
 	private void simplifyDouglasPeucker(GeneralizedWay gw, float epsilon, Collection<Integer> ints, int start, int end){
 		double dmax = -1;
 		int index = -1;
@@ -918,7 +918,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 			ints.add(end);
 		}
 	}
-	
+
 	private double orthogonalDistance(GeneralizedWay gn, int st, int end, int px, int py, boolean returnNanIfNoProjection){
 		float fromy31 = gn.py.get(st);
 		float fromx31 = gn.px.get(st);
@@ -936,16 +936,16 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		double C = MapUtils.convert31XToMeters(tox31, fromx31);
 		double D = MapUtils.convert31YToMeters(toy31, fromy31);
 		return Math.abs(A * D - C * B) / Math.sqrt(C * C + D * D);
-		
+
 	}
-	
+
 	private void douglasPeukerSimplificationStep(Collection<GeneralizedCluster> clusters){
 		for(GeneralizedCluster cluster : clusters) {
 			ArrayList<GeneralizedWay> copy = new ArrayList<GeneralizedWay>(cluster.ways);
 			for(GeneralizedWay gw : copy) {
 				Set<Integer> res = new HashSet<Integer>();
 				simplifyDouglasPeucker(gw, DOUGLAS_PEUKER_DISTANCE, res, 0, gw.size() - 1);
-				
+
 				int ind = 1;
 				int len = gw.size() - 1;
 				for(int j = 1; j < len; j++) {
@@ -961,7 +961,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 			}
 		}
 	}
-	
+
 	public int checkDistanceToLine(GeneralizedWay line, int start, boolean directionPlus, int px, int py, double distThreshold) {
 		int j = start;
 		int next = directionPlus ? j + 1 : j - 1;
@@ -975,7 +975,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		}
 		return -1;
 	}
-	
+
 	private void processRoundabouts(Collection<GeneralizedCluster> clusters) {
 		for(GeneralizedCluster cluster : clusters) {
 			ArrayList<GeneralizedWay> copy = new ArrayList<GeneralizedWay>(cluster.ways);
@@ -988,7 +988,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 			}
 		}
 	}
-	
+
 	private void removeGeneratedWay(GeneralizedWay gw, GeneralizedCluster gcluster) {
 		for (int i = 0; i < gw.size(); i++) {
 			gcluster = getCluster(gw, i, gcluster);
@@ -996,7 +996,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		}
 	}
 
-	
+
 	@SuppressWarnings("rawtypes")
 	private void removeWayAndSubstituteWithPoint(GeneralizedWay gw, GeneralizedCluster gcluster) {
 		// calculate center location
@@ -1048,7 +1048,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 			}
 		}
 	}
-	
+
 	private boolean compareRefs(GeneralizedWay gw, GeneralizedWay gn){
 		String ref1 = gw.names.get(routeTypes.getRefRuleType());
 		String ref2 = gn.names.get(routeTypes.getRefRuleType());
@@ -1056,14 +1056,14 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		String name2 = gn.names.get(routeTypes.getNameRuleType());
 		return equalsIfNotEmpty(ref1, ref2) && equalsIfNotEmpty(name1, name2);
 	}
-	
+
 	private boolean equalsIfNotEmpty(String s1, String s2) {
 		if(Algorithms.isEmpty(s1) || Algorithms.isEmpty(s2)) {
 			return true;
 		}
 		return s1.equalsIgnoreCase(s2);
 	}
-	
+
 	private void mergeName(MapRouteType rt, GeneralizedWay from, GeneralizedWay to){
 		String rfFrom = from.names.get(rt);
 		String rfTo = to.names.get(rt);
@@ -1075,7 +1075,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 			}
 		}
 	}
-	
+
 	private void mergeAddTypes(GeneralizedWay from, GeneralizedWay to){
 		TIntIterator it = to.addtypes.iterator();
 		while(it.hasNext()) {
@@ -1086,7 +1086,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 			}
 		}
 	}
-	
+
 	@SuppressWarnings("unchecked")
 	private GeneralizedWay selectBestWay(GeneralizedCluster cluster, GeneralizedWay gw, int ind) {
 		long loc = gw.getLocation(ind);
@@ -1098,7 +1098,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 				if (m.id != gw.id && m.mainType == gw.mainType && compareRefs(gw, m)) {
 					return m;
 				}
-				
+
 			}
 		} else if (o instanceof LinkedList) {
 			LinkedList<GeneralizedWay> l = (LinkedList<GeneralizedWay>) o;
@@ -1125,7 +1125,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		return res;
 	}
 
-	
+
 	private void attachWays(GeneralizedWay gw, boolean first) {
 		GeneralizedCluster cluster = null;
 		while(true) {
@@ -1141,14 +1141,14 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 			}
 			mergeAddTypes(prev, gw);
 			for(MapRouteType rt : new ArrayList<MapRouteType>(gw.names.keySet())) {
-				mergeName(rt, prev, gw);	
+				mergeName(rt, prev, gw);
 			}
 			for(MapRouteType rt : new ArrayList<MapRouteType>(prev.names.keySet())) {
 				if(!gw.names.containsKey(rt)){
 					mergeName(rt, prev, gw);
 				}
 			}
-			
+
 			TIntArrayList ax = first? prev.px : gw.px;
 			TIntArrayList ay = first? prev.py : gw.py;
 			TIntArrayList bx = !first? prev.px : gw.px;
@@ -1199,8 +1199,8 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 				selectData.close();
 		}
 	}
-	
-	private TLongObjectHashMap<BinaryFileReference> writeBinaryRouteIndexHeader(BinaryMapIndexWriter writer,  
+
+	private TLongObjectHashMap<BinaryFileReference> writeBinaryRouteIndexHeader(BinaryMapIndexWriter writer,
 			RTree rte, boolean basemap) throws IOException, SQLException, RTreeException {
 		// write map levels and map index
 		TLongObjectHashMap<BinaryFileReference> treeHeader = new TLongObjectHashMap<BinaryFileReference>();
@@ -1211,8 +1211,8 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 			writeBinaryRouteTree(root, rootBounds, rte, writer, treeHeader, basemap);
 		}
 		return treeHeader;
-	}	
-	
+	}
+
 	private int registerId(TLongArrayList ids, long id) {
 		for (int i = 0; i < ids.size(); i++) {
 			if (ids.getQuick(i) == id) {
@@ -1222,7 +1222,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		ids.add(id);
 		return ids.size() - 1;
 	}
-	
+
 	private void writeBinaryMapBlock(rtree.Node parent, Rect parentBounds, RTree r, BinaryMapIndexWriter writer, RouteWriteContext wc, boolean basemap)
 					throws IOException, RTreeException, SQLException {
 		Element[] e = parent.getAllElements();
@@ -1272,14 +1272,14 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 					String pointNames = rs.getString(6);
 					wc.tempPointNames.clear();
 					decodeListNames(pointNames, wc.tempPointNames);
-					
+
 					int pointsLength = pointCoordinates.length / 8;
 					RouteMissingPoints missingPoints = null;
 					if(basemap && basemapNodesToReinsert.containsKey(id) ) {
 						missingPoints = basemapNodesToReinsert.get(id);
 						missingPoints.buildPointsToInsert(pointsLength);
 					}
-					
+
 					int typeInd = 0;
 					List<RoutePointToWrite> points = new ArrayList<RoutePointToWrite>(pointsLength);
 					for (int j = 0; j < pointsLength; j++) {
@@ -1309,7 +1309,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 						} while (type != 0);
 					}
 
-					RouteData routeData = writer.writeRouteData(cid, parentBounds.getMinX(), parentBounds.getMinY(), typeUse, 
+					RouteData routeData = writer.writeRouteData(cid, parentBounds.getMinX(), parentBounds.getMinY(), typeUse,
 							points.toArray(new RoutePointToWrite[points.size()]),
 							wc.tempNames, wc.tempStringTable, wc.tempPointNames, dataBlock, true, false);
 					if (routeData != null) {
@@ -1368,23 +1368,23 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		}
 		writer.endRouteTreeElement();
 	}
-	
+
 
 	/*private*/ static class GeneralizedCluster {
 		public final int x;
 		public final int y;
 		public final int zoom;
-		
+
 		public GeneralizedCluster(int x, int y, int z){
 			this.x = x;
 			this.y = y;
 			this.zoom = z;
 		}
-		
+
 		public final Set<GeneralizedWay> ways = new HashSet<IndexRouteCreator.GeneralizedWay>();
 		// either LinkedList<GeneralizedWay> or GeneralizedWay
 		public final TLongObjectHashMap<Object> map = new TLongObjectHashMap<Object>();
-		
+
 		@SuppressWarnings({ "rawtypes", "unchecked" })
 		public void replaceWayFromLocation(GeneralizedWay delete, int ind, GeneralizedWay toReplace){
 			ways.remove(delete);
@@ -1405,7 +1405,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 				map.put(loc, toReplace);
 			}
 		}
-		
+
 		public void removeWayFromLocation(GeneralizedWay delete, int ind){
 			removeWayFromLocation(delete, ind, false);
 		}
@@ -1439,7 +1439,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 				}
 			}
 		}
-		
+
 		public void addWayFromLocation(GeneralizedWay w, int i) {
 			ways.add(w);
 			long loc = w.getLocation(i);
@@ -1448,7 +1448,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 
 		@SuppressWarnings("unchecked")
 		private void addWay(GeneralizedWay w, long loc) {
-			
+
 			if (map.containsKey(loc)) {
 				Object o = map.get(loc);
 				if (o instanceof LinkedList) {
@@ -1472,13 +1472,13 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		private TIntHashSet addtypes = new TIntHashSet();
 		private TIntArrayList px = new TIntArrayList();
 		private TIntArrayList py = new TIntArrayList();
-		
+
 		// TLongObjectHashMap<TIntArrayList> pointTypes = new TLongObjectHashMap<TIntArrayList>();
 		private Map<MapRoutingTypes.MapRouteType, String> names = new HashMap<MapRoutingTypes.MapRouteType, String>();
 		public GeneralizedWay(long id) {
 			this.id = id;
 		}
-		
+
 		public double getDistance() {
 			double dx = 0;
 			for (int i = 1; i < px.size(); i++) {
@@ -1487,15 +1487,15 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 			}
 			return dx;
 		}
-		
+
 		public long getLocation(int ind) {
 			return getBaseId(px.get(ind), py.get(ind));
 		}
-		
+
 		public int size(){
 			return px.size();
 		}
-		
+
 		// Gives route direction of EAST degrees from NORTH ]-PI, PI]
 		public double directionRoute(int startPoint, boolean plus) {
 			float dist = 5;
@@ -1525,6 +1525,6 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 			return -Math.atan2( x - px, y - py );
 		}
 	}
-	
-	
+
+
 }

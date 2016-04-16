@@ -10,10 +10,10 @@ import crosby.binary.file.FileBlock;
 
 /**
  * Generic serializer common code
- * 
+ *
  * Serialize a set of blobs and process them. Subclasses implement handlers for
  * different API's (osmosis, mkgmap, splitter, etc.)
- * 
+ *
  * All data is converted into PrimGroupWriterInterface objects, which are then
  * ordered to process their data at the appropriate time.
  * */
@@ -25,7 +25,7 @@ public class BinarySerializer {
      * group type (Node, Way, Relation, DenseNode, Changeset)
      */
     protected interface PrimGroupWriterInterface {
-        /** This callback is invoked on each group that is going into the fileblock in order to give it a chance to 
+        /** This callback is invoked on each group that is going into the fileblock in order to give it a chance to
          * add to the stringtable pool of strings. */
         public void addStringsToStringtable();
 
@@ -110,7 +110,7 @@ public class BinarySerializer {
         primblock.setDateGranularity(this.date_granularity);
 
         // Only generate data with offset (0,0)
-        // 
+        //
         Osmformat.PrimitiveBlock message = primblock.build();
 
         // System.out.println(message);

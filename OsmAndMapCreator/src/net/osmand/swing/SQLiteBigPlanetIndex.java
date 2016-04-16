@@ -19,10 +19,10 @@ import org.apache.commons.logging.Log;
 
 public class SQLiteBigPlanetIndex {
 	private static final Log log = PlatformUtil.getLog(SQLiteBigPlanetIndex.class);
-	
+
 	private static final int BATCH_SIZE = 50;
 	private static boolean bigPlanet = false;
-	
+
 	public static void createSQLiteDatabase(File dirWithTiles, String regionName, ITileSource template) throws SQLException, IOException {
 		long now = System.currentTimeMillis();
 		try {
@@ -40,7 +40,7 @@ public class SQLiteBigPlanetIndex {
 		statement.execute("CREATE TABLE info(tilenumbering,minzoom,maxzoom,timecolumn,url,rule,referer)");
 		statement.execute("CREATE TABLE android_metadata (locale TEXT)");
 		statement.close();
-		
+
 
 		PreparedStatement pStatement = conn.prepareStatement("INSERT INTO INFO VALUES(?,?,?,?,?,?,?)");
 		String tileNumbering = bigPlanet ? "BigPlanet" : "simple";
@@ -57,16 +57,16 @@ public class SQLiteBigPlanetIndex {
 		log.info("Info table" + tileNumbering + "maxzoom = " + maxzoom + " minzoom = " + minzoom + " timecolumn = yes"
 				+ " url = " + ((TileSourceTemplate) template).getUrlTemplate());
 		pStatement.close();
-		
+
 
 		conn.setAutoCommit(false);
 		pStatement = conn.prepareStatement("INSERT INTO tiles VALUES (?, ?, ?, ?, ?, ?)");
 		int ch = 0;
-		// be attentive to create buf enough for image 
+		// be attentive to create buf enough for image
 		byte[] buf;
 		int maxZoom = 17;
 		int minZoom = 1;
-		
+
 		File rootDir = new File(dirWithTiles, template.getName());
 		for(File z : rootDir.listFiles()){
 			try {
@@ -81,14 +81,14 @@ public class SQLiteBigPlanetIndex {
 							try {
 								int i = f.getName().indexOf('.');
 								int y = Integer.parseInt(f.getName().substring(0, i));
-								buf = new byte[(int) f.length()]; 
+								buf = new byte[(int) f.length()];
 								if(zoom > maxZoom){
 									maxZoom = zoom;
 								}
 								if(zoom < minZoom){
 									minZoom = zoom;
 								}
-								
+
 								FileInputStream is = new FileInputStream(f);
 								int l = 0;
 								try {
@@ -110,24 +110,24 @@ public class SQLiteBigPlanetIndex {
 										ch = 0;
 									}
 								}
-							
+
 							} catch (NumberFormatException e) {
 							}
 						}
 					} catch (NumberFormatException e) {
 					}
 				}
-				
+
 			} catch (NumberFormatException e) {
 			}
-			
+
 		}
-		
+
 		if (ch > 0) {
 			pStatement.executeBatch();
 			ch = 0;
 		}
-		
+
 		pStatement.close();
 		conn.commit();
 		conn.close();

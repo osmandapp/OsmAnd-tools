@@ -9,11 +9,11 @@ import org.apache.commons.logging.Log;
 
 public class ExceptionHandler {
 	private static final Log log = PlatformUtil.getLog(ExceptionHandler.class);
-	
+
 	public static void handle(Throwable e){
 		handle("Error occurred", e);
 	}
-	
+
 	public static void handle(String msg, Throwable e){
 		if(e != null){
 			log.error(msg, e);
@@ -36,7 +36,7 @@ public class ExceptionHandler {
 			JOptionPane.showMessageDialog(OsmExtractionUI.MAIN_APP.getFrame(), text, title, JOptionPane.ERROR_MESSAGE);
 		}
 	}
-	
+
 	public static void handle(String msg){
 		handle(msg, null);
 	}

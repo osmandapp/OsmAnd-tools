@@ -28,9 +28,9 @@ import org.xml.sax.SAXException;
 import org.xmlpull.v1.XmlPullParserException;
 
 public class FixAdminLevel0 {
-	
+
 	public static void main(String[] args) throws IOException, SAXException, XMLStreamException, XmlPullParserException {
-		String fileToRead = args != null && args.length > 0 ? args[0] : null; 
+		String fileToRead = args != null && args.length > 0 ? args[0] : null;
 		if(fileToRead == null) {
 			fileToRead = "/home/victor/projects/OsmAnd/download/basemap/10m_admin_level.osm";
 		}
@@ -39,23 +39,23 @@ public class FixAdminLevel0 {
 		String fileToWrite =  args != null && args.length > 1 ? args[1] : null;
 		if(fileToWrite != null){
 			write = new File(fileToWrite);
-			 
+
 		} else {
 			String fileName = read.getName();
 			int i = fileName.lastIndexOf('.');
 			fileName = fileName.substring(0, i) + "_out"+ fileName.substring(i);
 			write = new File(read.getParentFile(), fileName);
 		}
-		
+
 		write.createNewFile();
-		
+
 		process(read, write);
 	}
-	
+
 	private static void process(File read, File write) throws  IOException, XMLStreamException, XmlPullParserException {
 		OsmBaseStorage storage = new OsmBaseStorage();
 		storage.parseOSM(new FileInputStream(read), new ConsoleProgressImplementation());
-		
+
 		Map<EntityId, Entity> entities = new HashMap<EntityId, Entity>( storage.getRegisteredEntities());
 		long id = -1;
 		for(EntityId e : entities.keySet()){
@@ -82,10 +82,10 @@ public class FixAdminLevel0 {
 		writer.saveStorage(new FileOutputStream(write), storage, null, true);
 	}
 
-	
-	
+
+
 	private static Map<String, List<Way>> countryNames = new LinkedHashMap<String, List<Way>>();
-	
+
 	private static void processWay(Way way) {
 		if("0".equals(way.getTag("admin_level")) && way.getTag(OSMTagKey.NAME) != null){
 			String name = way.getTag(OSMTagKey.NAME);
@@ -116,7 +116,7 @@ public class FixAdminLevel0 {
 				}
 			}
 		}
-		
+
 	}
 
 }

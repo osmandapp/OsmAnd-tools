@@ -6,12 +6,12 @@ import java.util.Comparator;
 import java.util.List;
 
 public class MapZooms {
-	
+
 	public static class MapZoomPair {
 		public static int MAX_ALLOWED_ZOOM = 22;
 		private int minZoom;
 		private int maxZoom;
-		
+
 		public MapZoomPair(int minZoom, int maxZoom) {
 			this.maxZoom = maxZoom;
 			this.minZoom = minZoom;
@@ -20,24 +20,24 @@ public class MapZooms {
 		public int getMinZoom() {
 			return minZoom;
 		}
-		
+
 		public int getMaxZoom() {
 			return maxZoom;
 		}
-		
+
 		@Override
 		public String toString() {
 			return "MapZoomPair : " + minZoom + " - "+ maxZoom;
 		}
 	}
-	
+
 	private List<MapZoomPair> levels = new ArrayList<MapZoomPair>();
-	
-	
+
+
 	public List<MapZoomPair> getLevels() {
 		return levels;
 	}
-	
+
 	public void setLevels(List<MapZoomPair> levels) {
 		this.levels = levels;
 		Collections.sort(levels, new Comparator<MapZoomPair>() {
@@ -53,7 +53,7 @@ public class MapZooms {
 	 */
 	public static MapZooms parseZooms(String zooms) throws IllegalArgumentException {
 		String[] split = zooms.split(";");
-		
+
 		int zeroLevel = 15;
 		List<MapZoomPair> list = new ArrayList<MapZoomPair>();
 		for(String s : split){
@@ -75,15 +75,15 @@ public class MapZooms {
 		mapZooms.setLevels(list);
 		return mapZooms;
 	}
-	
+
 	public int size(){
 		return levels.size();
 	}
-	
+
 	public MapZoomPair getLevel(int level){
 		return levels.get(level);
 	}
-	
+
 	private static MapZooms DEFAULT = null;
 	public static String MAP_ZOOMS_DEFAULT = "11;12;13-14;15-";
 	public static MapZooms getDefault(){
@@ -91,7 +91,7 @@ public class MapZooms {
 			DEFAULT = parseZooms(MAP_ZOOMS_DEFAULT);
 		}
 		return DEFAULT;
-		
+
 	}
 
 }

@@ -25,7 +25,7 @@ import org.xmlpull.v1.XmlPullParserException;
 public class MainUtilities {
 	private static Log log = PlatformUtil.getLog(MainUtilities.class);
 
-	
+
 	public static void main(String[] args) throws Exception {
 		if(args.length == 0) {
 			printSynopsys();
@@ -72,7 +72,7 @@ public class MainUtilities {
 				IndexCreator ic = new IndexCreator(new File("."));
 				ic.setIndexPOI(true);
 				generateObf(subArgsArray, ic);
-				
+
 			} else if(utl.equals("delete-unused-strings")) {
 				ResourceDeleter.main(subArgsArray);
 			} else if(utl.equals("generate-roads")) {
@@ -85,7 +85,7 @@ public class MainUtilities {
 		}
 	}
 
-	private static void generateObf(String[] subArgsArray, IndexCreator ic) throws IOException, 
+	private static void generateObf(String[] subArgsArray, IndexCreator ic) throws IOException,
 			SQLException, InterruptedException, XmlPullParserException {
 		String fn = DataExtractionSettings.getSettings().getMapRenderingTypesFile();
 		String regionName = subArgsArray[0];

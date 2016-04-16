@@ -25,9 +25,9 @@ import org.xml.sax.SAXException;
 import org.xmlpull.v1.XmlPullParserException;
 
 public class FixLinkedCoastline {
-	
+
 	public static void main(String[] args) throws IOException, XMLStreamException, XmlPullParserException {
-		String fileToRead = args != null && args.length > 0 ? args[0] : null; 
+		String fileToRead = args != null && args.length > 0 ? args[0] : null;
 		if(fileToRead == null) {
 			fileToRead = "/home/victor/projects/osmand/data/basemap/ready/10m_coastline.osm";
 //			fileToRead = "/home/victor/projects/OsmAnd/download/basemap/10m_lakes.osm";
@@ -43,19 +43,19 @@ public class FixLinkedCoastline {
 			fileName = fileName.substring(0, i) + "_out"+ fileName.substring(i);
 			write = new File(read.getParentFile(), fileName);
 		}
-		
+
 		write.createNewFile();
-		
+
 		process(read, write);
 	}
-	
+
 	private static void process(File read, File write) throws  IOException, XMLStreamException, XmlPullParserException {
 		OsmBaseStorage storage = new OsmBaseStorage();
 		storage.parseOSM(new FileInputStream(read), new ConsoleProgressImplementation());
-		
+
 		Map<EntityId, Entity> entities = new HashMap<EntityId, Entity>( storage.getRegisteredEntities());
-		List<EntityId> toWrite = new ArrayList<EntityId>(); 
-		
+		List<EntityId> toWrite = new ArrayList<EntityId>();
+
 		for(EntityId e : entities.keySet()){
 			if(e.getType() == EntityType.WAY){
 				Entity oldWay = storage.getRegisteredEntities().remove(e);
@@ -63,7 +63,7 @@ public class FixLinkedCoastline {
 				alignAndAddtoStorage(storage, toWrite, result);
 			}
 		}
-		
+
 		System.out.println("ERROR Ways : ");
 		int errors = 0;
 		for(List<Way> w : endWays.values()){
@@ -114,7 +114,7 @@ public class FixLinkedCoastline {
 			toWrite.add(eId);
 		}
 	}
-	
+
 	private static long calcCoordinate(net.osmand.osm.edit.Node node){
 		LatLon l = node.getLatLon();
 		double lon  =l.getLongitude();
@@ -127,12 +127,12 @@ public class FixLinkedCoastline {
 		}
 		return ((long)MapUtils.getTileNumberY(21, l.getLatitude()) << 32L) + ((long)MapUtils.getTileNumberX(21, lon));
 	}
-	
+
 	private static Map<Long, List<Way>> startWays = new LinkedHashMap<Long, List<Way>>();
 	private static Map<Long, List<Way>> endWays = new LinkedHashMap<Long, List<Way>>();
 	private static Map<Way, LatLon> duplicatedSimpleIslands = new LinkedHashMap<Way, LatLon>();
 	private static int ERRORS = 0;
-	
+
 	private static Way revertWay(Way way){
 		ArrayList<net.osmand.osm.edit.Node> revNodes = new ArrayList<net.osmand.osm.edit.Node>(way.getNodes());
 		Collections.reverse(revNodes);
@@ -145,22 +145,22 @@ public class FixLinkedCoastline {
 		}
 		return ws;
 	}
-	
+
 	private static boolean pointContains(long start, long end){
 		return startWays.containsKey(start) || endWays.containsKey(end) || startWays.containsKey(end) || endWays.containsKey(start);
 	}
-	
+
 	private static long lastPoint(Way w){
 		return calcCoordinate(w.getNodes().get(w.getNodes().size() - 1));
 	}
 	private static long lastPoint(List<Way> w){
 		return lastPoint(w.get(w.size() - 1));
 	}
-	
+
 	private static long firstPoint(List<Way> w){
 		return firstPoint(w.get(0));
 	}
-	
+
 	private static long firstPoint(Way way) {
 		return calcCoordinate(way.getNodes().get(0));
 	}
@@ -187,9 +187,9 @@ public class FixLinkedCoastline {
 		} else {
 			List<Way> list = new ArrayList<Way>();
 			list.add(way);
-			
+
 //			System.out.println(val);
-			
+
 			while (pointContains(start, end)) {
 				if (startWays.containsKey(start) || endWays.containsKey(end)) {
 					ERRORS++;
@@ -206,7 +206,7 @@ public class FixLinkedCoastline {
 					startWays.remove(firstPoint(tlist));
 					tlist.addAll(list);
 					list = tlist;
-					
+
 				} else if (startWays.containsKey(end)) {
 					List<Way> tlist = startWays.remove(end);
 					endWays.remove(lastPoint(tlist));
@@ -217,14 +217,14 @@ public class FixLinkedCoastline {
 				if (start == end) {
 					cycle = list;
 					break;
-				} 
+				}
 			}
 			if (cycle == null) {
 				startWays.put(start, list);
 				endWays.put(end, list);
 			}
 		}
-		
+
 		if (cycle != null) {
 			boolean clockwiseWay = OsmMapUtils.isClockwiseWay(cycle);
 			if (clockwiseWay) {
@@ -237,10 +237,10 @@ public class FixLinkedCoastline {
 				return ways;
 			}
 			return cycle;
-			
+
 		}
 		return Collections.emptyList();
-		
+
 	}
 
 }

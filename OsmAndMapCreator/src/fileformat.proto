@@ -16,7 +16,7 @@ message Blob {
 }
 
 /* A file contains an sequence of fileblock headers, each prefixed by
-their length, followed by a data block containing the actual data. 
+their length, followed by a data block containing the actual data.
 types staring with a "_" are reserved.
 
 */

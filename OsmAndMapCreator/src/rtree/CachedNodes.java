@@ -1,10 +1,10 @@
 //BufferHeader.java,CachedNodes.java
-//  
+//
 //This library is free software; you can redistribute it and/or
 //modify it under the terms of the GNU Lesser General Public
 //License as published by the Free Software Foundation; either
 //version 2.1 of the License, or (at your option) any later version.
-//  
+//
 //This library is distributed in the hope that it will be useful,
 //but WITHOUT ANY WARRANTY; without even the implied warranty of
 //MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
@@ -16,11 +16,11 @@ import java.io.*;
 import rtree.seeded.SdNode;
 /**
    <b>A circular linked list of cached nodes using hashtable ?!!</b>
-   <p>This class will wrap a list of recently used nodes. 
-   If the requested node is in <tt>Hashtable</tt> of the class then the node would 
-   be returned from the <tt>Hashtable</tt>, else it would be read from the 
+   <p>This class will wrap a list of recently used nodes.
+   If the requested node is in <tt>Hashtable</tt> of the class then the node would
+   be returned from the <tt>Hashtable</tt>, else it would be read from the
    disk.
-   <br>This will be a static object in the class RTree. Therefore no matter how 
+   <br>This will be a static object in the class RTree. Therefore no matter how
    many RTree objects you create they all would have one cache for all the files
    the object handles.
    TODO : keep a set that keeps all the nodes that are dirty. With each node registering themselves
@@ -111,7 +111,7 @@ class BufferHeader
       cache.put(new Integer(lastNode.next), new NodeValue(nNode.node,nNode.next,key));
       recent = key;//this is the latest node
       last = lastNode.next;//set the next in chain as the new 'last'
-      
+
     }
     catch(Exception e){
       e.printStackTrace();
@@ -144,7 +144,7 @@ class BufferHeader
             nextNode.next = key;
           }
           cache.put(new Integer(node.next), new NodeValue(nextNode.node, nextNode.next,node.prev));
-                    
+
           //adjust previous node and the last node - if unequal
           prevNode = (NodeValue)(cache.remove(new Integer(node.prev)));
           if(last != node.prev){//if last node is not the prev node
@@ -156,7 +156,7 @@ class BufferHeader
             prevNode.prev = key;
           }
           cache.put(new Integer(node.prev), new NodeValue(prevNode.node, node.next,prevNode.prev));
-                        
+
           //put the new node
           cache.put(new Integer(key), new NodeValue(node.node,last,recent));
         }
@@ -259,7 +259,7 @@ public class CachedNodes
       }else{
         nNode = new SdNode(file, fileName, ndIndex, flHdr);
       }
-      key = calKey(fileName, (int)nNode.getNodeIndex());//this is for the case where index is NOT_DEFINED 
+      key = calKey(fileName, (int)nNode.getNodeIndex());//this is for the case where index is NOT_DEFINED
       nNode.sweepSort();
       //cache not full
       if(cache.size() < Node.CACHE_SIZE){
@@ -379,13 +379,13 @@ public class CachedNodes
   {
     buffHeader.reset();
   }
-  
+
   static Map<String, Integer> fileNamesMap = new LinkedHashMap<String, Integer>();
-  
+
   static void clearFileNamesMap(){
 	  fileNamesMap.clear();
   }
-  
+
   int calKey(String fileName,int idx)
   {
     if(fileName != null) {

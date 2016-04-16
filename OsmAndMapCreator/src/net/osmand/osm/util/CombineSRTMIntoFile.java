@@ -141,7 +141,7 @@ public class CombineSRTMIntoFile {
 								isOut = false;
 							} else if(MapAlgorithms.linesIntersect(prev.getLatLon(), n.getLatLon(), br, bl)) {
 								isOut = false;
-							} 
+							}
 							prev = n;
 						}
 						if(!isOut) {
@@ -206,8 +206,8 @@ public class CombineSRTMIntoFile {
 		}
 		return w;
 	}
-	
-	
+
+
 
 	private static void updateBbox(BinaryMapDataObject country, QuadRect qr) {
 		for(int i = 0; i < country.getPointsLength(); i++) {

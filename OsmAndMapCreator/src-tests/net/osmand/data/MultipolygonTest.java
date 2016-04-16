@@ -19,7 +19,7 @@ public class MultipolygonTest {
 	private Way closedBaseCircle;
 
 	@Before
-	public void setUp() 
+	public void setUp()
 	{
 		poly1_1_of_2 = polygon(n(0,0),n(1,0),n(1,1),n(1,2));
 		poly1_2_of_2 = polygon(n(1,2),n(0,2),n(-1,2),n(0,0));

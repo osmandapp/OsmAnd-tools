@@ -27,9 +27,9 @@ import net.osmand.osm.edit.Way;
 
 
 public class OsmDbAccessor implements OsmDbAccessorContext {
-	
+
 	//private static final Log log = LogFactory.getLog(OsmDbAccessor.class);
-	
+
 	private PreparedStatement pselectNode;
 	private PreparedStatement pselectWay;
 	private PreparedStatement pselectRelation;
@@ -40,20 +40,20 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 	private boolean realCounts = false;
 	private Connection dbConn;
 	private DBDialect dialect;
-	
+
 	private PreparedStatement iterateNodes;
 	private PreparedStatement iterateWays;
 	private PreparedStatement iterateRelations;
 	private PreparedStatement iterateWayBoundaries;
-	
+
 //	private TLongObjectMap<V>
-	
+
 
 	public interface OsmDbVisitor {
 		public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException;
 	}
-	
-	
+
+
 	public void initDatabase(OsmDbCreator dbCreator)
 			throws SQLException {
 		updateCounts(dbCreator);
@@ -62,7 +62,7 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 			computeRealCounts(stmt);
 			stmt.close();
 		}
-		
+
 
 		pselectNode = dbConn.prepareStatement("select n.latitude, n.longitude, n.tags from node n where n.id = ?"); //$NON-NLS-1$
 		pselectWay = dbConn.prepareStatement("select w.node, w.ord, w.tags, n.latitude, n.longitude, n.tags " + //$NON-NLS-1$
@@ -87,24 +87,24 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 			allWays += dbCreator.getAllWays();
 		}
 	}
-	
+
 	public Connection getDbConn() {
 		return dbConn;
 	}
-	
+
 	public int getAllNodes() {
 		return allNodes;
 	}
-	
+
 	public int getAllRelations() {
 		return allRelations;
 	}
-	
+
 	public int getAllWays() {
 		return allWays;
 	}
-	
-	
+
+
 	@Override
 	public void loadEntityWay(Way e) throws SQLException {
 		if (e.getEntityIds().isEmpty()) {
@@ -128,12 +128,12 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 			}
 		}
 	}
-	
+
 	@Override
 	public void loadEntityRelation(Relation e) throws SQLException {
 		loadEntityRelation(e, 1);
 	}
-	
+
 	public void loadEntityRelation(Relation e, int level) throws SQLException {
 		if (e.isDataLoaded()) { //data was already loaded, nothing to do
 			return;
@@ -185,7 +185,7 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 			e.entityDataLoaded();
 		}
 	}
-	
+
 	public void readTags(Entity e, byte[] tags){
 		if (tags != null) {
 			try {
@@ -209,7 +209,7 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 	public int iterateOverEntities(IProgress progress, EntityType type, OsmDbVisitor visitor) throws SQLException, InterruptedException {
 		return iterateOverEntities(progress, type, visitor, true);
 	}
-	
+
 	public int iterateOverEntities(IProgress progress, EntityType type, OsmDbVisitor visitor, boolean realCounts) throws SQLException, InterruptedException {
 
 		PreparedStatement select;
@@ -219,7 +219,7 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 			computeRealCounts(statement);
 			statement.close();
 		}
-		
+
 		BlockingQueue<Entity> toProcess = new ArrayBlockingQueue<Entity>(100000);
 		AbstractProducer entityProducer = null;
 		if (type == EntityType.NODE) {
@@ -238,7 +238,7 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 		}
 		entityProducer = new EntityProducer(toProcess, type, select);
 		progress.startWork(count);
-		
+
 		//produce
 		entityProducer.start();
 		try {
@@ -246,7 +246,7 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 			Thread.sleep(150);
 		} catch (InterruptedException e) {
 		}
-		
+
 		Entity entityToProcess = null;
 		Entity endEntity = entityProducer.getEndingEntity();
 		while ((entityToProcess = toProcess.take())  != endEntity) {
@@ -258,7 +258,7 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 		return count;
 	}
 
-	
+
 	public void computeRealCounts(Statement statement) throws SQLException {
 		if (!realCounts) {
 			realCounts = true;
@@ -270,8 +270,8 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 		}
 	}
 
-	
-	
+
+
 	public void closeReadingConnection() throws SQLException {
 		if (pselectNode != null) {
 			pselectNode.close();
@@ -299,13 +299,13 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 
 	public class AbstractProducer extends Thread {
 		private final Entity endingEntity = new Node(0,0,0);
-		
+
 		public Entity getEndingEntity() {
 			return endingEntity;
 		}
 	}
-	
-	
+
+
 	public class EntityProducer extends AbstractProducer {
 
 		private final BlockingQueue<Entity> toProcess;
@@ -316,7 +316,7 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 		public EntityProducer(BlockingQueue<Entity> toProcess, EntityType type, PreparedStatement select) {
 			this(toProcess,type,select,true);
 		}
-		
+
 		public EntityProducer(BlockingQueue<Entity> toProcess, EntityType type, PreparedStatement select, boolean putEndingEntity) {
 			this.toProcess = toProcess;
 			this.type = type;
@@ -387,7 +387,7 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 				}
 			}
 		}
-		
+
 	}
 
 	public void setDbConn(Object dbConnection, DBDialect dialect) {

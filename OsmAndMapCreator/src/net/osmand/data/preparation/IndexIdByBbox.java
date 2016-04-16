@@ -75,26 +75,26 @@ public class IndexIdByBbox {
 	    }
 	    return result;
 	}
-	
-	
+
+
 	static class Boundary {
-		static final int VL = -500; 
+		static final int VL = -500;
 		int top = VL;
 		int left = VL;
 		int right = VL;
 		int bottom = VL;
 		Boundary next;
 		static final int DIST_O = 5 * 10000000;
-		
+
 		public void clear() {
 			next = null;
 			top = left = right = bottom = VL;
 		}
-		
+
 		public void update(int x, int y) {
 			update(y, x, y, x);
 		}
-		
+
 		public void update(int t, int l, int b, int r) {
 			if (VL == left && VL == bottom && top == VL && right == VL) {
 				this.left = l;
@@ -103,7 +103,7 @@ public class IndexIdByBbox {
 				this.right = r;
 			} else {
 				boolean tooMuchDistance = false;
-				tooMuchDistance = 
+				tooMuchDistance =
 						(Math.abs(top - t) > DIST_O && Math.abs(bottom - t) > DIST_O) ||
 						(Math.abs(top - b) > DIST_O && Math.abs(bottom - b) > DIST_O) ||
 						(Math.abs(right - r) > DIST_O && Math.abs(left - r) > DIST_O) ||
@@ -121,7 +121,7 @@ public class IndexIdByBbox {
 				}
 			}
 		}
-		
+
 		public int depth() {
 			if(next == null) {
 				return 1;
@@ -136,48 +136,48 @@ public class IndexIdByBbox {
 		public void update(LatLon ll) {
 			update(convertLon(ll.getLongitude()), convertLat(ll.getLatitude()));
 		}
-		
+
 		public int getTop(boolean all) {
 			if(next == null || !all) {
 				return top;
 			}
 			return Math.max(top, next.getTop(all));
 		}
-		
-		
+
+
 		public int getRight(boolean all) {
 			if(next == null || !all) {
 				return right;
 			}
 			return Math.max(right, next.getRight(all));
 		}
-		
+
 		public int getLeft(boolean all) {
 			if(next == null || !all) {
 				return left;
 			}
 			return Math.min(left, next.getLeft(all));
 		}
-		
+
 		public int getBottom(boolean all) {
 			if(next == null || !all) {
 				return bottom;
 			}
 			return Math.min(bottom, next.getBottom(all));
 		}
-		
+
 		public double getTopLat(boolean all) {
 			return convertToLat(getTop(all));
 		}
-		
+
 		public double getBottomLat(boolean all) {
 			return convertToLat(getBottom(all));
 		}
-		
+
 		public double getRightLon(boolean all) {
 			return convertToLon(getRight(all));
 		}
-		
+
 		public double getLeftLon(boolean all) {
 			return convertToLon(getLeft(all));
 		}
@@ -185,15 +185,15 @@ public class IndexIdByBbox {
 		public double convertToLat(int y) {
 			return y / 10000000.0;
 		}
-		
+
 		public double convertToLon(int x) {
 			return x / 10000000.0;
 		}
-		
+
 		public int convertLat(double latitude) {
 			return (int) (MapUtils.checkLatitude(latitude) * 10000000);
 		}
-		
+
 		public int convertLon(double longitude) {
 			return (int) (MapUtils.checkLongitude(longitude) * 10000000);
 		}
@@ -231,9 +231,9 @@ public class IndexIdByBbox {
 			}
 			return  s;
 		}
-		
+
 	}
-	
+
 	public static class QueryData {
 		ByteBuffer buf8 = ByteBuffer.allocate(8);
 		ByteBuffer buf16 = ByteBuffer.allocate(16);
@@ -242,8 +242,8 @@ public class IndexIdByBbox {
 		Boundary boundary = new Boundary();
 		long queried;
 		long written;
-		
-		
+
+
 		public void updateBoundary(long id, byte[] bbox) {
 			queried ++;
 			if(bbox == null) {
@@ -277,10 +277,10 @@ public class IndexIdByBbox {
 					int b = buf16.getInt();
 					boundary.update(t, l, b, r);
 				}
-			}			
+			}
 		}
 	}
-	
+
 	abstract static class DatabaseAdapter {
 		File target;
 
@@ -288,17 +288,17 @@ public class IndexIdByBbox {
 			this.target = target;
 		}
 		public abstract void prepareToCreate() throws Exception;
-		
+
 		public abstract void prepareToRead() throws Exception;
-		
+
 		public abstract void putBbox(long key, byte[] bbox) throws Exception;
-		
+
 		public abstract void commitBatch() throws Exception;
-		
+
 		public abstract void close() throws Exception;
-		
+
 		public abstract byte[] query(long id) throws Exception;
-		
+
 		public byte[] getBbox(QueryData qd) throws Exception {
 			qd.missing.clear();
 			qd.boundary.clear();
@@ -312,20 +312,20 @@ public class IndexIdByBbox {
 			}
 			return qd.boundary.getBytes(qd.buf16);
 		}
-		
+
 		public void put(long id, LatLon ll, QueryData qd) throws Exception {
 			qd.buf8.clear();
 			qd.buf8.putInt(qd.boundary.convertLat(ll.getLatitude()));
 			qd.buf8.putInt(qd.boundary.convertLon(ll.getLongitude()));
-			putBbox(id, qd.buf8.array());			
-		} 
+			putBbox(id, qd.buf8.array());
+		}
 	}
-	
+
 	static class NullDatabaseTest extends DatabaseAdapter {
 		public NullDatabaseTest(File target) {
 			super(target);
 		}
-		
+
 		@Override
 		public void prepareToCreate() throws DBException, IOException, SQLException {
 		}
@@ -349,10 +349,10 @@ public class IndexIdByBbox {
 
 		@Override
 		public void prepareToRead() throws Exception {
-			
+
 		}
 	}
-	
+
 	class SqliteDatabaseAdapter extends DatabaseAdapter {
 		private int count;
 		private DBDialect sqlite = DBDialect.SQLITE;
@@ -366,7 +366,7 @@ public class IndexIdByBbox {
 		public SqliteDatabaseAdapter(File target) {
 			super(target);
 		}
-		
+
 
 		@Override
 		public void prepareToRead() throws Exception {
@@ -397,7 +397,7 @@ public class IndexIdByBbox {
 			queryByIdIn100 = db.prepareStatement(b100 + ")");
 			queryByIdIn10 = db.prepareStatement(b10 + ")");
 		}
-		
+
 		@Override
 		public void prepareToCreate() throws DBException, IOException, SQLException {
 			createTables = !target.exists();
@@ -446,7 +446,7 @@ public class IndexIdByBbox {
 			}
 			db.close();
 		}
-		
+
 		@Override
 		public byte[] getBbox(QueryData qd) throws Exception {
 			qd.missing.clear();
@@ -494,7 +494,7 @@ public class IndexIdByBbox {
 		}
 
 	}
-	
+
 	static class LevelDbDatabaseAdapter extends DatabaseAdapter {
 
 		private NativeDB open;
@@ -505,7 +505,7 @@ public class IndexIdByBbox {
 		public LevelDbDatabaseAdapter(File target) {
 			super(target);
 		}
-		
+
 		@Override
 		public void prepareToCreate() throws DBException, IOException {
 			NativeOptions no = new NativeOptions().
@@ -530,7 +530,7 @@ public class IndexIdByBbox {
 						public String name() {
 							return "Natural long";
 						}
-						
+
 					});
 			open = NativeDB.open(no, target);
 			updates = new NativeWriteBatch();
@@ -544,7 +544,7 @@ public class IndexIdByBbox {
 			updates.put(buffer.array(), value);
 			count++;
 			if (count >= BATCH_SIZE) {
-				commitBatch();	
+				commitBatch();
 			}
 		}
 
@@ -573,7 +573,7 @@ public class IndexIdByBbox {
 		public void prepareToRead() throws Exception {
 		}
 	}
-	
+
 	public static long nodeId(long id) {
 		return id << 2;
 	}
@@ -581,13 +581,13 @@ public class IndexIdByBbox {
 	public static long wayId(long id) {
 		return (id << 2) | 1;
 	}
-	
+
 	public static long relationId(long id) {
 		return (id << 2) | 2;
 	}
-	
-	
-	
+
+
+
 	public static long convertId(EntityId eid) {
 		if(eid.getType() == EntityType.NODE) {
 			return nodeId(eid.getId());
@@ -597,7 +597,7 @@ public class IndexIdByBbox {
 			return relationId(eid.getId());
 		}
 	}
-	
+
 	protected File[] getSortedFiles(File dir){
 		File[] listFiles = dir.listFiles();
 		if(listFiles == null) {
@@ -611,7 +611,7 @@ public class IndexIdByBbox {
 		});
 		return listFiles;
 	}
-	
+
 	public void splitRegionsOsc(String mainFolder, String indexFile, String planetFile, String ocbfFile) throws Exception {
 		File index = new File(indexFile);
 		if(!index.exists()) {
@@ -633,7 +633,7 @@ public class IndexIdByBbox {
 		}
 		adapter.close();
 	}
-	
+
 	private static class IdRect {
 		public double left;
 		public double right;
@@ -642,7 +642,7 @@ public class IndexIdByBbox {
 		public String action = "";
 	}
 
-	private void updateOsmFile(File oscFile, final DatabaseAdapter adapter, OsmandRegions regs, File procFolder) throws 
+	private void updateOsmFile(File oscFile, final DatabaseAdapter adapter, OsmandRegions regs, File procFolder) throws
 			IOException, SAXException, Exception {
 		String baseFile = oscFile.getName().substring(0, oscFile.getName().length() - "osc.gz".length());
 		File oscFileTxt = new File(oscFile.getParentFile(), baseFile + "txt");
@@ -673,7 +673,7 @@ public class IndexIdByBbox {
 		for(String country : countryUpdates.keySet()) {
 			File folder = new File(procFolder.getParentFile(), country);
 			folder.mkdirs();
-			
+
 			Algorithms.fileCopy(oscFile, new File(folder, oscFile.getName()));
 			Algorithms.fileCopy(oscFileTxt, new File(folder, oscFileTxt.getName()));
 			File ids = new File(folder, baseFile + "ids.txt");
@@ -801,7 +801,7 @@ public class IndexIdByBbox {
 						}
 					}
 					updateDownloadList(regs, qd, included, key, entity);
-					
+
 				} catch (Exception e) {
 					throw new RuntimeException(e);
 				}
@@ -888,9 +888,9 @@ public class IndexIdByBbox {
 				}
 			}
 
-			
+
 		});
-		
+
 		((OsmBaseStoragePbf) pbfReader).parseOSMPbf(fis, new ConsoleProgressImplementation(), false);
 		fis.close();
 		while(!pendingRelations.isEmpty()) {
@@ -903,19 +903,19 @@ public class IndexIdByBbox {
 			if(npendingRelations.size() == sz) {
 				for(Relation r : pendingRelations) {
 					processRelations(stats, processor, null, r, qd);
-				}	
+				}
 				break;
 			}
 			pendingRelations.clear();
 			pendingRelations.addAll(npendingRelations);
 		}
-		System.out.println("Error stats: " + stats[0] + " way null bbox, " + 
+		System.out.println("Error stats: " + stats[0] + " way null bbox, " +
 				stats[1] + " relation null bbox, " + stats[2] + " relation in cycle");
 		System.out.println("Comitting");
 		processor.close();
 		System.out.println("Done");
 	}
-	
+
 	private void processRelations(final int[] stats, final DatabaseAdapter processor,
 			final List<Relation> pendingRelations, Entity entity, QueryData qd) throws Exception {
 		Relation r = (Relation) entity;
@@ -952,7 +952,7 @@ public class IndexIdByBbox {
 			}
 		}
 	}
-	
+
 	public static void main(String[] args) throws Exception {
 		String operation = "";
 //		operation = "query";
@@ -964,7 +964,7 @@ public class IndexIdByBbox {
 		String location = "/Users/victorshcherb/osmand/temp/osmc/";
 //		String location = "/Users/victorshcherb/osmand/temp/Netherlands-noord-holland.osc";
 //		String location = "/Users/victorshcherb/osmand/temp/010.osc.gz";
-		
+
 		if (args.length > 1) {
 			location = args[1];
 		}
@@ -996,7 +996,7 @@ public class IndexIdByBbox {
 //			qd.ids.add(wayId(93368155l));
 //			qd.ids.add(nodeId(2042972578l));
 			processor.getBbox(qd);
-			System.out.println("Bbox " + qd.boundary.getTopLat(false) + ", " + qd.boundary.getLeftLon(false) + " - " 
+			System.out.println("Bbox " + qd.boundary.getTopLat(false) + ", " + qd.boundary.getLeftLon(false) + " - "
 					+ qd.boundary.getBottomLat(false) + ", " + qd.boundary.getRightLon(false));
 			processor.close();
 		}

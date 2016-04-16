@@ -92,7 +92,7 @@ public class BinaryMapIndexWriter {
 
 	private static final boolean USE_DEPRECATED_POI_NAME_ADD_INFO_STRUCTURE = true;
 	private static final boolean USE_DEPRECATED_POI_NAME_STRUCTURE = true;
-	
+
 	private RandomAccessFile raf;
 	private CodedOutputStream codedOutStream;
 	protected static final int SHIFT_COORDINATES = BinaryMapIndexReader.SHIFT_COORDINATES;
@@ -138,10 +138,10 @@ public class BinaryMapIndexWriter {
 	private final static int POI_INDEX_INIT = 12;
 	private final static int POI_BOX = 13;
 	private final static int POI_DATA = 14;
-	
+
 	private final static int ROUTE_INDEX_INIT = 15;
 	private final static int ROUTE_TREE = 16;
-	
+
 
 	public BinaryMapIndexWriter(final RandomAccessFile raf, long timestamp) throws IOException {
 		this.raf = raf;
@@ -166,8 +166,8 @@ public class BinaryMapIndexWriter {
 		codedOutStream.writeInt64(OsmandOdb.OsmAndStructure.DATECREATED_FIELD_NUMBER, timestamp);
 		state.push(OSMAND_STRUCTURE_INIT);
 	}
-	
-	
+
+
 	public BinaryMapIndexWriter(final RandomAccessFile raf, CodedOutputStream cos) throws IOException {
 		this.raf = raf;
 		codedOutStream = cos;
@@ -205,7 +205,7 @@ public class BinaryMapIndexWriter {
 		int length = ref.writeReference(raf, filePointer);
 		return length;
 	}
-	
+
 	private int prewriteInt32Size() throws IOException {
 		long filePointer = getFilePointer();
 		BinaryFileReference ref = stackSizes.peek();
@@ -222,13 +222,13 @@ public class BinaryMapIndexWriter {
 			codedOutStream.writeString(OsmandOdb.OsmAndMapIndex.NAME_FIELD_NUMBER, name);
 		}
 	}
-	
+
 	public void endWriteMapIndex() throws IOException {
 		popState(MAP_INDEX_INIT);
 		int len = writeInt32Size();
 		log.info("MAP INDEX SIZE : " + len);
 	}
-	
+
 	public void startWriteRouteIndex(String name) throws IOException {
 		pushState(ROUTE_INDEX_INIT, OSMAND_STRUCTURE_INIT);
 		codedOutStream.writeTag(OsmandOdb.OsmAndStructure.ROUTINGINDEX_FIELD_NUMBER, WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
@@ -237,8 +237,8 @@ public class BinaryMapIndexWriter {
 			codedOutStream.writeString(OsmandOdb.OsmAndRoutingIndex.NAME_FIELD_NUMBER, name);
 		}
 	}
-	
-	
+
+
 	public void endWriteRouteIndex() throws IOException {
 		popState(ROUTE_INDEX_INIT);
 		int len = writeInt32Size();
@@ -248,21 +248,21 @@ public class BinaryMapIndexWriter {
 		log.info("- ROUTE STRING SIZE " + BinaryMapIndexWriter.ROUTE_STRING_DATA_SIZE); //$NON-NLS-1$
 		log.info("- ROUTE ID SIZE " + BinaryMapIndexWriter.ROUTE_ID_SIZE); //$NON-NLS-1$
 		log.info("-- ROUTE_DATA " + BinaryMapIndexWriter.ROUTE_DATA_SIZE); //$NON-NLS-1$
-		ROUTE_TYPES_SIZE = ROUTE_DATA_SIZE = ROUTE_POINTS_SIZE = ROUTE_ID_SIZE = 
+		ROUTE_TYPES_SIZE = ROUTE_DATA_SIZE = ROUTE_POINTS_SIZE = ROUTE_ID_SIZE =
 				ROUTE_COORDINATES_COUNT = ROUTE_COORDINATES_SIZE = 0;
 		log.info("ROUTE INDEX SIZE : " + len);
 	}
-	
+
 	public void simulateWriteEndRouteIndex() throws IOException {
 		checkPeekState(ROUTE_INDEX_INIT);
 		int len = prewriteInt32Size();
 		log.info("PREROUTE INDEX SIZE : " + len);
 	}
-	
+
 	public RandomAccessFile getRaf() {
 		return raf;
 	}
-	
+
 
 	public void startWriteMapLevelIndex(int minZoom, int maxZoom, int leftX, int rightX, int topY, int bottomY) throws IOException {
 		pushState(MAP_ROOT_LEVEL_INIT, MAP_INDEX_INIT);
@@ -285,7 +285,7 @@ public class BinaryMapIndexWriter {
 		int len = writeInt32Size();
 		log.info("MAP level SIZE : " + len);
 	}
-	
+
 	public void writeMapEncodingRules(BinaryMapIndexReader reader, MapIndex part) throws IOException {
 		for(int i = 1; i <= part.decodingRules.size(); i++) {
 			TagValuePair value = part.decodingRules.get(i);
@@ -344,7 +344,7 @@ public class BinaryMapIndexWriter {
 			codedOutStream.writeMessage(OsmandOdb.OsmAndMapIndex.RULES_FIELD_NUMBER, rulet);
 		}
 	}
-	
+
 	public void writeRouteEncodingRules(List<MapRouteType> types) throws IOException {
 		checkPeekState(ROUTE_INDEX_INIT);
 
@@ -372,7 +372,7 @@ public class BinaryMapIndexWriter {
 			codedOutStream.writeMessage(OsmandOdb.OsmAndRoutingIndex.RULES_FIELD_NUMBER, rulet);
 		}
 	}
-	
+
 	public BinaryFileReference startRouteTreeElement(int leftX, int rightX, int topY, int bottomY, boolean containsObjects,
 			boolean basemap) throws IOException {
 		checkPeekState(ROUTE_TREE, ROUTE_INDEX_INIT);
@@ -389,12 +389,12 @@ public class BinaryMapIndexWriter {
 		preserveInt32Size();
 		long fp = getFilePointer();
 
-		
-		Bounds bounds; 
+
+		Bounds bounds;
 		if(stackBounds.isEmpty()) {
 			bounds = new Bounds(0, 0, 0, 0);
 		} else {
-			bounds = stackBounds.peek(); 
+			bounds = stackBounds.peek();
 		}
 		codedOutStream.writeSInt32(RouteDataBox.LEFT_FIELD_NUMBER, leftX - bounds.leftX);
 		codedOutStream.writeSInt32(RouteDataBox.RIGHT_FIELD_NUMBER, rightX - bounds.rightX);
@@ -415,13 +415,13 @@ public class BinaryMapIndexWriter {
 		stackBounds.pop();
 		writeInt32Size();
 	}
-	
-	
-	
+
+
+
 	public BinaryFileReference startMapTreeElement(int leftX, int rightX, int topY, int bottomY, boolean containsLeaf) throws IOException {
 		return startMapTreeElement(leftX, rightX, topY, bottomY, containsLeaf, 0);
 	}
-	
+
 	public BinaryFileReference startMapTreeElement(int leftX, int rightX, int topY, int bottomY, boolean containsObjects, int landCharacteristic) throws IOException {
 		checkPeekState(MAP_ROOT_LEVEL_INIT, MAP_TREE);
 		if (state.peek() == MAP_ROOT_LEVEL_INIT) {
@@ -467,7 +467,7 @@ public class BinaryMapIndexWriter {
 	public static int TYPES_SIZE = 0;
 	public static int MAP_DATA_SIZE = 0;
 	public static int STRING_TABLE_SIZE = 0;
-	
+
 	public static int ROUTE_ID_SIZE = 0;
 	public static int ROUTE_TYPES_SIZE = 0;
 	public static int ROUTE_COORDINATES_SIZE = 0;
@@ -503,8 +503,8 @@ public class BinaryMapIndexWriter {
 		ROUTE_DATA_SIZE += block.getSerializedSize();
 		codedOutStream.writeMessageNoTag(block);
 	}
-	
-	
+
+
 
 	/**
 	 * Encode and write a varint. {@code value} is treated as unsigned, so it won't be sign-extended if negative.
@@ -525,8 +525,8 @@ public class BinaryMapIndexWriter {
 	public void writeRawByte(TByteArrayList bf, final int value) throws IOException {
 		bf.add((byte) value);
 	}
-	
-	public RouteData writeRouteData(int diffId, int pleft, int ptop, int[] types, RoutePointToWrite[] points, 
+
+	public RouteData writeRouteData(int diffId, int pleft, int ptop, int[] types, RoutePointToWrite[] points,
 			Map<MapRouteType, String> names, Map<String, Integer> stringTable, List<MapPointName> pointNames, RouteDataBlock.Builder dataBlock,
 			boolean allowCoordinateSimplification, boolean writePointId)
 			throws IOException {
@@ -548,7 +548,7 @@ public class BinaryMapIndexWriter {
 		typesDataBuf.clear();
 		for(int k=0; k<points.length; k++) {
 			ROUTE_COORDINATES_COUNT++;
-			
+
 			int tx = (points[k].x >> ROUTE_SHIFT_COORDINATES) - pcalcx;
 			int ty = (points[k].y >> ROUTE_SHIFT_COORDINATES) - pcalcy;
 			writeRawVarint32(mapDataBuf, CodedOutputStream.encodeZigZag32(tx));
@@ -587,7 +587,7 @@ public class BinaryMapIndexWriter {
 			ROUTE_STRING_DATA_SIZE += mapDataBuf.size();
 			builder.setPointNames(ByteString.copyFrom(mapDataBuf.toArray()));
 		}
-		
+
 		if (names.size() > 0) {
 			mapDataBuf.clear();
 			for (Entry<MapRouteType, String> s : names.entrySet()) {
@@ -602,13 +602,13 @@ public class BinaryMapIndexWriter {
 			ROUTE_STRING_DATA_SIZE += mapDataBuf.size();
 			builder.setStringNames(ByteString.copyFrom(mapDataBuf.toArray()));
 		}
-		
+
 		return builder.build();
 	}
-	
+
 	public void writeMapDataBlock(MapDataBlock.Builder builder, Map<String, Integer> stringTable, BinaryFileReference ref)
 			throws IOException {
-		
+
 		checkPeekState(MAP_ROOT_LEVEL_INIT);
 		StringTable.Builder bs = OsmandOdb.StringTable.newBuilder();
 		if (stringTable != null) {
@@ -621,9 +621,9 @@ public class BinaryMapIndexWriter {
 		int size = st.getSerializedSize();
 		STRING_TABLE_SIZE += CodedOutputStream.computeTagSize(OsmandOdb.MapDataBlock.STRINGTABLE_FIELD_NUMBER)
 				+ CodedOutputStream.computeRawVarint32Size(size) + size;
-		
+
 		codedOutStream.writeTag(OsmAndMapIndex.MapRootLevel.BLOCKS_FIELD_NUMBER, FieldType.MESSAGE.getWireType());
-		
+
 		codedOutStream.flush();
 		ref.writeReference(raf, getFilePointer());
 		MapDataBlock block = builder.build();
@@ -699,7 +699,7 @@ public class BinaryMapIndexWriter {
 				}
 			}
 		}
-		
+
 		mapDataBuf.clear();
 		for (int i = 0; i < typeUse.length ; i++) {
 			writeRawVarint32(mapDataBuf, typeUse[i]);
@@ -746,7 +746,7 @@ public class BinaryMapIndexWriter {
 		ID_SIZE += CodedOutputStream.computeSInt64Size(OsmandOdb.MapData.ID_FIELD_NUMBER, diffId);
 		return data.build();
 	}
-	
+
 	public static class RoutePointToWrite {
 		public TIntArrayList types = new TIntArrayList();
 		public TIntArrayList nameTypes = new TIntArrayList();
@@ -755,7 +755,7 @@ public class BinaryMapIndexWriter {
 		public int x;
 		public int y;
 	}
-	
+
 	private static double orthogonalDistance(int x, int y, int x1, int y1, int x2, int y2) {
 		long A = (x - x1);
 		long B = (y - y1);
@@ -809,17 +809,17 @@ public class BinaryMapIndexWriter {
 		int len = writeInt32Size();
 		log.info("ADDRESS INDEX SIZE : " + len);
 	}
-	
-	
+
+
 	public void writeAddressNameIndex(Map<String, List<MapObject>> namesIndex) throws IOException {
 		checkPeekState(ADDRESS_INDEX_INIT);
 		codedOutStream.writeTag(OsmAndAddressIndex.NAMEINDEX_FIELD_NUMBER, WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
 		preserveInt32Size();
-		
+
 		Map<String, BinaryFileReference> res = writeIndexedTable(OsmAndAddressNameIndexData.TABLE_FIELD_NUMBER, namesIndex.keySet());
 		for(Entry<String, List<MapObject>> entry : namesIndex.entrySet()) {
 			BinaryFileReference ref = res.get(entry.getKey());
-			
+
 			codedOutStream.writeTag(OsmAndAddressNameIndexData.ATOM_FIELD_NUMBER, FieldType.MESSAGE.getWireType());
 			codedOutStream.flush();
 			long pointer = getFilePointer();
@@ -848,7 +848,7 @@ public class BinaryMapIndexWriter {
 				} else if(o instanceof Street) {
 					type = 4;
 				}
-				atom.setType(type); 
+				atom.setType(type);
 				atom.addShiftToIndex((int) (pointer - o.getFileOffset()));
 				if(o instanceof Street){
 					atom.addShiftToCityIndex((int) (pointer - ((Street) o).getCity().getFileOffset()));
@@ -857,7 +857,7 @@ public class BinaryMapIndexWriter {
 			}
 			codedOutStream.writeMessageNoTag(builder.build());
 		}
-		
+
 		int len = writeInt32Size();
 		log.info("ADDRESS NAME INDEX SIZE : " + len);
 	}
@@ -873,8 +873,8 @@ public class BinaryMapIndexWriter {
 		checkPeekState(CITY_INDEX_INIT);
 		codedOutStream.writeTag(CitiesIndex.CITIES_FIELD_NUMBER, FieldType.MESSAGE.getWireType());
 		long startMessage = getFilePointer();
-		
-		
+
+
 		CityIndex.Builder cityInd = OsmandOdb.CityIndex.newBuilder();
 		if(cityType >= 0) {
 			cityInd.setCityType(cityType);
@@ -882,7 +882,7 @@ public class BinaryMapIndexWriter {
 		if(city.getId() != null) {
 			cityInd.setId(city.getId());
 		}
-		
+
 		cityInd.setName(city.getName());
 		if(checkEnNameToWrite(city)){
 			cityInd.setNameEn(city.getEnName(false));
@@ -896,8 +896,8 @@ public class BinaryMapIndexWriter {
 				cityInd.addAttributeValues(next.getValue());
 			}
 		}
-		
-		
+
+
 		int cx = MapUtils.get31TileNumberX(city.getLocation().getLongitude());
 		int cy = MapUtils.get31TileNumberY(city.getLocation().getLatitude());
 		cityInd.setX(cx);
@@ -906,10 +906,10 @@ public class BinaryMapIndexWriter {
 		codedOutStream.writeMessageNoTag(cityInd.build());
 		codedOutStream.flush();
 		return BinaryFileReference.createShiftReference(getFilePointer() - 4, startMessage);
-		
+
 	}
-	
-	public void writeCityIndex(City cityOrPostcode, List<Street> streets, Map<Street, List<Node>> wayNodes, 
+
+	public void writeCityIndex(City cityOrPostcode, List<Street> streets, Map<Street, List<Node>> wayNodes,
 			BinaryFileReference ref, Map<String, Integer> tagRules) throws IOException {
 		checkPeekState(CITY_INDEX_INIT);
 		codedOutStream.writeTag(CitiesIndex.BLOCKS_FIELD_NUMBER, FieldType.MESSAGE.getWireType());
@@ -920,7 +920,7 @@ public class BinaryMapIndexWriter {
 		CityBlockIndex.Builder cityInd = OsmandOdb.CityBlockIndex.newBuilder();
 		cityInd.setShiftToCityIndex((int) (startMessage - startCityBlock));
 		long currentPointer = startMessage + 4 + CodedOutputStream.computeTagSize(CityBlockIndex.SHIFTTOCITYINDEX_FIELD_NUMBER);
-		
+
 		int cx = MapUtils.get31TileNumberX(cityOrPostcode.getLocation().getLongitude());
 		int cy = MapUtils.get31TileNumberY(cityOrPostcode.getLocation().getLatitude());
 		Map<Long, Set<Street>> mapNodeToStreet = new LinkedHashMap<Long, Set<Street>>();
@@ -944,7 +944,7 @@ public class BinaryMapIndexWriter {
 			s.setFileOffset((int) currentPointer);
 			currentPointer += CodedOutputStream.computeMessageSizeNoTag(streetInd);
 			cityInd.addStreets(streetInd);
-			
+
 		}
 		CityBlockIndex block = cityInd.build();
 		int size = CodedOutputStream.computeRawVarint32Size( block.getSerializedSize());
@@ -967,8 +967,8 @@ public class BinaryMapIndexWriter {
 		log.info("CITIES size " + length);
 	}
 
-	protected StreetIndex createStreetAndBuildings(Street street, int cx, int cy, String postcodeFilter, 
-			Map<Long, Set<Street>> mapNodeToStreet, Map<Street, List<Node>> wayNodes, 
+	protected StreetIndex createStreetAndBuildings(Street street, int cx, int cy, String postcodeFilter,
+			Map<Long, Set<Street>> mapNodeToStreet, Map<Street, List<Node>> wayNodes,
 			Map<String, Integer> tagRules) throws IOException {
 		checkPeekState(CITY_INDEX_INIT);
 		StreetIndex.Builder streetBuilder = OsmandOdb.StreetIndex.newBuilder();
@@ -1002,7 +1002,7 @@ public class BinaryMapIndexWriter {
 			int by = MapUtils.get31TileNumberY(b.getLocation().getLatitude());
 			bbuilder.setX((bx - sx) >> 7);
 			bbuilder.setY((by - sy) >> 7);
-			
+
 			String number2 = b.getName2();
 			if(!Algorithms.isEmpty(number2)){
 				LatLon loc = b.getLatLon2();
@@ -1284,7 +1284,7 @@ public class BinaryMapIndexWriter {
 		}
 
 	}
-	
+
 	public void writePoiSubtypesTable(PoiCreatorCategories cs) throws IOException {
 		checkPeekState(POI_INDEX_INIT);
 		int subcatId = 0;
@@ -1304,7 +1304,7 @@ public class BinaryMapIndexWriter {
 				builder.addSubtypes(subType);
 			}
 		}
-		
+
 		for(String tag : groupAdditionalByTagName.keySet()) {
 			int cInd = subcatId++;
 			OsmAndPoiSubtype.Builder subType = OsmandOdb.OsmAndPoiSubtype.newBuilder();
@@ -1350,7 +1350,7 @@ public class BinaryMapIndexWriter {
 		checkPeekState(POI_INDEX_INIT);
 		codedOutStream.writeTag(OsmandOdb.OsmAndPoiIndex.NAMEINDEX_FIELD_NUMBER, WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
 		preserveInt32Size();
-		
+
 		Map<PoiTileBox, List<BinaryFileReference>> fpToWriteSeeks = new LinkedHashMap<PoiTileBox, List<BinaryFileReference>>();
 		Map<String, BinaryFileReference> indexedTable = writeIndexedTable(OsmandOdb.OsmAndPoiNameIndex.TABLE_FIELD_NUMBER, namesIndex.keySet());
 		for(Map.Entry<String, Set<PoiTileBox>> e : namesIndex.entrySet()) {
@@ -1358,7 +1358,7 @@ public class BinaryMapIndexWriter {
 			BinaryFileReference nameTableRef = indexedTable.get(e.getKey());
 			codedOutStream.flush();
 			nameTableRef.writeReference(raf, getFilePointer());
-			
+
 			OsmAndPoiNameIndex.OsmAndPoiNameIndexData.Builder builder = OsmAndPoiNameIndex.OsmAndPoiNameIndexData.newBuilder();
 			List<PoiTileBox> tileBoxes = new ArrayList<PoiTileBox>(e.getValue());
 			for(PoiTileBox box : tileBoxes) {
@@ -1371,10 +1371,10 @@ public class BinaryMapIndexWriter {
 				builder.addAtoms(atom);
 			}
 			OsmAndPoiNameIndex.OsmAndPoiNameIndexData msg = builder.build();
-			
+
 			codedOutStream.writeMessageNoTag(msg);
 			long endPointer = getFilePointer();
-			
+
 			// first message
 			int accumulateSize = 4;
 			for (int i = tileBoxes.size() - 1; i >= 0; i--) {
@@ -1388,10 +1388,10 @@ public class BinaryMapIndexWriter {
 
 			}
 		}
-		
+
 		writeInt32Size();
-		
-		
+
+
 		return fpToWriteSeeks;
 	}
 
@@ -1410,7 +1410,7 @@ public class BinaryMapIndexWriter {
 		writeInt32Size();
 		return res;
 	}
-	
+
 	private String retrieveAdditionalType(String key, Map<PoiAdditionalType, String> additionalNames) {
 		PoiAdditionalType k = null;
 		for(PoiAdditionalType t : additionalNames.keySet()) {
@@ -1425,8 +1425,8 @@ public class BinaryMapIndexWriter {
 		return additionalNames.remove(k);
 	}
 
-	public void writePoiDataAtom(long id, int x24shift, int y24shift, 
-			String type, String subtype, Map<PoiAdditionalType, String> additionalNames, 
+	public void writePoiDataAtom(long id, int x24shift, int y24shift,
+			String type, String subtype, Map<PoiAdditionalType, String> additionalNames,
 			PoiCreatorCategories globalCategories, int limitZip) throws IOException {
 		checkPeekState(POI_DATA);
 		TIntArrayList types = globalCategories.buildTypeIds(type, subtype);
@@ -1437,7 +1437,7 @@ public class BinaryMapIndexWriter {
 			int j = types.get(i);
 			builder.addCategories(j);
 		}
-		
+
 		builder.setId(id);
 
 		if (USE_DEPRECATED_POI_NAME_STRUCTURE) {
@@ -1448,13 +1448,13 @@ public class BinaryMapIndexWriter {
 			String nameEn = retrieveAdditionalType("name:en", additionalNames);
 			if (!Algorithms.isEmpty(nameEn)) {
 				builder.setNameEn(nameEn);
-			}	
+			}
 		}
-		
+
 		if (USE_DEPRECATED_POI_NAME_ADD_INFO_STRUCTURE) {
 			String openingHours = retrieveAdditionalType("opening_hours", additionalNames);
 			String site = retrieveAdditionalType("website", additionalNames);
-			String phone = retrieveAdditionalType("phone", additionalNames); 
+			String phone = retrieveAdditionalType("phone", additionalNames);
 			String description = retrieveAdditionalType("description", additionalNames);
 
 			if (!Algorithms.isEmpty(openingHours)) {
@@ -1470,7 +1470,7 @@ public class BinaryMapIndexWriter {
 				builder.setNote(description);
 			}
 		}
-		
+
 		for (Map.Entry<PoiAdditionalType, String> rt : additionalNames.entrySet()) {
 			int targetPoiId = rt.getKey().getTargetId();
 			if (targetPoiId < 0) {
@@ -1596,7 +1596,7 @@ public class BinaryMapIndexWriter {
 		codedOutStream.writeInt32(OsmandOdb.OsmAndStructure.VERSIONCONFIRM_FIELD_NUMBER, IndexConstants.BINARY_MAP_VERSION);
 		codedOutStream.flush();
 	}
-	
+
 	public void preclose() throws IOException {
 		codedOutStream.writeInt32(OsmandOdb.OsmAndStructure.VERSIONCONFIRM_FIELD_NUMBER, IndexConstants.BINARY_MAP_VERSION);
 		codedOutStream.flush();

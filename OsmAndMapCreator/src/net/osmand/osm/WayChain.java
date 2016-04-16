@@ -9,35 +9,35 @@ import net.osmand.osm.edit.Way;
 public class WayChain  {
 	private List<Way> ways = new ArrayList<Way>(1);
 	private List<Node> chainNodes;
-	
+
 	public WayChain(Way w) {
 		ways.add(w);
 	}
-	
+
 	public List<Way> getWays() {
 		return ways;
 	}
-	
+
 	public void append(Way w) {
 		ways.add(w);
 	}
-	
+
 	public void append(WayChain w) {
 		ways.addAll(w.ways);
 	}
-	
+
 	public void prepend(Way w) {
 		ways.add(0, w);
 	}
-	
+
 	public long getFistNode(){
 		return ways.get(0).getFirstNodeId();
 	}
-	
+
 	public long getLastNode() {
 		return ways.get(ways.size() - 1).getLastNodeId();
 	}
-	
+
 	public boolean isIncomplete() {
 		for (int j = 0; j < ways.size(); j++) {
 			if(ways.get(j).getNodes().size() != ways.get(j).getNodeIds().size()) {
@@ -46,7 +46,7 @@ public class WayChain  {
 		}
 		return false;
 	}
-	
+
 	public List<Node> getChainNodes(){
 		if(chainNodes == null) {
 			chainNodes = new ArrayList<Node>();
@@ -61,9 +61,9 @@ public class WayChain  {
 					}
 				}
 			}
-			
+
 		}
 		return chainNodes;
 	}
-	
+
 }

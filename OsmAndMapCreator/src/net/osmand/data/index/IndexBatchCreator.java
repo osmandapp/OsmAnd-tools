@@ -54,21 +54,21 @@ import rtree.RTree;
 
 
 public class IndexBatchCreator {
-	
+
 	private static final int INMEM_LIMIT = 2000;
 
 	protected static final Log log = PlatformUtil.getLog(IndexBatchCreator.class);
-	
+
 	public static final String GEN_LOG_EXT = ".gen.log";
-	
-	
+
+
 	public static class RegionCountries {
 		String namePrefix = ""; // for states of the country
 		String nameSuffix = "";
 		Map<String, RegionSpecificData> regionNames = new LinkedHashMap<String, RegionSpecificData>();
 		String siteToDownload = "";
 	}
-	
+
 	private static class RegionSpecificData {
 		public String cityAdminLevel;
 		public String downloadName;
@@ -78,30 +78,30 @@ public class IndexBatchCreator {
 		public boolean indexMap = true;
 		public boolean indexRouting = true;
 	}
-	
-	
+
+
 	// process atributtes
 	File skipExistingIndexes;
 	MapZooms mapZooms = null;
-	Integer zoomWaySmoothness = null; 
-	
+	Integer zoomWaySmoothness = null;
+
 	File osmDirFiles;
 	File indexDirFiles;
 	File workDir;
-	
+
 	boolean indexPOI = false;
 	boolean indexTransport = false;
 	boolean indexAddress = false;
 	boolean indexMap = false;
 	boolean indexRouting = false;
-	
+
 	private String wget;
 
 	private DBDialect osmDbDialect;
 	private DBDialect mapDBDialect;
 
 	private String renderingTypesFile;
-	
+
 	public static void main(String[] args) {
 		IndexBatchCreator creator = new IndexBatchCreator();
 		OsmExtractionUI.configLogFile();
@@ -136,7 +136,7 @@ public class IndexBatchCreator {
 				}
 			}
 		}
-		
+
 		try {
 			Document doc = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(stream);
 			Document regions = null;
@@ -171,7 +171,7 @@ public class IndexBatchCreator {
 			safeClose(stream, "Error closing stream for " + name);
 		}
 	}
-	
+
 	public List<RegionCountries> setupProcess(Document doc, Document regions) throws SAXException, IOException, ParserConfigurationException{
 		NodeList list = doc.getElementsByTagName("process");
 		if(list.getLength() != 1){
@@ -184,20 +184,20 @@ public class IndexBatchCreator {
 			skipExistingIndexes = new File(file);
 		}
 		wget = process.getAttribute("wget");
-		
+
 		indexPOI = Boolean.parseBoolean(process.getAttribute("indexPOI"));
 		indexMap = Boolean.parseBoolean(process.getAttribute("indexMap"));
-		indexRouting = process.getAttribute("indexRouting") == null || 
+		indexRouting = process.getAttribute("indexRouting") == null ||
 				process.getAttribute("indexRouting").equalsIgnoreCase("true");
 		indexTransport = Boolean.parseBoolean(process.getAttribute("indexTransport"));
 		indexAddress = Boolean.parseBoolean(process.getAttribute("indexAddress"));
 		parseProcessAttributes(process);
-		
+
 		list = doc.getElementsByTagName("process_attributes");
 		if(list.getLength() == 1){
 			parseProcessAttributes((Element) list.item(0));
 		}
-	
+
 		String dir = process.getAttribute("directory_for_osm_files");
 		if(dir == null || !new File(dir).exists()) {
 			throw new IllegalArgumentException("Please specify directory with .osm or .osm.bz2 files as directory_for_osm_files (attribute)" + dir); //$NON-NLS-1$
@@ -213,13 +213,13 @@ public class IndexBatchCreator {
 		if(dir != null && new File(dir).exists()) {
 			workDir = new File(dir);
 		}
-		
+
 		List<RegionCountries> countriesToDownload = new ArrayList<RegionCountries>();
 		parseCountriesToDownload(doc, countriesToDownload);
 		if (regions != null) {
 			parseCountriesToDownload(regions, countriesToDownload);
 		}
-		
+
 		return countriesToDownload;
 	}
 
@@ -263,7 +263,7 @@ public class IndexBatchCreator {
 					}
 				}
 				countriesToDownload.add(countries);
-				
+
 			}
 		}
 	}
@@ -275,13 +275,13 @@ public class IndexBatchCreator {
 		} else {
 			mapZooms = MapZooms.parseZooms(zooms);
 		}
-		
+
 		String szoomWaySmoothness = process.getAttribute("zoomWaySmoothness");
 		if(szoomWaySmoothness != null && !szoomWaySmoothness.isEmpty()){
 			zoomWaySmoothness = Integer.parseInt(szoomWaySmoothness);
 		}
 		renderingTypesFile = process.getAttribute("renderingTypesFile");
-		
+
 		String osmDbDialect = process.getAttribute("osmDbDialect");
 		if(osmDbDialect != null && osmDbDialect.length() > 0){
 			try {
@@ -289,7 +289,7 @@ public class IndexBatchCreator {
 			} catch (RuntimeException e) {
 			}
 		}
-		
+
 		String mapDbDialect = process.getAttribute("mapDbDialect");
 		if (mapDbDialect != null && mapDbDialect.length() > 0) {
 			try {
@@ -298,7 +298,7 @@ public class IndexBatchCreator {
 			}
 		}
 	}
-	
+
 	public void runBatch(List<RegionCountries> countriesToDownload ){
 		Set<String> alreadyGeneratedFiles = new LinkedHashSet<String>();
 		if(!countriesToDownload.isEmpty()){
@@ -306,16 +306,16 @@ public class IndexBatchCreator {
 		}
 		generatedIndexes(alreadyGeneratedFiles);
 	}
-	
 
-	
+
+
 	protected void downloadFilesAndGenerateIndex(List<RegionCountries> countriesToDownload, Set<String> alreadyGeneratedFiles){
 		// clean before downloading
 //		for(File f : osmDirFiles.listFiles()){
 //			log.info("Delete old file " + f.getName());  //$NON-NLS-1$
 //			f.delete();
 //		}
-		
+
 		for(RegionCountries regionCountries : countriesToDownload){
 			String prefix = regionCountries.namePrefix;
 			String site = regionCountries.siteToDownload;
@@ -324,7 +324,7 @@ public class IndexBatchCreator {
 				RegionSpecificData regionSpecificData = regionCountries.regionNames.get(name);
 				name = name.toLowerCase();
 				String url = MessageFormat.format(site, regionSpecificData.downloadName);
-				
+
 				String regionName = prefix + name;
 				String fileName = Algorithms.capitalizeFirstLetterAndLowercase(prefix + name + suffix);
 				if (skipExistingIndexes != null) {
@@ -342,7 +342,7 @@ public class IndexBatchCreator {
 			}
 		}
 	}
-	
+
 	protected File downloadFile(String url, String regionName) {
 		if(!url.startsWith("http")) {
 			return new File(url);
@@ -366,7 +366,7 @@ public class IndexBatchCreator {
 		return toIndex;
 	}
 
-	private File wgetDownload(String url,  File toSave) 
+	private File wgetDownload(String url,  File toSave)
 	{
 		BufferedReader wgetOutput = null;
 		OutputStream wgetInput = null;
@@ -402,7 +402,7 @@ public class IndexBatchCreator {
 		}
 		return null;
 	}
-	
+
 	private final static int DOWNLOAD_DEBUG = 1 << 20;
 	private final static int BUFFER_SIZE = 1 << 15;
 	private File internalDownload(String url, File toSave) {
@@ -444,7 +444,7 @@ public class IndexBatchCreator {
 			}
 		}
 	}
-	
+
 	protected void generatedIndexes(Set<String> alreadyGeneratedFiles) {
 		for (File f : getSortedFiles(osmDirFiles)) {
 			if (alreadyGeneratedFiles.contains(f.getName())) {
@@ -466,14 +466,14 @@ public class IndexBatchCreator {
 		}
 		log.info("GENERATING INDEXES FINISHED ");
 	}
-	
-	
-	
+
+
+
 	protected void generateIndex(File file, String rName, RegionSpecificData rdata, Set<String> alreadyGeneratedFiles) {
 		try {
 			// be independent of previous results
 			RTree.clearCache();
-			
+
 			String regionName = file.getName();
 			log.warn("-------------------------------------------");
 			log.warn("----------- Generate " + file.getName() + "\n\n\n");
@@ -573,9 +573,9 @@ public class IndexBatchCreator {
 				fin.close();
 				fout.close();
 				//	logFileName.renameTo(new File(indexDirFiles, logFileName.getName()));
-				
+
 			} catch (Exception e) {
-				log.error("Exception generating indexes for " + file.getName(), e); //$NON-NLS-1$ 
+				log.error("Exception generating indexes for " + file.getName(), e); //$NON-NLS-1$
 			}
 		} catch (OutOfMemoryError e) {
 			System.gc();
@@ -584,7 +584,7 @@ public class IndexBatchCreator {
 		}
 		System.gc();
 	}
-	
+
 	protected File[] getSortedFiles(File dir){
 		File[] listFiles = dir.listFiles();
 		Arrays.sort(listFiles, new Comparator<File>(){

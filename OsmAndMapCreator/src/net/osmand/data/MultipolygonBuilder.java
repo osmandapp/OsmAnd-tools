@@ -15,10 +15,10 @@ import org.apache.commons.logging.Log;
  * The idea of multipolygon:
  * - we treat each outer way as closed polygon
  * - multipolygon is always closed!
- * - each way we try to assign to existing way and form 
+ * - each way we try to assign to existing way and form
  *   so a more complex polygon
  * - number of outer ways, is number of polygons
- * 
+ *
  * @author Pavol Zibrita
  */
 public class MultipolygonBuilder {
@@ -30,7 +30,7 @@ public class MultipolygonBuilder {
 
 	/**
 	 * Create a multipolygon with initialized outer and inner ways
-	 * 
+	 *
 	 * @param outers
 	 *            a list of outer ways
 	 * @param inners
@@ -58,11 +58,11 @@ public class MultipolygonBuilder {
 		innerWays.add(w);
 		return this;
 	}
-	
+
 	public List<Way> getOuterWays() {
 		return outerWays;
 	}
-	
+
 	public List<Way> getInnerWays() {
 		return innerWays;
 	}
@@ -74,7 +74,7 @@ public class MultipolygonBuilder {
 
 	/**
 	 * Split this multipolygon in several separate multipolygons with one outer ring each
-	 * 
+	 *
 	 * @param log
 	 *            the stream to log problems to, if log = null, nothing will be logged
 	 * @return a list with multipolygons which have exactly one outer ring
@@ -134,7 +134,7 @@ public class MultipolygonBuilder {
 				}
 			} while(newWay != null);
 			multiLines.add(changedWay);
-			
+
 		}
 		ArrayList<Ring> result = new ArrayList<Ring>();
 		for (Way multiLine : multiLines) {
@@ -146,7 +146,7 @@ public class MultipolygonBuilder {
 
 	/**
 	 * make a new Way with the nodes from two other ways
-	 * 
+	 *
 	 * @param w1
 	 *            the first way
 	 * @param w2
@@ -204,7 +204,7 @@ public class MultipolygonBuilder {
 
 	/**
 	 * get a random long number
-	 * 
+	 *
 	 * @return
 	 */
 	private static long nextRandId() {

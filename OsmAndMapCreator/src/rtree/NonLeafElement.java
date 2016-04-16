@@ -1,10 +1,10 @@
 //NonLeafElement.java
-//  
+//
 //This library is free software; you can redistribute it and/or
 //modify it under the terms of the GNU Lesser General Public
 //License as published by the Free Software Foundation; either
 //version 2.1 of the License, or (at your option) any later version.
-//  
+//
 //This library is distributed in the hope that it will be useful,
 //but WITHOUT ANY WARRANTY; without even the implied warranty of
 //MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
@@ -33,7 +33,7 @@ public class NonLeafElement extends Element
     return( Rect.sizeInBytes() + Node.LONG_SIZE);
   }
   /**
-     This can be the chile node pointer. 
+     This can be the chile node pointer.
   */
   //  public Object getPtr()//this is an integer object
   //  {
@@ -44,7 +44,7 @@ public long getPtr()//this is an integer object
   {
     return nodePtr;
   }
-  
+
   @Override
 public int getElementType()
   {
@@ -139,17 +139,17 @@ public String toString()
   private static int getMid( Element elmt,int on)
   {
     if(on == 0)
-      return ((elmt.getRect().getMaxX() 
+      return ((elmt.getRect().getMaxX()
                + elmt.getRect().getMinX())/2);
     else
-      return ((elmt.getRect().getMaxY() 
+      return ((elmt.getRect().getMaxY()
                + elmt.getRect().getMinY())/2);
   }
   @Override
 public Object clone()
   {
     try{
-      return new NonLeafElement(new Rect(Rectangle.getMinX(), Rectangle.getMinY(), 
+      return new NonLeafElement(new Rect(Rectangle.getMinX(), Rectangle.getMinY(),
                                          Rectangle.getMaxX(), Rectangle.getMaxY()), nodePtr);
     }
     catch(Exception e){

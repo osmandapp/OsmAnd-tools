@@ -5,7 +5,7 @@ import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Entity.EntityId;
 
 public class OsmBoundsFilter implements IOsmStorageFilter {
-	
+
 	private final double lonEnd;
 	private final double latDown;
 	private final double latUp;
@@ -16,7 +16,7 @@ public class OsmBoundsFilter implements IOsmStorageFilter {
 		this.lonStart = lonStart;
 		this.latDown = latEnd;
 		this.lonEnd = lonEnd;
-		
+
 	}
 
 	@Override

@@ -35,13 +35,13 @@ public class MapRoutingTypes {
 	private static Set<String> BASE_TAGS_TO_SAVE = new HashSet<String>();
 	private static Map<String, String> BASE_TAGS_TO_REPLACE = new HashMap<String, String>();
 	private static char TAG_DELIMETER = '/'; //$NON-NLS-1$
-	
+
 	private Map<String, MapRouteType> types = new LinkedHashMap<String, MapRoutingTypes.MapRouteType>();
 	private List<MapRouteType> listTypes = new ArrayList<MapRoutingTypes.MapRouteType>();
 	private MapRouteType refRuleType;
 	private MapRouteType nameRuleType;
-	private MapRenderingTypesEncoder encoder; 
-	
+	private MapRenderingTypesEncoder encoder;
+
 	public MapRoutingTypes(MapRenderingTypesEncoder baseTypes) {
 		this.encoder = baseTypes;
 		for(MapRouteTag tg :  baseTypes.getRouteTags() ) {
@@ -76,14 +76,14 @@ public class MapRoutingTypes {
 			}
 		}
 	}
-	
+
 	public static String constructRuleKey(String tag, String val) {
 		if(val == null || val.length() == 0){
 			return tag;
 		}
 		return tag + TAG_DELIMETER + val;
 	}
-	
+
 	protected static String getTagKey(String tagValue) {
 		int i = tagValue.indexOf(TAG_DELIMETER);
 		if(i >= 0){
@@ -91,7 +91,7 @@ public class MapRoutingTypes {
 		}
 		return tagValue;
 	}
-	
+
 	protected static String getValueKey(String tagValue) {
 		int i = tagValue.indexOf(TAG_DELIMETER);
 		if(i >= 0){
@@ -99,18 +99,18 @@ public class MapRoutingTypes {
 		}
 		return null;
 	}
-	
+
 	public MapRouteType getRefRuleType() {
 		return refRuleType;
 	}
-	
-	
+
+
 	public MapRouteType getNameRuleType() {
 		return nameRuleType;
 	}
-	
+
 	public Map<String, String> getRouteRelationPropogatedTags(Map<String, String> tags) {
-		Map<String, String> propogated = null; 
+		Map<String, String> propogated = null;
 		for(Entry<String, String> es : tags.entrySet()) {
 			String tag = es.getKey();
 			String value = converBooleanValue(es.getValue());
@@ -123,7 +123,7 @@ public class MapRoutingTypes {
 		if(propogated == null) {
 			return propogated;
 		}
-		
+
 		for(Entry<String, String> es : tags.entrySet()) {
 			String tag = es.getKey();
 			String value = converBooleanValue(es.getValue());
@@ -138,14 +138,14 @@ public class MapRoutingTypes {
 		}
 		return propogated;
 	}
-	
+
 	private boolean contains(Set<String> s, String tag, String value) {
 		if(s.contains(tag) || s.contains(tag + TAG_DELIMETER + value)){
 			return true;
 		}
 		return false;
 	}
-	
+
 	private String getMap(Map<String, String> s, String tag, String value) {
 		String r = s.get(tag);
 		if (r != null) {
@@ -154,9 +154,9 @@ public class MapRoutingTypes {
 		r = s.get(tag + TAG_DELIMETER + value);
 		return r;
 	}
-	
-	
-	
+
+
+
 	private boolean startsWith(Set<String> s, String tag, String value) {
 		if (s.contains(tag) || s.contains(tag + TAG_DELIMETER + value)) {
 			return true;
@@ -168,7 +168,7 @@ public class MapRoutingTypes {
 		}
 		return false;
 	}
-	
+
 	private boolean testNonParseableRules(String tag, String value) {
 		// fix possible issues (i.e. non arabic digits)
 		if(tag.equals("maxspeed") && value != null) {
@@ -180,8 +180,8 @@ public class MapRoutingTypes {
 		}
 		return true;
 	}
-	
-	
+
+
 	public boolean encodeEntity(Map<String, String> tags, TIntArrayList outTypes, Map<MapRouteType, String> names){
 		boolean init = false;
 		for(Entry<String, String> es : tags.entrySet()) {
@@ -220,7 +220,7 @@ public class MapRoutingTypes {
 		}
 		return true;
 	}
-	
+
 	public boolean encodeBaseEntity(Map<String, String> tags, TIntArrayList outTypes, Map<MapRouteType, String> names){
 		boolean init = false;
 		for(Entry<String, String> es : tags.entrySet()) {
@@ -261,7 +261,7 @@ public class MapRoutingTypes {
 		}
 		return true;
 	}
-	
+
 	private String converBooleanValue(String value){
 		if(value.equals("true")) {
 			return "yes";
@@ -270,8 +270,8 @@ public class MapRoutingTypes {
 		}
 		return value;
 	}
-	
-	public void encodePointTypes(Way e, TLongObjectHashMap<TIntArrayList> pointTypes,  
+
+	public void encodePointTypes(Way e, TLongObjectHashMap<TIntArrayList> pointTypes,
 			TLongObjectHashMap<TIntObjectHashMap<String> > pointNames, boolean base){
 		pointTypes.clear();
 		for(Node nd : e.getNodes() ) {
@@ -295,7 +295,7 @@ public class MapRoutingTypes {
 						accept = true;
 					}
 				}
-				
+
 				if (accept) {
 					for (Entry<String, String> es : ntags.entrySet()) {
 						String tag = es.getKey();
@@ -311,11 +311,11 @@ public class MapRoutingTypes {
 			}
 		}
 	}
-	
+
 	public MapRouteType getTypeByInternalId(int id) {
 		return listTypes.get(id - 1);
 	}
-	
+
 	private MapRouteType registerRule(String tag, String val) {
 		String id = constructRuleKey(tag, val);
 		if(!types.containsKey(id)) {
@@ -337,38 +337,38 @@ public class MapRoutingTypes {
 		type.freq ++;
 		return type;
 	}
-	
+
 	public static class MapRouteType {
 		int freq = 0;
 		int id;
 		int targetId;
 		String tag;
 		String value;
-		
+
 		public int getInternalId() {
 			return id;
 		}
-		
+
 		public int getFreq() {
 			return freq;
 		}
-		
+
 		public int getTargetId() {
 			return targetId;
 		}
-		
+
 		public String getTag() {
 			return tag;
 		}
-		
+
 		public String getValue() {
 			return value;
 		}
-		
+
 		public void setTargetId(int targetId) {
 			this.targetId = targetId;
 		}
-		
+
 		@Override
 		public String toString() {
 			if (value == null) {
@@ -382,7 +382,7 @@ public class MapRoutingTypes {
 	public List<MapRouteType> getEncodingRuleTypes() {
 		return listTypes;
 	}
-	
+
 	public static class MapPointName {
 		public int nameTypeInternalId;
 		public int nameTypeTargetId;
@@ -393,7 +393,7 @@ public class MapRoutingTypes {
 			this.pointIndex = pointIndex;
 			this.name = name;
 		}
-		
-		
+
+
 	}
 }

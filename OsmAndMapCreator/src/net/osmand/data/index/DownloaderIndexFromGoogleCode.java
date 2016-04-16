@@ -27,7 +27,7 @@ public class DownloaderIndexFromGoogleCode {
 	public static void main(String[] args) {
 		System.out.println(DownloaderIndexFromGoogleCode.getIndexFiles(new LinkedHashMap<String, String>()));
 	}
-	
+
 	private static Map<String, String> getContent(Map<String, String> files,
 			String... ext) {
 		BufferedReader reader = null;
@@ -70,7 +70,7 @@ public class DownloaderIndexFromGoogleCode {
 		log.info("Loaded indexes:" + files.size()); //$NON-NLS-1$
 		return files;
 	}
-	
+
 
 	private static String getIndexFiles(Map<String, String> files, String content, String prevFile, String ext){
 		int i = content.indexOf(ext, 0);
@@ -92,17 +92,17 @@ public class DownloaderIndexFromGoogleCode {
 		}
 		return prevFile;
 	}
-	
+
 	public static Map<String, String> getIndexFiles(Map<String, String> files){
 		return getContent(files, ".obf", ".zip", ".zip-1", ".zip-2", ".zip-3", ".zip-4");
 	}
-	
+
 	public static URL getInputStreamToLoadIndex(String indexName) throws IOException{
 		URL url = new URL("http://osmand.googlecode.com/files/"+indexName); //$NON-NLS-1$
 		return url;
 	}
-	
-	
+
+
 	public static String deleteFileFromGoogleDownloads(String fileName, GooglecodeUploadTokens ggtokens) throws IOException {
 		// prepare data
 		Map<String, String> cookies = new HashMap<String, String>();
@@ -117,7 +117,7 @@ public class DownloaderIndexFromGoogleCode {
 				cookieString.append("; "); //$NON-NLS-1$
 			}
 		}
-		
+
 		String urlText = "http://code.google.com/p/osmand/downloads/delete.do?name="+fileName; //$NON-NLS-1$
 		log.info("Url to delete :" + urlText);
 		StringBuilder requestBody = new StringBuilder();
@@ -127,23 +127,23 @@ public class DownloaderIndexFromGoogleCode {
 				append("&filename=").append(fileName). //$NON-NLS-1$
 				append("&delete=Delete+download"); //$NON-NLS-1$
 		log.info("Request body : " + requestBody);
-		
+
 		// getting url
 		URL url = new URL(urlText);
 		HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-		
+
 		connection.setRequestProperty("Cookie", cookieString.toString()); //$NON-NLS-1$
 		connection.setConnectTimeout(15000);
 		connection.setRequestMethod("POST"); //$NON-NLS-1$
 		connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");  //$NON-NLS-1$//$NON-NLS-2$
 		connection.setRequestProperty("Content-Length", String.valueOf(requestBody.length())); //$NON-NLS-1$ //$NON-NLS-2$
-		
+
 		connection.setDoInput(true);
 		connection.setDoOutput(true);
-		
+
 		connection.connect();
-		
-		
+
+
 		OutputStream out = connection.getOutputStream();
 		if (requestBody != null) {
 			BufferedWriter bwr = new BufferedWriter(new OutputStreamWriter(out, "UTF-8"), 1024); //$NON-NLS-1$
@@ -151,7 +151,7 @@ public class DownloaderIndexFromGoogleCode {
 			bwr.flush();
 			bwr.close();
 		}
-		
+
 		log.info("Response : " + connection.getResponseMessage()); //$NON-NLS-1$
 		// populate return fields.
 		StringBuilder responseBody = new StringBuilder();
@@ -170,8 +170,8 @@ public class DownloaderIndexFromGoogleCode {
 			}
 		}
 		return responseBody.toString();
-		
-		
+
+
 	}
 
 }

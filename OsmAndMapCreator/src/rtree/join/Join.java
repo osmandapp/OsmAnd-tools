@@ -1,10 +1,10 @@
 //Join.java
-//  
+//
 //This library is free software; you can redistribute it and/or
 //modify it under the terms of the GNU Lesser General Public
 //License as published by the Free Software Foundation; either
 //version 2.1 of the License, or (at your option) any later version.
-//  
+//
 //This library is distributed in the hope that it will be useful,
 //but WITHOUT ANY WARRANTY; without even the implied warranty of
 //MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
@@ -18,14 +18,14 @@ import java.util.List;
 
 /**
 	 A class to join two RTrees.
-   TODO: 
-   Make another buffer just for this algorithm of 512 bytes (or should you?). 
+   TODO:
+   Make another buffer just for this algorithm of 512 bytes (or should you?).
    It is best to have this method's own cache. Read the document well before deciding on it.
    FIXME:
    1) This thing goes out of memory for large randomly generated trees.
    2) The result for point objects are not correct. The extra check done at Rect class is not done at sweep line algorithm.
    3) Better documentation
-   
+
    @author Prachuryya Barua
 */
 public class Join
@@ -57,7 +57,7 @@ public class Join
     if(p != null)
       this.p = p;
   }
-  
+
   /**
      Will return all the record pointers of the left tree that intersects with the right tree.
      At the moment I assume that the heights of the trees are same.
@@ -77,10 +77,10 @@ public class Join
       /*We can't do anything when we do not have any mbrs in either of the trees*/
       if(ltRoot == Node.NOT_DEFINED || rtRoot == Node.NOT_DEFINED)
         return vct;
-      
+
       Node ltRootNd = ltTree.getReadNode(ltRoot);
       Node rtRootNd = rtTree.getReadNode(rtRoot);
-      
+
       relateRec(ltRootNd, rtRootNd, ltRootNd.getNodeMBR().intersection(rtRootNd.getNodeMBR()), vct);
       return vct;
     }catch(Exception e){
@@ -94,7 +94,7 @@ public class Join
   /**
      @param ltNode
      @param rtNode
-     @param ret 
+     @param ret
      @param intsect The intersection between the two <code>Node</code>.
      @param ret A <code>List</code> that would be filled with the pairs that intersect.
   */
@@ -105,11 +105,11 @@ public class Join
       throw new IllegalValueException("Join.intersectRec : Argument(s) null");
     Element[] ltElmts = ltNode.getAllElements();
     Element[] rtElmts = rtNode.getAllElements();
-    
-    if(ltNode.getElementType() == Node.NONLEAF_NODE && 
+
+    if(ltNode.getElementType() == Node.NONLEAF_NODE &&
        rtNode.getElementType() == Node.LEAF_NODE){//both sides are of different types
       ret.addAll(joinMismatch(ltElmts, rtElmts, Join.LEFT));
-    }else if(ltNode.getElementType() == Node.LEAF_NODE && 
+    }else if(ltNode.getElementType() == Node.LEAF_NODE &&
              rtNode.getElementType() == Node.NONLEAF_NODE){//both sides are of different types
       ret.addAll(joinMismatch(rtElmts, ltElmts, Join.RIGHT));
     }else {//either both are leaf or both non-leaf
@@ -119,13 +119,13 @@ public class Join
       List pairs = spLine.sortedIntersectionTest(ltElmts, rtElmts);//get the intersecting pairs
       for(int i=0; i<pairs.size(); i++){//for each pair
         PairElmt intPair = (PairElmt)pairs.get(i);//the intersecting pair at i
-        if(intPair.getLtElmt() instanceof NonLeafElement && 
+        if(intPair.getLtElmt() instanceof NonLeafElement &&
            intPair.getRtElmt() instanceof NonLeafElement){//both are non leaf elements
           Node newLtNode = ltTree.getReadNode(intPair.getLtPtr());
           Node newRtNode = rtTree.getReadNode(intPair.getRtPtr());
           relateRec(newLtNode, newRtNode, newLtNode.getNodeMBR().intersection(newRtNode.getNodeMBR()),
                     ret);
-        }else if(intPair.getLtElmt() instanceof LeafElement && 
+        }else if(intPair.getLtElmt() instanceof LeafElement &&
                  intPair.getRtElmt() instanceof LeafElement){//LeafElement
           ret.add(p.paired(intPair.getLtElmt(), intPair.getRtElmt()));
           //System.out.println("Join.intersectRec with size of ret - leaf " + ret.size());
@@ -153,7 +153,7 @@ public class Join
           else//non leaf is the right tree
             ret.addAll(windowQuery(rtTree.getReadNode(nlElmts[i].getPtr()),
                                    (LeafElement)lfElmts[j], side ));
-          
+
         }//if
       }//for leaf-elements - j
     }//for non-leaf-elements - i
@@ -169,7 +169,7 @@ public class Join
     throws Exception
   {
     RTree nlTree = null;//the non leaf tree
-    if(side == Join.LEFT) 
+    if(side == Join.LEFT)
       nlTree = ltTree;
     else
       nlTree = rtTree;
