@@ -23,12 +23,12 @@ import net.osmand.data.LatLon;
 public class MapInformationLayer implements MapPanelLayer {
 
 	private MapPanel map;
-	
+
 	private JButton setStart;
 	private JButton setEnd;
 	private JLabel gpsLocation;
 	private JButton areaButton;
-	
+
 
 	@Override
 	public void destroyLayer() {
@@ -66,7 +66,7 @@ public class MapInformationLayer implements MapPanelLayer {
 			public void actionPerformed(ActionEvent e) {
 				new TileBundleDownloadDialog(map, map).showDialog();
 			}
-			
+
 		});
 		zoomIn.addActionListener(new ActionListener(){
 			@Override
@@ -81,7 +81,7 @@ public class MapInformationLayer implements MapPanelLayer {
 			}
 		});
 		offline.addActionListener(new ActionListener() {
-			
+
 			@Override
 			public void actionPerformed(ActionEvent e) {
 				if(!QtCorePanel.isUnix()) {
@@ -96,7 +96,7 @@ public class MapInformationLayer implements MapPanelLayer {
 						folder = new File("lib-gl").getAbsolutePath();
 					}
 					QtCorePanel.loadNative(folder);
-					
+
 					final QtCorePanel sample = new QtCorePanel(new LatLon(map.getLatitude(), map.getLongitude()), map
 							.getZoom());
 					sample.setRenderingProperties(DataExtractionSettings.getSettings().getRenderingProperties());
@@ -109,11 +109,11 @@ public class MapInformationLayer implements MapPanelLayer {
 							map.refresh();
 						}
 					});
-					
+
 				}
 			}
 		});
-		
+
 		map.add(gpsLocation);
 		map.add(Box.createHorizontalGlue());
 		map.add(areaButton);
@@ -130,7 +130,7 @@ public class MapInformationLayer implements MapPanelLayer {
 		zoomOut.setAlignmentY(Component.TOP_ALIGNMENT);
 		zoomIn.setAlignmentY(Component.TOP_ALIGNMENT);
 		offline.setAlignmentY(Component.TOP_ALIGNMENT);
-		
+
 		JPopupMenu popupMenu = map.getPopupMenu();
 		Action selectMenu= new AbstractAction("Select point...") {
 			private static final long serialVersionUID = -3022499800877796459L;
@@ -146,20 +146,29 @@ public class MapInformationLayer implements MapPanelLayer {
 				}
 			}
 
-			
+
 		};
 		popupMenu.add(selectMenu);
 
+		applySettings();
+
 	}
-	
+
 	public void setAreaButtonVisible(boolean b){
 		areaButton.setVisible(b);
 	}
-	
+
 	public void setAreaActionHandler(Action a){
 		areaButton.setAction(a);
 	}
-	
+
+	@Override
+	public void applySettings() {
+		DataExtractionSettings settings = DataExtractionSettings.getSettings();
+		this.setStart.setVisible(settings.useAdvancedRoutingUI());
+		this.setEnd.setVisible(settings.useAdvancedRoutingUI());
+	}
+
 	private void updateLocationLabel(){
 		double latitude = map.getLatitude();
 		double longitude = map.getLongitude();
@@ -169,7 +178,7 @@ public class MapInformationLayer implements MapPanelLayer {
 	@Override
 	public void prepareToDraw() {
 		updateLocationLabel();
-		
+
 	}
 
 	@Override
@@ -178,8 +187,8 @@ public class MapInformationLayer implements MapPanelLayer {
 		g.fillOval((int)map.getCenterPointX() - 2,(int) map.getCenterPointY() - 2, 4, 4);
 		g.drawOval((int)map.getCenterPointX() - 2,(int) map.getCenterPointY() - 2, 4, 4);
 		g.drawOval((int)map.getCenterPointX() - 5,(int) map.getCenterPointY()- 5, 10, 10);
-		
+
 	}
-	
+
 
 }

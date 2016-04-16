@@ -78,12 +78,12 @@ public class OsmExtractionUI implements IMapLocationListener {
 //		}
 //		return path;
 	}
-	
+
 	public static void main(String[] args) {
 		// first of all config log
 		//System.out.println(System.getProperty("sun.arch.data.model"));
 		configLogFile();
-		
+
 		final UncaughtExceptionHandler defaultHandler = Thread.getDefaultUncaughtExceptionHandler();
 		Thread.setDefaultUncaughtExceptionHandler(new UncaughtExceptionHandler(){
 			@Override
@@ -114,12 +114,12 @@ public class OsmExtractionUI implements IMapLocationListener {
 			e1.printStackTrace();
 		}
 	}
-	
-	
+
+
 	private MapPanel mapPanel;
 	private JFrame frame;
 	private JLabel statusBarLabel;
-	
+
 
 	private JCheckBox buildPoiIndex;
 	private JCheckBox buildAddressIndex;
@@ -130,12 +130,11 @@ public class OsmExtractionUI implements IMapLocationListener {
 	private JCheckBox showOfflineIndex;
 
 	private String regionName;
-	
+
 	public OsmExtractionUI(){
 		createUI();
 	}
-	
-	
+
 	public void createUI(){
 		frame = new JFrame(Messages.getString("OsmExtractionUI.OSMAND_MAP_CREATOR")); //$NON-NLS-1$
 	    try {
@@ -143,28 +142,28 @@ public class OsmExtractionUI implements IMapLocationListener {
 		} catch (Exception e) {
 			log.error("Can't set look and feel", e); //$NON-NLS-1$
 		}
-		
-		
+
+
 	    frame.addWindowListener(new ExitListener());
 	    Container content = frame.getContentPane();
 	    frame.setFocusable(true);
-	    
+
 	    mapPanel = new MapPanel(DataExtractionSettings.getSettings().getTilesDirectory());
 	    mapPanel.setFocusable(true);
 	    mapPanel.addMapLocationListener(this);
-	    
+
 	    statusBarLabel = new JLabel();
 	    content.add(statusBarLabel, BorderLayout.SOUTH);
 	    File workingDir = DataExtractionSettings.getSettings().getDefaultWorkingDir();
 	    statusBarLabel.setText(workingDir == null ? Messages.getString("OsmExtractionUI.WORKING_DIR_UNSPECIFIED") : Messages.getString("OsmExtractionUI.WORKING_DIRECTORY") + workingDir.getAbsolutePath()); //$NON-NLS-1$ //$NON-NLS-2$
-	    
-	   
+
+
 //	    treePlaces = new JTree();
 //		treePlaces.setModel(new DefaultTreeModel(new DefaultMutableTreeNode(Messages.getString("OsmExtractionUI.REGION")), false)); 	     //$NON-NLS-1$
 //	    JSplitPane panelForTreeAndMap = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, new JScrollPane(treePlaces), mapPanel);
 //	    panelForTreeAndMap.setResizeWeight(0.2);
 //	    content.add(panelForTreeAndMap, BorderLayout.CENTER);
-	    
+
 	    content.add(mapPanel, BorderLayout.CENTER);
 	    JPanel bl = new JPanel();
 	    bl.setLayout(new BoxLayout(bl, BoxLayout.PAGE_AXIS));
@@ -173,7 +172,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 	    final JTextField statusField = new JTextField();
 	    mapPanel.setStatusField(statusField);
 	    bl.add(statusField);
-	    
+
 	    statusField.addActionListener(new ActionListener() {
 
 			@Override
@@ -186,51 +185,51 @@ public class OsmExtractionUI implements IMapLocationListener {
 
 			}
 		});
-	    
+
 	    content.add(bl, BorderLayout.NORTH);
 	    JMenuBar bar = new JMenuBar();
 	    fillMenuWithActions(bar);
-	    
+
 
 	    frame.setJMenuBar(bar);
 	}
-	
-	
-	
-	
+
+
+
+
 	public JPanel createButtonsBar(){
 		JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-		
+
 		buildMapIndex = new JCheckBox();
 		buildMapIndex.setText(Messages.getString("OsmExtractionUI.BUILD_MAP")); //$NON-NLS-1$
 		panel.add(buildMapIndex);
 		buildMapIndex.setSelected(true);
-		
+
 		buildRoutingIndex = new JCheckBox();
 		buildRoutingIndex.setText(Messages.getString("OsmExtractionUI.BUILD_ROUTING")); //$NON-NLS-1$
 		panel.add(buildRoutingIndex);
 		buildRoutingIndex.setSelected(true);
-		
+
 		buildPoiIndex = new JCheckBox();
 		buildPoiIndex.setText(Messages.getString("OsmExtractionUI.BUILD_POI")); //$NON-NLS-1$
 		panel.add(buildPoiIndex);
 		buildPoiIndex.setSelected(true);
-		
+
 		buildAddressIndex = new JCheckBox();
 		buildAddressIndex.setText(Messages.getString("OsmExtractionUI.BUILD_ADDRESS")); //$NON-NLS-1$
 		panel.add(buildAddressIndex);
 		buildAddressIndex.setSelected(true);
-		
+
 		normalizingStreets = new JCheckBox();
 		normalizingStreets.setText(Messages.getString("OsmExtractionUI.NORMALIZE_STREETS")); //$NON-NLS-1$
 //		panel.add(normalizingStreets);
 		normalizingStreets.setSelected(true);
-		
+
 		buildTransportIndex = new JCheckBox();
 		buildTransportIndex.setText(Messages.getString("OsmExtractionUI.BUILD_TRANSPORT")); //$NON-NLS-1$
 		panel.add(buildTransportIndex);
 		buildTransportIndex.setSelected(true);
-		
+
 		showOfflineIndex = new JCheckBox();
 		showOfflineIndex.setText("Offline Rendering");
 		panel.add(showOfflineIndex);
@@ -253,7 +252,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 		});
 		return panel;
 	}
-	
+
 	private void initNativeRendering(String renderingProperties) {
 		String genFile = DataExtractionSettings.getSettings().getRenderGenXmlPath();
 		String templateFile = DataExtractionSettings.getSettings().getRenderXmlPath();
@@ -290,7 +289,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 			JOptionPane.showMessageDialog(frame, "Native library was not configured in settings");
 		}
 	}
-	
+
 	public void fillMenuWithActions(final JMenuBar bar){
 		JMenu menu = new JMenu(Messages.getString("OsmExtractionUI.MENU_FILE")); //$NON-NLS-1$
 		bar.add(menu);
@@ -303,13 +302,13 @@ public class OsmExtractionUI implements IMapLocationListener {
 		menu.addSeparator();
 		JMenuItem exitMenu= new JMenuItem(Messages.getString("OsmExtractionUI.MENU_EXIT")); //$NON-NLS-1$
 		menu.add(exitMenu);
-		
+
 		JMenu tileSource = MapPanel.getMenuToChooseSource(mapPanel);
 		final JMenuItem sqliteDB = new JMenuItem(Messages.getString("OsmExtractionUI.MENU_CREATE_SQLITE")); //$NON-NLS-1$
 		tileSource.addSeparator();
 		tileSource.add(sqliteDB);
 		bar.add(tileSource);
-		
+
 		menu = new JMenu(Messages.getString("OsmExtractionUI.MENU_WINDOW")); //$NON-NLS-1$
 		bar.add(menu);
 		JMenuItem settings = new JMenuItem(Messages.getString("OsmExtractionUI.MENU_SETTINGS")); //$NON-NLS-1$
@@ -317,13 +316,13 @@ public class OsmExtractionUI implements IMapLocationListener {
 		menu.addSeparator();
 		JMenuItem openLogFile = new JMenuItem(Messages.getString("OsmExtractionUI.MENU_OPEN_LOG")); //$NON-NLS-1$
 		menu.add(openLogFile);
-		
+
 		menu = new JMenu(Messages.getString("OsmExtractionUI.MENU_ABOUT")); //$NON-NLS-1$
 		bar.add(menu);
 		JMenuItem aboutApplication = new JMenuItem(Messages.getString("OsmExtractionUI.MENU_ABOUT_2")); //$NON-NLS-1$
 		menu.add(aboutApplication);
-		
-		
+
+
 		aboutApplication.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
@@ -351,7 +350,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 				}
 			}
 		});
-		
+
 		sqliteDB.addActionListener(new ActionListener(){
 			@Override
 			public void actionPerformed(ActionEvent e) {
@@ -379,13 +378,13 @@ public class OsmExtractionUI implements IMapLocationListener {
 					} catch (InvocationTargetException e1) {
 						ExceptionHandler.handle("Can't create big planet sqlite index", e1.getCause()); //$NON-NLS-1$
 					}
-					
-					
+
+
 				}
 			}
 		});
 
-		
+
 		exitMenu.addActionListener(new ActionListener(){
 			@Override
 			public void actionPerformed(ActionEvent e) {
@@ -394,12 +393,17 @@ public class OsmExtractionUI implements IMapLocationListener {
 			}
 		});
 		settings.addActionListener(new ActionListener(){
+			private void applySettings() {
+				mapPanel.applySettings();
+			}
+
 			@Override
 			public void actionPerformed(ActionEvent e) {
 				OsmExtractionPreferencesDialog dlg = new OsmExtractionPreferencesDialog(frame);
 				dlg.showDialog();
+				applySettings();
 			}
-			
+
 		});
 		specifyWorkingDir.addActionListener(new ActionListener(){
 
@@ -412,7 +416,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 		        if(workingDir != null){
 		        	fc.setCurrentDirectory(workingDir);
 		        }
-		        if(fc.showOpenDialog(frame) == JFileChooser.APPROVE_OPTION && fc.getSelectedFile() != null && 
+		        if(fc.showOpenDialog(frame) == JFileChooser.APPROVE_OPTION && fc.getSelectedFile() != null &&
 		        		fc.getSelectedFile().isDirectory()){
 		        	DataExtractionSettings.getSettings().saveDefaultWorkingDir(fc.getSelectedFile());
 		        	mapPanel.setTilesLocation(DataExtractionSettings.getSettings().getTilesDirectory());
@@ -423,7 +427,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 		    		bar.add(tileSource, 1);
 		        }
 			}
-			
+
 		});
 		loadSpecifiedAreaFile.addActionListener(new ActionListener(){
 			@Override
@@ -444,11 +448,11 @@ public class OsmExtractionUI implements IMapLocationListener {
 							res.append(true);
 							dlg.setVisible(false);
 						}
-		        		
+
 		        	});
 		        	dlg.add(panel);
-		        	
-		        	
+
+
 		        	JMenuBar bar = new JMenuBar();
 		    	    bar.add(MapPanel.getMenuToChooseSource(panel));
 		    	    dlg.setJMenuBar(bar);
@@ -456,7 +460,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 		    	    double x = frame.getBounds().getCenterX();
 		    	    double y = frame.getBounds().getCenterY();
 		    	    dlg.setLocation((int) x - dlg.getWidth() / 2, (int) y - dlg.getHeight() / 2);
-		        	
+
 		    	    dlg.setVisible(true);
 		    		if(res.length() > 0 && panel.getSelectionArea().isVisible()){
 		    			MapSelectionArea area = panel.getSelectionArea();
@@ -465,7 +469,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 		    		}
 		        }
 			}
-			
+
 		});
 		loadFile.addActionListener(new ActionListener(){
 
@@ -477,11 +481,11 @@ public class OsmExtractionUI implements IMapLocationListener {
 		        	loadCountry(fc.getSelectedFile(), null);
 		        }
 			}
-			
+
 		});
 
 	}
-	
+
 	public JFileChooser getOsmFileChooser(){
 		JFileChooser fc = new JFileChooser();
         fc.setDialogTitle(Messages.getString("OsmExtractionUI.CHOOSE_OSM_FILE")); //$NON-NLS-1$
@@ -502,11 +506,11 @@ public class OsmExtractionUI implements IMapLocationListener {
         });
         return fc;
 	}
-	
+
 	public JFrame getFrame() {
 		return frame;
 	}
-	
+
 	public void loadCountry(final File f, final IOsmStorageFilter filter){
 		try {
     		final ProgressDialog dlg = new ProgressDialog(frame, Messages.getString("OsmExtractionUI.LOADING_OSM_FILE")); //$NON-NLS-1$
@@ -574,7 +578,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 					dialog.setVisible(true);
 				}
     		});
-    		
+
 			dlg.run();
 			frame.setTitle(Messages.getString("OsmExtractionUI.OSMAND_MAP_CREATOR_FILE") + f.getName()); //$NON-NLS-1$
 		} catch (InterruptedException e1) {
@@ -583,7 +587,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 			ExceptionHandler.handle("Exception during operation", e1.getCause()); //$NON-NLS-1$
 		}
 	}
-	
+
 	public void saveCountry(final File f, final OsmBaseStorage storage){
 		final OsmStorageWriter writer = new OsmStorageWriter();
 		try {
@@ -617,7 +621,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 			ExceptionHandler.handle("Log file is not found", e1.getCause()); //$NON-NLS-1$
 		}
 	}
-	
+
 	@Override
 	public void locationChanged(final double newLatitude, final double newLongitude, Object source){
 //		recalculateAmenities(newLatitude, newLongitude);
@@ -625,14 +629,14 @@ public class OsmExtractionUI implements IMapLocationListener {
 
 
 
-	
+
 	public class ExitListener extends WindowAdapter {
 		@Override
 		public void windowClosing(WindowEvent event) {
 			exit();
 		}
 	}
-	
+
 	public void exit(){
 		// save preferences
 		DataExtractionSettings settings = DataExtractionSettings.getSettings();

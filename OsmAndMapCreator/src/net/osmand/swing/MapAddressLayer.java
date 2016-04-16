@@ -41,13 +41,13 @@ import org.apache.commons.logging.LogFactory;
 public class MapAddressLayer implements MapPanelLayer {
 
 	private Log log = LogFactory.getLog(MapAddressLayer.class);
-	
+
 	private MapPanel map;
 	private static int distance = 15000;
-	
+
 	@Override
 	public void destroyLayer() {
-		
+
 	}
 
 	@Override
@@ -65,7 +65,7 @@ public class MapAddressLayer implements MapPanelLayer {
 				whereAmI();
 			}
 
-			
+
 		};
 		menu.add(where);
 		Action add= new AbstractAction("Show address") {
@@ -76,12 +76,12 @@ public class MapAddressLayer implements MapPanelLayer {
 				showCurrentCityActions();
 			}
 
-			
+
 		};
 		menu.add(add);
 	}
-	
-	
+
+
 	private void whereAmI() {
 		Point popupMenuPoint = map.getPopupMenuPoint();
 		double fy = (popupMenuPoint.y - map.getCenterPointY()) / map.getTileSize();
@@ -108,7 +108,7 @@ public class MapAddressLayer implements MapPanelLayer {
 
 		}).start();
 	}
-	
+
 	private void showCurrentCityActions() {
 		Point popupMenuPoint = map.getPopupMenuPoint();
 		double fy = (popupMenuPoint.y - map.getCenterPointY()) / map.getTileSize();
@@ -135,10 +135,10 @@ public class MapAddressLayer implements MapPanelLayer {
 
 		}).start();
 	}
-	
+
 	private List<Entity> searchAddress(double lat, double lon,
 			final DataTileManager<Entity> points ) throws IOException{
-		List<Entity> results = new ArrayList<Entity>(); 
+		List<Entity> results = new ArrayList<Entity>();
 		for (File f : new File(DataExtractionSettings.getSettings().getBinaryFilesDir()).listFiles()) {
 			if (f.getName().endsWith(".obf")) {
 				RandomAccessFile raf = new RandomAccessFile(f, "r"); //$NON-NLS-1$ //$NON-NLS-2$
@@ -152,10 +152,10 @@ public class MapAddressLayer implements MapPanelLayer {
 		}
 		return results;
 	}
-	
+
 	private List<Entity> whereAmI(double lat, double lon,
 			final DataTileManager<Entity> points ) throws IOException{
-		List<Entity> results = new ArrayList<Entity>(); 
+		List<Entity> results = new ArrayList<Entity>();
 		int x = MapUtils.get31TileNumberX(lon);
 		int y = MapUtils.get31TileNumberY(lat);
 		List<BinaryMapIndexReader> list = new ArrayList<BinaryMapIndexReader>();
@@ -171,7 +171,7 @@ public class MapAddressLayer implements MapPanelLayer {
 				}
 			}
 		}
-		RoutingConfiguration cfg = RoutingConfiguration.getDefault().build("car", 100, 
+		RoutingConfiguration cfg = RoutingConfiguration.getDefault().build("car", 100,
 				new HashMap<String, String>());
 		RoutingContext ctx = new RoutePlannerFrontEnd(false).buildRoutingContext(cfg, null, list.toArray(new BinaryMapIndexReader[list.size()]));
 		GeocodingUtilities su = new GeocodingUtilities();
@@ -183,7 +183,7 @@ public class MapAddressLayer implements MapPanelLayer {
 		Collections.sort(complete, GeocodingUtilities.DISTANCE_COMPARATOR);
 		long lid = -1;
 		for(GeocodingResult r : complete) {
-			if(r.building != null && 
+			if(r.building != null &&
 					r.getDistance() > minBuildingDistance * GeocodingUtilities.THRESHOLD_MULTIPLIER_SKIP_BUILDINGS_AFTER) {
 				continue;
 			}
@@ -231,12 +231,12 @@ public class MapAddressLayer implements MapPanelLayer {
 		}
 		return minBuildingDistance;
 	}
-	
+
 	private void searchAddressDetailedInfo(BinaryMapIndexReader index, double lat, double lon, List<Entity> results) throws IOException {
 		Map<String, List<Street>> streets = new LinkedHashMap<String, List<Street>>();
 			log.info("Searching region ");
 			int[] cityType = new int[] {BinaryMapAddressReaderAdapter.CITY_TOWN_TYPE,
-					BinaryMapAddressReaderAdapter.POSTCODES_TYPE, 
+					BinaryMapAddressReaderAdapter.POSTCODES_TYPE,
 					BinaryMapAddressReaderAdapter.VILLAGES_TYPE};
 			for (int j = 0; j < cityType.length; j++) {
 				int type = cityType[j];
@@ -261,7 +261,7 @@ public class MapAddressLayer implements MapPanelLayer {
 					}
 				}
 			}
-		
+
 		for(List<Street> l : streets.values()) {
 			while(l.size() > 0){
 				Street s = l.remove(l.size()-1);
@@ -271,7 +271,7 @@ public class MapAddressLayer implements MapPanelLayer {
 				for(int k = 0; k< l.size(); ){
 					if(MapUtils.getDistance(l.get(k).getLocation(), loc) < 50) {
 						Street ks = l.remove(k);
-						cityName += ";"+ks.getCity().getName(); 
+						cityName += ";"+ks.getCity().getName();
 					} else {
 						k++;
 					}
@@ -282,16 +282,20 @@ public class MapAddressLayer implements MapPanelLayer {
 
 		}
 	}
-	
-	
-	
-	
+
+
+
+
 	@Override
 	public void prepareToDraw() {
 	}
 
 	@Override
 	public void paintLayer(Graphics2D g) {
+	}
+
+	@Override
+	public void applySettings() {
 	}
 
 }
