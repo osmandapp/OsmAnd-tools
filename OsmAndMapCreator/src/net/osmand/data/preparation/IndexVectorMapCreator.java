@@ -113,10 +113,11 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			return GENERATE_OBJ_ID--;
 		}
 		long ll = orig.getId();
+		long sum = 0;
 		for(EntityId d : orig.getMemberIds()) {
-			ll += d.getId();
+			sum += d.getId();
 		}
-		return genId(SHIFT_MULTIPOLYGON_IDS, ll & ((1 << 20) - 1));
+		return genId(SHIFT_MULTIPOLYGON_IDS, (ll << 6) + (sum % 63));
 	}
 	
 	private long assignIdBasedOnOriginalSplit(EntityId originalId) {
@@ -290,6 +291,10 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			if (splitEntities != null) {
 				for (int i = 1; i < splitEntities.size(); i++) {
 					Map<String, String> tags = splitEntities.get(i);
+					while (generatedIds.contains(assignId)) {
+						assignId += 2;
+					}
+					generatedIds.add(assignId);
 					createMultipolygonObject(tags, out, innerWays, assignId);
 				}
 			}
