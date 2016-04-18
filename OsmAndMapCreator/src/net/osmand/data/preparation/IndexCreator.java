@@ -90,6 +90,7 @@ public class IndexCreator {
 	private boolean recreateOnlyBinaryFile = false; // false;
 	private boolean deleteOsmDB = true;
 	private boolean deleteDatabaseIndexes = true;
+	private boolean backwardComptibleIds = false;
 
 	private File dbFile;
 
@@ -109,6 +110,10 @@ public class IndexCreator {
 
 	public void setIndexAddress(boolean indexAddress) {
 		this.indexAddress = indexAddress;
+	}
+	
+	public void setBackwardComptibleIds(boolean backwardComptibleIds) {
+		this.backwardComptibleIds = backwardComptibleIds;
 	}
 	
 	public void setIndexRouting(boolean indexRouting) {
@@ -308,6 +313,7 @@ public class IndexCreator {
 
 		// 1. Loading osm file
 		OsmDbCreator dbCreator = new OsmDbCreator(additionId, shiftId, ovewriteIds);
+		dbCreator.setBackwardCompatibleIds(backwardComptibleIds);
 		try {
 			setGeneralProgress(progress,"[15 / 100]"); //$NON-NLS-1$
 			progress.startTask(Messages.getString("IndexCreator.LOADING_FILE") + readFile.getAbsolutePath(), -1); //$NON-NLS-1$
@@ -856,9 +862,9 @@ public class IndexCreator {
 		IndexPoiCreator.ZIP_LONG_STRINGS = false;
 		IndexCreator creator = new IndexCreator(new File(rootFolder + "/maps/")); //$NON-NLS-1$
 		creator.setIndexMap(true);
-//		creator.setIndexAddress(true);
-//		creator.setIndexPOI(true);
-//		creator.setIndexTransport(true);
+		creator.setIndexAddress(true);
+		creator.setIndexPOI(true);
+		creator.setIndexTransport(true);
 		creator.setIndexRouting(true);
 
 //		creator.deleteDatabaseIndexes = false;
@@ -869,7 +875,7 @@ public class IndexCreator {
 		
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 
-		String file = rootFolder + "/temp/map.osm";
+		String file = rootFolder + "/temp/andorra_europe.pbf";
 //		String file = rootFolder + "/repos/resources/synthetic_test_rendering.osm";
 
 		int st = file.lastIndexOf('/');

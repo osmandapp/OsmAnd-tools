@@ -2,6 +2,8 @@ package net.osmand.data.preparation;
 
 
 import gnu.trove.map.TLongObjectMap;
+import gnu.trove.set.TLongSet;
+import gnu.trove.set.hash.TLongHashSet;
 
 import java.io.UnsupportedEncodingException;
 import java.sql.Connection;
@@ -38,6 +40,7 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 	private int allNodes;
 	private int allBoundaries;
 	private boolean realCounts = false;
+	 
 	private Connection dbConn;
 	private DBDialect dialect;
 	
@@ -46,7 +49,6 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 	private PreparedStatement iterateRelations;
 	private PreparedStatement iterateWayBoundaries;
 	
-//	private TLongObjectMap<V>
 	
 
 	public interface OsmDbVisitor {

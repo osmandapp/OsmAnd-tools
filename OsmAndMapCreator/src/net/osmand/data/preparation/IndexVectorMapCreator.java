@@ -108,32 +108,28 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	private static boolean VALIDATE_DUPLICATE = false;
 	private TLongObjectHashMap<Long> duplicateIds = new TLongObjectHashMap<Long>();
 	
-	private long assignIdBasedOnOriginal(EntityId originalId) {
+	private long assignIdForMultipolygon(Relation orig) {
 		if(USE_OLD_GEN_ID) {
 			return GENERATE_OBJ_ID--;
 		}
-		return genId(SHIFT_MULTIPOLYGON_IDS, originalId);
+		long ll = orig.getId();
+		for(EntityId d : orig.getMemberIds()) {
+			ll += d.getId();
+		}
+		return genId(SHIFT_MULTIPOLYGON_IDS, ll & ((1 << 20) - 1));
 	}
 	
 	private long assignIdBasedOnOriginalSplit(EntityId originalId) {
 		if(USE_OLD_GEN_ID) {
 			return GENERATE_OBJ_ID--;
 		}
-		return genId(SHIFT_NON_SPLIT_EXISTING_IDS, originalId);
+		return genId(SHIFT_NON_SPLIT_EXISTING_IDS, originalId.getId());
 	}
 
-	private long genId(int baseShift, EntityId originalId) {
-		long gen = (originalId.getId() << DUPLICATE_SPLIT) + 
-				(1l << (baseShift - 1));
-		if(originalId.getType() == EntityType.NODE) {
-			gen += 1;
-		} else if(originalId.getType() == EntityType.WAY) {
-			gen += 2;
-		} else if(originalId.getType() == EntityType.RELATION) {
-			gen += 3;
-		}
+	private long genId(int baseShift, long id) {
+		long gen = (id << DUPLICATE_SPLIT) +  (1l << (baseShift - 1));
 		while (generatedIds.contains(gen)) {
-			gen += 4;
+			gen += 2;
 		}
 		generatedIds.add(gen);
 		return gen;
@@ -289,13 +285,12 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 
 			// don't use the relation ids. Create new onesgetInnerRings
 			Map<String, String> stags  = splitEntities == null ? e.getModifiableTags() : splitEntities.get(0);
-			createMultipolygonObject(stags, out, innerWays, 
-					assignIdBasedOnOriginal(EntityId.valueOf(e)));
+			long assignId = assignIdForMultipolygon((Relation) e);
+			createMultipolygonObject(stags, out, innerWays, assignId);
 			if (splitEntities != null) {
 				for (int i = 1; i < splitEntities.size(); i++) {
 					Map<String, String> tags = splitEntities.get(i);
-					createMultipolygonObject(tags, out, innerWays,	
-							assignIdBasedOnOriginal(EntityId.valueOf(e)));
+					createMultipolygonObject(tags, out, innerWays, assignId);
 				}
 			}
 		}

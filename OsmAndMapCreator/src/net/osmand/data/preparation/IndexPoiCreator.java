@@ -124,6 +124,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				if (a.getLocation() != null) {
 					if(e instanceof Relation || basemap) {
 						a.setId(GENERATE_OBJ_ID -- );
+					} else {
+						// keep backward compatibility for ids (osm editing)
+						a.setId(a.getId() >> (OsmDbCreator.SHIFT_ID) + (a.getId() % 2));
 					}
 					// do not convert english name
 					// convertEnglishName(a);
