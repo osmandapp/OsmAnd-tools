@@ -297,7 +297,7 @@ public class AugmentedDiffsInspector {
 							nid = EntityId.valueOf(currentWay);
 						} else if (type == EntityType.RELATION) {
 							// skip subrelations
-							throw new UnsupportedOperationException();
+							// throw new UnsupportedOperationException();
 						}
 					}
 					if (!skip) {
