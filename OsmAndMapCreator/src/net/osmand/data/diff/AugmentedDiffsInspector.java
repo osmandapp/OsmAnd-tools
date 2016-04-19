@@ -190,6 +190,7 @@ public class AugmentedDiffsInspector {
 		GZIPOutputStream gz = new GZIPOutputStream(fous);
 		new OsmStorageWriter().writeOSM(gz, new HashMap<Entity.EntityId, EntityInfo>(),
 				nodes, ways, relations);
+		gz.close();
 		fous.close();
 		return f;
 	}
