@@ -114,7 +114,7 @@ public class ObfChangesCreator {
 			ic.setNodesDBFile(tmpFile);
 			log.info("Processing "  + g.dayName + " " + g.osmGzFiles.size() + " files");
 			ic.generateIndexes(g.getSortedFiles(), new ConsoleProgressImplementation(), null,
-					MapZooms.parseZooms("13-14;15-"), new MapRenderingTypesEncoder(country.getName()), log, false);
+					MapZooms.parseZooms("13-14;15-"), new MapRenderingTypesEncoder(country.getName()), log, false, true);
 			File targetFile = new File(country, ic.getMapFileName());
 			targetFile.setLastModified(g.getTimestamp());
 			FileInputStream fis = new FileInputStream(targetFile);

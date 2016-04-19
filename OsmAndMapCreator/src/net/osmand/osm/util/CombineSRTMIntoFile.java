@@ -184,7 +184,7 @@ public class CombineSRTMIntoFile {
 		ic.setBoundary(polygon);
 		ic.setZoomWaySmothness(2);
 		ic.generateIndexes(files.toArray(new File[files.size()]), new ConsoleProgressImplementation(1), null, MapZooms.parseZooms("11-12;13-"),
-				new MapRenderingTypesEncoder(targetFile.getName()), log, true);
+				new MapRenderingTypesEncoder(targetFile.getName()), log, true, false);
 //		if(length > Integer.MAX_VALUE) {
 //			System.err.println("!! Can't process " + name + " because too big");
 //		} else {

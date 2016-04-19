@@ -341,7 +341,7 @@ public class IndexCreator {
 	}
 	
 	private OsmDbAccessor initDbAccessor(File[] readFile, IProgress progress, IOsmStorageFilter addFilter,
-			boolean generateUniqueIds) throws IOException, SQLException, InterruptedException, XmlPullParserException {
+			boolean generateUniqueIds, boolean overwriteIds) throws IOException, SQLException, InterruptedException, XmlPullParserException {
 		OsmDbAccessor accessor = new OsmDbAccessor();
 //		boolean loadFromExistingFile = dbFile != null && osmDBdialect.databaseFileExists(dbFile) && generateUniqueIds;
 		boolean loadFromExistingFile = false; // deprecate feature
@@ -351,7 +351,6 @@ public class IndexCreator {
 				osmDBdialect.removeDatabase(dbFile);
 			}
 		}
-		boolean ovewriteIds = readFile.length > 1 && !generateUniqueIds;
 		Object dbConn = getDatabaseConnection(dbFile.getAbsolutePath(), osmDBdialect);
 		accessor.setDbConn(dbConn, osmDBdialect);
 		int shift = readFile.length < 16 ? 4 : (readFile.length < 256 ? 8 : 10);
@@ -359,7 +358,7 @@ public class IndexCreator {
 		int mapInd = 1;
 		for (File read : readFile) {
 			OsmDbCreator dbCreator = extractOsmToNodesDB(accessor, read, progress, addFilter,
-					generateUniqueIds? ind++ : 0, generateUniqueIds ? shift : 0, ovewriteIds, mapInd == 1);
+					generateUniqueIds? ind++ : 0, generateUniqueIds ? shift : 0, overwriteIds, mapInd == 1);
 			accessor.updateCounts(dbCreator);
 			if (readFile.length > 1) {
 				log.info("Processing " + mapInd + " file out of " + readFile.length);
@@ -522,11 +521,12 @@ public class IndexCreator {
 	}
 	public void generateIndexes(File readFile, IProgress progress, IOsmStorageFilter addFilter, MapZooms mapZooms,
 			MapRenderingTypesEncoder renderingTypes, Log logMapDataWarn) throws IOException, SQLException, InterruptedException, XmlPullParserException {
-		generateIndexes(new File[] { readFile }, progress, addFilter, mapZooms, renderingTypes, logMapDataWarn, false);
+		generateIndexes(new File[] { readFile }, progress, addFilter, mapZooms, renderingTypes, logMapDataWarn, false, false);
 	}
 	
 	public void generateIndexes(File[] readFile, IProgress progress, IOsmStorageFilter addFilter, MapZooms mapZooms,
-			MapRenderingTypesEncoder renderingTypes, Log logMapDataWarn, boolean generateUniqueIds) throws IOException, SQLException, InterruptedException, XmlPullParserException {
+			MapRenderingTypesEncoder renderingTypes, Log logMapDataWarn, 
+			boolean generateUniqueIds, boolean ovewriteIds) throws IOException, SQLException, InterruptedException, XmlPullParserException {
 //		if(LevelDBAccess.load()){
 //			dialect = DBDialect.NOSQL;
 //		}
@@ -593,7 +593,7 @@ public class IndexCreator {
 			} else {
 				// 2. Create index connections and index structure
 				createDatabaseIndexesStructure();
-				OsmDbAccessor accessor = initDbAccessor(readFile, progress, addFilter, generateUniqueIds);
+				OsmDbAccessor accessor = initDbAccessor(readFile, progress, addFilter, generateUniqueIds, ovewriteIds);
 
 				// 3. Processing all entries
 				// 3.1 write all cities
