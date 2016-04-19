@@ -88,11 +88,13 @@ public class AugmentedDiffsInspector {
 				for (BinaryMapDataObject b : l) {
 					if(or.contain(b, x, y)) {
 						String dw = or.getDownloadName(b);
-						if(!regionsMap.containsKey(dw)) {
-							regionsMap.put(dw, new LinkedHashSet<Entity.EntityId>());
+						if (!Algorithms.isEmpty(dw) && or.isDownloadOfType(b, OsmandRegions.MAP_TYPE)) {
+							if (!regionsMap.containsKey(dw)) {
+								regionsMap.put(dw, new LinkedHashSet<Entity.EntityId>());
+							}
+							regionsMap.get(dw).add(id);
+							lst.add(dw);
 						}
-						regionsMap.get(dw).add(id);
-						lst.add(dw);
 					}
 				}
 			}
