@@ -54,31 +54,36 @@ public class AugmentedDiffsInspector {
 	private static String OSMAND_DELETE_TAG = "osmand_change";
 	private static String OSMAND_DELETE_VALUE = "delete";
 	private static long ID_BASE = -1000;
-	public static void main(String[] args) throws XmlPullParserException, IOException, XMLStreamException, SQLException, InterruptedException {
-		File inputFile = new File(args[0]);
-		File targetDir = new File(args[1]);
-		File ocbfFile = new File(args[2]);
-		
-		AugmentedDiffsInspector inspector = new AugmentedDiffsInspector();
-		Context ctx = inspector.parseFile(inputFile);
-		OsmandRegions or = new OsmandRegions();
-		or.prepareFile(ocbfFile.getAbsolutePath());
-		or.cacheAllCountries();
-		inspector.prepareRegions(ctx, ctx.newIds, ctx.regionsNew, or);
-		inspector.prepareRegions(ctx, ctx.oldIds, ctx.regionsOld, or);
-		String name = inputFile.getName();
-		String date = name.substring(0, name.indexOf('-'));
-		String time = name.substring(name.indexOf('-') + 1, name.indexOf('.'));
-		
-		inspector.write(ctx, targetDir, date, time);
+	public static void main(String[] args) {
+		try {
+			File inputFile = new File(args[0]);
+			File targetDir = new File(args[1]);
+			File ocbfFile = new File(args[2]);
+			
+			AugmentedDiffsInspector inspector = new AugmentedDiffsInspector();
+			Context ctx = inspector.parseFile(inputFile);
+			OsmandRegions or = new OsmandRegions();
+			or.prepareFile(ocbfFile.getAbsolutePath());
+			or.cacheAllCountries();
+			inspector.prepareRegions(ctx, ctx.newIds, ctx.regionsNew, or);
+			inspector.prepareRegions(ctx, ctx.oldIds, ctx.regionsOld, or);
+			String name = inputFile.getName();
+			String date = name.substring(0, name.indexOf('-'));
+			String time = name.substring(name.indexOf('-') + 1, name.indexOf('.'));
+			
+			inspector.write(ctx, targetDir, date, time);
+		} catch (Exception e) {
+			e.printStackTrace();
+			System.exit(1);
+		}
 			
 	}
 
 	private void prepareRegions(Context ctx, Map<EntityId, Entity> ids, Map<String, Set<EntityId>> regionsMap, 
 			OsmandRegions or) throws IOException {
 		Map<EntityId, Set<String>> mp = new HashMap<Entity.EntityId, Set<String>>();
-		for(Entity e : ids.values()) {
-			if(e instanceof Node) {
+		for (Entity e : ids.values()) {
+			if (e instanceof Node) {
 				int y = MapUtils.get31TileNumberY(((Node) e).getLatitude());
 				int x = MapUtils.get31TileNumberX(((Node) e).getLongitude());
 				List<BinaryMapDataObject> l = or.query(x, y);
@@ -298,6 +303,7 @@ public class AugmentedDiffsInspector {
 						} else if (type == EntityType.RELATION) {
 							// skip subrelations
 							// throw new UnsupportedOperationException();
+							skip = true;
 						}
 					}
 					if (!skip) {
