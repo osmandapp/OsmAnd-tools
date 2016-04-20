@@ -203,7 +203,7 @@ public class AugmentedDiffsInspector {
 	private void groupObjects(Map<EntityId, Entity> octx, Set<EntityId> oset, List<Node> nodes, List<Way> ways,
 			List<Relation> relations) {
 		for(Entity e: octx.values()) {
-			if(oset == null || oset.contains(EntityId.valueOf(e))) {
+			if(oset != null &&  oset.contains(EntityId.valueOf(e))) {
 				if(e instanceof Node) {
 					nodes.add((Node) e);
 				} else if(e instanceof Way) {
