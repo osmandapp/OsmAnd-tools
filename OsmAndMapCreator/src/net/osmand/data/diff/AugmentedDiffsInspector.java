@@ -155,33 +155,6 @@ public class AugmentedDiffsInspector {
 		}
 	}
 	
-//	private void indexFile() {
-//		IndexCreator ic = new IndexCreator(fl.getParentFile());
-//		RTree.clearCache();
-//		ic.setIndexAddress(false);
-//		ic.setIndexPOI(true);
-//		ic.setIndexRouting(true);
-//		ic.setIndexMap(true);
-//		ic.setGenerateLowLevelIndexes(false);
-//		ic.setDialects(DBDialect.SQLITE_IN_MEMORY, DBDialect.SQLITE_IN_MEMORY);
-//		//ic.setLastModifiedDate(g.getTimestamp());
-//		File tmpFile = new File(fl.getName() + ".tmp.odb");
-//		tmpFile.delete();
-////		ic.setRegionName(Algorithms.capitalizeFirstLetterAndLowercase(g.dayName));
-//		ic.setNodesDBFile(tmpFile);
-//		ic.generateIndexes(new File[]{fl}, new ConsoleProgressImplementation(), null, 
-//				MapZooms.parseZooms("13-14;15-"), new MapRenderingTypesEncoder(fl.getName()), log, false, true);
-//		File targetFile = new File(fl.getParentFile(), ic.getMapFileName());
-////		targetFile.setLastModified(g.getTimestamp());
-////		FileInputStream fis = new FileInputStream(targetFile);
-////		GZIPOutputStream gzout = new GZIPOutputStream(new FileOutputStream(obf));
-////		Algorithms.streamCopy(fis, gzout);
-////		fis.close();
-////		gzout.close();
-////		obf.setLastModified(g.getTimestamp());
-//		targetFile.delete();
-//	}
-
 	private File writeFile(File targetDir, String prefix, Map<EntityId, Entity> octx, Set<EntityId> oset,
 			Map<EntityId, Entity> nctx, Set<EntityId> nset) throws XMLStreamException,
 			IOException, FileNotFoundException {
