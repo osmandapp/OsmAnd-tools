@@ -11,18 +11,18 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.zip.GZIPOutputStream;
 
+import net.osmand.data.preparation.DBDialect;
+import net.osmand.data.preparation.IndexCreator;
+import net.osmand.data.preparation.MapZooms;
+import net.osmand.impl.ConsoleProgressImplementation;
+import net.osmand.osm.MapRenderingTypesEncoder;
+import net.osmand.util.Algorithms;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.xmlpull.v1.XmlPullParserException;
 
 import rtree.RTree;
-import net.osmand.data.preparation.DBDialect;
-import net.osmand.data.preparation.IndexCreator;
-import net.osmand.data.preparation.MapZooms;
-import net.osmand.data.preparation.ObfChangesCreator;
-import net.osmand.impl.ConsoleProgressImplementation;
-import net.osmand.osm.MapRenderingTypesEncoder;
-import net.osmand.util.Algorithms;
 
 public class GenerateDailyObf {
 	private static final Log log = LogFactory.getLog(GenerateDailyObf.class);
