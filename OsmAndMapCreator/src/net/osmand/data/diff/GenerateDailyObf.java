@@ -8,6 +8,7 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Date;
 import java.util.List;
 import java.util.zip.GZIPOutputStream;
 
@@ -59,6 +60,7 @@ public class GenerateDailyObf {
 							log.info("The file " + targetObf.getName() + " was updated for " + (targetObf.lastModified() - targetTimestamp) / 1000
 									+ " seconds");
 						}
+						System.out.println("Processing " + targetObf.getName() + " " + new Date());
 						Collections.sort(osmFiles, new Comparator<File>(){
 							@Override
 							public int compare(File o1, File o2) {
