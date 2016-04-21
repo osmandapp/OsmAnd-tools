@@ -149,6 +149,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 						if(!ids.add(a.getId())) {
 							poiPreparedStatement.executeBatch();
 							poiDeleteStatement.setString(1, a.getId() +"");
+							poiDeleteStatement.execute();
 							first = false;
 						}
 					}
