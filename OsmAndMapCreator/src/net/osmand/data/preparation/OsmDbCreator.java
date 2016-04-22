@@ -52,7 +52,6 @@ public class OsmDbCreator implements IOsmStorageFilter {
 	private PreparedStatement delWays;
 	private TLongHashSet nodeIds;
 	private TLongHashSet wayIds;
-	private TLongHashSet wayNodeIds;
 	private TLongHashSet relationIds;
 
 	private Connection dbConn;
@@ -133,11 +132,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 		if (delRelations != null) {
 			delRelations.close();
 		}
-		if (wayNodeIds != null) {
-			System.out.println("!!! " + wayNodeIds.size());
-			wayNodeIds.removeAll(nodeIds);
-			System.out.println("Missing " + wayNodeIds.size());
-		}
+		
 
 	}
 
@@ -147,34 +142,34 @@ public class OsmDbCreator implements IOsmStorageFilter {
 		if (nodeIds == null) {
 			nodeIds = new TLongHashSet();
 			wayIds = new TLongHashSet();
-			wayNodeIds = new TLongHashSet();
 			relationIds = new TLongHashSet();
 			delNode = dbConn.prepareStatement("delete from node where id = ?"); //$NON-NLS-1$
 			delWays = dbConn.prepareStatement("delete from ways where id = ?"); //$NON-NLS-1$
 			delRelations = dbConn.prepareStatement("delete from relations where id = ?"); //$NON-NLS-1$
 		}
 		long id = e.getId();
+		boolean changed = false;
 		if (e instanceof Node) {
-			nodeIds.add(id);
+			changed = nodeIds.add(id);
 		} else if (e instanceof Way) {
-			wayIds.add(id);
-			TLongArrayList nid = ((Way) e).getNodeIds();
-			wayNodeIds.addAll(nid);
+			changed = wayIds.add(id);
 		} else if (e instanceof Relation) {
-			relationIds.add(id);
+			changed = relationIds.add(id);
 		}
-		prepNode.executeBatch();
-		prepWays.executeBatch();
-		prepRelations.executeBatch();
-		if (e instanceof Node) {
-			delNode.setLong(1, id);
-			delNode.execute();
-		} else if (e instanceof Way) {
-			delWays.setLong(1, id);
-			delWays.execute();
-		} else if (e instanceof Relation) {
-			delRelations.setLong(1, id);
-			delRelations.execute();
+		if (!changed) {
+			prepNode.executeBatch();
+			prepWays.executeBatch();
+			prepRelations.executeBatch();
+			if (e instanceof Node) {
+				delNode.setLong(1, id);
+				delNode.execute();
+			} else if (e instanceof Way) {
+				delWays.setLong(1, id);
+				delWays.execute();
+			} else if (e instanceof Relation) {
+				delRelations.setLong(1, id);
+				delRelations.execute();
+			}
 		}
 	}
 
@@ -196,7 +191,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 			} catch (IOException es) {
 				throw new RuntimeException(es);
 			}
-			if (osmChange || ovewriteIds ) {
+			if (osmChange || ovewriteIds || (e instanceof Relation)) {
 				checkEntityExists(e);
 			}
 			if (e instanceof Node) {
