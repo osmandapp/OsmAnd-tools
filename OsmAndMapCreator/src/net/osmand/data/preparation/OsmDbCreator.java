@@ -95,12 +95,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 		}
 		int ord = EntityType.valueOf(e).ordinal();
 		if(id < 0) {
-			if(ovewriteIds) {
-				long lid = (id << shiftId) + additionId;
-				return getConvertId(lid, ord, 0);
-			} else {
-				return id;
-			}
+			return getConvertId(id, ord, 0);
 		}
 		if (e instanceof Node) {
 			int y = MapUtils.get31TileNumberY(((Node) e).getLatitude());
@@ -111,7 +106,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 			TLongArrayList lids = ((Way) e).getNodeIds();
 			int hash = 0;
 			for (int i = 0; i < lids.size(); i++) {
-				Long ld = generatedIds.get(lids.get(i) << 2);
+				Long ld = getGeneratedId(lids.get(i), 0);
 				if (ld != null) {
 					hash += ld.longValue() >> 2;
 					lids.set(i, ld);
@@ -123,7 +118,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 			Map<EntityId, EntityId> p = new HashMap<Entity.EntityId, Entity.EntityId>();
 			for (EntityId i : r.getMemberIds()) {
 				if (i.getType() != EntityType.RELATION) {
-					Long ll = generatedIds.get((i.getId().longValue() << 2) + i.getType().ordinal());
+					Long ll = getGeneratedId(i.getId().longValue(), i.getType().ordinal());
 					if (ll != null) {
 						p.put(i, new EntityId(i.getType(), ll));
 					}
@@ -139,7 +134,22 @@ public class OsmDbCreator implements IOsmStorageFilter {
 		}
 	}
 
+	private Long getGeneratedId(long l, int ord) {
+		if(l < 0) {
+			long lid = (l << shiftId) + additionId;
+			long fid = (lid << 2) + ord;
+			return generatedIds.get(fid);
+		}
+		return generatedIds.get((l << 2) + ord);
+	}
+
 	private long getConvertId(long id, int ord, int hash) {
+		if(id < 0) {
+			long lid = (id << shiftId) + additionId;
+			long fid = (lid << 2) + ord;
+			generatedIds.put(fid, lid);
+			return lid;
+		}
 		long cid = (id << SHIFT_ID) + (ord % 2) + (hash % ((1 << (SHIFT_ID - 1)) - 1)) << 1;
 		generatedIds.put((id << 2) + ord, cid);
 		return cid;
