@@ -358,7 +358,7 @@ public class IndexCreator {
 		int mapInd = 1;
 		for (File read : readFile) {
 			OsmDbCreator dbCreator = extractOsmToNodesDB(accessor, read, progress, addFilter,
-					generateUniqueIds? ind++ : 0, generateUniqueIds ? shift : 0, overwriteIds, mapInd == 1);
+					generateUniqueIds || overwriteIds ? ind++ : 0, generateUniqueIds || overwriteIds  ? shift : 0, overwriteIds, mapInd == 1);
 			accessor.updateCounts(dbCreator);
 			if (readFile.length > 1) {
 				log.info("Processing " + mapInd + " file out of " + readFile.length);

@@ -87,48 +87,56 @@ public class OsmDbCreator implements IOsmStorageFilter {
 	
 	private long convertId(Entity e) {
 		long id = e.getId();
-		if(shiftId <= 0) {
-			if(id < 0 || backwardComptibleIds) {
-				return id;
-			}
-			int ord = EntityType.valueOf(e).ordinal();
-			if(e instanceof Node) {
-				int y = MapUtils.get31TileNumberY(((Node) e).getLatitude());
-				int x = MapUtils.get31TileNumberY(((Node) e).getLongitude());
-				int hash = (x + y) >> 10;
-				return getConvertId(id, ord, hash);
-			} else if(e instanceof Way) {
-				TLongArrayList lids = ((Way) e).getNodeIds();
-				int hash = 0;
-				for(int i = 0; i < lids.size(); i++) {
-					Long ld = generatedIds.get(lids.get(i) << 2);
-					if(ld != null) {
-						hash += ld.longValue() >> 2;
-						lids.set(i, ld);
-					}
-				}
-				return getConvertId(id, ord, hash);
+		if (backwardComptibleIds) {
+			return id;
+		}
+		if (!ovewriteIds && shiftId > 0) {
+			return (id << shiftId) + additionId;
+		}
+		int ord = EntityType.valueOf(e).ordinal();
+		if(id < 0) {
+			if(ovewriteIds) {
+				long lid = (id << shiftId) + additionId;
+				return getConvertId(lid, ord, 0);
 			} else {
-				Relation r = (Relation) e;
-				Map<EntityId, EntityId> p = new HashMap<Entity.EntityId, Entity.EntityId>();
-				for(EntityId i :  r.getMemberIds()) {
-					if(i.getType() != EntityType.RELATION) {
-						Long ll = generatedIds.get((i.getId().longValue() << 2) + i.getType().ordinal());
-						if(ll != null) {
-							p.put(i, new EntityId(i.getType(), ll));
-						}
-					}
-				}
-				Iterator<Entry<EntityId, EntityId>> it = p.entrySet().iterator();
-				while(it.hasNext()) {
-					Entry<EntityId, EntityId> es = it.next();
-					String role = r.getModifiableMembersMap().remove(es.getKey());
-					r.getModifiableMembersMap().put(es.getValue(), role);
-				}
 				return id;
 			}
 		}
-		return (id << shiftId) + additionId;
+		if (e instanceof Node) {
+			int y = MapUtils.get31TileNumberY(((Node) e).getLatitude());
+			int x = MapUtils.get31TileNumberY(((Node) e).getLongitude());
+			int hash = (x + y) >> 10;
+			return getConvertId(id, ord, hash);
+		} else if (e instanceof Way) {
+			TLongArrayList lids = ((Way) e).getNodeIds();
+			int hash = 0;
+			for (int i = 0; i < lids.size(); i++) {
+				Long ld = generatedIds.get(lids.get(i) << 2);
+				if (ld != null) {
+					hash += ld.longValue() >> 2;
+					lids.set(i, ld);
+				}
+			}
+			return getConvertId(id, ord, hash);
+		} else {
+			Relation r = (Relation) e;
+			Map<EntityId, EntityId> p = new HashMap<Entity.EntityId, Entity.EntityId>();
+			for (EntityId i : r.getMemberIds()) {
+				if (i.getType() != EntityType.RELATION) {
+					Long ll = generatedIds.get((i.getId().longValue() << 2) + i.getType().ordinal());
+					if (ll != null) {
+						p.put(i, new EntityId(i.getType(), ll));
+					}
+				}
+			}
+			Iterator<Entry<EntityId, EntityId>> it = p.entrySet().iterator();
+			while (it.hasNext()) {
+				Entry<EntityId, EntityId> es = it.next();
+				String role = r.getModifiableMembersMap().remove(es.getKey());
+				r.getModifiableMembersMap().put(es.getValue(), role);
+			}
+			return id;
+		}
 	}
 
 	private long getConvertId(long id, int ord, int hash) {
