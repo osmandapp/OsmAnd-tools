@@ -95,10 +95,6 @@ public class OsmDbCreator implements IOsmStorageFilter {
 			return (id << shiftId) + additionId;
 		}
 		int ord = EntityType.valueOf(e).ordinal();
-		if(id < 0) {
-			int hash = e instanceof Node ? getNodeHash(e) :  0;
-			return getConvertId(id, ord, hash);
-		}
 		if (e instanceof Node) {
 			int hash = getNodeHash(e);
 			return getConvertId(id, ord, hash);
