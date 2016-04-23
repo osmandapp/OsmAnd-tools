@@ -70,6 +70,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 	private static boolean VALIDATE_DUPLICATES = false;
 	private boolean backwardComptibleIds;
 	private TLongObjectHashMap<Long> generatedIds = new TLongObjectHashMap<Long>();
+	private TLongObjectHashMap<Long> hashes = new TLongObjectHashMap<Long>();
 	private TLongSet idSet = new TLongHashSet();
 	
 
@@ -95,20 +96,22 @@ public class OsmDbCreator implements IOsmStorageFilter {
 		}
 		int ord = EntityType.valueOf(e).ordinal();
 		if(id < 0) {
-			return getConvertId(id, ord, 0);
+			int hash = e instanceof Node ? getNodeHash(e) :  0;
+			return getConvertId(id, ord, hash);
 		}
 		if (e instanceof Node) {
-			int y = MapUtils.get31TileNumberY(((Node) e).getLatitude());
-			int x = MapUtils.get31TileNumberY(((Node) e).getLongitude());
-			int hash = (x + y) >> 10;
+			int hash = getNodeHash(e);
 			return getConvertId(id, ord, hash);
 		} else if (e instanceof Way) {
 			TLongArrayList lids = ((Way) e).getNodeIds();
-			int hash = 0;
+			long hash = 0;
 			for (int i = 0; i < lids.size(); i++) {
 				Long ld = getGeneratedId(lids.get(i), 0);
+				Long hd = getHash(lids.get(i), 0);
+				if(hd != null) {
+					hash += hd;
+				}
 				if (ld != null) {
-					hash += ld.longValue() >> 2;
 					lids.set(i, ld);
 				}
 			}
@@ -134,6 +137,22 @@ public class OsmDbCreator implements IOsmStorageFilter {
 		}
 	}
 
+	private int getNodeHash(Entity e) {
+		int y = MapUtils.get31TileNumberY(((Node) e).getLatitude());
+		int x = MapUtils.get31TileNumberY(((Node) e).getLongitude());
+		int hash = (x + y) >> 10;
+		return hash;
+	}
+
+	private Long getHash(long l, int ord) {
+		if(l < 0) {
+			long lid = (l << shiftId) + additionId;
+			long fid = (lid << 2) + ord;
+			return hashes.get(fid);
+		}
+		return hashes.get((l << 2) + ord);
+	}
+
 	private Long getGeneratedId(long l, int ord) {
 		if(l < 0) {
 			long lid = (l << shiftId) + additionId;
@@ -143,15 +162,19 @@ public class OsmDbCreator implements IOsmStorageFilter {
 		return generatedIds.get((l << 2) + ord);
 	}
 
-	private long getConvertId(long id, int ord, int hash) {
+	private long getConvertId(long id, int ord, long hash) {
 		if(id < 0) {
 			long lid = (id << shiftId) + additionId;
 			long fid = (lid << 2) + ord;
 			generatedIds.put(fid, lid);
+			hashes.put(fid, hash);
 			return lid;
 		}
-		long cid = (id << SHIFT_ID) + (ord % 2) + (hash % ((1 << (SHIFT_ID - 1)) - 1)) << 1;
-		generatedIds.put((id << 2) + ord, cid);
+		int l = (int) (hash & ((1 << (SHIFT_ID - 1)) - 1));
+		long cid = (id << SHIFT_ID) + (ord % 2) + l << 1;
+		long fid = (id << 2) + ord;
+		generatedIds.put(fid, cid);
+		hashes.put(fid, hash);
 		return cid;
 	}
 	
