@@ -167,7 +167,7 @@ public class AugmentedDiffsInspector {
 		FileOutputStream fous = new FileOutputStream(f);
 		GZIPOutputStream gz = new GZIPOutputStream(fous);
 		new OsmStorageWriter().writeOSM(gz, new HashMap<Entity.EntityId, EntityInfo>(),
-				nodes, ways, relations);
+				nodes, ways, relations, true);
 		gz.close();
 		fous.close();
 		return f;
@@ -267,10 +267,11 @@ public class AugmentedDiffsInspector {
 					currentWay = null;
 					if (!o.containsKey(nid) || old) {
 						if (type == EntityType.NODE) {
-							Node nd = registerNewNode(parser, ctx, old);
+							Node nd = registerNewNode(parser, ctx, old, nid);
 							nid = EntityId.valueOf(nd);
 						} else if (type == EntityType.WAY) {
 							currentWay = new Way(ID_BASE--);
+							currentWay.putTag("oid", nid.getId().toString());
 							registerEntity(ctx, old, currentWay);
 							nid = EntityId.valueOf(currentWay);
 						} else if (type == EntityType.RELATION) {
@@ -285,13 +286,14 @@ public class AugmentedDiffsInspector {
 				} else if (name.equals("nd") && currentWay != null) {
 					String rf = parser.getAttributeValue("", "ref");
 					Node nd = null;
+					EntityId nid = null;
 					if (!Algorithms.isEmpty(rf) && !old) {
-						EntityId nid = new EntityId(EntityType.NODE, Long.parseLong(rf));
+						nid = new EntityId(EntityType.NODE, Long.parseLong(rf));
 						Map<EntityId, Entity> o = old ? ctx.oldIds : ctx.newIds;
 						nd = (Node) o.get(nid);
 					}
 					if (nd == null) {
-						nd = registerNewNode(parser, ctx, old);
+						nd = registerNewNode(parser, ctx, old, nid);
 					}
 					((Way) currentWay).addNode(nd.getId());
 				}
@@ -322,10 +324,13 @@ public class AugmentedDiffsInspector {
 		
 	}
 
-	private Node registerNewNode(XmlPullParser parser, Context ctx, boolean old) {
+	private Node registerNewNode(XmlPullParser parser, Context ctx, boolean old, EntityId nid) {
 		Node nd;
 		nd = new Node(Double.parseDouble(parser.getAttributeValue("", "lat")),
 				Double.parseDouble(parser.getAttributeValue("", "lon")), ID_BASE--);
+		if(nid != null) {
+			nd.putTag("oid", nid.getId().toString());
+		}
 		registerEntity(ctx, old, nd);
 		return nd;
 	}
