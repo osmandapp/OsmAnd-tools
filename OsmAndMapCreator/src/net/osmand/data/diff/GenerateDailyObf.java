@@ -44,7 +44,8 @@ public class GenerateDailyObf {
 			}
 			for(File date : countryF.listFiles()) {
 				if(date.getName().length() == 10) {
-					File targetObf = new File(date, countryF.getName() + ".obf.gz");
+					String name = countryF.getName() + "_" + date.getName().substring(2).replace('-', '_'); 
+					File targetObf = new File(date, name + ".obf.gz");
 					long targetTimestamp = 0;
 					List<File> osmFiles = new ArrayList<File>();
 					for(File f : date.listFiles()) {
@@ -67,7 +68,7 @@ public class GenerateDailyObf {
 								return o1.getName().compareTo(o2.getName());
 							}
 						});
-						generateCountry(countryF.getName(), 
+						generateCountry(name, 
 								targetObf, osmFiles.toArray(new File[osmFiles.size()]), targetTimestamp);
 					}
 				}
