@@ -80,7 +80,6 @@ public class GenerateDailyObf {
 		RTree.clearCache();
 		IndexCreator ic = new IndexCreator(targetObfZip.getParentFile());
 		ic.setIndexAddress(false);
-		ic.setBackwardComptibleIds(true);
 		ic.setIndexPOI(true);
 		ic.setIndexRouting(true);
 		ic.setIndexMap(true);
