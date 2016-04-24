@@ -116,12 +116,16 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		long ll = orig.getId();
 		long sum = 0;
 		for(Entity d : orig.getMemberEntities().keySet()) {
-			LatLon l = d.getLatLon();
+			LatLon l ;
+			if(d instanceof Way) {
+				l = OsmMapUtils.getWeightCenterForNodes(((Way) d).getNodes());
+			} else {
+				l = d.getLatLon();
+			}
 			if(l != null) {
 				int y = MapUtils.get31TileNumberY(l.getLatitude());
 				int x = MapUtils.get31TileNumberX(l.getLongitude());
-				int hash = (x + y) >> 10;
-				sum += hash;	
+				sum += (x + y);	
 			}
 			
 		}
