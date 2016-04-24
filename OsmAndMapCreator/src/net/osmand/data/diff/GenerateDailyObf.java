@@ -46,7 +46,7 @@ public class GenerateDailyObf {
 				if(date.getName().length() == 10) {
 					String name = countryF.getName() + "_" + date.getName().substring(2).replace('-', '_');
 					name = Algorithms.capitalizeFirstLetterAndLowercase(name);
-					File targetObf = new File(date, name + ".obf.gz");
+					File targetObf = new File(countryF, name + ".obf.gz");
 					long targetTimestamp = 0;
 					List<File> osmFiles = new ArrayList<File>();
 					for(File f : date.listFiles()) {
