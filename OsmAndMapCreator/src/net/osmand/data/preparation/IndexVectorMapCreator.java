@@ -31,6 +31,7 @@ import java.util.TreeSet;
 import net.osmand.IProgress;
 import net.osmand.binary.OsmandOdb.MapData;
 import net.osmand.binary.OsmandOdb.MapDataBlock;
+import net.osmand.data.LatLon;
 import net.osmand.data.Multipolygon;
 import net.osmand.data.MultipolygonBuilder;
 import net.osmand.data.Ring;
@@ -114,8 +115,15 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		}
 		long ll = orig.getId();
 		long sum = 0;
-		for(EntityId d : orig.getMemberIds()) {
-			sum += d.getId();
+		for(Entity d : orig.getMemberEntities().keySet()) {
+			LatLon l = d.getLatLon();
+			if(l != null) {
+				int y = MapUtils.get31TileNumberY(l.getLatitude());
+				int x = MapUtils.get31TileNumberX(l.getLongitude());
+				int hash = (x + y) >> 10;
+				sum += hash;	
+			}
+			
 		}
 		return genId(SHIFT_MULTIPOLYGON_IDS, (ll << 6) + (sum % 63));
 	}

@@ -135,7 +135,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 
 	private int getNodeHash(Entity e) {
 		int y = MapUtils.get31TileNumberY(((Node) e).getLatitude());
-		int x = MapUtils.get31TileNumberY(((Node) e).getLongitude());
+		int x = MapUtils.get31TileNumberX(((Node) e).getLongitude());
 		int hash = (x + y) >> 10;
 		return hash;
 	}
@@ -189,13 +189,13 @@ public class OsmDbCreator implements IOsmStorageFilter {
 			stat.executeUpdate("create table ways (id bigint, node bigint, ord smallint, tags blob, boundary smallint, primary key (id, ord))"); //$NON-NLS-1$
 			stat.executeUpdate("create index IdWIndex ON ways (id)"); //$NON-NLS-1$
 			dialect.deleteTableIfExists("relations", stat);
-			stat.executeUpdate("create table relations (id bigint, member bigint, type smallint, role varchar(1024), ord smallint, tags blob, primary key (id, ord))"); //$NON-NLS-1$
+			stat.executeUpdate("create table relations (id bigint, member bigint, type smallint, role varchar(1024), ord smallint, tags blob, del int, primary key (id, ord, del))"); //$NON-NLS-1$
 			stat.executeUpdate("create index IdRIndex ON relations (id)"); //$NON-NLS-1$
 			stat.close();
 		}
 		prepNode = dbConn.prepareStatement("insert into node values (?, ?, ?, ?)"); //$NON-NLS-1$
 		prepWays = dbConn.prepareStatement("insert into ways values (?, ?, ?, ?, ?)"); //$NON-NLS-1$
-		prepRelations = dbConn.prepareStatement("insert into relations values (?, ?, ?, ?, ?, ?)"); //$NON-NLS-1$
+		prepRelations = dbConn.prepareStatement("insert into relations values (?, ?, ?, ?, ?, ?, ?)"); //$NON-NLS-1$
 		dbConn.setAutoCommit(false);
 	}
 
@@ -225,14 +225,14 @@ public class OsmDbCreator implements IOsmStorageFilter {
 	
 	
 	
-	private void checkEntityExists(Entity e, long id) throws SQLException {
+	private void checkEntityExists(Entity e, long id, boolean delete) throws SQLException {
 		if (nodeIds == null) {
 			nodeIds = new TLongHashSet();
 			wayIds = new TLongHashSet();
 			relationIds = new TLongHashSet();
 			delNode = dbConn.prepareStatement("delete from node where id = ?"); //$NON-NLS-1$
 			delWays = dbConn.prepareStatement("delete from ways where id = ?"); //$NON-NLS-1$
-			delRelations = dbConn.prepareStatement("delete from relations where id = ?"); //$NON-NLS-1$
+			delRelations = dbConn.prepareStatement("delete from relations where id = ? and del = ?"); //$NON-NLS-1$
 		}
 		if (e instanceof Node) {
 			nodeIds.add(id);
@@ -252,6 +252,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 			delWays.execute();
 		} else if (e instanceof Relation) {
 			delRelations.setLong(1, id);
+			delRelations.setLong(2, delete ? 1 : 0);
 			delRelations.execute();
 		}
 	}
@@ -281,8 +282,9 @@ public class OsmDbCreator implements IOsmStorageFilter {
 				throw new RuntimeException(es);
 			}
 			long id = convertId(e);
-			if (osmChange || ovewriteIds ) {
-				checkEntityExists(e, id);
+			boolean delete = "delete".equals(e.getTag("osmand_change"));
+			if (osmChange || ovewriteIds || e instanceof Relation) {
+				checkEntityExists(e, id, delete);
 			}
 			if (e instanceof Node) {
 				currentCountNode++;
@@ -335,6 +337,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 					prepRelations.setLong(3, i.getKey().getType().ordinal());
 					prepRelations.setString(4, i.getValue());
 					prepRelations.setLong(5, ord++);
+					prepRelations.setInt(7, delete ? 1 : 0);
 					prepRelations.addBatch();
 				}
 				if (currentRelationsCount >= BATCH_SIZE_OSM) {

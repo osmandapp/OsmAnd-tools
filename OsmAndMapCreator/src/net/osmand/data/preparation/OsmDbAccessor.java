@@ -1,10 +1,6 @@
 package net.osmand.data.preparation;
 
 
-import gnu.trove.map.TLongObjectMap;
-import gnu.trove.set.TLongSet;
-import gnu.trove.set.hash.TLongHashSet;
-
 import java.io.UnsupportedEncodingException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -70,7 +66,7 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 		pselectWay = dbConn.prepareStatement("select w.node, w.ord, w.tags, n.latitude, n.longitude, n.tags " + //$NON-NLS-1$
 				"from ways w left join node n on w.node = n.id where w.id = ? order by w.ord"); //$NON-NLS-1$
 		pselectRelation = dbConn.prepareStatement("select r.member, r.type, r.role, r.ord, r.tags " + //$NON-NLS-1$
-				"from relations r where r.id = ? order by r.ord"); //$NON-NLS-1$
+				"from relations r where r.id = ? and r.del = ? order by r.ord"); //$NON-NLS-1$
 
 		iterateNodes = dbConn
 				.prepareStatement("select n.id, n.latitude, n.longitude, n.tags from node n where length(n.tags) > 0"); //$NON-NLS-1$
@@ -79,7 +75,7 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 		iterateWayBoundaries = dbConn
 				.prepareStatement("select w.id, w.node, w.ord, w.tags, n.latitude, n.longitude, n.tags " + //$NON-NLS-1$
 						"from ways w left join node n on w.node = n.id  where w.boundary > 0 order by w.id, w.ord"); //$NON-NLS-1$
-		iterateRelations = dbConn.prepareStatement("select r.id, r.tags from relations r where length(r.tags) > 0"); //$NON-NLS-1$
+		iterateRelations = dbConn.prepareStatement("select r.id, r.tags, r.del from relations r where length(r.tags) > 0"); //$NON-NLS-1$
 	}
 
 	public void updateCounts(OsmDbCreator dbCreator) {
@@ -143,6 +139,7 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 		Map<EntityId, Entity> map = new LinkedHashMap<EntityId, Entity>();
 		if (e.getMemberIds().isEmpty()) {
 			pselectRelation.setLong(1, e.getId());
+			pselectRelation.setInt(2, e.getModify() == Entity.MODIFY_DELETED ? 1 : 0);
 			if (pselectRelation.execute()) {
 				ResultSet rs = pselectRelation.getResultSet();
 				while (rs.next()) {
@@ -362,6 +359,7 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 					} else {
 						e = new Relation(curId);
 						readTags(e, rs.getBytes(2));
+						e.setModify(rs.getInt(3) == 1 ? Entity.MODIFY_DELETED : Entity.MODIFY_UNKNOWN);
 					}
 					if (newEntity) {
 						if (prevEntity != null) {
