@@ -78,7 +78,7 @@ public class GenerateDailyObf {
 		
 	}
 
-	private static void generateCountry(String name, File targetObfZip, File[] array, long targetTimestamp) throws IOException, SQLException, InterruptedException, XmlPullParserException {
+	public static void generateCountry(String name, File targetObfZip, File[] array, long targetTimestamp) throws IOException, SQLException, InterruptedException, XmlPullParserException {
 		RTree.clearCache();
 		IndexCreator ic = new IndexCreator(targetObfZip.getParentFile());
 		ic.setIndexAddress(false);
