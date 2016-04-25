@@ -28,6 +28,7 @@ import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -92,9 +93,12 @@ public class OsmStorageWriter {
 		writeOSM(output, entityInfo, nodes, ways, relations);
 	}
 
-
 	public void writeOSM(OutputStream output, Map<EntityId, EntityInfo> entityInfo, Collection<Node> nodes,
 			Collection<Way> ways, Collection<Relation> relations) throws FactoryConfigurationError, XMLStreamException {
+		writeOSM(output, entityInfo, nodes, ways, relations, false);
+	}
+	public void writeOSM(OutputStream output, Map<EntityId, EntityInfo> entityInfo, Collection<Node> nodes,
+			Collection<Way> ways, Collection<Relation> relations, boolean skipMissingMembers) throws FactoryConfigurationError, XMLStreamException {
 		// transformer.setOutputProperty(OutputKeys.INDENT, "yes");
 		// String indent = "{http://xml.apache.org/xslt}indent-amount";
 		// transformer.setOutputProperty(indent, "4");
@@ -102,7 +106,7 @@ public class OsmStorageWriter {
 		XMLStreamWriter streamWriter = xof.createXMLStreamWriter(new OutputStreamWriter(output));
 
 		streamWriter.writeStartDocument();
-
+		Set<EntityId> nd = new HashSet<Entity.EntityId>();
 		writeStartElement(streamWriter, ELEM_OSM, "");
 		streamWriter.writeAttribute(ATTR_VERSION, "0.6");
 		for (Node n : nodes) {
@@ -113,6 +117,9 @@ public class OsmStorageWriter {
 			writeEntityAttributes(streamWriter, n, entityInfo.get(EntityId.valueOf(n)));
 			writeTags(streamWriter, n);
 			writeEndElement(streamWriter, INDENT);
+			if(skipMissingMembers) {
+				nd.add(EntityId.valueOf(n));
+			}
 		}
 
 		for (Way w : ways) {
@@ -127,13 +134,22 @@ public class OsmStorageWriter {
 			}
 			writeTags(streamWriter, w);
 			writeEndElement(streamWriter, INDENT);
+			if(skipMissingMembers) {
+				nd.add(EntityId.valueOf(w));
+			}
 		}
 
 		for (Relation r : relations) {
+			if(skipMissingMembers) {
+				nd.add(EntityId.valueOf(r));
+			}
 			writeStartElement(streamWriter, ELEM_RELATION, INDENT);
 			streamWriter.writeAttribute(ATTR_ID, String.valueOf(r.getId()));
 			writeEntityAttributes(streamWriter, r, entityInfo.get(EntityId.valueOf(r)));
 			for (Entry<EntityId, String> e : r.getMembersMap().entrySet()) {
+				if(skipMissingMembers && !nd.contains(e.getKey())) {
+					continue;
+				}
 				writeStartElement(streamWriter, ELEM_MEMBER, INDENT2);
 				streamWriter.writeAttribute(ATTR_REF, String.valueOf(e.getKey().getId()));
 				String s = e.getValue();

@@ -6,6 +6,7 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -15,6 +16,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 
 import javax.xml.stream.XMLStreamException;
 
@@ -32,6 +34,7 @@ import net.osmand.osm.io.OsmStorageWriter;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
+import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 
@@ -45,32 +48,41 @@ public class AugmentedDiffsInspector {
 //	relation(changed:"2016-03-01T07:00:00Z","2016-03-01T07:03:00Z");
 //	)->.changed;
 //	.changed out geom meta;
+	private static Log log = PlatformUtil.getLog(AugmentedDiffsInspector.class);
+
 
 	private static String OSMAND_DELETE_TAG = "osmand_change";
 	private static String OSMAND_DELETE_VALUE = "delete";
 	private static long ID_BASE = -1000;
-	public static void main(String[] args) throws XmlPullParserException, IOException, XMLStreamException {
-		File f = new File(args[0]);
-		File targetDir = new File(args[1]);
-		File ocbfFile = new File(args[2]);
-
-		AugmentedDiffsInspector inspector = new AugmentedDiffsInspector();
-		Context ctx = inspector.parseFile(f);
-		OsmandRegions or = new OsmandRegions();
-		or.prepareFile(ocbfFile.getAbsolutePath());
-		or.cacheAllCountries();
-		inspector.prepareRegions(ctx, ctx.newIds, ctx.regionsNew, or);
-		inspector.prepareRegions(ctx, ctx.oldIds, ctx.regionsOld, or);
-
-		inspector.write(ctx, targetDir);
-
+	public static void main(String[] args) {
+		try {
+			File inputFile = new File(args[0]);
+			File targetDir = new File(args[1]);
+			File ocbfFile = new File(args[2]);
+			
+			AugmentedDiffsInspector inspector = new AugmentedDiffsInspector();
+			Context ctx = inspector.parseFile(inputFile);
+			OsmandRegions or = new OsmandRegions();
+			or.prepareFile(ocbfFile.getAbsolutePath());
+			or.cacheAllCountries();
+			inspector.prepareRegions(ctx, ctx.newIds, ctx.regionsNew, or);
+			inspector.prepareRegions(ctx, ctx.oldIds, ctx.regionsOld, or);
+			String name = inputFile.getName();
+			String date = name.substring(0, name.indexOf('-'));
+			String time = name.substring(name.indexOf('-') + 1, name.indexOf('.'));
+			
+			inspector.write(ctx, targetDir, date, time);
+		} catch (Exception e) {
+			e.printStackTrace();
+			System.exit(1);
+		}
 	}
 
 	private void prepareRegions(Context ctx, Map<EntityId, Entity> ids, Map<String, Set<EntityId>> regionsMap,
 			OsmandRegions or) throws IOException {
 		Map<EntityId, Set<String>> mp = new HashMap<Entity.EntityId, Set<String>>();
-		for(Entity e : ids.values()) {
-			if(e instanceof Node) {
+		for (Entity e : ids.values()) {
+			if (e instanceof Node) {
 				int y = MapUtils.get31TileNumberY(((Node) e).getLatitude());
 				int x = MapUtils.get31TileNumberX(((Node) e).getLongitude());
 				List<BinaryMapDataObject> l = or.query(x, y);
@@ -80,11 +92,13 @@ public class AugmentedDiffsInspector {
 				for (BinaryMapDataObject b : l) {
 					if(or.contain(b, x, y)) {
 						String dw = or.getDownloadName(b);
-						if(!regionsMap.containsKey(dw)) {
-							regionsMap.put(dw, new LinkedHashSet<Entity.EntityId>());
+						if (!Algorithms.isEmpty(dw) && or.isDownloadOfType(b, OsmandRegions.MAP_TYPE)) {
+							if (!regionsMap.containsKey(dw)) {
+								regionsMap.put(dw, new LinkedHashSet<Entity.EntityId>());
+							}
+							regionsMap.get(dw).add(id);
+							lst.add(dw);
 						}
-						regionsMap.get(dw).add(id);
-						lst.add(dw);
 					}
 				}
 			}
@@ -130,15 +144,17 @@ public class AugmentedDiffsInspector {
 		}
 	}
 
-	private void write(Context ctx, File targetDir) throws XMLStreamException, IOException {
+	private void write(Context ctx, File targetDir, String date, String time) throws XMLStreamException, IOException, SQLException, InterruptedException, XmlPullParserException {
 		targetDir.mkdirs();
-		writeFile(targetDir, "world", ctx.oldIds, null, ctx.newIds, null);
+//		writeFile(targetDir, "world", ctx.oldIds, null, ctx.newIds, null);
 		for(String reg : ctx.regionsNew.keySet()) {
-			writeFile(targetDir, reg, ctx.oldIds, ctx.regionsOld.get(reg), ctx.newIds, ctx.regionsNew.get(reg));
+			File dr = new File(targetDir, reg + "/" + date);
+			dr.mkdirs();
+			writeFile(dr, reg + "_" + time, ctx.oldIds, ctx.regionsOld.get(reg), ctx.newIds, ctx.regionsNew.get(reg));
 		}
 	}
-
-	private void writeFile(File targetDir, String prefix, Map<EntityId, Entity> octx, Set<EntityId> oset,
+	
+	private File writeFile(File targetDir, String prefix, Map<EntityId, Entity> octx, Set<EntityId> oset,
 			Map<EntityId, Entity> nctx, Set<EntityId> nset) throws XMLStreamException,
 			IOException, FileNotFoundException {
 		List<Node> nodes = new ArrayList<Node>();
@@ -146,14 +162,20 @@ public class AugmentedDiffsInspector {
 		List<Relation> relations = new ArrayList<Relation>();
 		groupObjects(octx, oset, nodes, ways, relations);
 		groupObjects(nctx, nset, nodes, ways, relations);
-		new OsmStorageWriter().writeOSM(new FileOutputStream(new File(targetDir, prefix + ".osm")), new HashMap<Entity.EntityId, EntityInfo>(),
-				nodes, ways, relations);
+		File f = new File(targetDir, prefix + ".osm.gz");
+		FileOutputStream fous = new FileOutputStream(f);
+		GZIPOutputStream gz = new GZIPOutputStream(fous);
+		new OsmStorageWriter().writeOSM(gz, new HashMap<Entity.EntityId, EntityInfo>(),
+				nodes, ways, relations, true);
+		gz.close();
+		fous.close();
+		return f;
 	}
 
 	private void groupObjects(Map<EntityId, Entity> octx, Set<EntityId> oset, List<Node> nodes, List<Way> ways,
 			List<Relation> relations) {
 		for(Entity e: octx.values()) {
-			if(oset == null || oset.contains(EntityId.valueOf(e))) {
+			if(oset != null &&  oset.contains(EntityId.valueOf(e))) {
 				if(e instanceof Node) {
 					nodes.add((Node) e);
 				} else if(e instanceof Way) {
@@ -244,15 +266,17 @@ public class AugmentedDiffsInspector {
 					currentWay = null;
 					if (!o.containsKey(nid) || old) {
 						if (type == EntityType.NODE) {
-							Node nd = registerNewNode(parser, ctx, old);
+							Node nd = registerNewNode(parser, ctx, old, nid);
 							nid = EntityId.valueOf(nd);
 						} else if (type == EntityType.WAY) {
 							currentWay = new Way(ID_BASE--);
+							currentWay.putTag("oid", nid.getId().toString());
 							registerEntity(ctx, old, currentWay);
 							nid = EntityId.valueOf(currentWay);
 						} else if (type == EntityType.RELATION) {
 							// skip subrelations
-							throw new UnsupportedOperationException();
+							// throw new UnsupportedOperationException();
+							skip = true;
 						}
 					}
 					if (!skip) {
@@ -261,13 +285,14 @@ public class AugmentedDiffsInspector {
 				} else if (name.equals("nd") && currentWay != null) {
 					String rf = parser.getAttributeValue("", "ref");
 					Node nd = null;
+					EntityId nid = null;
 					if (!Algorithms.isEmpty(rf) && !old) {
-						EntityId nid = new EntityId(EntityType.NODE, Long.parseLong(rf));
+						nid = new EntityId(EntityType.NODE, Long.parseLong(rf));
 						Map<EntityId, Entity> o = old ? ctx.oldIds : ctx.newIds;
 						nd = (Node) o.get(nid);
 					}
 					if (nd == null) {
-						nd = registerNewNode(parser, ctx, old);
+						nd = registerNewNode(parser, ctx, old, nid);
 					}
 					((Way) currentWay).addNode(nd.getId());
 				}
@@ -298,10 +323,13 @@ public class AugmentedDiffsInspector {
 
 	}
 
-	private Node registerNewNode(XmlPullParser parser, Context ctx, boolean old) {
+	private Node registerNewNode(XmlPullParser parser, Context ctx, boolean old, EntityId nid) {
 		Node nd;
 		nd = new Node(Double.parseDouble(parser.getAttributeValue("", "lat")),
 				Double.parseDouble(parser.getAttributeValue("", "lon")), ID_BASE--);
+		if(nid != null) {
+			nd.putTag("oid", nid.getId().toString());
+		}
 		registerEntity(ctx, old, nd);
 		return nd;
 	}

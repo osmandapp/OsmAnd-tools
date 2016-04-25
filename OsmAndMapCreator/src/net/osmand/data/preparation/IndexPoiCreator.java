@@ -1,6 +1,7 @@
 package net.osmand.data.preparation;
 
 import gnu.trove.list.array.TIntArrayList;
+import gnu.trove.set.hash.TLongHashSet;
 
 import java.io.File;
 import java.io.IOException;
@@ -50,6 +51,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	private Connection poiConnection;
 	private File poiIndexFile;
 	private PreparedStatement poiPreparedStatement;
+	private TLongHashSet ids = new TLongHashSet() ;
+	private PreparedStatement poiDeleteStatement;
 	private static final int ZOOM_TO_SAVE_END = 16;
 	private static final int ZOOM_TO_SAVE_START = 6;
 	private static final int ZOOM_TO_WRITE_CATEGORIES_START = 12;
@@ -60,8 +63,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	public static boolean ZIP_LONG_STRINGS = false;
 	public static int ZIP_STRING_LIMIT = 100;
 
-
-
+	
+	private boolean ovewriteIds;
 	private List<Amenity> tempAmenityList = new ArrayList<Amenity>();
 	private Map<EntityId, Map<String, String>> propogatedTags = new LinkedHashMap<Entity.EntityId, Map<String, String>>();
 
@@ -70,8 +73,13 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	private List<PoiAdditionalType> additionalTypesId = new ArrayList<PoiAdditionalType>();
 	private Map<String, PoiAdditionalType> additionalTypesByTag = new HashMap<String, PoiAdditionalType>();
 
-	public IndexPoiCreator(MapRenderingTypesEncoder renderingTypes) {
+	
+
+	
+
+	public IndexPoiCreator(MapRenderingTypesEncoder renderingTypes, boolean ovewriteIds) {
 		this.renderingTypes = renderingTypes;
+		this.ovewriteIds = ovewriteIds;
 		this.poiTypes = MapPoiTypes.getDefault();
 	}
 
@@ -106,6 +114,17 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			if(e instanceof Relation) {
 				ctx.loadEntityRelation((Relation) e);
 			}
+			boolean first = true;
+			long id;
+			if(e instanceof Relation || basemap) {
+				id = GENERATE_OBJ_ID -- ;
+			} else {
+				// keep backward compatibility for ids (osm editing)
+				id = e.getId() >> (OsmDbCreator.SHIFT_ID - 1);
+				if(id % 2 != (e.getId() % 2)) {
+					id ^= 1;
+				}
+			}
 			for (Amenity a : tempAmenityList) {
 				if(a.getType().getKeyName().equals("entertainment") && privateReg) {
 					// don't index private swimming pools
@@ -121,12 +140,19 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				// by statistic < 1% creates maps manually
 				// checkEntity(e);
 				EntityParser.parseMapObject(a, e, etags);
+				a.setId(id);
 				if (a.getLocation() != null) {
-					if(e instanceof Relation || basemap) {
-						a.setId(GENERATE_OBJ_ID -- );
-					}
+					
 					// do not convert english name
 					// convertEnglishName(a);
+					if(ovewriteIds && first) {
+						if(!ids.add(a.getId())) {
+							poiPreparedStatement.executeBatch();
+							poiDeleteStatement.setString(1, a.getId() +"");
+							poiDeleteStatement.execute();
+							first = false;
+						}
+					}
 					insertAmenityIntoPoi(a);
 				}
 			}
@@ -275,6 +301,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		poiPreparedStatement = poiConnection
 				.prepareStatement("INSERT INTO " + IndexConstants.POI_TABLE + "(id, x, y, type, subtype, additionalTags) " + //$NON-NLS-1$//$NON-NLS-2$
 						"VALUES (?, ?, ?, ?, ?, ?)");
+		poiDeleteStatement = poiConnection.prepareStatement("DELETE FROM " + IndexConstants.POI_TABLE + " where id = ?");
 		pStatements.put(poiPreparedStatement, 0);
 
 		poiConnection.setAutoCommit(false);

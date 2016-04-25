@@ -1,6 +1,8 @@
 package net.osmand.data.preparation;
 
 import gnu.trove.list.array.TLongArrayList;
+import gnu.trove.map.hash.TLongObjectHashMap;
+import gnu.trove.set.TLongSet;
 import gnu.trove.set.hash.TLongHashSet;
 
 import java.io.ByteArrayOutputStream;
@@ -9,6 +11,9 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
 import java.util.Map.Entry;
 
 import net.osmand.data.City.CityType;
@@ -21,19 +26,21 @@ import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Way;
 import net.osmand.osm.io.IOsmStorageFilter;
 import net.osmand.osm.io.OsmBaseStorage;
+import net.osmand.util.MapUtils;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 public class OsmDbCreator implements IOsmStorageFilter {
 
+	
 	private static final Log log = LogFactory.getLog(OsmDbCreator.class);
-
+	public static final int SHIFT_ID = 6;
 	public static final int BATCH_SIZE_OSM = 100000;
 
 	// do not store these tags in the database, just ignore them
 	final String[] tagsToIgnore= {"created_by","source","converted_by"};
-
+	
 	DBDialect dialect;
 	int currentCountNode = 0;
 	private PreparedStatement prepNode;
@@ -46,7 +53,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 	int currentWaysCount = 0;
 	private PreparedStatement prepWays;
 	int allWays = 0;
-
+	
 	private PreparedStatement delNode;
 	private PreparedStatement delRelations;
 	private PreparedStatement delWays;
@@ -59,7 +66,13 @@ public class OsmDbCreator implements IOsmStorageFilter {
 	private final int shiftId;
 	private final int additionId;
 	private boolean ovewriteIds;
-	private boolean augmentedDiffs;
+
+	private static boolean VALIDATE_DUPLICATES = false;
+	private boolean backwardComptibleIds;
+	private TLongObjectHashMap<Long> generatedIds = new TLongObjectHashMap<Long>();
+	private TLongObjectHashMap<Long> hashes = new TLongObjectHashMap<Long>();
+	private TLongSet idSet = new TLongHashSet();
+	
 
 
 	public OsmDbCreator(int additionId, int shiftId, boolean ovewriteIds) {
@@ -67,24 +80,100 @@ public class OsmDbCreator implements IOsmStorageFilter {
 		this.shiftId = shiftId;
 		this.ovewriteIds = ovewriteIds;
 	}
-
+	
 	public OsmDbCreator() {
 		this(0, 0, false);
 	}
-
-	private long convertId(long id, EntityType tp) {
-//		FIXME OSM_CHANGE;
-//		FIXME GEOMETRY_ID;
-		if(shiftId <= 0) {
+	
+	
+	private long convertId(Entity e) {
+		long id = e.getId();
+		if (backwardComptibleIds) {
 			return id;
 		}
-		return (id << shiftId) + additionId;
+		if (!ovewriteIds && shiftId > 0) {
+			return (id << shiftId) + additionId;
+		}
+		int ord = EntityType.valueOf(e).ordinal();
+		if (e instanceof Node) {
+			int hash = getNodeHash(e);
+			return getConvertId(id, ord, hash);
+		} else if (e instanceof Way) {
+			TLongArrayList lids = ((Way) e).getNodeIds();
+			long hash = 0;
+			for (int i = 0; i < lids.size(); i++) {
+				Long ld = getGeneratedId(lids.get(i), 0);
+				Long hd = getHash(lids.get(i), 0);
+				if(hd != null) {
+					hash += hd;
+				}
+				if (ld != null) {
+					lids.set(i, ld);
+				}
+			}
+			return getConvertId(id, ord, hash);
+		} else {
+			Relation r = (Relation) e;
+			Map<EntityId, EntityId> p = new HashMap<Entity.EntityId, Entity.EntityId>();
+			for (EntityId i : r.getMemberIds()) {
+				if (i.getType() != EntityType.RELATION) {
+					Long ll = getGeneratedId(i.getId().longValue(), i.getType().ordinal());
+					if (ll != null) {
+						p.put(i, new EntityId(i.getType(), ll));
+					}
+				}
+			}
+			Iterator<Entry<EntityId, EntityId>> it = p.entrySet().iterator();
+			while (it.hasNext()) {
+				Entry<EntityId, EntityId> es = it.next();
+				String role = r.getModifiableMembersMap().remove(es.getKey());
+				r.getModifiableMembersMap().put(es.getValue(), role);
+			}
+			return id;
+		}
 	}
 
-	private long getId(Entity e) {
-		return convertId(e.getId(), EntityType.valueOf(e));
+	private int getNodeHash(Entity e) {
+		int y = MapUtils.get31TileNumberY(((Node) e).getLatitude());
+		int x = MapUtils.get31TileNumberX(((Node) e).getLongitude());
+		int hash = (x + y) >> 10;
+		return hash;
 	}
 
+	private Long getHash(long l, int ord) {
+		if(l < 0) {
+			long lid = (l << shiftId) + additionId;
+			long fid = (lid << 2) + ord;
+			return hashes.get(fid);
+		}
+		return hashes.get((l << 2) + ord);
+	}
+
+	private Long getGeneratedId(long l, int ord) {
+		if(l < 0) {
+			long lid = (l << shiftId) + additionId;
+			long fid = (lid << 2) + ord;
+			return generatedIds.get(fid);
+		}
+		return generatedIds.get((l << 2) + ord);
+	}
+
+	private long getConvertId(long id, int ord, long hash) {
+		if(id < 0) {
+			long lid = (id << shiftId) + additionId;
+			long fid = (lid << 2) + ord;
+			generatedIds.put(fid, lid);
+			hashes.put(fid, hash);
+			return lid;
+		}
+		int l = (int) (hash & ((1 << (SHIFT_ID - 1)) - 1));
+		long cid = (id << SHIFT_ID) + (ord % 2) + l << 1;
+		long fid = (id << 2) + ord;
+		generatedIds.put(fid, cid);
+		hashes.put(fid, hash);
+		return cid;
+	}
+	
 
 	public void initDatabase(DBDialect dialect, Object databaseConn, boolean create) throws SQLException {
 
@@ -100,13 +189,13 @@ public class OsmDbCreator implements IOsmStorageFilter {
 			stat.executeUpdate("create table ways (id bigint, node bigint, ord smallint, tags blob, boundary smallint, primary key (id, ord))"); //$NON-NLS-1$
 			stat.executeUpdate("create index IdWIndex ON ways (id)"); //$NON-NLS-1$
 			dialect.deleteTableIfExists("relations", stat);
-			stat.executeUpdate("create table relations (id bigint, member bigint, type smallint, role varchar(1024), ord smallint, tags blob, primary key (id, ord))"); //$NON-NLS-1$
+			stat.executeUpdate("create table relations (id bigint, member bigint, type smallint, role varchar(1024), ord smallint, tags blob, del int, primary key (id, ord, del))"); //$NON-NLS-1$
 			stat.executeUpdate("create index IdRIndex ON relations (id)"); //$NON-NLS-1$
 			stat.close();
 		}
 		prepNode = dbConn.prepareStatement("insert into node values (?, ?, ?, ?)"); //$NON-NLS-1$
 		prepWays = dbConn.prepareStatement("insert into ways values (?, ?, ?, ?, ?)"); //$NON-NLS-1$
-		prepRelations = dbConn.prepareStatement("insert into relations values (?, ?, ?, ?, ?, ?)"); //$NON-NLS-1$
+		prepRelations = dbConn.prepareStatement("insert into relations values (?, ?, ?, ?, ?, ?, ?)"); //$NON-NLS-1$
 		dbConn.setAutoCommit(false);
 	}
 
@@ -132,50 +221,51 @@ public class OsmDbCreator implements IOsmStorageFilter {
 		if (delRelations != null) {
 			delRelations.close();
 		}
-		
-
 	}
-
-
-
-	private void checkEntityExists(Entity e) throws SQLException {
+	
+	
+	
+	private void checkEntityExists(Entity e, long id, boolean delete) throws SQLException {
 		if (nodeIds == null) {
 			nodeIds = new TLongHashSet();
 			wayIds = new TLongHashSet();
 			relationIds = new TLongHashSet();
 			delNode = dbConn.prepareStatement("delete from node where id = ?"); //$NON-NLS-1$
 			delWays = dbConn.prepareStatement("delete from ways where id = ?"); //$NON-NLS-1$
-			delRelations = dbConn.prepareStatement("delete from relations where id = ?"); //$NON-NLS-1$
+			delRelations = dbConn.prepareStatement("delete from relations where id = ? and del = ?"); //$NON-NLS-1$
 		}
-		long id = e.getId();
-		boolean changed = false;
 		if (e instanceof Node) {
-			changed = nodeIds.add(id);
+			nodeIds.add(id);
 		} else if (e instanceof Way) {
-			changed = wayIds.add(id);
+			wayIds.add(id);
 		} else if (e instanceof Relation) {
-			changed = relationIds.add(id);
+			relationIds.add(id);
 		}
-		if (!changed) {
-			prepNode.executeBatch();
-			prepWays.executeBatch();
-			prepRelations.executeBatch();
-			if (e instanceof Node) {
-				delNode.setLong(1, id);
-				delNode.execute();
-			} else if (e instanceof Way) {
-				delWays.setLong(1, id);
-				delWays.execute();
-			} else if (e instanceof Relation) {
-				delRelations.setLong(1, id);
-				delRelations.execute();
-			}
+		prepNode.executeBatch();
+		prepWays.executeBatch();
+		prepRelations.executeBatch();
+		if (e instanceof Node) {
+			delNode.setLong(1, id);
+			delNode.execute();
+		} else if (e instanceof Way) {
+			delWays.setLong(1, id);
+			delWays.execute();
+		} else if (e instanceof Relation) {
+			delRelations.setLong(1, id);
+			delRelations.setLong(2, delete ? 1 : 0);
+			delRelations.execute();
 		}
 	}
 
 	@Override
 	public boolean acceptEntityToLoad(OsmBaseStorage storage, EntityId entityId, Entity e) {
 		// put all nodes into temporary db to get only required nodes after loading all data
+		if(VALIDATE_DUPLICATES) {
+			long l = (e.getId() << 2) + entityId.getType().ordinal();
+			if(!idSet.add(l)) {
+				throw new IllegalStateException("Duplicate id '" + e.getId() +"' " + entityId.getType());
+			}
+		}
 		boolean osmChange = storage.isOsmChange();
 		try {
 			e.removeTags(tagsToIgnore);
@@ -191,15 +281,17 @@ public class OsmDbCreator implements IOsmStorageFilter {
 			} catch (IOException es) {
 				throw new RuntimeException(es);
 			}
-			if (osmChange || ovewriteIds || (e instanceof Relation)) {
-				checkEntityExists(e);
+			long id = convertId(e);
+			boolean delete = "delete".equals(e.getTag("osmand_change"));
+			if (osmChange || ovewriteIds || e instanceof Relation) {
+				checkEntityExists(e, id, delete);
 			}
 			if (e instanceof Node) {
 				currentCountNode++;
 				if (!e.getTags().isEmpty()) {
 					allNodes++;
 				}
-				prepNode.setLong(1, getId(e));
+				prepNode.setLong(1, id);
 				prepNode.setDouble(2, ((Node) e).getLatitude());
 				prepNode.setDouble(3, ((Node) e).getLongitude());
 				prepNode.setBytes(4, tags.toByteArray());
@@ -220,8 +312,8 @@ public class OsmDbCreator implements IOsmStorageFilter {
 					if (ord == 0) {
 						prepWays.setBytes(4, tags.toByteArray());
 					}
-					prepWays.setLong(1, getId(e));
-					prepWays.setLong(2, convertId(nodeIds.get(j), EntityType.NODE));
+					prepWays.setLong(1, id);
+					prepWays.setLong(2, nodeIds.get(j));
 					prepWays.setLong(3, ord++);
 					prepWays.setInt(5, boundary);
 					prepWays.addBatch();
@@ -240,11 +332,12 @@ public class OsmDbCreator implements IOsmStorageFilter {
 					if (ord == 0) {
 						prepRelations.setBytes(6, tags.toByteArray());
 					}
-					prepRelations.setLong(1, getId(e));
-					prepRelations.setLong(2, convertId(i.getKey().getId(), i.getKey().getType()));
+					prepRelations.setLong(1, id);
+					prepRelations.setLong(2, i.getKey().getId());
 					prepRelations.setLong(3, i.getKey().getType().ordinal());
 					prepRelations.setString(4, i.getValue());
 					prepRelations.setLong(5, ord++);
+					prepRelations.setInt(7, delete ? 1 : 0);
 					prepRelations.addBatch();
 				}
 				if (currentRelationsCount >= BATCH_SIZE_OSM) {
@@ -275,5 +368,10 @@ public class OsmDbCreator implements IOsmStorageFilter {
 		return allWays;
 	}
 
+	public void setBackwardCompatibleIds(boolean backwardComptibleIds) {
+		this.backwardComptibleIds = backwardComptibleIds;
+		
+	}
+	
 
 }
