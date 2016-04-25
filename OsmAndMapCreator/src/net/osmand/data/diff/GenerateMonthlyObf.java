@@ -33,27 +33,33 @@ public class GenerateMonthlyObf {
 	public static void main(String[] args) {
 		try {
 			File dir = new File(args[0]);
-			iterateOverDir(dir);
+			iterateOverDir(dir, args.length > 1 && "--delete".equals(args[1]));
 		} catch (Exception e) {
 			e.printStackTrace();
 			System.exit(1);
 		}
 	}
 
-	private static void iterateOverDir(File dir) throws IOException, SQLException, InterruptedException, XmlPullParserException {
-		for(File countryF : dir.listFiles()) {
-			if(!countryF.isDirectory()) {
+	private static void iterateOverDir(File dir, boolean delete) throws IOException, SQLException,
+			InterruptedException, XmlPullParserException {
+		for (File countryF : dir.listFiles()) {
+			if (!countryF.isDirectory()) {
 				continue;
 			}
 			ArrayList<File> deleteDates = new ArrayList<File>();
 			iterateCountry(countryF, deleteDates);
-			for(File fld : deleteDates) {
-				for(File oneF : fld.listFiles()) {
-					System.out.println("Delete " + oneF.getAbsolutePath());
-					oneF.delete();
+			for (File fld : deleteDates) {
+				for (File oneF : fld.listFiles()) {
+					System.out.println((delete ? "Delete " : "About to delete") + oneF.getAbsolutePath());
+					if (delete) {
+						oneF.delete();
+					}
 				}
-				System.out.println("Delete " + fld.getAbsolutePath());
-				fld.delete();
+
+				System.out.println((delete ? "Delete " : "About to delete") + fld.getAbsolutePath());
+				if (delete) {
+					fld.delete();
+				}
 			}
 		}
 	}
