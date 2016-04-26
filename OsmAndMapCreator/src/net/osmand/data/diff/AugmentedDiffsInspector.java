@@ -72,7 +72,7 @@ public class AugmentedDiffsInspector {
 			String time = name.substring(name.indexOf('-') + 1, name.indexOf('.'));
 			
 			inspector.write(ctx, targetDir, date, time);
-		} catch (Exception e) {
+		} catch (Throwable e) {
 			e.printStackTrace();
 			System.exit(1);
 		}
