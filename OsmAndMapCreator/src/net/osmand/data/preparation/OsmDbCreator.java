@@ -167,7 +167,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 			return lid;
 		}
 		int l = (int) (hash & ((1 << (SHIFT_ID - 1)) - 1));
-		long cid = (id << SHIFT_ID) + (ord % 2) + l << 1;
+		long cid = (id << SHIFT_ID) + (ord % 2) + (l << 1);
 		long fid = (id << 2) + ord;
 		generatedIds.put(fid, cid);
 		hashes.put(fid, hash);
