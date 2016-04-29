@@ -53,14 +53,17 @@ public class MainUtilities {
 				ic.setIndexPOI(true);
 				ic.setIndexRouting(true);
 				ic.setIndexAddress(true);
+				ic.setLastModifiedDate(new File(subArgsArray[0]).lastModified());
 				generateObf(subArgsArray, ic);
 			} else if(utl.equals("generate-map")) {
 				IndexCreator ic = new IndexCreator(new File("."));
 				ic.setIndexMap(true);
+				ic.setLastModifiedDate(new File(subArgsArray[0]).lastModified());
 				generateObf(subArgsArray, ic);
 			} else if(utl.equals("generate-address")) {
 				IndexCreator ic = new IndexCreator(new File("."));
 				ic.setIndexAddress(true);
+				ic.setLastModifiedDate(new File(subArgsArray[0]).lastModified());
 				generateObf(subArgsArray, ic);
 			} else if(utl.equals("extract-roads-only")) {
 				File mainFile = new File(subArgsArray[0]);
@@ -71,6 +74,7 @@ public class MainUtilities {
 			} else if(utl.equals("generate-poi")) {
 				IndexCreator ic = new IndexCreator(new File("."));
 				ic.setIndexPOI(true);
+				ic.setLastModifiedDate(new File(subArgsArray[0]).lastModified());
 				generateObf(subArgsArray, ic);
 
 			} else if(utl.equals("delete-unused-strings")) {
@@ -78,6 +82,7 @@ public class MainUtilities {
 			} else if(utl.equals("generate-roads")) {
 				IndexCreator ic = new IndexCreator(new File("."));
 				ic.setIndexRouting(true);
+				ic.setLastModifiedDate(new File(subArgsArray[0]).lastModified());
 				generateObf(subArgsArray, ic);
 			} else {
 				printSynopsys();
