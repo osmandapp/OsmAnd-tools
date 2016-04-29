@@ -657,6 +657,7 @@ public class IndexIdByBbox {
 		reader.getFilters().add(updateBbboxIncrementally(regs, adapter, qd, countryUpdates));
 		InputStream stream = new BufferedInputStream(new FileInputStream(oscFile), 8192 * 4);
 		InputStream streamFile = stream;
+		System.out.println(oscFile.getAbsolutePath());
 		if (oscFile.getName().endsWith(".bz2")) { //$NON-NLS-1$
 			if (stream.read() != 'B' || stream.read() != 'Z') {
 //				throw new RuntimeException("The source stream must start with the characters BZ if it is to be read as a BZip2 stream."); //$NON-NLS-1$
