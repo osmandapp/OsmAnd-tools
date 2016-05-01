@@ -8,11 +8,14 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.sql.SQLException;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
+import java.util.TimeZone;
 import java.util.zip.GZIPOutputStream;
 
 import net.osmand.data.preparation.DBDialect;
@@ -34,8 +37,7 @@ public class GenerateDailyObf {
 	public static void main(String[] args) {
 		try {
 			File dir = new File(args[0]);
-//			fixTimestamps(dir);
-			
+			fixTimestamps(dir);
 			iterateOverDir(dir);
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -71,18 +73,21 @@ public class GenerateDailyObf {
 		}		
 	}
 	
-	public static void fixTimestamps(File dir) throws IOException {
+	public static void fixTimestamps(File dir) throws IOException, ParseException {
+		SimpleDateFormat day = new SimpleDateFormat("yyyy_MM_dd_HH_mm");
+		day.setTimeZone(TimeZone.getTimeZone("UTC"));
 		for(File countryF : dir.listFiles()) {
 			if(!countryF.isDirectory()) {
 				continue;
 			}
 			for(File date : countryF.listFiles()) {
 				if(date.getName().length() == 10) {
-					String name = countryF.getName() + "_" + date.getName().substring(2).replace('-', '_');
-					name = Algorithms.capitalizeFirstLetterAndLowercase(name);
 					for(File f : date.listFiles()) {
 						if(f.getName().endsWith(".osm.gz")) {
-							
+							String hourt = f.getName().substring(f.getName().length() - ".osm.gz".length() - 5, 
+									f.getName().length() - ".osm.gz".length());
+							Date tm = day.parse(date.getName() +"_"+hourt);
+							f.setLastModified(tm.getTime());
 						}
 					}
 				}
