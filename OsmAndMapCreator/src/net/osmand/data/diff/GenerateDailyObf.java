@@ -34,7 +34,7 @@ public class GenerateDailyObf {
 	public static void main(String[] args) {
 		try {
 			File dir = new File(args[0]);
-			fixTimestamps(dir);
+//			fixTimestamps(dir);
 			
 			iterateOverDir(dir);
 		} catch (Exception e) {
