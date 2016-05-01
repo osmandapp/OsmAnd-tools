@@ -71,7 +71,7 @@ public class AugmentedDiffsInspector {
 			String date = name.substring(0, name.indexOf('-'));
 			String time = name.substring(name.indexOf('-') + 1, name.indexOf('.'));
 			
-			inspector.write(ctx, targetDir, date, time);
+			inspector.write(ctx, targetDir, date, time, inputFile.lastModified());
 		} catch (Throwable e) {
 			e.printStackTrace();
 			System.exit(1);
@@ -144,18 +144,18 @@ public class AugmentedDiffsInspector {
 		}
 	}
 
-	private void write(Context ctx, File targetDir, String date, String time) throws XMLStreamException, IOException, SQLException, InterruptedException, XmlPullParserException {
+	private void write(Context ctx, File targetDir, String date, String time, long lastModified) throws XMLStreamException, IOException, SQLException, InterruptedException, XmlPullParserException {
 		targetDir.mkdirs();
 //		writeFile(targetDir, "world", ctx.oldIds, null, ctx.newIds, null);
 		for(String reg : ctx.regionsNew.keySet()) {
 			File dr = new File(targetDir, reg + "/" + date);
 			dr.mkdirs();
-			writeFile(dr, reg + "_" + time, ctx.oldIds, ctx.regionsOld.get(reg), ctx.newIds, ctx.regionsNew.get(reg));
+			writeFile(dr, reg + "_" + time, ctx.oldIds, ctx.regionsOld.get(reg), ctx.newIds, ctx.regionsNew.get(reg), lastModified);
 		}
 	}
 	
 	private File writeFile(File targetDir, String prefix, Map<EntityId, Entity> octx, Set<EntityId> oset,
-			Map<EntityId, Entity> nctx, Set<EntityId> nset) throws XMLStreamException,
+			Map<EntityId, Entity> nctx, Set<EntityId> nset, long lastModified) throws XMLStreamException,
 			IOException, FileNotFoundException {
 		List<Node> nodes = new ArrayList<Node>();
 		List<Way> ways = new ArrayList<Way>();
@@ -169,6 +169,7 @@ public class AugmentedDiffsInspector {
 				nodes, ways, relations, true);
 		gz.close();
 		fous.close();
+		f.setLastModified(lastModified);
 		return f;
 	}
 

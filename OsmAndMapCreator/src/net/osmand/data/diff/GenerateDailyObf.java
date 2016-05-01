@@ -43,7 +43,7 @@ public class GenerateDailyObf {
 		}
 	}
 
-	private static void fixTimestamps(File dir) throws IOException {
+	public static void fixObfTimestamps(File dir) throws IOException {
 		for(File countryF : dir.listFiles()) {
 			if(!countryF.isDirectory()) {
 				continue;
@@ -65,6 +65,25 @@ public class GenerateDailyObf {
 					}
 					if (targetObf.exists() && targetObf.lastModified() == targetTimestamp) {
 						writeTotalSize(date, totalSize);
+					}
+				}
+			}
+		}		
+	}
+	
+	public static void fixTimestamps(File dir) throws IOException {
+		for(File countryF : dir.listFiles()) {
+			if(!countryF.isDirectory()) {
+				continue;
+			}
+			for(File date : countryF.listFiles()) {
+				if(date.getName().length() == 10) {
+					String name = countryF.getName() + "_" + date.getName().substring(2).replace('-', '_');
+					name = Algorithms.capitalizeFirstLetterAndLowercase(name);
+					for(File f : date.listFiles()) {
+						if(f.getName().endsWith(".osm.gz")) {
+							
+						}
 					}
 				}
 			}
