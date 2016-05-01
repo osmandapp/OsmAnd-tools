@@ -136,6 +136,7 @@ public class GenerateDailyObf {
 		ic.setIndexPOI(true);
 		ic.setIndexRouting(true);
 		ic.setIndexMap(true);
+		ic.setLastModifiedDate(targetTimestamp);
 		ic.setGenerateLowLevelIndexes(false);
 		ic.setDialects(DBDialect.SQLITE_IN_MEMORY, DBDialect.SQLITE_IN_MEMORY);
 		ic.setLastModifiedDate(targetTimestamp);
