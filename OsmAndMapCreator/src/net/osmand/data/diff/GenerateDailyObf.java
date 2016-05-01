@@ -1,8 +1,11 @@
 package net.osmand.data.diff;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -27,14 +30,52 @@ import rtree.RTree;
 
 public class GenerateDailyObf {
 	private static final Log log = LogFactory.getLog(GenerateDailyObf.class);
+	private static final String TOTAL_SIZE = "totalsize";
 	public static void main(String[] args) {
 		try {
 			File dir = new File(args[0]);
+			fixTimestamps(dir);
+			
 			iterateOverDir(dir);
 		} catch (Exception e) {
 			e.printStackTrace();
 			System.exit(1);
 		}
+	}
+
+	private static void fixTimestamps(File dir) throws IOException {
+		for(File countryF : dir.listFiles()) {
+			if(!countryF.isDirectory()) {
+				continue;
+			}
+			for(File date : countryF.listFiles()) {
+				if(date.getName().length() == 10) {
+					String name = countryF.getName() + "_" + date.getName().substring(2).replace('-', '_');
+					name = Algorithms.capitalizeFirstLetterAndLowercase(name);
+					File targetObf = new File(countryF, name + ".obf.gz");
+					long targetTimestamp = 0;
+					List<File> osmFiles = new ArrayList<File>();
+					long totalSize = 0;
+					for(File f : date.listFiles()) {
+						if(f.getName().endsWith(".osm.gz")) {
+							targetTimestamp = Math.max(targetTimestamp, f.lastModified());
+							osmFiles.add(f);
+							totalSize += f.length();
+						}
+					}
+					if (targetObf.exists() && targetObf.lastModified() == targetTimestamp) {
+						writeTotalSize(date, totalSize);
+					}
+				}
+			}
+		}		
+	}
+
+	private static void writeTotalSize(File date, long totalSize) throws IOException {
+		File fl = new File(date, TOTAL_SIZE);
+		FileWriter fw = new FileWriter(fl);
+		fw.write(Long.toString(totalSize));
+		fw.close();
 	}
 
 	private static void iterateOverDir(File dir) throws IOException, SQLException, InterruptedException, XmlPullParserException {
@@ -49,13 +90,22 @@ public class GenerateDailyObf {
 					File targetObf = new File(countryF, name + ".obf.gz");
 					long targetTimestamp = 0;
 					List<File> osmFiles = new ArrayList<File>();
+					long totalSize = 0;
+					long procSize = 0;
 					for(File f : date.listFiles()) {
 						if(f.getName().endsWith(".osm.gz")) {
 							targetTimestamp = Math.max(targetTimestamp, f.lastModified());
 							osmFiles.add(f);
+							totalSize += f.length();
+						}
+						if(f.getName().equals(TOTAL_SIZE)) {
+							FileReader fr = new FileReader(f);
+							BufferedReader br = new BufferedReader(fr);
+							procSize = Long.parseLong(br.readLine());
+							fr.close();
 						}
 					}
-					if (!targetObf.exists() || targetObf.lastModified() != targetTimestamp) {
+					if (!targetObf.exists() || procSize != totalSize) {
 						if(!targetObf.exists()) {
 							log.info("The file " + targetObf.getName() + " doesn't exist");
 						} else {
@@ -69,6 +119,7 @@ public class GenerateDailyObf {
 								return o1.getName().compareTo(o2.getName());
 							}
 						});
+						writeTotalSize(date, totalSize);
 						generateCountry(name, 
 								targetObf, osmFiles.toArray(new File[osmFiles.size()]), targetTimestamp);
 					}
