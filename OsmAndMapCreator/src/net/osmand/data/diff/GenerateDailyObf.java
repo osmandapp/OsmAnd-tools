@@ -11,6 +11,7 @@ import java.sql.SQLException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
@@ -102,10 +103,13 @@ public class GenerateDailyObf {
 	}
 
 	private static void iterateOverDir(File dir) throws IOException, SQLException, InterruptedException, XmlPullParserException {
-		for(File countryF : dir.listFiles()) {
+		List<File> cnt = sortFiles(dir);
+		int i = 0;
+		for(File countryF : cnt) {
 			if(!countryF.isDirectory()) {
 				continue;
 			}
+			i++;
 			for(File date : countryF.listFiles()) {
 				if(date.getName().length() == 10) {
 					String name = countryF.getName() + "_" + date.getName().substring(2).replace('-', '_');
@@ -135,7 +139,7 @@ public class GenerateDailyObf {
 							log.info("The file " + targetObf.getName() + " was updated for " + (targetObf.lastModified() - targetTimestamp) / 1000
 									+ " seconds");
 						}
-						System.out.println("Processing " + targetObf.getName() + " " + new Date());
+						System.out.println("Processing " + targetObf.getName() + " " + new Date() + " " + (i * 100.f / cnt.size()) +"%");
 						Collections.sort(osmFiles, new Comparator<File>(){
 							@Override
 							public int compare(File o1, File o2) {
@@ -150,6 +154,19 @@ public class GenerateDailyObf {
 			}
 		}
 		
+	}
+
+	public static List<File> sortFiles(File dir) {
+		File[] fs = dir.listFiles();
+		List<File> cnt = new ArrayList<File>(Arrays.asList(fs));
+		Collections.sort(cnt, new Comparator<File>() {
+
+			@Override
+			public int compare(File o1, File o2) {
+				return o1.getName().compareTo(o2.getName());
+			}
+		});
+		return cnt;
 	}
 
 	public static void generateCountry(String name, File targetObfZip, File[] array, long targetTimestamp) throws IOException, SQLException, InterruptedException, XmlPullParserException {

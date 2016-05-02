@@ -42,12 +42,15 @@ public class GenerateMonthlyObf {
 
 	private static void iterateOverDir(File dir, boolean delete) throws IOException, SQLException,
 			InterruptedException, XmlPullParserException {
-		for (File countryF : dir.listFiles()) {
+		int i = 0;
+		List<File> sortFiles = GenerateDailyObf.sortFiles(dir);
+		for (File countryF : sortFiles) {
 			if (!countryF.isDirectory()) {
 				continue;
 			}
+			i++;
 			ArrayList<File> deleteDates = new ArrayList<File>();
-			iterateCountry(countryF, deleteDates);
+			iterateCountry(countryF, deleteDates, (i * 100.f / sortFiles.size()));
 			for (File fld : deleteDates) {
 				for (File oneF : fld.listFiles()) {
 					System.out.println((delete ? "Delete " : "About to delete") + oneF.getAbsolutePath());
@@ -76,7 +79,7 @@ public class GenerateMonthlyObf {
 		}
 	}
 
-	private static void iterateCountry(File countryF, List<File> deleteFiles) throws IOException, SQLException, InterruptedException, XmlPullParserException {
+	private static void iterateCountry(File countryF, List<File> deleteFiles, float prog) throws IOException, SQLException, InterruptedException, XmlPullParserException {
 		Map<String, Month> filesByMonth = groupFilesByMonth(countryF, deleteFiles);
 		for(Month m : filesByMonth.values()) {
 			File targetObf = new File(countryF, m.getTargetName(countryF) + ".obf.gz");
@@ -87,7 +90,7 @@ public class GenerateMonthlyObf {
 					log.info("The file " + targetObf.getName() + " was updated for " + (targetObf.lastModified() - m.targetTimestamp) / 1000
 							+ " seconds");
 				}
-				System.out.println("Processing " + targetObf.getName() + " " + new Date());
+				System.out.println("Processing " + targetObf.getName() + " " + new Date() + " " + prog +"%");
 				List<File> osmFiles = new ArrayList<File>();
 				Iterator<Entry<String, List<File>>> it = m.files.entrySet().iterator();
 				while(it.hasNext()) {
