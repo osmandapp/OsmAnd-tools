@@ -214,7 +214,7 @@ public class AugmentedDiffsInspector {
 				if (name.equals("node") || name.equals("way") || name.equals("relation")) {
 					if (currentEntity != null) {
 						if (old) {
-							updateTags(currentEntity, "name", "type", "area");
+							updateTags(currentEntity, "name", "type", "area", "fixme");
 							ctx.oldIds.put(EntityId.valueOf(currentEntity), currentEntity);
 						} else if (modify != Entity.MODIFY_DELETED) {
 							ctx.newIds.put(EntityId.valueOf(currentEntity), currentEntity);
