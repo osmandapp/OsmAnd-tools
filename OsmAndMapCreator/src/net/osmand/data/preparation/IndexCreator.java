@@ -861,10 +861,10 @@ public class IndexCreator {
 		String rootFolder = "/Users/victorshcherb/osmand/";
 		IndexPoiCreator.ZIP_LONG_STRINGS = false;
 		IndexCreator creator = new IndexCreator(new File(rootFolder + "/maps/")); //$NON-NLS-1$
-//		creator.setIndexMap(true);
-//		creator.setIndexAddress(true);
-//		creator.setIndexPOI(true);
-//		creator.setIndexTransport(true);
+		creator.setIndexMap(true);
+		creator.setIndexAddress(true);
+		creator.setIndexPOI(true);
+		creator.setIndexTransport(true);
 		creator.setIndexRouting(true);
 
 //		creator.deleteDatabaseIndexes = false;
@@ -874,9 +874,9 @@ public class IndexCreator {
 
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 
-//		String file = rootFolder + "/temp/netherlands_gelderland_europe_o.pbf";
+		String file = rootFolder + "/temp/russia_vladimir_asia.pbf";
 //		String file = rootFolder + "/repos/resources/synthetic_test_rendering.osm";
-		String file = rootFolder + "/repos/resources/turn_lanes_test.osm";
+//		String file = rootFolder + "/repos/resources/turn_lanes_test.osm";
 
 		int st = file.lastIndexOf('/');
 		int e = file.indexOf('.', st);
