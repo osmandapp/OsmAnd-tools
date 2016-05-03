@@ -191,6 +191,8 @@ public class AugmentedDiffsInspector {
 	private static class Context {
 		Map<EntityId, Entity> oldIds = new LinkedHashMap<Entity.EntityId, Entity>();
 		Map<EntityId, Entity> newIds = new LinkedHashMap<Entity.EntityId, Entity>();
+		Map<EntityId, Entity> oldOIds = new LinkedHashMap<Entity.EntityId, Entity>();
+		Map<EntityId, Entity> newOIds = new LinkedHashMap<Entity.EntityId, Entity>();
 		Map<String, Set<EntityId>> regionsNew = new LinkedHashMap<String, Set<EntityId>>();
 		Map<String, Set<EntityId>> regionsOld = new LinkedHashMap<String, Set<EntityId>>();
 	}
@@ -272,7 +274,7 @@ public class AugmentedDiffsInspector {
 						} else if (type == EntityType.WAY) {
 							currentWay = new Way(ID_BASE--);
 							currentWay.putTag("oid", nid.getId().toString());
-							registerEntity(ctx, old, currentWay);
+							registerEntity(ctx, old, currentWay, nid);
 							nid = EntityId.valueOf(currentWay);
 						} else if (type == EntityType.RELATION) {
 							// skip subrelations
@@ -324,22 +326,35 @@ public class AugmentedDiffsInspector {
 
 	}
 
-	private Node registerNewNode(XmlPullParser parser, Context ctx, boolean old, EntityId nid) {
-		Node nd;
+	private Node registerNewNode(XmlPullParser parser, Context ctx, boolean old, EntityId oid) {
+		Node nd = null;
+		if (oid != null) {
+			nd = (Node) (old ? ctx.oldOIds.get(oid) : ctx.newOIds.get(oid));
+			if (nd != null) {
+				return nd;
+			}
+		}
 		nd = new Node(Double.parseDouble(parser.getAttributeValue("", "lat")),
 				Double.parseDouble(parser.getAttributeValue("", "lon")), ID_BASE--);
-		if(nid != null) {
-			nd.putTag("oid", nid.getId().toString());
+		if(oid != null) {
+			nd.putTag("oid", oid.getId().toString());
 		}
-		registerEntity(ctx, old, nd);
+		registerEntity(ctx, old, nd, oid);
 		return nd;
 	}
 
-	private void registerEntity(Context ctx, boolean old, Entity nd) {
+	private void registerEntity(Context ctx, boolean old, Entity nd, EntityId oid) {
 		if(old) {
 			ctx.oldIds.put(EntityId.valueOf(nd), nd);
 		} else {
 			ctx.newIds.put(EntityId.valueOf(nd), nd);
+		}
+		if(oid != null) {
+			if(old) {
+				ctx.oldOIds.put(oid, nd);
+			} else {
+				ctx.newOIds.put(oid, nd);
+			}	
 		}
 	}
 
