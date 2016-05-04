@@ -38,7 +38,7 @@ import net.osmand.IndexConstants;
 import net.osmand.PlatformUtil;
 import net.osmand.ResultMatcher;
 import net.osmand.binary.BinaryIndexPart;
-import net.osmand.binary.BinaryInspector;
+import net.osmand.BinaryMerger;
 import net.osmand.binary.BinaryMapAddressReaderAdapter.AddressRegion;
 import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.binary.BinaryMapIndexReader;
@@ -544,8 +544,8 @@ public class IndexUploader {
 			} else {
 				throw new UnsupportedOperationException();
 			}
-			BinaryInspector.writeInt(ous, part.getLength());
-			BinaryInspector.copyBinaryPart(ous, BUFFER_TO_READ, raf, part.getFilePointer(), part.getLength());
+			BinaryMerger.writeInt(ous, part.getLength());
+			BinaryMerger.copyBinaryPart(ous, BUFFER_TO_READ, raf, part.getFilePointer(), part.getLength());
 		}
 
 		ous.writeInt32(OsmandOdb.OsmAndStructure.VERSIONCONFIRM_FIELD_NUMBER, index.getVersion());

@@ -888,10 +888,10 @@ public class BinaryMapIndexWriter {
 			cityInd.setNameEn(city.getEnName(false));
 		}
 		Iterator<Entry<String, String>> it = city.getNamesMap(false).entrySet().iterator();
-		while(it.hasNext()) {
+		while (it.hasNext()) {
 			Entry<String, String> next = it.next();
 			Integer intg = tagRules.get("name:"+next.getKey());
-			if(intg != null) {
+			if (intg != null) {
 				cityInd.addAttributeTagIds(intg);
 				cityInd.addAttributeValues(next.getValue());
 			}
@@ -910,7 +910,7 @@ public class BinaryMapIndexWriter {
 	}
 
 	public void writeCityIndex(City cityOrPostcode, List<Street> streets, Map<Street, List<Node>> wayNodes,
-			BinaryFileReference ref, Map<String, Integer> tagRules) throws IOException {
+							   BinaryFileReference ref, Map<String, Integer> tagRules) throws IOException {
 		checkPeekState(CITY_INDEX_INIT);
 		codedOutStream.writeTag(CitiesIndex.BLOCKS_FIELD_NUMBER, FieldType.MESSAGE.getWireType());
 		codedOutStream.flush();
