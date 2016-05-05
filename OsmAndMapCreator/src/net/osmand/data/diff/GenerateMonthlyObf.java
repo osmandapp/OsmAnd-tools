@@ -8,7 +8,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -52,10 +51,12 @@ public class GenerateMonthlyObf {
 			ArrayList<File> deleteDates = new ArrayList<File>();
 			iterateCountry(countryF, deleteDates, (i * 100.f / sortFiles.size()));
 			for (File fld : deleteDates) {
-				for (File oneF : fld.listFiles()) {
-					System.out.println((delete ? "Delete " : "About to delete") + oneF.getAbsolutePath());
-					if (delete) {
-						oneF.delete();
+				if (fld.isDirectory()) {
+					for (File oneF : fld.listFiles()) {
+						System.out.println((delete ? "Delete " : "About to delete") + oneF.getAbsolutePath());
+						if (delete) {
+							oneF.delete();
+						}
 					}
 				}
 
@@ -98,13 +99,17 @@ public class GenerateMonthlyObf {
 					osmFiles.addAll(e.getValue());
 				}
 				GenerateDailyObf.generateCountry(m.getTargetName(countryF), 
-						targetObf, osmFiles.toArray(new File[osmFiles.size()]), m.targetTimestamp);
+						targetObf, osmFiles.toArray(new File[osmFiles.size()]), m.targetTimestamp, getOdbFile(countryF, m));
 			}
 			
 		}
 		
 //		
 //		
+	}
+
+	private static File getOdbFile(File countryF, Month m) {
+		return new File(countryF, "osm_" + m.monthName + ".odb");
 	}
 
 	private static Map<String, Month> groupFilesByMonth(File countryF, List<File> deleteFiles) {
@@ -122,6 +127,10 @@ public class GenerateMonthlyObf {
 					m = new Month();
 					m.monthName = month;
 					filesByMonth.put(month, m);
+				}
+				File odbDay = new File(date, GenerateDailyObf.OSM_ODB_FILE);
+				if(odbDay.exists()) {
+					odbDay.delete();
 				}
 				List<File> osmFiles = new ArrayList<File>();
 				for(File f : date.listFiles()) {
@@ -141,6 +150,7 @@ public class GenerateMonthlyObf {
 				}
 				if(!date.getName().startsWith(cmnt)) {
 					deleteFiles.add(date);
+					deleteFiles.add(getOdbFile(countryF, m));
 				}
 			}
 		}

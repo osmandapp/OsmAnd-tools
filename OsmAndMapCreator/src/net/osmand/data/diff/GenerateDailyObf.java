@@ -35,6 +35,7 @@ import rtree.RTree;
 public class GenerateDailyObf {
 	private static final Log log = LogFactory.getLog(GenerateDailyObf.class);
 	private static final String TOTAL_SIZE = "totalsize";
+	public static final String OSM_ODB_FILE = "osm.odb";
 	public static void main(String[] args) {
 		try {
 			File dir = new File(args[0]);
@@ -148,7 +149,7 @@ public class GenerateDailyObf {
 						});
 						writeTotalSize(date, totalSize);
 						generateCountry(name, 
-								targetObf, osmFiles.toArray(new File[osmFiles.size()]), targetTimestamp);
+								targetObf, osmFiles.toArray(new File[osmFiles.size()]), targetTimestamp, new File(date, OSM_ODB_FILE));
 					}
 				}
 			}
@@ -169,7 +170,8 @@ public class GenerateDailyObf {
 		return cnt;
 	}
 
-	public static void generateCountry(String name, File targetObfZip, File[] array, long targetTimestamp) throws IOException, SQLException, InterruptedException, XmlPullParserException {
+	public static void generateCountry(String name, File targetObfZip, File[] array, long targetTimestamp, File nodesFile) 
+			throws IOException, SQLException, InterruptedException, XmlPullParserException {
 		RTree.clearCache();
 		IndexCreator ic = new IndexCreator(targetObfZip.getParentFile());
 		ic.setIndexAddress(false);
@@ -178,12 +180,11 @@ public class GenerateDailyObf {
 		ic.setIndexMap(true);
 		ic.setLastModifiedDate(targetTimestamp);
 		ic.setGenerateLowLevelIndexes(false);
-		ic.setDialects(DBDialect.SQLITE_IN_MEMORY, DBDialect.SQLITE_IN_MEMORY);
+		ic.setDialects(DBDialect.SQLITE, DBDialect.SQLITE_IN_MEMORY);
 		ic.setLastModifiedDate(targetTimestamp);
-		File tmpFile = new File(targetObfZip.getName() + ".tmp.odb");
-		tmpFile.delete();
 		ic.setRegionName(Algorithms.capitalizeFirstLetterAndLowercase(name));
-		ic.setNodesDBFile(tmpFile);
+		ic.setNodesDBFile(nodesFile);
+		ic.setDeleteOsmDB(false);
 		ic.generateIndexes(array, new ConsoleProgressImplementation(), null,
 				MapZooms.parseZooms("13-14;15-"), new MapRenderingTypesEncoder(name), log, false, true);
 		File targetFile = new File(targetObfZip.getParentFile(), ic.getMapFileName());
