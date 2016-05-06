@@ -171,31 +171,40 @@ public class GenerateDailyObf {
 	}
 
 	public static void generateCountry(String name, File targetObfZip, File[] array, long targetTimestamp, File nodesFile) 
-			throws IOException, SQLException, InterruptedException, XmlPullParserException {
-		RTree.clearCache();
-		IndexCreator ic = new IndexCreator(targetObfZip.getParentFile());
-		ic.setIndexAddress(false);
-		ic.setIndexPOI(true);
-		ic.setIndexRouting(true);
-		ic.setIndexMap(true);
-		ic.setLastModifiedDate(targetTimestamp);
-		ic.setGenerateLowLevelIndexes(false);
-		ic.setDialects(DBDialect.SQLITE, DBDialect.SQLITE_IN_MEMORY);
-		ic.setLastModifiedDate(targetTimestamp);
-		ic.setRegionName(Algorithms.capitalizeFirstLetterAndLowercase(name));
-		ic.setNodesDBFile(nodesFile);
-		ic.setDeleteOsmDB(false);
-		ic.generateIndexes(array, new ConsoleProgressImplementation(), null,
-				MapZooms.parseZooms("13-14;15-"), new MapRenderingTypesEncoder(name), log, false, true);
-		File targetFile = new File(targetObfZip.getParentFile(), ic.getMapFileName());
-		targetFile.setLastModified(targetTimestamp);
-		FileInputStream fis = new FileInputStream(targetFile);
-		GZIPOutputStream gzout = new GZIPOutputStream(new FileOutputStream(targetObfZip));
-		Algorithms.streamCopy(fis, gzout);
-		fis.close();
-		gzout.close();
-		targetObfZip.setLastModified(targetTimestamp);
-		targetFile.delete();
+ throws IOException, SQLException, InterruptedException, XmlPullParserException {
+		boolean exception = true;
+		try {
+			RTree.clearCache();
+			IndexCreator ic = new IndexCreator(targetObfZip.getParentFile());
+			ic.setIndexAddress(false);
+			ic.setIndexPOI(true);
+			ic.setIndexRouting(true);
+			ic.setIndexMap(true);
+			ic.setLastModifiedDate(targetTimestamp);
+			ic.setGenerateLowLevelIndexes(false);
+			ic.setDialects(DBDialect.SQLITE, DBDialect.SQLITE_IN_MEMORY);
+			ic.setLastModifiedDate(targetTimestamp);
+			ic.setRegionName(Algorithms.capitalizeFirstLetterAndLowercase(name));
+			ic.setNodesDBFile(nodesFile);
+			ic.setDeleteOsmDB(false);
+			ic.generateIndexes(array, new ConsoleProgressImplementation(), null, MapZooms.parseZooms("13-14;15-"),
+					new MapRenderingTypesEncoder(name), log, false, true);
+			File targetFile = new File(targetObfZip.getParentFile(), ic.getMapFileName());
+			targetFile.setLastModified(targetTimestamp);
+			FileInputStream fis = new FileInputStream(targetFile);
+			GZIPOutputStream gzout = new GZIPOutputStream(new FileOutputStream(targetObfZip));
+			Algorithms.streamCopy(fis, gzout);
+			fis.close();
+			gzout.close();
+			targetObfZip.setLastModified(targetTimestamp);
+			targetFile.delete();
+			exception = false;
+		} finally {
+			if (exception) {
+				nodesFile.delete();
+				nodesFile.deleteOnExit();
+			}
+		}
 
 	}
 }
