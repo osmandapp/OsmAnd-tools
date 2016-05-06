@@ -400,6 +400,8 @@ public class IndexCreator {
 				osmDBdialect.closeDatabase(dbConn);
 				osmDBdialect.removeDatabase(dbFile);
 				dbConn = (Connection) getDatabaseConnection(dbFile.getAbsolutePath(), osmDBdialect);
+				stat = dbConn.createStatement();
+				stat.execute("CREATE TABLE input(shift int, ind int, file varchar, length int)");
 			} else {
 				ArrayList<File> list = new ArrayList<File>(Arrays.asList(readFile));
 				list.removeAll(filteredOut);
