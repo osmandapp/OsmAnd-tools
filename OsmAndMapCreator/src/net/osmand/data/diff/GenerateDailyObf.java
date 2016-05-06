@@ -147,9 +147,9 @@ public class GenerateDailyObf {
 								return o1.getName().compareTo(o2.getName());
 							}
 						});
-						writeTotalSize(date, totalSize);
 						generateCountry(name, 
 								targetObf, osmFiles.toArray(new File[osmFiles.size()]), targetTimestamp, new File(date, OSM_ODB_FILE));
+						writeTotalSize(date, totalSize);
 					}
 				}
 			}
