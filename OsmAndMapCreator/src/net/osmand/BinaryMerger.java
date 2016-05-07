@@ -169,9 +169,9 @@ public class BinaryMerger {
 
 		LinkedHashSet<Float>[] partsSet = new LinkedHashSet[partsToExtractFrom.size()];
 		int c = 0;
-		Set<String> addressNames = new LinkedHashSet<String>();
+//		Set<String> addressNames = new LinkedHashSet<String>();
 
-
+		long dateCreated = 0;
 		int version = -1;
 		// Go through all files and validate conistency
 		for (File f : partsToExtractFrom.keySet()) {
@@ -182,6 +182,7 @@ public class BinaryMerger {
 			rafs[c] = new RandomAccessFile(f.getAbsolutePath(), "r");
 			indexes[c] = new BinaryMapIndexReader(rafs[c], f);
 			partsSet[c] = new LinkedHashSet<Float>();
+			dateCreated = Math.max(dateCreated, indexes[c].getDateCreated());
 			if (version == -1) {
 				version = indexes[c].getVersion();
 			} else {
@@ -231,15 +232,11 @@ public class BinaryMerger {
 		}
 
 		// write files
-		FileOutputStream fout = new FileOutputStream(fileToExtract);
 		RandomAccessFile rafToExtract = new RandomAccessFile(fileToExtract, "rw");
-		CodedOutputStream ous = CodedOutputStream.newInstance(fout, BUFFER_SIZE);
-		BinaryMapIndexWriter writer = new BinaryMapIndexWriter(rafToExtract, ous);
+		BinaryMapIndexWriter writer = new BinaryMapIndexWriter(rafToExtract, dateCreated);
+		CodedOutputStream ous = writer.getCodedOutStream();
 		List<Float> list = new ArrayList<Float>();
 		byte[] BUFFER_TO_READ = new byte[BUFFER_SIZE];
-
-		ous.writeInt32(OsmandOdb.OsmAndStructure.VERSION_FIELD_NUMBER, version);
-		ous.writeInt64(OsmandOdb.OsmAndStructure.DATECREATED_FIELD_NUMBER, System.currentTimeMillis());
 
 		AddressRegion[] addressRegions = new AddressRegion[partsToExtractFrom.size()];
 		for (int k = 0; k < indexes.length; k++) {
@@ -275,7 +272,6 @@ public class BinaryMerger {
 
 		ous.writeInt32(OsmandOdb.OsmAndStructure.VERSIONCONFIRM_FIELD_NUMBER, version);
 		ous.flush();
-		fout.close();
 
 		return list;
 	}

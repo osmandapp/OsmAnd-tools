@@ -8,7 +8,7 @@ import java.io.RandomAccessFile;
  * Utility to keep references between binary blocks
  * while generating binary file
  */
-public class BinaryFileReference implements net.osmand.binary.IBinaryFileReference {
+public class BinaryFileReference {
 
 	private long pointerToWrite;
 	private long pointerToCalculateShiftFrom;
