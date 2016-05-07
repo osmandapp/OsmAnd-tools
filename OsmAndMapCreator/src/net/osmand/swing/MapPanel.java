@@ -66,8 +66,8 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 
 	private static final long serialVersionUID = 1L;
 
-	private static final int EXPAND_X = -16;
-	private static final int EXPAND_Y = -16;
+	private static final int EXPAND_X = 16;
+	private static final int EXPAND_Y = 16;
     private static final int PIXEL_FRAME = 16;
 
 	protected static final Log log = PlatformUtil.getLog(MapPanel.class);
