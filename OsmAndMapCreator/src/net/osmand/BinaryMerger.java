@@ -90,6 +90,162 @@ public class BinaryMerger {
 		//written += 4;
 	}
 
+//	startWriteAddressIndex
+//		writer.startCityBlockIndex
+//		writer.writeCityHeader
+//		writer.writeCityIndex(city, streets, streetNodes, ref, tagRules);
+//		writer.endCityBlockIndex();
+//		tagRules - map String -> new order
+//		writer.writeAddressNameIndex(namesIndex);
+//		writer.endWriteAddressIndex();
+//	private void putNamedMapObject(Map<String, List<MapObject>> namesIndex, MapObject o, long fileOffset){
+//			public List<City> getCities(SearchRequest<City> resultMatcher,  int cityType) throws IOException {
+
+//	private void writeCityBlockIndex(BinaryMapIndexWriter writer, int type, PreparedStatement streetstat, PreparedStatement waynodesStat,
+//									 List<City> suburbs, List<City> cities, Map<String, City> postcodes, Map<String, List<MapObject>> namesIndex,
+//									 Map<String, Integer> tagRules, IProgress progress)
+//			throws IOException {
+//		List<BinaryFileReference> refs = new ArrayList<BinaryFileReference>();
+//		// 1. write cities
+//		writer.startCityBlockIndex(type);
+//		for (City c : cities) {
+//			refs.add(writer.writeCityHeader(c, c.getType().ordinal(), tagRules));
+//		}
+//		for (int i = 0; i < cities.size(); i++) {
+//			City city = cities.get(i);
+//			BinaryFileReference ref = refs.get(i);
+//			putNamedMapObject(namesIndex, city, ref.getStartPointer());
+//			if (type == CITIES_TYPE) {
+//				progress.progress(1);
+//			} else {
+//				if ((cities.size() - i) % 100 == 0) {
+//					progress.progress(1);
+//				}
+//			}
+//			Map<Street, List<Node>> streetNodes = new LinkedHashMap<Street, List<Node>>();
+//			List<City> listSuburbs = null;
+//			if (suburbs != null) {
+//				for (City suburb : suburbs) {
+//					if (suburb.getIsInValue().toLowerCase().contains(city.getName().toLowerCase())) {
+//						if (listSuburbs == null) {
+//							listSuburbs = new ArrayList<City>();
+//						}
+//						listSuburbs.add(suburb);
+//					}
+//				}
+//			}
+//			long time = System.currentTimeMillis();
+//			List<Street> streets = readStreetsBuildings(streetstat, city, waynodesStat, streetNodes, listSuburbs);
+//			long f = System.currentTimeMillis() - time;
+//			writer.writeCityIndex(city, streets, streetNodes, ref, tagRules);
+//			int bCount = 0;
+//			// register postcodes and name index
+//			for (Street s : streets) {
+//				putNamedMapObject(namesIndex, s, s.getFileOffset());
+//
+//				for (Building b : s.getBuildings()) {
+//					bCount++;
+//					if (city.getPostcode() != null && b.getPostcode() == null) {
+//						b.setPostcode(city.getPostcode());
+//					}
+//					if (b.getPostcode() != null) {
+//						if (!postcodes.containsKey(b.getPostcode())) {
+//							City p = City.createPostcode(b.getPostcode());
+//							p.setLocation(b.getLocation().getLatitude(), b.getLocation().getLongitude());
+//							postcodes.put(b.getPostcode(), p);
+//						}
+//						City post = postcodes.get(b.getPostcode());
+//						Street newS = post.getStreetByName(s.getName());
+//						if(newS == null) {
+//							newS = new Street(post);
+//							newS.copyNames(s);
+//							newS.setLocation(s.getLocation().getLatitude(), s.getLocation().getLongitude());
+//							//newS.getWayNodes().addAll(s.getWayNodes());
+//							newS.setId(s.getId());
+//							post.registerStreet(newS);
+//						}
+//						newS.addBuildingCheckById(b);
+//					}
+//				}
+//			}
+//			if (f > 500) {
+//				if (logMapDataWarn != null) {
+//					logMapDataWarn.info("! " + city.getName() + " ! " + f + " ms " + streets.size() + " streets " + bCount + " buildings");
+//				} else {
+//					log.info("! " + city.getName() + " ! " + f + " ms " + streets.size() + " streets " + bCount + " buildings");
+//				}
+//			}
+//		}
+//		writer.endCityBlockIndex();
+//	}
+//
+//	public void writeAddressIndex(BinaryMapIndexWriter writer, String regionName, IProgress progress) throws IOException {
+//		List<String> additionalTags = new ArrayList<String>();
+//		Map<String, Integer> tagRules = new HashMap<String, Integer>();
+//		int ind = 0;
+//		for (String lng : langAttributes) {
+//			additionalTags.add("name:"+ lng);
+//			tagRules.put("name:"+ lng, ind);
+//			ind++;
+//		}
+//		writer.startWriteAddressIndex(regionName, additionalTags);
+//		Map<CityType, List<City>> cities = readCities(mapConnection);
+//
+//		// collect suburbs with is in value
+//		List<City> suburbs = new ArrayList<City>();
+//		List<City> cityTowns = new ArrayList<City>();
+//		List<City> villages = new ArrayList<City>();
+//		for (CityType t : cities.keySet()) {
+//			if (t == CityType.CITY || t == CityType.TOWN) {
+//				cityTowns.addAll(cities.get(t));
+//			} else {
+//				villages.addAll(cities.get(t));
+//			}
+//			if (t == CityType.SUBURB) {
+//				for (City c : cities.get(t)) {
+//					if (c.getIsInValue() != null) {
+//						suburbs.add(c);
+//					}
+//				}
+//			}
+//		}
+//
+//
+//		Map<String, List<MapObject>> namesIndex = new TreeMap<String, List<MapObject>>(Collator.getInstance());
+//		Map<String, City> postcodes = new TreeMap<String, City>();
+//		writeCityBlockIndex(writer, CITIES_TYPE,  streetstat, waynodesStat, suburbs, cityTowns, postcodes, namesIndex, tagRules, progress);
+//		writeCityBlockIndex(writer, VILLAGES_TYPE,  streetstat, waynodesStat, null, villages, postcodes, namesIndex, tagRules, progress);
+//
+//		// write postcodes
+//		List<BinaryFileReference> refs = new ArrayList<BinaryFileReference>();
+//		writer.startCityBlockIndex(POSTCODES_TYPE);
+//		ArrayList<City> posts = new ArrayList<City>(postcodes.values());
+//		for (City s : posts) {
+//			refs.add(writer.writeCityHeader(s, -1, tagRules));
+//		}
+//		for (int i = 0; i < posts.size(); i++) {
+//			City postCode = posts.get(i);
+//			BinaryFileReference ref = refs.get(i);
+//			putNamedMapObject(namesIndex, postCode, ref.getStartPointer());
+//			ArrayList<Street> list = new ArrayList<Street>(postCode.getStreets());
+//			Collections.sort(list, new Comparator<Street>() {
+//				final net.osmand.Collator clt = OsmAndCollator.primaryCollator();
+//
+//				@Override
+//				public int compare(Street o1, Street o2) {
+//					return clt.compare(o1.getName(), o2.getName());
+//				}
+//
+//			});
+//			writer.writeCityIndex(postCode, list, null, ref, tagRules);
+//		}
+//		writer.endCityBlockIndex();
+//
+//		writer.writeAddressNameIndex(namesIndex);
+//		writer.endWriteAddressIndex();
+//		writer.flush();
+//	}
+
 	public static void combineAddressIndex(String name, BinaryMapIndexWriter writer, AddressRegion[] addressRegions, BinaryMapIndexReader[] indexes)
 			throws IOException {
 		Set<String> attributeTagsTableSet = new TreeSet<String>();
