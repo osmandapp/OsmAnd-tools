@@ -99,6 +99,9 @@ public class BinaryMerger {
 				AddressRegion region = addressRegions[i];
 				final BinaryMapIndexReader index = indexes[i];
 				for (City city : index.getCities(region, null, type)) {
+					if(citiesMap.containsKey(city)) {
+						citiesMap.remove(city);
+					}
 					citiesMap.put(city, index);
 				}
 			}
