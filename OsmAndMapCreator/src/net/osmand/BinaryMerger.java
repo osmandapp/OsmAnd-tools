@@ -120,7 +120,17 @@ public class BinaryMerger {
 				Map<Street, List<Node>> streetNodes = new LinkedHashMap<Street, List<Node>>();
 				for (Street street : streets) {
 					rindex.preloadBuildings(street, null);
-//					streetNodes.put(street, ?)
+					ArrayList<Node> nns = new ArrayList<Node>();
+					for(Street is : street.getIntersectedStreets()) {
+						double lat = is.getLocation().getLatitude();
+						double lon = is.getLocation().getLongitude();
+						long id = (Float.floatToIntBits((float) lat) << 32) | Float.floatToIntBits((float) lon); 
+						Node nn = 
+								new Node(is.getLocation().getLatitude(),
+										is.getLocation().getLongitude(), id);
+						nns.add(nn);
+					}
+					streetNodes.put(street, nns);
 				}
 				writer.writeCityIndex(city, streets, streetNodes, ref, tagRules);
 				IndexAddressCreator.putNamedMapObject(namesIndex, city, ref.getStartPointer());
