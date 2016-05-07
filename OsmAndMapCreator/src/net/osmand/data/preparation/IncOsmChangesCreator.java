@@ -17,6 +17,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.sql.Connection;
 import java.sql.SQLException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -458,7 +459,7 @@ public class IncOsmChangesCreator {
 		}
 		log.info("Load pbf into sqlite " + dbFile.getAbsolutePath());
 		Object dbConn = dlct.getDatabaseConnection(dbFile.getAbsolutePath(), log);
-		accessor.setDbConn(dbConn, dlct);
+		accessor.setDbConn((Connection) dbConn, dlct);
 		OsmDbCreator dbCreator = new OsmDbCreator();
 		dbCreator.initDatabase(dlct, dbConn, true);
 		OsmBaseStoragePbf pbfReader = new OsmBaseStoragePbf();

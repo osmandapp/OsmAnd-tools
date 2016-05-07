@@ -593,6 +593,9 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	}
 
 	private String processSubstr(TagValuePattern ift, String vl) {
+		if (vl == null) {
+			return null;
+		}
 		if (ift.substrSt != 0) {
 			int s = ift.substrSt;
 			if (s > 0) {

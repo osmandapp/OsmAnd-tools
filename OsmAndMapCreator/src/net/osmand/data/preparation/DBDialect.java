@@ -3,6 +3,7 @@ package net.osmand.data.preparation;
 import java.io.File;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 
@@ -13,43 +14,27 @@ import org.sqlite.SQLiteJDBCLoader;
 
 
 public enum DBDialect {
-	DERBY,
-	H2,
 	SQLITE,
 	SQLITE_IN_MEMORY;
 
 	public void deleteTableIfExists(String table, Statement stat) throws SQLException {
-		if(this == DERBY){
-			try {
-				stat.executeUpdate("drop table " + table); //$NON-NLS-1$
-			} catch (SQLException e) {
-				// ignore it
-			}
-		} else {
-			stat.executeUpdate("drop table if exists " + table); //$NON-NLS-1$
-		}
-
+		stat.executeUpdate("drop table if exists " + table); //$NON-NLS-1$
+	}
+	
+	public boolean checkTableIfExists(String table, Statement stat) throws SQLException {
+		ResultSet rs = stat.getConnection().getMetaData().getTables(null, null, table, null);
+		boolean next = rs.next();
+		rs.close();
+		return next;
+//		return stat.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='"+table+"'");
 	}
 
 	public boolean databaseFileExists(File dbFile) {
-		if (DBDialect.H2 == this) {
-			return new File(dbFile.getAbsolutePath() + ".h2.db").exists(); //$NON-NLS-1$
-		} else {
-			return dbFile.exists();
-		}
+		return dbFile.exists();
 	}
 
 	public void removeDatabase(File file) {
-		if (DBDialect.H2 == this) {
-			File[] list = file.getParentFile().listFiles();
-			for (File f : list) {
-				if (f.getName().startsWith(file.getName())) {
-					Algorithms.removeAllFiles(f);
-				}
-			}
-		} else {
-			Algorithms.removeAllFiles(file);
-		}
+		Algorithms.removeAllFiles(file);
 	}
 
 	public void commitDatabase(Object connection) throws SQLException {
@@ -59,9 +44,6 @@ public enum DBDialect {
 	}
 
 	public void closeDatabase(Object dbConn) throws SQLException {
-		if (DBDialect.H2 == this) {
-			((Connection) dbConn).createStatement().execute("SHUTDOWN COMPACT"); //$NON-NLS-1$
-		}
 		((Connection) dbConn).close();
 	}
 
@@ -90,25 +72,6 @@ public enum DBDialect {
 				e.printStackTrace();
 			}
 			return connection;
-		} else if (DBDialect.DERBY == this) {
-			try {
-				Class.forName("org.apache.derby.jdbc.EmbeddedDriver");
-			} catch (ClassNotFoundException e) {
-				log.error("Illegal configuration", e);
-				throw new IllegalStateException(e);
-			}
-			Connection conn = DriverManager.getConnection("jdbc:derby:" + fileName + ";create=true");
-			conn.setAutoCommit(false);
-			return conn;
-		} else if (DBDialect.H2 == this) {
-			try {
-				Class.forName("org.h2.Driver");
-			} catch (ClassNotFoundException e) {
-				log.error("Illegal configuration", e);
-				throw new IllegalStateException(e);
-			}
-
-			return DriverManager.getConnection("jdbc:h2:file:" + fileName);
 		} else {
 			throw new UnsupportedOperationException();
 		}

@@ -59,7 +59,6 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 			stmt.close();
 		}
 
-
 		pselectNode = dbConn.prepareStatement("select n.latitude, n.longitude, n.tags from node n where n.id = ?"); //$NON-NLS-1$
 		pselectWay = dbConn.prepareStatement("select w.node, w.ord, w.tags, n.latitude, n.longitude, n.tags " + //$NON-NLS-1$
 				"from ways w left join node n on w.node = n.id where w.id = ? order by w.ord"); //$NON-NLS-1$
@@ -388,8 +387,8 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 
 	}
 
-	public void setDbConn(Object dbConnection, DBDialect dialect) {
-		this.dbConn = (Connection) dbConnection;
+	public void setDbConn(Connection dbConnection, DBDialect dialect) {
+		this.dbConn = dbConnection;
 		this.dialect = dialect;
 	}
 

@@ -7,8 +7,12 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.sql.Connection;
-import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.zip.GZIPInputStream;
 
 import net.osmand.IProgress;
@@ -166,6 +170,10 @@ public class IndexCreator {
 
 	public void setNodesDBFile(File file) {
 		dbFile = file;
+	}
+	
+	public void setDeleteOsmDB(boolean deleteOsmDB) {
+		this.deleteOsmDB = deleteOsmDB;
 	}
 
 	public void setMapFileName(String mapFileName) {
@@ -343,39 +351,91 @@ public class IndexCreator {
 	private OsmDbAccessor initDbAccessor(File[] readFile, IProgress progress, IOsmStorageFilter addFilter,
 			boolean generateUniqueIds, boolean overwriteIds) throws IOException, SQLException, InterruptedException, XmlPullParserException {
 		OsmDbAccessor accessor = new OsmDbAccessor();
-//		boolean loadFromExistingFile = dbFile != null && osmDBdialect.databaseFileExists(dbFile) && generateUniqueIds;
-		boolean loadFromExistingFile = false; // deprecate feature
 		if (dbFile == null) {
 			dbFile = new File(workingDir, TEMP_NODES_DB);
 			if (osmDBdialect.databaseFileExists(dbFile)) {
 				osmDBdialect.removeDatabase(dbFile);
 			}
 		}
-		Object dbConn = getDatabaseConnection(dbFile.getAbsolutePath(), osmDBdialect);
+		int shift = readFile.length < 16 ? 4 : (readFile.length < 64 ? 6 : 11);
+		if(readFile.length > (1 << 11)) {
+			throw new UnsupportedOperationException();
+		}
+		int mapInd = 0;
+		Connection dbConn = (Connection) getDatabaseConnection(dbFile.getAbsolutePath(), osmDBdialect);
+		Statement stat = dbConn.createStatement();
+		boolean exists = osmDBdialect.checkTableIfExists("input", stat);
+		if(exists) {
+			ResultSet rs = stat.executeQuery("SELECT shift, ind, file, length from input");
+			boolean recreate = indexAddress;
+			List<File> filteredOut = new ArrayList<File>();
+			int maxInd = 0;
+			while(rs.next() && !recreate) {
+				if(shift != rs.getInt(1)) {
+					log.info("Shift has changed in the prepared osm index.");
+					recreate = true;
+					break;
+				}
+				maxInd = Math.max(maxInd, rs.getInt(2));
+				String fn = rs.getString(3);
+				boolean missing = true;
+				for(File f : readFile) {
+					if(f.getAbsolutePath().equals(fn)) {
+						filteredOut.add(f);
+						missing = false;
+						if(f.length() != rs.getInt(4)) {
+							recreate = true;
+							log.info("File " + fn + " has changed in the prepared osm index.");
+						}
+						break;
+					}
+				}
+				if(missing) {
+					log.info("Missing " + fn + " in the prepared osm index.");
+					recreate = true;
+				}
+			}
+			rs.close();
+			if(recreate) {
+				osmDBdialect.closeDatabase(dbConn);
+				osmDBdialect.removeDatabase(dbFile);
+				dbConn = (Connection) getDatabaseConnection(dbFile.getAbsolutePath(), osmDBdialect);
+				stat = dbConn.createStatement();
+				stat.execute("CREATE TABLE input(shift int, ind int, file varchar, length int)");
+			} else {
+				ArrayList<File> list = new ArrayList<File>(Arrays.asList(readFile));
+				list.removeAll(filteredOut);
+				readFile = list.toArray(new File[list.size()]);
+				mapInd = maxInd + 1;
+			}
+		} else {
+			stat.execute("CREATE TABLE input(shift int, ind int, file varchar, length int)");
+		}
+		
+
+			
 		accessor.setDbConn(dbConn, osmDBdialect);
-		int shift = readFile.length < 16 ? 4 : (readFile.length < 256 ? 8 : 10);
-		int ind = 0;
-		int mapInd = 1;
+		boolean shiftIds = generateUniqueIds || overwriteIds ;
 		for (File read : readFile) {
-			OsmDbCreator dbCreator = extractOsmToNodesDB(accessor, read, progress, addFilter,
-					generateUniqueIds || overwriteIds ? ind++ : 0, generateUniqueIds || overwriteIds ? shift : 0, overwriteIds, mapInd == 1);
+			OsmDbCreator dbCreator = extractOsmToNodesDB(accessor, read, progress, addFilter, shiftIds ? mapInd : 0,
+					shiftIds ? shift : 0, overwriteIds, mapInd == 0);
 			accessor.updateCounts(dbCreator);
 			if (readFile.length > 1) {
-				log.info("Processing " + mapInd + " file out of " + readFile.length);
+				log.info("Processing " + (mapInd + 1) + " file out of " + readFile.length);
 			}
+			stat.execute("INSERT INTO input(ind, shift, file, length) VALUES (" + Integer.toString(mapInd) + 
+					", " + shift + ", '" + read.getAbsolutePath() + "'," + read.length() + ")");
 			mapInd++;
 		}
-		if (loadFromExistingFile) {
-			if (indexAddress) {
+		stat.close();
 				// load cities names
-				accessor.iterateOverEntities(progress, EntityType.NODE, new OsmDbVisitor() {
-					@Override
-					public void iterateEntity(Entity e, OsmDbAccessorContext ctx) {
-						indexAddressCreator.registerCityIfNeeded(e);
-					}
-				});
-			}
-		}
+//				accessor.iterateOverEntities(progress, EntityType.NODE,  new OsmDbVisitor() {
+//					@Override
+//					public void iterateEntity(Entity e, OsmDbAccessorContext ctx) {
+//						indexAddressCreator.registerCityIfNeeded(e);
+//					}
+//				});
+		osmDBdialect.commitDatabase(dbConn);
 		accessor.initDatabase(null);
 		return accessor;
 	}
@@ -416,7 +476,7 @@ public class IndexCreator {
 			osmDBdialect.removeDatabase(dbFile);
 		}
 		Object dbConn = getDatabaseConnection(dbFile.getAbsolutePath(), osmDBdialect);
-		accessor.setDbConn(dbConn, osmDBdialect);
+		accessor.setDbConn((Connection) dbConn, osmDBdialect);
 		OsmDbCreator dbCreator = null;
 		dbCreator = extractOsmToNodesDB(accessor, readFile, progress, addFilter, 0, 0, false, true);
 		accessor.initDatabase(dbCreator);
@@ -608,13 +668,6 @@ public class IndexCreator {
 					osmDBdialect.closeDatabase(accessor.getDbConn());
 				}
 				if (deleteOsmDB) {
-					if (DBDialect.DERBY == osmDBdialect) {
-						try {
-							DriverManager.getConnection("jdbc:derby:;shutdown=true"); //$NON-NLS-1$
-						} catch (SQLException e) {
-							// ignore exception
-						}
-					}
 					osmDBdialect.removeDatabase(dbFile);
 				}
 
@@ -872,6 +925,7 @@ public class IndexCreator {
 
 		String file = rootFolder + "/temp/russia_vladimir_asia.pbf";
 //		String file = rootFolder + "/repos/resources/synthetic_test_rendering.osm";
+//		String file = rootFolder + "/repos/resources/turn_lanes_test.osm";
 
 		int st = file.lastIndexOf('/');
 		int e = file.indexOf('.', st);
