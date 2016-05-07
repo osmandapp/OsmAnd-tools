@@ -109,7 +109,7 @@ public class BinaryMerger {
 				BinaryFileReference ref = refs.get(i);
 				City city = cities.get(i);
 				IndexAddressCreator.putNamedMapObject(namesIndex, city, ref.getStartPointer());
-				List<Street> streets = new ArrayList(city.getStreets());
+				List<Street> streets = new ArrayList<Street>(city.getStreets());
 				Map<Street, List<Node>> streetNodes = new LinkedHashMap<Street, List<Node>>();
 				writer.writeCityIndex(city, streets, streetNodes, ref, tagRules);
 				// register postcodes and name index
@@ -145,7 +145,6 @@ public class BinaryMerger {
 		writer.endWriteAddressIndex();
 	}
 
-	@SuppressWarnings("unchecked")
 	public static void combineParts(File fileToExtract, List<File> files) throws IOException {
 		BinaryMapIndexReader[] indexes = new BinaryMapIndexReader[files.size()];
 		RandomAccessFile[] rafs = new RandomAccessFile[files.size()];
