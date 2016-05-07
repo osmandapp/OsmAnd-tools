@@ -127,6 +127,9 @@ public class GenerateMonthlyObf {
 					m = new Month();
 					m.monthName = month;
 					filesByMonth.put(month, m);
+					if(!date.getName().startsWith(cmnt)) {
+						deleteFiles.add(getOdbFile(countryF, m));
+					}
 				}
 				File odbDay = new File(date, GenerateDailyObf.OSM_ODB_FILE);
 				if(odbDay.exists()) {
@@ -150,8 +153,8 @@ public class GenerateMonthlyObf {
 				}
 				if(!date.getName().startsWith(cmnt)) {
 					deleteFiles.add(date);
-					deleteFiles.add(getOdbFile(countryF, m));
 				}
+				
 			}
 		}
 		return filesByMonth;
