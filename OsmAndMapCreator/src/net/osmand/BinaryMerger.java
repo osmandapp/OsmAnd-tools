@@ -7,6 +7,7 @@ import java.io.RandomAccessFile;
 import java.text.Collator;
 import java.text.MessageFormat;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -15,6 +16,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+
+import org.sqlite.core.CoreDatabaseMetaData.PrimaryKeyFinder;
 
 import net.osmand.binary.BinaryIndexPart;
 import net.osmand.binary.BinaryMapAddressReaderAdapter;
@@ -90,14 +93,17 @@ public class BinaryMerger {
 			tagRules.put(it.next(), it.previousIndex());
 		}
 		for (int type : BinaryMapAddressReaderAdapter.CITY_TYPES) {
-			Set<City> citiesSet = new TreeSet<City>();
-			for (int i = 0; i != addressRegions.length; i++) {
+			Map<City, BinaryMapIndexReader> citiesMap = new TreeMap<City, BinaryMapIndexReader>();
+			for (int i = 0; i < addressRegions.length; i++) {
 				AddressRegion region = addressRegions[i];
-				BinaryMapIndexReader index = indexes[i];
-				citiesSet.addAll(index.getCities(region, null, type));
+				final BinaryMapIndexReader index = indexes[i];
+				for(City c : index.getCities(region, null, type)) {
+					citiesMap.put(c, index);
+					index.preloadStreets(c, null);
+				}
 			}
 			List<City> cities = new ArrayList<City>();
-			cities.addAll(citiesSet);
+			cities.addAll(citiesMap.keySet());
 			List<BinaryFileReference> refs = new ArrayList<BinaryFileReference>();
 			// 1. write cities
 			writer.startCityBlockIndex(type);
@@ -109,9 +115,16 @@ public class BinaryMerger {
 				BinaryFileReference ref = refs.get(i);
 				City city = cities.get(i);
 				IndexAddressCreator.putNamedMapObject(namesIndex, city, ref.getStartPointer());
+				BinaryMapIndexReader rindex = citiesMap.get(city);
+				rindex.preloadStreets(city, null);
 				List<Street> streets = new ArrayList<Street>(city.getStreets());
+				for(Street s : streets) {
+					rindex.preloadBuildings(s, null);
+				}
 				Map<Street, List<Node>> streetNodes = new LinkedHashMap<Street, List<Node>>();
 				writer.writeCityIndex(city, streets, streetNodes, ref, tagRules);
+				// clear memory
+				city.getStreets().clear();
 				// register postcodes and name index
 				for (Street s : streets) {
 					IndexAddressCreator.putNamedMapObject(namesIndex, s, s.getFileOffset());
