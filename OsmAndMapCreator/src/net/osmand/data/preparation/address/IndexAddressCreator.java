@@ -1324,7 +1324,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				String district = set.getString(12);
 				String cityPart = district == null || district.equals(city.getName()) ? "" : " (" + district + ")";
 				street.setName(streetName + cityPart);
-				for(String lang : names.keySet()) {
+				for (String lang : names.keySet()) {
 					street.setName(lang, names.get(lang) + cityPart);
 				}
 				streetNodes.put(street, thisWayNodes);

@@ -17,6 +17,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
+import org.apache.commons.logging.Log;
 import org.sqlite.core.CoreDatabaseMetaData.PrimaryKeyFinder;
 
 import net.osmand.binary.BinaryIndexPart;
@@ -39,6 +40,7 @@ import com.google.protobuf.WireFormat;
 public class BinaryMerger {
 
 	public static final int BUFFER_SIZE = 1 << 20;
+	private final static Log log = PlatformUtil.getLog(BinaryMerger.class);
 
 	public static void main(String[] args) throws IOException {
 		BinaryMerger in = new BinaryMerger();
@@ -96,9 +98,8 @@ public class BinaryMerger {
 			for (int i = 0; i < addressRegions.length; i++) {
 				AddressRegion region = addressRegions[i];
 				final BinaryMapIndexReader index = indexes[i];
-				for(City c : index.getCities(region, null, type)) {
-					citiesMap.put(c, index);
-					index.preloadStreets(c, null);
+				for (City city : index.getCities(region, null, type)) {
+					citiesMap.put(city, index);
 				}
 			}
 			List<City> cities = new ArrayList<City>();
@@ -107,21 +108,22 @@ public class BinaryMerger {
 			// 1. write cities
 			writer.startCityBlockIndex(type);
 			for (City city : cities) {
-				refs.add(writer.writeCityHeader(city, city.isPostcode() ? BinaryMapAddressReaderAdapter.POSTCODES_TYPE
-						: city.getType().ordinal(), tagRules));
+				int cityType = city.isPostcode() ? BinaryMapAddressReaderAdapter.POSTCODES_TYPE : city.getType().ordinal();
+				refs.add(writer.writeCityHeader(city, cityType, tagRules));
 			}
 			for (int i = 0; i != refs.size(); i++) {
 				BinaryFileReference ref = refs.get(i);
 				City city = cities.get(i);
-				IndexAddressCreator.putNamedMapObject(namesIndex, city, ref.getStartPointer());
 				BinaryMapIndexReader rindex = citiesMap.get(city);
 				rindex.preloadStreets(city, null);
 				List<Street> streets = new ArrayList<Street>(city.getStreets());
-				for(Street s : streets) {
-					rindex.preloadBuildings(s, null);
-				}
 				Map<Street, List<Node>> streetNodes = new LinkedHashMap<Street, List<Node>>();
+				for (Street street : streets) {
+					rindex.preloadBuildings(street, null);
+//					streetNodes.put(street, ?)
+				}
 				writer.writeCityIndex(city, streets, streetNodes, ref, tagRules);
+				IndexAddressCreator.putNamedMapObject(namesIndex, city, ref.getStartPointer());
 				// clear memory
 				city.getStreets().clear();
 				// register postcodes and name index
@@ -139,7 +141,7 @@ public class BinaryMerger {
 							}
 							City post = postcodes.get(b.getPostcode());
 							Street newS = post.getStreetByName(s.getName());
-							if(newS == null) {
+							if (newS == null) {
 								newS = new Street(post);
 								newS.copyNames(s);
 								newS.setLocation(s.getLocation().getLatitude(), s.getLocation().getLongitude());
@@ -207,7 +209,7 @@ public class BinaryMerger {
 		}
 		String nm = fileToExtract.getName();
 		int i = nm.indexOf('_');
-		if(i > 0) {
+		if (i > 0) {
 			nm = nm.substring(0, i);
 		}
 		combineAddressIndex(nm, writer, addressRegions, indexes);
