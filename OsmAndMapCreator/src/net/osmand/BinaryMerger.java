@@ -38,7 +38,6 @@ import com.google.protobuf.WireFormat;
 
 public class BinaryMerger {
 
-
 	public static final int BUFFER_SIZE = 1 << 20;
 
 	public static void main(String[] args) throws IOException {
@@ -46,9 +45,9 @@ public class BinaryMerger {
 		// test cases show info
 		if (args.length == 1 && "test".equals(args[0])) {
 			in.merger(new String[]{
-					"/Users/victorshcherb/osmand/maps/Argentina_southamerica_2.obf",
-					"/Users/victorshcherb/osmand/maps/Argentina_cordoba_southamerica_2.obf",
-					"/Users/victorshcherb/osmand/maps/Argentina_chubut_southamerica_2.obf"});
+					System.getProperty("maps.dir") + "Argentina_southamerica_2.obf",
+					System.getProperty("maps.dir") + "Argentina_cordoba_southamerica_2.obf",
+					System.getProperty("maps.dir") + "Argentina_chubut_southamerica_2.obf"});
 		} else {
 			in.merger(args);
 		}
