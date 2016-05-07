@@ -105,7 +105,7 @@ public class MainUtilities {
 	private static void printSynopsys() {
 		System.out.println("This utility provides access to all other console utilities of OsmAnd,");
 		System.out.println("each utility has own argument list and own synopsys. Here is the list:");
-		System.out.println("\t\t merge-address-index output_file.obf [input_file.obf] ...");
+		System.out.println("\t\t merge-address-index output_file.obf [input_file.obf] ...: merges all obf files and merges address structure into 1");
 		System.out.println("\t\t check-ocean-tile <lat> <lon> <zoom=11>: checks ocean or land tile is in bz2 list");
 		System.out.println("\t\t generate-ocean-tile <coastline osm file> <optional output file>: creates ocean tiles 12 zoom");
 		System.out.println("\t\t generate-java-style <pathtostyle> <pathtooutputfolder>: prints rendering style as java interpreted code");
