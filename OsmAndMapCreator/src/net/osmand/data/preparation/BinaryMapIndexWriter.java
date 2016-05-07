@@ -95,6 +95,7 @@ public class BinaryMapIndexWriter {
 
 	private RandomAccessFile raf;
 	private CodedOutputStream codedOutStream;
+
 	protected static final int SHIFT_COORDINATES = BinaryMapIndexReader.SHIFT_COORDINATES;
     public int MASK_TO_READ = ~((1 << SHIFT_COORDINATES) - 1);
 	private static final int ROUTE_SHIFT_COORDINATES = 4;
@@ -190,6 +191,10 @@ public class BinaryMapIndexWriter {
 		codedOutStream.flush();
 		return raf.getFilePointer();
 		// return codedOutStream.getWrittenBytes(); // doesn't work with route section rewrite (should not take into account)
+	}
+
+	public CodedOutputStream getCodedOutStream() {
+		return codedOutStream;
 	}
 
 //	private void writeFixed32(long posToWrite, int value, long currentPosition) throws IOException {
@@ -888,10 +893,10 @@ public class BinaryMapIndexWriter {
 			cityInd.setNameEn(city.getEnName(false));
 		}
 		Iterator<Entry<String, String>> it = city.getNamesMap(false).entrySet().iterator();
-		while(it.hasNext()) {
+		while (it.hasNext()) {
 			Entry<String, String> next = it.next();
-			Integer intg = tagRules.get("name:"+next.getKey());
-			if(intg != null) {
+			Integer intg = tagRules.get("name:" + next.getKey());
+			if (intg != null) {
 				cityInd.addAttributeTagIds(intg);
 				cityInd.addAttributeValues(next.getValue());
 			}
@@ -910,7 +915,7 @@ public class BinaryMapIndexWriter {
 	}
 
 	public void writeCityIndex(City cityOrPostcode, List<Street> streets, Map<Street, List<Node>> wayNodes,
-			BinaryFileReference ref, Map<String, Integer> tagRules) throws IOException {
+							   BinaryFileReference ref, Map<String, Integer> tagRules) throws IOException {
 		checkPeekState(CITY_INDEX_INIT);
 		codedOutStream.writeTag(CitiesIndex.BLOCKS_FIELD_NUMBER, FieldType.MESSAGE.getWireType());
 		codedOutStream.flush();
@@ -938,7 +943,7 @@ public class BinaryMapIndexWriter {
 		for (Street s : streets) {
 			StreetIndex streetInd = createStreetAndBuildings(s, cx, cy, postcodeFilter, mapNodeToStreet, wayNodes, tagRules);
 			currentPointer += CodedOutputStream.computeTagSize(CityBlockIndex.STREETS_FIELD_NUMBER);
-			if(currentPointer > Integer.MAX_VALUE) {
+			if (currentPointer > Integer.MAX_VALUE) {
 				throw new IllegalArgumentException("File offset > 2 GB.");
 			}
 			s.setFileOffset((int) currentPointer);

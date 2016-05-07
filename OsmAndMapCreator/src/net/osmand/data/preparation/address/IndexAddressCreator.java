@@ -27,7 +27,6 @@ import java.util.TreeSet;
 
 import net.osmand.IProgress;
 import net.osmand.OsmAndCollator;
-import net.osmand.PlatformUtil;
 import net.osmand.data.Boundary;
 import net.osmand.data.Building;
 import net.osmand.data.Building.BuildingInterpolation;
@@ -56,12 +55,11 @@ import net.osmand.swing.DataExtractionSettings;
 import net.osmand.swing.Messages;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
-import net.sf.junidecode.Junidecode;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
-public class IndexAddressCreator extends AbstractIndexPartCreator{
+public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 	private static final Log log = LogFactory.getLog(IndexAddressCreator.class);
 	private final Log logMapDataWarn;
@@ -1077,12 +1075,11 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 
 	}
 
-
-	private void putNamedMapObject(Map<String, List<MapObject>> namesIndex, MapObject o, long fileOffset){
+	public static void putNamedMapObject(Map<String, List<MapObject>> namesIndex, MapObject o, long fileOffset){
 		String name = o.getName();
 		parsePrefix(name, o, namesIndex);
-		for(String nm : o.getAllNames()) {
-			if(!nm.equals(name)) {
+		for (String nm : o.getAllNames()) {
+			if (!nm.equals(name)) {
 				parsePrefix(nm, o, namesIndex);
 			}
 		}
@@ -1092,7 +1089,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 		o.setFileOffset((int) fileOffset);
 	}
 
-	private void parsePrefix(String name, MapObject data, Map<String, List<MapObject>> namesIndex) {
+	private static void parsePrefix(String name, MapObject data, Map<String, List<MapObject>> namesIndex) {
 		int prev = -1;
 		for (int i = 0; i <= name.length(); i++) {
 			if (i == name.length() || (!Character.isLetter(name.charAt(i)) && !Character.isDigit(name.charAt(i)) && name.charAt(i) != '\'')) {
@@ -1103,17 +1100,17 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 					}
 					String val = substr.toLowerCase();
 					List<MapObject> list = namesIndex.get(val);
-					if(list == null){
+					if (list == null) {
 						list = new ArrayList<MapObject>();
 						namesIndex.put(val, list);
 					}
-					if(!list.contains(data)) {
+					if (!list.contains(data)) {
 						list.add(data);
 					}
 					prev = -1;
 				}
 			} else {
-				if(prev == -1){
+				if (prev == -1) {
 					prev = i;
 				}
 			}
@@ -1177,7 +1174,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 						}
 						City post = postcodes.get(b.getPostcode());
 						Street newS = post.getStreetByName(s.getName());
-						if(newS == null) {
+						if (newS == null) {
 							newS = new Street(post);
 							newS.copyNames(s);
 							newS.setLocation(s.getLocation().getLatitude(), s.getLocation().getLongitude());
@@ -1327,7 +1324,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator{
 				String district = set.getString(12);
 				String cityPart = district == null || district.equals(city.getName()) ? "" : " (" + district + ")";
 				street.setName(streetName + cityPart);
-				for(String lang : names.keySet()) {
+				for (String lang : names.keySet()) {
 					street.setName(lang, names.get(lang) + cityPart);
 				}
 				streetNodes.put(street, thisWayNodes);
