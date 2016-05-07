@@ -2,19 +2,24 @@ package net.osmand;
 
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.text.Collator;
 import java.text.MessageFormat;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.ListIterator;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
 
 import net.osmand.binary.BinaryIndexPart;
 import net.osmand.binary.BinaryMapAddressReaderAdapter;
 import net.osmand.binary.BinaryMapAddressReaderAdapter.AddressRegion;
 import net.osmand.binary.BinaryMapIndexReader;
-import net.osmand.binary.BinaryMapIndexReader.MapIndex;
-import net.osmand.binary.BinaryMapIndexReader.MapRoot;
 import net.osmand.binary.OsmandOdb;
 import net.osmand.data.Building;
 import net.osmand.data.City;
@@ -24,7 +29,6 @@ import net.osmand.data.preparation.BinaryFileReference;
 import net.osmand.data.preparation.BinaryMapIndexWriter;
 import net.osmand.data.preparation.address.IndexAddressCreator;
 import net.osmand.osm.edit.Node;
-import net.osmand.util.MapUtils;
 
 import com.google.protobuf.CodedOutputStream;
 import com.google.protobuf.WireFormat;
@@ -38,7 +42,10 @@ public class BinaryMerger {
 		BinaryMerger in = new BinaryMerger();
 		// test cases show info
 		if (args.length == 1 && "test".equals(args[0])) {
-			in.merger(new String[]{""});
+			in.merger(new String[]{
+					"/Users/victorshcherb/osmand/maps/Argentina_southamerica_2.obf",
+					"/Users/victorshcherb/osmand/maps/Argentina_cordoba_southamerica_2.obf",
+					"/Users/victorshcherb/osmand/maps/Argentina_chubut_southamerica_2.obf"});
 		} else {
 			in.merger(args);
 		}
@@ -46,40 +53,15 @@ public class BinaryMerger {
 
 	public void merger(String[] args) throws IOException {
 		if (args == null || args.length == 0) {
-			printUsage(null);
+			System.out.println("[output file] [input files]");
 			return;
 		}
-		String f = args[0];
-		if (f.charAt(0) == '-') {
-			// command
-			if (f.equals("-c") || f.equals("-combine")) {
-				if (args.length < 4) {
-					printUsage("Too few parameters to extract (require minimum 4)");
-				} else {
-					Map<File, String> parts = new HashMap<File, String>();
-					for (int i = 2; i < args.length; i++) {
-						File file = new File(args[i]);
-						if (!file.exists()) {
-							System.err.println("File to extract from doesn't exist " + args[i]);
-							return;
-						}
-						parts.put(file, null);
-						if (i < args.length - 1) {
-							if (args[i + 1].startsWith("-") || args[i + 1].startsWith("+")) {
-								parts.put(file, args[i + 1]);
-								i++;
-							}
-						}
-					}
-					List<Float> extracted = combineParts(new File(args[1]), parts);
-					if (extracted != null) {
-						System.out.println("\n" + extracted.size() + " parts were successfully extracted to " + args[1]);
-					}
-				}
-			} else {
-				printUsage("Unknown command : " + f);
-			}
+		List<File> parts = new ArrayList<File>();
+		for (int i = 1; i < args.length; i++) {
+			File file = new File(args[i]);
+			parts.add(file);
 		}
+		combineParts(new File(args[0]), parts);
 	}
 
 	public static final void writeInt(CodedOutputStream ous, int v) throws IOException {
@@ -89,162 +71,6 @@ public class BinaryMerger {
 		ous.writeRawByte(v & 0xFF);
 		//written += 4;
 	}
-
-//	startWriteAddressIndex
-//		writer.startCityBlockIndex
-//		writer.writeCityHeader
-//		writer.writeCityIndex(city, streets, streetNodes, ref, tagRules);
-//		writer.endCityBlockIndex();
-//		tagRules - map String -> new order
-//		writer.writeAddressNameIndex(namesIndex);
-//		writer.endWriteAddressIndex();
-//	private void putNamedMapObject(Map<String, List<MapObject>> namesIndex, MapObject o, long fileOffset){
-//			public List<City> getCities(SearchRequest<City> resultMatcher,  int cityType) throws IOException {
-
-//	private void writeCityBlockIndex(BinaryMapIndexWriter writer, int type, PreparedStatement streetstat, PreparedStatement waynodesStat,
-//									 List<City> suburbs, List<City> cities, Map<String, City> postcodes, Map<String, List<MapObject>> namesIndex,
-//									 Map<String, Integer> tagRules, IProgress progress)
-//			throws IOException {
-//		List<BinaryFileReference> refs = new ArrayList<BinaryFileReference>();
-//		// 1. write cities
-//		writer.startCityBlockIndex(type);
-//		for (City c : cities) {
-//			refs.add(writer.writeCityHeader(c, c.getType().ordinal(), tagRules));
-//		}
-//		for (int i = 0; i < cities.size(); i++) {
-//			City city = cities.get(i);
-//			BinaryFileReference ref = refs.get(i);
-//			putNamedMapObject(namesIndex, city, ref.getStartPointer());
-//			if (type == CITIES_TYPE) {
-//				progress.progress(1);
-//			} else {
-//				if ((cities.size() - i) % 100 == 0) {
-//					progress.progress(1);
-//				}
-//			}
-//			Map<Street, List<Node>> streetNodes = new LinkedHashMap<Street, List<Node>>();
-//			List<City> listSuburbs = null;
-//			if (suburbs != null) {
-//				for (City suburb : suburbs) {
-//					if (suburb.getIsInValue().toLowerCase().contains(city.getName().toLowerCase())) {
-//						if (listSuburbs == null) {
-//							listSuburbs = new ArrayList<City>();
-//						}
-//						listSuburbs.add(suburb);
-//					}
-//				}
-//			}
-//			long time = System.currentTimeMillis();
-//			List<Street> streets = readStreetsBuildings(streetstat, city, waynodesStat, streetNodes, listSuburbs);
-//			long f = System.currentTimeMillis() - time;
-//			writer.writeCityIndex(city, streets, streetNodes, ref, tagRules);
-//			int bCount = 0;
-//			// register postcodes and name index
-//			for (Street s : streets) {
-//				putNamedMapObject(namesIndex, s, s.getFileOffset());
-//
-//				for (Building b : s.getBuildings()) {
-//					bCount++;
-//					if (city.getPostcode() != null && b.getPostcode() == null) {
-//						b.setPostcode(city.getPostcode());
-//					}
-//					if (b.getPostcode() != null) {
-//						if (!postcodes.containsKey(b.getPostcode())) {
-//							City p = City.createPostcode(b.getPostcode());
-//							p.setLocation(b.getLocation().getLatitude(), b.getLocation().getLongitude());
-//							postcodes.put(b.getPostcode(), p);
-//						}
-//						City post = postcodes.get(b.getPostcode());
-//						Street newS = post.getStreetByName(s.getName());
-//						if(newS == null) {
-//							newS = new Street(post);
-//							newS.copyNames(s);
-//							newS.setLocation(s.getLocation().getLatitude(), s.getLocation().getLongitude());
-//							//newS.getWayNodes().addAll(s.getWayNodes());
-//							newS.setId(s.getId());
-//							post.registerStreet(newS);
-//						}
-//						newS.addBuildingCheckById(b);
-//					}
-//				}
-//			}
-//			if (f > 500) {
-//				if (logMapDataWarn != null) {
-//					logMapDataWarn.info("! " + city.getName() + " ! " + f + " ms " + streets.size() + " streets " + bCount + " buildings");
-//				} else {
-//					log.info("! " + city.getName() + " ! " + f + " ms " + streets.size() + " streets " + bCount + " buildings");
-//				}
-//			}
-//		}
-//		writer.endCityBlockIndex();
-//	}
-//
-//	public void writeAddressIndex(BinaryMapIndexWriter writer, String regionName, IProgress progress) throws IOException {
-//		List<String> additionalTags = new ArrayList<String>();
-//		Map<String, Integer> tagRules = new HashMap<String, Integer>();
-//		int ind = 0;
-//		for (String lng : langAttributes) {
-//			additionalTags.add("name:"+ lng);
-//			tagRules.put("name:"+ lng, ind);
-//			ind++;
-//		}
-//		writer.startWriteAddressIndex(regionName, additionalTags);
-//		Map<CityType, List<City>> cities = readCities(mapConnection);
-//
-//		// collect suburbs with is in value
-//		List<City> suburbs = new ArrayList<City>();
-//		List<City> cityTowns = new ArrayList<City>();
-//		List<City> villages = new ArrayList<City>();
-//		for (CityType t : cities.keySet()) {
-//			if (t == CityType.CITY || t == CityType.TOWN) {
-//				cityTowns.addAll(cities.get(t));
-//			} else {
-//				villages.addAll(cities.get(t));
-//			}
-//			if (t == CityType.SUBURB) {
-//				for (City c : cities.get(t)) {
-//					if (c.getIsInValue() != null) {
-//						suburbs.add(c);
-//					}
-//				}
-//			}
-//		}
-//
-//
-//		Map<String, List<MapObject>> namesIndex = new TreeMap<String, List<MapObject>>(Collator.getInstance());
-//		Map<String, City> postcodes = new TreeMap<String, City>();
-//		writeCityBlockIndex(writer, CITIES_TYPE,  streetstat, waynodesStat, suburbs, cityTowns, postcodes, namesIndex, tagRules, progress);
-//		writeCityBlockIndex(writer, VILLAGES_TYPE,  streetstat, waynodesStat, null, villages, postcodes, namesIndex, tagRules, progress);
-//
-//		// write postcodes
-//		List<BinaryFileReference> refs = new ArrayList<BinaryFileReference>();
-//		writer.startCityBlockIndex(POSTCODES_TYPE);
-//		ArrayList<City> posts = new ArrayList<City>(postcodes.values());
-//		for (City s : posts) {
-//			refs.add(writer.writeCityHeader(s, -1, tagRules));
-//		}
-//		for (int i = 0; i < posts.size(); i++) {
-//			City postCode = posts.get(i);
-//			BinaryFileReference ref = refs.get(i);
-//			putNamedMapObject(namesIndex, postCode, ref.getStartPointer());
-//			ArrayList<Street> list = new ArrayList<Street>(postCode.getStreets());
-//			Collections.sort(list, new Comparator<Street>() {
-//				final net.osmand.Collator clt = OsmAndCollator.primaryCollator();
-//
-//				@Override
-//				public int compare(Street o1, Street o2) {
-//					return clt.compare(o1.getName(), o2.getName());
-//				}
-//
-//			});
-//			writer.writeCityIndex(postCode, list, null, ref, tagRules);
-//		}
-//		writer.endCityBlockIndex();
-//
-//		writer.writeAddressNameIndex(namesIndex);
-//		writer.endWriteAddressIndex();
-//		writer.flush();
-//	}
 
 	public static void combineAddressIndex(String name, BinaryMapIndexWriter writer, AddressRegion[] addressRegions, BinaryMapIndexReader[] indexes)
 			throws IOException {
@@ -276,7 +102,8 @@ public class BinaryMerger {
 			// 1. write cities
 			writer.startCityBlockIndex(type);
 			for (City city : cities) {
-				refs.add(writer.writeCityHeader(city, city.getType().ordinal(), tagRules));
+				refs.add(writer.writeCityHeader(city, city.isPostcode() ? BinaryMapAddressReaderAdapter.POSTCODES_TYPE
+						: city.getType().ordinal(), tagRules));
 			}
 			for (int i = 0; i != refs.size(); i++) {
 				BinaryFileReference ref = refs.get(i);
@@ -319,71 +146,29 @@ public class BinaryMerger {
 	}
 
 	@SuppressWarnings("unchecked")
-	public static List<Float> combineParts(File fileToExtract, Map<File, String> partsToExtractFrom) throws IOException {
-		BinaryMapIndexReader[] indexes = new BinaryMapIndexReader[partsToExtractFrom.size()];
-		RandomAccessFile[] rafs = new RandomAccessFile[partsToExtractFrom.size()];
-
-		LinkedHashSet<Float>[] partsSet = new LinkedHashSet[partsToExtractFrom.size()];
-		int c = 0;
-//		Set<String> addressNames = new LinkedHashSet<String>();
-
+	public static void combineParts(File fileToExtract, List<File> files) throws IOException {
+		BinaryMapIndexReader[] indexes = new BinaryMapIndexReader[files.size()];
+		RandomAccessFile[] rafs = new RandomAccessFile[files.size()];
 		long dateCreated = 0;
 		int version = -1;
 		// Go through all files and validate conistency
-		for (File f : partsToExtractFrom.keySet()) {
+		int c = 0;
+		for (File f : files) {
 			if (f.getAbsolutePath().equals(fileToExtract.getAbsolutePath())) {
 				System.err.println("Error : Input file is equal to output file " + f.getAbsolutePath());
-				return null;
+				return;
 			}
 			rafs[c] = new RandomAccessFile(f.getAbsolutePath(), "r");
 			indexes[c] = new BinaryMapIndexReader(rafs[c], f);
-			partsSet[c] = new LinkedHashSet<Float>();
 			dateCreated = Math.max(dateCreated, indexes[c].getDateCreated());
 			if (version == -1) {
 				version = indexes[c].getVersion();
 			} else {
 				if (indexes[c].getVersion() != version) {
 					System.err.println("Error : Different input files has different input versions " + indexes[c].getVersion() + " != " + version);
-					return null;
+					return;
 				}
 			}
-
-			LinkedHashSet<Float> temp = new LinkedHashSet<Float>();
-			String pattern = partsToExtractFrom.get(f);
-			boolean minus = true;
-			for (int i = 0; i < indexes[c].getIndexes().size(); i++) {
-				partsSet[c].add(i + 1f);
-				BinaryIndexPart part = indexes[c].getIndexes().get(i);
-				if (part instanceof MapIndex) {
-					List<MapRoot> roots = ((MapIndex) part).getRoots();
-					int rsize = roots.size();
-					for (int j = 0; j < rsize; j++) {
-						partsSet[c].add((i + 1f) + (j + 1) / 10f);
-					}
-				}
-			}
-			if (pattern != null) {
-				minus = pattern.startsWith("-");
-				String[] split = pattern.substring(1).split(",");
-				for (String s : split) {
-					temp.add(Float.valueOf(s));
-				}
-			}
-
-			Iterator<Float> p = partsSet[c].iterator();
-			while (p.hasNext()) {
-				Float part = p.next();
-				if (minus) {
-					if (temp.contains(part)) {
-						p.remove();
-					}
-				} else {
-					if (!temp.contains(part)) {
-						p.remove();
-					}
-				}
-			}
-
 			c++;
 		}
 
@@ -391,22 +176,13 @@ public class BinaryMerger {
 		RandomAccessFile rafToExtract = new RandomAccessFile(fileToExtract, "rw");
 		BinaryMapIndexWriter writer = new BinaryMapIndexWriter(rafToExtract, dateCreated);
 		CodedOutputStream ous = writer.getCodedOutStream();
-		List<Float> list = new ArrayList<Float>();
 		byte[] BUFFER_TO_READ = new byte[BUFFER_SIZE];
-
-		AddressRegion[] addressRegions = new AddressRegion[partsToExtractFrom.size()];
+		AddressRegion[] addressRegions = new AddressRegion[files.size()];
 		for (int k = 0; k < indexes.length; k++) {
-			LinkedHashSet<Float> partSet = partsSet[k];
 			BinaryMapIndexReader index = indexes[k];
 			RandomAccessFile raf = rafs[k];
 			for (int i = 0; i < index.getIndexes().size(); i++) {
-				if (!partSet.contains(Float.valueOf(i + 1f))) {
-					continue;
-				}
-				list.add(i + 1f);
-
 				BinaryIndexPart part = index.getIndexes().get(i);
-
 				if (part.getFieldNumber() == OsmandOdb.OsmAndStructure.ADDRESSINDEX_FIELD_NUMBER) {
 					addressRegions[k] = (AddressRegion)part;
 				} else {
@@ -416,20 +192,16 @@ public class BinaryMerger {
 					System.out.println(MessageFormat.format("{2} part {0} is extracted {1} bytes",
 							new Object[]{part.getName(), part.getLength(), part.getPartName()}));
 				}
-//				} else if (part instanceof AddressRegion) {
-//					if (addressNames.contains(part.getName())) {
-//						System.err.println("Error : going to merge 2 addresses with same names. Skip " + part.getName());
-//						continue;
-//					}
-//					addressNames.add(part.getName());
 			}
 		}
-		combineAddressIndex(fileToExtract.getName(), writer, addressRegions, indexes);
-
+		String nm = fileToExtract.getName();
+		int i = nm.indexOf('_');
+		if(i > 0) {
+			nm = nm.substring(0, i);
+		}
+		combineAddressIndex(nm, writer, addressRegions, indexes);
 		ous.writeInt32(OsmandOdb.OsmAndStructure.VERSIONCONFIRM_FIELD_NUMBER, version);
 		ous.flush();
-
-		return list;
 	}
 
 
@@ -451,31 +223,6 @@ public class BinaryMerger {
 	}
 
 
-	protected String formatBounds(int left, int right, int top, int bottom) {
-		double l = MapUtils.get31LongitudeX(left);
-		double r = MapUtils.get31LongitudeX(right);
-		double t = MapUtils.get31LatitudeY(top);
-		double b = MapUtils.get31LatitudeY(bottom);
-		return formatLatBounds(l, r, t, b);
-	}
 
-	protected String formatLatBounds(double l, double r, double t, double b) {
-		MessageFormat format = new MessageFormat("(left top - right bottom) : {0,number,#.####}, {1,number,#.####} NE - {2,number,#.####}, {3,number,#.####} NE", new Locale("EN", "US"));
-		return format.format(new Object[]{l, t, r, b});
-	}
-
-	public void printUsage(String warning) {
-		if (warning != null) {
-			System.out.println(warning);
-		}
-		System.out.println("Merger is console utility for working with binary indexes of OsmAnd.");
-		System.out.println("It allows to merge indexes.");
-		System.out.println("\nUsage for combining indexes : merger -c file_to_create (file_from_extract ((+|-)parts_to_extract)? )*");
-		System.out.println("\tCreate new file of extracted parts from input file. [parts_to_extract] could be parts to include or exclude.");
-		System.out.println("  Example : merger -c output_file input_file +1,2,3\n\tExtracts 1, 2, 3 parts (could be find in print info)");
-		System.out.println("  Example : merger -c output_file input_file -2,3\n\tExtracts all  parts excluding 2, 3");
-		System.out.println("  Example : merger -c output_file input_file1 input_file2 input_file3\n\tSimply combine 3 files");
-		System.out.println("  Example : merger -c output_file input_file1 input_file2 -4\n\tCombine all parts of 1st file and all parts excluding 4th part of 2nd file");
-	}
 
 }
