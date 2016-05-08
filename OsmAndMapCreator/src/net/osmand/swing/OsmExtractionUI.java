@@ -274,8 +274,6 @@ public class OsmExtractionUI implements IMapLocationListener {
 				lib.initFilesInDir(new File(DataExtractionSettings.getSettings().getBinaryFilesDir()));
 				lib.loadRuleStorage(targetFile, renderingProperties);
 				mapPanel.setNativeLibrary(lib);
-				mapPanel.prepareImage();
-				mapPanel.repaint();
 			} catch (SAXException e) {
 				log.error(e.getMessage(), e);
 				throw new RuntimeException(e);

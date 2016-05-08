@@ -4,7 +4,6 @@ import java.awt.Color;
 import java.awt.Component;
 import java.awt.Frame;
 import java.awt.Graphics2D;
-import java.awt.Panel;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.File;
@@ -15,7 +14,6 @@ import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
-import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
@@ -28,7 +26,6 @@ public class MapInformationLayer implements MapPanelLayer {
 
 	private JButton setStart;
 	private JButton setEnd;
-	private JLabel gpsLocation;
 	private JButton areaButton;
 
 
@@ -44,6 +41,8 @@ public class MapInformationLayer implements MapPanelLayer {
 		this.setEnd.addActionListener(listener);
 	};
 
+	
+	
 	@Override
 	public void initLayer(final MapPanel map) {
 		this.map = map;
@@ -51,8 +50,6 @@ public class MapInformationLayer implements MapPanelLayer {
 		map.setLayout(layout);
 		map.setBorder(BorderFactory.createEmptyBorder(2, 10, 10, 10));
 		
-		gpsLocation = new JLabel();
-		gpsLocation.setOpaque(false);
 		JPanel btnPanel = new JPanel();
 		btnPanel.setLayout(new BoxLayout(btnPanel, BoxLayout.LINE_AXIS));
 //		btnPanel.setBackground(new Color(255, 255, 255, 0));
@@ -120,7 +117,6 @@ public class MapInformationLayer implements MapPanelLayer {
 			}
 		});
 
-		gpsLocation.setAlignmentY(Component.TOP_ALIGNMENT);
 		areaButton.setVisible(false);
 		areaButton.setAlignmentY(Component.TOP_ALIGNMENT);
 		setStart.setAlignmentY(Component.TOP_ALIGNMENT);
@@ -129,7 +125,6 @@ public class MapInformationLayer implements MapPanelLayer {
 		zoomIn.setAlignmentY(Component.TOP_ALIGNMENT);
 		offline.setAlignmentY(Component.TOP_ALIGNMENT);
 		
-		map.add(gpsLocation);
 		map.add(btnPanel);
 //		map.add(Box.createHorizontalGlue());
 		btnPanel.add(Box.createHorizontalGlue());
