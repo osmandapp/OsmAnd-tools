@@ -21,6 +21,7 @@ import java.util.logging.SimpleFormatter;
 
 import javax.swing.AbstractAction;
 import javax.swing.BoxLayout;
+import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JDialog;
 import javax.swing.JFileChooser;
@@ -127,7 +128,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 	private JCheckBox buildRoutingIndex;
 	private JCheckBox buildTransportIndex;
 	private JCheckBox normalizingStreets;
-	private JCheckBox showOfflineIndex;
+	private JButton showOfflineIndex;
 
 	private String regionName;
 
@@ -230,14 +231,15 @@ public class OsmExtractionUI implements IMapLocationListener {
 		panel.add(buildTransportIndex);
 		buildTransportIndex.setSelected(true);
 
-		showOfflineIndex = new JCheckBox();
+		showOfflineIndex = new JButton();
 		showOfflineIndex.setText("Offline Rendering");
 		panel.add(showOfflineIndex);
-		showOfflineIndex.setSelected(false);
+		mapPanel.setOnlineRendering(showOfflineIndex);
 		showOfflineIndex.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				if(showOfflineIndex.isSelected()) {
+				if(showOfflineIndex.getText().equals("Offline Rendering")) {
+					showOfflineIndex.setText("Online Rendering");
 					NativePreferencesDialog dlg = new NativePreferencesDialog( mapPanel);
 					dlg.showDialog();
 					if(dlg.isOkPressed()) {
@@ -246,6 +248,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 						showOfflineIndex.setSelected(false);
 					}
 				} else {
+					showOfflineIndex.setText("Offline Rendering");
 					mapPanel.setNativeLibrary(null);
 				}
 			}

@@ -186,6 +186,8 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 
 	private JPanel diffButton;
 
+	private JButton buttonOnlineRendering;
+
 
 
 	public MapPanel(File fileWithTiles) {
@@ -217,16 +219,17 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 			@Override
 			public boolean dispatchKeyEvent(KeyEvent e) {
 				KeyStroke key2 = KeyStroke.getKeyStroke(KeyEvent.VK_L, Toolkit.getDefaultToolkit().getMenuShortcutKeyMask());
+				KeyStroke key1 = KeyStroke.getKeyStroke(KeyEvent.VK_P, Toolkit.getDefaultToolkit().getMenuShortcutKeyMask());
 				KeyStroke keyStroke = KeyStroke.getKeyStrokeForEvent(e);
-				if (keyStroke.equals(key2) ) {
-					SwingUtilities.invokeLater(new Runnable() {
-						@Override
-						public void run() {
-							if(statusField != null) {
-								statusField.requestFocus();
-							}
-						}
-					});
+				if (keyStroke.equals(key2)) {
+					if (statusField != null) {
+						statusField.requestFocus();
+					}
+					return true;
+				} else if (keyStroke.equals(key1)) {
+					if (buttonOnlineRendering != null) {
+						buttonOnlineRendering.doClick();
+					}
 					return true;
 				}
 				return false;
@@ -1192,6 +1195,10 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 				repaint();
 			}
 		}
+	}
+
+	public void setOnlineRendering(JButton buttonOnlineRendering) {
+		this.buttonOnlineRendering = buttonOnlineRendering;
 	}
 
 }
