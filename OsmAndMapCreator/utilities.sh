@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # This file will start the Osm Extraction UI with custom memory settings for
 # the JVM. With the below settings the heap size (Available memory for the application)
