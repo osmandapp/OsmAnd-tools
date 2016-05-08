@@ -2,6 +2,7 @@ package net.osmand.swing;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.Component;
 import java.awt.Container;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
@@ -20,20 +21,31 @@ import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.awt.image.BufferedImage;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 
 import javax.imageio.IIOException;
 import javax.imageio.ImageIO;
 import javax.swing.AbstractAction;
+import javax.swing.Box;
+import javax.swing.BoxLayout;
+import javax.swing.ButtonGroup;
+import javax.swing.JButton;
 import javax.swing.JCheckBoxMenuItem;
 import javax.swing.JFrame;
 import javax.swing.JMenu;
@@ -41,6 +53,7 @@ import javax.swing.JMenuBar;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
+import javax.swing.JRadioButton;
 import javax.swing.JTextField;
 import javax.swing.UIManager;
 
@@ -56,10 +69,14 @@ import net.osmand.map.MapTileDownloader.IMapDownloaderCallback;
 import net.osmand.map.TileSourceManager;
 import net.osmand.map.TileSourceManager.TileSourceTemplate;
 import net.osmand.osm.edit.Entity;
+import net.osmand.osm.io.NetworkUtils;
+import net.osmand.swing.NativeSwingRendering.MapDiff;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
 import org.apache.commons.logging.Log;
+import org.xmlpull.v1.XmlPullParser;
+import org.xmlpull.v1.XmlPullParserException;
 
 
 public class MapPanel extends JPanel implements IMapDownloaderCallback {
@@ -159,6 +176,8 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 	private boolean willBePopupShown = false;
 
 	private JTextField statusField;
+
+	private JPanel diffButton;
 
 
 
@@ -442,6 +461,7 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 				}
 			}
 		}
+		updateMapDiffs((Graphics2D) g, false);
 		for(MapPanelLayer l : layers){
 			l.paintLayer((Graphics2D) g);
 		}
@@ -458,6 +478,113 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 
 		}
 	}
+
+	private void updateMapDiffs(final Graphics2D g, boolean delete) {
+		final MapDiff md = nativeLibRendering != null ? nativeLibRendering.getMapDiffs(latitude, longitude) : null;
+		if (md == null || zoom < 13 || delete) {
+			if (diffButton != null) {
+				remove(diffButton);
+				diffButton = null;
+			}
+		} else {
+			if(diffButton == null) {
+				diffButton = new JPanel(); //$NON-NLS-1$
+				diffButton.setLayout(new BoxLayout(diffButton, BoxLayout.X_AXIS));
+				diffButton.setOpaque(false);
+				diffButton.add(Box.createHorizontalGlue());
+				
+				JPanel vertLayout = new JPanel(); //$NON-NLS-1$
+				vertLayout.setLayout(new BoxLayout(vertLayout, BoxLayout.Y_AXIS));
+				vertLayout.setOpaque(false);
+				JButton downloadDiffs = new JButton("Download live " + (md.diffs.size() == 0 ? md.baseName : ""));
+				downloadDiffs.addActionListener(new ActionListener() {
+					@Override
+					public void actionPerformed(ActionEvent e) {
+						downloadDiffs(g, md);
+					}
+				});
+				vertLayout.add(downloadDiffs);
+				if (md.diffs.size() > 0) {
+					ButtonGroup bG = new ButtonGroup();
+					addButton(bG, md.baseName, vertLayout, md);
+					for (String s : md.diffs.keySet()) {
+						addButton(bG, s, vertLayout, md);
+					}
+				}
+				diffButton.add(vertLayout);
+				add(diffButton);
+				revalidate();
+			}
+		}
+	}
+
+
+	protected void downloadDiffs(Graphics2D g, MapDiff md) {
+		String url = "http://download.osmand.net/check_live.php?aosmc=true&timestamp=" + md.timestamp +
+				"&file=" + URLEncoder.encode(md.baseName);
+		System.out.println("Loading " + url);
+		try {
+			HttpURLConnection conn = NetworkUtils.getHttpURLConnection(url);
+			XmlPullParser parser = PlatformUtil.newXMLPullParser();
+			parser.setInput(conn.getInputStream(), "UTF-8");
+			Map<String, Long> updateFiles = new TreeMap<String, Long>();
+			while (parser.next() != XmlPullParser.END_DOCUMENT) {
+				if (parser.getEventType() == XmlPullParser.START_TAG) {
+					if (parser.getName().equals("update")) {
+						if (!parser.getAttributeValue("", "name").endsWith("00.obf.gz")) {
+							updateFiles.put(parser.getAttributeValue("", "name"),
+									Long.parseLong(parser.getAttributeValue("", "timestamp")));
+						}
+					}
+				}
+			}
+			conn.disconnect();
+			File dir = new File(DataExtractionSettings.getSettings().getBinaryFilesDir());
+			for(String file : updateFiles.keySet()) {
+				long time = updateFiles.get(file);
+				File targetFile = new File(dir, file.substring(0, file.length() - 3));
+				if(!targetFile.exists() || targetFile.lastModified() != time) {
+					String nurl = "http://download.osmand.net/download.php?aosmc=true&" + md.timestamp +
+							"&file=" + URLEncoder.encode(file);
+					System.out.println("Loading " + nurl);
+					HttpURLConnection c = NetworkUtils.getHttpURLConnection(nurl);
+					GZIPInputStream gzip = new GZIPInputStream(c.getInputStream());
+					FileOutputStream fout = new FileOutputStream(targetFile);
+					Algorithms.streamCopy(gzip, fout);
+					gzip.close();
+					fout.close();
+					targetFile.setLastModified(time);
+					nativeLibRendering.closeMapFile(targetFile.getAbsolutePath());
+					nativeLibRendering.initMapFile(targetFile.getAbsolutePath());
+				}
+			}
+			updateMapDiffs(g, true);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+	}
+
+
+	private void addButton(ButtonGroup bG, final String s, JPanel parent, final MapDiff md) {
+		boolean selected = s.equals(md.selected);
+		JRadioButton m = new JRadioButton(s.replace('_', ' '));
+		bG.add(m);
+		m.setAlignmentX(Component.LEFT_ALIGNMENT);
+		parent.add(m);
+		m.addActionListener(new ActionListener() {
+			
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				nativeLibRendering.enableMapFile(md, s);
+				lastAddedRunnable = null;
+				prepareImage();
+				repaint();
+			}
+		});
+		m.setSelected(selected);
+	}
+
 
 	public File getTilesLocation() {
 		return tilesLocation;
@@ -582,7 +709,7 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 			xStartingImage = -(int) ((xTileLeft - Math.floor(xTileLeft)) * tileSize);
 			yStartingImage = -(int) ((yTileUp - Math.floor(yTileUp)) * tileSize);
 
-			if(loadNecessaryImages){
+			if (loadNecessaryImages) {
 				downloader.refuseAllPreviousRequests();
 			}
 			int tileXCount = ((int) xTileRight - (int) xTileLeft + 1);
@@ -590,13 +717,13 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 			images = new BufferedImage[tileXCount][tileYCount];
 			for (int i = 0; i < images.length; i++) {
 				for (int j = 0; j < images[i].length; j++) {
-					int x= (int) xTileLeft + i;
+					int x = (int) xTileLeft + i;
 					int y = (int) yTileUp + j;
 					images[i][j] = getImageFor(x, y, zoom, loadNecessaryImages);
 				}
 			}
 
-			for(MapPanelLayer l : layers){
+			for (MapPanelLayer l : layers) {
 				l.prepareToDraw();
 			}
 			repaint();

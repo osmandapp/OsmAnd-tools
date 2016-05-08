@@ -4,6 +4,7 @@ import java.awt.Color;
 import java.awt.Component;
 import java.awt.Frame;
 import java.awt.Graphics2D;
+import java.awt.Panel;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.File;
@@ -16,6 +17,7 @@ import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
+import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 
 import net.osmand.data.LatLon;
@@ -45,13 +47,17 @@ public class MapInformationLayer implements MapPanelLayer {
 	@Override
 	public void initLayer(final MapPanel map) {
 		this.map = map;
-		BoxLayout layout = new BoxLayout(map, BoxLayout.LINE_AXIS);
+		BoxLayout layout = new BoxLayout(map, BoxLayout.Y_AXIS);
 		map.setLayout(layout);
 		map.setBorder(BorderFactory.createEmptyBorder(2, 10, 10, 10));
-
+		
 		gpsLocation = new JLabel();
 		gpsLocation.setOpaque(false);
-		updateLocationLabel();
+		JPanel btnPanel = new JPanel();
+		btnPanel.setLayout(new BoxLayout(btnPanel, BoxLayout.LINE_AXIS));
+//		btnPanel.setBackground(new Color(255, 255, 255, 0));
+		btnPanel.setOpaque(false);
+		
 
 		this.setStart = new JButton("S"); //$NON-NLS-1$
 		this.setEnd = new JButton("E"); //$NON-NLS-1$
@@ -114,14 +120,6 @@ public class MapInformationLayer implements MapPanelLayer {
 			}
 		});
 
-		map.add(gpsLocation);
-		map.add(Box.createHorizontalGlue());
-		map.add(areaButton);
-		map.add(setStart);
-		map.add(setEnd);
-		map.add(zoomIn);
-		map.add(zoomOut);
-		map.add(offline);
 		gpsLocation.setAlignmentY(Component.TOP_ALIGNMENT);
 		areaButton.setVisible(false);
 		areaButton.setAlignmentY(Component.TOP_ALIGNMENT);
@@ -130,9 +128,22 @@ public class MapInformationLayer implements MapPanelLayer {
 		zoomOut.setAlignmentY(Component.TOP_ALIGNMENT);
 		zoomIn.setAlignmentY(Component.TOP_ALIGNMENT);
 		offline.setAlignmentY(Component.TOP_ALIGNMENT);
+		
+		map.add(gpsLocation);
+		map.add(btnPanel);
+//		map.add(Box.createHorizontalGlue());
+		btnPanel.add(Box.createHorizontalGlue());
+		btnPanel.add(areaButton);
+		btnPanel.add(setStart);
+		btnPanel.add(setEnd);
+		btnPanel.add(zoomIn);
+		btnPanel.add(zoomOut);
+		btnPanel.add(offline);
+		
+		
 
 		JPopupMenu popupMenu = map.getPopupMenu();
-		Action selectMenu= new AbstractAction("Select point...") {
+		Action selectMenu = new AbstractAction("Select point...") {
 			private static final long serialVersionUID = -3022499800877796459L;
 
 			@Override
@@ -140,12 +151,11 @@ public class MapInformationLayer implements MapPanelLayer {
 				SelectPointDialog dlg = new SelectPointDialog(map, new LatLon(map.getLatitude(), map.getLongitude()));
 				dlg.showDialog();
 				LatLon l = dlg.getResult();
-				if(l != null){
+				if (l != null) {
 					map.setLatLon(l.getLatitude(), l.getLongitude());
 					map.setZoom(15);
 				}
 			}
-
 
 		};
 		popupMenu.add(selectMenu);
@@ -169,15 +179,9 @@ public class MapInformationLayer implements MapPanelLayer {
 		this.setEnd.setVisible(settings.useAdvancedRoutingUI());
 	}
 
-	private void updateLocationLabel(){
-		double latitude = map.getLatitude();
-		double longitude = map.getLongitude();
-		int zoom = map.getZoom();
-//		gpsLocation.setText(MessageFormat.format("Lat : {0,number,#.####}, lon : {1,number,#.####}, zoom : {2}", latitude, longitude, zoom)); //$NON-NLS-1$
-	}
+	
 	@Override
 	public void prepareToDraw() {
-		updateLocationLabel();
 
 	}
 

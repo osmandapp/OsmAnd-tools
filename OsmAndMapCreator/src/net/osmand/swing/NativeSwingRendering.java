@@ -5,12 +5,14 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.Arrays;
-import java.util.Comparator;
+import java.io.RandomAccessFile;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
 
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
@@ -21,6 +23,8 @@ import javax.xml.parsers.SAXParserFactory;
 
 import net.osmand.NativeLibrary;
 import net.osmand.RenderingContext;
+import net.osmand.binary.BinaryMapIndexReader;
+import net.osmand.binary.BinaryMapIndexReader.MapRoot;
 import net.osmand.data.QuadPointDouble;
 import net.osmand.data.QuadRect;
 import net.osmand.data.RotatedTileBox;
@@ -48,6 +52,18 @@ public class NativeSwingRendering extends NativeLibrary {
 
 	public static Boolean loaded = null;
 	private static NativeSwingRendering defaultLoadedLibrary;
+	
+	private Map<String, MapDiff> diffs = new LinkedHashMap<String, MapDiff>();
+	
+	public static class MapDiff {
+		String baseName;
+		File baseFile;
+		QuadRect bounds;
+		Map<String, File> diffs = new TreeMap<String, File>();
+		Set<String> disabled = new TreeSet<String>();
+		String selected;
+		public long timestamp; 
+	}
 
 	private void loadRenderingAttributes(InputStream is, final Map<String, String> renderingConstants) throws SAXException, IOException{
 		try {
@@ -298,13 +314,94 @@ public class NativeSwingRendering extends NativeLibrary {
 		return img;
 	}
 
-	public void initFilesInDir(File filesDir){
+	public void initFilesInDir(File filesDir) {
 		File[] lf = Algorithms.getSortedFilesVersions(filesDir);
 		for(File f : lf){
 			if(f.getName().endsWith(".obf")) {
+				// "_16_05_06.obf"
+				int l = f.getName().length() - 4;
+				if(f.getName().charAt(l - 3) == '_' && f.getName().charAt(l - 6) == '_' && 
+						f.getName().charAt(l - 9) == '_') {
+					String baseName = f.getName().substring(0, l - 9);
+					if(!diffs.containsKey(baseName)) {
+						MapDiff md = new MapDiff();
+						md.baseName = baseName;
+						diffs.put(baseName, md);
+					}
+					MapDiff md = diffs.get(baseName);
+					md.diffs.put(f.getName().substring(l - 8, l), f);
+				} else if( !f.getName().contains("basemap")){
+					if(f.getName().endsWith("_2.obf")) {
+						updateBoundaries(f, f.getName().substring(0, f.getName().length() - 6));	
+					} else {
+						updateBoundaries(f, f.getName().substring(0, f.getName().length() - 4));
+					}
+				}
 				initMapFile(f.getAbsolutePath());
 			}
 		}
+	}
+
+	private void updateBoundaries(File f, String nm) {
+		try {
+			BinaryMapIndexReader r = new BinaryMapIndexReader(new RandomAccessFile(f, "r"), f);
+			try {
+				if (r.getMapIndexes().isEmpty() || r.getMapIndexes().get(0).getRoots().isEmpty()) {
+					return;
+				}
+				MapRoot rt = r.getMapIndexes().get(0).getRoots().get(0);
+				if (!diffs.containsKey(nm)) {
+					MapDiff mm = new MapDiff();
+					mm.baseName = nm;
+					diffs.put(nm, mm);
+				}
+				MapDiff dd = diffs.get(nm);
+				dd.baseFile = f;
+				dd.timestamp = r.getDateCreated();
+				dd.bounds = new QuadRect(MapUtils.get31LongitudeX(rt.getLeft()), MapUtils.get31LatitudeY(rt.getTop()),
+						MapUtils.get31LongitudeX(rt.getRight()), MapUtils.get31LatitudeY(rt.getBottom()));
+				Iterator<String> iterator = dd.diffs.keySet().iterator();
+				while (iterator.hasNext()) {
+					dd.selected = iterator.next();
+				}
+			} finally {
+				r.close();
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+	
+	public void enableMapFile(MapDiff md, String df) {
+		boolean enable = !md.baseName.equals(df);
+		Set<String> ks = md.diffs.keySet();
+		for(String s : ks) {
+			String fp = md.diffs.get(s).getAbsolutePath();
+			if(!enable) {
+				if(!md.disabled.contains(fp)) {
+					closeBinaryMapFile(fp);
+					md.disabled.add(fp);
+				}
+			} else {
+				if(md.disabled.contains(fp)) {
+					initBinaryMapFile(fp);
+					md.disabled.remove(fp);
+				}
+			}
+			enable = enable && !s.equals(df); 
+		}
+		md.selected = df;
+		
+	}
+	
+	public MapDiff getMapDiffs(double lat, double lon) {
+		for(MapDiff md : diffs.values()) {
+			if(md.bounds != null && md.bounds.top > lat && md.bounds.bottom < lat && 
+					md.bounds.left < lon && md.bounds.right > lon) {
+				return md;
+			}
+		}
+		return null;
 	}
 
 
