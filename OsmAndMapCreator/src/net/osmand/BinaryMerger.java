@@ -2,6 +2,8 @@ package net.osmand;
 
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.text.Collator;
@@ -16,6 +18,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 import org.apache.commons.logging.Log;
 import org.sqlite.core.CoreDatabaseMetaData.PrimaryKeyFinder;
@@ -33,6 +37,7 @@ import net.osmand.data.preparation.BinaryFileReference;
 import net.osmand.data.preparation.BinaryMapIndexWriter;
 import net.osmand.data.preparation.address.IndexAddressCreator;
 import net.osmand.osm.edit.Node;
+import net.osmand.util.Algorithms;
 
 import com.google.protobuf.CodedOutputStream;
 import com.google.protobuf.WireFormat;
@@ -61,11 +66,34 @@ public class BinaryMerger {
 			return;
 		}
 		List<File> parts = new ArrayList<File>();
+		List<File> toDelete = new ArrayList<File>();
 		for (int i = 1; i < args.length; i++) {
 			File file = new File(args[i]);
-			parts.add(file);
+			if(file.getName().endsWith(".zip")) {
+				File tmp = File.createTempFile(file.getName(), "obf");
+				ZipInputStream zis = new ZipInputStream(new FileInputStream(file));
+				ZipEntry ze;
+				while((ze = zis.getNextEntry()) != null) {
+					String name = ze.getName();
+					if(!ze.isDirectory() && name.endsWith(".obf")) {
+						FileOutputStream fout = new FileOutputStream(tmp);
+						Algorithms.streamCopy(zis, fout);
+						fout.close();
+						parts.add(tmp);
+					}
+				}
+				zis.close();
+				tmp.deleteOnExit();
+				toDelete.add(tmp);
+				
+			} else {
+				parts.add(file);
+			}
 		}
 		combineParts(new File(args[0]), parts);
+		for(File f : toDelete) {
+			f.delete();
+		}
 	}
 
 	public static final void writeInt(CodedOutputStream ous, int v) throws IOException {
