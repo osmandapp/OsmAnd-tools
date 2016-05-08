@@ -6,4 +6,7 @@
 
 # Pass full paths to route_tests.xml files. All routing.xml configuration should be configured by OsmAndMapCreator
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
-java -Djava.util.logging.config.file=logging.properties -Xms64M -Xmx512M -cp "$DIR/OsmAndMapCreator.jar:$DIR/lib/OsmAnd-core.jar:$DIR/lib/*.jar" net.osmand.MainUtilities $@
+if [ -z "$JAVA_OPTS" ]; then 
+	JAVA_OPTS="-Xms64M -Xmx512M"
+fi
+java -Djava.util.logging.config.file=logging.properties $JAVA_OPTS -cp "$DIR/OsmAndMapCreator.jar:$DIR/lib/OsmAnd-core.jar:$DIR/lib/*.jar" net.osmand.MainUtilities $@
