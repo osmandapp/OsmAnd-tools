@@ -46,6 +46,7 @@ import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.ButtonGroup;
 import javax.swing.JButton;
+import javax.swing.JCheckBox;
 import javax.swing.JCheckBoxMenuItem;
 import javax.swing.JFrame;
 import javax.swing.JMenu;
@@ -214,7 +215,6 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 	}
 
 	public void applySettings() {
-		DataExtractionSettings settings = DataExtractionSettings.getSettings();
 		for (MapPanelLayer layer: layers) {
 			layer.applySettings();
 		}
@@ -496,19 +496,31 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 				JPanel vertLayout = new JPanel(); //$NON-NLS-1$
 				vertLayout.setLayout(new BoxLayout(vertLayout, BoxLayout.Y_AXIS));
 				vertLayout.setOpaque(false);
-				JButton downloadDiffs = new JButton("Download live " + (md.diffs.size() == 0 ? md.baseName : ""));
+				JCheckBox ch = new JCheckBox(md.baseName);
+				ch.setSelected(md.enableBaseMap);
+				ch.addActionListener(new ActionListener() {
+					@Override
+					public void actionPerformed(ActionEvent e) {
+						nativeLibRendering.enableBaseFile(md, !md.enableBaseMap);
+						vectorRedraw();
+					}
+				});
+				ch.setAlignmentX(Component.RIGHT_ALIGNMENT);
+				vertLayout.add(ch);
+				JButton downloadDiffs = new JButton("Download live");
 				downloadDiffs.addActionListener(new ActionListener() {
 					@Override
 					public void actionPerformed(ActionEvent e) {
 						downloadDiffs(g, md);
 					}
 				});
+				downloadDiffs.setAlignmentX(Component.RIGHT_ALIGNMENT);
 				vertLayout.add(downloadDiffs);
 				if (md.diffs.size() > 0) {
 					ButtonGroup bG = new ButtonGroup();
-					addButton(bG, md.baseName, vertLayout, md);
+					addButton(bG, md.baseName, vertLayout, md, "base");
 					for (String s : md.diffs.keySet()) {
-						addButton(bG, s, vertLayout, md);
+						addButton(bG, s, vertLayout, md, null);
 					}
 				}
 				diffButton.add(vertLayout);
@@ -566,26 +578,30 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 	}
 
 
-	private void addButton(ButtonGroup bG, final String s, JPanel parent, final MapDiff md) {
+	private void addButton(ButtonGroup bG, final String s, JPanel parent, final MapDiff md, String name) {
 		boolean selected = s.equals(md.selected);
-		JRadioButton m = new JRadioButton(s.replace('_', ' '));
+		JRadioButton m = new JRadioButton(name == null ? s.replace('_', ' ') : name);
 		bG.add(m);
-		m.setAlignmentX(Component.LEFT_ALIGNMENT);
+		m.setAlignmentX(Component.RIGHT_ALIGNMENT);
 		parent.add(m);
 		m.addActionListener(new ActionListener() {
 			
 			@Override
 			public void actionPerformed(ActionEvent e) {
 				nativeLibRendering.enableMapFile(md, s);
-				lastAddedRunnable = null;
-				prepareImage();
-				repaint();
+				vectorRedraw();
 			}
+			
 		});
 		m.setSelected(selected);
 	}
 
-
+	private void vectorRedraw() {
+		lastAddedRunnable = null;
+		prepareImage();
+		repaint();
+	}
+	
 	public File getTilesLocation() {
 		return tilesLocation;
 	}

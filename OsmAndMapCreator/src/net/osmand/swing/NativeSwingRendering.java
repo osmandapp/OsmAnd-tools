@@ -61,6 +61,7 @@ public class NativeSwingRendering extends NativeLibrary {
 		QuadRect bounds;
 		Map<String, File> diffs = new TreeMap<String, File>();
 		Set<String> disabled = new TreeSet<String>();
+		boolean enableBaseMap = true; 
 		String selected;
 		public long timestamp; 
 	}
@@ -369,6 +370,20 @@ public class NativeSwingRendering extends NativeLibrary {
 			}
 		} catch (IOException e) {
 			e.printStackTrace();
+		}
+	}
+	
+	public void enableBaseFile(MapDiff m, boolean enable) {
+		if(enable) {
+			if(!m.enableBaseMap) {
+				initBinaryMapFile(m.baseFile.getAbsolutePath());
+				m.enableBaseMap = true;
+			}
+		} else {
+			if(m.enableBaseMap) {
+				closeBinaryMapFile(m.baseFile.getAbsolutePath());
+				m.enableBaseMap = false;
+			}
 		}
 	}
 	
