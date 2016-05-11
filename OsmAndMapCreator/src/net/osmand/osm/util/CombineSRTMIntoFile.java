@@ -120,9 +120,10 @@ public class CombineSRTMIntoFile {
 		int leftLon = (int) Math.floor(qr.left);
 		int bottomLat = (int) Math.floor(qr.bottom);
 		int topLat = (int) Math.floor(qr.top);
+		boolean onetile = leftLon == rightLon && bottomLat == topLat;
 		for(int lon = leftLon; lon <= rightLon; lon++) {
 			for(int lat = bottomLat; lat <= topLat; lat++) {
-				boolean isOut = !polygon.containsPoint(lat + 0.5, lon + 0.5);
+				boolean isOut = !polygon.containsPoint(lat + 0.5, lon + 0.5) && !onetile;
 				if (isOut) {
 					LatLon bl = new LatLon(lat, lon);
 					LatLon br = new LatLon(lat, lon + 1);
