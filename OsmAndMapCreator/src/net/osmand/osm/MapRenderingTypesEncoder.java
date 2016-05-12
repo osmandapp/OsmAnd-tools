@@ -35,16 +35,17 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	private Map<String, List<EntityConvert>> convertTags = new HashMap<String, List<EntityConvert>>();
 	private MapRulType coastlineRuleType;
 	private String regionName;
+	public static final String OSMAND_REGION_NAME_TAG = "osmand_region_name";
 
 
 	public MapRenderingTypesEncoder(String fileName, String regionName) {
 		super(fileName != null && fileName.length() == 0 ? null : fileName);
-		this.regionName = "$" + regionName.toLowerCase();
+		this.regionName = "$" + regionName.toLowerCase() + "^";
 	}
 
 	public MapRenderingTypesEncoder(String regionName) {
 		super(null);
-		this.regionName = "$" + regionName.toLowerCase();
+		this.regionName = "$" + regionName.toLowerCase() + "^";
 	}
 
 
@@ -637,8 +638,14 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		boolean empty = ec.ifRegionName.isEmpty();
 		if (!empty) {
 			boolean found = false;
+			String rg = tags.get(OSMAND_REGION_NAME_TAG);
+			if(Algorithms.isEmpty(rg)) {
+				rg = regionName;
+			} else {
+				rg = "$" + rg + "^";
+			}
 			for (String s : ec.ifRegionName) {
-				if (regionName.contains(s)) {
+				if (rg.contains(s)) {
 					found = true;
 					break;
 				}
@@ -648,7 +655,13 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			}
 		}
 		for (String s : ec.ifNotRegionName) {
-			if (regionName.contains(s)) {
+			String rg = tags.get(OSMAND_REGION_NAME_TAG);
+			if(Algorithms.isEmpty(rg)) {
+				rg = regionName;
+			} else {
+				rg = "$" + rg + "^";
+			}
+			if (rg.contains(s)) {
 				return false;
 			}
 		}

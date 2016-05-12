@@ -105,7 +105,8 @@ public class MainUtilities {
 	private static void printSynopsys() {
 		System.out.println("This utility provides access to all other console utilities of OsmAnd,");
 		System.out.println("each utility has own argument list and own synopsys. Here is the list:");
-		System.out.println("\t\t merge-address-index output_file.obf [input_file.obf] ...: merges all obf files and merges address structure into 1");
+		System.out.println("\t\t generate-obf <path to osm file>: simple way to generate obf file in place. "
+				+ "\t\t\t	Another supported options generate-map, generate-address, generate-poi, generate-roads (generate obf partially)");
 		System.out.println("\t\t check-ocean-tile <lat> <lon> <zoom=11>: checks ocean or land tile is in bz2 list");
 		System.out.println("\t\t generate-ocean-tile <coastline osm file> <optional output file>: creates ocean tiles 12 zoom");
 		System.out.println("\t\t generate-java-style <pathtostyle> <pathtooutputfolder>: prints rendering style as java interpreted code");
@@ -115,7 +116,6 @@ public class MainUtilities {
 		System.out.println("\t\t delete-unused-strings <path to repos/android/OsmAnd/res>: deletes unused translation in git repository (transforms all strings.xml)");
 		System.out.println("\t\t extract-roads-only <path to full map obf file> : extracts .road.obf (road-only map) file from full .obf");
 		System.out.println("\t\t generate-ocean-tile-osm <optional path to osm file to write> <optional path to oceantiles_12.dat file>: generates ocean tiles osm file to check in JOSM ");
-		System.out.println("\t\t generate-obf <path to osm file>: simple way to generate obf file in place. "
-				+ "\t\t\t	Another supported options generate-map, generate-address, generate-poi, generate-roads (generate obf partially)");
+		System.out.println("\t\t merge-address-index output_file.obf [input_file.obf] ...: merges all obf files and merges address structure into 1");
 	}
 }
