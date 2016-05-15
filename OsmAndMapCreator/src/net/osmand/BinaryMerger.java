@@ -1,15 +1,10 @@
 package net.osmand;
 
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.RandomAccessFile;
+import java.io.*;
 import java.text.Collator;
 import java.text.MessageFormat;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -22,7 +17,6 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 import org.apache.commons.logging.Log;
-import org.sqlite.core.CoreDatabaseMetaData.PrimaryKeyFinder;
 
 import net.osmand.binary.BinaryIndexPart;
 import net.osmand.binary.BinaryMapAddressReaderAdapter;
@@ -69,11 +63,11 @@ public class BinaryMerger {
 		List<File> toDelete = new ArrayList<File>();
 		for (int i = 1; i < args.length; i++) {
 			File file = new File(args[i]);
-			if(file.getName().endsWith(".zip")) {
+			if (file.getName().endsWith(".zip")) {
 				File tmp = File.createTempFile(file.getName(), "obf");
 				ZipInputStream zis = new ZipInputStream(new FileInputStream(file));
 				ZipEntry ze;
-				while((ze = zis.getNextEntry()) != null) {
+				while ((ze = zis.getNextEntry()) != null) {
 					String name = ze.getName();
 					if(!ze.isDirectory() && name.endsWith(".obf")) {
 						FileOutputStream fout = new FileOutputStream(tmp);
@@ -91,7 +85,7 @@ public class BinaryMerger {
 			}
 		}
 		combineParts(new File(args[0]), parts);
-		for(File f : toDelete) {
+		for (File f : toDelete) {
 			f.delete();
 		}
 	}
@@ -104,7 +98,41 @@ public class BinaryMerger {
 		//written += 4;
 	}
 
-	public static void combineAddressIndex(String name, BinaryMapIndexWriter writer, AddressRegion[] addressRegions, BinaryMapIndexReader[] indexes)
+	private static <S> City getKeyByKeyValue(Map<City, S> map, City key) {
+		City found = key;
+		for (City i : map.keySet())
+			if (i.compareTo(key) == 0)
+				found = i;
+		return found;
+	}
+
+//	private static void addRegionToCityName(Map<City, BinaryMapIndexReader> cityMap, City city) {
+//		city.setName(city.getName() + " (" + cityMap.get(city).getRegionNames().get(0) + ")");
+//	}
+
+	private static void addRegionToCityName(City city, BinaryMapIndexReader index) {
+		String region = index.getRegionNames().get(0).split("_")[1];
+		region = region.substring(0, 1).toUpperCase() + region.substring(1);
+		city.setName(city.getName() + " (" + region + ")");
+	}
+
+	private static void renameDuplicates(Map<City, BinaryMapIndexReader> cityMap, City city, BinaryMapIndexReader index) {
+		if (cityMap.containsKey(city) && cityMap.get(city) != index) {
+//						citiesMap.remove(city);
+//						assert Boolean.TRUE;
+			City duplicate = getKeyByKeyValue(cityMap, city);
+			addRegionToCityName(duplicate, cityMap.get(duplicate));
+			addRegionToCityName(city, index);
+		}
+	}
+
+	private static void removeDuplicates(Map<City, BinaryMapIndexReader> cityMap, City city) {
+		if (cityMap.containsKey(city)) {
+			cityMap.remove(city);
+		}
+	}
+
+	private static void combineAddressIndex(String name, BinaryMapIndexWriter writer, AddressRegion[] addressRegions, BinaryMapIndexReader[] indexes)
 			throws IOException {
 		Set<String> attributeTagsTableSet = new TreeSet<String>();
 		for (int i = 0; i != addressRegions.length; i++) {
@@ -122,19 +150,23 @@ public class BinaryMerger {
 			tagRules.put(it.next(), it.previousIndex());
 		}
 		for (int type : BinaryMapAddressReaderAdapter.CITY_TYPES) {
-			Map<City, BinaryMapIndexReader> citiesMap = new TreeMap<City, BinaryMapIndexReader>();
+			Map<City, BinaryMapIndexReader> cityMap = new TreeMap<City, BinaryMapIndexReader>();
 			for (int i = 0; i < addressRegions.length; i++) {
 				AddressRegion region = addressRegions[i];
 				final BinaryMapIndexReader index = indexes[i];
-				for (City city : index.getCities(region, null, type)) {
-					if (citiesMap.containsKey(city)) {
-						citiesMap.remove(city);
+				if (type == BinaryMapAddressReaderAdapter.CITY_TOWN_TYPE) {
+					for (City city : index.getCities(region, null, type)) {
+						renameDuplicates(cityMap, city, index);
+						cityMap.put(city, index);
 					}
-					citiesMap.put(city, index);
+				} else {
+					for (City city : index.getCities(region, null, type)) {
+						removeDuplicates(cityMap, city);
+						cityMap.put(city, index);
+					}
 				}
 			}
-			List<City> cities = new ArrayList<City>();
-			cities.addAll(citiesMap.keySet());
+			List<City> cities = new ArrayList<City>(cityMap.keySet());
 			List<BinaryFileReference> refs = new ArrayList<BinaryFileReference>();
 			// 1. write cities
 			writer.startCityBlockIndex(type);
@@ -145,7 +177,7 @@ public class BinaryMerger {
 			for (int i = 0; i != refs.size(); i++) {
 				BinaryFileReference ref = refs.get(i);
 				City city = cities.get(i);
-				BinaryMapIndexReader rindex = citiesMap.get(city);
+				BinaryMapIndexReader rindex = cityMap.get(city);
 				rindex.preloadStreets(city, null);
 				List<Street> streets = new ArrayList<Street>(city.getStreets());
 				Map<Street, List<Node>> streetNodes = new LinkedHashMap<Street, List<Node>>();
