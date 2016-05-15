@@ -127,7 +127,7 @@ public class BinaryMerger {
 				AddressRegion region = addressRegions[i];
 				final BinaryMapIndexReader index = indexes[i];
 				for (City city : index.getCities(region, null, type)) {
-					if(citiesMap.containsKey(city)) {
+					if (citiesMap.containsKey(city)) {
 						citiesMap.remove(city);
 					}
 					citiesMap.put(city, index);
@@ -152,13 +152,11 @@ public class BinaryMerger {
 				for (Street street : streets) {
 					rindex.preloadBuildings(street, null);
 					ArrayList<Node> nns = new ArrayList<Node>();
-					for(Street is : street.getIntersectedStreets()) {
+					for (Street is : street.getIntersectedStreets()) {
 						double lat = is.getLocation().getLatitude();
 						double lon = is.getLocation().getLongitude();
 						long id = (Float.floatToIntBits((float) lat) << 32) | Float.floatToIntBits((float) lon); 
-						Node nn = 
-								new Node(is.getLocation().getLatitude(),
-										is.getLocation().getLongitude(), id);
+						Node nn = new Node(is.getLocation().getLatitude(), is.getLocation().getLongitude(), id);
 						nns.add(nn);
 					}
 					streetNodes.put(street, nns);
