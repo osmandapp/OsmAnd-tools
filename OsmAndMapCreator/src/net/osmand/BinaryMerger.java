@@ -51,6 +51,7 @@ public class BinaryMerger {
 			System.out.println("[output file] [input files]");
 			return;
 		}
+		File outputFile = new File(args[0]);
 		List<File> parts = new ArrayList<File>();
 		List<File> toDelete = new ArrayList<File>();
 		for (int i = 1; i < args.length; i++) {
@@ -76,7 +77,12 @@ public class BinaryMerger {
 				parts.add(file);
 			}
 		}
-		combineParts(new File(args[0]), parts);
+		if (outputFile.exists()) {
+			if (!outputFile.delete()) {
+				throw new IOException("Cannot delete file " + outputFile);
+			}
+		}
+		combineParts(outputFile, parts);
 		for (File f : toDelete) {
 			f.delete();
 		}
