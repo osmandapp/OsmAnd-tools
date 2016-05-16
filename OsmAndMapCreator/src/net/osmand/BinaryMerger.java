@@ -104,10 +104,6 @@ public class BinaryMerger {
 		return found;
 	}
 
-//	private static void addRegionToCityName(Map<City, BinaryMapIndexReader> cityMap, City city) {
-//		city.setName(city.getName() + " (" + cityMap.get(city).getRegionNames().get(0) + ")");
-//	}
-
 	private static void addRegionToCityName(City city, BinaryMapIndexReader index) {
 		String region = index.getRegionNames().get(0).split("_")[1];
 		region = region.substring(0, 1).toUpperCase() + region.substring(1);
@@ -131,26 +127,8 @@ public class BinaryMerger {
 		}
 	}
 
-	private static void renameDuplicates(Map<City, BinaryMapIndexReader> cityMap, City city, BinaryMapIndexReader index) {
-		if (cityMap.containsKey(city) && cityMap.get(city) != index) {
-//						citiesMap.remove(city);
-//						assert Boolean.TRUE;
-			City duplicate = getKeyByKeyValue(cityMap, city);
-			addRegionToCityName(duplicate, cityMap.get(duplicate));
-			addRegionToCityName(city, index);
-		}
-	}
-
 	private static void renameDuplicate(Map<City, BinaryMapIndexReader> cityMap, City city) {
-//		City duplicate = getKeyByKeyValue(cityMap, city);
-		City duplicate = city;
-		addRegionToCityName(duplicate, cityMap.get(duplicate));
-	}
-
-	private static void removeDuplicates(Map<City, BinaryMapIndexReader> cityMap, City city) {
-		if (cityMap.containsKey(city)) {
-			cityMap.remove(city);
-		}
+		addRegionToCityName(city, cityMap.get(city));
 	}
 
 	private static void combineAddressIndex(String name, BinaryMapIndexWriter writer, AddressRegion[] addressRegions, BinaryMapIndexReader[] indexes)
@@ -170,56 +148,17 @@ public class BinaryMerger {
 		while (it.hasNext()) {
 			tagRules.put(it.next(), it.previousIndex());
 		}
-//		for (int type : Arrays.asList(BinaryMapAddressReaderAdapter.CITY_TOWN_TYPE)) {
-//		for (int type : Collections.singletonList(BinaryMapAddressReaderAdapter.CITY_TOWN_TYPE)) {
-//		for (int type : Collections.singletonList(BinaryMapAddressReaderAdapter.VILLAGES_TYPE)) {
-//		for (int type : Collections.singletonList(BinaryMapAddressReaderAdapter.POSTCODES_TYPE)) {
 		for (int type : BinaryMapAddressReaderAdapter.CITY_TYPES) {
 			Map<City, BinaryMapIndexReader> cityMap = new HashMap<City, BinaryMapIndexReader>();
 			for (int i = 0; i < addressRegions.length; i++) {
 				AddressRegion region = addressRegions[i];
 				final BinaryMapIndexReader index = indexes[i];
 				for (City city : index.getCities(region, null, type)) {
-//					if (
-//							city.getId() != 337656071  // City [TOWN] Завалля
-////							city.getId() != 26150422   //
-//							&& city.getId() != 13272151   // City [CITY] Київ
-//							&& city.getId() != 26150422   // City [CITY] Київ
-////							&& city.getId() != 337656071  // City [TOWN] Завалля
-//							&& city.getId() != 337520861  // Illegal offset 6178006 while reading City [TOWN] Коцюбинське (id: 337520861)
-////							&& city.getId() != -75887     // Illegal offset 7799446 while reading Postcode : 01001 (id: -75887)
-////							&& city.getId() != -75889     // Illegal offset 7807800 while reading Postcode : 01004 (id: -75889)
-////							&& city.getId() != -75968     // Illegal offset 7812239 while reading Postcode : 01008 (id: -75968)
-////							&& city.getId() != -75861     // Illegal offset 7812761 while reading Postcode : 01010 (id: -75861)
-////							&& city.getId() != -76004     // Illegal offset 7813331 while reading Postcode : 01011 (id: -76004)
-////							&& city.getId() != -75954     // Illegal offset 7813863 while reading Postcode : 01015 (id: -75954)
-////							&& city.getId() != -75969     // Illegal offset 7814277 while reading Postcode : 01021 (id: -75969)
-////							&& city.getId() != -76001     // Illegal offset 7815493 while reading Postcode : 01023 (id: -76001)
-////							&& city.getId() != -75957     // Illegal offset 7815724 while reading Postcode : 01024 (id: -75957)
-////							&& city.getId() != -75894     // Illegal offset 7816050 while reading Postcode : 01030 (id: -75894)
-////							&& city.getId() != -75915     // Illegal offset 7820090 while reading Postcode : 01032 (id: -75915)
-////							&& city.getId() != -75937     // Illegal offset 7822317 while reading Postcode : 01033 (id: -75937)
-//							&& city.getId() != 337554753  // Illegal offset 4187222 while reading City [VILLAGE] Іванівка (id: 337554753)
-//							) {
 						if (cityMap.containsKey(city)) {
 							cityMap.remove(city);
 						}
 						cityMap.put(city, index);
-//					} else {
-//						cityMap.put(city, index);
-//					}
 				}
-//				if (type == BinaryMapAddressReaderAdapter.CITY_TOWN_TYPE) {
-//					for (City city : index.getCities(region, null, type)) {
-//						renameDuplicates(cityMap, city, index);
-//						cityMap.put(city, index);
-//					}
-//				} else {
-//					for (City city : index.getCities(region, null, type)) {
-//						removeDuplicates(cityMap, city);
-//						cityMap.put(city, index);
-//					}
-//				}
 			}
 			List<City> cities = new ArrayList<City>(cityMap.keySet());
 			Collections.sort(cities);
