@@ -8,6 +8,7 @@ import java.util.*;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
+import net.osmand.util.MapUtils;
 import org.apache.commons.logging.Log;
 
 import net.osmand.binary.BinaryIndexPart;
@@ -102,25 +103,82 @@ public class BinaryMerger {
 		city.setName(city.getName() + " (" + region + ")");
 	}
 
-	private static void renameDuplicates(Map<City, BinaryMapIndexReader> cityMap, List<City> cities) {
-		City prevCity = new City(City.CityType.CITY);
-		boolean duplicates = false;
-		for (City city : cities) {
-			if (city.compareToByNames(prevCity) == 0) {
-				duplicates = true;
-				renameDuplicate(cityMap, prevCity);
-			} else {
-				if (duplicates) {
-					renameDuplicate(cityMap, prevCity);
+	private static Map<String, List<City>> getNamesakes(Map<City, BinaryMapIndexReader> cityMap) {
+		Map<String, List<City>> result = new TreeMap<>(OsmAndCollator.primaryCollator());
+		List<City> cities = new ArrayList<>(cityMap.keySet());
+		Collections.sort(cities, MapObject.comparator);
+		for (int i = 1; i != cities.size(); i++) {
+			if (MapObject.comparator.compare(cities.get(i - 1), cities.get(i)) == 0) {
+				String name = cities.get(i).getName();
+				if (result.containsKey(name)) {
+//					List<City> dups = result.get(name);
+//					dups.add(cities.get(i));
+					result.get(name).add(cities.get(i));
+				} else {
+					result.put(name, new ArrayList<City>(Arrays.asList(cities.get(i - 1), cities.get(i))));
 				}
-				duplicates = false;
 			}
-			prevCity = city;
 		}
+		return result;
 	}
 
-	private static void renameDuplicate(Map<City, BinaryMapIndexReader> cityMap, City city) {
+	private static void renameNamesakes(Map<City, BinaryMapIndexReader> cityMap, City city) {
 		addRegionToCityName(city, cityMap.get(city));
+	}
+
+	private static boolean isSameCity(City namesake0, City namesake1) {
+		double sameCityDistance = 1000;
+		return MapUtils.getDistance(namesake0.getLocation(), namesake1.getLocation()) < sameCityDistance;
+	}
+
+	/**
+	 * @param cityMap
+	 * @param namesakes
+	 * @return City, that was merged to bigger namesake city, or null.
+	 */
+	private static City mergeTwoNamesakes(Map<City, BinaryMapIndexReader> cityMap, List<City> namesakes) throws IOException {
+		for (int i = 0; i != namesakes.size() - 1; i++) {
+			for (int j = i + 1; j != namesakes.size(); j++) {
+				City city0 = namesakes.get(i);
+				City city1 = namesakes.get(j);
+				if (isSameCity(city0, city1)) {
+					cityMap.get(city0).preloadStreets(city0, null);
+					cityMap.get(city1).preloadStreets(city1, null);
+					if (city1.getStreets().size() >= city0.getStreets().size()) {
+						City tmp = city0;
+						city0 = city1;
+						city1 = tmp;
+					}
+					city0.getStreets().addAll(city1.getStreets());
+					city0.copyNames(city1);
+					return city1;
+				}
+			}
+		}
+		return null;
+	}
+
+	private static List<City> mergeNamesakes(Map<City, BinaryMapIndexReader> cityMap, List<City> namesakes) throws IOException {
+		List<City> result = new ArrayList<>(namesakes);
+		City removedCity;
+		do {
+			removedCity = mergeTwoNamesakes(cityMap, namesakes);
+			namesakes.remove(removedCity);
+			result.remove(removedCity);
+			cityMap.remove(removedCity);
+		} while (removedCity != null);
+		return result;
+	}
+
+	private static void reduceNamesakes(Map<City, BinaryMapIndexReader> cityMap, Map<String, List<City>> namesakesMap, boolean rename) throws IOException {
+		for (List<City> namesakes : namesakesMap.values()) {
+			namesakes = mergeNamesakes(cityMap, namesakes);
+			if (rename && namesakes.size() > 1) {
+				for (City city : namesakes) {
+					renameNamesakes(cityMap, city);
+				}
+			}
+		}
 	}
 
 	private static void combineAddressIndex(String name, BinaryMapIndexWriter writer, AddressRegion[] addressRegions, BinaryMapIndexReader[] indexes)
@@ -152,11 +210,10 @@ public class BinaryMerger {
 					cityMap.put(city, index);
 				}
 			}
+			Map<String, List<City>> namesakes = getNamesakes(cityMap);
+			reduceNamesakes(cityMap, namesakes, (type == BinaryMapAddressReaderAdapter.CITY_TOWN_TYPE));
 			List<City> cities = new ArrayList<City>(cityMap.keySet());
-			Collections.sort(cities);
-			if (type == BinaryMapAddressReaderAdapter.CITY_TOWN_TYPE) {
-				renameDuplicates(cityMap, cities);
-			}
+			Collections.sort(cities, MapObject.comparator);
 			List<BinaryFileReference> refs = new ArrayList<BinaryFileReference>();
 			// 1. write cities
 			writer.startCityBlockIndex(type);
