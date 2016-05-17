@@ -1,22 +1,31 @@
 package net.osmand;
 
 
-import java.io.*;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.text.Collator;
 import java.text.MessageFormat;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.ListIterator;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
-
-import net.osmand.util.MapUtils;
-import org.apache.commons.logging.Log;
 
 import net.osmand.binary.BinaryIndexPart;
 import net.osmand.binary.BinaryMapAddressReaderAdapter;
 import net.osmand.binary.BinaryMapAddressReaderAdapter.AddressRegion;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.OsmandOdb;
-import net.osmand.data.Building;
 import net.osmand.data.City;
 import net.osmand.data.MapObject;
 import net.osmand.data.Street;
@@ -25,6 +34,9 @@ import net.osmand.data.preparation.BinaryMapIndexWriter;
 import net.osmand.data.preparation.address.IndexAddressCreator;
 import net.osmand.osm.edit.Node;
 import net.osmand.util.Algorithms;
+import net.osmand.util.MapUtils;
+
+import org.apache.commons.logging.Log;
 
 import com.google.protobuf.CodedOutputStream;
 import com.google.protobuf.WireFormat;
@@ -97,7 +109,7 @@ public class BinaryMerger {
 		//written += 4;
 	}
 
-	private static void addRegionToCityName(City city, BinaryMapIndexReader index) {
+	private void addRegionToCityName(City city, BinaryMapIndexReader index) {
 		String region = index.getRegionNames().get(0).split("_")[1];
 		region = region.substring(0, 1).toUpperCase() + region.substring(1);
 		city.setName(city.getName() + " (" + region + ")");
@@ -108,7 +120,7 @@ public class BinaryMerger {
 		return MapUtils.getDistance(namesake0.getLocation(), namesake1.getLocation()) < sameCityDistance;
 	}
 
-	private static void combineAddressIndex(String name, BinaryMapIndexWriter writer, AddressRegion[] addressRegions, BinaryMapIndexReader[] indexes)
+	private void combineAddressIndex(String name, BinaryMapIndexWriter writer, AddressRegion[] addressRegions, BinaryMapIndexReader[] indexes)
 			throws IOException {
 		Set<String> attributeTagsTableSet = new TreeSet<String>();
 		for (int i = 0; i != addressRegions.length; i++) {
@@ -120,7 +132,6 @@ public class BinaryMerger {
 		attributeTagsTable.addAll(attributeTagsTableSet);
 		Map<String, Integer> tagRules = new HashMap<String, Integer>();
 		Map<String, List<MapObject>> namesIndex = new TreeMap<String, List<MapObject>>(Collator.getInstance());
-		Map<String, City> postcodes = new TreeMap<String, City>();
 		ListIterator<String> it = attributeTagsTable.listIterator();
 		while (it.hasNext()) {
 			tagRules.put(it.next(), it.previousIndex());
@@ -138,7 +149,9 @@ public class BinaryMerger {
 				}
 			}
 			List<City> cities = new ArrayList<City>(cityMap.keySet());
+			Map<City, List<City>> mergeCityGroup = new HashMap<City, List<City>>();
 			Collections.sort(cities, MapObject.BY_NAME_COMPARATOR);
+			mergeCitiesByNameDistance(cities, mergeCityGroup, cityMap, type == BinaryMapAddressReaderAdapter.CITY_TOWN_TYPE);
 			List<BinaryFileReference> refs = new ArrayList<BinaryFileReference>();
 			// 1. write cities
 			writer.startCityBlockIndex(type);
@@ -146,104 +159,107 @@ public class BinaryMerger {
 				int cityType = city.isPostcode() ? BinaryMapAddressReaderAdapter.POSTCODES_TYPE : city.getType().ordinal();
 				refs.add(writer.writeCityHeader(city, cityType, tagRules));
 			}
-			List<List<City>> namesakes = new ArrayList<List<City>>();
-			String namesakesName = null;
 			Map<City, Map<Street, List<Node>>> namesakesStreetNodes = new HashMap<City, Map<Street, List<Node>>>();
-			for (int i = 0; i != refs.size(); i++) {
+			for (int i = 0; i < refs.size(); i++) {
 				BinaryFileReference ref = refs.get(i);
 				City city = cities.get(i);
-
-				if (!city.getName().equals(namesakesName)) {
-					boolean rename = (type == BinaryMapAddressReaderAdapter.CITY_TOWN_TYPE) && (namesakes.size() > 1);
-					for (List<City> namesakeGroup : namesakes) {
-						City mainCity = namesakeGroup.get(0);
-						for (City namesake : namesakeGroup.subList(1, namesakeGroup.size())) {
-							mainCity.mergeWith(namesake);
-							namesakesStreetNodes.get(mainCity).putAll(namesakesStreetNodes.get(namesake));
-							city.getStreets().clear();
-						}
-						if (rename) {
-							addRegionToCityName(mainCity, cityMap.get(mainCity));
-						}
-
-						List<Street> streets = new ArrayList<Street>(mainCity.getStreets());
-						Map<Street, List<Node>> streetNodes = namesakesStreetNodes.get(mainCity);
-						writer.writeCityIndex(mainCity, streets, streetNodes, ref, tagRules);
-						IndexAddressCreator.putNamedMapObject(namesIndex, mainCity, ref.getStartPointer());
-						mainCity.getStreets().clear();
-						// register postcodes and name index
-						for (Street s : streets) {
-							IndexAddressCreator.putNamedMapObject(namesIndex, s, s.getFileOffset());
-							for (Building b : s.getBuildings()) {
-								if (city.getPostcode() != null && b.getPostcode() == null) {
-									b.setPostcode(city.getPostcode());
-								}
-								if (b.getPostcode() != null) {
-									if (!postcodes.containsKey(b.getPostcode())) {
-										City p = City.createPostcode(b.getPostcode());
-										p.setLocation(b.getLocation().getLatitude(), b.getLocation().getLongitude());
-										postcodes.put(b.getPostcode(), p);
-									}
-									City post = postcodes.get(b.getPostcode());
-									Street newS = post.getStreetByName(s.getName());
-									if (newS == null) {
-										newS = new Street(post);
-										newS.copyNames(s);
-										newS.setLocation(s.getLocation().getLatitude(), s.getLocation().getLongitude());
-										newS.setId(s.getId());
-										post.registerStreet(newS);
-									}
-									newS.addBuildingCheckById(b);
-								}
-							}
-						}
-					}
-
-					namesakesName = city.getName();
-					namesakes.clear();
-					namesakesStreetNodes.clear();
-				}
-
 				BinaryMapIndexReader rindex = cityMap.get(city);
-				rindex.preloadStreets(city, null);
-				boolean isDuplicate = false;
-				for (List<City> namesakeGroup : namesakes) {
-					City mainCity = namesakeGroup.get(0);
-					if (isSameCity(mainCity, city)) {
-						isDuplicate = true;
-						if (city.getStreets().size() > mainCity.getStreets().size()) {
-							namesakeGroup.add(0, city);
-						} else {
-							namesakeGroup.add(city);
-						}
-						break;
+				preloadStreetsAndBuildings(rindex, city, namesakesStreetNodes);
+				if (mergeCityGroup.containsKey(city)) {
+					for (City namesake : mergeCityGroup.get(city)) {
+						preloadStreetsAndBuildings(rindex, namesake, namesakesStreetNodes);
+						city.mergeWith(namesake);
+						namesakesStreetNodes.get(city).putAll(namesakesStreetNodes.get(namesake));
 					}
 				}
-				if (!isDuplicate) {
-					namesakes.add(new ArrayList<City>(Collections.singletonList(city)));
+
+				Map<Street, List<Node>> streetNodes = namesakesStreetNodes.get(city);
+				writer.writeCityIndex(city, city.getStreets(), streetNodes, ref, tagRules);
+				IndexAddressCreator.putNamedMapObject(namesIndex, city, ref.getStartPointer());
+				for (Street s : city.getStreets()) {
+					IndexAddressCreator.putNamedMapObject(namesIndex, s, s.getFileOffset());
 				}
-				Map<Street, List<Node>> streetNodes = new LinkedHashMap<Street, List<Node>>();
-				for (Street street : city.getStreets()) {
-					rindex.preloadBuildings(street, null);
-					ArrayList<Node> nns = new ArrayList<Node>();
-					for (Street is : street.getIntersectedStreets()) {
-						double lat = is.getLocation().getLatitude();
-						double lon = is.getLocation().getLongitude();
-						long id = (Float.floatToIntBits((float) lat) << 32) | Float.floatToIntBits((float) lon);
-						Node nn = new Node(is.getLocation().getLatitude(), is.getLocation().getLongitude(), id);
-						nns.add(nn);
-					}
-					streetNodes.put(street, nns);
-				}
-				namesakesStreetNodes.put(city, streetNodes);
+
+				city.getStreets().clear();
+				namesakesStreetNodes.clear();
 			}
+			
 			writer.endCityBlockIndex();
 		}
 		writer.writeAddressNameIndex(namesIndex);
 		writer.endWriteAddressIndex();
 	}
 
-	public static void combineParts(File fileToExtract, List<File> files) throws IOException {
+	private void mergeCitiesByNameDistance(List<City> orderedCities, Map<City, List<City>> mergeCityGroup, 
+			Map<City, BinaryMapIndexReader> cityMap, boolean rename) {
+		for(int i = 0; i < orderedCities.size(); i++) {
+			City oc = orderedCities.get(i);
+			boolean renameMain = false;
+			for(int j = i + 1; j < orderedCities.size(); ) {
+				City nc = orderedCities.get(j);
+				if(!nc.getName().equals(oc.getName())) {
+					break;
+				}
+				if(isSameCity(oc, nc)) {
+					if(!mergeCityGroup.containsKey(oc)) {
+						mergeCityGroup.put(oc, new ArrayList<City>());
+					}
+					mergeCityGroup.get(oc).add(nc);
+					orderedCities.remove(j);
+				} else {
+					if(rename) {
+						renameMain = true;
+						addRegionToCityName(nc, cityMap.get(nc));
+					}
+					j++;
+				}
+			}
+			if(renameMain) {
+				addRegionToCityName(oc, cityMap.get(oc));
+			}
+		}
+		
+	}
+
+	private void preloadStreetsAndBuildings(BinaryMapIndexReader rindex, City city,
+			Map<City, Map<Street, List<Node>>> namesakesStreetNodes) throws IOException {
+		rindex.preloadStreets(city, null);
+		Map<Street, List<Node>> streetNodes = new LinkedHashMap<Street, List<Node>>();
+		for (Street street : city.getStreets()) {
+			rindex.preloadBuildings(street, null);
+			ArrayList<Node> nns = new ArrayList<Node>();
+			for (Street is : street.getIntersectedStreets()) {
+				double lat = is.getLocation().getLatitude();
+				double lon = is.getLocation().getLongitude();
+				long id = (Float.floatToIntBits((float) lat) << 32) | Float.floatToIntBits((float) lon);
+				Node nn = new Node(is.getLocation().getLatitude(), is.getLocation().getLongitude(), id);
+				nns.add(nn);
+			}
+			streetNodes.put(street, nns);
+		}
+		namesakesStreetNodes.put(city, streetNodes);
+	}
+
+	private void processNamesakeGroup(BinaryMapIndexWriter writer, Map<String, Integer> tagRules,
+			Map<String, List<MapObject>> namesIndex, 
+			Map<City, BinaryMapIndexReader> cityMap, List<List<City>> namesakes,
+			Map<City, Map<Street, List<Node>>> namesakesStreetNodes, BinaryFileReference ref, boolean rename)
+			throws IOException {
+		for (List<City> namesakeGroup : namesakes) {
+			City mainCity = namesakeGroup.get(0);
+			for (City namesake : namesakeGroup.subList(1, namesakeGroup.size())) {
+				mainCity.mergeWith(namesake);
+				namesakesStreetNodes.get(mainCity).putAll(namesakesStreetNodes.get(namesake));
+			}
+			if (rename) {
+				addRegionToCityName(mainCity, cityMap.get(mainCity));
+			}
+
+			
+		}
+	}
+
+	public void combineParts(File fileToExtract, List<File> files) throws IOException {
 		BinaryMapIndexReader[] indexes = new BinaryMapIndexReader[files.size()];
 		RandomAccessFile[] rafs = new RandomAccessFile[files.size()];
 		long dateCreated = 0;
