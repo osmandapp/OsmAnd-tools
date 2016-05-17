@@ -96,14 +96,6 @@ public class BinaryMerger {
 		//written += 4;
 	}
 
-	private static <S> City getKeyByKeyValue(Map<City, S> map, City key) {
-		City found = key;
-		for (City i : map.keySet())
-			if (i.compareTo(key) == 0)
-				found = i;
-		return found;
-	}
-
 	private static void addRegionToCityName(City city, BinaryMapIndexReader index) {
 		String region = index.getRegionNames().get(0).split("_")[1];
 		region = region.substring(0, 1).toUpperCase() + region.substring(1);
@@ -154,10 +146,10 @@ public class BinaryMerger {
 				AddressRegion region = addressRegions[i];
 				final BinaryMapIndexReader index = indexes[i];
 				for (City city : index.getCities(region, null, type)) {
-						if (cityMap.containsKey(city)) {
-							cityMap.remove(city);
-						}
-						cityMap.put(city, index);
+					if (cityMap.containsKey(city)) {
+						cityMap.remove(city);
+					}
+					cityMap.put(city, index);
 				}
 			}
 			List<City> cities = new ArrayList<City>(cityMap.keySet());
