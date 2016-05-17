@@ -146,9 +146,9 @@ public class BinaryMerger {
 				int cityType = city.isPostcode() ? BinaryMapAddressReaderAdapter.POSTCODES_TYPE : city.getType().ordinal();
 				refs.add(writer.writeCityHeader(city, cityType, tagRules));
 			}
-			List<List<City>> namesakes = new ArrayList<>();
+			List<List<City>> namesakes = new ArrayList<List<City>>();
 			String namesakesName = null;
-			Map<City, Map<Street, List<Node>>> namesakesStreetNodes = new HashMap<>();
+			Map<City, Map<Street, List<Node>>> namesakesStreetNodes = new HashMap<City, Map<Street, List<Node>>>();
 			for (int i = 0; i != refs.size(); i++) {
 				BinaryFileReference ref = refs.get(i);
 				City city = cities.get(i);
