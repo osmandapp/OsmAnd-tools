@@ -231,7 +231,7 @@ public class BinaryMerger {
 			for (Street is : street.getIntersectedStreets()) {
 				double lat = is.getLocation().getLatitude();
 				double lon = is.getLocation().getLongitude();
-				long id = (Float.floatToIntBits((float) lat) << 32) | Float.floatToIntBits((float) lon);
+				long id = (((long)Float.floatToIntBits((float) lat) << 32)) | Float.floatToIntBits((float) lon);
 				Node nn = new Node(is.getLocation().getLatitude(), is.getLocation().getLongitude(), id);
 				nns.add(nn);
 			}
@@ -240,24 +240,6 @@ public class BinaryMerger {
 		namesakesStreetNodes.put(city, streetNodes);
 	}
 
-	private void processNamesakeGroup(BinaryMapIndexWriter writer, Map<String, Integer> tagRules,
-			Map<String, List<MapObject>> namesIndex, 
-			Map<City, BinaryMapIndexReader> cityMap, List<List<City>> namesakes,
-			Map<City, Map<Street, List<Node>>> namesakesStreetNodes, BinaryFileReference ref, boolean rename)
-			throws IOException {
-		for (List<City> namesakeGroup : namesakes) {
-			City mainCity = namesakeGroup.get(0);
-			for (City namesake : namesakeGroup.subList(1, namesakeGroup.size())) {
-				mainCity.mergeWith(namesake);
-				namesakesStreetNodes.get(mainCity).putAll(namesakesStreetNodes.get(namesake));
-			}
-			if (rename) {
-				addRegionToCityName(mainCity, cityMap.get(mainCity));
-			}
-
-			
-		}
-	}
 
 	public void combineParts(File fileToExtract, List<File> files) throws IOException {
 		BinaryMapIndexReader[] indexes = new BinaryMapIndexReader[files.size()];
