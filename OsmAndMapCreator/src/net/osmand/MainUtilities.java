@@ -28,17 +28,17 @@ public class MainUtilities {
 
 
 	public static void main(String[] args) throws Exception {
-		if(args.length == 0) {
+		if (args.length == 0) {
 			printSynopsys();
 		} else {
 			String utl = args[0];
 			List<String> subArgs = new  ArrayList<String>(Arrays.asList(args).subList(1, args.length));
 			String[] subArgsArray = subArgs.toArray(new String[args.length -1]);
-			if(utl.equals("check-ocean-tile")) {
+			if (utl.equals("check-ocean-tile")) {
 				OceanTilesCreator.checkOceanTile(subArgsArray);
-			} else if(utl.equals("merge-address-index")) {
+			} else if (utl.equals("merge-address-index")) {
 				BinaryMerger.main(subArgsArray);
-			} else if(utl.equals("generate-region-tags")) {
+			} else if (utl.equals("generate-region-tags")) {
 				GenerateRegionTags.main(subArgsArray);
 			} else if (utl.equals("generate-ocean-tile-osm")) {
 				OceanTilesCreator.createJOSMFile(subArgsArray);
@@ -60,31 +60,31 @@ public class MainUtilities {
 				ic.setIndexAddress(true);
 				ic.setLastModifiedDate(new File(subArgsArray[0]).lastModified());
 				generateObf(subArgsArray, ic);
-			} else if(utl.equals("generate-map")) {
+			} else if (utl.equals("generate-map")) {
 				IndexCreator ic = new IndexCreator(new File("."));
 				ic.setIndexMap(true);
 				ic.setLastModifiedDate(new File(subArgsArray[0]).lastModified());
 				generateObf(subArgsArray, ic);
-			} else if(utl.equals("generate-address")) {
+			} else if (utl.equals("generate-address")) {
 				IndexCreator ic = new IndexCreator(new File("."));
 				ic.setIndexAddress(true);
 				ic.setLastModifiedDate(new File(subArgsArray[0]).lastModified());
 				generateObf(subArgsArray, ic);
-			} else if(utl.equals("extract-roads-only")) {
+			} else if (utl.equals("extract-roads-only")) {
 				File mainFile = new File(subArgsArray[0]);
 				IndexUploader.extractRoadOnlyFile(
 						mainFile,
 						new File(mainFile.getParentFile(), mainFile.getName().replace(IndexConstants.BINARY_MAP_INDEX_EXT,
 								IndexConstants.BINARY_ROAD_MAP_INDEX_EXT)));
-			} else if(utl.equals("generate-poi")) {
+			} else if (utl.equals("generate-poi")) {
 				IndexCreator ic = new IndexCreator(new File("."));
 				ic.setIndexPOI(true);
 				ic.setLastModifiedDate(new File(subArgsArray[0]).lastModified());
 				generateObf(subArgsArray, ic);
 
-			} else if(utl.equals("delete-unused-strings")) {
+			} else if (utl.equals("delete-unused-strings")) {
 				ResourceDeleter.main(subArgsArray);
-			} else if(utl.equals("generate-roads")) {
+			} else if (utl.equals("generate-roads")) {
 				IndexCreator ic = new IndexCreator(new File("."));
 				ic.setIndexRouting(true);
 				ic.setLastModifiedDate(new File(subArgsArray[0]).lastModified());

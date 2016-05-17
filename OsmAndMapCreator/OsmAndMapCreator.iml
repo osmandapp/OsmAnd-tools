@@ -2,7 +2,6 @@
 <module type="JAVA_MODULE" version="4">
   <component name="EclipseModuleManager">
     <libelement value="jar://$MODULE_DIR$/lib/h2-latest.jar!/" />
-    <libelement value="jar://$MODULE_DIR$/lib/sqlite-jdbc-3.7.6.3-20110609.081603-3.jar!/" />
     <libelement value="jar://$MODULE_DIR$/lib/jsch-20120101.jar!/" />
     <libelement value="jar://$MODULE_DIR$/lib/mysql-connector-java-5.1.18-bin.jar!/" />
     <libelement value="jar://$MODULE_DIR$/lib/junit-4.10.jar!/" />
@@ -14,7 +13,6 @@
     <libelement value="jar://$MODULE_DIR$/lib/json-20090211.jar!/" />
     <libelement value="jar://$MODULE_DIR$/lib/junidecode-0.1.jar!/" />
     <libelement value="jar://$MODULE_DIR$/lib/kxml2-2.3.0.jar!/" />
-    <libelement value="jar://$MODULE_DIR$/lib/jleveldb-v01.jar!/" />
     <libelement value="jar://$MODULE_DIR$/lib-gl/gluegen-rt.jar!/" />
     <libelement value="jar://$MODULE_DIR$/lib-gl/gluegen.jar!/" />
     <libelement value="jar://$MODULE_DIR$/lib-gl/jogl-all.jar!/" />
@@ -200,11 +198,112 @@
         <SOURCES />
       </library>
     </orderEntry>
-    <orderEntry type="module" module-name="OsmAnd-java" />
     <orderEntry type="module-library">
       <library name="OsmAndCore_jni.jar">
         <CLASSES>
           <root url="jar://$MODULE_DIR$/lib-gl/OsmAndCore_jni.jar!/" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES />
+      </library>
+    </orderEntry>
+    <orderEntry type="module" module-name="OsmAnd-java" exported="" />
+    <orderEntry type="module-library" exported="">
+      <library>
+        <CLASSES>
+          <root url="jar://$MODULE_DIR$/OsmAndMapCreator.jar!/" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES>
+          <root url="jar://$MODULE_DIR$/OsmAndMapCreator.jar!/" />
+        </SOURCES>
+      </library>
+    </orderEntry>
+    <orderEntry type="module-library">
+      <library>
+        <CLASSES>
+          <root url="jar://$MODULE_DIR$/lib-gl/gluegen-rt-natives-linux-amd64.jar!/" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES />
+      </library>
+    </orderEntry>
+    <orderEntry type="module-library">
+      <library>
+        <CLASSES>
+          <root url="jar://$MODULE_DIR$/lib-gl/gluegen-rt-natives-linux-i586.jar!/" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES />
+      </library>
+    </orderEntry>
+    <orderEntry type="module-library">
+      <library>
+        <CLASSES>
+          <root url="jar://$MODULE_DIR$/lib-gl/gluegen-rt-natives-macosx-universal.jar!/" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES />
+      </library>
+    </orderEntry>
+    <orderEntry type="module-library">
+      <library>
+        <CLASSES>
+          <root url="jar://$MODULE_DIR$/lib-gl/gluegen-rt-natives-windows-amd64.jar!/" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES />
+      </library>
+    </orderEntry>
+    <orderEntry type="module-library">
+      <library>
+        <CLASSES>
+          <root url="jar://$MODULE_DIR$/lib-gl/gluegen-rt-natives-windows-i586.jar!/" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES />
+      </library>
+    </orderEntry>
+    <orderEntry type="module-library">
+      <library>
+        <CLASSES>
+          <root url="jar://$MODULE_DIR$/lib-gl/jogl-all-natives-linux-amd64.jar!/" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES />
+      </library>
+    </orderEntry>
+    <orderEntry type="module-library">
+      <library>
+        <CLASSES>
+          <root url="jar://$MODULE_DIR$/lib-gl/jogl-all-natives-linux-i586.jar!/" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES />
+      </library>
+    </orderEntry>
+    <orderEntry type="module-library">
+      <library>
+        <CLASSES>
+          <root url="jar://$MODULE_DIR$/lib-gl/jogl-all-natives-macosx-universal.jar!/" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES />
+      </library>
+    </orderEntry>
+    <orderEntry type="module-library">
+      <library>
+        <CLASSES>
+          <root url="jar://$MODULE_DIR$/lib-gl/jogl-all-natives-windows-amd64.jar!/" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES />
+      </library>
+    </orderEntry>
+    <orderEntry type="module-library">
+      <library>
+        <CLASSES>
+          <root url="jar://$MODULE_DIR$/lib-gl/jogl-all-natives-windows-i586.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES />
