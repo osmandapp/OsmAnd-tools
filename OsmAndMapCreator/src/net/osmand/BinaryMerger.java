@@ -167,7 +167,7 @@ public class BinaryMerger {
 				preloadStreetsAndBuildings(rindex, city, namesakesStreetNodes);
 				if (mergeCityGroup.containsKey(city)) {
 					for (City namesake : mergeCityGroup.get(city)) {
-						preloadStreetsAndBuildings(rindex, namesake, namesakesStreetNodes);
+						preloadStreetsAndBuildings(cityMap.get(namesake), namesake, namesakesStreetNodes);
 						city.mergeWith(namesake);
 						namesakesStreetNodes.get(city).putAll(namesakesStreetNodes.get(namesake));
 					}
