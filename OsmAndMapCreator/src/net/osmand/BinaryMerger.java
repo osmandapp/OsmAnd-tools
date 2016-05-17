@@ -153,7 +153,7 @@ public class BinaryMerger {
 				BinaryFileReference ref = refs.get(i);
 				City city = cities.get(i);
 
-				if (!Objects.equals(namesakesName, city.getName())) {
+				if (!city.getName().equals(namesakesName)) {
 					boolean rename = (type == BinaryMapAddressReaderAdapter.CITY_TOWN_TYPE) && (namesakes.size() > 1);
 					for (List<City> namesakeGroup : namesakes) {
 						City mainCity = namesakeGroup.get(0);
