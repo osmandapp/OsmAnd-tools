@@ -156,7 +156,7 @@ public class BinaryMerger {
 			// 1. write cities
 			writer.startCityBlockIndex(type);
 			for (City city : cities) {
-				int cityType = city.isPostcode() ? BinaryMapAddressReaderAdapter.POSTCODES_TYPE : city.getType().ordinal();
+				int cityType = city.isPostcode() ? -1 : city.getType().ordinal();
 				refs.add(writer.writeCityHeader(city, cityType, tagRules));
 			}
 			Map<City, Map<Street, List<Node>>> namesakesStreetNodes = new HashMap<City, Map<Street, List<Node>>>();

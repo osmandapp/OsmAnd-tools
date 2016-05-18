@@ -13,9 +13,11 @@ import net.osmand.binary.BinaryIndexPart;
 import net.osmand.binary.BinaryMapAddressReaderAdapter;
 import net.osmand.binary.BinaryMapAddressReaderAdapter.AddressRegion;
 import net.osmand.binary.BinaryMapIndexReader;
+import net.osmand.data.Building;
 import net.osmand.data.City;
 import net.osmand.data.MapObject;
 import net.osmand.data.Street;
+import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
 import org.apache.commons.logging.Log;
@@ -83,6 +85,9 @@ public class BinaryComparator {
 					j++;	
 					i0.preloadStreets(c0, null);
 					i1.preloadStreets(c1, null);
+					if(!c0.getNamesMap(true).equals(c1.getNamesMap(true))) {
+						System.out.println("(1). City all names are not same : " + c1 + " " + c0.getNamesMap(true) + " != " + c1.getNamesMap(true));
+					}
 					if(c0.getStreets().size() != c1.getStreets().size()) {
 						System.out.println("(2). City streets " + c1 + ":  " + c0.getStreets().size() + " != " + c1.getStreets().size());
 						List<String> s0 = new ArrayList<String>();
@@ -98,14 +103,50 @@ public class BinaryComparator {
 							}
 						}
 						if(s0.isEmpty() && s1.isEmpty()) {
+							// locations of streets are not equal
 							System.out.println("(2)? " + c0.getStreets());
 						} else {
 							System.out.println("(2).. " + s0 + "!=" + s1);
 						}
 					} else {
 						// compare streets
-						// TODO (3) BUILDINGS INEQUAL + POSTCODE
-						// TODO (4) Intersections
+						for(int ij = 0; ij < c1.getStreets().size(); ij++) {
+							Street s0 = c0.getStreets().get(ij);
+							Street s1 = c1.getStreets().get(ij);
+							if(!s0.getNamesMap(true).equals(s1.getNamesMap(true))) {
+								System.out.println("(2)- Street all names are not same : " + c1 + " " + s0.getNamesMap(true) + " != " + s1.getNamesMap(true));
+							}
+							if(s0.getName().equals(s1.getName())) {
+								i0.preloadBuildings(s0, null);
+								i1.preloadBuildings(s1, null);
+								if (s0.getBuildings().size() != s1.getBuildings().size()) {
+									System.out.println("(3). Buildings size: " + s0.getBuildings().size() + "!="
+											+ s1.getBuildings().size() + " " + c0 + ", " + s0);
+								} else {
+									for(int it = 0; it < s0.getBuildings().size(); it++) {
+										Building b0 = s0.getBuildings().get(it);
+										Building b1 = s1.getBuildings().get(it);
+										if(!b0.getName().equals(b1.getName())) {
+											System.out.println("(4). Buildings name: " + b0.getName() + "!="
+													+ b1.getName() + " " + c0 + ", " + s0);
+										}
+										if(!Algorithms.objectEquals(b0.getPostcode(), b1.getPostcode())) {
+											System.out.println("(4). Buildings postcode: " + b0.getPostcode() + "!="
+													+ b1.getPostcode() + " " + c0 + ", " + s0);
+										}
+									}
+								}
+								if(s0.getIntersectedStreets().size() != s1.getIntersectedStreets().size()) {
+									System.out.println("(4). Intersections size: " + s0.getIntersectedStreets().size() + "!="
+											+ s1.getIntersectedStreets().size() + " " + c0 + ", " + s0);
+								} else {
+									// TODO (4) Intersections check name of intersections
+								}
+							} else {
+								System.out.println("(3)? Street name order: " + s0 + "!=" + s1 + " " + c0);
+							}
+						}
+
 					}
 				}
 			}
