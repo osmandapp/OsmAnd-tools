@@ -137,8 +137,9 @@ public class BinaryComparator {
 									}
 								}
 								if(s0.getIntersectedStreets().size() != s1.getIntersectedStreets().size()) {
-									System.out.println("(4). Intersections size: " + s0.getIntersectedStreets().size() + "!="
-											+ s1.getIntersectedStreets().size() + " " + c0 + ", " + s0);
+									// TODO completely wrong
+//									System.out.println("(4). Intersections size: " + s0.getIntersectedStreets().size() + "!="
+//											+ s1.getIntersectedStreets().size() + " " + c0 + ", " + s0);
 								} else {
 									// TODO (4) Intersections check name of intersections
 								}
