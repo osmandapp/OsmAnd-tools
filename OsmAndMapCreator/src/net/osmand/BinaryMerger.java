@@ -51,8 +51,8 @@ public class BinaryMerger {
 		// test cases show info
 		if (args.length == 1 && "test".equals(args[0])) {
 			in.merger(new String[]{
-					System.getProperty("maps.dir") + "Ukraine_ivano-frankivsk_europe_2m.road.obf",
-					System.getProperty("maps.dir") + "Ukraine_ivano-frankivsk_europe_2.road.obf"
+					System.getProperty("maps.dir") + "Ukraine_merge.road.obf",
+					System.getProperty("maps.dir") + "Ukraine_kherson_europe_2.road.obf"
 					});
 		} else {
 			in.merger(args);
@@ -209,7 +209,7 @@ public class BinaryMerger {
 					renameGroup = renameGroup || (rename && !areCitiesInSameRegion);
 					j++;
 				}
-				nc = orderedCities.get(j);
+				nc = (j < orderedCities.size()) ? orderedCities.get(j) : null;
 			}
 			if (renameGroup) {
 				for (City c : orderedCities.subList(i, j)) {
@@ -233,7 +233,11 @@ public class BinaryMerger {
 				Node nn = null;
 				if (list != null) {
 					for (Node n : list) {
-						if(MapUtils.getDistance(n.getLatLon(), is.getLocation()) < 10) {
+						double d = MapUtils.getDistance(n.getLatLon(), is.getLocation());
+						if(d < 10000 && Algorithms.objectEquals(street.getName(), n.getTag("name"))) {
+							nn = n;
+							break;
+						} else if(d < 10) {
 							nn = n;
 						}
 					}
@@ -243,6 +247,7 @@ public class BinaryMerger {
 					int tx = (int) MapUtils.getTileNumberY(24, is.getLocation().getLongitude());
 					long id = (((long) tx << 32)) | ty;
 					nn = new Node(is.getLocation().getLatitude(), is.getLocation().getLongitude(), id);
+					nn.putTag("name", is.getName());
 				}
 				nns.add(nn);
 			}
