@@ -75,7 +75,7 @@ public class BinaryMerger {
 				ZipEntry ze;
 				while ((ze = zis.getNextEntry()) != null) {
 					String name = ze.getName();
-					if(!ze.isDirectory() && name.endsWith(".obf")) {
+					if (!ze.isDirectory() && name.endsWith(".obf")) {
 						FileOutputStream fout = new FileOutputStream(tmp);
 						Algorithms.streamCopy(zis, fout);
 						fout.close();
@@ -183,7 +183,7 @@ public class BinaryMerger {
 				city.getStreets().clear();
 				namesakesStreetNodes.clear();
 			}
-			
+
 			writer.endCityBlockIndex();
 		}
 		writer.writeAddressNameIndex(namesIndex);
@@ -192,33 +192,33 @@ public class BinaryMerger {
 
 	private void mergeCitiesByNameDistance(List<City> orderedCities, Map<City, List<City>> mergeCityGroup, 
 			Map<City, BinaryMapIndexReader> cityMap, boolean rename) {
-		for(int i = 0; i < orderedCities.size(); i++) {
+		for (int i = 0; i < orderedCities.size(); i++) {
 			City oc = orderedCities.get(i);
 			boolean renameMain = false;
-			for(int j = i + 1; j < orderedCities.size(); ) {
+			for (int j = i + 1; j < orderedCities.size(); ) {
 				City nc = orderedCities.get(j);
-				if(!nc.getName().equals(oc.getName())) {
+				if (!nc.getName().equals(oc.getName())) {
 					break;
 				}
-				if(isSameCity(oc, nc)) {
-					if(!mergeCityGroup.containsKey(oc)) {
+				if (isSameCity(oc, nc)) {
+					if (!mergeCityGroup.containsKey(oc)) {
 						mergeCityGroup.put(oc, new ArrayList<City>());
 					}
 					mergeCityGroup.get(oc).add(nc);
 					orderedCities.remove(j);
 				} else {
-					if(rename) {
+					if (rename) {
 						renameMain = true;
 						addRegionToCityName(nc, cityMap.get(nc));
 					}
 					j++;
 				}
 			}
-			if(renameMain) {
+			if (renameMain) {
 				addRegionToCityName(oc, cityMap.get(oc));
 			}
 		}
-		
+
 	}
 
 	private void preloadStreetsAndBuildings(BinaryMapIndexReader rindex, City city,
@@ -231,7 +231,7 @@ public class BinaryMerger {
 			for (Street is : street.getIntersectedStreets()) {
 				double lat = is.getLocation().getLatitude();
 				double lon = is.getLocation().getLongitude();
-				long id = (((long)Float.floatToIntBits((float) lat) << 32)) | Float.floatToIntBits((float) lon);
+				long id = (((long) Float.floatToIntBits((float) lat) << 32)) | Float.floatToIntBits((float) lon);
 				Node nn = new Node(is.getLocation().getLatitude(), is.getLocation().getLongitude(), id);
 				nns.add(nn);
 			}
@@ -279,7 +279,7 @@ public class BinaryMerger {
 			for (int i = 0; i < index.getIndexes().size(); i++) {
 				BinaryIndexPart part = index.getIndexes().get(i);
 				if (part.getFieldNumber() == OsmandOdb.OsmAndStructure.ADDRESSINDEX_FIELD_NUMBER) {
-					addressRegions[k] = (AddressRegion)part;
+					addressRegions[k] = (AddressRegion) part;
 				} else {
 					ous.writeTag(part.getFieldNumber(), WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
 					writeInt(ous, part.getLength());
@@ -316,8 +316,6 @@ public class BinaryMerger {
 			toRead -= read;
 		}
 	}
-
-
 
 
 }
