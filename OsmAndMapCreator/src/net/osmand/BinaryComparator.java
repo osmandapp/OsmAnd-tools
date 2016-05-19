@@ -38,7 +38,7 @@ public class BinaryComparator {
 	private static final int BUILDINGS_COMPARE = 31;
 	private static final int INTERSECTIONS_COMPARE = 41;
 	static {
-		COMPARE_SET.add(CITY_COMPARE); // city
+//		COMPARE_SET.add(CITY_COMPARE); // city
 //		COMPARE_SET.add(CITY_NAME_COMPARE);
 //		COMPARE_SET.add(STREET_COMPARE);
 //		COMPARE_SET.add(BUILDINGS_COMPARE);
@@ -180,11 +180,26 @@ public class BinaryComparator {
 								}
 								if (COMPARE_SET.contains(INTERSECTIONS_COMPARE)) {
 									if (s0.getIntersectedStreets().size() != s1.getIntersectedStreets().size()) {
-										System.out.println("(4). Intersections size: "
+										System.out.println("(5). Intersections size: "
 												+ s0.getIntersectedStreets().size() + "!="
 												+ s1.getIntersectedStreets().size() + " " + c0 + ", " + s0);
 									} else {
-										// TODO (4) Intersections check name of intersections
+										Collections.sort(s0.getIntersectedStreets(), MapObject.BY_NAME_COMPARATOR);
+										Collections.sort(s1.getIntersectedStreets(), MapObject.BY_NAME_COMPARATOR);
+										for(int it = 0; it < s0.getIntersectedStreets().size(); it++) {
+											Street st0 = s0.getIntersectedStreets().get(it);
+											Street st1 = s1.getIntersectedStreets().get(it);
+											if(!st0.getName().equals(st1.getName()) 
+													// || !st0.getNamesMap(true).equals(st1.getNamesMap(true))
+													) {
+												System.out.println("(5). Intersections names <> : " + st0
+														+ "!=" + st1 + " " + c0 + ", " + s0 + " ");	
+											}
+											if(MapUtils.getDistance(st0.getLocation(), st1.getLocation()) > 1500) {
+												System.out.println("(5). Intersections location <> : " + st0
+														+ "!=" + st1 + " " + c0 + ", " + s0);	
+											}
+										}
 									}
 								}
 							} else {

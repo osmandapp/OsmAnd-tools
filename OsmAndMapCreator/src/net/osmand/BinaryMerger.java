@@ -232,13 +232,18 @@ public class BinaryMerger {
 				List<Node> list = streetNodesN.get(is.getName());
 				Node nn = null;
 				if (list != null) {
+					boolean  nameEqual = false;
+					double dd = 100000;
 					for (Node n : list) {
 						double d = MapUtils.getDistance(n.getLatLon(), is.getLocation());
-						if(d < 10000 && Algorithms.objectEquals(street.getName(), n.getTag("name"))) {
+						if(Algorithms.objectEquals(street.getName(), n.getTag("name")) && 
+								(d < dd || !nameEqual)) {
 							nn = n;
-							break;
-						} else if(d < 10) {
+							dd = d;
+							nameEqual = true;
+						} else if(!nameEqual && d < dd ) {
 							nn = n;
+							dd = d;
 						}
 					}
 				}
@@ -252,7 +257,11 @@ public class BinaryMerger {
 				nns.add(nn);
 			}
 			streetNodes.put(street, nns);
-			streetNodesN.put(street.getName(), nns);
+			if(streetNodesN.containsKey(street.getName())) {
+				streetNodesN.get(street.getName()).addAll(nns);
+			} else {
+				streetNodesN.put(street.getName(), nns);
+			}
 		}
 		namesakesStreetNodes.put(city, streetNodes);
 	}
