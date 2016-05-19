@@ -193,13 +193,11 @@ public class BinaryMerger {
 	private void mergeCitiesByNameDistance(List<City> orderedCities, Map<City, List<City>> mergeCityGroup, 
 			Map<City, BinaryMapIndexReader> cityMap, boolean rename) {
 		for (int i = 0; i < orderedCities.size(); i++) {
+			boolean renameGroup = false;
+			int j = i + 1;
 			City oc = orderedCities.get(i);
-			boolean renameMain = false;
-			for (int j = i + 1; j < orderedCities.size(); ) {
-				City nc = orderedCities.get(j);
-				if (!nc.getName().equals(oc.getName())) {
-					break;
-				}
+			City nc = (j < orderedCities.size()) ? orderedCities.get(j) : null;
+			while (MapObject.BY_NAME_COMPARATOR.areEqual(nc, oc)) {
 				if (isSameCity(oc, nc)) {
 					if (!mergeCityGroup.containsKey(oc)) {
 						mergeCityGroup.put(oc, new ArrayList<City>());
@@ -207,15 +205,16 @@ public class BinaryMerger {
 					mergeCityGroup.get(oc).add(nc);
 					orderedCities.remove(j);
 				} else {
-					if (rename) {
-						renameMain = true;
-						addRegionToCityName(nc, cityMap.get(nc));
-					}
+					boolean areCitiesInSameRegion = cityMap.get(oc) == cityMap.get(nc);
+					renameGroup = renameGroup || (rename && !areCitiesInSameRegion);
 					j++;
 				}
+				nc = orderedCities.get(j);
 			}
-			if (renameMain) {
-				addRegionToCityName(oc, cityMap.get(oc));
+			if (renameGroup) {
+				for (City c : orderedCities.subList(i, j)) {
+					addRegionToCityName(c, cityMap.get(c));
+				}
 			}
 		}
 
