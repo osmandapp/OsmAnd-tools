@@ -42,7 +42,7 @@ public class BinaryComparator {
 //		COMPARE_SET.add(CITY_NAME_COMPARE);
 //		COMPARE_SET.add(STREET_COMPARE);
 //		COMPARE_SET.add(BUILDINGS_COMPARE);
-//		COMPARE_SET.add(INTERSECTIONS_COMPARE);
+		COMPARE_SET.add(INTERSECTIONS_COMPARE);
 	}
 
 	public static void main(String[] args) throws IOException {
@@ -157,9 +157,9 @@ public class BinaryComparator {
 								System.out.println("(2)- Street all names are not same : " + c1 + " " + s0.getNamesMap(true) + " != " + s1.getNamesMap(true));
 							}
 							if(s0.getName().equals(s1.getName())) {
+								i0.preloadBuildings(s0, null);
+								i1.preloadBuildings(s1, null);
 								if (COMPARE_SET.contains(BUILDINGS_COMPARE)) {
-									i0.preloadBuildings(s0, null);
-									i1.preloadBuildings(s1, null);
 									if (s0.getBuildings().size() != s1.getBuildings().size()) {
 										System.out.println("(3). Buildings size: " + s0.getBuildings().size() + "!="
 												+ s1.getBuildings().size() + " " + c0 + ", " + s0);

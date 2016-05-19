@@ -51,9 +51,9 @@ public class BinaryMerger {
 		// test cases show info
 		if (args.length == 1 && "test".equals(args[0])) {
 			in.merger(new String[]{
-					System.getProperty("maps.dir") + "Argentina_southamerica_2.obf",
-					System.getProperty("maps.dir") + "Argentina_cordoba_southamerica_2.obf",
-					System.getProperty("maps.dir") + "Argentina_chubut_southamerica_2.obf"});
+					System.getProperty("maps.dir") + "Ukraine_ivano-frankivsk_europe_2m.road.obf",
+					System.getProperty("maps.dir") + "Ukraine_ivano-frankivsk_europe_2.road.obf"
+					});
 		} else {
 			in.merger(args);
 		}
@@ -224,17 +224,30 @@ public class BinaryMerger {
 			Map<City, Map<Street, List<Node>>> namesakesStreetNodes) throws IOException {
 		rindex.preloadStreets(city, null);
 		Map<Street, List<Node>> streetNodes = new LinkedHashMap<Street, List<Node>>();
+		Map<String, List<Node>> streetNodesN = new LinkedHashMap<String, List<Node>>();
 		for (Street street : city.getStreets()) {
 			rindex.preloadBuildings(street, null);
 			ArrayList<Node> nns = new ArrayList<Node>();
 			for (Street is : street.getIntersectedStreets()) {
-				double lat = is.getLocation().getLatitude();
-				double lon = is.getLocation().getLongitude();
-				long id = (((long) Float.floatToIntBits((float) lat) << 32)) | Float.floatToIntBits((float) lon);
-				Node nn = new Node(is.getLocation().getLatitude(), is.getLocation().getLongitude(), id);
+				List<Node> list = streetNodesN.get(is.getName());
+				Node nn = null;
+				if (list != null) {
+					for (Node n : list) {
+						if(MapUtils.getDistance(n.getLatLon(), is.getLocation()) < 10) {
+							nn = n;
+						}
+					}
+				}
+				if (nn == null) {
+					int ty = (int) MapUtils.getTileNumberY(24, is.getLocation().getLatitude());
+					int tx = (int) MapUtils.getTileNumberY(24, is.getLocation().getLongitude());
+					long id = (((long) tx << 32)) | ty;
+					nn = new Node(is.getLocation().getLatitude(), is.getLocation().getLongitude(), id);
+				}
 				nns.add(nn);
 			}
 			streetNodes.put(street, nns);
+			streetNodesN.put(street.getName(), nns);
 		}
 		namesakesStreetNodes.put(city, streetNodes);
 	}
