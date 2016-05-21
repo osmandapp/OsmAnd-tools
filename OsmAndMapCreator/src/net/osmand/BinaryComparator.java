@@ -4,12 +4,7 @@ package net.osmand;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 import net.osmand.binary.BinaryIndexPart;
 import net.osmand.binary.BinaryMapAddressReaderAdapter;
@@ -37,34 +32,50 @@ public class BinaryComparator {
 	private static final int STREET_NAME_COMPARE = 22;
 	private static final int BUILDINGS_COMPARE = 31;
 	private static final int INTERSECTIONS_COMPARE = 41;
-
-	static {
-		COMPARE_SET.add(CITY_COMPARE); // city
-//		COMPARE_SET.add(CITY_NAME_COMPARE);
-//		COMPARE_SET.add(STREET_COMPARE);
-//		COMPARE_SET.add(BUILDINGS_COMPARE);
-//		COMPARE_SET.add(INTERSECTIONS_COMPARE);
-	}
+	private static final Map<String, Integer> COMPARE_ARGS = new HashMap<String, Integer>() {{
+		put("--cities", CITY_COMPARE);
+		put("--city-names", CITY_NAME_COMPARE);
+		put("--streets", STREET_COMPARE);
+		put("--street-names", STREET_NAME_COMPARE);
+		put("--buildings", BUILDINGS_COMPARE);
+		put("--intersections", INTERSECTIONS_COMPARE);
+	}};
 
 	public static void main(String[] args) throws IOException {
 		BinaryComparator in = new BinaryComparator();
 		// test cases show info
 		if (args.length == 1 && "test".equals(args[0])) {
-			in.compare(new String[]{
+			in.compare(Arrays.asList(
 					System.getProperty("maps.dir") + "Ukraine_europe_2.road.obf",
 					System.getProperty("maps.dir") + "Ukraine_europe_2_all.road.obf"
-			});
+			));
 		} else {
-			in.compare(args);
+			in.compare(Arrays.asList(args));
 		}
 	}
 
-	private void compare(String[] args) throws IOException {
-		BinaryMapIndexReader[] indexes = new BinaryMapIndexReader[args.length];
-		RandomAccessFile[] rafs = new RandomAccessFile[args.length];
-		for (int i = 0; i < args.length; i++) {
-			rafs[i] = new RandomAccessFile(args[i], "r");
-			indexes[i] = new BinaryMapIndexReader(rafs[i], new File(args[i]));
+	private void compare(List<String> args) throws IOException {
+		args = new ArrayList<String>(args);
+		int i = 0;
+		do {
+			String arg = args.get(i);
+			if (arg.startsWith("--")) {
+				if (COMPARE_ARGS.containsKey(arg)) {
+					COMPARE_SET.add(COMPARE_ARGS.get(arg));
+					args.remove(i);
+				} else {
+					System.out.print("Error: unknown argument");
+					System.exit(1);
+				}
+			} else {
+				i++;
+			}
+		} while (i < args.size());
+		BinaryMapIndexReader[] indexes = new BinaryMapIndexReader[args.size()];
+		RandomAccessFile[] rafs = new RandomAccessFile[args.size()];
+		for (i = 0; i < args.size(); i++) {
+			rafs[i] = new RandomAccessFile(args.get(i), "r");
+			indexes[i] = new BinaryMapIndexReader(rafs[i], new File(args.get(i)));
 		}
 		AddressRegion r0 = getAddressRegion(indexes[0]);
 		AddressRegion r1 = getAddressRegion(indexes[1]);
@@ -246,9 +257,17 @@ public class BinaryComparator {
 		return i >= ct0.size() ? null : ct0.get(i);
 	}
 
-
 	private String strip(String name) {
-		return name.indexOf('(') != -1 ? name.substring(0, name.indexOf('(')).trim() : name;
+		name = name.indexOf('(') != -1 ? name.substring(0, name.indexOf('(')).trim() : name;
+		// Remove spaces in Netherlands' postcodes
+		name = (name.length() == 7 &&
+				Character.isDigit(name.charAt(0)) &&
+				Character.isDigit(name.charAt(1)) &&
+				Character.isDigit(name.charAt(2)) &&
+				Character.isDigit(name.charAt(3)) &&
+				name.charAt(4) == ' '
+		)? name.replaceAll(" ", "") : name;
+		return name;
 	}
 
 	private Comparator<City> comparator() {

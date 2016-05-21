@@ -97,7 +97,9 @@ public class BinaryMerger {
 		}
 		combineParts(outputFile, parts);
 		for (File f : toDelete) {
-			f.delete();
+			if (!f.delete()) {
+				throw new IOException("Cannot delete file " + outputFile);
+			}
 		}
 	}
 
@@ -118,6 +120,12 @@ public class BinaryMerger {
 	private static boolean isSameCity(City namesake0, City namesake1) {
 		double sameCityDistance = 1000;
 		return MapUtils.getDistance(namesake0.getLocation(), namesake1.getLocation()) < sameCityDistance;
+	}
+
+	private static City mergeCities(City city, City namesake, Map<City, Map<Street, List<Node>>> namesakesStreetNodes) {
+		city.mergeWith(namesake);
+		namesakesStreetNodes.get(city).putAll(namesakesStreetNodes.get(namesake));
+		return city;
 	}
 
 	private void combineAddressIndex(String name, BinaryMapIndexWriter writer, AddressRegion[] addressRegions, BinaryMapIndexReader[] indexes)
@@ -165,16 +173,15 @@ public class BinaryMerger {
 				City city = cities.get(i);
 				BinaryMapIndexReader rindex = cityMap.get(city);
 				preloadStreetsAndBuildings(rindex, city, namesakesStreetNodes);
-				if (mergeCityGroup.containsKey(city)) {
-					for (City namesake : mergeCityGroup.get(city)) {
+				List<City> namesakes = mergeCityGroup.get(city);
+				if (namesakes != null) {
+					for (City namesake : namesakes) {
 						preloadStreetsAndBuildings(cityMap.get(namesake), namesake, namesakesStreetNodes);
-						city.mergeWith(namesake);
-						namesakesStreetNodes.get(city).putAll(namesakesStreetNodes.get(namesake));
+						city = mergeCities(city, namesake, namesakesStreetNodes);
 					}
 				}
 
-				Map<Street, List<Node>> streetNodes = namesakesStreetNodes.get(city);
-				writer.writeCityIndex(city, city.getStreets(), streetNodes, ref, tagRules);
+				writer.writeCityIndex(city, city.getStreets(), namesakesStreetNodes.get(city), ref, tagRules);
 				IndexAddressCreator.putNamedMapObject(namesIndex, city, ref.getStartPointer());
 				for (Street s : city.getStreets()) {
 					IndexAddressCreator.putNamedMapObject(namesIndex, s, s.getFileOffset());
@@ -202,8 +209,18 @@ public class BinaryMerger {
 					if (!mergeCityGroup.containsKey(oc)) {
 						mergeCityGroup.put(oc, new ArrayList<City>());
 					}
+					boolean shorter = nc.getName().length() < oc.getName().length();
+					// Prefer cities with shortest names ("1101DL" instead "1101 DL")
+					if (shorter) {
+						orderedCities.remove(i);
+						mergeCityGroup.put(nc, mergeCityGroup.remove(oc));
+						City tmp = oc;
+						oc = nc;
+						nc = tmp;
+					} else {
+						orderedCities.remove(j);
+					}
 					mergeCityGroup.get(oc).add(nc);
-					orderedCities.remove(j);
 				} else {
 					boolean areCitiesInSameRegion = cityMap.get(oc) == cityMap.get(nc);
 					renameGroup = renameGroup || (rename && !areCitiesInSameRegion);
