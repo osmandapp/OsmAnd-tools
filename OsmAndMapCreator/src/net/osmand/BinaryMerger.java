@@ -173,7 +173,6 @@ public class BinaryMerger {
 				City city = cities.get(i);
 				BinaryMapIndexReader rindex = cityMap.get(city);
 				preloadStreetsAndBuildings(rindex, city, namesakesStreetNodes);
-//				Map<Street, List<Node>> streetNodes =
 				List<City> namesakes = mergeCityGroup.get(city);
 				if (namesakes != null) {
 					for (City namesake : namesakes) {
