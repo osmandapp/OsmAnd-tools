@@ -97,7 +97,9 @@ public class BinaryMerger {
 		}
 		combineParts(outputFile, parts);
 		for (File f : toDelete) {
-			f.delete();
+			if (!f.delete()) {
+				throw new IOException("Cannot delete file " + outputFile);
+			}
 		}
 	}
 
