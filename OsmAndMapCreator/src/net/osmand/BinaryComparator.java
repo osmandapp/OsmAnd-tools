@@ -37,12 +37,13 @@ public class BinaryComparator {
 	private static final int STREET_NAME_COMPARE = 22;
 	private static final int BUILDINGS_COMPARE = 31;
 	private static final int INTERSECTIONS_COMPARE = 41;
+
 	static {
-//		COMPARE_SET.add(CITY_COMPARE); // city
+		COMPARE_SET.add(CITY_COMPARE); // city
 //		COMPARE_SET.add(CITY_NAME_COMPARE);
 //		COMPARE_SET.add(STREET_COMPARE);
 //		COMPARE_SET.add(BUILDINGS_COMPARE);
-		COMPARE_SET.add(INTERSECTIONS_COMPARE);
+//		COMPARE_SET.add(INTERSECTIONS_COMPARE);
 	}
 
 	public static void main(String[] args) throws IOException {
@@ -50,9 +51,9 @@ public class BinaryComparator {
 		// test cases show info
 		if (args.length == 1 && "test".equals(args[0])) {
 			in.compare(new String[]{
-					System.getProperty("maps.dir") +"Ukraine_europe_2.road.obf",
+					System.getProperty("maps.dir") + "Ukraine_europe_2.road.obf",
 					System.getProperty("maps.dir") + "Ukraine_europe_2_all.road.obf"
-					});
+			});
 		} else {
 			in.compare(args);
 		}
@@ -61,14 +62,14 @@ public class BinaryComparator {
 	private void compare(String[] args) throws IOException {
 		BinaryMapIndexReader[] indexes = new BinaryMapIndexReader[args.length];
 		RandomAccessFile[] rafs = new RandomAccessFile[args.length];
-		for(int i = 0; i < args.length; i++) {
+		for (int i = 0; i < args.length; i++) {
 			rafs[i] = new RandomAccessFile(args[i], "r");
 			indexes[i] = new BinaryMapIndexReader(rafs[i], new File(args[i]));
 		}
 		AddressRegion r0 = getAddressRegion(indexes[0]);
 		AddressRegion r1 = getAddressRegion(indexes[1]);
 		compare(r0, indexes[0], r1, indexes[1]);
-		
+
 	}
 
 	private void compare(AddressRegion r0, BinaryMapIndexReader i0, AddressRegion r1, BinaryMapIndexReader i1) throws IOException {
@@ -81,20 +82,20 @@ public class BinaryComparator {
 			int i = 0;
 			int j = 0;
 			System.out.println("CITY TYPE: " + cityType);
-			while(i < ct0.size() || j < ct1.size()) {
+			while (i < ct0.size() || j < ct1.size()) {
 				City c0 = get(ct0, i);
 				City c1 = get(ct1, j);
-				int cmp = c.compare(c0, c1); 
-				if(cmp < 0) {
+				int cmp = c.compare(c0, c1);
+				if (cmp < 0) {
 					while (c.compare(c0, c1) < 0) {
-						if(COMPARE_SET.contains(CITY_COMPARE)) {
+						if (COMPARE_SET.contains(CITY_COMPARE)) {
 							City ps = searchSimilarCities(c0, ct1, j);
-							if(ps != null) {
+							if (ps != null) {
 								int distance = (int) MapUtils.getDistance(c0.getLocation(), ps.getLocation());
-								System.out.println("(1). Extra city in 1st file: " + c0 
-										+ "( " + distance +" m ) possible duplicate " + ps);
+								System.out.println("(1). Extra city in 1st file: " + c0
+										+ "( " + distance + " m ) possible duplicate " + ps);
 							} else {
-								System.out.println("(1)! Extra city in 1st file: " + c0 );
+								System.out.println("(1)! Extra city in 1st file: " + c0);
 							}
 						}
 						i++;
@@ -102,14 +103,14 @@ public class BinaryComparator {
 					}
 				} else if (cmp > 0) {
 					while (c.compare(c0, c1) > 0) {
-						if(COMPARE_SET.contains(CITY_COMPARE)) {
+						if (COMPARE_SET.contains(CITY_COMPARE)) {
 							City ps = searchSimilarCities(c1, ct0, i);
-							if(ps != null) {
+							if (ps != null) {
 								int distance = (int) MapUtils.getDistance(c1.getLocation(), ps.getLocation());
-								System.out.println("(1). Extra city in 2nd file: " + c1  
-										+ "( " + distance +" m ) possible duplicate " + ps);
+								System.out.println("(1). Extra city in 2nd file: " + c1
+										+ "( " + distance + " m ) possible duplicate " + ps);
 							} else {
-								System.out.println("(1)! Extra city in 2nd file: " + c1 );
+								System.out.println("(1)! Extra city in 2nd file: " + c1);
 							}
 						}
 						j++;
@@ -120,13 +121,13 @@ public class BinaryComparator {
 //						System.out.println("Same city " + c1.getName()  + " == " + c0.getName());
 //					}
 					i++;
-					j++;	
+					j++;
 					i0.preloadStreets(c0, null);
 					i1.preloadStreets(c1, null);
-					if(!c0.getNamesMap(true).equals(c1.getNamesMap(true)) && COMPARE_SET.contains(CITY_NAME_COMPARE)) {
+					if (!c0.getNamesMap(true).equals(c1.getNamesMap(true)) && COMPARE_SET.contains(CITY_NAME_COMPARE)) {
 						System.out.println("(1). City all names are not same : " + c1 + " " + c0.getNamesMap(true) + " != " + c1.getNamesMap(true));
 					}
-					if(c0.getStreets().size() != c1.getStreets().size()) {
+					if (c0.getStreets().size() != c1.getStreets().size()) {
 						if (COMPARE_SET.contains(STREET_COMPARE)) {
 							System.out.println("(2). City streets " + c1 + ":  " + c0.getStreets().size() + " != " + c1.getStreets().size());
 							List<String> s0 = new ArrayList<String>();
@@ -150,13 +151,13 @@ public class BinaryComparator {
 						}
 					} else {
 						// compare streets
-						for(int ij = 0; ij < c1.getStreets().size(); ij++) {
+						for (int ij = 0; ij < c1.getStreets().size(); ij++) {
 							Street s0 = c0.getStreets().get(ij);
 							Street s1 = c1.getStreets().get(ij);
-							if(!s0.getNamesMap(true).equals(s1.getNamesMap(true)) && COMPARE_SET.contains(STREET_NAME_COMPARE)) {
+							if (!s0.getNamesMap(true).equals(s1.getNamesMap(true)) && COMPARE_SET.contains(STREET_NAME_COMPARE)) {
 								System.out.println("(2)- Street all names are not same : " + c1 + " " + s0.getNamesMap(true) + " != " + s1.getNamesMap(true));
 							}
-							if(s0.getName().equals(s1.getName())) {
+							if (s0.getName().equals(s1.getName())) {
 								i0.preloadBuildings(s0, null);
 								i1.preloadBuildings(s1, null);
 								if (COMPARE_SET.contains(BUILDINGS_COMPARE)) {
@@ -186,24 +187,24 @@ public class BinaryComparator {
 									} else {
 										Collections.sort(s0.getIntersectedStreets(), MapObject.BY_NAME_COMPARATOR);
 										Collections.sort(s1.getIntersectedStreets(), MapObject.BY_NAME_COMPARATOR);
-										for(int it = 0; it < s0.getIntersectedStreets().size(); it++) {
+										for (int it = 0; it < s0.getIntersectedStreets().size(); it++) {
 											Street st0 = s0.getIntersectedStreets().get(it);
 											Street st1 = s1.getIntersectedStreets().get(it);
-											if(!st0.getName().equals(st1.getName()) 
-													// || !st0.getNamesMap(true).equals(st1.getNamesMap(true))
+											if (!st0.getName().equals(st1.getName())
+												// || !st0.getNamesMap(true).equals(st1.getNamesMap(true))
 													) {
 												System.out.println("(5). Intersections names <> : " + st0
-														+ "!=" + st1 + " " + c0 + ", " + s0 + " ");	
+														+ "!=" + st1 + " " + c0 + ", " + s0 + " ");
 											}
-											if(MapUtils.getDistance(st0.getLocation(), st1.getLocation()) > 1500) {
+											if (MapUtils.getDistance(st0.getLocation(), st1.getLocation()) > 1500) {
 												System.out.println("(5). Intersections location <> : " + st0
-														+ "!=" + st1 + " " + c0 + ", " + s0);	
+														+ "!=" + st1 + " " + c0 + ", " + s0);
 											}
 										}
 									}
 								}
 							} else {
-								if(COMPARE_SET.contains(STREET_NAME_COMPARE)) {
+								if (COMPARE_SET.contains(STREET_NAME_COMPARE)) {
 									System.out.println("(3)? Street name order: " + s0 + "!=" + s1 + " " + c0);
 								}
 							}
@@ -219,22 +220,22 @@ public class BinaryComparator {
 	private City searchSimilarCities(City city, List<City> search, int j) {
 		// scan similar cities
 		Collator collator = OsmAndCollator.primaryCollator();
-		for(int t = j; t >= 0; t--) {
+		for (int t = j; t >= 0; t--) {
 			City ps = search.get(t);
-			if(collator.compare(strip(city.getName()), strip(ps.getName())) != 0) {
+			if (collator.compare(strip(city.getName()), strip(ps.getName())) != 0) {
 				break;
 			}
-			if(MapUtils.getDistance(city.getLocation(), ps.getLocation()) < CITY_SIMILARITY_DISTANCE_POSSIBLE) {
+			if (MapUtils.getDistance(city.getLocation(), ps.getLocation()) < CITY_SIMILARITY_DISTANCE_POSSIBLE) {
 				return ps;
 			}
 		}
-		
-		for(int t = j; t < search.size(); t++) {
+
+		for (int t = j; t < search.size(); t++) {
 			City ps = search.get(t);
-			if(collator.compare(strip(city.getName()), strip(ps.getName())) != 0) {
+			if (collator.compare(strip(city.getName()), strip(ps.getName())) != 0) {
 				break;
 			}
-			if(MapUtils.getDistance(city.getLocation(), ps.getLocation()) < CITY_SIMILARITY_DISTANCE_POSSIBLE) {
+			if (MapUtils.getDistance(city.getLocation(), ps.getLocation()) < CITY_SIMILARITY_DISTANCE_POSSIBLE) {
 				return ps;
 			}
 		}
@@ -245,19 +246,20 @@ public class BinaryComparator {
 		return i >= ct0.size() ? null : ct0.get(i);
 	}
 
-	
+
 	private String strip(String name) {
 		return name.indexOf('(') != -1 ? name.substring(0, name.indexOf('(')).trim() : name;
 	}
-	
+
 	private Comparator<City> comparator() {
 		return new Comparator<City>() {
 			Collator collator = OsmAndCollator.primaryCollator();
+
 			@Override
 			public int compare(City o1, City o2) {
 				int c = collator.compare(strip(o1.getName()), strip(o2.getName()));
-				if(c == 0) {
-					if(MapUtils.getDistance(o1.getLocation(), o2.getLocation())  < CITY_SIMILARITY_DISTANCE) {
+				if (c == 0) {
+					if (MapUtils.getDistance(o1.getLocation(), o2.getLocation()) < CITY_SIMILARITY_DISTANCE) {
 						return 0;
 					}
 					c = Double.compare(MapUtils.getDistance(o1.getLocation(), 0, 0),
@@ -265,20 +267,20 @@ public class BinaryComparator {
 				}
 				return c;
 			}
-			
+
 		};
 	}
 
 
 	private AddressRegion getAddressRegion(BinaryMapIndexReader i) {
 		List<BinaryIndexPart> list = i.getIndexes();
-		for(BinaryIndexPart p : list) {
-			if(p instanceof AddressRegion) {
+		for (BinaryIndexPart p : list) {
+			if (p instanceof AddressRegion) {
 				return (AddressRegion) p;
 			}
 		}
 		return null;
 	}
 
-	
+
 }
