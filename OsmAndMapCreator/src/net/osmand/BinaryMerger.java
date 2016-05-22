@@ -118,7 +118,7 @@ public class BinaryMerger {
 	}
 
 	private static boolean isSameCity(City namesake0, City namesake1) {
-		double sameCityDistance = 1000;
+		double sameCityDistance = namesake0.isPostcode() ? 50000 : 5000;
 		return MapUtils.getDistance(namesake0.getLocation(), namesake1.getLocation()) < sameCityDistance;
 	}
 
