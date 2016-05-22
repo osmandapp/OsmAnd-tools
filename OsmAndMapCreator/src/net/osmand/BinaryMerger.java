@@ -28,6 +28,7 @@ import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.OsmandOdb;
 import net.osmand.data.City;
 import net.osmand.data.MapObject;
+import net.osmand.data.Postcode;
 import net.osmand.data.Street;
 import net.osmand.data.preparation.BinaryFileReference;
 import net.osmand.data.preparation.BinaryMapIndexWriter;
@@ -112,10 +113,28 @@ public class BinaryMerger {
 		//written += 4;
 	}
 
+	private List<String> extractCountryAndRegionNames(BinaryMapIndexReader index) {
+		return new ArrayList<String>(Arrays.asList(index.getRegionNames().get(0).split("_")));
+	}
+
+	private String extractCountryName(BinaryMapIndexReader index) {
+		return extractCountryAndRegionNames(index).get(0);
+	}
+
+	private String extractRegionName(BinaryMapIndexReader index) {
+		List<String> names = extractCountryAndRegionNames(index);
+		if (names.size() >= 2) {
+			String region = names.get(1);
+			region = region.substring(0, 1).toUpperCase() + region.substring(1);
+			return region;
+		} else {
+			return null;
+		}
+	}
+
 	private void addRegionToCityName(City city, BinaryMapIndexReader index) {
-		String region = index.getRegionNames().get(0).split("_")[1];
-		region = region.substring(0, 1).toUpperCase() + region.substring(1);
-		city.setName(city.getName() + " (" + region + ")");
+		String region = extractRegionName(index);
+		city.setName((region == null) ? city.getName() : city.getName() + " (" + region + ")");
 	}
 
 	private static boolean isSameCity(City namesake0, City namesake1) {
@@ -151,6 +170,7 @@ public class BinaryMerger {
 				AddressRegion region = addressRegions[i];
 				final BinaryMapIndexReader index = indexes[i];
 				for (City city : index.getCities(region, null, type)) {
+					normalizePostcode(city, extractCountryName(index));
 					if (cityMap.containsKey(city)) {
 						cityMap.remove(city);
 					}
@@ -196,6 +216,19 @@ public class BinaryMerger {
 		}
 		writer.writeAddressNameIndex(namesIndex);
 		writer.endWriteAddressIndex();
+	}
+
+	private void normalizePostcode(City city, String country) {
+		String normalizedPostcode;
+		if (city.isPostcode()) {
+			normalizedPostcode = Postcode.normalize(city.getName(), country);
+			city.setName(normalizedPostcode);
+			city.setEnName(normalizedPostcode);
+		}
+		if (city.getPostcode() != null) {
+			normalizedPostcode = Postcode.normalize(city.getPostcode(), country);
+			city.setPostcode(normalizedPostcode);
+		}
 	}
 
 	private void mergeCitiesByNameDistance(List<City> orderedCities, Map<City, List<City>> mergeCityGroup, 

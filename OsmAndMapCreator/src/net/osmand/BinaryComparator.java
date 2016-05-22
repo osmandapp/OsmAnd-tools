@@ -290,13 +290,7 @@ public class BinaryComparator {
 	}
 
 	private String strip(String name) {
-		name = name.indexOf('(') != -1 ? name.substring(0, name.indexOf('(')).trim() : name;
-		// Remove spaces in Netherlands' postcodes
-		name = (name.length() == 7 && 
-				Character.isDigit(name.charAt(0)) && Character.isDigit(name.charAt(1)) && 
-				Character.isDigit(name.charAt(2)) && Character.isDigit(name.charAt(3)) && 
-				name.charAt(4) == ' ') ? name.replaceAll(" ", "") : name;
-		return name;
+		return name.indexOf('(') != -1 ? name.substring(0, name.indexOf('(')).trim() : name;
 	}
 
 	private Comparator<City> comparator() {
