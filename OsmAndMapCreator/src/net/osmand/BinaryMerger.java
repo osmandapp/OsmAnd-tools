@@ -9,6 +9,7 @@ import java.io.RandomAccessFile;
 import java.text.Collator;
 import java.text.MessageFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
