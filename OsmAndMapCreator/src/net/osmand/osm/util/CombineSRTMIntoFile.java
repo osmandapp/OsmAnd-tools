@@ -11,8 +11,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 
-import javax.xml.stream.XMLStreamException;
-
 import net.osmand.IndexConstants;
 import net.osmand.PlatformUtil;
 import net.osmand.binary.BinaryMapDataObject;

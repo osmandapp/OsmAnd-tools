@@ -91,33 +91,44 @@ public class OsmDbCreator implements IOsmStorageFilter {
 		if (backwardComptibleIds) {
 			return id;
 		}
-		if (!ovewriteIds && shiftId > 0) {
-			return (id << shiftId) + additionId;
-		}
+		boolean simpleConvertId = !ovewriteIds && shiftId > 0;
 		int ord = EntityType.valueOf(e).ordinal();
 		if (e instanceof Node) {
+			if (simpleConvertId) {
+				return getSimpleConvertId(id);
+			}
 			int hash = getNodeHash(e);
 			return getConvertId(id, ord, hash);
 		} else if (e instanceof Way) {
 			TLongArrayList lids = ((Way) e).getNodeIds();
 			long hash = 0;
 			for (int i = 0; i < lids.size(); i++) {
-				Long ld = getGeneratedId(lids.get(i), 0);
-				Long hd = getHash(lids.get(i), 0);
-				if(hd != null) {
-					hash += hd;
+				Long ld;
+				if(simpleConvertId) {
+					ld = getSimpleConvertId(lids.get(i));
+				} else {
+					ld = getGeneratedId(lids.get(i), 0);
+					Long hd = getHash(lids.get(i), 0);
+					if (hd != null) {
+						hash += hd;
+					}
 				}
 				if (ld != null) {
 					lids.set(i, ld);
 				}
 			}
+			if (simpleConvertId) {
+				return getSimpleConvertId(id);
+			}
 			return getConvertId(id, ord, hash);
 		} else {
 			Relation r = (Relation) e;
 			Map<EntityId, EntityId> p = new HashMap<Entity.EntityId, Entity.EntityId>();
+
 			for (EntityId i : r.getMemberIds()) {
 				if (i.getType() != EntityType.RELATION) {
-					Long ll = getGeneratedId(i.getId().longValue(), i.getType().ordinal());
+					Long ll = simpleConvertId ? getSimpleConvertId(i.getId().longValue()) : getGeneratedId(i.getId()
+							.longValue(), i.getType().ordinal());
 					if (ll != null) {
 						p.put(i, new EntityId(i.getType(), ll));
 					}
@@ -129,8 +140,15 @@ public class OsmDbCreator implements IOsmStorageFilter {
 				String role = r.getModifiableMembersMap().remove(es.getKey());
 				r.getModifiableMembersMap().put(es.getValue(), role);
 			}
+			if (simpleConvertId) {
+				return getSimpleConvertId(id);
+			}
 			return id;
 		}
+	}
+
+	private long getSimpleConvertId(long id) {
+		return (id << shiftId) + additionId;
 	}
 
 	private int getNodeHash(Entity e) {
