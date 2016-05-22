@@ -912,9 +912,9 @@ public class IndexCreator {
 		IndexCreator creator = new IndexCreator(new File(rootFolder + "/maps/")); //$NON-NLS-1$
 //		creator.setIndexMap(true);
 		creator.setIndexAddress(true);
-		creator.setIndexPOI(true);
-		creator.setIndexTransport(true);
-		creator.setIndexRouting(true);
+//		creator.setIndexPOI(true);
+//		creator.setIndexTransport(true);
+//		creator.setIndexRouting(true);
 
 //		creator.deleteDatabaseIndexes = false;
 //		creator.recreateOnlyBinaryFile = true;
@@ -923,7 +923,8 @@ public class IndexCreator {
 
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 
-		String file = rootFolder + "/temp/map.osm";
+//		String file = rootFolder + "/temp/Neth_noord_cut.obf";
+		String file = rootFolder + "/maps/neth_noord_cut.osm";
 //		String file = rootFolder + "/repos/resources/synthetic_test_rendering.osm";
 //		String file = rootFolder + "/repos/resources/turn_lanes_test.osm";
 

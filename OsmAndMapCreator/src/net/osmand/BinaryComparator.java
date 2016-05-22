@@ -4,7 +4,15 @@ package net.osmand;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import net.osmand.binary.BinaryIndexPart;
 import net.osmand.binary.BinaryMapAddressReaderAdapter;
@@ -45,17 +53,20 @@ public class BinaryComparator {
 		BinaryComparator in = new BinaryComparator();
 		// test cases show info
 		if (args.length == 1 && "test".equals(args[0])) {
-			in.compare(Arrays.asList(
-					System.getProperty("maps.dir") + "Ukraine_europe_2.road.obf",
-					System.getProperty("maps.dir") + "Ukraine_europe_2_all.road.obf"
-			));
+			in.compare(new String[]{
+					System.getProperty("maps.dir") +"Netherlands_europe_2.road.obf",
+					System.getProperty("maps.dir") + "Netherlands_europe.road.obf",
+					"--cities", "--city-names"
+					,"--streets", "--street-names"
+					,"--buildings", "--intersections"
+					});
 		} else {
-			in.compare(Arrays.asList(args));
+			in.compare(args);
 		}
 	}
 
-	private void compare(List<String> args) throws IOException {
-		args = new ArrayList<String>(args);
+	private void compare(String[] argsAr) throws IOException {
+		List<String> args = new ArrayList<String>(Arrays.asList(argsAr));
 		int i = 0;
 		do {
 			String arg = args.get(i);
@@ -225,7 +236,7 @@ public class BinaryComparator {
 				}
 			}
 		}
-		// TODO (5) Compare by name index
+		// TODO (6) Compare by name index
 	}
 
 	private City searchSimilarCities(City city, List<City> search, int j) {
@@ -260,13 +271,10 @@ public class BinaryComparator {
 	private String strip(String name) {
 		name = name.indexOf('(') != -1 ? name.substring(0, name.indexOf('(')).trim() : name;
 		// Remove spaces in Netherlands' postcodes
-		name = (name.length() == 7 &&
-				Character.isDigit(name.charAt(0)) &&
-				Character.isDigit(name.charAt(1)) &&
-				Character.isDigit(name.charAt(2)) &&
-				Character.isDigit(name.charAt(3)) &&
-				name.charAt(4) == ' '
-		)? name.replaceAll(" ", "") : name;
+		name = (name.length() == 7 && 
+				Character.isDigit(name.charAt(0)) && Character.isDigit(name.charAt(1)) && 
+				Character.isDigit(name.charAt(2)) && Character.isDigit(name.charAt(3)) && 
+				name.charAt(4) == ' ') ? name.replaceAll(" ", "") : name;
 		return name;
 	}
 

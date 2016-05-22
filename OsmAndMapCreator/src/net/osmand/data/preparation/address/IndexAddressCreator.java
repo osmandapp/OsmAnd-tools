@@ -197,8 +197,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			if (cityFound != null) {
 				putCityBoundary(boundary, cityFound);
 			} else {
-
-				logBoundaryChanged(boundary, null);
+				logBoundaryChanged(boundary, null, 0, 0);
 				notAssignedBoundaries.add(boundary);
 			}
 			attachAllCitiesToBoundary(boundary);
@@ -336,7 +335,8 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		final Boundary oldBoundary = cityBoundaries.get(cityFound);
 		if(oldBoundary == null) {
 			cityBoundaries.put(cityFound, boundary);
-			logBoundaryChanged(boundary, cityFound);
+			logBoundaryChanged(boundary, cityFound, 
+					getCityBoundaryImportance(boundary, cityFound), 100);
 			return oldBoundary;
 		} else if (oldBoundary.getAdminLevel() == boundary.getAdminLevel()
 				&& oldBoundary != boundary
@@ -349,16 +349,17 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			int n = getCityBoundaryImportance(boundary, cityFound);
 			if (n < old) {
 				cityBoundaries.put(cityFound, boundary);
-				logBoundaryChanged(boundary, cityFound);
+				logBoundaryChanged(boundary, cityFound, n, old);
 			}
 			return oldBoundary;
 		}
 	}
 
 
-	private void logBoundaryChanged(Boundary boundary, City cityFound) {
+	private void logBoundaryChanged(Boundary boundary, City cityFound, int priority, int oldpriority) {
 		String s = "City " + (cityFound == null ? " not found " : " : " +cityFound.getName());
-		s += " boundary: " + boundary.toString() + " " + boundary.getBoundaryId();
+		s += " boundary: " + boundary.toString() + " " + boundary.getBoundaryId() + 
+				" priority:"+priority + " oldpriority:" + oldpriority;
 		if (logMapDataWarn != null) {
 			logMapDataWarn.info(s);
 		} else {
