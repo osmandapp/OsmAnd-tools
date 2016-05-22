@@ -45,6 +45,7 @@ public class BinaryMerger {
 
 	public static final int BUFFER_SIZE = 1 << 20;
 	private final static Log log = PlatformUtil.getLog(BinaryMerger.class);
+	public static final String helpMessage = "output_file.obf [input_file.obf] ...: merges all obf files and merges address structure into 1";
 
 	public static void main(String[] args) throws IOException {
 		BinaryMerger in = new BinaryMerger();
@@ -61,7 +62,7 @@ public class BinaryMerger {
 
 	public void merger(String[] args) throws IOException {
 		if (args == null || args.length == 0) {
-			System.out.println("[output file] [input files]");
+			System.out.println(helpMessage);
 			return;
 		}
 		File outputFile = new File(args[0]);

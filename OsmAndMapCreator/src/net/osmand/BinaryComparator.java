@@ -48,6 +48,7 @@ public class BinaryComparator {
 		put("--buildings", BUILDINGS_COMPARE);
 		put("--intersections", INTERSECTIONS_COMPARE);
 	}};
+	public static final String helpMessage = "[--cities] [--city-names] [--streets] [--street-names] [--buildings] [--intersections] <first> <second>: compare <first> and <second>";
 
 	public static void main(String[] args) throws IOException {
 		BinaryComparator in = new BinaryComparator();
@@ -65,8 +66,12 @@ public class BinaryComparator {
 		}
 	}
 
-	private void compare(String[] argsAr) throws IOException {
-		List<String> args = new ArrayList<String>(Arrays.asList(argsAr));
+	private void compare(List<String> args) throws IOException {
+		if (args == null || args.size() < 2) {
+			System.out.println(helpMessage);
+			System.exit(1);
+		}
+		args = new ArrayList<String>(args);
 		int i = 0;
 		do {
 			String arg = args.get(i);
@@ -76,12 +81,16 @@ public class BinaryComparator {
 					args.remove(i);
 				} else {
 					System.out.print("Error: unknown argument");
+					System.out.println(helpMessage);
 					System.exit(1);
 				}
 			} else {
 				i++;
 			}
 		} while (i < args.size());
+		if (COMPARE_SET.isEmpty()) {
+			COMPARE_SET.addAll(COMPARE_ARGS.values());
+		}
 		BinaryMapIndexReader[] indexes = new BinaryMapIndexReader[args.size()];
 		RandomAccessFile[] rafs = new RandomAccessFile[args.size()];
 		for (i = 0; i < args.size(); i++) {
