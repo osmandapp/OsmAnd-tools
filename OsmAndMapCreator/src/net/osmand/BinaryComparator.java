@@ -66,12 +66,12 @@ public class BinaryComparator {
 		}
 	}
 
-	private void compare(List<String> args) throws IOException {
+	private void compare(String[] argArr) throws IOException {
+		List<String> args = new ArrayList<String>(Arrays.asList(argArr));
 		if (args == null || args.size() < 2) {
 			System.out.println(helpMessage);
 			System.exit(1);
 		}
-		args = new ArrayList<String>(args);
 		int i = 0;
 		do {
 			String arg = args.get(i);
