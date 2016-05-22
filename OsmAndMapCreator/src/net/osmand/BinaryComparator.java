@@ -48,6 +48,7 @@ public class BinaryComparator {
 		put("--buildings", BUILDINGS_COMPARE);
 		put("--intersections", INTERSECTIONS_COMPARE);
 	}};
+	public static final String helpMessage = "[--cities] [--city-names] [--streets] [--street-names] [--buildings] [--intersections] <first> <second>: compare <first> and <second>";
 
 	public static void main(String[] args) throws IOException {
 		BinaryComparator in = new BinaryComparator();
@@ -65,8 +66,12 @@ public class BinaryComparator {
 		}
 	}
 
-	private void compare(String[] argsAr) throws IOException {
-		List<String> args = new ArrayList<String>(Arrays.asList(argsAr));
+	private void compare(String[] argArr) throws IOException {
+		List<String> args = new ArrayList<String>(Arrays.asList(argArr));
+		if (args == null || args.size() < 2) {
+			System.out.println(helpMessage);
+			System.exit(1);
+		}
 		int i = 0;
 		do {
 			String arg = args.get(i);
@@ -76,12 +81,16 @@ public class BinaryComparator {
 					args.remove(i);
 				} else {
 					System.out.print("Error: unknown argument");
+					System.out.println(helpMessage);
 					System.exit(1);
 				}
 			} else {
 				i++;
 			}
 		} while (i < args.size());
+		if (COMPARE_SET.isEmpty()) {
+			COMPARE_SET.addAll(COMPARE_ARGS.values());
+		}
 		BinaryMapIndexReader[] indexes = new BinaryMapIndexReader[args.size()];
 		RandomAccessFile[] rafs = new RandomAccessFile[args.size()];
 		for (i = 0; i < args.size(); i++) {
@@ -242,20 +251,32 @@ public class BinaryComparator {
 	private City searchSimilarCities(City city, List<City> search, int j) {
 		// scan similar cities
 		Collator collator = OsmAndCollator.primaryCollator();
+		boolean offByOneError = false;
 		for (int t = j; t >= 0; t--) {
 			City ps = search.get(t);
 			if (collator.compare(strip(city.getName()), strip(ps.getName())) != 0) {
-				break;
+				if (offByOneError) {
+					break;
+				} else {
+					offByOneError = true;
+					continue;
+				}
 			}
 			if (MapUtils.getDistance(city.getLocation(), ps.getLocation()) < CITY_SIMILARITY_DISTANCE_POSSIBLE) {
 				return ps;
 			}
 		}
 
+		offByOneError = false;
 		for (int t = j; t < search.size(); t++) {
 			City ps = search.get(t);
 			if (collator.compare(strip(city.getName()), strip(ps.getName())) != 0) {
-				break;
+				if (offByOneError) {
+					break;
+				} else {
+					offByOneError = true;
+					continue;
+				}
 			}
 			if (MapUtils.getDistance(city.getLocation(), ps.getLocation()) < CITY_SIMILARITY_DISTANCE_POSSIBLE) {
 				return ps;
@@ -269,13 +290,7 @@ public class BinaryComparator {
 	}
 
 	private String strip(String name) {
-		name = name.indexOf('(') != -1 ? name.substring(0, name.indexOf('(')).trim() : name;
-		// Remove spaces in Netherlands' postcodes
-		name = (name.length() == 7 && 
-				Character.isDigit(name.charAt(0)) && Character.isDigit(name.charAt(1)) && 
-				Character.isDigit(name.charAt(2)) && Character.isDigit(name.charAt(3)) && 
-				name.charAt(4) == ' ') ? name.replaceAll(" ", "") : name;
-		return name;
+		return name.indexOf('(') != -1 ? name.substring(0, name.indexOf('(')).trim() : name;
 	}
 
 	private Comparator<City> comparator() {

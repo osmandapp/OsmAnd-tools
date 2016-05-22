@@ -36,6 +36,8 @@ public class MainUtilities {
 			String[] subArgsArray = subArgs.toArray(new String[args.length -1]);
 			if (utl.equals("check-ocean-tile")) {
 				OceanTilesCreator.checkOceanTile(subArgsArray);
+			} else if (utl.equals("compare")) {
+				BinaryComparator.main(subArgsArray);
 			} else if (utl.equals("merge-address-index")) {
 				BinaryMerger.main(subArgsArray);
 			} else if (utl.equals("generate-region-tags")) {
@@ -120,6 +122,7 @@ public class MainUtilities {
 		System.out.println("\t\t extract-roads-only <path to full map obf file> : extracts .road.obf (road-only map) file from full .obf");
 		System.out.println("\t\t generate-region-tags <path to input osm file (osm, bz2, gz)> <path to output osm file> <path to ocbf file>: process osm file and assign tag osmand_region_name to every entity.");
 		System.out.println("\t\t generate-ocean-tile-osm <optional path to osm file to write> <optional path to oceantiles_12.dat file>: generates ocean tiles osm file to check in JOSM ");
-		System.out.println("\t\t merge-address-index output_file.obf [input_file.obf] ...: merges all obf files and merges address structure into 1");
+		System.out.println("\t\t merge-index " + BinaryMerger.helpMessage);
+		System.out.println("\t\t compare " + BinaryComparator.helpMessage);
 	}
 }
