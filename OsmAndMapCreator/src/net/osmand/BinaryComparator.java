@@ -251,20 +251,32 @@ public class BinaryComparator {
 	private City searchSimilarCities(City city, List<City> search, int j) {
 		// scan similar cities
 		Collator collator = OsmAndCollator.primaryCollator();
+		boolean offByOneError = false;
 		for (int t = j; t >= 0; t--) {
 			City ps = search.get(t);
 			if (collator.compare(strip(city.getName()), strip(ps.getName())) != 0) {
-				break;
+				if (offByOneError) {
+					break;
+				} else {
+					offByOneError = true;
+					continue;
+				}
 			}
 			if (MapUtils.getDistance(city.getLocation(), ps.getLocation()) < CITY_SIMILARITY_DISTANCE_POSSIBLE) {
 				return ps;
 			}
 		}
 
+		offByOneError = false;
 		for (int t = j; t < search.size(); t++) {
 			City ps = search.get(t);
 			if (collator.compare(strip(city.getName()), strip(ps.getName())) != 0) {
-				break;
+				if (offByOneError) {
+					break;
+				} else {
+					offByOneError = true;
+					continue;
+				}
 			}
 			if (MapUtils.getDistance(city.getLocation(), ps.getLocation()) < CITY_SIMILARITY_DISTANCE_POSSIBLE) {
 				return ps;
