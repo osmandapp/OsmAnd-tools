@@ -122,7 +122,7 @@ public class MainUtilities {
 		System.out.println("\t\t extract-roads-only <path to full map obf file> : extracts .road.obf (road-only map) file from full .obf");
 		System.out.println("\t\t generate-region-tags <path to input osm file (osm, bz2, gz)> <path to output osm file> <path to ocbf file>: process osm file and assign tag osmand_region_name to every entity.");
 		System.out.println("\t\t generate-ocean-tile-osm <optional path to osm file to write> <optional path to oceantiles_12.dat file>: generates ocean tiles osm file to check in JOSM ");
-		System.out.println("\t\t merge-index" + BinaryMerger.helpMessage);
+		System.out.println("\t\t merge-index " + BinaryMerger.helpMessage);
 		System.out.println("\t\t compare " + BinaryComparator.helpMessage);
 	}
 }
