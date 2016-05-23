@@ -22,6 +22,7 @@ import javax.xml.stream.XMLStreamException;
 
 import net.osmand.PlatformUtil;
 import net.osmand.binary.BinaryMapDataObject;
+import net.osmand.data.LatLon;
 import net.osmand.map.OsmandRegions;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
@@ -193,6 +194,8 @@ public class AugmentedDiffsInspector {
 		Map<EntityId, Entity> newIds = new LinkedHashMap<Entity.EntityId, Entity>();
 		Map<EntityId, Entity> oldOIds = new LinkedHashMap<Entity.EntityId, Entity>();
 		Map<EntityId, Entity> newOIds = new LinkedHashMap<Entity.EntityId, Entity>();
+		Map<LatLon, Node> oldLocNodes = new LinkedHashMap<LatLon, Node>();
+		Map<LatLon, Node> newLocNodes = new LinkedHashMap<LatLon, Node>();
 		Map<String, Set<EntityId>> regionsNew = new LinkedHashMap<String, Set<EntityId>>();
 		Map<String, Set<EntityId>> regionsOld = new LinkedHashMap<String, Set<EntityId>>();
 	}
@@ -274,7 +277,8 @@ public class AugmentedDiffsInspector {
 						} else if (type == EntityType.WAY) {
 							currentWay = new Way(ID_BASE--);
 							currentWay.putTag("oid", nid.getId().toString());
-							registerEntity(ctx, old, currentWay, nid);
+							registerEntity(ctx, old, currentWay);
+							registerByOldId(ctx, old, currentWay, nid);
 							nid = EntityId.valueOf(currentWay);
 						} else if (type == EntityType.RELATION) {
 							// skip subrelations
@@ -334,21 +338,35 @@ public class AugmentedDiffsInspector {
 				return nd;
 			}
 		}
-		nd = new Node(Double.parseDouble(parser.getAttributeValue("", "lat")),
-				Double.parseDouble(parser.getAttributeValue("", "lon")), ID_BASE--);
-		if(oid != null) {
-			nd.putTag("oid", oid.getId().toString());
+		double lat = Double.parseDouble(parser.getAttributeValue("", "lat"));
+		double lon = Double.parseDouble(parser.getAttributeValue("", "lon"));
+		LatLon ll = new LatLon(lat, lon);
+		nd = old ? ctx.oldLocNodes.get(ll) : ctx.newLocNodes.get(ll);
+		if (nd == null) {
+			nd = new Node(lat, lon, ID_BASE--);
+			if (oid != null) {
+				nd.putTag("oid", oid.getId().toString());
+			}
+			registerEntity(ctx, old, nd);
+			if(old) {
+				ctx.oldLocNodes.put(ll, nd);
+			} else {
+				ctx.newLocNodes.put(ll, nd);
+			}
 		}
-		registerEntity(ctx, old, nd, oid);
+		registerByOldId(ctx, old, nd, oid);
 		return nd;
 	}
 
-	private void registerEntity(Context ctx, boolean old, Entity nd, EntityId oid) {
+	private void registerEntity(Context ctx, boolean old, Entity nd) {
 		if(old) {
 			ctx.oldIds.put(EntityId.valueOf(nd), nd);
 		} else {
 			ctx.newIds.put(EntityId.valueOf(nd), nd);
 		}
+	}
+
+	private void registerByOldId(Context ctx, boolean old, Entity nd, EntityId oid) {
 		if(oid != null) {
 			if(old) {
 				ctx.oldOIds.put(oid, nd);
