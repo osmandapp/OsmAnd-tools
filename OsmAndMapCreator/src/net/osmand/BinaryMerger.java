@@ -196,8 +196,6 @@ public class BinaryMerger {
 						for (City c : mergeGroup.get(uc)) {
 							addRegionToCityName(c, cityMap.get(c));
 						}
-					}
-					for (City uc : uniqueNamesakes) {
 						addRegionToCityName(uc, cityMap.get(uc));
 					}
 				}
