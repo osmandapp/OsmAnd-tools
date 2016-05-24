@@ -149,6 +149,62 @@ public class BinaryMerger {
 		return city;
 	}
 
+	private void mergeCitiesByNameDistance(List<City> orderedCities, Map<City, List<City>> mergeGroup,
+			Map<City, BinaryMapIndexReader> cityMap, boolean rename) {
+		for (int i = 0; i < orderedCities.size() - 1; i++) {
+			int j = i;
+			City oc = orderedCities.get(i);
+			City nc = orderedCities.get(j);
+			BinaryMapIndexReader ocIndexReader = cityMap.get(oc);
+			List<City> uniqueNamesakes = new ArrayList<City>();
+			boolean renameGroup = false;
+			while (MapObject.BY_NAME_COMPARATOR.areEqual(nc, oc)) {
+				boolean isUniqueCity = true;
+				boolean areCitiesInSameRegion = ocIndexReader == cityMap.get(nc);
+				for (ListIterator<City> uci = uniqueNamesakes.listIterator(); uci.hasNext(); ) {
+					City uc = uci.next();
+					if (isSameCity(uc, nc)) {
+						// Prefer cities with shortest names ("1101DL" instead of "1101 DL")
+						boolean shorter = nc.getName().length() < uc.getName().length();
+						if (shorter) {
+							mergeGroup.put(nc, mergeGroup.remove(uc));
+							uniqueNamesakes.remove(uc);
+							uniqueNamesakes.add(nc);
+							City tmp = uc;
+							uc = nc;
+							nc = tmp;
+						}
+						orderedCities.remove(nc);
+						mergeGroup.get(uc).add(nc);
+						isUniqueCity = false;
+						break;
+					}
+				}
+				if (isUniqueCity) {
+					uniqueNamesakes.add(nc);
+					mergeGroup.put(nc, new ArrayList<City>());
+					j++;
+				}
+				renameGroup = renameGroup || (rename && !areCitiesInSameRegion && uniqueNamesakes.size() > 1);
+				nc = (j < orderedCities.size()) ? orderedCities.get(j) : null;
+			}
+			if (uniqueNamesakes.size() == 1 && mergeGroup.get(uniqueNamesakes.get(0)).size() == 0) {
+				mergeGroup.remove(uniqueNamesakes.get(0));
+			} else {
+				if (renameGroup) {
+					for (City uc : uniqueNamesakes) {
+						for (City c : mergeGroup.get(uc)) {
+							addRegionToCityName(c, cityMap.get(c));
+						}
+					}
+					for (City uc : uniqueNamesakes) {
+						addRegionToCityName(uc, cityMap.get(uc));
+					}
+				}
+			}
+		}
+	}
+
 	private void combineAddressIndex(String name, BinaryMapIndexWriter writer, AddressRegion[] addressRegions, BinaryMapIndexReader[] indexes)
 			throws IOException {
 		Set<String> attributeTagsTableSet = new TreeSet<String>();
@@ -230,46 +286,6 @@ public class BinaryMerger {
 			normalizedPostcode = Postcode.normalize(city.getPostcode(), country);
 			city.setPostcode(normalizedPostcode);
 		}
-	}
-
-	private void mergeCitiesByNameDistance(List<City> orderedCities, Map<City, List<City>> mergeCityGroup, 
-			Map<City, BinaryMapIndexReader> cityMap, boolean rename) {
-		for (int i = 0; i < orderedCities.size(); i++) {
-			boolean renameGroup = false;
-			int j = i + 1;
-			City oc = orderedCities.get(i);
-			City nc = (j < orderedCities.size()) ? orderedCities.get(j) : null;
-			while (MapObject.BY_NAME_COMPARATOR.areEqual(nc, oc)) {
-				if (isSameCity(oc, nc)) {
-					if (!mergeCityGroup.containsKey(oc)) {
-						mergeCityGroup.put(oc, new ArrayList<City>());
-					}
-					boolean shorter = nc.getName().length() < oc.getName().length();
-					// Prefer cities with shortest names ("1101DL" instead "1101 DL")
-					if (shorter) {
-						orderedCities.remove(i);
-						mergeCityGroup.put(nc, mergeCityGroup.remove(oc));
-						City tmp = oc;
-						oc = nc;
-						nc = tmp;
-					} else {
-						orderedCities.remove(j);
-					}
-					mergeCityGroup.get(oc).add(nc);
-				} else {
-					boolean areCitiesInSameRegion = cityMap.get(oc) == cityMap.get(nc);
-					renameGroup = renameGroup || (rename && !areCitiesInSameRegion);
-					j++;
-				}
-				nc = (j < orderedCities.size()) ? orderedCities.get(j) : null;
-			}
-			if (renameGroup) {
-				for (City c : orderedCities.subList(i, j)) {
-					addRegionToCityName(c, cityMap.get(c));
-				}
-			}
-		}
-
 	}
 
 	private void preloadStreetsAndBuildings(BinaryMapIndexReader rindex, City city,

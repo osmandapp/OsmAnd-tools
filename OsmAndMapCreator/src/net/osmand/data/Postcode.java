@@ -160,7 +160,7 @@ public class Postcode {
 			put("Turkmenistan",                                Arrays.asList("(?i)(?:TM-?)?(\\d{6})",                         "$1"));
 			put("Turks-and-caicos-islands",                    Arrays.asList("(?i)(?:TC-?)?(TKCA)\\W*(1ZZ)",                  "$1 $2"));
 			put("Virgin-islands-us",                           Arrays.asList("(?i)(?:VI-?)?(\\d{5})\\W*(-\\d{4})?",           "$1$2"));
-			put("Ukraine",                                     Arrays.asList("(?i)(?:UA-?)?(\\d{5})",                         "$1"));
+			put("Ukraine",                                     Arrays.asList("(?i)(?:UA-?)?(\\d{2})\\W*(\\d{3})",             "$1$2"));
 			put("Us",                                          Arrays.asList("(?i)(?:US-?)?(\\d{5})\\W*(-\\d{4})?",           "$1$2"));
 			put("Uruguay",                                     Arrays.asList("(?i)(?:UY-?)?(\\d{5})",                         "$1"));
 			put("Uzbekistan",                                  Arrays.asList("(?i)(?:UZ-?)?(\\d{6})",                         "$1"));
@@ -175,10 +175,10 @@ public class Postcode {
 			Matcher matcher = pattern.matcher(postcode);
 			result = matcher.replaceAll(replacement);
 			if (!result.equals(postcode)) {
-				log.info("Normalize " + country + " code: " + postcode + " -> " + result);
+				log.info("Normalize " + country + "'s postcode: " + postcode + " -> " + result);
 			}
 			if (!matcher.matches()) {
-				log.info("Not matches " + country + " code: " + postcode);
+				log.info("Not matches " + country + "'s postcode regex: " + postcode);
 			}
 		}
 		return result;
