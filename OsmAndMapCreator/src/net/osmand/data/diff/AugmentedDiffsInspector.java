@@ -52,8 +52,8 @@ public class AugmentedDiffsInspector {
 	private static Log log = PlatformUtil.getLog(AugmentedDiffsInspector.class);
 
 
-	private static String OSMAND_DELETE_TAG = "osmand_change";
-	private static String OSMAND_DELETE_VALUE = "delete";
+	public static String OSMAND_DELETE_TAG = "osmand_change";
+	public static String OSMAND_DELETE_VALUE = "delete";
 	private static long ID_BASE = -1000;
 	public static void main(String[] args) {
 		try {

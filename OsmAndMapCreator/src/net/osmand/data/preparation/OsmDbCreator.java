@@ -9,6 +9,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.HashMap;
@@ -17,6 +18,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 import net.osmand.data.City.CityType;
+import net.osmand.data.diff.AugmentedDiffsInspector;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.Entity.EntityType;
@@ -57,9 +59,9 @@ public class OsmDbCreator implements IOsmStorageFilter {
 	private PreparedStatement delNode;
 	private PreparedStatement delRelations;
 	private PreparedStatement delWays;
-	private TLongHashSet nodeIds;
-	private TLongHashSet wayIds;
-	private TLongHashSet relationIds;
+	private TLongHashSet nodeIds = new TLongHashSet();
+	private TLongHashSet wayIds = new TLongHashSet();
+	private TLongHashSet relationIds = new TLongHashSet();;
 
 	private Connection dbConn;
 
@@ -157,6 +159,30 @@ public class OsmDbCreator implements IOsmStorageFilter {
 		int hash = (x + y) >> 10;
 		return hash;
 	}
+	
+	public TLongHashSet getNodeIds() {
+		return nodeIds;
+	}
+	
+	public void setNodeIds(TLongHashSet nodeIds) {
+		this.nodeIds = nodeIds;
+	}
+	
+	public TLongHashSet getWayIds() {
+		return wayIds;
+	}
+	
+	public void setWayIds(TLongHashSet wayIds) {
+		this.wayIds = wayIds;
+	}
+	
+	public TLongHashSet getRelationIds() {
+		return relationIds;
+	}
+	
+	public void setRelationIds(TLongHashSet relationIds) {
+		this.relationIds = relationIds;
+	}
 
 	private Long getHash(long l, int ord) {
 		if(l < 0) {
@@ -211,10 +237,24 @@ public class OsmDbCreator implements IOsmStorageFilter {
 			stat.executeUpdate("create index IdRIndex ON relations (id)"); //$NON-NLS-1$
 			stat.close();
 		}
+		initIds("node", nodeIds);
+		initIds("ways", wayIds);
+		initIds("relations", relationIds);
 		prepNode = dbConn.prepareStatement("insert into node values (?, ?, ?, ?)"); //$NON-NLS-1$
 		prepWays = dbConn.prepareStatement("insert into ways values (?, ?, ?, ?, ?)"); //$NON-NLS-1$
 		prepRelations = dbConn.prepareStatement("insert into relations values (?, ?, ?, ?, ?, ?, ?)"); //$NON-NLS-1$
 		dbConn.setAutoCommit(false);
+	}
+
+	private void initIds(String table, TLongHashSet col) throws SQLException {
+		if(col.isEmpty()) {
+			Statement s = dbConn.createStatement();
+			ResultSet rs = s.executeQuery("select id from " + table);
+			while(rs.next()) {
+				col.add(rs.getLong(1));
+			}
+			s.close();
+		}
 	}
 
 	public void finishLoading() throws SQLException {
@@ -244,20 +284,26 @@ public class OsmDbCreator implements IOsmStorageFilter {
 	
 	
 	private void checkEntityExists(Entity e, long id, boolean delete) throws SQLException {
-		if (nodeIds == null) {
-			nodeIds = new TLongHashSet();
-			wayIds = new TLongHashSet();
-			relationIds = new TLongHashSet();
+		if (delNode == null) {
 			delNode = dbConn.prepareStatement("delete from node where id = ?"); //$NON-NLS-1$
 			delWays = dbConn.prepareStatement("delete from ways where id = ?"); //$NON-NLS-1$
 			delRelations = dbConn.prepareStatement("delete from relations where id = ? and del = ?"); //$NON-NLS-1$
 		}
+		boolean present = false;
 		if (e instanceof Node) {
-			nodeIds.add(id);
+			present = !nodeIds.add(id);
 		} else if (e instanceof Way) {
-			wayIds.add(id);
+			present = !wayIds.add(id);
 		} else if (e instanceof Relation) {
-			relationIds.add(id);
+			present = !relationIds.add(id);
+		}
+		if(!present) {
+			return;
+		}
+		if (e.getTags().isEmpty()) {
+			e.putTag(AugmentedDiffsInspector.OSMAND_DELETE_TAG,
+					AugmentedDiffsInspector.OSMAND_DELETE_VALUE);
+			delete = true;
 		}
 		prepNode.executeBatch();
 		prepWays.executeBatch();
@@ -300,7 +346,8 @@ public class OsmDbCreator implements IOsmStorageFilter {
 				throw new RuntimeException(es);
 			}
 			long id = convertId(e);
-			boolean delete = "delete".equals(e.getTag("osmand_change"));
+			boolean delete = AugmentedDiffsInspector.OSMAND_DELETE_VALUE.
+					equals(e.getTag(AugmentedDiffsInspector.OSMAND_DELETE_TAG));
 			if (osmChange || ovewriteIds || e instanceof Relation) {
 				checkEntityExists(e, id, delete);
 			}

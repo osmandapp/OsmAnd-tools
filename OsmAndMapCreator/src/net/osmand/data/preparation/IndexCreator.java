@@ -283,7 +283,7 @@ public class IndexCreator {
 
 	private OsmDbCreator extractOsmToNodesDB(OsmDbAccessor accessor,
 			File readFile, IProgress progress, IOsmStorageFilter addFilter, int additionId, int shiftId,
-			boolean ovewriteIds, boolean createTables) throws
+			boolean ovewriteIds, boolean createTables, OsmDbCreator previous) throws
 			IOException, SQLException, XmlPullParserException {
 		boolean pbfFile = false;
 		InputStream stream = new BufferedInputStream(new FileInputStream(readFile), 8192 * 4);
@@ -321,6 +321,11 @@ public class IndexCreator {
 
 		// 1. Loading osm file
 		OsmDbCreator dbCreator = new OsmDbCreator(additionId, shiftId, ovewriteIds);
+		if(previous != null) {
+			dbCreator.setNodeIds(previous.getNodeIds());
+			dbCreator.setWayIds(previous.getWayIds());
+			dbCreator.setRelationIds(previous.getRelationIds());
+		}
 		dbCreator.setBackwardCompatibleIds(backwardComptibleIds);
 		try {
 			setGeneralProgress(progress, "[15 / 100]"); //$NON-NLS-1$
@@ -416,9 +421,10 @@ public class IndexCreator {
 			
 		accessor.setDbConn(dbConn, osmDBdialect);
 		boolean shiftIds = generateUniqueIds || overwriteIds ;
+		OsmDbCreator dbCreator = null;
 		for (File read : readFile) {
-			OsmDbCreator dbCreator = extractOsmToNodesDB(accessor, read, progress, addFilter, shiftIds ? mapInd : 0,
-					shiftIds ? shift : 0, overwriteIds, mapInd == 0);
+			dbCreator = extractOsmToNodesDB(accessor, read, progress, addFilter, shiftIds ? mapInd : 0,
+					shiftIds ? shift : 0, overwriteIds, mapInd == 0, dbCreator);
 			accessor.updateCounts(dbCreator);
 			if (readFile.length > 1) {
 				log.info("Processing " + (mapInd + 1) + " file out of " + readFile.length);
@@ -478,7 +484,7 @@ public class IndexCreator {
 		Object dbConn = getDatabaseConnection(dbFile.getAbsolutePath(), osmDBdialect);
 		accessor.setDbConn((Connection) dbConn, osmDBdialect);
 		OsmDbCreator dbCreator = null;
-		dbCreator = extractOsmToNodesDB(accessor, readFile, progress, addFilter, 0, 0, false, true);
+		dbCreator = extractOsmToNodesDB(accessor, readFile, progress, addFilter, 0, 0, false, true, null);
 		accessor.initDatabase(dbCreator);
 	}
 
