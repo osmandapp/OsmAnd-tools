@@ -241,13 +241,8 @@ public class BinaryMerger {
 			List<BinaryFileReference> refs = new ArrayList<BinaryFileReference>();
 			// 1. write cities
 			writer.startCityBlockIndex(type);
-			for (City city : cities) {
-				int cityType = city.isPostcode() ? -1 : city.getType().ordinal();
-				refs.add(writer.writeCityHeader(city, cityType, tagRules));
-			}
 			Map<City, Map<Street, List<Node>>> namesakesStreetNodes = new HashMap<City, Map<Street, List<Node>>>();
-			for (int i = 0; i < refs.size(); i++) {
-				BinaryFileReference ref = refs.get(i);
+			for (int i = 0; i < cities.size(); i++) {
 				City city = cities.get(i);
 				BinaryMapIndexReader rindex = cityMap.get(city);
 				preloadStreetsAndBuildings(rindex, city, namesakesStreetNodes);
@@ -259,6 +254,9 @@ public class BinaryMerger {
 					}
 				}
 
+				int cityType = city.isPostcode() ? -1 : city.getType().ordinal();
+				BinaryFileReference ref = writer.writeCityHeader(city, cityType, tagRules);
+				refs.add(ref);
 				writer.writeCityIndex(city, city.getStreets(), namesakesStreetNodes.get(city), ref, tagRules);
 				IndexAddressCreator.putNamedMapObject(namesIndex, city, ref.getStartPointer());
 				for (Street s : city.getStreets()) {
