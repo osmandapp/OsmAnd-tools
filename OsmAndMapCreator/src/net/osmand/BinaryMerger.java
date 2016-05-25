@@ -62,56 +62,66 @@ public class BinaryMerger {
 		}
 	}
 
-	public void merger(String[] args) throws IOException {
-		if (args == null || args.length == 0) {
-			System.out.println(helpMessage);
-			return;
-		}
-		File outputFile = new File(args[0]);
-		List<File> parts = new ArrayList<File>();
-		List<File> toDelete = new ArrayList<File>();
-		for (int i = 1; i < args.length; i++) {
-			File file = new File(args[i]);
-			if (file.getName().endsWith(".zip")) {
-				File tmp = File.createTempFile(file.getName(), "obf");
-				ZipInputStream zis = new ZipInputStream(new FileInputStream(file));
-				ZipEntry ze;
-				while ((ze = zis.getNextEntry()) != null) {
-					String name = ze.getName();
-					if (!ze.isDirectory() && name.endsWith(".obf")) {
-						FileOutputStream fout = new FileOutputStream(tmp);
-						Algorithms.streamCopy(zis, fout);
-						fout.close();
-						parts.add(tmp);
-					}
-				}
-				zis.close();
-				tmp.deleteOnExit();
-				toDelete.add(tmp);
-
-			} else {
-				parts.add(file);
-			}
-		}
-		if (outputFile.exists()) {
-			if (!outputFile.delete()) {
-				throw new IOException("Cannot delete file " + outputFile);
-			}
-		}
-		combineParts(outputFile, parts);
-		for (File f : toDelete) {
-			if (!f.delete()) {
-				throw new IOException("Cannot delete file " + outputFile);
-			}
-		}
-	}
-
 	public static final void writeInt(CodedOutputStream ous, int v) throws IOException {
 		ous.writeRawByte((v >>> 24) & 0xFF);
 		ous.writeRawByte((v >>> 16) & 0xFF);
 		ous.writeRawByte((v >>>  8) & 0xFF);
 		ous.writeRawByte(v & 0xFF);
 		//written += 4;
+	}
+
+	private void mergeCitiesByNameDistance(List<City> orderedCities, Map<City, List<City>> mergeGroup,
+			Map<City, BinaryMapIndexReader> cityMap, boolean rename) {
+		for (int i = 0; i < orderedCities.size() - 1; i++) {
+			int j = i;
+			City oc = orderedCities.get(i);
+			City nc = orderedCities.get(j);
+			BinaryMapIndexReader ocIndexReader = cityMap.get(oc);
+			List<City> uniqueNamesakes = new ArrayList<City>();
+			boolean renameGroup = false;
+			while (MapObject.BY_NAME_COMPARATOR.areEqual(nc, oc)) {
+				boolean isUniqueCity = true;
+				for (ListIterator<City> uci = uniqueNamesakes.listIterator(); uci.hasNext(); ) {
+					City uc = uci.next();
+					if (isSameCity(uc, nc)) {
+						// Prefer cities with shortest names ("1101DL" instead of "1101 DL")
+						boolean shorter = nc.getName().length() < uc.getName().length();
+						if (shorter) {
+							mergeGroup.put(nc, mergeGroup.remove(uc));
+							uniqueNamesakes.remove(uc);
+							uniqueNamesakes.add(nc);
+							City tmp = uc;
+							uc = nc;
+							nc = tmp;
+						}
+						orderedCities.remove(nc);
+						mergeGroup.get(uc).add(nc);
+						isUniqueCity = false;
+						break;
+					}
+				}
+				if (isUniqueCity) {
+					uniqueNamesakes.add(nc);
+					mergeGroup.put(nc, new ArrayList<City>());
+					j++;
+				}
+				boolean areCitiesInSameRegion = ocIndexReader == cityMap.get(nc);
+				renameGroup = renameGroup || (rename && !areCitiesInSameRegion && uniqueNamesakes.size() > 1);
+				nc = (j < orderedCities.size()) ? orderedCities.get(j) : null;
+			}
+			if (uniqueNamesakes.size() == 1 && mergeGroup.get(uniqueNamesakes.get(0)).size() == 0) {
+				mergeGroup.remove(uniqueNamesakes.get(0));
+			} else {
+				if (renameGroup) {
+					for (City uc : uniqueNamesakes) {
+						for (City c : mergeGroup.get(uc)) {
+							addRegionToCityName(c, cityMap.get(c));
+						}
+						addRegionToCityName(uc, cityMap.get(uc));
+					}
+				}
+			}
+		}
 	}
 
 	private List<String> extractCountryAndRegionNames(BinaryMapIndexReader index) {
@@ -149,60 +159,63 @@ public class BinaryMerger {
 		return city;
 	}
 
-	private void mergeCitiesByNameDistance(List<City> orderedCities, Map<City, List<City>> mergeGroup,
-			Map<City, BinaryMapIndexReader> cityMap, boolean rename) {
-		for (int i = 0; i < orderedCities.size() - 1; i++) {
-			int j = i;
-			City oc = orderedCities.get(i);
-			City nc = orderedCities.get(j);
-			BinaryMapIndexReader ocIndexReader = cityMap.get(oc);
-			List<City> uniqueNamesakes = new ArrayList<City>();
-			boolean renameGroup = false;
-			while (MapObject.BY_NAME_COMPARATOR.areEqual(nc, oc)) {
-				boolean isUniqueCity = true;
-				boolean areCitiesInSameRegion = ocIndexReader == cityMap.get(nc);
-				for (ListIterator<City> uci = uniqueNamesakes.listIterator(); uci.hasNext(); ) {
-					City uc = uci.next();
-					if (isSameCity(uc, nc)) {
-						// Prefer cities with shortest names ("1101DL" instead of "1101 DL")
-						boolean shorter = nc.getName().length() < uc.getName().length();
-						if (shorter) {
-							mergeGroup.put(nc, mergeGroup.remove(uc));
-							uniqueNamesakes.remove(uc);
-							uniqueNamesakes.add(nc);
-							City tmp = uc;
-							uc = nc;
-							nc = tmp;
+	private void normalizePostcode(City city, String country) {
+		String normalizedPostcode;
+		if (city.isPostcode()) {
+			normalizedPostcode = Postcode.normalize(city.getName(), country);
+			city.setName(normalizedPostcode);
+			city.setEnName(normalizedPostcode);
+		}
+		if (city.getPostcode() != null) {
+			normalizedPostcode = Postcode.normalize(city.getPostcode(), country);
+			city.setPostcode(normalizedPostcode);
+		}
+	}
+
+	private void preloadStreetsAndBuildings(BinaryMapIndexReader rindex, City city,
+			Map<City, Map<Street, List<Node>>> namesakesStreetNodes) throws IOException {
+		rindex.preloadStreets(city, null);
+		Map<Street, List<Node>> streetNodes = new LinkedHashMap<Street, List<Node>>();
+		Map<String, List<Node>> streetNodesN = new LinkedHashMap<String, List<Node>>();
+		for (Street street : city.getStreets()) {
+			rindex.preloadBuildings(street, null);
+			ArrayList<Node> nns = new ArrayList<Node>();
+			for (Street is : street.getIntersectedStreets()) {
+				List<Node> list = streetNodesN.get(is.getName());
+				Node nn = null;
+				if (list != null) {
+					boolean  nameEqual = false;
+					double dd = 100000;
+					for (Node n : list) {
+						double d = MapUtils.getDistance(n.getLatLon(), is.getLocation());
+						if(Algorithms.objectEquals(street.getName(), n.getTag("name")) && 
+								(d < dd || !nameEqual)) {
+							nn = n;
+							dd = d;
+							nameEqual = true;
+						} else if(!nameEqual && d < dd ) {
+							nn = n;
+							dd = d;
 						}
-						orderedCities.remove(nc);
-						mergeGroup.get(uc).add(nc);
-						isUniqueCity = false;
-						break;
 					}
 				}
-				if (isUniqueCity) {
-					uniqueNamesakes.add(nc);
-					mergeGroup.put(nc, new ArrayList<City>());
-					j++;
+				if (nn == null) {
+					int ty = (int) MapUtils.getTileNumberY(24, is.getLocation().getLatitude());
+					int tx = (int) MapUtils.getTileNumberY(24, is.getLocation().getLongitude());
+					long id = (((long) tx << 32)) | ty;
+					nn = new Node(is.getLocation().getLatitude(), is.getLocation().getLongitude(), id);
+					nn.putTag("name", is.getName());
 				}
-				renameGroup = renameGroup || (rename && !areCitiesInSameRegion && uniqueNamesakes.size() > 1);
-				nc = (j < orderedCities.size()) ? orderedCities.get(j) : null;
+				nns.add(nn);
 			}
-			if (uniqueNamesakes.size() == 1 && mergeGroup.get(uniqueNamesakes.get(0)).size() == 0) {
-				mergeGroup.remove(uniqueNamesakes.get(0));
+			streetNodes.put(street, nns);
+			if(streetNodesN.containsKey(street.getName())) {
+				streetNodesN.get(street.getName()).addAll(nns);
 			} else {
-				if (renameGroup) {
-					for (City uc : uniqueNamesakes) {
-						for (City c : mergeGroup.get(uc)) {
-							addRegionToCityName(c, cityMap.get(c));
-						}
-					}
-					for (City uc : uniqueNamesakes) {
-						addRegionToCityName(uc, cityMap.get(uc));
-					}
-				}
+				streetNodesN.put(street.getName(), nns);
 			}
 		}
+		namesakesStreetNodes.put(city, streetNodes);
 	}
 
 	private void combineAddressIndex(String name, BinaryMapIndexWriter writer, AddressRegion[] addressRegions, BinaryMapIndexReader[] indexes)
@@ -273,65 +286,22 @@ public class BinaryMerger {
 		writer.endWriteAddressIndex();
 	}
 
-	private void normalizePostcode(City city, String country) {
-		String normalizedPostcode;
-		if (city.isPostcode()) {
-			normalizedPostcode = Postcode.normalize(city.getName(), country);
-			city.setName(normalizedPostcode);
-			city.setEnName(normalizedPostcode);
-		}
-		if (city.getPostcode() != null) {
-			normalizedPostcode = Postcode.normalize(city.getPostcode(), country);
-			city.setPostcode(normalizedPostcode);
+	public static void copyBinaryPart(CodedOutputStream ous, byte[] BUFFER, RandomAccessFile raf, long fp, int length)
+			throws IOException {
+		raf.seek(fp);
+		int toRead = length;
+		while (toRead > 0) {
+			int read = raf.read(BUFFER);
+			if (read == -1) {
+				throw new IllegalArgumentException("Unexpected end of file");
+			}
+			if (toRead < read) {
+				read = toRead;
+			}
+			ous.writeRawBytes(BUFFER, 0, read);
+			toRead -= read;
 		}
 	}
-
-	private void preloadStreetsAndBuildings(BinaryMapIndexReader rindex, City city,
-			Map<City, Map<Street, List<Node>>> namesakesStreetNodes) throws IOException {
-		rindex.preloadStreets(city, null);
-		Map<Street, List<Node>> streetNodes = new LinkedHashMap<Street, List<Node>>();
-		Map<String, List<Node>> streetNodesN = new LinkedHashMap<String, List<Node>>();
-		for (Street street : city.getStreets()) {
-			rindex.preloadBuildings(street, null);
-			ArrayList<Node> nns = new ArrayList<Node>();
-			for (Street is : street.getIntersectedStreets()) {
-				List<Node> list = streetNodesN.get(is.getName());
-				Node nn = null;
-				if (list != null) {
-					boolean  nameEqual = false;
-					double dd = 100000;
-					for (Node n : list) {
-						double d = MapUtils.getDistance(n.getLatLon(), is.getLocation());
-						if(Algorithms.objectEquals(street.getName(), n.getTag("name")) && 
-								(d < dd || !nameEqual)) {
-							nn = n;
-							dd = d;
-							nameEqual = true;
-						} else if(!nameEqual && d < dd ) {
-							nn = n;
-							dd = d;
-						}
-					}
-				}
-				if (nn == null) {
-					int ty = (int) MapUtils.getTileNumberY(24, is.getLocation().getLatitude());
-					int tx = (int) MapUtils.getTileNumberY(24, is.getLocation().getLongitude());
-					long id = (((long) tx << 32)) | ty;
-					nn = new Node(is.getLocation().getLatitude(), is.getLocation().getLongitude(), id);
-					nn.putTag("name", is.getName());
-				}
-				nns.add(nn);
-			}
-			streetNodes.put(street, nns);
-			if(streetNodesN.containsKey(street.getName())) {
-				streetNodesN.get(street.getName()).addAll(nns);
-			} else {
-				streetNodesN.put(street.getName(), nns);
-			}
-		}
-		namesakesStreetNodes.put(city, streetNodes);
-	}
-
 
 	public void combineParts(File fileToExtract, List<File> files) throws IOException {
 		BinaryMapIndexReader[] indexes = new BinaryMapIndexReader[files.size()];
@@ -391,23 +361,48 @@ public class BinaryMerger {
 		ous.flush();
 	}
 
+	public void merger(String[] args) throws IOException {
+		if (args == null || args.length == 0) {
+			System.out.println(helpMessage);
+			return;
+		}
+		File outputFile = new File(args[0]);
+		List<File> parts = new ArrayList<File>();
+		List<File> toDelete = new ArrayList<File>();
+		for (int i = 1; i < args.length; i++) {
+			File file = new File(args[i]);
+			if (file.getName().endsWith(".zip")) {
+				File tmp = File.createTempFile(file.getName(), "obf");
+				ZipInputStream zis = new ZipInputStream(new FileInputStream(file));
+				ZipEntry ze;
+				while ((ze = zis.getNextEntry()) != null) {
+					String name = ze.getName();
+					if (!ze.isDirectory() && name.endsWith(".obf")) {
+						FileOutputStream fout = new FileOutputStream(tmp);
+						Algorithms.streamCopy(zis, fout);
+						fout.close();
+						parts.add(tmp);
+					}
+				}
+				zis.close();
+				tmp.deleteOnExit();
+				toDelete.add(tmp);
 
-	public static void copyBinaryPart(CodedOutputStream ous, byte[] BUFFER, RandomAccessFile raf, long fp, int length)
-			throws IOException {
-		raf.seek(fp);
-		int toRead = length;
-		while (toRead > 0) {
-			int read = raf.read(BUFFER);
-			if (read == -1) {
-				throw new IllegalArgumentException("Unexpected end of file");
+			} else {
+				parts.add(file);
 			}
-			if (toRead < read) {
-				read = toRead;
+		}
+		if (outputFile.exists()) {
+			if (!outputFile.delete()) {
+				throw new IOException("Cannot delete file " + outputFile);
 			}
-			ous.writeRawBytes(BUFFER, 0, read);
-			toRead -= read;
+		}
+		combineParts(outputFile, parts);
+		for (File f : toDelete) {
+			if (!f.delete()) {
+				throw new IOException("Cannot delete file " + outputFile);
+			}
 		}
 	}
-
 
 }
