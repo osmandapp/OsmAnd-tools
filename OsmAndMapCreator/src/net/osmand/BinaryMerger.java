@@ -26,6 +26,7 @@ import net.osmand.binary.BinaryIndexPart;
 import net.osmand.binary.BinaryMapAddressReaderAdapter;
 import net.osmand.binary.BinaryMapAddressReaderAdapter.AddressRegion;
 import net.osmand.binary.BinaryMapIndexReader;
+import net.osmand.binary.BinaryMapPoiReaderAdapter.PoiRegion;
 import net.osmand.binary.OsmandOdb;
 import net.osmand.data.City;
 import net.osmand.data.MapObject;
@@ -286,6 +287,11 @@ public class BinaryMerger {
 		writer.endWriteAddressIndex();
 	}
 
+	private void combinePoiIndex(String name, BinaryMapIndexWriter writer, PoiRegion[] poiRegions, BinaryMapIndexReader[] indexes)
+			throws IOException {
+
+	}
+
 	public static void copyBinaryPart(CodedOutputStream ous, byte[] BUFFER, RandomAccessFile raf, long fp, int length)
 			throws IOException {
 		raf.seek(fp);
@@ -335,6 +341,7 @@ public class BinaryMerger {
 		CodedOutputStream ous = writer.getCodedOutStream();
 		byte[] BUFFER_TO_READ = new byte[BUFFER_SIZE];
 		AddressRegion[] addressRegions = new AddressRegion[files.size()];
+		PoiRegion[] poiRegions = new PoiRegion[files.size()];
 		for (int k = 0; k < indexes.length; k++) {
 			BinaryMapIndexReader index = indexes[k];
 			RandomAccessFile raf = rafs[k];
@@ -342,6 +349,8 @@ public class BinaryMerger {
 				BinaryIndexPart part = index.getIndexes().get(i);
 				if (part.getFieldNumber() == OsmandOdb.OsmAndStructure.ADDRESSINDEX_FIELD_NUMBER) {
 					addressRegions[k] = (AddressRegion) part;
+				} else if (part.getFieldNumber() == OsmandOdb.OsmAndStructure.POIINDEX_FIELD_NUMBER) {
+					poiRegions[k] = (PoiRegion) part;
 				} else {
 					ous.writeTag(part.getFieldNumber(), WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
 					writeInt(ous, part.getLength());
@@ -357,6 +366,7 @@ public class BinaryMerger {
 			nm = nm.substring(0, i);
 		}
 		combineAddressIndex(nm, writer, addressRegions, indexes);
+		combinePoiIndex(nm, writer, poiRegions, indexes);
 		ous.writeInt32(OsmandOdb.OsmAndStructure.VERSIONCONFIRM_FIELD_NUMBER, version);
 		ous.flush();
 	}
