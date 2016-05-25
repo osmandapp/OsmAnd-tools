@@ -59,12 +59,12 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	private static final int ZOOM_TO_WRITE_CATEGORIES_END = 16;
 	private static final int CHARACTERS_TO_BUILD = 4;
 	private boolean useInMemoryCreator = true;
-	public static long GENERATE_OBJ_ID = -(1l << 10l);
+	public static long GENERATE_OBJ_ID = -(1L << 10L);
 	public static boolean ZIP_LONG_STRINGS = false;
 	public static int ZIP_STRING_LIMIT = 100;
 
 
-	private boolean ovewriteIds;
+	private boolean overwriteIds;
 	private List<Amenity> tempAmenityList = new ArrayList<Amenity>();
 	private Map<EntityId, Map<String, String>> propogatedTags = new LinkedHashMap<Entity.EntityId, Map<String, String>>();
 
@@ -74,9 +74,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	private Map<String, PoiAdditionalType> additionalTypesByTag = new HashMap<String, PoiAdditionalType>();
 
 
-	public IndexPoiCreator(MapRenderingTypesEncoder renderingTypes, boolean ovewriteIds) {
+	public IndexPoiCreator(MapRenderingTypesEncoder renderingTypes, boolean overwriteIds) {
 		this.renderingTypes = renderingTypes;
-		this.ovewriteIds = ovewriteIds;
+		this.overwriteIds = overwriteIds;
 		this.poiTypes = MapPoiTypes.getDefault();
 	}
 
@@ -141,7 +141,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				if (a.getLocation() != null) {
 					// do not convert english name
 					// convertEnglishName(a);
-					if (ovewriteIds && first) {
+					if (overwriteIds && first) {
 						if (!ids.add(a.getId())) {
 							poiPreparedStatement.executeBatch();
 							poiDeleteStatement.setString(1, a.getId() + "");
@@ -159,8 +159,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 		Map<String, String> tags = renderingTypes.transformTags(e.getTags(), EntityType.RELATION, EntityConvertApplyType.POI);
 		for (String t : tags.keySet()) {
-			boolean index = false;
-			index = poiTypes.parseAmenity(t, tags.get(t), true, tags) != null;
+			boolean index = poiTypes.parseAmenity(t, tags.get(t), true, tags) != null;
 			if (index) {
 				ctx.loadEntityRelation(e);
 				for (EntityId id : ((Relation) e).getMembersMap().keySet()) {
@@ -839,6 +838,5 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			}
 		}
 	}
-
 
 }
