@@ -27,6 +27,7 @@ import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
 import org.apache.commons.logging.Log;
+import org.json.JSONObject;
 
 public class BinaryComparator {
 
@@ -170,8 +171,10 @@ public class BinaryComparator {
 					j++;
 					i0.preloadStreets(c0, null);
 					i1.preloadStreets(c1, null);
-					if (!c0.getNamesMap(true).equals(c1.getNamesMap(true)) && COMPARE_SET.contains(CITY_NAME_COMPARE)) {
-						printMapObject(CITY_NAME_COMPARE, c1, "(1). City all names are not same : " + c1 + " " + c0.getNamesMap(true) + " <> " + c1.getNamesMap(true));
+					if (COMPARE_SET.contains(CITY_NAME_COMPARE) && !c0.getNamesMap(true).equals(c1.getNamesMap(true))) {
+						System.out.println("(1). City all names are not same : " + c1 + " "
+								+ (new JSONObject(c0.getNamesMap(true)) + " != "
+								+ (new JSONObject(c1.getNamesMap(true)))));
 					}
 					if (c0.getStreets().size() != c1.getStreets().size()) {
 						if (COMPARE_SET.contains(STREET_COMPARE)) {
