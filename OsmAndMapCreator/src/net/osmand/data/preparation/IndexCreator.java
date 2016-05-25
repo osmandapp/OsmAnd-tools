@@ -585,7 +585,7 @@ public class IndexCreator {
 
 	public void generateIndexes(File[] readFile, IProgress progress, IOsmStorageFilter addFilter, MapZooms mapZooms,
 			MapRenderingTypesEncoder renderingTypes, Log logMapDataWarn,
-			boolean generateUniqueIds, boolean ovewriteIds) throws IOException, SQLException, InterruptedException, XmlPullParserException {
+			boolean generateUniqueIds, boolean overwriteIds) throws IOException, SQLException, InterruptedException, XmlPullParserException {
 //		if(LevelDBAccess.load()){
 //			dialect = DBDialect.NOSQL;
 //		}
@@ -609,7 +609,7 @@ public class IndexCreator {
 			renderingTypes = new MapRenderingTypesEncoder(null, regionName);
 		}
 		this.indexTransportCreator = new IndexTransportCreator();
-		this.indexPoiCreator = new IndexPoiCreator(renderingTypes, ovewriteIds);
+		this.indexPoiCreator = new IndexPoiCreator(renderingTypes, overwriteIds);
 		this.indexAddressCreator = new IndexAddressCreator(logMapDataWarn);
 		this.indexMapCreator = new IndexVectorMapCreator(logMapDataWarn, mapZooms, renderingTypes,
 				zoomWaySmothness);
@@ -652,7 +652,7 @@ public class IndexCreator {
 			} else {
 				// 2. Create index connections and index structure
 				createDatabaseIndexesStructure();
-				OsmDbAccessor accessor = initDbAccessor(readFile, progress, addFilter, generateUniqueIds, ovewriteIds);
+				OsmDbAccessor accessor = initDbAccessor(readFile, progress, addFilter, generateUniqueIds, overwriteIds);
 
 				// 3. Processing all entries
 				// 3.1 write all cities
