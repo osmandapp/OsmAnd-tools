@@ -239,7 +239,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 		}
 		initIds("node", nodeIds);
 		initIds("ways", wayIds);
-		initIds("relations", relationIds);
+		initRelationIds("relations", relationIds);
 		prepNode = dbConn.prepareStatement("insert into node values (?, ?, ?, ?)"); //$NON-NLS-1$
 		prepWays = dbConn.prepareStatement("insert into ways values (?, ?, ?, ?, ?)"); //$NON-NLS-1$
 		prepRelations = dbConn.prepareStatement("insert into relations values (?, ?, ?, ?, ?, ?, ?)"); //$NON-NLS-1$
@@ -252,6 +252,17 @@ public class OsmDbCreator implements IOsmStorageFilter {
 			ResultSet rs = s.executeQuery("select id from " + table);
 			while(rs.next()) {
 				col.add(rs.getLong(1));
+			}
+			s.close();
+		}
+	}
+	
+	private void initRelationIds(String table, TLongHashSet col) throws SQLException {
+		if(col.isEmpty()) {
+			Statement s = dbConn.createStatement();
+			ResultSet rs = s.executeQuery("select id, del from " + table);
+			while(rs.next()) {
+				col.add((rs.getLong(1) << 1) | (rs.getInt(2) & 1));
 			}
 			s.close();
 		}
@@ -289,21 +300,22 @@ public class OsmDbCreator implements IOsmStorageFilter {
 			delWays = dbConn.prepareStatement("delete from ways where id = ?"); //$NON-NLS-1$
 			delRelations = dbConn.prepareStatement("delete from relations where id = ? and del = ?"); //$NON-NLS-1$
 		}
+		if (e.getTags().isEmpty()) {
+			e.putTag(AugmentedDiffsInspector.OSMAND_DELETE_TAG,
+					AugmentedDiffsInspector.OSMAND_DELETE_VALUE);
+			delete = true;
+		}
 		boolean present = false;
 		if (e instanceof Node) {
 			present = !nodeIds.add(id);
 		} else if (e instanceof Way) {
 			present = !wayIds.add(id);
 		} else if (e instanceof Relation) {
-			present = !relationIds.add(id);
+			long rid = (id << 1) | (delete ? 1 : 0); 
+			present = !relationIds.add(rid);
 		}
 		if(!present) {
 			return;
-		}
-		if (e.getTags().isEmpty()) {
-			e.putTag(AugmentedDiffsInspector.OSMAND_DELETE_TAG,
-					AugmentedDiffsInspector.OSMAND_DELETE_VALUE);
-			delete = true;
 		}
 		prepNode.executeBatch();
 		prepWays.executeBatch();
