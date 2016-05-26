@@ -342,7 +342,6 @@ public class OsmDbCreator implements IOsmStorageFilter {
 				throw new IllegalStateException("Duplicate id '" + e.getId() +"' " + entityId.getType());
 			}
 		}
-		boolean osmChange = storage.isOsmChange();
 		try {
 			e.removeTags(tagsToIgnore);
 			ByteArrayOutputStream tags = new ByteArrayOutputStream();
@@ -360,7 +359,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 			long id = convertId(e);
 			boolean delete = AugmentedDiffsInspector.OSMAND_DELETE_VALUE.
 					equals(e.getTag(AugmentedDiffsInspector.OSMAND_DELETE_TAG));
-			if (osmChange || ovewriteIds || e instanceof Relation) {
+			if (ovewriteIds || e instanceof Relation) {
 				checkEntityExists(e, id, delete);
 			}
 			if (e instanceof Node) {
@@ -400,7 +399,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 					dbConn.commit(); // clear memory
 					currentWaysCount = 0;
 				}
-			} else if (!osmChange) {
+			} else {
 				// osm change can't handle relations properly
 				allRelations++;
 				short ord = 0;
@@ -417,7 +416,9 @@ public class OsmDbCreator implements IOsmStorageFilter {
 					prepRelations.setInt(7, delete ? 1 : 0);
 					prepRelations.addBatch();
 				}
-				if (currentRelationsCount >= BATCH_SIZE_OSM) {
+//				if (currentRelationsCount >= BATCH_SIZE_OSM) {
+				System.out.println(id + " " + delete);
+				if (currentRelationsCount >= 1) {
 					prepRelations.executeBatch();
 					dbConn.commit(); // clear memory
 					currentRelationsCount = 0;
