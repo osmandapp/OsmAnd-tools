@@ -21,7 +21,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 import rtree.RTree;
-
+@Deprecated
 public class ObfChangesCreator {
 	private static final Log log = LogFactory.getLog(ObfChangesCreator.class);
 

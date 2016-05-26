@@ -55,6 +55,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 
+@Deprecated
 public class IncOsmChangesCreator {
 	private static final Log log = LogFactory.getLog(IncOsmChangesCreator.class);
 	private static final int OSC_FILES_TO_COMBINE_OSMCONVERT = 400;
@@ -451,28 +452,6 @@ public class IncOsmChangesCreator {
 		}
 	}
 
-	protected OsmDbAccessor createDbAcessor(File outPbf, File dbFile, DBDialect dlct) throws SQLException,
-			FileNotFoundException, IOException {
-		OsmDbAccessor accessor = new OsmDbAccessor();
-		if (dlct.databaseFileExists(dbFile)) {
-			dlct.removeDatabase(dbFile);
-		}
-		log.info("Load pbf into sqlite " + dbFile.getAbsolutePath());
-		Object dbConn = dlct.getDatabaseConnection(dbFile.getAbsolutePath(), log);
-		accessor.setDbConn((Connection) dbConn, dlct);
-		OsmDbCreator dbCreator = new OsmDbCreator();
-		dbCreator.initDatabase(dlct, dbConn, true);
-		OsmBaseStoragePbf pbfReader = new OsmBaseStoragePbf();
-		InputStream fis = new FileInputStream(outPbf);
-		// InputStream fis = new ByteArrayInputStream(allBytes);
-		pbfReader.getFilters().add(dbCreator);
-		pbfReader.parseOSMPbf(fis, null, false);
-		fis.close();
-		dbCreator.finishLoading();
-		dlct.commitDatabase(dbConn);
-		accessor.initDatabase(dbCreator);
-		return accessor;
-	}
 
 	private void writeOsmFile(File parentFile, TLongObjectHashMap<Entity> found) throws FactoryConfigurationError, XMLStreamException, IOException {
 

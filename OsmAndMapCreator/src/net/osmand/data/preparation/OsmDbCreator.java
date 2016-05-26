@@ -262,7 +262,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 			Statement s = dbConn.createStatement();
 			ResultSet rs = s.executeQuery("select id, del from " + table);
 			while(rs.next()) {
-				col.add((rs.getLong(1) << 1) | (rs.getInt(2) & 1));
+				col.add((rs.getLong(1) << 1) | (rs.getInt(2) > 0 ? 1 : 0));
 			}
 			s.close();
 		}

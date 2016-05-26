@@ -55,6 +55,7 @@ import org.fusesource.leveldbjni.internal.NativeWriteBatch;
 import org.fusesource.leveldbjni.internal.NativeWriteOptions;
 import org.xml.sax.SAXException;
 
+@Deprecated
 public class IndexIdByBbox {
 	private static final Log log = LogFactory.getLog(IndexIdByBbox.class);
 	private static final int BATCH_SIZE = 100000;
