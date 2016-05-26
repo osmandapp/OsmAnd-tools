@@ -320,6 +320,10 @@ public class OsmDbCreator implements IOsmStorageFilter {
 		prepNode.executeBatch();
 		prepWays.executeBatch();
 		prepRelations.executeBatch();
+		currentWaysCount = 0;
+		currentCountNode = 0;
+		currentRelationsCount = 0;
+		dbConn.commit(); // clear memory
 		if (e instanceof Node) {
 			delNode.setLong(1, id);
 			delNode.execute();
@@ -417,8 +421,8 @@ public class OsmDbCreator implements IOsmStorageFilter {
 					prepRelations.addBatch();
 				}
 //				if (currentRelationsCount >= BATCH_SIZE_OSM) {
-				System.out.println(id + " " + delete);
-				if (currentRelationsCount >= 1) {
+//				System.out.println(id + " " + delete);
+				if (currentRelationsCount >= BATCH_SIZE_OSM) {
 					prepRelations.executeBatch();
 					dbConn.commit(); // clear memory
 					currentRelationsCount = 0;
