@@ -65,15 +65,15 @@ public class AbstractIndexPartCreator {
 		addBatch(p, BATCH_SIZE, true);
 	}
 
-	protected void addBatch(PreparedStatement p, boolean commit) throws SQLException{
+	protected void addBatch(PreparedStatement p, boolean commit) throws SQLException {
 		addBatch(p, BATCH_SIZE, commit);
 	}
 
-	protected void addBatch(PreparedStatement p, int batchSize, boolean commit) throws SQLException{
+	protected void addBatch(PreparedStatement p, int batchSize, boolean commit) throws SQLException {
 		p.addBatch();
-		if(pStatements.get(p) >= batchSize){
+		if (pStatements.get(p) >= batchSize) {
 			p.executeBatch();
-			if(commit){
+			if (commit) {
 				p.getConnection().commit();
 			}
 			pStatements.put(p, 0);
