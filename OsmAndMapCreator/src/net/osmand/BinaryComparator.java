@@ -14,15 +14,20 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 
 import net.osmand.binary.BinaryIndexPart;
 import net.osmand.binary.BinaryMapAddressReaderAdapter;
 import net.osmand.binary.BinaryMapAddressReaderAdapter.AddressRegion;
 import net.osmand.binary.BinaryMapIndexReader;
+import net.osmand.binary.BinaryMapPoiReaderAdapter.PoiRegion;
+import net.osmand.binary.OsmandOdb;
+import net.osmand.data.Amenity;
 import net.osmand.data.Building;
 import net.osmand.data.City;
 import net.osmand.data.MapObject;
 import net.osmand.data.Street;
+import net.osmand.data.preparation.BinaryMapIndexWriter;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
@@ -42,7 +47,12 @@ public class BinaryComparator {
 	private static final int STREET_NAME_COMPARE = 22;
 	private static final int BUILDINGS_COMPARE = 31;
 	private static final int INTERSECTIONS_COMPARE = 41;
+	private static final int POI_COMPARE = 51;
+	private static final int COMPARE_ADD = 91;
+	private static final int COMPARE_RM = 92;
 	private static final int OSM_OUTPUT = -1;
+	private static final int[] ADDRESS_COMPARE =
+			{CITY_COMPARE, CITY_NAME_COMPARE, STREET_COMPARE, STREET_NAME_COMPARE, BUILDINGS_COMPARE, INTERSECTIONS_COMPARE};
 	private static final Map<String, Integer> COMPARE_ARGS = new HashMap<String, Integer>() {{
 		put("--cities", CITY_COMPARE);
 		put("--city-names", CITY_NAME_COMPARE);
@@ -50,31 +60,31 @@ public class BinaryComparator {
 		put("--street-names", STREET_NAME_COMPARE);
 		put("--buildings", BUILDINGS_COMPARE);
 		put("--intersections", INTERSECTIONS_COMPARE);
+		put("--poi", POI_COMPARE);
+		put("--add", COMPARE_ADD);
+		put("--rm", COMPARE_RM);
 	}};
 	private int ELEM_ID = -1;
 	private FileOutputStream fosm = null;
-	public static final String helpMessage = "[--cities] [--city-names] [--streets] [--street-names] [--buildings] [--intersections] [--osm=file_path]"
-			+ " <first> <second>: compare <first> and <second>";
+	public static final String helpMessage = "[--cities] [--city-names] [--streets] [--street-names] [--buildings] [--intersections] [--poi]" +
+			"[--osm=file_path] [--add] [--rm] <first> <second>: compare <first> and <second>";
 
 	public static void main(String[] args) throws IOException {
 		BinaryComparator in = new BinaryComparator();
 		// test cases show info
 		if (args.length == 1 && "test".equals(args[0])) {
 			in.compare(new String[]{
-					System.getProperty("maps.dir") +"Ukraine_europe_2_all.road.obf",
+					System.getProperty("maps.dir") + "Ukraine_europe_2_all.road.obf",
 					System.getProperty("maps.dir") + "Ukraine_europe_2.road.obf",
 					"--cities", "--city-names"
-					,"--streets", "--street-names"
-					,"--buildings", "--intersections",
-					"--osm="+System.getProperty("maps.dir") +"compare.osm"
-					});
+					, "--streets", "--street-names"
+					, "--buildings", "--intersections",
+					"--osm=" + System.getProperty("maps.dir") + "compare.osm"
+			});
 		} else {
 			in.compare(args);
 		}
 	}
-
-
-	
 
 	private void compare(String[] argArr) throws IOException {
 		if (argArr == null || argArr.length < 2) {
@@ -101,25 +111,86 @@ public class BinaryComparator {
 				indexes.add(reader);
 				rafs.add(raf);
 			}
-		} 
+		}
 		if (COMPARE_SET.isEmpty()) {
 			COMPARE_SET.addAll(COMPARE_ARGS.values());
 		}
-		AddressRegion r0 = getAddressRegion(indexes.get(0));
-		AddressRegion r1 = getAddressRegion(indexes.get(1));
 		if (isOsmOutput()) {
 			fosm.write("<?xml version='1.0' encoding='utf-8'?>\n".getBytes());
 			fosm.write("<osm version='0.6'>\n".getBytes());
 		}
-		compare(r0, indexes.get(0), r1, indexes.get(1));
+		Set<Integer> addressCompareSet = new HashSet<Integer>(COMPARE_SET);
+		addressCompareSet.retainAll(Arrays.asList(ADDRESS_COMPARE));
+		if (!addressCompareSet.isEmpty()) {
+			compareAddress(indexes.get(0), indexes.get(1));
+		}
+		if (COMPARE_SET.contains(POI_COMPARE)) {
+			comparePoi(indexes.get(0), indexes.get(1));
+		}
 		if (isOsmOutput()) {
 			fosm.write("</osm>".getBytes());
 		}
 		fosm.close();
-
 	}
 
-	private void compare(AddressRegion r0, BinaryMapIndexReader i0, AddressRegion r1, BinaryMapIndexReader i1) throws IOException {
+	private List<Amenity> loadAmenities(BinaryMapIndexReader index) throws IOException {
+		List<Amenity> amenities = new ArrayList<Amenity>(index.searchPoi(BinaryMapIndexReader.buildSearchPoiRequest(
+				MapUtils.MAP_BOUNDING_BOX_31_TILE_NUMBER[0],
+				MapUtils.MAP_BOUNDING_BOX_31_TILE_NUMBER[1],
+				MapUtils.MAP_BOUNDING_BOX_31_TILE_NUMBER[2],
+				MapUtils.MAP_BOUNDING_BOX_31_TILE_NUMBER[3],
+				MapUtils.NO_ZOOM,
+				BinaryMapIndexReader.EMPTY_SEARCH_POI_TYPE_FILTER,
+				null)));
+		Collections.sort(amenities, MapObject.BY_ID_COMPARATOR);
+		log.info("Read " + amenities.size() + " amenities from " + index.getFile());
+		return amenities;
+	}
+
+	private void comparePoi(BinaryMapIndexReader i0, BinaryMapIndexReader i1) throws IOException {
+		List<Amenity> amenities0 = loadAmenities(i0);
+		List<Amenity> amenities1 = loadAmenities(i1);
+		int i = 0;
+		int j = 0;
+		int added = 0;
+		int removed = 0;
+		Comparator<MapObject> c = MapObject.BY_ID_COMPARATOR;
+		while (i < amenities0.size() || j < amenities1.size()) {
+			Amenity a0 = get(amenities0, i);
+			Amenity a1 = get(amenities1, j);
+			int cmp = c.compare(a0, a1);
+			if (cmp < 0) {
+				while (c.compare(a0, a1) < 0) {
+					if (COMPARE_SET.contains(COMPARE_RM)) {
+						printMapObject(POI_COMPARE, a0, "Amenity was removed: " + a0.toString().replace("&", "&amp;"));
+						removed++;
+					}
+					i++;
+					a0 = get(amenities0, i);
+				}
+			} else if (cmp > 0) {
+				while (c.compare(a0, a1) > 0) {
+					if (COMPARE_SET.contains(COMPARE_ADD)) {
+						printMapObject(POI_COMPARE, a1, "Amenity was added: " + a1.toString().replace("&", "&amp;"));
+						added++;
+					}
+					j++;
+					a1 = get(amenities1, j);
+				}
+			} else {
+				i++;
+				j++;
+			}
+		}
+		if (COMPARE_SET.contains(COMPARE_ADD)) {
+			log.info("Added POI count: " + added);
+		}
+		if (COMPARE_SET.contains(COMPARE_RM)) {
+			log.info("Removed POI count: " + removed);
+		}
+	}
+
+	private void compareAddress(BinaryMapIndexReader i0, BinaryMapIndexReader i1) throws IOException {
 		for (int cityType : BinaryMapAddressReaderAdapter.CITY_TYPES) {
 			List<City> ct0 = i0.getCities(null, cityType);
 			List<City> ct1 = i1.getCities(null, cityType);
@@ -135,7 +206,7 @@ public class BinaryComparator {
 				int cmp = c.compare(c0, c1);
 				if (cmp < 0) {
 					while (c.compare(c0, c1) < 0) {
-						if (COMPARE_SET.contains(CITY_COMPARE)) {
+						if (COMPARE_SET.contains(CITY_COMPARE) && COMPARE_SET.contains(COMPARE_RM)) {
 							City ps = searchSimilarCities(c0, ct1, j);
 							if (ps != null) {
 								int distance = (int) MapUtils.getDistance(c0.getLocation(), ps.getLocation());
@@ -150,7 +221,7 @@ public class BinaryComparator {
 					}
 				} else if (cmp > 0) {
 					while (c.compare(c0, c1) > 0) {
-						if (COMPARE_SET.contains(CITY_COMPARE)) {
+						if (COMPARE_SET.contains(CITY_COMPARE) && COMPARE_SET.contains(COMPARE_ADD)) {
 							City ps = searchSimilarCities(c1, ct0, i);
 							if (ps != null) {
 								int distance = (int) MapUtils.getDistance(c1.getLocation(), ps.getLocation());
@@ -348,8 +419,8 @@ public class BinaryComparator {
 		return null;
 	}
 
-	private City get(List<City> ct0, int i) {
-		return i >= ct0.size() ? null : ct0.get(i);
+	private <T> T get(List<T> list, int i) {
+		return i >= list.size() ? null : list.get(i);
 	}
 
 	private String strip(String name) {
@@ -381,6 +452,16 @@ public class BinaryComparator {
 		for (BinaryIndexPart p : list) {
 			if (p instanceof AddressRegion) {
 				return (AddressRegion) p;
+			}
+		}
+		return null;
+	}
+
+	private PoiRegion getPoiRegion(BinaryMapIndexReader i) {
+		List<BinaryIndexPart> list = i.getIndexes();
+		for (BinaryIndexPart p : list) {
+			if (p.getFieldNumber() == OsmandOdb.OsmAndStructure.POIINDEX_FIELD_NUMBER) {
+				return (PoiRegion) p;
 			}
 		}
 		return null;
