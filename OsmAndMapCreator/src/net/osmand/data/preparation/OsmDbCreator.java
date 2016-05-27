@@ -335,6 +335,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 			delRelations.setLong(2, delete ? 1 : 0);
 			delRelations.execute();
 		}
+		dbConn.commit(); // clear memory
 	}
 
 	@Override
