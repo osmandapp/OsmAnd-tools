@@ -422,7 +422,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 				}
 //				if (currentRelationsCount >= BATCH_SIZE_OSM) {
 				System.out.println(id + " " + delete);
-				if (currentRelationsCount >= 10) {
+				if (currentRelationsCount >= 1) {
 					prepRelations.executeBatch();
 					dbConn.commit(); // clear memory
 					currentRelationsCount = 0;
