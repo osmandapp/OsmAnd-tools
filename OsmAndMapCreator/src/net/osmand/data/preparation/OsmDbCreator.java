@@ -420,7 +420,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 					prepRelations.setInt(7, delete ? 1 : 0);
 					prepRelations.addBatch();
 				}
-				System.out.println(id + " " + delete);
+//				System.out.println(id + " " + delete);
 				if (currentRelationsCount >= BATCH_SIZE_OSM) {
 					prepRelations.executeBatch();
 					dbConn.commit(); // clear memory
