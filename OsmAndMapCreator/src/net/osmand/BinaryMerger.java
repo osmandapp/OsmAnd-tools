@@ -6,6 +6,7 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.sql.SQLException;
 import java.text.Collator;
 import java.text.MessageFormat;
 import java.util.ArrayList;
@@ -28,13 +29,17 @@ import net.osmand.binary.BinaryMapAddressReaderAdapter.AddressRegion;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.BinaryMapPoiReaderAdapter.PoiRegion;
 import net.osmand.binary.OsmandOdb;
+import net.osmand.data.Amenity;
 import net.osmand.data.City;
 import net.osmand.data.MapObject;
 import net.osmand.data.Postcode;
 import net.osmand.data.Street;
 import net.osmand.data.preparation.BinaryFileReference;
 import net.osmand.data.preparation.BinaryMapIndexWriter;
+import net.osmand.data.preparation.IndexCreator;
+import net.osmand.data.preparation.IndexPoiCreator;
 import net.osmand.data.preparation.address.IndexAddressCreator;
+import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.edit.Node;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
@@ -44,13 +49,15 @@ import org.apache.commons.logging.Log;
 import com.google.protobuf.CodedOutputStream;
 import com.google.protobuf.WireFormat;
 
+import static net.osmand.data.preparation.IndexCreator.REMOVE_POI_DB;
+
 public class BinaryMerger {
 
 	public static final int BUFFER_SIZE = 1 << 20;
 	private final static Log log = PlatformUtil.getLog(BinaryMerger.class);
 	public static final String helpMessage = "output_file.obf [input_file.obf] ...: merges all obf files and merges address structure into 1";
 
-	public static void main(String[] args) throws IOException {
+	public static void main(String[] args) throws IOException, SQLException  {
 		BinaryMerger in = new BinaryMerger();
 		// test cases show info
 		if (args.length == 1 && "test".equals(args[0])) {
@@ -287,9 +294,32 @@ public class BinaryMerger {
 		writer.endWriteAddressIndex();
 	}
 
-	private void combinePoiIndex(String name, BinaryMapIndexWriter writer, PoiRegion[] poiRegions, BinaryMapIndexReader[] indexes)
-			throws IOException {
-
+	private void combinePoiIndex(String name, BinaryMapIndexWriter writer, long dateCreated, PoiRegion[] poiRegions, BinaryMapIndexReader[] indexes)
+			throws IOException, SQLException {
+		MapRenderingTypesEncoder renderingTypes = new MapRenderingTypesEncoder(null, name);
+		boolean overwriteIds = false;
+		IndexPoiCreator indexPoiCreator = new IndexPoiCreator(renderingTypes, overwriteIds);
+		indexPoiCreator.createDatabaseStructure(new File(new File(System.getProperty("user.dir")), IndexCreator.getPoiFileName(name)));
+		for (int i = 0; i < poiRegions.length; i++) {
+			BinaryMapIndexReader index = indexes[i];
+			log.info("Region: " + extractRegionName(index));
+			List<Amenity> amenities = index.searchPoi(BinaryMapIndexReader.buildSearchPoiRequest(
+					MapUtils.MAP_BOUNDING_BOX_31_TILE_NUMBER[0],
+					MapUtils.MAP_BOUNDING_BOX_31_TILE_NUMBER[1],
+					MapUtils.MAP_BOUNDING_BOX_31_TILE_NUMBER[2],
+					MapUtils.MAP_BOUNDING_BOX_31_TILE_NUMBER[3],
+					MapUtils.NO_ZOOM,
+					BinaryMapIndexReader.EMPTY_SEARCH_POI_TYPE_FILTER,
+					null));
+			for (Amenity amenity : amenities) {
+				indexPoiCreator.insertAmenityIntoPoi(amenity);
+			}
+		}
+		indexPoiCreator.writeBinaryPoiIndex(writer, name, null);
+		indexPoiCreator.commitAndClosePoiFile(dateCreated);
+		if (REMOVE_POI_DB) {
+			indexPoiCreator.removePoiFile();
+		}
 	}
 
 	public static void copyBinaryPart(CodedOutputStream ous, byte[] BUFFER, RandomAccessFile raf, long fp, int length)
@@ -309,7 +339,7 @@ public class BinaryMerger {
 		}
 	}
 
-	public void combineParts(File fileToExtract, List<File> files) throws IOException {
+	public void combineParts(File fileToExtract, List<File> files) throws IOException, SQLException {
 		BinaryMapIndexReader[] indexes = new BinaryMapIndexReader[files.size()];
 		RandomAccessFile[] rafs = new RandomAccessFile[files.size()];
 		long dateCreated = 0;
@@ -365,13 +395,13 @@ public class BinaryMerger {
 		if (i > 0) {
 			nm = nm.substring(0, i);
 		}
+		combinePoiIndex(nm, writer, dateCreated, poiRegions, indexes);
 		combineAddressIndex(nm, writer, addressRegions, indexes);
-		combinePoiIndex(nm, writer, poiRegions, indexes);
 		ous.writeInt32(OsmandOdb.OsmAndStructure.VERSIONCONFIRM_FIELD_NUMBER, version);
 		ous.flush();
 	}
 
-	public void merger(String[] args) throws IOException {
+	public void merger(String[] args) throws IOException, SQLException  {
 		if (args == null || args.length == 0) {
 			System.out.println(helpMessage);
 			return;

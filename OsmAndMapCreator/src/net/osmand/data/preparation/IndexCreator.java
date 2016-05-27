@@ -209,8 +209,16 @@ public class IndexCreator {
 		this.lastModifiedDate = lastModifiedDate;
 	}
 
+	public static String getPoiFileName(String regionName) {
+		return regionName + IndexConstants.POI_INDEX_EXT;
+	}
+
 	public String getPoiFileName() {
-		return getRegionName() + IndexConstants.POI_INDEX_EXT;
+		return getPoiFileName(getRegionName());
+	}
+
+	private File getPoiFile() {
+		return new File(workingDir, getPoiFileName());
 	}
 
 	public String getCityAdminLevel() {
@@ -467,7 +475,7 @@ public class IndexCreator {
 			indexAddressCreator.createDatabaseStructure(mapConnection, mapIndexDBDialect);
 		}
 		if (indexPOI) {
-			indexPoiCreator.createDatabaseStructure(new File(workingDir, getPoiFileName()));
+			indexPoiCreator.createDatabaseStructure(getPoiFile());
 		}
 		if (indexTransport) {
 			indexTransportCreator.createDatabaseStructure(mapConnection, mapIndexDBDialect, getRTreeTransportStopsFileName());
@@ -506,7 +514,7 @@ public class IndexCreator {
 			final BasemapProcessor processor = new BasemapProcessor(logMapDataWarn, mapZooms, renderingTypes, zoomWaySmothness);
 			final IndexPoiCreator poiCreator = indexPOI ? new IndexPoiCreator(renderingTypes, false) : null;
 			if (indexPOI) {
-				poiCreator.createDatabaseStructure(new File(workingDir, getPoiFileName()));
+				poiCreator.createDatabaseStructure(getPoiFile());
 			}
 			for (File readFile : readFiles) {
 				OsmDbAccessor accessor = new OsmDbAccessor();

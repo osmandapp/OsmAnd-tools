@@ -190,7 +190,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	}
 
 
-	private void insertAmenityIntoPoi(Amenity amenity) throws SQLException {
+	public void insertAmenityIntoPoi(Amenity amenity) throws SQLException {
 		assert IndexConstants.POI_TABLE != null : "use constants here to show table usage "; //$NON-NLS-1$
 		poiPreparedStatement.setLong(1, amenity.getId());
 		poiPreparedStatement.setInt(2, MapUtils.get31TileNumberX(amenity.getLocation().getLongitude()));
@@ -198,7 +198,15 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		poiPreparedStatement.setString(4, amenity.getType().getKeyName());
 		poiPreparedStatement.setString(5, amenity.getSubType());
 		poiPreparedStatement.setString(6, encodeAdditionalInfo(amenity, amenity.getAdditionalInfo(), amenity.getName(), amenity.getEnName(false)));
-		addBatch(poiPreparedStatement);
+		try {
+			addBatch(poiPreparedStatement);
+		} catch (SQLException e) {
+			if (e.getMessage().contains("UNIQUE constraint failed: ")) {
+				log.info("Duplicate poi is not inserted: " + amenity.toString());
+			} else {
+				throw e;
+			}
+		}
 	}
 
 	private PoiAdditionalType getOrCreate(String tag, String value, boolean text) {
