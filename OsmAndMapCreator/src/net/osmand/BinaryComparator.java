@@ -82,7 +82,7 @@ public class BinaryComparator {
 		}
 		List<BinaryMapIndexReader> indexes = new ArrayList<BinaryMapIndexReader>();
 		List<RandomAccessFile> rafs = new ArrayList<RandomAccessFile>();
-		for(int i = 0; i < argArr.length; i++ ) {
+		for (int i = 0; i < argArr.length; i++) {
 			String arg = argArr[i];
 			if (arg.startsWith("--osm=")) {
 				fosm = new FileOutputStream(arg.substring("--osm=".length()));
@@ -175,7 +175,7 @@ public class BinaryComparator {
 					}
 					if (c0.getStreets().size() != c1.getStreets().size()) {
 						if (COMPARE_SET.contains(STREET_COMPARE)) {
-							if(!isOsmOutput()) {
+							if (!isOsmOutput()) {
 								printComment("(2). City streets " + c1 + ":  " + c0.getStreets().size() + " <> " + c1.getStreets().size());
 							}
 							List<String> s0 = new ArrayList<String>();
@@ -183,7 +183,7 @@ public class BinaryComparator {
 							for (Street s : c0.getStreets()) {
 								if (c1.getStreetByName(s.getName()) == null) {
 									s0.add(s.getName());
-									if(isOsmOutput()) {
+									if (isOsmOutput()) {
 										printMapObject(STREET_COMPARE, s, "(2) Street " + s
 												+ "is not present in 2nd file");
 									}
@@ -191,7 +191,7 @@ public class BinaryComparator {
 							}
 							for (Street s : c1.getStreets()) {
 								if (c0.getStreetByName(s.getName()) == null) {
-									if(isOsmOutput()) {
+									if (isOsmOutput()) {
 										printMapObject(STREET_COMPARE, s, "(2) Street " + s
 												+ " is not present in 1st file");
 									}
@@ -211,7 +211,7 @@ public class BinaryComparator {
 							Street s0 = c0.getStreets().get(ij);
 							Street s1 = c1.getStreets().get(ij);
 							if (!s0.getNamesMap(true).equals(s1.getNamesMap(true)) && COMPARE_SET.contains(STREET_NAME_COMPARE)) {
-								printMapObject(STREET_NAME_COMPARE, s0, 
+								printMapObject(STREET_NAME_COMPARE, s0,
 										"(2)- Street all names are not same : " + c1 + " " + s0.getNamesMap(true) + " <> " + s1.getNamesMap(true));
 							}
 							if (s0.getName().equals(s1.getName())) {
@@ -219,7 +219,7 @@ public class BinaryComparator {
 								i1.preloadBuildings(s1, null);
 								if (COMPARE_SET.contains(BUILDINGS_COMPARE)) {
 									if (s0.getBuildings().size() != s1.getBuildings().size()) {
-										printMapObject(BUILDINGS_COMPARE, s0, 
+										printMapObject(BUILDINGS_COMPARE, s0,
 												"(3). Buildings size: " + s0.getBuildings().size() + "<>"
 														+ s1.getBuildings().size() + " " + c0 + ", " + s0);
 									} else {
@@ -227,21 +227,21 @@ public class BinaryComparator {
 											Building b0 = s0.getBuildings().get(it);
 											Building b1 = s1.getBuildings().get(it);
 											if (!b0.getName().equals(b1.getName())) {
-												printMapObject(BUILDINGS_COMPARE, b0, 
+												printMapObject(BUILDINGS_COMPARE, b0,
 														"(4). Buildings name: " + b0.getName() + "<>"
 																+ b1.getName() + " " + c0 + ", " + s0);
 											}
 											if (!Algorithms.objectEquals(b0.getPostcode(), b1.getPostcode())) {
-												printMapObject(BUILDINGS_COMPARE, b0, 
+												printMapObject(BUILDINGS_COMPARE, b0,
 														"(4). Buildings postcode: " + b0.getPostcode()
-														+ "<>" + b1.getPostcode() + " " + c0 + ", " + s0);
+																+ "<>" + b1.getPostcode() + " " + c0 + ", " + s0);
 											}
 										}
 									}
 								}
 								if (COMPARE_SET.contains(INTERSECTIONS_COMPARE)) {
 									if (s0.getIntersectedStreets().size() != s1.getIntersectedStreets().size()) {
-										printMapObject(INTERSECTIONS_COMPARE, s0, 
+										printMapObject(INTERSECTIONS_COMPARE, s0,
 												"(5). Intersections size: " + s0.getIntersectedStreets().size() + "<>"
 														+ s1.getIntersectedStreets().size() + " " + c0 + ", " + s0);
 									} else {
@@ -253,14 +253,14 @@ public class BinaryComparator {
 											if (!st0.getName().equals(st1.getName())
 												// || !st0.getNamesMap(true).equals(st1.getNamesMap(true))
 													) {
-												printMapObject(INTERSECTIONS_COMPARE, st0, 
+												printMapObject(INTERSECTIONS_COMPARE, st0,
 														"(5). Intersections names <> : " + st0
-														+ "<>" + st1 + " " + c0 + ", " + s0 + " ");
+																+ "<>" + st1 + " " + c0 + ", " + s0 + " ");
 											}
 											if (MapUtils.getDistance(st0.getLocation(), st1.getLocation()) > 1500) {
-												printMapObject(INTERSECTIONS_COMPARE, st0, 
+												printMapObject(INTERSECTIONS_COMPARE, st0,
 														"(5). Intersections location <> : " + st0
-														+ "<>" + st1 + " " + c0 + ", " + s0 + " ");
+																+ "<>" + st1 + " " + c0 + ", " + s0 + " ");
 											}
 										}
 									}
@@ -271,7 +271,6 @@ public class BinaryComparator {
 								}
 							}
 						}
-
 					}
 				}
 			}
@@ -279,18 +278,21 @@ public class BinaryComparator {
 	}
 
 	private void printMapObject(int type, MapObject obj, String msg) throws IOException {
-		if(!isOsmOutput()) {
+		if (!isOsmOutput()) {
 			System.out.println(msg);
 		} else {
-			
-			fosm.write(("  <node lat='" + obj.getLocation().getLatitude() + "' lon='" +obj.getLocation().getLongitude() +"' "
-					+ " id='"+(ELEM_ID--)+"'>\n" ).getBytes());
-			fosm.write(("  <tag k='note' v='"+
+
+			fosm.write(("  <node lat='" + obj.getLocation().getLatitude() + "' lon='" + obj.getLocation().getLongitude() + "' "
+					+ " id='" + (ELEM_ID--) + "'>\n").getBytes());
+			fosm.write(("  <tag k='note' v='" +
 					msg.replace('\'', '_').replace("<", "&lt;").replace(">", "&gt;")
-					+"'/>\n" ).getBytes());
-			fosm.write(("  <tag k='fixme' v='yes'/>\n" ).getBytes());;
-			fosm.write(("  <tag k='type' v='"+type+"'/>\n" ).getBytes());;
-			fosm.write(("  </node>\n" ).getBytes());;
+					+ "'/>\n").getBytes());
+			fosm.write(("  <tag k='fixme' v='yes'/>\n").getBytes());
+			;
+			fosm.write(("  <tag k='type' v='" + type + "'/>\n").getBytes());
+			;
+			fosm.write(("  </node>\n").getBytes());
+			;
 		}
 	}
 
@@ -299,7 +301,7 @@ public class BinaryComparator {
 	}
 
 	private void printComment(String string) throws IOException {
-		if(!isOsmOutput()) {
+		if (!isOsmOutput()) {
 			System.out.println(string);
 		} else {
 			fosm.write(("<!-- " + string + "-->\n").getBytes());
@@ -370,7 +372,6 @@ public class BinaryComparator {
 
 		};
 	}
-
 
 	private AddressRegion getAddressRegion(BinaryMapIndexReader i) {
 		List<BinaryIndexPart> list = i.getIndexes();

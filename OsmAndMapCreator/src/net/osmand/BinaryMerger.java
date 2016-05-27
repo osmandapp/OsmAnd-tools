@@ -308,7 +308,7 @@ public class BinaryMerger {
 		RandomAccessFile[] rafs = new RandomAccessFile[files.size()];
 		long dateCreated = 0;
 		int version = -1;
-		// Go through all files and validate conistency
+		// Go through all files and validate consistency
 		int c = 0;
 		for (File f : files) {
 			if (f.getAbsolutePath().equals(fileToExtract.getAbsolutePath())) {
