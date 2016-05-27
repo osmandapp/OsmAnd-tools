@@ -300,11 +300,6 @@ public class OsmDbCreator implements IOsmStorageFilter {
 			delWays = dbConn.prepareStatement("delete from ways where id = ?"); //$NON-NLS-1$
 			delRelations = dbConn.prepareStatement("delete from relations where id = ? and del = ?"); //$NON-NLS-1$
 		}
-		if (e.getTags().isEmpty()) {
-			e.putTag(AugmentedDiffsInspector.OSMAND_DELETE_TAG,
-					AugmentedDiffsInspector.OSMAND_DELETE_VALUE);
-			delete = true;
-		}
 		boolean present = false;
 		if (e instanceof Node) {
 			present = !nodeIds.add(id);
@@ -323,7 +318,6 @@ public class OsmDbCreator implements IOsmStorageFilter {
 		currentWaysCount = 0;
 		currentCountNode = 0;
 		currentRelationsCount = 0;
-		dbConn.commit(); // clear memory
 		if (e instanceof Node) {
 			delNode.setLong(1, id);
 			delNode.execute();
@@ -364,6 +358,11 @@ public class OsmDbCreator implements IOsmStorageFilter {
 			long id = convertId(e);
 			boolean delete = AugmentedDiffsInspector.OSMAND_DELETE_VALUE.
 					equals(e.getTag(AugmentedDiffsInspector.OSMAND_DELETE_TAG));
+			if (e.getTags().isEmpty()) {
+				e.putTag(AugmentedDiffsInspector.OSMAND_DELETE_TAG,
+						AugmentedDiffsInspector.OSMAND_DELETE_VALUE);
+				delete = true;
+			}
 			if (ovewriteIds || e instanceof Relation) {
 				checkEntityExists(e, id, delete);
 			}
@@ -421,7 +420,6 @@ public class OsmDbCreator implements IOsmStorageFilter {
 					prepRelations.setInt(7, delete ? 1 : 0);
 					prepRelations.addBatch();
 				}
-//				if (currentRelationsCount >= BATCH_SIZE_OSM) {
 				System.out.println(id + " " + delete);
 				if (currentRelationsCount >= BATCH_SIZE_OSM) {
 					prepRelations.executeBatch();
