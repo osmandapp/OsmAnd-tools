@@ -38,7 +38,7 @@ public class MainUtilities {
 				OceanTilesCreator.checkOceanTile(subArgsArray);
 			} else if (utl.equals("compare")) {
 				BinaryComparator.main(subArgsArray);
-			} else if (utl.equals("merge-address-index")) {
+			} else if (utl.equals("merge-index")) {
 				BinaryMerger.main(subArgsArray);
 			} else if (utl.equals("generate-region-tags")) {
 				GenerateRegionTags.main(subArgsArray);
