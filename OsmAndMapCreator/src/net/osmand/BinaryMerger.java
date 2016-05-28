@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.ListIterator;
@@ -31,6 +32,7 @@ import net.osmand.binary.BinaryMapPoiReaderAdapter.PoiRegion;
 import net.osmand.binary.OsmandOdb;
 import net.osmand.data.Amenity;
 import net.osmand.data.City;
+import net.osmand.data.LatLon;
 import net.osmand.data.MapObject;
 import net.osmand.data.Postcode;
 import net.osmand.data.Street;
@@ -39,7 +41,9 @@ import net.osmand.data.preparation.BinaryMapIndexWriter;
 import net.osmand.data.preparation.IndexCreator;
 import net.osmand.data.preparation.IndexPoiCreator;
 import net.osmand.data.preparation.address.IndexAddressCreator;
+import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.MapRenderingTypesEncoder;
+import net.osmand.osm.PoiCategory;
 import net.osmand.osm.edit.Node;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
@@ -56,6 +60,10 @@ public class BinaryMerger {
 	public static final int BUFFER_SIZE = 1 << 20;
 	private final static Log log = PlatformUtil.getLog(BinaryMerger.class);
 	public static final String helpMessage = "output_file.obf [input_file.obf] ...: merges all obf files and merges address structure into 1";
+	private static final Map<String, Integer> COMBINE_ARGS = new HashMap<String, Integer>() {{
+		put("--address", OsmandOdb.OsmAndStructure.ADDRESSINDEX_FIELD_NUMBER);
+		put("--poi", OsmandOdb.OsmAndStructure.POIINDEX_FIELD_NUMBER);
+	}};
 
 	public static void main(String[] args) throws IOException, SQLException  {
 		BinaryMerger in = new BinaryMerger();
@@ -296,10 +304,15 @@ public class BinaryMerger {
 
 	private void combinePoiIndex(String name, BinaryMapIndexWriter writer, long dateCreated, PoiRegion[] poiRegions, BinaryMapIndexReader[] indexes)
 			throws IOException, SQLException {
+		int readPoiCount = 0;
+		int badNeg = 0;
+//		int writtenPoiCount = 0;
 		MapRenderingTypesEncoder renderingTypes = new MapRenderingTypesEncoder(null, name);
-		boolean overwriteIds = false;
+		boolean overwriteIds = true;
 		IndexPoiCreator indexPoiCreator = new IndexPoiCreator(renderingTypes, overwriteIds);
 		indexPoiCreator.createDatabaseStructure(new File(new File(System.getProperty("user.dir")), IndexCreator.getPoiFileName(name)));
+		List<Long> ids = new ArrayList<Long>();
+		Amenity a = null;
 		for (int i = 0; i < poiRegions.length; i++) {
 			BinaryMapIndexReader index = indexes[i];
 			log.info("Region: " + extractRegionName(index));
@@ -312,14 +325,46 @@ public class BinaryMerger {
 					BinaryMapIndexReader.EMPTY_SEARCH_POI_TYPE_FILTER,
 					null));
 			for (Amenity amenity : amenities) {
-				indexPoiCreator.insertAmenityIntoPoi(amenity);
+				readPoiCount++;
+				boolean isNeg = amenity.getId() < 0;
+				IndexPoiCreator.updateId(amenity);
+				if (isNeg && amenity.getId() > 0) {
+					badNeg++;
+				}
+				ids.add(amenity.getId());
+				boolean isWritten = indexPoiCreator.insertAmenityIntoPoi(amenity);
+				if (Arrays.asList(8316643308L, 8316171782L, 8316171780L).contains(amenity.getId())) {
+					log.info("Bad POI region: " + extractRegionName(index));
+					log.info("Read count: " + readPoiCount);
+				}
+				if (isWritten) {
+//					writtenPoiCount++;
+					a = amenity;
+				}
 			}
 		}
+		Collections.sort(ids);
+		List<Long> idsNeg = new ArrayList<Long>();
+		for (long id : ids) {
+			if (id < 0) {
+				idsNeg.add(id);
+			}
+		}
+		Set<Long> idsUnique = new TreeSet<Long>(ids);
+		Set<Long> idsUniqueNeg = new TreeSet<Long>(idsNeg);
+//		Amenity a = new Amenity();
+//		a.setId(0L);
+//		a.setLocation(0, 0);
+//		a.setType(MapPoiTypes.getPoiCategoryByName);
+		indexPoiCreator.insertAmenityIntoPoi(a);
 		indexPoiCreator.writeBinaryPoiIndex(writer, name, null);
 		indexPoiCreator.commitAndClosePoiFile(dateCreated);
+		REMOVE_POI_DB = false;
 		if (REMOVE_POI_DB) {
 			indexPoiCreator.removePoiFile();
 		}
+		log.info("Read " + readPoiCount + " POI.");
+//		log.info("Written " + writtenPoiCount + " POI.");
 	}
 
 	public static void copyBinaryPart(CodedOutputStream ous, byte[] BUFFER, RandomAccessFile raf, long fp, int length)
@@ -339,7 +384,7 @@ public class BinaryMerger {
 		}
 	}
 
-	public void combineParts(File fileToExtract, List<File> files) throws IOException, SQLException {
+	public void combineParts(File fileToExtract, List<File> files, Set<Integer> combineParts) throws IOException, SQLException {
 		BinaryMapIndexReader[] indexes = new BinaryMapIndexReader[files.size()];
 		RandomAccessFile[] rafs = new RandomAccessFile[files.size()];
 		long dateCreated = 0;
@@ -377,10 +422,12 @@ public class BinaryMerger {
 			RandomAccessFile raf = rafs[k];
 			for (int i = 0; i < index.getIndexes().size(); i++) {
 				BinaryIndexPart part = index.getIndexes().get(i);
-				if (part.getFieldNumber() == OsmandOdb.OsmAndStructure.ADDRESSINDEX_FIELD_NUMBER) {
-					addressRegions[k] = (AddressRegion) part;
-				} else if (part.getFieldNumber() == OsmandOdb.OsmAndStructure.POIINDEX_FIELD_NUMBER) {
-					poiRegions[k] = (PoiRegion) part;
+				if (combineParts.contains(part.getFieldNumber())) {
+					if (part.getFieldNumber() == OsmandOdb.OsmAndStructure.ADDRESSINDEX_FIELD_NUMBER) {
+						addressRegions[k] = (AddressRegion) part;
+					} else if (part.getFieldNumber() == OsmandOdb.OsmAndStructure.POIINDEX_FIELD_NUMBER) {
+						poiRegions[k] = (PoiRegion) part;
+					}
 				} else {
 					ous.writeTag(part.getFieldNumber(), WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
 					writeInt(ous, part.getLength());
@@ -395,8 +442,12 @@ public class BinaryMerger {
 		if (i > 0) {
 			nm = nm.substring(0, i);
 		}
-		combinePoiIndex(nm, writer, dateCreated, poiRegions, indexes);
-		combineAddressIndex(nm, writer, addressRegions, indexes);
+		if (combineParts.contains(OsmandOdb.OsmAndStructure.ADDRESSINDEX_FIELD_NUMBER)) {
+			combineAddressIndex(nm, writer, addressRegions, indexes);
+		}
+		if (combineParts.contains(OsmandOdb.OsmAndStructure.POIINDEX_FIELD_NUMBER)) {
+			combinePoiIndex(nm, writer, dateCreated, poiRegions, indexes);
+		}
 		ous.writeInt32(OsmandOdb.OsmAndStructure.VERSIONCONFIRM_FIELD_NUMBER, version);
 		ous.flush();
 	}
@@ -406,38 +457,48 @@ public class BinaryMerger {
 			System.out.println(helpMessage);
 			return;
 		}
-		File outputFile = new File(args[0]);
+		File outputFile = null;
 		List<File> parts = new ArrayList<File>();
 		List<File> toDelete = new ArrayList<File>();
-		for (int i = 1; i < args.length; i++) {
-			File file = new File(args[i]);
-			if (file.getName().endsWith(".zip")) {
-				File tmp = File.createTempFile(file.getName(), "obf");
-				ZipInputStream zis = new ZipInputStream(new FileInputStream(file));
-				ZipEntry ze;
-				while ((ze = zis.getNextEntry()) != null) {
-					String name = ze.getName();
-					if (!ze.isDirectory() && name.endsWith(".obf")) {
-						FileOutputStream fout = new FileOutputStream(tmp);
-						Algorithms.streamCopy(zis, fout);
-						fout.close();
-						parts.add(tmp);
-					}
-				}
-				zis.close();
-				tmp.deleteOnExit();
-				toDelete.add(tmp);
-
+		Set<Integer> combineParts = new HashSet<Integer>();
+		for (int i = 0; i < args.length; i++) {
+			if (args[i].startsWith("--")) {
+				combineParts.add(COMBINE_ARGS.get(args[i]));
+			} else if (outputFile == null) {
+				outputFile = new File(args[i]);
 			} else {
-				parts.add(file);
+				File file = new File(args[i]);
+				if (file.getName().endsWith(".zip")) {
+					File tmp = File.createTempFile(file.getName(), "obf");
+					ZipInputStream zis = new ZipInputStream(new FileInputStream(file));
+					ZipEntry ze;
+					while ((ze = zis.getNextEntry()) != null) {
+						String name = ze.getName();
+						if (!ze.isDirectory() && name.endsWith(".obf")) {
+							FileOutputStream fout = new FileOutputStream(tmp);
+							Algorithms.streamCopy(zis, fout);
+							fout.close();
+							parts.add(tmp);
+						}
+					}
+					zis.close();
+					tmp.deleteOnExit();
+					toDelete.add(tmp);
+
+				} else {
+					parts.add(file);
+				}
 			}
+		}
+		if (combineParts.isEmpty()) {
+			combineParts.addAll(COMBINE_ARGS.values());
 		}
 		if (outputFile.exists()) {
 			if (!outputFile.delete()) {
 				throw new IOException("Cannot delete file " + outputFile);
 			}
 		}
-		combineParts(outputFile, parts);
+		combineParts(outputFile, parts, combineParts);
 		for (File f : toDelete) {
 			if (!f.delete()) {
 				throw new IOException("Cannot delete file " + outputFile);

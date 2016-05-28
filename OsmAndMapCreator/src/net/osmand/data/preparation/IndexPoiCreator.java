@@ -27,6 +27,7 @@ import net.osmand.IProgress;
 import net.osmand.IndexConstants;
 import net.osmand.binary.BinaryMapPoiReaderAdapter;
 import net.osmand.data.Amenity;
+import net.osmand.data.LatLon;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.MapRenderingTypesEncoder;
@@ -155,6 +156,17 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		}
 	}
 
+	public static long generateRelationId(Amenity amenity) {
+		LatLon loc = amenity.getLocation();
+		return -((long) MapUtils.get31TileNumberX(loc.getLongitude()) << 31 | (long) MapUtils.get31TileNumberY(loc.getLatitude()));
+	}
+
+	public static void updateId(Amenity amenity) {
+		if (amenity.getId() < 0) {
+			amenity.setId(IndexPoiCreator.generateRelationId(amenity));
+		}
+	}
+
 	public void iterateRelation(Relation e, OsmDbAccessorContext ctx) throws SQLException {
 
 		Map<String, String> tags = renderingTypes.transformTags(e.getTags(), EntityType.RELATION, EntityConvertApplyType.POI);
@@ -190,7 +202,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	}
 
 
-	public void insertAmenityIntoPoi(Amenity amenity) throws SQLException {
+	public boolean insertAmenityIntoPoi(Amenity amenity) throws SQLException {
 		assert IndexConstants.POI_TABLE != null : "use constants here to show table usage "; //$NON-NLS-1$
 		poiPreparedStatement.setLong(1, amenity.getId());
 		poiPreparedStatement.setInt(2, MapUtils.get31TileNumberX(amenity.getLocation().getLongitude()));
@@ -200,12 +212,14 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		poiPreparedStatement.setString(6, encodeAdditionalInfo(amenity, amenity.getAdditionalInfo(), amenity.getName(), amenity.getEnName(false)));
 		try {
 			addBatch(poiPreparedStatement);
+			return true;
 		} catch (SQLException e) {
 			if (e.getMessage().contains("UNIQUE constraint failed: ")) {
 				log.info("Duplicate poi is not inserted: " + amenity.toString());
 			} else {
 				throw e;
 			}
+			return false;
 		}
 	}
 

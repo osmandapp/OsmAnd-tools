@@ -19,7 +19,7 @@ import rtree.RTreeException;
 public class AbstractIndexPartCreator {
 
 	private final static Log log = LogFactory.getLog(AbstractIndexPartCreator.class);
-	protected int BATCH_SIZE = 1000;
+	protected int BATCH_SIZE = 1000000;
 
 	protected Map<PreparedStatement, Integer> pStatements = new LinkedHashMap<PreparedStatement, Integer>();
 

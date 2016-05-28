@@ -28,6 +28,7 @@ import net.osmand.data.City;
 import net.osmand.data.MapObject;
 import net.osmand.data.Street;
 import net.osmand.data.preparation.BinaryMapIndexWriter;
+import net.osmand.data.preparation.IndexPoiCreator;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
@@ -142,6 +143,9 @@ public class BinaryComparator {
 				MapUtils.NO_ZOOM,
 				BinaryMapIndexReader.EMPTY_SEARCH_POI_TYPE_FILTER,
 				null)));
+		for (Amenity amenity : amenities) {
+			IndexPoiCreator.updateId(amenity);
+		}
 		Collections.sort(amenities, MapObject.BY_ID_COMPARATOR);
 		log.info("Read " + amenities.size() + " amenities from " + index.getFile());
 		return amenities;
