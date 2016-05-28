@@ -129,8 +129,8 @@ public class OsmDbCreator implements IOsmStorageFilter {
 
 			for (EntityId i : r.getMemberIds()) {
 				if (i.getType() != EntityType.RELATION) {
-					Long ll = simpleConvertId ? getSimpleConvertId(i.getId().longValue()) : getGeneratedId(i.getId()
-							.longValue(), i.getType().ordinal());
+					Long ll = simpleConvertId ? ((Long)getSimpleConvertId(i.getId().longValue())) : 
+						getGeneratedId(i.getId().longValue(), i.getType().ordinal());
 					if (ll != null) {
 						p.put(i, new EntityId(i.getType(), ll));
 					}
