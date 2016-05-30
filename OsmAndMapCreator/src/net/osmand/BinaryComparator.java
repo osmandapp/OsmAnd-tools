@@ -72,8 +72,10 @@ public class BinaryComparator {
 		// test cases show info
 		if (args.length == 1 && "test".equals(args[0])) {
 			in.compare(new String[]{
-					System.getProperty("maps.dir") + "Ukraine_europe_2_all.road.obf",
-					System.getProperty("maps.dir") + "Ukraine_europe_2.road.obf",
+//					System.getProperty("maps.dir") + "Ukraine_europe_2_all.road.obf",
+//					System.getProperty("maps.dir") + "Ukraine_europe_2.road.obf",
+					System.getProperty("maps.dir") + "Ukraine_zhytomyr_europe_2.road.obf",
+					System.getProperty("maps.dir") + "Ukraine_merge.road.obf",
 //					"--cities", "--city-names",
 //					"--streets", "--street-names",
 //					"--buildings", "--intersections",

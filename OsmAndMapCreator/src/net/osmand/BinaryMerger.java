@@ -70,7 +70,7 @@ public class BinaryMerger {
 		if (args.length == 1 && "test".equals(args[0])) {
 			in.merger(new String[]{
 					System.getProperty("maps.dir") + "Ukraine_merge.road.obf",
-					System.getProperty("maps.dir") + "Ukraine_kherson_europe_2.road.obf"
+					System.getProperty("maps.dir") + "Ukraine_zhytomyr_europe_2.road.obf"
 					});
 		} else {
 			in.merger(args);
@@ -334,18 +334,20 @@ public class BinaryMerger {
 									}
 									boolean unique = true;
 									for(Amenity a : list) {
-										if(a.getType() == amenity.getType()) {
+										if(a.getType() == amenity.getType() && 
+												Algorithms.objectEquals(a.getSubType(), amenity.getSubType())) {
 											unique = false;
+											break;
 										}
 									}
 									if(unique) {
 										amenity.setId(generatedRelationId[0]--);
 										amenityRelations.get(j).add(amenity);
+										indexPoiCreator.insertAmenityIntoPoi(amenity);
 									}
 								} else {
 									if (!set.contains(amenity.getId())) {
 										file.add(amenity.getId());
-										
 										indexPoiCreator.insertAmenityIntoPoi(amenity);
 									}
 								}
@@ -365,7 +367,7 @@ public class BinaryMerger {
 		}
 		indexPoiCreator.writeBinaryPoiIndex(writer, name, null);
 		indexPoiCreator.commitAndClosePoiFile(dateCreated);
-		REMOVE_POI_DB = false;
+//		REMOVE_POI_DB = false;
 		if (REMOVE_POI_DB) {
 			indexPoiCreator.removePoiFile();
 		}
