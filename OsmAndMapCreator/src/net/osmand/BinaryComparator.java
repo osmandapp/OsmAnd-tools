@@ -23,7 +23,6 @@ import net.osmand.data.City;
 import net.osmand.data.LatLon;
 import net.osmand.data.MapObject;
 import net.osmand.data.Street;
-import net.osmand.data.preparation.IndexPoiCreator;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
@@ -78,8 +77,8 @@ public class BinaryComparator {
 //					"--cities", "--city-names",
 //					"--streets", "--street-names",
 //					"--buildings", "--intersections",
-					"--poi",
-//					"--poi-details",
+//					"--poi",
+					"--poi-details",
 					"--unique-1", "--unique-2",
 					"--osm=" + System.getProperty("maps.dir") + "compare.osm"
 			});
@@ -126,7 +125,7 @@ public class BinaryComparator {
 		if (!addressCompareSet.isEmpty()) {
 			compareAddress(indexes.get(0), indexes.get(1));
 		}
-		if (COMPARE_SET.contains(POI_COMPARE)) {
+		if (COMPARE_SET.contains(POI_COMPARE) || COMPARE_SET.contains(POI_DETAILS)) {
 			comparePoi(indexes.get(0), indexes.get(1));
 		}
 		if (isOsmOutput()) {
@@ -195,14 +194,14 @@ public class BinaryComparator {
 		while (i < amenities0.size() || j < amenities1.size()) {
 			int cmp = c.compare(a0, a1);
 			if (cmp < 0) {
-				if (COMPARE_SET.contains(COMPARE_UNIQUE_1)) {
+				if (COMPARE_SET.contains(COMPARE_UNIQUE_1) && COMPARE_SET.contains(POI_COMPARE)) {
 					uniqueCount[0]++;
 					printAmenity(a0, 0);
 				}
 				i++;
 				a0 = get(amenities0, i);
 			} else if (cmp > 0) {
-				if (COMPARE_SET.contains(COMPARE_UNIQUE_2)) {
+				if (COMPARE_SET.contains(COMPARE_UNIQUE_2) && COMPARE_SET.contains(POI_COMPARE)) {
 					uniqueCount[1]++;
 					printAmenity(a1, 1);
 				}
