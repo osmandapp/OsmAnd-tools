@@ -1,6 +1,9 @@
 package net.osmand;
 
 
+import static net.osmand.data.preparation.IndexCreator.REMOVE_POI_DB;
+import gnu.trove.set.hash.TLongHashSet;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -50,17 +53,17 @@ import org.apache.commons.logging.Log;
 import com.google.protobuf.CodedOutputStream;
 import com.google.protobuf.WireFormat;
 
-import static net.osmand.data.preparation.IndexCreator.REMOVE_POI_DB;
-
 public class BinaryMerger {
 
 	public static final int BUFFER_SIZE = 1 << 20;
 	private final static Log log = PlatformUtil.getLog(BinaryMerger.class);
 	public static final String helpMessage = "output_file.obf [input_file.obf] ...: merges all obf files and merges address structure into 1";
-	private static final Map<String, Integer> COMBINE_ARGS = new HashMap<String, Integer>() {{
-		put("--address", OsmandOdb.OsmAndStructure.ADDRESSINDEX_FIELD_NUMBER);
-		put("--poi", OsmandOdb.OsmAndStructure.POIINDEX_FIELD_NUMBER);
-	}};
+	private static final Map<String, Integer> COMBINE_ARGS = new HashMap<String, Integer>() {
+		{
+			put("--address", OsmandOdb.OsmAndStructure.ADDRESSINDEX_FIELD_NUMBER);
+			put("--poi", OsmandOdb.OsmAndStructure.POIINDEX_FIELD_NUMBER);
+		}
+	};
 
 	public static void main(String[] args) throws IOException, SQLException  {
 		BinaryMerger in = new BinaryMerger();
@@ -299,15 +302,6 @@ public class BinaryMerger {
 		writer.endWriteAddressIndex();
 	}
 
-	private static boolean contains(List<Amenity> amenities, Amenity amenity) {
-		for (Amenity a : amenities) {
-			if (Amenity.BY_ID_COMPARATOR.areEqual(amenity, a)) {
-				return true;
-			}
-		}
-		return false;
-	}
-
 	private void combinePoiIndex(String name, BinaryMapIndexWriter writer, long dateCreated, PoiRegion[] poiRegions, BinaryMapIndexReader[] indexes)
 			throws IOException, SQLException {
 		final int[] writtenPoiCount = {0};
@@ -315,42 +309,50 @@ public class BinaryMerger {
 		boolean overwriteIds = false;
 		final IndexPoiCreator indexPoiCreator = new IndexPoiCreator(renderingTypes, overwriteIds);
 		indexPoiCreator.createDatabaseStructure(new File(new File(System.getProperty("user.dir")), IndexCreator.getPoiFileName(name)));
-		final Map<Long, List<Amenity>> amenityGroups = new HashMap<Long, List<Amenity>>();
-		final long[] generatedRelationId = {0};
+		final Map<Long, List<Amenity>> amenityRelations = new HashMap<Long, List<Amenity>>();
+		final TLongHashSet set = new TLongHashSet();
+		final long[] generatedRelationId = {-1};
 		for (int i = 0; i < poiRegions.length; i++) {
 			BinaryMapIndexReader index = indexes[i];
 			log.info("Region: " + extractRegionName(index));
 			index.searchPoi(BinaryMapIndexReader.buildSearchPoiRequest(
-					MapUtils.MAP_BOUNDING_BOX_31_TILE_NUMBER[0],
-					MapUtils.MAP_BOUNDING_BOX_31_TILE_NUMBER[1],
-					MapUtils.MAP_BOUNDING_BOX_31_TILE_NUMBER[2],
-					MapUtils.MAP_BOUNDING_BOX_31_TILE_NUMBER[3],
-					MapUtils.NO_ZOOM,
-					BinaryMapIndexReader.ACCEPT_ALL_POI_TYPE_FILTER,
+					0, 0, Integer.MAX_VALUE, Integer.MAX_VALUE, -1,
+					BinaryMapIndexReader.ACCEPT_ALL_POI_TYPE_FILTER, 
 					new ResultMatcher<Amenity>() {
 						@Override
 						public boolean publish(Amenity amenity) {
-							boolean isAmenityUnique;
-							boolean isRelation = amenity.getId() < 0;
-							long j = isRelation ? IndexPoiCreator.latlon(amenity) : amenity.getId();
-							if (!amenityGroups.containsKey(j)) {
-								amenityGroups.put(j, new ArrayList<Amenity>(1));
-							}
-							isAmenityUnique = !contains(amenityGroups.get(j), amenity);
-							if (isAmenityUnique) {
+							try {
+								boolean isRelation = amenity.getId() < 0;
 								if (isRelation) {
-									generatedRelationId[0]--;
-									amenity.setId(generatedRelationId[0]);
+									long j = IndexPoiCreator.latlon(amenity);
+									List<Amenity> list;
+									if (!amenityRelations.containsKey(j)) {
+										list = new ArrayList<Amenity>(1);
+										amenityRelations.put(j, list);
+									} else {
+										list = amenityRelations.get(j);
+									}
+									boolean unique = true;
+									for(Amenity a : list) {
+										if(a.getType() == amenity.getType()) {
+											unique = false;
+										}
+									}
+									if(unique) {
+										amenity.setId(generatedRelationId[0]--);
+										amenityRelations.get(j).add(amenity);
+									}
+								} else {
+									if (!set.contains(amenity.getId())) {
+										set.add(amenity.getId());
+										indexPoiCreator.insertAmenityIntoPoi(amenity);
+									}
 								}
-								amenityGroups.get(j).add(amenity);
-								try {
-									indexPoiCreator.insertAmenityIntoPoi(amenity);
-								} catch (SQLException e) {
-									e.printStackTrace();
-								}
-								writtenPoiCount[0]++;
+								return false;
+							} catch (SQLException e) {
+								throw new RuntimeException(e);
 							}
-							return false;
+
 						}
 
 						@Override

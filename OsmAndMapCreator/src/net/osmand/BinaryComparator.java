@@ -50,7 +50,6 @@ public class BinaryComparator {
 	private static final int POI_COMPARE = 51;
 	private static final int COMPARE_UNIQUE_1 = 91;
 	private static final int COMPARE_UNIQUE_2 = 92;
-	private static final int OSM_OUTPUT = -1;
 	private static final int[] ADDRESS_COMPARE =
 			{CITY_COMPARE, CITY_NAME_COMPARE, STREET_COMPARE, STREET_NAME_COMPARE, BUILDINGS_COMPARE, INTERSECTIONS_COMPARE};
 	private static final Map<String, Integer> COMPARE_ARGS = new HashMap<String, Integer>() {{
@@ -136,19 +135,41 @@ public class BinaryComparator {
 
 	private List<Amenity> loadAmenities(BinaryMapIndexReader index) throws IOException {
 		List<Amenity> amenities = new ArrayList<Amenity>(index.searchPoi(BinaryMapIndexReader.buildSearchPoiRequest(
-				MapUtils.MAP_BOUNDING_BOX_31_TILE_NUMBER[0],
-				MapUtils.MAP_BOUNDING_BOX_31_TILE_NUMBER[1],
-				MapUtils.MAP_BOUNDING_BOX_31_TILE_NUMBER[2],
-				MapUtils.MAP_BOUNDING_BOX_31_TILE_NUMBER[3],
-				MapUtils.NO_ZOOM,
+				0, 0, Integer.MAX_VALUE, Integer.MAX_VALUE, -1,
 				BinaryMapIndexReader.ACCEPT_ALL_POI_TYPE_FILTER,
 				null)));
 		for (Amenity amenity : amenities) {
 			IndexPoiCreator.updateId(amenity);
 		}
-		Collections.sort(amenities, Amenity.BY_ID_COMPARATOR);
+		Collections.sort(amenities, getNaturalOrder() );
 		log.info("Read " + amenities.size() + " amenities from " + index.getFile());
 		return amenities;
+	}
+
+	private Comparator<Amenity> getNaturalOrder() {
+		return new Comparator<Amenity>() {
+
+			@Override
+			public int compare(Amenity o1, Amenity o2) {
+				int c ;
+				if(o1.getId() < 0 || o2.getId() < 0) {
+					if(o1.getId() > 0) {
+						return 1;
+					} else if(o2.getId() > 0) {
+						return -1;
+					}
+					long h1 = IndexPoiCreator.latlon(o1);
+					long h2 = IndexPoiCreator.latlon(o2);
+					c = Algorithms.compare(h1, h2);
+				} else {
+					c = Algorithms.compare(o1.getId(), o2.getId());
+				}
+				if(c == 0) {
+					return Algorithms.compare(o1.getType().ordinal(), o2.getType().ordinal());
+				}
+				return c;
+			}
+		};
 	}
 
 	private void comparePoi(BinaryMapIndexReader i0, BinaryMapIndexReader i1) throws IOException {
@@ -157,7 +178,7 @@ public class BinaryComparator {
 		int i = 0;
 		int j = 0;
 		int[] uniqueCount = {0, 0};
-		Comparator<MapObject> c = MapObject.BY_ID_COMPARATOR;
+		Comparator<Amenity> c = getNaturalOrder();
 		Amenity a0 = get(amenities0, 0);
 		Amenity a1 = get(amenities1, 0);
 		while (i < amenities0.size() || j < amenities1.size()) {
@@ -453,25 +474,5 @@ public class BinaryComparator {
 		};
 	}
 
-	private AddressRegion getAddressRegion(BinaryMapIndexReader i) {
-		List<BinaryIndexPart> list = i.getIndexes();
-		for (BinaryIndexPart p : list) {
-			if (p instanceof AddressRegion) {
-				return (AddressRegion) p;
-			}
-		}
-		return null;
-	}
-
-	private PoiRegion getPoiRegion(BinaryMapIndexReader i) {
-		List<BinaryIndexPart> list = i.getIndexes();
-		for (BinaryIndexPart p : list) {
-			if (p.getFieldNumber() == OsmandOdb.OsmAndStructure.POIINDEX_FIELD_NUMBER) {
-				return (PoiRegion) p;
-			}
-		}
-		return null;
-	}
-
-
+	
 }
