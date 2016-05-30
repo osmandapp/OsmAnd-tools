@@ -161,11 +161,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		return ((long) MapUtils.get31TileNumberX(loc.getLongitude()) << 31 | (long) MapUtils.get31TileNumberY(loc.getLatitude()));
 	}
 
-	public static void updateId(Amenity amenity) {
-		if (amenity.getId() < 0) {
-			amenity.setId(IndexPoiCreator.latlon(amenity));
-		}
-	}
 
 	public void iterateRelation(Relation e, OsmDbAccessorContext ctx) throws SQLException {
 

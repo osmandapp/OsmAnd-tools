@@ -78,6 +78,8 @@ public class BinaryComparator {
 //					"--streets", "--street-names",
 //					"--buildings", "--intersections",
 					"--poi",
+//					"--poi-details",
+					"--unique-1", "--unique-2",
 					"--osm=" + System.getProperty("maps.dir") + "compare.osm"
 			});
 		} else {
@@ -137,9 +139,6 @@ public class BinaryComparator {
 				0, Integer.MAX_VALUE, 0, Integer.MAX_VALUE, -1,
 				BinaryMapIndexReader.ACCEPT_ALL_POI_TYPE_FILTER,
 				null)));
-		for (Amenity amenity : amenities) {
-			IndexPoiCreator.updateId(amenity);
-		}
 		Collections.sort(amenities, getNaturalOrder() );
 		log.info("Read " + amenities.size() + " amenities from " + index.getFile());
 		return amenities;
@@ -151,6 +150,9 @@ public class BinaryComparator {
 			@Override
 			public int compare(Amenity o1, Amenity o2) {
 				int c ;
+				if (o1 == null || o2 == null) {
+					return o1 == o2 ? 0 : (o1 == null ? 1 : -1);
+				}
 				if(o1.getId() < 0 || o2.getId() < 0) {
 					if(o1.getId() > 0) {
 						return 1;
@@ -201,21 +203,24 @@ public class BinaryComparator {
 				j++;
 				a0 = get(amenities0, i);
 				a1 = get(amenities1, j);
+				if(a0 == null || a1 == null || !COMPARE_SET.contains(POI_DETAILS)) {
+					continue;
+				}
 				if(!Algorithms.objectEquals(a0.getSubType(), a1.getSubType())) {
-					printMapObject(POI_COMPARE, a0,
-							"Amenity subtypes are not equal " + a0.getSubType() + "<> " + a0.getSubType());
+					printMapObject(POI_DETAILS, a0,
+							"Amenity subtypes are not equal " + a0.getSubType() + " <> " + a1.getSubType());
 				}
 				if(!Algorithms.objectEquals(a0.getAdditionalInfo(), a1.getAdditionalInfo())) {
-					printMapObject(POI_COMPARE, a0,
-							"Amenity info is not equal " + a0.getAdditionalInfo() + "<> " + a1.getAdditionalInfo());
+					printMapObject(POI_DETAILS, a0,
+							"Amenity info is not equal " + a0.getAdditionalInfo() + " <> " + a1.getAdditionalInfo());
 				}
 				if(!Algorithms.objectEquals(a0.getNamesMap(true), a1.getNamesMap(true))) {
-					printMapObject(POI_COMPARE, a0,
-							"Amenity name is not equal " + a0.getNamesMap(true) + "<> " + a1.getNamesMap(true));
+					printMapObject(POI_DETAILS, a0,
+							"Amenity name is not equal " + a0.getNamesMap(true) + " <> " + a1.getNamesMap(true));
 				}
 				if(MapUtils.getDistance(a0.getLocation(), a1.getLocation()) > 50) {
-					printMapObject(POI_COMPARE, a0,
-							"Amenitis are too far" + a0.getLocation() + "<> " + a1.getLocation() + " " + MapUtils.getDistance(a0.getLocation(), a1.getLocation())) ;
+					printMapObject(POI_DETAILS, a0,
+							"Amenitis are too far" + a0.getLocation() + " <> " + a1.getLocation() + " " + MapUtils.getDistance(a0.getLocation(), a1.getLocation())) ;
 				}
 			}
 		}
@@ -397,6 +402,7 @@ public class BinaryComparator {
 					+ " id='" + (ELEM_ID--) + "'>\n").getBytes());
 			fosm.write(("  <tag k='note' v='" +
 					msg.replace('\'', '_').replace("<", "&lt;").replace(">", "&gt;")
+					.replace("&", "&amp;")
 					+ "'/>\n").getBytes());
 			fosm.write(("  <tag k='fixme' v='yes'/>\n").getBytes());
 			;
@@ -409,7 +415,7 @@ public class BinaryComparator {
 
 	private void printAmenity(Amenity amenity, int uniqueToFile) throws IOException {
 		printMapObject(POI_COMPARE, amenity,
-				"Amenity exist only in " + fileNameByNumber[uniqueToFile] + ": " + amenity.toString().replace("&", "&amp;"));
+				"Amenity exist only in " + fileNameByNumber[uniqueToFile] + ": " + amenity.toString());
 	}
 	
 
