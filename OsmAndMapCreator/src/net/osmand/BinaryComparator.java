@@ -11,17 +11,12 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import net.osmand.binary.BinaryIndexPart;
 import net.osmand.binary.BinaryMapAddressReaderAdapter;
-import net.osmand.binary.BinaryMapAddressReaderAdapter.AddressRegion;
 import net.osmand.binary.BinaryMapIndexReader;
-import net.osmand.binary.BinaryMapPoiReaderAdapter.PoiRegion;
-import net.osmand.binary.OsmandOdb;
 import net.osmand.data.Amenity;
 import net.osmand.data.Building;
 import net.osmand.data.City;
@@ -48,26 +43,29 @@ public class BinaryComparator {
 	private static final int BUILDINGS_COMPARE = 31;
 	private static final int INTERSECTIONS_COMPARE = 41;
 	private static final int POI_COMPARE = 51;
+	private static final int POI_DETAILS = 55;
 	private static final int COMPARE_UNIQUE_1 = 91;
 	private static final int COMPARE_UNIQUE_2 = 92;
-	private static final int[] ADDRESS_COMPARE =
-			{CITY_COMPARE, CITY_NAME_COMPARE, STREET_COMPARE, STREET_NAME_COMPARE, BUILDINGS_COMPARE, INTERSECTIONS_COMPARE};
-	private static final Map<String, Integer> COMPARE_ARGS = new HashMap<String, Integer>() {{
-		put("--cities", CITY_COMPARE);
-		put("--city-names", CITY_NAME_COMPARE);
-		put("--streets", STREET_COMPARE);
-		put("--street-names", STREET_NAME_COMPARE);
-		put("--buildings", BUILDINGS_COMPARE);
-		put("--intersections", INTERSECTIONS_COMPARE);
-		put("--poi", POI_COMPARE);
-		put("--unique-1", COMPARE_UNIQUE_1);
-		put("--unique-2", COMPARE_UNIQUE_2);
-	}};
+	private static final int[] ADDRESS_COMPARE = { CITY_COMPARE, CITY_NAME_COMPARE, STREET_COMPARE,
+			STREET_NAME_COMPARE, BUILDINGS_COMPARE, INTERSECTIONS_COMPARE };
+	private static final Map<String, Integer> COMPARE_ARGS = new HashMap<String, Integer>() ;
+	static {
+		COMPARE_ARGS.put("--cities", CITY_COMPARE);
+		COMPARE_ARGS.put("--city-names", CITY_NAME_COMPARE);
+		COMPARE_ARGS.put("--streets", STREET_COMPARE);
+		COMPARE_ARGS.put("--street-names", STREET_NAME_COMPARE);
+		COMPARE_ARGS.put("--buildings", BUILDINGS_COMPARE);
+		COMPARE_ARGS.put("--intersections", INTERSECTIONS_COMPARE);
+		COMPARE_ARGS.put("--poi", POI_COMPARE);
+		COMPARE_ARGS.put("--poi-details", POI_DETAILS);
+		COMPARE_ARGS.put("--unique-1", COMPARE_UNIQUE_1);
+		COMPARE_ARGS.put("--unique-2", COMPARE_UNIQUE_2);
+	}
 	private static final String[] fileNameByNumber = {"first file", "second file"};
 	private int ELEM_ID = -1;
 	private FileOutputStream fosm = null;
-	public static final String helpMessage = "[--cities] [--city-names] [--streets] [--street-names] [--buildings] [--intersections] [--poi]" +
-			"[--osm=file_path] [--add] [--rm] <first> <second>: compare <first> and <second>";
+	public static final String helpMessage = "[--cities] [--city-names] [--streets] [--street-names] [--buildings] [--intersections] [--poi] [--poi-details]" +
+			" [--osm=file_path] [--add] [--rm] <first> <second>: compare <first> and <second>";
 
 	public static void main(String[] args) throws IOException {
 		BinaryComparator in = new BinaryComparator();
@@ -203,6 +201,22 @@ public class BinaryComparator {
 				j++;
 				a0 = get(amenities0, i);
 				a1 = get(amenities1, j);
+				if(!Algorithms.objectEquals(a0.getSubType(), a1.getSubType())) {
+					printMapObject(POI_COMPARE, a0,
+							"Amenity subtypes are not equal " + a0.getSubType() + "<> " + a0.getSubType());
+				}
+				if(!Algorithms.objectEquals(a0.getAdditionalInfo(), a1.getAdditionalInfo())) {
+					printMapObject(POI_COMPARE, a0,
+							"Amenity info is not equal " + a0.getAdditionalInfo() + "<> " + a1.getAdditionalInfo());
+				}
+				if(!Algorithms.objectEquals(a0.getNamesMap(true), a1.getNamesMap(true))) {
+					printMapObject(POI_COMPARE, a0,
+							"Amenity name is not equal " + a0.getNamesMap(true) + "<> " + a1.getNamesMap(true));
+				}
+				if(MapUtils.getDistance(a0.getLocation(), a1.getLocation()) > 50) {
+					printMapObject(POI_COMPARE, a0,
+							"Amenitis are too far" + a0.getLocation() + "<> " + a1.getLocation() + " " + MapUtils.getDistance(a0.getLocation(), a1.getLocation())) ;
+				}
 			}
 		}
 		for (int compareUnique : Arrays.asList(COMPARE_UNIQUE_1, COMPARE_UNIQUE_2)) {
@@ -397,6 +411,7 @@ public class BinaryComparator {
 		printMapObject(POI_COMPARE, amenity,
 				"Amenity exist only in " + fileNameByNumber[uniqueToFile] + ": " + amenity.toString().replace("&", "&amp;"));
 	}
+	
 
 	private boolean isOsmOutput() {
 		return fosm != null;

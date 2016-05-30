@@ -58,11 +58,10 @@ public class BinaryMerger {
 	public static final int BUFFER_SIZE = 1 << 20;
 	private final static Log log = PlatformUtil.getLog(BinaryMerger.class);
 	public static final String helpMessage = "output_file.obf [input_file.obf] ...: merges all obf files and merges address structure into 1";
-	private static final Map<String, Integer> COMBINE_ARGS = new HashMap<String, Integer>() {
-		{
-			put("--address", OsmandOdb.OsmAndStructure.ADDRESSINDEX_FIELD_NUMBER);
-			put("--poi", OsmandOdb.OsmAndStructure.POIINDEX_FIELD_NUMBER);
-		}
+	private static final Map<String, Integer> COMBINE_ARGS = new HashMap<String, Integer>();
+	static {
+		COMBINE_ARGS.put("--address", OsmandOdb.OsmAndStructure.ADDRESSINDEX_FIELD_NUMBER);
+		COMBINE_ARGS.put("--poi", OsmandOdb.OsmAndStructure.POIINDEX_FIELD_NUMBER);
 	};
 
 	public static void main(String[] args) throws IOException, SQLException  {
