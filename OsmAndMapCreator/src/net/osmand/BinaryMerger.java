@@ -313,6 +313,7 @@ public class BinaryMerger {
 		final long[] generatedRelationId = {-1};
 		for (int i = 0; i < poiRegions.length; i++) {
 			BinaryMapIndexReader index = indexes[i];
+			final TLongHashSet file = new TLongHashSet();
 			log.info("Region: " + extractRegionName(index));
 			index.searchPoi(BinaryMapIndexReader.buildSearchPoiRequest(
 					0, Integer.MAX_VALUE, 0, Integer.MAX_VALUE, -1,
@@ -343,7 +344,8 @@ public class BinaryMerger {
 									}
 								} else {
 									if (!set.contains(amenity.getId())) {
-										set.add(amenity.getId());
+										file.add(amenity.getId());
+										
 										indexPoiCreator.insertAmenityIntoPoi(amenity);
 									}
 								}
@@ -359,6 +361,7 @@ public class BinaryMerger {
 							return false;
 						}
 					}));
+			set.addAll(file);
 		}
 		indexPoiCreator.writeBinaryPoiIndex(writer, name, null);
 		indexPoiCreator.commitAndClosePoiFile(dateCreated);
