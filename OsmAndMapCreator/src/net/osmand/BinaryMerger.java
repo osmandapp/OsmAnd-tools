@@ -302,7 +302,6 @@ public class BinaryMerger {
 	private static boolean contains(List<Amenity> amenities, Amenity amenity) {
 		for (Amenity a : amenities) {
 			if (Amenity.BY_ID_COMPARATOR.areEqual(amenity, a)) {
-				log.info("Found duplicate: " + a);
 				return true;
 			}
 		}
