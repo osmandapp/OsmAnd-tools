@@ -11,6 +11,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -157,31 +158,29 @@ public class BinaryComparator {
 		int j = 0;
 		int[] uniqueCount = {0, 0};
 		Comparator<MapObject> c = MapObject.BY_ID_COMPARATOR;
+		Amenity a0 = get(amenities0, 0);
+		Amenity a1 = get(amenities1, 0);
 		while (i < amenities0.size() || j < amenities1.size()) {
-			Amenity a0 = get(amenities0, i);
-			Amenity a1 = get(amenities1, j);
 			int cmp = c.compare(a0, a1);
 			if (cmp < 0) {
-				while (c.compare(a0, a1) < 0) {
-					if (COMPARE_SET.contains(COMPARE_UNIQUE_1)) {
-						uniqueCount[0]++;
-						printAmenity(a0, 0);
-					}
-					i++;
-					a0 = get(amenities0, i);
+				if (COMPARE_SET.contains(COMPARE_UNIQUE_1)) {
+					uniqueCount[0]++;
+					printAmenity(a0, 0);
 				}
+				i++;
+				a0 = get(amenities0, i);
 			} else if (cmp > 0) {
-				while (c.compare(a0, a1) > 0) {
-					if (COMPARE_SET.contains(COMPARE_UNIQUE_2)) {
-						uniqueCount[1]++;
-						printAmenity(a1, 1);
-					}
-					j++;
-					a1 = get(amenities1, j);
+				if (COMPARE_SET.contains(COMPARE_UNIQUE_2)) {
+					uniqueCount[1]++;
+					printAmenity(a1, 1);
 				}
+				j++;
+				a1 = get(amenities1, j);
 			} else {
 				i++;
 				j++;
+				a0 = get(amenities0, i);
+				a1 = get(amenities1, j);
 			}
 		}
 		for (int compareUnique : Arrays.asList(COMPARE_UNIQUE_1, COMPARE_UNIQUE_2)) {
