@@ -299,17 +299,24 @@ public class BinaryMerger {
 		writer.endWriteAddressIndex();
 	}
 
+	private static Amenity findDuplicate(List<Amenity> amenities, Amenity amenity) {
+		for (Amenity duplicate : amenities) {
+			if (Amenity.BY_ID_COMPARATOR.areEqual(amenity, duplicate)) {
+				return duplicate;
+			}
+		}
+		return null;
+	}
+
 	private void combinePoiIndex(String name, BinaryMapIndexWriter writer, long dateCreated, PoiRegion[] poiRegions, BinaryMapIndexReader[] indexes)
 			throws IOException, SQLException {
-		int readPoiCount = 0;
-		int badNeg = 0;
-//		int writtenPoiCount = 0;
+		int writtenPoiCount = 0;
 		MapRenderingTypesEncoder renderingTypes = new MapRenderingTypesEncoder(null, name);
 		boolean overwriteIds = true;
 		IndexPoiCreator indexPoiCreator = new IndexPoiCreator(renderingTypes, overwriteIds);
 		indexPoiCreator.createDatabaseStructure(new File(new File(System.getProperty("user.dir")), IndexCreator.getPoiFileName(name)));
-		List<Long> ids = new ArrayList<Long>();
-		Amenity a = null;
+		Map<Long, List<Amenity>> amenitiesByLatLon = new HashMap<Long, List<Amenity>>();
+		long generatedRelationId = 0;
 		for (int i = 0; i < poiRegions.length; i++) {
 			BinaryMapIndexReader index = indexes[i];
 			log.info("Region: " + extractRegionName(index));
@@ -322,46 +329,33 @@ public class BinaryMerger {
 					BinaryMapIndexReader.ACCEPT_ALL_POI_TYPE_FILTER,
 					null));
 			for (Amenity amenity : amenities) {
-				readPoiCount++;
-				boolean isNeg = amenity.getId() < 0;
-				IndexPoiCreator.updateId(amenity);
-				if (isNeg && amenity.getId() > 0) {
-					badNeg++;
+				boolean isRelation = amenity.getId() < 0;
+				long lonlat = IndexPoiCreator.latlon(amenity);
+				if (!amenitiesByLatLon.containsKey(lonlat)) {
+					amenitiesByLatLon.put(lonlat, new ArrayList<Amenity>(1));
 				}
-				ids.add(amenity.getId());
-				boolean isWritten = indexPoiCreator.insertAmenityIntoPoi(amenity);
-				if (Arrays.asList(8316643308L, 8316171782L, 8316171780L).contains(amenity.getId())) {
-					log.info("Bad POI region: " + extractRegionName(index));
-					log.info("Read count: " + readPoiCount);
-				}
-				if (isWritten) {
-//					writtenPoiCount++;
-					a = amenity;
+				if (!amenitiesByLatLon.get(lonlat).contains(amenity)) {
+					amenitiesByLatLon.get(lonlat).add(amenity);
+					if (isRelation) {
+						generatedRelationId--;
+						amenity.setId(generatedRelationId);
+					}
+					boolean isWritten = indexPoiCreator.insertAmenityIntoPoi(amenity);
+					if (isWritten) {
+						writtenPoiCount++;
+					}
+				} else {
+					log.info("Skipping duplicate " + (isRelation ? "(relation) " : "") + amenity);
 				}
 			}
 		}
-		Collections.sort(ids);
-		List<Long> idsNeg = new ArrayList<Long>();
-		for (long id : ids) {
-			if (id < 0) {
-				idsNeg.add(id);
-			}
-		}
-		Set<Long> idsUnique = new TreeSet<Long>(ids);
-		Set<Long> idsUniqueNeg = new TreeSet<Long>(idsNeg);
-//		Amenity a = new Amenity();
-//		a.setId(0L);
-//		a.setLocation(0, 0);
-//		a.setType(MapPoiTypes.getPoiCategoryByName);
-		indexPoiCreator.insertAmenityIntoPoi(a);
 		indexPoiCreator.writeBinaryPoiIndex(writer, name, null);
 		indexPoiCreator.commitAndClosePoiFile(dateCreated);
 		REMOVE_POI_DB = false;
 		if (REMOVE_POI_DB) {
 			indexPoiCreator.removePoiFile();
 		}
-		log.info("Read " + readPoiCount + " POI.");
-//		log.info("Written " + writtenPoiCount + " POI.");
+		log.info("Written " + writtenPoiCount + " POI.");
 	}
 
 	public static void copyBinaryPart(CodedOutputStream ous, byte[] BUFFER, RandomAccessFile raf, long fp, int length)

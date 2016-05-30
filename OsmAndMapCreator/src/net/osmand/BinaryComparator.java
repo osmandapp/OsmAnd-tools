@@ -145,7 +145,7 @@ public class BinaryComparator {
 		for (Amenity amenity : amenities) {
 			IndexPoiCreator.updateId(amenity);
 		}
-		Collections.sort(amenities, MapObject.BY_ID_COMPARATOR);
+		Collections.sort(amenities, Amenity.BY_ID_COMPARATOR);
 		log.info("Read " + amenities.size() + " amenities from " + index.getFile());
 		return amenities;
 	}

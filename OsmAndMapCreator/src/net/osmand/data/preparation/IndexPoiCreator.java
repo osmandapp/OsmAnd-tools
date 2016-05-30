@@ -156,14 +156,14 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		}
 	}
 
-	public static long generateRelationId(Amenity amenity) {
+	public static long latlon(Amenity amenity) {
 		LatLon loc = amenity.getLocation();
-		return -((long) MapUtils.get31TileNumberX(loc.getLongitude()) << 31 | (long) MapUtils.get31TileNumberY(loc.getLatitude()));
+		return ((long) MapUtils.get31TileNumberX(loc.getLongitude()) << 31 | (long) MapUtils.get31TileNumberY(loc.getLatitude()));
 	}
 
 	public static void updateId(Amenity amenity) {
 		if (amenity.getId() < 0) {
-			amenity.setId(IndexPoiCreator.generateRelationId(amenity));
+			amenity.setId(IndexPoiCreator.latlon(amenity));
 		}
 	}
 
@@ -210,17 +210,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		poiPreparedStatement.setString(4, amenity.getType().getKeyName());
 		poiPreparedStatement.setString(5, amenity.getSubType());
 		poiPreparedStatement.setString(6, encodeAdditionalInfo(amenity, amenity.getAdditionalInfo(), amenity.getName(), amenity.getEnName(false)));
-		try {
-			addBatch(poiPreparedStatement);
-			return true;
-		} catch (SQLException e) {
-			if (e.getMessage().contains("UNIQUE constraint failed: ")) {
-				log.info("Duplicate poi is not inserted: " + amenity.toString());
-			} else {
-				throw e;
-			}
-			return false;
-		}
+		addBatch(poiPreparedStatement);
+		return true;
 	}
 
 	private PoiAdditionalType getOrCreate(String tag, String value, boolean text) {

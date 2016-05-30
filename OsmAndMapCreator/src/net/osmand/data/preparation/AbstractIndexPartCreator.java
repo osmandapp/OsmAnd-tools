@@ -33,15 +33,7 @@ public class AbstractIndexPartCreator {
 	protected void closePreparedStatements(PreparedStatement... preparedStatements) throws SQLException {
 		for (PreparedStatement p : preparedStatements) {
 			if (p != null) {
-				try {
-					p.executeBatch();
-				} catch (SQLException e) {
-					if (e.getMessage().contains("UNIQUE constraint failed: ")) {
-						log.info("Duplicate poi is not inserted");
-					} else {
-						throw e;
-					}
-				}
+				p.executeBatch();
 				p.close();
 				pStatements.remove(p);
 			}
