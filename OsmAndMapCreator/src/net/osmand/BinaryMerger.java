@@ -311,42 +311,54 @@ public class BinaryMerger {
 
 	private void combinePoiIndex(String name, BinaryMapIndexWriter writer, long dateCreated, PoiRegion[] poiRegions, BinaryMapIndexReader[] indexes)
 			throws IOException, SQLException {
-		int writtenPoiCount = 0;
+		final int[] writtenPoiCount = {0};
 		MapRenderingTypesEncoder renderingTypes = new MapRenderingTypesEncoder(null, name);
 		boolean overwriteIds = false;
-		IndexPoiCreator indexPoiCreator = new IndexPoiCreator(renderingTypes, overwriteIds);
+		final IndexPoiCreator indexPoiCreator = new IndexPoiCreator(renderingTypes, overwriteIds);
 		indexPoiCreator.createDatabaseStructure(new File(new File(System.getProperty("user.dir")), IndexCreator.getPoiFileName(name)));
-		Map<Long, List<Amenity>> amenityGroups = new HashMap<Long, List<Amenity>>();
-		long generatedRelationId = 0;
+		final Map<Long, List<Amenity>> amenityGroups = new HashMap<Long, List<Amenity>>();
+		final long[] generatedRelationId = {0};
 		for (int i = 0; i < poiRegions.length; i++) {
 			BinaryMapIndexReader index = indexes[i];
 			log.info("Region: " + extractRegionName(index));
-			List<Amenity> amenities = index.searchPoi(BinaryMapIndexReader.buildSearchPoiRequest(
+			index.searchPoi(BinaryMapIndexReader.buildSearchPoiRequest(
 					MapUtils.MAP_BOUNDING_BOX_31_TILE_NUMBER[0],
 					MapUtils.MAP_BOUNDING_BOX_31_TILE_NUMBER[1],
 					MapUtils.MAP_BOUNDING_BOX_31_TILE_NUMBER[2],
 					MapUtils.MAP_BOUNDING_BOX_31_TILE_NUMBER[3],
 					MapUtils.NO_ZOOM,
 					BinaryMapIndexReader.ACCEPT_ALL_POI_TYPE_FILTER,
-					null));
-			for (Amenity amenity : amenities) {
-				boolean isAmenityUnique;
-				boolean isRelation = amenity.getId() < 0;
-				long j = isRelation ? IndexPoiCreator.latlon(amenity) : amenity.getId();
-				if (!amenityGroups.containsKey(j)) {
-					amenityGroups.put(j, new ArrayList<Amenity>(1));
-				}
-				isAmenityUnique = !contains(amenityGroups.get(j), amenity);
-				if (isAmenityUnique) {
-					if (isRelation) {
-						generatedRelationId--;
-						amenity.setId(generatedRelationId);
-					}
-					amenityGroups.get(j).add(amenity);
-					indexPoiCreator.insertAmenityIntoPoi(amenity);
-					writtenPoiCount++;
-				}
-			}
+					new ResultMatcher<Amenity>() {
+						@Override
+						public boolean publish(Amenity amenity) {
+							boolean isAmenityUnique;
+							boolean isRelation = amenity.getId() < 0;
+							long j = isRelation ? IndexPoiCreator.latlon(amenity) : amenity.getId();
+							if (!amenityGroups.containsKey(j)) {
+								amenityGroups.put(j, new ArrayList<Amenity>(1));
+							}
+							isAmenityUnique = !contains(amenityGroups.get(j), amenity);
+							if (isAmenityUnique) {
+								if (isRelation) {
+									generatedRelationId[0]--;
+									amenity.setId(generatedRelationId[0]);
+								}
+								amenityGroups.get(j).add(amenity);
+								try {
+									indexPoiCreator.insertAmenityIntoPoi(amenity);
+								} catch (SQLException e) {
+									e.printStackTrace();
+								}
+								writtenPoiCount[0]++;
+							}
+							return false;
+						}
+
+						@Override
+						public boolean isCancelled() {
+							return false;
+						}
+					}));
 		}
 		indexPoiCreator.writeBinaryPoiIndex(writer, name, null);
 		indexPoiCreator.commitAndClosePoiFile(dateCreated);
@@ -354,7 +366,7 @@ public class BinaryMerger {
 		if (REMOVE_POI_DB) {
 			indexPoiCreator.removePoiFile();
 		}
-		log.info("Written " + writtenPoiCount + " POI.");
+		log.info("Written " + writtenPoiCount[0] + " POI.");
 	}
 
 	public static void copyBinaryPart(CodedOutputStream ous, byte[] BUFFER, RandomAccessFile raf, long fp, int length)
