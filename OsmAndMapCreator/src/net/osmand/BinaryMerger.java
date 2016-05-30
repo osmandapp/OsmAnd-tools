@@ -24,7 +24,6 @@ import java.util.TreeSet;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
-import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.binary.BinaryIndexPart;
 import net.osmand.binary.BinaryMapAddressReaderAdapter;
 import net.osmand.binary.BinaryMapAddressReaderAdapter.AddressRegion;
@@ -300,6 +299,16 @@ public class BinaryMerger {
 		writer.endWriteAddressIndex();
 	}
 
+	private static boolean contains(List<Amenity> amenities, Amenity amenity) {
+		for (Amenity a : amenities) {
+			if (Amenity.BY_ID_COMPARATOR.areEqual(amenity, a)) {
+				log.info("Found duplicate: " + a);
+				return true;
+			}
+		}
+		return false;
+	}
+
 	private void combinePoiIndex(String name, BinaryMapIndexWriter writer, long dateCreated, PoiRegion[] poiRegions, BinaryMapIndexReader[] indexes)
 			throws IOException, SQLException {
 		int writtenPoiCount = 0;
@@ -307,9 +316,8 @@ public class BinaryMerger {
 		boolean overwriteIds = false;
 		IndexPoiCreator indexPoiCreator = new IndexPoiCreator(renderingTypes, overwriteIds);
 		indexPoiCreator.createDatabaseStructure(new File(new File(System.getProperty("user.dir")), IndexCreator.getPoiFileName(name)));
-		Map<Long, List<Amenity>> relations = new HashMap<Long, List<Amenity>>();
+		Map<Long, List<Amenity>> amenityGroups = new HashMap<Long, List<Amenity>>();
 		long generatedRelationId = 0;
-		TLongHashSet ids = new TLongHashSet();
 		for (int i = 0; i < poiRegions.length; i++) {
 			BinaryMapIndexReader index = indexes[i];
 			log.info("Region: " + extractRegionName(index));
@@ -324,26 +332,20 @@ public class BinaryMerger {
 			for (Amenity amenity : amenities) {
 				boolean isAmenityUnique;
 				boolean isRelation = amenity.getId() < 0;
-				if (isRelation) {
-					long lonlat = IndexPoiCreator.latlon(amenity);
-					if (!relations.containsKey(lonlat)) {
-						relations.put(lonlat, new ArrayList<Amenity>(1));
-					}
-					isAmenityUnique = !relations.get(lonlat).contains(amenity);
-					if (isAmenityUnique) {
-						relations.get(lonlat).add(amenity);
+				long j = isRelation ? IndexPoiCreator.latlon(amenity) : amenity.getId();
+				if (!amenityGroups.containsKey(j)) {
+					amenityGroups.put(j, new ArrayList<Amenity>(1));
+				}
+				isAmenityUnique = !contains(amenityGroups.get(j), amenity);
+				if (isAmenityUnique) {
+					if (isRelation) {
 						generatedRelationId--;
 						amenity.setId(generatedRelationId);
 					}
-				} else {
-					isAmenityUnique = !ids.contains(amenity.getId());
-					ids.add(amenity.getId());
-				}
-				if (isAmenityUnique) {
+					amenityGroups.get(j).add(amenity);
 					indexPoiCreator.insertAmenityIntoPoi(amenity);
 					writtenPoiCount++;
 				}
-
 			}
 		}
 		indexPoiCreator.writeBinaryPoiIndex(writer, name, null);
