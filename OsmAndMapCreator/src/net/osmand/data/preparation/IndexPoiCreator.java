@@ -156,10 +156,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		}
 	}
 
-	public static long latlon(Amenity amenity) {
-		LatLon loc = amenity.getLocation();
-		return ((long) MapUtils.get31TileNumberX(loc.getLongitude()) << 31 | (long) MapUtils.get31TileNumberY(loc.getLatitude()));
-	}
+	
 
 
 	public void iterateRelation(Relation e, OsmDbAccessorContext ctx) throws SQLException {

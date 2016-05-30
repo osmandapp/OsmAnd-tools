@@ -35,6 +35,7 @@ import net.osmand.binary.BinaryMapPoiReaderAdapter.PoiRegion;
 import net.osmand.binary.OsmandOdb;
 import net.osmand.data.Amenity;
 import net.osmand.data.City;
+import net.osmand.data.LatLon;
 import net.osmand.data.MapObject;
 import net.osmand.data.Postcode;
 import net.osmand.data.Street;
@@ -300,6 +301,11 @@ public class BinaryMerger {
 		writer.writeAddressNameIndex(namesIndex);
 		writer.endWriteAddressIndex();
 	}
+	
+	public static long latlon(Amenity amenity) {
+		LatLon loc = amenity.getLocation();
+		return ((long) MapUtils.get31TileNumberX(loc.getLongitude()) << 31 | (long) MapUtils.get31TileNumberY(loc.getLatitude()));
+	}
 
 	private void combinePoiIndex(String name, BinaryMapIndexWriter writer, long dateCreated, PoiRegion[] poiRegions, BinaryMapIndexReader[] indexes)
 			throws IOException, SQLException {
@@ -324,7 +330,7 @@ public class BinaryMerger {
 							try {
 								boolean isRelation = amenity.getId() < 0;
 								if (isRelation) {
-									long j = IndexPoiCreator.latlon(amenity);
+									long j = latlon(amenity);
 									List<Amenity> list;
 									if (!amenityRelations.containsKey(j)) {
 										list = new ArrayList<Amenity>(1);

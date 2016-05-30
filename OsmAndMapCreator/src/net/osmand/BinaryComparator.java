@@ -20,6 +20,7 @@ import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.data.Amenity;
 import net.osmand.data.Building;
 import net.osmand.data.City;
+import net.osmand.data.LatLon;
 import net.osmand.data.MapObject;
 import net.osmand.data.Street;
 import net.osmand.data.preparation.IndexPoiCreator;
@@ -72,10 +73,8 @@ public class BinaryComparator {
 		// test cases show info
 		if (args.length == 1 && "test".equals(args[0])) {
 			in.compare(new String[]{
-//					System.getProperty("maps.dir") + "Ukraine_europe_2_all.road.obf",
-//					System.getProperty("maps.dir") + "Ukraine_europe_2.road.obf",
-					System.getProperty("maps.dir") + "Ukraine_zhytomyr_europe_2.road.obf",
-					System.getProperty("maps.dir") + "Ukraine_merge.road.obf",
+					System.getProperty("maps.dir") + "Ukraine_europe_2_all.road.obf",
+					System.getProperty("maps.dir") + "Ukraine_europe_2.road.obf",
 //					"--cities", "--city-names",
 //					"--streets", "--street-names",
 //					"--buildings", "--intersections",
@@ -161,18 +160,27 @@ public class BinaryComparator {
 					} else if(o2.getId() > 0) {
 						return -1;
 					}
-					long h1 = IndexPoiCreator.latlon(o1);
-					long h2 = IndexPoiCreator.latlon(o2);
+					long h1 = latlon(o1);
+					long h2 = latlon(o2);
 					c = Algorithms.compare(h1, h2);
 				} else {
 					c = Algorithms.compare(o1.getId(), o2.getId());
 				}
 				if(c == 0) {
-					return Algorithms.compare(o1.getType().ordinal(), o2.getType().ordinal());
+					int l = Algorithms.compare(o1.getType().ordinal(), o2.getType().ordinal());
+					if(l == 0) {
+						return o1.getSubType().compareTo(o2.getSubType());
+					}
+					return l;
 				}
 				return c;
 			}
 		};
+	}
+	
+	public static long latlon(Amenity amenity) {
+		LatLon loc = amenity.getLocation();
+		return ((long) MapUtils.getTileNumberX(21, loc.getLongitude()) << 31 | (long) MapUtils.getTileNumberY(21, loc.getLatitude()));
 	}
 
 	private void comparePoi(BinaryMapIndexReader i0, BinaryMapIndexReader i1) throws IOException {
