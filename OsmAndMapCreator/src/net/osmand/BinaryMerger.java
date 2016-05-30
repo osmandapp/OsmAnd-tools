@@ -24,6 +24,7 @@ import java.util.TreeSet;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
+import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.binary.BinaryIndexPart;
 import net.osmand.binary.BinaryMapAddressReaderAdapter;
 import net.osmand.binary.BinaryMapAddressReaderAdapter.AddressRegion;
@@ -317,6 +318,7 @@ public class BinaryMerger {
 		indexPoiCreator.createDatabaseStructure(new File(new File(System.getProperty("user.dir")), IndexCreator.getPoiFileName(name)));
 		Map<Long, List<Amenity>> amenitiesByLatLon = new HashMap<Long, List<Amenity>>();
 		long generatedRelationId = 0;
+		TLongHashSet ids = new TLongHashSet();
 		for (int i = 0; i < poiRegions.length; i++) {
 			BinaryMapIndexReader index = indexes[i];
 			log.info("Region: " + extractRegionName(index));
@@ -329,22 +331,28 @@ public class BinaryMerger {
 					BinaryMapIndexReader.ACCEPT_ALL_POI_TYPE_FILTER,
 					null));
 			for (Amenity amenity : amenities) {
+				boolean isAmenityUnique = false;
 				boolean isRelation = amenity.getId() < 0;
-				long lonlat = IndexPoiCreator.latlon(amenity);
-				if (!amenitiesByLatLon.containsKey(lonlat)) {
-					amenitiesByLatLon.put(lonlat, new ArrayList<Amenity>(1));
-				}
-				if (!amenitiesByLatLon.get(lonlat).contains(amenity)) {
-					amenitiesByLatLon.get(lonlat).add(amenity);
-					if (isRelation) {
+				if (isRelation) {
+					long lonlat = IndexPoiCreator.latlon(amenity);
+					if (!amenitiesByLatLon.containsKey(lonlat)) {
+						amenitiesByLatLon.put(lonlat, new ArrayList<Amenity>(1));
+					}
+					isAmenityUnique = !amenitiesByLatLon.get(lonlat).contains(amenity);
+					if (isAmenityUnique) {
+						amenitiesByLatLon.get(lonlat).add(amenity);
 						generatedRelationId--;
 						amenity.setId(generatedRelationId);
 					}
-					boolean isWritten = indexPoiCreator.insertAmenityIntoPoi(amenity);
-					if (isWritten) {
-						writtenPoiCount++;
-					}
+				} else {
+					isAmenityUnique = !ids.contains(amenity.getId());
+					ids.add(amenity.getId());
 				}
+				if (isAmenityUnique) {
+					indexPoiCreator.insertAmenityIntoPoi(amenity);
+					writtenPoiCount++;
+				}
+
 			}
 		}
 		indexPoiCreator.writeBinaryPoiIndex(writer, name, null);
