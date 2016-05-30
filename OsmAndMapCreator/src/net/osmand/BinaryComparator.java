@@ -14,7 +14,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeSet;
 
 import net.osmand.binary.BinaryIndexPart;
 import net.osmand.binary.BinaryMapAddressReaderAdapter;
@@ -27,7 +26,6 @@ import net.osmand.data.Building;
 import net.osmand.data.City;
 import net.osmand.data.MapObject;
 import net.osmand.data.Street;
-import net.osmand.data.preparation.BinaryMapIndexWriter;
 import net.osmand.data.preparation.IndexPoiCreator;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
@@ -141,7 +139,7 @@ public class BinaryComparator {
 				MapUtils.MAP_BOUNDING_BOX_31_TILE_NUMBER[2],
 				MapUtils.MAP_BOUNDING_BOX_31_TILE_NUMBER[3],
 				MapUtils.NO_ZOOM,
-				BinaryMapIndexReader.EMPTY_SEARCH_POI_TYPE_FILTER,
+				BinaryMapIndexReader.ACCEPT_ALL_POI_TYPE_FILTER,
 				null)));
 		for (Amenity amenity : amenities) {
 			IndexPoiCreator.updateId(amenity);

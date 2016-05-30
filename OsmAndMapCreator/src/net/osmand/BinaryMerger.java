@@ -32,7 +32,6 @@ import net.osmand.binary.BinaryMapPoiReaderAdapter.PoiRegion;
 import net.osmand.binary.OsmandOdb;
 import net.osmand.data.Amenity;
 import net.osmand.data.City;
-import net.osmand.data.LatLon;
 import net.osmand.data.MapObject;
 import net.osmand.data.Postcode;
 import net.osmand.data.Street;
@@ -41,9 +40,7 @@ import net.osmand.data.preparation.BinaryMapIndexWriter;
 import net.osmand.data.preparation.IndexCreator;
 import net.osmand.data.preparation.IndexPoiCreator;
 import net.osmand.data.preparation.address.IndexAddressCreator;
-import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.MapRenderingTypesEncoder;
-import net.osmand.osm.PoiCategory;
 import net.osmand.osm.edit.Node;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
@@ -322,7 +319,7 @@ public class BinaryMerger {
 					MapUtils.MAP_BOUNDING_BOX_31_TILE_NUMBER[2],
 					MapUtils.MAP_BOUNDING_BOX_31_TILE_NUMBER[3],
 					MapUtils.NO_ZOOM,
-					BinaryMapIndexReader.EMPTY_SEARCH_POI_TYPE_FILTER,
+					BinaryMapIndexReader.ACCEPT_ALL_POI_TYPE_FILTER,
 					null));
 			for (Amenity amenity : amenities) {
 				readPoiCount++;
