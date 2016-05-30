@@ -316,7 +316,7 @@ public class BinaryMerger {
 			BinaryMapIndexReader index = indexes[i];
 			log.info("Region: " + extractRegionName(index));
 			index.searchPoi(BinaryMapIndexReader.buildSearchPoiRequest(
-					0, 0, Integer.MAX_VALUE, Integer.MAX_VALUE, -1,
+					0, Integer.MAX_VALUE, 0, Integer.MAX_VALUE, -1,
 					BinaryMapIndexReader.ACCEPT_ALL_POI_TYPE_FILTER, 
 					new ResultMatcher<Amenity>() {
 						@Override

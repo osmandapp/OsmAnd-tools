@@ -76,9 +76,10 @@ public class BinaryComparator {
 			in.compare(new String[]{
 					System.getProperty("maps.dir") + "Ukraine_europe_2_all.road.obf",
 					System.getProperty("maps.dir") + "Ukraine_europe_2.road.obf",
-					"--cities", "--city-names"
-					, "--streets", "--street-names"
-					, "--buildings", "--intersections",
+//					"--cities", "--city-names",
+//					"--streets", "--street-names",
+//					"--buildings", "--intersections",
+					"--poi",
 					"--osm=" + System.getProperty("maps.dir") + "compare.osm"
 			});
 		} else {
@@ -135,7 +136,7 @@ public class BinaryComparator {
 
 	private List<Amenity> loadAmenities(BinaryMapIndexReader index) throws IOException {
 		List<Amenity> amenities = new ArrayList<Amenity>(index.searchPoi(BinaryMapIndexReader.buildSearchPoiRequest(
-				0, 0, Integer.MAX_VALUE, Integer.MAX_VALUE, -1,
+				0, Integer.MAX_VALUE, 0, Integer.MAX_VALUE, -1,
 				BinaryMapIndexReader.ACCEPT_ALL_POI_TYPE_FILTER,
 				null)));
 		for (Amenity amenity : amenities) {
