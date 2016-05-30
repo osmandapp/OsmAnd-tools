@@ -344,8 +344,6 @@ public class BinaryMerger {
 					if (isWritten) {
 						writtenPoiCount++;
 					}
-				} else {
-					log.info("Skipping duplicate " + (isRelation ? "(relation) " : "") + amenity);
 				}
 			}
 		}
