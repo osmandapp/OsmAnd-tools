@@ -47,8 +47,8 @@ public class BinaryComparator {
 	private static final int BUILDINGS_COMPARE = 31;
 	private static final int INTERSECTIONS_COMPARE = 41;
 	private static final int POI_COMPARE = 51;
-	private static final int COMPARE_ADD = 91;
-	private static final int COMPARE_RM = 92;
+	private static final int COMPARE_UNIQUE_1 = 91;
+	private static final int COMPARE_UNIQUE_2 = 92;
 	private static final int OSM_OUTPUT = -1;
 	private static final int[] ADDRESS_COMPARE =
 			{CITY_COMPARE, CITY_NAME_COMPARE, STREET_COMPARE, STREET_NAME_COMPARE, BUILDINGS_COMPARE, INTERSECTIONS_COMPARE};
@@ -60,9 +60,10 @@ public class BinaryComparator {
 		put("--buildings", BUILDINGS_COMPARE);
 		put("--intersections", INTERSECTIONS_COMPARE);
 		put("--poi", POI_COMPARE);
-		put("--add", COMPARE_ADD);
-		put("--rm", COMPARE_RM);
+		put("--unique-1", COMPARE_UNIQUE_1);
+		put("--unique-2", COMPARE_UNIQUE_2);
 	}};
+	private static final String[] fileNameByNumber = {"first file", "second file"};
 	private int ELEM_ID = -1;
 	private FileOutputStream fosm = null;
 	public static final String helpMessage = "[--cities] [--city-names] [--streets] [--street-names] [--buildings] [--intersections] [--poi]" +
@@ -154,8 +155,7 @@ public class BinaryComparator {
 		List<Amenity> amenities1 = loadAmenities(i1);
 		int i = 0;
 		int j = 0;
-		int added = 0;
-		int removed = 0;
+		int[] uniqueCount = {0, 0};
 		Comparator<MapObject> c = MapObject.BY_ID_COMPARATOR;
 		while (i < amenities0.size() || j < amenities1.size()) {
 			Amenity a0 = get(amenities0, i);
@@ -163,18 +163,18 @@ public class BinaryComparator {
 			int cmp = c.compare(a0, a1);
 			if (cmp < 0) {
 				while (c.compare(a0, a1) < 0) {
-					if (COMPARE_SET.contains(COMPARE_RM)) {
-						printMapObject(POI_COMPARE, a0, "Amenity was removed: " + a0.toString().replace("&", "&amp;"));
-						removed++;
+					if (COMPARE_SET.contains(COMPARE_UNIQUE_1)) {
+						uniqueCount[0]++;
+						printAmenity(a0, 0);
 					}
 					i++;
 					a0 = get(amenities0, i);
 				}
 			} else if (cmp > 0) {
 				while (c.compare(a0, a1) > 0) {
-					if (COMPARE_SET.contains(COMPARE_ADD)) {
-						printMapObject(POI_COMPARE, a1, "Amenity was added: " + a1.toString().replace("&", "&amp;"));
-						added++;
+					if (COMPARE_SET.contains(COMPARE_UNIQUE_2)) {
+						uniqueCount[1]++;
+						printAmenity(a1, 1);
 					}
 					j++;
 					a1 = get(amenities1, j);
@@ -184,11 +184,11 @@ public class BinaryComparator {
 				j++;
 			}
 		}
-		if (COMPARE_SET.contains(COMPARE_ADD)) {
-			log.info("Added POI count: " + added);
-		}
-		if (COMPARE_SET.contains(COMPARE_RM)) {
-			log.info("Removed POI count: " + removed);
+		for (int compareUnique : Arrays.asList(COMPARE_UNIQUE_1, COMPARE_UNIQUE_2)) {
+			if (COMPARE_SET.contains(compareUnique)) {
+				int uniqueToFile = compareUnique - COMPARE_UNIQUE_1;
+				log.info("Amenities present only in " + fileNameByNumber[uniqueToFile] + ": " + uniqueCount[uniqueToFile]);
+			}
 		}
 	}
 
@@ -208,7 +208,7 @@ public class BinaryComparator {
 				int cmp = c.compare(c0, c1);
 				if (cmp < 0) {
 					while (c.compare(c0, c1) < 0) {
-						if (COMPARE_SET.contains(CITY_COMPARE) && COMPARE_SET.contains(COMPARE_RM)) {
+						if (COMPARE_SET.contains(CITY_COMPARE) && COMPARE_SET.contains(COMPARE_UNIQUE_1)) {
 							City ps = searchSimilarCities(c0, ct1, j);
 							if (ps != null) {
 								int distance = (int) MapUtils.getDistance(c0.getLocation(), ps.getLocation());
@@ -223,7 +223,7 @@ public class BinaryComparator {
 					}
 				} else if (cmp > 0) {
 					while (c.compare(c0, c1) > 0) {
-						if (COMPARE_SET.contains(CITY_COMPARE) && COMPARE_SET.contains(COMPARE_ADD)) {
+						if (COMPARE_SET.contains(CITY_COMPARE) && COMPARE_SET.contains(COMPARE_UNIQUE_2)) {
 							City ps = searchSimilarCities(c1, ct0, i);
 							if (ps != null) {
 								int distance = (int) MapUtils.getDistance(c1.getLocation(), ps.getLocation());
@@ -370,6 +370,11 @@ public class BinaryComparator {
 			fosm.write(("  </node>\n").getBytes());
 			;
 		}
+	}
+
+	private void printAmenity(Amenity amenity, int uniqueToFile) throws IOException {
+		printMapObject(POI_COMPARE, amenity,
+				"Amenity exist only in " + fileNameByNumber[uniqueToFile] + ": " + amenity.toString().replace("&", "&amp;"));
 	}
 
 	private boolean isOsmOutput() {
