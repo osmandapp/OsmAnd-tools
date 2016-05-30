@@ -300,15 +300,6 @@ public class BinaryMerger {
 		writer.endWriteAddressIndex();
 	}
 
-	private static Amenity findDuplicate(List<Amenity> amenities, Amenity amenity) {
-		for (Amenity duplicate : amenities) {
-			if (Amenity.BY_ID_COMPARATOR.areEqual(amenity, duplicate)) {
-				return duplicate;
-			}
-		}
-		return null;
-	}
-
 	private void combinePoiIndex(String name, BinaryMapIndexWriter writer, long dateCreated, PoiRegion[] poiRegions, BinaryMapIndexReader[] indexes)
 			throws IOException, SQLException {
 		int writtenPoiCount = 0;
@@ -331,7 +322,7 @@ public class BinaryMerger {
 					BinaryMapIndexReader.ACCEPT_ALL_POI_TYPE_FILTER,
 					null));
 			for (Amenity amenity : amenities) {
-				boolean isAmenityUnique = false;
+				boolean isAmenityUnique;
 				boolean isRelation = amenity.getId() < 0;
 				if (isRelation) {
 					long lonlat = IndexPoiCreator.latlon(amenity);
