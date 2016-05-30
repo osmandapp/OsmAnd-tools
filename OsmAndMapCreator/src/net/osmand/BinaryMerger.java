@@ -304,10 +304,10 @@ public class BinaryMerger {
 			throws IOException, SQLException {
 		int writtenPoiCount = 0;
 		MapRenderingTypesEncoder renderingTypes = new MapRenderingTypesEncoder(null, name);
-		boolean overwriteIds = true;
+		boolean overwriteIds = false;
 		IndexPoiCreator indexPoiCreator = new IndexPoiCreator(renderingTypes, overwriteIds);
 		indexPoiCreator.createDatabaseStructure(new File(new File(System.getProperty("user.dir")), IndexCreator.getPoiFileName(name)));
-		Map<Long, List<Amenity>> amenitiesByLatLon = new HashMap<Long, List<Amenity>>();
+		Map<Long, List<Amenity>> relations = new HashMap<Long, List<Amenity>>();
 		long generatedRelationId = 0;
 		TLongHashSet ids = new TLongHashSet();
 		for (int i = 0; i < poiRegions.length; i++) {
@@ -326,12 +326,12 @@ public class BinaryMerger {
 				boolean isRelation = amenity.getId() < 0;
 				if (isRelation) {
 					long lonlat = IndexPoiCreator.latlon(amenity);
-					if (!amenitiesByLatLon.containsKey(lonlat)) {
-						amenitiesByLatLon.put(lonlat, new ArrayList<Amenity>(1));
+					if (!relations.containsKey(lonlat)) {
+						relations.put(lonlat, new ArrayList<Amenity>(1));
 					}
-					isAmenityUnique = !amenitiesByLatLon.get(lonlat).contains(amenity);
+					isAmenityUnique = !relations.get(lonlat).contains(amenity);
 					if (isAmenityUnique) {
-						amenitiesByLatLon.get(lonlat).add(amenity);
+						relations.get(lonlat).add(amenity);
 						generatedRelationId--;
 						amenity.setId(generatedRelationId);
 					}
