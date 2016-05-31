@@ -937,10 +937,9 @@ public class IndexCreator {
 
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 
-//		String file = rootFolder + "/temp/Neth_noord_cut.obf";
 		String file = rootFolder + "/maps/neth_noord_cut.osm";
-//		String file = rootFolder + "/repos/resources/synthetic_test_rendering.osm";
-//		String file = rootFolder + "/repos/resources/turn_lanes_test.osm";
+//		String file = rootFolder + "/repos/resources/test-resources/synthetic_test_rendering.osm";
+//		String file = rootFolder + "/repos/resources/test-resources/turn_lanes_test.osm";
 
 		int st = file.lastIndexOf('/');
 		int e = file.indexOf('.', st);
