@@ -352,11 +352,13 @@ public class BinaryMerger {
 										amenity.setId(generatedRelationId[0]--);
 										amenityRelations.get(j).add(amenity);
 										indexPoiCreator.insertAmenityIntoPoi(amenity);
+										writtenPoiCount[0]++;
 									}
 								} else {
 									if (!set.contains(amenity.getId())) {
 										file.add(amenity.getId());
 										indexPoiCreator.insertAmenityIntoPoi(amenity);
+										writtenPoiCount[0]++;
 									}
 								}
 								return false;
