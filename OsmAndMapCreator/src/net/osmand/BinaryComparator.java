@@ -46,7 +46,7 @@ public class BinaryComparator {
 	private static final int POI_DETAILS = 55;
 	private static final int COMPARE_UNIQUE_1 = 91;
 	private static final int COMPARE_UNIQUE_2 = 92;
-	private static final int[] ADDRESS_COMPARE = { CITY_COMPARE, CITY_NAME_COMPARE, STREET_COMPARE,
+	private static final Integer[] ADDRESS_COMPARE = { CITY_COMPARE, CITY_NAME_COMPARE, STREET_COMPARE,
 			STREET_NAME_COMPARE, BUILDINGS_COMPARE, INTERSECTIONS_COMPARE };
 	private static final Map<String, Integer> COMPARE_ARGS = new HashMap<String, Integer>() ;
 	static {
@@ -74,11 +74,11 @@ public class BinaryComparator {
 			in.compare(new String[]{
 					System.getProperty("maps.dir") + "Ukraine_europe_2_all.road.obf",
 					System.getProperty("maps.dir") + "Ukraine_europe_2.road.obf",
-//					"--cities", "--city-names",
-//					"--streets", "--street-names",
-//					"--buildings", "--intersections",
+					"--cities", "--city-names",
+					"--streets", "--street-names",
+					"--buildings", "--intersections",
 //					"--poi",
-					"--poi-details",
+//					"--poi-details",
 					"--unique-1", "--unique-2",
 					"--osm=" + System.getProperty("maps.dir") + "compare.osm"
 			});
@@ -130,8 +130,8 @@ public class BinaryComparator {
 		}
 		if (isOsmOutput()) {
 			fosm.write("</osm>".getBytes());
+			fosm.close();
 		}
-		fosm.close();
 	}
 
 	private List<Amenity> loadAmenities(BinaryMapIndexReader index) throws IOException {
