@@ -2,6 +2,7 @@ package net.osmand;
 
 
 import static net.osmand.data.preparation.IndexCreator.REMOVE_POI_DB;
+
 import gnu.trove.set.hash.TLongHashSet;
 
 import java.io.File;
@@ -60,19 +61,20 @@ public class BinaryMerger {
 	private final static Log log = PlatformUtil.getLog(BinaryMerger.class);
 	public static final String helpMessage = "output_file.obf [--address] [--poi] [input_file.obf] ...: merges all obf files and merges address structure into 1";
 	private static final Map<String, Integer> COMBINE_ARGS = new HashMap<String, Integer>();
+
 	static {
 		COMBINE_ARGS.put("--address", OsmandOdb.OsmAndStructure.ADDRESSINDEX_FIELD_NUMBER);
 		COMBINE_ARGS.put("--poi", OsmandOdb.OsmAndStructure.POIINDEX_FIELD_NUMBER);
-	};
+	}
 
-	public static void main(String[] args) throws IOException, SQLException  {
+	public static void main(String[] args) throws IOException, SQLException {
 		BinaryMerger in = new BinaryMerger();
 		// test cases show info
 		if (args.length == 1 && "test".equals(args[0])) {
 			in.merger(new String[]{
 					System.getProperty("maps.dir") + "Ukraine_merge.road.obf",
 					System.getProperty("maps.dir") + "Ukraine_zhytomyr_europe_2.road.obf"
-					});
+			});
 		} else {
 			in.merger(args);
 		}
@@ -200,16 +202,16 @@ public class BinaryMerger {
 				List<Node> list = streetNodesN.get(is.getName());
 				Node nn = null;
 				if (list != null) {
-					boolean  nameEqual = false;
+					boolean nameEqual = false;
 					double dd = 100000;
 					for (Node n : list) {
 						double d = MapUtils.getDistance(n.getLatLon(), is.getLocation());
-						if(Algorithms.objectEquals(street.getName(), n.getTag("name")) && 
+						if (Algorithms.objectEquals(street.getName(), n.getTag("name")) &&
 								(d < dd || !nameEqual)) {
 							nn = n;
 							dd = d;
 							nameEqual = true;
-						} else if(!nameEqual && d < dd ) {
+						} else if (!nameEqual && d < dd) {
 							nn = n;
 							dd = d;
 						}
@@ -225,7 +227,7 @@ public class BinaryMerger {
 				nns.add(nn);
 			}
 			streetNodes.put(street, nns);
-			if(streetNodesN.containsKey(street.getName())) {
+			if (streetNodesN.containsKey(street.getName())) {
 				streetNodesN.get(street.getName()).addAll(nns);
 			} else {
 				streetNodesN.put(street.getName(), nns);
@@ -301,7 +303,7 @@ public class BinaryMerger {
 		writer.writeAddressNameIndex(namesIndex);
 		writer.endWriteAddressIndex();
 	}
-	
+
 	public static long latlon(Amenity amenity) {
 		LatLon loc = amenity.getLocation();
 		return ((long) MapUtils.get31TileNumberX(loc.getLongitude()) << 31 | (long) MapUtils.get31TileNumberY(loc.getLatitude()));
@@ -323,7 +325,7 @@ public class BinaryMerger {
 			log.info("Region: " + extractRegionName(index));
 			index.searchPoi(BinaryMapIndexReader.buildSearchPoiRequest(
 					0, Integer.MAX_VALUE, 0, Integer.MAX_VALUE, -1,
-					BinaryMapIndexReader.ACCEPT_ALL_POI_TYPE_FILTER, 
+					BinaryMapIndexReader.ACCEPT_ALL_POI_TYPE_FILTER,
 					new ResultMatcher<Amenity>() {
 						@Override
 						public boolean publish(Amenity amenity) {
@@ -339,14 +341,14 @@ public class BinaryMerger {
 										list = amenityRelations.get(j);
 									}
 									boolean unique = true;
-									for(Amenity a : list) {
-										if(a.getType() == amenity.getType() && 
+									for (Amenity a : list) {
+										if (a.getType() == amenity.getType() &&
 												Algorithms.objectEquals(a.getSubType(), amenity.getSubType())) {
 											unique = false;
 											break;
 										}
 									}
-									if(unique) {
+									if (unique) {
 										amenity.setId(generatedRelationId[0]--);
 										amenityRelations.get(j).add(amenity);
 										indexPoiCreator.insertAmenityIntoPoi(amenity);
@@ -465,7 +467,7 @@ public class BinaryMerger {
 		ous.flush();
 	}
 
-	public void merger(String[] args) throws IOException, SQLException  {
+	public void merger(String[] args) throws IOException, SQLException {
 		if (args == null || args.length == 0) {
 			System.out.println(helpMessage);
 			return;
