@@ -74,11 +74,11 @@ public class BinaryComparator {
 			in.compare(new String[]{
 					System.getProperty("maps.dir") + "Ukraine_europe_2_all.road.obf",
 					System.getProperty("maps.dir") + "Ukraine_europe_2.road.obf",
-					"--cities", "--city-names",
-					"--streets", "--street-names",
-					"--buildings", "--intersections",
-//					"--poi",
-//					"--poi-details",
+//					"--cities", "--city-names",
+//					"--streets", "--street-names",
+//					"--buildings", "--intersections",
+					"--poi",
+					"--poi-details",
 					"--unique-1", "--unique-2",
 					"--osm=" + System.getProperty("maps.dir") + "compare.osm"
 			});
@@ -491,6 +491,9 @@ public class BinaryComparator {
 
 			@Override
 			public int compare(City o1, City o2) {
+				if (o1 == null || o2 == null) {
+					return o1 == o2 ? 0 : (o1 == null ? 1 : -1);
+				}
 				int c = collator.compare(strip(o1.getName()), strip(o2.getName()));
 				if (c == 0) {
 					if (MapUtils.getDistance(o1.getLocation(), o2.getLocation()) < CITY_SIMILARITY_DISTANCE) {
