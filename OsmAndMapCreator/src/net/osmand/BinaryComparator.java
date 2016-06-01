@@ -444,7 +444,7 @@ public class BinaryComparator {
 		// scan similar cities
 		Collator collator = OsmAndCollator.primaryCollator();
 		boolean offByOneError = false;
-		for (int t = j; t >= 0; t--) {
+		for (int t = Math.min(j, search.size() -1) ; t >= 0; t--) {
 			City ps = search.get(t);
 			if (collator.compare(strip(city.getName()), strip(ps.getName())) != 0) {
 				if (offByOneError) {
