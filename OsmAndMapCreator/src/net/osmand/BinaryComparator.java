@@ -409,13 +409,12 @@ public class BinaryComparator {
 
 			fosm.write(("  <node lat='" + obj.getLocation().getLatitude() + "' lon='" + obj.getLocation().getLongitude() + "' "
 					+ " id='" + (ELEM_ID--) + "'>\n").getBytes());
-			fosm.write(("  <tag k='note' v='" +
+			fosm.write(("  <tag k='comment' v='" +
 					msg.replace('\'', '_').replace("<", "&lt;").replace(">", "&gt;")
 					.replace("&", "&amp;")
 					+ "'/>\n").getBytes());
-			fosm.write(("  <tag k='fixme' v='yes'/>\n").getBytes());
 			;
-			fosm.write(("  <tag k='type' v='" + type + "'/>\n").getBytes());
+			fosm.write(("  <tag k='name' v='" + type + "'/>\n").getBytes());
 			;
 			fosm.write(("  </node>\n").getBytes());
 			;
