@@ -230,7 +230,7 @@ public class BinaryComparator {
 				}
 				if (MapUtils.getDistance(a0.getLocation(), a1.getLocation()) > 50) {
 					printMapObject(POI_DETAILS, a0,
-							"Amenitis are too far" + a0.getLocation() + " <> " + a1.getLocation() + " " + MapUtils.getDistance(a0.getLocation(), a1.getLocation()));
+							"Amenities are too far " + a0.getLocation() + " <> " + a1.getLocation() + " " + MapUtils.getDistance(a0.getLocation(), a1.getLocation())) ;
 				}
 			}
 		}
