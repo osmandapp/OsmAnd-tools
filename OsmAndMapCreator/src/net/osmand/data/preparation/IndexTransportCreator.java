@@ -75,11 +75,11 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		acceptedRoutes.add("ferry"); //$NON-NLS-1$
 	}
 
-	public IndexTransportCreator(){
+	public IndexTransportCreator() {
 	}
 
 
-	public void createRTreeFile(String rtreeTransportStopFile) throws RTreeException{
+	public void createRTreeFile(String rtreeTransportStopFile) throws RTreeException {
 		transportStopsTree = new RTree(rtreeTransportStopFile);
 	}
 
@@ -173,27 +173,27 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		}
 	}
 
-	public void createDatabaseStructure(Connection conn, DBDialect dialect, String rtreeStopsFileName) throws SQLException, IOException{
+	public void createDatabaseStructure(Connection conn, DBDialect dialect, String rtreeStopsFileName) throws SQLException, IOException {
 		Statement stat = conn.createStatement();
 
-        stat.executeUpdate("create table transport_route (id bigint primary key, type varchar(1024), operator varchar(1024)," +
-        		"ref varchar(1024), name varchar(1024), name_en varchar(1024), dist int)");
-        stat.executeUpdate("create index transport_route_id on transport_route (id)");
+		stat.executeUpdate("create table transport_route (id bigint primary key, type varchar(1024), operator varchar(1024)," +
+				"ref varchar(1024), name varchar(1024), name_en varchar(1024), dist int)");
+		stat.executeUpdate("create index transport_route_id on transport_route (id)");
 
-        stat.executeUpdate("create table transport_route_stop (stop bigint, route bigint, ord int, direction smallint, primary key (route, ord, direction))");
-        stat.executeUpdate("create index transport_route_stop_stop on transport_route_stop (stop)");
-        stat.executeUpdate("create index transport_route_stop_route on transport_route_stop (route)");
+		stat.executeUpdate("create table transport_route_stop (stop bigint, route bigint, ord int, direction smallint, primary key (route, ord, direction))");
+		stat.executeUpdate("create index transport_route_stop_stop on transport_route_stop (stop)");
+		stat.executeUpdate("create index transport_route_stop_route on transport_route_stop (route)");
 
-        stat.executeUpdate("create table transport_stop (id bigint primary key, latitude double, longitude double, name varchar(1024), name_en varchar(1024))");
-        stat.executeUpdate("create index transport_stop_id on transport_stop (id)");
-        stat.executeUpdate("create index transport_stop_location on transport_stop (latitude, longitude)");
+		stat.executeUpdate("create table transport_stop (id bigint primary key, latitude double, longitude double, name varchar(1024), name_en varchar(1024))");
+		stat.executeUpdate("create index transport_stop_id on transport_stop (id)");
+		stat.executeUpdate("create index transport_stop_location on transport_stop (latitude, longitude)");
 
 //        if(dialect == DBDialect.SQLITE){
 //        	stat.execute("PRAGMA user_version = " + IndexConstants.TRANSPORT_TABLE_VERSION); //$NON-NLS-1$
 //        }
-        stat.close();
+		stat.close();
 
-        try {
+		try {
 			File file = new File(rtreeStopsFileName);
 			if (file.exists()) {
 				file.delete();
@@ -226,16 +226,17 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 
 	}
 
-	private PreparedStatement createStatementTransportStopInsert(Connection conn) throws SQLException{
-        return conn.prepareStatement("insert into transport_stop(id, latitude, longitude, name, name_en) values(?, ?, ?, ?, ?)");
+	private PreparedStatement createStatementTransportStopInsert(Connection conn) throws SQLException {
+		return conn.prepareStatement("insert into transport_stop(id, latitude, longitude, name, name_en) values(?, ?, ?, ?, ?)");
 	}
-	private PreparedStatement createStatementTransportRouteStopInsert(Connection conn) throws SQLException{
-        return conn.prepareStatement("insert into transport_route_stop(route, stop, direction, ord) values(?, ?, ?, ?)");
+
+	private PreparedStatement createStatementTransportRouteStopInsert(Connection conn) throws SQLException {
+		return conn.prepareStatement("insert into transport_route_stop(route, stop, direction, ord) values(?, ?, ?, ?)");
 	}
 
 	private void writeRouteStops(TransportRoute r, List<TransportStop> stops, boolean direction) throws SQLException {
 		int i = 0;
-		for(TransportStop s : stops){
+		for (TransportStop s : stops) {
 			if (!visitedStops.contains(s.getId())) {
 				transStopsStat.setLong(1, s.getId());
 				transStopsStat.setDouble(2, s.getLocation().getLatitude());
@@ -262,8 +263,8 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		}
 	}
 
-	private PreparedStatement createStatementTransportRouteInsert(Connection conn) throws SQLException{
-        return conn.prepareStatement("insert into transport_route(id, type, operator, ref, name, name_en, dist) values(?, ?, ?, ?, ?, ?, ?)");
+	private PreparedStatement createStatementTransportRouteInsert(Connection conn) throws SQLException {
+		return conn.prepareStatement("insert into transport_route(id, type, operator, ref, name, name_en, dist) values(?, ?, ?, ?, ?, ?, ?)");
 	}
 
 
@@ -362,6 +363,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			throw new IllegalStateException(e);
 		}
 	}
+
 	private Rect calcBounds(rtree.Node n) {
 		Rect r = null;
 		Element[] e = n.getAllElements();
@@ -417,8 +419,6 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		}
 		closeAllPreparedStatements();
 	}
-
-
 
 
 	private TransportRoute indexTransportRoute(Relation rel) {
@@ -483,7 +483,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		List<Entity> stops = new ArrayList<Entity>();
 		for (Entry<Entity, String> entry : rel.getMemberEntities().entrySet()) {
 			String role = entry.getValue();
-			if(entry.getKey().getLatLon() == null) {
+			if (entry.getKey().getLatLon() == null) {
 				continue;
 			}
 			if (role.startsWith("platform")) {
@@ -500,8 +500,9 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		Map<Entity, String> replacement = new HashMap<Entity, String>();
 		List<Entity> merged = mergePlatformsStops(platforms, stops, replacement);
 
-		if (merged.isEmpty())
+		if (merged.isEmpty()) {
 			return false; // nothing to get from this relation - there is no stop
+		}
 
 		for (Entity s : merged) {
 			TransportStop stop = EntityParser.parseTransportStop(s);
@@ -509,11 +510,13 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			// name replacement (platform<->stop)
 			if (replacement.containsKey(s)) {
 				stop.setName(replacement.get(s));
-			} else
-			// refill empty name with name from stop_area relation if there was such
-			// verify name tag, not stop.getName because it may contain unnecessary refs, etc
-			if (s.getTag(OSMTagKey.NAME) == null && stopAreas.containsKey(EntityId.valueOf(s)))
-				stop.setName(stopAreas.get(EntityId.valueOf(s)).getTag(OSMTagKey.NAME));
+			} else {
+				// refill empty name with name from stop_area relation if there was such
+				// verify name tag, not stop.getName because it may contain unnecessary refs, etc
+				if (s.getTag(OSMTagKey.NAME) == null && stopAreas.containsKey(EntityId.valueOf(s))) {
+					stop.setName(stopAreas.get(EntityId.valueOf(s)).getTag(OSMTagKey.NAME));
+				}
+			}
 
 			r.getForwardStops().add(stop);
 		}
@@ -524,10 +527,12 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	private List<Entity> mergePlatformsStops(List<Entity> platforms, List<Entity> stops, Map<Entity, String> nameReplacement) {
 
 		// simple first - use one if other is empty
-		if (platforms.isEmpty())
+		if (platforms.isEmpty()) {
 			return stops;
-		if (stops.isEmpty())
+		}
+		if (stops.isEmpty()) {
 			return platforms;
+		}
 
 		// walk through bigger array (platforms or stops), and verify names from the second:
 
@@ -549,7 +554,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		for (Entity a : first) {
 			Entity bMin = null;
 			Relation aStopArea = stopAreas.get(a);
-			if(a.getLatLon() == null){
+			if (a.getLatLon() == null) {
 				continue;
 			}
 			double distance = 1.0e10;
@@ -586,7 +591,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 				// check which element satisfies us better (a or b) - which is platform
 				boolean useA = true;
 				if (!"platform".equals(a.getTag(OSMTagKey.PUBLIC_TRANSPORT))) {
-					if("platform".equals(b.getTag(OSMTagKey.PUBLIC_TRANSPORT)) || platforms.contains(b))
+					if ("platform".equals(b.getTag(OSMTagKey.PUBLIC_TRANSPORT)) || platforms.contains(b))
 						useA = false;
 				}
 
@@ -597,8 +602,8 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 				}
 
 				// if a does not have name, but b has - add a nameReplacement
-				Entity platform = useA?a:b;
-				Entity stop = useA?b:a;
+				Entity platform = useA ? a : b;
+				Entity stop = useA ? b : a;
 				if (stop.getTag(OSMTagKey.NAME) != null) {
 					nameReplacement.put(platform, stop.getTag(OSMTagKey.NAME));
 				}
@@ -618,14 +623,14 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		int forwardStop = 0;
 		int backwardStop = 0;
 		for (Entry<Entity, String> e : rel.getMemberEntities().entrySet()) {
-			if (e.getValue().contains("stop") || e.getValue().contains("platform")) { //$NON-NLS-1$
+			if (e.getValue().contains("stop") || e.getValue().contains("platform")) {  //$NON-NLS-1$
 				if (e.getKey() instanceof Node) {
 					TransportStop stop = EntityParser.parseTransportStop(e.getKey());
 					// add stop name if there was no name on the point, but was name on the corresponding stop_area relation
 					if (e.getKey().getTag(OSMTagKey.NAME) == null && stopAreas.containsKey(EntityId.valueOf(e.getKey())))
 						stop.setName(stopAreas.get(EntityId.valueOf(e.getKey())).getTag(OSMTagKey.NAME));
-					boolean forward = e.getValue().contains("forward"); //$NON-NLS-1$
-					boolean backward = e.getValue().contains("backward"); //$NON-NLS-1$
+					boolean forward = e.getValue().contains("forward");  //$NON-NLS-1$
+					boolean backward = e.getValue().contains("backward");  //$NON-NLS-1$
 					currentStop++;
 					if (forward || !backward) {
 						forwardStop++;
