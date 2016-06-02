@@ -469,12 +469,13 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 
 		for (Entry<Entity, String> entry : rel.getMemberEntities().entrySet()) {
 			String role = entry.getValue();
-			if (role.isEmpty()) continue; // accepted roles
-			if ("stop".equals(role)) continue;
-			if ("platform".equals(role)) continue;
-
+			if (role.isEmpty() || "stop".equals(role) || "platform".equals(role)) {
+				continue; // accepted roles
+			}
 			stopPlatformMatcher.reset(role);
-			if (stopPlatformMatcher.matches()) continue;
+			if (stopPlatformMatcher.matches()) {
+				continue;
+			}
 
 			return false; // there is wrong role in the relation, exit
 		}
