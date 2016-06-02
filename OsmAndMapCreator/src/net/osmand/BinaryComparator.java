@@ -295,7 +295,7 @@ public class BinaryComparator {
 					i0.preloadStreets(c0, null);
 					i1.preloadStreets(c1, null);
 					if (COMPARE_SET.contains(CITY_NAME_COMPARE) && !c0.getNamesMap(true).equals(c1.getNamesMap(true))) {
-						System.out.println("(1). City all names are not same : " + c1 + " "
+						printComment("(1). City all names are not same : " + c1 + " "
 								+ (new JSONObject(c0.getNamesMap(true)) + " != "
 								+ (new JSONObject(c1.getNamesMap(true)))));
 					}
