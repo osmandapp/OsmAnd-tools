@@ -21,6 +21,7 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import net.osmand.data.MapObject;
 import net.osmand.data.TransportRoute;
 import net.osmand.data.TransportStop;
 import net.osmand.osm.edit.Entity;
@@ -31,6 +32,7 @@ import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Way;
 import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
+import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import net.sf.junidecode.Junidecode;
 
@@ -40,7 +42,6 @@ import org.apache.commons.logging.LogFactory;
 import rtree.Element;
 import rtree.IllegalValueException;
 import rtree.LeafElement;
-import rtree.NonLeafElement;
 import rtree.RTree;
 import rtree.RTreeException;
 import rtree.RTreeInsertException;
@@ -498,7 +499,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			}
 		}
 
-		Map<Entity, String> replacement = new HashMap<Entity, String>();
+		Map<Entity, Entity> replacement = new HashMap<Entity, Entity>();
 		List<Entity> merged = mergePlatformsStops(platforms, stops, replacement);
 
 		if (merged.isEmpty()) {
@@ -508,15 +509,11 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		for (Entity s : merged) {
 			TransportStop stop = EntityParser.parseTransportStop(s);
 
-			// name replacement (platform<->stop)
-			if (replacement.containsKey(s)) {
-				stop.setName(replacement.get(s));
-			} else {
-				// refill empty name with name from stop_area relation if there was such
+			Relation stopArea = stopAreas.get(EntityId.valueOf(s));
+			if (stopArea != null) {
+				Entity e = !Algorithms.isEmpty(stopArea.getTag(OSMTagKey.NAME)) ? stopArea : replacement.get(s);
 				// verify name tag, not stop.getName because it may contain unnecessary refs, etc
-				if (s.getTag(OSMTagKey.NAME) == null && stopAreas.containsKey(EntityId.valueOf(s))) {
-					stop.setName(stopAreas.get(EntityId.valueOf(s)).getTag(OSMTagKey.NAME));
-				}
+				stop.copyNames(e.getTag(OSMTagKey.NAME), e.getTag(OSMTagKey.NAME_EN), e.getNameTags(), true);
 			}
 
 			r.getForwardStops().add(stop);
@@ -525,7 +522,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		return true;
 	}
 
-	private List<Entity> mergePlatformsStops(List<Entity> platforms, List<Entity> stops, Map<Entity, String> nameReplacement) {
+	private List<Entity> mergePlatformsStops(List<Entity> platforms, List<Entity> stops, Map<Entity, Entity> nameReplacement) {
 
 		// simple first - use one if other is empty
 		if (platforms.isEmpty()) {
@@ -602,11 +599,11 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 					merge.add(b);
 				}
 
-				// if a does not have name, but b has - add a nameReplacement
+//				// if a does not have name, but b has - add a nameReplacement
 				Entity platform = useA ? a : b;
 				Entity stop = useA ? b : a;
 				if (stop.getTag(OSMTagKey.NAME) != null) {
-					nameReplacement.put(platform, stop.getTag(OSMTagKey.NAME));
+					nameReplacement.put(platform, stop);
 				}
 			} else {
 				merge.add(a);
@@ -627,9 +624,10 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			if (e.getValue().contains("stop") || e.getValue().contains("platform")) {  //$NON-NLS-1$
 				if (e.getKey() instanceof Node) {
 					TransportStop stop = EntityParser.parseTransportStop(e.getKey());
-					// add stop name if there was no name on the point, but was name on the corresponding stop_area relation
-					if (e.getKey().getTag(OSMTagKey.NAME) == null && stopAreas.containsKey(EntityId.valueOf(e.getKey())))
-						stop.setName(stopAreas.get(EntityId.valueOf(e.getKey())).getTag(OSMTagKey.NAME));
+					Relation stopArea = stopAreas.get(EntityId.valueOf(e.getKey()));
+					if (stopArea != null) {
+						stop.copyNames(stopArea.getTag(OSMTagKey.NAME), stopArea.getTag(OSMTagKey.NAME_EN), stopArea.getNameTags(), true);
+					}
 					boolean forward = e.getValue().contains("forward");  //$NON-NLS-1$
 					boolean backward = e.getValue().contains("backward");  //$NON-NLS-1$
 					currentStop++;
