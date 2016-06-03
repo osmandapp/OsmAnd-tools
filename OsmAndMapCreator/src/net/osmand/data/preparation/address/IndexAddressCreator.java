@@ -1337,8 +1337,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				Street s = visitedStreets.get(streetId);
 				Building b = new Building();
 				b.setId(set.getLong(6));
-				b.setName(set.getString(7));
-				b.copyNames(Algorithms.decodeMap(set.getString(8)));
+				b.copyNames(set.getString(7), null, Algorithms.decodeMap(set.getString(8)));
 				b.setLocation(set.getDouble(9), set.getDouble(10));
 				b.setPostcode(set.getString(11));
 				b.setName2(set.getString(13));
@@ -1386,10 +1385,8 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		while(set.next()){
 			CityType type = CityType.valueFromString(set.getString(6));
 			City city = new City(type);
-			city.setName(set.getString(4));
-			city.copyNames(Algorithms.decodeMap(set.getString(5)));
-			city.setLocation(set.getDouble(2),
-					set.getDouble(3));
+			city.copyNames(set.getString(4), null, Algorithms.decodeMap(set.getString(5)));
+			city.setLocation(set.getDouble(2), set.getDouble(3));
 			city.setId(set.getLong(1));
 			cities.get(type).add(city);
 
