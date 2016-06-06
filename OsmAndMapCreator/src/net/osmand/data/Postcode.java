@@ -168,6 +168,7 @@ public class Postcode {
 			put("Vietnam",                                     Arrays.asList("(?i)(?:VN-?)?(\\d{6})",                         "$1"));
 			put("Zambia",                                      Arrays.asList("(?i)(?:ZM-?)?(\\d{5})",                         "$1"));
 		}};
+		postcode = postcode.toUpperCase();
 		String result = postcode;
 		if (rules.containsKey(country)) {
 			Pattern pattern = Pattern.compile(rules.get(country).get(0));
