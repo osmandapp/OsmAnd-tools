@@ -425,8 +425,6 @@ public class IndexCreator {
 			stat.execute("CREATE TABLE input(shift int, ind int, file varchar, length int)");
 		}
 		
-
-			
 		accessor.setDbConn(dbConn, osmDBdialect);
 		boolean shiftIds = generateUniqueIds || overwriteIds ;
 		OsmDbCreator dbCreator = null;
@@ -864,6 +862,9 @@ public class IndexCreator {
 					}
 				}
 			});
+			if (indexMap) {
+				indexMapCreator.createMapIndexTableIndexes(mapConnection);
+			}
 			if (indexAddress) {
 				setGeneralProgress(progress, "[40 / 100]"); //$NON-NLS-1$
 				progress.startTask(Messages.getString("IndexCreator.PREINDEX_BOUNDARIES_WAYS"), accessor.getAllWays()); //$NON-NLS-1$

@@ -647,6 +647,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			for (int level = 0; level < mapZooms.size(); level++) {
 				processMainEntity(e, originalId, assignedId, level, tags);
 			}
+
 			if (splitTags != null) {
 				for (int i = 1; i < splitTags.size(); i++) {
 					assignedId = assignIdBasedOnOriginalSplit(eid);
@@ -926,17 +927,22 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		pStatements.put(mapLowLevelBinaryStat, 0);
 	}
 
+	public void createMapIndexTableIndexes(Connection conn) throws SQLException {
+		Statement stat = conn.createStatement();
+		stat.executeUpdate("create index binary_map_objects_ind on binary_map_objects (id)");
+		stat.executeUpdate("create index low_level_map_objects_ind on low_level_map_objects (id)");
+		stat.executeUpdate("create index low_level_map_objects_ind_st on low_level_map_objects (start_node, type)");
+		stat.executeUpdate("create index low_level_map_objects_ind_end on low_level_map_objects (end_node, type)");
+		stat.close();
+	}
+
 	private void createMapIndexStructure(Connection conn) throws SQLException {
 		Statement stat = conn.createStatement();
 		stat.executeUpdate("create table binary_map_objects (id bigint primary key, name varchar(4096), "
 				+ "area smallint, types binary, additionalTypes binary, coordinates binary, innerPolygons binary)");
-		stat.executeUpdate("create index binary_map_objects_ind on binary_map_objects (id)");
 
 		stat.executeUpdate("create table low_level_map_objects (id bigint primary key, start_node bigint, "
 				+ "end_node bigint, name varchar(1024), nodes binary, type binary, addType binary, level smallint)");
-		stat.executeUpdate("create index low_level_map_objects_ind on low_level_map_objects (id)");
-		stat.executeUpdate("create index low_level_map_objects_ind_st on low_level_map_objects (start_node, type)");
-		stat.executeUpdate("create index low_level_map_objects_ind_end on low_level_map_objects (end_node, type)");
 		stat.close();
 	}
 
