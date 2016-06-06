@@ -1222,7 +1222,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 	private List<Street> readStreetsBuildings(PreparedStatement streetBuildingsStat, City city, PreparedStatement waynodesStat,
 			Map<Street, List<Node>> streetNodes, List<City> citySuburbs) throws SQLException {
 		TLongObjectHashMap<Street> visitedStreets = new TLongObjectHashMap<Street>();
-		Map<String, List<Street>> uniqueNames = new LinkedHashMap<String, List<Street>>();
+		Map<String, List<Street>> uniqueNames = new TreeMap<String, List<Street>>(OsmAndCollator.primaryCollator());
 
 		// read streets for city
 		readStreetsAndBuildingsForCity(streetBuildingsStat, city, waynodesStat, streetNodes, visitedStreets, uniqueNames);
@@ -1236,7 +1236,6 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		return new ArrayList<Street>(streetNodes.keySet());
 	}
 
-
 	private void mergeStreetsWithSameNames(Map<Street, List<Node>> streetNodes, Map<String, List<Street>> uniqueNames) {
 		for (String streetName : uniqueNames.keySet()) {
 			List<Street> streets = uniqueNames.get(streetName);
@@ -1246,8 +1245,15 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		}
 	}
 
-
 	private void mergeStreets(List<Street> streets, Map<Street, List<Node>> streetNodes) {
+		// Merge streets to streets with biggest amount of intersections.
+		// Streets, that were extracted from addr:street tag has no intersections at all.
+		Collections.sort(streets, new Comparator<Street>() {
+			@Override
+			public int compare(Street s0, Street s1) {
+				return Algorithms.compare(s0.getIntersectedStreets().size(), s1.getIntersectedStreets().size());
+			}
+		});
 		for (int i = 0; i < streets.size() - 1; ) {
 			Street s = streets.get(i);
 			boolean merged = false;
