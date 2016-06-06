@@ -32,8 +32,8 @@ public class MainUtilities {
 			printSynopsys();
 		} else {
 			String utl = args[0];
-			List<String> subArgs = new  ArrayList<String>(Arrays.asList(args).subList(1, args.length));
-			String[] subArgsArray = subArgs.toArray(new String[args.length -1]);
+			List<String> subArgs = new ArrayList<String>(Arrays.asList(args).subList(1, args.length));
+			String[] subArgsArray = subArgs.toArray(new String[args.length - 1]);
 			if (utl.equals("check-ocean-tile")) {
 				OceanTilesCreator.checkOceanTile(subArgsArray);
 			} else if (utl.equals("compare")) {
@@ -50,11 +50,11 @@ public class MainUtilities {
 				RenderingRulesStorage.main(subArgsArray);
 			} else if (utl.equals("generate-ocean-tile")) {
 				OceanTilesCreator.createTilesFile(subArgsArray[0], subArgsArray.length > 1 ? args[1] : null);
-			} else if(utl.equals("test-routing")) {
+			} else if (utl.equals("test-routing")) {
 				net.osmand.router.TestRouting.main(subArgsArray);
-			} else if(utl.equals("generate-ocbf")) {
+			} else if (utl.equals("generate-ocbf")) {
 				CountryOcbfGeneration.main(subArgsArray);
-			} else if(utl.equals("generate-obf")) {
+			} else if (utl.equals("generate-obf")) {
 				IndexCreator ic = new IndexCreator(new File("."));
 				ic.setIndexMap(true);
 				ic.setIndexPOI(true);
