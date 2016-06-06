@@ -129,14 +129,14 @@
 		 encoding="${java.encoding}"
 		 classpathref="build.path"
 		 debug="on"
-		 source="1.6"
+		 source="1.7"
 	  />
 		<javac srcdir="${srctests.dir}"
 		 destdir="${bintests.dir}"
 		 encoding="${java.encoding}"
 		 classpathref="test.classpath"
 		 debug="on"
-		 source="1.6"
+		 source="1.7"
 	  />
 	</target>
 
