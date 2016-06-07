@@ -134,6 +134,12 @@ public class DBStreetDAO extends AbstractIndexPartCreator
 		}
 	}
 
+	protected void cleanCityPart() throws SQLException {
+		Statement stat = mapConnection.createStatement();
+		stat.executeUpdate("UPDATE street SET citypart = null WHERE id IN (SELECT id FROM street WHERE name IN (SELECT name FROM street GROUP BY name HAVING count(DISTINCT citypart) <= 1))");
+		stat.close();
+	}
+
 	protected void writeBuilding(Set<Long> streetIds, Building building) throws SQLException {
 		for (Long streetId : streetIds) {
 			addressBuildingStat.setLong(1, building.getId());
