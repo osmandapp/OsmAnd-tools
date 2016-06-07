@@ -539,7 +539,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 							smoothness = Integer.parseInt(DataExtractionSettings.getSettings().getLineSmoothness());
 						} catch (NumberFormatException e) {
 						}
-						creator.setZoomWaySmothness(smoothness);
+						creator.setZoomWaySmoothness(smoothness);
 						creator.generateIndexes(f, dlg, filter, DataExtractionSettings.getSettings().getMapZooms(), types, log);
 					} catch (IOException e) {
 						throw new IllegalArgumentException(e);

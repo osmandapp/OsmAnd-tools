@@ -19,7 +19,6 @@ import net.osmand.util.MapUtils;
 
 import org.apache.commons.logging.Log;
 import org.apache.tools.bzip2.CBZip2InputStream;
-import org.xml.sax.SAXException;
 import org.xmlpull.v1.XmlPullParserException;
 
 import javax.xml.stream.XMLStreamException;
@@ -63,7 +62,7 @@ public class BasemapProcessor {
 		}
 	});
 
-    private final int zoomWaySmothness;
+    private final int zoomWaySmoothness;
     private final MapRenderingTypesEncoder renderingTypes;
     private final MapZooms mapZooms;
     private final Log logMapDataWarn;
@@ -154,16 +153,16 @@ public class BasemapProcessor {
 
     protected BasemapProcessor() {
         logMapDataWarn = null;
-        zoomWaySmothness = 0;
+        zoomWaySmoothness = 0;
         renderingTypes = null;
         mapZooms = null;
     }
 
-    public BasemapProcessor(Log logMapDataWarn, MapZooms mapZooms, MapRenderingTypesEncoder renderingTypes, int zoomWaySmothness) {
+    public BasemapProcessor(Log logMapDataWarn, MapZooms mapZooms, MapRenderingTypesEncoder renderingTypes, int zoomWaySmoothness) {
         this.logMapDataWarn = logMapDataWarn;
         this.mapZooms = mapZooms;
         this.renderingTypes = renderingTypes;
-        this.zoomWaySmothness = zoomWaySmothness;
+        this.zoomWaySmoothness = zoomWaySmoothness;
         constructBitSetInfo(null);
         quadTrees = new SimplisticQuadTree[mapZooms.getLevels().size()];
         for (int i = 0; i < mapZooms.getLevels().size(); i++) {
@@ -541,7 +540,7 @@ public class BasemapProcessor {
 		    }
 		}
 		List<Node> res = new ArrayList<Node>();
-		OsmMapUtils.simplifyDouglasPeucker(way, zoomToEncode - 1 + 8 + zoomWaySmothness, 3, res, false);
+		OsmMapUtils.simplifyDouglasPeucker(way, zoomToEncode - 1 + 8 + zoomWaySmoothness, 3, res, false);
 		if(inner != null) {
 			Iterator<List<Node>> it = inner.iterator();
 			while(it.hasNext()) {
@@ -549,7 +548,7 @@ public class BasemapProcessor {
 				if (OsmMapUtils.polygonAreaPixels(list, zoomToEncode) < PIXELS_THRESHOLD_AREA) {
 					it.remove();
 				} else {
-					OsmMapUtils.simplifyDouglasPeucker(list, zoomToEncode - 1 + 8 + zoomWaySmothness, 4, list, false);
+					OsmMapUtils.simplifyDouglasPeucker(list, zoomToEncode - 1 + 8 + zoomWaySmoothness, 4, list, false);
 					if (list.size() <= 3) {
 						it.remove();
 					}
@@ -622,7 +621,7 @@ public class BasemapProcessor {
                 }
             }
             List<Node> res = new ArrayList<Node>();
-            OsmMapUtils.simplifyDouglasPeucker(w, zoomToEncode - 1 + 8 + zoomWaySmothness, 3, res, true);
+            OsmMapUtils.simplifyDouglasPeucker(w, zoomToEncode - 1 + 8 + zoomWaySmoothness, 3, res, true);
             addRawData(res, null, types, addTypes, zoomPair, quadTree, z, tilex, tiley, null, refId);
         }
     }
@@ -706,7 +705,7 @@ public class BasemapProcessor {
 			creator.setDialects(DBDialect.SQLITE_IN_MEMORY, DBDialect.SQLITE_IN_MEMORY);
 			creator.setIndexMap(true);
 			creator.setIndexPOI(mini ? false : true);
-			creator.setZoomWaySmothness(zoomSmoothness);
+			creator.setZoomWaySmoothness(zoomSmoothness);
 			creator.setMapFileName(mini ? "World_basemap_mini_test_2.obf" : "World_basemap_2.obf");
 			ArrayList<File> src = new ArrayList<File>();
 			for (File f : folder.listFiles()) {
