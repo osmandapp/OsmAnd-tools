@@ -73,13 +73,14 @@ public class Multipolygon {
 
 	/**
 	 * check if this multipolygon contains a point
-	 * @param latitude lat to check
+	 *
+	 * @param latitude  lat to check
 	 * @param longitude lon to check
 	 * @return true if this multipolygon is correct and contains the point
 	 */
 	public boolean containsPoint(double latitude, double longitude) {
 		// fast check
-		if(maxLat + 0.3 < latitude || minLat - 0.3 > latitude ||
+		if (maxLat + 0.3 < latitude || minLat - 0.3 > latitude ||
 				maxLon + 0.3 < longitude || minLon - 0.3 > longitude) {
 			return false;
 		}
@@ -114,7 +115,7 @@ public class Multipolygon {
 
 		// if it is both, in an inner and in an outer, check if the inner is indeed the smallest one
 		Set<Ring> s = containedInnerInOuter.get(containedInInner);
-		if(s == null) {
+		if (s == null) {
 			throw new IllegalStateException();
 		}
 		return !s.contains(containedInOuter);
@@ -122,6 +123,7 @@ public class Multipolygon {
 
 	/**
 	 * check if this multipolygon contains a point
+	 *
 	 * @param point point to check
 	 * @return true if this multipolygon is correct and contains the point
 	 */
@@ -142,6 +144,7 @@ public class Multipolygon {
 	/**
 	 * Get the weighted center of all nodes in this multiPolygon <br />
 	 * This only works when the ways have initialized nodes
+	 *
 	 * @return the weighted center
 	 */
 	public LatLon getCenterPoint() {
@@ -149,7 +152,7 @@ public class Multipolygon {
 		for (Ring w : outerRings) {
 			points.addAll(w.getBorder());
 		}
-		if(points.isEmpty()) {
+		if (points.isEmpty()) {
 			for (Ring w : innerRings) {
 				points.addAll(w.getBorder());
 			}
@@ -165,7 +168,7 @@ public class Multipolygon {
 	}
 
 	public boolean hasOpenedPolygons() {
-	    return !areRingsComplete();
+		return !areRingsComplete();
 	}
 
 	public boolean areRingsComplete() {

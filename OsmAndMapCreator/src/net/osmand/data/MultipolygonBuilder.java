@@ -16,25 +16,23 @@ import org.apache.commons.logging.Log;
  * - we treat each outer way as closed polygon
  * - multipolygon is always closed!
  * - each way we try to assign to existing way and form
- *   so a more complex polygon
+ * so a more complex polygon
  * - number of outer ways, is number of polygons
  *
  * @author Pavol Zibrita
  */
 public class MultipolygonBuilder {
 
-	/* package */List<Way> outerWays = new ArrayList<Way>();
-	/* package */List<Way> innerWays = new ArrayList<Way>();
+	/* package */ List<Way> outerWays = new ArrayList<Way>();
+	/* package */ List<Way> innerWays = new ArrayList<Way>();
 
 	long id;
 
 	/**
 	 * Create a multipolygon with initialized outer and inner ways
 	 *
-	 * @param outers
-	 *            a list of outer ways
-	 * @param inners
-	 *            a list of inner ways
+	 * @param outers a list of outer ways
+	 * @param inners a list of inner ways
 	 */
 	public MultipolygonBuilder(List<Way> outers, List<Way> inners) {
 		this();
@@ -75,8 +73,7 @@ public class MultipolygonBuilder {
 	/**
 	 * Split this multipolygon in several separate multipolygons with one outer ring each
 	 *
-	 * @param log
-	 *            the stream to log problems to, if log = null, nothing will be logged
+	 * @param log the stream to log problems to, if log = null, nothing will be logged
 	 * @return a list with multipolygons which have exactly one outer ring
 	 */
 	public List<Multipolygon> splitPerOuterRing(Log log) {
@@ -120,19 +117,19 @@ public class MultipolygonBuilder {
 			Way newWay;
 			do {
 				newWay = null;
-				if(changedWay != null) {
+				if (changedWay != null) {
 					ListIterator<Way> it = multiLines.listIterator();
-					while(it.hasNext()){
+					while (it.hasNext()) {
 						Way w = it.next();
 						newWay = combineTwoWaysIfHasPoints(changedWay, w);
-						if(newWay != null) {
+						if (newWay != null) {
 							changedWay = newWay;
 							it.remove();
 							break;
 						}
 					}
 				}
-			} while(newWay != null);
+			} while (newWay != null);
 			multiLines.add(changedWay);
 
 		}
@@ -147,10 +144,8 @@ public class MultipolygonBuilder {
 	/**
 	 * make a new Way with the nodes from two other ways
 	 *
-	 * @param w1
-	 *            the first way
-	 * @param w2
-	 *            the second way
+	 * @param w1 the first way
+	 * @param w2 the second way
 	 * @return null if it is not possible
 	 */
 	private Way combineTwoWaysIfHasPoints(Way w1, Way w2) {
