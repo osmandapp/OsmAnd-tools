@@ -101,7 +101,7 @@ public class ObfChangesCreator {
 			RTree.clearCache();
 			IndexCreator ic = new IndexCreator(country);
 			ic.setIndexAddress(false);
-			ic.setBackwardComptibleIds(true);
+			ic.setBackwardCompatibleIds(true);
 			ic.setIndexPOI(true);
 			ic.setIndexRouting(true);
 			ic.setIndexMap(true);

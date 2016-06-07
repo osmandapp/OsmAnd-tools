@@ -94,7 +94,7 @@ public class IndexCreator {
 	private boolean recreateOnlyBinaryFile = false; // false;
 	private boolean deleteOsmDB = true;
 	private boolean deleteDatabaseIndexes = true;
-	private boolean backwardComptibleIds = false;
+	private boolean backwardCompatibleIds = false;
 
 	private File dbFile;
 
@@ -116,8 +116,8 @@ public class IndexCreator {
 		this.indexAddress = indexAddress;
 	}
 
-	public void setBackwardComptibleIds(boolean backwardComptibleIds) {
-		this.backwardComptibleIds = backwardComptibleIds;
+	public void setBackwardCompatibleIds(boolean backwardCompatibleIds) {
+		this.backwardCompatibleIds = backwardCompatibleIds;
 	}
 
 	public void setIndexRouting(boolean indexRouting) {
@@ -334,7 +334,7 @@ public class IndexCreator {
 			dbCreator.setWayIds(previous.getWayIds());
 			dbCreator.setRelationIds(previous.getRelationIds());
 		}
-		dbCreator.setBackwardCompatibleIds(backwardComptibleIds);
+		dbCreator.setBackwardCompatibleIds(backwardCompatibleIds);
 		try {
 			setGeneralProgress(progress, "[15 / 100]"); //$NON-NLS-1$
 			progress.startTask(Messages.getString("IndexCreator.LOADING_FILE") + readFile.getAbsolutePath(), -1); //$NON-NLS-1$
