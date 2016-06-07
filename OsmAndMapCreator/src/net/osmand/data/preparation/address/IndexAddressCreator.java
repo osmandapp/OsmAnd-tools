@@ -752,14 +752,12 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		if (e instanceof Way && interpolation != null) {
 			BuildingInterpolation type = null;
 			int interpolationInterval = 0;
-			if (interpolation != null) {
+			try {
+				type = BuildingInterpolation.valueOf(interpolation.toUpperCase());
+			} catch (RuntimeException ex) {
 				try {
-					type = BuildingInterpolation.valueOf(interpolation.toUpperCase());
-				} catch (RuntimeException ex) {
-					try {
-						interpolationInterval = Integer.parseInt(interpolation);
-					} catch (NumberFormatException ex2) {
-					}
+					interpolationInterval = Integer.parseInt(interpolation);
+				} catch (NumberFormatException ex2) {
 				}
 			}
 			if (type != null || interpolationInterval > 0) {
