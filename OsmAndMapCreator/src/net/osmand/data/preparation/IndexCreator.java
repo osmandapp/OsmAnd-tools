@@ -78,7 +78,7 @@ public class IndexCreator {
 
 	private boolean generateLowLevel = true;
 	private boolean normalizeStreets = true; // true by default
-	private int zoomWaySmothness = 2;
+	private int zoomWaySmoothness = 2;
 
 	private String regionName;
 	private String mapFileName = null;
@@ -94,7 +94,7 @@ public class IndexCreator {
 	private boolean recreateOnlyBinaryFile = false; // false;
 	private boolean deleteOsmDB = true;
 	private boolean deleteDatabaseIndexes = true;
-	private boolean backwardComptibleIds = false;
+	private boolean backwardCompatibleIds = false;
 
 	private File dbFile;
 
@@ -116,8 +116,8 @@ public class IndexCreator {
 		this.indexAddress = indexAddress;
 	}
 
-	public void setBackwardComptibleIds(boolean backwardComptibleIds) {
-		this.backwardComptibleIds = backwardComptibleIds;
+	public void setBackwardCompatibleIds(boolean backwardCompatibleIds) {
+		this.backwardCompatibleIds = backwardCompatibleIds;
 	}
 
 	public void setIndexRouting(boolean indexRouting) {
@@ -148,8 +148,8 @@ public class IndexCreator {
 		this.normalizeStreets = normalizeStreets;
 	}
 
-	public void setZoomWaySmothness(int zoomWaySmothness) {
-		this.zoomWaySmothness = zoomWaySmothness;
+	public void setZoomWaySmoothness(int zoomWaySmoothness) {
+		this.zoomWaySmoothness = zoomWaySmoothness;
 	}
 
 	public String getRegionName() {
@@ -334,7 +334,7 @@ public class IndexCreator {
 			dbCreator.setWayIds(previous.getWayIds());
 			dbCreator.setRelationIds(previous.getRelationIds());
 		}
-		dbCreator.setBackwardCompatibleIds(backwardComptibleIds);
+		dbCreator.setBackwardCompatibleIds(backwardCompatibleIds);
 		try {
 			setGeneralProgress(progress, "[15 / 100]"); //$NON-NLS-1$
 			progress.startTask(Messages.getString("IndexCreator.LOADING_FILE") + readFile.getAbsolutePath(), -1); //$NON-NLS-1$
@@ -425,8 +425,6 @@ public class IndexCreator {
 			stat.execute("CREATE TABLE input(shift int, ind int, file varchar, length int)");
 		}
 		
-
-			
 		accessor.setDbConn(dbConn, osmDBdialect);
 		boolean shiftIds = generateUniqueIds || overwriteIds ;
 		OsmDbCreator dbCreator = null;
@@ -511,7 +509,7 @@ public class IndexCreator {
 		// clear previous results and setting variables
 		try {
 
-			final BasemapProcessor processor = new BasemapProcessor(logMapDataWarn, mapZooms, renderingTypes, zoomWaySmothness);
+			final BasemapProcessor processor = new BasemapProcessor(logMapDataWarn, mapZooms, renderingTypes, zoomWaySmoothness);
 			final IndexPoiCreator poiCreator = indexPOI ? new IndexPoiCreator(renderingTypes, false) : null;
 			if (indexPOI) {
 				poiCreator.createDatabaseStructure(getPoiFile());
@@ -626,7 +624,7 @@ public class IndexCreator {
 		this.indexPoiCreator = new IndexPoiCreator(renderingTypes, overwriteIds);
 		this.indexAddressCreator = new IndexAddressCreator(logMapDataWarn);
 		this.indexMapCreator = new IndexVectorMapCreator(logMapDataWarn, mapZooms, renderingTypes,
-				zoomWaySmothness);
+				zoomWaySmoothness);
 		this.indexRouteCreator = new IndexRouteCreator(renderingTypes, logMapDataWarn, generateLowLevel);
 
 		// init address
@@ -864,6 +862,9 @@ public class IndexCreator {
 					}
 				}
 			});
+			if (indexMap) {
+				indexMapCreator.createMapIndexTableIndexes(mapConnection);
+			}
 			if (indexAddress) {
 				setGeneralProgress(progress, "[40 / 100]"); //$NON-NLS-1$
 				progress.startTask(Messages.getString("IndexCreator.PREINDEX_BOUNDARIES_WAYS"), accessor.getAllWays()); //$NON-NLS-1$
@@ -933,7 +934,7 @@ public class IndexCreator {
 //		creator.deleteDatabaseIndexes = false;
 //		creator.recreateOnlyBinaryFile = true;
 //		creator.deleteOsmDB = false;
-		creator.setZoomWaySmothness(2);
+		creator.setZoomWaySmoothness(2);
 
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 
@@ -977,7 +978,7 @@ public class IndexCreator {
 		creator.setIndexTransport(false);
 		creator.setIndexRouting(false);
 		MapZooms zooms = MapZooms.parseZooms("5-6");
-		creator.zoomWaySmothness = 1;
+		creator.zoomWaySmoothness = 1;
 		int st = file.lastIndexOf('/');
 		int e = file.indexOf('.', st);
 		creator.setNodesDBFile(new File(folder + file.substring(st, e) + ".tmp.odb"));

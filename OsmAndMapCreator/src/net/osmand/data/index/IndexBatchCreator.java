@@ -515,7 +515,7 @@ public class IndexBatchCreator {
 				indexCreator.setCityAdminLevel(rdata.cityAdminLevel);
 			}
 			if(zoomWaySmoothness != null){
-				indexCreator.setZoomWaySmothness(zoomWaySmoothness);
+				indexCreator.setZoomWaySmoothness(zoomWaySmoothness);
 			}
 
 			String mapFileName = regionName + "_" + IndexConstants.BINARY_MAP_VERSION + IndexConstants.BINARY_MAP_INDEX_EXT;

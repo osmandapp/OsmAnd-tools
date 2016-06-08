@@ -97,7 +97,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	private RTree[] mapTree = null;
 	private Connection mapConnection;
 
-	private int zoomWaySmothness = 0;
+	private int zoomWaySmoothness = 0;
 	private final Log logMapDataWarn;
 
 	public TLongHashSet generatedIds = new TLongHashSet();
@@ -148,10 +148,10 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	}
 
 	public IndexVectorMapCreator(Log logMapDataWarn, MapZooms mapZooms, MapRenderingTypesEncoder renderingTypes,
-	                             int zoomWaySmothness) {
+	                             int zoomWaySmoothness) {
 		this.logMapDataWarn = logMapDataWarn;
 		this.mapZooms = mapZooms;
-		this.zoomWaySmothness = zoomWaySmothness;
+		this.zoomWaySmoothness = zoomWaySmoothness;
 		this.renderingTypes = renderingTypes;
 		lowLevelWays = -1;
 	}
@@ -325,13 +325,13 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			List<Node> outerWay = out.getBorder();
 			int zoomToSimplify = mapZooms.getLevel(level).getMaxZoom() - 1;
 			if (zoomToSimplify < 15) {
-				outerWay = simplifyCycleWay(outerWay, zoomToSimplify, zoomWaySmothness);
+				outerWay = simplifyCycleWay(outerWay, zoomToSimplify, zoomWaySmoothness);
 				if (outerWay == null) {
 					continue nextZoom;
 				}
 				List<List<Node>> newinnerWays = new ArrayList<List<Node>>();
 				for (List<Node> ls : innerWays) {
-					ls = simplifyCycleWay(ls, zoomToSimplify, zoomWaySmothness);
+					ls = simplifyCycleWay(ls, zoomToSimplify, zoomWaySmoothness);
 					if (ls != null) {
 						newinnerWays.add(ls);
 					}
@@ -374,13 +374,13 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		}
 	}
 
-	public static List<Node> simplifyCycleWay(List<Node> ns, int zoom, int zoomWaySmothness) throws SQLException {
-		if (checkForSmallAreas(ns, zoom + Math.min(zoomWaySmothness / 2, 3), 2, 4)) {
+	public static List<Node> simplifyCycleWay(List<Node> ns, int zoom, int zoomWaySmoothness) throws SQLException {
+		if (checkForSmallAreas(ns, zoom + Math.min(zoomWaySmoothness / 2, 3), 2, 4)) {
 			return null;
 		}
 		List<Node> res = new ArrayList<Node>();
 		// simplification
-		OsmMapUtils.simplifyDouglasPeucker(ns, zoom + 8 + zoomWaySmothness, 3, res, false);
+		OsmMapUtils.simplifyDouglasPeucker(ns, zoom + 8 + zoomWaySmoothness, 3, res, false);
 		if (res.size() < 2) {
 			return null;
 		}
@@ -560,16 +560,16 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			boolean skip = false;
 			boolean cycle = startNode == endNode;
 			if (cycle) {
-				skip = checkForSmallAreas(wNodes, zoom  + Math.min(zoomWaySmothness / 2, 3), 3, 4);
+				skip = checkForSmallAreas(wNodes, zoom  + Math.min(zoomWaySmoothness / 2, 3), 3, 4);
 			} else {
 				// coastline
 				if(!typeUse.contains(renderingTypes.getCoastlineRuleType().getInternalId())) {
-					skip = checkForSmallAreas(wNodes, zoom  + Math.min(zoomWaySmothness / 2, 3), 2, 8);
+					skip = checkForSmallAreas(wNodes, zoom  + Math.min(zoomWaySmoothness / 2, 3), 2, 8);
 				}
 			}
 			if (!skip) {
 				List<Node> res = new ArrayList<Node>();
-				OsmMapUtils.simplifyDouglasPeucker(wNodes, zoom - 1 + 8 + zoomWaySmothness, 3, res, false);
+				OsmMapUtils.simplifyDouglasPeucker(wNodes, zoom - 1 + 8 + zoomWaySmoothness, 3, res, false);
 				if (res.size() > 0) {
 					insertBinaryMapRenderObjectIndex(mapTree[level], res, null, namesUse, id, false, typeUse, addtypeUse, false);
 				}
@@ -647,6 +647,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			for (int level = 0; level < mapZooms.size(); level++) {
 				processMainEntity(e, originalId, assignedId, level, tags);
 			}
+
 			if (splitTags != null) {
 				for (int i = 1; i < splitTags.size(); i++) {
 					assignedId = assignIdBasedOnOriginalSplit(eid);
@@ -691,7 +692,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 				int zoomToSimplify = mapZooms.getLevel(level).getMaxZoom() - 1;
 				boolean cycle = ((Way) e).getFirstNodeId() == ((Way) e).getLastNodeId();
 				if (cycle) {
-					res = simplifyCycleWay(((Way) e).getNodes(), zoomToSimplify, zoomWaySmothness);
+					res = simplifyCycleWay(((Way) e).getNodes(), zoomToSimplify, zoomWaySmoothness);
 				} else {
 					validateDuplicate(originalId, id);
 					insertLowLevelMapBinaryObject(level, zoomToSimplify, typeUse, addtypeUse, id, ((Way) e).getNodes(), namesUse);
@@ -926,17 +927,22 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		pStatements.put(mapLowLevelBinaryStat, 0);
 	}
 
+	public void createMapIndexTableIndexes(Connection conn) throws SQLException {
+		Statement stat = conn.createStatement();
+		stat.executeUpdate("create index binary_map_objects_ind on binary_map_objects (id)");
+		stat.executeUpdate("create index low_level_map_objects_ind on low_level_map_objects (id)");
+		stat.executeUpdate("create index low_level_map_objects_ind_st on low_level_map_objects (start_node, type)");
+		stat.executeUpdate("create index low_level_map_objects_ind_end on low_level_map_objects (end_node, type)");
+		stat.close();
+	}
+
 	private void createMapIndexStructure(Connection conn) throws SQLException {
 		Statement stat = conn.createStatement();
 		stat.executeUpdate("create table binary_map_objects (id bigint primary key, name varchar(4096), "
 				+ "area smallint, types binary, additionalTypes binary, coordinates binary, innerPolygons binary)");
-		stat.executeUpdate("create index binary_map_objects_ind on binary_map_objects (id)");
 
 		stat.executeUpdate("create table low_level_map_objects (id bigint primary key, start_node bigint, "
 				+ "end_node bigint, name varchar(1024), nodes binary, type binary, addType binary, level smallint)");
-		stat.executeUpdate("create index low_level_map_objects_ind on low_level_map_objects (id)");
-		stat.executeUpdate("create index low_level_map_objects_ind_st on low_level_map_objects (start_node, type)");
-		stat.executeUpdate("create index low_level_map_objects_ind_end on low_level_map_objects (end_node, type)");
 		stat.close();
 	}
 
@@ -954,7 +960,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			throws SQLException {
 		lowLevelWays++;
 		List<Node> nodes = new ArrayList<Node>();
-		OsmMapUtils.simplifyDouglasPeucker(in, zoom + 8 + zoomWaySmothness, 3, nodes, false);
+		OsmMapUtils.simplifyDouglasPeucker(in, zoom + 8 + zoomWaySmoothness, 3, nodes, false);
 		boolean first = true;
 		long firstId = -1;
 		long lastId = -1;
@@ -1123,11 +1129,11 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 
 	}
 
-	public void setZoomWaySmothness(int zoomWaySmothness) {
-		this.zoomWaySmothness = zoomWaySmothness;
+	public void setZoomWaySmoothness(int zoomWaySmoothness) {
+		this.zoomWaySmoothness = zoomWaySmoothness;
 	}
 
-	public int getZoomWaySmothness() {
-		return zoomWaySmothness;
+	public int getZoomWaySmoothness() {
+		return zoomWaySmoothness;
 	}
 }
