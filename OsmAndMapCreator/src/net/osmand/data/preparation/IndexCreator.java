@@ -698,11 +698,12 @@ public class IndexCreator {
 
 				}
 
-				// 3.5 update all postal codes from relations
+				// 3.5 update all postal codes from relations and clean unneeded city part names from street names
 				if (indexAddress) {
 					setGeneralProgress(progress, "[90 / 100]");
 					progress.startTask(Messages.getString("IndexCreator.REGISTER_PCODES"), -1);
 					indexAddressCreator.processingPostcodes();
+					indexAddressCreator.cleanCityPart();
 				}
 
 				// 4. packing map rtree indexes

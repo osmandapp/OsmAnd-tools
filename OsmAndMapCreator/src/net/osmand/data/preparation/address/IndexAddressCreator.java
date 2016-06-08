@@ -906,6 +906,10 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		}
 	}
 
+	public void cleanCityPart() throws SQLException {
+		streetDAO.cleanCityPart();
+	}
+
 	private Map<String, String> getOtherNames(Entity e) {
 		Map<String, String> m = null;
 		for (String t : e.getTagKeySet()) {
