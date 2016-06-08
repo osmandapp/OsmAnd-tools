@@ -57,7 +57,7 @@ public class Boundary {
 		return adminLevel;
 	}
 
-	public boolean hasAdminLevel(){
+	public boolean hasAdminLevel() {
 		return adminLevel > 0;
 	}
 
@@ -67,8 +67,8 @@ public class Boundary {
 
 	@Override
 	public String toString() {
-		return  getName() + " alevel:" + getAdminLevel() + " type: has opened polygons:" +
-				multipolygon.hasOpenedPolygons() + " no. of outer polygons:" +multipolygon.countOuterPolygons();
+		return getName() + " alevel:" + getAdminLevel() + " type: has opened polygons:" +
+				multipolygon.hasOpenedPolygons() + " no. of outer polygons:" + multipolygon.countOuterPolygons();
 	}
 
 
@@ -76,7 +76,7 @@ public class Boundary {
 		this.adminCenterId = l;
 	}
 
-	public boolean hasAdminCenterId(){
+	public boolean hasAdminCenterId() {
 		return adminCenterId != 0;
 	}
 

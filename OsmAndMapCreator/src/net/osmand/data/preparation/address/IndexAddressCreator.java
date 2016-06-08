@@ -136,7 +136,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 	public void indexBoundariesRelation(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 		Boundary boundary = extractBoundary(e, ctx);
-		// Bucurest has admin level 4
+		// Bucharest has admin level 4
 		boolean boundaryValid = boundary != null && (!boundary.hasAdminLevel() || boundary.getAdminLevel() >= 4) &&
 				boundary.getCenterPoint() != null && !Algorithms.isEmpty(boundary.getName());
 		if (boundaryValid) {
@@ -1027,7 +1027,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		}
 
 
-		progress.startTask(Messages.getString("IndexCreator.SERIALIZING_ADRESS"), cityTowns.size() + villages.size() / 100 + 1); //$NON-NLS-1$
+		progress.startTask(Messages.getString("IndexCreator.SERIALIZING_ADDRESS"), cityTowns.size() + villages.size() / 100 + 1); //$NON-NLS-1$
 
 		Map<String, List<MapObject>> namesIndex = new TreeMap<String, List<MapObject>>(Collator.getInstance());
 		Map<String, City> postcodes = new TreeMap<String, City>();
