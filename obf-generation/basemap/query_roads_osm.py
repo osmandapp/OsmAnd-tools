@@ -52,7 +52,7 @@ def process_roads(cond, filename, fields):
 		node_xml = ""
 		way_xml = ""
 		way_id = way_id + 1
-		way_xml = '\n<way version="1" id="%s" >\n' % (row[0] + way_id * 10000000000)
+		way_xml = '\n<way version="1" id="%s" >\n' % (row[0])
 		base = shift
 		while base - shift < len(array):
 			if row[base] is not None:
