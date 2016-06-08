@@ -183,6 +183,25 @@ public class BinaryComparator {
 		return ((long) MapUtils.getTileNumberX(21, loc.getLongitude()) << 31 | (long) MapUtils.getTileNumberY(21, loc.getLatitude()));
 	}
 
+	private void comparePoiDetails(Amenity a0, Amenity a1) throws IOException {
+		if (!Algorithms.objectEquals(a0.getSubType(), a1.getSubType())) {
+			printMapObject(POI_DETAILS, a0,
+					"Amenity subtypes are not equal " + a0.getSubType() + " <> " + a1.getSubType());
+		}
+		if (!Algorithms.objectEquals(a0.getAdditionalInfo(), a1.getAdditionalInfo())) {
+			printMapObject(POI_DETAILS, a0,
+					"Amenity info is not equal " + a0.getAdditionalInfo() + " <> " + a1.getAdditionalInfo());
+		}
+		if (!Algorithms.objectEquals(a0.getNamesMap(true), a1.getNamesMap(true))) {
+			printMapObject(POI_DETAILS, a0,
+					"Amenity name is not equal " + a0.getNamesMap(true) + " <> " + a1.getNamesMap(true));
+		}
+		if (MapUtils.getDistance(a0.getLocation(), a1.getLocation()) > 50) {
+			printMapObject(POI_DETAILS, a0,
+					"Amenitis are too far" + a0.getLocation() + " <> " + a1.getLocation() + " " + MapUtils.getDistance(a0.getLocation(), a1.getLocation()));
+		}
+	}
+
 	private void comparePoi(BinaryMapIndexReader i0, BinaryMapIndexReader i1) throws IOException {
 		List<Amenity> amenities0 = loadAmenities(i0);
 		List<Amenity> amenities1 = loadAmenities(i1);
@@ -209,29 +228,13 @@ public class BinaryComparator {
 				j++;
 				a1 = get(amenities1, j);
 			} else {
+				if (COMPARE_SET.contains(POI_DETAILS) && a0 != null && a1 != null) {
+					comparePoiDetails(a0, a1);
+				}
 				i++;
 				j++;
 				a0 = get(amenities0, i);
 				a1 = get(amenities1, j);
-				if (a0 == null || a1 == null || !COMPARE_SET.contains(POI_DETAILS)) {
-					continue;
-				}
-				if (!Algorithms.objectEquals(a0.getSubType(), a1.getSubType())) {
-					printMapObject(POI_DETAILS, a0,
-							"Amenity subtypes are not equal " + a0.getSubType() + " <> " + a1.getSubType());
-				}
-				if (!Algorithms.objectEquals(a0.getAdditionalInfo(), a1.getAdditionalInfo())) {
-					printMapObject(POI_DETAILS, a0,
-							"Amenity info is not equal " + a0.getAdditionalInfo() + " <> " + a1.getAdditionalInfo());
-				}
-				if (!Algorithms.objectEquals(a0.getNamesMap(true), a1.getNamesMap(true))) {
-					printMapObject(POI_DETAILS, a0,
-							"Amenity name is not equal " + a0.getNamesMap(true) + " <> " + a1.getNamesMap(true));
-				}
-				if (MapUtils.getDistance(a0.getLocation(), a1.getLocation()) > 50) {
-					printMapObject(POI_DETAILS, a0,
-							"Amenities are too far " + a0.getLocation() + " <> " + a1.getLocation() + " " + MapUtils.getDistance(a0.getLocation(), a1.getLocation())) ;
-				}
 			}
 		}
 		for (int compareUnique : Arrays.asList(COMPARE_UNIQUE_1, COMPARE_UNIQUE_2)) {
