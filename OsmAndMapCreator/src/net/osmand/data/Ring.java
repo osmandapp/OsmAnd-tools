@@ -10,7 +10,8 @@ import net.osmand.osm.edit.Way;
 import net.osmand.util.MapAlgorithms;
 
 /**
- * A ring is a list of CONTINUOS ways that form a simple boundary or an area. <p />
+ * A ring is a list of CONTIGUOUS ways that form a simple boundary or an area. <p />
+ *
  * @author sander
  */
 public class Ring implements Comparable<Ring> {
@@ -35,6 +36,7 @@ public class Ring implements Comparable<Ring> {
 
 	/**
 	 * Construct a Ring with a list of ways
+	 *
 	 * @param ways the ways that make up the Ring
 	 */
 	Ring(Way w) {
@@ -43,6 +45,7 @@ public class Ring implements Comparable<Ring> {
 
 	/**
 	 * check if this ring is closed by nature
+	 *
 	 * @return true if this ring is closed, false otherwise
 	 */
 	public boolean isClosed() {
@@ -56,25 +59,28 @@ public class Ring implements Comparable<Ring> {
 
 	/**
 	 * check if this Ring contains the node
+	 *
 	 * @param n the Node to check
 	 * @return yes if the node is inside the ring
 	 */
 	public boolean containsNode(Node n) {
-		return  containsPoint(n.getLatitude(), n.getLongitude());
+		return containsPoint(n.getLatitude(), n.getLongitude());
 	}
 
 	/**
 	 * check if this Ring contains the point
-	 * @param latitude lat of the point
+	 *
+	 * @param latitude  lat of the point
 	 * @param longitude lon of the point
 	 * @return yes if the point is inside the ring
 	 */
-	public boolean containsPoint(double latitude, double longitude){
-		return  MapAlgorithms.containsPoint(getBorder(), latitude, longitude);
+	public boolean containsPoint(double latitude, double longitude) {
+		return MapAlgorithms.containsPoint(getBorder(), latitude, longitude);
 	}
 
 	/**
 	 * Check if this is in Ring r
+	 *
 	 * @param r the ring to check
 	 * @return true if this Ring is inside Ring r
 	 */
@@ -86,7 +92,7 @@ public class Ring implements Comparable<Ring> {
 		List<Node> points = this.getBorder();
 
 		// r should contain all nodes of this
-		for(Node n : points) {
+		for (Node n : points) {
 			if (!r.containsNode(n)) {
 				return false;
 			}
@@ -95,7 +101,7 @@ public class Ring implements Comparable<Ring> {
 		points = r.getBorder();
 
 		// this should not contain a node from r
-		for(Node n : points) {
+		for (Node n : points) {
 			if (this.containsNode(n)) {
 				return false;
 			}
@@ -115,6 +121,7 @@ public class Ring implements Comparable<Ring> {
 	 *
 	 * The other Ring must be complete, and the part of this Ring
 	 * inside the other Ring must also be complete.
+	 *
 	 * @param other the other Ring (which is complete) used to close this one
 	 */
 	public void closeWithOtherRing(Ring other) {
@@ -124,7 +131,7 @@ public class Ring implements Comparable<Ring> {
 		boolean insideOther = other.containsNode(thisBorder.get(0));
 
 		// Search the node pairs for which the ring goes inside or out the other
-		for (int i = 0; i<thisBorder.size(); i++) {
+		for (int i = 0; i < thisBorder.size(); i++) {
 			Node n = thisBorder.get(i);
 			if (other.containsNode(n) != insideOther) {
 				// we are getting out or in the boundary now.
@@ -139,7 +146,7 @@ public class Ring implements Comparable<Ring> {
 
 		// Search the according node pairs in the other ring
 		for (int i : thisSwitchPoints) {
-			LatLon a = thisBorder.get(i-1).getLatLon();
+			LatLon a = thisBorder.get(i - 1).getLatLon();
 			LatLon b = thisBorder.get(i).getLatLon();
 			otherSwitchPoints.add(getTheSegmentRingIntersectsSegment(a, b));
 		}
@@ -166,17 +173,17 @@ public class Ring implements Comparable<Ring> {
 	 * going from point a to point b
 	 *
 	 * @param a the begin point of the segment
- 	 * @param b the end point of the segment
+	 * @param b the end point of the segment
 	 * @return an integer i which is the index so that the segment
-	 * 		from getBorder().get(i-1) to getBorder().get(i) intersects with
-	 * 		the segment from parameters a to b. <p />
-	 *
-	 * 		0 if the segment from a to b doesn't intersect with the Ring.
+	 * from getBorder().get(i-1) to getBorder().get(i) intersects with
+	 * the segment from parameters a to b. <p />
+	 * <p>
+	 * 0 if the segment from a to b doesn't intersect with the Ring.
 	 */
 	private int getTheSegmentRingIntersectsSegment(LatLon a, LatLon b) {
 		List<Node> border = getBorder();
-		for (int i = 1; i<border.size(); i++) {
-			LatLon c = border.get(i-1).getLatLon();
+		for (int i = 1; i < border.size(); i++) {
+			LatLon c = border.get(i - 1).getLatLon();
 			LatLon d = border.get(i).getLatLon();
 			if (MapAlgorithms.linesIntersect(
 					a.getLatitude(), a.getLongitude(),
@@ -197,8 +204,6 @@ public class Ring implements Comparable<Ring> {
 		}
 		return area;
 	}
-
-
 
 
 	/**
