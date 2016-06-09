@@ -67,7 +67,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 	private boolean overwriteIds;
 	private List<Amenity> tempAmenityList = new ArrayList<Amenity>();
-	private Map<EntityId, Map<String, String>> propogatedTags = new LinkedHashMap<Entity.EntityId, Map<String, String>>();
+	TagsTransformer tagsTransform = new TagsTransformer();
 
 	private final MapRenderingTypesEncoder renderingTypes;
 	private MapPoiTypes poiTypes;
@@ -88,23 +88,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 	public void iterateEntity(Entity e, OsmDbAccessorContext ctx, boolean basemap) throws SQLException {
 		tempAmenityList.clear();
-		EntityId eid = EntityId.valueOf(e);
+		tagsTransform.addPropogatedTags(e);
 		Map<String, String> tags = e.getTags();
-		Map<String, String> ptags = propogatedTags.get(eid);
-		if (ptags != null) {
-			tags = new LinkedHashMap<String, String>(tags);
-			Iterator<Entry<String, String>> iterator = ptags.entrySet().iterator();
-			while (iterator.hasNext()) {
-				Entry<String, String> ts = iterator.next();
-				if (tags.get(ts.getKey()) == null) {
-					String vl = ts.getValue();
-					if (vl != null) {
-						vl = vl.replaceAll(IndexVectorMapCreator.SPLIT_VALUE, ", ");
-					}
-					tags.put(ts.getKey(), vl);
-				}
-			}
-		}
 		Map<String, String> etags = renderingTypes.transformTags(tags, EntityType.valueOf(e), EntityConvertApplyType.POI);
 		boolean privateReg = "private".equals(e.getTag("access"));
 		tempAmenityList = EntityParser.parseAmenities(poiTypes, e, etags, tempAmenityList);
@@ -167,15 +152,14 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			if (index) {
 				ctx.loadEntityRelation(e);
 				for (EntityId id : ((Relation) e).getMembersMap().keySet()) {
-					if (!propogatedTags.containsKey(id)) {
-						propogatedTags.put(id, new LinkedHashMap<String, String>());
-					}
-					propogatedTags.get(id).put(t, tags.get(t));
+					tagsTransform.registerPropogatedTag(id, t, tags.get(t));
 				}
 			}
 		}
-		IndexVectorMapCreator.addPropogatedTags(propogatedTags, renderingTypes, e, ctx);
+		tagsTransform.handleRelationPropogatedTags(e, renderingTypes, ctx, EntityConvertApplyType.POI);
 	}
+
+	
 
 	public void commitAndClosePoiFile(Long lastModifiedDate) throws SQLException {
 		closeAllPreparedStatements();

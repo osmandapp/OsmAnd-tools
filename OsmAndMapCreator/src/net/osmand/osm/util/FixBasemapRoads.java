@@ -6,33 +6,42 @@ import gnu.trove.map.hash.TLongObjectHashMap;
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeSet;
 
 import javax.xml.stream.XMLStreamException;
 
 import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.data.LatLon;
 import net.osmand.data.QuadRect;
+import net.osmand.data.preparation.TagsTransformer;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.map.OsmandRegions;
+import net.osmand.osm.MapRenderingTypesEncoder;
+import net.osmand.osm.MapRenderingTypesEncoder.EntityConvertApplyType;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.OsmMapUtils;
+import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Way;
 import net.osmand.osm.io.OsmBaseStorage;
 import net.osmand.osm.io.OsmStorageWriter;
+import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
 import org.apache.tools.bzip2.CBZip2InputStream;
@@ -50,6 +59,12 @@ public class FixBasemapRoads {
 		File read = new File(fileToRead);
 		File write ;
 		String fileToWrite =  args != null && args.length > 1 ? args[1] : null;
+		List<File> relationFiles = new ArrayList<>();
+		if(args.length > 2) {
+			for(int i = 2; i < args.length; i++) {
+				relationFiles.add(new File(args[i]));
+			}
+		}
 		if(fileToWrite != null){
 			write = new File(fileToWrite);
 
@@ -62,13 +77,23 @@ public class FixBasemapRoads {
 
 		write.createNewFile();
 
-        new FixBasemapRoads().process(read, write);
+        new FixBasemapRoads().process(read, write, relationFiles);
 	}
 
-	private void process(File read, File write) throws  IOException, XMLStreamException, XmlPullParserException {
-		OsmBaseStorage storage = new OsmBaseStorage();
-        InputStream stream = new BufferedInputStream(new FileInputStream(read), 8192 * 4);
-        InputStream streamFile = stream;
+	private void process(File read, File write, List<File> relationFiles) throws  IOException, XMLStreamException, XmlPullParserException, SQLException {
+		MapRenderingTypesEncoder renderingTypes = new MapRenderingTypesEncoder("basemap");
+		TagsTransformer transformer = new TagsTransformer();
+		for(File relFile : relationFiles) {
+			OsmBaseStorage storage = parseOsmFile(relFile);
+			for(EntityId e : storage.getRegisteredEntities().keySet()){
+				if(e.getType() == EntityType.RELATION){
+					Relation es = (Relation) storage.getRegisteredEntities().get(e);
+					transformer.handleRelationPropogatedTags(es, renderingTypes, null, EntityConvertApplyType.MAP);
+				}
+			}
+		}
+		
+        
         OsmandRegions or = new OsmandRegions();
 		File regions = new File("OsmAndMapCreator/regions.ocbf");
 		if(!regions.exists()) {
@@ -76,7 +101,31 @@ public class FixBasemapRoads {
 		}
 		or.prepareFile(regions.getAbsolutePath());
 		or.cacheAllCountries();
-        long st = System.currentTimeMillis();
+		OsmBaseStorage storage = parseOsmFile(read);
+		Map<EntityId, Entity> entities = new HashMap<EntityId, Entity>( storage.getRegisteredEntities());
+		for(EntityId e : entities.keySet()){
+			if(e.getType() == EntityType.WAY){
+				Way es = (Way) storage.getRegisteredEntities().get(e);
+				addRegionTag(or, es);
+				transformer.addPropogatedTags(es);
+				Map<String, String> ntags = renderingTypes.transformTags(es.getModifiableTags(), EntityType.WAY, EntityConvertApplyType.MAP);
+				if(es.getModifiableTags() != ntags) {
+					es.getModifiableTags().putAll(ntags);
+				}
+				processWay(es);
+			}
+		}
+        List<EntityId> toWrite = new ArrayList<EntityId>();
+
+		processRegion(toWrite);
+		OsmStorageWriter writer = new OsmStorageWriter();
+		writer.saveStorage(new FileOutputStream(write), storage, toWrite, true);
+	}
+
+	private OsmBaseStorage parseOsmFile(File read) throws FileNotFoundException, IOException, XmlPullParserException {
+		OsmBaseStorage storage = new OsmBaseStorage();
+        InputStream stream = new BufferedInputStream(new FileInputStream(read), 8192 * 4);
+		InputStream streamFile = stream;
         if (read.getName().endsWith(".bz2")) { //$NON-NLS-1$
             if (stream.read() != 'B' || stream.read() != 'Z') {
 //				throw new RuntimeException("The source stream must start with the characters BZ if it is to be read as a BZip2 stream."); //$NON-NLS-1$
@@ -85,19 +134,7 @@ public class FixBasemapRoads {
             }
         }
 		storage.parseOSM(stream, new ConsoleProgressImplementation(), streamFile, true);
-
-		Map<EntityId, Entity> entities = new HashMap<EntityId, Entity>( storage.getRegisteredEntities());
-		for(EntityId e : entities.keySet()){
-			Entity es = storage.getRegisteredEntities().get(e);
-			if(e.getType() == EntityType.WAY){
-				processWay((Way) es);
-			}
-		}
-        List<EntityId> toWrite = new ArrayList<EntityId>();
-
-		processRegion(toWrite, or);
-		OsmStorageWriter writer = new OsmStorageWriter();
-		writer.saveStorage(new FileOutputStream(write), storage, toWrite, true);
+		return storage;
 	}
 
     public static long convertLatLon(LatLon l) {
@@ -317,7 +354,7 @@ public class FixBasemapRoads {
 
 
     // TODO try reverse?
-	private void processRegion(List<EntityId> toWrite, OsmandRegions or) throws IOException {
+	private void processRegion(List<EntityId> toWrite) throws IOException {
 		for (String ref : roadInfoMap.keySet()) {
 			RoadInfo ri = roadInfoMap.get(ref);
 			// combine unique roads
@@ -331,28 +368,44 @@ public class FixBasemapRoads {
 				if (ls.distance > MINIMAL_DISTANCE) {
 					ls.combineWaysIntoOneWay();
 					toWrite.add(ls.getFirstWayId());
-					Way firstWay = ls.getFirstWay();
-					QuadRect qr = firstWay.getLatLonBBox();
-					int lx = MapUtils.get31TileNumberX(qr.left);
-					int rx = MapUtils.get31TileNumberX(qr.right);
-					int by = MapUtils.get31TileNumberY(qr.bottom);
-					int ty = MapUtils.get31TileNumberY(qr.top);
-					List<BinaryMapDataObject> bbox = or.queryBbox(lx, rx, ty, by);
-					String regionName = "";
-					for (BinaryMapDataObject bo : bbox) {
-						if (!or.intersect(bo, lx, ty, rx, by)) {
-							continue;
-						}
-						String downloadName = or.getDownloadName(bo);
-						if (regionName.length() > 0) {
-							regionName += ",";
-						}
-						regionName += downloadName;
-					}
-					firstWay.putTag("regionName", regionName);
 				}
 			}
 		}
+	}
+
+	private void addRegionTag(OsmandRegions or, Way firstWay) throws IOException {
+		QuadRect qr = firstWay.getLatLonBBox();
+		int lx = MapUtils.get31TileNumberX(qr.left);
+		int rx = MapUtils.get31TileNumberX(qr.right);
+		int by = MapUtils.get31TileNumberY(qr.bottom);
+		int ty = MapUtils.get31TileNumberY(qr.top);
+		List<BinaryMapDataObject> bbox = or.queryBbox(lx, rx, ty, by);
+		TreeSet<String> lst = new TreeSet<String>();
+		for (BinaryMapDataObject bo : bbox) {
+//						if (!or.intersect(bo, lx, ty, rx, by)) {
+//							continue;
+//						}
+			if(or.contain(bo, lx/2+rx/2, by/2 + ty/2)) {
+				String dw = or.getDownloadName(bo);
+				if (!Algorithms.isEmpty(dw) && or.isDownloadOfType(bo, OsmandRegions.MAP_TYPE)) {
+					lst.add(dw);
+				}
+			}
+		}
+		firstWay.putTag(MapRenderingTypesEncoder.OSMAND_REGION_NAME_TAG, serialize(lst));
+	}
+	
+	private static String serialize(TreeSet<String> lst) {
+		StringBuilder bld = new StringBuilder();
+		Iterator<String> it = lst.iterator();
+		while(it.hasNext()) {
+			String next = it.next();
+			if(bld.length() > 0) {
+				bld.append(",");
+			}
+			bld.append(next);
+		}
+		return bld.toString();
 	}
 
     private void reverseWrongPositionedRoads(RoadInfo ri) {

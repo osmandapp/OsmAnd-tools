@@ -926,10 +926,10 @@ public class IndexCreator {
 		String rootFolder = "/Users/victorshcherb/osmand/";
 		IndexPoiCreator.ZIP_LONG_STRINGS = false;
 		IndexCreator creator = new IndexCreator(new File(rootFolder + "/maps/")); //$NON-NLS-1$
-		creator.setIndexMap(true);
-		creator.setIndexAddress(true);
-		creator.setIndexPOI(true);
-		creator.setIndexTransport(true);
+//		creator.setIndexMap(true);
+//		creator.setIndexAddress(true);
+//		creator.setIndexPOI(true);
+//		creator.setIndexTransport(true);
 		creator.setIndexRouting(true);
 
 //		creator.deleteDatabaseIndexes = false;
@@ -939,17 +939,17 @@ public class IndexCreator {
 
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 
-		String file = rootFolder + "/maps/neth_noord_cut.osm";
+		String file = rootFolder + "/temp/luxembourg_europe.pbf";
 //		String file = rootFolder + "/repos/resources/test-resources/synthetic_test_rendering.osm";
 //		String file = rootFolder + "/repos/resources/test-resources/turn_lanes_test.osm";
 
 		int st = file.lastIndexOf('/');
 		int e = file.indexOf('.', st);
-		creator.setNodesDBFile(new File(rootFolder + "/osm-gen/" + file.substring(st, e) + ".tmp.odb"));
+		creator.setNodesDBFile(new File(rootFolder + "/maps/" + file.substring(st, e) + ".tmp.odb"));
 		MapPoiTypes.setDefault(new MapPoiTypes(rootFolder + "/repos//resources/poi/poi_types.xml"));
 		MapRenderingTypesEncoder rt =
 				new MapRenderingTypesEncoder(rootFolder + "/repos//resources/obf_creation/rendering_types.xml",
-						file);
+						new File(file).getName());
 		creator.generateIndexes(new File(file),
 				new ConsoleProgressImplementation(1), null, zooms, rt, log);
 		//new File(file),

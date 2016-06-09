@@ -2,7 +2,6 @@ package net.osmand;
 
 
 import static net.osmand.data.preparation.IndexCreator.REMOVE_POI_DB;
-
 import gnu.trove.set.hash.TLongHashSet;
 
 import java.io.File;
@@ -18,6 +17,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.ListIterator;
@@ -47,10 +47,13 @@ import net.osmand.data.preparation.IndexPoiCreator;
 import net.osmand.data.preparation.address.IndexAddressCreator;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.edit.Node;
+import net.osmand.regions.CountryOcbfGeneration;
+import net.osmand.regions.CountryOcbfGeneration.CountryRegion;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
 import org.apache.commons.logging.Log;
+import org.xmlpull.v1.XmlPullParserException;
 
 import com.google.protobuf.CodedOutputStream;
 import com.google.protobuf.WireFormat;
@@ -77,6 +80,34 @@ public class BinaryMerger {
 			});
 		} else {
 			in.merger(args);
+		}
+	}
+	
+	public static void mergeStandardFiles(String[] args) throws IOException, SQLException, XmlPullParserException {
+		BinaryMerger in = new BinaryMerger();
+		String pathRepoToRegionsXML = args[0];
+		String pathWithGeneratedMapZips = args[1];
+		String pathToPutJointFiles = args[2];
+		boolean mapFiles = args.length > 3 && args[3].equals("--map");
+		CountryRegion world = new CountryOcbfGeneration().parseRegionStructure(pathRepoToRegionsXML);
+		Iterator<CountryRegion> it = world.iterator();
+		while(it.hasNext()) {
+			CountryRegion cr = it.next();
+			if((cr.jointMap && mapFiles) || (cr.jointRoads && !mapFiles)) {
+				List<CountryRegion> list = cr.getChildren();
+				List<String> sargs = new ArrayList<String>();
+				String ext = "_2" + (mapFiles ? ".obf" : ".road.obf");
+				String targetFileName = Algorithms.capitalizeFirstLetterAndLowercase(cr.getDownloadName()) + ext;
+				sargs.add(targetFileName);
+				sargs.add("--address");
+				sargs.add("--poi");
+				for (CountryRegion reg : list) {
+					sargs.add(pathWithGeneratedMapZips + reg.getDownloadName() + ext + ".zip");
+				}
+				log.info("Merge file with arguments: " + sargs);
+				in.merger(sargs.toArray(new String[sargs.size()]));
+				new File(targetFileName).renameTo(new File(pathToPutJointFiles, targetFileName));
+			}
 		}
 	}
 

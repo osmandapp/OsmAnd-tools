@@ -154,7 +154,7 @@ public class IndexBatchCreator {
 				Iterator<CountryRegion> it = regionStructure.iterator();
 				while(it.hasNext()) {
 					CountryRegion cr = it.next();
-					if(cr.map) {
+					if(cr.map && !cr.jointMap) {
 						RegionSpecificData dt = new RegionSpecificData();
 						dt.downloadName = cr.getDownloadName();
 						rc.regionNames.put(cr.getDownloadName(), dt);

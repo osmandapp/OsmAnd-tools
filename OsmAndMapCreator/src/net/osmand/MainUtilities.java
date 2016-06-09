@@ -86,6 +86,8 @@ public class MainUtilities {
 
 			} else if (utl.equals("delete-unused-strings")) {
 				ResourceDeleter.main(subArgsArray);
+			} else if (utl.equals("merge-std-files")) {
+				BinaryMerger.mergeStandardFiles(subArgsArray);
 			} else if (utl.equals("generate-roads")) {
 				IndexCreator ic = new IndexCreator(new File("."));
 				ic.setIndexRouting(true);

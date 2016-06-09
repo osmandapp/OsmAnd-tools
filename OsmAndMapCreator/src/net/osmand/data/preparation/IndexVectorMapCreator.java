@@ -19,14 +19,10 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
 import java.util.TreeMap;
-import java.util.TreeSet;
 
 import net.osmand.IProgress;
 import net.osmand.binary.OsmandOdb.MapData;
@@ -38,6 +34,7 @@ import net.osmand.data.Ring;
 import net.osmand.data.preparation.MapZooms.MapZoomPair;
 import net.osmand.osm.MapRenderingTypes.MapRulType;
 import net.osmand.osm.MapRenderingTypesEncoder;
+import net.osmand.osm.MapRenderingTypesEncoder.EntityConvertApplyType;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.Entity.EntityType;
@@ -66,7 +63,6 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	private static final int MAP_LEVELS_MAX = 1 << MAP_LEVELS_POWER;
 	private MapRenderingTypesEncoder renderingTypes;
 	private MapZooms mapZooms;
-	final static String SPLIT_VALUE= "SPLITVL";
 
 
 	Map<Long, TIntArrayList> multiPolygonsWays = new LinkedHashMap<Long, TIntArrayList>();
@@ -88,7 +84,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		}
 	};
 	TreeMap<MapRulType, String> namesUse = new TreeMap<MapRulType, String>(comparator);
-	Map<EntityId, Map<String, String>> propogatedTags = new LinkedHashMap<Entity.EntityId, Map<String, String>>();
+	TagsTransformer tagsTransformer = new TagsTransformer();
 	TIntArrayList addtypeUse = new TIntArrayList(8);
 
 	private PreparedStatement mapBinaryStat;
@@ -157,87 +153,15 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	}
 
 	public void indexMapRelationsAndMultiPolygons(Entity e, OsmDbAccessorContext ctx) throws SQLException {
-		indexMultiPolygon(e, ctx);
-		addPropogatedTags(propogatedTags, renderingTypes, e, ctx);
-	}
-
-	public static void addPropogatedTags(Map<EntityId, Map<String, String>> propogatedTags, MapRenderingTypesEncoder renderingTypes, Entity e, OsmDbAccessorContext ctx) throws SQLException {
-		if(e instanceof Relation) {
-			Map<MapRulType, Map<MapRulType, String>> propogated =
-					renderingTypes.getRelationPropogatedTags((Relation)e);
-			if(propogated != null && propogated.size() > 0) {
-				ctx.loadEntityRelation((Relation) e);
-				for(EntityId id : ((Relation) e).getMembersMap().keySet()) {
-					if(!propogatedTags.containsKey(id)) {
-						propogatedTags.put(id, new LinkedHashMap<String, String>());
-					}
-					Map<String, String> map = propogatedTags.get(id);
-					Iterator<Entry<MapRulType, Map<MapRulType, String>>> itMain = propogated.entrySet().iterator();
-					while (itMain.hasNext()) {
-						Entry<MapRulType, Map<MapRulType, String>> ev = itMain.next();
-						Map<MapRulType, String> pr = ev.getValue();
-						MapRulType propagateRule = ev.getKey();
-						if (propagateRule.isRelationGroup()) {
-							Iterator<Entry<MapRulType, String>> it = pr.entrySet().iterator();
-							int modifier = 1;
-							String s = propagateRule.getTag() + "__" + propagateRule.getValue() + "_";
-							while (map.containsKey(s + modifier)) {
-								modifier++;
-							}
-							map.put(s + modifier, s);
-							while (it.hasNext()) {
-								Entry<MapRulType, String> es = it.next();
-								String key = es.getKey().getTag();
-								map.put(key + "_" + modifier, es.getValue());
-							}
-						} else {
-							Iterator<Entry<MapRulType, String>> it = pr.entrySet().iterator();
-							while (it.hasNext()) {
-								Entry<MapRulType, String> es = it.next();
-								String key = es.getKey().getTag();
-								if (es.getKey().isText() && map.containsKey(key)) {
-									String res = sortAndAttachUniqueValue(map.get(key), es.getValue());
-									map.put(key, res);
-								} else {
-									map.put(key, es.getValue());
-								}
-							}
-						}
-					}
-				}
-			}
+		if (e instanceof Relation) {
+			indexMultiPolygon((Relation) e, ctx);
+			tagsTransformer.handleRelationPropogatedTags((Relation) e, renderingTypes, ctx, EntityConvertApplyType.MAP);
 		}
 	}
 
-	private static String sortAndAttachUniqueValue(String list, String value) {
-		String[] ls = list.split(SPLIT_VALUE);
-		Set<String> set = new TreeSet<String>(new Comparator<String>() {
+	
 
-			@Override
-			public int compare(String s1, String s2) {
-				int i1 = Algorithms.extractFirstIntegerNumber(s1);
-				int i2 = Algorithms.extractFirstIntegerNumber(s2);
-				if(i1 == i2) {
-					String t1 = Algorithms.extractIntegerSuffix(s1);
-					String t2 = Algorithms.extractIntegerSuffix(s2);
-					return t1.compareTo(t2);
-				}
-				return i1 - i2;
-			}
-		});
-		set.add(value);
-		for(String l : ls) {
-			set.add(l.trim());
-		}
-		String r = "";
-		for(String a : set) {
-			if(r.length() > 0) {
-				r += SPLIT_VALUE;
-			}
-			r+= a;
-		}
-		return r;
-	}
+	
 
 	/**
 	 * index a multipolygon into the database
@@ -248,10 +172,9 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	 * @param ctx the database context
 	 * @throws SQLException
 	 */
-	private void indexMultiPolygon(Entity e, OsmDbAccessorContext ctx) throws SQLException {
+	private void indexMultiPolygon(Relation e, OsmDbAccessorContext ctx) throws SQLException {
 		// Don't handle things that aren't multipolygon, and nothing administrative
-		if (!(e instanceof Relation) ||
-		    (!"multipolygon".equals(e.getTag(OSMTagKey.TYPE)) &&  !"protected_area".equals(e.getTag("boundary")))
+		if ((!"multipolygon".equals(e.getTag(OSMTagKey.TYPE)) &&  !"protected_area".equals(e.getTag("boundary")))
 				|| e.getTag(OSMTagKey.ADMIN_LEVEL) != null)
 			return;
 		MultipolygonBuilder original = createMultipolygonBuilder(e, ctx);
@@ -624,21 +547,8 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 
 	public void iterateMainEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 		if (e instanceof Way || e instanceof Node) {
-			EntityId eid = EntityId.valueOf(e);
-			Map<String, String> proptags = propogatedTags.get(eid);
-			if (proptags != null) {
-				Iterator<Entry<String, String>> iterator = proptags.entrySet().iterator();
-				while (iterator.hasNext()) {
-					Entry<String, String> ts = iterator.next();
-					if (e.getTag(ts.getKey()) == null) {
-						String vl = ts.getValue();
-						if(vl != null) {
-							vl = vl.replaceAll(SPLIT_VALUE, ", ");
-						}
-						e.putTag(ts.getKey(), vl);
-					}
-				}
-			}
+			tagsTransformer.addPropogatedTags(e);
+			
 			// manipulate what kind of way to load
 			long originalId = e.getId();
 			long assignedId = e.getId();
@@ -649,6 +559,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			}
 
 			if (splitTags != null) {
+				EntityId eid = EntityId.valueOf(e);
 				for (int i = 1; i < splitTags.size(); i++) {
 					assignedId = assignIdBasedOnOriginalSplit(eid);
 					Map<String, String> stags = splitTags.get(i);

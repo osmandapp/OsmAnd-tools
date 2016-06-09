@@ -3,6 +3,27 @@ package net.osmand.data.preparation;
 
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.hash.TLongObjectHashMap;
+
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.BitSet;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.TreeMap;
+
+import javax.xml.stream.XMLStreamException;
+
 import net.osmand.PlatformUtil;
 import net.osmand.binary.OsmandOdb.MapData;
 import net.osmand.binary.OsmandOdb.MapDataBlock;
@@ -12,7 +33,11 @@ import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.osm.MapRenderingTypes.MapRulType;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.WayChain;
-import net.osmand.osm.edit.*;
+import net.osmand.osm.edit.Entity;
+import net.osmand.osm.edit.Node;
+import net.osmand.osm.edit.OsmMapUtils;
+import net.osmand.osm.edit.Relation;
+import net.osmand.osm.edit.Way;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapAlgorithms;
 import net.osmand.util.MapUtils;
@@ -20,13 +45,6 @@ import net.osmand.util.MapUtils;
 import org.apache.commons.logging.Log;
 import org.apache.tools.bzip2.CBZip2InputStream;
 import org.xmlpull.v1.XmlPullParserException;
-
-import javax.xml.stream.XMLStreamException;
-
-import java.io.*;
-import java.sql.SQLException;
-import java.util.*;
-import java.util.Map.Entry;
 
 public class BasemapProcessor {
     TLongObjectHashMap<WayChain> coastlinesEndPoint = new TLongObjectHashMap<WayChain>();

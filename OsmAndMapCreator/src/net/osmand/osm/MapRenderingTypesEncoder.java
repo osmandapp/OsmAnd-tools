@@ -69,10 +69,10 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		return null;
 	}
 
-	public Map<MapRulType, Map<MapRulType, String>> getRelationPropogatedTags(Relation relation) {
+	public Map<MapRulType, Map<MapRulType, String>> getRelationPropogatedTags(Relation relation,  EntityConvertApplyType at) {
 		Map<MapRulType, Map<MapRulType, String>> propogated = new LinkedHashMap<MapRulType, Map<MapRulType, String>>();
 		Map<String, String> ts = relation.getTags();
-		ts = transformTags(ts, EntityType.RELATION, EntityConvertApplyType.MAP);
+		ts = transformTags(ts, EntityType.RELATION, at);
 		ts = processExtraTags(ts);
 		Iterator<Entry<String, String>> its = ts.entrySet().iterator();
 		while(its.hasNext()) {

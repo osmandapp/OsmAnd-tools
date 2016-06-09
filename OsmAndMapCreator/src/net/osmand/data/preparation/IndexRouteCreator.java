@@ -80,6 +80,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 	private RTree routeTree = null;
 	private RTree baserouteTree = null;
 	private MapRoutingTypes routeTypes;
+	TagsTransformer tagsTransformer = new TagsTransformer();
 
 	private final static float DOUGLAS_PEUKER_DISTANCE = 15;
 
@@ -115,12 +116,10 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		});
 	}
 
-	private TLongHashSet genSpeedCameras = new TLongHashSet();
 
 	TLongObjectHashMap<GeneralizedCluster> generalClusters = new TLongObjectHashMap<GeneralizedCluster>();
 	private PreparedStatement mapRouteInsertStat;
 	private PreparedStatement basemapRouteInsertStat;
-	private Map<EntityId, Map<String, String>> propogatedTags = new LinkedHashMap<Entity.EntityId, Map<String, String>>();
 	private MapRenderingTypesEncoder renderingTypes;
 	private boolean generateLowLevel;
 
@@ -156,17 +155,8 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 	public void indexRelations(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 		indexHighwayRestrictions(e, ctx);
 		if(e instanceof Relation) {
+			tagsTransformer.handleRelationPropogatedTags((Relation) e, renderingTypes, ctx, EntityConvertApplyType.ROUTING);
 			Map<String, String> tags = renderingTypes.transformTags(e.getTags(), EntityType.RELATION, EntityConvertApplyType.ROUTING);
-			Map<String, String> propogated = routeTypes.getRouteRelationPropogatedTags(tags);
-			if(propogated != null) {
-				ctx.loadEntityRelation((Relation) e);
-				for(EntityId id : ((Relation) e).getMembersMap().keySet()) {
-					if(!propogatedTags.containsKey(id)) {
-						propogatedTags.put(id, new LinkedHashMap<String, String>());
-					}
-					propogatedTags.get(id).putAll(propogated);
-				}
-			}
 			if("enforcement".equals(tags.get("type")) && "maxspeed".equals(tags.get("enforcement"))) {
 				ctx.loadEntityRelation((Relation) e);
 				Iterator<Entity> from = ((Relation) e).getMembers("from").iterator();
@@ -174,7 +164,8 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 				while(from.hasNext()) {
 					Entity n = from.next();
 					if(n instanceof Node) {
-						genSpeedCameras.add(n.getId());
+						tagsTransformer.registerPropogatedTag(new EntityId(EntityType.NODE, n.getId()), 
+								"highway", "speed_camera");
 					}
 				}
 
@@ -187,29 +178,13 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 	public void iterateMainEntity(Entity es, OsmDbAccessorContext ctx) throws SQLException {
 		if (es instanceof Way) {
 			Way e = (Way) es;
+			tagsTransformer.addPropogatedTags(e);
 			Map<String, String> tags = renderingTypes.transformTags(e.getTags(), EntityType.WAY, EntityConvertApplyType.ROUTING);
-			Map<String, String> ptags = propogatedTags.get(EntityId.valueOf(e));
-			if (ptags != null && !ptags.isEmpty()) {
-				tags = new LinkedHashMap<String, String>(tags);
-				Iterator<Entry<String, String>> iterator = ptags.entrySet().iterator();
-				while (iterator.hasNext()) {
-					Entry<String, String> ts = iterator.next();
-					if (tags.get(ts.getKey()) == null) {
-						tags.put(ts.getKey(), ts.getValue());
-					}
-				}
-			}
-
 			boolean encoded = routeTypes.encodeEntity(tags, outTypes, names)
 					&& e.getNodes().size() >= 2;
 			if (encoded) {
 				// Load point with tags!
 				ctx.loadEntityWay(e);
-				for (Node n : e.getNodes()) {
-					if (n != null && genSpeedCameras.contains(n.getId())) {
-						n.putTag("highway", "speed_camera");
-					}
-				}
 				routeTypes.encodePointTypes(e, pointTypes, pointNames, false);
 				addWayToIndex(e.getId(), e.getNodes(), mapRouteInsertStat, routeTree, outTypes, pointTypes, pointNames, names);
 			}

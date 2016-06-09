@@ -135,6 +135,8 @@ public class CountryOcbfGeneration {
 		public String polyExtract;
 
 
+		public boolean jointMap;
+		public boolean jointRoads;
 		public boolean map ;
 		public boolean wiki;
 		public boolean roads ;
@@ -145,6 +147,10 @@ public class CountryOcbfGeneration {
 
 		public CountryRegion getParent() {
 			return parent;
+		}
+		
+		public List<CountryRegion> getChildren() {
+			return children;
 		}
 
 		public Iterator<CountryRegion> iterator() {
@@ -620,6 +626,12 @@ public class CountryOcbfGeneration {
 			reg.map = parseBoolean(attrs.get("map"));
 		} else {
 			reg.map = type == null || type.equals("map");
+		}
+		if(attrs.containsKey("join_road_files")) {
+			reg.jointRoads = parseBoolean(attrs.get("join_road_files"));
+		}
+		if(attrs.containsKey("join_map_files")) {
+			reg.jointMap = parseBoolean(attrs.get("join_map_files"));
 		}
 
 		if(attrs.containsKey("roads")) {

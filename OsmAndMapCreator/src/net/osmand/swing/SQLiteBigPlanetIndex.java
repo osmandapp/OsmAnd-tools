@@ -45,16 +45,16 @@ public class SQLiteBigPlanetIndex {
 		PreparedStatement pStatement = conn.prepareStatement("INSERT INTO INFO VALUES(?,?,?,?,?,?,?)");
 		String tileNumbering = bigPlanet ? "BigPlanet" : "simple";
 		pStatement.setString(1, tileNumbering);
-		int maxzoom = bigPlanet ? 17 - template.getMaximumZoomSupported() : template.getMinimumZoomSupported();
-		int minzoom = bigPlanet ? 17 - template.getMinimumZoomSupported() : template.getMaximumZoomSupported();
-		pStatement.setInt(2, maxzoom);
-		pStatement.setInt(3, minzoom);
+		int minNormalZoom = bigPlanet ? 17 - template.getMaximumZoomSupported() : template.getMinimumZoomSupported();
+		int maxNormalZoom = bigPlanet ? 17 - template.getMinimumZoomSupported() : template.getMaximumZoomSupported();
+		pStatement.setInt(2, minNormalZoom);
+		pStatement.setInt(3, maxNormalZoom);
 		pStatement.setString(4, "yes");
 		pStatement.setString(5, ((TileSourceTemplate) template).getUrlTemplate());
 		pStatement.setString(6, ((TileSourceTemplate) template).getRule());
 		pStatement.setString(7, ((TileSourceTemplate) template).getReferer());
 		pStatement.execute();
-		log.info("Info table" + tileNumbering + "maxzoom = " + maxzoom + " minzoom = " + minzoom + " timecolumn = yes"
+		log.info("Info table" + tileNumbering + "maxzoom = " + maxNormalZoom + " minzoom = " + minNormalZoom + " timecolumn = yes"
 				+ " url = " + ((TileSourceTemplate) template).getUrlTemplate());
 		pStatement.close();
 
