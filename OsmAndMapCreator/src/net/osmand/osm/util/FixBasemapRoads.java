@@ -21,9 +21,12 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
+import java.util.zip.GZIPInputStream;
 
 import javax.xml.stream.XMLStreamException;
 
+import net.osmand.BinaryMerger;
+import net.osmand.PlatformUtil;
 import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.data.LatLon;
 import net.osmand.data.QuadRect;
@@ -44,68 +47,70 @@ import net.osmand.osm.io.OsmStorageWriter;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
+import org.apache.commons.logging.Log;
 import org.apache.tools.bzip2.CBZip2InputStream;
 import org.xmlpull.v1.XmlPullParserException;
 
 public class FixBasemapRoads {
     private static float MINIMAL_DISTANCE= 500;
     private static float MAXIMAL_DISTANCE_CUT = 3000;
+    private final static Log LOG = PlatformUtil.getLog(FixBasemapRoads.class);
 
 	public static void main(String[] args) throws Exception {
-		String fileToRead = args != null && args.length > 0 ? args[0] : null;
-		if(fileToRead == null) {
-			fileToRead = "/Users/victorshcherb/temp/test_fixbasemaproads.osm";
+		if(args == null || args.length == 0) {
+			args = new String[] {
+					System.getProperty("maps.dir") + "proc_line_trunk_out.osm.bz2",
+					System.getProperty("maps.dir") + "proc_line_trunk.osm",
+					System.getProperty("maps.dir") + "route_road.osm.gz"
+					
+			};
 		}
+		String fileToRead = args[0] ;
 		File read = new File(fileToRead);
-		File write ;
-		String fileToWrite =  args != null && args.length > 1 ? args[1] : null;
+		String fileToWrite =  args[1];
 		List<File> relationFiles = new ArrayList<>();
 		if(args.length > 2) {
 			for(int i = 2; i < args.length; i++) {
 				relationFiles.add(new File(args[i]));
 			}
 		}
-		if(fileToWrite != null){
-			write = new File(fileToWrite);
-
-		} else {
-			String fileName = read.getName();
-			int i = fileName.indexOf('.');
-			fileName = fileName.substring(0, i) + "_out.osm";
-			write = new File(read.getParentFile(), fileName);
-		}
-
+		File write = new File(fileToWrite);
 		write.createNewFile();
-
         new FixBasemapRoads().process(read, write, relationFiles);
 	}
 
 	private void process(File read, File write, List<File> relationFiles) throws  IOException, XMLStreamException, XmlPullParserException, SQLException {
 		MapRenderingTypesEncoder renderingTypes = new MapRenderingTypesEncoder("basemap");
+		OsmandRegions or = prepareRegions();
 		TagsTransformer transformer = new TagsTransformer();
 		for(File relFile : relationFiles) {
+			LOG.info("Parse relations file " + relFile.getName());
 			OsmBaseStorage storage = parseOsmFile(relFile);
+			int total = 0;
 			for(EntityId e : storage.getRegisteredEntities().keySet()){
 				if(e.getType() == EntityType.RELATION){
+					total++;
+					if(total % 1000 == 0) {
+						LOG.info("Processed " + total + " relations");
+					}
 					Relation es = (Relation) storage.getRegisteredEntities().get(e);
 					transformer.handleRelationPropogatedTags(es, renderingTypes, null, EntityConvertApplyType.MAP);
 				}
 			}
 		}
-		
         
-        OsmandRegions or = new OsmandRegions();
-		File regions = new File("OsmAndMapCreator/regions.ocbf");
-		if(!regions.exists()) {
-			 regions = new File("regions.ocbf");
-		}
-		or.prepareFile(regions.getAbsolutePath());
-		or.cacheAllCountries();
+        
+		LOG.info("Parse main file " + read.getName());
 		OsmBaseStorage storage = parseOsmFile(read);
 		Map<EntityId, Entity> entities = new HashMap<EntityId, Entity>( storage.getRegisteredEntities());
+		int total = 0;
 		for(EntityId e : entities.keySet()){
 			if(e.getType() == EntityType.WAY){
 				Way es = (Way) storage.getRegisteredEntities().get(e);
+				total++;
+				if(total % 1000 == 0) {
+					LOG.info("Processed " + total + " ways");
+				}
 				addRegionTag(or, es);
 				transformer.addPropogatedTags(es);
 				Map<String, String> ntags = renderingTypes.transformTags(es.getModifiableTags(), EntityType.WAY, EntityConvertApplyType.MAP);
@@ -119,7 +124,23 @@ public class FixBasemapRoads {
 
 		processRegion(toWrite);
 		OsmStorageWriter writer = new OsmStorageWriter();
+		LOG.info("Writing file... ");
 		writer.saveStorage(new FileOutputStream(write), storage, toWrite, true);
+		LOG.info("DONE");
+	}
+
+	private OsmandRegions prepareRegions() throws IOException {
+		OsmandRegions or = new OsmandRegions();
+		File regions = new File("OsmAndMapCreator/regions.ocbf");
+		if(!regions.exists()) {
+			 regions = new File("regions.ocbf");
+		}
+		if(!regions.exists()) {
+			 regions = new File("../../resources/countries-info/regions.ocbf");
+		}
+		or.prepareFile(regions.getAbsolutePath());
+		or.cacheAllCountries();
+		return or;
 	}
 
 	private OsmBaseStorage parseOsmFile(File read) throws FileNotFoundException, IOException, XmlPullParserException {
@@ -132,6 +153,8 @@ public class FixBasemapRoads {
             } else {
                 stream = new CBZip2InputStream(stream);
             }
+        } else if (read.getName().endsWith(".gz")) { //$NON-NLS-1$
+        	stream = new GZIPInputStream(stream);
         }
 		storage.parseOSM(stream, new ConsoleProgressImplementation(), streamFile, true);
 		return storage;
