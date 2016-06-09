@@ -309,5 +309,6 @@
         <SOURCES />
       </library>
     </orderEntry>
+    <orderEntry type="library" name="jts-1.14" level="project" />
   </component>
 </module>

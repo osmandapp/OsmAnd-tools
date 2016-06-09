@@ -96,4 +96,8 @@ public class Boundary {
 		return multipolygon.getCenterPoint();
 	}
 
+	public Multipolygon getMultipolygon() {
+		return multipolygon;
+	}
+
 }

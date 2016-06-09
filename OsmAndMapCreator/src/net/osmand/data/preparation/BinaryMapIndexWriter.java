@@ -1018,6 +1018,9 @@ public class BinaryMapIndexWriter {
 			}
 			bbuilder.setId(b.getId());
 			bbuilder.setName(b.getName());
+			if (b.getPostcode() != null) {
+				bbuilder.setPostcode(b.getPostcode());
+			}
 			it = b.getNamesMap(false).entrySet().iterator();
 			while (it.hasNext()) {
 				Entry<String, String> next = it.next();
