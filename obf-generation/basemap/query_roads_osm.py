@@ -76,15 +76,14 @@ def process_roads(cond, filename, fields):
 
 if __name__ == "__main__":
 	process_roads("highway='motorway'", "line_motorway.osm", ['highway', 'junction', 'route'])
-	# TODO enable
-	#process_roads("highway='trunk'", "line_trunk.osm", ['highway', 'junction', 'route'])
-	#process_roads("highway='primary'", "line_primary.osm", ['highway', 'junction', 'route'])
-	#process_roads("highway='secondary'", "line_secondary.osm", ['highway', 'junction', 'route'])
-	#process_roads("railway='rail'", "line_railway.osm", ['railway'])
-	#process_roads("highway='tertiary'", "line_tertiary.osm", ['highway', 'junction', 'route'])
-	#process_roads("route='ferry' or (tags->'seamark:type' in ('separation_line', 'separation_lane', 'separation_boundary'))", "proc_line_ferry_out.osm", ['route', 'seamark:type'])
+	process_roads("highway='trunk'", "line_trunk.osm", ['highway', 'junction', 'route'])
+	process_roads("highway='primary'", "line_primary.osm", ['highway', 'junction', 'route'])
+	process_roads("highway='secondary'", "line_secondary.osm", ['highway', 'junction', 'route'])
+	process_roads("railway='rail'", "line_railway.osm", ['railway'])
+	process_roads("highway='tertiary'", "line_tertiary.osm", ['highway', 'junction', 'route'])
+	process_roads("route='ferry' or (tags->'seamark:type' in ('separation_line', 'separation_lane', 'separation_boundary'))", "proc_line_ferry_out.osm", ['route', 'seamark:type'])
 	
-	#process_roads("(admin_level = '4' or admin_level = '2')", "line_admin_level.osm", ['admin_level'])
+	process_roads("(admin_level = '4' or admin_level = '2')", "line_admin_level.osm", ['admin_level'])
 	
 	# not used
 	#process_roads("waterway='river' or waterway='canal' ", "line_rivers.osm", ['waterway'])
