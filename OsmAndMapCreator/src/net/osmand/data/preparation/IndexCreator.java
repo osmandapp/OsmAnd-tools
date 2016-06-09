@@ -481,20 +481,6 @@ public class IndexCreator {
 	}
 
 
-	private void createPlainOsmDbBasemap(OsmDbAccessor accessor,
-			IProgress progress, File readFile, IOsmStorageFilter addFilter) throws SQLException, IOException, XmlPullParserException{
-		dbFile = new File(workingDir, TEMP_NODES_DB);
-		if (osmDBdialect.databaseFileExists(dbFile)) {
-			osmDBdialect.removeDatabase(dbFile);
-		}
-		Object dbConn = getDatabaseConnection(dbFile.getAbsolutePath(), osmDBdialect);
-		accessor.setDbConn((Connection) dbConn, osmDBdialect);
-		OsmDbCreator dbCreator = null;
-		dbCreator = extractOsmToNodesDB(accessor, readFile, progress, addFilter, 0, 0, false, true, null);
-		accessor.initDatabase(dbCreator);
-	}
-
-
 	public void generateBasemapIndex(IProgress progress, IOsmStorageFilter addFilter, MapZooms mapZooms,
 			MapRenderingTypesEncoder renderingTypes, Log logMapDataWarn, String regionName, File... readFiles) throws IOException, SQLException, InterruptedException, XmlPullParserException {
 		if (logMapDataWarn == null) {
@@ -509,51 +495,48 @@ public class IndexCreator {
 		// clear previous results and setting variables
 		try {
 
-			final BasemapProcessor processor = new BasemapProcessor(logMapDataWarn, mapZooms, renderingTypes, zoomWaySmoothness);
+			final BasemapProcessor processor = new BasemapProcessor(logMapDataWarn, mapZooms, renderingTypes,
+					zoomWaySmoothness);
 			final IndexPoiCreator poiCreator = indexPOI ? new IndexPoiCreator(renderingTypes, false) : null;
 			if (indexPOI) {
 				poiCreator.createDatabaseStructure(getPoiFile());
 			}
-			for (File readFile : readFiles) {
-				OsmDbAccessor accessor = new OsmDbAccessor();
-				createPlainOsmDbBasemap(accessor, progress, readFile, addFilter);
-				// 2. Create index connections and index structure
+			OsmDbAccessor accessor = initDbAccessor(readFiles, progress, addFilter, true, false);
+			// 2. Create index connections and index structure
 
-				setGeneralProgress(progress, "[50 / 100]");
-				progress.startTask(Messages.getString("IndexCreator.PROCESS_OSM_NODES"), accessor.getAllNodes());
-				accessor.iterateOverEntities(progress, EntityType.NODE, new OsmDbVisitor() {
-					@Override
-					public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
-						processor.processEntity(e);
-						if (indexPOI) {
-							poiCreator.iterateEntity(e, ctx, true);
-						}
+			setGeneralProgress(progress, "[50 / 100]");
+			progress.startTask(Messages.getString("IndexCreator.PROCESS_OSM_NODES"), accessor.getAllNodes());
+			accessor.iterateOverEntities(progress, EntityType.NODE, new OsmDbVisitor() {
+				@Override
+				public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
+					processor.processEntity(e);
+					if (indexPOI) {
+						poiCreator.iterateEntity(e, ctx, true);
 					}
-				});
-				setGeneralProgress(progress, "[70 / 100]");
-				progress.startTask(Messages.getString("IndexCreator.PROCESS_OSM_WAYS"), accessor.getAllWays());
-				accessor.iterateOverEntities(progress, EntityType.WAY, new OsmDbVisitor() {
-					@Override
-					public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
-						processor.processEntity(e);
-						if (indexPOI) {
-							poiCreator.iterateEntity(e, ctx, true);
-						}
+				}
+			});
+			setGeneralProgress(progress, "[70 / 100]");
+			progress.startTask(Messages.getString("IndexCreator.PROCESS_OSM_WAYS"), accessor.getAllWays());
+			accessor.iterateOverEntities(progress, EntityType.WAY, new OsmDbVisitor() {
+				@Override
+				public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
+					processor.processEntity(e);
+					if (indexPOI) {
+						poiCreator.iterateEntity(e, ctx, true);
 					}
-				});
-				setGeneralProgress(progress, "[90 / 100]");
+				}
+			});
+			setGeneralProgress(progress, "[90 / 100]");
 
-				progress.startTask(Messages.getString("IndexCreator.PROCESS_OSM_REL"), accessor.getAllRelations());
-				accessor.iterateOverEntities(progress, EntityType.RELATION, new OsmDbVisitor() {
-					@Override
-					public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
-						ctx.loadEntityRelation((Relation) e);
-						processor.processEntity(e);
-					}
-				});
-				accessor.closeReadingConnection();
-			}
-
+			progress.startTask(Messages.getString("IndexCreator.PROCESS_OSM_REL"), accessor.getAllRelations());
+			accessor.iterateOverEntities(progress, EntityType.RELATION, new OsmDbVisitor() {
+				@Override
+				public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
+					ctx.loadEntityRelation((Relation) e);
+					processor.processEntity(e);
+				}
+			});
+			accessor.closeReadingConnection();
 
 			mapFile = new File(workingDir, getMapFileName());
 			// to save space
@@ -562,8 +545,8 @@ public class IndexCreator {
 				mapFile.delete();
 			}
 			mapRAFile = new RandomAccessFile(mapFile, "rw");
-			BinaryMapIndexWriter writer = new BinaryMapIndexWriter(mapRAFile, lastModifiedDate == null ? System.currentTimeMillis() :
-					lastModifiedDate.longValue());
+			BinaryMapIndexWriter writer = new BinaryMapIndexWriter(mapRAFile,
+					lastModifiedDate == null ? System.currentTimeMillis() : lastModifiedDate.longValue());
 
 			setGeneralProgress(progress, "[95 of 100]");
 			progress.startTask("Writing map index to binary file...", -1);
