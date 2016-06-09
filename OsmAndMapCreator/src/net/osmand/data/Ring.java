@@ -4,6 +4,10 @@ package net.osmand.data;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.vividsolutions.jts.geom.Coordinate;
+import com.vividsolutions.jts.geom.CoordinateList;
+import com.vividsolutions.jts.geom.GeometryFactory;
+import com.vividsolutions.jts.geom.LinearRing;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.OsmMapUtils;
 import net.osmand.osm.edit.Way;
@@ -205,6 +209,15 @@ public class Ring implements Comparable<Ring> {
 		return area;
 	}
 
+	public LinearRing toLinearRing() {
+		GeometryFactory geometryFactory = new GeometryFactory();
+		CoordinateList coordinates = new CoordinateList();
+		for (Node node : border.getNodes()) {
+			coordinates.add(new Coordinate(node.getLatitude(), node.getLongitude()), true);
+		}
+		coordinates.closeRing();
+		return geometryFactory.createLinearRing(coordinates.toCoordinateArray());
+	}
 
 	/**
 	 * Use area size as comparable metric

@@ -702,7 +702,7 @@ public class IndexCreator {
 				if (indexAddress) {
 					setGeneralProgress(progress, "[90 / 100]");
 					progress.startTask(Messages.getString("IndexCreator.REGISTER_PCODES"), -1);
-					indexAddressCreator.processingPostcodes();
+					indexAddressCreator.processPostcodes();
 					indexAddressCreator.cleanCityPart();
 				}
 

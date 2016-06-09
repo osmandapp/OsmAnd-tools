@@ -1,5 +1,6 @@
 package net.osmand.data.preparation.address;
 
+import com.vividsolutions.jts.geom.MultiPolygon;
 import gnu.trove.map.hash.TLongObjectHashMap;
 import gnu.trove.set.hash.TLongHashSet;
 
@@ -75,6 +76,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 	private DataTileManager<City> cityVillageManager = new DataTileManager<City>(13);
 	private DataTileManager<City> cityManager = new DataTileManager<City>(10);
 	private List<Relation> postalCodeRelations = new ArrayList<Relation>();
+	private Map<Entity, Boundary> postcodeBoundaries = new HashMap<>();
 	private Map<City, Boundary> cityBoundaries = new HashMap<City, Boundary>();
 	private Map<Boundary, List<City>> boundaryToContainingCities = new HashMap<Boundary, List<City>>();
 	private List<Boundary> notAssignedBoundaries = new ArrayList<Boundary>();
@@ -92,6 +94,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 	Connection mapConnection;
 	DBStreetDAO streetDAO;
+	private PreparedStatement postcodeSetStat;
 
 
 	public IndexAddressCreator(Log logMapDataWarn) {
@@ -382,7 +385,8 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			}
 		}
 		boolean administrative = "administrative".equals(e.getTag(OSMTagKey.BOUNDARY));
-		if (administrative || ct != null) {
+		boolean postalCode = "postal_code".equals(e.getTag(OSMTagKey.BOUNDARY));
+		if (administrative || postalCode || ct != null) {
 			if (e instanceof Way && visitedBoundaryWays.contains(e.getId())) {
 				return null;
 			}
@@ -898,8 +902,11 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				}
 			}
 		}
-		if (e instanceof Relation) {
-			if (e.getTag(OSMTagKey.POSTAL_CODE) != null) {
+		if (e.getTag(OSMTagKey.POSTAL_CODE) != null) {
+			if ("postal_code".equals(e.getTag(OSMTagKey.BOUNDARY))) {
+				Boundary boundary = extractBoundary(e, ctx);
+				postcodeBoundaries.put(e, boundary);
+			} else if (e instanceof Relation) {
 				ctx.loadEntityRelation((Relation) e);
 				postalCodeRelations.add((Relation) e);
 			}
@@ -961,28 +968,82 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		}
 	}
 
-	public void processingPostcodes() throws SQLException {
-		streetDAO.commit();
-		PreparedStatement pstat = mapConnection.prepareStatement("UPDATE building SET postcode = ? WHERE id = ?");
-		pStatements.put(pstat, 0);
-		for (Relation r : postalCodeRelations) {
-			String tag = r.getTag(OSMTagKey.POSTAL_CODE);
-			for (EntityId l : r.getMemberIds()) {
-				pstat.setString(1, tag);
-				pstat.setLong(2, l.getId());
-				addBatch(pstat);
+	private void setPostcodeForBuilding(String postcode, long buildingId) throws SQLException {
+		postcodeSetStat.setString(1, postcode);
+		postcodeSetStat.setLong(2, buildingId);
+		addBatch(postcodeSetStat);
+	}
+
+	private List<Entity> postcodesInCityBoundary(Boundary cityBoundary) {
+		List<Entity> result = new ArrayList<>();
+		if (cityBoundary == null) {
+			return result;
+		}
+		MultiPolygon cityMultipolygon = cityBoundary.getMultipolygon().toMultiPolygon();
+		for (Map.Entry<Entity, Boundary> e: postcodeBoundaries.entrySet()) {
+			MultiPolygon postcodeMultipolygon = e.getValue().getMultipolygon().toMultiPolygon();
+			if (cityMultipolygon.intersects(postcodeMultipolygon)) {
+				result.add(e.getKey());
 			}
 		}
-		if (pStatements.get(pstat) > 0) {
-			pstat.executeBatch();
+		return result;
+	}
+
+	private void processPostcodeRelations() throws SQLException {
+		for (Relation r : postalCodeRelations) {
+			for (EntityId l : r.getMemberIds()) {
+				setPostcodeForBuilding(r.getTag(OSMTagKey.POSTAL_CODE), l.getId());
+			}
 		}
-		pStatements.remove(pstat);
+	}
+
+	public void processPostcodes() throws SQLException {
+		streetDAO.commit();
+		pStatements.put(postcodeSetStat, 0);
+		processPostcodeRelations();
+		if (pStatements.get(postcodeSetStat) > 0) {
+			postcodeSetStat.executeBatch();
+		}
+		pStatements.remove(postcodeSetStat);
 	}
 
 
 	private static final int CITIES_TYPE = 1;
 	private static final int POSTCODES_TYPE = 2;
 	private static final int VILLAGES_TYPE = 3;
+
+
+	private void readBuildingsForStreet(Street s) throws SQLException {
+		PreparedStatement streetBuildingsStat = mapConnection.prepareStatement(
+				"SELECT B.id, B.name, B.name_en, B.latitude, B.longitude, B.postcode, "+ //$NON-NLS-1$
+						" B.name2, B.name_en2, B.lat2, B.lon2, B.interval, B.interpolateType " +
+						"FROM street A LEFT JOIN building B ON B.street = A.id " + //$NON-NLS-1$
+						"WHERE A.id = ? ORDER BY A.name ASC"); //$NON-NLS-1$
+		streetBuildingsStat.setLong(1, s.getId());
+		ResultSet set = streetBuildingsStat.executeQuery();
+		while (set.next()) {
+			Building b = new Building();
+			b.setId(set.getLong(1));
+			b.copyNames(set.getString(2), null, Algorithms.decodeMap(set.getString(3)));
+			b.setLocation(set.getDouble(4), set.getDouble(5));
+			b.setPostcode(set.getString(6));
+			b.setName2(set.getString(7));
+			// no en name2 for now
+			b.setName2(set.getString(8));
+			double lat2 = set.getDouble(9);
+			double lon2 = set.getDouble(10);
+			if (lat2 != 0 || lon2 != 0) {
+				b.setLatLon2(new LatLon(lat2, lon2));
+			}
+			b.setInterpolationInterval(set.getInt(11));
+			String type = set.getString(12);
+			if (type != null) {
+				b.setInterpolationType(BuildingInterpolation.valueOf(type));
+			}
+
+			s.addBuildingCheckById(b);
+		}
+	}
 
 	public void writeBinaryAddressIndex(BinaryMapIndexWriter writer, String regionName, IProgress progress) throws IOException, SQLException {
 		streetDAO.close();
@@ -1045,8 +1106,11 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			City postCode = posts.get(i);
 			BinaryFileReference ref = refs.get(i);
 			putNamedMapObject(namesIndex, postCode, ref.getStartPointer());
-			ArrayList<Street> list = new ArrayList<Street>(postCode.getStreets());
-			Collections.sort(list, new Comparator<Street>() {
+			ArrayList<Street> streets = new ArrayList<Street>(postCode.getStreets());
+			for (Street s : streets) {
+				readBuildingsForStreet(s);
+			}
+			Collections.sort(streets, new Comparator<Street>() {
 				final net.osmand.Collator clt = OsmAndCollator.primaryCollator();
 
 				@Override
@@ -1055,7 +1119,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				}
 
 			});
-			writer.writeCityIndex(postCode, list, null, ref, tagRules);
+			writer.writeCityIndex(postCode, streets, null, ref, tagRules);
 		}
 		writer.endCityBlockIndex();
 
@@ -1153,6 +1217,11 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			List<Street> streets = readStreetsBuildings(streetstat, city, waynodesStat, streetNodes, listSuburbs);
 			long f = System.currentTimeMillis() - time;
 			writer.writeCityIndex(city, streets, streetNodes, ref, tagRules);
+			Map<String, Boundary> possiblePostcodeBoundaryMap = new HashMap<>();
+			for (Entity postcodeEntity : postcodesInCityBoundary(cityBoundaries.get(city))) {
+				String postcode = postcodeEntity.getTag(OSMTagKey.POSTAL_CODE);
+				possiblePostcodeBoundaryMap.put(postcode, postcodeBoundaries.get(postcodeEntity));
+			}
 			int bCount = 0;
 			// register postcodes and name index
 			for (Street s : streets) {
@@ -1162,6 +1231,12 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 					bCount++;
 					if (city.getPostcode() != null && b.getPostcode() == null) {
 						b.setPostcode(city.getPostcode());
+					}
+					for (Entry<String, Boundary> e : possiblePostcodeBoundaryMap.entrySet()) {
+						if (e.getValue().containsPoint(b.getLocation())) {
+							b.setPostcode(e.getKey());
+							break;
+						}
 					}
 					if (b.getPostcode() != null) {
 						if (!postcodes.containsKey(b.getPostcode())) {
@@ -1204,6 +1279,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		streetDAO.createDatabaseStructure(mapConnection, dialect);
 		createAddressIndexStructure(mapConnection, dialect);
 		addressCityStat = mapConnection.prepareStatement("insert into city (id, latitude, longitude, name, name_en, city_type) values (?, ?, ?, ?, ?, ?)");
+		postcodeSetStat = mapConnection.prepareStatement("UPDATE building SET postcode = ? WHERE id = ?");
 
 		pStatements.put(addressCityStat, 0);
 	}

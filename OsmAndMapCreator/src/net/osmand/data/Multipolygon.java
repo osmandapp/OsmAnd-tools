@@ -9,8 +9,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import com.vividsolutions.jts.geom.GeometryFactory;
+import com.vividsolutions.jts.geom.LinearRing;
+import com.vividsolutions.jts.geom.MultiPolygon;
+import com.vividsolutions.jts.geom.Polygon;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.OsmMapUtils;
+import net.osmand.util.Algorithms;
 
 public class Multipolygon {
 	private List<Ring> innerRings, outerRings;
@@ -36,6 +41,22 @@ public class Multipolygon {
 		innerRings = inner;
 		this.id = id;
 		updateRings();
+	}
+
+	public MultiPolygon toMultiPolygon() {
+		GeometryFactory geometryFactory = new GeometryFactory();
+		List<Polygon> polygons = new ArrayList<>();
+		for (Ring outerRing : outerRings) {
+			List<LinearRing> innerLinearRings = new ArrayList<>();
+			Set<Ring> innerRings = containedInnerInOuter.get(outerRing);
+			if (!Algorithms.isEmpty(innerRings)) {
+				for (Ring innerRing : innerRings) {
+					innerLinearRings.add(innerRing.toLinearRing());
+				}
+			}
+			polygons.add(geometryFactory.createPolygon(outerRing.toLinearRing(), innerLinearRings.toArray(new LinearRing[innerLinearRings.size()])));
+		}
+		return geometryFactory.createMultiPolygon(polygons.toArray(new Polygon[polygons.size()]));
 	}
 
 	public long getId() {
@@ -159,6 +180,10 @@ public class Multipolygon {
 		}
 
 		return OsmMapUtils.getWeightCenterForNodes(points);
+	}
+
+	public void intersectsWith(Multipolygon multipolygon) {
+
 	}
 
 	public void mergeWith(Multipolygon multipolygon) {
