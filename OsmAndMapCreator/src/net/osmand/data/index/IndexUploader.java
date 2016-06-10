@@ -438,12 +438,6 @@ public class IndexUploader {
 				|| fileName.endsWith(IndexConstants.TOUR_INDEX_EXT_ZIP);
 		boolean basemapFile = mainFile.getName().contains("basemap");
 		boolean regionFile = !srtmFile && !roadFile && !wikiFile && !tourFile && !basemapFile;
-		if (regionFile) {
-			extractRoadOnlyFile(
-					mainFile,
-					new File(mainFile.getParentFile(), mainFile.getName().replace(IndexConstants.BINARY_MAP_INDEX_EXT,
-							IndexConstants.BINARY_ROAD_MAP_INDEX_EXT)));
-		}
 		if (srtmFile != this.srtmProcess) {
 			return null;
 		}
@@ -455,6 +449,12 @@ public class IndexUploader {
 		}
 		if (wikiFile != this.wikiProcess) {
 			return null;
+		}
+		if (regionFile && roadFile) {
+			extractRoadOnlyFile(
+					mainFile,
+					new File(mainFile.getParentFile(), mainFile.getName().replace(IndexConstants.BINARY_MAP_INDEX_EXT,
+							IndexConstants.BINARY_ROAD_MAP_INDEX_EXT)));
 		}
 
 		if (tourFile) {
