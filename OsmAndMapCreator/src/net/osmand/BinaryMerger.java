@@ -102,7 +102,7 @@ public class BinaryMerger {
 				sargs.add("--address");
 				sargs.add("--poi");
 				for (CountryRegion reg : list) {
-					sargs.add(pathWithGeneratedMapZips + reg.getDownloadName() + ext + ".zip");
+					sargs.add(pathWithGeneratedMapZips + Algorithms.capitalizeFirstLetterAndLowercase(reg.getDownloadName()) + ext + ".zip");
 				}
 				log.info("Merge file with arguments: " + sargs);
 				in.merger(sargs.toArray(new String[sargs.size()]));
