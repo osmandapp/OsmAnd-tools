@@ -597,6 +597,7 @@ public class IndexUploader {
 				}
 				nonpackRtree.delete();
 				packRtree.delete();
+				RTree.clearCache();
 			}
 		}
 		writer.endWriteMapIndex();
