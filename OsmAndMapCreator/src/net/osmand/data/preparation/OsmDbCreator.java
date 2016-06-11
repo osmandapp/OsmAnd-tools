@@ -68,6 +68,8 @@ public class OsmDbCreator implements IOsmStorageFilter {
 	private final int shiftId;
 	private final int additionId;
 	private boolean ovewriteIds;
+	private boolean generateNewIds;
+	private long generatedId = -100;
 
 	private static boolean VALIDATE_DUPLICATES = false;
 	private boolean backwardComptibleIds;
@@ -77,14 +79,15 @@ public class OsmDbCreator implements IOsmStorageFilter {
 	
 
 
-	public OsmDbCreator(int additionId, int shiftId, boolean ovewriteIds) {
+	public OsmDbCreator(int additionId, int shiftId, boolean ovewriteIds, boolean generateNewIds) {
 		this.additionId = additionId;
 		this.shiftId = shiftId;
 		this.ovewriteIds = ovewriteIds;
+		this.generateNewIds = generateNewIds;
 	}
 	
 	public OsmDbCreator() {
-		this(0, 0, false);
+		this(0, 0, false, false);
 	}
 	
 	
@@ -97,7 +100,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 		int ord = EntityType.valueOf(e).ordinal();
 		if (e instanceof Node) {
 			if (simpleConvertId) {
-				return getSimpleConvertId(id);
+				return getSimpleConvertId(id, EntityType.NODE);
 			}
 			int hash = getNodeHash(e);
 			return getConvertId(id, ord, hash);
@@ -107,7 +110,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 			for (int i = 0; i < lids.size(); i++) {
 				Long ld;
 				if(simpleConvertId) {
-					ld = getSimpleConvertId(lids.get(i));
+					ld = getSimpleConvertId(lids.get(i), EntityType.NODE);
 				} else {
 					ld = getGeneratedId(lids.get(i), 0);
 					Long hd = getHash(lids.get(i), 0);
@@ -120,7 +123,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 				}
 			}
 			if (simpleConvertId) {
-				return getSimpleConvertId(id);
+				return getSimpleConvertId(id, EntityType.WAY);
 			}
 			return getConvertId(id, ord, hash);
 		} else {
@@ -129,7 +132,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 
 			for (EntityId i : r.getMemberIds()) {
 				if (i.getType() != EntityType.RELATION) {
-					Long ll = simpleConvertId ? ((Long)getSimpleConvertId(i.getId().longValue())) : 
+					Long ll = simpleConvertId ? ((Long)getSimpleConvertId(i.getId().longValue(), i.getType())) : 
 						getGeneratedId(i.getId().longValue(), i.getType().ordinal());
 					if (ll != null) {
 						p.put(i, new EntityId(i.getType(), ll));
@@ -143,13 +146,23 @@ public class OsmDbCreator implements IOsmStorageFilter {
 				r.getModifiableMembersMap().put(es.getValue(), role);
 			}
 			if (simpleConvertId) {
-				return getSimpleConvertId(id);
+				return getSimpleConvertId(id, EntityType.RELATION);
 			}
 			return id;
 		}
 	}
 
-	private long getSimpleConvertId(long id) {
+	private long getSimpleConvertId(long id, EntityType type) {
+		if (generateNewIds) {
+			long key = ((id << shiftId) + additionId) << 2 + type.ordinal();
+			if (generatedIds.contains(key)) {
+				id = generatedId--;
+				generatedIds.put(key, id);
+			} else {
+				id = generatedIds.get(key);
+			}
+
+		}
 		return (id << shiftId) + additionId;
 	}
 

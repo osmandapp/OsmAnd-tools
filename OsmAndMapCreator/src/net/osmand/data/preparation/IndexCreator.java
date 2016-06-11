@@ -291,7 +291,7 @@ public class IndexCreator {
 
 	private OsmDbCreator extractOsmToNodesDB(OsmDbAccessor accessor,
 			File readFile, IProgress progress, IOsmStorageFilter addFilter, int additionId, int shiftId,
-			boolean ovewriteIds, boolean createTables, OsmDbCreator previous) throws
+			boolean ovewriteIds, boolean generateNewIds, boolean createTables, OsmDbCreator previous) throws
 			IOException, SQLException, XmlPullParserException {
 		boolean pbfFile = false;
 		InputStream stream = new BufferedInputStream(new FileInputStream(readFile), 8192 * 4);
@@ -328,7 +328,7 @@ public class IndexCreator {
 		});
 
 		// 1. Loading osm file
-		OsmDbCreator dbCreator = new OsmDbCreator(additionId, shiftId, ovewriteIds);
+		OsmDbCreator dbCreator = new OsmDbCreator(additionId, shiftId, ovewriteIds, generateNewIds);
 		if(previous != null) {
 			dbCreator.setNodeIds(previous.getNodeIds());
 			dbCreator.setWayIds(previous.getWayIds());
@@ -362,7 +362,7 @@ public class IndexCreator {
 	}
 
 	private OsmDbAccessor initDbAccessor(File[] readFile, IProgress progress, IOsmStorageFilter addFilter,
-			boolean generateUniqueIds, boolean overwriteIds) throws IOException, SQLException, InterruptedException, XmlPullParserException {
+			boolean generateUniqueIds, boolean overwriteIds, boolean regeenerateNewIds) throws IOException, SQLException, InterruptedException, XmlPullParserException {
 		OsmDbAccessor accessor = new OsmDbAccessor();
 		if (dbFile == null) {
 			dbFile = new File(workingDir, TEMP_NODES_DB);
@@ -430,7 +430,7 @@ public class IndexCreator {
 		OsmDbCreator dbCreator = null;
 		for (File read : readFile) {
 			dbCreator = extractOsmToNodesDB(accessor, read, progress, addFilter, shiftIds ? mapInd : 0,
-					shiftIds ? shift : 0, overwriteIds, mapInd == 0, dbCreator);
+					shiftIds ? shift : 0, overwriteIds, regeenerateNewIds, mapInd == 0, dbCreator);
 			accessor.updateCounts(dbCreator);
 			if (readFile.length > 1) {
 				log.info("Processing " + (mapInd + 1) + " file out of " + readFile.length);
@@ -501,7 +501,7 @@ public class IndexCreator {
 			if (indexPOI) {
 				poiCreator.createDatabaseStructure(getPoiFile());
 			}
-			OsmDbAccessor accessor = initDbAccessor(readFiles, progress, addFilter, true, false);
+			OsmDbAccessor accessor = initDbAccessor(readFiles, progress, addFilter, true, false, true);
 			// 2. Create index connections and index structure
 
 			setGeneralProgress(progress, "[50 / 100]");
@@ -647,7 +647,7 @@ public class IndexCreator {
 			} else {
 				// 2. Create index connections and index structure
 				createDatabaseIndexesStructure();
-				OsmDbAccessor accessor = initDbAccessor(readFile, progress, addFilter, generateUniqueIds, overwriteIds);
+				OsmDbAccessor accessor = initDbAccessor(readFile, progress, addFilter, generateUniqueIds, overwriteIds, false);
 
 				// 3. Processing all entries
 				// 3.1 write all cities
