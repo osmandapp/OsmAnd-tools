@@ -154,8 +154,8 @@ public class OsmDbCreator implements IOsmStorageFilter {
 
 	private long getSimpleConvertId(long id, EntityType type) {
 		if (generateNewIds) {
-			long key = ((id << shiftId) + additionId) << 2 + type.ordinal();
-			if (generatedIds.contains(key)) {
+			long key = (id << 2) + type.ordinal();
+			if (!generatedIds.contains(key)) {
 				id = generatedId--;
 				generatedIds.put(key, id);
 			} else {
