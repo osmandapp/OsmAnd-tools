@@ -100,7 +100,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 		int ord = EntityType.valueOf(e).ordinal();
 		if (e instanceof Node) {
 			if (simpleConvertId) {
-				return getSimpleConvertId(id, EntityType.NODE);
+				return getSimpleConvertId(id, EntityType.NODE, true);
 			}
 			int hash = getNodeHash(e);
 			return getConvertId(id, ord, hash);
@@ -110,7 +110,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 			for (int i = 0; i < lids.size(); i++) {
 				Long ld;
 				if(simpleConvertId) {
-					ld = getSimpleConvertId(lids.get(i), EntityType.NODE);
+					ld = getSimpleConvertId(lids.get(i), EntityType.NODE, false);
 				} else {
 					ld = getGeneratedId(lids.get(i), 0);
 					Long hd = getHash(lids.get(i), 0);
@@ -123,7 +123,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 				}
 			}
 			if (simpleConvertId) {
-				return getSimpleConvertId(id, EntityType.WAY);
+				return getSimpleConvertId(id, EntityType.WAY, true);
 			}
 			return getConvertId(id, ord, hash);
 		} else {
@@ -132,7 +132,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 
 			for (EntityId i : r.getMemberIds()) {
 				if (i.getType() != EntityType.RELATION) {
-					Long ll = simpleConvertId ? ((Long)getSimpleConvertId(i.getId().longValue(), i.getType())) : 
+					Long ll = simpleConvertId ? ((Long)getSimpleConvertId(i.getId().longValue(), i.getType(), false)) : 
 						getGeneratedId(i.getId().longValue(), i.getType().ordinal());
 					if (ll != null) {
 						p.put(i, new EntityId(i.getType(), ll));
@@ -146,16 +146,16 @@ public class OsmDbCreator implements IOsmStorageFilter {
 				r.getModifiableMembersMap().put(es.getValue(), role);
 			}
 			if (simpleConvertId) {
-				return getSimpleConvertId(id, EntityType.RELATION);
+				return getSimpleConvertId(id, EntityType.RELATION, true);
 			}
 			return id;
 		}
 	}
 
-	private long getSimpleConvertId(long id, EntityType type) {
+	private long getSimpleConvertId(long id, EntityType type, boolean newId) {
 		if (generateNewIds) {
 			long key = (id << 2) + type.ordinal();
-			if (!generatedIds.contains(key)) {
+			if (!generatedIds.contains(key) || newId) {
 				id = generatedId--;
 				generatedIds.put(key, id);
 			} else {
