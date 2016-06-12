@@ -907,7 +907,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		if (e.getTag(OSMTagKey.POSTAL_CODE) != null) {
 			if ("postal_code".equals(e.getTag(OSMTagKey.BOUNDARY))) {
 				Boundary boundary = extractBoundary(e, ctx);
-				if(boundary != null) {
+				if (boundary != null) {
 					postcodeBoundaries.put(e, boundary);
 				}
 			} else if (e instanceof Relation) {
@@ -980,6 +980,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 	private List<Entity> postcodesInCityBoundary(Boundary cityBoundary) {
 		List<Entity> result = new ArrayList<>();
+//		if (cityBoundary == null || postcodeBoundaries.isEmpty()) {
 		if (cityBoundary == null) {
 			return result;
 		}

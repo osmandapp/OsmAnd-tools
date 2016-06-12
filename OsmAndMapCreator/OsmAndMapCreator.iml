@@ -33,6 +33,7 @@
       <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/icons" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/src-tests" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/test-resources" type="java-test-resource" />
     </content>
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="inheritedJdk" />
