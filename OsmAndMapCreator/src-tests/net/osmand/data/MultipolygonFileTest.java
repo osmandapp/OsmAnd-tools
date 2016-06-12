@@ -23,9 +23,8 @@ public class MultipolygonFileTest {
 
 	@Test
 	public void testDifferentOrientationMultipolygon() throws IOException, XmlPullParserException {
-		InputStream is = MultipolygonFileTest.class.getResourceAsStream("multipolygon.osm");
-		OsmBaseStorage st = new OsmBaseStorage();
-		st.parseOSM(is, IProgress.EMPTY_PROGRESS);
+		String file = "multipolygon.osm";
+		OsmBaseStorage st = parse(file);
 		Multipolygon polygon = buildPolygon(st, 1184817L);
 		assertTrue(polygon.areRingsComplete());
 		assertEquals(1, polygon.getOuterRings().size());
@@ -34,15 +33,14 @@ public class MultipolygonFileTest {
 		assertTrue(rng.containsPoint(53.18901289819956, 8.296700487828224));
 		assertFalse(rng.containsPoint(53.1863199155393, 8.309607569738336));
 		assertFalse(rng.containsPoint(53.13992097340422, 8.280586804995954));
-
-		is = MultipolygonFileTest.class.getResourceAsStream("multipolygon1.osm");
-		st = new OsmBaseStorage();
+	}
+	
+	
+	private OsmBaseStorage parse(String file) throws IOException, XmlPullParserException {
+		InputStream is = MultipolygonFileTest.class.getResourceAsStream(file);
+		OsmBaseStorage st = new OsmBaseStorage();
 		st.parseOSM(is, IProgress.EMPTY_PROGRESS);
-		polygon = buildPolygon(st, 6275048L);
-		for (Ring r : polygon.getOuterRings()) {
-			assertTrue(r.getBorder().size() > 2);
-		}
-
+		return st;
 	}
 
 	private Multipolygon buildPolygon(OsmBaseStorage st, long id) {
