@@ -182,10 +182,6 @@ public class Multipolygon {
 		return OsmMapUtils.getWeightCenterForNodes(points);
 	}
 
-	public void intersectsWith(Multipolygon multipolygon) {
-
-	}
-
 	public void mergeWith(Multipolygon multipolygon) {
 		innerRings.addAll(multipolygon.innerRings);
 		outerRings.addAll(multipolygon.outerRings);
