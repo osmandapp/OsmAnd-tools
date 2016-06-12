@@ -1,6 +1,7 @@
 package net.osmand.data.preparation.address;
 
 import com.vividsolutions.jts.geom.MultiPolygon;
+
 import gnu.trove.map.hash.TLongObjectHashMap;
 import gnu.trove.set.hash.TLongHashSet;
 
@@ -36,6 +37,7 @@ import net.osmand.data.City.CityType;
 import net.osmand.data.DataTileManager;
 import net.osmand.data.LatLon;
 import net.osmand.data.MapObject;
+import net.osmand.data.Multipolygon;
 import net.osmand.data.MultipolygonBuilder;
 import net.osmand.data.Street;
 import net.osmand.data.preparation.AbstractIndexPartCreator;
@@ -905,7 +907,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		if (e.getTag(OSMTagKey.POSTAL_CODE) != null) {
 			if ("postal_code".equals(e.getTag(OSMTagKey.BOUNDARY))) {
 				Boundary boundary = extractBoundary(e, ctx);
-				postcodeBoundaries.put(e, boundary);
+				if(boundary != null) {
+					postcodeBoundaries.put(e, boundary);
+				}
 			} else if (e instanceof Relation) {
 				ctx.loadEntityRelation((Relation) e);
 				postalCodeRelations.add((Relation) e);
@@ -981,8 +985,8 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		}
 		MultiPolygon cityMultipolygon = cityBoundary.getMultipolygon().toMultiPolygon();
 		for (Map.Entry<Entity, Boundary> e: postcodeBoundaries.entrySet()) {
-			MultiPolygon postcodeMultipolygon = e.getValue().getMultipolygon().toMultiPolygon();
-			if (cityMultipolygon.intersects(postcodeMultipolygon)) {
+			Multipolygon mp = e.getValue().getMultipolygon();
+			if (cityMultipolygon.intersects(mp.toMultiPolygon())) {
 				result.add(e.getKey());
 			}
 		}
