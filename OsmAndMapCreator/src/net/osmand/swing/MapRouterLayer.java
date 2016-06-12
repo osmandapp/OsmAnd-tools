@@ -654,19 +654,8 @@ public class MapRouterLayer implements MapPanelLayer {
 				files.add(f);
 			}
 		}
-		String xmlPath = DataExtractionSettings.getSettings().getRoutingXmlPath();
-		Builder builder;
-		if(xmlPath.equals("routing.xml")){
-			builder = RoutingConfiguration.getDefault() ;
-		} else{
-			try {
-				builder = RoutingConfiguration.parseFromInputStream(new FileInputStream(xmlPath));
-			} catch (IOException e) {
-				throw new IllegalArgumentException("Error parsing routing.xml file",e);
-			} catch (XmlPullParserException e) {
-				throw new IllegalArgumentException("Error parsing routing.xml file",e);
-			}
-		}
+		
+		
 		final boolean animateRoutingCalculation = DataExtractionSettings.getSettings().isAnimateRouting();
 		if(animateRoutingCalculation) {
 			nextTurn.setVisible(true);
@@ -702,7 +691,8 @@ public class MapRouterLayer implements MapPanelLayer {
 						paramsR.put(p, "true");
 					}
 				}
-				RoutingConfiguration config = builder.build(props[0], /*RoutingConfiguration.DEFAULT_MEMORY_LIMIT*/ 1000, paramsR);
+				RoutingConfiguration config = DataExtractionSettings.getSettings().getRoutingConfig().build(props[0],
+						/*RoutingConfiguration.DEFAULT_MEMORY_LIMIT*/ 1000, paramsR);
 				PrecalculatedRouteDirection precalculatedRouteDirection = null;
 				// Test gpx precalculation
 //				LatLon[] lts = parseGPXDocument("/home/victor/projects/osmand/temp/esya.gpx");

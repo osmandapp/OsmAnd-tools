@@ -2,15 +2,21 @@ package net.osmand.swing;
 
 import java.awt.Rectangle;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.prefs.Preferences;
+
+import org.xmlpull.v1.XmlPullParserException;
 
 import net.osmand.binary.GeocodingUtilities;
 import net.osmand.binary.GeocodingUtilities.GeocodingResult;
 import net.osmand.data.LatLon;
 import net.osmand.data.preparation.IndexCreator;
 import net.osmand.data.preparation.MapZooms;
+import net.osmand.router.RoutingConfiguration;
+import net.osmand.router.RoutingConfiguration.Builder;
 
 
 public class DataExtractionSettings {
@@ -233,6 +239,24 @@ public class DataExtractionSettings {
 	public String getRoutingXmlPath(){
 		return preferences.get("routingXmlPath", "routing.xml");
 	}
+	
+	public Builder getRoutingConfig() {
+		Builder builder;
+		String xmlPath = getRoutingXmlPath();
+		if(xmlPath.equals("routing.xml")){
+			builder = RoutingConfiguration.getDefault() ;
+		} else{
+			try {
+				builder = RoutingConfiguration.parseFromInputStream(new FileInputStream(xmlPath));
+			} catch (IOException e) {
+				throw new IllegalArgumentException("Error parsing routing.xml file",e);
+			} catch (XmlPullParserException e) {
+				throw new IllegalArgumentException("Error parsing routing.xml file",e);
+			}
+		}
+		return builder;
+	}
+	
 
 	public void setRoutingXmlPath(String file){
 		preferences.put("routingXmlPath", file);

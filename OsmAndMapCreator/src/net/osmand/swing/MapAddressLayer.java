@@ -29,6 +29,8 @@ import net.osmand.data.Street;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
+import net.osmand.router.GeneralRouter.RouteAttributeContext;
+import net.osmand.router.GeneralRouter.RouteDataObjectAttribute;
 import net.osmand.router.RoutePlannerFrontEnd;
 import net.osmand.router.RoutingConfiguration;
 import net.osmand.router.RoutingContext;
@@ -171,9 +173,10 @@ public class MapAddressLayer implements MapPanelLayer {
 				}
 			}
 		}
-		RoutingConfiguration cfg = RoutingConfiguration.getDefault().build("car", 100,
+		RoutingConfiguration cfg = DataExtractionSettings.getSettings().getRoutingConfig().build("geocoding", 100,
 				new HashMap<String, String>());
 		RoutingContext ctx = new RoutePlannerFrontEnd(false).buildRoutingContext(cfg, null, list.toArray(new BinaryMapIndexReader[list.size()]));
+		
 		GeocodingUtilities su = new GeocodingUtilities();
 		double minBuildingDistance = 0;
 		List<GeocodingResult> complete = new ArrayList<GeocodingUtilities.GeocodingResult>();
