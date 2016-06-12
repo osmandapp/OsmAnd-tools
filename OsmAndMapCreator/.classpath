@@ -3,6 +3,7 @@
 	<classpathentry kind="src" path="src"/>
 	<classpathentry kind="src" path="icons"/>
 	<classpathentry kind="src" path="src-tests"/>
+	<classpathentry kind="src" path="test-resources"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
 	<classpathentry kind="lib" path="lib/h2-latest.jar"/>
 	<classpathentry kind="lib" path="lib/jsch-20120101.jar"/>
