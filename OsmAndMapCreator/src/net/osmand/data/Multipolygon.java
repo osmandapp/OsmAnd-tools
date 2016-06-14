@@ -45,12 +45,19 @@ public class Multipolygon {
 
 	public MultiPolygon toMultiPolygon() {
 		GeometryFactory geometryFactory = new GeometryFactory();
+		MultiPolygon emptyMultiPolygon = geometryFactory.createMultiPolygon(new Polygon[0]);
 		List<Polygon> polygons = new ArrayList<>();
 		for (Ring outerRing : outerRings) {
+			if (!outerRing.isClosed()) {
+				return emptyMultiPolygon;
+			}
 			List<LinearRing> innerLinearRings = new ArrayList<>();
 			Set<Ring> innerRings = containedInnerInOuter.get(outerRing);
 			if (!Algorithms.isEmpty(innerRings)) {
 				for (Ring innerRing : innerRings) {
+					if (!innerRing.isClosed()) {
+						return emptyMultiPolygon;
+					}
 					innerLinearRings.add(innerRing.toLinearRing());
 				}
 			}
