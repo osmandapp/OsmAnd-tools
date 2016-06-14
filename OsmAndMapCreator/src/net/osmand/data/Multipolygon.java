@@ -214,7 +214,14 @@ public class Multipolygon {
 		}
 		return true;
 	}
-
+	
+	public QuadRect getBbox() {
+		if(minLat == 90) {
+			return new QuadRect();
+		}
+		return new QuadRect(minLon, minLat, maxLat, maxLon);
+	}
+	
 
 	public List<Ring> getInnerRings() {
 		return innerRings;
@@ -223,4 +230,6 @@ public class Multipolygon {
 	public List<Ring> getOuterRings() {
 		return outerRings;
 	}
+
+	
 }

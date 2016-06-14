@@ -39,6 +39,7 @@ import net.osmand.data.LatLon;
 import net.osmand.data.MapObject;
 import net.osmand.data.Multipolygon;
 import net.osmand.data.MultipolygonBuilder;
+import net.osmand.data.QuadRect;
 import net.osmand.data.Street;
 import net.osmand.data.preparation.AbstractIndexPartCreator;
 import net.osmand.data.preparation.BinaryFileReference;
@@ -983,10 +984,10 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		if (postcodeBoundaries.isEmpty() || cityBoundary == null) {
 			return result;
 		}
-		MultiPolygon cityMultipolygon = cityBoundary.getMultipolygon().toMultiPolygon();
+		Multipolygon cityMultipolygon = cityBoundary.getMultipolygon();
 		for (Map.Entry<Entity, Boundary> e: postcodeBoundaries.entrySet()) {
 			Multipolygon mp = e.getValue().getMultipolygon();
-			if (cityMultipolygon.intersects(mp.toMultiPolygon())) {
+			if (QuadRect.intersects(cityMultipolygon.getBbox(),mp.getBbox())) {
 				result.add(e.getKey());
 			}
 		}
