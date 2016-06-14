@@ -980,8 +980,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 	private List<Entity> postcodesInCityBoundary(Boundary cityBoundary) {
 		List<Entity> result = new ArrayList<>();
-//		if (cityBoundary == null || postcodeBoundaries.isEmpty()) {
-		if (cityBoundary == null) {
+		if (postcodeBoundaries.isEmpty() || cityBoundary == null) {
 			return result;
 		}
 		MultiPolygon cityMultipolygon = cityBoundary.getMultipolygon().toMultiPolygon();
