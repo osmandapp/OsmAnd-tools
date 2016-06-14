@@ -1016,39 +1016,6 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 	private static final int POSTCODES_TYPE = 2;
 	private static final int VILLAGES_TYPE = 3;
 
-
-	private void readBuildingsForStreet(Street s) throws SQLException {
-		PreparedStatement streetBuildingsStat = mapConnection.prepareStatement(
-				"SELECT B.id, B.name, B.name_en, B.latitude, B.longitude, B.postcode, "+ //$NON-NLS-1$
-						" B.name2, B.name_en2, B.lat2, B.lon2, B.interval, B.interpolateType " +
-						"FROM street A LEFT JOIN building B ON B.street = A.id " + //$NON-NLS-1$
-						"WHERE A.id = ? ORDER BY A.name ASC"); //$NON-NLS-1$
-		streetBuildingsStat.setLong(1, s.getId());
-		ResultSet set = streetBuildingsStat.executeQuery();
-		while (set.next()) {
-			Building b = new Building();
-			b.setId(set.getLong(1));
-			b.copyNames(set.getString(2), null, Algorithms.decodeMap(set.getString(3)));
-			b.setLocation(set.getDouble(4), set.getDouble(5));
-			b.setPostcode(set.getString(6));
-			b.setName2(set.getString(7));
-			// no en name2 for now
-			b.setName2(set.getString(8));
-			double lat2 = set.getDouble(9);
-			double lon2 = set.getDouble(10);
-			if (lat2 != 0 || lon2 != 0) {
-				b.setLatLon2(new LatLon(lat2, lon2));
-			}
-			b.setInterpolationInterval(set.getInt(11));
-			String type = set.getString(12);
-			if (type != null) {
-				b.setInterpolationType(BuildingInterpolation.valueOf(type));
-			}
-
-			s.addBuildingCheckById(b);
-		}
-	}
-
 	public void writeBinaryAddressIndex(BinaryMapIndexWriter writer, String regionName, IProgress progress) throws IOException, SQLException {
 		streetDAO.close();
 		closePreparedStatements(addressCityStat);
@@ -1111,9 +1078,6 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			BinaryFileReference ref = refs.get(i);
 			putNamedMapObject(namesIndex, postCode, ref.getStartPointer());
 			ArrayList<Street> streets = new ArrayList<Street>(postCode.getStreets());
-			for (Street s : streets) {
-				readBuildingsForStreet(s);
-			}
 			Collections.sort(streets, new Comparator<Street>() {
 				final net.osmand.Collator clt = OsmAndCollator.primaryCollator();
 
