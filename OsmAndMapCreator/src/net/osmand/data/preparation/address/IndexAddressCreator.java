@@ -458,23 +458,25 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			String streetName = null;
 			Set<String> isInNames = null;
 			ctx.loadEntityRelation(i);
-
-			Collection<Entity> members = i.getMembers("street");
-			for (Entity street : members) { // find the first street member with name and use it as a street name
-				String name = street.getTag(OSMTagKey.NAME);
-				if (name != null) {
-					streetName = name;
-					l = street.getLatLon();
-					isInNames = street.getIsInNames();
-					break;
+			
+			streetName = i.getTag(OSMTagKey.NAME);
+			l = i.getMemberEntities().keySet().iterator().next().getLatLon(); // get coordinates from any relation member
+			isInNames = i.getIsInNames();
+			String postcode = i.getTag(OSMTagKey.ADDR_POSTCODE);
+			if (streetName == null) { // use relation name as a street name
+				Collection<Entity> members = i.getMembers("street");
+				for (Entity street : members) { // find the first street member with name and use it as a street name
+					String name = street.getTag(OSMTagKey.NAME);
+					if (name != null) {
+						streetName = name;
+						l = street.getLatLon();
+						isInNames = street.getIsInNames();
+						break;
+					}
 				}
 			}
 
-			if (streetName == null) { // use relation name as a street name
-				streetName = i.getTag(OSMTagKey.NAME);
-				l = i.getMemberEntities().keySet().iterator().next().getLatLon(); // get coordinates from any relation member
-				isInNames = i.getIsInNames();
-			}
+			
 
 			if (streetName != null) {
 				Set<Long> idsOfStreet = getStreetInCity(isInNames, streetName, null, l);
@@ -510,6 +512,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 								log.warn("building with empty location! id: " + house.getId());
 							} else {
 								building.setName(hname);
+								if(Algorithms.isEmpty(building.getPostcode())) {
+									building.setPostcode(postcode);
+								}
 								streetDAO.writeBuilding(idsOfStreet, building);
 							}
 						}
