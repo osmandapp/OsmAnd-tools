@@ -157,9 +157,13 @@ public class WikipediaByCountryDivider {
 
 		private List<String> getRegions(double lat, double lon) throws IOException {
 			keyNames.clear();
-			List<BinaryMapDataObject> cs = regions.query(MapUtils.get31TileNumberX(lon), MapUtils.get31TileNumberY(lat));
+			int x31 = MapUtils.get31TileNumberX(lon);
+			int y31 = MapUtils.get31TileNumberY(lat);
+			List<BinaryMapDataObject> cs = regions.query(x31, y31);
 			for (BinaryMapDataObject b : cs) {
-				keyNames.add(regions.getDownloadName(b));
+				if(regions.contain(b, x31, y31)) {
+					keyNames.add(regions.getDownloadName(b));
+				}
 			}
 			return keyNames;
 		}
@@ -225,7 +229,7 @@ public class WikipediaByCountryDivider {
 			c.createStatement().execute("CREATE INDEX IF NOT EXISTS WIKIID_INDEX ON wiki_content(lang, wikiId)");
 			c.createStatement().execute("CREATE INDEX IF NOT EXISTS CONTENTID_INDEX ON wiki_content(ID)");
 
-			c.createStatement().execute("CREATE TABLE wiki_region(id long, regionName text)");
+			c.createStatement().execute("CREATE TABLE wiki_region(id long, regionName text, regionLang text)");
 			c.createStatement().execute("CREATE INDEX IF NOT EXISTS REGIONID_INDEX ON wiki_region(ID)");
 			c.createStatement().execute("CREATE INDEX IF NOT EXISTS REGIONNAME_INDEX ON wiki_region(regionName)");
 
@@ -277,6 +281,13 @@ public class WikipediaByCountryDivider {
 		Map<String, LinkedList<BinaryMapDataObject>> mapObjects = regs.cacheAllCountries();
 		File rgns = new File(folder, "regions");
 		rgns.mkdirs();
+		Map<String, String> preferredRegionLanguages = new LinkedHashMap<>();
+		for(String key : mapObjects.keySet()) {
+			LinkedList<BinaryMapDataObject> list = mapObjects.get(key);
+			String regionLang = regs.getRegionDataByDownloadName(key).getParams().getRegionLang();
+			preferredRegionLanguages.put(key.toLowerCase(), regionLang);
+		}
+		
 		ResultSet rs = conn.createStatement().executeQuery("SELECT DISTINCT regionName  FROM wiki_region");
 		while (rs.next()) {
 			String lcRegionName = rs.getString(1);
@@ -284,6 +295,10 @@ public class WikipediaByCountryDivider {
 				continue;
 			}
 			String regionName = Algorithms.capitalizeFirstLetterAndLowercase(lcRegionName);
+			String preferredLang = preferredRegionLanguages.get(lcRegionName);
+			if(preferredLang == null) {
+				preferredLang = "";
+			}
 			LinkedList<BinaryMapDataObject> list = mapObjects.get(lcRegionName.toLowerCase());
 			boolean hasWiki = false;
 			if(list != null) {
@@ -343,6 +358,7 @@ public class WikipediaByCountryDivider {
 			long prevOsmId = -1;
 			StringBuilder content = new StringBuilder();
 			String nameUnique = null;
+			boolean preferredAdded = false;
 			boolean nameAdded = false;
 			while (rps.next()) {
 				long osmId = -rps.getLong(1);
@@ -382,6 +398,7 @@ public class WikipediaByCountryDivider {
 					prevOsmId = osmId;
 					nameAdded = false;
 					nameUnique = null;
+					preferredAdded = false;
 					serializer.startTag(null, "node");
 					serializer.attribute(null, "visible", "true");
 					serializer.attribute(null, "id", (osmId)+"");
@@ -399,7 +416,10 @@ public class WikipediaByCountryDivider {
 					addTag(serializer, "name:"+wikiLang, title);
 					addTag(serializer, "wiki_id:"+wikiLang, wikiId +"");
 					addTag(serializer, "wiki_lang:"+wikiLang, "yes");
-					nameUnique = title;
+					if(!preferredAdded) {
+						nameUnique = title;
+						preferredAdded = preferredLang.contains(wikiLang);
+					}
 					addTag(serializer, "content:"+wikiLang, contentStr);
 				}
 			}
