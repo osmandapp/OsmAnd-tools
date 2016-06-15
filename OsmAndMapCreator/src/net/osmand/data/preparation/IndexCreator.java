@@ -681,14 +681,6 @@ public class IndexCreator {
 
 				}
 
-				// 3.5 update all postal codes from relations and clean unneeded city part names from street names
-				if (indexAddress) {
-					setGeneralProgress(progress, "[90 / 100]");
-					progress.startTask(Messages.getString("IndexCreator.REGISTER_PCODES"), -1);
-					indexAddressCreator.processPostcodes();
-					indexAddressCreator.cleanCityPart();
-				}
-
 				// 4. packing map rtree indexes
 				if (indexMap) {
 					setGeneralProgress(progress, "[90 / 100]"); //$NON-NLS-1$
@@ -909,11 +901,11 @@ public class IndexCreator {
 		String rootFolder = "/Users/victorshcherb/osmand/";
 		IndexPoiCreator.ZIP_LONG_STRINGS = false;
 		IndexCreator creator = new IndexCreator(new File(rootFolder + "/maps/")); //$NON-NLS-1$
-		creator.setIndexMap(true);
-//		creator.setIndexAddress(true);
+//		creator.setIndexMap(true);
+		creator.setIndexAddress(true);
 //		creator.setIndexPOI(true);
 //		creator.setIndexTransport(true);
-		creator.setIndexRouting(true);
+//		creator.setIndexRouting(true);
 
 //		creator.deleteDatabaseIndexes = false;
 //		creator.recreateOnlyBinaryFile = true;

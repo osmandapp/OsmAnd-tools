@@ -20,8 +20,7 @@ import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Way;
 import net.osmand.util.Algorithms;
 
-public class DBStreetDAO extends AbstractIndexPartCreator
-{
+public class DBStreetDAO extends AbstractIndexPartCreator {
 
 	public static class SimpleStreet {
 		private final long id;
@@ -88,23 +87,17 @@ public class DBStreetDAO extends AbstractIndexPartCreator
 		Statement stat = mapConnection.createStatement();
         stat.executeUpdate("create table street (id bigint primary key, latitude double, longitude double, " +
 					"name varchar(1024), name_en varchar(1024), city bigint, citypart varchar(1024), langs varchar(1024))");
-	    stat.executeUpdate("create index street_cnp on street (city,citypart,name,id)");
-        stat.executeUpdate("create index street_city on street (city)");
-        stat.executeUpdate("create index street_id on street (id)");
-
+	    
         // create index on name ?
         stat.executeUpdate("create table building (id bigint, latitude double, longitude double, " +
                          "name2 varchar(1024), name_en2 varchar(1024), lat2 double, lon2 double, interval int, interpolateType varchar(50), " +
 						"name varchar(1024), name_en varchar(1024), street bigint, postcode varchar(1024), primary key(street, id))");
-        stat.executeUpdate("create index building_postcode on building (postcode)");
-        stat.executeUpdate("create index building_street on building (street)");
-        stat.executeUpdate("create index building_id on building (id)");
+        
 
         stat.executeUpdate("create table street_node (id bigint, latitude double, longitude double, " +
 						"street bigint, way bigint)");
-        stat.executeUpdate("create index street_node_street on street_node (street)");
-        stat.executeUpdate("create index street_node_way on street_node (way)");
         stat.close();
+        createPrimaryIndexes(mapConnection);
 
 		addressStreetStat = createPrepareStatement(mapConnection,"insert into street (id, latitude, longitude, name, name_en, city, citypart, langs) values (?, ?, ?, ?, ?, ?, ?, ?)");
 		addressStreetNodeStat = createPrepareStatement(mapConnection,"insert into street_node (id, latitude, longitude, street, way) values (?, ?, ?, ?, ?)");
@@ -116,6 +109,26 @@ public class DBStreetDAO extends AbstractIndexPartCreator
 		addressSearchBuildingStat = createPrepareStatement(mapConnection,"SELECT id FROM building where ? = id");
 		addressRemoveBuildingStat = createPrepareStatement(mapConnection,"DELETE FROM building where ? = id");
 		addressSearchStreetNodeStat = createPrepareStatement(mapConnection,"SELECT way FROM street_node WHERE ? = way");
+	}
+
+	public void createIndexes(Connection mapConnection) throws SQLException {
+		Statement stat = mapConnection.createStatement();
+        stat.executeUpdate("create index building_loc on building (latitude, longitude)");
+        stat.executeUpdate("create index street_node_street on street_node (street)");
+        stat.close();
+	}
+	
+	public void createPrimaryIndexes(Connection mapConnection) throws SQLException {
+		Statement stat = mapConnection.createStatement();
+        stat.executeUpdate("create index street_cnp on street (city,citypart,name,id)");
+        stat.executeUpdate("create index street_city on street (city)");
+        stat.executeUpdate("create index street_id on street (id)");
+        stat.executeUpdate("create index building_postcode on building (postcode)");
+        stat.executeUpdate("create index building_street on building (street)");
+        stat.executeUpdate("create index building_id on building (id)");
+        
+        stat.executeUpdate("create index street_node_way on street_node (way)");
+        stat.close();
 	}
 
 	protected void writeStreetWayNodes(Set<Long> streetIds, Way way) throws SQLException {

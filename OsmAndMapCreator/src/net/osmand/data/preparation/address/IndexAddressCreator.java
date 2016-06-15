@@ -2,6 +2,7 @@ package net.osmand.data.preparation.address;
 
 import com.vividsolutions.jts.geom.MultiPolygon;
 
+import gnu.trove.iterator.TLongObjectIterator;
 import gnu.trove.map.hash.TLongObjectHashMap;
 import gnu.trove.set.hash.TLongHashSet;
 
@@ -979,20 +980,6 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		addBatch(postcodeSetStat);
 	}
 
-	private List<Entity> postcodesInCityBoundary(Boundary cityBoundary) {
-		List<Entity> result = new ArrayList<>();
-		if (postcodeBoundaries.isEmpty() || cityBoundary == null) {
-			return result;
-		}
-		Multipolygon cityMultipolygon = cityBoundary.getMultipolygon();
-		for (Map.Entry<Entity, Boundary> e: postcodeBoundaries.entrySet()) {
-			Multipolygon mp = e.getValue().getMultipolygon();
-			if (QuadRect.intersects(cityMultipolygon.getBbox(),mp.getBbox())) {
-				result.add(e.getKey());
-			}
-		}
-		return result;
-	}
 
 	private void processPostcodeRelations() throws SQLException {
 		for (Relation r : postalCodeRelations) {
@@ -1018,9 +1005,18 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 	private static final int VILLAGES_TYPE = 3;
 
 	public void writeBinaryAddressIndex(BinaryMapIndexWriter writer, String regionName, IProgress progress) throws IOException, SQLException {
+		processPostcodes();
+		cleanCityPart();
 		streetDAO.close();
 		closePreparedStatements(addressCityStat);
 		mapConnection.commit();
+		createDatabaseIndexes(mapConnection);
+		mapConnection.commit();
+		
+		Map<String, City> postcodes = new TreeMap<String, City>();
+		updatePostcodeBoundaries(progress, postcodes);
+		mapConnection.commit();
+		
 		List<String> additionalTags = new ArrayList<String>();
 		Map<String, Integer> tagRules = new HashMap<String, Integer>();
 		int ind = 0;
@@ -1060,10 +1056,11 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		}
 
 
-		progress.startTask(Messages.getString("IndexCreator.SERIALIZING_ADDRESS"), cityTowns.size() + villages.size() / 100 + 1); //$NON-NLS-1$
 
 		Map<String, List<MapObject>> namesIndex = new TreeMap<String, List<MapObject>>(Collator.getInstance());
-		Map<String, City> postcodes = new TreeMap<String, City>();
+		
+		progress.startTask(Messages.getString("IndexCreator.SERIALIZING_ADDRESS"), cityTowns.size() + villages.size() / 100 + 1); //$NON-NLS-1$
+		
 		writeCityBlockIndex(writer, CITIES_TYPE, streetstat, waynodesStat, suburbs, cityTowns, postcodes, namesIndex, tagRules, progress);
 		writeCityBlockIndex(writer, VILLAGES_TYPE, streetstat, waynodesStat, null, villages, postcodes, namesIndex, tagRules, progress);
 
@@ -1104,6 +1101,55 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		}
 
 	}
+
+	private void updatePostcodeBoundaries(IProgress progress, Map<String, City> postcodes) throws SQLException {
+		progress.startTask("Process postcode boundaries", postcodeBoundaries.size());
+		Iterator<Entry<Entity, Boundary>> it = postcodeBoundaries.entrySet().iterator();
+		PreparedStatement ps = 
+				mapConnection.prepareStatement("SELECT postcode, latitude, longitude, id"
+						+ " FROM building where latitude <= ? and latitude >= ? and longitude >= ? and longitude <= ? ");
+		TLongObjectHashMap<String> assignPostcodes = new TLongObjectHashMap<>();
+		while(it.hasNext()) {
+			Entry<Entity, Boundary> e = it.next();
+			String postcode = e.getKey().getTag(OSMTagKey.POSTAL_CODE);
+			Multipolygon mp = e.getValue().getMultipolygon();
+			QuadRect bbox = mp.getLatLonBbox();
+			if(bbox.width() > 0) {
+				ps.setDouble(1, bbox.top);
+				ps.setDouble(2, bbox.bottom);
+				ps.setDouble(3, bbox.left);
+				ps.setDouble(4, bbox.right);
+				ResultSet rs = ps.executeQuery();
+				while(rs.next()) {
+					String pst = rs.getString(1);
+					if(Algorithms.isEmpty(pst)) {
+						if (mp.containsPoint(rs.getDouble(2), rs.getDouble(3))) {
+							assignPostcodes.put(rs.getLong(4), postcode);
+						}
+					}
+				}
+			}
+			progress.progress(1);
+		}
+		ps.close();
+		ps = mapConnection.prepareStatement("UPDATE "
+				+ " building set postcode = ? where id = ? ");
+		TLongObjectIterator<String> its = assignPostcodes.iterator();
+		int cnt = 0;
+		while(its.hasNext()) {
+			its.advance();
+			ps.setString(1, its.value());
+			ps.setLong(2, its.key());
+			ps.addBatch();
+			if(cnt > BATCH_SIZE) {
+				ps.executeBatch();
+				cnt = 0;
+			}
+		}
+		ps.executeBatch();
+		ps.close();
+	}
+
 
 	public static void putNamedMapObject(Map<String, List<MapObject>> namesIndex, MapObject o, long fileOffset) {
 		String name = o.getName();
@@ -1186,11 +1232,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			List<Street> streets = readStreetsBuildings(streetstat, city, waynodesStat, streetNodes, listSuburbs);
 			long f = System.currentTimeMillis() - time;
 			writer.writeCityIndex(city, streets, streetNodes, ref, tagRules);
-			Map<String, Boundary> possiblePostcodeBoundaryMap = new HashMap<>();
-			for (Entity postcodeEntity : postcodesInCityBoundary(cityBoundaries.get(city))) {
-				String postcode = postcodeEntity.getTag(OSMTagKey.POSTAL_CODE);
-				possiblePostcodeBoundaryMap.put(postcode, postcodeBoundaries.get(postcodeEntity));
-			}
+			
 			int bCount = 0;
 			// register postcodes and name index
 			for (Street s : streets) {
@@ -1200,12 +1242,6 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 					bCount++;
 					if (city.getPostcode() != null && b.getPostcode() == null) {
 						b.setPostcode(city.getPostcode());
-					}
-					for (Entry<String, Boundary> e : possiblePostcodeBoundaryMap.entrySet()) {
-						if (e.getValue().containsPoint(b.getLocation())) {
-							b.setPostcode(e.getKey());
-							break;
-						}
 					}
 					if (b.getPostcode() != null) {
 						if (!postcodes.containsKey(b.getPostcode())) {
@@ -1242,28 +1278,25 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		// commit to put all cities
 		streetDAO.commit();
 	}
-
+	
+	public void createDatabaseIndexes(Connection mapConnection) throws SQLException {
+		Statement stat = mapConnection.createStatement();
+		stat.executeUpdate("create index city_ind on city (id, city_type)");
+		stat.close();
+		streetDAO.createIndexes(mapConnection);
+	}
+	
 	public void createDatabaseStructure(Connection mapConnection, DBDialect dialect) throws SQLException {
 		this.mapConnection = mapConnection;
 		streetDAO.createDatabaseStructure(mapConnection, dialect);
-		createAddressIndexStructure(mapConnection, dialect);
+		Statement stat = mapConnection.createStatement();
+        stat.executeUpdate("create table city (id bigint primary key, latitude double, longitude double, " +
+        			"name varchar(1024), name_en varchar(1024), city_type varchar(32))");
+        stat.close();
 		addressCityStat = mapConnection.prepareStatement("insert into city (id, latitude, longitude, name, name_en, city_type) values (?, ?, ?, ?, ?, ?)");
 		postcodeSetStat = mapConnection.prepareStatement("UPDATE building SET postcode = ? WHERE id = ?");
 
 		pStatements.put(addressCityStat, 0);
-	}
-
-	private void createAddressIndexStructure(Connection conn, DBDialect dialect) throws SQLException {
-		Statement stat = conn.createStatement();
-
-        stat.executeUpdate("create table city (id bigint primary key, latitude double, longitude double, " +
-        			"name varchar(1024), name_en varchar(1024), city_type varchar(32))");
-        stat.executeUpdate("create index city_ind on city (id, city_type)");
-
-//        if(dialect == DBDialect.SQLITE){
-//        	stat.execute("PRAGMA user_version = " + IndexConstants.ADDRESS_TABLE_VERSION); //$NON-NLS-1$
-//        }
-		stat.close();
 	}
 
 	private List<Street> readStreetsBuildings(PreparedStatement streetBuildingsStat, City city, PreparedStatement waynodesStat,

@@ -215,11 +215,11 @@ public class Multipolygon {
 		return true;
 	}
 	
-	public QuadRect getBbox() {
+	public QuadRect getLatLonBbox() {
 		if(minLat == 90) {
 			return new QuadRect();
 		}
-		return new QuadRect(minLon, minLat, maxLat, maxLon);
+		return new QuadRect(minLon, maxLat, maxLon, minLat);
 	}
 	
 
