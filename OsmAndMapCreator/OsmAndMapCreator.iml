@@ -310,6 +310,14 @@
         <SOURCES />
       </library>
     </orderEntry>
-    <orderEntry type="library" name="jts-1.14" level="project" />
+    <orderEntry type="module-library">
+      <library>
+        <CLASSES>
+          <root url="jar://$MODULE_DIR$/lib/jts-1.14.jar!/" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES />
+      </library>
+    </orderEntry>
   </component>
 </module>
