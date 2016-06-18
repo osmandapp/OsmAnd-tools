@@ -586,7 +586,7 @@ int main(int argc, char** argv)
     renderer->setTarget(OsmAnd::Utilities::convertLatLonTo31(OsmAnd::LatLon(
         45.731606,
         36.528217)));
-    renderer->setZoom(17.0f);
+    renderer->setZoom(8.0f);
 
     // Tokyo
     /*renderer->setTarget(OsmAnd::PointI(

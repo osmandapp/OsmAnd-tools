@@ -34,6 +34,7 @@
       <sourceFolder url="file://$MODULE_DIR$/icons" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/src-tests" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/test-resources" type="java-test-resource" />
+      <sourceFolder url="file://$MODULE_DIR$/gen" isTestSource="false" generated="true" />
     </content>
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="inheritedJdk" />
