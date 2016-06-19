@@ -117,7 +117,7 @@ public class WikipediaByCountryDivider {
 			c.createStatement().execute("DELETE FROM wiki_region");
 			c.createStatement().execute("DELETE FROM wiki_translation"); // not needed any more
 			c.createStatement().execute("VACUUM");
-			PreparedStatement insertWikiRegion = c.prepareStatement("INSERT INTO wiki_region VALUES(?, ?)");
+			PreparedStatement insertWikiRegion = c.prepareStatement("INSERT INTO wiki_region VALUES(?, ? )");
 			ResultSet rs = c.createStatement().executeQuery("SELECT id, lat, lon from wiki_content order by id");
 			long pid = -1;
 			while(rs.next()) {
@@ -127,6 +127,7 @@ public class WikipediaByCountryDivider {
 					List<String> rgs = getRegions(rs.getDouble(2), rs.getDouble(3));
 					for (String reg : rgs) {
 						insertWikiRegion.setLong(1, id);
+						insertWikiRegion.setString(2, reg);
 						insertWikiRegion.setString(2, reg);
 						addBatch(insertWikiRegion);
 					}
@@ -229,7 +230,7 @@ public class WikipediaByCountryDivider {
 			c.createStatement().execute("CREATE INDEX IF NOT EXISTS WIKIID_INDEX ON wiki_content(lang, wikiId)");
 			c.createStatement().execute("CREATE INDEX IF NOT EXISTS CONTENTID_INDEX ON wiki_content(ID)");
 
-			c.createStatement().execute("CREATE TABLE wiki_region(id long, regionName text, regionLang text)");
+			c.createStatement().execute("CREATE TABLE wiki_region(id long, regionName text)");
 			c.createStatement().execute("CREATE INDEX IF NOT EXISTS REGIONID_INDEX ON wiki_region(ID)");
 			c.createStatement().execute("CREATE INDEX IF NOT EXISTS REGIONNAME_INDEX ON wiki_region(regionName)");
 
@@ -283,7 +284,6 @@ public class WikipediaByCountryDivider {
 		rgns.mkdirs();
 		Map<String, String> preferredRegionLanguages = new LinkedHashMap<>();
 		for(String key : mapObjects.keySet()) {
-			LinkedList<BinaryMapDataObject> list = mapObjects.get(key);
 			String regionLang = regs.getRegionDataByDownloadName(key).getParams().getRegionLang();
 			preferredRegionLanguages.put(key.toLowerCase(), regionLang);
 		}
