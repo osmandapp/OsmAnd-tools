@@ -59,7 +59,7 @@ public class CachedDBStreetDAO extends DBStreetDAO
 		//batch the insert
 		long streetId = fillInsertStreetStatement(name, names, location, city, cityPart, langs);
 		addBatch(addressStreetStat);
-		SimpleStreet ss = new SimpleStreet(streetId,name, city.getId(), cityPart,location, langs);
+		SimpleStreet ss = new SimpleStreet(streetId, name, city.getId(), cityPart,location, langs, Algorithms.encodeMap(names));
 		addressStreetLocalMap.put(createStreetUniqueName(name, city.getId(), cityPart), ss);
 		addressStreetLocalMap.put(createStreetUniqueName(name, city.getId()), ss);
 		return streetId;

@@ -691,7 +691,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 					}
 				}
 				if (addNames != null) {
-					streetDAO.updateStreetLangs(foundStreet, addNames);
+					foundStreet = streetDAO.updateStreetLangs(foundStreet, addNames);
 				}
 			}
 			return foundStreet.getId();
