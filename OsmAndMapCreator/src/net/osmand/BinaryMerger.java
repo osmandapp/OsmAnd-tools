@@ -75,8 +75,9 @@ public class BinaryMerger {
 		// test cases show info
 		if (args.length == 1 && "test".equals(args[0])) {
 			in.merger(new String[]{
-					System.getProperty("maps.dir") + "Ukraine_merge.road.obf",
-					System.getProperty("maps.dir") + "Ukraine_zhytomyr_europe_2.road.obf"
+					System.getProperty("maps.dir") + "Netherlands_noord-holland_europe_merge.obf",
+					System.getProperty("maps.dir") + "Netherlands_flevoland_europe_2.obf",
+					System.getProperty("maps.dir") + "Netherlands_noord-holland_europe_2.obf"
 			});
 		} else {
 			in.merger(args);
@@ -205,8 +206,13 @@ public class BinaryMerger {
 	}
 
 	private static City mergeCities(City city, City namesake, Map<City, Map<Street, List<Node>>> namesakesStreetNodes) {
-		city.mergeWith(namesake);
-		namesakesStreetNodes.get(city).putAll(namesakesStreetNodes.get(namesake));
+		Map<Street, Street> smap = city.mergeWith(namesake);
+		Map<Street, List<Node>> wayNodes = namesakesStreetNodes.get(city);
+		Map<Street, List<Node>> owayNodes = namesakesStreetNodes.get(namesake);
+		for(Street o : smap.keySet()) {
+			List<Node> nodes = owayNodes.get(o);
+			wayNodes.put(smap.get(o), nodes);
+		}
 		return city;
 	}
 
