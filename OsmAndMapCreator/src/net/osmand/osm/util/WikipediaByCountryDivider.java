@@ -285,6 +285,10 @@ public class WikipediaByCountryDivider {
 		rgns.mkdirs();
 		Map<String, String> preferredRegionLanguages = new LinkedHashMap<>();
 		for(String key : mapObjects.keySet()) {
+			System.out.println(key);
+			if(key == null) {
+				continue;
+			}
 			WorldRegion wr = regs.getRegionDataByDownloadName(key);
 			if(wr == null) {
 				System.out.println("Missing language for world region '" + key + "'!");
