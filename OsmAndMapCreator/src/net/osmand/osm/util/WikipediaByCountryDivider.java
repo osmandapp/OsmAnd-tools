@@ -30,6 +30,7 @@ import net.osmand.data.preparation.IndexPoiCreator;
 import net.osmand.data.preparation.MapZooms;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.map.OsmandRegions;
+import net.osmand.map.WorldRegion;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.regions.CountryOcbfGeneration;
 import net.osmand.regions.CountryOcbfGeneration.CountryRegion;
@@ -284,8 +285,13 @@ public class WikipediaByCountryDivider {
 		rgns.mkdirs();
 		Map<String, String> preferredRegionLanguages = new LinkedHashMap<>();
 		for(String key : mapObjects.keySet()) {
-			String regionLang = regs.getRegionDataByDownloadName(key).getParams().getRegionLang();
-			preferredRegionLanguages.put(key.toLowerCase(), regionLang);
+			WorldRegion wr = regs.getRegionDataByDownloadName(key);
+			if(wr == null) {
+				System.out.println("Missing language for world region '" + key + "'!");
+			} else {
+				String regionLang = wr.getParams().getRegionLang();
+				preferredRegionLanguages.put(key.toLowerCase(), regionLang);
+			}
 		}
 		
 		ResultSet rs = conn.createStatement().executeQuery("SELECT DISTINCT regionName  FROM wiki_region");
