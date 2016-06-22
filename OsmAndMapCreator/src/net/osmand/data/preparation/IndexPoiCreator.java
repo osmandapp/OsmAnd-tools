@@ -98,10 +98,10 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				ctx.loadEntityRelation((Relation) e);
 			}
 			boolean first = true;
-			long id;
+			long id = e.getId();
 			if (e instanceof Relation || basemap) {
 				id = GENERATE_OBJ_ID--;
-			} else {
+			} else if(id > 0) {
 				// keep backward compatibility for ids (osm editing)
 				id = e.getId() >> (OsmDbCreator.SHIFT_ID - 1);
 				if (id % 2 != (e.getId() % 2)) {

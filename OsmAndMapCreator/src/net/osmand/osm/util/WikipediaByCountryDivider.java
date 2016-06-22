@@ -285,7 +285,6 @@ public class WikipediaByCountryDivider {
 		rgns.mkdirs();
 		Map<String, String> preferredRegionLanguages = new LinkedHashMap<>();
 		for(String key : mapObjects.keySet()) {
-			System.out.println(key);
 			if(key == null) {
 				continue;
 			}
