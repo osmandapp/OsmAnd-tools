@@ -477,9 +477,10 @@ int main(int argc, char** argv)
         (const OsmAnd::IMapRenderer* const mapRenderer)
         {
             //QMutexLocker scopedLocker(&glutWasInitializedFlagMutex);
-
-            if (glutWasInitialized)
+            sleep(1);
+            if (glutWasInitialized) {
                 glutPostRedisplay();
+            }
         };
     rendererSetup.gpuWorkerThreadEnabled = useGpuWorker;
     if (rendererSetup.gpuWorkerThreadEnabled)
@@ -511,13 +512,14 @@ int main(int argc, char** argv)
     renderer->setup(rendererSetup);
 
     const auto debugSettings = renderer->getDebugSettings();
-    debugSettings->debugStageEnabled = true;
-    //debugSettings->excludeBillboardSymbolsFromProcessing = true;
-    //debugSettings->excludeOnSurfaceSymbolsFromProcessing = true;
-    //debugSettings->excludeOnPathSymbolsFromProcessing = true;
-//    debugSettings->skipSymbolsMinDistanceToSameContentFromOtherSymbolCheck = true;
-//    debugSettings->showSymbolsBBoxesRejectedByMinDistanceToSameContentFromOtherSymbolCheck = true;
-//    debugSettings->showSymbolsBBoxesRejectedByIntersectionCheck = true;
+    // debugSettings->debugStageEnabled = true;
+    // debugSettings->disableNeededResourcesRequests = true;
+    // debugSettings->excludeBillboardSymbolsFromProcessing = true;
+    // debugSettings->excludeOnSurfaceSymbolsFromProcessing = true;
+    // debugSettings->excludeOnPathSymbolsFromProcessing = true;
+    // debugSettings->skipSymbolsMinDistanceToSameContentFromOtherSymbolCheck = true;
+    // debugSettings->showSymbolsBBoxesRejectedByMinDistanceToSameContentFromOtherSymbolCheck = true;
+    // debugSettings->showSymbolsBBoxesRejectedByIntersectionCheck = true;
     //debugSettings->showSymbolsBBoxesRejectedByPresentationMode = true;
     //debugSettings->disableFastSymbolsCheckByFrustum = true;
     /*
@@ -1188,19 +1190,19 @@ void activateProvider(int layerIdx, int idx)
         //mapLayerConfiguration.opacity = 0.5f;
         //renderer->setMapLayerConfiguration(layerIdx, mapLayerConfiguration);
         //
-        if (gpxPresenter)
-        {
-            const std::shared_ptr<OsmAnd::MapPrimitivesProvider> gpxPrimitivesProvider(new OsmAnd::MapPrimitivesProvider(
-                gpxPresenter->createMapObjectsProvider(),
-                primitivizer,
-                256,
-                OsmAnd::MapPrimitivesProvider::Mode::AllObjectsWithPolygonFiltering));
-            auto tileProvider = new OsmAnd::MapRasterLayerProvider_Software(gpxPrimitivesProvider, false);
-            renderer->setMapLayerProvider(10, std::shared_ptr<OsmAnd::IMapLayerProvider>(tileProvider));
-
-            mapObjectsSymbolsProvider.reset(new OsmAnd::MapObjectsSymbolsProvider(gpxPrimitivesProvider, 256u));
-            renderer->addSymbolsProvider(mapObjectsSymbolsProvider);
-        }
+//        if (gpxPresenter)
+//        {
+//            const std::shared_ptr<OsmAnd::MapPrimitivesProvider> gpxPrimitivesProvider(new OsmAnd::MapPrimitivesProvider(
+//                gpxPresenter->createMapObjectsProvider(),
+//                primitivizer,
+//                256,
+//                OsmAnd::MapPrimitivesProvider::Mode::AllObjectsWithPolygonFiltering));
+//            auto tileProvider = new OsmAnd::MapRasterLayerProvider_Software(gpxPrimitivesProvider, false);
+//            renderer->setMapLayerProvider(10, std::shared_ptr<OsmAnd::IMapLayerProvider>(tileProvider));
+//
+//            mapObjectsSymbolsProvider.reset(new OsmAnd::MapObjectsSymbolsProvider(gpxPrimitivesProvider, 256u));
+//            renderer->addSymbolsProvider(mapObjectsSymbolsProvider);
+//        }
         //
     }
     else if (idx == 3)

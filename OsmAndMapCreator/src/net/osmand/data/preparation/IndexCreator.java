@@ -902,10 +902,10 @@ public class IndexCreator {
 		IndexPoiCreator.ZIP_LONG_STRINGS = false;
 		IndexCreator creator = new IndexCreator(new File(rootFolder + "/maps/")); //$NON-NLS-1$
 //		creator.setIndexMap(true);
-		creator.setIndexAddress(true);
+//		creator.setIndexAddress(true);
 //		creator.setIndexPOI(true);
 //		creator.setIndexTransport(true);
-//		creator.setIndexRouting(true);
+		creator.setIndexRouting(true);
 
 //		creator.deleteDatabaseIndexes = false;
 //		creator.recreateOnlyBinaryFile = true;
@@ -914,7 +914,7 @@ public class IndexCreator {
 
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 
-		String file = rootFolder + "/temp/ukraine_kiev-city_europe.pbf";
+		String file = rootFolder + "/temp/map.osm";
 //		String file = rootFolder + "/repos/resources/test-resources/synthetic_test_rendering.osm";
 //		String file = rootFolder + "/repos/resources/test-resources/turn_lanes_test.osm";
 
