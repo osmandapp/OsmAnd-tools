@@ -59,7 +59,7 @@ public class MapAddressLayer implements MapPanelLayer {
 	}
 
 	public void fillPopupMenuWithActions(JPopupMenu menu) {
-		Action where= new AbstractAction("Where am I?") {
+		Action where = new AbstractAction("Where am I?") {
 			private static final long serialVersionUID = 7477484340246483239L;
 
 			@Override
@@ -70,7 +70,7 @@ public class MapAddressLayer implements MapPanelLayer {
 
 		};
 		menu.add(where);
-		Action add= new AbstractAction("Show address") {
+		Action add = new AbstractAction("Show address") {
 			private static final long serialVersionUID = 7477484340246483239L;
 
 			@Override
@@ -145,7 +145,7 @@ public class MapAddressLayer implements MapPanelLayer {
 			if (f.getName().endsWith(".obf")) {
 				RandomAccessFile raf = new RandomAccessFile(f, "r"); //$NON-NLS-1$ //$NON-NLS-2$
 				BinaryMapIndexReader rd = new BinaryMapIndexReader(raf, f);
-				if(rd.containsAddressData() && (!rd.containsPoiData() || rd.containsPoiData(lat, lon))){
+				if (rd.containsAddressData() && (!rd.containsPoiData() || rd.containsPoiData(lat, lon))) {
 					searchAddressDetailedInfo(rd, lat, lon, results);
 				}
 				rd.close();
@@ -165,7 +165,7 @@ public class MapAddressLayer implements MapPanelLayer {
 			if (f.getName().endsWith(".obf")) {
 				RandomAccessFile raf = new RandomAccessFile(f, "r"); //$NON-NLS-1$ //$NON-NLS-2$
 				BinaryMapIndexReader rd = new BinaryMapIndexReader(raf, f);
-				if(rd.containsAddressData() && rd.containsRouteData(x, y, x, y, 15)){
+				if (rd.containsAddressData() && rd.containsRouteData(x, y, x, y, 15)) {
 					list.add(rd);
 				} else {
 					rd.close();
@@ -176,7 +176,7 @@ public class MapAddressLayer implements MapPanelLayer {
 		RoutingConfiguration cfg = DataExtractionSettings.getSettings().getRoutingConfig().build("geocoding", 100,
 				new HashMap<String, String>());
 		RoutingContext ctx = new RoutePlannerFrontEnd(false).buildRoutingContext(cfg, null, list.toArray(new BinaryMapIndexReader[list.size()]));
-		
+
 		GeocodingUtilities su = new GeocodingUtilities();
 		double minBuildingDistance = 0;
 		List<GeocodingResult> complete = new ArrayList<GeocodingUtilities.GeocodingResult>();
@@ -185,8 +185,8 @@ public class MapAddressLayer implements MapPanelLayer {
 //		complete.addAll(res);
 		Collections.sort(complete, GeocodingUtilities.DISTANCE_COMPARATOR);
 		long lid = -1;
-		for(GeocodingResult r : complete) {
-			if(r.building != null &&
+		for (GeocodingResult r : complete) {
+			if (r.building != null &&
 					r.getDistance() > minBuildingDistance * GeocodingUtilities.THRESHOLD_MULTIPLIER_SKIP_BUILDINGS_AFTER) {
 				continue;
 			}
@@ -194,7 +194,7 @@ public class MapAddressLayer implements MapPanelLayer {
 			n.putTag(OSMTagKey.NAME.getValue(), r.toString());
 			results.add(n);
 		}
-		for(BinaryMapIndexReader l : list) {
+		for (BinaryMapIndexReader l : list) {
 			l.close();
 		}
 		return results;
@@ -219,9 +219,9 @@ public class MapAddressLayer implements MapPanelLayer {
 			}
 			if (reader != null) {
 				List<GeocodingResult> justified = su.justifyReverseGeocodingSearch(r, reader, minBuildingDistance, null);
-				if(!justified.isEmpty()) {
+				if (!justified.isEmpty()) {
 					double md = justified.get(0).getDistance();
-					if(minBuildingDistance == 0){
+					if (minBuildingDistance == 0) {
 						minBuildingDistance = md;
 					} else {
 						minBuildingDistance = Math.min(md, minBuildingDistance);
@@ -237,22 +237,22 @@ public class MapAddressLayer implements MapPanelLayer {
 
 	private void searchAddressDetailedInfo(BinaryMapIndexReader index, double lat, double lon, List<Entity> results) throws IOException {
 		Map<String, List<Street>> streets = new LinkedHashMap<String, List<Street>>();
-			log.info("Searching region ");
-			int[] cityType = new int[] {BinaryMapAddressReaderAdapter.CITY_TOWN_TYPE,
-					BinaryMapAddressReaderAdapter.POSTCODES_TYPE,
-					BinaryMapAddressReaderAdapter.VILLAGES_TYPE};
-			for (int j = 0; j < cityType.length; j++) {
-				int type = cityType[j];
-				for (City c : index.getCities(null, type)) {
-					if (MapUtils.getDistance(c.getLocation(), lat, lon) < distance) {
-						log.info("Searching city " + c.getName());
-						index.preloadStreets(c, null);
-						for (Street t : c.getStreets()) {
-							Long id = t.getId();
-							if(!streets.containsKey(t.getName())) {
-								streets.put(t.getName(), new ArrayList<Street>());
-							}
-							streets.get(t.getName()).add(t);
+		log.info("Searching region ");
+		int[] cityType = new int[]{BinaryMapAddressReaderAdapter.CITY_TOWN_TYPE,
+				BinaryMapAddressReaderAdapter.POSTCODES_TYPE,
+				BinaryMapAddressReaderAdapter.VILLAGES_TYPE};
+		for (int j = 0; j < cityType.length; j++) {
+			int type = cityType[j];
+			for (City c : index.getCities(null, type)) {
+				if (MapUtils.getDistance(c.getLocation(), lat, lon) < distance) {
+					log.info("Searching city " + c.getName());
+					index.preloadStreets(c, null);
+					for (Street t : c.getStreets()) {
+						Long id = t.getId();
+						if (!streets.containsKey(t.getName())) {
+							streets.put(t.getName(), new ArrayList<Street>());
+						}
+						streets.get(t.getName()).add(t);
 //							index.preloadBuildings(t, null);
 //							List<Street> streets = t.getIntersectedStreets();
 //							if (streets != null && !streets.isEmpty()) {
@@ -260,33 +260,31 @@ public class MapAddressLayer implements MapPanelLayer {
 //									// TODO
 //								}
 //							}
-						}
 					}
 				}
 			}
+		}
 
-		for(List<Street> l : streets.values()) {
-			while(l.size() > 0){
-				Street s = l.remove(l.size()-1);
+		for (List<Street> l : streets.values()) {
+			while (l.size() > 0) {
+				Street s = l.remove(l.size() - 1);
 				String cityName = s.getCity().getName();
 				LatLon loc = s.getLocation();
 				Node n = new Node(loc.getLatitude(), loc.getLongitude(), -1);
-				for(int k = 0; k< l.size(); ){
-					if(MapUtils.getDistance(l.get(k).getLocation(), loc) < 50) {
+				for (int k = 0; k < l.size(); ) {
+					if (MapUtils.getDistance(l.get(k).getLocation(), loc) < 50) {
 						Street ks = l.remove(k);
-						cityName += ";"+ks.getCity().getName();
+						cityName += ";" + ks.getCity().getName();
 					} else {
 						k++;
 					}
 				}
-				n.putTag(OSMTagKey.NAME.getValue(), s.getName()+"\n"+cityName);
+				n.putTag(OSMTagKey.NAME.getValue(), s.getName() + "\n" + cityName);
 				results.add(n);
 			}
 
 		}
 	}
-
-
 
 
 	@Override
