@@ -329,8 +329,10 @@ public class BinaryMerger {
 				refs.add(ref);
 				writer.writeCityIndex(city, city.getStreets(), namesakesStreetNodes.get(city), ref, tagRules);
 				IndexAddressCreator.putNamedMapObject(namesIndex, city, ref.getStartPointer());
-				for (Street s : city.getStreets()) {
-					IndexAddressCreator.putNamedMapObject(namesIndex, s, s.getFileOffset());
+				if (!city.isPostcode()) {
+					for (Street s : city.getStreets()) {
+						IndexAddressCreator.putNamedMapObject(namesIndex, s, s.getFileOffset());
+					}
 				}
 
 				city.getStreets().clear();
