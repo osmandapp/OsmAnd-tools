@@ -841,6 +841,10 @@ public class BinaryMapIndexWriter {
 					type = 4;
 				}
 				atom.setType(type);
+				LatLon ll = o.getLocation();
+				int x = (int) MapUtils.getTileNumberX(16, ll.getLongitude());
+				int y = (int) MapUtils.getTileNumberY(16, ll.getLatitude());
+				atom.addXy16((x << 16) + y);
 				atom.addShiftToIndex((int) (pointer - o.getFileOffset()));
 				if (o instanceof Street) {
 					atom.addShiftToCityIndex((int) (pointer - ((Street) o).getCity().getFileOffset()));

@@ -76,8 +76,8 @@ public class BinaryMerger {
 		if (args.length == 1 && "test".equals(args[0])) {
 			in.merger(new String[]{
 					System.getProperty("maps.dir") + "Netherlands_noord-holland_europe_merge.obf",
-					System.getProperty("maps.dir") + "Netherlands_flevoland_europe_2.obf",
-					System.getProperty("maps.dir") + "Netherlands_noord-holland_europe_2.obf"
+//					System.getProperty("maps.dir") + "Netherlands_flevoland_europe.obf",
+					System.getProperty("maps.dir") + "Netherlands_noord-holland_europe.obf"
 			});
 		} else {
 			in.merger(args);
