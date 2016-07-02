@@ -17,8 +17,13 @@
 #include <QFile>
 #include <QMutex>
 #include <QElapsedTimer>
+#include <QProcess>
+#include <QStringBuilder>
+#include <QTemporaryFile>
+#include <QTextStream>
 
 #include <OsmAndCore.h>
+#include <OsmAndCore/Search/CoordinateSearch.h>
 #include <OsmAndCore/Common.h>
 #include <OsmAndCore/QuadTree.h>
 #include <OsmAndCore/Utilities.h>
@@ -74,6 +79,7 @@
 #include <OsmAndCore/Search/AmenitiesInAreaSearch.h>
 #include <OsmAndCore/Search/AddressesByNameSearch.h>
 #include <OsmAndCore/ValueAnimator.h>
+#include <OsmAndCore/Utilities.h>
 
 bool glutWasInitialized = false;
 QMutex glutWasInitializedFlagMutex;
@@ -304,34 +310,6 @@ int main(int argc, char** argv)
     }
     animator.reset(new OsmAnd::MapAnimator());
     animator->setMapRenderer(renderer);
-
-    //////////////////////////////////////////////////////////////////////////
-    /*markers.reset(new OsmAnd::MapMarkersCollection());
-    std::shared_ptr<OsmAnd::MapMarkerBuilder> markerBuilder(new OsmAnd::MapMarkerBuilder());
-    {
-        std::shared_ptr<SkBitmap> locationPinImage(new SkBitmap());
-        pngDecoder->DecodeFile("d:\\OpenSource\\OsmAnd\\iOS7_icons_extended\\PNG\\Maps\\location\\location-32.png", locationPinImage.get());
-        markerBuilder->setPinIcon(locationPinImage);
-    }
-    {
-        std::shared_ptr<SkBitmap> locationOnMapSurfaceImage(new SkBitmap());
-        pngDecoder->DecodeFile("d:\\OpenSource\\OsmAnd\\iOS7_icons_extended\\PNG\\Camping_Equipment\\campfire\\campfire-32.png", locationOnMapSurfaceImage.get());
-        markerBuilder->addOnMapSurfaceIcon(reinterpret_cast<OsmAnd::MapMarker::OnSurfaceIconKey>(1), locationOnMapSurfaceImage);
-    }
-    markerBuilder->setIsAccuracyCircleSupported(true);
-    markerBuilder->setAccuracyCircleBaseColor(OsmAnd::FColorRGB(1.0f, 0.0f, 0.0f));
-    lastClickedLocationMarker = markerBuilder->buildAndAddToCollection(markers);
-    lastClickedLocationMarker->setOnMapSurfaceIconDirection(reinterpret_cast<OsmAnd::MapMarker::OnSurfaceIconKey>(1), Q_QNAN);
-    lastClickedLocationMarker->setIsAccuracyCircleVisible(true);
-    lastClickedLocationMarker->setAccuracyCircleRadius(2000.0);
-    renderer->addSymbolsProvider(markers);*/
-    //////////////////////////////////////////////////////////////////////////
-
-    favorites.reset(new OsmAnd::FavoriteLocationsGpxCollection());
-    favoritesPresenter.reset(new OsmAnd::FavoriteLocationsPresenter(favorites));
-    renderer->addSymbolsProvider(favoritesPresenter);
-    favorites->loadFrom(QLatin1String("d:\\OpenSource\\OsmAnd\\favorites.gpx"));
-
     //////////////////////////////////////////////////////////////////////////
 
     QList< std::shared_ptr<const OsmAnd::GeoInfoDocument> > geoInfoDocs;
@@ -339,12 +317,6 @@ int main(int argc, char** argv)
         geoInfoDocs.append(OsmAnd::GpxDocument::loadFrom("track.gpx"));
     gpxPresenter.reset(new OsmAnd::GeoInfoPresenter(geoInfoDocs));
     
-    //////////////////////////////////////////////////////////////////////////
-
-    //////////////////////////////////////////////////////////////////////////
-    //QList< std::shared_ptr<const OsmAnd::WorldRegion> > worldRegions;
-    //OsmAnd::WorldRegions("d:\\OpenSource\\OsmAnd\\OsmAnd\\resources\\countries-info\\regions.ocbf").loadWorldRegions(&worldRegions);
-    //OsmAnd::WorldRegions("d:\\OpenSource\\OsmAnd\\regions.ocbf").loadWorldRegions(&worldRegions);
     //////////////////////////////////////////////////////////////////////////
 
     if (dataDirSpecified)
@@ -400,67 +372,6 @@ int main(int argc, char** argv)
 
     }
 
-    //////////////////////////////////////////////////////////////////////////
-    //OsmAnd::AmenitiesByNameSearch amenitiesByNameSearch(obfsCollection);
-    //OsmAnd::AmenitiesByNameSearch::Criteria amenitiesByNameSearchCriteria;
-    //amenitiesByNameSearchCriteria.name = QString::fromWCharArray(L"эрмитаж");
-    ////amenitiesByNameSearchCriteria.name = QString::fromWCharArray(L"hermitage amsterdam");
-    //amenitiesByNameSearch.performSearch(amenitiesByNameSearchCriteria,
-    //    []
-    //    (const OsmAnd::ISearch::Criteria& criteria, const OsmAnd::ISearch::IResultEntry& resultEntry_)
-    //    {
-    //        const auto& resultEntry = *dynamic_cast<const OsmAnd::AmenitiesByNameSearch::ResultEntry*>(&resultEntry_);
-
-    //        OsmAnd::LogPrintf(
-    //            OsmAnd::LogSeverityLevel::Info, "%s (%s)",
-    //            qPrintable(resultEntry.amenity->nativeName),
-    //            qPrintable(resultEntry.amenity->id.toString()));
-
-    //        const auto& values = resultEntry.amenity->getDecodedValues();
-    //        for (const auto& entry : OsmAnd::rangeOf(values))
-    //        {
-    //            int i = 5;
-    //        }
-    //    });
-    //int i = 5;
-
-    //OsmAnd::AmenitiesInAreaSearch amenitiesInAreaSearch(obfsCollection);
-    //OsmAnd::AmenitiesInAreaSearch::Criteria amenitiesInAreaSearchCriteria;
-    //amenitiesInAreaSearchCriteria.zoomFilter = OsmAnd::ZoomLevel11;
-    //amenitiesInAreaSearch.performSearch(amenitiesInAreaSearchCriteria,
-    //    []
-    //    (const OsmAnd::ISearch::Criteria& criteria, const OsmAnd::ISearch::IResultEntry& resultEntry_)
-    //    {
-    //        const auto& resultEntry = *dynamic_cast<const OsmAnd::AmenitiesInAreaSearch::ResultEntry*>(&resultEntry_);
-
-    //        OsmAnd::LogPrintf(
-    //            OsmAnd::LogSeverityLevel::Info, "%s (%s)",
-    //            qPrintable(resultEntry.amenity->nativeName),
-    //            qPrintable(resultEntry.amenity->id.toString()));
-
-    //        const auto& values = resultEntry.amenity->getDecodedValues();
-    //        for (const auto& entry : OsmAnd::rangeOf(values))
-    //        {
-    //            int i = 5;
-    //        }
-    //    });
-    //int j = 5;
-
-    //OsmAnd::AddressesByNameSearch addressesByNameSearch(obfsCollection);
-    //OsmAnd::AddressesByNameSearch::Criteria addressesByNameSearchCriteria;
-    //addressesByNameSearchCriteria.name = QString::fromWCharArray(L"В");
-    ////amenitiesByNameSearchCriteria.name = QString::fromWCharArray(L"hermitage amsterdam");
-    //addressesByNameSearch.performSearch(addressesByNameSearchCriteria,
-    //    []
-    //    (const OsmAnd::ISearch::Criteria& criteria, const OsmAnd::ISearch::IResultEntry& resultEntry_)
-    //    {
-    //        const auto& resultEntry = *dynamic_cast<const OsmAnd::AddressesByNameSearch::ResultEntry*>(&resultEntry_);
-
-    //            int i = 5;
-    //    });
-    //int i = 5;
-    //////////////////////////////////////////////////////////////////////////
-
     roadLocator.reset(new OsmAnd::RoadLocator(obfsCollection));
     mapPresentationEnvironment.reset(new OsmAnd::MapPresentationEnvironment(
         style,
@@ -512,27 +423,7 @@ int main(int argc, char** argv)
     renderer->setup(rendererSetup);
 
     const auto debugSettings = renderer->getDebugSettings();
-    // debugSettings->debugStageEnabled = true;
-    // debugSettings->disableNeededResourcesRequests = true;
-    // debugSettings->excludeBillboardSymbolsFromProcessing = true;
-    // debugSettings->excludeOnSurfaceSymbolsFromProcessing = true;
-    // debugSettings->excludeOnPathSymbolsFromProcessing = true;
-    // debugSettings->skipSymbolsMinDistanceToSameContentFromOtherSymbolCheck = true;
-    // debugSettings->showSymbolsBBoxesRejectedByMinDistanceToSameContentFromOtherSymbolCheck = true;
-    // debugSettings->showSymbolsBBoxesRejectedByIntersectionCheck = true;
-    //debugSettings->showSymbolsBBoxesRejectedByPresentationMode = true;
-    //debugSettings->disableFastSymbolsCheckByFrustum = true;
-    /*
-    debugSettings->skipSymbolsIntersectionCheck = true;
-    */
-    //debugSettings->showSymbolsBBoxesAcceptedByIntersectionCheck = true;
-    //debugSettings->skipSymbolsPresentationModeCheck = true;
-    //debugSettings->showOnPathSymbolsRenderablesPaths = true;
-    ////debugSettings->showOnPath2dSymbolGlyphDetails = true;
-    ////debugSettings->showOnPath3dSymbolGlyphDetails = true;
-    //debugSettings->allSymbolsTransparentForIntersectionLookup = true;
-    //debugSettings->showTooShortOnPathSymbolsRenderablesPaths = true;
-    //debugSettings->showAllPaths = true;
+    debugSettings->debugStageEnabled = true;
     renderer->setDebugSettings(debugSettings);
     
     viewport.top() = 0;
@@ -571,36 +462,13 @@ int main(int argc, char** argv)
         1255337783,
         724166131));
     ////renderer->setZoom(11.0f);
-    renderer->setZoom(16.0f);
+    renderer->setZoom(8.0f);
 
-    // Bug
-    /*renderer->setTarget(OsmAnd::PointI(
-        1087672308,
-        738739261));
-    renderer->setZoom(18.0f);*/
-
-    //renderer->setTarget(OsmAnd::PointI(
-    //    1102425455,
-    //    706223457));
-    //renderer->setZoom(11.787f);
-    //
     // Synthetic
     renderer->setTarget(OsmAnd::Utilities::convertLatLonTo31(OsmAnd::LatLon(
         45.731606,
         36.528217)));
     renderer->setZoom(8.0f);
-
-    // Tokyo
-    /*renderer->setTarget(OsmAnd::PointI(
-        OsmAnd::Utilities::get31TileNumberX(139.6917),
-        OsmAnd::Utilities::get31TileNumberY(35.689506)));
-        renderer->setZoom(14.0f);*/
-
-    // Netanya
-    /*renderer->setTarget(OsmAnd::PointI(
-        OsmAnd::Utilities::get31TileNumberX(34.85320),
-        OsmAnd::Utilities::get31TileNumberY(32.32288)));
-        renderer->setZoom(14.0f);*/
 
     renderer->setAzimuth(0.0f);
 
@@ -649,6 +517,36 @@ bool dragInitialized = false;
 int dragInitX;
 int dragInitY;
 OsmAnd::PointI dragInitTarget;
+
+
+std::unique_ptr<QProcess> zenity(const QString& cmd)
+{
+    auto p = std::unique_ptr<QProcess>(new QProcess);
+    p->start(cmd);
+    p->waitForFinished();
+    return p;
+}
+
+QString inputDialog(const QString& title, const QString& text, const QString& entryText)
+{
+    //        Cannot use QtGui unfortuanately (why?)
+    //        QString text = QInputDialog::getText(this, tr("Input coordinate"), tr("Coordinate:"), QLineEdit::Normal, "", &ok);
+    //        But since this program runs only on Linux... We will do some weird stuff.
+    auto p = zenity("zenity --entry --title=\"" % title % "\" --text=\"" % text % "\" --entry-text \"" % entryText);
+    return p->readAllStandardOutput().simplified();
+}
+
+void textInfoDialog(const QString& title, const QString& text)
+{
+    QTemporaryFile f;
+    if (f.open()) {
+        QTextStream stream(&f);
+        stream << text;
+        stream.flush();
+        f.seek(0);
+        zenity("zenity --text-info --title=\"" % title % "\" --filename=\"" % f.fileName() % "\"");
+    }
+}
 
 void mouseHandler(int button, int state, int x, int y)
 {
@@ -831,6 +729,7 @@ void keyboardHandler(unsigned char key, int x, int y)
         state.zoomLevel + (state.visualZoom >= 1.0f ? state.visualZoom - 1.0f : (state.visualZoom - 1.0f) * 2.0f));
     const auto wasdStep = (1 << (31 - wasdZoom));
 
+    // ' ' * + - .  0 1 2 3 4 5 6 7 8 9 A D S W [ \\ \x1B ] a b c d e f g i j k l m n o p q r s t u w x z
     switch (key)
     {
     case '\x1B':
@@ -936,12 +835,24 @@ void keyboardHandler(unsigned char key, int x, int y)
     case 'k':
         renderer->setFieldOfView(state.fieldOfView - 0.5f);
         break;
-    //case 'o':
-    //    renderer->setElevationDataScaleFactor(state.elevationDataScaleFactor + 0.1f);
-    //    break;
-    //case 'l':
-    //    renderer->setElevationDataScaleFactor(state.elevationDataScaleFactor - 0.1f);
-    //    break;
+    case 'z':
+    {
+        auto text = inputDialog(QStringLiteral("Input zoom"), QStringLiteral("Zoom: "), QString::number(state.zoomLevel));
+        bool ok;
+        double zoom = text.toDouble(&ok);
+        if (ok)
+            renderer->setZoom(zoom);
+        break;
+    }
+    case 'l':
+    {
+        auto latLon = OsmAnd::Utilities::convert31ToLatLon(state.target31);
+        auto text = inputDialog(QStringLiteral("Input coordinate"), QStringLiteral("Coordinate: "), latLon.toQString());
+        latLon = OsmAnd::CoordinateSearch::search(text);
+        auto target31 = OsmAnd::Utilities::convertLatLonTo31(latLon);
+        renderer->setTarget(target31);
+        break;
+    }
     case 'c':
     {
         auto config = renderer->getConfiguration();
@@ -1001,7 +912,7 @@ void keyboardHandler(unsigned char key, int x, int y)
         });
     }
         break;
-    case 'z':
+    case 'h':
     {
         if (mapObjectsSymbolsProvider && renderer->removeSymbolsProvider(mapObjectsSymbolsProvider))
         {
@@ -1318,18 +1229,6 @@ void displayHandler()
     if (renderer->prepareFrame(&prepareMetrics))
         renderer->renderFrame(&renderMetrics);
 
-    //const auto totalElapsed = totalStopwatch.elapsed();
-    //OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info,
-    //    "Frame time %fs%s: update %d%%, prepare %d%%, render %d%%:\n%s\n%s\n%s",
-    //    totalElapsed,
-    //    totalElapsed > 0.033f ? qPrintable(QString(QLatin1String(" (%1 < 60fps)")).arg(static_cast<unsigned int>(1.0f / totalElapsed))) : "",
-    //    static_cast<unsigned int>((updateMetrics.elapsedTime / totalElapsed) * 100),
-    //    static_cast<unsigned int>((prepareMetrics.elapsedTime / totalElapsed) * 100),
-    //    static_cast<unsigned int>((renderMetrics.elapsedTime / totalElapsed) * 100),
-    //    qPrintable(updateMetrics.toString(false, QString(QLatin1String("update.")))),
-    //    qPrintable(prepareMetrics.toString(false, QString(QLatin1String("prepare.")))),
-    //    qPrintable(renderMetrics.toString(false, QString(QLatin1String("render.")))));
-    
     verifyOpenGL();
 
     //////////////////////////////////////////////////////////////////////////
@@ -1391,7 +1290,7 @@ void displayHandler()
 
         glRasterPos2f(8, t - 16 * 5);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("target (keys w,a,s,d)  : %1 %2").arg(state.target31.x).arg(state.target31.y)));
+            QString("target (keys w,a,s,d,l): %1 %2").arg(state.target31.x).arg(state.target31.y)));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * 6);
@@ -1401,7 +1300,7 @@ void displayHandler()
 
         glRasterPos2f(8, t - 16 * 7);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("zoom level             : %1").arg(state.zoomLevel)));
+            QString("zoom level (key z)     : %1").arg(state.zoomLevel)));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * 8);
@@ -1451,7 +1350,7 @@ void displayHandler()
 
         glRasterPos2f(8, t - 16 * 17);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("symbols (key z)        : %1").arg(!state.keyedSymbolsProviders.isEmpty() || !state.tiledSymbolsProviders.isEmpty())));
+            QString("symbols (key h)        : %1").arg(!state.keyedSymbolsProviders.isEmpty() || !state.tiledSymbolsProviders.isEmpty())));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * 18);
