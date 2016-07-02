@@ -8,285 +8,546 @@ public final class Fileformat {
   public static void registerAllExtensions(
       com.google.protobuf.ExtensionRegistry registry) {
   }
+  public interface BlobOrBuilder
+      extends com.google.protobuf.MessageOrBuilder {
+
+    // optional bytes raw = 1;
+    /**
+     * <code>optional bytes raw = 1;</code>
+     *
+     * <pre>
+     * No compression
+     * </pre>
+     */
+    boolean hasRaw();
+    /**
+     * <code>optional bytes raw = 1;</code>
+     *
+     * <pre>
+     * No compression
+     * </pre>
+     */
+    com.google.protobuf.ByteString getRaw();
+
+    // optional int32 raw_size = 2;
+    /**
+     * <code>optional int32 raw_size = 2;</code>
+     *
+     * <pre>
+     * When compressed, the uncompressed size
+     * </pre>
+     */
+    boolean hasRawSize();
+    /**
+     * <code>optional int32 raw_size = 2;</code>
+     *
+     * <pre>
+     * When compressed, the uncompressed size
+     * </pre>
+     */
+    int getRawSize();
+
+    // optional bytes zlib_data = 3;
+    /**
+     * <code>optional bytes zlib_data = 3;</code>
+     *
+     * <pre>
+     * Possible compressed versions of the data.
+     * </pre>
+     */
+    boolean hasZlibData();
+    /**
+     * <code>optional bytes zlib_data = 3;</code>
+     *
+     * <pre>
+     * Possible compressed versions of the data.
+     * </pre>
+     */
+    com.google.protobuf.ByteString getZlibData();
+
+    // optional bytes lzma_data = 4;
+    /**
+     * <code>optional bytes lzma_data = 4;</code>
+     */
+    boolean hasLzmaData();
+    /**
+     * <code>optional bytes lzma_data = 4;</code>
+     */
+    com.google.protobuf.ByteString getLzmaData();
+
+    // optional bytes bzip2_data = 5;
+    /**
+     * <code>optional bytes bzip2_data = 5;</code>
+     */
+    boolean hasBzip2Data();
+    /**
+     * <code>optional bytes bzip2_data = 5;</code>
+     */
+    com.google.protobuf.ByteString getBzip2Data();
+  }
+  /**
+   * Protobuf type {@code Blob}
+   */
   public static final class Blob extends
-      com.google.protobuf.GeneratedMessage {
+      com.google.protobuf.GeneratedMessage
+      implements BlobOrBuilder {
     // Use Blob.newBuilder() to construct.
-    private Blob() {
-      initFields();
+    private Blob(com.google.protobuf.GeneratedMessage.Builder<?> builder) {
+      super(builder);
+      this.unknownFields = builder.getUnknownFields();
     }
-    private Blob(boolean noInit) {}
+    private Blob(boolean noInit) { this.unknownFields = com.google.protobuf.UnknownFieldSet.getDefaultInstance(); }
 
     private static final Blob defaultInstance;
     public static Blob getDefaultInstance() {
       return defaultInstance;
     }
 
-    @Override
-	public Blob getDefaultInstanceForType() {
+    public Blob getDefaultInstanceForType() {
       return defaultInstance;
     }
 
+    private final com.google.protobuf.UnknownFieldSet unknownFields;
+    @java.lang.Override
+    public final com.google.protobuf.UnknownFieldSet
+        getUnknownFields() {
+      return this.unknownFields;
+    }
+    private Blob(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      initFields();
+      int mutable_bitField0_ = 0;
+      com.google.protobuf.UnknownFieldSet.Builder unknownFields =
+          com.google.protobuf.UnknownFieldSet.newBuilder();
+      try {
+        boolean done = false;
+        while (!done) {
+          int tag = input.readTag();
+          switch (tag) {
+            case 0:
+              done = true;
+              break;
+            default: {
+              if (!parseUnknownField(input, unknownFields,
+                                     extensionRegistry, tag)) {
+                done = true;
+              }
+              break;
+            }
+            case 10: {
+              bitField0_ |= 0x00000001;
+              raw_ = input.readBytes();
+              break;
+            }
+            case 16: {
+              bitField0_ |= 0x00000002;
+              rawSize_ = input.readInt32();
+              break;
+            }
+            case 26: {
+              bitField0_ |= 0x00000004;
+              zlibData_ = input.readBytes();
+              break;
+            }
+            case 34: {
+              bitField0_ |= 0x00000008;
+              lzmaData_ = input.readBytes();
+              break;
+            }
+            case 42: {
+              bitField0_ |= 0x00000010;
+              bzip2Data_ = input.readBytes();
+              break;
+            }
+          }
+        }
+      } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+        throw e.setUnfinishedMessage(this);
+      } catch (java.io.IOException e) {
+        throw new com.google.protobuf.InvalidProtocolBufferException(
+            e.getMessage()).setUnfinishedMessage(this);
+      } finally {
+        this.unknownFields = unknownFields.build();
+        makeExtensionsImmutable();
+      }
+    }
     public static final com.google.protobuf.Descriptors.Descriptor
         getDescriptor() {
       return crosby.binary.Fileformat.internal_static_Blob_descriptor;
     }
 
-    @Override
-	protected com.google.protobuf.GeneratedMessage.FieldAccessorTable
+    protected com.google.protobuf.GeneratedMessage.FieldAccessorTable
         internalGetFieldAccessorTable() {
-      return crosby.binary.Fileformat.internal_static_Blob_fieldAccessorTable;
+      return crosby.binary.Fileformat.internal_static_Blob_fieldAccessorTable
+          .ensureFieldAccessorsInitialized(
+              crosby.binary.Fileformat.Blob.class, crosby.binary.Fileformat.Blob.Builder.class);
     }
 
+    public static com.google.protobuf.Parser<Blob> PARSER =
+        new com.google.protobuf.AbstractParser<Blob>() {
+      public Blob parsePartialFrom(
+          com.google.protobuf.CodedInputStream input,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws com.google.protobuf.InvalidProtocolBufferException {
+        return new Blob(input, extensionRegistry);
+      }
+    };
+
+    @java.lang.Override
+    public com.google.protobuf.Parser<Blob> getParserForType() {
+      return PARSER;
+    }
+
+    private int bitField0_;
     // optional bytes raw = 1;
     public static final int RAW_FIELD_NUMBER = 1;
-    private boolean hasRaw;
-    private com.google.protobuf.ByteString raw_ = com.google.protobuf.ByteString.EMPTY;
-    public boolean hasRaw() { return hasRaw; }
-    public com.google.protobuf.ByteString getRaw() { return raw_; }
+    private com.google.protobuf.ByteString raw_;
+    /**
+     * <code>optional bytes raw = 1;</code>
+     *
+     * <pre>
+     * No compression
+     * </pre>
+     */
+    public boolean hasRaw() {
+      return ((bitField0_ & 0x00000001) == 0x00000001);
+    }
+    /**
+     * <code>optional bytes raw = 1;</code>
+     *
+     * <pre>
+     * No compression
+     * </pre>
+     */
+    public com.google.protobuf.ByteString getRaw() {
+      return raw_;
+    }
 
     // optional int32 raw_size = 2;
     public static final int RAW_SIZE_FIELD_NUMBER = 2;
-    private boolean hasRawSize;
-    private int rawSize_ = 0;
-    public boolean hasRawSize() { return hasRawSize; }
-    public int getRawSize() { return rawSize_; }
+    private int rawSize_;
+    /**
+     * <code>optional int32 raw_size = 2;</code>
+     *
+     * <pre>
+     * When compressed, the uncompressed size
+     * </pre>
+     */
+    public boolean hasRawSize() {
+      return ((bitField0_ & 0x00000002) == 0x00000002);
+    }
+    /**
+     * <code>optional int32 raw_size = 2;</code>
+     *
+     * <pre>
+     * When compressed, the uncompressed size
+     * </pre>
+     */
+    public int getRawSize() {
+      return rawSize_;
+    }
 
     // optional bytes zlib_data = 3;
     public static final int ZLIB_DATA_FIELD_NUMBER = 3;
-    private boolean hasZlibData;
-    private com.google.protobuf.ByteString zlibData_ = com.google.protobuf.ByteString.EMPTY;
-    public boolean hasZlibData() { return hasZlibData; }
-    public com.google.protobuf.ByteString getZlibData() { return zlibData_; }
+    private com.google.protobuf.ByteString zlibData_;
+    /**
+     * <code>optional bytes zlib_data = 3;</code>
+     *
+     * <pre>
+     * Possible compressed versions of the data.
+     * </pre>
+     */
+    public boolean hasZlibData() {
+      return ((bitField0_ & 0x00000004) == 0x00000004);
+    }
+    /**
+     * <code>optional bytes zlib_data = 3;</code>
+     *
+     * <pre>
+     * Possible compressed versions of the data.
+     * </pre>
+     */
+    public com.google.protobuf.ByteString getZlibData() {
+      return zlibData_;
+    }
 
     // optional bytes lzma_data = 4;
     public static final int LZMA_DATA_FIELD_NUMBER = 4;
-    private boolean hasLzmaData;
-    private com.google.protobuf.ByteString lzmaData_ = com.google.protobuf.ByteString.EMPTY;
-    public boolean hasLzmaData() { return hasLzmaData; }
-    public com.google.protobuf.ByteString getLzmaData() { return lzmaData_; }
+    private com.google.protobuf.ByteString lzmaData_;
+    /**
+     * <code>optional bytes lzma_data = 4;</code>
+     */
+    public boolean hasLzmaData() {
+      return ((bitField0_ & 0x00000008) == 0x00000008);
+    }
+    /**
+     * <code>optional bytes lzma_data = 4;</code>
+     */
+    public com.google.protobuf.ByteString getLzmaData() {
+      return lzmaData_;
+    }
 
     // optional bytes bzip2_data = 5;
     public static final int BZIP2_DATA_FIELD_NUMBER = 5;
-    private boolean hasBzip2Data;
-    private com.google.protobuf.ByteString bzip2Data_ = com.google.protobuf.ByteString.EMPTY;
-    public boolean hasBzip2Data() { return hasBzip2Data; }
-    public com.google.protobuf.ByteString getBzip2Data() { return bzip2Data_; }
+    private com.google.protobuf.ByteString bzip2Data_;
+    /**
+     * <code>optional bytes bzip2_data = 5;</code>
+     */
+    public boolean hasBzip2Data() {
+      return ((bitField0_ & 0x00000010) == 0x00000010);
+    }
+    /**
+     * <code>optional bytes bzip2_data = 5;</code>
+     */
+    public com.google.protobuf.ByteString getBzip2Data() {
+      return bzip2Data_;
+    }
 
     private void initFields() {
+      raw_ = com.google.protobuf.ByteString.EMPTY;
+      rawSize_ = 0;
+      zlibData_ = com.google.protobuf.ByteString.EMPTY;
+      lzmaData_ = com.google.protobuf.ByteString.EMPTY;
+      bzip2Data_ = com.google.protobuf.ByteString.EMPTY;
     }
-    @Override
-	public final boolean isInitialized() {
+    private byte memoizedIsInitialized = -1;
+    public final boolean isInitialized() {
+      byte isInitialized = memoizedIsInitialized;
+      if (isInitialized != -1) return isInitialized == 1;
+
+      memoizedIsInitialized = 1;
       return true;
     }
 
-    @Override
-	public void writeTo(com.google.protobuf.CodedOutputStream output)
+    public void writeTo(com.google.protobuf.CodedOutputStream output)
                         throws java.io.IOException {
       getSerializedSize();
-      if (hasRaw()) {
-        output.writeBytes(1, getRaw());
+      if (((bitField0_ & 0x00000001) == 0x00000001)) {
+        output.writeBytes(1, raw_);
       }
-      if (hasRawSize()) {
-        output.writeInt32(2, getRawSize());
+      if (((bitField0_ & 0x00000002) == 0x00000002)) {
+        output.writeInt32(2, rawSize_);
       }
-      if (hasZlibData()) {
-        output.writeBytes(3, getZlibData());
+      if (((bitField0_ & 0x00000004) == 0x00000004)) {
+        output.writeBytes(3, zlibData_);
       }
-      if (hasLzmaData()) {
-        output.writeBytes(4, getLzmaData());
+      if (((bitField0_ & 0x00000008) == 0x00000008)) {
+        output.writeBytes(4, lzmaData_);
       }
-      if (hasBzip2Data()) {
-        output.writeBytes(5, getBzip2Data());
+      if (((bitField0_ & 0x00000010) == 0x00000010)) {
+        output.writeBytes(5, bzip2Data_);
       }
       getUnknownFields().writeTo(output);
     }
 
     private int memoizedSerializedSize = -1;
-    @Override
-	public int getSerializedSize() {
+    public int getSerializedSize() {
       int size = memoizedSerializedSize;
       if (size != -1) return size;
 
       size = 0;
-      if (hasRaw()) {
+      if (((bitField0_ & 0x00000001) == 0x00000001)) {
         size += com.google.protobuf.CodedOutputStream
-          .computeBytesSize(1, getRaw());
+          .computeBytesSize(1, raw_);
       }
-      if (hasRawSize()) {
+      if (((bitField0_ & 0x00000002) == 0x00000002)) {
         size += com.google.protobuf.CodedOutputStream
-          .computeInt32Size(2, getRawSize());
+          .computeInt32Size(2, rawSize_);
       }
-      if (hasZlibData()) {
+      if (((bitField0_ & 0x00000004) == 0x00000004)) {
         size += com.google.protobuf.CodedOutputStream
-          .computeBytesSize(3, getZlibData());
+          .computeBytesSize(3, zlibData_);
       }
-      if (hasLzmaData()) {
+      if (((bitField0_ & 0x00000008) == 0x00000008)) {
         size += com.google.protobuf.CodedOutputStream
-          .computeBytesSize(4, getLzmaData());
+          .computeBytesSize(4, lzmaData_);
       }
-      if (hasBzip2Data()) {
+      if (((bitField0_ & 0x00000010) == 0x00000010)) {
         size += com.google.protobuf.CodedOutputStream
-          .computeBytesSize(5, getBzip2Data());
+          .computeBytesSize(5, bzip2Data_);
       }
       size += getUnknownFields().getSerializedSize();
       memoizedSerializedSize = size;
       return size;
     }
 
+    private static final long serialVersionUID = 0L;
+    @java.lang.Override
+    protected java.lang.Object writeReplace()
+        throws java.io.ObjectStreamException {
+      return super.writeReplace();
+    }
+
     public static crosby.binary.Fileformat.Blob parseFrom(
         com.google.protobuf.ByteString data)
         throws com.google.protobuf.InvalidProtocolBufferException {
-      return newBuilder().mergeFrom(data).buildParsed();
+      return PARSER.parseFrom(data);
     }
     public static crosby.binary.Fileformat.Blob parseFrom(
         com.google.protobuf.ByteString data,
         com.google.protobuf.ExtensionRegistryLite extensionRegistry)
         throws com.google.protobuf.InvalidProtocolBufferException {
-      return newBuilder().mergeFrom(data, extensionRegistry)
-               .buildParsed();
+      return PARSER.parseFrom(data, extensionRegistry);
     }
     public static crosby.binary.Fileformat.Blob parseFrom(byte[] data)
         throws com.google.protobuf.InvalidProtocolBufferException {
-      return newBuilder().mergeFrom(data).buildParsed();
+      return PARSER.parseFrom(data);
     }
     public static crosby.binary.Fileformat.Blob parseFrom(
         byte[] data,
         com.google.protobuf.ExtensionRegistryLite extensionRegistry)
         throws com.google.protobuf.InvalidProtocolBufferException {
-      return newBuilder().mergeFrom(data, extensionRegistry)
-               .buildParsed();
+      return PARSER.parseFrom(data, extensionRegistry);
     }
     public static crosby.binary.Fileformat.Blob parseFrom(java.io.InputStream input)
         throws java.io.IOException {
-      return newBuilder().mergeFrom(input).buildParsed();
+      return PARSER.parseFrom(input);
     }
     public static crosby.binary.Fileformat.Blob parseFrom(
         java.io.InputStream input,
         com.google.protobuf.ExtensionRegistryLite extensionRegistry)
         throws java.io.IOException {
-      return newBuilder().mergeFrom(input, extensionRegistry)
-               .buildParsed();
+      return PARSER.parseFrom(input, extensionRegistry);
     }
     public static crosby.binary.Fileformat.Blob parseDelimitedFrom(java.io.InputStream input)
         throws java.io.IOException {
-      Builder builder = newBuilder();
-      if (builder.mergeDelimitedFrom(input)) {
-        return builder.buildParsed();
-      } else {
-        return null;
-      }
+      return PARSER.parseDelimitedFrom(input);
     }
     public static crosby.binary.Fileformat.Blob parseDelimitedFrom(
         java.io.InputStream input,
         com.google.protobuf.ExtensionRegistryLite extensionRegistry)
         throws java.io.IOException {
-      Builder builder = newBuilder();
-      if (builder.mergeDelimitedFrom(input, extensionRegistry)) {
-        return builder.buildParsed();
-      } else {
-        return null;
-      }
+      return PARSER.parseDelimitedFrom(input, extensionRegistry);
     }
     public static crosby.binary.Fileformat.Blob parseFrom(
         com.google.protobuf.CodedInputStream input)
         throws java.io.IOException {
-      return newBuilder().mergeFrom(input).buildParsed();
+      return PARSER.parseFrom(input);
     }
     public static crosby.binary.Fileformat.Blob parseFrom(
         com.google.protobuf.CodedInputStream input,
         com.google.protobuf.ExtensionRegistryLite extensionRegistry)
         throws java.io.IOException {
-      return newBuilder().mergeFrom(input, extensionRegistry)
-               .buildParsed();
+      return PARSER.parseFrom(input, extensionRegistry);
     }
 
     public static Builder newBuilder() { return Builder.create(); }
-    @Override
-	public Builder newBuilderForType() { return newBuilder(); }
+    public Builder newBuilderForType() { return newBuilder(); }
     public static Builder newBuilder(crosby.binary.Fileformat.Blob prototype) {
       return newBuilder().mergeFrom(prototype);
     }
-    @Override
-	public Builder toBuilder() { return newBuilder(this); }
+    public Builder toBuilder() { return newBuilder(this); }
 
+    @java.lang.Override
+    protected Builder newBuilderForType(
+        com.google.protobuf.GeneratedMessage.BuilderParent parent) {
+      Builder builder = new Builder(parent);
+      return builder;
+    }
+    /**
+     * Protobuf type {@code Blob}
+     */
     public static final class Builder extends
-        com.google.protobuf.GeneratedMessage.Builder<Builder> {
-      private crosby.binary.Fileformat.Blob result;
+        com.google.protobuf.GeneratedMessage.Builder<Builder>
+       implements crosby.binary.Fileformat.BlobOrBuilder {
+      public static final com.google.protobuf.Descriptors.Descriptor
+          getDescriptor() {
+        return crosby.binary.Fileformat.internal_static_Blob_descriptor;
+      }
+
+      protected com.google.protobuf.GeneratedMessage.FieldAccessorTable
+          internalGetFieldAccessorTable() {
+        return crosby.binary.Fileformat.internal_static_Blob_fieldAccessorTable
+            .ensureFieldAccessorsInitialized(
+                crosby.binary.Fileformat.Blob.class, crosby.binary.Fileformat.Blob.Builder.class);
+      }
 
       // Construct using crosby.binary.Fileformat.Blob.newBuilder()
-      private Builder() {}
-
-      private static Builder create() {
-        Builder builder = new Builder();
-        builder.result = new crosby.binary.Fileformat.Blob();
-        return builder;
+      private Builder() {
+        maybeForceBuilderInitialization();
       }
 
-      @Override
-	protected crosby.binary.Fileformat.Blob internalGetResult() {
-        return result;
+      private Builder(
+          com.google.protobuf.GeneratedMessage.BuilderParent parent) {
+        super(parent);
+        maybeForceBuilderInitialization();
       }
-
-      @Override
-	public Builder clear() {
-        if (result == null) {
-          throw new IllegalStateException(
-            "Cannot call clear() after build().");
+      private void maybeForceBuilderInitialization() {
+        if (com.google.protobuf.GeneratedMessage.alwaysUseFieldBuilders) {
         }
-        result = new crosby.binary.Fileformat.Blob();
+      }
+      private static Builder create() {
+        return new Builder();
+      }
+
+      public Builder clear() {
+        super.clear();
+        raw_ = com.google.protobuf.ByteString.EMPTY;
+        bitField0_ = (bitField0_ & ~0x00000001);
+        rawSize_ = 0;
+        bitField0_ = (bitField0_ & ~0x00000002);
+        zlibData_ = com.google.protobuf.ByteString.EMPTY;
+        bitField0_ = (bitField0_ & ~0x00000004);
+        lzmaData_ = com.google.protobuf.ByteString.EMPTY;
+        bitField0_ = (bitField0_ & ~0x00000008);
+        bzip2Data_ = com.google.protobuf.ByteString.EMPTY;
+        bitField0_ = (bitField0_ & ~0x00000010);
         return this;
       }
 
-      @Override
-	public Builder clone() {
-        return create().mergeFrom(result);
+      public Builder clone() {
+        return create().mergeFrom(buildPartial());
       }
 
-      @Override
-	public com.google.protobuf.Descriptors.Descriptor
+      public com.google.protobuf.Descriptors.Descriptor
           getDescriptorForType() {
-        return crosby.binary.Fileformat.Blob.getDescriptor();
+        return crosby.binary.Fileformat.internal_static_Blob_descriptor;
       }
 
-      @Override
-	public crosby.binary.Fileformat.Blob getDefaultInstanceForType() {
+      public crosby.binary.Fileformat.Blob getDefaultInstanceForType() {
         return crosby.binary.Fileformat.Blob.getDefaultInstance();
       }
 
-      @Override
-	public boolean isInitialized() {
-        return result.isInitialized();
-      }
-      @Override
-	public crosby.binary.Fileformat.Blob build() {
-        if (result != null && !isInitialized()) {
+      public crosby.binary.Fileformat.Blob build() {
+        crosby.binary.Fileformat.Blob result = buildPartial();
+        if (!result.isInitialized()) {
           throw newUninitializedMessageException(result);
         }
-        return buildPartial();
+        return result;
       }
 
-      private crosby.binary.Fileformat.Blob buildParsed()
-          throws com.google.protobuf.InvalidProtocolBufferException {
-        if (!isInitialized()) {
-          throw newUninitializedMessageException(
-            result).asInvalidProtocolBufferException();
+      public crosby.binary.Fileformat.Blob buildPartial() {
+        crosby.binary.Fileformat.Blob result = new crosby.binary.Fileformat.Blob(this);
+        int from_bitField0_ = bitField0_;
+        int to_bitField0_ = 0;
+        if (((from_bitField0_ & 0x00000001) == 0x00000001)) {
+          to_bitField0_ |= 0x00000001;
         }
-        return buildPartial();
-      }
-
-      @Override
-	public crosby.binary.Fileformat.Blob buildPartial() {
-        if (result == null) {
-          throw new IllegalStateException(
-            "build() has already been called on this Builder.");
+        result.raw_ = raw_;
+        if (((from_bitField0_ & 0x00000002) == 0x00000002)) {
+          to_bitField0_ |= 0x00000002;
         }
-        crosby.binary.Fileformat.Blob returnMe = result;
-        result = null;
-        return returnMe;
+        result.rawSize_ = rawSize_;
+        if (((from_bitField0_ & 0x00000004) == 0x00000004)) {
+          to_bitField0_ |= 0x00000004;
+        }
+        result.zlibData_ = zlibData_;
+        if (((from_bitField0_ & 0x00000008) == 0x00000008)) {
+          to_bitField0_ |= 0x00000008;
+        }
+        result.lzmaData_ = lzmaData_;
+        if (((from_bitField0_ & 0x00000010) == 0x00000010)) {
+          to_bitField0_ |= 0x00000010;
+        }
+        result.bzip2Data_ = bzip2Data_;
+        result.bitField0_ = to_bitField0_;
+        onBuilt();
+        return result;
       }
 
-      @Override
-	public Builder mergeFrom(com.google.protobuf.Message other) {
+      public Builder mergeFrom(com.google.protobuf.Message other) {
         if (other instanceof crosby.binary.Fileformat.Blob) {
           return mergeFrom((crosby.binary.Fileformat.Blob)other);
         } else {
@@ -316,152 +577,251 @@ public final class Fileformat {
         return this;
       }
 
-      @Override
-	public Builder mergeFrom(
+      public final boolean isInitialized() {
+        return true;
+      }
+
+      public Builder mergeFrom(
           com.google.protobuf.CodedInputStream input,
           com.google.protobuf.ExtensionRegistryLite extensionRegistry)
           throws java.io.IOException {
-        com.google.protobuf.UnknownFieldSet.Builder unknownFields =
-          com.google.protobuf.UnknownFieldSet.newBuilder(
-            this.getUnknownFields());
-        while (true) {
-          int tag = input.readTag();
-          switch (tag) {
-            case 0:
-              this.setUnknownFields(unknownFields.build());
-              return this;
-            default: {
-              if (!parseUnknownField(input, unknownFields,
-                                     extensionRegistry, tag)) {
-                this.setUnknownFields(unknownFields.build());
-                return this;
-              }
-              break;
-            }
-            case 10: {
-              setRaw(input.readBytes());
-              break;
-            }
-            case 16: {
-              setRawSize(input.readInt32());
-              break;
-            }
-            case 26: {
-              setZlibData(input.readBytes());
-              break;
-            }
-            case 34: {
-              setLzmaData(input.readBytes());
-              break;
-            }
-            case 42: {
-              setBzip2Data(input.readBytes());
-              break;
-            }
+        crosby.binary.Fileformat.Blob parsedMessage = null;
+        try {
+          parsedMessage = PARSER.parsePartialFrom(input, extensionRegistry);
+        } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+          parsedMessage = (crosby.binary.Fileformat.Blob) e.getUnfinishedMessage();
+          throw e;
+        } finally {
+          if (parsedMessage != null) {
+            mergeFrom(parsedMessage);
           }
         }
+        return this;
       }
-
+      private int bitField0_;
 
       // optional bytes raw = 1;
+      private com.google.protobuf.ByteString raw_ = com.google.protobuf.ByteString.EMPTY;
+      /**
+       * <code>optional bytes raw = 1;</code>
+       *
+       * <pre>
+       * No compression
+       * </pre>
+       */
       public boolean hasRaw() {
-        return result.hasRaw();
+        return ((bitField0_ & 0x00000001) == 0x00000001);
       }
+      /**
+       * <code>optional bytes raw = 1;</code>
+       *
+       * <pre>
+       * No compression
+       * </pre>
+       */
       public com.google.protobuf.ByteString getRaw() {
-        return result.getRaw();
+        return raw_;
       }
+      /**
+       * <code>optional bytes raw = 1;</code>
+       *
+       * <pre>
+       * No compression
+       * </pre>
+       */
       public Builder setRaw(com.google.protobuf.ByteString value) {
         if (value == null) {
     throw new NullPointerException();
   }
-  result.hasRaw = true;
-        result.raw_ = value;
+  bitField0_ |= 0x00000001;
+        raw_ = value;
+        onChanged();
         return this;
       }
+      /**
+       * <code>optional bytes raw = 1;</code>
+       *
+       * <pre>
+       * No compression
+       * </pre>
+       */
       public Builder clearRaw() {
-        result.hasRaw = false;
-        result.raw_ = getDefaultInstance().getRaw();
+        bitField0_ = (bitField0_ & ~0x00000001);
+        raw_ = getDefaultInstance().getRaw();
+        onChanged();
         return this;
       }
 
       // optional int32 raw_size = 2;
+      private int rawSize_ ;
+      /**
+       * <code>optional int32 raw_size = 2;</code>
+       *
+       * <pre>
+       * When compressed, the uncompressed size
+       * </pre>
+       */
       public boolean hasRawSize() {
-        return result.hasRawSize();
+        return ((bitField0_ & 0x00000002) == 0x00000002);
       }
+      /**
+       * <code>optional int32 raw_size = 2;</code>
+       *
+       * <pre>
+       * When compressed, the uncompressed size
+       * </pre>
+       */
       public int getRawSize() {
-        return result.getRawSize();
+        return rawSize_;
       }
+      /**
+       * <code>optional int32 raw_size = 2;</code>
+       *
+       * <pre>
+       * When compressed, the uncompressed size
+       * </pre>
+       */
       public Builder setRawSize(int value) {
-        result.hasRawSize = true;
-        result.rawSize_ = value;
+        bitField0_ |= 0x00000002;
+        rawSize_ = value;
+        onChanged();
         return this;
       }
+      /**
+       * <code>optional int32 raw_size = 2;</code>
+       *
+       * <pre>
+       * When compressed, the uncompressed size
+       * </pre>
+       */
       public Builder clearRawSize() {
-        result.hasRawSize = false;
-        result.rawSize_ = 0;
+        bitField0_ = (bitField0_ & ~0x00000002);
+        rawSize_ = 0;
+        onChanged();
         return this;
       }
 
       // optional bytes zlib_data = 3;
+      private com.google.protobuf.ByteString zlibData_ = com.google.protobuf.ByteString.EMPTY;
+      /**
+       * <code>optional bytes zlib_data = 3;</code>
+       *
+       * <pre>
+       * Possible compressed versions of the data.
+       * </pre>
+       */
       public boolean hasZlibData() {
-        return result.hasZlibData();
+        return ((bitField0_ & 0x00000004) == 0x00000004);
       }
+      /**
+       * <code>optional bytes zlib_data = 3;</code>
+       *
+       * <pre>
+       * Possible compressed versions of the data.
+       * </pre>
+       */
       public com.google.protobuf.ByteString getZlibData() {
-        return result.getZlibData();
+        return zlibData_;
       }
+      /**
+       * <code>optional bytes zlib_data = 3;</code>
+       *
+       * <pre>
+       * Possible compressed versions of the data.
+       * </pre>
+       */
       public Builder setZlibData(com.google.protobuf.ByteString value) {
         if (value == null) {
     throw new NullPointerException();
   }
-  result.hasZlibData = true;
-        result.zlibData_ = value;
+  bitField0_ |= 0x00000004;
+        zlibData_ = value;
+        onChanged();
         return this;
       }
+      /**
+       * <code>optional bytes zlib_data = 3;</code>
+       *
+       * <pre>
+       * Possible compressed versions of the data.
+       * </pre>
+       */
       public Builder clearZlibData() {
-        result.hasZlibData = false;
-        result.zlibData_ = getDefaultInstance().getZlibData();
+        bitField0_ = (bitField0_ & ~0x00000004);
+        zlibData_ = getDefaultInstance().getZlibData();
+        onChanged();
         return this;
       }
 
       // optional bytes lzma_data = 4;
+      private com.google.protobuf.ByteString lzmaData_ = com.google.protobuf.ByteString.EMPTY;
+      /**
+       * <code>optional bytes lzma_data = 4;</code>
+       */
       public boolean hasLzmaData() {
-        return result.hasLzmaData();
+        return ((bitField0_ & 0x00000008) == 0x00000008);
       }
+      /**
+       * <code>optional bytes lzma_data = 4;</code>
+       */
       public com.google.protobuf.ByteString getLzmaData() {
-        return result.getLzmaData();
+        return lzmaData_;
       }
+      /**
+       * <code>optional bytes lzma_data = 4;</code>
+       */
       public Builder setLzmaData(com.google.protobuf.ByteString value) {
         if (value == null) {
     throw new NullPointerException();
   }
-  result.hasLzmaData = true;
-        result.lzmaData_ = value;
+  bitField0_ |= 0x00000008;
+        lzmaData_ = value;
+        onChanged();
         return this;
       }
+      /**
+       * <code>optional bytes lzma_data = 4;</code>
+       */
       public Builder clearLzmaData() {
-        result.hasLzmaData = false;
-        result.lzmaData_ = getDefaultInstance().getLzmaData();
+        bitField0_ = (bitField0_ & ~0x00000008);
+        lzmaData_ = getDefaultInstance().getLzmaData();
+        onChanged();
         return this;
       }
 
       // optional bytes bzip2_data = 5;
+      private com.google.protobuf.ByteString bzip2Data_ = com.google.protobuf.ByteString.EMPTY;
+      /**
+       * <code>optional bytes bzip2_data = 5;</code>
+       */
       public boolean hasBzip2Data() {
-        return result.hasBzip2Data();
+        return ((bitField0_ & 0x00000010) == 0x00000010);
       }
+      /**
+       * <code>optional bytes bzip2_data = 5;</code>
+       */
       public com.google.protobuf.ByteString getBzip2Data() {
-        return result.getBzip2Data();
+        return bzip2Data_;
       }
+      /**
+       * <code>optional bytes bzip2_data = 5;</code>
+       */
       public Builder setBzip2Data(com.google.protobuf.ByteString value) {
         if (value == null) {
     throw new NullPointerException();
   }
-  result.hasBzip2Data = true;
-        result.bzip2Data_ = value;
+  bitField0_ |= 0x00000010;
+        bzip2Data_ = value;
+        onChanged();
         return this;
       }
+      /**
+       * <code>optional bytes bzip2_data = 5;</code>
+       */
       public Builder clearBzip2Data() {
-        result.hasBzip2Data = false;
-        result.bzip2Data_ = getDefaultInstance().getBzip2Data();
+        bitField0_ = (bitField0_ & ~0x00000010);
+        bzip2Data_ = getDefaultInstance().getBzip2Data();
+        onChanged();
         return this;
       }
 
@@ -470,266 +830,454 @@ public final class Fileformat {
 
     static {
       defaultInstance = new Blob(true);
-      crosby.binary.Fileformat.internalForceInit();
       defaultInstance.initFields();
     }
 
     // @@protoc_insertion_point(class_scope:Blob)
   }
 
+  public interface BlockHeaderOrBuilder
+      extends com.google.protobuf.MessageOrBuilder {
+
+    // required string type = 1;
+    /**
+     * <code>required string type = 1;</code>
+     */
+    boolean hasType();
+    /**
+     * <code>required string type = 1;</code>
+     */
+    java.lang.String getType();
+    /**
+     * <code>required string type = 1;</code>
+     */
+    com.google.protobuf.ByteString
+        getTypeBytes();
+
+    // optional bytes indexdata = 2;
+    /**
+     * <code>optional bytes indexdata = 2;</code>
+     */
+    boolean hasIndexdata();
+    /**
+     * <code>optional bytes indexdata = 2;</code>
+     */
+    com.google.protobuf.ByteString getIndexdata();
+
+    // required int32 datasize = 3;
+    /**
+     * <code>required int32 datasize = 3;</code>
+     */
+    boolean hasDatasize();
+    /**
+     * <code>required int32 datasize = 3;</code>
+     */
+    int getDatasize();
+  }
+  /**
+   * Protobuf type {@code BlockHeader}
+   */
   public static final class BlockHeader extends
-      com.google.protobuf.GeneratedMessage {
+      com.google.protobuf.GeneratedMessage
+      implements BlockHeaderOrBuilder {
     // Use BlockHeader.newBuilder() to construct.
-    private BlockHeader() {
-      initFields();
+    private BlockHeader(com.google.protobuf.GeneratedMessage.Builder<?> builder) {
+      super(builder);
+      this.unknownFields = builder.getUnknownFields();
     }
-    private BlockHeader(boolean noInit) {}
+    private BlockHeader(boolean noInit) { this.unknownFields = com.google.protobuf.UnknownFieldSet.getDefaultInstance(); }
 
     private static final BlockHeader defaultInstance;
     public static BlockHeader getDefaultInstance() {
       return defaultInstance;
     }
 
-    @Override
-	public BlockHeader getDefaultInstanceForType() {
+    public BlockHeader getDefaultInstanceForType() {
       return defaultInstance;
     }
 
+    private final com.google.protobuf.UnknownFieldSet unknownFields;
+    @java.lang.Override
+    public final com.google.protobuf.UnknownFieldSet
+        getUnknownFields() {
+      return this.unknownFields;
+    }
+    private BlockHeader(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      initFields();
+      int mutable_bitField0_ = 0;
+      com.google.protobuf.UnknownFieldSet.Builder unknownFields =
+          com.google.protobuf.UnknownFieldSet.newBuilder();
+      try {
+        boolean done = false;
+        while (!done) {
+          int tag = input.readTag();
+          switch (tag) {
+            case 0:
+              done = true;
+              break;
+            default: {
+              if (!parseUnknownField(input, unknownFields,
+                                     extensionRegistry, tag)) {
+                done = true;
+              }
+              break;
+            }
+            case 10: {
+              bitField0_ |= 0x00000001;
+              type_ = input.readBytes();
+              break;
+            }
+            case 18: {
+              bitField0_ |= 0x00000002;
+              indexdata_ = input.readBytes();
+              break;
+            }
+            case 24: {
+              bitField0_ |= 0x00000004;
+              datasize_ = input.readInt32();
+              break;
+            }
+          }
+        }
+      } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+        throw e.setUnfinishedMessage(this);
+      } catch (java.io.IOException e) {
+        throw new com.google.protobuf.InvalidProtocolBufferException(
+            e.getMessage()).setUnfinishedMessage(this);
+      } finally {
+        this.unknownFields = unknownFields.build();
+        makeExtensionsImmutable();
+      }
+    }
     public static final com.google.protobuf.Descriptors.Descriptor
         getDescriptor() {
       return crosby.binary.Fileformat.internal_static_BlockHeader_descriptor;
     }
 
-    @Override
-	protected com.google.protobuf.GeneratedMessage.FieldAccessorTable
+    protected com.google.protobuf.GeneratedMessage.FieldAccessorTable
         internalGetFieldAccessorTable() {
-      return crosby.binary.Fileformat.internal_static_BlockHeader_fieldAccessorTable;
+      return crosby.binary.Fileformat.internal_static_BlockHeader_fieldAccessorTable
+          .ensureFieldAccessorsInitialized(
+              crosby.binary.Fileformat.BlockHeader.class, crosby.binary.Fileformat.BlockHeader.Builder.class);
     }
 
+    public static com.google.protobuf.Parser<BlockHeader> PARSER =
+        new com.google.protobuf.AbstractParser<BlockHeader>() {
+      public BlockHeader parsePartialFrom(
+          com.google.protobuf.CodedInputStream input,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws com.google.protobuf.InvalidProtocolBufferException {
+        return new BlockHeader(input, extensionRegistry);
+      }
+    };
+
+    @java.lang.Override
+    public com.google.protobuf.Parser<BlockHeader> getParserForType() {
+      return PARSER;
+    }
+
+    private int bitField0_;
     // required string type = 1;
     public static final int TYPE_FIELD_NUMBER = 1;
-    private boolean hasType;
-    private java.lang.String type_ = "";
-    public boolean hasType() { return hasType; }
-    public java.lang.String getType() { return type_; }
+    private java.lang.Object type_;
+    /**
+     * <code>required string type = 1;</code>
+     */
+    public boolean hasType() {
+      return ((bitField0_ & 0x00000001) == 0x00000001);
+    }
+    /**
+     * <code>required string type = 1;</code>
+     */
+    public java.lang.String getType() {
+      java.lang.Object ref = type_;
+      if (ref instanceof java.lang.String) {
+        return (java.lang.String) ref;
+      } else {
+        com.google.protobuf.ByteString bs = 
+            (com.google.protobuf.ByteString) ref;
+        java.lang.String s = bs.toStringUtf8();
+        if (bs.isValidUtf8()) {
+          type_ = s;
+        }
+        return s;
+      }
+    }
+    /**
+     * <code>required string type = 1;</code>
+     */
+    public com.google.protobuf.ByteString
+        getTypeBytes() {
+      java.lang.Object ref = type_;
+      if (ref instanceof java.lang.String) {
+        com.google.protobuf.ByteString b = 
+            com.google.protobuf.ByteString.copyFromUtf8(
+                (java.lang.String) ref);
+        type_ = b;
+        return b;
+      } else {
+        return (com.google.protobuf.ByteString) ref;
+      }
+    }
 
     // optional bytes indexdata = 2;
     public static final int INDEXDATA_FIELD_NUMBER = 2;
-    private boolean hasIndexdata;
-    private com.google.protobuf.ByteString indexdata_ = com.google.protobuf.ByteString.EMPTY;
-    public boolean hasIndexdata() { return hasIndexdata; }
-    public com.google.protobuf.ByteString getIndexdata() { return indexdata_; }
+    private com.google.protobuf.ByteString indexdata_;
+    /**
+     * <code>optional bytes indexdata = 2;</code>
+     */
+    public boolean hasIndexdata() {
+      return ((bitField0_ & 0x00000002) == 0x00000002);
+    }
+    /**
+     * <code>optional bytes indexdata = 2;</code>
+     */
+    public com.google.protobuf.ByteString getIndexdata() {
+      return indexdata_;
+    }
 
     // required int32 datasize = 3;
     public static final int DATASIZE_FIELD_NUMBER = 3;
-    private boolean hasDatasize;
-    private int datasize_ = 0;
-    public boolean hasDatasize() { return hasDatasize; }
-    public int getDatasize() { return datasize_; }
+    private int datasize_;
+    /**
+     * <code>required int32 datasize = 3;</code>
+     */
+    public boolean hasDatasize() {
+      return ((bitField0_ & 0x00000004) == 0x00000004);
+    }
+    /**
+     * <code>required int32 datasize = 3;</code>
+     */
+    public int getDatasize() {
+      return datasize_;
+    }
 
     private void initFields() {
+      type_ = "";
+      indexdata_ = com.google.protobuf.ByteString.EMPTY;
+      datasize_ = 0;
     }
-    @Override
-	public final boolean isInitialized() {
-      if (!hasType) return false;
-      if (!hasDatasize) return false;
+    private byte memoizedIsInitialized = -1;
+    public final boolean isInitialized() {
+      byte isInitialized = memoizedIsInitialized;
+      if (isInitialized != -1) return isInitialized == 1;
+
+      if (!hasType()) {
+        memoizedIsInitialized = 0;
+        return false;
+      }
+      if (!hasDatasize()) {
+        memoizedIsInitialized = 0;
+        return false;
+      }
+      memoizedIsInitialized = 1;
       return true;
     }
 
-    @Override
-	public void writeTo(com.google.protobuf.CodedOutputStream output)
+    public void writeTo(com.google.protobuf.CodedOutputStream output)
                         throws java.io.IOException {
       getSerializedSize();
-      if (hasType()) {
-        output.writeString(1, getType());
+      if (((bitField0_ & 0x00000001) == 0x00000001)) {
+        output.writeBytes(1, getTypeBytes());
       }
-      if (hasIndexdata()) {
-        output.writeBytes(2, getIndexdata());
+      if (((bitField0_ & 0x00000002) == 0x00000002)) {
+        output.writeBytes(2, indexdata_);
       }
-      if (hasDatasize()) {
-        output.writeInt32(3, getDatasize());
+      if (((bitField0_ & 0x00000004) == 0x00000004)) {
+        output.writeInt32(3, datasize_);
       }
       getUnknownFields().writeTo(output);
     }
 
     private int memoizedSerializedSize = -1;
-    @Override
-	public int getSerializedSize() {
+    public int getSerializedSize() {
       int size = memoizedSerializedSize;
       if (size != -1) return size;
 
       size = 0;
-      if (hasType()) {
+      if (((bitField0_ & 0x00000001) == 0x00000001)) {
         size += com.google.protobuf.CodedOutputStream
-          .computeStringSize(1, getType());
+          .computeBytesSize(1, getTypeBytes());
       }
-      if (hasIndexdata()) {
+      if (((bitField0_ & 0x00000002) == 0x00000002)) {
         size += com.google.protobuf.CodedOutputStream
-          .computeBytesSize(2, getIndexdata());
+          .computeBytesSize(2, indexdata_);
       }
-      if (hasDatasize()) {
+      if (((bitField0_ & 0x00000004) == 0x00000004)) {
         size += com.google.protobuf.CodedOutputStream
-          .computeInt32Size(3, getDatasize());
+          .computeInt32Size(3, datasize_);
       }
       size += getUnknownFields().getSerializedSize();
       memoizedSerializedSize = size;
       return size;
     }
 
+    private static final long serialVersionUID = 0L;
+    @java.lang.Override
+    protected java.lang.Object writeReplace()
+        throws java.io.ObjectStreamException {
+      return super.writeReplace();
+    }
+
     public static crosby.binary.Fileformat.BlockHeader parseFrom(
         com.google.protobuf.ByteString data)
         throws com.google.protobuf.InvalidProtocolBufferException {
-      return newBuilder().mergeFrom(data).buildParsed();
+      return PARSER.parseFrom(data);
     }
     public static crosby.binary.Fileformat.BlockHeader parseFrom(
         com.google.protobuf.ByteString data,
         com.google.protobuf.ExtensionRegistryLite extensionRegistry)
         throws com.google.protobuf.InvalidProtocolBufferException {
-      return newBuilder().mergeFrom(data, extensionRegistry)
-               .buildParsed();
+      return PARSER.parseFrom(data, extensionRegistry);
     }
     public static crosby.binary.Fileformat.BlockHeader parseFrom(byte[] data)
         throws com.google.protobuf.InvalidProtocolBufferException {
-      return newBuilder().mergeFrom(data).buildParsed();
+      return PARSER.parseFrom(data);
     }
     public static crosby.binary.Fileformat.BlockHeader parseFrom(
         byte[] data,
         com.google.protobuf.ExtensionRegistryLite extensionRegistry)
         throws com.google.protobuf.InvalidProtocolBufferException {
-      return newBuilder().mergeFrom(data, extensionRegistry)
-               .buildParsed();
+      return PARSER.parseFrom(data, extensionRegistry);
     }
     public static crosby.binary.Fileformat.BlockHeader parseFrom(java.io.InputStream input)
         throws java.io.IOException {
-      return newBuilder().mergeFrom(input).buildParsed();
+      return PARSER.parseFrom(input);
     }
     public static crosby.binary.Fileformat.BlockHeader parseFrom(
         java.io.InputStream input,
         com.google.protobuf.ExtensionRegistryLite extensionRegistry)
         throws java.io.IOException {
-      return newBuilder().mergeFrom(input, extensionRegistry)
-               .buildParsed();
+      return PARSER.parseFrom(input, extensionRegistry);
     }
     public static crosby.binary.Fileformat.BlockHeader parseDelimitedFrom(java.io.InputStream input)
         throws java.io.IOException {
-      Builder builder = newBuilder();
-      if (builder.mergeDelimitedFrom(input)) {
-        return builder.buildParsed();
-      } else {
-        return null;
-      }
+      return PARSER.parseDelimitedFrom(input);
     }
     public static crosby.binary.Fileformat.BlockHeader parseDelimitedFrom(
         java.io.InputStream input,
         com.google.protobuf.ExtensionRegistryLite extensionRegistry)
         throws java.io.IOException {
-      Builder builder = newBuilder();
-      if (builder.mergeDelimitedFrom(input, extensionRegistry)) {
-        return builder.buildParsed();
-      } else {
-        return null;
-      }
+      return PARSER.parseDelimitedFrom(input, extensionRegistry);
     }
     public static crosby.binary.Fileformat.BlockHeader parseFrom(
         com.google.protobuf.CodedInputStream input)
         throws java.io.IOException {
-      return newBuilder().mergeFrom(input).buildParsed();
+      return PARSER.parseFrom(input);
     }
     public static crosby.binary.Fileformat.BlockHeader parseFrom(
         com.google.protobuf.CodedInputStream input,
         com.google.protobuf.ExtensionRegistryLite extensionRegistry)
         throws java.io.IOException {
-      return newBuilder().mergeFrom(input, extensionRegistry)
-               .buildParsed();
+      return PARSER.parseFrom(input, extensionRegistry);
     }
 
     public static Builder newBuilder() { return Builder.create(); }
-    @Override
-	public Builder newBuilderForType() { return newBuilder(); }
+    public Builder newBuilderForType() { return newBuilder(); }
     public static Builder newBuilder(crosby.binary.Fileformat.BlockHeader prototype) {
       return newBuilder().mergeFrom(prototype);
     }
-    @Override
-	public Builder toBuilder() { return newBuilder(this); }
+    public Builder toBuilder() { return newBuilder(this); }
 
+    @java.lang.Override
+    protected Builder newBuilderForType(
+        com.google.protobuf.GeneratedMessage.BuilderParent parent) {
+      Builder builder = new Builder(parent);
+      return builder;
+    }
+    /**
+     * Protobuf type {@code BlockHeader}
+     */
     public static final class Builder extends
-        com.google.protobuf.GeneratedMessage.Builder<Builder> {
-      private crosby.binary.Fileformat.BlockHeader result;
+        com.google.protobuf.GeneratedMessage.Builder<Builder>
+       implements crosby.binary.Fileformat.BlockHeaderOrBuilder {
+      public static final com.google.protobuf.Descriptors.Descriptor
+          getDescriptor() {
+        return crosby.binary.Fileformat.internal_static_BlockHeader_descriptor;
+      }
+
+      protected com.google.protobuf.GeneratedMessage.FieldAccessorTable
+          internalGetFieldAccessorTable() {
+        return crosby.binary.Fileformat.internal_static_BlockHeader_fieldAccessorTable
+            .ensureFieldAccessorsInitialized(
+                crosby.binary.Fileformat.BlockHeader.class, crosby.binary.Fileformat.BlockHeader.Builder.class);
+      }
 
       // Construct using crosby.binary.Fileformat.BlockHeader.newBuilder()
-      private Builder() {}
-
-      private static Builder create() {
-        Builder builder = new Builder();
-        builder.result = new crosby.binary.Fileformat.BlockHeader();
-        return builder;
+      private Builder() {
+        maybeForceBuilderInitialization();
       }
 
-      @Override
-	protected crosby.binary.Fileformat.BlockHeader internalGetResult() {
-        return result;
+      private Builder(
+          com.google.protobuf.GeneratedMessage.BuilderParent parent) {
+        super(parent);
+        maybeForceBuilderInitialization();
       }
-
-      @Override
-	public Builder clear() {
-        if (result == null) {
-          throw new IllegalStateException(
-            "Cannot call clear() after build().");
+      private void maybeForceBuilderInitialization() {
+        if (com.google.protobuf.GeneratedMessage.alwaysUseFieldBuilders) {
         }
-        result = new crosby.binary.Fileformat.BlockHeader();
+      }
+      private static Builder create() {
+        return new Builder();
+      }
+
+      public Builder clear() {
+        super.clear();
+        type_ = "";
+        bitField0_ = (bitField0_ & ~0x00000001);
+        indexdata_ = com.google.protobuf.ByteString.EMPTY;
+        bitField0_ = (bitField0_ & ~0x00000002);
+        datasize_ = 0;
+        bitField0_ = (bitField0_ & ~0x00000004);
         return this;
       }
 
-      @Override
-	public Builder clone() {
-        return create().mergeFrom(result);
+      public Builder clone() {
+        return create().mergeFrom(buildPartial());
       }
 
-      @Override
-	public com.google.protobuf.Descriptors.Descriptor
+      public com.google.protobuf.Descriptors.Descriptor
           getDescriptorForType() {
-        return crosby.binary.Fileformat.BlockHeader.getDescriptor();
+        return crosby.binary.Fileformat.internal_static_BlockHeader_descriptor;
       }
 
-      @Override
-	public crosby.binary.Fileformat.BlockHeader getDefaultInstanceForType() {
+      public crosby.binary.Fileformat.BlockHeader getDefaultInstanceForType() {
         return crosby.binary.Fileformat.BlockHeader.getDefaultInstance();
       }
 
-      @Override
-	public boolean isInitialized() {
-        return result.isInitialized();
-      }
-      @Override
-	public crosby.binary.Fileformat.BlockHeader build() {
-        if (result != null && !isInitialized()) {
+      public crosby.binary.Fileformat.BlockHeader build() {
+        crosby.binary.Fileformat.BlockHeader result = buildPartial();
+        if (!result.isInitialized()) {
           throw newUninitializedMessageException(result);
         }
-        return buildPartial();
+        return result;
       }
 
-      private crosby.binary.Fileformat.BlockHeader buildParsed()
-          throws com.google.protobuf.InvalidProtocolBufferException {
-        if (!isInitialized()) {
-          throw newUninitializedMessageException(
-            result).asInvalidProtocolBufferException();
+      public crosby.binary.Fileformat.BlockHeader buildPartial() {
+        crosby.binary.Fileformat.BlockHeader result = new crosby.binary.Fileformat.BlockHeader(this);
+        int from_bitField0_ = bitField0_;
+        int to_bitField0_ = 0;
+        if (((from_bitField0_ & 0x00000001) == 0x00000001)) {
+          to_bitField0_ |= 0x00000001;
         }
-        return buildPartial();
-      }
-
-      @Override
-	public crosby.binary.Fileformat.BlockHeader buildPartial() {
-        if (result == null) {
-          throw new IllegalStateException(
-            "build() has already been called on this Builder.");
+        result.type_ = type_;
+        if (((from_bitField0_ & 0x00000002) == 0x00000002)) {
+          to_bitField0_ |= 0x00000002;
         }
-        crosby.binary.Fileformat.BlockHeader returnMe = result;
-        result = null;
-        return returnMe;
+        result.indexdata_ = indexdata_;
+        if (((from_bitField0_ & 0x00000004) == 0x00000004)) {
+          to_bitField0_ |= 0x00000004;
+        }
+        result.datasize_ = datasize_;
+        result.bitField0_ = to_bitField0_;
+        onBuilt();
+        return result;
       }
 
-      @Override
-	public Builder mergeFrom(com.google.protobuf.Message other) {
+      public Builder mergeFrom(com.google.protobuf.Message other) {
         if (other instanceof crosby.binary.Fileformat.BlockHeader) {
           return mergeFrom((crosby.binary.Fileformat.BlockHeader)other);
         } else {
@@ -741,7 +1289,9 @@ public final class Fileformat {
       public Builder mergeFrom(crosby.binary.Fileformat.BlockHeader other) {
         if (other == crosby.binary.Fileformat.BlockHeader.getDefaultInstance()) return this;
         if (other.hasType()) {
-          setType(other.getType());
+          bitField0_ |= 0x00000001;
+          type_ = other.type_;
+          onChanged();
         }
         if (other.hasIndexdata()) {
           setIndexdata(other.getIndexdata());
@@ -753,102 +1303,177 @@ public final class Fileformat {
         return this;
       }
 
-      @Override
-	public Builder mergeFrom(
+      public final boolean isInitialized() {
+        if (!hasType()) {
+          
+          return false;
+        }
+        if (!hasDatasize()) {
+          
+          return false;
+        }
+        return true;
+      }
+
+      public Builder mergeFrom(
           com.google.protobuf.CodedInputStream input,
           com.google.protobuf.ExtensionRegistryLite extensionRegistry)
           throws java.io.IOException {
-        com.google.protobuf.UnknownFieldSet.Builder unknownFields =
-          com.google.protobuf.UnknownFieldSet.newBuilder(
-            this.getUnknownFields());
-        while (true) {
-          int tag = input.readTag();
-          switch (tag) {
-            case 0:
-              this.setUnknownFields(unknownFields.build());
-              return this;
-            default: {
-              if (!parseUnknownField(input, unknownFields,
-                                     extensionRegistry, tag)) {
-                this.setUnknownFields(unknownFields.build());
-                return this;
-              }
-              break;
-            }
-            case 10: {
-              setType(input.readString());
-              break;
-            }
-            case 18: {
-              setIndexdata(input.readBytes());
-              break;
-            }
-            case 24: {
-              setDatasize(input.readInt32());
-              break;
-            }
+        crosby.binary.Fileformat.BlockHeader parsedMessage = null;
+        try {
+          parsedMessage = PARSER.parsePartialFrom(input, extensionRegistry);
+        } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+          parsedMessage = (crosby.binary.Fileformat.BlockHeader) e.getUnfinishedMessage();
+          throw e;
+        } finally {
+          if (parsedMessage != null) {
+            mergeFrom(parsedMessage);
           }
         }
+        return this;
       }
-
+      private int bitField0_;
 
       // required string type = 1;
+      private java.lang.Object type_ = "";
+      /**
+       * <code>required string type = 1;</code>
+       */
       public boolean hasType() {
-        return result.hasType();
+        return ((bitField0_ & 0x00000001) == 0x00000001);
       }
+      /**
+       * <code>required string type = 1;</code>
+       */
       public java.lang.String getType() {
-        return result.getType();
+        java.lang.Object ref = type_;
+        if (!(ref instanceof java.lang.String)) {
+          java.lang.String s = ((com.google.protobuf.ByteString) ref)
+              .toStringUtf8();
+          type_ = s;
+          return s;
+        } else {
+          return (java.lang.String) ref;
+        }
       }
-      public Builder setType(java.lang.String value) {
+      /**
+       * <code>required string type = 1;</code>
+       */
+      public com.google.protobuf.ByteString
+          getTypeBytes() {
+        java.lang.Object ref = type_;
+        if (ref instanceof String) {
+          com.google.protobuf.ByteString b = 
+              com.google.protobuf.ByteString.copyFromUtf8(
+                  (java.lang.String) ref);
+          type_ = b;
+          return b;
+        } else {
+          return (com.google.protobuf.ByteString) ref;
+        }
+      }
+      /**
+       * <code>required string type = 1;</code>
+       */
+      public Builder setType(
+          java.lang.String value) {
         if (value == null) {
     throw new NullPointerException();
   }
-  result.hasType = true;
-        result.type_ = value;
+  bitField0_ |= 0x00000001;
+        type_ = value;
+        onChanged();
         return this;
       }
+      /**
+       * <code>required string type = 1;</code>
+       */
       public Builder clearType() {
-        result.hasType = false;
-        result.type_ = getDefaultInstance().getType();
+        bitField0_ = (bitField0_ & ~0x00000001);
+        type_ = getDefaultInstance().getType();
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>required string type = 1;</code>
+       */
+      public Builder setTypeBytes(
+          com.google.protobuf.ByteString value) {
+        if (value == null) {
+    throw new NullPointerException();
+  }
+  bitField0_ |= 0x00000001;
+        type_ = value;
+        onChanged();
         return this;
       }
 
       // optional bytes indexdata = 2;
+      private com.google.protobuf.ByteString indexdata_ = com.google.protobuf.ByteString.EMPTY;
+      /**
+       * <code>optional bytes indexdata = 2;</code>
+       */
       public boolean hasIndexdata() {
-        return result.hasIndexdata();
+        return ((bitField0_ & 0x00000002) == 0x00000002);
       }
+      /**
+       * <code>optional bytes indexdata = 2;</code>
+       */
       public com.google.protobuf.ByteString getIndexdata() {
-        return result.getIndexdata();
+        return indexdata_;
       }
+      /**
+       * <code>optional bytes indexdata = 2;</code>
+       */
       public Builder setIndexdata(com.google.protobuf.ByteString value) {
         if (value == null) {
     throw new NullPointerException();
   }
-  result.hasIndexdata = true;
-        result.indexdata_ = value;
+  bitField0_ |= 0x00000002;
+        indexdata_ = value;
+        onChanged();
         return this;
       }
+      /**
+       * <code>optional bytes indexdata = 2;</code>
+       */
       public Builder clearIndexdata() {
-        result.hasIndexdata = false;
-        result.indexdata_ = getDefaultInstance().getIndexdata();
+        bitField0_ = (bitField0_ & ~0x00000002);
+        indexdata_ = getDefaultInstance().getIndexdata();
+        onChanged();
         return this;
       }
 
       // required int32 datasize = 3;
+      private int datasize_ ;
+      /**
+       * <code>required int32 datasize = 3;</code>
+       */
       public boolean hasDatasize() {
-        return result.hasDatasize();
+        return ((bitField0_ & 0x00000004) == 0x00000004);
       }
+      /**
+       * <code>required int32 datasize = 3;</code>
+       */
       public int getDatasize() {
-        return result.getDatasize();
+        return datasize_;
       }
+      /**
+       * <code>required int32 datasize = 3;</code>
+       */
       public Builder setDatasize(int value) {
-        result.hasDatasize = true;
-        result.datasize_ = value;
+        bitField0_ |= 0x00000004;
+        datasize_ = value;
+        onChanged();
         return this;
       }
+      /**
+       * <code>required int32 datasize = 3;</code>
+       */
       public Builder clearDatasize() {
-        result.hasDatasize = false;
-        result.datasize_ = 0;
+        bitField0_ = (bitField0_ & ~0x00000004);
+        datasize_ = 0;
+        onChanged();
         return this;
       }
 
@@ -857,7 +1482,6 @@ public final class Fileformat {
 
     static {
       defaultInstance = new BlockHeader(true);
-      crosby.binary.Fileformat.internalForceInit();
       defaultInstance.initFields();
     }
 
@@ -891,8 +1515,7 @@ public final class Fileformat {
     };
     com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner assigner =
       new com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner() {
-        @Override
-		public com.google.protobuf.ExtensionRegistry assignDescriptors(
+        public com.google.protobuf.ExtensionRegistry assignDescriptors(
             com.google.protobuf.Descriptors.FileDescriptor root) {
           descriptor = root;
           internal_static_Blob_descriptor =
@@ -900,17 +1523,13 @@ public final class Fileformat {
           internal_static_Blob_fieldAccessorTable = new
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_Blob_descriptor,
-              new java.lang.String[] { "Raw", "RawSize", "ZlibData", "LzmaData", "Bzip2Data", },
-              crosby.binary.Fileformat.Blob.class,
-              crosby.binary.Fileformat.Blob.Builder.class);
+              new java.lang.String[] { "Raw", "RawSize", "ZlibData", "LzmaData", "Bzip2Data", });
           internal_static_BlockHeader_descriptor =
             getDescriptor().getMessageTypes().get(1);
           internal_static_BlockHeader_fieldAccessorTable = new
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_BlockHeader_descriptor,
-              new java.lang.String[] { "Type", "Indexdata", "Datasize", },
-              crosby.binary.Fileformat.BlockHeader.class,
-              crosby.binary.Fileformat.BlockHeader.Builder.class);
+              new java.lang.String[] { "Type", "Indexdata", "Datasize", });
           return null;
         }
       };
@@ -919,8 +1538,6 @@ public final class Fileformat {
         new com.google.protobuf.Descriptors.FileDescriptor[] {
         }, assigner);
   }
-
-  public static void internalForceInit() {}
 
   // @@protoc_insertion_point(outer_class_scope)
 }
