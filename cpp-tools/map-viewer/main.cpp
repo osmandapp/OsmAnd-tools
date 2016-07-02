@@ -36,6 +36,7 @@
 #include <OsmAndCore/WorldRegion.h>
 #include <OsmAndCore/WorldRegions.h>
 #include <OsmAndCore/RoadLocator.h>
+#include <OsmAndCore/IRoadLocator.h>
 #include <OsmAndCore/Data/Road.h>
 #include <OsmAndCore/Data/ObfRoutingSectionInfo.h>
 #include <OsmAndCore/Data/Amenity.h>
@@ -80,6 +81,7 @@
 #include <OsmAndCore/Search/AddressesByNameSearch.h>
 #include <OsmAndCore/ValueAnimator.h>
 #include <OsmAndCore/Utilities.h>
+#include <OsmAndCore/Search/ReverseGeocoder.h>
 
 bool glutWasInitialized = false;
 QMutex glutWasInitializedFlagMutex;
@@ -835,6 +837,22 @@ void keyboardHandler(unsigned char key, int x, int y)
     case 'k':
         renderer->setFieldOfView(state.fieldOfView - 0.5f);
         break;
+    case 'o':
+    {
+        auto position31 = renderer->getState().target31;
+        OsmAnd::ReverseGeocoder reverseGeocoder{obfsCollection, roadLocator};
+        OsmAnd::ReverseGeocoder::Criteria criteria;
+        criteria.position31 = position31;
+        QStringList roads{};
+        reverseGeocoder.performSearch(
+                    criteria,
+                    [&roads](const OsmAnd::ISearch::Criteria& criteria,
+                    const OsmAnd::BaseSearch::IResultEntry& resultEntry) {
+            roads.append(static_cast<const OsmAnd::ReverseGeocoder::ResultEntry &>(resultEntry).address);
+        });
+        textInfoDialog("Reverse geocoding", roads.join("\n"));
+        break;
+    }
     case 'z':
     {
         auto text = inputDialog(QStringLiteral("Input zoom"), QStringLiteral("Zoom: "), QString::number(state.zoomLevel));
@@ -1335,7 +1353,7 @@ void displayHandler()
 
         glRasterPos2f(8, t - 16 * 14);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("height scale (keys o,l): %1").arg(state.elevationDataConfiguration.scaleFactor)));
+            QStringLiteral("reverse geocoding (key o)")));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * 15);
