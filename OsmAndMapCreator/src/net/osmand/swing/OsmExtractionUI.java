@@ -3,18 +3,34 @@ package net.osmand.swing;
 import java.awt.BorderLayout;
 import java.awt.Container;
 import java.awt.FlowLayout;
+import java.awt.Point;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.FocusEvent;
+import java.awt.event.FocusListener;
+import java.awt.event.KeyAdapter;
+import java.awt.event.KeyEvent;
+import java.awt.event.KeyListener;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.io.RandomAccessFile;
 import java.lang.Thread.UncaughtExceptionHandler;
 import java.lang.reflect.InvocationTargetException;
 import java.sql.SQLException;
 import java.text.MessageFormat;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.FileHandler;
 import java.util.logging.LogManager;
 import java.util.logging.SimpleFormatter;
@@ -32,12 +48,15 @@ import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JPopupMenu;
 import javax.swing.JTextField;
+import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 import javax.swing.filechooser.FileFilter;
 import javax.xml.stream.XMLStreamException;
 
 import net.osmand.MapCreatorVersion;
+import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.data.preparation.IndexCreator;
 import net.osmand.map.IMapLocationListener;
 import net.osmand.map.ITileSource;
@@ -48,7 +67,10 @@ import net.osmand.osm.io.OsmBoundsFilter;
 import net.osmand.osm.io.OsmStorageWriter;
 import net.osmand.render.RenderingRulesTransformer;
 import net.osmand.router.RouteResultPreparation;
+import net.osmand.search.example.SearchUIAdapter;
+import net.osmand.search.example.core.SearchResult;
 import net.osmand.swing.MapPanel.MapSelectionArea;
+import net.osmand.util.Algorithms;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -131,6 +153,8 @@ public class OsmExtractionUI implements IMapLocationListener {
 	private JButton showOfflineIndex;
 
 	private String regionName;
+	private SearchUIAdapter searchUIAdapter;
+	
 
 	public OsmExtractionUI(){
 		createUI();
@@ -157,7 +181,24 @@ public class OsmExtractionUI implements IMapLocationListener {
 	    content.add(statusBarLabel, BorderLayout.SOUTH);
 	    File workingDir = DataExtractionSettings.getSettings().getDefaultWorkingDir();
 	    statusBarLabel.setText(workingDir == null ? Messages.getString("OsmExtractionUI.WORKING_DIR_UNSPECIFIED") : Messages.getString("OsmExtractionUI.WORKING_DIRECTORY") + workingDir.getAbsolutePath()); //$NON-NLS-1$ //$NON-NLS-2$
-
+	    String bdir = DataExtractionSettings.getSettings().getBinaryFilesDir();
+	    List<BinaryMapIndexReader> files = new ArrayList<>();
+	    if(!Algorithms.isEmpty(bdir)) {
+	    	File file = new File(bdir);
+	    	if(file.exists() && file.listFiles() != null) {
+	    		for(File obf : file.listFiles()) {
+	    			if(!obf.isDirectory() && obf.getName().endsWith(".obf")) {
+	    				try {
+							BinaryMapIndexReader bmir = new BinaryMapIndexReader(new RandomAccessFile(obf, "r"), obf);
+							files.add(bmir);
+						} catch (Exception e1) {
+							e1.printStackTrace();
+						}
+	    			}
+	    		}
+	    	}
+	    }
+	    searchUIAdapter = new SearchUIAdapter(files.toArray(new BinaryMapIndexReader[files.size()]));
 
 //	    treePlaces = new JTree();
 //		treePlaces.setModel(new DefaultTreeModel(new DefaultMutableTreeNode(Messages.getString("OsmExtractionUI.REGION")), false)); 	     //$NON-NLS-1$
@@ -174,18 +215,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 	    mapPanel.setStatusField(statusField);
 	    bl.add(statusField);
 
-	    statusField.addActionListener(new ActionListener() {
-
-			@Override
-			public void actionPerformed(ActionEvent arg0) {
-				String txt = statusField.getText();
-				int i = txt.indexOf("#map=");
-				String[] vs = txt.substring(i + "#map=".length()).split("/");
-				mapPanel.setLatLon(Float.parseFloat(vs[1]), Float.parseFloat(vs[2]));
-				mapPanel.setZoom(Integer.parseInt(vs[0]));
-
-			}
-		});
+	    updateStatusField(statusField);
 
 	    content.add(bl, BorderLayout.NORTH);
 	    JMenuBar bar = new JMenuBar();
@@ -194,7 +224,113 @@ public class OsmExtractionUI implements IMapLocationListener {
 
 	    frame.setJMenuBar(bar);
 	}
+	
+	JPopupMenu popup ;
+	boolean focusPopup = false;
+	private void updateStatusField(final JTextField statusField) {
+		popup = new JPopupMenu();
+		popup.setFocusable(false);
+		searchUIAdapter.setOnResultsComplete(new Runnable() {
+			
+			@Override
+			public void run() {
+				SwingUtilities.invokeLater(new Runnable() {
+					
+					@Override
+					public void run() {
+						updateSearchResult(statusField, searchUIAdapter.getCurrentSearchResults());						
+					}
+				});
+			}
+		});
+		statusField.addFocusListener(new FocusListener() {
+			@Override
+			public void focusLost(FocusEvent e) {
+//				if(e.getOppositeComponent() != popup) {
+//					popup.setVisible(false);
+//				}
+			}
+			
+			@Override
+			public void focusGained(FocusEvent e) {
+				popup.setFocusable(false);				
+			}
+		});
+		statusField.addKeyListener(new KeyAdapter() {
+			@Override
+			public void keyPressed(KeyEvent e) {
+				super.keyPressed(e);
+				
+				if(e.getKeyCode() == KeyEvent.VK_DOWN && popup.getComponentCount() > 0) {
+					popup.setVisible(false);
+					popup.setFocusable(true);
+					Point p = statusField.getLocation();
+					popup.show(e.getComponent(), p.x, p.y - 4 );
+					popup.requestFocus();
+	    			return;
+	    		}
+			}
+	    	@Override
+	    	public void keyTyped(KeyEvent e) {
+	    		if(e.getKeyCode() == KeyEvent.VK_DOWN) {
+	    			return;
+	    		}
+	    		String text = statusField.getText();
+	    		List<SearchResult> ls = Collections.emptyList();
+	    		if (!text.contains("#map")) {
+	    			ls  = searchUIAdapter.search(text);
+	    		}
+	    		updateSearchResult(statusField, ls);
+	    		
+	    	}
+			
+		});
+	    statusField.addActionListener(new ActionListener() {
 
+			@Override
+			public void actionPerformed(ActionEvent arg0) {
+				mapPanel.setStatusField(statusField);
+				String txt = statusField.getText();
+				int i = txt.indexOf("#map=");
+				if(i != -1) {
+					String[] vs = txt.substring(i + "#map=".length()).split("/");
+					mapPanel.setLatLon(Float.parseFloat(vs[1]), Float.parseFloat(vs[2]));
+					mapPanel.setZoom(Integer.parseInt(vs[0]));
+				}
+				mapPanel.refresh();
+			}
+		});
+	}
+	
+	private void updateSearchResult(final JTextField statusField, List<SearchResult> ls) {
+		popup.setVisible(false);
+		popup.removeAll();
+		if (ls.size() > 0) {
+			for (final SearchResult sr : ls) {
+				JMenuItem mi = new JMenuItem();
+				mi.setText(sr.mainName);
+				mi.addActionListener(new ActionListener() {
+
+					@Override
+					public void actionPerformed(ActionEvent e) {
+						mapPanel.setStatusField(null);
+						mapPanel.setLatLon(sr.location.getLatitude(), sr.location.getLongitude());
+						mapPanel.setZoom(sr.preferredZoom);
+						statusField.setText(sr.mainName + ", ");
+						// statusField.requestFocus();
+						// statusField.setCaretPosition(statusField.getText().length());
+					}
+				});
+				popup.add(mi);
+			}
+			Point p = statusField.getLocation();// .getCaret().getMagicCaretPosition();
+			if (popup.isVisible()) {
+				popup.setVisible(true);
+			} else {
+				popup.show(statusField.getParent(), p.x, p.y + statusField.getHeight() + 4);
+			}
+		}
+	}
 
 
 
@@ -255,6 +391,8 @@ public class OsmExtractionUI implements IMapLocationListener {
 		});
 		return panel;
 	}
+	
+	
 
 	private void initNativeRendering(String renderingProperties) {
 		String genFile = DataExtractionSettings.getSettings().getRenderGenXmlPath();

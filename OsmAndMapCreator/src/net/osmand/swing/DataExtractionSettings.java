@@ -271,6 +271,8 @@ public class DataExtractionSettings {
 		}
 		return getDefaultWorkingDir().getAbsolutePath();
 	}
+	
+	
 
 	public void setBinaryFilesDir(String file){
 		preferences.put("binaryFilesDir", file);

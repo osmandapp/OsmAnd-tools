@@ -388,7 +388,7 @@ int main(int argc, char** argv)
         (const OsmAnd::IMapRenderer* const mapRenderer)
         {
             //QMutexLocker scopedLocker(&glutWasInitializedFlagMutex);
-            sleep(1);
+            // sleep(1);
             if (glutWasInitialized) {
                 glutPostRedisplay();
             }
