@@ -57,7 +57,7 @@ public class QtCorePanel implements GLEventListener {
 	}
 
 	public static boolean isUnix() {
-		return (OS.indexOf("nix") >= 0 || OS.indexOf("nux") >= 0 || OS.indexOf("aix") > 0 );
+		return (OS.indexOf("nix") >= 0 || OS.indexOf("nux") >= 0 || OS.indexOf("aix") > 0);
 	}
 
 	public static void loadNative(String folder) {
@@ -168,7 +168,7 @@ public class QtCorePanel implements GLEventListener {
 				if (i > 0) {
 					String name = s.substring(0, i).trim();
 					String value = s.substring(i + 1).trim();
-					if(value.contains(";")) {
+					if (value.contains(";")) {
 						value = value.substring(0, value.indexOf(';'));
 					}
 					if (name.equals("lang")) {
@@ -261,7 +261,7 @@ public class QtCorePanel implements GLEventListener {
 		options.parseRenderingProperties(renderingProperties);
 		MapStylesCollection mapStylesCollection = new MapStylesCollection();
 		ResolvedMapStyle mapStyle = null;
-		if(this.styleFile != null) {
+		if (this.styleFile != null) {
 			mapStylesCollection.addStyleFromFile(this.styleFile);
 			System.out.println("Going to use map style from: " + this.styleFile);
 			mapStyle = mapStylesCollection.getResolvedStyleByName((new File(this.styleFile)).getName());
@@ -389,7 +389,7 @@ public class QtCorePanel implements GLEventListener {
 			mapRenderer
 					.setTarget(new PointI(MapUtils.get31TileNumberX(longitude), MapUtils.get31TileNumberY(latitude)));
 			mapRenderer.setZoom(zoom);
-			zoomField.setText("http://www.openstreetmap.org/#map=" + ((int)zoom) + "/" + ((float) latitude) + "/"
+			zoomField.setText("http://www.openstreetmap.org/#map=" + ((int) zoom) + "/" + ((float) latitude) + "/"
 					+ ((float) longitude));
 		}
 
@@ -413,7 +413,7 @@ public class QtCorePanel implements GLEventListener {
 			return getHeight() / 2;
 		}
 
-		public double getTileSize(){
+		public double getTileSize() {
 			return referenceTileSize;
 		}
 
@@ -516,9 +516,9 @@ public class QtCorePanel implements GLEventListener {
 				double lat = MapUtils.getLatitudeFromTile(zoom, getYTile() + dy / getTileSize());
 				double lon = MapUtils.getLongitudeFromTile(zoom, getXTile() + dx / getTileSize());
 				setLatLon(lat, lon);
-				if(e.getWheelRotation() < 0){
+				if (e.getWheelRotation() < 0) {
 					setZoom(getZoom() + 1);
-				} else if(e.getWheelRotation() > 0) {
+				} else if (e.getWheelRotation() > 0) {
 					setZoom(getZoom() - 1);
 				}
 				lat = MapUtils.getLatitudeFromTile(zoom, getYTile() - dy / getTileSize());
@@ -563,7 +563,7 @@ public class QtCorePanel implements GLEventListener {
 		// System.load("/home/victor/temp/test/libOsmAndCore_shared.so");
 		// System.load("/home/victor/temp/test/libOsmAndCoreJNI.so");
 		String nativePath = "/home/victor/temp/OsmAndMapCreator-main/lib-gl";
-		if(args.length > 0){
+		if (args.length > 0) {
 			nativePath = args[0];
 		}
 		loadNative(nativePath);
@@ -584,8 +584,6 @@ public class QtCorePanel implements GLEventListener {
 			}
 		});
 	}
-
-
 
 
 }
