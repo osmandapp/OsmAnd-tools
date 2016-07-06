@@ -82,12 +82,12 @@ for line in lines:
 						max_lat = '0'
 						max_lon = '0'
 					c.execute("INSERT INTO changesets(id, bot, created_at, closed_at, closed_at_day, "+
-											"minlat, minlon, maxlat, maxlon, username, uid)" +
+											"minlat, minlon, maxlat, maxlon, username, uid, created_by)" +
 				                        	" VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", 
 				                        	(vl['@id'],0,vl['@created_at'].replace('T', ' '),
 				                         	vl['@closed_at'].replace('T', ' '),vl['@closed_at'][0:10],
 				                         	min_lat, min_lon, max_lat, max_lon,
-				                         	vl['@user'], vl['@uid']))
+				                         	vl['@user'], vl['@uid'], vl['@created_by']))
 					#v =  u' - '.join([vl['@id'], vl['@user'], vl['@closed_at']])
 					#print v;
 					if maxdate is None:
