@@ -84,7 +84,9 @@ for line in lines:
 						max_lat = '0'
 						max_lon = '0'
 					print(json.dumps(vl))
-					tags = vl['tag']
+					tags = []
+					if 'tag' in vl :
+						tags = vl['tag']
 					createdby = ''
 					if '@k' in tags:
 						if tags['@k'] == 'created_by':
