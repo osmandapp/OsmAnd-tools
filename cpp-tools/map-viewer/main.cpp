@@ -36,6 +36,7 @@
 #include <OsmAndCore/WorldRegion.h>
 #include <OsmAndCore/WorldRegions.h>
 #include <OsmAndCore/RoadLocator.h>
+#include <OsmAndCore/IRoadLocator.h>
 #include <OsmAndCore/Data/Road.h>
 #include <OsmAndCore/Data/ObfRoutingSectionInfo.h>
 #include <OsmAndCore/Data/Amenity.h>
@@ -80,6 +81,7 @@
 #include <OsmAndCore/Search/AddressesByNameSearch.h>
 #include <OsmAndCore/ValueAnimator.h>
 #include <OsmAndCore/Utilities.h>
+#include <OsmAndCore/Search/ReverseGeocoder.h>
 
 bool glutWasInitialized = false;
 QMutex glutWasInitializedFlagMutex;
@@ -1366,7 +1368,7 @@ void displayHandler()
 
         glRasterPos2f(8, t - 16 * 14);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("height scale (keys o,l): %1").arg(state.elevationDataConfiguration.scaleFactor)));
+            QStringLiteral("reverse geocoding (key o)")));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * 15);
