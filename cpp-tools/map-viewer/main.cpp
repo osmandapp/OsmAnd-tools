@@ -529,11 +529,11 @@ std::unique_ptr<QProcess> zenity(const QString& cmd)
     return p;
 }
 
-QString inputDialog(const QString& title, const QString& text, const QString& entryText)
+QString inputDialog(const QString& title, const QString& text, const QString& entryText = "")
 {
-    //        Cannot use QtGui unfortuanately (why?)
-    //        QString text = QInputDialog::getText(this, tr("Input coordinate"), tr("Coordinate:"), QLineEdit::Normal, "", &ok);
-    //        But since this program runs only on Linux... We will do some weird stuff.
+    // Cannot use QtGui unfortuanately (why?)
+    // QString text = QInputDialog::getText(this, tr("Input coordinate"), tr("Coordinate:"), QLineEdit::Normal, "", &ok);
+    // But since this program runs only on Linux... We will do some weird stuff.
     auto p = zenity("zenity --entry --title=\"" % title % "\" --text=\"" % text % "\" --entry-text \"" % entryText);
     return p->readAllStandardOutput().simplified();
 }
@@ -731,7 +731,7 @@ void keyboardHandler(unsigned char key, int x, int y)
         state.zoomLevel + (state.visualZoom >= 1.0f ? state.visualZoom - 1.0f : (state.visualZoom - 1.0f) * 2.0f));
     const auto wasdStep = (1 << (31 - wasdZoom));
 
-    // ' ' * + - .  0 1 2 3 4 5 6 7 8 9 A D S W [ \\ \x1B ] a b c d e f g i j k l m n o p q r s t u w x z
+    // ' ' * + - .  0 1 2 3 4 5 6 7 8 9 A D S W [ \\ \x1B ] a b c d e f g h i j k l m n o p q r s t u v w x z
     switch (key)
     {
     case '\x1B':
@@ -848,18 +848,9 @@ void keyboardHandler(unsigned char key, int x, int y)
                     criteria,
                     [&roads](const OsmAnd::ISearch::Criteria& criteria,
                     const OsmAnd::BaseSearch::IResultEntry& resultEntry) {
-            roads.append(static_cast<const OsmAnd::ReverseGeocoder::ResultEntry &>(resultEntry).address);
+            roads.append(static_cast<const OsmAnd::ReverseGeocoder::ResultEntry&>(resultEntry).toString());
         });
         textInfoDialog("Reverse geocoding", roads.join("\n"));
-        break;
-    }
-    case 'z':
-    {
-        auto text = inputDialog(QStringLiteral("Input zoom"), QStringLiteral("Zoom: "), QString::number(state.zoomLevel));
-        bool ok;
-        double zoom = text.toDouble(&ok);
-        if (ok)
-            renderer->setZoom(zoom);
         break;
     }
     case 'l':
@@ -966,6 +957,30 @@ void keyboardHandler(unsigned char key, int x, int y)
         animator->animateAzimuthTo(0.0f, 1.0f, OsmAnd::MapAnimator::TimingFunction::EaseInOutQuadratic);
         animator->resume();
         break;
+    case 'v':
+    {
+        OsmAnd::AddressesByNameSearch addressByNameSearch{obfsCollection};
+        OsmAnd::AddressesByNameSearch::Criteria criteria;
+        criteria.name = inputDialog(QStringLiteral("Input name"), QStringLiteral("Name: "));
+        QStringList result{};
+        addressByNameSearch.performSearch(
+                    criteria,
+                    [&result](const OsmAnd::ISearch::Criteria& criteria,
+                    const OsmAnd::BaseSearch::IResultEntry& resultEntry) {
+            result.append(static_cast<const OsmAnd::AddressesByNameSearch::ResultEntry&>(resultEntry).address->toString());
+        });
+        textInfoDialog("Search results", result.join("\n"));
+        break;
+    }
+    case 'z':
+    {
+        auto text = inputDialog(QStringLiteral("Input zoom"), QStringLiteral("Zoom: "), QString::number(state.zoomLevel));
+        bool ok;
+        double zoom = text.toDouble(&ok);
+        if (ok)
+            renderer->setZoom(zoom);
+        break;
+    }
     case '0':
     case '1':
     case '2':
