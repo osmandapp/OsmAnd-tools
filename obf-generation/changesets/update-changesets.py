@@ -90,7 +90,7 @@ for line in lines:
 					createdby = ''
 					if '@k' in tags:
 						if tags['@k'] == 'created_by':
-							createdby = tg['@v']
+							createdby = tags['@v']
 					else:
 						for tg in tags:
 							if tg['@k'] == 'created_by':
