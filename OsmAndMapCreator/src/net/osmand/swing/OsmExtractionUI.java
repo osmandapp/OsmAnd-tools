@@ -10,11 +10,9 @@ import java.awt.event.FocusEvent;
 import java.awt.event.FocusListener;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
-import java.awt.event.KeyListener;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -26,11 +24,6 @@ import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 import java.util.logging.FileHandler;
 import java.util.logging.LogManager;
 import java.util.logging.SimpleFormatter;
@@ -57,6 +50,7 @@ import javax.xml.stream.XMLStreamException;
 
 import net.osmand.MapCreatorVersion;
 import net.osmand.binary.BinaryMapIndexReader;
+import net.osmand.data.LatLon;
 import net.osmand.data.preparation.IndexCreator;
 import net.osmand.map.IMapLocationListener;
 import net.osmand.map.ITileSource;
@@ -67,7 +61,7 @@ import net.osmand.osm.io.OsmBoundsFilter;
 import net.osmand.osm.io.OsmStorageWriter;
 import net.osmand.render.RenderingRulesTransformer;
 import net.osmand.router.RouteResultPreparation;
-import net.osmand.search.example.SearchUIAdapter;
+import net.osmand.search.example.SearchUICore;
 import net.osmand.search.example.core.SearchResult;
 import net.osmand.swing.MapPanel.MapSelectionArea;
 import net.osmand.util.Algorithms;
@@ -153,7 +147,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 	private JButton showOfflineIndex;
 
 	private String regionName;
-	private SearchUIAdapter searchUIAdapter;
+	private SearchUICore searchUICore;
 	
 
 	public OsmExtractionUI(){
@@ -198,7 +192,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 	    		}
 	    	}
 	    }
-	    searchUIAdapter = new SearchUIAdapter(files.toArray(new BinaryMapIndexReader[files.size()]));
+	    searchUICore = new SearchUICore(files.toArray(new BinaryMapIndexReader[files.size()]));
 
 //	    treePlaces = new JTree();
 //		treePlaces.setModel(new DefaultTreeModel(new DefaultMutableTreeNode(Messages.getString("OsmExtractionUI.REGION")), false)); 	     //$NON-NLS-1$
@@ -230,7 +224,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 	private void updateStatusField(final JTextField statusField) {
 		popup = new JPopupMenu();
 		popup.setFocusable(false);
-		searchUIAdapter.setOnResultsComplete(new Runnable() {
+		searchUICore.setOnResultsComplete(new Runnable() {
 			
 			@Override
 			public void run() {
@@ -238,7 +232,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 					
 					@Override
 					public void run() {
-						updateSearchResult(statusField, searchUIAdapter.getCurrentSearchResults());						
+						updateSearchResult(statusField, searchUICore.getCurrentSearchResults());						
 					}
 				});
 			}
@@ -253,7 +247,9 @@ public class OsmExtractionUI implements IMapLocationListener {
 			
 			@Override
 			public void focusGained(FocusEvent e) {
-				popup.setFocusable(false);				
+				popup.setFocusable(false);
+				searchUICore.setSearchLocation(new LatLon(mapPanel.getLatitude(),
+						mapPanel.getLongitude()));
 			}
 		});
 		statusField.addKeyListener(new KeyAdapter() {
@@ -276,9 +272,12 @@ public class OsmExtractionUI implements IMapLocationListener {
 	    			return;
 	    		}
 	    		String text = statusField.getText();
+	    		if(e.getKeyChar() != KeyEvent.CHAR_UNDEFINED) {
+	    			text += e.getKeyChar();
+	    		}
 	    		List<SearchResult> ls = Collections.emptyList();
 	    		if (!text.contains("#map")) {
-	    			ls  = searchUIAdapter.search(text);
+					ls = searchUICore.search(text, null);
 	    		}
 	    		updateSearchResult(statusField, ls);
 	    		
@@ -316,7 +315,8 @@ public class OsmExtractionUI implements IMapLocationListener {
 						mapPanel.setStatusField(null);
 						mapPanel.setLatLon(sr.location.getLatitude(), sr.location.getLongitude());
 						mapPanel.setZoom(sr.preferredZoom);
-						statusField.setText(sr.mainName + ", ");
+						searchUICore.selectSearchResult(sr);
+						statusField.setText(searchUICore.getPhrase().getText());
 						// statusField.requestFocus();
 						// statusField.setCaretPosition(statusField.getText().length());
 					}
