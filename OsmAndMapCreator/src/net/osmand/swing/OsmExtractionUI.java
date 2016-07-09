@@ -316,7 +316,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 						mapPanel.setLatLon(sr.location.getLatitude(), sr.location.getLongitude());
 						mapPanel.setZoom(sr.preferredZoom);
 						searchUICore.selectSearchResult(sr);
-						statusField.setText(searchUICore.getPhrase().getText());
+						statusField.setText(searchUICore.getPhrase().getText(true));
 						// statusField.requestFocus();
 						// statusField.setCaretPosition(statusField.getText().length());
 					}
