@@ -54,6 +54,7 @@ import net.osmand.data.LatLon;
 import net.osmand.data.preparation.IndexCreator;
 import net.osmand.map.IMapLocationListener;
 import net.osmand.map.ITileSource;
+import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.io.IOsmStorageFilter;
 import net.osmand.osm.io.OsmBaseStorage;
@@ -63,6 +64,7 @@ import net.osmand.render.RenderingRulesTransformer;
 import net.osmand.router.RouteResultPreparation;
 import net.osmand.search.example.SearchUICore;
 import net.osmand.search.example.core.SearchResult;
+import net.osmand.search.example.core.SearchSettings;
 import net.osmand.swing.MapPanel.MapSelectionArea;
 import net.osmand.util.Algorithms;
 
@@ -192,7 +194,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 	    		}
 	    	}
 	    }
-	    searchUICore = new SearchUICore(files.toArray(new BinaryMapIndexReader[files.size()]));
+	    searchUICore = new SearchUICore(MapPoiTypes.getDefault(), "ru", files.toArray(new BinaryMapIndexReader[files.size()]));
 
 //	    treePlaces = new JTree();
 //		treePlaces.setModel(new DefaultTreeModel(new DefaultMutableTreeNode(Messages.getString("OsmExtractionUI.REGION")), false)); 	     //$NON-NLS-1$
@@ -232,7 +234,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 					
 					@Override
 					public void run() {
-						updateSearchResult(statusField, searchUICore.getCurrentSearchResults());						
+						updateSearchResult(statusField, searchUICore.getCurrentSearchResults(), true);						
 					}
 				});
 			}
@@ -248,8 +250,9 @@ public class OsmExtractionUI implements IMapLocationListener {
 			@Override
 			public void focusGained(FocusEvent e) {
 				popup.setFocusable(false);
-				searchUICore.setSearchLocation(new LatLon(mapPanel.getLatitude(),
+				SearchSettings settings = searchUICore.getPhrase().getSettings().setOriginalLocation(new LatLon(mapPanel.getLatitude(),
 						mapPanel.getLongitude()));
+				searchUICore.updateSettings(settings);
 			}
 		});
 		statusField.addKeyListener(new KeyAdapter() {
@@ -279,7 +282,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 	    		if (!text.contains("#map")) {
 					ls = searchUICore.search(text, null);
 	    		}
-	    		updateSearchResult(statusField, ls);
+	    		updateSearchResult(statusField, ls, false);
 	    		
 	    	}
 			
@@ -301,24 +304,49 @@ public class OsmExtractionUI implements IMapLocationListener {
 		});
 	}
 	
-	private void updateSearchResult(final JTextField statusField, List<SearchResult> ls) {
+	private void updateSearchResult(final JTextField statusField, List<SearchResult> ls, boolean addMore) {
 		popup.setVisible(false);
 		popup.removeAll();
 		if (ls.size() > 0) {
+			int count = 30;
 			for (final SearchResult sr : ls) {
+				count --;
+				if(count == 0) {
+					break;
+				}
 				JMenuItem mi = new JMenuItem();
-				mi.setText(sr.mainName);
+				mi.setText(sr.localeName + " [" + sr.objectType +"]");
 				mi.addActionListener(new ActionListener() {
 
 					@Override
 					public void actionPerformed(ActionEvent e) {
 						mapPanel.setStatusField(null);
-						mapPanel.setLatLon(sr.location.getLatitude(), sr.location.getLongitude());
-						mapPanel.setZoom(sr.preferredZoom);
+						if(sr.location != null) {
+							mapPanel.setLatLon(sr.location.getLatitude(), sr.location.getLongitude());
+							mapPanel.setZoom(sr.preferredZoom);
+						}
 						searchUICore.selectSearchResult(sr);
-						statusField.setText(searchUICore.getPhrase().getText(true));
+						String txt = searchUICore.getPhrase().getText(true);
+						statusField.setText(txt);
+						searchUICore.search(txt, null);
 						// statusField.requestFocus();
 						// statusField.setCaretPosition(statusField.getText().length());
+					}
+				});
+				popup.add(mi);
+			}
+			if(addMore) {
+				JMenuItem mi = new JMenuItem();
+				mi.setText("More...");
+				mi.addActionListener(new ActionListener() {
+
+					@SuppressWarnings("unchecked")
+					@Override
+					public void actionPerformed(ActionEvent e) {
+						SearchSettings settings = searchUICore.getPhrase().getSettings();
+						SearchSettings nsettings = settings.setRadiusLevel(settings.getRadiusLevel() + 1);
+						searchUICore.updateSettings(nsettings);
+						updateSearchResult(statusField, Collections.EMPTY_LIST, false);
 					}
 				});
 				popup.add(mi);
