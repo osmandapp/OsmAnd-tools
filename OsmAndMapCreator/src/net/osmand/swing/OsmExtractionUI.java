@@ -66,6 +66,7 @@ import net.osmand.search.example.core.SearchResult;
 import net.osmand.search.example.core.SearchSettings;
 import net.osmand.swing.MapPanel.MapSelectionArea;
 import net.osmand.util.Algorithms;
+import net.osmand.util.MapUtils;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -340,7 +341,12 @@ public class OsmExtractionUI implements IMapLocationListener {
 //					break;
 				}
 				JMenuItem mi = new JMenuItem();
-				mi.setText(sr.localeName + " [" + sr.objectType +"]");
+				LatLon location = res.getPhrase().getLastTokenLocation();
+				String locationString ="";
+				if(sr.location != null) {
+					locationString = ((int) MapUtils.getDistance(location, sr.location)) + " m";
+				}
+				mi.setText(sr.localeName + " [" + sr.objectType +"] " +locationString);
 				mi.addActionListener(new ActionListener() {
 
 					@Override
