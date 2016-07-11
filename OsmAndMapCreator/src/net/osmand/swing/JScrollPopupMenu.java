@@ -6,13 +6,21 @@ import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Insets;
 import java.awt.LayoutManager;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.awt.event.AdjustmentEvent;
 import java.awt.event.AdjustmentListener;
+import java.awt.event.KeyEvent;
 import java.awt.event.MouseWheelEvent;
 import java.awt.event.MouseWheelListener;
 
+import javax.swing.AbstractButton;
+import javax.swing.JMenuItem;
 import javax.swing.JPopupMenu;
 import javax.swing.JScrollBar;
+import javax.swing.MenuElement;
+import javax.swing.event.MenuKeyEvent;
+import javax.swing.event.MenuKeyListener;
 
 //http://stackoverflow.com/questions/9288350/adding-vertical-scroll-to-a-jpopupmenu
 public class JScrollPopupMenu extends JPopupMenu {
@@ -44,6 +52,33 @@ public class JScrollPopupMenu extends JPopupMenu {
 
 				scrollBar.setValue(scrollBar.getValue() + amount);
 				event.consume();
+			}
+		});
+		
+		addMenuKeyListener(new MenuKeyListener() {
+			
+			@Override
+			public void menuKeyTyped(MenuKeyEvent e) {
+			}
+			
+			@Override
+			public void menuKeyReleased(MenuKeyEvent e) {
+			}
+			
+			@Override
+			public void menuKeyPressed(MenuKeyEvent e) {
+				if (e.getKeyCode() == KeyEvent.VK_ENTER) {
+					for (MenuElement me : e.getMenuSelectionManager().getSelectedPath()) {
+						if (me instanceof JMenuItem) {
+							ActionListener[] as = ((JMenuItem) me).getActionListeners();
+							for (ActionListener a : as) {
+								a.actionPerformed(new ActionEvent(getComponent(), 0, ""));
+							}
+						}
+					}
+					
+				}
+				
 			}
 		});
 	}

@@ -347,7 +347,10 @@ public class OsmExtractionUI implements IMapLocationListener {
 				if(sr.location != null) {
 					locationString = ((int) MapUtils.getDistance(location, sr.location)) / 1000.f + " km";
 				}
-				mi.setText(sr.localeName + " [" + sr.objectType +"] " +locationString);
+				if (!Algorithms.isEmpty(sr.localeOtherName)) {
+					locationString += " " + sr.localeOtherName;
+				}
+				mi.setText(sr.localeName + " [" + sr.objectType + "] " + locationString);
 				mi.addActionListener(new ActionListener() {
 
 					@Override
@@ -361,7 +364,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 						String txt = searchUICore.getPhrase().getText(true);
 						statusField.setText(txt);
 						searchUICore.search(txt, null);
-						// statusField.requestFocus();
+						statusField.requestFocus();
 						// statusField.setCaretPosition(statusField.getText().length());
 					}
 				});
