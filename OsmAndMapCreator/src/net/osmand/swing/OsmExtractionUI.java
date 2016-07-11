@@ -22,7 +22,6 @@ import java.lang.reflect.InvocationTargetException;
 import java.sql.SQLException;
 import java.text.MessageFormat;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.logging.FileHandler;
 import java.util.logging.LogManager;
@@ -41,7 +40,6 @@ import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
-import javax.swing.JPopupMenu;
 import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
@@ -63,6 +61,7 @@ import net.osmand.osm.io.OsmStorageWriter;
 import net.osmand.render.RenderingRulesTransformer;
 import net.osmand.router.RouteResultPreparation;
 import net.osmand.search.example.SearchUICore;
+import net.osmand.search.example.SearchUICore.SearchResultCollection;
 import net.osmand.search.example.core.SearchResult;
 import net.osmand.search.example.core.SearchSettings;
 import net.osmand.swing.MapPanel.MapSelectionArea;
@@ -194,7 +193,12 @@ public class OsmExtractionUI implements IMapLocationListener {
 	    		}
 	    	}
 	    }
-	    searchUICore = new SearchUICore(MapPoiTypes.getDefault(), "ru", files.toArray(new BinaryMapIndexReader[files.size()]));
+	    String loc = DataExtractionSettings.getSettings().getSearchLocale();
+	    if(loc.isEmpty()) {
+	    	loc = null;
+	    }
+	    searchUICore = new SearchUICore(MapPoiTypes.getDefault(),
+	    		loc, files.toArray(new BinaryMapIndexReader[files.size()]));
 
 //	    treePlaces = new JTree();
 //		treePlaces.setModel(new DefaultTreeModel(new DefaultMutableTreeNode(Messages.getString("OsmExtractionUI.REGION")), false)); 	     //$NON-NLS-1$
@@ -221,10 +225,11 @@ public class OsmExtractionUI implements IMapLocationListener {
 	    frame.setJMenuBar(bar);
 	}
 	
-	JPopupMenu popup ;
+	JScrollPopupMenu popup;
 	boolean focusPopup = false;
 	private void updateStatusField(final JTextField statusField) {
-		popup = new JPopupMenu();
+		popup = new JScrollPopupMenu();
+		popup.setMaximumVisibleRows(15);
 		popup.setFocusable(false);
 		searchUICore.setOnResultsComplete(new Runnable() {
 			
@@ -234,7 +239,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 					
 					@Override
 					public void run() {
-						updateSearchResult(statusField, searchUICore.getCurrentSearchResults(), true);						
+						updateSearchResult(statusField, searchUICore.getCurrentSearchResult(), true);						
 					}
 				});
 			}
@@ -252,6 +257,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 				popup.setFocusable(false);
 				SearchSettings settings = searchUICore.getPhrase().getSettings().setOriginalLocation(new LatLon(mapPanel.getLatitude(),
 						mapPanel.getLongitude()));
+				settings = settings.setLang(DataExtractionSettings.getSettings().getSearchLocale());
 				searchUICore.updateSettings(settings);
 			}
 		});
@@ -278,12 +284,15 @@ public class OsmExtractionUI implements IMapLocationListener {
 	    		if(e.getKeyChar() != KeyEvent.CHAR_UNDEFINED) {
 	    			text += e.getKeyChar();
 	    		}
-	    		List<SearchResult> ls = Collections.emptyList();
-	    		if (!text.contains("#map")) {
-					ls = searchUICore.search(text, null);
+	    		SearchSettings settings = searchUICore.getPhrase().getSettings();
+	    		if(settings.getRadiusLevel() != 1){
+	    			searchUICore.updateSettings(settings.setRadiusLevel(1));
 	    		}
-	    		updateSearchResult(statusField, ls, false);
-	    		
+	    		SearchResultCollection c = new SearchResultCollection();
+	    		if (!text.contains("#map")) {
+					c = searchUICore.search(text, null);
+	    		}
+	    		updateSearchResult(statusField, c, false);
 	    	}
 			
 		});
@@ -304,15 +313,31 @@ public class OsmExtractionUI implements IMapLocationListener {
 		});
 	}
 	
-	private void updateSearchResult(final JTextField statusField, List<SearchResult> ls, boolean addMore) {
+	private void updateSearchResult(final JTextField statusField, SearchResultCollection res, boolean addMore) {
 		popup.setVisible(false);
 		popup.removeAll();
-		if (ls.size() > 0) {
+		if (res.getCurrentSearchResults().size() > 0) {
 			int count = 30;
-			for (final SearchResult sr : ls) {
+			if(addMore) {
+				JMenuItem mi = new JMenuItem();
+				mi.setText("Results " + res.getCurrentSearchResults().size() + ", radius " + res.getPhrase().getRadiusLevel()+
+						" (show more...)");
+				mi.addActionListener(new ActionListener() {
+
+					@Override
+					public void actionPerformed(ActionEvent e) {
+						SearchSettings settings = searchUICore.getPhrase().getSettings();
+						searchUICore.updateSettings(settings.setRadiusLevel(settings.getRadiusLevel() + 1));
+						searchUICore.search(statusField.getText(), null);
+						updateSearchResult(statusField, new SearchResultCollection(), false);
+					}
+				});
+				popup.add(mi);
+			}
+			for (final SearchResult sr : res.getCurrentSearchResults()) {
 				count --;
 				if(count == 0) {
-					break;
+//					break;
 				}
 				JMenuItem mi = new JMenuItem();
 				mi.setText(sr.localeName + " [" + sr.objectType +"]");
@@ -331,22 +356,6 @@ public class OsmExtractionUI implements IMapLocationListener {
 						searchUICore.search(txt, null);
 						// statusField.requestFocus();
 						// statusField.setCaretPosition(statusField.getText().length());
-					}
-				});
-				popup.add(mi);
-			}
-			if(addMore) {
-				JMenuItem mi = new JMenuItem();
-				mi.setText("More...");
-				mi.addActionListener(new ActionListener() {
-
-					@SuppressWarnings("unchecked")
-					@Override
-					public void actionPerformed(ActionEvent e) {
-						SearchSettings settings = searchUICore.getPhrase().getSettings();
-						SearchSettings nsettings = settings.setRadiusLevel(settings.getRadiusLevel() + 1);
-						searchUICore.updateSettings(nsettings);
-						updateSearchResult(statusField, Collections.EMPTY_LIST, false);
 					}
 				});
 				popup.add(mi);

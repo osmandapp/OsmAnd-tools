@@ -17,12 +17,16 @@ import javax.swing.JDialog;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JScrollPane;
 import javax.swing.JTextField;
+import javax.swing.ScrollPaneConstants;
 
 
 public class OsmExtractionPreferencesDialog extends JDialog {
 
 	private static final long serialVersionUID = -4862884032977071296L;
+
+	private static final int MAX_WIDTH = 700;
 
 	private JButton okButton;
 	private JButton cancelButton;
@@ -30,6 +34,7 @@ public class OsmExtractionPreferencesDialog extends JDialog {
 	private JTextField streetSuffixes;
 	private JTextField streetDefaultSuffixes;
 	private JTextField mapZooms;
+	private JTextField searchLocale;
 	private JTextField routingMode;
 	private JTextField lineSmoothness;
 	private JTextField renderingTypesFile;
@@ -60,7 +65,7 @@ public class OsmExtractionPreferencesDialog extends JDialog {
     }
 
 	public void showDialog(){
-		setSize(700, 600);
+		setSize(MAX_WIDTH + 50, 600);
         double x = getParent().getBounds().getCenterX();
         double y = getParent().getBounds().getCenterY();
         setLocation((int) x - getWidth() / 2, (int) y - getHeight() / 2);
@@ -71,12 +76,27 @@ public class OsmExtractionPreferencesDialog extends JDialog {
 		JPanel pane = new JPanel();
 		pane.setLayout(new BoxLayout(pane, BoxLayout.Y_AXIS));
         pane.setBorder(BorderFactory.createEmptyBorder(10, 10, 5, 10));
-        add(pane);
+//        add(pane);
 
 
-        createGeneralSection(pane);
-        createNormalizingStreetSection(pane);
-        createAddressSection(pane);
+        JPanel innerPane = new JPanel();
+        innerPane.setLayout(new BoxLayout(innerPane, BoxLayout.Y_AXIS));
+        createGeneralSection(innerPane );
+        createMapCreationSection(innerPane );
+        createSearchSection(innerPane );
+        createAddressSection(innerPane );
+        
+        Dimension d = innerPane.getPreferredSize();
+        d.width = MAX_WIDTH;
+        innerPane.setPreferredSize(d);
+		JScrollPane spanel = new JScrollPane(innerPane, 
+				ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED,
+			    ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+//		spanel.setSize(new Dimension(MAX_WIDTH+100, 1000));
+//		spanel.setSize(MAX_WIDTH, innerPane.getPreferredSize().height);
+//		pane.setMaximumSize(new Dimension(600, Short.MAX_VALUE));
+		pane.add(spanel);
+		add(pane);
         pane.add(Box.createVerticalGlue());
 
         FlowLayout l = new FlowLayout(FlowLayout.RIGHT);
@@ -86,7 +106,6 @@ public class OsmExtractionPreferencesDialog extends JDialog {
         cancelButton = new JButton(Messages.getString("OsmExtractionPreferencesDialog.CANCEL")); //$NON-NLS-1$
         buttonsPane.add(cancelButton);
 
-        buttonsPane.setMaximumSize(new Dimension(Short.MAX_VALUE, (int) l.preferredLayoutSize(buttonsPane).getHeight()));
         pane.add(buttonsPane);
 
         addListeners();
@@ -200,7 +219,7 @@ public class OsmExtractionPreferencesDialog extends JDialog {
         nativeLibFile = addTextField(panel, gridY++, l, "Native lib file (osmand.lib): ", DataExtractionSettings.getSettings().getNativeLibFile());
         nativeQtLib = addTextField(panel, gridY++, l, "Native lib folder (qt core): ", DataExtractionSettings.getSettings().getQtLibFolder());
 
-		panel.setMaximumSize(new Dimension(Short.MAX_VALUE, panel.getPreferredSize().height));
+		panel.setMaximumSize(new Dimension(MAX_WIDTH, panel.getPreferredSize().height));
 
 	}
 
@@ -244,14 +263,45 @@ public class OsmExtractionPreferencesDialog extends JDialog {
 		l.setConstraints(checkBox, constr);
 		return checkBox;
 	}
+	
+	private void createSearchSection(JPanel root) {
+		JPanel panel = new JPanel();
+		GridBagLayout l = new GridBagLayout();
+		panel.setLayout(l);
+		panel.setBorder(BorderFactory.createTitledBorder("Search parameters"));
+		JLabel label = new JLabel("Locale to use for search (2 characters)");
+		panel.add(label);
+		GridBagConstraints constr = new GridBagConstraints();
+		constr.ipadx = 5;
+		constr.gridx = 0;
+		constr.gridy = 2;
+		constr.anchor = GridBagConstraints.WEST;
+		l.setConstraints(label, constr);
 
-	private void createNormalizingStreetSection(JPanel root) {
+		searchLocale = new JTextField();
+		searchLocale.setText(DataExtractionSettings.getSettings().getSearchLocale());
+		panel.add(searchLocale);
+		constr = new GridBagConstraints();
+		constr.weightx = 1;
+		constr.fill = GridBagConstraints.HORIZONTAL;
+		constr.ipadx = 5;
+		constr.gridx = 1;
+		constr.gridy = 2;
+		l.setConstraints(searchLocale, constr);
+
+		root.add(panel);
+		panel.setMaximumSize(new Dimension(MAX_WIDTH, panel.getPreferredSize().height));
+	}
+
+	private void createMapCreationSection(JPanel root) {
 		JPanel panel = new JPanel();
 		GridBagLayout l = new GridBagLayout();
 		panel.setLayout(l);
 		panel.setBorder(BorderFactory.createTitledBorder("Map creation parameters"));
-		root.add(panel);
-
+		
+		
+//		root.add(panel);
+		
 		JLabel label = new JLabel(Messages.getString("OsmExtractionPreferencesDialog.NAME.SUFFIXES")); //$NON-NLS-1$
 		panel.add(label);
 		GridBagConstraints constr = new GridBagConstraints();
@@ -352,7 +402,8 @@ public class OsmExtractionPreferencesDialog extends JDialog {
 		constr.gridy = 4;
 		l.setConstraints(renderingTypesFile, constr);
 
-		panel.setMaximumSize(new Dimension(Short.MAX_VALUE, panel.getPreferredSize().height));
+		root.add(panel);
+		panel.setMaximumSize(new Dimension(MAX_WIDTH, panel.getPreferredSize().height));
 	}
 
 	private void createAddressSection(JPanel root) {
@@ -371,7 +422,7 @@ public class OsmExtractionPreferencesDialog extends JDialog {
 				DataExtractionSettings.getSettings().isAdditionalInfo(),
 				Messages.getString("OsmExtractionPreferencesDialog.ADDITIONAL.INFO"), l);
 
-		panel.setMaximumSize(new Dimension(Short.MAX_VALUE, panel.getPreferredSize().height));
+		panel.setMaximumSize(new Dimension(MAX_WIDTH, panel.getPreferredSize().height));
 	}
 
 	private void addListeners(){
@@ -424,6 +475,9 @@ public class OsmExtractionPreferencesDialog extends JDialog {
 		}
 		if(!settings.getMapZoomsValue().equals(mapZooms.getText())){
 			settings.setMapZooms(mapZooms.getText());
+		}
+		if(!settings.getSearchLocale().equals(searchLocale.getText())){
+			settings.setSearchLocale(searchLocale.getText());
 		}
 		if(!settings.getMapRenderingTypesFile().equals(renderingTypesFile.getText())){
 			settings.setMapRenderingTypesFile(renderingTypesFile.getText());

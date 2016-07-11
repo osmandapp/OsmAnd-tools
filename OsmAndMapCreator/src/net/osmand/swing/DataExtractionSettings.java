@@ -186,6 +186,14 @@ public class DataExtractionSettings {
 	}
 
 
+	public String getSearchLocale(){
+		return preferences.get("searchLocale", "");
+	}
+
+	public void setSearchLocale(String s){
+		preferences.put("searchLocale", s);
+	}
+	
 	public String getRouteMode(){
 		return preferences.get("routeMode", "car,short_way");
 	}
