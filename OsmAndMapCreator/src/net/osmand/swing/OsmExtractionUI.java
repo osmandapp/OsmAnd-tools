@@ -230,7 +230,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 	boolean focusPopup = false;
 	private void updateStatusField(final JTextField statusField) {
 		popup = new JScrollPopupMenu();
-		popup.setMaximumVisibleRows(15);
+		popup.setMaximumVisibleRows(25);
 		popup.setFocusable(false);
 		searchUICore.setOnResultsComplete(new Runnable() {
 			
@@ -271,7 +271,8 @@ public class OsmExtractionUI implements IMapLocationListener {
 					popup.setVisible(false);
 					popup.setFocusable(true);
 					Point p = statusField.getLocation();
-					popup.show(e.getComponent(), p.x, p.y - 4 );
+					 popup.show(e.getComponent(), p.x, p.y - 4 );
+//					popup.show();
 					popup.requestFocus();
 	    			return;
 	    		}
@@ -344,7 +345,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 				LatLon location = res.getPhrase().getLastTokenLocation();
 				String locationString ="";
 				if(sr.location != null) {
-					locationString = ((int) MapUtils.getDistance(location, sr.location)) + " m";
+					locationString = ((int) MapUtils.getDistance(location, sr.location)) / 1000.f + " km";
 				}
 				mi.setText(sr.localeName + " [" + sr.objectType +"] " +locationString);
 				mi.addActionListener(new ActionListener() {
@@ -370,7 +371,8 @@ public class OsmExtractionUI implements IMapLocationListener {
 			if (popup.isVisible()) {
 				popup.setVisible(true);
 			} else {
-				popup.show(statusField.getParent(), p.x, p.y + statusField.getHeight() + 4);
+				 popup.show(statusField.getParent(), p.x, p.y + statusField.getHeight() + 4);
+//				popup.show();
 			}
 		}
 	}

@@ -14,12 +14,19 @@ import java.awt.event.MouseWheelListener;
 import javax.swing.JPopupMenu;
 import javax.swing.JScrollBar;
 
-// http://stackoverflow.com/questions/9288350/adding-vertical-scroll-to-a-jpopupmenu
+//http://stackoverflow.com/questions/9288350/adding-vertical-scroll-to-a-jpopupmenu
 public class JScrollPopupMenu extends JPopupMenu {
 	protected int maximumVisibleRows = 10;
 
 	public JScrollPopupMenu() {
 		this(null);
+	}
+	
+	@Override
+	public void removeAll() {
+		while(getComponentCount() > 1) {
+			remove(0);
+		}
 	}
 
 	public JScrollPopupMenu(String label) {
@@ -54,7 +61,7 @@ public class JScrollPopupMenu extends JPopupMenu {
 				}
 			});
 
-			popupScrollBar.setVisible(false);
+			popupScrollBar.setVisible(true);
 		}
 
 		return popupScrollBar;
@@ -82,6 +89,7 @@ public class JScrollPopupMenu extends JPopupMenu {
 		}
 	}
 
+	
 	public void remove(int index) {
 		// can't remove the scrollbar
 		++index;
@@ -125,6 +133,7 @@ public class JScrollPopupMenu extends JPopupMenu {
 			width += scrollBar.getPreferredSize().width + widthMargin;
 			int height = heightMargin + extent;
 
+			scrollBar.setSize(new Dimension(width, height));
 			setPopupSize(new Dimension(width, height));
 		}
 
