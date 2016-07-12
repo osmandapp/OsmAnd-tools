@@ -62,6 +62,7 @@ import net.osmand.render.RenderingRulesTransformer;
 import net.osmand.router.RouteResultPreparation;
 import net.osmand.search.example.SearchUICore;
 import net.osmand.search.example.SearchUICore.SearchResultCollection;
+import net.osmand.search.example.core.SearchCoreFactory;
 import net.osmand.search.example.core.SearchResult;
 import net.osmand.search.example.core.SearchSettings;
 import net.osmand.swing.MapPanel.MapSelectionArea;
@@ -200,6 +201,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 	    }
 	    searchUICore = new SearchUICore(MapPoiTypes.getDefault(),
 	    		loc, files.toArray(new BinaryMapIndexReader[files.size()]));
+	    searchUICore.registerAPI(new SearchCoreFactory.SearchRegionByNameAPI());
 
 //	    treePlaces = new JTree();
 //		treePlaces.setModel(new DefaultTreeModel(new DefaultMutableTreeNode(Messages.getString("OsmExtractionUI.REGION")), false)); 	     //$NON-NLS-1$
