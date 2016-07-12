@@ -285,8 +285,13 @@ public class OsmExtractionUI implements IMapLocationListener {
 	    			return;
 	    		}
 	    		String text = statusField.getText();
+	    		int ps = statusField.getCaretPosition();
 	    		if(e.getKeyChar() != KeyEvent.CHAR_UNDEFINED) {
-	    			text += e.getKeyChar();
+	    			if(ps >= text.length()) {
+	    				text += e.getKeyChar();
+	    			} else {
+	    				text = text.substring(0, ps) + e.getKeyChar() + text.substring(ps);
+	    			}
 	    		}
 	    		SearchSettings settings = searchUICore.getPhrase().getSettings();
 	    		if(settings.getRadiusLevel() != 1){
