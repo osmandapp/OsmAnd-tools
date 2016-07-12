@@ -318,7 +318,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 	private void updateSearchResult(final JTextField statusField, SearchResultCollection res, boolean addMore) {
 		popup.setVisible(false);
 		popup.removeAll();
-		if (res.getCurrentSearchResults().size() > 0) {
+		if (res.getCurrentSearchResults().size() > 0 || addMore) {
 			int count = 30;
 			if(addMore) {
 				JMenuItem mi = new JMenuItem();
@@ -347,8 +347,11 @@ public class OsmExtractionUI implements IMapLocationListener {
 				if(sr.location != null) {
 					locationString = ((int) MapUtils.getDistance(location, sr.location)) / 1000.f + " km";
 				}
-				if (!Algorithms.isEmpty(sr.localeOtherName)) {
-					locationString += " " + sr.localeOtherName;
+				if (!Algorithms.isEmpty(sr.localeRelatedObjectName)) {
+					locationString += " " + sr.localeRelatedObjectName;
+					if (sr.distRelatedObjectName != 0) {
+						locationString += " " + (int) (sr.distRelatedObjectName / 1000.f) + " km";
+					}
 				}
 				mi.setText(sr.localeName + " [" + sr.objectType + "] " + locationString);
 				mi.addActionListener(new ActionListener() {
