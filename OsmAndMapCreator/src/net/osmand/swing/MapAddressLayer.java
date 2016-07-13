@@ -145,7 +145,10 @@ public class MapAddressLayer implements MapPanelLayer {
 			if (f.getName().endsWith(".obf")) {
 				RandomAccessFile raf = new RandomAccessFile(f, "r"); //$NON-NLS-1$ //$NON-NLS-2$
 				BinaryMapIndexReader rd = new BinaryMapIndexReader(raf, f);
-				if (rd.containsAddressData() && (!rd.containsPoiData() || rd.containsPoiData(lat, lon))) {
+				int x31 = MapUtils.get31TileNumberX(lon);
+				int y31 = MapUtils.get31TileNumberY(lat);
+				if (rd.containsAddressData() && (!rd.containsPoiData() ||
+						rd.containsPoiData(x31, y31, x31, y31))) {
 					searchAddressDetailedInfo(rd, lat, lon, results);
 				}
 				rd.close();

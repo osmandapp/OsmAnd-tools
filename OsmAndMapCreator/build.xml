@@ -201,9 +201,9 @@
 	<target name="native-libs">
 		<!-- DISABLE NATIVE BUILDS
 		<ant antfile="${osmand-jni.dir}/build.xml" target="native-libs-jar" dir="${osmand-jni.dir}" inheritAll="false" inheritRefs="false">
-		</ant> -->
-		<ant antfile="${osmand-jni.dir}/build.xml" target="native-legacy-libs-jar" dir="${osmand-jni.dir}" inheritAll="false" inheritRefs="false">
 		</ant>
+		<ant antfile="${osmand-jni.dir}/build.xml" target="native-legacy-libs-jar" dir="${osmand-jni.dir}" inheritAll="false" inheritRefs="false">
+		</ant> -->
 	</target>
 
 	<target name="update-jni">
