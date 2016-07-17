@@ -245,6 +245,9 @@ public class MapRoutingTypes {
 		for(Entry<String, String> es : tags.entrySet()) {
 			String tag = es.getKey();
 			String value = converBooleanValue(es.getValue());
+			if(!testNonParseableRules(tag, value)){
+				continue;
+			}
 			String tvl = getMap(BASE_TAGS_TO_REPLACE, tag, value);
 			if(tvl != null) {
 				int i = tvl.indexOf(TAG_DELIMETER);
