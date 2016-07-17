@@ -1243,6 +1243,8 @@ void idleHandler(void)
     animator->update(elapsedSeconds.count());
 
     lastTimeStamp = currentTimeStamp;
+     // sleep 10 ms 
+     usleep(10 * 1000);
 }
 
 void displayHandler()
