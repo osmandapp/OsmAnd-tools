@@ -48,6 +48,9 @@ import javax.xml.stream.XMLStreamException;
 
 import net.osmand.MapCreatorVersion;
 import net.osmand.binary.BinaryMapIndexReader;
+import net.osmand.binary.CachedOsmandIndexes;
+import net.osmand.binary.OsmandOdb;
+import net.osmand.data.Amenity;
 import net.osmand.data.LatLon;
 import net.osmand.data.preparation.IndexCreator;
 import net.osmand.map.IMapLocationListener;
@@ -180,21 +183,36 @@ public class OsmExtractionUI implements IMapLocationListener {
 	    statusBarLabel.setText(workingDir == null ? Messages.getString("OsmExtractionUI.WORKING_DIR_UNSPECIFIED") : Messages.getString("OsmExtractionUI.WORKING_DIRECTORY") + workingDir.getAbsolutePath()); //$NON-NLS-1$ //$NON-NLS-2$
 	    String bdir = DataExtractionSettings.getSettings().getBinaryFilesDir();
 	    List<BinaryMapIndexReader> files = new ArrayList<>();
-	    if(!Algorithms.isEmpty(bdir)) {
-	    	File file = new File(bdir);
-	    	if(file.exists() && file.listFiles() != null) {
-	    		for(File obf : file.listFiles()) {
-	    			if(!obf.isDirectory() && obf.getName().endsWith(".obf")) {
-	    				try {
-							BinaryMapIndexReader bmir = new BinaryMapIndexReader(new RandomAccessFile(obf, "r"), obf);
-							files.add(bmir);
-						} catch (Exception e1) {
-							e1.printStackTrace();
+		if (!Algorithms.isEmpty(bdir)) {
+			try {
+				File bdirFile = new File(bdir);
+				File cacheFile = new File(bdirFile, "indexes.cache");
+				CachedOsmandIndexes cache = new CachedOsmandIndexes();
+				if (cacheFile.exists()) {
+					cache.readFromFile(cacheFile, 2);
+				}
+				if (bdirFile.exists() && bdirFile.listFiles() != null) {
+					for (File obf : bdirFile.listFiles()) {
+						if (!obf.isDirectory() && obf.getName().endsWith(".obf")) {
+							try {
+								// BinaryMapIndexReader bmir = new BinaryMapIndexReader(new RandomAccessFile(obf, "r"),
+								// obf);
+								BinaryMapIndexReader bmir = cache.getReader(obf);
+								RandomAccessFile raf = new RandomAccessFile(obf, "r");
+								BinaryMapIndexReader bmir2 = new BinaryMapIndexReader(raf, bmir);
+								files.add(bmir2);
+							} catch (Exception e1) {
+								e1.printStackTrace();
+							}
 						}
-	    			}
-	    		}
-	    	}
-	    }
+					}
+				}
+
+				cache.writeToFile(cacheFile);
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
 	    String loc = DataExtractionSettings.getSettings().getSearchLocale();
 	    if(loc.isEmpty()) {
 	    	loc = null;
@@ -359,6 +377,9 @@ public class OsmExtractionUI implements IMapLocationListener {
 					if (sr.distRelatedObjectName != 0) {
 						locationString += " " + (int) (sr.distRelatedObjectName / 1000.f) + " km";
 					}
+				}
+				if(sr.object instanceof Amenity) {
+					locationString += " " + ((Amenity)sr.object).getSubType();
 				}
 				mi.setText(sr.localeName + " [" + sr.objectType + "] " + locationString);
 				mi.addActionListener(new ActionListener() {
