@@ -286,7 +286,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 			@Override
 			public void keyPressed(KeyEvent e) {
 				super.keyPressed(e);
-				
+				mapPanel.setStatusField(null);
 				if(e.getKeyCode() == KeyEvent.VK_DOWN && popup.getComponentCount() > 0) {
 					popup.setVisible(false);
 					popup.setFocusable(true);
@@ -299,6 +299,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 			}
 	    	@Override
 	    	public void keyTyped(KeyEvent e) {
+	    		mapPanel.setStatusField(null);
 	    		if(e.getKeyCode() == KeyEvent.VK_DOWN) {
 	    			return;
 	    		}
