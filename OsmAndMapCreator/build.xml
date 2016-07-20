@@ -22,6 +22,7 @@
 	<property name="lib-gl.absolute.dir" location="${lib-gl.dir}" />
 	<property name="java.encoding" value="UTF-8" />
 	<property name="srctests.dir" value="src-tests"/>
+	<property name="srctests-resources.dir" value="test-resources"/>
 	<property name="reports.tests" value="${basedir}/test-results" />
 
 
@@ -131,6 +132,11 @@
 		 debug="on"
 		 source="1.7"
 	  />
+		<copy todir="${bintests.dir}">
+			<fileset dir="${srctests-resources.dir}">
+				<include name="**/*" />
+			</fileset>
+		</copy>
 		<javac srcdir="${srctests.dir}"
 		 destdir="${bintests.dir}"
 		 encoding="${java.encoding}"
