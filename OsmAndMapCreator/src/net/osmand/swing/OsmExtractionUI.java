@@ -15,6 +15,7 @@ import java.awt.event.WindowEvent;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.lang.Thread.UncaughtExceptionHandler;
@@ -55,6 +56,7 @@ import net.osmand.data.LatLon;
 import net.osmand.data.preparation.IndexCreator;
 import net.osmand.map.IMapLocationListener;
 import net.osmand.map.ITileSource;
+import net.osmand.map.OsmandRegions;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.io.IOsmStorageFilter;
@@ -65,6 +67,7 @@ import net.osmand.render.RenderingRulesTransformer;
 import net.osmand.router.RouteResultPreparation;
 import net.osmand.search.SearchUICore;
 import net.osmand.search.SearchUICore.SearchResultCollection;
+import net.osmand.search.core.ObjectType;
 import net.osmand.search.core.SearchCoreFactory;
 import net.osmand.search.core.SearchResult;
 import net.osmand.search.core.SearchSettings;
@@ -154,6 +157,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 
 	private String regionName;
 	private SearchUICore searchUICore;
+	private OsmandRegions osmandRegions;
 	
 
 	public OsmExtractionUI(){
@@ -178,6 +182,20 @@ public class OsmExtractionUI implements IMapLocationListener {
 	    mapPanel.addMapLocationListener(this);
 
 	    statusBarLabel = new JLabel();
+	    osmandRegions = new OsmandRegions();
+		try {
+			File regions = new File("regions.ocbf");
+			if (!regions.exists()) {
+				InputStream is = OsmandRegions.class.getResourceAsStream("regions.ocbf");
+				FileOutputStream fous = new FileOutputStream(regions);
+				Algorithms.streamCopy(is, fous);
+				fous.close();
+			}
+			osmandRegions.prepareFile(regions.getAbsolutePath());
+		} catch (IOException e2) {
+			e2.printStackTrace();
+			log.error(e2.getMessage(), e2);
+		}
 	    content.add(statusBarLabel, BorderLayout.SOUTH);
 	    File workingDir = DataExtractionSettings.getSettings().getDefaultWorkingDir();
 	    statusBarLabel.setText(workingDir == null ? Messages.getString("OsmExtractionUI.WORKING_DIR_UNSPECIFIED") : Messages.getString("OsmExtractionUI.WORKING_DIRECTORY") + workingDir.getAbsolutePath()); //$NON-NLS-1$ //$NON-NLS-2$
@@ -378,6 +396,9 @@ public class OsmExtractionUI implements IMapLocationListener {
 					if (sr.distRelatedObjectName != 0) {
 						locationString += " " + (int) (sr.distRelatedObjectName / 1000.f) + " km";
 					}
+				}
+				if(sr.objectType == ObjectType.LOCATION) {
+					locationString += " " +osmandRegions.getCountryName(sr.location);
 				}
 				if(sr.object instanceof Amenity) {
 					locationString += " " + ((Amenity)sr.object).getSubType();
