@@ -323,7 +323,9 @@ public class OsmExtractionUI implements IMapLocationListener {
 	    		}
 	    		String text = statusField.getText();
 	    		int ps = statusField.getCaretPosition();
-	    		if(e.getKeyChar() != KeyEvent.CHAR_UNDEFINED) {
+	    		if(e.getKeyChar() == '\b'){
+	    			// nothing
+	    		} else if(e.getKeyChar() != KeyEvent.CHAR_UNDEFINED) {
 	    			if(ps >= text.length()) {
 	    				text += e.getKeyChar();
 	    			} else {
