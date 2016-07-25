@@ -1,7 +1,5 @@
 package net.osmand.data.preparation.address;
 
-import com.vividsolutions.jts.geom.MultiPolygon;
-
 import gnu.trove.iterator.TLongObjectIterator;
 import gnu.trove.map.hash.TLongObjectHashMap;
 import gnu.trove.set.hash.TLongHashSet;
@@ -931,11 +929,19 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 	private Map<String, String> getOtherNames(Entity e) {
 		Map<String, String> m = null;
 		for (String t : e.getTagKeySet()) {
-			if (t.startsWith("name:")) {
+			String prefix =  null;
+			if(t.startsWith("name:")) {
+				prefix = "name:";
+			} else if(t.startsWith("old_name")){
+				prefix = "";
+			} else if(t.startsWith("alt_name")){
+				prefix = "";
+			}
+			if (prefix != null) {
 				if (m == null) {
 					m = new HashMap<String, String>();
 				}
-				m.put(t.substring("name:".length()), e.getTag(t));
+				m.put(t.substring(prefix.length()), e.getTag(t));
 			}
 		}
 		return m;
