@@ -52,7 +52,9 @@ import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.CachedOsmandIndexes;
 import net.osmand.binary.OsmandOdb;
 import net.osmand.data.Amenity;
+import net.osmand.data.Building;
 import net.osmand.data.LatLon;
+import net.osmand.data.Street;
 import net.osmand.data.preparation.IndexCreator;
 import net.osmand.map.IMapLocationListener;
 import net.osmand.map.ITileSource;
@@ -397,6 +399,12 @@ public class OsmExtractionUI implements IMapLocationListener {
 					locationString += " " + sr.localeRelatedObjectName;
 					if (sr.distRelatedObjectName != 0) {
 						locationString += " " + (int) (sr.distRelatedObjectName / 1000.f) + " km";
+					}
+				}
+				if(sr.objectType == ObjectType.HOUSE) {
+					if (sr.relatedObject instanceof Street) {
+
+						locationString += " " + ((Street) sr.relatedObject).getCity().getName();
 					}
 				}
 				if(sr.objectType == ObjectType.LOCATION) {
