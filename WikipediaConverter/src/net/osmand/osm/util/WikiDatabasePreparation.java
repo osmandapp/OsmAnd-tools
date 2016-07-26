@@ -523,7 +523,7 @@ public class WikiDatabasePreparation {
 						parseText = pages.containsKey(cid);
 					} else if (name.equals("text")) {
 						if (parseText  
-								&& !title.toString().toLowerCase().contains("template")
+								&& !title.toString().toLowerCase().contains(":")
 								) {
 							LatLon ll = pages.get(cid);
 							String text = removeMacroBlocks(ctext.toString());
