@@ -523,9 +523,16 @@ public class WikiDatabasePreparation {
 						cid = Long.parseLong(pageId.toString());
 						parseText = pages.containsKey(cid);
 					} else if (name.equals("text")) {
+						boolean isJunk = false;
+						for(String wikiJunk : wikiJunkArray) {
+							if(title.toString().contains(wikiJunk)) {
+								isJunk = true;
+								break;
+							}
+						}
 						if (parseText
 								&& !title.toString().toLowerCase().contains(".jpg")
-								&& !ArrayUtils.contains(wikiJunkArray,title.toString()+":")
+								&& !isJunk
 								) {
 							LatLon ll = pages.get(cid);
 							String text = removeMacroBlocks(ctext.toString());
