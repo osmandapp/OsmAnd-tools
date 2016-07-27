@@ -431,7 +431,7 @@ public class WikiDatabasePreparation {
 		private String lang;
 		private Converter converter;
 		final String[] wikiJunkArray = new String[]{
-				"틀","위키프로젝트","แม่แบบ","위키백과","แม่แบบ","Àdàkọ","Aide","Aiuto","Andoza",
+				".jpg",".jpeg",".png",".gif",".svg","/doc","틀","위키프로젝트","แม่แบบ","위키백과","แม่แบบ","Àdàkọ","Aide","Aiuto","Andoza","Anexo","Bản","mẫu","Batakan","Categoría","Catégorie","Category","Cithakan","Draft","Endrika","Fájl","Format","Formula","Help","Hjælp","Kategori","Kategoria","Kategorie","モジュール","Mal","Mall","Malline","Modèle","Modèl","Modello","Modelo","Modèl","Moduł","Module","Modulis","Modul","Mô","đun","Nodyn","Padron","Patrom","Plantía","Plantilla","Plantilya","Portaal","Portail","Portal","Predefinição","Predloga","Predložak","Progetto","Proiect","Projet","Şablon","Šablona","Šablonas","Ŝablono","Sjabloon","Skabelon","Snið","Stampa","Szablon","Templat","Txantiloi","Veidne","Vikipedio","Vikipediya","Vikipeedia","Viquipèdia","Viquiprojecte","Viquiprojecte","Vörlaag","Vorlage","Vorlog","วิกิพีเดีย","Wikipedia","Wikipedie","Wikipedija","Wîkîpediya","Wikiproiektu","Wikiprojekt","Wikiproyecto","الگو","سانچ","قالب","وکیپیڈیا","ויקיפדיה","תבנית","Βικιπαίδεια","Πρότυπο","Википедиа","Википедија","Википедия","Вікіпедія","Довідка","Загвар","Калып","Кеп","Категорія","Портал","Проект","Уикипедия","Үлгі","Файл","Хуызæг","Шаблон","Կաղապար","Մոդուլ","Վիքիպեդիա","ვიკიპედია","თარგი","ढाँचा","विकिपीडिया","साचा","साँचा","ઢાંચો","વિકિપીડિયા","మూస","வார்ப்புரு","ഫലകം","വിക്കിപീഡിയ","টেমপ্লেট","プロジェクト"
 				};
 
 		WikiOsmHandler(SAXParser saxParser, InputStream progIS, String lang,
@@ -532,9 +532,7 @@ public class WikiDatabasePreparation {
 								break;
 							}
 						}
-						if (parseText
-								&& !title.toString().toLowerCase().contains(".jpg")
-								&& !isJunk
+						if (parseText !isJunk
 								) {
 							LatLon ll = pages.get(cid);
 							String text = removeMacroBlocks(ctext.toString());
