@@ -507,7 +507,7 @@ public class WikiDatabasePreparation {
 		@Override
 		public void endElement(String uri, String localName, String qName) throws SAXException {
 			String name = saxParser.isNamespaceAware() ? localName : qName;
-			String[] wikiJunkArray = new String[]{"틀","위키프로젝트","แม่แบบ","Шаблон"};
+			String[] wikiJunkArray = new String[]{"틀","위키프로젝트","แม่แบบ","위키백과","แม่แบบ","Àdàkọ","Aide","Aiuto","Andoza",};
 			try {
 				if (page) {
 					if (name.equals("page")) {
@@ -525,7 +525,7 @@ public class WikiDatabasePreparation {
 					} else if (name.equals("text")) {
 						if (parseText
 								&& !title.toString().toLowerCase().contains(".jpg")
-								&& !Arrays.asList(wikiJunkArray).contains(title.toString()+":")
+								&& !ArrayUtils.contains(wikiJunkArray,title.toString()+":")
 								) {
 							LatLon ll = pages.get(cid);
 							String text = removeMacroBlocks(ctext.toString());
