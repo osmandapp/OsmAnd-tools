@@ -430,7 +430,9 @@ public class WikiDatabasePreparation {
 		final ByteArrayOutputStream bous = new ByteArrayOutputStream(64000);
 		private String lang;
 		private Converter converter;
-		
+		final String[] wikiJunkArray = new String[]{
+				"틀","위키프로젝트","แม่แบบ","위키백과","แม่แบบ","Àdàkọ","Aide","Aiuto","Andoza",
+				};
 
 		WikiOsmHandler(SAXParser saxParser, InputStream progIS, String lang,
 				Map<Long, LatLon> pages, File sqliteFile)
@@ -507,7 +509,7 @@ public class WikiDatabasePreparation {
 		@Override
 		public void endElement(String uri, String localName, String qName) throws SAXException {
 			String name = saxParser.isNamespaceAware() ? localName : qName;
-			String[] wikiJunkArray = new String[]{"틀","위키프로젝트","แม่แบบ","위키백과","แม่แบบ","Àdàkọ","Aide","Aiuto","Andoza",};
+			
 			try {
 				if (page) {
 					if (name.equals("page")) {
