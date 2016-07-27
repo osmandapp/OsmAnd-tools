@@ -532,8 +532,7 @@ public class WikiDatabasePreparation {
 								break;
 							}
 						}
-						if (parseText !isJunk
-								) {
+						if (parseText && !isJunk) {
 							LatLon ll = pages.get(cid);
 							String text = removeMacroBlocks(ctext.toString());
 							final HTMLConverter converter = new HTMLConverter(false);
