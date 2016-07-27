@@ -507,7 +507,7 @@ public class WikiDatabasePreparation {
 		@Override
 		public void endElement(String uri, String localName, String qName) throws SAXException {
 			String name = saxParser.isNamespaceAware() ? localName : qName;
-			String[] wikiJunkArray = new String[]{"틀","위키프로젝트","แม่แบบ","Шаблон"}
+			String[] wikiJunkArray = new String[]{"틀","위키프로젝트","แม่แบบ","Шаблон"};
 			try {
 				if (page) {
 					if (name.equals("page")) {
