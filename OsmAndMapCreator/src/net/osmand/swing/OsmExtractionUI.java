@@ -50,9 +50,7 @@ import javax.xml.stream.XMLStreamException;
 import net.osmand.MapCreatorVersion;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.CachedOsmandIndexes;
-import net.osmand.binary.OsmandOdb;
 import net.osmand.data.Amenity;
-import net.osmand.data.Building;
 import net.osmand.data.LatLon;
 import net.osmand.data.Street;
 import net.osmand.data.preparation.IndexCreator;
@@ -238,7 +236,9 @@ public class OsmExtractionUI implements IMapLocationListener {
 	    	loc = null;
 	    }
 	    searchUICore = new SearchUICore(MapPoiTypes.getDefault(),
-	    		loc, files.toArray(new BinaryMapIndexReader[files.size()]));
+	    		loc);
+	    searchUICore.getSearchSettings().setOfflineIndexes(files);
+	    searchUICore.init();
 	    searchUICore.registerAPI(new SearchCoreFactory.SearchRegionByNameAPI());
 
 //	    treePlaces = new JTree();
