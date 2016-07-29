@@ -1,5 +1,6 @@
 package net.osmand.data.preparation;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.sql.Connection;
@@ -21,17 +22,15 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import net.osmand.data.MapObject;
 import net.osmand.data.TransportRoute;
 import net.osmand.data.TransportStop;
 import net.osmand.osm.edit.Entity;
+import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.EntityParser;
 import net.osmand.osm.edit.Node;
-import net.osmand.osm.edit.OsmTransportRoute;
+import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Way;
-import net.osmand.osm.edit.Entity.EntityId;
-import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import net.sf.junidecode.Junidecode;
@@ -55,6 +54,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	private PreparedStatement transRouteStat;
 	private PreparedStatement transRouteStopsStat;
 	private PreparedStatement transStopsStat;
+	private PreparedStatement transRouteGeometryStat;
 	private RTree transportStopsTree;
 	private Map<Long, Relation> masterRoutes = new HashMap<Long, Relation>();
 	// Note: in future when we need more information from stop_area relation, it is better to memorize relations itself
@@ -69,6 +69,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		acceptedRoutes.add("share_taxi"); //$NON-NLS-1$
 
 		acceptedRoutes.add("subway"); //$NON-NLS-1$
+		acceptedRoutes.add("light_rail"); //$NON-NLS-1$
 		acceptedRoutes.add("train"); //$NON-NLS-1$
 
 		acceptedRoutes.add("tram"); //$NON-NLS-1$
@@ -164,7 +165,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		}
 	}
 
-	public void visitEntityMainStep(Entity e, OsmDbAccessorContext ctx) throws SQLException {
+	public void iterateMainEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 		if (e instanceof Relation && e.getTag(OSMTagKey.ROUTE) != null) {
 			ctx.loadEntityRelation((Relation) e);
 			TransportRoute route = indexTransportRoute((Relation) e);
@@ -184,6 +185,10 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		stat.executeUpdate("create table transport_route_stop (stop bigint, route bigint, ord int, direction smallint, primary key (route, ord, direction))");
 		stat.executeUpdate("create index transport_route_stop_stop on transport_route_stop (stop)");
 		stat.executeUpdate("create index transport_route_stop_route on transport_route_stop (route)");
+		
+		stat.executeUpdate("create table transport_route_geometry (geometry bytes, route bigint, direction smallint)");
+		stat.executeUpdate("create index transport_route_geometry_route on transport_route_geometry (route)");
+		
 
 		stat.executeUpdate("create table transport_stop (id bigint primary key, latitude double, longitude double, name varchar(1024), name_en varchar(1024))");
 		stat.executeUpdate("create index transport_stop_id on transport_stop (id)");
@@ -203,12 +208,14 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		} catch (RTreeException e) {
 			throw new IOException(e);
 		}
-		transRouteStat = createStatementTransportRouteInsert(conn);
-		transRouteStopsStat = createStatementTransportRouteStopInsert(conn);
-		transStopsStat = createStatementTransportStopInsert(conn);
+		transRouteStat = conn.prepareStatement("insert into transport_route(id, type, operator, ref, name, name_en, dist) values(?, ?, ?, ?, ?, ?, ?)");
+		transRouteStopsStat = conn.prepareStatement("insert into transport_route_stop(route, stop, direction, ord) values(?, ?, ?, ?)");
+		transStopsStat = conn.prepareStatement("insert into transport_stop(id, latitude, longitude, name, name_en) values(?, ?, ?, ?, ?)");
+		transRouteGeometryStat = conn.prepareStatement("insert into transport_route_geometry(route, direction, geometry) values(?, ?, ?)");
 		pStatements.put(transRouteStat, 0);
 		pStatements.put(transRouteStopsStat, 0);
 		pStatements.put(transStopsStat, 0);
+		pStatements.put(transRouteGeometryStat, 0);
 	}
 
 
@@ -221,19 +228,51 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		transRouteStat.setString(6, route.getEnName(false));
 		transRouteStat.setInt(7, route.getAvgBothDistance());
 		addBatch(transRouteStat);
+		
+		ByteArrayOutputStream ous = new ByteArrayOutputStream();
+		if (route.getForwardWays() != null) {
+			for (Way tr : route.getForwardWays()) {
+				addBatch(route, ous, tr, 1);
+			}
+		}
+		if (route.getBackwardWays() != null) {
+			for (Way tr : route.getBackwardWays()) {
+				addBatch(route, ous, tr, -1);
+			}
+		}
+		if (route.getSharedWays() != null) {
+			for (Way tr : route.getSharedWays()) {
+				addBatch(route, ous, tr, 0);
+			}
+		}
 
 		writeRouteStops(route, route.getForwardStops(), true);
 		writeRouteStops(route, route.getBackwardStops(), false);
 
 	}
 
-	private PreparedStatement createStatementTransportStopInsert(Connection conn) throws SQLException {
-		return conn.prepareStatement("insert into transport_stop(id, latitude, longitude, name, name_en) values(?, ?, ?, ?, ?)");
+
+	private void addBatch(TransportRoute route, ByteArrayOutputStream ous, Way tr, int direction) throws SQLException {
+		if(tr.getNodes().size() == 0) {
+			return;
+		}
+		transRouteGeometryStat.setLong(1, route.getId());
+		transRouteGeometryStat.setLong(2, direction);
+		ous.reset();
+		for (Node n : tr.getNodes()) {
+			int y = MapUtils.get31TileNumberY(n.getLatitude());
+			int x = MapUtils.get31TileNumberX(n.getLongitude());
+			try {
+				Algorithms.writeInt(ous, x);
+				Algorithms.writeInt(ous, y);
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+		transRouteGeometryStat.setBytes(3, ous.toByteArray());
+		addBatch(transRouteGeometryStat);
 	}
 
-	private PreparedStatement createStatementTransportRouteStopInsert(Connection conn) throws SQLException {
-		return conn.prepareStatement("insert into transport_route_stop(route, stop, direction, ord) values(?, ?, ?, ?)");
-	}
 
 	private void writeRouteStops(TransportRoute r, List<TransportStop> stops, boolean direction) throws SQLException {
 		int i = 0;
@@ -264,15 +303,12 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		}
 	}
 
-	private PreparedStatement createStatementTransportRouteInsert(Connection conn) throws SQLException {
-		return conn.prepareStatement("insert into transport_route(id, type, operator, ref, name, name_en, dist) values(?, ?, ?, ?, ?, ?, ?)");
-	}
 
 
 	public void writeBinaryTransportIndex(BinaryMapIndexWriter writer, String regionName,
 			Connection mapConnection) throws IOException, SQLException {
 		try {
-			closePreparedStatements(transRouteStat, transRouteStopsStat, transStopsStat);
+			closePreparedStatements(transRouteStat, transRouteStopsStat, transStopsStat, transRouteGeometryStat);
 			mapConnection.commit();
 			transportStopsTree.flush();
 
@@ -282,6 +318,8 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			PreparedStatement selectTransportData = mapConnection.prepareStatement("SELECT S.stop, S.direction," + //$NON-NLS-1$
 					"  A.latitude,  A.longitude, A.name, A.name_en " + //$NON-NLS-1$
 					"FROM transport_route_stop S INNER JOIN transport_stop A ON A.id = S.stop WHERE S.route = ? ORDER BY S.ord asc"); //$NON-NLS-1$
+			PreparedStatement selectTransportRouteGeometry = mapConnection.prepareStatement("SELECT S.geometry, S.direction " + 
+					"FROM transport_route_geometry S WHERE S.route = ?"); //$NON-NLS-1$
 
 			writer.startWriteTransportIndex(regionName);
 
@@ -292,10 +330,12 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			Map<Long, Long> transportRoutes = new LinkedHashMap<Long, Long>();
 
 			ResultSet rs = selectTransportRouteData.executeQuery();
-			List<TransportStop> directStops = new ArrayList<TransportStop>();
-			List<TransportStop> reverseStops = new ArrayList<TransportStop>();
+			List<TransportStop> directStops = new ArrayList<>();
+			List<TransportStop> reverseStops = new ArrayList<>();
+			List<byte[]> directGeometry = new ArrayList<>();
+			List<byte[]> reverseGeometry = new ArrayList<>();
+			List<byte[]> sharedGeometry = new ArrayList<>();
 			while (rs.next()) {
-
 				long idRoute = rs.getLong(1);
 				int dist = rs.getInt(2);
 				String routeName = rs.getString(3);
@@ -332,8 +372,21 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 						reverseStops.add(st);
 					}
 				}
+				selectTransportRouteGeometry.setLong(1, idRoute);
+				rset = selectTransportRouteGeometry.executeQuery();
+				while (rset.next()) {
+					int dir = rset.getInt(2);
+					byte[] bytes = rset.getBytes(1);
+					if (dir > 0) {
+						directGeometry.add(bytes);
+					} else if (dir < 0) {
+						reverseGeometry.add(bytes);
+					} else {
+						sharedGeometry.add(bytes);
+					}
+				}
 				writer.writeTransportRoute(idRoute, routeName, routeEnName, ref, operator, type, dist, directStops, reverseStops,
-						stringTable, transportRoutes);
+						directGeometry, reverseGeometry, sharedGeometry, stringTable, transportRoutes);
 			}
 			rs.close();
 			selectTransportRouteData.close();
@@ -443,7 +496,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		if (!acceptedRoutes.contains(route)) {
 			return null;
 		}
-		OsmTransportRoute r = EntityParser.parserRoute(rel, ref);
+		TransportRoute r = EntityParser.parserRoute(rel, ref);
 		r.setOperator(operator);
 		r.setType(route);
 
@@ -464,7 +517,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	private Pattern platforms = Pattern.compile("^(stop|platform)_(entry|exit)_only$");
 	private Matcher stopPlatformMatcher = platforms.matcher("");
 
-	private boolean processNewTransportRelation(Relation rel, OsmTransportRoute r) {
+	private boolean processNewTransportRelation(Relation rel, TransportRoute route) {
 		// first, verify we can accept this relation as new transport relation
 		// accepted roles restricted to: <empty>, stop, platform, ^(stop|platform)_(entry|exit)_only$
 
@@ -494,7 +547,8 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 				stops.add(entry.getKey());
 			} else {
 				if (entry.getKey() instanceof Way) {
-					r.addWay((Way) entry.getKey());
+					int dir = entry.getValue().equals("backward") ? -1 : (entry.getValue().equals("forward") ? 1 : 0);
+					route.addWay((Way) entry.getKey(), dir);
 				}
 			}
 		}
@@ -516,7 +570,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 				stop.copyNames(e.getTag(OSMTagKey.NAME), e.getTag(OSMTagKey.NAME_EN), e.getNameTags(), true);
 			}
 
-			r.getForwardStops().add(stop);
+			route.getForwardStops().add(stop);
 		}
 
 		return true;
@@ -614,7 +668,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	}
 
 
-	private boolean processOldTransportRelation(Relation rel, OsmTransportRoute r) {
+	private boolean processOldTransportRelation(Relation rel, TransportRoute r) {
 		final Map<TransportStop, Integer> forwardStops = new LinkedHashMap<TransportStop, Integer>();
 		final Map<TransportStop, Integer> backwardStops = new LinkedHashMap<TransportStop, Integer>();
 		int currentStop = 0;
@@ -670,7 +724,8 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 				}
 
 			} else if (e.getKey() instanceof Way) {
-				r.addWay((Way) e.getKey());
+				int dir = e.getValue().equals("backward") ? -1 : (e.getValue().equals("forward") ? 1 : 0);
+				r.addWay((Way) e.getKey(), dir);
 			}
 		}
 		if (forwardStops.isEmpty() && backwardStops.isEmpty()) {

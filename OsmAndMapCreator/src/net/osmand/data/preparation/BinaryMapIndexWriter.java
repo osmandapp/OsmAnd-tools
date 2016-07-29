@@ -3,6 +3,7 @@ package net.osmand.data.preparation;
 
 import gnu.trove.list.array.TByteArrayList;
 import gnu.trove.list.array.TIntArrayList;
+import gnu.trove.list.array.TLongArrayList;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -1120,7 +1121,9 @@ public class BinaryMapIndexWriter {
 	}
 
 	public void writeTransportRoute(long idRoute, String routeName, String routeEnName, String ref, String operator, String type, int dist,
-			List<TransportStop> directStops, List<TransportStop> reverseStops, Map<String, Integer> stringTable,
+			List<TransportStop> directStops, List<TransportStop> reverseStops,
+			List<byte[]> directRoute, List<byte[]> reverseRoute, List<byte[]> sharedRoute,
+			Map<String, Integer> stringTable,
 			Map<Long, Long> transportRoutesRegistry) throws IOException {
 		checkPeekState(TRANSPORT_ROUTES);
 		TransportRoute.Builder tRoute = OsmandOdb.TransportRoute.newBuilder();
@@ -1160,12 +1163,98 @@ public class BinaryMapIndexWriter {
 				}
 			}
 		}
+		if(directRoute != null) {
+			writeTransportRouteCoordinates(directRoute);
+			tRoute.setDirectGeometry(ByteString.copyFrom(mapDataBuf.toArray()));
+		}
+		if(reverseRoute != null) {
+			writeTransportRouteCoordinates(reverseRoute);
+			tRoute.setReverseGeometry(ByteString.copyFrom(mapDataBuf.toArray()));
+		}
+		if(sharedRoute != null) {
+			writeTransportRouteCoordinates(sharedRoute);
+			tRoute.setSharedGeometry(ByteString.copyFrom(mapDataBuf.toArray()));
+		}
 		codedOutStream.writeTag(OsmandOdb.TransportRoutes.ROUTES_FIELD_NUMBER, FieldType.MESSAGE.getWireType());
 		if (transportRoutesRegistry != null) {
 			transportRoutesRegistry.put(idRoute, getFilePointer());
 		}
 		codedOutStream.writeMessageNoTag(tRoute.build());
 	}
+
+
+	private void writeTransportRouteCoordinates(List<byte[]> rt) throws IOException {
+		int pcalcx = 0;
+		int pcalcy = 0;
+		mapDataBuf.clear();
+		List<TLongArrayList> coordinates = simplifyCoordinates(rt);
+		for (int j = 0; j < coordinates.size(); j++) {
+			if(j > 0) {
+				writeRawVarint32(mapDataBuf, CodedOutputStream.encodeZigZag32(0));
+				writeRawVarint32(mapDataBuf, CodedOutputStream.encodeZigZag32(0));
+			}
+			TLongArrayList lst = coordinates.get(j);
+			for (int i = 0; i < lst.size(); i++) {
+				int x = (int) MapUtils.deinterleaveX(lst.get(i));
+				int y = (int) MapUtils.deinterleaveY(lst.get(i));
+				int tx = (x >> SHIFT_COORDINATES) - pcalcx;
+				int ty = (y >> SHIFT_COORDINATES) - pcalcy;
+				if (tx != 0 || ty != 0) {
+					writeRawVarint32(mapDataBuf, CodedOutputStream.encodeZigZag32(tx));
+					writeRawVarint32(mapDataBuf, CodedOutputStream.encodeZigZag32(ty));
+				}
+				pcalcx = pcalcx + tx;
+				pcalcy = pcalcy + ty;
+			}
+			
+		}
+	}
+
+	private List<TLongArrayList> simplifyCoordinates(List<byte[]> rt) {
+		List<TLongArrayList> ct = new ArrayList<>();
+		for(byte[] coordinates : rt) {
+			TLongArrayList lst = new TLongArrayList();
+			int len = coordinates.length / 8;
+			for (int i = 0; i < len; i ++) {
+				int x = Algorithms.parseIntFromBytes(coordinates, i * 8);
+				int y = Algorithms.parseIntFromBytes(coordinates, i * 8 + 4);
+				long clt = MapUtils.interleaveBits(x, y);
+				lst.add(clt);
+			}
+			if(lst.size() > 0) {
+				ct.add(lst);
+			}
+		}
+		// simple merge lines
+		boolean merged = true;
+		while (merged) {
+			merged = false;
+			for (int i = 0; i < ct.size() && !merged; i++) {
+				TLongArrayList head = ct.get(i);
+				for (int j = 0; j < ct.size() && !merged; j++) {
+					if (j != i) {
+						TLongArrayList tail = ct.get(j);
+						if (head.get(head.size() - 1) == tail.get(0)) {
+							head.addAll(tail.subList(1, tail.size()));
+							ct.remove(j);
+							merged = true;
+						}
+					}
+				}
+			}
+		}
+		Collections.sort(ct, new Comparator<TLongArrayList>() {
+
+			@Override
+			public int compare(TLongArrayList o1, TLongArrayList o2) {
+				long l1 = o1.size() > 0 ? o1.get(0) : 0;
+				long l2 = o1.size() > 0 ? o2.get(0) : 0;
+				return Algorithms.compare(l1, l2);
+			}
+		});
+		return ct;
+	}
+
 
 	public void startTransportTreeElement(int leftX, int rightX, int topY, int bottomY) throws IOException {
 		checkPeekState(TRANSPORT_STOPS_TREE, TRANSPORT_INDEX_INIT);

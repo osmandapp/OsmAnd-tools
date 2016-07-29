@@ -260,7 +260,7 @@ public class IndexCreator {
 			indexPoiCreator.iterateEntity(e, ctx, false);
 		}
 		if (indexTransport) {
-			indexTransportCreator.visitEntityMainStep(e, ctx);
+			indexTransportCreator.iterateMainEntity(e, ctx);
 		}
 		if (indexMap) {
 			if (boundary == null || checkBoundary(e)) {
