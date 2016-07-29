@@ -351,6 +351,9 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 				ResultSet rset = selectTransportData.executeQuery();
 				reverseStops.clear();
 				directStops.clear();
+				directGeometry.clear();
+				reverseGeometry.clear();
+				sharedGeometry.clear();
 				while (rset.next()) {
 					boolean dir = rset.getInt(2) != 0;
 					long idStop = rset.getInt(1);
