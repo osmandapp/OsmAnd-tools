@@ -1121,8 +1121,7 @@ public class BinaryMapIndexWriter {
 	}
 
 	public void writeTransportRoute(long idRoute, String routeName, String routeEnName, String ref, String operator, String type, int dist,
-			List<TransportStop> directStops, List<byte[]> directRoute, Map<String, Integer> stringTable,
- Map<Long, Long> transportRoutesRegistry) throws IOException {
+			List<TransportStop> directStops, List<byte[]> directRoute, Map<String, Integer> stringTable, Map<Long, Long> transportRoutesRegistry) throws IOException {
 		checkPeekState(TRANSPORT_ROUTES);
 		TransportRoute.Builder tRoute = OsmandOdb.TransportRoute.newBuilder();
 		tRoute.setRef(ref);

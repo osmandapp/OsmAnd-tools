@@ -14,6 +14,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 
@@ -128,7 +129,8 @@ public class OsmDbCreator implements IOsmStorageFilter {
 			return getConvertId(id, ord, hash);
 		} else {
 			Relation r = (Relation) e;
-			Map<EntityId, EntityId> p = new HashMap<Entity.EntityId, Entity.EntityId>();
+			// important keep order!
+			Map<EntityId, EntityId> p = new LinkedHashMap<Entity.EntityId, Entity.EntityId>();
 
 			for (EntityId i : r.getMemberIds()) {
 				if (i.getType() != EntityType.RELATION) {
