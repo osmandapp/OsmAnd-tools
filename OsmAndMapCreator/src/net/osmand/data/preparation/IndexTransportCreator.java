@@ -306,7 +306,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			PreparedStatement selectTransportData = mapConnection.prepareStatement("SELECT S.stop, " + //$NON-NLS-1$
 					"  A.latitude,  A.longitude, A.name, A.name_en " + //$NON-NLS-1$
 					"FROM transport_route_stop S INNER JOIN transport_stop A ON A.id = S.stop WHERE S.route = ? ORDER BY S.ord asc"); //$NON-NLS-1$
-			PreparedStatement selectTransportRouteGeometry = mapConnection.prepareStatement("SELECT S.geometry" + 
+			PreparedStatement selectTransportRouteGeometry = mapConnection.prepareStatement("SELECT S.geometry " + 
 					"FROM transport_route_geometry S WHERE S.route = ?"); //$NON-NLS-1$
 
 			writer.startWriteTransportIndex(regionName);
@@ -477,6 +477,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		directRoute.setOperator(operator);
 		directRoute.setType(route);
 		directRoute.setRef(ref);
+		directRoute.setId(directRoute.getId() << 1);
 		if (processTransportRelationV2(rel, directRoute)) { // try new transport relations first
 			troutes.add(directRoute);
 		} else {
@@ -489,6 +490,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 				backwardRoute.setEnName(reverseName(ref, backwardRoute.getEnName(false)));
 			}
 			if (processTransportRelationV1(rel, directRoute, backwardRoute)) { // old relation style otherwise
+				backwardRoute.setId((backwardRoute.getId() << 1) + 1);
 				troutes.add(directRoute);
 				troutes.add(backwardRoute);
 			}
