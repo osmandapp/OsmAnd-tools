@@ -1121,10 +1121,8 @@ public class BinaryMapIndexWriter {
 	}
 
 	public void writeTransportRoute(long idRoute, String routeName, String routeEnName, String ref, String operator, String type, int dist,
-			List<TransportStop> directStops, List<TransportStop> reverseStops,
-			List<byte[]> directRoute, List<byte[]> reverseRoute, List<byte[]> sharedRoute,
-			Map<String, Integer> stringTable,
-			Map<Long, Long> transportRoutesRegistry) throws IOException {
+			List<TransportStop> directStops, List<byte[]> directRoute, Map<String, Integer> stringTable,
+ Map<Long, Long> transportRoutesRegistry) throws IOException {
 		checkPeekState(TRANSPORT_ROUTES);
 		TransportRoute.Builder tRoute = OsmandOdb.TransportRoute.newBuilder();
 		tRoute.setRef(ref);
@@ -1137,43 +1135,29 @@ public class BinaryMapIndexWriter {
 		if (routeEnName != null) {
 			tRoute.setNameEn(registerString(stringTable, routeEnName));
 		}
-		for (int i = 0; i < 2; i++) {
-			List<TransportStop> stops = i == 0 ? directStops : reverseStops;
-			long id = 0;
-			int x24 = 0;
-			int y24 = 0;
-			for (TransportStop st : stops) {
-				TransportRouteStop.Builder tStop = OsmandOdb.TransportRouteStop.newBuilder();
-				tStop.setId(st.getId() - id);
-				id = st.getId();
-				int x = (int) MapUtils.getTileNumberX(24, st.getLocation().getLongitude());
-				int y = (int) MapUtils.getTileNumberY(24, st.getLocation().getLatitude());
-				tStop.setDx(x - x24);
-				tStop.setDy(y - y24);
-				x24 = x;
-				y24 = y;
-				tStop.setName(registerString(stringTable, st.getName()));
-				if (st.getEnName(false) != null) {
-					tStop.setNameEn(registerString(stringTable, st.getEnName(false)));
-				}
-				if (i == 0) {
-					tRoute.addDirectStops(tStop.build());
-				} else {
-					tRoute.addReverseStops(tStop.build());
-				}
+		List<TransportStop> stops = directStops;
+		long id = 0;
+		int x24 = 0;
+		int y24 = 0;
+		for (TransportStop st : stops) {
+			TransportRouteStop.Builder tStop = OsmandOdb.TransportRouteStop.newBuilder();
+			tStop.setId(st.getId() - id);
+			id = st.getId();
+			int x = (int) MapUtils.getTileNumberX(24, st.getLocation().getLongitude());
+			int y = (int) MapUtils.getTileNumberY(24, st.getLocation().getLatitude());
+			tStop.setDx(x - x24);
+			tStop.setDy(y - y24);
+			x24 = x;
+			y24 = y;
+			tStop.setName(registerString(stringTable, st.getName()));
+			if (st.getEnName(false) != null) {
+				tStop.setNameEn(registerString(stringTable, st.getEnName(false)));
 			}
+			tRoute.addDirectStops(tStop.build());
 		}
-		if(directRoute != null) {
+		if (directRoute != null) {
 			writeTransportRouteCoordinates(directRoute);
-			tRoute.setDirectGeometry(ByteString.copyFrom(mapDataBuf.toArray()));
-		}
-		if(reverseRoute != null) {
-			writeTransportRouteCoordinates(reverseRoute);
-			tRoute.setReverseGeometry(ByteString.copyFrom(mapDataBuf.toArray()));
-		}
-		if(sharedRoute != null) {
-			writeTransportRouteCoordinates(sharedRoute);
-			tRoute.setSharedGeometry(ByteString.copyFrom(mapDataBuf.toArray()));
+			tRoute.setGeometry(ByteString.copyFrom(mapDataBuf.toArray()));
 		}
 		codedOutStream.writeTag(OsmandOdb.TransportRoutes.ROUTES_FIELD_NUMBER, FieldType.MESSAGE.getWireType());
 		if (transportRoutesRegistry != null) {
