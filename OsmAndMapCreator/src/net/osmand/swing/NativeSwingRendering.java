@@ -312,6 +312,7 @@ public class NativeSwingRendering extends NativeLibrary {
 		ctx.renderingTime = rendering;
 		long last = time + System.currentTimeMillis() - rendering;
 		System.out.println(" TIMES search - " + search + " rendering - " + rendering + " unpack - " + last);
+		res.deleteNativeResult();
 		return img;
 	}
 
