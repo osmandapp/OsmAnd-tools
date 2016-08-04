@@ -93,6 +93,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 	private static final int ADDRESS_NAME_CHARACTERS_TO_INDEX = 4;
 	private TreeSet<String> langAttributes = new TreeSet<String>();
+	public static final String ENTRANCE_BUILDING_DELIMITER = ", ";
 
 	Connection mapConnection;
 	DBStreetDAO streetDAO;

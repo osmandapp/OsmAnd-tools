@@ -97,7 +97,7 @@ public class DBStreetDAO extends AbstractIndexPartCreator {
         // create index on name ?
         stat.executeUpdate("create table building (id bigint, latitude double, longitude double, " +
                          "name2 varchar(1024), name_en2 varchar(1024), lat2 double, lon2 double, interval int, interpolateType varchar(50), " +
-						"name varchar(1024), name_en varchar(1024), street bigint, postcode varchar(1024), primary key(street, id))");
+						"name varchar(1024), name_en varchar(1024), street bigint, postcode varchar(1024))");
         
 
         stat.executeUpdate("create table street_node (id bigint, latitude double, longitude double, " +
@@ -161,26 +161,40 @@ public class DBStreetDAO extends AbstractIndexPartCreator {
 
 	protected void writeBuilding(Set<Long> streetIds, Building building) throws SQLException {
 		for (Long streetId : streetIds) {
-			addressBuildingStat.setLong(1, building.getId());
-			addressBuildingStat.setDouble(2, building.getLocation().getLatitude());
-			addressBuildingStat.setDouble(3, building.getLocation().getLongitude());
+			addBuildtingToBatch(building, streetId, null, building.getLocation());
+			Iterator<Entry<String, LatLon>> it = building.getEntrances().entrySet().iterator();
+			while(it.hasNext()) {
+				Entry<String, LatLon> next = it.next();
+				addBuildtingToBatch(building, streetId, next.getKey(), next.getValue());
+			}
+		}
+	}
+
+	private void addBuildtingToBatch(Building building, Long streetId, String ref, LatLon loc) throws SQLException {
+		addressBuildingStat.setLong(1, building.getId());
+		addressBuildingStat.setDouble(2, loc.getLatitude());
+		addressBuildingStat.setDouble(3, loc.getLongitude());
+		addressBuildingStat.setLong(6, streetId);
+		addressBuildingStat.setString(7, building.getPostcode() == null ? null : building.getPostcode().toUpperCase());
+		if(ref != null) {
+			addressBuildingStat.setString(4, building.getName() + IndexAddressCreator.ENTRANCE_BUILDING_DELIMITER + ref);
+			addressBuildingStat.setString(5, "");
+		} else {
 			addressBuildingStat.setString(4, building.getName());
 			addressBuildingStat.setString(5, Algorithms.encodeMap(building.getNamesMap(false)));
-			addressBuildingStat.setLong(6, streetId);
-			addressBuildingStat.setString(7, building.getPostcode() == null ? null : building.getPostcode().toUpperCase());
 			addressBuildingStat.setString(8, building.getName2());
 			addressBuildingStat.setString(9, building.getName2());
-			LatLon l = building.getLatLon2() ;
-			addressBuildingStat.setDouble(10, l == null? 0 : l.getLatitude());
-			addressBuildingStat.setDouble(11, l == null? 0 : l.getLongitude());
+			LatLon l = building.getLatLon2();
+			addressBuildingStat.setDouble(10, l == null ? 0 : l.getLatitude());
+			addressBuildingStat.setDouble(11, l == null ? 0 : l.getLongitude());
 			addressBuildingStat.setInt(12, building.getInterpolationInterval());
-			if(building.getInterpolationType() == null) {
+			if (building.getInterpolationType() == null) {
 				addressBuildingStat.setString(13, null);
 			} else {
 				addressBuildingStat.setString(13, building.getInterpolationType().toString());
 			}
-			addBatch(addressBuildingStat);
 		}
+		addBatch(addressBuildingStat);
 	}
 
 	public DBStreetDAO.SimpleStreet findStreet(String name, City city) throws SQLException {

@@ -1021,7 +1021,7 @@ public class BinaryMapIndexWriter {
 					bbuilder.setInterpolation(1);
 				}
 			}
-			bbuilder.setId(b.getId());
+			// bbuilder.setId(b.getId());
 			bbuilder.setName(b.getName());
 			if (b.getPostcode() != null) {
 				bbuilder.setPostcode(b.getPostcode());
