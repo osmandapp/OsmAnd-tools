@@ -525,6 +525,10 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		String version = rel.getTag("public_transport:version");
 		if (Algorithms.isEmpty(version) || Integer.parseInt(version) < 2) {
 			for (Entry<Entity, String> entry : rel.getMemberEntities().entrySet()) {
+				// ignore ways (cause with even with new relations there could be a mix of forward/backward ways)
+				if(entry instanceof Way) {
+					continue;
+				}
 				String role = entry.getValue();
 				if (role.isEmpty() || "stop".equals(role) || "platform".equals(role)) {
 					continue; // accepted roles
