@@ -338,11 +338,13 @@ public class OsmExtractionUI implements IMapLocationListener {
 	    		if(settings.getRadiusLevel() != 1){
 	    			searchUICore.updateSettings(settings.setRadiusLevel(1));
 	    		}
-	    		SearchResultCollection c = new SearchResultCollection();
+	    		SearchResultCollection c = null;
 	    		if (!text.contains("#map")) {
 					c = searchUICore.search(text, null);
 	    		}
-	    		updateSearchResult(statusField, c, false);
+	    		if(c != null) {
+	    			updateSearchResult(statusField, c, false);
+	    		}
 	    	}
 			
 		});
@@ -378,8 +380,8 @@ public class OsmExtractionUI implements IMapLocationListener {
 					public void actionPerformed(ActionEvent e) {
 						SearchSettings settings = searchUICore.getPhrase().getSettings();
 						searchUICore.updateSettings(settings.setRadiusLevel(settings.getRadiusLevel() + 1));
-						searchUICore.search(statusField.getText(), null);
-						updateSearchResult(statusField, new SearchResultCollection(), false);
+						SearchResultCollection collection = searchUICore.search(statusField.getText(), null);
+						updateSearchResult(statusField, collection, false);
 					}
 				});
 				popup.add(mi);
