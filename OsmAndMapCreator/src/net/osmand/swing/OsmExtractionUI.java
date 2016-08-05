@@ -48,6 +48,7 @@ import javax.swing.filechooser.FileFilter;
 import javax.xml.stream.XMLStreamException;
 
 import net.osmand.MapCreatorVersion;
+import net.osmand.ResultMatcher;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.CachedOsmandIndexes;
 import net.osmand.data.Amenity;
@@ -68,7 +69,9 @@ import net.osmand.router.RouteResultPreparation;
 import net.osmand.search.SearchUICore;
 import net.osmand.search.SearchUICore.SearchResultCollection;
 import net.osmand.search.core.ObjectType;
+import net.osmand.search.core.SearchCoreAPI;
 import net.osmand.search.core.SearchCoreFactory;
+import net.osmand.search.core.SearchPhrase;
 import net.osmand.search.core.SearchResult;
 import net.osmand.search.core.SearchSettings;
 import net.osmand.swing.MapPanel.MapSelectionArea;
@@ -364,6 +367,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 			}
 		});
 	}
+
 	
 	private void updateSearchResult(final JTextField statusField, SearchResultCollection res, boolean addMore) {
 		popup.setVisible(false);
