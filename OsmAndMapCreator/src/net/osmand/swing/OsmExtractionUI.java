@@ -236,7 +236,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 	    	loc = null;
 	    }
 	    searchUICore = new SearchUICore(MapPoiTypes.getDefault(),
-	    		loc);
+	    		loc, false);
 	    searchUICore.getSearchSettings().setOfflineIndexes(files);
 	    searchUICore.init();
 	    searchUICore.registerAPI(new SearchCoreFactory.SearchRegionByNameAPI());
@@ -298,7 +298,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 				popup.setFocusable(false);
 				SearchSettings settings = searchUICore.getPhrase().getSettings().setOriginalLocation(new LatLon(mapPanel.getLatitude(),
 						mapPanel.getLongitude()));
-				settings = settings.setLang(DataExtractionSettings.getSettings().getSearchLocale());
+				settings = settings.setLang(DataExtractionSettings.getSettings().getSearchLocale(), false);
 				searchUICore.updateSettings(settings);
 			}
 		});
