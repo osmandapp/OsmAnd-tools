@@ -570,7 +570,7 @@ public class IndexUploader {
 			try {
 				rtree = new RTree(nonpackRtree.getAbsolutePath());
 				final SearchRequest<BinaryMapDataObject> req = buildSearchRequest(r, objects, rtree);
-				index.searchMapIndex(req);
+				index.searchMapIndex(req, part);
 				rtree = AbstractIndexPartCreator.packRtreeFile(rtree, nonpackRtree.getAbsolutePath(),
 						packRtree.getAbsolutePath());
 				TLongObjectHashMap<BinaryFileReference> treeHeader = new TLongObjectHashMap<BinaryFileReference>();
