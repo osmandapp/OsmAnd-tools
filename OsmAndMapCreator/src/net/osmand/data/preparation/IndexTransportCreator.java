@@ -523,22 +523,26 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		// first, verify we can accept this relation as new transport relation
 		// accepted roles restricted to: <empty>, stop, platform, ^(stop|platform)_(entry|exit)_only$
 		String version = rel.getTag("public_transport:version");
-		if (Algorithms.isEmpty(version) || Integer.parseInt(version) < 2) {
-			for (Entry<Entity, String> entry : rel.getMemberEntities().entrySet()) {
-				// ignore ways (cause with even with new relations there could be a mix of forward/backward ways)
-				if(entry instanceof Way) {
-					continue;
+		try {
+			if (Algorithms.isEmpty(version) || Integer.parseInt(version) < 2) {
+				for (Entry<Entity, String> entry : rel.getMemberEntities().entrySet()) {
+					// ignore ways (cause with even with new relations there could be a mix of forward/backward ways)
+					if (entry instanceof Way) {
+						continue;
+					}
+					String role = entry.getValue();
+					if (role.isEmpty() || "stop".equals(role) || "platform".equals(role)) {
+						continue; // accepted roles
+					}
+					stopPlatformMatcher.reset(role);
+					if (stopPlatformMatcher.matches()) {
+						continue;
+					}
+					return false; // there is wrong role in the relation, exit
 				}
-				String role = entry.getValue();
-				if (role.isEmpty() || "stop".equals(role) || "platform".equals(role)) {
-					continue; // accepted roles
-				}
-				stopPlatformMatcher.reset(role);
-				if (stopPlatformMatcher.matches()) {
-					continue;
-				}
-				return false; // there is wrong role in the relation, exit
 			}
+		} catch (NumberFormatException e) {
+			return false;
 		}
 
 		List<Entity> platformsAndStops = new ArrayList<Entity>();

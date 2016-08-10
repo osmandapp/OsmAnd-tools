@@ -430,7 +430,31 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			return tags;
 		}
 		Map<String, String> rtags = new LinkedHashMap<String, String>(tags);
-		String[] countyArray= new String[]{"berkeley","luc","herkimer","montgomery","guadalupe","cumberland","cass","koochiching","bergen","saint lawrence","schenectady","log","sullivan","wil","oneida","le sueur","way","tus","kandiyohi","beltrami","becker","madison","passaic","douglas","clay","rensselaer","dutchess","freeborn","ful","crow wing","hennepin","orange","clearwater","sum","hubbard","hol","otsego","stearns","carlton","itasca","anoka","kanabec","cook","atlantic","benton","saratoga","albany","essex","aitkin","mah","isanti","faribault","washington","rockland","cape_may","ramsey","lac qui parle","warren","greene","chisago","blue earth","jackson","ulster","somerset","ott","sussex","morris","kittson","car","pine","big stone","fillmore","dakota","monmouth","col","grant","kane","goodhue","vin","med","putnam","middlesex","lake","columbia","dodge","hoc","yellow medicine","rice","murray","per","steele","outagamie","asd","mercer","lake of the woods","mchenry","fulton","cottonwood","carver","ocean","mille lacs","redwood","meeker","winona","renville","brown","swift","pope","martin","delaware","fay","houston","union","chippewa","nobles","lyon","wright","sibley","nicollet","jef","watonwan","schoharie","mcleod","chenango","hudson","winnipeg","pipestone","mrw","woodbury","gue","lincoln","moe","preston","uni","stevens","wilkin","traverse","leelanau","sen","cook","woo","camden","sta","lic","h","cth","ath","burlington","gonzales","hamilton","sauk","colorado","westchester","story","bel","pau","san","lor","ozaukee","jasper","waupaca","dane","belt","oswego","erie","floyd","bremer","fond du lac","sheboygan","har","macon","chickasaw","boone","hays","caldwell","wya","cos","wayne","shelby","monona","harrison","clayton","monongalia","winnebago","langlade","hen","gea","eri","chp","but","dupage","ida","hardin","buena vista","hancock","waushara","walworth","shawano","saint croix","rock","portage","milwaukee","door","put","pre","por","odnr","mei","jac","hur","ham","gac","fra","cli","ash","onondaga","gloucester","cape may","charlotte","waseca","olmsted","marquette","fulton","champaign","worth","sac","pottawattamie","polk","marshall","lucas","keokuk","franklin","cedar","adams","escambia","kent","santa clara"};
+		String[] countyArray = new String[] { "berkeley", "luc", "herkimer", "montgomery", "guadalupe", "cumberland",
+				"cass", "koochiching", "bergen", "saint lawrence", "schenectady", "log", "sullivan", "wil", "oneida",
+				"le sueur", "way", "tus", "kandiyohi", "beltrami", "becker", "madison", "passaic", "douglas", "clay",
+				"rensselaer", "dutchess", "freeborn", "ful", "crow wing", "hennepin", "orange", "clearwater", "sum",
+				"hubbard", "hol", "otsego", "stearns", "carlton", "itasca", "anoka", "kanabec", "cook", "atlantic",
+				"benton", "saratoga", "albany", "essex", "aitkin", "mah", "isanti", "faribault", "washington",
+				"rockland", "cape_may", "ramsey", "lac qui parle", "warren", "greene", "chisago", "blue earth",
+				"jackson", "ulster", "somerset", "ott", "sussex", "morris", "kittson", "car", "pine", "big stone",
+				"fillmore", "dakota", "monmouth", "col", "grant", "kane", "goodhue", "vin", "med", "putnam",
+				"middlesex", "lake", "columbia", "dodge", "hoc", "yellow medicine", "rice", "murray", "per", "steele",
+				"outagamie", "asd", "mercer", "lake of the woods", "mchenry", "fulton", "cottonwood", "carver",
+				"ocean", "mille lacs", "redwood", "meeker", "winona", "renville", "brown", "swift", "pope", "martin",
+				"delaware", "fay", "houston", "union", "chippewa", "nobles", "lyon", "wright", "sibley", "nicollet",
+				"jef", "watonwan", "schoharie", "mcleod", "chenango", "hudson", "winnipeg", "pipestone", "mrw",
+				"woodbury", "gue", "lincoln", "moe", "preston", "uni", "stevens", "wilkin", "traverse", "leelanau",
+				"sen", "cook", "woo", "camden", "sta", "lic", "h", "cth", "ath", "burlington", "gonzales", "hamilton",
+				"sauk", "colorado", "westchester", "story", "bel", "pau", "san", "lor", "ozaukee", "jasper", "waupaca",
+				"dane", "belt", "oswego", "erie", "floyd", "bremer", "fond du lac", "sheboygan", "har", "macon",
+				"chickasaw", "boone", "hays", "caldwell", "wya", "cos", "wayne", "shelby", "monona", "harrison",
+				"clayton", "monongalia", "winnebago", "langlade", "hen", "gea", "eri", "chp", "but", "dupage", "ida",
+				"hardin", "buena vista", "hancock", "waushara", "walworth", "shawano", "saint croix", "rock",
+				"portage", "milwaukee", "door", "put", "pre", "por", "odnr", "mei", "jac", "hur", "ham", "gac", "fra",
+				"cli", "ash", "onondaga", "gloucester", "cape may", "charlotte", "waseca", "olmsted", "marquette",
+				"fulton", "champaign", "worth", "sac", "pottawattamie", "polk", "marshall", "lucas", "keokuk",
+				"franklin", "cedar", "adams", "escambia", "kent", "santa clara" };
 		if(rtags.containsKey("network")) {
 			String network = rtags.get("network");
 			if (network.startsWith("US:")) {
