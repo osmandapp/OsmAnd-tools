@@ -185,6 +185,9 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 			if (encoded) {
 				// Load point with tags!
 				ctx.loadEntityWay(e);
+				for(Node n : e.getNodes()) {
+					tagsTransformer.addPropogatedTags(n);
+				}
 				routeTypes.encodePointTypes(e, pointTypes, pointNames, false);
 				addWayToIndex(e.getId(), e.getNodes(), mapRouteInsertStat, routeTree, outTypes, pointTypes, pointNames, names);
 			}
