@@ -898,21 +898,22 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 	}
 
 	private double orthogonalDistance(GeneralizedWay gn, int st, int end, int px, int py, boolean returnNanIfNoProjection){
-		float fromy31 = gn.py.get(st);
-		float fromx31 = gn.px.get(st);
-		float toy31 = gn.py.get(end);
-		float tox31 = gn.px.get(end);
-		float mDist = (fromy31 - toy31) * (fromy31 - toy31) + (fromx31 - tox31) * (fromx31 - tox31);
+		int fromy31 = gn.py.get(st);
+		int fromx31 = gn.px.get(st);
+		int toy31 = gn.py.get(end);
+		int tox31 = gn.px.get(end);
+		float mDist = ((float)fromy31 - toy31) * ((float)fromy31 - toy31) +
+				((float)fromx31 - tox31) * ((float)fromx31 - tox31);
 		float projection = (float) scalarMultiplication(fromy31, fromx31, toy31, tox31, py, px);
 		if (returnNanIfNoProjection && (projection < 0 || projection > mDist)) {
 			return Double.NaN;
 		}
 //		float projy31 = fromy31 + (toy31 - fromy31) * (projection / mDist);
 //		float projx31 = fromx31 + (tox31 - fromx31) * (projection / mDist);
-		double A = MapUtils.convert31XToMeters(px, fromx31);
-		double B = MapUtils.convert31YToMeters(py, fromy31);
-		double C = MapUtils.convert31XToMeters(tox31, fromx31);
-		double D = MapUtils.convert31YToMeters(toy31, fromy31);
+		double A = MapUtils.convert31XToMeters(px, fromx31, py);
+		double B = MapUtils.convert31YToMeters(py, fromy31, px);
+		double C = MapUtils.convert31XToMeters(tox31, fromx31, toy31);
+		double D = MapUtils.convert31YToMeters(toy31, fromy31, tox31);
 		return Math.abs(A * D - C * B) / Math.sqrt(C * C + D * D);
 
 	}
