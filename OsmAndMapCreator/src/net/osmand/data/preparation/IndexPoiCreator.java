@@ -38,6 +38,7 @@ import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.EntityParser;
 import net.osmand.osm.edit.Relation;
+import net.osmand.osm.edit.Relation.RelationMember;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import net.sf.junidecode.Junidecode;
@@ -151,8 +152,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			boolean index = poiTypes.parseAmenity(t, tags.get(t), true, tags) != null;
 			if (index) {
 				ctx.loadEntityRelation(e);
-				for (EntityId id : ((Relation) e).getMembersMap().keySet()) {
-					tagsTransform.registerPropogatedTag(id, t, tags.get(t));
+				for (RelationMember id : ((Relation) e).getMembers()) {
+					tagsTransform.registerPropogatedTag(id.getEntityId(), t, tags.get(t));
 				}
 			}
 		}

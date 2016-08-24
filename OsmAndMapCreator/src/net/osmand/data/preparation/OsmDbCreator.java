@@ -26,6 +26,7 @@ import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.osm.edit.Relation;
+import net.osmand.osm.edit.Relation.RelationMember;
 import net.osmand.osm.edit.Way;
 import net.osmand.osm.io.IOsmStorageFilter;
 import net.osmand.osm.io.OsmBaseStorage;
@@ -130,22 +131,22 @@ public class OsmDbCreator implements IOsmStorageFilter {
 		} else {
 			Relation r = (Relation) e;
 			// important keep order!
-			Map<EntityId, EntityId> p = new LinkedHashMap<Entity.EntityId, Entity.EntityId>();
+			Map<RelationMember, EntityId> p = new LinkedHashMap<>();
 
-			for (EntityId i : r.getMemberIds()) {
-				if (i.getType() != EntityType.RELATION) {
-					Long ll = simpleConvertId ? ((Long)getSimpleConvertId(i.getId().longValue(), i.getType(), false)) : 
-						getGeneratedId(i.getId().longValue(), i.getType().ordinal());
+			for (RelationMember i : r.getMembers()) {
+				if (i.getEntityId().getType() != EntityType.RELATION) {
+					Long ll = simpleConvertId ? ((Long)getSimpleConvertId(i.getEntityId().getId().longValue(), i.getEntityId().getType(), false)) : 
+						getGeneratedId(i.getEntityId().getId().longValue(), i.getEntityId().getType().ordinal());
 					if (ll != null) {
-						p.put(i, new EntityId(i.getType(), ll));
+						p.put(i, new EntityId(i.getEntityId().getType(), ll));
 					}
 				}
 			}
-			Iterator<Entry<EntityId, EntityId>> it = p.entrySet().iterator();
+			Iterator<Entry<RelationMember, EntityId>> it = p.entrySet().iterator();
 			while (it.hasNext()) {
-				Entry<EntityId, EntityId> es = it.next();
-				String role = r.getModifiableMembersMap().remove(es.getKey());
-				r.getModifiableMembersMap().put(es.getValue(), role);
+				Entry<RelationMember, EntityId> es = it.next();
+				r.remove(es.getKey());
+				r.addMember(es.getValue().getId(), es.getValue().getType(), es.getKey().getRole());
 			}
 			if (simpleConvertId) {
 				return getSimpleConvertId(id, EntityType.RELATION, true);
@@ -422,15 +423,15 @@ public class OsmDbCreator implements IOsmStorageFilter {
 				// osm change can't handle relations properly
 				allRelations++;
 				short ord = 0;
-				for (Entry<EntityId, String> i : ((Relation) e).getMembersMap().entrySet()) {
+				for (RelationMember i : ((Relation) e).getMembers()) {
 					currentRelationsCount++;
 					if (ord == 0) {
 						prepRelations.setBytes(6, tags.toByteArray());
 					}
 					prepRelations.setLong(1, id);
-					prepRelations.setLong(2, i.getKey().getId());
-					prepRelations.setLong(3, i.getKey().getType().ordinal());
-					prepRelations.setString(4, i.getValue());
+					prepRelations.setLong(2, i.getEntityId().getId());
+					prepRelations.setLong(3, i.getEntityId().getType().ordinal());
+					prepRelations.setString(4, i.getRole());
 					prepRelations.setLong(5, ord++);
 					prepRelations.setInt(7, delete ? 1 : 0);
 					prepRelations.addBatch();

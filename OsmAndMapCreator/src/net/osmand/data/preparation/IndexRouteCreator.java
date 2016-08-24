@@ -56,6 +56,7 @@ import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.osm.edit.OsmMapUtils;
 import net.osmand.osm.edit.Relation;
+import net.osmand.osm.edit.Relation.RelationMember;
 import net.osmand.osm.edit.Way;
 import net.osmand.osm.util.CheckRoadConnectivity;
 import net.osmand.util.Algorithms;
@@ -159,10 +160,10 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 			Map<String, String> tags = renderingTypes.transformTags(e.getTags(), EntityType.RELATION, EntityConvertApplyType.ROUTING);
 			if("enforcement".equals(tags.get("type")) && "maxspeed".equals(tags.get("enforcement"))) {
 				ctx.loadEntityRelation((Relation) e);
-				Iterator<Entity> from = ((Relation) e).getMembers("from").iterator();
+				Iterator<RelationMember> from = ((Relation) e).getMembers("from").iterator();
 				// mark as speed cameras
 				while(from.hasNext()) {
-					Entity n = from.next();
+					Entity n = from.next().getEntity();
 					if(n instanceof Node) {
 						tagsTransformer.registerPropogatedTag(new EntityId(EntityType.NODE, n.getId()), 
 								"highway", "speed_camera");
@@ -573,16 +574,16 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 				}
 				if (type != -1) {
 					ctx.loadEntityRelation((Relation) e);
-					Collection<EntityId> fromL = ((Relation) e).getMemberIds("from"); //$NON-NLS-1$
-					Collection<EntityId> toL = ((Relation) e).getMemberIds("to"); //$NON-NLS-1$
+					Collection<RelationMember> fromL = ((Relation) e).getMembers("from"); //$NON-NLS-1$
+					Collection<RelationMember> toL = ((Relation) e).getMembers("to"); //$NON-NLS-1$
 					if (!fromL.isEmpty() && !toL.isEmpty()) {
-						EntityId from = fromL.iterator().next();
-						EntityId to = toL.iterator().next();
-						if (from.getType() == EntityType.WAY) {
-							if (!highwayRestrictions.containsKey(from.getId())) {
-								highwayRestrictions.put(from.getId(), new TLongArrayList());
+						RelationMember from = fromL.iterator().next();
+						RelationMember to = toL.iterator().next();
+						if (from.getEntityId().getType() == EntityType.WAY) {
+							if (!highwayRestrictions.containsKey(from.getEntityId().getId())) {
+								highwayRestrictions.put(from.getEntityId().getId(), new TLongArrayList());
 							}
-							highwayRestrictions.get(from.getId()).add((to.getId() << 3) | (long) type);
+							highwayRestrictions.get(from.getEntityId().getId()).add((to.getEntityId().getId() << 3) | (long) type);
 						}
 					}
 				}

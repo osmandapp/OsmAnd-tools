@@ -53,6 +53,7 @@ import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.osm.edit.OsmMapUtils;
 import net.osmand.osm.edit.Relation;
+import net.osmand.osm.edit.Relation.RelationMember;
 import net.osmand.osm.edit.Way;
 import net.osmand.swing.DataExtractionSettings;
 import net.osmand.swing.Messages;
@@ -399,24 +400,24 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			if (e instanceof Relation) {
 				Relation aRelation = (Relation) e;
 				ctx.loadEntityRelation(aRelation);
-				Map<Entity, String> entities = aRelation.getMemberEntities();
-				for (Entity es : entities.keySet()) {
-					if (es instanceof Way) {
-						boolean inner = "inner".equals(entities.get(es)); //$NON-NLS-1$
+				for (RelationMember es : aRelation.getMembers()) {
+					if (es.getEntity() instanceof Way) {
+						boolean inner = "inner".equals(es.getRole()); //$NON-NLS-1$
 						if (inner) {
-							m.addInnerWay((Way) es);
+							m.addInnerWay((Way) es.getEntity());
 						} else {
-							String wName = es.getTag(OSMTagKey.NAME);
+							String wName = es.getEntity().getTag(OSMTagKey.NAME);
 							// if name are not equal keep the way for further check (it could be different suburb)
 							if (Algorithms.objectEquals(wName, bname) || wName == null) {
-								visitedBoundaryWays.add(es.getId());
+								visitedBoundaryWays.add(es.getEntity().getId());
 							}
-							m.addOuterWay((Way) es);
+							m.addOuterWay((Way) es.getEntity());
 						}
-					} else if (es instanceof Node && ("admin_centre".equals(entities.get(es)) || "admin_center".equals(entities.get(es)))) {
-						centerId = es.getId();
-					} else if (es instanceof Node && ("label".equals(entities.get(es)) && centerId == 0)) {
-						centerId = es.getId();
+					} else if (es.getEntity() instanceof Node && 
+							("admin_centre".equals(es.getRole()) || "admin_center".equals(es.getRole()))) {
+						centerId = es.getEntity().getId();
+					} else if (es.getEntity() instanceof Node && ("label".equals(es.getRole()) && centerId == 0)) {
+						centerId = es.getEntity().getId();
 					}
 				}
 			} else if (e instanceof Way) {
@@ -459,11 +460,12 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			ctx.loadEntityRelation(i);
 			
 			streetName = i.getTag(OSMTagKey.NAME);
-			l = i.getMemberEntities().keySet().iterator().next().getLatLon(); // get coordinates from any relation member
+			Entity entityNext = i.getMemberEntities(null).iterator().next();
+			l = entityNext.getLatLon(); // get coordinates from any relation member
 			isInNames = i.getIsInNames();
 			String postcode = i.getTag(OSMTagKey.ADDR_POSTCODE);
 			if (streetName == null) { // use relation name as a street name
-				Collection<Entity> members = i.getMembers("street");
+				Collection<Entity> members = i.getMemberEntities("street");
 				for (Entity street : members) { // find the first street member with name and use it as a street name
 					String name = street.getTag(OSMTagKey.NAME);
 					if (name != null) {
@@ -480,8 +482,8 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			if (streetName != null) {
 				Set<Long> idsOfStreet = getStreetInCity(isInNames, streetName, null, l);
 				if (!idsOfStreet.isEmpty()) {
-					Collection<Entity> houses = i.getMembers("house"); // both house and address roles can have address
-					houses.addAll(i.getMembers("address"));
+					Collection<Entity> houses = i.getMemberEntities("house"); // both house and address roles can have address
+					houses.addAll(i.getMemberEntities("address"));
 					for (Entity house : houses) {
 						String hname = null;
 						String second = null;
@@ -825,7 +827,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		if ((houseName != null || houseNumber != null)) {
 			if (e instanceof Relation) {
 				ctx.loadEntityRelation((Relation) e);
-				Collection<Entity> outs = ((Relation) e).getMembers("outer");
+				Collection<Entity> outs = ((Relation) e).getMemberEntities("outer");
 				if (!outs.isEmpty()) {
 					e = outs.iterator().next();
 				}
@@ -995,8 +997,10 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 	private void processPostcodeRelations() throws SQLException {
 		for (Relation r : postalCodeRelations) {
-			for (EntityId l : r.getMemberIds()) {
-				setPostcodeForBuilding(r.getTag(OSMTagKey.POSTAL_CODE), l.getId());
+			for (RelationMember l : r.getMembers()) {
+				if(l.getEntityId() != null) {
+					setPostcodeForBuilding(r.getTag(OSMTagKey.POSTAL_CODE), l.getEntityId().getId());
+				}
 			}
 		}
 	}

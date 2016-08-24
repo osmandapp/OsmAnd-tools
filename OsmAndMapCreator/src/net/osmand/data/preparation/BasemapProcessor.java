@@ -37,6 +37,7 @@ import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.OsmMapUtils;
 import net.osmand.osm.edit.Relation;
+import net.osmand.osm.edit.Relation.RelationMember;
 import net.osmand.osm.edit.Way;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapAlgorithms;
@@ -467,18 +468,18 @@ public class BasemapProcessor {
 			}
 			if (e instanceof Relation) {
 				Relation r = (Relation) e;
-				Iterator<Entry<Entity, String>> it = r.getMemberEntities().entrySet().iterator();
+				Iterator<RelationMember> it = r.getMembers().iterator();
 				List<Node> outer = null;
 				List<List<Node>> inner = new ArrayList<List<Node>>();
 				while (it.hasNext()) {
-					Entry<Entity, String> n = it.next();
-					if (n.getValue().equals("outer")) {
+					RelationMember n = it.next();
+					if (n.getRole().equals("outer")) {
 						if (outer != null) {
 							throw new IllegalStateException("2 outer lines for relation = " + e.getId());
 						}
-						outer = ((Way) n.getKey()).getNodes();
-					} else if (n.getValue().equals("inner")) {
-						inner.add(((Way) n.getKey()).getNodes());
+						outer = ((Way) n.getEntity()).getNodes();
+					} else if (n.getRole().equals("inner")) {
+						inner.add(((Way) n.getEntity()).getNodes());
 					}
 
 				}

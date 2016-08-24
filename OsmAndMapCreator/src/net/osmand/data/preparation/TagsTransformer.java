@@ -15,6 +15,7 @@ import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.Relation;
+import net.osmand.osm.edit.Relation.RelationMember;
 import net.osmand.util.Algorithms;
 
 public class TagsTransformer {
@@ -30,11 +31,11 @@ public class TagsTransformer {
 			if(ctx != null) {
 				ctx.loadEntityRelation((Relation) e);
 			}
-			for(EntityId id : ((Relation) e).getMembersMap().keySet()) {
-				if(!propogatedTags.containsKey(id)) {
-					propogatedTags.put(id, new LinkedHashMap<String, String>());
+			for(RelationMember ids : ((Relation) e).getMembers()) {
+				if(!propogatedTags.containsKey(ids.getEntityId())) {
+					propogatedTags.put(ids.getEntityId(), new LinkedHashMap<String, String>());
 				}
-				Map<String, String> map = propogatedTags.get(id);
+				Map<String, String> map = propogatedTags.get(ids.getEntityId());
 				Iterator<Entry<MapRulType, Map<MapRulType, String>>> itMain = propogated.entrySet().iterator();
 				while (itMain.hasNext()) {
 					Entry<MapRulType, Map<MapRulType, String>> ev = itMain.next();

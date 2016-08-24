@@ -42,6 +42,7 @@ import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.osm.edit.OsmMapUtils;
 import net.osmand.osm.edit.Relation;
+import net.osmand.osm.edit.Relation.RelationMember;
 import net.osmand.osm.edit.Way;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
@@ -110,7 +111,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		}
 		long ll = orig.getId();
 		long sum = 0;
-		for(Entity d : orig.getMemberEntities().keySet()) {
+		for(Entity d : orig.getMemberEntities(null)) {
 			LatLon l ;
 			if(d instanceof Way) {
 				l = OsmMapUtils.getWeightCenterForNodes(((Way) d).getNodes());
@@ -268,20 +269,19 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 
 	private MultipolygonBuilder createMultipolygonBuilder(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 		ctx.loadEntityRelation((Relation) e);
-		Map<Entity, String> entities = ((Relation) e).getMemberEntities();
 
 		// create a multipolygon object for this
 		MultipolygonBuilder original = new MultipolygonBuilder();
 		original.setId(e.getId());
 
 		// fill the multipolygon with all ways from the Relation
-		for (Entity es : entities.keySet()) {
-			if (es instanceof Way) {
-				boolean inner = "inner".equals(entities.get(es)); //$NON-NLS-1$
+		for (RelationMember es : ((Relation) e).getMembers()) {
+			if (es.getEntity() instanceof Way) {
+				boolean inner = "inner".equals(es.getRole()); //$NON-NLS-1$
 				if (inner) {
-					original.addInnerWay((Way) es);
-				} else if("outer".equals(entities.get(es))){
-					original.addOuterWay((Way) es);
+					original.addInnerWay((Way) es.getEntity());
+				} else if("outer".equals(es.getRole())){
+					original.addOuterWay((Way) es.getEntity());
 				}
 			}
 		}

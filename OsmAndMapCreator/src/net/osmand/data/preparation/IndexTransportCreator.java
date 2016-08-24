@@ -16,7 +16,6 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -30,6 +29,7 @@ import net.osmand.osm.edit.EntityParser;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.osm.edit.Relation;
+import net.osmand.osm.edit.Relation.RelationMember;
 import net.osmand.osm.edit.Way;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
@@ -145,9 +145,11 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	public void indexRelations(Relation e, OsmDbAccessorContext ctx) throws SQLException {
 		if (e.getTag(OSMTagKey.ROUTE_MASTER) != null) {
 			ctx.loadEntityRelation(e);
-			for (Entry<Entity, String> child : ((Relation) e).getMemberEntities().entrySet()) {
-				Entity entity = child.getKey();
-				masterRoutes.put(entity.getId(), (Relation) e);
+			for (RelationMember child : ((Relation) e).getMembers()) {
+				Entity entity = child.getEntity();
+				if(entity != null) {
+					masterRoutes.put(entity.getId(), (Relation) e);
+				}
 			}
 		}
 		if ("stop_area".equals(e.getTag(OSMTagKey.PUBLIC_TRANSPORT))) {
@@ -156,11 +158,12 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			if (name == null) return;
 
 			ctx.loadEntityRelation(e);
-			for (Entry<Entity, String> entry : e.getMemberEntities().entrySet()) {
-				String role = entry.getValue();
+			for (RelationMember entry : e.getMembers()) {
+				String role = entry.getRole();
 				if ("platform".equals(role) || "stop".equals(role)) {
-					if (entry.getKey().getTag(OSMTagKey.NAME) == null) {
-						stopAreas.put(EntityId.valueOf(entry.getKey()), e);
+					if (entry.getEntity() != null && 
+							entry.getEntity().getTag(OSMTagKey.NAME) == null) {
+						stopAreas.put(entry.getEntityId(), e);
 					}
 				}
 			}
@@ -525,12 +528,12 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		String version = rel.getTag("public_transport:version");
 		try {
 			if (Algorithms.isEmpty(version) || Integer.parseInt(version) < 2) {
-				for (Entry<Entity, String> entry : rel.getMemberEntities().entrySet()) {
+				for (RelationMember entry : rel.getMembers()) {
 					// ignore ways (cause with even with new relations there could be a mix of forward/backward ways)
-					if (entry instanceof Way) {
+					if (entry.getEntity() instanceof Way) {
 						continue;
 					}
-					String role = entry.getValue();
+					String role = entry.getRole();
 					if (role.isEmpty() || "stop".equals(role) || "platform".equals(role)) {
 						continue; // accepted roles
 					}
@@ -548,21 +551,21 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		List<Entity> platformsAndStops = new ArrayList<Entity>();
 		List<Entity> platforms = new ArrayList<Entity>();
 		List<Entity> stops = new ArrayList<Entity>();
-		Map<Entity, Entity> platformNames = new LinkedHashMap<>();
-		for (Entry<Entity, String> entry : rel.getMemberEntities().entrySet()) {
-			String role = entry.getValue();
-			if (entry.getKey().getLatLon() == null) {
+		Map<EntityId, Entity> platformNames = new LinkedHashMap<>();
+		for (RelationMember entry : rel.getMembers()) {
+			String role = entry.getRole();
+			if (entry.getEntity() == null || entry.getEntity().getLatLon() == null) {
 				continue;
 			}
 			if (role.startsWith("platform")) {
-				platformsAndStops.add(entry.getKey());
-				platforms.add(entry.getKey());
+				platformsAndStops.add(entry.getEntity());
+				platforms.add(entry.getEntity());
 			} else if (role.startsWith("stop")) {
-				platformsAndStops.add(entry.getKey());
-				stops.add(entry.getKey());
+				platformsAndStops.add(entry.getEntity());
+				stops.add(entry.getEntity());
 			} else {
-				if (entry.getKey() instanceof Way) {
-					route.addWay((Way) entry.getKey());
+				if (entry.getEntity() instanceof Way) {
+					route.addWay((Way) entry.getEntity());
 				}
 			}
 		}
@@ -577,8 +580,8 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			Entity genericStopName = null;
 			if(stopArea != null && !Algorithms.isEmpty(stopArea.getTag(OSMTagKey.NAME))) {
 				genericStopName = stopArea;
-			} else if(platformNames.containsKey(s)){
-				genericStopName = platformNames.get(s);
+			} else if(platformNames.containsKey(EntityId.valueOf(s))){
+				genericStopName = platformNames.get(EntityId.valueOf(s));
 			}
 			if(genericStopName != null) {
 				stop.copyNames(genericStopName.getTag(OSMTagKey.NAME), genericStopName.getTag(OSMTagKey.NAME_EN), genericStopName.getNameTags(), true);
@@ -591,8 +594,8 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	}
 
 	private void mergePlatformsStops(List<Entity> platformsAndStopsToProcess, List<Entity> platforms, List<Entity> stops, 
-			Map<Entity, Entity> nameReplacement) {
-		// walk through bigger array (platforms or stops), and verify names from the second:
+			Map<EntityId, Entity> nameReplacement) {
+		// walk through platforms  and verify names from the second:
 		for(Entity platform : platforms) {
 			Entity replaceStop = null;
 			LatLon loc = platform.getLatLon();
@@ -601,22 +604,23 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 				continue;
 			}
 			double dist = 300;
-			for(Entity stop : stops ) {
-				if(stop.getLatLon() == null) {
+			Relation rr = stopAreas.get(EntityId.valueOf(platform));
+			for (Entity stop : stops) {
+				if (stop.getLatLon() == null) {
 					continue;
 				}
-				if(stopAreas.get(stop) == stopAreas.get(platform)) {
+				if (rr != null && stopAreas.get(EntityId.valueOf(stop)) == rr) {
 					replaceStop = stop;
 				}
-				if(MapUtils.getDistance(stop.getLatLon(), loc) < dist) {
+				if (MapUtils.getDistance(stop.getLatLon(), loc) < dist) {
 					replaceStop = stop;
-					dist= MapUtils.getDistance(stop.getLatLon(), loc);
+					dist = MapUtils.getDistance(stop.getLatLon(), loc);
 				}
 			}
 			if(replaceStop != null) {
 				platformsAndStopsToProcess.remove(platform);
 				if(!Algorithms.isEmpty(platform.getTag(OSMTagKey.NAME))) {
-					nameReplacement.put(replaceStop, platform);
+					nameReplacement.put(EntityId.valueOf(replaceStop), platform);
 				}
 			}
 		}
@@ -629,16 +633,16 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		int currentStop = 0;
 		int forwardStop = 0;
 		int backwardStop = 0;
-		for (Entry<Entity, String> e : rel.getMemberEntities().entrySet()) {
-			if (e.getValue().contains("stop") || e.getValue().contains("platform")) {  //$NON-NLS-1$
-				if (e.getKey() instanceof Node) {
-					TransportStop stop = EntityParser.parseTransportStop(e.getKey());
-					Relation stopArea = stopAreas.get(EntityId.valueOf(e.getKey()));
+		for (RelationMember e : rel.getMembers()) {
+			if (e.getRole().contains("stop") || e.getRole().contains("platform")) {  //$NON-NLS-1$
+				if (e.getEntity() instanceof Node) {
+					TransportStop stop = EntityParser.parseTransportStop(e.getEntity());
+					Relation stopArea = stopAreas.get(EntityId.valueOf(e.getEntity()));
 					if (stopArea != null) {
 						stop.copyNames(stopArea.getTag(OSMTagKey.NAME), stopArea.getTag(OSMTagKey.NAME_EN), stopArea.getNameTags(), true);
 					}
-					boolean forward = e.getValue().contains("forward");  //$NON-NLS-1$
-					boolean backward = e.getValue().contains("backward");  //$NON-NLS-1$
+					boolean forward = e.getRole().contains("forward");  //$NON-NLS-1$
+					boolean backward = e.getRole().contains("backward");  //$NON-NLS-1$
 					currentStop++;
 					if (forward || !backward) {
 						forwardStop++;
@@ -648,13 +652,13 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 					}
 					boolean common = !forward && !backward;
 					int index = -1;
-					int i = e.getValue().length() - 1;
+					int i = e.getRole().length() - 1;
 					int accum = 1;
-					while (i >= 0 && Character.isDigit(e.getValue().charAt(i))) {
+					while (i >= 0 && Character.isDigit(e.getRole().charAt(i))) {
 						if (index < 0) {
 							index = 0;
 						}
-						index = accum * Character.getNumericValue(e.getValue().charAt(i)) + index;
+						index = accum * Character.getNumericValue(e.getRole().charAt(i)) + index;
 						accum *= 10;
 						i--;
 					}
@@ -678,13 +682,13 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 
 				}
 
-			} else if (e.getKey() instanceof Way) {
-				int dir = e.getValue().equals("backward") ? -1 : (e.getValue().equals("forward") ? 1 : 0);
+			} else if (e.getEntity() instanceof Way) {
+				int dir = e.getRole().equals("backward") ? -1 : (e.getRole().equals("forward") ? 1 : 0);
 				if(dir >= 0) {
-					directRoute.addWay((Way) e.getKey());
+					directRoute.addWay((Way) e.getEntity());
 				}
 				if(dir <= 0) {
-					backwardRoute.addWay((Way) e.getKey());
+					backwardRoute.addWay((Way) e.getEntity());
 				}
 			}
 		}

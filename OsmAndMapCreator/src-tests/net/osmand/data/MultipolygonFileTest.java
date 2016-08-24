@@ -12,6 +12,7 @@ import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.Relation;
+import net.osmand.osm.edit.Relation.RelationMember;
 import net.osmand.osm.edit.Way;
 import net.osmand.osm.io.OsmBaseStorage;
 
@@ -45,14 +46,14 @@ public class MultipolygonFileTest {
 
 	private Multipolygon buildPolygon(OsmBaseStorage st, long id) {
 		Relation r = (Relation) st.getRegisteredEntities().get(new EntityId(EntityType.RELATION, id));
-		Iterator<Entry<Entity, String>> it = r.getMemberEntities().entrySet().iterator();
+		Iterator<RelationMember> it = r.getMembers().iterator();
 		MultipolygonBuilder bld = new MultipolygonBuilder();
 		while (it.hasNext()) {
-			Entry<Entity, String> e = it.next();
-			if (e.getValue().equals("outer")) {
-				bld.addOuterWay((Way) e.getKey());
-			} else if (e.getValue().equals("inner")) {
-				bld.addInnerWay((Way) e.getKey());
+			RelationMember e = it.next();
+			if (e.getRole().equals("outer")) {
+				bld.addOuterWay((Way) e.getEntity());
+			} else if (e.getRole().equals("inner")) {
+				bld.addInnerWay((Way) e.getEntity());
 			}
 		}
 		Multipolygon polygon = bld.build();

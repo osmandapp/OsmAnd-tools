@@ -21,6 +21,7 @@ import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Relation;
+import net.osmand.osm.edit.Relation.RelationMember;
 import net.osmand.osm.edit.Way;
 
 
@@ -134,7 +135,7 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 			return;
 		}
 		Map<EntityId, Entity> map = new LinkedHashMap<EntityId, Entity>();
-		if (e.getMemberIds().isEmpty()) {
+		if (e.getMembers().isEmpty()) {
 			pselectRelation.setLong(1, e.getId());
 			pselectRelation.setInt(2, e.getModify() == Entity.MODIFY_DELETED ? 1 : 0);
 			if (pselectRelation.execute()) {
@@ -149,31 +150,31 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 				rs.close();
 			}
 		}
-		Collection<EntityId> ids = e.getMemberIds() ;
+		Collection<RelationMember> ids = e.getMembers() ;
 		if (level > 0) {
-			for (EntityId i : ids) {
-				if (i.getType() == EntityType.NODE) {
-					pselectNode.setLong(1, i.getId());
+			for (RelationMember i : ids) {
+				if (i.getEntityId().getType() == EntityType.NODE) {
+					pselectNode.setLong(1, i.getEntityId().getId());
 					if (pselectNode.execute()) {
 						ResultSet rs = pselectNode.getResultSet();
 						Node n = null;
 						while (rs.next()) {
 							if (n == null) {
-								n = new Node(rs.getDouble(1), rs.getDouble(2), i.getId());
+								n = new Node(rs.getDouble(1), rs.getDouble(2), i.getEntityId().getId());
 								readTags(n, rs.getBytes(3));
 							}
 						}
-						map.put(i, n);
+						map.put(i.getEntityId(), n);
 						rs.close();
 					}
-				} else if (i.getType() == EntityType.WAY) {
-					Way way = new Way(i.getId());
+				} else if (i.getEntityId().getType() == EntityType.WAY) {
+					Way way = new Way(i.getEntityId().getId());
 					loadEntityWay(way);
-					map.put(i, way);
-				} else if (i.getType() == EntityType.RELATION) {
-					Relation rel = new Relation(i.getId());
+					map.put(i.getEntityId(), way);
+				} else if (i.getEntityId().getType() == EntityType.RELATION) {
+					Relation rel = new Relation(i.getEntityId().getId());
 					loadEntityRelation(rel, level - 1);
-					map.put(i, rel);
+					map.put(i.getEntityId(), rel);
 				}
 			}
 

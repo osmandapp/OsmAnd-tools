@@ -30,6 +30,7 @@ import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.EntityInfo;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Relation;
+import net.osmand.osm.edit.Relation.RelationMember;
 import net.osmand.osm.edit.Way;
 import net.osmand.osm.io.OsmStorageWriter;
 import net.osmand.util.Algorithms;
@@ -134,8 +135,8 @@ public class AugmentedDiffsInspector {
 				EntityId rid = EntityId.valueOf(r);
 				TreeSet<String> lst = new TreeSet<String>();
 				mp.put(rid, lst);
-				for(EntityId it : r.getMemberIds()) {
-					Set<String> countries = mp.get(it);
+				for(RelationMember it : r.getMembers()) {
+					Set<String> countries = mp.get(it.getEntityId());
 					for(String cnt : countries) {
 						regionsMap.get(cnt).add(rid);
 					}

@@ -46,6 +46,7 @@ import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.EntityInfo;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Relation;
+import net.osmand.osm.edit.Relation.RelationMember;
 import net.osmand.osm.edit.Way;
 import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.util.Algorithms;
@@ -85,7 +86,9 @@ public class OsmStorageWriter {
 			} else if (entities.get(l) instanceof Relation) {
 				relations.add((Relation) entities.get(l));
 				if (includeLinks) {
-					toResolve.addAll(((Relation) entities.get(l)).getMemberIds());
+					for(RelationMember rm : ((Relation) entities.get(l)).getMembers()) {
+						toResolve.add(rm.getEntityId());
+					}
 				}
 			}
 		}
@@ -146,18 +149,18 @@ public class OsmStorageWriter {
 			writeStartElement(streamWriter, ELEM_RELATION, INDENT);
 			streamWriter.writeAttribute(ATTR_ID, String.valueOf(r.getId()));
 			writeEntityAttributes(streamWriter, r, entityInfo.get(EntityId.valueOf(r)));
-			for (Entry<EntityId, String> e : r.getMembersMap().entrySet()) {
-				if(skipMissingMembers && !nd.contains(e.getKey())) {
+			for (RelationMember e : r.getMembers()) {
+				if(skipMissingMembers && !nd.contains(e.getEntityId())) {
 					continue;
 				}
 				writeStartElement(streamWriter, ELEM_MEMBER, INDENT2);
-				streamWriter.writeAttribute(ATTR_REF, String.valueOf(e.getKey().getId()));
-				String s = e.getValue();
+				streamWriter.writeAttribute(ATTR_REF, String.valueOf(e.getEntityId().getId()));
+				String s = e.getRole();
 				if (s == null) {
 					s = "";
 				}
 				streamWriter.writeAttribute(ATTR_ROLE, s);
-				streamWriter.writeAttribute(ATTR_TYPE, e.getKey().getType().toString().toLowerCase());
+				streamWriter.writeAttribute(ATTR_TYPE, e.getEntityId().getType().toString().toLowerCase());
 				writeEndElement(streamWriter, INDENT2);
 			}
 			writeTags(streamWriter, r);
