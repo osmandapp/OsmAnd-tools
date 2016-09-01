@@ -1103,6 +1103,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 				result = 0;
 			} else if ("designated".equals(foot)) {
 				result = 2;
+			}
 		}
 		if (result < 0) {
 			result = 0;
