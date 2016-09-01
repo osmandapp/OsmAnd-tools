@@ -353,7 +353,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 
 	private Map<String, String> transformIntegrityTags(Map<String, String> tags, EntityType entity,
 			EntityConvertApplyType appType) {
-		if(tags.containsKey("highway")) {
+		if(tags.containsKey("highway") && entity == EntityType.WAY) {
 			tags = new LinkedHashMap<>(tags);
 			int integrity = calculateIntegrity(tags);
 			int max_integrity = 27;
