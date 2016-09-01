@@ -359,7 +359,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			int max_integrity = 27;
 			int normalised_integrity = (integrity * 10) / max_integrity;
 			if(integrity < 100) {
-				tags.put("osmand_highway_integrity", integrity +"");
+				tags.put("osmand_highway_integrity", normalised_integrity +"");
 			}
 		}
 		return tags;
@@ -1042,27 +1042,27 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		String bicycle = mp.get("bicycle");
 		String foot = mp.get("foot");
 		if ("paved".equals(surface) || "concrete".equals(surface) || "concrete:lanes".equals(surface) || "concrete:plates".equals(surface) || "sett".equals(surface) || "paving_stones".equals(surface) || "metal".equals(surface) || "wood".equals(surface)) {
-			result = 1;
+			result += 1;
 		} else if ("compacted".equals(surface) || "fine_gravel".equals(surface) || "grass_paver".equals(surface)) {
-			result = 2;
+			result += 2;
 		} else if ("unpaved".equals(surface) || "ground".equals(surface) || "earth".equals(surface) || "pebblestone".equals(surface)) {
-			result = 3;
+			result += 3;
 		} else if ("grass".equals(surface)) {
-			result = 4;
+			result += 4;
 		} else if ("cobblestone".equals(surface)) {
-			result = 5;
+			result += 5;
 		} else if ("gravel".equals(surface)) {
-			result = 6;
+			result += 6;
 		} else if ("stone".equals(surface) || "rock".equals(surface) || "rocky".equals(surface)) {
-			result = 7;
+			result += 7;
 		} else if ("dirt".equals(surface)) {
-			result = 8;
+			result += 8;
 		} else if ("salt".equals(surface)) {
-			result = 9;
+			result += 9;
 		} else if ("sand".equals(surface)) {
-			result = 11;
+			result += 11;
 		} else if ("mud".equals(surface)) {
-			result = 14;
+			result += 14;
 		}
 		if ("excellent".equals(smoothness)) {
 			result -= 5;
