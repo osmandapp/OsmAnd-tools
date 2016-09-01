@@ -1093,26 +1093,16 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		if (("motorway".equals(highway) || ("motorway_link".equals(highway)) || ("trunk".equals(highway)) || ("trunk_link".equals(highway))
 			|| ("primary".equals(highway)) || ("primary_link".equals(highway)) || ("secondary".equals(highway))
 			|| ("secondary_link".equals(highway)) || ("tertiary".equals(highway)) || ("tertiary_link".equals(highway))
-			|| ("unclassified".equals(highway)) || ("residential".equals(highway)) || ("service".equals(highway))) && (surface == null) && (smoothness == null)) {
+			|| ("unclassified".equals(highway)) || ("residential".equals(highway)) || ("service".equals(highway))
+			|| ("track".equals(highway)) || ("footway".equals(highway)) || ("path".equals(highway)) || ("cycleway".equals(highway)))
+			&& (surface == null) && (smoothness == null)) {
 			result = 100;
-		}
-		if ("track".equals(highway) && (surface == null) && (smoothness == null) && (tracktype == null)) {
-			result = 3;
-		}
-		if ("footway".equals(highway) && (surface == null) && (smoothness == null)) {
-			result = 2;
 		}
 		if ("path".equals(highway)) {
 			if ("designated".equals(bicycle)) {
 				result = 0;
 			} else if ("designated".equals(foot)) {
 				result = 2;
-			} else if ((surface == null) && (smoothness == null) && (tracktype == null)) {
-				result = 4;
-			}
-		}
-		if ("cycleway".equals(highway) && (surface == null) && (smoothness == null)) {
-			result = 0;
 		}
 		if (result < 0) {
 			result = 0;
