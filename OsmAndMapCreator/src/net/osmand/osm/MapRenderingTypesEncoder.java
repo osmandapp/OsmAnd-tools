@@ -356,7 +356,11 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		if(tags.containsKey("highway")) {
 			tags = new LinkedHashMap<>(tags);
 			int integrity = calculateIntegrity(tags);
-			tags.put("osmand_highway_integrity", integrity +"");
+			int max_integrity = 27;
+			int normalised_integrity = (integrity * 10) / max_integrity;
+			if(integrity < 100) {
+				tags.put("osmand_highway_integrity", integrity +"");
+			}
 		}
 		return tags;
 	}
