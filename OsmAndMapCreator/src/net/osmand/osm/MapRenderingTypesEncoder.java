@@ -1028,10 +1028,6 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			tags = new LinkedHashMap<String, String>(tags);
 			prepareColorTag(tags, "colour");
 		}
-		if(tags.containsKey("colour")) {
-			tags = new LinkedHashMap<String, String>(tags);
-			prepareColorTag(tags, "colour");
-		}
 		
 		return tags;
 	}
