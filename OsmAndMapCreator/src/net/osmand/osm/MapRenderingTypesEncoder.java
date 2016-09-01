@@ -1033,94 +1033,93 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	}
 	
 
-    private static int calculateIntegrity(Map<String, String> mp) {
-        int result = 0;
-        String surface = mp.get("surface");
-        String smoothness = mp.get("smoothness");
-        String tracktype = mp.get("tracktype");
-        String highway = mp.get("highway");
-        String bicycle = mp.get("bicycle");
-        String foot = mp.get("foot");
-        if ("paved".equals(surface) || "concrete".equals(surface) || "concrete:lanes".equals(surface) || "concrete:plates".equals(surface) || "sett".equals(surface) || "paving_stones".equals(surface) || "metal".equals(surface) || "wood".equals(surface)) {
-            result = 1;
-          } else if ("compacted".equals(surface) || "fine_gravel".equals(surface) || "grass_paver".equals(surface)) {
-            result = 2;
-          } else if ("unpaved".equals(surface) || "ground".equals(surface) || "earth".equals(surface) || "pebblestone".equals(surface)) {
-            result = 3;
-          } else if ("grass".equals(surface)) {
-            result = 4;
-          } else if ("cobblestone".equals(surface)) {
-            result = 5;
-          } else if ("gravel".equals(surface)) {
-            result = 6;
-          } else if ("stone".equals(surface) || "rock".equals(surface) || "rocky".equals(surface)) {
-            result = 7;
-          } else if ("dirt".equals(surface)) {
-            result = 8;
-          } else if ("salt".equals(surface)) {
-            result = 9;
-          } else if ("sand".equals(surface)) {
-            result = 11;
-          } else if ("mud".equals(surface)) {
-            result = 14;
-        }
-        if ("excellent".equals(smoothness)) {
-            result -= 5;
-          } else if ("good".equals(smoothness)) {
-            result -= 3;
-          } else if ("bad".equals(smoothness)) {
-            result += 2;
-          } else if ("very_bad".equals(smoothness)) {
-            result += 4;
-          } else if ("horrible".equals(smoothness)) {
-            result += 7;
-          } else if ("very_horrible".equals(smoothness)) {
-            result += 10;
-          } else if ("impassable".equals(smoothness)) {
-            result += 13;
-        }
-        if (surface == null) {
-          if ("grade1".equals(tracktype)) {
-            result -= 3;
-          } else if ("grade2".equals(tracktype)) {
-            result -= 1;
-          } else if ("grade4".equals(tracktype)) {
-            result += 3;
-          } else if ("grade5".equals(tracktype)) {
-            result += 7;
-          }
-        }
-        if (("motorway".equals(highway) || ("motorway_link".equals(highway)) || ("trunk".equals(highway)) || ("trunk_link".equals(highway))
-            || ("primary".equals(highway)) || ("primary_link".equals(highway)) || ("secondary".equals(highway))
-            || ("secondary_link".equals(highway)) || ("tertiary".equals(highway)) || ("tertiary_link".equals(highway))
-            || ("unclassified".equals(highway)) || ("residential".equals(highway)) || ("service".equals(highway))) && (surface == null) && (smoothness == null)) {
-            result = 100;
-        }
-        if ("track".equals(highway) && (surface == null) && (smoothness == null) && (tracktype == null)) {
-            result = 3;
-        }
-        if ("footway".equals(highway) && (surface == null) && (smoothness == null)) {
-            result = 2;
-        }
-        if ("path".equals(highway)) {
-          if ("designated".equals(bicycle)) {
-            result = 0;
-          } else if ("designated".equals(foot)) {
-            result = 2;
-          } else if ((surface == null) && (smoothness == null) && (tracktype == null)) {
-            result = 4;
-          }
-        }
-        if ("cycleway".equals(highway) && (surface == null) && (smoothness == null)) {
-            result = 0;
-        }
-        if (result < 0) {
-          result = 0;
-        }
-       
-      return result;
-    }
-}
+	private static int calculateIntegrity(Map<String, String> mp) {
+		int result = 0;
+		String surface = mp.get("surface");
+		String smoothness = mp.get("smoothness");
+		String tracktype = mp.get("tracktype");
+		String highway = mp.get("highway");
+		String bicycle = mp.get("bicycle");
+		String foot = mp.get("foot");
+		if ("paved".equals(surface) || "concrete".equals(surface) || "concrete:lanes".equals(surface) || "concrete:plates".equals(surface) || "sett".equals(surface) || "paving_stones".equals(surface) || "metal".equals(surface) || "wood".equals(surface)) {
+			result = 1;
+		} else if ("compacted".equals(surface) || "fine_gravel".equals(surface) || "grass_paver".equals(surface)) {
+			result = 2;
+		} else if ("unpaved".equals(surface) || "ground".equals(surface) || "earth".equals(surface) || "pebblestone".equals(surface)) {
+			result = 3;
+		} else if ("grass".equals(surface)) {
+			result = 4;
+		} else if ("cobblestone".equals(surface)) {
+			result = 5;
+		} else if ("gravel".equals(surface)) {
+			result = 6;
+		} else if ("stone".equals(surface) || "rock".equals(surface) || "rocky".equals(surface)) {
+			result = 7;
+		} else if ("dirt".equals(surface)) {
+			result = 8;
+		} else if ("salt".equals(surface)) {
+			result = 9;
+		} else if ("sand".equals(surface)) {
+			result = 11;
+		} else if ("mud".equals(surface)) {
+			result = 14;
+		}
+		if ("excellent".equals(smoothness)) {
+			result -= 5;
+		} else if ("good".equals(smoothness)) {
+			result -= 3;
+		} else if ("bad".equals(smoothness)) {
+			result += 2;
+		} else if ("very_bad".equals(smoothness)) {
+			result += 4;
+		} else if ("horrible".equals(smoothness)) {
+			result += 7;
+		} else if ("very_horrible".equals(smoothness)) {
+			result += 10;
+		} else if ("impassable".equals(smoothness)) {
+			result += 13;
+		}
+		if (surface == null) {
+			if ("grade1".equals(tracktype)) {
+				result -= 3;
+			} else if ("grade2".equals(tracktype)) {
+				result -= 1;
+			} else if ("grade4".equals(tracktype)) {
+				result += 3;
+			} else if ("grade5".equals(tracktype)) {
+				result += 7;
+			}
+		}
+		if (("motorway".equals(highway) || ("motorway_link".equals(highway)) || ("trunk".equals(highway)) || ("trunk_link".equals(highway))
+			|| ("primary".equals(highway)) || ("primary_link".equals(highway)) || ("secondary".equals(highway))
+			|| ("secondary_link".equals(highway)) || ("tertiary".equals(highway)) || ("tertiary_link".equals(highway))
+			|| ("unclassified".equals(highway)) || ("residential".equals(highway)) || ("service".equals(highway))) && (surface == null) && (smoothness == null)) {
+			result = 100;
+		}
+		if ("track".equals(highway) && (surface == null) && (smoothness == null) && (tracktype == null)) {
+			result = 3;
+		}
+		if ("footway".equals(highway) && (surface == null) && (smoothness == null)) {
+			result = 2;
+		}
+		if ("path".equals(highway)) {
+			if ("designated".equals(bicycle)) {
+				result = 0;
+			} else if ("designated".equals(foot)) {
+				result = 2;
+			} else if ((surface == null) && (smoothness == null) && (tracktype == null)) {
+				result = 4;
+			}
+		}
+		if ("cycleway".equals(highway) && (surface == null) && (smoothness == null)) {
+			result = 0;
+		}
+		if (result < 0) {
+			result = 0;
+		}
+		return result;
+	}
+
 
 
 	private void addOsmcNewTags(Map<String, String> propogated, String[] tokens) {
