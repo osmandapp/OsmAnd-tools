@@ -1094,6 +1094,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			|| ("primary".equals(highway)) || ("primary_link".equals(highway)) || ("secondary".equals(highway))
 			|| ("secondary_link".equals(highway)) || ("tertiary".equals(highway)) || ("tertiary_link".equals(highway))
 			|| ("unclassified".equals(highway)) || ("residential".equals(highway)) || ("service".equals(highway))
+			|| ("pedestrian".equals(highway)) || ("living_street".equals(highway))
 			|| ("track".equals(highway)) || ("footway".equals(highway)) || ("path".equals(highway)) || ("cycleway".equals(highway)))
 			&& (surface == null) && (smoothness == null)) {
 			result = 100;
