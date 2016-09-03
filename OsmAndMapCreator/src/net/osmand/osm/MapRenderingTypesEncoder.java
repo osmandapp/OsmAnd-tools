@@ -1041,6 +1041,15 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		String highway = mp.get("highway");
 		String bicycle = mp.get("bicycle");
 		String foot = mp.get("foot");
+		if (surface != null) {
+			surface = surface.toLowerCase();
+		}
+		if (smoothness != null) {
+			smoothness = smoothness.toLowerCase();
+		}
+		if (tracktype != null) {
+			tracktype = tracktype.toLowerCase();
+		}
 		if ("paved".equals(surface) || "concrete".equals(surface) || "concrete:lanes".equals(surface) || "concrete:plates".equals(surface) || "sett".equals(surface) || "paving_stones".equals(surface) || "metal".equals(surface) || "wood".equals(surface)) {
 			result += 3;
 		} else if ("compacted".equals(surface) || "fine_gravel".equals(surface) || "grass_paver".equals(surface)) {
@@ -1057,7 +1066,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			result += 13;
 		} else if ("dirt".equals(surface)) {
 			result += 14;
-		} else if ("salt".equals(surface)) {
+		} else if ("salt".equals(surface) || "ice".equals(surface) || "snow".equals(surface)) {
 			result += 15;
 		} else if ("sand".equals(surface)) {
 			result += 16;
