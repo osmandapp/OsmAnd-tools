@@ -168,6 +168,7 @@ public class NativeSwingRendering extends NativeLibrary {
 		public long searchTime;
 		public long renderingTime;
 		public double mapDensity;
+		public RenderingContext context;
 
 		public RenderingImageContext(int sleft, int sright, int stop, int sbottom, int zoom, double mapDensity) {
 			this.sleft = sleft;
@@ -202,10 +203,6 @@ public class NativeSwingRendering extends NativeLibrary {
 			this.sbottom = MapUtils.get31TileNumberY(ll.bottom);
 			this.stop = MapUtils.get31TileNumberY(ll.top);
 		}
-	}
-
-	public BufferedImage renderImage(int sleft, int sright, int stop, int sbottom, int zoom, float mapDensity) throws IOException {
-		return renderImage(new RenderingImageContext(sleft, sright, stop, sbottom, zoom, mapDensity));
 	}
 
 	public BufferedImage renderImage(RenderingImageContext ctx) throws IOException {
@@ -310,6 +307,7 @@ public class NativeSwingRendering extends NativeLibrary {
 		BufferedImage img = reader.read(0);
 		ctx.searchTime = search;
 		ctx.renderingTime = rendering;
+		ctx.context = rctx;
 		long last = time + System.currentTimeMillis() - rendering;
 		System.out.println(" TIMES search - " + search + " rendering - " + rendering + " unpack - " + last);
 		res.deleteNativeResult();
@@ -442,6 +440,7 @@ public class NativeSwingRendering extends NativeLibrary {
 		}
 		return defaultLoadedLibrary;
 	}
+
 
 
 }

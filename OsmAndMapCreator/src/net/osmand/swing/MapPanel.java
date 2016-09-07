@@ -65,6 +65,7 @@ import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 
 import net.osmand.MapCreatorVersion;
+import net.osmand.NativeLibrary.RenderedObject;
 import net.osmand.PlatformUtil;
 import net.osmand.data.DataTileManager;
 import net.osmand.data.LatLon;
@@ -78,6 +79,7 @@ import net.osmand.map.TileSourceManager.TileSourceTemplate;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.io.NetworkUtils;
 import net.osmand.swing.NativeSwingRendering.MapDiff;
+import net.osmand.swing.NativeSwingRendering.RenderingImageContext;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
@@ -144,7 +146,7 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 	private NativeSwingRendering nativeLibRendering;
 	private NativeRendererRunnable lastAddedRunnable;
 	private Image nativeRenderingImg;
-
+	private RenderingImageContext lastContext;
 	private Rect nativeRect;
     private class Rect {
         int left31;
@@ -459,11 +461,10 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 	@Override
 	protected void paintComponent(Graphics g) {
 		if(nativeLibRendering != null) {
-			// TODO : 1. zoom scale 2. extend margin (these are center positions)
 			if (nativeRect != null && zoom == nativeRect.nativeZoom) {
                 double xTileLeft = getXTile() - getWidth() / (2.0d * getTileSize());
                 double yTileUp = getYTile() - getHeight() / (2.0d * getTileSize());
-				int shx = (int) (-xTileLeft * getTileSize()+ (nativeRect.left31)/ (MapUtils.getPowZoom(31 - zoom - 8) /mapDensity)) ;
+				int shx = (int) (-xTileLeft * getTileSize() + (nativeRect.left31)/ (MapUtils.getPowZoom(31 - zoom - 8) /mapDensity)) ;
 				int shy = (int) (-yTileUp * getTileSize() + (nativeRect.top31) / (MapUtils.getPowZoom(31 - zoom - 8) /mapDensity))  ;
 				g.drawImage(nativeRenderingImg, shx, shy, this);
 			}
@@ -1109,6 +1110,22 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 					selectionArea.setSelectedArea(startSelecting.x, startSelecting.y, e.getPoint().x, e.getPoint().y);
 					startSelecting = null;
 				}
+				if(selectionArea.getSelectedArea().getWidth() < 4 && selectionArea.getSelectedArea().getHeight() < 4) {
+					RenderingImageContext ctx = lastContext;
+					if (ctx != null && zoom == ctx.zoom) {
+						NativeRendererRunnable rr = new NativeRendererRunnable(getWidth(), getHeight());
+						int x = rr.sleft - ctx.sleft + e.getPoint().x;
+						int y = rr.stop - ctx.stop + e.getPoint().y;
+						System.out.println("Search objects at " + x + " " + y);
+						RenderedObject[] ls = nativeLibRendering.searchRenderedObjectsFromContext(ctx.context, x, y);
+						if(ls != null && ls.length > 0) {
+							for(RenderedObject o : ls) {
+								System.out.println((o.isText() ? o.getName() : "Icon") + " "
+											+o.getId() + " " + o.getTags() + " (" + o.getBbox() + ") ");
+							}
+						}
+					}
+				}
 			}
 
 			// possible bug if popup neither button1|| button3
@@ -1181,8 +1198,8 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 		public void run() {
 			if (nativeRenderer.getQueue().isEmpty()) {
 				try {
-					nativeRenderingImg = nativeLibRendering.renderImage(sleft,
-							sright , stop , sbottom , z, mapDensity);
+					lastContext = new RenderingImageContext(sleft, sright, stop, sbottom, zoom, mapDensity);
+					nativeRenderingImg = nativeLibRendering.renderImage(lastContext);
                     Rect rect = new Rect();
                     rect.left31 = sleft;
                     rect.top31 = stop;
