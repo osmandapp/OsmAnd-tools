@@ -1114,8 +1114,10 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 					RenderingImageContext ctx = lastContext;
 					if (ctx != null && zoom == ctx.zoom) {
 						NativeRendererRunnable rr = new NativeRendererRunnable(getWidth(), getHeight());
-						int x = rr.sleft - ctx.sleft + e.getPoint().x;
-						int y = rr.stop - ctx.stop + e.getPoint().y;
+						int x = (int) ((rr.oleft - ctx.sleft) / MapUtils.getPowZoom(31 - zoom) * getTileSize() + e
+								.getPoint().x);
+						int y = (int) ((rr.otop - ctx.stop) / MapUtils.getPowZoom(31 - zoom) * getTileSize() + e
+								.getPoint().y);
 						System.out.println("Search objects at " + x + " " + y);
 						RenderedObject[] ls = nativeLibRendering.searchRenderedObjectsFromContext(ctx.context, x, y);
 						if(ls != null && ls.length > 0) {
