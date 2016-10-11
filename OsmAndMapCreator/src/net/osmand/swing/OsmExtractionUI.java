@@ -228,8 +228,9 @@ public class OsmExtractionUI implements IMapLocationListener {
 						}
 					}
 				}
-
-				cache.writeToFile(cacheFile);
+				if(!files.isEmpty()) {
+					cache.writeToFile(cacheFile);
+				}
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
