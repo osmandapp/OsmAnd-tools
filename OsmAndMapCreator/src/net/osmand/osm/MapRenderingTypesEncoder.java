@@ -469,7 +469,9 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 				"portage", "milwaukee", "door", "put", "pre", "por", "odnr", "mei", "jac", "hur", "ham", "gac", "fra",
 				"cli", "ash", "onondaga", "gloucester", "cape may", "charlotte", "waseca", "olmsted", "marquette",
 				"fulton", "champaign", "worth", "sac", "pottawattamie", "polk", "marshall", "lucas", "keokuk",
-				"franklin", "cedar", "adams", "escambia", "kent", "santa clara" };
+				"franklin", "cedar", "adams", "escambia", "kent", "santa clara", "chautauqua", "yates", "steuben",
+				"chemung", "tioga", "tompkins", "schuyler", "allegany", "cattaraugus", "broome", "lewis", "jefferson",
+				"livingston" };
 		if(rtags.containsKey("network")) {
 			String network = rtags.get("network");
 			if (network.startsWith("US:")) {
