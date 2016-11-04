@@ -376,27 +376,38 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			Iterator<Entry<String, String>> it = tags.entrySet().iterator();
 			int maxModifier = 1;
 			Set<String> exisitingRefs = new LinkedHashSet<String>();
+			Map<String, String> missingColors = null;
 			while(it.hasNext()) {
 				Entry<String, String> e = it.next();
 				String tag = e.getKey();
 				String vl = e.getValue();
 				if(tag.startsWith("road_ref_")) {
 					String sf = Algorithms.extractOnlyIntegerSuffix(tag);
+					int modifier = -1;
 					if(sf.length() > 0) {
 						try {
-							maxModifier = Math.max(maxModifier, 1 + Integer.parseInt(sf));
+							modifier = Integer.parseInt(sf);
+							maxModifier = Math.max(maxModifier, 1 + modifier);
 						} catch (NumberFormatException e1) {
 							e1.printStackTrace();
 						}
 					}
 					exisitingRefs.add(vl);
-//					exisitingRefs.add("I " + vl); // I 5, 5
-//					exisitingRefs.add("US " + vl ); // US 5, 5
-//					exisitingRefs.add("US " + vl + " Business"); // US 5 Business
 					exisitingRefs.add(vl.replaceAll("-", "").replaceAll(" ", "")); // E 17, E-17, E17
+					if (tags.get("ref:colour") != null && modifier != -1 && 
+							tags.get("road_ref:colour_"+modifier) == null && rfs.contains(vl)) {
+						if(missingColors == null) {
+							missingColors = new LinkedHashMap<String, String>();
+						}
+						missingColors.put("road_ref:colour_"+modifier, tags.get("ref:colour"));
+					}
 				}
 			}
 			rfs.removeAll(exisitingRefs);
+			if(missingColors != null) {
+				tags = new LinkedHashMap<String, String>(tags);
+				tags.putAll(missingColors);
+			}
 			if (rfs.size() > 0) {
 				tags = new LinkedHashMap<String, String>(tags);
 				for (String r : rfs) {
