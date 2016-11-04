@@ -460,8 +460,10 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			ctx.loadEntityRelation(i);
 			
 			streetName = i.getTag(OSMTagKey.NAME);
-			Entity entityNext = i.getMemberEntities(null).iterator().next();
-			l = entityNext.getLatLon(); // get coordinates from any relation member
+			Iterator<Entity> it = i.getMemberEntities(null).iterator();
+			while(l == null && it.hasNext()) {
+				l = it.next().getLatLon(); // get coordinates from any relation member
+			}
 			isInNames = i.getIsInNames();
 			String postcode = i.getTag(OSMTagKey.ADDR_POSTCODE);
 			if (streetName == null) { // use relation name as a street name
@@ -478,7 +480,6 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			}
 
 			
-
 			if (streetName != null) {
 				Set<Long> idsOfStreet = getStreetInCity(isInNames, streetName, null, l);
 				if (!idsOfStreet.isEmpty()) {
