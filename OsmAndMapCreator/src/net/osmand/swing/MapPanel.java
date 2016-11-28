@@ -1119,11 +1119,12 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 						int y = (int) ((rr.otop - ctx.stop) / MapUtils.getPowZoom(31 - zoom) * getTileSize() + e
 								.getPoint().y);
 						System.out.println("Search objects at " + x + " " + y);
-						RenderedObject[] ls = nativeLibRendering.searchRenderedObjectsFromContext(ctx.context, x, y);
+						RenderedObject[] ls = nativeLibRendering.searchRenderedObjectsFromContext(ctx.context, x, y, true);
 						if(ls != null && ls.length > 0) {
 							for(RenderedObject o : ls) {
 								System.out.println((o.isText() ? o.getName() : "Icon") + " "
-											+o.getId() + " " + o.getTags() + " (" + o.getBbox() + ") ");
+											+o.getId() + " " + o.getTags() + " (" + o.getBbox() + ") " + 
+										" order = " + o.getOrder() + " visible = " + o.isVisible());
 							}
 						}
 					}
