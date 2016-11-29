@@ -941,11 +941,11 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			vl = palette6 ? "red" : "brown";
 		} else if ((h >= 16 && h < 45 && v > 60) || vl.equals("orange") || vl.equals("cream") || vl.equals("gold") || vl.equals("yellow-red") || vl.equals("ff8c00") || vl.equals("peach")) {
 			vl = palette6 ? "red" : "orange";
-		} else if ((h >= 46 && h < 73 && s > 30 && v > 80) || vl.equals("yellow") || vl.equals("gelb") || vl.equals("ffff00") || vl.equals("beige") || vl.equals("lightyellow") || vl.equals("jaune")) {
+		} else if ((h >= 46 && h < 66 && s > 30 && v > 83) || vl.equals("yellow") || vl.equals("gelb") || vl.equals("ffff00") || vl.equals("beige") || vl.equals("lightyellow") || vl.equals("jaune")) {
 			vl = "yellow";
-		} else if ((h >= 46 && h < 73 && s > 30 && v > 60 && v < 80)) {
+		} else if ((h >= 46 && h < 66 && s > 30 && v > 30 && v < 82)) {
 			vl = palette6 ? "yellow" : "darkyellow";
-		} else if ((h >= 74 && h < 165 && s > 30 && v > 77) || vl.equals("lightgreen") || vl.equals("lime") || vl.equals("seagreen") || vl.equals("00ff00") || vl.equals("yellow/green")) {
+		} else if ((h >= 67 && h < 165 && s > 30 && v > 77) || vl.equals("lightgreen") || vl.equals("lime") || vl.equals("seagreen") || vl.equals("00ff00") || vl.equals("yellow/green")) {
 			vl = palette6 ? "green" : "lightgreen";
 		} else if ((h >= 74 && h < 174 && s > 30 && v > 30 && v < 77) || vl.contains("green") || vl.equals("darkgreen") || vl.equals("natural") || vl.equals("natur") || vl.equals("mediumseagreen") || vl.equals("green/white") || vl.equals("white/green") || vl.equals("blue/yellow") || vl.equals("vert") || vl.equals("green/blue") || vl.equals("olive")) {
 			vl = "green";
