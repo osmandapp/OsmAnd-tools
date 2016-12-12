@@ -45,16 +45,30 @@
 			</fileset>
 		</copy>
 		<copy todir="${fonts.absolute.dir}">
-			<fileset dir="../../resources/rendering_styles/fonts/OpenSans">
-				<include name="OpenSans-Regular.ttf" />
+			<fileset dir="../../resources/fonts">
+				<include name="05_NotoSans-Regular.ttf"/>
+				<include name="10_NotoSans-Bold.ttf"/>
+				<include name="15_NotoSans-Italic.ttf"/>
+				<include name="20_NotoSans-BoldItalic.ttf"/>
+				<include name="25_NotoSansArabic-Regular.ttf"/>
+				<include name="30_NotoSansArabic-Bold.ttf"/>
+				<include name="35_NotoSansSouthAsian-Regular.ttf"/>
+				<include name="40_NotoSansSouthAsian-Bold.ttf"/>
+				<include name="45_NotoSansSoutheastAsian-Regular.ttf"/>
+				<include name="50_NotoSansSoutheastAsian-Bold.ttf"/>
+				<include name="55_NotoSansTibetan-Regular.ttf"/>
+				<include name="60_NotoSansTibetan-Bold.ttf"/>
+				<include name="65_NotoSansNastaliqUrdu-Regular.ttf"/>
+
+<!--				<include name="OpenSans-Regular.ttf" />
 				<include name="OpenSans-Italic.ttf"/>
 				<include name="OpenSans-Semibold.ttf"/>
-				<include name="OpenSans-SemiboldItalic.ttf"/>
+				<include name="OpenSans-SemiboldItalic.ttf"/>-->
 			</fileset>
 		</copy>
 		<copy todir="${fonts.absolute.dir}">
 			<fileset dir="../../resources/rendering_styles/fonts">
-				<include name="DroidSansEthiopic-Regular.ttf"/>
+<!--				<include name="DroidSansEthiopic-Regular.ttf"/>
 				<include name="DroidSansEthiopic-Bold.ttf"/>
 				<include name="DroidSansArabic.ttf"/>
 				<include name="DroidSansHebrew-Regular.ttf"/>
@@ -78,7 +92,7 @@
 				<include name="NotoSansKhmer-Regular.ttf"/>
 				<include name="NotoSansKhmer-Bold.ttf"/>
 				<include name="NotoSansLao-Regular.ttf"/>
-				<include name="NotoSansLao-Bold.ttf"/>
+				<include name="NotoSansLao-Bold.ttf"/>-->
 				<include name="DroidSansFallback.ttf"/>
 				<include name="MTLmr3m.ttf"/>
 			</fileset>
