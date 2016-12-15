@@ -111,6 +111,9 @@ public class IndexCreator {
 
 	public IndexCreator(File workingDir) {
 		this.workingDir = workingDir;
+		if(new File(workingDir, "srtm").exists()) {
+			setSRTMData(new File(workingDir, "srtm"));
+		}
 	}
 
 	public void setIndexAddress(boolean indexAddress) {
@@ -173,7 +176,7 @@ public class IndexCreator {
 		dbFile = file;
 	}
 	
-	private void setSRTMData(File file) {
+	public void setSRTMData(File file) {
 		heightData = new IndexHeightData();
 		heightData.setSrtmData(file);
 	}

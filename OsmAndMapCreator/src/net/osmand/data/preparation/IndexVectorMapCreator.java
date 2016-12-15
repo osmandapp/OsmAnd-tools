@@ -408,7 +408,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			decodeNames(rs.getString(5), namesUse);
 			parseAndSort(typeUse, rs.getBytes(6));
 			parseAndSort(addtypeUse, rs.getBytes(7));
-
+ 
 			loadNodes(rs.getBytes(4), list);
 			ArrayList<Float> wayNodes = new ArrayList<Float>(list);
 

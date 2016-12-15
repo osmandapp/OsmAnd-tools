@@ -88,6 +88,7 @@ public class IndexBatchCreator {
 	File osmDirFiles;
 	File indexDirFiles;
 	File workDir;
+	File srtmDir;
 
 	boolean indexPOI = false;
 	boolean indexTransport = false;
@@ -101,6 +102,7 @@ public class IndexBatchCreator {
 	private DBDialect mapDBDialect;
 
 	private String renderingTypesFile;
+
 
 	public static void main(String[] args) {
 		IndexBatchCreator creator = new IndexBatchCreator();
@@ -206,6 +208,11 @@ public class IndexBatchCreator {
 		dir = process.getAttribute("directory_for_index_files");
 		if(dir == null || !new File(dir).exists()) {
 			throw new IllegalArgumentException("Please specify directory with generated index files  as directory_for_index_files (attribute)"); //$NON-NLS-1$
+		}
+		
+		dir = process.getAttribute("directory_for_srtm_files");
+		if(dir != null && new File(dir).exists()) {
+			srtmDir = new File(dir);
 		}
 		indexDirFiles = new File(dir);
 		workDir = indexDirFiles;
@@ -492,6 +499,9 @@ public class IndexBatchCreator {
 				osmDb = DBDialect.SQLITE;
 			}
 			IndexCreator indexCreator = new IndexCreator(workDir);
+			if(srtmDir != null) {
+				indexCreator.setSRTMData(srtmDir);
+			}
 			indexCreator.setDialects(osmDb, osmDb);
 			final boolean indAddr = indexAddress && (rdata == null || rdata.indexAddress);
 			final boolean indPoi = indexPOI && (rdata == null || rdata.indexPOI);
