@@ -97,14 +97,15 @@ public class IndexCreator {
 	private boolean backwardCompatibleIds = false;
 
 	private File dbFile;
-
+	 
 	private File mapFile;
 	private RandomAccessFile mapRAFile;
 	private Connection mapConnection;
 
 	public static final int DEFAULT_CITY_ADMIN_LEVEL = 8;
 	private String cityAdminLevel = "" + DEFAULT_CITY_ADMIN_LEVEL;
-
+	private IndexHeightData heightData = null;
+	
 	private Multipolygon boundary;
 
 
@@ -170,6 +171,11 @@ public class IndexCreator {
 
 	public void setNodesDBFile(File file) {
 		dbFile = file;
+	}
+	
+	private void setSRTMData(File file) {
+		heightData = new IndexHeightData();
+		heightData.setSrtmData(file);
 	}
 	
 	public void setDeleteOsmDB(boolean deleteOsmDB) {
@@ -256,6 +262,9 @@ public class IndexCreator {
 	/* ***** END OF GETTERS/SETTERS ***** */
 
 	private void iterateMainEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
+		if (heightData != null && e instanceof Way) {
+			heightData.proccess((Way) e);
+		}
 		if (indexPOI) {
 			indexPoiCreator.iterateEntity(e, ctx, false);
 		}
@@ -902,10 +911,10 @@ public class IndexCreator {
 		IndexPoiCreator.ZIP_LONG_STRINGS = false;
 		IndexCreator creator = new IndexCreator(new File(rootFolder + "/maps/")); //$NON-NLS-1$
 		creator.setIndexMap(true);
-		creator.setIndexAddress(true);
-		creator.setIndexPOI(true);
-		creator.setIndexTransport(true);
-		creator.setIndexRouting(true);
+//		creator.setIndexAddress(true);
+//		creator.setIndexPOI(true);
+//		creator.setIndexTransport(true);
+//		creator.setIndexRouting(true);
 
 //		creator.deleteDatabaseIndexes = false;
 //		creator.recreateOnlyBinaryFile = true;
@@ -914,13 +923,15 @@ public class IndexCreator {
 
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 
-		String file = rootFolder + "/temp/map.osm";
+//		String file = rootFolder + "/temp/map.osm";
+		String file = rootFolder + "/temp/ukraine_kiev-city_europe.pbf";
 //		String file = rootFolder + "/repos/resources/test-resources/synthetic_test_rendering.osm";
 //		String file = rootFolder + "/repos/resources/test-resources/turn_lanes_test.osm";
 
 		int st = file.lastIndexOf('/');
 		int e = file.indexOf('.', st);
 		creator.setNodesDBFile(new File(rootFolder + "/maps/" + file.substring(st, e) + ".tmp.odb"));
+		creator.setSRTMData(new File(rootFolder+"/maps/srtm/"));
 		MapPoiTypes.setDefault(new MapPoiTypes(rootFolder + "/repos//resources/poi/poi_types.xml"));
 		MapRenderingTypesEncoder rt =
 				new MapRenderingTypesEncoder(rootFolder + "/repos//resources/obf_creation/rendering_types.xml",
@@ -940,6 +951,8 @@ public class IndexCreator {
 
 	}
 
+
+	
 
 	public static void generateRegionsFile() throws IOException, SQLException, InterruptedException, XmlPullParserException {
 		MapRenderingTypesEncoder rt = new MapRenderingTypesEncoder("regions");
