@@ -205,14 +205,15 @@ public class IndexBatchCreator {
 			throw new IllegalArgumentException("Please specify directory with .osm or .osm.bz2 files as directory_for_osm_files (attribute)" + dir); //$NON-NLS-1$
 		}
 		osmDirFiles = new File(dir);
-		dir = process.getAttribute("directory_for_index_files");
-		if(dir == null || !new File(dir).exists()) {
-			throw new IllegalArgumentException("Please specify directory with generated index files  as directory_for_index_files (attribute)"); //$NON-NLS-1$
-		}
 		
 		dir = process.getAttribute("directory_for_srtm_files");
 		if(dir != null && new File(dir).exists()) {
 			srtmDir = new File(dir);
+		}
+		
+		dir = process.getAttribute("directory_for_index_files");
+		if(dir == null || !new File(dir).exists()) {
+			throw new IllegalArgumentException("Please specify directory with generated index files  as directory_for_index_files (attribute)"); //$NON-NLS-1$
 		}
 		indexDirFiles = new File(dir);
 		workDir = indexDirFiles;
