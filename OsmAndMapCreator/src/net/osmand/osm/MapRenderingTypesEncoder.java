@@ -523,7 +523,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			rtags.put("modifier", rtags.get("modifier").toLowerCase());
 		}
 		if(rtags.containsKey("ref") && !Algorithms.isEmpty(rtags.get("ref"))) {
-			rtags.put("ref", rtags.get("ref").toUpperCase());
+			rtags.put("ref", rtags.get("ref"));
 		}
 		return rtags;
 	}
