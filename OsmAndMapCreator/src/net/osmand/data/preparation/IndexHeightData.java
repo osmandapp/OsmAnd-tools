@@ -19,6 +19,7 @@ import org.apache.commons.logging.Log;
 public class IndexHeightData {
 	private File srtmData;
 	
+	private String ELE_ASC_START = "osmand_ele_start";
 	private String ELE_ASC_TAG = "osmand_ele_asc";
 	private String ELE_DESC_TAG = "osmand_ele_desc";
 	private static double INEXISTENT_HEIGHT = Double.MIN_VALUE;
@@ -103,12 +104,14 @@ public class IndexHeightData {
 		
 		List<Node> ns = e.getNodes();
 		double prevHeight = INEXISTENT_HEIGHT;
+		double firstHeight = INEXISTENT_HEIGHT;
 		for(int i = 0; i < ns.size(); i++) {
 			Node n = ns.get(i);
 			if(n != null) {
 				double pointHeight = getPointHeight(n.getLatitude(), n.getLongitude());
 				if(prevHeight == INEXISTENT_HEIGHT) {
 					prevHeight = pointHeight;
+					firstHeight = pointHeight;
 				} else {
 					if(pointHeight > prevHeight) {
 						asc += (pointHeight - prevHeight);
@@ -118,6 +121,9 @@ public class IndexHeightData {
 				}
 			}
 			
+		}
+		if(firstHeight != INEXISTENT_HEIGHT) {
+			e.putTag(ELE_ASC_START, ((int)firstHeight)+"");
 		}
 		if(asc >= 1){
 			e.putTag(ELE_ASC_TAG, ((int)asc)+"");
