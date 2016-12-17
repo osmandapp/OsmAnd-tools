@@ -54,13 +54,13 @@ public class IndexHeightData {
 			}
 		}
 		
-		public double getHeight(double x, double  y) {
+		public double getHeight(double x, double y) {
 			if (data == null) {
 				return INEXISTENT_HEIGHT;
 			}
 			int px = (int) ((width - 1) * x);
-			int py = (int) ((height - 1) * y);
-			return data.getElem(px + py * width) & 0xffff;
+			int py = (int) ((height - 1) * (1 - y));
+			return data.getElem((px + 1) + (py + 1) * width) & 0xffff;
 		}
 
 		private String getId(int ln, int lt) {
@@ -153,7 +153,7 @@ public class IndexHeightData {
 				log.error(e.getMessage(), e);
 			}
 		}
-		return tileData.getHeight(lat - lt, lon - ln);
+		return tileData.getHeight(lon - ln, lat - lt);
 	}
 	
 	public int getTileId(int lat, int lon) {
