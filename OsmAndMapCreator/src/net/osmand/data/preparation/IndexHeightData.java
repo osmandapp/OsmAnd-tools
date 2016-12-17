@@ -95,7 +95,7 @@ public class IndexHeightData {
 	
 	public void proccess(Way e) {
 		if(e.getTag("highway") == null && 
-				e.getTag("cycleway") == null ||
+				e.getTag("cycleway") == null &&
 				e.getTag("footway") == null) {
 			return;
 		}
