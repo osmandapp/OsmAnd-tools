@@ -20,6 +20,7 @@ public class IndexHeightData {
 	private File srtmData;
 	
 	private String ELE_ASC_START = "osmand_ele_start";
+	private String ELE_ASC_END = "osmand_ele_end";
 	private String ELE_ASC_TAG = "osmand_ele_asc";
 	private String ELE_DESC_TAG = "osmand_ele_desc";
 	private static double INEXISTENT_HEIGHT = Double.MIN_VALUE;
@@ -99,6 +100,9 @@ public class IndexHeightData {
 				e.getTag("footway") == null) {
 			return;
 		}
+		if(e.getTag("tunnel") != null || e.getTag("bridge") != null) {
+			return;
+		}
 		double asc = 0;
 		double desc = 0;
 		
@@ -124,6 +128,9 @@ public class IndexHeightData {
 		}
 		if(firstHeight != INEXISTENT_HEIGHT) {
 			e.putTag(ELE_ASC_START, ((int)firstHeight)+"");
+		}
+		if(prevHeight != INEXISTENT_HEIGHT) {
+			e.putTag(ELE_ASC_END, ((int)prevHeight)+"");
 		}
 		if(asc >= 1){
 			e.putTag(ELE_ASC_TAG, ((int)asc)+"");
