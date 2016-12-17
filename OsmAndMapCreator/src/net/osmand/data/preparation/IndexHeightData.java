@@ -13,6 +13,7 @@ import javax.imageio.ImageIO;
 import net.osmand.PlatformUtil;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Way;
+import net.osmand.util.MapUtils;
 
 import org.apache.commons.logging.Log;
 
@@ -94,6 +95,27 @@ public class IndexHeightData {
 		}
 	}
 	
+	private class WayHeightStats {
+		double asc = 0;
+		double desc = 0;
+		double firstHeight = INEXISTENT_HEIGHT;
+		double lastHeight = INEXISTENT_HEIGHT;
+		
+		
+		void processHeight(double pointHeight, double prevHeight, double dist) {
+			if(firstHeight == INEXISTENT_HEIGHT) {
+				firstHeight = pointHeight;
+			} else {
+				if (pointHeight > prevHeight) {
+					asc += (pointHeight - prevHeight);
+				} else if (prevHeight > pointHeight) {
+					desc += (prevHeight - pointHeight);
+				}
+			}
+			lastHeight = pointHeight;
+		}
+	}
+	
 	public void proccess(Way e) {
 		if(e.getTag("highway") == null && 
 				e.getTag("cycleway") == null &&
@@ -103,40 +125,40 @@ public class IndexHeightData {
 		if(e.getTag("tunnel") != null || e.getTag("bridge") != null) {
 			return;
 		}
-		double asc = 0;
-		double desc = 0;
+		WayHeightStats wh = new WayHeightStats();
 		
 		List<Node> ns = e.getNodes();
 		double prevHeight = INEXISTENT_HEIGHT;
-		double firstHeight = INEXISTENT_HEIGHT;
+		Node prev = null;
 		for(int i = 0; i < ns.size(); i++) {
 			Node n = ns.get(i);
 			if(n != null) {
+				double segm = 0;
 				double pointHeight = getPointHeight(n.getLatitude(), n.getLongitude());
-				if(prevHeight == INEXISTENT_HEIGHT) {
-					firstHeight = pointHeight;
-				} else {
-					if(pointHeight > prevHeight) {
-						asc += (pointHeight - prevHeight);
-					} else if(prevHeight > pointHeight ) {
-						desc += (prevHeight - pointHeight);
+				if(prev != null) {
+					segm = MapUtils.getDistance(prev.getLatitude(), prev.getLongitude(), n.getLatitude(), n.getLongitude());
+				}
+				if (segm > 1) {
+					if(pointHeight != INEXISTENT_HEIGHT) {
+						wh.processHeight(pointHeight, prevHeight, segm);
 					}
 				}
 				prevHeight = pointHeight;
+				prev = n;
 			}
 			
 		}
-		if(firstHeight != INEXISTENT_HEIGHT) {
-			e.putTag(ELE_ASC_START, ((int)firstHeight)+"");
+		if(wh.firstHeight != INEXISTENT_HEIGHT) {
+			e.putTag(ELE_ASC_START, ((int)wh.firstHeight)+"");
 		}
-		if(prevHeight != INEXISTENT_HEIGHT) {
-			e.putTag(ELE_ASC_END, ((int)prevHeight)+"");
+		if(wh.lastHeight != INEXISTENT_HEIGHT) {
+			e.putTag(ELE_ASC_END, ((int)wh.lastHeight)+"");
 		}
-		if(asc >= 1){
-			e.putTag(ELE_ASC_TAG, ((int)asc)+"");
+		if(wh.asc >= 1){
+			e.putTag(ELE_ASC_TAG, ((int)wh.asc)+"");
 		}
-		if(desc >= 1){
-			e.putTag(ELE_DESC_TAG, ((int)desc)+"");
+		if(wh.desc >= 1){
+			e.putTag(ELE_DESC_TAG, ((int)wh.desc)+"");
 		}
 	}
 	
