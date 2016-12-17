@@ -114,7 +114,6 @@ public class IndexHeightData {
 			if(n != null) {
 				double pointHeight = getPointHeight(n.getLatitude(), n.getLongitude());
 				if(prevHeight == INEXISTENT_HEIGHT) {
-					prevHeight = pointHeight;
 					firstHeight = pointHeight;
 				} else {
 					if(pointHeight > prevHeight) {
@@ -123,6 +122,7 @@ public class IndexHeightData {
 						desc += (prevHeight - pointHeight);
 					}
 				}
+				prevHeight = pointHeight;
 			}
 			
 		}
