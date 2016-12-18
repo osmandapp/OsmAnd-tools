@@ -22,6 +22,8 @@ public class IndexHeightData {
 	
 	private String ELE_ASC_START = "osmand_ele_start";
 	private String ELE_ASC_END = "osmand_ele_end";
+	private String ELE_INCLINE = "osmand_ele_incline_";
+	private String ELE_DECLINE = "osmand_ele_decline_";
 	private String ELE_ASC_TAG = "osmand_ele_asc";
 	private String ELE_DESC_TAG = "osmand_ele_desc";
 	private static double INEXISTENT_HEIGHT = Double.MIN_VALUE;
@@ -101,18 +103,39 @@ public class IndexHeightData {
 		double firstHeight = INEXISTENT_HEIGHT;
 		double lastHeight = INEXISTENT_HEIGHT;
 		
+		int DEGREE_START = 1;
+		int DEGREE_PRECISION = 2;
+		int DEGREE_MAX = 13;
+		int SIZE = (DEGREE_MAX - DEGREE_START) / DEGREE_PRECISION;
+		
+		double[] ascIncline = new double[SIZE];
+		double[] descIncline = new double[SIZE];
+		
 		
 		void processHeight(double pointHeight, double prevHeight, double dist) {
-			if(firstHeight == INEXISTENT_HEIGHT) {
-				firstHeight = pointHeight;
-			} else {
-				if (pointHeight > prevHeight) {
-					asc += (pointHeight - prevHeight);
-				} else if (prevHeight > pointHeight) {
-					desc += (prevHeight - pointHeight);
-				}
+			if (firstHeight == INEXISTENT_HEIGHT) {
+				firstHeight = prevHeight;
 			}
 			lastHeight = pointHeight;
+			if(pointHeight == prevHeight) {
+				return;
+			}
+			double deg = Math.abs(Math.atan2(pointHeight - prevHeight, dist) / Math.PI * 180);
+			double[] arr ;
+			if (pointHeight > prevHeight) {
+				asc += (pointHeight - prevHeight);
+				arr = ascIncline;
+			} else //if (prevHeight > pointHeight) 
+			{
+				desc += (prevHeight - pointHeight);
+				arr = descIncline;
+			}
+			for(int k = 0; k < SIZE; k++) {
+				if(deg >= DEGREE_START + k * DEGREE_PRECISION) {
+					arr[k] += dist;
+				}
+			}
+			
 		}
 	}
 	
@@ -140,22 +163,28 @@ public class IndexHeightData {
 				} else {
 					double segm = MapUtils.getDistance(prev.getLatitude(), prev.getLongitude(), n.getLatitude(),
 							n.getLongitude());
-					if (segm > 100) {
-						if (pointHeight != INEXISTENT_HEIGHT) {
-							wh.processHeight(pointHeight, prevHeight, segm);
-						}
+					if (segm > 100 && pointHeight != INEXISTENT_HEIGHT) {
+						wh.processHeight(pointHeight, prevHeight, segm);
 						prevHeight = pointHeight;
 						prev = n;
 					}
 				}
 			}
-			
 		}
 		if(wh.firstHeight != INEXISTENT_HEIGHT && wh.firstHeight != wh.lastHeight) {
 			e.putTag(ELE_ASC_START, ((int)wh.firstHeight)+"");
 		}
 		if(wh.lastHeight != INEXISTENT_HEIGHT && wh.firstHeight != wh.lastHeight) {
 			e.putTag(ELE_ASC_END, ((int)wh.lastHeight)+"");
+		}
+		for(int k = 0; k < wh.SIZE; k++) {
+			int deg = wh.DEGREE_START + k * wh.DEGREE_PRECISION;
+			if (wh.ascIncline[k] > 0) {
+				e.putTag(ELE_INCLINE + deg, ((int) wh.ascIncline[k]) + "");
+			}
+			if (wh.descIncline[k] > 0) {
+				e.putTag(ELE_DECLINE + deg, ((int) wh.descIncline[k]) + "");
+			}
 		}
 		if(wh.asc >= 1){
 			e.putTag(ELE_ASC_TAG, ((int)wh.asc)+"");
