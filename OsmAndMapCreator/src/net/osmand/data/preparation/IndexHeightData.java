@@ -132,26 +132,29 @@ public class IndexHeightData {
 		Node prev = null;
 		for(int i = 0; i < ns.size(); i++) {
 			Node n = ns.get(i);
-			if(n != null) {
-				double segm = 0;
+			if (n != null) {
 				double pointHeight = getPointHeight(n.getLatitude(), n.getLongitude());
-				if(prev != null) {
-					segm = MapUtils.getDistance(prev.getLatitude(), prev.getLongitude(), n.getLatitude(), n.getLongitude());
-				}
-				if (segm > 1) {
-					if(pointHeight != INEXISTENT_HEIGHT) {
-						wh.processHeight(pointHeight, prevHeight, segm);
+				if (prev == null) {
+					prevHeight = pointHeight;
+					prev = n;
+				} else {
+					double segm = MapUtils.getDistance(prev.getLatitude(), prev.getLongitude(), n.getLatitude(),
+							n.getLongitude());
+					if (segm > 100) {
+						if (pointHeight != INEXISTENT_HEIGHT) {
+							wh.processHeight(pointHeight, prevHeight, segm);
+						}
+						prevHeight = pointHeight;
+						prev = n;
 					}
 				}
-				prevHeight = pointHeight;
-				prev = n;
 			}
 			
 		}
-		if(wh.firstHeight != INEXISTENT_HEIGHT) {
+		if(wh.firstHeight != INEXISTENT_HEIGHT && wh.firstHeight != wh.lastHeight) {
 			e.putTag(ELE_ASC_START, ((int)wh.firstHeight)+"");
 		}
-		if(wh.lastHeight != INEXISTENT_HEIGHT) {
+		if(wh.lastHeight != INEXISTENT_HEIGHT && wh.firstHeight != wh.lastHeight) {
 			e.putTag(ELE_ASC_END, ((int)wh.lastHeight)+"");
 		}
 		if(wh.asc >= 1){
