@@ -112,27 +112,40 @@ public class IndexHeightData {
 		double[] descIncline = new double[SIZE];
 		
 		
-		void processHeight(double pointHeight, double prevHeight, double dist) {
+		void processHeight(double pointHeight, double prevHeight, double dist, Node n) {
 			if (firstHeight == INEXISTENT_HEIGHT) {
 				firstHeight = prevHeight;
 			}
 			lastHeight = pointHeight;
-			if(pointHeight == prevHeight) {
+			double diff = (pointHeight - prevHeight);
+			int df = (int) diff;
+			if(df == 0) {
 				return;
 			}
 			double deg = Math.abs(Math.atan2(pointHeight - prevHeight, dist) / Math.PI * 180);
 			double[] arr ;
-			if (pointHeight > prevHeight) {
-				asc += (pointHeight - prevHeight);
+			if (df > 0) {
+				asc += diff;
 				arr = ascIncline;
-			} else //if (prevHeight > pointHeight) 
-			{
-				desc += (prevHeight - pointHeight);
+				n.putTag(ELE_ASC_TAG, df+"");
+			} else  {
+				desc += -diff;
 				arr = descIncline;
+				n.putTag(ELE_DESC_TAG, -df+"");
 			}
+			int maxDeg = 0;
 			for(int k = 0; k < SIZE; k++) {
-				if(deg >= DEGREE_START + k * DEGREE_PRECISION) {
+				int bs = DEGREE_START + k * DEGREE_PRECISION;
+				if(deg >= bs) {
 					arr[k] += dist;
+					maxDeg = bs;
+				}
+			}
+			if (maxDeg > 0) {
+				if (df > 0) {
+					n.putTag(ELE_INCLINE + maxDeg, "1");
+				} else {
+					n.putTag(ELE_DECLINE + maxDeg, "1");
 				}
 			}
 			
@@ -164,7 +177,7 @@ public class IndexHeightData {
 					double segm = MapUtils.getDistance(prev.getLatitude(), prev.getLongitude(), n.getLatitude(),
 							n.getLongitude());
 					if (segm > 100 && pointHeight != INEXISTENT_HEIGHT) {
-						wh.processHeight(pointHeight, prevHeight, segm);
+						wh.processHeight(pointHeight, prevHeight, segm, n);
 						prevHeight = pointHeight;
 						prev = n;
 					}
@@ -177,21 +190,21 @@ public class IndexHeightData {
 		if(wh.lastHeight != INEXISTENT_HEIGHT && wh.firstHeight != wh.lastHeight) {
 			e.putTag(ELE_ASC_END, ((int)wh.lastHeight)+"");
 		}
-		for(int k = 0; k < wh.SIZE; k++) {
-			int deg = wh.DEGREE_START + k * wh.DEGREE_PRECISION;
-			if (wh.ascIncline[k] > 0) {
-				e.putTag(ELE_INCLINE + deg, ((int) wh.ascIncline[k]) + "");
-			}
-			if (wh.descIncline[k] > 0) {
-				e.putTag(ELE_DECLINE + deg, ((int) wh.descIncline[k]) + "");
-			}
-		}
-		if(wh.asc >= 1){
-			e.putTag(ELE_ASC_TAG, ((int)wh.asc)+"");
-		}
-		if(wh.desc >= 1){
-			e.putTag(ELE_DESC_TAG, ((int)wh.desc)+"");
-		}
+//		for(int k = 0; k < wh.SIZE; k++) {
+//			int deg = wh.DEGREE_START + k * wh.DEGREE_PRECISION;
+//			if (wh.ascIncline[k] > 0) {
+//				e.putTag(ELE_INCLINE + deg, ((int) wh.ascIncline[k]) + "");
+//			}
+//			if (wh.descIncline[k] > 0) {
+//				e.putTag(ELE_DECLINE + deg, ((int) wh.descIncline[k]) + "");
+//			}
+//		}
+//		if(wh.asc >= 1){
+//			e.putTag(ELE_ASC_TAG, ((int)wh.asc)+"");
+//		}
+//		if(wh.desc >= 1){
+//			e.putTag(ELE_DESC_TAG, ((int)wh.desc)+"");
+//		}
 	}
 	
 	public void setSrtmData(File srtmData) {
