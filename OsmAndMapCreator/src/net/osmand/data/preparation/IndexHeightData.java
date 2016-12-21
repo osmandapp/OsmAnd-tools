@@ -23,7 +23,9 @@ public class IndexHeightData {
 	private String ELE_ASC_START = "osmand_ele_start";
 	private String ELE_ASC_END = "osmand_ele_end";
 	private String ELE_INCLINE = "osmand_ele_incline_";
+	private String ELE_INCLINE_MAX = "osmand_ele_incline_max";
 	private String ELE_DECLINE = "osmand_ele_decline_";
+	private String ELE_DECLINE_MAX = "osmand_ele_decline_max";
 	private String ELE_ASC_TAG = "osmand_ele_asc";
 	private String ELE_DESC_TAG = "osmand_ele_desc";
 	private static double INEXISTENT_HEIGHT = Double.MIN_VALUE;
@@ -98,14 +100,12 @@ public class IndexHeightData {
 	}
 	
 	private class WayHeightStats {
-		double asc = 0;
-		double desc = 0;
 		double firstHeight = INEXISTENT_HEIGHT;
 		double lastHeight = INEXISTENT_HEIGHT;
 		
 		int DEGREE_START = 1;
 		int DEGREE_PRECISION = 2;
-		int DEGREE_MAX = 13;
+		int DEGREE_MAX = 30;
 		int SIZE = (DEGREE_MAX - DEGREE_START) / DEGREE_PRECISION;
 		
 		double[] ascIncline = new double[SIZE];
@@ -122,29 +122,31 @@ public class IndexHeightData {
 			if(df == 0) {
 				return;
 			}
-			double deg = Math.abs(Math.atan2(pointHeight - prevHeight, dist) / Math.PI * 180);
+			// double deg = Math.abs(Math.atan2(pointHeight - prevHeight, dist) / Math.PI * 180);
+			double degIncline = Math.abs((pointHeight - prevHeight) /  dist * 100); 
+			
 			double[] arr ;
 			if (df > 0) {
-				asc += diff;
 				arr = ascIncline;
 				n.putTag(ELE_ASC_TAG, df+"");
 			} else  {
-				desc += -diff;
 				arr = descIncline;
 				n.putTag(ELE_DESC_TAG, -df+"");
 			}
 			int maxDeg = 0;
 			for(int k = 0; k < SIZE; k++) {
 				int bs = DEGREE_START + k * DEGREE_PRECISION;
-				if(deg >= bs) {
+				if(degIncline >= bs) {
 					arr[k] += dist;
 					maxDeg = bs;
 				}
 			}
 			if (maxDeg > 0) {
 				if (df > 0) {
-					n.putTag(ELE_INCLINE + maxDeg, "1");
+					n.putTag(ELE_INCLINE + "", "1");
+					n.putTag(ELE_INCLINE_MAX, maxDeg+"");
 				} else {
+					n.putTag(ELE_DECLINE_MAX, maxDeg +"");
 					n.putTag(ELE_DECLINE + maxDeg, "1");
 				}
 			}
