@@ -1133,11 +1133,11 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			} else if ("grade2".equals(tracktype)) {
 				result += 3;
 			} else if ("grade3".equals(tracktype)) {
-				result += 6;
-			} else if ("grade4".equals(tracktype)) {
 				result += 7;
+			} else if ("grade4".equals(tracktype)) {
+				result += 10;
 			} else if ("grade5".equals(tracktype)) {
-				result += 11;
+				result += 15;
 			}
 		}
 		if (("motorway".equals(highway) || ("motorway_link".equals(highway)) || ("trunk".equals(highway)) || ("trunk_link".equals(highway))
