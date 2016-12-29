@@ -45,7 +45,7 @@
 			</fileset>
 		</copy>
 		<copy todir="${fonts.absolute.dir}">
-			<fileset dir="../../resources/fonts">
+			<fileset dir="../../resources/rendering_styles/fonts">
 				<include name="05_NotoSans-Regular.ttf"/>
 				<include name="10_NotoSans-Bold.ttf"/>
 				<include name="15_NotoSans-Italic.ttf"/>
