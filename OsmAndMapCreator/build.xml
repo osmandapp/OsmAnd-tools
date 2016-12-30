@@ -32,7 +32,7 @@
 	</target>
 
 	<target name="download_resources">
-	    <get src="http://builder.osmand.net/binaries/amd64-linux-clang/OsmAndCore_JavaSample1.jar"
+	    <get src="http://builder.osmand.net/binaries/amd64-linux-gcc/OsmAndCore_JavaSample1.jar"
 	        dest="lib-gl/OsmAndCore_jni.jar"  usetimestamp="true"/>
 	</target>
 
@@ -60,39 +60,10 @@
 				<include name="60_NotoSansTibetan-Bold.ttf"/>
 				<include name="65_NotoSansNastaliqUrdu-Regular.ttf"/>
 
-<!--				<include name="OpenSans-Regular.ttf" />
-				<include name="OpenSans-Italic.ttf"/>
-				<include name="OpenSans-Semibold.ttf"/>
-				<include name="OpenSans-SemiboldItalic.ttf"/>-->
 			</fileset>
 		</copy>
 		<copy todir="${fonts.absolute.dir}">
 			<fileset dir="../../resources/rendering_styles/fonts">
-<!--				<include name="DroidSansEthiopic-Regular.ttf"/>
-				<include name="DroidSansEthiopic-Bold.ttf"/>
-				<include name="DroidSansArabic.ttf"/>
-				<include name="DroidSansHebrew-Regular.ttf"/>
-				<include name="DroidSansHebrew-Bold.ttf"/>
-				<include name="NotoSansThai-Regular.ttf"/>
-				<include name="NotoSansThai-Bold.ttf"/>
-				<include name="DroidSansArmenian.ttf"/>
-				<include name="DroidSansGeorgian.ttf"/>
-				<include name="NotoSansDevanagari-Regular.ttf"/>
-				<include name="NotoSansDevanagari-Bold.ttf"/>
-				<include name="NotoSansTamil-Regular.ttf"/>
-				<include name="NotoSansTamil-Bold.ttf"/>
-				<include name="NotoSansMalayalam.ttf"/>
-				<include name="NotoSansMalayalam-Bold.ttf"/>
-				<include name="NotoSansBengali-Regular.ttf"/>
-				<include name="NotoSansBengali-Bold.ttf"/>
-				<include name="NotoSansTelugu-Regular.ttf"/>
-				<include name="NotoSansTelugu-Bold.ttf"/>
-				<include name="NotoSansKannada-Regular.ttf"/>
-				<include name="NotoSansKannada-Bold.ttf"/>
-				<include name="NotoSansKhmer-Regular.ttf"/>
-				<include name="NotoSansKhmer-Bold.ttf"/>
-				<include name="NotoSansLao-Regular.ttf"/>
-				<include name="NotoSansLao-Bold.ttf"/>-->
 				<include name="DroidSansFallback.ttf"/>
 				<include name="MTLmr3m.ttf"/>
 			</fileset>
@@ -227,7 +198,7 @@
 	</target>
 
 	<target name="update-jni">
-	    <get src="http://builder.osmand.net/binaries/amd64-linux-clang/OsmAndCore_JavaSample1.jar"
+	    <get src="http://builder.osmand.net/binaries/amd64-linux-gcc/OsmAndCore_JavaSample1.jar"
 	        dest="lib-gl/OsmAndCore_jni.jar"  usetimestamp="true"/>
 	</target>
 
