@@ -1126,7 +1126,7 @@ void activateProvider(int layerIdx, int idx)
         QHash< QString, QString > settings;
         settings.insert("appMode", "browse map");
         //settings.insert("contourLines", "11");
-        settings.insert("osmcTraces", "true");
+        // settings.insert("osmcTraces", "true");
         mapPresentationEnvironment->setSettings(settings);
 
         auto tileProvider = new OsmAnd::MapRasterLayerProvider_Software(mapPrimitivesProvider);
