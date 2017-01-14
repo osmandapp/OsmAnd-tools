@@ -532,9 +532,7 @@ std::unique_ptr<QProcess> zenity(const QString& cmd)
 QString inputDialog(const QString& title, const QString& text, const QString& entryText = "")
 {
     // Cannot use QtGui unfortuanately (why?)
-    // QString text = QInputDialog::getText(this, tr("Input coordinate"), tr("Coordinate:"), QLineEdit::
-    
-    rmal, "", &ok);
+    // QString text = QInputDialog::getText(this, tr("Input coordinate"), tr("Coordinate:"), QLineEdit::rmal, "", &ok);
     // But since this program runs only on Linux... We will do some weird stuff.
     auto p = zenity("zenity --entry --title=\"" % title % "\" --text=\"" % text % "\" --entry-text \"" % entryText);
     return p->readAllStandardOutput().simplified();

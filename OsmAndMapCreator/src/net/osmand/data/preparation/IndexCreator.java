@@ -908,7 +908,7 @@ public class IndexCreator {
 
 	public static void main(String[] args) throws IOException, SQLException, InterruptedException, XmlPullParserException {
 		long time = System.currentTimeMillis();
-
+		
 //		if(true){ generateRegionsFile(); return;}
 		String rootFolder = "/Users/victorshcherb/osmand/";
 		IndexPoiCreator.ZIP_LONG_STRINGS = false;
