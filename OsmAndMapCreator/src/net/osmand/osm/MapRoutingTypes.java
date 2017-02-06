@@ -19,6 +19,7 @@ import net.osmand.osm.MapRenderingTypesEncoder.MapRouteTag;
 import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Way;
+import net.osmand.util.Algorithms;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -29,6 +30,7 @@ public class MapRoutingTypes {
 	private static Set<String> TAGS_TO_SAVE = new HashSet<String>();
 	private static Set<String> TAGS_TO_ACCEPT = new HashSet<String>();
 	private static Map<String, String> TAGS_TO_REPLACE = new HashMap<String, String>();
+	private static Map<String, String> TAGS_TYPE = new HashMap<String, String>();
 	private static Set<String> TAGS_RELATION_TO_ACCEPT = new HashSet<String>();
 	private static Set<String> TAGS_TEXT = new HashSet<String>();
 	private static Set<String> BASE_TAGS_TEXT = new HashSet<String>();
@@ -48,6 +50,9 @@ public class MapRoutingTypes {
 			String t = tg.tag;
 			if(tg.value != null) {
 				t += TAG_DELIMETER + tg.value;
+			}
+			if(!Algorithms.isEmpty(tg.type)) {
+				TAGS_TYPE.put(t, tg.type);
 			}
 			if(tg.register) {
 				if(tg.relation) {
@@ -114,7 +119,7 @@ public class MapRoutingTypes {
 		for(Entry<String, String> es : tags.entrySet()) {
 			String tag = es.getKey();
 			String value = converBooleanValue(es.getValue());
-			if(contains(TAGS_RELATION_TO_ACCEPT, tag, value)) {
+			if(contains(TAGS_RELATION_TO_ACCEPT, tag, value) && validateType(tag, value)) {
 				propogated = new LinkedHashMap<String, String>();
 				propogated.put(tag, value);
 				break;
@@ -133,10 +138,32 @@ public class MapRoutingTypes {
 //			}
 			if(contains(TAGS_TO_ACCEPT, tag, value) ||
 					startsWith(TAGS_TO_SAVE, tag, value)) {
-				propogated.put(tag, value);
+				if(validateType(tag, value)) {
+					propogated.put(tag, value);
+				}
 			}
 		}
 		return propogated;
+	}
+
+	private boolean validateType(String tag, String value) {
+		String tp = TAGS_TYPE.get(tag);
+		if(tp != null) {
+			try {
+				if(tp.equals("length")) {
+					return RouteDataObject.parseLength(value, -1) != -1;
+				}
+				if(tp.equals("weight")) {
+					return RouteDataObject.parseWeightInTon(value, -1) != -1;
+				}
+				if(tp.equals("speed")) {
+					return RouteDataObject.parseSpeed(value, -1) != -1;
+				}
+			} catch(Exception e) {
+				return false;
+			}
+		}
+		return true;
 	}
 
 	private boolean contains(Set<String> s, String tag, String value) {
@@ -213,9 +240,13 @@ public class MapRoutingTypes {
 				value = tvl.substring(i + 1);
 			}
             if(TAGS_TEXT.contains(tag) || startsWith(TAGS_TEXT, tag, value)) {
-                names.put(registerRule(tag, null), value);
+            	if(validateType(tag, value)) {
+            		names.put(registerRule(tag, null), value);
+            	}
             } else if(contains(TAGS_TO_ACCEPT, tag, value) || startsWith(TAGS_TO_SAVE, tag, value) || getMap(TAGS_TO_REPLACE, tag, value) != null) {
-				outTypes.add(registerRule(tag, value).id);
+            	if(validateType(tag, value)) {
+            		outTypes.add(registerRule(tag, value).id);
+            	}
 			}
 		}
 		return true;
@@ -255,11 +286,15 @@ public class MapRoutingTypes {
 				value = tvl.substring(i + 1);
 			}
 			if(BASE_TAGS_TEXT.contains(tag)) {
-				names.put(registerRule(tag, null), value);
+				if(validateType(tag, value)) {
+					names.put(registerRule(tag, null), value);
+				}
 			}
 			if(contains(TAGS_TO_ACCEPT, tag, value) ||
 					startsWith(BASE_TAGS_TO_SAVE, tag, value)) {
-				outTypes.add(registerRule(tag, value).id);
+				if(validateType(tag, value)) {
+					outTypes.add(registerRule(tag, value).id);
+				}
 			}
 		}
 		return true;

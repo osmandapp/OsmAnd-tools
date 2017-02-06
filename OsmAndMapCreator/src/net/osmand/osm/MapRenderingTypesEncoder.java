@@ -231,6 +231,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		rtype.base = Boolean.parseBoolean(parser.getAttributeValue("", "base"));
 		rtype.replace = "replace".equalsIgnoreCase(mode);
 		rtype.register = "register".equalsIgnoreCase(mode);
+		rtype.type = lc(parser.getAttributeValue("", "type"));
 		rtype.amend = "amend".equalsIgnoreCase(mode);
 		rtype.text = "text".equalsIgnoreCase(mode);
 		rtype.relation = Boolean.parseBoolean(parser.getAttributeValue("", "relation"));
@@ -1240,6 +1241,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		String value;
 		String tag2;
 		String value2;
+		String type;
 		boolean register;
 		boolean amend;
 		boolean base;
