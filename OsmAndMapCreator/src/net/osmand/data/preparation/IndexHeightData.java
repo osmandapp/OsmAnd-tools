@@ -47,9 +47,7 @@ public class IndexHeightData {
 		
 		public void loadData(File folder) throws IOException {
 			dataLoaded = true;
-			int ln = (id >> 10) - 180;
-			int lt = (id - ((id >> 10) << 10)) - 90;
-			String nd = getId(ln, lt);
+			String nd = getFileName();
 			File f = new File(folder, nd +".tif");
 			BufferedImage img;
 			if(f.exists()) {
@@ -59,6 +57,13 @@ public class IndexHeightData {
 				data = (DataBufferShort) img.getRaster().getDataBuffer(); 
 			}
 		}
+
+		private String getFileName() {
+			int ln = (id >> 10) - 180;
+			int lt = (id - ((id >> 10) << 10)) - 90;
+			String nd = getId(ln, lt);
+			return nd;
+		}
 		
 		public double getHeight(double x, double y) {
 			if (data == null) {
@@ -66,7 +71,12 @@ public class IndexHeightData {
 			}
 			int px = (int) ((width - 1) * x);
 			int py = (int) ((height - 1) * (1 - y));
-			return data.getElem((px + 1) + (py + 1) * width) & 0xffff;
+			int ind = (px + 1) + (py + 1) * width;
+			if(ind >= data.getSize()) {
+				throw new IllegalArgumentException("Illegal access " + x + ", " + y + " (" + px + ", " + py + ") "
+						+ ind + " - " + getFileName());
+			}
+			return data.getElem(ind) & 0xffff;
 		}
 
 		private String getId(int ln, int lt) {
