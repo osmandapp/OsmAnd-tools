@@ -69,9 +69,9 @@ public class IndexHeightData {
 			if (data == null) {
 				return INEXISTENT_HEIGHT;
 			}
-			int px = (int) ((width - 1) * x);
-			int py = (int) ((height - 1) * (1 - y));
-			int ind = (px + 1) + (py + 1) * width;
+			int px = (int) (Math.round((width - 3) * x)) + 1;
+			int py = (int) (Math.round((height - 3) * (1 - y))) + 1;
+			int ind = px + py * width ;
 			if(ind >= data.getSize()) {
 				throw new IllegalArgumentException("Illegal access " + x + ", " + y + " (" + px + ", " + py + ") "
 						+ ind + " - " + getFileName());
@@ -249,7 +249,34 @@ public class IndexHeightData {
 		return ind;
 	}
 
-	
+
+	public static void main(String[] args) {
+		IndexHeightData hd = new IndexHeightData();
+		hd.setSrtmData(new File("/Users/victorshcherb/osmand/maps/srtm/"));
+		
+		cmp(hd.getPointHeight(46.0, 9.0), 272);
+		cmp(hd.getPointHeight(46.0, 9.99999), 1748);
+		cmp(hd.getPointHeight(46.99999, 9.99999), 1112);
+		cmp(hd.getPointHeight(46.999999, 9.0), 2845);
+		
+		cmp(hd.getPointHeight(46.5, 9.5), 2436);
+		
+		cmp(hd.getPointHeight(46.1, 9), 1441);
+		cmp(hd.getPointHeight(46.7, 9), 2303);
+		cmp(hd.getPointHeight(46.0, 9.5), 1822);
+		cmp(hd.getPointHeight(46.99999, 9.5), 531);
+		
+
+	}
+
+	private static void cmp(double pointHeight, double exp) {
+		if(pointHeight != exp) {
+			System.out.println(pointHeight + " != " + exp);
+		} else {
+			System.out.println(pointHeight + " == " + exp);
+		}
+		
+	}
 	
 	
 }
