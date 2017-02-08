@@ -4,6 +4,7 @@ import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferShort;
 import java.io.File;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -13,6 +14,7 @@ import javax.imageio.ImageIO;
 import net.osmand.PlatformUtil;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Way;
+import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
 import org.apache.commons.logging.Log;
@@ -65,14 +67,23 @@ public class IndexHeightData {
 			return nd;
 		}
 		
-		public double getHeight(double x, double y) {
+		public double getHeight(double x, double y, double[] array) {
 			if (data == null) {
 				return INEXISTENT_HEIGHT;
 			}
-			int px = (int) (Math.round((width - 3) * x)) + 1;
+			int px = (int) (Math.round((width - 3) * x)) + 1 ;
 			int py = (int) (Math.round((height - 3) * (1 - y))) + 1;
-			int ind = px + py * width ;
-			if(ind >= data.getSize()) {
+			int ind = px + py * width;
+			if (array != null) {
+				for (int k = 0; k < 9; k++) {
+					int pind = (px + k % 3 - 1) + (py + k / 3 - 1) * width;
+					array[k] = 0;
+					if(pind >= 0 && pind < data.getSize()) {
+						array[k] = data.getElem(pind) & 0xffff;
+					}
+				}
+			}
+			if (ind >= data.getSize()) {
 				throw new IllegalArgumentException("Illegal access " + x + ", " + y + " (" + px + ", " + py + ") "
 						+ ind + " - " + getFileName());
 			}
@@ -224,6 +235,10 @@ public class IndexHeightData {
 	}
 	
 	public double getPointHeight(double lat, double lon) {
+		return getPointHeight(lat, lon, null);
+	}
+	
+	public double getPointHeight(double lat, double lon, double[] neighboors) {
 		int lt = (int) lat;
 		int ln = (int) lon;
 		int id = getTileId(lt, ln);
@@ -239,7 +254,7 @@ public class IndexHeightData {
 				log.error(e.getMessage(), e);
 			}
 		}
-		return tileData.getHeight(lon - ln, lat - lt);
+		return tileData.getHeight(lon - ln, lat - lt, neighboors);
 	}
 	
 	public int getTileId(int lat, int lon) {
@@ -254,28 +269,43 @@ public class IndexHeightData {
 		IndexHeightData hd = new IndexHeightData();
 		hd.setSrtmData(new File("/Users/victorshcherb/osmand/maps/srtm/"));
 		
-		cmp(hd.getPointHeight(46.0, 9.0), 272);
-		cmp(hd.getPointHeight(46.0, 9.99999), 1748);
-		cmp(hd.getPointHeight(46.99999, 9.99999), 1112);
-		cmp(hd.getPointHeight(46.999999, 9.0), 2845);
+		cmp(hd, 46.0, 9.0, 272);
+		cmp(hd, 46.0, 9.99999, 1748);
+		cmp(hd, 46.999999, 9.999999, 1121);
+		cmp(hd, 46.999999, 9.0, 2834);
+
+		cmp(hd, 46.0, 9.5, 1822);
+		cmp(hd, 46.99999, 9.5, 531);
 		
-		cmp(hd.getPointHeight(46.5, 9.5), 2436);
+		cmp(hd, 46.05321, 9.94346, 1515);
+		cmp(hd, 46.735, 9.287, 2368);
+		cmp(hd, 46.291, 9.297, 1670);
+		cmp(hd, 46.793, 9.878, 2033);
+		cmp(hd, 46.774, 9.888, 1975);
 		
-		cmp(hd.getPointHeight(46.1, 9), 1441);
-		cmp(hd.getPointHeight(46.7, 9), 2303);
-		cmp(hd.getPointHeight(46.0, 9.5), 1822);
-		cmp(hd.getPointHeight(46.99999, 9.5), 531);
-		
+		cmp(hd, 46.5, 9.5, 2436);		
+		cmp(hd, 46.1, 9, 1441);
+		cmp(hd, 46.7, 9, 2303);
 
 	}
 
-	private static void cmp(double pointHeight, double exp) {
-		if(pointHeight != exp) {
-			System.out.println(pointHeight + " != " + exp);
+	private static void cmp(IndexHeightData hd, double lat, double lon, double exp) {
+		double[] nh = new double[9];
+		double pointHeight = hd.getPointHeight(lat, lon, nh);
+		System.out.println("Lat " + lat + " lon " + lon);
+		if (pointHeight != exp) {
+			String extra = " NO NEIGHBOR FOUND " + Arrays.toString(nh);
+			for (int k = 0; k < 9; k++) {
+				if (nh[k] == exp) {
+					extra = " neighbor (" + (k / 3 - 1) + " y, " + (k % 3 - 1) + " x) ";
+				}
+			}
+			System.out.println(pointHeight + " (eval) != " + exp + " (exp) - " + extra);
+
 		} else {
-			System.out.println(pointHeight + " == " + exp);
+			System.out.println(pointHeight + " (eval) == " + exp + " (exp) ");
 		}
-		
+
 	}
 	
 	
