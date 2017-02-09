@@ -245,9 +245,11 @@ public class IndexHeightData {
 		double latDelta = lat - lt;
 		if(lonDelta < 0) {
 			lonDelta += 1;
+			ln -= 1;
 		}
 		if(latDelta < 0) {
 			latDelta += 1;
+			lt -= 1;
 		}
 		int id = getTileId(lt, ln);
 		TileData tileData = map.get(id);
@@ -280,18 +282,20 @@ public class IndexHeightData {
 		double latDelta = lat - lt;
 		if(lonDelta < 0) {
 			lonDelta += 1;
+			ln -= 1;
 		}
 		if(latDelta < 0) {
 			latDelta += 1;
+			lt -= 1;
 		}
 		int id = getTileId(lt, ln);
 		TileData td = new TileData(id);
-		System.out.println(lat + " "  +lon + "  " + td.getFileName() + " " + latDelta + " " + lonDelta);
+		System.out.println(lat + " "  +lon + " (lat/lon) -> file " + td.getFileName() + " (y, x in %) " + (float) latDelta + " " + (float) lonDelta);
 	}
 	
 	public static void main(String[] args) {
 		test(0.3, 3.1);
-		test(-0.5, 3.1);
+		test(-0.4, 3.2);
 		test(-1.3, -3.1);
 //		testHeight();
 	}
