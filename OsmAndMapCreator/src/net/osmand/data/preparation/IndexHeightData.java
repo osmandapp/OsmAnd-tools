@@ -207,9 +207,9 @@ public class IndexHeightData {
 				}
 			}
 		}
-		if(wh.firstHeight != INEXISTENT_HEIGHT && wh.firstHeight != wh.lastHeight) {
+//		if(wh.firstHeight != INEXISTENT_HEIGHT && wh.firstHeight != wh.lastHeight) {
 			e.putTag(ELE_ASC_START, ((int)wh.firstHeight)+"");
-		}
+//		}
 		if(wh.lastHeight != INEXISTENT_HEIGHT && wh.firstHeight != wh.lastHeight) {
 			e.putTag(ELE_ASC_END, ((int)wh.lastHeight)+"");
 		}
