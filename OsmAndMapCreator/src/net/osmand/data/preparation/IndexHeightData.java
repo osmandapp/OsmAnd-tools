@@ -108,7 +108,7 @@ public class IndexHeightData {
 			} else {
 				id += "W";
 			}
-			lt = Math.abs(ln);
+			ln = Math.abs(ln);
 			if(ln < 10) {
 				id += "0";
 			}
@@ -241,6 +241,14 @@ public class IndexHeightData {
 	public double getPointHeight(double lat, double lon, double[] neighboors) {
 		int lt = (int) lat;
 		int ln = (int) lon;
+		double lonDelta = lon - ln;
+		double latDelta = lat - lt;
+		if(lonDelta < 0) {
+			lonDelta += 1;
+		}
+		if(latDelta < 0) {
+			latDelta += 1;
+		}
 		int id = getTileId(lt, ln);
 		TileData tileData = map.get(id);
 		if(tileData == null) {
@@ -254,18 +262,41 @@ public class IndexHeightData {
 				log.error(e.getMessage(), e);
 			}
 		}
-		return tileData.getHeight(lon - ln, lat - lt, neighboors);
+		
+		return tileData.getHeight(lonDelta, latDelta, neighboors);
 	}
 	
-	public int getTileId(int lat, int lon) {
+	public static int getTileId(int lat, int lon) {
 		int ln = (int) (lon + 180);
 		int lt = (int) (lat  + 90);
 		int ind = lt + (ln << 10);
 		return ind;
 	}
 
-
+	public static void test(double lat, double lon) {
+		int lt = (int) lat;
+		int ln = (int) lon;
+		double lonDelta = lon - ln;
+		double latDelta = lat - lt;
+		if(lonDelta < 0) {
+			lonDelta += 1;
+		}
+		if(latDelta < 0) {
+			latDelta += 1;
+		}
+		int id = getTileId(lt, ln);
+		TileData td = new TileData(id);
+		System.out.println(lat + " "  +lon + "  " + td.getFileName() + " " + latDelta + " " + lonDelta);
+	}
+	
 	public static void main(String[] args) {
+		test(0.3, 3.1);
+		test(-0.5, 3.1);
+		test(-1.3, -3.1);
+//		testHeight();
+	}
+
+	private static void testHeight() {
 		IndexHeightData hd = new IndexHeightData();
 		hd.setSrtmData(new File("/Users/victorshcherb/osmand/maps/srtm/"));
 		
@@ -286,7 +317,6 @@ public class IndexHeightData {
 		cmp(hd, 46.5, 9.5, 2436);		
 		cmp(hd, 46.1, 9, 1441);
 		cmp(hd, 46.7, 9, 2303);
-
 	}
 
 	private static void cmp(IndexHeightData hd, double lat, double lon, double exp) {
