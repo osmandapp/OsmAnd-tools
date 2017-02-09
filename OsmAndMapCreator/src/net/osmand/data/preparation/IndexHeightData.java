@@ -199,7 +199,7 @@ public class IndexHeightData {
 				} else {
 					double segm = MapUtils.getDistance(prev.getLatitude(), prev.getLongitude(), n.getLatitude(),
 							n.getLongitude());
-					if (segm > 100 && pointHeight != INEXISTENT_HEIGHT) {
+					if (segm > 20 && pointHeight != INEXISTENT_HEIGHT) {
 						wh.processHeight(pointHeight, prevHeight, segm, n);
 						prevHeight = pointHeight;
 						prev = n;
@@ -207,9 +207,9 @@ public class IndexHeightData {
 				}
 			}
 		}
-//		if(wh.firstHeight != INEXISTENT_HEIGHT && wh.firstHeight != wh.lastHeight) {
+		if(wh.firstHeight != INEXISTENT_HEIGHT && wh.firstHeight != wh.lastHeight) {
 			e.putTag(ELE_ASC_START, ((int)wh.firstHeight)+"");
-//		}
+		}
 		if(wh.lastHeight != INEXISTENT_HEIGHT && wh.firstHeight != wh.lastHeight) {
 			e.putTag(ELE_ASC_END, ((int)wh.lastHeight)+"");
 		}
