@@ -194,8 +194,10 @@ public class IndexHeightData {
 			if (n != null) {
 				double pointHeight = getPointHeight(n.getLatitude(), n.getLongitude());
 				if (prev == null) {
-					prevHeight = pointHeight;
-					prev = n;
+					if(pointHeight != INEXISTENT_HEIGHT) {
+						prevHeight = pointHeight;
+						prev = n;
+					}
 				} else {
 					double segm = MapUtils.getDistance(prev.getLatitude(), prev.getLongitude(), n.getLatitude(),
 							n.getLongitude());
@@ -207,7 +209,7 @@ public class IndexHeightData {
 				}
 			}
 		}
-		if(wh.firstHeight != INEXISTENT_HEIGHT && wh.firstHeight != wh.lastHeight) {
+		if(wh.firstHeight != INEXISTENT_HEIGHT && wh.lastHeight != INEXISTENT_HEIGHT) {
 			e.putTag(ELE_ASC_START, ((int)wh.firstHeight)+"");
 		}
 		if(wh.lastHeight != INEXISTENT_HEIGHT && wh.firstHeight != wh.lastHeight) {
