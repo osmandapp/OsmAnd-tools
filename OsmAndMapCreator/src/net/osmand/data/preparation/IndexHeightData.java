@@ -91,7 +91,7 @@ public class IndexHeightData {
 					   (1 - cx) * cy       * array[2] + 
 					         cx * cy       * array[3];
 			
-			System.out.println(" Y:" + (float) pdy + " X:" + (float) pdx);
+//			System.out.println(" Y:" + (float) pdy + " X:" + (float) pdx);
 			return h;
 		}
 
