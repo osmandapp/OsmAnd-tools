@@ -71,21 +71,35 @@ public class IndexHeightData {
 			if (data == null) {
 				return INEXISTENT_HEIGHT;
 			}
-			int px = (int) (Math.round((width - 3) * x)) + 1 ;
-			int py = (int) (Math.round((height - 3) * (1 - y))) + 1;
-			int ind = px + py * width;
-			if (array != null) {
-				for (int k = 0; k < 9; k++) {
-					int pind = (px + k % 3 - 1) + (py + k / 3 - 1) * width;
-					array[k] = 0;
-					if(pind >= 0 && pind < data.getSize()) {
-						array[k] = data.getElem(pind) & 0xffff;
-					}
-				}
+			double pdx = (width - 2) * x + 1;
+			double pdy = (height - 2) * (1 - y) + 1;
+			int px = (int) Math.round(pdx);
+			int py = (int) Math.round(pdy);
+			if(array == null) {
+				array = new double[4]; 
 			}
+			array[0] = getElem(px - 1, py - 1);
+			array[1] = getElem(px, py - 1);
+			array[2] = getElem(px - 1, py);
+			array[3] = getElem(px, py);
+			// 1.3 pdx ->  0 ( 0.5 : 0.2 = 1 - cx), 1 px (1.5 : 0.8 = cx),
+			// 1.7 pdx ->  1 ( 1.5 : 0.8 = 1 - cx), 2 px (2.5 : 0.2 = cx), 
+			double cx = 0.5 + pdx - px;
+			double cy = 0.5 + pdy - py;
+			double h = (1 - cx) * (1 - cy) * array[0] + 
+					         cx * (1 - cy) * array[1] + 
+					   (1 - cx) * cy       * array[2] + 
+					         cx * cy       * array[3];
+			
+			System.out.println(" Y:" + (float) pdy + " X:" + (float) pdx);
+			return h;
+		}
+
+		private double getElem(int px, int py) {
+			int ind = px + py * width;
 			if (ind >= data.getSize()) {
-				throw new IllegalArgumentException("Illegal access " + x + ", " + y + " (" + px + ", " + py + ") "
-						+ ind + " - " + getFileName());
+				throw new IllegalArgumentException("Illegal access (" + px + ", " + py + ") " + ind + " - "
+						+ getFileName());
 			}
 			return data.getElem(ind) & 0xffff;
 		}
@@ -296,10 +310,10 @@ public class IndexHeightData {
 	}
 	
 	public static void main(String[] args) {
-		test(0.3, 3.1);
-		test(-0.4, 3.2);
-		test(-1.3, -3.1);
-//		testHeight();
+//		test(0.3, 3.1);
+//		test(-0.4, 3.2);
+//		test(-1.3, -3.1);
+		testHeight();
 	}
 
 	private static void testHeight() {
@@ -315,10 +329,10 @@ public class IndexHeightData {
 		cmp(hd, 46.99999, 9.5, 531);
 		
 		cmp(hd, 46.05321, 9.94346, 1515);
-		cmp(hd, 46.735, 9.287, 2368);
-		cmp(hd, 46.291, 9.297, 1670);
-		cmp(hd, 46.793, 9.878, 2033);
-		cmp(hd, 46.774, 9.888, 1975);
+		cmp(hd, 46.735, 9.287, 2311.3);
+		cmp(hd, 46.291, 9.297, 1646.9);
+		cmp(hd, 46.793, 9.878, 2174.2);
+		cmp(hd, 46.774, 9.888, 1985.7);
 		
 		cmp(hd, 46.5, 9.5, 2436);		
 		cmp(hd, 46.1, 9, 1441);
@@ -341,6 +355,7 @@ public class IndexHeightData {
 		} else {
 			System.out.println(pointHeight + " (eval) == " + exp + " (exp) ");
 		}
+		System.out.println("----------");
 
 	}
 	
