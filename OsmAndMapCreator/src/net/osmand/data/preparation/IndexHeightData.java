@@ -14,12 +14,13 @@ import javax.imageio.ImageIO;
 import net.osmand.PlatformUtil;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Way;
-import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
 import org.apache.commons.logging.Log;
 
 public class IndexHeightData {
+	private static final double MINIMAL_DISTANCE = 0;
+
 	private File srtmData;
 	
 	private String ELE_ASC_START = "osmand_ele_start";
@@ -147,15 +148,15 @@ public class IndexHeightData {
 		double[] descIncline = new double[SIZE];
 		
 		
-		void processHeight(double pointHeight, double prevHeight, double dist, Node n) {
+		float processHeight(double pointHeight, double prevHeight, double dist, Node n) {
 			if (firstHeight == INEXISTENT_HEIGHT) {
 				firstHeight = prevHeight;
 			}
 			lastHeight = pointHeight;
 			double diff = (pointHeight - prevHeight);
-			int df = (int) diff;
+			int df = (int) Math.round(diff * 4);
 			if(df == 0) {
-				return;
+				return 0 ;
 			}
 			// double deg = Math.abs(Math.atan2(pointHeight - prevHeight, dist) / Math.PI * 180);
 			double degIncline = Math.abs((pointHeight - prevHeight) /  dist * 100); 
@@ -163,10 +164,10 @@ public class IndexHeightData {
 			double[] arr ;
 			if (df > 0) {
 				arr = ascIncline;
-				n.putTag(ELE_ASC_TAG, df+"");
+				n.putTag(ELE_ASC_TAG, df / 4.0f + "");
 			} else  {
 				arr = descIncline;
-				n.putTag(ELE_DESC_TAG, -df+"");
+				n.putTag(ELE_DESC_TAG, -df / 4.0f + "");
 			}
 			int maxDeg = 0;
 			for(int k = 0; k < SIZE; k++) {
@@ -185,7 +186,7 @@ public class IndexHeightData {
 					n.putTag(ELE_DECLINE + maxDeg, "1");
 				}
 			}
-			
+			return df / 4.0f ;
 		}
 	}
 	
@@ -203,6 +204,7 @@ public class IndexHeightData {
 		List<Node> ns = e.getNodes();
 		double prevHeight = INEXISTENT_HEIGHT;
 		Node prev = null;
+		float cummulative = 0;
 		for(int i = 0; i < ns.size(); i++) {
 			Node n = ns.get(i);
 			if (n != null) {
@@ -215,8 +217,8 @@ public class IndexHeightData {
 				} else {
 					double segm = MapUtils.getDistance(prev.getLatitude(), prev.getLongitude(), n.getLatitude(),
 							n.getLongitude());
-					if (segm > 20 && pointHeight != INEXISTENT_HEIGHT) {
-						wh.processHeight(pointHeight, prevHeight, segm, n);
+					if (segm > MINIMAL_DISTANCE && pointHeight != INEXISTENT_HEIGHT) {
+						cummulative += wh.processHeight(pointHeight, prevHeight, segm, n);
 						prevHeight = pointHeight;
 						prev = n;
 					}
@@ -319,6 +321,11 @@ public class IndexHeightData {
 	private static void testHeight() {
 		IndexHeightData hd = new IndexHeightData();
 		hd.setSrtmData(new File("/Users/victorshcherb/osmand/maps/srtm/"));
+		
+		cmp(hd, 44.40735, 33.97509, 255);
+		cmp(hd, 44.407427, 33.975799, 255);
+		cmp(hd, 44.40742761384265, 33.9757990837097, 255);
+		
 		
 		cmp(hd, 46.0, 9.0, 272);
 		cmp(hd, 46.0, 9.99999, 1748);
