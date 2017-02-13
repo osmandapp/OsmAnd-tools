@@ -20,6 +20,7 @@ import org.apache.commons.logging.Log;
 
 public class IndexHeightData {
 	private static final double MINIMAL_DISTANCE = 0;
+	private static final int HEIGHT_ACCURACY = 2; 
 
 	private File srtmData;
 	
@@ -154,7 +155,7 @@ public class IndexHeightData {
 			}
 			lastHeight = pointHeight;
 			double diff = (pointHeight - prevHeight);
-			int df = (int) Math.round(diff * 4);
+			int df = (int) Math.round(diff * HEIGHT_ACCURACY);
 			if(df == 0) {
 				return 0 ;
 			}
@@ -164,10 +165,10 @@ public class IndexHeightData {
 			double[] arr ;
 			if (df > 0) {
 				arr = ascIncline;
-				n.putTag(ELE_ASC_TAG, df / 4.0f + "");
+				n.putTag(ELE_ASC_TAG, df / (float)HEIGHT_ACCURACY + "");
 			} else  {
 				arr = descIncline;
-				n.putTag(ELE_DESC_TAG, -df / 4.0f + "");
+				n.putTag(ELE_DESC_TAG, -df / (float)HEIGHT_ACCURACY + "");
 			}
 			int maxDeg = 0;
 			for(int k = 0; k < SIZE; k++) {
@@ -204,7 +205,6 @@ public class IndexHeightData {
 		List<Node> ns = e.getNodes();
 		double prevHeight = INEXISTENT_HEIGHT;
 		Node prev = null;
-		float cummulative = 0;
 		for(int i = 0; i < ns.size(); i++) {
 			Node n = ns.get(i);
 			if (n != null) {
@@ -218,7 +218,7 @@ public class IndexHeightData {
 					double segm = MapUtils.getDistance(prev.getLatitude(), prev.getLongitude(), n.getLatitude(),
 							n.getLongitude());
 					if (segm > MINIMAL_DISTANCE && pointHeight != INEXISTENT_HEIGHT) {
-						cummulative += wh.processHeight(pointHeight, prevHeight, segm, n);
+						wh.processHeight(pointHeight, prevHeight, segm, n);
 						prevHeight = pointHeight;
 						prev = n;
 					}
