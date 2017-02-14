@@ -103,7 +103,11 @@ public class IndexHeightData {
 				throw new IllegalArgumentException("Illegal access (" + px + ", " + py + ") " + ind + " - "
 						+ getFileName());
 			}
-			return data.getElem(ind) & 0xffff;
+			int h = data.getElem(ind) & 0xffff;
+			if(h > 0x7fff) {
+				return h - (0xffff);
+			}
+			return h;
 		}
 
 		private String getId(int ln, int lt) {
@@ -322,9 +326,16 @@ public class IndexHeightData {
 		IndexHeightData hd = new IndexHeightData();
 		hd.setSrtmData(new File("/Users/victorshcherb/osmand/maps/srtm/"));
 		
-		cmp(hd, 44.40735, 33.97509, 255);
-		cmp(hd, 44.407427, 33.975799, 255);
-		cmp(hd, 44.40742761384265, 33.9757990837097, 255);
+//		cmp(hd, 44.40735, 33.97509, 255);
+//		cmp(hd, 44.407427, 33.975799, 255);
+//		cmp(hd, 44.40742761384265, 33.9757990837097, 255);
+		
+		cmp(hd, 48.57522, 45.72296, 116);
+		cmp(hd, 56.18137, 40.50929, 116);
+		cmp(hd, 44.3992045, 33.9498114, 129.1);
+		cmp(hd, 56.17828284774868, 40.5031156539917, 116);
+		
+		
 		
 		
 		cmp(hd, 46.0, 9.0, 272);
