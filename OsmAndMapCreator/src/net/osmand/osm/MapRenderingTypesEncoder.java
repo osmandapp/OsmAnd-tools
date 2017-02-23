@@ -362,6 +362,9 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			if(integrity < 100) {
 				tags.put("osmand_highway_integrity", normalised_integrity +"");
 			}
+			if(normalised_integrity > 4) {
+				tags.put("osmand_highway_integrity", "low");
+			}
 		}
 		return tags;
 	}
