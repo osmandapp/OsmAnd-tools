@@ -20,7 +20,7 @@ import org.apache.commons.logging.Log;
 
 public class IndexHeightData {
 	private static final double MINIMAL_DISTANCE = 0;
-	private static final int HEIGHT_ACCURACY = 2; 
+	private static final int HEIGHT_ACCURACY = 4; 
 
 	private File srtmData;
 	
@@ -73,12 +73,13 @@ public class IndexHeightData {
 			if (data == null) {
 				return INEXISTENT_HEIGHT;
 			}
-			double h1 = bicubicInterpolation(x, y, array);
-//			double h2 = bilinearInterpolation(x, y, null);
-			return h1;
+//			double h1 = bicubicInterpolation(x, y, array);
+			double h2 = bilinearInterpolation(x, y, null);
+//			System.out.println(" --- " + (h1 - h2) + " " + h1 + " " + h2);
+			return h2;
 		}
 		
-		private double bicubicInterpolation(double ix, double iy, double[] array) {
+		protected double bicubicInterpolation(double ix, double iy, double[] array) {
 			double pdx = (width - 2) * ix + 1;
 			double pdy = (height - 2) * (1 - iy) + 1;
 			pdx -= 0.5;
@@ -115,7 +116,7 @@ public class IndexHeightData {
 			return h;
 		}
 
-		private double bilinearInterpolation(double x, double y, double[] array) {
+		protected double bilinearInterpolation(double x, double y, double[] array) {
 			double pdx = (width - 2) * x + 1;
 			double pdy = (height - 2) * (1 - y) + 1;
 			int px = (int) Math.round(pdx);
@@ -379,10 +380,10 @@ public class IndexHeightData {
 	private static void testHeight() {
 		IndexHeightData hd = new IndexHeightData();
 		hd.setSrtmData(new File("/Users/victorshcherb/osmand/maps/srtm/"));
-		
-//		cmp(hd, 44.40735, 33.97509, 255);
-//		cmp(hd, 44.407427, 33.975799, 255);
-//		cmp(hd, 44.40742761384265, 33.9757990837097, 255);
+	    cmp(hd, 44.80622158301841, 34.457974433898926, 255);
+	    cmp(hd, 44.80621397097076, 34.457995891571045, 255);
+	    cmp(hd, 44.806145462496666,34.45814609527588, 255);
+	    cmp(hd, 44.8060997901354,34.45840358734131, 255);
 		
 		cmp(hd, 48.57522, 45.72296, -3);
 		cmp(hd, 56.18137, 40.50929, 116);

@@ -928,6 +928,7 @@ public class IndexCreator {
 
 		String file = rootFolder + "/temp/map.osm";
 //		String file = rootFolder + "/temp/ukraine_kiev-city_europe.pbf";
+//		String file = rootFolder + "/temp/ukraine_crimea_europe.pbf";
 //		String file = rootFolder + "/repos/resources/test-resources/synthetic_test_rendering.osm";
 //		String file = rootFolder + "/repos/resources/test-resources/turn_lanes_test.osm";
 
