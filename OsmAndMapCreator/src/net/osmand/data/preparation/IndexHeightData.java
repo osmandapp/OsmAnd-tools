@@ -73,6 +73,49 @@ public class IndexHeightData {
 			if (data == null) {
 				return INEXISTENT_HEIGHT;
 			}
+			double h1 = bicubicInterpolation(x, y, array);
+//			double h2 = bilinearInterpolation(x, y, null);
+			return h1;
+		}
+		
+		private double bicubicInterpolation(double ix, double iy, double[] array) {
+			double pdx = (width - 2) * ix + 1;
+			double pdy = (height - 2) * (1 - iy) + 1;
+			pdx -= 0.5;
+			pdy -= 0.5;
+			int px = (int) pdx;
+			int py = (int) pdy;
+			double x = pdx - px;
+			double y = pdy - py;
+			if(array == null) {
+				array = new double[16]; 
+			}
+			double[] cf = array;
+			//https://en.wikipedia.org/wiki/Bicubic_interpolation
+			cf[0] = (x-1)*(x-2)*(x+1)*(y-1)*(y-2)*(y+1) / 4 * getElem(px, py);
+			cf[1] = -(x)*(x-2)*(x+1)*(y-1)*(y-2)*(y+1) / 4 * getElem(px, py + 1);
+			cf[2] = -(x-1)*(x-2)*(x+1)*(y)*(y-2)*(y+1) / 4 * getElem(px + 1, py);
+			cf[3] = (x)*(x-2)*(x+1)*(y)*(y-2)*(y+1) / 4 * getElem(px + 1, py + 1);
+			cf[4] = -(x)*(x-2)*(x-1)*(y-1)*(y-2)*(y+1) / 12 * getElem(px, py - 1);
+			cf[5] = -(x+1)*(x-2)*(x-1)*(y-1)*(y-2)*(y) / 12 * getElem(px - 1, py);
+			cf[6] = (x)*(x-2)*(x-1)*(y+1)*(y-2)*(y) / 12 * getElem(px + 1, py - 1);
+			cf[7] = (x)*(x-2)*(x+1)*(y-1)*(y-2)*(y) / 12 * getElem(px - 1, py + 1);
+			cf[8] = (x)*(x-1)*(x+1)*(y-1)*(y-2)*(y+1) / 12 * getElem(px, py + 2);
+			cf[9] = (x-2)*(x-1)*(x+1)*(y-1)*(y)*(y+1) / 12 * getElem(px + 2, py);
+			cf[10] = (x)*(x-1)*(x-2)*(y)*(y-1)*(y-2) / 36 * getElem(px - 1, py - 1);
+			cf[11] = -(x)*(x-1)*(x+1)*(y)*(y+1)*(y-2) / 12 * getElem(px + 1, py + 2);
+			cf[12] = -(x)*(x+1)*(x-2)*(y)*(y-1)*(y+1) / 12 * getElem(px + 2, py + 1);
+			cf[13] = -(x)*(x-1)*(x+1)*(y)*(y-1)*(y-2) / 36 * getElem(px - 1, py + 2);
+			cf[14] = -(x)*(x-1)*(x-2)*(y)*(y-1)*(y+1) / 36 * getElem(px + 2, py - 1);
+			cf[15] =  (x)*(x-1)*(x+1)*(y)*(y-1)*(y+1) / 36 * getElem(px + 2, py + 2);
+			double h = 0;
+			for(int i = 0; i < array.length; i++) {
+				h += array[i];
+			}
+			return h;
+		}
+
+		private double bilinearInterpolation(double x, double y, double[] array) {
 			double pdx = (width - 2) * x + 1;
 			double pdy = (height - 2) * (1 - y) + 1;
 			int px = (int) Math.round(pdx);
@@ -92,12 +135,23 @@ public class IndexHeightData {
 					         cx * (1 - cy) * array[1] + 
 					   (1 - cx) * cy       * array[2] + 
 					         cx * cy       * array[3];
-			
-//			System.out.println(" Y:" + (float) pdy + " X:" + (float) pdx);
 			return h;
 		}
 
 		private double getElem(int px, int py) {
+			if (px < 0) {
+				px = 0;
+			}
+			if(py < 0) {
+				py = 0;
+			}
+			if (px >= width) {
+				px = width - 1;
+			}
+			if (py >= height) {
+				py = height - 1;
+			}
+			
 			int ind = px + py * width;
 			if (ind >= data.getSize()) {
 				throw new IllegalArgumentException("Illegal access (" + px + ", " + py + ") " + ind + " - "
@@ -330,7 +384,7 @@ public class IndexHeightData {
 //		cmp(hd, 44.407427, 33.975799, 255);
 //		cmp(hd, 44.40742761384265, 33.9757990837097, 255);
 		
-		cmp(hd, 48.57522, 45.72296, 116);
+		cmp(hd, 48.57522, 45.72296, -3);
 		cmp(hd, 56.18137, 40.50929, 116);
 		cmp(hd, 44.3992045, 33.9498114, 129.1);
 		cmp(hd, 56.17828284774868, 40.5031156539917, 116);
@@ -358,7 +412,7 @@ public class IndexHeightData {
 	}
 
 	private static void cmp(IndexHeightData hd, double lat, double lon, double exp) {
-		double[] nh = new double[9];
+		double[] nh = new double[16];
 		double pointHeight = hd.getPointHeight(lat, lon, nh);
 		System.out.println("Lat " + lat + " lon " + lon);
 		if (pointHeight != exp) {
