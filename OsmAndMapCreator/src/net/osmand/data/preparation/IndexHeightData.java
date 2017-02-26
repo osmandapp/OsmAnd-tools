@@ -3,7 +3,10 @@ package net.osmand.data.preparation;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferShort;
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -12,15 +15,19 @@ import java.util.Map;
 import javax.imageio.ImageIO;
 
 import net.osmand.PlatformUtil;
+import net.osmand.data.LatLon;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Way;
 import net.osmand.util.MapUtils;
 
 import org.apache.commons.logging.Log;
+import org.xmlpull.v1.XmlPullParser;
+import org.xmlpull.v1.XmlPullParserException;
 
 public class IndexHeightData {
 	private static final double MINIMAL_DISTANCE = 0;
 	private static final int HEIGHT_ACCURACY = 4; 
+	private static boolean USE_BILINEAR_INTERPOLATION = false;
 
 	private File srtmData;
 	
@@ -73,26 +80,41 @@ public class IndexHeightData {
 			if (data == null) {
 				return INEXISTENT_HEIGHT;
 			}
-//			double h1 = bicubicInterpolation(x, y, array);
-			double h2 = bilinearInterpolation(x, y, null);
+			if(USE_BILINEAR_INTERPOLATION) {
+				return bilinearInterpolation(x, y, array);
+			} else {
+				return bicubicInterpolation(x, y, array);
+			}
 //			System.out.println(" --- " + (h1 - h2) + " " + h1 + " " + h2);
-			return h2;
 		}
 		
-		protected double bicubicInterpolation(double ix, double iy, double[] array) {
+		protected double bicubicInterpolation(double ix, double iy, double[] cf) {
 			double pdx = (width - 2) * ix + 1;
 			double pdy = (height - 2) * (1 - iy) + 1;
-			pdx -= 0.5;
-			pdy -= 0.5;
-			int px = (int) pdx;
-			int py = (int) pdy;
-			double x = pdx - px;
-			double y = pdy - py;
-			if(array == null) {
-				array = new double[16]; 
+			int px = (int) Math.round(pdx);
+			int py = (int) Math.round(pdy);
+			double x = pdx - px + 0.5;
+			double y = pdy - py + 0.5;
+//			int px = (int) pdx;
+//			int py = (int) pdy;
+//			double x = pdx - px;
+//			double y = pdy - py;
+			// pdx = 26.6 -> px = 27, x = 0.1 (26.5=0, 27.5=1)
+			// pdx = 26.4 -> px = 26, x = 0.9 (25.5=0, 26.5=1)
+			// pdx = 27.0 -> px = 27, x = 0.5 (26.5=0, 27.5=1)
+			px --;
+			py --;
+			if(cf == null) {
+				cf = new double[16]; 
 			}
-			double[] cf = array;
+			for(int i = 0; i < cf.length; i++) {
+				cf[i] = 0;
+			}
 			//https://en.wikipedia.org/wiki/Bicubic_interpolation
+			// swap formula
+			double tx = y;
+			y = x;
+			x = tx;
 			cf[0] = (x-1)*(x-2)*(x+1)*(y-1)*(y-2)*(y+1) / 4 * getElem(px, py);
 			cf[1] = -(x)*(x-2)*(x+1)*(y-1)*(y-2)*(y+1) / 4 * getElem(px, py + 1);
 			cf[2] = -(x-1)*(x-2)*(x+1)*(y)*(y-2)*(y+1) / 4 * getElem(px + 1, py);
@@ -110,8 +132,8 @@ public class IndexHeightData {
 			cf[14] = -(x)*(x-1)*(x-2)*(y)*(y-1)*(y+1) / 36 * getElem(px + 2, py - 1);
 			cf[15] =  (x)*(x-1)*(x+1)*(y)*(y-1)*(y+1) / 36 * getElem(px + 2, py + 2);
 			double h = 0;
-			for(int i = 0; i < array.length; i++) {
-				h += array[i];
+			for(int i = 0; i < cf.length; i++) {
+				h += cf[i];
 			}
 			return h;
 		}
@@ -128,10 +150,11 @@ public class IndexHeightData {
 			array[1] = getElem(px, py - 1);
 			array[2] = getElem(px - 1, py);
 			array[3] = getElem(px, py);
-			// 1.3 pdx ->  0 ( 0.5 : 0.2 = 1 - cx), 1 px (1.5 : 0.8 = cx),
-			// 1.7 pdx ->  1 ( 1.5 : 0.8 = 1 - cx), 2 px (2.5 : 0.2 = cx), 
 			double cx = 0.5 + pdx - px;
 			double cy = 0.5 + pdy - py;
+			// 1.3 pdx ->  px = 1, px - 1 = 0, cx = 0.8, 1 - cx = 0.2,
+			// 1.7 pdx ->  px = 2, px - 1 = 1, cx = 0.2, 1 - cx = 0.8, 
+			
 			double h = (1 - cx) * (1 - cy) * array[0] + 
 					         cx * (1 - cy) * array[1] + 
 					   (1 - cx) * cy       * array[2] + 
@@ -370,28 +393,99 @@ public class IndexHeightData {
 		System.out.println(lat + " "  +lon + " (lat/lon) -> file " + td.getFileName() + " (y, x in %) " + (float) latDelta + " " + (float) lonDelta);
 	}
 	
-	public static void main(String[] args) {
-//		test(0.3, 3.1);
-//		test(-0.4, 3.2);
+	public static void main(String[] args) throws XmlPullParserException, IOException {
 //		test(-1.3, -3.1);
-		testHeight();
+		
+//		simpleTestHeight();
+//		USE_BILINEAR_INTERPOLATION = false;
+//		simpleTestHeight();
+//		testHeight();
+		testFileSmoothness();
+	}
+
+	private static void testFileSmoothness() throws XmlPullParserException, IOException {
+		File fl = new File("/Users/victorshcherb/osmand/maps/route_laspi.gpx");
+		XmlPullParser parser = PlatformUtil.newXMLPullParser();
+		parser.setInput(new FileReader(fl));
+		int next;
+		List<LatLon> l = new ArrayList<>();
+		List<Float> h = new ArrayList<>();
+		double ele = 0;
+		double SPECIAL_VALUE = -18000;
+		String name = null;
+		IndexHeightData hd = new IndexHeightData();
+		hd.setSrtmData(new File("/Users/victorshcherb/osmand/maps/srtm/"));
+		while ((next = parser.next()) != XmlPullParser.END_DOCUMENT) {
+			if (next == XmlPullParser.START_TAG) {
+				if (parser.getName().equals("trkpt")) {
+					ele = SPECIAL_VALUE;
+					LatLon ls = new LatLon(Float.parseFloat(parser.getAttributeValue("", "lat")),
+							Float.parseFloat(parser.getAttributeValue("", "lon")));
+					l.add(ls);
+				} 
+				name = parser.getName();
+			} else if(next == XmlPullParser.TEXT) {
+				if (name.equals("ele") && ele == SPECIAL_VALUE) {
+					ele = Double.parseDouble(parser.getText());
+					h.add((float) ele);
+				}
+			} else if (next == XmlPullParser.END_TAG) {
+				if (parser.getName().equals("trkpt") && ele == SPECIAL_VALUE) {
+					h.add(0f);
+				} 
+			}
+		}
+		
+		float d = 0;
+		for(int i = 0; i < l.size(); i++) {
+			if(i == 0) {
+				System.out.println(0 + " " + h.get(0) + " ");
+			} else {
+				LatLon nxt = l.get(i);
+				LatLon prv = l.get(i - 1);
+				double dist = MapUtils.getDistance(prv, nxt);
+				int cf = 1;
+				while(dist / cf > 1) {
+					cf *= 2;
+				}
+				float ph = h.get(i - 1);
+				double plat = prv.getLatitude();
+				double plon = prv.getLongitude();
+				for (int j = 0; j < cf; j++) {
+					double nlat = (nxt.getLatitude() - prv.getLatitude()) / cf + plat;
+					double nlon = (nxt.getLongitude() - prv.getLongitude()) / cf + plon;
+					float ch = (h.get(i) - h.get(i - 1)) / cf + ph;
+					d += MapUtils.getDistance(plat, plon, nlat, nlon);
+					USE_BILINEAR_INTERPOLATION = true;
+					double blh = hd.getPointHeight(nlat, nlon, null);
+					USE_BILINEAR_INTERPOLATION = false;
+					double bch = hd.getPointHeight(nlat, nlon, null);
+					plat = nlat;
+					plon = nlon;
+					ph = ch;
+					System.out.println(d + "\t" + ch + "\t" + bch + "\t" + blh
+						//+"\t"+l.get(i)
+						);
+				}
+			}
+			
+		}
+	}
+	
+	private static void simpleTestHeight() {
+		IndexHeightData hd = new IndexHeightData();
+		hd.setSrtmData(new File("/Users/victorshcherb/osmand/maps/srtm/"));
+	    cmp(hd, 44.428722,33.711246, 255);
 	}
 
 	private static void testHeight() {
 		IndexHeightData hd = new IndexHeightData();
 		hd.setSrtmData(new File("/Users/victorshcherb/osmand/maps/srtm/"));
-	    cmp(hd, 44.80622158301841, 34.457974433898926, 255);
-	    cmp(hd, 44.80621397097076, 34.457995891571045, 255);
-	    cmp(hd, 44.806145462496666,34.45814609527588, 255);
-	    cmp(hd, 44.8060997901354,34.45840358734131, 255);
 		
 		cmp(hd, 48.57522, 45.72296, -3);
 		cmp(hd, 56.18137, 40.50929, 116);
 		cmp(hd, 44.3992045, 33.9498114, 129.1);
 		cmp(hd, 56.17828284774868, 40.5031156539917, 116);
-		
-		
-		
 		
 		cmp(hd, 46.0, 9.0, 272);
 		cmp(hd, 46.0, 9.99999, 1748);
