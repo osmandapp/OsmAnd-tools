@@ -27,7 +27,7 @@ import org.xmlpull.v1.XmlPullParserException;
 public class IndexHeightData {
 	private static final double MINIMAL_DISTANCE = 0;
 	private static final int HEIGHT_ACCURACY = 4; 
-	private static boolean USE_BILINEAR_INTERPOLATION = false;
+	private static boolean USE_BILINEAR_INTERPOLATION = true;
 
 	private File srtmData;
 	
@@ -404,7 +404,8 @@ public class IndexHeightData {
 	}
 
 	private static void testFileSmoothness() throws XmlPullParserException, IOException {
-		File fl = new File("/Users/victorshcherb/osmand/maps/route_laspi.gpx");
+//		File fl = new File("/Users/victorshcherb/osmand/maps/route_laspi.gpx");
+		File fl = new File("/Users/victorshcherb/osmand/route.gpx");
 		XmlPullParser parser = PlatformUtil.newXMLPullParser();
 		parser.setInput(new FileReader(fl));
 		int next;
@@ -412,6 +413,7 @@ public class IndexHeightData {
 		List<Float> h = new ArrayList<>();
 		double ele = 0;
 		double SPECIAL_VALUE = -18000;
+		double ROUTE_PRECISION = 0.2;
 		String name = null;
 		IndexHeightData hd = new IndexHeightData();
 		hd.setSrtmData(new File("/Users/victorshcherb/osmand/maps/srtm/"));
@@ -445,7 +447,7 @@ public class IndexHeightData {
 				LatLon prv = l.get(i - 1);
 				double dist = MapUtils.getDistance(prv, nxt);
 				int cf = 1;
-				while(dist / cf > 1) {
+				while(dist / cf > ROUTE_PRECISION) {
 					cf *= 2;
 				}
 				float ph = h.get(i - 1);

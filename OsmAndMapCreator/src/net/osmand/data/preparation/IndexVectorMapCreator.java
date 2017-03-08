@@ -62,6 +62,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	// map zoom levels <= 2^MAP_LEVELS
 	private static final int MAP_LEVELS_POWER = 3;
 	private static final int MAP_LEVELS_MAX = 1 << MAP_LEVELS_POWER;
+	private static final int LOW_LEVEL_COMBINE_WAY_POINS_LIMIT = 10000;
 	private MapRenderingTypesEncoder renderingTypes;
 	private MapZooms mapZooms;
 
@@ -422,7 +423,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 				}
 			};
 
-			while (combined) {
+			while (combined && wayNodes.size() < LOW_LEVEL_COMBINE_WAY_POINS_LIMIT) {
 				combined = false;
 				endStat.setLong(1, startNode);
 				endStat.setShort(2, (short) level);
@@ -451,7 +452,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 
 			// combined end point
 			combined = true;
-			while (combined) {
+			while (combined && wayNodes.size() < LOW_LEVEL_COMBINE_WAY_POINS_LIMIT) {
 				combined = false;
 				startStat.setLong(1, endNode);
 				startStat.setShort(2, (short) level);
