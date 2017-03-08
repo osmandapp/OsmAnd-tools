@@ -27,7 +27,7 @@ import org.xmlpull.v1.XmlPullParserException;
 public class IndexHeightData {
 	private static final double MINIMAL_DISTANCE = 0;
 	private static final int HEIGHT_ACCURACY = 4; 
-	private static boolean USE_BILINEAR_INTERPOLATION = true;
+	private static boolean USE_BILINEAR_INTERPOLATION = false;
 
 	private File srtmData;
 	
