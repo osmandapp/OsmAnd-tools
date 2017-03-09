@@ -1,0 +1,13 @@
+  <union into="_">
+    <query into="_" type="relation">
+      <has-kv k="admin_level" modv="" v="2"/>
+      <has-kv k="type" modv="" v="boundary"/>
+    </query>
+    <query into="_" type="way">
+      <has-kv k="admin_level" modv="" v="2"/>
+      <has-kv k="type" modv="" v="boundary"/>
+    </query>
+  </union>
+  <print e="" from="_" geometry="skeleton" limit="" mode="body" n="" order="id" s="" w=""/>
+  <recurse from="_" into="_" type="down"/>
+  <print e="" from="_" geometry="skeleton" limit="" mode="skeleton" n="" order="quadtile" s="" w=""/>
