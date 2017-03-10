@@ -5,12 +5,12 @@ query_overpass () {
 }
 
 query_overpass 2
-query_overpass 3
+#query_overpass 3
 query_overpass 4
 
 remove_tags () {
-	osmfilter admin_level_$1.osm --keep-tags="all admin_level=* type=boundary" --out-osm > admin_level_$1_flt.osm
+	osmfilter admin_level_$1.osm --keep-tags="all admin_level=*" --out-osm > admin_level_$1_flt.osm
 }
 remove_tags 2
-remove_tags 3
+#remove_tags 3
 remove_tags 4
