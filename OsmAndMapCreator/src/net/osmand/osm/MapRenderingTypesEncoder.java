@@ -356,14 +356,20 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			EntityConvertApplyType appType) {
 		if(tags.containsKey("highway") && entity == EntityType.WAY) {
 			tags = new LinkedHashMap<>(tags);
-			int integrity = calculateIntegrity(tags);
+			int integrity = calculateIntegrity(tags)[0];
+			int integrity_bicycle_routing = calculateIntegrity(tags)[1];
 			int max_integrity = 30;
-			int normalised_integrity = (integrity * 10) / max_integrity;
+			int normalised_integrity_brouting = 0;
+			if (integrity_bicycle_routing >= 0) {
+				normalised_integrity_brouting = (integrity_bicycle_routing * 10) / max_integrity;
+			} else normalised_integrity_brouting = -1;
+				int normalised_integrity = (integrity * 10) / max_integrity;
 			if(integrity < 100) {
 				tags.put("osmand_highway_integrity", normalised_integrity +"");
 			}
-			if(normalised_integrity > 4 && normalised_integrity <= 10) {
-				tags.put("osmand_highway_integrity_low", "yes");
+			tags.put("osmand_highway_integrity_brouting", normalised_integrity_brouting +"");
+			if(normalised_integrity_brouting > 4 && normalised_integrity_brouting <= 10) {
+				tags.put("osmand_highway_integrity_brouting_low", "yes");
 			}
 		}
 		return tags;
@@ -1050,8 +1056,9 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	}
 	
 
-	private static int calculateIntegrity(Map<String, String> mp) {
+	private static int[] calculateIntegrity(Map<String, String> mp) {
 		int result = 0;
+		int result_bicycle_routing = 0;
 		String surface = mp.get("surface");
 		String smoothness = mp.get("smoothness");
 		String tracktype = mp.get("tracktype");
@@ -1069,79 +1076,139 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		}
 		if ("paved".equals(surface) || "concrete".equals(surface) || "concrete:lanes".equals(surface) || "concrete:plates".equals(surface) || "sett".equals(surface) || "paving_stones".equals(surface) || "metal".equals(surface) || "wood".equals(surface)) {
 			result += 3;
+			result_bicycle_routing += 3;
 		} else if ("compacted".equals(surface) || "fine_gravel".equals(surface) || "grass_paver".equals(surface)) {
 			result += 4;
+			result_bicycle_routing += 4;
 		} else if ("unpaved".equals(surface) || "ground".equals(surface) || "earth".equals(surface) || "pebblestone".equals(surface)) {
 			result += 9;
+			result_bicycle_routing += 9;
 		} else if ("grass".equals(surface)) {
 			result += 10;
+			result_bicycle_routing += 10;
 		} else if ("cobblestone".equals(surface)) {
 			result += 11;
+			result_bicycle_routing += 11;
 		} else if ("gravel".equals(surface)) {
 			result += 12;
+			result_bicycle_routing += 12;
 		} else if ("stone".equals(surface) || "rock".equals(surface) || "rocky".equals(surface)) {
 			result += 13;
+			result_bicycle_routing += 13;
 		} else if ("dirt".equals(surface)) {
 			result += 14;
+			result_bicycle_routing += 14;
 		} else if ("salt".equals(surface) || "ice".equals(surface) || "snow".equals(surface)) {
 			result += 15;
+			result_bicycle_routing += 15;
 		} else if ("sand".equals(surface)) {
 			result += 16;
+			result_bicycle_routing += 16;
 		} else if ("mud".equals(surface)) {
 			result += 18;
+			result_bicycle_routing += 18;
 		}
 		if ("excellent".equals(smoothness)) {
-			result -= 5;
+			if (("track".equals(highway) || ("path".equals(highway))) && (surface == null)) {
+				result = 7;
+ 				result_bicycle_routing = 6;
+			} else {
+				result -= 5;
+				result_bicycle_routing -= 5;
+			}
+		} else if ("very_good".equals(smoothness)) {
+			if (("track".equals(highway) || ("path".equals(highway))) && (surface == null)) {
+				result = 6;
+				result_bicycle_routing = 6;
+			} else {
+				result -= 4;
+				result_bicycle_routing -= 6;
+			}
 		} else if ("good".equals(smoothness)) {
 			if (("track".equals(highway) || ("path".equals(highway))) && (surface == null)) {
-				result = 2;
-			} else result -= 2;
+				result = 8;
+				result_bicycle_routing = 6;
+			} else {
+				result -= 2;
+				result_bicycle_routing -= 2;
+			}
 		} else if ("intermediate".equals(smoothness)) {
 			if (("track".equals(highway) || ("path".equals(highway))) && (surface == null)) {
-				result = 3;
+				result = 9;
+				result_bicycle_routing = 9;
 			}
 		} else if ("bad".equals(smoothness)) {
 			if (("track".equals(highway) || ("path".equals(highway))) && (surface == null)) {
-				result = 4;
+				result = 9;
+				result_bicycle_routing = 9;
 			} else if ("asphalt".equals(surface)) {
 				result += 7;
-		} else result += 6;
+				result_bicycle_routing += 7;
+			} else {
+				result += 6;
+				result_bicycle_routing += 6;
+			}
 		} else if ("very_bad".equals(smoothness)) {
 			if (("track".equals(highway) || ("path".equals(highway))) && (surface == null)) {
-				result = 5;
+				result = 12;
+				result_bicycle_routing = 12;
 			} else if ("asphalt".equals(surface)) {
 				result += 12;
-		} else result += 7;
+				result_bicycle_routing += 12;
+			} else {
+				result += 7;
+				result_bicycle_routing += 7;
+			}
 		} else if ("horrible".equals(smoothness)) {
 			if (("track".equals(highway) || ("path".equals(highway))) && (surface == null)) {
-				result = 6;
+				result = 15;
+				result_bicycle_routing = 15;
 			} else if ("asphalt".equals(surface)) {
 				result += 19;
-		} else result += 9;
+				result_bicycle_routing += 19;
+			} else {
+				result += 9;
+				result_bicycle_routing += 9;
+			}
 		} else if ("very_horrible".equals(smoothness)) {
 			if (("track".equals(highway) || ("path".equals(highway))) && (surface == null)) {
-				result = 7;
+				result = 18;
+				result_bicycle_routing = 18;
 			} else if ("asphalt".equals(surface)) {
 				result += 22;
-		} else result += 11;
+				result_bicycle_routing += 22;
+			} else {
+				result += 11;
+				result_bicycle_routing += 11;
+			}
 		} else if ("impassable".equals(smoothness)) {
 			if (("track".equals(highway) || ("path".equals(highway))) && (surface == null)) {
-				result = 9;
+				result = 24;
+				result_bicycle_routing = 24;
 			} else if ("asphalt".equals(surface)) {
 				result += 26;
-		} else result += 12;
+				result_bicycle_routing += 26;
+			} else {
+				result += 12;
+				result_bicycle_routing += 12;
+			}
 		}
 		if (surface == null) {
 			if ("grade1".equals(tracktype)) {
 				result += 1;
+				result_bicycle_routing += 1;
 			} else if ("grade2".equals(tracktype)) {
 				result += 3;
+				result_bicycle_routing += 3;
 			} else if ("grade3".equals(tracktype)) {
 				result += 7;
+				result_bicycle_routing += 7;
 			} else if ("grade4".equals(tracktype)) {
 				result += 10;
+				result_bicycle_routing += 10;
 			} else if ("grade5".equals(tracktype)) {
 				result += 15;
+				result_bicycle_routing += 15;
 			}
 		}
 		if (("motorway".equals(highway) || ("motorway_link".equals(highway)) || ("trunk".equals(highway)) || ("trunk_link".equals(highway))
@@ -1156,6 +1223,12 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		if (("track".equals(highway) || "path".equals(highway)) && ((surface == null) && (smoothness == null) && (tracktype == null))) {
 			result = 100;
 		}
+		if ("track".equals(highway) && (surface == null) && (smoothness == null) && (tracktype == null)) {
+			result_bicycle_routing = 9;
+		}
+		if (("path".equals(highway) && (surface == null) && (smoothness == null) && (tracktype == null))) {
+			result_bicycle_routing = 12;
+		}
 		if ("path".equals(highway)) {
 			if ("designated".equals(bicycle)) {
 				result = 0;
@@ -1166,7 +1239,8 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		if (result < 0) {
 			result = 0;
 		}
-		return result;
+		int[] result_array = {result,result_bicycle_routing};
+		return result_array;
 	}
 
 
