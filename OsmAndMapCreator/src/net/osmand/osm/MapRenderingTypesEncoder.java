@@ -1196,19 +1196,19 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		if (surface == null) {
 			if ("grade1".equals(tracktype)) {
 				result += 1;
-				result_bicycle_routing += 1;
+				result_bicycle_routing += 6;
 			} else if ("grade2".equals(tracktype)) {
 				result += 3;
-				result_bicycle_routing += 3;
+				result_bicycle_routing += 9;
 			} else if ("grade3".equals(tracktype)) {
 				result += 7;
-				result_bicycle_routing += 7;
+				result_bicycle_routing += 9;
 			} else if ("grade4".equals(tracktype)) {
 				result += 10;
-				result_bicycle_routing += 10;
+				result_bicycle_routing += 12;
 			} else if ("grade5".equals(tracktype)) {
 				result += 15;
-				result_bicycle_routing += 15;
+				result_bicycle_routing += 16;
 			}
 		}
 		if (("motorway".equals(highway) || ("motorway_link".equals(highway)) || ("trunk".equals(highway)) || ("trunk_link".equals(highway))
@@ -1228,6 +1228,9 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		}
 		if (("path".equals(highway) && (surface == null) && (smoothness == null) && (tracktype == null))) {
 			result_bicycle_routing = 12;
+		}
+		if (("footway".equals(highway) && (surface == null) && (smoothness == null) && (tracktype == null))) {
+			result_bicycle_routing = 6;
 		}
 		if ("path".equals(highway)) {
 			if ("designated".equals(bicycle)) {
