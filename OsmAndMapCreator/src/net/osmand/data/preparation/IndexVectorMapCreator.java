@@ -443,7 +443,8 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 					li.addAll(wayNodes);
 					wayNodes = li;
 					for (MapRulType rt : new ArrayList<MapRulType>(namesUse.keySet())) {
-						if (!Algorithms.objectEquals(namesUse.get(rt), cand.names.get(rt))) {
+						if (!Algorithms.objectEquals(namesUse.get(rt), cand.names.get(rt)) &&
+								!checkOneLocaleHasSameName(namesUse, cand.names, rt) ) {
 							namesUse.remove(rt);
 						}
 					}
@@ -469,7 +470,8 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 						wayNodes.add(list.get(i));
 					}
 					for (MapRulType rt : new ArrayList<MapRulType>(namesUse.keySet())) {
-						if (!Algorithms.objectEquals(namesUse.get(rt), cand.names.get(rt))) {
+						if (!Algorithms.objectEquals(namesUse.get(rt), cand.names.get(rt)) &&
+								!checkOneLocaleHasSameName(namesUse, cand.names, rt) ) {
 							namesUse.remove(rt);
 						}
 					}
@@ -503,6 +505,21 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 
 		}
 
+	}
+
+	private boolean checkOneLocaleHasSameName(TreeMap<MapRulType, String> nu1, Map<MapRulType, String> nu2,
+			MapRulType rt) {
+		String tg = rt.getTag();
+		if(tg.startsWith("name:") || tg.equals("name")) {
+			for(MapRulType r : nu1.keySet()) {
+				if(r.getTag().startsWith("name:") || r.getTag().equals("name")) {
+					if(Algorithms.objectEquals(nu1.get(r), nu2.get(r)) && !Algorithms.isBlank(nu1.get(r))) {
+						return true;
+					}
+				}
+			}
+		}
+		return false;
 	}
 
 	private LowLevelWayCandidate getCandidate(List<LowLevelWayCandidate> candidates,
