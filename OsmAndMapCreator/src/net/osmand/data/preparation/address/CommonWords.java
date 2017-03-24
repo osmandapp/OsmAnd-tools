@@ -15,29 +15,50 @@ public class CommonWords {
 	}
 	
 	static {
+		addCommon("la");
+		addCommon("via");
+		addCommon("rua");
+		addCommon("de");
+		addCommon("du");
+		addCommon("des");
+		addCommon("del");
+		addCommon("am");
+		addCommon("da");
+		addCommon("a");
+		addCommon("der");
+		addCommon("do");
+		addCommon("los");
+		addCommon("di");
+		addCommon("im");
+		addCommon("el");
+		addCommon("e");
+		addCommon("an");
+		addCommon("g.");
+		addCommon("rd");
+		addCommon("dos");
+		addCommon("dei");
+		addCommon("b");
+		
 		addCommon("road");
 		addCommon("street");
 		addCommon("drive");
 		addCommon("avenue");
-		addCommon("de");
 		addCommon("rue");
 		addCommon("lane");
-		addCommon("via");
-		addCommon("rua");
-		addCommon("court");
-		addCommon("calle");
 		addCommon("улица");
-		addCommon("la");
 		addCommon("straße");
-		addCommon("north");
-		addCommon("du");
-		addCommon("west");
-		addCommon("east");
-		addCommon("des");
-		addCommon("south");
-		addCommon("place");
 		addCommon("chemin");
 		addCommon("way");
+		
+		addCommon("court");
+		addCommon("calle");
+		addCommon("north");
+		addCommon("west");
+		addCommon("east");
+		
+		addCommon("south");
+		addCommon("place");
+		
 		addCommon("avenida");
 		addCommon("boulevard");
 		addCommon("county");
@@ -46,8 +67,7 @@ public class CommonWords {
 		addCommon("circle");
 		addCommon("close");
 		addCommon("highway");
-		addCommon("del");
-		addCommon("am");
+		
 		addCommon("strada");
 		addCommon("northeast");
 		addCommon("park");
@@ -66,27 +86,25 @@ public class CommonWords {
 		addCommon("allée");
 		addCommon("old");
 		addCommon("weg");
-		addCommon("da");
+		
 		addCommon("terrace");
 		addCommon("jalan");
-		addCommon("a");
+		
 		addCommon("ridge");
 		addCommon("carrera");
 		addCommon("main");
 		addCommon("oak");
 		addCommon("josé");
-		addCommon("der");
+		
 		addCommon("parkway");
 		addCommon("forest");
 		addCommon("переулок");
-		addCommon("do");
-		addCommon("los");
+		
 		addCommon("state");
 		addCommon("carretera");
 		addCommon("grove");
 		addCommon("valley");
-		addCommon("di");
-		addCommon("im");
+		
 		addCommon("view");
 		addCommon("van");
 		addCommon("st");
@@ -96,7 +114,7 @@ public class CommonWords {
 		addCommon("camino");
 		addCommon("range");
 		addCommon("pine");
-		addCommon("el");
+		
 		addCommon("church");
 		addCommon("viale");
 		addCommon("loop");
@@ -109,16 +127,14 @@ public class CommonWords {
 		addCommon("point");
 		addCommon("piazza");
 		addCommon("della");
-		addCommon("e");
-		addCommon("an");
-		addCommon("g.");
+		
 		addCommon("cove");
 		addCommon("gardens");
-		addCommon("rd");
+		
 		addCommon("plaza");
 		addCommon("travessa");
 		addCommon("pasaje");
-		addCommon("dos");
+		
 		addCommon("francisco");
 		addCommon("mountain");
 		addCommon("jean");
@@ -126,7 +142,7 @@ public class CommonWords {
 		addCommon("meadow");
 		addCommon("farm");
 		addCommon("juan");
-		addCommon("dei");
+		
 		addCommon("bay");
 		addCommon("expressway");
 		addCommon("run");
@@ -138,7 +154,6 @@ public class CommonWords {
 		addCommon("high");
 		addCommon("square");
 		addCommon("maple");
-		addCommon("b");
 		addCommon("freeway");
 		addCommon("antonio");
 		addCommon("provinciale");
