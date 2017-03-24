@@ -84,12 +84,11 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 	private Map<Boundary, List<City>> boundaryToContainingCities = new HashMap<Boundary, List<City>>();
 	private List<Boundary> notAssignedBoundaries = new ArrayList<Boundary>();
 	private TLongHashSet visitedBoundaryWays = new TLongHashSet();
-
+	
 	private boolean normalizeStreets;
 	private String[] normalizeDefaultSuffixes;
 	private String[] normalizeSuffixes;
 
-	//TODO make it an option
 	private boolean DEBUG_FULL_NAMES = false; //true to see attached cityPart and boundaries to the street names
 
 	private static final int ADDRESS_NAME_CHARACTERS_TO_INDEX = 4;
@@ -1184,28 +1183,50 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 	private static void parsePrefix(String name, MapObject data, Map<String, List<MapObject>> namesIndex) {
 		int prev = -1;
+		List<String> namesToAdd = new ArrayList<>();
 		for (int i = 0; i <= name.length(); i++) {
 			if (i == name.length() || (!Character.isLetter(name.charAt(i)) && !Character.isDigit(name.charAt(i)) && name.charAt(i) != '\'')) {
 				if (prev != -1) {
 					String substr = name.substring(prev, i);
-					if (substr.length() > ADDRESS_NAME_CHARACTERS_TO_INDEX) {
-						substr = substr.substring(0, ADDRESS_NAME_CHARACTERS_TO_INDEX);
-					}
-					String val = substr.toLowerCase();
-					List<MapObject> list = namesIndex.get(val);
-					if (list == null) {
-						list = new ArrayList<MapObject>();
-						namesIndex.put(val, list);
-					}
-					if (!list.contains(data)) {
-						list.add(data);
-					}
+					namesToAdd.add(substr.toLowerCase());
 					prev = -1;
 				}
 			} else {
 				if (prev == -1) {
 					prev = i;
 				}
+			}
+		}
+		// remove common words
+		int pos = 0;
+		while(namesToAdd.size() > 1 && pos != -1) {
+			int prioP = Integer.MAX_VALUE;
+			pos = -1;
+			for(int k = 0; k < namesToAdd.size(); k++) {
+				int prio = CommonWords.getCommon(namesToAdd.get(k));
+				if(prio != -1 && prio < prioP) {
+					pos = k;
+					prioP = prio;
+				}
+			}
+			if(pos != -1) {
+				namesToAdd.remove(pos);
+			}
+		}
+		
+		// add to the map
+		for(String substr : namesToAdd) {
+			if (substr.length() > ADDRESS_NAME_CHARACTERS_TO_INDEX) {
+				substr = substr.substring(0, ADDRESS_NAME_CHARACTERS_TO_INDEX);
+			}
+			String val = substr.toLowerCase();
+			List<MapObject> list = namesIndex.get(val);
+			if (list == null) {
+				list = new ArrayList<MapObject>();
+				namesIndex.put(val, list);
+			}
+			if (!list.contains(data)) {
+				list.add(data);
 			}
 		}
 
@@ -1507,5 +1528,10 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			Collections.sort(t, comparator);
 		}
 		return cities;
+	}
+	
+	
+	static {
+		
 	}
 }
