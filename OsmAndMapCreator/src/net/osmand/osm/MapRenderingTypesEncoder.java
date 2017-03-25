@@ -200,7 +200,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 
 
 	protected void parseConvertCol(Map<String, String> mp, List<TagValuePattern> col, String prefix) {
-		for (int i = 1; i <= 15; i++) {
+		for (int i = 1; i <= 20; i++) {
 			String tg = mp.get(prefix +"tag" + i); //$NON-NLS-1$
 			String value = mp.get(prefix +"value" + i); //$NON-NLS-1$
 			if (tg != null) {
