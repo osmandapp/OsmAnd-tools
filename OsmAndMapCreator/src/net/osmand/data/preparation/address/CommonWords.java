@@ -38,7 +38,55 @@ public class CommonWords {
 		addCommon("dos");
 		addCommon("dei");
 		addCommon("b");
+		addCommon("st");
+		addCommon("the");
+		addCommon("las");
+		addCommon("f");
+		addCommon("u");
+		addCommon("jl.");
+		addCommon("j");
+		addCommon("sk");
+		addCommon("w");
+		addCommon("a.");
+		addCommon("of");
+		addCommon("k");
+		addCommon("r");
+		addCommon("h");
+		addCommon("mc");
+		addCommon("sw");
+		addCommon("g");
+		addCommon("v");
+		addCommon("m");
+		addCommon("c.");
+		addCommon("r.");
+		addCommon("ct");
+		addCommon("e.");
+		addCommon("dr.");
+		addCommon("j.");		
+		addCommon("in");
+		addCommon("al");
+		addCommon("út");
+		addCommon("per");
+		addCommon("ne");
+		addCommon("p");
+		addCommon("et");
+		addCommon("s.");
+		addCommon("f.");
+		addCommon("t");
+		addCommon("fe");
+		addCommon("à");
+		addCommon("i");
+		addCommon("c");
+		addCommon("le");
+		addCommon("s");
+		addCommon("av.");
+		addCommon("den");
+		addCommon("dr");
+		addCommon("y");
 		
+		
+		
+		addCommon("van");
 		addCommon("road");
 		addCommon("street");
 		addCommon("drive");
@@ -106,9 +154,9 @@ public class CommonWords {
 		addCommon("valley");
 		
 		addCommon("view");
-		addCommon("van");
-		addCommon("st");
-		addCommon("the");
+		
+		
+		
 		addCommon("river");
 		addCommon("santa");
 		addCommon("camino");
@@ -119,7 +167,7 @@ public class CommonWords {
 		addCommon("viale");
 		addCommon("loop");
 		addCommon("mill");
-		addCommon("las");
+		
 		addCommon("bridge");
 		addCommon("township");
 		addCommon("green");
@@ -164,9 +212,9 @@ public class CommonWords {
 		addCommon("pedro");
 		addCommon("estrada");
 		addCommon("line");
-		addCommon("i");
+		
 		addCommon("track");
-		addCommon("à");
+		
 		addCommon("vista");
 		addCommon("zum");
 		addCommon("rodovia");
@@ -174,14 +222,11 @@ public class CommonWords {
 		addCommon("grand");
 		addCommon("sur");
 		addCommon("path");
-		addCommon("c");
 		addCommon("saint");
-		addCommon("le");
 		addCommon("giuseppe");
 		addCommon("antônio");
 		addCommon("das");
-		addCommon("s");
-		addCommon("av.");
+		
 		addCommon("development");
 		addCommon("washington");
 		addCommon("white");
@@ -193,15 +238,15 @@ public class CommonWords {
 		addCommon("school");
 		addCommon("giovanni");
 		addCommon("canyon");
-		addCommon("út");
+		
 		addCommon("проспект");
-		addCommon("den");
+		
 		addCommon("general");
 		addCommon("charles");
 		addCommon("king");
-		addCommon("al");
+		
 		addCommon("village");
-		addCommon("in");
+
 		addCommon("moulin");
 		addCommon("auf");
 		addCommon("alley");
@@ -258,10 +303,10 @@ public class CommonWords {
 		addCommon("don");
 		addCommon("lincoln");
 		addCommon("orchard");
-		addCommon("dr");
+		
 		addCommon("little");
 		addCommon("memorial");
-		addCommon("y");
+		
 		addCommon("clos");
 		addCommon("club");
 		addCommon("na");
@@ -349,16 +394,13 @@ public class CommonWords {
 		addCommon("cruz");
 		addCommon("rosa");
 		addCommon("johnson");
-		addCommon("f");
+		
+		
 		addCommon("bypass");
-		addCommon("u");
-		addCommon("jl.");
 		addCommon("rúa");
-		addCommon("j");
 		addCommon("upper");
 		addCommon("union");
 		addCommon("crest");
-		addCommon("sk");
 		addCommon("gare");
 		addCommon("market");
 		addCommon("ленина");
@@ -367,7 +409,7 @@ public class CommonWords {
 		addCommon("franklin");
 		addCommon("résidence");
 		addCommon("francesco");
-		addCommon("w");
+		
 		addCommon("railroad");
 		addCommon("black");
 		addCommon("fontaine");
@@ -375,11 +417,11 @@ public class CommonWords {
 		addCommon("lower");
 		addCommon("mile");
 		addCommon("henri");
-		addCommon("a.");
+		
 		addCommon("big");
 		addCommon("brown");
 		addCommon("ave");
-		addCommon("of");
+		
 		addCommon("kennedy");
 		addCommon("pereira");
 		addCommon("airport");
@@ -389,7 +431,7 @@ public class CommonWords {
 		addCommon("robert");
 		addCommon("victor");
 		addCommon("manoel");
-		addCommon("k");
+		
 		addCommon("meadows");
 		addCommon("town");
 		addCommon("vicente");
@@ -422,7 +464,7 @@ public class CommonWords {
 		addCommon("holly");
 		addCommon("bergstraße");
 		addCommon("castle");
-		addCommon("r");
+		
 		addCommon("sierra");
 		addCommon("acceso");
 		addCommon("royal");
@@ -446,11 +488,10 @@ public class CommonWords {
 		addCommon("end");
 		addCommon("parade");
 		addCommon("val");
-		addCommon("h");
-		addCommon("mc");
+		
 		addCommon("field");
 		addCommon("professor");
-		addCommon("sw");
+		
 		addCommon("caddesi");
 		addCommon("bis");
 		addCommon("jones");
@@ -466,7 +507,7 @@ public class CommonWords {
 		addCommon("coronel");
 		addCommon("industrial");
 		addCommon("maréchal");
-		addCommon("g");
+		
 		addCommon("ქუჩა");
 		addCommon("kalea");
 		addCommon("acres");
@@ -479,7 +520,6 @@ public class CommonWords {
 		addCommon("pass");
 		addCommon("presidente");
 		addCommon("falls");
-		addCommon("v");
 		addCommon("jules");
 		addCommon("ponte");
 		addCommon("docteur");
@@ -490,11 +530,9 @@ public class CommonWords {
 		addCommon("cruce");
 		addCommon("diagonal");
 		addCommon("cypress");
-		addCommon("m");
 		addCommon("mar");
 		addCommon("harbor");
 		addCommon("shady");
-		addCommon("c.");
 		addCommon("clark");
 		addCommon("fort");
 		addCommon("bluff");
@@ -510,11 +548,11 @@ public class CommonWords {
 		addCommon("city");
 		addCommon("vico");
 		addCommon("józefa");
-		addCommon("dr.");
+		
 		addCommon("pietro");
 		addCommon("allee");
 		addCommon("bear");
-		addCommon("j.");
+		
 		addCommon("autobahn");
 		addCommon("lima");
 		addCommon("центральная");
@@ -594,7 +632,7 @@ public class CommonWords {
 		addCommon("françois");
 		addCommon("lewis");
 		addCommon("railway");
-		addCommon("r.");
+		
 		addCommon("allen");
 		addCommon("grange");
 		addCommon("ronda");
@@ -610,12 +648,11 @@ public class CommonWords {
 		addCommon("ribeiro");
 		addCommon("ford");
 		addCommon("linden");
-		addCommon("ct");
+		
 		addCommon("travesía");
 		addCommon("short");
 		addCommon("walker");
 		addCommon("marie");
-		addCommon("per");
 		addCommon("twin");
 		addCommon("degli");
 		addCommon("untere");
@@ -624,7 +661,6 @@ public class CommonWords {
 		addCommon("marconi");
 		addCommon("martins");
 		addCommon("windsor");
-		addCommon("ne");
 		addCommon("мира");
 		addCommon("david");
 		addCommon("middle");
@@ -693,7 +729,7 @@ public class CommonWords {
 		addCommon("post");
 		addCommon("vale");
 		addCommon("and");
-		addCommon("p");
+		
 		addCommon("молодёжная");
 		addCommon("октябрьская");
 		addCommon("london");
@@ -731,7 +767,7 @@ public class CommonWords {
 		addCommon("fairway");
 		addCommon("oxford");
 		addCommon("kirchweg");
-		addCommon("et");
+		
 		addCommon("sunrise");
 		addCommon("moore");
 		addCommon("apple");
@@ -750,14 +786,14 @@ public class CommonWords {
 		addCommon("champs");
 		addCommon("farm-to-market");
 		addCommon("nova");
-		addCommon("s.");
+		
 		addCommon("brasil");
 		addCommon("privada");
 		addCommon("barbosa");
 		addCommon("набережная");
 		addCommon("mare");
 		addCommon("dias");
-		addCommon("f.");
+		
 		addCommon("leclerc");
 		addCommon("daniel");
 		addCommon("dante");
@@ -776,7 +812,7 @@ public class CommonWords {
 		addCommon("peak");
 		addCommon("lakeside");
 		addCommon("ross");
-		addCommon("t");
+		
 		addCommon("лесная");
 		addCommon("ivy");
 		addCommon("filho");
@@ -915,7 +951,7 @@ public class CommonWords {
 		addCommon("bernardo");
 		addCommon("verte");
 		addCommon("platz");
-		addCommon("fe");
+		
 		addCommon("arbor");
 		addCommon("puits");
 		addCommon("mine");
@@ -964,7 +1000,7 @@ public class CommonWords {
 		addCommon("marechal");
 		addCommon("köz");
 		addCommon("marion");
-		addCommon("e.");
+		
 		addCommon("marco");
 		addCommon("léon");
 		addCommon("mt");
