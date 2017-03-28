@@ -347,7 +347,7 @@ public class CommonWords {
 		addCommon("brug");
 		addCommon("kade");
 		addCommon("eiland");
-		addCommon("eilandje");f
+		addCommon("eilandje");
 		addCommon("laan");
 		addCommon("plein");
 		addCommon("reizen");
@@ -404,7 +404,7 @@ public class CommonWords {
 		addCommon("jazdiť");
 		addCommon("zostup");
 		addCommon("stanice");
-		addCommon("cesta);
+		addCommon("cesta");
 		addCommon("pot");
 		addCommon("mesto");
 		addCommon("kraj");
