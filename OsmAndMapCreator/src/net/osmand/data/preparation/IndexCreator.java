@@ -914,8 +914,8 @@ public class IndexCreator {
 		IndexPoiCreator.ZIP_LONG_STRINGS = false;
 		IndexCreator creator = new IndexCreator(new File(rootFolder + "/maps/")); //$NON-NLS-1$
 		creator.setIndexMap(true);
-		creator.setIndexAddress(true);
-		creator.setIndexPOI(true);
+//		creator.setIndexAddress(true);
+//		creator.setIndexPOI(true);
 //		creator.setIndexTransport(true);
 		creator.setIndexRouting(true);
 
