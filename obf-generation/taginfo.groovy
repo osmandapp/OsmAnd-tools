@@ -11,7 +11,23 @@ json["project"] = [
 	"contact_name": "OsmAnd Team",
 	"contact_email": "contactus@osmand.net"
 ];
-json["tags"] = [:]
+def tags = []
+
+def renderingTypes = new XmlSlurper().parse("resources/obf_creation/rendering_types.xml")
+renderingTypes.type.each { tp ->
+	def tg = tp."@tag".text();
+	def value = tp."@value".text();
+	def notosm = tp."@notosm".text();
+	if(!tg.contains("osmand") && value != "" && notosm != "true") {
+		def taginfop = [:]
+		taginfop["key"] = tg;
+		taginfop["value"] = value;
+		taginfop["description"] = "used to create maps";
+		tags << taginfop
+	}
+	
+}
+json["tags"] = tags
 def txt = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(json));
 println txt
 new File("taginfo.json").text = txt
