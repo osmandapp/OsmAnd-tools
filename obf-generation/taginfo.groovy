@@ -14,9 +14,12 @@ json["project"] = [
 def tags = []
 
 def renderingTypes = new XmlSlurper().parse("resources/obf_creation/rendering_types.xml")
+def uniqueset = [:]
 renderingTypes.type.each { tp ->
 	def tg = tp."@tag".text();
 	def value = tp."@value".text();
+	if ( uniqueset[tg + "=" + value] )  return ;
+	uniqueset[tg + "=" + value] = tg;
 	def notosm = tp."@notosm".text();
 	if(!tg.contains("osmand") && value != "" && notosm != "true") {
 		def taginfop = [:]
@@ -24,8 +27,21 @@ renderingTypes.type.each { tp ->
 		taginfop["value"] = value;
 		taginfop["description"] = "used to create maps";
 		tags << taginfop
-	}
-	
+	}	
+}
+renderingTypes.entity_convert.each { tp ->
+	def tg = tp."@from_tag".text();
+	def value = tp."@from_value".text();
+	if ( uniqueset[tg + "=" + value] )  return ;
+	uniqueset[tg + "=" + value] = tg;
+	def notosm = tp."@notosm".text();
+	if(!tg.contains("osmand") && notosm != "true") {
+		def taginfop = [:]
+		taginfop["key"] = tg;
+		taginfop["value"] = value;
+		taginfop["description"] = "used to create maps";
+		tags << taginfop
+	}	
 }
 json["tags"] = tags
 def txt = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(json));
