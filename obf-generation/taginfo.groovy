@@ -21,7 +21,9 @@ def processEntityConvert(tp, uniqueset, tags) {
 	if(!tg.contains("osmand") && notosm != "true") {
 		def taginfop = [:]
 		taginfop["key"] = tg;
-		taginfop["value"] = value;
+		if(value != "") {
+			taginfop["value"] = value;
+		}
 		taginfop["description"] = "used to create maps";
 		tags << taginfop
 	}	
