@@ -40,7 +40,7 @@ def processPOItype(tp, uniqueset,tags) {
 		if(value != "") {
 			taginfop["value"] = value;
 		}
-		taginfop["description"] = "Used as POI";
+		taginfop["description"] = "Used to create maps (POI)";
 		tags << taginfop
 	}	
 }
