@@ -1,4 +1,4 @@
-def processType(tp,  uniqueset,tags) {
+def processType(tp, uniqueset,tags) {
 	def tg = tp."@tag".text();
 	def value = tp."@value".text();
 	if ( uniqueset[tg + "=" + value] )  return ;
@@ -8,7 +8,7 @@ def processType(tp,  uniqueset,tags) {
 		def taginfop = [:]
 		taginfop["key"] = tg;
 		taginfop["value"] = value;
-		taginfop["description"] = "used to create maps";
+		taginfop["description"] = "Used to create maps";
 		tags << taginfop
 	}	
 }
@@ -21,8 +21,26 @@ def processEntityConvert(tp, uniqueset, tags) {
 	if(!tg.contains("osmand") && notosm != "true") {
 		def taginfop = [:]
 		taginfop["key"] = tg;
-		taginfop["value"] = value;
-		taginfop["description"] = "used to create maps";
+		if(value != "") {
+			taginfop["value"] = value;
+		}
+		taginfop["description"] = "Used to create maps";
+		tags << taginfop
+	}	
+}
+def processPOItype(tp, uniqueset,tags) {
+	def tg = tp."@tag".text();
+	def value = tp."@value".text();
+	if ( uniqueset[tg + "=" + value] )  return ;
+	uniqueset[tg + "=" + value] = tg;
+	def notosm = tp."@notosm".text();
+	if(!tg.contains("osmand") && value != "" && notosm != "true") {
+		def taginfop = [:]
+		taginfop["key"] = tg;
+		if(value != "") {
+			taginfop["value"] = value;
+		}
+		taginfop["description"] = "Used as POI";
 		tags << taginfop
 	}	
 }
@@ -47,12 +65,19 @@ json["project"] = [
 def tags = []
 
 def renderingTypes = new XmlSlurper().parse("resources/obf_creation/rendering_types.xml")
+def poiTypes = new XmlSlurper().parse("resources/poi/poi_types.xml")
 def uniqueset = [:]
 renderingTypes.type.each { tp ->
 	processType(tp, uniqueset, tags)
 }
 renderingTypes.entity_convert.each { tp ->
 	processEntityConvert(tp, uniqueset, tags)	
+}
+poiTypes.poi_type.each { tp ->
+	processPOItype(tp, uniqueset, tags)	
+}
+poiTypes.poi_additional.each { tp ->
+	processPOItype(tp, uniqueset, tags)	
 }
 renderingTypes.category.each { c ->
 	c.type.each { tp ->
