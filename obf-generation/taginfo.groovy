@@ -69,10 +69,17 @@ def poiTypes = new XmlSlurper().parse("resources/poi/poi_types.xml")
 def uniqueset = [:]
 
 poiTypes.poi_type.each { tp ->
-	processPOItype(tp, uniqueset, tags)	
+	tp.poi_additional_category.each { pac ->
+		pac.poi_additional.each { pa->
+			processPOItype(pa, uniqueset, tags)	
+		}
+	}
+	pac.poi_additional.each { pa->
+		processPOItype(pa, uniqueset, tags)	
+	}
 }
-poiTypes.poi_additional.each { tp ->
-	processPOItype(tp, uniqueset, tags)	
+poiTypes.poi_additional.each { pa ->
+	processPOItype(pa, uniqueset, tags)	
 }
 /*
 renderingTypes.type.each { tp ->
