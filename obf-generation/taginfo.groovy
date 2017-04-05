@@ -41,6 +41,8 @@ def processPOItype(tp, uniqueset,tags) {
 			taginfop["value"] = value;
 		}
 		taginfop["description"] = "Used to create maps (POI)";
+		taginfop["icon_url"] = "https://raw.githubusercontent.com/osmandapp/OsmAnd-resources/master/rendering_styles/style-icons/drawable-hdpi/" +
+			+ "mx_"+name+".png";
 		tags << taginfop
 	}	
 }
@@ -81,7 +83,6 @@ poiTypes.poi_type.each { tp ->
 poiTypes.poi_additional.each { pa ->
 	processPOItype(pa, uniqueset, tags)	
 }
-/*
 renderingTypes.type.each { tp ->
 	processType(tp, uniqueset, tags)
 }
@@ -96,7 +97,7 @@ renderingTypes.category.each { c ->
 		processEntityConvert(tp, uniqueset, tags)	
 	}
 }
-*/
+
 json["tags"] = tags
 def txt = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(json));
 println txt
