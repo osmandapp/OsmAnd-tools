@@ -28,6 +28,7 @@ def processEntityConvert(tp, uniqueset, tags) {
 		tags << taginfop
 	}	
 }
+
 def processPOItype(tp, uniqueset,tags) {
 	def tg = tp."@tag".text();
 	def value = tp."@value".text();
@@ -45,6 +46,22 @@ def processPOItype(tp, uniqueset,tags) {
 			"mx_" + tp.name + ".png";
 		tags << taginfop
 	}	
+}
+def processPOIGroup(group, uniqueset,tags) {
+	group.poi_type.each { tp ->
+		processPOItype(tp, uniqueset, tags)	
+		processPOIGroup(tp, uniqueset, tags)
+	}
+	group.poi_additional.each { pa ->
+		processPOItype(pa, uniqueset, tags)	
+	}
+	group.poi_category.each { pac ->
+		processPOIGroup(pac, uniqueset, tags)
+	}
+	group.poi_additional_category.each { pac ->
+		processPOIGroup(pac, uniqueset, tags)
+	}
+
 }
 
 
@@ -70,19 +87,7 @@ def renderingTypes = new XmlSlurper().parse("resources/obf_creation/rendering_ty
 def poiTypes = new XmlSlurper().parse("resources/poi/poi_types.xml")
 def uniqueset = [:]
 
-poiTypes.poi_type.each { tp ->
-	tp.poi_additional_category.each { pac ->
-		pac.poi_additional.each { pa ->
-			processPOItype(pa, uniqueset, tags)	
-		}
-	}
-	tp.poi_additional.each { pa ->
-		processPOItype(pa, uniqueset, tags)	
-	}
-}
-poiTypes.poi_additional.each { pa ->
-	processPOItype(pa, uniqueset, tags)	
-}
+processPOIGroup(poiTypes, uniqueset, tags);
 renderingTypes.type.each { tp ->
 	processType(tp, uniqueset, tags)
 }
