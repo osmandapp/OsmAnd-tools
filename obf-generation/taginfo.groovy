@@ -67,17 +67,19 @@ def tags = []
 def renderingTypes = new XmlSlurper().parse("resources/obf_creation/rendering_types.xml")
 def poiTypes = new XmlSlurper().parse("resources/poi/poi_types.xml")
 def uniqueset = [:]
-renderingTypes.type.each { tp ->
-	processType(tp, uniqueset, tags)
-}
-renderingTypes.entity_convert.each { tp ->
-	processEntityConvert(tp, uniqueset, tags)	
-}
+
 poiTypes.poi_type.each { tp ->
 	processPOItype(tp, uniqueset, tags)	
 }
 poiTypes.poi_additional.each { tp ->
 	processPOItype(tp, uniqueset, tags)	
+}
+/*
+renderingTypes.type.each { tp ->
+	processType(tp, uniqueset, tags)
+}
+renderingTypes.entity_convert.each { tp ->
+	processEntityConvert(tp, uniqueset, tags)	
 }
 renderingTypes.category.each { c ->
 	c.type.each { tp ->
@@ -87,7 +89,7 @@ renderingTypes.category.each { c ->
 		processEntityConvert(tp, uniqueset, tags)	
 	}
 }
-
+*/
 json["tags"] = tags
 def txt = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(json));
 println txt
