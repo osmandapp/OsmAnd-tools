@@ -70,11 +70,11 @@ def uniqueset = [:]
 
 poiTypes.poi_type.each { tp ->
 	tp.poi_additional_category.each { pac ->
-		pac.poi_additional.each { pa->
+		pac.poi_additional.each { pa ->
 			processPOItype(pa, uniqueset, tags)	
 		}
 	}
-	pac.poi_additional.each { pa->
+	tp.poi_additional.each { pa ->
 		processPOItype(pa, uniqueset, tags)	
 	}
 }
