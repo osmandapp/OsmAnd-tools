@@ -43,7 +43,7 @@ def processPOItype(tp, uniqueset,tags) {
 		}
 		taginfop["description"] = "Used to create maps (POI)";
 		taginfop["icon_url"] = "https://raw.githubusercontent.com/osmandapp/OsmAnd-resources/master/rendering_styles/style-icons/drawable-hdpi/" +
-			"mx_" + tp.name + ".png";
+			"mx_" + tp."@name".text() + ".png";
 		tags << taginfop
 	}	
 }
