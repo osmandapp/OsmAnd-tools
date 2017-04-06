@@ -49,7 +49,7 @@ def processPOItype(tp, uniqueset,tags) {
 		if(new File(folder, "mx_" + name + ".png").exists()) {
 			taginfop["icon_url"] =  DEFAULT_HTTP_URL + "mx_" + name + ".png";
 		} else if(new File(folder, "mx_" + tg + "_" + value + ".png").exists()) {
-			taginfop["icon_url"] =  DEFAULT_HTTP_URL + "mx_" + tg + value  + ".png";
+			taginfop["icon_url"] =  DEFAULT_HTTP_URL + "mx_" + tg + "_" + value  + ".png";
 		} else if(new File(folder, "mx_" + value + ".png").exists()) {
 			taginfop["icon_url"] =  DEFAULT_HTTP_URL + "mx_" + value  + ".png";
 		}
