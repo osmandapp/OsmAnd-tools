@@ -29,9 +29,12 @@ def processEntityConvert(tp, uniqueset, tags) {
 	}	
 }
 
+DEFAULT_HTTP_URL = "https://raw.githubusercontent.com/osmandapp/OsmAnd-resources/master/rendering_styles/style-icons/drawable-hdpi/";
+
 def processPOItype(tp, uniqueset,tags) {
 	def tg = tp."@tag".text();
 	def value = tp."@value".text();
+	def name = tp."@name".text();
 	if ( uniqueset[tg + "=" + value] )  return ;
 	uniqueset[tg + "=" + value] = tg;
 	def notosm = tp."@notosm".text();
@@ -42,8 +45,15 @@ def processPOItype(tp, uniqueset,tags) {
 			taginfop["value"] = value;
 		}
 		taginfop["description"] = "Used to create maps (POI)";
-		taginfop["icon_url"] = "https://raw.githubusercontent.com/osmandapp/OsmAnd-resources/master/rendering_styles/style-icons/drawable-hdpi/" +
-			"mx_" + tp."@name".text() + ".png";
+		String folder = "resources/rendering_styles/style-icons/drawable-hdpi/";
+		if(new File(folder, "mx_" + name + ".png").exists()) {
+			taginfop["icon_url"] =  DEFAULT_HTTP_URL + "mx_" + name + ".png";
+		} else if(new File(folder, "mx_" + tg + "_" + value + ".png").exists()) {
+			taginfop["icon_url"] =  DEFAULT_HTTP_URL + "mx_" + value  + ".png";
+		} else if(new File(folder, "mx_" + tg + "_" + value + ".png").exists()) {
+			taginfop["icon_url"] =  DEFAULT_HTTP_URL + "mx_" + value  + ".png";
+		}
+		
 		tags << taginfop
 	}	
 }
@@ -57,6 +67,9 @@ def processPOIGroup(group, uniqueset,tags) {
 	}
 	group.poi_category.each { pac ->
 		processPOIGroup(pac, uniqueset, tags)
+	}
+	group.poi_filter.each { pf ->
+		processPOIGroup(pf, uniqueset, tags)
 	}
 	group.poi_additional_category.each { pac ->
 		processPOIGroup(pac, uniqueset, tags)
