@@ -52,16 +52,16 @@ import org.apache.tools.bzip2.CBZip2InputStream;
 import org.xmlpull.v1.XmlPullParserException;
 
 public class FixBasemapRoads {
-    private static float MINIMAL_DISTANCE= 500;
+    private static float MINIMAL_DISTANCE = 500;
     private static float MAXIMAL_DISTANCE_CUT = 3000;
     private final static Log LOG = PlatformUtil.getLog(FixBasemapRoads.class);
 
 	public static void main(String[] args) throws Exception {
 		if(args == null || args.length == 0) {
 			args = new String[] {
-					System.getProperty("maps.dir") + "proc_line_trunk_out.osm.bz2",
-					System.getProperty("maps.dir") + "proc_line_trunk.osm",
-					System.getProperty("maps.dir") + "route_road.osm.gz"
+					System.getProperty("maps.dir") + "admin_level_2_flt.osm",
+					System.getProperty("maps.dir") + "admin_level_2_fixed.osm",
+					//System.getProperty("maps.dir") + "route_road.osm.gz"
 					
 			};
 		}
@@ -294,10 +294,11 @@ public class FixBasemapRoads {
     }
 
     class RoadInfo {
-	    String ref;
+	    //String ref;
         Collection<RoadLine> roadLines = new LinkedHashSet<RoadLine>();
         TLongObjectHashMap<List<RoadLine>> startPoints = new TLongObjectHashMap<List<RoadLine>>();
         TLongObjectHashMap<List<RoadLine>> endPoints = new TLongObjectHashMap<List<RoadLine>>();
+		boolean adminLevel;
 
         void registerRoadLine(RoadLine r){
             roadLines.add(r);
@@ -376,7 +377,6 @@ public class FixBasemapRoads {
 
 
 
-    // TODO try reverse?
 	private void processRegion(List<EntityId> toWrite) throws IOException {
 		for (String ref : roadInfoMap.keySet()) {
 			RoadInfo ri = roadInfoMap.get(ref);
@@ -445,7 +445,7 @@ public class FixBasemapRoads {
         double last = directionRoute(end.getLastPoints(150), false);
         double first = directionRoute(begin.getFirstPoints(150), true);
         double diff = MapUtils.alignAngleDifference(first - last);
-	    return Math.abs(diff) < 3 * Math.PI / 8;
+	    return Math.abs(diff) < Math.PI / 4;
     }
 
     private boolean continuation(RoadLine end, RoadLine begin) {
@@ -524,12 +524,13 @@ public class FixBasemapRoads {
             merged = false;
             for (RoadLine ls : new ArrayList<RoadLine>(ri.roadLines)) {
                 if(!ri.roadLines.contains(ls)){
+                	// line already merged and deleted
                     continue;
                 }
                 List<RoadLine> endedInSamePoint = ri.getConnectedLinesEnd(ls.endPoint);
                 List<RoadLine> list = ri.getConnectedLinesStart(ls.endPoint);
                 if (list != null && list.size() == 1 && endedInSamePoint.size() == 1) {
-                    if (list.get(0) != ls && !inOppositeDirection(ls, list.get(0))) {
+                    if (list.get(0) != ls && (!inOppositeDirection(ls, list.get(0)) || ri.adminLevel)) {
                         merged = true;
                         ri.mergeRoadInto(ls, list.get(0));
                     }
@@ -579,6 +580,7 @@ public class FixBasemapRoads {
 			}
 			return;
 		}
+		
 		if (ref == null || ref.isEmpty()) {
 			ref = way.getTag("int_ref");
 		}
@@ -591,16 +593,25 @@ public class FixBasemapRoads {
 				ref = ref.substring(0, ref.indexOf(';'));
 			}
 		}
+		boolean adminLevel = false;
+		if(ref == null || ref.isEmpty()) {
+			ref = way.getTag("admin_level");
+			LatLon lt = way.getLatLon();
+			ref += ((int) MapUtils.getTileNumberY(5, lt.getLatitude())) + " "
+					+ ((int) MapUtils.getTileNumberX(5, lt.getLongitude()));
+			adminLevel = true;
+		}
 		if (ref == null || ref.isEmpty()) {
 			LatLon lt = way.getLatLon();
-			ref = ((int) MapUtils.getTileNumberY(4, lt.getLatitude())) + " "
-					+ ((int) MapUtils.getTileNumberX(4, lt.getLongitude()));
+			ref = ((int) MapUtils.getTileNumberY(6, lt.getLatitude())) + " "
+					+ ((int) MapUtils.getTileNumberX(6, lt.getLongitude()));
 		}
 
 		if (!roadInfoMap.containsKey(ref)) {
 			roadInfoMap.put(ref, new RoadInfo());
 		}
 		RoadInfo ri = roadInfoMap.get(ref);
+		ri.adminLevel = adminLevel;
 		ri.registerRoadLine(new RoadLine(way));
 	}
 
