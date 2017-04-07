@@ -36,8 +36,8 @@ fix_basemap_roads () {
 #clean 4
 #add_admin_level_tag 2
 #add_admin_level_tag 4
-fix_basemap_roads 2
-#fix_basemap_roads 4
+#fix_basemap_roads 2
+fix_basemap_roads 4
 
 #osmconvert proc_*.osm > proc_line_admin_level_out.osm
 #bzip2 proc_line_admin_level_out.osm
