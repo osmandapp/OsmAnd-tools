@@ -1,2 +1,3 @@
 .DS_Store
 OsmAndMapCreator/regions.ocbf
+obf-generation/basemap/admin_levels/*.osm

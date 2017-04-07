@@ -597,8 +597,8 @@ public class FixBasemapRoads {
 		if(ref == null || ref.isEmpty()) {
 			ref = way.getTag("admin_level");
 			LatLon lt = way.getLatLon();
-			ref += ((int) MapUtils.getTileNumberY(5, lt.getLatitude())) + " "
-					+ ((int) MapUtils.getTileNumberX(5, lt.getLongitude()));
+			ref += ((int) MapUtils.getTileNumberY(4, lt.getLatitude())) + " "
+					+ ((int) MapUtils.getTileNumberX(4, lt.getLongitude()));
 			adminLevel = true;
 		}
 		if (ref == null || ref.isEmpty()) {
