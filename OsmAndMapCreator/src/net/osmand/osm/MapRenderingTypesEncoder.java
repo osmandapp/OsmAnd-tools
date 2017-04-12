@@ -955,13 +955,13 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			vl = "yellow";
 		} else if ((h >= 46 && h < 66 && s > 30 && v > 30 && v < 82)) {
 			vl = palette6 ? "yellow" : "darkyellow";
-		} else if ((h >= 67 && h < 165 && s > 30 && v > 77) || vl.equals("lightgreen") || vl.equals("lime") || vl.equals("seagreen") || vl.equals("00ff00") || vl.equals("yellow/green")) {
+		} else if ((h >= 67 && h < 178 && s > 30 && v > 77) || vl.equals("lightgreen") || vl.equals("lime") || vl.equals("seagreen") || vl.equals("00ff00") || vl.equals("yellow/green")) {
 			vl = palette6 ? "green" : "lightgreen";
 		} else if ((h >= 74 && h < 174 && s > 30 && v > 30 && v < 77) || vl.contains("green") || vl.equals("darkgreen") || vl.equals("natural") || vl.equals("natur") || vl.equals("mediumseagreen") || vl.equals("green/white") || vl.equals("white/green") || vl.equals("blue/yellow") || vl.equals("vert") || vl.equals("green/blue") || vl.equals("olive")) {
 			vl = "green";
-		} else if ((h >= 165 && h < 215 && s > 32 && v > 50) || vl.equals("lightblue") || vl.equals("aqua") || vl.equals("cyan") || vl.equals("87ceeb") || vl.equals("turquoise")) {
+		} else if ((h >= 178 && h < 210 && s > 40 && v > 80) || (h >= 178 && h < 265 && s > 25 && s < 61 && v > 90) || vl.equals("lightblue") || vl.equals("aqua") || vl.equals("cyan") || vl.equals("87ceeb") || vl.equals("turquoise")) {
 			vl = palette6 ? "blue" : "lightblue";
-		} else if ((h >= 215 && h < 265 && s > 40 && v > 30) || vl.contains("blue") || vl.equals("0000ff") || vl.equals("teal") || vl.equals("darkblue") || vl.equals("blu") || vl.equals("navy")) {
+		} else if ((h >= 178 && h < 210 && s > 40 && v > 35 && v <= 80) || (h >= 210 && h < 265 && s > 40 && v > 30) || vl.contains("blue") || vl.equals("0000ff") || vl.equals("teal") || vl.equals("darkblue") || vl.equals("blu") || vl.equals("navy")) {
 			vl = "blue";
 		} else if ((h >= 265 && h < 325 && s > 15 && v >= 27) || (h > 250 && h < 325 && s > 10 && s < 25 && v > 90) || vl.equals("purple") || vl.equals("violet") || vl.equals("magenta") || vl.equals("maroon") || vl.equals("fuchsia") || vl.equals("800080")) {
 			vl = palette6 ? "blue" : "purple";
