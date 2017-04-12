@@ -30,7 +30,7 @@ import org.xml.sax.SAXException;
 import org.xmlpull.v1.XmlPullParserException;
 
 public class OceanTilesCreator {
-    public static final byte TILE_ZOOMLEVEL = 12;
+    public static final byte TILE_ZOOMLEVEL = BasemapProcessor.TILE_ZOOMLEVEL;
     private static final byte BITMASK = 0x3;
     private static final int BITS_COUNT = (1 << TILE_ZOOMLEVEL) * (1 << TILE_ZOOMLEVEL);
     private static final byte SEA = 0x2;
@@ -48,14 +48,15 @@ public class OceanTilesCreator {
      * @throws IOException
      * @throws XMLStreamException
      * @throws SAXException
+     * @throws XmlPullParserException 
      */
-    public static void main(String[] args) throws IOException, XMLStreamException, SAXException {
-//    	createTilesFile("/Users/victorshcherb/osmand/maps/coastline.osm.bz2",
-//    			"/Users/victorshcherb/osmand/maps/oceantiles_12.dat");
+    public static void main(String[] args) throws Exception{
 //    	System.out.println("Tiles generated ");
+    	createTilesFile("/Users/victorshcherb/osmand/maps/coastline.osm.bz2",
+    			"/Users/victorshcherb/osmand/maps/oceantiles_"+TILE_ZOOMLEVEL+".dat");
     	createJOSMFile(new String[] {
     			"/Users/victorshcherb/osmand/maps/oceantiles.osm",
-    			"/Users/victorshcherb/osmand/maps/oceantiles_12.dat"
+    			"/Users/victorshcherb/osmand/maps/oceantiles_"+TILE_ZOOMLEVEL+".dat"
     	});
 //        if(args.length > 0 && args[0].equals("generate")) {
 //        	createTilesFile(args[1], args[2]);
@@ -218,7 +219,7 @@ public class OceanTilesCreator {
 
     public static void createJOSMFile(String[] args) throws XMLStreamException, IOException {
         String fileLocation = args.length == 0 ? "oceanTiles.osm" : args[0];
-        int z = 12;
+        int z = TILE_ZOOMLEVEL;
         BasemapProcessor bmp = new BasemapProcessor();
         bmp.constructBitSetInfo(args.length > 1 ? args[1] : null);
 

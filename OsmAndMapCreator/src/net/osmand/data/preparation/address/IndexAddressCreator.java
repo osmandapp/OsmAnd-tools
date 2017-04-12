@@ -28,6 +28,7 @@ import java.util.TreeSet;
 
 import net.osmand.IProgress;
 import net.osmand.OsmAndCollator;
+import net.osmand.binary.CommonWords;
 import net.osmand.data.Boundary;
 import net.osmand.data.Building;
 import net.osmand.data.Building.BuildingInterpolation;
@@ -106,16 +107,12 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 	}
 
 
-	public void initSettings(boolean normalizeStreets, String[] normalizeDefaultSuffixes, String[] normalizeSuffixes,
-			String cityAdminLevel) {
+	public void initSettings(String cityAdminLevel) {
 		cities.clear();
 		cityManager.clear();
 		postalCodeRelations.clear();
 		cityBoundaries.clear();
 		notAssignedBoundaries.clear();
-		this.normalizeStreets = normalizeStreets;
-		this.normalizeDefaultSuffixes = normalizeDefaultSuffixes;
-		this.normalizeSuffixes = normalizeSuffixes;
 	}
 
 	public void registerCityIfNeeded(Entity e) {

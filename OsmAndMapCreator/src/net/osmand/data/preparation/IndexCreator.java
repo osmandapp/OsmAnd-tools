@@ -77,7 +77,6 @@ public class IndexCreator {
 	private boolean indexRouting;
 
 	private boolean generateLowLevel = true;
-	private boolean normalizeStreets = true; // true by default
 	private int zoomWaySmoothness = 2;
 
 	private String regionName;
@@ -146,10 +145,6 @@ public class IndexCreator {
 
 	public void setIndexTransport(boolean indexTransport) {
 		this.indexTransport = indexTransport;
-	}
-
-	public void setNormalizeStreets(boolean normalizeStreets) {
-		this.normalizeStreets = normalizeStreets;
 	}
 
 	public void setZoomWaySmoothness(int zoomWaySmoothness) {
@@ -623,13 +618,7 @@ public class IndexCreator {
 		this.indexRouteCreator = new IndexRouteCreator(renderingTypes, logMapDataWarn, generateLowLevel);
 
 		// init address
-		String[] normalizeDefaultSuffixes = null;
-		String[] normalizeSuffixes = null;
-		if (normalizeStreets) {
-			normalizeDefaultSuffixes = DataExtractionSettings.getSettings().getDefaultSuffixesToNormalizeStreets();
-			normalizeSuffixes = DataExtractionSettings.getSettings().getSuffixesToNormalizeStreets();
-		}
-		indexAddressCreator.initSettings(normalizeStreets, normalizeDefaultSuffixes, normalizeSuffixes, cityAdminLevel);
+		indexAddressCreator.initSettings(cityAdminLevel);
 
 		// Main generation method
 		try {

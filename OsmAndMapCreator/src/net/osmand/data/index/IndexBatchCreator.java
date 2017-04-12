@@ -520,7 +520,6 @@ public class IndexBatchCreator {
 			indexCreator.setIndexMap(indMap);
 			indexCreator.setIndexRouting(indRouting);
 			indexCreator.setLastModifiedDate(file.lastModified());
-			indexCreator.setNormalizeStreets(true);
 			indexCreator.setRegionName(rName);
 			if (rdata != null && rdata.cityAdminLevel != null) {
 				indexCreator.setCityAdminLevel(rdata.cityAdminLevel);

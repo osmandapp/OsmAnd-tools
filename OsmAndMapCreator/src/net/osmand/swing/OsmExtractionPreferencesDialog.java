@@ -31,8 +31,6 @@ public class OsmExtractionPreferencesDialog extends JDialog {
 	private JButton okButton;
 	private JButton cancelButton;
 
-	private JTextField streetSuffixes;
-	private JTextField streetDefaultSuffixes;
 	private JTextField mapZooms;
 	private JTextField searchLocale;
 	private JTextField routingMode;
@@ -311,36 +309,6 @@ public class OsmExtractionPreferencesDialog extends JDialog {
 		constr.gridy = 0;
 		l.setConstraints(label, constr);
 
-		streetSuffixes = new JTextField();
-		streetSuffixes.setText(DataExtractionSettings.getSettings().getSuffixesToNormalizeStreetsString());
-		panel.add(streetSuffixes);
-		constr = new GridBagConstraints();
-		constr.fill = GridBagConstraints.HORIZONTAL;
-		constr.ipadx = 5;
-		constr.gridx = 1;
-		constr.gridy = 0;
-		l.setConstraints(streetSuffixes, constr);
-
-		label = new JLabel(Messages.getString("OsmExtractionPreferencesDialog.DEFAULT.SUFFIXES")); //$NON-NLS-1$
-		panel.add(label);
-		constr = new GridBagConstraints();
-		constr.ipadx = 5;
-		constr.gridx = 0;
-		constr.gridy = 1;
-		constr.anchor = GridBagConstraints.WEST;
-		l.setConstraints(label, constr);
-
-		streetDefaultSuffixes = new JTextField();
-		streetDefaultSuffixes.setText(DataExtractionSettings.getSettings().getDefaultSuffixesToNormalizeStreetsString());
-		panel.add(streetDefaultSuffixes);
-		constr = new GridBagConstraints();
-		constr.weightx = 1;
-		constr.fill = GridBagConstraints.HORIZONTAL;
-		constr.ipadx = 5;
-		constr.gridx = 1;
-		constr.gridy = 1;
-		l.setConstraints(streetDefaultSuffixes, constr);
-
 		label = new JLabel("Map zooms (specify zoom levels in binary map) ");
 		panel.add(label);
 		constr = new GridBagConstraints();
@@ -445,12 +413,6 @@ public class OsmExtractionPreferencesDialog extends JDialog {
 
 	public void saveProperties(){
 		DataExtractionSettings settings = DataExtractionSettings.getSettings();
-		if(!settings.getSuffixesToNormalizeStreetsString().equals(streetSuffixes.getText())){
-			settings.setSuffixesToNormalizeStreets(streetSuffixes.getText());
-		}
-		if(!settings.getDefaultSuffixesToNormalizeStreetsString().equals(streetDefaultSuffixes.getText())){
-			settings.setDefaultSuffixesToNormalizeStreets(streetDefaultSuffixes.getText());
-		}
 		if(settings.useAdvancedRoutingUI() != advancedRoutingUI.isSelected()){
 			settings.setUseAdvancedRoutingUI(advancedRoutingUI.isSelected());
 		}

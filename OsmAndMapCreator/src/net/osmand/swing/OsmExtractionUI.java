@@ -782,7 +782,6 @@ public class OsmExtractionUI implements IMapLocationListener {
 					try {
 						creator.setIndexAddress(buildAddressIndex.isSelected());
 						creator.setIndexPOI(buildPoiIndex.isSelected());
-						creator.setNormalizeStreets(normalizingStreets.isSelected());
 						creator.setIndexTransport(buildTransportIndex.isSelected());
 						creator.setIndexMap(buildMapIndex.isSelected());
 						creator.setIndexRouting(buildRoutingIndex.isSelected());
