@@ -300,18 +300,9 @@ public class OsmExtractionPreferencesDialog extends JDialog {
 		
 //		root.add(panel);
 		
-		JLabel label = new JLabel(Messages.getString("OsmExtractionPreferencesDialog.NAME.SUFFIXES")); //$NON-NLS-1$
+		JLabel label = new JLabel("Map zooms (specify zoom levels in binary map) ");
 		panel.add(label);
 		GridBagConstraints constr = new GridBagConstraints();
-		constr.anchor = GridBagConstraints.WEST;
-		constr.ipadx = 5;
-		constr.gridx = 0;
-		constr.gridy = 0;
-		l.setConstraints(label, constr);
-
-		label = new JLabel("Map zooms (specify zoom levels in binary map) ");
-		panel.add(label);
-		constr = new GridBagConstraints();
 		constr.ipadx = 5;
 		constr.gridx = 0;
 		constr.gridy = 2;

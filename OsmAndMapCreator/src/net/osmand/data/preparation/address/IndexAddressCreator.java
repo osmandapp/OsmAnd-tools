@@ -1177,10 +1177,25 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		}
 		o.setFileOffset((int) fileOffset);
 	}
+	
+	private static String stripBraces(String localeName) {
+		int i = localeName.indexOf('(');
+		String retName = localeName;
+		if (i > -1) {
+			retName = localeName.substring(0, i);
+			int j = localeName.indexOf(')', i);
+			if (j > -1) {
+				retName = retName.trim() + ' ' + localeName.substring(j);
+			}
+		}
+		return retName;
+	}
 
 	private static void parsePrefix(String name, MapObject data, Map<String, List<MapObject>> namesIndex) {
 		int prev = -1;
 		List<String> namesToAdd = new ArrayList<>();
+		name = stripBraces(name);
+		
 		for (int i = 0; i <= name.length(); i++) {
 			if (i == name.length() || (!Character.isLetter(name.charAt(i)) && !Character.isDigit(name.charAt(i)) && name.charAt(i) != '\'')) {
 				if (prev != -1) {
