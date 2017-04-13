@@ -421,7 +421,8 @@ public class OsmExtractionUI implements IMapLocationListener {
 				if(sr.object instanceof Amenity) {
 					locationString += " " + ((Amenity)sr.object).getSubType();
 				}
-				mi.setText(sr.localeName + " [" + sr.objectType + "] " + locationString);
+				mi.setText(sr.localeName + " [" + sr.getFoundWordCount() + ", "+ sr.objectType + "] " + 
+						locationString);
 				mi.addActionListener(new ActionListener() {
 
 					@Override
