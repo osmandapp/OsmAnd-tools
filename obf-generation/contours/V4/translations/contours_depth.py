@@ -3,9 +3,9 @@ def filterTags(attrs):
         return
     tags = {}
 
-    depth = attrs['level'].split('.')[0]
+    depth = attrs['depth'].split('.')[0]
     if 'depth' in attrs:
-        tags['level'] = depth
+        tags['depth'] = depth
 
     if int(depth) != 0:
 	 tags.update({'contour':'depth'})
@@ -22,6 +22,9 @@ def filterTags(attrs):
 		tags.update({'name':depth})
 	    elif int(depth) % 10 == 0:
 		tags.update({'contourtype':'10m'})
+		tags.update({'name':depth})
+	    elif int(depth) % 5 == 0:
+		tags.update({'contourtype':'5m'})
 		tags.update({'name':depth})
 
     return tags
