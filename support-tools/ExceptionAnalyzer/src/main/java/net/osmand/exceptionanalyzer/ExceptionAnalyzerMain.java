@@ -25,11 +25,13 @@ import net.osmand.exceptionanalyzer.data.ExceptionText;
 public class ExceptionAnalyzerMain {
     private static final String LABEL = "OsmAnd Bug/May";
     private static final String VERSION_FILTER = "2.6.3";
-
+    private static final File FOLDER_WITH_LOGS =  new File(System.getProperty("user.home") + 
+    		"/"+ "attachments_logs");
+    
 	/** Application name. */
     private static final String APPLICATION_NAME = "ExceptionAnalyzer";
     
-    private static final File FOLDER_WITH_LOGS =  new File(System.getProperty("user.home") + "/"+"attachments_logs");
+    
 
     /** Directory to store user credentials for this application. */
     private static final java.io.File DATA_STORE_DIR = new java.io.File(
@@ -231,11 +233,15 @@ public class ExceptionAnalyzerMain {
 
     public static Map<String, List<ExceptionText>> analyzeExceptions(String versionFilter) {
         Map<String, List<ExceptionText>> result = new HashMap<>();
+        TreeSet<String> usrs  = new TreeSet<>();
+        int count = 0;
+        int exceptionCount = 0;
         if (FOLDER_WITH_LOGS.exists()) {
             for(File currLog : FOLDER_WITH_LOGS.listFiles()) {
             	if(!currLog.getName().endsWith(".exception.log")) {
             		continue;
             	}
+            	count++;
                 try{
                 	File usr = new File(FOLDER_WITH_LOGS, currLog.getName().substring(0, currLog.getName().indexOf('.'))+".uid.txt");
                 	String user = "";
@@ -244,6 +250,7 @@ public class ExceptionAnalyzerMain {
                 		user = br.readLine() ;
                 		br.close();
                 	}
+                	usrs.add(user);
                 	
                     FileInputStream fstream = new FileInputStream(currLog);
                     BufferedReader br = new BufferedReader(new InputStreamReader(fstream));
@@ -271,10 +278,10 @@ public class ExceptionAnalyzerMain {
                                 currBody += strLine + "\n";
                             }
                             ExceptionText exception = new ExceptionText(currDate, currName, currBody, currApkVersion, user);
-                            
                             if(versionFilter != null && !currApkVersion.contains(versionFilter)) {
                             	continue;
                             }
+                            exceptionCount ++;
                             String hsh = exception.getExceptionHash();
                             if (!result.containsKey(hsh)) {
                             	List<ExceptionText> exceptions = new ArrayList<>();
@@ -290,6 +297,8 @@ public class ExceptionAnalyzerMain {
                 }
             }
         }
+        System.out.println("Analyzed " + count + " emails from " + usrs.size() + 
+        		" users, parsed " + exceptionCount +" ("+  result.size() + " different) exceptions ");
         return result;
     }
 
