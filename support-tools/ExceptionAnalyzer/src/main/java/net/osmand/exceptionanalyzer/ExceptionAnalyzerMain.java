@@ -16,6 +16,7 @@ import com.google.api.services.gmail.model.*;
 import com.google.api.services.gmail.Gmail;
 
 import java.io.*;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
@@ -295,19 +296,41 @@ public class ExceptionAnalyzerMain {
 				return -Integer.compare(map.get(o1).size(), map.get(o2).size());
 			}
 		});
-        pw.write("Name,Version,Date,Count,Stacktrace\n");
+        SimpleDateFormat eDateParser = new SimpleDateFormat("dd.MM.yyyy HH:mm:ss");
+        pw.write("Name,Version,LastDate,Count,Hash,Stacktrace\n");
 
         for (String key : st) {
             StringBuilder sb = new StringBuilder();
             List<ExceptionText> exceptions = map.get(key);
             ExceptionText exception = exceptions.get(0);
+            String maxDate = exception.getDate();
+            long t = 0;
+            try {
+				t = eDateParser.parse(maxDate).getTime();
+			} catch (ParseException e) {
+				e.printStackTrace();
+			}
+            for(ExceptionText et : exceptions) {
+            	try {
+					if(eDateParser.parse(et.getDate()).getTime() > t) {
+						maxDate = et.getDate();
+						t = eDateParser.parse(et.getDate()).getTime();
+					}
+				} catch (ParseException e) {
+					e.printStackTrace();
+				}
+            }
+            
             //for (ExceptionText exception: exceptions) {
-                String info = exception.getAllInfo().toString()
-                        .replace("[", "")
-                        .replace("]", "");
-                sb.append(info);
+                sb.append(exception.getName());
+                sb.append(',');
+                sb.append(exception.getApkVersion());
+                sb.append(',');
+                sb.append(maxDate);
                 sb.append(',');
                 sb.append(exceptions.size());
+                sb.append(',');
+                sb.append(exception.getExceptionHash().replaceAll("\n", "").replaceAll("\tat", " "));
                 sb.append(',');
                 String body = exception.getStackTrace().replaceAll("\n", "").replaceAll("\tat", " ");
                 sb.append(body);

@@ -1,21 +1,20 @@
 package net.osmand.exceptionanalyzer.data;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 
 /**
  * Created by user on 28.05.17.
  */
 public class ExceptionText {
-    private String date;
+    private static final int PACKAGE_LINES = 2;
+	private static final int TOP_LINES_HASH = 2;
+	private String date;
     private String name;
     private String body;
     private String apkVersion;
 
     public ExceptionText(String date, String name, String body, String apkVersion) {
         this.date = date;
-        this.name = name;
+        this.name = simplify(name);
         this.body = body;
         this.apkVersion = apkVersion;
     }
@@ -28,43 +27,56 @@ public class ExceptionText {
     	int begin = 0;
     	for(int i = 0; i < lines.length - 1; i++) {
     		if(lines[i].contains("Caused by:")) {
-    			name = lines[i];
+    			name = simplify(lines[i]);
     			begin = i;
+    			if(name.contains("java.lang.OutOfMemoryError")) {
+    	    		return name;
+    	    	}
     		}
     	}
     	
-    	String hsh = name;
-    	int top = 3;
+    	String hsh = simplify(name);
+    	int top = PACKAGE_LINES;
     	int i = begin;
     	while(top > 0 && i < lines.length) {
     		if(lines[i].contains("net.osmand")) {
-    			hsh += "\n" + lines[i];
+    			hsh += "\n" + simplify(lines[i]);
     			top --;
     		}
     		i++;
     	}
     	
-    	top= 3;
+    	top = TOP_LINES_HASH;
     	i = begin;
     	while(top > 0 && i < lines.length) {
-    			hsh += "\n" + lines[i];
+    			hsh += "\n" + simplify(lines[i]);
     		top --;
     		i++;
     	}
     	return hsh;
     }
 
-    public String getName() {
+    private String simplify(String string) {
+    	if(string.contains("java.lang.OutOfMemoryError")) {
+    		return "java.lang.OutOfMemoryError";
+    	}
+    	if(string.contains("java.lang.IllegalArgumentException: Receiver not registered: net.osmand.aidl.OsmandAidlApi")) {
+    		return "java.lang.IllegalArgumentException: Receiver not registered: net.osmand.aidl.OsmandAidlApi";
+    	}
+		return string;
+	}
+
+	public String getName() {
         return String.valueOf(name);
     }
 
-    public List<String> getAllInfo() {
-        List<String> info = new ArrayList<>();
-        info.add(name);
-        info.add(apkVersion);
-        info.add(date);
-        return Collections.unmodifiableList(info);
-    }
+    public String getApkVersion() {
+		return apkVersion;
+	}
+    
+    public String getDate() {
+		return date;
+	}
 
     public String getStackTrace() {
         return String.valueOf(body);
