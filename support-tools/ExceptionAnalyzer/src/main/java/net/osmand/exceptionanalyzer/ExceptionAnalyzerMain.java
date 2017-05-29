@@ -100,7 +100,7 @@ public class ExceptionAnalyzerMain {
     }
 
     public static void main(String[] args) throws IOException {
-//        downloadAttachments();
+        downloadAttachments();
         makeReport();
     }
 
@@ -168,9 +168,17 @@ public class ExceptionAnalyzerMain {
         int count = 0;
         SimpleDateFormat sdfDate = new SimpleDateFormat("yyyy-MM-dd HH_mm_ss");
         String prev = null;
+        Set<String> users = new TreeSet<>();
         for (Message messageRef : messages) {
             String messageId = messageRef.getId();
             Message message = service.users().messages().get(userId, messageId).execute();
+            String from = "";
+            for(MessagePartHeader hdr :message.getPayload().getHeaders()) {
+            	if(hdr.getName().equals("From")) {
+            		from = hdr.getValue();
+            		break;
+            	}
+            }
             List<MessagePart> parts = message.getPayload().getParts();
             if (parts != null) {
             	String msgId = sdfDate.format(new Date(message.getInternalDate())) ;
@@ -179,10 +187,18 @@ public class ExceptionAnalyzerMain {
             	}
             	prev = msgId;
             	count++;
+            	users.add(userId);
                 for (MessagePart part : parts) {
                     if (part.getFilename() != null && part.getFilename().length() > 0) {
                         String filename = part.getFilename();
                         File exception = new File(FOLDER_WITH_LOGS, msgId + "." + filename);
+                        File uid = new File(FOLDER_WITH_LOGS, msgId + ".uid.txt");
+                        if(!uid.exists()) {
+                        	FileOutputStream fileOutFile = new FileOutputStream(uid);
+                            fileOutFile.write(from.getBytes());
+                            fileOutFile.close();
+                            uid.setLastModified(message.getInternalDate());
+                        }
                         if(exception.exists()) {
                         	System.out.println("Attachment already downloaded!");
                         } else {
@@ -206,7 +222,7 @@ public class ExceptionAnalyzerMain {
                 }
             }
         }
-        System.out.println("Number of files: " + count);
+        System.out.println("Processed emails " + count + " from " + users.size() + " users");
     }
 
     public static Map<String, List<ExceptionText>> analyzeExceptions(String versionFilter) {
