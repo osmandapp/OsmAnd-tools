@@ -295,9 +295,9 @@ public class ExceptionAnalyzerMain {
 				return -Integer.compare(map.get(o1).size(), map.get(o2).size());
 			}
 		});
-        pw.write("Name,Version,Date,Count,Stacktrace");
+        pw.write("Name,Version,Date,Count,Stacktrace\n");
 
-        for (String key : map.keySet()) {
+        for (String key : st) {
             StringBuilder sb = new StringBuilder();
             List<ExceptionText> exceptions = map.get(key);
             ExceptionText exception = exceptions.get(0);
