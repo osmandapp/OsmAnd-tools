@@ -20,11 +20,13 @@ import java.io.*;
 import java.util.*;
 
 public class ExceptionAnalyzerMain {
-    private static final String LABEL = "OSMAND BUG/MAY";
+    private static final String LABEL = "OsmAnd Bug/May";
 
 	/** Application name. */
     private static final String APPLICATION_NAME =
             "ExceptionAnalyzer";
+    
+    private static final String FOLDER_WITH_LOGS = "attachments_logs";
 
     /** Directory to store user credentials for this application. */
     private static final java.io.File DATA_STORE_DIR = new java.io.File(
@@ -110,7 +112,7 @@ public class ExceptionAnalyzerMain {
         }
         System.out.println("Labels:");
         for (Label label : labels) {
-            if (label.getName().toUpperCase().equals(LABEL)) {
+            if (label.getName().toUpperCase().equals(LABEL.toUpperCase())) {
                 List<String> trash = new ArrayList<>();
                 trash.add(label.getId());
                 List<Message> result = listMessagesWithLabels(service, user, trash);
@@ -163,28 +165,34 @@ public class ExceptionAnalyzerMain {
             Message message = service.users().messages().get(userId, messageId).execute();
             List<MessagePart> parts = message.getPayload().getParts();
             if (parts != null) {
+            	String msgId = messageId;
                 for (MessagePart part : parts) {
                     if (part.getFilename() != null && part.getFilename().length() > 0) {
                         count++;
                         String filename = part.getFilename();
                         String attId = part.getBody().getAttachmentId();
+                        
                         MessagePartBody attachPart = service.users().messages().attachments().
                                 get(userId, messageId, attId).execute();
-                        System.out.println("Downloading attachment: " + count + "_" + filename);
 
-                        Base64 base64Url = new Base64(true);
-                        byte[] fileByteArray = base64Url.decodeBase64(attachPart.getData());
-                        if (!new File(System.getProperty("user.home") + "/attachments_logs/").exists()) {
-                            new File(System.getProperty("user.home") + "/attachments_logs/").mkdir();
+                        File exception = new File(System.getProperty("user.home") + "/" + FOLDER_WITH_LOGS + "/" +
+                                msgId + "_" + filename);
+                        if(exception.exists()) {
+                        	System.out.println("Attachment already downloaded!");
+                        } else {
+                            System.out.println("Downloading attachment: " + count + "_" + filename);
+
+                            Base64 base64Url = new Base64(true);
+                            byte[] fileByteArray = base64Url.decodeBase64(attachPart.getData());
+                            if (!new File(System.getProperty("user.home") + "/"+FOLDER_WITH_LOGS).exists()) {
+                                new File(System.getProperty("user.home") + "/"+FOLDER_WITH_LOGS).mkdirs();
+                            }
+                            exception.createNewFile();
+                            FileOutputStream fileOutFile = new FileOutputStream(exception);
+                            fileOutFile.write(fileByteArray);
+                            fileOutFile.close();
+                            System.out.println("Attachment saved!");
                         }
-                        File exception = new File(System.getProperty("user.home") + "/attachments_logs/" +
-                                count + "_" + filename);
-                        exception.createNewFile();
-                        FileOutputStream fileOutFile =
-                                new FileOutputStream(exception);
-                        fileOutFile.write(fileByteArray);
-                        fileOutFile.close();
-                        System.out.println("Attachment saved!");
                     }
                 }
             }
