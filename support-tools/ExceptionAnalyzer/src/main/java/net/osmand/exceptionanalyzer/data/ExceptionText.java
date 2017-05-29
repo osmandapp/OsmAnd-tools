@@ -21,10 +21,21 @@ public class ExceptionText {
     }
     
     public String getExceptionHash() {
-    	String hsh = name;
+    	if(name.contains("java.lang.OutOfMemoryError")) {
+    		return name;
+    	}
     	String[] lines = body.split("\n");
+    	int begin = 0;
+    	for(int i = 0; i < lines.length - 1; i++) {
+    		if(lines[i].contains("Caused by:")) {
+    			name = lines[i];
+    			begin = i;
+    		}
+    	}
+    	
+    	String hsh = name;
     	int top = 3;
-    	int i = 0;
+    	int i = begin;
     	while(top > 0 && i < lines.length) {
     		if(lines[i].contains("net.osmand")) {
     			hsh += "\n" + lines[i];
@@ -34,7 +45,7 @@ public class ExceptionText {
     	}
     	
     	top= 3;
-    	i = 0;
+    	i = begin;
     	while(top > 0 && i < lines.length) {
     			hsh += "\n" + lines[i];
     		top --;
