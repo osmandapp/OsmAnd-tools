@@ -187,7 +187,7 @@ public class ExceptionAnalyzerMain {
             	}
             	prev = msgId;
             	count++;
-            	users.add(userId);
+            	users.add(from);
                 for (MessagePart part : parts) {
                     if (part.getFilename() != null && part.getFilename().length() > 0) {
                         String filename = part.getFilename();
@@ -202,21 +202,25 @@ public class ExceptionAnalyzerMain {
                         if(exception.exists()) {
                         	System.out.println("Attachment already downloaded!");
                         } else {
-                            System.out.println("Downloading attachment: " + msgId + "." + filename);
-                            String attId = part.getBody().getAttachmentId();
-                            MessagePartBody attachPart = service.users().messages().attachments().
-                                    get(userId, messageId, attId).execute();
-                            Base64 base64Url = new Base64(true);
-                            byte[] fileByteArray = base64Url.decodeBase64(attachPart.getData());
-                            if (!FOLDER_WITH_LOGS.exists()) {
-                                FOLDER_WITH_LOGS.mkdirs();
-                            }
-                            exception.createNewFile();
-                            FileOutputStream fileOutFile = new FileOutputStream(exception);
-                            fileOutFile.write(fileByteArray);
-                            fileOutFile.close();
-                            System.out.println("Attachment saved!");
-                            exception.setLastModified(message.getInternalDate());
+                            try {
+								System.out.println("Downloading attachment: " + msgId + "." + filename);
+								String attId = part.getBody().getAttachmentId();
+								MessagePartBody attachPart = service.users().messages().attachments()
+										.get(userId, messageId, attId).execute();
+								Base64 base64Url = new Base64(true);
+								byte[] fileByteArray = base64Url.decodeBase64(attachPart.getData());
+								if (!FOLDER_WITH_LOGS.exists()) {
+									FOLDER_WITH_LOGS.mkdirs();
+								}
+								exception.createNewFile();
+								FileOutputStream fileOutFile = new FileOutputStream(exception);
+								fileOutFile.write(fileByteArray);
+								fileOutFile.close();
+								System.out.println("Attachment saved!");
+								exception.setLastModified(message.getInternalDate());
+							} catch (Exception e) {
+								e.printStackTrace();
+							}
                         }
                     }
                 }
@@ -233,6 +237,14 @@ public class ExceptionAnalyzerMain {
             		continue;
             	}
                 try{
+                	File usr = new File(FOLDER_WITH_LOGS, currLog.getName().substring(0, currLog.getName().indexOf('.'))+".uid.txt");
+                	String user = "";
+                	if(usr.exists()) {
+                		BufferedReader br = new BufferedReader(new FileReader(usr));
+                		user = br.readLine() ;
+                		br.close();
+                	}
+                	
                     FileInputStream fstream = new FileInputStream(currLog);
                     BufferedReader br = new BufferedReader(new InputStreamReader(fstream));
                     String strLine;
@@ -258,7 +270,8 @@ public class ExceptionAnalyzerMain {
                             while (!strLine.contains("Version  OsmAnd") && (strLine = br.readLine()) != null) {
                                 currBody += strLine + "\n";
                             }
-                            ExceptionText exception = new ExceptionText(currDate, currName, currBody, currApkVersion);
+                            ExceptionText exception = new ExceptionText(currDate, currName, currBody, currApkVersion, user);
+                            
                             if(versionFilter != null && !currApkVersion.contains(versionFilter)) {
                             	continue;
                             }
@@ -313,7 +326,7 @@ public class ExceptionAnalyzerMain {
 			}
 		});
         SimpleDateFormat eDateParser = new SimpleDateFormat("dd.MM.yyyy HH:mm:ss");
-        pw.write("Name,Version,LastDate,Count,Hash,Stacktrace\n");
+        pw.write("Name,Version,LastDate,Count,Users,Hash,Stacktrace\n");
 
         for (String key : st) {
             StringBuilder sb = new StringBuilder();
@@ -326,7 +339,9 @@ public class ExceptionAnalyzerMain {
 			} catch (ParseException e) {
 				e.printStackTrace();
 			}
+            Set<String> users = new TreeSet<>();
             for(ExceptionText et : exceptions) {
+            	users.add(et.getUser());
             	try {
 					if(eDateParser.parse(et.getDate()).getTime() > t) {
 						maxDate = et.getDate();
@@ -346,6 +361,9 @@ public class ExceptionAnalyzerMain {
                 sb.append(',');
                 sb.append(exceptions.size());
                 sb.append(',');
+                sb.append(users.size());
+                sb.append(',');
+                
                 sb.append(exception.getExceptionHash().replaceAll("\n", "").replaceAll("\tat", " "));
                 sb.append(',');
                 String body = exception.getStackTrace().replaceAll("\n", "").replaceAll("\tat", " ");

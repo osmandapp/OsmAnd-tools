@@ -5,19 +5,25 @@ package net.osmand.exceptionanalyzer.data;
  * Created by user on 28.05.17.
  */
 public class ExceptionText {
-    private static final int PACKAGE_LINES = 2;
-	private static final int TOP_LINES_HASH = 2;
+    private static final int PACKAGE_LINES = 3;
+	private static final int TOP_LINES_HASH = 3;
 	private String date;
     private String name;
     private String body;
     private String apkVersion;
+	private String user;
 
-    public ExceptionText(String date, String name, String body, String apkVersion) {
+    public ExceptionText(String date, String name, String body, String apkVersion, String user) {
         this.date = date;
+		this.user = user;
         this.name = simplify(name);
         this.body = body;
         this.apkVersion = apkVersion;
     }
+    
+    public String getUser() {
+		return user;
+	}
     
     public String getExceptionHash() {
     	if(name.contains("java.lang.OutOfMemoryError")) {
