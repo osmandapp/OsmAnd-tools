@@ -286,21 +286,33 @@ public class ExceptionAnalyzerMain {
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         }
-        HashMap<String, ArrayList<ExceptionText>> map = (HashMap) mapToAnalyze;
+        final Map<String, List<ExceptionText>> map = mapToAnalyze;
+        List<String> st = new ArrayList<>(map.keySet());
+        Collections.sort(st,new Comparator<String>() {
+
+			@Override
+			public int compare(String o1, String o2) {
+				return -Integer.compare(map.get(o1).size(), map.get(o2).size());
+			}
+		});
+        pw.write("Name,Version,Date,Count,Stacktrace");
+
         for (String key : map.keySet()) {
             StringBuilder sb = new StringBuilder();
             List<ExceptionText> exceptions = map.get(key);
-            for (ExceptionText exception: exceptions) {
-                int count =  0;
+            ExceptionText exception = exceptions.get(0);
+            //for (ExceptionText exception: exceptions) {
                 String info = exception.getAllInfo().toString()
                         .replace("[", "")
                         .replace("]", "");
-                String body = exception.getStackTrace().replaceAll("\n", "").replaceAll("\tat", " ");
                 sb.append(info);
                 sb.append(',');
+                sb.append(exceptions.size());
+                sb.append(',');
+                String body = exception.getStackTrace().replaceAll("\n", "").replaceAll("\tat", " ");
                 sb.append(body);
                 sb.append('\n');
-            }
+            //}
 
             pw.write(sb.toString());
         }
