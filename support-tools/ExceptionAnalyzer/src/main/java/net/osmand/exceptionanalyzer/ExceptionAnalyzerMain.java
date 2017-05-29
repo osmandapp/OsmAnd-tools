@@ -182,17 +182,14 @@ public class ExceptionAnalyzerMain {
                 for (MessagePart part : parts) {
                     if (part.getFilename() != null && part.getFilename().length() > 0) {
                         String filename = part.getFilename();
-                        String attId = part.getBody().getAttachmentId();
-                        
-                        MessagePartBody attachPart = service.users().messages().attachments().
-                                get(userId, messageId, attId).execute();
-
                         File exception = new File(FOLDER_WITH_LOGS, msgId + "." + filename);
                         if(exception.exists()) {
                         	System.out.println("Attachment already downloaded!");
                         } else {
                             System.out.println("Downloading attachment: " + msgId + "." + filename);
-
+                            String attId = part.getBody().getAttachmentId();
+                            MessagePartBody attachPart = service.users().messages().attachments().
+                                    get(userId, messageId, attId).execute();
                             Base64 base64Url = new Base64(true);
                             byte[] fileByteArray = base64Url.decodeBase64(attachPart.getData());
                             if (!FOLDER_WITH_LOGS.exists()) {
@@ -203,6 +200,7 @@ public class ExceptionAnalyzerMain {
                             fileOutFile.write(fileByteArray);
                             fileOutFile.close();
                             System.out.println("Attachment saved!");
+                            exception.setLastModified(message.getInternalDate());
                         }
                     }
                 }
