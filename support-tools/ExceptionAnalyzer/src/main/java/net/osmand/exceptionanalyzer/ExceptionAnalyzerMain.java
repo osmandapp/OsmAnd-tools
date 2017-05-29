@@ -23,10 +23,10 @@ import net.osmand.exceptionanalyzer.data.ExceptionText;
 
 public class ExceptionAnalyzerMain {
     private static final String LABEL = "OsmAnd Bug/May";
+    private static final String VERSION_FILTER = "2.6.3";
 
 	/** Application name. */
-    private static final String APPLICATION_NAME =
-            "ExceptionAnalyzer";
+    private static final String APPLICATION_NAME = "ExceptionAnalyzer";
     
     private static final File FOLDER_WITH_LOGS =  new File(System.getProperty("user.home") + "/"+"attachments_logs");
 
@@ -49,8 +49,7 @@ public class ExceptionAnalyzerMain {
      * If modifying these scopes, delete your previously saved credentials
      * at ~/.credentials/gmail-java-quickstart
      */
-    private static final List<String> SCOPES =
-            Arrays.asList(GmailScopes.GMAIL_READONLY);
+    private static final List<String> SCOPES = Arrays.asList(GmailScopes.GMAIL_READONLY);
 
     static {
         try {
@@ -95,19 +94,20 @@ public class ExceptionAnalyzerMain {
      */
     public static Gmail getGmailService() throws IOException {
         Credential credential = authorize();
-        return new Gmail.Builder(HTTP_TRANSPORT, JSON_FACTORY, credential)
-                .setApplicationName(APPLICATION_NAME)
+        return new Gmail.Builder(HTTP_TRANSPORT, JSON_FACTORY, credential).setApplicationName(APPLICATION_NAME)
                 .build();
     }
 
     public static void main(String[] args) throws IOException {
-        downloadAttachments();
-
-//        System.out.println("Analyzing the exceptions...");
-//        Map<String, List<ExceptionText>> result = analyzeExceptions();
-//        writeResultToFile(result);
-
+//        downloadAttachments();
+        makeReport();
     }
+
+	private static void makeReport() {
+		System.out.println("Analyzing the exceptions...");
+        Map<String, List<ExceptionText>> result = analyzeExceptions(VERSION_FILTER);
+        writeResultToFile(result);
+	}
 
 	private static void downloadAttachments() throws IOException {
 		// Build a new authorized API client service.
@@ -127,8 +127,7 @@ public class ExceptionAnalyzerMain {
                 List<String> trash = new ArrayList<>();
                 trash.add(label.getId());
                 List<Message> result = listMessagesWithLabels(service, user, trash);
-                System.out.println("Messages in "+LABEL+": " + result.size());
-
+				System.out.println("Messages in " + LABEL + ": " + result.size());
                 getAttachments(result, user, service);
             }
         }
@@ -209,7 +208,7 @@ public class ExceptionAnalyzerMain {
         System.out.println("Number of files: " + count);
     }
 
-    public static Map<String, List<ExceptionText>> analyzeExceptions() {
+    public static Map<String, List<ExceptionText>> analyzeExceptions(String versionFilter) {
         Map<String, List<ExceptionText>> result = new HashMap<>();
         if (FOLDER_WITH_LOGS.exists()) {
             for(File currLog : FOLDER_WITH_LOGS.listFiles()) {
@@ -243,15 +242,15 @@ public class ExceptionAnalyzerMain {
                                 currBody += strLine + "\n";
                             }
                             ExceptionText exception = new ExceptionText(currDate, currName, currBody, currApkVersion);
-                            if (result.containsKey(exception.getName())) {
-                                List<ExceptionText> exceptionsList = result.get(exception.getName());
-                                exceptionsList.add(exception);
+                            if(versionFilter != null && !currApkVersion.contains(versionFilter)) {
+                            	continue;
                             }
-                            else {
-                                List<ExceptionText> exceptions = new ArrayList<>();
-                                exceptions.add(exception);
-                                result.put(exception.getName(), exceptions);
+                            String hsh = exception.getExceptionHash();
+                            if (!result.containsKey(hsh)) {
+                            	List<ExceptionText> exceptions = new ArrayList<>();
+                            	result.put(hsh, exceptions);
                             }
+                            result.get(hsh).add(exception);
                         }
                     }
                     br.close();

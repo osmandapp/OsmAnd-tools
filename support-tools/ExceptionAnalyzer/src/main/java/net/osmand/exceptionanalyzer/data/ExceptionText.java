@@ -19,6 +19,29 @@ public class ExceptionText {
         this.body = body;
         this.apkVersion = apkVersion;
     }
+    
+    public String getExceptionHash() {
+    	String hsh = name;
+    	String[] lines = body.split("\n");
+    	int top = 3;
+    	int i = 0;
+    	while(top > 0 && i < lines.length) {
+    		if(lines[i].contains("net.osmand")) {
+    			hsh += "\n" + lines[i];
+    			top --;
+    		}
+    		i++;
+    	}
+    	
+    	top= 3;
+    	i = 0;
+    	while(top > 0 && i < lines.length) {
+    			hsh += "\n" + lines[i];
+    		top --;
+    		i++;
+    	}
+    	return hsh;
+    }
 
     public String getName() {
         return String.valueOf(name);
