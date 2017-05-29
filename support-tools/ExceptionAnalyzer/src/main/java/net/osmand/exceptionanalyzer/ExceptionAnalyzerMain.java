@@ -165,7 +165,7 @@ public class ExceptionAnalyzerMain {
             Message message = service.users().messages().get(userId, messageId).execute();
             List<MessagePart> parts = message.getPayload().getParts();
             if (parts != null) {
-            	String msgId = messageId;
+            	String msgId = messageId; // use date, time, sendername
                 for (MessagePart part : parts) {
                     if (part.getFilename() != null && part.getFilename().length() > 0) {
                         count++;
@@ -176,11 +176,11 @@ public class ExceptionAnalyzerMain {
                                 get(userId, messageId, attId).execute();
 
                         File exception = new File(System.getProperty("user.home") + "/" + FOLDER_WITH_LOGS + "/" +
-                                msgId + "_" + filename);
+                                msgId + "." + filename);
                         if(exception.exists()) {
                         	System.out.println("Attachment already downloaded!");
                         } else {
-                            System.out.println("Downloading attachment: " + count + "_" + filename);
+                            System.out.println("Downloading attachment: " + msgId + "." + filename);
 
                             Base64 base64Url = new Base64(true);
                             byte[] fileByteArray = base64Url.decodeBase64(attachPart.getData());
@@ -201,7 +201,7 @@ public class ExceptionAnalyzerMain {
     }
 
     public static Map<String, List<ExceptionText>> analyzeExceptions() {
-        File file = new File(System.getProperty("user.home") + "/attachments_logs/");
+        File file = new File(System.getProperty("user.home") + "/" + FOLDER_WITH_LOGS);
         Map<String, List<ExceptionText>> result = new HashMap<>();
 
         if (file.exists()) {
@@ -209,8 +209,8 @@ public class ExceptionAnalyzerMain {
 
             int filesNum = file.listFiles().length;
             for (int i = 1; i < filesNum; i++) {
-                File currLog = new File(System.getProperty("user.home") + "/attachments_logs/" + i + "_exception.log");
-
+				File currLog = new File(System.getProperty("user.home") + "/" + FOLDER_WITH_LOGS + "/" + i
+						+ "_exception.log");
                 try{
                     FileInputStream fstream = new FileInputStream(currLog);
                     BufferedReader br = new BufferedReader(new InputStreamReader(fstream));
