@@ -14,10 +14,12 @@ import com.google.api.client.util.store.FileDataStoreFactory;
 import com.google.api.services.gmail.GmailScopes;
 import com.google.api.services.gmail.model.*;
 import com.google.api.services.gmail.Gmail;
-import com.test.exceptionanalyzer.data.ExceptionText;
 
 import java.io.*;
+import java.text.SimpleDateFormat;
 import java.util.*;
+
+import net.osmand.exceptionanalyzer.data.ExceptionText;
 
 public class ExceptionAnalyzerMain {
     private static final String LABEL = "OsmAnd Bug/May";
@@ -26,7 +28,7 @@ public class ExceptionAnalyzerMain {
     private static final String APPLICATION_NAME =
             "ExceptionAnalyzer";
     
-    private static final String FOLDER_WITH_LOGS = "attachments_logs";
+    private static final File FOLDER_WITH_LOGS =  new File(System.getProperty("user.home") + "/"+"attachments_logs");
 
     /** Directory to store user credentials for this application. */
     private static final java.io.File DATA_STORE_DIR = new java.io.File(
@@ -99,7 +101,16 @@ public class ExceptionAnalyzerMain {
     }
 
     public static void main(String[] args) throws IOException {
-        // Build a new authorized API client service.
+        downloadAttachments();
+
+//        System.out.println("Analyzing the exceptions...");
+//        Map<String, List<ExceptionText>> result = analyzeExceptions();
+//        writeResultToFile(result);
+
+    }
+
+	private static void downloadAttachments() throws IOException {
+		// Build a new authorized API client service.
         Gmail service = getGmailService();
 
         // Print the labels in the user's account.
@@ -121,12 +132,7 @@ public class ExceptionAnalyzerMain {
                 getAttachments(result, user, service);
             }
         }
-
-        System.out.println("Analyzing the exceptions...");
-//        Map<String, List<ExceptionText>> result = analyzeExceptions();
-//        writeResultToFile(result);
-
-    }
+	}
 
     /**
      * List all Messages of the user's mailbox with labelIds applied.
@@ -160,23 +166,28 @@ public class ExceptionAnalyzerMain {
     public static void getAttachments(List<Message> messages, String userId, Gmail service)
             throws IOException {
         int count = 0;
+        SimpleDateFormat sdfDate = new SimpleDateFormat("yyyy-MM-dd HH_mm_ss");
+        String prev = null;
         for (Message messageRef : messages) {
             String messageId = messageRef.getId();
             Message message = service.users().messages().get(userId, messageId).execute();
             List<MessagePart> parts = message.getPayload().getParts();
             if (parts != null) {
-            	String msgId = messageId; // use date, time, sendername
+            	String msgId = sdfDate.format(new Date(message.getInternalDate())) ;
+            	if(msgId.equals(prev)) {
+            		msgId += "_2";
+            	}
+            	prev = msgId;
+            	count++;
                 for (MessagePart part : parts) {
                     if (part.getFilename() != null && part.getFilename().length() > 0) {
-                        count++;
                         String filename = part.getFilename();
                         String attId = part.getBody().getAttachmentId();
                         
                         MessagePartBody attachPart = service.users().messages().attachments().
                                 get(userId, messageId, attId).execute();
 
-                        File exception = new File(System.getProperty("user.home") + "/" + FOLDER_WITH_LOGS + "/" +
-                                msgId + "." + filename);
+                        File exception = new File(FOLDER_WITH_LOGS, msgId + "." + filename);
                         if(exception.exists()) {
                         	System.out.println("Attachment already downloaded!");
                         } else {
@@ -184,8 +195,8 @@ public class ExceptionAnalyzerMain {
 
                             Base64 base64Url = new Base64(true);
                             byte[] fileByteArray = base64Url.decodeBase64(attachPart.getData());
-                            if (!new File(System.getProperty("user.home") + "/"+FOLDER_WITH_LOGS).exists()) {
-                                new File(System.getProperty("user.home") + "/"+FOLDER_WITH_LOGS).mkdirs();
+                            if (!FOLDER_WITH_LOGS.exists()) {
+                                FOLDER_WITH_LOGS.mkdirs();
                             }
                             exception.createNewFile();
                             FileOutputStream fileOutFile = new FileOutputStream(exception);
@@ -201,16 +212,12 @@ public class ExceptionAnalyzerMain {
     }
 
     public static Map<String, List<ExceptionText>> analyzeExceptions() {
-        File file = new File(System.getProperty("user.home") + "/" + FOLDER_WITH_LOGS);
         Map<String, List<ExceptionText>> result = new HashMap<>();
-
-        if (file.exists()) {
-
-
-            int filesNum = file.listFiles().length;
-            for (int i = 1; i < filesNum; i++) {
-				File currLog = new File(System.getProperty("user.home") + "/" + FOLDER_WITH_LOGS + "/" + i
-						+ "_exception.log");
+        if (FOLDER_WITH_LOGS.exists()) {
+            for(File currLog : FOLDER_WITH_LOGS.listFiles()) {
+            	if(!currLog.getName().endsWith(".exception.log")) {
+            		continue;
+            	}
                 try{
                     FileInputStream fstream = new FileInputStream(currLog);
                     BufferedReader br = new BufferedReader(new InputStreamReader(fstream));
@@ -260,7 +267,7 @@ public class ExceptionAnalyzerMain {
     }
 
     public static void writeResultToFile(Map<String, List<ExceptionText>> mapToAnalyze) {
-        File output = new File(System.getProperty("user.home") + "/attachments_logs/results.csv");
+        File output = new File(FOLDER_WITH_LOGS, "results.csv");
         if (output.exists()) {
             output.delete();
             try {

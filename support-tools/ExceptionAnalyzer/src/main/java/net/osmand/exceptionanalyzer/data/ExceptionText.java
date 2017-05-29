@@ -1,4 +1,4 @@
-package com.test.exceptionanalyzer.data;
+package net.osmand.exceptionanalyzer.data;
 
 import java.util.ArrayList;
 import java.util.Collections;
