@@ -1257,7 +1257,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			if (tokens.length > 1) {
 				String bgColor = tokens[1]; // formatColorToPalette(tokens[1], true);
 				propogated.put("osmc_background", bgColor);
-				propogated.put("osmc_stub_name", ".");
+				propogated.put("osmc_stub_name", "");
 				if (tokens.length > 2) {
 					String shpVl = tokens[2]; // formatColorToPalette(tokens[1], true);
 					propogated.put("osmc_foreground", shpVl);
