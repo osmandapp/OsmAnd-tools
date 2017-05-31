@@ -23,12 +23,12 @@ import java.util.*;
 import net.osmand.exceptionanalyzer.data.ExceptionText;
 
 public class ExceptionAnalyzerMain {
-	private static final String LABEL = "OsmAnd Bug/2014";
+	private static final String LABEL = "OsmAnd Bug/2012";
 //	private static final String LABEL = "OsmAnd Bug";
 	private static final boolean DOWNLOAD_MESSAGES = true;
     private static final String VERSION_FILTER = null;
     private static final File FOLDER_WITH_LOGS =  new File(System.getProperty("user.home") + 
-    		"/"+ "2014_logs");
+    		"/"+ "2012_logs");
     
 	/** Application name. */
     private static final String APPLICATION_NAME = "ExceptionAnalyzer";
