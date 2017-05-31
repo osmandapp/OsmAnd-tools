@@ -23,7 +23,8 @@ import java.util.*;
 import net.osmand.exceptionanalyzer.data.ExceptionText;
 
 public class ExceptionAnalyzerMain {
-	private static final String LABEL = "OsmAnd Bug/2014";
+	 private static final String LABEL = "OsmAnd Bug/2014";
+//	private static final String LABEL = "OsmAnd Bug";
     private static final String VERSION_FILTER = null;
     private static final File FOLDER_WITH_LOGS =  new File(System.getProperty("user.home") + 
     		"/"+ "2014_logs");
@@ -169,24 +170,40 @@ public class ExceptionAnalyzerMain {
     public static void getAttachments(List<Message> messages, String userId, Gmail service)
             throws IOException {
         int count = 0;
-        SimpleDateFormat sdfDate = new SimpleDateFormat("yyyy-MM-dd HH_mm_ss");
+        SimpleDateFormat sdfDate = new SimpleDateFormat("yyyy-MM-dd");
         String prev = null;
         Set<String> users = new TreeSet<>();
+        Set<String> messageIdsLoaded = new TreeSet<>();
+        
         FOLDER_WITH_LOGS.mkdirs();
+        for(File fld : FOLDER_WITH_LOGS.listFiles()) {
+        	if(fld.getName().endsWith(".exception.log")) {
+        		String nm = fld.getName();
+        		String mid = nm.substring(nm.indexOf('.') + 1, nm.length() - ".exception.log".length());
+        		messageIdsLoaded.add(mid);
+        	}
+        }
+        
+        long lastSaved = System.currentTimeMillis();
         for (Message messageRef : messages) {
             String messageId = messageRef.getId();
+            if(messageIdsLoaded.contains(messageId)) {
+            	System.out.println("Attachment already downloaded " + messageId + " " + (System.currentTimeMillis() - lastSaved) + " ms !");
+            	lastSaved = System.currentTimeMillis();
+            	continue;
+            }
             Message message = service.users().messages().get(userId, messageId).execute();
             String from = "";
-            for(MessagePartHeader hdr :message.getPayload().getHeaders()) {
+            for(MessagePartHeader hdr: message.getPayload().getHeaders()) {
             	if(hdr.getName().equals("From")) {
             		from = hdr.getValue();
             		break;
             	}
             }
-            long lastSaved = System.currentTimeMillis();
+            
             List<MessagePart> parts = message.getPayload().getParts();
             if (parts != null) {
-            	String msgId = sdfDate.format(new Date(message.getInternalDate())) ;
+            	String msgId = sdfDate.format(new Date(message.getInternalDate())) + "." + messageId ;
             	if(msgId.equals(prev)) {
             		msgId += "_2";
             	}
@@ -205,7 +222,7 @@ public class ExceptionAnalyzerMain {
                             uid.setLastModified(message.getInternalDate());
                         }
                         if(exception.exists()) {
-                        	System.out.println("Attachment already downloaded " + (System.currentTimeMillis() - lastSaved) + " ms !");
+                        	System.out.println("Attachment already downloaded " + msgId + " " + (System.currentTimeMillis() - lastSaved) + " ms !");
                         	lastSaved = System.currentTimeMillis();
                         } else {
                             try {
