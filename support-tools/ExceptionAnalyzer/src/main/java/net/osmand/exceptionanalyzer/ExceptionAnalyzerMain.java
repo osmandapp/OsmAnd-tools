@@ -23,10 +23,10 @@ import java.util.*;
 import net.osmand.exceptionanalyzer.data.ExceptionText;
 
 public class ExceptionAnalyzerMain {
-    private static final String LABEL = "OsmAnd Bug/May";
-    private static final String VERSION_FILTER = "2.6.3";
+	private static final String LABEL = "OsmAnd Bug/2014";
+    private static final String VERSION_FILTER = null;
     private static final File FOLDER_WITH_LOGS =  new File(System.getProperty("user.home") + 
-    		"/"+ "attachments_logs");
+    		"/"+ "2014_logs");
     
 	/** Application name. */
     private static final String APPLICATION_NAME = "ExceptionAnalyzer";
@@ -102,6 +102,7 @@ public class ExceptionAnalyzerMain {
     }
 
     public static void main(String[] args) throws IOException {
+    	FOLDER_WITH_LOGS.mkdirs();
         downloadAttachments();
         makeReport();
     }
@@ -171,6 +172,7 @@ public class ExceptionAnalyzerMain {
         SimpleDateFormat sdfDate = new SimpleDateFormat("yyyy-MM-dd HH_mm_ss");
         String prev = null;
         Set<String> users = new TreeSet<>();
+        FOLDER_WITH_LOGS.mkdirs();
         for (Message messageRef : messages) {
             String messageId = messageRef.getId();
             Message message = service.users().messages().get(userId, messageId).execute();
@@ -181,6 +183,7 @@ public class ExceptionAnalyzerMain {
             		break;
             	}
             }
+            long lastSaved = System.currentTimeMillis();
             List<MessagePart> parts = message.getPayload().getParts();
             if (parts != null) {
             	String msgId = sdfDate.format(new Date(message.getInternalDate())) ;
@@ -202,7 +205,8 @@ public class ExceptionAnalyzerMain {
                             uid.setLastModified(message.getInternalDate());
                         }
                         if(exception.exists()) {
-                        	System.out.println("Attachment already downloaded!");
+                        	System.out.println("Attachment already downloaded " + (System.currentTimeMillis() - lastSaved) + " ms !");
+                        	lastSaved = System.currentTimeMillis();
                         } else {
                             try {
 								System.out.println("Downloading attachment: " + msgId + "." + filename);
@@ -218,7 +222,8 @@ public class ExceptionAnalyzerMain {
 								FileOutputStream fileOutFile = new FileOutputStream(exception);
 								fileOutFile.write(fileByteArray);
 								fileOutFile.close();
-								System.out.println("Attachment saved!");
+								System.out.println("Attachment saved " + (System.currentTimeMillis() - lastSaved) +"ms !");
+								lastSaved = System.currentTimeMillis();
 								exception.setLastModified(message.getInternalDate());
 							} catch (Exception e) {
 								e.printStackTrace();
