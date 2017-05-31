@@ -23,8 +23,9 @@ import java.util.*;
 import net.osmand.exceptionanalyzer.data.ExceptionText;
 
 public class ExceptionAnalyzerMain {
-	 private static final String LABEL = "OsmAnd Bug/2014";
+	private static final String LABEL = "OsmAnd Bug/2014";
 //	private static final String LABEL = "OsmAnd Bug";
+	private static final boolean DOWNLOAD_MESSAGES = true;
     private static final String VERSION_FILTER = null;
     private static final File FOLDER_WITH_LOGS =  new File(System.getProperty("user.home") + 
     		"/"+ "2014_logs");
@@ -104,7 +105,9 @@ public class ExceptionAnalyzerMain {
 
     public static void main(String[] args) throws IOException {
     	FOLDER_WITH_LOGS.mkdirs();
-        downloadAttachments();
+    	if(DOWNLOAD_MESSAGES) {
+    		downloadAttachments();
+    	}
         makeReport();
     }
 
@@ -265,7 +268,7 @@ public class ExceptionAnalyzerMain {
             	}
             	count++;
                 try{
-                	File usr = new File(FOLDER_WITH_LOGS, currLog.getName().substring(0, currLog.getName().indexOf('.'))+".uid.txt");
+                	File usr = new File(FOLDER_WITH_LOGS, currLog.getName().substring(0, currLog.getName().length() - ".exception.log".length())+".uid.txt");
                 	String user = "";
                 	if(usr.exists()) {
                 		BufferedReader br = new BufferedReader(new FileReader(usr));
