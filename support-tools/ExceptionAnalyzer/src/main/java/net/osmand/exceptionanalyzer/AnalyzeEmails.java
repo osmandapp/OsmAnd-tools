@@ -7,6 +7,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Date;
 import java.util.Enumeration;
 import java.util.Iterator;
@@ -25,6 +26,26 @@ public class AnalyzeEmails {
 		int[] freq = new int[20];
 		TreeMap<String, Integer> domains = new TreeMap<>();
 		
+		public PeriodEmails() {
+			
+		}
+		public PeriodEmails(List<PeriodEmails> years) {
+			for (int i = 0; i < years.size(); i++) {
+				PeriodEmails p = years.get(i);
+				Iterator<Entry<String, List<Long>>> it = p.users.entrySet().iterator();
+				while(it.hasNext()) {
+					Entry<String, List<Long>> nn = it.next();
+					if(!users.containsKey(nn.getKey())) {
+						users.put(nn.getKey(), nn.getValue());
+					} else {
+						users.get(nn.getKey()).addAll(nn.getValue());	
+					}
+				}
+			}
+			calculateDomains();
+			calculateFrequencies();
+		}
+
 		private void calculateDomains() {
 			for(String s: users.keySet()) {
 				int i = s.indexOf('<');
@@ -73,36 +94,25 @@ public class AnalyzeEmails {
 		years.add(parseInformation("2016_logs.zip"));
 		years.add(parseInformation("2017_logs.zip"));
 		
-		int[] freqYearFrequencies = new int[10]; 
-		for (int i = 0; i < years.size(); i++) {
-			TreeSet<String> cs = new TreeSet<>();
-			for(int j = i + 1; j < years.size(); j++) {
-				TreeSet<String> ts = new TreeSet<>(years.get(i).users.keySet());
-				ts.retainAll(years.get(j).users.keySet());
-				cs.addAll(ts);
-			}
-			freqYearFrequencies[i] = cs.size();
-		}
-		PeriodEmails pe = new PeriodEmails();
-		for (int i = 0; i < years.size(); i++) {
-			PeriodEmails p = years.get(i);
-			Iterator<Entry<String, List<Long>>> it = p.users.entrySet().iterator();
-			while(it.hasNext()) {
-				Entry<String, List<Long>> nn = it.next();
-				if(!pe.users.containsKey(nn.getKey())) {
-					pe.users.put(nn.getKey(), nn.getValue());
-				} else {
-					pe.users.get(nn.getKey()).addAll(nn.getValue());	
+		PeriodEmails pe = new PeriodEmails(years);
+		System.out.println("FREQENCIES "  + Arrays.toString(pe.freq));
+		pe.printDomainStats(5);
+		// calculate average distance emails
+		long sum = 0;
+		long cnt = 0;
+		Iterator<Entry<String, List<Long>>> ll = pe.users.entrySet().iterator();
+		while (ll.hasNext()) {
+			Entry<String, List<Long>> e = ll.next();
+			Collections.sort(e.getValue());
+			for (int k = 0; k < e.getValue().size() - 1; k++) {
+				if (e.getValue().get(k) < e.getValue().get(k + 1)) {
+					sum += (e.getValue().get(k + 1) - e.getValue().get(k));
+					cnt ++;
+
 				}
 			}
 		}
-		System.out.println(Arrays.toString(freqYearFrequencies));
-		
-		pe.calculateFrequencies();
-		System.out.println("FREQENCIES "  + Arrays.toString(pe.freq));
-		
-		pe.calculateDomains();
-		pe.printDomainStats(5);
+		System.out.println("Average distance between emails is " + sum / (cnt * 1000.0d * 60 * 60 * 24) + " days ");
 		
 	}
 
