@@ -23,11 +23,11 @@ import java.util.*;
 import net.osmand.exceptionanalyzer.data.ExceptionText;
 
 public class ExceptionAnalyzerMain {
-	 private static final String LABEL = "OsmAnd Bug/2014";
+	 private static final String LABEL = "TRASH";
 //	private static final String LABEL = "OsmAnd Bug";
     private static final String VERSION_FILTER = null;
     private static final File FOLDER_WITH_LOGS =  new File(System.getProperty("user.home") + 
-    		"/"+ "2014_logs");
+    		"/"+ "attachments_logs");
     
 	/** Application name. */
     private static final String APPLICATION_NAME = "ExceptionAnalyzer";
@@ -108,7 +108,7 @@ public class ExceptionAnalyzerMain {
         makeReport();
     }
 
-	private static void makeReport() {
+	public static void makeReport() {
 		System.out.println("Analyzing the exceptions...");
         Map<String, List<ExceptionText>> result = analyzeExceptions(VERSION_FILTER);
         writeResultToFile(result);
@@ -284,32 +284,45 @@ public class ExceptionAnalyzerMain {
                         String currApkVersion = "";
                         String currBody = "";
                         String currName = "";
+                        String currText = "";
+
                         if (strLine.matches("[0-9]+.[0-9]+.[0-9]+ [0-9]+:[0-9]+:[0-9]+")) {
+
                             currDate = strLine;
-                            strLine = br.readLine();
-                            int indexOfColumn = strLine.indexOf(":");
-                            currApkVersion = strLine.substring(indexOfColumn + 1, strLine.length());
-                            br.readLine();
-                            strLine = br.readLine();
-                            if (strLine.contains(":")) {
-                                int columnIndex = strLine.indexOf(":");
-                                strLine = strLine.substring(0, columnIndex);
-                            }
-                            currName = strLine;
                             while (!strLine.contains("Version  OsmAnd") && (strLine = br.readLine()) != null) {
-                                currBody += strLine + "\n";
+                                currText += strLine + "\n";
                             }
+
+
+                        String[] lines = currText.split("\n");
+
+                        for (String line : lines) {
+
+                            if (line.contains("Apk Version")) {
+                                int indexOfColumn = line.indexOf(":");
+                                currApkVersion = line.substring(indexOfColumn + 1, line.length());
+                            }
+                            else if (line.contains("Exception:") || line.contains("Error:")) {
+                                int columnIndex = line.indexOf(":");
+                                currName = line.substring(0, columnIndex);
+                            }
+                            else {
+                                currBody += line;
+                            }
+                        }
+                        if (!currName.equals("") && !currBody.equals("") && !currApkVersion.equals("")) {
                             ExceptionText exception = new ExceptionText(currDate, currName, currBody, currApkVersion, user);
                             if(versionFilter != null && !currApkVersion.contains(versionFilter)) {
-                            	continue;
+                                continue;
                             }
                             exceptionCount ++;
                             String hsh = exception.getExceptionHash();
                             if (!result.containsKey(hsh)) {
-                            	List<ExceptionText> exceptions = new ArrayList<>();
-                            	result.put(hsh, exceptions);
+                                List<ExceptionText> exceptions = new ArrayList<>();
+                                result.put(hsh, exceptions);
                             }
                             result.get(hsh).add(exception);
+                        }
                         }
                     }
                     br.close();
@@ -394,10 +407,11 @@ public class ExceptionAnalyzerMain {
                 sb.append(',');
                 sb.append(users.size());
                 sb.append(',');
-                
-                sb.append(exception.getExceptionHash().replaceAll("\n", "").replaceAll("\tat", " "));
+
+                sb.append(exception.getExceptionHash().replaceAll("\n", "").replaceAll("\tat", " ").replaceAll(",", " "));
                 sb.append(',');
-                String body = exception.getStackTrace().replaceAll("\n", "").replaceAll("\tat", " ");
+                String body = exception.getStackTrace().replaceAll("\n", "").replaceAll("\tat", " ").replaceAll(",", " ");
+
                 sb.append(body);
                 sb.append('\n');
             //}
