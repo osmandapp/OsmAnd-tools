@@ -306,7 +306,7 @@ public class ExceptionAnalyzerMain {
                                 int indexOfColumn = line.indexOf(":");
                                 currApkVersion = line.substring(indexOfColumn + 1, line.length());
                             }
-                            else if (line.contains("Exception:") || line.contains("Error:")) {
+                            else if ((line.contains("Exception:") || line.contains("Error:")) && currName.equals("")) {
                                 int columnIndex = line.indexOf(":");
                                 currName = line.substring(0, columnIndex);
                             }
