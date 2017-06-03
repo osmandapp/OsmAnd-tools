@@ -311,7 +311,7 @@ public class ExceptionAnalyzerMain {
                                 currName = line.substring(0, columnIndex);
                             }
                             else {
-                                currBody += line;
+                                currBody += line + "\n";
                             }
                         }
                         if (!currName.equals("") && !currBody.equals("") && !currApkVersion.equals("")) {
@@ -412,9 +412,9 @@ public class ExceptionAnalyzerMain {
                 sb.append(users.size());
                 sb.append(',');
 
-                sb.append(exception.getExceptionHash().replaceAll("\n", "").replaceAll("\tat", " ").replaceAll(",", " "));
+                sb.append(exception.getExceptionHash().replaceAll("\n", "").replaceAll("\t", " ").replaceAll(",", " "));
                 sb.append(',');
-                String body = exception.getStackTrace().replaceAll("\n", "").replaceAll("\tat", " ").replaceAll(",", " ");
+                String body = exception.getStackTrace().replaceAll("\n", "").replaceAll("\t", " ").replaceAll(",", " ");
 
                 sb.append(body);
                 sb.append('\n');
