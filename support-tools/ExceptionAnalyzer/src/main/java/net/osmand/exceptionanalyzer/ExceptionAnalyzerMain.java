@@ -283,7 +283,7 @@ public class ExceptionAnalyzerMain {
                     String strLine;
 
                     /* read log line by line */
-                    while ((strLine = br.readLine()) != null)   {
+                    while ((strLine = br.readLine()) != null) {
                         String currDate = "";
                         String currApkVersion = "";
                         String currBody = "";
@@ -298,22 +298,22 @@ public class ExceptionAnalyzerMain {
                             }
 
 
-                        String[] lines = currText.split("\n");
+                            String[] lines = currText.split("\n");
 
-                        for (String line : lines) {
+                            for (String line : lines) {
 
-                            if (line.contains("Apk Version")) {
-                                int indexOfColumn = line.indexOf(":");
-                                currApkVersion = line.substring(indexOfColumn + 1, line.length());
+                                if (line.contains("Apk Version")) {
+                                    int indexOfColumn = line.indexOf(":");
+                                    currApkVersion = line.substring(indexOfColumn + 1, line.length());
+                                }
+                                else if ((line.contains("Exception:") || line.contains("Error:")) && currName.equals("")) {
+                                    int columnIndex = line.indexOf(":");
+                                    currName = line.substring(0, columnIndex);
+                                }
+                                else {
+                                    currBody += line + "\n";
+                                }
                             }
-                            else if ((line.contains("Exception:") || line.contains("Error:")) && currName.equals("")) {
-                                int columnIndex = line.indexOf(":");
-                                currName = line.substring(0, columnIndex);
-                            }
-                            else {
-                                currBody += line + "\n";
-                            }
-                        }
                         if (!currName.equals("") && !currBody.equals("") && !currApkVersion.equals("")) {
                             ExceptionText exception = new ExceptionText(currDate, currName, currBody, currApkVersion, user);
                             if(versionFilter != null && !currApkVersion.contains(versionFilter)) {
