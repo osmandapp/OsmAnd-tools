@@ -11,7 +11,13 @@ def filterTags(attrs):
 	 tags.update({'contour':'depth'})
 
     if int(depth) != 0:
-	    if int(depth) % 100 == 0:
+	    if int(depth) % 1000 == 0:
+		tags.update({'contourtype':'1000m'})
+		tags.update({'name':depth})
+	    elif int(depth) % 200 == 0:
+		tags.update({'contourtype':'200m'})
+		tags.update({'name':depth})
+	    elif int(depth) % 100 == 0:
 		tags.update({'contourtype':'100m'})
 		tags.update({'name':depth})
 	    elif int(depth) % 50 == 0:
