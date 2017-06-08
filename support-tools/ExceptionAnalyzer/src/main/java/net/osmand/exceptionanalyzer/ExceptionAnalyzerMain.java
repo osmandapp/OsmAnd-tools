@@ -26,10 +26,9 @@ public class ExceptionAnalyzerMain {
 	 private static final String LABEL = "TRASH";
 //	private static final String LABEL = "OsmAnd Bug";
 	private static final boolean DOWNLOAD_MESSAGES = true;
-    private static final String VERSION_FILTER = null;
+    private static final String VERSION_FILTER = "2.6.5";
     private static final File FOLDER_WITH_LOGS =  new File(System.getProperty("user.home") + 
     		"/"+ "attachments_logs");
-
     
 	/** Application name. */
     private static final String APPLICATION_NAME = "ExceptionAnalyzer";

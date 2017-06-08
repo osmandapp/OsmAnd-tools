@@ -72,6 +72,7 @@ public class IndexBatchCreator {
 	private static class RegionSpecificData {
 		public String cityAdminLevel;
 		public String downloadName;
+		public boolean indexSRTM = true;
 		public boolean indexPOI = true;
 		public boolean indexTransport = true;
 		public boolean indexAddress = true;
@@ -256,6 +257,8 @@ public class IndexBatchCreator {
 					String name = ncountry.getAttribute("name");
 					RegionSpecificData data = new RegionSpecificData();
 					data.cityAdminLevel = ncountry.getAttribute("cityAdminLevel");
+					data.indexSRTM = ncountry.getAttribute("indexSRTM") == null || 
+							ncountry.getAttribute("indexSRTM").equalsIgnoreCase("true");
 					String index = ncountry.getAttribute("index");
 					if (index != null && index.length() > 0) {
 						data.indexAddress = index.contains("address");
@@ -500,7 +503,8 @@ public class IndexBatchCreator {
 				osmDb = DBDialect.SQLITE;
 			}
 			IndexCreator indexCreator = new IndexCreator(workDir);
-			if(srtmDir != null) {
+			boolean worldMaps = rName.toLowerCase().contains("world") ;
+			if(srtmDir != null && rdata.indexSRTM && !worldMaps) {
 				indexCreator.setSRTMData(srtmDir);
 			}
 			indexCreator.setDialects(osmDb, osmDb);

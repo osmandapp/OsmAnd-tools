@@ -100,15 +100,18 @@ public class AnalyzeEmails {
 		// calculate average distance emails
 		long sum = 0;
 		long cnt = 0;
+		int THRESHOLD_COUNT_EMAILS = 100;
 		Iterator<Entry<String, List<Long>>> ll = pe.users.entrySet().iterator();
 		while (ll.hasNext()) {
 			Entry<String, List<Long>> e = ll.next();
 			Collections.sort(e.getValue());
-			for (int k = 0; k < e.getValue().size() - 1; k++) {
-				if (e.getValue().get(k) < e.getValue().get(k + 1)) {
-					sum += (e.getValue().get(k + 1) - e.getValue().get(k));
-					cnt ++;
+			if (e.getValue().size() < THRESHOLD_COUNT_EMAILS) {
+				for (int k = 0; k < e.getValue().size() - 1; k++) {
+					if (e.getValue().get(k) < e.getValue().get(k + 1)) {
+						sum += (e.getValue().get(k + 1) - e.getValue().get(k));
+						cnt++;
 
+					}
 				}
 			}
 		}
