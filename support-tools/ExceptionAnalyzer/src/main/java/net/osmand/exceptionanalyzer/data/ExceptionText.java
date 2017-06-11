@@ -13,7 +13,7 @@ public class ExceptionText {
     private String apkVersion;
 	private String user;
 
-    public ExceptionText(String date, String name, String body, String apkVersion, String user) {
+	public ExceptionText(String date, String name, String body, String apkVersion, String user) {
         this.date = date;
 		this.user = user;
         this.name = simplify(name);
@@ -26,18 +26,18 @@ public class ExceptionText {
 	}
     
     public String getExceptionHash() {
-    	if(name.contains("java.lang.OutOfMemoryError")) {
-    		return name;
-    	}
+//    	if(name.contains("java.lang.OutOfMemoryError")) {
+//    		return name;
+//    	}
     	String[] lines = body.split("\n");
     	int begin = 0;
     	for(int i = 0; i < lines.length - 1; i++) {
     		if(lines[i].contains("Caused by:")) {
-    			name = simplify(lines[i]);
+				String hash = simplify(lines[i]);
     			begin = i;
-    			if(name.contains("java.lang.OutOfMemoryError")) {
-    	    		return name;
-    	    	}
+//    			if(hash.contains("java.lang.OutOfMemoryError")) {
+//    	    		return hash;
+//    	    	}
     		}
     	}
     	
