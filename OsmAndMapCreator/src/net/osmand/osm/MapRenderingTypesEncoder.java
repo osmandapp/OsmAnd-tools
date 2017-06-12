@@ -883,6 +883,9 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		if(rType.id > 1<<15) {
 			throw new UnsupportedOperationException();
 		}
+		if(rType.order << 15 < 0) {
+			throw new UnsupportedOperationException();
+		}
 		return (rType.order << 15) | rType.id;
 	}
 
