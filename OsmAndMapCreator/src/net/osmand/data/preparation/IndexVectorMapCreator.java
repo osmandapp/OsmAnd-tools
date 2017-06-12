@@ -616,7 +616,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			id |= 1;
 
 			// simplify route id>>1
-			boolean mostDetailedLevel = level == 0;
+			boolean mostDetailedLevel = level == 0 || mapZooms.isDetailedZoomSimplified();
 			if (!mostDetailedLevel) {
 				int zoomToSimplify = mapZooms.getLevel(level).getMaxZoom() - 1;
 				boolean cycle = ((Way) e).getFirstNodeId() == ((Way) e).getLastNodeId();

@@ -32,6 +32,7 @@ public class MapZooms {
 	}
 
 	private List<MapZoomPair> levels = new ArrayList<MapZoomPair>();
+	private boolean simplify;
 
 
 	public List<MapZoomPair> getLevels() {
@@ -53,11 +54,15 @@ public class MapZooms {
 	 */
 	public static MapZooms parseZooms(String zooms) throws IllegalArgumentException {
 		String[] split = zooms.split(";");
+		
 
 		int zeroLevel = 15;
 		List<MapZoomPair> list = new ArrayList<MapZoomPair>();
 		for(String s : split){
 			s = s.trim();
+			if(s.length() == 0) {
+				continue;
+			}
 			int i = s.indexOf('-');
 			if (i == -1) {
 				zeroLevel = Integer.parseInt(s);
@@ -72,8 +77,17 @@ public class MapZooms {
 			throw new IllegalArgumentException("Map zooms should have at least 1 level and less than 8 levels");
 		}
 		MapZooms mapZooms = new MapZooms();
+		mapZooms.setSimplify(zooms.endsWith(";"));
 		mapZooms.setLevels(list);
 		return mapZooms;
+	}
+
+	private void setSimplify(boolean simplify) {
+		this.simplify = simplify;
+	}
+	
+	public boolean isDetailedZoomSimplified() {
+		return simplify;
 	}
 
 	public int size(){
