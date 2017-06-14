@@ -76,6 +76,7 @@ def process_roads(cond, filename, fields):
 
 if __name__ == "__main__":
 	process_roads("highway='motorway'", "line_motorway.osm", ['highway', 'junction', 'route'])
+        process_roads("highway='motorway_link'", "line_motorway.osm", ['highway', 'junction', 'route'])
 	process_roads("highway='trunk'", "line_trunk.osm", ['highway', 'junction', 'route'])
 	process_roads("highway='primary'", "line_primary.osm", ['highway', 'junction', 'route'])
 	process_roads("highway='secondary'", "line_secondary.osm", ['highway', 'junction', 'route'])
