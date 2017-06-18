@@ -1,20 +1,11 @@
 package net.osmand.exceptionanalyzer;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Date;
-import java.util.Enumeration;
-import java.util.Iterator;
-import java.util.List;
+import org.apache.http.impl.cookie.DateUtils;
+
+import javax.annotation.Nonnull;
+import java.io.*;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.TreeMap;
-import java.util.TreeSet;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipException;
 import java.util.zip.ZipFile;
@@ -22,7 +13,7 @@ import java.util.zip.ZipFile;
 public class AnalyzeEmails {
 
 	private static class PeriodEmails {
-		TreeMap<String, List<Long>> users = new TreeMap<String, List<Long>>();
+		TreeMap<String, List<Long>> users = new TreeMap<>();
 		int[] freq = new int[20];
 		TreeMap<String, Integer> domains = new TreeMap<>();
 		
@@ -62,6 +53,16 @@ public class AnalyzeEmails {
 				}
 			}
 		}
+
+		private String getDomain(String user) {
+            int i = user.indexOf('<');
+            int j = user.indexOf('>');
+            if(j > i && i > -1) {
+                String ml = user.substring(i + 1, j);
+                return ml.substring(ml.indexOf('@') + 1, ml.length());
+            }
+            return "";
+        }
 		
 		private void printDomainStats(int threshold) {
 			Iterator<Entry<String, Integer>> it = domains.entrySet().iterator();
@@ -73,6 +74,17 @@ public class AnalyzeEmails {
 				}
 			}
 		}
+
+		private boolean isFrequent(String domain) {
+            if (domain != null && domains.get(domain) != null) {
+                int frequency = domains.get(domain);
+                if (domains.get(domain) != null && frequency > 10) {
+                    return true;
+                }
+
+            }
+            return false;
+        }
 		
 		private void calculateFrequencies() {
 			for(List<Long> l : users.values()) {
@@ -83,7 +95,51 @@ public class AnalyzeEmails {
 				}
 			}
 		}
-	}
+
+		private void calculateOldUsers() {
+            File result = new File(System.getProperty("user.home") + "/" + "attachments_logs", "emails.csv");
+            StringBuilder sb = new StringBuilder();
+            if (result.exists()) {
+                result.delete();
+                try {
+                    result.createNewFile();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+            else {
+                try {
+                    result.createNewFile();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+            PrintWriter pw = null;
+            try {
+                pw = new PrintWriter(result);
+                pw.write("Name,Email,Last Date\n");
+            } catch (FileNotFoundException e) {
+                e.printStackTrace();
+            }
+            Calendar cal = Calendar.getInstance();
+            cal.add(Calendar.YEAR, -1);
+            Date prevYear = cal.getTime();
+			for (String user : users.keySet()) {
+			    String domain = getDomain(user);
+			    Date lastDate = new Date(users.get(user).get(users.get(user).size() - 1));
+			    if (isFrequent(domain) && lastDate.before(prevYear)) {
+			        String userParsed = parseUser(user);
+                    pw.write( userParsed + lastDate + "\n");
+                }
+            }
+            pw.close();
+            System.out.println("Created emails.csv with emails before: " + prevYear);
+		}
+
+        private String parseUser(String user) {
+		    return user.replace("<", ",").replace(">", ",");
+        }
+    }
 	
 	public static void main(String[] args) throws ZipException, IOException {
 		List<PeriodEmails> years = new ArrayList<>();
@@ -95,8 +151,9 @@ public class AnalyzeEmails {
 		years.add(parseInformation("2017_logs.zip"));
 		
 		PeriodEmails pe = new PeriodEmails(years);
-		System.out.println("FREQENCIES "  + Arrays.toString(pe.freq));
+		System.out.println("FREQUENCIES "  + Arrays.toString(pe.freq));
 		pe.printDomainStats(5);
+		pe.calculateOldUsers();
 		// calculate average distance emails
 		long sum = 0;
 		long cnt = 0;
@@ -120,7 +177,7 @@ public class AnalyzeEmails {
 		PeriodEmails users = new PeriodEmails();
 		collectUsers(users.users, file);
 		users.calculateFrequencies();
-		System.out.println("FREQENCIES "  + file + " " + Arrays.toString(users.freq));
+		System.out.println("FREQUENCIES "  + file + " " + Arrays.toString(users.freq));
 		return users;
 	}
 
