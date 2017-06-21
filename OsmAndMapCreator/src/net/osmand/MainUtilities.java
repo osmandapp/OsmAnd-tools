@@ -7,6 +7,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import net.osmand.data.diff.AugmentedDiffsInspector;
+import net.osmand.data.diff.GenerateDailyObf;
+import net.osmand.data.diff.OSMLiveObfCreator;
 import net.osmand.data.index.GenerateRegionTags;
 import net.osmand.data.index.IndexUploader;
 import net.osmand.data.preparation.IndexCreator;
@@ -93,7 +96,24 @@ public class MainUtilities {
 				ic.setIndexRouting(true);
 				ic.setLastModifiedDate(new File(subArgsArray[0]).lastModified());
 				generateObf(subArgsArray, ic);
-			} else {
+			} 
+			else if (utl.contentEquals("generate-from-overpass")) {
+				if (subArgsArray.length < 3) {
+					System.out.println("Usage: PATH_TO_OVERPASS PATH_TO_WORKING_DIR PATH_TO_REGIONS");
+					return;
+				}
+				String[] argsToGenerateOsm = new String[] {
+						subArgsArray[0],
+						subArgsArray[1],
+						subArgsArray[2]
+				};
+				AugmentedDiffsInspector.main(argsToGenerateOsm);
+				String[] argsToGenerateObf = new String[] {
+						subArgsArray[1]
+				};
+				GenerateDailyObf.main(argsToGenerateObf);
+			}
+			else {
 				printSynopsys();
 			}
 		}
