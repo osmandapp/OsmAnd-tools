@@ -9,7 +9,6 @@ import java.util.List;
 
 import net.osmand.data.diff.AugmentedDiffsInspector;
 import net.osmand.data.diff.GenerateDailyObf;
-import net.osmand.data.diff.OSMLiveObfCreator;
 import net.osmand.data.index.GenerateRegionTags;
 import net.osmand.data.index.IndexUploader;
 import net.osmand.data.preparation.IndexCreator;
