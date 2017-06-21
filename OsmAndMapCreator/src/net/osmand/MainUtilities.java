@@ -96,8 +96,7 @@ public class MainUtilities {
 				ic.setIndexRouting(true);
 				ic.setLastModifiedDate(new File(subArgsArray[0]).lastModified());
 				generateObf(subArgsArray, ic);
-			} 
-			else if (utl.contentEquals("generate-from-overpass")) {
+			} else if (utl.contentEquals("generate-from-overpass")) {
 				if (subArgsArray.length < 3) {
 					System.out.println("Usage: PATH_TO_OVERPASS PATH_TO_WORKING_DIR PATH_TO_REGIONS");
 					return;
@@ -112,8 +111,7 @@ public class MainUtilities {
 						subArgsArray[1]
 				};
 				GenerateDailyObf.main(argsToGenerateObf);
-			}
-			else {
+			} else {
 				printSynopsys();
 			}
 		}
