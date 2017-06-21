@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import net.osmand.data.diff.OSMLiveObfCreator;
 import net.osmand.data.index.GenerateRegionTags;
 import net.osmand.data.index.IndexUploader;
 import net.osmand.data.preparation.IndexCreator;
@@ -93,6 +94,8 @@ public class MainUtilities {
 				ic.setIndexRouting(true);
 				ic.setLastModifiedDate(new File(subArgsArray[0]).lastModified());
 				generateObf(subArgsArray, ic);
+			} else if (utl.contentEquals("generate-from-overpass")) {
+				OSMLiveObfCreator.main(subArgsArray);
 			} else {
 				printSynopsys();
 			}
