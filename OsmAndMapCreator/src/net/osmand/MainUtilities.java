@@ -144,5 +144,6 @@ public class MainUtilities {
 		System.out.println("\t\t generate-ocean-tile-osm <optional path to osm file to write> <optional path to oceantiles_12.dat file>: generates ocean tiles osm file to check in JOSM ");
 		System.out.println("\t\t merge-index " + BinaryMerger.helpMessage);
 		System.out.println("\t\t compare " + BinaryComparator.helpMessage);
+		System.out.println("\t\t generate-from-overpass <path to overpass.xml (must have format 2017_06_18-10_30)> <path to working directory> <path to regions.ocbf>: The utility converts overpass.xml to obf");
 	}
 }
