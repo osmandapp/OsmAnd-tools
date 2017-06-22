@@ -504,7 +504,7 @@ public class IndexBatchCreator {
 			}
 			IndexCreator indexCreator = new IndexCreator(workDir);
 			boolean worldMaps = rName.toLowerCase().contains("world") ;
-			if(srtmDir != null && rdata.indexSRTM && !worldMaps) {
+			if(srtmDir != null && (rdata == null || rdata.indexSRTM) && !worldMaps) {
 				indexCreator.setSRTMData(srtmDir);
 			}
 			indexCreator.setDialects(osmDb, osmDb);
