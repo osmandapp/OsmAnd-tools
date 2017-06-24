@@ -119,10 +119,12 @@ public class OsmDbCreator implements IOsmStorageFilter {
 					if (hd != null) {
 						hash += hd;
 					}
+					hash += e.getVersion();
 				}
 				if (ld != null) {
 					lids.set(i, ld);
 				}
+				hash += e.getVersion();
 			}
 			if (simpleConvertId) {
 				return getSimpleConvertId(id, EntityType.WAY, true);
@@ -172,7 +174,8 @@ public class OsmDbCreator implements IOsmStorageFilter {
 	private int getNodeHash(Entity e) {
 		int y = MapUtils.get31TileNumberY(((Node) e).getLatitude());
 		int x = MapUtils.get31TileNumberX(((Node) e).getLongitude());
-		int hash = (x + y) >> 10;
+		int v = e.getVersion();
+		int hash = (x + y + v) >> 10;
 		return hash;
 	}
 	
