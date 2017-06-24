@@ -9,6 +9,7 @@ import java.io.RandomAccessFile;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
@@ -387,9 +388,19 @@ public class NativeSwingRendering extends NativeLibrary {
 	}
 	
 	public void enableMapFile(MapDiff md, String df) {
-		boolean enable = !md.baseName.equals(df);
+		closeBinaryMapFile(md.baseFile.getAbsolutePath());
 		Set<String> ks = md.diffs.keySet();
+		LinkedList<String> reverse = new LinkedList<>();
 		for(String s : ks) {
+			String fp = md.diffs.get(s).getAbsolutePath();
+			if(!md.disabled.contains(fp)) {
+				closeBinaryMapFile(fp);
+				md.disabled.add(fp);
+			}
+			reverse.addFirst(s);
+		}
+		boolean enable = false;
+		for(String s : reverse) {
 			String fp = md.diffs.get(s).getAbsolutePath();
 			if(!enable) {
 				if(!md.disabled.contains(fp)) {
@@ -402,10 +413,10 @@ public class NativeSwingRendering extends NativeLibrary {
 					md.disabled.remove(fp);
 				}
 			}
-			enable = enable && !s.equals(df); 
+			enable = enable || s.equals(df); 
 		}
 		md.selected = df;
-		
+		initBinaryMapFile(md.baseFile.getAbsolutePath());
 	}
 	
 	public MapDiff getMapDiffs(double lat, double lon) {
