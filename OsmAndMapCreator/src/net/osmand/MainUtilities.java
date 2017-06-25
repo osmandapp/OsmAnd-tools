@@ -34,14 +34,12 @@ public class MainUtilities {
 		if (args.length == 0) {
 			printSynopsys();
 		} else if (args[0].equals("--test-osm-live-tag-removal")) {
-			String test = "2017_06_18-10_30_tagRemovalBug_01.xml";
-			AugmentedDiffsInspector.main(new String[]{
-					System.getProperty("repo.dir")+"/resources/test-resources/osm_live/" +test,
-					System.getProperty("repo.dir")+"/resources/test-resources/osm_live/"
-			});
-			GenerateDailyObf.main(new String[]{
-					System.getProperty("repo.dir")+"/resources/test-resources/osm_live/"		
-			});
+			generateAllOsmLiveTests(new File(System.getProperty("repo.dir")+"/resources/test-resources/osm_live"));
+//			String test = "2017_06_18-10_30_tagRemovalBug_01.xml";
+//			String osmLivePath = System.getProperty("repo.dir")+"/resources/test-resources/osm_live/";
+//			Algorithms.removeAllFiles(new File(osmLivePath, AugmentedDiffsInspector.DEFAULT_REGION));
+//			AugmentedDiffsInspector.main(new String[] { osmLivePath + test, osmLivePath });
+//			GenerateDailyObf.main(new String[] { osmLivePath });
 		} else {
 			String utl = args[0];
 			List<String> subArgs = new ArrayList<String>(Arrays.asList(args).subList(1, args.length));
@@ -111,13 +109,7 @@ public class MainUtilities {
 					return;
 				}
 				File testResources = new File(subArgsArray[0]+"/resources/test-resources/osm_live/");
-				// clean all files
-				Algorithms.removeAllFiles(new File(testResources, AugmentedDiffsInspector.DEFAULT_REGION));
-				for(File f : testResources.listFiles()) {
-					if(f.getName().endsWith(".xml"));
-					AugmentedDiffsInspector.main(new String[] { f.getAbsolutePath(), testResources.getAbsolutePath() });
-				}
-				GenerateDailyObf.main(new String[] { testResources.getAbsolutePath() });
+				generateAllOsmLiveTests(testResources);
 			} else if (utl.contentEquals("generate-from-overpass")) {
 				if (subArgsArray.length < 3) {
 					System.out.println("Usage: PATH_TO_OVERPASS PATH_TO_WORKING_DIR PATH_TO_REGIONS");
@@ -137,6 +129,18 @@ public class MainUtilities {
 				printSynopsys();
 			}
 		}
+	}
+
+	private static void generateAllOsmLiveTests(File testResources) {
+		// clean all files
+		Algorithms.removeAllFiles(new File(testResources, AugmentedDiffsInspector.DEFAULT_REGION));
+		for(File f : testResources.listFiles()) {
+			if(!f.getName().endsWith(".xml")) {
+				continue;
+			}
+			AugmentedDiffsInspector.main(new String[] { f.getAbsolutePath(), testResources.getAbsolutePath() });
+		}
+		GenerateDailyObf.main(new String[] { testResources.getAbsolutePath() });
 	}
 
 	private static void generateObf(String[] subArgsArray, IndexCreator ic) throws IOException,

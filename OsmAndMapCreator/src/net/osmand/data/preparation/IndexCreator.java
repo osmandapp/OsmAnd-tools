@@ -915,11 +915,11 @@ public class IndexCreator {
 
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 
-		String file = rootFolder + "/temp/map.osm";
+//		String file = rootFolder + "/temp/map.osm";
 //		String file = rootFolder + "/temp/ukraine_kiev-city_europe.pbf";
 //		String file = rootFolder + "/temp/ukraine_crimea_europe.pbf";
 //		String file = rootFolder + "/repos/resources/test-resources/synthetic_test_rendering.osm";
-//		String file = rootFolder + "/repos/resources/test-resources/turn_lanes_test.osm";
+		String file = rootFolder + "/repos/resources/test-resources/osm_live/osmlive_data.osm";
 
 		int st = file.lastIndexOf('/');
 		int e = file.indexOf('.', st);
