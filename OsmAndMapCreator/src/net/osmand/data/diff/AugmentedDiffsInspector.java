@@ -55,20 +55,24 @@ public class AugmentedDiffsInspector {
 
 	public static String OSMAND_DELETE_TAG = "osmand_change";
 	public static String OSMAND_DELETE_VALUE = "delete";
+	public static String DEFAULT_REGION = "osmlive_data";
 	private static long ID_BASE = -1000;
 	public static void main(String[] args) {
 		try {
 			File inputFile = new File(args[0]);
 			File targetDir = new File(args[1]);
-			File ocbfFile = new File(args[2]);
+			File ocbfFile = args.length <= 2 ? null : new File(args[2]);
 			
 			AugmentedDiffsInspector inspector = new AugmentedDiffsInspector();
 			Context ctx = inspector.parseFile(inputFile);
-			OsmandRegions or = new OsmandRegions();
-			or.prepareFile(ocbfFile.getAbsolutePath());
-			or.cacheAllCountries();
-			inspector.prepareRegions(ctx, ctx.newIds, ctx.regionsNew, or);
-			inspector.prepareRegions(ctx, ctx.oldIds, ctx.regionsOld, or);
+			OsmandRegions osmandRegions = null;
+			if(ocbfFile != null) {
+				osmandRegions = new OsmandRegions();
+				osmandRegions.prepareFile(ocbfFile.getAbsolutePath());
+				osmandRegions.cacheAllCountries();
+			}
+			inspector.prepareRegions(ctx, ctx.newIds, ctx.regionsNew, osmandRegions);
+			inspector.prepareRegions(ctx, ctx.oldIds, ctx.regionsOld, osmandRegions);
 			String name = inputFile.getName();
 			String date = name.substring(0, name.indexOf('-'));
 			String time = name.substring(name.indexOf('-') + 1, name.indexOf('.'));
@@ -81,25 +85,25 @@ public class AugmentedDiffsInspector {
 	}
 
 	private void prepareRegions(Context ctx, Map<EntityId, Entity> ids, Map<String, Set<EntityId>> regionsMap,
-			OsmandRegions or) throws IOException {
+			OsmandRegions osmandRegions) throws IOException {
 		Map<EntityId, Set<String>> mp = new HashMap<Entity.EntityId, Set<String>>();
 		for (Entity e : ids.values()) {
 			if (e instanceof Node) {
 				int y = MapUtils.get31TileNumberY(((Node) e).getLatitude());
 				int x = MapUtils.get31TileNumberX(((Node) e).getLongitude());
-				List<BinaryMapDataObject> l = or.query(x, y);
 				EntityId id = EntityId.valueOf(e);
 				TreeSet<String> lst = new TreeSet<String>();
 				mp.put(id, lst);
-				for (BinaryMapDataObject b : l) {
-					if(or.contain(b, x, y)) {
-						String dw = or.getDownloadName(b);
-						if (!Algorithms.isEmpty(dw) && or.isDownloadOfType(b, OsmandRegions.MAP_TYPE)) {
-							if (!regionsMap.containsKey(dw)) {
-								regionsMap.put(dw, new LinkedHashSet<Entity.EntityId>());
+				if(osmandRegions == null) {
+					addEntityToRegion(regionsMap, id, lst, DEFAULT_REGION);
+				} else {
+					List<BinaryMapDataObject> l = osmandRegions.query(x, y);
+					for (BinaryMapDataObject b : l) {
+						if (osmandRegions.contain(b, x, y)) {
+							String dw = osmandRegions.getDownloadName(b);
+							if (!Algorithms.isEmpty(dw) && osmandRegions.isDownloadOfType(b, OsmandRegions.MAP_TYPE)) {
+								addEntityToRegion(regionsMap, id, lst, dw);
 							}
-							regionsMap.get(dw).add(id);
-							lst.add(dw);
 						}
 					}
 				}
@@ -144,6 +148,14 @@ public class AugmentedDiffsInspector {
 				}
 			}
 		}
+	}
+
+	private void addEntityToRegion(Map<String, Set<EntityId>> regionsMap, EntityId id, TreeSet<String> lst, String dw) {
+		if (!regionsMap.containsKey(dw)) {
+			regionsMap.put(dw, new LinkedHashSet<Entity.EntityId>());
+		}
+		regionsMap.get(dw).add(id);
+		lst.add(dw);
 	}
 
 	private void write(Context ctx, File targetDir, String date, String time, long lastModified) throws XMLStreamException, IOException, SQLException, InterruptedException, XmlPullParserException {
