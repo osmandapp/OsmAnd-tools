@@ -90,12 +90,19 @@ public class NativeSwingRendering extends NativeLibrary {
 	
 	public void closeAllFiles() {
 		for(String s : diffs.keySet()) {
-			closeBinaryMapFile(s);
+			MapDiff md = diffs.get(s);
+			if(md.baseFile != null) {
+				closeBinaryMapFile(md.baseFile.getAbsolutePath());
+			}
+			if (md.diffs != null) {
+				for (File l : md.diffs.values()) {
+					closeBinaryMapFile(l.getAbsolutePath());
+				}
+			}
 		}
 		diffs.clear();
 	}
 
-	@SuppressWarnings("resource")
 	public void loadRuleStorage(String path, String renderingProperties) throws IOException, XmlPullParserException, SAXException{
 		final LinkedHashMap<String, String> renderingConstants = new LinkedHashMap<String, String>();
 
