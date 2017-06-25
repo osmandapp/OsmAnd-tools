@@ -87,6 +87,13 @@ public class NativeSwingRendering extends NativeLibrary {
 			is.close();
 		}
 	}
+	
+	public void closeAllFiles() {
+		for(String s : diffs.keySet()) {
+			closeBinaryMapFile(s);
+		}
+		diffs.clear();
+	}
 
 	@SuppressWarnings("resource")
 	public void loadRuleStorage(String path, String renderingProperties) throws IOException, XmlPullParserException, SAXException{

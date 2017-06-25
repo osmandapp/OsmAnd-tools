@@ -1,11 +1,15 @@
 package net.osmand;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.zip.GZIPInputStream;
 
 import net.osmand.data.diff.AugmentedDiffsInspector;
 import net.osmand.data.diff.GenerateDailyObf;
@@ -34,7 +38,8 @@ public class MainUtilities {
 		if (args.length == 0) {
 			printSynopsys();
 		} else if (args[0].equals("--test-osm-live-tag-removal")) {
-			generateAllOsmLiveTests(new File(System.getProperty("repo.dir")+"/resources/test-resources/osm_live"));
+			generateAllOsmLiveTests(new File(System.getProperty("repo.dir")+"/resources/test-resources/osm_live"),
+					System.getProperty("maps.dir"));
 //			String test = "2017_06_18-10_30_tagRemovalBug_01.xml";
 //			String osmLivePath = System.getProperty("repo.dir")+"/resources/test-resources/osm_live/";
 //			Algorithms.removeAllFiles(new File(osmLivePath, AugmentedDiffsInspector.DEFAULT_REGION));
@@ -105,11 +110,11 @@ public class MainUtilities {
 				generateObf(subArgsArray, ic);
 			} else if (utl.contentEquals("generate-osmlive-tests")) {
 				if (subArgsArray.length < 1) {
-					System.out.println("Usage: <path_to_directory_with_resources_project>");
+					System.out.println("Usage: <path_to_directory_with_resources_project> <optional_path_to_unpack_files>");
 					return;
 				}
 				File testResources = new File(subArgsArray[0]+"/resources/test-resources/osm_live/");
-				generateAllOsmLiveTests(testResources);
+				generateAllOsmLiveTests(testResources, subArgsArray.length > 1 ? subArgsArray[1] : null);
 			} else if (utl.contentEquals("generate-from-overpass")) {
 				if (subArgsArray.length < 3) {
 					System.out.println("Usage: PATH_TO_OVERPASS PATH_TO_WORKING_DIR PATH_TO_REGIONS");
@@ -131,7 +136,7 @@ public class MainUtilities {
 		}
 	}
 
-	private static void generateAllOsmLiveTests(File testResources) {
+	private static void generateAllOsmLiveTests(File testResources, String unpackFolder) throws IOException {
 		// clean all files
 		Algorithms.removeAllFiles(new File(testResources, AugmentedDiffsInspector.DEFAULT_REGION));
 		for(File f : testResources.listFiles()) {
@@ -141,6 +146,18 @@ public class MainUtilities {
 			AugmentedDiffsInspector.main(new String[] { f.getAbsolutePath(), testResources.getAbsolutePath() });
 		}
 		GenerateDailyObf.main(new String[] { testResources.getAbsolutePath() });
+		if(unpackFolder != null) {
+			for(File obfgz : new File(testResources, AugmentedDiffsInspector.DEFAULT_REGION).listFiles()) {
+				if(obfgz.getName().endsWith(".obf.gz")) {
+					GZIPInputStream is = new GZIPInputStream(new FileInputStream(obfgz));
+					FileOutputStream out = new FileOutputStream(new File(unpackFolder, obfgz.getName().substring(0,
+							obfgz.getName().length() - 3)));
+					Algorithms.streamCopy(is, out);
+					is.close();
+					out.close();
+				}
+			}
+		}
 	}
 
 	private static void generateObf(String[] subArgsArray, IndexCreator ic) throws IOException,
@@ -166,7 +183,7 @@ public class MainUtilities {
 		System.out.println("\t\t generate-ocbf <path to osmand/repos/ repository>: generates regions.ocbf file, this path should contain folders 'misc', 'tools', 'resources'");
 		System.out.println("\t\t delete-unused-strings <path to repos/android/OsmAnd/res>: deletes unused translation in git repository (transforms all strings.xml)");
 		System.out.println("\t\t extract-roads-only <path to full map obf file> : extracts .road.obf (road-only map) file from full .obf");
-		System.out.println("\t\t generate-osmlive-tests <path_to_directory_with_resources_project>: test osmand live functionality");
+		System.out.println("\t\t generate-osmlive-tests <path_to_directory_with_resources_project> <optional_path_to_unpack_files>: test osmand live functionality");
 		System.out.println("\t\t generate-region-tags <path to input osm file (osm, bz2, gz)> <path to output osm file> <path to ocbf file>: process osm file and assign tag osmand_region_name to every entity.");
 		System.out.println("\t\t generate-ocean-tile-osm <optional path to osm file to write> <optional path to oceantiles_12.dat file>: generates ocean tiles osm file to check in JOSM ");
 		System.out.println("\t\t merge-index " + BinaryMerger.helpMessage);

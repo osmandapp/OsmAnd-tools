@@ -532,6 +532,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 		NativeSwingRendering lib = NativeSwingRendering.getDefaultFromSettings();
 		if (lib != null) {
 			try {
+				lib.closeAllFiles();
 				lib.initFilesInDir(new File(DataExtractionSettings.getSettings().getBinaryFilesDir()));
 				lib.loadRuleStorage(targetFile, renderingProperties);
 				mapPanel.setNativeLibrary(lib);
