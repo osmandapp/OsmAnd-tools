@@ -430,7 +430,9 @@ public class NativeSwingRendering extends NativeLibrary {
 			enable = enable || s.equals(df); 
 		}
 		md.selected = df;
-		initBinaryMapFile(md.baseFile.getAbsolutePath());
+		if(md.enableBaseMap) {
+			initBinaryMapFile(md.baseFile.getAbsolutePath());
+		}
 	}
 	
 	public MapDiff getMapDiffs(double lat, double lon) {
