@@ -416,6 +416,7 @@ public class NativeSwingRendering extends NativeLibrary {
 		boolean enable = false;
 		for(String s : reverse) {
 			String fp = md.diffs.get(s).getAbsolutePath();
+			enable = enable || s.equals(df);
 			if(!enable) {
 				if(!md.disabled.contains(fp)) {
 					closeBinaryMapFile(fp);
@@ -427,7 +428,7 @@ public class NativeSwingRendering extends NativeLibrary {
 					md.disabled.remove(fp);
 				}
 			}
-			enable = enable || s.equals(df); 
+			 
 		}
 		md.selected = df;
 		if(md.enableBaseMap) {
