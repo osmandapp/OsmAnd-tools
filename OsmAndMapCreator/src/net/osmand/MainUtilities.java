@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 
 import net.osmand.data.diff.AugmentedDiffsInspector;
 import net.osmand.data.diff.GenerateDailyObf;
@@ -39,7 +40,7 @@ public class MainUtilities {
 			printSynopsys();
 		} else if (args[0].equals("--test-osm-live-tag-removal")) {
 			generateAllOsmLiveTests(new File(System.getProperty("repo.dir")+"/resources/test-resources/osm_live"),
-					System.getProperty("maps.dir"));
+					System.getProperty("maps.dir"), false);
 //			String test = "2017_06_18-10_30_tagRemovalBug_01.xml";
 //			String osmLivePath = System.getProperty("repo.dir")+"/resources/test-resources/osm_live/";
 //			Algorithms.removeAllFiles(new File(osmLivePath, AugmentedDiffsInspector.DEFAULT_REGION));
@@ -114,7 +115,7 @@ public class MainUtilities {
 					return;
 				}
 				File testResources = new File(subArgsArray[0]+"/resources/test-resources/osm_live/");
-				generateAllOsmLiveTests(testResources, subArgsArray.length > 1 ? subArgsArray[1] : null);
+				generateAllOsmLiveTests(testResources, subArgsArray.length > 1 ? subArgsArray[1] : null, false);
 			} else if (utl.contentEquals("generate-from-overpass")) {
 				if (subArgsArray.length < 3) {
 					System.out.println("Usage: PATH_TO_OVERPASS PATH_TO_WORKING_DIR PATH_TO_REGIONS");
@@ -136,14 +137,28 @@ public class MainUtilities {
 		}
 	}
 
-	private static void generateAllOsmLiveTests(File testResources, String unpackFolder) throws IOException {
+	private static void generateAllOsmLiveTests(File testResources, String unpackFolder, boolean delete) throws IOException {
 		// clean all files
-		Algorithms.removeAllFiles(new File(testResources, AugmentedDiffsInspector.DEFAULT_REGION));
+		if (delete) {
+			Algorithms.removeAllFiles(new File(testResources, AugmentedDiffsInspector.DEFAULT_REGION));
+		}
 		for(File f : testResources.listFiles()) {
-			if(!f.getName().endsWith(".xml")) {
-				continue;
+			if(f.getName().endsWith(".diff.osm")) {
+				int DATE_LENGTH = 10;
+				String date = f.getName().substring(0, DATE_LENGTH);
+				String targetFl = AugmentedDiffsInspector.DEFAULT_REGION + f.getName().substring(DATE_LENGTH) + ".gz";
+				FileInputStream fis = new FileInputStream(f);
+				File outFl = new File(testResources, AugmentedDiffsInspector.DEFAULT_REGION + "/" + date + "/"
+						+ targetFl);
+				outFl.getParentFile().mkdirs();
+				GZIPOutputStream out = new GZIPOutputStream(new FileOutputStream(outFl));
+				Algorithms.streamCopy(fis, out);
+				out.close();
+				fis.close();
 			}
-			AugmentedDiffsInspector.main(new String[] { f.getAbsolutePath(), testResources.getAbsolutePath() });
+			if(f.getName().endsWith(".xml")) {
+				AugmentedDiffsInspector.main(new String[] { f.getAbsolutePath(), testResources.getAbsolutePath() });
+			}
 		}
 		GenerateDailyObf.main(new String[] { testResources.getAbsolutePath() });
 		if(unpackFolder != null) {
