@@ -315,6 +315,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 			delNode = dbConn.prepareStatement("delete from node where id = ?"); //$NON-NLS-1$
 			delWays = dbConn.prepareStatement("delete from ways where id = ?"); //$NON-NLS-1$
 			delRelations = dbConn.prepareStatement("delete from relations where id = ? and del = ?"); //$NON-NLS-1$
+			
 		}
 		boolean present = false;
 		if (e instanceof Node) {
@@ -338,8 +339,18 @@ public class OsmDbCreator implements IOsmStorageFilter {
 			delNode.setLong(1, id);
 			delNode.execute();
 		} else if (e instanceof Way) {
-			delWays.setLong(1, id);
-			delWays.execute();
+			PreparedStatement ps = dbConn.prepareStatement("select * from ways where id = ?");
+			ps.setLong(1, id);
+			ResultSet rs = ps.executeQuery();
+			int version = -1;
+			if(rs.next()) { 
+				version = rs.getInt("version"); 
+			}
+			if (version == e.getVersion()) {
+				delWays.setLong(1, id);
+				delWays.execute();
+			}
+			
 		} else if (e instanceof Relation) {
 			delRelations.setLong(1, id);
 			delRelations.setLong(2, delete ? 1 : 0);
