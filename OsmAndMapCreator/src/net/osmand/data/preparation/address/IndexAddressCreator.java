@@ -936,6 +936,8 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				prefix = "";
 			} else if(t.startsWith("alt_name")){
 				prefix = "";
+			} else if(t.startsWith("loc_name")){
+				prefix = "";
 			}
 			if (prefix != null) {
 				if (m == null) {
