@@ -371,7 +371,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 			} catch (IOException es) {
 				throw new RuntimeException(es);
 			}
-			long id = convertId(e);
+			long id = e.getId();
 			boolean delete = AugmentedDiffsInspector.OSMAND_DELETE_VALUE.
 					equals(e.getTag(AugmentedDiffsInspector.OSMAND_DELETE_TAG));
 			if (e.getTags().isEmpty()) {
