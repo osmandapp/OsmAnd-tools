@@ -877,7 +877,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			}
 			int rnd = (int) (Math.round(simple01 * rad));
 			val = "" + (rnd * circle / rad);
-			int valint = (int) val;
+			int valint = Integer.parseInt(val);
 		} catch (NumberFormatException e) {
 			System.err.println("Wrong value of \"direction\" " + val);
 		}
