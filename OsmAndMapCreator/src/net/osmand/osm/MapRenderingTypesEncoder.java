@@ -304,6 +304,9 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			if(tag.equals("seamark:notice:orientation")){
 				val = simplifyValueTo45(val);
 			}
+			if(tag.equals("direction")) {
+				val = simplifyValueTo22(val);
+			}
 			MapRulType rType = getMapRuleType(tag, val);
 			if (rType != null) {
 				if (rType.minzoom > zoom || rType.maxzoom < zoom) {
@@ -860,6 +863,25 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		return val;
 	}
 
+	protected String simplifyValueTo22(String val) {
+		int rad = 16;
+		//0, 22.5, 45, 67.5, 90, 112.5, 135, 157.5, 180, 202.5, 225, 247.5, 270, 292.5, 315, 337.5, 360
+		double circle = 360;
+		try {
+			double simple01 = Double.parseDouble(val) / circle;
+			while (simple01 < 0) {
+				simple01++;
+			}
+			while (simple01 >= 1) {
+				simple01--;
+			}
+			int rnd = (int) (Math.round(simple01 * rad));
+			val = "" + (rnd * circle / rad);
+		} catch (NumberFormatException e) {
+			System.err.println("Wrong value of \"direction\" " + val);
+		}
+		return val;
+	}
 
 
 	private void prepareColorTag(Map<String, String> tags, String tag) {
