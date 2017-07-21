@@ -305,7 +305,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 				val = simplifyValueTo45(val);
 			}
 			if(tag.equals("direction")) {
-				val = simplifyValueTo22(val);
+				val = simplifyDirection(val);
 			}
 			MapRulType rType = getMapRuleType(tag, val);
 			if (rType != null) {
@@ -863,7 +863,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		return val;
 	}
 
-	protected String simplifyValueTo22(String val) {
+	protected String simplifyDirection(String val) {
 		int rad = 16;
 		//0, 22.5, 45, 67.5, 90, 112.5, 135, 157.5, 180, 202.5, 225, 247.5, 270, 292.5, 315, 337.5, 360
 		double circle = 360;
@@ -876,7 +876,26 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 				simple01--;
 			}
 			int rnd = (int) (Math.round(simple01 * rad));
-			val = "" + (rnd * circle / rad);
+			val = "" + (int) (rnd * circle / rad);
+			switch(val) {
+				case "0": val = "n"; break;
+				case "22": val = "nne"; break;
+				case "45": val = "ne"; break;
+				case "67": val = "ene"; break;
+				case "90": val = "e"; break;
+				case "112": val = "ese"; break;
+				case "135": val = "se"; break;
+				case "157": val = "sse"; break;
+				case "180": val = "s"; break;
+				case "202": val = "ssw"; break;
+				case "225": val = "sw"; break;
+				case "247": val = "wsw"; break;
+				case "270": val = "w"; break;
+				case "292": val = "wnw"; break;
+				case "315": val = "nw"; break;
+				case "337": val = "nnw"; break;
+				case "360": val = "n"; break;
+			}
 		} catch (NumberFormatException e) {
 			System.err.println("Wrong value of \"direction\" " + val);
 		}
