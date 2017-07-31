@@ -3,6 +3,7 @@ package net.osmand.bitcoinsender;
 import com.google.gson.Gson;
 import com.google.gson.internal.LinkedTreeMap;
 import com.google.gson.stream.JsonReader;
+
 import net.osmand.bitcoinsender.model.AccountBalance;
 import net.osmand.bitcoinsender.model.Withdrawal;
 import net.osmand.bitcoinsender.utils.BlockIOException;
@@ -77,11 +78,15 @@ public class CoinSenderMain {
         double allMoney = 0;
         for (LinkedTreeMap map : paymentsList) {
             Double sum = (Double) map.get("btc");
-            allMoney += sum;
-            if (payments.containsKey(map.get("btcaddress"))) {
-                sum += payments.get(map.get("btcaddress"));
+            String address = (String) map.get("btcaddress");
+            if(payments.containsKey(address)) {
+            	continue;
             }
-            payments.put((String) map.get("btcaddress"), sum);
+            allMoney += sum;
+            if (payments.containsKey(address)) {
+                sum += payments.get(address);
+            }
+            payments.put(address, sum);
         }
         List<Map> splitPayment = splitResults(payments);
         for (Map<String, Double> map : splitPayment) {
@@ -154,7 +159,7 @@ public class CoinSenderMain {
                             + " Amount sent: " + withdrawal.amountSent
                             + " Network fee: " + withdrawal.networkFee
                             + " Block.io fee: " + withdrawal.blockIOFee);
-
+                    System.out.println("Transaction url: https://chain.so/tx/BTC/" + withdrawal.txid);
                     if (splitPayment.size() == paidChunks.size()) {
                         System.out.println("You've successfully paid for all chunks!");
                         System.out.println("Exiting...");
@@ -171,14 +176,15 @@ public class CoinSenderMain {
     private static List splitResults(Map<String, Double> map) {
         List<Map<String, Double>> res = new ArrayList<Map<String, Double>>();
         Map<String, Double> part = new LinkedHashMap<String, Double>();
-        int count = 1;
         for (String key : map.keySet()) {
             part.put(key, map.get(key));
-            if (part.size() == PART_SIZE || count == map.keySet().size()) {
+            if (part.size() == PART_SIZE) {
                 res.add(part);
                 part = new LinkedHashMap<String, Double>();
             }
-            count++;
+        }
+        if(part.size() > 0) {
+            res.add(part);
         }
 
         return res;
