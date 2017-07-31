@@ -20,6 +20,7 @@ public class CoinSenderMain {
     private static String guid;
     private static String pass;
     private static String directory;
+	private static int PART_SIZE = 80;
 
     public static void main(String args[]) throws IOException {
 
@@ -56,7 +57,7 @@ public class CoinSenderMain {
         }
         System.out.println("Balance for account " + balance.network
                 + ": Confirmed: " + balance.availableBalance
-                + " Pendning: " + balance.getPendingReceivedBalance());
+                + " Pending: " + balance.getPendingReceivedBalance());
         System.out.println();
 
 
@@ -173,18 +174,12 @@ public class CoinSenderMain {
         int count = 1;
         for (String key : map.keySet()) {
             part.put(key, map.get(key));
-            if (part.size() == 50 || count == map.keySet().size()) {
+            if (part.size() == PART_SIZE || count == map.keySet().size()) {
                 res.add(part);
                 part = new LinkedHashMap<String, Double>();
             }
             count++;
         }
-
-        res.remove(8);
-        res.remove(7);
-        res.remove(3);
-        res.remove(1);
-        res.remove(0);
 
         return res;
     }

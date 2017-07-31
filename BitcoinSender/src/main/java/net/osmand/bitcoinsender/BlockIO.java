@@ -1,7 +1,6 @@
 package net.osmand.bitcoinsender;
 
 import com.google.gson.Gson;
-import io.block.api.model.*;
 import net.osmand.bitcoinsender.utils.BlockIOException;
 import net.osmand.bitcoinsender.utils.Constants;
 import net.osmand.bitcoinsender.utils.SigningUtils;
