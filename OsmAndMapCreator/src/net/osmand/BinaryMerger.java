@@ -427,6 +427,7 @@ public class BinaryMerger {
 
 	public static void copyBinaryPart(CodedOutputStream ous, byte[] BUFFER, RandomAccessFile raf, long fp, int length)
 			throws IOException {
+		long old = raf.getFilePointer();
 		raf.seek(fp);
 		int toRead = length;
 		while (toRead > 0) {
@@ -440,6 +441,7 @@ public class BinaryMerger {
 			ous.writeRawBytes(BUFFER, 0, read);
 			toRead -= read;
 		}
+		raf.seek(old);
 	}
 
 	public void combineParts(File fileToExtract, List<File> files, Set<Integer> combineParts) throws IOException, SQLException {
