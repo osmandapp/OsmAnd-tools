@@ -73,20 +73,19 @@ public class CoinSenderMain {
         }
         JsonReader reader = new JsonReader(new FileReader(directory));
         recipients.putAll((Map) gson.fromJson(reader, Map.class));
+        System.out.println(recipients);
         List<LinkedTreeMap> paymentsList = (ArrayList) recipients.get("payments");
         Map<String, Double> payments = new LinkedHashMap<String, Double>();
         double allMoney = 0;
         for (LinkedTreeMap map : paymentsList) {
-            Double sum = (Double) map.get("btc");
+            Double btc = (Double) map.get("btc");
             String address = (String) map.get("btcaddress");
-            if(payments.containsKey(address)) {
-            	continue;
-            }
-            allMoney += sum;
+            allMoney += btc;
             if (payments.containsKey(address)) {
-                sum += payments.get(address);
+                payments.put(address, btc + payments.get(address));
+            } else {
+            	payments.put(address, btc);
             }
-            payments.put(address, sum);
         }
         List<Map> splitPayment = splitResults(payments);
         for (Map<String, Double> map : splitPayment) {
