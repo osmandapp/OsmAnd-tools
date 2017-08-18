@@ -46,7 +46,7 @@ public class DailyDiffGenerator {
 	private double latbottom = -85;
 	private double lonleft = -179.9;
 	private double lonright = 179.9;
-	private static final int ZOOM_LEVEL = 13;
+	private static final int ZOOM_LEVEL = 15;
 	
 	public static final int BUFFER_SIZE = 1 << 20;
 	
@@ -110,7 +110,6 @@ public class DailyDiffGenerator {
 		for (BinaryIndexPart p : index.getIndexes()) {
 			if(p instanceof MapIndex) {
 				MapIndex m = ((MapIndex) p);
-				
 				final SearchRequest<BinaryMapDataObject> req = BinaryMapIndexReader.buildSearchRequest(
 						MapUtils.get31TileNumberX(lonleft),
 						MapUtils.get31TileNumberX(lonright),
@@ -265,8 +264,11 @@ public class DailyDiffGenerator {
 					writer.startWriteMapLevelIndex(r.getMinZoom(), r.getMaxZoom(), rootBounds.getMinX(),
 							rootBounds.getMaxX(), rootBounds.getMinY(), rootBounds.getMaxY());
 					IndexVectorMapCreator.writeBinaryMapTree(root, rootBounds, rtree, writer, treeHeader);
+
 					IndexUploader.writeBinaryMapBlock(root, rootBounds, rtree, writer, treeHeader, objects, r);
 					writer.endWriteMapLevelIndex();
+					
+					
 				}
 			} finally {
 				if (rtree != null) {
