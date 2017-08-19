@@ -6,8 +6,10 @@ import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import com.google.protobuf.CodedOutputStream;
 import com.google.protobuf.WireFormat;
@@ -70,10 +72,10 @@ public class DailyDiffGenerator {
 	}
 
 	private void compareFiles(File start, File end) throws IOException, RTreeException {
-		RandomAccessFile s = new RandomAccessFile(start.getAbsolutePath(), "r");
-		RandomAccessFile e = new RandomAccessFile(end.getAbsolutePath(), "r");
-		BinaryMapIndexReader indexS = new BinaryMapIndexReader(s, start);
-		BinaryMapIndexReader indexE = new BinaryMapIndexReader(e, end);
+		RandomAccessFile startRaf = new RandomAccessFile(start.getAbsolutePath(), "r");
+		RandomAccessFile endRaf = new RandomAccessFile(end.getAbsolutePath(), "r");
+		BinaryMapIndexReader indexS = new BinaryMapIndexReader(startRaf, start);
+		BinaryMapIndexReader indexE = new BinaryMapIndexReader(endRaf, end);
 		List<MapIndex> endIndexes = indexE.getMapIndexes();
 		MapIndex mapIdx = endIndexes.get(0);
 		Map<Long, BinaryMapDataObject> removeList = new HashMap<>();
@@ -93,9 +95,15 @@ public class DailyDiffGenerator {
 			}
 		}
 		System.out.println("Finished comparing.");
-		mapIdx.initMapEncodingRule(0, mapIdx.decodingRules.size() + 1, OSMAND_CHANGE_TAG, OSMAND_CHANGE_VALUE);
-		for (long id : removeList.keySet()) {
-			BinaryMapDataObject obj = new BinaryMapDataObject(removeList.get(id).getCoordinates(), new int[]{mapIdx.decodingRules.size()}, null, id);
+		int deleteId = mapIdx.decodingRules.size() + 1;
+		mapIdx.initMapEncodingRule(0, deleteId, OSMAND_CHANGE_TAG, OSMAND_CHANGE_VALUE);
+		Iterator<Entry<Long, BinaryMapDataObject>> iterator = removeList.entrySet().iterator();
+		while(iterator.hasNext()) {
+			Entry<Long, BinaryMapDataObject> e = iterator.next();
+			long id = e.getKey();
+			BinaryMapDataObject value = e.getValue();
+			BinaryMapDataObject obj = new BinaryMapDataObject(id, value.getCoordinates(),
+					value.getPolygonInnerCoordinates(), value.getObjectType(), value.isArea(), new int[]{deleteId}, null);
 			endData.put(id, obj);
 		}
 		File result = new File(PATH_TO_RESULT_OBF);
