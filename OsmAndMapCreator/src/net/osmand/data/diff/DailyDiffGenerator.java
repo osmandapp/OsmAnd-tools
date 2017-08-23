@@ -6,10 +6,8 @@ import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 
 import com.google.protobuf.CodedOutputStream;
 import com.google.protobuf.WireFormat;
@@ -43,18 +41,17 @@ public class DailyDiffGenerator {
 	
 	private static final String OSMAND_CHANGE_VALUE = "delete";
 	private static final String OSMAND_CHANGE_TAG = "osmand_change";
-	private static final String PATH_TO_RESULT_OBF = "/home/paul/result.obf";
 	private double lattop = 85;
 	private double latbottom = -85;
 	private double lonleft = -179.9;
 	private double lonright = 179.9;
+	private static String workDir;
 	private static final int ZOOM_LEVEL = 15;
-	
 	public static final int BUFFER_SIZE = 1 << 20;
 	
 	public static void main(String[] args) throws IOException, RTreeException {
 		if (!args[0].equals("-gen")) {
-			System.out.println("Usage: -gen PATH_TO_START_OBF PATH_TO_END_OBF");
+			System.out.println("Usage: -gen PATH_TO_START_OBF PATH_TO_END_OBF PATH_TO_WORKING_DIR");
 			return;
 		}
 		DailyDiffGenerator generator = new DailyDiffGenerator();
@@ -64,6 +61,7 @@ public class DailyDiffGenerator {
 	private void initialize(String[] args) throws IOException, RTreeException {
 		File start = new File(args[1]);
 		File end = new File(args[2]);
+		workDir = args[3];
 		if (!start.exists() || !end.exists()) {
 			System.out.println("Incorrect obf files.");
 			return;
@@ -72,10 +70,10 @@ public class DailyDiffGenerator {
 	}
 
 	private void compareFiles(File start, File end) throws IOException, RTreeException {
-		RandomAccessFile startRaf = new RandomAccessFile(start.getAbsolutePath(), "r");
-		RandomAccessFile endRaf = new RandomAccessFile(end.getAbsolutePath(), "r");
-		BinaryMapIndexReader indexS = new BinaryMapIndexReader(startRaf, start);
-		BinaryMapIndexReader indexE = new BinaryMapIndexReader(endRaf, end);
+		RandomAccessFile s = new RandomAccessFile(start.getAbsolutePath(), "r");
+		RandomAccessFile e = new RandomAccessFile(end.getAbsolutePath(), "r");
+		BinaryMapIndexReader indexS = new BinaryMapIndexReader(s, start);
+		BinaryMapIndexReader indexE = new BinaryMapIndexReader(e, end);
 		List<MapIndex> endIndexes = indexE.getMapIndexes();
 		MapIndex mapIdx = endIndexes.get(0);
 		Map<Long, BinaryMapDataObject> removeList = new HashMap<>();
@@ -88,25 +86,26 @@ public class DailyDiffGenerator {
 		for(Long idx : startData.keys()) {
 			BinaryMapDataObject objE = endData.get(idx);
 			if (objE != null) {
-				if (objE.compareBinary(startData.get(idx))) {
-					endData.remove(idx);
-					removeList.put(idx, objE);					
+				BinaryMapDataObject objS = startData.get(idx);
+				if (!objE.compareBinary(objS)) {
+					removeList.put(idx, objS);					
 				} 
 			}
 		}
 		System.out.println("Finished comparing.");
-		int deleteId = mapIdx.decodingRules.size() + 1;
-		mapIdx.initMapEncodingRule(0, deleteId, OSMAND_CHANGE_TAG, OSMAND_CHANGE_VALUE);
-		Iterator<Entry<Long, BinaryMapDataObject>> iterator = removeList.entrySet().iterator();
-		while(iterator.hasNext()) {
-			Entry<Long, BinaryMapDataObject> e = iterator.next();
-			long id = e.getKey();
-			BinaryMapDataObject value = e.getValue();
-			BinaryMapDataObject obj = new BinaryMapDataObject(id, value.getCoordinates(),
-					value.getPolygonInnerCoordinates(), value.getObjectType(), value.isArea(), new int[]{deleteId}, null);
+		mapIdx.initMapEncodingRule(0, mapIdx.decodingRules.size() + 1, OSMAND_CHANGE_TAG, OSMAND_CHANGE_VALUE);
+		for (long id : removeList.keySet()) {
+			BinaryMapDataObject toDelete = removeList.get(id);
+			BinaryMapDataObject obj = new BinaryMapDataObject(id, 
+					toDelete.getCoordinates(), 
+					null, 
+					toDelete.getObjectType(), 
+					toDelete.isArea(), 
+					new int[]{mapIdx.decodingRules.size()},
+					null);
 			endData.put(id, obj);
 		}
-		File result = new File(PATH_TO_RESULT_OBF);
+		File result = new File(workDir + new java.util.Date().toString().replaceAll(" ", "_") +".obf");
 		if (result.exists()) {
 			result.delete();
 		}
@@ -275,8 +274,7 @@ public class DailyDiffGenerator {
 
 					IndexUploader.writeBinaryMapBlock(root, rootBounds, rtree, writer, treeHeader, objects, r);
 					writer.endWriteMapLevelIndex();
-					
-					
+										
 				}
 			} finally {
 				if (rtree != null) {
