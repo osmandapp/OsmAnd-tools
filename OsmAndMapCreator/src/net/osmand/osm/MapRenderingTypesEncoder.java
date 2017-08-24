@@ -858,7 +858,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			int rnd = (int) (Math.round(simple01 * rad));
 			val = "" + (rnd * circle / rad);
 		} catch (NumberFormatException e) {
-			System.err.println("Wrong value of \"seamark:notice:orientation\" " + val);
+			log.error("Wrong value of \"seamark:notice:orientation\" " + val);
 		}
 		return val;
 	}
@@ -897,7 +897,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 				case "360": val = "n"; break;
 			}
 		} catch (NumberFormatException e) {
-			System.err.println("Wrong value of \"direction\" " + val);
+			log.error("Wrong value of \"direction\" " + val);
 		}
 		return val;
 	}
