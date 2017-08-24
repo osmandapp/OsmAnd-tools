@@ -64,9 +64,9 @@ public class ObfDiffGenerator {
 	}
 	
 	private void initialize(String[] args) throws IOException, RTreeException {
-		File start = new File(args[1]);
-		File end = new File(args[2]);
-		File result  = new File(args[3]);
+		File start = new File(args[0]);
+		File end = new File(args[1]);
+		File result  = new File(args[2]);
 		if (!start.exists() || !end.exists()) {
 			System.exit(1);
 			System.err.println("Input Obf file doesn't exist");
