@@ -36,7 +36,7 @@ import rtree.RTree;
 import rtree.RTreeException;
 import rtree.Rect;
 
-public class DailyDiffGenerator {
+public class ObfDiffGenerator {
 	
 	
 	private static final String OSMAND_CHANGE_VALUE = "delete";
@@ -45,31 +45,37 @@ public class DailyDiffGenerator {
 	private double latbottom = -85;
 	private double lonleft = -179.9;
 	private double lonright = 179.9;
-	private static String workDir;
 	private static final int ZOOM_LEVEL = 15;
 	public static final int BUFFER_SIZE = 1 << 20;
 	
 	public static void main(String[] args) throws IOException, RTreeException {
-		if (!args[0].equals("-gen")) {
-			System.out.println("Usage: -gen PATH_TO_START_OBF PATH_TO_END_OBF PATH_TO_WORKING_DIR");
+		if (args.length != 3) {
+			System.out.println("Usage: <path to old obf> <path to new obf> <result file name>");
+			System.exit(1);
 			return;
 		}
-		DailyDiffGenerator generator = new DailyDiffGenerator();
-		generator.initialize(args);
+		try {
+			ObfDiffGenerator generator = new ObfDiffGenerator();
+			generator.initialize(args);
+		} catch(Exception e) {
+			e.printStackTrace();
+			System.exit(1);
+		}
 	}
 	
 	private void initialize(String[] args) throws IOException, RTreeException {
 		File start = new File(args[1]);
 		File end = new File(args[2]);
-		workDir = args[3];
+		File result  = new File(args[3]);
 		if (!start.exists() || !end.exists()) {
-			System.out.println("Incorrect obf files.");
+			System.exit(1);
+			System.err.println("Input Obf file doesn't exist");
 			return;
 		}
-		compareFiles(start, end);
+		generateDiff(start, end, result);
 	}
 
-	private void compareFiles(File start, File end) throws IOException, RTreeException {
+	private void generateDiff(File start, File end, File result) throws IOException, RTreeException {
 		RandomAccessFile s = new RandomAccessFile(start.getAbsolutePath(), "r");
 		RandomAccessFile e = new RandomAccessFile(end.getAbsolutePath(), "r");
 		BinaryMapIndexReader indexS = new BinaryMapIndexReader(s, start);
@@ -105,7 +111,6 @@ public class DailyDiffGenerator {
 					null);
 			endData.put(id, obj);
 		}
-		File result = new File(workDir + new java.util.Date().toString().replaceAll(" ", "_") +".obf");
 		if (result.exists()) {
 			result.delete();
 		}
