@@ -94,13 +94,12 @@ public class ObfDiffGenerator {
 			BinaryMapDataObject objS = startData.get(idx);
 			if (objE == null) {
 				// Object with this id is not present in the second obf
-				if (objS != null) {
-					removeList.put(idx, objS);
-				}
+				removeList.put(idx, objS);
+			} else if(objE.compareBinary(objS)){
+				endData.remove(idx);
 			}
 			
 		}
-		System.out.println("Finished comparing.");
 		mapIdx.initMapEncodingRule(0, mapIdx.decodingRules.size() + 1, OSMAND_CHANGE_TAG, OSMAND_CHANGE_VALUE);
 		for (long id : removeList.keySet()) {
 			BinaryMapDataObject toDelete = removeList.get(id);
@@ -113,6 +112,7 @@ public class ObfDiffGenerator {
 					null);
 			endData.put(id, obj);
 		}
+		System.out.println("Finished comparing.");
 		if (result.exists()) {
 			result.delete();
 		}
