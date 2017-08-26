@@ -91,12 +91,14 @@ public class ObfDiffGenerator {
 		System.out.println("Comparing the files...");
 		for(Long idx : startData.keys()) {
 			BinaryMapDataObject objE = endData.get(idx);
-			if (objE != null) {
-				BinaryMapDataObject objS = startData.get(idx);
-				if (!objE.compareBinary(objS)) {
-					removeList.put(idx, objS);					
-				} 
+			BinaryMapDataObject objS = startData.get(idx);
+			if (objE == null) {
+				// Object with this id is not present in the second obf
+				if (objS != null) {
+					removeList.put(idx, objS);
+				}
 			}
+			
 		}
 		System.out.println("Finished comparing.");
 		mapIdx.initMapEncodingRule(0, mapIdx.decodingRules.size() + 1, OSMAND_CHANGE_TAG, OSMAND_CHANGE_VALUE);
@@ -235,62 +237,62 @@ public class ObfDiffGenerator {
 		BinaryMapIndexWriter writer = new BinaryMapIndexWriter(raf, ous);
 		writer.startWriteMapIndex(part.getName());
 		boolean first = true;
-		for (MapRoot r : part.getRoots()) {
-			File nonpackRtree = new File(fileToExtract.getParentFile(), "nonpack" + r.getMinZoom() + "."
-					+ fileToExtract.getName() + ".rtree");
-			File packRtree = new File(fileToExtract.getParentFile(), "pack" + r.getMinZoom() + "."
-					+ fileToExtract.getName() + ".rtree");
-			RTree rtree = null;
-			try {
-				rtree = new RTree(nonpackRtree.getAbsolutePath());
-				for (long key : objects.keys()) {
-					BinaryMapDataObject obj = objects.get(key);
-					int minX = obj.getPoint31XTile(0);
-					int maxX = obj.getPoint31XTile(0);
-					int maxY = obj.getPoint31YTile(0);
-					int minY = obj.getPoint31YTile(0);
-					for (int i = 1; i < obj.getPointsLength(); i++) {
-						minX = Math.min(minX, obj.getPoint31XTile(i));
-						minY = Math.min(minY, obj.getPoint31YTile(i));
-						maxX = Math.max(maxX, obj.getPoint31XTile(i));
-						maxY = Math.max(maxY, obj.getPoint31YTile(i));
-					}
-					try {
-						rtree.insert(new LeafElement(new Rect(minX, minY, maxX, maxY), obj.getId()));
-					} catch (Exception e) {
-						throw new RuntimeException(e);
-					}
+		MapRoot r = part.getRoots().get(0);
+		File nonpackRtree = new File(fileToExtract.getParentFile(), "nonpack" + r.getMinZoom() + "."
+				+ fileToExtract.getName() + ".rtree");
+		File packRtree = new File(fileToExtract.getParentFile(), "pack" + r.getMinZoom() + "."
+				+ fileToExtract.getName() + ".rtree");
+		RTree rtree = null;
+		try {
+			rtree = new RTree(nonpackRtree.getAbsolutePath());
+			for (long key : objects.keys()) {
+				BinaryMapDataObject obj = objects.get(key);
+				int minX = obj.getPoint31XTile(0);
+				int maxX = obj.getPoint31XTile(0);
+				int maxY = obj.getPoint31YTile(0);
+				int minY = obj.getPoint31YTile(0);
+				for (int i = 1; i < obj.getPointsLength(); i++) {
+					minX = Math.min(minX, obj.getPoint31XTile(i));
+					minY = Math.min(minY, obj.getPoint31YTile(i));
+					maxX = Math.max(maxX, obj.getPoint31XTile(i));
+					maxY = Math.max(maxY, obj.getPoint31YTile(i));
 				}
-				rtree = AbstractIndexPartCreator.packRtreeFile(rtree, nonpackRtree.getAbsolutePath(),
-						packRtree.getAbsolutePath());
-				TLongObjectHashMap<BinaryFileReference> treeHeader = new TLongObjectHashMap<BinaryFileReference>();
-
-				long rootIndex = rtree.getFileHdr().getRootIndex();
-				rtree.Node root = rtree.getReadNode(rootIndex);
-				Rect rootBounds = IndexUploader.calcBounds(root);
-				if (rootBounds != null) {
-					if(first) {
-						writer.writeMapEncodingRules(index, part);
-						first = false;
-					}
-					writer.startWriteMapLevelIndex(r.getMinZoom(), r.getMaxZoom(), rootBounds.getMinX(),
-							rootBounds.getMaxX(), rootBounds.getMinY(), rootBounds.getMaxY());
-					IndexVectorMapCreator.writeBinaryMapTree(root, rootBounds, rtree, writer, treeHeader);
-
-					IndexUploader.writeBinaryMapBlock(root, rootBounds, rtree, writer, treeHeader, objects, r);
-					writer.endWriteMapLevelIndex();
-										
+				try {
+					rtree.insert(new LeafElement(new Rect(minX, minY, maxX, maxY), obj.getId()));
+				} catch (Exception e) {
+					throw new RuntimeException(e);
 				}
-			} finally {
-				if (rtree != null) {
-					RandomAccessFile file = rtree.getFileHdr().getFile();
-					file.close();
-				}
-				nonpackRtree.delete();
-				packRtree.delete();
-				RTree.clearCache();
 			}
+			rtree = AbstractIndexPartCreator.packRtreeFile(rtree, nonpackRtree.getAbsolutePath(),
+					packRtree.getAbsolutePath());
+			TLongObjectHashMap<BinaryFileReference> treeHeader = new TLongObjectHashMap<BinaryFileReference>();
+
+			long rootIndex = rtree.getFileHdr().getRootIndex();
+			rtree.Node root = rtree.getReadNode(rootIndex);
+			Rect rootBounds = IndexUploader.calcBounds(root);
+			if (rootBounds != null) {
+				if(first) {
+					writer.writeMapEncodingRules(index, part);
+					first = false;
+				}
+				writer.startWriteMapLevelIndex(r.getMinZoom(), r.getMaxZoom(), rootBounds.getMinX(),
+						rootBounds.getMaxX(), rootBounds.getMinY(), rootBounds.getMaxY());
+				IndexVectorMapCreator.writeBinaryMapTree(root, rootBounds, rtree, writer, treeHeader);
+
+				IndexUploader.writeBinaryMapBlock(root, rootBounds, rtree, writer, treeHeader, objects, r);
+				writer.endWriteMapLevelIndex();
+									
+			}
+		} finally {
+			if (rtree != null) {
+				RandomAccessFile file = rtree.getFileHdr().getFile();
+				file.close();
+			}
+			nonpackRtree.delete();
+			packRtree.delete();
+			RTree.clearCache();
 		}
+	
 		writer.endWriteMapIndex();
 	}
 }
