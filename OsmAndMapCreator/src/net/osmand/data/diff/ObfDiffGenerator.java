@@ -89,28 +89,18 @@ public class ObfDiffGenerator {
 //		List<Amenity> endPoi = getPoiData(indexE);
 //		List<Amenity> newPoi = comparePoi(startPoi, endPoi);
 		System.out.println("Comparing the files...");
+		mapIdx.initMapEncodingRule(0, mapIdx.decodingRules.size() + 1, OSMAND_CHANGE_TAG, OSMAND_CHANGE_VALUE);
 		for(Long idx : startData.keys()) {
 			BinaryMapDataObject objE = endData.get(idx);
 			BinaryMapDataObject objS = startData.get(idx);
 			if (objE == null) {
 				// Object with this id is not present in the second obf
-				removeList.put(idx, objS);
+				BinaryMapDataObject obj = new BinaryMapDataObject(idx, objS.getCoordinates(), null,
+						objS.getObjectType(), objS.isArea(), new int[] { mapIdx.decodingRules.size() }, null);
+				endData.put(idx, obj);
 			} else if(objE.compareBinary(objS)){
 				endData.remove(idx);
 			}
-			
-		}
-		mapIdx.initMapEncodingRule(0, mapIdx.decodingRules.size() + 1, OSMAND_CHANGE_TAG, OSMAND_CHANGE_VALUE);
-		for (long id : removeList.keySet()) {
-			BinaryMapDataObject toDelete = removeList.get(id);
-			BinaryMapDataObject obj = new BinaryMapDataObject(id, 
-					toDelete.getCoordinates(), 
-					null, 
-					toDelete.getObjectType(), 
-					toDelete.isArea(), 
-					new int[]{mapIdx.decodingRules.size()},
-					null);
-			endData.put(id, obj);
 		}
 		System.out.println("Finished comparing.");
 		if (result.exists()) {
