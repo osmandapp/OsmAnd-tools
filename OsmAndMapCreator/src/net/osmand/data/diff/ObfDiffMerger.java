@@ -72,14 +72,9 @@ public class ObfDiffMerger {
 		}
 		// TODO check timestamps TODO!!!
 		ObfFileInMemory context = new ObfFileInMemory();
-		context.mergeObfFiles(diffs);
+		context.readObfFiles(diffs);
 		context.writeFile(result);
 	}
-
-
-	
-	
-	
 	
 	
 	
