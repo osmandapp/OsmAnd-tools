@@ -1,19 +1,31 @@
 package net.osmand.data.diff;
 
+import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.hash.TLongObjectHashMap;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.zip.GZIPOutputStream;
 
 import net.osmand.IndexConstants;
+import net.osmand.ResultMatcher;
+import net.osmand.binary.BinaryIndexPart;
 import net.osmand.binary.BinaryMapDataObject;
+import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.BinaryMapIndexReader.MapIndex;
+import net.osmand.binary.BinaryMapIndexReader.MapRoot;
+import net.osmand.binary.BinaryMapIndexReader.SearchFilter;
+import net.osmand.binary.BinaryMapIndexReader.SearchRequest;
 import net.osmand.binary.MapZooms;
 import net.osmand.binary.MapZooms.MapZoomPair;
 import net.osmand.binary.OsmandOdb;
@@ -23,6 +35,7 @@ import net.osmand.data.preparation.BinaryFileReference;
 import net.osmand.data.preparation.BinaryMapIndexWriter;
 import net.osmand.data.preparation.IndexVectorMapCreator;
 import net.osmand.util.Algorithms;
+import net.osmand.util.MapUtils;
 import rtree.LeafElement;
 import rtree.RTree;
 import rtree.RTreeException;
@@ -31,9 +44,15 @@ import rtree.Rect;
 import com.google.protobuf.CodedOutputStream;
 
 public class ObfFileInMemory {
+	private double lattop = 85;
+	private double latbottom = -85;
+	private double lonleft = -179.9;
+	private double lonright = 179.9;
+	
+
 	private Map<MapZooms.MapZoomPair, TLongObjectHashMap<BinaryMapDataObject>> mapObjects = new LinkedHashMap<>();
 	private long timestamp = 0;
-	private String name; 
+	private MapIndex mapIndex = new MapIndex(); 
 
 	public TLongObjectHashMap<BinaryMapDataObject> get(MapZooms.MapZoomPair zoom) {
 		if (mapObjects.containsKey(zoom)) {
@@ -41,9 +60,33 @@ public class ObfFileInMemory {
 		}
 		return mapObjects.get(zoom);
 	}
+	
+	public Collection<MapZooms.MapZoomPair> getZooms() {
+		return mapObjects.keySet();
+	}
+	
+	public MapIndex getMapIndex() {
+		return mapIndex;
+	}
+	
+	
+	public void putMapObjects(MapZoomPair pair, Collection<BinaryMapDataObject> objects, boolean override) {
+		TLongObjectHashMap<BinaryMapDataObject> res = get(pair);
+		for(BinaryMapDataObject o: objects) {
+			o = mapIndex.adoptMapObject(o);
+			if(override) {
+				res.put(o.getId(), o);
+			} else if(!res.containsKey(o.getId())){
+				res.put(o.getId(), o);
+			}
+			
+		}
+	}
 
-	public void writeFile(File f) throws IOException, RTreeException {
-		final RandomAccessFile raf = new RandomAccessFile(f, "rw");
+	public void writeFile(File targetFile) throws IOException, RTreeException {
+		boolean gzip = targetFile.getName().endsWith(".gz");
+		File nonGzip = new File(targetFile.getParentFile(), targetFile.getName().substring(0, targetFile.getName().length() - 3));
+		final RandomAccessFile raf = new RandomAccessFile(nonGzip, "rw");
 		// write files
 		CodedOutputStream ous = CodedOutputStream.newInstance(new OutputStream() {
 			@Override
@@ -69,25 +112,36 @@ public class ObfFileInMemory {
 		ous.writeInt64(OsmandOdb.OsmAndStructure.DATECREATED_FIELD_NUMBER, timestamp);
 		BinaryMapIndexWriter writer = new BinaryMapIndexWriter(raf, ous);
 		if (mapObjects.size() > 0) {
-			if(name == null) {
-				name = f.getName().substring(0, f.getName().indexOf('.'));
+			String name = mapIndex.getName();
+			if(Algorithms.isEmpty(name)) {
+				name = targetFile.getName().substring(0, targetFile.getName().indexOf('.'));
 			}
 			writer.startWriteMapIndex(Algorithms.capitalizeFirstLetter(name));
-			// TODO
-			writer.writeMapEncodingRules(mapIndex);
+			writer.writeMapEncodingRules(mapIndex.decodingRules);
 			Iterator<Entry<MapZoomPair, TLongObjectHashMap<BinaryMapDataObject>>> it = mapObjects.entrySet().iterator();
 			while (it.hasNext()) {
 				Entry<MapZoomPair, TLongObjectHashMap<BinaryMapDataObject>> n = it.next();
-				writeMapData(writer, n.getKey(), n.getValue(), f);
+				writeMapData(writer, n.getKey(), n.getValue(), targetFile);
 			}
 			writer.endWriteMapIndex();
 		}
-
-		// writePoiData(ous);
+		// TODO POI
+		// TODO Routing
+		// TODO Transport
 		ous.writeInt32(OsmandOdb.OsmAndStructure.VERSIONCONFIRM_FIELD_NUMBER, version);
 		ous.flush();
 		raf.close();
-		f.setLastModified(timestamp);
+		if (gzip) {
+			nonGzip.setLastModified(timestamp);
+
+			FileInputStream fis = new FileInputStream(nonGzip);
+			GZIPOutputStream gzout = new GZIPOutputStream(new FileOutputStream(targetFile));
+			Algorithms.streamCopy(fis, gzout);
+			fis.close();
+			gzout.close();
+			nonGzip.delete();
+		}
+		targetFile.setLastModified(timestamp);
 	}
 
 	private void writeMapData(BinaryMapIndexWriter writer, MapZoomPair mapZoomPair,
@@ -148,4 +202,65 @@ public class ObfFileInMemory {
 	public void updateTimestamp(long dateCreated) {
 		timestamp = Math.max(timestamp, dateCreated);
 	}
+	
+	public long getTimestamp() {
+		return timestamp;
+	}
+
+	public void readObfFiles(List<File> files) throws IOException {
+		// TODO POI, Routing, Transport
+		for (int i = 0; i < files.size(); i++) {
+			File f = files.get(i);
+			RandomAccessFile raf = new RandomAccessFile(f, "r");
+			BinaryMapIndexReader indexReader = new BinaryMapIndexReader(raf, f);
+			for (BinaryIndexPart p : indexReader.getIndexes()) {
+				if(p instanceof MapIndex) {
+					MapIndex mi = (MapIndex) p;
+					for(MapRoot mr : mi.getRoots()) {
+						MapZooms.MapZoomPair pair = new MapZooms.MapZoomPair(mr.getMinZoom(), mr.getMaxZoom());
+						TLongObjectHashMap<BinaryMapDataObject> objects = getBinaryMapData(indexReader, mr.getMinZoom());
+						putMapObjects(pair, objects.valueCollection(), true);
+					}
+				}
+			}
+			updateTimestamp(indexReader.getDateCreated());
+			indexReader.close();
+			raf.close();
+		}
+	}
+
+	private TLongObjectHashMap<BinaryMapDataObject> getBinaryMapData(BinaryMapIndexReader index, int zoom) throws IOException {
+		final TLongObjectHashMap<BinaryMapDataObject> result = new TLongObjectHashMap<>();
+		for (BinaryIndexPart p : index.getIndexes()) {
+			if(p instanceof MapIndex) {
+				MapIndex m = ((MapIndex) p);
+				final SearchRequest<BinaryMapDataObject> req = BinaryMapIndexReader.buildSearchRequest(
+						MapUtils.get31TileNumberX(lonleft),
+						MapUtils.get31TileNumberX(lonright),
+						MapUtils.get31TileNumberY(lattop),
+						MapUtils.get31TileNumberY(latbottom),
+						zoom,
+						new SearchFilter() {
+							@Override
+							public boolean accept(TIntArrayList types, MapIndex index) {
+								return true;
+							}
+						},
+						new ResultMatcher<BinaryMapDataObject>() {
+							@Override
+							public boolean publish(BinaryMapDataObject obj) {
+								result.put(obj.getId(), obj);
+								return false;
+							}
+
+							@Override
+							public boolean isCancelled() {
+								return false;
+							}
+						});
+				index.searchMapIndex(req, m);
+			} 
+		}
+		return result;
+	}	
 }

@@ -24,11 +24,6 @@ import rtree.RTreeException;
 
 public class ObfDiffMerger {
 	
-	private double lattop = 85;
-	private double latbottom = -85;
-	private double lonleft = -179.9;
-	private double lonright = 179.9;
-	
 	public static void main(String[] args) {
 		try {
 			ObfDiffMerger merger = new ObfDiffMerger();
@@ -75,73 +70,17 @@ public class ObfDiffMerger {
 				diffs.addAll(odiffs);
 			}
 		}
-		// TODO check timestamps
-		ObfFileInMemory context = fetchAllObjects(diffs);
+		// TODO check timestamps TODO!!!
+		ObfFileInMemory context = new ObfFileInMemory();
+		context.mergeObfFiles(diffs);
 		context.writeFile(result);
 	}
 
 
 	
-	private ObfFileInMemory fetchAllObjects(List<File> diffs) throws IOException {
-		// TODO POI, Routing, Transport
-		ObfFileInMemory m = new ObfFileInMemory();
-		for (int i = diffs.size() - 1; i >= 0; i--) {
-			File f = diffs.get(i);
-			RandomAccessFile raf = new RandomAccessFile(f, "r");
-			BinaryMapIndexReader indexReader = new BinaryMapIndexReader(raf, f);
-			for (BinaryIndexPart p : indexReader.getIndexes()) {
-				if(p instanceof MapIndex) {
-					MapIndex mi = (MapIndex) p;
-					for(MapRoot mr : mi.getRoots()) {
-						MapZooms.MapZoomPair pair = new MapZooms.MapZoomPair(mr.getMinZoom(), mr.getMaxZoom());
-						TLongObjectHashMap<BinaryMapDataObject> res = m.get(pair);
-						TLongObjectHashMap<BinaryMapDataObject> objects = getBinaryMapData(indexReader, mr.getMinZoom());
-						res.putAll(objects);
-					}
-				}
-			}
-			m.updateTimestamp(indexReader.getDateCreated());
-			
-			indexReader.close();
-			raf.close();
-		}
-		return m;
-	}
 	
-	private TLongObjectHashMap<BinaryMapDataObject> getBinaryMapData(BinaryMapIndexReader index, int zoom) throws IOException {
-		final TLongObjectHashMap<BinaryMapDataObject> result = new TLongObjectHashMap<>();
-		for (BinaryIndexPart p : index.getIndexes()) {
-			if(p instanceof MapIndex) {
-				MapIndex m = ((MapIndex) p);
-				final SearchRequest<BinaryMapDataObject> req = BinaryMapIndexReader.buildSearchRequest(
-						MapUtils.get31TileNumberX(lonleft),
-						MapUtils.get31TileNumberX(lonright),
-						MapUtils.get31TileNumberY(lattop),
-						MapUtils.get31TileNumberY(latbottom),
-						zoom,
-						new SearchFilter() {
-							@Override
-							public boolean accept(TIntArrayList types, MapIndex index) {
-								return true;
-							}
-						},
-						new ResultMatcher<BinaryMapDataObject>() {
-							@Override
-							public boolean publish(BinaryMapDataObject obj) {
-								result.put(obj.getId(), obj);
-								return false;
-							}
-
-							@Override
-							public boolean isCancelled() {
-								return false;
-							}
-						});
-				index.searchMapIndex(req, m);
-			} 
-		}
-		return result;
-	}
+	
+	
 	
 	
 }
