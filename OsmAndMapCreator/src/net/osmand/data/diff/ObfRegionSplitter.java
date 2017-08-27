@@ -46,11 +46,11 @@ public class ObfRegionSplitter {
 	private double lonright = 179.9;
 	private static final int ZOOM_LEVEL = 15;
 	private static String todaysDateFolder;
-	private static String currentTime;
+	private static String timeSuffix;
 	
 	public static void main(String[] args) throws IOException {
 		if (args.length != 3) {
-			System.out.println("Usage: <path_to_world_obf_diff> <path_to_result_folder> <path_to_regions.ocbf>");
+			System.out.println("Usage: <path_to_world_obf_diff> <path_to_result_folder> <path_to_regions.ocbf> <subfolder_name> <file_suffix>");
 		}
 		
 		ObfRegionSplitter thisGenerator = new ObfRegionSplitter();
@@ -61,8 +61,8 @@ public class ObfRegionSplitter {
 		File worldObf = new File(args[0]);
 		File ocbfFile = new File(args[2]);
 		File dir = new File(args[1]);
-		todaysDateFolder = worldObf.getName().substring(0, 10);
-		currentTime = worldObf.getName().substring(11, 16);
+		todaysDateFolder = args[3];
+		timeSuffix = args[4];
 		if (!worldObf.exists() || !ocbfFile.exists()) {
 			System.out.println("Incorrect file!");
 			System.exit(1);
@@ -102,7 +102,7 @@ public class ObfRegionSplitter {
 	}
 
 	private void writeData(BinaryMapIndexReader indexReader, File f, TLongObjectHashMap<BinaryMapDataObject> list, String regionName) throws IOException, RTreeException {
-		File result = new File(f.getAbsolutePath(), Algorithms.capitalizeFirstLetter(regionName) + "_" + currentTime + ".obf");
+		File result = new File(f.getAbsolutePath(), Algorithms.capitalizeFirstLetter(regionName) + "_" + timeSuffix + ".obf");
 		final RandomAccessFile raf = new RandomAccessFile(result, "rw");
 		MapIndex part = indexReader.getMapIndexes().get(0);
 		// write files
