@@ -82,7 +82,6 @@ public class ObfDiffGenerator {
 		BinaryMapIndexReader indexE = new BinaryMapIndexReader(e, end);
 		List<MapIndex> endIndexes = indexE.getMapIndexes();
 		MapIndex mapIdx = endIndexes.get(0);
-		Map<Long, BinaryMapDataObject> removeList = new HashMap<>();
 		TLongObjectHashMap<BinaryMapDataObject> startData = getBinaryMapData(indexS);
 		TLongObjectHashMap<BinaryMapDataObject> endData = getBinaryMapData(indexE);
 //		List<Amenity> startPoi = getPoiData(indexS);
