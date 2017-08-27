@@ -9,12 +9,14 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 import net.osmand.IndexConstants;
@@ -26,9 +28,11 @@ import net.osmand.binary.BinaryMapIndexReader.MapIndex;
 import net.osmand.binary.BinaryMapIndexReader.MapRoot;
 import net.osmand.binary.BinaryMapIndexReader.SearchFilter;
 import net.osmand.binary.BinaryMapIndexReader.SearchRequest;
+import net.osmand.binary.BinaryMapPoiReaderAdapter.PoiRegion;
 import net.osmand.binary.MapZooms;
 import net.osmand.binary.MapZooms.MapZoomPair;
 import net.osmand.binary.OsmandOdb;
+import net.osmand.data.Amenity;
 import net.osmand.data.index.IndexUploader;
 import net.osmand.data.preparation.AbstractIndexPartCreator;
 import net.osmand.data.preparation.BinaryFileReference;
@@ -44,6 +48,7 @@ import rtree.Rect;
 import com.google.protobuf.CodedOutputStream;
 
 public class ObfFileInMemory {
+	private static final int ZOOM_LEVEL_POI = 15;
 	private double lattop = 85;
 	private double latbottom = -85;
 	private double lonleft = -179.9;
@@ -131,6 +136,7 @@ public class ObfFileInMemory {
 		ous.writeInt32(OsmandOdb.OsmAndStructure.VERSIONCONFIRM_FIELD_NUMBER, version);
 		ous.flush();
 		raf.close();
+		
 		if (gzip) {
 			nonGzip.setLastModified(timestamp);
 
@@ -210,9 +216,20 @@ public class ObfFileInMemory {
 	public void readObfFiles(List<File> files) throws IOException {
 		// TODO POI, Routing, Transport
 		for (int i = 0; i < files.size(); i++) {
-			File f = files.get(i);
-			RandomAccessFile raf = new RandomAccessFile(f, "r");
-			BinaryMapIndexReader indexReader = new BinaryMapIndexReader(raf, f);
+			File inputFile = files.get(i);
+			File nonGzip = inputFile;
+			boolean gzip = false;
+			if(inputFile.getName().endsWith(".gz")) {
+				nonGzip = new File(inputFile.getParentFile(), inputFile.getName().substring(0, inputFile.getName().length() - 3));
+				GZIPInputStream gzin = new GZIPInputStream(new FileInputStream(inputFile));
+				FileOutputStream fous = new FileOutputStream(nonGzip);
+				Algorithms.streamCopy(gzin, fous);
+				fous.close();
+				gzin.close();
+				gzip = true;
+			}
+			RandomAccessFile raf = new RandomAccessFile(nonGzip, "r");
+			BinaryMapIndexReader indexReader = new BinaryMapIndexReader(raf, nonGzip);
 			for (BinaryIndexPart p : indexReader.getIndexes()) {
 				if(p instanceof MapIndex) {
 					MapIndex mi = (MapIndex) p;
@@ -226,6 +243,9 @@ public class ObfFileInMemory {
 			updateTimestamp(indexReader.getDateCreated());
 			indexReader.close();
 			raf.close();
+			if(gzip) {
+				nonGzip.delete();
+			}
 		}
 	}
 
@@ -262,5 +282,35 @@ public class ObfFileInMemory {
 			} 
 		}
 		return result;
-	}	
+	}
+	
+	private List<Amenity> getPoiData(BinaryMapIndexReader index) throws IOException {
+		final List<Amenity> amenities = new ArrayList<>();
+		for (BinaryIndexPart p : index.getIndexes()) {
+			if (p instanceof PoiRegion) {				
+				SearchRequest<Amenity> req = BinaryMapIndexReader.buildSearchPoiRequest(
+					MapUtils.get31TileNumberX(lonleft),
+					MapUtils.get31TileNumberX(lonright),
+					MapUtils.get31TileNumberY(lattop),
+					MapUtils.get31TileNumberY(latbottom),
+					ZOOM_LEVEL_POI,
+					BinaryMapIndexReader.ACCEPT_ALL_POI_TYPE_FILTER,
+					new ResultMatcher<Amenity>() {
+						@Override
+						public boolean publish(Amenity object) {
+							amenities.add(object);
+							return false;
+						}
+
+						@Override
+						public boolean isCancelled() {
+							return false;
+						}
+					});
+				index.initCategories((PoiRegion) p);
+				index.searchPoi((PoiRegion) p, req);
+			}
+		}
+		return amenities;
+	}
 }
