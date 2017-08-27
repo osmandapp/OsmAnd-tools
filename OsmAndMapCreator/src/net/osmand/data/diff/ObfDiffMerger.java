@@ -1,25 +1,11 @@
 package net.osmand.data.diff;
 
-import gnu.trove.list.array.TIntArrayList;
-import gnu.trove.map.hash.TLongObjectHashMap;
-
 import java.io.File;
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
-import net.osmand.ResultMatcher;
-import net.osmand.binary.BinaryIndexPart;
-import net.osmand.binary.BinaryMapDataObject;
-import net.osmand.binary.BinaryMapIndexReader;
-import net.osmand.binary.BinaryMapIndexReader.MapIndex;
-import net.osmand.binary.BinaryMapIndexReader.MapRoot;
-import net.osmand.binary.BinaryMapIndexReader.SearchFilter;
-import net.osmand.binary.BinaryMapIndexReader.SearchRequest;
-import net.osmand.binary.MapZooms;
-import net.osmand.util.MapUtils;
 import rtree.RTreeException;
 
 public class ObfDiffMerger {
@@ -75,7 +61,5 @@ public class ObfDiffMerger {
 		context.readObfFiles(diffs);
 		context.writeFile(result);
 	}
-	
-	
 	
 }
