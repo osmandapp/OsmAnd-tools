@@ -127,19 +127,21 @@ public class ObfRegionSplitter {
 		
 		int version = indexReader.getVersion();
 		ous.writeInt32(OsmandOdb.OsmAndStructure.VERSION_FIELD_NUMBER, version);
-		ous.writeInt64(OsmandOdb.OsmAndStructure.DATECREATED_FIELD_NUMBER, System.currentTimeMillis());
+		ous.writeInt64(OsmandOdb.OsmAndStructure.DATECREATED_FIELD_NUMBER, indexReader.getDateCreated());
 		writeMapData(ous, indexReader, raf, part, result, list);
 //		writePoiData(ous);
 	
 		ous.writeInt32(OsmandOdb.OsmAndStructure.VERSIONCONFIRM_FIELD_NUMBER, version);
 		ous.flush();
 		
+		File outFile = new File(result.getAbsolutePath() + ".gz");
 		FileInputStream fis = new FileInputStream(result);
-		GZIPOutputStream gzout = new GZIPOutputStream(new FileOutputStream(new File(result.getAbsolutePath() + ".gz")));
+		GZIPOutputStream gzout = new GZIPOutputStream(new FileOutputStream(outFile));
 		Algorithms.streamCopy(fis, gzout);
 		fis.close();
 		gzout.close();
 		result.delete();
+		outFile.setLastModified(indexReader.getDateCreated());
 	}
 
 	private static void writeMapData(CodedOutputStream ous,

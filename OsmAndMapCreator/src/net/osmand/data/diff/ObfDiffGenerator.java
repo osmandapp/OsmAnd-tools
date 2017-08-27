@@ -80,6 +80,7 @@ public class ObfDiffGenerator {
 		RandomAccessFile e = new RandomAccessFile(end.getAbsolutePath(), "r");
 		BinaryMapIndexReader indexS = new BinaryMapIndexReader(s, start);
 		BinaryMapIndexReader indexE = new BinaryMapIndexReader(e, end);
+		long fileTimestamp = Math.max(indexS.getDateCreated(), indexE.getDateCreated());
 		List<MapIndex> endIndexes = indexE.getMapIndexes();
 		MapIndex mapIdx = endIndexes.get(0);
 		TLongObjectHashMap<BinaryMapDataObject> startData = getBinaryMapData(indexS);
@@ -105,7 +106,7 @@ public class ObfDiffGenerator {
 		if (result.exists()) {
 			result.delete();
 		}
-		generateFinalObf(result, indexE, endData, mapIdx);
+		generateFinalObf(result, indexE, endData, mapIdx, fileTimestamp);
 	}
 	
 	private TLongObjectHashMap<BinaryMapDataObject> getBinaryMapData(BinaryMapIndexReader index) throws IOException {
@@ -185,7 +186,8 @@ public class ObfDiffGenerator {
 				WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
 	}
 	
-	public static void generateFinalObf(File fileToExtract, BinaryMapIndexReader index, TLongObjectHashMap<BinaryMapDataObject> objects, MapIndex part) throws IOException, RTreeException {
+	public static void generateFinalObf(File fileToExtract, BinaryMapIndexReader index, TLongObjectHashMap<BinaryMapDataObject> objects, MapIndex part, 
+			long fileTimestamp) throws IOException, RTreeException {
 		final RandomAccessFile raf = new RandomAccessFile(fileToExtract, "rw");
 		// write files
 		CodedOutputStream ous = CodedOutputStream.newInstance(new OutputStream() {
@@ -209,12 +211,14 @@ public class ObfDiffGenerator {
 		
 		int version = index.getVersion();
 		ous.writeInt32(OsmandOdb.OsmAndStructure.VERSION_FIELD_NUMBER, version);
-		ous.writeInt64(OsmandOdb.OsmAndStructure.DATECREATED_FIELD_NUMBER, System.currentTimeMillis());
+		ous.writeInt64(OsmandOdb.OsmAndStructure.DATECREATED_FIELD_NUMBER, fileTimestamp);
 		writeMapData(ous, index, raf, part, fileToExtract, objects);
 //		writePoiData(ous);
 	
 		ous.writeInt32(OsmandOdb.OsmAndStructure.VERSIONCONFIRM_FIELD_NUMBER, version);
 		ous.flush();
+		raf.close();
+		fileToExtract.setLastModified(fileTimestamp);
 	}
 
 	private static void writeMapData(CodedOutputStream ous,
