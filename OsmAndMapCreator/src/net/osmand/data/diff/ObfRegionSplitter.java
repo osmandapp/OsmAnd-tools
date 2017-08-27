@@ -1,7 +1,9 @@
 package net.osmand.data.diff;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
@@ -9,6 +11,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.zip.GZIPOutputStream;
 
 import com.google.protobuf.CodedOutputStream;
 
@@ -44,6 +47,7 @@ public class ObfRegionSplitter {
 	private double lonright = 179.9;
 	private static final int ZOOM_LEVEL = 15;
 	private static String todaysDateFolder;
+	private static String currentTime;
 	
 	public static void main(String[] args) throws IOException {
 		if (args.length != 3) {
@@ -57,8 +61,9 @@ public class ObfRegionSplitter {
 	private void init(String[] args) throws IOException {
 		File worldObf = new File(args[0]);
 		File ocbfFile = new File(args[2]);
-		File dir = new File(args[2]);
+		File dir = new File(args[1]);
 		todaysDateFolder = worldObf.getName().substring(0, 10);
+		currentTime = worldObf.getName().substring(11, 16);
 		if (!worldObf.exists() || !ocbfFile.exists()) {
 			System.out.println("Incorrect file!");
 			System.exit(1);
@@ -77,23 +82,28 @@ public class ObfRegionSplitter {
 			e.printStackTrace();
 			System.exit(1);
 		}
-		Map<String, List<BinaryMapDataObject>> regionsData = splitRegions(allMapObjects, osmandRegions);
+		Map<String, TLongObjectHashMap<BinaryMapDataObject>> regionsData = splitRegions(allMapObjects, osmandRegions);
 		writeSplitedFiles(indexReader, regionsData, dir);		
 	}
 
 	private void writeSplitedFiles(BinaryMapIndexReader indexReader,
-			Map<String, List<BinaryMapDataObject>> regionsData, File dir) {
+			Map<String, TLongObjectHashMap<BinaryMapDataObject>> regionsData, File dir) {
 		for (String regionName : regionsData.keySet()) {
 			File f = new File(dir.getAbsolutePath() + "/" + regionName + "/" + todaysDateFolder);
 			f.mkdirs();
-			writeData(indexReader, f, regionsData.get(regionName), regionName);
+			try {
+				writeData(indexReader, f, regionsData.get(regionName), regionName);
+			} catch (IOException | RTreeException e) {
+				e.printStackTrace();
+				System.exit(1);
+			}
 			
 		}
 		
 	}
 
-	private void writeData(BinaryMapIndexReader indexReader, File f, List<BinaryMapDataObject> list, String regionName) throws IOException, RTreeException {
-		File result = new File(f.getAbsolutePath(), Algorithms.capitalizeFirstLetter(regionName) + "_" + todaysDateFolder);
+	private void writeData(BinaryMapIndexReader indexReader, File f, TLongObjectHashMap<BinaryMapDataObject> list, String regionName) throws IOException, RTreeException {
+		File result = new File(f.getAbsolutePath(), Algorithms.capitalizeFirstLetter(regionName) + "_" + currentTime + ".obf");
 		final RandomAccessFile raf = new RandomAccessFile(result, "rw");
 		MapIndex part = indexReader.getMapIndexes().get(0);
 		// write files
@@ -124,6 +134,13 @@ public class ObfRegionSplitter {
 	
 		ous.writeInt32(OsmandOdb.OsmAndStructure.VERSIONCONFIRM_FIELD_NUMBER, version);
 		ous.flush();
+		
+		FileInputStream fis = new FileInputStream(result);
+		GZIPOutputStream gzout = new GZIPOutputStream(new FileOutputStream(new File(result.getAbsolutePath() + ".gz")));
+		Algorithms.streamCopy(fis, gzout);
+		fis.close();
+		gzout.close();
+		result.delete();
 	}
 
 	private static void writeMapData(CodedOutputStream ous,
@@ -131,7 +148,7 @@ public class ObfRegionSplitter {
 			RandomAccessFile raf,
 			MapIndex part,
 			File fileToExtract,
-			List<BinaryMapDataObject> objects) throws IOException, RTreeException {
+			TLongObjectHashMap<BinaryMapDataObject> objects) throws IOException, RTreeException {
 		BinaryMapIndexWriter writer = new BinaryMapIndexWriter(raf, ous);
 		writer.startWriteMapIndex(part.getName());
 		boolean first = true;
@@ -143,7 +160,7 @@ public class ObfRegionSplitter {
 		RTree rtree = null;
 		try {
 			rtree = new RTree(nonpackRtree.getAbsolutePath());
-			for (BinaryMapDataObject key : objects) {
+			for (BinaryMapDataObject obj : objects.valueCollection()) {
 				int minX = obj.getPoint31XTile(0);
 				int maxX = obj.getPoint31XTile(0);
 				int maxY = obj.getPoint31YTile(0);
@@ -193,9 +210,9 @@ public class ObfRegionSplitter {
 		writer.endWriteMapIndex();
 	}		
 
-	private Map<String, List<BinaryMapDataObject>> splitRegions(List<BinaryMapDataObject> allMapObjects,
+	private Map<String, TLongObjectHashMap<BinaryMapDataObject>> splitRegions(List<BinaryMapDataObject> allMapObjects,
 			OsmandRegions osmandRegions) throws IOException {
-		Map<String, List<BinaryMapDataObject>> result = new HashMap<>();
+		Map<String, TLongObjectHashMap<BinaryMapDataObject>> result = new HashMap<>();
 		for (BinaryMapDataObject obj : allMapObjects) {
 			int x = obj.getPoint31XTile(0);
 			int y = obj.getPoint31YTile(0);
@@ -205,10 +222,10 @@ public class ObfRegionSplitter {
 					String dw = osmandRegions.getDownloadName(b);
 					if (!Algorithms.isEmpty(dw) && osmandRegions.isDownloadOfType(b, OsmandRegions.MAP_TYPE)) {
 						if (result.get(dw) != null) {
-							result.get(dw).add(obj);
+							result.get(dw).put(obj.getId(), obj);
 						}
-						List<BinaryMapDataObject> resultList = new ArrayList<>();
-						resultList.add(obj);
+						TLongObjectHashMap<BinaryMapDataObject> resultList = new TLongObjectHashMap<>();
+						resultList.put(obj.getId(), obj);
 						result.put(dw, resultList);
 					}
 				}
