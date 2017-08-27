@@ -130,9 +130,7 @@ public class ObfFileInMemory {
 			}
 			writer.endWriteMapIndex();
 		}
-		// TODO POI
-		// TODO Routing
-		// TODO Transport
+		// TODO Write POI, Routing, Transport
 		ous.writeInt32(OsmandOdb.OsmAndStructure.VERSIONCONFIRM_FIELD_NUMBER, version);
 		ous.flush();
 		raf.close();
@@ -214,7 +212,7 @@ public class ObfFileInMemory {
 	}
 
 	public void readObfFiles(List<File> files) throws IOException {
-		// TODO POI, Routing, Transport
+		// TODO READ POI, Routing, Transport
 		for (int i = 0; i < files.size(); i++) {
 			File inputFile = files.get(i);
 			File nonGzip = inputFile;
@@ -312,5 +310,13 @@ public class ObfFileInMemory {
 			}
 		}
 		return amenities;
+	}
+
+	public void filterAllZoomsBelow(int zm) {
+		for(MapZoomPair mz : new ArrayList<>(getZooms())) {
+			if(mz.getMaxZoom() < zm) {
+				mapObjects.remove(mz);
+			}
+		}		
 	}
 }
