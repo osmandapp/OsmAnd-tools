@@ -1,5 +1,8 @@
 package net.osmand.data.diff;
 
+import gnu.trove.list.array.TIntArrayList;
+import gnu.trove.map.hash.TLongObjectHashMap;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -12,19 +15,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.zip.GZIPOutputStream;
 
-import com.google.protobuf.CodedOutputStream;
-
-import gnu.trove.list.array.TIntArrayList;
-import gnu.trove.map.hash.TLongObjectHashMap;
 import net.osmand.ResultMatcher;
 import net.osmand.binary.BinaryIndexPart;
 import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.binary.BinaryMapIndexReader;
-import net.osmand.binary.OsmandOdb;
 import net.osmand.binary.BinaryMapIndexReader.MapIndex;
 import net.osmand.binary.BinaryMapIndexReader.MapRoot;
 import net.osmand.binary.BinaryMapIndexReader.SearchFilter;
 import net.osmand.binary.BinaryMapIndexReader.SearchRequest;
+import net.osmand.binary.OsmandOdb;
 import net.osmand.data.index.IndexUploader;
 import net.osmand.data.preparation.AbstractIndexPartCreator;
 import net.osmand.data.preparation.BinaryFileReference;
@@ -37,6 +36,8 @@ import rtree.LeafElement;
 import rtree.RTree;
 import rtree.RTreeException;
 import rtree.Rect;
+
+import com.google.protobuf.CodedOutputStream;
 
 public class ObfRegionSplitter {
 	
@@ -128,7 +129,7 @@ public class ObfRegionSplitter {
 		int version = indexReader.getVersion();
 		ous.writeInt32(OsmandOdb.OsmAndStructure.VERSION_FIELD_NUMBER, version);
 		ous.writeInt64(OsmandOdb.OsmAndStructure.DATECREATED_FIELD_NUMBER, indexReader.getDateCreated());
-		writeMapData(ous, indexReader, raf, part, result, list);
+		writeMapData(ous, raf, part, result, list);
 //		writePoiData(ous);
 	
 		ous.writeInt32(OsmandOdb.OsmAndStructure.VERSIONCONFIRM_FIELD_NUMBER, version);
@@ -145,7 +146,6 @@ public class ObfRegionSplitter {
 	}
 
 	private static void writeMapData(CodedOutputStream ous,
-			BinaryMapIndexReader index,
 			RandomAccessFile raf,
 			MapIndex part,
 			File fileToExtract,
@@ -187,14 +187,14 @@ public class ObfRegionSplitter {
 			Rect rootBounds = IndexUploader.calcBounds(root);
 			if (rootBounds != null) {
 				if(first) {
-					writer.writeMapEncodingRules(index, part);
+					writer.writeMapEncodingRules(part.decodingRules);
 					first = false;
 				}
 				writer.startWriteMapLevelIndex(r.getMinZoom(), r.getMaxZoom(), rootBounds.getMinX(),
 						rootBounds.getMaxX(), rootBounds.getMinY(), rootBounds.getMaxY());
 				IndexVectorMapCreator.writeBinaryMapTree(root, rootBounds, rtree, writer, treeHeader);
 
-				IndexUploader.writeBinaryMapBlock(root, rootBounds, rtree, writer, treeHeader, objects, r);
+				IndexUploader.writeBinaryMapBlock(root, rootBounds, rtree, writer, treeHeader, objects, r.getMapZoom());
 				writer.endWriteMapLevelIndex();
 									
 			}

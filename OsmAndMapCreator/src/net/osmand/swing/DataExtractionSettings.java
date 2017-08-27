@@ -4,19 +4,15 @@ import java.awt.Rectangle;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.prefs.Preferences;
 
-import org.xmlpull.v1.XmlPullParserException;
-
-import net.osmand.binary.GeocodingUtilities;
-import net.osmand.binary.GeocodingUtilities.GeocodingResult;
+import net.osmand.binary.MapZooms;
 import net.osmand.data.LatLon;
 import net.osmand.data.preparation.IndexCreator;
-import net.osmand.data.preparation.MapZooms;
 import net.osmand.router.RoutingConfiguration;
 import net.osmand.router.RoutingConfiguration.Builder;
+
+import org.xmlpull.v1.XmlPullParserException;
 
 
 public class DataExtractionSettings {

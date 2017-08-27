@@ -19,8 +19,8 @@ import java.util.Set;
 import java.util.TreeMap;
 
 import net.osmand.PlatformUtil;
+import net.osmand.binary.MapZooms;
 import net.osmand.data.preparation.IndexCreator;
-import net.osmand.data.preparation.MapZooms;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.util.Algorithms;

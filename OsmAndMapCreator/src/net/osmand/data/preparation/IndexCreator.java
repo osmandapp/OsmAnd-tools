@@ -17,6 +17,7 @@ import java.util.zip.GZIPInputStream;
 
 import net.osmand.IProgress;
 import net.osmand.IndexConstants;
+import net.osmand.binary.MapZooms;
 import net.osmand.data.Multipolygon;
 import net.osmand.data.preparation.OsmDbAccessor.OsmDbVisitor;
 import net.osmand.data.preparation.address.IndexAddressCreator;

@@ -4,6 +4,7 @@ package net.osmand.data.preparation;
 import gnu.trove.list.array.TByteArrayList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.list.array.TLongArrayList;
+import gnu.trove.map.TIntObjectMap;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -279,9 +280,9 @@ public class BinaryMapIndexWriter {
 		log.info("MAP level SIZE : " + len);
 	}
 
-	public void writeMapEncodingRules(BinaryMapIndexReader reader, MapIndex part) throws IOException {
-		for (int i = 1; i <= part.decodingRules.size(); i++) {
-			TagValuePair value = part.decodingRules.get(i);
+	public void writeMapEncodingRules(TIntObjectMap<TagValuePair> decodingRules) throws IOException {
+		for (int i = 1; i <= decodingRules.size(); i++) {
+			TagValuePair value = decodingRules.get(i);
 			MapEncodingRule.Builder builder = OsmandOdb.OsmAndMapIndex.MapEncodingRule.newBuilder();
 			if (value == null) {
 				break;
