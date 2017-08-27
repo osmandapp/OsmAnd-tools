@@ -45,11 +45,9 @@ public class ObfRegionSplitter {
 	private double lonleft = -179.9;
 	private double lonright = 179.9;
 	private static final int ZOOM_LEVEL = 15;
-	private static String todaysDateFolder;
-	private static String timeSuffix;
 	
 	public static void main(String[] args) throws IOException {
-		if (args.length != 3) {
+		if (args.length <= 3) {
 			System.out.println("Usage: <path_to_world_obf_diff> <path_to_result_folder> <path_to_regions.ocbf> <subfolder_name> <file_suffix>");
 		}
 		
@@ -61,8 +59,8 @@ public class ObfRegionSplitter {
 		File worldObf = new File(args[0]);
 		File ocbfFile = new File(args[2]);
 		File dir = new File(args[1]);
-		todaysDateFolder = args[3];
-		timeSuffix = args[4];
+		String subFolder = args.length > 3? args[3] : "";
+		String fileSuffix = args.length > 4 ? args[4] : "";
 		if (!worldObf.exists() || !ocbfFile.exists()) {
 			System.out.println("Incorrect file!");
 			System.exit(1);
@@ -70,39 +68,41 @@ public class ObfRegionSplitter {
 		if (!dir.exists()) {
 			dir.mkdir();
 		}
-		RandomAccessFile raf = new RandomAccessFile(worldObf.getAbsolutePath(), "r");
-		BinaryMapIndexReader indexReader = new BinaryMapIndexReader(raf, worldObf);
-		List<BinaryMapDataObject> allMapObjects = getMapObjects(indexReader);
-		OsmandRegions osmandRegions = new OsmandRegions();
 		try {
+			RandomAccessFile raf = new RandomAccessFile(worldObf.getAbsolutePath(), "r");
+			BinaryMapIndexReader indexReader = new BinaryMapIndexReader(raf, worldObf);
+			List<BinaryMapDataObject> allMapObjects = getMapObjects(indexReader);
+			OsmandRegions osmandRegions = new OsmandRegions();
+
 			osmandRegions.prepareFile(ocbfFile.getAbsolutePath());
 			osmandRegions.cacheAllCountries();
-		} catch (IOException e) {
+
+			Map<String, TLongObjectHashMap<BinaryMapDataObject>> regionsData = splitRegions(allMapObjects,
+					osmandRegions);
+			writeSplittedFiles(indexReader, regionsData, dir, subFolder, fileSuffix);
+		} catch (Exception e) {
 			e.printStackTrace();
 			System.exit(1);
 		}
-		Map<String, TLongObjectHashMap<BinaryMapDataObject>> regionsData = splitRegions(allMapObjects, osmandRegions);
-		writeSplitedFiles(indexReader, regionsData, dir);		
 	}
 
-	private void writeSplitedFiles(BinaryMapIndexReader indexReader,
-			Map<String, TLongObjectHashMap<BinaryMapDataObject>> regionsData, File dir) {
+	private void writeSplittedFiles(BinaryMapIndexReader indexReader,
+			Map<String, TLongObjectHashMap<BinaryMapDataObject>> regionsData, 
+			File dir, String subFolder, String fileSuffix) throws IOException, RTreeException {
 		for (String regionName : regionsData.keySet()) {
-			File f = new File(dir.getAbsolutePath() + "/" + regionName + "/" + todaysDateFolder);
-			f.mkdirs();
-			try {
-				writeData(indexReader, f, regionsData.get(regionName), regionName);
-			} catch (IOException | RTreeException e) {
-				e.printStackTrace();
-				System.exit(1);
+			File folder = new File(dir, regionName);
+			if(Algorithms.isEmpty(subFolder)) {
+				folder = new File(folder, subFolder);
 			}
-			
+			folder.mkdirs();
+			writeData(indexReader, folder, regionsData.get(regionName), regionName, fileSuffix);
 		}
 		
 	}
 
-	private void writeData(BinaryMapIndexReader indexReader, File f, TLongObjectHashMap<BinaryMapDataObject> list, String regionName) throws IOException, RTreeException {
-		File result = new File(f.getAbsolutePath(), Algorithms.capitalizeFirstLetter(regionName) + "_" + timeSuffix + ".obf");
+	private void writeData(BinaryMapIndexReader indexReader, File f, TLongObjectHashMap<BinaryMapDataObject> list, 
+			String regionName, String fileSuffix) throws IOException, RTreeException {
+		File result = new File(f.getAbsolutePath(), Algorithms.capitalizeFirstLetter(regionName) + fileSuffix + ".obf");
 		final RandomAccessFile raf = new RandomAccessFile(result, "rw");
 		MapIndex part = indexReader.getMapIndexes().get(0);
 		// write files
