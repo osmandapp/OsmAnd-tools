@@ -59,7 +59,7 @@ public class ObfRegionSplitter {
 		File worldObf = new File(args[0]);
 		File ocbfFile = new File(args[2]);
 		File dir = new File(args[1]);
-		String subFolder = args.length > 3? args[3] : "";
+		String subFolder = args.length > 3 ? args[3] : "";
 		String fileSuffix = args.length > 4 ? args[4] : "";
 		if (!worldObf.exists() || !ocbfFile.exists()) {
 			System.out.println("Incorrect file!");
@@ -91,7 +91,7 @@ public class ObfRegionSplitter {
 			File dir, String subFolder, String fileSuffix) throws IOException, RTreeException {
 		for (String regionName : regionsData.keySet()) {
 			File folder = new File(dir, regionName);
-			if(Algorithms.isEmpty(subFolder)) {
+			if(!Algorithms.isEmpty(subFolder)) {
 				folder = new File(folder, subFolder);
 			}
 			folder.mkdirs();
