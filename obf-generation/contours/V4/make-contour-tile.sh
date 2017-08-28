@@ -47,7 +47,7 @@ outfile=$outdir$fileroot.osm
 #if [ ! -f $outfile.bz2 ]
 #then
 	echo "----------------------------------------------"
-	echo "Processing"$fileroot
+	echo "Processing "$fileroot
 	echo "----------------------------------------------"
 	echo "Extracting shapefile …"
 	if [ -f ${TMP_DIR}${tmpfile}.shp ]; then rm ${TMP_DIR}${tmpfile}.shp ${TMP_DIR}${tmpfile}.dbf ${TMP_DIR}${tmpfile}.prj ${TMP_DIR}${tmpfile}.shx; fi
