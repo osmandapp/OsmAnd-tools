@@ -21,7 +21,7 @@ if [ ! -d $2 ]; then
   exit 3
 fi
 if [ ! $3 ]; then
-  echo "thread numbers not found"
+  thread_number=1
   exit 3
 fi
 working_dir=$(pwd)
