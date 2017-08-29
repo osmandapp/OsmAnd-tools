@@ -84,15 +84,14 @@ public class ObfDiffMerger {
 		try {
 			Date currentDate = new Date();
 			String cdate = day.format(currentDate);
-			String cmnt = month.format(currentDate);
 			File folder = new File(location);
 			for (File region : getSortedFiles(folder)) {
 				if (!region.isDirectory()) {
 					continue;
 				}
 				String regionName = Algorithms.capitalizeFirstLetter(region.getName());
-				if (regionName.equals("_diff")) {
-					regionName = "World";
+				if (regionName.startsWith("_")) {
+					continue;
 				}
 				List<File> days = getSortedFiles(region);
 				
