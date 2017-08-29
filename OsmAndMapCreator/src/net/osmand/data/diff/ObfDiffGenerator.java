@@ -19,6 +19,12 @@ public class ObfDiffGenerator {
 	public static final int BUFFER_SIZE = 1 << 20;
 	
 	public static void main(String[] args) throws IOException, RTreeException {
+		if(args.length == 1 && args[0].equals("test")) {
+			args = new String[3];
+			args[0] = "/Users/victorshcherb/osmand/maps/diff/2017_08_28_01_00_before.obf.gz";
+			args[1] = "/Users/victorshcherb/osmand/maps/diff/2017_08_28_01_00_after.obf.gz";
+			args[2] = "/Users/victorshcherb/osmand/maps/diff/2017_08_28_01_00_diff.obf.gz";
+		}
 		if (args.length != 3) {
 			System.out.println("Usage: <path to old obf> <path to new obf> <result file name>");
 			System.exit(1);
@@ -38,8 +44,8 @@ public class ObfDiffGenerator {
 		File end = new File(args[1]);
 		File result  = new File(args[2]);
 		if (!start.exists() || !end.exists()) {
-			System.exit(1);
 			System.err.println("Input Obf file doesn't exist");
+			System.exit(1);
 			return;
 		}
 		generateDiff(start, end, result);

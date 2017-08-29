@@ -19,8 +19,17 @@ public class ObfRegionSplitter {
 	
 	
 	public static void main(String[] args) throws IOException {
+		if(args.length == 1 && args[0].equals("test")) {
+			args = new String[5];
+			args[0] = "/Users/victorshcherb/osmand/maps/diff/2017_08_28_01_00_diff.obf.gz";
+			args[1] = "/Users/victorshcherb/osmand/maps/diff/regions";
+			args[2] = "/Users/victorshcherb/osmand/repos/android/OsmAnd/src/net/osmand/map/regions.ocbf";
+			args[3] = "";
+			args[4] = "_01_00";
+		}
 		if (args.length <= 3) {
-			System.out.println("Usage: <path_to_world_obf_diff> <path_to_result_folder> <path_to_regions.ocbf> <subfolder_name> <file_suffix>");
+			System.err.println("Usage: <path_to_world_obf_diff> <path_to_result_folder> <path_to_regions.ocbf> <subfolder_name> <file_suffix>");
+			return;
 		}
 		
 		ObfRegionSplitter thisGenerator = new ObfRegionSplitter();
@@ -77,7 +86,7 @@ public class ObfRegionSplitter {
 		Map<String, Map<MapZoomPair, TLongObjectHashMap<BinaryMapDataObject>>> result = new HashMap<>();
 		for (MapZoomPair p : allMapObjects.getZooms()) {
 			TLongObjectHashMap<BinaryMapDataObject> objects = allMapObjects.get(p);
-			for (BinaryMapDataObject obj : objects.values()) {
+			for (BinaryMapDataObject obj : objects.valueCollection()) {
 				int x = obj.getPoint31XTile(0);
 				int y = obj.getPoint31YTile(0);
 				List<BinaryMapDataObject> l = osmandRegions.query(x, y);

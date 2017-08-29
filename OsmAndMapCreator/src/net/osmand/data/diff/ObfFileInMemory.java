@@ -60,7 +60,7 @@ public class ObfFileInMemory {
 	private MapIndex mapIndex = new MapIndex(); 
 
 	public TLongObjectHashMap<BinaryMapDataObject> get(MapZooms.MapZoomPair zoom) {
-		if (mapObjects.containsKey(zoom)) {
+		if (!mapObjects.containsKey(zoom)) {
 			mapObjects.put(zoom, new TLongObjectHashMap<BinaryMapDataObject>());
 		}
 		return mapObjects.get(zoom);
@@ -90,7 +90,11 @@ public class ObfFileInMemory {
 
 	public void writeFile(File targetFile) throws IOException, RTreeException {
 		boolean gzip = targetFile.getName().endsWith(".gz");
-		File nonGzip = new File(targetFile.getParentFile(), targetFile.getName().substring(0, targetFile.getName().length() - 3));
+		File nonGzip = targetFile;
+		if(gzip) {
+			nonGzip = new File(targetFile.getParentFile(), 
+				targetFile.getName().substring(0, targetFile.getName().length() - 3));
+		}
 		final RandomAccessFile raf = new RandomAccessFile(nonGzip, "rw");
 		// write files
 		CodedOutputStream ous = CodedOutputStream.newInstance(new OutputStream() {
