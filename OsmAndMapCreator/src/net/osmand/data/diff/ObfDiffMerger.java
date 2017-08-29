@@ -3,9 +3,11 @@ package net.osmand.data.diff;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 
+import net.osmand.util.Algorithms;
 import rtree.RTreeException;
 
 public class ObfDiffMerger {
@@ -22,8 +24,29 @@ public class ObfDiffMerger {
 	
 	
 	public static void mergeBulkOsmLiveDay(String location) {
-		// TODO Auto-generated method stub
-		
+		try {
+			File folder = new File(location);
+			for (File region : folder.listFiles()) {
+				if (!region.isDirectory()) {
+					continue;
+				}
+				System.out.println("Process " + region + " .");
+				String regionName = Algorithms.capitalizeFirstLetter(region.getName());
+				if (regionName.equals("_diff")) {
+					regionName = "World";
+				}
+				for (File date : region.listFiles()) {
+					if (!date.isDirectory()) {
+						continue;
+					}
+					File flToMerge = new File(region, regionName + "_" + date.getName() + ".obf.gz");
+					new ObfDiffMerger().process(flToMerge, Arrays.asList(date), true);
+				}
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+			System.exit(1);
+		}
 	}
 	
 	public static void mergeBulkOsmLiveMonth(String location) {
