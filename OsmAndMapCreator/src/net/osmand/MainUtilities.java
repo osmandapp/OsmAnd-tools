@@ -15,6 +15,7 @@ import net.osmand.binary.MapZooms;
 import net.osmand.data.diff.AugmentedDiffsInspector;
 import net.osmand.data.diff.GenerateDailyObf;
 import net.osmand.data.diff.ObfDiffGenerator;
+import net.osmand.data.diff.ObfDiffMerger;
 import net.osmand.data.diff.ObfRegionSplitter;
 import net.osmand.data.index.GenerateRegionTags;
 import net.osmand.data.index.IndexUploader;
@@ -88,6 +89,8 @@ public class MainUtilities {
 				generateObf(subArgsArray, ic);
 			} else if (utl.equals("split-obf")) {
 				ObfRegionSplitter.main(subArgsArray);
+			} else if (utl.equals("merge-obf")) {
+				ObfDiffMerger.main(subArgsArray);
 			} else if (utl.equals("generate-address")) {
 				IndexCreator ic = new IndexCreator(new File("."));
 				ic.setIndexAddress(true);
@@ -199,6 +202,7 @@ public class MainUtilities {
 		System.out.println("\t\t generate-ocean-tile <coastline osm file> <optional output file>: creates ocean tiles 12 zoom");
 		System.out.println("\t\t generate-java-style <pathtostyle> <pathtooutputfolder>: prints rendering style as java interpreted code");
 		System.out.println("\t\t explain-rendering-style <pathtostyle>: prints explanation of the style");
+		System.out.println("\t\t merge-obf <path to result file> <paths to files to merge (>2)>: merges all data from 2+ obf files");
 		System.out.println("\t\t split-obf <path_to_world_obf_diff> <path_to_result_folder> <path_to_regions.ocbf> <subfolder_name> <file_suffix>: splits a world_obf into obf region files");
 		System.out.println("\t\t generate-obf-diff <path_old_obf> <path_new_obf> <name_or_path_diff_obf>: generates obf diff file between 2 obf files");
 		System.out.println("\t\t test-routing <own list of parameters>: helps to run routing test for specific locations");
