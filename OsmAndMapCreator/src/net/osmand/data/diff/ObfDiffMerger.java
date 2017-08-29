@@ -34,7 +34,7 @@ public class ObfDiffMerger {
 
 	private void mergeChanges(String[] args) throws IOException, RTreeException {
 		File result = new File(args[0]);
-		List<File> diffs = new ArrayList<>();
+		List<File> inputDiffs = new ArrayList<>();
 		boolean checkTimestamps = false;
 		for (int i = 1; i < args.length; i++) {
 			if(args[i].equals("--check-timestamp")) {
@@ -42,6 +42,18 @@ public class ObfDiffMerger {
 				continue;
 			}
 			File fl = new File(args[i]);
+			if(!fl.exists()) {
+				throw new IllegalArgumentException("File not found: " + fl.getAbsolutePath());
+			}
+			inputDiffs.add(fl);
+		}
+		process(result, inputDiffs, checkTimestamps);
+	}
+
+	public void process(File result, List<File> inputDiffs, boolean checkTimestamps) throws IOException,
+			RTreeException {
+		List<File> diffs = new ArrayList<>();
+		for(File fl : inputDiffs) {
 			if (fl.isDirectory()) {
 				File[] lf = fl.listFiles();
 				List<File> odiffs = new ArrayList<>();
@@ -54,9 +66,23 @@ public class ObfDiffMerger {
 				}
 				sortByDate(odiffs);
 				diffs.addAll(odiffs);
+			} else {
+				diffs.add(fl);
 			}
 		}
-		// TODO check timestamps TODO!!!
+		if(checkTimestamps && result.exists()) {
+			boolean skipEditing = true;
+			long lastModified = result.lastModified();
+			for(File f : diffs) {
+				if(f.lastModified() > lastModified) {
+					skipEditing = false;
+					break;
+				}
+			}
+			if(skipEditing) {
+				return;
+			}
+		}
 		ObfFileInMemory context = new ObfFileInMemory();
 		context.readObfFiles(diffs);
 		context.writeFile(result);
