@@ -2,7 +2,6 @@ package net.osmand;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.sql.SQLException;
@@ -12,14 +11,14 @@ import java.util.List;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
+import net.osmand.binary.MapZooms;
 import net.osmand.data.diff.AugmentedDiffsInspector;
+import net.osmand.data.diff.GenerateDailyObf;
 import net.osmand.data.diff.ObfDiffGenerator;
 import net.osmand.data.diff.ObfRegionSplitter;
-import net.osmand.data.diff.GenerateDailyObf;
 import net.osmand.data.index.GenerateRegionTags;
 import net.osmand.data.index.IndexUploader;
 import net.osmand.data.preparation.IndexCreator;
-import net.osmand.data.preparation.MapZooms;
 import net.osmand.data.preparation.OceanTilesCreator;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.osm.MapRenderingTypesEncoder;

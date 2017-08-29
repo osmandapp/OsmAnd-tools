@@ -1,54 +1,30 @@
 package net.osmand.data.diff;
 
+import gnu.trove.map.hash.TLongObjectHashMap;
+
 import java.io.File;
 import java.io.IOException;
-import java.io.OutputStream;
-import java.io.RandomAccessFile;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.Collections;
 
-import com.google.protobuf.CodedOutputStream;
-import com.google.protobuf.WireFormat;
-
-import gnu.trove.list.array.TIntArrayList;
-import gnu.trove.map.hash.TLongObjectHashMap;
-import net.osmand.ResultMatcher;
-import net.osmand.binary.BinaryIndexPart;
 import net.osmand.binary.BinaryMapDataObject;
-import net.osmand.binary.BinaryMapIndexReader;
-import net.osmand.binary.OsmandOdb;
 import net.osmand.binary.BinaryMapIndexReader.MapIndex;
-import net.osmand.binary.BinaryMapIndexReader.MapRoot;
-import net.osmand.binary.BinaryMapIndexReader.SearchFilter;
-import net.osmand.binary.BinaryMapIndexReader.SearchRequest;
-import net.osmand.binary.BinaryMapPoiReaderAdapter.PoiRegion;
-import net.osmand.data.Amenity;
-import net.osmand.data.index.IndexUploader;
-import net.osmand.data.preparation.AbstractIndexPartCreator;
-import net.osmand.data.preparation.BinaryFileReference;
-import net.osmand.data.preparation.BinaryMapIndexWriter;
-import net.osmand.data.preparation.IndexVectorMapCreator;
-import net.osmand.util.MapUtils;
-import rtree.LeafElement;
-import rtree.RTree;
+import net.osmand.binary.MapZooms.MapZoomPair;
 import rtree.RTreeException;
-import rtree.Rect;
 
 public class ObfDiffGenerator {
 	
 	
 	private static final String OSMAND_CHANGE_VALUE = "delete";
 	private static final String OSMAND_CHANGE_TAG = "osmand_change";
-	private double lattop = 85;
-	private double latbottom = -85;
-	private double lonleft = -179.9;
-	private double lonright = 179.9;
-	private static final int ZOOM_LEVEL = 15;
 	public static final int BUFFER_SIZE = 1 << 20;
 	
 	public static void main(String[] args) throws IOException, RTreeException {
+		if(args.length == 1 && args[0].equals("test")) {
+			args = new String[3];
+			args[0] = "/Users/victorshcherb/osmand/maps/diff/2017_08_28_01_00_before.obf.gz";
+			args[1] = "/Users/victorshcherb/osmand/maps/diff/2017_08_28_01_00_after.obf.gz";
+			args[2] = "/Users/victorshcherb/osmand/maps/diff/2017_08_28_01_00_diff.obf.gz";
+		}
 		if (args.length != 3) {
 			System.out.println("Usage: <path to old obf> <path to new obf> <result file name>");
 			System.exit(1);
@@ -56,236 +32,63 @@ public class ObfDiffGenerator {
 		}
 		try {
 			ObfDiffGenerator generator = new ObfDiffGenerator();
-			generator.initialize(args);
+			generator.run(args);
 		} catch(Exception e) {
 			e.printStackTrace();
 			System.exit(1);
 		}
 	}
 	
-	private void initialize(String[] args) throws IOException, RTreeException {
+	private void run(String[] args) throws IOException, RTreeException {
 		File start = new File(args[0]);
 		File end = new File(args[1]);
 		File result  = new File(args[2]);
 		if (!start.exists() || !end.exists()) {
-			System.exit(1);
 			System.err.println("Input Obf file doesn't exist");
+			System.exit(1);
 			return;
 		}
 		generateDiff(start, end, result);
 	}
 
 	private void generateDiff(File start, File end, File result) throws IOException, RTreeException {
-		RandomAccessFile s = new RandomAccessFile(start.getAbsolutePath(), "r");
-		RandomAccessFile e = new RandomAccessFile(end.getAbsolutePath(), "r");
-		BinaryMapIndexReader indexS = new BinaryMapIndexReader(s, start);
-		BinaryMapIndexReader indexE = new BinaryMapIndexReader(e, end);
-		long fileTimestamp = Math.max(indexS.getDateCreated(), indexE.getDateCreated());
-		List<MapIndex> endIndexes = indexE.getMapIndexes();
-		MapIndex mapIdx = endIndexes.get(0);
-		TLongObjectHashMap<BinaryMapDataObject> startData = getBinaryMapData(indexS);
-		TLongObjectHashMap<BinaryMapDataObject> endData = getBinaryMapData(indexE);
-//		List<Amenity> startPoi = getPoiData(indexS);
-//		List<Amenity> endPoi = getPoiData(indexE);
-//		List<Amenity> newPoi = comparePoi(startPoi, endPoi);
+		ObfFileInMemory fStart = new ObfFileInMemory();
+		fStart.readObfFiles(Collections.singletonList(start));
+		ObfFileInMemory fEnd = new ObfFileInMemory();
+		fEnd.readObfFiles(Collections.singletonList(end));
+		// TODO Compare POI, Transport, Routing
+		// TODO compare zoom level 13-14 and pick up only area, point objects (not line objects!)
+		fStart.filterAllZoomsBelow(15);
+		fEnd.filterAllZoomsBelow(15);
+		MapIndex mi = fEnd.getMapIndex();
+		int deleteId = mi.decodingRules.size() + 1;
+		mi.initMapEncodingRule(0, deleteId, OSMAND_CHANGE_TAG, OSMAND_CHANGE_VALUE);
 		System.out.println("Comparing the files...");
-		mapIdx.initMapEncodingRule(0, mapIdx.decodingRules.size() + 1, OSMAND_CHANGE_TAG, OSMAND_CHANGE_VALUE);
-		for(Long idx : startData.keys()) {
-			BinaryMapDataObject objE = endData.get(idx);
-			BinaryMapDataObject objS = startData.get(idx);
-			if (objE == null) {
-				// Object with this id is not present in the second obf
-				BinaryMapDataObject obj = new BinaryMapDataObject(idx, objS.getCoordinates(), null,
-						objS.getObjectType(), objS.isArea(), new int[] { mapIdx.decodingRules.size() }, null);
-				endData.put(idx, obj);
-			} else if(objE.compareBinary(objS)){
-				endData.remove(idx);
+		for (MapZoomPair mz : fStart.getZooms()) {
+			TLongObjectHashMap<BinaryMapDataObject> startData = fStart.get(mz);
+			TLongObjectHashMap<BinaryMapDataObject> endData = fEnd.get(mz);
+			if (endData == null) {
+				continue;
+			}
+			for (Long idx : startData.keys()) {
+				BinaryMapDataObject objE = endData.get(idx);
+				BinaryMapDataObject objS = startData.get(idx);
+				if (objE == null) {
+					// Object with this id is not present in the second obf
+					BinaryMapDataObject obj = new BinaryMapDataObject(idx, objS.getCoordinates(), null,
+							objS.getObjectType(), objS.isArea(), new int[] { deleteId }, null);
+					endData.put(idx, obj);
+				} else if (objE.compareBinary(objS)) {
+					endData.remove(idx);
+				}
 			}
 		}
 		System.out.println("Finished comparing.");
 		if (result.exists()) {
 			result.delete();
 		}
-		generateFinalObf(result, indexE, endData, mapIdx, fileTimestamp);
-	}
-	
-	private TLongObjectHashMap<BinaryMapDataObject> getBinaryMapData(BinaryMapIndexReader index) throws IOException {
-		final TLongObjectHashMap<BinaryMapDataObject> result = new TLongObjectHashMap<>();
-		for (BinaryIndexPart p : index.getIndexes()) {
-			if(p instanceof MapIndex) {
-				MapIndex m = ((MapIndex) p);
-				final SearchRequest<BinaryMapDataObject> req = BinaryMapIndexReader.buildSearchRequest(
-						MapUtils.get31TileNumberX(lonleft),
-						MapUtils.get31TileNumberX(lonright),
-						MapUtils.get31TileNumberY(lattop),
-						MapUtils.get31TileNumberY(latbottom),
-						ZOOM_LEVEL,
-						new SearchFilter() {
-							@Override
-							public boolean accept(TIntArrayList types, MapIndex index) {
-								return true;
-							}
-						},
-						new ResultMatcher<BinaryMapDataObject>() {
-							@Override
-							public boolean publish(BinaryMapDataObject obj) {
-								result.put(obj.getId(), obj);
-								return false;
-							}
-
-							@Override
-							public boolean isCancelled() {
-								return false;
-							}
-						});
-				index.searchMapIndex(req, m);
-			} 
-		}
-		return result;
-	}
-	
-	private List<Amenity> comparePoi(List<Amenity> startPoi, List<Amenity> endPoi) {
-		for (Amenity a : startPoi) {
-			endPoi.remove(a);
-		}
-		return endPoi;
-	}
-	
-	private List<Amenity> getPoiData(BinaryMapIndexReader index) throws IOException {
-		final List<Amenity> amenities = new ArrayList<>();
-		for (BinaryIndexPart p : index.getIndexes()) {
-			if (p instanceof PoiRegion) {				
-				SearchRequest<Amenity> req = BinaryMapIndexReader.buildSearchPoiRequest(
-					MapUtils.get31TileNumberX(lonleft),
-					MapUtils.get31TileNumberX(lonright),
-					MapUtils.get31TileNumberY(lattop),
-					MapUtils.get31TileNumberY(latbottom),
-					ZOOM_LEVEL,
-					BinaryMapIndexReader.ACCEPT_ALL_POI_TYPE_FILTER,
-					new ResultMatcher<Amenity>() {
-						@Override
-						public boolean publish(Amenity object) {
-							amenities.add(object);
-							return false;
-						}
-
-						@Override
-						public boolean isCancelled() {
-							return false;
-						}
-					});
-				index.initCategories((PoiRegion) p);
-				index.searchPoi((PoiRegion) p, req);
-			}
-		}
-		return amenities;
-	}
-	
-	private static void writePoiData(CodedOutputStream ous) throws IOException {
-		ous.writeTag(OsmandOdb.OsmAndStructure.POIINDEX_FIELD_NUMBER,
-				WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
-	}
-	
-	public static void generateFinalObf(File fileToExtract, BinaryMapIndexReader index, TLongObjectHashMap<BinaryMapDataObject> objects, MapIndex part, 
-			long fileTimestamp) throws IOException, RTreeException {
-		final RandomAccessFile raf = new RandomAccessFile(fileToExtract, "rw");
-		// write files
-		CodedOutputStream ous = CodedOutputStream.newInstance(new OutputStream() {
-			@Override
-			public void write(int b) throws IOException {
-				raf.write(b);
-			}
-
-			@Override
-			public void write(byte[] b) throws IOException {
-				raf.write(b);
-			}
-
-			@Override
-			public void write(byte[] b, int off, int len) throws IOException {
-				raf.write(b, off, len);
-			}
-
-		});
-		
-		
-		int version = index.getVersion();
-		ous.writeInt32(OsmandOdb.OsmAndStructure.VERSION_FIELD_NUMBER, version);
-		ous.writeInt64(OsmandOdb.OsmAndStructure.DATECREATED_FIELD_NUMBER, fileTimestamp);
-		writeMapData(ous, index, raf, part, fileToExtract, objects);
-//		writePoiData(ous);
-	
-		ous.writeInt32(OsmandOdb.OsmAndStructure.VERSIONCONFIRM_FIELD_NUMBER, version);
-		ous.flush();
-		raf.close();
-		fileToExtract.setLastModified(fileTimestamp);
+		fEnd.writeFile(result);
 	}
 
-	private static void writeMapData(CodedOutputStream ous,
-			BinaryMapIndexReader index,
-			RandomAccessFile raf,
-			MapIndex part,
-			File fileToExtract,
-			TLongObjectHashMap<BinaryMapDataObject> objects) throws IOException, RTreeException {
-		BinaryMapIndexWriter writer = new BinaryMapIndexWriter(raf, ous);
-		writer.startWriteMapIndex(part.getName());
-		boolean first = true;
-		MapRoot r = part.getRoots().get(0);
-		File nonpackRtree = new File(fileToExtract.getParentFile(), "nonpack" + r.getMinZoom() + "."
-				+ fileToExtract.getName() + ".rtree");
-		File packRtree = new File(fileToExtract.getParentFile(), "pack" + r.getMinZoom() + "."
-				+ fileToExtract.getName() + ".rtree");
-		RTree rtree = null;
-		try {
-			rtree = new RTree(nonpackRtree.getAbsolutePath());
-			for (long key : objects.keys()) {
-				BinaryMapDataObject obj = objects.get(key);
-				int minX = obj.getPoint31XTile(0);
-				int maxX = obj.getPoint31XTile(0);
-				int maxY = obj.getPoint31YTile(0);
-				int minY = obj.getPoint31YTile(0);
-				for (int i = 1; i < obj.getPointsLength(); i++) {
-					minX = Math.min(minX, obj.getPoint31XTile(i));
-					minY = Math.min(minY, obj.getPoint31YTile(i));
-					maxX = Math.max(maxX, obj.getPoint31XTile(i));
-					maxY = Math.max(maxY, obj.getPoint31YTile(i));
-				}
-				try {
-					rtree.insert(new LeafElement(new Rect(minX, minY, maxX, maxY), obj.getId()));
-				} catch (Exception e) {
-					throw new RuntimeException(e);
-				}
-			}
-			rtree = AbstractIndexPartCreator.packRtreeFile(rtree, nonpackRtree.getAbsolutePath(),
-					packRtree.getAbsolutePath());
-			TLongObjectHashMap<BinaryFileReference> treeHeader = new TLongObjectHashMap<BinaryFileReference>();
-
-			long rootIndex = rtree.getFileHdr().getRootIndex();
-			rtree.Node root = rtree.getReadNode(rootIndex);
-			Rect rootBounds = IndexUploader.calcBounds(root);
-			if (rootBounds != null) {
-				if(first) {
-					writer.writeMapEncodingRules(index, part);
-					first = false;
-				}
-				writer.startWriteMapLevelIndex(r.getMinZoom(), r.getMaxZoom(), rootBounds.getMinX(),
-						rootBounds.getMaxX(), rootBounds.getMinY(), rootBounds.getMaxY());
-				IndexVectorMapCreator.writeBinaryMapTree(root, rootBounds, rtree, writer, treeHeader);
-
-				IndexUploader.writeBinaryMapBlock(root, rootBounds, rtree, writer, treeHeader, objects, r);
-				writer.endWriteMapLevelIndex();
-									
-			}
-		} finally {
-			if (rtree != null) {
-				RandomAccessFile file = rtree.getFileHdr().getFile();
-				file.close();
-			}
-			nonpackRtree.delete();
-			packRtree.delete();
-			RTree.clearCache();
-		}
 	
-		writer.endWriteMapIndex();
-	}
 }

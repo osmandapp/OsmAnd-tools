@@ -34,11 +34,11 @@ import java.util.zip.ZipOutputStream;
 
 import javax.xml.parsers.DocumentBuilderFactory;
 
+import net.osmand.BinaryMerger;
 import net.osmand.IndexConstants;
 import net.osmand.PlatformUtil;
 import net.osmand.ResultMatcher;
 import net.osmand.binary.BinaryIndexPart;
-import net.osmand.BinaryMerger;
 import net.osmand.binary.BinaryMapAddressReaderAdapter.AddressRegion;
 import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.binary.BinaryMapIndexReader;
@@ -50,6 +50,7 @@ import net.osmand.binary.BinaryMapIndexReader.TagValuePair;
 import net.osmand.binary.BinaryMapPoiReaderAdapter.PoiRegion;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
 import net.osmand.binary.BinaryMapTransportReaderAdapter.TransportIndex;
+import net.osmand.binary.MapZooms;
 import net.osmand.binary.OsmandOdb;
 import net.osmand.binary.OsmandOdb.MapData;
 import net.osmand.binary.OsmandOdb.MapDataBlock;
@@ -580,13 +581,13 @@ public class IndexUploader {
 				Rect rootBounds = calcBounds(root);
 				if (rootBounds != null) {
 					if(first) {
-						writer.writeMapEncodingRules(index, part);
+						writer.writeMapEncodingRules(part.decodingRules);
 						first = false;
 					}
 					writer.startWriteMapLevelIndex(r.getMinZoom(), r.getMaxZoom(), rootBounds.getMinX(),
 							rootBounds.getMaxX(), rootBounds.getMinY(), rootBounds.getMaxY());
 					IndexVectorMapCreator.writeBinaryMapTree(root, rootBounds, rtree, writer, treeHeader);
-					writeBinaryMapBlock(root, rootBounds, rtree, writer, treeHeader, objects, r);
+					writeBinaryMapBlock(root, rootBounds, rtree, writer, treeHeader, objects, r.getMapZoom());
 
 					writer.endWriteMapLevelIndex();
 				}
@@ -709,7 +710,7 @@ public class IndexUploader {
 
 	public static void writeBinaryMapBlock(Node parent, Rect parentBounds, RTree r, BinaryMapIndexWriter writer,
 			TLongObjectHashMap<BinaryFileReference> bounds, TLongObjectHashMap<BinaryMapDataObject> objects,
-			MapRoot mr) throws IOException, RTreeException {
+			MapZooms.MapZoomPair pair) throws IOException, RTreeException {
 		rtree.Element[] e = parent.getAllElements();
 
 		MapDataBlock.Builder dataBlock = null;
@@ -754,7 +755,7 @@ public class IndexUploader {
 					MapData mapData = writer.writeMapData(cid - baseId, parentBounds.getMinX(), parentBounds.getMinY(),
 							mdo.isArea(), coordinates, innerPolygonTypes,
 							typeUse, addtypeUse, null, mdo.getOrderedObjectNames(),
-							tempStringTable, dataBlock, mr.getMaxZoom() > 15);
+							tempStringTable, dataBlock, pair.getMaxZoom() > 15);
 					if (mapData != null) {
 						dataBlock.addDataObjects(mapData);
 					}
@@ -770,7 +771,7 @@ public class IndexUploader {
 			if (e[i].getElementType() != rtree.Node.LEAF_NODE) {
 				long ptr = e[i].getPtr();
 				rtree.Node ns = r.getReadNode(ptr);
-				writeBinaryMapBlock(ns, e[i].getRect(), r, writer, bounds, objects, mr);
+				writeBinaryMapBlock(ns, e[i].getRect(), r, writer, bounds, objects, pair);
 			}
 		}
 	}

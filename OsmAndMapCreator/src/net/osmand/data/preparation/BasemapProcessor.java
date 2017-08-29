@@ -25,10 +25,11 @@ import java.util.TreeMap;
 import javax.xml.stream.XMLStreamException;
 
 import net.osmand.PlatformUtil;
+import net.osmand.binary.MapZooms;
+import net.osmand.binary.MapZooms.MapZoomPair;
 import net.osmand.binary.OsmandOdb.MapData;
 import net.osmand.binary.OsmandOdb.MapDataBlock;
 import net.osmand.data.QuadRect;
-import net.osmand.data.preparation.MapZooms.MapZoomPair;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.osm.MapRenderingTypes.MapRulType;
 import net.osmand.osm.MapRenderingTypesEncoder;

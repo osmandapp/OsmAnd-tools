@@ -25,13 +25,14 @@ import java.util.Map;
 import java.util.TreeMap;
 
 import net.osmand.IProgress;
+import net.osmand.binary.MapZooms;
+import net.osmand.binary.MapZooms.MapZoomPair;
 import net.osmand.binary.OsmandOdb.MapData;
 import net.osmand.binary.OsmandOdb.MapDataBlock;
 import net.osmand.data.LatLon;
 import net.osmand.data.Multipolygon;
 import net.osmand.data.MultipolygonBuilder;
 import net.osmand.data.Ring;
-import net.osmand.data.preparation.MapZooms.MapZoomPair;
 import net.osmand.osm.MapRenderingTypes.MapRulType;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.MapRenderingTypesEncoder.EntityConvertApplyType;

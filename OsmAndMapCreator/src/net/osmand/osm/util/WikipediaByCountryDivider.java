@@ -24,22 +24,19 @@ import java.util.zip.GZIPInputStream;
 import net.osmand.IndexConstants;
 import net.osmand.PlatformUtil;
 import net.osmand.binary.BinaryMapDataObject;
+import net.osmand.binary.MapZooms;
 import net.osmand.data.preparation.DBDialect;
 import net.osmand.data.preparation.IndexCreator;
 import net.osmand.data.preparation.IndexPoiCreator;
-import net.osmand.data.preparation.MapZooms;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.map.OsmandRegions;
 import net.osmand.map.WorldRegion;
 import net.osmand.osm.MapRenderingTypesEncoder;
-import net.osmand.regions.CountryOcbfGeneration;
-import net.osmand.regions.CountryOcbfGeneration.CountryRegion;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
 import org.apache.commons.logging.Log;
 import org.apache.tools.bzip2.CBZip2OutputStream;
-import org.xml.sax.SAXException;
 import org.xmlpull.v1.XmlPullParserException;
 import org.xmlpull.v1.XmlSerializer;
 
