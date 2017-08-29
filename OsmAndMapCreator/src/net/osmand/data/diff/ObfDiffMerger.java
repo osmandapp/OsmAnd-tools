@@ -83,7 +83,7 @@ public class ObfDiffMerger {
 	public static void mergeBulkOsmLiveMonth(String location) {
 		try {
 			Date currentDate = new Date();
-			String cdate = day.format(currentDate);
+			String cdate = day.format(currentDate).substring(2);
 			System.out.println("Current date: " + cdate + ", file ends with will be ignored: " + cdate + ".obf.gz");
 			File folder = new File(location);
 			for (File region : getSortedFiles(folder)) {
