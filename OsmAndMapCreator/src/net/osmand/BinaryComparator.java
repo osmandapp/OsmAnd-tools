@@ -66,7 +66,7 @@ public class BinaryComparator {
 	private int ELEM_ID = -1;
 	private FileOutputStream fosm = null;
 	public static final String helpMessage = "[--cities] [--city-names] [--streets] [--street-names] [--buildings] [--intersections] [--poi] [--poi-details]" +
-			" [--osm=file_path] [--add] [--rm] <first> <second>: compare <first> and <second>";
+			" [--osm=file_path] [--add] [--rm] <first> <second>: compare <first> and <second> (map & routing data is not supported)";
 
 	public static void main(String[] args) throws IOException {
 		BinaryComparator in = new BinaryComparator();

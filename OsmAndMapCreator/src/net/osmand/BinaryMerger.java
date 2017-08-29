@@ -62,7 +62,7 @@ public class BinaryMerger {
 
 	public static final int BUFFER_SIZE = 1 << 20;
 	private final static Log log = PlatformUtil.getLog(BinaryMerger.class);
-	public static final String helpMessage = "output_file.obf [--address] [--poi] [input_file.obf] ...: merges all obf files and merges address structure into 1";
+	public static final String helpMessage = "output_file.obf [--address] [--poi] [input_file.obf] ...: merges all obf files and merges poi & address structure into 1";
 	private static final Map<String, Integer> COMBINE_ARGS = new HashMap<String, Integer>();
 
 	static {

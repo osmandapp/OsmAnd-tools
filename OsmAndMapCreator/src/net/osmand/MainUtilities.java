@@ -89,7 +89,7 @@ public class MainUtilities {
 				generateObf(subArgsArray, ic);
 			} else if (utl.equals("split-obf")) {
 				ObfRegionSplitter.main(subArgsArray);
-			} else if (utl.equals("merge-obf")) {
+			} else if (utl.equals("merge-flat-obf")) {
 				ObfDiffMerger.main(subArgsArray);
 			} else if (utl.equals("generate-address")) {
 				IndexCreator ic = new IndexCreator(new File("."));
@@ -202,9 +202,9 @@ public class MainUtilities {
 		System.out.println("\t\t generate-ocean-tile <coastline osm file> <optional output file>: creates ocean tiles 12 zoom");
 		System.out.println("\t\t generate-java-style <pathtostyle> <pathtooutputfolder>: prints rendering style as java interpreted code");
 		System.out.println("\t\t explain-rendering-style <pathtostyle>: prints explanation of the style");
-		System.out.println("\t\t merge-obf <path to result file> <paths to files to merge (>2)>: merges all data from 2+ obf files");
+		System.out.println("\t\t merge-flat-obf <path to result file> <paths to files to merge (>2)>: merges all data from 2+ obf files (address not supported)");
 		System.out.println("\t\t split-obf <path_to_world_obf_diff> <path_to_result_folder> <path_to_regions.ocbf> <subfolder_name> <file_suffix>: splits a world_obf into obf region files");
-		System.out.println("\t\t generate-obf-diff <path_old_obf> <path_new_obf> <name_or_path_diff_obf>: generates obf diff file between 2 obf files");
+		System.out.println("\t\t generate-obf-diff <path_old_obf> <path_new_obf> <name_or_path_diff_obf>: generates obf diff file between 2 obf files (address not supported)");
 		System.out.println("\t\t test-routing <own list of parameters>: helps to run routing test for specific locations");
 		System.out.println("\t\t generate-ocbf <path to osmand/repos/ repository>: generates regions.ocbf file, this path should contain folders 'misc', 'tools', 'resources'");
 		System.out.println("\t\t delete-unused-strings <path to repos/android/OsmAnd/res>: deletes unused translation in git repository (transforms all strings.xml)");
