@@ -20,6 +20,17 @@ public class ObfDiffMerger {
 		}
 	}
 	
+	
+	public static void mergeBulkOsmLiveDay(String location) {
+		// TODO Auto-generated method stub
+		
+	}
+	
+	public static void mergeBulkOsmLiveMonth(String location) {
+		// TODO Auto-generated method stub
+		
+	}
+	
 	private void sortByDate(List<File> f) {
 		f.sort(new Comparator<File>() {
 
@@ -87,5 +98,8 @@ public class ObfDiffMerger {
 		context.readObfFiles(diffs);
 		context.writeFile(result);
 	}
+
+
+	
 	
 }

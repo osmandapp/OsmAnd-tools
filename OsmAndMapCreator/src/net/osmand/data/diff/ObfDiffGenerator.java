@@ -21,9 +21,9 @@ public class ObfDiffGenerator {
 	public static void main(String[] args) throws IOException, RTreeException {
 		if(args.length == 1 && args[0].equals("test")) {
 			args = new String[3];
-			args[0] = "/Users/victorshcherb/osmand/maps/diff/2017_08_28_01_00_before.obf.gz";
-			args[1] = "/Users/victorshcherb/osmand/maps/diff/2017_08_28_01_00_after.obf.gz";
-			args[2] = "/Users/victorshcherb/osmand/maps/diff/2017_08_28_01_00_diff.obf.gz";
+			args[0] = "/Users/victorshcherb/osmand/maps/diff/Diff-start.obf";
+			args[1] = "/Users/victorshcherb/osmand/maps/diff/Diff-end.obf";
+			args[2] = "/Users/victorshcherb/osmand/maps/diff/2017_08_28_01_00_diff.obf";
 		}
 		if (args.length != 3) {
 			System.out.println("Usage: <path to old obf> <path to new obf> <result file name>");
