@@ -84,6 +84,7 @@ public class ObfDiffMerger {
 		try {
 			Date currentDate = new Date();
 			String cdate = day.format(currentDate);
+			System.out.println("Current date: " + cdate + ", file ends with will be ignored: " + cdate + ".obf.gz");
 			File folder = new File(location);
 			for (File region : getSortedFiles(folder)) {
 				if (!region.isDirectory()) {
