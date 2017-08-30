@@ -44,7 +44,7 @@ process_tiff ()
 		echo "----------------------------------------------"
 		echo "Extracting shapefile …"
 		if [ -f ${TMP_DIR}$filename.shp ]; then rm ${TMP_DIR}$filename.shp ${TMP_DIR}$filename.dbf ${TMP_DIR}$filename.prj ${TMP_DIR}$filename.shx; fi
-		gdal_contour -i 10 -snodata -32768 -a height $1 ${TMP_DIR}$filename.shp
+		gdal_contour -i 10 -a height $1 ${TMP_DIR}$filename.shp
 		if [ $? -ne 0 ]; then echo $(date)' Error creating shapefile' & exit 4;fi
 	
 		echo "Building osm file …"
