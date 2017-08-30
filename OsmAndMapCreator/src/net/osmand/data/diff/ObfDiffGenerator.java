@@ -56,7 +56,9 @@ public class ObfDiffGenerator {
 		fStart.readObfFiles(Collections.singletonList(start));
 		ObfFileInMemory fEnd = new ObfFileInMemory();
 		fEnd.readObfFiles(Collections.singletonList(end));
-		// TODO Compare POI, Transport, Routing
+		// TODO Compare POI
+		// TODO Compare Transport
+		// TODO Compare Routing
 		// TODO compare zoom level 13-14 and pick up only area, point objects (not line objects!)
 		fStart.filterAllZoomsBelow(15);
 		fEnd.filterAllZoomsBelow(15);

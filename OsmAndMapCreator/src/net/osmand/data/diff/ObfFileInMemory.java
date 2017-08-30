@@ -134,7 +134,9 @@ public class ObfFileInMemory {
 			}
 			writer.endWriteMapIndex();
 		}
-		// TODO Write POI, Routing, Transport
+		// TODO Write POI
+		// TODO Write Routing
+		// TODO Write Transport
 		ous.writeInt32(OsmandOdb.OsmAndStructure.VERSIONCONFIRM_FIELD_NUMBER, version);
 		ous.flush();
 		raf.close();
@@ -216,7 +218,9 @@ public class ObfFileInMemory {
 	}
 
 	public void readObfFiles(List<File> files) throws IOException {
-		// TODO READ POI, Routing, Transport
+		// TODO READ POI
+		// TODO READ Routing
+		// TODO READ Transport
 		for (int i = 0; i < files.size(); i++) {
 			File inputFile = files.get(i);
 			File nonGzip = inputFile;
