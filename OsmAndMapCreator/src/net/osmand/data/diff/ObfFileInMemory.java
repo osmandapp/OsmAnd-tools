@@ -29,9 +29,12 @@ import net.osmand.binary.BinaryMapIndexReader.MapRoot;
 import net.osmand.binary.BinaryMapIndexReader.SearchFilter;
 import net.osmand.binary.BinaryMapIndexReader.SearchRequest;
 import net.osmand.binary.BinaryMapPoiReaderAdapter.PoiRegion;
+import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
+import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteSubregion;
 import net.osmand.binary.MapZooms;
 import net.osmand.binary.MapZooms.MapZoomPair;
 import net.osmand.binary.OsmandOdb;
+import net.osmand.binary.RouteDataObject;
 import net.osmand.data.Amenity;
 import net.osmand.data.index.IndexUploader;
 import net.osmand.data.preparation.AbstractIndexPartCreator;
@@ -56,6 +59,7 @@ public class ObfFileInMemory {
 	
 
 	private Map<MapZooms.MapZoomPair, TLongObjectHashMap<BinaryMapDataObject>> mapObjects = new LinkedHashMap<>();
+	private TLongObjectHashMap<RouteDataObject> routeObjects;
 	private long timestamp = 0;
 	private MapIndex mapIndex = new MapIndex(); 
 
@@ -68,6 +72,10 @@ public class ObfFileInMemory {
 	
 	public Collection<MapZooms.MapZoomPair> getZooms() {
 		return mapObjects.keySet();
+	}
+	
+	public TLongObjectHashMap<RouteDataObject> getRoutingData() {
+		return routeObjects;
 	}
 	
 	public MapIndex getMapIndex() {
@@ -86,6 +94,10 @@ public class ObfFileInMemory {
 			}
 			
 		}
+	}
+	
+	public void setRoutingData(TLongObjectHashMap<RouteDataObject> newObjects) {
+		this.routeObjects = newObjects;
 	}
 
 	public void writeFile(File targetFile) throws IOException, RTreeException {
@@ -244,6 +256,11 @@ public class ObfFileInMemory {
 						TLongObjectHashMap<BinaryMapDataObject> objects = getBinaryMapData(indexReader, mr.getMinZoom());
 						putMapObjects(pair, objects.valueCollection(), true);
 					}
+					// Read routing objects
+					if (p instanceof RouteRegion) {
+						RouteRegion rr = (RouteRegion) p;
+						routeObjects = getRoutingData(indexReader, rr);
+					}
 				}
 			}
 			updateTimestamp(indexReader.getDateCreated());
@@ -253,6 +270,30 @@ public class ObfFileInMemory {
 				nonGzip.delete();
 			}
 		}
+	}
+	
+	private TLongObjectHashMap<RouteDataObject> getRoutingData(BinaryMapIndexReader indexReader, RouteRegion rr) throws IOException {
+		final TLongObjectHashMap<RouteDataObject> result = new TLongObjectHashMap<>();
+		List<RouteSubregion> regions = indexReader.searchRouteIndexTree(
+				BinaryMapIndexReader.buildSearchRequest(MapUtils.get31TileNumberX(lonleft),
+						MapUtils.get31TileNumberX(lonright), MapUtils.get31TileNumberY(lattop),
+						MapUtils.get31TileNumberY(latbottom), ZOOM_LEVEL_POI, null),
+				rr.getSubregions());
+		
+		indexReader.loadRouteIndexData(regions, new ResultMatcher<RouteDataObject>() {
+			@Override
+			public boolean publish(RouteDataObject obj) {
+				result.put(obj.getId(), obj);
+				return true;
+			}
+	
+			@Override
+			public boolean isCancelled() {
+				return false;
+			}
+		});
+		
+		return result;
 	}
 
 	private TLongObjectHashMap<BinaryMapDataObject> getBinaryMapData(BinaryMapIndexReader index, int zoom) throws IOException {
