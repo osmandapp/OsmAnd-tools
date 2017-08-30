@@ -52,6 +52,7 @@ import com.google.protobuf.CodedOutputStream;
 
 public class ObfFileInMemory {
 	private static final int ZOOM_LEVEL_POI = 15;
+	private static final int ZOOM_LEVEL_ROUTING = 15;
 	private double lattop = 85;
 	private double latbottom = -85;
 	private double lonleft = -179.9;
@@ -62,6 +63,7 @@ public class ObfFileInMemory {
 	private TLongObjectHashMap<RouteDataObject> routeObjects;
 	private long timestamp = 0;
 	private MapIndex mapIndex = new MapIndex(); 
+	private RouteRegion routeIndex = new RouteRegion(); 
 
 	public TLongObjectHashMap<BinaryMapDataObject> get(MapZooms.MapZoomPair zoom) {
 		if (!mapObjects.containsKey(zoom)) {
@@ -80,6 +82,10 @@ public class ObfFileInMemory {
 	
 	public MapIndex getMapIndex() {
 		return mapIndex;
+	}
+	
+	public RouteRegion getRouteIndex() {
+		return routeIndex;
 	}
 	
 	
@@ -230,9 +236,8 @@ public class ObfFileInMemory {
 	}
 
 	public void readObfFiles(List<File> files) throws IOException {
-		// TODO READ POI
-		// TODO READ Routing
-		// TODO READ Transport
+		// TODO READ & Merge POI
+		// TODO READ & Merge Transport
 		for (int i = 0; i < files.size(); i++) {
 			File inputFile = files.get(i);
 			File nonGzip = inputFile;
@@ -256,11 +261,11 @@ public class ObfFileInMemory {
 						TLongObjectHashMap<BinaryMapDataObject> objects = getBinaryMapData(indexReader, mr.getMinZoom());
 						putMapObjects(pair, objects.valueCollection(), true);
 					}
-					// Read routing objects
-					if (p instanceof RouteRegion) {
-						RouteRegion rr = (RouteRegion) p;
-						routeObjects = getRoutingData(indexReader, rr);
-					}
+				}
+				// Read routing objects
+				if (p instanceof RouteRegion) {
+					RouteRegion rr = (RouteRegion) p;
+					putRoutingData(indexReader, rr, ZOOM_LEVEL_ROUTING, true);
 				}
 			}
 			updateTimestamp(indexReader.getDateCreated());
@@ -272,18 +277,20 @@ public class ObfFileInMemory {
 		}
 	}
 	
-	private TLongObjectHashMap<RouteDataObject> getRoutingData(BinaryMapIndexReader indexReader, RouteRegion rr) throws IOException {
-		final TLongObjectHashMap<RouteDataObject> result = new TLongObjectHashMap<>();
+	public void putRoutingData(BinaryMapIndexReader indexReader, RouteRegion rr, int zm, final boolean override) throws IOException {
 		List<RouteSubregion> regions = indexReader.searchRouteIndexTree(
 				BinaryMapIndexReader.buildSearchRequest(MapUtils.get31TileNumberX(lonleft),
 						MapUtils.get31TileNumberX(lonright), MapUtils.get31TileNumberY(lattop),
-						MapUtils.get31TileNumberY(latbottom), ZOOM_LEVEL_POI, null),
+						MapUtils.get31TileNumberY(latbottom), zm, null),
 				rr.getSubregions());
 		
 		indexReader.loadRouteIndexData(regions, new ResultMatcher<RouteDataObject>() {
 			@Override
 			public boolean publish(RouteDataObject obj) {
-				result.put(obj.getId(), obj);
+				if(override || !routeObjects.containsKey(obj.getId())) {
+					// TODO adopt
+					routeObjects.put(obj.getId(), routeIndex.adopt(obj));
+				}
 				return true;
 			}
 	
@@ -292,8 +299,6 @@ public class ObfFileInMemory {
 				return false;
 			}
 		});
-		
-		return result;
 	}
 
 	private TLongObjectHashMap<BinaryMapDataObject> getBinaryMapData(BinaryMapIndexReader index, int zoom) throws IOException {

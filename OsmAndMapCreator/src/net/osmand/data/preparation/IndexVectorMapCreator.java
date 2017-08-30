@@ -64,6 +64,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	private static final int MAP_LEVELS_POWER = 3;
 	private static final int MAP_LEVELS_MAX = 1 << MAP_LEVELS_POWER;
 	private static final int LOW_LEVEL_COMBINE_WAY_POINS_LIMIT = 10000;
+	private static final int LOW_LEVEL_ZOOM_TO_COMBINE = 13; // 15 if use combination all the time
 	private MapRenderingTypesEncoder renderingTypes;
 	private MapZooms mapZooms;
 
@@ -402,6 +403,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 
 			int level = rs.getInt(8);
 			int zoom = mapZooms.getLevel(level).getMaxZoom();
+			int minZoom = mapZooms.getLevel(level).getMinZoom();
 
 			long startNode = rs.getLong(2);
 			long endNode = rs.getLong(3);
@@ -415,7 +417,6 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			ArrayList<Float> wayNodes = new ArrayList<Float>(list);
 
 			// combine startPoint with EndPoint
-			boolean combined = true;
 			List<LowLevelWayCandidate> candidates = new ArrayList<LowLevelWayCandidate>();
 			Comparator<LowLevelWayCandidate> cmpCandidates = new Comparator<LowLevelWayCandidate>() {
 				@Override
@@ -424,6 +425,11 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 				}
 			};
 
+			boolean combined = true;
+			if(minZoom >= LOW_LEVEL_ZOOM_TO_COMBINE) {
+				// disable combine
+				combined = false;
+			}
 			while (combined && wayNodes.size() < LOW_LEVEL_COMBINE_WAY_POINS_LIMIT) {
 				combined = false;
 				endStat.setLong(1, startNode);
@@ -454,6 +460,10 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 
 			// combined end point
 			combined = true;
+			if(minZoom >= LOW_LEVEL_ZOOM_TO_COMBINE) {
+				// disable combine
+				combined = false;
+			}
 			while (combined && wayNodes.size() < LOW_LEVEL_COMBINE_WAY_POINS_LIMIT) {
 				combined = false;
 				startStat.setLong(1, endNode);

@@ -56,10 +56,10 @@ public class ObfRegionSplitter {
 			osmandRegions.prepareFile(ocbfFile.getAbsolutePath());
 			osmandRegions.cacheAllCountries();
 
-			Map<String, Map<MapZoomPair, TLongObjectHashMap<BinaryMapDataObject>>> regionsData = splitRegions(fl,
+			Map<String, Map<MapZoomPair, TLongObjectHashMap<BinaryMapDataObject>>> regionsMapData = splitRegionMapData(fl,
 					osmandRegions);
 
-			for (String regionName : regionsData.keySet()) {
+			for (String regionName : regionsMapData.keySet()) {
 				File folder = new File(dir, regionName);
 				if (!Algorithms.isEmpty(subFolder)) {
 					folder = new File(folder, subFolder);
@@ -67,11 +67,17 @@ public class ObfRegionSplitter {
 				folder.mkdirs();
 				File result = new File(folder, Algorithms.capitalizeFirstLetter(regionName) + fileSuffix + ".obf.gz");
 				ObfFileInMemory obf = new ObfFileInMemory();
-				Map<MapZoomPair, TLongObjectHashMap<BinaryMapDataObject>> mp = regionsData.get(regionName);
-				obf.updateTimestamp(fl.getTimestamp());
+
+				Map<MapZoomPair, TLongObjectHashMap<BinaryMapDataObject>> mp = regionsMapData.get(regionName);
 				for (MapZoomPair mzPair : mp.keySet()) {
 					obf.putMapObjects(mzPair, mp.get(mzPair).valueCollection(), true);
 				}
+				
+				// TODO split Routing
+				// TODO split POI
+				// TODO split Transport
+				
+				obf.updateTimestamp(fl.getTimestamp());
 				obf.writeFile(result);
 			}
 		} catch (Exception e) {
@@ -81,7 +87,7 @@ public class ObfRegionSplitter {
 	}
 			
 
-	private Map<String, Map<MapZoomPair, TLongObjectHashMap<BinaryMapDataObject>>> splitRegions(ObfFileInMemory allMapObjects,
+	private Map<String, Map<MapZoomPair, TLongObjectHashMap<BinaryMapDataObject>>> splitRegionMapData(ObfFileInMemory allMapObjects,
 			OsmandRegions osmandRegions) throws IOException {
 		Map<String, Map<MapZoomPair, TLongObjectHashMap<BinaryMapDataObject>>> result = new HashMap<>();
 		for (MapZoomPair p : allMapObjects.getZooms()) {

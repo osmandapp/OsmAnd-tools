@@ -1,5 +1,6 @@
 package net.osmand.data.diff;
 
+import gnu.trove.iterator.TIntObjectIterator;
 import gnu.trove.map.hash.TLongObjectHashMap;
 
 import java.io.File;
@@ -8,7 +9,11 @@ import java.util.Collections;
 
 import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.binary.BinaryMapIndexReader.MapIndex;
+import net.osmand.binary.BinaryMapIndexReader.TagValuePair;
+import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
+import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteTypeRule;
 import net.osmand.binary.MapZooms.MapZoomPair;
+import net.osmand.binary.RouteDataObject;
 import rtree.RTreeException;
 
 public class ObfDiffGenerator {
@@ -56,16 +61,42 @@ public class ObfDiffGenerator {
 		fStart.readObfFiles(Collections.singletonList(start));
 		ObfFileInMemory fEnd = new ObfFileInMemory();
 		fEnd.readObfFiles(Collections.singletonList(end));
-		// TODO Compare POI
-		// TODO Compare Transport
-		// TODO Compare Routing
+
+		System.out.println("Comparing the files...");
 		// TODO compare zoom level 13-14 and pick up only area, point objects (not line objects!)
+		compareMapData(fStart, fEnd);
+		// TODO Compare Routing
+		// compareRouteData(fStart, fEnd);
+		// TODO Compare POI
+		// comparePOI(fStart, fEnd);
+		// TODO Compare Transport
+		//compareTransport(fStart, fEnd);
+		
+		System.out.println("Finished comparing.");
+		if (result.exists()) {
+			result.delete();
+		}
+		fEnd.writeFile(result);
+	}
+
+	private void compareMapData(ObfFileInMemory fStart, ObfFileInMemory fEnd) {
 		fStart.filterAllZoomsBelow(15);
 		fEnd.filterAllZoomsBelow(15);
 		MapIndex mi = fEnd.getMapIndex();
-		int deleteId = mi.decodingRules.size() + 1;
-		mi.initMapEncodingRule(0, deleteId, OSMAND_CHANGE_TAG, OSMAND_CHANGE_VALUE);
-		System.out.println("Comparing the files...");
+		int deleteId = -1;
+		TIntObjectIterator<TagValuePair> it = mi.decodingRules.iterator();
+		while(it.hasNext()) {
+			it.advance();
+			TagValuePair vp = it.value();
+			if(OSMAND_CHANGE_TAG.equals(vp.tag) && OSMAND_CHANGE_VALUE.equals(vp.value)){
+				deleteId = it.key();
+				break;
+			}
+		}
+		if(deleteId == -1) {
+			deleteId = mi.decodingRules.size() + 1;
+			mi.initMapEncodingRule(0, deleteId, OSMAND_CHANGE_TAG, OSMAND_CHANGE_VALUE);
+		}
 		for (MapZoomPair mz : fStart.getZooms()) {
 			TLongObjectHashMap<BinaryMapDataObject> startData = fStart.get(mz);
 			TLongObjectHashMap<BinaryMapDataObject> endData = fEnd.get(mz);
@@ -85,11 +116,42 @@ public class ObfDiffGenerator {
 				}
 			}
 		}
-		System.out.println("Finished comparing.");
-		if (result.exists()) {
-			result.delete();
+	}
+	
+	private void compareRouteData(ObfFileInMemory fStart, ObfFileInMemory fEnd) {
+		RouteRegion ri = fEnd.getRouteIndex();
+		int deleteId = -1;
+		for (int i = 0; i < ri.routeEncodingRules.size(); i++) {
+			RouteTypeRule rl = ri.routeEncodingRules.get(i);
+			if (rl != null && OSMAND_CHANGE_TAG.equals(rl.getTag()) && OSMAND_CHANGE_VALUE.equals(rl.getValue())) {
+				deleteId = i;
+				break;
+			}
 		}
-		fEnd.writeFile(result);
+		if (deleteId == -1) {
+			deleteId = ri.routeEncodingRules.size();
+			ri.initRouteEncodingRule(deleteId, OSMAND_CHANGE_TAG, OSMAND_CHANGE_VALUE);
+		}
+
+		TLongObjectHashMap<RouteDataObject> startData = fStart.getRoutingData();
+		TLongObjectHashMap<RouteDataObject> endData = fEnd.getRoutingData();
+		if (endData == null) {
+			return;
+		}
+		for (Long idx : startData.keys()) {
+			RouteDataObject objE = endData.get(idx);
+			RouteDataObject objS = startData.get(idx);
+			if (objE == null) {
+				// Object with this id is not present in the second obf
+				RouteDataObject rdo = new RouteDataObject(ri);
+				rdo.pointsX = objS.pointsX; 
+				rdo.pointsY = objS.pointsY;
+				rdo.types = new int[] {deleteId };
+				endData.put(idx, rdo);
+			} else if (objE.compareRoute(objS)) {
+				endData.remove(idx);
+			}
+		}
 	}
 
 	
