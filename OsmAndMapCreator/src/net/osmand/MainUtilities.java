@@ -79,7 +79,16 @@ public class MainUtilities {
 				ic.setIndexMap(true);
 				ic.setIndexPOI(true);
 				ic.setIndexRouting(true);
+				ic.setIndexTransport(true);
 				ic.setIndexAddress(true);
+				ic.setLastModifiedDate(new File(subArgsArray[0]).lastModified());
+				generateObf(subArgsArray, ic);
+			} else if (utl.equals("generate-obf-no-address")) {
+				IndexCreator ic = new IndexCreator(new File("."));
+				ic.setIndexMap(true);
+				ic.setIndexPOI(true);
+				ic.setIndexRouting(true);
+				ic.setIndexTransport(true);
 				ic.setLastModifiedDate(new File(subArgsArray[0]).lastModified());
 				generateObf(subArgsArray, ic);
 			} else if (utl.equals("generate-map")) {
