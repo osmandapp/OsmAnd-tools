@@ -277,6 +277,14 @@ public class ObfFileInMemory {
 		}
 	}
 	
+	public void putRoutingData(TLongObjectHashMap<RouteDataObject> ro, boolean override) {
+		for (RouteDataObject obj : ro.valueCollection()) {
+			if (override || !routeObjects.containsKey(obj.getId())) {
+				routeObjects.put(obj.getId(), routeIndex.adopt(obj));
+			}
+		}
+	}
+	
 	public void putRoutingData(BinaryMapIndexReader indexReader, RouteRegion rr, int zm, final boolean override) throws IOException {
 		List<RouteSubregion> regions = indexReader.searchRouteIndexTree(
 				BinaryMapIndexReader.buildSearchRequest(MapUtils.get31TileNumberX(lonleft),
@@ -372,4 +380,6 @@ public class ObfFileInMemory {
 			}
 		}		
 	}
+
+	
 }

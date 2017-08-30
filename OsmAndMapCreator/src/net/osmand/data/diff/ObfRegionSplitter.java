@@ -9,9 +9,11 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeSet;
 
 import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.binary.MapZooms.MapZoomPair;
+import net.osmand.binary.RouteDataObject;
 import net.osmand.map.OsmandRegions;
 import net.osmand.util.Algorithms;
 
@@ -58,8 +60,13 @@ public class ObfRegionSplitter {
 
 			Map<String, Map<MapZoomPair, TLongObjectHashMap<BinaryMapDataObject>>> regionsMapData = splitRegionMapData(fl,
 					osmandRegions);
+			Map<String, TLongObjectHashMap<RouteDataObject>> regionsRouteData = splitRegionRouteData(fl,
+					osmandRegions);
+			TreeSet<String> regionNames = new TreeSet<>();
+			regionNames.addAll(regionsMapData.keySet());
+			regionNames.addAll(regionsRouteData.keySet());
 
-			for (String regionName : regionsMapData.keySet()) {
+			for (String regionName : regionNames) {
 				File folder = new File(dir, regionName);
 				if (!Algorithms.isEmpty(subFolder)) {
 					folder = new File(folder, subFolder);
@@ -69,11 +76,16 @@ public class ObfRegionSplitter {
 				ObfFileInMemory obf = new ObfFileInMemory();
 
 				Map<MapZoomPair, TLongObjectHashMap<BinaryMapDataObject>> mp = regionsMapData.get(regionName);
-				for (MapZoomPair mzPair : mp.keySet()) {
-					obf.putMapObjects(mzPair, mp.get(mzPair).valueCollection(), true);
+				if (mp != null) {
+					for (MapZoomPair mzPair : mp.keySet()) {
+						obf.putMapObjects(mzPair, mp.get(mzPair).valueCollection(), true);
+					}
 				}
 				
-				// TODO split Routing
+				TLongObjectHashMap<RouteDataObject> ro = regionsRouteData.get(regionName);
+				if(ro != null) {
+					obf.putRoutingData(ro, true);
+				}
 				// TODO split POI
 				// TODO split Transport
 				
@@ -86,6 +98,31 @@ public class ObfRegionSplitter {
 		}
 	}
 			
+
+	private Map<String, TLongObjectHashMap<RouteDataObject>> splitRegionRouteData(ObfFileInMemory fl,
+			OsmandRegions osmandRegions) throws IOException {
+		Map<String, TLongObjectHashMap<RouteDataObject>> result = new HashMap<>();
+		TLongObjectHashMap<RouteDataObject> routingData = fl.getRoutingData();
+		for (RouteDataObject obj : routingData.valueCollection()) {
+			int x = obj.getPoint31XTile(0);
+			int y = obj.getPoint31YTile(0);
+			List<BinaryMapDataObject> l = osmandRegions.query(x, y);
+			for (BinaryMapDataObject b : l) {
+				if (osmandRegions.contain(b, x, y)) {
+					String dw = osmandRegions.getDownloadName(b);
+					if (!Algorithms.isEmpty(dw) && osmandRegions.isDownloadOfType(b, OsmandRegions.MAP_TYPE)) {
+						TLongObjectHashMap<RouteDataObject> mp = result.get(dw);
+						if (mp == null) {
+							mp = new TLongObjectHashMap<>();
+							result.put(dw, mp);
+						}
+						mp.put(obj.getId(), obj);
+					}
+				}
+			}
+		}
+		return result;
+	}
 
 	private Map<String, Map<MapZoomPair, TLongObjectHashMap<BinaryMapDataObject>>> splitRegionMapData(ObfFileInMemory allMapObjects,
 			OsmandRegions osmandRegions) throws IOException {
