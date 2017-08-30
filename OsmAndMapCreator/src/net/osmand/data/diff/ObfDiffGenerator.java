@@ -63,10 +63,9 @@ public class ObfDiffGenerator {
 		fEnd.readObfFiles(Collections.singletonList(end));
 
 		System.out.println("Comparing the files...");
-		// TODO compare zoom level 13-14 and pick up only area, point objects (not line objects!)
 		compareMapData(fStart, fEnd);
-		// TODO Compare Routing
-		// compareRouteData(fStart, fEnd);
+		// Compare Routing
+		compareRouteData(fStart, fEnd);
 		// TODO Compare POI
 		// comparePOI(fStart, fEnd);
 		// TODO Compare Transport
@@ -80,20 +79,14 @@ public class ObfDiffGenerator {
 	}
 
 	private void compareMapData(ObfFileInMemory fStart, ObfFileInMemory fEnd) {
-		fStart.filterAllZoomsBelow(15);
-		fEnd.filterAllZoomsBelow(15);
+		fStart.filterAllZoomsBelow(13);
+		fEnd.filterAllZoomsBelow(13);
 		MapIndex mi = fEnd.getMapIndex();
-		int deleteId = -1;
-		TIntObjectIterator<TagValuePair> it = mi.decodingRules.iterator();
-		while(it.hasNext()) {
-			it.advance();
-			TagValuePair vp = it.value();
-			if(OSMAND_CHANGE_TAG.equals(vp.tag) && OSMAND_CHANGE_VALUE.equals(vp.value)){
-				deleteId = it.key();
-				break;
-			}
-		}
-		if(deleteId == -1) {
+		int deleteId;
+		Integer rl = mi.getRule(OSMAND_CHANGE_TAG, OSMAND_CHANGE_VALUE);
+		if(rl != null) {
+			deleteId = rl; 
+		} else {
 			deleteId = mi.decodingRules.size() + 1;
 			mi.initMapEncodingRule(0, deleteId, OSMAND_CHANGE_TAG, OSMAND_CHANGE_VALUE);
 		}
@@ -120,14 +113,7 @@ public class ObfDiffGenerator {
 	
 	private void compareRouteData(ObfFileInMemory fStart, ObfFileInMemory fEnd) {
 		RouteRegion ri = fEnd.getRouteIndex();
-		int deleteId = -1;
-		for (int i = 0; i < ri.routeEncodingRules.size(); i++) {
-			RouteTypeRule rl = ri.routeEncodingRules.get(i);
-			if (rl != null && OSMAND_CHANGE_TAG.equals(rl.getTag()) && OSMAND_CHANGE_VALUE.equals(rl.getValue())) {
-				deleteId = i;
-				break;
-			}
-		}
+		int deleteId = ri.searchRouteEncodingRule(OSMAND_CHANGE_TAG, OSMAND_CHANGE_VALUE);
 		if (deleteId == -1) {
 			deleteId = ri.routeEncodingRules.size();
 			ri.initRouteEncodingRule(deleteId, OSMAND_CHANGE_TAG, OSMAND_CHANGE_VALUE);

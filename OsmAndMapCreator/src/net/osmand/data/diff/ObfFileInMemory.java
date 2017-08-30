@@ -288,7 +288,6 @@ public class ObfFileInMemory {
 			@Override
 			public boolean publish(RouteDataObject obj) {
 				if(override || !routeObjects.containsKey(obj.getId())) {
-					// TODO adopt
 					routeObjects.put(obj.getId(), routeIndex.adopt(obj));
 				}
 				return true;
