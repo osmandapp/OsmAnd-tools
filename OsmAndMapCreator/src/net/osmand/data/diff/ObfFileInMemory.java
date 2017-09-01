@@ -138,10 +138,11 @@ public class ObfFileInMemory {
 		ous.writeInt32(OsmandOdb.OsmAndStructure.VERSION_FIELD_NUMBER, version);
 		ous.writeInt64(OsmandOdb.OsmAndStructure.DATECREATED_FIELD_NUMBER, timestamp);
 		BinaryMapIndexWriter writer = new BinaryMapIndexWriter(raf, ous);
+		String defName = targetFile.getName().substring(0, targetFile.getName().indexOf('.'));
 		if (mapObjects.size() > 0) {
 			String name = mapIndex.getName();
 			if(Algorithms.isEmpty(name)) {
-				name = targetFile.getName().substring(0, targetFile.getName().indexOf('.'));
+				name = defName;
 			}
 			writer.startWriteMapIndex(Algorithms.capitalizeFirstLetter(name));
 			writer.writeMapEncodingRules(mapIndex.decodingRules);
@@ -152,8 +153,20 @@ public class ObfFileInMemory {
 			}
 			writer.endWriteMapIndex();
 		}
+		if (routeObjects.size() > 0 && false) {
+			String name = mapIndex.getName();
+			if(Algorithms.isEmpty(name)) {
+				name = defName;
+			}
+			
+			writer.startWriteRouteIndex(name);
+			writer.writeRouteRawEncodingRules(routeIndex.routeEncodingRules);
+			writeRouteData(writer, routeObjects, targetFile);
+			
+			// 1st write
+			writer.endWriteRouteIndex();
+		}
 		// TODO Write POI
-		// TODO Write Routing
 		// TODO Write Transport
 		ous.writeInt32(OsmandOdb.OsmAndStructure.VERSIONCONFIRM_FIELD_NUMBER, version);
 		ous.flush();
@@ -170,6 +183,29 @@ public class ObfFileInMemory {
 			nonGzip.delete();
 		}
 		targetFile.setLastModified(timestamp);
+	}
+
+	private void writeRouteData(BinaryMapIndexWriter writer, TLongObjectHashMap<RouteDataObject> routeObjs, File fileToWrite) throws IOException, RTreeException {
+		File nonpackRtree = new File(fileToWrite.getParentFile(), "nonpackroute."
+				+ fileToWrite.getName() + ".rtree");
+		File packRtree = new File(fileToWrite.getParentFile(), "packroute."
+				+ fileToWrite.getName() + ".rtree");
+		RTree rtree = null;
+		try {
+			rtree = new RTree(nonpackRtree.getAbsolutePath());
+			// TODO Write Routing
+			//		TLongObjectHashMap<BinaryFileReference> route = writeBinaryRouteIndexHeader(writer, routeTree, false);
+			//		writeBinaryRouteIndexBlocks(writer, routeTree, false, route);
+		} finally {
+			if (rtree != null) {
+				RandomAccessFile file = rtree.getFileHdr().getFile();
+				file.close();
+			}
+			nonpackRtree.delete();
+			packRtree.delete();
+			RTree.clearCache();
+		}
+		
 	}
 
 	private void writeMapData(BinaryMapIndexWriter writer, MapZoomPair mapZoomPair,

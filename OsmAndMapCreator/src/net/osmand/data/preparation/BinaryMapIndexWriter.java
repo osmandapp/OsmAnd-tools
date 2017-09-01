@@ -28,8 +28,10 @@ import java.util.zip.GZIPOutputStream;
 
 import net.osmand.IndexConstants;
 import net.osmand.binary.BinaryMapIndexReader;
+import net.osmand.binary.BinaryMapRouteReaderAdapter;
 import net.osmand.binary.BinaryMapIndexReader.MapIndex;
 import net.osmand.binary.BinaryMapIndexReader.TagValuePair;
+import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteTypeRule;
 import net.osmand.binary.OsmandOdb;
 import net.osmand.binary.OsmandOdb.AddressNameIndexDataAtom;
 import net.osmand.binary.OsmandOdb.CityBlockIndex;
@@ -338,7 +340,7 @@ public class BinaryMapIndexWriter {
 			codedOutStream.writeMessage(OsmandOdb.OsmAndMapIndex.RULES_FIELD_NUMBER, rulet);
 		}
 	}
-
+	
 	public void writeRouteEncodingRules(List<MapRouteType> types) throws IOException {
 		checkPeekState(ROUTE_INDEX_INIT);
 
@@ -356,6 +358,23 @@ public class BinaryMapIndexWriter {
 			MapRouteType rule = out.get(i);
 			rule.setTargetId(i + 1);
 
+			builder.setTag(rule.getTag());
+			if (rule.getValue() != null) {
+				builder.setValue(rule.getValue());
+			} else {
+				builder.setValue("");
+			}
+			RouteEncodingRule rulet = builder.build();
+			codedOutStream.writeMessage(OsmandOdb.OsmAndRoutingIndex.RULES_FIELD_NUMBER, rulet);
+		}
+	}
+
+	public void writeRouteRawEncodingRules(List<BinaryMapRouteReaderAdapter.RouteTypeRule> types) throws IOException {
+		checkPeekState(ROUTE_INDEX_INIT);
+
+		for (int i = 1; i < types.size(); i++) {
+			RouteEncodingRule.Builder builder = OsmandOdb.OsmAndRoutingIndex.RouteEncodingRule.newBuilder();
+			RouteTypeRule rule = types.get(i);
 			builder.setTag(rule.getTag());
 			if (rule.getValue() != null) {
 				builder.setValue(rule.getValue());
