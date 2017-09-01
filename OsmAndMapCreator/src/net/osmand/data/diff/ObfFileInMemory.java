@@ -421,12 +421,6 @@ public class ObfFileInMemory {
 		return result;
 	}
 	
-	private List<Amenity> getPoiData(BinaryMapIndexReader index) throws IOException {
-		final List<Amenity> amenities = new ArrayList<>();
-		
-		return amenities;
-	}
-
 	public void filterAllZoomsBelow(int zm) {
 		for(MapZoomPair mz : new ArrayList<>(getZooms())) {
 			if(mz.getMaxZoom() < zm) {
