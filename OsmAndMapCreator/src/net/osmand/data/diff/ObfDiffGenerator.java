@@ -94,7 +94,10 @@ public class ObfDiffGenerator {
 			if (objE == null) {
 				// TODO add delete tags and put into the result set
 				Amenity am = new Amenity();
-//				am.setType(type);
+				am.setAdditionalInfo(OSMAND_CHANGE_TAG, OSMAND_CHANGE_VALUE);
+				am.setX(objS.getX());
+				am.setY(objS.getY());
+				endPoi.put(idx, am);
 			}
 			else if (objE.comparePoi(objS)) {
 				endPoi.remove(idx);
