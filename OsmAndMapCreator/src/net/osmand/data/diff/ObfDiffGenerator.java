@@ -6,6 +6,7 @@ import gnu.trove.map.hash.TLongObjectHashMap;
 import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
+import java.util.Map;
 
 import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.binary.BinaryMapIndexReader.MapIndex;
@@ -14,6 +15,7 @@ import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteTypeRule;
 import net.osmand.binary.MapZooms.MapZoomPair;
 import net.osmand.binary.RouteDataObject;
+import net.osmand.data.Amenity;
 import rtree.RTreeException;
 
 public class ObfDiffGenerator {
@@ -67,7 +69,7 @@ public class ObfDiffGenerator {
 		// Compare Routing
 		compareRouteData(fStart, fEnd);
 		// TODO Compare POI
-		// comparePOI(fStart, fEnd);
+		comparePOI(fStart, fEnd);
 		// TODO Compare Transport
 		//compareTransport(fStart, fEnd);
 		
@@ -76,6 +78,29 @@ public class ObfDiffGenerator {
 			result.delete();
 		}
 		fEnd.writeFile(result);
+	}
+
+	private void comparePOI(ObfFileInMemory fStart, ObfFileInMemory fEnd) {
+		TLongObjectHashMap<Amenity> startPoi = fStart.getPoiData();
+		TLongObjectHashMap<Amenity> endPoi = fEnd.getPoiData();
+		
+		if (endPoi == null) {
+			return;
+		}
+		
+		for (long idx : startPoi.keys()) {
+			Amenity objE = endPoi.get(idx);
+			Amenity objS = startPoi.get(idx);
+			if (objE == null) {
+				// TODO add delete tags and put into the result set
+				Amenity am = new Amenity();
+//				am.setType(type);
+			}
+			else if (objE.comparePoi(objS)) {
+				endPoi.remove(idx);
+			}
+		}
+		
 	}
 
 	private void compareMapData(ObfFileInMemory fStart, ObfFileInMemory fEnd) {
