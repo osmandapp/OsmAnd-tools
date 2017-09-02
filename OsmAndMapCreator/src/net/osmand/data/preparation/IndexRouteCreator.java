@@ -1325,6 +1325,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 								i < rdo.pointTypes.length && rdo.pointTypes[i] != null) {
 							rw.types.addAll(rdo.pointTypes[i]);
 						}
+						points.add(rw);
 					}
 					return true;
 				}

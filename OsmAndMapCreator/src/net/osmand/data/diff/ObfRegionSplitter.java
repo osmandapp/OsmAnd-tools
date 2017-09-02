@@ -23,7 +23,7 @@ public class ObfRegionSplitter {
 	public static void main(String[] args) throws IOException {
 		if(args.length == 1 && args[0].equals("test")) {
 			args = new String[5];
-			args[0] = "/Users/victorshcherb/osmand/maps/diff/2017_08_28_01_00_diff.obf.gz";
+			args[0] = "/Users/victorshcherb/osmand/maps/diff/17_08_29_22_00.diff.obf";
 			args[1] = "/Users/victorshcherb/osmand/maps/diff/regions";
 			args[2] = "/Users/victorshcherb/osmand/repos/android/OsmAnd/src/net/osmand/map/regions.ocbf";
 			args[3] = "";
@@ -104,6 +104,9 @@ public class ObfRegionSplitter {
 		Map<String, TLongObjectHashMap<RouteDataObject>> result = new HashMap<>();
 		TLongObjectHashMap<RouteDataObject> routingData = fl.getRoutingData();
 		for (RouteDataObject obj : routingData.valueCollection()) {
+//			if(obj.getPointsLength() == 0) {
+//				continue;
+//			}
 			int x = obj.getPoint31XTile(0);
 			int y = obj.getPoint31YTile(0);
 			List<BinaryMapDataObject> l = osmandRegions.query(x, y);
