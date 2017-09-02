@@ -26,6 +26,12 @@ public class ObfDiffMerger {
 	
 	public static void main(String[] args) {
 		try {
+			if(args.length == 1 && args[0].equals("test")) {
+				args = new String[3];
+//				args[0] = "/Users/victorshcherb/osmand/maps/diff/M.obf";
+//				args[1] = "/Users/victorshcherb/osmand/maps/diff/M.obf";
+//				args[2] = "/Users/victorshcherb/osmand/maps/diff/M.obf";
+			}
 			ObfDiffMerger merger = new ObfDiffMerger();
 			merger.mergeChanges(args);
 		} catch (Exception e) {
