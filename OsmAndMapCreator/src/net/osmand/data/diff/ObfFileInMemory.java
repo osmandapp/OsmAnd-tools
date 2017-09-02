@@ -9,8 +9,10 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -31,16 +33,22 @@ import net.osmand.binary.BinaryMapIndexReader.SearchRequest;
 import net.osmand.binary.BinaryMapPoiReaderAdapter.PoiRegion;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteSubregion;
+import net.osmand.binary.BinaryMapTransportReaderAdapter.TransportIndex;
 import net.osmand.binary.MapZooms;
 import net.osmand.binary.MapZooms.MapZoomPair;
 import net.osmand.binary.OsmandOdb;
 import net.osmand.binary.RouteDataObject;
 import net.osmand.data.Amenity;
+import net.osmand.data.TransportStop;
 import net.osmand.data.index.IndexUploader;
 import net.osmand.data.preparation.AbstractIndexPartCreator;
 import net.osmand.data.preparation.BinaryFileReference;
 import net.osmand.data.preparation.BinaryMapIndexWriter;
+import net.osmand.data.preparation.IndexPoiCreator;
 import net.osmand.data.preparation.IndexVectorMapCreator;
+import net.osmand.data.preparation.IndexPoiCreator.PoiAdditionalType;
+import net.osmand.osm.MapPoiTypes;
+import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import rtree.LeafElement;
@@ -58,9 +66,10 @@ public class ObfFileInMemory {
 	private double lonleft = -179.9;
 	private double lonright = 179.9;
 	
-
 	private Map<MapZooms.MapZoomPair, TLongObjectHashMap<BinaryMapDataObject>> mapObjects = new LinkedHashMap<>();
 	private TLongObjectHashMap<RouteDataObject> routeObjects = new TLongObjectHashMap<>();
+	private TLongObjectHashMap<Amenity> poiObjects = new TLongObjectHashMap<Amenity>();
+	List<TransportStop> transportObjects = new ArrayList<>();
 	private long timestamp = 0;
 	private MapIndex mapIndex = new MapIndex(); 
 	private RouteRegion routeIndex = new RouteRegion(); 
@@ -80,6 +89,10 @@ public class ObfFileInMemory {
 		return routeObjects;
 	}
 	
+	public TLongObjectHashMap<Amenity> getPoiData() {
+		return poiObjects;
+	}
+	
 	public MapIndex getMapIndex() {
 		return mapIndex;
 	}
@@ -87,6 +100,11 @@ public class ObfFileInMemory {
 	public RouteRegion getRouteIndex() {
 		return routeIndex;
 	}
+	
+	public List<TransportStop> getTransportObjects() {
+		return transportObjects;
+	}
+	
 	
 	
 	public void putMapObjects(MapZoomPair pair, Collection<BinaryMapDataObject> objects, boolean override) {
@@ -167,6 +185,12 @@ public class ObfFileInMemory {
 			writer.endWriteRouteIndex();
 		}
 		// TODO Write POI
+//		try {
+//			writePoiData(writer, poiObjects, targetFile);
+//		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+//			e.printStackTrace();
+//		}
 		// TODO Write Transport
 		ous.writeInt32(OsmandOdb.OsmAndStructure.VERSIONCONFIRM_FIELD_NUMBER, version);
 		ous.flush();
@@ -262,6 +286,16 @@ public class ObfFileInMemory {
 		}
 
 	}
+	
+//	private void writePoiData(BinaryMapIndexWriter writer, TLongObjectHashMap<Amenity> poiObjs, File fileToWrite) throws SQLException {
+//		IndexPoiCreator creator = new IndexPoiCreator(new MapRenderingTypesEncoder("basemap"), false);
+//		creator.createDatabaseStructure(new File("/home/paul/db.dbl"));
+//		for (Amenity a : poiObjs.valueCollection()) {
+//			creator.insertAmenityIntoPoi(a);
+//			creator.commitAndClosePoiFile(timestamp);
+//		}
+//		
+//	}
 
 	public void updateTimestamp(long dateCreated) {
 		timestamp = Math.max(timestamp, dateCreated);
@@ -299,9 +333,19 @@ public class ObfFileInMemory {
 					}
 				}
 				// Read routing objects
-				if (p instanceof RouteRegion) {
+				else if (p instanceof RouteRegion) {
 					RouteRegion rr = (RouteRegion) p;
 					putRoutingData(indexReader, rr, ZOOM_LEVEL_ROUTING, true);
+				}
+				// Read POI
+				else if (p instanceof PoiRegion) {
+					PoiRegion pr = (PoiRegion) p;
+					putPoiData(indexReader, pr, ZOOM_LEVEL_POI, true);
+				}
+				// Read Transport
+				else if (p instanceof TransportIndex) {
+					TransportIndex ti = (TransportIndex) p;
+					putTransportData(indexReader, true);
 				}
 			}
 			updateTimestamp(indexReader.getDateCreated());
@@ -309,6 +353,55 @@ public class ObfFileInMemory {
 			raf.close();
 			if(gzip) {
 				nonGzip.delete();
+			}
+		}
+	}
+	
+	public void putTransportData(BinaryMapIndexReader indexReader, boolean b) throws IOException {
+		SearchRequest<TransportStop> sr = BinaryMapIndexReader.buildSearchTransportRequest(
+				MapUtils.get31TileNumberX(lonleft),
+				MapUtils.get31TileNumberX(lonright),
+				MapUtils.get31TileNumberY(lattop),
+				MapUtils.get31TileNumberY(latbottom),
+				-1, null);
+		transportObjects = indexReader.searchTransportIndex(sr);
+	}
+	
+	public void putTransportData(List<TransportStop> newData, boolean override) {
+		for (TransportStop ts : newData) {
+			if (override || !transportObjects.contains(ts)) {
+				transportObjects.add(ts);
+			}
+		}
+	}
+
+	public void putPoiData(BinaryMapIndexReader indexReader, PoiRegion pr, int zoomLevelPoi, final boolean override) throws IOException {
+		SearchRequest<Amenity> req = BinaryMapIndexReader.buildSearchPoiRequest(
+			MapUtils.get31TileNumberX(lonleft),	MapUtils.get31TileNumberX(lonright),
+			MapUtils.get31TileNumberY(lattop), MapUtils.get31TileNumberY(latbottom),
+			ZOOM_LEVEL_POI,	BinaryMapIndexReader.ACCEPT_ALL_POI_TYPE_FILTER,
+			new ResultMatcher<Amenity>() {
+				@Override
+				public boolean publish(Amenity object) {
+					if(override || !poiObjects.containsKey(object.getId())) {
+						poiObjects.put(object.getId(), object);
+					}
+					return false;
+				}
+
+				@Override
+				public boolean isCancelled() {
+					return false;
+				}
+			});
+		indexReader.initCategories(pr);
+		indexReader.searchPoi(pr, req);
+	}
+	
+	public void putPoiData(TLongObjectHashMap<Amenity> newData, boolean override) {
+		for (Amenity a : newData.values()) {
+			if (override || !poiObjects.containsKey(a.getId())) {
+				poiObjects.put(a.getId(), a);
 			}
 		}
 	}
@@ -379,36 +472,6 @@ public class ObfFileInMemory {
 		return result;
 	}
 	
-	private List<Amenity> getPoiData(BinaryMapIndexReader index) throws IOException {
-		final List<Amenity> amenities = new ArrayList<>();
-		for (BinaryIndexPart p : index.getIndexes()) {
-			if (p instanceof PoiRegion) {				
-				SearchRequest<Amenity> req = BinaryMapIndexReader.buildSearchPoiRequest(
-					MapUtils.get31TileNumberX(lonleft),
-					MapUtils.get31TileNumberX(lonright),
-					MapUtils.get31TileNumberY(lattop),
-					MapUtils.get31TileNumberY(latbottom),
-					ZOOM_LEVEL_POI,
-					BinaryMapIndexReader.ACCEPT_ALL_POI_TYPE_FILTER,
-					new ResultMatcher<Amenity>() {
-						@Override
-						public boolean publish(Amenity object) {
-							amenities.add(object);
-							return false;
-						}
-
-						@Override
-						public boolean isCancelled() {
-							return false;
-						}
-					});
-				index.initCategories((PoiRegion) p);
-				index.searchPoi((PoiRegion) p, req);
-			}
-		}
-		return amenities;
-	}
-
 	public void filterAllZoomsBelow(int zm) {
 		for(MapZoomPair mz : new ArrayList<>(getZooms())) {
 			if(mz.getMaxZoom() < zm) {
