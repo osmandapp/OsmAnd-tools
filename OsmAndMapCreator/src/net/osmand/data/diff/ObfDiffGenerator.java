@@ -1,21 +1,20 @@
 package net.osmand.data.diff;
 
-import gnu.trove.iterator.TIntObjectIterator;
+
 import gnu.trove.map.hash.TLongObjectHashMap;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
-import java.util.Map;
+import java.util.List;
 
 import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.binary.BinaryMapIndexReader.MapIndex;
-import net.osmand.binary.BinaryMapIndexReader.TagValuePair;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
-import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteTypeRule;
 import net.osmand.binary.MapZooms.MapZoomPair;
 import net.osmand.binary.RouteDataObject;
 import net.osmand.data.Amenity;
+import net.osmand.data.TransportStop;
 import rtree.RTreeException;
 
 public class ObfDiffGenerator {
@@ -71,13 +70,20 @@ public class ObfDiffGenerator {
 		// TODO Compare POI
 		comparePOI(fStart, fEnd);
 		// TODO Compare Transport
-		//compareTransport(fStart, fEnd);
+		compareTransport(fStart, fEnd);
 		
 		System.out.println("Finished comparing.");
 		if (result.exists()) {
 			result.delete();
 		}
 		fEnd.writeFile(result);
+	}
+
+	private void compareTransport(ObfFileInMemory fStart, ObfFileInMemory fEnd) {
+		List<TransportStop> startTransport = fStart.getTransportObjects();
+		List<TransportStop> endTransport = fEnd.getTransportObjects();
+		// TODO Compare Transport objects and delete the ones that are not present in the end list
+		
 	}
 
 	private void comparePOI(ObfFileInMemory fStart, ObfFileInMemory fEnd) {
@@ -95,8 +101,12 @@ public class ObfDiffGenerator {
 				// TODO add delete tags and put into the result set
 				Amenity am = new Amenity();
 				am.setAdditionalInfo(OSMAND_CHANGE_TAG, OSMAND_CHANGE_VALUE);
+				am.setId(idx);
 				am.setX(objS.getX());
 				am.setY(objS.getY());
+				am.setType(objS.getType());
+				am.setSubType(OSMAND_CHANGE_TAG);
+				am.setLocation(objS.getLocation().getLatitude(), objS.getLocation().getLongitude());
 				endPoi.put(idx, am);
 			}
 			else if (objE.comparePoi(objS)) {

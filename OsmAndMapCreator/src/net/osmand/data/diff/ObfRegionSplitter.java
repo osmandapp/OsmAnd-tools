@@ -14,8 +14,10 @@ import java.util.TreeSet;
 import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.binary.MapZooms.MapZoomPair;
 import net.osmand.binary.RouteDataObject;
+import net.osmand.data.Amenity;
 import net.osmand.map.OsmandRegions;
 import net.osmand.util.Algorithms;
+import net.osmand.util.MapUtils;
 
 public class ObfRegionSplitter {
 	
@@ -62,6 +64,8 @@ public class ObfRegionSplitter {
 					osmandRegions);
 			Map<String, TLongObjectHashMap<RouteDataObject>> regionsRouteData = splitRegionRouteData(fl,
 					osmandRegions);
+			Map<String, TLongObjectHashMap<Amenity>> regionsPoiData = splitRegionPoiData(fl, osmandRegions);
+			
 			TreeSet<String> regionNames = new TreeSet<>();
 			regionNames.addAll(regionsMapData.keySet());
 			regionNames.addAll(regionsRouteData.keySet());
@@ -98,6 +102,31 @@ public class ObfRegionSplitter {
 		}
 	}
 			
+
+	private Map<String, TLongObjectHashMap<Amenity>> splitRegionPoiData(ObfFileInMemory fl,
+			OsmandRegions osmandRegions) throws IOException {
+		Map<String, TLongObjectHashMap<Amenity>> result = new HashMap<>();
+		TLongObjectHashMap<Amenity> poiData = fl.getPoiData();
+		for (Amenity obj : poiData.valueCollection()) {
+			int x = MapUtils.get31TileNumberX(obj.getLocation().getLatitude());
+			int y = MapUtils.get31TileNumberY(obj.getLocation().getLongitude());
+			List<BinaryMapDataObject> l = osmandRegions.query(x, y);
+			for (BinaryMapDataObject b : l) {
+				if (osmandRegions.contain(b, x, y)) {
+					String dw = osmandRegions.getDownloadName(b);
+					if (!Algorithms.isEmpty(dw) && osmandRegions.isDownloadOfType(b, OsmandRegions.MAP_TYPE)) {
+						TLongObjectHashMap<Amenity> mp = result.get(dw);
+						if (mp == null) {
+							mp = new TLongObjectHashMap<>();
+							result.put(dw, mp);
+						}
+						mp.put(obj.getId(), obj);
+					}
+				}
+			}
+		}
+		return result;
+	}
 
 	private Map<String, TLongObjectHashMap<RouteDataObject>> splitRegionRouteData(ObfFileInMemory fl,
 			OsmandRegions osmandRegions) throws IOException {

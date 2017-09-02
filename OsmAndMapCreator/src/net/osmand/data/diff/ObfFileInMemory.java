@@ -9,6 +9,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -43,7 +44,11 @@ import net.osmand.data.index.IndexUploader;
 import net.osmand.data.preparation.AbstractIndexPartCreator;
 import net.osmand.data.preparation.BinaryFileReference;
 import net.osmand.data.preparation.BinaryMapIndexWriter;
+import net.osmand.data.preparation.IndexPoiCreator;
 import net.osmand.data.preparation.IndexVectorMapCreator;
+import net.osmand.data.preparation.IndexPoiCreator.PoiAdditionalType;
+import net.osmand.osm.MapPoiTypes;
+import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import rtree.LeafElement;
@@ -61,7 +66,6 @@ public class ObfFileInMemory {
 	private double lonleft = -179.9;
 	private double lonright = 179.9;
 	
-
 	private Map<MapZooms.MapZoomPair, TLongObjectHashMap<BinaryMapDataObject>> mapObjects = new LinkedHashMap<>();
 	private TLongObjectHashMap<RouteDataObject> routeObjects = new TLongObjectHashMap<>();
 	private TLongObjectHashMap<Amenity> poiObjects = new TLongObjectHashMap<Amenity>();
@@ -181,6 +185,12 @@ public class ObfFileInMemory {
 			writer.endWriteRouteIndex();
 		}
 		// TODO Write POI
+//		try {
+//			writePoiData(writer, poiObjects, targetFile);
+//		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+//			e.printStackTrace();
+//		}
 		// TODO Write Transport
 		ous.writeInt32(OsmandOdb.OsmAndStructure.VERSIONCONFIRM_FIELD_NUMBER, version);
 		ous.flush();
@@ -276,6 +286,16 @@ public class ObfFileInMemory {
 		}
 
 	}
+	
+//	private void writePoiData(BinaryMapIndexWriter writer, TLongObjectHashMap<Amenity> poiObjs, File fileToWrite) throws SQLException {
+//		IndexPoiCreator creator = new IndexPoiCreator(new MapRenderingTypesEncoder("basemap"), false);
+//		creator.createDatabaseStructure(new File("/home/paul/db.dbl"));
+//		for (Amenity a : poiObjs.valueCollection()) {
+//			creator.insertAmenityIntoPoi(a);
+//			creator.commitAndClosePoiFile(timestamp);
+//		}
+//		
+//	}
 
 	public void updateTimestamp(long dateCreated) {
 		timestamp = Math.max(timestamp, dateCreated);
@@ -378,7 +398,7 @@ public class ObfFileInMemory {
 		indexReader.searchPoi(pr, req);
 	}
 	
-	public void putPoiData(Map<String, Amenity> newData, boolean override) {
+	public void putPoiData(TLongObjectHashMap<Amenity> newData, boolean override) {
 		for (Amenity a : newData.values()) {
 			if (override || !poiObjects.containsKey(a.getId())) {
 				poiObjects.put(a.getId(), a);
