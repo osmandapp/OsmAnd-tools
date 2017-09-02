@@ -32,11 +32,13 @@ import net.osmand.binary.BinaryMapIndexReader.SearchRequest;
 import net.osmand.binary.BinaryMapPoiReaderAdapter.PoiRegion;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteSubregion;
+import net.osmand.binary.BinaryMapTransportReaderAdapter.TransportIndex;
 import net.osmand.binary.MapZooms;
 import net.osmand.binary.MapZooms.MapZoomPair;
 import net.osmand.binary.OsmandOdb;
 import net.osmand.binary.RouteDataObject;
 import net.osmand.data.Amenity;
+import net.osmand.data.TransportStop;
 import net.osmand.data.index.IndexUploader;
 import net.osmand.data.preparation.AbstractIndexPartCreator;
 import net.osmand.data.preparation.BinaryFileReference;
@@ -63,6 +65,7 @@ public class ObfFileInMemory {
 	private Map<MapZooms.MapZoomPair, TLongObjectHashMap<BinaryMapDataObject>> mapObjects = new LinkedHashMap<>();
 	private TLongObjectHashMap<RouteDataObject> routeObjects = new TLongObjectHashMap<>();
 	private TLongObjectHashMap<Amenity> poiObjects = new TLongObjectHashMap<Amenity>();
+	List<TransportStop> transportObjects = new ArrayList<>();
 	private long timestamp = 0;
 	private MapIndex mapIndex = new MapIndex(); 
 	private RouteRegion routeIndex = new RouteRegion(); 
@@ -93,6 +96,11 @@ public class ObfFileInMemory {
 	public RouteRegion getRouteIndex() {
 		return routeIndex;
 	}
+	
+	public List<TransportStop> getTransportObjects() {
+		return transportObjects;
+	}
+	
 	
 	
 	public void putMapObjects(MapZoomPair pair, Collection<BinaryMapDataObject> objects, boolean override) {
@@ -305,14 +313,19 @@ public class ObfFileInMemory {
 					}
 				}
 				// Read routing objects
-				if (p instanceof RouteRegion) {
+				else if (p instanceof RouteRegion) {
 					RouteRegion rr = (RouteRegion) p;
 					putRoutingData(indexReader, rr, ZOOM_LEVEL_ROUTING, true);
 				}
 				// Read POI
-				if (p instanceof PoiRegion) {
+				else if (p instanceof PoiRegion) {
 					PoiRegion pr = (PoiRegion) p;
 					putPoiData(indexReader, pr, ZOOM_LEVEL_POI, true);
+				}
+				// Read Transport
+				else if (p instanceof TransportIndex) {
+					TransportIndex ti = (TransportIndex) p;
+					putTransportData(indexReader, true);
 				}
 			}
 			updateTimestamp(indexReader.getDateCreated());
@@ -324,6 +337,24 @@ public class ObfFileInMemory {
 		}
 	}
 	
+	public void putTransportData(BinaryMapIndexReader indexReader, boolean b) throws IOException {
+		SearchRequest<TransportStop> sr = BinaryMapIndexReader.buildSearchTransportRequest(
+				MapUtils.get31TileNumberX(lonleft),
+				MapUtils.get31TileNumberX(lonright),
+				MapUtils.get31TileNumberY(lattop),
+				MapUtils.get31TileNumberY(latbottom),
+				-1, null);
+		transportObjects = indexReader.searchTransportIndex(sr);
+	}
+	
+	public void putTransportData(List<TransportStop> newData, boolean override) {
+		for (TransportStop ts : newData) {
+			if (override || !transportObjects.contains(ts)) {
+				transportObjects.add(ts);
+			}
+		}
+	}
+
 	public void putPoiData(BinaryMapIndexReader indexReader, PoiRegion pr, int zoomLevelPoi, final boolean override) throws IOException {
 		SearchRequest<Amenity> req = BinaryMapIndexReader.buildSearchPoiRequest(
 			MapUtils.get31TileNumberX(lonleft),	MapUtils.get31TileNumberX(lonright),
