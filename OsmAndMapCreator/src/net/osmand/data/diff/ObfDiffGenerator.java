@@ -1,17 +1,15 @@
 package net.osmand.data.diff;
 
-import gnu.trove.iterator.TIntObjectIterator;
 import gnu.trove.map.hash.TLongObjectHashMap;
 
 import java.io.File;
 import java.io.IOException;
+import java.sql.SQLException;
 import java.util.Collections;
 
 import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.binary.BinaryMapIndexReader.MapIndex;
-import net.osmand.binary.BinaryMapIndexReader.TagValuePair;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
-import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteTypeRule;
 import net.osmand.binary.MapZooms.MapZoomPair;
 import net.osmand.binary.RouteDataObject;
 import rtree.RTreeException;
@@ -26,9 +24,9 @@ public class ObfDiffGenerator {
 	public static void main(String[] args) throws IOException, RTreeException {
 		if(args.length == 1 && args[0].equals("test")) {
 			args = new String[3];
-			args[0] = "/Users/victorshcherb/osmand/maps/diff/Diff-start.obf";
-			args[1] = "/Users/victorshcherb/osmand/maps/diff/Diff-end.obf";
-			args[2] = "/Users/victorshcherb/osmand/maps/diff/2017_08_28_01_00_diff.obf";
+			args[0] = "/Users/victorshcherb/osmand/maps/diff/Ukraine_kiev-city_europe_09_2.obf";
+			args[1] = "/Users/victorshcherb/osmand/maps/diff/Ukraine_kiev-city_europe_09.obf";
+			args[2] = "/Users/victorshcherb/osmand/maps/diff/Diff.obf";
 		}
 		if (args.length != 3) {
 			System.out.println("Usage: <path to old obf> <path to new obf> <result file name>");
@@ -44,7 +42,7 @@ public class ObfDiffGenerator {
 		}
 	}
 	
-	private void run(String[] args) throws IOException, RTreeException {
+	private void run(String[] args) throws IOException, RTreeException, SQLException {
 		File start = new File(args[0]);
 		File end = new File(args[1]);
 		File result  = new File(args[2]);
@@ -56,7 +54,7 @@ public class ObfDiffGenerator {
 		generateDiff(start, end, result);
 	}
 
-	private void generateDiff(File start, File end, File result) throws IOException, RTreeException {
+	private void generateDiff(File start, File end, File result) throws IOException, RTreeException, SQLException {
 		ObfFileInMemory fStart = new ObfFileInMemory();
 		fStart.readObfFiles(Collections.singletonList(start));
 		ObfFileInMemory fEnd = new ObfFileInMemory();
@@ -130,6 +128,7 @@ public class ObfDiffGenerator {
 			if (objE == null) {
 				// Object with this id is not present in the second obf
 				RouteDataObject rdo = new RouteDataObject(ri);
+				rdo.id = objS.id;
 				rdo.pointsX = objS.pointsX; 
 				rdo.pointsY = objS.pointsY;
 				rdo.types = new int[] {deleteId };

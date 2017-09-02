@@ -35,6 +35,7 @@ import java.util.TreeMap;
 
 import net.osmand.IProgress;
 import net.osmand.binary.BinaryMapIndexReader;
+import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteTypeRule;
 import net.osmand.binary.OsmandOdb.IdTable;
 import net.osmand.binary.OsmandOdb.OsmAndRoutingIndex.RouteDataBlock;
 import net.osmand.binary.OsmandOdb.RestrictionData;
@@ -430,34 +431,8 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		return b.toString();
 	}
 
-	protected void decodeListNames(String name, List<MapPointName> tempNames) {
-		int i = name.indexOf(SPECIAL_CHAR);
-		while (i != -1) {
-			int n = name.indexOf(SPECIAL_CHAR, i + 3);
-			int ch = (short) name.charAt(i + 1);
-			int index = (short) name.charAt(i + 2);
-			String pointName = n == -1 ? name.substring(i + 3) : name.substring(i + 3, n);
-			MapPointName pn = new MapPointName(ch, index, pointName);
-			pn.nameTypeTargetId = routeTypes.getTypeByInternalId(ch).getTargetId();
-			tempNames.add(pn);
-			i = n;
-		}
-	}
 
-	protected void decodeNames(String name, Map<MapRouteType, String> tempNames) {
-		int i = name.indexOf(SPECIAL_CHAR);
-		while (i != -1) {
-			int n = name.indexOf(SPECIAL_CHAR, i + 2);
-			int ch = (short) name.charAt(i + 1);
-			MapRouteType rt = routeTypes.getTypeByInternalId(ch);
-			if (n == -1) {
-				tempNames.put(rt, name.substring(i + 2));
-			} else {
-				tempNames.put(rt, name.substring(i + 2, n));
-			}
-			i = n;
-		}
-	}
+	
 
 
 
@@ -1153,115 +1128,137 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		}
 	}
 
-	private static class RouteWriteContext {
+	public static class RouteWriteContext {
 		PreparedStatement selectData ;
+		TLongObjectHashMap<RouteDataObject> objects;
+		
 		TLongObjectHashMap<BinaryFileReference> treeHeader;
-		Map<String, Integer> tempStringTable = new LinkedHashMap<String, Integer>();
-		Map<MapRouteType, String> tempNames = createTreeMap();
-		List<MapPointName> tempPointNames = new ArrayList<MapRoutingTypes.MapPointName>();
-		TLongArrayList wayMapIds = new TLongArrayList();
-		TLongArrayList pointMapIds = new TLongArrayList();
-	}
-
-	private void writeBinaryRouteIndexBlocks(BinaryMapIndexWriter writer, RTree rte, boolean basemap,
-			TLongObjectHashMap<BinaryFileReference> treeHeader) throws IOException, SQLException, RTreeException {
-
-		// write map levels and map index
-		long rootIndex = rte.getFileHdr().getRootIndex();
-		rtree.Node root = rte.getReadNode(rootIndex);
-		Rect rootBounds = calcBounds(root);
-		if (rootBounds != null) {
-				PreparedStatement selectData = mapConnection.prepareStatement(basemap ? SELECT_BASE_STAT : SELECT_STAT);
-				RouteWriteContext wc = new RouteWriteContext();
-				wc.selectData = selectData;
-				wc.treeHeader = treeHeader;
-				writeBinaryMapBlock(root, rootBounds, rte, writer, wc, basemap);
-				selectData.close();
+		Log logMapDataWarn;
+		private MapRoutingTypes routeTypes;
+		
+		TLongObjectHashMap<TLongArrayList> highwayRestrictions = new TLongObjectHashMap<TLongArrayList>();
+		TLongObjectHashMap<RouteMissingPoints> basemapNodesToReinsert = new TLongObjectHashMap<RouteMissingPoints> ();
+		
+		public RouteWriteContext(Log logMapDataWarn, TLongObjectHashMap<BinaryFileReference> treeHeader, MapRoutingTypes routeTypes,
+				PreparedStatement selectData) {
+			this.logMapDataWarn = logMapDataWarn;
+			this.treeHeader = treeHeader;
+			this.routeTypes = routeTypes;
+			this.selectData = selectData;
+			
 		}
-	}
-
-	private TLongObjectHashMap<BinaryFileReference> writeBinaryRouteIndexHeader(BinaryMapIndexWriter writer,
-			RTree rte, boolean basemap) throws IOException, SQLException, RTreeException {
-		// write map levels and map index
-		TLongObjectHashMap<BinaryFileReference> treeHeader = new TLongObjectHashMap<BinaryFileReference>();
-		long rootIndex = rte.getFileHdr().getRootIndex();
-		rtree.Node root = rte.getReadNode(rootIndex);
-		Rect rootBounds = calcBounds(root);
-		if (rootBounds != null) {
-			writeBinaryRouteTree(root, rootBounds, rte, writer, treeHeader, basemap);
-		}
-		return treeHeader;
-	}
-
-	private int registerId(TLongArrayList ids, long id) {
-		for (int i = 0; i < ids.size(); i++) {
-			if (ids.getQuick(i) == id) {
-				return i;
+		
+		public RouteWriteContext(Log logMapDataWarn, TLongObjectHashMap<BinaryFileReference> treeHeader, MapRoutingTypes routeTypes,
+				TLongObjectHashMap<RouteDataObject> objects) {
+			this.logMapDataWarn = logMapDataWarn;
+			this.treeHeader = treeHeader;
+			this.routeTypes = routeTypes;
+			this.objects = objects;
+			
+			for(RouteDataObject o : objects.valueCollection()){
+				TLongArrayList list = new TLongArrayList();
+				for(int k = 0 ; k < o.getRestrictionLength(); k++) {
+					list.add(o.getRawRestriction(k));
+				}
+				highwayRestrictions.put(o.getId(), list);
 			}
 		}
-		ids.add(id);
-		return ids.size() - 1;
-	}
+		
+		
+		Map<String, Integer> stringTable = new LinkedHashMap<String, Integer>();
+		Map<MapRouteType, String> wayNames = createTreeMap();
+		List<MapPointName> pointNames = new ArrayList<MapRoutingTypes.MapPointName>();
+		TLongArrayList wayMapIds = new TLongArrayList();
+		TLongObjectHashMap<Integer> wayMapIdsCache = new TLongObjectHashMap<>();
+		
+		TLongArrayList pointMapIds = new TLongArrayList();
+		int[] wayTypes;
+		private ArrayList<RoutePointToWrite> points;
+		
+		protected void decodeNames(String name, Map<MapRouteType, String> tempNames) {
+			int i = name.indexOf(SPECIAL_CHAR);
+			while (i != -1) {
+				int n = name.indexOf(SPECIAL_CHAR, i + 2);
+				int ch = (short) name.charAt(i + 1);
+				MapRouteType rt = routeTypes.getTypeByInternalId(ch);
+				if (n == -1) {
+					tempNames.put(rt, name.substring(i + 2));
+				} else {
+					tempNames.put(rt, name.substring(i + 2, n));
+				}
+				i = n;
+			}
+		}
+		
+		protected void decodeListNames(String name, List<MapPointName> tempNames) {
+			int i = name.indexOf(SPECIAL_CHAR);
+			while (i != -1) {
+				int n = name.indexOf(SPECIAL_CHAR, i + 3);
+				int ch = (short) name.charAt(i + 1);
+				int index = (short) name.charAt(i + 2);
+				String pointName = n == -1 ? name.substring(i + 3) : name.substring(i + 3, n);
+				MapPointName pn = new MapPointName(ch, index, pointName);
+				pn.nameTypeTargetId = routeTypes.getTypeByInternalId(ch).getTargetId();
+				tempNames.add(pn);
+				i = n;
+			}
+		}
+		
+		private int registerId(TLongArrayList ids, long id) {
+			for (int i = 0; i < ids.size(); i++) {
+				if (ids.getQuick(i) == id) {
+					return i;
+				}
+			}
+			ids.add(id);
+			return ids.size() - 1;
+		}
+		
+		public int registerWayMapId(long id) {
+			if(!wayMapIdsCache.contains(id)) {
+				wayMapIdsCache.put(id, wayMapIdsCache.size());
+				wayMapIds.add(id);
+			}
+//			int oldId = registerId(wayMapIds, id);
+			int newId = wayMapIdsCache.get(id);
+//			if(oldId != newId) {
+//				throw new IllegalArgumentException();
+//			}
+			return newId;
+		}
 
-	private void writeBinaryMapBlock(rtree.Node parent, Rect parentBounds, RTree r, BinaryMapIndexWriter writer, RouteWriteContext wc, boolean basemap)
-					throws IOException, RTreeException, SQLException {
-		Element[] e = parent.getAllElements();
-
-		RouteDataBlock.Builder dataBlock = null;
-		BinaryFileReference ref = wc.treeHeader.get(parent.getNodeIndex());
-		wc.wayMapIds.clear();
-		wc.pointMapIds.clear();
-		for (int i = 0; i < parent.getTotalElements(); i++) {
-			if (e[i].getElementType() == rtree.Node.LEAF_NODE) {
-				long id = e[i].getPtr();
-				// IndexRouteCreator.SELECT_STAT;
-				// "SELECT types, pointTypes, pointIds, pointCoordinates, name FROM route_objects WHERE id = ?"
-				wc.selectData.setLong(1, id);
-
-				ResultSet rs = wc.selectData.executeQuery();
-				if (rs.next()) {
-					if (dataBlock == null) {
-						dataBlock = RouteDataBlock.newBuilder();
-						wc.tempStringTable.clear();
-						wc.wayMapIds.clear();
-						wc.pointMapIds.clear();
-					}
-					int cid = registerId(wc.wayMapIds, id);
-					wc.tempNames.clear();
-					decodeNames(rs.getString(5), wc.tempNames);
+		public boolean retrieveObject(long id) throws SQLException {
+			if (selectData != null) {
+				selectData.setLong(1, id);
+				ResultSet rs = selectData.executeQuery();
+				boolean next = rs.next();
+				if(next) {
+					wayNames.clear();
+					decodeNames(rs.getString(5), wayNames);
+					
 					byte[] types = rs.getBytes(1);
-					int[] typeUse = new int[types.length / 2];
+					this.wayTypes = new int[types.length / 2];
 					for (int j = 0; j < types.length; j += 2) {
 						int ids = Algorithms.parseSmallIntFromBytes(types, j);
-						typeUse[j / 2] = routeTypes.getTypeByInternalId(ids).getTargetId();
+						wayTypes[j / 2] = routeTypes.getTypeByInternalId(ids).getTargetId();
 					}
-					TLongArrayList restrictions = highwayRestrictions.get(id);
-					if(!basemap && restrictions != null){
-						for(int li = 0; li<restrictions.size(); li++){
-							Builder restriction = RestrictionData.newBuilder();
-							restriction.setFrom(cid);
-							int toId = registerId(wc.wayMapIds, restrictions.get(li) >> 3);
-							restriction.setTo(toId);
-							restriction.setType((int) (restrictions.get(li) & 0x7));
-							dataBlock.addRestrictions(restriction.build());
-						}
-					}
+					
 					byte[] pointTypes = rs.getBytes(2);
 					//byte[] pointIds = rs.getBytes(3);
 					byte[] pointCoordinates = rs.getBytes(4);
-					String pointNames = rs.getString(6);
-					wc.tempPointNames.clear();
-					decodeListNames(pointNames, wc.tempPointNames);
+					String pointNamesString = rs.getString(6);
+					pointNames.clear();
+					decodeListNames(pointNamesString, pointNames);
 
 					int pointsLength = pointCoordinates.length / 8;
 					RouteMissingPoints missingPoints = null;
-					if(basemap && basemapNodesToReinsert.containsKey(id) ) {
+					if(basemapNodesToReinsert != null && basemapNodesToReinsert.containsKey(id) ) {
 						missingPoints = basemapNodesToReinsert.get(id);
 						missingPoints.buildPointsToInsert(pointsLength);
 					}
-
+					
 					int typeInd = 0;
-					List<RoutePointToWrite> points = new ArrayList<RoutePointToWrite>(pointsLength);
+					points = new ArrayList<RoutePointToWrite>(pointsLength);
 					for (int j = 0; j < pointsLength; j++) {
 						if(missingPoints != null && missingPoints.pointsXToInsert[j] != null) {
 							for(int k = 0; k < missingPoints.pointsXToInsert[j].size(); k++) {
@@ -1288,15 +1285,137 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 							}
 						} while (type != 0);
 					}
+				}
+				return next;
+			} else {
+				RouteDataObject rdo = objects.get(id);
+				if (rdo != null) {
+					wayTypes = rdo.types;
+					pointNames.clear();
+					if (rdo.pointNames != null) {
+						for (int i = 0; i < rdo.pointNames.length; i++) {
+							if (rdo.pointNames[i] != null) {
+								for (int j = 0; j < rdo.pointNames[i].length; j++) {
+									MapPointName mpn = new MapPointName(rdo.pointNameTypes[i][j], i, rdo.pointNames[i][j]);
+									pointNames.add(mpn);
+								}
+							}
+						}
+					}
+					
+					wayNames.clear();
+					if (rdo.names != null) {
+						TIntObjectIterator<String> it = rdo.names.iterator();
+						while (it.hasNext()) {
+							it.advance();
+							int vl = it.key();
+							String value = it.value();
+							RouteTypeRule rtr = rdo.region.quickGetEncodingRule(vl);
+							MapRouteType mrt = new MapRouteType(vl, rtr.getTag(), rtr.getValue());
+							wayNames.put(mrt, value);
+						}
+					}
+					
+					points = new ArrayList<>(rdo.pointsX.length);
+					for (int i = 0; i < rdo.pointsX.length; i++) {
+						RoutePointToWrite rw = new RoutePointToWrite();
+						rw.x = rdo.pointsX[i];
+						rw.y = rdo.pointsY[i];
+						if (rdo.pointTypes != null && 
+								i < rdo.pointTypes.length && rdo.pointTypes[i] != null) {
+							rw.types.addAll(rdo.pointTypes[i]);
+						}
+					}
+					return true;
+				}
+				return false;
+			}
 
-					RouteData routeData = writer.writeRouteData(cid, parentBounds.getMinX(), parentBounds.getMinY(), typeUse,
-							points.toArray(new RoutePointToWrite[points.size()]),
-							wc.tempNames, wc.tempStringTable, wc.tempPointNames, dataBlock, true, false);
+		}
+		
+	}
+
+	private void writeBinaryRouteIndexBlocks(BinaryMapIndexWriter writer, RTree rte, boolean basemap,
+			TLongObjectHashMap<BinaryFileReference> treeHeader) throws IOException, SQLException, RTreeException {
+
+		// write map levels and map index
+		long rootIndex = rte.getFileHdr().getRootIndex();
+		rtree.Node root = rte.getReadNode(rootIndex);
+		Rect rootBounds = calcBounds(root);
+		if (rootBounds != null) {
+				PreparedStatement selectData = mapConnection.prepareStatement(basemap ? SELECT_BASE_STAT : SELECT_STAT);
+				RouteWriteContext wc = new RouteWriteContext(logMapDataWarn, treeHeader, routeTypes, selectData);
+				wc.highwayRestrictions = highwayRestrictions;
+				if(basemap) {
+					wc.basemapNodesToReinsert = basemapNodesToReinsert;
+				}
+				writeBinaryMapBlock(root, rootBounds, rte, writer, wc, basemap);
+				selectData.close();
+		}
+	}
+
+	private TLongObjectHashMap<BinaryFileReference> writeBinaryRouteIndexHeader(BinaryMapIndexWriter writer,
+			RTree rte, boolean basemap) throws IOException, SQLException, RTreeException {
+		// write map levels and map index
+		TLongObjectHashMap<BinaryFileReference> treeHeader = new TLongObjectHashMap<BinaryFileReference>();
+		long rootIndex = rte.getFileHdr().getRootIndex();
+		rtree.Node root = rte.getReadNode(rootIndex);
+		Rect rootBounds = calcBounds(root);
+		if (rootBounds != null) {
+			writeBinaryRouteTree(root, rootBounds, rte, writer, treeHeader, basemap);
+		}
+		return treeHeader;
+	}
+
+	
+
+	public static void writeBinaryMapBlock(rtree.Node parent, Rect parentBounds, RTree r, BinaryMapIndexWriter writer, RouteWriteContext wc, boolean basemap)
+					throws IOException, RTreeException, SQLException {
+		Element[] e = parent.getAllElements();
+
+		RouteDataBlock.Builder dataBlock = null;
+		BinaryFileReference ref = wc.treeHeader.get(parent.getNodeIndex());
+		wc.wayMapIds.clear();
+		wc.wayMapIdsCache.clear();
+		wc.pointMapIds.clear();
+		for (int i = 0; i < parent.getTotalElements(); i++) {
+			if (e[i].getElementType() == rtree.Node.LEAF_NODE) {
+				long id = e[i].getPtr();
+				// IndexRouteCreator.SELECT_STAT;
+				// "SELECT types, pointTypes, pointIds, pointCoordinates, name FROM route_objects WHERE id = ?"
+				boolean retrieveObject = wc.retrieveObject(id);
+				if (retrieveObject) {
+					if (dataBlock == null) {
+						dataBlock = RouteDataBlock.newBuilder();
+						wc.stringTable.clear();
+						wc.wayMapIds.clear();
+						wc.wayMapIdsCache.clear();
+						wc.pointMapIds.clear();
+					}
+					int cid = wc.registerWayMapId(id);
+					TLongArrayList restrictions = wc.highwayRestrictions.get(id);
+					if (!basemap && restrictions != null) {
+						for (int li = 0; li < restrictions.size(); li++) {
+							Builder restriction = RestrictionData.newBuilder();
+							restriction.setFrom(cid);
+							int toId = wc.registerWayMapId(restrictions.get(li) >> 3);
+							restriction.setTo(toId);
+							restriction.setType((int) (restrictions.get(li) & 0x7));
+							dataBlock.addRestrictions(restriction.build());
+						}
+					}
+					RouteData routeData = writer.writeRouteData(cid, parentBounds.getMinX(), parentBounds.getMinY(), wc.wayTypes,
+							wc.points.toArray(new RoutePointToWrite[wc.points.size()]),
+							wc.wayNames, wc.stringTable, wc.pointNames, dataBlock, true, false);
 					if (routeData != null) {
 						dataBlock.addDataObjects(routeData);
 					}
 				} else {
-					logMapDataWarn.error("Something goes wrong with id = " + id); //$NON-NLS-1$
+					if(wc.logMapDataWarn != null) {
+						wc.logMapDataWarn.error("Something goes wrong with id = " + id); //$NON-NLS-1$
+					} else {
+						System.err.println("Something goes wrong with id = " + id);
+					}
 				}
 			}
 		}
@@ -1314,7 +1433,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 //				}
 //			}
 			dataBlock.setIdTable(idTable.build());
-			writer.writeRouteDataBlock(dataBlock, wc.tempStringTable, ref);
+			writer.writeRouteDataBlock(dataBlock, wc.stringTable, ref);
 		}
 		for (int i = 0; i < parent.getTotalElements(); i++) {
 			if (e[i].getElementType() != rtree.Node.LEAF_NODE) {
@@ -1325,7 +1444,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		}
 	}
 
-	private void writeBinaryRouteTree(rtree.Node parent, Rect re, RTree r, BinaryMapIndexWriter writer,
+	public static void writeBinaryRouteTree(rtree.Node parent, Rect re, RTree r, BinaryMapIndexWriter writer,
 			TLongObjectHashMap<BinaryFileReference> bounds, boolean basemap)
 			throws IOException, RTreeException {
 		Element[] e = parent.getAllElements();

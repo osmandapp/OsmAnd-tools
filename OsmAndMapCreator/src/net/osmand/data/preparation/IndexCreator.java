@@ -904,9 +904,9 @@ public class IndexCreator {
 		IndexPoiCreator.ZIP_LONG_STRINGS = false;
 		IndexCreator creator = new IndexCreator(new File(rootFolder + "/maps/")); //$NON-NLS-1$
 		creator.setIndexMap(true);
-//		creator.setIndexAddress(true);
-//		creator.setIndexPOI(true);
-//		creator.setIndexTransport(true);
+		creator.setIndexAddress(true);
+		creator.setIndexPOI(true);
+		creator.setIndexTransport(true);
 		creator.setIndexRouting(true);
 
 //		creator.deleteDatabaseIndexes = false;
@@ -918,9 +918,9 @@ public class IndexCreator {
 
 //		String file = rootFolder + "/temp/map.osm";
 //		String file = rootFolder + "/temp/ukraine_kiev-city_europe.pbf";
-//		String file = rootFolder + "/temp/ukraine_crimea_europe.pbf";
+//		String file = rootFolder + "/maps/diff/2017_08_28_00_30_before.osm";
+		String file = rootFolder + "/maps/diff/ukraine_kiev-city_europe_09.pbf";
 //		String file = rootFolder + "/repos/resources/test-resources/synthetic_test_rendering.osm";
-		String file = rootFolder + "/repos/resources/test-resources/osm_live/osmlive_data.osm";
 
 		int st = file.lastIndexOf('/');
 		int e = file.indexOf('.', st);

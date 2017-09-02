@@ -382,6 +382,16 @@ public class MapRoutingTypes {
 		int targetId;
 		String tag;
 		String value;
+		
+		public MapRouteType() {
+		}
+		
+		public MapRouteType(int id, String tag, String value) {
+			this.id = id;
+			this.targetId = id;
+			this.tag = tag;
+			this.value = value;
+		}
 
 		public int getInternalId() {
 			return id;
@@ -428,6 +438,7 @@ public class MapRoutingTypes {
 		public String name;
 		public MapPointName(int nameType, int pointIndex, String name) {
 			this.nameTypeInternalId = nameType;
+			this.nameTypeTargetId = nameType;
 			this.pointIndex = pointIndex;
 			this.name = name;
 		}

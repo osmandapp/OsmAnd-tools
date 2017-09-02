@@ -9,6 +9,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
@@ -40,7 +42,9 @@ import net.osmand.data.index.IndexUploader;
 import net.osmand.data.preparation.AbstractIndexPartCreator;
 import net.osmand.data.preparation.BinaryFileReference;
 import net.osmand.data.preparation.BinaryMapIndexWriter;
+import net.osmand.data.preparation.IndexRouteCreator;
 import net.osmand.data.preparation.IndexVectorMapCreator;
+import net.osmand.data.preparation.IndexRouteCreator.RouteWriteContext;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import rtree.LeafElement;
@@ -102,11 +106,7 @@ public class ObfFileInMemory {
 		}
 	}
 	
-	public void setRoutingData(TLongObjectHashMap<RouteDataObject> newObjects) {
-		this.routeObjects = newObjects;
-	}
-
-	public void writeFile(File targetFile) throws IOException, RTreeException {
+	public void writeFile(File targetFile) throws IOException, RTreeException, SQLException {
 		boolean gzip = targetFile.getName().endsWith(".gz");
 		File nonGzip = targetFile;
 		if(gzip) {
@@ -153,12 +153,17 @@ public class ObfFileInMemory {
 			}
 			writer.endWriteMapIndex();
 		}
-		if (routeObjects.size() > 0 && false) {
+		if (routeObjects.size() > 0) {
 			String name = mapIndex.getName();
 			if(Algorithms.isEmpty(name)) {
 				name = defName;
 			}
 			
+			for (long key : routeObjects.keys()) {
+				RouteDataObject obj = routeObjects.get(key);
+				if(key != obj.id) 
+				System.out.println(key + " " + obj.id);
+			}
 			writer.startWriteRouteIndex(name);
 			writer.writeRouteRawEncodingRules(routeIndex.routeEncodingRules);
 			writeRouteData(writer, routeObjects, targetFile);
@@ -184,8 +189,9 @@ public class ObfFileInMemory {
 		}
 		targetFile.setLastModified(timestamp);
 	}
+	
 
-	private void writeRouteData(BinaryMapIndexWriter writer, TLongObjectHashMap<RouteDataObject> routeObjs, File fileToWrite) throws IOException, RTreeException {
+	private void writeRouteData(BinaryMapIndexWriter writer, TLongObjectHashMap<RouteDataObject> routeObjs, File fileToWrite) throws IOException, RTreeException, SQLException {
 		File nonpackRtree = new File(fileToWrite.getParentFile(), "nonpackroute."
 				+ fileToWrite.getName() + ".rtree");
 		File packRtree = new File(fileToWrite.getParentFile(), "packroute."
@@ -193,9 +199,37 @@ public class ObfFileInMemory {
 		RTree rtree = null;
 		try {
 			rtree = new RTree(nonpackRtree.getAbsolutePath());
-			// TODO Write Routing
-			//		TLongObjectHashMap<BinaryFileReference> route = writeBinaryRouteIndexHeader(writer, routeTree, false);
-			//		writeBinaryRouteIndexBlocks(writer, routeTree, false, route);
+			for (long key : routeObjs.keys()) {
+				RouteDataObject obj = routeObjs.get(key);
+				int minX = obj.getPoint31XTile(0);
+				int maxX = obj.getPoint31XTile(0);
+				int maxY = obj.getPoint31YTile(0);
+				int minY = obj.getPoint31YTile(0);
+				for (int i = 1; i < obj.getPointsLength(); i++) {
+					minX = Math.min(minX, obj.getPoint31XTile(i));
+					minY = Math.min(minY, obj.getPoint31YTile(i));
+					maxX = Math.max(maxX, obj.getPoint31XTile(i));
+					maxY = Math.max(maxY, obj.getPoint31YTile(i));
+				}
+				try {
+					rtree.insert(new LeafElement(new Rect(minX, minY, maxX, maxY), obj.getId()));
+				} catch (Exception e) {
+					throw new RuntimeException(e);
+				}
+			}
+			rtree = AbstractIndexPartCreator.packRtreeFile(rtree, nonpackRtree.getAbsolutePath(),
+					packRtree.getAbsolutePath());
+			
+			TLongObjectHashMap<BinaryFileReference> treeHeader = new TLongObjectHashMap<BinaryFileReference>();
+			long rootIndex = rtree.getFileHdr().getRootIndex();
+			rtree.Node root = rtree.getReadNode(rootIndex);
+			Rect rootBounds = IndexUploader.calcBounds(root);
+			if (rootBounds != null) {
+				IndexRouteCreator.writeBinaryRouteTree(root, rootBounds, rtree, writer, treeHeader, false);
+				RouteWriteContext wc = new RouteWriteContext(null, treeHeader, null, routeObjs);
+				IndexRouteCreator.writeBinaryMapBlock(root, rootBounds, rtree, writer, wc, false);
+			}
+			
 		} finally {
 			if (rtree != null) {
 				RandomAccessFile file = rtree.getFileHdr().getFile();
@@ -332,7 +366,8 @@ public class ObfFileInMemory {
 			@Override
 			public boolean publish(RouteDataObject obj) {
 				if(override || !routeObjects.containsKey(obj.getId())) {
-					routeObjects.put(obj.getId(), routeIndex.adopt(obj));
+					RouteDataObject ad = routeIndex.adopt(obj);
+					routeObjects.put(ad.getId(), ad);
 				}
 				return true;
 			}

@@ -2,6 +2,7 @@ package net.osmand.data.diff;
 
 import java.io.File;
 import java.io.IOException;
+import java.sql.SQLException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -154,7 +155,7 @@ public class ObfDiffMerger {
 		});
 	}
 
-	private void mergeChanges(String[] args) throws IOException, RTreeException {
+	private void mergeChanges(String[] args) throws IOException, RTreeException, SQLException {
 		File result = new File(args[0]);
 		List<File> inputDiffs = new ArrayList<>();
 		boolean checkTimestamps = false;
@@ -173,7 +174,7 @@ public class ObfDiffMerger {
 	}
 
 	public boolean process(File result, List<File> inputDiffs, boolean checkTimestamps) throws IOException,
-			RTreeException {
+			RTreeException, SQLException {
 		List<File> diffs = new ArrayList<>();
 		for(File fl : inputDiffs) {
 			if (fl.isDirectory()) {

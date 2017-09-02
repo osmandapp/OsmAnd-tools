@@ -762,8 +762,6 @@ public class BinaryMapIndexWriter {
 
 	public static class RoutePointToWrite {
 		public TIntArrayList types = new TIntArrayList();
-		public TIntArrayList nameTypes = new TIntArrayList();
-		public List<String> names = new ArrayList<String>();
 		public int id;
 		public int x;
 		public int y;
