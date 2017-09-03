@@ -25,8 +25,8 @@ public class ObfDiffGenerator {
 	public static void main(String[] args) throws IOException, RTreeException {
 		if(args.length == 1 && args[0].equals("test")) {
 			args = new String[3];
-			args[0] = "/Users/victorshcherb/osmand/maps/diff/Belarus_europe_17_08_28O.obf";
-			args[1] = "/Users/victorshcherb/osmand/maps/diff/Belarus_europe_17_08_28N.obf";
+			args[1] = "/Users/victorshcherb/osmand/maps/diff/Ukraine_kiev-city_europe-merge.obf";
+			args[0] = "/Users/victorshcherb/osmand/maps/diff/Ukraine_kiev-city_europe-new-b.obf";
 			args[2] = "/Users/victorshcherb/osmand/maps/diff/Diff.obf";
 //			args[2] = "stdout";
 		}
@@ -76,7 +76,7 @@ public class ObfDiffGenerator {
 			if (result.exists()) {
 				result.delete();
 			}
-			fEnd.writeFile(result);
+			fEnd.writeFile(result, false);
 		}
 	}
 
@@ -106,7 +106,7 @@ public class ObfDiffGenerator {
 				BinaryMapDataObject objS = startData.get(idx);
 				if (print) {
 					if (objE == null) {
-						System.out.println("Map " + idx + " is missing in (2): " + toString(objS));
+//						System.out.println("Map " + idx + " is missing in (2): " + toString(objS));
 					} else {
 						if (//!objS.getMapIndex().decodeType(objS.getTypes()[0]).tag.equals(OSMAND_CHANGE_TAG) &&
 								!objE.compareBinary(objS)) {

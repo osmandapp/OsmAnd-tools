@@ -781,7 +781,6 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 						}
 					}
 
-
 					MapData mapData = writer.writeMapData(cid - baseId, parentBounds.getMinX(), parentBounds.getMinY(), rs.getBoolean(1), rs.getBytes(2), rs.getBytes(3),
 							typeUse, addtypeUse, tempNames, null, tempStringTable, dataBlock, level.getMaxZoom() > 15);
 					if(mapData != null) {

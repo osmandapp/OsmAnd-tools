@@ -587,7 +587,7 @@ public class IndexUploader {
 					writer.startWriteMapLevelIndex(r.getMinZoom(), r.getMaxZoom(), rootBounds.getMinX(),
 							rootBounds.getMaxX(), rootBounds.getMinY(), rootBounds.getMaxY());
 					IndexVectorMapCreator.writeBinaryMapTree(root, rootBounds, rtree, writer, treeHeader);
-					writeBinaryMapBlock(root, rootBounds, rtree, writer, treeHeader, objects, r.getMapZoom());
+					writeBinaryMapBlock(root, rootBounds, rtree, writer, treeHeader, objects, r.getMapZoom(), false);
 
 					writer.endWriteMapLevelIndex();
 				}
@@ -710,7 +710,7 @@ public class IndexUploader {
 
 	public static void writeBinaryMapBlock(Node parent, Rect parentBounds, RTree r, BinaryMapIndexWriter writer,
 			TLongObjectHashMap<BinaryFileReference> bounds, TLongObjectHashMap<BinaryMapDataObject> objects,
-			MapZooms.MapZoomPair pair) throws IOException, RTreeException {
+			MapZooms.MapZoomPair pair, boolean doNotSimplify) throws IOException, RTreeException {
 		rtree.Element[] e = parent.getAllElements();
 
 		MapDataBlock.Builder dataBlock = null;
@@ -755,7 +755,7 @@ public class IndexUploader {
 					MapData mapData = writer.writeMapData(cid - baseId, parentBounds.getMinX(), parentBounds.getMinY(),
 							mdo.isArea(), coordinates, innerPolygonTypes,
 							typeUse, addtypeUse, null, mdo.getOrderedObjectNames(),
-							tempStringTable, dataBlock, pair.getMaxZoom() > 15);
+							tempStringTable, dataBlock, !doNotSimplify && pair.getMaxZoom() > 15);
 					if (mapData != null) {
 						dataBlock.addDataObjects(mapData);
 					}
@@ -771,7 +771,7 @@ public class IndexUploader {
 			if (e[i].getElementType() != rtree.Node.LEAF_NODE) {
 				long ptr = e[i].getPtr();
 				rtree.Node ns = r.getReadNode(ptr);
-				writeBinaryMapBlock(ns, e[i].getRect(), r, writer, bounds, objects, pair);
+				writeBinaryMapBlock(ns, e[i].getRect(), r, writer, bounds, objects, pair, doNotSimplify);
 			}
 		}
 	}

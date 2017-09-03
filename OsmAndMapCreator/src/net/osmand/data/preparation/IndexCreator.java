@@ -919,7 +919,7 @@ public class IndexCreator {
 //		String file = rootFolder + "/temp/map.osm";
 //		String file = rootFolder + "/temp/ukraine_kiev-city_europe.pbf";
 //		String file = rootFolder + "/maps/diff/2017_08_28_00_30_before.osm";
-		String file = rootFolder + "/maps/diff/ukraine_kiev-city_europe_09.pbf";
+		String file = rootFolder + "/maps/diff/ukraine_kiev-city_europe.pbf";
 //		String file = rootFolder + "/repos/resources/test-resources/synthetic_test_rendering.osm";
 
 		int st = file.lastIndexOf('/');

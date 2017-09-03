@@ -106,7 +106,7 @@ public class ObfFileInMemory {
 		}
 	}
 	
-	public void writeFile(File targetFile) throws IOException, RTreeException, SQLException {
+	public void writeFile(File targetFile, boolean doNotSimplifyObjects) throws IOException, RTreeException, SQLException {
 		boolean gzip = targetFile.getName().endsWith(".gz");
 		File nonGzip = targetFile;
 		if(gzip) {
@@ -149,7 +149,7 @@ public class ObfFileInMemory {
 			Iterator<Entry<MapZoomPair, TLongObjectHashMap<BinaryMapDataObject>>> it = mapObjects.entrySet().iterator();
 			while (it.hasNext()) {
 				Entry<MapZoomPair, TLongObjectHashMap<BinaryMapDataObject>> n = it.next();
-				writeMapData(writer, n.getKey(), n.getValue(), targetFile);
+				writeMapData(writer, n.getKey(), n.getValue(), targetFile, doNotSimplifyObjects);
 			}
 			writer.endWriteMapIndex();
 		}
@@ -157,12 +157,6 @@ public class ObfFileInMemory {
 			String name = mapIndex.getName();
 			if(Algorithms.isEmpty(name)) {
 				name = defName;
-			}
-			
-			for (long key : routeObjects.keys()) {
-				RouteDataObject obj = routeObjects.get(key);
-				if(key != obj.id) 
-				System.out.println(key + " " + obj.id);
 			}
 			writer.startWriteRouteIndex(name);
 			writer.writeRouteRawEncodingRules(routeIndex.routeEncodingRules);
@@ -243,7 +237,7 @@ public class ObfFileInMemory {
 	}
 
 	private void writeMapData(BinaryMapIndexWriter writer, MapZoomPair mapZoomPair,
-			TLongObjectHashMap<BinaryMapDataObject> objects, File fileToWrite) throws IOException, RTreeException {
+			TLongObjectHashMap<BinaryMapDataObject> objects, File fileToWrite, boolean doNotSimplify) throws IOException, RTreeException {
 		File nonpackRtree = new File(fileToWrite.getParentFile(), "nonpack" + mapZoomPair.getMinZoom() + "."
 				+ fileToWrite.getName() + ".rtree");
 		File packRtree = new File(fileToWrite.getParentFile(), "pack" + mapZoomPair.getMinZoom() + "."
@@ -281,7 +275,8 @@ public class ObfFileInMemory {
 						rootBounds.getMinX(), rootBounds.getMaxX(), rootBounds.getMinY(), rootBounds.getMaxY());
 				IndexVectorMapCreator.writeBinaryMapTree(root, rootBounds, rtree, writer, treeHeader);
 
-				IndexUploader.writeBinaryMapBlock(root, rootBounds, rtree, writer, treeHeader, objects, mapZoomPair);
+				IndexUploader.writeBinaryMapBlock(root, rootBounds, rtree, writer, treeHeader, objects, mapZoomPair, 
+						doNotSimplify);
 				writer.endWriteMapLevelIndex();
 
 			}
@@ -328,14 +323,14 @@ public class ObfFileInMemory {
 					MapIndex mi = (MapIndex) p;
 					for(MapRoot mr : mi.getRoots()) {
 						MapZooms.MapZoomPair pair = new MapZooms.MapZoomPair(mr.getMinZoom(), mr.getMaxZoom());
-						TLongObjectHashMap<BinaryMapDataObject> objects = getBinaryMapData(indexReader, mr.getMinZoom());
+						TLongObjectHashMap<BinaryMapDataObject> objects = readBinaryMapData(indexReader, mi, mr.getMinZoom());
 						putMapObjects(pair, objects.valueCollection(), true);
 					}
 				}
 				// Read routing objects
 				if (p instanceof RouteRegion) {
 					RouteRegion rr = (RouteRegion) p;
-					putRoutingData(indexReader, rr, ZOOM_LEVEL_ROUTING, true);
+					readRoutingData(indexReader, rr, ZOOM_LEVEL_ROUTING, true);
 				}
 			}
 			updateTimestamp(indexReader.getDateCreated());
@@ -355,7 +350,7 @@ public class ObfFileInMemory {
 		}
 	}
 	
-	public void putRoutingData(BinaryMapIndexReader indexReader, RouteRegion rr, int zm, final boolean override) throws IOException {
+	public void readRoutingData(BinaryMapIndexReader indexReader, RouteRegion rr, int zm, final boolean override) throws IOException {
 		List<RouteSubregion> regions = indexReader.searchRouteIndexTree(
 				BinaryMapIndexReader.buildSearchRequest(MapUtils.get31TileNumberX(lonleft),
 						MapUtils.get31TileNumberX(lonright), MapUtils.get31TileNumberY(lattop),
@@ -379,38 +374,32 @@ public class ObfFileInMemory {
 		});
 	}
 
-	private TLongObjectHashMap<BinaryMapDataObject> getBinaryMapData(BinaryMapIndexReader index, int zoom) throws IOException {
+	private TLongObjectHashMap<BinaryMapDataObject> readBinaryMapData(BinaryMapIndexReader index, MapIndex mi, int zoom)
+			throws IOException {
 		final TLongObjectHashMap<BinaryMapDataObject> result = new TLongObjectHashMap<>();
-		for (BinaryIndexPart p : index.getIndexes()) {
-			if(p instanceof MapIndex) {
-				MapIndex m = ((MapIndex) p);
-				final SearchRequest<BinaryMapDataObject> req = BinaryMapIndexReader.buildSearchRequest(
-						MapUtils.get31TileNumberX(lonleft),
-						MapUtils.get31TileNumberX(lonright),
-						MapUtils.get31TileNumberY(lattop),
-						MapUtils.get31TileNumberY(latbottom),
-						zoom,
-						new SearchFilter() {
-							@Override
-							public boolean accept(TIntArrayList types, MapIndex index) {
-								return true;
-							}
-						},
-						new ResultMatcher<BinaryMapDataObject>() {
-							@Override
-							public boolean publish(BinaryMapDataObject obj) {
-								result.put(obj.getId(), obj);
-								return false;
-							}
+		final SearchRequest<BinaryMapDataObject> req = BinaryMapIndexReader.buildSearchRequest(
+				MapUtils.get31TileNumberX(lonleft), MapUtils.get31TileNumberX(lonright),
+				MapUtils.get31TileNumberY(lattop), MapUtils.get31TileNumberY(latbottom), 
+				zoom, 
+				new SearchFilter() {
+					@Override
+					public boolean accept(TIntArrayList types, MapIndex index) {
+						return true;
+					}
+				}, 
+				new ResultMatcher<BinaryMapDataObject>() {
+					@Override
+					public boolean publish(BinaryMapDataObject obj) {
+						result.put(obj.getId(), obj);
+						return false;
+					}
 
-							@Override
-							public boolean isCancelled() {
-								return false;
-							}
-						});
-				index.searchMapIndex(req, m);
-			} 
-		}
+					@Override
+					public boolean isCancelled() {
+						return false;
+					}
+				});
+		index.searchMapIndex(req, mi);
 		return result;
 	}
 	

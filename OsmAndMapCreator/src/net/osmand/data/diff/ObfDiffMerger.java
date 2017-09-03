@@ -27,10 +27,11 @@ public class ObfDiffMerger {
 	public static void main(String[] args) {
 		try {
 			if(args.length == 1 && args[0].equals("test")) {
-				args = new String[3];
-//				args[0] = "/Users/victorshcherb/osmand/maps/diff/M.obf";
-//				args[1] = "/Users/victorshcherb/osmand/maps/diff/M.obf";
-//				args[2] = "/Users/victorshcherb/osmand/maps/diff/M.obf";
+				args = new String[4];
+				args[0] = "/Users/victorshcherb/osmand/maps/diff/Ukraine_kiev-city_europe-merge.obf";
+				args[1] = "/Users/victorshcherb/osmand/maps/diff/Ukraine_kiev-city_europe.obf";
+				args[2] = "/Users/victorshcherb/osmand/maps/diff/Ukraine_kiev-city_europe_17_09_00.obf.gz";
+				args[3] = "/Users/victorshcherb/osmand/maps/diff/Ukraine_kiev-city_europe_17_09_03.obf.gz";
 			}
 			ObfDiffMerger merger = new ObfDiffMerger();
 			merger.mergeChanges(args);
@@ -214,7 +215,7 @@ public class ObfDiffMerger {
 		}
 		ObfFileInMemory context = new ObfFileInMemory();
 		context.readObfFiles(diffs);
-		context.writeFile(result);
+		context.writeFile(result, true);
 		return true;
 	}
 

@@ -90,7 +90,7 @@ public class ObfRegionSplitter {
 				// TODO split Transport
 				
 				obf.updateTimestamp(fl.getTimestamp());
-				obf.writeFile(result);
+				obf.writeFile(result, true);
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
