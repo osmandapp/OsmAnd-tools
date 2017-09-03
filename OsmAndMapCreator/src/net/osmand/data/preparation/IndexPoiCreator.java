@@ -27,14 +27,12 @@ import net.osmand.IProgress;
 import net.osmand.IndexConstants;
 import net.osmand.binary.BinaryMapPoiReaderAdapter;
 import net.osmand.data.Amenity;
-import net.osmand.data.LatLon;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.MapRenderingTypesEncoder.EntityConvertApplyType;
 import net.osmand.osm.PoiType;
 import net.osmand.osm.edit.Entity;
-import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.EntityParser;
 import net.osmand.osm.edit.Relation;
@@ -64,7 +62,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	public static long GENERATE_OBJ_ID = -(1L << 10L);
 	public static boolean ZIP_LONG_STRINGS = false;
 	public static int ZIP_STRING_LIMIT = 100;
-
+	private static int SHIFT_MULTIPOLYGON_IDS = 43;
+	private static int DUPLICATE_SPLIT = 5;
+	public TLongHashSet generatedIds = new TLongHashSet();
 
 	private boolean overwriteIds;
 	private List<Amenity> tempAmenityList = new ArrayList<Amenity>();
@@ -86,6 +86,19 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		this.poiTypes = poiTypes;
 	}
 
+	private long assignIdForMultipolygon(Relation orig) {
+		long ll = orig.getId();
+		return genId(SHIFT_MULTIPOLYGON_IDS, (ll << 6) );
+	}
+	
+	private long genId(int baseShift, long id) {
+		long gen = (id << DUPLICATE_SPLIT) +  (1l << (baseShift - 1));
+		while (generatedIds.contains(gen)) {
+			gen += 2;
+		}
+		generatedIds.add(gen);
+		return gen;
+	}
 
 	public void iterateEntity(Entity e, OsmDbAccessorContext ctx, boolean basemap) throws SQLException {
 		tempAmenityList.clear();
@@ -100,8 +113,11 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			}
 			boolean first = true;
 			long id = e.getId();
-			if (e instanceof Relation || basemap) {
+			if (basemap) { 
 				id = GENERATE_OBJ_ID--;
+			} else if(e instanceof Relation) {
+//				id = GENERATE_OBJ_ID--;
+				id = assignIdForMultipolygon((Relation) e);
 			} else if(id > 0) {
 				// keep backward compatibility for ids (osm editing)
 				id = e.getId() >> (OsmDbCreator.SHIFT_ID - 1);

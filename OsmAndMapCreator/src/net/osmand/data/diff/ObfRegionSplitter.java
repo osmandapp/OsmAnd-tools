@@ -14,8 +14,10 @@ import java.util.TreeSet;
 import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.binary.MapZooms.MapZoomPair;
 import net.osmand.binary.RouteDataObject;
+import net.osmand.data.Amenity;
 import net.osmand.map.OsmandRegions;
 import net.osmand.util.Algorithms;
+import net.osmand.util.MapUtils;
 
 public class ObfRegionSplitter {
 	
@@ -23,7 +25,7 @@ public class ObfRegionSplitter {
 	public static void main(String[] args) throws IOException {
 		if(args.length == 1 && args[0].equals("test")) {
 			args = new String[5];
-			args[0] = "/Users/victorshcherb/osmand/maps/diff/17_08_29_22_00.diff.obf";
+			args[0] = "/Users/victorshcherb/osmand/maps/diff/Diff.obf";
 			args[1] = "/Users/victorshcherb/osmand/maps/diff/regions";
 			args[2] = "/Users/victorshcherb/osmand/repos/android/OsmAnd/src/net/osmand/map/regions.ocbf";
 			args[3] = "";
@@ -58,10 +60,9 @@ public class ObfRegionSplitter {
 			osmandRegions.prepareFile(ocbfFile.getAbsolutePath());
 			osmandRegions.cacheAllCountries();
 
-			Map<String, Map<MapZoomPair, TLongObjectHashMap<BinaryMapDataObject>>> regionsMapData = splitRegionMapData(fl,
-					osmandRegions);
-			Map<String, TLongObjectHashMap<RouteDataObject>> regionsRouteData = splitRegionRouteData(fl,
-					osmandRegions);
+			Map<String, Map<MapZoomPair, TLongObjectHashMap<BinaryMapDataObject>>> regionsMapData = splitRegionMapData(fl,osmandRegions);
+			Map<String, TLongObjectHashMap<RouteDataObject>> regionsRouteData = splitRegionRouteData(fl, osmandRegions);
+			Map<String, TLongObjectHashMap<Map<String, Amenity>>> regionsPoiData = splitRegionPoiData(fl, osmandRegions);
 			TreeSet<String> regionNames = new TreeSet<>();
 			regionNames.addAll(regionsMapData.keySet());
 			regionNames.addAll(regionsRouteData.keySet());
@@ -86,7 +87,10 @@ public class ObfRegionSplitter {
 				if(ro != null) {
 					obf.putRoutingData(ro, true);
 				}
-				// TODO split POI
+				TLongObjectHashMap<Map<String, Amenity>> poi = regionsPoiData.get(regionName);
+				if(poi != null) {
+					obf.putPoiData(poi, true);
+				}
 				// TODO split Transport
 				
 				obf.updateTimestamp(fl.getTimestamp());
@@ -99,6 +103,32 @@ public class ObfRegionSplitter {
 	}
 			
 
+	private Map<String, TLongObjectHashMap<Map<String, Amenity>>> splitRegionPoiData(ObfFileInMemory fl,
+ 			OsmandRegions osmandRegions) throws IOException {
+ 		Map<String, TLongObjectHashMap<Map<String, Amenity>>> result = new HashMap<>();
+ 		TLongObjectHashMap<Map<String, Amenity>> poiData = fl.getPoiObjects();
+ 		for (Map<String, Amenity> objMap : poiData.valueCollection()) {
+ 			Amenity obj = objMap.values().iterator().next();
+ 			int x = MapUtils.get31TileNumberX(obj.getLocation().getLongitude());
+ 			int y = MapUtils.get31TileNumberY(obj.getLocation().getLatitude());
+ 			List<BinaryMapDataObject> l = osmandRegions.query(x, y);
+ 			for (BinaryMapDataObject b : l) {
+ 				if (osmandRegions.contain(b, x, y)) {
+ 					String dw = osmandRegions.getDownloadName(b);
+ 					if (!Algorithms.isEmpty(dw) && osmandRegions.isDownloadOfType(b, OsmandRegions.MAP_TYPE)) {
+ 						TLongObjectHashMap<Map<String, Amenity>> mp = result.get(dw);
+ 						if (mp == null) {
+ 							mp = new TLongObjectHashMap<>();
+ 							result.put(dw, mp);
+ 						}
+ 						mp.put(obj.getId(), objMap);
+ 					}
+ 				}
+ 			}
+ 		}
+ 		return result;
+ 	}
+	
 	private Map<String, TLongObjectHashMap<RouteDataObject>> splitRegionRouteData(ObfFileInMemory fl,
 			OsmandRegions osmandRegions) throws IOException {
 		Map<String, TLongObjectHashMap<RouteDataObject>> result = new HashMap<>();

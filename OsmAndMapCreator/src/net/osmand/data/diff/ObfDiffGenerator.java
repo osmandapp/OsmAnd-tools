@@ -1,11 +1,16 @@
 package net.osmand.data.diff;
 
+import gnu.trove.iterator.TLongObjectIterator;
 import gnu.trove.map.hash.TLongObjectHashMap;
 
 import java.io.File;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.Collections;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.Map.Entry;
 
 import net.osmand.binary.BinaryInspector;
 import net.osmand.binary.BinaryMapDataObject;
@@ -13,6 +18,9 @@ import net.osmand.binary.BinaryMapIndexReader.MapIndex;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
 import net.osmand.binary.MapZooms.MapZoomPair;
 import net.osmand.binary.RouteDataObject;
+import net.osmand.data.Amenity;
+import net.osmand.osm.MapPoiTypes;
+import net.osmand.osm.PoiCategory;
 import rtree.RTreeException;
 
 public class ObfDiffGenerator {
@@ -25,8 +33,8 @@ public class ObfDiffGenerator {
 	public static void main(String[] args) throws IOException, RTreeException {
 		if(args.length == 1 && args[0].equals("test")) {
 			args = new String[3];
-			args[1] = "/Users/victorshcherb/osmand/maps/diff/Ukraine_kiev-city_europe-merge.obf";
-			args[0] = "/Users/victorshcherb/osmand/maps/diff/Ukraine_kiev-city_europe-new-b.obf";
+			args[0] = "/Users/victorshcherb/osmand/maps/diff/17_09_03_21_00_before.obf.gz";
+			args[1] = "/Users/victorshcherb/osmand/maps/diff/17_09_03_21_00_after.obf.gz";
 			args[2] = "/Users/victorshcherb/osmand/maps/diff/Diff.obf";
 //			args[2] = "stdout";
 		}
@@ -64,10 +72,8 @@ public class ObfDiffGenerator {
 
 		System.out.println("Comparing the files...");
 		compareMapData(fStart, fEnd, result == null);
-		// Compare Routing
 		compareRouteData(fStart, fEnd, result == null);
-		// TODO Compare POI
-		// comparePOI(fStart, fEnd);
+		comparePOI(fStart, fEnd, result == null);
 		// TODO Compare Transport
 		//compareTransport(fStart, fEnd);
 		
@@ -78,6 +84,74 @@ public class ObfDiffGenerator {
 			}
 			fEnd.writeFile(result, false);
 		}
+	}
+	
+	private void comparePOI(ObfFileInMemory fStart, ObfFileInMemory fEnd, boolean print) {
+	 	TLongObjectHashMap<Map<String, Amenity>> startPoi = fStart.getPoiObjects();
+	 	TLongObjectHashMap<Map<String, Amenity>> endPoi = fEnd.getPoiObjects();
+	 	if (endPoi == null) {
+	 		return;
+	 	}
+	 	if(print) {
+			System.out.println("Compare POI");
+		}
+	 	for (long idx : startPoi.keys()) {
+	 		Map<String, Amenity> objE = endPoi.get(idx);
+	 		Map<String, Amenity> objS = startPoi.get(idx);
+	 		if (objE == null) {
+	 			if(print) {
+	 				System.out.println("POI " + idx + " is missing in (2): " + toString(objS));
+	 			} else {
+	 				// TODO Validate in the application correct behavior
+	 				Amenity sa = objS.values().iterator().next();
+	 				TreeMap<String, Amenity> mp = new TreeMap<>();
+	 				Amenity am = new Amenity();
+	 				am.setId(idx);
+	 				am.setType(MapPoiTypes.getDefault().getPoiCategoryByName("man_made"));
+	 				am.setSubType("abandoned_poi");
+	 				mp.put("man_made", am);
+	 				am.setLocation(sa.getLocation().getLatitude(), sa.getLocation().getLongitude());
+	 				endPoi.put(idx, mp);
+	 			}
+	 		} else {
+	 			boolean equals = true;
+	 			if(objS.size() != objE.size()) {
+	 				equals = false;
+	 			} else {
+	 				Iterator<Entry<String, Amenity>> itE = objE.entrySet().iterator();
+	 				Iterator<Entry<String, Amenity>> itS = objS.entrySet().iterator();
+	 				// we can compare in the right order cause it is a TreeMap
+	 				while(itE.hasNext()) {
+	 					Entry<String, Amenity> ve = itE.next();
+	 					Entry<String, Amenity> se = itS.next();
+	 					if(!ve.getValue().comparePoi(se.getValue())) {
+	 						equals = false;
+	 						break;
+	 					}
+	 				}
+	 			}
+	 			if (equals) {
+		 			endPoi.remove(idx);
+		 		} else {
+		 			if(print) {
+		 				System.out.println("POI " + idx + " is not equal: " + toString(objS) + " != " + toString(objE));
+		 			}
+		 		}
+	 		}
+	 	}
+	 	
+	 	if(print) {
+	 		TLongObjectIterator<Map<String, Amenity>> it = endPoi.iterator();
+			while(it.hasNext()) {
+				it.advance();
+				System.out.println("POI " + it.key() + " is missing in (1): " + toString(it.value()));
+			}
+		}
+	 	
+	 }
+
+	private String toString(Map<String, Amenity> value) {
+		return value.toString();
 	}
 
 	private void compareMapData(ObfFileInMemory fStart, ObfFileInMemory fEnd, boolean print) {
@@ -106,7 +180,7 @@ public class ObfDiffGenerator {
 				BinaryMapDataObject objS = startData.get(idx);
 				if (print) {
 					if (objE == null) {
-//						System.out.println("Map " + idx + " is missing in (2): " + toString(objS));
+						System.out.println("Map " + idx + " is missing in (2): " + toString(objS));
 					} else {
 						if (//!objS.getMapIndex().decodeType(objS.getTypes()[0]).tag.equals(OSMAND_CHANGE_TAG) &&
 								!objE.compareBinary(objS, COORDINATES_PRECISION_COMPARE )) {

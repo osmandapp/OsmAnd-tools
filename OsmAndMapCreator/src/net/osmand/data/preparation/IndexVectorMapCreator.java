@@ -101,7 +101,6 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	private final Log logMapDataWarn;
 
 	public TLongHashSet generatedIds = new TLongHashSet();
-	private static boolean USE_OLD_GEN_ID = false;
 	public static long GENERATE_OBJ_ID = - (1l << 20l); // million million
 	private static int SHIFT_MULTIPOLYGON_IDS = 43;
 	private static int SHIFT_NON_SPLIT_EXISTING_IDS = 41;
@@ -109,9 +108,6 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	private static boolean VALIDATE_DUPLICATE = false;
 	private TLongObjectHashMap<Long> duplicateIds = new TLongObjectHashMap<Long>();
 	private long assignIdForMultipolygon(Relation orig) {
-		if(USE_OLD_GEN_ID) {
-			return GENERATE_OBJ_ID--;
-		}
 		long ll = orig.getId();
 		long sum = 0;
 		for(Entity d : orig.getMemberEntities(null)) {
@@ -132,9 +128,6 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	}
 
 	private long assignIdBasedOnOriginalSplit(EntityId originalId) {
-		if(USE_OLD_GEN_ID) {
-			return GENERATE_OBJ_ID--;
-		}
 		return genId(SHIFT_NON_SPLIT_EXISTING_IDS, originalId.getId());
 	}
 
