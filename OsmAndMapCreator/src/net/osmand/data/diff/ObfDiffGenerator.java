@@ -16,7 +16,7 @@ import net.osmand.binary.RouteDataObject;
 import rtree.RTreeException;
 
 public class ObfDiffGenerator {
-	
+	private static final int COORDINATES_PRECISION_COMPARE = 0;
 	
 	private static final String OSMAND_CHANGE_VALUE = "delete";
 	private static final String OSMAND_CHANGE_TAG = "osmand_change";
@@ -109,7 +109,7 @@ public class ObfDiffGenerator {
 //						System.out.println("Map " + idx + " is missing in (2): " + toString(objS));
 					} else {
 						if (//!objS.getMapIndex().decodeType(objS.getTypes()[0]).tag.equals(OSMAND_CHANGE_TAG) &&
-								!objE.compareBinary(objS)) {
+								!objE.compareBinary(objS, COORDINATES_PRECISION_COMPARE )) {
 							System.out.println("Map " + idx + " is not equal: " + toString(objS) + " != " + toString(objE));
 						}
 						endData.remove(idx);
@@ -120,7 +120,7 @@ public class ObfDiffGenerator {
 						BinaryMapDataObject obj = new BinaryMapDataObject(idx, objS.getCoordinates(), null,
 								objS.getObjectType(), objS.isArea(), new int[] { deleteId }, null);
 						endData.put(idx, obj);
-					} else if (objE.compareBinary(objS)) {
+					} else if (objE.compareBinary(objS, COORDINATES_PRECISION_COMPARE)) {
 						endData.remove(idx);
 					}
 				}
