@@ -281,7 +281,10 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		if (poiIndexFile.exists()) {
 			Algorithms.removeAllFiles(poiIndexFile);
 		}
-		poiIndexFile.getParentFile().mkdirs();
+		File parentFile = poiIndexFile.getParentFile();
+		System.out.println(parentFile + " ");
+		System.out.println(parentFile.getAbsolutePath() + " ");
+		parentFile.mkdirs();
 		// creating connection
 		poiConnection = (Connection) DBDialect.SQLITE.getDatabaseConnection(poiIndexFile.getAbsolutePath(), log);
 
