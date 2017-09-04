@@ -278,13 +278,11 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	public void createDatabaseStructure(File poiIndexFile) throws SQLException {
 		this.poiIndexFile = poiIndexFile;
 		// delete previous file to save space
+		File parentFile = poiIndexFile.getParentFile();
+		parentFile.mkdirs();
 		if (poiIndexFile.exists()) {
 			Algorithms.removeAllFiles(poiIndexFile);
 		}
-		File parentFile = poiIndexFile.getParentFile();
-		System.out.println(parentFile + " ");
-		System.out.println(parentFile.getAbsolutePath() + " ");
-		parentFile.mkdirs();
 		// creating connection
 		poiConnection = (Connection) DBDialect.SQLITE.getDatabaseConnection(poiIndexFile.getAbsolutePath(), log);
 
