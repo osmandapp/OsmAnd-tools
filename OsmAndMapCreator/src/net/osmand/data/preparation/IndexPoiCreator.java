@@ -279,7 +279,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		this.poiIndexFile = poiIndexFile;
 		// delete previous file to save space
 		File parentFile = poiIndexFile.getParentFile();
-		parentFile.mkdirs();
+		if(parentFile != null) { 
+			parentFile.mkdirs();
+		}
 		if (poiIndexFile.exists()) {
 			Algorithms.removeAllFiles(poiIndexFile);
 		}
