@@ -864,6 +864,19 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	}
 
 	protected String simplifyDirection(String val) {
+		if("down".equals(val) || "forward".equals(val) || 
+				"up".equals(val) || "down".equals(val) || "all".equals(val)) {
+			return val;
+		} 
+		if ("N".equalsIgnoreCase(val) || "NNW".equalsIgnoreCase(val) || "NW".equalsIgnoreCase(val)
+				|| "NNE".equalsIgnoreCase(val) || "NE".equalsIgnoreCase(val) 
+				|| "E".equalsIgnoreCase(val) || "ESE".equalsIgnoreCase(val) || "ENE".equalsIgnoreCase(val) 
+				|| "W".equalsIgnoreCase(val) || "WSW".equalsIgnoreCase(val) || "WNW".equalsIgnoreCase(val) 
+				|| "S".equalsIgnoreCase(val) || "SSW".equalsIgnoreCase(val) || "SW".equalsIgnoreCase(val)  
+				|| "SSE".equalsIgnoreCase(val) || "SE".equalsIgnoreCase(val)) {
+			return val.toLowerCase();
+		}
+
 		int rad = 16;
 		//0, 22.5, 45, 67.5, 90, 112.5, 135, 157.5, 180, 202.5, 225, 247.5, 270, 292.5, 315, 337.5, 360
 		double circle = 360;
