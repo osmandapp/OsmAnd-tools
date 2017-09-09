@@ -864,10 +864,13 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	}
 
 	protected String simplifyDirection(String val) {
-		if("down".equals(val) || "forward".equals(val) || 
+		if("down".equals(val) || "forward".equals(val) || "backward".equals(val) ||
+				"anticlockwise".equals(val)  || "clockwise".equals(val)  ||
 				"up".equals(val) || "down".equals(val) || "all".equals(val)) {
 			return val;
-		} 
+		}
+		
+		
 		if ("N".equalsIgnoreCase(val) || "NNW".equalsIgnoreCase(val) || "NW".equalsIgnoreCase(val)
 				|| "NNE".equalsIgnoreCase(val) || "NE".equalsIgnoreCase(val) 
 				|| "E".equalsIgnoreCase(val) || "ESE".equalsIgnoreCase(val) || "ENE".equalsIgnoreCase(val) 
