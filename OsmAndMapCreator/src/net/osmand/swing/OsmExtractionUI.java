@@ -211,7 +211,8 @@ public class OsmExtractionUI implements IMapLocationListener {
 					cache.readFromFile(cacheFile, 2);
 				}
 				if (bdirFile.exists() && bdirFile.listFiles() != null) {
-					for (File obf : bdirFile.listFiles()) {
+					File[] sortedFiles = Algorithms.getSortedFilesVersions(bdirFile);
+					for (File obf : sortedFiles) {
 						if (!obf.isDirectory() && obf.getName().endsWith(".obf")) {
 							try {
 								// BinaryMapIndexReader bmir = new BinaryMapIndexReader(new RandomAccessFile(obf, "r"),

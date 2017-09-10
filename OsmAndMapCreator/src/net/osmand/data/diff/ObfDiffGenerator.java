@@ -109,6 +109,7 @@ public class ObfDiffGenerator {
 	 				am.setId(idx);
 	 				am.setType(MapPoiTypes.getDefault().getPoiCategoryByName("man_made"));
 	 				am.setSubType("abandoned_poi");
+	 				am.setName(sa.getName());
 	 				mp.put("man_made", am);
 	 				am.setLocation(sa.getLocation().getLatitude(), sa.getLocation().getLongitude());
 	 				endPoi.put(idx, mp);
