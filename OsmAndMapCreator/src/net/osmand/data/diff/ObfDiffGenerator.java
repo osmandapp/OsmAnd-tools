@@ -1,17 +1,16 @@
 package net.osmand.data.diff;
 
-import gnu.trove.iterator.TLongObjectIterator;
-import gnu.trove.map.hash.TLongObjectHashMap;
-
 import java.io.File;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.TreeMap;
 import java.util.Map.Entry;
+import java.util.TreeMap;
 
+import gnu.trove.map.hash.TLongObjectHashMap;
 import net.osmand.binary.BinaryInspector;
 import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.binary.BinaryMapIndexReader.MapIndex;
@@ -19,8 +18,6 @@ import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
 import net.osmand.binary.MapZooms.MapZoomPair;
 import net.osmand.binary.RouteDataObject;
 import net.osmand.data.Amenity;
-import net.osmand.osm.MapPoiTypes;
-import net.osmand.osm.PoiCategory;
 import rtree.RTreeException;
 
 public class ObfDiffGenerator {
@@ -56,8 +53,13 @@ public class ObfDiffGenerator {
 		File start = new File(args[0]);
 		File end = new File(args[1]);
 		File result  = args.length < 3 || args[2].equals("stdout") ? null :new File(args[2]);
-		if (!start.exists() || !end.exists()) {
-			System.err.println("Input Obf file doesn't exist");
+		if (!start.exists()) {
+			System.err.println("Input Obf file doesn't exist: " + start.getAbsolutePath());
+			System.exit(1);
+			return;
+		}
+		if (!end.exists()) {
+			System.err.println("Input Obf file doesn't exist: " + end.getAbsolutePath());
 			System.exit(1);
 			return;
 		}
@@ -87,73 +89,68 @@ public class ObfDiffGenerator {
 	}
 	
 	private void comparePOI(ObfFileInMemory fStart, ObfFileInMemory fEnd, boolean print) {
-	 	TLongObjectHashMap<Map<String, Amenity>> startPoi = fStart.getPoiObjects();
-	 	TLongObjectHashMap<Map<String, Amenity>> endPoi = fEnd.getPoiObjects();
-	 	if (endPoi == null) {
+	 	TLongObjectHashMap<Map<String, Amenity>> startPoiSource = fStart.getPoiObjects();
+	 	TLongObjectHashMap<Map<String, Amenity>> endPoiSource = fEnd.getPoiObjects();
+	 	if (endPoiSource == null) {
 	 		return;
 	 	}
+	 	Map<String, Amenity> startPoi = buildPoiMap(startPoiSource);
+	 	Map<String, Amenity> endPoi = buildPoiMap(endPoiSource);
 	 	if(print) {
 			System.out.println("Compare POI");
 		}
-	 	for (long idx : startPoi.keys()) {
-	 		Map<String, Amenity> objE = endPoi.get(idx);
-	 		Map<String, Amenity> objS = startPoi.get(idx);
-	 		if (objE == null) {
-	 			if(print) {
-	 				System.out.println("POI " + idx + " is missing in (2): " + toString(objS));
-	 			} else {
-	 				// TODO Validate in the application correct behavior
-	 				Amenity sa = objS.values().iterator().next();
-	 				TreeMap<String, Amenity> mp = new TreeMap<>();
-	 				Amenity am = new Amenity();
-	 				am.setId(idx);
-	 				am.setType(MapPoiTypes.getDefault().getPoiCategoryByName("man_made"));
-	 				am.setSubType("abandoned_poi");
-	 				am.setName(sa.getName());
-	 				mp.put("man_made", am);
-	 				am.setLocation(sa.getLocation().getLatitude(), sa.getLocation().getLongitude());
-	 				endPoi.put(idx, mp);
-	 			}
-	 		} else {
-	 			boolean equals = true;
-	 			if(objS.size() != objE.size()) {
-	 				equals = false;
-	 			} else {
-	 				Iterator<Entry<String, Amenity>> itE = objE.entrySet().iterator();
-	 				Iterator<Entry<String, Amenity>> itS = objS.entrySet().iterator();
-	 				// we can compare in the right order cause it is a TreeMap
-	 				while(itE.hasNext()) {
-	 					Entry<String, Amenity> ve = itE.next();
-	 					Entry<String, Amenity> se = itS.next();
-	 					if(!ve.getValue().comparePoi(se.getValue())) {
-	 						equals = false;
-	 						break;
-	 					}
-	 				}
-	 			}
-	 			if (equals) {
-		 			endPoi.remove(idx);
-		 		} else {
-		 			if(print) {
-		 				System.out.println("POI " + idx + " is not equal: " + toString(objS) + " != " + toString(objE));
-		 			}
-		 		}
-	 		}
-	 	}
+		for (String idx : startPoi.keySet()) {
+			Amenity objE = endPoi.get(idx);
+			Amenity objS = startPoi.get(idx);
+			if (print) {
+				if (objE == null) {
+					System.out.println("POI " + idx + " is missing in (2): " + objS);
+				} else {
+					if (!objS.comparePoi(objE)) {
+						System.out.println("POI " + idx + " is not equal: " + objS + " != " + objE);
+					}
+					endPoi.remove(idx);
+				}
+			} else {
+				if (objE == null) {
+					objS.setAdditionalInfo(OSMAND_CHANGE_TAG, OSMAND_CHANGE_VALUE);
+					endPoi.put(idx, objS);
+					if (endPoiSource.get(objS.getId()) == null) {
+						endPoiSource.put(objS.getId(), new TreeMap<String, Amenity>());
+					}
+					endPoiSource.get(objS.getId()).put(objS.getType().getKeyName(), objS);
+				} else {
+					if (objS.comparePoi(objE)) {
+						endPoi.remove(idx);
+						endPoiSource.get(objS.getId()).remove(objS.getType().getKeyName());
+					}
+				}
+			}
+		}
 	 	
-	 	if(print) {
-	 		TLongObjectIterator<Map<String, Amenity>> it = endPoi.iterator();
-			while(it.hasNext()) {
-				it.advance();
-				System.out.println("POI " + it.key() + " is missing in (1): " + toString(it.value()));
+		if (print) {
+			Iterator<Entry<String, Amenity>> it = endPoi.entrySet().iterator();
+			while (it.hasNext()) {
+				Entry<String, Amenity> e = it.next();
+				System.out.println("POI " + e.getKey() + " is missing in (1): " + e.getValue());
 			}
 		}
 	 	
 	 }
 
-	private String toString(Map<String, Amenity> value) {
-		return value.toString();
+	private Map<String, Amenity> buildPoiMap(TLongObjectHashMap<Map<String, Amenity>> startPoiSource) {
+		HashMap<String, Amenity> map = new HashMap<>();
+		for (Map<String, Amenity> am : startPoiSource.valueCollection()) {
+			Iterator<Entry<String, Amenity>> it = am.entrySet().iterator();
+			while (it.hasNext()) {
+				Entry<String, Amenity> next = it.next();
+				String key = next.getValue().getId() + ":" + next.getKey();
+				map.put(key, next.getValue());
+			}
+		}
+		return map;
 	}
+
 
 	private void compareMapData(ObfFileInMemory fStart, ObfFileInMemory fEnd, boolean print) {
 		fStart.filterAllZoomsBelow(13);
