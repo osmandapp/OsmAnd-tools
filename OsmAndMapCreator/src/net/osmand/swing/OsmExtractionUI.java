@@ -23,6 +23,8 @@ import java.lang.reflect.InvocationTargetException;
 import java.sql.SQLException;
 import java.text.MessageFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.logging.FileHandler;
 import java.util.logging.LogManager;
@@ -211,7 +213,9 @@ public class OsmExtractionUI implements IMapLocationListener {
 					cache.readFromFile(cacheFile, 2);
 				}
 				if (bdirFile.exists() && bdirFile.listFiles() != null) {
-					File[] sortedFiles = Algorithms.getSortedFilesVersions(bdirFile);
+					List<File> asList = Arrays.asList(Algorithms.getSortedFilesVersions(bdirFile));
+					ArrayList<File> sortedFiles = new ArrayList<>(asList);
+//					Collections.reverse(sortedFiles);
 					for (File obf : sortedFiles) {
 						if (!obf.isDirectory() && obf.getName().endsWith(".obf")) {
 							try {
@@ -418,6 +422,9 @@ public class OsmExtractionUI implements IMapLocationListener {
 				}
 				if(sr.object instanceof Amenity) {
 					locationString += " " + ((Amenity)sr.object).getSubType();
+					if(((Amenity)sr.object).isClosed()) {
+						locationString += " (CLOSED)";
+					}
 				}
 				mi.setText(sr.localeName + " [" + sr.getFoundWordCount() + ", "+ sr.objectType + "] " + 
 						locationString);
@@ -562,7 +569,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 		JMenuItem exitMenu= new JMenuItem(Messages.getString("OsmExtractionUI.MENU_EXIT")); //$NON-NLS-1$
 		menu.add(exitMenu);
 
-		JMenu tileSource = MapPanel.getMenuToChooseSource(mapPanel);
+		JMenu tileSource = new JMenu(Messages.getString("OsmExtractionUI.MENU_WINDOW")); //$NON-NLS-1$MapPanel.getMenuToChooseSource(mapPanel);
 		final JMenuItem sqliteDB = new JMenuItem(Messages.getString("OsmExtractionUI.MENU_CREATE_SQLITE")); //$NON-NLS-1$
 		tileSource.addSeparator();
 		tileSource.add(sqliteDB);
