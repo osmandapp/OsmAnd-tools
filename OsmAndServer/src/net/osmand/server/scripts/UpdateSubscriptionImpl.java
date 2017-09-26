@@ -1,17 +1,12 @@
 package net.osmand.server.scripts;
-import java.io.BufferedReader;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.*;
+import java.security.GeneralSecurityException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.Properties;
+import java.util.*;
 
 import org.apache.http.NameValuePair;
 import org.apache.http.client.HttpClient;
@@ -35,8 +30,9 @@ import com.google.api.services.androidpublisher.model.SubscriptionPurchase;
 
 
 public class UpdateSubscriptionImpl {
-	
-	
+
+
+	private static String PATH_TO_KEY = "";
 	// init one time
 	private static String GOOGLE_CLIENT_CODE="";
 	private static String GOOGLE_CLIENT_ID = "";
@@ -140,24 +136,35 @@ public class UpdateSubscriptionImpl {
 		GOOGLE_CLIENT_ID = properties.getProperty("GOOGLE_CLIENT_ID");
 		GOOGLE_CLIENT_SECRET = properties.getProperty("GOOGLE_CLIENT_SECRET");
 		GOOGLE_REDIRECT_URI = properties.getProperty("GOOGLE_REDIRECT_URI");
+		PATH_TO_KEY =properties.getProperty("PATH_TO_KEY");
 		TOKEN = properties.getProperty("TOKEN");
 		
 		String token = TOKEN;//getRefreshToken();
-		String accessToken = getAccessToken(token);
-		TokenResponse tokenResponse = new TokenResponse();
+//		String accessToken = getAccessToken(token);
+//		TokenResponse tokenResponse = new TokenResponse();
 		
 //		System.out.println("refresh token=" + token);
 //		System.out.println("access token=" + accessToken);
 		
-		tokenResponse.setAccessToken(accessToken);
-		tokenResponse.setRefreshToken(token);
-		tokenResponse.setExpiresInSeconds(3600L);
-		tokenResponse.setScope("https://www.googleapis.com/auth/androidpublisher");
-		tokenResponse.setTokenType("Bearer");
+//		tokenResponse.setAccessToken(accessToken);
+//		tokenResponse.setRefreshToken(token);
+//		tokenResponse.setExpiresInSeconds(3600L);
+//		tokenResponse.setScope("https://www.googleapis.com/auth/androidpublisher");
+//		tokenResponse.setTokenType("Bearer");
 
-		HttpRequestInitializer credential = new GoogleCredential.Builder().setTransport(HTTP_TRANSPORT)
-				.setJsonFactory(JSON_FACTORY).setClientSecrets(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET).build()
-				.setFromTokenResponse(tokenResponse);
+		GoogleCredential credential = null;
+		try {
+			credential = new GoogleCredential.Builder().setTransport(HTTP_TRANSPORT)
+                    .setJsonFactory(JSON_FACTORY)
+                    .setServiceAccountId(GOOGLE_CLIENT_ID)
+                    .setServiceAccountScopes(Collections.singleton("https://www.googleapis.com/auth/androidpublisher"))
+                    .setServiceAccountPrivateKeyFromP12File(new File(PATH_TO_KEY))
+                    .build();
+		} catch (GeneralSecurityException e) {
+			e.printStackTrace();
+			System.exit(-1);
+		}
+
 
 		AndroidPublisher publisher = new AndroidPublisher.Builder(HTTP_TRANSPORT, JSON_FACTORY, credential)
 				.setApplicationName(GOOGLE_PRODUCT_NAME).build();
