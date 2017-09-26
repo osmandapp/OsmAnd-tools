@@ -1,6 +1,5 @@
 package net.osmand.server.scripts;
 import java.io.*;
-import java.security.GeneralSecurityException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -147,7 +146,7 @@ public class UpdateSubscriptionImpl {
 		
 		tokenResponse.setAccessToken(accessToken);
 		tokenResponse.setRefreshToken(token);
-		tokenResponse.setExpiresInSeconds(3600L);
+		tokenResponse.setExpiresInSeconds(5600L);
 		tokenResponse.setScope("https://www.googleapis.com/auth/androidpublisher");
 		tokenResponse.setTokenType("Bearer");
 
