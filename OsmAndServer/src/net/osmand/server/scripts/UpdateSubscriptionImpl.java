@@ -144,7 +144,7 @@ public class UpdateSubscriptionImpl {
 //		System.out.println("refresh token=" + token);
 //		System.out.println("access token=" + accessToken);
 		
-//		tokenResponse.setAccessToken(accessToken);
+		tokenResponse.setAccessToken(accessToken);
 		tokenResponse.setRefreshToken(token);
 		tokenResponse.setExpiresInSeconds(3600L);
 		tokenResponse.setScope("https://www.googleapis.com/auth/androidpublisher");
