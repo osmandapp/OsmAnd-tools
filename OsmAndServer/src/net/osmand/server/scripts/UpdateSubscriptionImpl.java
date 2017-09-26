@@ -156,7 +156,7 @@ public class UpdateSubscriptionImpl {
 		try {
 			credential = new GoogleCredential.Builder().setTransport(HTTP_TRANSPORT)
                     .setJsonFactory(JSON_FACTORY)
-                    .setServiceAccountId(GOOGLE_CLIENT_ID)
+                    .setClientSecrets(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET)
                     .setServiceAccountScopes(Collections.singleton("https://www.googleapis.com/auth/androidpublisher"))
                     .setServiceAccountPrivateKeyFromP12File(new File(PATH_TO_KEY))
                     .build();
