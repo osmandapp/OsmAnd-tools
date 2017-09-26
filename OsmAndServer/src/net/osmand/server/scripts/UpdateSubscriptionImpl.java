@@ -195,7 +195,7 @@ public class UpdateSubscriptionImpl {
 	private static String getAccessToken(String refreshToken) throws JSONException {
 
 		HttpClient client = new DefaultHttpClient();
-		HttpPost post = new HttpPost("https://accounts.google.com/o/oauth2/token");
+		HttpPost post = new HttpPost("https://www.googleapis.com/oauth2/v4/token");
 		try {
 			List<NameValuePair> nameValuePairs = new ArrayList<NameValuePair>(4);
 			nameValuePairs.add(new BasicNameValuePair("grant_type", "refresh_token"));
