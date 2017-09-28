@@ -31,6 +31,7 @@ import com.google.api.services.androidpublisher.model.SubscriptionPurchase;
 public class UpdateSubscriptionImpl {
 
 
+	public static final String INVALID_PURCHASE = "invalid";
 	private static String PATH_TO_KEY = "";
 	// init one time
 	private static String GOOGLE_CLIENT_CODE="";
@@ -88,14 +89,17 @@ public class UpdateSubscriptionImpl {
 				.prepareStatement("INSERT INTO supporters_subscription(userid, sku, purchaseToken, checktime, autorenewing, starttime, expiretime, kind) "
 						+ " VALUES(?, ?, ?, ?, ?, ?, ?, ?)");
 
-		PreparedStatement delStatement = conn
-				.prepareStatement("DELETE FROM supporters_subscription "
-						+ "WHERE userid =?");
+		PreparedStatement updateStatement = conn
+				.prepareStatement("UPDATE supporters_subscription SET kind=?"
+						+ " WHERE userid =?");
 
 		AndroidPublisher.Purchases purchases = publisher.purchases();
 		int changes = 0;
 		int deletions = 0;
 		while (rs.next()) {
+			if (rs.getString("kind").equals(INVALID_PURCHASE)) {
+				continue;
+			}
 			String userid = rs.getString("userid");
 			String pt = rs.getString("purchasetoken");
 			String subscriptionId = rs.getString("sku");
@@ -108,8 +112,9 @@ public class UpdateSubscriptionImpl {
 				}
 			} catch (Exception e) {
 				if (!pt.contains(".AO")) {
-					delStatement.setString(1, userid);
-					delStatement.addBatch();
+					updateStatement.setString(1, INVALID_PURCHASE);
+					updateStatement.setString(2, userid);
+					updateStatement.addBatch();
 					deletions++;
 					System.out.println("Clearing invalid subscription: userid=" + userid + " sku=" + subscriptionId);
 				}
@@ -135,7 +140,7 @@ public class UpdateSubscriptionImpl {
 		if (changes > 0) {
 			ps.executeBatch();
 			if (deletions > 0) {
-				delStatement.executeBatch();
+				updateStatement.executeBatch();
 			}
 			if (!conn.getAutoCommit()) {
 				conn.commit();
