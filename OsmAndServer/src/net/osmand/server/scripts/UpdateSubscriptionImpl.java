@@ -48,7 +48,6 @@ public class UpdateSubscriptionImpl {
 	
 	private static HttpTransport HTTP_TRANSPORT = new NetHttpTransport();
 	private static JsonFactory JSON_FACTORY = new com.google.api.client.json.jackson2.JacksonFactory();
-	private static boolean removeInvalidSubscription = false;
 
 	public static void main(String[] args) throws JSONException, IOException, SQLException, ClassNotFoundException {
 		AndroidPublisher publisher = getPublisherApi(args[0]);
@@ -64,9 +63,6 @@ public class UpdateSubscriptionImpl {
 		for (int i = 1; i < args.length; i++) {
 			if ("-verifyall".equals(args[i])) {
 				verifyAll = true;
-			}
-			if ("-removeinvalid".equals(args[i])) {
-				removeInvalidSubscription = true;
 			}
 		}
 		
@@ -111,7 +107,7 @@ public class UpdateSubscriptionImpl {
 					subscription = purchases.subscriptions().get(GOOGLE_PACKAGE_NAME, subscriptionId, pt).execute();
 				}
 			} catch (Exception e) {
-				if (removeInvalidSubscription) {
+				if (!pt.contains(".AO")) {
 					delStatement.setString(1, userid);
 					delStatement.addBatch();
 					deletions++;
