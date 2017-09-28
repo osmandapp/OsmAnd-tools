@@ -31,7 +31,7 @@ import com.google.api.services.androidpublisher.model.SubscriptionPurchase;
 public class UpdateSubscriptionImpl {
 
 
-	public static final String INVALID_PURCHASE = "invalid";
+	private static final String INVALID_PURCHASE = "invalid";
 	private static String PATH_TO_KEY = "";
 	// init one time
 	private static String GOOGLE_CLIENT_CODE="";
