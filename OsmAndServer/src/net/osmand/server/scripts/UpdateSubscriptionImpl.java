@@ -101,6 +101,9 @@ public class UpdateSubscriptionImpl {
 				} else {
 					subscription = purchases.subscriptions().get(GOOGLE_PACKAGE_NAME, subscriptionId, pt).execute();
 				}
+				if (!pt.conains(".")) {
+					System.out.println("Successfull query with short token: " + pt);
+				}
 			} catch (Exception e) {
 				System.err.println("Error updating userid " + userid + " and sku " + subscriptionId);
 				e.printStackTrace();
