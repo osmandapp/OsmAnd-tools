@@ -48,6 +48,7 @@ public class UpdateSubscriptionImpl {
 	
 	private static HttpTransport HTTP_TRANSPORT = new NetHttpTransport();
 	private static JsonFactory JSON_FACTORY = new com.google.api.client.json.jackson2.JacksonFactory();
+	private static boolean removeInvalidSubscription = false;
 
 	public static void main(String[] args) throws JSONException, IOException, SQLException, ClassNotFoundException {
 		AndroidPublisher publisher = getPublisherApi(args[0]);
@@ -63,6 +64,9 @@ public class UpdateSubscriptionImpl {
 		for (int i = 1; i < args.length; i++) {
 			if ("-verifyall".equals(args[i])) {
 				verifyAll = true;
+			}
+			if ("-removeinvalid".equals(args[i])) {
+				removeInvalidSubscription = true;
 			}
 		}
 		
@@ -88,8 +92,13 @@ public class UpdateSubscriptionImpl {
 				.prepareStatement("INSERT INTO supporters_subscription(userid, sku, purchaseToken, checktime, autorenewing, starttime, expiretime, kind) "
 						+ " VALUES(?, ?, ?, ?, ?, ?, ?, ?)");
 
+		PreparedStatement delStatement = conn
+				.prepareStatement("DELETE FROM supporters_subscription "
+						+ "WHERE userid =?");
+
 		AndroidPublisher.Purchases purchases = publisher.purchases();
 		int changes = 0;
+		int deletions = 0;
 		while (rs.next()) {
 			String userid = rs.getString("userid");
 			String pt = rs.getString("purchasetoken");
@@ -102,8 +111,16 @@ public class UpdateSubscriptionImpl {
 					subscription = purchases.subscriptions().get(GOOGLE_PACKAGE_NAME, subscriptionId, pt).execute();
 				}
 			} catch (Exception e) {
-				System.err.println("Error updating userid " + userid + " and sku " + subscriptionId);
-				e.printStackTrace();
+				if (removeInvalidSubscription) {
+					delStatement.setString(1, userid);
+					delStatement.addBatch();
+					deletions++;
+					System.out.println("Clearing invalid subscription: userid=" + userid + " sku=" + subscriptionId);
+				}
+				else {
+					System.err.println("Error updating userid " + userid + " and sku " + subscriptionId);
+					e.printStackTrace();
+				}
 				continue;
 			}
 			long tm = System.currentTimeMillis();
@@ -121,6 +138,9 @@ public class UpdateSubscriptionImpl {
 		}
 		if (changes > 0) {
 			ps.executeBatch();
+			if (deletions > 0) {
+				delStatement.executeBatch();
+			}
 			if (!conn.getAutoCommit()) {
 				conn.commit();
 			}
