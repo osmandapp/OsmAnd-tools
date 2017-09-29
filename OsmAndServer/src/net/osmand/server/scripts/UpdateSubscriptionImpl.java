@@ -97,8 +97,11 @@ public class UpdateSubscriptionImpl {
 		int changes = 0;
 		int deletions = 0;
 		while (rs.next()) {
-			if (rs.getString("kind").equals(INVALID_PURCHASE)) {
-				continue;
+			if (rs.getString("kind") != null) {
+				if (rs.getString("kind").equals(INVALID_PURCHASE)) {
+					continue;
+				}
+
 			}
 			String userid = rs.getString("userid");
 			String pt = rs.getString("purchasetoken");
