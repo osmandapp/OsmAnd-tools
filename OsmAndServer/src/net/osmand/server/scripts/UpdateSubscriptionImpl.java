@@ -31,6 +31,7 @@ import com.google.api.services.androidpublisher.model.SubscriptionPurchase;
 public class UpdateSubscriptionImpl {
 
 
+	private static final String INVALID_PURCHASE = "invalid";
 	private static String PATH_TO_KEY = "";
 	// init one time
 	private static String GOOGLE_CLIENT_CODE="";
@@ -88,9 +89,17 @@ public class UpdateSubscriptionImpl {
 				.prepareStatement("INSERT INTO supporters_subscription(userid, sku, purchaseToken, checktime, autorenewing, starttime, expiretime, kind) "
 						+ " VALUES(?, ?, ?, ?, ?, ?, ?, ?)");
 
+		PreparedStatement updateStatement = conn
+				.prepareStatement("UPDATE supporters_subscription SET kind=?"
+						+ " WHERE userid =?");
+
 		AndroidPublisher.Purchases purchases = publisher.purchases();
 		int changes = 0;
+		int deletions = 0;
 		while (rs.next()) {
+			if (rs.getString("kind").equals(INVALID_PURCHASE)) {
+				continue;
+			}
 			String userid = rs.getString("userid");
 			String pt = rs.getString("purchasetoken");
 			String subscriptionId = rs.getString("sku");
@@ -102,8 +111,17 @@ public class UpdateSubscriptionImpl {
 					subscription = purchases.subscriptions().get(GOOGLE_PACKAGE_NAME, subscriptionId, pt).execute();
 				}
 			} catch (Exception e) {
-				System.err.println("Error updating userid " + userid + " and sku " + subscriptionId);
-				e.printStackTrace();
+				if (!pt.contains(".AO")) {
+					updateStatement.setString(1, INVALID_PURCHASE);
+					updateStatement.setString(2, userid);
+					updateStatement.addBatch();
+					deletions++;
+					System.out.println("Clearing invalid subscription: userid=" + userid + " sku=" + subscriptionId);
+				}
+				else {
+					System.err.println("Error updating userid " + userid + " and sku " + subscriptionId);
+					e.printStackTrace();
+				}
 				continue;
 			}
 			long tm = System.currentTimeMillis();
@@ -121,6 +139,9 @@ public class UpdateSubscriptionImpl {
 		}
 		if (changes > 0) {
 			ps.executeBatch();
+			if (deletions > 0) {
+				updateStatement.executeBatch();
+			}
 			if (!conn.getAutoCommit()) {
 				conn.commit();
 			}
