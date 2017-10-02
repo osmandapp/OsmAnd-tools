@@ -1,16 +1,27 @@
 package net.osmand.data.diff;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.sql.SQLException;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
+
+import org.xmlpull.v1.XmlPullParser;
+import org.xmlpull.v1.XmlPullParserException;
+
 import java.util.TreeMap;
 
+import gnu.trove.list.array.TLongArrayList;
 import gnu.trove.map.hash.TLongObjectHashMap;
+import net.osmand.PlatformUtil;
 import net.osmand.binary.BinaryInspector;
 import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.binary.BinaryMapIndexReader.MapIndex;
@@ -35,8 +46,8 @@ public class ObfDiffGenerator {
 			args[2] = "/Users/victorshcherb/osmand/maps/diff/Diff.obf";
 //			args[2] = "stdout";
 		}
-		if (args.length != 3) {
-			System.out.println("Usage: <path to old obf> <path to new obf> <[result file name] or [stdout]>");
+		if (args.length != 4) {
+			System.out.println("Usage: <path to old obf> <path to new obf> <[result file name] or [stdout]> <path to diff file>");
 			System.exit(1);
 			return;
 		}
@@ -52,7 +63,8 @@ public class ObfDiffGenerator {
 	private void run(String[] args) throws IOException, RTreeException, SQLException {
 		File start = new File(args[0]);
 		File end = new File(args[1]);
-		File result  = args.length < 3 || args[2].equals("stdout") ? null :new File(args[2]);
+		File diff = new File(args[3]);
+		File result  = args.length < 4 || args[2].equals("stdout") ? null :new File(args[2]);
 		if (!start.exists()) {
 			System.err.println("Input Obf file doesn't exist: " + start.getAbsolutePath());
 			System.exit(1);
@@ -63,17 +75,22 @@ public class ObfDiffGenerator {
 			System.exit(1);
 			return;
 		}
-		generateDiff(start, end, result);
+		if (!diff.exists()) {
+			System.err.println("Overpass diff doesn't exist: " + diff.getAbsolutePath());
+			System.exit(1);
+			return;
+		}
+		generateDiff(start, end, result, diff);
 	}
 
-	private void generateDiff(File start, File end, File result) throws IOException, RTreeException, SQLException {
+	private void generateDiff(File start, File end, File result, File diff) throws IOException, RTreeException, SQLException {
 		ObfFileInMemory fStart = new ObfFileInMemory();
 		fStart.readObfFiles(Collections.singletonList(start));
 		ObfFileInMemory fEnd = new ObfFileInMemory();
 		fEnd.readObfFiles(Collections.singletonList(end));
 
 		System.out.println("Comparing the files...");
-		compareMapData(fStart, fEnd, result == null);
+		compareMapData(fStart, fEnd, result == null, diff);
 		compareRouteData(fStart, fEnd, result == null);
 		comparePOI(fStart, fEnd, result == null);
 		// TODO Compare Transport
@@ -152,9 +169,15 @@ public class ObfDiffGenerator {
 	}
 
 
-	private void compareMapData(ObfFileInMemory fStart, ObfFileInMemory fEnd, boolean print) {
+	private void compareMapData(ObfFileInMemory fStart, ObfFileInMemory fEnd, boolean print, File diff) {
 		fStart.filterAllZoomsBelow(13);
 		fEnd.filterAllZoomsBelow(13);
+		Set<Long> deletedObjIds = null;
+		try {
+			deletedObjIds = DiffParser.fetchDeletedIds(diff);
+		} catch (IOException | XmlPullParserException e) {
+			e.printStackTrace();
+		}
 		MapIndex mi = fEnd.getMapIndex();
 		int deleteId;
 		Integer rl = mi.getRule(OSMAND_CHANGE_TAG, OSMAND_CHANGE_VALUE);
@@ -174,6 +197,7 @@ public class ObfDiffGenerator {
 				continue;
 			}
 			for (Long idx : startData.keys()) {
+				long osmid = (idx >> (BinaryInspector.SHIFT_ID + 1));
 				BinaryMapDataObject objE = endData.get(idx);
 				BinaryMapDataObject objS = startData.get(idx);
 				if (print) {
@@ -188,10 +212,13 @@ public class ObfDiffGenerator {
 					}
 				} else {
 					if (objE == null) {
-						// Object with this id is not present in the second obf
-						BinaryMapDataObject obj = new BinaryMapDataObject(idx, objS.getCoordinates(), null,
-								objS.getObjectType(), objS.isArea(), new int[] { deleteId }, null);
-						endData.put(idx, obj);
+						if (deletedObjIds.contains(osmid)) {
+							// Object with this id is not present in the second obf & was deleted according to diff
+							BinaryMapDataObject obj = new BinaryMapDataObject(idx, objS.getCoordinates(), null,
+									objS.getObjectType(), objS.isArea(), new int[] { deleteId }, null);
+							endData.put(idx, obj);
+						}
+						
 					} else if (objE.compareBinary(objS, COORDINATES_PRECISION_COMPARE)) {
 						endData.remove(idx);
 					}
@@ -259,6 +286,57 @@ public class ObfDiffGenerator {
 				System.out.println("Route " + e.getId() + " is missing in (1): " + e);
 			}
 		}
+	}
+	
+	private static class DiffParser {
+		
+		private static final String TYPE_RELATION = "relation";
+		private static final String TYPE_WAY = "way";
+		private static final String TYPE_NODE = "node";
+		private static final String TYPE_ATTR_VALUE = "delete";
+		private static final String TYPE_ATTR = "type";
+
+		public static Set<Long> fetchDeletedIds(File diff) throws IOException, XmlPullParserException {
+			Set<Long> result = new HashSet<>();
+			InputStream fis = new FileInputStream(diff);
+			XmlPullParser parser = PlatformUtil.newXMLPullParser();
+			parser.setInput(fis, "UTF-8");
+			int tok;
+			boolean parsing = false;
+			while ((tok = parser.next()) != XmlPullParser.END_DOCUMENT) {
+				if (tok == XmlPullParser.START_TAG ) {
+					if (parser.getAttributeValue("", TYPE_ATTR) != null) {
+						if (parser.getAttributeValue("", TYPE_ATTR).equals(TYPE_ATTR_VALUE)) {
+							parsing = true;
+						}
+						
+					}
+					if ((parser.getName().equals(TYPE_NODE) || parser.getName().equals(TYPE_WAY) || parser.getName().equals(TYPE_RELATION)) && parsing) {
+						long val = parseLong(parser, "id", -1l);
+						if (val != -1l) {
+							result.add(val);
+						}
+					}
+				} else if (tok == XmlPullParser.END_TAG) {
+					parsing = false;
+				}
+			}
+			
+			return result;
+		}
+	}
+	
+	protected static long parseLong(XmlPullParser parser, String name, long defVal){
+		long ret = defVal; 
+		String value = parser.getAttributeValue("", name);
+		if(value == null) {
+			return defVal;
+		}
+		try {
+			ret = Long.parseLong(value);
+		} catch (NumberFormatException e) {
+		}
+		return ret;
 	}
 
 	
