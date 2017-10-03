@@ -30,6 +30,7 @@ import net.osmand.binary.MapZooms.MapZoomPair;
 import net.osmand.binary.RouteDataObject;
 import net.osmand.data.Amenity;
 import net.osmand.osm.edit.Entity;
+import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Relation;
@@ -172,7 +173,7 @@ public class ObfDiffGenerator {
 	private void compareMapData(ObfFileInMemory fStart, ObfFileInMemory fEnd, boolean print, File diff) {
 		fStart.filterAllZoomsBelow(13);
 		fEnd.filterAllZoomsBelow(13);
-		TLongObjectHashMap<Entity> deletedObjIds = null;
+		TLongObjectHashMap<EntityId> deletedObjIds = null;
 		if (diff != null) {
 			try {
 				deletedObjIds = DiffParser.fetchDeletedIds(diff);
@@ -216,8 +217,8 @@ public class ObfDiffGenerator {
 					if (objE == null) {
 						if (deletedObjIds != null) {
 							if (deletedObjIds.containsKey(osmid)) {
-								EntityType thisType = getEntityType(objS);
-								if (thisType == EntityType.valueOf(deletedObjIds.get(osmid))) {
+								EntityId thisEntityId = getMapEntityId(objS.getId());
+								if (thisEntityId.equals(deletedObjIds.get(osmid))) {
 									// Object with this id is not present in the second obf & was deleted according to diff
 									BinaryMapDataObject obj = new BinaryMapDataObject(idx, objS.getCoordinates(), null,
 											objS.getObjectType(), objS.isArea(), new int[] { deleteId }, null);
@@ -243,6 +244,17 @@ public class ObfDiffGenerator {
 
 	}
 	
+	private EntityId getMapEntityId(long id) {
+		if (id < (1 << 41)) {
+			if ((id % 2) == 0) {
+				return new EntityId(EntityType.WAY, id >> (BinaryInspector.SHIFT_ID + 1));
+			} else {
+				return new EntityId(EntityType.NODE, id >> (BinaryInspector.SHIFT_ID + 1));
+			}
+		}
+		return new EntityId(EntityType.RELATION, id >> (BinaryInspector.SHIFT_ID + 1));
+	}
+
 	private EntityType getEntityType(BinaryMapDataObject obj) {
 		boolean multipolygon = obj.getPolygonInnerCoordinates() != null && obj.getPolygonInnerCoordinates().length > 0;
 		if (multipolygon || obj.isArea()) {
@@ -317,10 +329,10 @@ public class ObfDiffGenerator {
 		private static final String TYPE_ATTR = "type";
 		private static final String ATTR_LAT = "lat";
 		private static final String ATTR_LON = "lon";
-		private static Entity currentParsedEntity;
+		private static EntityId currentParsedEntity;
 
-		public static TLongObjectHashMap<Entity> fetchDeletedIds(File diff) throws IOException, XmlPullParserException {
-			TLongObjectHashMap<Entity> result = new TLongObjectHashMap<>();
+		public static TLongObjectHashMap<EntityId> fetchDeletedIds(File diff) throws IOException, XmlPullParserException {
+			TLongObjectHashMap<EntityId> result = new TLongObjectHashMap<>();
 			InputStream fis = new FileInputStream(diff);
 			XmlPullParser parser = PlatformUtil.newXMLPullParser();
 			parser.setInput(fis, "UTF-8");
@@ -336,13 +348,12 @@ public class ObfDiffGenerator {
 					}
 					String name = parser.getName();
 					if (TYPE_NODE.equals(name) && parsing) {
-						currentParsedEntity = new Node(parseDouble(parser, ATTR_LAT, 0), parseDouble(parser, ATTR_LON, 0),
-								parseLong(parser, ATTR_ID, -1));
+						currentParsedEntity = new EntityId(EntityType.NODE, parseLong(parser, ATTR_ID, -1));
 						
 					} else if (TYPE_WAY.equals(name) && parsing) {
-						currentParsedEntity = new Way(parseLong(parser, ATTR_ID, -1));
+						currentParsedEntity = new EntityId(EntityType.WAY, parseLong(parser, ATTR_ID, -1));
 					} else if (TYPE_RELATION.equals(name) && parsing) {
-						currentParsedEntity = new Relation(parseLong(parser, ATTR_ID, -1));
+						currentParsedEntity = new EntityId(EntityType.RELATION, parseLong(parser, ATTR_ID, -1));
 					}	
 				} else if (tok == XmlPullParser.END_TAG) {
 					parsing = false;
