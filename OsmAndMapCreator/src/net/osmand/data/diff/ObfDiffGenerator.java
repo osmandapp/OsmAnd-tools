@@ -2,7 +2,6 @@ package net.osmand.data.diff;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.sql.SQLException;
@@ -19,7 +18,6 @@ import org.xmlpull.v1.XmlPullParserException;
 
 import java.util.TreeMap;
 
-import gnu.trove.list.array.TLongArrayList;
 import gnu.trove.map.hash.TLongObjectHashMap;
 import net.osmand.PlatformUtil;
 import net.osmand.binary.BinaryInspector;
@@ -29,15 +27,13 @@ import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
 import net.osmand.binary.MapZooms.MapZoomPair;
 import net.osmand.binary.RouteDataObject;
 import net.osmand.data.Amenity;
-import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.Entity.EntityType;
-import net.osmand.osm.edit.Node;
-import net.osmand.osm.edit.Relation;
-import net.osmand.osm.edit.Way;
 import rtree.RTreeException;
 
 public class ObfDiffGenerator {
+	private static final int ID_TYPE = 1 << 41;
+
 	private static final int COORDINATES_PRECISION_COMPARE = 0;
 	
 	private static final String OSMAND_CHANGE_VALUE = "delete";
@@ -173,7 +169,7 @@ public class ObfDiffGenerator {
 	private void compareMapData(ObfFileInMemory fStart, ObfFileInMemory fEnd, boolean print, File diff) {
 		fStart.filterAllZoomsBelow(13);
 		fEnd.filterAllZoomsBelow(13);
-		TLongObjectHashMap<EntityId> deletedObjIds = null;
+		Set<EntityId> deletedObjIds = new HashSet<>();
 		if (diff != null) {
 			try {
 				deletedObjIds = DiffParser.fetchDeletedIds(diff);
@@ -200,9 +196,9 @@ public class ObfDiffGenerator {
 				continue;
 			}
 			for (Long idx : startData.keys()) {
-				long osmid = idx >> (BinaryInspector.SHIFT_ID + 1);
 				BinaryMapDataObject objE = endData.get(idx);
 				BinaryMapDataObject objS = startData.get(idx);
+				EntityId thisEntityId = getMapEntityId(objS.getId());
 				if (print) {
 					if (objE == null) {
 						System.out.println("Map " + idx + " is missing in (2): " + toString(objS));
@@ -215,15 +211,12 @@ public class ObfDiffGenerator {
 					}
 				} else {
 					if (objE == null) {
-						if (deletedObjIds != null) {
-							if (deletedObjIds.containsKey(osmid)) {
-								EntityId thisEntityId = getMapEntityId(objS.getId());
-								if (thisEntityId.equals(deletedObjIds.get(osmid))) {
-									// Object with this id is not present in the second obf & was deleted according to diff
-									BinaryMapDataObject obj = new BinaryMapDataObject(idx, objS.getCoordinates(), null,
-											objS.getObjectType(), objS.isArea(), new int[] { deleteId }, null);
-									endData.put(idx, obj);
-								}
+						if (!deletedObjIds.isEmpty()) {
+							if (deletedObjIds.contains(thisEntityId)) {
+								// Object with this id is not present in the second obf & was deleted according to diff
+								BinaryMapDataObject obj = new BinaryMapDataObject(idx, objS.getCoordinates(), null,
+										objS.getObjectType(), objS.isArea(), new int[] { deleteId }, null);
+								endData.put(idx, obj);
 							}
 						} else {
 							BinaryMapDataObject obj = new BinaryMapDataObject(idx, objS.getCoordinates(), null,
@@ -245,7 +238,7 @@ public class ObfDiffGenerator {
 	}
 	
 	private EntityId getMapEntityId(long id) {
-		if (id < (1 << 41)) {
+		if (id < ID_TYPE) {
 			if ((id % 2) == 0) {
 				return new EntityId(EntityType.WAY, id >> (BinaryInspector.SHIFT_ID + 1));
 			} else {
@@ -318,12 +311,10 @@ public class ObfDiffGenerator {
 		private static final String TYPE_NODE = "node";
 		private static final String TYPE_ATTR_VALUE = "delete";
 		private static final String TYPE_ATTR = "type";
-		private static final String ATTR_LAT = "lat";
-		private static final String ATTR_LON = "lon";
 		private static EntityId currentParsedEntity;
 
-		public static TLongObjectHashMap<EntityId> fetchDeletedIds(File diff) throws IOException, XmlPullParserException {
-			TLongObjectHashMap<EntityId> result = new TLongObjectHashMap<>();
+		public static Set<EntityId> fetchDeletedIds(File diff) throws IOException, XmlPullParserException {
+			Set<EntityId> result = new HashSet<>();
 			InputStream fis = new FileInputStream(diff);
 			XmlPullParser parser = PlatformUtil.newXMLPullParser();
 			parser.setInput(fis, "UTF-8");
@@ -349,12 +340,11 @@ public class ObfDiffGenerator {
 				} else if (tok == XmlPullParser.END_TAG) {
 					parsing = false;
 					if (currentParsedEntity != null) {
-						result.put(currentParsedEntity.getId(), currentParsedEntity);
+						result.add(currentParsedEntity);
 						currentParsedEntity = null;
 					}
 				}
 			}
-			
 			return result;
 		}
 		
@@ -366,19 +356,6 @@ public class ObfDiffGenerator {
 			}
 			try {
 				ret = Long.parseLong(value);
-			} catch (NumberFormatException e) {
-			}
-			return ret;
-		}
-		
-		protected static double parseDouble(XmlPullParser parser, String name, double defVal){
-			double ret = defVal; 
-			String value = parser.getAttributeValue("", name);
-			if(value == null) {
-				return defVal;
-			}
-			try {
-				ret = Double.parseDouble(value);
 			} catch (NumberFormatException e) {
 			}
 			return ret;
