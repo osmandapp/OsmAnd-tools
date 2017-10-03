@@ -29,6 +29,11 @@ import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
 import net.osmand.binary.MapZooms.MapZoomPair;
 import net.osmand.binary.RouteDataObject;
 import net.osmand.data.Amenity;
+import net.osmand.osm.edit.Entity;
+import net.osmand.osm.edit.Entity.EntityType;
+import net.osmand.osm.edit.Node;
+import net.osmand.osm.edit.Relation;
+import net.osmand.osm.edit.Way;
 import rtree.RTreeException;
 
 public class ObfDiffGenerator {
@@ -46,8 +51,8 @@ public class ObfDiffGenerator {
 			args[2] = "/Users/victorshcherb/osmand/maps/diff/Diff.obf";
 //			args[2] = "stdout";
 		}
-		if (args.length != 4) {
-			System.out.println("Usage: <path to old obf> <path to new obf> <[result file name] or [stdout]> <path to diff file>");
+		if (args.length < 3) {
+			System.out.println("Usage: <path to old obf> <path to new obf> <[result file name] or [stdout]> <path to diff file (optional)>");
 			System.exit(1);
 			return;
 		}
@@ -63,7 +68,7 @@ public class ObfDiffGenerator {
 	private void run(String[] args) throws IOException, RTreeException, SQLException {
 		File start = new File(args[0]);
 		File end = new File(args[1]);
-		File diff = new File(args[3]);
+		File diff = args.length < 4 ? null :new File(args[3]);
 		File result  = args.length < 4 || args[2].equals("stdout") ? null :new File(args[2]);
 		if (!start.exists()) {
 			System.err.println("Input Obf file doesn't exist: " + start.getAbsolutePath());
@@ -72,11 +77,6 @@ public class ObfDiffGenerator {
 		}
 		if (!end.exists()) {
 			System.err.println("Input Obf file doesn't exist: " + end.getAbsolutePath());
-			System.exit(1);
-			return;
-		}
-		if (!diff.exists()) {
-			System.err.println("Overpass diff doesn't exist: " + diff.getAbsolutePath());
 			System.exit(1);
 			return;
 		}
@@ -172,12 +172,14 @@ public class ObfDiffGenerator {
 	private void compareMapData(ObfFileInMemory fStart, ObfFileInMemory fEnd, boolean print, File diff) {
 		fStart.filterAllZoomsBelow(13);
 		fEnd.filterAllZoomsBelow(13);
-		Set<Long> deletedObjIds = null;
-		try {
-			deletedObjIds = DiffParser.fetchDeletedIds(diff);
-		} catch (IOException | XmlPullParserException e) {
-			e.printStackTrace();
-		}
+		TLongObjectHashMap<Entity> deletedObjIds = null;
+		if (diff != null) {
+			try {
+				deletedObjIds = DiffParser.fetchDeletedIds(diff);
+			} catch (IOException | XmlPullParserException e) {
+				e.printStackTrace();
+			}
+		}		
 		MapIndex mi = fEnd.getMapIndex();
 		int deleteId;
 		Integer rl = mi.getRule(OSMAND_CHANGE_TAG, OSMAND_CHANGE_VALUE);
@@ -197,7 +199,7 @@ public class ObfDiffGenerator {
 				continue;
 			}
 			for (Long idx : startData.keys()) {
-				long osmid = (idx >> (BinaryInspector.SHIFT_ID + 1));
+				long osmid = idx >> (BinaryInspector.SHIFT_ID + 1);
 				BinaryMapDataObject objE = endData.get(idx);
 				BinaryMapDataObject objS = startData.get(idx);
 				if (print) {
@@ -212,13 +214,21 @@ public class ObfDiffGenerator {
 					}
 				} else {
 					if (objE == null) {
-						if (deletedObjIds.contains(osmid)) {
-							// Object with this id is not present in the second obf & was deleted according to diff
+						if (deletedObjIds != null) {
+							if (deletedObjIds.containsKey(osmid)) {
+								EntityType thisType = getEntityType(objS);
+								if (thisType == EntityType.valueOf(deletedObjIds.get(osmid))) {
+									// Object with this id is not present in the second obf & was deleted according to diff
+									BinaryMapDataObject obj = new BinaryMapDataObject(idx, objS.getCoordinates(), null,
+											objS.getObjectType(), objS.isArea(), new int[] { deleteId }, null);
+									endData.put(idx, obj);
+								}
+							}
+						} else {
 							BinaryMapDataObject obj = new BinaryMapDataObject(idx, objS.getCoordinates(), null,
 									objS.getObjectType(), objS.isArea(), new int[] { deleteId }, null);
 							endData.put(idx, obj);
 						}
-						
 					} else if (objE.compareBinary(objS, COORDINATES_PRECISION_COMPARE)) {
 						endData.remove(idx);
 					}
@@ -233,6 +243,15 @@ public class ObfDiffGenerator {
 
 	}
 	
+	private EntityType getEntityType(BinaryMapDataObject obj) {
+		boolean multipolygon = obj.getPolygonInnerCoordinates() != null && obj.getPolygonInnerCoordinates().length > 0;
+		if (multipolygon || obj.isArea()) {
+			return EntityType.RELATION;
+		} else{
+			return obj.getPointsLength() > 1 ? EntityType.WAY : EntityType.NODE;
+		}
+	}
+
 	private String toString(BinaryMapDataObject objS) {
 		StringBuilder s = new StringBuilder();
 		BinaryInspector.printMapDetails(objS, s, false);
@@ -290,54 +309,77 @@ public class ObfDiffGenerator {
 	
 	private static class DiffParser {
 		
+		private static final String ATTR_ID = "id";
 		private static final String TYPE_RELATION = "relation";
 		private static final String TYPE_WAY = "way";
 		private static final String TYPE_NODE = "node";
 		private static final String TYPE_ATTR_VALUE = "delete";
 		private static final String TYPE_ATTR = "type";
+		private static final String ATTR_LAT = "lat";
+		private static final String ATTR_LON = "lon";
+		private static Entity currentParsedEntity;
 
-		public static Set<Long> fetchDeletedIds(File diff) throws IOException, XmlPullParserException {
-			Set<Long> result = new HashSet<>();
+		public static TLongObjectHashMap<Entity> fetchDeletedIds(File diff) throws IOException, XmlPullParserException {
+			TLongObjectHashMap<Entity> result = new TLongObjectHashMap<>();
 			InputStream fis = new FileInputStream(diff);
 			XmlPullParser parser = PlatformUtil.newXMLPullParser();
 			parser.setInput(fis, "UTF-8");
 			int tok;
 			boolean parsing = false;
+			
 			while ((tok = parser.next()) != XmlPullParser.END_DOCUMENT) {
 				if (tok == XmlPullParser.START_TAG ) {
 					if (parser.getAttributeValue("", TYPE_ATTR) != null) {
 						if (parser.getAttributeValue("", TYPE_ATTR).equals(TYPE_ATTR_VALUE)) {
 							parsing = true;
 						}
+					}
+					String name = parser.getName();
+					if (TYPE_NODE.equals(name) && parsing) {
+						currentParsedEntity = new Node(parseDouble(parser, ATTR_LAT, 0), parseDouble(parser, ATTR_LON, 0),
+								parseLong(parser, ATTR_ID, -1));
 						
-					}
-					if ((parser.getName().equals(TYPE_NODE) || parser.getName().equals(TYPE_WAY) || parser.getName().equals(TYPE_RELATION)) && parsing) {
-						long val = parseLong(parser, "id", -1l);
-						if (val != -1l) {
-							result.add(val);
-						}
-					}
+					} else if (TYPE_WAY.equals(name) && parsing) {
+						currentParsedEntity = new Way(parseLong(parser, ATTR_ID, -1));
+					} else if (TYPE_RELATION.equals(name) && parsing) {
+						currentParsedEntity = new Relation(parseLong(parser, ATTR_ID, -1));
+					}	
 				} else if (tok == XmlPullParser.END_TAG) {
 					parsing = false;
+					if (currentParsedEntity != null) {
+						result.put(currentParsedEntity.getId(), currentParsedEntity);
+						currentParsedEntity = null;
+					}
 				}
 			}
 			
 			return result;
 		}
-	}
-	
-	protected static long parseLong(XmlPullParser parser, String name, long defVal){
-		long ret = defVal; 
-		String value = parser.getAttributeValue("", name);
-		if(value == null) {
-			return defVal;
+		
+		protected static long parseLong(XmlPullParser parser, String name, long defVal){
+			long ret = defVal; 
+			String value = parser.getAttributeValue("", name);
+			if(value == null) {
+				return defVal;
+			}
+			try {
+				ret = Long.parseLong(value);
+			} catch (NumberFormatException e) {
+			}
+			return ret;
 		}
-		try {
-			ret = Long.parseLong(value);
-		} catch (NumberFormatException e) {
+		
+		protected static double parseDouble(XmlPullParser parser, String name, double defVal){
+			double ret = defVal; 
+			String value = parser.getAttributeValue("", name);
+			if(value == null) {
+				return defVal;
+			}
+			try {
+				ret = Double.parseDouble(value);
+			} catch (NumberFormatException e) {
+			}
+			return ret;
 		}
-		return ret;
-	}
-
-	
+	}	
 }
