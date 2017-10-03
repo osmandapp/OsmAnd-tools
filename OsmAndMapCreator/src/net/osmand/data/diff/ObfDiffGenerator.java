@@ -255,15 +255,6 @@ public class ObfDiffGenerator {
 		return new EntityId(EntityType.RELATION, id >> (BinaryInspector.SHIFT_ID + 1));
 	}
 
-	private EntityType getEntityType(BinaryMapDataObject obj) {
-		boolean multipolygon = obj.getPolygonInnerCoordinates() != null && obj.getPolygonInnerCoordinates().length > 0;
-		if (multipolygon || obj.isArea()) {
-			return EntityType.RELATION;
-		} else{
-			return obj.getPointsLength() > 1 ? EntityType.WAY : EntityType.NODE;
-		}
-	}
-
 	private String toString(BinaryMapDataObject objS) {
 		StringBuilder s = new StringBuilder();
 		BinaryInspector.printMapDetails(objS, s, false);
