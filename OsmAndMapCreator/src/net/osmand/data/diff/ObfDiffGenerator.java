@@ -43,10 +43,10 @@ public class ObfDiffGenerator {
 	public static void main(String[] args) throws IOException, RTreeException {
 		if(args.length == 1 && args[0].equals("test")) {
 			args = new String[3];
-			args[0] = "/Users/victorshcherb/osmand/maps/diff/17_09_03_22_15_before.obf.gz";
-			args[1] = "/Users/victorshcherb/osmand/maps/diff/17_09_03_22_15_after.obf.gz";
-			args[2] = "/Users/victorshcherb/osmand/maps/diff/Diff.obf";
-//			args[2] = "stdout";
+			args[0] = "/Users/victorshcherb/osmand/maps/diff/17_10_01_05_45__new.obf";
+			args[1] = "/Users/victorshcherb/osmand/maps/diff/17_10_01_05_45__old.obf";
+//			args[2] = "/Users/victorshcherb/osmand/maps/diff/Diff.obf";
+			args[2] = "stdout";
 		}
 		if (args.length < 3) {
 			System.out.println("Usage: <path to old obf> <path to new obf> <[result file name] or [stdout]> <path to diff file (optional)>");
@@ -137,7 +137,7 @@ public class ObfDiffGenerator {
 				}
 			} else {
 				if (objE == null) {
-					if (modifiedObjIds == null || modifiedObjIds.contains(aid)) {
+					if (modifiedObjIds == null || modifiedObjIds.contains(aid) || aid == null) {
 						objS.setAdditionalInfo(OSMAND_CHANGE_TAG, OSMAND_CHANGE_VALUE);
 						endPoi.put(idx, objS);
 						if (endPoiSource.get(objS.getId()) == null) {
@@ -218,7 +218,7 @@ public class ObfDiffGenerator {
 					}
 				} else {
 					if (objE == null) {
-						if (modifiedObjIds == null || modifiedObjIds.contains(thisEntityId)) {
+						if (modifiedObjIds == null || modifiedObjIds.contains(thisEntityId) || thisEntityId == null) {
 							BinaryMapDataObject obj = new BinaryMapDataObject(idx, objS.getCoordinates(), null,
 									objS.getObjectType(), objS.isArea(), new int[] { deleteId }, null);
 							endData.put(idx, obj);
