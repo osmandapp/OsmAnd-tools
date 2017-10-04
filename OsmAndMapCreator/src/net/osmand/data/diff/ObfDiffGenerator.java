@@ -32,13 +32,13 @@ import net.osmand.osm.edit.Entity.EntityType;
 import rtree.RTreeException;
 
 public class ObfDiffGenerator {
-	private static final int ID_TYPE = 1 << 41;
+	private static final long ID_TYPE = 1l << 41l;
 
 	private static final int COORDINATES_PRECISION_COMPARE = 0;
 	
 	private static final String OSMAND_CHANGE_VALUE = "delete";
 	private static final String OSMAND_CHANGE_TAG = "osmand_change";
-	public static final int BUFFER_SIZE = 1 << 20;
+	public static final long BUFFER_SIZE = 1 << 41;
 	
 	public static void main(String[] args) throws IOException, RTreeException {
 		if(args.length == 1 && args[0].equals("test")) {
