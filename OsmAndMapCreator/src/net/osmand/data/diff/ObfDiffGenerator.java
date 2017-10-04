@@ -212,13 +212,12 @@ public class ObfDiffGenerator {
 					}
 				} else {
 					if (objE == null) {
-						if (deletedObjIds != null) {
-							if (deletedObjIds.contains(thisEntityId)) {
-								// Object with this id is not present in the second obf & was deleted according to diff
-								BinaryMapDataObject obj = new BinaryMapDataObject(idx, objS.getCoordinates(), null,
-										objS.getObjectType(), objS.isArea(), new int[] { deleteId }, null);
-								endData.put(idx, obj);	
-							}
+						if ((deletedObjIds != null) ? deletedObjIds.contains(thisEntityId) : false) {
+							// Object with this id is not present in the second obf & was deleted according to diff
+							BinaryMapDataObject obj = new BinaryMapDataObject(idx, objS.getCoordinates(), null,
+									objS.getObjectType(), objS.isArea(), new int[] { deleteId }, null);
+							endData.put(idx, obj);	
+							
 												
 						} else {
 							BinaryMapDataObject obj = new BinaryMapDataObject(idx, objS.getCoordinates(), null,
