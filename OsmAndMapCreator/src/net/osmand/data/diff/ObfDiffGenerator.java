@@ -64,8 +64,8 @@ public class ObfDiffGenerator {
 	private void run(String[] args) throws IOException, RTreeException, SQLException {
 		File start = new File(args[0]);
 		File end = new File(args[1]);
-		File diff = args.length < 4 ? null :new File(args[3]);
-		File result  = args.length < 4 || args[2].equals("stdout") ? null :new File(args[2]);
+		File diff = args.length < 4 ? null : new File(args[3]);
+		File result = args[2].equals("stdout") ? null : new File(args[2]);
 		if (!start.exists()) {
 			System.err.println("Input Obf file doesn't exist: " + start.getAbsolutePath());
 			System.exit(1);
