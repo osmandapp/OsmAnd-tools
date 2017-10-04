@@ -11,6 +11,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.zip.GZIPInputStream;
 import java.util.Set;
 
 import org.xmlpull.v1.XmlPullParser;
@@ -330,7 +331,12 @@ public class ObfDiffGenerator {
 
 		public static Set<EntityId> fetchModifiedIds(File diff) throws IOException, XmlPullParserException {
 			Set<EntityId> result = new HashSet<>();
-			InputStream fis = new FileInputStream(diff);
+			InputStream fis ;
+			if(diff.getName().endsWith(".gz")) {
+				fis = new GZIPInputStream(new FileInputStream(diff));
+			} else {
+				fis = new FileInputStream(diff);
+			}
 			XmlPullParser parser = PlatformUtil.newXMLPullParser();
 			parser.setInput(fis, "UTF-8");
 			int tok;
