@@ -214,14 +214,12 @@ public class ObfDiffGenerator {
 						boolean osmchangeIsMissing = deletedObjIds == null;
 						if (!osmchangeIsMissing && deletedObjIds.contains(thisEntityId)) {
 							// Object with this id is not present in the second obf & was deleted according to diff
-							BinaryMapDataObject obj = new BinaryMapDataObject(idx, objS.getCoordinates(), null,
-									objS.getObjectType(), objS.isArea(), new int[] { deleteId }, null);
+							BinaryMapDataObject obj = generateDeletedMapObject(deleteId, idx, objS);
 							endData.put(idx, obj);	
 							
 												
 						} else if (osmchangeIsMissing) {
-							BinaryMapDataObject obj = new BinaryMapDataObject(idx, objS.getCoordinates(), null,
-									objS.getObjectType(), objS.isArea(), new int[] { deleteId }, null);
+							BinaryMapDataObject obj = generateDeletedMapObject(deleteId, idx, objS);
 							endData.put(idx, obj);
 						}
 					} else if (objE.compareBinary(objS, COORDINATES_PRECISION_COMPARE)) {
@@ -236,6 +234,12 @@ public class ObfDiffGenerator {
 			}
 		}
 
+	}
+
+	private BinaryMapDataObject generateDeletedMapObject(int deleteId, Long idx, BinaryMapDataObject objS) {
+		BinaryMapDataObject obj = new BinaryMapDataObject(idx, objS.getCoordinates(), null,
+				objS.getObjectType(), objS.isArea(), new int[] { deleteId }, null);
+		return obj;
 	}
 	
 	private EntityId getMapEntityId(long id) {
@@ -289,18 +293,10 @@ public class ObfDiffGenerator {
 					boolean osmchangeIsMissing = deletedObjIds == null;
 					if (!osmchangeIsMissing && deletedObjIds.contains(wayId)) {
 						// Object with this id is not present in the second obf
-						RouteDataObject rdo = new RouteDataObject(ri);
-						rdo.id = objS.id;
-						rdo.pointsX = objS.pointsX;
-						rdo.pointsY = objS.pointsY;
-						rdo.types = new int[] { deleteId };
+						RouteDataObject rdo = generateDeletedRouteObject(ri, deleteId, objS);
 						endData.put(idx, rdo);
 					} else if (osmchangeIsMissing) {
-						RouteDataObject rdo = new RouteDataObject(ri);
-						rdo.id = objS.id;
-						rdo.pointsX = objS.pointsX;
-						rdo.pointsY = objS.pointsY;
-						rdo.types = new int[] { deleteId };
+						RouteDataObject rdo = generateDeletedRouteObject(ri, deleteId, objS);
 						endData.put(idx, rdo);
 					}
 					
@@ -314,6 +310,15 @@ public class ObfDiffGenerator {
 				System.out.println("Route " + e.getId() + " is missing in (1): " + e);
 			}
 		}
+	}
+
+	private RouteDataObject generateDeletedRouteObject(RouteRegion ri, int deleteId, RouteDataObject objS) {
+		RouteDataObject rdo = new RouteDataObject(ri);
+		rdo.id = objS.id;
+		rdo.pointsX = objS.pointsX;
+		rdo.pointsY = objS.pointsY;
+		rdo.types = new int[] { deleteId };
+		return rdo;
 	}
 	
 	private static class DiffParser {
