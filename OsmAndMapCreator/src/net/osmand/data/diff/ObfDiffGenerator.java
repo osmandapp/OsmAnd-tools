@@ -211,16 +211,11 @@ public class ObfDiffGenerator {
 					}
 				} else {
 					if (objE == null) {
-						if (deletedObjIds == null) {
+						if (deletedObjIds == null || deletedObjIds.contains(thisEntityId)) {
 							BinaryMapDataObject obj = new BinaryMapDataObject(idx, objS.getCoordinates(), null,
 									objS.getObjectType(), objS.isArea(), new int[] { deleteId }, null);
 							endData.put(idx, obj);
-						} else if (deletedObjIds.contains(thisEntityId)) {
-							// Object with this id is not present in the second obf & was deleted according to diff
-							BinaryMapDataObject obj = new BinaryMapDataObject(idx, objS.getCoordinates(), null,
-									objS.getObjectType(), objS.isArea(), new int[] { deleteId }, null);
-							endData.put(idx, obj);	
-						}
+						} 
 					} else if (objE.compareBinary(objS, COORDINATES_PRECISION_COMPARE)) {
 						endData.remove(idx);
 					}
@@ -283,15 +278,10 @@ public class ObfDiffGenerator {
 			} else {
 				if (objE == null) {
 					EntityId wayId = new EntityId(EntityType.WAY, idx >> (BinaryInspector.SHIFT_ID));
-					if (deletedObjIds == null) {
-						RouteDataObject rdo = generateDeletedRouteObject(ri, deleteId, objS);
-						endData.put(idx, rdo);
-					} else if (deletedObjIds.contains(wayId)) {
-						// Object with this id is not present in the second obf
+					if (deletedObjIds == null || deletedObjIds.contains(wayId)) {
 						RouteDataObject rdo = generateDeletedRouteObject(ri, deleteId, objS);
 						endData.put(idx, rdo);
 					}
-					
 				} else if (objE.compareRoute(objS)) {
 					endData.remove(idx);
 				}
