@@ -142,8 +142,9 @@ public class ObfDiffGenerator {
 						if (endPoiSource.get(objS.getId()) == null) {
 							endPoiSource.put(objS.getId(), new TreeMap<String, Amenity>());
 						}
+						endPoiSource.get(objS.getId()).put(objS.getType().getKeyName(), objS);
 					}
-					endPoiSource.get(objS.getId()).put(objS.getType().getKeyName(), objS);
+					
 				} else {
 					if (objS.comparePoi(objE)) {
 						endPoi.remove(idx);
