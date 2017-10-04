@@ -212,14 +212,15 @@ public class ObfDiffGenerator {
 					}
 				} else {
 					if (objE == null) {
-						if ((deletedObjIds != null) ? deletedObjIds.contains(thisEntityId) : false) {
+						boolean osmchangeIsMissing = deletedObjIds == null;
+						if (!osmchangeIsMissing && deletedObjIds.contains(thisEntityId)) {
 							// Object with this id is not present in the second obf & was deleted according to diff
 							BinaryMapDataObject obj = new BinaryMapDataObject(idx, objS.getCoordinates(), null,
 									objS.getObjectType(), objS.isArea(), new int[] { deleteId }, null);
 							endData.put(idx, obj);	
 							
 												
-						} else {
+						} else if (osmchangeIsMissing) {
 							BinaryMapDataObject obj = new BinaryMapDataObject(idx, objS.getCoordinates(), null,
 									objS.getObjectType(), objS.isArea(), new int[] { deleteId }, null);
 							endData.put(idx, obj);
@@ -241,12 +242,12 @@ public class ObfDiffGenerator {
 	private EntityId getMapEntityId(long id) {
 		if (id < ID_TYPE) {
 			if ((id % 2) == 0) {
-				return new EntityId(EntityType.WAY, id >> (BinaryInspector.SHIFT_ID + 1));
-			} else {
 				return new EntityId(EntityType.NODE, id >> (BinaryInspector.SHIFT_ID + 1));
+			} else {
+				return new EntityId(EntityType.WAY, id >> (BinaryInspector.SHIFT_ID + 1));
 			}
 		}
-		return new EntityId(EntityType.RELATION, id >> (BinaryInspector.SHIFT_ID + 1));
+		return null;
 	}
 
 	private String toString(BinaryMapDataObject objS) {
