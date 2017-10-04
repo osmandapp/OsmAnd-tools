@@ -32,13 +32,12 @@ import net.osmand.osm.edit.Entity.EntityType;
 import rtree.RTreeException;
 
 public class ObfDiffGenerator {
-	private static final long ID_TYPE = 1l << 41l;
+	private static final long ID_MULTIPOLYGON_LIMIT = 1l << 41l;
 
 	private static final int COORDINATES_PRECISION_COMPARE = 0;
 	
 	private static final String OSMAND_CHANGE_VALUE = "delete";
 	private static final String OSMAND_CHANGE_TAG = "osmand_change";
-	public static final long BUFFER_SIZE = 1 << 41;
 	
 	public static void main(String[] args) throws IOException, RTreeException {
 		if(args.length == 1 && args[0].equals("test")) {
@@ -97,7 +96,7 @@ public class ObfDiffGenerator {
 
 		System.out.println("Comparing the files...");
 		compareMapData(fStart, fEnd, result == null, deletedObjIds);
-		compareRouteData(fStart, fEnd, result == null);
+		compareRouteData(fStart, fEnd, result == null, deletedObjIds);
 		comparePOI(fStart, fEnd, result == null);
 		// TODO Compare Transport
 		//compareTransport(fStart, fEnd);
@@ -240,7 +239,7 @@ public class ObfDiffGenerator {
 	}
 	
 	private EntityId getMapEntityId(long id) {
-		if (id < ID_TYPE) {
+		if (id < ID_MULTIPOLYGON_LIMIT) {
 			if ((id % 2) == 0) {
 				return new EntityId(EntityType.NODE, id >> (BinaryInspector.SHIFT_ID + 1));
 			} else {
@@ -256,7 +255,7 @@ public class ObfDiffGenerator {
 		return s.toString();
 	}
 
-	private void compareRouteData(ObfFileInMemory fStart, ObfFileInMemory fEnd, boolean print) {
+	private void compareRouteData(ObfFileInMemory fStart, ObfFileInMemory fEnd, boolean print, Set<EntityId> deletedObjIds) {
 		RouteRegion ri = fEnd.getRouteIndex();
 		int deleteId = ri.searchRouteEncodingRule(OSMAND_CHANGE_TAG, OSMAND_CHANGE_VALUE);
 		if (deleteId == -1) {
@@ -286,13 +285,25 @@ public class ObfDiffGenerator {
 				}
 			} else {
 				if (objE == null) {
-					// Object with this id is not present in the second obf
-					RouteDataObject rdo = new RouteDataObject(ri);
-					rdo.id = objS.id;
-					rdo.pointsX = objS.pointsX;
-					rdo.pointsY = objS.pointsY;
-					rdo.types = new int[] { deleteId };
-					endData.put(idx, rdo);
+					EntityId wayId = new EntityId(EntityType.WAY, idx >> (BinaryInspector.SHIFT_ID));
+					boolean osmchangeIsMissing = deletedObjIds == null;
+					if (!osmchangeIsMissing && deletedObjIds.contains(wayId)) {
+						// Object with this id is not present in the second obf
+						RouteDataObject rdo = new RouteDataObject(ri);
+						rdo.id = objS.id;
+						rdo.pointsX = objS.pointsX;
+						rdo.pointsY = objS.pointsY;
+						rdo.types = new int[] { deleteId };
+						endData.put(idx, rdo);
+					} else if (osmchangeIsMissing) {
+						RouteDataObject rdo = new RouteDataObject(ri);
+						rdo.id = objS.id;
+						rdo.pointsX = objS.pointsX;
+						rdo.pointsY = objS.pointsY;
+						rdo.types = new int[] { deleteId };
+						endData.put(idx, rdo);
+					}
+					
 				} else if (objE.compareRoute(objS)) {
 					endData.remove(idx);
 				}
