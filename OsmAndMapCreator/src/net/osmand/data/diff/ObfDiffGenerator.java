@@ -85,9 +85,18 @@ public class ObfDiffGenerator {
 		fStart.readObfFiles(Collections.singletonList(start));
 		ObfFileInMemory fEnd = new ObfFileInMemory();
 		fEnd.readObfFiles(Collections.singletonList(end));
+		
+		Set<EntityId> deletedObjIds = null;
+		if (diff != null) {
+			try {
+				deletedObjIds = DiffParser.fetchDeletedIds(diff);
+			} catch (IOException | XmlPullParserException e) {
+				e.printStackTrace();
+			}
+		}
 
 		System.out.println("Comparing the files...");
-		compareMapData(fStart, fEnd, result == null, diff);
+		compareMapData(fStart, fEnd, result == null, deletedObjIds);
 		compareRouteData(fStart, fEnd, result == null);
 		comparePOI(fStart, fEnd, result == null);
 		// TODO Compare Transport
@@ -166,17 +175,9 @@ public class ObfDiffGenerator {
 	}
 
 
-	private void compareMapData(ObfFileInMemory fStart, ObfFileInMemory fEnd, boolean print, File diff) {
+	private void compareMapData(ObfFileInMemory fStart, ObfFileInMemory fEnd, boolean print, Set<EntityId> deletedObjIds) {
 		fStart.filterAllZoomsBelow(13);
-		fEnd.filterAllZoomsBelow(13);
-		Set<EntityId> deletedObjIds = new HashSet<>();
-		if (diff != null) {
-			try {
-				deletedObjIds = DiffParser.fetchDeletedIds(diff);
-			} catch (IOException | XmlPullParserException e) {
-				e.printStackTrace();
-			}
-		}		
+		fEnd.filterAllZoomsBelow(13);		
 		MapIndex mi = fEnd.getMapIndex();
 		int deleteId;
 		Integer rl = mi.getRule(OSMAND_CHANGE_TAG, OSMAND_CHANGE_VALUE);
@@ -211,13 +212,14 @@ public class ObfDiffGenerator {
 					}
 				} else {
 					if (objE == null) {
-						if (!deletedObjIds.isEmpty()) {
+						if (deletedObjIds != null) {
 							if (deletedObjIds.contains(thisEntityId)) {
 								// Object with this id is not present in the second obf & was deleted according to diff
 								BinaryMapDataObject obj = new BinaryMapDataObject(idx, objS.getCoordinates(), null,
 										objS.getObjectType(), objS.isArea(), new int[] { deleteId }, null);
-								endData.put(idx, obj);
+								endData.put(idx, obj);	
 							}
+												
 						} else {
 							BinaryMapDataObject obj = new BinaryMapDataObject(idx, objS.getCoordinates(), null,
 									objS.getObjectType(), objS.isArea(), new int[] { deleteId }, null);
