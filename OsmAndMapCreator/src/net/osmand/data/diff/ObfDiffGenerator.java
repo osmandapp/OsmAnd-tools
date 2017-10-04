@@ -211,16 +211,15 @@ public class ObfDiffGenerator {
 					}
 				} else {
 					if (objE == null) {
-						boolean osmchangeIsMissing = deletedObjIds == null;
-						if (!osmchangeIsMissing && deletedObjIds.contains(thisEntityId)) {
-							// Object with this id is not present in the second obf & was deleted according to diff
-							BinaryMapDataObject obj = generateDeletedMapObject(deleteId, idx, objS);
-							endData.put(idx, obj);	
-							
-												
-						} else if (osmchangeIsMissing) {
-							BinaryMapDataObject obj = generateDeletedMapObject(deleteId, idx, objS);
+						if (deletedObjIds == null) {
+							BinaryMapDataObject obj = new BinaryMapDataObject(idx, objS.getCoordinates(), null,
+									objS.getObjectType(), objS.isArea(), new int[] { deleteId }, null);
 							endData.put(idx, obj);
+						} else if (deletedObjIds.contains(thisEntityId)) {
+							// Object with this id is not present in the second obf & was deleted according to diff
+							BinaryMapDataObject obj = new BinaryMapDataObject(idx, objS.getCoordinates(), null,
+									objS.getObjectType(), objS.isArea(), new int[] { deleteId }, null);
+							endData.put(idx, obj);	
 						}
 					} else if (objE.compareBinary(objS, COORDINATES_PRECISION_COMPARE)) {
 						endData.remove(idx);
@@ -236,13 +235,7 @@ public class ObfDiffGenerator {
 
 	}
 
-	private BinaryMapDataObject generateDeletedMapObject(int deleteId, Long idx, BinaryMapDataObject objS) {
-		BinaryMapDataObject obj = new BinaryMapDataObject(idx, objS.getCoordinates(), null,
-				objS.getObjectType(), objS.isArea(), new int[] { deleteId }, null);
-		return obj;
-	}
-	
-	private EntityId getMapEntityId(long id) {
+		private EntityId getMapEntityId(long id) {
 		if (id < ID_MULTIPOLYGON_LIMIT) {
 			if ((id % 2) == 0) {
 				return new EntityId(EntityType.NODE, id >> (BinaryInspector.SHIFT_ID + 1));
@@ -290,12 +283,11 @@ public class ObfDiffGenerator {
 			} else {
 				if (objE == null) {
 					EntityId wayId = new EntityId(EntityType.WAY, idx >> (BinaryInspector.SHIFT_ID));
-					boolean osmchangeIsMissing = deletedObjIds == null;
-					if (!osmchangeIsMissing && deletedObjIds.contains(wayId)) {
-						// Object with this id is not present in the second obf
+					if (deletedObjIds == null) {
 						RouteDataObject rdo = generateDeletedRouteObject(ri, deleteId, objS);
 						endData.put(idx, rdo);
-					} else if (osmchangeIsMissing) {
+					} else if (deletedObjIds.contains(wayId)) {
+						// Object with this id is not present in the second obf
 						RouteDataObject rdo = generateDeletedRouteObject(ri, deleteId, objS);
 						endData.put(idx, rdo);
 					}
