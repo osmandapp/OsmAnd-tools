@@ -85,19 +85,19 @@ public class ObfDiffGenerator {
 		ObfFileInMemory fEnd = new ObfFileInMemory();
 		fEnd.readObfFiles(Collections.singletonList(end));
 		
-		Set<EntityId> deletedObjIds = null;
+		Set<EntityId> modifiedObjIds = null;
 		if (diff != null) {
 			try {
-				deletedObjIds = DiffParser.fetchDeletedIds(diff);
+				modifiedObjIds = DiffParser.fetchModifiedIds(diff);
 			} catch (IOException | XmlPullParserException e) {
 				e.printStackTrace();
 			}
 		}
 
 		System.out.println("Comparing the files...");
-		compareMapData(fStart, fEnd, result == null, deletedObjIds);
-		compareRouteData(fStart, fEnd, result == null, deletedObjIds);
-		comparePOI(fStart, fEnd, result == null);
+		compareMapData(fStart, fEnd, result == null, modifiedObjIds);
+		compareRouteData(fStart, fEnd, result == null, modifiedObjIds);
+		comparePOI(fStart, fEnd, result == null, modifiedObjIds);
 		// TODO Compare Transport
 		//compareTransport(fStart, fEnd);
 		
@@ -110,7 +110,7 @@ public class ObfDiffGenerator {
 		}
 	}
 	
-	private void comparePOI(ObfFileInMemory fStart, ObfFileInMemory fEnd, boolean print) {
+	private void comparePOI(ObfFileInMemory fStart, ObfFileInMemory fEnd, boolean print, Set<EntityId> modifiedObjIds) {
 	 	TLongObjectHashMap<Map<String, Amenity>> startPoiSource = fStart.getPoiObjects();
 	 	TLongObjectHashMap<Map<String, Amenity>> endPoiSource = fEnd.getPoiObjects();
 	 	if (endPoiSource == null) {
@@ -124,6 +124,7 @@ public class ObfDiffGenerator {
 		for (String idx : startPoi.keySet()) {
 			Amenity objE = endPoi.get(idx);
 			Amenity objS = startPoi.get(idx);
+			EntityId aid = getAmenityId(objS);
 			if (print) {
 				if (objE == null) {
 					System.out.println("POI " + idx + " is missing in (2): " + objS);
@@ -135,10 +136,12 @@ public class ObfDiffGenerator {
 				}
 			} else {
 				if (objE == null) {
-					objS.setAdditionalInfo(OSMAND_CHANGE_TAG, OSMAND_CHANGE_VALUE);
-					endPoi.put(idx, objS);
-					if (endPoiSource.get(objS.getId()) == null) {
-						endPoiSource.put(objS.getId(), new TreeMap<String, Amenity>());
+					if (modifiedObjIds == null || modifiedObjIds.contains(aid)) {
+						objS.setAdditionalInfo(OSMAND_CHANGE_TAG, OSMAND_CHANGE_VALUE);
+						endPoi.put(idx, objS);
+						if (endPoiSource.get(objS.getId()) == null) {
+							endPoiSource.put(objS.getId(), new TreeMap<String, Amenity>());
+						}
 					}
 					endPoiSource.get(objS.getId()).put(objS.getType().getKeyName(), objS);
 				} else {
@@ -160,6 +163,8 @@ public class ObfDiffGenerator {
 	 	
 	 }
 
+	
+
 	private Map<String, Amenity> buildPoiMap(TLongObjectHashMap<Map<String, Amenity>> startPoiSource) {
 		HashMap<String, Amenity> map = new HashMap<>();
 		for (Map<String, Amenity> am : startPoiSource.valueCollection()) {
@@ -174,7 +179,7 @@ public class ObfDiffGenerator {
 	}
 
 
-	private void compareMapData(ObfFileInMemory fStart, ObfFileInMemory fEnd, boolean print, Set<EntityId> deletedObjIds) {
+	private void compareMapData(ObfFileInMemory fStart, ObfFileInMemory fEnd, boolean print, Set<EntityId> modifiedObjIds) {
 		fStart.filterAllZoomsBelow(13);
 		fEnd.filterAllZoomsBelow(13);		
 		MapIndex mi = fEnd.getMapIndex();
@@ -211,7 +216,7 @@ public class ObfDiffGenerator {
 					}
 				} else {
 					if (objE == null) {
-						if (deletedObjIds == null || deletedObjIds.contains(thisEntityId)) {
+						if (modifiedObjIds == null || modifiedObjIds.contains(thisEntityId)) {
 							BinaryMapDataObject obj = new BinaryMapDataObject(idx, objS.getCoordinates(), null,
 									objS.getObjectType(), objS.isArea(), new int[] { deleteId }, null);
 							endData.put(idx, obj);
@@ -230,8 +235,20 @@ public class ObfDiffGenerator {
 
 	}
 
-		private EntityId getMapEntityId(long id) {
-		if (id < ID_MULTIPOLYGON_LIMIT) {
+	private EntityId getAmenityId(Amenity objS) {
+		Long id = objS.getId();
+		if (id < ID_MULTIPOLYGON_LIMIT && id > 0) {
+			if ((id % 2) == 0) {
+				return new EntityId(EntityType.NODE, id >> 1);
+			} else {
+				return new EntityId(EntityType.WAY, id >> 1);
+			}
+		}
+		return null;
+	}
+	
+	private EntityId getMapEntityId(long id) {
+		if (id < ID_MULTIPOLYGON_LIMIT && id > 0) {
 			if ((id % 2) == 0) {
 				return new EntityId(EntityType.NODE, id >> (BinaryInspector.SHIFT_ID + 1));
 			} else {
@@ -247,7 +264,7 @@ public class ObfDiffGenerator {
 		return s.toString();
 	}
 
-	private void compareRouteData(ObfFileInMemory fStart, ObfFileInMemory fEnd, boolean print, Set<EntityId> deletedObjIds) {
+	private void compareRouteData(ObfFileInMemory fStart, ObfFileInMemory fEnd, boolean print, Set<EntityId> modifiedObjIds) {
 		RouteRegion ri = fEnd.getRouteIndex();
 		int deleteId = ri.searchRouteEncodingRule(OSMAND_CHANGE_TAG, OSMAND_CHANGE_VALUE);
 		if (deleteId == -1) {
@@ -278,7 +295,7 @@ public class ObfDiffGenerator {
 			} else {
 				if (objE == null) {
 					EntityId wayId = new EntityId(EntityType.WAY, idx >> (BinaryInspector.SHIFT_ID));
-					if (deletedObjIds == null || deletedObjIds.contains(wayId)) {
+					if (modifiedObjIds == null || modifiedObjIds.contains(wayId)) {
 						RouteDataObject rdo = generateDeletedRouteObject(ri, deleteId, objS);
 						endData.put(idx, rdo);
 					}
@@ -309,40 +326,23 @@ public class ObfDiffGenerator {
 		private static final String TYPE_RELATION = "relation";
 		private static final String TYPE_WAY = "way";
 		private static final String TYPE_NODE = "node";
-		private static final String TYPE_ATTR_VALUE = "delete";
-		private static final String TYPE_ATTR = "type";
-		private static EntityId currentParsedEntity;
 
-		public static Set<EntityId> fetchDeletedIds(File diff) throws IOException, XmlPullParserException {
+		public static Set<EntityId> fetchModifiedIds(File diff) throws IOException, XmlPullParserException {
 			Set<EntityId> result = new HashSet<>();
 			InputStream fis = new FileInputStream(diff);
 			XmlPullParser parser = PlatformUtil.newXMLPullParser();
 			parser.setInput(fis, "UTF-8");
 			int tok;
-			boolean parsing = false;
-			
 			while ((tok = parser.next()) != XmlPullParser.END_DOCUMENT) {
 				if (tok == XmlPullParser.START_TAG ) {
-					if (parser.getAttributeValue("", TYPE_ATTR) != null) {
-						if (parser.getAttributeValue("", TYPE_ATTR).equals(TYPE_ATTR_VALUE)) {
-							parsing = true;
-						}
-					}
 					String name = parser.getName();
-					if (TYPE_NODE.equals(name) && parsing) {
-						currentParsedEntity = new EntityId(EntityType.NODE, parseLong(parser, ATTR_ID, -1));
-						
-					} else if (TYPE_WAY.equals(name) && parsing) {
-						currentParsedEntity = new EntityId(EntityType.WAY, parseLong(parser, ATTR_ID, -1));
-					} else if (TYPE_RELATION.equals(name) && parsing) {
-						currentParsedEntity = new EntityId(EntityType.RELATION, parseLong(parser, ATTR_ID, -1));
+					if (TYPE_NODE.equals(name)) {
+						result.add(new EntityId(EntityType.NODE, parseLong(parser, ATTR_ID, -1)));
+					} else if (TYPE_WAY.equals(name) ) {
+						result.add(new EntityId(EntityType.WAY, parseLong(parser, ATTR_ID, -1)));
+					} else if (TYPE_RELATION.equals(name)) {
+						result.add(new EntityId(EntityType.RELATION, parseLong(parser, ATTR_ID, -1)));
 					}	
-				} else if (tok == XmlPullParser.END_TAG) {
-					parsing = false;
-					if (currentParsedEntity != null) {
-						result.add(currentParsedEntity);
-						currentParsedEntity = null;
-					}
 				}
 			}
 			return result;
