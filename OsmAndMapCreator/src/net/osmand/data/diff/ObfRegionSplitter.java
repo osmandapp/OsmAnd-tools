@@ -16,6 +16,7 @@ import net.osmand.binary.MapZooms.MapZoomPair;
 import net.osmand.binary.RouteDataObject;
 import net.osmand.data.Amenity;
 import net.osmand.map.OsmandRegions;
+import net.osmand.map.WorldRegion;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
@@ -115,7 +116,8 @@ public class ObfRegionSplitter {
  			for (BinaryMapDataObject b : l) {
  				if (osmandRegions.contain(b, x, y)) {
  					String dw = osmandRegions.getDownloadName(b);
- 					if (!Algorithms.isEmpty(dw) && osmandRegions.isDownloadOfType(b, OsmandRegions.MAP_TYPE)) {
+					WorldRegion wr = osmandRegions.getRegionDataByDownloadName(dw);
+					if (!Algorithms.isEmpty(dw) && wr.isRegionMapDownload()) {
  						TLongObjectHashMap<Map<String, Amenity>> mp = result.get(dw);
  						if (mp == null) {
  							mp = new TLongObjectHashMap<>();
@@ -143,7 +145,8 @@ public class ObfRegionSplitter {
 			for (BinaryMapDataObject b : l) {
 				if (osmandRegions.contain(b, x, y)) {
 					String dw = osmandRegions.getDownloadName(b);
-					if (!Algorithms.isEmpty(dw) && osmandRegions.isDownloadOfType(b, OsmandRegions.MAP_TYPE)) {
+					WorldRegion wr = osmandRegions.getRegionDataByDownloadName(dw);
+					if (!Algorithms.isEmpty(dw) && wr.isRegionMapDownload()) {
 						TLongObjectHashMap<RouteDataObject> mp = result.get(dw);
 						if (mp == null) {
 							mp = new TLongObjectHashMap<>();
@@ -169,7 +172,8 @@ public class ObfRegionSplitter {
 				for (BinaryMapDataObject b : l) {
 					if (osmandRegions.contain(b, x, y)) {
 						String dw = osmandRegions.getDownloadName(b);
-						if (!Algorithms.isEmpty(dw) && osmandRegions.isDownloadOfType(b, OsmandRegions.MAP_TYPE)) {
+						WorldRegion wr = osmandRegions.getRegionDataByDownloadName(dw);
+						if (!Algorithms.isEmpty(dw) && wr.isRegionMapDownload()) {
 							Map<MapZoomPair, TLongObjectHashMap<BinaryMapDataObject>> mp = result.get(dw);
 							if(mp == null) {
 								mp = new LinkedHashMap<>();
