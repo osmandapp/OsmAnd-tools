@@ -115,7 +115,7 @@ public class ObfRegionSplitter {
  			List<BinaryMapDataObject> l = osmandRegions.query(x, y);
  			for (BinaryMapDataObject b : l) {
  				if (osmandRegions.contain(b, x, y)) {
- 					String dw = osmandRegions.getDownloadName(b);
+ 					String dw = osmandRegions.getDownloadName(b) == null ? "" : osmandRegions.getDownloadName(b);
 					WorldRegion wr = osmandRegions.getRegionDataByDownloadName(dw);
 					if (!Algorithms.isEmpty(dw) && wr.isRegionMapDownload()) {
  						TLongObjectHashMap<Map<String, Amenity>> mp = result.get(dw);
@@ -144,7 +144,7 @@ public class ObfRegionSplitter {
 			List<BinaryMapDataObject> l = osmandRegions.query(x, y);
 			for (BinaryMapDataObject b : l) {
 				if (osmandRegions.contain(b, x, y)) {
-					String dw = osmandRegions.getDownloadName(b);
+					String dw = osmandRegions.getDownloadName(b) == null ? "" : osmandRegions.getDownloadName(b);
 					WorldRegion wr = osmandRegions.getRegionDataByDownloadName(dw);
 					if (!Algorithms.isEmpty(dw) && wr.isRegionMapDownload()) {
 						TLongObjectHashMap<RouteDataObject> mp = result.get(dw);
@@ -171,7 +171,7 @@ public class ObfRegionSplitter {
 				List<BinaryMapDataObject> l = osmandRegions.query(x, y);
 				for (BinaryMapDataObject b : l) {
 					if (osmandRegions.contain(b, x, y)) {
-						String dw = osmandRegions.getDownloadName(b);
+						String dw = osmandRegions.getDownloadName(b) == null ? "" : osmandRegions.getDownloadName(b);
 						WorldRegion wr = osmandRegions.getRegionDataByDownloadName(dw);
 						if (!Algorithms.isEmpty(dw) && wr.isRegionMapDownload()) {
 							Map<MapZoomPair, TLongObjectHashMap<BinaryMapDataObject>> mp = result.get(dw);
