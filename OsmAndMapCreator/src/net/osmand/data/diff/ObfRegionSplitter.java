@@ -117,7 +117,7 @@ public class ObfRegionSplitter {
  				if (osmandRegions.contain(b, x, y)) {
  					String dw = osmandRegions.getDownloadName(b);
  					WorldRegion wr = osmandRegions.getRegionDataByDownloadName(dw);
- 					if (wr == null) {
+ 					if (dw == null || wr == null) {
 						continue;
 					}
 					if (!Algorithms.isEmpty(dw) && wr.isRegionMapDownload()) {
@@ -149,7 +149,7 @@ public class ObfRegionSplitter {
 				if (osmandRegions.contain(b, x, y)) {
 					String dw = osmandRegions.getDownloadName(b);
 					WorldRegion wr = osmandRegions.getRegionDataByDownloadName(dw);
-					if (wr == null) {
+					if (dw == null || wr == null) {
 						continue;
 					}
 					if (!Algorithms.isEmpty(dw) && wr.isRegionMapDownload()) {
@@ -179,7 +179,7 @@ public class ObfRegionSplitter {
 					if (osmandRegions.contain(b, x, y)) {
 						String dw = osmandRegions.getDownloadName(b);
 						WorldRegion wr = osmandRegions.getRegionDataByDownloadName(dw);
-						if (wr == null) {
+						if (dw == null || wr == null) {
 							continue;
 						}
 						if (!Algorithms.isEmpty(dw) && wr.isRegionMapDownload()) {
