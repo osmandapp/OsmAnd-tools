@@ -20,8 +20,8 @@ conn = psycopg2.connect(conn_string)
 c = conn.cursor()
 
 max_query_1 = 99
-max_cnt = 3
-lines = ["", "", ""]
+max_cnt = 10
+lines = ["", "", "", "", "", "", "", "", "", ""]
 max_query_changeset = max_cnt * max_query_1
 lndind = 0
 values = 0
