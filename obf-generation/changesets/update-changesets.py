@@ -118,7 +118,7 @@ for line in lines:
 	conn.commit()
 if maxdate is not None:
 	print 'Max date ' + maxdate
-else
+else:
 	raise Exception('Nothing was processed!')
 
 
