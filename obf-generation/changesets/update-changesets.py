@@ -20,18 +20,12 @@ conn = psycopg2.connect(conn_string)
 c = conn.cursor()
 
 max_query_1 = 99
-max_cnt = 100
+max_cnt = 30
 lines = [
 "", "", "", "", "", "", "", "", "", "",
 "", "", "", "", "", "", "", "", "", "",
-"", "", "", "", "", "", "", "", "", "",
-"", "", "", "", "", "", "", "", "", "",
-"", "", "", "", "", "", "", "", "", "",
-"", "", "", "", "", "", "", "", "", "",
-"", "", "", "", "", "", "", "", "", "",
-"", "", "", "", "", "", "", "", "", "",
-"", "", "", "", "", "", "", "", "", "",
-"", "", "", "", "", "", "", "", "", ""]
+"", "", "", "", "", "", "", "", "", ""
+]
 max_query_changeset = max_cnt * max_query_1
 lndind = 0
 values = 0
@@ -107,11 +101,11 @@ for line in lines:
 								createdby = tg['@v']
 					c.execute("INSERT INTO changesets(id, bot, created_at, closed_at, closed_at_day, "+
 											"minlat, minlon, maxlat, maxlon, username, uid, created_by)" +
-				                        	" VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", 
-				                        	(vl['@id'],0,vl['@created_at'].replace('T', ' '),
-				                         	vl['@closed_at'].replace('T', ' '),vl['@closed_at'][0:10],
-				                         	min_lat, min_lon, max_lat, max_lon,
-				                         	vl['@user'], vl['@uid'], createdby))
+											" VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", 
+											(vl['@id'],0,vl['@created_at'].replace('T', ' '),
+											vl['@closed_at'].replace('T', ' '),vl['@closed_at'][0:10],
+											min_lat, min_lon, max_lat, max_lon,
+											vl['@user'], vl['@uid'], createdby))
 					#v =  u' - '.join([vl['@id'], vl['@user'], vl['@closed_at']])
 					#print v;
 					if maxdate is None:
@@ -124,6 +118,8 @@ for line in lines:
 	conn.commit()
 if maxdate is not None:
 	print 'Max date ' + maxdate
+else
+	raise Exception('Nothing was processed!')
 
 
 # OLD CODE
