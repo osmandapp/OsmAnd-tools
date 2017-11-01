@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -xe
 if [ -z "$PERIOD" ]; then 
   PERIOD=$(date -d "$(date +%Y-%m-01) -1 day" "+%Y-%m")
 fi
