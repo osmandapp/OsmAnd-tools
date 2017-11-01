@@ -21,7 +21,7 @@ CREATE INDEX changesets_username_idx on changesets(username);
 CREATE INDEX changesets_country_country_idx on changeset_country(countryid);
 CREATE INDEX changesets_country_changeset_idx on changeset_country(changesetid);
 
-CREATE TABLE final_reports (name text, month text, region text, report text) ;
+CREATE TABLE final_reports (name text, month text, region text, report text, time int) ;
 
 GRANT ALL privileges ON ALL TABLES IN SCHEMA public to <user>;
 GRANT ALL privileges ON supporters_seq to <user>;
