@@ -3,7 +3,7 @@ if [ -z "$PERIOD" ]; then
   PERIOD=$(date -d "$(date +%Y-%m-01) -1 day" "+%Y-%m")
 fi
 DB_NAME=changeset_${PERIOD//-/_}
-cd /var/www-download/reports/
+cd /var/www-download/reports/background
 DUMPNAME=${DB_NAME}
 if [ -z "$EUR_VALUE" ]; then 
   # curl -X POST "http://builder.osmand.net/reports/all_reports.php?month=${PERIOD}&dbmonth=${PERIOD}"
