@@ -30,7 +30,7 @@ public class CalculateCountryForChangesets {
 
 	private static void calculateCountries() throws Exception {
 		// jdbc:postgresql://user:secret@localhost
-		Connection conn = DriverManager.getConnection("jdbc:postgresql://localhost:5432/changeset",
+		Connection conn = DriverManager.getConnection("jdbc:postgresql://localhost:5433/changeset",
 				System.getenv("DB_USER"), System.getenv("DB_PWD"));
 		try {
 			Statement stat = conn.createStatement();
