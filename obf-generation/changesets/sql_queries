@@ -33,10 +33,3 @@ CREATE MATERIALIZED VIEW changeset_country_view AS SELECT * FROM changeset_count
 
 GRANT ALL privileges ON ALL TABLES IN SCHEMA public to <user>;
 GRANT ALL privileges ON supporters_seq to <user>;
-
-
-# SCHEDULE BASH !
-for i in $(ls -d */); do echo $i; rm $i/15_*.osm.gz; done
-for i in $(ls -d */); do echo $i; for t in $(seq 1 9); do rm $i/*_15_*_0$t.obf.gz; done; for t in $(seq 10 31); do rm $i/*_15_*_$t.obf.gz; done; done
-# download
-for t in $(seq 1 9); do rm $i/*_15_*_0$t.obf.gz; done; for t in $(seq 10 31); do rm $i/*_15_*_$t.obf.gz; done
