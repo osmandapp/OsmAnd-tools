@@ -13,7 +13,7 @@ import psycopg2
 
 
 begin_query = 33500000
-conn_string = "host='localhost' dbname='changeset' user='"+os.environ['DB_USER']+"' password='"+os.environ['DB_PWD']+"'"
+conn_string = "host='localhost' port ='5433' dbname='changeset' user='"+os.environ['DB_USER']+"' password='"+os.environ['DB_PWD']+"'"
 conn = psycopg2.connect(conn_string)
 c = conn.cursor()
 

@@ -58,7 +58,7 @@ public class UpdateSubscriptionImpl {
 //		}
 		
 		Class.forName("org.postgresql.Driver");
-		Connection conn = DriverManager.getConnection("jdbc:postgresql://localhost:5432/changeset",
+		Connection conn = DriverManager.getConnection("jdbc:postgresql://localhost:5433/changeset",
 				System.getenv("DB_USER"), System.getenv("DB_PWD"));
 		boolean verifyAll = false;
 		for (int i = 1; i < args.length; i++) {

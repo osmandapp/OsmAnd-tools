@@ -23,6 +23,14 @@ CREATE INDEX changesets_country_changeset_idx on changeset_country(changesetid);
 
 CREATE TABLE final_reports (name text, month text, region text, report text, time int) ;
 
+# CURRENT MONTH MATERIALIZED VIEW
+CREATE MATERIALIZED VIEW changesets_view AS SELECT * FROM changesets where 
+closed_at > ( (SELECT max(closed_at) FROM changesets)::date - '60 day'::interval) WITH DATA;
+CREATE MATERIALIZED VIEW changeset_country_view AS SELECT * FROM changeset_country c where exists (select 1 from changesets_view d where d.id = c.changesetid) WITH DATA;
+# REFRESH MATERIALIZED VIEW  changesets_view ;
+# REFRESH MATERIALIZED VIEW  changeset_country_view ;
+
+
 GRANT ALL privileges ON ALL TABLES IN SCHEMA public to <user>;
 GRANT ALL privileges ON supporters_seq to <user>;
 
