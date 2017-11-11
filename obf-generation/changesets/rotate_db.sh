@@ -6,7 +6,7 @@ if [ -z "$PERIOD" ]; then
 fi
 DB_NAME=changeset_${PERIOD//-/_}
 PSQL="/usr/lib/postgresql/9.3/bin"
-$PSQL/psql -p 5433 -d changeset -U $DB_USER -c "DROP DATABASE $DB_NAME" || true;
+# $PSQL/psql -p 5433 -d changeset -U $DB_USER -c "DROP DATABASE $DB_NAME" || true;
 $PSQL/psql -p 5433 -d changeset -U $DB_USER -c "CREATE DATABASE $DB_NAME OWNER $DB_USER TABLESPACE changeset";
 $PSQL/pg_dump -p 5433 -U $DB_USER -v -F t -f $DB_NAME.tar changeset
 $PSQL/pg_restore -p 5433 -n public -U $DB_USER -v $DB_NAME.tar -d $DB_NAME
