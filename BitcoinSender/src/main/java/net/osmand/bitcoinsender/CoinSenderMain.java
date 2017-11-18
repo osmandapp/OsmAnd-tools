@@ -42,12 +42,12 @@ public class CoinSenderMain {
         pass = in.nextLine();
         System.out.print("Enter full path to JSON file: ");
         directory = in.nextLine();
-        System.out.print("Enter your part size (default 80): ");
+        System.out.print("Enter your part size (default "+PART_SIZE+"): ");
         String ll = in.nextLine();
         if(ll.trim().length() > 0) {
         	PART_SIZE = Integer.parseInt(ll);
         }
-        System.out.print("Enter minimal amount to pay (default 0.0005): ");
+        System.out.print("Enter minimal amount to pay (default "+MIN_PAY+"): ");
         ll = in.nextLine();
         if(ll.trim().length() > 0) {
         	MIN_PAY = Double.parseDouble(ll);
@@ -83,8 +83,7 @@ public class CoinSenderMain {
             }
         }
 
-        List<LinkedTreeMap> paymentsList = getPayments(new FileReader(directory));
-        Map<String, Double> payments = convertPaymentsToMap(paymentsList);
+        Map<String, Double> payments = convertPaymentsToMap(getPayments(new FileReader(directory)));
         double allMoney = calculateTotalSum(payments);
 
         List<Map> splitPayment = splitResults(payments);
@@ -211,6 +210,17 @@ public class CoinSenderMain {
                 payments.put(address, btc);
             }
         }
+        double skip = 0;
+        int cnt = 0;
+        for(String addr: new ArrayList<>(payments.keySet())) {
+        	if(payments.get(addr) < MIN_PAY) {
+        		skip += payments.remove(addr);
+        		cnt ++;
+        	}
+        }
+		System.out.println("Skipped " + cnt + " payments ( tx  < minimal = " + MIN_PAY + ") in total " + skip * 1000 + " mBTC");
+        
+        
         return payments;
     }
 
