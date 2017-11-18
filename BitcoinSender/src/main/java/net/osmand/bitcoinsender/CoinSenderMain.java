@@ -21,9 +21,14 @@ public class CoinSenderMain {
     private static String guid;
     private static String pass;
     private static String directory;
-	private static int PART_SIZE = 80;
-	private static double MIN_PAY = 0.0001;
-
+	private static int PART_SIZE = 100;
+	// MIN PAY FORMULA
+	// FEE_KB - avg fee per KB in mBTC, currently 1.0 mBTC/KB
+	// AVG_TX_SIZE - 50 bytes= 0.05 KB
+	// MIN_PAY =  AVG_TX_SIZE * FEE_KB / 10 - Transaction not more than 10% of fees
+	// Currently: MIN_PAY = 1.0 * 0.05 / 10 mBTC = 0.005 mBTC
+	private static double MIN_PAY = 0.001 * 0.005; // 0.005 mBTC: 0.5$ 1 BTC-10000$
+	
     public static void main(String args[]) throws IOException {
 
         if (args.length <= 0) {
