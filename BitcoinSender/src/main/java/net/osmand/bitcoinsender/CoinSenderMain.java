@@ -54,8 +54,6 @@ public class CoinSenderMain {
         }
 
         BlockIO api = new BlockIO(guid);
-        Map<String, Object> recipients = new LinkedHashMap<String, Object>();
-
         System.out.println();
 
         AccountBalance balance = null;
@@ -71,8 +69,6 @@ public class CoinSenderMain {
                 + " Pending: " + balance.getPendingReceivedBalance());
         System.out.println();
 
-
-        Gson gson = new Gson();
         File file = new File(directory);
         if (!file.exists()) {
             while (!file.exists()) {
@@ -81,21 +77,11 @@ public class CoinSenderMain {
                 file = new File(directory);
             }
         }
-        JsonReader reader = new JsonReader(new FileReader(directory));
-        recipients.putAll((Map) gson.fromJson(reader, Map.class));
-        List<LinkedTreeMap> paymentsList = (ArrayList) recipients.get("payments");
-        Map<String, Double> payments = new LinkedHashMap<String, Double>();
-        double allMoney = 0;
-        for (LinkedTreeMap map : paymentsList) {
-            Double btc = (Double) map.get("btc");
-            String address = (String) map.get("btcaddress");
-            allMoney += btc;
-            if (payments.containsKey(address)) {
-                payments.put(address, btc + payments.get(address));
-            } else {
-            	payments.put(address, btc);
-            }
-        }
+
+        List<LinkedTreeMap> paymentsList = getPayments(new FileReader(directory));
+        Map<String, Double> payments = convertPaymentsToMap(paymentsList);
+        double allMoney = calculateTotalSum(payments);
+
         List<Map> splitPayment = splitResults(payments);
         for (Map<String, Double> map : splitPayment) {
             payments.putAll(map);
@@ -197,8 +183,38 @@ public class CoinSenderMain {
             }
 
         }
+    }
 
+    private static double calculateTotalSum(Map<String, Double> payments) {
+        double sum = 0;
+        for (double d : payments.values()) {
+            sum += d;
+        }
+        return sum;
+    }
 
+    public static Map<String, Double> convertPaymentsToMap(List<LinkedTreeMap> paymentsList) {
+        Map<String, Double> payments = new LinkedHashMap<>();
+        for (LinkedTreeMap map : paymentsList) {
+            Double btc = (Double) map.get("btc");
+            String address = (String) map.get("btcaddress");
+            // trim to avoid trailing or starting spaces
+            address = address.trim();
+            if (payments.containsKey(address)) {
+                payments.put(address, btc + payments.get(address));
+            } else {
+                payments.put(address, btc);
+            }
+        }
+        return payments;
+    }
+
+    public static List<LinkedTreeMap> getPayments (FileReader fr) {
+        Gson gson = new Gson();
+        Map<String, Object> recipients = new LinkedHashMap<String, Object>();
+        JsonReader reader = new JsonReader(fr);
+        recipients.putAll((Map) gson.fromJson(reader, Map.class));
+        return (ArrayList) recipients.get("payments");
     }
 
 	private static List splitResults(Map<String, Double> map) {
