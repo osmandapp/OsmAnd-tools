@@ -21,13 +21,13 @@ public class CoinSenderMain {
     private static String guid;
     private static String pass;
     private static String directory;
-	private static int PART_SIZE = 100;
+	public static int PART_SIZE = 100;
 	// MIN PAY FORMULA
 	// FEE_KB - avg fee per KB in mBTC, currently 1.0 mBTC/KB
 	// AVG_TX_SIZE - 50 bytes= 0.05 KB
 	// MIN_PAY =  AVG_TX_SIZE * FEE_KB * 10 - Transaction not more than 10% of fees
 	// Currently: MIN_PAY = 1.0 * 0.05 * 10 mBTC = 0.5 mBTC
-	private static double MIN_PAY = 0.001 * 0.5; // 0.5 mBTC: 5$ 1 BTC-10000$
+	public static double MIN_PAY = 0.001 * 0.5; // 0.5 mBTC: 5$ 1 BTC-10000$
 	
     public static void main(String args[]) throws IOException {
 
@@ -47,7 +47,7 @@ public class CoinSenderMain {
         if(ll.trim().length() > 0) {
         	PART_SIZE = Integer.parseInt(ll);
         }
-        System.out.print("Enter minimal amount to pay (default 0.0001): ");
+        System.out.print("Enter minimal amount to pay (default 0.0005): ");
         ll = in.nextLine();
         if(ll.trim().length() > 0) {
         	MIN_PAY = Double.parseDouble(ll);

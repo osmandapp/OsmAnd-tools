@@ -5,7 +5,7 @@
 # Mobile Tools for Java (J2ME)
 .mtj.tmp/
 cache/
-
+report_underpaid.json
 # Package Files #
 *.jar
 *.war
