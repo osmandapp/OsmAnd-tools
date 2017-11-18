@@ -4,32 +4,12 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>io.block.api</groupId>
-    <artifactId>blockio</artifactId>
+    <groupId>net.osmand</groupId>
+    <artifactId>BitcoinSender</artifactId>
     <version>1.0-SNAPSHOT</version>
-    <name>Block.io Java</name>
+    <name>Bitcoin sender Java</name>
     <description>Java API wrapper for http://block.io</description>
-    <url>https://github.com/langerhans/blockio-java</url>
-
-    <issueManagement>
-        <system>GitHub</system>
-        <url>https://github.com/langerhans/blockio-java/issues</url>
-    </issueManagement>
-
-    <licenses>
-        <license>
-            <name>MIT License</name>
-            <url>http://www.opensource.org/licenses/mit-license.php</url>
-            <distribution>repo</distribution>
-        </license>
-    </licenses>
-
-    <scm>
-        <url>https://github.com/langerhans/blockio-java</url>
-        <connection>scm:git:git://github.com/langerhans/blockio-java.git</connection>
-        <developerConnection>scm:git:git@github.com:langerhans/blockio-java.git</developerConnection>
-    </scm>
-
+    
     <dependencies>
         <dependency>
             <groupId>org.apache.httpcomponents</groupId>

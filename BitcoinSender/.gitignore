@@ -4,6 +4,8 @@
 .settings
 # Mobile Tools for Java (J2ME)
 .mtj.tmp/
+btc_*
+tx_
 
 # Package Files #
 *.jar

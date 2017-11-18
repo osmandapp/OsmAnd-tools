@@ -1,95 +1,116 @@
 package net.osmand.bitcoinsender;
 
-import com.google.gson.*;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.FileReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonIOException;
+import com.google.gson.JsonSyntaxException;
 import com.google.gson.internal.LinkedTreeMap;
 import com.google.gson.stream.JsonReader;
-
-import java.io.*;
-import java.util.*;
 
 public class TransactionAnalyzer {
 
     private static final Gson gson = new GsonBuilder().disableHtmlEscaping().create();
-
-    public static void main(String[] args) throws FileNotFoundException {
-        if (args.length < 3 ) {
-            System.out.println("Usage: <path_to_json_report> <path_to_folder_with_montly_transactions> <path_to_result_json>");
-            System.exit(-1);
-        }
-        List<LinkedTreeMap> paymentsParsed = CoinSenderMain.getPayments(new FileReader(args[0]));
-        Map<String, Double> payments = CoinSenderMain.convertPaymentsToMap(paymentsParsed);
-        payments = filterPayments(payments, 0.0001d);
-        Map<String, Double> payouts = getPayoutsForMonth(args[1]);
-        calculateDebt(payments, payouts, args[2]);
+    private static final int BEGIN_YEAR = 2016;
+	private static final String REPORT_URL = "http://builder.osmand.net/reports/query_month_report.php?report=getPayouts&month=";
+	private static final String TRANSACTIONS = "https://raw.githubusercontent.com/osmandapp/osmandapp.github.io/master/website/reports/transactions.json";
+    public static void main(String[] args) throws IOException {
+    	int FINAL_YEAR = Calendar.getInstance().get(Calendar.YEAR);
+    	int FINAL_MONTH = Calendar.getInstance().get(Calendar.MONTH) ;
+    	if(FINAL_MONTH == 0) {
+    		FINAL_MONTH = 12;
+    		FINAL_YEAR--;
+    	}
+    	System.out.println("Read all transcation ids...");
+    	JsonReader tx = readJsonUrl(TRANSACTIONS, "", "tx_");
+    	Map<String, Double> calculatePayouts = calculatePayouts(tx);
+    	// transactions url 
+    	for(int year = BEGIN_YEAR; year <= FINAL_YEAR; year++) {
+    		int fMonth = year == FINAL_YEAR ? FINAL_MONTH : 12;
+			for (int month = 1; month <= fMonth; month++) {
+				String period = year + "-";
+				if (month < 10) {
+					period += "0";
+				}
+				period += month;
+				System.out.println("Processing " + period + "... ");
+				JsonReader monthPayouts = readJsonUrl(REPORT_URL, period, "payout_");
+				System.out.println(monthPayouts.toString());
+			}
+    	}
+    	// https://chain.so/api/v2/tx/BTC/59703a0e48d1a03031dcc769689f27eb3f8a5480a6dffdd896975b3d994c9b26
+    	//  "address" : "1D1ZKjJRHPq4xWNucSyAzSLJZDZRRKyc9g",
+        // "value" : "0.00010060",
+    	
+    	
     }
 
-    private static Map<String,Double> filterPayments(Map<String, Double> payments, double filter) {
-        Map<String,Double> res = new HashMap<>();
-        for (String key : payments.keySet()) {
-            if (payments.get(key) < filter) {
-                res.put(key, payments.get(key));
-            }
-        }
-        return res;
-    }
+	@SuppressWarnings("unchecked")
+	private static Map<String, Double> calculatePayouts(JsonReader tx) throws JsonIOException, JsonSyntaxException, IOException {
+		Gson gson = new Gson();
+		Map<?, ?> mp = gson.fromJson(tx, Map.class);
+		System.out.println(mp);
+		Map<String, Double> result = new HashMap<>();
+		for(Map.Entry<?, ?> e: mp.entrySet()) {
+			System.out.println("Read transactions for " + e.getKey() +"... ");
+			List<?> array = (List<?>)((Map<?, ?>)e.getValue()).get("transactions");
+			for (Object tid : array) {
+				String turl = "https://blockchain.info/rawtx/" + tid;
+				System.out.println("Read transactions for " + turl + "... ");
+				Map<?, ?> payoutObjects = gson.fromJson(readJsonUrl("https://blockchain.info/rawtx/", tid.toString(), "btc_"), Map.class);
+//				Map<?, ?> data = (Map<?, ?>) payoutObjects.get("data");
+				List<Map<?, ?>> outputs = (List<Map<?, ?>>) payoutObjects.get("out");
+				for (Map<?, ?> payout : outputs) {
+					String address = (String) payout.get("addr");
+					Double sum = (Double) payout.get("value");
+					if (result.containsKey(address)) {
+						result.put(address, result.get(address) + sum);
+					} else {
+						result.put(address, sum);
+					}
+				}
+			}
+		}
+		System.out.println(result);
+		return result;
+	}
 
-    private static Map<String, Double> getPayoutsForMonth(String directory) throws FileNotFoundException {
-        File dir = new File(directory);
-        if (!dir.isDirectory()) {
-            System.out.println(directory + " is not a directory");
-            System.exit(-1);
-        }
-        Map<String, Double> result = new HashMap<>();
+	private static JsonReader readJsonUrl(String urlBase, String id, String cachePrefix) throws IOException {
+		File fl = new File(cachePrefix + id);
+		if(fl.exists()) {
+			return new JsonReader(new FileReader(fl));
+		}
+		URL url = new URL(urlBase + id);
+		InputStream is = url.openStream();
+		ByteArrayOutputStream bous = new ByteArrayOutputStream();
+		byte[] bs = new byte[1024];
+		int l;
+		while ((l = is.read(bs)) != -1) {
+			bous.write(bs, 0, l);
+		}
+		is.close();
+		FileOutputStream fous = new FileOutputStream(fl);
+		fous.write(bous.toByteArray());
+		fous.close();
+		JsonReader reader = new JsonReader(new InputStreamReader(new ByteArrayInputStream(bous.toByteArray())));
+		return reader;
+	}
 
-        for (File f : dir.listFiles()) {
-            Map<String, Object> payoutObjects = new LinkedHashMap<String, Object>();
-            JsonReader reader = new JsonReader(new FileReader(f));
-            payoutObjects.putAll((Map) gson.fromJson(reader, Map.class));
-            LinkedTreeMap data = (LinkedTreeMap) payoutObjects.get("data");
-            List<LinkedTreeMap> outputs = (ArrayList) data.get("outputs");
-            for (LinkedTreeMap payout : outputs) {
-                String address = (String) payout.get("address");
-                Double sum = Double.valueOf((String) payout.get("value"));
-                if (result.containsKey(address)) {
-                    result.put(address, result.get(address) + sum);
-                } else {
-                    result.put(address, sum);
-                }
-            }
 
-        }
-        return result;
-    }
-
-    private static void calculateDebt(Map<String, Double> payments, Map<String, Double> payouts, String pathname) {
-        for (String key : payments.keySet()) {
-            if (payouts.containsKey(key)) {
-                if (payouts.get(key).equals(payments.get(key))) {
-                    payments.remove(key);
-                }
-            }
-        }
-        File f = new File(pathname);
-        BufferedWriter writer = null;
-        try
-        {
-            JsonArray ja = new JsonArray();
-            for (String key : payments.keySet()) {
-                JsonObject el = new JsonObject();
-                el.addProperty(key, payments.get(key));
-                ja.add(el);
-            }
-            JsonObject jo = new JsonObject();
-            jo.add("not_payed", ja);
-            writer = new BufferedWriter( new FileWriter(f));
-            writer.write(jo.toString());
-            writer.close();
-
-        }
-        catch ( IOException e)
-        {
-            e.printStackTrace();
-        }
-    }
+    
 
 }
