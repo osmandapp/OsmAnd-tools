@@ -31,6 +31,8 @@ public class TransactionAnalyzer {
     		setPrettyPrinting().
     		disableHtmlEscaping().
     		create();
+    
+    private static final boolean CACHE_BUILDER_REPORTS = false;
     private static final int BEGIN_YEAR = 2016;
     private static final long BITCOIN_SATOSHI = 1000 * 1000 * 100;
     private static final int MBTC_SATOSHI = 100000;
@@ -46,7 +48,7 @@ public class TransactionAnalyzer {
     		FINAL_YEAR--;
     	}
     	System.out.println("Read all transcation ids...");
-    	JsonReader tx = readJsonUrl(TRANSACTIONS, "", "transactions.json", false);
+    	JsonReader tx = readJsonUrl(TRANSACTIONS, "", "transactions.json", CACHE_BUILDER_REPORTS);
     	Map<String, Double> payedOut = calculatePayouts(tx);
     	// transactions url 
     	Map<String, Double> toPay = new HashMap<>();
@@ -60,7 +62,7 @@ public class TransactionAnalyzer {
 				}
 				period += month;
 				System.out.println("Processing " + period + "... ");
-				Map<?, ?> payoutObjects = gson.fromJson(readJsonUrl(REPORT_URL, period, "payout_", false), Map.class);
+				Map<?, ?> payoutObjects = gson.fromJson(readJsonUrl(REPORT_URL, period, "payout_", CACHE_BUILDER_REPORTS), Map.class);
 				List<Map<?, ?>> outputs = (List<Map<?, ?>>) payoutObjects.get("payments");
 				for (Map<?, ?> payout : outputs) {
 					String address = simplifyBTC((String) payout.get("btcaddress"));
@@ -175,10 +177,11 @@ public class TransactionAnalyzer {
 		return result;
 	}
 
-	private static JsonReader readJsonUrl(String urlBase, String id, String cachePrefix, boolean cache) throws IOException {
-		File fl = new File("cache/"+cachePrefix + id);
+	private static JsonReader readJsonUrl(String urlBase, String id, String cachePrefix, boolean cache)
+			throws IOException {
+		File fl = new File("cache/" + cachePrefix + id);
 		fl.getParentFile().mkdirs();
-		if(fl.exists()) {
+		if (fl.exists() && cache) {
 			return new JsonReader(new FileReader(fl));
 		}
 		URL url = new URL(urlBase + id);
@@ -190,7 +193,7 @@ public class TransactionAnalyzer {
 			bous.write(bs, 0, l);
 		}
 		is.close();
-		if(cache) {
+		if (cache) {
 			FileOutputStream fous = new FileOutputStream(fl);
 			fous.write(bous.toByteArray());
 			fous.close();
