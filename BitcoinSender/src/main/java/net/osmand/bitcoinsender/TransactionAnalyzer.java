@@ -26,6 +26,8 @@ public class TransactionAnalyzer {
 
     private static final Gson gson = new GsonBuilder().disableHtmlEscaping().create();
     private static final int BEGIN_YEAR = 2016;
+    private static final int UNDERPAYED_THRESHOLD = 10;
+    private static final int OVERPAYED_THRESHOLD = 1000;
 	private static final String REPORT_URL = "http://builder.osmand.net/reports/query_month_report.php?report=getPayouts&month=";
 	private static final String TRANSACTIONS = "https://raw.githubusercontent.com/osmandapp/osmandapp.github.io/master/website/reports/transactions.json";
     public static void main(String[] args) throws IOException {
@@ -36,9 +38,10 @@ public class TransactionAnalyzer {
     		FINAL_YEAR--;
     	}
     	System.out.println("Read all transcation ids...");
-    	JsonReader tx = readJsonUrl(TRANSACTIONS, "", "tx_");
-    	Map<String, Double> calculatePayouts = calculatePayouts(tx);
+    	JsonReader tx = readJsonUrl(TRANSACTIONS, "", "transactions.json");
+    	Map<String, Double> payedOut = calculatePayouts(tx);
     	// transactions url 
+    	Map<String, Double> toPay = new HashMap<>();
     	for(int year = BEGIN_YEAR; year <= FINAL_YEAR; year++) {
     		int fMonth = year == FINAL_YEAR ? FINAL_MONTH : 12;
 			for (int month = 1; month <= fMonth; month++) {
@@ -48,13 +51,33 @@ public class TransactionAnalyzer {
 				}
 				period += month;
 				System.out.println("Processing " + period + "... ");
-				JsonReader monthPayouts = readJsonUrl(REPORT_URL, period, "payout_");
-				System.out.println(monthPayouts.toString());
+				Map<?, ?> payoutObjects = gson.fromJson(readJsonUrl(REPORT_URL, period, "payout_"), Map.class);
+				List<Map<?, ?>> outputs = (List<Map<?, ?>>) payoutObjects.get("payments");
+				for (Map<?, ?> payout : outputs) {
+					String address = (String) payout.get("btcaddress");
+					Double sum = ((Double) payout.get("btc")) * 1000 * 1000 * 100;
+					if (toPay.containsKey(address)) {
+						toPay.put(address, toPay.get(address) + sum);
+					} else {
+						toPay.put(address, sum);
+					}
+				}
+				
 			}
     	}
-    	// https://chain.so/api/v2/tx/BTC/59703a0e48d1a03031dcc769689f27eb3f8a5480a6dffdd896975b3d994c9b26
-    	//  "address" : "1D1ZKjJRHPq4xWNucSyAzSLJZDZRRKyc9g",
-        // "value" : "0.00010060",
+    	for(String addrToPay : toPay.keySet()) {
+    		Double sumToPay = toPay.get(addrToPay);
+    		Double paid = payedOut.get(addrToPay);
+    		if(paid == null) {
+    			paid = 0d;
+    		}
+    		if(sumToPay < paid - OVERPAYED_THRESHOLD) {
+    			System.out.println("??? " + addrToPay + " "+ (sumToPay - paid) + " satoshis");
+    		} else if(paid < sumToPay - UNDERPAYED_THRESHOLD ) {
+    			System.out.println("!!! " + addrToPay + " " + (sumToPay - paid) + " satoshis");
+    		}
+    	}
+    	System.out.println(toPay.toString());
     	
     	
     }
@@ -90,7 +113,7 @@ public class TransactionAnalyzer {
 	}
 
 	private static JsonReader readJsonUrl(String urlBase, String id, String cachePrefix) throws IOException {
-		File fl = new File(cachePrefix + id);
+		File fl = new File("cache/"+cachePrefix + id);
 		if(fl.exists()) {
 			return new JsonReader(new FileReader(fl));
 		}
