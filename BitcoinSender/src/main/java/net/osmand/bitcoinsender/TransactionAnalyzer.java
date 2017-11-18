@@ -10,8 +10,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.URL;
-import java.text.DateFormat;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
@@ -48,10 +46,11 @@ public class TransactionAnalyzer {
     		FINAL_YEAR--;
     	}
     	System.out.println("Read all transcation ids...");
-    	JsonReader tx = readJsonUrl(TRANSACTIONS, "", "transactions.json");
+    	JsonReader tx = readJsonUrl(TRANSACTIONS, "", "transactions.json", false);
     	Map<String, Double> payedOut = calculatePayouts(tx);
     	// transactions url 
     	Map<String, Double> toPay = new HashMap<>();
+    	Map<String, String> osmid = new HashMap<>();
     	for(int year = BEGIN_YEAR; year <= FINAL_YEAR; year++) {
     		int fMonth = year == FINAL_YEAR ? FINAL_MONTH : 12;
 			for (int month = 1; month <= fMonth; month++) {
@@ -61,10 +60,11 @@ public class TransactionAnalyzer {
 				}
 				period += month;
 				System.out.println("Processing " + period + "... ");
-				Map<?, ?> payoutObjects = gson.fromJson(readJsonUrl(REPORT_URL, period, "payout_"), Map.class);
+				Map<?, ?> payoutObjects = gson.fromJson(readJsonUrl(REPORT_URL, period, "payout_", false), Map.class);
 				List<Map<?, ?>> outputs = (List<Map<?, ?>>) payoutObjects.get("payments");
 				for (Map<?, ?> payout : outputs) {
 					String address = simplifyBTC((String) payout.get("btcaddress"));
+					osmid.put(address, payout.get("osmid").toString());
 					Double sum = ((Double) payout.get("btc")) * BITCOIN_SATOSHI;
 					if (toPay.containsKey(address)) {
 						toPay.put(address, toPay.get(address) + sum);
@@ -79,8 +79,8 @@ public class TransactionAnalyzer {
     	Date dt = new java.util.Date();
     	results.put("timestamp", dt.getTime());
     	results.put("date", dt.toString());
-    	List<?> overPaid = getResults(payedOut, toPay, true);
-    	List<?> underPaid = getResults(payedOut, toPay, false);
+    	List<?> overPaid = getResults(payedOut, toPay, osmid, true);
+    	List<?> underPaid = getResults(payedOut, toPay, osmid, false);
     	results.put("payments", underPaid);
     	results.put("overPayments", overPaid);
     	FileWriter fw = new FileWriter(new File("report_underpaid.json"));
@@ -91,7 +91,7 @@ public class TransactionAnalyzer {
     	
     }
 
-	private static List<Object> getResults(Map<String, Double> payedOut, Map<String, Double> toPay, boolean overpaid) {
+	private static List<Object> getResults(Map<String, Double> payedOut, Map<String, Double> toPay, Map<String, String> osmid, boolean overpaid) {
 		double sum = 0;
 		List<Object> res = new ArrayList<Object>();
 		for(String addrToPay : toPay.keySet()) {
@@ -105,12 +105,16 @@ public class TransactionAnalyzer {
     		}
     		Map<String, Object> map = new HashMap<String, Object>();
     		map.put("btcaddress", addrToPay);
+    		if(osmid.containsKey(addrToPay)) {
+    			map.put("osmid", osmid.get(addrToPay));
+    		}
     		
-    		if(overpaid && (paid - sumToPay) > 10) { // 10 satoshi
+    		if(overpaid & paid - sumToPay > 10) { // 10 satoshi
     			map.put("btc", (Double)((paid - sumToPay)/BITCOIN_SATOSHI));
     			sum += -(sumToPay - paid);
     			res.add(map);
-    		} else if(!overpaid && (sumToPay - paid) > 0) {
+    			
+    		} else if(!overpaid && sumToPay - paid > 10) {
     			map.put("btc", (Double)((sumToPay - paid)/BITCOIN_SATOSHI));
     			sum += (sumToPay - paid);
     			res.add(map);
@@ -153,7 +157,7 @@ public class TransactionAnalyzer {
 			for (Object tid : array) {
 				String turl = "https://blockchain.info/rawtx/" + tid;
 				System.out.println("Read transactions for " + turl + "... ");
-				Map<?, ?> payoutObjects = gson.fromJson(readJsonUrl("https://blockchain.info/rawtx/", tid.toString(), "btc_"), Map.class);
+				Map<?, ?> payoutObjects = gson.fromJson(readJsonUrl("https://blockchain.info/rawtx/", tid.toString(), "btc_", true), Map.class);
 //				Map<?, ?> data = (Map<?, ?>) payoutObjects.get("data");
 				List<Map<?, ?>> outputs = (List<Map<?, ?>>) payoutObjects.get("out");
 				for (Map<?, ?> payout : outputs) {
@@ -171,8 +175,9 @@ public class TransactionAnalyzer {
 		return result;
 	}
 
-	private static JsonReader readJsonUrl(String urlBase, String id, String cachePrefix) throws IOException {
+	private static JsonReader readJsonUrl(String urlBase, String id, String cachePrefix, boolean cache) throws IOException {
 		File fl = new File("cache/"+cachePrefix + id);
+		fl.getParentFile().mkdirs();
 		if(fl.exists()) {
 			return new JsonReader(new FileReader(fl));
 		}
@@ -185,9 +190,11 @@ public class TransactionAnalyzer {
 			bous.write(bs, 0, l);
 		}
 		is.close();
-		FileOutputStream fous = new FileOutputStream(fl);
-		fous.write(bous.toByteArray());
-		fous.close();
+		if(cache) {
+			FileOutputStream fous = new FileOutputStream(fl);
+			fous.write(bous.toByteArray());
+			fous.close();
+		}
 		JsonReader reader = new JsonReader(new InputStreamReader(new ByteArrayInputStream(bous.toByteArray())));
 		return reader;
 	}
