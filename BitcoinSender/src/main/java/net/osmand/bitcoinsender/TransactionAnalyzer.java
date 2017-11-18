@@ -24,7 +24,7 @@ public class TransactionAnalyzer {
 
     private static final Gson gson = new GsonBuilder().disableHtmlEscaping().create();
     private static final int BEGIN_YEAR = 2016;
-    private static final int UNDERPAYED_THRESHOLD = 10*1000; // 1$: 1BTC=10000$ (0.1 mBTC)   
+    private static final int UNDERPAYED_THRESHOLD = 50*1000; // 5$: 1BTC=10000$ (0.5 mBTC)   
     private static final int OVERPAYED_THRESHOLD = 10*1000; // 1$: 1BTC=10000$  (0.1 mBTC)
 	private static final String REPORT_URL = "http://builder.osmand.net/reports/query_month_report.php?report=getPayouts&month=";
 	private static final String TRANSACTIONS = "https://raw.githubusercontent.com/osmandapp/osmandapp.github.io/master/website/reports/transactions.json";
