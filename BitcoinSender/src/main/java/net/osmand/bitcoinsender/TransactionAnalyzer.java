@@ -107,8 +107,10 @@ public class TransactionAnalyzer {
     		}
     		Map<String, Object> map = new HashMap<String, Object>();
     		map.put("btcaddress", addrToPay);
+    		String osmId = "";
     		if(osmid.containsKey(addrToPay)) {
-    			map.put("osmid", osmid.get(addrToPay));
+    			osmId = osmid.get(addrToPay);
+    			map.put("osmid", osmId);
     		}
     		
     		if(overpaid & paid - sumToPay > 10) { // 10 satoshi
@@ -126,12 +128,12 @@ public class TransactionAnalyzer {
     		if(sumToPay < paid - OVERPAYED_THRESHOLD) {
     			if(overpaid) {
     				System.out.println("OVERPAID: " + addrToPay + " "+ -(sumToPay - paid)/MBTC_SATOSHI + " mBTC " + 
-    						" " + ((int)((paid - sumToPay)/paid*100))+"%");
+    						" " + ((int)((paid - sumToPay)/paid*100))+"% " + osmId  );
     			}
     		} else if(paid < sumToPay - UNDERPAYED_THRESHOLD ) {
     			if(!overpaid) {
     				System.out.println("TO   PAY: " + addrToPay + " " + (sumToPay - paid)/MBTC_SATOSHI + " mBTC " +
-    				" " + ((int)((sumToPay - paid)/sumToPay*100))+"%");
+    				" " + ((int)((sumToPay - paid)/sumToPay*100))+"% " + osmId);
     			}
     		}
     	}
