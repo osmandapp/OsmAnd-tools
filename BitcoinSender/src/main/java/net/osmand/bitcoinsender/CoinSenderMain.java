@@ -21,13 +21,20 @@ public class CoinSenderMain {
     private static String guid;
     private static String pass;
     private static String directory;
-	public static int PART_SIZE = 100;
+	public static int PART_SIZE = 200;
 	// MIN PAY FORMULA
 	// FEE_KB - avg fee per KB in mBTC, currently 1.0 mBTC/KB
 	// AVG_TX_SIZE - 50 bytes= 0.05 KB
 	// MIN_PAY =  AVG_TX_SIZE * FEE_KB * 10 - Transaction not more than 10% of fees
 	// Currently: MIN_PAY = 1.0 * 0.05 * 10 mBTC = 0.5 mBTC
-	public static double MIN_PAY = 0.001 * 0.5; // 0.5 mBTC: 5$ 1 BTC-10000$
+	public static double AVG_TX_SIZE = 0.05;
+	public static double FEE_BYTE_SATOSHI = 10;
+	public static final long BITCOIN_SATOSHI = 1000 * 1000 * 100;
+    public static final int MBTC_SATOSHI = 100* 1000;
+	
+	public static double getMinPayInBTC() {
+		return (FEE_BYTE_SATOSHI / 10) * AVG_TX_SIZE * 0.001 * 10; // 0.5 mBTC: 5$ 1 BTC-10000$;
+	}
 	
     public static void main(String args[]) throws IOException {
 
@@ -47,11 +54,12 @@ public class CoinSenderMain {
         if(ll.trim().length() > 0) {
         	PART_SIZE = Integer.parseInt(ll);
         }
-        System.out.print("Enter minimal amount to pay (default "+MIN_PAY+"): ");
+		System.out.print("Enter satoshi per byte price (default " + FEE_BYTE_SATOSHI + "): ");
         ll = in.nextLine();
         if(ll.trim().length() > 0) {
-        	MIN_PAY = Double.parseDouble(ll);
+        	FEE_BYTE_SATOSHI = Double.parseDouble(ll);
         }
+        double MIN_PAY = getMinPayInBTC();
 
         if (guid.equals("") || pass.equals("")) {
             System.out.println("You forgot to enter Client_ID or Secret. Exiting...");
@@ -83,7 +91,7 @@ public class CoinSenderMain {
             }
         }
 
-        Map<String, Double> payments = convertPaymentsToMap(getPayments(new FileReader(directory)));
+        Map<String, Double> payments = convertPaymentsToMap(getPayments(new FileReader(directory)), MIN_PAY);
         double allMoney = calculateTotalSum(payments);
 
         List<Map> splitPayment = splitResults(payments);
@@ -153,6 +161,10 @@ public class CoinSenderMain {
                     int chunkUI = (chunk + 1);
                     System.out.println("Prepare to pay for chunk " + chunkUI + " (" + (chunk * PART_SIZE + 1) + "-"
 							+ ((chunk + 1)* PART_SIZE ) + ") ...");
+                    int numberOfInputs = 1;
+                    int txSize = currentPayment.size() * 34 + numberOfInputs * 180 + 10 + 40;
+                    double calculatedFee = ((double)txSize * FEE_BYTE_SATOSHI) / BITCOIN_SATOSHI;
+                    System.out.println("! Double check that estimated fee not less than: " + calculatedFee + " BTC!");
                     System.out.print("Are you sure you want to pay " + totalString + " BTC? [y/n]: ");
                     String answer = scanner.nextLine();
 
@@ -197,7 +209,7 @@ public class CoinSenderMain {
         return sum;
     }
 
-    public static Map<String, Double> convertPaymentsToMap(List<LinkedTreeMap> paymentsList) {
+    public static Map<String, Double> convertPaymentsToMap(List<LinkedTreeMap> paymentsList, double MIN_PAY) {
         Map<String, Double> payments = new LinkedHashMap<>();
         for (LinkedTreeMap map : paymentsList) {
             Double btc = (Double) map.get("btc");

@@ -26,6 +26,9 @@ import com.google.gson.stream.JsonReader;
 
 public class TransactionAnalyzer {
 
+	public static final long BITCOIN_SATOSHI = 1000 * 1000 * 100;
+    public static final int MBTC_SATOSHI = 100* 1000;
+    
     private static final Gson gson = new GsonBuilder().
     		enableComplexMapKeySerialization().
     		setPrettyPrinting().
@@ -34,10 +37,9 @@ public class TransactionAnalyzer {
     
     private static final boolean CACHE_BUILDER_REPORTS = false;
     private static final int BEGIN_YEAR = 2016;
-    private static final long BITCOIN_SATOSHI = 1000 * 1000 * 100;
-    private static final int MBTC_SATOSHI = 100000;
-    private static final double UNDERPAYED_THRESHOLD = (CoinSenderMain.MIN_PAY * BITCOIN_SATOSHI); // 5$: 1BTC=10000$ (0.5 mBTC)   
-    private static final double OVERPAYED_THRESHOLD = 10*1000; // 1$: 1BTC=10000$  (0.1 mBTC)
+    
+    private static final double UNDERPAYED_THRESHOLD = CoinSenderMain.getMinPayInBTC() * BITCOIN_SATOSHI; // 5$: 1BTC=10000$ (0.5 mBTC)   
+    private static final double OVERPAYED_THRESHOLD = CoinSenderMain.getMinPayInBTC() * BITCOIN_SATOSHI / 5; // 1$: 1BTC=10000$  (0.1 mBTC)
 	private static final String REPORT_URL = "http://builder.osmand.net/reports/query_month_report.php?report=getPayouts&month=";
 	private static final String TRANSACTIONS = "https://raw.githubusercontent.com/osmandapp/osmandapp.github.io/master/website/reports/transactions.json";
     public static void main(String[] args) throws IOException {
