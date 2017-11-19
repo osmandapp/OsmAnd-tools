@@ -36,8 +36,8 @@ public class TransactionAnalyzer {
     private static final int BEGIN_YEAR = 2016;
     private static final long BITCOIN_SATOSHI = 1000 * 1000 * 100;
     private static final int MBTC_SATOSHI = 100000;
-    private static final int UNDERPAYED_THRESHOLD = (int) (CoinSenderMain.MIN_PAY * BITCOIN_SATOSHI); // 5$: 1BTC=10000$ (0.5 mBTC)   
-    private static final int OVERPAYED_THRESHOLD = 10*1000; // 1$: 1BTC=10000$  (0.1 mBTC)
+    private static final double UNDERPAYED_THRESHOLD = (CoinSenderMain.MIN_PAY * BITCOIN_SATOSHI); // 5$: 1BTC=10000$ (0.5 mBTC)   
+    private static final double OVERPAYED_THRESHOLD = 10*1000; // 1$: 1BTC=10000$  (0.1 mBTC)
 	private static final String REPORT_URL = "http://builder.osmand.net/reports/query_month_report.php?report=getPayouts&month=";
 	private static final String TRANSACTIONS = "https://raw.githubusercontent.com/osmandapp/osmandapp.github.io/master/website/reports/transactions.json";
     public static void main(String[] args) throws IOException {
@@ -94,8 +94,11 @@ public class TransactionAnalyzer {
     }
 
 	private static List<Object> getResults(Map<String, Double> payedOut, Map<String, Double> toPay, Map<String, String> osmid, boolean overpaid) {
-		double sum = 0;
 		List<Object> res = new ArrayList<Object>();
+		int cntAll = 0;
+		double sumAll = 0;
+		int cntPayment = 0;
+		double sumPayment = 0;
 		for(String addrToPay : toPay.keySet()) {
     		Double sumToPay = toPay.get(addrToPay);
     		Double paid = payedOut.get(addrToPay);
@@ -115,33 +118,36 @@ public class TransactionAnalyzer {
     		
     		if(overpaid & paid - sumToPay > 10) { // 10 satoshi
     			map.put("btc", (Double)((paid - sumToPay)/BITCOIN_SATOSHI));
-    			sum += -(sumToPay - paid);
+    			sumAll += -(sumToPay - paid);
+    			cntAll++;
     			res.add(map);
     			
     		} else if(!overpaid && sumToPay - paid > 10) {
     			map.put("btc", (Double)((sumToPay - paid)/BITCOIN_SATOSHI));
-    			sum += (sumToPay - paid);
+    			sumAll += (sumToPay - paid);
+    			cntAll++;
     			res.add(map);
     		}
     		
     		
     		if(sumToPay < paid - OVERPAYED_THRESHOLD) {
     			if(overpaid) {
+    				sumPayment += -(sumToPay - paid);
+    				cntPayment++;
     				System.out.println("OVERPAID: " + addrToPay + " "+ -(sumToPay - paid)/MBTC_SATOSHI + " mBTC " + 
     						" " + ((int)((paid - sumToPay)/paid*100))+"% " + osmId  );
     			}
     		} else if(paid < sumToPay - UNDERPAYED_THRESHOLD ) {
     			if(!overpaid) {
+    				sumPayment += (sumToPay - paid);
+    				cntPayment++;
     				System.out.println("TO   PAY: " + addrToPay + " " + (sumToPay - paid)/MBTC_SATOSHI + " mBTC " +
     				" " + ((int)((sumToPay - paid)/sumToPay*100))+"% " + osmId);
     			}
     		}
     	}
-		if(overpaid) {
-			System.out.println("TOTAL: OVERPAID " + sum / MBTC_SATOSHI + " mBTC");
-		} else {
-			System.out.println("TOTAL: UNDERPAID " + sum / MBTC_SATOSHI + " mBTC");
-		}
+		System.out.println("TOTAL SELECTED: " + cntPayment + " payments " + sumPayment / MBTC_SATOSHI + " mBTC");
+		System.out.println("TOTAL      ALL: " + cntAll +" payments "+ sumAll / MBTC_SATOSHI + " mBTC");
 		return res;
 	}
 
