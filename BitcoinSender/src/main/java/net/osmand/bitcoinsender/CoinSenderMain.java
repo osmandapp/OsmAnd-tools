@@ -217,6 +217,12 @@ public class CoinSenderMain {
         		skip += payments.remove(addr);
         		cnt ++;
         	}
+        	// invalid address to contact
+        	if(addr.equals("3d347aae368d426aae104b50d3bdd695") ||
+        			addr.equals("13H8LERRKFUTqr2YM9J9bdy6xshzjwSAfw") ||
+        			addr.equals("3c9e8e73bff140b391e71eae311cdcce")) {
+        		payments.remove(addr);
+        	}
         }
 		System.out.println("Skipped " + cnt + " payments ( tx  < minimal = " + MIN_PAY + ") in total " + skip * 1000 + " mBTC");
         
