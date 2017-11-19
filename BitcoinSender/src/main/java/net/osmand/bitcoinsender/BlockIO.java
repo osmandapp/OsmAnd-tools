@@ -468,7 +468,7 @@ public class BlockIO {
                 postParams.add(new BasicNameValuePair(entry.getKey(), entry.getValue()));
             }
         }
-        postParams.add(new BasicNameValuePair("priority", "low"));
+        postParams.add(new BasicNameValuePair("priority", "medium"));
 
         CloseableHttpResponse response;
         try {
