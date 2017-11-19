@@ -60,6 +60,7 @@ public class CoinSenderMain {
         	FEE_BYTE_SATOSHI = Double.parseDouble(ll);
         }
         double MIN_PAY = getMinPayInBTC();
+        System.out.println("Minimal payment in BTC: " + MIN_PAY);
 
         if (guid.equals("") || pass.equals("")) {
             System.out.println("You forgot to enter Client_ID or Secret. Exiting...");
