@@ -127,6 +127,7 @@ download scn Sicilian;
 download bar Bavarian;
 download mn Mongolian;
 download nap Neapolitan;
+download hsb UpperSorbian;
 
 
 
