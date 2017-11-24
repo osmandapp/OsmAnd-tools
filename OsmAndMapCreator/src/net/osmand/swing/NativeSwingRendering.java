@@ -352,7 +352,7 @@ public class NativeSwingRendering extends NativeLibrary {
 						updateBoundaries(f, f.getName().substring(0, f.getName().length() - 4));
 					}
 				}
-				initMapFile(f.getAbsolutePath());
+				initMapFile(f.getAbsolutePath(), true);
 			}
 		}
 	}
