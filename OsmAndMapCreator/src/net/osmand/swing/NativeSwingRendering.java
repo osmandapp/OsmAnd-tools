@@ -352,7 +352,7 @@ public class NativeSwingRendering extends NativeLibrary {
 						updateBoundaries(f, f.getName().substring(0, f.getName().length() - 4));
 					}
 				}
-				initMapFile(f.getAbsolutePath());
+				initMapFile(f.getAbsolutePath(), true);
 			}
 		}
 	}
@@ -390,7 +390,7 @@ public class NativeSwingRendering extends NativeLibrary {
 	public void enableBaseFile(MapDiff m, boolean enable) {
 		if(enable) {
 			if(!m.enableBaseMap) {
-				initBinaryMapFile(m.baseFile.getAbsolutePath());
+				initBinaryMapFile(m.baseFile.getAbsolutePath(), true);
 				m.enableBaseMap = true;
 			}
 		} else {
@@ -424,7 +424,7 @@ public class NativeSwingRendering extends NativeLibrary {
 				}
 			} else {
 				if(md.disabled.contains(fp)) {
-					initBinaryMapFile(fp);
+					initBinaryMapFile(fp, true);
 					md.disabled.remove(fp);
 				}
 			}
@@ -432,7 +432,7 @@ public class NativeSwingRendering extends NativeLibrary {
 		}
 		md.selected = df;
 		if(md.enableBaseMap) {
-			initBinaryMapFile(md.baseFile.getAbsolutePath());
+			initBinaryMapFile(md.baseFile.getAbsolutePath(), true);
 		}
 	}
 	

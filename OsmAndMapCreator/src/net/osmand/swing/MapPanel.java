@@ -600,7 +600,7 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 					fout.close();
 					targetFile.setLastModified(time);
 					nativeLibRendering.closeMapFile(targetFile.getAbsolutePath());
-					nativeLibRendering.initMapFile(targetFile.getAbsolutePath());
+					nativeLibRendering.initMapFile(targetFile.getAbsolutePath(), true);
 				}
 			}
 			updateMapDiffs(g, true);
