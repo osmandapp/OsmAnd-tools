@@ -385,7 +385,7 @@ public class OsmAndImageRendering {
 				}
 			}
 			if(nsr != null) {
-				nsr.initMapFile(targetFile.getAbsolutePath());
+				nsr.initMapFile(targetFile.getAbsolutePath(), true);
 			}
 			initFiles.add(targetFile);
 		}
