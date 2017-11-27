@@ -154,10 +154,11 @@ public class TransactionAnalyzer {
 	}
 
 	private static String simplifyBTC(String string) {
-		if (string.replace("-", "").replace(" ", "").trim().equals("3c9e8e73bff140b391e71eae311cdcce")) {
+		String res = string.replace("-", "").replace(" ", "").trim();
+		if (res.equals("3c9e8e73bff140b391e71eae311cdcce")) {
 			return "1GRgEnKujorJJ9VBa76g8cp3sfoWtQqSs4";
 		}
-		return string.replace("-", "").replace(" ", "").trim();
+		return res;
 	}
 
 	@SuppressWarnings("unchecked")
