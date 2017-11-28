@@ -15,6 +15,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.Reader;
 import java.io.StringReader;
 import java.io.UnsupportedEncodingException;
 import java.net.URL;
@@ -42,6 +43,7 @@ import net.osmand.impl.ConsoleProgressImplementation;
 import org.apache.commons.logging.Log;
 import org.apache.tools.bzip2.CBZip2InputStream;
 import org.xml.sax.Attributes;
+import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 import org.xwiki.component.embed.EmbeddableComponentManager;
@@ -227,9 +229,12 @@ public class WikiDatabasePreparation {
 			throw new RuntimeException(
 					"The source stream must start with the characters BZ if it is to be read as a BZip2 stream."); //$NON-NLS-1$
 		} 
-		
+		CBZip2InputStream zis = new CBZip2InputStream(stream);
+		Reader reader = new InputStreamReader(zis,"UTF-8");
+		InputSource is = new InputSource(reader);
+		is.setEncoding("UTF-8");
 		final WikiOsmHandler handler = new WikiOsmHandler(sx, streamFile, lang, links,  new File(sqliteFileName));
-		sx.parse(new CBZip2InputStream(stream), handler);
+		sx.parse(is, handler);
 		handler.finish();
 	}
 
