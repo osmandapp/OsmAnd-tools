@@ -531,6 +531,10 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		if (e instanceof Relation && "restriction".equals(e.getTag(OSMTagKey.TYPE))) { //$NON-NLS-1$
 			String val = e.getTag("restriction"); //$NON-NLS-1$
 			if (val != null) {
+				if("no_u_turn".equalsIgnoreCase(val) && Algorithms.objectEquals(e.getTag("from"), e.getTag("to"))) {
+					// don't index such roads - can't go through issue https://www.openstreetmap.org/way/338099991#map=17/46.86699/-0.20473
+					return;
+				}
 				byte type = -1;
 				if ("no_right_turn".equalsIgnoreCase(val)) { //$NON-NLS-1$
 					type = MapRenderingTypes.RESTRICTION_NO_RIGHT_TURN;
