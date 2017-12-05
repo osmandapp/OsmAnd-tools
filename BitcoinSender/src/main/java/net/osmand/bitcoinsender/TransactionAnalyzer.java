@@ -164,8 +164,9 @@ public class TransactionAnalyzer {
 		} else if (res.equals("13H8LERRKFUTqr2YM9J9bdy6xshzjwSAfw")) {
 			return "1A2PRCVN2tFnF5AXBwXmPyV52gH11uCFaS";
 			
-		} else if (res.equals("3d347aae368d426aae104d50d3bdd695")) {
-			// to contact
+		} else if (res.equals("3d347aae368d426aae104d50d3bdd695") || 
+				res.equals("3d347aae368d426aae104b50d3bdd695")) {
+			// to contact tshedy
 			return null;
 		}
 		return res;
