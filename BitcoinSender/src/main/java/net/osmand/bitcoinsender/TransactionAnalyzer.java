@@ -67,7 +67,11 @@ public class TransactionAnalyzer {
 				Map<?, ?> payoutObjects = gson.fromJson(readJsonUrl(REPORT_URL, period, "payout_", CACHE_BUILDER_REPORTS), Map.class);
 				List<Map<?, ?>> outputs = (List<Map<?, ?>>) payoutObjects.get("payments");
 				for (Map<?, ?> payout : outputs) {
-					String address = simplifyBTC((String) payout.get("btcaddress"));
+					String inputAddress = (String) payout.get("btcaddress");
+					String address = simplifyBTC(inputAddress);
+					if(address == null) {
+						address = inputAddress;
+					}
 					osmid.put(address, payout.get("osmid").toString());
 					Double sum = ((Double) payout.get("btc")) * BITCOIN_SATOSHI;
 					if (toPay.containsKey(address)) {
@@ -153,12 +157,16 @@ public class TransactionAnalyzer {
 		return res;
 	}
 
-	private static String simplifyBTC(String string) {
+	public static String simplifyBTC(String string) {
 		String res = string.replace("-", "").replace(" ", "").trim();
 		if (res.equals("3c9e8e73bff140b391e71eae311cdcce")) {
 			return "1GRgEnKujorJJ9VBa76g8cp3sfoWtQqSs4";
 		} else if (res.equals("13H8LERRKFUTqr2YM9J9bdy6xshzjwSAfw")) {
 			return "1A2PRCVN2tFnF5AXBwXmPyV52gH11uCFaS";
+			
+		} else if (res.equals("3d347aae368d426aae104d50d3bdd695")) {
+			// to contact
+			return null;
 		}
 		return res;
 	}

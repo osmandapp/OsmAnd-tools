@@ -24,16 +24,17 @@ public class CoinSenderMain {
 	public static int PART_SIZE = 200;
 	// MIN PAY FORMULA
 	// FEE_KB - avg fee per KB in mBTC, currently 1.0 mBTC/KB
-	// AVG_TX_SIZE - 50 bytes= 0.05 KB
+	// AVG_TX_SIZE - 50 bytes = 0.05 KB
+	// MIN_PAY = TX_FEE * 10 - so that TX_FEE <= 10% PAYMENT
 	// MIN_PAY =  AVG_TX_SIZE * FEE_KB * 10 - Transaction not more than 10% of fees
-	// Currently: MIN_PAY = 1.0 * 0.05 * 10 mBTC = 0.5 mBTC
-	public static double AVG_TX_SIZE = 0.05;
-	public static double FEE_BYTE_SATOSHI = 10;
+	public static int AVG_TX_SIZE = 50; // 50 byte
+	public static double FEE_BYTE_SATOSHI = 30;
 	public static final long BITCOIN_SATOSHI = 1000 * 1000 * 100;
-    public static final int MBTC_SATOSHI = 100* 1000;
+    public static final int MBTC_SATOSHI = 100 * 1000;
 	
 	public static double getMinPayInBTC() {
-		return (FEE_BYTE_SATOSHI / 10) * AVG_TX_SIZE * 0.001 * 10; // 0.5 mBTC: 5$ 1 BTC-10000$;
+		return (((double)AVG_TX_SIZE * FEE_BYTE_SATOSHI) / BITCOIN_SATOSHI) * 10; // 0.5 mBTC: 5$ 1 BTC-10000$;
+		//return (FEE_BYTE_SATOSHI / 10) * AVG_TX_SIZE * 0.001 * 10; // 0.5 mBTC: 5$ 1 BTC-10000$;
 	}
 	
     public static void main(String args[]) throws IOException {
@@ -214,9 +215,10 @@ public class CoinSenderMain {
         Map<String, Double> payments = new LinkedHashMap<>();
         for (LinkedTreeMap map : paymentsList) {
             Double btc = (Double) map.get("btc");
-            String address = (String) map.get("btcaddress");
-            // trim to avoid trailing or starting spaces
-            address = address.trim();
+            String address = TransactionAnalyzer.simplifyBTC((String) map.get("btcaddress"));
+            if(address == null) {
+            	continue;
+            }
             if (payments.containsKey(address)) {
                 payments.put(address, btc + payments.get(address));
             } else {
@@ -229,12 +231,6 @@ public class CoinSenderMain {
         	if(payments.get(addr) < MIN_PAY) {
         		skip += payments.remove(addr);
         		cnt ++;
-        	}
-        	// invalid address to contact
-        	if(addr.equals("3d347aae368d426aae104b50d3bdd695") ||
-        			addr.equals("13H8LERRKFUTqr2YM9J9bdy6xshzjwSAfw") ||
-        			addr.equals("3c9e8e73bff140b391e71eae311cdcce")) {
-        		payments.remove(addr);
         	}
         }
 		System.out.println("Skipped " + cnt + " payments ( tx  < minimal = " + MIN_PAY + ") in total " + skip * 1000 + " mBTC");
