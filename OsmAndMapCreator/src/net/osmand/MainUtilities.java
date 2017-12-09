@@ -69,7 +69,7 @@ public class MainUtilities {
 			} else if (utl.equals("generate-obf-diff")) {
 				ObfDiffGenerator.main(subArgsArray);
 			} else if (utl.equals("generate-ocean-tile")) {
-				OceanTilesCreator.createTilesFile(subArgsArray[0], subArgsArray.length > 1 ? args[1] : null);
+				OceanTilesCreator.createTilesFile(subArgsArray[0], subArgsArray.length > 1 ? subArgsArray[1] : null);
 			} else if (utl.equals("test-routing")) {
 				net.osmand.router.TestRouting.main(subArgsArray);
 			} else if (utl.equals("generate-ocbf")) {
