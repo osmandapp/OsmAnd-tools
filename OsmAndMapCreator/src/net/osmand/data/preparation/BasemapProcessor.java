@@ -285,11 +285,16 @@ public class BasemapProcessor {
                     if (seaTileInfo.get((y1 + i) * 4096 + (x1 + j))) {
                         c++;
                     }
-
+                    if (!seaTileInfo.get((y1 + i) * 4096 + (x1 + j)) && !landTileInfo.get((y1 + i) * 4096 + (x1 + j))) {
+                	    c --;
+                    }
                 }
             }
-
-            return ((float)c) / ((float) max * (float) max);
+            float res = ((float)c) / ((float) max * (float) max);
+            if (res < 0) {
+            	return 0;
+            }
+            return res;
         }
     }
 
