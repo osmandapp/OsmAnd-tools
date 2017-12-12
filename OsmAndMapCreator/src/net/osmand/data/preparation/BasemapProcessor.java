@@ -282,12 +282,12 @@ public class BasemapProcessor {
 //                    if (landTileInfo.get((y1 + i) * 4096 + (x1 + j))) {
 //                        c++;
 //                    }
-                	if (seaTileInfo.get((y1 + i) * 4096 + (x1 + j))) {
+                    if (seaTileInfo.get((y1 + i) * 4096 + (x1 + j))) {
                         c++;
                     }
-                	if (!seaTileInfo.get((y1 + i) * 4096 + (x1 + j)) && !landTileInfo.get((y1 + i) * 4096 + (x1 + j))) {
-                		c --;
-                	}
+                    if (!seaTileInfo.get((y1 + i) * 4096 + (x1 + j)) && !landTileInfo.get((y1 + i) * 4096 + (x1 + j))) {
+                	    c --;
+                    }
                 }
             }
             float res = ((float)c) / ((float) max * (float) max);
