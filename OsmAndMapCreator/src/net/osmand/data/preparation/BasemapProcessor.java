@@ -285,7 +285,6 @@ public class BasemapProcessor {
                     if (seaTileInfo.get((y1 + i) * 4096 + (x1 + j))) {
                         c++;
                     }
-
                 }
             }
 
@@ -435,6 +434,7 @@ public class BasemapProcessor {
             SimplisticQuadTree[] allChildren = quadTree.getAllChildren();
 
             for (SimplisticQuadTree ch : allChildren) {
+            	ch.seaCharacteristic = getSeaTile(ch.x << 1, ch.y << 1, ch.zoom + 1);
                 writeBinaryMapTree(ch, writer, refs, p);
             }
         }
