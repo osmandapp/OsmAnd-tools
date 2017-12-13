@@ -569,8 +569,11 @@ public class OsmExtractionUI implements IMapLocationListener {
 		JMenuItem exitMenu= new JMenuItem(Messages.getString("OsmExtractionUI.MENU_EXIT")); //$NON-NLS-1$
 		menu.add(exitMenu);
 
-		JMenu tileSource = new JMenu(Messages.getString("OsmExtractionUI.MENU_WINDOW")); //$NON-NLS-1$MapPanel.getMenuToChooseSource(mapPanel);
+//		JMenu tileSource = new JMenu(Messages.getString("OsmExtractionUI.MENU_MAPS")); //$NON-NLS-1$MapPanel.getMenuToChooseSource(mapPanel);
 		final JMenuItem sqliteDB = new JMenuItem(Messages.getString("OsmExtractionUI.MENU_CREATE_SQLITE")); //$NON-NLS-1$
+//		tileSource.addSeparator();
+//		tileSource.add(sqliteDB);
+		JMenu tileSource = MapPanel.getMenuToChooseSource(mapPanel);
 		tileSource.addSeparator();
 		tileSource.add(sqliteDB);
 		bar.add(tileSource);
