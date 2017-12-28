@@ -150,7 +150,7 @@ public class AreaSimplifier {
 	private static boolean nodeGluesWays(final Node node) {
 		Set<Node> referenceNeighbours = null;
 		for (final Way way : reference.get(node)) {
-			final Set<Node> neighbours = way.getNeighbours(node);
+			final Set<Node> neighbours = getNeighbours(node, way);
 			if (referenceNeighbours == null) {
 				referenceNeighbours = neighbours;
 			} else if (!referenceNeighbours.containsAll(neighbours)) {
@@ -159,6 +159,30 @@ public class AreaSimplifier {
 		}
 		return false;
 	}
+	
+	/**
+     * Return nodes adjacent to <code>node</code>
+     *
+     * @param node the node. May be null.
+     * @return Set of nodes adjacent to <code>node</code>
+     */
+    private static Set<Node> getNeighbours(Node node, Way way) {
+        Set<Node> neigh = new HashSet<>();
+
+        if (node == null) return neigh;
+
+        List<Node> wayNodes = way.getNodes();
+		Node[] nodes = wayNodes.toArray(new Node[wayNodes.size()]);
+        for (int i = 0; i < nodes.length; i++) {
+            if (nodes[i].equals(node)) {
+                if (i > 0)
+                    neigh.add(nodes[i-1]);
+                if (i < nodes.length-1)
+                    neigh.add(nodes[i+1]);
+            }
+        }
+        return neigh;
+    }
 
 	private static void addNodesToDelete(final Collection<Node> nodesToDelete, final Way w) {
 		// TODO extract these values as simplification parameters
