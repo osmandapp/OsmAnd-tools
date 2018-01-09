@@ -374,7 +374,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		}
 		long centerId = 0;
 		CityType ct = CityType.valueFromString(e.getTag(OSMTagKey.PLACE));
-		if (ct == null && "townland".equals(e.getTag(OSMTagKey.LOCALITY))) {
+		// if a place that has addr_place is a neighbourhood mark it as a suburb (made for the suburbs of Venice)
+		boolean isNeighbourhood = e.getTag(OSMTagKey.ADDR_PLACE) != null && "neighbourhood".equals(e.getTag(OSMTagKey.PLACE));
+		if ((ct == null && "townland".equals(e.getTag(OSMTagKey.LOCALITY))) || isNeighbourhood) {
 			if (e instanceof Relation) {
 				ctx.loadEntityRelation((Relation) e);
 			}
