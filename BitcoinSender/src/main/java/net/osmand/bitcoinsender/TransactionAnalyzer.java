@@ -65,6 +65,9 @@ public class TransactionAnalyzer {
 				period += month;
 				System.out.println("Processing " + period + "... ");
 				Map<?, ?> payoutObjects = gson.fromJson(readJsonUrl(REPORT_URL, period, "payout_", CACHE_BUILDER_REPORTS), Map.class);
+				if (payoutObjects == null) {
+					continue;
+				}
 				List<Map<?, ?>> outputs = (List<Map<?, ?>>) payoutObjects.get("payments");
 				for (Map<?, ?> payout : outputs) {
 					String inputAddress = (String) payout.get("btcaddress");
