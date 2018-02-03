@@ -641,7 +641,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	private void parsePrefix(String name, PoiTileBox data, Map<String, Set<PoiTileBox>> poiData) {
 		int prev = -1;
 		for (int i = 0; i <= name.length(); i++) {
-			if (i == name.length() || (!Character.isLetter(name.charAt(i)) && !Character.isDigit(name.charAt(i)) && name.charAt(i) != '\'')) {
+			if (i == name.length() || 
+					(!Character.isLetter(name.charAt(i)) && !Character.isDigit(name.charAt(i)) )) {
+				// && name.charAt(i) != '\''
 				if (prev != -1) {
 					String substr = name.substring(prev, i);
 					if (substr.length() > CHARACTERS_TO_BUILD) {
