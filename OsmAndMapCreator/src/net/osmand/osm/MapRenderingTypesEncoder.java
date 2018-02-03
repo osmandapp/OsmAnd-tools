@@ -203,8 +203,13 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		for (int i = 1; i <= 20; i++) {
 			String tg = mp.get(prefix +"tag" + i); //$NON-NLS-1$
 			String value = mp.get(prefix +"value" + i); //$NON-NLS-1$
+			String tgPrefix = mp.get(prefix +"tag_prefix" + i); //$NON-NLS-1$
+			if(tg == null) {
+				tg = tgPrefix;
+			}
 			if (tg != null) {
 				TagValuePattern pt = new TagValuePattern(tg, "".equals(value) ? null : value);
+				pt.tagPrefix = tgPrefix;
 				col.add(pt);
 				String substr = mp.get(prefix +"substr" + i); //$NON-NLS-1$
 				if(substr != null) {
@@ -654,7 +659,13 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 				vl = fromValue;
 			}
 			vl = processSubstr(ift, vl);
-			tags.put(ift.tag, vl);
+			if(ift.tagPrefix != null) {
+				for(String vlSplit : fromValue.split(";")) {
+					tags.put(ift.tagPrefix+vlSplit.trim(), vl);
+				}
+			} else {
+				tags.put(ift.tag, vl);
+			}
 		}
 	}
 
