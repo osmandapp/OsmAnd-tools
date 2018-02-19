@@ -29,6 +29,9 @@ import org.xmlpull.v1.XmlPullParser;
 
 public class MapRenderingTypesEncoder extends MapRenderingTypes {
 
+	private static final String HIGH_CHARGING_OUT = "high";
+	private static final String MEDIUM_CHARGING_OUT = "medium";
+	private static final String LOW_CHARGING_OUT = "low";
 	private static Log log = PlatformUtil.getLog(MapRenderingTypesEncoder.class);
 	// stored information to convert from osm tags to int type
 	private List<MapRouteTag> routeTags = new ArrayList<MapRouteTag>();
@@ -36,6 +39,19 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	private MapRulType coastlineRuleType;
 	private String regionName;
 	public static final String OSMAND_REGION_NAME_TAG = "osmand_region_name";
+	
+	private enum ChargingOutput {
+		TYPE_2_LOW(20),
+		TYPE_2_MEDIUM(35);
+		
+		private final int value;
+		ChargingOutput (int value) {
+			this.value = value;
+		}
+		public int getValue() {
+			return value;
+		}
+	}
 
 
 	public MapRenderingTypesEncoder(String fileName, String regionName) {
@@ -347,6 +363,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			EntityConvertApplyType appType) {
 		tags = transformShieldTags(tags, entity, appType);
 		tags = transformIntegrityTags(tags, entity, appType);
+		tags = transformChargingTags(tags, entity);
 		EntityConvertType filter = EntityConvertType.TAG_TRANSFORM;
 		List<EntityConvert> listToConvert = getApplicableConverts(tags, entity, filter, appType);
 		if(listToConvert == null) {
@@ -359,6 +376,58 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		return rtags;
 	}
 
+
+	private Map<String, String> transformChargingTags(Map<String, String> tags, EntityType entity) {
+		if (entity == EntityType.NODE) {
+			tags = new LinkedHashMap<>(tags);
+			String key = "socket:type2:output";
+			String val = tags.get(key);
+			if(val != null) {
+				tags.put(key, filterValues(val));
+			}
+		}
+		return tags;
+	}
+	
+
+	private String filterValues(String val) {
+		String standard = val.toLowerCase().replaceAll(" ", "");
+		if (standard.contains("x")) {
+			standard = standard.substring(standard.indexOf("x"), (standard.length() - 1));
+		}
+		if (standard.contains(";")) {
+			int out = 0;
+			String[] vals = standard.split(";");
+			for (String value : vals) {
+				out = Math.max(out, getNumericValue(value));
+			}
+			return getAppropriateVal(out);
+		}
+		return getAppropriateVal(getNumericValue(standard));
+	}
+
+	private int getNumericValue(String value) {
+		value = value.replaceAll("[^\\d.,]", "");
+		double tmp = 0d;
+		if (!value.isEmpty()) {
+			tmp = Double.valueOf(value);
+		}
+		return (int) tmp;
+	}
+
+	private String getAppropriateVal(int output) {
+		// to convert possible values in watts
+		if (output > 1000) {
+			output = (int) output / 1000;
+		}
+		if (output <= ChargingOutput.TYPE_2_LOW.getValue()) {
+			return LOW_CHARGING_OUT;
+		} else if (output <= ChargingOutput.TYPE_2_MEDIUM.getValue()) {
+			return MEDIUM_CHARGING_OUT;
+		} else {
+			return HIGH_CHARGING_OUT;
+		}
+	}
 
 	private Map<String, String> transformIntegrityTags(Map<String, String> tags, EntityType entity,
 			EntityConvertApplyType appType) {
