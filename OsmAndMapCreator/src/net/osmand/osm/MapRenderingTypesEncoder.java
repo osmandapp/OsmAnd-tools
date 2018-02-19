@@ -4,6 +4,7 @@ import gnu.trove.list.array.TIntArrayList;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -40,20 +41,8 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	private String regionName;
 	public static final String OSMAND_REGION_NAME_TAG = "osmand_region_name";
 	
-	private enum ChargingOutput {
-		TYPE_2_LOW(20),
-		TYPE_2_MEDIUM(35);
-		
-		private final int value;
-		ChargingOutput (int value) {
-			this.value = value;
-		}
-		public int getValue() {
-			return value;
-		}
-	}
-
-
+	private Map<String, TIntArrayList> socketTypes;
+	
 	public MapRenderingTypesEncoder(String fileName, String regionName) {
 		super(fileName != null && fileName.length() == 0 ? null : fileName);
 		this.regionName = "$" + regionName.toLowerCase() + "^";
@@ -63,8 +52,14 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		super(null);
 		this.regionName = "$" + regionName.toLowerCase() + "^";
 	}
-
-
+	
+	private void initSocketTypes() {
+		Map<String, TIntArrayList> m = new HashMap<>();
+		m.put("socket:type2:output", new TIntArrayList(new int[] {20, 35}));
+		m.put("socket:cee_blue:output", new TIntArrayList(new int[] {2, 5}));
+		m.put("socket:cee_blue:output", new TIntArrayList(new int[] {20, 40}));
+		socketTypes = Collections.unmodifiableMap(m);
+	}
 
 	@Override
 	protected MapRulType registerRuleType(MapRulType rt){
@@ -379,18 +374,23 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 
 	private Map<String, String> transformChargingTags(Map<String, String> tags, EntityType entity) {
 		if (entity == EntityType.NODE) {
-			tags = new LinkedHashMap<>(tags);
-			String key = "socket:type2:output";
-			String val = tags.get(key);
-			if(val != null) {
-				tags.put(key, filterValues(val));
+			if (socketTypes == null) {
+				initSocketTypes();
 			}
+			tags = new LinkedHashMap<>(tags);
+			for (String key : socketTypes.keySet()) {
+				String val = tags.get(key);
+				if(val != null) {
+					tags.put(key, filterValues(val, socketTypes.get(key)));
+				}
+			}
+			
 		}
 		return tags;
 	}
 	
 
-	private String filterValues(String val) {
+	private String filterValues(String val, TIntArrayList limits) {
 		String standard = val.toLowerCase().replaceAll(" ", "");
 		if (standard.contains("x")) {
 			standard = standard.substring(standard.indexOf("x"), (standard.length() - 1));
@@ -401,9 +401,9 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			for (String value : vals) {
 				out = Math.max(out, getNumericValue(value));
 			}
-			return getAppropriateVal(out);
+			return getAppropriateVal(out, limits);
 		}
-		return getAppropriateVal(getNumericValue(standard));
+		return getAppropriateVal(getNumericValue(standard), limits);
 	}
 
 	private int getNumericValue(String value) {
@@ -415,14 +415,14 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		return (int) tmp;
 	}
 
-	private String getAppropriateVal(int output) {
+	private String getAppropriateVal(int output, TIntArrayList limits) {
 		// to convert possible values in watts
 		if (output > 1000) {
 			output = (int) output / 1000;
 		}
-		if (output <= ChargingOutput.TYPE_2_LOW.getValue()) {
+		if (output <= limits.get(0)) {
 			return LOW_CHARGING_OUT;
-		} else if (output <= ChargingOutput.TYPE_2_MEDIUM.getValue()) {
+		} else if (output <= limits.get(1)) {
 			return MEDIUM_CHARGING_OUT;
 		} else {
 			return HIGH_CHARGING_OUT;
