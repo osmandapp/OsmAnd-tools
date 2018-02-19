@@ -57,7 +57,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		Map<String, TIntArrayList> m = new HashMap<>();
 		m.put("socket:type2:output", new TIntArrayList(new int[] {20, 35}));
 		m.put("socket:cee_blue:output", new TIntArrayList(new int[] {2, 5}));
-		m.put("socket:cee_blue:output", new TIntArrayList(new int[] {20, 40}));
+		m.put("socket:chademo:output", new TIntArrayList(new int[] {20, 40}));
 		socketTypes = Collections.unmodifiableMap(m);
 	}
 
