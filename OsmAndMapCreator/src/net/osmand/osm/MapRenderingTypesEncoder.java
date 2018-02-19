@@ -8,6 +8,7 @@ import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IllegalFormatException;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -410,7 +411,11 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		value = value.replaceAll("[^\\d.,]", "");
 		double tmp = 0d;
 		if (!value.isEmpty()) {
-			tmp = Double.valueOf(value);
+			try {
+				tmp = Double.valueOf(value);
+			} catch (IllegalFormatException e) {
+				e.printStackTrace();
+			}
 		}
 		return (int) tmp;
 	}
