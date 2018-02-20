@@ -381,8 +381,10 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			tags = new LinkedHashMap<>(tags);
 			for (String key : socketTypes.keySet()) {
 				String val = tags.get(key);
+				String socketType = parseSocketType(key);
+				String newKey = "osmand_socket_" + socketType + "_output";
 				if(val != null) {
-					tags.put(key, filterValues(val, socketTypes.get(key)));
+					tags.put(newKey, filterValues(val, socketTypes.get(key)));
 				}
 			}
 			
@@ -390,6 +392,15 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		return tags;
 	}
 	
+
+	private String parseSocketType(String string) {
+		int firstColon = string.indexOf(':');
+		int secondColon = string.indexOf(':', firstColon+1);
+		if (firstColon != -1 && secondColon != -1) {
+		    return string.substring(firstColon + 1, secondColon);
+		}
+		return "";
+	}
 
 	private String filterValues(String val, TIntArrayList limits) {
 		String standard = val.toLowerCase().replaceAll(" ", "");
