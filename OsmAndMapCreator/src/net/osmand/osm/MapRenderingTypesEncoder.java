@@ -8,7 +8,6 @@ import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.IllegalFormatException;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -59,6 +58,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		m.put("socket:type2:output", new TIntArrayList(new int[] {20, 35}));
 		m.put("socket:cee_blue:output", new TIntArrayList(new int[] {2, 5}));
 		m.put("socket:chademo:output", new TIntArrayList(new int[] {20, 40}));
+		m.put("socket:schuko:output", new TIntArrayList(new int[] {2, 5}));
 		socketTypes = Collections.unmodifiableMap(m);
 	}
 
@@ -392,7 +392,6 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		return tags;
 	}
 	
-
 	private String parseSocketType(String string) {
 		int firstColon = string.indexOf(':');
 		int secondColon = string.indexOf(':', firstColon+1);
@@ -419,12 +418,12 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	}
 
 	private int getNumericValue(String value) {
-		value = value.replaceAll("[^\\d.,]", "");
+		value = value.replaceAll("[^\\d.,]", "").replaceAll(",", ".");
 		double tmp = 0d;
 		if (!value.isEmpty()) {
 			try {
 				tmp = Double.valueOf(value);
-			} catch (IllegalFormatException e) {
+			} catch (NumberFormatException e) {
 				e.printStackTrace();
 			}
 		}
