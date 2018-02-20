@@ -4,9 +4,11 @@ import gnu.trove.list.array.TIntArrayList;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IllegalFormatException;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -29,6 +31,9 @@ import org.xmlpull.v1.XmlPullParser;
 
 public class MapRenderingTypesEncoder extends MapRenderingTypes {
 
+	private static final String HIGH_CHARGING_OUT = "high";
+	private static final String MEDIUM_CHARGING_OUT = "medium";
+	private static final String LOW_CHARGING_OUT = "low";
 	private static Log log = PlatformUtil.getLog(MapRenderingTypesEncoder.class);
 	// stored information to convert from osm tags to int type
 	private List<MapRouteTag> routeTags = new ArrayList<MapRouteTag>();
@@ -36,8 +41,9 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	private MapRulType coastlineRuleType;
 	private String regionName;
 	public static final String OSMAND_REGION_NAME_TAG = "osmand_region_name";
-
-
+	
+	private Map<String, TIntArrayList> socketTypes;
+	
 	public MapRenderingTypesEncoder(String fileName, String regionName) {
 		super(fileName != null && fileName.length() == 0 ? null : fileName);
 		this.regionName = "$" + regionName.toLowerCase() + "^";
@@ -47,8 +53,14 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		super(null);
 		this.regionName = "$" + regionName.toLowerCase() + "^";
 	}
-
-
+	
+	private void initSocketTypes() {
+		Map<String, TIntArrayList> m = new HashMap<>();
+		m.put("socket:type2:output", new TIntArrayList(new int[] {20, 35}));
+		m.put("socket:cee_blue:output", new TIntArrayList(new int[] {2, 5}));
+		m.put("socket:chademo:output", new TIntArrayList(new int[] {20, 40}));
+		socketTypes = Collections.unmodifiableMap(m);
+	}
 
 	@Override
 	protected MapRulType registerRuleType(MapRulType rt){
@@ -347,6 +359,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			EntityConvertApplyType appType) {
 		tags = transformShieldTags(tags, entity, appType);
 		tags = transformIntegrityTags(tags, entity, appType);
+		tags = transformChargingTags(tags, entity);
 		EntityConvertType filter = EntityConvertType.TAG_TRANSFORM;
 		List<EntityConvert> listToConvert = getApplicableConverts(tags, entity, filter, appType);
 		if(listToConvert == null) {
@@ -359,6 +372,78 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		return rtags;
 	}
 
+
+	private Map<String, String> transformChargingTags(Map<String, String> tags, EntityType entity) {
+		if (entity == EntityType.NODE) {
+			if (socketTypes == null) {
+				initSocketTypes();
+			}
+			tags = new LinkedHashMap<>(tags);
+			for (String key : socketTypes.keySet()) {
+				String val = tags.get(key);
+				String socketType = parseSocketType(key);
+				String newKey = "osmand_socket_" + socketType + "_output";
+				if(val != null) {
+					tags.put(newKey, filterValues(val, socketTypes.get(key)));
+				}
+			}
+			
+		}
+		return tags;
+	}
+	
+
+	private String parseSocketType(String string) {
+		int firstColon = string.indexOf(':');
+		int secondColon = string.indexOf(':', firstColon+1);
+		if (firstColon != -1 && secondColon != -1) {
+		    return string.substring(firstColon + 1, secondColon);
+		}
+		return "";
+	}
+
+	private String filterValues(String val, TIntArrayList limits) {
+		String standard = val.toLowerCase().replaceAll(" ", "");
+		if (standard.contains("x")) {
+			standard = standard.substring(standard.indexOf("x"), (standard.length() - 1));
+		}
+		if (standard.contains(";")) {
+			int out = 0;
+			String[] vals = standard.split(";");
+			for (String value : vals) {
+				out = Math.max(out, getNumericValue(value));
+			}
+			return getAppropriateVal(out, limits);
+		}
+		return getAppropriateVal(getNumericValue(standard), limits);
+	}
+
+	private int getNumericValue(String value) {
+		value = value.replaceAll("[^\\d.,]", "");
+		double tmp = 0d;
+		if (!value.isEmpty()) {
+			try {
+				tmp = Double.valueOf(value);
+			} catch (IllegalFormatException e) {
+				e.printStackTrace();
+			}
+		}
+		return (int) tmp;
+	}
+
+	private String getAppropriateVal(int output, TIntArrayList limits) {
+		// to convert possible values in watts
+		if (output > 1000) {
+			output = (int) output / 1000;
+		}
+		if (output <= limits.get(0)) {
+			return LOW_CHARGING_OUT;
+		} else if (output <= limits.get(1)) {
+			return MEDIUM_CHARGING_OUT;
+		} else {
+			return HIGH_CHARGING_OUT;
+		}
+	}
 
 	private Map<String, String> transformIntegrityTags(Map<String, String> tags, EntityType entity,
 			EntityConvertApplyType appType) {
