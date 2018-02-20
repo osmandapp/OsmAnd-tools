@@ -8,7 +8,6 @@ import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.IllegalFormatException;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -395,7 +394,6 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		return tags;
 	}
 	
-
 	private String parseSocketType(String string) {
 		int firstColon = string.indexOf(':');
 		int secondColon = string.indexOf(':', firstColon+1);
@@ -422,12 +420,12 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	}
 
 	private int getNumericValue(String value) {
-		value = value.replaceAll("[^\\d.,]", "");
+		value = value.replaceAll("[^\\d.,]", "").replaceAll(",", ".");
 		double tmp = 0d;
 		if (!value.isEmpty()) {
 			try {
 				tmp = Double.valueOf(value);
-			} catch (IllegalFormatException e) {
+			} catch (NumberFormatException e) {
 				e.printStackTrace();
 			}
 		}
