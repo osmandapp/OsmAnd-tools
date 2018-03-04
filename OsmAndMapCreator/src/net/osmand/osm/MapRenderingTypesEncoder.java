@@ -1077,7 +1077,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		return new double[]{h,s,v};
 	}
 
-	public String formatColorToPalette(String vl, boolean palette6){
+	public static String formatColorToPalette(String vl, boolean palette6){
 		vl = vl.toLowerCase();
 		int color = -1;
 		int r = -1;

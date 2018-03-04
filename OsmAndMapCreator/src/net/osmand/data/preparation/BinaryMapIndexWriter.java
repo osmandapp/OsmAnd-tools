@@ -1138,7 +1138,7 @@ public class BinaryMapIndexWriter {
 		log.info("TRANSPORT INDEX SIZE : " + len);
 	}
 
-	public void writeTransportRoute(long idRoute, String routeName, String routeEnName, String ref, String operator, String type, int dist,
+	public void writeTransportRoute(long idRoute, String routeName, String routeEnName, String ref, String operator, String type, int dist, String color,
 			List<TransportStop> directStops, List<byte[]> directRoute, Map<String, Integer> stringTable, Map<Long, Long> transportRoutesRegistry) throws IOException {
 		checkPeekState(TRANSPORT_ROUTES);
 		TransportRoute.Builder tRoute = OsmandOdb.TransportRoute.newBuilder();
@@ -1148,6 +1148,7 @@ public class BinaryMapIndexWriter {
 		tRoute.setId(idRoute);
 		tRoute.setName(registerString(stringTable, routeName));
 		tRoute.setDistance(dist);
+		tRoute.setColor(registerString(stringTable, color));
 
 		if (routeEnName != null) {
 			tRoute.setNameEn(registerString(stringTable, routeEnName));
