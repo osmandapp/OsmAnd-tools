@@ -16,6 +16,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.zip.GZIPOutputStream;
 
@@ -41,12 +42,27 @@ import org.xwiki.rendering.converter.Converter;
 public class WikiVoyagePreparation {
 	private static final Log log = PlatformUtil.getLog(WikiDatabasePreparation.class);
 	
+	public enum WikivoyageTemplates {
+		LOCATION("geo"),
+		POI("poi"),
+		PART_OF("part_of");
+		
+		private String type;
+		WikivoyageTemplates(String s) {
+			type = s;
+		}
+		
+		public String getType() {
+			return type;
+		}
+	}
+	
 	public static void main(String[] args) throws IOException, ParserConfigurationException, SAXException, SQLException, ComponentLookupException {
 		String lang = "";
 		String folder = "";
 		if(args.length == 0) {
 			lang = "en";
-			folder = "/Users/victorshcherb/osmand/wikivoyage/";
+			folder = "/home/user/osmand/wikivoyage/";
 		}
 		if(args.length > 0) {
 			lang = args[0];
@@ -55,18 +71,20 @@ public class WikiVoyagePreparation {
 			folder = args[1];
 		}
 		final String wikiPg = folder + lang + "wikivoyage-latest-pages-articles.xml.bz2";
-		final String sqliteFileName = folder + lang + "wiki.sqlite";
+		final String sqliteFileName = folder + lang + "wikivoyage.sqlite";
     	
 		processWikivoyage(wikiPg, lang, sqliteFileName);
+		System.out.println("Successfully generated.");
 		// testContent(lang, folder);
     }
-//
+
 	protected static void processWikivoyage(final String wikiPg, String lang, String sqliteFileName)
 			throws ParserConfigurationException, SAXException, FileNotFoundException, IOException, SQLException, ComponentLookupException {
 		SAXParser sx = SAXParserFactory.newInstance().newSAXParser();
 		InputStream streamFile = new BufferedInputStream(new FileInputStream(wikiPg), 8192 * 4);
 		InputStream stream = streamFile;
 		if (stream.read() != 'B' || stream.read() != 'Z') {
+			stream.close();
 			throw new RuntimeException(
 					"The source stream must start with the characters BZ if it is to be read as a BZip2 stream."); //$NON-NLS-1$
 		} 
@@ -84,12 +102,13 @@ public class WikiVoyagePreparation {
 		private final SAXParser saxParser;
 		private boolean page = false;
 		private boolean revision = false;
+		
 		private StringBuilder ctext = null;
 		private long cid;
-
 		private StringBuilder title = new StringBuilder();
 		private StringBuilder text = new StringBuilder();
 		private StringBuilder pageId = new StringBuilder();
+		
 		private boolean parseText = false;
 
 		private final InputStream progIS;
@@ -110,8 +129,8 @@ public class WikiVoyagePreparation {
 			this.progIS = progIS;
 			dialect.removeDatabase(sqliteFile);
 			conn = (Connection) dialect.getDatabaseConnection(sqliteFile.getAbsolutePath(), log);
-			conn.createStatement().execute("CREATE TABLE wiki(id long, lat double, lon double, title text, zipContent blob)");
-			prep = conn.prepareStatement("INSERT INTO wiki VALUES (?, ?, ?, ?, ?)");
+			conn.createStatement().execute("CREATE TABLE " + lang + "_wikivoyage(article_id long, title text, content_gz blob, is_part_of text, lat double, lon double, image blob, gpx_gz blob)");
+			prep = conn.prepareStatement("INSERT INTO " + lang + "_wikivoyage VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
 			
 			progress.startTask("Parse wiki xml", progIS.available());
 			EmbeddableComponentManager cm = new EmbeddableComponentManager();
@@ -192,7 +211,7 @@ public class WikiVoyagePreparation {
 						parseText = true;// pages.containsKey(cid);
 					} else if (name.equals("text")) {
 						if (parseText) {
-							System.out.println(ctext.toString());
+//							System.out.println(ctext.toString());
 							String text = WikiDatabasePreparation.removeMacroBlocks(ctext.toString());
 							final HTMLConverter converter = new HTMLConverter(false);
 							WikiModel wikiModel = new WikiModel("http://"+lang+".wikipedia.com/wiki/${image}", "http://"+lang+".wikipedia.com/wiki/${title}");
@@ -202,25 +221,40 @@ public class WikiVoyagePreparation {
 //							System.out.println("\n\n");
 //							converter.convert(new StringReader(text), Syntax.MEDIAWIKI_1_0, Syntax.XHTML_1_0, printer);
 //							String plainStr = printer.toString();
-							LatLon ll = new LatLon(0, 0);
-							if (id++ % 500 == 0) {
-								log.debug("Article accepted " + cid + " " + title.toString() + " " + ll.getLatitude()
-										+ " " + ll.getLongitude() + " free: "
-										+ (Runtime.getRuntime().freeMemory() / (1024 * 1024)));
-//								System.out.println(plainStr);
-							}
+//							if (id++ % 500 == 0) {
+//								log.debug("Article accepted " + cid + " " + title.toString() + " " + ll.getLatitude()
+//										+ " " + ll.getLongitude() + " free: "
+//										+ (Runtime.getRuntime().freeMemory() / (1024 * 1024)));
+////								System.out.println(plainStr);
+//							}
 							try {
-								prep.setLong(1, cid);
-								prep.setDouble(2, ll.getLatitude());
-								prep.setDouble(3, ll.getLongitude());
-								prep.setString(4, title.toString());
-								bous.reset();
-								GZIPOutputStream gzout = new GZIPOutputStream(bous);
-								gzout.write(plainStr.getBytes("UTF-8"));
-								gzout.close();
-								final byte[] byteArray = bous.toByteArray();
-								prep.setBytes(5, byteArray);
-								addBatch();
+								Map<String, List<String>> macroBlocks = WikiDatabasePreparation.getMacroBlocks();
+								if (!macroBlocks.isEmpty()) {
+									LatLon ll = getLatLonFromGeoBlock(
+											macroBlocks.get(WikivoyageTemplates.LOCATION.getType()));
+									if (!ll.isZero()) {
+										prep.setLong(1, cid);
+										prep.setString(2, title.toString());
+										bous.reset();
+										GZIPOutputStream gzout = new GZIPOutputStream(bous);
+										gzout.write(plainStr.getBytes("UTF-8"));
+										gzout.close();
+										final byte[] byteArray = bous.toByteArray();
+										prep.setBytes(3, byteArray);
+										// part_of
+										prep.setString(4,
+												parsePartOf(macroBlocks.get(WikivoyageTemplates.PART_OF.getType())));
+										
+										prep.setDouble(5, ll.getLatitude());
+										prep.setDouble(6, ll.getLongitude());
+										// TODO: get image and create the gpx from macroBlocks.get(WigivoyageTemplates.POI)
+										// image
+										prep.setBytes(7, new byte[0]);
+										// gpx_gz
+										prep.setBytes(8, new byte[0]);
+										addBatch();
+									}
+								}
 							} catch (SQLException e) {
 								throw new SAXException(e);
 							}
@@ -232,7 +266,31 @@ public class WikiVoyagePreparation {
 				throw new SAXException(e);
 			}
 		}
-		
-		
+
+		private LatLon getLatLonFromGeoBlock(List<String> list) {
+			if (list != null && !list.isEmpty()) {
+				String location = list.get(0);
+				String[] parts = location.split("\\|");
+				double lat = 0d;
+				double lon = 0d;
+				// skip malformed location blocks
+				try {
+					lat = Double.valueOf(parts[1]);
+					lon = Double.valueOf(parts[2]);
+				} catch (Exception e) {
+//					e.printStackTrace();
+				}
+				return new LatLon(lat, lon);
+			}
+			return new LatLon(0, 0);
+		}
+
+		private String parsePartOf(List<String> list) {
+			if (list != null && !list.isEmpty()) {
+				String partOf = list.get(0);
+				return partOf.substring(partOf.indexOf("|") + 1, partOf.length());
+			}
+			return "";
+		}
 	}
 }

@@ -39,6 +39,7 @@ import javax.xml.parsers.SAXParserFactory;
 import net.osmand.PlatformUtil;
 import net.osmand.data.preparation.DBDialect;
 import net.osmand.impl.ConsoleProgressImplementation;
+import net.osmand.osm.util.WikiVoyagePreparation.WikivoyageTemplates;
 
 import org.apache.commons.logging.Log;
 import org.apache.tools.bzip2.CBZip2InputStream;
@@ -64,6 +65,7 @@ import org.xwiki.rendering.syntax.Syntax;
 
 public class WikiDatabasePreparation {
 	private static final Log log = PlatformUtil.getLog(WikiDatabasePreparation.class);
+	private static Map<String, List<String>> macroBlocksMap;
 	
 	public interface InsertValueProcessor {
     	public void process(List<String> vs);
@@ -86,33 +88,69 @@ public class WikiDatabasePreparation {
 		public double getLongitude() {
 			return longitude;
 		}
+		
+		public boolean isZero() {
+			return (latitude == 0 && longitude == 0);
+		}
 
 	}
 
-	
+	public static Map<String, List<String>> getMacroBlocks() {
+		return macroBlocksMap;
+	}
     
 	public static String removeMacroBlocks(String s) {
 		StringBuilder bld = new StringBuilder();
 		int openCnt = 0;
+		macroBlocksMap = new HashMap<>();
+		int beginInd = 0;
+		int endInd;
 		for (int i = 0; i < s.length(); i++) {
 			int nt = s.length() - i - 1;
 			if (nt > 0 && s.charAt(i) == '{' && s.charAt(i + 1) == '{') {
+				beginInd = i + 2;
 				openCnt++;
 				i++;
 			} else if (nt > 0 && s.charAt(i) == '}' && s.charAt(i + 1) == '}') {
 				if (openCnt > 0) {
 					openCnt--;
 				}
+				endInd = i;
+				String val = s.substring(beginInd, endInd);
+				String key = getKey(val);
+				if (macroBlocksMap.containsKey(key)) {
+					macroBlocksMap.get(key).add(val);
+				} else {
+					List<String> tmp = new ArrayList<>();
+					tmp.add(val);
+					macroBlocksMap.put(key, tmp);
+				}
 				i++;
 			} else {
 				if (openCnt == 0) {
 					bld.append(s.charAt(i));
+					beginInd = 0;
+					endInd = 0;
 				}
 			}
 		}
 		return bld.toString();
 	}
 	
+	private static String getKey(String str) {
+		str = str.toLowerCase();
+		if (str.contains("geo|")) {
+			return WikivoyageTemplates.LOCATION.getType();
+		} else if (str.contains("ispartof")) {
+			return WikivoyageTemplates.PART_OF.getType();
+		} else if (str.contains("do") || str.contains("see") 
+				|| str.contains("eat") || str.contains("drink") 
+				|| str.contains("sleep") || str.contains("buy")) {
+			return WikivoyageTemplates.POI.getType();
+		}
+		return "";
+	}
+
 	public static void mainTest(String[] args) throws ConversionException, ComponentLookupException, ParseException, IOException {
 		EmbeddableComponentManager cm = new EmbeddableComponentManager();
 		cm.initialize(WikiDatabasePreparation.class.getClassLoader());
