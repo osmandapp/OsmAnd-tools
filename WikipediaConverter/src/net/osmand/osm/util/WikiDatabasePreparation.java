@@ -94,15 +94,11 @@ public class WikiDatabasePreparation {
 		}
 
 	}
-
-	public static Map<String, List<String>> getMacroBlocks() {
-		return macroBlocksMap;
-	}
     
-	public static String removeMacroBlocks(String s) {
+	public static String removeMacroBlocks(String s, Map<String, List<String>> blocksMap) {
 		StringBuilder bld = new StringBuilder();
 		int openCnt = 0;
-		macroBlocksMap = new HashMap<>();
+		blocksMap = new HashMap<>();
 		int beginInd = 0;
 		int endInd;
 		for (int i = 0; i < s.length(); i++) {
@@ -118,12 +114,14 @@ public class WikiDatabasePreparation {
 				endInd = i;
 				String val = s.substring(beginInd, endInd);
 				String key = getKey(val);
-				if (macroBlocksMap.containsKey(key)) {
-					macroBlocksMap.get(key).add(val);
-				} else {
-					List<String> tmp = new ArrayList<>();
-					tmp.add(val);
-					macroBlocksMap.put(key, tmp);
+				if (!key.isEmpty()) {
+					if (blocksMap.containsKey(key)) {
+						blocksMap.get(key).add(val);
+					} else {
+						List<String> tmp = new ArrayList<>();
+						tmp.add(val);
+						blocksMap.put(key, tmp);
+					}
 				}
 				i++;
 			} else {
@@ -147,6 +145,8 @@ public class WikiDatabasePreparation {
 				|| str.contains("eat") || str.contains("drink") 
 				|| str.contains("sleep") || str.contains("buy")) {
 			return WikivoyageTemplates.POI.getType();
+		} else if (str.contains("pagebanner")) {
+			return WikivoyageTemplates.BANNER.getType();
 		}
 		return "";
 	}
@@ -162,7 +162,7 @@ public class WikiDatabasePreparation {
 		while((s = br.readLine()) != null) {
 			content += s;
 		}
-		content = removeMacroBlocks(content);
+		content = removeMacroBlocks(content, new HashMap<>());
 		
 		XDOM xdom = parser.parse(new StringReader(content));
 		        
@@ -577,7 +577,7 @@ public class WikiDatabasePreparation {
 						}
 						if (parseText && !isJunk) {
 							LatLon ll = pages.get(cid);
-							String text = removeMacroBlocks(ctext.toString());
+							String text = removeMacroBlocks(ctext.toString(), new HashMap<>());
 							final HTMLConverter converter = new HTMLConverter(false);
 							WikiModel wikiModel = new WikiModel("http://"+lang+".wikipedia.com/wiki/${image}", "http://"+lang+".wikipedia.com/wiki/${title}");
 							String plainStr = wikiModel.render(converter, text);
