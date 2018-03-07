@@ -54,5 +54,6 @@
 	<classpathentry kind="lib" path="lib/xwiki-rendering-syntax-xhtml-7.1-milestone-2.jar"/>
 	<classpathentry kind="lib" path="lib/xwiki-rendering-wikimodel-7.1-milestone-2.jar"/>
 	<classpathentry kind="lib" path="lib/xwiki-rendering-xml-7.1-milestone-2.jar"/>
+	<classpathentry kind="lib" path="lib/gson-2.8.2.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

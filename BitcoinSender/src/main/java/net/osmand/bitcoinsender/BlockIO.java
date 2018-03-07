@@ -1,10 +1,12 @@
 package net.osmand.bitcoinsender;
 
 import com.google.gson.Gson;
+
 import net.osmand.bitcoinsender.utils.BlockIOException;
 import net.osmand.bitcoinsender.utils.Constants;
 import net.osmand.bitcoinsender.utils.SigningUtils;
 import net.osmand.bitcoinsender.model.*;
+
 import org.apache.http.HttpStatus;
 import org.apache.http.NameValuePair;
 import org.apache.http.client.entity.UrlEncodedFormEntity;
@@ -25,7 +27,8 @@ import java.util.*;
 
 public class BlockIO {
 
-    private String apiKey;
+    private static String PRIORITY = "low"; // "medium"
+	private String apiKey;
 
     public enum ParamType{
         ADDRS, LABELS, USERIDS
@@ -468,7 +471,7 @@ public class BlockIO {
                 postParams.add(new BasicNameValuePair(entry.getKey(), entry.getValue()));
             }
         }
-        postParams.add(new BasicNameValuePair("priority", "medium"));
+        postParams.add(new BasicNameValuePair("priority", PRIORITY));
 
         CloseableHttpResponse response;
         try {

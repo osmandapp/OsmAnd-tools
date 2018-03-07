@@ -165,8 +165,8 @@ public class CoinSenderMain {
 							+ ((chunk + 1)* PART_SIZE ) + ") ...");
                     int numberOfInputs = 1;
                     int txSize = currentPayment.size() * 34 + numberOfInputs * 180 + 10 + 40;
-                    double calculatedFee = ((double)txSize * FEE_BYTE_SATOSHI) / BITCOIN_SATOSHI;
-                    System.out.println("! Double check that estimated fee not less than: " + calculatedFee + " BTC!");
+                    float calculatedFee = (float) (((float)txSize * FEE_BYTE_SATOSHI) / BITCOIN_SATOSHI);
+                    System.out.println("! Double check that estimated fee is close to and not less than (!): " + calculatedFee + " BTC!");
                     System.out.print("Are you sure you want to pay " + totalString + " BTC? [y/n]: ");
                     String answer = scanner.nextLine();
 
