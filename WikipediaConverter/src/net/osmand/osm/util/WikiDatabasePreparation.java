@@ -98,7 +98,6 @@ public class WikiDatabasePreparation {
 	public static String removeMacroBlocks(String s, Map<String, List<String>> blocksMap) {
 		StringBuilder bld = new StringBuilder();
 		int openCnt = 0;
-		blocksMap = new HashMap<>();
 		int beginInd = 0;
 		int endInd;
 		for (int i = 0; i < s.length(); i++) {
