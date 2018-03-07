@@ -45,7 +45,8 @@ public class WikiVoyagePreparation {
 	public enum WikivoyageTemplates {
 		LOCATION("geo"),
 		POI("poi"),
-		PART_OF("part_of");
+		PART_OF("part_of"),
+		BANNER("pagebanner");
 		
 		private String type;
 		WikivoyageTemplates(String s) {
@@ -71,7 +72,7 @@ public class WikiVoyagePreparation {
 			folder = args[1];
 		}
 		final String wikiPg = folder + lang + "wikivoyage-latest-pages-articles.xml.bz2";
-		final String sqliteFileName = folder + lang + "wikivoyage.sqlite";
+		final String sqliteFileName = folder + lang + "wikivoyage_uncompressed.sqlite";
     	
 		processWikivoyage(wikiPg, lang, sqliteFileName);
 		System.out.println("Successfully generated.");
@@ -212,7 +213,8 @@ public class WikiVoyagePreparation {
 					} else if (name.equals("text")) {
 						if (parseText) {
 //							System.out.println(ctext.toString());
-							String text = WikiDatabasePreparation.removeMacroBlocks(ctext.toString());
+							Map<String, List<String>> macroBlocks = new HashMap<>();
+							String text = WikiDatabasePreparation.removeMacroBlocks(ctext.toString(), macroBlocks);
 							final HTMLConverter converter = new HTMLConverter(false);
 							WikiModel wikiModel = new WikiModel("http://"+lang+".wikipedia.com/wiki/${image}", "http://"+lang+".wikipedia.com/wiki/${title}");
 							String plainStr = wikiModel.render(converter, text);
@@ -228,7 +230,6 @@ public class WikiVoyagePreparation {
 ////								System.out.println(plainStr);
 //							}
 							try {
-								Map<String, List<String>> macroBlocks = WikiDatabasePreparation.getMacroBlocks();
 								if (!macroBlocks.isEmpty()) {
 									LatLon ll = getLatLonFromGeoBlock(
 											macroBlocks.get(WikivoyageTemplates.LOCATION.getType()));
@@ -249,7 +250,7 @@ public class WikiVoyagePreparation {
 										prep.setDouble(6, ll.getLongitude());
 										// TODO: get image and create the gpx from macroBlocks.get(WigivoyageTemplates.POI)
 										// image
-										prep.setBytes(7, new byte[0]);
+										prep.setBytes(7, getPageBanner(macroBlocks.get(WikivoyageTemplates.BANNER.getType())));
 										// gpx_gz
 										prep.setBytes(8, new byte[0]);
 										addBatch();
@@ -265,6 +266,14 @@ public class WikiVoyagePreparation {
 			} catch (IOException e) {
 				throw new SAXException(e);
 			}
+		}
+
+		private byte[] getPageBanner(List<String> list) {
+			if (list != null && !list.isEmpty()) {
+				String bannerInfo = list.get(0);
+				return new byte[0];
+			}
+			return new byte[0];
 		}
 
 		private LatLon getLatLonFromGeoBlock(List<String> list) {
