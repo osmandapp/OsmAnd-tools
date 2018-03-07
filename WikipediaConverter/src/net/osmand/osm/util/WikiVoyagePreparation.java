@@ -308,7 +308,7 @@ public class WikiVoyagePreparation {
 					String url = urls.get("url").getAsString();
 					return downloadFromUrl(url);
 				} catch (Exception e) {
-//					e.printStackTrace();
+					// e.printStackTrace();
 				}
 			}
 			return new byte[0];
@@ -337,13 +337,13 @@ public class WikiVoyagePreparation {
 			ByteArrayOutputStream baos = new ByteArrayOutputStream();
 			InputStream is = null;
 			try {
-			  is = url.openStream();
-			  byte[] byteChunk = new byte[4096]; // Or whatever size you want to read in at a time.
-			  int n;
+				is = url.openStream();
+				byte[] byteChunk = new byte[4096]; // Or whatever size you want to read in at a time.
+				int n;
 
-			  while ( (n = is.read(byteChunk)) > 0 ) {
-			    baos.write(byteChunk, 0, n);
-			  }
+				while ((n = is.read(byteChunk)) > 0) {
+					baos.write(byteChunk, 0, n);
+				}
 			} catch (IOException e) {
 				System.err.printf("Failed while reading bytes from %s: %s", url.toExternalForm(), e.getMessage());
 				e.printStackTrace();
@@ -361,28 +361,28 @@ public class WikiVoyagePreparation {
 		}
 
 		private static String readUrl(String urlString) {
-	        BufferedReader reader = null;
-	        try {
-	            URL url = new URL(urlString);
-	            reader = new BufferedReader(new InputStreamReader(url.openStream()));
-	            StringBuffer buffer = new StringBuffer();
-	            int read;
-	            char[] chars = new char[1024];
-	            while ((read = reader.read(chars)) != -1)
-	                buffer.append(chars, 0, read); 
+			BufferedReader reader = null;
+			try {
+				URL url = new URL(urlString);
+				reader = new BufferedReader(new InputStreamReader(url.openStream()));
+				StringBuffer buffer = new StringBuffer();
+				int read;
+				char[] chars = new char[1024];
+				while ((read = reader.read(chars)) != -1)
+					buffer.append(chars, 0, read);
 
-	            return buffer.toString();
-	        } catch (Exception e) {
-	        	return "";
-	        } finally {
-	            if (reader != null)
+				return buffer.toString();
+			} catch (Exception e) {
+				return "";
+			} finally {
+				if (reader != null)
 					try {
 						reader.close();
 					} catch (IOException e) {
 						return "";
 					}
-	        }
-	    }
+			}
+		}
 
 		private LatLon getLatLonFromGeoBlock(List<String> list) {
 			if (list != null && !list.isEmpty()) {
