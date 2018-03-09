@@ -52,6 +52,9 @@ public class WikiVoyagePreparation {
 	private static String urlBase;
 	private static final String urlEnd = "&prop=imageinfo&&iiprop=url&&format=json";
 	
+	private static WikivoyageImageLinksStorage imageStorage;
+	private static boolean imageLinks;
+	
 	public enum WikivoyageTemplates {
 		LOCATION("geo"),
 		POI("poi"),
@@ -71,6 +74,7 @@ public class WikiVoyagePreparation {
 	public static void main(String[] args) throws IOException, ParserConfigurationException, SAXException, SQLException, ComponentLookupException {
 		String lang = "";
 		String folder = "";
+		imageLinks = false;
 		if(args.length == 0) {
 			lang = "en";
 			folder = "/home/user/osmand/wikivoyage/";
@@ -80,6 +84,12 @@ public class WikiVoyagePreparation {
 		}
 		if(args.length > 1){
 			folder = args[1];
+		}
+		if(args.length > 2){
+			imageLinks = Boolean.valueOf(args[2]);
+		}
+		if (imageLinks) {
+			imageStorage = new WikivoyageImageLinksStorage(lang, folder);
 		}
 		urlBase = "https://" + lang + ".wikivoyage.org/w/api.php?action=query&titles=File:";
 		final String wikiPg = folder + lang + "wikivoyage-latest-pages-articles.xml.bz2";
@@ -114,6 +124,8 @@ public class WikiVoyagePreparation {
 		private final SAXParser saxParser;
 		private boolean page = false;
 		private boolean revision = false;
+		private Map<String, Long> images = new HashMap<>();
+		private long imageId = 0l;
 		
 		private StringBuilder ctext = null;
 		private long cid;
@@ -132,7 +144,7 @@ public class WikiVoyagePreparation {
 		private int batch = 0;
 		private int imageBatch = 0;
 		private final static int BATCH_SIZE = 500;
-		private final static int IMAGE_BATCH_SIZE = 50;
+		private final static int IMAGE_BATCH_SIZE = 500;
 		final ByteArrayOutputStream bous = new ByteArrayOutputStream(64000);
 		private String lang;
 		private Converter converter;
@@ -144,9 +156,9 @@ public class WikiVoyagePreparation {
 			this.progIS = progIS;
 			dialect.removeDatabase(sqliteFile);
 			conn = (Connection) dialect.getDatabaseConnection(sqliteFile.getAbsolutePath(), log);
-			conn.createStatement().execute("CREATE TABLE " + lang + "_wikivoyage(article_id long, title text, content_gz blob, is_part_of text, lat double, lon double, gpx_gz blob)");
-			conn.createStatement().execute("CREATE TABLE images(image_id long, image_title text, image blob)");
-			prep = conn.prepareStatement("INSERT INTO " + lang + "_wikivoyage VALUES (?, ?, ?, ?, ?, ?, ?)");
+			conn.createStatement().execute("CREATE TABLE " + lang + "_wikivoyage(article_id long, title text, content_gz blob, is_part_of text, lat double, lon double, image_id long, gpx_gz blob)");
+			conn.createStatement().execute("CREATE TABLE images(image_id long, image_title text, image text)");
+			prep = conn.prepareStatement("INSERT INTO " + lang + "_wikivoyage VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
 			imagePrep = conn.prepareStatement("INSERT INTO images VALUES (?, ?, ?)");
 			
 			progress.startTask("Parse wiki xml", progIS.available());
@@ -237,7 +249,7 @@ public class WikiVoyagePreparation {
 							Map<String, List<String>> macroBlocks = new HashMap<>();
 							String text = WikiDatabasePreparation.removeMacroBlocks(ctext.toString(), macroBlocks);
 							final HTMLConverter converter = new HTMLConverter(false);
-							WikiModel wikiModel = new WikiModel("http://"+lang+".wikipedia.com/wiki/${image}", "http://"+lang+".wikipedia.com/wiki/${title}");
+							WikiModel wikiModel = new WikiModel("https://"+lang+".wikivoyage.org/wiki/${image}", "https://"+lang+".wikivoyage.com/wiki/${title}");
 							String plainStr = wikiModel.render(converter, text);
 //							WikiPrinter printer = new DefaultWikiPrinter();
 //							System.out.println(text);
@@ -271,14 +283,25 @@ public class WikiVoyagePreparation {
 										prep.setDouble(6, ll.getLongitude());
 										// TODO: get image and create the gpx from macroBlocks.get(WigivoyageTemplates.POI)
 										// image
-										imagePrep.setLong(1, cid);
 										String filename = getFileName(macroBlocks.get(WikivoyageTemplates.BANNER.getType()));
 										if (!filename.isEmpty()) {
-											imagePrep.setString(2, filename);
-											imagePrep.setBytes(3, getPageBanner(filename));
+											if (images.containsKey(filename)) {
+												prep.setLong(7, images.get(filename));
+											} else {
+												imagePrep.setLong(1, imageId);
+												imagePrep.setString(2, filename);
+//												imagePrep.setBytes(3, getPageBanner(filename));
+												imagePrep.setString(3, urlBase + filename + urlEnd);
+												prep.setLong(7, imageId);
+												imageId++;
+											}
+											
 										}
 										// gpx_gz
-										prep.setBytes(7, new byte[0]);
+										prep.setBytes(8, new byte[0]);
+										if (imageLinks) {
+											imageStorage.saveImageLinks(title.toString().replaceAll(" ", "%20"));
+										}
 										addBatch();
 									}
 								}
@@ -294,7 +317,7 @@ public class WikiVoyagePreparation {
 			}
 		}
 
-		private byte[] getPageBanner(String filename) {
+		private /**byte[]**/ String getPageBanner(String filename) {
 			String json = readUrl(urlBase + filename + urlEnd);
 			if (!json.isEmpty()) {
 				Gson gson = new Gson();
@@ -306,12 +329,14 @@ public class WikiVoyagePreparation {
 					JsonArray imageInfo = minOne.getAsJsonArray("imageinfo");
 					JsonObject urls = (JsonObject) imageInfo.get(0);
 					String url = urls.get("url").getAsString();
-					return downloadFromUrl(url);
+//					return downloadFromUrl(url);
+					return url;
 				} catch (Exception e) {
 					// e.printStackTrace();
 				}
 			}
-			return new byte[0];
+//			return new byte[0];
+			return "";
 		}
 
 		private String getFileName(List<String> list) {
@@ -338,7 +363,7 @@ public class WikiVoyagePreparation {
 			InputStream is = null;
 			try {
 				is = url.openStream();
-				byte[] byteChunk = new byte[4096]; // Or whatever size you want to read in at a time.
+				byte[] byteChunk = new byte[4096];
 				int n;
 
 				while ((n = is.read(byteChunk)) > 0) {
@@ -356,11 +381,10 @@ public class WikiVoyagePreparation {
 					}
 				}
 			}
-			System.out.println(urlString);
 			return baos.toByteArray();
 		}
 
-		private static String readUrl(String urlString) {
+		public static String readUrl(String urlString) {
 			BufferedReader reader = null;
 			try {
 				URL url = new URL(urlString);
