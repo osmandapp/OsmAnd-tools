@@ -391,14 +391,9 @@ public class WikiVoyagePreparation {
 				if (!points.isEmpty()) {
 					f.addPoints(points);
 					ByteArrayOutputStream baos = new ByteArrayOutputStream();
-					Writer writer;
 					try {
-						writer = new OutputStreamWriter(baos, "UTF-8");
-						GPXUtils.writeGpx(writer , f);
-						byte[] bytes = baos.toByteArray();
-						baos.reset();
 						GZIPOutputStream gzout = new GZIPOutputStream(baos);
-						gzout.write(bytes);
+						gzout.write(GPXUtils.asString(f).getBytes("UTF-8"));
 						gzout.close();
 						return baos.toByteArray();
 					} catch (IOException e) {

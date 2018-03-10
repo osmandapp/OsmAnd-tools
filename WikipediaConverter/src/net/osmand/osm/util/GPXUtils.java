@@ -72,22 +72,7 @@ public class GPXUtils {
 
 		public WptPt() {
 		}
-
-		public WptPt(WptPt wptPt) {
-			this.lat = wptPt.lat;
-			this.lon = wptPt.lon;
-			this.name = wptPt.name;
-			this.link = wptPt.link;
-
-			this.category = wptPt.category;
-			this.desc = wptPt.desc;
-			this.comment = wptPt.comment;
-
-		}
 		
-		public int getColor() {
-			return getColor(0);
-		}
 		public void setColor() {
 			if (category.equals("see") || category.equals("do")) {
 				super.setColor(15461130);
@@ -100,7 +85,6 @@ public class GPXUtils {
 			}
 		}
 
-		
 		public double getLatitude() {
 			return lat;
 		}
@@ -112,20 +96,6 @@ public class GPXUtils {
 		public WptPt(double lat, double lon) {
 			this.lat = lat;
 			this.lon = lon;
-		}
-
-
-		@Override
-		public int hashCode() {
-			final int prime = 31;
-			int result = 1;
-			result = prime * result + ((name == null) ? 0 : name.hashCode());
-			result = prime * result + ((category == null) ? 0 : category.hashCode());
-			result = prime * result + ((desc == null) ? 0 : desc.hashCode());
-			result = prime * result + ((comment == null) ? 0 : comment.hashCode());
-			result = prime * result + ((lat == 0) ? 0 : Double.valueOf(lat).hashCode());
-			result = prime * result + ((lon == 0) ? 0 : Double.valueOf(lon).hashCode());
-			return result;
 		}
 
 		public boolean hasLocation() {
@@ -173,10 +143,6 @@ public class GPXUtils {
 			modifiedTime = System.currentTimeMillis();
 		}
 
-		public boolean isCloudmadeRouteFile() {
-			return "cloudmade".equalsIgnoreCase(author);
-		}
-
 		public boolean hasWptPt() {
 			return points.size() > 0;
 		}
@@ -194,27 +160,6 @@ public class GPXUtils {
 			points.add(pt);
 			modifiedTime = System.currentTimeMillis();
 			return pt;
-		}
-
-		public void updateWptPt(WptPt pt, double lat, double lon, long time, String description, String name, String category, int color) {
-			int index = points.indexOf(pt);
-
-			double latAdjusted = Double.parseDouble(latLonFormat.format(lat));
-			double lonAdjusted = Double.parseDouble(latLonFormat.format(lon));
-
-			pt.lat = latAdjusted;
-			pt.lon = lonAdjusted;
-			pt.desc = description;
-			pt.name = name;
-			pt.category = category;
-			if (color != 0) {
-				pt.setColor(color);
-			}
-
-			if (index != -1) {
-				points.set(index, pt);
-			}
-			modifiedTime = System.currentTimeMillis();
 		}
 
 		public boolean deleteWptPt(WptPt pt) {
