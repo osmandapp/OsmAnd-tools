@@ -65,7 +65,6 @@ import org.xwiki.rendering.syntax.Syntax;
 
 public class WikiDatabasePreparation {
 	private static final Log log = PlatformUtil.getLog(WikiDatabasePreparation.class);
-	private static Map<String, List<String>> macroBlocksMap;
 	
 	public interface InsertValueProcessor {
     	public void process(List<String> vs);

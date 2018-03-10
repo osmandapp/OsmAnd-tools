@@ -1,28 +1,20 @@
 package net.osmand.osm.util;
 
 import java.io.File;
-import java.io.IOException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.commons.logging.Log;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
-import info.bliki.htmlcleaner.TagNode;
-import info.bliki.htmlcleaner.Utils;
-import info.bliki.wiki.filter.HTMLConverter;
-import info.bliki.wiki.model.IWikiModel;
-import info.bliki.wiki.model.ImageFormat;
 import net.osmand.PlatformUtil;
 import net.osmand.data.preparation.DBDialect;
 
@@ -38,6 +30,7 @@ public class WikivoyageImageLinksStorage {
 	private int batch = 0;
 	private final static int BATCH_SIZE = 500;
 	private DBDialect dialect = DBDialect.SQLITE;
+	private final Map<String, List<String>> map = new ConcurrentHashMap<>(); 
 	
 	public WikivoyageImageLinksStorage(String lang, String folder) throws SQLException {
 		this.lang = lang;
@@ -53,24 +46,47 @@ public class WikivoyageImageLinksStorage {
 		prep = conn.prepareStatement("INSERT INTO image_links VALUES (?, ?)");
 	}
 	
-	public void saveImageLinks(String title) throws SQLException {
+	public void writeData() throws SQLException {
 		Gson gson = new Gson();
-		List<String> urls = getSrcUrls(title);
-		prep.setString(1, title);
-		prep.setString(2, gson.toJson(urls));
-		System.out.println("Saving links for title: " + title + " Urls: " + urls.toString());
-		addBatch();
+		if (!map.isEmpty()) {
+			for (String s : map.keySet()) {
+				prep.setString(1, s);
+				prep.setString(2, gson.toJson(map.get(s)));
+				System.out.println("Saving links for title: " + s + " Urls: " + map.get(s).toString());
+				addBatch();
+			}
+		}
+		finish();
 	}
 	
-	public void addBatch() throws SQLException {
+	public void saveImageLinks(String title) throws SQLException {
+		if (title != null) {
+			getSrcUrls(title, map);
+		}
+	}
+	
+	
+	
+	public void addBatch() throws SQLException { 
 		prep.addBatch();
 		if(batch++ > BATCH_SIZE) {
 			prep.executeBatch();
 			batch = 0;
 		}
 	}
+	
+	public void finish() throws SQLException {
+		prep.executeBatch();
+		addBatch();
+		
+		if(!conn.getAutoCommit()) {
+			conn.commit();
+		}
+		prep.close();
+		conn.close();
+	}
 
-	private List<String> getSrcUrls(String title) {
+	private void getSrcUrls(String title, Map<String, List<String>> map) {
 		List<String> res = new ArrayList<>();
 		String urlStart = "https://" + lang + ".wikivoyage.org/w/api.php?action=query&prop=info%7Cimageinfo&titles=";
 		String urlEnd = "&generator=images&inprop=url&iiprop=url&format=json";
@@ -93,6 +109,8 @@ public class WikivoyageImageLinksStorage {
 //				e.printStackTrace();
 			}
 		}
-		return res;
+		if (!res.isEmpty()) {
+			map.putIfAbsent(title, res);
+		}
 	}
 }

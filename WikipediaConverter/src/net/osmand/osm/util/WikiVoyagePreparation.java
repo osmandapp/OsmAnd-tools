@@ -18,6 +18,7 @@ import java.net.URL;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,6 +31,8 @@ import javax.xml.parsers.SAXParserFactory;
 import net.osmand.PlatformUtil;
 import net.osmand.data.preparation.DBDialect;
 import net.osmand.impl.ConsoleProgressImplementation;
+import net.osmand.osm.util.GPXUtils.GPXFile;
+import net.osmand.osm.util.GPXUtils.WptPt;
 import net.osmand.osm.util.WikiDatabasePreparation.LatLon;
 
 import org.apache.commons.logging.Log;
@@ -100,7 +103,7 @@ public class WikiVoyagePreparation {
 		// testContent(lang, folder);
     }
 
-	protected static void processWikivoyage(final String wikiPg, String lang, String sqliteFileName)
+	protected static synchronized void processWikivoyage(final String wikiPg, String lang, String sqliteFileName)
 			throws ParserConfigurationException, SAXException, FileNotFoundException, IOException, SQLException, ComponentLookupException {
 		SAXParser sx = SAXParserFactory.newInstance().newSAXParser();
 		InputStream streamFile = new BufferedInputStream(new FileInputStream(wikiPg), 8192 * 4);
@@ -117,6 +120,9 @@ public class WikiVoyagePreparation {
 		final WikiOsmHandler handler = new WikiOsmHandler(sx, streamFile, lang, new File(sqliteFileName));
 		sx.parse(is, handler);
 		handler.finish();
+		if (imageStorage != null) {
+			imageStorage.finish();
+		}
 	}
 	
 	public static class WikiOsmHandler extends DefaultHandler {
@@ -187,6 +193,9 @@ public class WikiVoyagePreparation {
 			}
 			prep.close();
 			conn.close();
+			if (imageLinks) {
+				imageStorage.writeData();
+			}
 		}
 
 		public int getCount() {
@@ -281,7 +290,6 @@ public class WikiVoyagePreparation {
 										
 										prep.setDouble(5, ll.getLatitude());
 										prep.setDouble(6, ll.getLongitude());
-										// TODO: get image and create the gpx from macroBlocks.get(WigivoyageTemplates.POI)
 										// image
 										String filename = getFileName(macroBlocks.get(WikivoyageTemplates.BANNER.getType()));
 										if (!filename.isEmpty()) {
@@ -295,12 +303,21 @@ public class WikiVoyagePreparation {
 												prep.setLong(7, imageId);
 												imageId++;
 											}
-											
 										}
 										// gpx_gz
-										prep.setBytes(8, new byte[0]);
+										prep.setBytes(8, generateGpx(macroBlocks.get(WikivoyageTemplates.POI.getType())));
 										if (imageLinks) {
-											imageStorage.saveImageLinks(title.toString().replaceAll(" ", "%20"));
+											new Thread( new Runnable() {
+											    @Override
+											    public void run() {
+											    	try {
+														imageStorage.saveImageLinks(title.toString().replaceAll(" ", "%20"));
+													} catch (SQLException e) {
+														// TODO Auto-generated catch block
+														e.printStackTrace();
+													}
+											    }
+											}).start();
 										}
 										addBatch();
 									}
@@ -315,6 +332,71 @@ public class WikiVoyagePreparation {
 			} catch (IOException e) {
 				throw new SAXException(e);
 			}
+		}
+		
+		private byte[] generateGpx(List<String> list) {
+			if (list != null && !list.isEmpty()) {
+				
+				GPXFile f = new GPXFile();
+				List<WptPt> points = new ArrayList<>(); 
+				for (String s : list) {
+					String[] info = s.split("\\|");
+					WptPt point = new WptPt();
+					point.category = info[0].replaceAll("\n", "");
+					for (int i = 1; i < info.length; i++) {
+						String field = info[i].trim();
+						String value = "";
+						if (field.indexOf("=") != -1) {
+							value = field.substring(field.indexOf("=") + 1, field.length()).trim();
+						}
+						if (!value.isEmpty()) {
+							try {
+								if (field.contains("name=")) {
+									point.name = value;
+								} else if (field.contains("url=")) {
+									point.link = value;
+								} else if (field.contains("lat=")) {
+									point.lat = Double.valueOf(value);
+								} else if (field.contains("long=")) {
+									point.lon = Double.valueOf(value);
+								} else if (field.contains("content=")) {
+									point.desc = point.desc = point.desc == null ? value : 
+										point.desc + "\n" + value;
+								} else if (field.contains("email=")) {
+									point.desc = point.desc == null ? "Email: " + value : 
+										point.desc + "\nEmail: " + value;
+								} else if (field.contains("phone=")) {
+									point.desc = point.desc == null ? "Phone: " + value : 
+										point.desc + "\nPhone: " + value;
+								} else if (field.contains("price=")) {
+									point.desc = point.desc == null ? "Price: " + value : 
+										point.desc + "\nPrice: " + value;
+								} else if (field.contains("hours=")) {
+									point.desc = point.desc == null ? "Working hours: " + value : 
+										point.desc + "\nWorking hours: " + value;
+								}
+							} catch (Exception e) {}
+						}
+					}
+					if (point.hasLocation() && point.name != null && !point.name.isEmpty()) {
+						point.setColor();
+						points.add(point);
+					}
+				}
+				if (!points.isEmpty()) {
+					f.addPoints(points);
+					ByteArrayOutputStream baos = new ByteArrayOutputStream();
+					try {
+						GZIPOutputStream gzout = new GZIPOutputStream(baos);
+						gzout.write(GPXUtils.asString(f).getBytes("UTF-8"));
+						gzout.close();
+						return baos.toByteArray();
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+				}
+			}
+			return new byte[0];
 		}
 
 		private /**byte[]**/ String getPageBanner(String filename) {
