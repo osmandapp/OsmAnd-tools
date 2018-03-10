@@ -77,7 +77,7 @@ public class WikiVoyagePreparation {
 	public static void main(String[] args) throws IOException, ParserConfigurationException, SAXException, SQLException, ComponentLookupException {
 		String lang = "";
 		String folder = "";
-		imageLinks = false;
+		imageLinks = true;
 		if(args.length == 0) {
 			lang = "en";
 			folder = "/home/user/osmand/wikivoyage/";
@@ -96,7 +96,7 @@ public class WikiVoyagePreparation {
 		}
 		urlBase = "https://" + lang + ".wikivoyage.org/w/api.php?action=query&titles=File:";
 		final String wikiPg = folder + lang + "wikivoyage-latest-pages-articles.xml.bz2";
-		final String sqliteFileName = folder + lang + "wikivoyage.sqlite";
+		final String sqliteFileName = folder + lang + "_wikivoyage.sqlite";
     	
 		processWikivoyage(wikiPg, lang, sqliteFileName);
 		System.out.println("Successfully generated.");
@@ -120,8 +120,8 @@ public class WikiVoyagePreparation {
 		final WikiOsmHandler handler = new WikiOsmHandler(sx, streamFile, lang, new File(sqliteFileName));
 		sx.parse(is, handler);
 		handler.finish();
-		if (imageStorage != null) {
-			imageStorage.finish();
+		if (imageLinks) {
+			imageStorage.writeData();
 		}
 	}
 	
@@ -193,9 +193,6 @@ public class WikiVoyagePreparation {
 			}
 			prep.close();
 			conn.close();
-			if (imageLinks) {
-				imageStorage.writeData();
-			}
 		}
 
 		public int getCount() {
