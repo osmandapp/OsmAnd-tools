@@ -77,8 +77,6 @@ public class WikivoyageImageLinksStorage {
 	
 	public void finish() throws SQLException {
 		prep.executeBatch();
-		addBatch();
-		
 		if(!conn.getAutoCommit()) {
 			conn.commit();
 		}
