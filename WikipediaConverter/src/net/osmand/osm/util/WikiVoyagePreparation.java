@@ -57,6 +57,7 @@ public class WikiVoyagePreparation {
 	
 	private static WikivoyageImageLinksStorage imageStorage;
 	private static boolean imageLinks;
+	private static boolean uncompressed;
 	
 	public enum WikivoyageTemplates {
 		LOCATION("geo"),
@@ -77,7 +78,8 @@ public class WikiVoyagePreparation {
 	public static void main(String[] args) throws IOException, ParserConfigurationException, SAXException, SQLException, ComponentLookupException {
 		String lang = "";
 		String folder = "";
-		imageLinks = true;
+		imageLinks = false;
+		uncompressed = true;
 		if(args.length == 0) {
 			lang = "en";
 			folder = "/home/user/osmand/wikivoyage/";
@@ -89,14 +91,17 @@ public class WikiVoyagePreparation {
 			folder = args[1];
 		}
 		if(args.length > 2){
-			imageLinks = Boolean.valueOf(args[2]);
+			imageLinks = args[2].equals("fetch_image_links");
+		}
+		if (args.length > 3) {
+			uncompressed = args[3].equals("uncompressed");
 		}
 		if (imageLinks) {
 			imageStorage = new WikivoyageImageLinksStorage(lang, folder);
 		}
 		urlBase = "https://" + lang + ".wikivoyage.org/w/api.php?action=query&titles=File:";
 		final String wikiPg = folder + lang + "wikivoyage-latest-pages-articles.xml.bz2";
-		final String sqliteFileName = folder + lang + "_wikivoyage.sqlite";
+		final String sqliteFileName = folder + lang + (uncompressed ? "_full" : "") + "_wikivoyage.sqlite";
     	
 		processWikivoyage(wikiPg, lang, sqliteFileName);
 		System.out.println("Successfully generated.");
@@ -121,6 +126,14 @@ public class WikiVoyagePreparation {
 		sx.parse(is, handler);
 		handler.finish();
 		if (imageLinks) {
+			while (Thread.activeCount() > 1) {
+				System.out.println("Waiting for the image requests to complete... Threads active: " + Thread.activeCount());
+				try {
+					Thread.sleep(1500);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+			}
 			imageStorage.writeData();
 		}
 	}
@@ -162,7 +175,9 @@ public class WikiVoyagePreparation {
 			this.progIS = progIS;
 			dialect.removeDatabase(sqliteFile);
 			conn = (Connection) dialect.getDatabaseConnection(sqliteFile.getAbsolutePath(), log);
-			conn.createStatement().execute("CREATE TABLE " + lang + "_wikivoyage(article_id long, title text, content_gz blob, is_part_of text, lat double, lon double, image_id long, gpx_gz blob)");
+			String dataType = uncompressed ? "text" : "blob";
+			conn.createStatement().execute("CREATE TABLE " + lang + "_wikivoyage(article_id long, title text, content_gz" + 
+					dataType + ", is_part_of text, lat double, lon double, image_id long, gpx_gz " + dataType + ")");
 			conn.createStatement().execute("CREATE TABLE images(image_id long, image_title text, image text)");
 			prep = conn.prepareStatement("INSERT INTO " + lang + "_wikivoyage VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
 			imagePrep = conn.prepareStatement("INSERT INTO images VALUES (?, ?, ?)");
@@ -275,12 +290,11 @@ public class WikiVoyagePreparation {
 									if (!ll.isZero()) {
 										prep.setLong(1, cid);
 										prep.setString(2, title.toString());
-										bous.reset();
-										GZIPOutputStream gzout = new GZIPOutputStream(bous);
-										gzout.write(plainStr.getBytes("UTF-8"));
-										gzout.close();
-										final byte[] byteArray = bous.toByteArray();
-										prep.setBytes(3, byteArray);
+										if (uncompressed) {
+											prep.setString(3, plainStr);
+										} else {
+											prep.setBytes(3, stringToCompressedByteArray(bous, plainStr));
+										}
 										// part_of
 										prep.setString(4,
 												parsePartOf(macroBlocks.get(WikivoyageTemplates.PART_OF.getType())));
@@ -302,7 +316,13 @@ public class WikiVoyagePreparation {
 											}
 										}
 										// gpx_gz
-										prep.setBytes(8, generateGpx(macroBlocks.get(WikivoyageTemplates.POI.getType())));
+										if (uncompressed) {
+											prep.setString(8, generateGpx(macroBlocks.get(WikivoyageTemplates.POI.getType())));
+										} else {
+											prep.setBytes(8, stringToCompressedByteArray(new ByteArrayOutputStream(), 
+													generateGpx(macroBlocks.get(WikivoyageTemplates.POI.getType()))));
+										}
+										
 										if (imageLinks) {
 											new Thread( new Runnable() {
 											    @Override
@@ -310,7 +330,6 @@ public class WikiVoyagePreparation {
 											    	try {
 														imageStorage.saveImageLinks(title.toString().replaceAll(" ", "%20"));
 													} catch (SQLException e) {
-														// TODO Auto-generated catch block
 														e.printStackTrace();
 													}
 											    }
@@ -331,7 +350,7 @@ public class WikiVoyagePreparation {
 			}
 		}
 		
-		private byte[] generateGpx(List<String> list) {
+		private String generateGpx(List<String> list) {
 			if (list != null && !list.isEmpty()) {
 				
 				GPXFile f = new GPXFile();
@@ -371,6 +390,9 @@ public class WikiVoyagePreparation {
 								} else if (field.contains("hours=")) {
 									point.desc = point.desc == null ? "Working hours: " + value : 
 										point.desc + "\nWorking hours: " + value;
+								} else if (field.contains("directions=")) {
+									point.desc = point.desc == null ? "Directions: " + value : 
+										point.desc + "\nDirections: " + value;
 								}
 							} catch (Exception e) {}
 						}
@@ -382,18 +404,22 @@ public class WikiVoyagePreparation {
 				}
 				if (!points.isEmpty()) {
 					f.addPoints(points);
-					ByteArrayOutputStream baos = new ByteArrayOutputStream();
-					try {
-						GZIPOutputStream gzout = new GZIPOutputStream(baos);
-						gzout.write(GPXUtils.asString(f).getBytes("UTF-8"));
-						gzout.close();
-						return baos.toByteArray();
-					} catch (IOException e) {
-						e.printStackTrace();
-					}
+					return GPXUtils.asString(f);
 				}
 			}
-			return new byte[0];
+			return "";
+		}
+		
+		private byte[] stringToCompressedByteArray(ByteArrayOutputStream baos, String toCompress) {
+			baos.reset();
+			try {
+				GZIPOutputStream gzout = new GZIPOutputStream(baos);
+				gzout.write(toCompress.getBytes("UTF-8"));
+				gzout.close();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+			return baos.toByteArray();
 		}
 
 		private /**byte[]**/ String getPageBanner(String filename) {
@@ -476,12 +502,14 @@ public class WikiVoyagePreparation {
 
 				return buffer.toString();
 			} catch (Exception e) {
+				e.printStackTrace();
 				return "";
 			} finally {
 				if (reader != null)
 					try {
 						reader.close();
 					} catch (IOException e) {
+						e.printStackTrace();
 						return "";
 					}
 			}

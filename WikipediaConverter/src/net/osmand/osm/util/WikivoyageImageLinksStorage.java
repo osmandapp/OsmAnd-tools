@@ -30,7 +30,7 @@ public class WikivoyageImageLinksStorage {
 	private int batch = 0;
 	private final static int BATCH_SIZE = 500;
 	private DBDialect dialect = DBDialect.SQLITE;
-	private final Map<String, List<String>> map = new ConcurrentHashMap<>(); 
+	private final Map<String, List<String>> map = new ConcurrentHashMap<>();
 	
 	public WikivoyageImageLinksStorage(String lang, String folder) throws SQLException {
 		this.lang = lang;
@@ -49,10 +49,10 @@ public class WikivoyageImageLinksStorage {
 	public void writeData() throws SQLException {
 		Gson gson = new Gson();
 		if (!map.isEmpty()) {
+			System.out.println("Image map size " + map.size());
 			for (String s : map.keySet()) {
 				prep.setString(1, s);
 				prep.setString(2, gson.toJson(map.get(s)));
-				System.out.println("Saving links for title: " + s + " Urls: " + map.get(s).toString());
 				addBatch();
 			}
 		}
@@ -61,7 +61,31 @@ public class WikivoyageImageLinksStorage {
 	
 	public void saveImageLinks(String title) throws SQLException {
 		if (title != null) {
-			getSrcUrls(title, map);
+			List<String> res = new ArrayList<>();
+			String urlStart = "https://" + lang + ".wikivoyage.org/w/api.php?action=query&prop=info%7Cimageinfo&titles=";
+			String urlEnd = "&generator=images&inprop=url&iiprop=url&format=json";
+			String json = WikiVoyagePreparation.WikiOsmHandler.readUrl(urlStart + title + urlEnd);
+			if (!json.isEmpty()) {
+				Gson gson = new Gson();
+				try {
+					JsonObject obj = gson.fromJson(json, JsonObject.class);
+					JsonObject query = obj.getAsJsonObject("query");
+					JsonObject pages = query.getAsJsonObject("pages");
+					JsonObject objcts = pages.getAsJsonObject();
+					for (String s : objcts.keySet()) {
+						JsonArray imageInfo = objcts.getAsJsonObject(s).getAsJsonArray("imageinfo");
+						JsonObject urls = (JsonObject) imageInfo.get(0);
+						String url = urls.get("url").getAsString();
+						res.add(url);
+					}
+					
+				} catch (Exception e) {
+//					e.printStackTrace();
+				}
+			}
+			if (!res.isEmpty()) {
+				map.putIfAbsent(title, res);
+			}
 		}
 	}
 	
@@ -82,33 +106,5 @@ public class WikivoyageImageLinksStorage {
 		}
 		prep.close();
 		conn.close();
-	}
-
-	private void getSrcUrls(String title, Map<String, List<String>> map) {
-		List<String> res = new ArrayList<>();
-		String urlStart = "https://" + lang + ".wikivoyage.org/w/api.php?action=query&prop=info%7Cimageinfo&titles=";
-		String urlEnd = "&generator=images&inprop=url&iiprop=url&format=json";
-		String json = WikiVoyagePreparation.WikiOsmHandler.readUrl(urlStart + title + urlEnd);
-		if (!json.isEmpty()) {
-			Gson gson = new Gson();
-			try {
-				JsonObject obj = gson.fromJson(json, JsonObject.class);
-				JsonObject query = obj.getAsJsonObject("query");
-				JsonObject pages = query.getAsJsonObject("pages");
-				JsonObject objcts = pages.getAsJsonObject();
-				for (String s : objcts.keySet()) {
-					JsonArray imageInfo = objcts.getAsJsonObject(s).getAsJsonArray("imageinfo");
-					JsonObject urls = (JsonObject) imageInfo.get(0);
-					String url = urls.get("url").getAsString();
-					res.add(url);
-				}
-				
-			} catch (Exception e) {
-//				e.printStackTrace();
-			}
-		}
-		if (!res.isEmpty()) {
-			map.putIfAbsent(title, res);
-		}
 	}
 }
