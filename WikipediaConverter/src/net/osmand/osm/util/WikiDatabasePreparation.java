@@ -101,17 +101,24 @@ public class WikiDatabasePreparation {
 		int endInd;
 		for (int i = 0; i < s.length(); i++) {
 			int nt = s.length() - i - 1;
-			if (nt > 0 && s.charAt(i) == '{' && s.charAt(i + 1) == '{') {
+			if (nt > 0 && (s.charAt(i) == '{' && s.charAt(i + 1) == '{') 
+					|| (s.charAt(i) == '<' && s.charAt(i + 1) == 'm' && s.charAt(i + 2) == 'a' && s.charAt(i + 3) == 'p' 
+					&& s.charAt(i + 4) == 'l' && s.charAt(i + 5) == 'i')) {
 				beginInd = i + 2;
 				openCnt++;
 				i++;
-			} else if (nt > 0 && s.charAt(i) == '}' && s.charAt(i + 1) == '}') {
+			} else if (nt > 0 && (s.charAt(i) == '}' && s.charAt(i + 1) == '}') 
+					|| (s.charAt(i) == '>' && s.charAt(i - 1) == 'k' && s.charAt(i - 2) == 'n' && s.charAt(i - 3) == 'i' 
+					&& s.charAt(i - 4) == 'l' && s.charAt(i - 5) == 'p')) {
 				if (openCnt > 0) {
 					openCnt--;
 				}
 				endInd = i;
 				String val = s.substring(beginInd, endInd);
 				String key = getKey(val);
+				if (key.equals(WikivoyageTemplates.POI.getType())) {
+					bld.append(parseListing(val));
+				}
 				if (!key.isEmpty()) {
 					if (blocksMap.containsKey(key)) {
 						blocksMap.get(key).add(val);
@@ -133,17 +140,55 @@ public class WikiDatabasePreparation {
 		return bld.toString();
 	}
 	
+	private static String parseListing(String val) {
+		StringBuilder bld = new StringBuilder();
+		String[] parts = val.split("\\|");
+		for (int i = 1; i < parts.length; i++) {
+			String field = parts[i].trim();
+			String value = "";
+			if (field.indexOf("=") != -1) {
+				value = field.substring(field.indexOf("=") + 1, field.length()).trim();
+			}
+			if (!value.isEmpty()) {
+				try {
+					if (field.trim().contains(("name="))) {
+						bld.append("'''" + value + "'''" + " ");
+					} else if (field.contains("url=")) {
+						bld.append("Website: " + value + ". ");
+					} else if (field.startsWith("lat=")) {
+						bld.append("Latitude: " + value + ". ");
+					} else if (field.contains("long=")) {
+						bld.append("Latitude: " + value + ". ");
+					} else if (field.contains("content=")) {
+						bld.append("Description: " + value + " ");
+					} else if (field.contains("email=")) {
+						bld.append("Email: " + value + ". ");
+					} else if (field.contains("phone=")) {
+						bld.append("Tel.: " + value + ". ");
+					} else if (field.contains("price=")) {
+						bld.append("Price: " + value + ". ");
+					} else if (field.contains("hours=")) {
+						bld.append("Working hours: " + value + ". ");
+					} else if (field.contains("directions=")) {
+						bld.append("Directions: " + value + ". ");
+					}
+				} catch (Exception e) {}
+			}
+		}
+		return bld.toString();
+	}
+
 	private static String getKey(String str) {
 		str = str.toLowerCase();
-		if (str.contains("geo|")) {
+		if (str.startsWith("geo|")) {
 			return WikivoyageTemplates.LOCATION.getType();
-		} else if (str.contains("ispartof")) {
+		} else if (str.startsWith("ispartof|")) {
 			return WikivoyageTemplates.PART_OF.getType();
-		} else if (str.contains("do") || str.contains("see") 
-				|| str.contains("eat") || str.contains("drink") 
-				|| str.contains("sleep") || str.contains("buy")) {
+		} else if (str.startsWith("do") || str.startsWith("see") 
+				|| str.startsWith("eat") || str.startsWith("drink") 
+				|| str.startsWith("sleep") || str.startsWith("buy") || str.startsWith("listing")) {
 			return WikivoyageTemplates.POI.getType();
-		} else if (str.contains("pagebanner")) {
+		} else if (str.startsWith("pagebanner")) {
 			return WikivoyageTemplates.BANNER.getType();
 		}
 		return "";
