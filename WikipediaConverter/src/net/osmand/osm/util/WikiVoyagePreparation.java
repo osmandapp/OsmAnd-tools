@@ -1,7 +1,6 @@
 package net.osmand.osm.util;
 
 import info.bliki.wiki.filter.HTMLConverter;
-import info.bliki.wiki.model.WikiModel;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedReader;
@@ -45,20 +44,14 @@ import org.xwiki.component.embed.EmbeddableComponentManager;
 import org.xwiki.component.manager.ComponentLookupException;
 import org.xwiki.rendering.converter.Converter;
 
-import com.google.gson.Gson;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonObject;
-
 public class WikiVoyagePreparation {
 	private static final Log log = PlatformUtil.getLog(WikiDatabasePreparation.class);
-	
-	private static String urlBase;
-	private static final String urlEnd = "&prop=imageinfo&&iiprop=url&&format=json";
-	
+		
 	private static WikivoyageImageLinksStorage imageStorage;
 	private static boolean imageLinks;
 	private static boolean uncompressed;
-	
+	private static String folderPath;
+		
 	public enum WikivoyageTemplates {
 		LOCATION("geo"),
 		POI("poi"),
@@ -78,7 +71,7 @@ public class WikiVoyagePreparation {
 	public static void main(String[] args) throws IOException, ParserConfigurationException, SAXException, SQLException, ComponentLookupException {
 		String lang = "";
 		String folder = "";
-		imageLinks = false;
+		imageLinks = true;
 		uncompressed = true;
 		if(args.length == 0) {
 			lang = "en";
@@ -97,18 +90,18 @@ public class WikiVoyagePreparation {
 			uncompressed = args[3].equals("uncompressed");
 		}
 		if (imageLinks) {
+			System.out.println("Processing the image links for " + lang + " articles");
 			imageStorage = new WikivoyageImageLinksStorage(lang, folder);
 		}
-		urlBase = "https://" + lang + ".wikivoyage.org/w/api.php?action=query&titles=File:";
+		folderPath = folder;
 		final String wikiPg = folder + lang + "wikivoyage-latest-pages-articles.xml.bz2";
 		final String sqliteFileName = folder + lang + (uncompressed ? "_full" : "") + "_wikivoyage.sqlite";
-    	
 		processWikivoyage(wikiPg, lang, sqliteFileName);
 		System.out.println("Successfully generated.");
 		// testContent(lang, folder);
     }
 
-	protected static synchronized void processWikivoyage(final String wikiPg, String lang, String sqliteFileName)
+	protected static void processWikivoyage(final String wikiPg, String lang, String sqliteFileName)
 			throws ParserConfigurationException, SAXException, FileNotFoundException, IOException, SQLException, ComponentLookupException {
 		SAXParser sx = SAXParserFactory.newInstance().newSAXParser();
 		InputStream streamFile = new BufferedInputStream(new FileInputStream(wikiPg), 8192 * 4);
@@ -125,17 +118,6 @@ public class WikiVoyagePreparation {
 		final WikiOsmHandler handler = new WikiOsmHandler(sx, streamFile, lang, new File(sqliteFileName));
 		sx.parse(is, handler);
 		handler.finish();
-		if (imageLinks) {
-			while (Thread.activeCount() > 1) {
-				System.out.println("Waiting for the image requests to complete... Threads active: " + Thread.activeCount());
-				try {
-					Thread.sleep(1500);
-				} catch (InterruptedException e) {
-					e.printStackTrace();
-				}
-			}
-			imageStorage.writeData();
-		}
 	}
 	
 	public static class WikiOsmHandler extends DefaultHandler {
@@ -143,8 +125,6 @@ public class WikiVoyagePreparation {
 		private final SAXParser saxParser;
 		private boolean page = false;
 		private boolean revision = false;
-		private Map<String, Long> images = new HashMap<>();
-		private long imageId = 0l;
 		
 		private StringBuilder ctext = null;
 		private long cid;
@@ -159,15 +139,14 @@ public class WikiVoyagePreparation {
 		private DBDialect dialect = DBDialect.SQLITE;
 		private Connection conn;
 		private PreparedStatement prep;
-		private PreparedStatement imagePrep;
 		private int batch = 0;
-		private int imageBatch = 0;
 		private final static int BATCH_SIZE = 500;
-		private final static int IMAGE_BATCH_SIZE = 500;
 		final ByteArrayOutputStream bous = new ByteArrayOutputStream(64000);
 		private String lang;
 		private Converter converter;
-
+		private Connection imageConn;
+		private PreparedStatement imagePrep;
+			
 		WikiOsmHandler(SAXParser saxParser, InputStream progIS, String lang, File sqliteFile)
 				throws IOException, SQLException, ComponentLookupException{
 			this.lang = lang;
@@ -177,37 +156,39 @@ public class WikiVoyagePreparation {
 			conn = (Connection) dialect.getDatabaseConnection(sqliteFile.getAbsolutePath(), log);
 			String dataType = uncompressed ? "text" : "blob";
 			conn.createStatement().execute("CREATE TABLE " + lang + "_wikivoyage(article_id long, title text, content_gz" + 
-					dataType + ", is_part_of text, lat double, lon double, image_id long, gpx_gz " + dataType + ")");
-			conn.createStatement().execute("CREATE TABLE images(image_id long, image_title text, image text)");
+					dataType + ", is_part_of text, lat double, lon double, image_title text, gpx_gz " + dataType + ")");
 			prep = conn.prepareStatement("INSERT INTO " + lang + "_wikivoyage VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-			imagePrep = conn.prepareStatement("INSERT INTO images VALUES (?, ?, ?)");
 			
 			progress.startTask("Parse wiki xml", progIS.available());
 			EmbeddableComponentManager cm = new EmbeddableComponentManager();
 			cm.initialize(WikiDatabasePreparation.class.getClassLoader());
 			converter = cm.getInstance(Converter.class);
+			if (!imageLinks) {
+				imageConn = (Connection) dialect.getDatabaseConnection(folderPath + "imageData.sqlite", log);
+				imagePrep = imageConn.prepareStatement("SELECT image_url FROM image_links WHERE image_title = ?");
+			}
 		}
 		
 		public void addBatch() throws SQLException {
 			prep.addBatch();
-			imagePrep.addBatch();
 			if(batch++ > BATCH_SIZE) {
 				prep.executeBatch();
 				batch = 0;
-			}
-			if (imageBatch++ > IMAGE_BATCH_SIZE) {
-				imagePrep.executeBatch();
-				imageBatch = 0;
 			}
 		}
 		
 		public void finish() throws SQLException {
 			prep.executeBatch();
+			if (imageLinks) {
+				imageStorage.finish();
+			}
 			if(!conn.getAutoCommit()) {
 				conn.commit();
 			}
 			prep.close();
 			conn.close();
+			imageConn.close();
+			imagePrep.close();
 		}
 
 		public int getCount() {
@@ -269,9 +250,6 @@ public class WikiVoyagePreparation {
 //							System.out.println(ctext.toString());
 							Map<String, List<String>> macroBlocks = new HashMap<>();
 							String text = WikiDatabasePreparation.removeMacroBlocks(ctext.toString(), macroBlocks);
-							final HTMLConverter converter = new HTMLConverter(false);
-							WikiModel wikiModel = new WikiModel("https://"+lang+".wikivoyage.org/wiki/${image}", "https://"+lang+".wikivoyage.com/wiki/${title}");
-							String plainStr = wikiModel.render(converter, text);
 //							WikiPrinter printer = new DefaultWikiPrinter();
 //							System.out.println(text);
 //							System.out.println("\n\n");
@@ -288,6 +266,18 @@ public class WikiVoyagePreparation {
 									LatLon ll = getLatLonFromGeoBlock(
 											macroBlocks.get(WikivoyageTemplates.LOCATION.getType()));
 									if (!ll.isZero()) {
+										String filename = getFileName(macroBlocks.get(WikivoyageTemplates.BANNER.getType()));
+										if (imageLinks) {
+											if (!filename.isEmpty()) {
+												imageStorage.savePageBanner(filename);
+											}
+											imageStorage.saveImageLinks(title.toString());
+											return;
+										}
+										final HTMLConverter converter = new HTMLConverter(false);
+										CustomWikiModel wikiModel = new CustomWikiModel("https://upload.wikimedia.org/wikipedia/commons/${image}", 
+												"https://"+lang+".wikivoyage.com/wiki/${title}", folderPath, imagePrep);
+										String plainStr = wikiModel.render(converter, text);
 										prep.setLong(1, cid);
 										prep.setString(2, title.toString());
 										if (uncompressed) {
@@ -301,39 +291,14 @@ public class WikiVoyagePreparation {
 										
 										prep.setDouble(5, ll.getLatitude());
 										prep.setDouble(6, ll.getLongitude());
-										// image
-										String filename = getFileName(macroBlocks.get(WikivoyageTemplates.BANNER.getType()));
-										if (!filename.isEmpty()) {
-											if (images.containsKey(filename)) {
-												prep.setLong(7, images.get(filename));
-											} else {
-												imagePrep.setLong(1, imageId);
-												imagePrep.setString(2, filename);
-//												imagePrep.setBytes(3, getPageBanner(filename));
-												imagePrep.setString(3, urlBase + filename + urlEnd);
-												prep.setLong(7, imageId);
-												imageId++;
-											}
-										}
+										// banner
+										prep.setString(7, filename);
 										// gpx_gz
 										if (uncompressed) {
 											prep.setString(8, generateGpx(macroBlocks.get(WikivoyageTemplates.POI.getType())));
 										} else {
 											prep.setBytes(8, stringToCompressedByteArray(new ByteArrayOutputStream(), 
 													generateGpx(macroBlocks.get(WikivoyageTemplates.POI.getType()))));
-										}
-										
-										if (imageLinks) {
-											new Thread( new Runnable() {
-											    @Override
-											    public void run() {
-											    	try {
-														imageStorage.saveImageLinks(title.toString().replaceAll(" ", "%20"));
-													} catch (SQLException e) {
-														e.printStackTrace();
-													}
-											    }
-											}).start();
 										}
 										addBatch();
 									}
@@ -422,35 +387,13 @@ public class WikiVoyagePreparation {
 			return baos.toByteArray();
 		}
 
-		private /**byte[]**/ String getPageBanner(String filename) {
-			String json = readUrl(urlBase + filename + urlEnd);
-			if (!json.isEmpty()) {
-				Gson gson = new Gson();
-				try {
-					JsonObject obj = gson.fromJson(json, JsonObject.class);
-					JsonObject query = obj.getAsJsonObject("query");
-					JsonObject pages = query.getAsJsonObject("pages");
-					JsonObject minOne = pages.getAsJsonObject("-1");
-					JsonArray imageInfo = minOne.getAsJsonArray("imageinfo");
-					JsonObject urls = (JsonObject) imageInfo.get(0);
-					String url = urls.get("url").getAsString();
-//					return downloadFromUrl(url);
-					return url;
-				} catch (Exception e) {
-					// e.printStackTrace();
-				}
-			}
-//			return new byte[0];
-			return "";
-		}
-
 		private String getFileName(List<String> list) {
 			if (list != null && !list.isEmpty()) {
 				String bannerInfo = list.get(0);
 				String[] infoSplit = bannerInfo.split("\\|");
 				for (String s : infoSplit) {
 					if (s.contains(".jpg") || s.contains(".jpeg") || s.contains(".png") || s.contains(".gif")) {
-						return s.trim().replaceAll(" ", "%20");
+						return s.trim();
 					}
 				}
 			}
