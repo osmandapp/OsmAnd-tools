@@ -1,13 +1,13 @@
 package net.osmand.osm.util;
 
 import java.io.File;
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.HashSet;
+import java.util.Set;
 
 import org.apache.commons.logging.Log;
 
@@ -30,41 +30,57 @@ public class WikivoyageImageLinksStorage {
 	private int batch = 0;
 	private final static int BATCH_SIZE = 500;
 	private DBDialect dialect = DBDialect.SQLITE;
-	private final Map<String, List<String>> map = new ConcurrentHashMap<>();
+	private Set<String> savedNames;
 	
 	public WikivoyageImageLinksStorage(String lang, String folder) throws SQLException {
 		this.lang = lang;
 		this.folder = folder;
-		sqliteName = this.lang + "_imageData.sqlite";
+		sqliteName = "imageData.sqlite";
 		new File(folder + sqliteName).delete();
 		conn = (Connection) dialect.getDatabaseConnection(folder + sqliteName, log);
 		init();
 	}
 	
 	private void init() throws SQLException {
-		conn.createStatement().execute("CREATE TABLE image_links(article_title text, images_json_array text)");
+		savedNames = new HashSet<>();
+		conn.createStatement().execute("CREATE TABLE image_links(image_title text, image_url text)");
 		prep = conn.prepareStatement("INSERT INTO image_links VALUES (?, ?)");
 	}
 	
-	public void writeData() throws SQLException {
-		Gson gson = new Gson();
-		if (!map.isEmpty()) {
-			System.out.println("Image map size " + map.size());
-			for (String s : map.keySet()) {
-				prep.setString(1, s);
-				prep.setString(2, gson.toJson(map.get(s)));
-				addBatch();
+	public void savePageBanner(String filename) throws UnsupportedEncodingException {
+		if (savedNames.contains(filename)) {
+			return;
+		}
+		String urlBase = "https://" + lang + ".wikivoyage.org/w/api.php?action=query&titles=File:";
+		String urlEnd = "&prop=imageinfo&&iiprop=url&&format=json";
+		String json = WikiVoyagePreparation.WikiOsmHandler.readUrl(urlBase + URLEncoder.encode(filename, "UTF-8") + urlEnd);
+		if (!json.isEmpty()) {
+			Gson gson = new Gson();
+			try {
+				JsonObject obj = gson.fromJson(json, JsonObject.class);
+				JsonObject query = obj.getAsJsonObject("query");
+				JsonObject pages = query.getAsJsonObject("pages");
+				JsonObject minOne = pages.getAsJsonObject("-1");
+				JsonArray imageInfo = minOne.getAsJsonArray("imageinfo");
+				JsonObject urls = (JsonObject) imageInfo.get(0);
+				String url = urls.get("url").getAsString();
+				addToDB(url, filename);
+				savedNames.add(filename);
+				System.out.println("Processed page banner: " + filename);
+			} catch (Exception e) {
+
 			}
 		}
-		finish();
 	}
 	
-	public void saveImageLinks(String title) throws SQLException {
+	public void saveImageLinks(String title) throws SQLException, UnsupportedEncodingException {
 		if (title != null) {
-			List<String> res = new ArrayList<>();
+			String url = "";
 			String urlStart = "https://" + lang + ".wikivoyage.org/w/api.php?action=query&prop=info%7Cimageinfo&titles=";
 			String urlEnd = "&generator=images&inprop=url&iiprop=url&format=json";
-			String json = WikiVoyagePreparation.WikiOsmHandler.readUrl(urlStart + title + urlEnd);
+			String json = WikiVoyagePreparation.WikiOsmHandler.readUrl(urlStart + URLEncoder.encode(title, "UTF-8") + urlEnd);
+			String name = "";
+			System.out.println("Processing urls for title: " + title);
 			if (!json.isEmpty()) {
 				Gson gson = new Gson();
 				try {
@@ -73,23 +89,32 @@ public class WikivoyageImageLinksStorage {
 					JsonObject pages = query.getAsJsonObject("pages");
 					JsonObject objcts = pages.getAsJsonObject();
 					for (String s : objcts.keySet()) {
-						JsonArray imageInfo = objcts.getAsJsonObject(s).getAsJsonArray("imageinfo");
-						JsonObject urls = (JsonObject) imageInfo.get(0);
-						String url = urls.get("url").getAsString();
-						res.add(url);
+						JsonObject item = objcts.getAsJsonObject(s);
+						name = item.get("title").getAsString().replaceFirst("File:", "");
+						if (name != null && !name.isEmpty() && !savedNames.contains(name)) {
+							JsonArray imageInfo = item.getAsJsonArray("imageinfo");
+							JsonObject urls = (JsonObject) imageInfo.get(0);
+							url = urls.get("url").getAsString();
+							addToDB(url, name);
+							savedNames.add(name);
+						}
+						
 					}
 					
 				} catch (Exception e) {
-//					e.printStackTrace();
+					e.printStackTrace();
 				}
-			}
-			if (!res.isEmpty()) {
-				map.putIfAbsent(title, res);
-			}
+			}			
 		}
 	}
-	
-	
+
+	private void addToDB(String url, String name) throws SQLException {
+		if (!url.isEmpty() && !name.isEmpty()) {
+			prep.setString(1, name);
+			prep.setString(2, url);
+			addBatch();
+		}
+	}
 	
 	public void addBatch() throws SQLException { 
 		prep.addBatch();

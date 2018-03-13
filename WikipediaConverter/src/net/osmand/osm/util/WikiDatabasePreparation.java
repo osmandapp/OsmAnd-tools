@@ -143,6 +143,8 @@ public class WikiDatabasePreparation {
 	private static String parseListing(String val) {
 		StringBuilder bld = new StringBuilder();
 		String[] parts = val.split("\\|");
+		String lat = null;
+		String lon = null;
 		for (int i = 1; i < parts.length; i++) {
 			String field = parts[i].trim();
 			String value = "";
@@ -156,9 +158,9 @@ public class WikiDatabasePreparation {
 					} else if (field.contains("url=")) {
 						bld.append("Website: " + value + ". ");
 					} else if (field.startsWith("lat=")) {
-						bld.append("Latitude: " + value + ". ");
+						lat = value;
 					} else if (field.contains("long=")) {
-						bld.append("Latitude: " + value + ". ");
+						lon = value;
 					} else if (field.contains("content=")) {
 						bld.append("Description: " + value + " ");
 					} else if (field.contains("email=")) {
@@ -175,6 +177,9 @@ public class WikiDatabasePreparation {
 				} catch (Exception e) {}
 			}
 		}
+		if (lat != null && lon != null) {
+			bld.append(" <a href=\"geo:" + lat + "," + lon +"\">Open map</a>");
+		}
 		return bld.toString();
 	}
 
@@ -186,7 +191,8 @@ public class WikiDatabasePreparation {
 			return WikivoyageTemplates.PART_OF.getType();
 		} else if (str.startsWith("do") || str.startsWith("see") 
 				|| str.startsWith("eat") || str.startsWith("drink") 
-				|| str.startsWith("sleep") || str.startsWith("buy") || str.startsWith("listing")) {
+				|| str.startsWith("sleep") || str.startsWith("buy") 
+				|| str.startsWith("listing")) {
 			return WikivoyageTemplates.POI.getType();
 		} else if (str.startsWith("pagebanner")) {
 			return WikivoyageTemplates.BANNER.getType();
