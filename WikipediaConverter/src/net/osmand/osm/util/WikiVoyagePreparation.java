@@ -71,11 +71,11 @@ public class WikiVoyagePreparation {
 	public static void main(String[] args) throws IOException, ParserConfigurationException, SAXException, SQLException, ComponentLookupException {
 		String lang = "";
 		String folder = "";
-		imageLinks = true;
-		uncompressed = true;
 		if(args.length == 0) {
 			lang = "en";
 			folder = "/home/user/osmand/wikivoyage/";
+			imageLinks = true;
+			uncompressed = false;
 		}
 		if(args.length > 0) {
 			lang = args[0];
@@ -85,6 +85,7 @@ public class WikiVoyagePreparation {
 		}
 		if(args.length > 2){
 			imageLinks = args[2].equals("fetch_image_links");
+			uncompressed = args[2].equals("uncompressed");
 		}
 		if (args.length > 3) {
 			uncompressed = args[3].equals("uncompressed");
@@ -98,7 +99,6 @@ public class WikiVoyagePreparation {
 		final String sqliteFileName = folder + lang + (uncompressed ? "_full" : "") + "_wikivoyage.sqlite";
 		processWikivoyage(wikiPg, lang, sqliteFileName);
 		System.out.println("Successfully generated.");
-		// testContent(lang, folder);
     }
 
 	protected static void processWikivoyage(final String wikiPg, String lang, String sqliteFileName)
@@ -181,14 +181,15 @@ public class WikiVoyagePreparation {
 			prep.executeBatch();
 			if (imageLinks) {
 				imageStorage.finish();
+			} else {
+				imageConn.close();
+				imagePrep.close();
 			}
 			if(!conn.getAutoCommit()) {
 				conn.commit();
 			}
 			prep.close();
 			conn.close();
-			imageConn.close();
-			imagePrep.close();
 		}
 
 		public int getCount() {
@@ -244,28 +245,21 @@ public class WikiVoyagePreparation {
 					} else if (name.equals("id") && !revision) {
 						ctext = null;
 						cid = Long.parseLong(pageId.toString());
-						parseText = true;// pages.containsKey(cid);
+						parseText = true;
 					} else if (name.equals("text")) {
 						if (parseText) {
-//							System.out.println(ctext.toString());
 							Map<String, List<String>> macroBlocks = new HashMap<>();
 							String text = WikiDatabasePreparation.removeMacroBlocks(ctext.toString(), macroBlocks);
-//							WikiPrinter printer = new DefaultWikiPrinter();
-//							System.out.println(text);
-//							System.out.println("\n\n");
-//							converter.convert(new StringReader(text), Syntax.MEDIAWIKI_1_0, Syntax.XHTML_1_0, printer);
-//							String plainStr = printer.toString();
-//							if (id++ % 500 == 0) {
-//								log.debug("Article accepted " + cid + " " + title.toString() + " " + ll.getLatitude()
-//										+ " " + ll.getLongitude() + " free: "
-//										+ (Runtime.getRuntime().freeMemory() / (1024 * 1024)));
-////								System.out.println(plainStr);
-//							}
 							try {
 								if (!macroBlocks.isEmpty()) {
 									LatLon ll = getLatLonFromGeoBlock(
 											macroBlocks.get(WikivoyageTemplates.LOCATION.getType()));
 									if (!ll.isZero()) {
+										if (id++ % 500 == 0) {
+											log.debug("Article accepted " + cid + " " + title.toString() + " " + ll.getLatitude()
+													+ " " + ll.getLongitude() + " free: "
+													+ (Runtime.getRuntime().freeMemory() / (1024 * 1024)));
+										}
 										String filename = getFileName(macroBlocks.get(WikivoyageTemplates.BANNER.getType()));
 										if (imageLinks) {
 											if (!filename.isEmpty()) {
@@ -317,7 +311,6 @@ public class WikiVoyagePreparation {
 		
 		private String generateGpx(List<String> list) {
 			if (list != null && !list.isEmpty()) {
-				
 				GPXFile f = new GPXFile();
 				List<WptPt> points = new ArrayList<>(); 
 				for (String s : list) {
@@ -400,64 +393,6 @@ public class WikiVoyagePreparation {
 			return "";
 		}
 		
-		private byte[] downloadFromUrl(String urlString) {
-			URL url = null;
-			try {
-				url = new URL(urlString);
-			} catch (MalformedURLException e1) {
-				e1.printStackTrace();
-			}
-			ByteArrayOutputStream baos = new ByteArrayOutputStream();
-			InputStream is = null;
-			try {
-				is = url.openStream();
-				byte[] byteChunk = new byte[4096];
-				int n;
-
-				while ((n = is.read(byteChunk)) > 0) {
-					baos.write(byteChunk, 0, n);
-				}
-			} catch (IOException e) {
-				System.err.printf("Failed while reading bytes from %s: %s", url.toExternalForm(), e.getMessage());
-				e.printStackTrace();
-			} finally {
-				if (is != null) {
-					try {
-						is.close();
-					} catch (IOException e) {
-						e.printStackTrace();
-					}
-				}
-			}
-			return baos.toByteArray();
-		}
-
-		public static String readUrl(String urlString) {
-			BufferedReader reader = null;
-			try {
-				URL url = new URL(urlString);
-				reader = new BufferedReader(new InputStreamReader(url.openStream()));
-				StringBuffer buffer = new StringBuffer();
-				int read;
-				char[] chars = new char[1024];
-				while ((read = reader.read(chars)) != -1)
-					buffer.append(chars, 0, read);
-
-				return buffer.toString();
-			} catch (Exception e) {
-				e.printStackTrace();
-				return "";
-			} finally {
-				if (reader != null)
-					try {
-						reader.close();
-					} catch (IOException e) {
-						e.printStackTrace();
-						return "";
-					}
-			}
-		}
-
 		private LatLon getLatLonFromGeoBlock(List<String> list) {
 			if (list != null && !list.isEmpty()) {
 				String location = list.get(0);
@@ -468,9 +403,7 @@ public class WikiVoyagePreparation {
 				try {
 					lat = Double.valueOf(parts[1]);
 					lon = Double.valueOf(parts[2]);
-				} catch (Exception e) {
-//					e.printStackTrace();
-				}
+				} catch (Exception e) {}
 				return new LatLon(lat, lon);
 			}
 			return new LatLon(0, 0);
