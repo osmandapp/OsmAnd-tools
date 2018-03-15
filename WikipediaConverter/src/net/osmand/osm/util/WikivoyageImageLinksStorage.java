@@ -1,7 +1,13 @@
 package net.osmand.osm.util;
 
-import java.io.File;
+import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.net.URLEncoder;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -25,7 +31,6 @@ public class WikivoyageImageLinksStorage {
 	private Connection conn;
 	private PreparedStatement prep;
 	private String lang;
-	private String folder;
 	private String sqliteName;
 	private int batch = 0;
 	private final static int BATCH_SIZE = 500;
@@ -34,17 +39,15 @@ public class WikivoyageImageLinksStorage {
 	
 	public WikivoyageImageLinksStorage(String lang, String folder) throws SQLException {
 		this.lang = lang;
-		this.folder = folder;
 		sqliteName = "imageData.sqlite";
-		new File(folder + sqliteName).delete();
 		conn = (Connection) dialect.getDatabaseConnection(folder + sqliteName, log);
 		init();
 	}
 	
 	private void init() throws SQLException {
 		savedNames = new HashSet<>();
-		conn.createStatement().execute("CREATE TABLE image_links(image_title text, image_url text)");
-		prep = conn.prepareStatement("INSERT INTO image_links VALUES (?, ?)");
+		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS image_links(image_title text UNIQUE, image_url text)");
+		prep = conn.prepareStatement("INSERT OR IGNORE INTO image_links VALUES (?, ?)");
 	}
 	
 	public void savePageBanner(String filename) throws UnsupportedEncodingException {
@@ -53,7 +56,7 @@ public class WikivoyageImageLinksStorage {
 		}
 		String urlBase = "https://" + lang + ".wikivoyage.org/w/api.php?action=query&titles=File:";
 		String urlEnd = "&prop=imageinfo&&iiprop=url&&format=json";
-		String json = WikiVoyagePreparation.WikiOsmHandler.readUrl(urlBase + URLEncoder.encode(filename, "UTF-8") + urlEnd);
+		String json = readUrl(urlBase + URLEncoder.encode(filename, "UTF-8") + urlEnd);
 		if (!json.isEmpty()) {
 			Gson gson = new Gson();
 			try {
@@ -78,7 +81,7 @@ public class WikivoyageImageLinksStorage {
 			String url = "";
 			String urlStart = "https://" + lang + ".wikivoyage.org/w/api.php?action=query&prop=info%7Cimageinfo&titles=";
 			String urlEnd = "&generator=images&inprop=url&iiprop=url&format=json";
-			String json = WikiVoyagePreparation.WikiOsmHandler.readUrl(urlStart + URLEncoder.encode(title, "UTF-8") + urlEnd);
+			String json = readUrl(urlStart + URLEncoder.encode(title, "UTF-8") + urlEnd);
 			String name = "";
 			System.out.println("Processing urls for title: " + title);
 			if (!json.isEmpty()) {
@@ -131,5 +134,62 @@ public class WikivoyageImageLinksStorage {
 		}
 		prep.close();
 		conn.close();
+	}
+	
+	private String readUrl(String urlString) {
+		BufferedReader reader = null;
+		try {
+			URL url = new URL(urlString);
+			reader = new BufferedReader(new InputStreamReader(url.openStream()));
+			StringBuffer buffer = new StringBuffer();
+			int read;
+			char[] chars = new char[1024];
+			while ((read = reader.read(chars)) != -1)
+				buffer.append(chars, 0, read);
+			return buffer.toString();
+		} catch (Exception e) {
+			e.printStackTrace();
+		} finally {
+			if (reader != null)
+				try {
+					reader.close();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+		}
+		return "";
+	}
+	// method to download the images (unused)
+	@SuppressWarnings("unused")
+	private byte[] downloadFromUrl(String urlString) {
+		URL url = null;
+		try {
+			url = new URL(urlString);
+		} catch (MalformedURLException e1) {
+			e1.printStackTrace();
+		}
+		ByteArrayOutputStream baos = new ByteArrayOutputStream();
+		InputStream is = null;
+		try {
+			is = url.openStream();
+			byte[] byteChunk = new byte[4096];
+			int n;
+
+			while ((n = is.read(byteChunk)) > 0) {
+				baos.write(byteChunk, 0, n);
+			}
+		} catch (IOException e) {
+			System.err.printf("Failed while reading bytes from %s: %s", url.toExternalForm(), e.getMessage());
+			e.printStackTrace();
+		} finally {
+			if (is != null) {
+				try {
+					is.close();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
+		}
+		return baos.toByteArray();
 	}
 }
