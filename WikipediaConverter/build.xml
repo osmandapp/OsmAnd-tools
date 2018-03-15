@@ -28,7 +28,7 @@
 		 encoding="${java.encoding}"
 		 classpathref="build.path"
 		 debug="on"
-		 source="1.6"
+		 source="1.8"
 	  />
 	</target>
 
