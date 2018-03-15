@@ -181,14 +181,15 @@ public class WikiVoyagePreparation {
 			prep.executeBatch();
 			if (imageLinks) {
 				imageStorage.finish();
+			} else {
+				imageConn.close();
+				imagePrep.close();
 			}
 			if(!conn.getAutoCommit()) {
 				conn.commit();
 			}
 			prep.close();
 			conn.close();
-			imageConn.close();
-			imagePrep.close();
 		}
 
 		public int getCount() {
