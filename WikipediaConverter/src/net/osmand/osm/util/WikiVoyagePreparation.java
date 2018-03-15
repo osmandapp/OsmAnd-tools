@@ -74,7 +74,7 @@ public class WikiVoyagePreparation {
 		if(args.length == 0) {
 			lang = "en";
 			folder = "/home/user/osmand/wikivoyage/";
-			imageLinks = false;
+			imageLinks = true;
 			uncompressed = false;
 		}
 		if(args.length > 0) {

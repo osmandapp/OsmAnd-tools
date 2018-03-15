@@ -47,6 +47,7 @@ public class WikivoyageImageLinksStorage {
 	private void init() throws SQLException {
 		savedNames = new HashSet<>();
 		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS image_links(image_title text UNIQUE, image_url text)");
+		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_title ON image_links (image_title);");
 		prep = conn.prepareStatement("INSERT OR IGNORE INTO image_links VALUES (?, ?)");
 	}
 	
