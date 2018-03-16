@@ -187,7 +187,7 @@ public class WikiDatabasePreparation {
 		str = str.toLowerCase();
 		if (str.startsWith("geo|") || str.startsWith("geodata")) {
 			return WikivoyageTemplates.LOCATION.getType();
-		} else if (str.startsWith("ispartof|") || str.startsWith("istinkat")) {
+		} else if (str.startsWith("ispartof|") || str.startsWith("istinkat") || str.startsWith("isin")) {
 			return WikivoyageTemplates.PART_OF.getType();
 		} else if (str.startsWith("do") || str.startsWith("see") 
 				|| str.startsWith("eat") || str.startsWith("drink") 
