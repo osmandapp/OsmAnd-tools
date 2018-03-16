@@ -70,7 +70,7 @@ public class WikivoyageImageLinksStorage {
 				String url = urls.get("url").getAsString();
 				addToDB(url, filename);
 				savedNames.add(filename);
-				if (batch % 500 == 0) {
+				if (batch % 200 == 0) {
 					System.out.println("Processed page banner: " + filename);
 				}
 			} catch (Exception e) {
@@ -86,7 +86,7 @@ public class WikivoyageImageLinksStorage {
 			String urlEnd = "&generator=images&inprop=url&iiprop=url&format=json";
 			String json = readUrl(urlStart + URLEncoder.encode(title, "UTF-8") + urlEnd);
 			String name = "";
-			if (batch % 500 == 0) {
+			if (batch % 200 == 0) {
 				System.out.println("Processing urls for title: " + title);
 			}
 			if (!json.isEmpty()) {

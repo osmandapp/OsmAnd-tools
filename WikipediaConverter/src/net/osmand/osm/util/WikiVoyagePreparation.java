@@ -143,7 +143,6 @@ public class WikiVoyagePreparation {
 		private final static int BATCH_SIZE = 500;
 		final ByteArrayOutputStream bous = new ByteArrayOutputStream(64000);
 		private String lang;
-		private Converter converter;
 		private Connection imageConn;
 		private PreparedStatement imagePrep;
 			
@@ -151,25 +150,19 @@ public class WikiVoyagePreparation {
 				throws IOException, SQLException, ComponentLookupException{
 			this.lang = lang;
 			this.saxParser = saxParser;
-			this.progIS = progIS;
-			dialect.removeDatabase(sqliteFile);
-			conn = (Connection) dialect.getDatabaseConnection(sqliteFile.getAbsolutePath(), log);
-			String dataType = uncompressed ? "text" : "blob";
-			conn.createStatement().execute("CREATE TABLE " + lang + "_wikivoyage(article_id long, title text, content_gz" + 
-					dataType + ", is_part_of text, lat double, lon double, image_title text, gpx_gz " + dataType + ")");
-			prep = conn.prepareStatement("INSERT INTO " + lang + "_wikivoyage VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-			
+			this.progIS = progIS;		
 			progress.startTask("Parse wiki xml", progIS.available());
-			EmbeddableComponentManager cm = new EmbeddableComponentManager();
-			cm.initialize(WikiDatabasePreparation.class.getClassLoader());
-			converter = cm.getInstance(Converter.class);
 			if (!imageLinks) {
+				dialect.removeDatabase(sqliteFile);
+				conn = (Connection) dialect.getDatabaseConnection(sqliteFile.getAbsolutePath(), log);
+				String dataType = uncompressed ? "text" : "blob";
+				conn.createStatement().execute("CREATE TABLE " + lang + "_wikivoyage(article_id long, title text, content_gz" + 
+						dataType + ", is_part_of text, lat double, lon double, image_title text, gpx_gz " + dataType + ")");
+				prep = conn.prepareStatement("INSERT INTO " + lang + "_wikivoyage VALUES (?, ?, ?, ?, ?, ?, ?, ?)");	
 				try {
 					imageConn = (Connection) dialect.getDatabaseConnection(folderPath + "imageData.sqlite", log);
 					imagePrep = imageConn.prepareStatement("SELECT image_url FROM image_links WHERE image_title = ?");
-				} catch (Exception e) {
-					
-				}
+				} catch (Exception e) {	}
 			}
 		}
 		
@@ -188,12 +181,12 @@ public class WikiVoyagePreparation {
 			} else {
 				imageConn.close();
 				imagePrep.close();
+				if(!conn.getAutoCommit()) {
+					conn.commit();
+				}
+				prep.close();
+				conn.close();
 			}
-			if(!conn.getAutoCommit()) {
-				conn.commit();
-			}
-			prep.close();
-			conn.close();
 		}
 
 		public int getCount() {
