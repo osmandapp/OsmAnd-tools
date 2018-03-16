@@ -175,10 +175,10 @@ public class WikiVoyagePreparation {
 		}
 		
 		public void finish() throws SQLException {
-			prep.executeBatch();
 			if (imageLinks) {
 				imageStorage.finish();
 			} else {
+				prep.executeBatch();
 				imageConn.close();
 				imagePrep.close();
 				if(!conn.getAutoCommit()) {
