@@ -67,7 +67,7 @@ public class WikiVoyagePreparation {
 		String lang = "";
 		String folder = "";
 		if(args.length == 0) {
-			lang = "de";
+			lang = "en";
 			folder = "/home/user/osmand/wikivoyage/";
 			imageLinks = false;
 			uncompressed = false;
@@ -411,6 +411,12 @@ public class WikiVoyagePreparation {
 					lat = Double.valueOf(latStr);
 					lon = Double.valueOf(lonStr);
 				} catch (Exception e) {}
+				if (location.contains("geo|")) {
+					try {
+						lat = Double.valueOf(parts[1]);
+						lon = Double.valueOf(parts[2]);
+					} catch (Exception e) {	}
+				}
 				return new LatLon(lat, lon);
 			}
 			return new LatLon(0, 0);
