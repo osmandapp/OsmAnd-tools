@@ -274,7 +274,6 @@ public class WikiVoyagePreparation {
 										String plainStr = wikiModel.render(converter, text);
 										prep.setLong(2, cid);
 										prep.setString(3, Encoder.encodeUrl(title.toString()));
-										System.out.println(Encoder.encodeUrl(title.toString()));
 										if (uncompressed) {
 											prep.setString(4, plainStr);
 										} else {
