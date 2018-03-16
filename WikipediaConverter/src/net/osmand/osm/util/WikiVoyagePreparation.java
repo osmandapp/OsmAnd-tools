@@ -70,7 +70,7 @@ public class WikiVoyagePreparation {
 			lang = "de";
 			folder = "/home/user/osmand/wikivoyage/";
 			imageLinks = false;
-			uncompressed = true;
+			uncompressed = false;
 		}
 		if(args.length > 0) {
 			lang = args[0];
