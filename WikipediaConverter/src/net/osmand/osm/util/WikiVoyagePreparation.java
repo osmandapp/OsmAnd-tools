@@ -67,10 +67,10 @@ public class WikiVoyagePreparation {
 		String lang = "";
 		String folder = "";
 		if(args.length == 0) {
-			lang = "en";
+			lang = "de";
 			folder = "/home/user/osmand/wikivoyage/";
 			imageLinks = false;
-			uncompressed = false;
+			uncompressed = true;
 		}
 		if(args.length > 0) {
 			lang = args[0];
@@ -395,10 +395,21 @@ public class WikiVoyagePreparation {
 				String[] parts = location.split("\\|");
 				double lat = 0d;
 				double lon = 0d;
+				String latStr = null;
+				String lonStr = null;
 				// skip malformed location blocks
+				for (String part : parts) {
+					part = part.trim();
+					if (part.startsWith("lat")) {
+						latStr = part.substring(part.indexOf("=") + 1, part.length());
+					}
+					if (part.startsWith("lon")) {
+						lonStr = part.substring(part.indexOf("=") + 1, part.length());
+					}
+				}
 				try {
-					lat = Double.valueOf(parts[1]);
-					lon = Double.valueOf(parts[2]);
+					lat = Double.valueOf(latStr);
+					lon = Double.valueOf(lonStr);
 				} catch (Exception e) {}
 				return new LatLon(lat, lon);
 			}
