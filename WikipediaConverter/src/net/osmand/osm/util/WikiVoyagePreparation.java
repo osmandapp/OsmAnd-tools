@@ -252,11 +252,6 @@ public class WikiVoyagePreparation {
 									LatLon ll = getLatLonFromGeoBlock(
 											macroBlocks.get(WikivoyageTemplates.LOCATION.getType()));
 									if (!ll.isZero()) {
-										if (id++ % 500 == 0) {
-											log.debug("Article accepted " + cid + " " + title.toString() + " " + ll.getLatitude()
-													+ " " + ll.getLongitude() + " free: "
-													+ (Runtime.getRuntime().freeMemory() / (1024 * 1024)));
-										}
 										String filename = getFileName(macroBlocks.get(WikivoyageTemplates.BANNER.getType()));
 										if (imageLinks) {
 											if (!filename.isEmpty()) {
@@ -264,6 +259,11 @@ public class WikiVoyagePreparation {
 											}
 											imageStorage.saveImageLinks(title.toString());
 											return;
+										}
+										if (id++ % 500 == 0) {
+											log.debug("Article accepted " + cid + " " + title.toString() + " " + ll.getLatitude()
+													+ " " + ll.getLongitude() + " free: "
+													+ (Runtime.getRuntime().freeMemory() / (1024 * 1024)));
 										}
 										final HTMLConverter converter = new HTMLConverter(false);
 										CustomWikiModel wikiModel = new CustomWikiModel("https://upload.wikimedia.org/wikipedia/commons/${image}", 
