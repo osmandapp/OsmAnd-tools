@@ -149,7 +149,7 @@ public class WikiDatabasePreparation {
 			String field = parts[i].trim();
 			String value = "";
 			if (field.indexOf("=") != -1) {
-				value = field.substring(field.indexOf("=") + 1, field.length()).trim();
+				value = field.substring(field.indexOf("=") + 1, field.length());
 			}
 			if (!value.isEmpty()) {
 				try {
@@ -157,7 +157,7 @@ public class WikiDatabasePreparation {
 						bld.append("'''" + value + "'''" + " ");
 					} else if (field.contains("url=")) {
 						bld.append("Website: " + value + ". ");
-					} else if (field.startsWith("lat=")) {
+					} else if (field.contains("lat=")) {
 						lat = value;
 					} else if (field.contains("long=")) {
 						lon = value;
@@ -185,9 +185,9 @@ public class WikiDatabasePreparation {
 
 	private static String getKey(String str) {
 		str = str.toLowerCase();
-		if (str.startsWith("geo|")) {
+		if (str.startsWith("geo|") || str.startsWith("geodata")) {
 			return WikivoyageTemplates.LOCATION.getType();
-		} else if (str.startsWith("ispartof|")) {
+		} else if (str.startsWith("ispartof|") || str.startsWith("istinkat")) {
 			return WikivoyageTemplates.PART_OF.getType();
 		} else if (str.startsWith("do") || str.startsWith("see") 
 				|| str.startsWith("eat") || str.startsWith("drink") 
