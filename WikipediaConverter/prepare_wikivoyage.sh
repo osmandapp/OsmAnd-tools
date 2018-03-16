@@ -20,7 +20,7 @@ function download {
 
 
 
-#download en English;
+download en English;
 download de German;
 download nl Dutch;
 download fr French;
