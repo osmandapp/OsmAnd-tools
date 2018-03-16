@@ -68,7 +68,6 @@ public class CustomWikiModel extends WikiModel {
 			}
 			prep.clearParameters();
 		} catch (SQLException e) {
-			e.printStackTrace();
 		}
 		if (imageSrc.isEmpty()) {
 			return;

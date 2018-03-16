@@ -74,7 +74,7 @@ public class WikiVoyagePreparation {
 		if(args.length == 0) {
 			lang = "en";
 			folder = "/home/user/osmand/wikivoyage/";
-			imageLinks = true;
+			imageLinks = false;
 			uncompressed = false;
 		}
 		if(args.length > 0) {
@@ -164,8 +164,12 @@ public class WikiVoyagePreparation {
 			cm.initialize(WikiDatabasePreparation.class.getClassLoader());
 			converter = cm.getInstance(Converter.class);
 			if (!imageLinks) {
-				imageConn = (Connection) dialect.getDatabaseConnection(folderPath + "imageData.sqlite", log);
-				imagePrep = imageConn.prepareStatement("SELECT image_url FROM image_links WHERE image_title = ?");
+				try {
+					imageConn = (Connection) dialect.getDatabaseConnection(folderPath + "imageData.sqlite", log);
+					imagePrep = imageConn.prepareStatement("SELECT image_url FROM image_links WHERE image_title = ?");
+				} catch (Exception e) {
+					
+				}
 			}
 		}
 		
