@@ -3,7 +3,6 @@ package net.osmand.osm.util;
 import info.bliki.wiki.filter.HTMLConverter;
 
 import java.io.BufferedInputStream;
-import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -12,8 +11,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
-import java.net.MalformedURLException;
-import java.net.URL;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
@@ -40,9 +37,7 @@ import org.xml.sax.Attributes;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
-import org.xwiki.component.embed.EmbeddableComponentManager;
 import org.xwiki.component.manager.ComponentLookupException;
-import org.xwiki.rendering.converter.Converter;
 
 public class WikiVoyagePreparation {
 	private static final Log log = PlatformUtil.getLog(WikiDatabasePreparation.class);
@@ -96,6 +91,10 @@ public class WikiVoyagePreparation {
 		}
 		folderPath = folder;
 		final String wikiPg = folder + lang + "wikivoyage-latest-pages-articles.xml.bz2";
+		if (!new File(wikiPg).exists()) {
+			System.out.println("Dump for " + lang + " doesn't exist");
+			return;
+		}
 		final String sqliteFileName = folder + lang + (uncompressed ? "_full" : "") + "_wikivoyage.sqlite";
 		processWikivoyage(wikiPg, lang, sqliteFileName);
 		System.out.println("Successfully generated.");
