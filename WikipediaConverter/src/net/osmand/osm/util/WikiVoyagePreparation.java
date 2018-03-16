@@ -162,7 +162,7 @@ public class WikiVoyagePreparation {
 				dialect.removeDatabase(sqliteFile);
 				conn = (Connection) dialect.getDatabaseConnection(sqliteFile.getAbsolutePath(), log);
 				String dataType = uncompressed ? "text" : "blob";
-				conn.createStatement().execute("CREATE TABLE " + lang + "_wikivoyage(article_id long, title text, content_gz" + 
+				conn.createStatement().execute("CREATE TABLE " + lang + "_wikivoyage(id INTEGER PRIMARY KEY, article_id long, title text, content_gz" + 
 						dataType + ", is_part_of text, lat double, lon double, image_title text, gpx_gz " + dataType + ")");
 				prep = conn.prepareStatement("INSERT INTO " + lang + "_wikivoyage VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
 				try {
@@ -272,27 +272,27 @@ public class WikiVoyagePreparation {
 										CustomWikiModel wikiModel = new CustomWikiModel("https://upload.wikimedia.org/wikipedia/commons/${image}", 
 												"https://"+lang+".wikivoyage.com/wiki/${title}", folderPath, imagePrep);
 										String plainStr = wikiModel.render(converter, text);
-										prep.setLong(1, cid);
-										prep.setString(2, Encoder.encodeUrl(title.toString()));
+										prep.setLong(2, cid);
+										prep.setString(3, Encoder.encodeUrl(title.toString()));
 										System.out.println(Encoder.encodeUrl(title.toString()));
 										if (uncompressed) {
-											prep.setString(3, plainStr);
+											prep.setString(4, plainStr);
 										} else {
-											prep.setBytes(3, stringToCompressedByteArray(bous, plainStr));
+											prep.setBytes(4, stringToCompressedByteArray(bous, plainStr));
 										}
 										// part_of
-										prep.setString(4, Encoder.encodeUrl(
+										prep.setString(5, Encoder.encodeUrl(
 												parsePartOf(macroBlocks.get(WikivoyageTemplates.PART_OF.getType()))));
 										
-										prep.setDouble(5, ll.getLatitude());
-										prep.setDouble(6, ll.getLongitude());
+										prep.setDouble(6, ll.getLatitude());
+										prep.setDouble(7, ll.getLongitude());
 										// banner
-										prep.setString(7, savePageBanner(filename));
+										prep.setString(8, savePageBanner(filename));
 										// gpx_gz
 										if (uncompressed) {
-											prep.setString(8, generateGpx(macroBlocks.get(WikivoyageTemplates.POI.getType())));
+											prep.setString(9, generateGpx(macroBlocks.get(WikivoyageTemplates.POI.getType())));
 										} else {
-											prep.setBytes(8, stringToCompressedByteArray(new ByteArrayOutputStream(), 
+											prep.setBytes(9, stringToCompressedByteArray(new ByteArrayOutputStream(), 
 													generateGpx(macroBlocks.get(WikivoyageTemplates.POI.getType()))));
 										}
 										addBatch();
