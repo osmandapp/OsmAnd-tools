@@ -164,7 +164,7 @@ public class WikiVoyagePreparation {
 				String dataType = uncompressed ? "text" : "blob";
 				conn.createStatement().execute("CREATE TABLE " + lang + "_wikivoyage(id INTEGER PRIMARY KEY, article_id long, title text, content_gz" + 
 						dataType + ", is_part_of text, lat double, lon double, image_title text, gpx_gz " + dataType + ")");
-				prep = conn.prepareStatement("INSERT INTO " + lang + "_wikivoyage VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+				prep = conn.prepareStatement("INSERT INTO " + lang + "_wikivoyage VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
 				try {
 					imageConn = (Connection) dialect.getDatabaseConnection(folderPath + "imageData.sqlite", log);
 					imagePrep = imageConn.prepareStatement("SELECT image_url FROM image_links WHERE image_title = ?");
