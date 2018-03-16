@@ -1,5 +1,6 @@
 package net.osmand.osm.util;
 
+import info.bliki.wiki.filter.Encoder;
 import info.bliki.wiki.filter.HTMLConverter;
 
 import java.io.BufferedInputStream;
@@ -11,6 +12,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
@@ -38,6 +41,10 @@ import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 import org.xwiki.component.manager.ComponentLookupException;
+
+import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
 
 public class WikiVoyagePreparation {
 	private static final Log log = PlatformUtil.getLog(WikiDatabasePreparation.class);
@@ -253,9 +260,6 @@ public class WikiVoyagePreparation {
 									if (!ll.isZero()) {
 										String filename = getFileName(macroBlocks.get(WikivoyageTemplates.BANNER.getType()));
 										if (imageLinks) {
-											if (!filename.isEmpty()) {
-												imageStorage.savePageBanner(filename);
-											}
 											imageStorage.saveImageLinks(title.toString());
 											return;
 										}
@@ -269,20 +273,21 @@ public class WikiVoyagePreparation {
 												"https://"+lang+".wikivoyage.com/wiki/${title}", folderPath, imagePrep);
 										String plainStr = wikiModel.render(converter, text);
 										prep.setLong(1, cid);
-										prep.setString(2, title.toString());
+										prep.setString(2, Encoder.encodeUrl(title.toString()));
+										System.out.println(Encoder.encodeUrl(title.toString()));
 										if (uncompressed) {
 											prep.setString(3, plainStr);
 										} else {
 											prep.setBytes(3, stringToCompressedByteArray(bous, plainStr));
 										}
 										// part_of
-										prep.setString(4,
-												parsePartOf(macroBlocks.get(WikivoyageTemplates.PART_OF.getType())));
+										prep.setString(4, Encoder.encodeUrl(
+												parsePartOf(macroBlocks.get(WikivoyageTemplates.PART_OF.getType()))));
 										
 										prep.setDouble(5, ll.getLatitude());
 										prep.setDouble(6, ll.getLongitude());
 										// banner
-										prep.setString(7, filename);
+										prep.setString(7, savePageBanner(filename));
 										// gpx_gz
 										if (uncompressed) {
 											prep.setString(8, generateGpx(macroBlocks.get(WikivoyageTemplates.POI.getType())));
@@ -360,6 +365,26 @@ public class WikiVoyagePreparation {
 					f.addPoints(points);
 					return GPXUtils.asString(f);
 				}
+			}
+			return "";
+		}
+		
+		public String savePageBanner(String filename) throws UnsupportedEncodingException {
+			String urlBase = "https://" + lang + ".wikivoyage.org/w/api.php?action=query&titles=File:";
+			String urlEnd = "&prop=imageinfo&&iiprop=url&&format=json";
+			String json = WikivoyageImageLinksStorage.readUrl(urlBase + URLEncoder.encode(filename, "UTF-8") + urlEnd);
+			if (!json.isEmpty()) {
+				Gson gson = new Gson();
+				try {
+					JsonObject obj = gson.fromJson(json, JsonObject.class);
+					JsonObject query = obj.getAsJsonObject("query");
+					JsonObject pages = query.getAsJsonObject("pages");
+					JsonObject minOne = pages.getAsJsonObject("-1");
+					JsonArray imageInfo = minOne.getAsJsonArray("imageinfo");
+					JsonObject urls = (JsonObject) imageInfo.get(0);
+					String url = urls.get("url").getAsString();
+					return url;
+					} catch (Exception e) {	}
 			}
 			return "";
 		}
