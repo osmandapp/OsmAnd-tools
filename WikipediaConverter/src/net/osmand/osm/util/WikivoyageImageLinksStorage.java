@@ -110,7 +110,7 @@ public class WikivoyageImageLinksStorage {
 					}
 					
 				} catch (Exception e) {
-					e.printStackTrace();
+					// Most likely imageinfo is null meaning there are no images for this article.
 				}
 			}			
 		}
