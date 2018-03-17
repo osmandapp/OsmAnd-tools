@@ -288,7 +288,7 @@ public class WikiVoyagePreparation {
 										prep.setDouble(5, ll.getLatitude());
 										prep.setDouble(6, ll.getLongitude());
 										// banner
-										prep.setString(7, savePageBanner(filename));
+										prep.setString(7, wikiModel.getImageLinkFromDB(filename));
 										// gpx_gz
 										if (uncompressed) {
 											prep.setString(8, generateGpx(macroBlocks.get(WikivoyageTemplates.POI.getType())));
@@ -386,26 +386,6 @@ public class WikiVoyagePreparation {
 				}
 			}
 			return type;
-		}
-
-		public String savePageBanner(String filename) throws UnsupportedEncodingException {
-			String urlBase = "https://" + lang + ".wikivoyage.org/w/api.php?action=query&titles=File:";
-			String urlEnd = "&prop=imageinfo&&iiprop=url&&format=json";
-			String json = WikivoyageImageLinksStorage.readUrl(urlBase + URLEncoder.encode(filename, "UTF-8") + urlEnd);
-			if (!json.isEmpty()) {
-				Gson gson = new Gson();
-				try {
-					JsonObject obj = gson.fromJson(json, JsonObject.class);
-					JsonObject query = obj.getAsJsonObject("query");
-					JsonObject pages = query.getAsJsonObject("pages");
-					JsonObject minOne = pages.getAsJsonObject("-1");
-					JsonArray imageInfo = minOne.getAsJsonArray("imageinfo");
-					JsonObject urls = (JsonObject) imageInfo.get(0);
-					String url = urls.get("url").getAsString();
-					return url;
-					} catch (Exception e) {	}
-			}
-			return "";
 		}
 		
 		private byte[] stringToCompressedByteArray(ByteArrayOutputStream baos, String toCompress) {
