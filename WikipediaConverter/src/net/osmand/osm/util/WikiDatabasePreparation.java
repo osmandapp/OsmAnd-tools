@@ -149,26 +149,33 @@ public class WikiDatabasePreparation {
 			String field = parts[i].trim();
 			String value = "";
 			if (field.indexOf("=") != -1) {
-				value = field.substring(field.indexOf("=") + 1, field.length()).trim();
+				value = field.substring(field.indexOf("=") + 1, field.length());
 			}
 			if (!value.isEmpty()) {
 				try {
+					String areaCode = "";
 					if (field.trim().contains(("name="))) {
-						bld.append("'''" + value + "'''" + " ");
+						bld.append("'''" + value + "'''" + ", ");
 					} else if (field.contains("url=")) {
 						bld.append("Website: " + value + ". ");
-					} else if (field.startsWith("lat=")) {
+					} else if (field.contains("intl-area-code=")) {
+						areaCode = value;
+					} else if (field.contains("address=")) {
+						bld.append(value + ", ");
+					} else if (field.contains("lat=")) {
 						lat = value;
 					} else if (field.contains("long=")) {
 						lon = value;
 					} else if (field.contains("content=")) {
-						bld.append("Description: " + value + " ");
+						bld.append(value + " ");
 					} else if (field.contains("email=")) {
-						bld.append("Email: " + value + ". ");
+						bld.append("e-mail: " + value + ", ");
+					} else if (field.contains("fax=")) {
+						bld.append("fax: " + value + ", ");
 					} else if (field.contains("phone=")) {
-						bld.append("Tel.: " + value + ". ");
+						bld.append("☎ " + areaCode + " " + value + ". ");
 					} else if (field.contains("price=")) {
-						bld.append("Price: " + value + ". ");
+						bld.append(value + ". ");
 					} else if (field.contains("hours=")) {
 						bld.append("Working hours: " + value + ". ");
 					} else if (field.contains("directions=")) {
@@ -185,14 +192,14 @@ public class WikiDatabasePreparation {
 
 	private static String getKey(String str) {
 		str = str.toLowerCase();
-		if (str.startsWith("geo|")) {
+		if (str.startsWith("geo|") || str.startsWith("geodata")) {
 			return WikivoyageTemplates.LOCATION.getType();
-		} else if (str.startsWith("ispartof|")) {
+		} else if (str.startsWith("ispartof|") || str.startsWith("istinkat") || str.startsWith("isin")) {
 			return WikivoyageTemplates.PART_OF.getType();
 		} else if (str.startsWith("do") || str.startsWith("see") 
 				|| str.startsWith("eat") || str.startsWith("drink") 
 				|| str.startsWith("sleep") || str.startsWith("buy") 
-				|| str.startsWith("listing")) {
+				|| str.startsWith("listing") || str.startsWith("vcard")) {
 			return WikivoyageTemplates.POI.getType();
 		} else if (str.startsWith("pagebanner")) {
 			return WikivoyageTemplates.BANNER.getType();

@@ -50,33 +50,7 @@ public class WikivoyageImageLinksStorage {
 		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_title ON image_links (image_title);");
 		prep = conn.prepareStatement("INSERT OR IGNORE INTO image_links VALUES (?, ?)");
 	}
-	
-	public void savePageBanner(String filename) throws UnsupportedEncodingException {
-		if (savedNames.contains(filename)) {
-			return;
-		}
-		String urlBase = "https://" + lang + ".wikivoyage.org/w/api.php?action=query&titles=File:";
-		String urlEnd = "&prop=imageinfo&&iiprop=url&&format=json";
-		String json = readUrl(urlBase + URLEncoder.encode(filename, "UTF-8") + urlEnd);
-		if (!json.isEmpty()) {
-			Gson gson = new Gson();
-			try {
-				JsonObject obj = gson.fromJson(json, JsonObject.class);
-				JsonObject query = obj.getAsJsonObject("query");
-				JsonObject pages = query.getAsJsonObject("pages");
-				JsonObject minOne = pages.getAsJsonObject("-1");
-				JsonArray imageInfo = minOne.getAsJsonArray("imageinfo");
-				JsonObject urls = (JsonObject) imageInfo.get(0);
-				String url = urls.get("url").getAsString();
-				addToDB(url, filename);
-				savedNames.add(filename);
-				System.out.println("Processed page banner: " + filename);
-			} catch (Exception e) {
-
-			}
-		}
-	}
-	
+		
 	public void saveImageLinks(String title) throws SQLException, UnsupportedEncodingException {
 		if (title != null) {
 			String url = "";
@@ -84,7 +58,9 @@ public class WikivoyageImageLinksStorage {
 			String urlEnd = "&generator=images&inprop=url&iiprop=url&format=json";
 			String json = readUrl(urlStart + URLEncoder.encode(title, "UTF-8") + urlEnd);
 			String name = "";
-			System.out.println("Processing urls for title: " + title);
+			if (batch % 200 == 0) {
+				System.out.println("Processing urls for title: " + title);
+			}
 			if (!json.isEmpty()) {
 				Gson gson = new Gson();
 				try {
@@ -106,7 +82,7 @@ public class WikivoyageImageLinksStorage {
 					}
 					
 				} catch (Exception e) {
-					e.printStackTrace();
+					// Most likely imageinfo is null meaning there are no images for this article.
 				}
 			}			
 		}
@@ -135,6 +111,32 @@ public class WikivoyageImageLinksStorage {
 		}
 		prep.close();
 		conn.close();
+	}
+	
+	public void saveageBanner(String filename) throws UnsupportedEncodingException {
+		if (savedNames.contains(filename)) {
+			return;
+		}
+		if (batch % 200 == 0) {
+			System.out.println("Saving pagebanner: " + filename);
+		}
+		String urlBase = "https://" + lang + ".wikivoyage.org/w/api.php?action=query&titles=File:";
+		String urlEnd = "&prop=imageinfo&&iiprop=url&&format=json";
+		String json = readUrl(urlBase + URLEncoder.encode(filename, "UTF-8") + urlEnd);
+		if (!json.isEmpty()) {
+			Gson gson = new Gson();
+			try {
+				JsonObject obj = gson.fromJson(json, JsonObject.class);
+				JsonObject query = obj.getAsJsonObject("query");
+				JsonObject pages = query.getAsJsonObject("pages");
+				JsonObject minOne = pages.getAsJsonObject("-1");
+				JsonArray imageInfo = minOne.getAsJsonArray("imageinfo");
+				JsonObject urls = (JsonObject) imageInfo.get(0);
+				String url = urls.get("url").getAsString();
+				addToDB(url, filename);
+				savedNames.add(filename);
+			} catch (Exception e) {	}
+		}
 	}
 	
 	private String readUrl(String urlString) {
