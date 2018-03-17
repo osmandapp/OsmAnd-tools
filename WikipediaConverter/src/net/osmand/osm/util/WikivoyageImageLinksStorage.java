@@ -113,7 +113,33 @@ public class WikivoyageImageLinksStorage {
 		conn.close();
 	}
 	
-	public static String readUrl(String urlString) {
+	public void saveageBanner(String filename) throws UnsupportedEncodingException {
+		if (savedNames.contains(filename)) {
+			return;
+		}
+		if (batch % 200 == 0) {
+			System.out.println("Saving pagebanner: " + filename);
+		}
+		String urlBase = "https://" + lang + ".wikivoyage.org/w/api.php?action=query&titles=File:";
+		String urlEnd = "&prop=imageinfo&&iiprop=url&&format=json";
+		String json = readUrl(urlBase + URLEncoder.encode(filename, "UTF-8") + urlEnd);
+		if (!json.isEmpty()) {
+			Gson gson = new Gson();
+			try {
+				JsonObject obj = gson.fromJson(json, JsonObject.class);
+				JsonObject query = obj.getAsJsonObject("query");
+				JsonObject pages = query.getAsJsonObject("pages");
+				JsonObject minOne = pages.getAsJsonObject("-1");
+				JsonArray imageInfo = minOne.getAsJsonArray("imageinfo");
+				JsonObject urls = (JsonObject) imageInfo.get(0);
+				String url = urls.get("url").getAsString();
+				addToDB(url, filename);
+				savedNames.add(filename);
+			} catch (Exception e) {	}
+		}
+	}
+	
+	private String readUrl(String urlString) {
 		BufferedReader reader = null;
 		try {
 			URL url = new URL(urlString);
