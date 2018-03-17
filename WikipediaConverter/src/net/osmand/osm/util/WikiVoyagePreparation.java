@@ -102,7 +102,7 @@ public class WikiVoyagePreparation {
 			System.out.println("Dump for " + lang + " doesn't exist");
 			return;
 		}
-		final String sqliteFileName = folder + lang + (uncompressed ? "_full" : "") + "_wikivoyage.sqlite";
+		final String sqliteFileName = folder + (uncompressed ? "full_" : "") + "wikivoyage.sqlite";
 		processWikivoyage(wikiPg, lang, sqliteFileName);
 		System.out.println("Successfully generated.");
     }
