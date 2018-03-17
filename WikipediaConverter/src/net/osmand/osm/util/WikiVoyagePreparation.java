@@ -74,10 +74,10 @@ public class WikiVoyagePreparation {
 		String lang = "";
 		String folder = "";
 		if(args.length == 0) {
-			lang = "en";
+			lang = "de";
 			folder = "/home/user/osmand/wikivoyage/";
 			imageLinks = false;
-			uncompressed = false;
+			uncompressed = true;
 		}
 		if(args.length > 0) {
 			lang = args[0];
@@ -159,11 +159,13 @@ public class WikiVoyagePreparation {
 			this.progIS = progIS;		
 			progress.startTask("Parse wiki xml", progIS.available());
 			if (!imageLinks) {
-				dialect.removeDatabase(sqliteFile);
 				conn = (Connection) dialect.getDatabaseConnection(sqliteFile.getAbsolutePath(), log);
 				String dataType = uncompressed ? "text" : "blob";
-				conn.createStatement().execute("CREATE TABLE " + lang + "_wikivoyage(id INTEGER PRIMARY KEY, article_id long, title text, content_gz" + 
+				conn.createStatement().execute("DROP TABLE IF EXISTS " + lang + "_wikivoyage");
+				conn.createStatement().execute("CREATE TABLE " + lang + "_wikivoyage(article_id text, title text, content_gz" + 
 						dataType + ", is_part_of text, lat double, lon double, image_title text, gpx_gz " + dataType + ")");
+				conn.createStatement().execute("CREATE INDEX index_id ON " + lang + "_wikivoyage(article_id);");
+				conn.createStatement().execute("CREATE INDEX index_part_of ON " + lang + "_wikivoyage(is_part_of);");
 				prep = conn.prepareStatement("INSERT INTO " + lang + "_wikivoyage VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
 				try {
 					imageConn = (Connection) dialect.getDatabaseConnection(folderPath + "imageData.sqlite", log);
@@ -272,26 +274,26 @@ public class WikiVoyagePreparation {
 										CustomWikiModel wikiModel = new CustomWikiModel("https://upload.wikimedia.org/wikipedia/commons/${image}", 
 												"https://"+lang+".wikivoyage.com/wiki/${title}", folderPath, imagePrep);
 										String plainStr = wikiModel.render(converter, text);
-										prep.setLong(2, cid);
-										prep.setString(3, Encoder.encodeUrl(title.toString()));
+										prep.setString(1, Encoder.encodeUrl(title.toString()));
+										prep.setString(2, title.toString());
 										if (uncompressed) {
-											prep.setString(4, plainStr);
+											prep.setString(3, plainStr);
 										} else {
-											prep.setBytes(4, stringToCompressedByteArray(bous, plainStr));
+											prep.setBytes(3, stringToCompressedByteArray(bous, plainStr));
 										}
 										// part_of
-										prep.setString(5, Encoder.encodeUrl(
+										prep.setString(4, Encoder.encodeUrl(
 												parsePartOf(macroBlocks.get(WikivoyageTemplates.PART_OF.getType()))));
 										
-										prep.setDouble(6, ll.getLatitude());
-										prep.setDouble(7, ll.getLongitude());
+										prep.setDouble(5, ll.getLatitude());
+										prep.setDouble(6, ll.getLongitude());
 										// banner
-										prep.setString(8, savePageBanner(filename));
+										prep.setString(7, savePageBanner(filename));
 										// gpx_gz
 										if (uncompressed) {
-											prep.setString(9, generateGpx(macroBlocks.get(WikivoyageTemplates.POI.getType())));
+											prep.setString(8, generateGpx(macroBlocks.get(WikivoyageTemplates.POI.getType())));
 										} else {
-											prep.setBytes(9, stringToCompressedByteArray(new ByteArrayOutputStream(), 
+											prep.setBytes(8, stringToCompressedByteArray(bous, 
 													generateGpx(macroBlocks.get(WikivoyageTemplates.POI.getType()))));
 										}
 										addBatch();
@@ -316,7 +318,12 @@ public class WikiVoyagePreparation {
 				for (String s : list) {
 					String[] info = s.split("\\|");
 					WptPt point = new WptPt();
-					point.category = info[0].replaceAll("\n", "");
+					String category = info[0].replaceAll("\n", "");
+					if (category.toLowerCase().equals("vcard")) {
+						point.category = transformCategory(info);
+					} else {
+						point.category = category;
+					}
 					for (int i = 1; i < info.length; i++) {
 						String field = info[i].trim();
 						String value = "";
@@ -325,10 +332,13 @@ public class WikiVoyagePreparation {
 						}
 						if (!value.isEmpty()) {
 							try {
+								String areaCode = "";
 								if (field.contains("name=")) {
 									point.name = value;
 								} else if (field.contains("url=")) {
 									point.link = value;
+								} else if (field.contains("intl-area-code=")) {
+									areaCode = value;
 								} else if (field.contains("lat=")) {
 									point.lat = Double.valueOf(value);
 								} else if (field.contains("long=")) {
@@ -340,8 +350,8 @@ public class WikiVoyagePreparation {
 									point.desc = point.desc == null ? "Email: " + value : 
 										point.desc + "\nEmail: " + value;
 								} else if (field.contains("phone=")) {
-									point.desc = point.desc == null ? "Phone: " + value : 
-										point.desc + "\nPhone: " + value;
+									point.desc = point.desc == null ? "Phone: " + areaCode + value : 
+										point.desc + "\nPhone: " + areaCode + value;
 								} else if (field.contains("price=")) {
 									point.desc = point.desc == null ? "Price: " + value : 
 										point.desc + "\nPrice: " + value;
@@ -368,6 +378,16 @@ public class WikiVoyagePreparation {
 			return "";
 		}
 		
+		private String transformCategory(String[] info) {
+			String type = "";
+			for (int i = 1; i < info.length; i++) {
+				if (info[i].startsWith("type=")) {
+					type = info[i] .substring(info[i].indexOf("=") + 1, info[i].length());
+				}
+			}
+			return type;
+		}
+
 		public String savePageBanner(String filename) throws UnsupportedEncodingException {
 			String urlBase = "https://" + lang + ".wikivoyage.org/w/api.php?action=query&titles=File:";
 			String urlEnd = "&prop=imageinfo&&iiprop=url&&format=json";
@@ -414,36 +434,36 @@ public class WikiVoyagePreparation {
 		}
 		
 		private LatLon getLatLonFromGeoBlock(List<String> list) {
+			double lat = 0d;
+			double lon = 0d;
 			if (list != null && !list.isEmpty()) {
 				String location = list.get(0);
 				String[] parts = location.split("\\|");
-				double lat = 0d;
-				double lon = 0d;
-				String latStr = null;
-				String lonStr = null;
 				// skip malformed location blocks
-				for (String part : parts) {
-					part = part.trim();
-					if (part.startsWith("lat")) {
-						latStr = part.substring(part.indexOf("=") + 1, part.length());
-					}
-					if (part.startsWith("lon")) {
-						lonStr = part.substring(part.indexOf("=") + 1, part.length());
-					}
-				}
-				try {
-					lat = Double.valueOf(latStr);
-					lon = Double.valueOf(lonStr);
-				} catch (Exception e) {}
 				if (location.contains("geo|")) {
 					try {
 						lat = Double.valueOf(parts[1]);
 						lon = Double.valueOf(parts[2]);
 					} catch (Exception e) {	}
+				} else if (location.toLowerCase().contains("geodata")) {
+					String latStr = null;
+					String lonStr = null;
+					for (String part : parts) {
+						part = part.trim();
+						if (part.startsWith("lat=")) {
+							latStr = part.substring(part.indexOf("=") + 1, part.length());
+						}
+						if (part.startsWith("lon=")) {
+							lonStr = part.substring(part.indexOf("=") + 1, part.length());
+						}
+					}
+					try {
+						lat = Double.valueOf(latStr);
+						lon = Double.valueOf(lonStr);
+					} catch (Exception e) {}
 				}
-				return new LatLon(lat, lon);
 			}
-			return new LatLon(0, 0);
+			return new LatLon(lat, lon);
 		}
 
 		private String parsePartOf(List<String> list) {
