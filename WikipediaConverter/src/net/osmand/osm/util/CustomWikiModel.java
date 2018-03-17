@@ -59,8 +59,7 @@ public class CustomWikiModel extends WikiModel {
 				imageHref = imageHref.replace("${title}", imageNamespace + ':' + imageName);
 			}
 		}
-		String imageSrc = "";
-		imageSrc = getImageLinkFromDB(imageName);
+		String imageSrc = getImageLinkFromDB(imageName);
 		if (imageSrc.isEmpty()) {
 			return;
 		}	
