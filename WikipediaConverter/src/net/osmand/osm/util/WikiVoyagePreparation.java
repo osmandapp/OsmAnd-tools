@@ -77,7 +77,7 @@ public class WikiVoyagePreparation {
 			lang = "de";
 			folder = "/home/user/osmand/wikivoyage/";
 			imageLinks = false;
-			uncompressed = true;
+			uncompressed = false;
 		}
 		if(args.length > 0) {
 			lang = args[0];
@@ -164,8 +164,8 @@ public class WikiVoyagePreparation {
 				conn.createStatement().execute("DROP TABLE IF EXISTS " + lang + "_wikivoyage");
 				conn.createStatement().execute("CREATE TABLE " + lang + "_wikivoyage(article_id text, title text, content_gz" + 
 						dataType + ", is_part_of text, lat double, lon double, image_title text, gpx_gz " + dataType + ")");
-				conn.createStatement().execute("CREATE INDEX index_id ON " + lang + "_wikivoyage(article_id);");
-				conn.createStatement().execute("CREATE INDEX index_part_of ON " + lang + "_wikivoyage(is_part_of);");
+				conn.createStatement().execute("CREATE INDEX index_id_" + lang +  " ON " + lang + "_wikivoyage(article_id);");
+				conn.createStatement().execute("CREATE INDEX " + lang + "_index_part_of ON " + lang + "_wikivoyage(is_part_of);");
 				prep = conn.prepareStatement("INSERT INTO " + lang + "_wikivoyage VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
 				try {
 					imageConn = (Connection) dialect.getDatabaseConnection(folderPath + "imageData.sqlite", log);
