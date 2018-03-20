@@ -76,7 +76,7 @@ public class WikiVoyagePreparation {
 		String lang = "";
 		String folder = "";
 		if(args.length == 0) {
-			lang = "it";
+			lang = "fr";
 			folder = "/home/paul/osmand/wikivoyage/";
 			imageLinks = false;
 			uncompressed = true;
@@ -338,32 +338,33 @@ public class WikiVoyagePreparation {
 						if (!value.isEmpty()) {
 							try {
 								String areaCode = "";
-								if (field.contains("name=") || field.contains("nome=")) {
+								if (field.contains("name=") || field.contains("nome=") || field.contains("nom=")) {
 									point.name = value;
 								} else if (field.contains("url=") || field.contains("sito=")) {
 									point.link = value;
 								} else if (field.contains("intl-area-code=")) {
 									areaCode = value;
-								} else if (field.contains("lat=")) {
+								} else if (field.contains("lat=") || field.contains("latitude=")) {
 									point.lat = Double.valueOf(value);
-								} else if (field.contains("long=")) {
+								} else if (field.contains("long=") || field.contains("longitude=")) {
 									point.lon = Double.valueOf(value);
-								} else if (field.contains("content=") || field.contains("descrizione=")) {
+								} else if (field.contains("content=") || field.contains("descrizione=") 
+										|| field.contains("description")) {
 									point.desc = point.desc = point.desc == null ? value : 
 										point.desc + "\n" + value;
 								} else if (field.contains("email=")) {
 									point.desc = point.desc == null ? "Email: " + value : 
 										point.desc + "\nEmail: " + value;
-								} else if (field.contains("phone=") || field.contains("tel=")) {
+								} else if (field.contains("phone=") || field.contains("tel=") || field.contains("téléphone")) {
 									point.desc = point.desc == null ? "Phone: " + areaCode + value : 
 										point.desc + "\nPhone: " + areaCode + value;
-								} else if (field.contains("price=") || field.contains("prezzo=")) {
+								} else if (field.contains("price=") || field.contains("prezzo=") || field.contains("prix=")) {
 									point.desc = point.desc == null ? "Price: " + value : 
 										point.desc + "\nPrice: " + value;
-								} else if (field.contains("hours=") || field.contains("orari=")) {
+								} else if (field.contains("hours=") || field.contains("orari=") || field.contains("horaire=")) {
 									point.desc = point.desc == null ? "Working hours: " + value : 
 										point.desc + "\nWorking hours: " + value;
-								} else if (field.contains("directions=")) {
+								} else if (field.contains("directions=") || field.contains("direction=")) {
 									point.desc = point.desc == null ? "Directions: " + value : 
 										point.desc + "\nDirections: " + value;
 								}
@@ -411,10 +412,11 @@ public class WikiVoyagePreparation {
 				String[] infoSplit = bannerInfo.split("\\|");
 				for (String s : infoSplit) {
 					String toCompare = s.toLowerCase();
-					if (toCompare.contains("banner")) {
-						return s.substring(s.indexOf("=") + 1, s.length()).trim();
-					} else if (toCompare.contains(".jpg") || toCompare.contains(".jpeg") 
+					if (toCompare.contains(".jpg") || toCompare.contains(".jpeg") 
 							|| toCompare.contains(".png") || toCompare.contains(".gif")) {
+						if (s.indexOf("=") != -1) {
+							return s.substring(s.indexOf("=") + 1, s.length()).trim();
+						}
 						return s.trim();
 					}
 				}
@@ -439,9 +441,9 @@ public class WikiVoyagePreparation {
 					String lonStr = "";
 					for (String part : parts) {
 						part = part.replaceAll(" ", "");
-						if (part.startsWith("lat=")) {
+						if (part.startsWith("lat=") || part.startsWith("latitude=")) {
 							latStr = part.substring(part.indexOf("=") + 1, part.length()).replaceAll("\n", "");
-						} else if (part.startsWith("lon=") || part.startsWith("long=")) {
+						} else if (part.startsWith("lon=") || part.startsWith("long=") || part.startsWith("longitude=")) {
 							lonStr = part.substring(part.indexOf("=") + 1, part.length()).replaceAll("\n", "");
 						}
 					}
@@ -488,10 +490,10 @@ public class WikiVoyagePreparation {
 		private String parsePartOf(List<String> list) {
 			if (list != null && !list.isEmpty()) {
 				String partOf = list.get(0);
-				if (partOf.toLowerCase().contains("ispartof")) {
-					return partOf.substring(partOf.indexOf("|") + 1, partOf.length());
-				} else if (partOf.toLowerCase().contains("quickfooter")) {
+				if (partOf.toLowerCase().contains("quickfooter")) {
 					return parsePartOfFromQuickBar(partOf);
+				} else {
+					return partOf.substring(partOf.indexOf("|") + 1, partOf.length());
 				}
 			}
 			return "";
