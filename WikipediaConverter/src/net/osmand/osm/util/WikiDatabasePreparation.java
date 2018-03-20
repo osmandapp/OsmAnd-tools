@@ -146,11 +146,10 @@ public class WikiDatabasePreparation {
 		String lat = null;
 		String lon = null;
 		for (int i = 1; i < parts.length; i++) {
-			String fieldText = parts[i].trim();
-			String field = fieldText.replaceAll(" ", "");
+			String field = parts[i].trim();
 			String value = "";
 			if (field.indexOf("=") != -1) {
-				value = fieldText.substring(field.indexOf("=") + 1, field.length()).trim();
+				value = field.substring(field.indexOf("=") + 1, field.length()).trim();
 			}
 			if (!value.isEmpty()) {
 				try {

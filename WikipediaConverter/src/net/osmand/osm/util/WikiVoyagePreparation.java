@@ -330,11 +330,10 @@ public class WikiVoyagePreparation {
 						point.category = category;
 					}
 					for (int i = 1; i < info.length; i++) {
-						String fieldText = info[i].trim();
-						String field = fieldText.replaceAll(" ", "");
+						String field = info[i].trim();
 						String value = "";
 						if (field.indexOf("=") != -1) {
-							value = fieldText.substring(field.indexOf("=") + 1, field.length()).trim();
+							value = field.substring(field.indexOf("=") + 1, field.length()).trim();
 						}
 						if (!value.isEmpty()) {
 							try {
