@@ -21,6 +21,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.zip.GZIPOutputStream;
 
 import javax.xml.parsers.ParserConfigurationException;
@@ -74,10 +76,10 @@ public class WikiVoyagePreparation {
 		String lang = "";
 		String folder = "";
 		if(args.length == 0) {
-			lang = "de";
-			folder = "/home/user/osmand/wikivoyage/";
+			lang = "it";
+			folder = "/home/paul/osmand/wikivoyage/";
 			imageLinks = false;
-			uncompressed = false;
+			uncompressed = true;
 		}
 		if(args.length > 0) {
 			lang = args[0];
@@ -187,8 +189,10 @@ public class WikiVoyagePreparation {
 				imageStorage.finish();
 			} else {
 				prep.executeBatch();
-				imageConn.close();
-				imagePrep.close();
+				if (imagePrep != null) {
+					imageConn.close();
+					imagePrep.close();
+				}
 				if(!conn.getAutoCommit()) {
 					conn.commit();
 				}
@@ -262,6 +266,7 @@ public class WikiVoyagePreparation {
 									if (!ll.isZero()) {
 										String filename = getFileName(macroBlocks.get(WikivoyageTemplates.BANNER.getType()));
 										if (imageLinks) {
+											imageStorage.saveageBanner(filename);
 											imageStorage.saveImageLinks(title.toString());
 											return;
 										}
@@ -325,17 +330,18 @@ public class WikiVoyagePreparation {
 						point.category = category;
 					}
 					for (int i = 1; i < info.length; i++) {
-						String field = info[i].trim();
+						String fieldText = info[i].trim();
+						String field = fieldText.replaceAll(" ", "");
 						String value = "";
 						if (field.indexOf("=") != -1) {
-							value = field.substring(field.indexOf("=") + 1, field.length()).trim();
+							value = fieldText.substring(field.indexOf("=") + 1, field.length()).trim();
 						}
 						if (!value.isEmpty()) {
 							try {
 								String areaCode = "";
-								if (field.contains("name=")) {
+								if (field.contains("name=") || field.contains("nome=")) {
 									point.name = value;
-								} else if (field.contains("url=")) {
+								} else if (field.contains("url=") || field.contains("sito=")) {
 									point.link = value;
 								} else if (field.contains("intl-area-code=")) {
 									areaCode = value;
@@ -343,19 +349,19 @@ public class WikiVoyagePreparation {
 									point.lat = Double.valueOf(value);
 								} else if (field.contains("long=")) {
 									point.lon = Double.valueOf(value);
-								} else if (field.contains("content=")) {
+								} else if (field.contains("content=") || field.contains("descrizione=")) {
 									point.desc = point.desc = point.desc == null ? value : 
 										point.desc + "\n" + value;
 								} else if (field.contains("email=")) {
 									point.desc = point.desc == null ? "Email: " + value : 
 										point.desc + "\nEmail: " + value;
-								} else if (field.contains("phone=")) {
+								} else if (field.contains("phone=") || field.contains("tel=")) {
 									point.desc = point.desc == null ? "Phone: " + areaCode + value : 
 										point.desc + "\nPhone: " + areaCode + value;
-								} else if (field.contains("price=")) {
+								} else if (field.contains("price=") || field.contains("prezzo=")) {
 									point.desc = point.desc == null ? "Price: " + value : 
 										point.desc + "\nPrice: " + value;
-								} else if (field.contains("hours=")) {
+								} else if (field.contains("hours=") || field.contains("orari=")) {
 									point.desc = point.desc == null ? "Working hours: " + value : 
 										point.desc + "\nWorking hours: " + value;
 								} else if (field.contains("directions=")) {
@@ -405,7 +411,11 @@ public class WikiVoyagePreparation {
 				String bannerInfo = list.get(0);
 				String[] infoSplit = bannerInfo.split("\\|");
 				for (String s : infoSplit) {
-					if (s.contains(".jpg") || s.contains(".jpeg") || s.contains(".png") || s.contains(".gif")) {
+					String toCompare = s.toLowerCase();
+					if (toCompare.contains("banner")) {
+						return s.substring(s.indexOf("=") + 1, s.length()).trim();
+					} else if (toCompare.contains(".jpg") || toCompare.contains(".jpeg") 
+							|| toCompare.contains(".png") || toCompare.contains(".gif")) {
 						return s.trim();
 					}
 				}
@@ -425,33 +435,80 @@ public class WikiVoyagePreparation {
 						lat = Double.valueOf(parts[1]);
 						lon = Double.valueOf(parts[2]);
 					} catch (Exception e) {	}
-				} else if (location.toLowerCase().contains("geodata")) {
-					String latStr = null;
-					String lonStr = null;
+				} else {
+					String latStr = "";
+					String lonStr = "";
 					for (String part : parts) {
-						part = part.trim();
+						part = part.replaceAll(" ", "");
 						if (part.startsWith("lat=")) {
-							latStr = part.substring(part.indexOf("=") + 1, part.length());
-						}
-						if (part.startsWith("lon=")) {
-							lonStr = part.substring(part.indexOf("=") + 1, part.length());
+							latStr = part.substring(part.indexOf("=") + 1, part.length()).replaceAll("\n", "");
+						} else if (part.startsWith("lon=") || part.startsWith("long=")) {
+							lonStr = part.substring(part.indexOf("=") + 1, part.length()).replaceAll("\n", "");
 						}
 					}
-					try {
-						lat = Double.valueOf(latStr);
-						lon = Double.valueOf(lonStr);
-					} catch (Exception e) {}
+					String regex = "(\\d+).+?(\\d+).+?(\\d*).*?([N|E|W|S|n|e|w|s]+)";
+					if (latStr.matches(regex) && lonStr.matches(regex)) {
+						lat = toDecimalDegrees(latStr, regex);
+						lon = toDecimalDegrees(lonStr, regex);
+					} else {
+						try {
+							lat = Double.valueOf(latStr.replaceAll("°", ""));
+							lon = Double.valueOf(lonStr.replaceAll("°", ""));
+						} catch (Exception e) {}
+					}
 				}
 			}
 			return new LatLon(lat, lon);
 		}
 
+		private double toDecimalDegrees(String str, String regex) {
+			Pattern p = Pattern.compile(regex);
+			Matcher m = p.matcher(str);
+			m.find();
+			double res = 0;
+			double signe = 1.0;
+			double degrees = 0;
+			double minutes = 0;
+			double seconds = 0;
+			String hemisphereOUmeridien = "";
+			try {
+				degrees = Double.parseDouble(m.group(1));
+		        minutes = Double.parseDouble(m.group(2));
+		        seconds = m.group(3).isEmpty() ? 0 :Double.parseDouble(m.group(3));
+		        hemisphereOUmeridien = m.group(4).toUpperCase();
+			} catch (Exception e) {
+				// Skip malformed strings
+			}
+			if ((hemisphereOUmeridien.equals("W")) || (hemisphereOUmeridien.equals("S"))) {
+				signe = -1.0;
+			}
+			res = signe * (Math.floor(degrees) + Math.floor(minutes) / 60.0 + seconds / 3600.0);
+			return res;
+		}
+
 		private String parsePartOf(List<String> list) {
 			if (list != null && !list.isEmpty()) {
 				String partOf = list.get(0);
-				return partOf.substring(partOf.indexOf("|") + 1, partOf.length());
+				if (partOf.toLowerCase().contains("ispartof")) {
+					return partOf.substring(partOf.indexOf("|") + 1, partOf.length());
+				} else if (partOf.toLowerCase().contains("quickfooter")) {
+					return parsePartOfFromQuickBar(partOf);
+				}
 			}
 			return "";
+		}
+
+		private String parsePartOfFromQuickBar(String partOf) {
+			String[] info = partOf.split("\\|");
+			String region = "";
+			for (String s : info) {
+				if (s.indexOf("=") != -1) {
+					if (!s.contains("livello")) {
+						region = s.substring(s.indexOf("=") + 1, s.length()).trim();
+					}
+				}
+			}
+			return region;
 		}
 	}
 }

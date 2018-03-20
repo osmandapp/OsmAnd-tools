@@ -114,7 +114,7 @@ public class WikiDatabasePreparation {
 					openCnt--;
 				}
 				endInd = i;
-				String val = s.substring(beginInd, endInd);
+				String val = s.substring(beginInd, endInd).toLowerCase();
 				String key = getKey(val);
 				if (key.equals(WikivoyageTemplates.POI.getType())) {
 					bld.append(parseListing(val));
@@ -146,17 +146,18 @@ public class WikiDatabasePreparation {
 		String lat = null;
 		String lon = null;
 		for (int i = 1; i < parts.length; i++) {
-			String field = parts[i].trim();
+			String fieldText = parts[i].trim();
+			String field = fieldText.replaceAll(" ", "");
 			String value = "";
 			if (field.indexOf("=") != -1) {
-				value = field.substring(field.indexOf("=") + 1, field.length());
+				value = fieldText.substring(field.indexOf("=") + 1, field.length()).trim();
 			}
 			if (!value.isEmpty()) {
 				try {
 					String areaCode = "";
-					if (field.trim().contains(("name="))) {
+					if (field.contains(("name=")) || field.contains("nome=")) {
 						bld.append("'''" + value + "'''" + ", ");
-					} else if (field.contains("url=")) {
+					} else if (field.contains("url=") || field.contains("sito=")) {
 						bld.append("Website: " + value + ". ");
 					} else if (field.contains("intl-area-code=")) {
 						areaCode = value;
@@ -166,20 +167,24 @@ public class WikiDatabasePreparation {
 						lat = value;
 					} else if (field.contains("long=")) {
 						lon = value;
-					} else if (field.contains("content=")) {
+					} else if (field.contains("content=") || field.contains("descrizione=")) {
 						bld.append(value + " ");
 					} else if (field.contains("email=")) {
 						bld.append("e-mail: " + value + ", ");
 					} else if (field.contains("fax=")) {
 						bld.append("fax: " + value + ", ");
-					} else if (field.contains("phone=")) {
+					} else if (field.contains("phone=") || field.contains("tel")) {
 						bld.append("☎ " + areaCode + " " + value + ". ");
-					} else if (field.contains("price=")) {
+					} else if (field.contains("price=") || field.contains("prezzo=")) {
 						bld.append(value + ". ");
 					} else if (field.contains("hours=")) {
 						bld.append("Working hours: " + value + ". ");
 					} else if (field.contains("directions=")) {
 						bld.append("Directions: " + value + ". ");
+					} else if (field.contains("indicazioni=")) {
+						bld.append("Indicazioni: " + value + ". ");
+					} else if (field.contains("orari=")) {
+						bld.append("Orari: " + value + ". ");
 					}
 				} catch (Exception e) {}
 			}
@@ -191,17 +196,16 @@ public class WikiDatabasePreparation {
 	}
 
 	private static String getKey(String str) {
-		str = str.toLowerCase();
-		if (str.startsWith("geo|") || str.startsWith("geodata")) {
+		if (str.startsWith("geo|") || str.startsWith("geodata") || str.startsWith("quickbarcity")) {
 			return WikivoyageTemplates.LOCATION.getType();
-		} else if (str.startsWith("ispartof|") || str.startsWith("istinkat") || str.startsWith("isin")) {
+		} else if (str.startsWith("ispartof|") || str.startsWith("istinkat") || str.startsWith("isin") || str.startsWith("quickfooter")) {
 			return WikivoyageTemplates.PART_OF.getType();
 		} else if (str.startsWith("do") || str.startsWith("see") 
 				|| str.startsWith("eat") || str.startsWith("drink") 
 				|| str.startsWith("sleep") || str.startsWith("buy") 
 				|| str.startsWith("listing") || str.startsWith("vcard")) {
 			return WikivoyageTemplates.POI.getType();
-		} else if (str.startsWith("pagebanner")) {
+		} else if (str.startsWith("pagebanner") || str.startsWith("quickbarcity")) {
 			return WikivoyageTemplates.BANNER.getType();
 		}
 		return "";
