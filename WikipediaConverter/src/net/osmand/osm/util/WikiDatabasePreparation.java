@@ -114,18 +114,18 @@ public class WikiDatabasePreparation {
 					openCnt--;
 				}
 				endInd = i;
-				String val = s.substring(beginInd, endInd).toLowerCase();
-				String key = getKey(val);
+				String val = s.substring(beginInd, endInd);
+				String key = getKey(val.toLowerCase());
 				if (key.equals(WikivoyageTemplates.POI.getType())) {
 					bld.append(parseListing(val));
 				}
 				if (!key.isEmpty()) {
-					if (blocksMap.containsKey(key)) {
-						blocksMap.get(key).add(val);
+					if (key.contains("|")) {
+						for (String str : key.split("\\|")) {
+							addToMap(blocksMap, str, val);
+						}
 					} else {
-						List<String> tmp = new ArrayList<>();
-						tmp.add(val);
-						blocksMap.put(key, tmp);
+						addToMap(blocksMap, key, val);
 					}
 				}
 				i++;
@@ -138,6 +138,16 @@ public class WikiDatabasePreparation {
 			}
 		}
 		return bld.toString();
+	}
+
+	private static void addToMap(Map<String, List<String>> blocksMap, String key, String val) {
+		if (blocksMap.containsKey(key)) {
+			blocksMap.get(key).add(val);
+		} else {
+			List<String> tmp = new ArrayList<>();
+			tmp.add(val);
+			blocksMap.put(key, tmp);
+		}
 	}
 	
 	private static String parseListing(String val) {
@@ -200,11 +210,10 @@ public class WikiDatabasePreparation {
 	}
 
 	private static String getKey(String str) {
-		if (str.startsWith("geo|") || str.startsWith("geodata") || str.startsWith("quickbarcity") 
-				|| str.startsWith("info ville") || str.startsWith("info pays") || str.startsWith("info région")) {
+		if (str.startsWith("geo|") || str.startsWith("geodata")) {
 			return WikivoyageTemplates.LOCATION.getType();
 		} else if (str.startsWith("ispartof|") || str.startsWith("istinkat") || str.startsWith("isin") 
-				|| str.startsWith("quickfooter") || str.startsWith("dans")) {
+				|| str.startsWith("quickfooter") || str.startsWith("dans") || str.startsWith("footer|")) {
 			return WikivoyageTemplates.PART_OF.getType();
 		} else if (str.startsWith("do") || str.startsWith("see") 
 				|| str.startsWith("eat") || str.startsWith("drink") 
@@ -212,9 +221,11 @@ public class WikiDatabasePreparation {
 				|| str.startsWith("listing") || str.startsWith("vcard") || str.startsWith("se loger") 
 				|| str.startsWith("destination") || str.startsWith("voir") || str.startsWith("aller") || str.startsWith("manger")) {
 			return WikivoyageTemplates.POI.getType();
-		} else if (str.startsWith("pagebanner") || str.startsWith("quickbarcity")
-				|| str.startsWith("info ville") || str.startsWith("info pays") || str.startsWith("info région")) {
+		} else if (str.startsWith("pagebanner") || str.startsWith("citybar") 
+				|| str.startsWith("quickbar ")) {
 			return WikivoyageTemplates.BANNER.getType();
+		} else if (str.startsWith("quickbarcity") || str.startsWith("info ")) {
+			return "geo|pagebanner";
 		}
 		return "";
 	}

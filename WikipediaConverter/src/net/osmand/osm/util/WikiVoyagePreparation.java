@@ -78,7 +78,7 @@ public class WikiVoyagePreparation {
 		if(args.length == 0) {
 			lang = "fr";
 			folder = "/home/paul/osmand/wikivoyage/";
-			imageLinks = false;
+			imageLinks = true;
 			uncompressed = true;
 		}
 		if(args.length > 0) {
@@ -266,7 +266,9 @@ public class WikiVoyagePreparation {
 									if (!ll.isZero()) {
 										String filename = getFileName(macroBlocks.get(WikivoyageTemplates.BANNER.getType()));
 										if (imageLinks) {
-											imageStorage.saveageBanner(filename);
+											if (!filename.isEmpty()) {
+												imageStorage.saveageBanner(filename);
+											}
 											imageStorage.saveImageLinks(title.toString());
 											return;
 										}
@@ -414,8 +416,11 @@ public class WikiVoyagePreparation {
 					String toCompare = s.toLowerCase();
 					if (toCompare.contains(".jpg") || toCompare.contains(".jpeg") 
 							|| toCompare.contains(".png") || toCompare.contains(".gif")) {
-						if (s.indexOf("=") != -1) {
-							return s.substring(s.indexOf("=") + 1, s.length()).trim();
+						int equalInd = s.indexOf("=");
+						int columnInd = s.indexOf(":");
+						int index = equalInd != -1 ? (columnInd > equalInd ? columnInd : equalInd) : equalInd;
+						if (index != -1) {
+							return s.substring(index + 1, s.length()).trim();
 						}
 						return s.trim();
 					}
@@ -476,11 +481,11 @@ public class WikiVoyagePreparation {
 				degrees = Double.parseDouble(m.group(1));
 		        minutes = Double.parseDouble(m.group(2));
 		        seconds = m.group(3).isEmpty() ? 0 :Double.parseDouble(m.group(3));
-		        hemisphereOUmeridien = m.group(4).toUpperCase();
+		        hemisphereOUmeridien = m.group(4);
 			} catch (Exception e) {
 				// Skip malformed strings
 			}
-			if ((hemisphereOUmeridien.equals("W")) || (hemisphereOUmeridien.equals("S"))) {
+			if ((hemisphereOUmeridien.equalsIgnoreCase("W")) || (hemisphereOUmeridien.equalsIgnoreCase("S"))) {
 				signe = -1.0;
 			}
 			res = signe * (Math.floor(degrees) + Math.floor(minutes) / 60.0 + seconds / 3600.0);
@@ -492,7 +497,18 @@ public class WikiVoyagePreparation {
 				String partOf = list.get(0);
 				if (partOf.toLowerCase().contains("quickfooter")) {
 					return parsePartOfFromQuickBar(partOf);
+				} else if (partOf.toLowerCase().startsWith("footer|")) {
+					String part = "";
+					try {
+						int index = partOf.indexOf('|', partOf.indexOf('|') + 1);
+						part = partOf.substring(partOf.indexOf("=") + 1, 
+								index == -1 ? partOf.length() : index);
+					} catch (Exception e) {
+						System.out.println("Error parsing the partof: " + partOf);
+					}
+					return part;
 				} else {
+				
 					return partOf.substring(partOf.indexOf("|") + 1, partOf.length());
 				}
 			}

@@ -135,7 +135,9 @@ public class WikivoyageImageLinksStorage {
 				String url = urls.get("url").getAsString();
 				addToDB(url, filename);
 				savedNames.add(filename);
-			} catch (Exception e) {	}
+			} catch (Exception e) {
+				System.out.println("Request returned error: " + json);
+			}
 		}
 	}
 	
