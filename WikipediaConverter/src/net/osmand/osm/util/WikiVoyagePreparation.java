@@ -418,7 +418,7 @@ public class WikiVoyagePreparation {
 							|| toCompare.contains(".png") || toCompare.contains(".gif")) {
 						int equalInd = s.indexOf("=");
 						int columnInd = s.indexOf(":");
-						int index = equalInd != -1 ? (columnInd > equalInd ? columnInd : equalInd) : equalInd;
+						int index = (equalInd == -1 && columnInd == -1) ? -1 : (columnInd > equalInd ? columnInd : equalInd);
 						if (index != -1) {
 							return s.substring(index + 1, s.length()).trim();
 						}
