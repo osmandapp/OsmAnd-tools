@@ -76,7 +76,7 @@ public class WikiVoyagePreparation {
 		String lang = "";
 		String folder = "";
 		if(args.length == 0) {
-			lang = "fr";
+			lang = "en";
 			folder = "/home/paul/osmand/wikivoyage/";
 			imageLinks = true;
 			uncompressed = true;
@@ -416,6 +416,7 @@ public class WikiVoyagePreparation {
 					String toCompare = s.toLowerCase();
 					if (toCompare.contains(".jpg") || toCompare.contains(".jpeg") 
 							|| toCompare.contains(".png") || toCompare.contains(".gif")) {
+						s = s.replace("https:", "");
 						int equalInd = s.indexOf("=");
 						int columnInd = s.indexOf(":");
 						int index = (equalInd == -1 && columnInd == -1) ? -1 : (columnInd > equalInd ? columnInd : equalInd);
