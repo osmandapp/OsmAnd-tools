@@ -4,6 +4,7 @@ import info.bliki.wiki.filter.Encoder;
 import info.bliki.wiki.filter.HTMLConverter;
 
 import java.io.BufferedInputStream;
+import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -16,6 +17,7 @@ import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -23,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 import javax.xml.parsers.ParserConfigurationException;
@@ -78,8 +81,8 @@ public class WikiVoyagePreparation {
 		if(args.length == 0) {
 			lang = "en";
 			folder = "/home/paul/osmand/wikivoyage/";
-			imageLinks = true;
-			uncompressed = true;
+			imageLinks = false;
+			uncompressed = false;
 		}
 		if(args.length > 0) {
 			lang = args[0];
@@ -100,14 +103,64 @@ public class WikiVoyagePreparation {
 		}
 		folderPath = folder;
 		final String wikiPg = folder + lang + "wikivoyage-latest-pages-articles.xml.bz2";
+		final String langlink = folder + lang + "wikivoyage-latest-langlinks.sql.gz";
 		if (!new File(wikiPg).exists()) {
 			System.out.println("Dump for " + lang + " doesn't exist");
 			return;
 		}
 		final String sqliteFileName = folder + (uncompressed ? "full_" : "") + "wikivoyage.sqlite";
 		processWikivoyage(wikiPg, lang, sqliteFileName);
+//		processLangLinks(langlink, lang, sqliteFileName);
 		System.out.println("Successfully generated.");
     }
+
+	private static void processLangLinks(String langlink, String lang, String sqliteFileName) throws IOException, SQLException {
+		InputStream streamFile = new BufferedInputStream(new FileInputStream(langlink), 8192 * 4);
+		InputStream stream = streamFile;
+		GZIPInputStream gzis = new GZIPInputStream(stream);
+		Reader reader = new InputStreamReader(gzis,"UTF-8");
+		InputSource is = new InputSource(reader);
+		is.setEncoding("UTF-8");
+		BufferedReader in = new BufferedReader(reader);
+		String line;
+		DBDialect dialect = DBDialect.SQLITE;
+		Connection conn;
+		conn = (Connection) dialect.getDatabaseConnection(sqliteFileName, log);
+		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS langlinks (id int(10) NOT NULL DEFAULT 0, "
+				+ "lang text NOT NULL DEFAULT '', "
+				+ "title text UNIQUE NOT NULL DEFAULT '')");
+		conn.createStatement().execute("CREATE INDEX index_id ON langlinks(id);");
+		PreparedStatement prep = conn.prepareStatement("INSERT OR IGNORE INTO langlinks VALUES (?, ?, ?)");
+		int batch = 0;
+		while((line = in.readLine()) != null) {
+		    if (line.startsWith("INSERT INTO")) {
+		    	line = line.substring(line.indexOf("(") + 1);
+		    	line = line.replaceAll("\\),\\(", "|");
+		    	String[] vals = line.split("\\|");
+		    	for (String s : vals) {
+		    		s = s.replaceAll("'", "").replace(");", "");
+		    		String[] values = s.split(",");
+		    		if (values.length == 3) {
+		    			prep.setInt(1, Integer.valueOf(values[0]));
+			    		prep.setString(2, values[1]);
+			    		prep.setString(3, values[2]);
+			    		prep.addBatch();
+			    		if (batch++ > 500) {
+			    			prep.executeBatch();
+							batch = 0;
+			    		}
+		    		}
+		    	}
+		    }
+		}
+		stream.close();
+		streamFile.close();
+		gzis.close();
+		prep.addBatch();
+    	prep.executeBatch();
+    	prep.close();
+		conn.close();
+	}
 
 	protected static void processWikivoyage(final String wikiPg, String lang, String sqliteFileName)
 			throws ParserConfigurationException, SAXException, FileNotFoundException, IOException, SQLException, ComponentLookupException {
@@ -165,10 +218,10 @@ public class WikiVoyagePreparation {
 				String dataType = uncompressed ? "text" : "blob";
 				conn.createStatement().execute("DROP TABLE IF EXISTS " + lang + "_wikivoyage");
 				conn.createStatement().execute("CREATE TABLE " + lang + "_wikivoyage(article_id text, title text, content_gz" + 
-						dataType + ", is_part_of text, lat double, lon double, image_title text, gpx_gz " + dataType + ")");
-				conn.createStatement().execute("CREATE INDEX index_id_" + lang +  " ON " + lang + "_wikivoyage(article_id);");
+						dataType + ", is_part_of text, lat double, lon double, image_title text, gpx_gz " + dataType + ", id long)");
+				conn.createStatement().execute("CREATE INDEX index_title_" + lang +  " ON " + lang + "_wikivoyage(article_id);");
 				conn.createStatement().execute("CREATE INDEX " + lang + "_index_part_of ON " + lang + "_wikivoyage(is_part_of);");
-				prep = conn.prepareStatement("INSERT INTO " + lang + "_wikivoyage VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+				prep = conn.prepareStatement("INSERT INTO " + lang + "_wikivoyage VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
 				try {
 					imageConn = (Connection) dialect.getDatabaseConnection(folderPath + "imageData.sqlite", log);
 					imagePrep = imageConn.prepareStatement("SELECT image_url FROM image_links WHERE image_title = ?");
@@ -303,6 +356,7 @@ public class WikiVoyagePreparation {
 											prep.setBytes(8, stringToCompressedByteArray(bous, 
 													generateGpx(macroBlocks.get(WikivoyageTemplates.POI.getType()))));
 										}
+										prep.setLong(9, cid);
 										addBatch();
 									}
 								}
@@ -509,7 +563,6 @@ public class WikiVoyagePreparation {
 					}
 					return part;
 				} else {
-				
 					return partOf.substring(partOf.indexOf("|") + 1, partOf.length());
 				}
 			}
