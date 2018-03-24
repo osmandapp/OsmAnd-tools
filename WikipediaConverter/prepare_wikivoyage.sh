@@ -1,15 +1,14 @@
 #!/bin/bash
 BUILD_PATH=$1
 PARAMETER=$2
+INITIAL_PATH=$PWD
 
 function download {
+      cd $INITIAL_PATH
       echo "Start download $1";
       if [ ! -f  "$1"wiki-latest-pages-articles.xml.bz2 ]; then
       	wget --quiet -N http://dumps.wikimedia.org/"$1"wikivoyage/latest/"$1"wikivoyage-latest-pages-articles.xml.bz2
       fi
-      #if [ ! -f  "$1"wiki-latest-langlinks.sql.gz ]; then
-      	#wget --quiet -N http://dumps.wikimedia.org/"$1"wikivoyage/latest/"$1"wikivoyage-latest-langlinks.sql.gz      
-      #fi
       #if [ ! -f  "$1"wiki-latest-externallinks.sql.gz ]; then
       #      wget --quiet -N http://dumps.wikimedia.org/"$1"wikivoyage/latest/"$1"wikivoyage-latest-externallinks.sql.gz      
       #fi
@@ -18,8 +17,24 @@ function download {
       fi
 }
 
+function downloadLangLinks {
+      if [ ! -d "$BUILD_PATH"langlinks ]; then
+           mkdir langlinks
+      fi
+      
+      cd langlinks
+      array=(en de nl fr ru es pl it ca pt uk ja vo vi eu no da sv sr eo ro lt fa cs ms zh id fi bg et hr nn ko sl el he ar tr th be ka mk lv lb os gl fy af hy ml als sw ta nds ku la ga nv hi hu te ht sc new ceb bs bpy is sq br mr az sh tl cy bn pms sk war min kk uz ce ur oc zhimminnan mg tt jv ky zhyue ast tg ba sco pnb cv lmo my yo an ne gu scn bar mn nap hsb)
+      echo "Start downloading langlinks";
+      for item in ${array[*]}
+      do
+            if [ ! -f  "$1"wiki-latest-langlinks.sql.gz ]; then
+                  wget --quiet -N http://dumps.wikimedia.org/"$item"wikivoyage/latest/"$item"wikivoyage-latest-langlinks.sql.gz      
+            fi
+      done
+}
 
 
+downloadLangLinks;
 download en English;
 download de German;
 download nl Dutch;
