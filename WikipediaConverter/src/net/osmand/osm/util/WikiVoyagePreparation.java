@@ -274,7 +274,7 @@ public class WikiVoyagePreparation {
 				conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wikivoyage_articles(article_id text, title text, content_gz" + 
 						dataType + ", is_part_of text, lat double, lon double, image_title text, gpx_gz " + dataType + ", id long, lang text)");
 				conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_title ON wikivoyage_articles(article_id);");
-				conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_title ON wikivoyage_articles(id);");
+				conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_id ON wikivoyage_articles(id);");
 				conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_part_of ON wikivoyage_articles(is_part_of);");
 				prep = conn.prepareStatement("INSERT INTO wikivoyage_articles VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 				try {
