@@ -18,7 +18,7 @@ function download {
 }
 
 function downloadLangLinks {
-      if [ ! -d "$BUILD_PATH"langlinks ]; then
+      if [ ! -d "$INITIAL_PATH"langlinks ]; then
            mkdir langlinks
       fi
       
