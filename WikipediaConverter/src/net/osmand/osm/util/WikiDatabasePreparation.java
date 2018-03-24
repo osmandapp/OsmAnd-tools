@@ -176,7 +176,8 @@ public class WikiDatabasePreparation {
 						lat = value;
 					} else if (field.contains("long=") || field.contains("longitude=")) {
 						lon = value;
-					} else if (field.contains("content=") || field.contains("descrizione=") || field.contains("description")) {
+					} else if (field.contains("content=") || field.contains("descrizione=") || field.contains("description")
+							|| field.contains("sobre")) {
 						bld.append(value + " ");
 					} else if (field.contains("email=")) {
 						bld.append("e-mail: " + value + ", ");
@@ -199,6 +200,8 @@ public class WikiDatabasePreparation {
 						bld.append("Horaire: " + value + ". ");
 					} else if (field.contains("prix=")) {
 						bld.append("Prix: " + value + ". ");
+					} else if (field.contains("funcionamento")) {
+						bld.append("Funcionamento: " + value + ". ");
 					}
 				} catch (Exception e) {}
 			}
@@ -213,16 +216,19 @@ public class WikiDatabasePreparation {
 		if (str.startsWith("geo|") || str.startsWith("geodata")) {
 			return WikivoyageTemplates.LOCATION.getType();
 		} else if (str.startsWith("ispartof|") || str.startsWith("istinkat") || str.startsWith("isin") 
-				|| str.startsWith("quickfooter") || str.startsWith("dans") || str.startsWith("footer|")) {
+				|| str.startsWith("quickfooter") || str.startsWith("dans") || str.startsWith("footer|")
+				|| str.startsWith("fica em")) {
 			return WikivoyageTemplates.PART_OF.getType();
 		} else if (str.startsWith("do") || str.startsWith("see") 
 				|| str.startsWith("eat") || str.startsWith("drink") 
 				|| str.startsWith("sleep") || str.startsWith("buy") 
 				|| str.startsWith("listing") || str.startsWith("vcard") || str.startsWith("se loger") 
-				|| str.startsWith("destination") || str.startsWith("voir") || str.startsWith("aller") || str.startsWith("manger")) {
+				|| str.startsWith("destination") || str.startsWith("voir") || str.startsWith("aller") 
+				|| str.startsWith("manger") || str.startsWith("durma") || str.startsWith("veja") 
+				|| str.startsWith("coma")) {
 			return WikivoyageTemplates.POI.getType();
 		} else if (str.startsWith("pagebanner") || str.startsWith("citybar") 
-				|| str.startsWith("quickbar ")) {
+				|| str.startsWith("quickbar ") || str.startsWith("banner")) {
 			return WikivoyageTemplates.BANNER.getType();
 		} else if (str.startsWith("quickbarcity") || str.startsWith("info ")) {
 			return "geo|pagebanner";

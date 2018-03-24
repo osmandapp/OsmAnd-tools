@@ -81,7 +81,7 @@ public class WikiVoyagePreparation {
 		String lang = "";
 		String folder = "";
 		if(args.length == 0) {
-			lang = "en";
+			lang = "it";
 			folder = "/home/paul/osmand/wikivoyage/";
 			imageLinks = false;
 			uncompressed = false;
@@ -476,7 +476,7 @@ public class WikiVoyagePreparation {
 								} else if (field.contains("long=") || field.contains("longitude=")) {
 									point.lon = Double.valueOf(value);
 								} else if (field.contains("content=") || field.contains("descrizione=") 
-										|| field.contains("description")) {
+										|| field.contains("description") || field.contains("sobre")) {
 									point.desc = point.desc = point.desc == null ? value : 
 										point.desc + "\n" + value;
 								} else if (field.contains("email=")) {
@@ -488,7 +488,8 @@ public class WikiVoyagePreparation {
 								} else if (field.contains("price=") || field.contains("prezzo=") || field.contains("prix=")) {
 									point.desc = point.desc == null ? "Price: " + value : 
 										point.desc + "\nPrice: " + value;
-								} else if (field.contains("hours=") || field.contains("orari=") || field.contains("horaire=")) {
+								} else if (field.contains("hours=") || field.contains("orari=") || field.contains("horaire=") 
+										|| field.contains("funcionamento")) {
 									point.desc = point.desc == null ? "Working hours: " + value : 
 										point.desc + "\nWorking hours: " + value;
 								} else if (field.contains("directions=") || field.contains("direction=")) {
@@ -571,7 +572,7 @@ public class WikiVoyagePreparation {
 					String latStr = "";
 					String lonStr = "";
 					for (String part : parts) {
-						part = part.replaceAll(" ", "");
+						part = part.replaceAll(" ", "").toLowerCase();
 						if (part.startsWith("lat=") || part.startsWith("latitude=")) {
 							latStr = part.substring(part.indexOf("=") + 1, part.length()).replaceAll("\n", "");
 						} else if (part.startsWith("lon=") || part.startsWith("long=") || part.startsWith("longitude=")) {
