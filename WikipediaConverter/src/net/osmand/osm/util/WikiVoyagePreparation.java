@@ -638,9 +638,9 @@ public class WikiVoyagePreparation {
 					} catch (Exception e) {
 						System.out.println("Error parsing the partof: " + partOf);
 					}
-					return part;
+					return part.trim();
 				} else {
-					return partOf.substring(partOf.indexOf("|") + 1, partOf.length());
+					return partOf.substring(partOf.indexOf("|") + 1, partOf.length()).trim();
 				}
 			}
 			return "";
