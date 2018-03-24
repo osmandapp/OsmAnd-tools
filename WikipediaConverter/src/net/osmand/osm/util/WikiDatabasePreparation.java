@@ -217,7 +217,7 @@ public class WikiDatabasePreparation {
 			return WikivoyageTemplates.LOCATION.getType();
 		} else if (str.startsWith("ispartof|") || str.startsWith("istinkat") || str.startsWith("isin") 
 				|| str.startsWith("quickfooter") || str.startsWith("dans") || str.startsWith("footer|")
-				|| str.startsWith("fica em")) {
+				|| str.startsWith("fica em") || str.startsWith("estáen")) {
 			return WikivoyageTemplates.PART_OF.getType();
 		} else if (str.startsWith("do") || str.startsWith("see") 
 				|| str.startsWith("eat") || str.startsWith("drink") 
