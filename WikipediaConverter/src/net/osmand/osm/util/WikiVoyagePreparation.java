@@ -134,6 +134,7 @@ public class WikiVoyagePreparation {
 		long maxId = 0;
 		int langNum = 1;
 		Map<Integer, Set<Long>> genIds = new HashMap<>();
+		Map<Long, Long> currMapping = new HashMap<>();
 		for (File f : langlinkFolder.listFiles()) {
 			Set<Long> ids = new HashSet<>();
 			InputStream fis = new FileInputStream(f);
@@ -178,14 +179,17 @@ public class WikiVoyagePreparation {
 	    					if(buf.charAt(k) == ')') {
 	    						long id = Long.valueOf(insValues.get(0));
 				    			maxId = Math.max(maxId, id);
-				    			long genId = -1;
-				    			for (Set<Long> set : genIds.values()) {
-				    				if (set.contains(id)) {
-				    					genId = maxId++;
-				    				}
+				    			Long genId = currMapping.get(id);
+				    			if (genId == null) {
+				    				for (Set<Long> set : genIds.values()) {
+					    				if (set.contains(id)) {
+					    					genId = maxId++;
+					    					currMapping.put(id, genId);
+					    				}
+					    			}
 				    			}
-				    			ids.add(genId == -1 ? id : genId);
-				    			prep.setLong(1, genId == -1 ? id : genId);
+				    			ids.add(genId == null ? id : genId);
+				    			prep.setLong(1, genId == null ? id : genId);
 					    		prep.setString(2, insValues.get(2));
 					    		prep.addBatch();
 					    		if (batch++ > 500) {
@@ -205,6 +209,7 @@ public class WikiVoyagePreparation {
 	    		}
 	    	}
 	    	genIds.put(langNum, ids);
+	    	currMapping.clear();
 			langNum++;
 	    	read.close();
 		}
