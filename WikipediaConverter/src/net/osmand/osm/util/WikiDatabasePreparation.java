@@ -101,15 +101,15 @@ public class WikiDatabasePreparation {
 		int endInd;
 		for (int i = 0; i < s.length(); i++) {
 			int nt = s.length() - i - 1;
-			if (nt > 0 && (s.charAt(i) == '{' && s.charAt(i + 1) == '{') 
+			if (nt > 0 && ((s.charAt(i) == '{' && s.charAt(i + 1) == '{') || (s.charAt(i) == '[' && s.charAt(i + 1) == '[') 
 					|| (s.charAt(i) == '<' && s.charAt(i + 1) == 'm' && s.charAt(i + 2) == 'a' && s.charAt(i + 3) == 'p' 
-					&& s.charAt(i + 4) == 'l' && s.charAt(i + 5) == 'i')) {
+					&& s.charAt(i + 4) == 'l' && s.charAt(i + 5) == 'i'))) {
 				beginInd = i + 2;
 				openCnt++;
 				i++;
-			} else if (nt > 0 && (s.charAt(i) == '}' && s.charAt(i + 1) == '}') 
+			} else if (nt > 0 && ((s.charAt(i) == '}' && s.charAt(i + 1) == '}') || (s.charAt(i) == ']' && s.charAt(i + 1) == ']')
 					|| (s.charAt(i) == '>' && s.charAt(i - 1) == 'k' && s.charAt(i - 2) == 'n' && s.charAt(i - 3) == 'i' 
-					&& s.charAt(i - 4) == 'l' && s.charAt(i - 5) == 'p')) {
+					&& s.charAt(i - 4) == 'l' && s.charAt(i - 5) == 'p'))) {
 				if (openCnt > 0) {
 					openCnt--;
 				}
@@ -164,33 +164,36 @@ public class WikiDatabasePreparation {
 			if (!value.isEmpty()) {
 				try {
 					String areaCode = "";
-					if (field.contains(("name=")) || field.contains("nome=") || field.contains("nom=")) {
+					if (field.contains(("name=")) || field.contains("nome=") || field.contains("nom=") 
+							|| field.contains("שם")) {
 						bld.append("'''" + value + "'''" + ", ");
-					} else if (field.contains("url=") || field.contains("sito=")) {
+					} else if (field.contains("url=") || field.contains("sito=") || field.contains("האתר הרשמי")) {
 						bld.append("Website: " + value + ". ");
 					} else if (field.contains("intl-area-code=")) {
 						areaCode = value;
-					} else if (field.contains("address=") || field.contains("addresse=")) {
+					} else if (field.contains("address=") || field.contains("addresse=") || field.contains("כתובת")) {
 						bld.append(value + ", ");
 					} else if (field.contains("lat=") || field.contains("latitude=")) {
 						lat = value;
 					} else if (field.contains("long=") || field.contains("longitude=")) {
 						lon = value;
 					} else if (field.contains("content=") || field.contains("descrizione=") || field.contains("description")
-							|| field.contains("sobre")) {
+							|| field.contains("sobre") || field.contains("תיאור")) {
 						bld.append(value + " ");
-					} else if (field.contains("email=")) {
+					} else if (field.contains("email=") || field.contains("מייל")) {
 						bld.append("e-mail: " + value + ", ");
-					} else if (field.contains("fax=")) {
+					} else if (field.contains("fax=") || field.contains("פקס")) {
 						bld.append("fax: " + value + ", ");
 					} else if (field.contains("phone=") || field.contains("tel")
-							|| field.contains("téléphone")) {
+							|| field.contains("téléphone") || field.contains("טלפון")) {
 						bld.append("☎ " + areaCode + " " + value + ". ");
-					} else if (field.contains("price=") || field.contains("prezzo=")) {
+					} else if (field.contains("price=") || field.contains("prezzo=") || field.contains("מחיר")
+							|| field.contains("prix=")) {
 						bld.append(value + ". ");
-					} else if (field.contains("hours=")) {
+					} else if (field.contains("hours=") || field.contains("שעות")) {
 						bld.append("Working hours: " + value + ". ");
-					} else if (field.contains("directions=") || field.contains("direction=")) {
+					} else if (field.contains("directions=") || field.contains("direction=") 
+							|| field.contains("הוראות")) {
 						bld.append("Directions: " + value + ". ");
 					} else if (field.contains("indicazioni=")) {
 						bld.append("Indicazioni: " + value + ". ");
@@ -198,8 +201,6 @@ public class WikiDatabasePreparation {
 						bld.append("Orari: " + value + ". ");
 					} else if (field.contains("horaire=")) {
 						bld.append("Horaire: " + value + ". ");
-					} else if (field.contains("prix=")) {
-						bld.append("Prix: " + value + ". ");
 					} else if (field.contains("funcionamento")) {
 						bld.append("Funcionamento: " + value + ". ");
 					}
@@ -217,7 +218,7 @@ public class WikiDatabasePreparation {
 			return WikivoyageTemplates.LOCATION.getType();
 		} else if (str.startsWith("ispartof|") || str.startsWith("istinkat") || str.startsWith("isin") 
 				|| str.startsWith("quickfooter") || str.startsWith("dans") || str.startsWith("footer|")
-				|| str.startsWith("fica em") || str.startsWith("estáen")) {
+				|| str.startsWith("fica em") || str.startsWith("estáen") || str.startsWith("קטגוריה")) {
 			return WikivoyageTemplates.PART_OF.getType();
 		} else if (str.startsWith("do") || str.startsWith("see") 
 				|| str.startsWith("eat") || str.startsWith("drink") 
@@ -225,10 +226,11 @@ public class WikiDatabasePreparation {
 				|| str.startsWith("listing") || str.startsWith("vcard") || str.startsWith("se loger") 
 				|| str.startsWith("destination") || str.startsWith("voir") || str.startsWith("aller") 
 				|| str.startsWith("manger") || str.startsWith("durma") || str.startsWith("veja") 
-				|| str.startsWith("coma")) {
+				|| str.startsWith("coma") || str.startsWith("אוכל") || str.startsWith("שתייה") 
+				|| str.startsWith("לינה") || str.startsWith("מוקדי") || str.startsWith("רשימה")) {
 			return WikivoyageTemplates.POI.getType();
 		} else if (str.startsWith("pagebanner") || str.startsWith("citybar") 
-				|| str.startsWith("quickbar ") || str.startsWith("banner")) {
+				|| str.startsWith("quickbar ") || str.startsWith("banner") || str.startsWith("באנר")) {
 			return WikivoyageTemplates.BANNER.getType();
 		} else if (str.startsWith("quickbarcity") || str.startsWith("info ")) {
 			return "geo|pagebanner";

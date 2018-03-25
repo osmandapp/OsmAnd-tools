@@ -81,10 +81,10 @@ public class WikiVoyagePreparation {
 		String lang = "";
 		String folder = "";
 		if(args.length == 0) {
-			lang = "it";
+			lang = "he";
 			folder = "/home/paul/osmand/wikivoyage/";
 			imageLinks = false;
-			uncompressed = false;
+			uncompressed = true;
 		}
 		if(args.length > 0) {
 			lang = args[0];
@@ -470,9 +470,10 @@ public class WikiVoyagePreparation {
 						if (!value.isEmpty()) {
 							try {
 								String areaCode = "";
-								if (field.contains("name=") || field.contains("nome=") || field.contains("nom=")) {
+								if (field.contains("name=") || field.contains("nome=") || field.contains("nom=")
+										|| field.contains("שם")) {
 									point.name = value;
-								} else if (field.contains("url=") || field.contains("sito=")) {
+								} else if (field.contains("url=") || field.contains("sito=") || field.contains("האתר הרשמי")) {
 									point.link = value;
 								} else if (field.contains("intl-area-code=")) {
 									areaCode = value;
@@ -481,23 +482,25 @@ public class WikiVoyagePreparation {
 								} else if (field.contains("long=") || field.contains("longitude=")) {
 									point.lon = Double.valueOf(value);
 								} else if (field.contains("content=") || field.contains("descrizione=") 
-										|| field.contains("description") || field.contains("sobre")) {
+										|| field.contains("description") || field.contains("sobre") || field.contains("תיאור")) {
 									point.desc = point.desc = point.desc == null ? value : 
 										point.desc + "\n" + value;
-								} else if (field.contains("email=")) {
+								} else if (field.contains("email=") || field.contains("מייל")) {
 									point.desc = point.desc == null ? "Email: " + value : 
 										point.desc + "\nEmail: " + value;
-								} else if (field.contains("phone=") || field.contains("tel=") || field.contains("téléphone")) {
+								} else if (field.contains("phone=") || field.contains("tel=") || field.contains("téléphone")
+										|| field.contains("טלפון")) {
 									point.desc = point.desc == null ? "Phone: " + areaCode + value : 
 										point.desc + "\nPhone: " + areaCode + value;
-								} else if (field.contains("price=") || field.contains("prezzo=") || field.contains("prix=")) {
+								} else if (field.contains("price=") || field.contains("prezzo=") || field.contains("prix=") 
+										|| field.contains("מחיר")) {
 									point.desc = point.desc == null ? "Price: " + value : 
 										point.desc + "\nPrice: " + value;
 								} else if (field.contains("hours=") || field.contains("orari=") || field.contains("horaire=") 
-										|| field.contains("funcionamento")) {
+										|| field.contains("funcionamento") || field.contains("שעות")) {
 									point.desc = point.desc == null ? "Working hours: " + value : 
 										point.desc + "\nWorking hours: " + value;
-								} else if (field.contains("directions=") || field.contains("direction=")) {
+								} else if (field.contains("directions=") || field.contains("direction=") || field.contains("הוראות")) {
 									point.desc = point.desc == null ? "Directions: " + value : 
 										point.desc + "\nDirections: " + value;
 								}
@@ -627,9 +630,10 @@ public class WikiVoyagePreparation {
 		private String parsePartOf(List<String> list) {
 			if (list != null && !list.isEmpty()) {
 				String partOf = list.get(0);
-				if (partOf.toLowerCase().contains("quickfooter")) {
+				String lowerCasePartOf = partOf.toLowerCase();
+				if (lowerCasePartOf.contains("quickfooter")) {
 					return parsePartOfFromQuickBar(partOf);
-				} else if (partOf.toLowerCase().startsWith("footer|")) {
+				} else if (lowerCasePartOf.startsWith("footer|")) {
 					String part = "";
 					try {
 						int index = partOf.indexOf('|', partOf.indexOf('|') + 1);
@@ -639,6 +643,8 @@ public class WikiVoyagePreparation {
 						System.out.println("Error parsing the partof: " + partOf);
 					}
 					return part.trim();
+				} else if (lowerCasePartOf.contains("קטגוריה")) {
+					return partOf.substring(0, partOf.indexOf(":") - 1).trim();
 				} else {
 					return partOf.substring(partOf.indexOf("|") + 1, partOf.length()).trim();
 				}
