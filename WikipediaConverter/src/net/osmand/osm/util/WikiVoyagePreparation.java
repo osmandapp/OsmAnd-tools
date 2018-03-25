@@ -4,7 +4,6 @@ import info.bliki.wiki.filter.Encoder;
 import info.bliki.wiki.filter.HTMLConverter;
 
 import java.io.BufferedInputStream;
-import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -13,8 +12,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
-import java.io.UnsupportedEncodingException;
-import java.net.URLEncoder;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -48,10 +45,6 @@ import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 import org.xwiki.component.manager.ComponentLookupException;
-
-import com.google.gson.Gson;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonObject;
 
 public class WikiVoyagePreparation {
 	private static final Log log = PlatformUtil.getLog(WikiDatabasePreparation.class);
@@ -424,7 +417,6 @@ public class WikiVoyagePreparation {
 										langPrep.setString(1, title.toString());
 										ResultSet rs = langPrep.executeQuery();
 										long id = 0;
-										
 										while (rs.next()) {
 											id = rs.getLong("id");
 										}
