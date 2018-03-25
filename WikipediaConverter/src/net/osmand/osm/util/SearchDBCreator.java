@@ -21,16 +21,17 @@ public class SearchDBCreator {
 		}
 		DBDialect dialect = DBDialect.SQLITE;
 		Connection conn = (Connection) dialect.getDatabaseConnection(pathTodb, log);
+		generateIdsIfMissing(conn, pathTodb.substring(0, pathTodb.lastIndexOf("/") + 1));
 		conn.createStatement().execute("DROP TABLE IF EXISTS wikivoyage_search;");
-		conn.createStatement().execute("CREATE TABLE wikivoyage_search(word text, translation_id long, article_title text, lang text)");
-		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_word ON wikivoyage_search(word);");
+		conn.createStatement().execute("CREATE TABLE wikivoyage_search(search_term text, city_id long, article_title text, lang text)");
+		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_word ON wikivoyage_search(search_term);");
 		PreparedStatement ps = conn.prepareStatement("INSERT INTO wikivoyage_search VALUES (?, ?, ?, ?)");
-		PreparedStatement data = conn.prepareStatement("SELECT title, generated_id, lang FROM wikivoyage_articles");
+		PreparedStatement data = conn.prepareStatement("SELECT title, city_id, lang FROM wikivoyage_articles");
 		ResultSet rs = data.executeQuery();
 		int batch = 0;
 		while (rs.next()) {
 			String title = rs.getString("title");
-			long id = rs.getLong("generated_id");
+			long id = rs.getLong("city_id");
 			for (String s : title.split(" ")) {
 				ps.setString(1, s.toLowerCase());
 				ps.setLong(2, id);
@@ -49,5 +50,40 @@ public class SearchDBCreator {
 		data.close();
 		rs.close();
 		conn.close();
+	}
+
+	private static void generateIdsIfMissing(Connection conn, String workingDir) throws SQLException {
+		long maxId = 0;
+		DBDialect dialect = DBDialect.SQLITE;
+		Connection langConn = (Connection) dialect.getDatabaseConnection(workingDir + "langlink.sqlite", log);
+		PreparedStatement st = langConn.prepareStatement("SELECT MAX(id) FROM langlinks");
+		ResultSet rs = st.executeQuery();
+		while (rs.next()) {
+			maxId = rs.getLong(1) + 1;
+		}
+		st.close();
+		rs.close();
+		langConn.close();
+		if (maxId == 0) {
+			return;
+		}
+		int batch = 0;
+		PreparedStatement ps = conn.prepareStatement("SELECT title FROM wikivoyage_articles WHERE city_id = 0");
+		PreparedStatement prep = conn.prepareStatement("UPDATE wikivoyage_articles SET city_id = ? WHERE title = ?");
+		ResultSet res = ps.executeQuery();
+		while (res.next()) {
+			String title = res.getString("title");
+			prep.setLong(1, maxId++);
+			prep.setString(2, title);
+			prep.addBatch();
+			if (batch++ > 500) {
+				prep.executeBatch();
+				batch = 0;
+			}
+		}
+		prep.addBatch();
+		prep.executeBatch();
+		prep.close();
+		res.close();		
 	}
 }
