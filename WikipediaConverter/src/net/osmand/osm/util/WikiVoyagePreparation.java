@@ -270,11 +270,11 @@ public class WikiVoyagePreparation {
 				String dataType = uncompressed ? "text" : "blob";
 //				conn.createStatement().execute("DROP TABLE IF EXISTS " + lang + "_wikivoyage");
 				conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wikivoyage_articles(article_id text, title text, content_gz" + 
-						dataType + ", is_part_of text, lat double, lon double, image_title text, gpx_gz " + dataType + ", id long, lang text)");
+						dataType + ", is_part_of text, lat double, lon double, image_title text, gpx_gz " + dataType + ", generated_id long, original_id long, lang text)");
 				conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_title ON wikivoyage_articles(title);");
-				conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_id ON wikivoyage_articles(id);");
+				conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_id ON wikivoyage_articles(generated_id);");
 				conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_part_of ON wikivoyage_articles(is_part_of);");
-				prep = conn.prepareStatement("INSERT INTO wikivoyage_articles VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+				prep = conn.prepareStatement("INSERT INTO wikivoyage_articles VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 				try {
 					imageConn = (Connection) dialect.getDatabaseConnection(folderPath + "imageData.sqlite", log);
 					imagePrep = imageConn.prepareStatement("SELECT image_url FROM image_links WHERE image_title = ?");
@@ -421,7 +421,8 @@ public class WikiVoyagePreparation {
 											id = rs.getLong("id");
 										}
 										prep.setLong(9, id);
-										prep.setString(10, lang);
+										prep.setLong(10, cid);
+										prep.setString(11, lang);
 										langPrep.clearParameters();
 
 										addBatch();
