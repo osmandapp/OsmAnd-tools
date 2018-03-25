@@ -218,7 +218,7 @@ public class WikiVoyagePreparation {
     	prep.close();
     	conn.close();
 	}
-
+	
 	protected static void processWikivoyage(final String wikiPg, String lang, String sqliteFileName, File langlinkConn)
 			throws ParserConfigurationException, SAXException, FileNotFoundException, IOException, SQLException, ComponentLookupException {
 		SAXParser sx = SAXParserFactory.newInstance().newSAXParser();
@@ -278,7 +278,7 @@ public class WikiVoyagePreparation {
 //				conn.createStatement().execute("DROP TABLE IF EXISTS " + lang + "_wikivoyage");
 				conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wikivoyage_articles(article_id text, title text, content_gz" + 
 						dataType + ", is_part_of text, lat double, lon double, image_title text, gpx_gz " + dataType + ", id long, lang text)");
-				conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_title ON wikivoyage_articles(article_id);");
+				conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_title ON wikivoyage_articles(title);");
 				conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_id ON wikivoyage_articles(id);");
 				conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_part_of ON wikivoyage_articles(is_part_of);");
 				prep = conn.prepareStatement("INSERT INTO wikivoyage_articles VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
@@ -408,8 +408,7 @@ public class WikiVoyagePreparation {
 											prep.setBytes(3, stringToCompressedByteArray(bous, plainStr));
 										}
 										// part_of
-										prep.setString(4, Encoder.encodeUrl(
-												parsePartOf(macroBlocks.get(WikivoyageTemplates.PART_OF.getType()))));
+										prep.setString(4, parsePartOf(macroBlocks.get(WikivoyageTemplates.PART_OF.getType())));
 										
 										prep.setDouble(5, ll.getLatitude());
 										prep.setDouble(6, ll.getLongitude());
