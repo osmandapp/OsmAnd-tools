@@ -15,7 +15,7 @@ public class SearchDBCreator {
 	private static final Log log = PlatformUtil.getLog(SearchDBCreator.class);
 
 	public static void main(String[] args) throws SQLException {
-		String pathTodb = "/home/paul/osmand/wikivoyage/full_wikivoyage.sqlite";
+		String pathTodb = "/home/paul/osmand/wikivoyage/wikivoyage.sqlite";
 		if(args.length > 0) {
 			pathTodb = args[0];
 		}
@@ -33,7 +33,7 @@ public class SearchDBCreator {
 			String title = rs.getString("title");
 			long id = rs.getLong("city_id");
 			for (String s : title.split(" ")) {
-				ps.setString(1, s.toLowerCase());
+				ps.setString(1, s.replaceAll("[\\)\\(]", "").toLowerCase());
 				ps.setLong(2, id);
 				ps.setString(3, title);
 				ps.setString(4, rs.getString("lang"));
