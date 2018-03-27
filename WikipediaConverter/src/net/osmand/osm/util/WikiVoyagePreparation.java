@@ -74,8 +74,8 @@ public class WikiVoyagePreparation {
 		String lang = "";
 		String folder = "";
 		if(args.length == 0) {
-			lang = "he";
-			folder = "/home/paul/osmand/wikivoyage/";
+			lang = "pl";
+			folder = "/home/paul/osmand/wikivoyage/articles/";
 			imageLinks = false;
 			uncompressed = true;
 		}
@@ -447,12 +447,9 @@ public class WikiVoyagePreparation {
 				for (String s : list) {
 					String[] info = s.split("\\|");
 					WptPt point = new WptPt();
-					String category = info[0].replaceAll("\n", "");
-					if (category.toLowerCase().equals("vcard")) {
-						point.category = transformCategory(info);
-					} else {
-						point.category = category;
-					}
+					String category = info[0].replaceAll("\n", "").trim();
+					point.category = (category.equalsIgnoreCase("vcard") 
+							|| category.equalsIgnoreCase("listing")) ? transformCategory(info) : category;
 					for (int i = 1; i < info.length; i++) {
 						String field = info[i].trim();
 						String value = "";
@@ -563,14 +560,23 @@ public class WikiVoyagePreparation {
 				String location = list.get(0);
 				String[] parts = location.split("\\|");
 				// skip malformed location blocks
-				if (location.contains("geo|")) {
-					try {
-						lat = Double.valueOf(parts[1]);
-						lon = Double.valueOf(parts[2]);
-					} catch (Exception e) {	}
+				String regex_pl = "(\\d+).+?(\\d+).+?(\\d*).*?";
+				if (location.toLowerCase().contains("geo|")) {
+					if (parts.length >= 3) {
+						if (parts[1].matches(regex_pl) && parts[2].matches(regex_pl)) {
+							lat = toDecimalDegrees(parts[1], regex_pl);
+							lon = toDecimalDegrees(parts[2], regex_pl);
+						} else {
+							try {
+								lat = Double.valueOf(parts[1]);
+								lon = Double.valueOf(parts[2]);
+							} catch (Exception e) {	}
+						}
+					}
 				} else {
 					String latStr = "";
 					String lonStr = "";
+					String regex = "(\\d+).+?(\\d+).+?(\\d*).*?([N|E|W|S|n|e|w|s]+)";
 					for (String part : parts) {
 						part = part.replaceAll(" ", "").toLowerCase();
 						if (part.startsWith("lat=") || part.startsWith("latitude=")) {
@@ -579,7 +585,6 @@ public class WikiVoyagePreparation {
 							lonStr = part.substring(part.indexOf("=") + 1, part.length()).replaceAll("\n", "");
 						}
 					}
-					String regex = "(\\d+).+?(\\d+).+?(\\d*).*?([N|E|W|S|n|e|w|s]+)";
 					if (latStr.matches(regex) && lonStr.matches(regex)) {
 						lat = toDecimalDegrees(latStr, regex);
 						lon = toDecimalDegrees(lonStr, regex);
