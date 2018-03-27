@@ -406,7 +406,7 @@ public class WikiVoyagePreparation {
 										prep.setDouble(5, ll.getLatitude());
 										prep.setDouble(6, ll.getLongitude());
 										// banner
-										prep.setString(7, wikiModel.getImageLinkFromDB(filename));
+										prep.setString(7, wikiModel.getImageLinkFromDB(filename).replace("https://upload.wikimedia.org/wikipedia/commons/", ""));
 										// gpx_gz
 										if (uncompressed) {
 											prep.setString(8, generateGpx(macroBlocks.get(WikivoyageTemplates.POI.getType())));
