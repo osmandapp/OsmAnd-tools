@@ -98,16 +98,18 @@ public class WikiDatabasePreparation {
 		StringBuilder bld = new StringBuilder();
 		int openCnt = 0;
 		int beginInd = 0;
-		int endInd;
+		int endInd = 0;
+		char openingChar = '{';
 		for (int i = 0; i < s.length(); i++) {
 			int nt = s.length() - i - 1;
-			if (nt > 0 && ((s.charAt(i) == '{' && s.charAt(i + 1) == '{') || (s.charAt(i) == '[' && s.charAt(i + 1) == '[') 
+			if (nt > 0 && beginInd == 0 && ((s.charAt(i) == '{' && s.charAt(i + 1) == '{') || (s.charAt(i) == '[' && s.charAt(i + 1) == '[') 
 					|| (s.charAt(i) == '<' && s.charAt(i + 1) == 'm' && s.charAt(i + 2) == 'a' && s.charAt(i + 3) == 'p' 
 					&& s.charAt(i + 4) == 'l' && s.charAt(i + 5) == 'i'))) {
+				openingChar = s.charAt(i);
 				beginInd = i + 2;
 				openCnt++;
 				i++;
-			} else if (nt > 0 && ((s.charAt(i) == '}' && s.charAt(i + 1) == '}') || (s.charAt(i) == ']' && s.charAt(i + 1) == ']')
+			} else if (nt > 0 && ((s.charAt(i) == '}' && s.charAt(i + 1) == '}' && openingChar == '{') || (openingChar == '[' && s.charAt(i) == ']' && s.charAt(i + 1) == ']')
 					|| (s.charAt(i) == '>' && s.charAt(i - 1) == 'k' && s.charAt(i - 2) == 'n' && s.charAt(i - 3) == 'i' 
 					&& s.charAt(i - 4) == 'l' && s.charAt(i - 5) == 'p'))) {
 				if (openCnt > 0) {
@@ -232,7 +234,7 @@ public class WikiDatabasePreparation {
 		} else if (str.startsWith("pagebanner") || str.startsWith("citybar") 
 				|| str.startsWith("quickbar ") || str.startsWith("banner") || str.startsWith("באנר")) {
 			return WikivoyageTemplates.BANNER.getType();
-		} else if (str.startsWith("quickbarcity") || str.startsWith("info ")) {
+		} else if (str.startsWith("quickbar") || str.startsWith("info ")) {
 			return "geo|pagebanner";
 		}
 		return "";

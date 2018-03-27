@@ -15,7 +15,7 @@ public class SearchDBCreator {
 	private static final Log log = PlatformUtil.getLog(SearchDBCreator.class);
 
 	public static void main(String[] args) throws SQLException {
-		String pathTodb = "/home/paul/osmand/wikivoyage/wikivoyage.sqlite";
+		String pathTodb = "/home/paul/osmand/wikivoyage/full_wikivoyage.sqlite";
 		if(args.length > 0) {
 			pathTodb = args[0];
 		}

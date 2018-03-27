@@ -269,7 +269,7 @@ public class WikiVoyagePreparation {
 				conn = (Connection) dialect.getDatabaseConnection(sqliteFile.getAbsolutePath(), log);
 				String dataType = uncompressed ? "text" : "blob";
 //				conn.createStatement().execute("DROP TABLE IF EXISTS " + lang + "_wikivoyage");
-				conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wikivoyage_articles(article_id text, title text, content_gz" + 
+				conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wikivoyage_articles(article_id text, title text, content_gz " + 
 						dataType + ", is_part_of text, lat double, lon double, image_title text, gpx_gz " + dataType + ", city_id long, original_id long, lang text)");
 				conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_title ON wikivoyage_articles(title);");
 				conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_id ON wikivoyage_articles(city_id);");
@@ -636,9 +636,9 @@ public class WikiVoyagePreparation {
 					}
 					return part.trim();
 				} else if (lowerCasePartOf.contains("קטגוריה")) {
-					return partOf.substring(0, partOf.indexOf(":") - 1).trim();
+					return partOf.substring(partOf.indexOf(":") + 1).trim().replaceAll("[\\|\\*]", "");
 				} else {
-					return partOf.substring(partOf.indexOf("|") + 1, partOf.length()).trim();
+					return partOf.substring(partOf.indexOf("|") + 1).trim();
 				}
 			}
 			return "";
@@ -649,7 +649,7 @@ public class WikiVoyagePreparation {
 			String region = "";
 			for (String s : info) {
 				if (s.indexOf("=") != -1) {
-					if (!s.contains("livello")) {
+					if (!s.toLowerCase().contains("livello")) {
 						region = s.substring(s.indexOf("=") + 1, s.length()).trim();
 					}
 				}
