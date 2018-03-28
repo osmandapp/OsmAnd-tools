@@ -102,7 +102,7 @@ public class WikiDatabasePreparation {
 		char openingChar = '{';
 		for (int i = 0; i < s.length(); i++) {
 			int nt = s.length() - i - 1;
-			if (nt > 0 && beginInd == 0 && ((s.charAt(i) == '{' && s.charAt(i + 1) == '{') || (s.charAt(i) == '[' && s.charAt(i + 1) == '[') 
+			if (nt > 0 && ((s.charAt(i) == '{' && s.charAt(i + 1) == '{') || (s.charAt(i) == '[' && s.charAt(i + 1) == '[' && s.charAt(i + 2) == 'ק') 
 					|| (s.charAt(i) == '<' && s.charAt(i + 1) == 'm' && s.charAt(i + 2) == 'a' && s.charAt(i + 3) == 'p' 
 					&& s.charAt(i + 4) == 'l' && s.charAt(i + 5) == 'i'))) {
 				openingChar = s.charAt(i);
@@ -196,7 +196,7 @@ public class WikiDatabasePreparation {
 						bld.append("Working hours: " + value + ". ");
 					} else if (field.contains("directions=") || field.contains("direction=") 
 							|| field.contains("הוראות")) {
-						bld.append("Directions: " + value + ". ");
+						bld.append(value + ". ");
 					} else if (field.contains("indicazioni=")) {
 						bld.append("Indicazioni: " + value + ". ");
 					} else if (field.contains("orari=")) {
