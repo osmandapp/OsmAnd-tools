@@ -105,7 +105,7 @@ public class WikiDatabasePreparation {
 			if (nt > 0 && ((s.charAt(i) == '{' && s.charAt(i + 1) == '{') || (s.charAt(i) == '[' && s.charAt(i + 1) == '[' && s.charAt(i + 2) == 'ק') 
 					|| (s.charAt(i) == '<' && s.charAt(i + 1) == 'm' && s.charAt(i + 2) == 'a' && s.charAt(i + 3) == 'p' 
 					&& s.charAt(i + 4) == 'l' && s.charAt(i + 5) == 'i'))) {
-				hebrew = s.charAt(i + 2) == 'ק';
+				hebrew = s.length() > 2 ? s.charAt(i + 2) == 'ק' : false;
 				beginInd = i + 2;
 				openCnt++;
 				i++;
