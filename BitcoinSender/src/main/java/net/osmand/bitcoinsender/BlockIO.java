@@ -27,7 +27,7 @@ import java.util.*;
 
 public class BlockIO {
 
-    private static String PRIORITY = "low"; // "medium"
+    private static String PRIORITY = "low"; // "medium", "high"
 	private String apiKey;
 
     public enum ParamType{
