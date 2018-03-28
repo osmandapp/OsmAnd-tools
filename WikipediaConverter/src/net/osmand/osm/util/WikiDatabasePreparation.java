@@ -112,9 +112,12 @@ public class WikiDatabasePreparation {
 			} else if (nt > 0 && ((s.charAt(i) == '}' && s.charAt(i + 1) == '}') || (hebrew && s.charAt(i) == ']' && s.charAt(i + 1) == ']')
 					|| (s.charAt(i) == '>' && s.charAt(i - 1) == 'k' && s.charAt(i - 2) == 'n' && s.charAt(i - 3) == 'i' 
 					&& s.charAt(i - 4) == 'l' && s.charAt(i - 5) == 'p'))) {
-				if (openCnt > 0) {
+				if (openCnt > 1) {
 					openCnt--;
+					i++;
+					continue;
 				}
+				openCnt--;
 				endInd = i;
 				String val = s.substring(beginInd, endInd);
 				String key = getKey(val.toLowerCase());
@@ -183,12 +186,14 @@ public class WikiDatabasePreparation {
 							|| field.contains("sobre") || field.contains("תיאור")) {
 						bld.append(value + " ");
 					} else if (field.contains("email=") || field.contains("מייל")) {
-						bld.append("e-mail: " + value + ", ");
+						bld.append("e-mail: " + "mailto:" + value + ", ");
 					} else if (field.contains("fax=") || field.contains("פקס")) {
 						bld.append("fax: " + value + ", ");
 					} else if (field.contains("phone=") || field.contains("tel")
 							|| field.contains("téléphone") || field.contains("טלפון")) {
-						bld.append("☎ " + areaCode + " " + value + ". ");
+						String tel = areaCode.replaceAll("[ -]", "/") + "/" + value.replaceAll("[ -]", "/");
+						tel = tel.replaceAll("\\(", "o").replaceAll("\\)", "c");
+						bld.append("☎ " + "tel:" + tel + ". ");
 					} else if (field.contains("price=") || field.contains("prezzo=") || field.contains("מחיר")
 							|| field.contains("prix=")) {
 						bld.append(value + ". ");
@@ -210,7 +215,7 @@ public class WikiDatabasePreparation {
 			}
 		}
 		if (lat != null && lon != null) {
-			bld.append(" <a href=\"geo:" + lat + "," + lon +"\">Open map</a>");
+			bld.append(" geo:" + lat + "," + lon);
 		}
 		return bld.toString();
 	}
