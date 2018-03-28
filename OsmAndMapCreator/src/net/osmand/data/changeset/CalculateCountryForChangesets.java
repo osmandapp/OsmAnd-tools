@@ -22,6 +22,10 @@ import net.osmand.util.MapUtils;
 
 public class CalculateCountryForChangesets {
 
+	private static final int BATCH_SIZE = 1000;
+	private static final int FETCH_LIMIT = 1000000;
+	private static final int MAX_COUNTRY_SIZE = 5;
+
 	public static void main(String[] args) throws Exception {
 		if(args[0].equals("calculate_countries")) {
 			calculateCountries();
@@ -44,8 +48,9 @@ public class CalculateCountryForChangesets {
 							+ " VALUES(?, ?, ?)");
 			rs = stat.executeQuery("select id, minlat, minlon, maxlat, maxlon from changesets C "
 					+ " where (maxlat <> 0 or minlat <> 0 or maxlon <> 0 or minlon <> 0) and "
-					+ "not exists (select 1 from changeset_country CC where CC.changesetid=C.id)");
+					+ "not exists (select 1 from changeset_country CC where CC.changesetid=C.id) limit " + FETCH_LIMIT);
 			int batch = 0;
+			int batchInd = 1;
 			while(rs.next()) {
 				double minlat = rs.getDouble(2);
 				double minlon = rs.getDouble(3);
@@ -66,7 +71,7 @@ public class CalculateCountryForChangesets {
 					WorldRegion reg = or.getRegionData(full);
 					if(reg.isRegionMapDownload() && !full.toLowerCase().startsWith("world_")) {
 						cid++;
-						if (cid > 5) {
+						if (cid > MAX_COUNTRY_SIZE) {
 							continue;
 						}
 						System.out.println(changesetId  + " " + full + " " + reg.getLocaleName() + " " + map.get(reg));
@@ -90,7 +95,9 @@ public class CalculateCountryForChangesets {
 					}
 
 				}
-				if(batch ++ > 1000) {
+				if(batch ++ > BATCH_SIZE) {
+					
+					System.out.println("Execute batch " + (batchInd++) +" by " + BATCH_SIZE);
 					ps.executeBatch();
 					batch = 0;
 				}
