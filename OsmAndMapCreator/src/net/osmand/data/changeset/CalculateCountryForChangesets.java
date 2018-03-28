@@ -74,7 +74,7 @@ public class CalculateCountryForChangesets {
 						if (cid > MAX_COUNTRY_SIZE) {
 							continue;
 						}
-						System.out.println(changesetId  + " " + full + " " + reg.getLocaleName() + " " + map.get(reg));
+						// System.out.println(changesetId  + " " + full + " " + reg.getLocaleName() + " " + map.get(reg));
 						if(map.get(reg) == null) {
 							throw new UnsupportedOperationException("Not found " + changesetId + " " + full);
 						}
