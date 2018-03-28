@@ -31,9 +31,10 @@ public class SearchDBCreator {
 		int batch = 0;
 		while (rs.next()) {
 			String title = rs.getString("title");
+			String titleToSplit = title.replaceAll("[/\\)\\(-]", " ").replaceAll(" +", " ");
 			long id = rs.getLong("city_id");
-			for (String s : title.split(" ")) {
-				ps.setString(1, s.replaceAll("[\\)\\(]", "").toLowerCase());
+			for (String s : titleToSplit.split(" ")) {
+				ps.setString(1, s.toLowerCase());
 				ps.setLong(2, id);
 				ps.setString(3, title);
 				ps.setString(4, rs.getString("lang"));
