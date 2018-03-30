@@ -4,16 +4,20 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 
+import info.bliki.Messages;
 import info.bliki.htmlcleaner.ContentToken;
 import info.bliki.htmlcleaner.TagNode;
 import info.bliki.htmlcleaner.TagToken;
 import info.bliki.htmlcleaner.Utils;
 import info.bliki.wiki.filter.Encoder;
 import info.bliki.wiki.filter.WikipediaParser;
+import info.bliki.wiki.filter.WikipediaPreTagParser;
 import info.bliki.wiki.model.Configuration;
 import info.bliki.wiki.model.ImageFormat;
 import info.bliki.wiki.model.WikiModel;
+import info.bliki.wiki.tags.HTMLTag;
 import info.bliki.wiki.tags.PTag;
+import info.bliki.wiki.tags.WPATag;
 
 public class CustomWikiModel extends WikiModel {
 		
@@ -145,4 +149,86 @@ public class CustomWikiModel extends WikiModel {
             }
         }
     }
+	
+	@Override
+	public void appendInternalLink(String topic, String hashSection,
+			String topicDescription, String cssClass, boolean parseRecursive) {
+		appendInternalLink(topic, hashSection, topicDescription, cssClass,
+				parseRecursive, true);
+	}
+
+	protected void appendInternalLink(String topic, String hashSection,
+			String topicDescription, String cssClass, boolean parseRecursive,
+			boolean topicExists) {
+		String hrefLink;
+		String description = topicDescription.trim();
+		WPATag aTagNode = new WPATag();
+		if (topic.length() > 0) {
+			String title = Encoder.normaliseTitle(topic, true, ' ', true);
+			if (hashSection == null) {
+				String pageName = Encoder.normaliseTitle(fPageTitle, true, ' ',
+						true);
+				// self link?
+				if (title.equals(pageName)) {
+					HTMLTag selfLink = new HTMLTag("strong");
+					selfLink.addAttribute("class", "selflink", false);
+					pushNode(selfLink);
+					selfLink.addChild(new ContentToken(description));
+					popNode();
+					return;
+				}
+			}
+
+			String encodedtopic = encodeTitleToUrl(topic, true);
+			if (replaceColon()) {
+				encodedtopic = encodedtopic.replace(':', '/');
+			}
+			hrefLink = getWikiBaseURL().replace("${title}", encodedtopic);
+			if (!topicExists) {
+				if (cssClass == null) {
+					cssClass = "new";
+				}
+				if (hrefLink.indexOf('?') != -1) {
+					hrefLink += "&";
+				} else {
+					hrefLink += "?";
+				}
+				hrefLink += "action=edit&redlink=1";
+				String redlinkString = Messages.getString(getResourceBundle(),
+						Messages.WIKI_TAGS_RED_LINK,
+						"${title} (page does not exist)");
+				title = redlinkString.replace("${title}", title);
+			}
+			aTagNode.addAttribute("title", title, true);
+		} else {
+			// assume, the own topic exists
+			if (hashSection != null) {
+				hrefLink = "";
+				if (description.length() == 0) {
+					description = "&#35;" + hashSection; // #....
+				}
+			} else {
+				hrefLink = getWikiBaseURL().replace("${title}", "");
+			}
+		}
+
+		String href = hrefLink;
+		if (topicExists && hashSection != null) {
+			href = href + '#' + encodeTitleDotUrl(hashSection, false);
+		}
+		aTagNode.addAttribute("href", href, true);
+		if (cssClass != null) {
+			aTagNode.addAttribute("class", cssClass, true);
+		}
+		aTagNode.addObjectAttribute("wikilink", topic);
+
+		pushNode(aTagNode);
+		if (parseRecursive) {
+			WikipediaPreTagParser
+					.parseRecursive(description, this, false, true);
+		} else {
+			aTagNode.addChild(new ContentToken(description));
+		}
+		popNode();
+	}
 }
