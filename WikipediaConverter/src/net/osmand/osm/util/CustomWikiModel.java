@@ -201,7 +201,7 @@ public class CustomWikiModel extends WikiModel {
 			}
 			String toCompare = hrefLink.toLowerCase();
 			if (!toCompare.contains(".jpg") && !toCompare.contains(".jpeg") 
-					&& !toCompare.contains(".png") && !toCompare.contains(".gif")) {
+					&& !toCompare.contains(".png") && !toCompare.contains(".gif") && !toCompare.contains(".svg")) {
 				appendExternalLink("https", hrefLink, topicDescription, true);
 			}
 		}
