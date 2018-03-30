@@ -184,6 +184,7 @@ public class CustomWikiModel extends WikiModel {
 				encodedtopic = encodedtopic.replace(':', '/');
 			}
 			hrefLink = getWikiBaseURL().replace("${title}", encodedtopic);
+			System.out.println(hrefLink);
 			if (!topicExists) {
 				if (cssClass == null) {
 					cssClass = "new";
