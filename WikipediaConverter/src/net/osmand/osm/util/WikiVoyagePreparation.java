@@ -456,7 +456,7 @@ public class WikiVoyagePreparation {
 						if (field.indexOf("=") != -1) {
 							value = field.substring(field.indexOf("=") + 1, field.length()).trim();
 						}
-						if (!value.isEmpty()) {
+						if (!value.isEmpty() && !value.contains("{{")) {
 							try {
 								String areaCode = "";
 								if (field.contains("name=") || field.contains("nome=") || field.contains("nom=")

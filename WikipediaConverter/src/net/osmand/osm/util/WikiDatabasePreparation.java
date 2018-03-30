@@ -106,7 +106,7 @@ public class WikiDatabasePreparation {
 					|| (s.charAt(i) == '<' && s.charAt(i + 1) == 'm' && s.charAt(i + 2) == 'a' && s.charAt(i + 3) == 'p' 
 					&& s.charAt(i + 4) == 'l' && s.charAt(i + 5) == 'i'))) {
 				hebrew = s.length() > 2 ? s.charAt(i + 2) == 'ק' : false;
-				beginInd = i + 2;
+				beginInd = beginInd == 0 ? i + 2 : beginInd;
 				openCnt++;
 				i++;
 			} else if (nt > 0 && ((s.charAt(i) == '}' && s.charAt(i + 1) == '}') || (hebrew && s.charAt(i) == ']' && s.charAt(i + 1) == ']')
@@ -166,7 +166,7 @@ public class WikiDatabasePreparation {
 			if (field.indexOf("=") != -1) {
 				value = field.substring(field.indexOf("=") + 1, field.length()).trim();
 			}
-			if (!value.isEmpty()) {
+			if (!value.isEmpty() && !value.contains("{{")) {
 				try {
 					String areaCode = "";
 					if (field.contains(("name=")) || field.contains("nome=") || field.contains("nom=") 
@@ -217,7 +217,7 @@ public class WikiDatabasePreparation {
 		if (lat != null && lon != null) {
 			bld.append(" geo:" + lat + "," + lon);
 		}
-		return bld.toString();
+		return bld.toString() + "\n";
 	}
 
 	private static String getKey(String str) {

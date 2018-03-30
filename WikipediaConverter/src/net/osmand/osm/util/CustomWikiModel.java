@@ -199,7 +199,11 @@ public class CustomWikiModel extends WikiModel {
 						"${title} (page does not exist)");
 				title = redlinkString.replace("${title}", title);
 			}
-			appendExternalLink("https", hrefLink, topicDescription, true);
+			String toCompare = hrefLink.toLowerCase();
+			if (!toCompare.contains(".jpg") && !toCompare.contains(".jpeg") 
+					&& !toCompare.contains(".png") && !toCompare.contains(".gif")) {
+				appendExternalLink("https", hrefLink, topicDescription, true);
+			}
 		}
 	}
 }
