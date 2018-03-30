@@ -162,7 +162,7 @@ public class CustomWikiModel extends WikiModel {
 			boolean topicExists) {
 		String hrefLink;
 		String description = topicDescription.trim();
-		WPATag aTagNode = new WPATag();
+
 		if (topic.length() > 0) {
 			String title = Encoder.normaliseTitle(topic, true, ' ', true);
 			if (hashSection == null) {
@@ -184,7 +184,6 @@ public class CustomWikiModel extends WikiModel {
 				encodedtopic = encodedtopic.replace(':', '/');
 			}
 			hrefLink = getWikiBaseURL().replace("${title}", encodedtopic);
-			System.out.println(hrefLink);
 			if (!topicExists) {
 				if (cssClass == null) {
 					cssClass = "new";
@@ -200,36 +199,7 @@ public class CustomWikiModel extends WikiModel {
 						"${title} (page does not exist)");
 				title = redlinkString.replace("${title}", title);
 			}
-			aTagNode.addAttribute("title", title, true);
-		} else {
-			// assume, the own topic exists
-			if (hashSection != null) {
-				hrefLink = "";
-				if (description.length() == 0) {
-					description = "&#35;" + hashSection; // #....
-				}
-			} else {
-				hrefLink = getWikiBaseURL().replace("${title}", "");
-			}
+			appendExternalLink("https", hrefLink, topicDescription, true);
 		}
-
-		String href = hrefLink;
-		if (topicExists && hashSection != null) {
-			href = href + '#' + encodeTitleDotUrl(hashSection, false);
-		}
-		aTagNode.addAttribute("href", href, true);
-		if (cssClass != null) {
-			aTagNode.addAttribute("class", cssClass, true);
-		}
-		aTagNode.addObjectAttribute("wikilink", topic);
-
-		pushNode(aTagNode);
-		if (parseRecursive) {
-			WikipediaPreTagParser
-					.parseRecursive(description, this, false, true);
-		} else {
-			aTagNode.addChild(new ContentToken(description));
-		}
-		popNode();
 	}
 }
