@@ -24,7 +24,9 @@ public class SearchDBCreator {
 		generateIdsIfMissing(conn, pathTodb.substring(0, pathTodb.lastIndexOf("/") + 1));
 		conn.createStatement().execute("DROP TABLE IF EXISTS wikivoyage_search;");
 		conn.createStatement().execute("CREATE TABLE wikivoyage_search(search_term text, city_id long, article_title text, lang text)");
-		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_word ON wikivoyage_search(search_term);");
+		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_search_term ON wikivoyage_search(search_term);");
+		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_search_city ON wikivoyage_search(city_id)");
+		
 		PreparedStatement ps = conn.prepareStatement("INSERT INTO wikivoyage_search VALUES (?, ?, ?, ?)");
 		PreparedStatement data = conn.prepareStatement("SELECT title, city_id, lang FROM wikivoyage_articles");
 		ResultSet rs = data.executeQuery();
