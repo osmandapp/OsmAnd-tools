@@ -189,8 +189,8 @@ public class WikiDatabasePreparation {
 						bld.append("e-mail: " + "mailto:" + value + ", ");
 					} else if (field.contains("fax=") || field.contains("פקס")) {
 						bld.append("fax: " + value + ", ");
-					} else if (field.contains("phone=") || field.contains("tel")
-							|| field.contains("téléphone") || field.contains("טלפון")) {
+					} else if (field.contains("phone=") || field.contains("tel=")
+							|| field.contains("téléphone=") || field.contains("טלפון")) {
 						String tel = areaCode.replaceAll("[ -]", "/") + "/" + value.replaceAll("[ -]", "/");
 						tel = tel.replaceAll("\\(", "o").replaceAll("\\)", "c");
 						bld.append("☎ " + "tel:" + tel + ". ");
