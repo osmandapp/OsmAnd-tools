@@ -11,13 +11,12 @@ import info.bliki.htmlcleaner.TagToken;
 import info.bliki.htmlcleaner.Utils;
 import info.bliki.wiki.filter.Encoder;
 import info.bliki.wiki.filter.WikipediaParser;
-import info.bliki.wiki.filter.WikipediaPreTagParser;
 import info.bliki.wiki.model.Configuration;
 import info.bliki.wiki.model.ImageFormat;
 import info.bliki.wiki.model.WikiModel;
 import info.bliki.wiki.tags.HTMLTag;
 import info.bliki.wiki.tags.PTag;
-import info.bliki.wiki.tags.WPATag;
+
 
 public class CustomWikiModel extends WikiModel {
 		
@@ -45,7 +44,8 @@ public class CustomWikiModel extends WikiModel {
 	@Override
 	public void parseInternalImageLink(String imageNamespace,
 			String rawImageLink) {
-		String imageName = rawImageLink.split("\\|")[0].replaceFirst("File:", "");
+		String imageName = rawImageLink.split("\\|")[0];
+		imageName = imageName.substring(imageName.indexOf(":") + 1);
 		if (imageName.isEmpty()) {
 			return;
 		}
@@ -79,6 +79,8 @@ public class CustomWikiModel extends WikiModel {
 			}
 			reduceTokenStack(Configuration.HTML_DIV_OPEN);
 		}
+		imageFormat.setType("thumbnail");
+		imageFormat.setWidth(-1);
 		appendInternalImageLink(imageHref, imageSrc, imageFormat);
 		if (tag instanceof PTag) {
 			pushNode(new PTag());
@@ -91,7 +93,8 @@ public class CustomWikiModel extends WikiModel {
 			prep.setString(1, imageName);
 			ResultSet rs = prep.executeQuery();
 			while (rs.next()) {
-				imageSrc = rs.getString("image_url");
+				String thumbUrl = rs.getString("thumb_url");
+				imageSrc = thumbUrl.isEmpty() ? rs.getString("image_url") : thumbUrl;
 			}
 			prep.clearParameters();
 		} catch (SQLException e) {}

@@ -74,7 +74,7 @@ public class WikiVoyagePreparation {
 		String lang = "";
 		String folder = "";
 		if(args.length == 0) {
-			lang = "ru";
+			lang = "en";
 			folder = "/home/user/osmand/wikivoyage/";
 			imageLinks = false;
 			uncompressed = true;
@@ -277,7 +277,7 @@ public class WikiVoyagePreparation {
 				prep = conn.prepareStatement("INSERT INTO wikivoyage_articles VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 				try {
 					imageConn = (Connection) dialect.getDatabaseConnection(folderPath + "imageData.sqlite", log);
-					imagePrep = imageConn.prepareStatement("SELECT image_url FROM image_links WHERE image_title = ?");
+					imagePrep = imageConn.prepareStatement("SELECT image_url, thumb_url FROM image_links WHERE image_title = ?");
 				} catch (Exception e) {	}
 			}
 			this.langConn = (Connection) dialect.getDatabaseConnection(langConn.getAbsolutePath(), log);

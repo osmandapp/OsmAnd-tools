@@ -235,7 +235,8 @@ public class WikiDatabasePreparation {
 				|| str.startsWith("destination") || str.startsWith("voir") || str.startsWith("aller") 
 				|| str.startsWith("manger") || str.startsWith("durma") || str.startsWith("veja") 
 				|| str.startsWith("coma") || str.startsWith("אוכל") || str.startsWith("שתייה") 
-				|| str.startsWith("לינה") || str.startsWith("מוקדי") || str.startsWith("רשימה")) {
+				|| str.startsWith("לינה") || str.startsWith("מוקדי") || str.startsWith("רשימה")
+				|| str.startsWith("marker")) {
 			return WikivoyageTemplates.POI.getType();
 		} else if (str.startsWith("pagebanner") || str.startsWith("citybar") 
 				|| str.startsWith("quickbar ") || str.startsWith("banner") || str.startsWith("באנר")) {

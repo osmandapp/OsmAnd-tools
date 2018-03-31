@@ -46,16 +46,17 @@ public class WikivoyageImageLinksStorage {
 	
 	private void init() throws SQLException {
 		savedNames = new HashSet<>();
-		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS image_links(image_title text UNIQUE, image_url text)");
+		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS image_links(image_title text UNIQUE, image_url text, thumb_url text)");
 		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_title ON image_links (image_title);");
-		prep = conn.prepareStatement("INSERT OR IGNORE INTO image_links VALUES (?, ?)");
+		prep = conn.prepareStatement("INSERT OR IGNORE INTO image_links VALUES (?, ?, ?)");
 	}
 		
 	public void saveImageLinks(String title) throws SQLException, UnsupportedEncodingException {
 		if (title != null) {
 			String url = "";
+			String thumb = "";
 			String urlStart = "https://" + lang + ".wikivoyage.org/w/api.php?action=query&prop=info%7Cimageinfo&titles=";
-			String urlEnd = "&generator=images&inprop=url&iiprop=url&format=json";
+			String urlEnd = "&generator=images&inprop=url&iiprop=url&iiurlwidth=300&format=json";
 			String json = readUrl(urlStart + URLEncoder.encode(title, "UTF-8") + urlEnd);
 			String name = "";
 			if (batch % 200 == 0) {
@@ -70,12 +71,14 @@ public class WikivoyageImageLinksStorage {
 					JsonObject objcts = pages.getAsJsonObject();
 					for (String s : objcts.keySet()) {
 						JsonObject item = objcts.getAsJsonObject(s);
-						name = item.get("title").getAsString().replaceFirst("File:", "");
+						name = item.get("title").getAsString();
+						name = name.substring(name.indexOf(":") + 1);
 						if (name != null && !name.isEmpty() && !savedNames.contains(name)) {
 							JsonArray imageInfo = item.getAsJsonArray("imageinfo");
 							JsonObject urls = (JsonObject) imageInfo.get(0);
 							url = urls.get("url").getAsString();
-							addToDB(url, name);
+							thumb = urls.get("thumburl").getAsString();
+							addToDB(url, name, thumb);
 							savedNames.add(name);
 						}
 						
@@ -88,10 +91,11 @@ public class WikivoyageImageLinksStorage {
 		}
 	}
 
-	private void addToDB(String url, String name) throws SQLException {
+	private void addToDB(String url, String name, String thumbUrl) throws SQLException {
 		if (!url.isEmpty() && !name.isEmpty()) {
 			prep.setString(1, name);
 			prep.setString(2, url);
+			prep.setString(3, thumbUrl);
 			addBatch();
 		}
 	}
@@ -133,7 +137,7 @@ public class WikivoyageImageLinksStorage {
 				JsonArray imageInfo = minOne.getAsJsonArray("imageinfo");
 				JsonObject urls = (JsonObject) imageInfo.get(0);
 				String url = urls.get("url").getAsString();
-				addToDB(url, filename);
+				addToDB(url, filename, "");
 				savedNames.add(filename);
 			} catch (Exception e) {
 				System.out.println("Request returned error: " + json);
