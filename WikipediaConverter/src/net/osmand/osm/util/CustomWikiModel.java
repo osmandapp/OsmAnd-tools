@@ -126,7 +126,8 @@ public class CustomWikiModel extends WikiModel {
         aTagNode.addAttribute("href", link, true);
         aTagNode.addAttribute("rel", "nofollow", true);
         if (withoutSquareBrackets) {
-            aTagNode.addAttribute("class", "external free", true);
+        	boolean geo = uriSchemeName.equals("geo");
+        	geo = geo ? aTagNode.addAttribute("class", "geo", true) : aTagNode.addAttribute("class", "external free", true);
             append(aTagNode);
             aTagNode.addChild(new ContentToken(linkName));
         } else {
