@@ -373,7 +373,7 @@ public class WikiVoyagePreparation {
 										prep.setDouble(5, ll.getLatitude());
 										prep.setDouble(6, ll.getLongitude());
 										// banner
-										prep.setString(7, CustomWikiModel.getUrl(filename).replace(CustomWikiModel.ROOT_URL, ""));
+										prep.setString(7, CustomWikiModel.getUrl(Encoder.encodeUrl(filename)).replace(CustomWikiModel.ROOT_URL, ""));
 										// gpx_gz
 										if (uncompressed) {
 											prep.setString(8, generateGpx(macroBlocks.get(WikivoyageTemplates.POI.getType())));
