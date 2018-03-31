@@ -10,6 +10,7 @@
 	<classpathentry kind="lib" path="lib/commons-collections-3.2.1.jar"/>
 	<classpathentry kind="lib" path="lib/commons-collections4-4.0.jar"/>
 	<classpathentry kind="lib" path="lib/commons-io-2.4.jar"/>
+	<classpathentry kind="lib" path="lib/commons-codec-1.6.jar" />
 	<classpathentry kind="lib" path="lib/commons-lang3-3.4.jar"/>
 	<classpathentry kind="lib" path="lib/cssparser-0.9.15.jar"/>
 	<classpathentry kind="lib" path="lib/dom4j-1.6.1.jar"/>

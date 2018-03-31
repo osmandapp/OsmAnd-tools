@@ -1,8 +1,6 @@
 package net.osmand.osm.util;
 
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import org.apache.commons.codec.digest.DigestUtils;
 
 import info.bliki.Messages;
 import info.bliki.htmlcleaner.ContentToken;
@@ -19,12 +17,13 @@ import info.bliki.wiki.tags.PTag;
 
 
 public class CustomWikiModel extends WikiModel {
-		
-	private PreparedStatement prep;
+	
 
-	public CustomWikiModel(String imageBaseURL, String linkBaseURL, String folder, PreparedStatement prep) {
+	public static final String ROOT_URL = "https://upload.wikimedia.org/wikipedia/commons/";
+	private static final String PREFIX = "320px-";
+
+	public CustomWikiModel(String imageBaseURL, String linkBaseURL) {
 		super(imageBaseURL, linkBaseURL);
-		this.prep = prep;
 	}
 	
 	@Override
@@ -67,7 +66,7 @@ public class CustomWikiModel extends WikiModel {
 				imageHref = imageHref.replace("${title}", imageNamespace + ':' + imageName);
 			}
 		}
-		String imageSrc = getImageLinkFromDB(imageName);
+		String imageSrc = getThumbUrl(Encoder.encodeUrl(imageName));
 		if (imageSrc.isEmpty()) {
 			return;
 		}	
@@ -85,20 +84,6 @@ public class CustomWikiModel extends WikiModel {
 		if (tag instanceof PTag) {
 			pushNode(new PTag());
 		}
-	}
-
-	public String getImageLinkFromDB(String imageName) {
-		String imageSrc = "";
-		try {
-			prep.setString(1, imageName);
-			ResultSet rs = prep.executeQuery();
-			while (rs.next()) {
-				String thumbUrl = rs.getString("thumb_url");
-				imageSrc = thumbUrl.isEmpty() ? rs.getString("image_url") : thumbUrl;
-			}
-			prep.clearParameters();
-		} catch (SQLException e) {}
-		return imageSrc;
 	}
 	
 	@Override
@@ -209,5 +194,19 @@ public class CustomWikiModel extends WikiModel {
 				appendExternalLink("https", hrefLink, topicDescription, true);
 			}
 		}
+	}
+	
+	public static String getThumbUrl(String fileName) {
+		String md5 = DigestUtils.md5Hex(fileName.replace(" ", "_"));
+		String hash1 = md5.substring(0, 1);
+		String hash2 = md5.substring(0, 2);
+		return ROOT_URL + "thumb/" + hash1 + "/" + hash2 + "/" + fileName + "/" + PREFIX + fileName;
+	}
+
+	public static String getUrl(String fileName) {
+		String md5 = DigestUtils.md5Hex(fileName.replace(" ", "_"));
+		String hash1 = md5.substring(0, 1);
+		String hash2 = md5.substring(0, 2);
+		return ROOT_URL + hash1 + "/" + hash2 + "/" + fileName;
 	}
 }

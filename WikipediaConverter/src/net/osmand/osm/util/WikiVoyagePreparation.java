@@ -47,12 +47,8 @@ import org.xml.sax.helpers.DefaultHandler;
 import org.xwiki.component.manager.ComponentLookupException;
 
 public class WikiVoyagePreparation {
-	private static final Log log = PlatformUtil.getLog(WikiDatabasePreparation.class);
-		
-	private static WikivoyageImageLinksStorage imageStorage;
-	private static boolean imageLinks;
+	private static final Log log = PlatformUtil.getLog(WikiDatabasePreparation.class);	
 	private static boolean uncompressed;
-	private static String folderPath;
 		
 	public enum WikivoyageTemplates {
 		LOCATION("geo"),
@@ -75,8 +71,7 @@ public class WikiVoyagePreparation {
 		String folder = "";
 		if(args.length == 0) {
 			lang = "en";
-			folder = "/home/user/osmand/wikivoyage/";
-			imageLinks = false;
+			folder = "/home/paul/osmand/wikivoyage/articles/";
 			uncompressed = true;
 		}
 		if(args.length > 0) {
@@ -86,17 +81,8 @@ public class WikiVoyagePreparation {
 			folder = args[1];
 		}
 		if(args.length > 2){
-			imageLinks = args[2].equals("fetch_image_links");
 			uncompressed = args[2].equals("uncompressed");
 		}
-		if (args.length > 3) {
-			uncompressed = args[3].equals("uncompressed");
-		}
-		if (imageLinks) {
-			System.out.println("Processing the image links for " + lang + " articles");
-			imageStorage = new WikivoyageImageLinksStorage(lang, folder);
-		}
-		folderPath = folder;
 		final String wikiPg = folder + lang + "wikivoyage-latest-pages-articles.xml.bz2";
 		final File langlinkFolder = new File(folder + "langlinks");
 		final File langlinkFile = new File(folder + "langlink.sqlite");
@@ -254,8 +240,6 @@ public class WikiVoyagePreparation {
 		private final static int BATCH_SIZE = 500;
 		final ByteArrayOutputStream bous = new ByteArrayOutputStream(64000);
 		private String lang;
-		private Connection imageConn;
-		private PreparedStatement imagePrep;
 		private Connection langConn;
 		private PreparedStatement langPrep;
 			
@@ -265,21 +249,19 @@ public class WikiVoyagePreparation {
 			this.saxParser = saxParser;
 			this.progIS = progIS;		
 			progress.startTask("Parse wiki xml", progIS.available());
-			if (!imageLinks) {
-				conn = (Connection) dialect.getDatabaseConnection(sqliteFile.getAbsolutePath(), log);
-				String dataType = uncompressed ? "text" : "blob";
-//				conn.createStatement().execute("DROP TABLE IF EXISTS " + lang + "_wikivoyage");
-				conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wikivoyage_articles(article_id text, title text, content_gz " + 
-						dataType + ", is_part_of text, lat double, lon double, image_title text, gpx_gz " + dataType + ", city_id long, original_id long, lang text)");
-				conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_title ON wikivoyage_articles(title);");
-				conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_id ON wikivoyage_articles(city_id);");
-				conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_part_of ON wikivoyage_articles(is_part_of);");
-				prep = conn.prepareStatement("INSERT INTO wikivoyage_articles VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-				try {
-					imageConn = (Connection) dialect.getDatabaseConnection(folderPath + "imageData.sqlite", log);
-					imagePrep = imageConn.prepareStatement("SELECT image_url, thumb_url FROM image_links WHERE image_title = ?");
-				} catch (Exception e) {	}
-			}
+
+			conn = (Connection) dialect.getDatabaseConnection(sqliteFile.getAbsolutePath(), log);
+			String dataType = uncompressed ? "text" : "blob";
+			conn.createStatement()
+					.execute("CREATE TABLE IF NOT EXISTS wikivoyage_articles(article_id text, title text, content_gz "
+							+ dataType + ", is_part_of text, lat double, lon double, image_title text, gpx_gz "
+							+ dataType + ", city_id long, original_id long, lang text)");
+			conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_title ON wikivoyage_articles(title);");
+			conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_id ON wikivoyage_articles(city_id);");
+			conn.createStatement()
+					.execute("CREATE INDEX IF NOT EXISTS index_part_of ON wikivoyage_articles(is_part_of);");
+			prep = conn.prepareStatement("INSERT INTO wikivoyage_articles VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+
 			this.langConn = (Connection) dialect.getDatabaseConnection(langConn.getAbsolutePath(), log);
 			langPrep = this.langConn.prepareStatement("SELECT id FROM langlinks WHERE title = ?");
 		}
@@ -293,23 +275,15 @@ public class WikiVoyagePreparation {
 		}
 		
 		public void finish() throws SQLException {
-			if (imageLinks) {
-				imageStorage.finish();
-			} else {
-				prep.executeBatch();
-				if (imagePrep != null) {
-					imageConn.close();
-					imagePrep.close();
-				}
-				if(!conn.getAutoCommit()) {
-					conn.commit();
-				}
-				prep.close();
-				conn.close();
-				if (langConn != null) {
-					langConn.close();
-					langPrep.close();
-				}
+			prep.executeBatch();
+			if(!conn.getAutoCommit()) {
+				conn.commit();
+			}
+			prep.close();
+			conn.close();
+			if (langConn != null) {
+				langConn.close();
+				langPrep.close();
 			}
 		}
 
@@ -377,13 +351,6 @@ public class WikiVoyagePreparation {
 											macroBlocks.get(WikivoyageTemplates.LOCATION.getType()));
 									if (!ll.isZero()) {
 										String filename = getFileName(macroBlocks.get(WikivoyageTemplates.BANNER.getType()));
-										if (imageLinks) {
-											if (!filename.isEmpty()) {
-												imageStorage.saveageBanner(filename);
-											}
-											imageStorage.saveImageLinks(title.toString());
-											return;
-										}
 										if (id++ % 500 == 0) {
 											log.debug("Article accepted " + cid + " " + title.toString() + " " + ll.getLatitude()
 													+ " " + ll.getLongitude() + " free: "
@@ -391,7 +358,7 @@ public class WikiVoyagePreparation {
 										}
 										final HTMLConverter converter = new HTMLConverter(false);
 										CustomWikiModel wikiModel = new CustomWikiModel("https://upload.wikimedia.org/wikipedia/commons/${image}", 
-												"https://"+lang+".wikivoyage.com/wiki/${title}", folderPath, imagePrep);
+												"https://"+lang+".wikivoyage.com/wiki/${title}");
 										String plainStr = wikiModel.render(converter, text);
 										prep.setString(1, Encoder.encodeUrl(title.toString()));
 										prep.setString(2, title.toString());
@@ -406,7 +373,7 @@ public class WikiVoyagePreparation {
 										prep.setDouble(5, ll.getLatitude());
 										prep.setDouble(6, ll.getLongitude());
 										// banner
-										prep.setString(7, wikiModel.getImageLinkFromDB(filename).replace("https://upload.wikimedia.org/wikipedia/commons/", ""));
+										prep.setString(7, CustomWikiModel.getUrl(filename).replace(CustomWikiModel.ROOT_URL, ""));
 										// gpx_gz
 										if (uncompressed) {
 											prep.setString(8, generateGpx(macroBlocks.get(WikivoyageTemplates.POI.getType())));
@@ -424,7 +391,6 @@ public class WikiVoyagePreparation {
 										prep.setLong(10, cid);
 										prep.setString(11, lang);
 										langPrep.clearParameters();
-
 										addBatch();
 									}
 								}
