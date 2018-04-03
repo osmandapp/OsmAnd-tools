@@ -123,13 +123,15 @@ public class WikiDatabasePreparation {
 				String key = getKey(val.toLowerCase());
 				if (key.equals(WikivoyageTemplates.POI.getType())) {
 					bld.append(parseListing(val));
+				} else if (key.equals(WikivoyageTemplates.REGION_LIST.getType())) {
+					bld.append((parseRegionList(val)));
 				}
 				if (!key.isEmpty()) {
 					if (key.contains("|")) {
 						for (String str : key.split("\\|")) {
 							addToMap(blocksMap, str, val);
 						}
-					} else {
+					} else if (!key.equals(WikivoyageTemplates.REGION_LIST.getType())){
 						addToMap(blocksMap, key, val);
 					}
 				}
@@ -139,6 +141,36 @@ public class WikiDatabasePreparation {
 					bld.append(s.charAt(i));
 					beginInd = 0;
 					endInd = 0;
+				}
+			}
+		}
+		return bld.toString();
+	}
+
+	private static String parseRegionList(String val) {
+		StringBuilder bld = new StringBuilder();
+		String[] parts = val.split("\\|");
+		for (int i = 0; i < parts.length; i++) {
+			String part = parts[i].trim();
+			int ind = part.indexOf("=");
+			if (ind != -1) {
+				String partname = part.trim().substring(0, ind).trim();
+				if (partname.matches("region\\d+name")) {
+					String value = part.substring(ind + 1, part.length());
+					bld.append("*");
+					if (!value.endsWith("]]") && parts[i+1].trim().endsWith("]]") && value.contains("[[")) {
+						bld.append(value);
+						bld.append("|");
+						bld.append(parts[i+1]);
+					} else if (value.contains("[[") && value.endsWith("]]")){
+						bld.append(value);
+					} else {
+						bld.append(value.replaceAll("\\[", ""));
+					}
+					bld.append("\n");
+				} else if (partname.matches("region\\d+description")) {
+					bld.append(part.substring(ind + 1, part.length()));
+					bld.append("\n");
 				}
 			}
 		}
@@ -170,37 +202,40 @@ public class WikiDatabasePreparation {
 				try {
 					String areaCode = "";
 					if (field.contains(("name=")) || field.contains("nome=") || field.contains("nom=") 
-							|| field.contains("שם")) {
+							|| field.contains("שם") || field.contains("نام")) {
 						bld.append("'''" + value + "'''" + ", ");
-					} else if (field.contains("url=") || field.contains("sito=") || field.contains("האתר הרשמי")) {
+					} else if (field.contains("url=") || field.contains("sito=") || field.contains("האתר הרשמי")
+							|| field.contains("نشانی اینترنتی")) {
 						bld.append("Website: " + value + ". ");
 					} else if (field.contains("intl-area-code=")) {
 						areaCode = value;
-					} else if (field.contains("address=") || field.contains("addresse=") || field.contains("כתובת")) {
+					} else if (field.contains("address=") || field.contains("addresse=") || field.contains("כתובת")
+							|| field.contains("نشانی")) {
 						bld.append(value + ", ");
-					} else if (field.contains("lat=") || field.contains("latitude=")) {
+					} else if (field.contains("lat=") || field.contains("latitude=") || field.contains("عرض جغرافیایی")) {
 						lat = value;
-					} else if (field.contains("long=") || field.contains("longitude=")) {
+					} else if (field.contains("long=") || field.contains("longitude=") || field.contains("طول جغرافیایی")) {
 						lon = value;
 					} else if (field.contains("content=") || field.contains("descrizione=") || field.contains("description")
-							|| field.contains("sobre") || field.contains("תיאור")) {
+							|| field.contains("sobre") || field.contains("תיאור") || field.contains("متن")) {
 						bld.append(value + " ");
-					} else if (field.contains("email=") || field.contains("מייל")) {
+					} else if (field.contains("email=") || field.contains("מייל") || field.contains("پست الکترونیکی")) {
 						bld.append("e-mail: " + "mailto:" + value + ", ");
-					} else if (field.contains("fax=") || field.contains("פקס")) {
+					} else if (field.contains("fax=") || field.contains("פקס")
+							|| field.contains("دورنگار")) {
 						bld.append("fax: " + value + ", ");
 					} else if (field.contains("phone=") || field.contains("tel=")
-							|| field.contains("téléphone=") || field.contains("טלפון")) {
+							|| field.contains("téléphone=") || field.contains("טלפון") || field.contains("تلفن")) {
 						String tel = areaCode.replaceAll("[ -]", "/") + "/" + value.replaceAll("[ -]", "/");
 						tel = tel.replaceAll("\\(", "o").replaceAll("\\)", "c");
 						bld.append("☎ " + "tel:" + tel + ". ");
 					} else if (field.contains("price=") || field.contains("prezzo=") || field.contains("מחיר")
-							|| field.contains("prix=")) {
+							|| field.contains("prix=") || field.contains("بها")) {
 						bld.append(value + ". ");
-					} else if (field.contains("hours=") || field.contains("שעות")) {
+					} else if (field.contains("hours=") || field.contains("שעות") || field.contains("ساعت‌ها")) {
 						bld.append("Working hours: " + value + ". ");
 					} else if (field.contains("directions=") || field.contains("direction=") 
-							|| field.contains("הוראות")) {
+							|| field.contains("הוראות") || field.contains("مسیرها")) {
 						bld.append(value + ". ");
 					} else if (field.contains("indicazioni=")) {
 						bld.append("Indicazioni: " + value + ". ");
@@ -226,7 +261,8 @@ public class WikiDatabasePreparation {
 		} else if (str.startsWith("ispartof|") || str.startsWith("istinkat") || str.startsWith("isin") 
 				|| str.startsWith("quickfooter") || str.startsWith("dans") || str.startsWith("footer|")
 				|| str.startsWith("fica em") || str.startsWith("estáen") || str.startsWith("קטגוריה") 
-				|| str.startsWith("είναιΤμήμαΤου") || str.startsWith("commonscat") || str.startsWith("jest w")) {
+				|| str.startsWith("είναιΤμήμαΤου") || str.startsWith("commonscat") || str.startsWith("jest w")
+				|| str.startsWith("بخشی")) {
 			return WikivoyageTemplates.PART_OF.getType();
 		} else if (str.startsWith("do") || str.startsWith("see") 
 				|| str.startsWith("eat") || str.startsWith("drink") 
@@ -236,13 +272,17 @@ public class WikiDatabasePreparation {
 				|| str.startsWith("manger") || str.startsWith("durma") || str.startsWith("veja") 
 				|| str.startsWith("coma") || str.startsWith("אוכל") || str.startsWith("שתייה") 
 				|| str.startsWith("לינה") || str.startsWith("מוקדי") || str.startsWith("רשימה")
-				|| str.startsWith("marker")) {
+				|| str.startsWith("marker") || str.startsWith("خوابیدن") || str.startsWith("دیدن")
+				|| str.startsWith("انجام‌دادن") || str.startsWith("نوشیدن")) {
 			return WikivoyageTemplates.POI.getType();
 		} else if (str.startsWith("pagebanner") || str.startsWith("citybar") 
-				|| str.startsWith("quickbar ") || str.startsWith("banner") || str.startsWith("באנר")) {
+				|| str.startsWith("quickbar ") || str.startsWith("banner") || str.startsWith("באנר")
+				|| str.startsWith("سرصفحه")) {
 			return WikivoyageTemplates.BANNER.getType();
 		} else if (str.startsWith("quickbar") || str.startsWith("info ")) {
 			return "geo|pagebanner";
+		} else if (str.startsWith("regionlist")) {
+			return WikivoyageTemplates.REGION_LIST.getType();
 		}
 		return "";
 	}

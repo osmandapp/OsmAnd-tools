@@ -54,7 +54,8 @@ public class WikiVoyagePreparation {
 		LOCATION("geo"),
 		POI("poi"),
 		PART_OF("part_of"),
-		BANNER("pagebanner");
+		BANNER("pagebanner"),
+		REGION_LIST("regionlist");
 		
 		private String type;
 		WikivoyageTemplates(String s) {
@@ -70,9 +71,9 @@ public class WikiVoyagePreparation {
 		String lang = "";
 		String folder = "";
 		if(args.length == 0) {
-			lang = "en";
+			lang = "fa";
 			folder = "/home/user/osmand/wikivoyage/";
-			uncompressed = false;
+			uncompressed = true;
 		}
 		if(args.length > 0) {
 			lang = args[0];
@@ -351,6 +352,7 @@ public class WikiVoyagePreparation {
 											macroBlocks.get(WikivoyageTemplates.LOCATION.getType()));
 									if (!ll.isZero()) {
 										String filename = getFileName(macroBlocks.get(WikivoyageTemplates.BANNER.getType()));
+										filename = filename.startsWith("<!--") ? "" : filename;
 										if (id++ % 500 == 0) {
 											log.debug("Article accepted " + cid + " " + title.toString() + " " + ll.getLatitude()
 													+ " " + ll.getLongitude() + " free: "
@@ -426,36 +428,39 @@ public class WikiVoyagePreparation {
 							try {
 								String areaCode = "";
 								if (field.contains("name=") || field.contains("nome=") || field.contains("nom=")
-										|| field.contains("שם")) {
+										|| field.contains("שם") || field.contains("نام")) {
 									point.name = value;
-								} else if (field.contains("url=") || field.contains("sito=") || field.contains("האתר הרשמי")) {
+								} else if (field.contains("url=") || field.contains("sito=") || field.contains("האתר הרשמי")
+										|| field.contains("نشانی اینترنتی")) {
 									point.link = value;
 								} else if (field.contains("intl-area-code=")) {
 									areaCode = value;
-								} else if (field.contains("lat=") || field.contains("latitude=")) {
+								} else if (field.contains("lat=") || field.contains("latitude=") || field.contains("عرض جغرافیایی")) {
 									point.lat = Double.valueOf(value);
-								} else if (field.contains("long=") || field.contains("longitude=")) {
+								} else if (field.contains("long=") || field.contains("longitude=") || field.contains("طول جغرافیایی")) {
 									point.lon = Double.valueOf(value);
 								} else if (field.contains("content=") || field.contains("descrizione=") 
-										|| field.contains("description") || field.contains("sobre") || field.contains("תיאור")) {
+										|| field.contains("description") || field.contains("sobre") || field.contains("תיאור")
+										|| field.contains("متن")) {
 									point.desc = point.desc = point.desc == null ? value : 
 										point.desc + "\n" + value;
-								} else if (field.contains("email=") || field.contains("מייל")) {
+								} else if (field.contains("email=") || field.contains("מייל") || field.contains("پست الکترونیکی")) {
 									point.desc = point.desc == null ? "Email: " + value : 
 										point.desc + "\nEmail: " + value;
 								} else if (field.contains("phone=") || field.contains("tel=") || field.contains("téléphone")
-										|| field.contains("טלפון")) {
+										|| field.contains("טלפון") || field.contains("تلفن")) {
 									point.desc = point.desc == null ? "Phone: " + areaCode + value : 
 										point.desc + "\nPhone: " + areaCode + value;
 								} else if (field.contains("price=") || field.contains("prezzo=") || field.contains("prix=") 
-										|| field.contains("מחיר")) {
+										|| field.contains("מחיר") || field.contains("بها")) {
 									point.desc = point.desc == null ? "Price: " + value : 
 										point.desc + "\nPrice: " + value;
 								} else if (field.contains("hours=") || field.contains("orari=") || field.contains("horaire=") 
-										|| field.contains("funcionamento") || field.contains("שעות")) {
+										|| field.contains("funcionamento") || field.contains("שעות") || field.contains("ساعت‌ها")) {
 									point.desc = point.desc == null ? "Working hours: " + value : 
 										point.desc + "\nWorking hours: " + value;
-								} else if (field.contains("directions=") || field.contains("direction=") || field.contains("הוראות")) {
+								} else if (field.contains("directions=") || field.contains("direction=") || field.contains("הוראות")
+										|| field.contains("مسیرها")) {
 									point.desc = point.desc == null ? "Directions: " + value : 
 										point.desc + "\nDirections: " + value;
 								}
