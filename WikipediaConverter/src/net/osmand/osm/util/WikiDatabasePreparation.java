@@ -104,14 +104,16 @@ public class WikiDatabasePreparation {
 			int nt = s.length() - i - 1;
 			if (nt > 0 && ((s.charAt(i) == '{' && s.charAt(i + 1) == '{') || (s.charAt(i) == '[' && s.charAt(i + 1) == '[' && s.charAt(i + 2) == 'ק') 
 					|| (s.charAt(i) == '<' && s.charAt(i + 1) == 'm' && s.charAt(i + 2) == 'a' && s.charAt(i + 3) == 'p' 
-					&& s.charAt(i + 4) == 'l' && s.charAt(i + 5) == 'i'))) {
+					&& s.charAt(i + 4) == 'l' && s.charAt(i + 5) == 'i') 
+					|| (s.charAt(i) == '<' && s.charAt(i + 1) == 'g' && s.charAt(i + 2) == 'a' && s.charAt(i + 3) == 'l'))) {
 				hebrew = s.length() > 2 ? s.charAt(i + 2) == 'ק' : false;
 				beginInd = beginInd == 0 ? i + 2 : beginInd;
 				openCnt++;
 				i++;
 			} else if (nt > 0 && ((s.charAt(i) == '}' && s.charAt(i + 1) == '}') || (hebrew && s.charAt(i) == ']' && s.charAt(i + 1) == ']')
 					|| (s.charAt(i) == '>' && s.charAt(i - 1) == 'k' && s.charAt(i - 2) == 'n' && s.charAt(i - 3) == 'i' 
-					&& s.charAt(i - 4) == 'l' && s.charAt(i - 5) == 'p'))) {
+					&& s.charAt(i - 4) == 'l' && s.charAt(i - 5) == 'p') 
+					|| (s.charAt(i) == '>' && s.charAt(i - 1) == 'y' && s.charAt(i - 2) == 'r' && s.charAt(i - 3) == 'e'))) {
 				if (openCnt > 1) {
 					openCnt--;
 					i++;
@@ -120,6 +122,9 @@ public class WikiDatabasePreparation {
 				openCnt--;
 				endInd = i;
 				String val = s.substring(beginInd, endInd);
+				if (val.startsWith("allery")) {
+					bld.append(parseGallery(val));
+				}
 				String key = getKey(val.toLowerCase());
 				if (key.equals(WikivoyageTemplates.POI.getType())) {
 					bld.append(parseListing(val));
@@ -142,6 +147,21 @@ public class WikiDatabasePreparation {
 					beginInd = 0;
 					endInd = 0;
 				}
+			}
+		}
+		return bld.toString();
+	}
+
+	private static String parseGallery(String val) {
+		String[] parts = val.split("\n");
+		StringBuilder bld = new StringBuilder();
+		for (String part : parts) {
+			String toCompare = part.toLowerCase();
+			if (toCompare.contains(".jpg") || toCompare.contains(".jpeg") 
+					|| toCompare.contains(".png") || toCompare.contains(".gif")) {
+				bld.append("[[");
+				bld.append(part);
+				bld.append("]]");
 			}
 		}
 		return bld.toString();

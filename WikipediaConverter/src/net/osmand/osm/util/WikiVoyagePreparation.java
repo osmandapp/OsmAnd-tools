@@ -71,7 +71,7 @@ public class WikiVoyagePreparation {
 		String lang = "";
 		String folder = "";
 		if(args.length == 0) {
-			lang = "fa";
+			lang = "nl";
 			folder = "/home/user/osmand/wikivoyage/";
 			uncompressed = true;
 		}
