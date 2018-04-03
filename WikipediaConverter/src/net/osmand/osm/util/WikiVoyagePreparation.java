@@ -71,8 +71,8 @@ public class WikiVoyagePreparation {
 		String folder = "";
 		if(args.length == 0) {
 			lang = "en";
-			folder = "/home/paul/osmand/wikivoyage/articles/";
-			uncompressed = true;
+			folder = "/home/user/osmand/wikivoyage/";
+			uncompressed = false;
 		}
 		if(args.length > 0) {
 			lang = args[0];
@@ -526,7 +526,7 @@ public class WikiVoyagePreparation {
 				String location = list.get(0);
 				String[] parts = location.split("\\|");
 				// skip malformed location blocks
-				String regex_pl = "(\\d+).+?(\\d+).+?(\\d*).*?";
+				String regex_pl = "(\\d+)°.+?(\\d+).+?(\\d*).*?";
 				if (location.toLowerCase().contains("geo|")) {
 					if (parts.length >= 3) {
 						if (parts[1].matches(regex_pl) && parts[2].matches(regex_pl)) {
