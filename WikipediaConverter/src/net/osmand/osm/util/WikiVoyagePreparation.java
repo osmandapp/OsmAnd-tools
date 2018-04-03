@@ -373,7 +373,7 @@ public class WikiVoyagePreparation {
 										prep.setDouble(5, ll.getLatitude());
 										prep.setDouble(6, ll.getLongitude());
 										// banner
-										prep.setString(7, CustomWikiModel.getUrl(Encoder.encodeUrl(filename)).replace(CustomWikiModel.ROOT_URL, ""));
+										prep.setString(7, Encoder.encodeUrl(filename).replace(CustomWikiModel.ROOT_URL, ""));
 										// gpx_gz
 										if (uncompressed) {
 											prep.setString(8, generateGpx(macroBlocks.get(WikivoyageTemplates.POI.getType())));
@@ -605,11 +605,11 @@ public class WikiVoyagePreparation {
 					} catch (Exception e) {
 						System.out.println("Error parsing the partof: " + partOf);
 					}
-					return part.trim();
+					return part.trim().replaceAll("_", " ");
 				} else if (lowerCasePartOf.contains("קטגוריה")) {
-					return partOf.substring(partOf.indexOf(":") + 1).trim().replaceAll("[\\|\\*]", "");
+					return partOf.substring(partOf.indexOf(":") + 1).trim().replaceAll("[_\\|\\*]", "");
 				} else {
-					return partOf.substring(partOf.indexOf("|") + 1).trim();
+					return partOf.substring(partOf.indexOf("|") + 1).trim().replaceAll("_", " ");
 				}
 			}
 			return "";

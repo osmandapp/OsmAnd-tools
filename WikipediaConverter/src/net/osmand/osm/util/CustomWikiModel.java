@@ -197,14 +197,14 @@ public class CustomWikiModel extends WikiModel {
 	}
 	
 	public static String getThumbUrl(String fileName) {
-		String md5 = DigestUtils.md5Hex(fileName.replace(" ", "_"));
+		String md5 = DigestUtils.md5Hex(fileName);
 		String hash1 = md5.substring(0, 1);
 		String hash2 = md5.substring(0, 2);
 		return ROOT_URL + "thumb/" + hash1 + "/" + hash2 + "/" + fileName + "/" + PREFIX + fileName;
 	}
 
 	public static String getUrl(String fileName) {
-		String md5 = DigestUtils.md5Hex(fileName.replace(" ", "_"));
+		String md5 = DigestUtils.md5Hex(fileName);
 		String hash1 = md5.substring(0, 1);
 		String hash2 = md5.substring(0, 2);
 		return ROOT_URL + hash1 + "/" + hash2 + "/" + fileName;
