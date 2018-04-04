@@ -1,7 +1,7 @@
 Dependency java project info.bliki-core
 How to install https://bitbucket.org/axelclk/info.bliki.wiki/wiki/Home
 
-
+```
 cd .. (tools-root)
 git clone https://bitbucket.org/axelclk/info.bliki.wiki.git
 
@@ -18,3 +18,4 @@ cd WikipediaConverter
 mvn dependency:copy-dependencies
 cp target/dependency/*.jar lib/.
 cp build/lib/*.jar lib/.
+```
