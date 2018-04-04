@@ -252,16 +252,15 @@ public class WikiVoyagePreparation {
 			progress.startTask("Parse wiki xml", progIS.available());
 
 			conn = (Connection) dialect.getDatabaseConnection(sqliteFile.getAbsolutePath(), log);
-			String dataType = uncompressed ? "text" : "blob";
 			conn.createStatement()
-					.execute("CREATE TABLE IF NOT EXISTS wikivoyage_articles(article_id text, title text, content_gz "
-							+ dataType + ", is_part_of text, lat double, lon double, image_title text, gpx_gz "
-							+ dataType + ", city_id long, original_id long, lang text)");
+					.execute("CREATE TABLE IF NOT EXISTS wikivoyage_articles(article_id text, title text, content_gz blob"
+							+ (uncompressed ? ", content text" : "") + ", is_part_of text, lat double, lon double, image_title text, gpx_gz blob"
+							+ (uncompressed ? ", gpx text" : "") + ", city_id long, original_id long, lang text)");
 			conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_title ON wikivoyage_articles(title);");
 			conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_id ON wikivoyage_articles(city_id);");
 			conn.createStatement()
 					.execute("CREATE INDEX IF NOT EXISTS index_part_of ON wikivoyage_articles(is_part_of);");
-			prep = conn.prepareStatement("INSERT INTO wikivoyage_articles VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+			prep = conn.prepareStatement("INSERT INTO wikivoyage_articles VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?"+(uncompressed ? ", ?, ?": "")+")");
 
 			this.langConn = (Connection) dialect.getDatabaseConnection(langConn.getAbsolutePath(), log);
 			langPrep = this.langConn.prepareStatement("SELECT id FROM langlinks WHERE title = ?");
@@ -351,6 +350,7 @@ public class WikiVoyagePreparation {
 									LatLon ll = getLatLonFromGeoBlock(
 											macroBlocks.get(WikivoyageTemplates.LOCATION.getType()));
 									if (!ll.isZero()) {
+										int column = 1;
 										String filename = getFileName(macroBlocks.get(WikivoyageTemplates.BANNER.getType()));
 										filename = filename.startsWith("<!--") ? "" : filename;
 										if (id++ % 500 == 0) {
@@ -362,36 +362,34 @@ public class WikiVoyagePreparation {
 										CustomWikiModel wikiModel = new CustomWikiModel("https://upload.wikimedia.org/wikipedia/commons/${image}", 
 												"https://"+lang+".wikivoyage.com/wiki/${title}");
 										String plainStr = wikiModel.render(converter, text);
-										prep.setString(1, Encoder.encodeUrl(title.toString()));
-										prep.setString(2, title.toString());
+										prep.setString(column++, Encoder.encodeUrl(title.toString()));
+										prep.setString(column++, title.toString());
+										prep.setBytes(column++, stringToCompressedByteArray(bous, plainStr));
 										if (uncompressed) {
-											prep.setString(3, plainStr);
-										} else {
-											prep.setBytes(3, stringToCompressedByteArray(bous, plainStr));
+											prep.setString(column++, plainStr);
 										}
 										// part_of
-										prep.setString(4, parsePartOf(macroBlocks.get(WikivoyageTemplates.PART_OF.getType())));
+										prep.setString(column++, parsePartOf(macroBlocks.get(WikivoyageTemplates.PART_OF.getType())));
 										
-										prep.setDouble(5, ll.getLatitude());
-										prep.setDouble(6, ll.getLongitude());
+										prep.setDouble(column++, ll.getLatitude());
+										prep.setDouble(column++, ll.getLongitude());
 										// banner
-										prep.setString(7, Encoder.encodeUrl(filename).replace(CustomWikiModel.ROOT_URL, ""));
+										prep.setString(column++, Encoder.encodeUrl(filename).replace(CustomWikiModel.ROOT_URL, ""));
 										// gpx_gz
+										String gpx = generateGpx(macroBlocks.get(WikivoyageTemplates.POI.getType()));
+										prep.setBytes(column++, stringToCompressedByteArray(bous, gpx));
 										if (uncompressed) {
-											prep.setString(8, generateGpx(macroBlocks.get(WikivoyageTemplates.POI.getType())));
-										} else {
-											prep.setBytes(8, stringToCompressedByteArray(bous, 
-													generateGpx(macroBlocks.get(WikivoyageTemplates.POI.getType()))));
-										} 
+											prep.setString(column++, gpx);
+										}
 										langPrep.setString(1, title.toString());
 										ResultSet rs = langPrep.executeQuery();
 										long id = 0;
 										while (rs.next()) {
 											id = rs.getLong("id");
 										}
-										prep.setLong(9, id);
-										prep.setLong(10, cid);
-										prep.setString(11, lang);
+										prep.setLong(column++, id);
+										prep.setLong(column++, cid);
+										prep.setString(column++, lang);
 										langPrep.clearParameters();
 										addBatch();
 									}
