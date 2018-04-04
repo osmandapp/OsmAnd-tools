@@ -66,7 +66,7 @@ public class CustomWikiModel extends WikiModel {
 				imageHref = imageHref.replace("${title}", imageNamespace + ':' + imageName);
 			}
 		}
-		String imageSrc = getThumbUrl(Encoder.encodeUrl(imageName));
+		String imageSrc = getThumbUrl(imageName);
 		if (imageSrc.isEmpty()) {
 			return;
 		}	
