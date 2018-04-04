@@ -67,7 +67,7 @@ public class WikiVoyagePreparation {
 		}
 	}
 	
-	public static void main(String[] args) throws IOException, ParserConfigurationException, SAXException, SQLException, ComponentLookupException {
+	public static void main(String[] args) throws IOException, ParserConfigurationException, SAXException, SQLException {
 		String lang = "";
 		String folder = "";
 		if(args.length == 0) {
@@ -200,7 +200,7 @@ public class WikiVoyagePreparation {
 	}
 	
 	protected static void processWikivoyage(final String wikiPg, String lang, String sqliteFileName, File langlinkConn)
-			throws ParserConfigurationException, SAXException, FileNotFoundException, IOException, SQLException, ComponentLookupException {
+			throws ParserConfigurationException, SAXException, FileNotFoundException, IOException, SQLException {
 		SAXParser sx = SAXParserFactory.newInstance().newSAXParser();
 		InputStream streamFile = new BufferedInputStream(new FileInputStream(wikiPg), 8192 * 4);
 		InputStream stream = streamFile;
@@ -245,7 +245,7 @@ public class WikiVoyagePreparation {
 		private PreparedStatement langPrep;
 			
 		WikiOsmHandler(SAXParser saxParser, InputStream progIS, String lang, File sqliteFile, File langConn)
-				throws IOException, SQLException, ComponentLookupException{
+				throws IOException, SQLException {
 			this.lang = lang;
 			this.saxParser = saxParser;
 			this.progIS = progIS;		

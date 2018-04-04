@@ -16,6 +16,7 @@
       <artifactId>xwiki-rendering-syntax-xhtml</artifactId>
       <version>7.1-milestone-2</version>
     </dependency>
+    
     <dependency>
       <groupId>org.xwiki.rendering</groupId>
       <artifactId>xwiki-rendering-syntax-mediawiki</artifactId>
@@ -44,5 +45,11 @@
       <scope>runtime</scope>
       <version>1.7.12</version>
     </dependency>
+    <dependency>
+      <groupId>net.sf.kxml</groupId>
+      <artifactId>kxml2</artifactId>
+      <version>2.1.8</version>
+    </dependency>
+    
   </dependencies>
 </project>
