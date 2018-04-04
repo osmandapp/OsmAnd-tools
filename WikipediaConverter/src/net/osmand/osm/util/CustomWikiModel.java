@@ -201,7 +201,7 @@ public class CustomWikiModel extends WikiModel {
 		String md5 = DigestUtils.md5Hex(simplify);
 		String hash1 = md5.substring(0, 1);
 		String hash2 = md5.substring(0, 2);
-		return ROOT_URL + "thumb/" + hash1 + "/" + hash2 + "/" + fileName + "/" + PREFIX + simplify;
+		return ROOT_URL + "thumb/" + hash1 + "/" + hash2 + "/" + simplify + "/" + PREFIX + simplify;
 	}
 
 	public static String getUrl(String fileName) {
