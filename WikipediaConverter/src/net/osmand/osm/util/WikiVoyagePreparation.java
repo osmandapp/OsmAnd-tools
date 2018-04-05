@@ -374,7 +374,7 @@ public class WikiVoyagePreparation {
 										prep.setDouble(column++, ll.getLatitude());
 										prep.setDouble(column++, ll.getLongitude());
 										// banner
-										prep.setString(column++, filename);
+										prep.setString(column++, Encoder.encodeUrl(filename));
 										// gpx_gz
 										String gpx = generateGpx(macroBlocks.get(WikivoyageTemplates.POI.getType()));
 										prep.setBytes(column++, stringToCompressedByteArray(bous, gpx));
