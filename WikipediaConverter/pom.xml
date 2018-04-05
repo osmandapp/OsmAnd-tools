@@ -16,7 +16,11 @@
       <artifactId>xwiki-rendering-syntax-xhtml</artifactId>
       <version>7.1-milestone-2</version>
     </dependency>
-    
+    <dependency>
+    	<groupId>com.google.code.gson</groupId>
+    	<artifactId>gson</artifactId>
+    	<version>2.8.2</version>
+	</dependency>
     <dependency>
       <groupId>org.xwiki.rendering</groupId>
       <artifactId>xwiki-rendering-syntax-mediawiki</artifactId>

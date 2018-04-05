@@ -2,28 +2,43 @@ package net.osmand.osm.util;
 
 import org.apache.commons.codec.digest.DigestUtils;
 
+import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+
 import info.bliki.Messages;
 import info.bliki.htmlcleaner.ContentToken;
 import info.bliki.htmlcleaner.TagNode;
 import info.bliki.htmlcleaner.TagToken;
 import info.bliki.htmlcleaner.Utils;
 import info.bliki.wiki.filter.Encoder;
+import info.bliki.wiki.filter.SectionHeader;
 import info.bliki.wiki.filter.WikipediaParser;
 import info.bliki.wiki.model.Configuration;
+import info.bliki.wiki.model.ITableOfContent;
 import info.bliki.wiki.model.ImageFormat;
 import info.bliki.wiki.model.WikiModel;
+import info.bliki.wiki.tags.HTMLBlockTag;
 import info.bliki.wiki.tags.HTMLTag;
 import info.bliki.wiki.tags.PTag;
+import info.bliki.wiki.tags.TableOfContentTag;
+import info.bliki.wiki.tags.util.TagStack;
 
 
 public class CustomWikiModel extends WikiModel {
 	
+	private JsonObject contentsJson;	
 
 	public static final String ROOT_URL = "https://upload.wikimedia.org/wikipedia/commons/";
 	private static final String PREFIX = "320px-";
 
 	public CustomWikiModel(String imageBaseURL, String linkBaseURL) {
 		super(imageBaseURL, linkBaseURL);
+		contentsJson = new JsonObject();
+	}
+	
+	public JsonObject getContentsJson() {
+		return contentsJson;
 	}
 	
 	@Override
@@ -195,6 +210,55 @@ public class CustomWikiModel extends WikiModel {
 			}
 		}
 	}
+	
+	/**
+     * Append a new head to the table of content
+     */
+    @Override
+    public ITableOfContent appendHead(String rawHead, int headLevel,
+            boolean noToC, int headCounter, int startPosition, int endPosition) {
+        TagStack localStack = WikipediaParser.parseRecursive(rawHead.trim(),
+                this, true, true);
+
+        HTMLBlockTag headTagNode = new HTMLBlockTag("h" + headLevel,
+                Configuration.SPECIAL_BLOCK_TAGS);
+        TagNode spanTagNode = new TagNode("span");
+        // Example:
+        // <h2><span class="mw-headline" id="Header_level_2">Header level
+        // 2</span></h2>
+        spanTagNode.addChildren(localStack.getNodeList());
+        headTagNode.addChild(spanTagNode);
+        String tocHead = headTagNode.getBodyString();
+        String anchor = Encoder.encodeDotUrl(tocHead);
+        createTableOfContent(false);
+        if (fToCSet.contains(anchor)) {
+            String newAnchor = anchor;
+            for (int i = 2; i < Integer.MAX_VALUE; i++) {
+                newAnchor = anchor + '_' + Integer.toString(i);
+                if (!fToCSet.contains(newAnchor)) {
+                    break;
+                }
+            }
+            anchor = newAnchor;
+        }
+        fToCSet.add(anchor);
+        if (headLevel < 4) {
+        	JsonArray item = new JsonArray();
+            item.add(headLevel);
+            item.add("#" + anchor);
+            contentsJson.add(rawHead, item);
+        }
+        SectionHeader strPair = new SectionHeader(headLevel, startPosition,
+                endPosition, tocHead, anchor);
+        if (getRecursionLevel() == 1) {
+            buildEditLinkUrl(fSectionCounter++);
+        }
+        spanTagNode.addAttribute("class", "mw-headline", true);
+        spanTagNode.addAttribute("id", anchor, true);
+
+        append(headTagNode);
+        return new TableOfContentTag("a");
+    }
 	
 	public static String getThumbUrl(String fileName) {
 		String simplify = fileName.replace(' ', '_');

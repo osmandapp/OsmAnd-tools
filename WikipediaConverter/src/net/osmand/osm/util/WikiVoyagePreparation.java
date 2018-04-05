@@ -255,12 +255,12 @@ public class WikiVoyagePreparation {
 			conn.createStatement()
 					.execute("CREATE TABLE IF NOT EXISTS wikivoyage_articles(article_id text, title text, content_gz blob"
 							+ (uncompressed ? ", content text" : "") + ", is_part_of text, lat double, lon double, image_title text, gpx_gz blob"
-							+ (uncompressed ? ", gpx text" : "") + ", city_id long, original_id long, lang text)");
+							+ (uncompressed ? ", gpx text" : "") + ", city_id long, original_id long, lang text, contents_json text)");
 			conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_title ON wikivoyage_articles(title);");
 			conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_id ON wikivoyage_articles(city_id);");
 			conn.createStatement()
 					.execute("CREATE INDEX IF NOT EXISTS index_part_of ON wikivoyage_articles(is_part_of);");
-			prep = conn.prepareStatement("INSERT INTO wikivoyage_articles VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?"+(uncompressed ? ", ?, ?": "")+")");
+			prep = conn.prepareStatement("INSERT INTO wikivoyage_articles VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?" + (uncompressed ? ", ?, ?": "") + ")");
 
 			this.langConn = (Connection) dialect.getDatabaseConnection(langConn.getAbsolutePath(), log);
 			langPrep = this.langConn.prepareStatement("SELECT id FROM langlinks WHERE title = ?");
@@ -390,8 +390,10 @@ public class WikiVoyagePreparation {
 										prep.setLong(column++, id);
 										prep.setLong(column++, cid);
 										prep.setString(column++, lang);
+										prep.setString(column++, wikiModel.getContentsJson().toString());
 										langPrep.clearParameters();
 										addBatch();
+										
 									}
 								}
 							} catch (SQLException e) {
