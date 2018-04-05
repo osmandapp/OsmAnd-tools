@@ -133,7 +133,7 @@ public class WikiDatabasePreparation {
 				} else if (key.equals(WikivoyageTemplates.WARNING.getType())) {
 					int ind = val.indexOf("|");
 					ind = ind == -1 ? 0 : ind + 1;
-					bld.append("<p class=\"waring\">");
+					bld.append("<p class=\"waring\"><b>Warning: </b>");
 					bld.append(val.substring(ind, val.length()));
 					bld.append("</p>");
 				}
