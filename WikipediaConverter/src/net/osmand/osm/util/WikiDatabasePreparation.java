@@ -130,6 +130,12 @@ public class WikiDatabasePreparation {
 					bld.append(parseListing(val));
 				} else if (key.equals(WikivoyageTemplates.REGION_LIST.getType())) {
 					bld.append((parseRegionList(val)));
+				} else if (key.equals(WikivoyageTemplates.WARNING.getType())) {
+					int ind = val.indexOf("|");
+					ind = ind == -1 ? 0 : ind + 1;
+					bld.append("<p class=\"waring\">");
+					bld.append(val.substring(ind, val.length()));
+					bld.append("</p>");
 				}
 				if (!key.isEmpty()) {
 					if (key.contains("|")) {
@@ -303,6 +309,8 @@ public class WikiDatabasePreparation {
 			return "geo|pagebanner";
 		} else if (str.startsWith("regionlist")) {
 			return WikivoyageTemplates.REGION_LIST.getType();
+		} else if (str.startsWith("warningbox")) {
+			return WikivoyageTemplates.WARNING.getType();
 		}
 		return "";
 	}

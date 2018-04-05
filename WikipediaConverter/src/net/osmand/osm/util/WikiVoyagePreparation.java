@@ -44,7 +44,6 @@ import org.xml.sax.Attributes;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
-import org.xwiki.component.manager.ComponentLookupException;
 
 public class WikiVoyagePreparation {
 	private static final Log log = PlatformUtil.getLog(WikiDatabasePreparation.class);	
@@ -55,7 +54,8 @@ public class WikiVoyagePreparation {
 		POI("poi"),
 		PART_OF("part_of"),
 		BANNER("pagebanner"),
-		REGION_LIST("regionlist");
+		REGION_LIST("regionlist"), 
+		WARNING("warningbox");
 		
 		private String type;
 		WikivoyageTemplates(String s) {
@@ -71,7 +71,7 @@ public class WikiVoyagePreparation {
 		String lang = "";
 		String folder = "";
 		if(args.length == 0) {
-			lang = "nl";
+			lang = "en";
 			folder = "/home/user/osmand/wikivoyage/";
 			uncompressed = true;
 		}
@@ -374,7 +374,7 @@ public class WikiVoyagePreparation {
 										prep.setDouble(column++, ll.getLatitude());
 										prep.setDouble(column++, ll.getLongitude());
 										// banner
-										prep.setString(column++, Encoder.encodeUrl(filename).replace(CustomWikiModel.ROOT_URL, ""));
+										prep.setString(column++, filename);
 										// gpx_gz
 										String gpx = generateGpx(macroBlocks.get(WikivoyageTemplates.POI.getType()));
 										prep.setBytes(column++, stringToCompressedByteArray(bous, gpx));
