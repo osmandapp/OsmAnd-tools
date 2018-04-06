@@ -143,6 +143,8 @@ public class WikiDatabasePreparation {
 							addToMap(blocksMap, str, val);
 						}
 					} else if (!key.equals(WikivoyageTemplates.REGION_LIST.getType())){
+						String[] parts = val.split("\\|");
+						val = parts.length > 1 ? parts[1] : "";
 						addToMap(blocksMap, key, val);
 					}
 				}
