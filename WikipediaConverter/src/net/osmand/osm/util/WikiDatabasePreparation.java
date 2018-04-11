@@ -134,7 +134,7 @@ public class WikiDatabasePreparation {
 				} else if (key.equals(WikivoyageTemplates.WARNING.getType())) {
 					int ind = val.indexOf("|");
 					ind = ind == -1 ? 0 : ind + 1;
-					bld.append("<p class=\"waring\"><b>Warning: </b>");
+					bld.append("<p class=\"warning\"><b>Warning: </b>");
 					String[] parts = val.split("\\|");
 					val = parts.length > 1 ? parts[1] : "";
 					bld.append(val);
@@ -177,7 +177,6 @@ public class WikiDatabasePreparation {
 				}
 			}
 		}
-		System.out.println(bld.toString());
 		return bld.toString();
 	}
 
