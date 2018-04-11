@@ -57,8 +57,11 @@ public class WikivoyageOSMDataGenerator {
 		}
 		File sqliteFile = new File(file);
 		File countriesObfFile = new File(citiesObf);
-		if (!sqliteFile.exists() || !countriesObfFile.exists()) {
+		if (!sqliteFile.exists()) {
 			System.err.println("The path to the wikivoyage.sqlite is incorrect. Exiting...");
+			System.exit(-1);
+		} else if (!countriesObfFile.exists()) {
+			System.err.println("The path to the regions.ocbf is incorrect. Exiting...");
 			System.exit(-1);
 		}
 		regions = new OsmandRegions();
