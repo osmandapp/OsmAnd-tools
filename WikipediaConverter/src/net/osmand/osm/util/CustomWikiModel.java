@@ -219,7 +219,6 @@ public class CustomWikiModel extends WikiModel {
             boolean noToC, int headCounter, int startPosition, int endPosition) {
         TagStack localStack = WikipediaParser.parseRecursive(rawHead.trim(),
                 this, true, true);
-
         HTMLBlockTag headTagNode = new HTMLBlockTag("h" + headLevel,
                 Configuration.SPECIAL_BLOCK_TAGS);
         TagNode spanTagNode = new TagNode("span");
@@ -255,7 +254,7 @@ public class CustomWikiModel extends WikiModel {
         }
         spanTagNode.addAttribute("class", "mw-headline", true);
         spanTagNode.addAttribute("id", anchor, true);
-
+        
         append(headTagNode);
         return new TableOfContentTag("a");
     }

@@ -99,6 +99,7 @@ public class WikiDatabasePreparation {
 		int openCnt = 0;
 		int beginInd = 0;
 		int endInd = 0;
+		int headerCount = 0;
 		boolean hebrew = false;
 		for (int i = 0; i < s.length(); i++) {
 			int nt = s.length() - i - 1;
@@ -134,7 +135,9 @@ public class WikiDatabasePreparation {
 					int ind = val.indexOf("|");
 					ind = ind == -1 ? 0 : ind + 1;
 					bld.append("<p class=\"waring\"><b>Warning: </b>");
-					bld.append(val.substring(ind, val.length()));
+					String[] parts = val.split("\\|");
+					val = parts.length > 1 ? parts[1] : "";
+					bld.append(val);
 					bld.append("</p>");
 				}
 				if (!key.isEmpty()) {
@@ -142,21 +145,39 @@ public class WikiDatabasePreparation {
 						for (String str : key.split("\\|")) {
 							addToMap(blocksMap, str, val);
 						}
-					} else if (!key.equals(WikivoyageTemplates.REGION_LIST.getType())){
-						String[] parts = val.split("\\|");
-						val = parts.length > 1 ? parts[1] : "";
+					} else {
 						addToMap(blocksMap, key, val);
 					}
 				}
 				i++;
 			} else {
 				if (openCnt == 0) {
-					bld.append(s.charAt(i));
+					int headerLvl = 0;
+					int indexCopy = i;
+					while (s.charAt(indexCopy) == '=' && indexCopy < s.length() - 1 && (i > 0 && s.charAt(i - 1) != '=')) {
+						headerLvl++;
+						indexCopy++;
+					}
+					if (headerLvl == 2 && Character.isLetterOrDigit((s.charAt(i + 2)))) {
+						if (headerCount != 0) {
+							bld.append("\n</div>\n");
+						}
+						bld.append(s.charAt(i));
+						bld.append(s.charAt(i++));
+					} else if (headerLvl == 2 && s.charAt(i + 2) == '\n') {
+						bld.append(s.charAt(i));
+						bld.append(s.charAt(i++));
+						bld.append("\n<div class=\"content\">");
+						headerCount++;
+					} else {
+						bld.append(s.charAt(i));
+					}
 					beginInd = 0;
 					endInd = 0;
 				}
 			}
 		}
+		System.out.println(bld.toString());
 		return bld.toString();
 	}
 
