@@ -172,7 +172,7 @@ public class WikivoyageOSMDataGenerator {
 			try {
 				conn.createStatement().execute("ALTER TABLE wikivoyage_articles ADD COLUMN " + s);
 			} catch (SQLException ex) {
-				ex.printStackTrace();
+				// ex.printStackTrace();
 				System.out.println("Column alredy exsists");
 			}
 		}
