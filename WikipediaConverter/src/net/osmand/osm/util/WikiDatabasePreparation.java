@@ -160,14 +160,14 @@ public class WikiDatabasePreparation {
 					}
 					if (headerLvl == 2 && Character.isLetterOrDigit((s.charAt(i + 2)))) {
 						if (headerCount != 0) {
-							bld.append("\n</div>\n");
+							bld.append("\n/div\n");
 						}
 						bld.append(s.charAt(i));
 						bld.append(s.charAt(i++));
 					} else if (headerLvl == 2 && s.charAt(i + 2) == '\n') {
 						bld.append(s.charAt(i));
 						bld.append(s.charAt(i++));
-						bld.append("\n<div class=\"content\">");
+						bld.append("\ndiv class=\"content\"");
 						headerCount++;
 					} else {
 						bld.append(s.charAt(i));
