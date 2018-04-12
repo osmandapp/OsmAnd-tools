@@ -72,7 +72,7 @@ public class WikiVoyagePreparation {
 		String folder = "";
 		if(args.length == 0) {
 			lang = "en";
-			folder = "/home/paul/osmand/wikivoyage/articles/";
+			folder = "/home/user/osmand/wikivoyage/";
 			uncompressed = true;
 		}
 		if(args.length > 0) {
@@ -390,7 +390,7 @@ public class WikiVoyagePreparation {
 										prep.setLong(column++, id);
 										prep.setLong(column++, cid);
 										prep.setString(column++, lang);
-										prep.setString(column++, wikiModel.getContentsJson().toString());
+										prep.setString(column++, wikiModel.getContentsJson());
 										langPrep.clearParameters();
 										addBatch();
 										

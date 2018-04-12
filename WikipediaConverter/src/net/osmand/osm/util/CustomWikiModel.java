@@ -1,5 +1,10 @@
 package net.osmand.osm.util;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 import org.apache.commons.codec.digest.DigestUtils;
 
 import com.google.gson.Gson;
@@ -27,18 +32,23 @@ import info.bliki.wiki.tags.util.TagStack;
 
 public class CustomWikiModel extends WikiModel {
 	
-	private JsonObject contentsJson;	
+	private Map<String, Map<String, Object>> dataMap;
+	private String prevHead = "";
+	
 
 	public static final String ROOT_URL = "https://upload.wikimedia.org/wikipedia/commons/";
 	private static final String PREFIX = "320px-";
 
 	public CustomWikiModel(String imageBaseURL, String linkBaseURL) {
 		super(imageBaseURL, linkBaseURL);
-		contentsJson = new JsonObject();
+		
+		dataMap = new HashMap<>();
 	}
 	
-	public JsonObject getContentsJson() {
-		return contentsJson;
+	public String getContentsJson() {
+		Map<String, Map<String, Map<String, Object>>> finalData = new HashMap<>();
+		finalData.put("headers", dataMap);
+		return new Gson().toJson(finalData);
 	}
 	
 	@Override
@@ -241,12 +251,26 @@ public class CustomWikiModel extends WikiModel {
             anchor = newAnchor;
         }
         fToCSet.add(anchor);
-        if (headLevel < 4) {
-        	JsonArray item = new JsonArray();
-            item.add(headLevel);
-            item.add("#" + anchor);
-            contentsJson.add(rawHead, item);
+        if (headLevel == 2) {
+//        	JsonArray item = new JsonArray();
+//            item.add(headLevel);
+//            item.add("#" + anchor);
+        	Map<String, Object> data = new HashMap<>();
+        	data.put("link", "#" + anchor);
+            dataMap.put(rawHead, data);
+            prevHead = rawHead;
+        } else if (headLevel == 3) {
+        	Map<String, Object> data = dataMap.get(prevHead);
+        	List<Map<String, Map<String, String>>> vals = data.get("subheaders") == null ? new ArrayList<>() : 
+        		(ArrayList<Map<String, Map<String, String>>>) data.get("subheaders");
+        	Map<String, Map<String, String>> subHeaders = new HashMap<>();
+        	Map<String, String> link = new HashMap<>();
+        	link.put("link", "#" + anchor);
+        	subHeaders.put(rawHead, link);
+        	vals.add(subHeaders);
+        	data.put("subheaders", vals);
         }
+        getContentsJson();
         SectionHeader strPair = new SectionHeader(headLevel, startPosition,
                 endPosition, tocHead, anchor);
         if (getRecursionLevel() == 1) {
