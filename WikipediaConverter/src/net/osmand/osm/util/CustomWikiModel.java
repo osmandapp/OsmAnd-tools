@@ -41,7 +41,6 @@ public class CustomWikiModel extends WikiModel {
 
 	public CustomWikiModel(String imageBaseURL, String linkBaseURL) {
 		super(imageBaseURL, linkBaseURL);
-		
 		dataMap = new HashMap<>();
 	}
 	

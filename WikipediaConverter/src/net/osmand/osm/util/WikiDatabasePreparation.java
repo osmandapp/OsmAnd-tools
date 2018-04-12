@@ -217,7 +217,13 @@ public class WikiDatabasePreparation {
 					}
 					bld.append("\n");
 				} else if (partname.matches("region\\d+description")) {
-					bld.append(part.substring(ind + 1, part.length()));
+					String desc = part.substring(ind + 1, part.length());
+					int startInd = i;
+					while (i < parts.length - 1 && !parts[++i].contains("=")) {
+						desc += "|" + parts[i];
+					}
+					i = i == startInd++ ? i : i - 1;
+					bld.append(desc);
 					bld.append("\n");
 				}
 			}
