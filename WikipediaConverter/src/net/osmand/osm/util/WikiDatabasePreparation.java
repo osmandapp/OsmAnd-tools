@@ -132,7 +132,7 @@ public class WikiDatabasePreparation {
 				} else if (key.equals(WikivoyageTemplates.REGION_LIST.getType())) {
 					bld.append((parseRegionList(val)));
 				} else if (key.equals(WikivoyageTemplates.WARNING.getType())) {
-					val = appendWarning(bld, val);
+					appendWarning(bld, val);
 				}
 				if (!key.isEmpty()) {
 					if (key.contains("|")) {
