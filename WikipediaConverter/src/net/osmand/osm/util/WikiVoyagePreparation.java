@@ -49,21 +49,6 @@ public class WikiVoyagePreparation {
 	private static final Log log = PlatformUtil.getLog(WikiDatabasePreparation.class);	
 	private static boolean uncompressed;
 	
-	private static final String collapsibleJS = "<script>\n" + 
-			"var coll = document.getElementsByTagName(\"H2\");\n" + 
-			"var i;\n" + 
-			"for (i = 0; i < coll.length; i++) {\n" + 
-			"  coll[i].addEventListener(\"click\", function() {\n" + 
-			"    this.classList.toggle(\"active\");\n" + 
-			"    var content = this.nextElementSibling;\n" + 
-			"    if (content.style.display === \"block\") {\n" + 
-			"      content.style.display = \"none\";\n" + 
-			"    } else {\n" + 
-			"      content.style.display = \"block\";\n" + 
-			"    }\n" + 
-			"  });\n" + 
-			"}</script>";
-		
 	public enum WikivoyageTemplates {
 		LOCATION("geo"),
 		POI("poi"),
@@ -88,7 +73,7 @@ public class WikiVoyagePreparation {
 		if(args.length == 0) {
 			lang = "uk";
 			folder = "/home/user/osmand/wikivoyage/";
-			uncompressed = true;
+			uncompressed = false;
 		}
 		if(args.length > 0) {
 			lang = args[0];
@@ -378,7 +363,6 @@ public class WikiVoyagePreparation {
 												"https://"+lang+".wikivoyage.com/wiki/${title}");
 										String plainStr = wikiModel.render(converter, text);
 										plainStr = plainStr.replaceAll("<p>div class=&#34;content&#34;", "<div class=\"content\">\n<p>").replaceAll("<p>/div\n</p>", "</div>");
-										plainStr += "\n" + collapsibleJS;
 										prep.setString(column++, Encoder.encodeUrl(title.toString()));
 										prep.setString(column++, title.toString());
 										prep.setBytes(column++, stringToCompressedByteArray(bous, plainStr));
