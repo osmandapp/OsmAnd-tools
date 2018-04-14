@@ -174,7 +174,7 @@ public class WikiDatabasePreparation {
 		return bld.toString();
 	}
 
-	private static String appendWarning(StringBuilder bld, String val) {
+	private static void appendWarning(StringBuilder bld, String val) {
 		int ind = val.indexOf("|");
 		ind = ind == -1 ? 0 : ind + 1;
 		bld.append("<p class=\"warning\"><b>Warning: </b>");
@@ -182,7 +182,6 @@ public class WikiDatabasePreparation {
 		val = parts.length > 1 ? parts[1] : "";
 		bld.append(val);
 		bld.append("</p>");
-		return val;
 	}
 
 	private static String parseGallery(String val) {
