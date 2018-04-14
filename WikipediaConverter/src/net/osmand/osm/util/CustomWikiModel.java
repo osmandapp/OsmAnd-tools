@@ -258,16 +258,14 @@ public class CustomWikiModel extends WikiModel {
             prevHead = rawHead;
         } else if (headLevel == 3) {
         	Map<String, Object> data = dataMap.get(prevHead);
-        	if (data != null) {
-        		List<Map<String, Map<String, String>>> vals = data.get("subheaders") == null ? new ArrayList<>() : 
-            		(ArrayList<Map<String, Map<String, String>>>) data.get("subheaders");
-            	Map<String, Map<String, String>> subHeaders = new HashMap<>();
-            	Map<String, String> link = new HashMap<>();
-            	link.put("link", "#" + anchor);
-            	subHeaders.put(rawHead, link);
-            	vals.add(subHeaders);
-            	data.put("subheaders", vals);
-        	}
+			if (data != null) {
+				Map<String, Map<String, String>> subHeaders = (Map<String, Map<String, String>>) data.get("subheaders");
+				subHeaders = subHeaders == null ? new HashMap<String, Map<String, String>>() : subHeaders;
+				Map<String, String> link = new HashMap<>();
+				link.put("link", "#" + anchor);
+				subHeaders.put(rawHead, link);
+				data.put("subheaders", subHeaders);
+			}
         }
         getContentsJson();
         SectionHeader strPair = new SectionHeader(headLevel, startPosition,
