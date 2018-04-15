@@ -1,15 +1,12 @@
 package net.osmand.osm.util;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 import org.apache.commons.codec.digest.DigestUtils;
 
 import com.google.gson.Gson;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonObject;
 
 import info.bliki.Messages;
 import info.bliki.htmlcleaner.ContentToken;
@@ -41,11 +38,11 @@ public class CustomWikiModel extends WikiModel {
 
 	public CustomWikiModel(String imageBaseURL, String linkBaseURL) {
 		super(imageBaseURL, linkBaseURL);
-		dataMap = new HashMap<>();
+		dataMap = new LinkedHashMap<>();
 	}
 	
 	public String getContentsJson() {
-		Map<String, Map<String, Map<String, Object>>> finalData = new HashMap<>();
+		Map<String, Map<String, Map<String, Object>>> finalData = new LinkedHashMap<>();
 		finalData.put("headers", dataMap);
 		return new Gson().toJson(finalData);
 	}
@@ -252,7 +249,7 @@ public class CustomWikiModel extends WikiModel {
         }
         fToCSet.add(anchor);
         if (headLevel == 2) {
-        	Map<String, Object> data = new HashMap<>();
+        	Map<String, Object> data = new LinkedHashMap<>();
         	data.put("link", "#" + anchor);
             dataMap.put(rawHead, data);
             prevHead = rawHead;
@@ -260,7 +257,7 @@ public class CustomWikiModel extends WikiModel {
 			Map<String, Object> data = dataMap.get(prevHead);
 			if (data != null) {
 				Map<String, Map<String, String>> subHeaders = (Map<String, Map<String, String>>) data.get("subheaders");
-				subHeaders = subHeaders == null ? new HashMap<String, Map<String, String>>() : subHeaders;
+				subHeaders = subHeaders == null ? new LinkedHashMap<String, Map<String, String>>() : subHeaders;
 				Map<String, String> link = new HashMap<>();
 				link.put("link", "#" + anchor);
 				subHeaders.put(rawHead, link);
