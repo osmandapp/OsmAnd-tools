@@ -409,6 +409,18 @@ public class WikiVoyagePreparation {
 			}
 		}
 		
+		public static boolean isEmpty(String s) {
+			return s == null || s.length() == 0;
+		}
+		public static String capitalizeFirstLetterAndLowercase(String s) {
+			if (s != null && s.length() > 1) {
+				// not very efficient algorithm
+				return Character.toUpperCase(s.charAt(0)) + s.substring(1).toLowerCase();
+			} else {
+				return s;
+			}
+		}
+		
 		private String generateGpx(List<String> list) {
 			if (list != null && !list.isEmpty()) {
 				GPXFile f = new GPXFile();
@@ -419,6 +431,9 @@ public class WikiVoyagePreparation {
 					String category = info[0].replaceAll("\n", "").trim();
 					point.category = (category.equalsIgnoreCase("vcard") 
 							|| category.equalsIgnoreCase("listing")) ? transformCategory(info) : category;
+					if(!isEmpty(point.category)) {
+						point.category = capitalizeFirstLetterAndLowercase(point.category);
+					}
 					for (int i = 1; i < info.length; i++) {
 						String field = info[i].trim();
 						String value = "";

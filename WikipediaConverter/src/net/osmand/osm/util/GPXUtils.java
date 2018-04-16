@@ -75,13 +75,13 @@ public class GPXUtils {
 		
 		public void setColor() {
 			if (category != null) {
-				if (category.equals("see") || category.equals("do")) {
+				if (category.equalsIgnoreCase("see") || category.equalsIgnoreCase("do")) {
 					super.setColor(15461130);
-				} else if (category.equals("eat") || category.equals("drink")) {
+				} else if (category.equalsIgnoreCase("eat") || category.equalsIgnoreCase("drink")) {
 					super.setColor(15400960);
-				} else if (category.equals("sleep")) {
+				} else if (category.equalsIgnoreCase("sleep")) {
 					super.setColor(3279595);
-				} else if (category.equals("buy") || category.equals("listing")) {
+				} else if (category.equalsIgnoreCase("buy") || category.equalsIgnoreCase("listing")) {
 					super.setColor(3336970);
 				}
 			}
