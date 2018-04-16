@@ -432,7 +432,7 @@ public class WikiVoyagePreparation {
 					point.category = (category.equalsIgnoreCase("vcard") 
 							|| category.equalsIgnoreCase("listing")) ? transformCategory(info) : category;
 					if(!isEmpty(point.category)) {
-						point.category = capitalizeFirstLetterAndLowercase(point.category);
+						point.category = capitalizeFirstLetterAndLowercase(point.category.trim());
 					}
 					for (int i = 1; i < info.length; i++) {
 						String field = info[i].trim();
