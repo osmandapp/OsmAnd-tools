@@ -284,7 +284,8 @@ public class WikiDatabasePreparation {
 						bld.append("fax: " + value + ", ");
 					} else if (field.contains("phone=") || field.contains("tel=")
 							|| field.contains("téléphone=") || field.contains("טלפון") || field.contains("تلفن")) {
-						String tel = areaCode.replaceAll("[ -]", "/") + "/" + value.replaceAll("[ -]", "/");
+						String tel = areaCode.replaceAll("[ -]", "/") + "/" + value.replaceAll("[ -]", "/")
+							.replaceAll("[^\\d\\+\\)\\(,]", "");
 						tel = tel.replaceAll("\\(", "o").replaceAll("\\)", "c");
 						bld.append("☎ " + "tel:" + tel + ". ");
 					} else if (field.contains("price=") || field.contains("prezzo=") || field.contains("מחיר")

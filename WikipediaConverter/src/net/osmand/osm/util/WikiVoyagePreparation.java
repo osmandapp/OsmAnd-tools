@@ -71,9 +71,9 @@ public class WikiVoyagePreparation {
 		String lang = "";
 		String folder = "";
 		if(args.length == 0) {
-			lang = "uk";
+			lang = "en";
 			folder = "/home/paul/osmand/wikivoyage/articles/";
-			uncompressed = false;
+			uncompressed = true;
 		}
 		if(args.length > 0) {
 			lang = args[0];
@@ -445,7 +445,7 @@ public class WikiVoyagePreparation {
 								String areaCode = "";
 								if (field.contains("name=") || field.contains("nome=") || field.contains("nom=")
 										|| field.contains("שם") || field.contains("نام")) {
-									point.name = value;
+									point.name = value.replaceAll("\\]\\[", "");
 								} else if (field.contains("url=") || field.contains("sito=") || field.contains("האתר הרשמי")
 										|| field.contains("نشانی اینترنتی")) {
 									point.link = value;
