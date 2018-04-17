@@ -459,26 +459,26 @@ public class WikiVoyagePreparation {
 										|| field.contains("description") || field.contains("sobre") || field.contains("תיאור")
 										|| field.contains("متن")) {
 									point.desc = point.desc = point.desc == null ? value : 
-										point.desc + "\n" + value;
+										point.desc + " " + value;
 								} else if (field.contains("email=") || field.contains("מייל") || field.contains("پست الکترونیکی")) {
 									point.desc = point.desc == null ? "Email: " + value : 
-										point.desc + "\nEmail: " + value;
+										point.desc + " Email: " + value;
 								} else if (field.contains("phone=") || field.contains("tel=") || field.contains("téléphone")
 										|| field.contains("טלפון") || field.contains("تلفن")) {
 									point.desc = point.desc == null ? "Phone: " + areaCode + value : 
-										point.desc + "\nPhone: " + areaCode + value;
+										point.desc + " Phone: " + areaCode + value;
 								} else if (field.contains("price=") || field.contains("prezzo=") || field.contains("prix=") 
 										|| field.contains("מחיר") || field.contains("بها")) {
 									point.desc = point.desc == null ? "Price: " + value : 
-										point.desc + "\nPrice: " + value;
+										point.desc + " Price: " + value;
 								} else if (field.contains("hours=") || field.contains("orari=") || field.contains("horaire=") 
 										|| field.contains("funcionamento") || field.contains("שעות") || field.contains("ساعت‌ها")) {
 									point.desc = point.desc == null ? "Working hours: " + value : 
-										point.desc + "\nWorking hours: " + value;
+										point.desc + " Working hours: " + value;
 								} else if (field.contains("directions=") || field.contains("direction=") || field.contains("הוראות")
 										|| field.contains("مسیرها")) {
 									point.desc = point.desc == null ? "Directions: " + value : 
-										point.desc + "\nDirections: " + value;
+										point.desc + " Directions: " + value;
 								}
 							} catch (Exception e) {}
 						}
