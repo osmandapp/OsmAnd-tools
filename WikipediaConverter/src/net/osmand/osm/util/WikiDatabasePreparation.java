@@ -261,7 +261,7 @@ public class WikiDatabasePreparation {
 					String areaCode = "";
 					if (field.contains(("name=")) || field.contains("nome=") || field.contains("nom=") 
 							|| field.contains("שם") || field.contains("نام")) {
-						bld.append("'''" + value + "'''" + ", ");
+						bld.append("'''" + value.replaceAll("[\\[\\]]", "") + "'''" + ", ");
 					} else if (field.contains("url=") || field.contains("sito=") || field.contains("האתר הרשמי")
 							|| field.contains("نشانی اینترنتی")) {
 						bld.append("Website: " + value + ". ");
