@@ -486,7 +486,6 @@ public class WikiVoyagePreparation {
 						}
 					}
 					if (point.hasLocation() && point.name != null && !point.name.isEmpty()) {
-						point.desc = (!point.desc.isEmpty() && !point.desc.endsWith(".")) ? point.desc + "." : point.desc;
 						point.setColor();
 						points.add(point);
 					}
