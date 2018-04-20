@@ -434,6 +434,7 @@ public class WikiVoyagePreparation {
 					if(!isEmpty(point.category)) {
 						point.category = capitalizeFirstLetterAndLowercase(point.category.trim());
 					}
+					String areaCode = "";
 					for (int i = 1; i < info.length; i++) {
 						String field = info[i].trim();
 						String value = "";
@@ -444,7 +445,6 @@ public class WikiVoyagePreparation {
 						}
 						if (!value.isEmpty() && !value.contains("{{")) {
 							try {
-								String areaCode = "";
 								if (field.equalsIgnoreCase("name") || field.equalsIgnoreCase("nome") || field.equalsIgnoreCase("nom")
 										|| field.equalsIgnoreCase("שם") || field.equalsIgnoreCase("نام")) {
 									point.name = value.replaceAll("\\]\\[", "");
