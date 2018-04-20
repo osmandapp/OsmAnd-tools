@@ -502,8 +502,8 @@ public class WikiVoyagePreparation {
 		private String transformCategory(String[] info) {
 			String type = "";
 			for (int i = 1; i < info.length; i++) {
-				if (info[i].startsWith("type=")) {
-					type = info[i] .substring(info[i].indexOf("=") + 1, info[i].length());
+				if (info[i].trim().startsWith("type")) {
+					type = info[i].substring(info[i].indexOf("=") + 1, info[i].length()).trim();
 				}
 			}
 			return type;
