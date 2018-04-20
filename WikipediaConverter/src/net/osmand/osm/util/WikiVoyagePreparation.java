@@ -72,7 +72,7 @@ public class WikiVoyagePreparation {
 		String folder = "";
 		if(args.length == 0) {
 			lang = "en";
-			folder = "/home/paul/osmand/wikivoyage/articles/";
+			folder = "/home/user/osmand/wikivoyage/";
 			uncompressed = true;
 		}
 		if(args.length > 0) {
@@ -437,46 +437,48 @@ public class WikiVoyagePreparation {
 					for (int i = 1; i < info.length; i++) {
 						String field = info[i].trim();
 						String value = "";
-						if (field.indexOf("=") != -1) {
-							value = field.substring(field.indexOf("=") + 1, field.length()).trim();
+						int index = field.indexOf("=");
+						if (index != -1) {
+							value = field.substring(index + 1, field.length()).trim();
+							field = field.substring(0, index).trim();
 						}
 						if (!value.isEmpty() && !value.contains("{{")) {
 							try {
 								String areaCode = "";
-								if (field.contains("name=") || field.contains("nome=") || field.contains("nom=")
-										|| field.contains("שם") || field.contains("نام")) {
+								if (field.equalsIgnoreCase("name") || field.equalsIgnoreCase("nome") || field.equalsIgnoreCase("nom")
+										|| field.equalsIgnoreCase("שם") || field.equalsIgnoreCase("نام")) {
 									point.name = value.replaceAll("\\]\\[", "");
-								} else if (field.contains("url=") || field.contains("sito=") || field.contains("האתר הרשמי")
-										|| field.contains("نشانی اینترنتی")) {
+								} else if (field.equalsIgnoreCase("url") || field.equalsIgnoreCase("sito") || field.equalsIgnoreCase("האתר הרשמי")
+										|| field.equalsIgnoreCase("نشانی اینترنتی")) {
 									point.link = value;
-								} else if (field.contains("intl-area-code=")) {
+								} else if (field.equalsIgnoreCase("intl-area-code")) {
 									areaCode = value;
-								} else if (field.contains("lat=") || field.contains("latitude=") || field.contains("عرض جغرافیایی")) {
+								} else if (field.equalsIgnoreCase("lat") || field.equalsIgnoreCase("latitude") || field.equalsIgnoreCase("عرض جغرافیایی")) {
 									point.lat = Double.valueOf(value);
-								} else if (field.contains("long=") || field.contains("longitude=") || field.contains("طول جغرافیایی")) {
+								} else if (field.equalsIgnoreCase("long") || field.equalsIgnoreCase("longitude") || field.equalsIgnoreCase("طول جغرافیایی")) {
 									point.lon = Double.valueOf(value);
-								} else if (field.contains("content=") || field.contains("descrizione=") 
-										|| field.contains("description") || field.contains("sobre") || field.contains("תיאור")
-										|| field.contains("متن")) {
+								} else if (field.equalsIgnoreCase("content") || field.equalsIgnoreCase("descrizione") 
+										|| field.equalsIgnoreCase("description") || field.equalsIgnoreCase("sobre") || field.equalsIgnoreCase("תיאור")
+										|| field.equalsIgnoreCase("متن")) {
 									point.desc = point.desc = point.desc == null ? value : 
-										point.desc + " " + value;
-								} else if (field.contains("email=") || field.contains("מייל") || field.contains("پست الکترونیکی")) {
+										point.desc + ". " + value;
+								} else if (field.equalsIgnoreCase("email") || field.equalsIgnoreCase("מייל") || field.equalsIgnoreCase("پست الکترونیکی")) {
 									point.desc = point.desc == null ? "Email: " + value : 
-										point.desc + " Email: " + value;
-								} else if (field.contains("phone=") || field.contains("tel=") || field.contains("téléphone")
-										|| field.contains("טלפון") || field.contains("تلفن")) {
+										point.desc + ". Email: " + value;
+								} else if (field.equalsIgnoreCase("phone") || field.equalsIgnoreCase("tel") || field.equalsIgnoreCase("téléphone")
+										|| field.equalsIgnoreCase("טלפון") || field.equalsIgnoreCase("تلفن")) {
 									point.desc = point.desc == null ? "Phone: " + areaCode + value : 
-										point.desc + " Phone: " + areaCode + value;
-								} else if (field.contains("price=") || field.contains("prezzo=") || field.contains("prix=") 
-										|| field.contains("מחיר") || field.contains("بها")) {
+										point.desc + ". Phone: " + areaCode + value;
+								} else if (field.equalsIgnoreCase("price") || field.equalsIgnoreCase("prezzo") || field.equalsIgnoreCase("prix") 
+										|| field.equalsIgnoreCase("מחיר") || field.equalsIgnoreCase("بها")) {
 									point.desc = point.desc == null ? "Price: " + value : 
-										point.desc + " Price: " + value;
-								} else if (field.contains("hours=") || field.contains("orari=") || field.contains("horaire=") 
-										|| field.contains("funcionamento") || field.contains("שעות") || field.contains("ساعت‌ها")) {
+										point.desc + ". Price: " + value;
+								} else if (field.equalsIgnoreCase("hours") || field.equalsIgnoreCase("orari") || field.equalsIgnoreCase("horaire") 
+										|| field.equalsIgnoreCase("funcionamento") || field.equalsIgnoreCase("שעות") || field.equalsIgnoreCase("ساعت‌ها")) {
 									point.desc = point.desc == null ? "Working hours: " + value : 
-										point.desc + " Working hours: " + value;
-								} else if (field.contains("directions=") || field.contains("direction=") || field.contains("הוראות")
-										|| field.contains("مسیرها")) {
+										point.desc + ". Working hours: " + value;
+								} else if (field.equalsIgnoreCase("directions") || field.equalsIgnoreCase("direction") || field.equalsIgnoreCase("הוראות")
+										|| field.equalsIgnoreCase("مسیرها")) {
 									point.desc = point.desc == null ? "Directions: " + value : 
 										point.desc + " Directions: " + value;
 								}
@@ -484,6 +486,7 @@ public class WikiVoyagePreparation {
 						}
 					}
 					if (point.hasLocation() && point.name != null && !point.name.isEmpty()) {
+						point.desc = (!point.desc.isEmpty() && !point.desc.endsWith(".")) ? point.desc + "." : point.desc;
 						point.setColor();
 						points.add(point);
 					}

@@ -250,59 +250,61 @@ public class WikiDatabasePreparation {
 		String[] parts = val.split("\\|");
 		String lat = null;
 		String lon = null;
+		String areaCode = "";
 		for (int i = 1; i < parts.length; i++) {
 			String field = parts[i].trim();
 			String value = "";
-			if (field.indexOf("=") != -1) {
-				value = field.substring(field.indexOf("=") + 1, field.length()).trim();
+			int index = field.indexOf("=");
+			if (index != -1) {
+				value = field.substring(index + 1, field.length()).trim();
+				field = field.substring(0, index).trim();
 			}
 			if (!value.isEmpty() && !value.contains("{{")) {
 				try {
-					String areaCode = "";
-					if (field.contains(("name=")) || field.contains("nome=") || field.contains("nom=") 
-							|| field.contains("שם") || field.contains("نام")) {
-						bld.append("'''" + value.replaceAll("[\\[\\]]", "") + "'''" + ", ");
-					} else if (field.contains("url=") || field.contains("sito=") || field.contains("האתר הרשמי")
-							|| field.contains("نشانی اینترنتی")) {
+					if (field.equalsIgnoreCase(("name")) || field.equalsIgnoreCase("nome") || field.equalsIgnoreCase("nom") 
+							|| field.equalsIgnoreCase("שם") || field.equalsIgnoreCase("نام")) {
+						bld.append("'''" + value + "'''" + ", ");
+					} else if (field.equalsIgnoreCase("url") || field.equalsIgnoreCase("sito") || field.equalsIgnoreCase("האתר הרשמי")
+							|| field.equalsIgnoreCase("نشانی اینترنتی")) {
 						bld.append("Website: " + value + ". ");
-					} else if (field.contains("intl-area-code=")) {
+					} else if (field.equalsIgnoreCase("intl-area-code")) {
 						areaCode = value;
-					} else if (field.contains("address=") || field.contains("addresse=") || field.contains("כתובת")
-							|| field.contains("نشانی")) {
+					} else if (field.equalsIgnoreCase("address") || field.equalsIgnoreCase("addresse") || field.equalsIgnoreCase("כתובת")
+							|| field.equalsIgnoreCase("نشانی")) {
 						bld.append(value + ", ");
-					} else if (field.contains("lat=") || field.contains("latitude=") || field.contains("عرض جغرافیایی")) {
+					} else if (field.equalsIgnoreCase("lat") || field.equalsIgnoreCase("latitude") || field.equalsIgnoreCase("عرض جغرافیایی")) {
 						lat = value;
-					} else if (field.contains("long=") || field.contains("longitude=") || field.contains("طول جغرافیایی")) {
+					} else if (field.equalsIgnoreCase("long") || field.equalsIgnoreCase("longitude") || field.equalsIgnoreCase("طول جغرافیایی")) {
 						lon = value;
-					} else if (field.contains("content=") || field.contains("descrizione=") || field.contains("description")
-							|| field.contains("sobre") || field.contains("תיאור") || field.contains("متن")) {
+					} else if (field.equalsIgnoreCase("content") || field.equalsIgnoreCase("descrizione") || field.equalsIgnoreCase("description")
+							|| field.equalsIgnoreCase("sobre") || field.equalsIgnoreCase("תיאור") || field.equalsIgnoreCase("متن")) {
 						bld.append(value + " ");
-					} else if (field.contains("email=") || field.contains("מייל") || field.contains("پست الکترونیکی")) {
+					} else if (field.equalsIgnoreCase("email") || field.equalsIgnoreCase("מייל") || field.equalsIgnoreCase("پست الکترونیکی")) {
 						bld.append("e-mail: " + "mailto:" + value + ", ");
-					} else if (field.contains("fax=") || field.contains("פקס")
-							|| field.contains("دورنگار")) {
+					} else if (field.equalsIgnoreCase("fax") || field.equalsIgnoreCase("פקס")
+							|| field.equalsIgnoreCase("دورنگار")) {
 						bld.append("fax: " + value + ", ");
-					} else if (field.contains("phone=") || field.contains("tel=")
-							|| field.contains("téléphone=") || field.contains("טלפון") || field.contains("تلفن")) {
+					} else if (field.equalsIgnoreCase("phone") || field.equalsIgnoreCase("tel")
+							|| field.equalsIgnoreCase("téléphone") || field.equalsIgnoreCase("טלפון") || field.equalsIgnoreCase("تلفن")) {
 						String tel = areaCode.replaceAll("[ -]", "/") + "/" + value.replaceAll("[ -]", "/")
 							.replaceAll("[^\\d\\+\\)\\(,]", "");
 						tel = tel.replaceAll("\\(", "o").replaceAll("\\)", "c");
 						bld.append("☎ " + "tel:" + tel + ". ");
-					} else if (field.contains("price=") || field.contains("prezzo=") || field.contains("מחיר")
-							|| field.contains("prix=") || field.contains("بها")) {
+					} else if (field.equalsIgnoreCase("price") || field.equalsIgnoreCase("prezzo") || field.equalsIgnoreCase("מחיר")
+							|| field.equalsIgnoreCase("prix") || field.equalsIgnoreCase("بها")) {
 						bld.append(value + ". ");
-					} else if (field.contains("hours=") || field.contains("שעות") || field.contains("ساعت‌ها")) {
+					} else if (field.equalsIgnoreCase("hours") || field.equalsIgnoreCase("שעות") || field.equalsIgnoreCase("ساعت‌ها")) {
 						bld.append("Working hours: " + value + ". ");
-					} else if (field.contains("directions=") || field.contains("direction=") 
-							|| field.contains("הוראות") || field.contains("مسیرها")) {
+					} else if (field.equalsIgnoreCase("directions") || field.equalsIgnoreCase("direction") 
+							|| field.equalsIgnoreCase("הוראות") || field.equalsIgnoreCase("مسیرها")) {
 						bld.append(value + ". ");
-					} else if (field.contains("indicazioni=")) {
+					} else if (field.equalsIgnoreCase("indicazioni")) {
 						bld.append("Indicazioni: " + value + ". ");
-					} else if (field.contains("orari=")) {
+					} else if (field.equalsIgnoreCase("orari")) {
 						bld.append("Orari: " + value + ". ");
-					} else if (field.contains("horaire=")) {
+					} else if (field.equalsIgnoreCase("horaire")) {
 						bld.append("Horaire: " + value + ". ");
-					} else if (field.contains("funcionamento")) {
+					} else if (field.equalsIgnoreCase("funcionamento")) {
 						bld.append("Funcionamento: " + value + ". ");
 					}
 				} catch (Exception e) {}
