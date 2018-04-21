@@ -49,6 +49,8 @@ public class WikiVoyagePreparation {
 	private static final Log log = PlatformUtil.getLog(WikiDatabasePreparation.class);	
 	private static boolean uncompressed;
 	
+	private static String language;
+	
 	public enum WikivoyageTemplates {
 		LOCATION("geo"),
 		POI("poi"),
@@ -71,12 +73,14 @@ public class WikiVoyagePreparation {
 		String lang = "";
 		String folder = "";
 		if(args.length == 0) {
-			lang = "en";
+			lang = "uk";
+			language = lang;
 			folder = "/home/user/osmand/wikivoyage/";
 			uncompressed = true;
 		}
 		if(args.length > 0) {
 			lang = args[0];
+			language = lang;
 		}
 		if(args.length > 1){
 			folder = args[1];
@@ -197,6 +201,10 @@ public class WikiVoyagePreparation {
     	prep.executeBatch();
     	prep.close();
     	conn.close();
+	}
+	
+	public static String getLanguage() {
+		return language;
 	}
 	
 	protected static void processWikivoyage(final String wikiPg, String lang, String sqliteFileName, File langlinkConn)

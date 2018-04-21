@@ -306,6 +306,9 @@ public class WikiDatabasePreparation {
 						bld.append("Horaire: " + value + ". ");
 					} else if (field.equalsIgnoreCase("funcionamento")) {
 						bld.append("Funcionamento: " + value + ". ");
+					} else if (field.equalsIgnoreCase("wikipedia") && !value.equals("undefined")
+							&& !value.isEmpty()) {
+						bld.append(addWikiLink(value) + " ");
 					}
 				} catch (Exception e) {}
 			}
@@ -314,6 +317,12 @@ public class WikiDatabasePreparation {
 			bld.append(" geo:" + lat + "," + lon);
 		}
 		return bld.toString() + "\n";
+	}
+
+	private static String addWikiLink(String value) {
+		return "[https://" + WikiVoyagePreparation.getLanguage() + 
+				".wikipedia.org/wiki/" + value.trim().replaceAll(" ", "_").replaceAll("\"", "%22")
+				.replaceAll("«", "%C2%AB").replaceAll("»", "%C2%BB") + " Wikipedia]";
 	}
 
 	private static String getKey(String str) {
