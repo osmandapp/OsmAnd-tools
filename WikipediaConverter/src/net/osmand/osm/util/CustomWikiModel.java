@@ -151,7 +151,7 @@ public class CustomWikiModel extends WikiModel {
                     aTagNode.addChild(new ContentToken("["
                             + (++fExternalLinksCounter) + "]"));
                 } else {
-                    aTagNode.addAttribute("class", "external text", true);
+                    aTagNode.addAttribute("class", link.contains(".wikipedia.org/wiki/") ? "geo" : "external text", true);
                     WikipediaParser.parseRecursive(trimmedText, this, false,
                             true);
                 }

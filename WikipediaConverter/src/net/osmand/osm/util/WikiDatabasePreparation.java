@@ -251,6 +251,7 @@ public class WikiDatabasePreparation {
 		String lat = null;
 		String lon = null;
 		String areaCode = "";
+		String wikiLink = "";
 		for (int i = 1; i < parts.length; i++) {
 			String field = parts[i].trim();
 			String value = "";
@@ -308,10 +309,15 @@ public class WikiDatabasePreparation {
 						bld.append("Funcionamento: " + value + ". ");
 					} else if (field.equalsIgnoreCase("wikipedia") && !value.equals("undefined")
 							&& !value.isEmpty()) {
-						bld.append(addWikiLink(value) + " ");
+//						bld.append(addWikiLink(value) + " ");
+						wikiLink = value;
 					}
 				} catch (Exception e) {}
 			}
+		}
+		if (!wikiLink.isEmpty()) {
+			bld.append(addWikiLink(wikiLink));
+			bld.append(" ");
 		}
 		if (lat != null && lon != null) {
 			bld.append(" geo:" + lat + "," + lon);
