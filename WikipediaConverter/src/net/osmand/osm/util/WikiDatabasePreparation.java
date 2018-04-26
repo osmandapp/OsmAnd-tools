@@ -148,21 +148,30 @@ public class WikiDatabasePreparation {
 				if (openCnt == 0) {
 					int headerLvl = 0;
 					int indexCopy = i;
-					while (s.charAt(indexCopy) == '=' && indexCopy < s.length() - 1 && (i > 0 && s.charAt(i - 1) != '=')) {
-						headerLvl++;
-						indexCopy++;
+					if (i > 0 && s.charAt(i - 1) != '=') {
+						headerLvl = calculateHeaderLevel(s, i);
+						indexCopy = indexCopy + headerLvl;
 					}
-					if (headerLvl == 2 && s.charAt(i + 2) != '\n') {
-						if (headerCount != 0) {
-							bld.append("\n/div\n");
-						}
-						bld.append(s.charAt(i));
-						bld.append(s.charAt(i++));
-					} else if (headerLvl == 2 && s.charAt(i + 2) == '\n') {
-						bld.append(s.charAt(i));
-						bld.append(s.charAt(i++));
-						bld.append("\ndiv class=\"content\"");
-						headerCount++;
+					if (s.charAt(indexCopy) != '\n' && headerLvl > 1) {
+						int indEnd = s.indexOf("=", indexCopy);
+						if (indEnd != -1) {
+							indEnd = indEnd + calculateHeaderLevel(s, indEnd);
+							int nextHeader = calculateHeaderLevel(s, indEnd + 2);
+							if (nextHeader > 1 && headerLvl >= nextHeader ) {
+								i = indEnd + 1;
+								continue;
+							} else if (headerLvl == 2) {
+								if (headerCount != 0) {
+									bld.append("\n/div\n");
+								}
+								bld.append(s.substring(i, indEnd));
+								bld.append("\ndiv class=\"content\"\n");
+								headerCount++;
+								i = indEnd;
+							} else {
+								bld.append(s.charAt(i));
+							}
+						}						
 					} else {
 						bld.append(s.charAt(i));
 					}
@@ -172,6 +181,15 @@ public class WikiDatabasePreparation {
 			}
 		}
 		return bld.toString();
+	}
+
+	private static int calculateHeaderLevel(String s, int index) {
+		int res = 0;
+		while (index < s.length() - 1 && s.charAt(index) == '=') {
+			index++;
+			res++;
+		}
+		return res;
 	}
 
 	private static void appendWarning(StringBuilder bld, String val) {
