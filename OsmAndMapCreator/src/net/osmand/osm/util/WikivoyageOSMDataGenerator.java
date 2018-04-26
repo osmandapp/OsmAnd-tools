@@ -123,7 +123,7 @@ public class WikivoyageOSMDataGenerator {
 			updateStatement.setLong(column++, acceptedResult.getId() >> 1);
 			updateStatement.setString(column++, acceptedResult.getSubType());
 			String population = acceptedResult.getAdditionalInfo("population");
-			updateStatement.setLong(column++, (population == null || population.isEmpty()) ? 0 : Long.parseLong(population.replaceAll("[,. ]", "")));
+			updateStatement.setLong(column++, (population == null || population.isEmpty()) ? 0 : Long.parseLong(population.replaceAll("[,. -]", "")));
 		}
 		List<String> regionsList = getRegions(coords.getLatitude(), coords.getLongitude());
 		WorldRegion country = null;
