@@ -34,7 +34,7 @@ public class WikivoyageOSMDataGenerator {
 	private static int sbottom = MapUtils.get31TileNumberY(-85);
 	
 	private static final Log log = PlatformUtil.getLog(WikivoyageOSMDataGenerator.class);
-	private static final String[] columns = new String[] {"osm_id long", "city_type text", "population text", "country text", "region text"};
+	private static final String[] columns = new String[] {"osm_id long", "city_type text", "population long", "country text", "region text"};
 	private static final double DISTANCE_THRESHOLD = 3000000;
 	private static OsmandRegions regions;
 	
@@ -44,7 +44,7 @@ public class WikivoyageOSMDataGenerator {
 		String citiesObf = "";
 		if(args.length == 0) {	
 			file = "/home/user/osmand/wikivoyage/wikivoyage.sqlite";
-			regionsFile = "/home/user/repo/resources/countries-info/regions.ocbf";
+			regionsFile = "/home/user/repo/tools/OsmAndMapCreator/regions.ocbf";
 			citiesObf = "/home/user/Cities.obf";
 		}
 		if(args.length > 2) {
@@ -95,9 +95,18 @@ public class WikivoyageOSMDataGenerator {
 				System.out.println("%");
 			}
 		}
+		createPopularArticlesTable(conn);
 		stat.close();
     	conn.close();
     	raf.close();
+	}
+
+	private static void createPopularArticlesTable(Connection conn) throws SQLException {
+		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS popular_articles(title text, lang text)");
+		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS popular_lang_title ON popular_articles(lang);");
+		conn.createStatement().execute("INSERT INTO popular_articles(title, lang)" + 
+				"SELECT title, lang " + 
+				"FROM wikivoyage_articles WHERE population > 1000000");
 	}
 
 	private static void insertData(Connection conn, String title, Amenity acceptedResult, LatLon fromDB)
@@ -113,7 +122,7 @@ public class WikivoyageOSMDataGenerator {
 			updateStatement.setDouble(column++, coords.getLongitude());
 			updateStatement.setLong(column++, acceptedResult.getId() >> 1);
 			updateStatement.setString(column++, acceptedResult.getSubType());
-			updateStatement.setString(column++, acceptedResult.getAdditionalInfo("population"));
+			updateStatement.setLong(column++, Long.parseLong(acceptedResult.getAdditionalInfo("population")));
 		}
 		List<String> regionsList = getRegions(coords.getLatitude(), coords.getLongitude());
 		WorldRegion country = null;
