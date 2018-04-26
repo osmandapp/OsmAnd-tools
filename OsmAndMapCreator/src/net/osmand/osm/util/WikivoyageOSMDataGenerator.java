@@ -97,14 +97,14 @@ public class WikivoyageOSMDataGenerator {
 		}
 		createPopularArticlesTable(conn);
 		stat.close();
-    	conn.close();
-    	raf.close();
+		conn.close();
+		raf.close();
 	}
 
 	private static void createPopularArticlesTable(Connection conn) throws SQLException {
 		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS popular_articles(title text, lang text)");
 		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS popular_lang_title ON popular_articles(lang);");
-		conn.createStatement().execute("INSERT INTO popular_articles(title, lang)" + 
+		conn.createStatement().execute("INSERT INTO popular_articles(title, lang) " + 
 				"SELECT title, lang " + 
 				"FROM wikivoyage_articles WHERE population > 1000000");
 	}
@@ -122,7 +122,8 @@ public class WikivoyageOSMDataGenerator {
 			updateStatement.setDouble(column++, coords.getLongitude());
 			updateStatement.setLong(column++, acceptedResult.getId() >> 1);
 			updateStatement.setString(column++, acceptedResult.getSubType());
-			updateStatement.setLong(column++, Long.parseLong(acceptedResult.getAdditionalInfo("population")));
+			String population = acceptedResult.getAdditionalInfo("population");
+			updateStatement.setLong(column++, (population == null || population.isEmpty()) ? 0 : Long.parseLong(population));
 		}
 		List<String> regionsList = getRegions(coords.getLatitude(), coords.getLongitude());
 		WorldRegion country = null;
