@@ -103,8 +103,8 @@ public class WikivoyageOSMDataGenerator {
 	}
 
 	private static void createPopularArticlesTable(Connection conn) throws SQLException {
-		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS popular_articles(title text, city_id long, popularity_index long, lat double, lon double, lang text)");
-		conn.createStatement().execute("DELETE FROM popular_articles;");
+		conn.createStatement().execute("DROP TABLE IF EXISTS popular_articles;");
+		conn.createStatement().execute("CREATE TABLE popular_articles(title text, city_id long, popularity_index long, lat double, lon double, lang text)");
 		conn.createStatement().execute("INSERT INTO popular_articles(title, city_id, popularity_index, lat, lon, lang) " + 
 				"SELECT title, city_id, population, lat, lon, lang " + 
 				"FROM wikivoyage_articles WHERE population > " + POPULATION_LIMIT);
