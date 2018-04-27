@@ -36,6 +36,7 @@ public class WikivoyageOSMDataGenerator {
 	private static final Log log = PlatformUtil.getLog(WikivoyageOSMDataGenerator.class);
 	private static final String[] columns = new String[] {"osm_id long", "city_type text", "population long", "country text", "region text"};
 	private static final double DISTANCE_THRESHOLD = 3000000;
+	private static final int POPULATION_LIMIT = 1000000;
 	private static OsmandRegions regions;
 	
 	public static void main(String[] args) throws SQLException, IOException {
@@ -102,11 +103,13 @@ public class WikivoyageOSMDataGenerator {
 	}
 
 	private static void createPopularArticlesTable(Connection conn) throws SQLException {
-		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS popular_articles(title text, lang text)");
-		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS popular_lang_title ON popular_articles(lang);");
-		conn.createStatement().execute("INSERT INTO popular_articles(title, lang) " + 
-				"SELECT title, lang " + 
-				"FROM wikivoyage_articles WHERE population > 1000000");
+		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS popular_articles(title text, city_id long, popularity_index long, lat double, lon double, lang text)");
+		conn.createStatement().execute("DELETE FROM popular_articles;");
+		conn.createStatement().execute("INSERT INTO popular_articles(title, city_id, popularity_index, lat, lon, lang) " + 
+				"SELECT title, city_id, population, lat, lon, lang " + 
+				"FROM wikivoyage_articles WHERE population > " + POPULATION_LIMIT);
+		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS popular_lang_ind ON popular_articles(lang);");
+		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS popular_city_id_ind ON popular_articles(city_id);");
 	}
 
 	private static void insertData(Connection conn, String title, Amenity acceptedResult, LatLon fromDB)
