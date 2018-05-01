@@ -13,9 +13,12 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.sql.Connection;
+import java.sql.JDBCType;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.SQLType;
+import java.sql.Types;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -357,7 +360,6 @@ public class WikiVoyagePreparation {
 								if (!macroBlocks.isEmpty()) {
 									LatLon ll = getLatLonFromGeoBlock(
 											macroBlocks.get(WikivoyageTemplates.LOCATION.getType()));
-									if (!ll.isZero()) {
 										int column = 1;
 										String filename = getFileName(macroBlocks.get(WikivoyageTemplates.BANNER.getType()));
 										filename = filename.startsWith("<!--") ? "" : filename;
@@ -379,9 +381,13 @@ public class WikiVoyagePreparation {
 										}
 										// part_of
 										prep.setString(column++, parsePartOf(macroBlocks.get(WikivoyageTemplates.PART_OF.getType())));
-										
-										prep.setDouble(column++, ll.getLatitude());
-										prep.setDouble(column++, ll.getLongitude());
+										if(ll.isZero()) {
+											prep.setNull(column++, Types.DOUBLE);
+											prep.setNull(column++, Types.DOUBLE); 
+										} else {
+											prep.setDouble(column++, ll.getLatitude());
+											prep.setDouble(column++, ll.getLongitude());
+										}
 										// banner
 										prep.setString(column++, Encoder.encodeUrl(filename));
 										// gpx_gz
@@ -404,7 +410,6 @@ public class WikiVoyagePreparation {
 										addBatch();
 										
 									}
-								}
 							} catch (SQLException e) {
 								throw new SAXException(e);
 							}

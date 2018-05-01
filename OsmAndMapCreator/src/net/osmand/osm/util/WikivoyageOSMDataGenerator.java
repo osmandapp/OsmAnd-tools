@@ -88,6 +88,9 @@ public class WikivoyageOSMDataGenerator {
 			long lat = rs.getLong(2);
 			long lon = rs.getLong(3);
 			LatLon ll = new LatLon(lat, lon);
+			if(lat == 0 && lon == 0) {
+				continue;
+			}
 			List<Amenity> results = cities.get(searchTitle);
 			Amenity acceptedResult = (results != null && results.size() == 1) ? results.get(0) : getClosestMatch(results, ll);
 			insertData(conn, title, acceptedResult, ll);
