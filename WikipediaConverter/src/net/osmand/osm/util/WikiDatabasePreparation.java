@@ -283,7 +283,18 @@ public class WikiDatabasePreparation {
 				try {
 					if (field.equalsIgnoreCase(("name")) || field.equalsIgnoreCase("nome") || field.equalsIgnoreCase("nom") 
 							|| field.equalsIgnoreCase("שם") || field.equalsIgnoreCase("نام")) {
-						bld.append("'''" + value + "'''" + ", ");
+						if (value.startsWith("[[") && !value.endsWith("]]")) {
+							bld.append("'''" + value);
+							if (parts[i + 1].contains("]]")) {
+								bld.append("|");
+								bld.append(parts[++i].trim());
+								bld.append("'''" + ", ");
+							} else {
+								bld.append("'''" + ", ");
+							}
+						} else {
+							bld.append("'''" + value + "'''" + ", ");
+						}
 					} else if (field.equalsIgnoreCase("url") || field.equalsIgnoreCase("sito") || field.equalsIgnoreCase("האתר הרשמי")
 							|| field.equalsIgnoreCase("نشانی اینترنتی")) {
 						bld.append("Website: " + value + ". ");
