@@ -360,6 +360,8 @@ public class WikiVoyagePreparation {
 								if (!macroBlocks.isEmpty()) {
 									LatLon ll = getLatLonFromGeoBlock(
 											macroBlocks.get(WikivoyageTemplates.LOCATION.getType()));
+									boolean accepted = !title.toString().contains(':');
+									if(accepted) {
 										int column = 1;
 										String filename = getFileName(macroBlocks.get(WikivoyageTemplates.BANNER.getType()));
 										filename = filename.startsWith("<!--") ? "" : filename;
@@ -410,6 +412,7 @@ public class WikiVoyagePreparation {
 										addBatch();
 										
 									}
+								}
 							} catch (SQLException e) {
 								throw new SAXException(e);
 							}
