@@ -157,9 +157,10 @@ public class WikiDatabasePreparation {
 						if (indEnd != -1) {
 							indEnd = indEnd + calculateHeaderLevel(s, indEnd);
 							char ch = indEnd < s.length() - 2 ? s.charAt(indEnd + 1) : s.charAt(indEnd);
+							String foo = s.substring(indexCopy, indEnd);
 							int nextHeader = calculateHeaderLevel(s, ch == '\n' ? indEnd + 2 : indEnd + 1);
 							if (nextHeader > 1 && headerLvl >= nextHeader ) {
-								i = indEnd + 1;
+								i = indEnd;
 								continue;
 							} else if (headerLvl == 2) {
 								if (headerCount != 0) {
@@ -827,16 +828,10 @@ public class WikiDatabasePreparation {
 							CustomWikiModel wikiModel = new CustomWikiModel("http://"+lang+".wikipedia.com/wiki/${image}", "http://"+lang+".wikipedia.com/wiki/${title}");
 							String plainStr = wikiModel.render(converter, text);
 							plainStr = plainStr.replaceAll("<p>div class=&#34;content&#34;", "<div class=\"content\">\n<p>").replaceAll("<p>/div\n</p>", "</div>");
-//							WikiPrinter printer = new DefaultWikiPrinter();
-//							System.out.println(text);
-//							System.out.println("\n\n");
-//							converter.convert(new StringReader(text), Syntax.MEDIAWIKI_1_0, Syntax.XHTML_1_0, printer);
-//							String plainStr = printer.toString();
 							if (id++ % 500 == 0) {
 								log.debug("Article accepted " + cid + " " + title.toString() + " " + ll.getLatitude()
 										+ " " + ll.getLongitude() + " free: "
 										+ (Runtime.getRuntime().freeMemory() / (1024 * 1024)));
-//								System.out.println(plainStr);
 							}
 							try {
 								prep.setLong(1, cid);
