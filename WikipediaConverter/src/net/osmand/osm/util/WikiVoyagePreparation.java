@@ -13,11 +13,9 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.sql.Connection;
-import java.sql.JDBCType;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.SQLType;
 import java.sql.Types;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -76,7 +74,7 @@ public class WikiVoyagePreparation {
 		String lang = "";
 		String folder = "";
 		if(args.length == 0) {
-			lang = "de";
+			lang = "en";
 			language = lang;
 			folder = "/home/user/osmand/wikivoyage/";
 			uncompressed = true;

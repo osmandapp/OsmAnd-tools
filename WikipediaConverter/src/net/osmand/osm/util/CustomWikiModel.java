@@ -1,5 +1,9 @@
 package net.osmand.osm.util;
 
+import static info.bliki.wiki.tags.WPATag.CLASS;
+import static info.bliki.wiki.tags.WPATag.HREF;
+import static info.bliki.wiki.tags.WPATag.WIKILINK;
+
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -214,6 +218,19 @@ public class CustomWikiModel extends WikiModel {
 					&& !toCompare.contains(".png") && !toCompare.contains(".gif") && !toCompare.contains(".svg")) {
 				appendExternalLink("https", hrefLink, topicDescription, true);
 			}
+		} else if (hashSection != null) {
+			TagNode aTagNode = new TagNode("a");
+			String href = encodeTitleToUrl(topic, true);
+	        if (hashSection != null) {
+	            href = href + '#' + encodeTitleDotUrl(hashSection, false);
+	        }
+	        aTagNode.addAttribute(HREF, href, true);
+	        if (cssClass != null) {
+	            aTagNode.addAttribute(CLASS, cssClass, true);
+	        }
+	        pushNode(aTagNode);
+	        aTagNode.addChild(new ContentToken(description));;
+	        popNode();
 		}
 	}
 	
