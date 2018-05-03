@@ -463,7 +463,7 @@ public class WikiVoyagePreparation {
 							try {
 								if (field.equalsIgnoreCase("name") || field.equalsIgnoreCase("nome") || field.equalsIgnoreCase("nom")
 										|| field.equalsIgnoreCase("שם") || field.equalsIgnoreCase("نام")) {
-									point.name = value.replaceAll("\\]\\[", "");
+									point.name = value.replaceAll("[\\]\\[]", "");
 								} else if (field.equalsIgnoreCase("url") || field.equalsIgnoreCase("sito") || field.equalsIgnoreCase("האתר הרשמי")
 										|| field.equalsIgnoreCase("نشانی اینترنتی")) {
 									point.link = value;
