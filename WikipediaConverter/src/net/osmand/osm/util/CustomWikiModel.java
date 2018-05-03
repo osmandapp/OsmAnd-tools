@@ -35,14 +35,16 @@ public class CustomWikiModel extends WikiModel {
 	
 	private Map<String, Map<String, Object>> dataMap;
 	private String prevHead = "";
+	private boolean preserveContents;
 	
 
 	public static final String ROOT_URL = "https://upload.wikimedia.org/wikipedia/commons/";
 	private static final String PREFIX = "320px-";
 
-	public CustomWikiModel(String imageBaseURL, String linkBaseURL) {
+	public CustomWikiModel(String imageBaseURL, String linkBaseURL, boolean preserveContents) {
 		super(imageBaseURL, linkBaseURL);
 		dataMap = new LinkedHashMap<>();
+		this.preserveContents = preserveContents;
 	}
 	
 	public String getContentsJson() {
@@ -241,57 +243,57 @@ public class CustomWikiModel extends WikiModel {
 	@Override
     public ITableOfContent appendHead(String rawHead, int headLevel,
             boolean noToC, int headCounter, int startPosition, int endPosition) {
-        TagStack localStack = WikipediaParser.parseRecursive(rawHead.trim(),
-                this, true, true);
-        HTMLBlockTag headTagNode = new HTMLBlockTag("h" + headLevel,
-                Configuration.SPECIAL_BLOCK_TAGS);
-        TagNode spanTagNode = new TagNode("span");
-        // Example:
-        // <h2><span class="mw-headline" id="Header_level_2">Header level
-        // 2</span></h2>
-        spanTagNode.addChildren(localStack.getNodeList());
-        headTagNode.addChild(spanTagNode);
-        String tocHead = headTagNode.getBodyString();
-        String anchor = Encoder.encodeDotUrl(tocHead);
-        createTableOfContent(false);
-        if (fToCSet.contains(anchor)) {
-            String newAnchor = anchor;
-            for (int i = 2; i < Integer.MAX_VALUE; i++) {
-                newAnchor = anchor + '_' + Integer.toString(i);
-                if (!fToCSet.contains(newAnchor)) {
-                    break;
+    	if (preserveContents) {
+    		return super.appendHead(rawHead, headLevel, noToC, headCounter, startPosition, endPosition);
+    	} else {
+    		TagStack localStack = WikipediaParser.parseRecursive(rawHead.trim(),
+                    this, true, true);
+            HTMLBlockTag headTagNode = new HTMLBlockTag("h" + headLevel,
+                    Configuration.SPECIAL_BLOCK_TAGS);
+            TagNode spanTagNode = new TagNode("span");
+            spanTagNode.addChildren(localStack.getNodeList());
+            headTagNode.addChild(spanTagNode);
+            String tocHead = headTagNode.getBodyString();
+            String anchor = Encoder.encodeDotUrl(tocHead);
+            createTableOfContent(false);
+            if (fToCSet.contains(anchor)) {
+                String newAnchor = anchor;
+                for (int i = 2; i < Integer.MAX_VALUE; i++) {
+                    newAnchor = anchor + '_' + Integer.toString(i);
+                    if (!fToCSet.contains(newAnchor)) {
+                        break;
+                    }
                 }
+                anchor = newAnchor;
             }
-            anchor = newAnchor;
-        }
-        fToCSet.add(anchor);
-        if (headLevel == 2) {
-        	Map<String, Object> data = new LinkedHashMap<>();
-        	data.put("link", "#" + anchor);
-            dataMap.put(rawHead, data);
-            prevHead = rawHead;
-        } else if (headLevel == 3) {
-			Map<String, Object> data = dataMap.get(prevHead);
-			if (data != null) {
-				Map<String, Map<String, String>> subHeaders = (Map<String, Map<String, String>>) data.get("subheaders");
-				subHeaders = subHeaders == null ? new LinkedHashMap<String, Map<String, String>>() : subHeaders;
-				Map<String, String> link = new HashMap<>();
-				link.put("link", "#" + anchor);
-				subHeaders.put(rawHead, link);
-				data.put("subheaders", subHeaders);
-			}
-		}
-        getContentsJson();
-        SectionHeader strPair = new SectionHeader(headLevel, startPosition,
-                endPosition, tocHead, anchor);
-        if (getRecursionLevel() == 1) {
-            buildEditLinkUrl(fSectionCounter++);
-        }
-        spanTagNode.addAttribute("class", "mw-headline", true);
-        spanTagNode.addAttribute("id", anchor, true);
-        
-        append(headTagNode);
-        return new TableOfContentTag("a");
+            fToCSet.add(anchor);
+            if (headLevel == 2) {
+            	Map<String, Object> data = new LinkedHashMap<>();
+            	data.put("link", "#" + anchor);
+                dataMap.put(rawHead, data);
+                prevHead = rawHead;
+            } else if (headLevel == 3) {
+    			Map<String, Object> data = dataMap.get(prevHead);
+    			if (data != null) {
+    				Map<String, Map<String, String>> subHeaders = (Map<String, Map<String, String>>) data.get("subheaders");
+    				subHeaders = subHeaders == null ? new LinkedHashMap<String, Map<String, String>>() : subHeaders;
+    				Map<String, String> link = new HashMap<>();
+    				link.put("link", "#" + anchor);
+    				subHeaders.put(rawHead, link);
+    				data.put("subheaders", subHeaders);
+    			}
+    		}
+            SectionHeader strPair = new SectionHeader(headLevel, startPosition,
+                    endPosition, tocHead, anchor);
+            if (getRecursionLevel() == 1) {
+                buildEditLinkUrl(fSectionCounter++);
+            }
+            spanTagNode.addAttribute("class", "mw-headline", true);
+            spanTagNode.addAttribute("id", anchor, true);
+            
+            append(headTagNode);
+            return new TableOfContentTag("a");
+    	}
     }
 	
 	public static String getThumbUrl(String fileName) {
