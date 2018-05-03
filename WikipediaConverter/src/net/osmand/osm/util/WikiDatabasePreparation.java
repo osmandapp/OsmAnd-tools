@@ -450,8 +450,8 @@ public class WikiDatabasePreparation {
 		String lang = "";
 		String folder = "";
 		if(args.length == 0) {
-//			lang = "be";
-//			folder = "/Users/victorshcherb/osmand/wiki/";
+			lang = "en";
+			folder = "/home/user/osmand/wikivoyage/";
 		}
 		if(args.length > 0) {
 			lang = args[0];
@@ -466,7 +466,8 @@ public class WikiDatabasePreparation {
 		
 		
     	
-		Map<Long, LatLon> links = prep.parseExternalLinks(fileName);
+		Map<Long, LatLon> links = new HashMap<>();
+//				prep.parseExternalLinks(fileName);
 		processWikipedia(wikiPg, lang, links, sqliteFileName);
 		// testContent(lang, folder);
     }
@@ -824,8 +825,9 @@ public class WikiDatabasePreparation {
 							LatLon ll = pages.get(cid);
 							String text = removeMacroBlocks(ctext.toString(), new HashMap<>());
 							final HTMLConverter converter = new HTMLConverter(false);
-							WikiModel wikiModel = new WikiModel("http://"+lang+".wikipedia.com/wiki/${image}", "http://"+lang+".wikipedia.com/wiki/${title}");
+							CustomWikiModel wikiModel = new CustomWikiModel("http://"+lang+".wikipedia.com/wiki/${image}", "http://"+lang+".wikipedia.com/wiki/${title}");
 							String plainStr = wikiModel.render(converter, text);
+							plainStr = plainStr.replaceAll("<p>div class=&#34;content&#34;", "<div class=\"content\">\n<p>").replaceAll("<p>/div\n</p>", "</div>");
 //							WikiPrinter printer = new DefaultWikiPrinter();
 //							System.out.println(text);
 //							System.out.println("\n\n");
