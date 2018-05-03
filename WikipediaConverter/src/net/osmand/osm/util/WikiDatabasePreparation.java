@@ -466,8 +466,7 @@ public class WikiDatabasePreparation {
 		
 		
     	
-		Map<Long, LatLon> links = new HashMap<>();
-//				prep.parseExternalLinks(fileName);
+		Map<Long, LatLon> links = prep.parseExternalLinks(fileName);
 		processWikipedia(wikiPg, lang, links, sqliteFileName);
 		// testContent(lang, folder);
     }
