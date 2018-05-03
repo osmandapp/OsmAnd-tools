@@ -157,7 +157,6 @@ public class WikiDatabasePreparation {
 						if (indEnd != -1) {
 							indEnd = indEnd + calculateHeaderLevel(s, indEnd);
 							char ch = indEnd < s.length() - 2 ? s.charAt(indEnd + 1) : s.charAt(indEnd);
-							String foo = s.substring(indexCopy, indEnd);
 							int nextHeader = calculateHeaderLevel(s, ch == '\n' ? indEnd + 2 : indEnd + 1);
 							if (nextHeader > 1 && headerLvl >= nextHeader ) {
 								i = indEnd;
