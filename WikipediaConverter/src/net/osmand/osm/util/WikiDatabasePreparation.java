@@ -824,7 +824,7 @@ public class WikiDatabasePreparation {
 							LatLon ll = pages.get(cid);
 							String text = removeMacroBlocks(ctext.toString(), new HashMap<>());
 							final HTMLConverter converter = new HTMLConverter(false);
-							CustomWikiModel wikiModel = new CustomWikiModel("http://"+lang+".wikipedia.com/wiki/${image}", "http://"+lang+".wikipedia.com/wiki/${title}", true);
+							CustomWikiModel wikiModel = new CustomWikiModel("http://"+lang+".wikipedia.org/wiki/${image}", "http://"+lang+".wikipedia.org/wiki/${title}", true);
 							String plainStr = wikiModel.render(converter, text);
 							plainStr = plainStr.replaceAll("<p>div class=&#34;content&#34;", "<div class=\"content\">\n<p>").replaceAll("<p>/div\n</p>", "</div>");
 							if (id++ % 500 == 0) {
