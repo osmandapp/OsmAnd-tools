@@ -389,8 +389,8 @@ public class WikiVoyagePreparation {
 											prep.setDouble(column++, ll.getLongitude());
 										}
 										// banner
-										prep.setString(column++, Encoder.encodeUrl(filename).replaceAll("(", "%28")
-												.replaceAll(")", "%29"));
+										prep.setString(column++, Encoder.encodeUrl(filename).replaceAll("\\(", "%28")
+												.replaceAll("\\)", "%29"));
 										// gpx_gz
 										String gpx = generateGpx(macroBlocks.get(WikivoyageTemplates.POI.getType()));
 										prep.setBytes(column++, stringToCompressedByteArray(bous, gpx));
