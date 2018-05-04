@@ -267,11 +267,12 @@ public class CustomWikiModel extends WikiModel {
                 anchor = newAnchor;
             }
             fToCSet.add(anchor);
+            String trimmedHead = rawHead.trim();
             if (headLevel == 2) {
             	Map<String, Object> data = new LinkedHashMap<>();
             	data.put("link", "#" + anchor);
-                dataMap.put(rawHead, data);
-                prevHead = rawHead;
+                dataMap.put(trimmedHead, data);
+                prevHead = trimmedHead;
             } else if (headLevel == 3) {
     			Map<String, Object> data = dataMap.get(prevHead);
     			if (data != null) {
@@ -279,7 +280,7 @@ public class CustomWikiModel extends WikiModel {
     				subHeaders = subHeaders == null ? new LinkedHashMap<String, Map<String, String>>() : subHeaders;
     				Map<String, String> link = new HashMap<>();
     				link.put("link", "#" + anchor);
-    				subHeaders.put(rawHead, link);
+    				subHeaders.put(trimmedHead, link);
     				data.put("subheaders", subHeaders);
     			}
     		}
