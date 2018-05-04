@@ -369,7 +369,7 @@ public class WikiVoyagePreparation {
 													+ (Runtime.getRuntime().freeMemory() / (1024 * 1024)));
 										}
 										final HTMLConverter converter = new HTMLConverter(false);
-										CustomWikiModel wikiModel = new CustomWikiModel("https://upload.wikimedia.com/wikipedia/commons/${image}", 
+										CustomWikiModel wikiModel = new CustomWikiModel("https://upload.wikimedia.org/wikipedia/commons/${image}", 
 												"https://"+lang+".wikivoyage.org/wiki/${title}", false);
 										String plainStr = wikiModel.render(converter, text);
 										plainStr = plainStr.replaceAll("<p>div class=&#34;content&#34;", "<div class=\"content\">\n<p>").replaceAll("<p>/div\n</p>", "</div>");
