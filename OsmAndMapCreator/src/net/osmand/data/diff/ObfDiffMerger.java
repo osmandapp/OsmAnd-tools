@@ -98,9 +98,9 @@ public class ObfDiffMerger {
 			String ppdate = day.format(new Date(System.currentTimeMillis() - 1000 * 24 * 60 * 60 * 40)).substring(2);
 			System.out.println("Current date: " + cdate + ", file ends with will be ignored: " + cdate + ".obf.gz");
 			Set<String> allowedMonths = new TreeSet<String>();
-			allowedMonths.add(cdate.substring(0, cdate.length() - 2) +"_00");
-			allowedMonths.add(pdate.substring(0, pdate.length() - 2) +"_00");
-			allowedMonths.add(ppdate.substring(0, ppdate.length() - 2) +"_00");
+			allowedMonths.add(cdate.substring(0, cdate.length() - 2) +"00");
+			allowedMonths.add(pdate.substring(0, pdate.length() - 2) +"00");
+			allowedMonths.add(ppdate.substring(0, ppdate.length() - 2) +"00");
 			System.out.println("Process following months: " +  allowedMonths);
 			
 			File folder = new File(location);
