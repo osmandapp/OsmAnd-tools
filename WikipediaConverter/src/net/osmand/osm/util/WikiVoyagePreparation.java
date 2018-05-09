@@ -13,11 +13,9 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.sql.Connection;
-import java.sql.JDBCType;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.SQLType;
 import java.sql.Types;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -76,7 +74,7 @@ public class WikiVoyagePreparation {
 		String lang = "";
 		String folder = "";
 		if(args.length == 0) {
-			lang = "de";
+			lang = "en";
 			language = lang;
 			folder = "/home/user/osmand/wikivoyage/";
 			uncompressed = true;
@@ -372,7 +370,7 @@ public class WikiVoyagePreparation {
 										}
 										final HTMLConverter converter = new HTMLConverter(false);
 										CustomWikiModel wikiModel = new CustomWikiModel("https://upload.wikimedia.org/wikipedia/commons/${image}", 
-												"https://"+lang+".wikivoyage.com/wiki/${title}");
+												"https://"+lang+".wikivoyage.org/wiki/${title}", false);
 										String plainStr = wikiModel.render(converter, text);
 										plainStr = plainStr.replaceAll("<p>div class=&#34;content&#34;", "<div class=\"content\">\n<p>").replaceAll("<p>/div\n</p>", "</div>");
 										prep.setString(column++, Encoder.encodeUrl(title.toString()));
@@ -391,7 +389,8 @@ public class WikiVoyagePreparation {
 											prep.setDouble(column++, ll.getLongitude());
 										}
 										// banner
-										prep.setString(column++, Encoder.encodeUrl(filename));
+										prep.setString(column++, Encoder.encodeUrl(filename).replaceAll("\\(", "%28")
+												.replaceAll("\\)", "%29"));
 										// gpx_gz
 										String gpx = generateGpx(macroBlocks.get(WikivoyageTemplates.POI.getType()));
 										prep.setBytes(column++, stringToCompressedByteArray(bous, gpx));
@@ -463,7 +462,7 @@ public class WikiVoyagePreparation {
 							try {
 								if (field.equalsIgnoreCase("name") || field.equalsIgnoreCase("nome") || field.equalsIgnoreCase("nom")
 										|| field.equalsIgnoreCase("שם") || field.equalsIgnoreCase("نام")) {
-									point.name = value.replaceAll("\\]\\[", "");
+									point.name = value.replaceAll("[\\]\\[]", "");
 								} else if (field.equalsIgnoreCase("url") || field.equalsIgnoreCase("sito") || field.equalsIgnoreCase("האתר הרשמי")
 										|| field.equalsIgnoreCase("نشانی اینترنتی")) {
 									point.link = value;
