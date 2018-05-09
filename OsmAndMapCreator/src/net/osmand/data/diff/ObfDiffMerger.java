@@ -11,7 +11,9 @@ import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TimeZone;
+import java.util.TreeSet;
 
 import net.osmand.util.Algorithms;
 import rtree.RTreeException;
@@ -92,7 +94,15 @@ public class ObfDiffMerger {
 		try {
 			Date currentDate = new Date();
 			String cdate = day.format(currentDate).substring(2);
+			String pdate = day.format(new Date(System.currentTimeMillis() - 1000 * 24 * 60 * 60 * 20)).substring(2);
+			String ppdate = day.format(new Date(System.currentTimeMillis() - 1000 * 24 * 60 * 60 * 40)).substring(2);
 			System.out.println("Current date: " + cdate + ", file ends with will be ignored: " + cdate + ".obf.gz");
+			Set<String> allowedMonths = new TreeSet<String>();
+			allowedMonths.add(cdate.substring(0, cdate.length() - 2) +"_00");
+			allowedMonths.add(pdate.substring(0, pdate.length() - 2) +"_00");
+			allowedMonths.add(ppdate.substring(0, ppdate.length() - 2) +"_00");
+			System.out.println("Process following months: " +  allowedMonths);
+			
 			File folder = new File(location);
 			for (File region : getSortedFiles(folder)) {
 				if (!region.isDirectory()) {
@@ -104,7 +114,7 @@ public class ObfDiffMerger {
 				}
 				List<File> days = getSortedFiles(region);
 				
-				Map<String, List<File>> fls = groupFilesByMonth(regionName, days, cdate);
+				Map<String, List<File>> fls = groupFilesByMonth(regionName, days, cdate, allowedMonths);
 				for (String fl : fls.keySet()) {
 					File flToMerge = new File(region, fl);
 					boolean processed = new ObfDiffMerger().process(flToMerge, fls.get(fl), true);
@@ -123,7 +133,8 @@ public class ObfDiffMerger {
 		}		
 	}
 	
-	private static Map<String, List<File>> groupFilesByMonth(String regionName, List<File> days, String cdate) {
+	private static Map<String, List<File>> groupFilesByMonth(String regionName, List<File> days, String cdate,
+			Set<String> allowedMonths) {
 		Map<String, List<File>> grpFiles = new LinkedHashMap<String, List<File>>();
 		for (File d : days) {
 			if (!d.isFile() || !d.getName().startsWith(regionName + "_") || !d.getName().endsWith(".obf.gz")) {
@@ -140,6 +151,9 @@ public class ObfDiffMerger {
 			String date = d.getName().substring(regionName.length() + 1, d.getName().length() - ".obf.gz".length());
 			String mnth = date.substring(0, date.length() - 2) + "00";
 			String mnthFile = regionName + "_" + mnth +".obf.gz";
+			if(!allowedMonths.contains(mnth)) {
+				continue;
+			}
 			if(!grpFiles.containsKey(mnthFile)) {
 				grpFiles.put(mnthFile, new ArrayList<File>());
 			}
