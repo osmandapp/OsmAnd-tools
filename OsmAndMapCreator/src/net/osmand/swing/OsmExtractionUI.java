@@ -347,11 +347,11 @@ public class OsmExtractionUI implements IMapLocationListener {
 	    		}
 	    		SearchResultCollection c = null;
 	    		if (!text.contains("#map")) {
-					c = searchUICore.search(text, true, null);
+					searchUICore.search(text, true, null);
 	    		}
-	    		if(c != null) {
-	    			updateSearchResult(statusField, c, false);
-	    		}
+//	    		if(c != null) {
+//	    			updateSearchResult(statusField, c, false);
+//	    		}
 	    	}
 			
 		});
@@ -376,25 +376,29 @@ public class OsmExtractionUI implements IMapLocationListener {
 	private void updateSearchResult(final JTextField statusField, SearchResultCollection res, boolean addMore) {
 		popup.setVisible(false);
 		popup.removeAll();
-		if (res.getCurrentSearchResults().size() > 0 || addMore) {
+		List<SearchResult> resSearch = res.getCurrentSearchResults();
+		if(resSearch == null) {
+			resSearch = Collections.emptyList();
+		}
+		if (resSearch.size() > 0 || addMore) {
 			int count = 30;
 			if(addMore) {
 				JMenuItem mi = new JMenuItem();
-				mi.setText("Results " + res.getCurrentSearchResults().size() + ", radius " + res.getPhrase().getRadiusLevel()+
-						" (show more...)");
+				mi.setText("Results " + resSearch.size() + ", radius " + res.getPhrase().getRadiusLevel()
+						+ " (show more...)");
 				mi.addActionListener(new ActionListener() {
 
 					@Override
 					public void actionPerformed(ActionEvent e) {
 						SearchSettings settings = searchUICore.getPhrase().getSettings();
 						searchUICore.updateSettings(settings.setRadiusLevel(settings.getRadiusLevel() + 1));
-						SearchResultCollection collection = searchUICore.search(statusField.getText(), true, null);
-						updateSearchResult(statusField, collection, false);
+						searchUICore.search(statusField.getText(), true, null);
+						updateSearchResult(statusField, searchUICore.getCurrentSearchResult(), false);
 					}
 				});
 				popup.add(mi);
 			}
-			for (final SearchResult sr : res.getCurrentSearchResults()) {
+			for (final SearchResult sr : resSearch) {
 				count --;
 				if(count == 0) {
 //					break;
