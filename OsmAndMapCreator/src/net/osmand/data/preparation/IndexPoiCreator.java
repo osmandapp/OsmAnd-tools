@@ -590,14 +590,16 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			Iterator<Entry<PoiAdditionalType, String>> it = additionalTags.entrySet().iterator();
 			while (it.hasNext()) {
 				Entry<PoiAdditionalType, String> e = it.next();
-				if (e.getKey().getTag().contains("name") && !"name:en".equals(e.getKey().getTag())) {
+				if ((e.getKey().getTag().contains("name") || e.getKey().getTag().equals("brand")) 
+						&& !"name:en".equals(e.getKey().getTag())) {
 					if (otherNames == null) {
 						otherNames = new TreeSet<String>();
 					}
 					otherNames.add(e.getValue());
 				}
 			}
-			addNamePrefix(additionalTags.get(nameRuleType), additionalTags.get(nameEnRuleType), prevTree.getNode(), namesIndex, otherNames);
+			addNamePrefix(additionalTags.get(nameRuleType), additionalTags.get(nameEnRuleType), prevTree.getNode(), 
+					namesIndex, otherNames);
 
 			if (useInMemoryCreator) {
 				if (prevTree.getNode().poiData == null) {
