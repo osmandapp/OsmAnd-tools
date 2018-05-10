@@ -111,10 +111,11 @@ public class WikiVoyagePreparation {
 		}
 		DBDialect dialect = DBDialect.SQLITE;
 		Connection conn = (Connection) dialect.getDatabaseConnection(langlinkFile.getAbsolutePath(), log);
-		conn.createStatement().execute("CREATE TABLE langlinks (id long NOT NULL DEFAULT 0, "
-				+ "title text UNIQUE NOT NULL DEFAULT '')");
+		conn.createStatement().execute("CREATE TABLE langlinks (id long NOT NULL DEFAULT 0, lang text NOT NULL DEFAULT '', "
+				+ "title text NOT NULL DEFAULT '', UNIQUE (lang, title) ON CONFLICT IGNORE)");
 		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_title ON langlinks(title);");
-		PreparedStatement prep = conn.prepareStatement("INSERT OR IGNORE INTO langlinks VALUES (?, ?)");
+		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_lang ON langlinks(lang);");
+		PreparedStatement prep = conn.prepareStatement("INSERT OR IGNORE INTO langlinks VALUES (?, ?, ?)");
 		int batch = 0;
 		long maxId = 0;
 		int langNum = 1;
@@ -175,7 +176,8 @@ public class WikiVoyagePreparation {
 				    			}
 				    			ids.add(genId == null ? id : genId);
 				    			prep.setLong(1, genId == null ? id : genId);
-					    		prep.setString(2, insValues.get(2));
+				    			prep.setString(2, insValues.get(1));
+					    		prep.setString(3, insValues.get(2));
 					    		prep.addBatch();
 					    		if (batch++ > 500) {
 					    			prep.executeBatch();
@@ -272,7 +274,7 @@ public class WikiVoyagePreparation {
 			prep = conn.prepareStatement("INSERT INTO wikivoyage_articles VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?" + (uncompressed ? ", ?, ?": "") + ")");
 
 			this.langConn = (Connection) dialect.getDatabaseConnection(langConn.getAbsolutePath(), log);
-			langPrep = this.langConn.prepareStatement("SELECT id FROM langlinks WHERE title = ?");
+			langPrep = this.langConn.prepareStatement("SELECT id FROM langlinks WHERE title = ? AND lang = ?");
 		}
 		
 		public void addBatch() throws SQLException {
@@ -398,6 +400,7 @@ public class WikiVoyagePreparation {
 											prep.setString(column++, gpx);
 										}
 										langPrep.setString(1, title.toString());
+										langPrep.setString(2, lang);
 										ResultSet rs = langPrep.executeQuery();
 										long id = 0;
 										while (rs.next()) {
