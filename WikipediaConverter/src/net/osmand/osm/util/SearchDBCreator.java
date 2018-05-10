@@ -115,13 +115,15 @@ public class SearchDBCreator {
 			return;
 		}
 		int batch = 0;
-		PreparedStatement ps = conn.prepareStatement("SELECT title FROM wikivoyage_articles WHERE city_id = 0");
-		PreparedStatement prep = conn.prepareStatement("UPDATE wikivoyage_articles SET city_id = ? WHERE title = ?");
+		PreparedStatement ps = conn.prepareStatement("SELECT title, lang FROM wikivoyage_articles WHERE city_id = 0");
+		PreparedStatement prep = conn.prepareStatement("UPDATE wikivoyage_articles SET city_id = ? WHERE title = ?, lang = ?");
 		ResultSet res = ps.executeQuery();
 		while (res.next()) {
 			String title = res.getString("title");
+			String lang = res.getString("lang");
 			prep.setLong(1, maxId++);
 			prep.setString(2, title);
+			prep.setString(3, lang);
 			prep.addBatch();
 			if (batch++ > 500) {
 				prep.executeBatch();
