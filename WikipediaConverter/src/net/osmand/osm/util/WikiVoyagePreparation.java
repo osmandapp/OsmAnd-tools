@@ -112,7 +112,7 @@ public class WikiVoyagePreparation {
 		DBDialect dialect = DBDialect.SQLITE;
 		Connection conn = (Connection) dialect.getDatabaseConnection(langlinkFile.getAbsolutePath(), log);
 		conn.createStatement().execute("CREATE TABLE langlinks (id long NOT NULL DEFAULT 0, lang text NOT NULL DEFAULT '', "
-				+ "title text UNIQUE NOT NULL DEFAULT '')");
+				+ "title text NOT NULL DEFAULT '', UNIQUE (lang, title) ON CONFLICT IGNORE)");
 		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_title ON langlinks(title);");
 		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_lang ON langlinks(lang);");
 		PreparedStatement prep = conn.prepareStatement("INSERT OR IGNORE INTO langlinks VALUES (?, ?, ?)");
