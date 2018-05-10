@@ -116,7 +116,7 @@ public class SearchDBCreator {
 		}
 		int batch = 0;
 		PreparedStatement ps = conn.prepareStatement("SELECT title, lang FROM wikivoyage_articles WHERE city_id = 0");
-		PreparedStatement prep = conn.prepareStatement("UPDATE wikivoyage_articles SET city_id = ? WHERE title = ?, lang = ?");
+		PreparedStatement prep = conn.prepareStatement("UPDATE wikivoyage_articles SET city_id = ? WHERE title = ? AND lang = ?");
 		ResultSet res = ps.executeQuery();
 		while (res.next()) {
 			String title = res.getString("title");
