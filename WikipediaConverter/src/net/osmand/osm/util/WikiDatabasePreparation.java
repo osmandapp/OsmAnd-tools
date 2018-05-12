@@ -309,7 +309,7 @@ public class WikiDatabasePreparation {
 						lon = value;
 					} else if (field.equalsIgnoreCase("content") || field.equalsIgnoreCase("descrizione") || field.equalsIgnoreCase("description")
 							|| field.equalsIgnoreCase("sobre") || field.equalsIgnoreCase("תיאור") || field.equalsIgnoreCase("متن")) {
-						bld.append(value + " ");
+						bld.append(value.replaceAll("[\\]\\[]", "") + " ");
 					} else if (field.equalsIgnoreCase("email") || field.equalsIgnoreCase("מייל") || field.equalsIgnoreCase("پست الکترونیکی")) {
 						bld.append("e-mail: " + "mailto:" + value + ", ");
 					} else if (field.equalsIgnoreCase("fax") || field.equalsIgnoreCase("פקס")
@@ -328,7 +328,19 @@ public class WikiDatabasePreparation {
 						bld.append("Working hours: " + value + ". ");
 					} else if (field.equalsIgnoreCase("directions") || field.equalsIgnoreCase("direction") 
 							|| field.equalsIgnoreCase("הוראות") || field.equalsIgnoreCase("مسیرها")) {
-						bld.append(value + ". ");
+						if (value.contains("[[") && parts[i + 1].contains("]]") && i + 1 < parts.length) {
+							String secondPart = parts[i + 1];
+							int indexOfBrackets = secondPart.indexOf("]]"); 
+							secondPart = indexOfBrackets != -1 ? secondPart.substring(0, indexOfBrackets + 2) : "";
+							if (!secondPart.isEmpty()) {
+								bld.append(value + "|");
+								bld.append(secondPart + ". ");
+							} else {
+								bld.append(value.replaceAll("[\\]\\[]", "") + ". ");
+							}
+						} else {
+							bld.append(value.replaceAll("[\\]\\[]", "") + ". ");
+						}
 					} else if (field.equalsIgnoreCase("indicazioni")) {
 						bld.append("Indicazioni: " + value + ". ");
 					} else if (field.equalsIgnoreCase("orari")) {
