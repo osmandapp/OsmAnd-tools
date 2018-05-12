@@ -162,6 +162,7 @@ public class WikiVoyagePreparation {
 							+ (uncompressed ? ", gpx text" : "") + ", city_id long, original_id long, lang text, contents_json text)");
 			conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_title ON wikivoyage_articles(title);");
 			conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_id ON wikivoyage_articles(city_id);");
+			conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_orig_id ON wikivoyage_articles(original_id);");
 			conn.createStatement()
 					.execute("CREATE INDEX IF NOT EXISTS index_part_of ON wikivoyage_articles(is_part_of);");
 			prep = conn.prepareStatement("INSERT INTO wikivoyage_articles VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?" + (uncompressed ? ", ?, ?": "") + ")");

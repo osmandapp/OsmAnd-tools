@@ -214,6 +214,7 @@ public class SearchDBCreator {
 		prep.addBatch();
     	prep.executeBatch();
     	prep.close();
+    	conn.createStatement().execute("DROP INDEX IF EXISTS index_orig_id;");
     	articleQuery.close();
     	conn.close();
 	}
