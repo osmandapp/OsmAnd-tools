@@ -18,6 +18,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Types;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -90,127 +91,21 @@ public class WikiVoyagePreparation {
 			uncompressed = args[2].equals("uncompressed");
 		}
 		final String wikiPg = folder + lang + "wikivoyage-latest-pages-articles.xml.bz2";
-		final File langlinkFolder = new File(folder + "langlinks");
-		final File langlinkFile = new File(folder + "langlink.sqlite");
+		
 		if (!new File(wikiPg).exists()) {
 			System.out.println("Dump for " + lang + " doesn't exist");
 			return;
 		}
-		final String sqliteFileName = folder + (uncompressed ? "full_" : "") + "wikivoyage.sqlite";
-		if (langlinkFolder.exists() && !langlinkFile.exists()) {
-			processLangLinks(langlinkFolder, langlinkFile);
-		}	
-		processWikivoyage(wikiPg, lang, sqliteFileName, langlinkFile);
+		final String sqliteFileName = folder + (uncompressed ? "full_" : "") + "wikivoyage.sqlite";	
+		processWikivoyage(wikiPg, lang, sqliteFileName);
 		System.out.println("Successfully generated.");
     }
-
-	private static void processLangLinks(File langlinkFolder, File langlinkFile) throws IOException, SQLException {
-		if (!langlinkFolder.isDirectory()) {
-			System.err.println("Specified langlink folder is not a directory");
-			System.exit(-1);
-		}
-		DBDialect dialect = DBDialect.SQLITE;
-		Connection conn = (Connection) dialect.getDatabaseConnection(langlinkFile.getAbsolutePath(), log);
-		conn.createStatement().execute("CREATE TABLE langlinks (id long NOT NULL DEFAULT 0, lang text NOT NULL DEFAULT '', "
-				+ "title text NOT NULL DEFAULT '', UNIQUE (lang, title) ON CONFLICT IGNORE)");
-		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_title ON langlinks(title);");
-		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_lang ON langlinks(lang);");
-		PreparedStatement prep = conn.prepareStatement("INSERT OR IGNORE INTO langlinks VALUES (?, ?, ?)");
-		int batch = 0;
-		long maxId = 0;
-		int langNum = 1;
-		Map<Integer, Set<Long>> genIds = new HashMap<>();
-		Map<Long, Long> currMapping = new HashMap<>();
-		for (File f : langlinkFolder.listFiles()) {
-			Set<Long> ids = new HashSet<>();
-			InputStream fis = new FileInputStream(f);
-			if(f.getName().endsWith("gz")) {
-				fis = new GZIPInputStream(fis);
-			}
-	    	InputStreamReader read = new InputStreamReader(fis, "UTF-8");
-	    	char[] cbuf = new char[1000];
-	    	int cnt;
-	    	boolean values = false;
-	    	String buf = ""	;
-	    	List<String> insValues = new ArrayList<String>();
-	    	while((cnt = read.read(cbuf)) >= 0) {
-	    		String str = new String(cbuf, 0, cnt);
-	    		buf += str;
-	    		if(!values) {
-	    			if(buf.contains("VALUES")) {
-	    				buf = buf.substring(buf.indexOf("VALUES") + "VALUES".length());
-	    				values = true;
-	    			}
-	    		} else {
-	    			boolean openString = false;
-	    			int word = -1;
-	    			int last = 0;
-	    			for(int k = 0; k < buf.length(); k++) {
-	    				if(openString ) {
-							if (buf.charAt(k) == '\'' && (buf.charAt(k - 1) != '\\'
-									|| buf.charAt(k - 2) == '\\')) {
-	    						openString = false;
-	    					}
-	    				} else if(buf.charAt(k) == ',' && word == -1) {
-	    					continue;
-	    				} else if(buf.charAt(k) == '(') {
-	    					word = k;
-	    					insValues.clear();
-	    				} else if(buf.charAt(k) == ')' || buf.charAt(k) == ',') {
-	    					String vl = buf.substring(word + 1, k).trim();
-	    					if(vl.startsWith("'")) {
-	    						vl = vl.substring(1, vl.length() - 1);
-	    					}
-	    					insValues.add(vl);
-	    					if(buf.charAt(k) == ')') {
-	    						long id = Long.valueOf(insValues.get(0));
-				    			maxId = Math.max(maxId, id);
-				    			Long genId = currMapping.get(id);
-				    			if (genId == null) {
-				    				for (Set<Long> set : genIds.values()) {
-					    				if (set.contains(id)) {
-					    					genId = maxId++;
-					    					currMapping.put(id, genId);
-					    				}
-					    			}
-				    			}
-				    			ids.add(genId == null ? id : genId);
-				    			prep.setLong(1, genId == null ? id : genId);
-				    			prep.setString(2, insValues.get(1));
-					    		prep.setString(3, insValues.get(2));
-					    		prep.addBatch();
-					    		if (batch++ > 500) {
-					    			prep.executeBatch();
-									batch = 0;
-					    		}
-	    						last = k + 1;
-	    						word = -1;
-	    					} else {
-	    						word = k;
-	    					}
-	    				} else if(buf.charAt(k) == '\'') {
-	    					openString = true;
-	    				}
-	    			}
-	    			buf = buf.substring(last);
-	    		}
-	    	}
-	    	genIds.put(langNum, ids);
-	    	currMapping.clear();
-			langNum++;
-	    	read.close();
-		}
-		prep.addBatch();
-    	prep.executeBatch();
-    	prep.close();
-    	conn.close();
-	}
 	
 	public static String getLanguage() {
 		return language;
 	}
 	
-	protected static void processWikivoyage(final String wikiPg, String lang, String sqliteFileName, File langlinkConn)
+	protected static void processWikivoyage(final String wikiPg, String lang, String sqliteFileName)
 			throws ParserConfigurationException, SAXException, FileNotFoundException, IOException, SQLException {
 		SAXParser sx = SAXParserFactory.newInstance().newSAXParser();
 		InputStream streamFile = new BufferedInputStream(new FileInputStream(wikiPg), 8192 * 4);
@@ -224,7 +119,7 @@ public class WikiVoyagePreparation {
 		Reader reader = new InputStreamReader(zis,"UTF-8");
 		InputSource is = new InputSource(reader);
 		is.setEncoding("UTF-8");
-		final WikiOsmHandler handler = new WikiOsmHandler(sx, streamFile, lang, new File(sqliteFileName), langlinkConn);
+		final WikiOsmHandler handler = new WikiOsmHandler(sx, streamFile, lang, new File(sqliteFileName));
 		sx.parse(is, handler);
 		handler.finish();
 	}
@@ -252,10 +147,8 @@ public class WikiVoyagePreparation {
 		private final static int BATCH_SIZE = 500;
 		final ByteArrayOutputStream bous = new ByteArrayOutputStream(64000);
 		private String lang;
-		private Connection langConn;
-		private PreparedStatement langPrep;
 			
-		WikiOsmHandler(SAXParser saxParser, InputStream progIS, String lang, File sqliteFile, File langConn)
+		WikiOsmHandler(SAXParser saxParser, InputStream progIS, String lang, File sqliteFile)
 				throws IOException, SQLException {
 			this.lang = lang;
 			this.saxParser = saxParser;
@@ -272,9 +165,6 @@ public class WikiVoyagePreparation {
 			conn.createStatement()
 					.execute("CREATE INDEX IF NOT EXISTS index_part_of ON wikivoyage_articles(is_part_of);");
 			prep = conn.prepareStatement("INSERT INTO wikivoyage_articles VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?" + (uncompressed ? ", ?, ?": "") + ")");
-
-			this.langConn = (Connection) dialect.getDatabaseConnection(langConn.getAbsolutePath(), log);
-			langPrep = this.langConn.prepareStatement("SELECT id FROM langlinks WHERE title = ? AND lang = ?");
 		}
 		
 		public void addBatch() throws SQLException {
@@ -292,10 +182,6 @@ public class WikiVoyagePreparation {
 			}
 			prep.close();
 			conn.close();
-			if (langConn != null) {
-				langConn.close();
-				langPrep.close();
-			}
 		}
 
 		public int getCount() {
@@ -399,18 +285,11 @@ public class WikiVoyagePreparation {
 										if (uncompressed) {
 											prep.setString(column++, gpx);
 										}
-										langPrep.setString(1, title.toString());
-										langPrep.setString(2, lang);
-										ResultSet rs = langPrep.executeQuery();
-										long id = 0;
-										while (rs.next()) {
-											id = rs.getLong("id");
-										}
-										prep.setLong(column++, id);
+										// skip city_id column
+										column++;
 										prep.setLong(column++, cid);
 										prep.setString(column++, lang);
 										prep.setString(column++, wikiModel.getContentsJson());
-										langPrep.clearParameters();
 										addBatch();
 										
 									}

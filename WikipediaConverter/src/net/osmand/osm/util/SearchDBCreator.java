@@ -1,9 +1,21 @@
 package net.osmand.osm.util;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.zip.GZIPInputStream;
 
 import org.apache.commons.logging.Log;
 
@@ -14,38 +26,47 @@ public class SearchDBCreator {
 	
 	private static final Log log = PlatformUtil.getLog(SearchDBCreator.class);
 
-	public static void main(String[] args) throws SQLException {
-		String pathTodb = "/home/user/osmand/wikivoyage/wikivoyage.sqlite";
-		if(args.length > 0) {
-			pathTodb = args[0];
+	public static void main(String[] args) throws SQLException, IOException {
+		boolean uncompressed = false;
+		String workingDir = "/home/user/osmand/wikivoyage/";
+		if(args.length > 1) {
+			workingDir = args[0];
+			uncompressed = Boolean.parseBoolean(args[1]);
 		}
+		String pathTodb = workingDir + (uncompressed ? "full_wikivoyage.sqlite" : "wikivoyage.sqlite");
+		final File langlinkFolder = new File(workingDir + "langlinks");
+		final File langlinkFile = new File(workingDir + "langlink.sqlite");
 		DBDialect dialect = DBDialect.SQLITE;
 		Connection conn = (Connection) dialect.getDatabaseConnection(pathTodb, log);
+		createLangLinksIfMissing(langlinkFile, langlinkFolder, conn);
 		generateIdsIfMissing(conn, pathTodb.substring(0, pathTodb.lastIndexOf("/") + 1));
+		Connection langlinkConn = (Connection) dialect.getDatabaseConnection(langlinkFile.getAbsolutePath(), log);
 		conn.createStatement().execute("DROP TABLE IF EXISTS wikivoyage_search;");
 		conn.createStatement().execute("CREATE TABLE wikivoyage_search(search_term text, city_id long, article_title text, lang text)");
 		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_search_term ON wikivoyage_search(search_term);");
 		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_search_city ON wikivoyage_search(city_id)");
 		conn.createStatement().execute("ALTER TABLE wikivoyage_articles ADD COLUMN aggregated_part_of");
 		
-		PreparedStatement partOf = conn.prepareStatement("UPDATE wikivoyage_articles SET aggregated_part_of = ? WHERE title = ? AND lang = ?");
+		PreparedStatement partOf = conn.prepareStatement("UPDATE wikivoyage_articles SET aggregated_part_of = ?, city_id = ? WHERE title = ? AND lang = ?");
 		PreparedStatement ps = conn.prepareStatement("INSERT INTO wikivoyage_search VALUES (?, ?, ?, ?)");
-		PreparedStatement data = conn.prepareStatement("SELECT title, city_id, lang, is_part_of FROM wikivoyage_articles");
+		PreparedStatement data = conn.prepareStatement("SELECT title, lang, is_part_of FROM wikivoyage_articles");
+		PreparedStatement langlinkStatement = langlinkConn.prepareStatement("SELECT id FROM langlinks WHERE title = ? AND lang = ?");
 		ResultSet rs = data.executeQuery();
 		int batch = 0;
 		while (rs.next()) {
 			String title = rs.getString("title");
 			String titleToSplit = title.replaceAll("[/\\)\\(-]", " ").replaceAll(" +", " ");
-			long id = rs.getLong("city_id");
 			String lang = rs.getString("lang");
+			long id = getCityId(langlinkStatement, title, lang);
 			for (String s : titleToSplit.split(" ")) {
 				ps.setString(1, s.toLowerCase());
 				ps.setLong(2, id);
 				ps.setString(3, title);
 				ps.setString(4, lang);
 				partOf.setString(1, getAggregatedPartOf(conn, rs.getString("is_part_of"), lang));
-				partOf.setString(2, title);
-				partOf.setString(3, lang);
+				partOf.setLong(2, id);
+				partOf.setString(3, title);
+				partOf.setString(4, lang);
 				partOf.addBatch();
 				ps.addBatch();
 				if (batch++ > 500) {
@@ -57,9 +78,144 @@ public class SearchDBCreator {
 		}
 		finishPrep(ps);
 		finishPrep(partOf);
+		langlinkStatement.close();
+		langlinkConn.close();
 		data.close();
 		rs.close();
 		conn.close();
+	}
+
+	private static long getCityId(PreparedStatement langlinkStatement, String title, String lang) throws SQLException {
+		langlinkStatement.setString(1, title);
+		langlinkStatement.setString(2, lang);
+		ResultSet rs = langlinkStatement.executeQuery();
+		long result = 0;
+		while (rs.next()) {
+			result = rs.getLong("id");
+		}
+		return result;
+	}
+
+	private static void createLangLinksIfMissing(File langlinkFile, File langlinkFolder, Connection conn) throws IOException, SQLException {
+		if (langlinkFolder.exists() && !langlinkFile.exists()) {
+			processLangLinks(langlinkFolder, langlinkFile, conn);
+		}
+	}
+	
+	private static void processLangLinks(File langlinkFolder, File langlinkFile, Connection wikivoyageConnection) throws IOException, SQLException {
+		if (!langlinkFolder.isDirectory()) {
+			System.err.println("Specified langlink folder is not a directory");
+			System.exit(-1);
+		}
+		DBDialect dialect = DBDialect.SQLITE;
+		Connection conn = (Connection) dialect.getDatabaseConnection(langlinkFile.getAbsolutePath(), log);
+		conn.createStatement().execute("CREATE TABLE langlinks (id long NOT NULL DEFAULT 0, lang text NOT NULL DEFAULT '', "
+				+ "title text NOT NULL DEFAULT '', UNIQUE (lang, title) ON CONFLICT IGNORE)");
+		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_title ON langlinks(title);");
+		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_lang ON langlinks(lang);");
+		PreparedStatement prep = conn.prepareStatement("INSERT OR IGNORE INTO langlinks VALUES (?, ?, ?)");
+		PreparedStatement articleQuery = wikivoyageConnection.prepareStatement("SELECT title FROM wikivoyage_articles WHERE original_id = ? AND lang = ?");
+		int batch = 0;
+		long maxId = 0;
+		Set<Long> ids = new HashSet<>();
+		Map<Long, Long> currMapping = new HashMap<>();
+		File[] files = langlinkFolder.listFiles();
+		for (File f : files) {
+			String lang = f.getName().replace("wikivoyage-latest-langlinks.sql.gz", "");
+			InputStream fis = new FileInputStream(f);
+			if(f.getName().endsWith("gz")) {
+				fis = new GZIPInputStream(fis);
+			}
+	    	InputStreamReader read = new InputStreamReader(fis, "UTF-8");
+	    	char[] cbuf = new char[1000];
+	    	int cnt;
+	    	boolean values = false;
+	    	String buf = ""	;
+	    	List<String> insValues = new ArrayList<String>();
+	    	while((cnt = read.read(cbuf)) >= 0) {
+	    		String str = new String(cbuf, 0, cnt);
+	    		buf += str;
+	    		if(!values) {
+	    			if(buf.contains("VALUES")) {
+	    				buf = buf.substring(buf.indexOf("VALUES") + "VALUES".length());
+	    				values = true;
+	    			}
+	    		} else {
+	    			boolean openString = false;
+	    			int word = -1;
+	    			int last = 0;
+	    			for(int k = 0; k < buf.length(); k++) {
+	    				if(openString ) {
+							if (buf.charAt(k) == '\'' && (buf.charAt(k - 1) != '\\'
+									|| buf.charAt(k - 2) == '\\')) {
+	    						openString = false;
+	    					}
+	    				} else if(buf.charAt(k) == ',' && word == -1) {
+	    					continue;
+	    				} else if(buf.charAt(k) == '(') {
+	    					word = k;
+	    					insValues.clear();
+	    				} else if(buf.charAt(k) == ')' || buf.charAt(k) == ',') {
+	    					String vl = buf.substring(word + 1, k).trim();
+	    					if(vl.startsWith("'")) {
+	    						vl = vl.substring(1, vl.length() - 1);
+	    					}
+	    					insValues.add(vl);
+	    					if(buf.charAt(k) == ')') {
+	    						long id = Long.valueOf(insValues.get(0));
+	    						articleQuery.setLong(1, id);
+	    						articleQuery.setString(2, lang);
+	    						ResultSet rs = articleQuery.executeQuery();
+	    						String thisTitle = "";
+	    						while (rs.next()) {
+	    							thisTitle = rs.getString("title");
+	    						}
+	    						articleQuery.clearParameters();
+				    			maxId = Math.max(maxId, id);
+				    			Long genId = currMapping.get(id);
+				    			if (genId == null) {
+									if (ids.contains(id)) {
+										genId = maxId++;
+										currMapping.put(id, genId);
+									}
+				    			}
+				    			id = genId == null ? id : genId;
+				    			ids.add(id);
+				    			if (!thisTitle.isEmpty()) {
+				    				prep.setLong(1, id);
+				    				prep.setString(2, lang);
+						    		prep.setString(3, thisTitle);
+						    		prep.addBatch();
+						    		batch++;
+				    			}
+				    			prep.setLong(1, id);
+				    			prep.setString(2, insValues.get(1));
+					    		prep.setString(3, insValues.get(2));
+					    		prep.addBatch();
+					    		if (batch++ > 500) {
+					    			prep.executeBatch();
+									batch = 0;
+					    		}
+	    						last = k + 1;
+	    						word = -1;
+	    					} else {
+	    						word = k;
+	    					}
+	    				} else if(buf.charAt(k) == '\'') {
+	    					openString = true;
+	    				}
+	    			}
+	    			buf = buf.substring(last);
+	    		}
+	    	}
+	    	currMapping.clear();
+	    	read.close();
+		}
+		prep.addBatch();
+    	prep.executeBatch();
+    	prep.close();
+    	articleQuery.close();
+    	conn.close();
 	}
 
 	private static void finishPrep(PreparedStatement ps) throws SQLException {
