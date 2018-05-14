@@ -269,13 +269,14 @@ public class SearchDBCreator {
 		Connection langConn = (Connection) dialect.getDatabaseConnection(langlinkfile.getAbsolutePath(), log);
 		PreparedStatement st = langConn.prepareStatement("SELECT MAX(id) FROM langlinks");
 		ResultSet rs = st.executeQuery();
-		while (rs.next()) {
+		if(rs.next()) {
 			maxId = rs.getLong(1) + 1;
 		}
 		st.close();
 		rs.close();
 		langConn.close();
 		if (maxId == 0) {
+			System.err.println("MAX ID is 0");
 			throw new IllegalStateException();
 		}
 		int batch = 0;
