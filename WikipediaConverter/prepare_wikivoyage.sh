@@ -18,8 +18,8 @@ function download {
 }
 
 function downloadLangLinks {
-      if [ ! -d "$INITIAL_PATH"langlinks ]; then
-           mkdir langlinks
+      if [ ! -d langlinks ]; then
+           mkdir -p langlinks
       fi
       
       cd langlinks
