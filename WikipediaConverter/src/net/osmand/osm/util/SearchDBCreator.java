@@ -269,7 +269,7 @@ public class SearchDBCreator {
 		rs.close();
 		langConn.close();
 		if (maxId == 0) {
-			return;
+			throw new IllegalStateException();
 		}
 		int batch = 0;
 		PreparedStatement ps = conn.prepareStatement("SELECT title, lang FROM wikivoyage_articles WHERE city_id = 0");
