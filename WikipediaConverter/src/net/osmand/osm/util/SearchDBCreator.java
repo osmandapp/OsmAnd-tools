@@ -9,6 +9,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -267,22 +268,23 @@ public class SearchDBCreator {
 		long maxId = 0;
 		DBDialect dialect = DBDialect.SQLITE;
 		Connection langConn = (Connection) dialect.getDatabaseConnection(langlinkfile.getAbsolutePath(), log);
-		PreparedStatement st = langConn.prepareStatement("SELECT MAX(id) FROM langlinks");
-		ResultSet rs = st.executeQuery();
+		Statement st = langConn.createStatement();
+		ResultSet rs = st.executeQuery("SELECT MAX(id) FROM langlinks");
 		if(rs.next()) {
 			maxId = rs.getLong(1) + 1;
 		}
 		st.close();
 		rs.close();
+		
 		langConn.close();
 		if (maxId == 0) {
 			System.err.println("MAX ID is 0");
 			throw new IllegalStateException();
 		}
 		int batch = 0;
-		PreparedStatement ps = conn.prepareStatement("SELECT title, lang FROM travel_articles WHERE trip_id = 0");
+		Statement ps = conn.createStatement();
 		PreparedStatement prep = conn.prepareStatement("UPDATE travel_articles SET trip_id = ? WHERE title = ? AND lang = ?");
-		ResultSet res = ps.executeQuery();
+		ResultSet res = ps.executeQuery("SELECT title, lang FROM travel_articles WHERE trip_id = 0");
 		int updated = 0;
 		while (res.next()) {
 			updated++;
@@ -296,12 +298,23 @@ public class SearchDBCreator {
 				prep.executeBatch();
 				batch = 0;
 			}
-			updated++;
 		}
-		System.out.println("Updated " + updated + " trip_id with max id " + maxId);
 		prep.addBatch();
 		prep.executeBatch();
 		prep.close();
-		res.close();		
+		res.close();
+		ps.close();
+		conn.commit();
+		
+		System.out.println("Updated " + updated + " trip_id with max id " + maxId);
+		Statement st2 = conn.createStatement();
+		rs = st2.executeQuery("SELECT count(*) FROM travel_articles WHERE trip_id = 0");
+		if(rs.next()) {
+			System.out.println("Count travel articles with trip_id = 0" + rs.getInt(1));
+			
+		}
+		rs.close();
+		st2.close();
+		
 	}
 }
