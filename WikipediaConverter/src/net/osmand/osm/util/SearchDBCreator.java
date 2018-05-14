@@ -33,13 +33,13 @@ public class SearchDBCreator {
 			workingDir = args[0];
 			uncompressed = Boolean.parseBoolean(args[1]);
 		}
-		String pathTodb = workingDir + (uncompressed ? "full_wikivoyage.sqlite" : "wikivoyage.sqlite");
-		final File langlinkFolder = new File(workingDir + "langlinks");
-		final File langlinkFile = new File(workingDir + "langlink.sqlite");
+		File pathTodb = new File(workingDir, (uncompressed ? "full_wikivoyage.sqlite" : "wikivoyage.sqlite"));
+		final File langlinkFolder = new File(workingDir,  "langlinks");
+		final File langlinkFile = new File(workingDir, "langlink.sqlite");
 		DBDialect dialect = DBDialect.SQLITE;
-		Connection conn = (Connection) dialect.getDatabaseConnection(pathTodb, log);
+		Connection conn = (Connection) dialect.getDatabaseConnection(pathTodb.getAbsolutePath(), log);
 		createLangLinksIfMissing(langlinkFile, langlinkFolder, conn);
-		generateIdsIfMissing(conn, pathTodb.substring(0, pathTodb.lastIndexOf("/") + 1));
+		generateIdsIfMissing(conn, langlinkFile);
 		Connection langlinkConn = (Connection) dialect.getDatabaseConnection(langlinkFile.getAbsolutePath(), log);
 		conn.createStatement().execute("DROP TABLE IF EXISTS travel_search;");
 		conn.createStatement().execute("CREATE TABLE travel_search(search_term text, trip_id long, article_title text, lang text)");
@@ -260,10 +260,10 @@ public class SearchDBCreator {
 		}
 	}
 
-	private static void generateIdsIfMissing(Connection conn, String workingDir) throws SQLException {
+	private static void generateIdsIfMissing(Connection conn, File langlinkfile) throws SQLException {
 		long maxId = 0;
 		DBDialect dialect = DBDialect.SQLITE;
-		Connection langConn = (Connection) dialect.getDatabaseConnection(workingDir + "langlink.sqlite", log);
+		Connection langConn = (Connection) dialect.getDatabaseConnection(langlinkfile.getAbsolutePath(), log);
 		PreparedStatement st = langConn.prepareStatement("SELECT MAX(id) FROM langlinks");
 		ResultSet rs = st.executeQuery();
 		while (rs.next()) {
@@ -279,7 +279,9 @@ public class SearchDBCreator {
 		PreparedStatement ps = conn.prepareStatement("SELECT title, lang FROM travel_articles WHERE trip_id = 0");
 		PreparedStatement prep = conn.prepareStatement("UPDATE travel_articles SET trip_id = ? WHERE title = ? AND lang = ?");
 		ResultSet res = ps.executeQuery();
+		int updated = 0;
 		while (res.next()) {
+			updated++;
 			String title = res.getString("title");
 			String lang = res.getString("lang");
 			prep.setLong(1, maxId++);
@@ -290,7 +292,9 @@ public class SearchDBCreator {
 				prep.executeBatch();
 				batch = 0;
 			}
+			updated++;
 		}
+		System.out.println("Updated " + updated + " trip_id with max id " + maxId);
 		prep.addBatch();
 		prep.executeBatch();
 		prep.close();
