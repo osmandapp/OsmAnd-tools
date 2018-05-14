@@ -304,7 +304,6 @@ public class SearchDBCreator {
 		prep.close();
 		res.close();
 		ps.close();
-		conn.commit();
 		
 		System.out.println("Updated " + updated + " trip_id with max id " + maxId);
 		Statement st2 = conn.createStatement();
