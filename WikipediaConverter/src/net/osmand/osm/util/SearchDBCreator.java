@@ -117,12 +117,10 @@ public class SearchDBCreator {
 		PreparedStatement articleQuery = wikivoyageConnection.prepareStatement("SELECT title FROM wikivoyage_articles WHERE original_id = ? AND lang = ?");
 		int batch = 0;
 		long maxId = 0;
-		int langNum = 1;
-	    Map<Integer, Set<Long>> genIds = new HashMap<>();
+		Set<Long> ids = new HashSet<>();
 		Map<Long, Long> currMapping = new HashMap<>();
 		File[] files = langlinkFolder.listFiles();
 		for (File f : files) {
-			Set<Long> ids = new HashSet<>();
 			String lang = f.getName().replace("wikivoyage-latest-langlinks.sql.gz", "");
 			InputStream fis = new FileInputStream(f);
 			if(f.getName().endsWith("gz")) {
@@ -176,11 +174,9 @@ public class SearchDBCreator {
 				    			maxId = Math.max(maxId, id);
 				    			Long genId = currMapping.get(id);
 				    			if (genId == null) {
-									for (Set<Long> set : genIds.values()) {
-										if (set.contains(id)) {
-											genId = maxId++;
-											currMapping.put(id, genId);
-										}
+									if (ids.contains(id)) {
+										genId = maxId++;
+										currMapping.put(id, genId);
 									}
 				    			}
 				    			id = genId == null ? id : genId;
@@ -213,8 +209,6 @@ public class SearchDBCreator {
 	    		}
 	    	}
 	    	currMapping.clear();
-	    	genIds.put(langNum, ids);
-	    	langNum++;
 	    	read.close();
 		}
 		prep.addBatch();
