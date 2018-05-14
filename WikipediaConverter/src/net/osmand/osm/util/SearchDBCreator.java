@@ -26,6 +26,7 @@ import net.osmand.data.preparation.DBDialect;
 public class SearchDBCreator {
 	
 	private static final Log log = PlatformUtil.getLog(SearchDBCreator.class);
+	private static final int BATCH_SIZE = 100;
 
 	public static void main(String[] args) throws SQLException, IOException {
 		boolean uncompressed = false;
@@ -39,74 +40,121 @@ public class SearchDBCreator {
 		final File langlinkFile = new File(workingDir, "langlink.sqlite");
 		DBDialect dialect = DBDialect.SQLITE;
 		Connection conn = (Connection) dialect.getDatabaseConnection(pathTodb.getAbsolutePath(), log);
+		
+		System.out.println("Processing langlink file " + langlinkFile.getAbsolutePath());
 		createLangLinksIfMissing(langlinkFile, langlinkFolder, conn);
+		System.out.println("Connect translations " );
+		generateSameTripIdForDifferentLang(langlinkFile, conn);
+		System.out.println("Generate missing ids" );
 		generateIdsIfMissing(conn, langlinkFile);
-		Connection langlinkConn = (Connection) dialect.getDatabaseConnection(langlinkFile.getAbsolutePath(), log);
+		System.out.println("Generate agg part of" );
+		generateAggPartOf(conn);
+		System.out.println("Generate search table" );
+		generateSearchTable(conn);
+		conn.close();
+	}
+	
+	private static void generateAggPartOf(Connection conn) throws SQLException {
+		try {
+			conn.createStatement().execute("ALTER TABLE travel_articles ADD COLUMN aggregated_part_of");
+		} catch (Exception e) {
+			System.err.println("Column aggregated_part_of already exists");
+		}
+		PreparedStatement updatePartOf = conn
+				.prepareStatement("UPDATE travel_articles SET aggregated_part_of = ? WHERE title = ? AND lang = ?");
+		PreparedStatement data = conn.prepareStatement("SELECT trip_id, title, lang, is_part_of FROM travel_articles");
+		ResultSet rs = data.executeQuery();
+		int batch = 0;
+		while (rs.next()) {
+			String title = rs.getString("title");
+			String lang = rs.getString("lang");
+			updatePartOf.setString(1, getAggregatedPartOf(conn, rs.getString("is_part_of"), lang));
+			updatePartOf.setString(2, title);
+			updatePartOf.setString(3, lang);
+			updatePartOf.addBatch();
+			if (batch++ > BATCH_SIZE) {
+				updatePartOf.executeBatch();
+				batch = 0;
+			}
+		}
+		finishPrep(updatePartOf);
+		data.close();
+		rs.close();
+	}
+
+	private static void generateSearchTable(Connection conn) throws SQLException {
 		conn.createStatement().execute("DROP TABLE IF EXISTS travel_search;");
 		conn.createStatement().execute("CREATE TABLE travel_search(search_term text, trip_id long, article_title text, lang text)");
 		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_search_term ON travel_search(search_term);");
 		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_search_city ON travel_search(trip_id)");
-		try {
-			conn.createStatement().execute("ALTER TABLE travel_articles ADD COLUMN aggregated_part_of");
-		} catch(Exception e) {
-			System.err.println("Column aggregated_part_of already exists" );
-		}
 		
-		PreparedStatement partOf = conn.prepareStatement("UPDATE travel_articles SET aggregated_part_of = ?, trip_id = ? WHERE title = ? AND lang = ?");
-		PreparedStatement ps = conn.prepareStatement("INSERT INTO travel_search VALUES (?, ?, ?, ?)");
-		PreparedStatement data = conn.prepareStatement("SELECT title, lang, is_part_of FROM travel_articles");
-		PreparedStatement langlinkStatement = langlinkConn.prepareStatement("SELECT id FROM langlinks WHERE title = ? AND lang = ?");
+		PreparedStatement insertSearch = conn.prepareStatement("INSERT INTO travel_search VALUES (?, ?, ?, ?)");
+		PreparedStatement data = conn.prepareStatement("SELECT trip_id, title, lang, is_part_of FROM travel_articles");
+		
 		ResultSet rs = data.executeQuery();
 		int batch = 0;
 		while (rs.next()) {
 			String title = rs.getString("title");
 			String titleToSplit = title.replaceAll("[/\\)\\(-]", " ").replaceAll(" +", " ");
 			String lang = rs.getString("lang");
-			long id = getCityId(langlinkStatement, title, lang);
+			long id = rs.getLong("trip_id");
 			for (String s : titleToSplit.split(" ")) {
-				ps.setString(1, s.toLowerCase());
-				ps.setLong(2, id);
-				ps.setString(3, title);
-				ps.setString(4, lang);
-				partOf.setString(1, getAggregatedPartOf(conn, rs.getString("is_part_of"), lang));
-				partOf.setLong(2, id);
-				partOf.setString(3, title);
-				partOf.setString(4, lang);
-				partOf.addBatch();
-				ps.addBatch();
+				insertSearch.setString(1, s.toLowerCase());
+				insertSearch.setLong(2, id);
+				insertSearch.setString(3, title);
+				insertSearch.setString(4, lang);
+				insertSearch.addBatch();
 				if (batch++ > 500) {
-					partOf.executeBatch();
-					ps.executeBatch();
+					insertSearch.executeBatch();
 					batch = 0;
 				}
 			}
 		}
-		finishPrep(ps);
-		finishPrep(partOf);
-		langlinkStatement.close();
-		langlinkConn.close();
+		finishPrep(insertSearch);
 		data.close();
 		rs.close();
-		conn.close();
+	}
+
+	private static void generateSameTripIdForDifferentLang(final File langlinkFile, Connection conn) throws SQLException {
+		DBDialect dialect = DBDialect.SQLITE;
+		Connection langlinkConn = (Connection) dialect.getDatabaseConnection(langlinkFile.getAbsolutePath(), log);
+		PreparedStatement langlinkStatement = langlinkConn.prepareStatement("SELECT id FROM langlinks WHERE title = ? AND lang = ?");
+		PreparedStatement updateTripId = conn.prepareStatement("UPDATE travel_articles SET trip_id = ? WHERE title = ? AND lang = ?");
+		PreparedStatement data = conn.prepareStatement("SELECT trip_id, title, lang, is_part_of FROM travel_articles");
+		
+		ResultSet rs = data.executeQuery();
+		int batch = 0;
+		while (rs.next()) {
+			String title = rs.getString("title");
+			String lang = rs.getString("lang");
+			long id = getCityId(langlinkStatement, title, lang);
+			updateTripId.setLong(1, id);
+			updateTripId.setString(2, title);
+			updateTripId.setString(3, lang);
+			updateTripId.addBatch();
+			if (batch++ > BATCH_SIZE) {
+				updateTripId.executeBatch();
+				batch = 0;
+			}
+		}
+		finishPrep(updateTripId);
+		langlinkStatement.close();
+		langlinkConn.close();
 	}
 
 	private static long getCityId(PreparedStatement langlinkStatement, String title, String lang) throws SQLException {
 		langlinkStatement.setString(1, title);
 		langlinkStatement.setString(2, lang);
 		ResultSet rs = langlinkStatement.executeQuery();
-		long result = 0;
-		while (rs.next()) {
-			result = rs.getLong("id");
+		if(rs.next()) {
+			return rs.getLong("id");
 		}
-		return result;
+		return 0;
 	}
 
 	private static void createLangLinksIfMissing(File langlinkFile, File langlinkFolder, Connection conn) throws IOException, SQLException {
 		if (langlinkFolder.exists() && !langlinkFile.exists()) {
-			System.out.println("Processing langlink into: " + langlinkFile.getAbsolutePath());
 			processLangLinks(langlinkFolder, langlinkFile, conn);
-		} else {
-			System.out.println("No langlink processing cause file already exist: " + langlinkFile.getAbsolutePath());
 		}
 	}
 	
@@ -309,7 +357,7 @@ public class SearchDBCreator {
 		Statement st2 = conn.createStatement();
 		rs = st2.executeQuery("SELECT count(*) FROM travel_articles WHERE trip_id = 0");
 		if(rs.next()) {
-			System.out.println("Count travel articles with trip_id = 0" + rs.getInt(1));
+			System.out.println("Count travel articles with empty trip_id: " + rs.getInt(1));
 			
 		}
 		rs.close();
