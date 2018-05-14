@@ -22,7 +22,7 @@ public class CheckWikivoyage {
 	private static void testWikivoyage(String filepath) throws SQLException, IOException {
 		Connection connection = DriverManager.getConnection("jdbc:sqlite:" + filepath);
 		Statement statement = connection.createStatement();
-		ResultSet rs = statement.executeQuery("Select title, lang, content_gz From wikivoyage_articles");
+		ResultSet rs = statement.executeQuery("Select title, lang, content_gz From travel_articles");
 		int count = 0;
 		while(rs.next()) {
 			byte[] bytes = rs.getBytes(3);

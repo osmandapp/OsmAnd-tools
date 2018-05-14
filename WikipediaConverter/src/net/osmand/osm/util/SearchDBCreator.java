@@ -41,15 +41,15 @@ public class SearchDBCreator {
 		createLangLinksIfMissing(langlinkFile, langlinkFolder, conn);
 		generateIdsIfMissing(conn, pathTodb.substring(0, pathTodb.lastIndexOf("/") + 1));
 		Connection langlinkConn = (Connection) dialect.getDatabaseConnection(langlinkFile.getAbsolutePath(), log);
-		conn.createStatement().execute("DROP TABLE IF EXISTS wikivoyage_search;");
-		conn.createStatement().execute("CREATE TABLE wikivoyage_search(search_term text, city_id long, article_title text, lang text)");
-		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_search_term ON wikivoyage_search(search_term);");
-		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_search_city ON wikivoyage_search(city_id)");
-		conn.createStatement().execute("ALTER TABLE wikivoyage_articles ADD COLUMN aggregated_part_of");
+		conn.createStatement().execute("DROP TABLE IF EXISTS travel_search;");
+		conn.createStatement().execute("CREATE TABLE travel_search(search_term text, trip_id long, article_title text, lang text)");
+		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_search_term ON travel_search(search_term);");
+		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_search_city ON travel_search(trip_id)");
+		conn.createStatement().execute("ALTER TABLE travel_articles ADD COLUMN aggregated_part_of");
 		
-		PreparedStatement partOf = conn.prepareStatement("UPDATE wikivoyage_articles SET aggregated_part_of = ?, city_id = ? WHERE title = ? AND lang = ?");
-		PreparedStatement ps = conn.prepareStatement("INSERT INTO wikivoyage_search VALUES (?, ?, ?, ?)");
-		PreparedStatement data = conn.prepareStatement("SELECT title, lang, is_part_of FROM wikivoyage_articles");
+		PreparedStatement partOf = conn.prepareStatement("UPDATE travel_articles SET aggregated_part_of = ?, trip_id = ? WHERE title = ? AND lang = ?");
+		PreparedStatement ps = conn.prepareStatement("INSERT INTO travel_search VALUES (?, ?, ?, ?)");
+		PreparedStatement data = conn.prepareStatement("SELECT title, lang, is_part_of FROM travel_articles");
 		PreparedStatement langlinkStatement = langlinkConn.prepareStatement("SELECT id FROM langlinks WHERE title = ? AND lang = ?");
 		ResultSet rs = data.executeQuery();
 		int batch = 0;
@@ -114,7 +114,7 @@ public class SearchDBCreator {
 		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_title ON langlinks(title);");
 		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_lang ON langlinks(lang);");
 		PreparedStatement prep = conn.prepareStatement("INSERT OR IGNORE INTO langlinks VALUES (?, ?, ?)");
-		PreparedStatement articleQuery = wikivoyageConnection.prepareStatement("SELECT title FROM wikivoyage_articles WHERE original_id = ? AND lang = ?");
+		PreparedStatement articleQuery = wikivoyageConnection.prepareStatement("SELECT title FROM travel_articles WHERE original_id = ? AND lang = ?");
 		int batch = 0;
 		long maxId = 0;
 		Set<Long> ids = new HashSet<>();
@@ -232,7 +232,7 @@ public class SearchDBCreator {
 		StringBuilder res = new StringBuilder();
 		res.append(partOf);
 		res.append(",");
-		PreparedStatement ps = conn.prepareStatement("SELECT is_part_of FROM wikivoyage_articles WHERE title = ? AND lang = '" + lang + "'");
+		PreparedStatement ps = conn.prepareStatement("SELECT is_part_of FROM travel_articles WHERE title = ? AND lang = '" + lang + "'");
 		String prev = "";
 		while (true) {
 			ps.setString(1, partOf);
@@ -272,8 +272,8 @@ public class SearchDBCreator {
 			throw new IllegalStateException();
 		}
 		int batch = 0;
-		PreparedStatement ps = conn.prepareStatement("SELECT title, lang FROM wikivoyage_articles WHERE city_id = 0");
-		PreparedStatement prep = conn.prepareStatement("UPDATE wikivoyage_articles SET city_id = ? WHERE title = ? AND lang = ?");
+		PreparedStatement ps = conn.prepareStatement("SELECT title, lang FROM travel_articles WHERE trip_id = 0");
+		PreparedStatement prep = conn.prepareStatement("UPDATE travel_articles SET trip_id = ? WHERE title = ? AND lang = ?");
 		ResultSet res = ps.executeQuery();
 		while (res.next()) {
 			String title = res.getString("title");

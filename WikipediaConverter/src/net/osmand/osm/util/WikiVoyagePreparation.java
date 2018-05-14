@@ -157,15 +157,15 @@ public class WikiVoyagePreparation {
 
 			conn = (Connection) dialect.getDatabaseConnection(sqliteFile.getAbsolutePath(), log);
 			conn.createStatement()
-					.execute("CREATE TABLE IF NOT EXISTS wikivoyage_articles(article_id text, title text, content_gz blob"
+					.execute("CREATE TABLE IF NOT EXISTS travel_articles(article_id text, title text, content_gz blob"
 							+ (uncompressed ? ", content text" : "") + ", is_part_of text, lat double, lon double, image_title text, gpx_gz blob"
-							+ (uncompressed ? ", gpx text" : "") + ", city_id long, original_id long, lang text, contents_json text)");
-			conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_title ON wikivoyage_articles(title);");
-			conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_id ON wikivoyage_articles(city_id);");
-			conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_orig_id ON wikivoyage_articles(original_id);");
+							+ (uncompressed ? ", gpx text" : "") + ", trip_id long, original_id long, lang text, contents_json text)");
+			conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_title ON travel_articles(title);");
+			conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_id ON travel_articles(trip_id);");
+			conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_orig_id ON travel_articles(original_id);");
 			conn.createStatement()
-					.execute("CREATE INDEX IF NOT EXISTS index_part_of ON wikivoyage_articles(is_part_of);");
-			prep = conn.prepareStatement("INSERT INTO wikivoyage_articles VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?" + (uncompressed ? ", ?, ?": "") + ")");
+					.execute("CREATE INDEX IF NOT EXISTS index_part_of ON travel_articles(is_part_of);");
+			prep = conn.prepareStatement("INSERT INTO travel_articles VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?" + (uncompressed ? ", ?, ?": "") + ")");
 		}
 		
 		public void addBatch() throws SQLException {
@@ -286,7 +286,7 @@ public class WikiVoyagePreparation {
 										if (uncompressed) {
 											prep.setString(column++, gpx);
 										}
-										// skip city_id column
+										// skip trip_id column
 										column++;
 										prep.setLong(column++, cid);
 										prep.setString(column++, lang);

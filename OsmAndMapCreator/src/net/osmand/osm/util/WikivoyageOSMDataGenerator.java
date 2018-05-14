@@ -77,7 +77,7 @@ public class WikivoyageOSMDataGenerator {
 		addColumns(conn);
 		RandomAccessFile raf = new RandomAccessFile(citiesObf, "r");
 		BinaryMapIndexReader reader = new BinaryMapIndexReader(raf, citiesObf);
-		PreparedStatement stat = conn.prepareStatement("SELECT title, lat, lon FROM wikivoyage_articles");
+		PreparedStatement stat = conn.prepareStatement("SELECT title, lat, lon FROM travel_articles");
 		int columns = getRowCount(conn);
 		int count = 0;
 		ResultSet rs = stat.executeQuery();
@@ -107,19 +107,19 @@ public class WikivoyageOSMDataGenerator {
 
 	private static void createPopularArticlesTable(Connection conn) throws SQLException {
 		conn.createStatement().execute("DROP TABLE IF EXISTS popular_articles;");
-		conn.createStatement().execute("CREATE TABLE popular_articles(title text, city_id long, popularity_index long, lat double, lon double, lang text)");
-		conn.createStatement().execute("INSERT INTO popular_articles(title, city_id, popularity_index, lat, lon, lang) " + 
-				"SELECT title, city_id, population, lat, lon, lang " + 
-				"FROM wikivoyage_articles WHERE population > " + POPULATION_LIMIT);
+		conn.createStatement().execute("CREATE TABLE popular_articles(title text, trip_id long, popularity_index long, lat double, lon double, lang text)");
+		conn.createStatement().execute("INSERT INTO popular_articles(title, trip_id , popularity_index, lat, lon, lang) " + 
+				"SELECT title, trip_id , population, lat, lon, lang " + 
+				"FROM travel_articles WHERE population > " + POPULATION_LIMIT);
 		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS popular_lang_ind ON popular_articles(lang);");
-		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS popular_city_id_ind ON popular_articles(city_id);");
+		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS popular_city_id_ind ON popular_articles(trip_id);");
 	}
 
 	private static void insertData(Connection conn, String title, Amenity acceptedResult, LatLon fromDB)
 			throws SQLException, IOException {
 		boolean hasResult = acceptedResult != null;
-		String sqlStatement = hasResult ? "UPDATE wikivoyage_articles SET lat = ?, lon = ?, osm_id = ?, city_type = ?, population = ?, "
-				+ "country = ?, region = ? WHERE title = ?" : "UPDATE wikivoyage_articles SET country = ?, region = ? WHERE title = ?";
+		String sqlStatement = hasResult ? "UPDATE travel_articles SET lat = ?, lon = ?, osm_id = ?, city_type = ?, population = ?, "
+				+ "country = ?, region = ? WHERE title = ?" : "UPDATE travel_articles SET country = ?, region = ? WHERE title = ?";
 		PreparedStatement updateStatement = conn.prepareStatement(sqlStatement);
 		int column = 1;
 		LatLon coords = hasResult ? acceptedResult.getLocation() : fromDB;
@@ -174,7 +174,7 @@ public class WikivoyageOSMDataGenerator {
 	}
 
 	private static int getRowCount(Connection conn) throws SQLException {
-		PreparedStatement ps = conn.prepareStatement("SELECT Count(*) FROM wikivoyage_articles");
+		PreparedStatement ps = conn.prepareStatement("SELECT Count(*) FROM travel_articles");
 		int columns = 0;
 		ResultSet res = ps.executeQuery();
 		while (res.next()) {
@@ -186,7 +186,7 @@ public class WikivoyageOSMDataGenerator {
 	private static void addColumns(Connection conn) {
 		for (String s : columns) {
 			try {
-				conn.createStatement().execute("ALTER TABLE wikivoyage_articles ADD COLUMN " + s);
+				conn.createStatement().execute("ALTER TABLE travel_articles ADD COLUMN " + s);
 			} catch (SQLException ex) {
 				// ex.printStackTrace();
 				System.out.println("Column alredy exsists");
