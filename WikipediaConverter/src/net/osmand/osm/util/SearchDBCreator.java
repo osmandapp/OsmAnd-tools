@@ -45,7 +45,11 @@ public class SearchDBCreator {
 		conn.createStatement().execute("CREATE TABLE travel_search(search_term text, trip_id long, article_title text, lang text)");
 		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_search_term ON travel_search(search_term);");
 		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_search_city ON travel_search(trip_id)");
-		conn.createStatement().execute("ALTER TABLE travel_articles ADD COLUMN aggregated_part_of");
+		try {
+			conn.createStatement().execute("ALTER TABLE travel_articles ADD COLUMN aggregated_part_of");
+		} catch(Exception e) {
+			System.err.println("Column aggregated_part_of already exists" );
+		}
 		
 		PreparedStatement partOf = conn.prepareStatement("UPDATE travel_articles SET aggregated_part_of = ?, trip_id = ? WHERE title = ? AND lang = ?");
 		PreparedStatement ps = conn.prepareStatement("INSERT INTO travel_search VALUES (?, ?, ?, ?)");
