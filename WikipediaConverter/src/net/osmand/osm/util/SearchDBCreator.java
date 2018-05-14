@@ -102,7 +102,10 @@ public class SearchDBCreator {
 
 	private static void createLangLinksIfMissing(File langlinkFile, File langlinkFolder, Connection conn) throws IOException, SQLException {
 		if (langlinkFolder.exists() && !langlinkFile.exists()) {
+			System.out.println("Processing langlink into: " + langlinkFile.getAbsolutePath());
 			processLangLinks(langlinkFolder, langlinkFile, conn);
+		} else {
+			System.out.println("No langlink processing cause file already exist: " + langlinkFile.getAbsolutePath());
 		}
 	}
 	
