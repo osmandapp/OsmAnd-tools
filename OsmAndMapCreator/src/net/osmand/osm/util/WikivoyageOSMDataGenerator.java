@@ -131,7 +131,7 @@ public class WikivoyageOSMDataGenerator {
 			System.out.println("Loading " + url);
 				HttpURLConnection conn = NetworkUtils.getHttpURLConnection(url);
 				StringBuilder sb = Algorithms.readFromInputStream(conn.getInputStream());
-				System.out.println("Debug Data " + sb);
+				//System.out.println("Debug Data " + sb);
 				JSONObject object = new JSONObject(new JSONTokener(sb.toString()));
 				JSONArray articles = object.getJSONArray("items").getJSONObject(0).getJSONArray("articles");
 				for(int i = 0; i < articles.length() && i < limit; i++ ) {
