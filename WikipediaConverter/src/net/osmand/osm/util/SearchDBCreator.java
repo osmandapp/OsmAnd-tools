@@ -224,7 +224,7 @@ public class SearchDBCreator {
 					prep.setString(2, insValues.get(1));
 					prep.setString(3, insValues.get(2));
 					prep.addBatch();
-					if (batch++ > 500) {
+					if (batch++ > BATCH_SIZE) {
 						prep.executeBatch();
 						batch = 0;
 					}
