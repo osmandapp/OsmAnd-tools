@@ -108,11 +108,21 @@ public class GPXUtils {
 	public static class GPXFile extends GPXExtensions {
 		public String author;
 		private List<WptPt> points = new ArrayList<>();
+		
+		private String title;
+		private String lang;
+		private String description;
 
 		public String warning = null;
 		public String path = "";
 		public boolean showCurrentTrack;
 		public long modifiedTime = 0;
+		
+		public GPXFile(String title, String lang, String description) {
+			this.title = title;
+			this.lang = lang;
+			this.description = description;
+		}
 
 		public List<WptPt> getPoints() {
 			return Collections.unmodifiableList(points);
@@ -230,7 +240,8 @@ public class GPXUtils {
 			serializer.attribute(null, "xmlns:xsi", "http://www.w3.org/2001/XMLSchema-instance");
 			serializer.attribute(null, "xsi:schemaLocation",
 					"http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd");
-
+			writeMetaData(file, serializer);
+			
 			for (WptPt l : file.points) {
 				serializer.startTag(null, "wpt"); //$NON-NLS-1$
 				writeWpt(format, serializer, l);
@@ -246,6 +257,22 @@ public class GPXUtils {
 			e.printStackTrace();
 		}
 		return null;
+	}
+
+	private static void writeMetaData(GPXFile file, XmlSerializer serializer) throws IOException {
+		serializer.startTag(null, "metadata");
+		serializer.startTag(null, "desc");
+		serializer.text(file.description == null ? "" : file.description);
+		serializer.endTag(null, "desc");
+		serializer.startTag(null, "extensions");
+		serializer.startTag(null, "article_lang");
+		serializer.text(file.lang == null ? "" : file.lang);
+		serializer.endTag(null, "article_lang");
+		serializer.startTag(null, "article_title");
+		serializer.text(file.title == null ? "" : file.title);
+		serializer.endTag(null, "article_title");
+		serializer.endTag(null, "extensions");
+		serializer.endTag(null, "metadata");
 	}
 
 	private static void writeNotNullText(XmlSerializer serializer, String tag, String value) throws IOException {

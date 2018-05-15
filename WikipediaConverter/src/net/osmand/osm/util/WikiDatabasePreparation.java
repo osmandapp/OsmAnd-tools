@@ -67,7 +67,9 @@ public class WikiDatabasePreparation {
 	private static final Log log = PlatformUtil.getLog(WikiDatabasePreparation.class);
 	
 	public interface InsertValueProcessor {
-    	public void process(List<String> vs);
+		public void process(List<String> vs);
+
+		public void setLang(String replace);
     }
 	
 	
@@ -575,6 +577,11 @@ public class WikiDatabasePreparation {
 					total[1]++;
 				}
 			}
+			
+			@Override
+			public void setLang (String s) {
+				return;
+			}
 
 			protected String strip(String paramsStr, char c) {
 				if(paramsStr.indexOf(c) != -1) {
@@ -636,7 +643,7 @@ public class WikiDatabasePreparation {
 		return Double.parseDouble(params);
 	}
 
-	protected void readInsertValuesFile(final String fileName, InsertValueProcessor p)
+	public static void readInsertValuesFile(final String fileName, InsertValueProcessor p)
 			throws FileNotFoundException, UnsupportedEncodingException, IOException {
 		InputStream fis = new FileInputStream(fileName);
 		if(fileName.endsWith("gz")) {
