@@ -141,7 +141,6 @@ public class WikivoyageOSMDataGenerator {
 				list.add(title);
 				articleIds.add(title);
 			}
-			System.out.println("Popular articles: " + list);
 		}
 		return articleIds;
 	}
