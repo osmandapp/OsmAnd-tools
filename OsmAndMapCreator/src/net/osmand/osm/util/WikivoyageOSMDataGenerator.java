@@ -167,7 +167,7 @@ public class WikivoyageOSMDataGenerator {
 		System.out.println("Scan articles for big cities");
 		rs = conn.createStatement().executeQuery("SELECT article_id, trip_id, population, lat, lon, lang FROM travel_articles ");
 		while(rs.next()) {
-			String title = rs.getString(1).toLowerCase();
+			String title = java.net.URLDecoder.decode(rs.getString(1), "UTF-8").toLowerCase();
 			Long tripId = rs.getLong(2);
 			if(title.contains("itineraries") || title.contains("unesco")) {
 				tripIds.add(tripId);
