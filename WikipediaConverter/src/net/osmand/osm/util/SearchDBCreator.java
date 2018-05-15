@@ -97,7 +97,6 @@ public class SearchDBCreator {
 			} else {
 				String metadataUrl = "https://commons.wikimedia.org/w/index.php?title=File:"+imageTitle+"&action=raw";
 				try {
-					imagesFetched++;
 					URL url = new URL(metadataUrl);
 					BufferedReader reader = new BufferedReader(new InputStreamReader(url.openStream()));
 					StringBuilder metadata = new StringBuilder();
@@ -123,14 +122,15 @@ public class SearchDBCreator {
 						valuesToUpdate.put(imageTitle, sourceFile);
 					}
 					pInsert.executeUpdate();
+					if(imagesFetched++ % 100 == 0) {
+						System.out.println("Images metadata fetched: " + imagesFetched);
+					}
 				} catch (IOException e) {
 					System.err.println("Error fetching image " + imageTitle + " " + lang + ":" + name + " "+ e.getMessage());
 				}
-				
+					
 			}
-			if(imagesFetched % 100 == 0) {
-				System.out.println("Images metadata fetched: " + imagesFetched);
-			}
+			
 		}
 		PreparedStatement pUpdate = conn.prepareStatement("UPDATE travel_articles  SET image_title=? WHERE image_title=?");
 		Iterator<Entry<String, String>> it = valuesToUpdate.entrySet().iterator();
