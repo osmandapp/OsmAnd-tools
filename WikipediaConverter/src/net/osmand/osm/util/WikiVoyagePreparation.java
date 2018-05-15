@@ -145,6 +145,8 @@ public class WikiVoyagePreparation {
 		private PreparedStatement prep;
 		private int batch = 0;
 		private final static int BATCH_SIZE = 500;
+		private static final String P_OPENED = "<p>";
+		private static final String P_CLOSED = "</p>";
 		final ByteArrayOutputStream bous = new ByteArrayOutputStream(64000);
 		private String lang;
 			
@@ -281,7 +283,7 @@ public class WikiVoyagePreparation {
 										prep.setString(column++, Encoder.encodeUrl(filename).replaceAll("\\(", "%28")
 												.replaceAll("\\)", "%29"));
 										// gpx_gz
-										String gpx = generateGpx(macroBlocks.get(WikivoyageTemplates.POI.getType()));
+										String gpx = generateGpx(macroBlocks.get(WikivoyageTemplates.POI.getType()), title.toString(), lang, getShortDescr(plainStr));
 										prep.setBytes(column++, stringToCompressedByteArray(bous, gpx));
 										if (uncompressed) {
 											prep.setString(column++, gpx);
@@ -307,6 +309,32 @@ public class WikiVoyagePreparation {
 			}
 		}
 		
+		private String getShortDescr(String content) {
+			if (content == null) {
+				return null;
+			}
+
+			int firstParagraphStart = content.indexOf(P_OPENED);
+			int firstParagraphEnd = content.indexOf(P_CLOSED);
+			firstParagraphEnd = firstParagraphEnd < firstParagraphStart ? content.indexOf(P_CLOSED, firstParagraphStart) : firstParagraphEnd;
+			if (firstParagraphStart == -1 || firstParagraphEnd == -1
+					|| firstParagraphEnd < firstParagraphStart) {
+				return null;
+			}
+			String firstParagraphHtml = content.substring(firstParagraphStart, firstParagraphEnd + P_CLOSED.length());
+			while (firstParagraphHtml.length() == (P_OPENED.length() + P_CLOSED.length())
+					&& (firstParagraphEnd + P_CLOSED.length()) < content.length()) {
+				firstParagraphStart = content.indexOf(P_OPENED, firstParagraphEnd);
+				firstParagraphEnd = firstParagraphStart == -1 ? -1 : content.indexOf(P_CLOSED, firstParagraphStart);
+				if (firstParagraphStart != -1 && firstParagraphEnd != -1) {
+					firstParagraphHtml = content.substring(firstParagraphStart, firstParagraphEnd + P_CLOSED.length());
+				} else {
+					break;
+				}
+			}
+			return firstParagraphHtml;
+		}
+
 		public static boolean isEmpty(String s) {
 			return s == null || s.length() == 0;
 		}
@@ -319,9 +347,9 @@ public class WikiVoyagePreparation {
 			}
 		}
 		
-		private String generateGpx(List<String> list) {
+		private String generateGpx(List<String> list, String title, String lang, String descr) {
 			if (list != null && !list.isEmpty()) {
-				GPXFile f = new GPXFile();
+				GPXFile f = new GPXFile(title, lang, descr);
 				List<WptPt> points = new ArrayList<>(); 
 				for (String s : list) {
 					String[] info = s.split("\\|");
