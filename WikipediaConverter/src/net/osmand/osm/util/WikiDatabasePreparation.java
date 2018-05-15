@@ -41,6 +41,7 @@ import net.osmand.data.preparation.DBDialect;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.osm.util.WikiVoyagePreparation.WikivoyageTemplates;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.tools.bzip2.CBZip2InputStream;
 import org.xml.sax.Attributes;
@@ -231,14 +232,12 @@ public class WikiDatabasePreparation {
 				if (partname.matches("region\\d+name")) {
 					String value = part.substring(ind + 1, part.length());
 					bld.append("*");
-					if (!value.endsWith("]]") && parts[i+1].trim().endsWith("]]") && value.contains("[[")) {
+					if (StringUtils.countMatches(value, "[[") != StringUtils.countMatches(value, "]]") && i + 1 < parts.length) {
 						bld.append(value);
 						bld.append("|");
 						bld.append(parts[i+1]);
-					} else if (value.contains("[[") && value.endsWith("]]")){
-						bld.append(value);
 					} else {
-						bld.append(value.replaceAll("\\[", ""));
+						bld.append(value);
 					}
 					bld.append("\n");
 				} else if (partname.matches("region\\d+description")) {
