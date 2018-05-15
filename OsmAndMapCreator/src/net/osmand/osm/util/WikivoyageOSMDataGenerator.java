@@ -147,7 +147,7 @@ public class WikivoyageOSMDataGenerator {
 		// Itineraries UNESCO
 		System.out.println("Create popular articles");
 		conn.createStatement().execute("CREATE TABLE popular_articles(title text, trip_id long,"
-				+ " population long, order long, popularity_index long, lat double, lon double, lang text)");
+				+ " population long, order_index long, popularity_index long, lat double, lon double, lang text)");
 		ResultSet rs = conn.createStatement().executeQuery("SELECT DISTINCT lang from travel_articles");
 		TreeSet<String> langs = new TreeSet<String>();
 		while(rs.next()) {
