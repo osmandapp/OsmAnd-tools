@@ -67,7 +67,7 @@ public class WikiDatabasePreparation {
 	private static final Log log = PlatformUtil.getLog(WikiDatabasePreparation.class);
 	
 	public interface InsertValueProcessor {
-    	public void process(List<String> vs);
+		public void process(List<String> vs);
 
 		public void setLang(String replace);
     }
