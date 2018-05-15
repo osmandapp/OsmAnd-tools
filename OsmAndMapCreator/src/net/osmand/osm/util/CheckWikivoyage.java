@@ -13,28 +13,27 @@ import net.osmand.util.Algorithms;
 public class CheckWikivoyage {
 
 	public static void main(String[] args) throws SQLException, IOException {
-		File f = new File("../../../maps/wikivoyage/World_wikivoyage.sqlite");
+		File f = new File("../../../maps/wikivoyage/wikivoyage.sqlite");
 		System.out.println(System.currentTimeMillis() - 24*60*60*1000*3
 				);
-//		testWikivoyage(f.getCanonicalPath());
+		testWikivoyage(f.getCanonicalPath());
 	}
 
 	private static void testWikivoyage(String filepath) throws SQLException, IOException {
 		Connection connection = DriverManager.getConnection("jdbc:sqlite:" + filepath);
 		Statement statement = connection.createStatement();
-		ResultSet rs = statement.executeQuery("Select title, lang, content_gz From travel_articles");
+		ResultSet rs = statement.executeQuery("Select title, lang, content_gz From travel_articles ");
 		int count = 0;
 		while(rs.next()) {
 			byte[] bytes = rs.getBytes(3);
 			String cont = Algorithms.gzipToString(bytes);
-			if(//cont.contains("[[") || 
-					cont.contains("]]")) {
+			if(cont.contains("[[") || cont.contains("]]")) {
 				System.out.println(rs.getString(1) + " " + rs.getString(2));
-				if(count > 0) {
+				if(count >= 0) {
 					if(count < 20) {
 						System.out.println(cont);
 					} else {
-						break;
+//						break;
 					}
 				}
 				count++;

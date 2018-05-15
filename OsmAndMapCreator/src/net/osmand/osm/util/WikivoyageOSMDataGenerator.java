@@ -126,17 +126,22 @@ public class WikivoyageOSMDataGenerator {
 	private static TreeSet<String> readMostPopularArticlesFromWikivoyage(TreeSet<String> langs, int limit) throws IOException, JSONException {
 		TreeSet<String> articleIds = new TreeSet<>();
 		String date = new SimpleDateFormat("yyyy/MM").format(new Date(System.currentTimeMillis() - 24*60*60*1000*30l));// previous month
-		for(String lang : langs) {
-			String url = "https://wikimedia.org/api/rest_v1/metrics/pageviews/top/"+lang+".wikivoyage/all-access/"+date+"/all-days";
+		for (String lang : langs) {
+			String url = "https://wikimedia.org/api/rest_v1/metrics/pageviews/top/" + lang + ".wikivoyage/all-access/"
+					+ date + "/all-days";
 			System.out.println("Loading " + url);
-				HttpURLConnection conn = NetworkUtils.getHttpURLConnection(url);
-				StringBuilder sb = Algorithms.readFromInputStream(conn.getInputStream());
-				//System.out.println("Debug Data " + sb);
-				JSONObject object = new JSONObject(new JSONTokener(sb.toString()));
-				JSONArray articles = object.getJSONArray("items").getJSONObject(0).getJSONArray("articles");
-				for(int i = 0; i < articles.length() && i < limit; i++ ) {
-					articleIds.add(articles.getJSONObject(i).getString("article").toLowerCase());
-				}
+			HttpURLConnection conn = NetworkUtils.getHttpURLConnection(url);
+			StringBuilder sb = Algorithms.readFromInputStream(conn.getInputStream());
+			// System.out.println("Debug Data " + sb);
+			JSONObject object = new JSONObject(new JSONTokener(sb.toString()));
+			TreeSet<String> list = new TreeSet<String>();
+			JSONArray articles = object.getJSONArray("items").getJSONObject(0).getJSONArray("articles");
+			for (int i = 0; i < articles.length() && i < limit; i++) {
+				String title = articles.getJSONObject(i).getString("article").toLowerCase();
+				list.add(title);
+				articleIds.add(title);
+			}
+			System.out.println("Popular articles: " + list);
 		}
 		return articleIds;
 	}
