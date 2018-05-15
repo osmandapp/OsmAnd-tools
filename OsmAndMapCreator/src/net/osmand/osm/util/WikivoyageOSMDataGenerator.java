@@ -146,7 +146,8 @@ public class WikivoyageOSMDataGenerator {
 		conn.createStatement().execute("DROP TABLE IF EXISTS popular_articles;");
 		// Itineraries UNESCO
 		System.out.println("Create popular articles");
-		conn.createStatement().execute("CREATE TABLE popular_articles(title text, trip_id long, popularity_index long, lat double, lon double, lang text)");
+		conn.createStatement().execute("CREATE TABLE popular_articles(title text, trip_id long,"
+				+ " population long, order long, popularity_index long, lat double, lon double, lang text)");
 		ResultSet rs = conn.createStatement().executeQuery("SELECT DISTINCT lang from travel_articles");
 		TreeSet<String> langs = new TreeSet<String>();
 		while(rs.next()) {
@@ -189,8 +190,8 @@ public class WikivoyageOSMDataGenerator {
 				it.remove();
 			}
 			
-			conn.createStatement().execute("INSERT INTO popular_articles(title, trip_id , popularity_index, lat, lon, lang) " + 
-				"SELECT title, trip_id , population, lat, lon, lang FROM travel_articles WHERE trip_id IN ("+tripIdsInStr+")");
+			conn.createStatement().execute("INSERT INTO popular_articles(title, trip_id, population, lat, lon, lang) " + 
+				"SELECT title, trip_id, population, lat, lon, lang FROM travel_articles WHERE trip_id IN ("+tripIdsInStr+")");
 		}
 		
 		
