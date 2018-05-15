@@ -70,27 +70,32 @@ public class SearchDBCreator {
 	private static void updateProperHeaderForArticles(Connection conn, String workingDir) throws SQLException {
 		final File imagesMetadata = new File(workingDir, "images.sqlite");
 		// TODO temporarily delete until stabilize
-		imagesMetadata.delete();
+		// imagesMetadata.delete();
 		Connection imagesConn = (Connection) DBDialect.SQLITE.getDatabaseConnection(imagesMetadata.getAbsolutePath(), log);
 		imagesConn.createStatement()
 				.execute("CREATE TABLE IF NOT EXISTS images(file text, url text, metadata text, sourcefile text)");
 		PreparedStatement pSelect = imagesConn.prepareStatement("SELECT file, url, metadata, sourcefile FROM images WHERE file = ?");
 		//PreparedStatement pDelete = imagesConn.prepareStatement("DELETE FROM images WHERE file = ?");
 		PreparedStatement pInsert = imagesConn.prepareStatement("INSERT INTO images(file, url, metadata, sourcefile) VALUES (?, ?, ?, ?)");
-		ResultSet rs = conn.createStatement().executeQuery("SELECT distinct image_title FROM travel_articles ");
+		ResultSet rs = conn.createStatement().executeQuery("SELECT distinct image_title, title, lang FROM travel_articles ");
 		Map<String, String> valuesToUpdate = new LinkedHashMap<String, String>();
 		int imagesFetched = 0;
 		while(rs.next()) {
-			String title = rs.getString(1);
+			String imageTitle = rs.getString(1);
+			String name = rs.getString(2);
+			String lang = rs.getString(3);
+			if(valuesToUpdate.containsKey(imageTitle)  || imageTitle == null || imageTitle.length() == 0) {
+				continue;
+			}
 			
-			valuesToUpdate.put(title, null);
-			pSelect.setString(1, title);
+			valuesToUpdate.put(imageTitle, null);
+			pSelect.setString(1, imageTitle);
 			ResultSet stored = pSelect.executeQuery();
 			if(stored.next()) {
 				// pDelete and update
-				valuesToUpdate.put(title, stored.getString(4));
+				valuesToUpdate.put(imageTitle, stored.getString(4));
 			} else {
-				String metadataUrl = "https://commons.wikimedia.org/w/index.php?title=File:"+title+"&action=raw";
+				String metadataUrl = "https://commons.wikimedia.org/w/index.php?title=File:"+imageTitle+"&action=raw";
 				try {
 					imagesFetched++;
 					URL url = new URL(metadataUrl);
@@ -109,17 +114,17 @@ public class SearchDBCreator {
 						metadata.append(s).append("\n");
 					}
 					
-					pInsert.setString(1, title);
+					pInsert.setString(1, imageTitle);
 					pInsert.setString(2, metadataUrl);
 					pInsert.setString(3, metadata.toString());
 					pInsert.setString(4, null);
 					if(sourceFile != null) {
 						pInsert.setString(4, sourceFile.toString());
-						valuesToUpdate.put(title, sourceFile);
+						valuesToUpdate.put(imageTitle, sourceFile);
 					}
 					pInsert.executeUpdate();
 				} catch (IOException e) {
-					System.err.println("Error fetching image " + title + " " + metadataUrl + " " + e.getMessage());
+					System.err.println("Error fetching image " + imageTitle + " " + lang + ":" + name + " "+ e.getMessage());
 				}
 				
 			}
