@@ -106,8 +106,9 @@ public class SearchDBCreator {
 					pInsert.setString(1, title);
 					pInsert.setString(2, metadataUrl);
 					pInsert.setString(3, metadata.toString());
-					pInsert.setString(4, sourceFile.toString());
+					pInsert.setString(4, null);
 					if(sourceFile != null) {
+						pInsert.setString(4, sourceFile.toString());
 						valuesToUpdate.put(title, sourceFile);
 					}
 					pInsert.executeUpdate();

@@ -57,9 +57,10 @@
 	<classpathentry kind="lib" path="lib/xwiki-rendering-syntax-xhtml-7.1-milestone-2.jar"/>
 	<classpathentry kind="lib" path="lib/xwiki-rendering-wikimodel-7.1-milestone-2.jar"/>
 	<classpathentry kind="lib" path="lib/xwiki-rendering-xml-7.1-milestone-2.jar"/>
-	<classpathentry kind="lib" path="lib/kxml2-2.3.0.jar"/>
 	<classpathentry kind="lib" path="lib/bzip2-20090327.jar"/>
 	<classpathentry kind="lib" path="lib/sqlite-jdbc-3.7.6.3-20110609.081603-3.jar"/>
 	<classpathentry kind="lib" path="lib/gson-2.8.2.jar"/>
+	<classpathentry kind="lib" path="lib/kxml2-2.1.8.jar"/>
+	<classpathentry kind="lib" path="lib/validation-api-1.0.0.GA.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

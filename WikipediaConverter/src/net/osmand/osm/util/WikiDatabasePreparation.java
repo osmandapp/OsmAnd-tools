@@ -94,6 +94,11 @@ public class WikiDatabasePreparation {
 		public boolean isZero() {
 			return (latitude == 0 && longitude == 0);
 		}
+		
+		@Override
+		public String toString() {
+			return "lat: " + latitude + " lon:" + longitude;
+		}
 
 	}
     

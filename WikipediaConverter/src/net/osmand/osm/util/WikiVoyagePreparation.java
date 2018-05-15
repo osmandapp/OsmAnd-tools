@@ -66,6 +66,16 @@ public class WikiVoyagePreparation {
 		}
 	}
 	
+	private static void testLatLonParse() {
+		// {{}}
+		System.out.println(WikiOsmHandler.parseLatLon("geo|-34.60|-58.38|zoom=4"));
+		System.out.println(WikiOsmHandler.parseLatLon("geo|48.856|2.351"));
+		System.out.println(WikiOsmHandler.parseLatLon("geo|7.4|14.5|zoom=6"));
+
+		
+
+	}
+	
 	public static void main(String[] args) throws IOException, ParserConfigurationException, SAXException, SQLException {
 		String lang = "";
 		String folder = "";
@@ -464,52 +474,60 @@ public class WikiVoyagePreparation {
 		}
 		
 		private LatLon getLatLonFromGeoBlock(List<String> list) {
-			double lat = 0d;
-			double lon = 0d;
+			
 			if (list != null && !list.isEmpty()) {
 				String location = list.get(0);
-				String[] parts = location.split("\\|");
-				// skip malformed location blocks
-				String regex_pl = "(\\d+)°.+?(\\d+).+?(\\d*).*?";
-				if (location.toLowerCase().contains("geo|")) {
-					if (parts.length >= 3) {
-						if (parts[1].matches(regex_pl) && parts[2].matches(regex_pl)) {
-							lat = toDecimalDegrees(parts[1], regex_pl);
-							lon = toDecimalDegrees(parts[2], regex_pl);
-						} else {
-							try {
-								lat = Double.valueOf(parts[1]);
-								lon = Double.valueOf(parts[2]);
-							} catch (Exception e) {	}
-						}
-					}
-				} else {
-					String latStr = "";
-					String lonStr = "";
-					String regex = "(\\d+).+?(\\d+).+?(\\d*).*?([N|E|W|S|n|e|w|s]+)";
-					for (String part : parts) {
-						part = part.replaceAll(" ", "").toLowerCase();
-						if (part.startsWith("lat=") || part.startsWith("latitude=")) {
-							latStr = part.substring(part.indexOf("=") + 1, part.length()).replaceAll("\n", "");
-						} else if (part.startsWith("lon=") || part.startsWith("long=") || part.startsWith("longitude=")) {
-							lonStr = part.substring(part.indexOf("=") + 1, part.length()).replaceAll("\n", "");
-						}
-					}
-					if (latStr.matches(regex) && lonStr.matches(regex)) {
-						lat = toDecimalDegrees(latStr, regex);
-						lon = toDecimalDegrees(lonStr, regex);
+				return parseLatLon(location);
+			}
+			return new LatLon(0, 0);
+		}
+
+		private static LatLon parseLatLon(String location) {
+			double lat = 0d;
+			double lon = 0d;
+			
+
+			String[] parts = location.split("\\|");
+			// skip malformed location blocks
+			String regex_pl = "(\\d+)°.+?(\\d+).+?(\\d*).*?";
+			if (location.toLowerCase().contains("geo|")) {
+				if (parts.length >= 3) {
+					if (parts[1].matches(regex_pl) && parts[2].matches(regex_pl)) {
+						lat = toDecimalDegrees(parts[1], regex_pl);
+						lon = toDecimalDegrees(parts[2], regex_pl);
 					} else {
 						try {
-							lat = Double.valueOf(latStr.replaceAll("°", ""));
-							lon = Double.valueOf(lonStr.replaceAll("°", ""));
-						} catch (Exception e) {}
+							lat = Double.valueOf(parts[1]);
+							lon = Double.valueOf(parts[2]);
+						} catch (Exception e) {	}
 					}
+				}
+			} else {
+				String latStr = "";
+				String lonStr = "";
+				String regex = "(\\d+).+?(\\d+).+?(\\d*).*?([N|E|W|S|n|e|w|s]+)";
+				for (String part : parts) {
+					part = part.replaceAll(" ", "").toLowerCase();
+					if (part.startsWith("lat=") || part.startsWith("latitude=")) {
+						latStr = part.substring(part.indexOf("=") + 1, part.length()).replaceAll("\n", "");
+					} else if (part.startsWith("lon=") || part.startsWith("long=") || part.startsWith("longitude=")) {
+						lonStr = part.substring(part.indexOf("=") + 1, part.length()).replaceAll("\n", "");
+					}
+				}
+				if (latStr.matches(regex) && lonStr.matches(regex)) {
+					lat = toDecimalDegrees(latStr, regex);
+					lon = toDecimalDegrees(lonStr, regex);
+				} else {
+					try {
+						lat = Double.valueOf(latStr.replaceAll("°", ""));
+						lon = Double.valueOf(lonStr.replaceAll("°", ""));
+					} catch (Exception e) {}
 				}
 			}
 			return new LatLon(lat, lon);
 		}
 
-		private double toDecimalDegrees(String str, String regex) {
+		private static double toDecimalDegrees(String str, String regex) {
 			Pattern p = Pattern.compile(regex);
 			Matcher m = p.matcher(str);
 			m.find();
