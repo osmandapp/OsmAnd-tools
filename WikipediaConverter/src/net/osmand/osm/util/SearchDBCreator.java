@@ -177,6 +177,7 @@ public class SearchDBCreator {
 		Map<Long, Long> currMapping = new HashMap<>();
 		File[] files = langlinkFolder.listFiles();
 		for (File f : files) {
+			Set<Long> currIds = new HashSet<>();
 			String lang = f.getName().replace("wikivoyage-latest-langlinks.sql.gz", "");
 			InputStream fis = new FileInputStream(f);
 			if(f.getName().endsWith("gz")) {
@@ -236,7 +237,7 @@ public class SearchDBCreator {
 									}
 				    			}
 				    			id = genId == null ? id : genId;
-				    			ids.add(id);
+				    			currIds.add(id);
 				    			if (!thisTitle.isEmpty()) {
 				    				prep.setLong(1, id);
 				    				prep.setString(2, lang);
@@ -264,6 +265,7 @@ public class SearchDBCreator {
 	    			buf = buf.substring(last);
 	    		}
 	    	}
+	    	ids.addAll(currIds);
 	    	currMapping.clear();
 	    	read.close();
 		}
