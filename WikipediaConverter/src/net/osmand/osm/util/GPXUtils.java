@@ -240,19 +240,7 @@ public class GPXUtils {
 			serializer.attribute(null, "xmlns:xsi", "http://www.w3.org/2001/XMLSchema-instance");
 			serializer.attribute(null, "xsi:schemaLocation",
 					"http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd");
-			serializer.startTag(null, "metadata");
-			serializer.startTag(null, "desc");
-			serializer.text(file.description == null ? "" : file.description);
-			serializer.endTag(null, "desc");
-			serializer.startTag(null, "extensions");
-			serializer.startTag(null, "article_lang");
-			serializer.text(file.lang == null ? "" : file.lang);
-			serializer.endTag(null, "article_lang");
-			serializer.startTag(null, "article_title");
-			serializer.text(file.title == null ? "" : file.title);
-			serializer.endTag(null, "article_title");
-			serializer.endTag(null, "extensions");
-			serializer.endTag(null, "metadata");
+			writeMetaData(file, serializer);
 			
 			for (WptPt l : file.points) {
 				serializer.startTag(null, "wpt"); //$NON-NLS-1$
@@ -269,6 +257,22 @@ public class GPXUtils {
 			e.printStackTrace();
 		}
 		return null;
+	}
+
+	private static void writeMetaData(GPXFile file, XmlSerializer serializer) throws IOException {
+		serializer.startTag(null, "metadata");
+		serializer.startTag(null, "desc");
+		serializer.text(file.description == null ? "" : file.description);
+		serializer.endTag(null, "desc");
+		serializer.startTag(null, "extensions");
+		serializer.startTag(null, "article_lang");
+		serializer.text(file.lang == null ? "" : file.lang);
+		serializer.endTag(null, "article_lang");
+		serializer.startTag(null, "article_title");
+		serializer.text(file.title == null ? "" : file.title);
+		serializer.endTag(null, "article_title");
+		serializer.endTag(null, "extensions");
+		serializer.endTag(null, "metadata");
 	}
 
 	private static void writeNotNullText(XmlSerializer serializer, String tag, String value) throws IOException {
