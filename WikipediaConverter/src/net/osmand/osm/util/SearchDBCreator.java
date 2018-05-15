@@ -1,10 +1,13 @@
 package net.osmand.osm.util;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -13,8 +16,11 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.zip.GZIPInputStream;
 
@@ -42,18 +48,113 @@ public class SearchDBCreator {
 		final File langlinkFile = new File(workingDir, "langlink.sqlite");
 		DBDialect dialect = DBDialect.SQLITE;
 		Connection conn = (Connection) dialect.getDatabaseConnection(pathTodb.getAbsolutePath(), log);
-
+		
 		System.out.println("Processing langlink file " + langlinkFile.getAbsolutePath());
 		createLangLinksIfMissing(langlinkFile, langlinkFolder, conn);
 		System.out.println("Connect translations ");
 		generateSameTripIdForDifferentLang(langlinkFile, conn);
 		System.out.println("Generate missing ids");
 		generateIdsIfMissing(conn, langlinkFile);
+		System.out.println("Download/Copy proper headers for articles");
+		updateProperHeaderForArticles(conn, workingDir);
+		System.out.println("Copy headers between lang");
+		copyHeaders(conn);
+		
 		System.out.println("Generate agg part of");
 		generateAggPartOf(conn);
 		System.out.println("Generate search table");
 		generateSearchTable(conn);
 		conn.close();
+	}
+
+	private static void updateProperHeaderForArticles(Connection conn, String workingDir) throws SQLException {
+		final File imagesMetadata = new File(workingDir, "images.sqlite");
+		Connection imagesConn = (Connection) DBDialect.SQLITE.getDatabaseConnection(imagesMetadata.getAbsolutePath(), log);
+		imagesConn.createStatement()
+				.execute("CREATE TABLE IF NOT EXISTS images(file text, url text, metadata text, sourcefile text)");
+		PreparedStatement pSelect = imagesConn.prepareStatement("SELECT file, url, metadata, sourcefile FROM images WHERE file = ?");
+		//PreparedStatement pDelete = imagesConn.prepareStatement("DELETE FROM images WHERE file = ?");
+		PreparedStatement pInsert = imagesConn.prepareStatement("INSERT INTO images(file, url, metadata, sourcefile) VALUES (?, ?, ?, ?)");
+		ResultSet rs = conn.createStatement().executeQuery("SELECT distinct image_title FROM travel_articles ");
+		Map<String, String> valuesToUpdate = new LinkedHashMap<String, String>();
+		int imagesFetched = 0;
+		while(rs.next()) {
+			String title = rs.getString(1);
+			
+			valuesToUpdate.put(title, null);
+			pSelect.setString(1, title);
+			ResultSet stored = pSelect.executeQuery();
+			if(stored.next()) {
+				// pDelete and update
+				valuesToUpdate.put(title, stored.getString(4));
+			} else {
+				String metadataUrl = "https://commons.wikimedia.org/w/index.php?title="+title+"&action=raw";
+				try {
+					imagesFetched++;
+					URL url = new URL(metadataUrl);
+					BufferedReader reader = new BufferedReader(new InputStreamReader(url.openStream()));
+					StringBuilder metadata = new StringBuilder();
+					String s;
+					String sourceFile = null;
+					while((s = reader.readLine()) != null) {
+						if(s.contains("source=") && s.contains("File:")) {
+							sourceFile = s.substring(s.indexOf("File:") + "File:".length());
+						}
+						metadata.append(s).append("\n");
+					}
+					
+					pInsert.setString(1, title);
+					pInsert.setString(2, metadataUrl);
+					pInsert.setString(3, metadata.toString());
+					pInsert.setString(4, sourceFile.toString());
+					if(sourceFile != null) {
+						valuesToUpdate.put(title, sourceFile);
+					}
+					pInsert.executeUpdate();
+				} catch (IOException e) {
+					System.err.println("Error fetching image " + title + " " + e.getMessage());
+				}
+				
+			}
+			if(imagesFetched % 100 == 0) {
+				System.out.println("Images metadata fetched: " + imagesFetched);
+			}
+		}
+		PreparedStatement pUpdate = conn.prepareStatement("UPDATE travel_articles  SET image_title=? WHERE image_title=?");
+		Iterator<Entry<String, String>> it = valuesToUpdate.entrySet().iterator();
+		int count = 0;
+		while(it.hasNext()) {
+			Entry<String, String> e = it.next();
+			if(e.getValue() != null && e.getValue().length() > 0) {
+				pUpdate.setString(1, e.getKey());
+				pUpdate.setString(2, e.getValue());
+				pUpdate.addBatch();
+				if(count ++ > BATCH_SIZE) {
+					pUpdate.executeBatch();
+				}	
+			}
+		}
+		pUpdate.executeBatch();
+		System.out.println("Update to full size images " + count );
+		
+		imagesConn.close();
+		
+	}
+
+	private static void copyHeaders(Connection conn) throws SQLException {
+		Statement statement = conn.createStatement();
+		boolean update = statement.execute("update travel_articles ts set image_title=(SELECT image_title FROM travel_articles t "  +
+           " WHERE ts.trip_id = t.trip_id and t.lang = 'en') where ts.image_title='' and ts.lang <>'en'");
+        System.out.println("Copy headers from english language to others: " + update);
+        statement.close();
+        statement = conn.createStatement();
+        System.out.println("Articles without banner image:");
+        ResultSet rs = statement.executeQuery("select count(*), lang from travel_articles where image_title = '' group by lang");
+        while(rs.next()) {
+        	System.out.println("\t" + rs.getString(2) + " " + rs.getInt(1));
+        }
+		rs.close();
+		statement.close();
 	}
 
 	private static void generateAggPartOf(Connection conn) throws SQLException {
