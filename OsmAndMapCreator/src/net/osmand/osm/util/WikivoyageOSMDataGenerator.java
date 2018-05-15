@@ -160,15 +160,21 @@ public class WikivoyageOSMDataGenerator {
 		}
 		rs.close();
 		Set<Long> tripIds = new TreeSet<Long>();
+		Set<Long> excludeTripIds = new TreeSet<Long>();
 		
 		System.out.println("Read most popular articles for " + langs);
 		TreeSet<String> popularArticleIds = readMostPopularArticlesFromWikivoyage(langs, 100);
 		
 		System.out.println("Scan articles for big cities");
 		rs = conn.createStatement().executeQuery("SELECT article_id, trip_id, population, lat, lon, lang FROM travel_articles ");
+		
 		while(rs.next()) {
 			String title = java.net.URLDecoder.decode(rs.getString(1), "UTF-8").toLowerCase();
 			Long tripId = rs.getLong(2);
+			if(title.equals("main page") || title.contains("disambiguation") 
+					|| title.contains("значения")) {
+				excludeTripIds.add(tripId);
+			}
 			if(title.contains("itineraries") || title.contains("unesco")) {
 				tripIds.add(tripId);
 			}
@@ -180,7 +186,7 @@ public class WikivoyageOSMDataGenerator {
 			}
 		}
 		rs.close();
-		
+		tripIds.removeAll(excludeTripIds);
 		
 		System.out.println("Create popular article refs");
 		while(!tripIds.isEmpty()) {
