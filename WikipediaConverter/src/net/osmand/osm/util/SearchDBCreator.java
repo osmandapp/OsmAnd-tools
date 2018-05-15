@@ -69,6 +69,8 @@ public class SearchDBCreator {
 
 	private static void updateProperHeaderForArticles(Connection conn, String workingDir) throws SQLException {
 		final File imagesMetadata = new File(workingDir, "images.sqlite");
+		// TODO temporarily delete until stabilize
+		imagesMetadata.delete();
 		Connection imagesConn = (Connection) DBDialect.SQLITE.getDatabaseConnection(imagesMetadata.getAbsolutePath(), log);
 		imagesConn.createStatement()
 				.execute("CREATE TABLE IF NOT EXISTS images(file text, url text, metadata text, sourcefile text)");
@@ -88,7 +90,7 @@ public class SearchDBCreator {
 				// pDelete and update
 				valuesToUpdate.put(title, stored.getString(4));
 			} else {
-				String metadataUrl = "https://commons.wikimedia.org/w/index.php?title="+title+"&action=raw";
+				String metadataUrl = "https://commons.wikimedia.org/w/index.php?title=File:"+title+"&action=raw";
 				try {
 					imagesFetched++;
 					URL url = new URL(metadataUrl);
@@ -99,6 +101,10 @@ public class SearchDBCreator {
 					while((s = reader.readLine()) != null) {
 						if(s.contains("source=") && s.contains("File:")) {
 							sourceFile = s.substring(s.indexOf("File:") + "File:".length());
+							if (sourceFile.contains("]")) {
+								sourceFile = sourceFile.substring(0, sourceFile.indexOf(']'));
+							}
+							
 						}
 						metadata.append(s).append("\n");
 					}
