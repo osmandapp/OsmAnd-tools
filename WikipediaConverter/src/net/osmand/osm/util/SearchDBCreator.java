@@ -238,8 +238,8 @@ public class SearchDBCreator {
 			}
 		};
 		for (File f : files) {
-			WikiDatabasePreparation.readInsertValuesFile(f.getAbsolutePath(), p);
 			p.setLang(f.getName().replace("wikivoyage-latest-langlinks.sql.gz", ""));
+			WikiDatabasePreparation.readInsertValuesFile(f.getAbsolutePath(), p);
 			currentFileIds.clear();
 			currMapping.clear();
 		}
