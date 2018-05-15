@@ -119,7 +119,7 @@ public class SearchDBCreator {
 					}
 					pInsert.executeUpdate();
 				} catch (IOException e) {
-					System.err.println("Error fetching image " + title + " " + e.getMessage());
+					System.err.println("Error fetching image " + title + " " + metadataUrl + " " + e.getMessage());
 				}
 				
 			}
