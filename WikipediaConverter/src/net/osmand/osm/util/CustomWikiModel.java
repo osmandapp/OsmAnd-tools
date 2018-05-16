@@ -139,7 +139,7 @@ public class CustomWikiModel extends WikiModel {
         aTagNode.addAttribute("rel", "nofollow", true);
         if (withoutSquareBrackets) {
         	boolean geo = uriSchemeName.equals("geo");
-        	geo = geo ? aTagNode.addAttribute("class", "geo", true) : aTagNode.addAttribute("class", "external free", true);
+        	geo = geo ? aTagNode.addAttribute("class", "geo url-geo", true) : aTagNode.addAttribute("class", "external free", true);
             append(aTagNode);
             aTagNode.addChild(new ContentToken(linkName));
         } else {
@@ -157,7 +157,7 @@ public class CustomWikiModel extends WikiModel {
                     aTagNode.addChild(new ContentToken("["
                             + (++fExternalLinksCounter) + "]"));
                 } else {
-                    aTagNode.addAttribute("class", link.contains(".wikipedia.org/wiki/") ? "geo" : "external text", true);
+                    aTagNode.addAttribute("class", link.contains(".wikipedia.org/wiki/") ? "geo url-wikipedia" : "external text", true);
                     WikipediaParser.parseRecursive(trimmedText, this, false,
                             true);
                 }
