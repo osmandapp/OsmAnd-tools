@@ -165,7 +165,7 @@ public class WikivoyageOSMDataGenerator {
 		while(rs.next()) {
 			String title = java.net.URLDecoder.decode(rs.getString(1), "UTF-8").toLowerCase();
 			Long tripId = rs.getLong(2);
-			if(title.equals("main page") || title.contains("disambiguation") 
+			if(title.equals("main_page") || title.contains("disambiguation") 
 					|| title.contains("значения")) {
 				excludeTripIds.add(tripId);
 			}
