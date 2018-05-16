@@ -25,8 +25,8 @@ function downloadLangLinks {
       echo "Start downloading langlinks";
       for item in ${array[*]}
       do
-            if [ ! -f  "$item"wiki-latest-langlinks.sql.gz ]; then
-                  wget --quiet -N http://dumps.wikimedia.org/"$item"wikivoyage/latest/"$item"wikivoyage-latest-langlinks.sql.gz      
+            if [ ! -f  "${item}wikivoyage-latest-langlinks.sql.gz" ]; then
+                  wget --quiet -N "http://dumps.wikimedia.org/${item}wikivoyage/latest/${item}wikivoyage-latest-langlinks.sql.gz" 
             fi
       done
 }
