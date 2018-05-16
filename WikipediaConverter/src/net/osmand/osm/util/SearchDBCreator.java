@@ -81,8 +81,11 @@ public class SearchDBCreator {
 		TreeSet<String> sourceImages = new TreeSet<String>();
 		ResultSet rs1 = imagesConn.createStatement().executeQuery("SELECT file, sourcefile FROM images");
 		while(rs1.next()) {
-			existingImagesMapping.put(rs1.getString(1), rs1.getString(2));
-			sourceImages.add(rs1.getString(2));
+			String sourceFile = rs1.getString(2);
+			existingImagesMapping.put(rs1.getString(1), sourceFile);
+			if(sourceFile != null) {
+				sourceImages.add(rs1.getString(2));
+			}
 		}
 		rs1.close();
 		
@@ -129,11 +132,9 @@ public class SearchDBCreator {
 							if (sourceFile.contains("]")) {
 								sourceFile = sourceFile.substring(0, sourceFile.indexOf(']'));
 							}
-
 						}
 						metadata.append(s).append("\n");
 					}
-
 					pInsert.setString(1, imageTitle);
 					pInsert.setString(2, metadataUrl);
 					pInsert.setString(3, metadata.toString());
