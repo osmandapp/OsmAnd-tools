@@ -617,7 +617,7 @@ public class WikiVoyagePreparation {
 		public JsonObject downloadMetadata(String id) {
 			JsonObject obj = null;
 			try {
-				if(downloadMetadata ++ % 1000 == 0) {
+				if(++downloadMetadata % 100 == 0) {
 					System.out.println("Download wiki metadata " + downloadMetadata);
 				}
 				StringBuilder metadata = new StringBuilder();
