@@ -169,8 +169,6 @@ public class WikiVoyagePreparation {
 							+ (uncompressed ? ", gpx text" : "") + ", trip_id long, original_id long, lang text, contents_json text)");
 			conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_title ON travel_articles(title);");
 			conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_id ON travel_articles(trip_id);");
-			conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_orig_id ON travel_articles(original_id);");
-			conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_image_title ON travel_articles(image_title);");
 			conn.createStatement()
 					.execute("CREATE INDEX IF NOT EXISTS index_part_of ON travel_articles(is_part_of);");
 			prep = conn.prepareStatement("INSERT INTO travel_articles VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?" + (uncompressed ? ", ?, ?": "") + ")");

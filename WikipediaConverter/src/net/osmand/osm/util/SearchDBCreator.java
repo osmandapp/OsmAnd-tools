@@ -12,11 +12,9 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeSet;
 
@@ -44,6 +42,9 @@ public class SearchDBCreator {
 		DBDialect dialect = DBDialect.SQLITE;
 		Connection conn = (Connection) dialect.getDatabaseConnection(pathTodb.getAbsolutePath(), log);
 		
+		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_orig_id ON travel_articles(original_id);");
+		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_image_title ON travel_articles(image_title);");
+		
 		System.out.println("Processing langlink file " + langlinkFile.getAbsolutePath());
 		createLangLinksIfMissing(langlinkFile, langlinkFolder, conn);
 		System.out.println("Connect translations ");
@@ -59,6 +60,9 @@ public class SearchDBCreator {
 		generateAggPartOf(conn);
 		System.out.println("Generate search table");
 		generateSearchTable(conn);
+		
+		conn.createStatement().execute("DROP INDEX IF EXISTS index_orig_id");
+		conn.createStatement().execute("DROP INDEX IF EXISTS index_image_title ");
 		conn.close();
 	}
 
@@ -147,31 +151,21 @@ public class SearchDBCreator {
 							+ e.getMessage());
 				}
 			}
-		}
-		System.out.println("Updating images... ");
-		PreparedStatement pUpdate = conn.prepareStatement("UPDATE travel_articles SET image_title=? WHERE image_title=?");
-		Iterator<Entry<String, String>> it = valuesToUpdate.entrySet().iterator();
-		int count = 0;
-		int countUpd = 0;
-		while(it.hasNext()) {
-			Entry<String, String> e = it.next();
-			if(e.getValue() != null && e.getValue().length() > 0) {
-				pUpdate.setString(1, e.getValue());
-				pUpdate.setString(2, e.getKey());
-				pUpdate.addBatch();
-				if(count ++ > BATCH_SIZE) {
-					int[] bb = pUpdate.executeBatch();
-					if(bb != null) {
-						for(int k = 0; k < bb.length; k ++) {
-							countUpd += bb[k];
-						}
-					}
-				}	
+			String sourceFile = existingImagesMapping.get(imageTitle);
+			valuesToUpdate.put(imageTitle, sourceFile);
+			if(sourceFile!= null && sourceFile.trim().length() > 0) {
+				pInsertSource.setString(1, imageTitle);
+				pInsertSource.setString(2, sourceFile);
+				pInsertSource.executeUpdate();
+				imagesToUpdate++;
 			}
 		}
-		pUpdate.executeBatch();
-		conn.createStatement().execute("DROP INDEX IF EXISTS index_image_title;");
-		System.out.println("Update to full size images " + count  + " " + countUpd);
+		rs.close();
+		System.out.println("Updating images " + imagesToUpdate + ".");
+		int updated = conn.createStatement().executeUpdate("UPDATE travel_articles SET image_title = "
+				+ " (SELECT source_image from source_image s where s.banner_image = travel_articles.image_title) "
+				+ " WHERE image_title IN (SELECT distinct banner_image from source_image)");
+		System.out.println("Update to full size images finished, updated: " + updated);
 		
 		imagesConn.close();
 		
