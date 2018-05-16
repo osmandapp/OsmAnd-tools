@@ -367,11 +367,15 @@ public class WikiDatabasePreparation {
 		if(metadata == null) {
 			return "";
 		}
-		JsonObject ks = metadata.get("entities").getAsJsonObject();
-		JsonObject sitelinks = ks.get(ks.keySet().iterator().next()).getAsJsonObject().get("sitelinks").getAsJsonObject();
-		if(sitelinks.has(wikiLang + "wiki")) {
-			String title = sitelinks.get(wikiLang + "wiki").getAsJsonObject().get("title").getAsString();
-			return title;
+		try {
+			JsonObject ks = metadata.get("entities").getAsJsonObject();
+			JsonObject sitelinks = ks.get(ks.keySet().iterator().next()).getAsJsonObject().get("sitelinks").getAsJsonObject();
+			if(sitelinks.has(wikiLang + "wiki")) {
+				String title = sitelinks.get(wikiLang + "wiki").getAsJsonObject().get("title").getAsString();
+				return title;
+			}
+		} catch (IllegalStateException e) {
+			System.err.println("Error parsing wikidata Json " + wikiData + " "  + metadata);
 		}
 		return "";
 	}
