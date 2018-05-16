@@ -170,6 +170,9 @@ public class SearchDBCreator {
 	}
 
 	private static String stripImageName(String sourceFile) {
+		if(sourceFile == null) {
+			return null;
+		}
 		if (sourceFile.contains("]")) {
 			sourceFile = sourceFile.substring(0, sourceFile.indexOf(']'));
 		}
