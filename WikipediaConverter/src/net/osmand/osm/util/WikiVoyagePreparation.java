@@ -177,7 +177,7 @@ public class WikiVoyagePreparation {
 			prep = conn.prepareStatement("INSERT INTO travel_articles(title, content_gz"
 							+ (uncompressed ? ", content text" : "") + ", is_part_of, lat, lon, image_title, gpx_gz"
 							+ (uncompressed ? ", gpx text" : "") + ", trip_id , original_id , lang, contents_json)"
-					+ " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?" + (uncompressed ? ", ?, ?": "") + ")");
+					+ " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?" + (uncompressed ? ", ?, ?": "") + ")");
 			
 			wikidataconn  = new WikidataConnection(new File(sqliteFile.getParentFile(), "wikidata.sqlite"));
 			

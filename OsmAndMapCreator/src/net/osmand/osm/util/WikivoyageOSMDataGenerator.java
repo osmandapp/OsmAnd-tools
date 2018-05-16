@@ -160,12 +160,12 @@ public class WikivoyageOSMDataGenerator {
 		TreeSet<String> popularArticleIds = readMostPopularArticlesFromWikivoyage(langs, 100);
 		
 		System.out.println("Scan articles for big cities");
-		rs = conn.createStatement().executeQuery("SELECT article_id, trip_id, population, lat, lon, lang FROM travel_articles ");
+		rs = conn.createStatement().executeQuery("SELECT title, trip_id, population, lat, lon, lang FROM travel_articles ");
 		
 		while(rs.next()) {
-			String title = java.net.URLDecoder.decode(rs.getString(1), "UTF-8").toLowerCase();
+			String title = rs.getString(1).toLowerCase();
 			Long tripId = rs.getLong(2);
-			if(title.equals("main_page") || title.contains("disambiguation") 
+			if(title.equals("main page") || title.contains("disambiguation") 
 					|| title.contains("значения")) {
 				excludeTripIds.add(tripId);
 			}
