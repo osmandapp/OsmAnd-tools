@@ -4,6 +4,7 @@ import info.bliki.wiki.filter.Encoder;
 import info.bliki.wiki.filter.HTMLConverter;
 
 import java.io.BufferedInputStream;
+import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -12,8 +13,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
+import java.net.URL;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Types;
 import java.util.ArrayList;
@@ -42,11 +45,15 @@ import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import com.google.gson.JsonSyntaxException;
+import com.google.gson.stream.JsonReader;
+
 public class WikiVoyagePreparation {
 	private static final Log log = PlatformUtil.getLog(WikiDatabasePreparation.class);	
 	private static boolean uncompressed;
 	
-	private static String language;
 	
 	public enum WikivoyageTemplates {
 		LOCATION("geo"),
@@ -66,6 +73,7 @@ public class WikiVoyagePreparation {
 		}
 	}
 	
+	
 	private static void testLatLonParse() {
 		// {{}}
 		System.out.println(WikiOsmHandler.parseLatLon("geo|-34.60|-58.38|zoom=4"));
@@ -81,13 +89,11 @@ public class WikiVoyagePreparation {
 		String folder = "";
 		if(args.length == 0) {
 			lang = "en";
-			language = lang;
 			folder = "/home/user/osmand/wikivoyage/";
 			uncompressed = true;
 		}
 		if(args.length > 0) {
 			lang = args[0];
-			language = lang;
 		}
 		if(args.length > 1){
 			folder = args[1];
@@ -105,10 +111,6 @@ public class WikiVoyagePreparation {
 		processWikivoyage(wikiPg, lang, sqliteFileName);
 		System.out.println("Successfully generated.");
     }
-	
-	public static String getLanguage() {
-		return language;
-	}
 	
 	protected static void processWikivoyage(final String wikiPg, String lang, String sqliteFileName)
 			throws ParserConfigurationException, SAXException, FileNotFoundException, IOException, SQLException {
@@ -154,6 +156,7 @@ public class WikiVoyagePreparation {
 		private static final String P_CLOSED = "</p>";
 		final ByteArrayOutputStream bous = new ByteArrayOutputStream(64000);
 		private String lang;
+		private WikidataConnection wikidataconn;
 			
 		WikiOsmHandler(SAXParser saxParser, InputStream progIS, String lang, File sqliteFile)
 				throws IOException, SQLException {
@@ -172,6 +175,9 @@ public class WikiVoyagePreparation {
 			conn.createStatement()
 					.execute("CREATE INDEX IF NOT EXISTS index_part_of ON travel_articles(is_part_of);");
 			prep = conn.prepareStatement("INSERT INTO travel_articles VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?" + (uncompressed ? ", ?, ?": "") + ")");
+			
+			wikidataconn  = new WikidataConnection(new File(sqliteFile.getParentFile(), "wikidata.sqlite"));
+			
 		}
 		
 		public void addBatch() throws SQLException {
@@ -248,7 +254,8 @@ public class WikiVoyagePreparation {
 					} else if (name.equals("text")) {
 						if (parseText) {
 							Map<String, List<String>> macroBlocks = new HashMap<>();
-							String text = WikiDatabasePreparation.removeMacroBlocks(ctext.toString(), macroBlocks);
+							String text = WikiDatabasePreparation.removeMacroBlocks(ctext.toString(), macroBlocks,
+									lang, wikidataconn);
 							try {
 								if (!macroBlocks.isEmpty()) {
 									LatLon ll = getLatLonFromGeoBlock(
@@ -309,6 +316,8 @@ public class WikiVoyagePreparation {
 					}
 				}
 			} catch (IOException e) {
+				throw new SAXException(e);
+			} catch (SQLException e) {
 				throw new SAXException(e);
 			}
 		}
@@ -590,4 +599,64 @@ public class WikiVoyagePreparation {
 			return region;
 		}
 	}
+	
+	public static class WikidataConnection {
+		private Connection conn;
+		private PreparedStatement pselect;
+		private PreparedStatement pinsert;
+		private int downloadMetadata = 0;
+
+		public WikidataConnection(File f) throws SQLException {
+			conn = (Connection) DBDialect.SQLITE.getDatabaseConnection(f.getAbsolutePath(), log);
+			conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wikidata(wikidataid text, metadata text)");
+			pselect = conn.prepareStatement("SELECT metadata FROM wikidata where wikidataid = ? ");
+			pinsert = conn.prepareStatement("INSERT INTO wikidata( wikidataid, metadata) VALUES(?, ?) ");
+		}
+		
+		public JsonObject downloadMetadata(String id) {
+			JsonObject obj = null;
+			try {
+				if(downloadMetadata ++ % 1000 == 0) {
+					System.out.println("Download wiki metadata " + downloadMetadata);
+				}
+				StringBuilder metadata = new StringBuilder();
+				String metadataUrl = "https://www.wikidata.org/wiki/Special:EntityData/"+id+".json";
+				URL url = new URL(metadataUrl);
+				BufferedReader reader = new BufferedReader(new InputStreamReader(url.openStream()));
+				String s;
+				while ((s = reader.readLine()) != null) {
+					metadata.append(s).append("\n");
+				}
+				obj = new JsonParser().parse(metadata.toString()).getAsJsonObject();
+				pinsert.setString(1, id);
+				pinsert.setString(2, metadata.toString());
+				pinsert.execute();
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+			return obj;
+		}
+		
+		
+		public JsonObject getMetadata(String id) throws SQLException {
+			pselect.setString(1, id);
+			ResultSet rs = pselect.executeQuery();
+			try {
+				if(rs.next()){
+					return new JsonParser().parse(rs.getString(1)).getAsJsonObject();
+				}
+			} catch (JsonSyntaxException e) {
+				e.printStackTrace();
+				return null;
+			} finally {
+				rs.close();
+			}
+			return null;
+		}
+		
+		public void close() throws SQLException {
+			conn.close();
+		}
+	}
+	
 }

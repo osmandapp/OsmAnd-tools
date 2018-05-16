@@ -19,6 +19,7 @@ import java.io.Reader;
 import java.io.StringReader;
 import java.io.UnsupportedEncodingException;
 import java.net.URL;
+import java.net.URLEncoder;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -39,6 +40,7 @@ import javax.xml.parsers.SAXParserFactory;
 import net.osmand.PlatformUtil;
 import net.osmand.data.preparation.DBDialect;
 import net.osmand.impl.ConsoleProgressImplementation;
+import net.osmand.osm.util.WikiVoyagePreparation.WikidataConnection;
 import net.osmand.osm.util.WikiVoyagePreparation.WikivoyageTemplates;
 
 import org.apache.commons.lang3.StringUtils;
@@ -63,6 +65,9 @@ import org.xwiki.rendering.parser.Parser;
 import org.xwiki.rendering.renderer.printer.DefaultWikiPrinter;
 import org.xwiki.rendering.renderer.printer.WikiPrinter;
 import org.xwiki.rendering.syntax.Syntax;
+
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 
 public class WikiDatabasePreparation {
 	private static final Log log = PlatformUtil.getLog(WikiDatabasePreparation.class);
@@ -102,27 +107,28 @@ public class WikiDatabasePreparation {
 
 	}
     
-	public static String removeMacroBlocks(String s, Map<String, List<String>> blocksMap) {
+	public static String removeMacroBlocks(String text, Map<String, List<String>> blocksMap,
+			String lang, WikidataConnection wikidata) throws IOException, SQLException {
 		StringBuilder bld = new StringBuilder();
 		int openCnt = 0;
 		int beginInd = 0;
 		int endInd = 0;
 		int headerCount = 0;
 		boolean hebrew = false;
-		for (int i = 0; i < s.length(); i++) {
-			int nt = s.length() - i - 1;
-			if (nt > 0 && ((s.charAt(i) == '{' && s.charAt(i + 1) == '{') || (s.charAt(i) == '[' && s.charAt(i + 1) == '[' && s.charAt(i + 2) == 'ק') 
-					|| (s.charAt(i) == '<' && s.charAt(i + 1) == 'm' && s.charAt(i + 2) == 'a' && s.charAt(i + 3) == 'p' 
-					&& s.charAt(i + 4) == 'l' && s.charAt(i + 5) == 'i') 
-					|| (s.charAt(i) == '<' && s.charAt(i + 1) == 'g' && s.charAt(i + 2) == 'a' && s.charAt(i + 3) == 'l'))) {
-				hebrew = s.length() > 2 ? s.charAt(i + 2) == 'ק' : false;
+		for (int i = 0; i < text.length(); i++) {
+			int nt = text.length() - i - 1;
+			if (nt > 0 && ((text.charAt(i) == '{' && text.charAt(i + 1) == '{') || (text.charAt(i) == '[' && text.charAt(i + 1) == '[' && text.charAt(i + 2) == 'ק') 
+					|| (text.charAt(i) == '<' && text.charAt(i + 1) == 'm' && text.charAt(i + 2) == 'a' && text.charAt(i + 3) == 'p' 
+					&& text.charAt(i + 4) == 'l' && text.charAt(i + 5) == 'i') 
+					|| (text.charAt(i) == '<' && text.charAt(i + 1) == 'g' && text.charAt(i + 2) == 'a' && text.charAt(i + 3) == 'l'))) {
+				hebrew = text.length() > 2 ? text.charAt(i + 2) == 'ק' : false;
 				beginInd = beginInd == 0 ? i + 2 : beginInd;
 				openCnt++;
 				i++;
-			} else if (nt > 0 && ((s.charAt(i) == '}' && s.charAt(i + 1) == '}') || (hebrew && s.charAt(i) == ']' && s.charAt(i + 1) == ']')
-					|| (s.charAt(i) == '>' && s.charAt(i - 1) == 'k' && s.charAt(i - 2) == 'n' && s.charAt(i - 3) == 'i' 
-					&& s.charAt(i - 4) == 'l' && s.charAt(i - 5) == 'p') 
-					|| (s.charAt(i) == '>' && s.charAt(i - 1) == 'y' && s.charAt(i - 2) == 'r' && s.charAt(i - 3) == 'e'))) {
+			} else if (nt > 0 && ((text.charAt(i) == '}' && text.charAt(i + 1) == '}') || (hebrew && text.charAt(i) == ']' && text.charAt(i + 1) == ']')
+					|| (text.charAt(i) == '>' && text.charAt(i - 1) == 'k' && text.charAt(i - 2) == 'n' && text.charAt(i - 3) == 'i' 
+					&& text.charAt(i - 4) == 'l' && text.charAt(i - 5) == 'p') 
+					|| (text.charAt(i) == '>' && text.charAt(i - 1) == 'y' && text.charAt(i - 2) == 'r' && text.charAt(i - 3) == 'e'))) {
 				if (openCnt > 1) {
 					openCnt--;
 					i++;
@@ -130,13 +136,13 @@ public class WikiDatabasePreparation {
 				}
 				openCnt--;
 				endInd = i;
-				String val = s.substring(beginInd, endInd);
+				String val = text.substring(beginInd, endInd);
 				if (val.startsWith("allery")) {
 					bld.append(parseGallery(val));
 				}
 				String key = getKey(val.toLowerCase());
 				if (key.equals(WikivoyageTemplates.POI.getType())) {
-					bld.append(parseListing(val));
+					bld.append(parseListing(val, wikidata, lang));
 				} else if (key.equals(WikivoyageTemplates.REGION_LIST.getType())) {
 					bld.append((parseRegionList(val)));
 				} else if (key.equals(WikivoyageTemplates.WARNING.getType())) {
@@ -156,16 +162,16 @@ public class WikiDatabasePreparation {
 				if (openCnt == 0) {
 					int headerLvl = 0;
 					int indexCopy = i;
-					if (i > 0 && s.charAt(i - 1) != '=') {
-						headerLvl = calculateHeaderLevel(s, i);
+					if (i > 0 && text.charAt(i - 1) != '=') {
+						headerLvl = calculateHeaderLevel(text, i);
 						indexCopy = indexCopy + headerLvl;
 					}
-					if (s.charAt(indexCopy) != '\n' && headerLvl > 1) {
-						int indEnd = s.indexOf("=", indexCopy);
+					if (text.charAt(indexCopy) != '\n' && headerLvl > 1) {
+						int indEnd = text.indexOf("=", indexCopy);
 						if (indEnd != -1) {
-							indEnd = indEnd + calculateHeaderLevel(s, indEnd);
-							char ch = indEnd < s.length() - 2 ? s.charAt(indEnd + 1) : s.charAt(indEnd);
-							int nextHeader = calculateHeaderLevel(s, ch == '\n' ? indEnd + 2 : indEnd + 1);
+							indEnd = indEnd + calculateHeaderLevel(text, indEnd);
+							char ch = indEnd < text.length() - 2 ? text.charAt(indEnd + 1) : text.charAt(indEnd);
+							int nextHeader = calculateHeaderLevel(text, ch == '\n' ? indEnd + 2 : indEnd + 1);
 							if (nextHeader > 1 && headerLvl >= nextHeader ) {
 								i = indEnd;
 								continue;
@@ -173,16 +179,16 @@ public class WikiDatabasePreparation {
 								if (headerCount != 0) {
 									bld.append("\n/div\n");
 								}
-								bld.append(s.substring(i, indEnd));
+								bld.append(text.substring(i, indEnd));
 								bld.append("\ndiv class=\"content\"\n");
 								headerCount++;
 								i = indEnd;
 							} else {
-								bld.append(s.charAt(i));
+								bld.append(text.charAt(i));
 							}
 						}						
 					} else {
-						bld.append(s.charAt(i));
+						bld.append(text.charAt(i));
 					}
 					beginInd = 0;
 					endInd = 0;
@@ -264,13 +270,14 @@ public class WikiDatabasePreparation {
 		}
 	}
 	
-	private static String parseListing(String val) {
+	private static String parseListing(String val, WikidataConnection wikiDataconn, String wikiLang) throws IOException, SQLException {
 		StringBuilder bld = new StringBuilder();
 		String[] parts = val.split("\\|");
 		String lat = null;
 		String lon = null;
 		String areaCode = "";
 		String wikiLink = "";
+		String wikiData = "";
 		for (int i = 1; i < parts.length; i++) {
 			String field = parts[i].trim();
 			String value = "";
@@ -304,6 +311,8 @@ public class WikiDatabasePreparation {
 					} else if (field.equalsIgnoreCase("fax") || field.equalsIgnoreCase("פקס")
 							|| field.equalsIgnoreCase("دورنگار")) {
 						bld.append("fax: " + value + ", ");
+					} else if (field.equalsIgnoreCase("wdid") || field.equalsIgnoreCase("wikidata")) {
+						wikiData = value;
 					} else if (field.equalsIgnoreCase("phone") || field.equalsIgnoreCase("tel")
 							|| field.equalsIgnoreCase("téléphone") || field.equalsIgnoreCase("טלפון") || field.equalsIgnoreCase("تلفن")) {
 						String tel = areaCode.replaceAll("[ -]", "/") + "/" + value.replaceAll("[ -]", "/")
@@ -333,14 +342,38 @@ public class WikiDatabasePreparation {
 				} catch (Exception e) {}
 			}
 		}
+		if (!wikiLink.isEmpty() && !wikiData.isEmpty()) {
+			wikiLink = getWikidata(wikiLang, wikiData, wikiDataconn);
+		}
 		if (!wikiLink.isEmpty()) {
-			bld.append(addWikiLink(wikiLink));
+			bld.append(addWikiLink(wikiLang, wikiLink));
 			bld.append(" ");
 		}
 		if (lat != null && lon != null) {
 			bld.append(" geo:" + lat + "," + lon);
 		}
 		return bld.toString() + "\n";
+	}
+	
+
+	private static String getWikidata(String wikiLang, String wikiData, WikidataConnection wikiDataconn) throws SQLException {
+		if(wikiDataconn == null) {
+			return "";
+		}
+		JsonObject metadata = wikiDataconn.getMetadata(wikiData);
+		if(metadata == null) {
+			metadata = wikiDataconn.downloadMetadata(wikiData);
+		}
+		if(metadata == null) {
+			return "";
+		}
+		JsonObject ks = metadata.get("entities").getAsJsonObject();
+		JsonObject sitelinks = ks.get(ks.keySet().iterator().next()).getAsJsonObject().get("sitelinks").getAsJsonObject();
+		if(sitelinks.has(wikiLang + "wiki")) {
+			String title = sitelinks.get(wikiLang + "wiki").getAsJsonObject().get("title").getAsString();
+			return title;
+		}
+		return "";
 	}
 
 	public static String appendSqareBracketsIfNeeded(int i, String[] parts, String value) {
@@ -350,10 +383,10 @@ public class WikiDatabasePreparation {
 		return value;
 	}
 
-	private static String addWikiLink(String value) {
-		return "[https://" + WikiVoyagePreparation.getLanguage() + 
-				".wikipedia.org/wiki/" + value.trim().replaceAll(" ", "_").replaceAll("\"", "%22")
-				.replaceAll("«", "%C2%AB").replaceAll("»", "%C2%BB") + " Wikipedia]";
+	private static String addWikiLink(String lang, String value) throws UnsupportedEncodingException {
+		return "[https://" + lang + 
+				".wikipedia.org/wiki/" + URLEncoder.encode(value.trim().replaceAll(" ", "_"), "UTF_8") 
+				+ " Wikipedia]";
 	}
 
 	private static String getKey(String str) {
@@ -391,7 +424,7 @@ public class WikiDatabasePreparation {
 		return "";
 	}
 
-	public static void mainTest(String[] args) throws ConversionException, ComponentLookupException, ParseException, IOException {
+	public static void mainTest(String[] args) throws ConversionException, ComponentLookupException, ParseException, IOException, SQLException {
 		EmbeddableComponentManager cm = new EmbeddableComponentManager();
 		cm.initialize(WikiDatabasePreparation.class.getClassLoader());
 		Parser parser = cm.getInstance(Parser.class, Syntax.MEDIAWIKI_1_0.toIdString());
@@ -402,7 +435,7 @@ public class WikiDatabasePreparation {
 		while((s = br.readLine()) != null) {
 			content += s;
 		}
-		content = removeMacroBlocks(content, new HashMap<>());
+		content = removeMacroBlocks(content, new HashMap<>(), "en", null);
 		
 		XDOM xdom = parser.parse(new StringReader(content));
 		        
@@ -822,7 +855,8 @@ public class WikiDatabasePreparation {
 						}
 						if (parseText && !isJunk) {
 							LatLon ll = pages.get(cid);
-							String text = removeMacroBlocks(ctext.toString(), new HashMap<>());
+							String text = removeMacroBlocks(ctext.toString(), new HashMap<>(), 
+									lang, null);
 							final HTMLConverter converter = new HTMLConverter(false);
 							CustomWikiModel wikiModel = new CustomWikiModel("http://"+lang+".wikipedia.org/wiki/${image}", "http://"+lang+".wikipedia.org/wiki/${title}", true);
 							String plainStr = wikiModel.render(converter, text);
@@ -852,6 +886,8 @@ public class WikiDatabasePreparation {
 					}
 				}
 			} catch (IOException e) {
+				throw new SAXException(e);
+			} catch (SQLException e) {
 				throw new SAXException(e);
 			}
 		}
