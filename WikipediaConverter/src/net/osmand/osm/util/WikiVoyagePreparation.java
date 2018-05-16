@@ -371,14 +371,15 @@ public class WikiVoyagePreparation {
 						String value = "";
 						int index = field.indexOf("=");
 						if (index != -1) {
-							value = field.substring(index + 1, field.length()).trim();
+							value = WikiDatabasePreparation.appendSqareBracketsIfNeeded(i, info, field.substring(index + 1, field.length()).trim());
+							value = value.replaceAll("[\\]\\[]", "");
 							field = field.substring(0, index).trim();
 						}
 						if (!value.isEmpty() && !value.contains("{{")) {
 							try {
 								if (field.equalsIgnoreCase("name") || field.equalsIgnoreCase("nome") || field.equalsIgnoreCase("nom")
 										|| field.equalsIgnoreCase("שם") || field.equalsIgnoreCase("نام")) {
-									point.name = value.replaceAll("[\\]\\[]", "");
+									point.name = value;
 								} else if (field.equalsIgnoreCase("url") || field.equalsIgnoreCase("sito") || field.equalsIgnoreCase("האתר הרשמי")
 										|| field.equalsIgnoreCase("نشانی اینترنتی")) {
 									point.link = value;

@@ -235,15 +235,9 @@ public class WikiDatabasePreparation {
 			if (ind != -1) {
 				String partname = part.trim().substring(0, ind).trim();
 				if (partname.matches("region\\d+name")) {
-					String value = part.substring(ind + 1, part.length());
+					String value = appendSqareBracketsIfNeeded(i, parts, part.substring(ind + 1, part.length()));
 					bld.append("*");
-					if (StringUtils.countMatches(value, "[[") != StringUtils.countMatches(value, "]]") && i + 1 < parts.length) {
-						bld.append(value);
-						bld.append("|");
-						bld.append(parts[i+1]);
-					} else {
-						bld.append(value);
-					}
+					bld.append(value);
 					bld.append("\n");
 				} else if (partname.matches("region\\d+description")) {
 					String desc = part.substring(ind + 1, part.length());
@@ -282,25 +276,14 @@ public class WikiDatabasePreparation {
 			String value = "";
 			int index = field.indexOf("=");
 			if (index != -1) {
-				value = field.substring(index + 1, field.length()).trim();
+				value = appendSqareBracketsIfNeeded(i, parts, field.substring(index + 1, field.length()).trim());
 				field = field.substring(0, index).trim();
 			}
 			if (!value.isEmpty() && !value.contains("{{")) {
 				try {
 					if (field.equalsIgnoreCase(("name")) || field.equalsIgnoreCase("nome") || field.equalsIgnoreCase("nom") 
 							|| field.equalsIgnoreCase("שם") || field.equalsIgnoreCase("نام")) {
-						if (value.startsWith("[[") && !value.endsWith("]]")) {
-							bld.append("'''" + value);
-							if (parts[i + 1].contains("]]")) {
-								bld.append("|");
-								bld.append(parts[++i].trim());
-								bld.append("'''" + ", ");
-							} else {
-								bld.append("'''" + ", ");
-							}
-						} else {
-							bld.append("'''" + value + "'''" + ", ");
-						}
+						bld.append("'''" + value + "'''" + ", ");
 					} else if (field.equalsIgnoreCase("url") || field.equalsIgnoreCase("sito") || field.equalsIgnoreCase("האתר הרשמי")
 							|| field.equalsIgnoreCase("نشانی اینترنتی")) {
 						bld.append("Website: " + value + ". ");
@@ -315,7 +298,7 @@ public class WikiDatabasePreparation {
 						lon = value;
 					} else if (field.equalsIgnoreCase("content") || field.equalsIgnoreCase("descrizione") || field.equalsIgnoreCase("description")
 							|| field.equalsIgnoreCase("sobre") || field.equalsIgnoreCase("תיאור") || field.equalsIgnoreCase("متن")) {
-						bld.append(value.replaceAll("[\\]\\[]", "") + " ");
+						bld.append(value + " ");
 					} else if (field.equalsIgnoreCase("email") || field.equalsIgnoreCase("מייל") || field.equalsIgnoreCase("پست الکترونیکی")) {
 						bld.append("e-mail: " + "mailto:" + value + ", ");
 					} else if (field.equalsIgnoreCase("fax") || field.equalsIgnoreCase("פקס")
@@ -334,19 +317,7 @@ public class WikiDatabasePreparation {
 						bld.append("Working hours: " + value + ". ");
 					} else if (field.equalsIgnoreCase("directions") || field.equalsIgnoreCase("direction") 
 							|| field.equalsIgnoreCase("הוראות") || field.equalsIgnoreCase("مسیرها")) {
-						if (value.contains("[[") && parts[i + 1].contains("]]") && i + 1 < parts.length) {
-							String secondPart = parts[i + 1];
-							int indexOfBrackets = secondPart.indexOf("]]"); 
-							secondPart = indexOfBrackets != -1 ? secondPart.substring(0, indexOfBrackets + 2) : "";
-							if (!secondPart.isEmpty()) {
-								bld.append(value + "|");
-								bld.append(secondPart + ". ");
-							} else {
-								bld.append(value.replaceAll("[\\]\\[]", "") + ". ");
-							}
-						} else {
-							bld.append(value.replaceAll("[\\]\\[]", "") + ". ");
-						}
+						bld.append(value + ". ");
 					} else if (field.equalsIgnoreCase("indicazioni")) {
 						bld.append("Indicazioni: " + value + ". ");
 					} else if (field.equalsIgnoreCase("orari")) {
@@ -357,7 +328,6 @@ public class WikiDatabasePreparation {
 						bld.append("Funcionamento: " + value + ". ");
 					} else if (field.equalsIgnoreCase("wikipedia") && !value.equals("undefined")
 							&& !value.isEmpty()) {
-//						bld.append(addWikiLink(value) + " ");
 						wikiLink = value;
 					}
 				} catch (Exception e) {}
@@ -371,6 +341,13 @@ public class WikiDatabasePreparation {
 			bld.append(" geo:" + lat + "," + lon);
 		}
 		return bld.toString() + "\n";
+	}
+
+	public static String appendSqareBracketsIfNeeded(int i, String[] parts, String value) {
+		while (StringUtils.countMatches(value, "[[") > StringUtils.countMatches(value, "]]") && i + 1 < parts.length) {
+			value += "|" + parts[++i];
+		}
+		return value;
 	}
 
 	private static String addWikiLink(String value) {
