@@ -342,7 +342,7 @@ public class WikiDatabasePreparation {
 				} catch (Exception e) {}
 			}
 		}
-		if (!wikiLink.isEmpty() && !wikiData.isEmpty()) {
+		if (wikiLink.isEmpty() && !wikiData.isEmpty()) {
 			wikiLink = getWikidata(wikiLang, wikiData, wikiDataconn);
 		}
 		if (!wikiLink.isEmpty()) {
