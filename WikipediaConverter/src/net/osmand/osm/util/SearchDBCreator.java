@@ -153,21 +153,31 @@ public class SearchDBCreator {
 							+ e.getMessage());
 				}
 			}
-			String sourceFile = existingImagesMapping.get(imageTitle);
-			valuesToUpdate.put(imageTitle, sourceFile);
-			if(sourceFile!= null && sourceFile.trim().length() > 0) {
-				pInsertSource.setString(1, imageTitle);
-				pInsertSource.setString(2, sourceFile);
-				pInsertSource.executeUpdate();
-				imagesToUpdate++;
+		}
+		System.out.println("Updating images... ");
+		PreparedStatement pUpdate = conn.prepareStatement("UPDATE travel_articles SET image_title=? WHERE image_title=?");
+		Iterator<Entry<String, String>> it = valuesToUpdate.entrySet().iterator();
+		int count = 0;
+		int countUpd = 0;
+		while(it.hasNext()) {
+			Entry<String, String> e = it.next();
+			if(e.getValue() != null && e.getValue().length() > 0) {
+				pUpdate.setString(1, e.getValue());
+				pUpdate.setString(2, e.getKey());
+				pUpdate.addBatch();
+				if(count ++ > BATCH_SIZE) {
+					int[] bb = pUpdate.executeBatch();
+					if(bb != null) {
+						for(int k = 0; k < bb.length; k ++) {
+							countUpd += bb[k];
+						}
+					}
+				}	
 			}
 		}
-		rs.close();
-		System.out.println("Updating images " + imagesToUpdate + ".");
-		int updated = conn.createStatement().executeUpdate("UPDATE travel_articles SET image_title = "
-				+ " (SELECT source_image from source_image s where s.banner_image = travel_articles.image_title) "
-				+ " WHERE image_title IN (SELECT distinct banner_image from source_image)");
-		System.out.println("Update to full size images finished, updated: " + updated);
+		pUpdate.executeBatch();
+		conn.createStatement().execute("DROP INDEX IF EXISTS index_image_title;");
+		System.out.println("Update to full size images " + count  + " " + countUpd);
 		
 		imagesConn.close();
 		
@@ -175,8 +185,9 @@ public class SearchDBCreator {
 
 	private static void copyHeaders(Connection conn) throws SQLException {
 		Statement statement = conn.createStatement();
-		boolean update = statement.execute("update travel_articles ts set image_title=(SELECT image_title FROM travel_articles t "  +
-           " WHERE ts.trip_id = t.trip_id and t.lang = 'en') where ts.image_title='' and ts.lang <>'en'");
+		boolean update = statement.execute("update or ignore travel_articles set image_title=(SELECT image_title FROM travel_articles t "
+				+ "WHERE t.trip_id = travel_articles.trip_id and t.lang = 'en')"
+				+ " where travel_articles.image_title='' and travel_articles.lang <>'en'");
         System.out.println("Copy headers from english language to others: " + update);
         statement.close();
         statement = conn.createStatement();

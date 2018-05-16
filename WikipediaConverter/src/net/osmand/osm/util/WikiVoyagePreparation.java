@@ -165,11 +165,12 @@ public class WikiVoyagePreparation {
 			conn = (Connection) dialect.getDatabaseConnection(sqliteFile.getAbsolutePath(), log);
 			conn.createStatement()
 					.execute("CREATE TABLE IF NOT EXISTS travel_articles(article_id text, title text, content_gz blob"
-							+ (uncompressed ? ", content text" : "") + ", is_part_of text, lat double, lon double, image_title text, gpx_gz blob"
+							+ (uncompressed ? ", content text" : "") + ", is_part_of text, lat double, lon double, image_title text not null, gpx_gz blob"
 							+ (uncompressed ? ", gpx text" : "") + ", trip_id long, original_id long, lang text, contents_json text)");
 			conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_title ON travel_articles(title);");
 			conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_id ON travel_articles(trip_id);");
 			conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_orig_id ON travel_articles(original_id);");
+			conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_image_title ON travel_articles(image_title);");
 			conn.createStatement()
 					.execute("CREATE INDEX IF NOT EXISTS index_part_of ON travel_articles(is_part_of);");
 			prep = conn.prepareStatement("INSERT INTO travel_articles VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?" + (uncompressed ? ", ?, ?": "") + ")");
@@ -371,14 +372,15 @@ public class WikiVoyagePreparation {
 						String value = "";
 						int index = field.indexOf("=");
 						if (index != -1) {
-							value = field.substring(index + 1, field.length()).trim();
+							value = WikiDatabasePreparation.appendSqareBracketsIfNeeded(i, info, field.substring(index + 1, field.length()).trim());
+							value = value.replaceAll("[\\]\\[]", "");
 							field = field.substring(0, index).trim();
 						}
 						if (!value.isEmpty() && !value.contains("{{")) {
 							try {
 								if (field.equalsIgnoreCase("name") || field.equalsIgnoreCase("nome") || field.equalsIgnoreCase("nom")
 										|| field.equalsIgnoreCase("שם") || field.equalsIgnoreCase("نام")) {
-									point.name = value.replaceAll("[\\]\\[]", "");
+									point.name = value;
 								} else if (field.equalsIgnoreCase("url") || field.equalsIgnoreCase("sito") || field.equalsIgnoreCase("האתר הרשמי")
 										|| field.equalsIgnoreCase("نشانی اینترنتی")) {
 									point.link = value;
