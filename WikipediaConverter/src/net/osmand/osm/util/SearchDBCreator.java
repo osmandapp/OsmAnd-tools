@@ -77,13 +77,17 @@ public class SearchDBCreator {
 		PreparedStatement pSelect = imagesConn.prepareStatement("SELECT file, url, metadata, sourcefile FROM images WHERE file = ?");
 		//PreparedStatement pDelete = imagesConn.prepareStatement("DELETE FROM images WHERE file = ?");
 		PreparedStatement pInsert = imagesConn.prepareStatement("INSERT INTO images(file, url, metadata, sourcefile) VALUES (?, ?, ?, ?)");
-		ResultSet rs = conn.createStatement().executeQuery("SELECT distinct image_title, title, lang FROM travel_articles ");
+		ResultSet rs = conn.createStatement().executeQuery("SELECT distinct image_title, title, lang FROM travel_articles where image_title <> ''");
 		Map<String, String> valuesToUpdate = new LinkedHashMap<String, String>();
 		int imagesFetched = 0;
+		int imagesProcessed = 0;
 		while(rs.next()) {
 			String imageTitle = rs.getString(1);
 			String name = rs.getString(2);
 			String lang = rs.getString(3);
+			if(imagesProcessed ++ % 5000 == 0) {
+				System.out.println("Images metadata processed: " + imagesProcessed);
+			}
 			if(valuesToUpdate.containsKey(imageTitle)  || imageTitle == null || imageTitle.length() == 0) {
 				continue;
 			}
