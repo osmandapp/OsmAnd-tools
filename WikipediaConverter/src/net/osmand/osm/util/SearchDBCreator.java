@@ -56,7 +56,7 @@ public class SearchDBCreator {
 		System.out.println("Generate missing ids");
 		generateIdsIfMissing(conn, langlinkFile);
 		System.out.println("Download/Copy proper headers for articles");
-//		updateProperHeaderForArticles(conn, workingDir);
+		updateProperHeaderForArticles(conn, workingDir);
 		System.out.println("Copy headers between lang");
 		copyHeaders(conn);
 		
