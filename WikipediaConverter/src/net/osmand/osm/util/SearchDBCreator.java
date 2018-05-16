@@ -129,9 +129,7 @@ public class SearchDBCreator {
 					while ((s = reader.readLine()) != null) {
 						if (s.contains("source=") && s.contains("File:")) {
 							sourceFile = s.substring(s.indexOf("File:") + "File:".length());
-							if (sourceFile.contains("]")) {
-								sourceFile = sourceFile.substring(0, sourceFile.indexOf(']'));
-							}
+							sourceFile = stripImageName(sourceFile);
 						}
 						metadata.append(s).append("\n");
 					}
@@ -153,6 +151,7 @@ public class SearchDBCreator {
 				}
 			}
 			String sourceFile = existingImagesMapping.get(imageTitle);
+			sourceFile = stripImageName(sourceFile);
 			valuesToUpdate.put(imageTitle, sourceFile);
 			if (sourceFile != null && sourceFile.trim().length() > 0) {
 				pInsertSource.setString(1, imageTitle);
@@ -170,6 +169,16 @@ public class SearchDBCreator {
 		
 		imagesConn.close();
 		
+	}
+
+	private static String stripImageName(String sourceFile) {
+		if (sourceFile.contains("]")) {
+			sourceFile = sourceFile.substring(0, sourceFile.indexOf(']'));
+		}
+		if (sourceFile.contains("}")) {
+			sourceFile = sourceFile.substring(0, sourceFile.indexOf('}'));
+		}
+		return sourceFile;
 	}
 
 	private static void copyHeaders(Connection conn) throws SQLException {
