@@ -20,6 +20,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeSet;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.zip.GZIPInputStream;
@@ -34,7 +35,7 @@ import net.osmand.osm.util.WikiDatabasePreparation.LatLon;
 public class SearchDBCreator {
 
 	private static final Log log = PlatformUtil.getLog(SearchDBCreator.class);
-	private static final int BATCH_SIZE = 100;
+	private static final int BATCH_SIZE = 500;
 
 	public static void main(String[] args) throws SQLException, IOException {
 		boolean uncompressed = false;
@@ -69,96 +70,104 @@ public class SearchDBCreator {
 
 	private static void updateProperHeaderForArticles(Connection conn, String workingDir) throws SQLException {
 		final File imagesMetadata = new File(workingDir, "images.sqlite");
-		// TODO temporarily delete until stabilize
+		// delete images to fully recreate db
 		// imagesMetadata.delete();
 		Connection imagesConn = (Connection) DBDialect.SQLITE.getDatabaseConnection(imagesMetadata.getAbsolutePath(), log);
 		imagesConn.createStatement()
 				.execute("CREATE TABLE IF NOT EXISTS images(file text, url text, metadata text, sourcefile text)");
-		PreparedStatement pSelect = imagesConn.prepareStatement("SELECT file, url, metadata, sourcefile FROM images WHERE file = ?");
+		conn.createStatement().execute("DROP TABLE IF EXISTS source_image;");
+		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS source_image(banner_image text, source_image text)");
+		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_source_image ON source_image(banner_image);");
+		
+		Map<String, String> existingImagesMapping = new LinkedHashMap<String, String>();
+		TreeSet<String> sourceImages = new TreeSet<String>();
+		ResultSet rs1 = imagesConn.createStatement().executeQuery("SELECT file, sourcefile FROM images");
+		while(rs1.next()) {
+			existingImagesMapping.put(rs1.getString(1), rs1.getString(2));
+			sourceImages.add(rs1.getString(1));
+		}
+		rs1.close();
+		
+		
+		Map<String, String> valuesToUpdate = new LinkedHashMap<String, String>();
+//		PreparedStatement pSelect = imagesConn.prepareStatement("SELECT file, url, metadata, sourcefile FROM images WHERE file = ?");
 		//PreparedStatement pDelete = imagesConn.prepareStatement("DELETE FROM images WHERE file = ?");
 		PreparedStatement pInsert = imagesConn.prepareStatement("INSERT INTO images(file, url, metadata, sourcefile) VALUES (?, ?, ?, ?)");
 		ResultSet rs = conn.createStatement().executeQuery("SELECT distinct image_title, title, lang FROM travel_articles where image_title <> ''");
-		Map<String, String> valuesToUpdate = new LinkedHashMap<String, String>();
+		PreparedStatement pInsertSource = conn.prepareStatement("INSERT INTO source_image(banner_image, source_image) VALUES(?, ?)");
+		
 		int imagesFetched = 0;
 		int imagesProcessed = 0;
-		while(rs.next()) {
+		int imagesToUpdate = 0;
+		while (rs.next()) {
 			String imageTitle = rs.getString(1);
 			String name = rs.getString(2);
 			String lang = rs.getString(3);
-			if(imagesProcessed ++ % 5000 == 0) {
-				System.out.println("Images metadata processed: " + imagesProcessed);
-			}
-			if(valuesToUpdate.containsKey(imageTitle)  || imageTitle == null || imageTitle.length() == 0) {
+			if(imageTitle == null || imageTitle.length() == 0) {
 				continue;
 			}
-			
-			valuesToUpdate.put(imageTitle, null);
-			pSelect.setString(1, imageTitle);
-			ResultSet stored = pSelect.executeQuery();
-			if(stored.next()) {
-				// pDelete and update
-				valuesToUpdate.put(imageTitle, stored.getString(4));
-			} else {
-				String metadataUrl = "https://commons.wikimedia.org/w/index.php?title=File:"+imageTitle+"&action=raw";
+			if (valuesToUpdate.containsKey(imageTitle)) {
+				continue;
+			}
+			if(sourceImages.contains(imageTitle)) {
+				// processed before
+				continue;
+			}
+			if (imagesProcessed++ % 5000 == 0) {
+				System.out.println("Images metadata processed: " + imagesProcessed);
+			}
+			if(!existingImagesMapping.containsKey(imageTitle)) {
+				existingImagesMapping.put(imageTitle, null);
+				String metadataUrl = "https://commons.wikimedia.org/w/index.php?title=File:" + imageTitle + "&action=raw";
 				try {
 					URL url = new URL(metadataUrl);
 					BufferedReader reader = new BufferedReader(new InputStreamReader(url.openStream()));
 					StringBuilder metadata = new StringBuilder();
 					String s;
 					String sourceFile = null;
-					while((s = reader.readLine()) != null) {
-						if(s.contains("source=") && s.contains("File:")) {
+					while ((s = reader.readLine()) != null) {
+						if (s.contains("source=") && s.contains("File:")) {
 							sourceFile = s.substring(s.indexOf("File:") + "File:".length());
 							if (sourceFile.contains("]")) {
 								sourceFile = sourceFile.substring(0, sourceFile.indexOf(']'));
 							}
-							
+
 						}
 						metadata.append(s).append("\n");
 					}
-					
+
 					pInsert.setString(1, imageTitle);
 					pInsert.setString(2, metadataUrl);
 					pInsert.setString(3, metadata.toString());
 					pInsert.setString(4, null);
-					if(sourceFile != null) {
+					if (sourceFile != null) {
 						pInsert.setString(4, sourceFile.toString());
-						valuesToUpdate.put(imageTitle, sourceFile);
+						existingImagesMapping.put(imageTitle, sourceFile);
 					}
 					pInsert.executeUpdate();
-					if(imagesFetched++ % 100 == 0) {
+					if (imagesFetched++ % 100 == 0) {
 						System.out.println("Images metadata fetched: " + imagesFetched);
 					}
 				} catch (IOException e) {
-					System.err.println("Error fetching image " + imageTitle + " " + lang + ":" + name + " "+ e.getMessage());
+					System.err.println("Error fetching image " + imageTitle + " " + lang + ":" + name + " "
+							+ e.getMessage());
 				}
-					
 			}
-			
-		}
-		System.out.println("Updating images... ");
-		PreparedStatement pUpdate = conn.prepareStatement("UPDATE travel_articles  SET image_title=? WHERE image_title=?");
-		Iterator<Entry<String, String>> it = valuesToUpdate.entrySet().iterator();
-		int count = 0;
-		int countUpd = 0;
-		while(it.hasNext()) {
-			Entry<String, String> e = it.next();
-			if(e.getValue() != null && e.getValue().length() > 0) {
-				pUpdate.setString(1, e.getValue());
-				pUpdate.setString(2, e.getKey());
-				pUpdate.addBatch();
-				if(count ++ > BATCH_SIZE) {
-					int[] bb = pUpdate.executeBatch();
-					if(bb != null) {
-						for(int k = 0; k < bb.length; k ++) {
-							countUpd += bb[k];
-						}
-					}
-				}	
+			String sourceFile = existingImagesMapping.get(imageTitle);
+			valuesToUpdate.put(imageTitle, sourceFile);
+			if(sourceFile!= null && sourceFile.trim().length() > 0) {
+				pInsertSource.setString(1, imageTitle);
+				pInsertSource.setString(2, sourceFile);
+				pInsertSource.executeUpdate();
+				imagesToUpdate++;
 			}
 		}
-		pUpdate.executeBatch();
-		System.out.println("Update to full size images " + count  + " " + countUpd);
+		rs.close();
+		System.out.println("Updating images " + imagesToUpdate + ".");
+		int updated = conn.createStatement().executeUpdate("UPDATE travel_articles SET image_title = "
+				+ " (SELECT source_image from source_image s where s.banner_image = travel_articles.image_title) "
+				+ " WHERE image_title IN (SELECT distinct banner_image from source_image)");
+		System.out.println("Update to full size images finished, updated: " + updated);
 		
 		imagesConn.close();
 		
