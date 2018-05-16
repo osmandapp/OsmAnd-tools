@@ -136,22 +136,29 @@ public class SearchDBCreator {
 			}
 			
 		}
+		System.out.println("Updating images... ");
 		PreparedStatement pUpdate = conn.prepareStatement("UPDATE travel_articles  SET image_title=? WHERE image_title=?");
 		Iterator<Entry<String, String>> it = valuesToUpdate.entrySet().iterator();
 		int count = 0;
+		int countUpd = 0;
 		while(it.hasNext()) {
 			Entry<String, String> e = it.next();
 			if(e.getValue() != null && e.getValue().length() > 0) {
-				pUpdate.setString(1, e.getKey());
-				pUpdate.setString(2, e.getValue());
+				pUpdate.setString(1, e.getValue());
+				pUpdate.setString(2, e.getKey());
 				pUpdate.addBatch();
 				if(count ++ > BATCH_SIZE) {
-					pUpdate.executeBatch();
+					int[] bb = pUpdate.executeBatch();
+					if(bb != null) {
+						for(int k = 0; k < bb.length; k ++) {
+							countUpd += bb[k];
+						}
+					}
 				}	
 			}
 		}
 		pUpdate.executeBatch();
-		System.out.println("Update to full size images " + count );
+		System.out.println("Update to full size images " + count  + " " + countUpd);
 		
 		imagesConn.close();
 		
