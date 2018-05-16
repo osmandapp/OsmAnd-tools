@@ -167,14 +167,17 @@ public class WikiVoyagePreparation {
 
 			conn = (Connection) dialect.getDatabaseConnection(sqliteFile.getAbsolutePath(), log);
 			conn.createStatement()
-					.execute("CREATE TABLE IF NOT EXISTS travel_articles(article_id text, title text, content_gz blob"
+					.execute("CREATE TABLE IF NOT EXISTS travel_articles(title text, content_gz blob"
 							+ (uncompressed ? ", content text" : "") + ", is_part_of text, lat double, lon double, image_title text not null, gpx_gz blob"
 							+ (uncompressed ? ", gpx text" : "") + ", trip_id long, original_id long, lang text, contents_json text)");
 			conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_title ON travel_articles(title);");
 			conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_id ON travel_articles(trip_id);");
 			conn.createStatement()
 					.execute("CREATE INDEX IF NOT EXISTS index_part_of ON travel_articles(is_part_of);");
-			prep = conn.prepareStatement("INSERT INTO travel_articles VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?" + (uncompressed ? ", ?, ?": "") + ")");
+			prep = conn.prepareStatement("INSERT INTO travel_articles(title, content_gz"
+							+ (uncompressed ? ", content text" : "") + ", is_part_of, lat, lon, image_title, gpx_gz"
+							+ (uncompressed ? ", gpx text" : "") + ", trip_id , original_id , lang, contents_json)"
+					+ " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?" + (uncompressed ? ", ?, ?": "") + ")");
 			
 			wikidataconn  = new WikidataConnection(new File(sqliteFile.getParentFile(), "wikidata.sqlite"));
 			
@@ -276,7 +279,7 @@ public class WikiVoyagePreparation {
 												"https://"+lang+".wikivoyage.org/wiki/${title}", false);
 										String plainStr = wikiModel.render(converter, text);
 										plainStr = plainStr.replaceAll("<p>div class=&#34;content&#34;", "<div class=\"content\">\n<p>").replaceAll("<p>/div\n</p>", "</div>");
-										prep.setString(column++, Encoder.encodeUrl(title.toString()));
+										//prep.setString(column++, Encoder.encodeUrl(title.toString()));
 										prep.setString(column++, title.toString());
 										prep.setBytes(column++, stringToCompressedByteArray(bous, plainStr));
 										if (uncompressed) {
