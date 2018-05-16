@@ -82,6 +82,7 @@ public class SearchDBCreator {
 		ResultSet rs1 = imagesConn.createStatement().executeQuery("SELECT file, sourcefile FROM images");
 		while(rs1.next()) {
 			String sourceFile = rs1.getString(2);
+			sourceFile = stripImageName(sourceFile);
 			existingImagesMapping.put(rs1.getString(1), sourceFile);
 			if(sourceFile != null) {
 				sourceImages.add(rs1.getString(2));
@@ -136,12 +137,9 @@ public class SearchDBCreator {
 					pInsert.setString(1, imageTitle);
 					pInsert.setString(2, metadataUrl);
 					pInsert.setString(3, metadata.toString());
-					pInsert.setString(4, null);
-					if (sourceFile != null) {
-						pInsert.setString(4, sourceFile.toString());
-						existingImagesMapping.put(imageTitle, sourceFile);
-					}
+					pInsert.setString(4, sourceFile);
 					pInsert.executeUpdate();
+					existingImagesMapping.put(imageTitle, sourceFile);
 					if (imagesFetched++ % 100 == 0) {
 						System.out.println("Images metadata fetched: " + imagesFetched);
 					}
@@ -151,7 +149,7 @@ public class SearchDBCreator {
 				}
 			}
 			String sourceFile = existingImagesMapping.get(imageTitle);
-			sourceFile = stripImageName(sourceFile);
+			
 			valuesToUpdate.put(imageTitle, sourceFile);
 			if (sourceFile != null && sourceFile.trim().length() > 0) {
 				pInsertSource.setString(1, imageTitle);
@@ -177,6 +175,9 @@ public class SearchDBCreator {
 		}
 		if (sourceFile.contains("}")) {
 			sourceFile = sourceFile.substring(0, sourceFile.indexOf('}'));
+		}
+		if(sourceFile.contains("[[") || sourceFile.contains("|")) {
+			return null;
 		}
 		return sourceFile;
 	}
