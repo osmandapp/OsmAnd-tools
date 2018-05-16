@@ -137,7 +137,7 @@ public class SearchDBCreator {
 			
 		}
 		System.out.println("Updating images... ");
-		PreparedStatement pUpdate = conn.prepareStatement("UPDATE travel_articles  SET image_title=? WHERE image_title=?");
+		PreparedStatement pUpdate = conn.prepareStatement("UPDATE travel_articles SET image_title=? WHERE image_title=?");
 		Iterator<Entry<String, String>> it = valuesToUpdate.entrySet().iterator();
 		int count = 0;
 		int countUpd = 0;
@@ -158,6 +158,7 @@ public class SearchDBCreator {
 			}
 		}
 		pUpdate.executeBatch();
+		conn.createStatement().execute("DROP INDEX IF EXISTS index_image_title;");
 		System.out.println("Update to full size images " + count  + " " + countUpd);
 		
 		imagesConn.close();
@@ -166,8 +167,9 @@ public class SearchDBCreator {
 
 	private static void copyHeaders(Connection conn) throws SQLException {
 		Statement statement = conn.createStatement();
-		boolean update = statement.execute("update travel_articles ts set image_title=(SELECT image_title FROM travel_articles t "  +
-           " WHERE ts.trip_id = t.trip_id and t.lang = 'en') where ts.image_title='' and ts.lang <>'en'");
+		boolean update = statement.execute("update or ignore travel_articles set image_title=(SELECT image_title FROM travel_articles t "
+				+ "WHERE t.trip_id = travel_articles.trip_id and t.lang = 'en')"
+				+ " where travel_articles.image_title='' and travel_articles.lang <>'en'");
         System.out.println("Copy headers from english language to others: " + update);
         statement.close();
         statement = conn.createStatement();
