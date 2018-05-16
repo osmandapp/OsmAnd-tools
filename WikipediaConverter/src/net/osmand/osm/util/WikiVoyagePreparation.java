@@ -195,6 +195,7 @@ public class WikiVoyagePreparation {
 			}
 			prep.close();
 			conn.close();
+			wikidataconn.close();
 		}
 
 		public int getCount() {
