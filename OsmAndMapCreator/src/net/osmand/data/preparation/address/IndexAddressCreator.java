@@ -814,7 +814,8 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			}
 		}
 		String houseName = e.getTag(OSMTagKey.ADDR_HOUSE_NAME);
-		String houseNumber = e.getTag(OSMTagKey.ADDR_HOUSE_NUMBER);
+		String houseNumber = normalizeHousenumber(e.getTag(OSMTagKey.ADDR_HOUSE_NUMBER));
+		
 		String street = null;
 		if (houseNumber != null) {
 			street = e.getTag(OSMTagKey.ADDR_STREET);
@@ -923,6 +924,20 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			}
 		}
 	}
+
+	private String normalizeHousenumber(String hno) {
+		if(hno != null) {
+			if(hno.toLowerCase().endsWith("bis")) {
+				hno = hno.substring(0, hno.length() - "bis".length()).trim() + " bis";
+			} else if(hno.toLowerCase().endsWith("quater")) {
+				hno = hno.substring(0, hno.length() - "quater".length()).trim() + " quater";
+			} else if(hno.toLowerCase().endsWith("ter")) {
+				hno = hno.substring(0, hno.length() - "ter".length()).trim() + " ter";
+			}
+		}
+		return hno;
+	}
+
 
 	public void cleanCityPart() throws SQLException {
 		streetDAO.cleanCityPart();
