@@ -369,9 +369,10 @@ public class WikiDatabasePreparation {
 		}
 		try {
 			JsonObject ks = metadata.get("entities").getAsJsonObject();
-			JsonObject sitelinks = ks.get(ks.keySet().iterator().next()).getAsJsonObject().get("sitelinks").getAsJsonObject();
-			if(sitelinks.has(wikiLang + "wiki")) {
-				String title = sitelinks.get(wikiLang + "wiki").getAsJsonObject().get("title").getAsString();
+			JsonElement siteLinksElement = ks.get(ks.keySet().iterator().next()).getAsJsonObject().get("sitelinks");
+			if(siteLinksElement.isJsonObject() &&  siteLinksElement.getAsJsonObject().has(wikiLang + "wiki")) {
+				
+				String title = siteLinksElement.getAsJsonObject().get(wikiLang + "wiki").getAsJsonObject().get("title").getAsString();
 				return title;
 			}
 		} catch (IllegalStateException e) {

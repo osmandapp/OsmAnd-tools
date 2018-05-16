@@ -633,7 +633,7 @@ public class WikiVoyagePreparation {
 				pinsert.setString(2, metadata.toString());
 				pinsert.execute();
 			} catch (Exception e) {
-				e.printStackTrace();
+				System.err.println("Error downloading wikidata " + id + " " + e.getMessage());
 			}
 			return obj;
 		}
