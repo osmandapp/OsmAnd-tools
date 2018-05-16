@@ -82,7 +82,7 @@ public class SearchDBCreator {
 		ResultSet rs1 = imagesConn.createStatement().executeQuery("SELECT file, sourcefile FROM images");
 		while(rs1.next()) {
 			existingImagesMapping.put(rs1.getString(1), rs1.getString(2));
-			sourceImages.add(rs1.getString(1));
+			sourceImages.add(rs1.getString(2));
 		}
 		rs1.close();
 		
@@ -153,7 +153,7 @@ public class SearchDBCreator {
 			}
 			String sourceFile = existingImagesMapping.get(imageTitle);
 			valuesToUpdate.put(imageTitle, sourceFile);
-			if(sourceFile!= null && sourceFile.trim().length() > 0) {
+			if (sourceFile != null && sourceFile.trim().length() > 0) {
 				pInsertSource.setString(1, imageTitle);
 				pInsertSource.setString(2, sourceFile);
 				pInsertSource.executeUpdate();
