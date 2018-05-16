@@ -385,7 +385,7 @@ public class WikiDatabasePreparation {
 
 	private static String addWikiLink(String lang, String value) throws UnsupportedEncodingException {
 		return "[https://" + lang + 
-				".wikipedia.org/wiki/" + URLEncoder.encode(value.trim().replaceAll(" ", "_"), "UTF_8") 
+				".wikipedia.org/wiki/" + URLEncoder.encode(value.trim().replaceAll(" ", "_"), "UTF-8") 
 				+ " Wikipedia]";
 	}
 
