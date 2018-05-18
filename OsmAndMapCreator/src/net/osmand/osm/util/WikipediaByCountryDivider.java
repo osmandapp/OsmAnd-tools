@@ -15,6 +15,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -577,7 +578,6 @@ public class WikipediaByCountryDivider {
     	int cnt;
     	boolean values = false;
     	String buf = ""	;
-    	List<String> insValues = new ArrayList<String>();
     	while((cnt = read.read(cbuf)) >= 0) {
     		String str = new String(cbuf, 0, cnt);
     		buf += str;
@@ -591,47 +591,20 @@ public class WikipediaByCountryDivider {
     			int word = -1;
     			int last = 0;
     			for(int k = 0; k < buf.length(); k++) {
-    				if(openString ) {
-						if (buf.charAt(k) == '\'' && (buf.charAt(k - 1) != '\\'
-								|| buf.charAt(k - 2) == '\\')) {
+    				if(openString) {
+    					if (buf.charAt(k) == ')' && buf.charAt(k -1) == '\'') {
     						openString = false;
-    					}
-    				} else if(buf.charAt(k) == ',' && word == -1) {
-    					continue;
-    				} else if(buf.charAt(k) == '(') {
-    					word = k;
-    					insValues.clear();
-    				} else if(buf.charAt(k) == ')' || buf.charAt(k) == ',') {
-    					String vl = buf.substring(word + 1, k).trim();
-    					if(vl.startsWith("'")) {
-    						vl = vl.substring(1, vl.length() - 1);
-    					}
-    					insValues.add(vl);
-    					if(buf.charAt(k) == ')') {
-//    						if(insValues.size() < 4) {
-//    							System.err.println(insValues);
-//    							System.err.println(buf);
-//    						}
-    						try {
-								p.process(insValues);
-							} catch (Exception e) {
-								System.err.println(e.getMessage() + " " +insValues);
-								e.printStackTrace();
-							}
     						last = k + 1;
-    						word = -1;
-    					} else {
-    						word = k;
+    						p.process(Arrays.asList(buf.substring(word, k)
+    								.replaceAll("^'|'$", "").split(",")));
     					}
-    				} else if(buf.charAt(k) == '\'') {
+    				} else if(buf.charAt(k) == '(' && !openString) {
     					openString = true;
+    					word = k + 1;
     				}
     			}
     			buf = buf.substring(last);
-
-
     		}
-
     	}
     	read.close();
 	}
