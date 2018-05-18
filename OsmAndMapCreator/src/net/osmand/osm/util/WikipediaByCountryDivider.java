@@ -259,6 +259,8 @@ public class WikipediaByCountryDivider {
 			generateCountrySqlite(folder, skip);
 		} else if(cmd.equals("regenerate")) {
 			generateGlobalWikiFile(folder, regionsFile);
+		} else if (cmd.equals("debug")) {
+			testValueGroupProcessing();
 		}
 	}
 
@@ -595,8 +597,7 @@ public class WikipediaByCountryDivider {
     					if (buf.charAt(k) == ')' && buf.charAt(k -1) == '\'') {
     						openString = false;
     						last = k + 1;
-    						p.process(Arrays.asList(buf.substring(word, k)
-    								.replaceAll("^'|'$", "").split(",")));
+    						processValueGroup(p, buf.substring(word, k));
     					}
     				} else if(buf.charAt(k) == '(' && !openString) {
     					openString = true;
@@ -607,5 +608,35 @@ public class WikipediaByCountryDivider {
     		}
     	}
     	read.close();
+	}
+
+	private static void processValueGroup(InsertValueProcessor p, String values) {
+		String[] vals = values.split(",");
+		List<String> insValues = new ArrayList<>();
+		for (String val : vals) {
+			insValues.add(val.replaceAll("^'|'$", ""));
+		}
+		try {
+			p.process(insValues);
+		} catch (Exception e) {
+			System.err.println(e.getMessage() + " " + insValues);
+			e.printStackTrace();
+		}
+	}
+	
+	private static void testValueGroupProcessing() {
+		InsertValueProcessor p = new InsertValueProcessor() {
+
+			@Override
+			public void process(List<String> vs) {
+				System.out.println(vs.toString());				
+			}
+		};
+		processValueGroup(p, "121,'af','abcd'");
+		processValueGroup(p, "121,'af','ab\'cd'");
+		processValueGroup(p, "121,'af','abcd (abc)'");
+		processValueGroup(p, "121,'af','abcd (abc)(abcd)'");
+		processValueGroup(p, "121,'af','abcd (abc(abcd))'");
+		processValueGroup(p, "121,'a\'f','abcd'");
 	}
 }
