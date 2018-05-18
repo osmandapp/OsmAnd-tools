@@ -1,5 +1,6 @@
 INSERT INTO `langlinks` VALUES (14965,'aa','abcd'),(14986,'a\'a','abc\'d')
-INSERT INTO `langlinks` VALUES (14965,'aa','abcd (defg)'),(14986,'aa','abcd (defg(ascd))'),(1,'2\'3\'4','3'),(299236,'af','Sjabloon:\\')
+INSERT INTO `langlinks` VALUES (14965,'aa','abcd (defg)'),(14986,'aa','abcd (defg(ascd))'),(1,'2\'3\'4','3'),(299236,'af','Sjabloon:\\'),(183442,'ast','Jacobo II d\\\'Inglaterra')
+
 INSERT INTO `langlinks` VALUES (14965,'aa','abcd (defg)'),(14986,'aa','abcd (defg(ascd))'),(1,'2\'3\'4','3')
 INSERT INTO `langlinks` VALUES (14965,'aa','abcd (defg)'),(14986,'aa','abcd (defg(ascd))'),(1,'2\'3\'4','3')
 INSERT INTO `langlinks` VALUES (14965,'aa','abcd (defg)'),(14986,'aa','abcd (defg(ascd))'),(1,'2\'3\'4','3')

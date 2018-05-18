@@ -54,6 +54,7 @@ public class WikipediaByCountryDividerTest {
 		expectedOutputs.add(Arrays.asList("14986","aa","abcd (defg(ascd))"));
 		expectedOutputs.add(Arrays.asList("1", "2\\'3\\'4", "3"));
 		expectedOutputs.add(Arrays.asList("299236", "af", "Sjabloon:\\\\"));
+		expectedOutputs.add(Arrays.asList("183442", "ast", "Jacobo II d\\\\\\'Inglaterra"));
 		InsertValueProcessor p = new InsertValueProcessor() {
 			int testCase = 0;
 			@Override
