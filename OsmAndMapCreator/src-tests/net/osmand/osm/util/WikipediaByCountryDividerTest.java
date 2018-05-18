@@ -2,6 +2,9 @@ package net.osmand.osm.util;
 
 import static org.junit.Assert.*;
 
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -39,6 +42,29 @@ public class WikipediaByCountryDividerTest {
 		WikipediaByCountryDivider.processValueGroup(p, "121,'af','abcd (abc(abcd))'");
 		WikipediaByCountryDivider.processValueGroup(p, "121,'a\'f','abcd'");
 		WikipediaByCountryDivider.processValueGroup(p, "123,'a\\'f\\'','abcdef'");
+	}
+	
+	@Test
+	public void testFileProcessing() throws FileNotFoundException, UnsupportedEncodingException, IOException {
+		String testFile = getClass().getResource("test_wiki.sql").getPath();
+		final List<List<String>> expectedOutputs = new ArrayList<List<String>>();
+		expectedOutputs.add(Arrays.asList("14965","aa", "abcd"));
+		expectedOutputs.add(Arrays.asList("14986","a\\'a", "abc\\'d"));
+		expectedOutputs.add(Arrays.asList("14965","aa","abcd (defg)"));
+		expectedOutputs.add(Arrays.asList("14986","aa","abcd (defg(ascd))"));
+		expectedOutputs.add(Arrays.asList("1", "2\\'3\\'4", "3"));
+		InsertValueProcessor p = new InsertValueProcessor() {
+			int testCase = 0;
+			@Override
+			public void process(List<String> vs) {
+				if (testCase < expectedOutputs.size()) {
+					Assert.assertEquals(expectedOutputs.get(testCase).toString(), vs.toString());
+					testCase++;
+				}
+				
+			}
+		};
+		WikipediaByCountryDivider.readInsertValuesFile(testFile, p);
 	}
 
 }
