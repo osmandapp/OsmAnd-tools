@@ -259,8 +259,6 @@ public class WikipediaByCountryDivider {
 			generateCountrySqlite(folder, skip);
 		} else if(cmd.equals("regenerate")) {
 			generateGlobalWikiFile(folder, regionsFile);
-		} else if (cmd.equals("debug")) {
-			testValueGroupProcessing();
 		}
 	}
 
@@ -610,7 +608,7 @@ public class WikipediaByCountryDivider {
     	read.close();
 	}
 
-	private static void processValueGroup(InsertValueProcessor p, String values) {
+	static void processValueGroup(InsertValueProcessor p, String values) {
 		String[] vals = values.split(",");
 		List<String> insValues = new ArrayList<>();
 		for (String val : vals) {
@@ -622,21 +620,5 @@ public class WikipediaByCountryDivider {
 			System.err.println(e.getMessage() + " " + insValues);
 			e.printStackTrace();
 		}
-	}
-	
-	private static void testValueGroupProcessing() {
-		InsertValueProcessor p = new InsertValueProcessor() {
-
-			@Override
-			public void process(List<String> vs) {
-				System.out.println(vs.toString());				
-			}
-		};
-		processValueGroup(p, "121,'af','abcd'");
-		processValueGroup(p, "121,'af','ab\'cd'");
-		processValueGroup(p, "121,'af','abcd (abc)'");
-		processValueGroup(p, "121,'af','abcd (abc)(abcd)'");
-		processValueGroup(p, "121,'af','abcd (abc(abcd))'");
-		processValueGroup(p, "121,'a\'f','abcd'");
 	}
 }
