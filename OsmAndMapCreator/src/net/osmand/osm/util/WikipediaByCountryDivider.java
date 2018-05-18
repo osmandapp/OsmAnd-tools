@@ -590,9 +590,11 @@ public class WikipediaByCountryDivider {
     			boolean openString = false;
     			int word = -1;
     			int last = 0;
+    			int bracketCount = 0;
     			for(int k = 0; k < buf.length(); k++) {
     				if(openString) {
-    					if (buf.charAt(k) == ')' && buf.charAt(k -1) == '\'') {
+    					bracketCount = buf.charAt(k) == '(' ? ++bracketCount : buf.charAt(k) == ')' ? --bracketCount : bracketCount;
+    					if (buf.charAt(k) == ')' && buf.charAt(k - 1) == '\'' && bracketCount == 0) {
     						openString = false;
     						last = k + 1;
     						processValueGroup(p, buf.substring(word, k));
@@ -600,7 +602,8 @@ public class WikipediaByCountryDivider {
     				} else if(buf.charAt(k) == '(' && !openString) {
     					openString = true;
     					word = k + 1;
-    				}
+    					bracketCount++;
+    				} 
     			}
     			buf = buf.substring(last);
     		}
