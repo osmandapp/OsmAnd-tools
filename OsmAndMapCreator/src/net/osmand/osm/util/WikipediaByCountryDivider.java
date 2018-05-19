@@ -90,12 +90,10 @@ public class WikipediaByCountryDivider {
 
 	private static class GlobalWikiStructure {
 
-		private long idGen = 100;
 
-		private PreparedStatement getIdByTitle;
+		private PreparedStatement getWikidataById;
 		private PreparedStatement insertWikiContent;
-		private PreparedStatement insertWikiTranslation;
-		private PreparedStatement updateIdByTitleTranslation;
+		private PreparedStatement insertWikidata;
 		private Map<PreparedStatement, Long> statements = new LinkedHashMap<PreparedStatement, Long>();
 		private Connection c;
 		private OsmandRegions regions;
@@ -117,7 +115,6 @@ public class WikipediaByCountryDivider {
 
 		public void updateRegions() throws SQLException, IOException {
 			c.createStatement().execute("DELETE FROM wiki_region");
-			c.createStatement().execute("DELETE FROM wiki_translation"); // not needed any more
 			c.createStatement().execute("VACUUM");
 			PreparedStatement insertWikiRegion = c.prepareStatement("INSERT INTO wiki_region VALUES(?, ? )");
 			ResultSet rs = c.createStatement().executeQuery("SELECT id, lat, lon from wiki_content order by id");
@@ -180,59 +177,35 @@ public class WikipediaByCountryDivider {
 		}
 
 		public void prepareStatetements() throws SQLException {
-			getIdByTitle = c.prepareStatement("SELECT gen_id, id, id_lang FROM wiki_translation WHERE lang = ? and title = ? ");
-			updateIdByTitleTranslation = c.prepareStatement("UPDATE wiki_translation SET gen_id = ? WHERE ID = ? and id_lang = ?  ");
+			getWikidataById = c.prepareStatement("SELECT wikidata FROM wikidata WHERE lang = ? and id = ? ");
 			insertWikiContent = c.prepareStatement("INSERT INTO wiki_content VALUES(?, ?, ?, ?, ?, ?, ?)");
-			insertWikiTranslation = c.prepareStatement("INSERT INTO wiki_translation VALUES(?, ?, ?, ?, ?)");
+			insertWikidata = c.prepareStatement("INSERT INTO wikidata(lang, id, wikidata) VALUES(?, ?, ?)");
 		}
 
-		public long getIdForArticle(String lang, long wikiId, String title) throws SQLException {
-			getIdByTitle.setString(1, lang);
-			getIdByTitle.setString(2, title);
-			ResultSet rs = getIdByTitle.executeQuery();
-			long resGenId = -1;
-			while (rs.next()) {
-				long genId = rs.getLong(1);
-				long id = rs.getLong(2);
-				String idLang = rs.getString(3);
-				if (resGenId == -1) {
-					if (genId != -1) {
-						resGenId = genId;
-					} else {
-						resGenId = idGen++;
-					}
-
-				} else {
-					if (resGenId != genId && genId != -1) {
-						System.err.println("Lang " + lang + " wiki " + wikiId + " " + title + ": " + resGenId + " !="
-								+ genId + " (" + id + ", " + idLang + ")");
-					}
-				}
-				if (genId == -1) {
-					updateIdByTitleTranslation.setLong(1, resGenId);
-					updateIdByTitleTranslation.setLong(2, id);
-					updateIdByTitleTranslation.setString(3, idLang);
-				}
+		public String getIdForArticle(String lang, long wikiId) throws SQLException {
+			getWikidataById.setString(1, lang);
+			getWikidataById.setLong(2, wikiId);
+			ResultSet rs = getWikidataById.executeQuery();
+			if(rs.next()) {
+				return rs.getString(1);
 			}
-			return resGenId;
+			return null;
 		}
 
-		public void insertWikiTranslation(long id, String idLang, String lang, String title) throws SQLException {
-			insertWikiTranslation.setLong(1, -1);
-			insertWikiTranslation.setLong(2, id);
-			insertWikiTranslation.setString(3, idLang);
-			insertWikiTranslation.setString(4, lang);
-			insertWikiTranslation.setString(5, title);
-			addBatch(insertWikiTranslation);
+		public void insertWikiTranslation(String lang, long id, String wikidata) throws SQLException {
+			insertWikidata.setString(1, lang);
+			insertWikidata.setLong(2, id);
+			insertWikidata.setString(3, wikidata);
+			addBatch(insertWikidata);
 		}
 
 		public void commitTranslationInsert() throws SQLException {
-			insertWikiTranslation.executeBatch();
+			insertWikidata.executeBatch();
 		}
 
-		public long insertArticle(long id, double lat, double lon, String lang, long wikiId, String title, byte[] zipContent)
+		public void insertArticle(String id, double lat, double lon, String lang, long wikiId, String title, byte[] zipContent)
 				throws SQLException, IOException {
-			insertWikiContent.setLong(1, id);
+			insertWikiContent.setString(1, id);
 			insertWikiContent.setDouble(2, lat);
 			insertWikiContent.setDouble(3, lon);
 			insertWikiContent.setString(4, lang);
@@ -240,24 +213,22 @@ public class WikipediaByCountryDivider {
 			insertWikiContent.setString(6, title);
 			insertWikiContent.setBytes(7, zipContent);
 			addBatch(insertWikiContent);
-			return id;
 
 		}
 
 		public void createTables() throws SQLException {
 			c.createStatement()
 					.execute(
-							"CREATE TABLE wiki_content(id long, lat double, lon double, lang text, wikiId long, title text, zipContent blob)");
+							"CREATE TABLE wiki_content(id text, lat double, lon double, lang text, wikiId long, title text, zipContent blob)");
 			c.createStatement().execute("CREATE TABLE wiki_region(id long, regionName text)");
-			c.createStatement().execute("CREATE TABLE wiki_translation(gen_id long, id long, id_lang text, lang text, title text)");
+			c.createStatement().execute("CREATE TABLE wikidata(lang text, id long, wikidata text)");
 		}
 
 		public void createIndexes() throws SQLException {
 			c.createStatement().execute("CREATE INDEX IF NOT EXISTS WIKIID_INDEX ON wiki_content(lang, wikiId)");
 			c.createStatement().execute("CREATE INDEX IF NOT EXISTS CONTENTID_INDEX ON wiki_content(ID)");
 			
-			c.createStatement().execute("CREATE INDEX IF NOT EXISTS TRANS_INDEX ON wiki_translation(lang,title)");
-			c.createStatement().execute("CREATE INDEX IF NOT EXISTS TRANS_INDEX ON wiki_translation(id_lang,id)");
+			c.createStatement().execute("CREATE INDEX IF NOT EXISTS TRANS_INDEX ON wikidata(lang,id)");
 			
 			c.createStatement().execute("CREATE INDEX IF NOT EXISTS REGIONID_INDEX ON wiki_region(ID)");
 			c.createStatement().execute("CREATE INDEX IF NOT EXISTS REGIONNAME_INDEX ON wiki_region(regionName)");
@@ -362,7 +333,7 @@ public class WikipediaByCountryDivider {
 			loc.createStatement()
 					.execute(
 							"CREATE TABLE wiki_content(id long, lat double, lon double, lang text, wikiId long, title text, zipContent blob)");
-			PreparedStatement insertWikiContent = loc
+			PreparedStatement insertWikiContentCountry = loc
 					.prepareStatement("INSERT INTO wiki_content VALUES(?, ?, ?, ?, ?, ?, ?)");
 			ResultSet rps = conn.createStatement().executeQuery(
 					"SELECT WC.id, WC.lat, WC.lon, WC.lang, WC.wikiId, WC.title, WC.zipContent "
@@ -394,7 +365,7 @@ public class WikipediaByCountryDivider {
 			boolean preferredAdded = false;
 			boolean nameAdded = false;
 			while (rps.next()) {
-				long osmId = -rps.getLong(1);
+				long osmId = -Long.parseLong(rps.getString(1).substring(1));
 				double lat = rps.getDouble(2);
 				double lon = rps.getDouble(3);
 				long wikiId = rps.getLong(5);
@@ -413,16 +384,16 @@ public class WikipediaByCountryDivider {
 				contentStr = contentStr.replace((char) 0, ' ');
 				contentStr = contentStr.replace((char) 22, ' ');
 				contentStr = contentStr.replace((char) 27, ' ');
-				insertWikiContent.setLong(1, osmId);
-				insertWikiContent.setDouble(2, lat);
-				insertWikiContent.setDouble(3, lon);
-				insertWikiContent.setString(4, wikiLang);
-				insertWikiContent.setLong(5, wikiId);
-				insertWikiContent.setString(6, title);
-				insertWikiContent.setBytes(7, bytes);
-				insertWikiContent.addBatch();
+				insertWikiContentCountry.setLong(1, osmId);
+				insertWikiContentCountry.setDouble(2, lat);
+				insertWikiContentCountry.setDouble(3, lon);
+				insertWikiContentCountry.setString(4, wikiLang);
+				insertWikiContentCountry.setLong(5, wikiId);
+				insertWikiContentCountry.setString(6, title);
+				insertWikiContentCountry.setBytes(7, bytes);
+				insertWikiContentCountry.addBatch();
 				if (cnt++ % BATCH_SIZE == 0) {
-					insertWikiContent.executeBatch();
+					insertWikiContentCountry.executeBatch();
 				}
 				if(osmId != prevOsmId) {
 					if(prevOsmId != -1) {
@@ -459,7 +430,7 @@ public class WikipediaByCountryDivider {
 			if(prevOsmId != -1) {
 				closeOsmWikiNode(serializer, nameUnique, nameAdded);
 			}
-			insertWikiContent.executeBatch();
+			insertWikiContentCountry.executeBatch();
 			loc.close();
 			serializer.endDocument();
 			serializer.flush();
@@ -545,8 +516,8 @@ public class WikipediaByCountryDivider {
 		}
 		// insert translation
 		for (String lang : langs) {
-			String langLinks = folder + lang + "wiki-latest-langlinks.sql.gz";
-			System.out.println("Insert translation " + lang + " " + new Date());
+			String langLinks = folder + lang + "wiki-latest-page_props.sql.gz";
+			System.out.println("Insert wikidata " + lang + " " + new Date());
 			insertTranslationMapping(wikiStructure, lang, langLinks);
 		}
 		wikiStructure.createIndexes();
@@ -561,13 +532,15 @@ public class WikipediaByCountryDivider {
 			throws SQLException, IOException, FileNotFoundException, UnsupportedEncodingException {
 		System.out.println("Copy articles for " + lang + " " + new Date());
 		LanguageSqliteFile ifl = new LanguageSqliteFile(folder + lang + "wiki.sqlite");
-		final Map<Long, Long> idMapping = new LinkedHashMap<Long, Long>();
 		while (ifl.next()) {
 			final long wikiId = ifl.getId();
-			long id = wikiStructure.getIdForArticle(lang, wikiId, ifl.getTitle());
-			long articleId = wikiStructure.insertArticle(id, ifl.getLat(), ifl.getLon(), lang, wikiId, ifl.getTitle(),
+			String id = wikiStructure.getIdForArticle(lang, wikiId);
+			if(id == null) {
+				System.err.println("ERROR: Skip article " + lang + " " + ifl.getTitle() + " no wikidata id" ) ;
+			} else {
+				wikiStructure.insertArticle(id, ifl.getLat(), ifl.getLon(), lang, wikiId, ifl.getTitle(),
 					ifl.getContent());
-			idMapping.put(wikiId, articleId);
+			}
 		}
 		ifl.closeConnnection();
 		
@@ -579,10 +552,13 @@ public class WikipediaByCountryDivider {
 		SqlInsertValuesReader.readInsertValuesFile(langLinks, new InsertValueProcessor() {
 			@Override
 			public void process(List<String> vs) {
-				final long wikiId = Long.parseLong(vs.get(0));
 				try {
-					wikiStructure.insertWikiTranslation(wikiId, lang, vs.get(1), vs.get(2));
-				} catch (SQLException e) {
+					if(!vs.get(1).equals("wikibase_item")) {
+						return;
+					}
+					final long wikiId = Long.parseLong(vs.get(0));
+					wikiStructure.insertWikiTranslation(lang, wikiId, vs.get(2));
+				} catch (Exception e) {
 					e.printStackTrace();
 					throw new RuntimeException(e);
 				}
