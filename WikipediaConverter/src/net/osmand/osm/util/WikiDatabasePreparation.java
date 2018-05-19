@@ -662,8 +662,7 @@ public class WikiDatabasePreparation {
 		return Double.parseDouble(params);
 	}
 
-	public static void readInsertValuesFile(final String fileName, InsertValueProcessor p)
-			throws FileNotFoundException, UnsupportedEncodingException, IOException {
+	public static void readInsertValuesFile(final String fileName, InsertValueProcessor p) throws IOException {
 		InputStream fis = new FileInputStream(fileName);
 		if(fileName.endsWith("gz")) {
 			fis = new GZIPInputStream(fis);
@@ -671,61 +670,89 @@ public class WikiDatabasePreparation {
     	InputStreamReader read = new InputStreamReader(fis, "UTF-8");
     	char[] cbuf = new char[1000];
     	int cnt;
-    	boolean values = false;
+    	
     	String buf = ""	;
     	List<String> insValues = new ArrayList<String>();
+    	boolean values = false;
+    	boolean openInsValues = false;
+    	boolean openWord = false;
     	while((cnt = read.read(cbuf)) >= 0) {
     		String str = new String(cbuf, 0, cnt);
     		buf += str;
-    		if(!values) {
-    			if(buf.contains("VALUES")) {
-    				buf = buf.substring(buf.indexOf("VALUES") + "VALUES".length()); 
-    				values = true;
-    			}
-    		} else {
-    			boolean openString = false;
-    			int word = -1;
-    			int last = 0;
-    			for(int k = 0; k < buf.length(); k++) {
-    				if(openString ) {
-						if (buf.charAt(k) == '\'' && (buf.charAt(k - 1) != '\\' 
-								|| buf.charAt(k - 2) == '\\')) {
-    						openString = false;
-    					}
-    				} else if(buf.charAt(k) == ',' && word == -1) {
-    					continue;
-    				} else if(buf.charAt(k) == '(') {
-    					word = k;
-    					insValues.clear();
-    				} else if(buf.charAt(k) == ')' || buf.charAt(k) == ',') {
-    					String vl = buf.substring(word + 1, k).trim();
-    					if(vl.startsWith("'")) {
-    						vl = vl.substring(1, vl.length() - 1);
-    					}
-    					insValues.add(vl);
-    					if(buf.charAt(k) == ')') {
-//    						if(insValues.size() < 4) {
-//    							System.err.println(insValues);
-//    							System.err.println(buf);
-//    						}
-    						try {
-								p.process(insValues);
-							} catch (Exception e) {
-								System.err.println(e.getMessage() + " " +insValues);
-//								e.printStackTrace();
-							}
-    						last = k + 1;
-    						word = -1;
-    					} else {
-    						word = k;
-    					}
-    				} else if(buf.charAt(k) == '\'') {
-    					openString = true;
+    		boolean processed = true;
+    		while(processed) {
+    			processed = false;
+    			if(!values) {
+        			int ind = buf.indexOf("VALUES");
+    				if (ind != -1) {
+    					buf = buf.substring(ind + "VALUES".length());
+    					values = true;
+    					processed = true;
     				}
-    			}
-    			buf = buf.substring(last);
-    			
-    			
+        		} else if(!openInsValues) {
+        			int ind = buf.indexOf("(");
+        			if (ind != -1) {
+    					buf = buf.substring(ind + 1);
+    					openInsValues = true;
+    					insValues.clear();
+    					processed = true;
+    				}
+        		} else if(!openWord){
+        			StringBuilder number = new StringBuilder(100);
+        			for(int k = 0; k < buf.length(); k++) {
+        				char ch = buf.charAt(k);
+        				if(ch == '\'') {
+        					openWord = true;
+        					processed = true;
+        				} else if(ch == ')') {
+            				// TODO new  values (close)
+        					if(number.toString().trim().length() > 0) {
+        						insValues.add(number.toString().trim());
+        					}
+        					
+            				try {
+    							p.process(insValues);
+    						} catch (Exception e) {
+    							System.err.println(e.getMessage() + " " + insValues);
+    						}
+            				openInsValues = false;
+        					processed = true;
+        				} else if(ch == ',') {
+        					if(number.toString().trim().length() > 0) {
+        						insValues.add(number.toString().trim());
+        					}
+        					processed = true;
+        				} else {
+        					number.append(ch);
+        				}
+        				if(processed) {
+        					buf = buf.substring(k + 1);
+        					break;
+        				}
+        			}
+        		} else if(openWord) {
+        			StringBuilder word = new StringBuilder(100);
+        			boolean escape = false;
+        			for(int k = 0; k < buf.length(); k++) {
+        				char ch = buf.charAt(k);
+        				if(escape) {
+        					word.append(ch);
+        					escape = false;
+        				} else {
+        					if(ch == '\'') {
+        						insValues.add(word.toString());
+        						processed = true;	
+        						openWord = false;
+								buf = buf.substring(k + 1);
+        						break;
+        					} else if(ch == '\\') {
+        						escape = true;
+            				} else {
+            					word.append(ch);
+            				}
+        				}
+        			}
+        		}
     		}
     		
     	}
