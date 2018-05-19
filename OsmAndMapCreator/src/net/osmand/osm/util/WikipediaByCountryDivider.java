@@ -3,11 +3,9 @@ package net.osmand.osm.util;
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
 import java.sql.Connection;
@@ -15,7 +13,6 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -35,6 +32,8 @@ import net.osmand.map.WorldRegion;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
+import net.osmand.util.sql.SqlInsertValuesReader;
+import net.osmand.util.sql.SqlInsertValuesReader.InsertValueProcessor;
 
 import org.apache.commons.logging.Log;
 import org.apache.tools.bzip2.CBZip2OutputStream;
@@ -544,7 +543,7 @@ public class WikipediaByCountryDivider {
 	protected static void insertTranslationMapping(final GlobalWikiStructure wikiStructure, String langLinks,
 			final Map<Long, Long> idMapping) throws FileNotFoundException, UnsupportedEncodingException, IOException,
 			SQLException {
-		readInsertValuesFile(langLinks, new InsertValueProcessor() {
+		SqlInsertValuesReader.readInsertValuesFile(langLinks, new InsertValueProcessor() {
 			@Override
 			public void process(List<String> vs) {
 				final long wikiId = Long.parseLong(vs.get(0));
@@ -563,49 +562,6 @@ public class WikipediaByCountryDivider {
 	}
 
 
-	public interface InsertValueProcessor {
-    	public void process(List<String> vs);
-    }
 
-	protected static void readInsertValuesFile(final String fileName, InsertValueProcessor p)
-			throws FileNotFoundException, UnsupportedEncodingException, IOException {
-		InputStream fis = new FileInputStream(fileName);
-		if(fileName.endsWith("gz")) {
-			fis = new GZIPInputStream(fis);
-		}
-    	InputStreamReader read = new InputStreamReader(fis, "UTF-8");
-    	char[] cbuf = new char[1000];
-    	int cnt;
-    	boolean values = false;
-    	String buf = ""	;
-    	while((cnt = read.read(cbuf)) >= 0) {
-    		String str = new String(cbuf, 0, cnt);
-    		buf += str;
-    		if(!values) {
-    			if(buf.contains("VALUES")) {
-    				buf = buf.substring(buf.indexOf("VALUES") + "VALUES".length());
-    				values = true;
-    			}
-    		} else {
-    			boolean openString = false;
-    			int word = -1;
-    			int last = 0;
-    			for(int k = 0; k < buf.length(); k++) {
-    				if(openString) {
-    					if (buf.charAt(k) == ')' && buf.charAt(k -1) == '\'') {
-    						openString = false;
-    						last = k + 1;
-    						p.process(Arrays.asList(buf.substring(word, k)
-    								.replaceAll("^'|'$", "").split(",")));
-    					}
-    				} else if(buf.charAt(k) == '(' && !openString) {
-    					openString = true;
-    					word = k + 1;
-    				}
-    			}
-    			buf = buf.substring(last);
-    		}
-    	}
-    	read.close();
-	}
+	
 }
