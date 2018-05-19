@@ -13,6 +13,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -44,7 +45,7 @@ import rtree.RTree;
 
 public class WikipediaByCountryDivider {
 	private static final Log log = PlatformUtil.getLog(WikipediaByCountryDivider.class);
-	private static final long BATCH_SIZE = 500;
+	private static final long BATCH_SIZE = 3500;
 
 	private static class LanguageSqliteFile {
 		private Connection conn;
@@ -225,16 +226,19 @@ public class WikipediaByCountryDivider {
 			c.createStatement()
 					.execute(
 							"CREATE TABLE wiki_content(id long, lat double, lon double, lang text, wikiId long, title text, zipContent blob)");
+			c.createStatement().execute("CREATE TABLE wiki_region(id long, regionName text)");
+			c.createStatement().execute("CREATE TABLE wiki_translation(id long, lang text, title text)");
+		}
+
+		public void createIndexes() throws SQLException {
 			c.createStatement().execute("CREATE INDEX IF NOT EXISTS WIKIID_INDEX ON wiki_content(lang, wikiId)");
 			c.createStatement().execute("CREATE INDEX IF NOT EXISTS CONTENTID_INDEX ON wiki_content(ID)");
-
-			c.createStatement().execute("CREATE TABLE wiki_region(id long, regionName text)");
-			c.createStatement().execute("CREATE INDEX IF NOT EXISTS REGIONID_INDEX ON wiki_region(ID)");
-			c.createStatement().execute("CREATE INDEX IF NOT EXISTS REGIONNAME_INDEX ON wiki_region(regionName)");
-
-			c.createStatement().execute("CREATE TABLE wiki_translation(id long, lang text, title text)");
+			
 			c.createStatement().execute("CREATE INDEX IF NOT EXISTS TRANSID_INDEX ON wiki_translation(ID)");
 			c.createStatement().execute("CREATE INDEX IF NOT EXISTS TRANS_INDEX ON wiki_translation(lang,title)");
+			
+			c.createStatement().execute("CREATE INDEX IF NOT EXISTS REGIONID_INDEX ON wiki_region(ID)");
+			c.createStatement().execute("CREATE INDEX IF NOT EXISTS REGIONNAME_INDEX ON wiki_region(regionName)");
 		}
 
 	}
@@ -519,13 +523,15 @@ public class WikipediaByCountryDivider {
 		for (String lang : langs) {
 			processLang(lang, folder, wikiStructure);
 		}
+		System.out.println("Create indexes " + new Date());
+		wikiStructure.createIndexes();
 		wikiStructure.closeConnnection();
 		System.out.println("Generation finished");
 	}
 
 	protected static void processLang(String lang, String folder, final GlobalWikiStructure wikiStructure)
 			throws SQLException, IOException, FileNotFoundException, UnsupportedEncodingException {
-		System.out.println("Copy articles for " + lang);
+		System.out.println("Copy articles for " + lang + " " + new Date());
 		String langLinks = folder + lang + "wiki-latest-langlinks.sql.gz";
 		LanguageSqliteFile ifl = new LanguageSqliteFile(folder + lang + "wiki.sqlite");
 		final Map<Long, Long> idMapping = new LinkedHashMap<Long, Long>();
@@ -536,7 +542,7 @@ public class WikipediaByCountryDivider {
 			idMapping.put(wikiId, articleId);
 		}
 		ifl.closeConnnection();
-		System.out.println("Insert translation " + lang);
+		System.out.println("Insert translation " + lang + " " + new Date());
 		insertTranslationMapping(wikiStructure, langLinks, idMapping);
 	}
 
