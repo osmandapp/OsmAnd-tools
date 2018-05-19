@@ -4,13 +4,13 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 
+import net.osmand.osm.util.WikiDatabasePreparation;
+import net.osmand.util.sql.SqlInsertValuesReader;
+import net.osmand.util.sql.SqlInsertValuesReader.InsertValueProcessor;
+
 import org.junit.Assert;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.xmlpull.v1.XmlPullParserException;
-
-import net.osmand.osm.util.WikiDatabasePreparation;
-import net.osmand.osm.util.WikiDatabasePreparation.InsertValueProcessor;
 
 public class ReadInsertValuesTest {
 
@@ -25,7 +25,7 @@ public class ReadInsertValuesTest {
 			new String[] {"11112", "aa", "bbbb (bbbb(bbbb))"},
 			new String[] {"11113", "a'a'a", "b", "((c,c)),"},
 		};
-		WikiDatabasePreparation.readInsertValuesFile("tests/test_wiki.sql", new InsertValueProcessor() {
+		SqlInsertValuesReader.readInsertValuesFile("tests/test_wiki.sql", new InsertValueProcessor() {
 			int ind = 0;
 			@Override
 			public void process(List<String> vs) {
@@ -39,7 +39,7 @@ public class ReadInsertValuesTest {
 	
 	@Test
 	public void testEnglish() throws IOException, XmlPullParserException {
-		WikiDatabasePreparation.readInsertValuesFile("tests/langlinks.sql", new InsertValueProcessor() {
+		SqlInsertValuesReader.readInsertValuesFile("tests/langlinks.sql", new InsertValueProcessor() {
 			@Override
 			public void process(List<String> vs) {
 				Assert.assertEquals(3, vs.size());

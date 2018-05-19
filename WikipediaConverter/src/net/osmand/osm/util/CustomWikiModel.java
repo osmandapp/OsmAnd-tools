@@ -2,16 +2,6 @@ package net.osmand.osm.util;
 
 import static info.bliki.wiki.tags.WPATag.CLASS;
 import static info.bliki.wiki.tags.WPATag.HREF;
-import static info.bliki.wiki.tags.WPATag.WIKILINK;
-
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.Map;
-
-import org.apache.commons.codec.digest.DigestUtils;
-
-import com.google.gson.Gson;
-
 import info.bliki.Messages;
 import info.bliki.htmlcleaner.ContentToken;
 import info.bliki.htmlcleaner.TagNode;
@@ -29,6 +19,14 @@ import info.bliki.wiki.tags.HTMLTag;
 import info.bliki.wiki.tags.PTag;
 import info.bliki.wiki.tags.TableOfContentTag;
 import info.bliki.wiki.tags.util.TagStack;
+
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+import org.apache.commons.codec.digest.DigestUtils;
+
+import com.google.gson.Gson;
 
 
 public class CustomWikiModel extends WikiModel {

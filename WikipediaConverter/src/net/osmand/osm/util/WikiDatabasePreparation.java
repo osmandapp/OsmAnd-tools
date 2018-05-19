@@ -42,6 +42,8 @@ import net.osmand.data.preparation.DBDialect;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.osm.util.WikiVoyagePreparation.WikidataConnection;
 import net.osmand.osm.util.WikiVoyagePreparation.WikivoyageTemplates;
+import net.osmand.util.sql.SqlInsertValuesReader;
+import net.osmand.util.sql.SqlInsertValuesReader.InsertValueProcessor;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.logging.Log;
@@ -71,12 +73,6 @@ import com.google.gson.JsonObject;
 
 public class WikiDatabasePreparation {
 	private static final Log log = PlatformUtil.getLog(WikiDatabasePreparation.class);
-	
-	public interface InsertValueProcessor {
-		public void process(List<String> vs);
-
-    }
-	
 	
 	public static class LatLon {
 		private final double longitude;
@@ -607,7 +603,7 @@ public class WikiDatabasePreparation {
 
     		
     	};
-		readInsertValuesFile(fileName, p);
+    	SqlInsertValuesReader.readInsertValuesFile(fileName, p);
 		System.out.println("Found links for " + total[0] + ", parsed links " + total[1]);
 		return pages;
 	}
@@ -657,101 +653,7 @@ public class WikiDatabasePreparation {
 		return Double.parseDouble(params);
 	}
 
-	public static void readInsertValuesFile(final String fileName, InsertValueProcessor p) throws IOException {
-		InputStream fis = new FileInputStream(fileName);
-		if(fileName.endsWith("gz")) {
-			fis = new GZIPInputStream(fis);
-		}
-    	InputStreamReader read = new InputStreamReader(fis, "UTF-8");
-    	char[] cbuf = new char[1000];
-    	int cnt;
-    	
-    	String buf = ""	;
-    	List<String> insValues = new ArrayList<String>();
-    	boolean values = false;
-    	boolean openInsValues = false;
-    	boolean openWord = false;
-    	while((cnt = read.read(cbuf)) >= 0) {
-    		String str = new String(cbuf, 0, cnt);
-    		buf += str;
-    		boolean processed = true;
-    		while(processed) {
-    			processed = false;
-    			if(!values) {
-        			int ind = buf.indexOf("VALUES");
-    				if (ind != -1) {
-    					buf = buf.substring(ind + "VALUES".length());
-    					values = true;
-    					processed = true;
-    				}
-        		} else if(!openInsValues) {
-        			int ind = buf.indexOf("(");
-        			if (ind != -1) {
-    					buf = buf.substring(ind + 1);
-    					openInsValues = true;
-    					insValues.clear();
-    					processed = true;
-    				}
-        		} else if(!openWord){
-        			StringBuilder number = new StringBuilder(100);
-        			for(int k = 0; k < buf.length(); k++) {
-        				char ch = buf.charAt(k);
-        				if(ch == '\'') {
-        					openWord = true;
-        					processed = true;
-        				} else if(ch == ')') {
-        					if(number.toString().trim().length() > 0) {
-        						insValues.add(number.toString().trim());
-        					}
-        					
-            				try {
-    							p.process(insValues);
-    						} catch (Exception e) {
-    							System.err.println(e.getMessage() + " " + insValues);
-    						}
-            				openInsValues = false;
-        					processed = true;
-        				} else if(ch == ',') {
-        					if(number.toString().trim().length() > 0) {
-        						insValues.add(number.toString().trim());
-        					}
-        					processed = true;
-        				} else {
-        					number.append(ch);
-        				}
-        				if(processed) {
-        					buf = buf.substring(k + 1);
-        					break;
-        				}
-        			}
-        		} else if(openWord) {
-        			StringBuilder word = new StringBuilder(100);
-        			boolean escape = false;
-        			for(int k = 0; k < buf.length(); k++) {
-        				char ch = buf.charAt(k);
-        				if(escape) {
-        					word.append(ch);
-        					escape = false;
-        				} else {
-        					if(ch == '\'') {
-        						insValues.add(word.toString());
-        						processed = true;	
-        						openWord = false;
-								buf = buf.substring(k + 1);
-        						break;
-        					} else if(ch == '\\') {
-        						escape = true;
-            				} else {
-            					word.append(ch);
-            				}
-        				}
-        			}
-        		}
-    		}
-    		
-    	}
-    	read.close();
-	}
+	
 	
 	public static class WikiOsmHandler extends DefaultHandler {
 		long id = 1;

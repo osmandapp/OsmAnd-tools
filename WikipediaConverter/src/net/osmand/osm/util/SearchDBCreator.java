@@ -20,7 +20,8 @@ import java.util.TreeSet;
 
 import net.osmand.PlatformUtil;
 import net.osmand.data.preparation.DBDialect;
-import net.osmand.osm.util.WikiDatabasePreparation.InsertValueProcessor;
+import net.osmand.util.sql.SqlInsertValuesReader;
+import net.osmand.util.sql.SqlInsertValuesReader.InsertValueProcessor;
 
 import org.apache.commons.logging.Log;
 
@@ -381,7 +382,7 @@ public class SearchDBCreator {
 		};
 		for (File f : files) {
 			lang[0] = f.getName().replace("wikivoyage-latest-langlinks.sql.gz", "");
-			WikiDatabasePreparation.readInsertValuesFile(f.getAbsolutePath(), p);
+			SqlInsertValuesReader.readInsertValuesFile(f.getAbsolutePath(), p);
 			ids.addAll(currentFileIds);
 			currentFileIds.clear();
 			currMapping.clear();

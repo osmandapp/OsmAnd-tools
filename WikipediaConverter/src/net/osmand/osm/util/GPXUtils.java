@@ -1,9 +1,6 @@
 package net.osmand.osm.util;
 
-import org.xmlpull.v1.XmlSerializer;
-
 import java.io.File;
-
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
@@ -21,6 +18,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.TimeZone;
+
+import org.xmlpull.v1.XmlSerializer;
 
 public class GPXUtils {
 
