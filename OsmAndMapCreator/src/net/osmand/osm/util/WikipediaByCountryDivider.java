@@ -95,10 +95,13 @@ public class WikipediaByCountryDivider {
 		private PreparedStatement getIdByTitle;
 		private PreparedStatement insertWikiContent;
 		private PreparedStatement insertWikiTranslation;
+		private PreparedStatement updateIdByTitleTranslation;
 		private Map<PreparedStatement, Long> statements = new LinkedHashMap<PreparedStatement, Long>();
 		private Connection c;
 		private OsmandRegions regions;
 		private List<String> keyNames = new ArrayList<String>();
+
+		
 
 		public GlobalWikiStructure(String fileName, OsmandRegions regions, boolean regenerate) throws SQLException {
 			this.regions = regions;
@@ -177,25 +180,49 @@ public class WikipediaByCountryDivider {
 		}
 
 		public void prepareStatetements() throws SQLException {
-			getIdByTitle = c.prepareStatement("SELECT ID FROM wiki_translation WHERE lang = ? and title = ? ");
+			getIdByTitle = c.prepareStatement("SELECT gen_id, id, id_lang FROM wiki_translation WHERE lang = ? and title = ? ");
+			updateIdByTitleTranslation = c.prepareStatement("UPDATE wiki_translation SET gen_id = ? WHERE ID = ? and id_lang = ?  ");
 			insertWikiContent = c.prepareStatement("INSERT INTO wiki_content VALUES(?, ?, ?, ?, ?, ?, ?)");
-			insertWikiTranslation = c.prepareStatement("INSERT INTO wiki_translation VALUES(?, ?, ?)");
+			insertWikiTranslation = c.prepareStatement("INSERT INTO wiki_translation VALUES(?, ?, ?, ?, ?)");
 		}
 
-		public long getIdForArticle(String lang, String title) throws SQLException {
+		public long getIdForArticle(String lang, long wikiId, String title) throws SQLException {
 			getIdByTitle.setString(1, lang);
 			getIdByTitle.setString(2, title);
 			ResultSet rs = getIdByTitle.executeQuery();
-			if(rs.next()) {
-				return rs.getLong(1);
+			long resGenId = -1;
+			while (rs.next()) {
+				long genId = rs.getLong(1);
+				long id = rs.getLong(2);
+				String idLang = rs.getString(3);
+				if (resGenId == -1) {
+					if (genId != -1) {
+						resGenId = genId;
+					} else {
+						resGenId = idGen++;
+					}
+
+				} else {
+					if (resGenId != genId && genId != -1) {
+						System.err.println("Lang " + lang + " wiki " + wikiId + " " + title + ": " + resGenId + " !="
+								+ genId + " (" + id + ", " + idLang + ")");
+					}
+				}
+				if (genId == -1) {
+					updateIdByTitleTranslation.setLong(1, resGenId);
+					updateIdByTitleTranslation.setLong(2, id);
+					updateIdByTitleTranslation.setString(3, idLang);
+				}
 			}
-			return -1;
+			return resGenId;
 		}
 
-		public void insertWikiTranslation(long id, String lang, String title) throws SQLException {
-			insertWikiTranslation.setLong(1, id);
-			insertWikiTranslation.setString(2, lang);
-			insertWikiTranslation.setString(3, title);
+		public void insertWikiTranslation(long id, String idLang, String lang, String title) throws SQLException {
+			insertWikiTranslation.setLong(1, -1);
+			insertWikiTranslation.setLong(2, id);
+			insertWikiTranslation.setString(3, idLang);
+			insertWikiTranslation.setString(4, lang);
+			insertWikiTranslation.setString(5, title);
 			addBatch(insertWikiTranslation);
 		}
 
@@ -203,13 +230,8 @@ public class WikipediaByCountryDivider {
 			insertWikiTranslation.executeBatch();
 		}
 
-		public long insertArticle(double lat, double lon, String lang, long wikiId, String title, byte[] zipContent)
+		public long insertArticle(long id, double lat, double lon, String lang, long wikiId, String title, byte[] zipContent)
 				throws SQLException, IOException {
-			long id = getIdForArticle(lang, title);
-			boolean genId = id < 0;
-			if (genId) {
-				id = idGen++;
-			}
 			insertWikiContent.setLong(1, id);
 			insertWikiContent.setDouble(2, lat);
 			insertWikiContent.setDouble(3, lon);
@@ -227,24 +249,20 @@ public class WikipediaByCountryDivider {
 					.execute(
 							"CREATE TABLE wiki_content(id long, lat double, lon double, lang text, wikiId long, title text, zipContent blob)");
 			c.createStatement().execute("CREATE TABLE wiki_region(id long, regionName text)");
-			c.createStatement().execute("CREATE TABLE wiki_translation(id long, lang text, title text)");
+			c.createStatement().execute("CREATE TABLE wiki_translation(gen_id long, id long, id_lang text, lang text, title text)");
 		}
 
 		public void createIndexes() throws SQLException {
 			c.createStatement().execute("CREATE INDEX IF NOT EXISTS WIKIID_INDEX ON wiki_content(lang, wikiId)");
 			c.createStatement().execute("CREATE INDEX IF NOT EXISTS CONTENTID_INDEX ON wiki_content(ID)");
 			
-			c.createStatement().execute("CREATE INDEX IF NOT EXISTS TRANSID_INDEX ON wiki_translation(ID)");
 			c.createStatement().execute("CREATE INDEX IF NOT EXISTS TRANS_INDEX ON wiki_translation(lang,title)");
+			c.createStatement().execute("CREATE INDEX IF NOT EXISTS TRANS_INDEX ON wiki_translation(id_lang,id)");
 			
 			c.createStatement().execute("CREATE INDEX IF NOT EXISTS REGIONID_INDEX ON wiki_region(ID)");
 			c.createStatement().execute("CREATE INDEX IF NOT EXISTS REGIONNAME_INDEX ON wiki_region(regionName)");
 		}
 
-		public void dropIndexesWikiTranslation() throws SQLException {
-			c.createStatement().execute("DROP INDEX IF EXISTS TRANSID_INDEX");
-			c.createStatement().execute("DROP INDEX IF EXISTS TRANS_INDEX ");
-		}
 
 	}
 
@@ -525,11 +543,16 @@ public class WikipediaByCountryDivider {
 				langs.add(f.getName().substring(0, f.getName().length() - "wiki.sqlite".length()));
 			}
 		}
+		// insert translation
+		for (String lang : langs) {
+			String langLinks = folder + lang + "wiki-latest-langlinks.sql.gz";
+			System.out.println("Insert translation " + lang + " " + new Date());
+			insertTranslationMapping(wikiStructure, lang, langLinks);
+		}
+		wikiStructure.createIndexes();
 		for (String lang : langs) {
 			processLang(lang, folder, wikiStructure);
 		}
-		System.out.println("Create indexes " + new Date());
-		wikiStructure.createIndexes();
 		wikiStructure.closeConnnection();
 		System.out.println("Generation finished");
 	}
@@ -537,44 +560,36 @@ public class WikipediaByCountryDivider {
 	protected static void processLang(String lang, String folder, final GlobalWikiStructure wikiStructure)
 			throws SQLException, IOException, FileNotFoundException, UnsupportedEncodingException {
 		System.out.println("Copy articles for " + lang + " " + new Date());
-		String langLinks = folder + lang + "wiki-latest-langlinks.sql.gz";
 		LanguageSqliteFile ifl = new LanguageSqliteFile(folder + lang + "wiki.sqlite");
 		final Map<Long, Long> idMapping = new LinkedHashMap<Long, Long>();
 		while (ifl.next()) {
 			final long wikiId = ifl.getId();
-			long articleId = wikiStructure.insertArticle(ifl.getLat(), ifl.getLon(), lang, wikiId, ifl.getTitle(),
+			long id = wikiStructure.getIdForArticle(lang, wikiId, ifl.getTitle());
+			long articleId = wikiStructure.insertArticle(id, ifl.getLat(), ifl.getLon(), lang, wikiId, ifl.getTitle(),
 					ifl.getContent());
 			idMapping.put(wikiId, articleId);
 		}
 		ifl.closeConnnection();
-		System.out.println("Insert translation " + lang + " " + new Date());
-		insertTranslationMapping(wikiStructure, langLinks, idMapping);
+		
 	}
 
-	protected static void insertTranslationMapping(final GlobalWikiStructure wikiStructure, String langLinks,
-			final Map<Long, Long> idMapping) throws FileNotFoundException, UnsupportedEncodingException, IOException,
-			SQLException {
-		wikiStructure.dropIndexesWikiTranslation();
+	protected static void insertTranslationMapping(final GlobalWikiStructure wikiStructure, final String lang,
+			String langLinks) throws IOException, SQLException {
+
 		SqlInsertValuesReader.readInsertValuesFile(langLinks, new InsertValueProcessor() {
 			@Override
 			public void process(List<String> vs) {
 				final long wikiId = Long.parseLong(vs.get(0));
-				Long lid = idMapping.get(wikiId);
-				if (lid != null) {
-					try {
-						wikiStructure.insertWikiTranslation(lid, vs.get(1), vs.get(2));
-					} catch (SQLException e) {
-						e.printStackTrace();
-						throw new RuntimeException(e);
-					}
+				try {
+					wikiStructure.insertWikiTranslation(wikiId, lang, vs.get(1), vs.get(2));
+				} catch (SQLException e) {
+					e.printStackTrace();
+					throw new RuntimeException(e);
 				}
 			}
 		});
 		wikiStructure.commitTranslationInsert();
-		System.out.println("Create indexes " + new Date());
-		wikiStructure.createIndexes();
 	}
-
 
 
 	
