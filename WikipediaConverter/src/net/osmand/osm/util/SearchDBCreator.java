@@ -331,18 +331,18 @@ public class SearchDBCreator {
 		Set<Long> currentFileIds = new HashSet<>();
 		Map<Long, Long> currMapping = new HashMap<>();
 		File[] files = langlinkFolder.listFiles();
+		final String[] lang = new String[1];
 		InsertValueProcessor p = new InsertValueProcessor() {
 
 			private int batch = 0;
 			private long maxId = 0;
-			private String lang = "";
 
 			@Override
 			public void process(List<String> insValues) {
 				long id = Long.valueOf(insValues.get(0));
 				try {
 					articleQuery.setLong(1, id);
-					articleQuery.setString(2, lang);
+					articleQuery.setString(2, lang[0]);
 					ResultSet rs = articleQuery.executeQuery();
 					String thisTitle = "";
 					while (rs.next()) {
@@ -361,7 +361,7 @@ public class SearchDBCreator {
 					currentFileIds.add(id);
 					if (!thisTitle.isEmpty()) {
 						prep.setLong(1, id);
-						prep.setString(2, lang);
+						prep.setString(2, lang[0]);
 						prep.setString(3, thisTitle);
 						prep.addBatch();
 						batch++;
@@ -378,13 +378,9 @@ public class SearchDBCreator {
 					System.err.println(e.getMessage());
 				}
 			}
-
-			public void setLang(String lang) {
-				this.lang = lang;
-			}
 		};
 		for (File f : files) {
-			p.setLang(f.getName().replace("wikivoyage-latest-langlinks.sql.gz", ""));
+			lang[0] = f.getName().replace("wikivoyage-latest-langlinks.sql.gz", "");
 			WikiDatabasePreparation.readInsertValuesFile(f.getAbsolutePath(), p);
 			ids.addAll(currentFileIds);
 			currentFileIds.clear();

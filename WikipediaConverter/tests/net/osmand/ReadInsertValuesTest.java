@@ -28,10 +28,6 @@ public class ReadInsertValuesTest {
 		WikiDatabasePreparation.readInsertValuesFile("tests/test_wiki.sql", new InsertValueProcessor() {
 			int ind = 0;
 			@Override
-			public void setLang(String replace) {
-			}
-
-			@Override
 			public void process(List<String> vs) {
 				System.out.println(ind + " " + Arrays.toString(expected[ind]) +" " + vs);
 				String[] array = vs.toArray(new String[vs.size()]);
@@ -44,10 +40,6 @@ public class ReadInsertValuesTest {
 	@Test
 	public void testEnglish() throws IOException, XmlPullParserException {
 		WikiDatabasePreparation.readInsertValuesFile("tests/langlinks.sql", new InsertValueProcessor() {
-			@Override
-			public void setLang(String replace) {
-			}
-
 			@Override
 			public void process(List<String> vs) {
 				Assert.assertEquals(3, vs.size());

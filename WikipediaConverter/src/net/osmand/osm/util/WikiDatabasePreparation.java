@@ -75,7 +75,6 @@ public class WikiDatabasePreparation {
 	public interface InsertValueProcessor {
 		public void process(List<String> vs);
 
-		public void setLang(String replace);
     }
 	
 	
@@ -598,11 +597,6 @@ public class WikiDatabasePreparation {
 				}
 			}
 			
-			@Override
-			public void setLang (String s) {
-				return;
-			}
-
 			protected String strip(String paramsStr, char c) {
 				if(paramsStr.indexOf(c) != -1) {
 					paramsStr = paramsStr.substring(0, paramsStr.indexOf(c));
