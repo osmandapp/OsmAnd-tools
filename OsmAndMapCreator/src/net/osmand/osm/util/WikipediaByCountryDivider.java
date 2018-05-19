@@ -590,22 +590,38 @@ public class WikipediaByCountryDivider {
     			boolean openString = false;
     			int word = -1;
     			int last = 0;
+    			int bracketCount = 0;
     			for(int k = 0; k < buf.length(); k++) {
     				if(openString) {
-    					if (buf.charAt(k) == ')' && buf.charAt(k -1) == '\'') {
+    					bracketCount = buf.charAt(k) == '(' ? ++bracketCount : buf.charAt(k) == ')' ? --bracketCount : bracketCount;
+    					if (buf.charAt(k) == ')' && buf.charAt(k - 1) == '\'' && bracketCount == 0) {
     						openString = false;
     						last = k + 1;
-    						p.process(Arrays.asList(buf.substring(word, k)
-    								.replaceAll("^'|'$", "").split(",")));
+    						processValueGroup(p, buf.substring(word, k));
     					}
     				} else if(buf.charAt(k) == '(' && !openString) {
     					openString = true;
     					word = k + 1;
-    				}
+    					bracketCount++;
+    				} 
     			}
     			buf = buf.substring(last);
     		}
     	}
     	read.close();
+	}
+
+	static void processValueGroup(InsertValueProcessor p, String values) {
+		String[] vals = values.split("(,|, )(?='.*'$)");
+		List<String> insValues = new ArrayList<>();
+		for (String val : vals) {
+			insValues.add(val.replaceAll("^'|'$", ""));
+		}
+		try {
+			p.process(insValues);
+		} catch (Exception e) {
+			System.err.println(e.getMessage() + " " + insValues);
+			e.printStackTrace();
+		}
 	}
 }
