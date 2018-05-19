@@ -203,9 +203,9 @@ public class WikipediaByCountryDivider {
 			insertWikidata.executeBatch();
 		}
 
-		public void insertArticle(String id, double lat, double lon, String lang, long wikiId, String title, byte[] zipContent)
+		public void insertArticle(long id, double lat, double lon, String lang, long wikiId, String title, byte[] zipContent)
 				throws SQLException, IOException {
-			insertWikiContent.setString(1, id);
+			insertWikiContent.setLong(1, id);
 			insertWikiContent.setDouble(2, lat);
 			insertWikiContent.setDouble(3, lon);
 			insertWikiContent.setString(4, lang);
@@ -219,7 +219,7 @@ public class WikipediaByCountryDivider {
 		public void createTables() throws SQLException {
 			c.createStatement()
 					.execute(
-							"CREATE TABLE wiki_content(id text, lat double, lon double, lang text, wikiId long, title text, zipContent blob)");
+							"CREATE TABLE wiki_content(id long, lat double, lon double, lang text, wikiId long, title text, zipContent blob)");
 			c.createStatement().execute("CREATE TABLE wiki_region(id long, regionName text)");
 			c.createStatement().execute("CREATE TABLE wikidata(lang text, id long, wikidata text)");
 		}
@@ -365,7 +365,7 @@ public class WikipediaByCountryDivider {
 			boolean preferredAdded = false;
 			boolean nameAdded = false;
 			while (rps.next()) {
-				long osmId = -Long.parseLong(rps.getString(1).substring(1));
+				long osmId = -rps.getLong(1);
 				double lat = rps.getDouble(2);
 				double lon = rps.getDouble(3);
 				long wikiId = rps.getLong(5);
@@ -518,7 +518,7 @@ public class WikipediaByCountryDivider {
 		for (String lang : langs) {
 			String langLinks = folder + lang + "wiki-latest-page_props.sql.gz";
 			System.out.println("Insert wikidata " + lang + " " + new Date());
-			insertTranslationMapping(wikiStructure, lang, langLinks);
+			insertWikidata(wikiStructure, lang, langLinks);
 		}
 		wikiStructure.createIndexes();
 		for (String lang : langs) {
@@ -538,15 +538,19 @@ public class WikipediaByCountryDivider {
 			if(id == null) {
 				System.err.println("ERROR: Skip article " + lang + " " + ifl.getTitle() + " no wikidata id" ) ;
 			} else {
-				wikiStructure.insertArticle(id, ifl.getLat(), ifl.getLon(), lang, wikiId, ifl.getTitle(),
-					ifl.getContent());
+				try {
+					wikiStructure.insertArticle(Long.parseLong(id.substring(1)), ifl.getLat(), ifl.getLon(), lang, wikiId, ifl.getTitle(),
+						ifl.getContent());
+				} catch (Exception e) {
+					System.err.println("ERROR: Skip article " + lang + " " + ifl.getTitle() + " wrong wikidata id: " +  id) ;
+				}
 			}
 		}
 		ifl.closeConnnection();
 		
 	}
 
-	protected static void insertTranslationMapping(final GlobalWikiStructure wikiStructure, final String lang,
+	protected static void insertWikidata(final GlobalWikiStructure wikiStructure, final String lang,
 			String langLinks) throws IOException, SQLException {
 
 		SqlInsertValuesReader.readInsertValuesFile(langLinks, new InsertValueProcessor() {
