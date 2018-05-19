@@ -706,7 +706,6 @@ public class WikiDatabasePreparation {
         					openWord = true;
         					processed = true;
         				} else if(ch == ')') {
-            				// TODO new  values (close)
         					if(number.toString().trim().length() > 0) {
         						insValues.add(number.toString().trim());
         					}

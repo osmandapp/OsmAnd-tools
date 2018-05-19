@@ -5,6 +5,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import org.junit.Assert;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.xmlpull.v1.XmlPullParserException;
 
@@ -36,6 +37,20 @@ public class ReadInsertValuesTest {
 				String[] array = vs.toArray(new String[vs.size()]);
 				Assert.assertArrayEquals(array, expected[ind]);
 				ind++;
+			}
+		});
+	}
+	
+	@Test
+	public void testEnglish() throws IOException, XmlPullParserException {
+		WikiDatabasePreparation.readInsertValuesFile("tests/langlinks.sql", new InsertValueProcessor() {
+			@Override
+			public void setLang(String replace) {
+			}
+
+			@Override
+			public void process(List<String> vs) {
+				Assert.assertEquals(3, vs.size());
 			}
 		});
 	}
