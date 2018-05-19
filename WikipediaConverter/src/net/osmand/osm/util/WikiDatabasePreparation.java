@@ -213,6 +213,7 @@ public class WikiDatabasePreparation {
 		bld.append("<p class=\"warning\"><b>Warning: </b>");
 		String[] parts = val.split("\\|");
 		val = parts.length > 1 ? parts[1] : "";
+		val = !val.isEmpty() ? appendSqareBracketsIfNeeded(1, parts, val) : val;
 		bld.append(val);
 		bld.append("</p>");
 	}
