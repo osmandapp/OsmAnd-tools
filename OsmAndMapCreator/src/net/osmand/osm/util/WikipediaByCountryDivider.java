@@ -571,6 +571,7 @@ public class WikipediaByCountryDivider {
 			}
 		});
 		wikiStructure.commitTranslationInsert();
+		System.out.println("Create indexes " + new Date());
 		wikiStructure.createIndexes();
 	}
 
