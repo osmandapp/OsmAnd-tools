@@ -612,7 +612,7 @@ public class WikipediaByCountryDivider {
 	}
 
 	static void processValueGroup(InsertValueProcessor p, String values) {
-		String[] vals = values.split(",");
+		String[] vals = values.split(",(?='.+'$)");
 		List<String> insValues = new ArrayList<>();
 		for (String val : vals) {
 			insValues.add(val.replaceAll("^'|'$", ""));
