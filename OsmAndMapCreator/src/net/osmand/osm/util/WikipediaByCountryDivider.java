@@ -241,6 +241,11 @@ public class WikipediaByCountryDivider {
 			c.createStatement().execute("CREATE INDEX IF NOT EXISTS REGIONNAME_INDEX ON wiki_region(regionName)");
 		}
 
+		public void dropIndexesWikiTranslation() throws SQLException {
+			c.createStatement().execute("DROP INDEX IF EXISTS TRANSID_INDEX");
+			c.createStatement().execute("DROP INDEX IF EXISTS TRANS_INDEX ");
+		}
+
 	}
 
 	public static void main(String[] args) throws IOException, SQLException, InterruptedException, XmlPullParserException {
@@ -549,6 +554,7 @@ public class WikipediaByCountryDivider {
 	protected static void insertTranslationMapping(final GlobalWikiStructure wikiStructure, String langLinks,
 			final Map<Long, Long> idMapping) throws FileNotFoundException, UnsupportedEncodingException, IOException,
 			SQLException {
+		wikiStructure.dropIndexesWikiTranslation();
 		SqlInsertValuesReader.readInsertValuesFile(langLinks, new InsertValueProcessor() {
 			@Override
 			public void process(List<String> vs) {
@@ -565,6 +571,7 @@ public class WikipediaByCountryDivider {
 			}
 		});
 		wikiStructure.commitTranslationInsert();
+		wikiStructure.createIndexes();
 	}
 
 
