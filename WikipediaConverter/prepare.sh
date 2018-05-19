@@ -8,15 +8,14 @@ function download {
       if [ ! -f  "$1"wiki-latest-langlinks.sql.gz ]; then
       	wget --quiet -N http://dumps.wikimedia.org/"$1"wiki/latest/"$1"wiki-latest-langlinks.sql.gz      
       fi
-      if [ ! -f  "$1"wiki-latest-externallinks.sql.gz ]; then
-            wget --quiet -N http://dumps.wikimedia.org/"$1"wiki/latest/"$1"wiki-latest-externallinks.sql.gz      
+      if [ ! -f  "$1"wiki-page_props.sql.gz ]; then
+            wget --quiet -N http://dumps.wikimedia.org/"$1"wiki/latest/"$1"wiki-latest-page_props.sql.gz    
       fi
+      
       if [ ! -f  "$1"wiki.sqlite ]; then
       	java -Xms256M -Xmx3200M -cp "$BUILD_PATH/WikiConverter.jar:$BUILD_PATH/build/lib/*.jar" net.osmand.osm.util.WikiDatabasePreparation $1
       fi
 }
-
-
 
 download en English;
 download de German;
