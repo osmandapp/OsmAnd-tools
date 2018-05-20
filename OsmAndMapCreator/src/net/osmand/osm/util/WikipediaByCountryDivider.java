@@ -105,13 +105,11 @@ public class WikipediaByCountryDivider {
 			this.regions = regions;
 			if(regenerate) {
 				File fl = new File(fileName);
-				// FIXME
-//				fl.delete();
+				fl.delete();
 			}
 			c = (Connection) DBDialect.SQLITE.getDatabaseConnection(fileName, log);
 			if(regenerate) {
-				// FIXME
-//				createTables();
+				createTables();
 				prepareStatetements();
 			}
 		}
@@ -517,8 +515,7 @@ public class WikipediaByCountryDivider {
 		for (String lang : langs) {
 			String langLinks = folder + lang + "wiki-latest-page_props.sql.gz";
 			System.out.println("Insert wikidata " + lang + " " + new Date());
-			// FIXME
-			// insertWikidata(wikiStructure, lang, langLinks);
+			insertWikidata(wikiStructure, lang, langLinks);
 		}
 		System.out.println("Creating indexes " + new Date());
 		wikiStructure.createIndexes();
@@ -539,7 +536,7 @@ public class WikipediaByCountryDivider {
 			String id = wikiStructure.getIdForArticle(lang, wikiId);
 			if(id == null) {
 				accum++;
-				if(accum > 8) {
+				if(accum >= 10) {
 					if(accum % 10000 == 0) {
 						System.err.println("ERROR: Skipped "+ accum+ " articles " + lang + " no wikidata id" ) ;
 					}
@@ -555,7 +552,7 @@ public class WikipediaByCountryDivider {
 				}
 			}
 		}
-		if(accum > 1000) {
+		if(accum > 10) {
 			System.err.println("ERROR TOTAL: Skipped "+ accum+ " articles " + lang + " no wikidata id" ) ;
 		}
 		ifl.closeConnnection();
