@@ -105,11 +105,14 @@ public class WikipediaByCountryDivider {
 			this.regions = regions;
 			if(regenerate) {
 				File fl = new File(fileName);
-				fl.delete();
+				// TODO
+//				fl.delete();
 			}
 			c = (Connection) DBDialect.SQLITE.getDatabaseConnection(fileName, log);
 			if(regenerate) {
-				prepareToInsert();
+				// TODO
+//				createTables();
+				prepareStatetements();
 			}
 		}
 
@@ -135,10 +138,6 @@ public class WikipediaByCountryDivider {
 
 		}
 
-		public void prepareToInsert() throws SQLException {
-			createTables();
-			prepareStatetements();
-		}
 
 		public void addBatch(PreparedStatement p) throws SQLException {
 			p.addBatch();
@@ -518,8 +517,9 @@ public class WikipediaByCountryDivider {
 		for (String lang : langs) {
 			String langLinks = folder + lang + "wiki-latest-page_props.sql.gz";
 			System.out.println("Insert wikidata " + lang + " " + new Date());
-			insertWikidata(wikiStructure, lang, langLinks);
+			// insertWikidata(wikiStructure, lang, langLinks);
 		}
+		System.out.println("Creating indexes " + new Date());
 		wikiStructure.createIndexes();
 		for (String lang : langs) {
 			processLang(lang, folder, wikiStructure);
@@ -532,11 +532,19 @@ public class WikipediaByCountryDivider {
 			throws SQLException, IOException, FileNotFoundException, UnsupportedEncodingException {
 		System.out.println("Copy articles for " + lang + " " + new Date());
 		LanguageSqliteFile ifl = new LanguageSqliteFile(folder + lang + "wiki.sqlite");
+		int accum = 0;
 		while (ifl.next()) {
 			final long wikiId = ifl.getId();
 			String id = wikiStructure.getIdForArticle(lang, wikiId);
 			if(id == null) {
-				System.err.println("ERROR: Skip article " + lang + " " + ifl.getTitle() + " no wikidata id" ) ;
+				if(lang.equals("ceb")) {
+					if(accum ++ >= 1000) {
+						System.err.println("ERROR: Skipped "+ accum+ " articles " + lang + " no wikidata id" ) ;
+						accum = 0;
+					}
+				} else {
+					System.err.println("ERROR: Skip article " + lang + " " + ifl.getTitle() + " no wikidata id" ) ;
+				}
 			} else {
 				try {
 					wikiStructure.insertArticle(Long.parseLong(id.substring(1)), ifl.getLat(), ifl.getLon(), lang, wikiId, ifl.getTitle(),
