@@ -917,10 +917,10 @@ public class IndexCreator {
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 
 		String file = rootFolder + "/temp/map.osm";
-//		String file = rootFolder + "/temp/ukraine_kiev-city_europe.pbf";
 //		String file = rootFolder + "/maps/diff/2017_08_28_00_30_before.osm";
 //		String file = rootFolder + "/maps/diff/ukraine_kiev-city_europe.pbf";
 //		String file = rootFolder + "/repos/resources/test-resources/synthetic_test_rendering.osm";
+//		String file = rootFolder + "/repos/resources/test-resources/turn_lanes_test.osm";
 		int st = file.lastIndexOf('/');
 		int e = file.indexOf('.', st);
 		creator.setNodesDBFile(new File(rootFolder + "/maps/" + file.substring(st, e) + ".tmp.odb"));
