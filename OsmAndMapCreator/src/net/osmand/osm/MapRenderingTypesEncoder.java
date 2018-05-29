@@ -982,11 +982,14 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		double circle = 360;
 		try {
 			double simple01 = Double.parseDouble(val) / circle;
-			while (simple01 < 0) {
-				simple01++;
+			if(simple01 > Integer.MAX_VALUE || simple01 < Integer.MIN_VALUE) { 
+				return "n";
 			}
-			while (simple01 >= 1) {
-				simple01--;
+			if (simple01 < 0) {
+				simple01 = simple01 - ((int)simple01);
+			}
+			if (simple01 >= 1) {
+				simple01 = simple01 - ((int)simple01);
 			}
 			int rnd = (int) (Math.round(simple01 * rad));
 			val = "" + (int) (rnd * circle / rad);
