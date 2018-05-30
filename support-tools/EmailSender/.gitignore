@@ -1,0 +1,11 @@
+.classpath
+src/main/resources/client_secret.json
+credentials
+.gradle
+gradle
+.project
+.settings
+.idea
+out
+bin
+build
