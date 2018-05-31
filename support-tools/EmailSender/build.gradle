@@ -15,5 +15,6 @@ dependencies {
     compile 'com.google.oauth-client:google-oauth-client-jetty:1.23.0'
     compile 'com.google.apis:google-api-services-sheets:v4-rev516-1.23.0'
     compile 'com.sendgrid:sendgrid-java:4.2.1'
+    compile group: 'org.postgresql', name: 'postgresql', version: '9.3-1100-jdbc4'
 }
 
