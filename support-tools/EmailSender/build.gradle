@@ -1,7 +1,7 @@
 apply plugin: 'java'
 apply plugin: 'application'
 
-mainClassName = 'SheetsQuickstart'
+mainClassName = 'EmailSenderMain'
 sourceCompatibility = 1.7
 targetCompatibility = 1.7
 version = '1.0'
@@ -9,6 +9,8 @@ version = '1.0'
 repositories {
     mavenCentral()
 }
+
+mainClassName = "net.osmand.mailsender.EmailSenderMain"
 
 dependencies {
     compile 'com.google.api-client:google-api-client:1.23.0'

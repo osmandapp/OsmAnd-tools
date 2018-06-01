@@ -36,7 +36,8 @@ public class EmailSenderMain {
             System.out.println("Can't connect to the database");
             System.exit(1);
         }
-        PreparedStatement ps = conn.prepareStatement("SELECT email FROM " + tableName);
+        PreparedStatement ps = conn.prepareStatement("SELECT" +
+                (tableName.equals("supporters") ? "useremail" : "email") + " FROM " + tableName);
         ResultSet resultSet = ps.executeQuery();
         while (resultSet.next()) {
             String address = resultSet.getString(1);
@@ -48,8 +49,8 @@ public class EmailSenderMain {
     @Nullable
     private static Connection getConnection() {
         String url = "jdbc:postgresql://localhost:5433/changeset";
-        String user = System.getenv("PG_USER");
-        String password = System.getenv("PG_PASS");
+        String user = System.getenv("DB_USER");
+        String password = System.getenv("DB_PWD");
         Connection conn = null;
         try {
             return DriverManager.getConnection(url, user, password);
