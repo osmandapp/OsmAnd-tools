@@ -22,6 +22,11 @@ jar {
     }
 }
 
+task copyDepJars(type: Copy) {
+    from configurations.compile
+    into 'build/libs'
+}
+
 dependencies {
     compile 'com.google.api-client:google-api-client:1.23.0'
     compile 'com.google.oauth-client:google-oauth-client-jetty:1.23.0'
