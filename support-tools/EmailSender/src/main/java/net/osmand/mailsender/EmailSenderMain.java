@@ -6,6 +6,7 @@ import javax.annotation.Nullable;
 import java.io.IOException;
 
 import java.sql.*;
+import java.util.logging.Logger;
 
 
 // Uses SendGrid's Java Library
@@ -13,19 +14,25 @@ import java.sql.*;
 
 public class EmailSenderMain {
 
+    private final static Logger LOGGER = Logger.getLogger(EmailSenderMain.class.getName());
+
     private static String mailFrom;
     private static SendGrid sendGridClient;
 
     public static void main(String[] args) throws SQLException {
         String tableName = null;
         String templateId = null;
+        boolean dryRun = false;
         if (args.length > 2) {
             templateId = args[0];
             tableName = args[1];
             mailFrom = args[2];
         } else {
-            System.out.println("Usage: <template_id> <table_name> <mail_from>");
+            LOGGER.info("Usage: <template_id> <table_name> <mail_from> [-d]<dry_run>(optional)");
             System.exit(1);
+        }
+        if (args.length > 3) {
+            dryRun = args[3].equals("-d");
         }
 
         final String apiKey = System.getenv("SENDGRID_KEY");
@@ -33,7 +40,7 @@ public class EmailSenderMain {
 
         Connection conn = getConnection();
         if (conn == null) {
-            System.out.println("Can't connect to the database");
+            LOGGER.info("Can't connect to the database");
             System.exit(1);
         }
         PreparedStatement ps = conn.prepareStatement("SELECT" +
@@ -41,8 +48,13 @@ public class EmailSenderMain {
         ResultSet resultSet = ps.executeQuery();
         while (resultSet.next()) {
             String address = resultSet.getString(1);
-            System.out.println("Sending mail to: " + address);
-            sendMail(address, templateId);
+            if (dryRun) {
+                LOGGER.info("Address to send email: " + address);
+            } else {
+                LOGGER.info("Sending mail to: " + address);
+                sendMail(address, templateId);
+            }
+
         }
     }
 
@@ -76,8 +88,6 @@ public class EmailSenderMain {
             request.setBody(mail.build());
             Response response = sendGridClient.api(request);
             System.out.println(response.getStatusCode());
-            System.out.println(response.getBody());
-            System.out.println(response.getHeaders());
         } catch (IOException ex) {
             System.err.println(ex.getMessage());
         }
