@@ -1,13 +1,25 @@
 apply plugin: 'java'
 apply plugin: 'application'
 
-mainClassName = 'SheetsQuickstart'
+mainClassName = 'EmailSenderMain'
 sourceCompatibility = 1.7
 targetCompatibility = 1.7
 version = '1.0'
 
 repositories {
     mavenCentral()
+}
+
+task wrapper(type: Wrapper) {
+    gradleVersion = '4.7'
+}
+
+mainClassName = "net.osmand.mailsender.EmailSenderMain"
+
+jar {
+    manifest {
+        attributes 'Main-Class': 'net.osmand.mailsender.EmailSenderMain'
+    }
 }
 
 dependencies {
