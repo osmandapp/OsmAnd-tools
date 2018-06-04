@@ -63,13 +63,12 @@ public class EmailSenderMain {
         String url = "jdbc:postgresql://localhost:5433/changeset";
         String user = System.getenv("DB_USER");
         String password = System.getenv("DB_PWD");
-        Connection conn = null;
         try {
             return DriverManager.getConnection(url, user, password);
         } catch (SQLException e) {
             System.out.println(e.getMessage());
         }
-        return conn;
+        return null;
     }
 
     private static void sendMail(String mailTo, String templateId) {
