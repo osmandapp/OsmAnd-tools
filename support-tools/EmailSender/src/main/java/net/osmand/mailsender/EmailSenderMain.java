@@ -43,7 +43,7 @@ public class EmailSenderMain {
             LOGGER.info("Can't connect to the database");
             System.exit(1);
         }
-        PreparedStatement ps = conn.prepareStatement("SELECT" +
+        PreparedStatement ps = conn.prepareStatement("SELECT " +
                 (tableName.equals("supporters") ? "useremail" : "email") + " FROM " + tableName);
         ResultSet resultSet = ps.executeQuery();
         while (resultSet.next()) {
