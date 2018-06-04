@@ -22,17 +22,21 @@ public class EmailSenderMain {
     public static void main(String[] args) throws SQLException {
         String tableName = null;
         String templateId = null;
+        String[] debugAddresses = null;
         boolean dryRun = false;
         if (args.length > 2) {
             templateId = args[0];
             tableName = args[1];
             mailFrom = args[2];
         } else {
-            LOGGER.info("Usage: <template_id> <table_name> <mail_from> [-d]<dry_run>(optional)");
-            System.exit(1);
+            printUsage();
         }
-        if (args.length > 3) {
+        if (args.length > 4) {
             dryRun = args[3].equals("-d");
+            if (!dryRun) {
+                printUsage();
+            }
+            debugAddresses = args[4].split(",");
         }
 
         final String apiKey = System.getenv("SENDGRID_KEY");
@@ -43,19 +47,26 @@ public class EmailSenderMain {
             LOGGER.info("Can't connect to the database");
             System.exit(1);
         }
-        PreparedStatement ps = conn.prepareStatement("SELECT " +
-                (tableName.equals("supporters") ? "useremail" : "email") + " FROM " + tableName);
-        ResultSet resultSet = ps.executeQuery();
-        while (resultSet.next()) {
-            String address = resultSet.getString(1);
-            if (dryRun) {
-                LOGGER.info("Address to send email: " + address);
-            } else {
-                LOGGER.info("Sending mail to: " + address);
+        if (dryRun) {
+            LOGGER.info("Connection to the database successfully established");
+            for (String testEmail : debugAddresses) {
+                sendMail(testEmail, templateId);
+            }
+        } else {
+            PreparedStatement ps = conn.prepareStatement("SELECT " +
+                    (tableName.equals("supporters") ? "useremail" : "email") + " FROM " + tableName);
+            ResultSet resultSet = ps.executeQuery();
+            while (resultSet.next()) {
+                String address = resultSet.getString(1);
                 sendMail(address, templateId);
             }
-
         }
+
+    }
+
+    private static void printUsage() {
+        LOGGER.info("Usage: <template_id> <table_name> <mail_from> ([-d]<dry_run> <email_to>) optional");
+        System.exit(1);
     }
 
     @Nullable
@@ -72,6 +83,7 @@ public class EmailSenderMain {
     }
 
     private static void sendMail(String mailTo, String templateId) {
+        LOGGER.info("Sending mail to: " + mailTo);
         Email from = new Email(mailFrom);
         Email to = new Email(mailTo);
         Mail mail = new Mail();
