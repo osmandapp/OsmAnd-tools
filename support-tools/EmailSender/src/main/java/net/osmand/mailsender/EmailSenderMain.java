@@ -20,11 +20,12 @@ public class EmailSenderMain {
     private final static Logger LOGGER = Logger.getLogger(EmailSenderMain.class.getName());
 
     private static String mailFrom;
-    private static String templateId;
+    private static String tableName;
     private static SendGrid sendGridClient;
 
     public static void main(String[] args) throws SQLException {
-        String tableName = null;
+
+        String templateId = null;
         String[] debugAddresses = null;
         boolean dryRun = false;
         if (args.length > 2) {
@@ -106,7 +107,7 @@ public class EmailSenderMain {
         MailSettings mailSettings = new MailSettings();
         FooterSetting footerSetting = new FooterSetting();
         footerSetting.setEnable(true);
-        footerSetting.setHtml("<html><center><a href=\"https://osmand.net/unsubscribe?id=" + userHash + "&group=" + templateId
+        footerSetting.setHtml("<html><center><a href=\"http://builder.osmand.net/unsubscribe?id=" + userHash + "&group=" + tableName
                 + "\">Unsubscribe</a></center></html>");
         mailSettings.setFooterSetting(footerSetting);
         mail.setMailSettings(mailSettings);
