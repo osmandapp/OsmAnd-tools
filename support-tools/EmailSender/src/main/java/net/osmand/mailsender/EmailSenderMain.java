@@ -5,7 +5,10 @@ import com.sendgrid.*;
 import javax.annotation.Nullable;
 import java.io.IOException;
 
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
 import java.sql.*;
+import java.util.Base64;
 import java.util.logging.Logger;
 
 
@@ -17,11 +20,11 @@ public class EmailSenderMain {
     private final static Logger LOGGER = Logger.getLogger(EmailSenderMain.class.getName());
 
     private static String mailFrom;
+    private static String templateId;
     private static SendGrid sendGridClient;
 
     public static void main(String[] args) throws SQLException {
         String tableName = null;
-        String templateId = null;
         String[] debugAddresses = null;
         boolean dryRun = false;
         if (args.length > 2) {
@@ -84,6 +87,14 @@ public class EmailSenderMain {
 
     private static void sendMail(String mailTo, String templateId) {
         LOGGER.info("Sending mail to: " + mailTo);
+        String userHash;
+        try {
+            userHash = URLEncoder.encode( Base64.getEncoder().encodeToString(mailTo.getBytes()), "UTF-8");
+        } catch (UnsupportedEncodingException e) {
+            // Shouldn't happen
+            LOGGER.info(e.getMessage());
+            return;
+        }
         Email from = new Email(mailFrom);
         Email to = new Email(mailTo);
         Mail mail = new Mail();
@@ -92,6 +103,13 @@ public class EmailSenderMain {
         personalization.addTo(to);
         mail.addPersonalization(personalization);
         mail.setTemplateId(templateId);
+        MailSettings mailSettings = new MailSettings();
+        FooterSetting footerSetting = new FooterSetting();
+        footerSetting.setEnable(true);
+        footerSetting.setHtml("<html><center><a href=\"https://osmand.net/unsubscribe?id=" + userHash + "&group=" + templateId
+                + "\">Unsubscribe</a></center></html>");
+        mailSettings.setFooterSetting(footerSetting);
+        mail.setMailSettings(mailSettings);
         Request request = new Request();
         try {
             request.setMethod(Method.POST);
