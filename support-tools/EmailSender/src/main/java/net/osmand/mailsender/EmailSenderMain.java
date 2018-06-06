@@ -49,11 +49,13 @@ public class EmailSenderMain {
         sendGridClient = new SendGrid(apiKey);
 
         Connection conn = getConnection();
-        Set<String> unsubscribed = getUnsubscribed(conn);
         if (conn == null) {
             LOGGER.info("Can't connect to the database");
             System.exit(1);
         }
+
+        Set<String> unsubscribed = getUnsubscribed(conn);
+
         if (dryRun) {
             LOGGER.info("Connection to the database successfully established");
             for (String testEmail : debugAddresses) {
@@ -96,8 +98,9 @@ public class EmailSenderMain {
         String url = "jdbc:postgresql://localhost:5433/changeset";
         String user = System.getenv("DB_USER");
         String password = System.getenv("DB_PWD");
+
         try {
-            return DriverManager.getConnection(url, user, password);
+            return  DriverManager.getConnection(url, user, password);
         } catch (SQLException e) {
             System.out.println(e.getMessage());
         }
