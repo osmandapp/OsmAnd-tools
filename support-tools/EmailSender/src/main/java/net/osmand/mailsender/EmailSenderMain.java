@@ -9,6 +9,8 @@ import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.sql.*;
 import java.util.Base64;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.logging.Logger;
 
 
@@ -47,6 +49,7 @@ public class EmailSenderMain {
         sendGridClient = new SendGrid(apiKey);
 
         Connection conn = getConnection();
+        Set<String> unsubscribed = getUnsubscribed(conn);
         if (conn == null) {
             LOGGER.info("Can't connect to the database");
             System.exit(1);
@@ -54,6 +57,9 @@ public class EmailSenderMain {
         if (dryRun) {
             LOGGER.info("Connection to the database successfully established");
             for (String testEmail : debugAddresses) {
+                if (unsubscribed.contains(testEmail)) {
+                    LOGGER.info("Your test email is in the unsubscribed list.");
+                }
                 sendMail(testEmail, templateId);
             }
         } else {
@@ -62,10 +68,22 @@ public class EmailSenderMain {
             ResultSet resultSet = ps.executeQuery();
             while (resultSet.next()) {
                 String address = resultSet.getString(1);
-                sendMail(address, templateId);
+                if (!unsubscribed.contains(address)) {
+                    sendMail(address, templateId);
+                }
             }
         }
+        conn.close();
+    }
 
+    private static Set<String> getUnsubscribed(Connection conn) throws SQLException {
+        PreparedStatement ps = conn.prepareStatement("SELECT email FROM email_unsubscribed");
+        ResultSet rs = ps.executeQuery();
+        Set<String> res = new HashSet<>();
+        while (rs.next()) {
+            res.add(rs.getString(1));
+        }
+        return res;
     }
 
     private static void printUsage() {
