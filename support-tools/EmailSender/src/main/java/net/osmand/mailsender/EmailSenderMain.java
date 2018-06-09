@@ -36,7 +36,7 @@ public class EmailSenderMain {
         }
         for (int i = 0; i < args.length; i++) {
             String arg = args[i];
-            String val = arg.substring(arg.indexOf("="));
+            String val = arg.substring(arg.indexOf("=") + 1);
             if (arg.startsWith("id=")) {
                 templateId = val;
             } else if (arg.startsWith("groups=")) {
