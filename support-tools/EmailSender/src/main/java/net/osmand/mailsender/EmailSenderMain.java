@@ -34,8 +34,7 @@ public class EmailSenderMain {
         if (args.length < 5) {
             printUsage();
         }
-        for (int i = 0; i < args.length; i++) {
-            String arg = args[i];
+        for (String arg : args) {
             String val = arg.substring(arg.indexOf("=") + 1);
             if (arg.startsWith("id=")) {
                 templateId = val;
@@ -97,7 +96,7 @@ public class EmailSenderMain {
                     (mailingGroups.equals("supporters") ? "useremail" : "email") + " FROM " + mailingGroups;
         } else {
             StringBuilder sb = new StringBuilder();
-            for (int i = 0; i < groups.length - 2; i++) {
+            for (int i = 0; i < groups.length - 1; i++) {
                 sb.append("SELECT ");
                 sb.append((groups[i].equals("supporters") ? "useremail" : "email"));
                 sb.append(" FROM ");
@@ -127,7 +126,11 @@ public class EmailSenderMain {
             prep = conn.prepareStatement("SELECT COUNT(*) FROM " + group);
             rs.close();
             rs = prep.executeQuery();
-            LOGGER.info("Total in the group: " + rs.getInt(1));
+            int total = 0;
+            while (rs.next()) {
+                total = rs.getInt(1);
+            }
+            LOGGER.info("Total in the group: " + total);
             rs.close();
             prep.close();
         }
