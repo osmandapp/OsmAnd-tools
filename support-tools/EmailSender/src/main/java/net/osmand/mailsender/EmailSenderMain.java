@@ -58,6 +58,7 @@ public class EmailSenderMain {
 
         Connection conn = getConnection();
         if (updateBlockList) {
+            updateUnsubscribed(conn);
             updateBlockList(conn);
             conn.close();
             return;
@@ -83,6 +84,41 @@ public class EmailSenderMain {
                 break;
         }
         conn.close();
+    }
+
+    private static void updateUnsubscribed(Connection conn) {
+        Request request = new Request();
+        request.setMethod(Method.GET);
+        request.setEndpoint("suppression/unsubscribes");
+        try {
+            updateUnsubscribeDbFromResponse(sendGridClient.api(request), conn);
+        } catch (Exception e) {
+            LOGGER.info(e.getMessage());
+        }
+    }
+
+    private static void updateUnsubscribeDbFromResponse(Response queryResponse, Connection conn) throws SQLException {
+        String response = queryResponse.getBody();
+        PreparedStatement ps = conn.prepareStatement("INSERT INTO email_unsubscribed(email, channel, timestamp) " +
+                "SELECT ?, ?, ? " +
+                "WHERE NOT EXISTS (SELECT email FROM email_blocked WHERE email=? AND channel=?)");
+        Gson gson = new Gson();
+        System.out.println(response);
+        BlockedUser[] users = gson.fromJson(response, BlockedUser[].class);
+        int batchSize = 0;
+        for (BlockedUser user : users) {
+            ps.setString(1, user.getEmail());
+            ps.setString(2, "all");
+            ps.setLong(3, Long.parseLong(user.getCreated()));
+            ps.setString(4, user.getEmail());
+            ps.setString(5, "all");
+            ps.addBatch();
+            if (++batchSize > 500) {
+                ps.executeBatch();
+            }
+        }
+        ps.executeBatch();
+        ps.close();
     }
 
     private static void updateBlockList(Connection conn)  {
