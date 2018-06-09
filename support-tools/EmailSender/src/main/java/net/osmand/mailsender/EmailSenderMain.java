@@ -170,16 +170,10 @@ public class EmailSenderMain {
             PreparedStatement prep = conn.prepareStatement("SELECT " +
                     (group.equals("supporters") ? "useremail" : "email") + " FROM " + group);
             ResultSet rs = prep.executeQuery();
-            while (rs.next()) {
-                LOGGER.info(rs.getString(1));
-            }
-            prep.close();
-            prep = conn.prepareStatement("SELECT COUNT(*) FROM " + group);
-            rs.close();
-            rs = prep.executeQuery();
             int total = 0;
             while (rs.next()) {
-                total = rs.getInt(1);
+                LOGGER.info(rs.getString(1));
+                total++;
             }
             LOGGER.info("Total in the group: " + total);
             rs.close();
