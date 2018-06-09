@@ -1,6 +1,8 @@
 package net.osmand.mailsender;
 
+import com.google.gson.Gson;
 import com.sendgrid.*;
+import net.osmand.mailsender.data.BlockedUser;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
@@ -10,6 +12,7 @@ import java.net.URLEncoder;
 import java.sql.*;
 import java.util.Base64;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.logging.Logger;
 
@@ -20,6 +23,7 @@ import java.util.logging.Logger;
 public class EmailSenderMain {
 
     private final static Logger LOGGER = Logger.getLogger(EmailSenderMain.class.getName());
+    private static final String BASE_URI = "https://api.sendgrid.com/v3/";
 
     private static String mailFrom;
     private static SendGrid sendGridClient;
@@ -31,9 +35,7 @@ public class EmailSenderMain {
         String topic = null;
         String runMode = null;
         String testAddresses = null;
-        if (args.length < 5) {
-            printUsage();
-        }
+        boolean updateBlockList = false;
         for (String arg : args) {
             String val = arg.substring(arg.indexOf("=") + 1);
             if (arg.startsWith("id=")) {
@@ -48,14 +50,22 @@ public class EmailSenderMain {
                 runMode = val;
             } else if (arg.startsWith("test_addr=")) {
                 testAddresses = val;
+            } else if (arg.equals("update_block_list")) {
+                updateBlockList = true;
             }
         }
-        checkValidity(templateId, mailingGroups, mailFrom, topic, runMode, testAddresses);
-
         final String apiKey = System.getenv("SENDGRID_KEY");
         sendGridClient = new SendGrid(apiKey);
 
         Connection conn = getConnection();
+        if (updateBlockList) {
+            updateBlockList(conn);
+            conn.close();
+            return;
+        }
+        checkValidity(templateId, mailingGroups, mailFrom, topic, runMode, testAddresses);
+
+
         if (conn == null) {
             LOGGER.info("Can't connect to the database");
             System.exit(1);
@@ -74,6 +84,32 @@ public class EmailSenderMain {
                 break;
         }
         conn.close();
+    }
+
+    private static void updateBlockList(Connection conn)  {
+        String[] blockList = new String[] {"suppression/blocks", "suppression/bounces",
+                "suppression/spam_reports", "suppression/invalid_emails"};
+        for (String bloked : blockList) {
+            Request request = new Request();
+            request.setMethod(Method.GET);
+            request.setEndpoint(bloked);
+            try {
+                updateBlockDbFromResponse(sendGridClient.api(request), conn);
+            } catch (Exception e) {
+                LOGGER.info(e.getMessage());
+            }
+        }
+
+    }
+
+    private static void updateBlockDbFromResponse(Response queryResponse, Connection conn) throws SQLException {
+        String response = queryResponse.getBody();
+        PreparedStatement ps = conn.prepareStatement("INSERT INTO email_blocked VALUES (email=?, reason=?, timestamp=?)");
+        Gson gson = new Gson();
+        BlockedUser[] users = gson.fromJson(response, BlockedUser[].class);
+        for (BlockedUser user : users) {
+            System.out.println(user.getEmail());
+        }
     }
 
     private static void sendProductionEmails(Connection conn, String templateId,

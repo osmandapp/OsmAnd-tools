@@ -33,5 +33,6 @@ dependencies {
     compile 'com.google.apis:google-api-services-sheets:v4-rev516-1.23.0'
     compile 'com.sendgrid:sendgrid-java:4.2.1'
     compile group: 'org.postgresql', name: 'postgresql', version: '9.3-1100-jdbc4'
+    compile group: 'com.google.code.gson', name: 'gson', version: '2.7'
 }
 
