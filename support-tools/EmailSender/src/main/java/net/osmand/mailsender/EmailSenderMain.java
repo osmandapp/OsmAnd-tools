@@ -98,15 +98,17 @@ public class EmailSenderMain {
             StringBuilder sb = new StringBuilder();
             for (int i = 0; i < groups.length - 1; i++) {
                 sb.append("SELECT ");
-                sb.append((groups[i].equals("supporters") ? "useremail" : "email"));
+                String trimmed = groups[i].trim();
+                sb.append((trimmed.equals("supporters") ? "useremail" : "email"));
                 sb.append(" FROM ");
-                sb.append(groups[i]);
+                sb.append(trimmed);
                 sb.append(" UNION ");
             }
             sb.append("SELECT ");
-            sb.append((groups[groups.length - 1].equals("supporters") ? "useremail" : "email"));
+            String trimmed = groups[groups.length - 1].trim();
+            sb.append((trimmed.equals("supporters") ? "useremail" : "email"));
             sb.append(" FROM ");
-            sb.append(groups[groups.length - 1]);
+            sb.append(trimmed);
             return sb.toString();
         }
     }
@@ -115,6 +117,7 @@ public class EmailSenderMain {
         LOGGER.info("TEST SQL query for the databases: " + buildQuery(mailingGroups));
         String[] groups = mailingGroups.split(",");
         for (String group : groups) {
+            group = group.trim();
             LOGGER.info("Outputting addresses of the group " + group);
             PreparedStatement prep = conn.prepareStatement("SELECT " +
                     (group.equals("supporters") ? "useremail" : "email") + " FROM " + group);
