@@ -59,7 +59,7 @@ public class EmailSenderMain {
         Connection conn = getConnection();
         if (updateBlockList) {
             updateUnsubscribed(conn);
-            updateBlockList(conn);
+//            updateBlockList(conn);
             conn.close();
             return;
         }
@@ -99,6 +99,7 @@ public class EmailSenderMain {
 
     private static void updateUnsubscribeDbFromResponse(Response queryResponse, Connection conn) throws SQLException {
         String response = queryResponse.getBody();
+        System.out.println(response);
         PreparedStatement ps = conn.prepareStatement("INSERT INTO email_unsubscribed(email, channel, timestamp) " +
                 "SELECT ?, ?, ? " +
                 "WHERE NOT EXISTS (SELECT email FROM email_blocked WHERE email=? AND channel=?)");
