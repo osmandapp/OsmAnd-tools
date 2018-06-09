@@ -12,7 +12,6 @@ import java.net.URLEncoder;
 import java.sql.*;
 import java.util.Base64;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 import java.util.logging.Logger;
 
@@ -71,16 +70,16 @@ public class EmailSenderMain {
             System.exit(1);
         }
 
-        Set<String> unsubscribed = getUnsubscribed(conn, topic);
+        Set<String> unsubscribedAndBlocked = getUnsubscribedAndBlocked(conn, topic);
         switch (runMode) {
             case "send_to_test_email_group":
-                sendTestEmails(testAddresses, topic, templateId, unsubscribed);
+                sendTestEmails(testAddresses, topic, templateId, unsubscribedAndBlocked);
                 break;
             case "print_statistics":
-                printStats(conn, mailingGroups, topic, unsubscribed);
+                printStats(conn, mailingGroups, topic, unsubscribedAndBlocked);
                 break;
             case "send_to_production":
-                sendProductionEmails(conn, templateId, topic, mailingGroups, unsubscribed);
+                sendProductionEmails(conn, templateId, topic, mailingGroups, unsubscribedAndBlocked);
                 break;
         }
         conn.close();
@@ -108,6 +107,7 @@ public class EmailSenderMain {
                 "SELECT ?, ?, ? " +
                 "WHERE NOT EXISTS (SELECT email FROM email_blocked WHERE email=?)");
         Gson gson = new Gson();
+        System.out.println(response);
         BlockedUser[] users = gson.fromJson(response, BlockedUser[].class);
         int batchSize = 0;
         for (BlockedUser user : users) {
@@ -161,7 +161,7 @@ public class EmailSenderMain {
         }
     }
 
-    private static void printStats(Connection conn, String mailingGroups, String topic, Set<String> unsubscribed) throws SQLException {
+    private static void printStats(Connection conn, String mailingGroups, String topic) throws SQLException {
         LOGGER.info("TEST SQL query for the databases: " + buildQuery(mailingGroups));
         String[] groups = mailingGroups.split(",");
         for (String group : groups) {
@@ -186,11 +186,26 @@ public class EmailSenderMain {
             prep.close();
         }
         LOGGER.info("Selecting unsubscribed users for topic: " + topic);
-        LOGGER.info("Unsubscribed from this topic: " + unsubscribed.size());
-        LOGGER.info("Printing unsubscribed...");
-        for (String s : unsubscribed) {
-            LOGGER.info(s);
+        PreparedStatement prep = conn.prepareStatement("SELECT email FROM email_unsubscribed WHERE channel=?");
+        prep.setString(1, topic);
+        ResultSet rs = prep.executeQuery();
+        int count = 0;
+        while (rs.next()) {
+            LOGGER.info(rs.getString(1));
+            count++;
         }
+        LOGGER.info("Unsubscribed from this topic: " + count);
+        LOGGER.info("Fetching the invalid/blocked emails...");
+        prep.close();
+        rs.close();
+        count = 0;
+        prep = conn.prepareStatement("SELECT email FROM email_blocked");
+        rs = prep.executeQuery();
+        while (rs.next()) {
+            LOGGER.info(rs.getString(1));
+            count++;
+        }
+        LOGGER.info("Total blocked: " + count);
     }
 
     private static void sendTestEmails(String testAddresses, String topic,
@@ -217,14 +232,17 @@ public class EmailSenderMain {
         }
     }
 
-    private static Set<String> getUnsubscribed(Connection conn, String topic) throws SQLException {
-        PreparedStatement ps = conn.prepareStatement("SELECT email FROM email_unsubscribed WHERE channel=?");
+    private static Set<String> getUnsubscribedAndBlocked(Connection conn, String topic) throws SQLException {
+        PreparedStatement ps = conn.prepareStatement("SELECT email FROM email_unsubscribed WHERE channel=? UNION " +
+                "SELECT email FROM email_blocked");
         ps.setString(1, topic);
         ResultSet rs = ps.executeQuery();
         Set<String> res = new HashSet<>();
         while (rs.next()) {
             res.add(rs.getString(1));
         }
+        ps.close();
+        rs.close();
         return res;
     }
 
