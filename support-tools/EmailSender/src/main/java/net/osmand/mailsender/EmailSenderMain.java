@@ -266,7 +266,7 @@ public class EmailSenderMain {
     }
 
     private static Set<String> getUnsubscribedAndBlocked(Connection conn, String topic) throws SQLException {
-        PreparedStatement ps = conn.prepareStatement("SELECT email FROM email_unsubscribed WHERE channel=? UNION " +
+        PreparedStatement ps = conn.prepareStatement("SELECT email FROM email_unsubscribed WHERE channel=? OR chanel='all' UNION " +
                 "SELECT email FROM email_blocked");
         ps.setString(1, topic);
         ResultSet rs = ps.executeQuery();
