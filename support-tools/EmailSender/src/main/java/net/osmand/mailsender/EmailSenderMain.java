@@ -179,7 +179,10 @@ public class EmailSenderMain {
             rs.close();
             prep.close();
         }
-        LOGGER.info("Selecting unsubscribed users for topic: " + topic);
+        String[] topics = new String[] {"news", "marketing", "osmand_live"};
+        for (String topicInTopics : topics) {
+            LOGGER.info("Selecting unsubscribed users for topic: " + topicInTopics);
+        }
         PreparedStatement prep = conn.prepareStatement("SELECT email FROM email_unsubscribed WHERE channel=?");
         prep.setString(1, topic);
         ResultSet rs = prep.executeQuery();
