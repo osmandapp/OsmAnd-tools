@@ -76,7 +76,7 @@ public class EmailSenderMain {
                 sendTestEmails(testAddresses, topic, templateId, unsubscribedAndBlocked);
                 break;
             case "print_statistics":
-                printStats(conn, mailingGroups, topic, unsubscribedAndBlocked);
+                printStats(conn, mailingGroups, topic);
                 break;
             case "send_to_production":
                 sendProductionEmails(conn, templateId, topic, mailingGroups, unsubscribedAndBlocked);
