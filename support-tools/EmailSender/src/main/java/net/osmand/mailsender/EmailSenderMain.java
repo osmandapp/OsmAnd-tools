@@ -132,10 +132,7 @@ public class EmailSenderMain {
             prep.close();
         }
         LOGGER.info("Selecting unsubscribed users for topic: " + topic);
-        PreparedStatement ps = conn.prepareStatement("SELECT COUNT(*) FROM email_unsubscribed WHERE topic=?");
-        ps.setString(1, topic);
-        ResultSet rs = ps.executeQuery();
-        LOGGER.info("Unsubscribed from this topic: " + rs.getInt(1));
+        LOGGER.info("Unsubscribed from this topic: " + unsubscribed.size());
         LOGGER.info("Printing unsubscribed...");
         for (String s : unsubscribed) {
             LOGGER.info(s);
