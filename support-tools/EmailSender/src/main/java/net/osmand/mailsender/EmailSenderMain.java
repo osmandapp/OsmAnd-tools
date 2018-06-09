@@ -59,7 +59,7 @@ public class EmailSenderMain {
         Connection conn = getConnection();
         if (updateBlockList) {
             updateUnsubscribed(conn);
-//            updateBlockList(conn);
+            updateBlockList(conn);
             conn.close();
             return;
         }
@@ -102,7 +102,7 @@ public class EmailSenderMain {
         System.out.println(response);
         PreparedStatement ps = conn.prepareStatement("INSERT INTO email_unsubscribed(email, channel, timestamp) " +
                 "SELECT ?, ?, ? " +
-                "WHERE NOT EXISTS (SELECT email FROM email_blocked WHERE email=? AND channel=?)");
+                "WHERE NOT EXISTS (SELECT email FROM email_unsubscribed WHERE email=? AND channel=?)");
         Gson gson = new Gson();
         System.out.println(response);
         BlockedUser[] users = gson.fromJson(response, BlockedUser[].class);
