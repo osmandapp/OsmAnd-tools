@@ -89,10 +89,10 @@ public class EmailSenderMain {
     private static void updateBlockList(Connection conn)  {
         String[] blockList = new String[] {"suppression/blocks", "suppression/bounces",
                 "suppression/spam_reports", "suppression/invalid_emails"};
-        for (String bloked : blockList) {
+        for (String blocked : blockList) {
             Request request = new Request();
             request.setMethod(Method.GET);
-            request.setEndpoint(bloked);
+            request.setEndpoint(blocked);
             try {
                 updateBlockDbFromResponse(sendGridClient.api(request), conn);
             } catch (Exception e) {
@@ -104,12 +104,24 @@ public class EmailSenderMain {
 
     private static void updateBlockDbFromResponse(Response queryResponse, Connection conn) throws SQLException {
         String response = queryResponse.getBody();
-        PreparedStatement ps = conn.prepareStatement("INSERT INTO email_blocked VALUES (email=?, reason=?, timestamp=?)");
+        PreparedStatement ps = conn.prepareStatement("INSERT INTO email_blocked(email, reason, timestamp) " +
+                "SELECT ?, ?, ? " +
+                "WHERE NOT EXISTS (SELECT email FROM email_blocked WHERE email=?)");
         Gson gson = new Gson();
         BlockedUser[] users = gson.fromJson(response, BlockedUser[].class);
+        int batchSize = 0;
         for (BlockedUser user : users) {
-            System.out.println(user.getEmail());
+            ps.setString(1, user.getEmail());
+            ps.setString(2, user.getReason());
+            ps.setLong(3, Long.parseLong(user.getCreated()));
+            ps.setString(4, user.getEmail());
+            ps.addBatch();
+            if (++batchSize > 500) {
+                ps.executeBatch();
+            }
         }
+        ps.executeBatch();
+        ps.close();
     }
 
     private static void sendProductionEmails(Connection conn, String templateId,
