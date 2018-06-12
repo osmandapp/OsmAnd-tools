@@ -202,14 +202,13 @@ public class EmailSenderMain {
         String[] groups = mailingGroups.split(",");
         for (String group : groups) {
             group = group.trim();
-            LOGGER.info("Outputting addresses of the group " + group);
             PreparedStatement prep = conn.prepareStatement("SELECT count(*) FROM " + group);
             ResultSet rs = prep.executeQuery();
             int total = 0;
             while (rs.next()) {
                 total = rs.getInt(1);
             }
-            LOGGER.info("Total in the group" + group +": " + total);
+            LOGGER.info("Total in the group " + group +": " + total);
             rs.close();
             prep.close();
         }
