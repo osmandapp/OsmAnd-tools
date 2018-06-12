@@ -22,7 +22,6 @@ import java.util.logging.Logger;
 public class EmailSenderMain {
 
     private final static Logger LOGGER = Logger.getLogger(EmailSenderMain.class.getName());
-    private static final String BASE_URI = "https://api.sendgrid.com/v3/";
 
     private static String mailFrom;
     private static SendGrid sendGridClient;
@@ -204,40 +203,31 @@ public class EmailSenderMain {
         for (String group : groups) {
             group = group.trim();
             LOGGER.info("Outputting addresses of the group " + group);
-            PreparedStatement prep = conn.prepareStatement("SELECT " +
-                    (group.equals("supporters") ? "useremail" : "email") + " FROM " + group);
+            PreparedStatement prep = conn.prepareStatement("SELECT count(*) FROM " + group);
             ResultSet rs = prep.executeQuery();
             int total = 0;
             while (rs.next()) {
-                LOGGER.info(rs.getString(1));
-                total++;
+                total = rs.getInt(1);
             }
-            LOGGER.info("Total in the group: " + total);
+            LOGGER.info("Total in the group" + group +": " + total);
             rs.close();
             prep.close();
         }
-        String[] topics = new String[] {"news", "marketing", "osmand_live"};
-        for (String topicInTopics : topics) {
-            LOGGER.info("Selecting unsubscribed users for topic: " + topicInTopics);
-        }
-        PreparedStatement prep = conn.prepareStatement("SELECT email FROM email_unsubscribed WHERE channel=?");
-        prep.setString(1, topic);
+        PreparedStatement prep = conn.prepareStatement("SELECT count(*) FROM email_unsubscribed");
         ResultSet rs = prep.executeQuery();
         int count = 0;
         while (rs.next()) {
-            LOGGER.info(rs.getString(1));
-            count++;
+            count = rs.getInt(1);
         }
-        LOGGER.info("Unsubscribed from this topic: " + count);
+        LOGGER.info("Unsubscribed in total: " + count);
         LOGGER.info("Fetching the invalid/blocked emails...");
         prep.close();
         rs.close();
         count = 0;
-        prep = conn.prepareStatement("SELECT email FROM email_blocked");
+        prep = conn.prepareStatement("SELECT count(*) FROM email_blocked");
         rs = prep.executeQuery();
         while (rs.next()) {
-            LOGGER.info(rs.getString(1));
-            count++;
+            count = rs.getInt(1);
         }
         LOGGER.info("Total blocked: " + count);
     }
@@ -267,7 +257,7 @@ public class EmailSenderMain {
     }
 
     private static Set<String> getUnsubscribedAndBlocked(Connection conn, String topic) throws SQLException {
-        PreparedStatement ps = conn.prepareStatement("SELECT email FROM email_unsubscribed WHERE channel=? OR chanel='all' UNION " +
+        PreparedStatement ps = conn.prepareStatement("SELECT email FROM email_unsubscribed WHERE channel=? OR channel='all' UNION " +
                 "SELECT email FROM email_blocked");
         ps.setString(1, topic);
         ResultSet rs = ps.executeQuery();
