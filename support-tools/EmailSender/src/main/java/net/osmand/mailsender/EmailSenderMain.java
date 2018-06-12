@@ -40,7 +40,7 @@ public class EmailSenderMain {
                 templateId = val;
             } else if (arg.startsWith("groups=")) {
                 mailingGroups = val;
-            } else if (arg.startsWith("sneder_mail=")) {
+            } else if (arg.startsWith("sender_mail=")) {
                 mailFrom = val;
             } else if (arg.startsWith("topic=")) {
                 topic = val;
@@ -270,7 +270,7 @@ public class EmailSenderMain {
     }
 
     private static void printUsage() {
-        LOGGER.info("Usage: id=$TEMPLATE_ID groups=$GROUP_NAMES sneder_mail=$SENDER_EMAIL topic=$TOPIC run_opt=$RUN_OPTIONS test_addr=$TEST_EMAIL_GROUP");
+        LOGGER.info("Usage: id=$TEMPLATE_ID groups=$GROUP_NAMES sender_mail=$SENDER_EMAIL topic=$TOPIC run_opt=$RUN_OPTIONS test_addr=$TEST_EMAIL_GROUP");
         System.exit(1);
     }
 
