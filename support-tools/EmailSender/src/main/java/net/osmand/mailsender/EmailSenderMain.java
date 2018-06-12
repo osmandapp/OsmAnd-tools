@@ -76,7 +76,7 @@ public class EmailSenderMain {
                 sendTestEmails(testAddresses, topic, templateId, unsubscribedAndBlocked);
                 break;
             case "print_statistics":
-                printStats(conn, mailingGroups, topic);
+                printStats(conn, mailingGroups);
                 break;
             case "send_to_production":
                 sendProductionEmails(conn, templateId, topic, mailingGroups, unsubscribedAndBlocked);
@@ -197,7 +197,7 @@ public class EmailSenderMain {
         }
     }
 
-    private static void printStats(Connection conn, String mailingGroups, String topic) throws SQLException {
+    private static void printStats(Connection conn, String mailingGroups) throws SQLException {
         LOGGER.info("TEST SQL query for the databases: " + buildQuery(mailingGroups));
         String[] groups = mailingGroups.split(",");
         for (String group : groups) {
