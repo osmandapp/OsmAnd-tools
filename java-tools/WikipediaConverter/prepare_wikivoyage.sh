@@ -1,6 +1,6 @@
 #!/bin/bash
-BUILD_PATH=$1
-PARAMETER=$2
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+PARAMETER=$1
 INITIAL_PATH=$PWD
 
 function download {
@@ -12,7 +12,7 @@ function download {
       #if [ ! -f  "$1"wiki-latest-externallinks.sql.gz ]; then
       #      wget --quiet -N http://dumps.wikimedia.org/"$1"wikivoyage/latest/"$1"wikivoyage-latest-externallinks.sql.gz      
       #fi
-      java -Xms256M -Xmx3200M -cp "$BUILD_PATH/WikiConverter.jar:$BUILD_PATH/build/lib/*.jar" net.osmand.osm.util.WikiVoyagePreparation $1 ./ $PARAMETER
+      java -Xms256M -Xmx3200M -jar "$DIR/build/libs/WikipediaConverter.jar" net.osmand.osm.util.WikiVoyagePreparation $1 ./ $PARAMETER
 }
 
 function downloadLangLinks {
