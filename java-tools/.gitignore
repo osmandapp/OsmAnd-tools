@@ -1,2 +1,10 @@
 build/
 .gradle
+*/.classpath
+*/.gradle
+*/gradle
+*/.project
+*/.settings
+*/.idea
+*/bin
+*/build

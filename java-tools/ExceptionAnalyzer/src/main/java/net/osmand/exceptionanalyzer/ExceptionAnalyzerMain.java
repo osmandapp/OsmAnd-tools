@@ -3,6 +3,7 @@ package net.osmand.exceptionanalyzer;
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.extensions.java6.auth.oauth2.AuthorizationCodeInstalledApp;
 import com.google.api.client.extensions.jetty.auth.oauth2.LocalServerReceiver;
+import com.google.api.client.extensions.jetty.auth.oauth2.LocalServerReceiver.Builder;
 import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeFlow;
 import com.google.api.client.googleapis.auth.oauth2.GoogleClientSecrets;
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
@@ -26,7 +27,7 @@ public class ExceptionAnalyzerMain {
 	 private static final String LABEL = "TRASH";
 //	private static final String LABEL = "OsmAnd Bug";
 	private static final boolean DOWNLOAD_MESSAGES = true;
-    private static final String VERSION_FILTER = "2.6.5";
+    private static final String VERSION_FILTER = "3.0";
     private static final File FOLDER_WITH_LOGS =  new File(System.getProperty("user.home") + 
     		"/"+ "attachments_logs");
     
@@ -85,8 +86,10 @@ public class ExceptionAnalyzerMain {
                         .setDataStoreFactory(DATA_STORE_FACTORY)
                         .setAccessType("offline")
                         .build();
+        Builder bld = new LocalServerReceiver.Builder();
+        bld.setPort(5000);
         Credential credential = new AuthorizationCodeInstalledApp(
-                flow, new LocalServerReceiver()).authorize("user");
+                flow, bld.build()).authorize("user");
         System.out.println(
                 "Credentials saved to " + DATA_STORE_DIR.getAbsolutePath());
         return credential;
@@ -182,7 +185,8 @@ public class ExceptionAnalyzerMain {
         for(File fld : FOLDER_WITH_LOGS.listFiles()) {
         	if(fld.getName().endsWith(".exception.log")) {
         		String nm = fld.getName();
-        		String mid = nm.substring(nm.indexOf('.') + 1, nm.length() - ".exception.log".length());
+        		String mid = nm.substring(0, nm.length() - ".exception.log".length());
+        		mid = mid.substring(nm.indexOf('.') + 1);
         		messageIdsLoaded.add(mid);
         	}
         }
