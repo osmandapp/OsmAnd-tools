@@ -5,6 +5,9 @@ function download {
       if [ ! -f  "$1"wiki-latest-pages-articles.xml.bz2 ]; then
       	wget --quiet -N http://dumps.wikimedia.org/"$1"wiki/latest/"$1"wiki-latest-pages-articles.xml.bz2
       fi
+      if [ ! -f  "$1"wiki-latest-externallinks.sql.gz ]; then
+            wget --quiet -N http://dumps.wikimedia.org/"$1"wiki/latest/"$1"wiki-latest-externallinks.sql.gz      
+      fi
       if [ ! -f  "$1"wiki-latest-langlinks.sql.gz ]; then
       	wget --quiet -N http://dumps.wikimedia.org/"$1"wiki/latest/"$1"wiki-latest-langlinks.sql.gz      
       fi
