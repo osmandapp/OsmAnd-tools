@@ -1,0 +1,39 @@
+buildscript {
+
+    repositories {
+        mavenCentral()
+        jcenter()
+    }
+}
+
+subprojects {
+	
+	apply plugin: 'java'
+
+	group 'net.osmand'
+	version '1.0'
+	sourceCompatibility = 1.8
+
+    task fatJar(type: Jar) {
+        manifest.from jar.manifest
+        dependsOn configurations.runtimeClasspath
+        archiveName "${project.name}.jar"
+        from {
+            configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+        } 
+        {
+            exclude "META-INF/*.SF"
+            exclude "META-INF/*.DSA"
+            exclude "META-INF/*.RSA"
+        }
+        with jar
+    }
+
+	
+    repositories {
+        mavenCentral()
+        jcenter()
+        google()
+        
+    }
+}

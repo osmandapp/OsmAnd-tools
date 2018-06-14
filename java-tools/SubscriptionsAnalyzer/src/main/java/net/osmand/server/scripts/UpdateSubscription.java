@@ -28,7 +28,7 @@ import com.google.api.services.androidpublisher.model.InappproductsListResponse;
 import com.google.api.services.androidpublisher.model.SubscriptionPurchase;
 
 
-public class UpdateSubscriptionImpl {
+public class UpdateSubscription {
 
 
 	private static final String INVALID_PURCHASE = "invalid";

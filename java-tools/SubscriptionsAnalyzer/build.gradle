@@ -1,0 +1,10 @@
+
+dependencies {
+    testImplementation group: 'junit', name: 'junit', version: '4.12'
+
+    implementation(group: 'com.google.oauth-client', name: 'google-oauth-client', version: '1.19.0') { transitive = true }
+    implementation(group: 'com.google.apis', name: 'google-api-services-androidpublisher', version: 'v2-rev84-1.23.0') { transitive = true }
+	implementation(group: 'org.json', name: 'json', version: '20171018') { transitive = true }
+	implementation group: 'org.postgresql', name: 'postgresql', version: '9.4.1212'
+    implementation group: 'commons-logging', name: 'commons-logging', version: '1.2'
+}

@@ -105,7 +105,7 @@ public class IndexUploader {
 	private final static int MB = 1 << 20;
 
 	/**
-	 * Something bad have happend
+	 * Something bad have happened
 	 */
 	public static class IndexUploadException extends Exception {
 

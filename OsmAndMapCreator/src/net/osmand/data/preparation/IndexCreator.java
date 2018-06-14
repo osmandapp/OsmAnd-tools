@@ -906,7 +906,7 @@ public class IndexCreator {
 		creator.setIndexMap(true);
 //		creator.setIndexAddress(true);
 		creator.setIndexPOI(true);
-//		creator.setIndexTransport(true);
+		creator.setIndexTransport(true);
 		creator.setIndexRouting(true);
 
 //		creator.deleteDatabaseIndexes = false;
