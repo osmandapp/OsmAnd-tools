@@ -9,6 +9,9 @@ buildscript {
 subprojects {
 	
 	apply plugin: 'java'
+    apply plugin: 'eclipse'
+    apply plugin: 'idea'
+
 
 	group 'net.osmand'
 	version '1.0'
