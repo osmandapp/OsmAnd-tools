@@ -23,7 +23,7 @@ public class TravelGuideCreatorMain {
             while (dir.isEmpty()) {
                 System.out.print("Please provide the path to the data directory: ");
                 Scanner scanner = new Scanner( System.in );
-                dir = scanner.nextLine();
+                dir = scanner.nextLine().trim();
             }
         } else {
             dir = args[0];
