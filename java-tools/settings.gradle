@@ -1,1 +1,1 @@
-include 'SubscriptionsAnalyzer', 'ExceptionAnalyzer', 'BitcoinSender'
+include 'SubscriptionsAnalyzer', 'ExceptionAnalyzer', 'BitcoinSender', 'TravelGuideCreator'

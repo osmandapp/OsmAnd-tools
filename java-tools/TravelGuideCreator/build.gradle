@@ -1,0 +1,16 @@
+
+// jar {
+    // manifest {
+        // attributes(
+                // 'Main-Class': 'net.osmand.travelguidecreator.TravelGuideCreatorMain',
+        // )
+    // }
+// }
+
+
+dependencies {
+    testCompile group: 'junit', name: 'junit', version: '4.12'
+    compile group: 'org.xerial', name: 'sqlite-jdbc', version: '3.7.2'
+    compile group: 'commons-logging', name: 'commons-logging', version: '1.2'
+
+}
