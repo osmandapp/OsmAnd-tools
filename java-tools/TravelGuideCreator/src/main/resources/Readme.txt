@@ -1,9 +1,8 @@
 Steps to run the app:
-Linux or Mac
+Open the terminal in the root folder of the application.
 
-1. Open the terminal in the root folder of the application.
-2. Run: ./start.sh <path to the directory with files> (optional)
+Linux or Mac
+Run: ./start.sh <optional path to the travel guide directory>
 
 Windows
-
-Open start.bat file.
+RUn ./start.bat <optional path to the travel guide directory>

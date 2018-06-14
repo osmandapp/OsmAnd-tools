@@ -17,10 +17,15 @@ subprojects {
 	group 'net.osmand'
 	version '1.0'
 	sourceCompatibility = 1.8
+    
 
     task fatJar(type: Jar) {
+        
         manifest.from jar.manifest
         dependsOn configurations.runtimeClasspath
+        if(project.hasProperty('mainClassAttribute')) {
+            manifest.attributes 'Main-Class': project.getProperty('mainClassAttribute');
+        }
         archiveName "${project.name}.jar"
         from {
             configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }

@@ -1,2 +1,2 @@
 @ECHO OFF
-start java -jar TravelGuideCreator-1.0.jar
+start java -jar TravelGuideCreator.jar %*

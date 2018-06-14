@@ -1,1 +1,1 @@
-java -jar TravelGuideCreator-1.0.jar $1
+java -jar TravelGuideCreator.jar "$@"

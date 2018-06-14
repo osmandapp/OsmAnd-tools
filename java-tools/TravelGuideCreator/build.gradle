@@ -1,11 +1,12 @@
-
-// jar {
-    // manifest {
-        // attributes(
-                // 'Main-Class': 'net.osmand.travelguidecreator.TravelGuideCreatorMain',
-        // )
-    // }
-// }
+task distributionZip(type: Zip) {
+    dependsOn fatJar
+    archiveName "${project.name}.zip"
+    from("src/main/resources") {
+        include "**/*"
+        
+    }
+    from "$buildDir/libs/${project.name}.jar"
+}
 
 
 dependencies {
