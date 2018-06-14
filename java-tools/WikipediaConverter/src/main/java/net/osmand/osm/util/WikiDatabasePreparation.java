@@ -45,9 +45,9 @@ import net.osmand.osm.util.WikiVoyagePreparation.WikivoyageTemplates;
 import net.osmand.util.sql.SqlInsertValuesReader;
 import net.osmand.util.sql.SqlInsertValuesReader.InsertValueProcessor;
 
+import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.logging.Log;
-import org.apache.tools.bzip2.CBZip2InputStream;
 import org.xml.sax.Attributes;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
@@ -536,12 +536,7 @@ public class WikiDatabasePreparation {
 			throws ParserConfigurationException, SAXException, FileNotFoundException, IOException, SQLException, ComponentLookupException {
 		SAXParser sx = SAXParserFactory.newInstance().newSAXParser();
 		InputStream streamFile = new BufferedInputStream(new FileInputStream(wikiPg), 8192 * 4);
-		InputStream stream = streamFile;
-		if (stream.read() != 'B' || stream.read() != 'Z') {
-			throw new RuntimeException(
-					"The source stream must start with the characters BZ if it is to be read as a BZip2 stream."); //$NON-NLS-1$
-		} 
-		CBZip2InputStream zis = new CBZip2InputStream(stream);
+		BZip2CompressorInputStream zis = new BZip2CompressorInputStream(streamFile);
 		Reader reader = new InputStreamReader(zis,"UTF-8");
 		InputSource is = new InputSource(reader);
 		is.setEncoding("UTF-8");

@@ -1,1 +1,2 @@
 include 'SubscriptionsAnalyzer', 'ExceptionAnalyzer', 'BitcoinSender', 'TravelGuideCreator', 'EmailSender'
+include 'WikipediaConverter'
