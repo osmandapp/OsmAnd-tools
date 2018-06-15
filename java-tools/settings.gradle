@@ -1,6 +1,6 @@
-include 'TravelGuideCreator', 'EmailSender'
 include 'WikipediaConverter'
-include 'OsmAndUtilities'
+include 'OsmAndMapCreatorUtilities'
+include 'OsmAndServerUtilities'
 def osmAndJava = new File(settingsDir, '../../android/OsmAnd-java')
 //if(osmAndJava.exists()) {
 	include ':OsmAnd-java'
