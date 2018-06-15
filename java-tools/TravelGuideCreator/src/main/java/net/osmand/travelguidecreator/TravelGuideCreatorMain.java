@@ -16,6 +16,8 @@ public class TravelGuideCreatorMain {
 
     private static final int BATCH_SIZE = 30;
     private static final Log log = PlatformUtil.getLog(TravelGuideCreatorMain.class);
+    public static final String HTML_EXT = ".html";
+    public static final String GPX_EXT = ".gpx";
 
     public static void main(String[] args) throws SQLException, IOException {
         String dir = "";
@@ -103,9 +105,9 @@ public class TravelGuideCreatorMain {
             File gpx = null;
             File html = null;
             for (File f : files) {
-                if (f.getName().endsWith(".gpx")) {
+                if (f.getName().endsWith(GPX_EXT)) {
                     gpx = f;
-                } else if (f.getName().endsWith(".html")){
+                } else if (f.getName().endsWith(HTML_EXT)){
                     html = f;
                 }
             }
@@ -161,6 +163,9 @@ public class TravelGuideCreatorMain {
         Map<String, List<File>> result = new HashMap<>();
         for (File f : files) {
             String filename = f.getName();
+            if (!filename.endsWith(HTML_EXT) && !filename.endsWith(GPX_EXT)) {
+                continue;
+            }
             filename = filename.substring(0, filename.lastIndexOf("."));
             List<File> currList = result.get(filename);
             if (currList == null) {
