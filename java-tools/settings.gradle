@@ -1,2 +1,5 @@
 include 'SubscriptionsAnalyzer', 'ExceptionAnalyzer', 'BitcoinSender', 'TravelGuideCreator', 'EmailSender'
 include 'WikipediaConverter'
+include 'OsmAndUtilities'
+include ':OsmAnd-java'
+project(':OsmAnd-java').projectDir = new File(settingsDir, '../../android/OsmAnd-java')

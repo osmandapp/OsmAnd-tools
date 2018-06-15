@@ -673,7 +673,6 @@ public class WikiDatabasePreparation {
 		private final static int BATCH_SIZE = 500;
 		final ByteArrayOutputStream bous = new ByteArrayOutputStream(64000);
 		private String lang;
-		private Converter converter;
 		final String[] wikiJunkArray = new String[]{
 				".jpg",".JPG",".jpeg",".png",".gif",".svg","/doc","틀:","위키프로젝트:","แม่แบบ:","위키백과:","แม่แบบ:","Àdàkọ:","Aide:","Aiuto:","Andoza:","Anexo:","Bản:","mẫu:","Batakan:","Categoría:","Categoria:","Catégorie:","Category:","Cithakan:","Datei:","Draft:","Endrika:","Fájl:","Fichier:","File:","Format:","Formula:","Help:","Hjælp:","Kategori:","Kategoria:","Kategorie:","Kigezo:","モジュール:","Mal:","Mall:","Malline:","Modèle:","Modèl:","Modello:","Modelo:","Modèl:","Moduł:","Module:","Modulis:","Modul:","Mô:","đun:","Nodyn:","Padron:","Patrom:","Pilt:","Plantía:","Plantilla:","Plantilya:","Portaal:","Portail:","Portal:","Portál:","Predefinição:","Predloga:","Predložak:","Progetto:","Proiect:","Projet:","Sablon:","Šablon:","Şablon:","Šablona:","Šablóna:","Šablonas:","Ŝablono:","Sjabloon:","Schabloun:","Skabelon:","Snið:","Stampa:","Szablon:","Templat:","Txantiloi:","Veidne:","Vikipedio:","Vikipediya:","Vikipeedia:","Viquipèdia:","Viquiprojecte:","Viquiprojecte:","Vörlaag:","Vorlage:","Vorlog:","วิกิพีเดีย:","Wikipedia:","Wikipedie:","Wikipedija:","Wîkîpediya:","Wikipédia:","Wikiproiektu:","Wikiprojekt:","Wikiproyecto:","الگو:","سانچ:","قالب:","وکیپیڈیا:","ויקיפדיה:","תבנית","Βικιπαίδεια:","Πρότυπο:","Википедиа:","Википедија:","Википедия:","Вікіпедія:","Довідка:","Загвар:","Инкубатор:","Калып:","Ҡалып:","Кеп:","Категорія:","Портал:","Проект:","Уикипедия:","Үлгі:","Файл:","Хуызæг:","Шаблон:","Կաղապար:","Մոդուլ:","Վիքիպեդիա:","ვიკიპედია:","თარგი:","ढाँचा:","विकिपीडिया:","साचा:","साँचा:","ઢાંચો:","વિકિપીડિયા:","మూస:","வார்ப்புரு:","ഫലകം:","വിക്കിപീഡിയ:","টেমপ্লেট:","プロジェクト:","উইকিপিডিয়া:","মডেল:","پرونده:","模块:","ماڈیول:"
 				};
@@ -692,9 +691,6 @@ public class WikiDatabasePreparation {
 			
 			
 			progress.startTask("Parse wiki xml", progIS.available());
-			EmbeddableComponentManager cm = new EmbeddableComponentManager();
-			cm.initialize(WikiDatabasePreparation.class.getClassLoader());
-			converter = cm.getInstance(Converter.class);
 		}
 		
 		public void addBatch() throws SQLException {
