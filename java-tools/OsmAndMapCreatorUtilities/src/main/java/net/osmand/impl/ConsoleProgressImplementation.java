@@ -2,16 +2,18 @@ package net.osmand.impl;
 
 import java.text.MessageFormat;
 
+import net.osmand.IProgress;
 import net.osmand.PlatformUtil;
+import net.osmand.util.Algorithms;
 
 import org.apache.commons.logging.Log;
 
 
-public class ConsoleProgressImplementation  {
+public class ConsoleProgressImplementation implements IProgress {
 	public static double deltaPercentsToPrint = 3.5;
 	public static long deltaTimeToPrint = 1000;
 	private static Log log = PlatformUtil.getLog(ConsoleProgressImplementation.class);
-	
+
 	String currentTask;
 	int work;
 	int currentDone;
@@ -19,36 +21,39 @@ public class ConsoleProgressImplementation  {
 	long deltaTime = deltaTimeToPrint;
 	private long previousTaskStarted = 0;
 	private long lastTimePrinted = 0;
-	
+
 	double lastPercentPrint = 0;
 	public ConsoleProgressImplementation(){
 		delta = deltaPercentsToPrint;
 	}
-	
+
 	public ConsoleProgressImplementation(double deltaToPrint){
 		delta = deltaToPrint;
 	}
-	
+
 	public ConsoleProgressImplementation(double deltaToPrint, int deltaTime){
 		delta = deltaToPrint;
 		deltaToPrint = deltaTime;
 	}
-	
+
+	@Override
 	public void finishTask() {
 		log.info("Task " + currentTask + " is finished "); //$NON-NLS-1$ //$NON-NLS-2$
 		this.currentTask = null;
-		
+
 	}
 
+	@Override
 	public boolean isIndeterminate() {
 		return work == -1;
 	}
 
+	@Override
 	public void progress(int deltaWork) {
 		this.currentDone += deltaWork;
 		printIfNeeded();
 	}
-	
+
 	private void printIfNeeded() {
 		if(getCurrentPercent() - lastPercentPrint >= delta){
 			this.lastPercentPrint = getCurrentPercent();
@@ -57,7 +62,7 @@ public class ConsoleProgressImplementation  {
 				log.info(MessageFormat.format("Done {0} %.", getCurrentPercent())); //$NON-NLS-1$
 				lastTimePrinted = now;
 			}
-			
+
 		}
 	}
 
@@ -65,13 +70,15 @@ public class ConsoleProgressImplementation  {
 		return (double) currentDone * 100.0d / work;
 	}
 
+	@Override
 	public void remaining(int remainingWork) {
 		this.currentDone = work - remainingWork;
 		printIfNeeded();
 	}
 
+	@Override
 	public void startTask(String taskName, int work) {
-		if(currentTask == null || !currentTask.equals(taskName)){
+		if(!Algorithms.objectEquals(currentTask, taskName)){
 			this.currentTask = taskName;
 			log.debug("Memory before task exec: " + Runtime.getRuntime().totalMemory() + " free : " + Runtime.getRuntime().freeMemory()); //$NON-NLS-1$ //$NON-NLS-2$
 			if (previousTaskStarted == 0) {
@@ -84,6 +91,7 @@ public class ConsoleProgressImplementation  {
 		startWork(work);
 	}
 
+	@Override
 	public void startWork(int work) {
 		if(this.work != work){
 			this.work = work;
@@ -93,6 +101,7 @@ public class ConsoleProgressImplementation  {
 		this.lastPercentPrint = 0;
 	}
 
+	@Override
 	public boolean isInterrupted() {
 		return false;
 	}

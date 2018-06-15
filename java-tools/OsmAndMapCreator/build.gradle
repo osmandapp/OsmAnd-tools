@@ -1,4 +1,62 @@
 
+
+task collectMdpiIcons(type: Copy) {
+	from("../../../resources/rendering_styles/style-icons/drawable-mdpi/")
+	into "src/main/resources/resources"
+}
+
+task collectFonts(type: Copy) {
+	from("../../../resources/rendering_styles/fonts"){
+		include "05_NotoSans-Regular.ttf"
+		include "10_NotoSans-Bold.ttf"
+		include "15_NotoSans-Italic.ttf"
+		include "20_NotoSans-BoldItalic.ttf"
+		include "25_NotoSansArabic-Regular.ttf"
+		include "30_NotoSansArabic-Bold.ttf"
+		include "35_NotoSansSouthAsian-Regular.ttf"
+		include "40_NotoSansSouthAsian-Bold.ttf"
+		include "45_NotoSansSoutheastAsian-Regular.ttf"
+		include "50_NotoSansSoutheastAsian-Bold.ttf"
+		include "55_NotoSansTibetan-Regular.ttf"
+		include "60_NotoSansTibetan-Bold.ttf"
+		include "65_NotoSansNastaliqUrdu-Regular.ttf"
+
+		include "DroidSansFallback.ttf"
+		include "MTLmr3m.ttf"
+	}
+
+	into "fonts"	
+}
+
+task buildDistribution(type: Zip) {
+	dependsOn compileJava
+   	from(configurations.runtime.allArtifacts.files) {
+   		rename { String fileName ->
+        	fileName.replace("-1.0", '')
+    	} 
+   		into '.'
+   	}
+
+   	from(configurations.runtimeClasspath) {
+   		into 'lib'
+   	}
+
+   	from('.') {
+   		include 'fonts'
+   	}
+   	from('src/main/resources') {
+   		include '*.sh'
+   		include '*.bat'
+   		include 'batch.xml'
+   		include 'logging.properties'
+   	}
+	archiveName 'OsmAndMapCreator.zip'
+}
+
+compileJava {
+    dependsOn collectMdpiIcons, collectFonts
+}
+
 dependencies {
     testImplementation group: 'junit', name: 'junit', version: '4.12'
 
@@ -20,8 +78,33 @@ dependencies {
 	implementation 'com.moparisthebest:junidecode:0.1.1'
     implementation group: 'com.jcraft', name: 'jsch', version: '0.1.54'
  	
-
  	implementation fileTree(dir: "lib-gl", include: ["*.jar"])
-    
+
+ 	implementation "org.jogamp.gluegen:gluegen-rt:2.3.1"
+    implementation "org.jogamp.jogl:jogl-all:2.3.1"
+
+    // runtime "org.jogamp.gluegen:gluegen-rt:2.3.1:natives-android-aarch64"
+    // runtime "org.jogamp.gluegen:gluegen-rt:2.3.1:natives-android-armv6"
+    runtime "org.jogamp.gluegen:gluegen-rt:2.3.1:natives-linux-amd64"
+    runtime "org.jogamp.gluegen:gluegen-rt:2.3.1:natives-linux-armv6"
+    // runtime "org.jogamp.gluegen:gluegen-rt:2.3.1:natives-linux-armv6hf"
+    runtime "org.jogamp.gluegen:gluegen-rt:2.3.1:natives-linux-i586"
+    runtime "org.jogamp.gluegen:gluegen-rt:2.3.1:natives-macosx-universal"
+    runtime "org.jogamp.gluegen:gluegen-rt:2.3.1:natives-solaris-amd64"
+    runtime "org.jogamp.gluegen:gluegen-rt:2.3.1:natives-solaris-i586"
+    runtime "org.jogamp.gluegen:gluegen-rt:2.3.1:natives-windows-amd64"
+    runtime "org.jogamp.gluegen:gluegen-rt:2.3.1:natives-windows-i586"
+
+    // runtime "org.jogamp.jogl:jogl-all:2.3.1:natives-android-aarch64"
+    // runtime "org.jogamp.jogl:jogl-all:2.3.1:natives-android-armv6"
+    runtime "org.jogamp.jogl:jogl-all:2.3.1:natives-linux-amd64"
+    runtime "org.jogamp.jogl:jogl-all:2.3.1:natives-linux-armv6"
+    // runtime "org.jogamp.jogl:jogl-all:2.3.1:natives-linux-armv6hf"
+    runtime "org.jogamp.jogl:jogl-all:2.3.1:natives-linux-i586"
+    runtime "org.jogamp.jogl:jogl-all:2.3.1:natives-macosx-universal"
+    runtime "org.jogamp.jogl:jogl-all:2.3.1:natives-solaris-amd64"
+    runtime "org.jogamp.jogl:jogl-all:2.3.1:natives-solaris-i586"
+    runtime "org.jogamp.jogl:jogl-all:2.3.1:natives-windows-amd64"
+    runtime "org.jogamp.jogl:jogl-all:2.3.1:natives-windows-i586"
  	testImplementation 'com.ibm.icu:icu4j:50.1'   
 }

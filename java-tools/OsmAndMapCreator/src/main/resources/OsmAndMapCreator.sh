@@ -4,4 +4,4 @@
 # the JVM. With the below settings the heap size (Available memory for the application)
 # will range from 64 megabyte up to 720 megabyte.
 
-java -Djava.util.logging.config.file=logging.properties -Xms64M -Xmx720M -cp "./OsmAndMapCreator.jar:./lib/OsmAnd-core.jar:./lib/*.jar:./lib-gl/*.jar" net.osmand.swing.OsmExtractionUI
+java -Djava.util.logging.config.file=logging.properties -cp "./OsmAndMapCreator.jar:./lib/OsmAnd-core.jar:./lib/*.jar:./lib-gl/*.jar" net.osmand.swing.OsmExtractionUI

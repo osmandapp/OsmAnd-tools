@@ -12,9 +12,6 @@ import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.File;
 
-import javax.media.opengl.GLAutoDrawable;
-import javax.media.opengl.GLEventListener;
-import javax.media.opengl.awt.GLCanvas;
 import javax.swing.JTextField;
 
 import net.osmand.core.jni.AreaI;
@@ -39,6 +36,8 @@ import net.osmand.core.jni.ResolvedMapStyle;
 import net.osmand.data.LatLon;
 import net.osmand.util.MapUtils;
 
+import com.jogamp.opengl.GLAutoDrawable;
+import com.jogamp.opengl.GLEventListener;
 import com.jogamp.opengl.util.Animator;
 
 public class QtCorePanel implements GLEventListener {
@@ -374,7 +373,7 @@ public class QtCorePanel implements GLEventListener {
 		// settings.saveWindowBounds(frame.getBounds());
 	}
 
-	private class MapCanvas extends GLCanvas {
+	private class MapCanvas extends com.jogamp.opengl.awt.GLCanvas {
 		private int zoom;
 		private double longitude;
 		private double latitude;

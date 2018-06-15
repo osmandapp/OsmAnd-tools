@@ -116,26 +116,20 @@ public class IndexBatchCreator {
 		InputStream stream;
 		InputStream regionsStream = null;
 		String internalRegionsList = null;
-		if(name.equals("-local")){
-			stream = IndexBatchCreator.class.getResourceAsStream("batch.xml");
-			regionsStream = IndexBatchCreator.class.getResourceAsStream("regions.xml");
-			log.info("Using local settings");
-		} else {
-			try {
-				stream = new FileInputStream(name);
-			} catch (FileNotFoundException e) {
-				throw new IllegalArgumentException("XML configuration file not found : " + name, e);
-			}
-			if (args.length > 1) {
-				if(args[1].startsWith("internal:")) {
-					internalRegionsList = args[1].substring("internal:".length());
-				} else {
-					try {
-						File regionsFile = new File(args[1]);
-						regionsStream = new FileInputStream(regionsFile);
-					} catch (FileNotFoundException e) {
-						throw new IllegalArgumentException("Please specify xml-file with regions to download", e);
-					}
+		try {
+			stream = new FileInputStream(name);
+		} catch (FileNotFoundException e) {
+			throw new IllegalArgumentException("XML configuration file not found : " + name, e);
+		}
+		if (args.length > 1) {
+			if (args[1].startsWith("internal:")) {
+				internalRegionsList = args[1].substring("internal:".length());
+			} else {
+				try {
+					File regionsFile = new File(args[1]);
+					regionsStream = new FileInputStream(regionsFile);
+				} catch (FileNotFoundException e) {
+					throw new IllegalArgumentException("Please specify xml-file with regions to download", e);
 				}
 			}
 		}
