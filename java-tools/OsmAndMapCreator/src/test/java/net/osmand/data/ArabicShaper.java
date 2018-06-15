@@ -1,5 +1,7 @@
 package net.osmand.data;
 
+import org.junit.Test;
+
 import com.ibm.icu.text.ArabicShaping;
 import com.ibm.icu.text.ArabicShapingException;
 import com.ibm.icu.text.Bidi;
@@ -7,7 +9,8 @@ import com.ibm.icu.text.Bidi;
 public class ArabicShaper {
 
 
-	public static void main(String[] args) throws ArabicShapingException {
+	@Test
+	public void testArabicShaper() throws ArabicShapingException {
 
 		ArabicShaping as = new ArabicShaping(ArabicShaping.LETTERS_SHAPE |
 				ArabicShaping.LENGTH_GROW_SHRINK);
