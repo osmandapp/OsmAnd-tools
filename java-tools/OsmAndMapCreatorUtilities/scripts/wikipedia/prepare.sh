@@ -1,5 +1,5 @@
 #!/bin/bash
-DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )/../../" && pwd )"
 function download {
       echo "Start download $1";
       if [ ! -f  "$1"wiki-latest-pages-articles.xml.bz2 ]; then
@@ -16,7 +16,7 @@ function download {
       fi
       
       if [ ! -f  "$1"wiki.sqlite ]; then
-      	java -Xms256M -Xmx3200M -cp "$DIR/build/libs/WikipediaConverter.jar" net.osmand.osm.util.WikiDatabasePreparation $1
+      	java -Xms256M -Xmx3200M -cp "$DIR/build/libs/OsmAndMapCreatorUtilities.jar" net.osmand.wiki.creator.WikiDatabasePreparation $1
       fi
 }
 
