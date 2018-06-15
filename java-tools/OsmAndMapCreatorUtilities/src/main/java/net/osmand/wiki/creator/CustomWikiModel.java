@@ -1,4 +1,4 @@
-package net.osmand.osm.util;
+package net.osmand.wiki.creator;
 
 import static info.bliki.wiki.tags.WPATag.CLASS;
 import static info.bliki.wiki.tags.WPATag.HREF;

@@ -1,4 +1,4 @@
-package net.osmand.osm.util;
+package net.osmand.wiki.creator;
 
 import info.bliki.wiki.filter.Encoder;
 import info.bliki.wiki.filter.HTMLConverter;
@@ -34,9 +34,9 @@ import javax.xml.parsers.SAXParserFactory;
 import net.osmand.PlatformUtil;
 import net.osmand.data.preparation.DBDialect;
 import net.osmand.impl.ConsoleProgressImplementation;
-import net.osmand.osm.util.GPXUtils.GPXFile;
-import net.osmand.osm.util.GPXUtils.WptPt;
-import net.osmand.osm.util.WikiDatabasePreparation.LatLon;
+import net.osmand.wiki.creator.GPXUtils.GPXFile;
+import net.osmand.wiki.creator.GPXUtils.WptPt;
+import net.osmand.wiki.creator.WikiDatabasePreparation.LatLon;
 
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
 import org.apache.commons.logging.Log;

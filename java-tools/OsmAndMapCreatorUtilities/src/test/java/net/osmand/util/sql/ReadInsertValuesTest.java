@@ -1,12 +1,12 @@
-package net.osmand;
+package net.osmand.util.sql;
 
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 
-import net.osmand.osm.util.WikiDatabasePreparation;
 import net.osmand.util.sql.SqlInsertValuesReader;
 import net.osmand.util.sql.SqlInsertValuesReader.InsertValueProcessor;
+import net.osmand.wiki.creator.WikiDatabasePreparation;
 
 import org.junit.Assert;
 import org.junit.Test;
@@ -15,7 +15,7 @@ import org.xmlpull.v1.XmlPullParserException;
 public class ReadInsertValuesTest {
 
 	@Test
-	public void testDifferentOrientationMultipolygon() throws IOException, XmlPullParserException {
+	public void testComplexQuotesSql() throws IOException, XmlPullParserException {
 		final String[][] expected = new String[][] {
 			new String[] {"11111", "aa", "bbbb"},
 			new String[] {"11111", "aa", "bbbb"},
@@ -25,7 +25,8 @@ public class ReadInsertValuesTest {
 			new String[] {"11112", "aa", "bbbb (bbbb(bbbb))"},
 			new String[] {"11113", "a'a'a", "b", "((c,c)),"},
 		};
-		SqlInsertValuesReader.readInsertValuesFile("tests/test_wiki.sql", new InsertValueProcessor() {
+		SqlInsertValuesReader.readInsertValuesFile(ReadInsertValuesTest.class.getResourceAsStream("/test_wiki.sql"), 
+				new InsertValueProcessor() {
 			int ind = 0;
 			@Override
 			public void process(List<String> vs) {
@@ -39,7 +40,8 @@ public class ReadInsertValuesTest {
 	
 	@Test
 	public void testEnglish() throws IOException, XmlPullParserException {
-		SqlInsertValuesReader.readInsertValuesFile("tests/langlinks.sql", new InsertValueProcessor() {
+		SqlInsertValuesReader.readInsertValuesFile(
+				ReadInsertValuesTest.class.getResourceAsStream("/langlinks.sql"), new InsertValueProcessor() {
 			@Override
 			public void process(List<String> vs) {
 				Assert.assertEquals(3, vs.size());

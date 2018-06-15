@@ -1,4 +1,3 @@
-include 'WikipediaConverter'
 include 'OsmAndMapCreatorUtilities'
 include 'OsmAndServerUtilities'
 def osmAndJava = new File(settingsDir, '../../android/OsmAnd-java')

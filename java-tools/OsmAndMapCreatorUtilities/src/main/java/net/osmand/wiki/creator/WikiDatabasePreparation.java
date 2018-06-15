@@ -1,4 +1,4 @@
-package net.osmand.osm.util;
+package net.osmand.wiki.creator;
 
 import info.bliki.wiki.filter.HTMLConverter;
 import info.bliki.wiki.model.WikiModel;
@@ -40,10 +40,10 @@ import javax.xml.parsers.SAXParserFactory;
 import net.osmand.PlatformUtil;
 import net.osmand.data.preparation.DBDialect;
 import net.osmand.impl.ConsoleProgressImplementation;
-import net.osmand.osm.util.WikiVoyagePreparation.WikidataConnection;
-import net.osmand.osm.util.WikiVoyagePreparation.WikivoyageTemplates;
 import net.osmand.util.sql.SqlInsertValuesReader;
 import net.osmand.util.sql.SqlInsertValuesReader.InsertValueProcessor;
+import net.osmand.wiki.creator.WikiVoyagePreparation.WikidataConnection;
+import net.osmand.wiki.creator.WikiVoyagePreparation.WikivoyageTemplates;
 
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
 import org.apache.commons.lang3.StringUtils;

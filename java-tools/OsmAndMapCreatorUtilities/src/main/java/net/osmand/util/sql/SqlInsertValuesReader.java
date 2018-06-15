@@ -20,6 +20,9 @@ public class SqlInsertValuesReader {
 		if (fileName.endsWith("gz")) {
 			fis = new GZIPInputStream(fis);
 		}
+		readInsertValuesFile(fis, p);
+	}
+	public static void readInsertValuesFile(final InputStream fis, InsertValueProcessor p) throws IOException {
 		InputStreamReader read = new InputStreamReader(fis, "UTF-8");
 		char[] cbuf = new char[1000];
 		int cnt;

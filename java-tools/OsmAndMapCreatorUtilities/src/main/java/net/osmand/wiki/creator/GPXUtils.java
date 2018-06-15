@@ -1,4 +1,4 @@
-package net.osmand.osm.util;
+package net.osmand.wiki.creator;
 
 import java.io.File;
 import java.io.FileOutputStream;
