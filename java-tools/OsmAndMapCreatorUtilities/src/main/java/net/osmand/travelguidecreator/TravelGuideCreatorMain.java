@@ -1,7 +1,7 @@
 package net.osmand.travelguidecreator;
 
 import net.osmand.PlatformUtil;
-import net.osmand.travelguidecreator.connection.SQLiteJDBCDriverConnection;
+import net.osmand.data.preparation.DBDialect;
 import org.apache.commons.logging.Log;
 
 import java.io.ByteArrayOutputStream;
@@ -39,7 +39,7 @@ public class TravelGuideCreatorMain {
             throw new RuntimeException("Supplied path is not a directory");
         }
         File[] files = directory.listFiles();
-        Connection conn = SQLiteJDBCDriverConnection.SQLITE.getDatabaseConnection((dir.endsWith("/") ? dir : dir + "/")
+        Connection conn = DBDialect.SQLITE.getDatabaseConnection((dir.endsWith("/") ? dir : dir + "/")
                 + "travel_guide.sqlite", log);
         if (conn == null) {
             log.error("Couldn't establish the database connection");
