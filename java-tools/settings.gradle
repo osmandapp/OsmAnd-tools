@@ -1,4 +1,4 @@
-include 'SubscriptionsAnalyzer', 'ExceptionAnalyzer', 'BitcoinSender', 'TravelGuideCreator', 'EmailSender'
+include 'TravelGuideCreator', 'EmailSender'
 include 'WikipediaConverter'
 include 'OsmAndUtilities'
 def osmAndJava = new File(settingsDir, '../../android/OsmAnd-java')
