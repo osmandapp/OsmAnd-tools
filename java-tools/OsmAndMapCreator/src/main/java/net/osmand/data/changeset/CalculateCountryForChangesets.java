@@ -1,6 +1,5 @@
 package net.osmand.data.changeset;
 
-import java.io.File;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -8,12 +7,10 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 
 import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.map.OsmandRegions;
@@ -115,11 +112,7 @@ public class CalculateCountryForChangesets {
 	private static OsmandRegions initCountriesTable(Connection conn, boolean empty, Map<WorldRegion, Integer> map) throws IOException, SQLException {
 
 		OsmandRegions or = new OsmandRegions();
-		File regions = new File("OsmAndMapCreator/regions.ocbf");
-		if(!regions.exists()) {
-			 regions = new File("regions.ocbf");
-		}
-		or.prepareFile(regions.getAbsolutePath());
+		or.prepareFile();
 		or.cacheAllCountries();
 		WorldRegion worldRegion = or.getWorldRegion();
 		if (empty) {

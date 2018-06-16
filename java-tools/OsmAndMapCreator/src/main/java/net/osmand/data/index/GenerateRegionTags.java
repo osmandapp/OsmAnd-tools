@@ -42,15 +42,13 @@ public class GenerateRegionTags {
 		try {
 			if (args.length == 0) {
 				args = new String[] { "/Users/victorshcherb/osmand/temp/proc_line_motorway_out.osm.bz2",
-						"/Users/victorshcherb/osmand/temp/region_proc_line_motorway_out.osm.bz2",
-						"/Users/victorshcherb/osmand/repos/resources/countries-info/regions.ocbf" };
+						"/Users/victorshcherb/osmand/temp/region_proc_line_motorway_out.osm.bz2" };
 			}
 
 			File inputFile = new File(args[0]);
 			File targetFile = new File(args[1]);
-			File ocbfFile = new File(args[2]);
 			OsmandRegions or = new OsmandRegions();
-			or.prepareFile(ocbfFile.getAbsolutePath());
+			or.prepareFile();
 			or.cacheAllCountries();
 			process(inputFile, targetFile, or);
 		} catch (Throwable e) {
