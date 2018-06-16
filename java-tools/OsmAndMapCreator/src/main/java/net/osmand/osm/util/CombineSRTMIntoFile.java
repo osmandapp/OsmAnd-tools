@@ -44,7 +44,6 @@ public class CombineSRTMIntoFile {
 	public static void main(String[] args) throws IOException {
 		File directoryWithSRTMFiles = new File(args[0]);
 		File directoryWithTargetFiles = new File(args[1]);
-		String ocbfFile = args[2];
 		boolean dryRun = true;
 		String filter = null; // mauritius
 		for(int i = 3; i < args.length; i++ ){
@@ -55,7 +54,7 @@ public class CombineSRTMIntoFile {
 			}
 		}
 		OsmandRegions or = new OsmandRegions();
-		BinaryMapIndexReader fl = or.prepareFile(ocbfFile);
+		BinaryMapIndexReader fl = or.prepareFile();
 		Map<String, LinkedList<BinaryMapDataObject>> allCountries = or.cacheAllCountries();
 		MapIndex mapIndex = fl.getMapIndexes().get(0);
 		int srtm = mapIndex.getRule("region_srtm", "yes");

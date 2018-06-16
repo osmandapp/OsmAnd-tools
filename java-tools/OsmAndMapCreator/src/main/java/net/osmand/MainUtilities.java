@@ -141,14 +141,13 @@ public class MainUtilities {
 				File testResources = new File(subArgsArray[0]+"/resources/test-resources/osm_live/");
 				generateAllOsmLiveTests(testResources, subArgsArray.length > 1 ? subArgsArray[1] : null, false);
 			} else if (utl.contentEquals("generate-from-overpass")) {
-				if (subArgsArray.length < 3) {
-					System.out.println("Usage: PATH_TO_OVERPASS PATH_TO_WORKING_DIR PATH_TO_REGIONS");
+				if (subArgsArray.length < 2) {
+					System.out.println("Usage: PATH_TO_OVERPASS PATH_TO_WORKING_DIR");
 					return;
 				}
 				String[] argsToGenerateOsm = new String[] {
 						subArgsArray[0],
-						subArgsArray[1],
-						subArgsArray[2]
+						subArgsArray[1]
 				};
 				AugmentedDiffsInspector.main(argsToGenerateOsm);
 				String[] argsToGenerateObf = new String[] {
@@ -227,10 +226,10 @@ public class MainUtilities {
 		System.out.println("\t\t delete-unused-strings <path to repos/android/OsmAnd/res>: deletes unused translation in git repository (transforms all strings.xml)");
 		System.out.println("\t\t extract-roads-only <path to full map obf file> : extracts .road.obf (road-only map) file from full .obf");
 		System.out.println("\t\t generate-osmlive-tests <path_to_directory_with_resources_project> <optional_path_to_unpack_files>: test osmand live functionality");
-		System.out.println("\t\t generate-region-tags <path to input osm file (osm, bz2, gz)> <path to output osm file> <path to ocbf file>: process osm file and assign tag osmand_region_name to every entity.");
+		System.out.println("\t\t generate-region-tags <path to input osm file (osm, bz2, gz)> <path to output osm file>: process osm file and assign tag osmand_region_name to every entity.");
 		System.out.println("\t\t generate-ocean-tile-osm <optional path to osm file to write> <optional path to oceantiles_12.dat file>: generates ocean tiles osm file to check in JOSM ");
 		System.out.println("\t\t merge-index " + BinaryMerger.helpMessage);
 		System.out.println("\t\t compare " + BinaryComparator.helpMessage);
-		System.out.println("\t\t generate-from-overpass <path to overpass.xml (must have format 2017_06_18-10_30)> <path to working directory> <path to regions.ocbf>: The utility converts overpass.xml to obf");
+		System.out.println("\t\t generate-from-overpass <path to overpass.xml (must have format 2017_06_18-10_30)> <path to working directory>: The utility converts overpass.xml to obf");
 	}
 }

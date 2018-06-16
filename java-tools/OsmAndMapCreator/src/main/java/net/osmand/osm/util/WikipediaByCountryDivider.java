@@ -239,26 +239,25 @@ public class WikipediaByCountryDivider {
 //		String regionsFile = "/home/victor/projects/osmand/repo/resources/countries-info/regions.ocbf";
 //		String cmd = "regenerate";
 		String cmd = args[0];
-		String regionsFile = args[1];
-		String folder = args[2];
+		String folder = args[1];
 		boolean skip = false;
-		if (args.length > 3) {
-			skip = args[3].equals("-skip-existing");
+		if (args.length > 2) {
+			skip = args[2].equals("-skip-existing");
 		}
 		if(cmd.equals("inspect")) {
 			inspectWikiFile(folder);
 		} else if(cmd.equals("update_countries")) {
-			updateCountries(folder, regionsFile);
+			updateCountries(folder);
 		} else if(cmd.equals("generate_country_sqlite")) {
 			generateCountrySqlite(folder, skip);
 		} else if(cmd.equals("regenerate")) {
-			generateGlobalWikiFile(folder, regionsFile);
+			generateGlobalWikiFile(folder);
 		}
 	}
 
-	protected static void updateCountries(String folder, String regionsFile) throws IOException, SQLException {
+	protected static void updateCountries(String folder) throws IOException, SQLException {
 		OsmandRegions regions = new OsmandRegions();
-		regions.prepareFile(regionsFile);
+		regions.prepareFile();
 		regions.cacheAllCountries();
 		final GlobalWikiStructure wikiStructure = new GlobalWikiStructure(folder + "wiki.sqlite", regions, false);
 		wikiStructure.updateRegions();
@@ -271,7 +270,7 @@ public class WikipediaByCountryDivider {
 	protected static void generateCountrySqlite(String folder, boolean skip) throws SQLException, IOException, InterruptedException, XmlPullParserException {
 		Connection conn = (Connection) DBDialect.SQLITE.getDatabaseConnection(folder + "wiki.sqlite", log);
 		OsmandRegions regs = new OsmandRegions();
-		regs.prepareFile(new File("resources/countries-info/regions.ocbf").getAbsolutePath());
+		regs.prepareFile();
 		Map<String, LinkedList<BinaryMapDataObject>> mapObjects = regs.cacheAllCountries();
 		File rgns = new File(folder, "regions");
 		rgns.mkdirs();
@@ -504,10 +503,10 @@ public class WikipediaByCountryDivider {
 		}
 	}
 
-	protected static void generateGlobalWikiFile(String folder, String regionsFile) throws IOException, SQLException,
+	protected static void generateGlobalWikiFile(String folder) throws IOException, SQLException,
 			FileNotFoundException, UnsupportedEncodingException {
 		OsmandRegions regions = new OsmandRegions();
-		regions.prepareFile(regionsFile);
+		regions.prepareFile();
 		regions.cacheAllCountries();
 		final GlobalWikiStructure wikiStructure = new GlobalWikiStructure(folder + "wiki.sqlite", regions, true);
 		File fl = new File(folder);

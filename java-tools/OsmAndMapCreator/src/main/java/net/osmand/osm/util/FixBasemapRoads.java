@@ -130,14 +130,7 @@ public class FixBasemapRoads {
 
 	private OsmandRegions prepareRegions() throws IOException {
 		OsmandRegions or = new OsmandRegions();
-		File regions = new File("OsmAndMapCreator/regions.ocbf");
-		if(!regions.exists()) {
-			 regions = new File("regions.ocbf");
-		}
-		if(!regions.exists()) {
-			 regions = new File("../../resources/countries-info/regions.ocbf");
-		}
-		or.prepareFile(regions.getAbsolutePath());
+		or.prepareFile();
 		or.cacheAllCountries();
 		return or;
 	}

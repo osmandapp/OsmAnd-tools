@@ -61,16 +61,13 @@ public class AugmentedDiffsInspector {
 		try {
 			File inputFile = new File(args[0]);
 			File targetDir = new File(args[1]);
-			File ocbfFile = args.length <= 2 ? null : new File(args[2]);
 			
 			AugmentedDiffsInspector inspector = new AugmentedDiffsInspector();
 			Context ctx = inspector.parseFile(inputFile);
 			OsmandRegions osmandRegions = null;
-			if(ocbfFile != null) {
-				osmandRegions = new OsmandRegions();
-				osmandRegions.prepareFile(ocbfFile.getAbsolutePath());
-				osmandRegions.cacheAllCountries();
-			}
+			osmandRegions = new OsmandRegions();
+			osmandRegions.prepareFile();
+			osmandRegions.cacheAllCountries();
 			inspector.prepareRegions(ctx, ctx.newIds, ctx.regionsNew, osmandRegions);
 			inspector.prepareRegions(ctx, ctx.oldIds, ctx.regionsOld, osmandRegions);
 			String name = inputFile.getName();
