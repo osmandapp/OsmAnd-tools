@@ -24,9 +24,7 @@ public class CalculateCountryForChangesets {
 	private static final int MAX_COUNTRY_SIZE = 5;
 
 	public static void main(String[] args) throws Exception {
-		if(args[0].equals("calculate_countries")) {
-			calculateCountries();
-		}
+		calculateCountries();
 	}
 
 	private static void calculateCountries() throws Exception {
