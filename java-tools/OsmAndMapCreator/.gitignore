@@ -2,3 +2,4 @@ bin/
 build/
 fonts/
 src/main/resources/resources/*
+regions.ocbf
