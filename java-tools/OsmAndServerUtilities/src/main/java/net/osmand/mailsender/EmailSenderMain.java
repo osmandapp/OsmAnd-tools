@@ -36,19 +36,19 @@ public class EmailSenderMain {
         boolean updateBlockList = false;
         for (String arg : args) {
             String val = arg.substring(arg.indexOf("=") + 1);
-            if (arg.startsWith("id=")) {
+            if (arg.startsWith("--id=")) {
                 templateId = val;
-            } else if (arg.startsWith("groups=")) {
+            } else if (arg.startsWith("--groups=")) {
                 mailingGroups = val;
-            } else if (arg.startsWith("sender_mail=")) {
+            } else if (arg.startsWith("--sender_mail=")) {
                 mailFrom = val;
-            } else if (arg.startsWith("topic=")) {
+            } else if (arg.startsWith("--topic=")) {
                 topic = val;
-            } else if (arg.startsWith("run_opt=")) {
+            } else if (arg.startsWith("--run_opt=")) {
                 runMode = val;
-            } else if (arg.startsWith("test_addr=")) {
+            } else if (arg.startsWith("--test_addr=")) {
                 testAddresses = val;
-            } else if (arg.equals("update_block_list")) {
+            } else if (arg.equals("--update_block_list")) {
                 updateBlockList = true;
             }
         }
