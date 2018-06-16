@@ -28,12 +28,11 @@ public class ObfRegionSplitter {
 			args = new String[5];
 			args[0] = "/Users/victorshcherb/osmand/maps/diff/Diff.obf";
 			args[1] = "/Users/victorshcherb/osmand/maps/diff/regions";
-			args[2] = "/Users/victorshcherb/osmand/repos/android/OsmAnd/src/net/osmand/map/regions.ocbf";
-			args[3] = "";
-			args[4] = "_01_00";
+			args[2] = "";
+			args[3] = "_01_00";
 		}
 		if (args.length <= 3) {
-			System.err.println("Usage: <path_to_world_obf_diff> <path_to_result_folder> <path_to_regions.ocbf> <subfolder_name> <file_suffix>");
+			System.err.println("Usage: <path_to_world_obf_diff> <path_to_result_folder> <subfolder_name> <file_suffix>");
 			return;
 		}
 		
@@ -43,11 +42,10 @@ public class ObfRegionSplitter {
 
 	private void split(String[] args) throws IOException {
 		File worldObf = new File(args[0]);
-		File ocbfFile = new File(args[2]);
 		File dir = new File(args[1]);
-		String subFolder = args.length > 3 ? args[3] : "";
-		String fileSuffix = args.length > 4 ? args[4] : "";
-		if (!worldObf.exists() || !ocbfFile.exists()) {
+		String subFolder = args.length > 2 ? args[2] : "";
+		String fileSuffix = args.length > 3 ? args[3] : "";
+		if (!worldObf.exists()) {
 			System.out.println("Incorrect file!");
 			System.exit(1);
 		}
@@ -58,7 +56,7 @@ public class ObfRegionSplitter {
 			ObfFileInMemory fl = new ObfFileInMemory();
 			fl.readObfFiles(Collections.singletonList(worldObf));
 			OsmandRegions osmandRegions = new OsmandRegions();
-			osmandRegions.prepareFile(ocbfFile.getAbsolutePath());
+			osmandRegions.prepareFile();
 			osmandRegions.cacheAllCountries();
 
 			Map<String, Map<MapZoomPair, TLongObjectHashMap<BinaryMapDataObject>>> regionsMapData = splitRegionMapData(fl,osmandRegions);

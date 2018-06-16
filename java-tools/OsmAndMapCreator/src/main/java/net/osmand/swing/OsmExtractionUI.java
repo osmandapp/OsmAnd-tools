@@ -187,14 +187,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 	    statusBarLabel = new JLabel();
 	    osmandRegions = new OsmandRegions();
 		try {
-			File regions = new File("regions.ocbf");
-			if (!regions.exists()) {
-				InputStream is = OsmandRegions.class.getResourceAsStream("regions.ocbf");
-				FileOutputStream fous = new FileOutputStream(regions);
-				Algorithms.streamCopy(is, fous);
-				fous.close();
-			}
-			osmandRegions.prepareFile(regions.getAbsolutePath());
+			osmandRegions.prepareFile();
 		} catch (IOException e2) {
 			e2.printStackTrace();
 			log.error(e2.getMessage(), e2);
