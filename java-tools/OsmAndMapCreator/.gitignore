@@ -1,11 +1,4 @@
 bin/
 build/
-build.zip
-cpd.xml
-OsmAnd-core.jar
-/bin-tests
-*.lib
 fonts/
-OsmAndMapCreator.jar
-lib-gl/OsmAndCore_jni.jar
 src/main/resources/resources/*
