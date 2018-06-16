@@ -54,17 +54,14 @@ public class WikivoyageOSMDataGenerator {
 	
 	public static void main(String[] args) throws SQLException, IOException, JSONException {
 		String file = "";
-		String regionsFile = "";
 		String citiesObf = "";
 		if(args.length == 0) {	
 			file = "/home/user/osmand/wikivoyage/wikivoyage.sqlite";
-			regionsFile = "/home/user/repo/tools/OsmAndMapCreator/regions.ocbf";
 			citiesObf = "/home/user/Cities.obf";
 		}
 		if(args.length > 2) {
 			file = args[0];
-			regionsFile = args[1];
-			citiesObf = args[2];
+			citiesObf = args[1];
 		} else if (file.isEmpty()) {
 			System.err.println("You should provide the path to the wikivoyage.sqlite file.");
 			System.exit(-1);
@@ -79,7 +76,7 @@ public class WikivoyageOSMDataGenerator {
 			System.exit(-1);
 		}
 		regions = new OsmandRegions();
-		regions.prepareFile(regionsFile);
+		regions.prepareFile();
 		regions.cacheAllCountries();
 		processDb(sqliteFile, countriesObfFile);
 	}
