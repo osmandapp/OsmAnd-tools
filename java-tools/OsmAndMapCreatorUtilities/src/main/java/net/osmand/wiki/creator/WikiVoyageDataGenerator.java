@@ -25,9 +25,9 @@ import net.osmand.util.sql.SqlInsertValuesReader.InsertValueProcessor;
 
 import org.apache.commons.logging.Log;
 
-public class SearchDBCreator {
+public class WikiVoyageDataGenerator {
 
-	private static final Log log = PlatformUtil.getLog(SearchDBCreator.class);
+	private static final Log log = PlatformUtil.getLog(WikiVoyageDataGenerator.class);
 	private static final int BATCH_SIZE = 500;
 
 	public static void main(String[] args) throws SQLException, IOException {
@@ -231,7 +231,7 @@ public class SearchDBCreator {
 		rs.close();
 	}
 
-	private static void generateSearchTable(Connection conn) throws SQLException {
+	public static void generateSearchTable(Connection conn) throws SQLException {
 		conn.createStatement().execute("DROP TABLE IF EXISTS travel_search;");
 		conn.createStatement()
 				.execute("CREATE TABLE travel_search(search_term text, trip_id long, article_title text, lang text)");
@@ -395,7 +395,7 @@ public class SearchDBCreator {
 		conn.close();
 	}
 
-	private static void finishPrep(PreparedStatement ps) throws SQLException {
+	public static void finishPrep(PreparedStatement ps) throws SQLException {
 		ps.addBatch();
 		ps.executeBatch();
 		ps.close();
