@@ -16,8 +16,8 @@ import java.util.Map;
 import net.osmand.data.DataTileManager;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Node;
-import net.osmand.osm.edit.Way;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
+import net.osmand.osm.edit.Way;
 import net.osmand.util.MapUtils;
 
 

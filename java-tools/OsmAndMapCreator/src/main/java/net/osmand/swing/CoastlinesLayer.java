@@ -13,7 +13,7 @@ import javax.swing.Action;
 import javax.swing.JPopupMenu;
 
 import net.osmand.binary.MapZooms;
-import net.osmand.data.preparation.BasemapProcessor;
+import net.osmand.obf.preparation.BasemapProcessor;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.util.MapUtils;
 

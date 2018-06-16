@@ -8,7 +8,7 @@ import java.util.prefs.Preferences;
 
 import net.osmand.binary.MapZooms;
 import net.osmand.data.LatLon;
-import net.osmand.data.preparation.IndexCreator;
+import net.osmand.obf.preparation.IndexCreator;
 import net.osmand.router.RoutingConfiguration;
 import net.osmand.router.RoutingConfiguration.Builder;
 

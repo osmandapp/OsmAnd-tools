@@ -11,7 +11,6 @@ import java.sql.Statement;
 
 import net.osmand.PlatformUtil;
 import net.osmand.map.ITileSource;
-import net.osmand.map.TileSourceManager.BeanShellTileSourceTemplate;
 import net.osmand.map.TileSourceManager.TileSourceTemplate;
 
 import org.apache.commons.logging.Log;

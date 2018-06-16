@@ -106,5 +106,10 @@ public class ConsoleProgressImplementation implements IProgress {
 		return false;
 	}
 
+	@Override
+	public void setGeneralProgress(String genProgress) {
+		// not implemented now
+	}
+
 
 }

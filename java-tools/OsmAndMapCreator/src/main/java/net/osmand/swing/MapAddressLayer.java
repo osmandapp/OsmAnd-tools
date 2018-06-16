@@ -29,8 +29,6 @@ import net.osmand.data.Street;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
-import net.osmand.router.GeneralRouter.RouteAttributeContext;
-import net.osmand.router.GeneralRouter.RouteDataObjectAttribute;
 import net.osmand.router.RoutePlannerFrontEnd;
 import net.osmand.router.RoutingConfiguration;
 import net.osmand.router.RoutingContext;
