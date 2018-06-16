@@ -25,6 +25,7 @@ import net.osmand.data.preparation.IndexCreator;
 import net.osmand.data.preparation.OceanTilesCreator;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.osm.MapRenderingTypesEncoder;
+import net.osmand.osm.util.FixBasemapRoads;
 import net.osmand.osm.util.ResourceDeleter;
 import net.osmand.regions.CountryOcbfGeneration;
 import net.osmand.render.RenderingRulesStorage;
@@ -73,6 +74,8 @@ public class MainUtilities {
 				RenderingRulesStorage.main(subArgsArray);
 			} else if (utl.equals("generate-obf-diff")) {
 				ObfDiffGenerator.main(subArgsArray);
+			} else if (utl.equals("fix-basemap-roads")) {
+				FixBasemapRoads.main(subArgsArray);
 			} else if (utl.equals("generate-ocean-tile")) {
 				OceanTilesCreator.createTilesFile(subArgsArray[0], subArgsArray.length > 1 ? subArgsArray[1] : null);
 			} else if (utl.equals("test-routing")) {
@@ -234,9 +237,11 @@ public class MainUtilities {
 		System.out.println("\t\t generate-osmlive-tests <path_to_directory_with_resources_project> <optional_path_to_unpack_files>: test osmand live functionality");
 		System.out.println("\t\t generate-region-tags <path to input osm file (osm, bz2, gz)> <path to output osm file>: process osm file and assign tag osmand_region_name to every entity.");
 		System.out.println("\t\t generate-ocean-tile-osm <optional path to osm file to write> <optional path to oceantiles_12.dat file>: generates ocean tiles osm file to check in JOSM ");
+		System.out.println("\t\t fix-basemap-roads <input-osm-file> <output-osm-file>: merges and simplifies basemap roads");
+		System.out.println("\t\t merge-index " + BinaryMerger.helpMessage);
 		System.out.println("\t\t merge-index " + BinaryMerger.helpMessage);
 		System.out.println("\t\t compare " + BinaryComparator.helpMessage);
 		System.out.println("\t\t generate-from-overpass <path to overpass.xml (must have format 2017_06_18-10_30)> <path to working directory>: The utility converts overpass.xml to obf");
-		System.out.println("\t\t travel-guide-creator --help or -h (for more information)");
+		System.out.println("\t\t travel-guide-creator: creates custom travel guide from existing resources (.travel.sqlite), --help or -h for more details");
 	}
 }
