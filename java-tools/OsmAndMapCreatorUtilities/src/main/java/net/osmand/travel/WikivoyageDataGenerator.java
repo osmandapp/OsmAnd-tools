@@ -66,7 +66,7 @@ public class WikivoyageDataGenerator {
 	public static void main(String[] args) throws SQLException, IOException {
 		boolean uncompressed = false;
 		File wikivoyageFile = new File(args[0]);
-		if(wikivoyageFile.exists()) {
+		if(!wikivoyageFile.exists()) {
 			throw new IllegalArgumentException("Wikivoyage file doesn't exist: " + args[0]);
 		}
 		File citiesObfFile = null;
