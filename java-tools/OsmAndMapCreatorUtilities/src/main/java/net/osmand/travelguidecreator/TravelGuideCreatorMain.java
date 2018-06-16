@@ -12,6 +12,11 @@ import java.sql.*;
 import java.util.*;
 import java.util.zip.GZIPOutputStream;
 
+import static net.osmand.wiki.creator.WikiVoyageDataGenerator.finishPrep;
+import static net.osmand.wiki.creator.WikiVoyageDataGenerator.generateSearchTable;
+import static net.osmand.wiki.creator.WikiVoyagePreparation.createInitialDbStructure;
+import static net.osmand.wiki.creator.WikiVoyagePreparation.generateInsertPrep;
+
 public class TravelGuideCreatorMain {
 
     private static final int BATCH_SIZE = 30;
@@ -51,53 +56,9 @@ public class TravelGuideCreatorMain {
         conn.close();
     }
 
-    private static void generateSearchTable(Connection conn) throws SQLException {
-        log.debug("Finishing database creation");
-        conn.createStatement().execute("DROP TABLE IF EXISTS travel_search;");
-        conn.createStatement()
-                .execute("CREATE TABLE travel_search(search_term text, trip_id long, article_title text, lang text)");
-        conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_search_term ON travel_search(search_term);");
-        conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_search_city ON travel_search(trip_id)");
-
-        PreparedStatement insertSearch = conn.prepareStatement("INSERT INTO travel_search VALUES (?, ?, ?, ?)");
-        PreparedStatement data = conn.prepareStatement("SELECT trip_id, title, lang, is_part_of FROM travel_articles");
-
-        ResultSet rs = data.executeQuery();
-        int batch = 0;
-        while (rs.next()) {
-            String title = rs.getString("title");
-            String titleToSplit = title.replaceAll("[/\\)\\(-]", " ").replaceAll(" +", " ");
-            String lang = rs.getString("lang");
-            long id = rs.getLong("trip_id");
-            for (String s : titleToSplit.split(" ")) {
-                insertSearch.setString(1, s.toLowerCase());
-                insertSearch.setLong(2, id);
-                insertSearch.setString(3, title);
-                insertSearch.setString(4, lang);
-                insertSearch.addBatch();
-                if (batch++ > 500) {
-                    insertSearch.executeBatch();
-                    batch = 0;
-                }
-            }
-        }
-        finishPrep(insertSearch);
-        data.close();
-        rs.close();
-    }
-
     private static void generateTravelSqlite(Map<String,List<File>> mapping, Connection conn) throws SQLException, IOException {
-        conn.createStatement()
-                .execute("CREATE TABLE IF NOT EXISTS travel_articles(title text, content_gz blob, is_part_of text, lat double," +
-                        " lon double, image_title text not null, gpx_gz blob, trip_id long, " +
-                        "original_id long, lang text, contents_json text, aggregated_part_of)");
-        conn.createStatement().execute("CREATE TABLE IF NOT EXISTS popular_articles(title text, trip_id long,"
-                + " population long, order_index long, popularity_index long, lat double, lon double, lang text)");
-        conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_title ON travel_articles(title);");
-        conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_id ON travel_articles(trip_id);");
-        PreparedStatement prep = conn.prepareStatement("INSERT INTO travel_articles(title, content_gz, is_part_of, lat, lon, " +
-                "image_title, gpx_gz, trip_id , original_id , " +
-                "lang, contents_json, aggregated_part_of) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )");
+        createInitialDbStructure(conn, false);
+        PreparedStatement prep = generateInsertPrep(conn, false);
         int count = 0;
         int batch = 0;
         for (String title : mapping.keySet()) {
@@ -139,12 +100,6 @@ public class TravelGuideCreatorMain {
         }
         finishPrep(prep);
         log.debug("Successfully created a travel book. Size: " + count);
-    }
-
-    private static void finishPrep(PreparedStatement ps) throws SQLException {
-        ps.addBatch();
-        ps.executeBatch();
-        ps.close();
     }
 
     private static byte[] compress(byte[] content){
