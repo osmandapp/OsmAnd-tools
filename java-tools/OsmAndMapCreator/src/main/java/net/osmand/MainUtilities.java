@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
+import net.osmand.binary.BinaryInspector;
 import net.osmand.binary.MapZooms;
 import net.osmand.data.diff.AugmentedDiffsInspector;
 import net.osmand.data.diff.GenerateDailyObf;
@@ -54,6 +55,8 @@ public class MainUtilities {
 			String[] subArgsArray = subArgs.toArray(new String[args.length - 1]);
 			if (utl.equals("check-ocean-tile")) {
 				OceanTilesCreator.checkOceanTile(subArgsArray);
+			} else if (utl.equals("inspector")) {
+				BinaryInspector.main(subArgsArray);
 			} else if (utl.equals("compare")) {
 				BinaryComparator.main(subArgsArray);
 			} else if (utl.equals("merge-index")) {
@@ -211,6 +214,7 @@ public class MainUtilities {
 		System.out.println("each utility has own argument list and own synopsys. Here is the list:");
 		System.out.println("\t\t generate-obf <path to osm file>: simple way to generate obf file in place. "
 				+ "\t\t\t	Another supported options generate-map, generate-address, generate-poi, generate-roads (generate obf partially)");
+		System.out.println("\t\t inspector <params>: powerful tool to inspect obf files and convert them to osm");
 		System.out.println("\t\t check-ocean-tile <lat> <lon> <zoom=11>: checks ocean or land tile is in bz2 list");
 		System.out.println("\t\t generate-ocean-tile <coastline osm file> <optional output file>: creates ocean tiles 12 zoom");
 		System.out.println("\t\t generate-java-style <pathtostyle> <pathtooutputfolder>: prints rendering style as java interpreted code");
