@@ -243,7 +243,7 @@ public class WikipediaByCountryDivider {
 		String folder = args[1];
 		boolean skip = false;
 		if (args.length > 2) {
-			skip = args[2].equals("-skip-existing");
+			skip = args[2].equals("--skip-existing");
 		}
 		if(cmd.equals("inspect")) {
 			inspectWikiFile(folder);

@@ -40,6 +40,7 @@ import net.osmand.util.GenerateExtractScript;
 import net.osmand.util.IndexBatchCreator;
 import net.osmand.util.IndexUploader;
 import net.osmand.util.ResourceDeleter;
+import net.osmand.wiki.WikiDatabasePreparation;
 import net.osmand.wiki.WikipediaByCountryDivider;
 
 import org.apache.commons.logging.Log;
@@ -82,6 +83,8 @@ public class MainUtilities {
 				RenderingRulesStoragePrinter.main(subArgsArray);
 			} else if (utl.equals("explain-rendering-style")) {
 				RenderingRulesStorage.main(subArgsArray);
+			} else if (utl.equals("generate-wikilang-sqlite")) {
+				WikiDatabasePreparation.main(subArgsArray);
 			} else if (utl.equals("generate-wikipedia-by-country")) {
 				WikipediaByCountryDivider.main(subArgsArray);
 			} else if (utl.equals("generate-obf-diff")) {
