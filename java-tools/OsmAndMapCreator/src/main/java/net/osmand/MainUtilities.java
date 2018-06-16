@@ -234,6 +234,6 @@ public class MainUtilities {
 		System.out.println("\t\t merge-index " + BinaryMerger.helpMessage);
 		System.out.println("\t\t compare " + BinaryComparator.helpMessage);
 		System.out.println("\t\t generate-from-overpass <path to overpass.xml (must have format 2017_06_18-10_30)> <path to working directory>: The utility converts overpass.xml to obf");
-		System.out.println("\t\t travel-guide-creator -help (for more information)");
+		System.out.println("\t\t travel-guide-creator --help or -h (for more information)");
 	}
 }

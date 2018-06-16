@@ -35,7 +35,7 @@ public class TravelGuideCreatorMain {
         } else {
             dir = args[0];
         }
-        if (dir.equals("-help")) {
+        if (dir.equals("--help") || dir.equals("-h")) {
             printHelp();
         }
         generateTravelGuide(dir);
