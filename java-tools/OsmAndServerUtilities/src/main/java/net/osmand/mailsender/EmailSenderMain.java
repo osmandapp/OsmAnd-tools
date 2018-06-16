@@ -27,7 +27,7 @@ public class EmailSenderMain {
     private static SendGrid sendGridClient;
 
     public static void main(String[] args) throws SQLException {
-
+    	System.out.println("Send email utility");
         String templateId = null;
         String mailingGroups = null;
         String topic = null;
