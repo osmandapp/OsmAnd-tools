@@ -234,6 +234,6 @@ public class MainUtilities {
 		System.out.println("\t\t merge-index " + BinaryMerger.helpMessage);
 		System.out.println("\t\t compare " + BinaryComparator.helpMessage);
 		System.out.println("\t\t generate-from-overpass <path to overpass.xml (must have format 2017_06_18-10_30)> <path to working directory>: The utility converts overpass.xml to obf");
-		System.out.println(	"\t\t travel-guide-creator <path to directory with html and gpx files (should contain gpx and html files with identical names)>: The utility creates an sqlite file that contains articles and points from the specified directory.");
+		System.out.println("\t\t travel-guide-creator <path to directory with html and gpx files (should contain gpx and html files with identical names)>: The utility creates an sqlite file that contains articles and points from the specified directory.");
 	}
 }
