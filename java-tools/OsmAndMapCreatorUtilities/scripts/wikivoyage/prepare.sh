@@ -9,9 +9,6 @@ function download {
       if [ ! -f  "$1"wiki-latest-pages-articles.xml.bz2 ]; then
       	wget --quiet -N http://dumps.wikimedia.org/"$1"wikivoyage/latest/"$1"wikivoyage-latest-pages-articles.xml.bz2
       fi
-      #if [ ! -f  "$1"wiki-latest-externallinks.sql.gz ]; then
-      #      wget --quiet -N http://dumps.wikimedia.org/"$1"wikivoyage/latest/"$1"wikivoyage-latest-externallinks.sql.gz      
-      #fi
       java -Xms256M -Xmx3200M -cp "$DIR/build/libs/OsmAndMapCreatorUtilities.jar" net.osmand.wiki.creator.WikivoyagePreparation $1 ./ $PARAMETER
 }
 

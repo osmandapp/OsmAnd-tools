@@ -29,7 +29,6 @@ import net.osmand.obf.preparation.OceanTilesCreator;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.render.RenderingRulesStorage;
 import net.osmand.render.RenderingRulesStoragePrinter;
-import net.osmand.swing.DataExtractionSettings;
 import net.osmand.travel.TravelGuideCreatorMain;
 import net.osmand.util.Algorithms;
 import net.osmand.util.CombineSRTMIntoFile;
@@ -232,14 +231,16 @@ public class MainUtilities {
 		}
 	}
 
-	private static void generateObf(String[] subArgsArray, IndexCreator ic) throws IOException,
-			SQLException, InterruptedException, XmlPullParserException {
-		String fn = DataExtractionSettings.getSettings().getMapRenderingTypesFile();
+	private static void generateObf(String[] subArgsArray, IndexCreator ic) throws IOException, SQLException,
+			InterruptedException, XmlPullParserException {
 		String regionName = subArgsArray[0];
-		MapRenderingTypesEncoder types = new MapRenderingTypesEncoder(fn, regionName);
-		ic.generateIndexes(new File(subArgsArray[0]),
-				new ConsoleProgressImplementation(), null, MapZooms.getDefault(), types,
-				log);
+		String renderingTypesFile = "";
+		if (subArgsArray.length > 1) {
+			renderingTypesFile = subArgsArray[1];
+		}
+		MapRenderingTypesEncoder types = new MapRenderingTypesEncoder(renderingTypesFile, regionName);
+		ic.generateIndexes(new File(subArgsArray[0]), new ConsoleProgressImplementation(), null, MapZooms.getDefault(),
+				types, log);
 	}
 
 	private static void printSynopsys() {
