@@ -136,6 +136,9 @@ public class MainUtilities {
 
 			} else if (utl.equals("delete-unused-strings")) {
 				ResourceDeleter.main(subArgsArray);
+			} else if (utl.equals("index-uploader-std")) {
+				// should be split into server utilites and map generation
+				IndexUploader.main(subArgsArray);
 			} else if (utl.equals("merge-std-files")) {
 				BinaryMerger.mergeStandardFiles(subArgsArray);
 			} else if (utl.equals("generate-roads")) {
