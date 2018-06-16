@@ -9,6 +9,7 @@ import java.util.prefs.Preferences;
 import net.osmand.binary.MapZooms;
 import net.osmand.data.LatLon;
 import net.osmand.obf.preparation.IndexCreator;
+import net.osmand.obf.preparation.IndexCreatorSettings;
 import net.osmand.router.RoutingConfiguration;
 import net.osmand.router.RoutingConfiguration.Builder;
 
@@ -171,14 +172,6 @@ public class DataExtractionSettings {
 
 	public void setUseInterentToLoadImages(boolean b){
 		preferences.putBoolean("use_internet", b);
-	}
-
-	public String getCityAdminLevel(){
-		return preferences.get("cityAdminLevel", "" + IndexCreator.DEFAULT_CITY_ADMIN_LEVEL);
-	}
-
-	public void setCityAdminLevel(String s){
-		preferences.put("cityAdminLevel", s);
 	}
 
 

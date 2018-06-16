@@ -26,6 +26,7 @@ import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.map.OsmandRegions;
 import net.osmand.obf.preparation.DBDialect;
 import net.osmand.obf.preparation.IndexCreator;
+import net.osmand.obf.preparation.IndexCreatorSettings;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Way;
@@ -175,17 +176,18 @@ public class CombineSRTMIntoFile {
 		// be independent of previous results
 		new File(targetFile.getParentFile(), IndexCreator.TEMP_NODES_DB).delete();
 		RTree.clearCache();
-		IndexCreator ic = new IndexCreator(targetFile.getParentFile());
+		IndexCreatorSettings settings = new IndexCreatorSettings();
+		settings.indexMap = true;
+		settings.zoomWaySmoothness = 2;
+		settings.boundary = polygon;
+		IndexCreator ic = new IndexCreator(targetFile.getParentFile(), settings);
 		if(srtmFileNames.size() > 100) {
 			ic.setDialects(DBDialect.SQLITE, DBDialect.SQLITE);
 		} else {
 			ic.setDialects(DBDialect.SQLITE_IN_MEMORY, DBDialect.SQLITE_IN_MEMORY);
 		}
-		ic.setIndexMap(true);
 		ic.setRegionName(name +" contour lines");
 		ic.setMapFileName(targetFile.getName());
-		ic.setBoundary(polygon);
-		ic.setZoomWaySmoothness(2);
 		ic.generateIndexes(files.toArray(new File[files.size()]), new ConsoleProgressImplementation(1), null, MapZooms.parseZooms("11-12;13-"),
 				new MapRenderingTypesEncoder(targetFile.getName()), log, true, false);
 //		if(length > Integer.MAX_VALUE) {

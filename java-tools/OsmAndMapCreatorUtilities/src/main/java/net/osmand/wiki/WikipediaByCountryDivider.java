@@ -29,6 +29,7 @@ import net.osmand.map.OsmandRegions;
 import net.osmand.map.WorldRegion;
 import net.osmand.obf.preparation.DBDialect;
 import net.osmand.obf.preparation.IndexCreator;
+import net.osmand.obf.preparation.IndexCreatorSettings;
 import net.osmand.obf.preparation.IndexPoiCreator;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.util.Algorithms;
@@ -455,16 +456,18 @@ public class WikipediaByCountryDivider {
 	}
 
 	private static void generateObf(File osmBz2, File obf) throws IOException, SQLException, InterruptedException, XmlPullParserException {
-		IndexPoiCreator.ZIP_LONG_STRINGS = true;
 		// be independent of previous results
 		RTree.clearCache();
-		IndexCreator creator = new IndexCreator(obf.getParentFile()); //$NON-NLS-1$
+		IndexCreatorSettings settings = new IndexCreatorSettings();
+		settings.indexMap = false;
+		settings.indexAddress = false;
+		settings.indexPOI = true;
+		settings.indexTransport = false;
+		settings.indexRouting = false;
+		settings.poiZipLongStrings = true;
+		
+		IndexCreator creator = new IndexCreator(obf.getParentFile(), settings); //$NON-NLS-1$
 		new File(obf.getParentFile(), IndexCreator.TEMP_NODES_DB).delete();
-		creator.setIndexMap(false);
-		creator.setIndexAddress(false);
-		creator.setIndexPOI(true);
-		creator.setIndexTransport(false);
-		creator.setIndexRouting(false);
 		creator.setMapFileName(obf.getName());
 		creator.generateIndexes(osmBz2,
 				new ConsoleProgressImplementation(1), null, MapZooms.getDefault(),

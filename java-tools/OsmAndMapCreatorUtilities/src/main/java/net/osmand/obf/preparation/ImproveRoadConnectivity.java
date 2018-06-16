@@ -1,4 +1,4 @@
-package net.osmand.obf;
+package net.osmand.obf.preparation;
 
 import gnu.trove.iterator.TLongIterator;
 import gnu.trove.map.hash.TLongObjectHashMap;
@@ -29,12 +29,12 @@ import net.osmand.router.RoutingContext.RoutingSubregionTile;
 import net.osmand.router.VehicleRouter;
 import net.osmand.util.MapUtils;
 
-public class CheckRoadConnectivity {
+public class ImproveRoadConnectivity {
 	public static boolean TRACE = false;
 
 	public static void main(String[] args) throws IOException {
 
-		CheckRoadConnectivity crc = new CheckRoadConnectivity();
+		ImproveRoadConnectivity crc = new ImproveRoadConnectivity();
 		File fl = new File("/home/victor/projects/osmand/osm-gen/Brazil_southamerica_2.obf");
 		RandomAccessFile raf = new RandomAccessFile(fl, "r"); //$NON-NLS-1$ //$NON-NLS-2$
 
@@ -65,7 +65,7 @@ public class CheckRoadConnectivity {
 			tiles.addAll(loadTiles);
 		}
 
-		List<Cluster> allClusters = new ArrayList<CheckRoadConnectivity.Cluster>();
+		List<Cluster> allClusters = new ArrayList<ImproveRoadConnectivity.Cluster>();
 		for(RoutingSubregionTile tile : tiles) {
 			List<Cluster> clusters = processDataObjects(ctx, tile);
 			allClusters.addAll(clusters);

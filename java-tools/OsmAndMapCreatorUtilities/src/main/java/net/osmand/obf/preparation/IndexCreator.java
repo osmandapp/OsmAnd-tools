@@ -32,9 +32,6 @@ import net.osmand.osm.edit.Way;
 import net.osmand.osm.io.IOsmStorageFilter;
 import net.osmand.osm.io.OsmBaseStorage;
 import net.osmand.osm.io.OsmBaseStoragePbf;
-import net.osmand.swing.DataExtractionSettings;
-import net.osmand.swing.Messages;
-import net.osmand.swing.ProgressDialog;
 import net.osmand.util.Algorithms;
 
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
@@ -67,90 +64,45 @@ public class IndexCreator {
 	public static final String TEMP_NODES_DB = "nodes.tmp.odb";
 
 	public static final int STEP_MAIN = 4;
-
+	
 	private File workingDir = null;
-
-	private boolean indexMap;
-	private boolean indexPOI;
-	private boolean indexTransport;
-	private boolean indexAddress;
-	private boolean indexRouting;
-
-	private boolean generateLowLevel = true;
-	private int zoomWaySmoothness = 2;
-
 	private String regionName;
 	private String mapFileName = null;
 	private Long lastModifiedDate = null;
-
-
+	private IndexCreatorSettings settings;
+	
 	private IndexTransportCreator indexTransportCreator;
 	private IndexPoiCreator indexPoiCreator;
 	private IndexAddressCreator indexAddressCreator;
 	private IndexVectorMapCreator indexMapCreator;
 	private IndexRouteCreator indexRouteCreator;
+	private IndexHeightData heightData = null;
+	
+	private File dbFile;
+	private File mapFile;
+	private RandomAccessFile mapRAFile;
+	private Connection mapConnection;
+	
 	// constants to start process from the middle and save temporary results
 	private boolean recreateOnlyBinaryFile = false; // false;
 	private boolean deleteOsmDB = true;
 	private boolean deleteDatabaseIndexes = true;
-	private boolean backwardCompatibleIds = false;
-
-	private File dbFile;
-	 
-	private File mapFile;
-	private RandomAccessFile mapRAFile;
-	private Connection mapConnection;
-
-	public static final int DEFAULT_CITY_ADMIN_LEVEL = 8;
-	private String cityAdminLevel = "" + DEFAULT_CITY_ADMIN_LEVEL;
-	private IndexHeightData heightData = null;
 	
-	private Multipolygon boundary;
 
-
-	public IndexCreator(File workingDir) {
+	
+	public IndexCreator(File workingDir, IndexCreatorSettings settings) {
 		this.workingDir = workingDir;
-		if(new File(workingDir, "srtm").exists()) {
-			setSRTMData(new File(workingDir, "srtm"));
+		this.settings = settings;
+		if(settings.srtmDataFolder == null && new File(workingDir, "srtm").exists()) {
+			settings.srtmDataFolder = new File(workingDir, "srtm");
+		}
+		if(settings.srtmDataFolder != null) {
+			heightData = new IndexHeightData();
+			heightData.setSrtmData(settings.srtmDataFolder);
 		}
 	}
 
-	public void setIndexAddress(boolean indexAddress) {
-		this.indexAddress = indexAddress;
-	}
-
-	public void setBackwardCompatibleIds(boolean backwardCompatibleIds) {
-		this.backwardCompatibleIds = backwardCompatibleIds;
-	}
-
-	public void setIndexRouting(boolean indexRouting) {
-		this.indexRouting = indexRouting;
-	}
-
-	public void setIndexMap(boolean indexMap) {
-		this.indexMap = indexMap;
-	}
-
-	public void setIndexPOI(boolean indexPOI) {
-		this.indexPOI = indexPOI;
-	}
-
-	public void setGenerateLowLevelIndexes(boolean param) {
-		generateLowLevel = param;
-	}
-
-	public boolean isGenerateLowLevelIndexes() {
-		return generateLowLevel;
-	}
-
-	public void setIndexTransport(boolean indexTransport) {
-		this.indexTransport = indexTransport;
-	}
-
-	public void setZoomWaySmoothness(int zoomWaySmoothness) {
-		this.zoomWaySmoothness = zoomWaySmoothness;
-	}
-
+	
 	public String getRegionName() {
 		if (regionName == null) {
 			return "Region"; //$NON-NLS-1$
@@ -171,10 +123,6 @@ public class IndexCreator {
 		dbFile = file;
 	}
 	
-	public void setSRTMData(File file) {
-		heightData = new IndexHeightData();
-		heightData.setSrtmData(file);
-	}
 	
 	public void setDeleteOsmDB(boolean deleteOsmDB) {
 		this.deleteOsmDB = deleteOsmDB;
@@ -225,13 +173,6 @@ public class IndexCreator {
 		return new File(workingDir, getPoiFileName());
 	}
 
-	public String getCityAdminLevel() {
-		return cityAdminLevel;
-	}
-
-	public void setCityAdminLevel(String cityAdminLevel) {
-		this.cityAdminLevel = cityAdminLevel;
-	}
 
 	public String getRTreeMapIndexNonPackFileName() {
 		return mapFile.getAbsolutePath() + ".rtree"; //$NON-NLS-1$
@@ -263,35 +204,37 @@ public class IndexCreator {
 		if (heightData != null && e instanceof Way) {
 			heightData.proccess((Way) e);
 		}
-		if (indexPOI) {
+		if (settings.indexPOI) {
 			indexPoiCreator.iterateEntity(e, ctx, false);
 		}
-		if (indexTransport) {
+		if (settings.indexTransport) {
 			indexTransportCreator.iterateMainEntity(e, ctx);
 		}
-		if (indexMap) {
-			if (boundary == null || checkBoundary(e)) {
+		if (settings.indexMap) {
+			if (settings.boundary == null || checkBoundary(e)) {
 				indexMapCreator.iterateMainEntity(e, ctx);
 			}
 		}
-		if (indexAddress) {
+		if (settings.indexAddress) {
 			indexAddressCreator.iterateMainEntity(e, ctx);
 		}
-		if (indexRouting) {
+		if (settings.indexRouting) {
 			indexRouteCreator.iterateMainEntity(e, ctx);
 		}
 	}
 
 	private boolean checkBoundary(Entity e) {
-		if (e instanceof Way) {
-			for (Node n : ((Way) e).getNodes()) {
-				if (boundary.containsPoint(((Node) n).getLatitude(), ((Node) n).getLongitude())) {
-					return true;
+		if (settings.boundary != null) {
+			if (e instanceof Way) {
+				for (Node n : ((Way) e).getNodes()) {
+					if (settings.boundary.containsPoint(((Node) n).getLatitude(), ((Node) n).getLongitude())) {
+						return true;
+					}
 				}
+				return false;
+			} else if (e instanceof Node) {
+				return settings.boundary.containsPoint(((Node) e).getLatitude(), ((Node) e).getLongitude());
 			}
-			return false;
-		} else if (e instanceof Node) {
-			return boundary.containsPoint(((Node) e).getLatitude(), ((Node) e).getLongitude());
 		}
 		return true;
 	}
@@ -313,7 +256,7 @@ public class IndexCreator {
 		}
 
 		OsmBaseStorage storage = pbfFile ? new OsmBaseStoragePbf() : new OsmBaseStorage();
-		storage.setSupressWarnings(DataExtractionSettings.getSettings().isSupressWarningsForDuplicatedId());
+		storage.setSupressWarnings(settings.suppressWarningsForDuplicateIds);
 		if (addFilter != null) {
 			storage.getFilters().add(addFilter);
 		}
@@ -337,10 +280,10 @@ public class IndexCreator {
 			dbCreator.setWayIds(previous.getWayIds());
 			dbCreator.setRelationIds(previous.getRelationIds());
 		}
-		dbCreator.setBackwardCompatibleIds(backwardCompatibleIds);
+		dbCreator.setBackwardCompatibleIds(settings.backwardCompatibleIds);
 		try {
 			setGeneralProgress(progress, "[15 / 100]"); //$NON-NLS-1$
-			progress.startTask(Messages.getString("IndexCreator.LOADING_FILE") + readFile.getAbsolutePath(), -1); //$NON-NLS-1$
+			progress.startTask(settings.getString("IndexCreator.LOADING_FILE") + readFile.getAbsolutePath(), -1); //$NON-NLS-1$
 			// 1 init database to store temporary data
 			dbCreator.initDatabase(osmDBdialect, accessor.getDbConn(), createTables);
 			storage.getFilters().add(dbCreator);
@@ -383,7 +326,7 @@ public class IndexCreator {
 		boolean exists = osmDBdialect.checkTableIfExists("input", stat);
 		if(exists) {
 			ResultSet rs = stat.executeQuery("SELECT shift, ind, file, length from input");
-			boolean recreate = indexAddress;
+			boolean recreate = settings.indexAddress;
 			List<File> filteredOut = new ArrayList<File>();
 			int maxInd = 0;
 			while(rs.next() && !recreate) {
@@ -466,19 +409,19 @@ public class IndexCreator {
 		mapConnection.setAutoCommit(false);
 
 		// 2.2 create rtree map
-		if (indexMap) {
+		if (settings.indexMap) {
 			indexMapCreator.createDatabaseStructure(mapConnection, mapIndexDBDialect, getRTreeMapIndexNonPackFileName());
 		}
-		if (indexRouting) {
+		if (settings.indexRouting) {
 			indexRouteCreator.createDatabaseStructure(mapConnection, mapIndexDBDialect, getRTreeRouteIndexNonPackFileName());
 		}
-		if (indexAddress) {
+		if (settings.indexAddress) {
 			indexAddressCreator.createDatabaseStructure(mapConnection, mapIndexDBDialect);
 		}
-		if (indexPOI) {
+		if (settings.indexPOI) {
 			indexPoiCreator.createDatabaseStructure(getPoiFile());
 		}
-		if (indexTransport) {
+		if (settings.indexTransport) {
 			indexTransportCreator.createDatabaseStructure(mapConnection, mapIndexDBDialect, getRTreeTransportStopsFileName());
 		}
 	}
@@ -499,39 +442,39 @@ public class IndexCreator {
 		try {
 
 			final BasemapProcessor processor = new BasemapProcessor(logMapDataWarn, mapZooms, renderingTypes,
-					zoomWaySmoothness);
-			final IndexPoiCreator poiCreator = indexPOI ? new IndexPoiCreator(renderingTypes, false) : null;
-			if (indexPOI) {
+					settings.zoomWaySmoothness);
+			final IndexPoiCreator poiCreator = settings.indexPOI ? new IndexPoiCreator(settings, renderingTypes, false) : null;
+			if (settings.indexPOI) {
 				poiCreator.createDatabaseStructure(getPoiFile());
 			}
 			OsmDbAccessor accessor = initDbAccessor(readFiles, progress, addFilter, true, false, true);
 			// 2. Create index connections and index structure
 
 			setGeneralProgress(progress, "[50 / 100]");
-			progress.startTask(Messages.getString("IndexCreator.PROCESS_OSM_NODES"), accessor.getAllNodes());
+			progress.startTask(settings.getString("IndexCreator.PROCESS_OSM_NODES"), accessor.getAllNodes());
 			accessor.iterateOverEntities(progress, EntityType.NODE, new OsmDbVisitor() {
 				@Override
 				public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 					processor.processEntity(e);
-					if (indexPOI) {
+					if (settings.indexPOI) {
 						poiCreator.iterateEntity(e, ctx, true);
 					}
 				}
 			});
 			setGeneralProgress(progress, "[70 / 100]");
-			progress.startTask(Messages.getString("IndexCreator.PROCESS_OSM_WAYS"), accessor.getAllWays());
+			progress.startTask(settings.getString("IndexCreator.PROCESS_OSM_WAYS"), accessor.getAllWays());
 			accessor.iterateOverEntities(progress, EntityType.WAY, new OsmDbVisitor() {
 				@Override
 				public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 					processor.processEntity(e);
-					if (indexPOI) {
+					if (settings.indexPOI) {
 						poiCreator.iterateEntity(e, ctx, true);
 					}
 				}
 			});
 			setGeneralProgress(progress, "[90 / 100]");
 
-			progress.startTask(Messages.getString("IndexCreator.PROCESS_OSM_REL"), accessor.getAllRelations());
+			progress.startTask(settings.getString("IndexCreator.PROCESS_OSM_REL"), accessor.getAllRelations());
 			accessor.iterateOverEntities(progress, EntityType.RELATION, new OsmDbVisitor() {
 				@Override
 				public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
@@ -554,7 +497,7 @@ public class IndexCreator {
 			setGeneralProgress(progress, "[95 of 100]");
 			progress.startTask("Writing map index to binary file...", -1);
 			processor.writeBasemapFile(writer, regionName);
-			if (indexPOI) {
+			if (settings.indexPOI) {
 				poiCreator.writeBinaryPoiIndex(writer, regionName, progress);
 			}
 			progress.finishTask();
@@ -607,14 +550,11 @@ public class IndexCreator {
 			renderingTypes = new MapRenderingTypesEncoder(null, regionName);
 		}
 		this.indexTransportCreator = new IndexTransportCreator();
-		this.indexPoiCreator = new IndexPoiCreator(renderingTypes, overwriteIds);
-		this.indexAddressCreator = new IndexAddressCreator(logMapDataWarn);
+		this.indexPoiCreator = new IndexPoiCreator(settings, renderingTypes, overwriteIds);
+		this.indexAddressCreator = new IndexAddressCreator(logMapDataWarn, settings);
 		this.indexMapCreator = new IndexVectorMapCreator(logMapDataWarn, mapZooms, renderingTypes,
-				zoomWaySmoothness);
-		this.indexRouteCreator = new IndexRouteCreator(renderingTypes, logMapDataWarn, generateLowLevel);
-
-		// init address
-		indexAddressCreator.initSettings(cityAdminLevel);
+				settings.zoomWaySmoothness);
+		this.indexRouteCreator = new IndexRouteCreator(renderingTypes, logMapDataWarn, settings);
 
 		// Main generation method
 		try {
@@ -628,13 +568,13 @@ public class IndexCreator {
 				mapConnection = (Connection) getDatabaseConnection(tempDBMapFile.getAbsolutePath(), mapIndexDBDialect);
 				mapConnection.setAutoCommit(false);
 				try {
-					if (indexMap) {
+					if (settings.indexMap) {
 						indexMapCreator.createRTreeFiles(getRTreeMapIndexPackFileName());
 					}
-					if (indexRouting) {
+					if (settings.indexRouting) {
 						indexRouteCreator.createRTreeFiles(getRTreeRouteIndexPackFileName());
 					}
-					if (indexTransport) {
+					if (settings.indexTransport) {
 						indexTransportCreator.createRTreeFile(getRTreeTransportStopsPackFileName());
 					}
 				} catch (RTreeException e) {
@@ -664,69 +604,69 @@ public class IndexCreator {
 				}
 
 				// 3.4 combine all low level ways and simplify them
-				if (indexMap || indexRouting) {
+				if (settings.indexMap || settings.indexRouting) {
 					setGeneralProgress(progress, "[90 / 100]");
-					if (indexMap) {
-						progress.startTask(Messages.getString("IndexCreator.INDEX_LO_LEVEL_WAYS"),
+					if (settings.indexMap) {
+						progress.startTask(settings.getString("IndexCreator.INDEX_LO_LEVEL_WAYS"),
 								indexMapCreator.getLowLevelWays());
 						indexMapCreator.processingLowLevelWays(progress);
 					}
-					if (indexRouting) {
-						progress.startTask(Messages.getString("IndexCreator.INDEX_LO_LEVEL_WAYS"), -1);
+					if (settings.indexRouting) {
+						progress.startTask(settings.getString("IndexCreator.INDEX_LO_LEVEL_WAYS"), -1);
 						indexRouteCreator.processingLowLevelWays(progress);
 					}
 
 				}
 
 				// 4. packing map rtree indexes
-				if (indexMap) {
+				if (settings.indexMap) {
 					setGeneralProgress(progress, "[90 / 100]"); //$NON-NLS-1$
-					progress.startTask(Messages.getString("IndexCreator.PACK_RTREE_MAP"), -1); //$NON-NLS-1$
+					progress.startTask(settings.getString("IndexCreator.PACK_RTREE_MAP"), -1); //$NON-NLS-1$
 					indexMapCreator.packRtreeFiles(getRTreeMapIndexNonPackFileName(), getRTreeMapIndexPackFileName());
 				}
-				if (indexRouting) {
+				if (settings.indexRouting) {
 					indexRouteCreator.packRtreeFiles(getRTreeRouteIndexNonPackFileName(), getRTreeRouteIndexPackFileName());
 				}
 
-				if (indexTransport) {
+				if (settings.indexTransport) {
 					setGeneralProgress(progress, "[90 / 100]"); //$NON-NLS-1$
-					progress.startTask(Messages.getString("IndexCreator.PACK_RTREE_TRANSP"), -1); //$NON-NLS-1$
+					progress.startTask(settings.getString("IndexCreator.PACK_RTREE_TRANSP"), -1); //$NON-NLS-1$
 					indexTransportCreator.packRTree(getRTreeTransportStopsFileName(), getRTreeTransportStopsPackFileName());
 				}
 			}
 
 			// 5. Writing binary file
-			if (indexMap || indexAddress || indexTransport || indexPOI || indexRouting) {
+			if (settings.indexMap || settings.indexAddress || settings.indexTransport || settings.indexPOI || settings.indexRouting) {
 				if (mapFile.exists()) {
 					mapFile.delete();
 				}
 				mapRAFile = new RandomAccessFile(mapFile, "rw");
 				BinaryMapIndexWriter writer = new BinaryMapIndexWriter(mapRAFile, lastModifiedDate == null ? System.currentTimeMillis() :
 					lastModifiedDate.longValue());
-				if (indexMap) {
+				if (settings.indexMap) {
 					setGeneralProgress(progress, "[95 of 100]");
 					progress.startTask("Writing map index to binary file...", -1);
 					indexMapCreator.writeBinaryMapIndex(writer, regionName);
 				}
-				if (indexRouting) {
+				if (settings.indexRouting) {
 					setGeneralProgress(progress, "[95 of 100]");
 					progress.startTask("Writing route index to binary file...", -1);
-					indexRouteCreator.writeBinaryRouteIndex(mapFile, writer, regionName, generateLowLevel);
+					indexRouteCreator.writeBinaryRouteIndex(mapFile, writer, regionName, settings.generateLowLevel);
 				}
 
-				if (indexAddress) {
+				if (settings.indexAddress) {
 					setGeneralProgress(progress, "[95 of 100]");
 					progress.startTask("Writing address index to binary file...", -1);
 					indexAddressCreator.writeBinaryAddressIndex(writer, regionName, progress);
 				}
 
-				if (indexPOI) {
+				if (settings.indexPOI) {
 					setGeneralProgress(progress, "[95 of 100]");
 					progress.startTask("Writing poi index to binary file...", -1);
 					indexPoiCreator.writeBinaryPoiIndex(writer, regionName, progress);
 				}
 
-				if (indexTransport) {
+				if (settings.indexTransport) {
 					setGeneralProgress(progress, "[95 of 100]");
 					progress.startTask("Writing transport index to binary file...", -1);
 					indexTransportCreator.writeBinaryTransportIndex(writer, regionName, mapConnection);
@@ -785,7 +725,7 @@ public class IndexCreator {
 
 	private void iterateMainEntities(OsmDbAccessor accessor, IProgress progress) throws SQLException, InterruptedException {
 		setGeneralProgress(progress, "[50 / 100]");
-		progress.startTask(Messages.getString("IndexCreator.PROCESS_OSM_NODES"), accessor.getAllNodes());
+		progress.startTask(settings.getString("IndexCreator.PROCESS_OSM_NODES"), accessor.getAllNodes());
 		accessor.iterateOverEntities(progress, EntityType.NODE, new OsmDbVisitor() {
 			@Override
 			public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
@@ -793,7 +733,7 @@ public class IndexCreator {
 			}
 		});
 		setGeneralProgress(progress, "[70 / 100]");
-		progress.startTask(Messages.getString("IndexCreator.PROCESS_OSM_WAYS"), accessor.getAllWays());
+		progress.startTask(settings.getString("IndexCreator.PROCESS_OSM_WAYS"), accessor.getAllWays());
 		accessor.iterateOverEntities(progress, EntityType.WAY, new OsmDbVisitor() {
 			@Override
 			public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
@@ -801,7 +741,7 @@ public class IndexCreator {
 			}
 		});
 		setGeneralProgress(progress, "[85 / 100]");
-		progress.startTask(Messages.getString("IndexCreator.PROCESS_OSM_REL"), accessor.getAllRelations());
+		progress.startTask(settings.getString("IndexCreator.PROCESS_OSM_REL"), accessor.getAllRelations());
 		accessor.iterateOverEntities(progress, EntityType.RELATION, new OsmDbVisitor() {
 			@Override
 			public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
@@ -811,36 +751,36 @@ public class IndexCreator {
 	}
 
 	private void indexRelations(OsmDbAccessor accessor, IProgress progress) throws SQLException, InterruptedException {
-		if (indexAddress || indexMap || indexRouting || indexPOI || indexTransport) {
+		if (settings.indexAddress || settings.indexMap || settings.indexRouting || settings.indexPOI || settings.indexTransport) {
 			setGeneralProgress(progress, "[30 / 100]"); //$NON-NLS-1$
-			progress.startTask(Messages.getString("IndexCreator.PREINDEX_BOUNDARIES_RELATIONS"), accessor.getAllRelations()); //$NON-NLS-1$
+			progress.startTask(settings.getString("IndexCreator.PREINDEX_BOUNDARIES_RELATIONS"), accessor.getAllRelations()); //$NON-NLS-1$
 			accessor.iterateOverEntities(progress, EntityType.RELATION, new OsmDbVisitor() {
 				@Override
 				public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
-					if (indexAddress) {
+					if (settings.indexAddress) {
 						//indexAddressCreator.indexAddressRelation((Relation) e, ctx); streets needs loaded boundaries !!!
 						indexAddressCreator.indexBoundariesRelation(e, ctx);
 					}
-					if (indexMap) {
+					if (settings.indexMap) {
 						indexMapCreator.indexMapRelationsAndMultiPolygons(e, ctx);
 					}
-					if (indexRouting) {
+					if (settings.indexRouting) {
 						indexRouteCreator.indexRelations(e, ctx);
 					}
-					if (indexPOI) {
+					if (settings.indexPOI) {
 						indexPoiCreator.iterateRelation((Relation) e, ctx);
 					}
-					if (indexTransport) {
+					if (settings.indexTransport) {
 						indexTransportCreator.indexRelations((Relation) e, ctx);
 					}
 				}
 			});
-			if (indexMap) {
+			if (settings.indexMap) {
 				indexMapCreator.createMapIndexTableIndexes(mapConnection);
 			}
-			if (indexAddress) {
+			if (settings.indexAddress) {
 				setGeneralProgress(progress, "[40 / 100]"); //$NON-NLS-1$
-				progress.startTask(Messages.getString("IndexCreator.PREINDEX_BOUNDARIES_WAYS"), accessor.getAllWays()); //$NON-NLS-1$
+				progress.startTask(settings.getString("IndexCreator.PREINDEX_BOUNDARIES_WAYS"), accessor.getAllWays()); //$NON-NLS-1$
 				accessor.iterateOverEntities(progress, EntityType.WAY_BOUNDARY, new OsmDbVisitor() {
 					@Override
 					public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
@@ -849,12 +789,12 @@ public class IndexCreator {
 				});
 
 				setGeneralProgress(progress, "[42 / 100]"); //$NON-NLS-1$
-				progress.startTask(Messages.getString("IndexCreator.BIND_CITIES_AND_BOUNDARIES"), 100); //$NON-NLS-1$
+				progress.startTask(settings.getString("IndexCreator.BIND_CITIES_AND_BOUNDARIES"), 100); //$NON-NLS-1$
 				//finish up the boundaries and cities
 				indexAddressCreator.tryToAssignBoundaryToFreeCities(progress);
 
 				setGeneralProgress(progress, "[45 / 100]"); //$NON-NLS-1$
-				progress.startTask(Messages.getString("IndexCreator.PREINDEX_ADRESS_MAP"), accessor.getAllRelations()); //$NON-NLS-1$
+				progress.startTask(settings.getString("IndexCreator.PREINDEX_ADRESS_MAP"), accessor.getAllRelations()); //$NON-NLS-1$
 				accessor.iterateOverEntities(progress, EntityType.RELATION, new OsmDbVisitor() {
 					@Override
 					public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
@@ -869,9 +809,9 @@ public class IndexCreator {
 
 	private void writeAllCities(OsmDbAccessor accessor, IProgress progress) throws SQLException,
 			InterruptedException {
-		if (indexAddress) {
+		if (settings.indexAddress) {
 			setGeneralProgress(progress, "[20 / 100]"); //$NON-NLS-1$
-			progress.startTask(Messages.getString("IndexCreator.INDEX_CITIES"), accessor.getAllNodes()); //$NON-NLS-1$
+			progress.startTask(settings.getString("IndexCreator.INDEX_CITIES"), accessor.getAllNodes()); //$NON-NLS-1$
 			indexAddressCreator.writeCitiesIntoDb();
 		}
 	}
@@ -881,34 +821,29 @@ public class IndexCreator {
 		progress.setGeneralProgress(genProgress);
 	}
 
-	public void setBoundary(Multipolygon polygon) {
-		this.boundary = polygon;
-	}
-
-	public Multipolygon getBoundary() {
-		return boundary;
-	}
-
 	public static void main(String[] args) throws IOException, SQLException, InterruptedException, XmlPullParserException {
 		long time = System.currentTimeMillis();
 		
 //		if(true){ generateRegionsFile(); return;}
 		String rootFolder = "/Users/victorshcherb/osmand/";
-		IndexPoiCreator.ZIP_LONG_STRINGS = false;
-		IndexCreator creator = new IndexCreator(new File(rootFolder + "/maps/")); //$NON-NLS-1$
-		creator.setIndexMap(true);
-//		creator.setIndexAddress(true);
-		creator.setIndexPOI(true);
-		creator.setIndexTransport(true);
-		creator.setIndexRouting(true);
-
+		IndexCreatorSettings settings = new IndexCreatorSettings();
+		settings.poiZipLongStrings = false;
+		settings.indexMap = true;
+//		settings.indexAddress = true;
+		settings.indexPOI = true;
+		settings.indexTransport = true;
+		settings.indexRouting = true;
+		
+		settings.srtmDataFolder = new File(rootFolder+"/maps/srtm/");
+		
 //		creator.deleteDatabaseIndexes = false;
 //		creator.recreateOnlyBinaryFile = true;
 //		creator.deleteOsmDB = false;	
-		creator.setZoomWaySmoothness(2);
+//		settings.zoomWaySmoothness = 2;
+		
+		IndexCreator creator = new IndexCreator(new File(rootFolder + "/maps/"), settings); //$NON-NLS-1$
 
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
-
 		String file = rootFolder + "/temp/map.osm";
 //		String file = rootFolder + "/maps/diff/2017_08_28_00_30_before.osm";
 //		String file = rootFolder + "/maps/diff/ukraine_kiev-city_europe.pbf";
@@ -917,12 +852,11 @@ public class IndexCreator {
 		int st = file.lastIndexOf('/');
 		int e = file.indexOf('.', st);
 		creator.setNodesDBFile(new File(rootFolder + "/maps/" + file.substring(st, e) + ".tmp.odb"));
-		creator.setSRTMData(new File(rootFolder+"/maps/srtm/"));
 		MapPoiTypes.setDefault(new MapPoiTypes(rootFolder + "/repos//resources/poi/poi_types.xml"));
 		MapRenderingTypesEncoder rt =
 				new MapRenderingTypesEncoder(rootFolder + "/repos//resources/obf_creation/rendering_types.xml",
 						new File(file).getName());
-		creator.setLastModifiedDate(1504224000000l);
+//		creator.setLastModifiedDate(1504224000000l);
 		creator.generateIndexes(new File(file),
 				new ConsoleProgressImplementation(1), null, zooms, rt, log);
 		//new File(file),
@@ -945,16 +879,18 @@ public class IndexCreator {
 		MapRenderingTypesEncoder rt = new MapRenderingTypesEncoder("regions");
 		String file = "/home/victor/projects/osmand/repo/resources/osmand_regions.osm";
 		String folder = "/home/victor/projects/osmand/repo/resources/countries-info/";
-		IndexCreator creator = new IndexCreator(new File(folder)); //$NON-NLS-1$
+		IndexCreatorSettings settings = new IndexCreatorSettings();
+		settings.indexMap = true;
+		settings.indexAddress = false;
+		settings.indexPOI = false;
+		settings.indexTransport = false;
+		settings.indexRouting = false;
+		settings.zoomWaySmoothness = 1;
+		IndexCreator creator = new IndexCreator(new File(folder), settings); //$NON-NLS-1$
 
 		creator.setMapFileName("regions.ocbf");
-		creator.setIndexMap(true);
-		creator.setIndexAddress(false);
-		creator.setIndexPOI(false);
-		creator.setIndexTransport(false);
-		creator.setIndexRouting(false);
+		
 		MapZooms zooms = MapZooms.parseZooms("5-6");
-		creator.zoomWaySmoothness = 1;
 		int st = file.lastIndexOf('/');
 		int e = file.indexOf('.', st);
 		creator.setNodesDBFile(new File(folder + file.substring(st, e) + ".tmp.odb"));

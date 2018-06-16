@@ -31,14 +31,13 @@ import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
 import net.osmand.IndexConstants;
-import net.osmand.MapCreatorVersion;
 import net.osmand.PlatformUtil;
 import net.osmand.binary.MapZooms;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.obf.preparation.DBDialect;
 import net.osmand.obf.preparation.IndexCreator;
+import net.osmand.obf.preparation.IndexCreatorSettings;
 import net.osmand.osm.MapRenderingTypesEncoder;
-import net.osmand.swing.OsmExtractionUI;
 import net.osmand.util.CountryOcbfGeneration.CountryRegion;
 
 import org.apache.commons.logging.Log;
@@ -105,7 +104,6 @@ public class IndexBatchCreator {
 
 	public static void main(String[] args) {
 		IndexBatchCreator creator = new IndexBatchCreator();
-		OsmExtractionUI.configLogFile();
 		if(args == null || args.length == 0){
 			System.out.println("Please specify -local parameter or path to batch.xml configuration file as 1 argument.");
 			throw new IllegalArgumentException("Please specify -local parameter or path to batch.xml configuration file as 1 argument.");
@@ -494,12 +492,6 @@ public class IndexBatchCreator {
 				log.warn("Switching SQLITE in memory dialect to SQLITE");
 				osmDb = DBDialect.SQLITE;
 			}
-			IndexCreator indexCreator = new IndexCreator(workDir);
-			boolean worldMaps = rName.toLowerCase().contains("world") ;
-			if(srtmDir != null && (rdata == null || rdata.indexSRTM) && !worldMaps) {
-				indexCreator.setSRTMData(srtmDir);
-			}
-			indexCreator.setDialects(osmDb, osmDb);
 			final boolean indAddr = indexAddress && (rdata == null || rdata.indexAddress);
 			final boolean indPoi = indexPOI && (rdata == null || rdata.indexPOI);
 			final boolean indTransport = indexTransport && (rdata == null || rdata.indexTransport);
@@ -510,20 +502,26 @@ public class IndexBatchCreator {
 				file.delete();
 				return;
 			}
-			indexCreator.setIndexAddress(indAddr);
-			indexCreator.setIndexPOI(indPoi);
-			indexCreator.setIndexTransport(indTransport);
-			indexCreator.setIndexMap(indMap);
-			indexCreator.setIndexRouting(indRouting);
+			
+			
+			IndexCreatorSettings settings = new IndexCreatorSettings();
+			settings.indexMap = indMap;
+			settings.indexAddress = indAddr;
+			settings.indexPOI = indPoi;
+			settings.indexTransport = indTransport;
+			settings.indexRouting = indRouting;
+			if(zoomWaySmoothness != null){
+				settings.zoomWaySmoothness = zoomWaySmoothness;
+			}
+			boolean worldMaps = rName.toLowerCase().contains("world") ;
+			if(srtmDir != null && (rdata == null || rdata.indexSRTM) && !worldMaps) {
+				settings.srtmDataFolder = srtmDir;
+			}
+			IndexCreator indexCreator = new IndexCreator(workDir, settings);
+			
+			indexCreator.setDialects(osmDb, osmDb);
 			indexCreator.setLastModifiedDate(file.lastModified());
 			indexCreator.setRegionName(rName);
-			if (rdata != null && rdata.cityAdminLevel != null) {
-				indexCreator.setCityAdminLevel(rdata.cityAdminLevel);
-			}
-			if(zoomWaySmoothness != null){
-				indexCreator.setZoomWaySmoothness(zoomWaySmoothness);
-			}
-
 			String mapFileName = regionName + "_" + IndexConstants.BINARY_MAP_VERSION + IndexConstants.BINARY_MAP_INDEX_EXT;
 			indexCreator.setMapFileName(mapFileName);
 			try {
@@ -536,7 +534,7 @@ public class IndexBatchCreator {
 
 					FileOutputStream fout = new FileOutputStream(logFileName);
 					fout.write((new Date() + "\n").getBytes());
-					fout.write((MapCreatorVersion.APP_MAP_CREATOR_FULL_NAME + "\n").getBytes());
+//					fout.write((MapCreatorVersion.APP_MAP_CREATOR_FULL_NAME + "\n").getBytes());
 					fout.close();
 					fh = new FileHandler(logFileName.getAbsolutePath(), 10*1000*1000, 1, true);
 					fh.setFormatter(new SimpleFormatter());

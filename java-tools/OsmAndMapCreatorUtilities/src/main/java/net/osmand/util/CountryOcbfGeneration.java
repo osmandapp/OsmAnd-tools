@@ -27,6 +27,7 @@ import net.osmand.PlatformUtil;
 import net.osmand.binary.MapZooms;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.obf.preparation.IndexCreator;
+import net.osmand.obf.preparation.IndexCreatorSettings;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.util.Algorithms;
 
@@ -389,14 +390,16 @@ public class CountryOcbfGeneration {
 		serializer.endDocument();
 		serializer.flush();
 		fous.close();
+		
+		IndexCreatorSettings settings = new IndexCreatorSettings();
+		settings.indexMap = true;
+		settings.indexAddress = false;
+		settings.indexPOI = false;
+		settings.indexTransport = false;
+		settings.indexRouting = false;
 
-		IndexCreator creator = new IndexCreator(new File(targetObf).getParentFile()); //$NON-NLS-1$
+		IndexCreator creator = new IndexCreator(new File(targetObf).getParentFile(), settings); //$NON-NLS-1$
 		creator.setMapFileName(new File(targetObf).getName());
-		creator.setIndexMap(true);
-		creator.setIndexAddress(false);
-		creator.setIndexPOI(false);
-		creator.setIndexTransport(false);
-		creator.setIndexRouting(false);
 		MapZooms zooms = MapZooms.parseZooms("5-6");
 		creator.generateIndexes(osm,
 				new ConsoleProgressImplementation(1), null, zooms,

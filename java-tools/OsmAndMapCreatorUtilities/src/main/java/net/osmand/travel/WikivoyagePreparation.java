@@ -34,10 +34,10 @@ import javax.xml.parsers.SAXParserFactory;
 import net.osmand.PlatformUtil;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.obf.preparation.DBDialect;
+import net.osmand.travel.GPXUtils.GPXFile;
+import net.osmand.travel.GPXUtils.WptPt;
 import net.osmand.wiki.CustomWikiModel;
 import net.osmand.wiki.WikiDatabasePreparation;
-import net.osmand.wiki.GPXUtils.GPXFile;
-import net.osmand.wiki.GPXUtils.WptPt;
 import net.osmand.wiki.WikiDatabasePreparation.LatLon;
 
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;

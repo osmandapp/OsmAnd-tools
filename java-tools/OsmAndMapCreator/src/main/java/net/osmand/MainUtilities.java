@@ -24,6 +24,7 @@ import net.osmand.obf.diff.ObfDiffMerger;
 import net.osmand.obf.diff.ObfRegionSplitter;
 import net.osmand.obf.preparation.BasemapProcessor;
 import net.osmand.obf.preparation.IndexCreator;
+import net.osmand.obf.preparation.IndexCreatorSettings;
 import net.osmand.obf.preparation.OceanTilesCreator;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.render.RenderingRulesStorage;
@@ -95,25 +96,29 @@ public class MainUtilities {
 			} else if (utl.equals("generate-ocbf")) {
 				CountryOcbfGeneration.main(subArgsArray);
 			} else if (utl.equals("generate-obf")) {
-				IndexCreator ic = new IndexCreator(new File("."));
-				ic.setIndexMap(true);
-				ic.setIndexPOI(true);
-				ic.setIndexRouting(true);
-				ic.setIndexTransport(true);
-				ic.setIndexAddress(true);
+				IndexCreatorSettings settings = new IndexCreatorSettings();
+				settings.indexMap = true;
+				settings.indexAddress = true;
+				settings.indexPOI = true;
+				settings.indexTransport = true;
+				settings.indexRouting = true;
+				IndexCreator ic = new IndexCreator(new File("."), settings);
 				ic.setLastModifiedDate(new File(subArgsArray[0]).lastModified());
 				generateObf(subArgsArray, ic);
 			} else if (utl.equals("generate-obf-no-address")) {
-				IndexCreator ic = new IndexCreator(new File("."));
-				ic.setIndexMap(true);
-				ic.setIndexPOI(true);
-				ic.setIndexRouting(true);
-				ic.setIndexTransport(true);
+				IndexCreatorSettings settings = new IndexCreatorSettings();
+				settings.indexMap = true;
+				settings.indexAddress = false;
+				settings.indexPOI = true;
+				settings.indexTransport = true;
+				settings.indexRouting = true;
+				IndexCreator ic = new IndexCreator(new File("."), settings);
 				ic.setLastModifiedDate(new File(subArgsArray[0]).lastModified());
 				generateObf(subArgsArray, ic);
 			} else if (utl.equals("generate-map")) {
-				IndexCreator ic = new IndexCreator(new File("."));
-				ic.setIndexMap(true);
+				IndexCreatorSettings settings = new IndexCreatorSettings();
+				settings.indexMap = true;
+				IndexCreator ic = new IndexCreator(new File("."), settings);
 				ic.setLastModifiedDate(new File(subArgsArray[0]).lastModified());
 				generateObf(subArgsArray, ic);
 			} else if (utl.equals("split-obf")) {
@@ -127,8 +132,9 @@ public class MainUtilities {
 			} else if (utl.equals("generate-obf-extract-script")) {
 				GenerateExtractScript.main(subArgsArray);
 			} else if (utl.equals("generate-address")) {
-				IndexCreator ic = new IndexCreator(new File("."));
-				ic.setIndexAddress(true);
+				IndexCreatorSettings settings = new IndexCreatorSettings();
+				settings.indexAddress = true;
+				IndexCreator ic = new IndexCreator(new File("."), settings);
 				ic.setLastModifiedDate(new File(subArgsArray[0]).lastModified());
 				generateObf(subArgsArray, ic);
 			} else if (utl.equals("extract-roads-only")) {
@@ -138,8 +144,9 @@ public class MainUtilities {
 						new File(mainFile.getParentFile(), mainFile.getName().replace(IndexConstants.BINARY_MAP_INDEX_EXT,
 								IndexConstants.BINARY_ROAD_MAP_INDEX_EXT)));
 			} else if (utl.equals("generate-poi")) {
-				IndexCreator ic = new IndexCreator(new File("."));
-				ic.setIndexPOI(true);
+				IndexCreatorSettings settings = new IndexCreatorSettings();
+				settings.indexPOI = true;
+				IndexCreator ic = new IndexCreator(new File("."), settings);
 				ic.setLastModifiedDate(new File(subArgsArray[0]).lastModified());
 				generateObf(subArgsArray, ic);
 
@@ -153,8 +160,9 @@ public class MainUtilities {
 			} else if (utl.equals("merge-std-files")) {
 				BinaryMerger.mergeStandardFiles(subArgsArray);
 			} else if (utl.equals("generate-roads")) {
-				IndexCreator ic = new IndexCreator(new File("."));
-				ic.setIndexRouting(true);
+				IndexCreatorSettings settings = new IndexCreatorSettings();
+				settings.indexRouting = true;
+				IndexCreator ic = new IndexCreator(new File("."), settings);
 				ic.setLastModifiedDate(new File(subArgsArray[0]).lastModified());
 				generateObf(subArgsArray, ic);
 			} else if (utl.contentEquals("generate-osmlive-tests")) {

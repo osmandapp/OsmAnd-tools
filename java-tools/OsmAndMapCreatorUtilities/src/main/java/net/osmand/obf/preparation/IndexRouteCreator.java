@@ -46,8 +46,8 @@ import net.osmand.data.LatLon;
 import net.osmand.obf.preparation.BinaryMapIndexWriter.RoutePointToWrite;
 import net.osmand.osm.MapRenderingTypes;
 import net.osmand.osm.MapRenderingTypesEncoder;
-import net.osmand.osm.MapRoutingTypes;
 import net.osmand.osm.MapRenderingTypesEncoder.EntityConvertApplyType;
+import net.osmand.osm.MapRoutingTypes;
 import net.osmand.osm.MapRoutingTypes.MapPointName;
 import net.osmand.osm.MapRoutingTypes.MapRouteType;
 import net.osmand.osm.edit.Entity;
@@ -59,7 +59,6 @@ import net.osmand.osm.edit.OsmMapUtils;
 import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Relation.RelationMember;
 import net.osmand.osm.edit.Way;
-import net.osmand.osm.util.CheckRoadConnectivity;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
@@ -123,7 +122,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 	private PreparedStatement mapRouteInsertStat;
 	private PreparedStatement basemapRouteInsertStat;
 	private MapRenderingTypesEncoder renderingTypes;
-	private boolean generateLowLevel;
+	private IndexCreatorSettings settings;
 
 
 	private class RouteMissingPoints {
@@ -148,10 +147,10 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		}
 	}
 
-	public IndexRouteCreator(MapRenderingTypesEncoder renderingTypes, Log logMapDataWarn, boolean generateLowLevel) {
+	public IndexRouteCreator(MapRenderingTypesEncoder renderingTypes, Log logMapDataWarn, IndexCreatorSettings settings) {
 		this.renderingTypes = renderingTypes;
 		this.logMapDataWarn = logMapDataWarn;
-		this.generateLowLevel = generateLowLevel;
+		this.settings = settings;
 		this.routeTypes = new MapRoutingTypes(renderingTypes);
 	}
 	public void indexRelations(Entity e, OsmDbAccessorContext ctx) throws SQLException {
@@ -193,7 +192,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 				routeTypes.encodePointTypes(e, pointTypes, pointNames, false);
 				addWayToIndex(e.getId(), e.getNodes(), mapRouteInsertStat, routeTree, outTypes, pointTypes, pointNames, names);
 			}
-			if (generateLowLevel) {
+			if (settings.generateLowLevel) {
 				encoded = routeTypes.encodeBaseEntity(tags, outTypes, names) && e.getNodes().size() >= 2;
 				if (encoded) {
 					List<Node> source = e.getNodes();
@@ -479,7 +478,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 			throw new IOException(e);
 		}
 		pStatements.put(mapRouteInsertStat, 0);
-		if (generateLowLevel) {
+		if (settings.generateLowLevel) {
 			basemapRouteInsertStat = createStatementRouteObjInsert(mapConnection, true);
 			try {
 				baserouteTree = new RTree(rtreeMapIndexNonPackFileName + "b");
@@ -500,7 +499,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 			throws IOException, SQLException {
 		// delete map rtree files
 		deleteRouteTreeFiles(rTreeMapIndexNonPackFileName, rTreeMapIndexPackFileName, deleteDatabaseIndexes, routeTree);
-		if(generateLowLevel) {
+		if(settings.generateLowLevel) {
 			deleteRouteTreeFiles(rTreeMapIndexNonPackFileName+"b", rTreeMapIndexPackFileName+"b", deleteDatabaseIndexes, baserouteTree);
 		}
 		closeAllPreparedStatements();
@@ -572,14 +571,14 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 
 	public void createRTreeFiles(String rTreeRouteIndexPackFileName) throws RTreeException {
 		routeTree = new RTree(rTreeRouteIndexPackFileName);
-		if(generateLowLevel) {
+		if(settings.generateLowLevel) {
 			baserouteTree = new RTree(rTreeRouteIndexPackFileName+"b");
 		}
 	}
 
 	public void packRtreeFiles(String rTreeRouteIndexNonPackFileName, String rTreeRouteIndexPackFileName) throws IOException {
 		routeTree = packRtreeFile(routeTree, rTreeRouteIndexNonPackFileName, rTreeRouteIndexPackFileName);
-		if (generateLowLevel) {
+		if (settings.generateLowLevel) {
 			baserouteTree = packRtreeFile(baserouteTree, rTreeRouteIndexNonPackFileName + "b",
 					rTreeRouteIndexPackFileName + "b");
 		}
@@ -649,7 +648,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 	}
 
 	private void appendMissingRoadsForBaseMap(Connection conn, BinaryMapIndexReader reader) throws IOException, SQLException {
-		TLongObjectHashMap<RouteDataObject> map = new CheckRoadConnectivity().collectDisconnectedRoads(reader);
+		TLongObjectHashMap<RouteDataObject> map = new ImproveRoadConnectivity().collectDisconnectedRoads(reader);
 		// to add
 		PreparedStatement ps = conn.prepareStatement(COPY_BASE);
 		for(RouteDataObject rdo : map.valueCollection()) {
@@ -762,7 +761,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 
 
 	public void processingLowLevelWays(IProgress progress) {
-		if(!generateLowLevel) {
+		if(!settings.generateLowLevel) {
 			return;
 		}
 		pointTypes.clear();

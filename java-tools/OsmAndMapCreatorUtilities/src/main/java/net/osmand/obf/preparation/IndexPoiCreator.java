@@ -60,8 +60,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	private static final int CHARACTERS_TO_BUILD = 4;
 	private boolean useInMemoryCreator = true;
 	public static long GENERATE_OBJ_ID = -(1L << 10L);
-	public static boolean ZIP_LONG_STRINGS = false;
-	public static int ZIP_STRING_LIMIT = 100;
+	
 	private static int SHIFT_MULTIPOLYGON_IDS = 43;
 	private static int DUPLICATE_SPLIT = 5;
 	public TLongHashSet generatedIds = new TLongHashSet();
@@ -74,9 +73,11 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	private MapPoiTypes poiTypes;
 	private List<PoiAdditionalType> additionalTypesId = new ArrayList<PoiAdditionalType>();
 	private Map<String, PoiAdditionalType> additionalTypesByTag = new HashMap<String, PoiAdditionalType>();
+	private IndexCreatorSettings settings;
 
 
-	public IndexPoiCreator(MapRenderingTypesEncoder renderingTypes, boolean overwriteIds) {
+	public IndexPoiCreator(IndexCreatorSettings settings, MapRenderingTypesEncoder renderingTypes, boolean overwriteIds) {
+		this.settings = settings;
 		this.renderingTypes = renderingTypes;
 		this.overwriteIds = overwriteIds;
 		this.poiTypes = MapPoiTypes.getDefault();
@@ -486,7 +487,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					int x24shift = (x31 >> 7) - (x << (24 - z));
 					int y24shift = (y31 >> 7) - (y << (24 - z));
 					writer.writePoiDataAtom(poi.id, x24shift, y24shift, type, subtype, poi.additionalTags,
-							globalCategories, ZIP_LONG_STRINGS ? ZIP_STRING_LIMIT : -1);
+							globalCategories, settings.poiZipLongStrings ? settings.poiZipStringLimit : -1);
 				}
 
 			} else {
@@ -506,7 +507,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					String subtype = rset.getString(5);
 					writer.writePoiDataAtom(id, x24shift, y24shift, type, subtype,
 							decodeAdditionalInfo(rset.getString(6), mp), globalCategories,
-							ZIP_LONG_STRINGS ? ZIP_STRING_LIMIT : -1);
+							settings.poiZipLongStrings ? settings.poiZipStringLimit : -1);
 				}
 				rset.close();
 			}

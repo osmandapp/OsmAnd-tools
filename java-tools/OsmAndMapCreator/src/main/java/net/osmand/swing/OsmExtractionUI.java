@@ -58,6 +58,7 @@ import net.osmand.map.IMapLocationListener;
 import net.osmand.map.ITileSource;
 import net.osmand.map.OsmandRegions;
 import net.osmand.obf.preparation.IndexCreator;
+import net.osmand.obf.preparation.IndexCreatorSettings;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.io.IOsmStorageFilter;
@@ -784,24 +785,29 @@ public class OsmExtractionUI implements IMapLocationListener {
 				@Override
 				public void run() {
 					File dir = DataExtractionSettings.getSettings().getDefaultWorkingDir();
-					IndexCreator creator = new IndexCreator(dir);
+					IndexCreatorSettings settings = new IndexCreatorSettings() {
+						public String getString(String key) {
+							return Messages.getString(key);
+						};
+					};
+					settings.indexMap = buildMapIndex.isSelected();
+					settings.indexAddress = buildAddressIndex.isSelected();
+					settings.indexPOI = buildPoiIndex.isSelected();
+					settings.indexTransport = buildTransportIndex.isSelected();
+					settings.indexRouting = buildRoutingIndex.isSelected();
+					settings.suppressWarningsForDuplicateIds = DataExtractionSettings.getSettings().isSupressWarningsForDuplicatedId();
+					settings.houseNameAddAdditionalInfo = DataExtractionSettings.getSettings().isAdditionalInfo();
+					settings.houseNumberPreferredOverName = DataExtractionSettings.getSettings().isHousenumberPrefered();
 					try {
-						creator.setIndexAddress(buildAddressIndex.isSelected());
-						creator.setIndexPOI(buildPoiIndex.isSelected());
-						creator.setIndexTransport(buildTransportIndex.isSelected());
-						creator.setIndexMap(buildMapIndex.isSelected());
-						creator.setIndexRouting(buildRoutingIndex.isSelected());
-						creator.setCityAdminLevel(DataExtractionSettings.getSettings().getCityAdminLevel());
+						settings.zoomWaySmoothness = Integer.parseInt(DataExtractionSettings.getSettings().getLineSmoothness());
+					} catch (NumberFormatException e) {
+					}
+					IndexCreator creator = new IndexCreator(dir, settings);
+					try {
 						String fn = DataExtractionSettings.getSettings().getMapRenderingTypesFile();
 						MapRenderingTypesEncoder types;
 						types = new MapRenderingTypesEncoder(fn, f.getName());
 						RTree.clearCache();
-						int smoothness = 0;
-						try {
-							smoothness = Integer.parseInt(DataExtractionSettings.getSettings().getLineSmoothness());
-						} catch (NumberFormatException e) {
-						}
-						creator.setZoomWaySmoothness(smoothness);
 						creator.generateIndexes(f, dlg, filter, DataExtractionSettings.getSettings().getMapZooms(), types, log);
 					} catch (IOException e) {
 						throw new IllegalArgumentException(e);

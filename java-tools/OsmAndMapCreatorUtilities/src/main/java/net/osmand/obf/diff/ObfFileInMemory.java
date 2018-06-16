@@ -45,6 +45,7 @@ import net.osmand.obf.preparation.AbstractIndexPartCreator;
 import net.osmand.obf.preparation.BinaryFileReference;
 import net.osmand.obf.preparation.BinaryMapIndexWriter;
 import net.osmand.obf.preparation.IndexCreator;
+import net.osmand.obf.preparation.IndexCreatorSettings;
 import net.osmand.obf.preparation.IndexPoiCreator;
 import net.osmand.obf.preparation.IndexRouteCreator;
 import net.osmand.obf.preparation.IndexRouteCreator.RouteWriteContext;
@@ -188,7 +189,9 @@ public class ObfFileInMemory {
 				name = defName;
 			}
 			MapRenderingTypesEncoder renderingTypes = new MapRenderingTypesEncoder(null, name);
-			final IndexPoiCreator indexPoiCreator = new IndexPoiCreator(renderingTypes, overwriteIds);
+			IndexCreatorSettings settings = new IndexCreatorSettings();
+			settings.indexPOI = true;
+			final IndexPoiCreator indexPoiCreator = new IndexPoiCreator(settings, renderingTypes, overwriteIds);
 			File poiFile = new File(targetFile.getParentFile(), IndexCreator.getPoiFileName(name));
 			indexPoiCreator.createDatabaseStructure(poiFile);
 			for(Map<String, Amenity> mp : poiObjects.valueCollection()) {

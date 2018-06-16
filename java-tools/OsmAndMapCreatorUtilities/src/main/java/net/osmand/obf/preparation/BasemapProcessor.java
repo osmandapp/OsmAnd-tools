@@ -223,6 +223,7 @@ public class BasemapProcessor {
                     landTileInfo.set(i * 4 + 3);
                 }
             }
+            dis.close();
         } catch (IOException e) {
             throw new RuntimeException("File with coastline tiles was not found ");
         }
@@ -716,11 +717,16 @@ public class BasemapProcessor {
 			int zoomSmoothness = mini ? 2 : 2;
 			MapZooms zooms = mini ? MapZooms.parseZooms("1-2;3;4-5;6-") : MapZooms.parseZooms("1-2;3;4-5;6-7;8;9-");
 			MOST_DETAILED_APPROXIMATION = mini ? 6 : 11;
-			IndexCreator creator = new IndexCreator(folder); //$NON-NLS-1$
+			IndexCreatorSettings settings = new IndexCreatorSettings();
+			settings.indexMap = true;
+			settings.indexAddress = false;
+			settings.indexPOI = mini ? false : true;
+			settings.indexTransport = false;
+			settings.indexRouting = false;
+			settings.zoomWaySmoothness = zoomSmoothness;
+			
+			IndexCreator creator = new IndexCreator(folder, settings); //$NON-NLS-1$
 			creator.setDialects(DBDialect.SQLITE_IN_MEMORY, DBDialect.SQLITE_IN_MEMORY);
-			creator.setIndexMap(true);
-			creator.setIndexPOI(mini ? false : true);
-			creator.setZoomWaySmoothness(zoomSmoothness);
 			creator.setMapFileName(mini ? "World_basemap_mini_test_2.obf" : "World_basemap_2.obf");
 			ArrayList<File> src = new ArrayList<File>();
 			for (File f : folder.listFiles()) {

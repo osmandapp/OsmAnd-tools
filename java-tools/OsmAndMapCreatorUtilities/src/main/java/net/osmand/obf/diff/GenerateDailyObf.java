@@ -23,6 +23,7 @@ import net.osmand.binary.MapZooms;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.obf.preparation.DBDialect;
 import net.osmand.obf.preparation.IndexCreator;
+import net.osmand.obf.preparation.IndexCreatorSettings;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.util.Algorithms;
 
@@ -175,13 +176,16 @@ public class GenerateDailyObf {
 		boolean exception = true;
 		try {
 			RTree.clearCache();
-			IndexCreator ic = new IndexCreator(targetObfZip.getParentFile());
-			ic.setIndexAddress(false);
-			ic.setIndexPOI(true);
-			ic.setIndexRouting(true);
-			ic.setIndexMap(true);
+			IndexCreatorSettings settings = new IndexCreatorSettings();
+			settings.indexMap = true;
+			settings.indexAddress = false;
+			settings.indexPOI = true;
+			settings.indexTransport = false;
+			settings.indexRouting = false;
+			settings.generateLowLevel = false;
+			
+			IndexCreator ic = new IndexCreator(targetObfZip.getParentFile(), settings);
 			ic.setLastModifiedDate(targetTimestamp);
-			ic.setGenerateLowLevelIndexes(false);
 			ic.setDialects(DBDialect.SQLITE, DBDialect.SQLITE_IN_MEMORY);
 			ic.setLastModifiedDate(targetTimestamp);
 			ic.setRegionName(Algorithms.capitalizeFirstLetterAndLowercase(name));

@@ -51,8 +51,6 @@ import net.osmand.osm.edit.OsmMapUtils;
 import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Relation.RelationMember;
 import net.osmand.osm.edit.Way;
-import net.osmand.swing.DataExtractionSettings;
-import net.osmand.swing.Messages;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
@@ -94,21 +92,16 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 	Connection mapConnection;
 	DBStreetDAO streetDAO;
 	private PreparedStatement postcodeSetStat;
+	private IndexCreatorSettings settings;
 
 
-	public IndexAddressCreator(Log logMapDataWarn) {
+	public IndexAddressCreator(Log logMapDataWarn, IndexCreatorSettings settings) {
 		this.logMapDataWarn = logMapDataWarn;
+		this.settings = settings;
 		streetDAO = loadInMemory ? new CachedDBStreetDAO() : new DBStreetDAO();
 	}
 
 
-	public void initSettings(String cityAdminLevel) {
-		cities.clear();
-		cityManager.clear();
-		postalCodeRelations.clear();
-		cityBoundaries.clear();
-		notAssignedBoundaries.clear();
-	}
 
 	public void registerCityIfNeeded(Entity e) {
 		if (e instanceof Node && e.getTag(OSMTagKey.PLACE) != null) {
@@ -482,7 +475,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 						String hname = null;
 						String second = null;
 
-						if (DataExtractionSettings.getSettings().isHousenumberPrefered()) {
+						if (settings.houseNumberPreferredOverName) {
 							hname = house.getTag(OSMTagKey.ADDR_HOUSE_NUMBER);
 							second = house.getTag(OSMTagKey.ADDR_HOUSE_NAME);
 						} else {
@@ -495,8 +488,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 						}
 						if (hname == null)
 							continue;
-						if (DataExtractionSettings.getSettings().isAdditionalInfo() && second != null)
+						if (settings.houseNameAddAdditionalInfo && second != null) {
 							hname += " - [" + second + "]";
+						}
 
 						if (!streetDAO.findBuilding(house)) {
 							// process multipolygon (relation) houses - preload members to create building with correct latlon
@@ -837,7 +831,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 					String hname = null;
 					String second = null;
 
-					if (DataExtractionSettings.getSettings().isHousenumberPrefered()) {
+					if (settings.houseNumberPreferredOverName) {
 						hname = houseNumber;
 						second = houseName;
 					} else {
@@ -849,8 +843,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 						second = null;
 					}
 					String additionalHname = "";
-					if (DataExtractionSettings.getSettings().isAdditionalInfo() && second != null)
+					if (settings.houseNameAddAdditionalInfo && second != null) {
 						additionalHname = " - [" + second + "]";
+					}
 
 					int i = hname.indexOf('-');
 					if (i != -1 && interpolation != null) {
@@ -1086,7 +1081,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 		Map<String, List<MapObject>> namesIndex = new TreeMap<String, List<MapObject>>(Collator.getInstance());
 		
-		progress.startTask(Messages.getString("IndexCreator.SERIALIZING_ADDRESS"), cityTowns.size() + villages.size() / 100 + 1); //$NON-NLS-1$
+		progress.startTask(settings.getString("IndexCreator.SERIALIZING_ADDRESS"), cityTowns.size() + villages.size() / 100 + 1); //$NON-NLS-1$
 		
 		writeCityBlockIndex(writer, CITIES_TYPE, streetstat, waynodesStat, suburbs, cityTowns, postcodes, namesIndex, tagRules, progress);
 		writeCityBlockIndex(writer, VILLAGES_TYPE, streetstat, waynodesStat, null, villages, postcodes, namesIndex, tagRules, progress);

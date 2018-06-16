@@ -46,6 +46,7 @@ import net.osmand.obf.preparation.BinaryFileReference;
 import net.osmand.obf.preparation.BinaryMapIndexWriter;
 import net.osmand.obf.preparation.IndexAddressCreator;
 import net.osmand.obf.preparation.IndexCreator;
+import net.osmand.obf.preparation.IndexCreatorSettings;
 import net.osmand.obf.preparation.IndexPoiCreator;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.edit.Node;
@@ -356,7 +357,10 @@ public class BinaryMerger {
 		final int[] writtenPoiCount = {0};
 		MapRenderingTypesEncoder renderingTypes = new MapRenderingTypesEncoder(null, name);
 		boolean overwriteIds = false;
-		final IndexPoiCreator indexPoiCreator = new IndexPoiCreator(renderingTypes, overwriteIds);
+		IndexCreatorSettings settings = new IndexCreatorSettings();
+		settings.indexPOI = true;
+		
+		final IndexPoiCreator indexPoiCreator = new IndexPoiCreator(settings, renderingTypes, overwriteIds);
 		indexPoiCreator.createDatabaseStructure(new File(new File(System.getProperty("user.dir")), IndexCreator.getPoiFileName(name)));
 		final Map<Long, List<Amenity>> amenityRelations = new HashMap<Long, List<Amenity>>();
 		final TLongHashSet set = new TLongHashSet();
