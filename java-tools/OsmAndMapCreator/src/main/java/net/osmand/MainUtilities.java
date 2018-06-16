@@ -29,6 +29,7 @@ import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.util.FixBasemapRoads;
 import net.osmand.osm.util.ResourceDeleter;
+import net.osmand.osm.util.WikipediaByCountryDivider;
 import net.osmand.regions.CountryOcbfGeneration;
 import net.osmand.render.RenderingRulesStorage;
 import net.osmand.render.RenderingRulesStoragePrinter;
@@ -76,6 +77,8 @@ public class MainUtilities {
 				RenderingRulesStoragePrinter.main(subArgsArray);
 			} else if (utl.equals("explain-rendering-style")) {
 				RenderingRulesStorage.main(subArgsArray);
+			} else if (utl.equals("generate-wikipedia-by-country")) {
+				WikipediaByCountryDivider.main(subArgsArray);
 			} else if (utl.equals("generate-obf-diff")) {
 				ObfDiffGenerator.main(subArgsArray);
 			} else if (utl.equals("generate-basemap")) {
