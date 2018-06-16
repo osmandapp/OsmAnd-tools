@@ -20,6 +20,7 @@ import net.osmand.data.diff.ObfDiffMerger;
 import net.osmand.data.diff.ObfRegionSplitter;
 import net.osmand.data.index.GenerateRegionTags;
 import net.osmand.data.index.IndexUploader;
+import net.osmand.data.preparation.GenerateExtractScript;
 import net.osmand.data.preparation.IndexCreator;
 import net.osmand.data.preparation.OceanTilesCreator;
 import net.osmand.impl.ConsoleProgressImplementation;
@@ -108,6 +109,8 @@ public class MainUtilities {
 				ObfDiffMerger.mergeBulkOsmLiveMonth(subArgsArray[0]);
 			} else if (utl.equals("merge-flat-obf")) {
 				ObfDiffMerger.main(subArgsArray);
+			} else if (utl.equals("generate-obf-extract-script")) {
+				GenerateExtractScript.main(subArgsArray);
 			} else if (utl.equals("generate-address")) {
 				IndexCreator ic = new IndexCreator(new File("."));
 				ic.setIndexAddress(true);
