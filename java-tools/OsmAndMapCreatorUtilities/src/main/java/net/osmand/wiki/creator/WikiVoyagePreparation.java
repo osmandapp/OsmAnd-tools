@@ -123,6 +123,24 @@ public class WikiVoyagePreparation {
 		sx.parse(is, handler);
 		handler.finish();
 	}
+
+	public static void createInitialDbStructure(Connection conn, boolean uncompressed) throws SQLException {
+		conn.createStatement()
+				.execute("CREATE TABLE IF NOT EXISTS travel_articles(title text, content_gz blob"
+						+ (uncompressed ? ", content text" : "") + ", is_part_of text, lat double, lon double, image_title text not null, gpx_gz blob"
+						+ (uncompressed ? ", gpx text" : "") + ", trip_id long, original_id long, lang text, contents_json text)");
+		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_title ON travel_articles(title);");
+		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_id ON travel_articles(trip_id);");
+		conn.createStatement()
+				.execute("CREATE INDEX IF NOT EXISTS index_part_of ON travel_articles(is_part_of);");
+	}
+
+	public static PreparedStatement generateInsertPrep(Connection conn, boolean uncompressed) throws SQLException {
+		return conn.prepareStatement("INSERT INTO travel_articles(title, content_gz"
+				+ (uncompressed ? ", content text" : "") + ", is_part_of, lat, lon, image_title, gpx_gz"
+				+ (uncompressed ? ", gpx text" : "") + ", trip_id , original_id , lang, contents_json)"
+				+ " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?" + (uncompressed ? ", ?, ?": "") + ")");
+	}
 	
 	public static class WikiOsmHandler extends DefaultHandler {
 		long id = 1;
@@ -159,23 +177,13 @@ public class WikiVoyagePreparation {
 			progress.startTask("Parse wiki xml", progIS.available());
 
 			conn = (Connection) dialect.getDatabaseConnection(sqliteFile.getAbsolutePath(), log);
-			conn.createStatement()
-					.execute("CREATE TABLE IF NOT EXISTS travel_articles(title text, content_gz blob"
-							+ (uncompressed ? ", content text" : "") + ", is_part_of text, lat double, lon double, image_title text not null, gpx_gz blob"
-							+ (uncompressed ? ", gpx text" : "") + ", trip_id long, original_id long, lang text, contents_json text)");
-			conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_title ON travel_articles(title);");
-			conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_id ON travel_articles(trip_id);");
-			conn.createStatement()
-					.execute("CREATE INDEX IF NOT EXISTS index_part_of ON travel_articles(is_part_of);");
-			prep = conn.prepareStatement("INSERT INTO travel_articles(title, content_gz"
-							+ (uncompressed ? ", content text" : "") + ", is_part_of, lat, lon, image_title, gpx_gz"
-							+ (uncompressed ? ", gpx text" : "") + ", trip_id , original_id , lang, contents_json)"
-					+ " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?" + (uncompressed ? ", ?, ?": "") + ")");
+			createInitialDbStructure(conn, uncompressed);
+			prep = generateInsertPrep(conn, uncompressed);
 			
 			wikidataconn  = new WikidataConnection(new File(sqliteFile.getParentFile(), "wikidata.sqlite"));
 			
 		}
-		
+
 		public void addBatch() throws SQLException {
 			prep.addBatch();
 			if(batch++ > BATCH_SIZE) {
@@ -312,9 +320,7 @@ public class WikiVoyagePreparation {
 						ctext = null;
 					}
 				}
-			} catch (IOException e) {
-				throw new SAXException(e);
-			} catch (SQLException e) {
+			} catch (IOException | SQLException e) {
 				throw new SAXException(e);
 			}
 		}
