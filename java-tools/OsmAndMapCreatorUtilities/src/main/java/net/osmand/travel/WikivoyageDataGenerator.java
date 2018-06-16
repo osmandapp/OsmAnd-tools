@@ -95,30 +95,34 @@ public class WikivoyageDataGenerator {
 		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_orig_id ON travel_articles(original_id);");
 		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_image_title ON travel_articles(image_title);");
 		
-		System.out.println("Processing langlink file " + langlinkFile.getAbsolutePath());
+		printStep("Processing langlink file " + langlinkFile.getAbsolutePath());
 		generator.createLangLinksIfMissing(langlinkFile, langlinkFolder, conn);
-		System.out.println("Connect translations ");
+		printStep("Connect translations ");
 		generator.generateSameTripIdForDifferentLang(langlinkFile, conn);
-		System.out.println("Generate missing ids");
+		printStep("Generate missing ids");
 		generator.generateIdsIfMissing(conn, langlinkFile);
-		System.out.println("Download/Copy proper headers for articles");
+		printStep("Download/Copy proper headers for articles");
 		generator.updateProperHeaderForArticles(conn, workingDir);
-		System.out.println("Copy headers between lang");
+		printStep("Copy headers between lang");
 		generator.copyHeaders(conn);
-		System.out.println("Generate agg part of");
+		printStep("Generate agg part of");
 		generator.generateAggPartOf(conn);
-		System.out.println("Generate search table");
+		printStep("Generate search table");
 		generator.generateSearchTable(conn);
 		if (citiesObfFile != null) {
-			System.out.println("Add osm city data");
+			printStep("Add osm city data");
 		}
 		generator.addCitiesData(citiesObfFile, conn);
-		System.out.println("Populate popular articles");
+		printStep("Populate popular articles");
 		generator.createPopularArticlesTable(conn);
 		
 		conn.createStatement().execute("DROP INDEX IF EXISTS index_orig_id");
 		conn.createStatement().execute("DROP INDEX IF EXISTS index_image_title ");
 		conn.close();
+	}
+
+	private static void printStep(String step) {
+		System.out.println("########## " +step+" ##########");
 	}
 
 	private void updateProperHeaderForArticles(Connection conn, File workingDir) throws SQLException {
