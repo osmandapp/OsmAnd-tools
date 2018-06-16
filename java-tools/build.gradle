@@ -18,6 +18,12 @@ subprojects {
 	version '1.0'
 	sourceCompatibility = 1.8
     
+    test {
+        reports {
+            junitXml.enabled = true
+            html.enabled = false
+        }               
+    }
 
     task fatJar(type: Jar) {
         
