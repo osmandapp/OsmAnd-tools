@@ -46,7 +46,7 @@ public class CombineSRTMIntoFile {
 		File directoryWithTargetFiles = new File(args[1]);
 		boolean dryRun = true;
 		String filter = null; // mauritius
-		for(int i = 3; i < args.length; i++ ){
+		for(int i = 2; i < args.length; i++ ){
 			if("--dry-run".equals(args[i])) {
 				dryRun = true;
 			} else if(args[i].startsWith("--filter")) {

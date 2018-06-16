@@ -27,6 +27,7 @@ import net.osmand.data.preparation.IndexCreator;
 import net.osmand.data.preparation.OceanTilesCreator;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.osm.MapRenderingTypesEncoder;
+import net.osmand.osm.util.CombineSRTMIntoFile;
 import net.osmand.osm.util.FixBasemapRoads;
 import net.osmand.osm.util.ResourceDeleter;
 import net.osmand.osm.util.WikipediaByCountryDivider;
@@ -145,6 +146,8 @@ public class MainUtilities {
 			} else if (utl.equals("index-uploader-std")) {
 				// should be split into server utilites and map generation
 				IndexUploader.main(subArgsArray);
+			} else if (utl.equals("combine-srtm-into-file")) {
+				CombineSRTMIntoFile.main(subArgsArray);
 			} else if (utl.equals("merge-std-files")) {
 				BinaryMerger.mergeStandardFiles(subArgsArray);
 			} else if (utl.equals("generate-roads")) {
