@@ -73,7 +73,7 @@ public class WikivoyageDataGenerator {
 		File workingDir = wikivoyageFile.getParentFile();
 
 		for(int i = 1; i < args.length; i++) {
-			String val = args[i].substring(args[i].indexOf('='));
+			String val = args[i].substring(args[i].indexOf('=') + 1);
 			if(args[i].startsWith("--uncompressed=")) {
 				uncompressed = Boolean.parseBoolean(val);
 			} else if(args[i].startsWith("--cities-obf=")) {
@@ -122,7 +122,7 @@ public class WikivoyageDataGenerator {
 	}
 
 	private static void printStep(String step) {
-		System.out.println("########## " +step+" ##########");
+		System.out.println("########## " + step + " ##########");
 	}
 
 	private void updateProperHeaderForArticles(Connection conn, File workingDir) throws SQLException {
