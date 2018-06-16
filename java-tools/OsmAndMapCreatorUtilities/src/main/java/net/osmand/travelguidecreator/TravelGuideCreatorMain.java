@@ -35,7 +35,17 @@ public class TravelGuideCreatorMain {
         } else {
             dir = args[0];
         }
+        if (dir.equals("--help") || dir.equals("-h")) {
+            printHelp();
+        }
         generateTravelGuide(dir);
+    }
+
+    private static void printHelp() {
+        System.out.println("Usage: <path to directory with html and gpx files " +
+                "(should contain gpx and html files with identical names)>: " +
+                "The utility creates an sqlite file that contains articles and points from the specified directory.");
+        System.exit(1);
     }
 
     private static void generateTravelGuide(String dir) throws SQLException, IOException {
