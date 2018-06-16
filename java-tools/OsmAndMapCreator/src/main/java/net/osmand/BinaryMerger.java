@@ -86,11 +86,10 @@ public class BinaryMerger {
 	
 	public static void mergeStandardFiles(String[] args) throws IOException, SQLException, XmlPullParserException {
 		BinaryMerger in = new BinaryMerger();
-		String pathRepoToRegionsXML = args[0];
-		String pathWithGeneratedMapZips = args[1];
-		String pathToPutJointFiles = args[2];
+		String pathWithGeneratedMapZips = args[0];
+		String pathToPutJointFiles = args[1];
 		boolean mapFiles = args.length > 3 && args[3].equals("--map");
-		CountryRegion world = new CountryOcbfGeneration().parseRegionStructure(pathRepoToRegionsXML);
+		CountryRegion world = new CountryOcbfGeneration().parseDefaultOsmAndRegionStructure();
 		Iterator<CountryRegion> it = world.iterator();
 		while(it.hasNext()) {
 			CountryRegion cr = it.next();

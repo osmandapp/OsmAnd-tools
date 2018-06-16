@@ -36,7 +36,7 @@ public class GenerateExtractScript {
 
 	private void process(String location, String repo, String binaryFolder) throws IOException, XmlPullParserException {
 		CountryOcbfGeneration ocbfGeneration = new CountryOcbfGeneration();
-		CountryRegion regionStructure = ocbfGeneration.parseRegionStructure(repo);
+		CountryRegion regionStructure = ocbfGeneration.parseRegionStructureFromRepo(repo);
 		Map<String, File> polygons = ocbfGeneration.getPolygons(repo);
 		List<CountryRegion> rt = new ArrayList<CountryRegion>();
 		Iterator<CountryRegion> it = regionStructure.iterator();

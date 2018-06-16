@@ -2,9 +2,14 @@ package net.osmand.regions;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.URL;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -71,11 +76,17 @@ public class CountryOcbfGeneration {
 		}
 		return translates;
 	}
+	
+	public CountryRegion parseDefaultOsmAndRegionStructure() throws XmlPullParserException, IOException {
+		URL url = new URL( "https://raw.githubusercontent.com/osmandapp/OsmAnd-resources/master/countries-info/regions.xml");
+		return parseRegionStructure(url.openStream()); 
+	}
 
-	public CountryRegion parseRegionStructure(String repo) throws XmlPullParserException, IOException {
-		String regionsXml = repo + "/resources/countries-info/regions.xml";
+	
+	public CountryRegion parseRegionStructure(InputStream repo) throws XmlPullParserException, IOException {
+		
 		XmlPullParser parser = PlatformUtil.newXMLPullParser();
-		parser.setInput(new FileReader(regionsXml));
+		parser.setInput(new InputStreamReader(repo, "UTF-8"));
 		int tok;
 		CountryRegion global = new CountryRegion();
 		List<CountryRegion> stack = new ArrayList<CountryOcbfGeneration.CountryRegion>();
@@ -101,6 +112,7 @@ public class CountryOcbfGeneration {
 				}
 			}
 		}
+		repo.close();
 		return global;
 	}
 
@@ -345,8 +357,15 @@ public class CountryOcbfGeneration {
 		String targetOsmXml = repo + "regions.osm.xml";
 		Map<String, Set<TranslateEntity>> translates = getTranslates(repo);
 		Map<String, File> polygonFiles = getPolygons(repo);
-		CountryRegion global = parseRegionStructure(repo);
+		CountryRegion global = parseRegionStructureFromRepo(repo);
 		createFile(global, translates, polygonFiles, targetObf, targetOsmXml);
+	}
+
+
+	public CountryRegion parseRegionStructureFromRepo(String repo) throws XmlPullParserException, IOException,
+			FileNotFoundException {
+		String regionsXml = repo + "/resources/countries-info/regions.xml";
+		return parseRegionStructure(new FileInputStream(regionsXml));
 	}
 
 

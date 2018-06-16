@@ -147,7 +147,7 @@ public class IndexBatchCreator {
 				//rc.siteToDownload = "http://builder.osmand.net/osm-extract/{0}/{0}.pbf";
 				rc.siteToDownload = "/home/osm-planet/osm-extract/{0}/{0}.pbf";
 				CountryOcbfGeneration ocbfGeneration = new CountryOcbfGeneration();
-				CountryRegion regionStructure = ocbfGeneration.parseRegionStructure(internalRegionsList);
+				CountryRegion regionStructure = ocbfGeneration.parseDefaultOsmAndRegionStructure();
 				Iterator<CountryRegion> it = regionStructure.iterator();
 				while(it.hasNext()) {
 					CountryRegion cr = it.next();
