@@ -30,6 +30,8 @@ import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.render.RenderingRulesStorage;
 import net.osmand.render.RenderingRulesStoragePrinter;
 import net.osmand.travel.TravelGuideCreatorMain;
+import net.osmand.travel.WikivoyageDataGenerator;
+import net.osmand.travel.WikivoyageLangPreparation;
 import net.osmand.util.Algorithms;
 import net.osmand.util.CombineSRTMIntoFile;
 import net.osmand.util.CountryOcbfGeneration;
@@ -128,6 +130,10 @@ public class MainUtilities {
 				ObfDiffMerger.mergeBulkOsmLiveMonth(subArgsArray[0]);
 			} else if (utl.equals("merge-flat-obf")) {
 				ObfDiffMerger.main(subArgsArray);
+			} else if (utl.equals("generate-wikivoyage-raw-lang")) {
+				WikivoyageLangPreparation.main(subArgsArray);
+			} else if (utl.equals("proccess-wikivoyage")) {
+				WikivoyageDataGenerator.main(subArgsArray);
 			} else if (utl.equals("generate-obf-extract-script")) {
 				GenerateExtractScript.main(subArgsArray);
 			} else if (utl.equals("generate-address")) {

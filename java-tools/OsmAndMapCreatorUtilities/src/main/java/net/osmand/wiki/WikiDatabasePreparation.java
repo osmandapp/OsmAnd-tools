@@ -40,8 +40,8 @@ import javax.xml.parsers.SAXParserFactory;
 import net.osmand.PlatformUtil;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.obf.preparation.DBDialect;
-import net.osmand.travel.WikivoyagePreparation.WikidataConnection;
-import net.osmand.travel.WikivoyagePreparation.WikivoyageTemplates;
+import net.osmand.travel.WikivoyageLangPreparation.WikidataConnection;
+import net.osmand.travel.WikivoyageLangPreparation.WikivoyageTemplates;
 import net.osmand.util.SqlInsertValuesReader;
 import net.osmand.util.SqlInsertValuesReader.InsertValueProcessor;
 

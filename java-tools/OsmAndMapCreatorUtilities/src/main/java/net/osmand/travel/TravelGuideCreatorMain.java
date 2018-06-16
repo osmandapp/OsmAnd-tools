@@ -23,7 +23,7 @@ import org.apache.commons.logging.Log;
 public class TravelGuideCreatorMain {
 
     private static final int BATCH_SIZE = 30;
-    private static final Log log = PlatformUtil.getLog(TravelGuideCreatorMain.class);
+    private static final Log LOG = PlatformUtil.getLog(TravelGuideCreatorMain.class);
     public static final String HTML_EXT = ".html";
     public static final String GPX_EXT = ".gpx";
 
@@ -43,7 +43,7 @@ public class TravelGuideCreatorMain {
             printHelp();
             return;
         }
-        generateTravelGuide(dir);
+        new TravelGuideCreatorMain().generateTravelGuide(dir);
     }
 
     private static void printHelp() {
@@ -52,27 +52,28 @@ public class TravelGuideCreatorMain {
                 "The utility creates an sqlite file that contains articles and points from the specified directory.");
     }
 
-    private static void generateTravelGuide(String dir) throws SQLException, IOException {
+    private void generateTravelGuide(String dir) throws SQLException, IOException {
         File directory = new File(dir);
         if (!directory.isDirectory()) {
             throw new RuntimeException("Supplied path is not a directory");
         }
         File[] files = directory.listFiles();
         Connection conn = DBDialect.SQLITE.getDatabaseConnection((dir.endsWith("/") ? dir : dir + "/")
-                + "travel_guide.sqlite", log);
+                + "travel_guide.sqlite", LOG);
         if (conn == null) {
-            log.error("Couldn't establish the database connection");
+            LOG.error("Couldn't establish the database connection");
             System.exit(1);
         }
         Map<String, List<File>> mapping = getFileMapping(files);
+        WikivoyageDataGenerator dataGenerator = new WikivoyageDataGenerator();
         generateTravelSqlite(mapping, conn);
-        WikivoyageDataGenerator.generateSearchTable(conn);
+        dataGenerator.generateSearchTable(conn);
         conn.close();
     }
 
-    private static void generateTravelSqlite(Map<String,List<File>> mapping, Connection conn) throws SQLException, IOException {
-    	WikivoyagePreparation.createInitialDbStructure(conn, false);
-        PreparedStatement prep = WikivoyagePreparation.generateInsertPrep(conn, false);
+    private void generateTravelSqlite(Map<String,List<File>> mapping, Connection conn) throws SQLException, IOException {
+    	WikivoyageLangPreparation.createInitialDbStructure(conn, false);
+        PreparedStatement prep = WikivoyageLangPreparation.generateInsertPrep(conn, false);
         int count = 0;
         int batch = 0;
         for (String title : mapping.keySet()) {
@@ -112,23 +113,26 @@ public class TravelGuideCreatorMain {
                 batch = 0;
             }
         }
-        WikivoyageDataGenerator.finishPrep(prep);
-        log.debug("Successfully created a travel book. Size: " + count);
+        prep.addBatch();
+        prep.executeBatch();
+        prep.close();
+		
+        LOG.debug("Successfully created a travel book. Size: " + count);
     }
 
-    private static byte[] compress(byte[] content){
-        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-        try{
-            GZIPOutputStream gzipOutputStream = new GZIPOutputStream(byteArrayOutputStream);
-            gzipOutputStream.write(content);
-            gzipOutputStream.close();
-        } catch(IOException e){
-            throw new RuntimeException(e);
-        }
-        return byteArrayOutputStream.toByteArray();
-    }
+	private byte[] compress(byte[] content) {
+		ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+		try {
+			GZIPOutputStream gzipOutputStream = new GZIPOutputStream(byteArrayOutputStream);
+			gzipOutputStream.write(content);
+			gzipOutputStream.close();
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		}
+		return byteArrayOutputStream.toByteArray();
+	}
 
-    private static Map<String, List<File>> getFileMapping(File[] files) {
+    private Map<String, List<File>> getFileMapping(File[] files) {
         Map<String, List<File>> result = new HashMap<>();
         for (File f : files) {
             String filename = f.getName();

@@ -2,16 +2,23 @@ package net.osmand.travel;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.RandomAccessFile;
+import java.net.HttpURLConnection;
 import java.net.URL;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,57 +26,102 @@ import java.util.Set;
 import java.util.TreeSet;
 
 import net.osmand.PlatformUtil;
+import net.osmand.binary.BinaryMapDataObject;
+import net.osmand.binary.BinaryMapIndexReader;
+import net.osmand.binary.BinaryMapIndexReader.SearchRequest;
+import net.osmand.data.Amenity;
+import net.osmand.data.LatLon;
+import net.osmand.map.OsmandRegions;
+import net.osmand.map.WorldRegion;
 import net.osmand.obf.preparation.DBDialect;
+import net.osmand.osm.io.NetworkUtils;
+import net.osmand.util.Algorithms;
+import net.osmand.util.MapUtils;
 import net.osmand.util.SqlInsertValuesReader;
 import net.osmand.util.SqlInsertValuesReader.InsertValueProcessor;
 
 import org.apache.commons.logging.Log;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+import org.json.JSONTokener;
 
 public class WikivoyageDataGenerator {
 
 	private static final Log log = PlatformUtil.getLog(WikivoyageDataGenerator.class);
 	private static final int BATCH_SIZE = 500;
+	
+	private static final String[] columns = new String[] {"osm_id long", "city_type text", "population long", "country text", "region text"};
+	private static final double DISTANCE_THRESHOLD = 3000000;
+	private static final int POPULATION_LIMIT = 1000000;
+	private static final int BATCH_INSERT_INTO_SIZE = 100;
+	
+	private int sleft = MapUtils.get31TileNumberX(-179.9);
+	private int sright = MapUtils.get31TileNumberX(179.9);
+	private int stop = MapUtils.get31TileNumberY(85);
+	private int sbottom = MapUtils.get31TileNumberY(-85);
+	private OsmandRegions regions;
+	
 
 	public static void main(String[] args) throws SQLException, IOException {
 		boolean uncompressed = false;
-		String workingDir = "/home/user/osmand/wikivoyage/";
-		if (args.length > 0) {
-			workingDir = args[0];
+		File wikivoyageFile = new File(args[0]);
+		if(wikivoyageFile.exists()) {
+			throw new IllegalArgumentException("Wikivoyage file doesn't exist: " + args[0]);
 		}
-		if (args.length > 1) {
-			uncompressed = Boolean.parseBoolean(args[1]);
+		File citiesObfFile = null;
+		File workingDir = wikivoyageFile.getParentFile();
+
+		for(int i = 1; i < args.length; i++) {
+			String val = args[i].substring(args[i].indexOf('='));
+			if(args[i].startsWith("--uncompressed=")) {
+				uncompressed = Boolean.parseBoolean(val);
+			} else if(args[i].startsWith("--cities-obf=")) {
+				citiesObfFile = new File(val);
+			}
 		}
-		File pathTodb = new File(workingDir, (uncompressed ? "full_wikivoyage.sqlite" : "wikivoyage.sqlite"));
+		System.out.println("Process " + wikivoyageFile.getName() + " " + (uncompressed ? "uncompressed" : ""));
+		
 		final File langlinkFolder = new File(workingDir, "langlinks");
 		final File langlinkFile = new File(workingDir, "langlink.sqlite");
 		DBDialect dialect = DBDialect.SQLITE;
-		Connection conn = (Connection) dialect.getDatabaseConnection(pathTodb.getAbsolutePath(), log);
+		Connection conn = (Connection) dialect.getDatabaseConnection(wikivoyageFile.getAbsolutePath(), log);
+		WikivoyageDataGenerator generator = new WikivoyageDataGenerator();
+		generator.regions = new OsmandRegions();
+		generator.regions.prepareFile();
+		generator.regions.cacheAllCountries();
+		
 		
 		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_orig_id ON travel_articles(original_id);");
 		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_image_title ON travel_articles(image_title);");
 		
 		System.out.println("Processing langlink file " + langlinkFile.getAbsolutePath());
-		createLangLinksIfMissing(langlinkFile, langlinkFolder, conn);
+		generator.createLangLinksIfMissing(langlinkFile, langlinkFolder, conn);
 		System.out.println("Connect translations ");
-		generateSameTripIdForDifferentLang(langlinkFile, conn);
+		generator.generateSameTripIdForDifferentLang(langlinkFile, conn);
 		System.out.println("Generate missing ids");
-		generateIdsIfMissing(conn, langlinkFile);
+		generator.generateIdsIfMissing(conn, langlinkFile);
 		System.out.println("Download/Copy proper headers for articles");
-		updateProperHeaderForArticles(conn, workingDir);
+		generator.updateProperHeaderForArticles(conn, workingDir);
 		System.out.println("Copy headers between lang");
-		copyHeaders(conn);
-		
+		generator.copyHeaders(conn);
 		System.out.println("Generate agg part of");
-		generateAggPartOf(conn);
+		generator.generateAggPartOf(conn);
 		System.out.println("Generate search table");
-		generateSearchTable(conn);
+		generator.generateSearchTable(conn);
+		if (citiesObfFile != null) {
+			System.out.println("Add osm city data");
+		}
+		generator.addCitiesData(citiesObfFile, conn);
+		System.out.println("Populate popular articles");
+		generator.createPopularArticlesTable(conn);
 		
 		conn.createStatement().execute("DROP INDEX IF EXISTS index_orig_id");
 		conn.createStatement().execute("DROP INDEX IF EXISTS index_image_title ");
 		conn.close();
 	}
 
-	private static void updateProperHeaderForArticles(Connection conn, String workingDir) throws SQLException {
+	private void updateProperHeaderForArticles(Connection conn, File workingDir) throws SQLException {
 		final File imagesMetadata = new File(workingDir, "images.sqlite");
 		// delete images to fully recreate db
 		// imagesMetadata.delete();
@@ -172,7 +224,7 @@ public class WikivoyageDataGenerator {
 		
 	}
 
-	private static String stripImageName(String sourceFile) {
+	private String stripImageName(String sourceFile) {
 		if(sourceFile == null) {
 			return null;
 		}
@@ -188,7 +240,7 @@ public class WikivoyageDataGenerator {
 		return sourceFile;
 	}
 
-	private static void copyHeaders(Connection conn) throws SQLException {
+	private void copyHeaders(Connection conn) throws SQLException {
 		Statement statement = conn.createStatement();
 		boolean update = statement.execute("update or ignore travel_articles set image_title=(SELECT image_title FROM travel_articles t "
 				+ "WHERE t.trip_id = travel_articles.trip_id and t.lang = 'en')"
@@ -205,7 +257,7 @@ public class WikivoyageDataGenerator {
 		statement.close();
 	}
 
-	private static void generateAggPartOf(Connection conn) throws SQLException {
+	private void generateAggPartOf(Connection conn) throws SQLException {
 		try {
 			conn.createStatement().execute("ALTER TABLE travel_articles ADD COLUMN aggregated_part_of");
 		} catch (Exception e) {
@@ -233,7 +285,7 @@ public class WikivoyageDataGenerator {
 		rs.close();
 	}
 
-	public static void generateSearchTable(Connection conn) throws SQLException {
+	public void generateSearchTable(Connection conn) throws SQLException {
 		conn.createStatement().execute("DROP TABLE IF EXISTS travel_search;");
 		conn.createStatement()
 				.execute("CREATE TABLE travel_search(search_term text, trip_id long, article_title text, lang text)");
@@ -267,7 +319,7 @@ public class WikivoyageDataGenerator {
 		rs.close();
 	}
 
-	private static void generateSameTripIdForDifferentLang(final File langlinkFile, Connection conn)
+	private void generateSameTripIdForDifferentLang(final File langlinkFile, Connection conn)
 			throws SQLException {
 		DBDialect dialect = DBDialect.SQLITE;
 		Connection langlinkConn = (Connection) dialect.getDatabaseConnection(langlinkFile.getAbsolutePath(), log);
@@ -297,7 +349,7 @@ public class WikivoyageDataGenerator {
 		langlinkConn.close();
 	}
 
-	private static long getCityId(PreparedStatement langlinkStatement, String title, String lang) throws SQLException {
+	private long getCityId(PreparedStatement langlinkStatement, String title, String lang) throws SQLException {
 		langlinkStatement.setString(1, title);
 		langlinkStatement.setString(2, lang);
 		ResultSet rs = langlinkStatement.executeQuery();
@@ -307,14 +359,14 @@ public class WikivoyageDataGenerator {
 		return 0;
 	}
 
-	private static void createLangLinksIfMissing(File langlinkFile, File langlinkFolder, Connection conn)
+	private void createLangLinksIfMissing(File langlinkFile, File langlinkFolder, Connection conn)
 			throws IOException, SQLException {
 		if (langlinkFolder.exists() && !langlinkFile.exists()) {
 			processLangLinks(langlinkFolder, langlinkFile, conn);
 		}
 	}
 
-	private static void processLangLinks(File langlinkFolder, File langlinkFile, Connection wikivoyageConnection)
+	private void processLangLinks(File langlinkFolder, File langlinkFile, Connection wikivoyageConnection)
 			throws IOException, SQLException {
 		if (!langlinkFolder.isDirectory()) {
 			System.err.println("Specified langlink folder is not a directory");
@@ -397,13 +449,13 @@ public class WikivoyageDataGenerator {
 		conn.close();
 	}
 
-	public static void finishPrep(PreparedStatement ps) throws SQLException {
+	public void finishPrep(PreparedStatement ps) throws SQLException {
 		ps.addBatch();
 		ps.executeBatch();
 		ps.close();
 	}
 
-	private static String getAggregatedPartOf(Connection conn, String partOf, String lang) throws SQLException {
+	private String getAggregatedPartOf(Connection conn, String partOf, String lang) throws SQLException {
 		if (partOf.isEmpty()) {
 			return "";
 		}
@@ -435,7 +487,7 @@ public class WikivoyageDataGenerator {
 		}
 	}
 
-	private static void generateIdsIfMissing(Connection conn, File langlinkfile) throws SQLException {
+	private void generateIdsIfMissing(Connection conn, File langlinkfile) throws SQLException {
 		long maxId = 0;
 		DBDialect dialect = DBDialect.SQLITE;
 		Connection langConn = (Connection) dialect.getDatabaseConnection(langlinkfile.getAbsolutePath(), log);
@@ -488,4 +540,243 @@ public class WikivoyageDataGenerator {
 		st2.close();
 
 	}
+	
+
+	
+
+
+	private void addCitiesData(File citiesObf, Connection conn) throws FileNotFoundException, IOException,
+			SQLException {
+		addColumns(conn);
+		if (citiesObf != null) {
+			RandomAccessFile raf = new RandomAccessFile(citiesObf, "r");
+			BinaryMapIndexReader reader = new BinaryMapIndexReader(raf, citiesObf);
+			PreparedStatement stat = conn.prepareStatement("SELECT title, lat, lon FROM travel_articles");
+			int columns = getRowCount(conn);
+			int count = 0;
+			ResultSet rs = stat.executeQuery();
+			Map<String, List<Amenity>> cities = fetchCities(reader);
+			while (rs.next()) {
+				String title = rs.getString(1);
+				String searchTitle = title.replaceAll("\\(.*\\)", "").trim();
+				long lat = rs.getLong(2);
+				long lon = rs.getLong(3);
+				LatLon ll = new LatLon(lat, lon);
+				if (lat == 0 && lon == 0) {
+					continue;
+				}
+				List<Amenity> results = cities.get(searchTitle);
+				Amenity acceptedResult = (results != null && results.size() == 1) ? results.get(0) : getClosestMatch(
+						results, ll);
+				insertData(conn, title, acceptedResult, ll);
+				if (count++ % BATCH_SIZE == 0) {
+					System.out.format("%.2f", (((double) count / (double) columns) * 100d));
+					System.out.println("%");
+				}
+			}
+			stat.close();
+			raf.close();
+		}
+	}
+	
+	private TreeSet<String> readMostPopularArticlesFromWikivoyage(TreeSet<String> langs, int limit) throws IOException, JSONException {
+		TreeSet<String> articleIds = new TreeSet<>();
+		String date = new SimpleDateFormat("yyyy/MM").format(new Date(System.currentTimeMillis() - 24*60*60*1000*30l));// previous month
+		for (String lang : langs) {
+			String url = "https://wikimedia.org/api/rest_v1/metrics/pageviews/top/" + lang + ".wikivoyage/all-access/"
+					+ date + "/all-days";
+			System.out.println("Loading " + url);
+			HttpURLConnection conn = NetworkUtils.getHttpURLConnection(url);
+			StringBuilder sb = Algorithms.readFromInputStream(conn.getInputStream());
+			// System.out.println("Debug Data " + sb);
+			JSONObject object = new JSONObject(new JSONTokener(sb.toString()));
+			TreeSet<String> list = new TreeSet<String>();
+			JSONArray articles = object.getJSONArray("items").getJSONObject(0).getJSONArray("articles");
+			for (int i = 0; i < articles.length() && i < limit; i++) {
+				String title = articles.getJSONObject(i).getString("article").toLowerCase();
+				list.add(title);
+				articleIds.add(title);
+			}
+		}
+		return articleIds;
+	}
+	
+
+	private void createPopularArticlesTable(Connection conn) throws SQLException, IOException, JSONException {
+		conn.createStatement().execute("DROP TABLE IF EXISTS popular_articles;");
+		// Itineraries UNESCO
+		System.out.println("Create popular articles");
+		conn.createStatement().execute("CREATE TABLE popular_articles(title text, trip_id long,"
+				+ " population long, order_index long, popularity_index long, lat double, lon double, lang text)");
+		ResultSet rs = conn.createStatement().executeQuery("SELECT DISTINCT lang from travel_articles");
+		TreeSet<String> langs = new TreeSet<String>();
+		while(rs.next()) {
+			langs.add(rs.getString(1));
+		}
+		rs.close();
+		Set<Long> tripIds = new TreeSet<Long>();
+		Set<Long> excludeTripIds = new TreeSet<Long>();
+		
+		System.out.println("Read most popular articles for " + langs);
+		TreeSet<String> popularArticleIds = readMostPopularArticlesFromWikivoyage(langs, 100);
+		
+		System.out.println("Scan articles for big cities");
+		rs = conn.createStatement().executeQuery("SELECT title, trip_id, population, lat, lon, lang FROM travel_articles ");
+		
+		while(rs.next()) {
+			String title = rs.getString(1).toLowerCase();
+			Long tripId = rs.getLong(2);
+			if(title.equals("main page") || title.contains("disambiguation") 
+					|| title.contains("значения")) {
+				excludeTripIds.add(tripId);
+			}
+			if(title.contains("itineraries") || title.contains("unesco")) {
+				tripIds.add(tripId);
+			}
+			if(popularArticleIds.contains(title)) {
+				tripIds.add(tripId);
+			}
+			if(rs.getLong(3) > POPULATION_LIMIT) {
+				tripIds.add(tripId);
+			}
+		}
+		rs.close();
+		tripIds.removeAll(excludeTripIds);
+		
+		System.out.println("Create popular article refs");
+		while(!tripIds.isEmpty()) {
+			int batchSize = BATCH_INSERT_INTO_SIZE;
+			StringBuilder tripIdsInStr = new StringBuilder();
+			Iterator<Long> it = tripIds.iterator();
+			while(it.hasNext() && batchSize -- > 0) {
+				if(tripIdsInStr.length() > 0) {
+					tripIdsInStr.append(", ");
+				}
+				tripIdsInStr.append(it.next());
+				it.remove();
+			}
+			
+			conn.createStatement().execute("INSERT INTO popular_articles(title, trip_id, population, lat, lon, lang) " + 
+				"SELECT title, trip_id, population, lat, lon, lang FROM travel_articles WHERE trip_id IN ("+tripIdsInStr+")");
+		}
+		
+		
+		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS popular_lang_ind ON popular_articles(lang);");
+		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS popular_city_id_ind ON popular_articles(trip_id);");
+	}
+
+	private void insertData(Connection conn, String title, Amenity acceptedResult, LatLon fromDB)
+			throws SQLException, IOException {
+		boolean hasResult = acceptedResult != null;
+		String sqlStatement = hasResult ? "UPDATE travel_articles SET lat = ?, lon = ?, osm_id = ?, city_type = ?, population = ?, "
+				+ "country = ?, region = ? WHERE title = ?" : "UPDATE travel_articles SET country = ?, region = ? WHERE title = ?";
+		PreparedStatement updateStatement = conn.prepareStatement(sqlStatement);
+		int column = 1;
+		LatLon coords = hasResult ? acceptedResult.getLocation() : fromDB;
+		if (hasResult) {
+			updateStatement.setDouble(column++, coords.getLatitude());
+			updateStatement.setDouble(column++, coords.getLongitude());
+			updateStatement.setLong(column++, acceptedResult.getId() >> 1);
+			updateStatement.setString(column++, acceptedResult.getSubType());
+			String population = acceptedResult.getAdditionalInfo("population");
+			updateStatement.setLong(column++, (population == null || population.isEmpty()) ? 0 : Long.parseLong(population.replaceAll("[-,. \\)\\(]", "")));
+		}
+		List<String> regionsList = getRegions(coords.getLatitude(), coords.getLongitude());
+		WorldRegion country = null;
+		WorldRegion region = null;
+		for (String reg : regionsList) {
+			WorldRegion regionData = regions.getRegionDataByDownloadName(reg);
+			if (regionData == null) {
+				continue;
+			}
+			if (regionData.getLevel() == 2) {
+				country = regionData;
+			} else if (regionData.getLevel() > 2) {
+				region = regionData;
+			}
+		}
+		updateStatement.setString(column++, country == null ? null : country.getLocaleName());
+		updateStatement.setString(column++, region == null ? null : region.getRegionDownloadName());
+		updateStatement.setString(column++, title);
+		updateStatement.executeUpdate();
+		updateStatement.clearParameters();
+	}
+
+	private Map<String, List<Amenity>> fetchCities(BinaryMapIndexReader reader) throws IOException {
+		Map<String, List<Amenity>> res = new HashMap<>();
+		SearchRequest<Amenity> req = BinaryMapIndexReader.buildSearchPoiRequest(sleft, sright, stop, sbottom, -1, BinaryMapIndexReader.ACCEPT_ALL_POI_TYPE_FILTER, null);
+		System.out.println("Start fetching cities");
+		long startTime = System.currentTimeMillis();
+		List<Amenity> results = reader.searchPoi(req);
+		System.out.println("Getting cities list took: " + (System.currentTimeMillis() - startTime) + " ms");
+		for (Amenity am : results) {
+			for (String name : am.getAllNames()) {
+				if (!res.containsKey(name)) {
+					List<Amenity> list = new ArrayList<>();
+					list.add(am);
+					res.put(name, list);
+				} else {
+					res.get(name).add(am);
+				}
+			}
+		}
+		return res;
+	}
+
+	private int getRowCount(Connection conn) throws SQLException {
+		PreparedStatement ps = conn.prepareStatement("SELECT Count(*) FROM travel_articles");
+		int columns = 0;
+		ResultSet res = ps.executeQuery();
+		while (res.next()) {
+			columns = res.getInt(1);
+		}
+		return columns;
+	}
+
+	private void addColumns(Connection conn) {
+		for (String s : columns) {
+			try {
+				conn.createStatement().execute("ALTER TABLE travel_articles ADD COLUMN " + s);
+			} catch (SQLException ex) {
+				// ex.printStackTrace();
+				System.out.println("Column alredy exsists");
+			}
+		}
+	}
+
+	private Amenity getClosestMatch(List<Amenity> results, LatLon fromDB) {
+		if (results == null || results.isEmpty()) {
+			return null;
+		}
+		Amenity result = results.get(0);
+		double distance = MapUtils.getDistance(fromDB, result.getLocation());;
+		for (int i = 1; i < results.size(); i++) {
+			Amenity a = results.get(i);
+			LatLon thisLoc = a.getLocation();
+			double calculatedDistance = MapUtils.getDistance(fromDB, thisLoc);
+			if (calculatedDistance < distance) {
+				result = a;
+			}
+		}
+		LatLon loc = result.getLocation();
+		if ((((int) loc.getLongitude() == (int) fromDB.getLongitude()) && ((int) loc.getLatitude() == (int) fromDB.getLatitude()) 
+				|| distance < DISTANCE_THRESHOLD)) {
+			return result;
+		}
+		return null;	
+	}
+	
+	private List<String> getRegions(double lat, double lon) throws IOException {
+		List<String> keyNames = new ArrayList<>();
+		int x31 = MapUtils.get31TileNumberX(lon);
+		int y31 = MapUtils.get31TileNumberY(lat);
+		List<BinaryMapDataObject> cs = regions.query(x31, y31);
+		for (BinaryMapDataObject b : cs) {
+			if(regions.contain(b, x31, y31)) {
+				keyNames.add(regions.getDownloadName(b));
+			}
+		}
+		return keyNames;
+	}
+
 }

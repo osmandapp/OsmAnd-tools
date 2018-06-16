@@ -51,7 +51,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.google.gson.JsonSyntaxException;
 
-public class WikivoyagePreparation {
+public class WikivoyageLangPreparation {
 	private static final Log log = PlatformUtil.getLog(WikiDatabasePreparation.class);	
 	private static boolean uncompressed;
 	
