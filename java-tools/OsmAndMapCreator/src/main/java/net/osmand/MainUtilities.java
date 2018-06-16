@@ -21,6 +21,7 @@ import net.osmand.data.diff.ObfRegionSplitter;
 import net.osmand.data.index.GenerateRegionTags;
 import net.osmand.data.index.IndexBatchCreator;
 import net.osmand.data.index.IndexUploader;
+import net.osmand.data.preparation.BasemapProcessor;
 import net.osmand.data.preparation.GenerateExtractScript;
 import net.osmand.data.preparation.IndexCreator;
 import net.osmand.data.preparation.OceanTilesCreator;
@@ -77,6 +78,8 @@ public class MainUtilities {
 				RenderingRulesStorage.main(subArgsArray);
 			} else if (utl.equals("generate-obf-diff")) {
 				ObfDiffGenerator.main(subArgsArray);
+			} else if (utl.equals("generate-basemap")) {
+				BasemapProcessor.main(subArgsArray);
 			} else if (utl.equals("fix-basemap-roads")) {
 				FixBasemapRoads.main(subArgsArray);
 			} else if (utl.equals("generate-ocean-tile")) {
@@ -244,6 +247,7 @@ public class MainUtilities {
 		System.out.println("\t\t generate-region-tags <path to input osm file (osm, bz2, gz)> <path to output osm file>: process osm file and assign tag osmand_region_name to every entity.");
 		System.out.println("\t\t generate-ocean-tile-osm <optional path to osm file to write> <optional path to oceantiles_12.dat file>: generates ocean tiles osm file to check in JOSM ");
 		System.out.println("\t\t generate-obf-files-in-batch <path to batch.xml> <optional path to the file with regions list>: generates multiple obf files with different options");
+		System.out.println("\t\t generate-basemap <folder-with-osm-base-files> <optional mini>: generates basemap from prepared osm files");
 		System.out.println("\t\t fix-basemap-roads <input-osm-file> <output-osm-file>: merges and simplifies basemap roads");
 		System.out.println("\t\t merge-index " + BinaryMerger.helpMessage);
 		

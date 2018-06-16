@@ -700,16 +700,16 @@ public class BasemapProcessor {
     }
 
 
-    public static void main(String[] p) throws InterruptedException, SQLException, IOException, XMLStreamException, XmlPullParserException {
-        if (p.length == 0) {
+    public static void main(String[] args) throws InterruptedException, SQLException, IOException, XMLStreamException, XmlPullParserException {
+        if (args.length == 0) {
 	        System.out.println("Please specify folder with basemap *.osm or *.osm.bz2 files");
 		} else {
 			boolean mini = false;
 			long time = System.currentTimeMillis();
 			MapRenderingTypesEncoder rt = new MapRenderingTypesEncoder("basemap");
 			// BASEMAP generation
-			File folder = new File(p[0]);
-			if (p.length >= 2 && p[1].equals("mini")) {
+			File folder = new File(args[0]);
+			if (args.length >= 2 && args[1].equals("mini")) {
 				mini = true;
 			}
 			// MapZooms zooms = MapZooms.parseZooms("1-2;3;4-5;6-7;8-9;10-");
