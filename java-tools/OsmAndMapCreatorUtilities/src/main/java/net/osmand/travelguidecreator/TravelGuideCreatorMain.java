@@ -1,21 +1,26 @@
 package net.osmand.travelguidecreator;
 
-import net.osmand.PlatformUtil;
-import net.osmand.data.preparation.DBDialect;
-import org.apache.commons.logging.Log;
-
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.sql.*;
-import java.util.*;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
+import java.sql.Types;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Scanner;
 import java.util.zip.GZIPOutputStream;
 
-import static net.osmand.wiki.creator.WikiVoyageDataGenerator.finishPrep;
-import static net.osmand.wiki.creator.WikiVoyageDataGenerator.generateSearchTable;
-import static net.osmand.wiki.creator.WikiVoyagePreparation.createInitialDbStructure;
-import static net.osmand.wiki.creator.WikiVoyagePreparation.generateInsertPrep;
+import net.osmand.PlatformUtil;
+import net.osmand.data.preparation.DBDialect;
+import net.osmand.wiki.creator.WikivoyageDataGenerator;
+import net.osmand.wiki.creator.WikivoyagePreparation;
+
+import org.apache.commons.logging.Log;
 
 public class TravelGuideCreatorMain {
 
@@ -62,13 +67,13 @@ public class TravelGuideCreatorMain {
         }
         Map<String, List<File>> mapping = getFileMapping(files);
         generateTravelSqlite(mapping, conn);
-        generateSearchTable(conn);
+        WikivoyageDataGenerator.generateSearchTable(conn);
         conn.close();
     }
 
     private static void generateTravelSqlite(Map<String,List<File>> mapping, Connection conn) throws SQLException, IOException {
-        createInitialDbStructure(conn, false);
-        PreparedStatement prep = generateInsertPrep(conn, false);
+    	WikivoyagePreparation.createInitialDbStructure(conn, false);
+        PreparedStatement prep = WikivoyagePreparation.generateInsertPrep(conn, false);
         int count = 0;
         int batch = 0;
         for (String title : mapping.keySet()) {
@@ -108,7 +113,7 @@ public class TravelGuideCreatorMain {
                 batch = 0;
             }
         }
-        finishPrep(prep);
+        WikivoyageDataGenerator.finishPrep(prep);
         log.debug("Successfully created a travel book. Size: " + count);
     }
 

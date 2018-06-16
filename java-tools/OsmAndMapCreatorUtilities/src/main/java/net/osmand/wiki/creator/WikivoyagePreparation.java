@@ -49,7 +49,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.google.gson.JsonSyntaxException;
 
-public class WikiVoyagePreparation {
+public class WikivoyagePreparation {
 	private static final Log log = PlatformUtil.getLog(WikiDatabasePreparation.class);	
 	private static boolean uncompressed;
 	

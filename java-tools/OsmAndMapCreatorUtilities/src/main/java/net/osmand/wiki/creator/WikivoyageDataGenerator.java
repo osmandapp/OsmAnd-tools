@@ -25,16 +25,18 @@ import net.osmand.util.sql.SqlInsertValuesReader.InsertValueProcessor;
 
 import org.apache.commons.logging.Log;
 
-public class WikiVoyageDataGenerator {
+public class WikivoyageDataGenerator {
 
-	private static final Log log = PlatformUtil.getLog(WikiVoyageDataGenerator.class);
+	private static final Log log = PlatformUtil.getLog(WikivoyageDataGenerator.class);
 	private static final int BATCH_SIZE = 500;
 
 	public static void main(String[] args) throws SQLException, IOException {
 		boolean uncompressed = false;
 		String workingDir = "/home/user/osmand/wikivoyage/";
-		if (args.length > 1) {
+		if (args.length > 0) {
 			workingDir = args[0];
+		}
+		if (args.length > 1) {
 			uncompressed = Boolean.parseBoolean(args[1]);
 		}
 		File pathTodb = new File(workingDir, (uncompressed ? "full_wikivoyage.sqlite" : "wikivoyage.sqlite"));

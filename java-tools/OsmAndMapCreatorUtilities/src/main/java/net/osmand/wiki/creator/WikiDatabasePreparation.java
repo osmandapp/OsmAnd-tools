@@ -42,8 +42,8 @@ import net.osmand.data.preparation.DBDialect;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.util.sql.SqlInsertValuesReader;
 import net.osmand.util.sql.SqlInsertValuesReader.InsertValueProcessor;
-import net.osmand.wiki.creator.WikiVoyagePreparation.WikidataConnection;
-import net.osmand.wiki.creator.WikiVoyagePreparation.WikivoyageTemplates;
+import net.osmand.wiki.creator.WikivoyagePreparation.WikidataConnection;
+import net.osmand.wiki.creator.WikivoyagePreparation.WikivoyageTemplates;
 
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
 import org.apache.commons.lang3.StringUtils;
