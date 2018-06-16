@@ -1,4 +1,13 @@
-
+jar {
+    doFirst {
+		manifest {
+        	attributes('Main-Class': project.getProperty('mainClassAttribute'),
+        		   'Class-Path': configurations.runtimeClasspath.collect { 'lib/'+it.getName() }.join(' ')
+        		   )
+    	}
+    }
+}
+// TODO package osmand-linux-amd64.lib  into OsmAnd-java
 
 task collectMdpiIcons(type: Copy) {
 	from("../../../resources/rendering_styles/style-icons/drawable-mdpi/")
@@ -29,20 +38,22 @@ task collectFonts(type: Copy) {
 }
 
 task buildDistribution(type: Zip) {
-	dependsOn compileJava
+	dependsOn jar
    	from(configurations.runtime.allArtifacts.files) {
-   		rename { String fileName ->
-        	fileName.replace("-1.0", '')
-    	} 
+   		rename { it.contains("OsmAnd") ? it.replace("-1.0", '') : it }
    		into '.'
+   	}
+
+   	from('lib-native') {
+   		into 'lib'
    	}
 
    	from(configurations.runtimeClasspath) {
    		into 'lib'
    	}
 
-   	from('.') {
-   		include 'fonts'
+   	from('fonts') {
+   		into 'fonts'
    	}
    	from('src/main/resources') {
    		include '*.sh'

@@ -49,6 +49,9 @@ public enum DBDialect {
 
     public Connection getDatabaseConnection(String fileName, Log log) throws SQLException {
 		if (DBDialect.SQLITE == this || DBDialect.SQLITE_IN_MEMORY == this) {
+			if(System.getProperty("os.name").toLowerCase().contains("mac")) {
+				System.setProperty("org.sqlite.lib.name", "libsqlitejdbc.jnilib");
+			}
 			try {
 				Class.forName("org.sqlite.JDBC");
 			} catch (ClassNotFoundException e) {

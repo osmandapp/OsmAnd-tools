@@ -561,7 +561,7 @@ public class QtCorePanel implements GLEventListener {
 		// load QT
 		// System.load("/home/victor/temp/test/libOsmAndCore_shared.so");
 		// System.load("/home/victor/temp/test/libOsmAndCoreJNI.so");
-		String nativePath = "/home/victor/temp/OsmAndMapCreator-main/lib-gl";
+		String nativePath = "/home/victor/temp/OsmAndMapCreator-main/lib";
 		if (args.length > 0) {
 			nativePath = args[0];
 		}

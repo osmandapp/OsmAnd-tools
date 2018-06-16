@@ -1,2 +1,2 @@
 REM the JVM. With the below settings the heap size (Available memory for the application)
-start javaw.exe -Djava.util.logging.config.file=logging.properties -cp "./OsmAndMapCreator.jar;./lib/OsmAnd-core.jar;./lib/*.jar;./lib-gl/*.jar" net.osmand.swing.OsmExtractionUI
+start javaw.exe -Djava.util.logging.config.file=logging.properties -jar OsmAndMapCreator.jar

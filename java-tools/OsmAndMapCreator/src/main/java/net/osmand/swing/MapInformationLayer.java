@@ -96,7 +96,7 @@ public class MapInformationLayer implements MapPanelLayer {
 				if (dlg.isOkPressed()) {
 					String folder = DataExtractionSettings.getSettings().getQtLibFolder();
 					if (folder.equals("")) {
-						folder = new File("lib-gl").getAbsolutePath();
+						folder = new File("lib").getAbsolutePath();
 					}
 					QtCorePanel.loadNative(folder);
 
