@@ -1,19 +1,16 @@
 package net.osmand.server;
 
-import java.io.IOException;
-import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import org.json.JSONException;
-
 import net.osmand.bitcoinsender.TransactionAnalyzer;
+import net.osmand.data.changeset.CalculateCountryForChangesets;
 import net.osmand.live.subscriptions.UpdateSubscription;
 
 public class ServerUtilities {
 
-	public static void main(String[] args) throws IOException, JSONException, ClassNotFoundException, SQLException {
+	public static void main(String[] args) throws Exception {
 		String utl = args[0];
 		List<String> subArgs = new ArrayList<String>(Arrays.asList(args).subList(1, args.length));
 		String[] subArgsArray = subArgs.toArray(new String[args.length - 1]);
@@ -21,6 +18,8 @@ public class ServerUtilities {
 			TransactionAnalyzer.main(subArgsArray);
 		} else if (utl.equals("update-subscriptions")) {
 			UpdateSubscription.main(subArgsArray);
+		} else if (utl.equals("update-countries-for-changeset")) {
+			CalculateCountryForChangesets.main(subArgsArray);
 		}
 	}
 }
