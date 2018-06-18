@@ -12,13 +12,16 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.List;
 import java.util.zip.GZIPInputStream;
+
+import javax.imageio.ImageIO;
+import javax.imageio.ImageReader;
 
 import net.osmand.IProgress;
 import net.osmand.IndexConstants;
 import net.osmand.binary.MapZooms;
-import net.osmand.data.Multipolygon;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.obf.preparation.OsmDbAccessor.OsmDbVisitor;
 import net.osmand.osm.MapPoiTypes;
@@ -97,6 +100,10 @@ public class IndexCreator {
 			settings.srtmDataFolder = new File(workingDir, "srtm");
 		}
 		if(settings.srtmDataFolder != null) {
+			Iterator<ImageReader> readers = ImageIO.getImageReadersByFormatName("TIFF");
+			while (readers.hasNext()) {
+			    System.out.println("Tiff reader: " + readers.next());
+			}
 			heightData = new IndexHeightData();
 			heightData.setSrtmData(settings.srtmDataFolder);
 		}
