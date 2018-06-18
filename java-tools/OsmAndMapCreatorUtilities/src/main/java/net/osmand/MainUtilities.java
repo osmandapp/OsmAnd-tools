@@ -106,6 +106,7 @@ public class MainUtilities {
 				settings.indexPOI = true;
 				settings.indexTransport = true;
 				settings.indexRouting = true;
+				settings.srtmDataFolder = scanSrtmFolder(subArgsArray);
 				IndexCreator ic = new IndexCreator(new File("."), settings);
 				ic.setLastModifiedDate(new File(subArgsArray[0]).lastModified());
 				generateObf(subArgsArray, ic);
@@ -116,6 +117,7 @@ public class MainUtilities {
 				settings.indexPOI = true;
 				settings.indexTransport = true;
 				settings.indexRouting = true;
+				settings.srtmDataFolder = scanSrtmFolder(subArgsArray);
 				IndexCreator ic = new IndexCreator(new File("."), settings);
 				ic.setLastModifiedDate(new File(subArgsArray[0]).lastModified());
 				generateObf(subArgsArray, ic);
@@ -124,6 +126,7 @@ public class MainUtilities {
 				settings.indexMap = true;
 				IndexCreator ic = new IndexCreator(new File("."), settings);
 				ic.setLastModifiedDate(new File(subArgsArray[0]).lastModified());
+				settings.srtmDataFolder = scanSrtmFolder(subArgsArray);
 				generateObf(subArgsArray, ic);
 			} else if (utl.equals("split-obf")) {
 				ObfRegionSplitter.main(subArgsArray);
@@ -170,6 +173,7 @@ public class MainUtilities {
 			} else if (utl.equals("generate-roads")) {
 				IndexCreatorSettings settings = new IndexCreatorSettings();
 				settings.indexRouting = true;
+				settings.srtmDataFolder = scanSrtmFolder(subArgsArray);
 				IndexCreator ic = new IndexCreator(new File("."), settings);
 				ic.setLastModifiedDate(new File(subArgsArray[0]).lastModified());
 				generateObf(subArgsArray, ic);
@@ -200,6 +204,15 @@ public class MainUtilities {
 				printSynopsys();
 			}
 		}
+	}
+
+	private static File scanSrtmFolder(String[] subArgsArray) {
+		for(String s : subArgsArray) {
+			if(s.startsWith("--srtm=")) {
+				return new File(s.substring(s.indexOf('=') + 1));
+			}
+		}
+		return null;
 	}
 
 	private static void generateAllOsmLiveTests(File testResources, String unpackFolder, boolean delete) throws IOException {
@@ -255,7 +268,7 @@ public class MainUtilities {
 	private static void printSynopsys() {
 		System.out.println("This utility provides access to all other console utilities of OsmAnd,");
 		System.out.println("each utility has own argument list and own synopsys. Here is the list:");
-		System.out.println("\t\t generate-obf <path to osm file>: simple way to generate obf file in place. "
+		System.out.println("\t\t generate-obf <path to osm file> <--srtm=opt-folder-with-srtm-data>: simple way to generate obf file in place. "
 				+ "\t\t\t	Another supported options generate-map, generate-address, generate-poi, generate-roads (generate obf partially)");
 		System.out.println("\t\t inspector <params>: powerful tool to inspect obf files and convert them to osm");
 		System.out.println("\t\t check-ocean-tile <lat> <lon> <zoom=11>: checks ocean or land tile is in bz2 list");
