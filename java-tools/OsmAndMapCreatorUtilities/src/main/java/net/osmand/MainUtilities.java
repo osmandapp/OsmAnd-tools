@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.List;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
@@ -207,9 +208,12 @@ public class MainUtilities {
 	}
 
 	private static String[] scanSrtmFolder(List<String> subArgs, IndexCreatorSettings settings) {
-		for(String s : subArgs) {
+		Iterator<String> it = subArgs.iterator();
+		while(it.hasNext()) {
+			String s = it.next();
 			if(s.startsWith("--srtm=")) {
 				settings.srtmDataFolder = new File(s.substring(s.indexOf('=') + 1));
+				it.remove();
 			}
 		}
 		return subArgs.toArray(new String[subArgs.size()]);
