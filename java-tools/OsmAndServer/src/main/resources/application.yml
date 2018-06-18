@@ -1,0 +1,17 @@
+google:
+  client:
+    clientId: ${GOOGLE_CLIENT_ID}
+    clientSecret: ${GOOGLE_CLIENT_SECRET}
+    accessTokenUri: https://www.googleapis.com/oauth2/v4/token
+    userAuthorizationUri: https://accounts.google.com/o/oauth2/v2/auth
+    clientAuthenticationScheme: form
+    scope:
+      - openid
+      - email
+  resource:
+    userInfoUri: https://www.googleapis.com/oauth2/v3/userinfo
+    tokenInfoUri:
+    preferTokenInfo: true
+logging:
+  level:
+    org.springframework.security: DEBUG

@@ -1,20 +1,15 @@
-package hello;
-
-import java.io.IOException;
-import java.sql.SQLException;
+package net.osmand.server.controllers;
 
 import net.osmand.MapCreatorVersion;
 
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.xmlpull.v1.XmlPullParserException;
 
 @RestController
 public class HelloController {
 
-    @RequestMapping("/")
-    public String index() throws IOException, SQLException, InterruptedException, XmlPullParserException {
-//    	IndexCreator.main(null);
+    @RequestMapping("/hello")
+    public String index() {
         return "Greetings from: " + MapCreatorVersion.APP_MAP_CREATOR_FULL_NAME+ " ";
     }
 
