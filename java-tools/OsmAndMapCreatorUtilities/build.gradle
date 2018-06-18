@@ -25,8 +25,14 @@ dependencies {
 	implementation group: 'com.jcraft', name: 'jsch', version: '0.1.54'
 
 	// Add to process srtm data
-	implementation 'com.github.jai-imageio:jai-imageio-core:1.4.0'
+	implementation 'com.twelvemonkeys.common:common-image:3.3.1'
+	implementation 'com.twelvemonkeys.common:common-io:3.3.1'
 	
+	implementation 'com.twelvemonkeys.imageio:imageio-core:3.3.1'
+	implementation 'com.twelvemonkeys.imageio:imageio-jpeg:3.3.1'
+	implementation 'com.twelvemonkeys.imageio:imageio-metadata:3.3.1'
+	implementation 'com.twelvemonkeys.imageio:imageio-tiff:3.3.1'
+ 
 	// Wikimedia projects
 	implementation 'info.bliki.wiki:bliki-core:3.1.0'
 	implementation 'org.xwiki.commons:xwiki-commons-component-default:7.1-milestone-2'
