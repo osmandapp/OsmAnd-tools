@@ -64,7 +64,7 @@ public class MainUtilities {
 		} else {
 			String utl = args[0];
 			List<String> subArgs = new ArrayList<String>(Arrays.asList(args).subList(1, args.length));
-			String[] subArgsArray = subArgs.toArray(new String[args.length - 1]);
+			String[] subArgsArray = subArgs.toArray(new String[subArgs.size()]);
 			if (utl.equals("check-ocean-tile")) {
 				OceanTilesCreator.checkOceanTile(subArgsArray);
 			} else if (utl.equals("inspector")) {
@@ -106,7 +106,7 @@ public class MainUtilities {
 				settings.indexPOI = true;
 				settings.indexTransport = true;
 				settings.indexRouting = true;
-				settings.srtmDataFolder = scanSrtmFolder(subArgsArray);
+				subArgsArray = scanSrtmFolder(subArgs, settings);
 				IndexCreator ic = new IndexCreator(new File("."), settings);
 				ic.setLastModifiedDate(new File(subArgsArray[0]).lastModified());
 				generateObf(subArgsArray, ic);
@@ -117,7 +117,7 @@ public class MainUtilities {
 				settings.indexPOI = true;
 				settings.indexTransport = true;
 				settings.indexRouting = true;
-				settings.srtmDataFolder = scanSrtmFolder(subArgsArray);
+				subArgsArray = scanSrtmFolder(subArgs, settings);
 				IndexCreator ic = new IndexCreator(new File("."), settings);
 				ic.setLastModifiedDate(new File(subArgsArray[0]).lastModified());
 				generateObf(subArgsArray, ic);
@@ -125,8 +125,8 @@ public class MainUtilities {
 				IndexCreatorSettings settings = new IndexCreatorSettings();
 				settings.indexMap = true;
 				IndexCreator ic = new IndexCreator(new File("."), settings);
+				subArgsArray = scanSrtmFolder(subArgs, settings);
 				ic.setLastModifiedDate(new File(subArgsArray[0]).lastModified());
-				settings.srtmDataFolder = scanSrtmFolder(subArgsArray);
 				generateObf(subArgsArray, ic);
 			} else if (utl.equals("split-obf")) {
 				ObfRegionSplitter.main(subArgsArray);
@@ -173,7 +173,7 @@ public class MainUtilities {
 			} else if (utl.equals("generate-roads")) {
 				IndexCreatorSettings settings = new IndexCreatorSettings();
 				settings.indexRouting = true;
-				settings.srtmDataFolder = scanSrtmFolder(subArgsArray);
+				subArgsArray = scanSrtmFolder(subArgs, settings);
 				IndexCreator ic = new IndexCreator(new File("."), settings);
 				ic.setLastModifiedDate(new File(subArgsArray[0]).lastModified());
 				generateObf(subArgsArray, ic);
@@ -206,13 +206,13 @@ public class MainUtilities {
 		}
 	}
 
-	private static File scanSrtmFolder(String[] subArgsArray) {
-		for(String s : subArgsArray) {
+	private static String[] scanSrtmFolder(List<String> subArgs, IndexCreatorSettings settings) {
+		for(String s : subArgs) {
 			if(s.startsWith("--srtm=")) {
-				return new File(s.substring(s.indexOf('=') + 1));
+				settings.srtmDataFolder = new File(s.substring(s.indexOf('=') + 1));
 			}
 		}
-		return null;
+		return subArgs.toArray(new String[subArgs.size()]);
 	}
 
 	private static void generateAllOsmLiveTests(File testResources, String unpackFolder, boolean delete) throws IOException {
