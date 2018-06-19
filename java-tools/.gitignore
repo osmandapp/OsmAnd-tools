@@ -8,3 +8,5 @@ build/
 */.idea
 */bin
 */build
+/local.properties
+.idea
