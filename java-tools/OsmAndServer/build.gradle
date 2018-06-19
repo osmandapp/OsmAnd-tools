@@ -3,7 +3,7 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath("org.springframework.boot:spring-boot-gradle-plugin:2.0.2.RELEASE")
+        classpath("org.springframework.boot:spring-boot-gradle-plugin:2.0.1.RELEASE")
     }
 }
 
@@ -13,6 +13,7 @@ apply plugin: 'io.spring.dependency-management'
 bootJar {
     baseName = 'osmand-server-boot'
     version =  version
+    mainClassName = 'net.osmand.server.Application'
 }
 
 
@@ -20,16 +21,19 @@ dependencies {
     implementation "org.springframework.boot:spring-boot-starter-web:2.0.1.RELEASE"
     implementation "org.springframework.boot:spring-boot-starter-security:2.0.1.RELEASE"
 
+    // make optional for release run
+    implementation "org.springframework.boot:spring-boot-devtools:2.0.1.RELEASE"
+
+
     implementation "org.springframework.security.oauth:spring-security-oauth2:2.2.2.RELEASE"
     implementation "org.springframework.security.oauth.boot:spring-security-oauth2-autoconfigure:2.0.1.RELEASE"
-    // make dependencies consistent
+
+    // security dependencies consistent
     // implementation 'org.springframework.security:spring-security-web:5.0.6.RELEASE'
     // implementation 'org.springframework.security:spring-security-core:5.0.6.RELEASE'
     // implementation 'org.springframework.security:spring-security-config:5.0.6.RELEASE'
     // implementation 'org.springframework.security:spring-security-oauth2-client:5.0.6.RELEASE'
     
-
-
     implementation "org.springframework.cloud:spring-cloud-security:1.2.2.RELEASE"
 
 

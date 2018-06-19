@@ -1,29 +1,42 @@
 package net.osmand.server;
 
-import java.util.Collection;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.security.oauth2.resource.AuthoritiesExtractor;
+import org.springframework.boot.autoconfigure.security.oauth2.resource.FixedAuthoritiesExtractor;
+import org.springframework.boot.autoconfigure.security.oauth2.resource.FixedPrincipalExtractor;
 import org.springframework.boot.autoconfigure.security.oauth2.resource.UserInfoTokenServices;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.AuthorityUtils;
+import org.springframework.security.core.authority.mapping.GrantedAuthoritiesMapper;
+import org.springframework.security.core.authority.mapping.NullAuthoritiesMapper;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.oauth2.client.OAuth2ClientContext;
 import org.springframework.security.oauth2.client.OAuth2RestTemplate;
 import org.springframework.security.oauth2.client.filter.OAuth2ClientAuthenticationProcessingFilter;
 import org.springframework.security.oauth2.client.filter.OAuth2ClientContextFilter;
 import org.springframework.security.oauth2.client.token.grant.code.AuthorizationCodeResourceDetails;
-import org.springframework.security.oauth2.common.exceptions.InvalidTokenException;
 import org.springframework.security.oauth2.config.annotation.web.configuration.EnableOAuth2Client;
-import org.springframework.security.oauth2.provider.OAuth2Authentication;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 
 @Configuration
 @EnableOAuth2Client
@@ -34,12 +47,26 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
     
     @Value("${google.resource.userInfoUri}")
     String googleUserInfoUri;
+    
+    @Value("${admin.emails}")
+    private String adminEmails;
+    
+    private Set<String> adminEmailsSet = new TreeSet<>();
+    
+    private static final Log LOG = LogFactory.getLog(WebSecurityConfiguration.class);
+    
+    public static final String ROLE_ADMIN = "ROLE_ADMIN";
+    public static final String ROLE_USER = "ROLE_USER";
 
 	
     @Override
 	protected void configure(HttpSecurity http) throws Exception {
-    	http.csrf().disable().antMatcher("/**");
-    	// http.csrf().csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse());
+    	for(String admin: adminEmails.split(",")) {
+    		adminEmailsSet.add(admin.trim());
+    	}
+    	LOG.info("Admin logins are:" + adminEmailsSet);
+    	// http.csrf().disable().antMatcher("/**");
+    	http.csrf().csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse());
     	
     	http.authorizeRequests().antMatchers("/", "/hello", "/login**", "/webjars/**", "/error**").permitAll();
     	http.authorizeRequests().anyRequest().authenticated();
@@ -62,28 +89,33 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
 		OAuth2RestTemplate template = new OAuth2RestTemplate(google(), oauth2ClientContext);
 		filter.setRestTemplate(template);
 		UserInfoTokenServices tokenServices = new UserInfoTokenServices(googleUserInfoUri,
-				google().getClientId()) {
+				google().getClientId());
+		// sub (id), name, email, picture - picture url, email_verified, gender
+		tokenServices.setAuthoritiesExtractor(new FixedAuthoritiesExtractor() {
 			@Override
-			public OAuth2Authentication loadAuthentication(String accessToken) throws AuthenticationException,
-					InvalidTokenException {
-				OAuth2Authentication auth = super.loadAuthentication(accessToken);
-				Authentication user = auth.getUserAuthentication();
-				Collection<GrantedAuthority> authorities = auth.getAuthorities();
-				return auth;
+			public List<GrantedAuthority> extractAuthorities(Map<String, Object> map) {
+				Object email = map.get("email");
+				if(adminEmailsSet.contains(email) && 
+						"true".equals(map.get("email_verified") + "")) {
+					LOG.info("Admin '" + email + "' logged in");
+					return AuthorityUtils.createAuthorityList(ROLE_USER, ROLE_ADMIN);
+				}
+				LOG.info("User '" + email + "' logged in");
+				return AuthorityUtils.createAuthorityList(ROLE_USER);
 			}
-		};
+		});
+		// tokenServices.setPrincipalExtractor();
 		tokenServices.setRestTemplate(template);
 		filter.setTokenServices(tokenServices);
 		return filter;
 	}
     
-	
 
 	@Bean
 	@ConfigurationProperties("google.client")
 	public AuthorizationCodeResourceDetails google() {
 		return new AuthorizationCodeResourceDetails();
 	}
-
-    
+ 
+	
 }

@@ -12,6 +12,9 @@ google:
     userInfoUri: https://www.googleapis.com/oauth2/v3/userinfo
     tokenInfoUri:
     preferTokenInfo: true
+admin:
+  emails:
+      victor.shcherb@gmail.com, victor.shcherb+2@gmail.com
 logging:
   level:
-    org.springframework.security: DEBUG
+    root: INFO
