@@ -236,7 +236,7 @@ public class EmailSenderMain {
         LOGGER.info("Sending test messages...");
         String[] testRecipients = testAddresses.split(",");
         for (String recipient : testRecipients) {
-            sendMail(recipient, templateId, topic);
+            sendMail(recipient.trim(), templateId, topic);
         }
     }
 
