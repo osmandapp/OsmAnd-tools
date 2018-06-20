@@ -32,5 +32,11 @@ logging:
 
 server:
   port: 8090
+  tomcat:
+    accesslog:
+      directory: /var/log/osmand-server-logs/
+      enabled: true
+      pattern: common
+
 spring:
   profiles: production
