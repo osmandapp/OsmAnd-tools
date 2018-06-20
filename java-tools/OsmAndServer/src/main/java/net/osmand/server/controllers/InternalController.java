@@ -15,12 +15,11 @@ public class InternalController {
 //    	IndexCreator.main(null);
 		String pg = "Internal page. Greetings from: " + MapCreatorVersion.APP_MAP_CREATOR_FULL_NAME + " "
 				+ user.getName();
-    	if(user instanceof OAuth2Authentication ) {
-    		OAuth2Authentication oAuth2Authentication= (OAuth2Authentication) user;
-    		Authentication authentication = oAuth2Authentication.getUserAuthentication();
-    		pg += authentication.getDetails();
-    		pg += " " + authentication.getCredentials();
-    	}
+		if (user instanceof OAuth2Authentication) {
+			OAuth2Authentication oAuth2Authentication = (OAuth2Authentication) user;
+			Authentication authentication = oAuth2Authentication.getUserAuthentication();
+			pg += authentication.getDetails();
+		}
     	return pg;
     }
 
