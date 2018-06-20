@@ -244,7 +244,7 @@ public class EmailSenderMain {
                                       String topic, String runMode, String testAddresses) {
         if (templateId == null || mailingGroups == null
                 || mailFrom == null || topic == null || runMode == null || templateId.isEmpty()
-                || mailingGroups.isEmpty() || mailFrom.isEmpty()
+                || mailFrom.isEmpty()
                 || topic.isEmpty() || runMode.isEmpty()) {
             printUsage();
             throw new RuntimeException("Correct arguments weren't supplied");
