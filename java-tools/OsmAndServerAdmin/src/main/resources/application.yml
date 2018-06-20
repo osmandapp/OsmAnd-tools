@@ -1,0 +1,47 @@
+---
+logging:
+  file: "logs/osmand-server-admin-boot.log"
+  pattern:
+    file: "%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} %clr(%5p) %clr(${PID}){magenta} %clr(---){faint} %clr([%15.15t]){faint} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %m%n%wEx"
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+  endpoint:
+    health:
+      show-details: ALWAYS
+
+spring:
+  application:
+    name: osmand-server-admin-boot
+  boot:
+    admin:
+      client:
+        url: http://localhost:8080
+  profiles:
+    active:
+      - insecure
+
+---
+spring:
+  profiles: insecure
+
+---
+spring:
+  profiles: secure
+  security:
+    user:
+      name: "admin"
+      password: "admin"
+  boot:
+    admin:
+      client:
+        username: "admin"       #These two are needed so that the client
+        password: "admin"   #can register at the protected server api
+        instance:
+          metadata:
+            user.name: "admin"         #These two are needed so that the server
+            user.password: "admin" #can access the protected client endpoints
+

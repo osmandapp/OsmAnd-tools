@@ -2,6 +2,7 @@ include 'OsmAndMapCreatorUtilities'
 include 'OsmAndMapCreator'
 include 'OsmAndServerUtilities'
 include 'OsmAndServer'
+include 'OsmAndServerAdmin'
 
 def osmAndJava = new File(settingsDir, '../../android/OsmAnd-java')
 //if(osmAndJava.exists()) {
