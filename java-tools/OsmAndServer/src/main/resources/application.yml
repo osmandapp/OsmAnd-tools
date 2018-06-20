@@ -12,7 +12,7 @@ google:
     userInfoUri: https://www.googleapis.com/oauth2/v3/userinfo
     tokenInfoUri:
     preferTokenInfo: true
-    
+
 admin:
   emails:
       victor.shcherb@gmail.com, dmpr0.ua@gmail.com, alex.crimean@gmail.com
@@ -20,16 +20,16 @@ admin:
 logging:
   file: logs/server.log
   config: classpath:logback-spring.xml
-  
+
 server:
-  port: 8091
-          
+  port: 8080
+
 ---
 
 logging:
-  file: /var/log/osmand-server-error.log
+  file: /var/log/osmand-server-logs/error.log
   config: classpath:logback-spring.xml
-        
+
 server:
   port: 8091
 spring:
