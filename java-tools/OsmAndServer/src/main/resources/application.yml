@@ -15,9 +15,11 @@ google:
 admin:
   emails:
       victor.shcherb@gmail.com, victor.shcherb+2@gmail.com
+server:
+  port: 8090
 spring:
   profiles:
-    active: dev
+    active: prod
 logging:
   file: logs/server.log
   config: classpath:logback-spring.xml

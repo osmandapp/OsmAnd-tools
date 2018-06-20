@@ -11,6 +11,8 @@ apply plugin: 'org.springframework.boot'
 apply plugin: 'io.spring.dependency-management'
 
 bootJar {
+    launchScript()
+
     baseName = 'osmand-server-boot'
     version =  version
     mainClassName = 'net.osmand.server.Application'
@@ -20,8 +22,6 @@ bootJar {
 dependencies {
     implementation "org.springframework.boot:spring-boot-starter-web:2.0.1.RELEASE"
     implementation "org.springframework.boot:spring-boot-starter-security:2.0.1.RELEASE"
-
-    implementation "de.codecentric:spring-boot-admin-starter-client:2.0.0"
 
     // make optional for release run
     implementation "org.springframework.boot:spring-boot-devtools:2.0.1.RELEASE"
