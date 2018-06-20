@@ -4,8 +4,11 @@
 	<property name="LOG_FILE"
 		value="${LOG_FILE:-${LOG_PATH:-${LOG_TEMP:-${java.io.tmpdir:-/tmp}}/}spring.log}" />
 
-	<springProfile name="dev">
+	<springProfile name="default">
 		<include resource="org/springframework/boot/logging/logback/console-appender.xml" />
+		<!--  debug security package -->
+		<!-- <logger name="org.springframework.security" level="DEBUG" /> -->
+			
 		<root level="INFO">
 			<appender-ref ref="CONSOLE" />
 		</root>

@@ -25,10 +25,18 @@ server:
   port: 8080
 
 management:
-  metrics:
-    export:
-      simple:
-        enabled: true
+  - 
+    metrics:
+      export:
+        simple:
+          enabled: true
+  -
+    management:
+      endpoints:
+        web:
+          exposure:
+            include: "*"
+
 
 ---
 

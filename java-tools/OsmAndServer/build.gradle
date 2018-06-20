@@ -21,6 +21,8 @@ bootJar {
 
 dependencies {
     implementation "org.springframework.boot:spring-boot-starter-web:2.0.1.RELEASE"
+    implementation "org.springframework.boot:spring-boot-starter-actuator:2.0.1.RELEASE"
+
     implementation "org.springframework.boot:spring-boot-starter-security:2.0.1.RELEASE"
 
     // make optional for release run

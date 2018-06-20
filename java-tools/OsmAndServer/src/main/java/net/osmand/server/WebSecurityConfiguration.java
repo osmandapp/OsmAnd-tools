@@ -68,8 +68,9 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
     	// http.csrf().disable().antMatcher("/**");
     	http.csrf().csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse());
     	
-    	http.authorizeRequests().antMatchers("/", "/hello", "/login**", "/webjars/**", "/error**").permitAll();
-    	http.authorizeRequests().anyRequest().authenticated();
+    	http.authorizeRequests().antMatchers("/", "/hello", "/login**", "/webjars/**", "/error**").permitAll()
+    							.antMatchers("/actuator", "/actuator/**").hasAuthority(ROLE_ADMIN)
+    							.anyRequest().authenticated();
 		http.exceptionHandling().authenticationEntryPoint(new LoginUrlAuthenticationEntryPoint("/login"));
 		http.logout().logoutSuccessUrl("/").permitAll();
 		http.addFilterBefore(ssoFilter(), BasicAuthenticationFilter.class);
@@ -97,7 +98,7 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
 				Object email = map.get("email");
 				if(adminEmailsSet.contains(email) && 
 						"true".equals(map.get("email_verified") + "")) {
-					LOG.info("Admin '" + email + "' logged in");
+					LOG.warn("Admin '" + email + "' logged in");
 					return AuthorityUtils.createAuthorityList(ROLE_USER, ROLE_ADMIN);
 				}
 				LOG.info("User '" + email + "' logged in");
