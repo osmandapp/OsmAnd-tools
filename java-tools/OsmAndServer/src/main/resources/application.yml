@@ -1,7 +1,7 @@
 google:
   client:
-    clientId: ${GOOGLE_CLIENT_ID}
-    clientSecret: ${GOOGLE_CLIENT_SECRET}
+    clientId: ${GOOGLE_CLIENT_ID:521675454867-pmot5ink84bf4876advcmr16o0mgg8lk.apps.googleusercontent.com}
+    clientSecret: ${GOOGLE_CLIENT_SECRET:bH3wvAogUIln12u-TR-E7IEV}
     accessTokenUri: https://www.googleapis.com/oauth2/v4/token
     userAuthorizationUri: https://accounts.google.com/o/oauth2/v2/auth
     clientAuthenticationScheme: form
@@ -16,6 +16,9 @@ admin:
   emails:
       victor.shcherb@gmail.com, victor.shcherb+2@gmail.com
 spring:
+  boot:
+    admin:
+      url=http://localhost:8080
   profiles:
     active: dev
 logging:
