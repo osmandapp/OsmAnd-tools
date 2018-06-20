@@ -6,22 +6,12 @@
 
 	<springProfile name="dev">
 		<include resource="org/springframework/boot/logging/logback/console-appender.xml" />
-		<appender name="ROLLING-FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-			<encoder>
-				<pattern>${FILE_LOG_PATTERN}</pattern>
-			</encoder>
-			<file>${LOG_FILE}</file>
-			<rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-				<fileNamePattern>${LOG_FILE}.%d{yyyy-MM-dd}.log</fileNamePattern>
-			</rollingPolicy>
-		</appender>
 		<root level="INFO">
 			<appender-ref ref="CONSOLE" />
-			<appender-ref ref="ROLLING-FILE" />
 		</root>
 	</springProfile>
 
-	<springProfile name="prod">
+	<springProfile name="production">
 		<appender name="ROLLING-FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
 			<encoder>
 				<pattern>${FILE_LOG_PATTERN}</pattern>
@@ -30,12 +20,12 @@
 			<rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
 				<fileNamePattern>${LOG_FILE}.%d{yyyy-MM-dd}.%i.gz</fileNamePattern>
 				<maxFileSize>10MB</maxFileSize>
-				<maxHistory>90</maxHistory>
+				<maxHistory>3000</maxHistory>
 				<totalSizeCap>1GB</totalSizeCap>
 			</rollingPolicy>
 		</appender>
 
-		<root level="ERROR">
+		<root level="WARN">
 			<appender-ref ref="ROLLING-FILE" />
 		</root>
 	</springProfile>

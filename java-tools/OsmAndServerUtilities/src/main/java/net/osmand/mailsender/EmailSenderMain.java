@@ -22,7 +22,6 @@ import java.util.logging.Logger;
 public class EmailSenderMain {
 
     private final static Logger LOGGER = Logger.getLogger(EmailSenderMain.class.getName());
-
     private static String mailFrom;
     private static SendGrid sendGridClient;
 
