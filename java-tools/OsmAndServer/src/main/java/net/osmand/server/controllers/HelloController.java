@@ -10,9 +10,12 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class HelloController {
 
+	
+	private static final Log logger = LogFactory.getLog(HelloController.class);	
+
     @RequestMapping("/hello")
     public String index() {
-		LogFactory.getLog(HelloController.class).info("TEST LOG!!!");
+    	logger.warn("Hello logger from warn");
         return "Greetings from: " + MapCreatorVersion.APP_MAP_CREATOR_FULL_NAME+ " ";
     }
 

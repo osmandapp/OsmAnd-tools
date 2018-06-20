@@ -31,6 +31,6 @@ logging:
   config: classpath:logback-spring.xml
 
 server:
-  port: 8091
+  port: 8090
 spring:
   profiles: production
