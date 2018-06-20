@@ -15,6 +15,9 @@ google:
 admin:
   emails:
       victor.shcherb@gmail.com, victor.shcherb+2@gmail.com
+spring:
+  profiles:
+    active: dev
 logging:
-  level:
-    root: INFO
+  file: logs/server.log
+  config: classpath:logback-spring.xml
