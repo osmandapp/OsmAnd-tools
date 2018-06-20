@@ -24,6 +24,12 @@ logging:
 server:
   port: 8080
 
+management:
+  metrics:
+    export:
+      simple:
+        enabled: true
+
 ---
 
 logging:
@@ -36,6 +42,7 @@ server:
     accesslog:
       directory: /var/log/osmand-server-logs/
       enabled: true
+      rotate: true
       pattern: common
 
 spring:
