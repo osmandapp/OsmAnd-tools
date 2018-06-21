@@ -22,31 +22,38 @@ import java.util.logging.Logger;
 public class EmailSenderMain {
 
     private final static Logger LOGGER = Logger.getLogger(EmailSenderMain.class.getName());
-    private static String mailFrom;
     private static SendGrid sendGridClient;
-
-    public static void main(String[] args) throws SQLException {
-    	System.out.println("Send email utility");
-        String templateId = null;
+    
+    private static class EmailParams {
+    	String templateId = null;
         String mailingGroups = null;
         String topic = null;
         String runMode = null;
         String testAddresses = null;
+        String subject = null;
+        String mailFrom;
+    }
+
+    public static void main(String[] args) throws SQLException {
+    	System.out.println("Send email utility");
+        EmailParams p = new EmailParams(); 
         boolean updateBlockList = false;
         for (String arg : args) {
             String val = arg.substring(arg.indexOf("=") + 1);
             if (arg.startsWith("--id=")) {
-                templateId = val;
+                p.templateId = val;
             } else if (arg.startsWith("--groups=")) {
-                mailingGroups = val;
+            	p.mailingGroups = val;
             } else if (arg.startsWith("--sender_mail=")) {
-                mailFrom = val;
+            	p.mailFrom = val;
+            } else if (arg.startsWith("--subject=")) {
+            	p.subject = val;
             } else if (arg.startsWith("--topic=")) {
-                topic = val;
+            	p.topic = val;
             } else if (arg.startsWith("--run_opt=")) {
-                runMode = val;
+            	p.runMode = val;
             } else if (arg.startsWith("--test_addr=")) {
-                testAddresses = val;
+            	p.testAddresses = val;
             } else if (arg.equals("--update_block_list")) {
                 updateBlockList = true;
             }
@@ -61,7 +68,7 @@ public class EmailSenderMain {
             conn.close();
             return;
         }
-        checkValidity(templateId, mailingGroups, mailFrom, topic, runMode, testAddresses);
+        checkValidity(p);
 
 
         if (conn == null) {
@@ -69,16 +76,16 @@ public class EmailSenderMain {
             System.exit(1);
         }
 
-        Set<String> unsubscribedAndBlocked = getUnsubscribedAndBlocked(conn, topic);
-        switch (runMode) {
+        Set<String> unsubscribedAndBlocked = getUnsubscribedAndBlocked(conn, p.topic);
+        switch (p.runMode) {
             case "send_to_test_email_group":
-                sendTestEmails(testAddresses, topic, templateId, unsubscribedAndBlocked);
+                sendTestEmails(p, unsubscribedAndBlocked);
                 break;
             case "print_statistics":
-                printStats(conn, mailingGroups);
+                printStats(conn, p, unsubscribedAndBlocked);
                 break;
             case "send_to_production":
-                sendProductionEmails(conn, templateId, topic, mailingGroups, unsubscribedAndBlocked);
+                sendProductionEmails(conn, p, unsubscribedAndBlocked);
                 break;
         }
         conn.close();
@@ -159,15 +166,14 @@ public class EmailSenderMain {
         ps.close();
     }
 
-    private static void sendProductionEmails(Connection conn, String templateId,
-                                             String topic, String mailingGroups, Set<String> unsubscribed) throws SQLException {
-        String query = buildQuery(mailingGroups);
+    private static void sendProductionEmails(Connection conn, EmailParams p, Set<String> unsubscribed) throws SQLException {
+        String query = buildQuery(p.mailingGroups);
         PreparedStatement ps = conn.prepareStatement(query);
         ResultSet resultSet = ps.executeQuery();
         while (resultSet.next()) {
             String address = resultSet.getString(1);
             if (!unsubscribed.contains(address)) {
-                sendMail(address, templateId, topic);
+                sendMail(address, p);
             }
         }
     }
@@ -196,9 +202,9 @@ public class EmailSenderMain {
         }
     }
 
-    private static void printStats(Connection conn, String mailingGroups) throws SQLException {
-        LOGGER.info("TEST SQL query for the databases: " + buildQuery(mailingGroups));
-        String[] groups = mailingGroups.split(",");
+    private static void printStats(Connection conn, EmailParams p, Set<String> unsubscribed ) throws SQLException {
+        LOGGER.info("TEST SQL query for the databases: " + buildQuery(p.mailingGroups));
+        String[] groups = p.mailingGroups.split(",");
         for (String group : groups) {
             group = group.trim();
             PreparedStatement prep = conn.prepareStatement("SELECT count(*) FROM " + group);
@@ -218,6 +224,7 @@ public class EmailSenderMain {
             count = rs.getInt(1);
         }
         LOGGER.info("Unsubscribed in total: " + count);
+        LOGGER.info("Blocked/unsubscribed on db: " + unsubscribed.size());
         LOGGER.info("Fetching the invalid/blocked emails...");
         prep.close();
         rs.close();
@@ -230,26 +237,24 @@ public class EmailSenderMain {
         LOGGER.info("Total blocked: " + count);
     }
 
-    private static void sendTestEmails(String testAddresses, String topic,
-                                       String templateId, Set<String> unsubscribed) {
+    private static void sendTestEmails(EmailParams p, Set<String> unsubscribed) {
         LOGGER.info("Sending test messages...");
-        String[] testRecipients = testAddresses.split(",");
+        String[] testRecipients = p.testAddresses.split(",");
         for (String recipient : testRecipients) {
-            sendMail(recipient.trim(), templateId, topic);
+            sendMail(recipient.trim(), p);
         }
     }
 
-    private static void checkValidity(String templateId, String mailingGroups, String mailFrom,
-                                      String topic, String runMode, String testAddresses) {
-        if (templateId == null || mailingGroups == null
-                || mailFrom == null || topic == null || runMode == null || templateId.isEmpty()
-                || mailFrom.isEmpty()
-                || topic.isEmpty() || runMode.isEmpty()) {
+    private static void checkValidity(EmailParams p) {
+        if (p.templateId == null || p.mailingGroups == null
+                || p.mailFrom == null || p.topic == null || p.runMode == null || p.templateId.isEmpty()
+                || p.mailFrom.isEmpty()
+                || p.topic.isEmpty() || p.runMode.isEmpty()) {
             printUsage();
             throw new RuntimeException("Correct arguments weren't supplied");
         }
-        if (runMode.equals("send_to_test_email_group") &&
-                (testAddresses == null || testAddresses.isEmpty())) {
+        if (p.runMode.equals("send_to_test_email_group") &&
+                (p.testAddresses == null || p.testAddresses.isEmpty())) {
             throw new RuntimeException("Test email group wasn't specified in test sending mode.");
         }
     }
@@ -287,7 +292,7 @@ public class EmailSenderMain {
         return null;
     }
 
-    private static void sendMail(String mailTo, String templateId, String topic) {
+    private static void sendMail(String mailTo, EmailParams p) {
         LOGGER.info("Sending mail to: " + mailTo);
         String userHash;
         try {
@@ -297,18 +302,21 @@ public class EmailSenderMain {
             LOGGER.info(e.getMessage());
             return;
         }
-        Email from = new Email(mailFrom);
+        Email from = new Email(p.mailFrom);
         Email to = new Email(mailTo);
         Mail mail = new Mail();
         mail.from = from;
         Personalization personalization = new Personalization();
         personalization.addTo(to);
         mail.addPersonalization(personalization);
-        mail.setTemplateId(templateId);
+        mail.setTemplateId(p.templateId);
+        if(p.subject != null) {
+        	mail.setSubject(p.subject);
+        }
         MailSettings mailSettings = new MailSettings();
         FooterSetting footerSetting = new FooterSetting();
         footerSetting.setEnable(true);
-        footerSetting.setHtml("<html><center><a href=\"https://osmand.net/unsubscribe?id=" + userHash + "&group=" + topic
+        footerSetting.setHtml("<html><center><a href=\"https://osmand.net/unsubscribe?id=" + userHash + "&group=" + p.topic
                 + "\">Unsubscribe</a></center></html>");
         mailSettings.setFooterSetting(footerSetting);
         mail.setMailSettings(mailSettings);
