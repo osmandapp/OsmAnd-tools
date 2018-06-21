@@ -164,9 +164,11 @@ public class TransactionAnalyzer {
 		String res = string.replace("-", "").replace(" ", "").trim();
 		if (res.equals("3c9e8e73bff140b391e71eae311cdcce")) {
 			return "1GRgEnKujorJJ9VBa76g8cp3sfoWtQqSs4";
+		} else if (res.equals("3")) {
+			// not valid address
+			return null;
 		} else if (res.equals("13H8LERRKFUTqr2YM9J9bdy6xshzjwSAfw")) {
 			return "1A2PRCVN2tFnF5AXBwXmPyV52gH11uCFaS";
-			
 		} else if (res.equals("3d347aae368d426aae104d50d3bdd695") || 
 				res.equals("3d347aae368d426aae104b50d3bdd695")) {
 			return "18btnN8JczdC5QyYfyv5WBksMTWTPAiqor";
@@ -212,6 +214,7 @@ public class TransactionAnalyzer {
 			return new JsonReader(new FileReader(fl));
 		}
 		URL url = new URL(urlBase + id);
+		System.out.println("Read transactions from " + urlBase + id);
 		InputStream is = url.openStream();
 		ByteArrayOutputStream bous = new ByteArrayOutputStream();
 		byte[] bs = new byte[1024];

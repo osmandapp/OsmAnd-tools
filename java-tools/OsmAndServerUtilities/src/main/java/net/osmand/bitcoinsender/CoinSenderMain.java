@@ -1,17 +1,22 @@
 package net.osmand.bitcoinsender;
 
-import com.google.gson.Gson;
-import com.google.gson.internal.LinkedTreeMap;
-import com.google.gson.stream.JsonReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Scanner;
 
 import net.osmand.bitcoinsender.model.AccountBalance;
 import net.osmand.bitcoinsender.model.Withdrawal;
 import net.osmand.bitcoinsender.utils.BlockIOException;
 
-import java.io.File;
-import java.io.FileReader;
-import java.io.IOException;
-import java.util.*;
+import com.google.gson.Gson;
+import com.google.gson.internal.LinkedTreeMap;
+import com.google.gson.stream.JsonReader;
 
 /**
  * Created by Paul on 07.06.17.
@@ -20,7 +25,6 @@ public class CoinSenderMain {
 
     private static String guid;
     private static String pass;
-    private static String directory;
 	public static int PART_SIZE = 200;
 	// MIN PAY FORMULA
 	// FEE_KB - avg fee per KB in mBTC, currently 1.0 mBTC/KB
@@ -31,6 +35,7 @@ public class CoinSenderMain {
 	public static double FEE_BYTE_SATOSHI = 30;
 	public static final long BITCOIN_SATOSHI = 1000 * 1000 * 100;
     public static final int MBTC_SATOSHI = 100 * 1000;
+    public static final String URL_TO_PAY = "http://builder.osmand.net/reports/report_underpaid.json.html";
 	
 	public static double getMinPayInBTC() {
 		return (((double)AVG_TX_SIZE * FEE_BYTE_SATOSHI) / BITCOIN_SATOSHI) * 10; // 0.5 mBTC: 5$ 1 BTC-10000$;
@@ -48,8 +53,6 @@ public class CoinSenderMain {
         guid = in.nextLine();
         System.out.print("Enter your PIN: ");
         pass = in.nextLine();
-        System.out.print("Enter full path to JSON file: ");
-        directory = in.nextLine();
         System.out.print("Enter your part size (default "+PART_SIZE+"): ");
         String ll = in.nextLine();
         if(ll.trim().length() > 0) {
@@ -84,16 +87,8 @@ public class CoinSenderMain {
                 + " Pending: " + balance.getPendingReceivedBalance());
         System.out.println();
 
-        File file = new File(directory);
-        if (!file.exists()) {
-            while (!file.exists()) {
-                System.out.print("You have entered incorrect file path. Please try again: ");
-                directory = in.nextLine();
-                file = new File(directory);
-            }
-        }
-
-        Map<String, Double> payments = convertPaymentsToMap(getPayments(new FileReader(directory)), MIN_PAY);
+        URL ur = new URL(URL_TO_PAY);
+        Map<String, Double> payments = convertPaymentsToMap(getPayments(new InputStreamReader(ur.openConnection().getInputStream())), MIN_PAY);
         double allMoney = calculateTotalSum(payments);
 
         List<Map> splitPayment = splitResults(payments);
@@ -239,7 +234,7 @@ public class CoinSenderMain {
         return payments;
     }
 
-    public static List<LinkedTreeMap> getPayments (FileReader fr) {
+    public static List<LinkedTreeMap> getPayments (Reader fr) {
         Gson gson = new Gson();
         Map<String, Object> recipients = new LinkedHashMap<String, Object>();
         JsonReader reader = new JsonReader(fr);
