@@ -76,6 +76,8 @@ public class MapPointsLayer implements MapPanelLayer {
 
 	@Override
 	public void paintLayer(Graphics2D g) {
+		Map<Point, String> pointsToDraw = this.pointsToDraw;
+		List<LineObject> linesToDraw = this.linesToDraw;
 		g.setColor(color);
 		if (whiteFont == null) {
 			whiteFont = g.getFont().deriveFont(15).deriveFont(Font.BOLD);
@@ -171,6 +173,8 @@ public class MapPointsLayer implements MapPanelLayer {
 	@Override
 	public void prepareToDraw() {
 		if (points != null) {
+			Map<Point, String> pointsToDraw = new LinkedHashMap<Point, String>();
+			List<LineObject> linesToDraw = new ArrayList<LineObject>();
 			double xTileLeft = map.getXTile() - map.getCenterPointX() / map.getTileSize();
 			double xTileRight = map.getXTile() + map.getCenterPointX() / map.getTileSize();
 			double yTileUp = map.getYTile() - map.getCenterPointY() / map.getTileSize();
@@ -211,6 +215,8 @@ public class MapPointsLayer implements MapPanelLayer {
 				} else {
 				}
 			}
+			this.linesToDraw = linesToDraw;
+			this.pointsToDraw = pointsToDraw;
 		}
 	}
 
