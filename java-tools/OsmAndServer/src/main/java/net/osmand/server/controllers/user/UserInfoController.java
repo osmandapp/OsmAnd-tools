@@ -8,9 +8,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-public class InternalController {
+public class UserInfoController {
 
-	protected static final Log logger = LogFactory.getLog(InternalController.class);
+	protected static final Log logger = LogFactory.getLog(UserInfoController.class);
 	
     @RequestMapping("/u/info")
     public String index(java.security.Principal user) throws Exception {

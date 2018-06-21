@@ -68,8 +68,9 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
     	// http.csrf().disable().antMatcher("/**");
     	http.csrf().csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse());
     	
-    	http.authorizeRequests().antMatchers("/", "/hello", "/login**", "/webjars/**", "/error**").permitAll()
-    							.antMatchers("/actuator", "/actuator/**").hasAuthority(ROLE_ADMIN)
+    	// all top level are accessible without login
+    	http.authorizeRequests().antMatchers("/actuator/**", "/admin/**").hasAuthority(ROLE_ADMIN)
+    							.antMatchers("/", "/*", "/login/**", "/webjars/**", "/error/**").permitAll()
     							.anyRequest().authenticated();
 		http.exceptionHandling().authenticationEntryPoint(new LoginUrlAuthenticationEntryPoint("/login"));
 		http.logout().logoutSuccessUrl("/").permitAll();
