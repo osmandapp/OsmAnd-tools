@@ -15,12 +15,16 @@ import java.util.Set;
 import java.util.TimeZone;
 import java.util.TreeSet;
 
+import org.apache.commons.logging.Log;
+
+import net.osmand.PlatformUtil;
 import net.osmand.util.Algorithms;
 import rtree.RTreeException;
 
 public class ObfDiffMerger {
 	static SimpleDateFormat day = new SimpleDateFormat("yyyy_MM_dd");
 	static SimpleDateFormat month = new SimpleDateFormat("yyyy_MM");
+	private static final Log LOG = PlatformUtil.getLog(ObfDiffMerger.class);
 	static {
 		day.setTimeZone(TimeZone.getTimeZone("UTC"));
 		month.setTimeZone(TimeZone.getTimeZone("UTC"));
@@ -59,6 +63,7 @@ public class ObfDiffMerger {
 					if (!date.isDirectory()) {
 						continue;
 					}
+					LOG.info("Processing " + date.getName() + " " + regionName);
 					File flToMerge = new File(region, regionName + "_" + date.getName() + ".obf.gz");
 					boolean processed = new ObfDiffMerger().process(flToMerge, Arrays.asList(date), true);
 					if(processed) {

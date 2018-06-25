@@ -22,7 +22,10 @@ import java.util.TreeMap;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
+import org.apache.commons.logging.Log;
+
 import net.osmand.IndexConstants;
+import net.osmand.PlatformUtil;
 import net.osmand.ResultMatcher;
 import net.osmand.binary.BinaryIndexPart;
 import net.osmand.binary.BinaryMapDataObject;
@@ -67,7 +70,7 @@ public class ObfFileInMemory {
 	private double latbottom = -85;
 	private double lonleft = -179.9;
 	private double lonright = 179.9;
-	
+	private static final Log LOG = PlatformUtil.getLog(ObfFileInMemory.class);
 
 	private Map<MapZooms.MapZoomPair, TLongObjectHashMap<BinaryMapDataObject>> mapObjects = new LinkedHashMap<>();
 	private TLongObjectHashMap<RouteDataObject> routeObjects = new TLongObjectHashMap<>();
@@ -342,6 +345,7 @@ public class ObfFileInMemory {
 			File inputFile = files.get(i);
 			File nonGzip = inputFile;
 			boolean gzip = false;
+			LOG.info("Reading " + inputFile.getName());
 			if(inputFile.getName().endsWith(".gz")) {
 				nonGzip = new File(inputFile.getParentFile(), inputFile.getName().substring(0, inputFile.getName().length() - 3));
 				GZIPInputStream gzin = new GZIPInputStream(new FileInputStream(inputFile));
