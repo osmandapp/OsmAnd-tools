@@ -387,7 +387,7 @@ public class WikiDatabasePreparation {
 	private static String addWikiLink(String lang, String value, String lat, String lon) throws UnsupportedEncodingException {
 		return "[https://" + lang + 
 				".wikipedia.org/wiki/" + URLEncoder.encode(value.trim().replaceAll(" ", "_"), "UTF-8") 
-				+ ((lat != null && lon != null) ? "?lat=" + lat + "&lon=" + lon : "") +  " Wikipedia]";
+				+ ((lat != null && lon != null && !lat.isEmpty() && !lon.isEmpty()) ? "?lat=" + lat + "&lon=" + lon : "") +  " Wikipedia]";
 	}
 
 	private static String getKey(String str) {
