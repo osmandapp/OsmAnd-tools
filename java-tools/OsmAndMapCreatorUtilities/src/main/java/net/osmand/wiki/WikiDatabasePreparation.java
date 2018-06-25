@@ -342,7 +342,7 @@ public class WikiDatabasePreparation {
 			wikiLink = getWikidata(wikiLang, wikiData, wikiDataconn);
 		}
 		if (!wikiLink.isEmpty()) {
-			bld.append(addWikiLink(wikiLang, wikiLink));
+			bld.append(addWikiLink(wikiLang, wikiLink, lat, lon));
 			bld.append(" ");
 		}
 		if (lat != null && lon != null) {
@@ -384,10 +384,10 @@ public class WikiDatabasePreparation {
 		return value;
 	}
 
-	private static String addWikiLink(String lang, String value) throws UnsupportedEncodingException {
+	private static String addWikiLink(String lang, String value, String lat, String lon) throws UnsupportedEncodingException {
 		return "[https://" + lang + 
 				".wikipedia.org/wiki/" + URLEncoder.encode(value.trim().replaceAll(" ", "_"), "UTF-8") 
-				+ " Wikipedia]";
+				+ ((lat != null && lon != null) ? "?lat=" + lat + "&lon=" + lon : "") +  " Wikipedia]";
 	}
 
 	private static String getKey(String str) {

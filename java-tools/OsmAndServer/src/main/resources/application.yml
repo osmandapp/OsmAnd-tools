@@ -15,7 +15,7 @@ google:
 
 admin:
   emails:
-      victor.shcherb@gmail.com, dmpr0.ua@gmail.com, alex.crimean@gmail.com
+      victor.shcherb@gmail.com, dmpr0.ua@gmail.com, alex.crimean@gmail.com, stetsenko.pavlo@gmail.com
 
 logging:
   file: logs/server.log
