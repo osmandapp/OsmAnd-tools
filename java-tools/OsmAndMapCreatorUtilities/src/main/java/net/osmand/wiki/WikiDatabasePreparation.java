@@ -115,15 +115,17 @@ public class WikiDatabasePreparation {
 			if (nt > 0 && ((text.charAt(i) == '{' && text.charAt(i + 1) == '{') || (text.charAt(i) == '[' && text.charAt(i + 1) == '[' && text.charAt(i + 2) == 'ק') 
 					|| (text.charAt(i) == '<' && text.charAt(i + 1) == 'm' && text.charAt(i + 2) == 'a' && text.charAt(i + 3) == 'p' 
 					&& text.charAt(i + 4) == 'l' && text.charAt(i + 5) == 'i') 
-					|| (text.charAt(i) == '<' && text.charAt(i + 1) == 'g' && text.charAt(i + 2) == 'a' && text.charAt(i + 3) == 'l'))) {
-				hebrew = text.length() > 2 ? text.charAt(i + 2) == 'ק' : false;
+					|| (text.charAt(i) == '<' && text.charAt(i + 1) == 'g' && text.charAt(i + 2) == 'a' && text.charAt(i + 3) == 'l')
+					|| (text.charAt(i) == '<' && text.charAt(i + 1) == '!' && text.charAt(i + 2) == '-' && text.charAt(i + 3) == '-'))) {
+				hebrew = text.length() > 2 && text.charAt(i + 2) == 'ק';
 				beginInd = beginInd == 0 ? i + 2 : beginInd;
 				openCnt++;
 				i++;
 			} else if (nt > 0 && ((text.charAt(i) == '}' && text.charAt(i + 1) == '}') || (hebrew && text.charAt(i) == ']' && text.charAt(i + 1) == ']')
 					|| (text.charAt(i) == '>' && text.charAt(i - 1) == 'k' && text.charAt(i - 2) == 'n' && text.charAt(i - 3) == 'i' 
 					&& text.charAt(i - 4) == 'l' && text.charAt(i - 5) == 'p') 
-					|| (text.charAt(i) == '>' && text.charAt(i - 1) == 'y' && text.charAt(i - 2) == 'r' && text.charAt(i - 3) == 'e'))) {
+					|| (text.charAt(i) == '>' && text.charAt(i - 1) == 'y' && text.charAt(i - 2) == 'r' && text.charAt(i - 3) == 'e')
+					|| (text.charAt(i) == '>' && text.charAt(i - 1) == '-' && text.charAt(i - 2) == '-'))) {
 				if (openCnt > 1) {
 					openCnt--;
 					i++;
@@ -279,7 +281,7 @@ public class WikiDatabasePreparation {
 			String value = "";
 			int index = field.indexOf("=");
 			if (index != -1) {
-				value = appendSqareBracketsIfNeeded(i, parts, field.substring(index + 1, field.length()).trim());
+				value = appendSqareBracketsIfNeeded(i, parts, field.substring(index + 1, field.length()).trim()).replaceAll("\n", "");
 				field = field.substring(0, index).trim();
 			}
 			if (!value.isEmpty() && !value.contains("{{")) {
@@ -415,7 +417,9 @@ public class WikiDatabasePreparation {
 				|| str.startsWith("quickbar ") || str.startsWith("banner") || str.startsWith("באנר")
 				|| str.startsWith("سرصفحه")) {
 			return WikivoyageTemplates.BANNER.getType();
-		} else if (str.startsWith("quickbar") || str.startsWith("info ")) {
+		} else if ((str.startsWith("quickbar") && (str.contains("lat=") || str.contains("lon=") || str.contains("long=")
+				|| str.contains("longitude=")))
+				|| str.startsWith("info ")) {
 			return "geo|pagebanner";
 		} else if (str.startsWith("regionlist")) {
 			return WikivoyageTemplates.REGION_LIST.getType();
