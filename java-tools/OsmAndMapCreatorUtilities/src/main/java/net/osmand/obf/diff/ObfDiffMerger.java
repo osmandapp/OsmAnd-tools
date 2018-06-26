@@ -56,6 +56,7 @@ public class ObfDiffMerger {
 					continue;
 				}
 				String regionName = Algorithms.capitalizeFirstLetter(region.getName());
+				LOG.info("Processing " + regionName);
 				if (regionName.equals("_diff")) {
 					regionName = "World";
 				}
@@ -63,7 +64,7 @@ public class ObfDiffMerger {
 					if (!date.isDirectory()) {
 						continue;
 					}
-					LOG.info("Processing " + date.getName() + " " + regionName);
+					
 					File flToMerge = new File(region, regionName + "_" + date.getName() + ".obf.gz");
 					boolean processed = new ObfDiffMerger().process(flToMerge, Arrays.asList(date), true);
 					if(processed) {
