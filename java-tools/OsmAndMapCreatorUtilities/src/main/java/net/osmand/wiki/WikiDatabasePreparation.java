@@ -116,7 +116,7 @@ public class WikiDatabasePreparation {
 					|| (text.charAt(i) == '<' && text.charAt(i + 1) == 'm' && text.charAt(i + 2) == 'a' && text.charAt(i + 3) == 'p' 
 					&& text.charAt(i + 4) == 'l' && text.charAt(i + 5) == 'i') 
 					|| (text.charAt(i) == '<' && text.charAt(i + 1) == 'g' && text.charAt(i + 2) == 'a' && text.charAt(i + 3) == 'l'))) {
-				hebrew = text.length() > 2 ? text.charAt(i + 2) == 'ק' : false;
+				hebrew = text.length() > 2 && text.charAt(i + 2) == 'ק';
 				beginInd = beginInd == 0 ? i + 2 : beginInd;
 				openCnt++;
 				i++;
@@ -279,7 +279,7 @@ public class WikiDatabasePreparation {
 			String value = "";
 			int index = field.indexOf("=");
 			if (index != -1) {
-				value = appendSqareBracketsIfNeeded(i, parts, field.substring(index + 1, field.length()).trim());
+				value = appendSqareBracketsIfNeeded(i, parts, field.substring(index + 1, field.length()).trim()).replaceAll("\n", "");
 				field = field.substring(0, index).trim();
 			}
 			if (!value.isEmpty() && !value.contains("{{")) {
