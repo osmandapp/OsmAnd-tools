@@ -172,7 +172,7 @@ public class EmailSenderMain {
         ResultSet resultSet = ps.executeQuery();
         while (resultSet.next()) {
             String address = resultSet.getString(1);
-            if (!unsubscribed.contains(address)) {
+            if (!unsubscribed.contains(address) && address != null) {
                 sendMail(address, p);
             }
         }
