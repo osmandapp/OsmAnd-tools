@@ -417,7 +417,9 @@ public class WikiDatabasePreparation {
 				|| str.startsWith("quickbar ") || str.startsWith("banner") || str.startsWith("באנר")
 				|| str.startsWith("سرصفحه")) {
 			return WikivoyageTemplates.BANNER.getType();
-		} else if (str.startsWith("quickbar") || str.startsWith("info ")) {
+		} else if ((str.startsWith("quickbar") && (str.contains("lat=") || str.contains("lon=") || str.contains("long=")
+				|| str.contains("longitude=")))
+				|| str.startsWith("info ")) {
 			return "geo|pagebanner";
 		} else if (str.startsWith("regionlist")) {
 			return WikivoyageTemplates.REGION_LIST.getType();
