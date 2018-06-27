@@ -74,7 +74,7 @@ public class OsmAndServerMonitorTasks {
 				String name = jb.getString("name");
 				String color = jb.getString("color");
 				if(!color.equals("blue") && !color.equals("disabled") && 
-						!color.equals("notbuilt")) {
+						!color.equals("notbuilt") && !color.equals("blue_anime")) {
 					jobsFailed.add(name);
 				}
 			}
