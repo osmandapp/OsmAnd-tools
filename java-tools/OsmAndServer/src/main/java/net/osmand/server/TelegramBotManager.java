@@ -89,13 +89,21 @@ public class TelegramBotManager {
 			Message msg = update.getMessage();
 			SendMessage snd = new SendMessage();
 			snd.setChatId(msg.getChatId());
-			if (msg.isCommand() && "/start_monitoring".equals(msg.getText())) {
+			String coreMsg = msg.getText();
+			if(coreMsg.startsWith("/")) {
+				coreMsg = coreMsg.substring(1);
+			}
+			int at = coreMsg.indexOf("@");
+			if(at > 0) {
+				coreMsg = coreMsg.substring(0, at);
+			}
+			if (msg.isCommand() && "start_monitoring".equals(coreMsg)) {
 				monitoringChatIds.add(msg.getChatId());
 				snd.setText("Monitoring of OsmAnd server has started");
-			} else if (msg.isCommand() && "/stop_monitoring".equals(msg.getText())) {
+			} else if (msg.isCommand() && "stop_monitoring".equals(coreMsg)) {
 				monitoringChatIds.remove((Long)msg.getChatId());
 				snd.setText("Monitoring of OsmAnd server has stopped");
-			} else if (msg.isCommand() && "/status".equals(msg.getText())) {
+			} else if (msg.isCommand() && "status".equals(coreMsg)) {
 				snd.setText(monitoring.getStatusMessage());
 			} else {
 				snd.setText("Sorry, I don't know what to do");
