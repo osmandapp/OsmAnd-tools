@@ -58,7 +58,7 @@ public class OsmAndServerMonitorTasks {
     }
 
 	private String getLiveDelayedMessage(long delay) {
-		int roundUp = (int) (delay / HOUR * 100);
+		int roundUp = (int) (delay * 100 / HOUR);
     	return "OsmAnd Live is delayed by " + (roundUp / 100.f) + " hours";
 	}
 	
