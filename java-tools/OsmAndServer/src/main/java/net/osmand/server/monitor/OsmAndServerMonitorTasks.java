@@ -28,7 +28,8 @@ public class OsmAndServerMonitorTasks {
 	@Autowired
 	TelegramBotManager telegram;
 
-	long previousOsmAndLiveDelay = 0;
+	LiveCheckInfo live = new LiveCheckInfo(); 
+	
 	SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd HH:mm");
 	
     @Scheduled(fixedRate = 10 * MINUTE)
@@ -42,10 +43,12 @@ public class OsmAndServerMonitorTasks {
 			Date dt = format.parse(osmlivetime);
 			br.close();
 			long currentDelay = System.currentTimeMillis() - dt.getTime();
-			if(currentDelay - previousOsmAndLiveDelay > 30 * MINUTE && currentDelay > HOUR) {
+			if(currentDelay - live.previousOsmAndLiveDelay > 30 * MINUTE && currentDelay > HOUR) {
 				telegram.sendMonitoringAlertMessage(getLiveDelayedMessage(currentDelay));
-				previousOsmAndLiveDelay = currentDelay;
+				live.previousOsmAndLiveDelay = currentDelay;
 			}
+			live.lastCheckTimestamp = System.currentTimeMillis();
+			live.lastOsmAndLiveDelay = currentDelay;
 		} catch (Exception e) {
 			telegram.sendMonitoringAlertMessage("Exception while checking the server status.");
 			LOG.error(e.getMessage(), e);
@@ -54,12 +57,18 @@ public class OsmAndServerMonitorTasks {
     }
 
     public String getStatusMessage() {
-    	return getLiveDelayedMessage(previousOsmAndLiveDelay);
+    	return getLiveDelayedMessage(live.lastOsmAndLiveDelay);
     }
 
 	private String getLiveDelayedMessage(long delay) {
 		int roundUp = (int) (delay * 100 / HOUR);
     	return "OsmAnd Live is delayed by " + (roundUp / 100.f) + " hours";
+	}
+	
+	private static class LiveCheckInfo {
+		long previousOsmAndLiveDelay = 0;
+		long lastOsmAndLiveDelay = 0;
+		long lastCheckTimestamp = 0;
 	}
 	
 }
