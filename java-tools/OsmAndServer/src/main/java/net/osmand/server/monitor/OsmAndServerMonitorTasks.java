@@ -73,7 +73,8 @@ public class OsmAndServerMonitorTasks {
 				JSONObject jb = jsonArray.getJSONObject(i);
 				String name = jb.getString("name");
 				String color = jb.getString("color");
-				if(!color.equals("blue") && !color.equals("disabled")) {
+				if(!color.equals("blue") && !color.equals("disabled") && 
+						!color.equals("notbuilt")) {
 					jobsFailed.add(name);
 				}
 			}
