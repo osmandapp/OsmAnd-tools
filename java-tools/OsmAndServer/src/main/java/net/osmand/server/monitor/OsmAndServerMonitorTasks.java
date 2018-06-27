@@ -61,7 +61,7 @@ public class OsmAndServerMonitorTasks {
     }
     
     
-    @Scheduled(fixedRate = 5 * MINUTE)
+    @Scheduled(fixedRate =  MINUTE)
     public void checkOsmAndBuildServer() {
     	try {
     		Set<String> jobsFailed = new TreeSet<String>();
