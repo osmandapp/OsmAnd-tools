@@ -3,8 +3,11 @@ package net.osmand.server;
 import java.util.ArrayList;
 import java.util.List;
 
+import net.osmand.server.monitor.OsmAndServerMonitorTasks;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.ApiContextInitializer;
 import org.telegram.telegrambots.TelegramBotsApi;
@@ -23,6 +26,9 @@ public class TelegramBotManager {
 	private List<Long> monitoringChatIds = new ArrayList<>();
 
 	private OsmAndServerMonitoringBot osmAndServerMonitoringBot;
+	
+	@Autowired
+	private OsmAndServerMonitorTasks monitoring;
 	
 	public void init() {
 		if(System.getenv("OSMAND_SERVER_BOT_TOKEN") == null) {
@@ -87,8 +93,10 @@ public class TelegramBotManager {
 				monitoringChatIds.add(msg.getChatId());
 				snd.setText("Monitoring of OsmAnd server has started");
 			} else if (msg.isCommand() && "/stop_monitoring".equals(msg.getText())) {
-				monitoringChatIds.remove((Long) msg.getChatId());
+				monitoringChatIds.remove((Long)msg.getChatId());
 				snd.setText("Monitoring of OsmAnd server has stopped");
+			} else if (msg.isCommand() && "/status".equals(msg.getText())) {
+				snd.setText(monitoring.getStatusMessage());
 			} else {
 				snd.setText("Sorry, I don't know what to do");
 			}

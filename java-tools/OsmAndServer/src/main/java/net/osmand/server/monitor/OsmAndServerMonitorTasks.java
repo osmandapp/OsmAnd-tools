@@ -17,14 +17,16 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 @Component
-public class ScheduledTasks {
+public class OsmAndServerMonitorTasks {
 
 	private static final Log LOG = LogFactory.getLog(TelegramBotManager.class);
-	@Autowired
-	TelegramBotManager telegram;
+	
 	private static final int SECOND = 1000;
 	private static final int MINUTE = 60 * SECOND;
 	private static final int HOUR = 60 * MINUTE;
+	
+	@Autowired
+	TelegramBotManager telegram;
 
 	long previousOsmAndLiveDelay = 0;
 	SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd HH:mm");
@@ -41,8 +43,7 @@ public class ScheduledTasks {
 			br.close();
 			long currentDelay = System.currentTimeMillis() - dt.getTime();
 			if(currentDelay - previousOsmAndLiveDelay > 30 * MINUTE && currentDelay > HOUR) {
-				int roundUp = (int) (currentDelay / HOUR * 100);
-				telegram.sendMonitoringAlertMessage("OsmAnd Live is delayed by " + (roundUp / 100.f) + " hours");
+				telegram.sendMonitoringAlertMessage(getLiveDelayedMessage(currentDelay));
 				previousOsmAndLiveDelay = currentDelay;
 			}
 		} catch (Exception e) {
@@ -51,4 +52,14 @@ public class ScheduledTasks {
 		}
     	
     }
+
+    public String getStatusMessage() {
+    	return getLiveDelayedMessage(previousOsmAndLiveDelay);
+    }
+
+	private String getLiveDelayedMessage(long delay) {
+		int roundUp = (int) (delay / HOUR * 100);
+    	return "OsmAnd Live is delayed by " + (roundUp / 100.f) + " hours";
+	}
+	
 }
