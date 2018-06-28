@@ -31,10 +31,16 @@
  		<appender name="FILE_ERROR" class="ch.qos.logback.core.FileAppender">
         	<file>/var/log/osmand-server-logs/error.log</file>
         	<append>true</append>
+        	<encoder>
+				<pattern>${FILE_LOG_PATTERN}</pattern>
+			</encoder>
     	</appender>   
  		<appender name="FILE_INFO" class="ch.qos.logback.core.FileAppender">
         	<file>/var/log/osmand-server-logs/info.log</file>
         	<append>true</append>
+        	<encoder>
+				<pattern>${FILE_LOG_PATTERN}</pattern>
+			</encoder>
     	</appender>
     	<root level="WARN">
 			<appender-ref ref="FILE_ERROR" />
