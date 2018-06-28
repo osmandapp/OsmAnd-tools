@@ -3,9 +3,10 @@
 	<include resource="org/springframework/boot/logging/logback/defaults.xml" />
 	<property name="LOG_FILE"
 		value="${LOG_FILE:-${LOG_PATH:-${LOG_TEMP:-${java.io.tmpdir:-/tmp}}/}spring.log}" />
+	<include resource="org/springframework/boot/logging/logback/console-appender.xml" />
 
 	<springProfile name="default">
-		<include resource="org/springframework/boot/logging/logback/console-appender.xml" />
+		
 		<!--  debug security package -->
 		<!-- <logger name="org.springframework.security" level="DEBUG" /> -->
 			
@@ -35,13 +36,6 @@
 				<pattern>${FILE_LOG_PATTERN}</pattern>
 			</encoder>
     	</appender>   
- 		<appender name="FILE_INFO" class="ch.qos.logback.core.FileAppender">
-        	<file>/var/log/osmand-server-logs/info.log</file>
-        	<append>true</append>
-        	<encoder>
-				<pattern>${FILE_LOG_PATTERN}</pattern>
-			</encoder>
-    	</appender>
     	<root level="WARN">
 			<appender-ref ref="FILE_ERROR" />
 		</root>   
