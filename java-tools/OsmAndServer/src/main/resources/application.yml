@@ -52,7 +52,7 @@ server:
     accesslog:
       directory: /var/log/osmand-server-logs/
       enabled: true
-      rotate: true
+      rotate: false
       pattern: '%h %l %u %t "%r" %s %b %D "%{Referer}i" "%{User-Agent}i"'
 
 spring:
