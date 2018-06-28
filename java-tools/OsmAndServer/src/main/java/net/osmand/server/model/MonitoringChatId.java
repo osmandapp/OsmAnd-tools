@@ -1,6 +1,6 @@
 package net.osmand.server.model;
 
-import javax.annotation.Nullable;
+import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.Id;
 import javax.persistence.Table;
@@ -14,13 +14,13 @@ public class MonitoringChatId {
 	//@GeneratedValue(strategy = GenerationType.IDENTITY)
 	public Long id;
 
-	@Nullable
+	@Column(nullable = true)
 	public String firstName;
 	
-	@Nullable
+	@Column(nullable = true)
 	public String lastName;
-	
-	@Nullable
+
+	@Column(nullable = true)
 	public Long userId;
 
 	@Override
