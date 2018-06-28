@@ -15,6 +15,7 @@ import org.telegram.telegrambots.TelegramBotsApi;
 import org.telegram.telegrambots.api.methods.send.SendMessage;
 import org.telegram.telegrambots.api.objects.Message;
 import org.telegram.telegrambots.api.objects.Update;
+import org.telegram.telegrambots.api.objects.User;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.exceptions.TelegramApiException;
 import org.telegram.telegrambots.exceptions.TelegramApiRequestException;
@@ -115,10 +116,11 @@ public class TelegramBotManager {
 				if (msg.isCommand() && "start_monitoring".equals(coreMsg)) {
 					MonitoringChatId mid = new MonitoringChatId();
 					mid.id = msg.getChatId();
-					if(msg.getContact() != null) {
-						mid.firstName = msg.getContact().getFirstName();
-						mid.lastName = msg.getContact().getLastName();
-						mid.userId = msg.getContact().getUserID() == null ? null : new Long(msg.getContact().getUserID());
+					User from = msg.getFrom();
+					if(from != null) {
+						mid.firstName = from.getFirstName();
+						mid.lastName = from.getLastName();
+						mid.userId = from.getId() == null ? null : new Long(from.getId());
 					}
 					addMonitoringChatId(mid);
 					snd.setText("Monitoring of OsmAnd server has started");
