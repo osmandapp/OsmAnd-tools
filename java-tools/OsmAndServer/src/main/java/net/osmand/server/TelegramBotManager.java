@@ -114,6 +114,7 @@ public class TelegramBotManager {
 				}
 				if (msg.isCommand() && "start_monitoring".equals(coreMsg)) {
 					MonitoringChatId mid = new MonitoringChatId();
+					mid.id = msg.getChatId();
 					if(msg.getContact() != null) {
 						mid.firstName = msg.getContact().getFirstName();
 						mid.lastName = msg.getContact().getLastName();
