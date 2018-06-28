@@ -43,7 +43,6 @@ spring:
 spring.jpa.hibernate.ddl-auto: validate
 
 logging:
-  file: /var/log/osmand-server-logs/error.log
   config: classpath:logback-spring.xml
 
 server:
@@ -52,7 +51,7 @@ server:
     accesslog:
       directory: /var/log/osmand-server-logs/
       enabled: true
-      rotate: false
+      rotatable: false
       pattern: '%h %l %u %t "%r" %s %b %D "%{Referer}i" "%{User-Agent}i"'
 
 spring:
