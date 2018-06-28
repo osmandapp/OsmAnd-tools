@@ -1,9 +1,10 @@
 package net.osmand.server;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Collection;
 
+import net.osmand.server.model.MonitoringChatId;
 import net.osmand.server.monitor.OsmAndServerMonitorTasks;
+import net.osmand.server.repo.MonitoringChatRepository;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -23,14 +24,32 @@ public class TelegramBotManager {
 	
 	private static final Log LOG = LogFactory.getLog(TelegramBotManager.class);
 	
-	private List<Long> monitoringChatIds = new ArrayList<>();
-
 	private OsmAndServerMonitoringBot osmAndServerMonitoringBot;
 	
 	@Autowired
 	private OsmAndServerMonitorTasks monitoring;
 	
+	@Autowired
+	private MonitoringChatRepository chatRepo;
+	
+	public Collection<MonitoringChatId> getMonitoringChatIds() {
+		return chatRepo.findAll();
+	}
+	
+	public void addMonitoringChatId(MonitoringChatId cid) {
+		chatRepo.save(cid);
+	}
+	
+	public void removeMonitoringChatId(Long chatId) {
+		chatRepo.deleteById(chatId);
+	}
+	
 	public void init() {
+		System.out.println(chatRepo.findAll());
+		MonitoringChatId mid = new MonitoringChatId();
+		mid.id = 1l;
+		mid.firstName = "Hei";
+		addMonitoringChatId(mid);
 		if(System.getenv("OSMAND_SERVER_BOT_TOKEN") == null) {
 			return;
 		}
@@ -51,9 +70,9 @@ public class TelegramBotManager {
 		if(osmAndServerMonitoringBot == null) {
 			return;
 		}
-		for(Long id : monitoringChatIds) {
+		for(MonitoringChatId id : getMonitoringChatIds()) {
 			SendMessage snd = new SendMessage();
-			snd.setChatId(id);
+			snd.setChatId(id.id);
 			snd.setText(text);
 			try {
 				osmAndServerMonitoringBot.sendText(snd);
@@ -87,28 +106,46 @@ public class TelegramBotManager {
 				return;
 			}
 			Message msg = update.getMessage();
-			SendMessage snd = new SendMessage();
-			snd.setChatId(msg.getChatId());
-			String coreMsg = msg.getText();
-			if(coreMsg.startsWith("/")) {
-				coreMsg = coreMsg.substring(1);
-			}
-			int at = coreMsg.indexOf("@");
-			if(at > 0) {
-				coreMsg = coreMsg.substring(0, at);
-			}
-			if (msg.isCommand() && "start_monitoring".equals(coreMsg)) {
-				monitoringChatIds.add(msg.getChatId());
-				snd.setText("Monitoring of OsmAnd server has started");
-			} else if (msg.isCommand() && "stop_monitoring".equals(coreMsg)) {
-				monitoringChatIds.remove((Long)msg.getChatId());
-				snd.setText("Monitoring of OsmAnd server has stopped");
-			} else if (msg.isCommand() && "status".equals(coreMsg)) {
-				snd.setText(monitoring.getStatusMessage());
-			} else {
-				snd.setText("Sorry, I don't know what to do");
-			}
 			try {
+				SendMessage snd = new SendMessage();
+				snd.setChatId(msg.getChatId());
+				String coreMsg = msg.getText();
+				if (coreMsg.startsWith("/")) {
+					coreMsg = coreMsg.substring(1);
+				}
+				int at = coreMsg.indexOf("@");
+				if (at > 0) {
+					coreMsg = coreMsg.substring(0, at);
+				}
+				if (msg.isCommand() && "start_monitoring".equals(coreMsg)) {
+					MonitoringChatId mid = new MonitoringChatId();
+					if(msg.getContact() != null) {
+						mid.firstName = msg.getContact().getFirstName();
+						mid.lastName = msg.getContact().getLastName();
+						mid.userId = msg.getContact().getUserID() == null ? null : new Long(msg.getContact().getUserID());
+					}
+					addMonitoringChatId(mid);
+					snd.setText("Monitoring of OsmAnd server has started");
+				} else if (msg.isCommand() && "stop_monitoring".equals(coreMsg)) {
+					removeMonitoringChatId(msg.getChatId());
+					snd.setText("Monitoring of OsmAnd server has stopped");
+				} else if (msg.isCommand() && "refresh".equals(coreMsg)) {
+					snd.setText(monitoring.refreshAll());
+				} else if (msg.isCommand() && "refresh-all".equals(coreMsg)) {
+					String refreshAll = monitoring.refreshAll();
+					for (MonitoringChatId l : getMonitoringChatIds()) {
+						snd = new SendMessage();
+						snd.setChatId(l.id);
+						snd.setText(refreshAll);
+						osmAndServerMonitoringBot.sendText(snd);
+					}
+					return;
+				} else if (msg.isCommand() && "status".equals(coreMsg)) {
+					snd.setText(monitoring.getStatusMessage());
+				} else {
+					snd.setText("Sorry, I don't know what to do");
+				}
+
 				sendApiMethod(snd);
 			} catch (TelegramApiException e) {
 				LOG.error(
@@ -121,5 +158,7 @@ public class TelegramBotManager {
 		public void clearWebhook() throws TelegramApiRequestException {
 		}
 	}
+
+	
 	
 }

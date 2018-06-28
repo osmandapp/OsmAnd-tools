@@ -61,7 +61,7 @@ public class OsmAndServerMonitorTasks {
     }
     
     
-    @Scheduled(fixedRate =  MINUTE)
+    @Scheduled(fixedRate = MINUTE)
     public void checkOsmAndBuildServer() {
     	try {
     		Set<String> jobsFailed = new TreeSet<String>();
@@ -102,6 +102,12 @@ public class OsmAndServerMonitorTasks {
     }
     
 
+    public String refreshAll() {
+    	checkOsmAndLiveStatus();
+    	checkOsmAndBuildServer();
+    	return getStatusMessage();
+    }
+    
     public String getStatusMessage() {
     	String msg = getLiveDelayedMessage(live.lastOsmAndLiveDelay) +"\n";
     	if(buildServer.jobsFailed.isEmpty()) {

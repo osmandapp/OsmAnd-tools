@@ -31,5 +31,13 @@ CREATE MATERIALIZED VIEW changeset_country_view AS SELECT * FROM changeset_count
 # REFRESH MATERIALIZED VIEW  changeset_country_view ;
 
 
+CREATE TABLE telegram_monitoring (
+  id bigint NOT NULL,
+  first_name varchar(100)  DEFAULT NULL,
+  last_name varchar(100)  DEFAULT NULL,
+  user_id bigint DEFAULT NULL,
+  PRIMARY KEY (id)
+) ;
+
 GRANT ALL privileges ON ALL TABLES IN SCHEMA public to <user>;
 GRANT ALL privileges ON supporters_seq to <user>;

@@ -29,9 +29,18 @@ management:
     web:
       exposure:
         include: "*"
-
+spring:
+  jpa:
+    properties.hibernate.dialect: org.hibernate.dialect.PostgreSQLDialect
+    properties.hibernate.jdbc.lob.non_contextual_creation: true
+    hibernate.ddl-auto: update
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/changeset}
+    username: ${DB_USER:test}
+    password: ${DB_PWD:test}
 
 ---
+spring.jpa.hibernate.ddl-auto: validate
 
 logging:
   file: /var/log/osmand-server-logs/error.log
