@@ -45,11 +45,6 @@ public class TelegramBotManager {
 	}
 	
 	public void init() {
-		System.out.println(chatRepo.findAll());
-		MonitoringChatId mid = new MonitoringChatId();
-		mid.id = 1l;
-		mid.firstName = "Hei";
-		addMonitoringChatId(mid);
 		if(System.getenv("OSMAND_SERVER_BOT_TOKEN") == null) {
 			return;
 		}
