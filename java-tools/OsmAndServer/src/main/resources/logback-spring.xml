@@ -40,7 +40,7 @@
 			<appender-ref ref="FILE_ERROR" />
 		</root>   
 		<root level="INFO">
-			<appender-ref ref="FILE_INFO" />
+			<appender-ref ref="CONSOLE" />
 		</root>
 	</springProfile>
 
