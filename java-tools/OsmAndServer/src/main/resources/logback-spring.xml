@@ -32,15 +32,15 @@
         	<file>/var/log/osmand-server-logs/error.log</file>
         	<append>true</append>
     	</appender>   
- 		<appender name="FILE" class="ch.qos.logback.core.FileAppender">
+ 		<appender name="FILE_INFO" class="ch.qos.logback.core.FileAppender">
         	<file>/var/log/osmand-server-logs/info.log</file>
         	<append>true</append>
     	</appender>
     	<root level="WARN">
-			<appender-ref ref="ROLLING-FILE" />
+			<appender-ref ref="FILE_ERROR" />
 		</root>   
-		<root level="FILE">
-			<appender-ref ref="ROLLING-FILE" />
+		<root level="INFO">
+			<appender-ref ref="FILE_INFO" />
 		</root>
 	</springProfile>
 
