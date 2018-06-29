@@ -139,8 +139,8 @@ public class WikivoyageLangPreparation {
 
 	public static PreparedStatement generateInsertPrep(Connection conn, boolean uncompressed) throws SQLException {
 		return conn.prepareStatement("INSERT INTO travel_articles(title, content_gz"
-				+ (uncompressed ? ", content text" : "") + ", is_part_of, lat, lon, image_title, gpx_gz"
-				+ (uncompressed ? ", gpx text" : "") + ", trip_id , original_id , lang, contents_json)"
+				+ (uncompressed ? ", content" : "") + ", is_part_of, lat, lon, image_title, gpx_gz"
+				+ (uncompressed ? ", gpx" : "") + ", trip_id , original_id , lang, contents_json)"
 				+ " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?" + (uncompressed ? ", ?, ?": "") + ")");
 	}
 	
