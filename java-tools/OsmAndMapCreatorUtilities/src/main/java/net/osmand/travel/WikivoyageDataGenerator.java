@@ -595,7 +595,7 @@ public class WikivoyageDataGenerator {
 			// System.out.println("Debug Data " + sb);
 			JSONObject object = new JSONObject(new JSONTokener(sb.toString()));
 			TreeSet<String> list = new TreeSet<String>();
-			JSONArray articles = object.getJSONArray("labels").getJSONObject(0).getJSONArray("articles");
+			JSONArray articles = object.getJSONArray("items").getJSONObject(0).getJSONArray("articles");
 			for (int i = 0; i < articles.length() && i < limit; i++) {
 				String title = articles.getJSONObject(i).getString("article").toLowerCase();
 				list.add(title);
