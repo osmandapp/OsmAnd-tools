@@ -469,12 +469,13 @@ public class WikiDatabasePreparation {
 		final String sqliteFileName = folder + "wiki.sqlite";
 		final String pathToWikiData = folder + "wikidatawiki-latest-pages-articles.xml.bz2";
 		final String wikidataSqlite = folder + "wikidata.sqlite";
-		if (!new File(wikidataSqlite).exists() && new File(pathToWikiData).exists()) {
+		if (!new File(wikidataSqlite).exists()) {
+			if (!new File(pathToWikiData).exists()) {
+				log.error("Wikidata dump doesn't exist. Exiting.");
+				System.exit(1);
+			}
 			log.info("Processing wikidata...");
 			processDump(pathToWikiData, wikidataSqlite);
-		} else {
-			log.error("Wikidata dump doesn't exist. Exiting.");
-			System.exit(1);
 		}
 		log.info("Processing Wikipedia articles");
 		processDump(wikiPg, sqliteFileName, lang, wikidataSqlite);

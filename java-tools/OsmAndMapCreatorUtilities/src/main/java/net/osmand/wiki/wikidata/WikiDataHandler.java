@@ -1,5 +1,9 @@
 package net.osmand.wiki.wikidata;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import net.osmand.PlatformUtil;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.obf.preparation.DBDialect;
@@ -19,6 +23,7 @@ import java.io.InputStream;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.util.Map;
 
 
 public class WikiDataHandler extends DefaultHandler {
@@ -114,38 +119,20 @@ public class WikiDataHandler extends DefaultHandler {
                     ctext = null;
                 } else if (name.equals("text")) {
                     try {
-                        JSONObject object = new JSONObject(new JSONTokener(ctext.toString()));
-                        JSONObject labels = object.getJSONObject("labels");
-                        JSONObject claims = object.getJSONObject("claims");
-                        JSONArray coordinatesField = claims.getJSONArray("P625");
-                        JSONObject coordVals = null;
-                        for (int i = 0; i < coordinatesField.length(); i++) {
-                            JSONObject obj = coordinatesField.getJSONObject(i);
-                            if (obj.keySet().contains("mainsnak")) {
-                                coordVals = obj;
-                                break;
-                            }
-                        }
-                        Double lat = null;
-                        Double lon = null;
-                        if (coordVals != null) {
-                            JSONObject coordinates = coordVals.getJSONObject("mainsnak").getJSONObject("datavalue")
-                                    .getJSONObject("value");
-                            lat = (Double) coordinates.get("latitude");
-                            lon = (Double) coordinates.get("longitude");
-                        }
-                        if (lat != null && lon != null) {
+                        Gson gson = new GsonBuilder()
+                                .registerTypeAdapter(ArticleMapper.Article.class, new ArticleMapper())
+                                .create();
+                        ArticleMapper.Article article = gson.fromJson(ctext.toString(), ArticleMapper.Article.class);
+                        if (article.getLabels() != null && article.getLat() != 0 && article.getLon() != 0) {
                             coordsPrep.setString(1, title.toString());
-                            coordsPrep.setDouble(2, lat);
-                            coordsPrep.setDouble(3, lon);
-                            addTranslationMappings(labels);
+                            coordsPrep.setDouble(2, article.getLat());
+                            coordsPrep.setDouble(3, article.getLon());
+                            addTranslationMappings(article.getLabels());
                             addBatch();
                         }
-                    } catch (JSONException | ClassCastException | SQLException e) {
+                    } catch (Exception e) {
                         // Generally means that the field is missing in the json or the incorrect data is supplied
                     }
-
-
                 }
             }
         } catch (IOException e) {
@@ -153,10 +140,10 @@ public class WikiDataHandler extends DefaultHandler {
         }
     }
 
-    private void addTranslationMappings(JSONObject labels) throws SQLException {
-        for (Object key : labels.keySet()) {
-            String lang = (String) key;
-            String article = labels.getJSONObject(lang).getString("value");
+    private void addTranslationMappings(JsonObject labels) throws SQLException {
+        for (Map.Entry<String, JsonElement> entry : labels.entrySet()) {
+            String lang = entry.getKey();
+            String article = entry.getValue().getAsJsonObject().getAsJsonPrimitive("value").getAsString();
             mappingPrep.setString(1, title.toString());
             mappingPrep.setString(2, lang);
             mappingPrep.setString(3, article);
