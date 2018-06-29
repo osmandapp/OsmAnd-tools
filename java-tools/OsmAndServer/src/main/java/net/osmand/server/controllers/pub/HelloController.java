@@ -14,6 +14,8 @@ public class HelloController {
 
     @RequestMapping("/hello")
     public String index() {
+		logger.info("Test info log message");
+    	logger.error("Test error log message");
         return "Greetings from: " + MapCreatorVersion.APP_MAP_CREATOR_FULL_NAME+ " ";
     }
 
