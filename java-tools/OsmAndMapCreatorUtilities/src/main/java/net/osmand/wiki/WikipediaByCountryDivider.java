@@ -1,25 +1,5 @@
 package net.osmand.wiki;
 
-import java.io.BufferedReader;
-import java.io.ByteArrayInputStream;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.UnsupportedEncodingException;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.LinkedHashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.zip.GZIPInputStream;
-
 import net.osmand.IndexConstants;
 import net.osmand.PlatformUtil;
 import net.osmand.binary.BinaryMapDataObject;
@@ -30,71 +10,29 @@ import net.osmand.map.WorldRegion;
 import net.osmand.obf.preparation.DBDialect;
 import net.osmand.obf.preparation.IndexCreator;
 import net.osmand.obf.preparation.IndexCreatorSettings;
-import net.osmand.obf.preparation.IndexPoiCreator;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
-import net.osmand.util.SqlInsertValuesReader;
-import net.osmand.util.SqlInsertValuesReader.InsertValueProcessor;
-
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorOutputStream;
 import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlPullParserException;
 import org.xmlpull.v1.XmlSerializer;
-
 import rtree.RTree;
+
+import java.io.*;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.*;
+import java.util.zip.GZIPInputStream;
 
 public class WikipediaByCountryDivider {
 	private static final Log log = PlatformUtil.getLog(WikipediaByCountryDivider.class);
 	private static final long BATCH_SIZE = 3500;
 
-	private static class LanguageSqliteFile {
-		private Connection conn;
-		private ResultSet rs;
-
-		public LanguageSqliteFile(String fileName) throws SQLException {
-			conn = (Connection) DBDialect.SQLITE.getDatabaseConnection(fileName, log);
-//			conn.createStatement().execute("CREATE INDEX IF NOT EXISTS ID_INDEX ON WIKI(ID)");
-		}
-
-		public long getId() throws SQLException {
-			return rs.getLong(1);
-		}
-
-		public double getLat() throws SQLException {
-			return rs.getDouble(2);
-		}
-
-		public double getLon() throws SQLException {
-			return rs.getDouble(3);
-		}
-
-		public String getTitle() throws SQLException {
-			return rs.getString(4);
-		}
-
-		public byte[] getContent() throws SQLException {
-			return rs.getBytes(5);
-		}
-
-		public boolean next() throws SQLException {
-			if(rs == null) {
-				rs = conn.createStatement().executeQuery("SELECT id, lat, lon, title, zipContent FROM wiki");
-			}
-			return rs.next();
-		}
-
-		public void closeConnnection() throws SQLException {
-			conn.close();
-		}
-	}
-
 	private static class GlobalWikiStructure {
 
-
-		private PreparedStatement getWikidataById;
-		private PreparedStatement insertWikiContent;
-		private PreparedStatement insertWikidata;
 		private Map<PreparedStatement, Long> statements = new LinkedHashMap<PreparedStatement, Long>();
 		private Connection c;
 		private OsmandRegions regions;
@@ -102,17 +40,11 @@ public class WikipediaByCountryDivider {
 
 		
 
-		public GlobalWikiStructure(String fileName, OsmandRegions regions, boolean regenerate) throws SQLException {
+		public GlobalWikiStructure(String fileName, OsmandRegions regions) throws SQLException {
 			this.regions = regions;
-			if(regenerate) {
-				File fl = new File(fileName);
-				fl.delete();
-			}
-			c = (Connection) DBDialect.SQLITE.getDatabaseConnection(fileName, log);
-			if(regenerate) {
-				createTables();
-				prepareStatetements();
-			}
+			c = DBDialect.SQLITE.getDatabaseConnection(fileName, log);
+			createTables();
+			createIndexes();
 		}
 
 		public void updateRegions() throws SQLException, IOException {
@@ -174,71 +106,18 @@ public class WikipediaByCountryDivider {
 			c.close();
 		}
 
-		public void prepareStatetements() throws SQLException {
-			getWikidataById = c.prepareStatement("SELECT wikidata FROM wikidata WHERE lang = ? and id = ? ");
-			insertWikiContent = c.prepareStatement("INSERT INTO wiki_content VALUES(?, ?, ?, ?, ?, ?, ?)");
-			insertWikidata = c.prepareStatement("INSERT INTO wikidata(lang, id, wikidata) VALUES(?, ?, ?)");
-		}
-
-		public String getIdForArticle(String lang, long wikiId) throws SQLException {
-			getWikidataById.setString(1, lang);
-			getWikidataById.setLong(2, wikiId);
-			ResultSet rs = getWikidataById.executeQuery();
-			if(rs.next()) {
-				return rs.getString(1);
-			}
-			return null;
-		}
-
-		public void insertWikiTranslation(String lang, long id, String wikidata) throws SQLException {
-			insertWikidata.setString(1, lang);
-			insertWikidata.setLong(2, id);
-			insertWikidata.setString(3, wikidata);
-			addBatch(insertWikidata);
-		}
-
-		public void commitTranslationInsert() throws SQLException {
-			insertWikidata.executeBatch();
-		}
-
-		public void insertArticle(long id, double lat, double lon, String lang, long wikiId, String title, byte[] zipContent)
-				throws SQLException, IOException {
-			insertWikiContent.setLong(1, id);
-			insertWikiContent.setDouble(2, lat);
-			insertWikiContent.setDouble(3, lon);
-			insertWikiContent.setString(4, lang);
-			insertWikiContent.setLong(5, wikiId);
-			insertWikiContent.setString(6, title);
-			insertWikiContent.setBytes(7, zipContent);
-			addBatch(insertWikiContent);
-
-		}
-
 		public void createTables() throws SQLException {
-			c.createStatement()
-					.execute(
-							"CREATE TABLE wiki_content(id long, lat double, lon double, lang text, wikiId long, title text, zipContent blob)");
 			c.createStatement().execute("CREATE TABLE wiki_region(id long, regionName text)");
-			c.createStatement().execute("CREATE TABLE wikidata(lang text, id long, wikidata text)");
 		}
 
 		public void createIndexes() throws SQLException {
-			c.createStatement().execute("CREATE INDEX IF NOT EXISTS WIKIID_INDEX ON wiki_content(lang, wikiId)");
 			c.createStatement().execute("CREATE INDEX IF NOT EXISTS CONTENTID_INDEX ON wiki_content(ID)");
-			
-			c.createStatement().execute("CREATE INDEX IF NOT EXISTS TRANS_INDEX ON wikidata(lang,id)");
-			
 			c.createStatement().execute("CREATE INDEX IF NOT EXISTS REGIONID_INDEX ON wiki_region(ID)");
 			c.createStatement().execute("CREATE INDEX IF NOT EXISTS REGIONNAME_INDEX ON wiki_region(regionName)");
 		}
-
-
 	}
 
 	public static void main(String[] args) throws IOException, SQLException, InterruptedException, XmlPullParserException {
-//		String folder = "/home/victor/projects/osmand/wiki/";
-//		String regionsFile = "/home/victor/projects/osmand/repo/resources/countries-info/regions.ocbf";
-//		String cmd = "regenerate";
 		String cmd = args[0];
 		String folder = args[1];
 		boolean skip = false;
@@ -251,8 +130,6 @@ public class WikipediaByCountryDivider {
 			updateCountries(folder);
 		} else if(cmd.equals("generate_country_sqlite")) {
 			generateCountrySqlite(folder, skip);
-		} else if(cmd.equals("regenerate")) {
-			generateGlobalWikiFile(folder);
 		}
 	}
 
@@ -260,7 +137,7 @@ public class WikipediaByCountryDivider {
 		OsmandRegions regions = new OsmandRegions();
 		regions.prepareFile();
 		regions.cacheAllCountries();
-		final GlobalWikiStructure wikiStructure = new GlobalWikiStructure(folder + "wiki.sqlite", regions, false);
+		final GlobalWikiStructure wikiStructure = new GlobalWikiStructure(folder + "wiki.sqlite", regions);
 		wikiStructure.updateRegions();
 		wikiStructure.closeConnnection();
 		System.out.println("Generation finished");
@@ -345,7 +222,7 @@ public class WikipediaByCountryDivider {
 		PreparedStatement insertWikiContentCountry = loc
 				.prepareStatement("INSERT INTO wiki_content VALUES(?, ?, ?, ?, ?, ?, ?)");
 		ResultSet rps = conn.createStatement().executeQuery(
-				"SELECT WC.id, WC.lat, WC.lon, WC.lang, WC.wikiId, WC.title, WC.zipContent "
+				"SELECT WC.id, WC.lat, WC.lon, WC.lang, WC.title, WC.zipContent "
 						+ " FROM wiki_content WC INNER JOIN wiki_region WR "
 						+ " ON WC.id = WR.id AND WR.regionName = '" + rs.getString(1) + "' ORDER BY WC.id");
 
@@ -374,10 +251,10 @@ public class WikipediaByCountryDivider {
 			long osmId = -rps.getLong(1);
 			double lat = rps.getDouble(2);
 			double lon = rps.getDouble(3);
-			long wikiId = rps.getLong(5);
+			long wikiId = rps.getLong(1);
 			String wikiLang = rps.getString(4);
-			String title = rps.getString(6);
-			byte[] bytes = rps.getBytes(7);
+			String title = rps.getString(5);
+			byte[] bytes = rps.getBytes(6);
 			GZIPInputStream gzin = new GZIPInputStream(new ByteArrayInputStream(bytes));
 			BufferedReader br = new BufferedReader(new InputStreamReader(gzin));
 			content.setLength(0);
@@ -484,15 +361,12 @@ public class WikipediaByCountryDivider {
 	}
 
 	protected static void inspectWikiFile(String folder) throws SQLException {
-		Connection conn = (Connection) DBDialect.SQLITE.getDatabaseConnection(folder + "wiki.sqlite", log);
+		Connection conn = DBDialect.SQLITE.getDatabaseConnection(folder + "wiki.sqlite", log);
 		ResultSet rs = conn.createStatement().executeQuery("SELECT COUNT(*) cnt, regionName  FROM wiki_region GROUP BY regionName ORDER BY cnt desc");
 		System.out.println("POI by countries");
 		while(rs.next()) {
 			System.out.println(rs.getString(1) + " " + rs.getString(2));
 		}
-//		rs = conn.createStatement().executeQuery("SELECT COUNT(distinct id) FROM wiki_content");
-//		rs.next();
-//		System.out.println("POI in total: " + rs.getLong(1)) ;
 		System.out.println("POI by languages: ");
 		rs = conn.createStatement().executeQuery("SELECT COUNT(*) cnt, lang  FROM wiki_content GROUP BY lang ORDER BY cnt desc");
 		while(rs.next()) {
@@ -506,88 +380,4 @@ public class WikipediaByCountryDivider {
 		}
 	}
 
-	protected static void generateGlobalWikiFile(String folder) throws IOException, SQLException,
-			FileNotFoundException, UnsupportedEncodingException {
-		OsmandRegions regions = new OsmandRegions();
-		regions.prepareFile();
-		regions.cacheAllCountries();
-		final GlobalWikiStructure wikiStructure = new GlobalWikiStructure(folder + "wiki.sqlite", regions, true);
-		File fl = new File(folder);
-		List<String> langs = new ArrayList<String>();
-		for (File f : fl.listFiles()) {
-			if (f.getName().endsWith("wiki.sqlite") && f.getName().length() > "wiki.sqlite".length()) {
-				langs.add(f.getName().substring(0, f.getName().length() - "wiki.sqlite".length()));
-			}
-		}
-		// insert translation
-		for (String lang : langs) {
-			String langLinks = folder + lang + "wiki-latest-page_props.sql.gz";
-			System.out.println("Insert wikidata " + lang + " " + new Date());
-			insertWikidata(wikiStructure, lang, langLinks);
-		}
-		System.out.println("Creating indexes " + new Date());
-		wikiStructure.createIndexes();
-		for (String lang : langs) {
-			processLang(lang, folder, wikiStructure);
-		}
-		wikiStructure.closeConnnection();
-		System.out.println("Generation finished");
-	}
-
-	protected static void processLang(String lang, String folder, final GlobalWikiStructure wikiStructure)
-			throws SQLException, IOException, FileNotFoundException, UnsupportedEncodingException {
-		System.out.println("Copy articles for " + lang + " " + new Date());
-		LanguageSqliteFile ifl = new LanguageSqliteFile(folder + lang + "wiki.sqlite");
-		int accum = 0;
-		while (ifl.next()) {
-			final long wikiId = ifl.getId();
-			String id = wikiStructure.getIdForArticle(lang, wikiId);
-			if(id == null) {
-				accum++;
-				if(accum >= 10) {
-					if(accum % 10000 == 0) {
-						System.err.println("ERROR: Skipped "+ accum+ " articles " + lang + " no wikidata id" ) ;
-					}
-				} else {
-					System.err.println("ERROR: Skip article " + lang + " " + ifl.getTitle() + " no wikidata id" ) ;
-				}
-			} else {
-				try {
-					wikiStructure.insertArticle(Long.parseLong(id.substring(1)), ifl.getLat(), ifl.getLon(), lang, wikiId, ifl.getTitle(),
-						ifl.getContent());
-				} catch (Exception e) {
-					System.err.println("ERROR: Skip article " + lang + " " + ifl.getTitle() + " wrong wikidata id: " +  id) ;
-				}
-			}
-		}
-		if(accum > 10) {
-			System.err.println("ERROR TOTAL: Skipped "+ accum+ " articles " + lang + " no wikidata id" ) ;
-		}
-		ifl.closeConnnection();
-		
-	}
-
-	protected static void insertWikidata(final GlobalWikiStructure wikiStructure, final String lang,
-			String langLinks) throws IOException, SQLException {
-
-		SqlInsertValuesReader.readInsertValuesFile(langLinks, new InsertValueProcessor() {
-			@Override
-			public void process(List<String> vs) {
-				try {
-					if(!vs.get(1).equals("wikibase_item")) {
-						return;
-					}
-					final long wikiId = Long.parseLong(vs.get(0));
-					wikiStructure.insertWikiTranslation(lang, wikiId, vs.get(2));
-				} catch (Exception e) {
-					e.printStackTrace();
-					throw new RuntimeException(e);
-				}
-			}
-		});
-		wikiStructure.commitTranslationInsert();
-	}
-
-
-	
 }
