@@ -29,7 +29,7 @@
 			</rollingPolicy>
 		</appender>
  		-->
-		<appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+		<appender name="STDOUT_INFO" class="ch.qos.logback.core.ConsoleAppender">
 			<filter class="ch.qos.logback.classic.filter.ThresholdFilter">
 				<level>INFO</level>
 			</filter>
@@ -46,6 +46,7 @@
     	</appender>   
     	<root level="ERROR">
 			<appender-ref ref="FILE_ERROR" />
+			<appender-ref ref="STDOUT_INFO" />
 		</root>   
 	</springProfile>
 
