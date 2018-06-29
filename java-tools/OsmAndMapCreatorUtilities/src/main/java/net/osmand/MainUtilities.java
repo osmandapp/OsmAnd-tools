@@ -84,7 +84,7 @@ public class MainUtilities {
 				RenderingRulesStoragePrinter.main(subArgsArray);
 			} else if (utl.equals("explain-rendering-style")) {
 				RenderingRulesStorage.main(subArgsArray);
-			} else if (utl.equals("generate-wikilang-sqlite")) {
+			} else if (utl.equals("generate-wiki-world-sqlite")) {
 				WikiDatabasePreparation.main(subArgsArray);
 			} else if (utl.equals("generate-wikipedia-by-country")) {
 				WikipediaByCountryDivider.main(subArgsArray);
