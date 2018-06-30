@@ -455,30 +455,39 @@ public class WikiDatabasePreparation {
 	public static void main(String[] args) throws IOException, ParserConfigurationException, SAXException, SQLException, ComponentLookupException {
 		String lang = "";
 		String folder = "";
-		if(args.length == 0) {
-			lang = "en";
-			folder = "/home/user/osmand/wikivoyage/";
+		String mode = "";
+
+		for (String arg : args) {
+			String val = arg.substring(arg.indexOf("=") + 1);
+			if (arg.startsWith("--lang=")) {
+				lang = val;
+			} else if (arg.startsWith("--dir=")) {
+				folder = val;
+			} else if (arg.startsWith("--mode=")) {
+				mode = val;
+			}
 		}
-		if(args.length > 0) {
-			lang = args[0];
+		if (mode.isEmpty() || folder.isEmpty() || (mode.equals("process-wikipedia") && lang.isEmpty())){
+			throw new RuntimeException("Correct arguments weren't supplied");
 		}
-		if(args.length > 1){
-			folder = args[1];
-		}
+
+		final String wikidataSqlite = folder + "wikidata.sqlite";
 		final String wikiPg = folder + lang + "wiki-latest-pages-articles.xml.bz2";
 		final String sqliteFileName = folder + "wiki.sqlite";
 		final String pathToWikiData = folder + "wikidatawiki-latest-pages-articles.xml.bz2";
-		final String wikidataSqlite = folder + "wikidata.sqlite";
-		if (!new File(wikidataSqlite).exists()) {
-			if (!new File(pathToWikiData).exists()) {
-				log.error("Wikidata dump doesn't exist. Exiting.");
-				System.exit(1);
+
+		if (mode.equals("process-wikidata")) {
+			if (!new File(wikidataSqlite).exists()) {
+				if (!new File(pathToWikiData).exists()) {
+					log.error("Wikidata dump doesn't exist. Exiting.");
+					System.exit(1);
+				}
+				log.info("Processing wikidata...");
+				processDump(pathToWikiData, wikidataSqlite);
 			}
-			log.info("Processing wikidata...");
-			processDump(pathToWikiData, wikidataSqlite);
+		} else if (mode.equals("process-wikipedia")){
+			processDump(wikiPg, sqliteFileName, lang, wikidataSqlite);
 		}
-		log.info("Processing Wikipedia articles");
-		processDump(wikiPg, sqliteFileName, lang, wikidataSqlite);
     }
 	
 	public static void downloadPage(String page, String fl) throws IOException {
