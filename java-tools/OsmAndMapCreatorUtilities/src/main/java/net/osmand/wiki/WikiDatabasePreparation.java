@@ -477,14 +477,15 @@ public class WikiDatabasePreparation {
 		final String pathToWikiData = folder + "wikidatawiki-latest-pages-articles.xml.bz2";
 
 		if (mode.equals("process-wikidata")) {
-			if (!new File(wikidataSqlite).exists()) {
-				if (!new File(pathToWikiData).exists()) {
-					log.error("Wikidata dump doesn't exist. Exiting.");
-					System.exit(1);
-				}
-				log.info("Processing wikidata...");
-				processDump(pathToWikiData, wikidataSqlite);
+			File wikiDB = new File(wikidataSqlite);
+			if (wikiDB.exists()) {
+				wikiDB.delete();
 			}
+			if (!new File(pathToWikiData).exists()) {
+				throw new RuntimeException("Wikidata dump doesn't exist. Exiting.");
+			}
+			log.info("Processing wikidata...");
+			processDump(pathToWikiData, wikidataSqlite);
 		} else if (mode.equals("process-wikipedia")){
 			processDump(wikiPg, sqliteFileName, lang, wikidataSqlite);
 		}

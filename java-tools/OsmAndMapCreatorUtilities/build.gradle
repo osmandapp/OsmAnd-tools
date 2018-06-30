@@ -8,6 +8,9 @@ dependencies {
 	implementation 'net.sf.kxml:kxml2:2.1.8'
 	implementation 'com.google.code.findbugs:jsr305:3.0.2'
 	implementation 'com.google.code.gson:gson:2.8.2'
+
+	implementation group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: '2.9.6'
+
 	implementation 'org.xerial:sqlite-jdbc:3.7.2'
 
 	implementation 'org.apache.commons:commons-compress:1.17'
