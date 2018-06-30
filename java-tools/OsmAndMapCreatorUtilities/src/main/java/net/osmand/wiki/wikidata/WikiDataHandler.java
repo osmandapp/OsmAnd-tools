@@ -38,8 +38,10 @@ public class WikiDataHandler extends DefaultHandler {
     private Connection conn;
     private PreparedStatement coordsPrep;
     private PreparedStatement mappingPrep;
-    private int batch = 0;
-    private final static int BATCH_SIZE = 500;
+    private int coordsBatch = 0;
+    private int mappingBatch = 0;
+    private final static int BATCH_SIZE = 5000;
+    private int count = 0;
 
     public WikiDataHandler(SAXParser saxParser, InputStream progIS, File sqliteFile)
             throws IOException, SQLException {
@@ -55,16 +57,21 @@ public class WikiDataHandler extends DefaultHandler {
         progress.startTask("Parse wiki xml", progIS.available());
     }
 
-    public void addBatch() throws SQLException {
-        coordsPrep.addBatch();
-        if (batch++ > BATCH_SIZE) {
-            coordsPrep.executeBatch();
-            mappingPrep.executeBatch();
-            batch = 0;
+    public void addBatch(PreparedStatement prep, boolean coords) throws SQLException {
+        prep.addBatch();
+        int batch = coords ? ++coordsBatch : ++mappingBatch;
+        if (batch > BATCH_SIZE) {
+            prep.executeBatch();
+            if (coords) {
+                coordsBatch = 0;
+            } else {
+                mappingBatch = 0;
+            }
         }
     }
 
     public void finish() throws SQLException {
+        log.info("Total accepted: " + count);
         conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_lang_title ON wiki_mapping(lang, title)");
         coordsPrep.executeBatch();
         mappingPrep.executeBatch();
@@ -118,11 +125,15 @@ public class WikiDataHandler extends DefaultHandler {
                                 .create();
                         ArticleMapper.Article article = gson.fromJson(ctext.toString(), ArticleMapper.Article.class);
                         if (article.getLabels() != null && article.getLat() != 0 && article.getLon() != 0) {
+                            if (count++ % 5000 == 0) {
+                                log.info("Article accepted " + title.toString() + " free memory: "
+                                        + (Runtime.getRuntime().freeMemory() / (1024 * 1024)));
+                            }
                             coordsPrep.setString(1, title.toString());
                             coordsPrep.setDouble(2, article.getLat());
                             coordsPrep.setDouble(3, article.getLon());
                             addTranslationMappings(article.getLabels());
-                            addBatch();
+                            addBatch(coordsPrep, true);
                         }
                     } catch (Exception e) {
                         // Generally means that the field is missing in the json or the incorrect data is supplied
@@ -141,7 +152,7 @@ public class WikiDataHandler extends DefaultHandler {
             mappingPrep.setString(1, title.toString());
             mappingPrep.setString(2, lang);
             mappingPrep.setString(3, article);
-            mappingPrep.addBatch();
+            addBatch(mappingPrep, false);
         }
     }
 }
