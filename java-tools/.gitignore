@@ -1,5 +1,6 @@
 build/
 .gradle
+*/out
 */.classpath
 */.gradle
 */gradle
@@ -10,3 +11,4 @@ build/
 */build
 /local.properties
 .idea
+regions.ocbf

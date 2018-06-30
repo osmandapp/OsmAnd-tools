@@ -1,17 +1,11 @@
 package net.osmand.wiki.wikidata;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import net.osmand.PlatformUtil;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.obf.preparation.DBDialect;
 import org.apache.commons.logging.Log;
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
-import org.json.JSONTokener;
 import org.xml.sax.Attributes;
 import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
@@ -23,6 +17,7 @@ import java.io.InputStream;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.util.Iterator;
 import java.util.Map;
 
 
@@ -42,8 +37,10 @@ public class WikiDataHandler extends DefaultHandler {
     private Connection conn;
     private PreparedStatement coordsPrep;
     private PreparedStatement mappingPrep;
-    private int batch = 0;
-    private final static int BATCH_SIZE = 500;
+    private int coordsBatch = 0;
+    private int mappingBatch = 0;
+    private final static int BATCH_SIZE = 5000;
+    private int count = 0;
 
     public WikiDataHandler(SAXParser saxParser, InputStream progIS, File sqliteFile)
             throws IOException, SQLException {
@@ -54,24 +51,27 @@ public class WikiDataHandler extends DefaultHandler {
         conn = dialect.getDatabaseConnection(sqliteFile.getAbsolutePath(), log);
         conn.createStatement().execute("CREATE TABLE wiki_coords(id text, lat double, lon double)");
         conn.createStatement().execute("CREATE TABLE wiki_mapping(id text, lang text, title text)");
-        conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_lang_title ON wiki_mapping(lang, title)");
         coordsPrep = conn.prepareStatement("INSERT INTO wiki_coords VALUES (?, ?, ?)");
         mappingPrep = conn.prepareStatement("INSERT INTO wiki_mapping VALUES (?, ?, ?)");
-
-
         progress.startTask("Parse wiki xml", progIS.available());
     }
 
-    public void addBatch() throws SQLException {
-        coordsPrep.addBatch();
-        if (batch++ > BATCH_SIZE) {
-            coordsPrep.executeBatch();
-            mappingPrep.executeBatch();
-            batch = 0;
+    public void addBatch(PreparedStatement prep, boolean coords) throws SQLException {
+        prep.addBatch();
+        int batch = coords ? ++coordsBatch : ++mappingBatch;
+        if (batch > BATCH_SIZE) {
+            prep.executeBatch();
+            if (coords) {
+                coordsBatch = 0;
+            } else {
+                mappingBatch = 0;
+            }
         }
     }
 
     public void finish() throws SQLException {
+        log.info("Total accepted: " + count);
+        conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_lang_title ON wiki_mapping(lang, title)");
         coordsPrep.executeBatch();
         mappingPrep.executeBatch();
         if (!conn.getAutoCommit()) {
@@ -119,18 +119,27 @@ public class WikiDataHandler extends DefaultHandler {
                     ctext = null;
                 } else if (name.equals("text")) {
                     try {
-                        Gson gson = new GsonBuilder()
-                                .registerTypeAdapter(ArticleMapper.Article.class, new ArticleMapper())
-                                .create();
-                        ArticleMapper.Article article = gson.fromJson(ctext.toString(), ArticleMapper.Article.class);
-                        if (article.getLabels() != null && article.getLat() != 0 && article.getLon() != 0) {
+                        ObjectMapper objectMapper = new ObjectMapper();
+                        JsonNode node = objectMapper.readTree(ctext.toString());
+                        JsonNode lat = node.findValue("latitude");
+                        JsonNode lon = node.findValue("longitude");
+                        JsonNode labels = node.findValue("labels");
+
+                        if (labels != null && lat != null && lon != null) {
+                            double latitude = lat.asDouble();
+                            double longitude = lon.asDouble();
+                            if (count++ % 5000 == 0) {
+                                log.info("Article accepted " + title.toString() + " free memory: "
+                                        + (Runtime.getRuntime().freeMemory() / (1024 * 1024)));
+                            }
                             coordsPrep.setString(1, title.toString());
-                            coordsPrep.setDouble(2, article.getLat());
-                            coordsPrep.setDouble(3, article.getLon());
-                            addTranslationMappings(article.getLabels());
-                            addBatch();
+                            coordsPrep.setDouble(2, latitude);
+                            coordsPrep.setDouble(3, longitude);
+                            addTranslationMappings(labels);
+                            addBatch(coordsPrep, true);
                         }
                     } catch (Exception e) {
+//                        log.info(e);
                         // Generally means that the field is missing in the json or the incorrect data is supplied
                     }
                 }
@@ -140,14 +149,16 @@ public class WikiDataHandler extends DefaultHandler {
         }
     }
 
-    private void addTranslationMappings(JsonObject labels) throws SQLException {
-        for (Map.Entry<String, JsonElement> entry : labels.entrySet()) {
+    private void addTranslationMappings(JsonNode labels) throws SQLException {
+        Iterator<Map.Entry<String, JsonNode>> it = labels.fields();
+        for (; it.hasNext(); ) {
+            Map.Entry<String, JsonNode> entry = it.next();
             String lang = entry.getKey();
-            String article = entry.getValue().getAsJsonObject().getAsJsonPrimitive("value").getAsString();
+            String article = entry.getValue().get("value").asText();
             mappingPrep.setString(1, title.toString());
             mappingPrep.setString(2, lang);
             mappingPrep.setString(3, article);
-            mappingPrep.addBatch();
+            addBatch(mappingPrep, false);
         }
     }
 }
