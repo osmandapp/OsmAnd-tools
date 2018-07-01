@@ -8,6 +8,7 @@ import java.nio.charset.StandardCharsets;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
 import java.util.List;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -32,6 +33,7 @@ import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.util.EntityUtils;
 import org.springframework.stereotype.Component;
+import org.telegram.telegrambots.api.methods.send.SendLocation;
 import org.telegram.telegrambots.api.methods.send.SendMessage;
 import org.telegram.telegrambots.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.api.objects.replykeyboard.buttons.InlineKeyboardButton;
@@ -87,7 +89,7 @@ public class MegaGPSTracker {
 		int sattelites;
 		
 		@CsvColumn(columnName="temp", mustBeSupplied=false)
-		int temparature;
+		int temparature = -100;
 		
 		public float getLongitude() {
 			return lng / 1000000.0f;
@@ -145,27 +147,67 @@ public class MegaGPSTracker {
 		return devs;
 	}
 	
-	public void retrieveInfoAboutMyDevice(OsmAndAssistantBot bot, UserChatIdentifier ucid, TrackerConfiguration c, int dId) {
+	public void retrieveInfoAboutMyDevice(OsmAndAssistantBot bot, UserChatIdentifier ucid, TrackerConfiguration c, String dId) {
 		exe.submit(new Runnable() {
 			@Override
 			public void run() {
 				try {
-					List<MegaGPSDevice> devs = getDevices(c, "1", ""+dId);
-					SendMessage msg = new SendMessage();
-					msg.setChatId(ucid.getChatId());
-					msg.setText(devs.toString());
-					bot.sendTextMsg(msg);
+					List<MegaGPSDevice> devs = getDevices(c, "1", dId);
+					if(devs.size() > 0) {
+						MegaGPSDevice dv = devs.get(0);
+						StringBuilder info = new StringBuilder();
+						info.append("Device ").append(dId).append(".\n");
+						if(dv.timeLastReceived != 0) {
+							info.append("Last signal received: \t").append(formatTime(dv.timeLastReceived)).append("\n");
+						}
+						if(dv.timeLastValid != 0) {
+							info.append("Last location received: \t").append(formatTime(dv.timeLastValid)).append("\n");
+						}
+						if(dv.speed != 0) {
+							info.append("Speed: \t").append(dv.speed).append("\n");
+						}
+						if(dv.temparature != -100) {
+							info.append("Temparature: \t").append(dv.temparature).append("\n");
+						}
+						SendMessage msg = new SendMessage();
+						msg.setChatId(ucid.getChatId());
+						msg.setText(info.toString());
+						bot.sendMethod(msg);
+						if (dv.getLatitude() != 0 || dv.getLongitude() != 0) {
+							SendLocation loc = new SendLocation(dv.getLatitude(), dv.getLongitude());
+							loc.setChatId(ucid.getChatId());
+							bot.sendMethod(loc);
+						}
+					}
+					;
 				} catch (Exception e) {
 					processError(bot, ucid, e, "retrieving info about device");
 				}
 			}
+
+			
 		});		
+	}
+	
+	private String formatTime(long tm) {
+		Date dt = new Date(tm * 1000);
+		long current = System.currentTimeMillis() / 1000;
+		if(current - tm < 10) {
+			return "few seconds ago";
+		} else if (current - tm < 50) {
+			return (current - tm) + " seconds ago";
+		} else if (current - tm < 60 * 60 * 2) {
+			return (current - tm) / 60 + " minutes ago";
+		} else if (current - tm < 60 * 60 * 24) {
+			return (current - tm) / (60 * 60) + " hours ago";
+		}
+		return dt.toString();
 	}
 	
 	private void processError(OsmAndAssistantBot bot, UserChatIdentifier ucid, Exception e, String action) {
 		if (!(e instanceof TelegramApiException)) {
 			try {
-				bot.sendTextMsg(new SendMessage(ucid.getChatId(), 
+				bot.sendMethod(new SendMessage(ucid.getChatId(), 
 						"Error while retrieving list:" + e.getMessage()));
 			} catch (TelegramApiException e1) {
 			}
@@ -182,7 +224,7 @@ public class MegaGPSTracker {
 					SendMessage msg = new SendMessage();
 					msg.setChatId(ucid.getChatId());
 					printDevices(msg, c, devs, cfgOrder, true);
-					bot.sendTextMsg(msg);
+					bot.sendMethod(msg);
 				} catch (Exception e) {
 					processError(bot, ucid, e, "retrieving my devices");
 				}

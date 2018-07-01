@@ -26,7 +26,7 @@ public abstract class AssistantConversation {
 	
 	protected boolean validateEmptyInput(OsmAndAssistantBot bot, String msg) throws TelegramApiException {
 		if(msg.isEmpty()) {
-			bot.sendTextMsg(getSendMessage("Your input is not valid. Please try again:"));
+			bot.sendMethod(getSendMessage("Your input is not valid. Please try again:"));
 			return false;
 		}
 		return true;

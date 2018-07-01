@@ -28,7 +28,7 @@ public class SetTrackerConversation extends AssistantConversation {
 	@Override
 	public boolean updateMessage(OsmAndAssistantBot bot, Message msg, String reply) throws TelegramApiException {
 		if (state == ASK_TRACKER_ID) {
-			bot.sendTextMsg(getSendMessage("Please specify tracker site to monitor:"));
+			bot.sendMethod(getSendMessage("Please specify tracker site to monitor:"));
 			config.lastName = chatIdentifier.getLastName();
 			config.firstName = chatIdentifier.getFirstName();
 			config.userId = chatIdentifier.getUserId();
@@ -38,7 +38,7 @@ public class SetTrackerConversation extends AssistantConversation {
 		} else if (state == ASK_TRACKER_TOKEN) {
 			if(validateEmptyInput(bot, reply)) {
 				config.trackerId = reply;
-				bot.sendTextMsg(getSendMessage("Please specify tracker token:"));
+				bot.sendMethod(getSendMessage("Please specify tracker token:"));
 				state++;
 			}
 			return false;
@@ -50,10 +50,10 @@ public class SetTrackerConversation extends AssistantConversation {
 				LOG.info("Register new tracker config: " + config);
 				String error = bot.saveTrackerConfiguration(config);
 				if (error == null) {
-					bot.sendTextMsg(getSendMessage("Tracker configuration '" + config.trackerName
+					bot.sendMethod(getSendMessage("Tracker configuration '" + config.trackerName
 							+ "' is successfully saved"));
 				} else {
-					bot.sendTextMsg(getSendMessage(error));
+					bot.sendMethod(getSendMessage(error));
 				}
 				return true;
 			}

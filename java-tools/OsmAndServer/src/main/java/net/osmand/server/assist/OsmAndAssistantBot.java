@@ -1,5 +1,6 @@
 package net.osmand.server.assist;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -16,6 +17,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import org.telegram.telegrambots.api.methods.BotApiMethod;
 import org.telegram.telegrambots.api.methods.send.SendMessage;
 import org.telegram.telegrambots.api.objects.CallbackQuery;
 import org.telegram.telegrambots.api.objects.Message;
@@ -137,12 +139,11 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 		if(data.startsWith("device|")) {
 			String[] sl = data.split("\\|");
 			int cId = Integer.parseInt(sl[1]);
-			int dId = Integer.parseInt(sl[2]);
 			Optional<TrackerConfiguration> tracker = repository.findById(new Long(cId));
 			if(tracker.isPresent()) {
 				if(tracker.get().userId.longValue() == ucid.getUserId().longValue()) {
 					if(megaGPSTracker.accept(tracker.get())) {
-						megaGPSTracker.retrieveInfoAboutMyDevice(this, ucid, tracker.get(), dId);
+						megaGPSTracker.retrieveInfoAboutMyDevice(this, ucid, tracker.get(), sl[2]);
 					}
 				} else {
 					throw new IllegalStateException("User reply is corrupted");
@@ -164,9 +165,9 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 
 	
 
-	public void sendTextMsg(SendMessage msg) throws TelegramApiException {
-		sendApiMethod(msg);
-	}
+	public final <T extends Serializable, Method extends BotApiMethod<T>> T sendMethod(Method method) throws TelegramApiException {
+		return super.sendApiMethod(method);
+    }
 
 	public String saveTrackerConfiguration(TrackerConfiguration config) {
 		List<TrackerConfiguration> list = repository.findByUserIdOrderByDateCreated(config.userId);

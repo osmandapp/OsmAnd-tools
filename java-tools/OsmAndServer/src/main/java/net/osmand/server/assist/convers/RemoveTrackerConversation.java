@@ -27,7 +27,7 @@ public class RemoveTrackerConversation extends AssistantConversation {
 	public boolean updateMessage(OsmAndAssistantBot bot, Message msg, String reply) throws TelegramApiException {
 		if (state == 0) {
 			SendMessage smsg = getSendMessage("Please specify tracker configuration to delete (type a number).");
-			bot.sendTextMsg(smsg);
+			bot.sendMethod(smsg);
 			bot.sendAllTrackerConfigurations(chatIdentifier, true);
 			state++;
 			return false;
@@ -41,7 +41,7 @@ public class RemoveTrackerConversation extends AssistantConversation {
 				return true;
 			} catch (Exception e) {
 				SendMessage smsg = getSendMessage("Sorry, your input is not correct. Please try again:");
-				bot.sendTextMsg(smsg);
+				bot.sendMethod(smsg);
 			}
 			return false;
 		}
