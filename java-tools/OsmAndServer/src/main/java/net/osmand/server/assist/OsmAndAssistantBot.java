@@ -81,12 +81,12 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 					SetTrackerConversation nconversation = new SetTrackerConversation(ucid);
 					setNewConversation(nconversation);
 					nconversation.updateMessage(this, msg);
-				} else if ("settracker".equals(coreMsg)) {
+				} else if ("removetracker".equals(coreMsg)) {
 					RemoveTrackerConversation nconversation = new RemoveTrackerConversation(ucid);
 					setNewConversation(nconversation);
 					nconversation.updateMessage(this, msg);
 				} else if ("mytrackers".equals(coreMsg)) {
-					sendAllTrackerConfigurations(msg.getChatId());
+					sendAllTrackerConfigurations(ucid);
 				} else if ("whoami".equals(coreMsg)) {
 					sendApiMethod(new SendMessage(msg.getChatId(), "I'm your OsmAnd assistant"));
 				} else {
@@ -127,19 +127,26 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 		repository.save(config);
 	}
 
-	public void sendAllTrackerConfigurations(long chatId) throws TelegramApiException {
-		List<TrackerConfiguration> list = repository.findAll();
+	public void sendAllTrackerConfigurations(UserChatIdentifier ucid) throws TelegramApiException {
+		List<TrackerConfiguration> list = repository.findByUserIdOrderByDateCreated(ucid.getChatId());
 		StringBuilder bld = new StringBuilder();
-		if(list.isEmpty()) {
+		if (list.isEmpty()) {
 			bld.append("You don't have any tracker configurations yet. You can set them with /settracker command");
 		} else {
 			bld.append("Your tracker configurations are:\n");
-			for(int i =0; i< list.size(); i++) {
+			for (int i = 0; i < list.size(); i++) {
 				TrackerConfiguration c = list.get(i);
-				bld.append(i+1).append(". ").append(c.trackerName);
+				bld.append(i + 1).append(". ").append(c.trackerName).append("\n");
 			}
 		}
-		sendApiMethod(new SendMessage(chatId, bld.toString()));
+		sendApiMethod(new SendMessage(ucid.getChatId(), bld.toString()));
+	}
+	
+	public TrackerConfiguration removeTrackerConfiguration(UserChatIdentifier ucid, int order) {
+		List<TrackerConfiguration> list = repository.findByUserIdOrderByDateCreated(ucid.getUserId());
+		TrackerConfiguration config = list.get(order - 1);
+		repository.delete(config);
+		return config;
 	}
 
 	
@@ -187,4 +194,6 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 		el.setMessageId(sl.getMessageId());
 		sendApiMethodAsync(el, cb);
 	}
+
+	
 }

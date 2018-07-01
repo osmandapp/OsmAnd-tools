@@ -23,7 +23,23 @@ public abstract class AssistantConversation {
 	public long getUpdateTime() {
 		return time;
 	}
+	
+	protected boolean validateEmptyInput(OsmAndAssistantBot bot, Message msg) throws TelegramApiException {
+		if(msg.getText().isEmpty()) {
+			bot.sendTextMsg(getSendMessage("Your input is not valid. Please try again:"));
+			return false;
+		}
+		return true;
+	}
+	
+	protected SendMessage getSendMessage(String text) {
+		return new SendMessage(chatIdentifier.getChatId(), text);
+	}
 
+
+	/**
+	 * @return name of conversation to be displayed to the user
+	 */
 	public abstract String getConversationId();
 
 	/**

@@ -28,6 +28,9 @@ public class TrackerConfiguration {
 	
 	@Column(nullable = false)
 	public Long userId;
+	
+	@Column(nullable = false)
+	public long dateCreated;
 
 	@Column(nullable = true, length = 100)
 	public String firstName;
