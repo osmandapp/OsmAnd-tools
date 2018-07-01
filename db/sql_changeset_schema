@@ -69,3 +69,4 @@ ALTER SEQUENCE telegram_tracker_configuration_id_seq OWNED BY telegram_tracker_c
 
 GRANT ALL privileges ON ALL TABLES IN SCHEMA public to <user>;
 GRANT ALL privileges ON supporters_seq to <user>;
+GRANT ALL privileges ON telegram_tracker_configuration_id_seq to <user>;
