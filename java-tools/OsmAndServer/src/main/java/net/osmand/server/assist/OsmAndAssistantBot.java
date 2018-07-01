@@ -1,9 +1,11 @@
 package net.osmand.server.assist;
 
 import java.io.Serializable;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import net.osmand.server.assist.convers.AssistantConversation;
+import net.osmand.server.assist.convers.RemoveTrackerConversation;
 import net.osmand.server.assist.convers.SetTrackerConversation;
 import net.osmand.server.assist.convers.UserChatIdentifier;
 
@@ -79,8 +81,12 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 					SetTrackerConversation nconversation = new SetTrackerConversation(ucid);
 					setNewConversation(nconversation);
 					nconversation.updateMessage(this, msg);
+				} else if ("settracker".equals(coreMsg)) {
+					RemoveTrackerConversation nconversation = new RemoveTrackerConversation(ucid);
+					setNewConversation(nconversation);
+					nconversation.updateMessage(this, msg);
 				} else if ("mytrackers".equals(coreMsg)) {
-					sendApiMethod(new SendMessage(msg.getChatId(), repository.findAll().toString()));
+					sendAllTrackerConfigurations(msg.getChatId());
 				} else if ("whoami".equals(coreMsg)) {
 					sendApiMethod(new SendMessage(msg.getChatId(), "I'm your OsmAnd assistant"));
 				} else {
@@ -102,7 +108,7 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 		}
 	}
 
-	private void setNewConversation(SetTrackerConversation c) throws TelegramApiException {
+	private void setNewConversation(AssistantConversation c) throws TelegramApiException {
 		AssistantConversation conversation = conversations.get(c.getChatIdentifier());
 		if (conversation != null) {
 			sendApiMethod(new SendMessage(c.getChatIdentifier().getChatId(), "FYI: Your conversation about "
@@ -111,6 +117,33 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 		conversations.put(c.getChatIdentifier(), c);
 	}
 
+	
+
+	public void sendTextMsg(SendMessage msg) throws TelegramApiException {
+		sendApiMethod(msg);
+	}
+
+	public void saveTrackerConfiguration(TrackerConfiguration config) {
+		repository.save(config);
+	}
+
+	public void sendAllTrackerConfigurations(long chatId) throws TelegramApiException {
+		List<TrackerConfiguration> list = repository.findAll();
+		StringBuilder bld = new StringBuilder();
+		if(list.isEmpty()) {
+			bld.append("You don't have any tracker configurations yet. You can set them with /settracker command");
+		} else {
+			bld.append("Your tracker configurations are:\n");
+			for(int i =0; i< list.size(); i++) {
+				TrackerConfiguration c = list.get(i);
+				bld.append(i+1).append(". ").append(c.trackerName);
+			}
+		}
+		sendApiMethod(new SendMessage(chatId, bld.toString()));
+	}
+
+	
+	/////////////////
 	private void sendLocMessage(Message sl, Float lat, Float lon, final int tries) {
 		try {
 			Thread.sleep(1000);
@@ -154,13 +187,4 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 		el.setMessageId(sl.getMessageId());
 		sendApiMethodAsync(el, cb);
 	}
-
-	public void sendTextMsg(SendMessage msg) throws TelegramApiException {
-		sendApiMethod(msg);
-	}
-
-	public void saveTrackerConfiguration(TrackerConfiguration config) {
-		repository.save(config);
-	}
-
 }

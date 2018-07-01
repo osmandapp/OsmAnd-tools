@@ -42,6 +42,8 @@ dependencies {
     
     implementation "org.springframework.cloud:spring-cloud-security:1.2.2.RELEASE"
 
+    implementation "org.apache.commons:commons-collections4:4.1"
+
 
     // frontend
     implementation "org.webjars:jquery:3.3.1"
