@@ -43,6 +43,7 @@ dependencies {
     implementation "org.springframework.cloud:spring-cloud-security:1.2.2.RELEASE"
 
     implementation "org.apache.commons:commons-collections4:4.1"
+    implementation "com.j256.simplecsv:simplecsv:2.3"
 
 
     // frontend

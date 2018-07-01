@@ -24,19 +24,19 @@ public class RemoveTrackerConversation extends AssistantConversation {
 	}
 
 	@Override
-	public boolean updateMessage(OsmAndAssistantBot bot, Message msg) throws TelegramApiException {
+	public boolean updateMessage(OsmAndAssistantBot bot, Message msg, String reply) throws TelegramApiException {
 		if (state == 0) {
-			bot.sendAllTrackerConfigurations(chatIdentifier);
-			SendMessage smsg = getSendMessage("Please specify tracker configuration to delete (type a number):");
+			SendMessage smsg = getSendMessage("Please specify tracker configuration to delete (type a number).");
 			bot.sendTextMsg(smsg);
+			bot.sendAllTrackerConfigurations(chatIdentifier, true);
 			state++;
 			return false;
 		} else if (state == 1) {
 			try {
-				int n = Integer.parseInt(msg.getText());
+				int n = Integer.parseInt(reply);
 				TrackerConfiguration config = bot.removeTrackerConfiguration(chatIdentifier, n);
 				LOG.info("Remove tracker config: " + config);
-				bot.sendAllTrackerConfigurations(chatIdentifier);
+				bot.sendAllTrackerConfigurations(chatIdentifier, false);
 				state++;
 				return true;
 			} catch (Exception e) {

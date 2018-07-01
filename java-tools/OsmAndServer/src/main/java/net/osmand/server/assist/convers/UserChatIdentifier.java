@@ -1,5 +1,7 @@
 package net.osmand.server.assist.convers;
 
+import org.telegram.telegrambots.api.objects.User;
+
 public class UserChatIdentifier {
 
 	private long chatId;
@@ -71,6 +73,14 @@ public class UserChatIdentifier {
 	public String toString() {
 		return "UserChatIdentifier [chatId=" + chatId + ", userId=" + userId + ", firstName=" + firstName
 				+ ", lastName=" + lastName + "]";
+	}
+
+	public void setFieldsFromMessage(User from) {
+		if (from != null) {
+			setFirstName(from.getFirstName());
+			setUserId(from.getId() == null ? null : new Long(from.getId().longValue()));
+			setLastName(from.getLastName());
+		}		
 	}
 
 }
