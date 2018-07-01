@@ -52,7 +52,7 @@ public class TrackerConfiguration {
 	@Override
 	public String toString() {
 		return "TrackerConfiguration [id=" + id + ", trackerId=" + trackerId + ", token=" + token + ", trackerName="
-				+ trackerName + ", userId=" + userId + ", firstName=" + firstName + ", lastName=" + lastName + "] " + data.toString();
+				+ trackerName + ", userId=" + userId + ", firstName=" + firstName + ", lastName=" + lastName + "] " + data;
 	}	
 
 	
