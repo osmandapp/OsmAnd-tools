@@ -19,10 +19,9 @@ public class Application {
 	TelegramBotManager telegram;
 
 	public static void main(String[] args) {
-//		System.setProperty("spring.devtools.restart.enabled", "false");
-		SpringApplication.run(Application.class, args);
+		System.setProperty("spring.devtools.restart.enabled", "false");
 		ApiContextInitializer.init();
-
+		SpringApplication.run(Application.class, args);
 	}
 
 	@Bean

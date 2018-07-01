@@ -1,6 +1,4 @@
-package net.osmand.server.repo;
-import net.osmand.server.model.MonitoringChatId;
-
+package net.osmand.server.monitor;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

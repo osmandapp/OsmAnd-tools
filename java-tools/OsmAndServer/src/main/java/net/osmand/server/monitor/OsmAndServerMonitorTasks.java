@@ -31,7 +31,7 @@ public class OsmAndServerMonitorTasks {
 	private static final int HOUR = 60 * MINUTE;
 	
 	@Autowired
-	TelegramBotManager telegram;
+	OsmAndServerMonitoringBot telegram;
 
 	LiveCheckInfo live = new LiveCheckInfo();
 	BuildServerCheckInfo buildServer = new BuildServerCheckInfo();

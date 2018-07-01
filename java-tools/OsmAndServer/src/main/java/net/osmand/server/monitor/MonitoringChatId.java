@@ -1,4 +1,4 @@
-package net.osmand.server.model;
+package net.osmand.server.monitor;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;
