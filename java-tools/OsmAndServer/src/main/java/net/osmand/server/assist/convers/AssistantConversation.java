@@ -15,23 +15,21 @@ public abstract class AssistantConversation {
 		this.chatIdentifier = chatIdentifier;
 		this.time = System.currentTimeMillis();
 	}
-	
+
 	public UserChatIdentifier getChatIdentifier() {
 		return chatIdentifier;
 	}
-	
+
 	public long getUpdateTime() {
 		return time;
 	}
-	
-	
+
 	public abstract String getConversationId();
 
 	/**
-	 * @param bot 
+	 * @param bot
 	 * @param msg
 	 * @return true if conversation has finished
 	 */
-	public abstract boolean updateMessage(OsmAndAssistantBot bot, Message msg) throws TelegramApiException ;
+	public abstract boolean updateMessage(OsmAndAssistantBot bot, Message msg) throws TelegramApiException;
 }
-

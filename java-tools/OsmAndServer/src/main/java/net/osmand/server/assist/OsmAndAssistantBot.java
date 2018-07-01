@@ -27,14 +27,13 @@ import org.telegram.telegrambots.updateshandlers.SentCallback;
 public class OsmAndAssistantBot extends TelegramLongPollingBot {
 
 	private static final Log LOG = LogFactory.getLog(OsmAndAssistantBot.class);
-	
-	PassiveExpiringMap<UserChatIdentifier, AssistantConversation> conversations = 
+
+	PassiveExpiringMap<UserChatIdentifier, AssistantConversation> conversations =
 			new PassiveExpiringMap<UserChatIdentifier, AssistantConversation>(5, TimeUnit.MINUTES);
-	
+
 	@Autowired
 	TrackerConfigurationRepository repository;
-	
-	
+
 	@Override
 	public String getBotUsername() {
 		return "osmand_bot";
@@ -74,15 +73,15 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 				ucid.setUserId(from.getId() == null ? null : new Long(from.getId().longValue()));
 				ucid.setLastName(from.getLastName());
 			}
-			
-			if(msg.isCommand()) {
-				if("settracker".equals(coreMsg)){
+
+			if (msg.isCommand()) {
+				if ("settracker".equals(coreMsg)) {
 					SetTrackerConversation nconversation = new SetTrackerConversation(ucid);
 					setNewConversation(nconversation);
 					nconversation.updateMessage(this, msg);
-				} else if("mytrackers".equals(coreMsg)){
+				} else if ("mytrackers".equals(coreMsg)) {
 					sendApiMethod(new SendMessage(msg.getChatId(), repository.findAll().toString()));
-				} else if("whoami".equals(coreMsg)){
+				} else if ("whoami".equals(coreMsg)) {
 					sendApiMethod(new SendMessage(msg.getChatId(), "I'm your OsmAnd assistant"));
 				} else {
 					sendApiMethod(new SendMessage(msg.getChatId(), "Sorry, the command is not recognized"));
@@ -119,10 +118,10 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 			// TODO Auto-generated catch block
 			e1.printStackTrace();
 		}
-		if(tries == 0) {
+		if (tries == 0) {
 			return;
 		}
-		final SentCallback<Serializable> cb = new SentCallback<Serializable>(){
+		final SentCallback<Serializable> cb = new SentCallback<Serializable>() {
 
 			@Override
 			public void onResult(BotApiMethod<Serializable> method, Serializable response) {
@@ -144,13 +143,13 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 			public void onException(BotApiMethod<Serializable> method, Exception exception) {
 				System.err.println(exception);
 			}
-			
+
 		};
 		EditMessageText el = new EditMessageText();
 		el.setText((lat + tries * 0.001f) + " " + (lon + tries * 0.001f));
-//		EditMessageLiveLocation el = new EditMessageLiveLocation();
-//		el.setLatitude(lat + tries * 0.001f);
-//		el.setLongitud(lon + tries * 0.001f);
+		// EditMessageLiveLocation el = new EditMessageLiveLocation();
+		// el.setLatitude(lat + tries * 0.001f);
+		// el.setLongitud(lon + tries * 0.001f);
 		el.setChatId(sl.getChatId());
 		el.setMessageId(sl.getMessageId());
 		sendApiMethodAsync(el, cb);
@@ -163,5 +162,5 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 	public void saveTrackerConfiguration(TrackerConfiguration config) {
 		repository.save(config);
 	}
-	
+
 }

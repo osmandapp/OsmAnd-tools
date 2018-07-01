@@ -6,36 +6,38 @@ public class UserChatIdentifier {
 	private Long userId;
 	private String firstName;
 	private String lastName;
-	
+
 	public long getChatId() {
 		return chatId;
 	}
-	
+
 	public void setChatId(long chatId) {
 		this.chatId = chatId;
 	}
-	
+
 	public Long getUserId() {
 		return userId;
 	}
-	
+
 	public void setUserId(Long userId) {
 		this.userId = userId;
 	}
-	
+
 	public String getFirstName() {
 		return firstName;
 	}
+
 	public void setFirstName(String firstName) {
 		this.firstName = firstName;
 	}
+
 	public String getLastName() {
 		return lastName;
 	}
+
 	public void setLastName(String lastName) {
 		this.lastName = lastName;
 	}
-	
 
 	@Override
 	public int hashCode() {
@@ -45,6 +47,7 @@ public class UserChatIdentifier {
 		result = prime * result + ((userId == null) ? 0 : userId.hashCode());
 		return result;
 	}
+
 	@Override
 	public boolean equals(Object obj) {
 		if (this == obj)
@@ -63,11 +66,11 @@ public class UserChatIdentifier {
 			return false;
 		return true;
 	}
-	
+
 	@Override
 	public String toString() {
 		return "UserChatIdentifier [chatId=" + chatId + ", userId=" + userId + ", firstName=" + firstName
 				+ ", lastName=" + lastName + "]";
 	}
-	
+
 }
