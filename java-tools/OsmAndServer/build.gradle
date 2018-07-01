@@ -44,6 +44,7 @@ dependencies {
 
     implementation "org.apache.commons:commons-collections4:4.1"
     implementation "com.j256.simplecsv:simplecsv:2.3"
+    implementation "com.google.code.gson:gson:2.8.2"
 
 
     // frontend

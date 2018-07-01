@@ -43,7 +43,7 @@ public class TrackerConfiguration {
 	public String lastName;
 	
 	
-	@Column(name = "data")
+	@Column(name = "data", columnDefinition = "jsonb")
     @Type(type = "net.osmand.server.assist.JsonbType") 
 	public JsonObject data;
 	
