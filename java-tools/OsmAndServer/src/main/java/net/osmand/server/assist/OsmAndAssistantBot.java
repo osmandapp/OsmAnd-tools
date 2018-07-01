@@ -2,6 +2,7 @@ package net.osmand.server.assist;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 import net.osmand.server.assist.convers.AssistantConversation;
@@ -60,16 +61,18 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 		try {
 			CallbackQuery callbackQuery = update.getCallbackQuery();
 			if (callbackQuery != null) {
-				msg = callbackQuery.getMessage();
+				String data = callbackQuery.getData();
 				UserChatIdentifier ucid = new UserChatIdentifier();
+				msg = callbackQuery.getMessage();
 				ucid.setChatId(msg.getChatId());
 				ucid.setFieldsFromMessage(callbackQuery.getFrom());
-				AssistantConversation conversation = conversations.get(ucid);
-				if (conversation != null) {
-					boolean finished = conversation.updateMessage(this, msg,
-							callbackQuery.getData());
-					if (finished) {
-						conversations.remove(ucid);
+				if (!processStandardData(ucid, data, callbackQuery)) {
+					AssistantConversation conversation = conversations.get(ucid);
+					if (conversation != null) {
+						boolean finished = conversation.updateMessage(this, msg, data);
+						if (finished) {
+							conversations.remove(ucid);
+						}
 					}
 				}
 			} else if (update.hasMessage() && update.getMessage().hasText()) {
@@ -120,7 +123,7 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 					}
 				}
 			}
-		} catch (TelegramApiException e) {
+		} catch (Exception e) {
 			if (msg != null) {
 				LOG.error(
 						"Could not send message on update " + msg.getChatId() + " " + msg.getText() + ": "
@@ -129,6 +132,26 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 		}
 	}
 
+
+	private boolean processStandardData(UserChatIdentifier ucid, String data, CallbackQuery callbackQuery) {
+		if(data.startsWith("device|")) {
+			String[] sl = data.split("\\|");
+			int cId = Integer.parseInt(sl[1]);
+			int dId = Integer.parseInt(sl[2]);
+			Optional<TrackerConfiguration> tracker = repository.findById(new Long(cId));
+			if(tracker.isPresent()) {
+				if(tracker.get().userId.longValue() == ucid.getUserId().longValue()) {
+					if(megaGPSTracker.accept(tracker.get())) {
+						megaGPSTracker.retrieveInfoAboutMyDevice(this, ucid, tracker.get(), dId);
+					}
+				} else {
+					throw new IllegalStateException("User reply is corrupted");
+				}
+			}
+			return true;
+		}
+		return false;
+	}
 
 	private void setNewConversation(AssistantConversation c) throws TelegramApiException {
 		AssistantConversation conversation = conversations.get(c.getChatIdentifier());

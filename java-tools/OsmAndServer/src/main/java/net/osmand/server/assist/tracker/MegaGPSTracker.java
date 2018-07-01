@@ -145,6 +145,34 @@ public class MegaGPSTracker {
 		return devs;
 	}
 	
+	public void retrieveInfoAboutMyDevice(OsmAndAssistantBot bot, UserChatIdentifier ucid, TrackerConfiguration c, int dId) {
+		exe.submit(new Runnable() {
+			@Override
+			public void run() {
+				try {
+					List<MegaGPSDevice> devs = getDevices(c, "1", ""+dId);
+					SendMessage msg = new SendMessage();
+					msg.setChatId(ucid.getChatId());
+					msg.setText(devs.toString());
+					bot.sendTextMsg(msg);
+				} catch (Exception e) {
+					processError(bot, ucid, e, "retrieving info about device");
+				}
+			}
+		});		
+	}
+	
+	private void processError(OsmAndAssistantBot bot, UserChatIdentifier ucid, Exception e, String action) {
+		if (!(e instanceof TelegramApiException)) {
+			try {
+				bot.sendTextMsg(new SendMessage(ucid.getChatId(), 
+						"Error while retrieving list:" + e.getMessage()));
+			} catch (TelegramApiException e1) {
+			}
+		}
+		LOG.warn("Error while " + action, e);
+	}
+	
 	public void retrieveMyDevices(OsmAndAssistantBot bot, TrackerConfiguration c, UserChatIdentifier ucid, int cfgOrder) {
 		exe.submit(new Runnable() {
 			@Override
@@ -156,14 +184,7 @@ public class MegaGPSTracker {
 					printDevices(msg, c, devs, cfgOrder, true);
 					bot.sendTextMsg(msg);
 				} catch (Exception e) {
-					if (!(e instanceof TelegramApiException)) {
-						try {
-							bot.sendTextMsg(new SendMessage(ucid.getChatId(), 
-									"Error while retrieving list:" + e.getMessage()));
-						} catch (TelegramApiException e1) {
-						}
-					}
-					LOG.warn("Error while retrieving devices list", e);
+					processError(bot, ucid, e, "retrieving my devices");
 				}
 			}
 
@@ -198,7 +219,7 @@ public class MegaGPSTracker {
 			} else {
 				ArrayList<InlineKeyboardButton> lt = new ArrayList<InlineKeyboardButton>();
 				InlineKeyboardButton button = new InlineKeyboardButton(txt.toString());
-				button.setCallbackData("device." + c.id + "." + d.id);
+				button.setCallbackData("device|" + c.id + "|" + d.id);
 				lt.add(button);
 				markup.getKeyboard().add(lt);
 			}
@@ -233,4 +254,6 @@ public class MegaGPSTracker {
 	public boolean accept(TrackerConfiguration c) {
 		return c.trackerId.equals("http://mega-gps.org/") || c.trackerId.equals("mega-gps.org");
 	}
+
+	
 }
