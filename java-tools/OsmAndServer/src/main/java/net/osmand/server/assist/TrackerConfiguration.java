@@ -5,14 +5,18 @@ import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
-import javax.persistence.Lob;
 import javax.persistence.Table;
+
+import org.hibernate.annotations.Type;
+
+import com.google.gson.JsonObject;
 
 @Entity
 @Table(name = "telegram_tracker_configuration")
 // @EntityListeners(AuditingEntityListener.class)
 public class TrackerConfiguration {
 	
+	public static final String CHATS = "chats";
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	public Long id;
@@ -39,15 +43,16 @@ public class TrackerConfiguration {
 	public String lastName;
 	
 	
-	@Lob
-	@Column
-	public byte[] data;
+	@Column(name = "data")
+    @Type(type = "net.osmand.server.assist.JsonbType") 
+	public JsonObject data;
+	
 
 
 	@Override
 	public String toString() {
 		return "TrackerConfiguration [id=" + id + ", trackerId=" + trackerId + ", token=" + token + ", trackerName="
-				+ trackerName + ", userId=" + userId + ", firstName=" + firstName + ", lastName=" + lastName + "]";
+				+ trackerName + ", userId=" + userId + ", firstName=" + firstName + ", lastName=" + lastName + "] " + data.toString();
 	}	
 
 	

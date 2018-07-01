@@ -27,6 +27,8 @@ import org.telegram.telegrambots.api.objects.replykeyboard.buttons.InlineKeyboar
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.exceptions.TelegramApiException;
 
+import com.google.gson.JsonObject;
+
 @Component
 public class OsmAndAssistantBot extends TelegramLongPollingBot {
 
@@ -141,9 +143,12 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 			int cId = Integer.parseInt(sl[1]);
 			Optional<TrackerConfiguration> tracker = repository.findById(new Long(cId));
 			if(tracker.isPresent()) {
-				if(tracker.get().userId.longValue() == ucid.getUserId().longValue()) {
-					if(megaGPSTracker.accept(tracker.get())) {
-						megaGPSTracker.retrieveInfoAboutMyDevice(this, ucid, tracker.get(), sl[2]);
+				TrackerConfiguration c = tracker.get();
+				if(c.userId.longValue() == ucid.getUserId().longValue() ||
+						(c.data.has(TrackerConfiguration.CHATS) && 
+						c.data.get(TrackerConfiguration.CHATS).getAsJsonObject().has(ucid.getChatId()+""))) {
+					if(megaGPSTracker.accept(c)) {
+						megaGPSTracker.retrieveInfoAboutMyDevice(this, ucid, c, sl[2]);
 					}
 				} else {
 					throw new IllegalStateException("User reply is corrupted");
@@ -223,7 +228,16 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 			sendApiMethod(new SendMessage(ucid.getChatId(), "You don't have any tracking configurations set yet"));
 		} else {
 			int i = 1;
+			String cid = ucid.getChatId() + "";
 			for (TrackerConfiguration c : list) {
+				if(!c.data.has(TrackerConfiguration.CHATS) || 
+						!c.data.get(TrackerConfiguration.CHATS).getAsJsonObject().has(cid)) {
+					if(!c.data.has(TrackerConfiguration.CHATS)) {
+						c.data.add(TrackerConfiguration.CHATS, new JsonObject());
+					}
+					c.data.get(TrackerConfiguration.CHATS).getAsJsonObject().add(cid, new JsonObject());
+					repository.save(c);
+				}
 				if(params.isEmpty() || params.equals(i+"")) {
 					retrieveMyDevices(c, ucid, list.size() == 1 ? 0 : 1);
 				}
