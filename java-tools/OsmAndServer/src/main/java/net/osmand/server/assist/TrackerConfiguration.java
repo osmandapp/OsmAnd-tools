@@ -38,7 +38,15 @@ public class TrackerConfiguration {
 	
 	@Lob
 	@Column
-	public byte[] data;	
+	public byte[] data;
 
+
+	@Override
+	public String toString() {
+		return "TrackerConfiguration [id=" + id + ", trackerId=" + trackerId + ", token=" + token + ", trackerName="
+				+ trackerName + ", userId=" + userId + ", firstName=" + firstName + ", lastName=" + lastName + "]";
+	}	
+
+	
 		
 }

@@ -105,8 +105,10 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 
 	private void setNewConversation(SetTrackerConversation c) throws TelegramApiException {
 		AssistantConversation conversation = conversations.get(c.getChatIdentifier());
-		sendApiMethod(new SendMessage(c.getChatIdentifier().getChatId(), "FYI: Your conversation about " + conversation.getConversationId() + 
-				" was interrupted"));
+		if (conversation != null) {
+			sendApiMethod(new SendMessage(c.getChatIdentifier().getChatId(), "FYI: Your conversation about "
+					+ conversation.getConversationId() + " was interrupted"));
+		}
 		conversations.put(c.getChatIdentifier(), c);
 	}
 
