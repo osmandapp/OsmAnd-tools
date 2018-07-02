@@ -133,14 +133,14 @@ public class OsmAndServerMonitorTasks {
     }
 
 	private String getLiveDelayedMessage(long delay) {
-		float f = (float)delay / HOUR;
-		String txt = "OsmAnd Live is delayed by " + formatTime(f) + " hours ";
+		String txt = "OsmAnd Live is delayed by " + formatTime(delay) + " hours ";
 		txt += " ( avg3h  " + formatTime(live3Hours.getMean()) + ", avg24h  " + formatTime(live24Hours.getMean())
-				+ ", max24h  " + formatTime(live24Hours.getMax());
+				+ ", max24h  " + formatTime(live24Hours.getMax()) + ")";
     	return txt;
 	}
 	
-	private String formatTime(double f) {
+	private String formatTime(double i) {
+		double f = i / HOUR;
 		int d = (int) f;
 		int min = ((int)(f-d)*60);
 		if(min < 10) {
