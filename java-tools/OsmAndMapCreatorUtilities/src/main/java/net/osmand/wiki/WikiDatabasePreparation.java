@@ -587,7 +587,7 @@ public class WikiDatabasePreparation {
 			languageConn = dialect.getDatabaseConnection(sqliteFile.getAbsolutePath(), log);
 			wikidataConn = dialect.getDatabaseConnection(pathToWikiData, log);
 			languageConn.createStatement().execute("CREATE TABLE IF NOT EXISTS wiki_content(id long, lat double, lon double, title text, lang text, zipContent blob)");
-			languageConn.createStatement().execute("CREATE INDEX WIKIID_INDEX ON wiki_content(lang, id)");
+			languageConn.createStatement().execute("CREATE INDEX IF NOT EXISTS WIKIID_INDEX ON wiki_content(lang, id)");
 			insertPrep = languageConn.prepareStatement("INSERT INTO wiki_content VALUES (?, ?, ?, ?, ?, ?)");
 			selectPrep = wikidataConn.prepareStatement("SELECT wiki_coords.lat, wiki_coords.lon, wiki_coords.id " +
 					"FROM wiki_coords JOIN wiki_mapping ON " +
