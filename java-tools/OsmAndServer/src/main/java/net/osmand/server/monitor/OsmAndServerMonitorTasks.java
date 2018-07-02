@@ -142,7 +142,7 @@ public class OsmAndServerMonitorTasks {
 	private String formatTime(double i) {
 		double f = i / HOUR;
 		int d = (int) f;
-		int min = ((int)(f-d)*60);
+		int min = (int) ((f - d) * 60);
 		if(min < 10) {
 			return d + ":0" + min;
 		}
