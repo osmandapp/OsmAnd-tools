@@ -14,6 +14,7 @@ import net.osmand.server.TelegramBotManager;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.json.JSONTokener;
@@ -29,6 +30,10 @@ public class OsmAndServerMonitorTasks {
 	private static final int SECOND = 1000;
 	private static final int MINUTE = 60 * SECOND;
 	private static final int HOUR = 60 * MINUTE;
+	private static final int LIVE_STATUS_MINUTES = 3;
+	
+	DescriptiveStatistics live3Hours = new DescriptiveStatistics(3 * 60 / LIVE_STATUS_MINUTES);
+	DescriptiveStatistics live24Hours = new DescriptiveStatistics(24 * 60 / LIVE_STATUS_MINUTES);
 	
 	@Autowired
 	OsmAndServerMonitoringBot telegram;
@@ -37,9 +42,14 @@ public class OsmAndServerMonitorTasks {
 	BuildServerCheckInfo buildServer = new BuildServerCheckInfo();
 	SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd HH:mm");
 	
-    @Scheduled(fixedRate = 5 * MINUTE)
+    @Scheduled(fixedRate = LIVE_STATUS_MINUTES * MINUTE)
     public void checkOsmAndLiveStatus() {
+    	checkOsmAndLiveStatus(true);
+    }
+    
+    public void checkOsmAndLiveStatus(boolean updateStats) {
     	try {
+    		
 			URL url = new URL("http://osmand.net/api/osmlive_status");
 			InputStream is = url.openConnection().getInputStream();
 			BufferedReader br = new BufferedReader(new InputStreamReader(is));
@@ -54,6 +64,10 @@ public class OsmAndServerMonitorTasks {
 			}
 			live.lastCheckTimestamp = System.currentTimeMillis();
 			live.lastOsmAndLiveDelay = currentDelay;
+			if(updateStats) {
+				live3Hours.addValue(currentDelay);
+				live24Hours.addValue(currentDelay);
+			}
 		} catch (Exception e) {
 			telegram.sendMonitoringAlertMessage("Exception while checking the server live status.");
 			LOG.error(e.getMessage(), e);
@@ -103,7 +117,7 @@ public class OsmAndServerMonitorTasks {
     
 
     public String refreshAll() {
-    	checkOsmAndLiveStatus();
+    	checkOsmAndLiveStatus(false);
     	checkOsmAndBuildServer();
     	return getStatusMessage();
     }
@@ -119,10 +133,22 @@ public class OsmAndServerMonitorTasks {
     }
 
 	private String getLiveDelayedMessage(long delay) {
-		int roundUp = (int) (delay * 100 / HOUR);
-    	return "OsmAnd Live is delayed by " + (roundUp / 100.f) + " hours";
+		float f = (float)delay / HOUR;
+		String txt = "OsmAnd Live is delayed by " + formatTime(f) + " hours ";
+		txt += " ( avg3h  " + formatTime(live3Hours.getMean()) + ", avg24h  " + formatTime(live24Hours.getMean())
+				+ ", max24h  " + formatTime(live24Hours.getMax());
+    	return txt;
 	}
 	
+	private String formatTime(double f) {
+		int d = (int) f;
+		int min = ((int)(f-d)*60);
+		if(min < 10) {
+			return d + ":0" + min;
+		}
+		return d + ":" + min;
+	}
+
 	protected static class LiveCheckInfo {
 		long previousOsmAndLiveDelay = 0;
 		long lastOsmAndLiveDelay = 0;
