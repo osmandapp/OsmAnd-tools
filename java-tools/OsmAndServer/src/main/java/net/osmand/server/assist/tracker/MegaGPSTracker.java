@@ -109,6 +109,8 @@ public class MegaGPSTracker {
 		public String deviceId;
 		
 		public MegaGPSDevice device;
+
+		public int updateId ;
 		
 	}
 	
@@ -296,8 +298,18 @@ public class MegaGPSTracker {
 						if (dv.getLatitude() != 0 || dv.getLongitude() != 0) {
 							SendLocation loc = new SendLocation(dv.getLatitude(), dv.getLongitude());
 							loc.setChatId(ucid.getChatId());
+							
+							InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+							ArrayList<InlineKeyboardButton> lt = new ArrayList<InlineKeyboardButton>();
+							InlineKeyboardButton button = new InlineKeyboardButton("Monitor live location");
+							button.setCallbackData("device|" + c.id + "|" + dv.id);
+							lt.add(button);
+							markup.getKeyboard().add(lt);
+							loc.setReplyMarkup(markup);
+							
 							bot.sendMethod(loc);
 						}
+						
 					}
 					;
 				} catch (Exception e) {
@@ -458,7 +470,10 @@ public class MegaGPSTracker {
 							) {
 						continue;
 					}
-					String bld = buildMessage(dd, time);
+					existingMessage.updateId++;
+					existingMessage.device = dd;
+					existingMessage.updateTime = time;
+					String bld = buildMessage(existingMessage);
 					if (existingMessage.messageId == null) {
 						SendMessage msg = new SendMessage();
 						msg.setChatId(group.chatId);
@@ -486,8 +501,7 @@ public class MegaGPSTracker {
 						group.bot.sendMethod(msg);
 
 					}
-					existingMessage.device = dd;
-					existingMessage.updateTime = time;
+					
 				}
 			} catch (Exception e) {
 				LOG.error(e.getMessage() ,e);
@@ -504,7 +518,9 @@ public class MegaGPSTracker {
 			return existingMessage;
 		}
 		
-		public String buildMessage(MegaGPSDevice dd, long time) {
+		public String buildMessage(MessageToDevice existingMessage) {
+			MegaGPSDevice dd = existingMessage.device;
+			long time = existingMessage.updateTime;
 			JsonObject obj = new JsonObject();
 			obj.addProperty("name", dd.name == null ? dd.id : dd.name);
 			obj.addProperty("lat", (Float)dd.getLatitude());
@@ -524,6 +540,8 @@ public class MegaGPSTracker {
 			if(dd.timeLastValid != 0) {
 				obj.addProperty("locAgo", (Long)(time/ 1000 - dd.timeLastValid));
 			}
+			obj.addProperty("updId", (Integer)existingMessage.updateId);
+			obj.addProperty("updTime", (Long)((existingMessage.updateTime - existingMessage.initialTimestamp)/1000));
 			return obj.toString();
 		}
 
