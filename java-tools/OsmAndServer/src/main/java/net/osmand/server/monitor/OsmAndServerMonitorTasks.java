@@ -30,7 +30,7 @@ public class OsmAndServerMonitorTasks {
 	private static final int SECOND = 1000;
 	private static final int MINUTE = 60 * SECOND;
 	private static final int HOUR = 60 * MINUTE;
-	private static final int LIVE_STATUS_MINUTES = 3;
+	private static final int LIVE_STATUS_MINUTES = 2;
 	
 	DescriptiveStatistics live3Hours = new DescriptiveStatistics(3 * 60 / LIVE_STATUS_MINUTES);
 	DescriptiveStatistics live24Hours = new DescriptiveStatistics(24 * 60 / LIVE_STATUS_MINUTES);
@@ -134,8 +134,8 @@ public class OsmAndServerMonitorTasks {
 
 	private String getLiveDelayedMessage(long delay) {
 		String txt = "OsmAnd Live is delayed by " + formatTime(delay) + " hours ";
-		txt += " ( avg3h  " + formatTime(live3Hours.getMean()) + ", avg24h  " + formatTime(live24Hours.getMean())
-				+ ", max24h  " + formatTime(live24Hours.getMax()) + ")";
+		txt += " (avg3h " + formatTime(live3Hours.getMean()) + ", avg24h " + formatTime(live24Hours.getMean())
+				+ ", max24h " + formatTime(live24Hours.getMax()) + ")";
     	return txt;
 	}
 	

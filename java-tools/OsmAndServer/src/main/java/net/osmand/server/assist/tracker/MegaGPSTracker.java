@@ -9,15 +9,25 @@ import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.TreeMap;
+import java.util.TreeSet;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import net.osmand.server.assist.OsmAndAssistantBot;
+import net.osmand.server.assist.OsmAndAssistantBot.MyDevicesOptions;
 import net.osmand.server.assist.TrackerConfiguration;
 import net.osmand.server.assist.convers.UserChatIdentifier;
 
+import org.apache.commons.lang3.builder.EqualsBuilder;
+import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.commons.logging.LogFactory;
 import org.apache.http.HttpEntity;
 import org.apache.http.NameValuePair;
@@ -32,25 +42,75 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.util.EntityUtils;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.telegram.telegrambots.api.methods.BotApiMethod;
 import org.telegram.telegrambots.api.methods.send.SendLocation;
 import org.telegram.telegrambots.api.methods.send.SendMessage;
+import org.telegram.telegrambots.api.methods.updatingmessages.EditMessageText;
+import org.telegram.telegrambots.api.objects.Message;
 import org.telegram.telegrambots.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 import org.telegram.telegrambots.exceptions.TelegramApiException;
+import org.telegram.telegrambots.exceptions.TelegramApiRequestException;
+import org.telegram.telegrambots.updateshandlers.SentCallback;
 
+import com.google.gson.JsonObject;
 import com.j256.simplecsv.common.CsvColumn;
 import com.j256.simplecsv.processor.CsvProcessor;
 
 @Component
 public class MegaGPSTracker {
 
-	protected ThreadPoolExecutor exe;
-	protected CloseableHttpClient httpclient;
-	protected RequestConfig requestConfig;
 	private static final String BASE_URL = "http://mega-gps.org/api3";
 	public static final int SOCKET_TIMEOUT = 15 * 1000;
+	public static final long INTERVAL_TO_UPDATE_GROUPS = 10000;
+	public static final long INITIAL_TIMESTAMP_TO_DISPLAY = 120000;
+	
 	private static final org.apache.commons.logging.Log LOG = LogFactory.getLog(MegaGPSTracker.class);
+	
+	private Map<String, String> namesCache = new ConcurrentHashMap<String, String>();
+	
+	private Map<String, MonitorLocationGroup> monitorLocations = new ConcurrentHashMap<String, MonitorLocationGroup>();
+	
+	protected ThreadPoolExecutor exe;
+	
+	protected CloseableHttpClient httpclient;
+	
+	protected RequestConfig requestConfig;
+
+	
+	public static class MonitorLocationGroup {
+		
+		public OsmAndAssistantBot bot;
+		
+		public String chatId;
+		
+		public long initialTimestamp;
+		
+		public long updateTime;
+		
+		public TrackerConfiguration config;
+		
+		public ConcurrentHashMap<String, MessageToDevice> group = new ConcurrentHashMap<String, MessageToDevice>();
+		
+	}
+	
+	public static class MessageToDevice {
+		
+		public long initialTimestamp;
+		
+		public long updateTime;
+		
+		public Integer messageId ;
+		
+		public boolean isLiveLocation;
+		
+		public String deviceId;
+		
+		public MegaGPSDevice device;
+		
+	}
 	
 	public static class MegaGPSDevice {
 		@CsvColumn(columnName="id")
@@ -110,9 +170,10 @@ public class MegaGPSTracker {
 		
 		
 	}
+	
 
 	public MegaGPSTracker() {
-		this.exe = new ThreadPoolExecutor(1, 8, 1L, TimeUnit.MINUTES,
+		this.exe = new ThreadPoolExecutor(1, 10, 1L, TimeUnit.MINUTES,
                 new LinkedBlockingQueue<Runnable>());
         httpclient = HttpClientBuilder.create()
                 .setSSLHostnameVerifier(new NoopHostnameVerifier())
@@ -124,6 +185,24 @@ public class MegaGPSTracker {
                 .setConnectTimeout(SOCKET_TIMEOUT)
                 .setConnectionRequestTimeout(SOCKET_TIMEOUT).build();
 	}
+	
+	
+	
+	
+	@Scheduled(fixedRate = 5 * 1000)
+    public void updateMonitoringDevices() {
+		Iterator<Entry<String, MonitorLocationGroup>> it = monitorLocations.entrySet().iterator();
+		long timestamp = System.currentTimeMillis();
+		while(it.hasNext()) {
+			MonitorLocationGroup locGroup = it.next().getValue();
+			if(timestamp - locGroup.updateTime  > INTERVAL_TO_UPDATE_GROUPS) {
+				TaskToUpdateLocationGroup task = new TaskToUpdateLocationGroup(locGroup);
+				if(!exe.getQueue().contains(task)) {
+					exe.submit(task);
+				}
+			}
+		}
+    }
 
 	private List<MegaGPSDevice> getDevices(TrackerConfiguration c, String apiMethod, String deviceId) throws IOException, ClientProtocolException {
 		String url = BASE_URL;
@@ -147,16 +226,57 @@ public class MegaGPSTracker {
 		return devs;
 	}
 	
+	private List<MegaGPSDevice> getDevices(TrackerConfiguration c, boolean withLocations, String trackerId) throws IOException, ClientProtocolException {
+		if(!withLocations) {
+			List<MegaGPSDevice> devices = getDevices(c, "0", trackerId == null ?  "0" : trackerId);
+			updateCacheNames(devices);
+			return devices;
+		}
+		List<MegaGPSDevice> devices = getDevices(c, "1", trackerId == null ?  "0" : trackerId);
+		for(MegaGPSDevice d : devices) {
+			if(!namesCache.containsKey(d.id)) {
+				updateCacheNames(getDevices(c, "0", "0"));
+				break;
+			}
+		}
+		for(MegaGPSDevice d : devices) {
+			d.name = namesCache.get(d.id);
+		}
+		return devices;
+	}
+	
+	private void updateCacheNames(List<MegaGPSDevice> devices) {
+		for(MegaGPSDevice d : devices) {
+			if(d.id != null && d.name != null) {
+				namesCache.put(d.id, d.name);
+			}
+		}
+		
+	}
+	
+	public void monitorDevices(OsmAndAssistantBot bt, UserChatIdentifier ucid, TrackerConfiguration c) {
+		MonitorLocationGroup lg = new MonitorLocationGroup();
+		lg.bot = bt;
+		lg.config = c;
+		lg.chatId = ucid.getChatId() + "";
+		monitorLocations.put(lg.chatId, lg);
+		exe.submit(new TaskToUpdateLocationGroup(lg));
+	}
+	
+	public void stopMonitorDevices(OsmAndAssistantBot bt, UserChatIdentifier ucid, TrackerConfiguration c) {
+		monitorLocations.remove(ucid.getChatId()+"");
+	}
+
 	public void retrieveInfoAboutMyDevice(OsmAndAssistantBot bot, UserChatIdentifier ucid, TrackerConfiguration c, String dId) {
 		exe.submit(new Runnable() {
 			@Override
 			public void run() {
 				try {
-					List<MegaGPSDevice> devs = getDevices(c, "1", dId);
+					List<MegaGPSDevice> devs = getDevices(c, true, dId);
 					if(devs.size() > 0) {
 						MegaGPSDevice dv = devs.get(0);
 						StringBuilder info = new StringBuilder();
-						info.append("Device ").append(dId).append(".\n");
+						info.append("Device ").append(dv.name == null ? dId : dv.name).append(".\n");
 						if(dv.timeLastReceived != 0) {
 							info.append("Last signal received: \t").append(formatTime(dv.timeLastReceived)).append("\n");
 						}
@@ -215,18 +335,25 @@ public class MegaGPSTracker {
 		LOG.warn("Error while " + action, e);
 	}
 	
-	public void retrieveMyDevices(OsmAndAssistantBot bot, TrackerConfiguration c, UserChatIdentifier ucid, int cfgOrder) {
+	public void retrieveMyDevices(OsmAndAssistantBot bot, MyDevicesOptions options) {
 		exe.submit(new Runnable() {
 			@Override
 			public void run() {
 				try {
-					List<MegaGPSDevice> devs = getDevices(c, "0", "0");
+					List<MegaGPSDevice> devs = getDevices(options.config, options.filterLocationTime > 0, null);
+					Iterator<MegaGPSDevice> it = devs.iterator();
+					while(it.hasNext()) {
+						MegaGPSDevice d = it.next();
+						if(d.timeLastValid < options.filterLocationTime) {
+							it.remove();
+						}
+					}
 					SendMessage msg = new SendMessage();
-					msg.setChatId(ucid.getChatId());
-					printDevices(msg, c, devs, cfgOrder, true);
+					msg.setChatId(options.ucid.getChatId());
+					printDevices(msg, devs, options, true);
 					bot.sendMethod(msg);
 				} catch (Exception e) {
-					processError(bot, ucid, e, "retrieving my devices");
+					processError(bot, options.ucid, e, "retrieving my devices");
 				}
 			}
 
@@ -234,19 +361,23 @@ public class MegaGPSTracker {
 	}
 
 
-	protected String printDevices(SendMessage msg, TrackerConfiguration c, List<MegaGPSDevice> devs, int cfgOrder, boolean keyboard) {
+	protected String printDevices(SendMessage msg, List<MegaGPSDevice> devs, MyDevicesOptions opts, boolean keyboard) {
 		InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
 		StringBuilder s = new StringBuilder();
-		if(cfgOrder != 0) {
-			s.append("Devices in '").append(c.trackerName).append("':");
+		if(opts.cfgOrder != 0) {
+			s.append("Devices in '").append(opts.config.trackerName).append("':");
 		} else {
-			s.append("Available devices:");
+			if(devs.size() == 0) {
+				s.append("No available devices.");
+			} else {
+				s.append("Available devices:");
+			}
 		}
 		s.append('\n');
 		int k = 1;
 		for(MegaGPSDevice d : devs) {
 			StringBuilder txt = new StringBuilder(40); 
-			txt.append(cfgOrder == 0 ? "" : (cfgOrder +".")).append(k).append(k < 10 ? " " : "").append("  ");
+			txt.append(opts.cfgOrder == 0 ? "" : (opts.cfgOrder +".")).append(k).append(k < 10 ? " " : "").append("  ");
 			if(d.name != null) {
 				txt.append(d.name);
 			}
@@ -261,7 +392,7 @@ public class MegaGPSTracker {
 			} else {
 				ArrayList<InlineKeyboardButton> lt = new ArrayList<InlineKeyboardButton>();
 				InlineKeyboardButton button = new InlineKeyboardButton(txt.toString());
-				button.setCallbackData("device|" + c.id + "|" + d.id);
+				button.setCallbackData("device|" + opts.config.id + "|" + d.id);
 				lt.add(button);
 				markup.getKeyboard().add(lt);
 			}
@@ -297,5 +428,123 @@ public class MegaGPSTracker {
 		return c.trackerId.equals("http://mega-gps.org/") || c.trackerId.equals("mega-gps.org");
 	}
 
+	public class TaskToUpdateLocationGroup implements Runnable {
+
+		private MonitorLocationGroup group;
+		
+		public TaskToUpdateLocationGroup(MonitorLocationGroup group) {
+			this.group = group;
+		}
+		
+		@Override
+		public void run() {
+			try {
+				long time = System.currentTimeMillis();
+				if(group.initialTimestamp == 0) {
+					group.initialTimestamp = time;
+				} 
+				group.updateTime = time;
+				List<MegaGPSDevice> allDevices = getDevices(group.config, true, null);
+				for (MegaGPSDevice dd : allDevices) {
+					if (dd.timeLastValid * 1000 < time - INITIAL_TIMESTAMP_TO_DISPLAY) {
+						continue;
+					}
+					final MessageToDevice existingMessage = getMessageToDevice(time, dd);
+					if (existingMessage.device != null && existingMessage.device.lat == dd.lat
+							&& existingMessage.device.lng == dd.lng 
+							&& existingMessage.device.azi == dd.azi
+							// creates extra traffic for updates
+							&& existingMessage.device.timeLastReceived == dd.timeLastReceived  
+							) {
+						continue;
+					}
+					String bld = buildMessage(dd, time);
+					if (existingMessage.messageId == null) {
+						SendMessage msg = new SendMessage();
+						msg.setChatId(group.chatId);
+						msg.setText(bld);
+						group.bot.sendMethodAsync(msg, new SentCallback<Message>() {
+
+							@Override
+							public void onResult(BotApiMethod<Message> method, Message response) {
+								existingMessage.messageId = response.getMessageId();
+							}
+
+							@Override
+							public void onError(BotApiMethod<Message> method, TelegramApiRequestException apiException) {
+							}
+
+							@Override
+							public void onException(BotApiMethod<Message> method, Exception exception) {
+							}
+						});
+					} else {
+						EditMessageText msg = new EditMessageText();
+						msg.setChatId(group.chatId);
+						msg.setText(bld);
+						msg.setMessageId(existingMessage.messageId);
+						group.bot.sendMethod(msg);
+
+					}
+					existingMessage.device = dd;
+					existingMessage.updateTime = time;
+				}
+			} catch (Exception e) {
+				LOG.error(e.getMessage() ,e);
+			}
+		}
+
+		private MessageToDevice getMessageToDevice(long time, MegaGPSDevice dd) {
+			MessageToDevice existingMessage = group.group.get(dd.id);
+			if(existingMessage == null) {
+				existingMessage = new MessageToDevice();
+				existingMessage.initialTimestamp = time;
+				group.group.put(dd.id, existingMessage);
+			}
+			return existingMessage;
+		}
+		
+		public String buildMessage(MegaGPSDevice dd, long time) {
+			JsonObject obj = new JsonObject();
+			obj.addProperty("name", dd.name == null ? dd.id : dd.name);
+			obj.addProperty("lat", (Float)dd.getLatitude());
+			obj.addProperty("lon", (Float)dd.getLongitude());
+			if(dd.altitude != 0) {
+				obj.addProperty("alt", (Float)dd.altitude);
+			}
+			if(dd.azi != 0 && dd.timeLastReceived == dd.timeLastValid) {
+				obj.addProperty("azi", (Float)dd.azi);
+			}
+			if(dd.speed != 0 && dd.timeLastReceived == dd.timeLastValid) {
+				obj.addProperty("spd", (Float)dd.speed);
+			}
+			if(dd.timeLastReceived != 0) {
+				obj.addProperty("updAgo", (Long)(time/ 1000 - dd.timeLastReceived));
+			}
+			if(dd.timeLastValid != 0) {
+				obj.addProperty("locAgo", (Long)(time/ 1000 - dd.timeLastValid));
+			}
+			return obj.toString();
+		}
+
+
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj || (obj instanceof TaskToUpdateLocationGroup && 
+					((TaskToUpdateLocationGroup)obj).group == group)) {
+				return true;
+			}
+			return false;
+		}
+		
+		@Override
+		public int hashCode() {
+			return group == null ? 0 : group.hashCode();
+		}
+
+	}
+
+
+	
 	
 }

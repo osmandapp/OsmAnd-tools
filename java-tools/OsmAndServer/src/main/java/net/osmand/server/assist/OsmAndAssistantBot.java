@@ -26,6 +26,7 @@ import org.telegram.telegrambots.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.exceptions.TelegramApiException;
+import org.telegram.telegrambots.updateshandlers.SentCallback;
 
 import com.google.gson.JsonObject;
 
@@ -47,6 +48,9 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 
 	@Override
 	public String getBotUsername() {
+		if(System.getenv("OSMAND_DEV_TEST_BOT_TOKEN") != null) {
+			return "osmand_dev_test_bot"; 
+		}
 		return "osmand_bot";
 	}
 
@@ -56,6 +60,9 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 
 	@Override
 	public String getBotToken() {
+		if(System.getenv("OSMAND_DEV_TEST_BOT_TOKEN") != null) {
+			return System.getenv("OSMAND_DEV_TEST_BOT_TOKEN");
+		}
 		return System.getenv("OSMAND_ASSISTANT_BOT_TOKEN");
 	}
 
@@ -87,14 +94,18 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 				if (coreMsg.startsWith("/")) {
 					coreMsg = coreMsg.substring(1);
 				}
+				String params = "";
+				int space = coreMsg.indexOf(' ');
+				if (space != -1) {
+					params = coreMsg.substring(space).trim();
+					coreMsg = coreMsg.substring(0, space);
+					
+				}
 				int at = coreMsg.indexOf("@");
 				if (at > 0) {
 					coreMsg = coreMsg.substring(0, at);
 				}
-				String params = "";
-				if (msg.getText().indexOf(' ') != -1) {
-					params = msg.getText().substring(msg.getText().indexOf(' ')).trim();
-				}
+				
 				UserChatIdentifier ucid = new UserChatIdentifier();
 				ucid.setChatId(msg.getChatId());
 				ucid.setFieldsFromMessage(msg.getFrom());
@@ -112,6 +123,10 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 						sendAllTrackerConfigurations(ucid, false);
 					} else if ("mydevices".equals(coreMsg)) {
 						retrieveMyDevices(ucid, params);
+					} else if ("start-monitoring".equals(coreMsg)) {
+						monitorMyDevices(ucid, params);
+					} else if ("stop-monitoring".equals(coreMsg)) {
+						stopMonitorMyDevices(ucid, params);
 					} else if ("whoami".equals(coreMsg)) {
 						sendApiMethod(new SendMessage(msg.getChatId(), "I'm your OsmAnd assistant"));
 					} else {
@@ -173,6 +188,10 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 	public final <T extends Serializable, Method extends BotApiMethod<T>> T sendMethod(Method method) throws TelegramApiException {
 		return super.sendApiMethod(method);
     }
+	
+	public final <T extends Serializable, Method extends BotApiMethod<T>, Callback extends SentCallback<T>> void sendMethodAsync(Method method, Callback callback) {
+		super.sendApiMethodAsync(method, callback);
+    }
 
 	public String saveTrackerConfiguration(TrackerConfiguration config) {
 		List<TrackerConfiguration> list = repository.findByUserIdOrderByDateCreated(config.userId);
@@ -221,36 +240,84 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 		return config;
 	}
 
+	public static class MyDevicesOptions {
+		public long filterLocationTime;
+		public UserChatIdentifier ucid;
+		public TrackerConfiguration config;
+		public int cfgOrder;
+	}
 	
 	public void retrieveMyDevices(UserChatIdentifier ucid, String params) throws TelegramApiException {
+		List<TrackerConfiguration> list = getTrackerConfigurations(ucid);
+		int i = 1;
+		for (TrackerConfiguration c : list) {
+			MyDevicesOptions options = new MyDevicesOptions();
+			if (params.startsWith("recent")) {
+				long dl = TimeUnit.HOURS.toMillis(24);
+				if (params.startsWith("recent ")) {
+					try {
+						double hours = Double.parseDouble(params.substring("recent ".length()));
+						dl = TimeUnit.MINUTES.toMillis((long) (60 * hours));
+					} catch (NumberFormatException e) {
+					}
+				}
+				options.filterLocationTime = (System.currentTimeMillis() - dl) / 1000l;
+			}
+			options.ucid = ucid;
+			options.cfgOrder = list.size() == 1 ? 0 : i;
+			options.config = c;
+			retrieveMyDevices(options);
+			i++;
+		}
+	}
+
+	private List<TrackerConfiguration> getTrackerConfigurations(UserChatIdentifier ucid) throws TelegramApiException {
 		List<TrackerConfiguration> list = repository.findByUserIdOrderByDateCreated(ucid.getUserId());
 		if (list.isEmpty()) {
 			sendApiMethod(new SendMessage(ucid.getChatId(), "You don't have any tracking configurations set yet"));
 		} else {
-			int i = 1;
 			String cid = ucid.getChatId() + "";
 			for (TrackerConfiguration c : list) {
-				if(!c.data.has(TrackerConfiguration.CHATS) || 
-						!c.data.get(TrackerConfiguration.CHATS).getAsJsonObject().has(cid)) {
-					if(!c.data.has(TrackerConfiguration.CHATS)) {
+				if (!c.data.has(TrackerConfiguration.CHATS)
+						|| !c.data.get(TrackerConfiguration.CHATS).getAsJsonObject().has(cid)) {
+					if (!c.data.has(TrackerConfiguration.CHATS)) {
 						c.data.add(TrackerConfiguration.CHATS, new JsonObject());
 					}
 					c.data.get(TrackerConfiguration.CHATS).getAsJsonObject().add(cid, new JsonObject());
 					repository.save(c);
 				}
-				if(params.isEmpty() || params.equals(i+"")) {
-					retrieveMyDevices(c, ucid, list.size() == 1 ? 0 : 1);
-				}
-				i++;
+			}
+		}
+		return list;
+	}
+	
+	public void monitorMyDevices(UserChatIdentifier ucid, String params) throws TelegramApiException {
+		List<TrackerConfiguration> list = getTrackerConfigurations(ucid);
+		for (TrackerConfiguration c : list) {
+			if(megaGPSTracker.accept(c)) {
+				megaGPSTracker.monitorDevices(this, ucid, c);;
+				break;
+			}
+		}
+	}
+	
+	public void stopMonitorMyDevices(UserChatIdentifier ucid, String params) throws TelegramApiException {
+		List<TrackerConfiguration> list = getTrackerConfigurations(ucid);
+		for (TrackerConfiguration c : list) {
+			if(megaGPSTracker.accept(c)) {
+				megaGPSTracker.stopMonitorDevices(this, ucid, c);;
+				break;
 			}
 		}
 	}
 
-	private void retrieveMyDevices(TrackerConfiguration c, UserChatIdentifier ucid, int cfgOrder) throws TelegramApiException {
-		if(megaGPSTracker.accept(c)) {
-			megaGPSTracker.retrieveMyDevices(this, c, ucid, cfgOrder);
+	
+	
+	private void retrieveMyDevices(MyDevicesOptions options) throws TelegramApiException {
+		if(megaGPSTracker.accept(options.config)) {
+			megaGPSTracker.retrieveMyDevices(this, options);
 		} else {
-			sendApiMethod(new SendMessage(ucid.getChatId(), "Tracker configuration '" + c.trackerId
+			sendApiMethod(new SendMessage(options.ucid.getChatId(), "Tracker configuration '" + options.config.trackerId
 					+ "' is not supported"));
 		}
 	}
