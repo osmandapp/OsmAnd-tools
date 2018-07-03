@@ -1,14 +1,18 @@
 package net.osmand.server.monitor;
 
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.net.MalformedURLException;
 import java.net.URL;
+import java.net.URLConnection;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Set;
 import java.util.TimeZone;
 import java.util.TreeSet;
+import java.util.zip.GZIPInputStream;
 
 import net.osmand.server.TelegramBotManager;
 
@@ -18,9 +22,12 @@ import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.json.JSONTokener;
+import org.kxml2.io.KXmlParser;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.xmlpull.v1.XmlPullParser;
+import org.xmlpull.v1.XmlPullParserException;
 
 @Component
 public class OsmAndServerMonitorTasks {
@@ -114,6 +121,57 @@ public class OsmAndServerMonitorTasks {
 		}
     	
     }
+
+    @Scheduled(fixedRate = 5 * MINUTE)
+    public void checkIndexesValidity() {
+		GZIPInputStream gis = null;
+    	try {
+			URL url = new URL("http://osmand.net/get_indexes?gzip=true");
+			URLConnection conn = url.openConnection();
+			InputStream is = conn.getInputStream();
+			gis = new GZIPInputStream(is);
+
+			validateAndReport(gis);
+
+		} catch (IOException ioex) {
+			LOG.error(ioex.getMessage(), ioex);
+			telegram.sendMonitoringAlertMessage("Exception while checking the indexes.xml validity.");
+		} finally {
+			if (gis != null) {
+				close(gis);
+			}
+		}
+	}
+
+	private void validateAndReport(InputStream is) throws IOException {
+		try {
+			XmlPullParser xpp = new KXmlParser();
+			xpp.setInput(new InputStreamReader(is));
+
+			int eventType = xpp.getEventType();
+			while (eventType != XmlPullParser.END_DOCUMENT) {
+				if (eventType == XmlPullParser.TEXT) {
+					if (!xpp.isWhitespace()) {
+						throw new XmlPullParserException("Text in document");
+					}
+				}
+				eventType = xpp.next();
+			}
+
+			telegram.sendMonitoringAlertMessage("indexes.xml is well-formed.");
+		} catch (XmlPullParserException ex) {
+			LOG.error(ex.getMessage(), ex);
+			telegram.sendMonitoringAlertMessage("indexes.xml has invalid structure.");
+		}
+	}
+
+	private void close(InputStream is) {
+    	try {
+    		is.close();
+		} catch (IOException ex) {
+    		LOG.error(ex.getMessage(), ex);
+		}
+	}
     
 
     public String refreshAll() {
