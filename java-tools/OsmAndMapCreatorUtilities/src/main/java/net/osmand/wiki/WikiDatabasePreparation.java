@@ -843,7 +843,7 @@ public class WikiDatabasePreparation {
 								String plainStr = wikiModel.render(converter, text);
 								plainStr = plainStr.replaceAll("<p>div class=&#34;content&#34;", "<div class=\"content\">\n<p>").replaceAll("<p>/div\n</p>", "</div>");
 								if (this.id++ % 500 == 0) {
-									log.debug("Article accepted " + cid + " " + title.toString() + " " + ll.getLatitude()
+									log.info("Article accepted " + cid + " " + title.toString() + " " + ll.getLatitude()
 											+ " " + ll.getLongitude() + " free: "
 											+ (Runtime.getRuntime().freeMemory() / (1024 * 1024)));
 								}

@@ -73,6 +73,9 @@ public class WikiDataHandler extends DefaultHandler {
     public void finish() throws SQLException {
         log.info("Total accepted: " + count);
         conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_lang_title ON wiki_mapping(lang, title)");
+        conn.createStatement().execute("CREATE INDEX id_mapping_index on wiki_mapping(id)");
+        conn.createStatement().execute("CREATE INDEX id_coords_index on wiki_coords(id)");
+
         coordsPrep.executeBatch();
         mappingPrep.executeBatch();
         if (!conn.getAutoCommit()) {
