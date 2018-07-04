@@ -184,7 +184,7 @@ public class WikiDatabasePreparation {
 	private static void parseAndAppendLangSpelling(String val, StringBuilder bld) {
 		String[] parts = val.split("\\|");
 		if (parts.length > 1) {
-			bld.append(parts[2]);
+			bld.append(parts[1]);
 		}
 	}
 
