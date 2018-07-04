@@ -295,7 +295,7 @@ public class WikiDatabasePreparation {
 		selfClosed = selfClosed < 0 ? Integer.MAX_VALUE : selfClosed;
 		int endInd = Math.min(closingTag, selfClosed);
 		endInd = endInd == closingTag ? endInd + "</ref>".length() : endInd + "/>".length();
-		if (endInd > text.length() - 1) {
+		if (endInd > text.length() - 1 || endInd < 0) {
 			return i;
 		}
 		parseAndAppendCitation(text.substring(i, endInd), bld);
