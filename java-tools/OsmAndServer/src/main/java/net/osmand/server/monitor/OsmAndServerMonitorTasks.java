@@ -96,7 +96,7 @@ public class OsmAndServerMonitorTasks {
                 String name = jb.getString("name");
                 String color = jb.getString("color");
                 if (!color.equals("blue") && !color.equals("disabled") &&
-                        !color.equals("notbuilt") && !color.equals("blue_anime")) {
+                    !color.equals("notbuilt") && !color.equals("blue_anime")) {
                     jobsFailed.add(name);
                 }
             }
@@ -131,13 +131,22 @@ public class OsmAndServerMonitorTasks {
             InputStream is = conn.getInputStream();
             gis = new GZIPInputStream(is);
 
-            boolean mapIndexCurrValidation = validateMapIndex(gis);
+            boolean mapIndexCurrValidation = true;
+            int mapsInMapIndex = 0;
+            try {
+                mapsInMapIndex = countMapsInMapIndex(gis);
+            } catch (XmlPullParserException xmlex) {
+                mapIndexCurrValidation = false;
+                LOG.error(xmlex.getMessage(), xmlex);
+            }
+
             if (mapIndexPrevValidation && !mapIndexCurrValidation) {
                 telegram.sendMonitoringAlertMessage("Map index is not correctly generated on the website (check).");
             }
 
             if (!mapIndexPrevValidation && mapIndexCurrValidation) {
-                telegram.sendMonitoringAlertMessage("Map index is correct.");
+                telegram.sendMonitoringAlertMessage(
+                    String.format("Map index is correct and contains %5d maps.", mapsInMapIndex));
             }
             mapIndexPrevValidation = mapIndexCurrValidation;
 
@@ -151,13 +160,17 @@ public class OsmAndServerMonitorTasks {
         }
     }
 
-    private boolean validateMapIndex(InputStream is) throws IOException {
-        boolean valid = true;
-        try {
+    private int countMapsInMapIndex(InputStream is) throws IOException, XmlPullParserException {
+        int mapCounter = 0;
             XmlPullParser xpp = new KXmlParser();
             xpp.setInput(new InputStreamReader(is));
             int eventType = xpp.getEventType();
             while (eventType != XmlPullParser.END_DOCUMENT) {
+                if (eventType == XmlPullParser.START_TAG) {
+                    if (!xpp.getName().equals("osmand_regions")) {
+                        mapCounter++;
+                    }
+                }
                 if (eventType == XmlPullParser.TEXT) {
                     if (!xpp.isWhitespace()) {
                         throw new XmlPullParserException("Text in document");
@@ -165,11 +178,8 @@ public class OsmAndServerMonitorTasks {
                 }
                 eventType = xpp.next();
             }
-        } catch (XmlPullParserException ex) {
-            valid = false;
-            LOG.error(ex.getMessage(), ex);
-        }
-        return valid;
+
+        return mapCounter;
     }
 
     private void close(InputStream is) {
@@ -200,7 +210,7 @@ public class OsmAndServerMonitorTasks {
     private String getLiveDelayedMessage(long delay) {
         String txt = "OsmAnd Live is delayed by " + formatTime(delay) + " hours ";
         txt += " (avg3h " + formatTime(live3Hours.getMean()) + ", avg24h " + formatTime(live24Hours.getMean())
-                + ", max24h " + formatTime(live24Hours.getMax()) + ")";
+            + ", max24h " + formatTime(live24Hours.getMax()) + ")";
         return txt;
     }
 
