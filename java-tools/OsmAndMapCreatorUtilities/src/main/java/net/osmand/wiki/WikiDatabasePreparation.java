@@ -120,6 +120,8 @@ public class WikiDatabasePreparation {
 					bld.append((parseRegionList(val)));
 				} else if (key.equals(WikivoyageTemplates.WARNING.getType())) {
 					appendWarning(bld, val);
+				} else if (key.equals(WikivoyageTemplates.CITATION.getType())) {
+					parseAndAppendCitation(val, bld);
 				}
 				if (!key.isEmpty()) {
 					if (key.contains("|")) {
@@ -131,6 +133,9 @@ public class WikiDatabasePreparation {
 					}
 				}
 				i++;
+			} else if (nt > 2 && text.charAt(i) == '<' && text.charAt(i + 1) == 'r' && text.charAt(i + 2) == 'e'
+					&& text.charAt(i + 3) == 'f' && openCnt == 0) {
+				i = parseRef(text, bld, i);
 			} else {
 				if (openCnt == 0) {
 					int headerLvl = 0;
@@ -169,6 +174,35 @@ public class WikiDatabasePreparation {
 			}
 		}
 		return bld.toString();
+	}
+
+	private static int parseRef(String text, StringBuilder bld, int i) {
+		int closingTag = text.indexOf("</", i);
+		int selfClosed = text.indexOf("/>", i);
+		closingTag = closingTag < 0 ? Integer.MAX_VALUE : closingTag;
+		selfClosed = selfClosed < 0 ? Integer.MAX_VALUE : selfClosed;
+		int endInd = Math.min(closingTag, selfClosed);
+		endInd = endInd == closingTag ? endInd + "</ref>".length() : endInd + "/>".length();
+		if (endInd > text.length() - 1) {
+			return i;
+		}
+		parseAndAppendCitation(text.substring(i, endInd), bld);
+		// return index of the last char in the reference
+		return --endInd;
+	}
+
+	private static void parseAndAppendCitation(String ref, StringBuilder bld) {
+		String[] parts = ref.split("\\|");
+		String url = "";
+		for (String part : parts) {
+			part = part.trim().toLowerCase();
+			if (part.startsWith("url=")) {
+				url = part.substring(part.indexOf("=") + 1);
+			}
+		}
+		if (!url.isEmpty()) {
+			bld.append("[").append(url).append("]");
+		}
 	}
 
 	private static int calculateHeaderLevel(String s, int index) {
@@ -400,6 +434,8 @@ public class WikiDatabasePreparation {
 			return WikivoyageTemplates.REGION_LIST.getType();
 		} else if (str.startsWith("warningbox")) {
 			return WikivoyageTemplates.WARNING.getType();
+		} else if (str.startsWith("cite")) {
+			return WikivoyageTemplates.CITATION.getType();
 		}
 		return "";
 	}
@@ -677,17 +713,18 @@ public class WikiDatabasePreparation {
 							selectPrep.setString(2, lang);
 							ResultSet rs = selectPrep.executeQuery();
 							String id = null;
-							double lat = 0;
-							double lon = 0;
+							double lat = 50.4547;
+							double lon = 30.5238;
 							while (rs.next()) {
 								lat = rs.getDouble(1);
 								lon = rs.getDouble(2);
 								id = rs.getString(3);
 							}
 							selectPrep.clearParameters();
-							if (id != null && lat != 0 && lon != 0) {
+//							if (id != null && lat != 0 && lon != 0) {
 								LatLon ll = new LatLon(lat, lon);
-								long wikiId = Long.parseLong(id.substring(1));
+//								long wikiId = Long.parseLong(id.substring(1));
+								long wikiId = 354;
 								String text = removeMacroBlocks(ctext.toString(), new HashMap<>(),
 										lang, null);
 								final HTMLConverter converter = new HTMLConverter(false);
@@ -716,7 +753,7 @@ public class WikiDatabasePreparation {
 									throw new SAXException(e);
 								}
 							}
-						}
+//						}
 						ctext = null;
 					}
 				}
