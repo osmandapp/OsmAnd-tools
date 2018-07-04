@@ -2,6 +2,7 @@ package net.osmand.wiki;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import gnu.trove.map.hash.TIntObjectHashMap;
 import info.bliki.wiki.filter.HTMLConverter;
 import info.bliki.wiki.model.WikiModel;
 import net.osmand.PlatformUtil;
@@ -112,6 +113,8 @@ public class WikiDatabasePreparation {
 				String val = text.substring(beginInd, endInd);
 				if (val.startsWith("allery")) {
 					bld.append(parseGallery(val));
+				} else if (val.toLowerCase().startsWith("weather box")) {
+					parseAndAppendWeatherTable(val, bld);
 				}
 				String key = getKey(val.toLowerCase());
 				if (key.equals(WikivoyageTemplates.POI.getType())) {
@@ -174,6 +177,106 @@ public class WikiDatabasePreparation {
 			}
 		}
 		return bld.toString();
+	}
+
+	private static void parseAndAppendWeatherTable(String val, StringBuilder bld) {
+		String[] parts = val.split("\\|");
+		Map<String, String> headerMappings = new HashMap<>();
+		headerMappings.put("record high", "Record high °C");
+		headerMappings.put("high", "Average high °C");
+		headerMappings.put("mean", "Daily mean °C");
+		headerMappings.put("low", "Average low °C");
+		headerMappings.put("record low", "Record low °C");
+		headerMappings.put("precipitation", "Average rainfall mm");
+		headerMappings.put("rain", "Average rainy days (≥ 1.0 mm)");
+
+		bld.append("{| class=\"wikitable sortable\"\n");
+		bld.append("!Month\n");
+		bld.append("!Jan\n");
+		bld.append("!Feb\n");
+		bld.append("!Mar\n");
+		bld.append("!Apr\n");
+		bld.append("!May\n");
+		bld.append("!Jun\n");
+		bld.append("!Jul\n");
+		bld.append("!Aug\n");
+		bld.append("!Sep\n");
+		bld.append("!Oct\n");
+		bld.append("!Nov\n");
+		bld.append("!Dec\n");
+		bld.append("!Year\n");
+		Map<String, TIntObjectHashMap<String>> data = new LinkedHashMap<>();
+		for (String part : parts) {
+			String header = getHeader(part, headerMappings);
+			if (part.contains("colour") || header == null) {
+				continue;
+			}
+			if (data.get(header) == null) {
+				TIntObjectHashMap<String> vals = new TIntObjectHashMap<>();
+				vals.put(getIndex(part), part.substring(part.indexOf("=") + 1));
+				data.put(header, vals);
+			} else {
+				data.get(header).put(getIndex(part), part.substring(part.indexOf("=") + 1));
+			}
+		}
+		for (String header : data.keySet()) {
+			bld.append("|-\n");
+			bld.append("|").append(header).append("\n");
+			TIntObjectHashMap<String> values = data.get(header);
+			for (int i = 1; i < 14; i++) {
+				String valueToAppend = values.get(i);
+				valueToAppend = valueToAppend == null ? "" : valueToAppend;
+				bld.append("|").append(valueToAppend).append("\n");
+			}
+		}
+		bld.append("|}");
+	}
+
+	private static int getIndex(String part) {
+		if (part.contains("Jan")) {
+			return 1;
+		} else if (part.contains("Feb")) {
+			return 2;
+		} else if (part.contains("Mar")) {
+			return 3;
+		} else if (part.contains("Apr")) {
+			return 4;
+		} else if (part.contains("May")) {
+			return 5;
+		} else if (part.contains("Jun")) {
+			return 6;
+		} else if (part.contains("Jul")) {
+			return 7;
+		} else if (part.contains("Aug")) {
+			return 8;
+		} else if (part.contains("Sep")) {
+			return 9;
+		} else if (part.contains("Oct")) {
+			return 10;
+		} else if (part.contains("Nov")) {
+			return 11;
+		} else if (part.contains("Dec")) {
+			return 12;
+		} else if (part.contains("year")) {
+			return 13;
+		} else {
+			return -1;
+		}
+	}
+
+	private static String getHeader(String part, Map<String, String> mapping) {
+		if (part.contains("high")) {
+			return part.contains("record") ? mapping.get("record high") : mapping.get("high");
+		} else if (part.contains("low")) {
+			return part.contains("record") ? mapping.get("record low") : mapping.get("low");
+		} else if (part.contains("mean")) {
+			return mapping.get("mean");
+		} else if (part.contains("precipitation")) {
+			return mapping.get("precipitation");
+		} else if (part.contains("rain")) {
+			return mapping.get("rain");
+		}
+		return null;
 	}
 
 	private static int parseRef(String text, StringBuilder bld, int i) {
