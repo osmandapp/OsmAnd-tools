@@ -115,6 +115,8 @@ public class WikiDatabasePreparation {
 					bld.append(parseGallery(val));
 				} else if (val.toLowerCase().startsWith("weather box")) {
 					parseAndAppendWeatherTable(val, bld);
+				} else if (val.toLowerCase().startsWith("lang-")) {
+					parseAndAppendLangSpelling(val, bld);
 				}
 				String key = getKey(val.toLowerCase());
 				if (key.equals(WikivoyageTemplates.POI.getType())) {
@@ -177,6 +179,13 @@ public class WikiDatabasePreparation {
 			}
 		}
 		return bld.toString();
+	}
+
+	private static void parseAndAppendLangSpelling(String val, StringBuilder bld) {
+		String[] parts = val.split("\\|");
+		if (parts.length > 1) {
+			bld.append(parts[2]);
+		}
 	}
 
 	private static void parseAndAppendWeatherTable(String val, StringBuilder bld) {
