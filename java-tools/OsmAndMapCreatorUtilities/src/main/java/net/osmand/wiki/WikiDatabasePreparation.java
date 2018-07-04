@@ -713,18 +713,17 @@ public class WikiDatabasePreparation {
 							selectPrep.setString(2, lang);
 							ResultSet rs = selectPrep.executeQuery();
 							String id = null;
-							double lat = 50.4547;
-							double lon = 30.5238;
+							double lat = 0;
+							double lon = 0;
 							while (rs.next()) {
 								lat = rs.getDouble(1);
 								lon = rs.getDouble(2);
 								id = rs.getString(3);
 							}
 							selectPrep.clearParameters();
-//							if (id != null && lat != 0 && lon != 0) {
+							if (id != null && lat != 0 && lon != 0) {
 								LatLon ll = new LatLon(lat, lon);
-//								long wikiId = Long.parseLong(id.substring(1));
-								long wikiId = 354;
+								long wikiId = Long.parseLong(id.substring(1));
 								String text = removeMacroBlocks(ctext.toString(), new HashMap<>(),
 										lang, null);
 								final HTMLConverter converter = new HTMLConverter(false);
@@ -753,7 +752,7 @@ public class WikiDatabasePreparation {
 									throw new SAXException(e);
 								}
 							}
-//						}
+						}
 						ctext = null;
 					}
 				}
