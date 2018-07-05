@@ -89,11 +89,11 @@ public class WikiDatabasePreparation {
 		boolean hebrew = false;
 		for (int i = 0; i < text.length(); i++) {
 			int nt = text.length() - i - 1;
-			if (nt > 0 && ((text.charAt(i) == '{' && text.charAt(i + 1) == '{') || (text.charAt(i) == '[' && text.charAt(i + 1) == '[' && text.charAt(i + 2) == 'ק') 
-					|| (text.charAt(i) == '<' && text.charAt(i + 1) == 'm' && text.charAt(i + 2) == 'a' && text.charAt(i + 3) == 'p' 
+			if ((nt > 0 && text.charAt(i) == '{' && text.charAt(i + 1) == '{') || (nt > 1 && text.charAt(i) == '[' && text.charAt(i + 1) == '[' && text.charAt(i + 2) == 'ק')
+					|| (nt > 4 && text.charAt(i) == '<' && text.charAt(i + 1) == 'm' && text.charAt(i + 2) == 'a' && text.charAt(i + 3) == 'p'
 					&& text.charAt(i + 4) == 'l' && text.charAt(i + 5) == 'i') 
-					|| (text.charAt(i) == '<' && text.charAt(i + 1) == 'g' && text.charAt(i + 2) == 'a' && text.charAt(i + 3) == 'l')
-					|| (text.charAt(i) == '<' && text.charAt(i + 1) == '!' && text.charAt(i + 2) == '-' && text.charAt(i + 3) == '-'))) {
+					|| (nt > 2 && text.charAt(i) == '<' && text.charAt(i + 1) == 'g' && text.charAt(i + 2) == 'a' && text.charAt(i + 3) == 'l')
+					|| (nt > 2 && text.charAt(i) == '<' && text.charAt(i + 1) == '!' && text.charAt(i + 2) == '-' && text.charAt(i + 3) == '-')) {
 				hebrew = text.length() > 2 && text.charAt(i + 2) == 'ק';
 				beginInd = beginInd == 0 ? i + 2 : beginInd;
 				openCnt++;
@@ -839,7 +839,7 @@ public class WikiDatabasePreparation {
 								LatLon ll = new LatLon(lat, lon);
 								long wikiId = Long.parseLong(id.substring(1));
 								// TODO remove temporary measures to continue parsing from the start of the document
-								boolean lastParsed = lat == 57.16667 && lon == -4.66667 && title.toString().equals("Glen Moriston") && wikiId == 24640975;
+								boolean lastParsed = lat == 54.5377 && lon == -1.59675 && title.toString().equals("Branksome School") && wikiId == 4957508;
 								if (lastParsed) {
 									continueParsing = true;
 								}
