@@ -712,8 +712,6 @@ public class WikiDatabasePreparation {
 		private StringBuilder text = new StringBuilder();
 		private StringBuilder pageId = new StringBuilder();
 
-		private boolean continueParsing = false;
-
 		private final InputStream progIS;
 		private ConsoleProgressImplementation progress = new ConsoleProgressImplementation();
 		private DBDialect dialect = DBDialect.SQLITE;
@@ -838,14 +836,6 @@ public class WikiDatabasePreparation {
 							if (id != null && lat != 0 && lon != 0) {
 								LatLon ll = new LatLon(lat, lon);
 								long wikiId = Long.parseLong(id.substring(1));
-								// TODO remove temporary measures to continue parsing from the start of the document
-								boolean lastParsed = lat == 54.5377 && lon == -1.59675 && title.toString().equals("Branksome School") && wikiId == 4957508;
-								if (lastParsed) {
-									continueParsing = true;
-								}
-								if (!continueParsing) {
-									return;
-								}
 								String text = removeMacroBlocks(ctext.toString(), new HashMap<>(),
 										lang, null);
 								final HTMLConverter converter = new HTMLConverter(false);
