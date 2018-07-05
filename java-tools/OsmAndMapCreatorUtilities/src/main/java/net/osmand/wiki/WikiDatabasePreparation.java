@@ -99,10 +99,10 @@ public class WikiDatabasePreparation {
 				openCnt++;
 				i++;
 			} else if (nt > 0 && ((text.charAt(i) == '}' && text.charAt(i + 1) == '}') || (hebrew && text.charAt(i) == ']' && text.charAt(i + 1) == ']')
-					|| (text.charAt(i) == '>' && text.charAt(i - 1) == 'k' && text.charAt(i - 2) == 'n' && text.charAt(i - 3) == 'i' 
+					|| (i > 4 && text.charAt(i) == '>' && text.charAt(i - 1) == 'k' && text.charAt(i - 2) == 'n' && text.charAt(i - 3) == 'i'
 					&& text.charAt(i - 4) == 'l' && text.charAt(i - 5) == 'p') 
-					|| (text.charAt(i) == '>' && text.charAt(i - 1) == 'y' && text.charAt(i - 2) == 'r' && text.charAt(i - 3) == 'e')
-					|| (text.charAt(i) == '>' && text.charAt(i - 1) == '-' && text.charAt(i - 2) == '-'))) {
+					|| (i > 2 && text.charAt(i) == '>' && text.charAt(i - 1) == 'y' && text.charAt(i - 2) == 'r' && text.charAt(i - 3) == 'e')
+					|| (i > 1 && text.charAt(i) == '>' && text.charAt(i - 1) == '-' && text.charAt(i - 2) == '-'))) {
 				if (openCnt > 1) {
 					openCnt--;
 					i++;
@@ -712,6 +712,8 @@ public class WikiDatabasePreparation {
 		private StringBuilder text = new StringBuilder();
 		private StringBuilder pageId = new StringBuilder();
 
+		private boolean continueParsing = false;
+
 		private final InputStream progIS;
 		private ConsoleProgressImplementation progress = new ConsoleProgressImplementation();
 		private DBDialect dialect = DBDialect.SQLITE;
@@ -836,6 +838,11 @@ public class WikiDatabasePreparation {
 							if (id != null && lat != 0 && lon != 0) {
 								LatLon ll = new LatLon(lat, lon);
 								long wikiId = Long.parseLong(id.substring(1));
+								// TODO remove temporary measures to continue parsing from the start of the document
+								continueParsing = lat == 57.16667 && lon == -4.66667 && title.toString().equals("Glen Moriston") && wikiId == 24640975;
+								if (!continueParsing) {
+									return;
+								}
 								String text = removeMacroBlocks(ctext.toString(), new HashMap<>(),
 										lang, null);
 								final HTMLConverter converter = new HTMLConverter(false);
