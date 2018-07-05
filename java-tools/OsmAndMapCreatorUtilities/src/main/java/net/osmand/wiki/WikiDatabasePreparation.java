@@ -839,7 +839,10 @@ public class WikiDatabasePreparation {
 								LatLon ll = new LatLon(lat, lon);
 								long wikiId = Long.parseLong(id.substring(1));
 								// TODO remove temporary measures to continue parsing from the start of the document
-								continueParsing = lat == 57.16667 && lon == -4.66667 && title.toString().equals("Glen Moriston") && wikiId == 24640975;
+								boolean lastParsed = lat == 57.16667 && lon == -4.66667 && title.toString().equals("Glen Moriston") && wikiId == 24640975;
+								if (lastParsed) {
+									continueParsing = true;
+								}
 								if (!continueParsing) {
 									return;
 								}
