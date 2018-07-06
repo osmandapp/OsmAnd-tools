@@ -305,7 +305,7 @@ public class OsmAndServerMonitorTasks {
 	}
 
 	private String getTileServerMessage() {
-		return String.format("Tile server response time: avg24h = %.1f sec, max24h = %.1f sec%n",
+		return String.format("<b>Tile Server:</b>%nResponse time: Avg: 24h - %.1f sec &#183; Max: 24h - %.1f sec.%n",
 				tile24Hours.getMean(), tile24Hours.getMax());
 	}
 
@@ -317,11 +317,13 @@ public class OsmAndServerMonitorTasks {
 
 	public String getStatusMessage() {
 		String msg = getLiveDelayedMessage(live.lastOsmAndLiveDelay) + "\n";
+		msg += "<b>OsmAnd Build Server:</b>\n";
 		if (buildServer.jobsFailed.isEmpty()) {
-			msg += "Build server is OK.";
+			msg += "Build server is OK.\n";
 		} else {
-			msg += "Build server has failures: " + buildServer.jobsFailed;
+			msg += "Failing jobs: " + buildServer.jobsFailed + "\n";
 		}
+		msg += "<b>Download Maps:</b>\n";
 		for (DownloadTestResult r : downloadTests.values()) {
 			msg += r.toString() + "\n";
 		}
@@ -330,7 +332,7 @@ public class OsmAndServerMonitorTasks {
 	}
 
 	private String getLiveDelayedMessage(long delay) {
-		String txt = "OsmAnd Live is delayed by " + formatTime(delay) + " hours ";
+		String txt = "<b>OsmAnd Live:</b>\nDelayed - by " + formatTime(delay) + " hours ";
 		txt += " (avg3h " + formatTime(live3Hours.getMean()) + ", avg24h " + formatTime(live24Hours.getMean())
 				+ ", max24h " + formatTime(live24Hours.getMax()) + ")";
 		return txt;
@@ -374,7 +376,7 @@ public class OsmAndServerMonitorTasks {
 			speed24Hours.addValue(spdMBPerSec);
 			speed3Hours.addValue(spdMBPerSec);
 		}
-		
+
 		@Override
 		public boolean equals(Object o) {
 			if (this == o) return true;
@@ -385,8 +387,8 @@ public class OsmAndServerMonitorTasks {
 		
 		@Override
 		public String toString() {
-			return host + ": " + (lastSuccess ? "OK" : "FAILED") + 
-					" (" + String.format("3h %5.2f MBs, 24h %5.2f MBs", speed3Hours.getMean(), speed24Hours.getMean()) + ")";
+			return host + ": " + (lastSuccess ? "OK" : "FAILED") + "&#183;" +
+					" (" + String.format("Avg: 3h - %5.2f MBs %s Avg: 24h - %5.2f MBs", speed3Hours.getMean(),"&#183;",speed24Hours.getMean()) + ")";
 		}
 
 		@Override
