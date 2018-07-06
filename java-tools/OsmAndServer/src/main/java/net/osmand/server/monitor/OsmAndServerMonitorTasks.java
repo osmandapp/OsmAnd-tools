@@ -1,11 +1,18 @@
 package net.osmand.server.monitor;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.net.URL;
 import java.net.URLConnection;
 import java.text.SimpleDateFormat;
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.Date;
+import java.util.Map;
+import java.util.Set;
+import java.util.TimeZone;
+import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.zip.GZIPInputStream;
 
 import net.osmand.server.TelegramBotManager;
@@ -32,18 +39,13 @@ public class OsmAndServerMonitorTasks {
 	private static final int MINUTE = 60 * SECOND;
 	private static final int HOUR = 60 * MINUTE;
 	private static final int LIVE_STATUS_MINUTES = 2;
+	private static final int DOWNLOAD_MAPS_MINITES = 5;
 
 	private static final int MAPS_COUNT_THRESHOLD = 700;
 
-	private static final int DIVIDER = 1000;
-
-	private static final List<String> URLS_FOR_DOWNLOAD =
-			Arrays.asList(
-					"http://download.osmand.net/download.php?standard=yes&file=Angola_africa_2.obf.zip",
-					"http://dl4.osmand.net/download.php?standard=yes&file=Angola_africa_2.obf.zip",
-					"http://dl5.osmand.net/download.php?standard=yes&file=Angola_africa_2.obf.zip",
-					"http://dl6.osmand.net/download.php?standard=yes&file=Angola_africa_2.obf.zip");
-
+	private static final String[] HOSTS_TO_TEST = new String[] { "download.osmand.net", "dl4.osmand.net",
+			"dl5.osmand.net", "dl6.osmand.net" };
+	
 	DescriptiveStatistics live3Hours = new DescriptiveStatistics(3 * 60 / LIVE_STATUS_MINUTES);
 	DescriptiveStatistics live24Hours = new DescriptiveStatistics(24 * 60 / LIVE_STATUS_MINUTES);
 
@@ -54,9 +56,8 @@ public class OsmAndServerMonitorTasks {
 	BuildServerCheckInfo buildServer = new BuildServerCheckInfo();
 	SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd HH:mm");
 
-	private boolean mapIndexPrevValidation = true;
-
-	private Set<DownloadTestResult> failedTests = new TreeSet<>();
+	boolean mapIndexPrevValidation = true;
+	Map<String, DownloadTestResult> downloadTests = new TreeMap<>();
 
 	@Scheduled(fixedRate = LIVE_STATUS_MINUTES * MINUTE)
 	public void checkOsmAndLiveStatus() {
@@ -130,7 +131,7 @@ public class OsmAndServerMonitorTasks {
 		}
 	}
 
-	@Scheduled(fixedRate = 5 * MINUTE)
+	@Scheduled(fixedRate = DOWNLOAD_MAPS_MINITES * MINUTE)
 	public void checkIndexesValidity() {
 		GZIPInputStream gis = null;
 		try {
@@ -138,9 +139,7 @@ public class OsmAndServerMonitorTasks {
 			URLConnection conn = url.openConnection();
 			InputStream is = conn.getInputStream();
 			gis = new GZIPInputStream(is);
-
 			validateAndReport(gis);
-
 		} catch (IOException ioex) {
 			LOG.error(ioex.getMessage(), ioex);
 			telegram.sendMonitoringAlertMessage("Exception while checking the map index validity.");
@@ -149,67 +148,44 @@ public class OsmAndServerMonitorTasks {
 				close(gis);
 			}
 		}
-
-		File tmpDir = new File("/tmp/dlspeedtest/");
-		if (!tmpDir.exists()) {
-			tmpDir.mkdir();
-		}
-
-		File tmpFile = new File(tmpDir.getPath() + "dltestfile.zip");
-
-		Set<DownloadTestResult> downloadTestResults = new TreeSet<>();
-
-		for (String downloadUrl : URLS_FOR_DOWNLOAD) {
-			String host = null;
+		for (String host : HOSTS_TO_TEST) {
 			URL url = null;
+			DownloadTestResult res = downloadTests.get(host);
+			if(res == null) {
+				res = new DownloadTestResult(host);
+				downloadTests.put(host, res);
+			}
 			try {
-				url = new URL(downloadUrl);
-				host = url.getHost();
+				url = new URL("http://"+host+"/download.php?standard=yes&file=Angola_africa_2.obf.zip");
 				URLConnection conn = url.openConnection();
 				long contentLength = 0;
-				try (InputStream is = conn.getInputStream();
-					 FileOutputStream fos = new FileOutputStream(tmpFile)) {
+				try (InputStream is = conn.getInputStream()) {
 					int read = 0;
 					byte[] buf = new byte[1024 * 1024];
 					long startedAt = System.currentTimeMillis();
 					while ((read = is.read(buf)) != -1) {
-						fos.write(buf);
 						contentLength += read;
 					}
 					long finishedAt = System.currentTimeMillis();
 					double downloadTimeInSec = (finishedAt - startedAt) / 1000d;
-					double downloadSpeedBytesPerSec = contentLength / downloadTimeInSec;
-					DownloadTestResult dtr = new DownloadTestResult(host, true, downloadSpeedBytesPerSec);
-					downloadTestResults.add(dtr);
+					double downloadSpeedMBPerSec = (contentLength / downloadTimeInSec) / (1024*1024);
+					res.addSpeedMeasurement(downloadSpeedMBPerSec);
+					if(!res.lastSuccess) {
+						telegram.sendMonitoringAlertMessage(
+							"There are no problems any more with host " + host);
+					}
+					res.lastSuccess = true;
 				}
+				
 			} catch (IOException ex) {
-				DownloadTestResult dtr = new DownloadTestResult(host, false, -1);
-				downloadTestResults.add(dtr);
-				LOG.error(ex.getMessage(), ex);
+				if(res.lastSuccess ) {
+					telegram.sendMonitoringAlertMessage(
+							"There are problems with downloading maps from " + host);
+					LOG.error(ex.getMessage(), ex);	
+				}
+				res.lastSuccess = false;
+				
 			}
-		}
-		tmpFile.delete();
-		tmpDir.delete();
-
-		Set<DownloadTestResult> currentFailedTests = downloadTestResults.stream()
-				.filter(dtr -> !dtr.success)
-				.collect(Collectors.toSet());
-
-		if (!failedTests.equals(currentFailedTests)) {
-			Set<DownloadTestResult> testsFailedCopy = new TreeSet<>(currentFailedTests);
-			testsFailedCopy.removeAll(failedTests);
-			if (!testsFailedCopy.isEmpty()) {
-				telegram.sendMonitoringAlertMessage(
-						String.format("There are new failures in download test:%n%s", buildMessage(downloadTestResults)));
-			}
-
-			Set<DownloadTestResult> testsRecoveredCopy = new TreeSet<>(failedTests);
-			testsRecoveredCopy.removeAll(currentFailedTests);
-			if (!testsRecoveredCopy.isEmpty()) {
-				telegram.sendMonitoringAlertMessage(
-						String.format("There are recovered tests in download test:%n%s", buildMessage(downloadTestResults)));
-			}
-			failedTests = currentFailedTests;
 		}
 	}
 
@@ -292,6 +268,9 @@ public class OsmAndServerMonitorTasks {
 		} else {
 			msg += "OsmAnd Build server has failing jobs: " + buildServer.jobsFailed;
 		}
+		for (DownloadTestResult r : downloadTests.values()) {
+			msg += r.toString() + "\n";
+		}
 		return msg;
 	}
 
@@ -325,32 +304,35 @@ public class OsmAndServerMonitorTasks {
 
 	protected static class DownloadTestResult {
 		private final String host;
-		private final boolean success;
-		private final double speed;
+		boolean lastSuccess = true;
+		double lastSpeed;
+		
+		DescriptiveStatistics speed3Hours = new DescriptiveStatistics(3 * 60 / DOWNLOAD_MAPS_MINITES);
+		DescriptiveStatistics speed24Hours = new DescriptiveStatistics(24 * 60 / DOWNLOAD_MAPS_MINITES);
 
-		public DownloadTestResult(String host, boolean success, double speed) {
+		public DownloadTestResult(String host) {
 			this.host = host;
-			this.success = success;
-			this.speed = speed;
 		}
 
-		private String formatSpeed(double downloadSpeed) {
-			downloadSpeed /= DIVIDER;
-			if (downloadSpeed < DIVIDER) {
-				return String.format("%5.2f %s", downloadSpeed, "kb");
-			}
-			downloadSpeed /= DIVIDER;
-			return String.format("%5.2f %s", downloadSpeed, "Mb");
+		public void addSpeedMeasurement(double spdMBPerSec) {
+			lastSpeed = spdMBPerSec;
+			speed24Hours.addValue(spdMBPerSec);
+			speed3Hours.addValue(spdMBPerSec);
 		}
+
 
 		@Override
 		public boolean equals(Object o) {
 			if (this == o) return true;
 			if (o == null || getClass() != o.getClass()) return false;
-
 			DownloadTestResult that = (DownloadTestResult) o;
-
 			return host != null ? host.equals(that.host) : that.host == null;
+		}
+		
+		@Override
+		public String toString() {
+			return host +(lastSuccess? ": OK. ": ": FAILED. ") +
+					String.format("Avg3h %5.2f MBs, avg24h %5.2f MBs", speed3Hours.getMean(), speed24Hours.getMean());
 		}
 
 		@Override
@@ -358,13 +340,7 @@ public class OsmAndServerMonitorTasks {
 			return host != null ? host.hashCode() : 0;
 		}
 
-		@Override
-		public String toString() {
-			if (success) {
-				return String.format("Download speed from %s - %s%n.", host, formatSpeed(speed));
-			}
-			return String.format("%s is unavailable.%n", host);
-		}
+
 	}
 
 
