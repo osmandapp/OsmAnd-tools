@@ -114,13 +114,13 @@ public class OsmAndServerMonitorTasks {
 				Set<String> jobsFailedCopy = new TreeSet<String>(jobsFailed);
 				jobsFailedCopy.removeAll(buildServer.jobsFailed);
 				if (!jobsFailedCopy.isEmpty()) {
-					telegram.sendMonitoringAlertMessage("There are new failures on OsmAnd Build Server: " + jobsFailedCopy);
+					telegram.sendMonitoringAlertMessage("There are new failures on Build Server: " + jobsFailedCopy);
 				}
 
 				Set<String> jobsRecoveredCopy = new TreeSet<String>(buildServer.jobsFailed);
 				jobsRecoveredCopy.removeAll(jobsFailed);
 				if (!jobsRecoveredCopy.isEmpty()) {
-					telegram.sendMonitoringAlertMessage("There are recovered jobs on OsmAnd Build Server: " + jobsRecoveredCopy);
+					telegram.sendMonitoringAlertMessage("There are recovered jobs on Build Server: " + jobsRecoveredCopy);
 				}
 				buildServer.jobsFailed = jobsFailed;
 			}
@@ -264,9 +264,9 @@ public class OsmAndServerMonitorTasks {
 	public String getStatusMessage() {
 		String msg = getLiveDelayedMessage(live.lastOsmAndLiveDelay) + "\n";
 		if (buildServer.jobsFailed.isEmpty()) {
-			msg += "OsmAnd Build server is OK.";
+			msg += "Build server is OK.";
 		} else {
-			msg += "OsmAnd Build server has failing jobs: " + buildServer.jobsFailed;
+			msg += "Build server has failures: " + buildServer.jobsFailed;
 		}
 		for (DownloadTestResult r : downloadTests.values()) {
 			msg += r.toString() + "\n";
@@ -331,8 +331,8 @@ public class OsmAndServerMonitorTasks {
 		
 		@Override
 		public String toString() {
-			return host +(lastSuccess? ": OK. ": ": FAILED. ") +
-					String.format("Avg3h %5.2f MBs, avg24h %5.2f MBs", speed3Hours.getMean(), speed24Hours.getMean());
+			return host +(lastSuccess? ": OK ": ": FAILED ") + 
+					" (" + String.format("3h %5.2 MBs, 24h %5.2f MBs", speed3Hours.getMean(), speed24Hours.getMean()) +")";
 		}
 
 		@Override
