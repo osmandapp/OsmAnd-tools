@@ -47,9 +47,7 @@ public class OsmAndServerMonitorTasks {
 	private static final int TILEX_NUMBER = 268660;
 	private static final int TILEY_NUMBER = 174100;
 
-
 	private static final int MAPS_COUNT_THRESHOLD = 700;
-
 
 	private static final String[] HOSTS_TO_TEST = new String[] { "download.osmand.net", "dl4.osmand.net",
 			"dl5.osmand.net", "dl6.osmand.net" };
@@ -81,7 +79,6 @@ public class OsmAndServerMonitorTasks {
 
 	public void checkOsmAndLiveStatus(boolean updateStats) {
 		try {
-
 			URL url = new URL("http://osmand.net/api/osmlive_status");
 			InputStream is = url.openConnection().getInputStream();
 			BufferedReader br = new BufferedReader(new InputStreamReader(is));
@@ -105,7 +102,6 @@ public class OsmAndServerMonitorTasks {
 			LOG.error(e.getMessage(), e);
 		}
 	}
-
 
 	@Scheduled(fixedRate = MINUTE)
 	public void checkOsmAndBuildServer() {
@@ -131,7 +127,6 @@ public class OsmAndServerMonitorTasks {
 				if (!jobsFailedCopy.isEmpty()) {
 					telegram.sendMonitoringAlertMessage("There are new failures on Build Server: " + jobsFailedCopy);
 				}
-
 				Set<String> jobsRecoveredCopy = new TreeSet<String>(buildServer.jobsFailed);
 				jobsRecoveredCopy.removeAll(jobsFailed);
 				if (!jobsRecoveredCopy.isEmpty()) {
@@ -191,7 +186,6 @@ public class OsmAndServerMonitorTasks {
 					}
 					res.lastSuccess = true;
 				}
-				
 			} catch (IOException ex) {
 				if(res.lastSuccess ) {
 					telegram.sendMonitoringAlertMessage(
@@ -221,7 +215,6 @@ public class OsmAndServerMonitorTasks {
 			}
 			eventType = xpp.next();
 		}
-
 		return mapCounter;
 	}
 
@@ -282,27 +275,28 @@ public class OsmAndServerMonitorTasks {
 			} else {
 				telegram.sendMonitoringAlertMessage("There are problems with downloading tile from " + tileUrl);
 			}
-			tileY -= NEXT_TILE;
-			if (tileY == 0) {
-				tileY = TILEY_NUMBER;
-			}
+			tileY += NEXT_TILE;
 		}
 	}
 
 	private double estimateResponse(String tileUrl) {
 		double respTime = -1d;
 		HttpURLConnection conn = null;
+		InputStream is = null;
 		try {
 			URL url = new URL(tileUrl);
 			conn = (HttpURLConnection) url.openConnection();
 			conn.setConnectTimeout(7 * MINUTE);
 			long startedAt = System.currentTimeMillis();
-			conn.connect();
+			is = conn.getInputStream();
 			long finishedAt = System.currentTimeMillis();
 			respTime = (finishedAt - startedAt) / 1000d;
 		} catch (IOException ex) {
 			LOG.error(ex.getMessage(), ex);
 		} finally {
+			if (is != null) {
+				close(is);
+			}
 			if (conn != null) {
 				conn.disconnect();
 			}
@@ -380,8 +374,7 @@ public class OsmAndServerMonitorTasks {
 			speed24Hours.addValue(spdMBPerSec);
 			speed3Hours.addValue(spdMBPerSec);
 		}
-
-
+		
 		@Override
 		public boolean equals(Object o) {
 			if (this == o) return true;
