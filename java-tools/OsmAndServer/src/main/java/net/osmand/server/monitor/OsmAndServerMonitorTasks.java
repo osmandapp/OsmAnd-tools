@@ -331,8 +331,8 @@ public class OsmAndServerMonitorTasks {
 		
 		@Override
 		public String toString() {
-			return host +(lastSuccess? ": OK ": ": FAILED ") + 
-					" (" + String.format("3h %5.2 MBs, 24h %5.2f MBs", speed3Hours.getMean(), speed24Hours.getMean()) +")";
+			return host + ": " + (lastSuccess ? "OK" : "FAILED") + 
+					" (" + String.format("3h %5.2f MBs, 24h %5.2f MBs", speed3Hours.getMean(), speed24Hours.getMean()) + ")";
 		}
 
 		@Override
