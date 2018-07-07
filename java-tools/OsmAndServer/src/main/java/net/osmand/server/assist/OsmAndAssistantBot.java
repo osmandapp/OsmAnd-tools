@@ -1,16 +1,22 @@
 package net.osmand.server.assist;
 
 import java.io.Serializable;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
-import net.osmand.server.assist.convers.AssistantConversation;
-import net.osmand.server.assist.convers.RemoveTrackerConversation;
-import net.osmand.server.assist.convers.SetTrackerConversation;
-import net.osmand.server.assist.convers.UserChatIdentifier;
-import net.osmand.server.assist.tracker.MegaGPSTracker;
+import net.osmand.server.assist.data.Device;
+import net.osmand.server.assist.data.DeviceRepository;
+import net.osmand.server.assist.data.TrackerConfiguration;
+import net.osmand.server.assist.data.TrackerConfigurationRepository;
+import net.osmand.server.assist.data.UserChatIdentifier;
+import net.osmand.server.assist.ext.ITrackerManager;
+import net.osmand.server.assist.ext.ITrackerManager.DeviceInfo;
 
 import org.apache.commons.collections4.map.PassiveExpiringMap;
 import org.apache.commons.logging.Log;
@@ -19,6 +25,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.api.methods.BotApiMethod;
 import org.telegram.telegrambots.api.methods.send.SendMessage;
+import org.telegram.telegrambots.api.methods.updatingmessages.EditMessageText;
 import org.telegram.telegrambots.api.objects.CallbackQuery;
 import org.telegram.telegrambots.api.objects.Message;
 import org.telegram.telegrambots.api.objects.Update;
@@ -28,7 +35,7 @@ import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.exceptions.TelegramApiException;
 import org.telegram.telegrambots.updateshandlers.SentCallback;
 
-import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 
 @Component
 public class OsmAndAssistantBot extends TelegramLongPollingBot {
@@ -36,16 +43,27 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 	private static final Log LOG = LogFactory.getLog(OsmAndAssistantBot.class);
 
 	private static final int LIMIT_CONFIGURATIONS = 3;
+	
+	public static final String URL_TO_POST_COORDINATES = "http://localhost:8080/tracker/c/";
+	
+	SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
 
 	PassiveExpiringMap<UserChatIdentifier, AssistantConversation> conversations =
 			new PassiveExpiringMap<UserChatIdentifier, AssistantConversation>(5, TimeUnit.MINUTES);
 	
 	@Autowired
-	MegaGPSTracker megaGPSTracker;
-
+	List<ITrackerManager> trackerManagers;
+	
 	@Autowired
-	TrackerConfigurationRepository repository;
+	TrackerConfigurationRepository trackerRepo;
+	
+	@Autowired
+	DeviceRepository deviceRepo;
 
+	private static final int USER_UNIQUENESS = 1 << 20;
+	Random rnd = new Random();
+	
+	
 	@Override
 	public String getBotUsername() {
 		if(System.getenv("OSMAND_DEV_TEST_BOT_TOKEN") != null) {
@@ -69,25 +87,20 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 	@Override
 	public void onUpdateReceived(Update update) {
 		Message msg = null;
+		UserChatIdentifier ucid = new UserChatIdentifier();
 		try {
 			CallbackQuery callbackQuery = update.getCallbackQuery();
 			if (callbackQuery != null) {
-				String data = callbackQuery.getData();
-				UserChatIdentifier ucid = new UserChatIdentifier();
 				msg = callbackQuery.getMessage();
 				ucid.setChatId(msg.getChatId());
-				ucid.setFieldsFromMessage(callbackQuery.getFrom());
-				if (!processStandardData(ucid, data, callbackQuery)) {
-					AssistantConversation conversation = conversations.get(ucid);
-					if (conversation != null) {
-						boolean finished = conversation.updateMessage(this, msg, data);
-						if (finished) {
-							conversations.remove(ucid);
-						}
-					}
-				}
+				ucid.setUser(callbackQuery.getFrom());
+				String data = callbackQuery.getData();
+				processCallback(ucid, data, callbackQuery);
 			} else if (update.hasMessage() && update.getMessage().hasText()) {
 				msg = update.getMessage();
+				ucid = new UserChatIdentifier();
+				ucid.setChatId(msg.getChatId());
+				ucid.setUser(msg.getFrom());
 				SendMessage snd = new SendMessage();
 				snd.setChatId(msg.getChatId());
 				String coreMsg = msg.getText();
@@ -106,27 +119,15 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 					coreMsg = coreMsg.substring(0, at);
 				}
 				
-				UserChatIdentifier ucid = new UserChatIdentifier();
-				ucid.setChatId(msg.getChatId());
-				ucid.setFieldsFromMessage(msg.getFrom());
-
 				if (msg.isCommand()) {
-					if ("settracker".equals(coreMsg)) {
-						SetTrackerConversation nconversation = new SetTrackerConversation(ucid);
-						setNewConversation(nconversation);
-						nconversation.updateMessage(this, msg);
-					} else if ("removetracker".equals(coreMsg)) {
-						RemoveTrackerConversation nconversation = new RemoveTrackerConversation(ucid);
-						setNewConversation(nconversation);
-						nconversation.updateMessage(this, msg);
-					} else if ("mytrackers".equals(coreMsg)) {
+					if ("mytrackers".equals(coreMsg)) {
 						sendAllTrackerConfigurations(ucid, false);
+					} else if ("add_device".equals(coreMsg)) {
+						AddDeviceConversation c = new AddDeviceConversation(ucid);
+						setNewConversation(c);
+						c.updateMessage(this, msg);
 					} else if ("mydevices".equals(coreMsg)) {
-						retrieveMyDevices(ucid, params);
-					} else if ("start-monitoring".equals(coreMsg)) {
-						monitorMyDevices(ucid, params);
-					} else if ("stop-monitoring".equals(coreMsg)) {
-						stopMonitorMyDevices(ucid, params);
+						retrieveDevices(ucid, params);
 					} else if ("whoami".equals(coreMsg)) {
 						sendApiMethod(new SendMessage(msg.getChatId(), "I'm your OsmAnd assistant"));
 					} else {
@@ -143,35 +144,138 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 				}
 			}
 		} catch (Exception e) {
-			if (msg != null) {
-				LOG.error(
-						"Could not send message on update " + msg.getChatId() + " " + msg.getText() + ": "
-								+ e.getMessage(), e);
+			if (!(e instanceof TelegramApiException)) {
+				try {
+					sendMethod(new SendMessage(ucid.getChatId(), "Internal error: " + e.getMessage()));
+				} catch (TelegramApiException e1) {
+				}
 			}
+			LOG.warn(e.getMessage(), e);
 		}
 	}
 
 
-	private boolean processStandardData(UserChatIdentifier ucid, String data, CallbackQuery callbackQuery) {
-		if(data.startsWith("device|")) {
-			String[] sl = data.split("\\|");
-			int cId = Integer.parseInt(sl[1]);
-			Optional<TrackerConfiguration> tracker = repository.findById(new Long(cId));
-			if(tracker.isPresent()) {
-				TrackerConfiguration c = tracker.get();
-				if(c.userId.longValue() == ucid.getUserId().longValue() ||
-						(c.data.has(TrackerConfiguration.CHATS) && 
-						c.data.get(TrackerConfiguration.CHATS).getAsJsonObject().has(ucid.getChatId()+""))) {
-					if(megaGPSTracker.accept(c)) {
-						megaGPSTracker.retrieveInfoAboutMyDevice(this, ucid, c, sl[2]);
-					}
+	protected boolean processCallback(UserChatIdentifier ucid, String data, CallbackQuery callbackQuery) throws TelegramApiException {
+		Message msg = callbackQuery.getMessage();
+		if(msg == null) {
+			return false;
+		}
+		UserChatIdentifier ci = new UserChatIdentifier();
+		ci.setChatId(msg.getChatId());
+		ci.setUser(callbackQuery.getFrom());
+		String[] sl = data.split("\\|");
+		if(data.startsWith("dv|")) {
+			long deviceId = Device.getDecodedId(sl[1]);
+			String pm = sl.length > 2 ? sl[2] : ""; 
+			Optional<Device> device = deviceRepo.findById(deviceId);
+			if(!device.isPresent()) {
+				SendMessage snd = new SendMessage();
+				snd.setChatId(msg.getChatId());
+				snd.setText("Device is not found.");
+				sendApiMethod(snd);
+			} else {
+				Device d = device.get();
+				if(callbackQuery.getFrom() == null && d.userId != callbackQuery.getFrom().getId()){
+					SendMessage snd = new SendMessage(msg.getChatId(), "Only device owner can request information about device.");
+					sendApiMethod(snd);	
 				} else {
-					throw new IllegalStateException("User reply is corrupted");
+					retrieveDeviceInformation(d, msg, pm);
+				}
+			}
+		} else if(data.startsWith("impc|") ) {
+			TrackerConfiguration c = null;
+			for(TrackerConfiguration  tc : getExternalConfigurations(ci)) {
+				if(tc.trackerName.equals(sl[1])) {
+					c = tc;
+					break;
+				}
+			}
+			if(c == null) {
+				SendMessage snd = new SendMessage(msg.getChatId(), "Tracker configuration '" + sl[1]
+						+ "' is not accessible.");
+				sendApiMethod(snd);
+			} else {
+				importFromConfigurationMessage(ci, c);
+			}
+		} else if(data.startsWith("impd|") ) {
+			Long l = Long.parseLong(sl[1]);
+			String extId = sl[2];
+			Optional<TrackerConfiguration> opt = trackerRepo.findById(l);
+			String msgSend = "Can't find configuration or device";
+			DeviceInfo info = null;
+			if(opt.isPresent()) {
+				TrackerConfiguration dt = opt.get();
+				dt.mgr = getTrackerManagerById(dt.trackerName);
+				if(dt.mgr != null) {
+					List<? extends DeviceInfo> di = dt.mgr.getDevicesList(dt);
+					for(DeviceInfo i : di) {
+						if(extId.equals(i.getId())) {
+							info = i;
+							break;
+						}
+					}
+				}
+			}
+			
+			if(info != null) {
+				if(!checkExternalDevicePresent(ci, opt.get(), info.getId())) {
+					Device device = createDevice(ci, info.getName());
+					device.externalConfiguration = opt.get().id;
+					device.externalId = info.getId();
+					deviceRepo.save(device);
+					msgSend = String.format("Device '%s' is successfully imported", info.getName());	
+				} else {
+					msgSend = String.format("Device '%s' is already imported", info.getName());
+				}
+			}
+			SendMessage msgs = new SendMessage(msg.getChatId(), msgSend);
+			sendMethod(msgs);
+		} else {
+			AssistantConversation conversation = conversations.get(ucid);
+			if (conversation != null) {
+				boolean finished = conversation.updateMessage(this, msg, data);
+				if (finished) {
+					conversations.remove(ucid);
 				}
 			}
 			return true;
 		}
 		return false;
+	}
+
+	private void retrieveDeviceInformation(Device d, 
+			Message replyMsg, String pm) throws TelegramApiException {
+		
+		InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+		
+		String txt = String.format("Device: <b>%s</b>\nLocation: %s\n", d.deviceName, "n/a");
+		if(pm.equals("more")) {
+			txt += String.format("URL to post: %s\nRegistered: %s", d.deviceName,
+				URL_TO_POST_COORDINATES + d.getEncodedId(), dateFormat.format(d.createdDate));
+		}
+		ArrayList<InlineKeyboardButton> lt = new ArrayList<InlineKeyboardButton>();
+		markup.getKeyboard().add(lt);
+		
+		InlineKeyboardButton button = new InlineKeyboardButton("Update");
+		button.setCallbackData("dv|" + d.getEncodedId()+"|upd");
+		lt.add(button);
+		
+		button = new InlineKeyboardButton("More");
+		button.setCallbackData("dv|" + d.getEncodedId()+"|more");
+		lt.add(button);
+		
+		if (pm.equals("")) {
+			SendMessage sendMessage = new SendMessage();
+			sendMessage.setChatId(replyMsg.getChatId());
+			sendMessage.enableHtml(true).setReplyMarkup(markup).setText(txt);
+			sendApiMethod(sendMessage);
+		} else {
+			EditMessageText editMsg = new EditMessageText();
+			editMsg.setChatId(replyMsg.getChatId());
+			editMsg.setMessageId(replyMsg.getMessageId());
+			editMsg.enableHtml(true).setReplyMarkup(markup).setText(txt);
+			sendApiMethod(editMsg);
+		}
 	}
 
 	private void setNewConversation(AssistantConversation c) throws TelegramApiException {
@@ -194,16 +298,28 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
     }
 
 	public String saveTrackerConfiguration(TrackerConfiguration config) {
-		List<TrackerConfiguration> list = repository.findByUserIdOrderByDateCreated(config.userId);
+		List<TrackerConfiguration> list = trackerRepo.findByUserIdOrderByCreatedDate(config.userId);
+		String suffix = "" ;
+		if(config.token.length() >= 3) {
+			suffix = config.token.substring(config.token.length() - 3, config.token.length());
+		}
+		if(config.trackerName == null) {
+			config.trackerName = config.trackerId + "-" + suffix;
+		}
 		if(list.size() >= LIMIT_CONFIGURATIONS) {
 			return "Currently 1 user is allowed to have only " + LIMIT_CONFIGURATIONS + " configurations.";
 		}
-		repository.save(config);
+		for (TrackerConfiguration dc : list) {
+			if (dc.trackerName.equals(config.trackerName)) {
+				return "Tracker with name '" + config.trackerName + "' is already registered";
+			}
+		}
+		trackerRepo.save(config);
 		return null;
 	}
 
 	public void sendAllTrackerConfigurations(UserChatIdentifier ucid, boolean keyboard) throws TelegramApiException {
-		List<TrackerConfiguration> list = repository.findByUserIdOrderByDateCreated(ucid.getUserId());
+		List<TrackerConfiguration> list = trackerRepo.findByUserIdOrderByCreatedDate(ucid.getUserId());
 		StringBuilder bld = new StringBuilder();
 		SendMessage msg = new SendMessage();
 		msg.setChatId(ucid.getChatId());
@@ -234,9 +350,9 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 	}
 	
 	public TrackerConfiguration removeTrackerConfiguration(UserChatIdentifier ucid, int order) {
-		List<TrackerConfiguration> list = repository.findByUserIdOrderByDateCreated(ucid.getUserId());
+		List<TrackerConfiguration> list = trackerRepo.findByUserIdOrderByCreatedDate(ucid.getUserId());
 		TrackerConfiguration config = list.get(order - 1);
-		repository.delete(config);
+		trackerRepo.delete(config);
 		return config;
 	}
 
@@ -247,79 +363,140 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 		public int cfgOrder;
 	}
 	
-	public void retrieveMyDevices(UserChatIdentifier ucid, String params) throws TelegramApiException {
-		List<TrackerConfiguration> list = getTrackerConfigurations(ucid);
+	
+	public void retrieveDevices(UserChatIdentifier ucid, String params) throws TelegramApiException {
 		int i = 1;
-		for (TrackerConfiguration c : list) {
-			MyDevicesOptions options = new MyDevicesOptions();
-			if (params.startsWith("recent")) {
-				long dl = TimeUnit.HOURS.toMillis(24);
-				if (params.startsWith("recent ")) {
-					try {
-						double hours = Double.parseDouble(params.substring("recent ".length()));
-						dl = TimeUnit.MINUTES.toMillis((long) (60 * hours));
-					} catch (NumberFormatException e) {
-					}
-				}
-				options.filterLocationTime = (System.currentTimeMillis() - dl) / 1000l;
+		parseRecentParam(params);
+		List<Device> devs = deviceRepo.findByUserIdOrderByCreatedDate(ucid.getUserId());
+		InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+		SendMessage msg = new SendMessage();
+		msg.setChatId(ucid.getChatId());
+		msg.enableHtml(true);
+		msg.setReplyMarkup(markup);
+		if (devs.size() > 0) {
+			msg.setText("<b>Available devices:</b>");
+			for (Device c : devs) {
+				StringBuilder sb = new StringBuilder();
+				sb.append(i).append(". ").append(c.deviceName);
+				ArrayList<InlineKeyboardButton> lt = new ArrayList<InlineKeyboardButton>();
+				InlineKeyboardButton button = new InlineKeyboardButton(sb.toString());
+				button.setCallbackData("dv|" + c.getEncodedId());
+				lt.add(button);
+				markup.getKeyboard().add(lt);
+				i++;
 			}
-			options.ucid = ucid;
-			options.cfgOrder = list.size() == 1 ? 0 : i;
-			options.config = c;
-			retrieveMyDevices(options);
-			i++;
+		} else {
+			msg.setText("You don't have any added devices. Please use /add_device to register new devices.");
 		}
+		
+		sendApiMethod(msg);
 	}
 
-	private List<TrackerConfiguration> getTrackerConfigurations(UserChatIdentifier ucid) throws TelegramApiException {
-		List<TrackerConfiguration> list = repository.findByUserIdOrderByDateCreated(ucid.getUserId());
-		if (list.isEmpty()) {
-			sendApiMethod(new SendMessage(ucid.getChatId(), "You don't have any tracking configurations set yet"));
-		} else {
-			String cid = ucid.getChatId() + "";
-			for (TrackerConfiguration c : list) {
-				if (!c.data.has(TrackerConfiguration.CHATS)
-						|| !c.data.get(TrackerConfiguration.CHATS).getAsJsonObject().has(cid)) {
-					if (!c.data.has(TrackerConfiguration.CHATS)) {
-						c.data.add(TrackerConfiguration.CHATS, new JsonObject());
-					}
-					c.data.get(TrackerConfiguration.CHATS).getAsJsonObject().add(cid, new JsonObject());
-					repository.save(c);
+	private long parseRecentParam(String params) {
+		long filterLocationTime = 0;
+		if (params.startsWith("recent")) {
+			long dl = TimeUnit.HOURS.toMillis(24);
+			if (params.startsWith("recent ")) {
+				try {
+					double hours = Double.parseDouble(params.substring("recent ".length()));
+					dl = TimeUnit.MINUTES.toMillis((long) (60 * hours));
+				} catch (NumberFormatException e) {
 				}
 			}
+			filterLocationTime = (System.currentTimeMillis() - dl) / 1000l;
+		}
+		return filterLocationTime;
+	}
+	
+
+
+	public Device createDevice(UserChatIdentifier chatIdentifier, String name) {
+		String js = chatIdentifier.getUserJsonString();
+		Device device = new Device();
+		device.data.add(Device.USER_INFO, new JsonParser().parse(js));
+		device.chatId = chatIdentifier.getChatId();
+		device.userId = chatIdentifier.getUserId();
+		device.deviceName = name;
+		device.id =  rnd.nextInt(USER_UNIQUENESS) + USER_UNIQUENESS;
+		return device;
+	}
+	
+	public void saveDevice(Device device) {
+		deviceRepo.save(device);
+	}
+	
+	public List<TrackerConfiguration> getExternalConfigurations(UserChatIdentifier chatIdentifier) {
+		List<TrackerConfiguration> list = trackerRepo.findByUserIdOrderByCreatedDate(chatIdentifier.getUserId());
+		for(TrackerConfiguration d : list) {
+			d.mgr = getTrackerManagerById(d.trackerId); 
 		}
 		return list;
 	}
 	
-	public void monitorMyDevices(UserChatIdentifier ucid, String params) throws TelegramApiException {
-		List<TrackerConfiguration> list = getTrackerConfigurations(ucid);
-		for (TrackerConfiguration c : list) {
-			if(megaGPSTracker.accept(c)) {
-				megaGPSTracker.monitorDevices(this, ucid, c);;
-				break;
+	public ITrackerManager getTrackerManagerById(String id) {
+		for(ITrackerManager c : trackerManagers) {
+			if(c.getTrackerId().equals(id)) {
+				return c;
 			}
 		}
+		return null;
 	}
 	
-	public void stopMonitorMyDevices(UserChatIdentifier ucid, String params) throws TelegramApiException {
-		List<TrackerConfiguration> list = getTrackerConfigurations(ucid);
-		for (TrackerConfiguration c : list) {
-			if(megaGPSTracker.accept(c)) {
-				megaGPSTracker.stopMonitorDevices(this, ucid, c);;
-				break;
+	
+	public boolean checkExternalDevicePresent(UserChatIdentifier chatIdentifier, TrackerConfiguration ext, String id) {
+		List<Device> devices = deviceRepo.findByUserIdOrderByCreatedDate(chatIdentifier.getUserId());
+		for(Device dv : devices) {
+			if(dv.externalConfiguration != null && dv.externalConfiguration.longValue() == ext.id.longValue() ) {
+				if(Objects.equals(dv.externalId, id)) {
+					return true;
+				}
+				
 			}
 		}
+		return false;
+		
+	}
+	
+	public String formatTime(long tm) {
+		Date dt = new Date(tm * 1000);
+		long current = System.currentTimeMillis() / 1000;
+		if(current - tm < 10) {
+			return "few seconds ago";
+		} else if (current - tm < 50) {
+			return (current - tm) + " seconds ago";
+		} else if (current - tm < 60 * 60 * 2) {
+			return (current - tm) / 60 + " minutes ago";
+		} else if (current - tm < 60 * 60 * 24) {
+			return (current - tm) / (60 * 60) + " hours ago";
+		}
+		return dt.toString();
+	}
+
+	public void importFromConfigurationMessage(UserChatIdentifier chatIdentifier, TrackerConfiguration ext) throws TelegramApiException {
+		List<? extends DeviceInfo> list = ext.mgr.getDevicesList(ext);
+		List<DeviceInfo> lst = new ArrayList<DeviceInfo>(list.size());
+		for(DeviceInfo i : list) {
+			if(!checkExternalDevicePresent(chatIdentifier, ext, i.getId())) {
+				lst.add(i);
+			}
+		}
+		InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+		SendMessage smsg = new SendMessage(chatIdentifier.getChatId(), "Select devices to import: ");
+		smsg.setReplyMarkup(markup);
+		int i = 1;
+		for (DeviceInfo c : lst) {
+			StringBuilder sb = new StringBuilder();
+			sb.append(i).append(". ").append(c.getName());
+			ArrayList<InlineKeyboardButton> lt = new ArrayList<InlineKeyboardButton>();
+			InlineKeyboardButton button = new InlineKeyboardButton(sb.toString());
+			button.setCallbackData("impd|" + ext.id + "|" + c.getId());
+			lt.add(button);
+			markup.getKeyboard().add(lt);
+			i++;
+		}
+		sendMethod(smsg);		
 	}
 
 	
-	
-	private void retrieveMyDevices(MyDevicesOptions options) throws TelegramApiException {
-		if(megaGPSTracker.accept(options.config)) {
-			megaGPSTracker.retrieveMyDevices(this, options);
-		} else {
-			sendApiMethod(new SendMessage(options.ucid.getChatId(), "Tracker configuration '" + options.config.trackerId
-					+ "' is not supported"));
-		}
-	}
 	
 }

@@ -1,6 +1,6 @@
-package net.osmand.server.assist.convers;
+package net.osmand.server.assist;
 
-import net.osmand.server.assist.OsmAndAssistantBot;
+import net.osmand.server.assist.data.UserChatIdentifier;
 
 import org.telegram.telegrambots.api.methods.send.SendMessage;
 import org.telegram.telegrambots.api.objects.Message;

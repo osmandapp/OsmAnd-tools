@@ -1,4 +1,4 @@
-package net.osmand.server.assist;
+package net.osmand.server.assist.data;
 
 import java.io.Serializable;
 import java.sql.PreparedStatement;

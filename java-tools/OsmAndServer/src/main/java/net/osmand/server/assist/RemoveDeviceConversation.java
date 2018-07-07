@@ -1,26 +1,26 @@
-package net.osmand.server.assist.convers;
+package net.osmand.server.assist;
 
 
-import net.osmand.server.assist.OsmAndAssistantBot;
-import net.osmand.server.assist.TrackerConfiguration;
+import net.osmand.server.assist.data.TrackerConfiguration;
+import net.osmand.server.assist.data.UserChatIdentifier;
 
 import org.apache.commons.logging.LogFactory;
 import org.telegram.telegrambots.api.methods.send.SendMessage;
 import org.telegram.telegrambots.api.objects.Message;
 import org.telegram.telegrambots.exceptions.TelegramApiException;
 
-public class RemoveTrackerConversation extends AssistantConversation {
+public class RemoveDeviceConversation extends AssistantConversation {
 
 	int state = 0;
-	private static final org.apache.commons.logging.Log LOG = LogFactory.getLog(RemoveTrackerConversation.class);
+	private static final org.apache.commons.logging.Log LOG = LogFactory.getLog(RemoveDeviceConversation.class);
 
-	public RemoveTrackerConversation(UserChatIdentifier chatIdentifier) {
+	public RemoveDeviceConversation(UserChatIdentifier chatIdentifier) {
 		super(chatIdentifier);
 	}
 
 	@Override
 	public String getConversationId() {
-		return "removetracker";
+		return "remove_device";
 	}
 
 	@Override

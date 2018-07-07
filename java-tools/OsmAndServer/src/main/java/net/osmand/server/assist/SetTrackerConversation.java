@@ -1,7 +1,7 @@
-package net.osmand.server.assist.convers;
+package net.osmand.server.assist;
 
-import net.osmand.server.assist.OsmAndAssistantBot;
-import net.osmand.server.assist.TrackerConfiguration;
+import net.osmand.server.assist.data.TrackerConfiguration;
+import net.osmand.server.assist.data.UserChatIdentifier;
 
 import org.apache.commons.logging.LogFactory;
 import org.telegram.telegrambots.api.objects.Message;
@@ -29,10 +29,7 @@ public class SetTrackerConversation extends AssistantConversation {
 	public boolean updateMessage(OsmAndAssistantBot bot, Message msg, String reply) throws TelegramApiException {
 		if (state == ASK_TRACKER_ID) {
 			bot.sendMethod(getSendMessage("Please specify tracker site to monitor:"));
-			config.lastName = chatIdentifier.getLastName();
-			config.firstName = chatIdentifier.getFirstName();
 			config.userId = chatIdentifier.getUserId();
-			config.dateCreated = getUpdateTime();
 			state++;
 			return false;
 		} else if (state == ASK_TRACKER_TOKEN) {
