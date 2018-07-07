@@ -321,9 +321,8 @@ public class OsmAndServerMonitorTasks {
 	}
 
 	private String getTileServerMessage() {
-		return String.format("<b>tile.osmand.net:</b> %s. Response time: avg 24h - %.1f sec · max 24h - %.1f sec.%n",
-				
-				tile24Hours.getMean(), tile24Hours.getMax());
+		return String.format("<b>tile.osmand.net:</b> %s. Response time: avg 24h - %.1f sec · max 24h - %.1f sec.",
+				lastResponseTime < 60 ? "OK" : "FAILED", tile24Hours.getMean(), tile24Hours.getMax());
 	}
 
 	public String refreshAll() {
