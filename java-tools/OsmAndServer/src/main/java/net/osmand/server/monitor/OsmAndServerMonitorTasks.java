@@ -284,7 +284,9 @@ public class OsmAndServerMonitorTasks {
 				telegram.sendMonitoringAlertMessage("There are problems with downloading tiles.");
 				return;
 			}
-			respTimeSum += estimateResponse(tileUrl);
+			double tileDownload = estimateResponse(tileUrl);
+			LOG.info("Downloaded " + tileUrl + " " + tileDownload + " seconds.");
+			respTimeSum += tileDownload;
 		}
 		lastResponseTime = respTimeSum / count;
 		if (lastResponseTime > 0) {
