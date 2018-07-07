@@ -4,6 +4,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
 import java.text.SimpleDateFormat;
@@ -40,14 +41,26 @@ public class OsmAndServerMonitorTasks {
 	private static final int HOUR = 60 * MINUTE;
 	private static final int LIVE_STATUS_MINUTES = 2;
 	private static final int DOWNLOAD_MAPS_MINITES = 5;
+	private static final int DOWNLOAD_TILE_MINUTES = 10;
+	private static final int TILE_ZOOM = 19;
+	private static final int NEXT_TILE = 64;
+	private static final int TILEX_NUMBER = 268660;
+	private static final int TILEY_NUMBER = 174100;
 
 	private static final int MAPS_COUNT_THRESHOLD = 700;
 
 	private static final String[] HOSTS_TO_TEST = new String[] { "download.osmand.net", "dl4.osmand.net",
 			"dl5.osmand.net", "dl6.osmand.net" };
-	
+
+	private static final String TILE_SERVER = "http://tile.osmand.net/hd/";
+
 	DescriptiveStatistics live3Hours = new DescriptiveStatistics(3 * 60 / LIVE_STATUS_MINUTES);
 	DescriptiveStatistics live24Hours = new DescriptiveStatistics(24 * 60 / LIVE_STATUS_MINUTES);
+
+	private int tileX = TILEX_NUMBER;
+	private int tileY = TILEY_NUMBER;
+
+	DescriptiveStatistics tile24Hours = new DescriptiveStatistics(24 * 60 / DOWNLOAD_TILE_MINUTES);
 
 	@Autowired
 	OsmAndServerMonitoringBot telegram;
@@ -66,7 +79,6 @@ public class OsmAndServerMonitorTasks {
 
 	public void checkOsmAndLiveStatus(boolean updateStats) {
 		try {
-
 			URL url = new URL("http://osmand.net/api/osmlive_status");
 			InputStream is = url.openConnection().getInputStream();
 			BufferedReader br = new BufferedReader(new InputStreamReader(is));
@@ -90,7 +102,6 @@ public class OsmAndServerMonitorTasks {
 			LOG.error(e.getMessage(), e);
 		}
 	}
-
 
 	@Scheduled(fixedRate = MINUTE)
 	public void checkOsmAndBuildServer() {
@@ -116,7 +127,6 @@ public class OsmAndServerMonitorTasks {
 				if (!jobsFailedCopy.isEmpty()) {
 					telegram.sendMonitoringAlertMessage("There are new failures on Build Server: " + jobsFailedCopy);
 				}
-
 				Set<String> jobsRecoveredCopy = new TreeSet<String>(buildServer.jobsFailed);
 				jobsRecoveredCopy.removeAll(jobsFailed);
 				if (!jobsRecoveredCopy.isEmpty()) {
@@ -176,7 +186,6 @@ public class OsmAndServerMonitorTasks {
 					}
 					res.lastSuccess = true;
 				}
-				
 			} catch (IOException ex) {
 				if(res.lastSuccess ) {
 					telegram.sendMonitoringAlertMessage(
@@ -184,7 +193,6 @@ public class OsmAndServerMonitorTasks {
 					LOG.error(ex.getMessage(), ex);	
 				}
 				res.lastSuccess = false;
-				
 			}
 		}
 	}
@@ -207,7 +215,6 @@ public class OsmAndServerMonitorTasks {
 			}
 			eventType = xpp.next();
 		}
-
 		return mapCounter;
 	}
 
@@ -254,6 +261,53 @@ public class OsmAndServerMonitorTasks {
 		return sb.toString();
 	}
 
+	@Scheduled(fixedRate = DOWNLOAD_TILE_MINUTES * MINUTE)
+	public void tileDownloadTest() {
+		for (int i = 0; i < 3; i++) {
+			String tileUrl = new StringBuilder()
+					.append(TILE_SERVER).append(TILE_ZOOM)
+					.append("/").append(tileX)
+					.append("/").append(tileY)
+					.append(".png").toString();
+			double responseTime = estimateResponse(tileUrl);
+			if (responseTime > 0) {
+				tile24Hours.addValue(responseTime);
+			} else {
+				telegram.sendMonitoringAlertMessage("There are problems with downloading tile from " + tileUrl);
+			}
+			tileY += NEXT_TILE;
+		}
+	}
+
+	private double estimateResponse(String tileUrl) {
+		double respTime = -1d;
+		HttpURLConnection conn = null;
+		InputStream is = null;
+		try {
+			URL url = new URL(tileUrl);
+			conn = (HttpURLConnection) url.openConnection();
+			conn.setConnectTimeout(7 * MINUTE);
+			long startedAt = System.currentTimeMillis();
+			is = conn.getInputStream();
+			long finishedAt = System.currentTimeMillis();
+			respTime = (finishedAt - startedAt) / 1000d;
+		} catch (IOException ex) {
+			LOG.error(ex.getMessage(), ex);
+		} finally {
+			if (is != null) {
+				close(is);
+			}
+			if (conn != null) {
+				conn.disconnect();
+			}
+		}
+		return respTime;
+	}
+
+	private String getTileServerMessage() {
+		return String.format("<b>Tile Server:</b>%nResponse time: Avg: 24h - %.1f sec &#183; Max: 24h - %.1f sec.%n",
+				tile24Hours.getMean(), tile24Hours.getMax());
+	}
 
 	public String refreshAll() {
 		checkOsmAndLiveStatus(false);
@@ -263,19 +317,22 @@ public class OsmAndServerMonitorTasks {
 
 	public String getStatusMessage() {
 		String msg = getLiveDelayedMessage(live.lastOsmAndLiveDelay) + "\n";
+		msg += "<b>OsmAnd Build Server:</b>\n";
 		if (buildServer.jobsFailed.isEmpty()) {
-			msg += "Build server is OK.";
+			msg += "Build server is OK.\n";
 		} else {
-			msg += "Build server has failures: " + buildServer.jobsFailed;
+			msg += "Failing jobs: " + buildServer.jobsFailed + "\n";
 		}
+		msg += "<b>Download Maps:</b>\n";
 		for (DownloadTestResult r : downloadTests.values()) {
 			msg += r.toString() + "\n";
 		}
+		msg += getTileServerMessage();
 		return msg;
 	}
 
 	private String getLiveDelayedMessage(long delay) {
-		String txt = "OsmAnd Live is delayed by " + formatTime(delay) + " hours ";
+		String txt = "<b>OsmAnd Live:</b>\nDelayed - by " + formatTime(delay) + " hours ";
 		txt += " (avg3h " + formatTime(live3Hours.getMean()) + ", avg24h " + formatTime(live24Hours.getMean())
 				+ ", max24h " + formatTime(live24Hours.getMax()) + ")";
 		return txt;
@@ -320,7 +377,6 @@ public class OsmAndServerMonitorTasks {
 			speed3Hours.addValue(spdMBPerSec);
 		}
 
-
 		@Override
 		public boolean equals(Object o) {
 			if (this == o) return true;
@@ -331,17 +387,13 @@ public class OsmAndServerMonitorTasks {
 		
 		@Override
 		public String toString() {
-			return host + ": " + (lastSuccess ? "OK" : "FAILED") + 
-					" (" + String.format("3h %5.2f MBs, 24h %5.2f MBs", speed3Hours.getMean(), speed24Hours.getMean()) + ")";
+			return host + ": " + (lastSuccess ? "OK" : "FAILED") + "&#183;" +
+					" (" + String.format("Avg: 3h - %5.2f MBs %s Avg: 24h - %5.2f MBs", speed3Hours.getMean(),"&#183;",speed24Hours.getMean()) + ")";
 		}
 
 		@Override
 		public int hashCode() {
 			return host != null ? host.hashCode() : 0;
 		}
-
-
 	}
-
-
 }
