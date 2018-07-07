@@ -279,12 +279,11 @@ public class OsmAndServerMonitorTasks {
 			String tileUrl = new StringBuilder().append(TILE_SERVER).append(TILE_ZOOM).append("/").
 					append(TILEX_NUMBER + (i + count * xShift) * NEXT_TILE).append("/").
 					append(TILEY_NUMBER + yShift * NEXT_TILE).append(".png").toString();
-			double est = estimateResponse(tileUrl);
-			if(est < 0) {
+			double tileDownload = estimateResponse(tileUrl);
+			if(tileDownload < 0) {
 				telegram.sendMonitoringAlertMessage("There are problems with downloading tiles.");
 				return;
 			}
-			double tileDownload = estimateResponse(tileUrl);
 			LOG.info("Downloaded " + tileUrl + " " + tileDownload + " seconds.");
 			respTimeSum += tileDownload;
 		}
