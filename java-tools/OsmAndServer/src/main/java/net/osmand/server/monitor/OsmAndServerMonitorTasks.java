@@ -277,7 +277,7 @@ public class OsmAndServerMonitorTasks {
 		
 		for (int i = 0; i < count; i++) {
 			String tileUrl = new StringBuilder().append(TILE_SERVER).append(TILE_ZOOM).append("/").
-					append(TILEX_NUMBER + (-i + count * xShift) * NEXT_TILE).append("/").
+					append(TILEX_NUMBER + (i + count * xShift) * NEXT_TILE).append("/").
 					append(TILEY_NUMBER + yShift * NEXT_TILE).append(".png").toString();
 			double est = estimateResponse(tileUrl);
 			if(est < 0) {
@@ -299,11 +299,14 @@ public class OsmAndServerMonitorTasks {
 		HttpURLConnection conn = null;
 		InputStream is = null;
 		try {
+			long startedAt = System.currentTimeMillis();
 			URL url = new URL(tileUrl);
 			conn = (HttpURLConnection) url.openConnection();
-			conn.setConnectTimeout(7 * MINUTE);
-			long startedAt = System.currentTimeMillis();
+			conn.setConnectTimeout(15 * MINUTE);
 			is = conn.getInputStream();
+			while(is.read() != -1) {
+				// read input stream
+			}
 			long finishedAt = System.currentTimeMillis();
 			respTime = (finishedAt - startedAt) / 1000d;
 		} catch (IOException ex) {
