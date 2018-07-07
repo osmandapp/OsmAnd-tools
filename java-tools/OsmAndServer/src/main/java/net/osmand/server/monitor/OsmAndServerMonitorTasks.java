@@ -46,31 +46,38 @@ public class OsmAndServerMonitorTasks {
 	private static final int NEXT_TILE = 64;
 	private static final int TILEX_NUMBER = 268660;
 	private static final int TILEY_NUMBER = 174100;
+	private static final long INITIAL_TIMESTAMP_S = 1530840000;
 
 	private static final int MAPS_COUNT_THRESHOLD = 700;
 
 	private static final String[] HOSTS_TO_TEST = new String[] { "download.osmand.net", "dl4.osmand.net",
 			"dl5.osmand.net", "dl6.osmand.net" };
-
 	private static final String TILE_SERVER = "http://tile.osmand.net/hd/";
-
+	
+	// OsmAnd Live validation
 	DescriptiveStatistics live3Hours = new DescriptiveStatistics(3 * 60 / LIVE_STATUS_MINUTES);
 	DescriptiveStatistics live24Hours = new DescriptiveStatistics(24 * 60 / LIVE_STATUS_MINUTES);
-
-	private int tileX = TILEX_NUMBER;
-	private int tileY = TILEY_NUMBER;
-
+	LiveCheckInfo live = new LiveCheckInfo();
+	SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd HH:mm");
+	
+	// Build Server
+	BuildServerCheckInfo buildServer = new BuildServerCheckInfo();
+	
+	// Tile validation	
 	DescriptiveStatistics tile24Hours = new DescriptiveStatistics(24 * 60 / DOWNLOAD_TILE_MINUTES);
+	double lastResponseTime;
+	
+	// Index map validation
+	boolean mapIndexPrevValidation = true;
+	Map<String, DownloadTestResult> downloadTests = new TreeMap<>();
 
 	@Autowired
 	OsmAndServerMonitoringBot telegram;
 
-	LiveCheckInfo live = new LiveCheckInfo();
-	BuildServerCheckInfo buildServer = new BuildServerCheckInfo();
-	SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd HH:mm");
+	
+	
 
-	boolean mapIndexPrevValidation = true;
-	Map<String, DownloadTestResult> downloadTests = new TreeMap<>();
+	
 
 	@Scheduled(fixedRate = LIVE_STATUS_MINUTES * MINUTE)
 	public void checkOsmAndLiveStatus() {
@@ -121,7 +128,9 @@ public class OsmAndServerMonitorTasks {
 				}
 			}
 			is.close();
-			if (!buildServer.jobsFailed.equals(jobsFailed)) {
+			if(buildServer.jobsFailed == null) {
+				buildServer.jobsFailed = jobsFailed;
+			} else if (!buildServer.jobsFailed.equals(jobsFailed)) {
 				Set<String> jobsFailedCopy = new TreeSet<String>(jobsFailed);
 				jobsFailedCopy.removeAll(buildServer.jobsFailed);
 				if (!jobsFailedCopy.isEmpty()) {
@@ -263,19 +272,26 @@ public class OsmAndServerMonitorTasks {
 
 	@Scheduled(fixedRate = DOWNLOAD_TILE_MINUTES * MINUTE)
 	public void tileDownloadTest() {
-		for (int i = 0; i < 3; i++) {
-			String tileUrl = new StringBuilder()
-					.append(TILE_SERVER).append(TILE_ZOOM)
-					.append("/").append(tileX)
-					.append("/").append(tileY)
-					.append(".png").toString();
-			double responseTime = estimateResponse(tileUrl);
-			if (responseTime > 0) {
-				tile24Hours.addValue(responseTime);
-			} else {
-				telegram.sendMonitoringAlertMessage("There are problems with downloading tile from " + tileUrl);
+		double respTimeSum = 0; 
+		int count = 4;
+		long period = (((System.currentTimeMillis() / 1000) - INITIAL_TIMESTAMP_S) / 60 ) / DOWNLOAD_TILE_MINUTES;
+		long yShift = period % 14400;
+		long xShift = period / 14400;
+		
+		for (int i = 0; i < count; i++) {
+			String tileUrl = new StringBuilder().append(TILE_SERVER).append(TILE_ZOOM).append("/").
+					append(TILEX_NUMBER + (-i + count * xShift) * NEXT_TILE).append("/").
+					append(TILEY_NUMBER + yShift * NEXT_TILE).append(".png").toString();
+			double est = estimateResponse(tileUrl);
+			if(est < 0) {
+				telegram.sendMonitoringAlertMessage("There are problems with downloading tiles.");
+				return;
 			}
-			tileY += NEXT_TILE;
+			respTimeSum += estimateResponse(tileUrl);
+		}
+		lastResponseTime = respTimeSum / count;
+		if (lastResponseTime > 0) {
+			tile24Hours.addValue(lastResponseTime);
 		}
 	}
 
@@ -305,7 +321,8 @@ public class OsmAndServerMonitorTasks {
 	}
 
 	private String getTileServerMessage() {
-		return String.format("<b>tile.osmand.net:</b> %s response time: avg 24h - %.1f sec · max 24h - %.1f sec.%n",
+		return String.format("<b>tile.osmand.net:</b> %s. Response time: avg 24h - %.1f sec · max 24h - %.1f sec.%n",
+				
 				tile24Hours.getMean(), tile24Hours.getMax());
 	}
 
@@ -317,7 +334,7 @@ public class OsmAndServerMonitorTasks {
 
 	public String getStatusMessage() {
 		String msg = getLiveDelayedMessage(live.lastOsmAndLiveDelay) + "\n";
-		if (buildServer.jobsFailed.isEmpty()) {
+		if (buildServer.jobsFailed == null || buildServer.jobsFailed.isEmpty()) {
 			msg += "<b>builder.osmand.net</b>: OK.\n";
 		} else {
 			msg += "<b>builder.osmand.net</b>: FAILED. Jobs: " + buildServer.jobsFailed + "\n";
@@ -352,7 +369,7 @@ public class OsmAndServerMonitorTasks {
 	}
 
 	protected static class BuildServerCheckInfo {
-		Set<String> jobsFailed = new TreeSet<String>();
+		Set<String> jobsFailed;
 		long lastCheckTimestamp = 0;
 	}
 
