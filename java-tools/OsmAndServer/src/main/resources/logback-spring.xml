@@ -7,9 +7,11 @@
 
 	<springProfile name="default">
 		
-		<!--  debug security package -->
+		<!-- debug security package -->
 		<!-- <logger name="org.springframework.security" level="DEBUG" /> -->
-			
+		<!-- hibernate show sql -->
+		<logger name="org.hibernate.SQL" level="DEBUG" />
+		<!--  <logger name="org.hibernate.type" level="TRACE" />  -->	
 		<root level="INFO">
 			<appender-ref ref="CONSOLE" />
 		</root>

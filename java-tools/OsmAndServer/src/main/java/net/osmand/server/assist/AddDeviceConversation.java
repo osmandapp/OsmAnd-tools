@@ -67,9 +67,9 @@ public class AddDeviceConversation extends AssistantConversation {
 				state = READ_EXTERNAL_CONFIGURATION;
 			} else if (validateEmptyInput(bot, reply)) {
 				Device device = bot.createDevice(chatIdentifier, reply);
-				bot.saveDevice(device);
+				String msgs = bot.saveDevice(device);
+				bot.sendMethod(getSendMessage(msgs));
 				state = FINISHED;
-				bot.retrieveDevices(chatIdentifier, "");
 				return true;
 			}
 			return false;

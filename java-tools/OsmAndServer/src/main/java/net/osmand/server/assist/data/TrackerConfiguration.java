@@ -29,7 +29,7 @@ public class TrackerConfiguration {
 	
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
-	public Long id;
+	public long id;
 	
 	@Column(nullable = false, length = 100)
 	public String trackerId;
@@ -52,7 +52,7 @@ public class TrackerConfiguration {
 	
 	
 	@Column(nullable = false)
-	public Long userId;
+	public long userId;
 	
 	@Column(nullable = false)
 	public long chatId;

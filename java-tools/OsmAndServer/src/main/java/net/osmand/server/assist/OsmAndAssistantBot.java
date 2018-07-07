@@ -8,7 +8,11 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Random;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
+
+import javax.transaction.Transactional;
 
 import net.osmand.server.assist.data.Device;
 import net.osmand.server.assist.data.DeviceRepository;
@@ -23,6 +27,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.EnableTransactionManagement;
 import org.telegram.telegrambots.api.methods.BotApiMethod;
 import org.telegram.telegrambots.api.methods.send.SendMessage;
 import org.telegram.telegrambots.api.methods.updatingmessages.EditMessageText;
@@ -61,6 +66,8 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 	DeviceRepository deviceRepo;
 
 	private static final int USER_UNIQUENESS = 1 << 20;
+
+	private static final int LIMIT_DEVICES_PER_USER = 200;
 	Random rnd = new Random();
 	
 	
@@ -128,6 +135,8 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 						c.updateMessage(this, msg);
 					} else if ("mydevices".equals(coreMsg)) {
 						retrieveDevices(ucid, params);
+					} else if ("configs".equals(coreMsg)) {
+						retrieveConfigs(ucid, params);
 					} else if ("whoami".equals(coreMsg)) {
 						sendApiMethod(new SendMessage(msg.getChatId(), "I'm your OsmAnd assistant"));
 					} else {
@@ -182,6 +191,24 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 					retrieveDeviceInformation(d, msg, pm);
 				}
 			}
+		} else if(data.startsWith("cfg|")) {
+			long deviceId = Long.parseLong(sl[1]);
+			String pm = sl.length > 2 ? sl[2] : ""; 
+			Optional<TrackerConfiguration> cfg = trackerRepo.findById(deviceId);
+			if(!cfg.isPresent()) {
+				SendMessage snd = new SendMessage();
+				snd.setChatId(msg.getChatId());
+				snd.setText("Configuration is not found.");
+				sendApiMethod(snd);
+			} else {
+				TrackerConfiguration d = cfg.get();
+				if(callbackQuery.getFrom() == null && d.userId != callbackQuery.getFrom().getId()){
+					SendMessage snd = new SendMessage(msg.getChatId(), "Only device owner can request information about device.");
+					sendApiMethod(snd);	
+				} else {
+					retrieveConfigInformation(d, msg, pm);
+				}
+			}
 		} else if(data.startsWith("impc|") ) {
 			TrackerConfiguration c = null;
 			for(TrackerConfiguration  tc : getExternalConfigurations(ci)) {
@@ -205,7 +232,7 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 			DeviceInfo info = null;
 			if(opt.isPresent()) {
 				TrackerConfiguration dt = opt.get();
-				dt.mgr = getTrackerManagerById(dt.trackerName);
+				dt.mgr = getTrackerManagerById(dt.trackerId);
 				if(dt.mgr != null) {
 					List<? extends DeviceInfo> di = dt.mgr.getDevicesList(dt);
 					for(DeviceInfo i : di) {
@@ -220,10 +247,9 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 			if(info != null) {
 				if(!checkExternalDevicePresent(ci, opt.get(), info.getId())) {
 					Device device = createDevice(ci, info.getName());
-					device.externalConfiguration = opt.get().id;
+					device.externalConfiguration = opt.get();
 					device.externalId = info.getId();
-					deviceRepo.save(device);
-					msgSend = String.format("Device '%s' is successfully imported", info.getName());	
+					msgSend = saveDevice(device);
 				} else {
 					msgSend = String.format("Device '%s' is already imported", info.getName());
 				}
@@ -243,26 +269,59 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 		return false;
 	}
 
-	private void retrieveDeviceInformation(Device d, 
+	public void retrieveDeviceInformation(Device d, 
 			Message replyMsg, String pm) throws TelegramApiException {
-		
+
 		InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
-		
-		String txt = String.format("Device: <b>%s</b>\nLocation: %s\n", d.deviceName, "n/a");
-		if(pm.equals("more")) {
-			txt += String.format("URL to post: %s\nRegistered: %s", d.deviceName,
-				URL_TO_POST_COORDINATES + d.getEncodedId(), dateFormat.format(d.createdDate));
-		}
 		ArrayList<InlineKeyboardButton> lt = new ArrayList<InlineKeyboardButton>();
 		markup.getKeyboard().add(lt);
+		if(pm.equals("delconfirm")) {
+			EditMessageText editMsg = new EditMessageText();
+			editMsg.setChatId(replyMsg.getChatId());
+			editMsg.setMessageId(replyMsg.getMessageId());
+			editMsg.enableHtml(true).setReplyMarkup(markup).setText("Device was deleted.");
+			deviceRepo.delete(d);
+			sendApiMethod(editMsg);
+			return;
+		}
+		String txt = String.format("Device: <b>%s</b>\nLocation: %s\n", d.deviceName, "n/a");
+		if(d.externalConfiguration != null) {
+			txt += String.format("External cfg: %s\n", d.externalConfiguration.trackerName);
+		}
+		if(pm.equals("del")) {
+			txt += "<b>Are you sure, you want to delete it? </b>";
+		}
+		if(pm.equals("more")) {
+			txt += String.format("URL to post: %s\nRegistered: %s\n", 
+				URL_TO_POST_COORDINATES + d.getEncodedId(), dateFormat.format(d.createdDate));
+		}
 		
-		InlineKeyboardButton button = new InlineKeyboardButton("Update");
-		button.setCallbackData("dv|" + d.getEncodedId()+"|upd");
-		lt.add(button);
 		
-		button = new InlineKeyboardButton("More");
-		button.setCallbackData("dv|" + d.getEncodedId()+"|more");
-		lt.add(button);
+		if(pm.equals("del")) {
+			InlineKeyboardButton upd = new InlineKeyboardButton("No");
+			upd.setCallbackData("dv|" + d.getEncodedId() + "|");
+			lt.add(upd);
+
+			InlineKeyboardButton more = new InlineKeyboardButton("Yes");
+			more.setCallbackData("dv|" + d.getEncodedId() + "|delconfirm");
+			lt.add(more);			
+		} else {
+			if (pm.equals("more")) {
+				InlineKeyboardButton ls = new InlineKeyboardButton("Less");
+				ls.setCallbackData("dv|" + d.getEncodedId() + "|");
+				lt.add(ls);
+				InlineKeyboardButton del = new InlineKeyboardButton("Delete");
+				del.setCallbackData("dv|" + d.getEncodedId() + "|del");
+				lt.add(del);
+			} else {
+				InlineKeyboardButton upd = new InlineKeyboardButton("Update");
+				upd.setCallbackData("dv|" + d.getEncodedId() + "|upd");
+				lt.add(upd);
+				InlineKeyboardButton more = new InlineKeyboardButton("More");
+				more.setCallbackData("dv|" + d.getEncodedId() + "|more");
+				lt.add(more);
+			}
+		}
 		
 		if (pm.equals("")) {
 			SendMessage sendMessage = new SendMessage();
@@ -307,7 +366,7 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 			config.trackerName = config.trackerId + "-" + suffix;
 		}
 		if(list.size() >= LIMIT_CONFIGURATIONS) {
-			return "Currently 1 user is allowed to have only " + LIMIT_CONFIGURATIONS + " configurations.";
+			return "Currently 1 user is allowed to have only " + LIMIT_CONFIGURATIONS + " configurations. Manage your configurations with /configs .";
 		}
 		for (TrackerConfiguration dc : list) {
 			if (dc.trackerName.equals(config.trackerName)) {
@@ -408,6 +467,91 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 		return filterLocationTime;
 	}
 	
+	public void retrieveConfigs(UserChatIdentifier ucid, String params) throws TelegramApiException {
+		int i = 1;
+		parseRecentParam(params);
+		List<TrackerConfiguration> cfgs = trackerRepo.findByUserIdOrderByCreatedDate(ucid.getUserId());
+		InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+		SendMessage msg = new SendMessage();
+		msg.setChatId(ucid.getChatId());
+		msg.enableHtml(true);
+		msg.setReplyMarkup(markup);
+		if (cfgs.size() > 0) {
+			msg.setText("<b>Available configurations:</b>");
+			for (TrackerConfiguration c : cfgs) {
+				StringBuilder sb = new StringBuilder();
+				sb.append(i).append(". ").append(c.trackerName);
+				ArrayList<InlineKeyboardButton> lt = new ArrayList<InlineKeyboardButton>();
+				InlineKeyboardButton button = new InlineKeyboardButton(sb.toString());
+				button.setCallbackData("cfg|" + c.id);
+				lt.add(button);
+				markup.getKeyboard().add(lt);
+				i++;
+			}
+		} else {
+			msg.setText("You don't have any added devices. Please use /add_device to register new devices.");
+		}
+		
+		sendApiMethod(msg);
+	}
+	
+	public void retrieveConfigInformation(TrackerConfiguration d, 
+			Message replyMsg, String pm) throws TelegramApiException {
+
+		InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+		ArrayList<InlineKeyboardButton> lt = new ArrayList<InlineKeyboardButton>();
+		markup.getKeyboard().add(lt);
+		if(pm.equals("delconfirm")) {
+			deleteConfiguration(d);
+			EditMessageText editMsg = new EditMessageText();
+			editMsg.setChatId(replyMsg.getChatId());
+			editMsg.setMessageId(replyMsg.getMessageId());
+			editMsg.enableHtml(true).setReplyMarkup(markup).setText("Configuration was deleted.");
+			
+			sendApiMethod(editMsg);
+			return;
+		}
+		String txt = String.format("Configuration: <b>%s</b>\nCreated: %s\n", 
+				d.trackerName, dateFormat.format(d.createdDate));
+		if(pm.equals("del")) {
+			txt += "<b>Are you sure, you want to delete configuration and ALL devices configured with it? </b>";
+		}
+		
+		if(pm.equals("del")) {
+			InlineKeyboardButton upd = new InlineKeyboardButton("No");
+			upd.setCallbackData("cfg|" + d.id + "|");
+			lt.add(upd);
+			InlineKeyboardButton yes = new InlineKeyboardButton("Yes");
+			yes.setCallbackData("cfg|" + d.id + "|delconfirm");
+			lt.add(yes);			
+		} else if(!pm.equals("keep")){
+			InlineKeyboardButton del = new InlineKeyboardButton("Delete");
+			del.setCallbackData("cfg|" + d.id + "|del");
+			lt.add(del);
+			InlineKeyboardButton kp = new InlineKeyboardButton("Keep");
+			kp.setCallbackData("cfg|" + d.id + "|keep");
+			lt.add(kp);
+		}
+		
+		if (pm.equals("")) {
+			SendMessage sendMessage = new SendMessage();
+			sendMessage.setChatId(replyMsg.getChatId());
+			sendMessage.enableHtml(true).setReplyMarkup(markup).setText(txt);
+			sendApiMethod(sendMessage);
+		} else {
+			EditMessageText editMsg = new EditMessageText();
+			editMsg.setChatId(replyMsg.getChatId());
+			editMsg.setMessageId(replyMsg.getMessageId());
+			editMsg.enableHtml(true).setReplyMarkup(markup).setText(txt);
+			sendApiMethod(editMsg);
+		}
+	}
+
+	private void deleteConfiguration(TrackerConfiguration d) {
+		deviceRepo.deleteAllByExternalConfiguration(d);
+		trackerRepo.delete(d);
+	}
+	
 
 
 	public Device createDevice(UserChatIdentifier chatIdentifier, String name) {
@@ -421,8 +565,12 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 		return device;
 	}
 	
-	public void saveDevice(Device device) {
+	public String saveDevice(Device device) {
+		if (deviceRepo.findByUserIdOrderByCreatedDate(device.userId).size() > LIMIT_DEVICES_PER_USER) {
+			return String.format("Currently 1 user is allowed to have maximum '%d' devices.", LIMIT_DEVICES_PER_USER);
+		}
 		deviceRepo.save(device);
+		return String.format("Device '%s' is successfully added. Check it with /mydevices", device.deviceName);
 	}
 	
 	public List<TrackerConfiguration> getExternalConfigurations(UserChatIdentifier chatIdentifier) {
@@ -446,7 +594,7 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 	public boolean checkExternalDevicePresent(UserChatIdentifier chatIdentifier, TrackerConfiguration ext, String id) {
 		List<Device> devices = deviceRepo.findByUserIdOrderByCreatedDate(chatIdentifier.getUserId());
 		for(Device dv : devices) {
-			if(dv.externalConfiguration != null && dv.externalConfiguration.longValue() == ext.id.longValue() ) {
+			if(dv.externalConfiguration != null && dv.externalConfiguration.id == ext.id ) {
 				if(Objects.equals(dv.externalId, id)) {
 					return true;
 				}
@@ -475,8 +623,15 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 	public void importFromConfigurationMessage(UserChatIdentifier chatIdentifier, TrackerConfiguration ext) throws TelegramApiException {
 		List<? extends DeviceInfo> list = ext.mgr.getDevicesList(ext);
 		List<DeviceInfo> lst = new ArrayList<DeviceInfo>(list.size());
+		List<Device> existingDevices = deviceRepo.findByUserIdOrderByCreatedDate(chatIdentifier.getUserId());
+		Set<String> exSet = new TreeSet<>();
+		for(Device d : existingDevices) {
+			if(d.externalConfiguration != null && d.externalConfiguration.id == ext.id) {
+				exSet.add(d.externalId);
+			}
+		}
 		for(DeviceInfo i : list) {
-			if(!checkExternalDevicePresent(chatIdentifier, ext, i.getId())) {
+			if(!exSet.contains(i.getId())) {
 				lst.add(i);
 			}
 		}
