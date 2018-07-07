@@ -94,7 +94,7 @@ public class WikiDatabasePreparation {
 					&& text.charAt(i + 4) == 'l' && text.charAt(i + 5) == 'i') 
 					|| (nt > 2 && text.charAt(i) == '<' && text.charAt(i + 1) == 'g' && text.charAt(i + 2) == 'a' && text.charAt(i + 3) == 'l')
 					|| (nt > 2 && text.charAt(i) == '<' && text.charAt(i + 1) == '!' && text.charAt(i + 2) == '-' && text.charAt(i + 3) == '-')) {
-				hebrew = text.length() > 2 && text.charAt(i + 2) == 'ק';
+				hebrew = nt > 1 && text.charAt(i + 2) == 'ק';
 				beginInd = beginInd == 0 ? i + 2 : beginInd;
 				openCnt++;
 				i++;
