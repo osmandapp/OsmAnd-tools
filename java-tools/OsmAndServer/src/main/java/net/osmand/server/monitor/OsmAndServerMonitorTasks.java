@@ -43,7 +43,7 @@ public class OsmAndServerMonitorTasks {
 	private static final int DOWNLOAD_MAPS_MINITES = 5;
 	private static final int DOWNLOAD_TILE_MINUTES = 10;
 	private static final int TILE_ZOOM = 19;
-	private static final int NEXT_TILE = 64;
+	private static final int NEXT_TILE = 16;
 	private static final int TILEX_NUMBER = 268660;
 	private static final int TILEY_NUMBER = 174100;
 	private static final long INITIAL_TIMESTAMP_S = 1530840000;
