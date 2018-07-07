@@ -305,7 +305,7 @@ public class OsmAndServerMonitorTasks {
 	}
 
 	private String getTileServerMessage() {
-		return String.format("<b>Tile Server:</b>%nResponse time: Avg: 24h - %.1f sec &#183; Max: 24h - %.1f sec.%n",
+		return String.format("<b>tile.osmand.net:</b> %s response time: avg 24h - %.1f sec · max 24h - %.1f sec.%n",
 				tile24Hours.getMean(), tile24Hours.getMax());
 	}
 
@@ -317,13 +317,11 @@ public class OsmAndServerMonitorTasks {
 
 	public String getStatusMessage() {
 		String msg = getLiveDelayedMessage(live.lastOsmAndLiveDelay) + "\n";
-		msg += "<b>OsmAnd Build Server:</b>\n";
 		if (buildServer.jobsFailed.isEmpty()) {
-			msg += "Build server is OK.\n";
+			msg += "<b>builder.osmand.net</b>: OK.\n";
 		} else {
-			msg += "Failing jobs: " + buildServer.jobsFailed + "\n";
+			msg += "<b>builder.osmand.net</b>: FAILED. Jobs: " + buildServer.jobsFailed + "\n";
 		}
-		msg += "<b>Download Maps:</b>\n";
 		for (DownloadTestResult r : downloadTests.values()) {
 			msg += r.toString() + "\n";
 		}
@@ -332,10 +330,9 @@ public class OsmAndServerMonitorTasks {
 	}
 
 	private String getLiveDelayedMessage(long delay) {
-		String txt = "<b>OsmAnd Live:</b>\nDelayed - by " + formatTime(delay) + " hours ";
-		txt += " (avg3h " + formatTime(live3Hours.getMean()) + ", avg24h " + formatTime(live24Hours.getMean())
-				+ ", max24h " + formatTime(live24Hours.getMax()) + ")";
-		return txt;
+		return String.format("<b>osmand.net/osm_live:</b> %s. Delayed by %s hours · avg 3h %s · avg 24h %s · max 24h %s",
+				delay < HOUR ? "OK" : "FAILED", formatTime(delay), formatTime(live3Hours.getMean()),
+				formatTime(live24Hours.getMean()), formatTime(live24Hours.getMax()));
 	}
 
 	private String formatTime(double i) {
@@ -387,8 +384,8 @@ public class OsmAndServerMonitorTasks {
 		
 		@Override
 		public String toString() {
-			return host + ": " + (lastSuccess ? "OK" : "FAILED") + "&#183;" +
-					" (" + String.format("Avg: 3h - %5.2f MBs %s Avg: 24h - %5.2f MBs", speed3Hours.getMean(),"&#183;",speed24Hours.getMean()) + ")";
+			return host + ": " + (lastSuccess ? "OK" : "FAILED") + ". "
+					+ String.format("3h - %5.2f MBs · 24h - %5.2f MBs", speed3Hours.getMean(), speed24Hours.getMean());
 		}
 
 		@Override

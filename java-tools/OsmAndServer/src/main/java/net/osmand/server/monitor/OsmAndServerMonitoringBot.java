@@ -104,17 +104,20 @@ public class OsmAndServerMonitoringBot extends TelegramLongPollingBot {
 				removeMonitoringChatId(msg.getChatId());
 				snd.setText("Monitoring of OsmAnd server has stopped");
 			} else if (msg.isCommand() && "refresh".equals(coreMsg)) {
+				snd.enableHtml(true);
 				snd.setText(monitoring.refreshAll());
 			} else if (msg.isCommand() && "refresh-all".equals(coreMsg)) {
 				String refreshAll = monitoring.refreshAll();
 				for (MonitoringChatId l : getMonitoringChatIds()) {
 					snd = new SendMessage();
+					snd.enableHtml(true);
 					snd.setChatId(l.id);
 					snd.setText(refreshAll);
 					sendText(snd);
 				}
 				return;
 			} else if (msg.isCommand() && "status".equals(coreMsg)) {
+				snd.enableHtml(true);
 				snd.setText(monitoring.getStatusMessage());
 			} else {
 				snd.setText("Sorry, I don't know what to do");
