@@ -45,7 +45,7 @@ public class OsmAndServerMonitorTasks {
 	private static final int TILE_ZOOM = 19;
 	private static final int NEXT_TILE = 16;
 	private static final int TILEX_NUMBER = 268660;
-	private static final int TILEY_NUMBER = 174100;
+	private static final int TILEY_NUMBER = 175100;
 	private static final long INITIAL_TIMESTAMP_S = 1530840000;
 
 	private static final int MAPS_COUNT_THRESHOLD = 700;
