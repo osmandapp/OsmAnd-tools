@@ -97,7 +97,7 @@ public class WikiDataHandler extends DefaultHandler {
     public void startElement(String uri, String localName, String qName, Attributes attributes) {
         String name = saxParser.isNamespaceAware() ? localName : qName;
         if (!page) {
-            // page = name.equals("page");
+             page = name.equals("page");
         } else {
             if (name.equals("title")) {
                 title.setLength(0);
