@@ -1,13 +1,41 @@
 package net.osmand.wiki;
 
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-
 import gnu.trove.map.hash.TIntObjectHashMap;
 import info.bliki.wiki.filter.HTMLConverter;
 import info.bliki.wiki.model.WikiModel;
+
+import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.FileReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.io.StringReader;
+import java.io.UnsupportedEncodingException;
+import java.net.URL;
+import java.net.URLEncoder;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
+
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.parsers.SAXParser;
+import javax.xml.parsers.SAXParserFactory;
+
 import net.osmand.PlatformUtil;
-import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.impl.FileProgressImplementation;
 import net.osmand.obf.preparation.DBDialect;
 import net.osmand.travel.WikivoyageLangPreparation.WikidataConnection;
@@ -37,20 +65,8 @@ import org.xwiki.rendering.renderer.printer.DefaultWikiPrinter;
 import org.xwiki.rendering.renderer.printer.WikiPrinter;
 import org.xwiki.rendering.syntax.Syntax;
 
-import javax.xml.parsers.ParserConfigurationException;
-import javax.xml.parsers.SAXParser;
-import javax.xml.parsers.SAXParserFactory;
-
-import java.io.*;
-import java.net.URL;
-import java.net.URLEncoder;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.util.*;
-import java.util.zip.GZIPInputStream;
-import java.util.zip.GZIPOutputStream;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 
 public class WikiDatabasePreparation {
 	private static final Log log = PlatformUtil.getLog(WikiDatabasePreparation.class);
@@ -623,7 +639,7 @@ public class WikiDatabasePreparation {
 			throw new RuntimeException("Correct arguments weren't supplied");
 		}
 
-		final String wikidataSqlite = folder + "wikidata.sqlite";
+		final String wikidataSqlite = folder + "wiki.sqlite";
 		final String wikiPg = folder + lang + "wiki-latest-pages-articles.xml.bz2";
 		final String sqliteFileName = folder + "wiki.sqlite";
 		final String pathToWikiData = folder + "wikidatawiki-latest-pages-articles.xml.bz2";
@@ -637,9 +653,9 @@ public class WikiDatabasePreparation {
 				throw new RuntimeException("Wikidata dump doesn't exist. Exiting.");
 			}
 			log.info("Processing wikidata...");
-			processDump(pathToWikiData, wikidataSqlite);
+			processDump(pathToWikiData, sqliteFileName, null, null);
 		} else if (mode.equals("process-wikipedia")){
-			processDump(wikiPg, sqliteFileName, lang, wikidataSqlite);
+//			processDump(wikiPg, sqliteFileName, lang, wikidataSqlite);
 		}
     }
 	
@@ -675,10 +691,6 @@ public class WikiDatabasePreparation {
 		}
 	}
 
-	private static void processDump(final String pathToDump, String sqliteFileName)
-			throws ParserConfigurationException, SAXException, IOException, SQLException, ComponentLookupException {
-		processDump(pathToDump, sqliteFileName, null, null);
-	}
 
 	private static void processDump(final String wikiPg, String sqliteFileName, String lang, String pathToWikiData)
 			throws ParserConfigurationException, SAXException, IOException, SQLException, ComponentLookupException {
@@ -805,6 +817,7 @@ public class WikiDatabasePreparation {
 			
 			try {
 				if (page) {
+					progIS.update();
 					if (name.equals("page")) {
 						page = false;
 					} else if (name.equals("title")) {

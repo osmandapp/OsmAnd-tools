@@ -43,8 +43,10 @@ public class WikiDataHandler extends DefaultHandler {
     private int mappingBatch = 0;
     private final static int BATCH_SIZE = 5000;
 	private final static int ARTICLE_BATCH_SIZE = 10000;
+	private static final int ERROR_BATCH_SIZE = 200;
 
     private int count = 0;
+    private int errorCount = 0;
 
 	private Gson gson;
 
@@ -57,8 +59,8 @@ public class WikiDataHandler extends DefaultHandler {
         conn = dialect.getDatabaseConnection(sqliteFile.getAbsolutePath(), log);
         conn.createStatement().execute("CREATE TABLE wiki_coords(id text, lat double, lon double)");
         conn.createStatement().execute("CREATE TABLE wiki_mapping(id text, lang text, title text)");
-        coordsPrep = conn.prepareStatement("INSERT INTO wiki_coords VALUES (?, ?, ?)");
-        mappingPrep = conn.prepareStatement("INSERT INTO wiki_mapping VALUES (?, ?, ?)");
+        coordsPrep = conn.prepareStatement("INSERT INTO wiki_coords(id, lat, lon) VALUES (?, ?, ?)");
+        mappingPrep = conn.prepareStatement("INSERT INTO wiki_mapping(id, lang, title) VALUES (?, ?, ?)");
         gson = new GsonBuilder().registerTypeAdapter(ArticleMapper.Article.class, new ArticleMapper()).create();
     }
 
@@ -130,8 +132,7 @@ public class WikiDataHandler extends DefaultHandler {
 					ArticleMapper.Article article = gson.fromJson(ctext.toString(), ArticleMapper.Article.class);
 					if (article.getLabels() != null && article.getLat() != 0 && article.getLon() != 0) {
 						if (count++ % ARTICLE_BATCH_SIZE == 0) {
-							log.info("Article accepted " + title.toString() + " free memory: "
-									+ (Runtime.getRuntime().freeMemory() / (1024 * 1024)));
+							log.info(String.format("Article accepted %s", title.toString()));
 						}
 						coordsPrep.setString(1, title.toString());
 						coordsPrep.setDouble(2, article.getLat());
@@ -141,6 +142,11 @@ public class WikiDataHandler extends DefaultHandler {
 					}
 				} catch (Exception e) {
 					// Generally means that the field is missing in the json or the incorrect data is supplied
+					errorCount++;
+					if(errorCount % ERROR_BATCH_SIZE == 0) {
+						log.error(String.format("Error pages size %d - %s ", errorCount
+								+ title.toString()));
+					}
 				}
 			}
 		}
