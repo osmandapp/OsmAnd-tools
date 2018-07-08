@@ -2,16 +2,8 @@ package net.osmand.impl;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.text.MessageFormat;
-
-import net.osmand.IProgress;
-import net.osmand.PlatformUtil;
-import net.osmand.util.Algorithms;
-
-import org.apache.commons.logging.Log;
 
 
 public class FileProgressImplementation extends ConsoleProgressImplementation {

@@ -640,9 +640,9 @@ public class WikiDatabasePreparation {
 		}
 
 		final String wikidataSqlite = folder + "wiki.sqlite";
-		final String wikiPg = folder + lang + "wiki-latest-pages-articles.xml.bz2";
+		final String wikiPg = folder + lang + "wiki-latest-pages-articles.xml.gz";
 		final String sqliteFileName = folder + "wiki.sqlite";
-		final String pathToWikiData = folder + "wikidatawiki-latest-pages-articles.xml.bz2";
+		final String pathToWikiData = folder + "wikidatawiki-latest-pages-articles.xml.gz";
 
 		if (mode.equals("process-wikidata")) {
 			File wikiDB = new File(wikidataSqlite);
@@ -710,7 +710,7 @@ public class WikiDatabasePreparation {
 	}
 
 	private static InputSource getInputSource(InputStream streamFile) throws IOException {
-		BZip2CompressorInputStream zis = new BZip2CompressorInputStream(streamFile);
+		GZIPInputStream zis = new GZIPInputStream(streamFile);
 		Reader reader = new InputStreamReader(zis,"UTF-8");
 		InputSource is = new InputSource(reader);
 		is.setEncoding("UTF-8");
