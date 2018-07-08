@@ -131,8 +131,8 @@ public class WikiDataHandler extends DefaultHandler {
 				try {
 					ArticleMapper.Article article = gson.fromJson(ctext.toString(), ArticleMapper.Article.class);
 					if (article.getLabels() != null && article.getLat() != 0 && article.getLon() != 0) {
-						if (count++ % ARTICLE_BATCH_SIZE == 0) {
-							log.info(String.format("Article accepted %s", title.toString()));
+						if (++count % ARTICLE_BATCH_SIZE == 0) {
+							log.info(String.format("Article accepted %s (%d)", title.toString(), count));
 						}
 						coordsPrep.setString(1, title.toString());
 						coordsPrep.setDouble(2, article.getLat());
@@ -144,8 +144,7 @@ public class WikiDataHandler extends DefaultHandler {
 					// Generally means that the field is missing in the json or the incorrect data is supplied
 					errorCount++;
 					if(errorCount % ERROR_BATCH_SIZE == 0) {
-						log.error(String.format("Error pages size %d - %s ", errorCount
-								+ title.toString()));
+						log.error(String.format("Error pages %s (total %d)", errorCount, title.toString()));
 					}
 				}
 			}
