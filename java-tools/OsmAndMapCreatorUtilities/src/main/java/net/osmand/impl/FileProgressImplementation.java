@@ -40,7 +40,7 @@ public class FileProgressImplementation extends ConsoleProgressImplementation {
 		if(lastPrintedTime != 0 && now - lastPrintedTime > 0) {
 			spd = (((double)read - lastPrintedBytes) / (1024.0 * 1024.0)) / ((now - lastPrintedTime) / 1000.0) ;
 		}
-		String msg = String.format("Done %.2f %.2f MBs", getCurrentPercent(), spd);
+		String msg = String.format("Done %.2f%% %.2f MBs", getCurrentPercent(), spd);
 		lastPrintedTime = now;
 		lastPrintedBytes = read;
 		return msg;
