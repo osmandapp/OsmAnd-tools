@@ -14,13 +14,13 @@ public class ConsoleProgressImplementation implements IProgress {
 	public static long deltaTimeToPrint = 1000;
 	private static Log log = PlatformUtil.getLog(ConsoleProgressImplementation.class);
 
-	String currentTask;
-	int work;
-	int currentDone;
-	double delta;
-	long deltaTime = deltaTimeToPrint;
-	private long previousTaskStarted = 0;
-	private long lastTimePrinted = 0;
+	protected String currentTask;
+	protected long work;
+	protected long currentDone;
+	protected double delta;
+	protected long deltaTime = deltaTimeToPrint;
+	protected long previousTaskStarted = 0;
+	protected long lastTimePrinted = 0;
 
 	double lastPercentPrint = 0;
 	public ConsoleProgressImplementation(){
@@ -54,16 +54,20 @@ public class ConsoleProgressImplementation implements IProgress {
 		printIfNeeded();
 	}
 
-	private void printIfNeeded() {
+	protected  void printIfNeeded() {
 		if(getCurrentPercent() - lastPercentPrint >= delta){
 			this.lastPercentPrint = getCurrentPercent();
 			long now = System.currentTimeMillis();
 			if(now - lastTimePrinted >= deltaTimeToPrint || deltaTime < 0){
-				log.info(MessageFormat.format("Done {0} %.", getCurrentPercent())); //$NON-NLS-1$
+				log.info(getPrintMessage()); //$NON-NLS-1$
 				lastTimePrinted = now;
 			}
 
 		}
+	}
+
+	protected String getPrintMessage() {
+		return MessageFormat.format("Done {0} %.", getCurrentPercent());
 	}
 
 	public double getCurrentPercent(){
@@ -75,9 +79,19 @@ public class ConsoleProgressImplementation implements IProgress {
 		this.currentDone = work - remainingWork;
 		printIfNeeded();
 	}
+	
+	public void remainingLong(long remainingWork) {
+		this.currentDone = work - remainingWork;
+		printIfNeeded();
+	}
 
 	@Override
 	public void startTask(String taskName, int work) {
+		startTaskLong(taskName, work);
+	}
+	
+	
+	public void startTaskLong(String taskName, long work) {
 		if(!Algorithms.objectEquals(currentTask, taskName)){
 			this.currentTask = taskName;
 			log.debug("Memory before task exec: " + Runtime.getRuntime().totalMemory() + " free : " + Runtime.getRuntime().freeMemory()); //$NON-NLS-1$ //$NON-NLS-2$
@@ -88,11 +102,15 @@ public class ConsoleProgressImplementation implements IProgress {
 			}
 			previousTaskStarted = System.currentTimeMillis();
 		}
-		startWork(work);
+		startWorkLong(work);
 	}
 
 	@Override
 	public void startWork(int work) {
+		startWorkLong(work);
+	}
+
+	private void startWorkLong(long work) {
 		if(this.work != work){
 			this.work = work;
 			log.info("Task " + currentTask + ": work total has changed to " + work); //$NON-NLS-1$

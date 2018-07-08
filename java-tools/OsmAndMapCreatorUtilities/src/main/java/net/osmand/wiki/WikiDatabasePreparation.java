@@ -2,15 +2,18 @@ package net.osmand.wiki;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+
 import gnu.trove.map.hash.TIntObjectHashMap;
 import info.bliki.wiki.filter.HTMLConverter;
 import info.bliki.wiki.model.WikiModel;
 import net.osmand.PlatformUtil;
 import net.osmand.impl.ConsoleProgressImplementation;
+import net.osmand.impl.FileProgressImplementation;
 import net.osmand.obf.preparation.DBDialect;
 import net.osmand.travel.WikivoyageLangPreparation.WikidataConnection;
 import net.osmand.travel.WikivoyageLangPreparation.WikivoyageTemplates;
 import net.osmand.wiki.wikidata.WikiDataHandler;
+
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.logging.Log;
@@ -37,6 +40,7 @@ import org.xwiki.rendering.syntax.Syntax;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
+
 import java.io.*;
 import java.net.URL;
 import java.net.URLEncoder;
@@ -679,14 +683,15 @@ public class WikiDatabasePreparation {
 	private static void processDump(final String wikiPg, String sqliteFileName, String lang, String pathToWikiData)
 			throws ParserConfigurationException, SAXException, IOException, SQLException, ComponentLookupException {
 		SAXParser sx = SAXParserFactory.newInstance().newSAXParser();
-		InputStream streamFile = new BufferedInputStream(new FileInputStream(wikiPg), 8192 * 4);
+		FileProgressImplementation prog = new FileProgressImplementation("Read wikidata file", new File(wikiPg));
+		InputStream streamFile = prog.openFileInputStream();
 		InputSource is = getInputSource(streamFile);
 		if (lang != null && pathToWikiData != null) {
-			final WikiOsmHandler handler = new WikiOsmHandler(sx, streamFile, lang, pathToWikiData,  new File(sqliteFileName));
+			final WikiOsmHandler handler = new WikiOsmHandler(sx, prog, lang, pathToWikiData,  new File(sqliteFileName));
 			sx.parse(is, handler);
 			handler.finish();
 		} else {
-			final WikiDataHandler handler = new WikiDataHandler(sx, streamFile, new File(sqliteFileName));
+			final WikiDataHandler handler = new WikiDataHandler(sx, prog, new File(sqliteFileName));
 			sx.parse(is, handler);
 			handler.finish();
 		}
@@ -712,8 +717,6 @@ public class WikiDatabasePreparation {
 		private StringBuilder text = new StringBuilder();
 		private StringBuilder pageId = new StringBuilder();
 
-		private final InputStream progIS;
-		private ConsoleProgressImplementation progress = new ConsoleProgressImplementation();
 		private DBDialect dialect = DBDialect.SQLITE;
 		private Connection languageConn;
 		private Connection wikidataConn;
@@ -726,8 +729,9 @@ public class WikiDatabasePreparation {
 		final String[] wikiJunkArray = new String[]{
 				".jpg",".JPG",".jpeg",".png",".gif",".svg","/doc","틀:","위키프로젝트:","แม่แบบ:","위키백과:","แม่แบบ:","Àdàkọ:","Aide:","Aiuto:","Andoza:","Anexo:","Bản:","mẫu:","Batakan:","Categoría:","Categoria:","Catégorie:","Category:","Cithakan:","Datei:","Draft:","Endrika:","Fájl:","Fichier:","File:","Format:","Formula:","Help:","Hjælp:","Kategori:","Kategoria:","Kategorie:","Kigezo:","モジュール:","Mal:","Mall:","Malline:","Modèle:","Modèl:","Modello:","Modelo:","Modèl:","Moduł:","Module:","Modulis:","Modul:","Mô:","đun:","Nodyn:","Padron:","Patrom:","Pilt:","Plantía:","Plantilla:","Plantilya:","Portaal:","Portail:","Portal:","Portál:","Predefinição:","Predloga:","Predložak:","Progetto:","Proiect:","Projet:","Sablon:","Šablon:","Şablon:","Šablona:","Šablóna:","Šablonas:","Ŝablono:","Sjabloon:","Schabloun:","Skabelon:","Snið:","Stampa:","Szablon:","Templat:","Txantiloi:","Veidne:","Vikipedio:","Vikipediya:","Vikipeedia:","Viquipèdia:","Viquiprojecte:","Viquiprojecte:","Vörlaag:","Vorlage:","Vorlog:","วิกิพีเดีย:","Wikipedia:","Wikipedie:","Wikipedija:","Wîkîpediya:","Wikipédia:","Wikiproiektu:","Wikiprojekt:","Wikiproyecto:","الگو:","سانچ:","قالب:","وکیپیڈیا:","ויקיפדיה:","תבנית","Βικιπαίδεια:","Πρότυπο:","Википедиа:","Википедија:","Википедия:","Вікіпедія:","Довідка:","Загвар:","Инкубатор:","Калып:","Ҡалып:","Кеп:","Категорія:","Портал:","Проект:","Уикипедия:","Үлгі:","Файл:","Хуызæг:","Шаблон:","Կաղապար:","Մոդուլ:","Վիքիպեդիա:","ვიკიპედია:","თარგი:","ढाँचा:","विकिपीडिया:","साचा:","साँचा:","ઢાંચો:","વિકિપીડિયા:","మూస:","வார்ப்புரு:","ഫലകം:","വിക്കിപീഡിയ:","টেমপ্লেট:","プロジェクト:","উইকিপিডিয়া:","মডেল:","پرونده:","模块:","ماڈیول:"
 				};
+		private FileProgressImplementation progIS;
 
-		WikiOsmHandler(SAXParser saxParser, InputStream progIS, String lang, String pathToWikiData, File sqliteFile)
+		WikiOsmHandler(SAXParser saxParser, FileProgressImplementation progIS, String lang, String pathToWikiData, File sqliteFile)
 				throws IOException, SQLException {
 			this.lang = lang;
 			this.saxParser = saxParser;
@@ -740,7 +744,6 @@ public class WikiDatabasePreparation {
 			selectPrep = wikidataConn.prepareStatement("SELECT wiki_coords.lat, wiki_coords.lon, wiki_coords.id " +
 					"FROM wiki_coords JOIN wiki_mapping ON " +
 					"wiki_coords.id = wiki_mapping.id WHERE wiki_mapping.title = ? AND wiki_mapping.lang = ?");
-			progress.startTask("Parse wiki xml", progIS.available());
 		}
 
 		public void addBatch() throws SQLException {
@@ -804,7 +807,6 @@ public class WikiDatabasePreparation {
 				if (page) {
 					if (name.equals("page")) {
 						page = false;
-						progress.remaining(progIS.available());
 					} else if (name.equals("title")) {
 						ctext = null;
 					} else if (name.equals("revision")) {

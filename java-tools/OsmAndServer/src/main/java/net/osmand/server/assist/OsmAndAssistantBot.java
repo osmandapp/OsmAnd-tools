@@ -332,7 +332,8 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 			EditMessageText editMsg = new EditMessageText();
 			editMsg.setChatId(replyMsg.getChatId());
 			editMsg.setMessageId(replyMsg.getMessageId());
-			editMsg.enableHtml(true).setReplyMarkup(markup).setText(txt);
+			editMsg.setReplyMarkup(markup);
+			editMsg.enableHtml(true).setText(txt);
 			sendApiMethod(editMsg);
 		}
 	}

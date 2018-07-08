@@ -1,25 +1,27 @@
 package net.osmand.wiki.wikidata;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
+import java.io.File;
+import java.io.IOException;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
+import java.util.Map;
+
+import javax.xml.parsers.SAXParser;
+
 import net.osmand.PlatformUtil;
-import net.osmand.impl.ConsoleProgressImplementation;
+import net.osmand.impl.FileProgressImplementation;
 import net.osmand.obf.preparation.DBDialect;
+
 import org.apache.commons.logging.Log;
 import org.xml.sax.Attributes;
 import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 
-import javax.xml.parsers.SAXParser;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.SQLException;
-import java.util.Map;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 
 
 public class WikiDataHandler extends DefaultHandler {
@@ -33,20 +35,23 @@ public class WikiDataHandler extends DefaultHandler {
     private StringBuilder title = new StringBuilder();
     private StringBuilder text = new StringBuilder();
 
-    private final InputStream progIS;
-    private ConsoleProgressImplementation progress = new ConsoleProgressImplementation();
+    private FileProgressImplementation progress;
     private Connection conn;
     private PreparedStatement coordsPrep;
     private PreparedStatement mappingPrep;
     private int coordsBatch = 0;
     private int mappingBatch = 0;
     private final static int BATCH_SIZE = 5000;
+	private final static int ARTICLE_BATCH_SIZE = 10000;
+
     private int count = 0;
 
-    public WikiDataHandler(SAXParser saxParser, InputStream progIS, File sqliteFile)
+	private Gson gson;
+
+    public WikiDataHandler(SAXParser saxParser, FileProgressImplementation progress, File sqliteFile)
             throws IOException, SQLException {
         this.saxParser = saxParser;
-        this.progIS = progIS;
+        this.progress = progress;
         DBDialect dialect = DBDialect.SQLITE;
         dialect.removeDatabase(sqliteFile);
         conn = dialect.getDatabaseConnection(sqliteFile.getAbsolutePath(), log);
@@ -54,7 +59,7 @@ public class WikiDataHandler extends DefaultHandler {
         conn.createStatement().execute("CREATE TABLE wiki_mapping(id text, lang text, title text)");
         coordsPrep = conn.prepareStatement("INSERT INTO wiki_coords VALUES (?, ?, ?)");
         mappingPrep = conn.prepareStatement("INSERT INTO wiki_mapping VALUES (?, ?, ?)");
-        progress.startTask("Parse wiki xml", progIS.available());
+        gson = new GsonBuilder().registerTypeAdapter(ArticleMapper.Article.class, new ArticleMapper()).create();
     }
 
     public void addBatch(PreparedStatement prep, boolean coords) throws SQLException {
@@ -112,41 +117,34 @@ public class WikiDataHandler extends DefaultHandler {
     }
 
     @Override
-    public void endElement(String uri, String localName, String qName) throws SAXException {
-        String name = saxParser.isNamespaceAware() ? localName : qName;
-        try {
-            if (page) {
-                if (name.equals("page")) {
-                    page = false;
-                    progress.remaining(progIS.available());
-                } else if (name.equals("title")) {
-                    ctext = null;
-                } else if (name.equals("text")) {
-                    try {
-                        Gson gson = new GsonBuilder()
-                                .registerTypeAdapter(ArticleMapper.Article.class, new ArticleMapper())
-                                .create();
-                        ArticleMapper.Article article = gson.fromJson(ctext.toString(), ArticleMapper.Article.class);
-                        if (article.getLabels() != null && article.getLat() != 0 && article.getLon() != 0) {
-                            if (count++ % 5000 == 0) {
-                                log.info("Article accepted " + title.toString() + " free memory: "
-                                        + (Runtime.getRuntime().freeMemory() / (1024 * 1024)));
-                            }
-                            coordsPrep.setString(1, title.toString());
-                            coordsPrep.setDouble(2, article.getLat());
-                            coordsPrep.setDouble(3, article.getLon());
-                            addTranslationMappings(article.getLabels());
-                            addBatch(coordsPrep, true);
-                        }
-                    } catch (Exception e) {
-                        // Generally means that the field is missing in the json or the incorrect data is supplied
-                    }
-                }
-            }
-        } catch (IOException e) {
-            throw new SAXException(e);
-        }
-    }
+	public void endElement(String uri, String localName, String qName) throws SAXException {
+		String name = saxParser.isNamespaceAware() ? localName : qName;
+		if (page) {
+			if (name.equals("page")) {
+				page = false;
+				progress.update();
+			} else if (name.equals("title")) {
+				ctext = null;
+			} else if (name.equals("text")) {
+				try {
+					ArticleMapper.Article article = gson.fromJson(ctext.toString(), ArticleMapper.Article.class);
+					if (article.getLabels() != null && article.getLat() != 0 && article.getLon() != 0) {
+						if (count++ % ARTICLE_BATCH_SIZE == 0) {
+							log.info("Article accepted " + title.toString() + " free memory: "
+									+ (Runtime.getRuntime().freeMemory() / (1024 * 1024)));
+						}
+						coordsPrep.setString(1, title.toString());
+						coordsPrep.setDouble(2, article.getLat());
+						coordsPrep.setDouble(3, article.getLon());
+						addTranslationMappings(article.getLabels());
+						addBatch(coordsPrep, true);
+					}
+				} catch (Exception e) {
+					// Generally means that the field is missing in the json or the incorrect data is supplied
+				}
+			}
+		}
+	}
 
     private void addTranslationMappings(JsonObject labels) throws SQLException {
         for (Map.Entry<String, JsonElement> entry : labels.entrySet()) {

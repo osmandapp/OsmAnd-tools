@@ -500,20 +500,20 @@ public class MegaGPSTracker implements ITrackerManager {
 
 
 
-public static class MonitorLocationGroup {
-		
+	public static class MonitorLocationGroup {
+
 		public OsmAndAssistantBot bot;
-		
+
 		public String chatId;
-		
+
 		public long initialTimestamp;
-		
+
 		public long updateTime;
-		
+
 		public TrackerConfiguration config;
-		
+
 		public ConcurrentHashMap<String, MessageToDevice> group = new ConcurrentHashMap<String, MessageToDevice>();
-		
+
 	}
 	
 	public static class MessageToDevice {
