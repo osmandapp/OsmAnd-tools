@@ -37,12 +37,12 @@ import javax.xml.parsers.SAXParserFactory;
 
 import net.osmand.PlatformUtil;
 import net.osmand.impl.FileProgressImplementation;
+import net.osmand.map.OsmandRegions;
 import net.osmand.obf.preparation.DBDialect;
 import net.osmand.travel.WikivoyageLangPreparation.WikidataConnection;
 import net.osmand.travel.WikivoyageLangPreparation.WikivoyageTemplates;
 import net.osmand.wiki.wikidata.WikiDataHandler;
 
-import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.logging.Log;
 import org.xml.sax.Attributes;
@@ -639,13 +639,12 @@ public class WikiDatabasePreparation {
 			throw new RuntimeException("Correct arguments weren't supplied");
 		}
 
-		final String wikidataSqlite = folder + "wiki.sqlite";
 		final String wikiPg = folder + lang + "wiki-latest-pages-articles.xml.gz";
 		final String sqliteFileName = folder + "wiki.sqlite";
 		final String pathToWikiData = folder + "wikidatawiki-latest-pages-articles.xml.gz";
 
 		if (mode.equals("process-wikidata")) {
-			File wikiDB = new File(wikidataSqlite);
+			File wikiDB = new File(sqliteFileName);
 			if (wikiDB.exists()) {
 				wikiDB.delete();
 			}
@@ -653,9 +652,9 @@ public class WikiDatabasePreparation {
 				throw new RuntimeException("Wikidata dump doesn't exist. Exiting.");
 			}
 			log.info("Processing wikidata...");
-			processDump(pathToWikiData, sqliteFileName, null, null);
+			processDump(pathToWikiData, sqliteFileName, null);
 		} else if (mode.equals("process-wikipedia")){
-//			processDump(wikiPg, sqliteFileName, lang, wikidataSqlite);
+			processDump(wikiPg, sqliteFileName, lang);
 		}
     }
 	
@@ -692,18 +691,21 @@ public class WikiDatabasePreparation {
 	}
 
 
-	private static void processDump(final String wikiPg, String sqliteFileName, String lang, String pathToWikiData)
+	private static void processDump(final String wikiPg, String sqliteFileName, String lang)
 			throws ParserConfigurationException, SAXException, IOException, SQLException, ComponentLookupException {
 		SAXParser sx = SAXParserFactory.newInstance().newSAXParser();
 		FileProgressImplementation prog = new FileProgressImplementation("Read wikidata file", new File(wikiPg));
 		InputStream streamFile = prog.openFileInputStream();
 		InputSource is = getInputSource(streamFile);
-		if (lang != null && pathToWikiData != null) {
-			final WikiOsmHandler handler = new WikiOsmHandler(sx, prog, lang, pathToWikiData,  new File(sqliteFileName));
+		if (lang != null) {
+			final WikiOsmHandler handler = new WikiOsmHandler(sx, prog, lang, new File(sqliteFileName));
 			sx.parse(is, handler);
 			handler.finish();
 		} else {
-			final WikiDataHandler handler = new WikiDataHandler(sx, prog, new File(sqliteFileName));
+			OsmandRegions regions = new OsmandRegions();
+			regions.prepareFile();
+			regions.cacheAllCountries();
+			final WikiDataHandler handler = new WikiDataHandler(sx, prog, new File(sqliteFileName), regions);
 			sx.parse(is, handler);
 			handler.finish();
 		}
@@ -718,44 +720,45 @@ public class WikiDatabasePreparation {
 	}
 
 	public static class WikiOsmHandler extends DefaultHandler {
-		long id = 1;
+		long counter = 1;
 		private final SAXParser saxParser;
 		private boolean page = false;
 		private boolean revision = false;
 		private StringBuilder ctext = null;
-		private long cid;
 
 		private StringBuilder title = new StringBuilder();
 		private StringBuilder text = new StringBuilder();
 		private StringBuilder pageId = new StringBuilder();
 
 		private DBDialect dialect = DBDialect.SQLITE;
-		private Connection languageConn;
-		private Connection wikidataConn;
+		private Connection conn;
 		private PreparedStatement insertPrep;
 		private PreparedStatement selectPrep;
 		private int batch = 0;
-		private final static int BATCH_SIZE = 500;
+		private final static int BATCH_SIZE = 1500;
+		private static final long ARTICLES_BATCH = 1000;
+		
 		final ByteArrayOutputStream bous = new ByteArrayOutputStream(64000);
 		private String lang;
 		final String[] wikiJunkArray = new String[]{
 				".jpg",".JPG",".jpeg",".png",".gif",".svg","/doc","틀:","위키프로젝트:","แม่แบบ:","위키백과:","แม่แบบ:","Àdàkọ:","Aide:","Aiuto:","Andoza:","Anexo:","Bản:","mẫu:","Batakan:","Categoría:","Categoria:","Catégorie:","Category:","Cithakan:","Datei:","Draft:","Endrika:","Fájl:","Fichier:","File:","Format:","Formula:","Help:","Hjælp:","Kategori:","Kategoria:","Kategorie:","Kigezo:","モジュール:","Mal:","Mall:","Malline:","Modèle:","Modèl:","Modello:","Modelo:","Modèl:","Moduł:","Module:","Modulis:","Modul:","Mô:","đun:","Nodyn:","Padron:","Patrom:","Pilt:","Plantía:","Plantilla:","Plantilya:","Portaal:","Portail:","Portal:","Portál:","Predefinição:","Predloga:","Predložak:","Progetto:","Proiect:","Projet:","Sablon:","Šablon:","Şablon:","Šablona:","Šablóna:","Šablonas:","Ŝablono:","Sjabloon:","Schabloun:","Skabelon:","Snið:","Stampa:","Szablon:","Templat:","Txantiloi:","Veidne:","Vikipedio:","Vikipediya:","Vikipeedia:","Viquipèdia:","Viquiprojecte:","Viquiprojecte:","Vörlaag:","Vorlage:","Vorlog:","วิกิพีเดีย:","Wikipedia:","Wikipedie:","Wikipedija:","Wîkîpediya:","Wikipédia:","Wikiproiektu:","Wikiprojekt:","Wikiproyecto:","الگو:","سانچ:","قالب:","وکیپیڈیا:","ויקיפדיה:","תבנית","Βικιπαίδεια:","Πρότυπο:","Википедиа:","Википедија:","Википедия:","Вікіпедія:","Довідка:","Загвар:","Инкубатор:","Калып:","Ҡалып:","Кеп:","Категорія:","Портал:","Проект:","Уикипедия:","Үлгі:","Файл:","Хуызæг:","Шаблон:","Կաղապար:","Մոդուլ:","Վիքիպեդիա:","ვიკიპედია:","თარგი:","ढाँचा:","विकिपीडिया:","साचा:","साँचा:","ઢાંચો:","વિકિપીડિયા:","మూస:","வார்ப்புரு:","ഫലകം:","വിക്കിപീഡിയ:","টেমপ্লেট:","プロジェクト:","উইকিপিডিয়া:","মডেল:","پرونده:","模块:","ماڈیول:"
 				};
 		private FileProgressImplementation progIS;
+		private long cid;
 
-		WikiOsmHandler(SAXParser saxParser, FileProgressImplementation progIS, String lang, String pathToWikiData, File sqliteFile)
+		WikiOsmHandler(SAXParser saxParser, FileProgressImplementation progIS, String lang, 
+				File sqliteFile)
 				throws IOException, SQLException {
 			this.lang = lang;
 			this.saxParser = saxParser;
 			this.progIS = progIS;
-			languageConn = dialect.getDatabaseConnection(sqliteFile.getAbsolutePath(), log);
-			wikidataConn = dialect.getDatabaseConnection(pathToWikiData, log);
-			languageConn.createStatement().execute("CREATE TABLE IF NOT EXISTS wiki_content(id long, lat double, lon double, title text, lang text, zipContent blob)");
-			languageConn.createStatement().execute("CREATE INDEX IF NOT EXISTS WIKIID_INDEX ON wiki_content(lang, id)");
-			insertPrep = languageConn.prepareStatement("INSERT INTO wiki_content VALUES (?, ?, ?, ?, ?, ?)");
-			selectPrep = wikidataConn.prepareStatement("SELECT wiki_coords.lat, wiki_coords.lon, wiki_coords.id " +
-					"FROM wiki_coords JOIN wiki_mapping ON " +
-					"wiki_coords.id = wiki_mapping.id WHERE wiki_mapping.title = ? AND wiki_mapping.lang = ?");
+			conn = dialect.getDatabaseConnection(sqliteFile.getAbsolutePath(), log);
+			log.info("Prepare wiki_content table");
+			conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wiki_content(id long, title text, lang text, zipContent blob)");
+			conn.createStatement().execute("DELETE FROM wiki_content WHERE lang = '" + lang + "'");
+			insertPrep = conn.prepareStatement("INSERT INTO wiki_content(id, title, lang, zipContent) VALUES (?, ?, ?, ?)");
+			selectPrep = conn.prepareStatement("SELECT id FROM wiki_mapping WHERE wiki_mapping.title = ? AND wiki_mapping.lang = ?");
+			log.info("Tables are prepared");
 		}
 
 		public void addBatch() throws SQLException {
@@ -768,17 +771,16 @@ public class WikiDatabasePreparation {
 		
 		public void finish() throws SQLException {
 			insertPrep.executeBatch();
-			if(!languageConn.getAutoCommit()) {
-				languageConn.commit();
+			if(!conn.getAutoCommit()) {
+				conn.commit();
 			}
 			insertPrep.close();
 			selectPrep.close();
-			languageConn.close();
-			wikidataConn.close();
+			conn.close();
 		}
 
 		public int getCount() {
-			return (int) (id - 1);
+			return (int) (counter - 1);
 		}
 
 		@Override
@@ -814,7 +816,6 @@ public class WikiDatabasePreparation {
 		@Override
 		public void endElement(String uri, String localName, String qName) throws SAXException {
 			String name = saxParser.isNamespaceAware() ? localName : qName;
-			
 			try {
 				if (page) {
 					progIS.update();
@@ -840,16 +841,11 @@ public class WikiDatabasePreparation {
 							selectPrep.setString(2, lang);
 							ResultSet rs = selectPrep.executeQuery();
 							String id = null;
-							double lat = 0;
-							double lon = 0;
-							while (rs.next()) {
-								lat = rs.getDouble(1);
-								lon = rs.getDouble(2);
+							if (rs.next()) {
 								id = rs.getString(3);
 							}
 							selectPrep.clearParameters();
-							if (id != null && lat != 0 && lon != 0) {
-								LatLon ll = new LatLon(lat, lon);
+							if (id != null ) {
 								long wikiId = Long.parseLong(id.substring(1));
 								String text = removeMacroBlocks(ctext.toString(), new HashMap<>(),
 										lang, null);
@@ -857,23 +853,19 @@ public class WikiDatabasePreparation {
 								CustomWikiModel wikiModel = new CustomWikiModel("http://"+lang+".wikipedia.org/wiki/${image}", "http://"+lang+".wikipedia.org/wiki/${title}", true);
 								String plainStr = wikiModel.render(converter, text);
 								plainStr = plainStr.replaceAll("<p>div class=&#34;content&#34;", "<div class=\"content\">\n<p>").replaceAll("<p>/div\n</p>", "</div>");
-								if (this.id++ % 500 == 0) {
-									log.info("Article accepted " + cid + " " + title.toString() + " " + ll.getLatitude()
-											+ " " + ll.getLongitude() + " free: "
-											+ (Runtime.getRuntime().freeMemory() / (1024 * 1024)));
+								if (++counter % ARTICLES_BATCH == 0) {
+									log.info("Article accepted " + cid + " " + title.toString());
 								}
 								try {
 									insertPrep.setLong(1, wikiId);
-									insertPrep.setDouble(2, ll.getLatitude());
-									insertPrep.setDouble(3, ll.getLongitude());
-									insertPrep.setString(4, title.toString());
-									insertPrep.setString(5, lang);
+									insertPrep.setString(2, title.toString());
+									insertPrep.setString(3, lang);
 									bous.reset();
 									GZIPOutputStream gzout = new GZIPOutputStream(bous);
 									gzout.write(plainStr.getBytes("UTF-8"));
 									gzout.close();
 									final byte[] byteArray = bous.toByteArray();
-									insertPrep.setBytes(6, byteArray);
+									insertPrep.setBytes(4, byteArray);
 									addBatch();
 								} catch (SQLException e) {
 									throw new SAXException(e);

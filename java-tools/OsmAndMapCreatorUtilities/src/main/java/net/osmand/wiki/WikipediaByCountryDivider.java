@@ -1,5 +1,20 @@
 package net.osmand.wiki;
 
+import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.Map;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
+
 import net.osmand.IndexConstants;
 import net.osmand.PlatformUtil;
 import net.osmand.binary.BinaryMapDataObject;
@@ -12,110 +27,15 @@ import net.osmand.obf.preparation.IndexCreator;
 import net.osmand.obf.preparation.IndexCreatorSettings;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.util.Algorithms;
-import net.osmand.util.MapUtils;
-import org.apache.commons.compress.compressors.bzip2.BZip2CompressorOutputStream;
+
 import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlPullParserException;
 import org.xmlpull.v1.XmlSerializer;
-import rtree.RTree;
 
-import java.io.*;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.util.*;
-import java.util.zip.GZIPInputStream;
+import rtree.RTree;
 
 public class WikipediaByCountryDivider {
 	private static final Log log = PlatformUtil.getLog(WikipediaByCountryDivider.class);
-	private static final long BATCH_SIZE = 3500;
-
-	private static class GlobalWikiStructure {
-
-		private Map<PreparedStatement, Long> statements = new LinkedHashMap<PreparedStatement, Long>();
-		private Connection c;
-		private OsmandRegions regions;
-		private List<String> keyNames = new ArrayList<String>();
-
-		
-
-		public GlobalWikiStructure(String fileName, OsmandRegions regions) throws SQLException {
-			this.regions = regions;
-			c = DBDialect.SQLITE.getDatabaseConnection(fileName, log);
-			createTables();
-			createIndexes();
-		}
-
-		public void updateRegions() throws SQLException, IOException {
-			c.createStatement().execute("DELETE FROM wiki_region");
-			c.createStatement().execute("VACUUM");
-			PreparedStatement insertWikiRegion = c.prepareStatement("INSERT INTO wiki_region VALUES(?, ? )");
-			ResultSet rs = c.createStatement().executeQuery("SELECT id, lat, lon from wiki_content order by id");
-			long pid = -1;
-			while(rs.next()) {
-				long id = rs.getLong(1);
-				if(id != pid) {
-					pid = id;
-					List<String> rgs = getRegions(rs.getDouble(2), rs.getDouble(3));
-					for (String reg : rgs) {
-						insertWikiRegion.setLong(1, id);
-						insertWikiRegion.setString(2, reg);
-						insertWikiRegion.setString(2, reg);
-						addBatch(insertWikiRegion);
-					}
-				}
-			}
-
-		}
-
-
-		public void addBatch(PreparedStatement p) throws SQLException {
-			p.addBatch();
-			Long l = statements.get(p);
-			if (l == null) {
-				l = new Long(0);
-			}
-			long lt = l + 1;
-			if (lt > BATCH_SIZE) {
-				p.executeBatch();
-				lt = 0;
-			}
-			statements.put(p, lt);
-
-		}
-
-		private List<String> getRegions(double lat, double lon) throws IOException {
-			keyNames.clear();
-			int x31 = MapUtils.get31TileNumberX(lon);
-			int y31 = MapUtils.get31TileNumberY(lat);
-			List<BinaryMapDataObject> cs = regions.query(x31, y31);
-			for (BinaryMapDataObject b : cs) {
-				if(regions.contain(b, x31, y31)) {
-					keyNames.add(regions.getDownloadName(b));
-				}
-			}
-			return keyNames;
-		}
-
-		public void closeConnnection() throws SQLException {
-			for(PreparedStatement s : statements.keySet()) {
-				s.executeBatch();
-				s.close();
-			}
-			c.close();
-		}
-
-		public void createTables() throws SQLException {
-			c.createStatement().execute("CREATE TABLE wiki_region(id long, regionName text)");
-		}
-
-		public void createIndexes() throws SQLException {
-			c.createStatement().execute("CREATE INDEX IF NOT EXISTS CONTENTID_INDEX ON wiki_content(id)");
-			c.createStatement().execute("CREATE INDEX IF NOT EXISTS REGIONID_INDEX ON wiki_region(id)");
-			c.createStatement().execute("CREATE INDEX IF NOT EXISTS REGIONNAME_INDEX ON wiki_region(regionName)");
-		}
-	}
 
 	public static void main(String[] args) throws IOException, SQLException, InterruptedException, XmlPullParserException {
 		String cmd = args[0];
@@ -126,23 +46,10 @@ public class WikipediaByCountryDivider {
 		}
 		if(cmd.equals("inspect")) {
 			inspectWikiFile(folder);
-		} else if(cmd.equals("update_countries")) {
-			updateCountries(folder);
 		} else if(cmd.equals("generate_country_sqlite")) {
 			generateCountrySqlite(folder, skip);
 		}
 	}
-
-	protected static void updateCountries(String folder) throws IOException, SQLException {
-		OsmandRegions regions = new OsmandRegions();
-		regions.prepareFile();
-		regions.cacheAllCountries();
-		final GlobalWikiStructure wikiStructure = new GlobalWikiStructure(folder + "wiki.sqlite", regions);
-		wikiStructure.updateRegions();
-		wikiStructure.closeConnnection();
-		System.out.println("Generation finished");
-	}
-
 
 
 	protected static void generateCountrySqlite(String folder, boolean skip) throws SQLException, IOException, InterruptedException, XmlPullParserException {
@@ -192,44 +99,36 @@ public class WikipediaByCountryDivider {
 				System.out.println("Skip " + lcRegionName.toLowerCase() + " doesn't generate wiki");
 				continue;
 			}
-			File sqliteFile = new File(rgns, regionName + ".sqlite");
-			File osmBz2 = new File(rgns, regionName + "_" + IndexConstants.BINARY_MAP_VERSION + ".wiki.osm.bz2");
+			File osmGz = new File(rgns, regionName + "_" + IndexConstants.BINARY_MAP_VERSION + ".wiki.osm.gz");
 			File obfFile = new File(rgns, regionName + "_" + IndexConstants.BINARY_MAP_VERSION + ".wiki.obf");
 			if(obfFile.exists() && skip) {
 				continue;
 			}
 			if(!skip) {
-				sqliteFile.delete();
-				osmBz2.delete();
+				osmGz.delete();
 			}
-			if(!osmBz2.exists() || !sqliteFile.exists()) {
-				System.out.println("Generate " +sqliteFile.getName());
-				generateOsmFileAndLocalSqlite(conn, rs, preferredLang, sqliteFile, osmBz2);
+			if(!osmGz.exists()) {
+				System.out.println("Generate " + osmGz.getName());
+				generateOsmFile(conn, rs.getString(1), preferredLang, osmGz);
 			}
-			
 			obfFile.delete();
-			generateObf(osmBz2, obfFile);
+			generateObf(osmGz, obfFile);
 		}
 		conn.close();
 	}
 
-	private static void generateOsmFileAndLocalSqlite(Connection conn, ResultSet rs, String preferredLang,
-			File sqliteFile, File osmBz2) throws SQLException, FileNotFoundException, IOException {
-		Connection loc = (Connection) DBDialect.SQLITE.getDatabaseConnection(sqliteFile.getAbsolutePath(), log);
-		loc.createStatement()
-				.execute(
-						"CREATE TABLE wiki_content(id long, lat double, lon double, lang text, wikiId long, title text, zipContent blob)");
-		PreparedStatement insertWikiContentCountry = loc
-				.prepareStatement("INSERT INTO wiki_content VALUES(?, ?, ?, ?, ?, ?, ?)");
+	private static void generateOsmFile(Connection conn, String regionName, String preferredLang, File osmGz) throws SQLException, IOException {
 		ResultSet rps = conn.createStatement().executeQuery(
-				"SELECT WC.id, WC.lat, WC.lon, WC.lang, WC.title, WC.zipContent "
-						+ " FROM wiki_content WC INNER JOIN wiki_region WR "
-						+ " ON WC.id = WR.id AND WR.regionName = '" + rs.getString(1) + "' ORDER BY WC.id");
+				"SELECT WC.id, WO.lat, WO.lon, WC.lang, WC.title, WC.zipContent "
+						+ " FROM wiki_region WR"
+						+ " INNER JOIN wiki_coords WO ON WR.id = WO.id "
+						+ " INNER JOIN wiki_content WC ON WC.id = WR.id "
+						+ " WHERE WR.regionName = '" + regionName + "' ORDER BY WC.id");
 
-		FileOutputStream out = new FileOutputStream(osmBz2);
-		BZip2CompressorOutputStream bzipStream = new BZip2CompressorOutputStream(out);
+		FileOutputStream out = new FileOutputStream(osmGz);
+		GZIPOutputStream gzStream = new GZIPOutputStream(out);
 		XmlSerializer serializer = new org.kxml2.io.KXmlSerializer();
-		serializer.setOutput(bzipStream, "UTF-8");
+		serializer.setOutput(gzStream, "UTF-8");
 		serializer.startDocument("UTF-8", true);
 		serializer.startTag(null, "osm");
 		serializer.attribute(null, "version", "0.6");
@@ -267,17 +166,6 @@ public class WikipediaByCountryDivider {
 			contentStr = contentStr.replace((char) 0, ' ');
 			contentStr = contentStr.replace((char) 22, ' ');
 			contentStr = contentStr.replace((char) 27, ' ');
-			insertWikiContentCountry.setLong(1, osmId);
-			insertWikiContentCountry.setDouble(2, lat);
-			insertWikiContentCountry.setDouble(3, lon);
-			insertWikiContentCountry.setString(4, wikiLang);
-			insertWikiContentCountry.setLong(5, wikiId);
-			insertWikiContentCountry.setString(6, title);
-			insertWikiContentCountry.setBytes(7, bytes);
-			insertWikiContentCountry.addBatch();
-			if (cnt++ % BATCH_SIZE == 0) {
-				insertWikiContentCountry.executeBatch();
-			}
 			if (osmId != prevOsmId) {
 				if (prevOsmId != -1) {
 					closeOsmWikiNode(serializer, nameUnique, nameAdded);
@@ -313,11 +201,9 @@ public class WikipediaByCountryDivider {
 		if (prevOsmId != -1) {
 			closeOsmWikiNode(serializer, nameUnique, nameAdded);
 		}
-		insertWikiContentCountry.executeBatch();
-		loc.close();
 		serializer.endDocument();
 		serializer.flush();
-		bzipStream.close();
+		gzStream.close();
 		System.out.println("Processed " + cnt + " pois");
 	}
 
@@ -332,7 +218,7 @@ public class WikipediaByCountryDivider {
 		serializer.endTag(null, "node");
 	}
 
-	private static void generateObf(File osmBz2, File obf) throws IOException, SQLException, InterruptedException, XmlPullParserException {
+	private static void generateObf(File osmGz, File obf) throws IOException, SQLException, InterruptedException, XmlPullParserException {
 		// be independent of previous results
 		RTree.clearCache();
 		IndexCreatorSettings settings = new IndexCreatorSettings();
@@ -346,7 +232,7 @@ public class WikipediaByCountryDivider {
 		IndexCreator creator = new IndexCreator(obf.getParentFile(), settings); //$NON-NLS-1$
 		new File(obf.getParentFile(), IndexCreator.TEMP_NODES_DB).delete();
 		creator.setMapFileName(obf.getName());
-		creator.generateIndexes(osmBz2,
+		creator.generateIndexes(osmGz,
 				new ConsoleProgressImplementation(1), null, MapZooms.getDefault(),
 				new MapRenderingTypesEncoder(obf.getName()), log);
 

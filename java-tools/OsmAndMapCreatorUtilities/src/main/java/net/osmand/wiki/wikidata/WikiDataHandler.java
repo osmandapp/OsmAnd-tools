@@ -5,13 +5,18 @@ import java.io.IOException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 import javax.xml.parsers.SAXParser;
 
 import net.osmand.PlatformUtil;
+import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.impl.FileProgressImplementation;
+import net.osmand.map.OsmandRegions;
 import net.osmand.obf.preparation.DBDialect;
+import net.osmand.util.MapUtils;
 
 import org.apache.commons.logging.Log;
 import org.xml.sax.Attributes;
@@ -21,7 +26,6 @@ import org.xml.sax.helpers.DefaultHandler;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
 
 
 public class WikiDataHandler extends DefaultHandler {
@@ -39,8 +43,11 @@ public class WikiDataHandler extends DefaultHandler {
     private Connection conn;
     private PreparedStatement coordsPrep;
     private PreparedStatement mappingPrep;
-    private int coordsBatch = 0;
-    private int mappingBatch = 0;
+    private PreparedStatement wikiRegionPrep;
+    private int[] mappingBatch = new int[]{0};
+    private int[] coordsBatch = new int[]{0};
+    private int[] regionBatch = new int[]{0};
+    
     private final static int BATCH_SIZE = 5000;
 	private final static int ARTICLE_BATCH_SIZE = 10000;
 	private static final int ERROR_BATCH_SIZE = 200;
@@ -49,39 +56,44 @@ public class WikiDataHandler extends DefaultHandler {
     private int errorCount = 0;
 
 	private Gson gson;
+	
+	private OsmandRegions regions;
+	private List<String> keyNames = new ArrayList<String>();
 
-    public WikiDataHandler(SAXParser saxParser, FileProgressImplementation progress, File sqliteFile)
+
+    public WikiDataHandler(SAXParser saxParser, FileProgressImplementation progress, File sqliteFile, OsmandRegions regions)
             throws IOException, SQLException {
         this.saxParser = saxParser;
         this.progress = progress;
         DBDialect dialect = DBDialect.SQLITE;
         dialect.removeDatabase(sqliteFile);
         conn = dialect.getDatabaseConnection(sqliteFile.getAbsolutePath(), log);
-        conn.createStatement().execute("CREATE TABLE wiki_coords(id text, lat double, lon double)");
-        conn.createStatement().execute("CREATE TABLE wiki_mapping(id text, lang text, title text)");
-        coordsPrep = conn.prepareStatement("INSERT INTO wiki_coords(id, lat, lon) VALUES (?, ?, ?)");
+        conn.createStatement().execute("CREATE TABLE wiki_coords(id long, originalId text, lat double, lon double)");
+        conn.createStatement().execute("CREATE TABLE wiki_mapping(id long, lang text, title text)");
+        conn.createStatement().execute("CREATE TABLE wiki_region(id long, regionName text)");
+        coordsPrep = conn.prepareStatement("INSERT INTO wiki_coords(id, originalId, lat, lon) VALUES (?, ?, ?, ?)");
         mappingPrep = conn.prepareStatement("INSERT INTO wiki_mapping(id, lang, title) VALUES (?, ?, ?)");
+        wikiRegionPrep = conn.prepareStatement("INSERT INTO wiki_region(id, regionName) VALUES(?, ? )");
         gson = new GsonBuilder().registerTypeAdapter(ArticleMapper.Article.class, new ArticleMapper()).create();
     }
 
-    public void addBatch(PreparedStatement prep, boolean coords) throws SQLException {
+    public void addBatch(PreparedStatement prep, int[] bt) throws SQLException {
         prep.addBatch();
-        int batch = coords ? ++coordsBatch : ++mappingBatch;
+        bt[0] = bt[0] + 1;
+        int batch = bt[0];
         if (batch > BATCH_SIZE) {
             prep.executeBatch();
-            if (coords) {
-                coordsBatch = 0;
-            } else {
-                mappingBatch = 0;
-            }
+            bt[0] = 0;
         }
     }
 
     public void finish() throws SQLException {
         log.info("Total accepted: " + count);
-        conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_lang_title ON wiki_mapping(lang, title)");
+        conn.createStatement().execute("CREATE INDEX IF NOT EXISTS map_lang_title_idx ON wiki_mapping(lang, title)");
         conn.createStatement().execute("CREATE INDEX IF NOT EXISTS id_mapping_index on wiki_mapping(id)");
-        conn.createStatement().execute("CREATE INDEX IF NOT EXISTS id_coords_index on wiki_coords(id)");
+        conn.createStatement().execute("CREATE INDEX IF NOT EXISTS id_coords_idx on wiki_coords(id)");
+        conn.createStatement().execute("CREATE INDEX IF NOT EXISTS id_region_idx on wiki_region(id)");
+        conn.createStatement().execute("CREATE INDEX IF NOT EXISTS reg_region_idx on wiki_region(regionName)");
 
         coordsPrep.executeBatch();
         mappingPrep.executeBatch();
@@ -134,11 +146,26 @@ public class WikiDataHandler extends DefaultHandler {
 						if (++count % ARTICLE_BATCH_SIZE == 0) {
 							log.info(String.format("Article accepted %s (%d)", title.toString(), count));
 						}
-						coordsPrep.setString(1, title.toString());
-						coordsPrep.setDouble(2, article.getLat());
-						coordsPrep.setDouble(3, article.getLon());
-						addTranslationMappings(article.getLabels());
-						addBatch(coordsPrep, true);
+						long id = Long.parseLong(title.toString().substring(1));
+						coordsPrep.setLong(1, id);
+						coordsPrep.setString(2, title.toString());
+						coordsPrep.setDouble(3, article.getLat());
+						coordsPrep.setDouble(4, article.getLon());
+						addBatch(coordsPrep, coordsBatch);
+						List<String> rgs = getRegions(article.getLat(), article.getLon());
+						for (String reg : rgs) {
+							wikiRegionPrep.setLong(1, id);
+							wikiRegionPrep.setString(2, reg);
+							addBatch(wikiRegionPrep, regionBatch);
+						}
+						for (Map.Entry<String, JsonElement> entry : article.getLabels().entrySet()) {
+				            String lang = entry.getKey();
+				            String articleV = entry.getValue().getAsJsonObject().getAsJsonPrimitive("value").getAsString();
+				            mappingPrep.setLong(1, id);
+				            mappingPrep.setString(2, lang);
+				            mappingPrep.setString(3, articleV);
+				            addBatch(mappingPrep, mappingBatch);
+				        }
 					}
 				} catch (Exception e) {
 					// Generally means that the field is missing in the json or the incorrect data is supplied
@@ -151,15 +178,18 @@ public class WikiDataHandler extends DefaultHandler {
 		}
 	}
 
-    private void addTranslationMappings(JsonObject labels) throws SQLException {
-        for (Map.Entry<String, JsonElement> entry : labels.entrySet()) {
-            String lang = entry.getKey();
-            String article = entry.getValue().getAsJsonObject().getAsJsonPrimitive("value").getAsString();
-            mappingPrep.setString(1, title.toString());
-            mappingPrep.setString(2, lang);
-            mappingPrep.setString(3, article);
-            addBatch(mappingPrep, false);
-        }
-    }
+    
+    private List<String> getRegions(double lat, double lon) throws IOException {
+		keyNames.clear();
+		int x31 = MapUtils.get31TileNumberX(lon);
+		int y31 = MapUtils.get31TileNumberY(lat);
+		List<BinaryMapDataObject> cs = regions.query(x31, y31);
+		for (BinaryMapDataObject b : cs) {
+			if(regions.contain(b, x31, y31)) {
+				keyNames.add(regions.getDownloadName(b));
+			}
+		}
+		return keyNames;
+	}
 }
 
