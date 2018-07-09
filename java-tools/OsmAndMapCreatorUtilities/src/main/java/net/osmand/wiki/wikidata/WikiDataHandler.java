@@ -64,6 +64,7 @@ public class WikiDataHandler extends DefaultHandler {
     public WikiDataHandler(SAXParser saxParser, FileProgressImplementation progress, File sqliteFile, OsmandRegions regions)
             throws IOException, SQLException {
         this.saxParser = saxParser;
+        this.regions = regions;
         this.progress = progress;
         DBDialect dialect = DBDialect.SQLITE;
         dialect.removeDatabase(sqliteFile);
