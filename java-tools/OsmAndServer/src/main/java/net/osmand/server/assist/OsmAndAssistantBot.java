@@ -49,6 +49,7 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 	public static final String URL_TO_POST_COORDINATES = "http://builder.osmand.net:8090/tracker/c/";
 	
 	SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
+	Random rnd = new Random();
 
 	PassiveExpiringMap<UserChatIdentifier, AssistantConversation> conversations =
 			new PassiveExpiringMap<UserChatIdentifier, AssistantConversation>(5, TimeUnit.MINUTES);
@@ -60,12 +61,15 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 	TrackerConfigurationRepository trackerRepo;
 	
 	@Autowired
+	DeviceLocationManager deviceLocManager;
+	
+	@Autowired
 	DeviceRepository deviceRepo;
 
 	private static final int USER_UNIQUENESS = 1 << 20;
 
 	private static final int LIMIT_DEVICES_PER_USER = 200;
-	Random rnd = new Random();
+	
 	
 	
 	@Override
@@ -271,7 +275,9 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 
 		InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
 		ArrayList<InlineKeyboardButton> lt = new ArrayList<InlineKeyboardButton>();
+		ArrayList<InlineKeyboardButton> lt2 = new ArrayList<InlineKeyboardButton>();
 		markup.getKeyboard().add(lt);
+		markup.getKeyboard().add(lt2);
 		if(pm.equals("delconfirm")) {
 			EditMessageText editMsg = new EditMessageText();
 			editMsg.setChatId(replyMsg.getChatId());
@@ -287,8 +293,11 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 		}
 		if(pm.equals("del")) {
 			txt += "<b>Are you sure, you want to delete it? </b>";
-		}
-		if(pm.equals("more")) {
+		} else if(pm.equals("mon")) {
+			deviceLocManager.startMonitoringLocation(d, replyMsg.getChatId());
+		} else if(pm.equals("stmon")) {
+			deviceLocManager.stopMonitoringLocation(d, replyMsg.getChatId());
+		} else if(pm.equals("more")) {
 			txt += String.format("URL to post: %s\nRegistered: %s\n", 
 				URL_TO_POST_COORDINATES + d.getEncodedId(), dateFormat.format(d.createdDate));
 		}
@@ -317,6 +326,11 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 				InlineKeyboardButton more = new InlineKeyboardButton("More");
 				more.setCallbackData("dv|" + d.getEncodedId() + "|more");
 				lt.add(more);
+				boolean locationMonitored = deviceLocManager.isLocationMonitored(d, replyMsg.getChatId());
+				InlineKeyboardButton loc = new InlineKeyboardButton(locationMonitored ? "Stop displaying location"
+						: "Start displaying location");
+				loc.setCallbackData("dv|" + d.getEncodedId() + (locationMonitored ? "|mon" : "|stmon"));
+				lt2.add(loc);
 			}
 		}
 		

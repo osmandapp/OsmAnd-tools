@@ -17,4 +17,7 @@ public interface DeviceRepository extends JpaRepository<Device, Long> {
 	@Transactional
 	void deleteAllByExternalConfiguration(TrackerConfiguration cfg);
 
+
+	boolean isLocationMonitored(Device d, Long chatId);
+
 }

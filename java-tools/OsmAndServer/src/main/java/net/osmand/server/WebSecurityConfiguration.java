@@ -61,7 +61,7 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
     	
     	// all top level are accessible without login
     	http.authorizeRequests().antMatchers("/actuator/**", "/admin/**").hasAuthority(ROLE_ADMIN)
-    							.antMatchers("/", "/*", "/login/**", "/webjars/**", "/error/**").permitAll()
+    							.antMatchers("/", "/*", "/login/**", "/webjars/**", "/error/**", "/tracker/s/**").permitAll()
     							.anyRequest().authenticated();
 		http.exceptionHandling().authenticationEntryPoint(new LoginUrlAuthenticationEntryPoint("/login"));
 		http.logout().logoutSuccessUrl("/").permitAll();
