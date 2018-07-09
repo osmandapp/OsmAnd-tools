@@ -49,10 +49,9 @@ public class DeviceLocationManager {
 				lt = Double.parseDouble(lat);
 				ln = Double.parseDouble(lon);
 			}
+			dm.setLocation(lt, ln);
 			for (LocationMessage lm : dm.chats.values()) {
 				if(lm.isEnabled()) {
-					lm.lat = lt;
-					lm.lon = ln;
 					lm.sendMessage(assistantBot);
 				}
 			}
@@ -83,12 +82,12 @@ public class DeviceLocationManager {
 	public void startMonitoringLocation(Device d, Long chatId) throws TelegramApiException {
 		DeviceMonitor dm = devices.get(d.id);
 		if(dm == null) {
-			dm = new DeviceMonitor();
+			dm = new DeviceMonitor(d);
 			devices.put(d.id, dm);
 		}
 		LocationMessage lm = dm.chats.get(chatId);
 		if(lm == null) {
-			lm = new LocationMessage(d, chatId);
+			lm = new LocationMessage(dm, chatId);
 			dm.chats.put(chatId, lm);
 		}
 		lm.enable();
@@ -109,28 +108,52 @@ public class DeviceLocationManager {
 	
 	protected static class DeviceMonitor {
 		ConcurrentHashMap<Long, LocationMessage> chats = new ConcurrentHashMap<>();
+		final Device device;
+		
+		double lat = Double.NaN;
+		double lon = Double.NaN;
+		double speed = 0;
+		double altitude = Double.NaN;
+		double azi = Double.NaN;
+		long locationTimestamp = 0;
+		boolean locationLost = false;
+		
+		protected DeviceMonitor(Device device) {
+			this.device = device;
+		}
+
+		public void setLocation(double lt, double ln) {
+			if(Double.isNaN(lt)) {
+				locationLost = true;
+			} else {
+				locationLost = false;
+				locationTimestamp = System.currentTimeMillis();
+				lat = lt;
+				lon = ln;
+				speed = 0;
+				azi = Double.NaN;
+				altitude = Double.NaN;
+			}
+		}
 	}
 	
 	protected static class LocationMessage {
 		
 		final long chatId;
-		final Device device;
+		final DeviceMonitor mon;
 		
 		int messageId;
-		
 		long initialTimestamp = System.currentTimeMillis();
 		long updateTime;
 		boolean isLiveLocation;
-		double lat = Double.NaN;
-		double lon = Double.NaN;
-		int updateId = 1;
 		
+		int updateId = 1;
 		private boolean enabled;
 		private long disabledTimestamp;
 		
 		
-		public LocationMessage(Device d, Long chatId) {
-			device = d;
+		public LocationMessage(DeviceMonitor d, Long chatId) {
+			mon = d;
 			this.chatId = chatId;
 		}
 		
@@ -151,26 +174,26 @@ public class DeviceLocationManager {
 		public String sendMessage(OsmAndAssistantBot bot) {
 			JsonObject obj = new JsonObject();
 			updateTime = System.currentTimeMillis();
-			obj.addProperty("name", device.deviceName);
-			obj.addProperty("id", device.getEncodedId());
-			if(!Double.isNaN(lat)) {
-				obj.addProperty("lat", (float)lat);
+			obj.addProperty("name", mon.device.deviceName);
+			obj.addProperty("id", mon.device.getEncodedId());
+			if(!Double.isNaN(mon.lat)) {
+				obj.addProperty("lat", (float)mon.lat);
 			}
-			if(!Double.isNaN(lon)) {
-				obj.addProperty("lon", (float)lon);
+			if(!Double.isNaN(mon.lon)) {
+				obj.addProperty("lon", (float)mon.lon);
 			}
-//			if(dd.altitude != 0) {
-//				obj.addProperty("alt", (Float)dd.altitude);
-//			}
-//			if(dd.azi != 0 && dd.timeLastReceived == dd.timeLastValid) {
-//				obj.addProperty("azi", (Float)dd.azi);
-//			}
-//			if(dd.speed != 0 && dd.timeLastReceived == dd.timeLastValid) {
-//				obj.addProperty("spd", (Float)dd.speed);
-//			}
-//			if(dd.timeLastReceived != 0) {
-//				obj.addProperty("updAgo", (Long)(time/ 1000 - dd.timeLastReceived));
-//			}
+			if(!Double.isNaN(mon.altitude) && !mon.locationLost) {
+				obj.addProperty("alt", (float)mon.altitude);
+			}
+			if(!Double.isNaN(mon.azi) && !mon.locationLost) {
+				obj.addProperty("azi", (float)mon.azi);
+			}
+			if(mon.speed != 0 && !mon.locationLost) {
+				obj.addProperty("spd", (float)mon.speed);
+			}
+			if(mon.locationTimestamp != 0) {
+				obj.addProperty("locAgo", (Long)(updateTime/ 1000 - mon.locationTimestamp));
+			}
 //			if(dd.timeLastValid != 0) {
 //				obj.addProperty("locAgo", (Long)(time/ 1000 - dd.timeLastValid));
 //			}
