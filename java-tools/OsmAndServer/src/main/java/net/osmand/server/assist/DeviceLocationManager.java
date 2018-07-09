@@ -42,8 +42,20 @@ public class DeviceLocationManager {
             throw new DeviceNotFoundException(); 
 		}
 		DeviceMonitor dm = devices.get(did);
-		for(LocationMessage lm: dm.chats.values()) {
-			lm.sendMessage(assistantBot);
+		if (dm != null) {
+			double lt = Double.NaN;
+			double ln = Double.NaN;
+			if (lat != null && lon != null) {
+				lt = Double.parseDouble(lat);
+				ln = Double.parseDouble(lon);
+			}
+			for (LocationMessage lm : dm.chats.values()) {
+				if(lm.isEnabled()) {
+					lm.lat = lt;
+					lm.lon = ln;
+					lm.sendMessage(assistantBot);
+				}
+			}
 		}
 		return "OK";
 	}

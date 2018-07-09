@@ -27,6 +27,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.api.methods.BotApiMethod;
 import org.telegram.telegrambots.api.methods.send.SendMessage;
+import org.telegram.telegrambots.api.methods.updatingmessages.DeleteMessage;
 import org.telegram.telegrambots.api.methods.updatingmessages.EditMessageText;
 import org.telegram.telegrambots.api.objects.CallbackQuery;
 import org.telegram.telegrambots.api.objects.Message;
@@ -286,6 +287,14 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 			deviceRepo.delete(d);
 			sendApiMethod(editMsg);
 			return;
+		} else if(pm.equals("hide")) {
+			DeleteMessage delmsg = new DeleteMessage(replyMsg.getChatId(), replyMsg.getMessageId());
+			sendApiMethod(delmsg);
+			return;
+		} else if(pm.equals("mon")) {
+			deviceLocManager.startMonitoringLocation(d, replyMsg.getChatId());
+		} else if(pm.equals("stmon")) {
+			deviceLocManager.stopMonitoringLocation(d, replyMsg.getChatId());
 		}
 		String txt = String.format("Device: <b>%s</b>\nLocation: %s\n", d.deviceName, "n/a");
 		boolean locationMonitored = deviceLocManager.isLocationMonitored(d, replyMsg.getChatId());
@@ -293,14 +302,10 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 			txt += String.format("External cfg: %s\n", d.externalConfiguration.trackerName);
 		}
 		if(locationMonitored) {
-			txt += String.format("Device is monitored");
+			txt += String.format("Location is continuously updated");
 		}
 		if(pm.equals("del")) {
 			txt += "<b>Are you sure, you want to delete it? </b>";
-		} else if(pm.equals("mon")) {
-			deviceLocManager.startMonitoringLocation(d, replyMsg.getChatId());
-		} else if(pm.equals("stmon")) {
-			deviceLocManager.stopMonitoringLocation(d, replyMsg.getChatId());
 		} else if(pm.equals("more")) {
 			txt += String.format("URL to post: %s\nRegistered: %s\n", 
 					String.format(URL_TO_POST_COORDINATES, d.getEncodedId()), dateFormat.format(d.createdDate));
@@ -318,12 +323,15 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 		} else {
 			if (pm.equals("more")) {
 				InlineKeyboardButton ls = new InlineKeyboardButton("Less");
-				ls.setCallbackData("dv|" + d.getEncodedId() + "|");
+				ls.setCallbackData("dv|" + d.getEncodedId() + "|less");
 				lt.add(ls);
 				InlineKeyboardButton del = new InlineKeyboardButton("Delete");
 				del.setCallbackData("dv|" + d.getEncodedId() + "|del");
 				lt.add(del);
 			} else {
+				InlineKeyboardButton hide = new InlineKeyboardButton("Hide");
+				hide.setCallbackData("dv|" + d.getEncodedId() + "|hide");
+				lt.add(hide);
 				InlineKeyboardButton upd = new InlineKeyboardButton("Update");
 				upd.setCallbackData("dv|" + d.getEncodedId() + "|upd");
 				lt.add(upd);
@@ -332,7 +340,7 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 				lt.add(more);
 				InlineKeyboardButton loc = new InlineKeyboardButton(locationMonitored ? "Stop monitoring location"
 						: "Start monitoring location");
-				loc.setCallbackData("dv|" + d.getEncodedId() + (locationMonitored ? "|mon" : "|stmon"));
+				loc.setCallbackData("dv|" + d.getEncodedId() + (locationMonitored ? "|stmon" : "|mon"));
 				lt2.add(loc);
 			}
 		}
