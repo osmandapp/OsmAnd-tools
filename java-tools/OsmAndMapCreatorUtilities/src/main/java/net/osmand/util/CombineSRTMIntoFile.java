@@ -42,7 +42,7 @@ public class CombineSRTMIntoFile {
 	public static void main(String[] args) throws IOException {
 		File directoryWithSRTMFiles = new File(args[0]);
 		File directoryWithTargetFiles = new File(args[1]);
-		boolean dryRun = true;
+		boolean dryRun = false;
 		String filter = null; // mauritius
 		for(int i = 2; i < args.length; i++ ){
 			if("--dry-run".equals(args[i])) {
