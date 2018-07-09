@@ -14,7 +14,7 @@ else
 #  php all_reports.php "${PERIOD}" "${EUR_VALUE}" "${BTC_VALUE}"
 fi
 cd /home/changesets/dumps
-PSQL="/usr/lib/postgresql/10.4/bin/"
+PSQL="/usr/lib/postgresql/10/bin/"
 ${PSQL}pg_dump -p 5433 -U $DB_USER -v -F t -f $DUMPNAME.tar $DB_NAME
 rm $DUMPNAME.tar.gz || true
 gzip $DUMPNAME.tar 
