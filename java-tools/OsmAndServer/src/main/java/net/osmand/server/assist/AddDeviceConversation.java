@@ -28,9 +28,11 @@ public class AddDeviceConversation extends AssistantConversation {
 	int state = 0;
 	
 	private ITrackerManager mgr;
+	private boolean addExternal;
 
-	public AddDeviceConversation(UserChatIdentifier chatIdentifier) {
+	public AddDeviceConversation(UserChatIdentifier chatIdentifier, boolean addExternal) {
 		super(chatIdentifier);
+		this.addExternal = addExternal;
 	}
 
 	@Override
@@ -42,29 +44,17 @@ public class AddDeviceConversation extends AssistantConversation {
 	@Override
 	public boolean updateMessage(OsmAndAssistantBot bot, Message msg, String reply) throws TelegramApiException {
 		if (state == ASK_DEVICE_NAME) {
-			SendMessage smsg = getSendMessage("Please enter a device name:");
-			bot.sendMethod(smsg);
-			state = READ_DEVICE_NAME;
+			if(addExternal) {
+				askExternalConfiguration(bot);
+			} else {
+				SendMessage smsg = getSendMessage("Please enter a device name:");
+				bot.sendMethod(smsg);
+				state = READ_DEVICE_NAME;
+			}
 			return false;
 		} else if (state == READ_DEVICE_NAME) {
 			if ("import".equals(reply)) {
-				SendMessage smsg = getSendMessage("Enter or select external website configuration:");
-				InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
-				smsg.setReplyMarkup(markup);
-				int i = 1;
-				for (TrackerConfiguration c : bot.getExternalConfigurations(chatIdentifier)) {
-					StringBuilder sb = new StringBuilder();
-					sb.append(i).append(". ").append(c.trackerName);
-					ArrayList<InlineKeyboardButton> lt = new ArrayList<InlineKeyboardButton>();
-					InlineKeyboardButton button = new InlineKeyboardButton(sb.toString());
-					button.setCallbackData("impc|" + c.trackerName);
-					lt.add(button);
-					markup.getKeyboard().add(lt);
-					i++;
-				}
-				
-				bot.sendMethod(smsg);
-				state = READ_EXTERNAL_CONFIGURATION;
+				askExternalConfiguration(bot);
 			} else if (validateEmptyInput(bot, reply)) {
 				Device device = bot.createDevice(chatIdentifier, reply);
 				String msgs = bot.saveDevice(device);
@@ -107,6 +97,27 @@ public class AddDeviceConversation extends AssistantConversation {
 			return true;
 		}
 		return false;
+	}
+
+	private void askExternalConfiguration(OsmAndAssistantBot bot) throws TelegramApiException {
+		SendMessage smsg = getSendMessage("Enter or select external website configuration:");
+		InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+		smsg.setReplyMarkup(markup);
+		int i = 1;
+		for (TrackerConfiguration c : bot.getExternalConfigurations(chatIdentifier)) {
+			StringBuilder sb = new StringBuilder();
+			sb.append(i).append(". ").append(c.trackerName);
+			ArrayList<InlineKeyboardButton> lt = new ArrayList<InlineKeyboardButton>();
+			InlineKeyboardButton button = new InlineKeyboardButton(sb.toString());
+			button.setCallbackData("impc|" + c.trackerName);
+			lt.add(button);
+			markup.getKeyboard().add(lt);
+			i++;
+		}
+		
+		bot.sendMethod(smsg);
+		state = READ_EXTERNAL_CONFIGURATION;
+
 	}
 
 	private TrackerConfiguration saveConfiguration(OsmAndAssistantBot bot, String token) throws TelegramApiException {

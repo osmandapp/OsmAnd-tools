@@ -129,18 +129,16 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 				}
 				
 				if (msg.isCommand()) {
-					if ("mytrackers".equals(coreMsg)) {
-						sendAllTrackerConfigurations(ucid, false);
-					} else if ("add_device".equals(coreMsg)) {
-						AddDeviceConversation c = new AddDeviceConversation(ucid);
+					if ("add_device".equals(coreMsg) || "add_ext_device".equals(coreMsg)) {
+						AddDeviceConversation c = new AddDeviceConversation(ucid, "add_ext_device".equals(coreMsg));
 						setNewConversation(c);
 						c.updateMessage(this, msg);
 					} else if ("mydevices".equals(coreMsg)) {
 						retrieveDevices(ucid, params);
 					} else if ("configs".equals(coreMsg)) {
 						retrieveConfigs(ucid, params);
-					} else if ("whoami".equals(coreMsg)) {
-						sendApiMethod(new SendMessage(msg.getChatId(), "I'm your OsmAnd assistant"));
+					} else if ("whoami".equals(coreMsg) && "start".equals(coreMsg)) {
+						sendApiMethod(new SendMessage(msg.getChatId(), "I'm your OsmAnd assistant. To list your devices use /mydevices."));
 					} else {
 						sendApiMethod(new SendMessage(msg.getChatId(), "Sorry, the command is not recognized"));
 					}
@@ -400,36 +398,6 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 		return null;
 	}
 
-	public void sendAllTrackerConfigurations(UserChatIdentifier ucid, boolean keyboard) throws TelegramApiException {
-		List<TrackerConfiguration> list = trackerRepo.findByUserIdOrderByCreatedDate(ucid.getUserId());
-		StringBuilder bld = new StringBuilder();
-		SendMessage msg = new SendMessage();
-		msg.setChatId(ucid.getChatId());
-		if (list.isEmpty()) {
-			bld.append("You don't have any tracker configurations yet. You can set them with /settracker command");
-		} else {
-			InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
-			bld.append("Your tracker configurations are:\n");
-			for (int i = 0; i < list.size(); i++) {
-				
-				TrackerConfiguration c = list.get(i);
-				String txt = (i+1) +". " + c.trackerName;
-				if (!keyboard) {
-					bld.append(txt).append("\n");
-				} else {
-					ArrayList<InlineKeyboardButton> lt = new ArrayList<InlineKeyboardButton>();
-					InlineKeyboardButton button = new InlineKeyboardButton(txt);
-					button.setCallbackData((i + 1) + "");
-					lt.add(button);
-					markup.getKeyboard().add(lt);
-				}
-			}
-			msg.setReplyMarkup(markup);
-			
-		}
-		msg.setText(bld.toString());
-		sendApiMethod(msg);
-	}
 	
 	public TrackerConfiguration removeTrackerConfiguration(UserChatIdentifier ucid, int order) {
 		List<TrackerConfiguration> list = trackerRepo.findByUserIdOrderByCreatedDate(ucid.getUserId());
@@ -512,7 +480,7 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 				i++;
 			}
 		} else {
-			msg.setText("You don't have any added devices. Please use /add_device to register new devices.");
+			msg.setText("You don't have any external configurations. Please use /add_ext_device to register 3rd party devices.");
 		}
 		
 		sendApiMethod(msg);
