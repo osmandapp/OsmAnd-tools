@@ -5,7 +5,7 @@ if [ -z "$PERIOD" ]; then
   PERIOD=$(date -d "$(date +%Y-%m-01) -1 day" "+%Y-%m")
 fi
 DB_NAME=changeset_${PERIOD//-/_}
-PSQL="/usr/lib/postgresql/10.4/bin/"
+PSQL="/usr/lib/postgresql/10/bin/"
 # ${PSQL}psql -p 5433 -d changeset -U $DB_USER -c "DROP DATABASE $DB_NAME" || true;
 ${PSQL}psql -p 5433 -d changeset -U $DB_USER -c "CREATE DATABASE $DB_NAME OWNER $DB_USER TABLESPACE changeset";
 ${PSQL}pg_dump -p 5433 -U $DB_USER -v -F t -f $DB_NAME.tar changeset
