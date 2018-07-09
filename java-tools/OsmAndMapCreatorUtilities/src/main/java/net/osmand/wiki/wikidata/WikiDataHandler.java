@@ -170,6 +170,9 @@ public class WikiDataHandler extends DefaultHandler {
 				} catch (Exception e) {
 					// Generally means that the field is missing in the json or the incorrect data is supplied
 					errorCount++;
+					if(errorCount == ERROR_BATCH_SIZE) {
+						log.error(e.getMessage(), e);
+					}
 					if(errorCount % ERROR_BATCH_SIZE == 0) {
 						log.error(String.format("Error pages %s (total %d)", title.toString(), errorCount));
 					}
