@@ -643,20 +643,51 @@ public class WikiDatabasePreparation {
 		final String sqliteFileName = folder + "wiki.sqlite";
 		final String pathToWikiData = folder + "wikidatawiki-latest-pages-articles.xml.gz";
 
-		if (mode.equals("process-wikidata")) {
+		if (mode.equals("process-wikidata-regions")) {
+			processWikidataRegions(sqliteFileName);
+		} else if (mode.equals("process-wikidata")) {
 			File wikiDB = new File(sqliteFileName);
-			if (wikiDB.exists()) {
-				wikiDB.delete();
-			}
 			if (!new File(pathToWikiData).exists()) {
 				throw new RuntimeException("Wikidata dump doesn't exist. Exiting.");
 			}
+			if (wikiDB.exists()) {
+				wikiDB.delete();
+			} 
 			log.info("Processing wikidata...");
 			processDump(pathToWikiData, sqliteFileName, null);
 		} else if (mode.equals("process-wikipedia")){
 			processDump(wikiPg, sqliteFileName, lang);
 		}
     }
+
+	private static void processWikidataRegions(final String sqliteFileName) throws SQLException, IOException {
+		File wikiDB = new File(sqliteFileName);
+		log.info("Processing wikidata regions...");
+		DBDialect dialect = DBDialect.SQLITE;
+		Connection conn = dialect.getDatabaseConnection(wikiDB.getAbsolutePath(), log);
+		OsmandRegions regions = new OsmandRegions();
+		regions.prepareFile();
+		regions.cacheAllCountries();
+		PreparedStatement wikiRegionPrep = conn
+				.prepareStatement("INSERT INTO wiki_region(id, regionName) VALUES(?, ? )");
+		ResultSet rs = conn.createStatement().executeQuery("SELECT id, lat, lon from wiki_coords");
+		int batch = 0;
+		List<String> rgs = new ArrayList<String>();
+		while (rs.next()) {
+			rgs = regions.getRegions(rs.getDouble(2), rs.getDouble(3), rgs);
+			for (String reg : rgs) {
+				wikiRegionPrep.setLong(1, rs.getLong(1));
+				wikiRegionPrep.setString(2, reg);
+				if (batch > WikiDataHandler.BATCH_SIZE) {
+					wikiRegionPrep.executeBatch();
+					batch = 0;
+				}
+			}
+		}
+		rs.close();
+		wikiRegionPrep.close();
+		conn.close();
+	}
 	
 	public static void downloadPage(String page, String fl) throws IOException {
 		URL url = new URL(page);

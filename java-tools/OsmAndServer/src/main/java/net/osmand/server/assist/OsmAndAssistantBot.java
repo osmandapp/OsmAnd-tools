@@ -12,8 +12,6 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 
-import javax.transaction.Transactional;
-
 import net.osmand.server.assist.data.Device;
 import net.osmand.server.assist.data.DeviceRepository;
 import net.osmand.server.assist.data.TrackerConfiguration;
@@ -27,7 +25,6 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.EnableTransactionManagement;
 import org.telegram.telegrambots.api.methods.BotApiMethod;
 import org.telegram.telegrambots.api.methods.send.SendMessage;
 import org.telegram.telegrambots.api.methods.updatingmessages.EditMessageText;
@@ -49,7 +46,7 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 
 	private static final int LIMIT_CONFIGURATIONS = 3;
 	
-	public static final String URL_TO_POST_COORDINATES = "http://localhost:8080/tracker/c/";
+	public static final String URL_TO_POST_COORDINATES = "http://builder.osmand.net:8090/tracker/c/";
 	
 	SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
 

@@ -49,7 +49,7 @@ public class WikiDataHandler extends DefaultHandler {
     private int[] coordsBatch = new int[]{0};
     private int[] regionBatch = new int[]{0};
     
-    private final static int BATCH_SIZE = 5000;
+    public final static int BATCH_SIZE = 5000;
 	private final static int ARTICLE_BATCH_SIZE = 10000;
 	private static final int ERROR_BATCH_SIZE = 200;
 
@@ -162,7 +162,7 @@ public class WikiDataHandler extends DefaultHandler {
 						coordsPrep.setDouble(3, article.getLat());
 						coordsPrep.setDouble(4, article.getLon());
 						addBatch(coordsPrep, coordsBatch);
-						List<String> rgs = getRegions(article.getLat(), article.getLon());
+						List<String> rgs = regions.getRegions(article.getLat(), article.getLon(), keyNames);
 						for (String reg : rgs) {
 							wikiRegionPrep.setLong(1, id);
 							wikiRegionPrep.setString(2, reg);
@@ -192,17 +192,6 @@ public class WikiDataHandler extends DefaultHandler {
 	}
 
     
-    private List<String> getRegions(double lat, double lon) throws IOException {
-		keyNames.clear();
-		int x31 = MapUtils.get31TileNumberX(lon);
-		int y31 = MapUtils.get31TileNumberY(lat);
-		List<BinaryMapDataObject> cs = regions.query(x31, y31);
-		for (BinaryMapDataObject b : cs) {
-			if(regions.contain(b, x31, y31)) {
-				keyNames.add(regions.getDownloadName(b));
-			}
-		}
-		return keyNames;
-	}
+    
 }
 
