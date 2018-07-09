@@ -1,5 +1,7 @@
 package net.osmand.server.assist.data;
 
+import java.util.Comparator;
+
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.EntityListeners;
@@ -13,6 +15,8 @@ import javax.persistence.Transient;
 
 import net.osmand.server.assist.ext.ITrackerManager;
 
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.hibernate.annotations.Type;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
@@ -69,6 +73,28 @@ public class TrackerConfiguration {
 	public String toString() {
 		return "TrackerConfiguration [id=" + id + ", trackerId=" + trackerId 
 				+ ", trackerName=" + trackerName + ", createdDate=" + createdDate + ", data=" + data + "]";
+	}
+	
+	public static Comparator<TrackerConfiguration> getGlobalUniqueComparator() {
+		return new Comparator<TrackerConfiguration>() {
+
+			@Override
+			public int compare(TrackerConfiguration o1, TrackerConfiguration o2) {
+				int i = StringUtils.compare(o1.trackerId, o2.trackerId);
+				if(i != 0) {
+					return i;
+				}
+				i = StringUtils.compare(o1.token, o2.token);
+				if(i != 0) {
+					return i;
+				}
+				return 0;
+			}
+		};
+	}
+
+	public int hashCodeGlobalUnique() {
+		return new HashCodeBuilder().append(trackerId).append(token).toHashCode();
 	}
 	
 	

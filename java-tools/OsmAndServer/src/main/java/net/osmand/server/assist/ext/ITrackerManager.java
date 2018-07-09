@@ -1,7 +1,9 @@
 package net.osmand.server.assist.ext;
 
 import java.util.List;
+import java.util.Map;
 
+import net.osmand.server.assist.data.DeviceMonitor;
 import net.osmand.server.assist.data.TrackerConfiguration;
 
 public interface ITrackerManager {
@@ -12,11 +14,15 @@ public interface ITrackerManager {
 	
 	public List<? extends DeviceInfo> getDevicesList(TrackerConfiguration config);
 	
+	
 	public interface DeviceInfo {
 		
 		public String getName();
 		
 		public String getId();
 	}
+
+
+	public void updateDeviceMonitors(TrackerConfiguration ext, Map<String, List<DeviceMonitor>> mp);
 	
 }
