@@ -678,7 +678,8 @@ public class WikiDatabasePreparation {
 			for (String reg : rgs) {
 				wikiRegionPrep.setLong(1, rs.getLong(1));
 				wikiRegionPrep.setString(2, reg);
-				if (batch > WikiDataHandler.BATCH_SIZE) {
+				wikiRegionPrep.addBatch();
+				if (batch++ > WikiDataHandler.BATCH_SIZE) {
 					wikiRegionPrep.executeBatch();
 					batch = 0;
 				}
