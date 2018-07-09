@@ -162,7 +162,7 @@ public class WikiDataHandler extends DefaultHandler {
 						coordsPrep.setDouble(3, article.getLat());
 						coordsPrep.setDouble(4, article.getLon());
 						addBatch(coordsPrep, coordsBatch);
-						List<String> rgs = regions.getRegions(article.getLat(), article.getLon(), keyNames);
+						List<String> rgs = regions.getRegionsToDownload(article.getLat(), article.getLon(), keyNames);
 						for (String reg : rgs) {
 							wikiRegionPrep.setLong(1, id);
 							wikiRegionPrep.setString(2, reg);

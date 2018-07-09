@@ -674,7 +674,7 @@ public class WikiDatabasePreparation {
 		int batch = 0;
 		List<String> rgs = new ArrayList<String>();
 		while (rs.next()) {
-			rgs = regions.getRegions(rs.getDouble(2), rs.getDouble(3), rgs);
+			rgs = regions.getRegionsToDownload(rs.getDouble(2), rs.getDouble(3), rgs);
 			for (String reg : rgs) {
 				wikiRegionPrep.setLong(1, rs.getLong(1));
 				wikiRegionPrep.setString(2, reg);
@@ -685,6 +685,7 @@ public class WikiDatabasePreparation {
 				}
 			}
 		}
+		wikiRegionPrep.executeBatch();
 		rs.close();
 		wikiRegionPrep.close();
 		conn.close();
