@@ -46,7 +46,7 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 
 	private static final int LIMIT_CONFIGURATIONS = 3;
 	
-	public static final String URL_TO_POST_COORDINATES = "http://builder.osmand.net:8090/tracker/c/";
+	public static final String URL_TO_POST_COORDINATES = "http://builder.osmand.net:8090/device/%s/send";
 	
 	SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
 	Random rnd = new Random();
@@ -288,8 +288,12 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 			return;
 		}
 		String txt = String.format("Device: <b>%s</b>\nLocation: %s\n", d.deviceName, "n/a");
+		boolean locationMonitored = deviceLocManager.isLocationMonitored(d, replyMsg.getChatId());
 		if(d.externalConfiguration != null) {
 			txt += String.format("External cfg: %s\n", d.externalConfiguration.trackerName);
+		}
+		if(locationMonitored) {
+			txt += String.format("Device is monitored");
 		}
 		if(pm.equals("del")) {
 			txt += "<b>Are you sure, you want to delete it? </b>";
@@ -299,7 +303,7 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 			deviceLocManager.stopMonitoringLocation(d, replyMsg.getChatId());
 		} else if(pm.equals("more")) {
 			txt += String.format("URL to post: %s\nRegistered: %s\n", 
-				URL_TO_POST_COORDINATES + d.getEncodedId(), dateFormat.format(d.createdDate));
+					String.format(URL_TO_POST_COORDINATES, d.getEncodedId()), dateFormat.format(d.createdDate));
 		}
 		
 		
@@ -326,9 +330,8 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 				InlineKeyboardButton more = new InlineKeyboardButton("More");
 				more.setCallbackData("dv|" + d.getEncodedId() + "|more");
 				lt.add(more);
-				boolean locationMonitored = deviceLocManager.isLocationMonitored(d, replyMsg.getChatId());
-				InlineKeyboardButton loc = new InlineKeyboardButton(locationMonitored ? "Stop displaying location"
-						: "Start displaying location");
+				InlineKeyboardButton loc = new InlineKeyboardButton(locationMonitored ? "Stop monitoring location"
+						: "Start monitoring location");
 				loc.setCallbackData("dv|" + d.getEncodedId() + (locationMonitored ? "|mon" : "|stmon"));
 				lt2.add(loc);
 			}
