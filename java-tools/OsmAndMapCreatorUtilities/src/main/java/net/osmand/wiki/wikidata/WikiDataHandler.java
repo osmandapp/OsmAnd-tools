@@ -121,7 +121,7 @@ public class WikiDataHandler extends DefaultHandler {
                 ctext = text;
             } else if (name.equals("format")) {
                 format.setLength(0);
-                ctext = text;
+                ctext = format;
             }
         }
     }
