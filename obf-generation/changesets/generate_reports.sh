@@ -11,7 +11,7 @@ if [ -z "$EUR_VALUE" ]; then
 else 
   echo "EUR $EUR_VALUE / BTC $BTC_VALUE"
   # curl -X POST "http://builder.osmand.net/reports/all_reports.php?month=${PERIOD}&dbmonth=${PERIOD}&eurValue=${EUR_VALUE}&btcValue=${BTC_VALUE}"
-#  php all_reports.php "${PERIOD}" "${EUR_VALUE}" "${BTC_VALUE}"
+  php all_reports.php "${PERIOD}" "${EUR_VALUE}" "${BTC_VALUE}"
 fi
 cd /home/changesets/dumps
 PSQL="/usr/lib/postgresql/10/bin/"
