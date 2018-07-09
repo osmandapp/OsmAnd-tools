@@ -41,21 +41,33 @@ CREATE TABLE telegram_monitoring (
 ) ;
 
 ###### TELEGRAM TRACKER CONFIGURATION ########
+CREATE TABLE telegram_devices (
+    id bigint NOT NULL,
+    chat_id bigint NOT NULL,
+    created_date timestamp NOT NULL,
+    modified_date timestamp,
+    device_name character varying(200)  NOT NULL,
+    ext_config  bigint,
+    ext_id character varying(200),
+    user_id bigint NOT NULL,
+    data jsonb,
+    PRIMARY KEY (id)
+);
+CREATE INDEX telegram_devices_idx on telegram_devices(user_id);
 
 CREATE TABLE telegram_tracker_configuration (
     id bigint NOT NULL,
-    date_created bigint NOT NULL,
-    first_name character varying(100),
-    last_name character varying(100),
+    chat_id bigint NOT NULL,
+    created_date timestamp NOT NULL,
+    modified_date timestamp,
+    tracker_id character varying(200)  NOT NULL,
+    tracker_name character varying(200)  NOT NULL,
     token character varying(200),
-    tracker_id character varying(100) NOT NULL,
-    tracker_name character varying(200) NOT NULL,
     user_id bigint NOT NULL,
     data jsonb,
     PRIMARY KEY (id)
 );
 CREATE INDEX telegram_tracker_configuration_user_idx on telegram_tracker_configuration(user_id);
-
 
 CREATE SEQUENCE telegram_tracker_configuration_id_seq
     START WITH 1
