@@ -173,6 +173,10 @@ public class CombineSRTMIntoFile {
 //				mp.put(ttf, null);
 			}
 		}
+		if(files.isEmpty()) {
+			System.err.println("!!! SKIP " + name + " because no files are present to index !!!");
+			return;
+		}
 		// be independent of previous results
 		new File(targetFile.getParentFile(), IndexCreator.TEMP_NODES_DB).delete();
 		RTree.clearCache();
