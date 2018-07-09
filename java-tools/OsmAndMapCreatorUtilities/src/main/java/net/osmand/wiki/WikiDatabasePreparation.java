@@ -875,7 +875,7 @@ public class WikiDatabasePreparation {
 							ResultSet rs = selectPrep.executeQuery();
 							String id = null;
 							if (rs.next()) {
-								id = rs.getString(3);
+								id = rs.getString(1);
 							}
 							selectPrep.clearParameters();
 							if (id != null ) {
