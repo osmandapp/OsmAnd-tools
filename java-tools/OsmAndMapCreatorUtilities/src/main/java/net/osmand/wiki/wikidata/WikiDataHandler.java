@@ -38,6 +38,7 @@ public class WikiDataHandler extends DefaultHandler {
 
     private StringBuilder title = new StringBuilder();
     private StringBuilder text = new StringBuilder();
+    private StringBuilder format = new StringBuilder();
 
     private FileProgressImplementation progress;
     private Connection conn;
@@ -118,6 +119,9 @@ public class WikiDataHandler extends DefaultHandler {
             } else if (name.equals("text")) {
                 text.setLength(0);
                 ctext = text;
+            } else if (name.equals("format")) {
+                format.setLength(0);
+                ctext = text;
             }
         }
     }
@@ -140,7 +144,12 @@ public class WikiDataHandler extends DefaultHandler {
 				progress.update();
 			} else if (name.equals("title")) {
 				ctext = null;
+			} else if (name.equals("format")) {
+				ctext = null;
 			} else if (name.equals("text")) {
+				if (!format.toString().equals("application/json")) {
+					return;
+				}
 				try {
 					ArticleMapper.Article article = gson.fromJson(ctext.toString(), ArticleMapper.Article.class);
 					if (article.getLabels() != null && article.getLat() != 0 && article.getLon() != 0) {
