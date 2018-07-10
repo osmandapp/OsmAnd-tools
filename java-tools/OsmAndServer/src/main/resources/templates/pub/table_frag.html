@@ -1,0 +1,22 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Indexes</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+</head>
+<body>
+    <div th:fragment="index_table (index_list, table_title)">
+        <h1 th:text="${table_title}"></h1>
+        <table border="1">
+            <tr th:each="index : ${index_list}">
+                <td th:text="${index.name}"></td>
+                <td th:text="${index.date}"></td>
+                <td th:text="${index.size}"></td>
+                <td th:text="${index.targetsize}"></td>
+                <td th:text="${index.description}"></td>
+            </tr>
+        </table>
+
+    </div>
+</body>
+</html>
