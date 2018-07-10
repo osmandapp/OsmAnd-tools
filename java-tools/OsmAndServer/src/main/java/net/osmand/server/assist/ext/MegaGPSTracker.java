@@ -43,7 +43,6 @@ public class MegaGPSTracker implements ITrackerManager {
 	public static final int SOCKET_TIMEOUT = 15 * 1000;
 	
 	private static final org.apache.commons.logging.Log LOG = LogFactory.getLog(MegaGPSTracker.class);
-	private static final long INITIAL_TIMESTAMP_TO_DISPLAY = 30 * 24 * 60 * 60 * 1000; // 30 days
 	
 	private Map<String, String> namesCache = new ConcurrentHashMap<String, String>();
 	protected CloseableHttpClient httpclient;
@@ -88,11 +87,10 @@ public class MegaGPSTracker implements ITrackerManager {
 	@Override
 	public void updateDeviceMonitors(TrackerConfiguration ext, Map<String, List<DeviceMonitor>> mp) {
 		try {
-			
 			List<MegaGPSDevice> allDevices = getDevices(ext, true, null);
 			long time = System.currentTimeMillis();
 			for (MegaGPSDevice dd : allDevices) {
-				if (dd.timeLastValid * 1000 < time - INITIAL_TIMESTAMP_TO_DISPLAY) {
+				if (dd.timeLastValid < time / 1000  - 90 * 24 * 60 * 60) {
 					continue;
 				}
 				List<DeviceMonitor> list = mp.get(dd.id);
@@ -106,9 +104,15 @@ public class MegaGPSTracker implements ITrackerManager {
 					location.setLatLon(dd.getLatitude(), dd.getLongitude());
 					location.setAltitude(dd.altitude);
 					location.setAzi(dd.azi);
-					location.setSpeed(dd.speed);
-					location.setSatellites(dd.satellites);
-					li.setTemperature(dd.temparature);
+					if(dd.speed >= 0) {
+						location.setSpeed(dd.speed);
+					}
+					if(dd.satellites != 0) {
+						location.setSatellites(dd.satellites);
+					}
+					if(dd.temparature != -100) {
+						li.setTemperature(dd.temparature);
+					}
 					// li.setIpSender(ipSender);
 					for (DeviceMonitor dm : list) {
 						LocationInfo lastSignal = dm.getLastSignal();
@@ -229,7 +233,7 @@ public class MegaGPSTracker implements ITrackerManager {
 		int lng;
 		
 		@CsvColumn(columnName="speed", mustBeSupplied=false)
-		float speed;
+		float speed = -100;
 		
 		@CsvColumn(columnName="alt", mustBeSupplied=false)
 		float altitude;

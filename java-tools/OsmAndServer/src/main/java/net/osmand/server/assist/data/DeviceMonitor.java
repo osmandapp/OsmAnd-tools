@@ -137,6 +137,10 @@ public class DeviceMonitor {
 		public boolean isEnabled() {
 			return enabled;
 		}
+		
+		public long getDisabledTimestamp() {
+			return disabledTimestamp;
+		}
 
 		public void disable() {
 			disabledTimestamp = System.currentTimeMillis();
@@ -171,9 +175,9 @@ public class DeviceMonitor {
 			if (lastSignal.isLocationPresent()) {
 				obj.addProperty("lat", (float) lastSignal.lat);
 				obj.addProperty("lon", (float) lastSignal.lon);
-			} else if (lastLocationSignal != null) {
-				obj.addProperty("lat", (float) lastSignal.lat);
-				obj.addProperty("lon", (float) lastSignal.lon);
+			} else if (lastLocationSignal != null && lastLocationSignal.isLocationPresent()) {
+				obj.addProperty("lat", (float) lastLocationSignal.lat);
+				obj.addProperty("lon", (float) lastLocationSignal.lon);
 			}
 			if (!Double.isNaN(lastSignal.altitude) && lastSignal.isLocationPresent()) {
 				obj.addProperty("alt", (float) lastSignal.altitude);
@@ -192,7 +196,7 @@ public class DeviceMonitor {
 				obj.addProperty("hdop", (int) lastSignal.hdop);
 			}
 			if (!Double.isNaN(lastSignal.temperature)) {
-				obj.addProperty("temp", (float) lastSignal.azi);
+				obj.addProperty("temp", (float) lastSignal.temperature);
 			}
 			if (!lastSignal.isLocationPresent() && lastLocationSignal != null) {
 				obj.addProperty("locAgo", (Long) ((updateTime - lastLocationSignal.timestamp)) / 1000);
