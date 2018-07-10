@@ -14,6 +14,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 import net.osmand.server.assist.data.DeviceMonitor;
+import net.osmand.server.assist.data.LocationInfo;
 import net.osmand.server.assist.data.TrackerConfiguration;
 
 import org.apache.commons.logging.LogFactory;
@@ -42,6 +43,7 @@ public class MegaGPSTracker implements ITrackerManager {
 	public static final int SOCKET_TIMEOUT = 15 * 1000;
 	
 	private static final org.apache.commons.logging.Log LOG = LogFactory.getLog(MegaGPSTracker.class);
+	private static final long INITIAL_TIMESTAMP_TO_DISPLAY = 30 * 24 * 60 * 60 * 1000; // 30 days
 	
 	private Map<String, String> namesCache = new ConcurrentHashMap<String, String>();
 	protected CloseableHttpClient httpclient;
@@ -86,25 +88,41 @@ public class MegaGPSTracker implements ITrackerManager {
 	@Override
 	public void updateDeviceMonitors(TrackerConfiguration ext, Map<String, List<DeviceMonitor>> mp) {
 		try {
+			
 			List<MegaGPSDevice> allDevices = getDevices(ext, true, null);
+			long time = System.currentTimeMillis();
 			for (MegaGPSDevice dd : allDevices) {
-				// if (dd.timeLastValid * 1000 < time - INITIAL_TIMESTAMP_TO_DISPLAY) {
-				// continue;
-				// }
+				if (dd.timeLastValid * 1000 < time - INITIAL_TIMESTAMP_TO_DISPLAY) {
+					continue;
+				}
 				List<DeviceMonitor> list = mp.get(dd.id);
 				if (list != null) {
+					LocationInfo li = new LocationInfo(dd.timeLastReceived * 1000);
+					LocationInfo location = new LocationInfo(dd.timeLastValid * 1000);
+					// in case location is valid last 15 seconds use location
+					if(dd.timeLastValid < dd.timeLastReceived - 15) {
+						li = location;
+					}
+					location.setLatLon(dd.getLatitude(), dd.getLongitude());
+					location.setAltitude(dd.altitude);
+					location.setAzi(dd.azi);
+					location.setSpeed(dd.speed);
+					location.setSatellites(dd.satellites);
+					li.setTemperature(dd.temparature);
+					// li.setIpSender(ipSender);
 					for (DeviceMonitor dm : list) {
-						// final MessageToDevice existingMessage = getMessageToDevice(time, dd);
-						// if (existingMessage.device != null && existingMessage.device.lat == dd.lat
-						// && existingMessage.device.lng == dd.lng
-						// && existingMessage.device.azi == dd.azi
-						// // creates extra traffic for updates
-						// && existingMessage.device.timeLastReceived == dd.timeLastReceived
-						// ) {
-						// continue;
-						// }
-						dm.setLocation(dd.lat, dd.lng);
-						dm.notifyChats();
+						LocationInfo lastSignal = dm.getLastSignal();
+						LocationInfo lastLocSignal = dm.getLastLocationSignal();
+						if (lastSignal != null && li.getTimestamp() == lastSignal.getTimestamp()) {
+							continue;
+						}
+						if(li == location) {
+							dm.sendLocation(li);
+						} else if(lastLocSignal != null && location.getTimestamp() == lastLocSignal.getTimestamp()){
+							dm.sendLocation(li);
+						} else {
+							dm.sendLocation(li, location);
+						}
 					}
 				}
 			}
@@ -254,6 +272,8 @@ public class MegaGPSTracker implements ITrackerManager {
 		
 		
 	}
+	
+	
 }
 
 	

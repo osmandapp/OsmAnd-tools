@@ -14,8 +14,8 @@ import java.util.concurrent.TimeUnit;
 
 import net.osmand.server.assist.data.Device;
 import net.osmand.server.assist.data.DeviceMonitor;
-import net.osmand.server.assist.data.DeviceMonitor.LocationChatMessage;
 import net.osmand.server.assist.data.DeviceRepository;
+import net.osmand.server.assist.data.LocationInfo;
 import net.osmand.server.assist.data.TrackerConfiguration;
 import net.osmand.server.assist.ext.ITrackerManager;
 
@@ -43,32 +43,23 @@ public class DeviceLocationManager {
 
 	private ThreadPoolExecutor exe;
 	public static final long INTERVAL_TO_UPDATE_GROUPS = 10000;
+	public static final long INTERVAL_TO_RUN_UPDATES = 5000;
 	public static final long INITIAL_TIMESTAMP_TO_DISPLAY = 120000;
 	public static final Integer DEFAULT_LIVE_PERIOD = 24 * 60 * 60;
 	
 	
 	public DeviceLocationManager() {
-		this.exe = new ThreadPoolExecutor(1, 10, 1L, TimeUnit.MINUTES,
+		this.exe = new ThreadPoolExecutor(5, 5, 1L, TimeUnit.MINUTES,
                 new LinkedBlockingQueue<Runnable>());
 	}
 	
-	public String sendLocation(String deviceId, String lat, String lon)  throws DeviceNotFoundException {
+	public String sendLocation(String deviceId, LocationInfo info)  throws DeviceNotFoundException {
 		long did = Device.getDecodedId(deviceId);
 		if(!deviceRepo.existsById(did)) {
             throw new DeviceNotFoundException(); 
 		}
 		DeviceMonitor dm = devices.get(did);
-		if (dm != null) {
-			double lt = Double.NaN;
-			double ln = Double.NaN;
-			if (lat != null && lon != null) {
-				lt = Double.parseDouble(lat);
-				ln = Double.parseDouble(lon);
-			}
-			dm.setLocation(lt, ln);
-			dm.notifyChats();
-			
-		}
+		dm.sendLocation(info);
 		return "OK";
 	}
 	
@@ -76,7 +67,6 @@ public class DeviceLocationManager {
 	public static class DeviceNotFoundException extends RuntimeException {
 
 		private static final long serialVersionUID = 8429349261883069752L;
-
 		
 	}
 
@@ -95,29 +85,30 @@ public class DeviceLocationManager {
 			dm = new DeviceMonitor(d, assistantBot);
 			devices.put(d.id, dm);
 		}
-		LocationChatMessage lm = dm.getOrCreateLocationChat(chatId);
-		lm.enable();
-		lm.sendMessage();
+		dm.startMonitoring(chatId);
+		
 	}
 
 	public void stopMonitoringLocation(Device d, Long chatId) {
 		DeviceMonitor dm = devices.get(d.id);
 		if(dm != null) {
-			LocationChatMessage lm = dm.getLocationChat(chatId);
-			if(lm != null) {
-				lm.disable();
-			}
+			dm.stopMonitoring(chatId);
 		}		
 	}
 	
 	
 
-	@Scheduled(fixedRate = 15 * 1000)
+	@Scheduled(fixedRate = INTERVAL_TO_RUN_UPDATES)
 	public void updateExternalMonitoring() {
 		// could be compare TrackerConfiguration by trackerId & token - to avoid duplication
+		long timestamp = System.currentTimeMillis();
 		Map<TrackerConfiguration, Map<String, List<DeviceMonitor>>> dms = new TreeMap<>(
 				TrackerConfiguration.getGlobalUniqueComparator());
 		for (DeviceMonitor dm : devices.values()) {
+			LocationInfo sig = dm.getLastSignal();
+			if(sig != null && timestamp - sig.getTimestamp() < INTERVAL_TO_UPDATE_GROUPS) {
+				continue;
+			}
 			TrackerConfiguration ext = dm.getDevice().externalConfiguration;
 			if (ext != null && dm.isOneChatMonitored()) {
 				Map<String, List<DeviceMonitor>> mp = dms.get(ext);
@@ -138,10 +129,9 @@ public class DeviceLocationManager {
 		// long timestamp = System.currentTimeMillis();
 		while (it.hasNext()) {
 			Entry<TrackerConfiguration, Map<String, List<DeviceMonitor> > > en = it.next();
-			// if(timestamp - locGroup.updateTime > INTERVAL_TO_UPDATE_GROUPS) {
 			TaskToUpdateLocationGroup task = new TaskToUpdateLocationGroup(en.getKey(), en.getValue());
 			if (!exe.getQueue().contains(task)) {
-				exe.submit(task);
+				exe.execute(task);
 			}
 		}
 
@@ -177,9 +167,7 @@ public class DeviceLocationManager {
 		@Override
 		public boolean equals(Object obj) {
 			if (this == obj || (obj instanceof TaskToUpdateLocationGroup)){
-				TrackerConfiguration.getGlobalUniqueComparator().compare(ext, ((TaskToUpdateLocationGroup)obj).ext);
-					
-				return true;
+				return TrackerConfiguration.getGlobalUniqueComparator().compare(ext, ((TaskToUpdateLocationGroup)obj).ext) == 0;
 			}
 			return false;
 		}

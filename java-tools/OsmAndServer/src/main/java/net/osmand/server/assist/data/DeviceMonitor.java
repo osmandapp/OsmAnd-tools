@@ -22,39 +22,44 @@ public class DeviceMonitor {
 	ConcurrentHashMap<Long, LocationChatMessage> chats = new ConcurrentHashMap<>();
 	final OsmAndAssistantBot bot;
 	final Device device;
-
-	double lat = Double.NaN;
-	double lon = Double.NaN;
-	double speed = 0;
-	double altitude = Double.NaN;
-	double azi = Double.NaN;
-	long locationTimestamp = 0;
-	boolean locationLost = false;
+	LocationInfo lastSignal = null;
+	LocationInfo lastLocationSignal = null;
 
 	public DeviceMonitor(Device device, OsmAndAssistantBot bot) {
 		this.device = device;
 		this.bot = bot;
 	}
+	
+	public void sendLocation(LocationInfo info) {
+		LocationInfo locSignal = lastLocationSignal;
+		if(info.isLocationPresent()) {
+			locSignal = info;
+		}
+		sendLocation(info, locSignal);
+	}
 
-	public void setLocation(double lt, double ln) {
-		if (Double.isNaN(lt)) {
-			locationLost = true;
-		} else {
-			locationLost = false;
-			locationTimestamp = System.currentTimeMillis();
-			lat = lt;
-			lon = ln;
-			speed = 0;
-			azi = Double.NaN;
-			altitude = Double.NaN;
+	public void sendLocation(LocationInfo info, LocationInfo locSignal) {
+		lastSignal = info;
+		lastLocationSignal = locSignal;
+		for (LocationChatMessage lm : chats.values()) {
+			if (lm.isEnabled()) {
+				lm.sendMessage(bot, device, info, locSignal);
+			}
 		}
 	}
 	
-	public void notifyChats() {
-		for (LocationChatMessage lm : chats.values()) {
-			if (lm.isEnabled()) {
-				lm.sendMessage();
-			}
+	public void startMonitoring(Long chatId) {
+		LocationChatMessage lm = getOrCreateLocationChat(chatId);
+		if(lastSignal == null) {
+			lastSignal = new LocationInfo();
+		}
+		lm.sendMessage(bot, device, lastSignal, lastLocationSignal);
+	}
+	
+	public void stopMonitoring(Long chatId) {
+		LocationChatMessage lm = getLocationChat(chatId);
+		if (lm != null) {
+			lm.disable();
 		}
 	}
 	
@@ -75,6 +80,14 @@ public class DeviceMonitor {
 		return device;
 	}
 	
+	public LocationInfo getLastSignal() {
+		return lastSignal;
+	}
+	
+	public LocationInfo getLastLocationSignal() {
+		return lastLocationSignal;
+	}
+	
 	public boolean isLocationMonitored(Long chatId) {
 		LocationChatMessage lm = chats.get(chatId);
 		if(lm != null) {
@@ -91,6 +104,7 @@ public class DeviceMonitor {
 		}
 		return false;
 	}
+	
 
 	public static class LocationChatMessage {
 
@@ -124,28 +138,30 @@ public class DeviceMonitor {
 			enabled = false;
 		}
 
-		public String sendMessage() {
+		public String sendMessage(OsmAndAssistantBot bot, Device device, 
+				LocationInfo lastSignal, LocationInfo lastLocationSignal) {
 			JsonObject obj = new JsonObject();
 			updateTime = System.currentTimeMillis();
-			obj.addProperty("name", mon.device.deviceName);
-			obj.addProperty("id", mon.device.getEncodedId());
-			if (!Double.isNaN(mon.lat)) {
-				obj.addProperty("lat", (float) mon.lat);
+			obj.addProperty("name", device.deviceName);
+			obj.addProperty("id", device.getEncodedId());
+			if (lastSignal.isLocationPresent()) {
+				obj.addProperty("lat", (float) lastSignal.lat);
+				obj.addProperty("lon", (float) lastSignal.lon);
+			} else if (lastLocationSignal != null) {
+				obj.addProperty("lat", (float) lastSignal.lat);
+				obj.addProperty("lon", (float) lastSignal.lon);
 			}
-			if (!Double.isNaN(mon.lon)) {
-				obj.addProperty("lon", (float) mon.lon);
+			if (!Double.isNaN(lastSignal.altitude) && lastSignal.isLocationPresent()) {
+				obj.addProperty("alt", (float) lastSignal.altitude);
 			}
-			if (!Double.isNaN(mon.altitude) && !mon.locationLost) {
-				obj.addProperty("alt", (float) mon.altitude);
+			if (!Double.isNaN(lastSignal.azi) && lastSignal.isLocationPresent()) {
+				obj.addProperty("azi", (float) lastSignal.azi);
 			}
-			if (!Double.isNaN(mon.azi) && !mon.locationLost) {
-				obj.addProperty("azi", (float) mon.azi);
+			if (!Double.isNaN(lastSignal.speed) && lastSignal.isLocationPresent()) {
+				obj.addProperty("spd", (float) lastSignal.speed);
 			}
-			if (mon.speed != 0 && !mon.locationLost) {
-				obj.addProperty("spd", (float) mon.speed);
-			}
-			if (mon.locationTimestamp != 0) {
-				obj.addProperty("locAgo", (Long) (updateTime / 1000 - mon.locationTimestamp));
+			if (!lastSignal.isLocationPresent() && lastLocationSignal != null) {
+				obj.addProperty("locAgo", (Long) ((updateTime - lastLocationSignal.timestamp)) / 1000);
 			}
 			// if(dd.timeLastValid != 0) {
 			// obj.addProperty("locAgo", (Long)(time/ 1000 - dd.timeLastValid));
@@ -153,7 +169,7 @@ public class DeviceMonitor {
 			obj.addProperty("updId", updateId++);
 			obj.addProperty("updTime", (Long) ((updateTime - initialTimestamp) / 1000));
 			if (messageId == 0) {
-				mon.bot.sendMethodAsync(new SendMessage(chatId, obj.toString()), new SentCallback<Message>() {
+				bot.sendMethodAsync(new SendMessage(chatId, obj.toString()), new SentCallback<Message>() {
 
 					@Override
 					public void onResult(BotApiMethod<Message> method, Message response) {
@@ -175,7 +191,7 @@ public class DeviceMonitor {
 				mtd.setChatId(chatId);
 				mtd.setMessageId(messageId);
 				mtd.setText(obj.toString());
-				mon.bot.sendMethodAsync(mtd, new SentCallback<Serializable>() {
+				bot.sendMethodAsync(mtd, new SentCallback<Serializable>() {
 					@Override
 					public void onResult(BotApiMethod<Serializable> method, Serializable response) {
 					}
@@ -194,6 +210,9 @@ public class DeviceMonitor {
 			return obj.toString();
 		}
 	}
+
+
+	
 
 	
 }
