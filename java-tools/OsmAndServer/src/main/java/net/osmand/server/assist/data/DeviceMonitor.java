@@ -1,6 +1,7 @@
 package net.osmand.server.assist.data;
 
 import java.io.Serializable;
+import java.util.Collections;
 import java.util.concurrent.ConcurrentHashMap;
 
 import net.osmand.server.assist.DeviceLocationManager;
@@ -10,8 +11,11 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.telegram.telegrambots.api.methods.BotApiMethod;
 import org.telegram.telegrambots.api.methods.send.SendMessage;
+import org.telegram.telegrambots.api.methods.updatingmessages.DeleteMessage;
 import org.telegram.telegrambots.api.methods.updatingmessages.EditMessageText;
 import org.telegram.telegrambots.api.objects.Message;
+import org.telegram.telegrambots.api.objects.replykeyboard.InlineKeyboardMarkup;
+import org.telegram.telegrambots.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 import org.telegram.telegrambots.exceptions.TelegramApiRequestException;
 import org.telegram.telegrambots.updateshandlers.SentCallback;
 
@@ -53,6 +57,7 @@ public class DeviceMonitor {
 		if(lastSignal == null) {
 			lastSignal = new LocationInfo();
 		}
+		lm.enable();
 		lm.sendMessage(bot, device, lastSignal, lastLocationSignal);
 	}
 	
@@ -136,6 +141,25 @@ public class DeviceMonitor {
 		public void disable() {
 			disabledTimestamp = System.currentTimeMillis();
 			enabled = false;
+			if(messageId != 0) {
+				mon.bot.sendMethodAsync(new DeleteMessage(chatId, messageId), new SentCallback<Boolean>() {
+					@Override
+					public void onResult(BotApiMethod<Boolean> method, Boolean response) {
+						
+					}
+
+					@Override
+					public void onException(BotApiMethod<Boolean> method, Exception exception) {
+						LOG.error(exception.getMessage(), exception);
+					}
+
+					@Override
+					public void onError(BotApiMethod<Boolean> method, TelegramApiRequestException apiException) {
+						LOG.error(apiException.getMessage(), apiException);
+					}
+				});
+				messageId = 0;
+			}
 		}
 
 		public String sendMessage(OsmAndAssistantBot bot, Device device, 
@@ -154,11 +178,21 @@ public class DeviceMonitor {
 			if (!Double.isNaN(lastSignal.altitude) && lastSignal.isLocationPresent()) {
 				obj.addProperty("alt", (float) lastSignal.altitude);
 			}
+			
 			if (!Double.isNaN(lastSignal.azi) && lastSignal.isLocationPresent()) {
 				obj.addProperty("azi", (float) lastSignal.azi);
 			}
 			if (!Double.isNaN(lastSignal.speed) && lastSignal.isLocationPresent()) {
 				obj.addProperty("spd", (float) lastSignal.speed);
+			}
+			if (!Double.isNaN(lastSignal.satellites) && lastSignal.isLocationPresent()) {
+				obj.addProperty("sat", (int) lastSignal.satellites);
+			}
+			if (!Double.isNaN(lastSignal.hdop) && lastSignal.isLocationPresent()) {
+				obj.addProperty("hdop", (int) lastSignal.hdop);
+			}
+			if (!Double.isNaN(lastSignal.temperature)) {
+				obj.addProperty("temp", (float) lastSignal.azi);
 			}
 			if (!lastSignal.isLocationPresent() && lastLocationSignal != null) {
 				obj.addProperty("locAgo", (Long) ((updateTime - lastLocationSignal.timestamp)) / 1000);
@@ -168,8 +202,11 @@ public class DeviceMonitor {
 			// }
 			obj.addProperty("updId", updateId++);
 			obj.addProperty("updTime", (Long) ((updateTime - initialTimestamp) / 1000));
+			InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+			markup.getKeyboard().add(Collections.singletonList(new InlineKeyboardButton("Hide").setCallbackData("dv|"+
+					device.getEncodedId() + "|stmon")));
 			if (messageId == 0) {
-				bot.sendMethodAsync(new SendMessage(chatId, obj.toString()), new SentCallback<Message>() {
+				bot.sendMethodAsync(new SendMessage(chatId, obj.toString()).setReplyMarkup(markup), new SentCallback<Message>() {
 
 					@Override
 					public void onResult(BotApiMethod<Message> method, Message response) {
@@ -191,6 +228,7 @@ public class DeviceMonitor {
 				mtd.setChatId(chatId);
 				mtd.setMessageId(messageId);
 				mtd.setText(obj.toString());
+				mtd.setReplyMarkup(markup);
 				bot.sendMethodAsync(mtd, new SentCallback<Serializable>() {
 					@Override
 					public void onResult(BotApiMethod<Serializable> method, Serializable response) {

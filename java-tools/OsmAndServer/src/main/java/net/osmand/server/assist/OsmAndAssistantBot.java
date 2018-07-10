@@ -3,6 +3,7 @@ package net.osmand.server.assist;
 import java.io.Serializable;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Objects;
@@ -172,6 +173,11 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 		UserChatIdentifier ci = new UserChatIdentifier();
 		ci.setChatId(msg.getChatId());
 		ci.setUser(callbackQuery.getFrom());
+		if(data.equals("hide")) {
+			DeleteMessage delmsg = new DeleteMessage(msg.getChatId(), msg.getMessageId());
+			sendApiMethod(delmsg);
+			return true;
+		}
 		String[] sl = data.split("\\|");
 		if(data.startsWith("dv|")) {
 			long deviceId = Device.getDecodedId(sl[1]);
@@ -285,10 +291,6 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 			deviceRepo.delete(d);
 			sendApiMethod(editMsg);
 			return;
-		} else if(pm.equals("hide")) {
-			DeleteMessage delmsg = new DeleteMessage(replyMsg.getChatId(), replyMsg.getMessageId());
-			sendApiMethod(delmsg);
-			return;
 		} else if(pm.equals("mon")) {
 			deviceLocManager.startMonitoringLocation(d, replyMsg.getChatId());
 		} else if(pm.equals("stmon")) {
@@ -328,7 +330,7 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 				lt.add(del);
 			} else {
 				InlineKeyboardButton hide = new InlineKeyboardButton("Hide");
-				hide.setCallbackData("dv|" + d.getEncodedId() + "|hide");
+				hide.setCallbackData("hide");
 				lt.add(hide);
 				InlineKeyboardButton upd = new InlineKeyboardButton("Update");
 				upd.setCallbackData("dv|" + d.getEncodedId() + "|upd");
@@ -431,10 +433,10 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 				ArrayList<InlineKeyboardButton> lt = new ArrayList<InlineKeyboardButton>();
 				InlineKeyboardButton button = new InlineKeyboardButton(sb.toString());
 				button.setCallbackData("dv|" + c.getEncodedId());
-				lt.add(button);
-				markup.getKeyboard().add(lt);
+				markup.getKeyboard().add(Collections.singletonList(button));
 				i++;
 			}
+			markup.getKeyboard().add(Collections.singletonList(new InlineKeyboardButton("Hide").setCallbackData("hide")));
 		} else {
 			msg.setText("You don't have any added devices. Please use /add_device to register new devices.");
 		}
@@ -472,13 +474,12 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 			for (TrackerConfiguration c : cfgs) {
 				StringBuilder sb = new StringBuilder();
 				sb.append(i).append(". ").append(c.trackerName);
-				ArrayList<InlineKeyboardButton> lt = new ArrayList<InlineKeyboardButton>();
-				InlineKeyboardButton button = new InlineKeyboardButton(sb.toString());
-				button.setCallbackData("cfg|" + c.id);
-				lt.add(button);
-				markup.getKeyboard().add(lt);
+				InlineKeyboardButton button = new InlineKeyboardButton(sb.toString()).setCallbackData("cfg|" + c.id);
+				markup.getKeyboard().add(Collections.singletonList(button));
 				i++;
 			}
+			InlineKeyboardButton button = new InlineKeyboardButton("Hide").setCallbackData("hide");
+			markup.getKeyboard().add(Collections.singletonList(button));
 		} else {
 			msg.setText("You don't have any external configurations. Please use /add_ext_device to register 3rd party devices.");
 		}
