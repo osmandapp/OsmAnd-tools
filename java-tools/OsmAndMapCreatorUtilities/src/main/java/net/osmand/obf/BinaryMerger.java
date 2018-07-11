@@ -91,7 +91,7 @@ public class BinaryMerger {
 		BinaryMerger in = new BinaryMerger();
 		String pathWithGeneratedMapZips = args[0];
 		String pathToPutJointFiles = args[1];
-		boolean mapFiles = args.length > 3 && args[3].equals("--map");
+		boolean mapFiles = args.length > 2 && args[2].equals("--map");
 		CountryRegion world = new CountryOcbfGeneration().parseDefaultOsmAndRegionStructure();
 		Iterator<CountryRegion> it = world.iterator();
 		while(it.hasNext()) {
