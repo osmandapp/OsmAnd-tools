@@ -190,7 +190,7 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 				sendApiMethod(snd);
 			} else {
 				Device d = device.get();
-				if(callbackQuery.getFrom() == null && d.userId != callbackQuery.getFrom().getId()){
+				if(callbackQuery.getFrom() == null || d.userId != callbackQuery.getFrom().getId()){
 					SendMessage snd = new SendMessage(msg.getChatId(), "Only device owner can request information about device.");
 					sendApiMethod(snd);	
 				} else {
@@ -208,7 +208,7 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 				sendApiMethod(snd);
 			} else {
 				TrackerConfiguration d = cfg.get();
-				if(callbackQuery.getFrom() == null && d.userId != callbackQuery.getFrom().getId()){
+				if(callbackQuery.getFrom() == null || d.userId != callbackQuery.getFrom().getId()){
 					SendMessage snd = new SendMessage(msg.getChatId(), "Only device owner can request information about device.");
 					sendApiMethod(snd);	
 				} else {
