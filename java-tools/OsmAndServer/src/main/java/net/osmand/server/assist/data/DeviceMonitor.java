@@ -26,7 +26,9 @@ public class DeviceMonitor {
 	ConcurrentHashMap<Long, LocationChatMessage> chats = new ConcurrentHashMap<>();
 	final OsmAndAssistantBot bot;
 	final Device device;
+	// signal with last location 
 	LocationInfo lastSignal = null;
+	// signal with last location 
 	LocationInfo lastLocationSignal = null;
 
 	public DeviceMonitor(Device device, OsmAndAssistantBot bot) {
@@ -61,11 +63,12 @@ public class DeviceMonitor {
 		lm.sendMessage(bot, device, lastSignal, lastLocationSignal);
 	}
 	
-	public void stopMonitoring(Long chatId) {
+	public int stopMonitoring(Long chatId) {
 		LocationChatMessage lm = getLocationChat(chatId);
 		if (lm != null) {
-			lm.disable();
+			return lm.disable();
 		}
+		return 0;
 	}
 	
 	public LocationChatMessage getOrCreateLocationChat(Long chatId) {
@@ -142,9 +145,10 @@ public class DeviceMonitor {
 			return disabledTimestamp;
 		}
 
-		public void disable() {
+		public int disable() {
 			disabledTimestamp = System.currentTimeMillis();
 			enabled = false;
+			int oldMessageId = messageId;
 			if(messageId != 0) {
 				mon.bot.sendMethodAsync(new DeleteMessage(chatId, messageId), new SentCallback<Boolean>() {
 					@Override
@@ -164,6 +168,7 @@ public class DeviceMonitor {
 				});
 				messageId = 0;
 			}
+			return oldMessageId;
 		}
 
 		public String sendMessage(OsmAndAssistantBot bot, Device device, 
@@ -172,34 +177,42 @@ public class DeviceMonitor {
 			updateTime = System.currentTimeMillis();
 			obj.addProperty("name", device.deviceName);
 			obj.addProperty("id", device.getEncodedId());
-			if (lastSignal.isLocationPresent()) {
+			boolean locationCurrentlyPresent = lastSignal.isLocationPresent();
+			// display location from lastSignal anyway though it could be deprecated
+			if (locationCurrentlyPresent) {
 				obj.addProperty("lat", (float) lastSignal.lat);
 				obj.addProperty("lon", (float) lastSignal.lon);
 			} else if (lastLocationSignal != null && lastLocationSignal.isLocationPresent()) {
 				obj.addProperty("lat", (float) lastLocationSignal.lat);
 				obj.addProperty("lon", (float) lastLocationSignal.lon);
 			}
-			if (!Double.isNaN(lastSignal.altitude) && lastSignal.isLocationPresent()) {
+			if (!Double.isNaN(lastSignal.altitude) && locationCurrentlyPresent) {
 				obj.addProperty("alt", (float) lastSignal.altitude);
 			}
 			
-			if (!Double.isNaN(lastSignal.azi) && lastSignal.isLocationPresent()) {
+			if (!Double.isNaN(lastSignal.azi) && locationCurrentlyPresent) {
 				obj.addProperty("azi", (float) lastSignal.azi);
 			}
-			if (!Double.isNaN(lastSignal.speed) && lastSignal.isLocationPresent()) {
+			if (!Double.isNaN(lastSignal.speed) && locationCurrentlyPresent) {
 				obj.addProperty("spd", (float) lastSignal.speed);
 			}
-			if (!Double.isNaN(lastSignal.satellites) && lastSignal.isLocationPresent()) {
+			if (!Double.isNaN(lastSignal.satellites) && locationCurrentlyPresent) {
 				obj.addProperty("sat", (int) lastSignal.satellites);
 			}
-			if (!Double.isNaN(lastSignal.hdop) && lastSignal.isLocationPresent()) {
+			if (!Double.isNaN(lastSignal.hdop) && locationCurrentlyPresent) {
 				obj.addProperty("hdop", (int) lastSignal.hdop);
 			}
 			if (!Double.isNaN(lastSignal.temperature)) {
 				obj.addProperty("temp", (float) lastSignal.temperature);
 			}
-			if (!lastSignal.isLocationPresent() && lastLocationSignal != null) {
+			if (lastSignal.isLocationPresent()) {
+				obj.addProperty("locAgo", (Long) ((updateTime - lastSignal.timestamp)) / 1000);
+			} else if (lastLocationSignal != null) {
 				obj.addProperty("locAgo", (Long) ((updateTime - lastLocationSignal.timestamp)) / 1000);
+			}
+			long signalAgo = (Long) ((updateTime - lastSignal.timestamp)) / 1000;
+			if(signalAgo > 5) {
+				obj.addProperty("signalAgo", (Long) ((updateTime - lastSignal.timestamp)) / 1000);
 			}
 			// if(dd.timeLastValid != 0) {
 			// obj.addProperty("locAgo", (Long)(time/ 1000 - dd.timeLastValid));

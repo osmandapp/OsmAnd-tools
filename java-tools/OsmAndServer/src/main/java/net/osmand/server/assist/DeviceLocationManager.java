@@ -42,8 +42,8 @@ public class DeviceLocationManager {
 	ConcurrentHashMap<Long, DeviceMonitor> devices = new ConcurrentHashMap<>();
 
 	private ThreadPoolExecutor exe;
-	public static final long INTERVAL_TO_UPDATE_GROUPS = 10000;
-	public static final long INTERVAL_TO_RUN_UPDATES = 5000;
+	public static final long INTERVAL_TO_UPDATE_GROUPS = 20000;
+	public static final long INTERVAL_TO_RUN_UPDATES = 15000;
 	public static final long INITIAL_TIMESTAMP_TO_DISPLAY = 120000;
 	public static final Integer DEFAULT_LIVE_PERIOD = 24 * 60 * 60;
 	
@@ -59,7 +59,9 @@ public class DeviceLocationManager {
             throw new DeviceNotFoundException(); 
 		}
 		DeviceMonitor dm = devices.get(did);
-		dm.sendLocation(info);
+		if(dm != null) {
+			dm.sendLocation(info);
+		}
 		return "OK";
 	}
 	
@@ -89,11 +91,12 @@ public class DeviceLocationManager {
 		
 	}
 
-	public void stopMonitoringLocation(Device d, Long chatId) {
+	public int stopMonitoringLocation(Device d, Long chatId) {
 		DeviceMonitor dm = devices.get(d.id);
 		if(dm != null) {
-			dm.stopMonitoring(chatId);
+			return dm.stopMonitoring(chatId);
 		}		
+		return 0;
 	}
 	
 	

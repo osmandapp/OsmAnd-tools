@@ -294,7 +294,10 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 		} else if(pm.equals("mon")) {
 			deviceLocManager.startMonitoringLocation(d, replyMsg.getChatId());
 		} else if(pm.equals("stmon")) {
-			deviceLocManager.stopMonitoringLocation(d, replyMsg.getChatId());
+			int msgId = deviceLocManager.stopMonitoringLocation(d, replyMsg.getChatId());
+			if(msgId == replyMsg.getMessageId()) {
+				return;
+			}
 		}
 		String txt = String.format("Device: <b>%s</b>\nLocation: %s\n", d.deviceName, "n/a");
 		boolean locationMonitored = deviceLocManager.isLocationMonitored(d, replyMsg.getChatId());

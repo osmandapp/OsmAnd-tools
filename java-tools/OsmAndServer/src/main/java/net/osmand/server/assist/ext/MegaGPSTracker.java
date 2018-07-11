@@ -97,8 +97,11 @@ public class MegaGPSTracker implements ITrackerManager {
 				if (list != null) {
 					LocationInfo li = new LocationInfo(dd.timeLastReceived * 1000);
 					LocationInfo location = new LocationInfo(dd.timeLastValid * 1000);
-					// in case location is valid last 15 seconds use location
-					if(dd.timeLastValid < dd.timeLastReceived - 15) {
+					// Assume location is valid in case 
+					// 1. last location received no later than 15 seconds from signal 
+					// 2. less than an hour from now
+					if(dd.timeLastValid < dd.timeLastReceived - 15 && 
+							System.currentTimeMillis() / 1000 - dd.timeLastValid < 60 * 60) {
 						li = location;
 					}
 					location.setLatLon(dd.getLatitude(), dd.getLongitude());
@@ -116,17 +119,10 @@ public class MegaGPSTracker implements ITrackerManager {
 					// li.setIpSender(ipSender);
 					for (DeviceMonitor dm : list) {
 						LocationInfo lastSignal = dm.getLastSignal();
-						LocationInfo lastLocSignal = dm.getLastLocationSignal();
 						if (lastSignal != null && li.getTimestamp() == lastSignal.getTimestamp()) {
 							continue;
 						}
-						if(li == location) {
-							dm.sendLocation(li);
-						} else if(lastLocSignal != null && location.getTimestamp() == lastLocSignal.getTimestamp()){
-							dm.sendLocation(li);
-						} else {
-							dm.sendLocation(li, location);
-						}
+						dm.sendLocation(li, location);
 					}
 				}
 			}
