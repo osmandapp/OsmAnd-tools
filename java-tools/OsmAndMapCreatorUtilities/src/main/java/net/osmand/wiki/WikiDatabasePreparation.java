@@ -789,6 +789,7 @@ public class WikiDatabasePreparation {
 			log.info("Prepare wiki_content table");
 			conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wiki_content(id long, title text, lang text, zipContent blob)");
 			conn.createStatement().execute("CREATE INDEX IF NOT EXISTS id_wiki_content ON wiki_content(id)");
+			conn.createStatement().execute("CREATE INDEX IF NOT EXISTS lang_title_wiki_content ON wiki_content (lang, title)");
 			conn.createStatement().execute("DELETE FROM wiki_content WHERE lang = '" + lang + "'");
 			insertPrep = conn.prepareStatement("INSERT INTO wiki_content(id, title, lang, zipContent) VALUES (?, ?, ?, ?)");
 			selectPrep = conn.prepareStatement("SELECT id FROM wiki_mapping WHERE wiki_mapping.title = ? AND wiki_mapping.lang = ?");
