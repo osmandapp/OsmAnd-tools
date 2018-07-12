@@ -875,13 +875,12 @@ public class WikiDatabasePreparation {
 							selectPrep.setString(1, title.toString());
 							selectPrep.setString(2, lang);
 							ResultSet rs = selectPrep.executeQuery();
-							String id = null;
+							long wikiId = 0;
 							if (rs.next()) {
-								id = rs.getString(1);
+								wikiId = rs.getLong(1);
 							}
 							selectPrep.clearParameters();
-							if (id != null ) {
-								long wikiId = Long.parseLong(id.substring(1));
+							if (wikiId != 0 ) {
 								String text = removeMacroBlocks(ctext.toString(), new HashMap<>(),
 										lang, null);
 								final HTMLConverter converter = new HTMLConverter(false);
