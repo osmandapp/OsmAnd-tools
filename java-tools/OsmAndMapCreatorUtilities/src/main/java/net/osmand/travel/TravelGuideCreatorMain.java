@@ -105,7 +105,6 @@ public class TravelGuideCreatorMain {
             prep.setLong(column++, ++count);
             prep.setLong(column++, count);
             prep.setString(column++, "en");
-            prep.setString(column++, "");
             prep.setString(column, "");
             prep.addBatch();
             if(batch++ > BATCH_SIZE) {
