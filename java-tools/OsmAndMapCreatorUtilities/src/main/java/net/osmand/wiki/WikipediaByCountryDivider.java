@@ -166,6 +166,9 @@ public class WikipediaByCountryDivider {
 			contentStr = contentStr.replace((char) 0, ' ');
 			contentStr = contentStr.replace((char) 22, ' ');
 			contentStr = contentStr.replace((char) 27, ' ');
+			if(contentStr.trim().length() == 0) {
+				continue;
+			}
 			if (osmId != prevOsmId) {
 				if (prevOsmId != -1) {
 					closeOsmWikiNode(serializer, nameUnique, nameAdded);
