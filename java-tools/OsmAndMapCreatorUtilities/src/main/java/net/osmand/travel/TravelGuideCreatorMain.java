@@ -113,10 +113,11 @@ public class TravelGuideCreatorMain {
                 batch = 0;
             }
         }
-        prep.addBatch();
-        prep.executeBatch();
+        if (batch > 0) {
+            prep.addBatch();
+            prep.executeBatch();
+        }
         prep.close();
-		
         LOG.debug("Successfully created a travel book. Size: " + count);
     }
 
