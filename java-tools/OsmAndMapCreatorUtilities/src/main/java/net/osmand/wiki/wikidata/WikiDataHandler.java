@@ -168,8 +168,8 @@ public class WikiDataHandler extends DefaultHandler {
 						}
 						for (Map.Entry<String, JsonElement> entry : article.getLinks().entrySet()) {
 				            String lang = entry.getKey().replace("wiki", "");
-				            if (lang.equals("commons")) {
-				                continue;
+                            if (lang.equals("commons")) {
+                                continue;
                             }
 				            String articleV = entry.getValue().getAsJsonObject().getAsJsonPrimitive("title").getAsString();
 				            mappingPrep.setLong(1, id);
