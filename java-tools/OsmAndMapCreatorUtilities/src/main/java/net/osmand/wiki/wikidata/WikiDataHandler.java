@@ -166,13 +166,13 @@ public class WikiDataHandler extends DefaultHandler {
 							wikiRegionPrep.setString(2, reg);
 							addBatch(wikiRegionPrep, regionBatch);
 						}
-						for (Map.Entry<String, JsonElement> entry : article.getLinks().entrySet()) {
-				            String lang = entry.getKey().replace("wiki", "");
+                        for (Map.Entry<String, JsonElement> entry : article.getLinks().entrySet()) {
+                            String lang = entry.getKey().replace("wiki", "");
                             if (lang.equals("commons")) {
                                 continue;
                             }
-				            String articleV = entry.getValue().getAsJsonObject().getAsJsonPrimitive("title").getAsString();
-				            mappingPrep.setLong(1, id);
+                            String articleV = entry.getValue().getAsJsonObject().getAsJsonPrimitive("title").getAsString();
+                            mappingPrep.setLong(1, id);
 				            mappingPrep.setString(2, lang);
 				            mappingPrep.setString(3, articleV);
 				            addBatch(mappingPrep, mappingBatch);
