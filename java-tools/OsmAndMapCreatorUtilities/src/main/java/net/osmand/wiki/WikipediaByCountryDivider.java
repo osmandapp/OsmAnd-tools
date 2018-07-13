@@ -73,7 +73,7 @@ public class WikipediaByCountryDivider {
 			}
 		}
 		
-		ResultSet rs = conn.createStatement().executeQuery("SELECT DISTINCT regionName  FROM wiki_region");
+		ResultSet rs = conn.createStatement().executeQuery("SELECT DISTINCT regionName FROM wiki_region");
 		while (rs.next()) {
 			String lcRegionName = rs.getString(1);
 			if(lcRegionName == null) {
