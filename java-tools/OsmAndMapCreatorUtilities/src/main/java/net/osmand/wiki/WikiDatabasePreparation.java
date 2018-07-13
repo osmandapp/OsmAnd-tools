@@ -209,7 +209,7 @@ public class WikiDatabasePreparation {
 		}
 		String val = text.substring(i, closeTag);
 		bld.append(parseGalleryString(val));
-		return endInd;
+		return --endInd;
 	}
 
 	private static void parseAndAppendLangSpelling(String val, StringBuilder bld) {
