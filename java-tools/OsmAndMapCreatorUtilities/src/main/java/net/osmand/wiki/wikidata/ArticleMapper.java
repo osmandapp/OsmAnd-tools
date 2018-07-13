@@ -24,8 +24,8 @@ public class ArticleMapper implements JsonDeserializer<ArticleMapper.Article> {
 						.getAsJsonObject("datavalue").getAsJsonObject("value");
 				double lat = coordinates.getAsJsonPrimitive("latitude").getAsDouble();
 				double lon = coordinates.getAsJsonPrimitive("longitude").getAsDouble();
-				JsonObject labels = obj.getAsJsonObject("labels");
-				article.setLabels(labels);
+				JsonObject links = obj.getAsJsonObject("sitelinks");
+				article.setLinks(links);
 				article.setLat(lat);
 				article.setLon(lon);
 			}
@@ -42,12 +42,12 @@ public class ArticleMapper implements JsonDeserializer<ArticleMapper.Article> {
     }
 
     public class Article {
-        private JsonObject labels;
+        private JsonObject links;
         private double lat;
         private double lon;
 
-        public JsonObject getLabels() {
-            return labels;
+        public JsonObject getLinks() {
+            return links;
         }
 
         public double getLon() {
@@ -66,8 +66,8 @@ public class ArticleMapper implements JsonDeserializer<ArticleMapper.Article> {
             this.lat = lat;
         }
 
-        public void setLabels(JsonObject labels) {
-            this.labels = labels;
+        public void setLinks(JsonObject labels) {
+            this.links = labels;
         }
     }
 }
