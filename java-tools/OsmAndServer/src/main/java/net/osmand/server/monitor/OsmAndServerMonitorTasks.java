@@ -188,14 +188,14 @@ public class OsmAndServerMonitorTasks {
 					res.addSpeedMeasurement(downloadSpeedMBPerSec);
 					if(!res.lastSuccess) {
 						telegram.sendMonitoringAlertMessage(
-							"There are no problems any more with host " + host);
+								host + " OK. Maps download works fine");
 					}
 					res.lastSuccess = true;
 				}
 			} catch (IOException ex) {
 				if(res.lastSuccess ) {
 					telegram.sendMonitoringAlertMessage(
-							"There are problems with downloading maps from " + host);
+							host + " FAILURE: problems downloading maps " + ex.getMessage());
 					LOG.error(ex.getMessage(), ex);	
 				}
 				res.lastSuccess = false;
@@ -229,26 +229,27 @@ public class OsmAndServerMonitorTasks {
 		int mapsInMapIndex = 0;
 		try {
 			mapsInMapIndex = countMapsInMapIndex(is);
+			if (!mapIndexPrevValidation) {
+				telegram.sendMonitoringAlertMessage(
+						String.format("download.osmand.net: Map index is correct and serves %d maps.", mapsInMapIndex));
+			}
+			
+			if (mapsInMapIndex < MAPS_COUNT_THRESHOLD) {
+				mapIndexCurrValidation = false;
+				if (mapIndexPrevValidation) {
+					telegram.sendMonitoringAlertMessage(String.format(
+							"download.osmand.net: Maps index is not correct and serves only of %d maps.", mapsInMapIndex));
+				}
+			}
 		} catch (XmlPullParserException xmlex) {
 			mapIndexCurrValidation = false;
-			LOG.error(xmlex.getMessage(), xmlex);
+			if (mapIndexPrevValidation) {
+				telegram.sendMonitoringAlertMessage("download.osmand.net: problems with parsing map index.");
+				LOG.error(xmlex.getMessage(), xmlex);
+			}
+			
 		}
-
-		if (mapIndexPrevValidation && !mapIndexCurrValidation) {
-			telegram.sendMonitoringAlertMessage("Map index is not correctly generated on the website (check).");
-		}
-
-		if (!mapIndexPrevValidation && mapIndexCurrValidation) {
-			telegram.sendMonitoringAlertMessage(
-					String.format("Map index is correct and contains %5d maps.", mapsInMapIndex));
-		}
-
-		if (mapsInMapIndex < MAPS_COUNT_THRESHOLD) {
-			telegram.sendMonitoringAlertMessage(
-					String.format("Maps quantity (%5d) is less than required (%5d).",
-							mapsInMapIndex, MAPS_COUNT_THRESHOLD));
-		}
-		mapIndexPrevValidation = mapIndexCurrValidation;
+		this.mapIndexPrevValidation = mapIndexCurrValidation;
 	}
 
 	private void close(InputStream is) {
@@ -259,13 +260,7 @@ public class OsmAndServerMonitorTasks {
 		}
 	}
 
-	private String buildMessage(Set<DownloadTestResult> downloadTestResults) {
-		StringBuilder sb = new StringBuilder();
-		for (DownloadTestResult dtr : downloadTestResults) {
-			sb.append(dtr.toString());
-		}
-		return sb.toString();
-	}
+	
 
 	@Scheduled(fixedRate = DOWNLOAD_TILE_MINUTES * MINUTE)
 	public void tileDownloadTest() {
@@ -281,7 +276,7 @@ public class OsmAndServerMonitorTasks {
 					append(TILEY_NUMBER + yShift * NEXT_TILE).append(".png").toString();
 			double tileDownload = estimateResponse(tileUrl);
 			if(tileDownload < 0) {
-				telegram.sendMonitoringAlertMessage("There are problems with downloading tiles.");
+				telegram.sendMonitoringAlertMessage("tile.osmand.net: problems with downloading tiles.");
 				return;
 			}
 			LOG.info("Downloaded " + tileUrl + " " + tileDownload + " seconds.");
