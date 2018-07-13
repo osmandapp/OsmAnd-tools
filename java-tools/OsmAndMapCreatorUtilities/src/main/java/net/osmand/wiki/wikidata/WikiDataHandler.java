@@ -173,10 +173,10 @@ public class WikiDataHandler extends DefaultHandler {
 							}
 							String articleV = entry.getValue().getAsJsonObject().getAsJsonPrimitive("title").getAsString();
 							mappingPrep.setLong(1, id);
-				            mappingPrep.setString(2, lang);
-				            mappingPrep.setString(3, articleV);
-				            addBatch(mappingPrep, mappingBatch);
-				        }
+							mappingPrep.setString(2, lang);
+							mappingPrep.setString(3, articleV);
+							addBatch(mappingPrep, mappingBatch);
+						}
 					}
 				} catch (Exception e) {
 					// Generally means that the field is missing in the json or the incorrect data is supplied
