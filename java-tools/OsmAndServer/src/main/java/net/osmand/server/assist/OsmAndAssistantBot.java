@@ -344,7 +344,7 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 			lt.clear();
 		}
 		String locMsg = "n/a";
-		if(sig != null &&sig.isLocationPresent()){
+		if (sig != null && sig.isLocationPresent()) {
 			locMsg = String.format("%.3f, %.3f (%s)", sig.getLat(), sig.getLon(),
 					formatTime(sig.getTimestamp()));
 		}

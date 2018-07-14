@@ -6,6 +6,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Optional;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -64,10 +65,11 @@ public class DeviceLocationManager {
 	
 	public String sendLocation(String deviceId, LocationInfo info)  throws DeviceNotFoundException {
 		long did = Device.getDecodedId(deviceId);
-		Device d = deviceRepo.getOne(did);
-		if(d == null) {
+		Optional<Device> opt = deviceRepo.findById(did);
+		if(!opt.isPresent()) {
             throw new DeviceNotFoundException(); 
 		}
+		Device d = opt.get();
 		DeviceMonitor dm = getDeviceMonitor(d);
 		dm.sendLocation(info);
 		return "OK";
