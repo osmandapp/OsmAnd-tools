@@ -53,15 +53,23 @@ public class DeviceLocationManager {
                 new LinkedBlockingQueue<Runnable>());
 	}
 	
+	public DeviceMonitor getDeviceMonitor(Device d) {
+		DeviceMonitor dm = devices.get(d.id);
+		if(dm == null) {
+			dm = new DeviceMonitor(d, assistantBot);
+			devices.put(d.id, dm);
+		}
+		return dm;
+	}
+	
 	public String sendLocation(String deviceId, LocationInfo info)  throws DeviceNotFoundException {
 		long did = Device.getDecodedId(deviceId);
-		if(!deviceRepo.existsById(did)) {
+		Device d = deviceRepo.getOne(did);
+		if(d == null) {
             throw new DeviceNotFoundException(); 
 		}
-		DeviceMonitor dm = devices.get(did);
-		if(dm != null) {
-			dm.sendLocation(info);
-		}
+		DeviceMonitor dm = getDeviceMonitor(d);
+		dm.sendLocation(info);
 		return "OK";
 	}
 	
@@ -73,30 +81,20 @@ public class DeviceLocationManager {
 	}
 
 	public boolean isLocationMonitored(Device d, Long chatId) {
-		DeviceMonitor dm = devices.get(d.id);
-		if(dm != null) {
-			return dm.isLocationMonitored(chatId);
-		}
-		return false;
+		DeviceMonitor dm = getDeviceMonitor(d);
+		return dm.isLocationMonitored(chatId);
 	}
 	
 
 	public void startMonitoringLocation(Device d, Long chatId) throws TelegramApiException {
-		DeviceMonitor dm = devices.get(d.id);
-		if(dm == null) {
-			dm = new DeviceMonitor(d, assistantBot);
-			devices.put(d.id, dm);
-		}
+		DeviceMonitor dm = getDeviceMonitor(d);
 		dm.startMonitoring(chatId);
 		
 	}
 
 	public int stopMonitoringLocation(Device d, Long chatId) {
-		DeviceMonitor dm = devices.get(d.id);
-		if(dm != null) {
-			return dm.stopMonitoring(chatId);
-		}		
-		return 0;
+		DeviceMonitor dm = getDeviceMonitor(d);
+		return dm.stopMonitoring(chatId);
 	}
 	
 	
