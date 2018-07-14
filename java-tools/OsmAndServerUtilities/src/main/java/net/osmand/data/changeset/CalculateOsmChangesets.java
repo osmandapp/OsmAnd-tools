@@ -189,7 +189,8 @@ public class CalculateOsmChangesets {
 								}
 								
 								delPrepare.setString(1, p.id);
-								if(delPrepare.execute()) {
+								int upd = delPrepare.executeUpdate();
+								if(upd > 0) {
 									delPChangesets++;
 								}
 							} else {
