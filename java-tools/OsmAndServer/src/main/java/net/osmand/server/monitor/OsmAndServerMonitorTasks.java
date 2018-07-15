@@ -302,7 +302,7 @@ public class OsmAndServerMonitorTasks {
 	private void addStat(String key, double score) {
 		long now = System.currentTimeMillis();
 		redisTemplate.opsForZSet().add(key, score + ":" + now, now);
-		redisTemplate.opsForZSet().removeRangeByScore(key, 0, now - METRICS_EXPIRE);
+		//redisTemplate.opsForZSet().removeRangeByScore(key, 0, now - METRICS_EXPIRE);
 	}
 
 	private double estimateResponse(String tileUrl) {
