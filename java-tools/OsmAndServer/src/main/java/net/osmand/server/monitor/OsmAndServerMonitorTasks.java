@@ -27,6 +27,7 @@ import org.json.JSONTokener;
 import org.kxml2.io.KXmlParser;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ZSetOperations.TypedTuple;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.xmlpull.v1.XmlPullParser;
@@ -40,7 +41,7 @@ public class OsmAndServerMonitorTasks {
 	private static final int SECOND = 1000;
 	private static final int MINUTE = 60 * SECOND;
 	private static final int HOUR = 60 * MINUTE;
-	private static final int DAY = 24 * HOUR;
+	private static final long DAY = 24l * HOUR;
 	private static final int LIVE_STATUS_MINUTES = 2;
 	private static final int DOWNLOAD_MAPS_MINITES = 5;
 	private static final int DOWNLOAD_TILE_MINUTES = 10;
@@ -49,7 +50,7 @@ public class OsmAndServerMonitorTasks {
 	private static final int TILEX_NUMBER = 268660;
 	private static final int TILEY_NUMBER = 175100;
 	private static final long INITIAL_TIMESTAMP_S = 1530840000;
-	private static final long METRICS_EXPIRE = 30 * DAY;
+	private static final long METRICS_EXPIRE = 30l * DAY;
 
 	private static final int MAPS_COUNT_THRESHOLD = 700;
 
@@ -302,7 +303,8 @@ public class OsmAndServerMonitorTasks {
 	private void addStat(String key, double score) {
 		long now = System.currentTimeMillis();
 		redisTemplate.opsForZSet().add(key, score + ":" + now, now);
-		//redisTemplate.opsForZSet().removeRangeByScore(key, 0, now - METRICS_EXPIRE);
+		// Long removed = 
+		redisTemplate.opsForZSet().removeRangeByScore(key, 0, now - METRICS_EXPIRE);
 	}
 
 	private double estimateResponse(String tileUrl) {
