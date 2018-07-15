@@ -53,6 +53,8 @@ public class OsmAndServerMonitorTasks {
 	private static final String[] HOSTS_TO_TEST = new String[] { "download.osmand.net", "dl4.osmand.net",
 			"dl5.osmand.net", "dl6.osmand.net" };
 	private static final String TILE_SERVER = "http://tile.osmand.net/hd/";
+
+	private static final double PERCENTILE = 95;
 	
 	// OsmAnd Live validation
 	DescriptiveStatistics live3Hours = new DescriptiveStatistics(3 * 60 / LIVE_STATUS_MINUTES);
@@ -317,8 +319,8 @@ public class OsmAndServerMonitorTasks {
 	}
 
 	private String getTileServerMessage() {
-		return String.format("tile.osmand.net: <b>%s</b>. Response time: avg 24h - %.1f sec · max 24h - %.1f sec.",
-				lastResponseTime < 60 ? "OK" : "FAILED", tile24Hours.getMean(), tile24Hours.getMax());
+		return String.format("tile.osmand.net: <b>%s</b>. Response time: 24h - %.1f sec · max 24h - %.1f sec.",
+				lastResponseTime < 60 ? "OK" : "FAILED", tile24Hours.getMean(), tile24Hours.getPercentile(95));
 	}
 
 	public String refreshAll() {
@@ -345,9 +347,9 @@ public class OsmAndServerMonitorTasks {
 	}
 
 	private String getLiveDelayedMessage(long delay) {
-		return String.format("live.osmand.net: <b>%s</b>. Delayed by %s hours · avg 3h %s · avg 24h %s · max 24h %s",
-				delay < HOUR ? "OK" : "FAILED", formatTime(delay), formatTime(live3Hours.getMean()),
-				formatTime(live24Hours.getMean()), formatTime(live24Hours.getMax()));
+		return String.format("live.osmand.net: <b>%s</b>. Delayed by %s hours · 3h %s · 24h %s (%s)",
+				delay < HOUR ? "OK" : "FAILED", formatTime(delay), formatTime(live3Hours.getPercentile(PERCENTILE)),
+						formatTime(live24Hours.getPercentile(PERCENTILE)), formatTime(live24Hours.getMean()));
 	}
 
 	private String formatTime(double i) {
@@ -400,7 +402,8 @@ public class OsmAndServerMonitorTasks {
 		@Override
 		public String toString() {
 			return host + ": <b>" + (lastSuccess ? "OK" : "FAILED") + "</b>. "
-					+ String.format("3h - %5.2f MBs · 24h - %5.2f MBs", speed3Hours.getMean(), speed24Hours.getMean());
+					+ String.format("3h - %5.2f MBs · 24h - %5.2f MBs", 
+							speed3Hours.getPercentile(PERCENTILE), speed24Hours.getPercentile(PERCENTILE));
 		}
 
 		@Override

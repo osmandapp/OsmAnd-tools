@@ -90,7 +90,7 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 	@Override
 	public String getBotUsername() {
 		if(System.getenv("OSMAND_DEV_TEST_BOT_TOKEN") != null) {
-			return "osmand_dev_test_bot"; 
+			return System.getenv("OSMAND_DEV_TEST_BOT"); 
 		}
 		return "osmand_bot";
 	}
