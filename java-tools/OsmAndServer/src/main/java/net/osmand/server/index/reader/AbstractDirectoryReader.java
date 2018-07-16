@@ -3,7 +3,6 @@ package net.osmand.server.index.reader;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 
 public abstract class AbstractDirectoryReader implements DirectoryReader {
 
@@ -21,6 +20,4 @@ public abstract class AbstractDirectoryReader implements DirectoryReader {
         }
         throw new IOException("It's not a directory");
     }
-
-
 }

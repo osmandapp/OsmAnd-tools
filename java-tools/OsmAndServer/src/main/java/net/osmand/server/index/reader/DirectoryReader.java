@@ -6,5 +6,5 @@ import java.util.List;
 
 public interface DirectoryReader {
 
-    public List<Path> readFiles() throws IOException;
+    List<Path> readFiles() throws IOException;
 }
