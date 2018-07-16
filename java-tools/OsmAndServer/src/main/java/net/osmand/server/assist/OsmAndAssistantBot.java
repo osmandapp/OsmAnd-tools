@@ -343,11 +343,7 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 			}
 			lt.clear();
 		}
-		String locMsg = "n/a";
-		if (sig != null && sig.isLocationPresent()) {
-			locMsg = String.format("%.3f, %.3f (%s)", sig.getLat(), sig.getLon(),
-					formatTime(sig.getTimestamp()));
-		}
+		String locMsg = formatLocation(sig);
 		String txt = String.format("<b>Device</b>: %s\n<b>Location</b>: %s\n", d.deviceName, locMsg);
 		boolean locationMonitored = mon.isLocationMonitored(replyMsg.getChatId());
 		if(d.externalConfiguration != null) {
@@ -419,6 +415,15 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 			editMsg.enableHtml(true).setText(txt);
 			sendApiMethod(editMsg);
 		}
+	}
+
+	public String formatLocation(LocationInfo sig) {
+		String locMsg = "n/a";
+		if (sig != null && sig.isLocationPresent()) {
+			locMsg = String.format("%.3f, %.3f (%s)", sig.getLat(), sig.getLon(),
+					formatTime(sig.getTimestamp()));
+		}
+		return locMsg;
 	}
 
 	private ReplyKeyboard getKeyboardWithHide() {
@@ -677,6 +682,11 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 		} else if (current - tm < 60 * 60 * 24) {
 			return (current - tm) / (60 * 60) + " hours ago";
 		}
+		return UTC_DATE_FORMAT.format(dt) + " " + UTC_TIME_FORMAT.format(dt) + " UTC";
+	}
+	
+	public String formatFullTime(long ti) {
+		Date dt = new Date(ti);
 		return UTC_DATE_FORMAT.format(dt) + " " + UTC_TIME_FORMAT.format(dt) + " UTC";
 	}
 

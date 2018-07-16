@@ -115,9 +115,11 @@ public class DeviceMonitor {
 	
 
 	public static class LocationChatMessage {
-
+		private boolean JSON_MESSAGE = false;
+		
 		final long chatId;
 		final DeviceMonitor mon;
+		
 
 		int messageId;
 		long initialTimestamp = System.currentTimeMillis();
@@ -170,8 +172,49 @@ public class DeviceMonitor {
 			}
 			return oldMessageId;
 		}
-
+		
+		public String getMessageTxt(OsmAndAssistantBot bot, Device device, 
+				LocationInfo lastSignal, LocationInfo lastSig) {
+			
+			StringBuilder bld = new StringBuilder();
+			String locMsg = bot.formatLocation(lastSignal);
+			bld.append(String.format("<b>Device</b>: %s\n<b>Location</b>: %s\n", device.deviceName, locMsg));
+			if(!lastSignal.isLocationPresent() && lastSig != null && lastSig.isLocationPresent()) {
+				bld.append(String.format("<b>Last location</b>: %s\n", bot.formatLocation(lastSig)));
+			}
+			boolean locationCurrentlyPresent = lastSignal.isLocationPresent();
+			if (!Double.isNaN(lastSignal.altitude) && lastSignal.isLocationPresent()) {
+				bld.append(String.format("<b>Altitude</b>: %.1f\n", (float) lastSignal.altitude));
+			}
+			if (!Double.isNaN(lastSignal.azi) && locationCurrentlyPresent) {
+				bld.append(String.format("<b>Altitude</b>: %.1f\n", (float) lastSignal.altitude));
+			}
+			if (!Double.isNaN(lastSignal.speed) && locationCurrentlyPresent) {
+				bld.append(String.format("<b>Speed</b>: %.1f\n", lastSignal.speed));
+			}
+			if (!Double.isNaN(lastSignal.satellites) && locationCurrentlyPresent) {
+				bld.append(String.format("<b>Sattelites</b>: %d\n", (int) (int) lastSignal.satellites));
+			}
+			if (!Double.isNaN(lastSignal.hdop) && locationCurrentlyPresent) {
+				bld.append(String.format("<b>Horizontal precision</b>: %d\n", (int) lastSignal.hdop));
+			}
+			if (!Double.isNaN(lastSignal.temperature)) {
+				bld.append(String.format("<b>Temperature</b>: %.1f\n", lastSignal.temperature));
+			}
+			bld.append(String.format("Updated: %s (%d)\n", bot.formatFullTime(lastSignal.getTimestamp()) ,updateId++));
+			return bld.toString().trim();
+		
+		}
 		public String sendMessage(OsmAndAssistantBot bot, Device device, 
+				LocationInfo lastSignal, LocationInfo lastLocationSignal) {
+			updateTime = System.currentTimeMillis();
+			String txt = JSON_MESSAGE ? getMessageJson(bot, device, lastSignal, lastLocationSignal).toString() : 
+				getMessageTxt(bot, device, lastSignal, lastLocationSignal);
+			sendMsg(bot, device, txt);
+			return txt;
+		}
+		
+		public JsonObject getMessageJson(OsmAndAssistantBot bot, Device device, 
 				LocationInfo lastSignal, LocationInfo lastLocationSignal) {
 			JsonObject obj = new JsonObject();
 			updateTime = System.currentTimeMillis();
@@ -219,11 +262,15 @@ public class DeviceMonitor {
 			// }
 			obj.addProperty("updId", updateId++);
 			obj.addProperty("updTime", (Long) ((updateTime - initialTimestamp) / 1000));
+			return obj;
+		}
+
+		private void sendMsg(OsmAndAssistantBot bot, Device device, String txt) {
 			InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
 			markup.getKeyboard().add(Collections.singletonList(new InlineKeyboardButton("Hide").setCallbackData("dv|"+
 					device.getEncodedId() + "|stmon")));
 			if (messageId == 0) {
-				bot.sendMethodAsync(new SendMessage(chatId, obj.toString()).setReplyMarkup(markup), new SentCallback<Message>() {
+				bot.sendMethodAsync(new SendMessage(chatId, txt).setReplyMarkup(markup).enableHtml(true), new SentCallback<Message>() {
 
 					@Override
 					public void onResult(BotApiMethod<Message> method, Message response) {
@@ -244,7 +291,8 @@ public class DeviceMonitor {
 				EditMessageText mtd = new EditMessageText();
 				mtd.setChatId(chatId);
 				mtd.setMessageId(messageId);
-				mtd.setText(obj.toString());
+				mtd.setText(txt);
+				mtd.enableHtml(true);
 				mtd.setReplyMarkup(markup);
 				bot.sendMethodAsync(mtd, new SentCallback<Serializable>() {
 					@Override
@@ -262,7 +310,6 @@ public class DeviceMonitor {
 					}
 				});
 			}
-			return obj.toString();
 		}
 	}
 
