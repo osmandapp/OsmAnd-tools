@@ -1,12 +1,11 @@
 package net.osmand.server.service;
 
-import net.osmand.server.index.IndexAttributes;
-import net.osmand.server.index.dao.AbstractDAO;
+import net.osmand.server.index.MapIndexGenerator;
 import net.osmand.server.index.type.Type;
+import net.osmand.server.index.type.TypeFactory;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
 import javax.xml.stream.XMLOutputFactory;
@@ -14,110 +13,66 @@ import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamWriter;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.util.List;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
 @Service
 public class UpdateIndexesService implements UpdateIndexes {
-    private static final Log LOGGER = LogFactory.getLog(UpdateIndexesService.class);
+	private static final Log LOGGER = LogFactory.getLog(UpdateIndexesService.class);
 
-    private static final String MAP_INDEX_FILE = "/var/www-download/my_indexes.xml";
+	private static final String MAP_INDEX_FILE = "/var/www-download/my_indexes.xml";
 
-    @Autowired
-    @Qualifier("Maps")
-    private AbstractDAO mapsDAO;
+	private static final Path BASE_PATH = Paths.get("/var/www-download/");
 
-    @Autowired
-    @Qualifier("Voices")
-    private AbstractDAO voicesDAO;
+	private final MapIndexGenerator generator;
+	private final TypeFactory typeFactory;
 
-    @Autowired
-    @Qualifier("Fonts")
-    private AbstractDAO fontsDAO;
+	@Autowired
+	public UpdateIndexesService(MapIndexGenerator generator, TypeFactory typeFactory) {
+		this.generator = generator;
+		this.typeFactory = typeFactory;
+	}
 
-    @Autowired
-    @Qualifier("Depths")
-    private AbstractDAO depthsDAO;
+	private void close(XMLStreamWriter writer) {
+		try {
+			writer.close();
+		} catch (XMLStreamException ex) {
+			LOGGER.error(ex.getMessage(), ex);
+		}
+	}
 
-    @Autowired
-    @Qualifier("Wikimaps")
-    private AbstractDAO wikimapsDAO;
+	@Override
+	public void update() {
+		try (FileOutputStream fos = new FileOutputStream(MAP_INDEX_FILE)) {
+			XMLOutputFactory factory = XMLOutputFactory.newInstance();
+			XMLStreamWriter writer = null;
+			try {
+				writer = factory.createXMLStreamWriter(fos);
+				writer.writeStartDocument();
+				writer.writeCharacters("\n");
+				writer.writeStartElement("osmadn_regions");
+				writer.writeAttribute("mapversion", "1");
 
-    @Autowired
-    @Qualifier("Wikivoyage")
-    private AbstractDAO wikivoyageDAO;
+				generator.generate(BASE_PATH.resolve("indexes/"), ".obf.zip", typeFactory.newMapType(), writer);
+				generator.generate(BASE_PATH.resolve("indexes/"), ".voice.zip", typeFactory.newVoiceType(), writer);
+				generator.generate(BASE_PATH.resolve("indexes/fonts/"), ".otf.zip", typeFactory.newFontsType(), writer);
+				generator.generate(BASE_PATH.resolve("indexes/inapp/depth/"), ".obf.zip", typeFactory.newDepthType(), writer);
+				generator.generate(BASE_PATH.resolve("road-indexes/"), ".road.obf.zip", typeFactory.newRoadmapType(), writer);
+				generator.generate(BASE_PATH.resolve("srtm-countries/"), ".srtm.obf.zip", typeFactory.newSrtmMapType(), writer);
+				generator.generate(BASE_PATH.resolve("wikivoyage/"), ".sqlite", typeFactory.newWikivoyageType(), writer);
+				generator.generate(BASE_PATH.resolve("hillshade/"), ".sqlitedb", typeFactory.newHillshadeType(), writer);
+				writer.writeEndElement();
+				writer.writeEndDocument();
 
-    @Autowired
-    @Qualifier("RoadMaps")
-    private AbstractDAO roadMapsDAO;
-
-    @Autowired
-    @Qualifier("SrtmMaps")
-    private AbstractDAO srtmMapsDAO;
-
-    @Autowired
-    @Qualifier("Hillshades")
-    private AbstractDAO hillshadesDAO;
-
-    private void close(XMLStreamWriter writer) {
-        try {
-            writer.close();
-        } catch (XMLStreamException ex) {
-            LOGGER.error(ex.getMessage(), ex);
-        }
-    }
-
-    private void writeElement(XMLStreamWriter writer, Type type) throws XMLStreamException {
-        writer.writeEmptyElement(type.getElementName());
-        writer.writeAttribute(IndexAttributes.TYPE, type.getType());
-        writer.writeAttribute(IndexAttributes.CONTAINER_SIZE, type.getContainerSize());
-        writer.writeAttribute(IndexAttributes.CONTENT_SIZE, type.getContentSize());
-        writer.writeAttribute(IndexAttributes.TIMESTAMP, type.getTimestamp());
-        writer.writeAttribute(IndexAttributes.DATE, type.getDate());
-        writer.writeAttribute(IndexAttributes.SIZE, type.getSize());
-        writer.writeAttribute(IndexAttributes.TARGET_SIZE, type.getTargetSize());
-        writer.writeAttribute(IndexAttributes.NAME, type.getName());
-        writer.writeAttribute(IndexAttributes.DESCRIPTION, type.getDescription());
-    }
-
-    private void writeType(XMLStreamWriter writer, List<Type> types) throws XMLStreamException {
-        for (Type type : types) {
-            writer.writeCharacters("\n\t");
-            writeElement(writer, type);
-        }
-    }
-
-    @Override
-    public void update() {
-        try (FileOutputStream fos = new FileOutputStream(MAP_INDEX_FILE)) {
-            XMLOutputFactory factory = XMLOutputFactory.newInstance();
-            XMLStreamWriter writer = null;
-            try {
-                writer = factory.createXMLStreamWriter(fos);
-                writer.writeStartDocument();
-                writer.writeCharacters("\n");
-                writer.writeStartElement("osmand_regions");
-                writer.writeAttribute("mapversion", "1");
-                writeType(writer, mapsDAO.getAll());
-                writeType(writer, voicesDAO.getAll());
-                writeType(writer, fontsDAO.getAll());
-                writeType(writer, depthsDAO.getAll());
-                writeType(writer, wikimapsDAO.getAll());
-                writeType(writer, wikivoyageDAO.getAll());
-                writeType(writer, roadMapsDAO.getAll());
-                writeType(writer, srtmMapsDAO.getAll());
-                writeType(writer, hillshadesDAO.getAll());
-                writer.writeCharacters("\n");
-                writer.writeEndElement();
-                writer.writeEndDocument();
-            } catch (XMLStreamException ex) {
-                LOGGER.error(ex.getMessage(), ex);
-            } finally {
-                if (writer != null) {
-                    close(writer);
-                }
-            }
-        } catch (IOException ex) {
-            LOGGER.error(ex.getMessage(), ex);
-        }
-    }
+			} catch (XMLStreamException ex) {
+				LOGGER.error(ex.getMessage(), ex);
+			} finally {
+				if (writer != null) {
+					close(writer);
+				}
+			}
+		} catch (IOException ex) {
+			LOGGER.error(ex.getMessage(), ex);
+		}
+	}
 }
