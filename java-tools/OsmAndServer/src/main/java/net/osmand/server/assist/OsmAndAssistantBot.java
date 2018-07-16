@@ -294,8 +294,10 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 		InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
 		ArrayList<InlineKeyboardButton> lt = new ArrayList<InlineKeyboardButton>();
 		ArrayList<InlineKeyboardButton> lt2 = new ArrayList<InlineKeyboardButton>();
+		ArrayList<InlineKeyboardButton> lt3 = new ArrayList<InlineKeyboardButton>();
 		markup.getKeyboard().add(lt);
 		markup.getKeyboard().add(lt2);
+		markup.getKeyboard().add(lt3);
 		DeviceMonitor mon = deviceLocManager.getDeviceMonitor(d);
 		LocationInfo sig = mon.getLastLocationSignal();
 		if(pm.equals("more") && !replyMsg.getChat().isUserChat()) {
@@ -312,13 +314,12 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 		} else if(pm.equals("mon")) {
 			deviceLocManager.startMonitoringLocation(d, replyMsg.getChatId());
 		} else if(pm.equals("stmon")) {
-			int msgId = deviceLocManager.stopMonitoringLocation(d, replyMsg.getChatId());
-			if(msgId == replyMsg.getMessageId()) {
-				return;
-			}
+			deviceLocManager.stopMonitoringLocation(d, replyMsg.getChatId());
+		} else if (pm.equals("loctext")) {
+			deviceLocManager.sendLiveLocationMessage(d, replyMsg.getChatId());
 		} else if (pm.equals("loc")) {
 			lt.add(new InlineKeyboardButton("Hide").setCallbackData("hide"));
-			lt.add(new InlineKeyboardButton("Update").setCallbackData("dv|" + d.getEncodedId() + "|loc"));
+			lt.add(new InlineKeyboardButton("Update " + d.deviceName).setCallbackData("dv|" + d.getEncodedId() + "|loc"));
 			if(replyMsg.hasLocation()) {
 				Location loc = replyMsg.getLocation();
 				if (sig != null && sig.isLocationPresent() && 
@@ -348,9 +349,9 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 		boolean locationMonitored = mon.isLocationMonitored(replyMsg.getChatId());
 		if(d.externalConfiguration != null) {
 			txt += String.format("<b>External cfg</b>: %s\n", d.externalConfiguration.trackerName);
-		}
-		if(locationMonitored) {
-			txt += String.format("Location is continuously updated");
+			if(locationMonitored) {
+				txt += String.format("Location is continuously updated");
+			}
 		}
 		if(pm.equals("del")) {
 			txt += "<b>Are you sure, you want to delete it? </b>";
@@ -391,14 +392,20 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 				more.setCallbackData("dv|" + d.getEncodedId() + "|more");
 				lt.add(more);
 				if (sig != null && sig.isLocationPresent()) {
-					InlineKeyboardButton locK = new InlineKeyboardButton("Show location");
+					InlineKeyboardButton locK = new InlineKeyboardButton("Live map");
 					locK.setCallbackData("dv|" + d.getEncodedId() + "|loc");
 					lt2.add(locK);
+					
+					InlineKeyboardButton locT = new InlineKeyboardButton("Live location as text");
+					locT.setCallbackData("dv|" + d.getEncodedId() + "|loctext");
+					lt2.add(locK);
 				}
-				InlineKeyboardButton monL = new InlineKeyboardButton(locationMonitored ? "Stop monitoring"
-						: "Start monitoring");
-				monL.setCallbackData("dv|" + d.getEncodedId() + (locationMonitored ? "|stmon" : "|mon"));
-				lt2.add(monL);
+				if (d.externalConfiguration != null) {
+					InlineKeyboardButton monL = new InlineKeyboardButton(locationMonitored ? "Stop monitoring"
+							: "Start monitoring");
+					monL.setCallbackData("dv|" + d.getEncodedId() + (locationMonitored ? "|stmon" : "|mon"));
+					lt3.add(monL);
+				}
 			}
 		}
 		

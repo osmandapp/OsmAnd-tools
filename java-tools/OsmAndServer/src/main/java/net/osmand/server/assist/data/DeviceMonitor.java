@@ -27,7 +27,7 @@ public class DeviceMonitor {
 	final OsmAndAssistantBot bot;
 	final Device device;
 	// signal with last location 
-	LocationInfo lastSignal = null;
+	LocationInfo lastSignal = new LocationInfo();
 	// signal with last location 
 	LocationInfo lastLocationSignal = null;
 
@@ -56,19 +56,20 @@ public class DeviceMonitor {
 	
 	public void startMonitoring(Long chatId) {
 		LocationChatMessage lm = getOrCreateLocationChat(chatId);
-		if(lastSignal == null) {
-			lastSignal = new LocationInfo();
-		}
 		lm.enable();
+		
+	}
+	
+	public void showLiveMessage(Long chatId) {
+		LocationChatMessage lm = getOrCreateLocationChat(chatId);
 		lm.sendMessage(bot, device, lastSignal, lastLocationSignal);
 	}
 	
-	public int stopMonitoring(Long chatId) {
+	public void stopMonitoring(Long chatId) {
 		LocationChatMessage lm = getLocationChat(chatId);
 		if (lm != null) {
-			return lm.disable();
+			lm.disable();
 		}
-		return 0;
 	}
 	
 	public LocationChatMessage getOrCreateLocationChat(Long chatId) {
@@ -147,9 +148,12 @@ public class DeviceMonitor {
 			return disabledTimestamp;
 		}
 
-		public int disable() {
+		public void disable() {
 			disabledTimestamp = System.currentTimeMillis();
 			enabled = false;
+		}
+
+		public int deleteOldMessage() {
 			int oldMessageId = messageId;
 			if(messageId != 0) {
 				mon.bot.sendMethodAsync(new DeleteMessage(chatId, messageId), new SentCallback<Boolean>() {
@@ -268,7 +272,7 @@ public class DeviceMonitor {
 		private void sendMsg(OsmAndAssistantBot bot, Device device, String txt) {
 			InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
 			markup.getKeyboard().add(Collections.singletonList(new InlineKeyboardButton("Hide").setCallbackData("dv|"+
-					device.getEncodedId() + "|stmon")));
+					device.getEncodedId() + "|hide")));
 			if (messageId == 0) {
 				bot.sendMethodAsync(new SendMessage(chatId, txt).setReplyMarkup(markup).enableHtml(true), new SentCallback<Message>() {
 

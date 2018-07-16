@@ -94,12 +94,15 @@ public class DeviceLocationManager {
 		
 	}
 
-	public int stopMonitoringLocation(Device d, Long chatId) {
+	public void stopMonitoringLocation(Device d, Long chatId) {
 		DeviceMonitor dm = getDeviceMonitor(d);
-		return dm.stopMonitoring(chatId);
+		dm.stopMonitoring(chatId);
 	}
 	
-	
+	public void sendLiveLocationMessage(Device d, Long chatId) {
+		DeviceMonitor dm = getDeviceMonitor(d);
+		dm.showLiveMessage(chatId);
+	}
 
 	@Scheduled(fixedRate = INTERVAL_TO_RUN_UPDATES)
 	public void updateExternalMonitoring() {
