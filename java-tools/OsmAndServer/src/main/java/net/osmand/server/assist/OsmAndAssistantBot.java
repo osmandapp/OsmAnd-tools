@@ -57,7 +57,7 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 	private static final int USER_UNIQUENESS = 1 << 20;
 	private static final int LIMIT_DEVICES_PER_USER = 200;
 	private static final Log LOG = LogFactory.getLog(OsmAndAssistantBot.class);
-	private static final Integer DEFAULT_UPD_PERIOD = 86400;
+	
 	
 	SimpleDateFormat UTC_DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd");
 	{
@@ -318,36 +318,12 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 		} else if (pm.equals("loctext")) {
 			deviceLocManager.sendLiveLocationMessage(d, replyMsg.getChatId());
 		} else if (pm.equals("loc")) {
-			lt.add(new InlineKeyboardButton("Hide").setCallbackData("hide"));
-			lt.add(new InlineKeyboardButton("Update " + d.deviceName).setCallbackData("dv|" + d.getEncodedId() + "|loc"));
-			if(replyMsg.hasLocation()) {
-				Location loc = replyMsg.getLocation();
-				if (sig != null && sig.isLocationPresent() && 
-						MapUtils.getDistance(loc.getLatitude(), loc.getLongitude(), sig.getLat(), sig.getLon()) > 5) {
-					EditMessageLiveLocation sl = new EditMessageLiveLocation();
-					sl.setMessageId(replyMsg.getMessageId());
-					sl.setChatId(replyMsg.getChatId());
-					sl.setLatitude((float) sig.getLat());
-					sl.setLongitud((float) sig.getLon());
-					sl.setReplyMarkup(markup);
-					sendApiMethod(sl);
-				}
-				return;
-			}
-			if (sig != null && sig.isLocationPresent()) {
-				SendLocation sl = new SendLocation((float) sig.getLat(), (float) sig.getLon());
-				sl.setChatId(replyMsg.getChatId());
-				sl.setLivePeriod(DEFAULT_UPD_PERIOD);
-				sl.setReplyMarkup(markup);
-				sendApiMethod(sl);
-				return;
-			}
-			lt.clear();
+			deviceLocManager.sendLiveMapMessage(d, replyMsg.getChatId());
 		}
 		String locMsg = formatLocation(sig);
 		String txt = String.format("<b>Device</b>: %s\n<b>Location</b>: %s\n", d.deviceName, locMsg);
-		boolean locationMonitored = mon.isLocationMonitored(replyMsg.getChatId());
 		if(d.externalConfiguration != null) {
+			boolean locationMonitored = mon.isLocationMonitored();
 			txt += String.format("<b>External cfg</b>: %s\n", d.externalConfiguration.trackerName);
 			if(locationMonitored) {
 				txt += String.format("Location is continuously updated");
@@ -398,9 +374,10 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 					
 					InlineKeyboardButton locT = new InlineKeyboardButton("Live location as text");
 					locT.setCallbackData("dv|" + d.getEncodedId() + "|loctext");
-					lt2.add(locK);
+					lt2.add(locT);
 				}
 				if (d.externalConfiguration != null) {
+					boolean locationMonitored = mon.isLocationMonitored();
 					InlineKeyboardButton monL = new InlineKeyboardButton(locationMonitored ? "Stop monitoring"
 							: "Start monitoring");
 					monL.setCallbackData("dv|" + d.getEncodedId() + (locationMonitored ? "|stmon" : "|mon"));

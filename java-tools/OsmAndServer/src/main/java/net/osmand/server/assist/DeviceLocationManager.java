@@ -82,26 +82,28 @@ public class DeviceLocationManager {
 		
 	}
 
-	public boolean isLocationMonitored(Device d, Long chatId) {
-		DeviceMonitor dm = getDeviceMonitor(d);
-		return dm.isLocationMonitored(chatId);
-	}
+	
 	
 
 	public void startMonitoringLocation(Device d, Long chatId) throws TelegramApiException {
 		DeviceMonitor dm = getDeviceMonitor(d);
-		dm.startMonitoring(chatId);
+		dm.startMonitoring();
 		
 	}
 
 	public void stopMonitoringLocation(Device d, Long chatId) {
 		DeviceMonitor dm = getDeviceMonitor(d);
-		dm.stopMonitoring(chatId);
+		dm.stopMonitoring();
 	}
 	
 	public void sendLiveLocationMessage(Device d, Long chatId) {
 		DeviceMonitor dm = getDeviceMonitor(d);
 		dm.showLiveMessage(chatId);
+	}
+	
+	public void sendLiveMapMessage(Device d, Long chatId) {
+		DeviceMonitor dm = getDeviceMonitor(d);
+		dm.showLiveMap(chatId);
 	}
 
 	@Scheduled(fixedRate = INTERVAL_TO_RUN_UPDATES)
@@ -116,7 +118,7 @@ public class DeviceLocationManager {
 				continue;
 			}
 			TrackerConfiguration ext = dm.getDevice().externalConfiguration;
-			if (ext != null && dm.isOneChatMonitored()) {
+			if (ext != null && dm.isLocationMonitored()) {
 				Map<String, List<DeviceMonitor>> mp = dms.get(ext);
 				if (mp == null) {
 					mp = new HashMap<>();
@@ -184,6 +186,8 @@ public class DeviceLocationManager {
 		}
 
 	}
+
+	
 	
 	
 	
