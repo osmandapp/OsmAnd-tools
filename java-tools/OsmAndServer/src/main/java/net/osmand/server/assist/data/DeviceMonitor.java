@@ -87,6 +87,17 @@ public class DeviceMonitor {
 		lm.sendMessage(bot, device, lastSignal, lastLocationSignal);
 	}
 	
+	
+	public void hideMessage(Long chatId, int messageId) {
+		LocationChatMessage lm = chats.get(chatId);
+		if(lm != null) {
+			lm.deleteMessage(messageId);
+		}
+		lm = mapChats.get(chatId);
+		if(lm != null) {
+			lm.deleteMessage(messageId);
+		}
+	}
 	public void stopMonitoring() {
 		disable();
 	}
@@ -96,7 +107,7 @@ public class DeviceMonitor {
 		if(lm == null) {
 			lm = new LocationChatMessage(this, chatId);
 			lm.isLiveLocation = true;
-			chats.put(chatId, lm);
+			mapChats.put(chatId, lm);
 		}
 		return lm;
 	}
@@ -164,9 +175,16 @@ public class DeviceMonitor {
 
 
 		public boolean isEnabled(long now) {
-			return messageId == 0 && (now - initialTimestamp) < DEFAULT_UPD_PERIOD * 1000 ;
+			return messageId != 0 && (now - initialTimestamp) < DEFAULT_UPD_PERIOD * 1000 ;
 		}
 
+		public boolean deleteMessage(int msgId) {
+			if(this.messageId == msgId) {
+				messageId = 0;
+				return true;
+			}
+			return false;
+		}
 
 		public int deleteOldMessage() {
 			int oldMessageId = messageId;
@@ -248,6 +266,7 @@ public class DeviceMonitor {
 			lt.add(new InlineKeyboardButton("Update " + d.deviceName).setCallbackData("dv|" + d.getEncodedId() + "|loc"));
 			if (locSig != null && locSig.isLocationPresent()) {
 				if (messageId == 0) {
+					initialTimestamp = System.currentTimeMillis();
 					SendLocation sl = new SendLocation((float) locSig.getLat(), (float) locSig.getLon());
 					sl.setChatId(chatId);
 					sl.setLivePeriod(DEFAULT_UPD_PERIOD);
@@ -349,7 +368,7 @@ public class DeviceMonitor {
 			markup.getKeyboard().add(Collections.singletonList(new InlineKeyboardButton("Hide").setCallbackData("dv|"+
 					device.getEncodedId() + "|hide")));
 			if (messageId == 0) {
-				initialTimestamp = messageId;
+				initialTimestamp = System.currentTimeMillis();
 				bot.sendMethodAsync(new SendMessage(chatId, txt).setReplyMarkup(markup).enableHtml(true), new SentCallback<Message>() {
 
 					@Override

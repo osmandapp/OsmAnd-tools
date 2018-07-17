@@ -187,8 +187,7 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 		ci.setChatId(msg.getChatId());
 		ci.setUser(callbackQuery.getFrom());
 		if(data.equals("hide")) {
-			DeleteMessage delmsg = new DeleteMessage(msg.getChatId(), msg.getMessageId());
-			sendApiMethod(delmsg);
+			sendApiMethod(new DeleteMessage(msg.getChatId(), msg.getMessageId()));
 			return true;
 		}
 		String[] sl = data.split("\\|");
@@ -289,7 +288,7 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 	}
 
 	public void retrieveDeviceInformation(Device d, 
-			Message replyMsg, String pm) throws TelegramApiException {
+			Message msg, String pm) throws TelegramApiException {
 
 		InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
 		ArrayList<InlineKeyboardButton> lt = new ArrayList<InlineKeyboardButton>();
@@ -300,25 +299,28 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 		markup.getKeyboard().add(lt3);
 		DeviceMonitor mon = deviceLocManager.getDeviceMonitor(d);
 		LocationInfo sig = mon.getLastLocationSignal();
-		if(pm.equals("more") && !replyMsg.getChat().isUserChat()) {
-			sendApiMethod(new SendMessage(replyMsg.getChatId(), "Detailed information could not be displayed in a non-private chat."));
+		if(pm.equals("hide")) {
+			mon.hideMessage(msg.getChatId(), msg.getMessageId());
+			sendApiMethod(new DeleteMessage(msg.getChatId(), msg.getMessageId()));
+		} else if(pm.equals("more") && !msg.getChat().isUserChat()) {
+			sendApiMethod(new SendMessage(msg.getChatId(), "Detailed information could not be displayed in a non-private chat."));
 			return;
 		} else if(pm.equals("delconfirm")) {
 			EditMessageText editMsg = new EditMessageText();
-			editMsg.setChatId(replyMsg.getChatId());
-			editMsg.setMessageId(replyMsg.getMessageId());
+			editMsg.setChatId(msg.getChatId());
+			editMsg.setMessageId(msg.getMessageId());
 			editMsg.enableHtml(true).setReplyMarkup(markup).setText("Device was deleted.");
 			deviceRepo.delete(d);
 			sendApiMethod(editMsg);
 			return;
 		} else if(pm.equals("mon")) {
-			deviceLocManager.startMonitoringLocation(d, replyMsg.getChatId());
+			deviceLocManager.startMonitoringLocation(d, msg.getChatId());
 		} else if(pm.equals("stmon")) {
-			deviceLocManager.stopMonitoringLocation(d, replyMsg.getChatId());
+			deviceLocManager.stopMonitoringLocation(d, msg.getChatId());
 		} else if (pm.equals("loctext")) {
-			deviceLocManager.sendLiveLocationMessage(d, replyMsg.getChatId());
+			deviceLocManager.sendLiveLocationMessage(d, msg.getChatId());
 		} else if (pm.equals("loc")) {
-			deviceLocManager.sendLiveMapMessage(d, replyMsg.getChatId());
+			deviceLocManager.sendLiveMapMessage(d, msg.getChatId());
 		}
 		String locMsg = formatLocation(sig);
 		String txt = String.format("<b>Device</b>: %s\n<b>Location</b>: %s\n", d.deviceName, locMsg);
@@ -388,13 +390,13 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 		
 		if (pm.equals("")) {
 			SendMessage sendMessage = new SendMessage();
-			sendMessage.setChatId(replyMsg.getChatId());
+			sendMessage.setChatId(msg.getChatId());
 			sendMessage.enableHtml(true).setReplyMarkup(markup).setText(txt);
 			sendApiMethod(sendMessage);
 		} else {
 			EditMessageText editMsg = new EditMessageText();
-			editMsg.setChatId(replyMsg.getChatId());
-			editMsg.setMessageId(replyMsg.getMessageId());
+			editMsg.setChatId(msg.getChatId());
+			editMsg.setMessageId(msg.getMessageId());
 			editMsg.setReplyMarkup(markup);
 			editMsg.enableHtml(true).setText(txt);
 			sendApiMethod(editMsg);
