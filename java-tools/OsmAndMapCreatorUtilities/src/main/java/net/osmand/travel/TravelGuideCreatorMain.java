@@ -73,6 +73,11 @@ public class TravelGuideCreatorMain {
 
     private void generateTravelSqlite(Map<String,List<File>> mapping, Connection conn) throws SQLException, IOException {
     	WikivoyageLangPreparation.createInitialDbStructure(conn, false);
+        try {
+            conn.createStatement().execute("ALTER TABLE travel_articles ADD COLUMN aggregated_part_of");
+        } catch (Exception e) {
+            System.err.println("Column aggregated_part_of already exists");
+        }
         PreparedStatement prep = WikivoyageLangPreparation.generateInsertPrep(conn, false);
         int count = 0;
         int batch = 0;
