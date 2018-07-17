@@ -103,7 +103,7 @@ public class DeviceMonitor {
 	}
 	
 	public LocationChatMessage getOrCreateLocationMapChat(Long chatId) {
-		LocationChatMessage lm = chats.get(chatId);
+		LocationChatMessage lm = mapChats.get(chatId);
 		if(lm == null) {
 			lm = new LocationChatMessage(this, chatId);
 			lm.isLiveLocation = true;
@@ -262,7 +262,7 @@ public class DeviceMonitor {
 			InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
 			ArrayList<InlineKeyboardButton> lt = new ArrayList<InlineKeyboardButton>();
 			markup.getKeyboard().add(lt);
-			lt.add(new InlineKeyboardButton("Hide").setCallbackData("hide"));
+			lt.add(new InlineKeyboardButton("Hide").setCallbackData("dv|" + d.getEncodedId() + "|hide"));
 			lt.add(new InlineKeyboardButton("Update " + d.deviceName).setCallbackData("dv|" + d.getEncodedId() + "|loc"));
 			if (locSig != null && locSig.isLocationPresent()) {
 				if (messageId == 0) {
@@ -365,8 +365,8 @@ public class DeviceMonitor {
 
 		private void sendMsg(OsmAndAssistantBot bot, Device device, String txt) {
 			InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
-			markup.getKeyboard().add(Collections.singletonList(new InlineKeyboardButton("Hide").setCallbackData("dv|"+
-					device.getEncodedId() + "|hide")));
+			markup.getKeyboard().add(Collections.singletonList(new InlineKeyboardButton("Hide").setCallbackData(
+					"dv|" + device.getEncodedId() + "|hide")));
 			if (messageId == 0) {
 				initialTimestamp = System.currentTimeMillis();
 				bot.sendMethodAsync(new SendMessage(chatId, txt).setReplyMarkup(markup).enableHtml(true), new SentCallback<Message>() {
