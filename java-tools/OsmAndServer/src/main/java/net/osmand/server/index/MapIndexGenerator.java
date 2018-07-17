@@ -10,8 +10,6 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
@@ -42,7 +40,6 @@ public class MapIndexGenerator {
 	private void processAttributes(Type type, Path path) throws IOException {
 		BasicFileAttributes fileAttributes = Files.readAttributes(path, BasicFileAttributes.class);
 		String fileName = path.getFileName().toString();
-		type.setTimestamp(fileAttributes.creationTime().to(TimeUnit.MILLISECONDS));
 		long sizeInBytes = fileAttributes.size();
 		if (isZip(path)) {
 			long contentSize = calculateContentSizeForZipFile(path);
@@ -55,9 +52,11 @@ public class MapIndexGenerator {
 		type.setContainerSize(sizeInBytes);
 		type.setSize(sizeInBytes);
 		type.setName(fileName);
+		type.setTimestamp(fileAttributes.creationTime().to(TimeUnit.MILLISECONDS));
 	}
 
 	private void writeType(Type type, XMLStreamWriter writer) throws XMLStreamException {
+		System.out.println("Writing...");
 		writer.writeCharacters("\n");
 		writer.writeEmptyElement(type.getElementName());
 		writer.writeAttribute(IndexAttributes.TYPE, type.getType());
@@ -77,12 +76,11 @@ public class MapIndexGenerator {
 			throw new IOException("It's not a directory");
 		}
 		try (DirectoryStream<Path> stream = Files.newDirectoryStream(path, glob)) {
-			List<Type> types = new ArrayList<>();
 			for (Path file : stream) {
 				if (isZip(file) && !validateZipFile(file)) {
 					continue;
 				}
-				processAttributes(type, path);
+				processAttributes(type, file);
 				writeType(type, writer);
 			}
 		}

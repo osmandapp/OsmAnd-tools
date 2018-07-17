@@ -19,7 +19,7 @@ public class ApiController {
     private static final Log LOGGER = LogFactory.getLog(ApiController.class);
 
     @Autowired
-    UpdateIndexes updateIndexes;
+    private UpdateIndexes updateIndexes;
 
     @RequestMapping(value = "update", method = RequestMethod.GET)
     public String update(Model model) throws IOException {

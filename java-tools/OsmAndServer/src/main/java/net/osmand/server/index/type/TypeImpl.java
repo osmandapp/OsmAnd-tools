@@ -16,6 +16,7 @@ public class TypeImpl implements Type {
     private final String type;
     private final String descriptionPattern;
     private final String elementName;
+    private final String descriptionPrefix;
 
     private long containerSize;
     private long contentSize;
@@ -24,10 +25,15 @@ public class TypeImpl implements Type {
     private long targetSize;
     private String name;
 
-    public TypeImpl(String type, String descriptionPattern, String elementName) {
-        this.type = type;
-        this.descriptionPattern = descriptionPattern;
+    public TypeImpl(String elementName, String type, String descriptionPattern) {
+        this(elementName, type, descriptionPattern, "");
+    }
+
+    public TypeImpl(String elementName, String type,  String descriptionPattern, String descriptionPrefix) {
         this.elementName = elementName;
+        this.type = type;
+        this.descriptionPrefix = descriptionPrefix;
+        this.descriptionPattern = descriptionPattern;
     }
 
     private double bytesToMbs(long bytes) {
@@ -40,6 +46,10 @@ public class TypeImpl implements Type {
         if (m.find()) {
             String description = m.group("d");
             description = description.replaceAll("_", " ");
+            String descriptionMsg;
+            if (!descriptionPrefix.isEmpty()) {
+                return String.format("%s %s", descriptionPrefix, description.trim());
+            }
             return description.trim();
         }
         String msg = String.format("Cannot create description from %s", name);
