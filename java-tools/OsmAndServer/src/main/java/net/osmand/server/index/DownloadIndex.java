@@ -36,9 +36,10 @@ public class DownloadIndex {
 	    public static final String DESCRIPTION = "description";
 	}
     
-    public DownloadIndex(File lf, DownloadType type) {
+    public DownloadIndex(String name, File lf, DownloadType type) {
     	this.type = type;
     	this.file = lf;
+    	this.name = name;
 	}
 
 	public DownloadType getType() {
@@ -107,6 +108,7 @@ public class DownloadIndex {
     }
     
     public void setDescription(String description) {
+    	
 		this.description = description;
 	}
     

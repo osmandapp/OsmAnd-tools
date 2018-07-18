@@ -100,7 +100,12 @@ public class DownloadIndexesService  {
 		}
 		for(File lf : files) {
 			if(tp.acceptFile(lf)) {
-				DownloadIndex di = new DownloadIndex(lf, tp);
+				// TODO set proper name parse from file name (exclude _2, _ext_2), replace 
+				// TODO set proper description (as first comment from zip file)
+				String name = lf.getName();
+				name = name.substring(0, name.indexOf('.'));
+				name = name.replace('_', ' ');
+				DownloadIndex di = new DownloadIndex(name, lf, tp);
 				if (di.isZip()) {
 					try {
 						ZipFile zipFile = new ZipFile(lf);
