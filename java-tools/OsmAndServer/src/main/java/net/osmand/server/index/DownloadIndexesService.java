@@ -38,10 +38,7 @@ public class DownloadIndexesService  {
 	}
 	
 	//@Value("${download.indexes}")
-    private String pathToDownloadFiles = getEnvVar(System.getenv("MAPS_DIR"), "/var/www-download/");
-
-    		
-    
+    private String pathToDownloadFiles = getEnvVar("MAPS_DIR", "/var/www-download/");
     		
 	
 	// 15 minutes
