@@ -13,6 +13,7 @@ import org.springframework.core.io.FileSystemResource;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
 
 @Controller
 public class IndexController {
@@ -23,24 +24,33 @@ public class IndexController {
     private DownloadIndexesService downloadIndexes;
 
 	@RequestMapping(path = { "indexes.xml", "indexes" })
-    public FileSystemResource indexesXml(@RequestParam boolean update, 
-    		@RequestParam boolean refresh) throws IOException {
+	@ResponseBody
+    public FileSystemResource indexesXml(@RequestParam(required=false) boolean update, 
+    		@RequestParam(required=false) boolean refresh) throws IOException {
     	File fl = downloadIndexes.getIndexesXml(refresh || update, false);
         return new FileSystemResource(fl); 
     }
 	
 	@RequestMapping(path = { "get_indexes.php", "get_indexes"})
-    public FileSystemResource indexesPhp(@RequestParam String gzip) throws IOException {
+	@ResponseBody
+    public FileSystemResource indexesPhp(@RequestParam(defaultValue="", required=false)
+    String gzip) throws IOException {
 		boolean gz = gzip != null && !gzip.isEmpty();
 		File fl = downloadIndexes.getIndexesXml(false, gz);
 		return new FileSystemResource(fl); 
 	}
     
     @RequestMapping("indexes.php")
-    public FileSystemResource indexesPhp(@RequestParam boolean update, 
-    		@RequestParam boolean refresh) throws IOException {
-    	// TODO print table
+    @ResponseBody
+    public FileSystemResource indexesPhp(@RequestParam(required=false) boolean update, 
+    		@RequestParam(required=false)  boolean refresh) throws IOException {
+    	// keep this step
     	File fl = downloadIndexes.getIndexesXml(refresh || update, false);
+    	// TODO print table
+    	// possible algorithm
+    	// 1. read from xml into DownloadIndex Map, Map<DownloadType, List<DownloadIndex> >
+    	// 2. print each section 
+
         return new FileSystemResource(fl); 
     }
 }

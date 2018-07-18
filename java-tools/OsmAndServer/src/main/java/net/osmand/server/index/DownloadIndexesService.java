@@ -30,9 +30,19 @@ public class DownloadIndexesService  {
 
 	private static final String INDEX_FILE = "new_indexes.xml";
 	
-	@Value("${download.indexes}")
-    private String pathToDownloadFiles = "/var/www-download/";
+	private String getEnvVar(String key, String df) {
+		if(!Algorithms.isEmpty(System.getenv(key))) {
+			return System.getenv(key);
+		}
+		return df;
+	}
+	
+	//@Value("${download.indexes}")
+    private String pathToDownloadFiles = getEnvVar(System.getenv("MAPS_DIR"), "/var/www-download/");
 
+    		
+    
+    		
 	
 	// 15 minutes
 	@Scheduled(fixedDelay = 1000 * 60 * 15)
@@ -58,7 +68,7 @@ public class DownloadIndexesService  {
 	
 	public File getIndexesXml(boolean upd, boolean gzip) {
 		File target = getStandardFilePath(gzip);
-		if(target.exists() || upd) {
+		if(!target.exists() || upd) {
 			generateStandardIndexFile();
 		}
 		return target;
