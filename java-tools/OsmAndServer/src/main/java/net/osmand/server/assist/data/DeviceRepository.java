@@ -9,9 +9,9 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 @Repository
 @EnableTransactionManagement
-public interface DeviceRepository extends JpaRepository<Device, Long> {
+public interface DeviceRepository extends JpaRepository<DeviceBean, Long> {
 	
-	List<Device> findByUserIdOrderByCreatedDate(long userId);
+	List<DeviceBean> findByUserIdOrderByCreatedDate(long userId);
 	
 	
 	@Transactional
