@@ -5,7 +5,9 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.zip.GZIPOutputStream;
 import java.util.zip.ZipEntry;
@@ -143,6 +145,8 @@ public class DownloadIndexesService  {
 			writer.writeCharacters("\n");
 			writer.writeStartElement("osmand_regions");
 			writer.writeAttribute("mapversion", "1");
+			writer.writeAttribute("timestamp", 
+					new SimpleDateFormat("dd.MM.yyyy HH:mm:ss").format(new Date()) );
 			writer.writeAttribute("gentime", String.format("%.1f",
 					((System.currentTimeMillis() - start) / 1000.0)) );
 			for (DownloadIndex di : indexes) {
