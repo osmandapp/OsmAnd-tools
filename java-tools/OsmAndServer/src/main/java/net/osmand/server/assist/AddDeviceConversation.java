@@ -2,7 +2,7 @@ package net.osmand.server.assist;
 
 import java.util.ArrayList;
 
-import net.osmand.server.assist.data.Device;
+import net.osmand.server.assist.data.DeviceBean;
 import net.osmand.server.assist.data.TrackerConfiguration;
 import net.osmand.server.assist.data.UserChatIdentifier;
 import net.osmand.server.assist.ext.ITrackerManager;
@@ -56,8 +56,7 @@ public class AddDeviceConversation extends AssistantConversation {
 			if ("import".equals(reply)) {
 				askExternalConfiguration(bot);
 			} else if (validateEmptyInput(bot, reply)) {
-				Device device = bot.createDevice(chatIdentifier, reply);
-				String msgs = bot.saveDevice(device);
+				String msgs = bot.createNewDevice(chatIdentifier, reply);
 				bot.sendMethod(getSendMessage(msgs));
 				state = FINISHED;
 				return true;
@@ -125,7 +124,7 @@ public class AddDeviceConversation extends AssistantConversation {
 		ext.mgr = mgr;
 		ext.trackerId = mgr.getTrackerId();
 		String js = chatIdentifier.getUserJsonString();
-		ext.data.add(Device.USER_INFO, new JsonParser().parse(js));
+		ext.data.add(DeviceBean.USER_INFO, new JsonParser().parse(js));
 		ext.token = token;
 		ext.userId = chatIdentifier.getUserId();
 		ext.chatId = chatIdentifier.getChatId();

@@ -12,11 +12,9 @@ import java.util.Map;
 import javax.xml.parsers.SAXParser;
 
 import net.osmand.PlatformUtil;
-import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.impl.FileProgressImplementation;
 import net.osmand.map.OsmandRegions;
 import net.osmand.obf.preparation.DBDialect;
-import net.osmand.util.MapUtils;
 
 import org.apache.commons.logging.Log;
 import org.xml.sax.Attributes;
@@ -152,7 +150,7 @@ public class WikiDataHandler extends DefaultHandler {
 				}
 				try {
 					ArticleMapper.Article article = gson.fromJson(ctext.toString(), ArticleMapper.Article.class);
-					if (article.getLabels() != null && article.getLat() != 0 && article.getLon() != 0) {
+					if (article.getLinks() != null && article.getLat() != 0 && article.getLon() != 0) {
 						if (++count % ARTICLE_BATCH_SIZE == 0) {
 							log.info(String.format("Article accepted %s (%d)", title.toString(), count));
 						}
@@ -168,14 +166,17 @@ public class WikiDataHandler extends DefaultHandler {
 							wikiRegionPrep.setString(2, reg);
 							addBatch(wikiRegionPrep, regionBatch);
 						}
-						for (Map.Entry<String, JsonElement> entry : article.getLabels().entrySet()) {
-				            String lang = entry.getKey();
-				            String articleV = entry.getValue().getAsJsonObject().getAsJsonPrimitive("value").getAsString();
-				            mappingPrep.setLong(1, id);
-				            mappingPrep.setString(2, lang);
-				            mappingPrep.setString(3, articleV);
-				            addBatch(mappingPrep, mappingBatch);
-				        }
+						for (Map.Entry<String, JsonElement> entry : article.getLinks().entrySet()) {
+							String lang = entry.getKey().replace("wiki", "");
+							if (lang.equals("commons")) {
+								continue;
+							}
+							String articleV = entry.getValue().getAsJsonObject().getAsJsonPrimitive("title").getAsString();
+							mappingPrep.setLong(1, id);
+							mappingPrep.setString(2, lang);
+							mappingPrep.setString(3, articleV);
+							addBatch(mappingPrep, mappingBatch);
+						}
 					}
 				} catch (Exception e) {
 					// Generally means that the field is missing in the json or the incorrect data is supplied

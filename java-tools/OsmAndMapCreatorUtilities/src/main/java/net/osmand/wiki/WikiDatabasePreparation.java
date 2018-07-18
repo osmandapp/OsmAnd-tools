@@ -111,8 +111,7 @@ public class WikiDatabasePreparation {
 			int nt = text.length() - i - 1;
 			if ((nt > 0 && text.charAt(i) == '{' && text.charAt(i + 1) == '{') || (nt > 1 && text.charAt(i) == '[' && text.charAt(i + 1) == '[' && text.charAt(i + 2) == 'ק')
 					|| (nt > 4 && text.charAt(i) == '<' && text.charAt(i + 1) == 'm' && text.charAt(i + 2) == 'a' && text.charAt(i + 3) == 'p'
-					&& text.charAt(i + 4) == 'l' && text.charAt(i + 5) == 'i') 
-					|| (nt > 2 && text.charAt(i) == '<' && text.charAt(i + 1) == 'g' && text.charAt(i + 2) == 'a' && text.charAt(i + 3) == 'l')
+					&& text.charAt(i + 4) == 'l' && text.charAt(i + 5) == 'i')
 					|| (nt > 2 && text.charAt(i) == '<' && text.charAt(i + 1) == '!' && text.charAt(i + 2) == '-' && text.charAt(i + 3) == '-')) {
 				hebrew = nt > 1 && text.charAt(i + 2) == 'ק';
 				beginInd = beginInd == 0 ? i + 2 : beginInd;
@@ -120,8 +119,7 @@ public class WikiDatabasePreparation {
 				i++;
 			} else if (nt > 0 && ((text.charAt(i) == '}' && text.charAt(i + 1) == '}') || (hebrew && text.charAt(i) == ']' && text.charAt(i + 1) == ']')
 					|| (i > 4 && text.charAt(i) == '>' && text.charAt(i - 1) == 'k' && text.charAt(i - 2) == 'n' && text.charAt(i - 3) == 'i'
-					&& text.charAt(i - 4) == 'l' && text.charAt(i - 5) == 'p') 
-					|| (i > 2 && text.charAt(i) == '>' && text.charAt(i - 1) == 'y' && text.charAt(i - 2) == 'r' && text.charAt(i - 3) == 'e')
+					&& text.charAt(i - 4) == 'l' && text.charAt(i - 5) == 'p')
 					|| (i > 1 && text.charAt(i) == '>' && text.charAt(i - 1) == '-' && text.charAt(i - 2) == '-'))) {
 				if (openCnt > 1) {
 					openCnt--;
@@ -132,7 +130,7 @@ public class WikiDatabasePreparation {
 				endInd = i;
 				String val = text.substring(beginInd, endInd);
 				if (val.startsWith("allery")) {
-					bld.append(parseGallery(val));
+					bld.append(parseGalleryString(val));
 				} else if (val.toLowerCase().startsWith("weather box")) {
 					parseAndAppendWeatherTable(val, bld);
 				} else if (val.toLowerCase().startsWith("lang-")) {
@@ -161,6 +159,8 @@ public class WikiDatabasePreparation {
 			} else if (nt > 2 && text.charAt(i) == '<' && text.charAt(i + 1) == 'r' && text.charAt(i + 2) == 'e'
 					&& text.charAt(i + 3) == 'f' && openCnt == 0) {
 				i = parseRef(text, bld, i);
+			} else if (nt > 2 && text.charAt(i) == '<' && text.charAt(i + 1) == 'g' && text.charAt(i + 2) == 'a' && text.charAt(i + 3) == 'l') {
+				i = parseGallery(text, bld, i);
 			} else {
 				if (openCnt == 0) {
 					int headerLvl = 0;
@@ -199,6 +199,17 @@ public class WikiDatabasePreparation {
 			}
 		}
 		return bld.toString();
+	}
+
+	private static int parseGallery(String text, StringBuilder bld, int i) {
+		int closeTag = text.indexOf("</gallery>", i);
+		int endInd = closeTag + "</gallery>".length();
+		if (endInd > text.length() - 1 || closeTag < i) {
+			return i;
+		}
+		String val = text.substring(i, closeTag);
+		bld.append(parseGalleryString(val));
+		return --endInd;
 	}
 
 	private static void parseAndAppendLangSpelling(String val, StringBuilder bld) {
@@ -357,7 +368,7 @@ public class WikiDatabasePreparation {
 		bld.append("</p>");
 	}
 
-	private static String parseGallery(String val) {
+	private static String parseGalleryString(String val) {
 		String[] parts = val.split("\n");
 		StringBuilder bld = new StringBuilder();
 		for (String part : parts) {
@@ -788,6 +799,8 @@ public class WikiDatabasePreparation {
 			conn = dialect.getDatabaseConnection(sqliteFile.getAbsolutePath(), log);
 			log.info("Prepare wiki_content table");
 			conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wiki_content(id long, title text, lang text, zipContent blob)");
+			conn.createStatement().execute("CREATE INDEX IF NOT EXISTS id_wiki_content ON wiki_content(id)");
+			conn.createStatement().execute("CREATE INDEX IF NOT EXISTS lang_title_wiki_content ON wiki_content (lang, title)");
 			conn.createStatement().execute("DELETE FROM wiki_content WHERE lang = '" + lang + "'");
 			insertPrep = conn.prepareStatement("INSERT INTO wiki_content(id, title, lang, zipContent) VALUES (?, ?, ?, ?)");
 			selectPrep = conn.prepareStatement("SELECT id FROM wiki_mapping WHERE wiki_mapping.title = ? AND wiki_mapping.lang = ?");
@@ -873,13 +886,12 @@ public class WikiDatabasePreparation {
 							selectPrep.setString(1, title.toString());
 							selectPrep.setString(2, lang);
 							ResultSet rs = selectPrep.executeQuery();
-							String id = null;
+							long wikiId = 0;
 							if (rs.next()) {
-								id = rs.getString(1);
+								wikiId = rs.getLong(1);
 							}
 							selectPrep.clearParameters();
-							if (id != null ) {
-								long wikiId = Long.parseLong(id.substring(1));
+							if (wikiId != 0 ) {
 								String text = removeMacroBlocks(ctext.toString(), new HashMap<>(),
 										lang, null);
 								final HTMLConverter converter = new HTMLConverter(false);

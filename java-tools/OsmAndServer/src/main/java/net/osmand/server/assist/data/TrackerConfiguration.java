@@ -14,6 +14,7 @@ import javax.persistence.TemporalType;
 import javax.persistence.Transient;
 
 import net.osmand.server.assist.ext.ITrackerManager;
+import net.osmand.util.Algorithms;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
@@ -80,11 +81,11 @@ public class TrackerConfiguration {
 
 			@Override
 			public int compare(TrackerConfiguration o1, TrackerConfiguration o2) {
-				int i = StringUtils.compare(o1.trackerId, o2.trackerId);
+				int i = Algorithms.compare(o1.trackerId, o2.trackerId);
 				if(i != 0) {
 					return i;
 				}
-				i = StringUtils.compare(o1.token, o2.token);
+				i = Algorithms.compare(o1.token, o2.token);
 				if(i != 0) {
 					return i;
 				}
