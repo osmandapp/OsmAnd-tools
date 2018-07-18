@@ -385,17 +385,20 @@ public class Device {
 
 		private void sendInlineMap(OsmAndAssistantBot bot, LocationInfo locSig) {
 			InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
-			markup.getKeyboard().add(Collections.singletonList(new InlineKeyboardButton("Update").setCallbackData(
+			markup.getKeyboard().add(Collections.singletonList(new InlineKeyboardButton("Update " + device.getDeviceName()).setCallbackData(
 					"msg|" + device.getStringId() + "|updmap")));
 			if (locSig != null && locSig.isLocationPresent()) {
 				if (lastSentLoc == null
 						|| MapUtils.getDistance(lastSentLoc.getLat(), lastSentLoc.getLon(), locSig.getLat(),
 								locSig.getLon()) > 5) {
 					EditMessageLiveLocation editMessageText = new EditMessageLiveLocation();
+					editMessageText.setInlineMessageId(inlineMessageId);
+					editMessageText.setChatId("");
 					editMessageText.setLatitude((float) locSig.getLat());
 					editMessageText.setLongitud((float) locSig.getLon());
+					editMessageText.setChatId((String)null);
 					editMessageText.setReplyMarkup(markup);
-					editMessageText.setInlineMessageId(inlineMessageId);
+					
 					bot.sendMethodAsync(editMessageText, getCallback(locSig));
 				}
 			}
@@ -403,7 +406,7 @@ public class Device {
 		
 		private void sendInline(OsmAndAssistantBot bot, LocationInfo lastLocationSignal) {
 			InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
-			markup.getKeyboard().add(Collections.singletonList(new InlineKeyboardButton("Update").setCallbackData(
+			markup.getKeyboard().add(Collections.singletonList(new InlineKeyboardButton("Update " + device.getDeviceName()).setCallbackData(
 					"msg|" + device.getStringId() + "|updtxt")));
 			EditMessageText editMessageText = new EditMessageText();
 			editMessageText.setText(getMessageTxt(updateId));

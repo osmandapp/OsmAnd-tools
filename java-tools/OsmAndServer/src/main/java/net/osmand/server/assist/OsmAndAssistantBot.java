@@ -3,20 +3,18 @@ package net.osmand.server.assist;
 import java.io.Serializable;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Random;
 import java.util.Set;
 import java.util.TimeZone;
 import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 
-import net.osmand.server.assist.data.DeviceBean;
 import net.osmand.server.assist.data.Device;
-import net.osmand.server.assist.data.DeviceRepository;
 import net.osmand.server.assist.data.LocationInfo;
 import net.osmand.server.assist.data.TrackerConfiguration;
 import net.osmand.server.assist.data.TrackerConfigurationRepository;
@@ -32,11 +30,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.api.methods.AnswerInlineQuery;
 import org.telegram.telegrambots.api.methods.BotApiMethod;
-import org.telegram.telegrambots.api.methods.send.SendLocation;
 import org.telegram.telegrambots.api.methods.send.SendMessage;
 import org.telegram.telegrambots.api.methods.updatingmessages.DeleteMessage;
-import org.telegram.telegrambots.api.methods.updatingmessages.EditMessageCaption;
-import org.telegram.telegrambots.api.methods.updatingmessages.EditMessageLiveLocation;
 import org.telegram.telegrambots.api.methods.updatingmessages.EditMessageText;
 import org.telegram.telegrambots.api.objects.CallbackQuery;
 import org.telegram.telegrambots.api.objects.Location;
@@ -44,21 +39,14 @@ import org.telegram.telegrambots.api.objects.Message;
 import org.telegram.telegrambots.api.objects.Update;
 import org.telegram.telegrambots.api.objects.inlinequery.InlineQuery;
 import org.telegram.telegrambots.api.objects.inlinequery.inputmessagecontent.InputLocationMessageContent;
-import org.telegram.telegrambots.api.objects.inlinequery.inputmessagecontent.InputMessageContent;
 import org.telegram.telegrambots.api.objects.inlinequery.inputmessagecontent.InputTextMessageContent;
-import org.telegram.telegrambots.api.objects.inlinequery.inputmessagecontent.InputVenueMessageContent;
 import org.telegram.telegrambots.api.objects.inlinequery.result.InlineQueryResult;
 import org.telegram.telegrambots.api.objects.inlinequery.result.InlineQueryResultArticle;
-import org.telegram.telegrambots.api.objects.inlinequery.result.InlineQueryResultLocation;
 import org.telegram.telegrambots.api.objects.replykeyboard.InlineKeyboardMarkup;
-import org.telegram.telegrambots.api.objects.replykeyboard.ReplyKeyboard;
 import org.telegram.telegrambots.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.exceptions.TelegramApiException;
-import org.telegram.telegrambots.exceptions.TelegramApiValidationException;
 import org.telegram.telegrambots.updateshandlers.SentCallback;
-
-import com.google.gson.JsonParser;
 
 @Component
 public class OsmAndAssistantBot extends TelegramLongPollingBot {
@@ -147,7 +135,7 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 						c.updateMessage(this, msg);
 					} else if ("mydevices".equals(cmd.coreMsg) || 
 							("start".equals(cmd.coreMsg) && "mydevices".equals(cmd.params))) {
-						retrieveDevices(ucid, cmd.params);
+						retrieveDevices(ucid, cmd.params, 0);
 					} else if ("configs".equals(cmd.coreMsg)) {
 						retrieveConfigs(ucid, cmd.params);
 					} else if ("whoami".equals(cmd.coreMsg) || "start".equals(cmd.coreMsg)) {
@@ -201,21 +189,28 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 		aw.setInlineQueryId(iq.getId());
 		aw.setPersonal(true);
 		aw.setCacheTime(15);
+		String query = iq.getQuery();
 		List<InlineQueryResult> results = new ArrayList<InlineQueryResult>();
 		List<Device> devs = deviceLocManager.getDevicesByUserId(iq.getFrom().getId());
 		Location userLoc = iq.getLocation();
 		for(Device d : devs) {
 			LocationInfo l = d.getLastLocationSignal();
+			if(!query.isEmpty() && !d.getDeviceName().toLowerCase().startsWith(query.toLowerCase()) ) {
+				continue;
+			}
 			if (l != null) {
 				String desc = String.format("Location updated: %s", formatTime(l.getTimestamp(), false));
-				if (userLoc != null && l.isLocationPresent()) {
-					desc += String.format(
+					if (userLoc != null && l.isLocationPresent()) {
+						desc += String.format(
 							"Distance: %d meters",
 							(int) MapUtils.getDistance(l.getLat(), l.getLon(), userLoc.getLatitude(),
 									userLoc.getLongitude()));
-				}
+					}
 				InlineQueryResultArticle txt = new InlineQueryResultArticle();
 				txt.setDescription(desc);
+				if(!query.isEmpty()) {
+					txt.setDescription("Location will be displayed as text and could be viewed in OsmAnd");
+				}
 				txt.setId("t"+d.getStringId());
 				txt.setTitle(d.getDeviceName());
 				txt.setInputMessageContent(new InputTextMessageContent().setMessageText(
@@ -229,6 +224,9 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 				if (l.isLocationPresent()) {
 					InlineQueryResultArticle loc = new InlineQueryResultArticle();
 					loc.setDescription(desc);
+					if(!query.isEmpty()) {
+						loc.setDescription("Location will be displayed on the map. Only 1 message is allowed per chat.");
+					}
 					loc.setId("m" + d.getStringId());
 					loc.setTitle(d.getDeviceName() + " on map");
 					loc.setInputMessageContent(new InputLocationMessageContent((float) l.getLat(), (float) l.getLon())
@@ -265,8 +263,6 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 				}
 				return true;
 			}
-			System.out.println("???" +callbackQuery);
-			
 			return false;
 		}
 		if(data.equals("hide")) {
@@ -278,7 +274,16 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 		UserChatIdentifier ci = new UserChatIdentifier();
 		ci.setChatId(msg.getChatId());
 		ci.setUser(callbackQuery.getFrom());
-		if(data.startsWith("dv|")) {
+		if(data.startsWith("devices|")) {
+			if(data.startsWith("devices|add")) {
+				AddDeviceConversation c = new AddDeviceConversation(ucid, false);
+				setNewConversation(c);
+				c.updateMessage(this, msg);
+				return true;
+			}
+			retrieveDevices(ucid, "", msg.getMessageId());
+			return true;
+		} else if(data.startsWith("dv|")) {
 			String pm = sl.length > 2 ? sl[2] : "";
 			Device d = deviceLocManager.getDevice(sl[1]);
 			if(d == null) {
@@ -451,13 +456,23 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 				more.setCallbackData("dv|" + d.getStringId() + "|more");
 				lt.add(more);
 				if (sig != null && sig.isLocationPresent()) {
-					InlineKeyboardButton locK = new InlineKeyboardButton("Live map");
+					InlineKeyboardButton locT = new InlineKeyboardButton("Live text");
+					locT.setCallbackData("dv|" + d.getStringId() + "|loctext");
+					lt2.add(locT);
+					lt2.clear();
+					
+					InlineKeyboardButton locK = new InlineKeyboardButton("Location on map");
 					locK.setCallbackData("dv|" + d.getStringId() + "|loc");
 					lt2.add(locK);
 					
-					InlineKeyboardButton locT = new InlineKeyboardButton("Live location as text");
-					locT.setCallbackData("dv|" + d.getStringId() + "|loctext");
-					lt2.add(locT);
+					
+//					
+					
+					InlineKeyboardButton shareMap = new InlineKeyboardButton("Share");
+					shareMap.setSwitchInlineQuery(d.getDeviceName());
+					lt2.add(shareMap);
+					
+					
 				}
 				if (d.getExternalConfiguration() != null) {
 					boolean locationMonitored = d.isLocationMonitored();
@@ -548,32 +563,61 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 	}
 	
 	
-	public void retrieveDevices(UserChatIdentifier ucid, String params) throws TelegramApiException {
+	public void retrieveDevices(UserChatIdentifier ucid, String params, int messageId) throws TelegramApiException {
 		int i = 1;
 		parseRecentParam(params);
 		List<Device> devs = deviceLocManager.getDevicesByUserId(ucid.getUserId()); 
 		InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
-		SendMessage msg = new SendMessage();
-		msg.setChatId(ucid.getChatId());
-		msg.enableHtml(true);
-		msg.setReplyMarkup(markup);
+		String txt =  "You don't have any added devices. Please use /add_device to register new devices.";
 		if (devs.size() > 0) {
-			msg.setText("<b>Available devices:</b>");
+			int monitored = 0;
+			int live = 0;
 			for (Device c : devs) {
 				StringBuilder sb = new StringBuilder();
 				sb.append(i).append(". ").append(c.getDeviceName());
-				ArrayList<InlineKeyboardButton> lt = new ArrayList<InlineKeyboardButton>();
+				LocationInfo last = c.getLastLocationSignal();
+				if(last != null && last.isLocationPresent()) {
+					if(System.currentTimeMillis() - last.getTimestamp() < TimeUnit.HOURS.toMillis(1)) {
+						sb.append(" - LIVE ");
+						live++;
+					}
+				}
+				if(c.isLocationMonitored()) {
+					sb.append(" [monitored] ");
+					monitored++;
+				}
+				
 				InlineKeyboardButton button = new InlineKeyboardButton(sb.toString());
 				button.setCallbackData("dv|" + c.getStringId());
 				markup.getKeyboard().add(Collections.singletonList(button));
 				i++;
 			}
-			markup.getKeyboard().add(Collections.singletonList(new InlineKeyboardButton("Hide").setCallbackData("hide")));
-		} else {
-			msg.setText("You don't have any added devices. Please use /add_device to register new devices.");
+			txt = String.format("<b>Available devices</b>: %d (%d active)", devs.size(), live);
+			if(monitored > 0) {
+				txt += "\n"  + String.format("<b>Actively monitored devices</b>: %d", monitored);
+			}
+			txt += String.format("\nTime: %s UTC\n", UTC_TIME_FORMAT.format(new Date()));
+			InlineKeyboardButton hide = new InlineKeyboardButton("Hide").setCallbackData("hide");
+			InlineKeyboardButton upd = new InlineKeyboardButton("Update").setCallbackData("devices|update");
+			InlineKeyboardButton nw = new InlineKeyboardButton("New").setCallbackData("devices|add");
+			markup.getKeyboard().add(Arrays.asList(hide, upd, nw));
 		}
-		
-		sendApiMethod(msg);
+		if(messageId == 0) {
+			SendMessage msg = new SendMessage();
+			msg.setChatId(ucid.getChatId());
+			msg.enableHtml(true);
+			msg.setReplyMarkup(markup);
+			msg.setText(txt);
+			sendApiMethod(msg);
+		} else {
+			EditMessageText msg = new EditMessageText();
+			msg.setChatId(ucid.getChatId());
+			msg.setMessageId(messageId);
+			msg.enableHtml(true);
+			msg.setReplyMarkup(markup);
+			msg.setText(txt);
+			sendApiMethod(msg);
+		}
 	}
 
 	private long parseRecentParam(String params) {
