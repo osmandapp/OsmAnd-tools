@@ -1,17 +1,13 @@
 package net.osmand.server.index;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.nio.file.DirectoryStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.attribute.BasicFileAttributes;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
+import java.util.zip.GZIPOutputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -19,10 +15,12 @@ import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamWriter;
 
+import net.osmand.util.Algorithms;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -35,6 +33,12 @@ public class DownloadIndexesService  {
 	@Value("${download.indexes}")
     private String pathToDownloadFiles = "/var/www-download/";
 
+	
+	// 15 minutes
+	@Scheduled(fixedDelay = 1000 * 60 * 15)
+	public void checkOsmAndLiveStatus() {
+		generateStandardIndexFile();
+	}
 	
 	public List<DownloadIndex> loadDownloadIndexes() {
 		List<DownloadIndex> list = new ArrayList<DownloadIndex>();
@@ -52,19 +56,40 @@ public class DownloadIndexesService  {
 		return list;
 	}
 	
-	public File getIndexesXml(boolean upd) {
-		File target = new File(pathToDownloadFiles, INDEX_FILE);
+	public File getIndexesXml(boolean upd, boolean gzip) {
+		File target = getStandardFilePath(gzip);
 		if(target.exists() || upd) {
-			generateStandardIndexFile(target);
+			generateStandardIndexFile();
 		}
 		return target;
 	}
+
+	private File getStandardFilePath(boolean gzip) {
+		return new File(pathToDownloadFiles, gzip ? INDEX_FILE + ".gz" : INDEX_FILE);
+	}
 	
-	private synchronized File generateStandardIndexFile(File target) {
-		
+	private synchronized void generateStandardIndexFile() {
+		long start = System.currentTimeMillis();
 		List<DownloadIndex> di = loadDownloadIndexes();
-		generateIndexesFile(di, target);
-		return target;
+		File target = getStandardFilePath(false);
+		generateIndexesFile(di, target, start);
+		File gzip = getStandardFilePath(true);
+		gzipFile(target, gzip);
+		LOGGER.info(String.format("Regenerate indexes.xml in %.1f seconds",
+				((System.currentTimeMillis() - start) / 1000.0)));
+	}
+
+	private void gzipFile(File target, File gzip) {
+		try {
+			FileInputStream is = new FileInputStream(target);
+			GZIPOutputStream out = new GZIPOutputStream(new FileOutputStream(gzip));
+			Algorithms.streamCopy(is, out);
+			is.close();
+			out.close();
+		} catch (IOException e) {
+			LOGGER.error("Gzip file " + target.getName(), e);
+			e.printStackTrace();
+		}
 	}
 
 	private void loadIndexesFromDir(List<DownloadIndex> list, File rootFolder, String subPath, DownloadType tp) {
@@ -95,7 +120,7 @@ public class DownloadIndexesService  {
 	}
 
 
-	private void generateIndexesFile(List<DownloadIndex> indexes, File file) {
+	private void generateIndexesFile(List<DownloadIndex> indexes, File file, long start) {
 		XMLStreamWriter writer = null;
 		FileOutputStream fous = null;
 		try {
@@ -106,6 +131,8 @@ public class DownloadIndexesService  {
 			writer.writeCharacters("\n");
 			writer.writeStartElement("osmand_regions");
 			writer.writeAttribute("mapversion", "1");
+			writer.writeAttribute("gentime", String.format("%.1f",
+					((System.currentTimeMillis() - start) / 1000.0)) );
 			for (DownloadIndex di : indexes) {
 				di.writeType(writer);
 			}

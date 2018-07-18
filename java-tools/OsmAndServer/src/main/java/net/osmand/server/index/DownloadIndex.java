@@ -2,19 +2,12 @@ package net.osmand.server.index;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Path;
 import java.text.SimpleDateFormat;
 import java.util.Date;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipException;
 import java.util.zip.ZipFile;
 
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamWriter;
-
-import com.google.common.collect.ContiguousSet;
 
 import net.osmand.server.index.DownloadIndexesService.DownloadType;
 

@@ -25,16 +25,14 @@ public class IndexController {
 	@RequestMapping(path = { "indexes.xml", "indexes" })
     public FileSystemResource indexesXml(@RequestParam boolean update, 
     		@RequestParam boolean refresh) throws IOException {
-    	File fl = downloadIndexes.getIndexesXml(refresh || update);
+    	File fl = downloadIndexes.getIndexesXml(refresh || update, false);
         return new FileSystemResource(fl); 
     }
 	
 	@RequestMapping(path = { "get_indexes.php", "get_indexes"})
     public FileSystemResource indexesPhp(@RequestParam String gzip) throws IOException {
-		File fl = downloadIndexes.getIndexesXml(false);
-		if(gzip != null && !gzip.isEmpty()) {
-			return new FileSystemResource(fl.getAbsolutePath() + ".gz"); 
-		}
+		boolean gz = gzip != null && !gzip.isEmpty();
+		File fl = downloadIndexes.getIndexesXml(false, gz);
 		return new FileSystemResource(fl); 
 	}
     
@@ -42,7 +40,7 @@ public class IndexController {
     public FileSystemResource indexesPhp(@RequestParam boolean update, 
     		@RequestParam boolean refresh) throws IOException {
     	// TODO print table
-    	File fl = downloadIndexes.getIndexesXml(refresh || update);
+    	File fl = downloadIndexes.getIndexesXml(refresh || update, false);
         return new FileSystemResource(fl); 
     }
 }
