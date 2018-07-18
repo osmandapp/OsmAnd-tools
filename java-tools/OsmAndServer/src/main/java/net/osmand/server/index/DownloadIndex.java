@@ -127,7 +127,7 @@ public class DownloadIndex {
 		writer.writeAttribute(IndexXmlAttributes.DATE, getDate());
 		writer.writeAttribute(IndexXmlAttributes.SIZE, getSize());
 		writer.writeAttribute(IndexXmlAttributes.TARGET_SIZE, getTargetSize());
-		writer.writeAttribute(IndexXmlAttributes.NAME, getName());
+		writer.writeAttribute(IndexXmlAttributes.NAME, file.getName());
 		writer.writeAttribute(IndexXmlAttributes.DESCRIPTION, getDescription());
 	}
 

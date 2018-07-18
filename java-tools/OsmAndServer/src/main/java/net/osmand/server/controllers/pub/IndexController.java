@@ -27,6 +27,7 @@ public class IndexController {
 	@ResponseBody
     public FileSystemResource indexesXml(@RequestParam(required=false) boolean update, 
     		@RequestParam(required=false) boolean refresh) throws IOException {
+		// TODO set proper mime-type (to display in browser) - indexes.xml doesn't work
     	File fl = downloadIndexes.getIndexesXml(refresh || update, false);
         return new FileSystemResource(fl); 
     }
