@@ -1,6 +1,5 @@
 package net.osmand.server.index;
 
-import net.osmand.server.index.type.Type;
 import org.springframework.stereotype.Component;
 
 import javax.xml.stream.XMLStreamException;
@@ -16,6 +15,7 @@ import java.util.zip.ZipFile;
 
 @Component
 public class MapIndexGenerator {
+	private static final String ZIP_EXT = ".zip";
 
 	private boolean isZip(Path path) {
 		String fileName = path.getFileName().toString();
@@ -56,7 +56,6 @@ public class MapIndexGenerator {
 	}
 
 	private void writeType(Type type, XMLStreamWriter writer) throws XMLStreamException {
-		System.out.println("Writing...");
 		writer.writeCharacters("\n");
 		writer.writeEmptyElement(type.getElementName());
 		writer.writeAttribute(IndexAttributes.TYPE, type.getType());

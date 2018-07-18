@@ -9,20 +9,21 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
 
 
 import java.io.IOException;
 
 @Controller
-public class ApiController {
+public class IndexController {
 
-    private static final Log LOGGER = LogFactory.getLog(ApiController.class);
+    private static final Log LOGGER = LogFactory.getLog(IndexController.class);
 
     @Autowired
     private UpdateIndexes updateIndexes;
 
     @RequestMapping(value = "update", method = RequestMethod.GET)
-    public String update(Model model) throws IOException {
+    public String update() throws IOException {
         updateIndexes.update();
         return "pub/indexes";
     }
