@@ -606,7 +606,7 @@ public class WikivoyageDataGenerator {
 	}
 	
 
-	private void createPopularArticlesTable(Connection conn) throws SQLException, IOException, JSONException {
+	public void createPopularArticlesTable(Connection conn) throws SQLException, IOException, JSONException {
 		conn.createStatement().execute("DROP TABLE IF EXISTS popular_articles;");
 		// Itineraries UNESCO
 		System.out.println("Create popular articles");

@@ -68,6 +68,7 @@ public class TravelGuideCreatorMain {
         WikivoyageDataGenerator dataGenerator = new WikivoyageDataGenerator();
         generateTravelSqlite(mapping, conn);
         dataGenerator.generateSearchTable(conn);
+        dataGenerator.createPopularArticlesTable(conn);
         conn.close();
     }
 
