@@ -111,6 +111,11 @@ public class DownloadIndexesService  {
 			if(tp.acceptFile(lf)) {
 				// TODO set proper name parse from file name (exclude _2, _ext_2), replace 
 				// TODO set proper description (as first comment from zip file)
+				// $description = $zip->getCommentIndex(0);
+				// TODO set timestamp from first file in zip 
+//				$stat = $zip->statIndex( 0 , ZIPARCHIVE::FL_UNCHANGED);
+//				$timestamp = $stat['mtime'];
+				
 				String name = lf.getName();
 				name = name.substring(0, name.indexOf('.'));
 				name = name.replace('_', ' ');
