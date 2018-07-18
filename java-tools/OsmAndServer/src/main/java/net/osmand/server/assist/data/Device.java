@@ -4,10 +4,12 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.Iterator;
+import java.util.List;
 
 import net.osmand.server.assist.DeviceLocationManager;
 import net.osmand.server.assist.OsmAndAssistantBot;
+import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
 import org.apache.commons.logging.Log;
@@ -30,11 +32,20 @@ public class Device {
 	private static final Log LOG = LogFactory.getLog(DeviceLocationManager.class);
 	private static final Integer DEFAULT_UPD_PERIOD = 86400;
 	
-	ConcurrentHashMap<Long, LocationChatMessage> chats = new ConcurrentHashMap<>();
-	ConcurrentHashMap<Long, LocationChatMessage> mapChats = new ConcurrentHashMap<>();
-	
 	final OsmAndAssistantBot bot;
 	final DeviceBean device;
+	
+	private enum ChatType {
+		MESSAGE_CHAT,
+		JSON_CHAT,
+		MAP_CHAT,
+		MESSAGE_INLINE,
+		MAP_INLINE,
+	}
+	
+	List<LocationChatMessage> chats = new ArrayList<Device.LocationChatMessage>();
+	
+	
 	// signal with last location 
 	LocationInfo lastSignal = new LocationInfo();
 	// signal with last location 
@@ -115,10 +126,10 @@ public class Device {
 		LocationInfo lastSignal = this.lastSignal;
 		LocationInfo lastLocSig = this.lastLocationSignal;
 		StringBuilder bld = new StringBuilder();
-		String locMsg = bot.formatLocation(lastSignal);
+		String locMsg = bot.formatLocation(lastSignal, true);
 		bld.append(String.format("<b>Device</b>: %s\n<b>Location</b>: %s\n", device.deviceName, locMsg));
 		if(!lastSignal.isLocationPresent() && lastLocSig != null && lastLocSig.isLocationPresent()) {
-			bld.append(String.format("<b>Last location</b>: %s\n", bot.formatLocation(lastLocSig)));
+			bld.append(String.format("<b>Last location</b>: %s\n", bot.formatLocation(lastLocSig, false)));
 		}
 		boolean locationCurrentlyPresent = lastSignal.isLocationPresent();
 		if (!Double.isNaN(lastSignal.altitude) && lastSignal.isLocationPresent()) {
@@ -139,7 +150,11 @@ public class Device {
 		if (!Double.isNaN(lastSignal.temperature)) {
 			bld.append(String.format("<b>Temperature</b>: %.1f\n", lastSignal.temperature));
 		}
-		bld.append(String.format("Updated: %s (%d)\n", bot.formatFullTime(lastSignal.getTimestamp()) ,updateId++));
+		if(updateId == 0) {
+			bld.append(String.format("Updated: %s\n", bot.formatFullTime(lastSignal.getTimestamp())));
+		} else {
+			bld.append(String.format("Updated: %s (%d)\n", bot.formatFullTime(lastSignal.getTimestamp()) ,updateId));
+		}
 		return bld.toString().trim();
 	
 	}
@@ -156,70 +171,91 @@ public class Device {
 		lastSignal = info;
 		lastLocationSignal = locSignal;
 		long now = System.currentTimeMillis();
-		for (LocationChatMessage lm : chats.values()) {
-			if (lm.isEnabled(now)) {
-				lm.sendMessage(bot, device, info, locSignal);
+		List<LocationChatMessage> ch = this.chats;
+		for(LocationChatMessage m : ch) {
+			if(m.isEnabled(now)) {
+				m.sendMessage();
 			}
-		}
-		for (LocationChatMessage lm : mapChats.values()) {
-			if (lm.isEnabled(now)) {
-				lm.sendMessage(bot, device, info, locSignal);
-			}
+			
 		}
 	}
 	
 	public void startMonitoring() {
 		this.enabled = true;
-		
 	}
 	
-	public void showLiveMessage(Long chatId) {
-		LocationChatMessage lm = getOrCreateLocationChat(chatId);
-		lm.sendMessage(bot, device, lastSignal, lastLocationSignal);
+	private void addChatMessage(LocationChatMessage lm) {
+		List<LocationChatMessage>  n = new ArrayList<>(chats);
+		n.add(lm);
+		setNewChats(n);
+	}
+
+
+	private void setNewChats(List<LocationChatMessage> n) {
+		long now = System.currentTimeMillis();
+		Iterator<LocationChatMessage> it = n.iterator();
+		while(it.hasNext()) {
+			LocationChatMessage msg = it.next();
+			if(!msg.isEnabled(now)) {
+				it.remove();
+			}
+		}
+		this.chats = n;
+	}
+	
+	private LocationChatMessage getOrCreate(ChatType tp, Long chatId) {
+		for(LocationChatMessage lm : chats) {
+			if(lm.chatId == chatId.longValue() && lm.type == tp) {
+				return lm;
+			}
+		}
+		LocationChatMessage lm = new LocationChatMessage(this, tp, chatId);
+		addChatMessage(lm);
+		return lm;
+	}
+	
+	private LocationChatMessage getOrCreate(ChatType tp, String inlineMsgId) {
+		for(LocationChatMessage lm : chats) {
+			if(Algorithms.objectEquals(inlineMsgId, lm.inlineMessageId) && lm.type == tp) {
+				return lm;
+			}
+		}
+		LocationChatMessage lm = new LocationChatMessage(this, tp, inlineMsgId);
+		addChatMessage(lm);
+		return lm;
 	}
 	
 	public void showLiveMap(Long chatId) {
-		LocationChatMessage lm = getOrCreateLocationMapChat(chatId);
-		lm.sendMessage(bot, device, lastSignal, lastLocationSignal);
+		getOrCreate(ChatType.MAP_CHAT, chatId).sendMessage();
+	}
+	
+	public void showLiveMessage(Long chatId) {
+		getOrCreate(ChatType.MESSAGE_CHAT, chatId).sendMessage();
+	}
+	
+	public void showLiveMessage(String inlineMsgId) {
+		getOrCreate(ChatType.MESSAGE_INLINE, inlineMsgId).sendMessage();
+	}
+	
+	public void showLiveMap(String inlineMsgId) {
+		getOrCreate(ChatType.MAP_INLINE, inlineMsgId).sendMessage();
 	}
 	
 	
 	public void hideMessage(Long chatId, int messageId) {
-		LocationChatMessage lm = chats.get(chatId);
-		if(lm != null) {
-			lm.deleteMessage(messageId);
+		for(LocationChatMessage m : chats) {
+			if(m.messageId == messageId && m.chatId == chatId.longValue()) {
+				m.hide();
+			}
 		}
-		lm = mapChats.get(chatId);
-		if(lm != null) {
-			lm.deleteMessage(messageId);
-		}
+		// refresh list to delete hidden
+		setNewChats(new ArrayList<>(chats));
 	}
+	
 	public void stopMonitoring() {
 		disable();
 	}
 	
-	public LocationChatMessage getOrCreateLocationMapChat(Long chatId) {
-		LocationChatMessage lm = mapChats.get(chatId);
-		if(lm == null) {
-			lm = new LocationChatMessage(this, chatId);
-			lm.isLiveLocation = true;
-			mapChats.put(chatId, lm);
-		}
-		return lm;
-	}
-	
-	public LocationChatMessage getOrCreateLocationChat(Long chatId) {
-		LocationChatMessage lm = chats.get(chatId);
-		if(lm == null) {
-			lm = new LocationChatMessage(this, chatId);
-			chats.put(chatId, lm);
-		}
-		return lm;
-	}
-	
-	public LocationChatMessage getLocationChat(Long chatId) {
-		return chats.get(chatId);
-	}
 	
 	public DeviceBean getDevice() {
 		return device;
@@ -255,31 +291,43 @@ public class Device {
 	public class LocationChatMessage {
 		protected static final int ERROR_THRESHOLD = 3;
 
-		private boolean JSON_MESSAGE = false;
-		
+		final Device device;
+		final ChatType type;
 		final long chatId;
-		final Device mon;
-
+		final String inlineMessageId;
+		final long initialTimestamp;
+		
+		boolean hidden = false;
 		int messageId;
-		
-		long initialTimestamp;
-		long updateTime;
-		int errorCount = 0;
-		
-		boolean isLiveLocation;
 		LocationInfo lastSentLoc;
-
+		long updateTime;
 		int updateId = 1;
+		int errorCount = 0;
+
 		
-		
-		public LocationChatMessage(Device d, Long chatId) {
-			mon = d;
+		public LocationChatMessage(Device d, ChatType type, long chatId) {
+			device = d;
+			this.type = type;
 			this.chatId = chatId;
+			this.inlineMessageId = null;
+			this.initialTimestamp = System.currentTimeMillis();
+		}
+		
+		public LocationChatMessage(Device d, ChatType type, String inlineMessageId) {
+			device = d;
+			this.type = type;
+			this.chatId = 0;
+			this.inlineMessageId = inlineMessageId;
+			this.initialTimestamp = System.currentTimeMillis();
+		}
+		
+		public void hide() {
+			hidden = true;
 		}
 
 
 		public boolean isEnabled(long now) {
-			return messageId != 0 && (now - initialTimestamp) < DEFAULT_UPD_PERIOD * 1000 ;
+			return !hidden &&  (now - initialTimestamp) < DEFAULT_UPD_PERIOD * 1000 ;
 		}
 
 		public boolean deleteMessage(int msgId) {
@@ -293,7 +341,7 @@ public class Device {
 		public int deleteOldMessage() {
 			int oldMessageId = messageId;
 			if(messageId != 0) {
-				mon.bot.sendMethodAsync(new DeleteMessage(chatId, messageId), new SentCallback<Boolean>() {
+				device.bot.sendMethodAsync(new DeleteMessage(chatId, messageId), new SentCallback<Boolean>() {
 					@Override
 					public void onResult(BotApiMethod<Boolean> method, Boolean response) {
 						
@@ -315,57 +363,69 @@ public class Device {
 		}
 		
 		
-		public void sendMessage(OsmAndAssistantBot bot, DeviceBean device, 
-				LocationInfo lastSignal, LocationInfo lastLocationSignal) {
+		public void sendMessage() {
+			LocationInfo lastSignal= device.lastLocationSignal;
 			updateTime = System.currentTimeMillis();
 			if(!isEnabled(updateTime)) {
 				messageId = 0;
 			}
-			if(isLiveLocation) {
-				sendMapMessage(bot, device, lastSignal, lastLocationSignal);
-			} else {
-				updateId++;
-				String txt = JSON_MESSAGE ? mon.getMessageJson(updateId).toString() : mon.getMessageTxt(updateId);
-				sendMsg(bot, device, txt);
+			if(type == ChatType.MAP_CHAT) {
+				sendMapMessage(bot, lastSignal);
+			} else if(type == ChatType.JSON_CHAT) {
+				sendMsg(bot, device.getMessageJson(updateId).toString(), lastSignal);
+			} else if(type == ChatType.MAP_CHAT) {
+				sendMsg(bot, device.getMessageTxt(updateId), lastSignal);
+			} else if(type == ChatType.MAP_INLINE) {
+				sendInlineMap(bot, lastSignal);
+			} else if(type == ChatType.MESSAGE_INLINE) {
+				sendInline(bot, lastSignal);
+			}
+			updateId++;
+		}
+
+		private void sendInlineMap(OsmAndAssistantBot bot, LocationInfo locSig) {
+			InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+			markup.getKeyboard().add(Collections.singletonList(new InlineKeyboardButton("Update").setCallbackData(
+					"msg|" + device.getStringId() + "|updmap")));
+			if (locSig != null && locSig.isLocationPresent()) {
+				if (lastSentLoc == null
+						|| MapUtils.getDistance(lastSentLoc.getLat(), lastSentLoc.getLon(), locSig.getLat(),
+								locSig.getLon()) > 5) {
+					EditMessageLiveLocation editMessageText = new EditMessageLiveLocation();
+					editMessageText.setLatitude((float) locSig.getLat());
+					editMessageText.setLongitud((float) locSig.getLon());
+					editMessageText.setReplyMarkup(markup);
+					editMessageText.setInlineMessageId(inlineMessageId);
+					bot.sendMethodAsync(editMessageText, getCallback(locSig));
+				}
 			}
 		}
 		
-		private void sendMapMessage(OsmAndAssistantBot bot, DeviceBean d, LocationInfo lastSignal,
-				LocationInfo locSig) {
+		private void sendInline(OsmAndAssistantBot bot, LocationInfo lastLocationSignal) {
+			InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+			markup.getKeyboard().add(Collections.singletonList(new InlineKeyboardButton("Update").setCallbackData(
+					"msg|" + device.getStringId() + "|updtxt")));
+			EditMessageText editMessageText = new EditMessageText();
+			editMessageText.setText(getMessageTxt(updateId));
+			editMessageText.enableHtml(true);
+			editMessageText.setReplyMarkup(markup);
+			editMessageText.setInlineMessageId(inlineMessageId);
+			bot.sendMethodAsync(editMessageText, getCallback(lastLocationSignal));
+		}
+		
+		private void sendMapMessage(OsmAndAssistantBot bot, LocationInfo locSig) {
 			InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
 			ArrayList<InlineKeyboardButton> lt = new ArrayList<InlineKeyboardButton>();
 			markup.getKeyboard().add(lt);
-			lt.add(new InlineKeyboardButton("Hide").setCallbackData("dv|" + d.getEncodedId() + "|hide"));
-			lt.add(new InlineKeyboardButton("Update " + d.deviceName).setCallbackData("dv|" + d.getEncodedId() + "|loc"));
+			lt.add(new InlineKeyboardButton("Hide").setCallbackData("dv|" + device.getStringId() + "|hide"));
+			lt.add(new InlineKeyboardButton("Update " + device.getDeviceName()).setCallbackData("dv|" + device.getStringId() + "|loc"));
 			if (locSig != null && locSig.isLocationPresent()) {
 				if (messageId == 0) {
-					initialTimestamp = System.currentTimeMillis();
 					SendLocation sl = new SendLocation((float) locSig.getLat(), (float) locSig.getLon());
 					sl.setChatId(chatId);
 					sl.setLivePeriod(DEFAULT_UPD_PERIOD);
 					sl.setReplyMarkup(markup);
-					bot.sendMethodAsync(sl, new SentCallback<Message>() {
-
-						@Override
-						public void onResult(BotApiMethod<Message> method, Message response) {
-							messageId = response.getMessageId();
-							lastSentLoc = locSig;
-						}
-
-						@Override
-						public void onException(BotApiMethod<Message> method, Exception exception) {
-							LOG.error(exception.getMessage(), exception);
-						}
-
-						@Override
-						public void onError(BotApiMethod<Message> method, TelegramApiRequestException apiException) {
-							// message expired or deleted
-							if(errorCount++ > ERROR_THRESHOLD) {
-								messageId = 0;
-								errorCount = 0;
-							}
-						}
-					});
+					bot.sendMethodAsync(sl, getCallback(locSig));
 				} else {
 					if (lastSentLoc != null
 							&& MapUtils.getDistance(lastSentLoc.getLat(), lastSentLoc.getLon(), locSig.getLat(),
@@ -376,82 +436,56 @@ public class Device {
 						sl.setLatitude((float) locSig.getLat());
 						sl.setLongitud((float) locSig.getLon());
 						sl.setReplyMarkup(markup);
-						bot.sendMethodAsync(sl, new SentCallback<Serializable>() {
-							@Override
-							public void onResult(BotApiMethod<Serializable> method, Serializable response) {
-								lastSentLoc = locSig;
-							}
-
-							@Override
-							public void onException(BotApiMethod<Serializable> method, Exception exception) {
-								
-								LOG.error(exception.getMessage(), exception);
-							}
-
-							@Override
-							public void onError(BotApiMethod<Serializable> method,
-									TelegramApiRequestException apiException) {
-								LOG.info(apiException.getMessage(), apiException);
-								// message expired or deleted
-								if(errorCount++ > ERROR_THRESHOLD) {
-									messageId = 0;
-									errorCount = 0;
-								}
-							}
-						});
+						bot.sendMethodAsync(sl, getCallback(locSig));
 					}
 				}
 			}
 		}
 
-
-
-		private void sendMsg(OsmAndAssistantBot bot, DeviceBean device, String txt) {
+		private void sendMsg(OsmAndAssistantBot bot, String text, LocationInfo lastLocSignal) {
 			InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
 			markup.getKeyboard().add(Collections.singletonList(new InlineKeyboardButton("Hide").setCallbackData(
-					"dv|" + device.getEncodedId() + "|hide")));
+					"dv|" + device.getStringId() + "|hide")));
 			if (messageId == 0) {
-				initialTimestamp = System.currentTimeMillis();
-				bot.sendMethodAsync(new SendMessage(chatId, txt).setReplyMarkup(markup).enableHtml(true), new SentCallback<Message>() {
-
-					@Override
-					public void onResult(BotApiMethod<Message> method, Message response) {
-						messageId = response.getMessageId();
-					}
-
-					@Override
-					public void onException(BotApiMethod<Message> method, Exception exception) {
-						LOG.error(exception.getMessage(), exception);
-					}
-
-					@Override
-					public void onError(BotApiMethod<Message> method, TelegramApiRequestException apiException) {
-						LOG.error(apiException.getMessage(), apiException);
-					}
-				});
+				bot.sendMethodAsync(new SendMessage(chatId, text).setReplyMarkup(markup).enableHtml(true), 
+						getCallback(lastLocSignal));
 			} else {
 				EditMessageText mtd = new EditMessageText();
 				mtd.setChatId(chatId);
 				mtd.setMessageId(messageId);
-				mtd.setText(txt);
+				mtd.setText(text);
 				mtd.enableHtml(true);
 				mtd.setReplyMarkup(markup);
-				bot.sendMethodAsync(mtd, new SentCallback<Serializable>() {
-					@Override
-					public void onResult(BotApiMethod<Serializable> method, Serializable response) {
-					}
-
-					@Override
-					public void onException(BotApiMethod<Serializable> method, Exception exception) {
-						LOG.error(exception.getMessage(), exception);
-					}
-
-					@Override
-					public void onError(BotApiMethod<Serializable> method, TelegramApiRequestException apiException) {
-						LOG.error(apiException.getMessage(), apiException);
-					}
-				});
+				bot.sendMethodAsync(mtd, getCallback(lastLocSignal));
 			}
+		}
+		
+		private <T extends Serializable> SentCallback<T> getCallback(LocationInfo locSig) {
+			return new SentCallback<T>() {
+				@Override
+				public void onResult(BotApiMethod<T> method, T response) {
+					lastSentLoc = locSig;
+					if(response instanceof Message) {
+						messageId = ((Message)response).getMessageId();
+					}
+				}
+
+				@Override
+				public void onException(BotApiMethod<T> method, Exception exception) {
+					LOG.error(exception.getMessage(), exception);
+				}
+
+				@Override
+				public void onError(BotApiMethod<T> method,
+						TelegramApiRequestException apiException) {
+					LOG.info(apiException.getMessage(), apiException);
+					// message expired or deleted
+					if(errorCount++ > ERROR_THRESHOLD) {
+//						errorCount = 0;
+						hidden = true;
+					}
+				}
+			};
 		}
 	}
 
