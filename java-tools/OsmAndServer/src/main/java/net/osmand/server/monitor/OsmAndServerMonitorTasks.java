@@ -339,7 +339,7 @@ public class OsmAndServerMonitorTasks {
 		DescriptiveStatistics tile24Hours = readStats(RED_KEY_TILE, 24);
 		return String.format("<a href='http://tile.osmand.net/hd/3/4/2.png'>tile</a>: "
 				+ "<b>%s</b>. Response time: 24h — %.1f sec · max 24h — %.1f sec.",
-				lastResponseTime < 60 ? "OK" : "FAILED", tile24Hours.getMean(), tile24Hours.getPercentile(95));
+				lastResponseTime < 60 ? "OK" : "FAILED", tile24Hours.getMean(), tile24Hours.getPercentile(PERCENTILE));
 	}
 
 	private DescriptiveStatistics readStats(String key, int hour) {
