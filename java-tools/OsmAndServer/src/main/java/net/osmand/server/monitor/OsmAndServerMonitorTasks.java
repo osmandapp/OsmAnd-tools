@@ -58,7 +58,8 @@ public class OsmAndServerMonitorTasks {
 			"dl5.osmand.net", "dl6.osmand.net" };
 	private static final String TILE_SERVER = "http://tile.osmand.net/hd/";
 
-	private static final double PERCENTILE = 95;
+	private static final double PERCENTILE = 5;
+	private static final double PERCENTILE_SMALL = 100 - PERCENTILE;
 	
 	
 	private static final String RED_KEY_OSMAND_LIVE = "live_delay_time";
@@ -338,7 +339,7 @@ public class OsmAndServerMonitorTasks {
 	private String getTileServerMessage() {
 		DescriptiveStatistics tile24Hours = readStats(RED_KEY_TILE, 24);
 		return String.format("<a href='http://tile.osmand.net/hd/3/4/2.png'>tile</a>: "
-				+ "<b>%s</b>. Response time: 24h — %.1f sec · max 24h — %.1f sec.",
+				+ "<b>%s</b>. Response time: 24h — %.1f sec · 95th 24h — %.1f sec.",
 				lastResponseTime < 60 ? "OK" : "FAILED", tile24Hours.getMean(), tile24Hours.getPercentile(PERCENTILE));
 	}
 
@@ -434,8 +435,8 @@ public class OsmAndServerMonitorTasks {
 			String name = host.substring(0, host.indexOf('.'));
 			return String.format("<a href='%s'>%s</a>: <b>%s</b>. Speed: %5.2f, 3h — %5.2f MBs · 24h — %5.2f MBs",
 					host, name, (lastSuccess ? "OK" : "FAILED"),
-					last.getMean(), speed3Hours.getPercentile(PERCENTILE),
-					speed24Hours.getPercentile(PERCENTILE));
+					last.getMean(), speed3Hours.getPercentile(PERCENTILE_SMALL),
+					speed24Hours.getPercentile(PERCENTILE_SMALL));
 		}
 		
 		@Override
