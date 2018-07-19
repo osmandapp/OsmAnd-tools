@@ -342,7 +342,7 @@ public class OsmAndServerMonitorTasks {
 				lastResponseTime < 60 ? "OK" : "FAILED", tile24Hours.getMean(), tile24Hours.getPercentile(95));
 	}
 
-	private DescriptiveStatistics readStats(String key, int hour) {
+	private DescriptiveStatistics readStats(String key, double hour) {
 		long now = System.currentTimeMillis();
 		DescriptiveStatistics stats = new DescriptiveStatistics();
 		Set<String> ls = redisTemplate.opsForZSet().rangeByScore(key, now - hour * HOUR, now);
@@ -428,11 +428,13 @@ public class OsmAndServerMonitorTasks {
 		}
 		
 		public String fullString() {
+			DescriptiveStatistics last = readStats(RED_KEY_DOWNLOAD + host, 0.5);
 			DescriptiveStatistics speed3Hours = readStats(RED_KEY_DOWNLOAD + host, 3);
 			DescriptiveStatistics speed24Hours = readStats(RED_KEY_DOWNLOAD + host, 24);
 			String name = host.substring(0, host.indexOf('.'));
-			return String.format("<a href='%s'>%s</a>: <b>%s</b>. Speed: " + "3h — %5.2f MBs · 24h — %5.2f MBs",
-					host, name, (lastSuccess ? "OK" : "FAILED"), speed3Hours.getPercentile(PERCENTILE),
+			return String.format("<a href='%s'>%s</a>: <b>%s</b>. Speed: %5.2f, 3h — %5.2f MBs · 24h — %5.2f MBs",
+					host, name, (lastSuccess ? "OK" : "FAILED"),
+					last.getMean(), speed3Hours.getPercentile(PERCENTILE),
 					speed24Hours.getPercentile(PERCENTILE));
 		}
 		
