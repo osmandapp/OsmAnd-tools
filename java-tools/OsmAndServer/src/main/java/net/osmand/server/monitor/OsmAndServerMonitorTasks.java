@@ -58,7 +58,7 @@ public class OsmAndServerMonitorTasks {
 			"dl5.osmand.net", "dl6.osmand.net" };
 	private static final String TILE_SERVER = "http://tile.osmand.net/hd/";
 
-	private static final double PERCENTILE = 5;
+	private static final double PERCENTILE = 95;
 	private static final double PERCENTILE_SMALL = 100 - PERCENTILE;
 	
 	
