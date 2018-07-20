@@ -142,12 +142,12 @@ public class OsmAndServerMonitorTasks {
 				Set<String> jobsFailedCopy = new TreeSet<String>(jobsFailed);
 				jobsFailedCopy.removeAll(buildServer.jobsFailed);
 				if (!jobsFailedCopy.isEmpty()) {
-					telegram.sendMonitoringAlertMessage("There are new failures on Build Server: " + jobsFailedCopy);
+					telegram.sendMonitoringAlertMessage("There are new failures on Build Server: " + formatJobNamesAsHref(jobsFailedCopy));
 				}
 				Set<String> jobsRecoveredCopy = new TreeSet<String>(buildServer.jobsFailed);
 				jobsRecoveredCopy.removeAll(jobsFailed);
 				if (!jobsRecoveredCopy.isEmpty()) {
-					telegram.sendMonitoringAlertMessage("There are recovered jobs on Build Server: " + jobsRecoveredCopy);
+					telegram.sendMonitoringAlertMessage("There are recovered jobs on Build Server: " + formatJobNamesAsHref(jobsRecoveredCopy));
 				}
 				buildServer.jobsFailed = jobsFailed;
 			}
@@ -367,13 +367,21 @@ public class OsmAndServerMonitorTasks {
 		if (buildServer.jobsFailed == null || buildServer.jobsFailed.isEmpty()) {
 			msg += "<a href='builder.osmand.net'>builder</a>: <b>OK</b>.\n";
 		} else {
-			msg += "<a href='builder.osmand.net'>builder</a>: <b>FAILED</b>. Jobs: " + buildServer.jobsFailed + "\n";
+			msg += "<a href='builder.osmand.net'>builder</a>: <b>FAILED</b>. Jobs: " + formatJobNamesAsHref(buildServer.jobsFailed) + "\n";
 		}
 		for (DownloadTestResult r : downloadTests.values()) {
 			msg += r.fullString() + "\n";
 		}
 		msg += getTileServerMessage();
 		return msg;
+	}
+
+	private Set<String> formatJobNamesAsHref(Set<String> jobNames) {
+		Set<String> formatted = new TreeSet<>();
+		for (String jobName : jobNames) {
+			formatted.add(String.format("<a href='builder.osmand.net:8080/job/%1$s/'>%1$s</a>", jobName));
+		}
+		return formatted;
 	}
 
 	private String getLiveDelayedMessage(long delay) {
