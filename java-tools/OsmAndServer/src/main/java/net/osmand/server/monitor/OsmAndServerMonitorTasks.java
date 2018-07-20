@@ -55,7 +55,7 @@ public class OsmAndServerMonitorTasks {
 	private static final int MAPS_COUNT_THRESHOLD = 700;
 
 	private static final String[] HOSTS_TO_TEST = new String[] { "download.osmand.net", "dl4.osmand.net",
-			"dl5.osmand.net", "dl6.osmand.net", "dl1.osmand.net"};
+			"dl6.osmand.net", "dl1.osmand.net"};
 	private static final String TILE_SERVER = "http://tile.osmand.net/hd/";
 
 	private static final double PERCENTILE = 95;
