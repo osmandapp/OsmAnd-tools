@@ -2,18 +2,26 @@ package net.osmand.server.controllers.pub;
 
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.util.List;
+import java.util.Map;
 
+import net.osmand.server.index.DownloadIndex;
 import net.osmand.server.index.DownloadIndexesService;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.kxml2.io.KXmlParser;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
+import org.xmlpull.v1.XmlPullParser;
+import org.xmlpull.v1.XmlPullParserException;
 
 @Controller
 public class IndexController {
@@ -23,11 +31,10 @@ public class IndexController {
     @Autowired
     private DownloadIndexesService downloadIndexes;
 
-	@RequestMapping(path = { "indexes.xml", "indexes" })
+	@RequestMapping(path = { "indexes.xml", "indexes" }, produces = {"application/xml"})
 	@ResponseBody
     public FileSystemResource indexesXml(@RequestParam(required=false) boolean update, 
     		@RequestParam(required=false) boolean refresh) throws IOException {
-		// TODO set proper mime-type (to display in browser) - indexes.xml doesn't work
     	File fl = downloadIndexes.getIndexesXml(refresh || update, false);
         return new FileSystemResource(fl); 
     }
@@ -50,8 +57,7 @@ public class IndexController {
     	// TODO print table
     	// possible algorithm
     	// 1. read from xml into DownloadIndex Map, Map<DownloadType, List<DownloadIndex> >
-    	// 2. print each section 
-
+    	// 2. print each section
         return new FileSystemResource(fl); 
     }
 }

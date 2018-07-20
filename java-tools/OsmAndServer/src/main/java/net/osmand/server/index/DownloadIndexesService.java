@@ -6,9 +6,7 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
+import java.util.*;
 import java.util.zip.GZIPOutputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
@@ -19,6 +17,7 @@ import javax.xml.stream.XMLStreamWriter;
 
 import net.osmand.util.Algorithms;
 
+import org.apache.commons.collections4.map.HashedMap;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -109,15 +108,18 @@ public class DownloadIndexesService  {
 		}
 		for(File lf : files) {
 			if(tp.acceptFile(lf)) {
-				// TODO set proper name parse from file name (exclude _2, _ext_2), replace 
-				// TODO set proper description (as first comment from zip file)
-				// $description = $zip->getCommentIndex(0);
 				// TODO set timestamp from first file in zip 
 //				$stat = $zip->statIndex( 0 , ZIPARCHIVE::FL_UNCHANGED);
 //				$timestamp = $stat['mtime'];
 				
 				String name = lf.getName();
 				name = name.substring(0, name.indexOf('.'));
+				if (name.endsWith("_ext_2")) {
+					name = name.replace("_ext_2", "");
+				}
+				if (name.endsWith("_2")) {
+					name = name.replace("_2", "");
+				}
 				name = name.replace('_', ' ');
 				DownloadIndex di = new DownloadIndex(name, lf, tp);
 				if (di.isZip()) {
@@ -125,6 +127,11 @@ public class DownloadIndexesService  {
 						ZipFile zipFile = new ZipFile(lf);
 						long contentSize = zipFile.stream().mapToLong(ZipEntry::getSize).sum();
 						di.setContentSize(contentSize);
+						Enumeration<? extends ZipEntry> entries = zipFile.entries();
+						if (entries.hasMoreElements()) {
+							ZipEntry entry = entries.nextElement();
+							di.setDescription(entry.getComment());
+						}
 						zipFile.close();
 					} catch (Exception e) {
 						LOGGER.error(lf.getName() + ": " + e.getMessage(), e);

@@ -49,8 +49,7 @@ public class DownloadIndex {
     public void setType(DownloadType type) {
 		this.type = type;
 	}
-    
-    
+
 	public boolean isValid() {
 		boolean isValid = true;
 		if (isZip()) {
@@ -78,7 +77,6 @@ public class DownloadIndex {
         return contentSize;
     }
 
-    
     public long getContainerSize() {
     	return file.length();
     }
@@ -86,7 +84,6 @@ public class DownloadIndex {
     public long getTimestamp() {
         return file.lastModified();
     }
-
 
     public String getTargetSize() {
         return String.format("%.1f", getContentSize() / MB);
@@ -108,10 +105,8 @@ public class DownloadIndex {
     }
     
     public void setDescription(String description) {
-    	
 		this.description = description;
 	}
-    
 
     public String getDate() {
         return DATE_FORMAT.format(new Date(getTimestamp()));
