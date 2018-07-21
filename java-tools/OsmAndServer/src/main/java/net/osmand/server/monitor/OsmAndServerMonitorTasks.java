@@ -55,10 +55,11 @@ public class OsmAndServerMonitorTasks {
 	private static final int MAPS_COUNT_THRESHOLD = 700;
 
 	private static final String[] HOSTS_TO_TEST = new String[] { "download.osmand.net", "dl4.osmand.net",
-			"dl5.osmand.net", "dl6.osmand.net" };
+			"dl6.osmand.net", "dl1.osmand.net"};
 	private static final String TILE_SERVER = "http://tile.osmand.net/hd/";
 
 	private static final double PERCENTILE = 95;
+	private static final double PERCENTILE_SMALL = 100 - PERCENTILE;
 	
 	
 	private static final String RED_KEY_OSMAND_LIVE = "live_delay_time";
@@ -338,11 +339,11 @@ public class OsmAndServerMonitorTasks {
 	private String getTileServerMessage() {
 		DescriptiveStatistics tile24Hours = readStats(RED_KEY_TILE, 24);
 		return String.format("<a href='http://tile.osmand.net/hd/3/4/2.png'>tile</a>: "
-				+ "<b>%s</b>. Response time: 24h — %.1f sec · max 24h — %.1f sec.",
-				lastResponseTime < 60 ? "OK" : "FAILED", tile24Hours.getMean(), tile24Hours.getPercentile(95));
+				+ "<b>%s</b>. Response time: 24h — %.1f sec · 95th 24h — %.1f sec.",
+				lastResponseTime < 60 ? "OK" : "FAILED", tile24Hours.getMean(), tile24Hours.getPercentile(PERCENTILE));
 	}
 
-	private DescriptiveStatistics readStats(String key, int hour) {
+	private DescriptiveStatistics readStats(String key, double hour) {
 		long now = System.currentTimeMillis();
 		DescriptiveStatistics stats = new DescriptiveStatistics();
 		Set<String> ls = redisTemplate.opsForZSet().rangeByScore(key, now - hour * HOUR, now);
@@ -365,9 +366,9 @@ public class OsmAndServerMonitorTasks {
 	public String getStatusMessage() {
 		String msg = getLiveDelayedMessage(live.lastOsmAndLiveDelay) + "\n";
 		if (buildServer.jobsFailed == null || buildServer.jobsFailed.isEmpty()) {
-			msg += "<a href='builder.osmand.net'>builder</a>: <b>OK</b>.\n";
+			msg += "<a href='builder.osmand.net:8080'>builder</a>: <b>OK</b>.\n";
 		} else {
-			msg += "<a href='builder.osmand.net'>builder</a>: <b>FAILED</b>. Jobs: " + buildServer.jobsFailed + "\n";
+			msg += "<a href='builder.osmand.net:8080'>builder</a>: <b>FAILED</b>. Jobs: " + buildServer.jobsFailed + "\n";
 		}
 		for (DownloadTestResult r : downloadTests.values()) {
 			msg += r.fullString() + "\n";
@@ -428,12 +429,14 @@ public class OsmAndServerMonitorTasks {
 		}
 		
 		public String fullString() {
+			DescriptiveStatistics last = readStats(RED_KEY_DOWNLOAD + host, 0.5);
 			DescriptiveStatistics speed3Hours = readStats(RED_KEY_DOWNLOAD + host, 3);
 			DescriptiveStatistics speed24Hours = readStats(RED_KEY_DOWNLOAD + host, 24);
 			String name = host.substring(0, host.indexOf('.'));
-			return String.format("<a href='%s'>%s</a>: <b>%s</b>. Speed: " + "3h — %5.2f MBs · 24h — %5.2f MBs",
-					host, name, (lastSuccess ? "OK" : "FAILED"), speed3Hours.getPercentile(PERCENTILE),
-					speed24Hours.getPercentile(PERCENTILE));
+			return String.format("<a href='%s'>%s</a>: <b>%s</b>. Speed: %5.2f, 3h — %5.2f MBs · 24h — %5.2f MBs",
+					host, name, (lastSuccess ? "OK" : "FAILED"),
+					last.getMean(), speed3Hours.getPercentile(PERCENTILE_SMALL),
+					speed24Hours.getPercentile(PERCENTILE_SMALL));
 		}
 		
 		@Override

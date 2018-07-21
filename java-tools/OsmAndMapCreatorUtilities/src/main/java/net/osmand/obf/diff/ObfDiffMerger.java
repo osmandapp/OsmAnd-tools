@@ -68,7 +68,7 @@ public class ObfDiffMerger {
 					File flToMerge = new File(region, regionName + "_" + date.getName() + ".obf.gz");
 					boolean processed = new ObfDiffMerger().process(flToMerge, Arrays.asList(date), true);
 					if(processed) {
-						System.out.println("Processed " + region + ".");
+						System.out.println("Processed " + region + " " + date + " .");
 					}
 				}
 			}
@@ -225,6 +225,8 @@ public class ObfDiffMerger {
 			long lastModified = result.lastModified();
 			for(File f : diffs) {
 				if(f.lastModified() > lastModified) {
+					LOG.info("Process " + result.getName() + " because of " + f.getName() + " " + 
+							lastModified + " != " + f.lastModified());
 					skipEditing = false;
 					break;
 				}

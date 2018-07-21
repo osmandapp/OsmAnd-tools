@@ -68,7 +68,13 @@ public class TravelGuideCreatorMain {
         WikivoyageDataGenerator dataGenerator = new WikivoyageDataGenerator();
         generateTravelSqlite(mapping, conn);
         dataGenerator.generateSearchTable(conn);
+        createPopularArticlesTable(conn);
         conn.close();
+    }
+
+    private void createPopularArticlesTable(Connection conn) throws SQLException {
+        conn.createStatement().execute("CREATE TABLE popular_articles(title text, trip_id long,"
+                + " population long, order_index long, popularity_index long, lat double, lon double, lang text)");
     }
 
     private void generateTravelSqlite(Map<String,List<File>> mapping, Connection conn) throws SQLException, IOException {
