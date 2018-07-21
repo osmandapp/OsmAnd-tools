@@ -225,6 +225,8 @@ public class ObfDiffMerger {
 			long lastModified = result.lastModified();
 			for(File f : diffs) {
 				if(f.lastModified() > lastModified) {
+					LOG.info("Process " + result.getName() + " because of " + f.getName() + " " + 
+							lastModified + " != " + f.lastModified());
 					skipEditing = false;
 					break;
 				}
