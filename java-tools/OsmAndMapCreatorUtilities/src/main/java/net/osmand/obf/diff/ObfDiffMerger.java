@@ -68,7 +68,7 @@ public class ObfDiffMerger {
 					File flToMerge = new File(region, regionName + "_" + date.getName() + ".obf.gz");
 					boolean processed = new ObfDiffMerger().process(flToMerge, Arrays.asList(date), true);
 					if(processed) {
-						System.out.println("Processed " + region + ".");
+						System.out.println("Processed " + region + " " + date + " .");
 					}
 				}
 			}
