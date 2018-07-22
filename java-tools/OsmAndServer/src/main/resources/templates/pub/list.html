@@ -1,0 +1,38 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Osmand Local Indexes List</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+</head>
+<body>
+    <h1>Osmand Local Indexes List</h1>
+    <p th:text="${asc}"></p>
+    <p th:text="${sortby}"></p>
+    <div>
+        <table border="1">
+            <tr>
+                <th>
+                    <a th:href="@{/list.php?sortby=name(asc=${asc})}">File</a>
+                </th>
+                <th>
+                    <a th:href="@{/list.php?sortby=date(asc=${asc})}">Date</a>
+                </th>
+                <th>
+                    <a th:href="@{/list.php?sortby=size(asc=${asc})}">Size</a>
+                </th>
+                <th>
+                    <a th:href="@{/list.php?sortby=descr(asc=${asc})}">Description</a>
+                </th>
+            </tr>
+            <tr th:each="index : ${list}">
+                <td th:text="${index.name}"></td>
+                <td th:text="${index.date}"></td>
+                <td th:text="${index.size}"></td>
+                <td th:text="${index.description}"></td>
+            </tr>
+        </table>
+
+    </div>
+
+</body>
+</html>
