@@ -3,7 +3,11 @@ package net.osmand.server.controllers.pub;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Comparator;
+import java.util.List;
+import java.util.stream.Collectors;
 
+import net.osmand.server.index.DownloadIndex;
 import net.osmand.server.index.DownloadIndexDocument;
 import net.osmand.server.index.DownloadIndexesService;
 
@@ -74,5 +78,59 @@ public class IndexController {
 		model.addAttribute("wiki", doc.getWikimaps());
 		model.addAttribute("wikivoyage", doc.getWikivoyages());
         return "pub/indexes";
+    }
+
+    @RequestMapping(value = {"list", "list.php"})
+    public String listPhp(@RequestParam(required = false) String sortby,
+                          @RequestParam(required = false) boolean asc,
+                          Model model) throws IOException {
+        File fl = null;
+        if (sortby == null || sortby.isEmpty()) {
+            // Update at first load
+            fl = downloadIndexes.getIndexesXml(true, false);
+        } else {
+            // Do not update when filtering
+            fl = downloadIndexes.getIndexesXml(false, false);
+        }
+        DownloadIndexDocument doc = unmarshallIndexes(fl);
+        List<DownloadIndex> regions = doc.getMaps();
+        if (sortby != null && sortby.equals("name")) {
+            if (asc) {
+                regions = regions.stream().sorted(Comparator.comparing(DownloadIndex::getName)).collect(Collectors.toList());
+            } else {
+                regions = regions.stream().sorted(Comparator.comparing(DownloadIndex::getName).reversed()).collect(Collectors.toList());
+            }
+            asc = !asc;
+        }
+
+        if (sortby != null && sortby.equals("date")) {
+            if (asc) {
+                regions = regions.stream().sorted(Comparator.comparing(DownloadIndex::getDate)).collect(Collectors.toList());
+            } else {
+                regions = regions.stream().sorted(Comparator.comparing(DownloadIndex::getDate).reversed()).collect(Collectors.toList());
+            }
+            asc = !asc;
+        }
+
+        if (sortby != null && sortby.equals("size")) {
+            if (asc) {
+                regions = regions.stream().sorted(Comparator.comparing(DownloadIndex::getSize)).collect(Collectors.toList());
+            } else {
+                regions = regions.stream().sorted(Comparator.comparing(DownloadIndex::getSize).reversed()).collect(Collectors.toList());
+            }
+            asc = !asc;
+        }
+
+        if (sortby != null && sortby.equals("descr")) {
+            if (asc) {
+                regions = regions.stream().sorted(Comparator.comparing(DownloadIndex::getDescription)).collect(Collectors.toList());
+            } else {
+                regions = regions.stream().sorted(Comparator.comparing(DownloadIndex::getDescription).reversed()).collect(Collectors.toList());
+            }
+            asc = !asc;
+        }
+        model.addAttribute("regions", regions);
+        model.addAttribute("asc", asc);
+        return "pub/list";
     }
 }
