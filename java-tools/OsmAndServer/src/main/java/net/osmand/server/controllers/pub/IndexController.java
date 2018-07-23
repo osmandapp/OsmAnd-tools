@@ -3,7 +3,12 @@ package net.osmand.server.controllers.pub;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Comparator;
+import java.util.List;
+import java.util.stream.Collectors;
 
+import net.osmand.server.index.DownloadIndex;
+import net.osmand.server.index.DownloadIndexDocument;
 import net.osmand.server.index.DownloadIndexesService;
 
 import org.apache.commons.logging.Log;
@@ -11,9 +16,14 @@ import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
+
+import javax.xml.bind.JAXBContext;
+import javax.xml.bind.JAXBException;
+import javax.xml.bind.Unmarshaller;
 
 @Controller
 public class IndexController {
@@ -23,11 +33,22 @@ public class IndexController {
     @Autowired
     private DownloadIndexesService downloadIndexes;
 
-	@RequestMapping(path = { "indexes.xml", "indexes" })
+    private DownloadIndexDocument unmarshallIndexes(File fl) throws IOException {
+		DownloadIndexDocument doc;
+		try {
+			JAXBContext jc = JAXBContext.newInstance(DownloadIndexDocument.class);
+			Unmarshaller unmarshaller = jc.createUnmarshaller();
+			return (DownloadIndexDocument) unmarshaller.unmarshal(fl);
+		} catch (JAXBException ex) {
+			LOGGER.error(ex.getMessage(), ex);
+			throw new IOException(ex);
+		}
+	}
+
+	@RequestMapping(path = { "indexes.xml", "indexes" }, produces = {"application/xml"})
 	@ResponseBody
     public FileSystemResource indexesXml(@RequestParam(required=false) boolean update, 
     		@RequestParam(required=false) boolean refresh) throws IOException {
-		// TODO set proper mime-type (to display in browser) - indexes.xml doesn't work
     	File fl = downloadIndexes.getIndexesXml(refresh || update, false);
         return new FileSystemResource(fl); 
     }
@@ -41,17 +62,75 @@ public class IndexController {
 		return new FileSystemResource(fl); 
 	}
     
-    @RequestMapping("indexes.php")
-    @ResponseBody
-    public FileSystemResource indexesPhp(@RequestParam(required=false) boolean update, 
-    		@RequestParam(required=false)  boolean refresh) throws IOException {
+    @RequestMapping(value = "indexes.php")
+    public String indexesPhp(@RequestParam(required=false) boolean update,
+    		@RequestParam(required=false)  boolean refresh, Model model) throws IOException {
     	// keep this step
     	File fl = downloadIndexes.getIndexesXml(refresh || update, false);
     	// TODO print table
     	// possible algorithm
     	// 1. read from xml into DownloadIndex Map, Map<DownloadType, List<DownloadIndex> >
-    	// 2. print each section 
+    	// 2. print each section
+		DownloadIndexDocument doc = unmarshallIndexes(fl);
+		model.addAttribute("region", doc.getMaps());
+		model.addAttribute("road_region", doc.getRoadMaps());
+		model.addAttribute("srtmcountry", doc.getSrtmMaps());
+		model.addAttribute("wiki", doc.getWikimaps());
+		model.addAttribute("wikivoyage", doc.getWikivoyages());
+        return "pub/indexes";
+    }
 
-        return new FileSystemResource(fl); 
+    @RequestMapping(value = {"list", "list.php"})
+    public String listPhp(@RequestParam(required = false) String sortby,
+                          @RequestParam(required = false) boolean asc,
+                          Model model) throws IOException {
+        File fl = null;
+        if (sortby == null || sortby.isEmpty()) {
+            // Update at first load
+            fl = downloadIndexes.getIndexesXml(true, false);
+        } else {
+            // Do not update when filtering
+            fl = downloadIndexes.getIndexesXml(false, false);
+        }
+        DownloadIndexDocument doc = unmarshallIndexes(fl);
+        List<DownloadIndex> regions = doc.getMaps();
+        if (sortby != null && sortby.equals("name")) {
+            if (asc) {
+                regions = regions.stream().sorted(Comparator.comparing(DownloadIndex::getName)).collect(Collectors.toList());
+            } else {
+                regions = regions.stream().sorted(Comparator.comparing(DownloadIndex::getName).reversed()).collect(Collectors.toList());
+            }
+            asc = !asc;
+        }
+
+        if (sortby != null && sortby.equals("date")) {
+            if (asc) {
+                regions = regions.stream().sorted(Comparator.comparing(DownloadIndex::getDate)).collect(Collectors.toList());
+            } else {
+                regions = regions.stream().sorted(Comparator.comparing(DownloadIndex::getDate).reversed()).collect(Collectors.toList());
+            }
+            asc = !asc;
+        }
+
+        if (sortby != null && sortby.equals("size")) {
+            if (asc) {
+                regions = regions.stream().sorted(Comparator.comparing(DownloadIndex::getSize)).collect(Collectors.toList());
+            } else {
+                regions = regions.stream().sorted(Comparator.comparing(DownloadIndex::getSize).reversed()).collect(Collectors.toList());
+            }
+            asc = !asc;
+        }
+
+        if (sortby != null && sortby.equals("descr")) {
+            if (asc) {
+                regions = regions.stream().sorted(Comparator.comparing(DownloadIndex::getDescription)).collect(Collectors.toList());
+            } else {
+                regions = regions.stream().sorted(Comparator.comparing(DownloadIndex::getDescription).reversed()).collect(Collectors.toList());
+            }
+            asc = !asc;
+        }
+        model.addAttribute("regions", regions);
+        model.addAttribute("asc", asc);
+        return "pub/list";
     }
 }

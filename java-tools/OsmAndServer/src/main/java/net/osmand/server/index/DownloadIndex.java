@@ -1,136 +1,130 @@
 package net.osmand.server.index;
 
-import java.io.File;
-import java.io.IOException;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.zip.ZipFile;
-
-import javax.xml.stream.XMLStreamException;
-import javax.xml.stream.XMLStreamWriter;
-
 import net.osmand.server.index.DownloadIndexesService.DownloadType;
 
+import javax.xml.bind.annotation.XmlAttribute;
+import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 public class DownloadIndex {
 
-	private static final double MB =  1 << 20;
+	@XmlJavaTypeAdapter(DownloadIndexTypeAdapter.class)
+	@XmlAttribute(name = "type")
 	private DownloadType type;
-	private File file;
-	
-    private long contentSize = -1;
-    private String name;
-    private String description = null;
+
+	private long containerSize;
+
+    private long contentSize;
+
+    private long timestamp;
+
+	@XmlAttribute(name = "date")
+    private String date;
+
+    @XmlJavaTypeAdapter(DownloadIndexSizeAdapter.class)
+	@XmlAttribute(name = "size")
+    private Double size;
+
+	@XmlJavaTypeAdapter(DownloadIndexSizeAdapter.class)
+	@XmlAttribute(name = "targetsize")
+    private Double targetsize;
+
+	private String name;
+
+    private String description;
     
     private SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("dd.MM.yyyy");
-    
-    private static class IndexXmlAttributes {
-	    public static final String TYPE = "type";
-	    public static final String CONTAINER_SIZE = "containerSize";
-	    public static final String CONTENT_SIZE = "contentSize";
-	    public static final String TIMESTAMP = "timestamp";
-	    public static final String DATE = "date";
-	    public static final String SIZE = "size";
-	    public static final String TARGET_SIZE = "targetSize";
-	    public static final String NAME = "name";
-	    public static final String DESCRIPTION = "description";
-	}
-    
-    public DownloadIndex(String name, File lf, DownloadType type) {
-    	this.type = type;
-    	this.file = lf;
-    	this.name = name;
-	}
 
-	public DownloadType getType() {
-		return type;
-	}
-    
     public void setType(DownloadType type) {
 		this.type = type;
 	}
-    
-    
-	public boolean isValid() {
-		boolean isValid = true;
-		if (isZip()) {
-			try {
-				new ZipFile(file);
-			} catch (IOException ex) {
-				isValid = false;
-			}
-		}
-		return isValid;
+
+	public void setTimestamp(long timestamp) {
+		this.timestamp = timestamp;
 	}
-	
-    public boolean isZip() {
-		return file.getName().endsWith(".zip");
+
+	public void setDate(long timestamp) {
+		this.date = DATE_FORMAT.format(new Date(timestamp));
 	}
-    
-    public void setContentSize(long contentSize) {
+
+	public void setSize(double size) {
+		this.size = size;
+	}
+
+	public void setTargetsize(double targetsize) {
+		this.targetsize = targetsize;
+	}
+
+	public void setContentSize(long contentSize) {
 		this.contentSize = contentSize;
 	}
-    
-    public long getContentSize() {
-    	if(contentSize == -1) {
-    		contentSize = file.length();
-    	}
-        return contentSize;
-    }
 
-    
-    public long getContainerSize() {
-    	return file.length();
-    }
+	public void setContainerSize(long containerSize) {
+		this.containerSize = containerSize;
+	}
 
-    public long getTimestamp() {
-        return file.lastModified();
-    }
+	public void setName(String name) {
+		this.name = name;
+	}
 
+	public String getType() {
+		return type.getType();
+	}
 
-    public String getTargetSize() {
-        return String.format("%.1f", getContentSize() / MB);
-    }
-    
-    public String getSize() {
-        return String.format("%.1f", getContainerSize() / MB);
-    }
-    
-    public String getName() {
-        return name;
-    }
+	@XmlAttribute(name = "containerSize")
+	public long getContainerSize() {
+		return containerSize;
+	}
 
-    public String getDescription() {
-    	if(description == null) {
-    		description = type.getDefaultTitle(name);
-    	}
-        return description;
-    }
-    
+	@XmlAttribute(name = "contentSize")
+	public long getContentSize() {
+		return contentSize;
+	}
+
+	@XmlAttribute(name = "timestamp")
+	public long getTimestamp() {
+		return timestamp;
+	}
+
+	public String getDate() {
+		return date;
+	}
+
+	public Double getSize() {
+		return size;
+	}
+
+	public Double getTargetsize() {
+		return targetsize;
+	}
+
+	@XmlAttribute(name = "name")
+	public String getName() {
+		return name;
+	}
+
+	@XmlAttribute(name = "description")
+	public String getDescription() {
+		return description;
+	}
+
     public void setDescription(String description) {
-    	
 		this.description = description;
 	}
-    
 
-    public String getDate() {
-        return DATE_FORMAT.format(new Date(getTimestamp()));
-    }
-    
-    public void writeType(XMLStreamWriter writer) throws XMLStreamException {
-		writer.writeCharacters("\n");
-		writer.writeEmptyElement(type.getXmlTag());
-		writer.writeAttribute(IndexXmlAttributes.TYPE, type.getType());
-		writer.writeAttribute(IndexXmlAttributes.CONTAINER_SIZE, getContainerSize() +"");
-		writer.writeAttribute(IndexXmlAttributes.CONTENT_SIZE, getContentSize() + "");
-		writer.writeAttribute(IndexXmlAttributes.TIMESTAMP, getTimestamp() + "");
-		writer.writeAttribute(IndexXmlAttributes.DATE, getDate());
-		writer.writeAttribute(IndexXmlAttributes.SIZE, getSize());
-		writer.writeAttribute(IndexXmlAttributes.TARGET_SIZE, getTargetSize());
-		writer.writeAttribute(IndexXmlAttributes.NAME, file.getName());
-		writer.writeAttribute(IndexXmlAttributes.DESCRIPTION, getDescription());
+	@Override
+	public String toString() {
+		return "DownloadIndex{" +
+				"type=" + type +
+				", containerSize=" + containerSize +
+				", contentSize=" + contentSize +
+				", timestamp=" + timestamp +
+				", date='" + date + '\'' +
+				", size=" + size +
+				", targetSize=" + targetsize +
+				", name='" + name + '\'' +
+				", description='" + description + '\'' +
+				'}';
 	}
-
 }
-
-
