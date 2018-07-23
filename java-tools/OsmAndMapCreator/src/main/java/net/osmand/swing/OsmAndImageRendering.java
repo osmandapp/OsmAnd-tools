@@ -272,12 +272,14 @@ public class OsmAndImageRendering {
 
 				}
 				if(nativeLib != null){
+					final String fileName = ic.generateName + ".png";
+					System.out.println("Generate to " + fileName );
 					nsr.loadRuleStorage(ic.renderingStyle, ic.renderingProperties);
 					BufferedImage mg = nsr.renderImage(new RenderingImageContext(lat, lon, imageWidth, imageHeight,
 							ic.zoom, ic.mapDensity));
 
 					ImageWriter writer = ImageIO.getImageWritersBySuffix("png").next();
-					final String fileName = ic.generateName + ".png";
+					  
 					if (html != null) {
 						html.addFile(fileName);
 					}
