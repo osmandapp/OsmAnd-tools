@@ -162,6 +162,8 @@ public class OsmAndImageRendering {
 			boolean old = NativeLibrary.loadOldLib(nativeLib);
 			NativeLibrary nl = new NativeLibrary();
 			nl.loadFontData(new File("fonts"));
+			nl.loadFontData(new File("OsmAndMapCreator/fonts"));
+			
 			if (!old) {
 				throw new UnsupportedOperationException("Not supported");
 			}
