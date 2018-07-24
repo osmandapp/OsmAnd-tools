@@ -276,7 +276,9 @@ public class WikiDatabasePreparation {
 
 	private static void parseAndAppendMetricData(String val, StringBuilder bld) {
 		String[] parts = val.split("\\|");
-		bld.append(String.format("%s %s", parts[1], parts[0]));
+		if (parts.length == 2) {
+			bld.append(String.format("%s %s", parts[1], parts[0]));
+		}
 	}
 
 	private static int getIndex(String part) {
