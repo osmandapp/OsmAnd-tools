@@ -195,13 +195,14 @@ public class TransactionAnalyzer {
 				for (Map<?, ?> payout : outputs) {
 					String address = (String) payout.get("addr");
 					Double sum = (Double) payout.get("value");
+					txSum += sum;
 					if (result.containsKey(address)) {
 						result.put(address, result.get(address) + sum);
 					} else {
 						result.put(address, sum);
 					}
 				}
-				System.out.println(String.format("Read transactions for %s (%.2f mBTC)", turl, txSum / 10000));
+				System.out.println(String.format("Read %s - %.2f mBTC", turl, txSum / 10000));
 				total += txSum;
 			}
 		}
