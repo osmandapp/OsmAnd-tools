@@ -5,6 +5,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Comparator;
 import java.util.List;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import net.osmand.server.index.DownloadIndex;
@@ -21,6 +22,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
+import javax.servlet.http.HttpServletResponse;
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBException;
 import javax.xml.bind.Unmarshaller;
@@ -45,7 +47,7 @@ public class IndexController {
 		}
 	}
 
-	@RequestMapping(path = { "indexes.xml", "indexes" }, produces = {"application/xml"})
+	@RequestMapping(path = { "indexes.xml"}, produces = {"application/xml"})
 	@ResponseBody
     public FileSystemResource indexesXml(@RequestParam(required=false) boolean update, 
     		@RequestParam(required=false) boolean refresh) throws IOException {
@@ -56,13 +58,13 @@ public class IndexController {
 	@RequestMapping(path = { "get_indexes.php", "get_indexes"})
 	@ResponseBody
     public FileSystemResource indexesPhp(@RequestParam(defaultValue="", required=false)
-    String gzip) throws IOException {
+    String gzip, HttpServletResponse resp) throws IOException {
 		boolean gz = gzip != null && !gzip.isEmpty();
 		File fl = downloadIndexes.getIndexesXml(false, gz);
 		return new FileSystemResource(fl); 
 	}
     
-    @RequestMapping(value = "indexes.php")
+    @RequestMapping(value = {"indexes.php", "indexes"})
     public String indexesPhp(@RequestParam(required=false) boolean update,
     		@RequestParam(required=false)  boolean refresh, Model model) throws IOException {
     	// keep this step
@@ -95,42 +97,39 @@ public class IndexController {
         DownloadIndexDocument doc = unmarshallIndexes(fl);
         List<DownloadIndex> regions = doc.getMaps();
         if (sortby != null && sortby.equals("name")) {
-            if (asc) {
-                regions = regions.stream().sorted(Comparator.comparing(DownloadIndex::getName)).collect(Collectors.toList());
-            } else {
-                regions = regions.stream().sorted(Comparator.comparing(DownloadIndex::getName).reversed()).collect(Collectors.toList());
-            }
+            regions = sortUsingComparatorAndDirection(regions, compareBy(DownloadIndex::getName), asc);
             asc = !asc;
         }
 
         if (sortby != null && sortby.equals("date")) {
-            if (asc) {
-                regions = regions.stream().sorted(Comparator.comparing(DownloadIndex::getDate)).collect(Collectors.toList());
-            } else {
-                regions = regions.stream().sorted(Comparator.comparing(DownloadIndex::getDate).reversed()).collect(Collectors.toList());
-            }
+            regions = sortUsingComparatorAndDirection(regions, compareBy(DownloadIndex::getDate), asc);
             asc = !asc;
         }
 
         if (sortby != null && sortby.equals("size")) {
-            if (asc) {
-                regions = regions.stream().sorted(Comparator.comparing(DownloadIndex::getSize)).collect(Collectors.toList());
-            } else {
-                regions = regions.stream().sorted(Comparator.comparing(DownloadIndex::getSize).reversed()).collect(Collectors.toList());
-            }
+            regions = sortUsingComparatorAndDirection(regions, compareBy(DownloadIndex::getSize), asc);
             asc = !asc;
         }
 
         if (sortby != null && sortby.equals("descr")) {
-            if (asc) {
-                regions = regions.stream().sorted(Comparator.comparing(DownloadIndex::getDescription)).collect(Collectors.toList());
-            } else {
-                regions = regions.stream().sorted(Comparator.comparing(DownloadIndex::getDescription).reversed()).collect(Collectors.toList());
-            }
+            regions = sortUsingComparatorAndDirection(regions, compareBy(DownloadIndex::getDescription), asc);
             asc = !asc;
         }
+
         model.addAttribute("regions", regions);
         model.addAttribute("asc", asc);
         return "pub/list";
+    }
+
+    private <T,R extends Comparable<? super R>> Comparator<T> compareBy(Function<T,R> fun) {
+        return Comparator.comparing(fun);
+    }
+
+    private List<DownloadIndex> sortUsingComparatorAndDirection(List<DownloadIndex> list, Comparator<DownloadIndex> comparator, boolean asc) {
+        if (asc) {
+            return list.stream().sorted().collect(Collectors.toList());
+        } else {
+            return list.stream().sorted(comparator.reversed()).collect(Collectors.toList());
+        }
     }
 }
