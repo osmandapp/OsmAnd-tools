@@ -202,12 +202,12 @@ public class TransactionAnalyzer {
 						result.put(address, sum);
 					}
 				}
-				System.out.println(String.format("Read %s - %.2f mBTC", turl, txSum / 10000));
+				System.out.println(String.format("Read %s - %.2f mBTC", turl, txSum / 100000));
 				total += txSum;
 			}
 		}
 		System.out.println(result);
-		System.out.println(String.format("Total payout is %.2f mBTC", total / 10000));
+		System.out.println(String.format("Total payout is %.2f mBTC", total / 100000));
 		return result;
 	}
 
