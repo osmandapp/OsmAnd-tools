@@ -63,8 +63,9 @@ public class WikivoyageLangPreparation {
 		BANNER("pagebanner"),
 		REGION_LIST("regionlist"), 
 		WARNING("warningbox"),
-		CITATION("citation");
-		
+		CITATION("citation"),
+		METRIC_DATA("metric");
+
 		private String type;
 		WikivoyageTemplates(String s) {
 			type = s;
