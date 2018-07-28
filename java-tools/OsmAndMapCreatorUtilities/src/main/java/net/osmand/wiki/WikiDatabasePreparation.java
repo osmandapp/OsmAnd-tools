@@ -432,6 +432,7 @@ public class WikiDatabasePreparation {
 	
 	private static String parseListing(String val, WikidataConnection wikiDataconn, String wikiLang) throws IOException, SQLException {
 		StringBuilder bld = new StringBuilder();
+		val = val.replaceAll("\\{\\{.*}}", "");
 		String[] parts = val.split("\\|");
 		String lat = null;
 		String lon = null;
