@@ -7,7 +7,6 @@ jar {
     	}
     }
 }
-// TODO package osmand-linux-amd64.lib  into OsmAnd-java
 
 task collectMdpiIcons(type: Copy) {
 	from("../../../resources/rendering_styles/style-icons/drawable-mdpi/")

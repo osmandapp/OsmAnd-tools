@@ -182,27 +182,32 @@ public class TransactionAnalyzer {
 		Map<?, ?> mp = gson.fromJson(tx, Map.class);
 //		System.out.println(mp);
 		Map<String, Double> result = new HashMap<>();
+		double total = 0;
 		for(Map.Entry<?, ?> e: mp.entrySet()) {
-			System.out.println("Read transactions for " + e.getKey() +"... ");
+			System.out.println("Read transactions for " + e.getKey() + "... ");
 			List<?> array = (List<?>)((Map<?, ?>)e.getValue()).get("transactions");
 			for (Object tid : array) {
 				String turl = "https://blockchain.info/rawtx/" + tid;
-				System.out.println("Read transactions for " + turl + "... ");
+				double txSum = 0;
 				Map<?, ?> payoutObjects = gson.fromJson(readJsonUrl("https://blockchain.info/rawtx/", tid.toString(), "btc_", true), Map.class);
 //				Map<?, ?> data = (Map<?, ?>) payoutObjects.get("data");
 				List<Map<?, ?>> outputs = (List<Map<?, ?>>) payoutObjects.get("out");
 				for (Map<?, ?> payout : outputs) {
 					String address = (String) payout.get("addr");
 					Double sum = (Double) payout.get("value");
+					txSum += sum;
 					if (result.containsKey(address)) {
 						result.put(address, result.get(address) + sum);
 					} else {
 						result.put(address, sum);
 					}
 				}
+				System.out.println(String.format("Read %s - %.2f mBTC", turl, txSum / 100000));
+				total += txSum;
 			}
 		}
 		System.out.println(result);
+		System.out.println(String.format("Total payout is %.2f mBTC", total / 100000));
 		return result;
 	}
 

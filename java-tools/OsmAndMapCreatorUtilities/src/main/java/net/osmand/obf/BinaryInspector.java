@@ -77,10 +77,10 @@ public class BinaryInspector {
 		// test cases show info
 		if ("test".equals(args[0])) {
 			in.inspector(new String[] {
-					"-vpoi",
+//					"-vpoi",
 //					"-vmap", "-vmapobjects", 
 //					"-vmapcoordinates",
-//					"-vrouting",
+					"-vrouting",
 //					"-vtransport",
 //					"-vaddress", "-vcities","-vstreetgroups",
 //					"-vstreets", "-vbuildings", "-vintersections",
@@ -88,8 +88,7 @@ public class BinaryInspector {
 //					"-bbox=30.4981,50.4424,30.5195,50.4351",
 //					"-osm="+System.getProperty("maps.dir")+"/map_full_1.obf.osm",
 //					System.getProperty("maps.dir")+"/diff/Bulgaria_europe_01_00.obf"
-//					System.getProperty("maps.dir")+"/diff/Diff.obf"
-					System.getProperty("maps.dir")+"/Andorra_europe.wiki.obf"
+					System.getProperty("maps.dir")+"Map.obf"
 			});
 		} else {
 			in.inspector(args);
@@ -620,10 +619,13 @@ public class BinaryInspector {
 						}
 						b.append(obj.getRestrictionId(i)).append(" (").append(
 								MapRenderingTypes.getRestrictionValue(
-								obj.getRestrictionType(i))).append(") ");
+								obj.getRestrictionType(i))).append(")");
+						if(obj.getRestrictionVia(i) != 0) {
+							b.append(" via ").append(obj.getRestrictionVia(i));
+						}
 
 					}
-					b.append("] ");
+					b.append(" ]");
 				}
 				if (vInfo.vmapCoordinates) {
 					b.append(" lat/lon : ");

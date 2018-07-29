@@ -42,6 +42,7 @@ import net.osmand.binary.OsmandOdb.RestrictionData;
 import net.osmand.binary.OsmandOdb.RestrictionData.Builder;
 import net.osmand.binary.OsmandOdb.RouteData;
 import net.osmand.binary.RouteDataObject;
+import net.osmand.binary.RouteDataObject.RestrictionInfo;
 import net.osmand.data.LatLon;
 import net.osmand.obf.preparation.BinaryMapIndexWriter.RoutePointToWrite;
 import net.osmand.osm.MapRenderingTypes;
@@ -86,7 +87,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 	private final static float DOUGLAS_PEUKER_DISTANCE = 15;
 
 
-	private TLongObjectHashMap<TLongArrayList> highwayRestrictions = new TLongObjectHashMap<TLongArrayList>();
+	private TLongObjectHashMap<List<RestrictionInfo>> highwayRestrictions = new TLongObjectHashMap<List<RestrictionInfo>>();
 	private TLongObjectHashMap<Long> basemapRemovedNodes = new TLongObjectHashMap<Long>();
 	private TLongObjectHashMap<RouteMissingPoints> basemapNodesToReinsert = new TLongObjectHashMap<RouteMissingPoints> ();
 
@@ -95,6 +96,8 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 	TLongObjectHashMap<TIntArrayList> pointTypes = new TLongObjectHashMap<TIntArrayList>();
 	TLongObjectHashMap<TIntObjectHashMap<String> >  pointNames = new TLongObjectHashMap<TIntObjectHashMap<String> > ();
 	Map<MapRoutingTypes.MapRouteType, String> names = createTreeMap();
+	
+
 
 	static TreeMap<MapRoutingTypes.MapRouteType, String> createTreeMap() {
 		return new TreeMap<MapRoutingTypes.MapRouteType, String>(new Comparator<MapRoutingTypes.MapRouteType>() {
@@ -560,14 +563,24 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 					ctx.loadEntityRelation((Relation) e);
 					Collection<RelationMember> fromL = ((Relation) e).getMembers("from"); //$NON-NLS-1$
 					Collection<RelationMember> toL = ((Relation) e).getMembers("to"); //$NON-NLS-1$
+					Collection<RelationMember> viaL = ((Relation) e).getMembers("via"); //$NON-NLS-1$
 					if (!fromL.isEmpty() && !toL.isEmpty()) {
 						RelationMember from = fromL.iterator().next();
 						RelationMember to = toL.iterator().next();
 						if (from.getEntityId().getType() == EntityType.WAY) {
 							if (!highwayRestrictions.containsKey(from.getEntityId().getId())) {
-								highwayRestrictions.put(from.getEntityId().getId(), new TLongArrayList());
+								highwayRestrictions.put(from.getEntityId().getId(), new ArrayList<>());
 							}
-							highwayRestrictions.get(from.getEntityId().getId()).add((to.getEntityId().getId() << 3) | (long) type);
+							RestrictionInfo rd = new RestrictionInfo();
+							rd.toWay = to.getEntityId().getId();
+							rd.type = type;
+							if(!viaL.isEmpty()) {
+								RelationMember via = viaL.iterator().next();
+								if(via.getEntityId().getType() == EntityType.WAY) {
+									rd.viaWay = via.getEntityId().getId();
+								}
+							}
+							highwayRestrictions.get(from.getEntityId().getId()).add(rd);
 						}
 					}
 				}
@@ -1145,7 +1158,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		Log logMapDataWarn;
 		private MapRoutingTypes routeTypes;
 		
-		TLongObjectHashMap<TLongArrayList> highwayRestrictions = new TLongObjectHashMap<TLongArrayList>();
+		TLongObjectHashMap<List<RestrictionInfo>> highwayRestrictions = new TLongObjectHashMap<List<RestrictionInfo>>();
 		TLongObjectHashMap<RouteMissingPoints> basemapNodesToReinsert = new TLongObjectHashMap<RouteMissingPoints> ();
 		
 		public RouteWriteContext(Log logMapDataWarn, TLongObjectHashMap<BinaryFileReference> treeHeader, MapRoutingTypes routeTypes,
@@ -1165,9 +1178,9 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 			this.objects = objects;
 			
 			for(RouteDataObject o : objects.valueCollection()){
-				TLongArrayList list = new TLongArrayList();
+				List<RestrictionInfo> list = new ArrayList<>();
 				for(int k = 0 ; k < o.getRestrictionLength(); k++) {
-					list.add(o.getRawRestriction(k));
+					list.add(o.getRestrictionInfo(k));
 				}
 				highwayRestrictions.put(o.getId(), list);
 			}
@@ -1213,15 +1226,6 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 			}
 		}
 		
-		private int registerId(TLongArrayList ids, long id) {
-			for (int i = 0; i < ids.size(); i++) {
-				if (ids.getQuick(i) == id) {
-					return i;
-				}
-			}
-			ids.add(id);
-			return ids.size() - 1;
-		}
 		
 		public int registerWayMapId(long id) {
 			if(!wayMapIdsCache.contains(id)) {
@@ -1403,14 +1407,20 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 						wc.pointMapIds.clear();
 					}
 					int cid = wc.registerWayMapId(id);
-					TLongArrayList restrictions = wc.highwayRestrictions.get(id);
+					List<RestrictionInfo> restrictions = wc.highwayRestrictions.get(id);
 					if (!basemap && restrictions != null) {
 						for (int li = 0; li < restrictions.size(); li++) {
+							RestrictionInfo rd = restrictions.get(li);
 							Builder restriction = RestrictionData.newBuilder();
 							restriction.setFrom(cid);
-							int toId = wc.registerWayMapId(restrictions.get(li) >> 3);
+							int toId = wc.registerWayMapId(rd.toWay);
 							restriction.setTo(toId);
-							restriction.setType((int) (restrictions.get(li) & 0x7));
+							restriction.setType(rd.type);
+							if(rd.viaWay != 0) {
+								int viaId = wc.registerWayMapId(rd.viaWay);
+								restriction.setVia(viaId);
+							}
+							
 							dataBlock.addRestrictions(restriction.build());
 						}
 					}

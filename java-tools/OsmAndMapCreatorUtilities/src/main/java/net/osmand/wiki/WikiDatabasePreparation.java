@@ -145,6 +145,8 @@ public class WikiDatabasePreparation {
 					appendWarning(bld, val);
 				} else if (key.equals(WikivoyageTemplates.CITATION.getType())) {
 					parseAndAppendCitation(val, bld);
+				} else if (key.equals(WikivoyageTemplates.METRIC_DATA.getType())) {
+					parseAndAppendMetricData(val, bld);
 				}
 				if (!key.isEmpty()) {
 					if (key.contains("|")) {
@@ -270,6 +272,13 @@ public class WikiDatabasePreparation {
 			}
 		}
 		bld.append("|}");
+	}
+
+	private static void parseAndAppendMetricData(String val, StringBuilder bld) {
+		String[] parts = val.split("\\|");
+		if (parts.length == 2) {
+			bld.append(String.format("%s %s", parts[1], parts[0]));
+		}
 	}
 
 	private static int getIndex(String part) {
@@ -423,6 +432,7 @@ public class WikiDatabasePreparation {
 	
 	private static String parseListing(String val, WikidataConnection wikiDataconn, String wikiLang) throws IOException, SQLException {
 		StringBuilder bld = new StringBuilder();
+		val = val.replaceAll("\\{\\{.*}}", "");
 		String[] parts = val.split("\\|");
 		String lat = null;
 		String lon = null;
@@ -579,6 +589,8 @@ public class WikiDatabasePreparation {
 			return WikivoyageTemplates.WARNING.getType();
 		} else if (str.startsWith("cite")) {
 			return WikivoyageTemplates.CITATION.getType();
+		} else if (str.startsWith("m|") || str.startsWith("km|")) {
+			return WikivoyageTemplates.METRIC_DATA.getType();
 		}
 		return "";
 	}
