@@ -6,6 +6,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.zip.GZIPOutputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
@@ -147,8 +148,6 @@ public class DownloadIndexesService  {
 				DownloadIndex di = new DownloadIndex();
 				di.setType(tp);
 				di.setName(lf.getName());
-				di.setTimestamp(lf.lastModified());
-				di.setDate(lf.lastModified());
 				di.setSize(lf.length());
 				di.setContainerSize(lf.length());
 				if (isZip(lf)) {
@@ -160,6 +159,9 @@ public class DownloadIndexesService  {
 						Enumeration<? extends ZipEntry> entries = zipFile.entries();
 						if (entries.hasMoreElements()) {
 							ZipEntry entry = entries.nextElement();
+							long mtime = entry.getLastModifiedTime().to(TimeUnit.MILLISECONDS);
+							di.setTimestamp(mtime);
+							di.setDate(mtime);
 							String description = entry.getComment();
 							if (description != null) {
 								di.setDescription(description);
@@ -173,6 +175,8 @@ public class DownloadIndexesService  {
 						e.printStackTrace();
 					}
 				} else {
+					di.setTimestamp(lf.lastModified());
+					di.setDate(lf.lastModified());
 					di.setContentSize(lf.length());
 					di.setTargetsize(lf.length());
 					di.setDescription(tp.getDefaultTitle(name));
@@ -244,7 +248,7 @@ public class DownloadIndexesService  {
 			case WIKIMAP:
 			case DEPTH:
 			case SRTM_MAP:
-				return f.getName().endsWith(".obf.zip") || f.getName().endsWith(".obf");
+				return f.getName().endsWith(".obf.zip") || f.getName().endsWith(".obf") || f.getName().endsWith(".extra.zip");
 			case WIKIVOYAGE:
 				return f.getName().endsWith(".sqlite");
 			case HILLSHADE:
