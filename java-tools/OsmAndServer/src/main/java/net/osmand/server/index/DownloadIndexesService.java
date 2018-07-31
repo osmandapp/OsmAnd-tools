@@ -248,7 +248,7 @@ public class DownloadIndexesService  {
 			case WIKIMAP:
 			case DEPTH:
 			case SRTM_MAP:
-				return f.getName().endsWith(".obf.zip") || f.getName().endsWith(".obf");
+				return f.getName().endsWith(".obf.zip") || f.getName().endsWith(".obf") || f.getName().endsWith(".extra.zip");
 			case WIKIVOYAGE:
 				return f.getName().endsWith(".sqlite");
 			case HILLSHADE:

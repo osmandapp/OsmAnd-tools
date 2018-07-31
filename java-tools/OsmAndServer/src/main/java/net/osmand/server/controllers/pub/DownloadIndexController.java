@@ -16,6 +16,7 @@ import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.*;
+import java.net.InetSocketAddress;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
@@ -31,6 +32,11 @@ public class DownloadIndexController {
 	private static final int MAIN_SERVERS_LOAD = 60;
 	private static final List<String> HELP_SERVERS = Arrays.asList("dl4.osmand.net");
 	private static final List<String> MAIN_SERVERS = Arrays.asList("dl6.osmand.net");
+
+	/*
+		DATE_AND_EXT_STR_LEN = "_18_06_02.obf.gz".length()
+	 */
+	private static final int DATE_AND_EXT_STR_LEN = 16;
 
 	private final File rootDir = new File("/var/www-download/");
 
@@ -144,7 +150,7 @@ public class DownloadIndexController {
 		throw new IllegalArgumentException(msg);
 	}
 
-	private Resource findFileResource(MultiValueMap<String, String> params) throws IOException {
+	private Resource findFileResource(MultiValueMap<String, String> params) throws FileNotFoundException {
 		String filename = getFileOrThrow(params);
 		if (params.containsKey("srtm")) {
 			return getFileAsResource("srtm", filename);
@@ -156,10 +162,12 @@ public class DownloadIndexController {
 			return getFileAsResource("road-indexes", filename);
 		}
 		if (params.containsKey("osmc")) {
-			throw new FileNotFoundException("Osmc not implemented");
+			String folder = filename.substring(0, filename.length() - DATE_AND_EXT_STR_LEN).toLowerCase();
+			return getFileAsResource("osmc" + File.separator + folder, filename);
 		}
 		if (params.containsKey("aosmc")) {
-			throw new FileNotFoundException("Aosmc not implemeted");
+			String folder = filename.substring(0, filename.length() - DATE_AND_EXT_STR_LEN).toLowerCase();
+			return getFileAsResource("aosmc" + File.separator + folder, filename);
 		}
 		if (params.containsKey("wiki")) {
 			return getFileAsResource("wiki", filename);
@@ -213,14 +221,18 @@ public class DownloadIndexController {
 							  @RequestHeader HttpHeaders headers,
 							  HttpServletRequest req,
 							  HttpServletResponse resp) throws IOException {
-		String hostName = headers.getHost().getHostName();
+		InetSocketAddress inetHost = headers.getHost();
+		if (inetHost == null) {
+			resp.sendError(HttpServletResponse.SC_BAD_REQUEST, "Invalid host name");
+			return;
+		}
+		String hostName = inetHost.getHostName();
 		boolean self = isContainAndEqual("self", "true", params);
 		if (hostName.equals(DOWNLOAD_SERVER) && self) {
 			Resource res = findFileResource(params);
 			handleDownload(res, headers, resp);
 			return;
 		}
-
 		if (hostName.equals(DOWNLOAD_SERVER)) {
 			ThreadLocalRandom tlr = ThreadLocalRandom.current();
 			int random = tlr.nextInt(100);
@@ -245,11 +257,15 @@ public class DownloadIndexController {
 	}
 
 	@RequestMapping(value = "/download.php", method = RequestMethod.HEAD)
-	public HttpHeaders checkRangeRequests(@RequestParam MultiValueMap<String, String> params) throws IOException {
-		HttpHeaders headers = new HttpHeaders();
-		Resource resource = findFileResource(params);
-		headers.add(HttpHeaders.ACCEPT_RANGES, "bytes");
-		headers.setContentLength(resource.contentLength());
-		return headers;
+	public void checkRangeRequests(@RequestParam MultiValueMap<String, String> params, HttpServletResponse resp)
+			throws IOException {
+		try {
+			Resource resource = findFileResource(params);
+			resp.setStatus(HttpServletResponse.SC_OK);
+			resp.setHeader(HttpHeaders.ACCEPT_RANGES, "bytes");
+			resp.setContentLengthLong(resource.contentLength());
+		} catch (FileNotFoundException ex) {
+			resp.sendError(HttpServletResponse.SC_NOT_FOUND, ex.getMessage());
+		}
 	}
 }

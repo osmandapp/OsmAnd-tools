@@ -1,44 +1,31 @@
 package net.osmand.server.controllers.pub;
 
-
-import java.io.*;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-
-import com.sun.xml.internal.ws.developer.MemberSubmissionAddressing;
-import net.osmand.bitcoinsender.model.Input;
 import net.osmand.server.index.DownloadIndex;
 import net.osmand.server.index.DownloadIndexDocument;
 import net.osmand.server.index.DownloadIndexesService;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
-import org.springframework.core.io.WritableResource;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpRange;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.util.MimeType;
-import org.springframework.util.MimeTypeUtils;
-import org.springframework.util.MultiValueMap;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
-import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServletResponse;
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBException;
 import javax.xml.bind.Unmarshaller;
+import java.io.File;
+import java.io.IOException;
+import java.util.Comparator;
+import java.util.List;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Controller
 public class IndexController {
@@ -66,7 +53,7 @@ public class IndexController {
 
     private List<DownloadIndex> sortUsingComparatorAndDirection(List<DownloadIndex> list, Comparator<DownloadIndex> comparator, boolean asc) {
         if (asc) {
-            return list.stream().sorted().collect(Collectors.toList());
+            return list.stream().sorted(comparator).collect(Collectors.toList());
         } else {
             return list.stream().sorted(comparator.reversed()).collect(Collectors.toList());
         }
