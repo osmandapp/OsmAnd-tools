@@ -42,7 +42,7 @@ spring:
 
 download:
   servers:
-    self: download.osmand.net
+    self: builder.osmand.net
     main:
       - dl6.osmand.net
     help:
