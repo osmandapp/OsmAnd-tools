@@ -2,6 +2,9 @@ package net.osmand.server.controllers.pub;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -17,7 +20,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.*;
 import java.net.InetSocketAddress;
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -27,12 +30,13 @@ public class DownloadIndexController {
 
 	private static final int BUFFER_SIZE = 4096;
 
-	private static final String DOWNLOAD_SERVER = "download.osmand.net";
 
-	private static final int MAIN_SERVERS_LOAD = 60;
-	private static final List<String> HELP_SERVERS = Arrays.asList("dl4.osmand.net");
-	private static final List<String> MAIN_SERVERS = Arrays.asList("dl6.osmand.net");
+	private final DownloadProperties config;
 
+	@Autowired
+	public DownloadIndexController(DownloadProperties config) {
+		this.config = config;
+	}
 	/*
 		DATE_AND_EXT_STR_LEN = "_18_06_02.obf.gz".length()
 	 */
@@ -130,7 +134,6 @@ public class DownloadIndexController {
 				break;
 			}
 		}
-
 	}
 
 	private void handleDownload(Resource res, HttpHeaders headers, HttpServletResponse resp) throws IOException {
@@ -188,8 +191,8 @@ public class DownloadIndexController {
 			return getFileAsResource("indexes", filename);
 		}
 		String msg = "Requested resource is missing or request is incorrect.\nRequest parameters: " + params;
+		LOGGER.error(msg);
 		throw new FileNotFoundException(msg);
-
 	}
 
 	private boolean isContainAndEqual(String param, String equalTo, MultiValueMap<String, String> params) {
@@ -221,6 +224,7 @@ public class DownloadIndexController {
 							  @RequestHeader HttpHeaders headers,
 							  HttpServletRequest req,
 							  HttpServletResponse resp) throws IOException {
+		DownloadProperties.DownloadServers servers = config.getServers();
 		InetSocketAddress inetHost = headers.getHost();
 		if (inetHost == null) {
 			resp.sendError(HttpServletResponse.SC_BAD_REQUEST, "Invalid host name");
@@ -228,23 +232,23 @@ public class DownloadIndexController {
 		}
 		String hostName = inetHost.getHostName();
 		boolean self = isContainAndEqual("self", "true", params);
-		if (hostName.equals(DOWNLOAD_SERVER) && self) {
+		if (self) {
 			Resource res = findFileResource(params);
 			handleDownload(res, headers, resp);
 			return;
 		}
-		if (hostName.equals(DOWNLOAD_SERVER)) {
+		if (hostName.equals(config.getServers().getSelf()) && !self) {
 			ThreadLocalRandom tlr = ThreadLocalRandom.current();
 			int random = tlr.nextInt(100);
 			boolean isSimple = computeSimpleCondition(params);
 			if (computeStayHereCondition(params)) {
 				handleDownload(findFileResource(params), headers, resp);
-			} else if (HELP_SERVERS.size() > 0 && isSimple && random < (100 - MAIN_SERVERS_LOAD)) {
-				String host = HELP_SERVERS.get(random % HELP_SERVERS.size());
+			} else if (servers.getHelp().size() > 0 && isSimple && random < (100 - config.getLoad())) {
+				String host = servers.getHelp().get(random % servers.getHelp().size());
 				resp.setStatus(HttpServletResponse.SC_FOUND);
 				resp.setHeader(HttpHeaders.LOCATION, "http://" + host + "/download.php?" + req.getQueryString());
-			} else if (MAIN_SERVERS.size() > 0) {
-				String host = MAIN_SERVERS.get(random % MAIN_SERVERS.size());
+			} else if (servers.getMain().size() > 0) {
+				String host = servers.getMain().get(random % servers.getMain().size());
 				resp.setStatus(HttpServletResponse.SC_FOUND);
 				resp.setHeader(HttpHeaders.LOCATION, "http://" + host + "/download.php?" + req.getQueryString());
 			} else {
@@ -265,7 +269,61 @@ public class DownloadIndexController {
 			resp.setHeader(HttpHeaders.ACCEPT_RANGES, "bytes");
 			resp.setContentLengthLong(resource.contentLength());
 		} catch (FileNotFoundException ex) {
+			LOGGER.error(ex.getMessage(), ex);
 			resp.sendError(HttpServletResponse.SC_NOT_FOUND, ex.getMessage());
+		}
+	}
+
+	@Configuration
+	@ConfigurationProperties(prefix = "download")
+	public static class DownloadProperties {
+		private int load;
+		private DownloadServers servers = new DownloadServers();
+
+		public int getLoad() {
+			return load;
+		}
+
+		public void setLoad(int load) {
+			this.load = load;
+		}
+
+		public DownloadServers getServers() {
+			return servers;
+		}
+
+		public void setServers(DownloadServers servers) {
+			this.servers = servers;
+		}
+
+		public static class DownloadServers {
+			private String self;
+			private List<String> help = new ArrayList<>();
+			private List<String> main = new ArrayList<>();
+
+			public String getSelf() {
+				return self;
+			}
+
+			public void setSelf(String self) {
+				this.self = self;
+			}
+
+			public List<String> getHelp() {
+				return help;
+			}
+
+			public void setHelp(List<String> help) {
+				this.help = help;
+			}
+
+			public List<String> getMain() {
+				return main;
+			}
+
+			public void setMain(List<String> main) {
+				this.main = main;
+			}
 		}
 	}
 }

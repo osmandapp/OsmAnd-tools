@@ -40,6 +40,16 @@ spring:
     username: ${DB_USER:test}
     password: ${DB_PWD:test}
 
+download:
+  servers:
+    self: download.osmand.net
+    main:
+      - dl6.osmand.net
+    help:
+      - dl1.osmand.net
+      - dl4.osmand.net
+  load: 60
+
 ---
 spring.jpa.hibernate.ddl-auto: validate
 
