@@ -6,6 +6,7 @@ import org.springframework.core.io.AbstractResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
+import org.springframework.lang.Nullable;
 import org.springframework.web.servlet.resource.AbstractResourceResolver;
 import org.springframework.web.servlet.resource.HttpResource;
 import org.springframework.web.servlet.resource.ResourceResolverChain;
@@ -35,6 +36,7 @@ public class IndexResourceResolver extends AbstractResourceResolver {
                                                List<? extends Resource> locations, ResourceResolverChain chain) {
         Resource resource = chain.resolveResource(request, requestPath, locations);
         if (request == null) {
+            LOGGER.error("Request is null. Can't resolve resource");
             return resource;
         }
         String file = request.getParameter("file");
@@ -101,6 +103,7 @@ public class IndexResourceResolver extends AbstractResourceResolver {
         }
 
         @Override
+        @Nullable
         public HttpHeaders getResponseHeaders() {
             HttpHeaders headers;
             if (resource instanceof HttpResource) {
@@ -144,21 +147,25 @@ public class IndexResourceResolver extends AbstractResourceResolver {
         }
 
         @Override
+        @Nullable
         public URL getURL() throws IOException {
             return resource.getURL();
         }
 
         @Override
+        @Nullable
         public URI getURI() throws IOException {
             return resource.getURI();
         }
 
         @Override
+        @Nullable
         public File getFile() throws IOException {
             return resource.getFile();
         }
 
         @Override
+        @Nullable
         public ReadableByteChannel readableChannel() throws IOException {
             return resource.readableChannel();
         }
@@ -174,6 +181,7 @@ public class IndexResourceResolver extends AbstractResourceResolver {
         }
 
         @Override
+        @Nullable
         public Resource createRelative(String relativePath) throws IOException {
             return resource.createRelative(relativePath);
         }

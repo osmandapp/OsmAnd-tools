@@ -1,5 +1,7 @@
 package net.osmand.server.index;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
@@ -14,6 +16,7 @@ import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class IndexResourceBalancingFilter implements Filter {
+    private static final Log LOGGER = LogFactory.getLog(IndexResourceBalancingFilter.class);
 
     private boolean isContainAndEqual(String param, String equalTo, Map<String, String[]> params) {
         return params.containsKey(param) && params.get(param) != null && params.get(param).length > 0
