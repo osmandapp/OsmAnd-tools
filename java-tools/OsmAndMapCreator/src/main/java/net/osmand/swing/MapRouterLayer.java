@@ -70,7 +70,6 @@ import org.xml.sax.SAXException;
 public class MapRouterLayer implements MapPanelLayer {
 
 	private final static Log log = PlatformUtil.getLog(MapRouterLayer.class);
-	private boolean USE_OLD_ROUTING = false;
 
 	private MapPanel map;
 	private LatLon startRoute ;
@@ -677,7 +676,7 @@ public class MapRouterLayer implements MapPanelLayer {
 				}
 				String m = DataExtractionSettings.getSettings().getRouteMode();
 				String[] props = m.split("\\,");
-				RoutePlannerFrontEnd router = new RoutePlannerFrontEnd(USE_OLD_ROUTING);
+				RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
 
 				Map<String, String> paramsR = new LinkedHashMap<String, String>();
 				for(String p : props) {

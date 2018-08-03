@@ -837,7 +837,7 @@ public class IndexCreator {
 		settings.poiZipLongStrings = false;
 		settings.indexMap = true;
 //		settings.indexAddress = true;
-		settings.indexPOI = true;
+//		settings.indexPOI = true;
 		settings.indexTransport = true;
 		settings.indexRouting = true;
 		
@@ -851,7 +851,8 @@ public class IndexCreator {
 		IndexCreator creator = new IndexCreator(new File(rootFolder + "/maps/"), settings); //$NON-NLS-1$
 
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
-		String file = rootFolder + "/temp/map.osm";
+//		String file = rootFolder + "/temp/map.osm";
+		String file = rootFolder + "/temp/netherlands_amstelveen.osm.gz";
 //		String file = rootFolder + "/maps/diff/2017_08_28_00_30_before.osm";
 //		String file = rootFolder + "/maps/diff/ukraine_kiev-city_europe.pbf";
 //		String file = rootFolder + "/repos/resources/test-resources/synthetic_test_rendering.osm";
