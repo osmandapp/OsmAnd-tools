@@ -1,6 +1,7 @@
 package net.osmand.swing;
 
 
+import java.awt.Color;
 import java.awt.Component;
 import java.awt.Graphics2D;
 import java.awt.event.ActionEvent;
@@ -13,8 +14,11 @@ import java.util.List;
 
 import javax.swing.AbstractAction;
 import javax.swing.Action;
+import javax.swing.Box;
+import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JOptionPane;
+import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.SwingUtilities;
 
@@ -45,8 +49,12 @@ public class MapTransportLayer implements MapPanelLayer {
 	private JButton prevRoute;
 	private JButton infoButton;
 	private JButton nextRoute;
+	
 
+	private LatLon start;
+	private LatLon end;
 	private List<TransportRouteResult> results = new ArrayList<TransportRouteResult>();
+	private int currentRoute = 0; 
 
 	@Override
 	public void destroyLayer() {
@@ -58,18 +66,41 @@ public class MapTransportLayer implements MapPanelLayer {
 	public void initLayer(MapPanel map) {
 		this.map = map;
 		fillPopupMenuWithActions(map.getPopupMenu());
-		
+		JPanel btnPanel = new JPanel();
+		btnPanel.setLayout(new BoxLayout(btnPanel, BoxLayout.LINE_AXIS));
+//		btnPanel.setBackground(new Color(255, 255, 255, 0));
+		btnPanel.setOpaque(false);
 
 		prevRoute = new JButton("<<"); //$NON-NLS-1$
 		prevRoute.addActionListener(new ActionListener(){
 			@Override
 			public void actionPerformed(ActionEvent e) {
+				if(currentRoute >= 0) {
+					currentRoute--;
+					redrawRoute();
+				}
 			}
 		});
 		prevRoute.setVisible(false);
 		prevRoute.setAlignmentY(Component.TOP_ALIGNMENT);
-		map.add(prevRoute, 0);
-		infoButton = new JButton("Route"); //$NON-NLS-1$
+		btnPanel.add(prevRoute);
+		
+		
+		nextRoute = new JButton(">>"); //$NON-NLS-1$
+		nextRoute.addActionListener(new ActionListener(){
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				if(currentRoute < results.size() - 1) {
+					currentRoute++;
+					redrawRoute();
+				}
+			}
+		});
+		nextRoute.setVisible(false);
+		nextRoute.setAlignmentY(Component.TOP_ALIGNMENT);
+		btnPanel.add(nextRoute);
+		
+		infoButton = new JButton("Info about route"); //$NON-NLS-1$
 		infoButton.addActionListener(new ActionListener(){
 			@Override
 			public void actionPerformed(ActionEvent e) {
@@ -77,16 +108,11 @@ public class MapTransportLayer implements MapPanelLayer {
 		});
 		infoButton.setVisible(false);
 		infoButton.setAlignmentY(Component.TOP_ALIGNMENT);
-		map.add(infoButton, 0);
-		nextRoute = new JButton(">>"); //$NON-NLS-1$
-		nextRoute.addActionListener(new ActionListener(){
-			@Override
-			public void actionPerformed(ActionEvent e) {
-			}
-		});
-		nextRoute.setVisible(false);
-		nextRoute.setAlignmentY(Component.TOP_ALIGNMENT);
-		map.add(nextRoute);
+		btnPanel.add(infoButton);
+		
+		map.add(btnPanel, 0);
+//		map.add(Box.createHorizontalGlue());
+		btnPanel.add(Box.createHorizontalGlue());
 	}
 
 	public void fillPopupMenuWithActions(JPopupMenu menu) {
@@ -103,29 +129,55 @@ public class MapTransportLayer implements MapPanelLayer {
 	}
 
 
+	private void redrawRoute() {
+		List<Way> ways = new ArrayList<Way>();
+		TransportRouteResult r  = null;
+		if (results.size() > currentRoute && currentRoute >= 0) {
+			r = results.get(currentRoute);
+		}
+		calculateResult(ways, r);
+		DataTileManager<Way> points = new DataTileManager<Way>(11);
+		for (Way w : ways) {
+			LatLon n = w.getLatLon();
+			points.registerObject(n.getLatitude(), n.getLongitude(), w);
+		}
+		map.setPoints(points);
+		
+		nextRoute.setVisible(r != null);
+		infoButton.setVisible(r != null);
+		if(r != null) {
+			String refs = "";
+			for(int i = 0; i < r.getSegments().size(); i++) {
+				TransportRouteResultSegment res = r.getSegments().get(i);
+				if(i > 0) {
+					refs += ", ";
+				}
+				refs += res.route.getRef() ;
+			}
+			infoButton.setText(String.format("%d. %.1f min (T %.1f min, W %.1f min): %s", currentRoute + 1,
+					r.getRouteTime() / 60.0, r.getTravelTime() / 60.0, r.getWalkTime() / 60.0, refs));
+		}
+		prevRoute.setVisible(r != null);
+		
+		map.prepareImage();
+	}
 
 	private void calcRoute() {
 		new Thread() {
 			@Override
 			public void run() {
-				LatLon startRoute = DataExtractionSettings.getSettings().getStartLocation();
-				LatLon endRoute = DataExtractionSettings.getSettings().getEndLocation();
-				List<Way> ways = selfRoute(startRoute, endRoute);
-				if (ways != null) {
-					DataTileManager<Way> points = new DataTileManager<Way>(11);
-					for (Way w : ways) {
-						LatLon n = w.getLatLon();
-						points.registerObject(n.getLatitude(), n.getLongitude(), w);
-					}
-					map.setPoints(points);
-				}
+				start = DataExtractionSettings.getSettings().getStartLocation();
+				end = DataExtractionSettings.getSettings().getEndLocation();
+				buildRoute();
+				redrawRoute();
 			}
+
+			
 		}.start();
 	}
 
 
-	public List<Way> selfRoute(LatLon start, LatLon end) {
-		List<Way> res = new ArrayList<Way>();
+	public void buildRoute() {
 		long time = System.currentTimeMillis();
 		List<File> files = new ArrayList<File>();
 		for (File f : Algorithms.getSortedFilesVersions(new File(DataExtractionSettings.getSettings().getBinaryFilesDir()))) {
@@ -136,7 +188,7 @@ public class MapTransportLayer implements MapPanelLayer {
 		if(files.isEmpty()){
 			JOptionPane.showMessageDialog(OsmExtractionUI.MAIN_APP.getFrame(), "Please specify obf file in settings", "Obf file not found",
 					JOptionPane.ERROR_MESSAGE);
-			return null;
+			return;
 		}
 		System.out.println("Transport route from " + start + " to " + end);
 		if (start != null && end != null) {
@@ -166,9 +218,9 @@ public class MapTransportLayer implements MapPanelLayer {
 //				RoutingConfiguration config = DataExtractionSettings.getSettings().getRoutingConfig().build(props[0],
 //						/*RoutingConfiguration.DEFAULT_MEMORY_LIMIT*/ 1000, paramsR);
 				startProgressThread(ctx);
-				List<TransportRouteResult> results = planner.buildRoute(ctx, start, end);
+				this.results = planner.buildRoute(ctx, start, end);
+				this.currentRoute = 0;
 				throwExceptionIfRouteNotFound(ctx, results);
-				calculateResult(res, results, start, end);
 			} catch (Exception e) {
 				ExceptionHandler.handle(e);
 			} finally {
@@ -179,16 +231,17 @@ public class MapTransportLayer implements MapPanelLayer {
 					map.getPoints().clear();
 				}
 			}
-			System.out.println("Finding self routes " + res.size() + " " + (System.currentTimeMillis() - time) + " ms");
+			System.out.println("Finding self routes " + results.size() + " " + (System.currentTimeMillis() - time) + " ms");
 		}
-		return res;
+		return ;
 	}
 
 	
 
-	private void throwExceptionIfRouteNotFound(TransportRoutingContext ctx, List<TransportRouteResult> results2) {
-		// TODO Auto-generated method stub
-		
+	private void throwExceptionIfRouteNotFound(TransportRoutingContext ctx, List<TransportRouteResult> res) {
+		if(res.isEmpty()) {
+			throw new IllegalArgumentException("There is no public transport route for selected start/stop.");
+		}
 	}
 
 
@@ -220,24 +273,26 @@ public class MapTransportLayer implements MapPanelLayer {
 		}.start();
 	}
 
-	private void calculateResult(List<Way> res, List<TransportRouteResult> results, LatLon start, LatLon end) {
-		if (results.size() > 0) {
-			TransportRouteResult r = results.get(0);
+	private void calculateResult(List<Way> res, TransportRouteResult r) {
+		if (r != null) {
 			LatLon p = start; 
 			for (TransportRouteResultSegment s : r.getSegments()) {
 				LatLon floc = s.getStart().getLocation();
 				addWalk(res, p, floc);
-				Way way = new Way(-1);
+				
+				res.addAll(s.getGeometry());
 				// String name = String.format("time %.2f ", s.getSegmentTime());
-				String name = String.format("%d st, %.1f m, %s", s.end - s.start, s.getTravelDist(), s.route.getName());
-				way.putTag(OSMTagKey.NAME.getValue(), name);
-				for (int i = s.start; i <= s.end; i++) {
-					LatLon l = s.getStop(i).getLocation();
-					Node n = new Node(l.getLatitude(), l.getLongitude(), -1);
-					way.addNode(n);
-					p = l;
-				}
-				res.add(way);
+//				String name = String.format("%d st, %.1f m, %s", s.end - s.start, s.getTravelDist(), s.route.getName());
+//				Way way = new Way(-1);
+//				way.putTag(OSMTagKey.NAME.getValue(), name);
+//				for (int i = s.start; i <= s.end; i++) {
+//					LatLon l = s.getStop(i).getLocation();
+//					Node n = new Node(l.getLatitude(), l.getLongitude(), -1);
+//					way.addNode(n);
+//				}
+//				res.add(way);
+				
+				p = s.getEnd().getLocation();
 			}
 			addWalk(res, p, end);
 
@@ -279,13 +334,31 @@ public class MapTransportLayer implements MapPanelLayer {
 
 	@Override
 	public void paintLayer(Graphics2D g) {
-//		g.setColor(Color.green);
-//		if(startRoute != null){
-//			int x = map.getMapXForPoint(startRoute.getLongitude());
-//			int y = map.getMapYForPoint(startRoute.getLatitude());
-//			g.drawOval(x, y, 12, 12);
-//			g.fillOval(x, y, 12, 12);
-//		}
+		
+		TransportRouteResult r  = null;
+		if (results.size() > currentRoute && currentRoute >= 0) {
+			r = results.get(currentRoute);
+		}
+		if(r != null){
+			g.setColor(Color.blue);
+			int rad = 10;
+			for (TransportRouteResultSegment s : r.getSegments()) {
+				LatLon l = s.getStart().getLocation();
+				int x = map.getMapXForPoint(l.getLongitude());
+				int y = map.getMapYForPoint(l.getLatitude());
+				g.drawOval(x, y, rad, rad);
+				g.fillOval(x, y, rad, rad);
+			}
+			rad = 9;
+			g.setColor(Color.red);
+			for (TransportRouteResultSegment s : r.getSegments()) {
+				LatLon l = s.getEnd().getLocation();
+				int x = map.getMapXForPoint(l.getLongitude());
+				int y = map.getMapYForPoint(l.getLatitude());
+				g.drawOval(x, y, rad, rad);
+				g.fillOval(x, y, rad, rad);
+			}
+		}
 		
 	}
 
