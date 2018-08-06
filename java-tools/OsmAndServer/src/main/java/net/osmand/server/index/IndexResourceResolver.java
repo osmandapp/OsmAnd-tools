@@ -21,7 +21,7 @@ import java.nio.channels.ReadableByteChannel;
 import java.util.List;
 
 public class IndexResourceResolver extends AbstractResourceResolver {
-    private static final Log LOGGER = LogFactory.getLog(IndexResourceResolver.class);
+    private static final Log LOG = LogFactory.getLog(IndexResourceResolver.class);
     /*
 		DATE_AND_EXT_STR_LEN = "_18_06_02.obf.gz".length()
 	 */
@@ -34,10 +34,9 @@ public class IndexResourceResolver extends AbstractResourceResolver {
     @Override
     protected Resource resolveResourceInternal(HttpServletRequest request, String requestPath,
                                                List<? extends Resource> locations, ResourceResolverChain chain) {
-        Resource resource = chain.resolveResource(request, requestPath, locations);
         if (request == null) {
-            LOGGER.error("Request is null. Can't resolve resource");
-            return resource;
+            LOG.error("Request is null. Can't resolve resource");
+            return null;
         }
         String file = request.getParameter("file");
 
@@ -76,14 +75,15 @@ public class IndexResourceResolver extends AbstractResourceResolver {
         if (checkParameter(request, "standard")) {
             file = "indexes" + File.separator + file;
         }
+        Resource resource = null;
         for (Resource location : locations) {
             try {
-                Resource indexResource = new IndexResource(location.createRelative(file));
-                if (indexResource.exists()) {
-                    return indexResource;
+                resource = new IndexResource(location.createRelative(file));
+                if (resource.exists()) {
+                    return resource;
                 }
             } catch (IOException ex) {
-                LOGGER.error(ex.getMessage(), ex);
+                LOG.error(ex.getMessage(), ex);
             }
         }
         return resource;

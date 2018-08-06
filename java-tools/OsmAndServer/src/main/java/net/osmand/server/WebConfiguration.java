@@ -8,7 +8,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
-import org.springframework.web.servlet.resource.PathResourceResolver;
 
 @Configuration
 @EnableWebMvc
@@ -19,8 +18,7 @@ public class WebConfiguration implements WebMvcConfigurer {
         registry.addResourceHandler("/download.php*")
                 .addResourceLocations("file:/var/www-download/")
                 .resourceChain(false)
-                .addResolver(new IndexResourceResolver())
-                .addResolver(new PathResourceResolver());
+                .addResolver(new IndexResourceResolver());
     }
 
     @Bean

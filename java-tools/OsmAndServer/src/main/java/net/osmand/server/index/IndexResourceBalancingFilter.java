@@ -1,7 +1,5 @@
 package net.osmand.server.index;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
@@ -16,7 +14,6 @@ import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class IndexResourceBalancingFilter implements Filter {
-    private static final Log LOGGER = LogFactory.getLog(IndexResourceBalancingFilter.class);
 
     private boolean isContainAndEqual(String param, String equalTo, Map<String, String[]> params) {
         return params.containsKey(param) && params.get(param) != null && params.get(param).length > 0
@@ -45,7 +42,11 @@ public class IndexResourceBalancingFilter implements Filter {
     private DownloadProperties config;
 
     @Override
-    public void init(FilterConfig filterConfig) throws ServletException { }
+    public void init(FilterConfig filterConfig) throws ServletException {
+        /*
+            Do nothing
+         */
+    }
 
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
@@ -63,16 +64,16 @@ public class IndexResourceBalancingFilter implements Filter {
 			chain.doFilter(request, response);
 			return;
 		}
-		if (hostName.equals(config.getServers().getSelf()) && !self) {
+		if (hostName.equals(config.getServers().getSelf())) {
 			ThreadLocalRandom tlr = ThreadLocalRandom.current();
 			int random = tlr.nextInt(100);
 			boolean isSimple = computeSimpleCondition(request.getParameterMap());
 			if (computeStayHereCondition(request.getParameterMap())) {
                 chain.doFilter(request, response);
-			} else if (servers.getHelp().size() > 0 && isSimple && random < (100 - config.getLoad())) {
+			} else if (!servers.getHelp().isEmpty() && isSimple && random < (100 - config.getLoad())) {
 				String host = servers.getHelp().get(random % servers.getHelp().size());
 				httpResponse.sendRedirect("http://" + host + "/download.php?" + httpRequest.getQueryString());
-			} else if (servers.getMain().size() > 0) {
+			} else if (!servers.getMain().isEmpty()) {
 				String host = servers.getMain().get(random % servers.getMain().size());
                 httpResponse.sendRedirect("http://" + host + "/download.php?" + httpRequest.getQueryString());
 			} else {
@@ -84,7 +85,11 @@ public class IndexResourceBalancingFilter implements Filter {
     }
 
     @Override
-    public void destroy() { }
+    public void destroy() {
+        /*
+            Do nothing
+         */
+    }
 
     @Configuration
     @ConfigurationProperties(prefix = "download")
