@@ -29,6 +29,7 @@ import net.osmand.data.LatLon;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.osm.edit.Way;
+import net.osmand.router.RoutingConfiguration.Builder;
 import net.osmand.router.TransportRoutePlanner;
 import net.osmand.router.TransportRoutePlanner.TransportRouteResult;
 import net.osmand.router.TransportRoutePlanner.TransportRouteResultSegment;
@@ -201,8 +202,9 @@ public class MapTransportLayer implements MapPanelLayer {
 					RandomAccessFile raf = new RandomAccessFile(f, "r"); //$NON-NLS-1$ //$NON-NLS-2$
 					rs[it++] = new BinaryMapIndexReader(raf, f);
 				}
+				Builder builder = DataExtractionSettings.getSettings().getRoutingConfig();
+				TransportRoutingConfiguration cfg = new TransportRoutingConfiguration(builder);
 				TransportRoutePlanner planner = new TransportRoutePlanner();
-				TransportRoutingConfiguration cfg = new TransportRoutingConfiguration();
 //				cfg.maxNumberOfChanges = 2;
 				TransportRoutingContext ctx = new TransportRoutingContext(cfg, rs);
 				
