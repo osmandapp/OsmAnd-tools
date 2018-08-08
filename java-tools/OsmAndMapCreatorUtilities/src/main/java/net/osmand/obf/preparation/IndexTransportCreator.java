@@ -17,10 +17,12 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import net.osmand.data.LatLon;
+import net.osmand.data.QuadRect;
 import net.osmand.data.TransportRoute;
 import net.osmand.data.TransportStop;
 import net.osmand.osm.MapRenderingTypesEncoder;
@@ -51,6 +53,8 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 
 	private static final Log log = LogFactory.getLog(IndexTransportCreator.class);
 
+	private static final int DISTANCE_THRESHOLD = 15;
+
 	private Set<Long> visitedStops = new HashSet<Long>();
 	private PreparedStatement transRouteStat;
 	private PreparedStatement transRouteStopsStat;
@@ -58,12 +62,20 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	private PreparedStatement transRouteGeometryStat;
 	private RTree transportStopsTree;
 	private Map<Long, Relation> masterRoutes = new HashMap<Long, Relation>();
+	private Connection gtfsConnection;
+	
+	
 	// Note: in future when we need more information from stop_area relation, it is better to memorize relations itself
 	// now we need only specific names of stops and platforms
 	private Map<EntityId, Relation> stopAreas = new HashMap<EntityId, Relation>();
 
 
 	private static Set<String> acceptedRoutes = new HashSet<String>();
+
+	private PreparedStatement gtfsSelectRoute;
+
+
+	
 	static {
 		acceptedRoutes.add("bus"); //$NON-NLS-1$
 		acceptedRoutes.add("trolleybus"); //$NON-NLS-1$
@@ -80,7 +92,12 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		acceptedRoutes.add("ferry"); //$NON-NLS-1$
 	}
 
-	public IndexTransportCreator() {
+	public IndexTransportCreator(IndexCreatorSettings settings) throws SQLException {
+		File gtfs = settings.gtfsData;
+		if(gtfs != null && gtfs.exists()) {
+			DBDialect dialect = DBDialect.SQLITE;
+			gtfsConnection = dialect.getDatabaseConnection(gtfs.getAbsolutePath(), log);
+		}
 	}
 
 
@@ -223,6 +240,98 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		pStatements.put(transRouteStopsStat, 0);
 		pStatements.put(transStopsStat, 0);
 		pStatements.put(transRouteGeometryStat, 0);
+		
+		if(gtfsConnection != null) {
+			boolean hasTripMetadataLoc = false;
+			ResultSet columns = gtfsConnection.createStatement().executeQuery("PRAGMA table_info(trips)");
+			while(columns.next()) {
+				String name = columns.getString("name");
+				if(name.equals("firstStopLat")) {
+					hasTripMetadataLoc = true;
+				}
+			}
+//			if (!hasTripMetadataLoc) {
+				indexBboxForGtfsTrips();
+//			}
+		}
+		
+	}
+
+
+	private void indexBboxForGtfsTrips() throws SQLException {
+		ResultSet countRs = gtfsConnection.createStatement().executeQuery("SELECT COUNT(*) FROM trips");
+		countRs.next();
+		int total = countRs.getInt(1);
+		countRs.close();
+		log.info(String.format("Indexing %d gtfs trips to compute bbox", total));
+		for (String s : new String[] { "routes:route_id", "trips:trip_id,route_id,shape_id,service_id",
+				"shapes:shape_id", "stops:stop_id", "stop_times:trip_id,stop_id", "calendar_dates:service_id" }) {
+			int spl = s.indexOf(':');
+			String tableName = s.substring(0, spl);
+			String[] colNames = s.substring(spl+1).split(",");
+			for(String colName : colNames) {
+				String indName = tableName + "_" + colName;
+				String ddl = "CREATE INDEX IF NOT EXISTS " + indName + " on " + tableName + " (" + colName + ")"; 
+				log.info(ddl);
+				gtfsConnection.createStatement().execute(ddl);
+			}
+			
+		}
+		log.info("Alter table and add columns");
+		for (String s : new String[] { "firstStopLat", "firstStopLon", "minLat", "maxLat", "minLon", "maxLon" }) {
+			try {
+				gtfsConnection.createStatement().execute("ALTER TABLE trips ADD COLUMN " + s + " double");
+			} catch(Exception e) {
+			}
+		}
+
+		PreparedStatement ins = gtfsConnection
+				.prepareStatement("UPDATE trips SET firstStopLat = ?, firstStopLon = ?, minLat = ?, maxLat = ?, minLon = ?, maxLon = ? where trip_id = ?");
+		
+		ResultSet selectTimes = gtfsConnection.createStatement().executeQuery(
+				"SELECT t.trip_id, t.stop_sequence, s.stop_lat, s.stop_lon from stop_times t "
+						+ "join stops s on s.stop_id = t.stop_id order by t.trip_id, t.stop_sequence");
+		QuadRect bbox = null;
+		LatLon start = null;
+		String tripId = null;
+		int cnt = 0;
+		while (selectTimes.next()) {
+			String nTripId = selectTimes.getString(1);
+			double lat = selectTimes.getDouble(3);
+			double lon = selectTimes.getDouble(4);
+			if (!Algorithms.objectEquals(nTripId, tripId)) {
+				insertTripIds(ins, tripId, start, bbox, ++cnt);
+				start = new LatLon(lat, lon);
+				bbox = new QuadRect(lon, lat, lon, lat);
+				tripId = nTripId;
+			}
+			bbox.left = Math.min(bbox.left, lon);
+			bbox.right = Math.max(bbox.right, lon);
+			bbox.top = Math.max(bbox.top, lat);
+			bbox.bottom = Math.min(bbox.bottom, lat);
+		}
+		insertTripIds(ins, tripId, start, bbox, 0);
+		ins.close();
+		selectTimes.close();
+	}
+
+
+	private void insertTripIds(PreparedStatement ins, String tripId, LatLon start, QuadRect bbox, int i)
+			throws SQLException {
+		if (tripId != null) {
+			ins.setDouble(1, start.getLatitude());
+			ins.setDouble(2, start.getLongitude());
+			ins.setDouble(3, bbox.bottom);
+			ins.setDouble(4, bbox.top);
+			ins.setDouble(5, bbox.left);
+			ins.setDouble(6, bbox.right);
+			ins.setString(7, tripId);
+			ins.addBatch();
+		}
+		if (i % 10000 == 0) {
+			ins.executeBatch();
+			log.info("Progress " + i + " trips");
+		}
 	}
 
 
@@ -456,7 +565,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	}
 
 
-	private void indexTransportRoute(Relation rel, List<TransportRoute> troutes) {
+	private void indexTransportRoute(Relation rel, List<TransportRoute> troutes) throws SQLException {
 		String ref = rel.getTag(OSMTagKey.REF);
 		String route = rel.getTag(OSMTagKey.ROUTE);
 		String operator = rel.getTag(OSMTagKey.OPERATOR);
@@ -494,6 +603,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		directRoute.setRef(ref);
 		directRoute.setId(directRoute.getId() << 1);
 		if (processTransportRelationV2(rel, directRoute)) { // try new transport relations first
+			appendInformationFromGTFS(directRoute);
 			troutes.add(directRoute);
 		} else {
 			TransportRoute backwardRoute = EntityParser.parserRoute(rel, ref);
@@ -512,6 +622,68 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			}
 		}
 
+	}
+
+
+	private static class GTFSRouteInfo {
+		private String routeId;
+		private String routeShortName;
+		private String routeLongName;
+		private List<GTFSTripInfo> trips = new ArrayList<GTFSTripInfo>();
+	}
+	
+	private static class GTFSTripInfo {
+		
+		private String tripId;
+		private String shapeId;
+		private String serviceId;
+	}
+	
+	private void appendInformationFromGTFS(TransportRoute directRoute) throws SQLException {
+		if(!Algorithms.isEmpty(directRoute.getRef()) && gtfsConnection != null) {
+			if(gtfsSelectRoute == null) {
+				gtfsSelectRoute = gtfsConnection.prepareStatement(
+						"SELECT r.route_id, r.route_short_name, r.route_long_name, "+
+						" t.trip_id, t.shape_id, t.service_id from routes r join "+
+						" trips t on t.route_id = r.route_id where route_short_name = ? order by r.route_id asc, t.trip_id asc ");
+			}
+			gtfsSelectRoute.setString(1, directRoute.getRef());
+			ResultSet rs = gtfsSelectRoute.executeQuery();
+			List<GTFSTripInfo> possibleTrips = new ArrayList<GTFSTripInfo>();
+			GTFSRouteInfo gtfsRoute = new GTFSRouteInfo();
+			while(rs.next()) {
+				String routeId = rs.getString(1);
+				if(!Algorithms.objectEquals(routeId, gtfsRoute.routeId)) {
+					gtfsRoute = new GTFSRouteInfo();
+					gtfsRoute.routeId = rs.getString(1);
+					gtfsRoute.routeShortName = rs.getString(2);
+					gtfsRoute.routeLongName = rs.getString(3);
+				}
+				GTFSTripInfo trip = new GTFSTripInfo();
+				trip.tripId = rs.getString(4);
+				trip.shapeId = rs.getString(5);
+				trip.serviceId = rs.getString(6);
+				gtfsRoute.trips.add(trip);
+				if(directRoute.getRef().equals("51")) {
+//					BboxInfo b = tripBbox.get(trip.tripId);
+//					TransportStop firstStop = directRoute.getForwardStops().get(0);
+//					if(MapUtils.getDistance(firstStop.getLocation(), b.start) < DISTANCE_THRESHOLD) {
+//						if(b.refRoute != null) {
+//							System.err.println(String.format("Overwrite %s with %s for %s", b.refRoute, directRoute, gtfsRoute.routeShortName));
+//						} else {
+//							b.refRoute = directRoute;
+//						}
+//					}
+//					possibleTrips.add(trip);
+				}
+			}
+			if(directRoute.getRef().equals("51")) {
+				String ref = directRoute.getRef();
+				for(GTFSTripInfo r : possibleTrips) {
+					System.out.println(String.format("%s - %s", ref, r.tripId));
+				}
+			}
+		}
 	}
 
 

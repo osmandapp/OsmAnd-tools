@@ -556,7 +556,7 @@ public class IndexCreator {
 		if (renderingTypes == null) {
 			renderingTypes = new MapRenderingTypesEncoder(null, regionName);
 		}
-		this.indexTransportCreator = new IndexTransportCreator();
+		this.indexTransportCreator = new IndexTransportCreator(settings);
 		this.indexPoiCreator = new IndexPoiCreator(settings, renderingTypes, overwriteIds);
 		this.indexAddressCreator = new IndexAddressCreator(logMapDataWarn, settings);
 		this.indexMapCreator = new IndexVectorMapCreator(logMapDataWarn, mapZooms, renderingTypes,
@@ -835,13 +835,14 @@ public class IndexCreator {
 		String rootFolder = "/Users/victorshcherb/osmand/";
 		IndexCreatorSettings settings = new IndexCreatorSettings();
 		settings.poiZipLongStrings = false;
-		settings.indexMap = true;
+//		settings.indexMap = true;
 //		settings.indexAddress = true;
 //		settings.indexPOI = true;
 		settings.indexTransport = true;
-		settings.indexRouting = true;
+//		settings.indexRouting = true;
 		
-		settings.srtmDataFolder = new File(rootFolder+"/maps/srtm/");
+		settings.srtmDataFolder = new File(rootFolder + "/maps/srtm/");
+		settings.gtfsData = new File(rootFolder + "/maps/transport/Netherlands.sqlite");
 		
 //		creator.deleteDatabaseIndexes = false;
 //		creator.recreateOnlyBinaryFile = true;
@@ -852,9 +853,7 @@ public class IndexCreator {
 
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 //		String file = rootFolder + "/temp/map.osm";
-		String file = rootFolder + "/temp/netherlands_amstelveen.osm.gz";
-//		String file = rootFolder + "/maps/diff/2017_08_28_00_30_before.osm";
-//		String file = rootFolder + "/maps/diff/ukraine_kiev-city_europe.pbf";
+		String file = rootFolder + "/temp/transport.osm";
 //		String file = rootFolder + "/repos/resources/test-resources/synthetic_test_rendering.osm";
 //		String file = rootFolder + "/repos/resources/test-resources/turn_lanes_test.osm";
 		int st = file.lastIndexOf('/');
