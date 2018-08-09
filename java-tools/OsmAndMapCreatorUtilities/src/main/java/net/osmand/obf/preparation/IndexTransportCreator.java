@@ -1,5 +1,7 @@
 package net.osmand.obf.preparation;
 
+import gnu.trove.list.array.TIntArrayList;
+
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
@@ -9,6 +11,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -21,6 +24,8 @@ import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import net.osmand.binary.OsmandOdb.TransportRouteSchedule;
+import net.osmand.binary.OsmandOdb.TransportRouteSchedule.Builder;
 import net.osmand.data.LatLon;
 import net.osmand.data.QuadRect;
 import net.osmand.data.TransportRoute;
@@ -53,7 +58,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 
 	private static final Log log = LogFactory.getLog(IndexTransportCreator.class);
 
-	private static final int DISTANCE_THRESHOLD = 15;
+	private static final int DISTANCE_THRESHOLD = 50;
 
 	private Set<Long> visitedStops = new HashSet<Long>();
 	private PreparedStatement transRouteStat;
@@ -73,7 +78,9 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	private static Set<String> acceptedRoutes = new HashSet<String>();
 
 	private PreparedStatement gtfsSelectRoute;
-
+	private PreparedStatement gtfsSelectStopTimes;
+	
+	private GtfsInfoStats gtfsStats = new GtfsInfoStats(); 
 
 	
 	static {
@@ -250,9 +257,9 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 					hasTripMetadataLoc = true;
 				}
 			}
-//			if (!hasTripMetadataLoc) {
+			if (!hasTripMetadataLoc) {
 				indexBboxForGtfsTrips();
-//			}
+			}
 		}
 		
 	}
@@ -263,7 +270,6 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		countRs.next();
 		int total = countRs.getInt(1);
 		countRs.close();
-		log.info(String.format("Indexing %d gtfs trips to compute bbox", total));
 		for (String s : new String[] { "routes:route_id", "trips:trip_id,route_id,shape_id,service_id",
 				"shapes:shape_id", "stops:stop_id", "stop_times:trip_id,stop_id", "calendar_dates:service_id" }) {
 			int spl = s.indexOf(':');
@@ -284,26 +290,34 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			} catch(Exception e) {
 			}
 		}
+		log.info(String.format("Indexing %d gtfs trips to compute bbox", total));
 
 		PreparedStatement ins = gtfsConnection
 				.prepareStatement("UPDATE trips SET firstStopLat = ?, firstStopLon = ?, minLat = ?, maxLat = ?, minLon = ?, maxLon = ? where trip_id = ?");
 		
 		ResultSet selectTimes = gtfsConnection.createStatement().executeQuery(
 				"SELECT t.trip_id, t.stop_sequence, s.stop_lat, s.stop_lon from stop_times t "
-						+ "join stops s on s.stop_id = t.stop_id order by t.trip_id, t.stop_sequence");
+						+ "join stops s on s.stop_id = t.stop_id order by t.trip_id"); // 
 		QuadRect bbox = null;
 		LatLon start = null;
 		String tripId = null;
 		int cnt = 0;
+		int minStopSeq = 0;
 		while (selectTimes.next()) {
 			String nTripId = selectTimes.getString(1);
 			double lat = selectTimes.getDouble(3);
 			double lon = selectTimes.getDouble(4);
+			int stopSeq = selectTimes.getInt(2);
 			if (!Algorithms.objectEquals(nTripId, tripId)) {
 				insertTripIds(ins, tripId, start, bbox, ++cnt);
+				minStopSeq = stopSeq;
 				start = new LatLon(lat, lon);
 				bbox = new QuadRect(lon, lat, lon, lat);
 				tripId = nTripId;
+			}
+			if(stopSeq < minStopSeq) {
+				minStopSeq = stopSeq;
+				start = new LatLon(lat, lon);
 			}
 			bbox.left = Math.min(bbox.left, lon);
 			bbox.right = Math.max(bbox.right, lon);
@@ -475,8 +489,9 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 					byte[] bytes = rset.getBytes(1);
 					directGeometry.add(bytes);
 				}
+				TransportRouteSchedule schedule = readSchedule(ref, directStops);
 				writer.writeTransportRoute(idRoute, routeName, routeEnName, ref, operator, type, dist, color, directStops, 
-						directGeometry, stringTable, transportRoutes);
+						directGeometry, stringTable, transportRoutes, schedule);
 			}
 			rs.close();
 			selectTransportRouteData.close();
@@ -503,10 +518,12 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 
 			writer.endWriteTransportIndex();
 			writer.flush();
+			log.info(gtfsStats);
 		} catch (RTreeException e) {
 			throw new IllegalStateException(e);
 		}
 	}
+
 
 	private Rect calcBounds(rtree.Node n) {
 		Rect r = null;
@@ -603,7 +620,6 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		directRoute.setRef(ref);
 		directRoute.setId(directRoute.getId() << 1);
 		if (processTransportRelationV2(rel, directRoute)) { // try new transport relations first
-			appendInformationFromGTFS(directRoute);
 			troutes.add(directRoute);
 		} else {
 			TransportRoute backwardRoute = EntityParser.parserRoute(rel, ref);
@@ -624,66 +640,135 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 
 	}
 
-
-	private static class GTFSRouteInfo {
-		private String routeId;
-		private String routeShortName;
-		private String routeLongName;
-		private List<GTFSTripInfo> trips = new ArrayList<GTFSTripInfo>();
-	}
-	
-	private static class GTFSTripInfo {
-		
-		private String tripId;
-		private String shapeId;
-		private String serviceId;
-	}
-	
-	private void appendInformationFromGTFS(TransportRoute directRoute) throws SQLException {
-		if(!Algorithms.isEmpty(directRoute.getRef()) && gtfsConnection != null) {
+	private TransportRouteSchedule readSchedule(String ref, List<TransportStop> directStops) throws SQLException {
+		if(!Algorithms.isEmpty(ref) && gtfsConnection != null && directStops.size() > 0) {
 			if(gtfsSelectRoute == null) {
+				// new String[] { "firstStopLat", "firstStopLon", "minLat", "maxLat", "minLon", "maxLon" }
 				gtfsSelectRoute = gtfsConnection.prepareStatement(
 						"SELECT r.route_id, r.route_short_name, r.route_long_name, "+
-						" t.trip_id, t.shape_id, t.service_id from routes r join "+
+						" t.trip_id, t.shape_id, t.service_id, t.firstStopLat, t.firstStopLon from routes r join "+
 						" trips t on t.route_id = r.route_id where route_short_name = ? order by r.route_id asc, t.trip_id asc ");
 			}
-			gtfsSelectRoute.setString(1, directRoute.getRef());
+			if(gtfsSelectStopTimes == null) {
+				gtfsSelectStopTimes = gtfsConnection.prepareStatement(
+						"SELECT arrival_time, departure_time, stop_id, stop_sequence"+
+						" from stop_times where trip_id = ? order by stop_sequence ");
+			}
+			gtfsSelectRoute.setString(1, ref);
 			ResultSet rs = gtfsSelectRoute.executeQuery();
-			List<GTFSTripInfo> possibleTrips = new ArrayList<GTFSTripInfo>();
-			GTFSRouteInfo gtfsRoute = new GTFSRouteInfo();
-			while(rs.next()) {
-				String routeId = rs.getString(1);
-				if(!Algorithms.objectEquals(routeId, gtfsRoute.routeId)) {
-					gtfsRoute = new GTFSRouteInfo();
-					gtfsRoute.routeId = rs.getString(1);
-					gtfsRoute.routeShortName = rs.getString(2);
-					gtfsRoute.routeLongName = rs.getString(3);
+			String routeId = null, routeShortName = null, routeLongName = null;
+			Builder schedule = TransportRouteSchedule.newBuilder();
+			TIntArrayList avgStopIntervals = null;
+			TIntArrayList avgWaitIntervals = null;
+			TIntArrayList timeDeparturesFirst = new TIntArrayList(); 
+			while (rs.next()) {
+				String nrouteId = rs.getString(1);
+				if (!Algorithms.objectEquals(routeId, nrouteId)) {
+					routeId = nrouteId;
+					routeShortName = rs.getString(2);
+					routeLongName = rs.getString(3);
 				}
-				GTFSTripInfo trip = new GTFSTripInfo();
-				trip.tripId = rs.getString(4);
-				trip.shapeId = rs.getString(5);
-				trip.serviceId = rs.getString(6);
-				gtfsRoute.trips.add(trip);
-				if(directRoute.getRef().equals("51")) {
-//					BboxInfo b = tripBbox.get(trip.tripId);
-//					TransportStop firstStop = directRoute.getForwardStops().get(0);
-//					if(MapUtils.getDistance(firstStop.getLocation(), b.start) < DISTANCE_THRESHOLD) {
-//						if(b.refRoute != null) {
-//							System.err.println(String.format("Overwrite %s with %s for %s", b.refRoute, directRoute, gtfsRoute.routeShortName));
-//						} else {
-//							b.refRoute = directRoute;
-//						}
-//					}
-//					possibleTrips.add(trip);
+				String tripId = rs.getString(4);
+				// String shapeId = rs.getString(5);
+				// String serviceId = rs.getString(6);
+				double firstLat = rs.getDouble(7);
+				double firstLon = rs.getDouble(8);
+				double dist = MapUtils.getDistance(directStops.get(0).getLocation(), firstLat,
+						firstLon);
+				if (dist < DISTANCE_THRESHOLD) {
+					gtfsSelectStopTimes.setString(1, tripId);
+					StringBuilder sb = new StringBuilder();
+					ResultSet nrs = gtfsSelectStopTimes.executeQuery();
+					TIntArrayList stopIntervals = new TIntArrayList(directStops.size());
+					TIntArrayList waitIntervals = new TIntArrayList(directStops.size());
+					int ftime = 0, ptime = 0;
+					
+					while (nrs.next()) {
+						int arrivalTime = parseTime(nrs.getString(1));
+						int depTime = parseTime(nrs.getString(2));
+						if(arrivalTime == -1 || depTime == -1) {
+							gtfsStats.errorsTimeParsing++;
+							continue;
+						}
+						if(ftime == 0) {
+							ftime = ptime = depTime;
+						} else {
+							stopIntervals.add(arrivalTime - ptime);
+						}
+						waitIntervals.add(depTime - arrivalTime);
+						ptime = arrivalTime;
+					}
+					if(waitIntervals.size() != directStops.size()) {
+						gtfsStats.errorsTripsStopCounts++;
+						// failed = true;
+					} else {
+						gtfsStats.successTripsParsing++;
+						if(avgWaitIntervals == null) {
+							avgWaitIntervals = waitIntervals;
+						} else {
+							// check wait intervals different
+							for (int j = 0; j < waitIntervals.size(); j++) {
+								if(Math.abs(avgWaitIntervals.getQuick(j) - waitIntervals.getQuick(j)) > 3) {
+									gtfsStats.avgWaitDiff30Sec++;
+									break;
+								}
+							}
+						}
+						if(avgStopIntervals == null) {
+							avgStopIntervals = stopIntervals;
+						} else {
+							for (int j = 0; j < stopIntervals.size(); j++) {
+								if(Math.abs(avgStopIntervals.getQuick(j) - stopIntervals.getQuick(j)) > 3) {
+									gtfsStats.avgStopDiff30Sec++;
+									break;
+								}
+							}
+						}
+						timeDeparturesFirst.add(ftime);
+					}
+					nrs.close();
 				}
 			}
-			if(directRoute.getRef().equals("51")) {
-				String ref = directRoute.getRef();
-				for(GTFSTripInfo r : possibleTrips) {
-					System.out.println(String.format("%s - %s", ref, r.tripId));
+			if(timeDeparturesFirst.size() > 0) {
+				timeDeparturesFirst.sort();
+				int p = 0;
+				for(int i = 0; i < timeDeparturesFirst.size(); i++) {
+					int x = timeDeparturesFirst.get(i) - p;
+					schedule.addTripIntervals(x);
+					p = timeDeparturesFirst.get(i);
 				}
+				for (int i = 0; i < avgStopIntervals.size(); i++) {
+					schedule.addAvgStopIntervals(avgStopIntervals.getQuick(i));
+				}
+				for (int i = 0; i < avgWaitIntervals.size(); i++) {
+					schedule.addAvgWaitIntervals(avgWaitIntervals.getQuick(i));
+				}
+				TransportRouteSchedule res = schedule.build();
+				return res;
 			}
 		}
+		return null;
+	}
+	
+	
+	
+	
+
+
+	private int parseTime(String str) {
+		int f1 = str.indexOf(':');
+		int f2 = str.indexOf(':', f1 + 1);
+		if (f1 != -1 && f2 != -1) {
+			try {
+				int h = Integer.parseInt(str.substring(0, f1));
+				int m = Integer.parseInt(str.substring(f1 + 1, f2));
+				int s = Integer.parseInt(str.substring(f2 + 1));
+				return h * 60 * 6 + m * 6 + s / 10;
+			} catch (NumberFormatException e) {
+				return -1;
+			}
+		}
+		return -1;
 	}
 
 
@@ -901,4 +986,23 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		return true;
 	}
 
+	
+	private static class GtfsInfoStats {
+		public int avgWaitDiff30Sec;
+		public int avgStopDiff30Sec;
+		int errorsTimeParsing = 0;
+		int successTripsParsing = 0;
+		int errorsTripsStopCounts = 0;
+		@Override
+		public String toString() {
+			return "GtfsInfoStats [avgWaitDiff30Sec=" + avgWaitDiff30Sec + ", avgStopDiff30Sec=" + avgStopDiff30Sec
+					+ ", errorsTimeParsing=" + errorsTimeParsing + ", successTripsParsing=" + successTripsParsing
+					+ ", errorsTripsStopCounts=" + errorsTripsStopCounts + "]";
+		}
+		
+		
+		
+		
+		
+	}
 }

@@ -28,9 +28,8 @@ import java.util.zip.GZIPOutputStream;
 
 import net.osmand.IndexConstants;
 import net.osmand.binary.BinaryMapIndexReader;
-import net.osmand.binary.BinaryMapRouteReaderAdapter;
-import net.osmand.binary.BinaryMapIndexReader.MapIndex;
 import net.osmand.binary.BinaryMapIndexReader.TagValuePair;
+import net.osmand.binary.BinaryMapRouteReaderAdapter;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteTypeRule;
 import net.osmand.binary.OsmandOdb;
 import net.osmand.binary.OsmandOdb.AddressNameIndexDataAtom;
@@ -62,6 +61,7 @@ import net.osmand.binary.OsmandOdb.StreetIndex;
 import net.osmand.binary.OsmandOdb.StreetIntersection;
 import net.osmand.binary.OsmandOdb.StringTable;
 import net.osmand.binary.OsmandOdb.TransportRoute;
+import net.osmand.binary.OsmandOdb.TransportRouteSchedule;
 import net.osmand.binary.OsmandOdb.TransportRouteStop;
 import net.osmand.data.Building;
 import net.osmand.data.City;
@@ -1139,7 +1139,8 @@ public class BinaryMapIndexWriter {
 	}
 
 	public void writeTransportRoute(long idRoute, String routeName, String routeEnName, String ref, String operator, String type, int dist, String color,
-			List<TransportStop> directStops, List<byte[]> directRoute, Map<String, Integer> stringTable, Map<Long, Long> transportRoutesRegistry) throws IOException {
+			List<TransportStop> directStops, List<byte[]> directRoute, Map<String, Integer> stringTable, Map<Long, Long> transportRoutesRegistry,
+			TransportRouteSchedule schedule) throws IOException {
 		checkPeekState(TRANSPORT_ROUTES);
 		TransportRoute.Builder tRoute = OsmandOdb.TransportRoute.newBuilder();
 		tRoute.setRef(ref);
@@ -1149,7 +1150,9 @@ public class BinaryMapIndexWriter {
 		tRoute.setName(registerString(stringTable, routeName));
 		tRoute.setDistance(dist);
 		tRoute.setColor(registerString(stringTable, color));
-
+		if(schedule != null) {
+			tRoute.addScheduleTrip(schedule);
+		}
 		if (routeEnName != null) {
 			tRoute.setNameEn(registerString(stringTable, routeEnName));
 		}

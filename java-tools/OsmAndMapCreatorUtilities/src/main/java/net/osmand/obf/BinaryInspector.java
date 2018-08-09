@@ -80,7 +80,7 @@ public class BinaryInspector {
 //					"-vpoi",
 //					"-vmap", "-vmapobjects", 
 //					"-vmapcoordinates",
-					"-vrouting",
+//					"-vrouting",
 //					"-vtransport",
 //					"-vaddress", "-vcities","-vstreetgroups",
 //					"-vstreets", "-vbuildings", "-vintersections",
