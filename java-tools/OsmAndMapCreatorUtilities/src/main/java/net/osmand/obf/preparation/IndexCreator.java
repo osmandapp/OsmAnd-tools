@@ -844,12 +844,13 @@ public class IndexCreator {
 		settings.srtmDataFolder = new File(rootFolder + "/maps/srtm/");
 		settings.gtfsData = new File(rootFolder + "/maps/transport/Netherlands.sqlite");
 		
-//		creator.deleteDatabaseIndexes = false;
-//		creator.recreateOnlyBinaryFile = true;
-//		creator.deleteOsmDB = false;	
 //		settings.zoomWaySmoothness = 2;
 		
 		IndexCreator creator = new IndexCreator(new File(rootFolder + "/maps/"), settings); //$NON-NLS-1$
+		
+//		creator.deleteDatabaseIndexes = false;
+//		creator.recreateOnlyBinaryFile = true;
+//		creator.deleteOsmDB = false;
 
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 //		String file = rootFolder + "/temp/map.osm";

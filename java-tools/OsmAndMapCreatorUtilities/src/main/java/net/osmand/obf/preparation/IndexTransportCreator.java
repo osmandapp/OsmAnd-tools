@@ -677,7 +677,6 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 						firstLon);
 				if (dist < DISTANCE_THRESHOLD) {
 					gtfsSelectStopTimes.setString(1, tripId);
-					StringBuilder sb = new StringBuilder();
 					ResultSet nrs = gtfsSelectStopTimes.executeQuery();
 					TIntArrayList stopIntervals = new TIntArrayList(directStops.size());
 					TIntArrayList waitIntervals = new TIntArrayList(directStops.size());
@@ -734,14 +733,26 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 				int p = 0;
 				for(int i = 0; i < timeDeparturesFirst.size(); i++) {
 					int x = timeDeparturesFirst.get(i) - p;
-					schedule.addTripIntervals(x);
-					p = timeDeparturesFirst.get(i);
+					// this is a wrong check cause there should be a check for calendar
+					if(x > 0) {
+						schedule.addTripIntervals(x);
+						p = timeDeparturesFirst.get(i);
+					}
 				}
 				for (int i = 0; i < avgStopIntervals.size(); i++) {
 					schedule.addAvgStopIntervals(avgStopIntervals.getQuick(i));
 				}
+				boolean allZeros = true;
 				for (int i = 0; i < avgWaitIntervals.size(); i++) {
-					schedule.addAvgWaitIntervals(avgWaitIntervals.getQuick(i));
+					if(avgWaitIntervals.getQuick(i) != 0) {
+						allZeros = false;
+						break;
+					}
+				}
+				if (!allZeros) {
+					for (int i = 0; i < avgWaitIntervals.size(); i++) {
+						schedule.addAvgWaitIntervals(avgWaitIntervals.getQuick(i));
+					}
 				}
 				TransportRouteSchedule res = schedule.build();
 				return res;
