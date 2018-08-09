@@ -58,8 +58,8 @@ public class OsmAndServerMonitorTasks {
 			"dl6.osmand.net", "dl1.osmand.net"};
 	private static final String TILE_SERVER = "http://tile.osmand.net/hd/";
 
-	private static final double PERCENTILE = 95;
-	private static final double PERCENTILE_SMALL = 100 - PERCENTILE;
+	private static final double PERC = 95;
+	private static final double PERC_SMALL = 100 - PERC;
 	
 	
 	private static final String RED_KEY_OSMAND_LIVE = "live_delay_time";
@@ -340,7 +340,7 @@ public class OsmAndServerMonitorTasks {
 		DescriptiveStatistics tile24Hours = readStats(RED_KEY_TILE, 24);
 		return String.format("<a href='http://tile.osmand.net/hd/3/4/2.png'>tile</a>: "
 				+ "<b>%s</b>. Response time: 24h — %.1f sec · 95th 24h — %.1f sec.",
-				lastResponseTime < 60 ? "OK" : "FAILED", tile24Hours.getMean(), tile24Hours.getPercentile(PERCENTILE));
+				lastResponseTime < 60 ? "OK" : "FAILED", tile24Hours.getMean(), tile24Hours.getPercentile(PERC));
 	}
 
 	private DescriptiveStatistics readStats(String key, double hour) {
@@ -388,9 +388,17 @@ public class OsmAndServerMonitorTasks {
 	private String getLiveDelayedMessage(long delay) {
 		DescriptiveStatistics live3Hours = readStats(RED_KEY_OSMAND_LIVE, 3);
 		DescriptiveStatistics live24Hours = readStats(RED_KEY_OSMAND_LIVE, 24);
-		return String.format("<a href='osmand.net/osm_live'>live</a>: <b>%s</b>. Delayed by: %s h · 3h — %s h · 24h — %s (%s) h",
-				delay < HOUR ? "OK" : "FAILED", formatTime(delay), formatTime(live3Hours.getPercentile(PERCENTILE)),
-						formatTime(live24Hours.getPercentile(PERCENTILE)), formatTime(live24Hours.getMean()));
+		DescriptiveStatistics live3Days = readStats(RED_KEY_OSMAND_LIVE, 24 * 3);
+		DescriptiveStatistics live7Days = readStats(RED_KEY_OSMAND_LIVE, 24 * 7);
+		DescriptiveStatistics live30Days = readStats(RED_KEY_OSMAND_LIVE, 24 * 30);
+		return String.format("<a href='osmand.net/osm_live'>live</a>: <b>%s</b>. Delayed by: %s h · 3h — %s h · 24h — %s (%s) h\n"
+				+ "Day stats: 3d %s (%s) h  · 7d — %s (%s) h · 30d — %s (%s) h",
+				delay < HOUR ? "OK" : "FAILED", 
+						formatTime(delay), formatTime(live3Hours.getPercentile(PERC)), 
+						formatTime(live24Hours.getPercentile(PERC)), formatTime(live24Hours.getMean()),
+						formatTime(live3Days.getPercentile(PERC)), formatTime(live3Days.getMean()),
+						formatTime(live7Days.getPercentile(PERC)), formatTime(live7Days.getMean()),
+						formatTime(live30Days.getPercentile(PERC)), formatTime(live30Days.getMean()));
 	}
 
 	private String formatTime(double i) {
@@ -443,8 +451,8 @@ public class OsmAndServerMonitorTasks {
 			String name = host.substring(0, host.indexOf('.'));
 			return String.format("<a href='%s'>%s</a>: <b>%s</b>. Speed: %5.2f, 3h — %5.2f MBs · 24h — %5.2f MBs",
 					host, name, (lastSuccess ? "OK" : "FAILED"),
-					last.getMean(), speed3Hours.getPercentile(PERCENTILE_SMALL),
-					speed24Hours.getPercentile(PERCENTILE_SMALL));
+					last.getMean(), speed3Hours.getPercentile(PERC_SMALL),
+					speed24Hours.getPercentile(PERC_SMALL));
 		}
 		
 		@Override
