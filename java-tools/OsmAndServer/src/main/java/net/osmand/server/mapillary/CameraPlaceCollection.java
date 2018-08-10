@@ -2,11 +2,11 @@ package net.osmand.server.mapillary;
 
 import java.util.List;
 
-public class CameraPlaceHolder {
+public class CameraPlaceCollection {
 
     private final List<CameraPlace> features;
 
-    public CameraPlaceHolder(List<CameraPlace> features) {
+    public CameraPlaceCollection(List<CameraPlace> features) {
         this.features = features;
     }
 

@@ -30,7 +30,7 @@ public class WebConfiguration implements WebMvcConfigurer {
     }
 
     @Bean
-    public IndexResourceBalancingFilter myFilter() {
+    public IndexResourceBalancingFilter indexResourceBalancingFilter() {
         return new IndexResourceBalancingFilter();
     }
 }

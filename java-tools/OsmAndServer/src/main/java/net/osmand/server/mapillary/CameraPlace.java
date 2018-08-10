@@ -1,18 +1,21 @@
 package net.osmand.server.mapillary;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+
+@JsonInclude(JsonInclude.Include.NON_EMPTY)
 public class CameraPlace {
     private final String type;
-    private final double lat;
-    private final double lon;
+    private final Double lat;
+    private final Double lon;
     private final String timestamp;
     private final String key;
     private final String title;
     private final String url;
-    private final boolean externalLink;
-    private final double ca;
+    private final Boolean externalLink;
+    private final Double ca;
     private final String username;
-    private final double distance;
-    private final double bearing;
+    private final Double distance;
+    private final Double bearing;
     private final String imageUrl;
     private final String imageHiresUrl;
     private final String topIcon;
@@ -22,8 +25,8 @@ public class CameraPlace {
     private final String buttonColor;
     private final String buttonTextColor;
 
-    private CameraPlace(String type, double lat, double lon, String timestamp, String key, String title, String url,
-                        boolean externalLink, double ca, String username, double distance, double bearing,
+    private CameraPlace(String type, Double lat, Double lon, String timestamp, String key, String title, String url,
+                        Boolean externalLink, Double ca, String username, Double distance, Double bearing,
                         String imageUrl, String imageHiresUrl, String topIcon, String buttonIcon, String buttonText,
                         String buttonIconColor, String buttonColor, String buttonTextColor) {
         this.type = type;
@@ -52,11 +55,11 @@ public class CameraPlace {
         return type;
     }
 
-    public double getLat() {
+    public Double getLat() {
         return lat;
     }
 
-    public double getLon() {
+    public Double getLon() {
         return lon;
     }
 
@@ -76,11 +79,11 @@ public class CameraPlace {
         return url;
     }
 
-    public boolean isExternalLink() {
+    public Boolean isExternalLink() {
         return externalLink;
     }
 
-    public double getCa() {
+    public Double getCa() {
         return ca;
     }
 
@@ -88,11 +91,11 @@ public class CameraPlace {
         return username;
     }
 
-    public double getDistance() {
+    public Double getDistance() {
         return distance;
     }
 
-    public double getBearing() {
+    public Double getBearing() {
         return bearing;
     }
 
@@ -130,17 +133,17 @@ public class CameraPlace {
 
     public static class CameraPlaceBuilder {
         private String type;
-        private double lat;
-        private double lon;
+        private Double lat = null;
+        private Double lon = null;
         private String timestamp;
         private String key;
         private String title;
         private String url;
-        private boolean externalLink = false;
-        private double ca = -1.0;
+        private Boolean externalLink;
+        private Double ca = null;
         private String username;
-        private double distance;
-        private double bearing;
+        private Double distance = null;
+        private Double bearing = null;
         private String imageUrl = null;
         private String imageHiresUrl = null;
         private String topIcon = null;
