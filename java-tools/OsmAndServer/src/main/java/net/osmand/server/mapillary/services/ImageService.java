@@ -71,7 +71,7 @@ public class ImageService {
         return Double.parseDouble(String.valueOf(cameraAngle));
     }
 
-    private CameraPlace parseFeature(Feature feature, double clientLat, double clientLon) {
+    private CameraPlace parseFeature(Feature feature, double targetLat, double targetLon) {
         LngLatAlt coordinates = ((Point) feature.getGeometry()).getCoordinates();
         Map<String, Object> properties = feature.getProperties();
         CameraPlace.CameraPlaceBuilder cameraBuilder = new CameraPlace.CameraPlaceBuilder();
@@ -88,12 +88,12 @@ public class ImageService {
         cameraBuilder.setLat(coordinates.getLatitude());
         cameraBuilder.setLon(coordinates.getLongitude());
         cameraBuilder.setTopIcon("ic_logo_mapillary");
-        double bearing = computeInitialBearing(coordinates.getLatitude(), coordinates.getLongitude(), clientLat,
-                clientLon);
+        double bearing = computeInitialBearing(coordinates.getLatitude(), coordinates.getLongitude(), targetLat,
+                targetLon);
         cameraBuilder.setBearing(bearing);
-        cameraBuilder.setDistance(computeDistance(coordinates.getLatitude(), coordinates.getLongitude(), clientLat,
-                clientLon));
-        return cameraBuilder.createCameraPlace();
+        cameraBuilder.setDistance(computeDistance(coordinates.getLatitude(), coordinates.getLongitude(), targetLat,
+                targetLon));
+        return cameraBuilder.build();
     }
 
     private String buildUrl(String rootUrl, boolean hires, String photoIdKey) {
@@ -129,14 +129,13 @@ public class ImageService {
         double bearing = cp.getBearing();
         if (ca >= 0 && angleDiff(bearing - ca, 30.0)) {
             resultMap.get(RESULT_MAP_ARR).add(cp);
-        }
-        if (ca >= 0 && angleDiff(bearing - ca, 60.0) || ca < 0) {
+        } else if (ca >= 0 && angleDiff(bearing - ca, 60.0) || ca < 0) {
             resultMap.get(RESULT_MAP_HALFVISARR).add(cp);
         }
     }
 
     private boolean isPrimaryCameraPlace(CameraPlace cp, String primaryImageKey) {
-        return !isEmpty(primaryImageKey) && cp.getKey().equals(primaryImageKey);
+        return !isEmpty(primaryImageKey) && cp != null && cp.getKey() != null && cp.getKey().equals(primaryImageKey);
     }
 
     private boolean isEmpty(String str) {
@@ -223,7 +222,7 @@ public class ImageService {
         builder.setUsername(imageInfo.getUser());
         builder.setLat(targetLat);
         builder.setLon(targetLon);
-        return builder.createCameraPlace();
+        return builder.build();
     }
 
     public CameraPlace processWikimediaData(double lat, double lon, String osmImage) {
@@ -259,7 +258,7 @@ public class ImageService {
             builder.setUrl(osmImage);
             builder.setLat(lat);
             builder.setLon(lon);
-            primaryImage = builder.createCameraPlace();
+            primaryImage = builder.build();
         }
         return primaryImage;
     }
