@@ -179,7 +179,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			return;
 		}
 		// some big islands are marked as multipolygon - don't process them (only keep coastlines)
-		boolean polygon = "multipolygon".equals(e.getTag(OSMTagKey.TYPE)) || "island".equals(e.getTag(OSMTagKey.PLACE));
+		boolean polygon = "multipolygon".equals(e.getTag(OSMTagKey.TYPE)) && "island".equals(e.getTag(OSMTagKey.PLACE));
 		if (polygon) {
 			int coastlines = 0;
 			int otherWays = 0;
