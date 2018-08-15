@@ -182,27 +182,34 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		boolean polygon = "multipolygon".equals(e.getTag(OSMTagKey.TYPE)) || "island".equals(e.getTag(OSMTagKey.PLACE));
 		if (polygon) {
 			int coastlines = 0;
+			int otherWays = 0;
+			ctx.loadEntityRelation((Relation) e);
 			List<Entity> me = e.getMemberEntities("outer");
 
 			for (Entity es : me) {
-				boolean coastline = "coastline".equals(es.getTag(OSMTagKey.NATURAL));
-				if (coastline) {
-					coastlines++;
+				if(es instanceof Way && !((Way) es).getEntityIds().isEmpty()) {
+					boolean coastline = "coastline".equals(es.getTag(OSMTagKey.NATURAL));
+					if (coastline) {
+						coastlines++;
+					} else {
+						otherWays++;
+					}
 				}
+				
 			}
 			if (coastlines > 0) {
 				// don't index all coastlines
-				if (coastlines != me.size()) {
+				if (otherWays != 0) {
 					throw new IllegalArgumentException(String.format(
-							"Wrong coastline (isladn) relation %d has %d coastlines out of %d entries", e.getId(),
-							coastlines, me.size()));
+							"Wrong coastline (island) relation %d has %d coastlines out of %d entries", e.getId(),
+							coastlines, otherWays + coastlines));
 				}
 				if (e.getMembers("inner").size() > 0) {
 					throw new IllegalArgumentException(String.format(
-							"Wrong coastline (isladn) relation %d has inner ways", e.getId()));
+							"Wrong coastline (island) relation %d has inner ways", e.getId()));
 				}
 				log.info(String.format("Relation %s %d consists only of coastlines so it was skipped.",
-						e.getTag(OSMTagKey.NAME_EN), e.getId()));
+						e.getTag(OSMTagKey.NAME), e.getId()));
 				return;
 			}
 		}
