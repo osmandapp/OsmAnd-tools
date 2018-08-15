@@ -201,6 +201,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 					throw new IllegalArgumentException(
 							String.format("Wrong coastline (isladn) relation %d has inner ways", e.getId()));
 				}
+				log.info(String.format("Relation %s %d consists only of coastlines so it was skipped.", e.getTag(OSMTagKey.NAME_EN), e.getId()));
 				return;
 			}
 		}
