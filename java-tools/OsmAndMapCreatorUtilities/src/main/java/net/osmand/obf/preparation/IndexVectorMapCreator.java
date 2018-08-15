@@ -154,8 +154,13 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 
 	public void indexMapRelationsAndMultiPolygons(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 		if (e instanceof Relation) {
+			long ts = System.currentTimeMillis();
 			indexMultiPolygon((Relation) e, ctx);
 			tagsTransformer.handleRelationPropogatedTags((Relation) e, renderingTypes, ctx, EntityConvertApplyType.MAP);
+			long tm = (System.currentTimeMillis() - ts) / 1000;
+			if (tm > 15 ) {
+				log.warn(String.format("Relation %d took %d seconds to process", e.getId(), tm ));
+			}
 		}
 	}
 
@@ -200,13 +205,15 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			if (coastlines > 0) {
 				// don't index all coastlines
 				if (otherWays != 0) {
-					throw new IllegalArgumentException(String.format(
+					log.error(String.format(
 							"Wrong coastline (island) relation %d has %d coastlines out of %d entries", e.getId(),
 							coastlines, otherWays + coastlines));
+					return;
 				}
 				if (e.getMembers("inner").size() > 0) {
-					throw new IllegalArgumentException(String.format(
+					log.error(String.format(
 							"Wrong coastline (island) relation %d has inner ways", e.getId()));
+					return;
 				}
 				log.info(String.format("Relation %s %d consists only of coastlines so it was skipped.",
 						e.getTag(OSMTagKey.NAME), e.getId()));
