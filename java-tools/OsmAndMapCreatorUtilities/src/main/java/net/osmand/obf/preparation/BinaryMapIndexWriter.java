@@ -69,6 +69,7 @@ import net.osmand.data.City.CityType;
 import net.osmand.data.LatLon;
 import net.osmand.data.MapObject;
 import net.osmand.data.Street;
+import net.osmand.data.TransportSchedule;
 import net.osmand.data.TransportStop;
 import net.osmand.obf.preparation.IndexPoiCreator.PoiAdditionalType;
 import net.osmand.obf.preparation.IndexPoiCreator.PoiCreatorCategories;
@@ -1140,7 +1141,7 @@ public class BinaryMapIndexWriter {
 
 	public void writeTransportRoute(long idRoute, String routeName, String routeEnName, String ref, String operator, String type, int dist, String color,
 			List<TransportStop> directStops, List<byte[]> directRoute, Map<String, Integer> stringTable, Map<Long, Long> transportRoutesRegistry,
-			TransportRouteSchedule schedule) throws IOException {
+			TransportSchedule schedule) throws IOException {
 		checkPeekState(TRANSPORT_ROUTES);
 		TransportRoute.Builder tRoute = OsmandOdb.TransportRoute.newBuilder();
 		tRoute.setRef(ref);
@@ -1150,9 +1151,6 @@ public class BinaryMapIndexWriter {
 		tRoute.setName(registerString(stringTable, routeName));
 		tRoute.setDistance(dist);
 		tRoute.setColor(registerString(stringTable, color));
-		if(schedule != null) {
-			tRoute.addScheduleTrip(schedule);
-		}
 		if (routeEnName != null) {
 			tRoute.setNameEn(registerString(stringTable, routeEnName));
 		}
@@ -1180,10 +1178,34 @@ public class BinaryMapIndexWriter {
 			writeTransportRouteCoordinates(directRoute);
 			tRoute.setGeometry(ByteString.copyFrom(mapDataBuf.toArray()));
 		}
+		if(schedule != null && schedule.tripIntervals.size() > 0) {
+			net.osmand.binary.OsmandOdb.TransportRouteSchedule.Builder sched = TransportRouteSchedule.newBuilder();
+			TByteArrayList bf = new TByteArrayList();
+			for(int i = 0; i < schedule.tripIntervals.size(); i++) {
+				writeRawVarint32(bf, schedule.tripIntervals.getQuick(i));
+			}
+			sched.setTripIntervals(ByteString.copyFrom(bf.toArray()));
+			if(schedule.avgStopIntervals.size() > 0) {
+				bf.clear();
+				for(int i = 0; i < schedule.avgStopIntervals.size(); i++) {
+					writeRawVarint32(bf, schedule.avgStopIntervals.getQuick(i));
+				}
+				sched.setAvgStopIntervals(ByteString.copyFrom(bf.toArray()));
+			}
+			if(schedule.avgWaitIntervals.size() > 0) {
+				bf.clear();
+				for(int i = 0; i < schedule.avgWaitIntervals.size(); i++) {
+					writeRawVarint32(bf, schedule.avgWaitIntervals.getQuick(i));
+				}
+				sched.setAvgWaitIntervals(ByteString.copyFrom(bf.toArray()));
+			}
+			tRoute.addScheduleTrip(sched.build());
+		}
 		codedOutStream.writeTag(OsmandOdb.TransportRoutes.ROUTES_FIELD_NUMBER, FieldType.MESSAGE.getWireType());
 		if (transportRoutesRegistry != null) {
 			transportRoutesRegistry.put(idRoute, getFilePointer());
 		}
+		
 		codedOutStream.writeMessageNoTag(tRoute.build());
 	}
 

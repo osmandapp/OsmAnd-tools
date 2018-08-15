@@ -24,11 +24,10 @@ import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import net.osmand.binary.OsmandOdb.TransportRouteSchedule;
-import net.osmand.binary.OsmandOdb.TransportRouteSchedule.Builder;
 import net.osmand.data.LatLon;
 import net.osmand.data.QuadRect;
 import net.osmand.data.TransportRoute;
+import net.osmand.data.TransportSchedule;
 import net.osmand.data.TransportStop;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.edit.Entity;
@@ -489,7 +488,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 					byte[] bytes = rset.getBytes(1);
 					directGeometry.add(bytes);
 				}
-				TransportRouteSchedule schedule = readSchedule(ref, directStops);
+				TransportSchedule schedule = readSchedule(ref, directStops);
 				writer.writeTransportRoute(idRoute, routeName, routeEnName, ref, operator, type, dist, color, directStops, 
 						directGeometry, stringTable, transportRoutes, schedule);
 			}
@@ -640,7 +639,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 
 	}
 
-	private TransportRouteSchedule readSchedule(String ref, List<TransportStop> directStops) throws SQLException {
+	private TransportSchedule readSchedule(String ref, List<TransportStop> directStops) throws SQLException {
 		if(!Algorithms.isEmpty(ref) && gtfsConnection != null && directStops.size() > 0) {
 			if(gtfsSelectRoute == null) {
 				// new String[] { "firstStopLat", "firstStopLon", "minLat", "maxLat", "minLon", "maxLon" }
@@ -657,9 +656,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			gtfsSelectRoute.setString(1, ref);
 			ResultSet rs = gtfsSelectRoute.executeQuery();
 			String routeId = null, routeShortName = null, routeLongName = null;
-			Builder schedule = TransportRouteSchedule.newBuilder();
-			TIntArrayList avgStopIntervals = null;
-			TIntArrayList avgWaitIntervals = null;
+			TransportSchedule schedule = new TransportSchedule();
 			TIntArrayList timeDeparturesFirst = new TIntArrayList(); 
 			while (rs.next()) {
 				String nrouteId = rs.getString(1);
@@ -702,22 +699,22 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 						// failed = true;
 					} else {
 						gtfsStats.successTripsParsing++;
-						if(avgWaitIntervals == null) {
-							avgWaitIntervals = waitIntervals;
+						if(schedule.avgWaitIntervals.isEmpty()) {
+							schedule.avgWaitIntervals.addAll(waitIntervals);
 						} else {
 							// check wait intervals different
 							for (int j = 0; j < waitIntervals.size(); j++) {
-								if(Math.abs(avgWaitIntervals.getQuick(j) - waitIntervals.getQuick(j)) > 3) {
+								if(Math.abs(schedule.avgWaitIntervals.getQuick(j) - waitIntervals.getQuick(j)) > 3) {
 									gtfsStats.avgWaitDiff30Sec++;
 									break;
 								}
 							}
 						}
-						if(avgStopIntervals == null) {
-							avgStopIntervals = stopIntervals;
+						if(schedule.avgStopIntervals.isEmpty()) {
+							schedule.avgStopIntervals.addAll(stopIntervals);
 						} else {
 							for (int j = 0; j < stopIntervals.size(); j++) {
-								if(Math.abs(avgStopIntervals.getQuick(j) - stopIntervals.getQuick(j)) > 3) {
+								if(Math.abs(schedule.avgStopIntervals.getQuick(j) - stopIntervals.getQuick(j)) > 3) {
 									gtfsStats.avgStopDiff30Sec++;
 									break;
 								}
@@ -735,27 +732,21 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 					int x = timeDeparturesFirst.get(i) - p;
 					// this is a wrong check cause there should be a check for calendar
 					if(x > 0) {
-						schedule.addTripIntervals(x);
+						schedule.tripIntervals.add(x);
 						p = timeDeparturesFirst.get(i);
 					}
 				}
-				for (int i = 0; i < avgStopIntervals.size(); i++) {
-					schedule.addAvgStopIntervals(avgStopIntervals.getQuick(i));
-				}
 				boolean allZeros = true;
-				for (int i = 0; i < avgWaitIntervals.size(); i++) {
-					if(avgWaitIntervals.getQuick(i) != 0) {
+				for (int i = 0; i < schedule.avgWaitIntervals.size(); i++) {
+					if(schedule.avgWaitIntervals.getQuick(i) != 0) {
 						allZeros = false;
 						break;
 					}
 				}
-				if (!allZeros) {
-					for (int i = 0; i < avgWaitIntervals.size(); i++) {
-						schedule.addAvgWaitIntervals(avgWaitIntervals.getQuick(i));
-					}
+				if (allZeros) {
+					schedule.avgWaitIntervals.clear();
 				}
-				TransportRouteSchedule res = schedule.build();
-				return res;
+				return schedule;
 			}
 		}
 		return null;

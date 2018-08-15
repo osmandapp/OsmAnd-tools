@@ -56,6 +56,7 @@ import net.osmand.data.City;
 import net.osmand.data.MapObject;
 import net.osmand.data.Street;
 import net.osmand.data.TransportRoute;
+import net.osmand.data.TransportSchedule;
 import net.osmand.data.TransportStop;
 import net.osmand.osm.MapRenderingTypes;
 import net.osmand.util.MapUtils;
@@ -1227,10 +1228,10 @@ public class BinaryInspector {
 			}
 			println("  " + st.getRef() + " " + st.getType() + " " + st.getName(verbose.lang) + ": " + stopsString);
 			if(verbose.vtransportschedule) {
-				TransportRouteSchedule sc = st.getSchedule();
+				TransportSchedule sc = st.getSchedule();
 				if (sc != null) {
 					StringBuilder bld = new StringBuilder();
-					List<Integer> tripIntervalsList = sc.getTripIntervalsList();
+					int[] tripIntervalsList = sc.getTripIntervals();
 					int prevTime = 0;
 					for (int i : tripIntervalsList) {
 						i = i + prevTime;
@@ -1240,16 +1241,18 @@ public class BinaryInspector {
 					}
 					println("   " + bld.toString());
 					bld = new StringBuilder();
-					int atm = tripIntervalsList.get(0);
+					int atm = tripIntervalsList[0];
+					int[] avgStopIntervals = sc.getAvgStopIntervals();
+					int[] avgWaitIntervals = sc.getAvgWaitIntervals();
 					for(int k = 0; k < st.getForwardStops().size(); k++) {
 						TransportStop stp = st.getForwardStops().get(k);
 						if(k == 0) {
 							bld.append(String.format("%6.6s %s, ", stp.getName(), formatTransporTime(atm)));
 						} else {
-							atm += sc.getAvgStopIntervals(k - 1);
-							if(sc.getAvgWaitIntervalsCount() > 0 && sc.getAvgWaitIntervals(k) > 0)  {
+							atm += avgStopIntervals[k - 1];
+							if(avgWaitIntervals.length > k && avgWaitIntervals[k] > 0)  {
 								bld.append(String.format("%6.6s %s - %s, ", stp.getName(), formatTransporTime(atm),
-										formatTransporTime(sc.getAvgWaitIntervals(k) + atm)));
+										formatTransporTime(avgWaitIntervals[k] + atm)));
 							} else {
 								bld.append(String.format("%6.6s %s, ", stp.getName(), formatTransporTime(atm)));
 							}

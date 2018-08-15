@@ -17,6 +17,7 @@ import javax.swing.Action;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
+import javax.swing.JMenu;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
@@ -117,15 +118,26 @@ public class MapTransportLayer implements MapPanelLayer {
 	}
 
 	public void fillPopupMenuWithActions(JPopupMenu menu) {
-		Action selfRoute = new AbstractAction("Calculate transport route") {
+		Action transportRoute = new AbstractAction("Calculate route") {
 			private static final long serialVersionUID = 5071561074552411238L;
 
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				calcRoute();
+				calcRoute(false);
 			}
 		};
-		menu.add(selfRoute);
+		Action transportRouteSchedule = new AbstractAction("Calculate route by schedule") {
+			private static final long serialVersionUID = 5071561074552411238L;
+
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				calcRoute(true);
+			}
+		};
+		JMenu jmenu = new JMenu("Public Transport");
+		jmenu.add(transportRoute);
+		jmenu.add(transportRouteSchedule);
+		menu.add(jmenu);
 
 	}
 
@@ -165,13 +177,13 @@ public class MapTransportLayer implements MapPanelLayer {
 		map.prepareImage();
 	}
 
-	private void calcRoute() {
+	private void calcRoute(boolean schedule) {
 		new Thread() {
 			@Override
 			public void run() {
 				start = DataExtractionSettings.getSettings().getStartLocation();
 				end = DataExtractionSettings.getSettings().getEndLocation();
-				buildRoute();
+				buildRoute(schedule);
 				redrawRoute();
 			}
 
@@ -180,7 +192,7 @@ public class MapTransportLayer implements MapPanelLayer {
 	}
 
 
-	public void buildRoute() {
+	public void buildRoute(boolean schedule) {
 		long time = System.currentTimeMillis();
 		List<File> files = new ArrayList<File>();
 		for (File f : Algorithms.getSortedFilesVersions(new File(DataExtractionSettings.getSettings().getBinaryFilesDir()))) {
@@ -204,9 +216,11 @@ public class MapTransportLayer implements MapPanelLayer {
 				}
 				Builder builder = DataExtractionSettings.getSettings().getRoutingConfig();
 				TransportRoutingConfiguration cfg = new TransportRoutingConfiguration(builder);
+				cfg.useSchedule = schedule;
 				TransportRoutePlanner planner = new TransportRoutePlanner();
 //				cfg.maxNumberOfChanges = 2;
 				TransportRoutingContext ctx = new TransportRoutingContext(cfg, rs);
+				
 				
 //				String m = DataExtractionSettings.getSettings().getRouteMode();
 //				String[] props = m.split("\\,");
