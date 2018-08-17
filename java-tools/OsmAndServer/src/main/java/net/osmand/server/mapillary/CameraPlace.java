@@ -140,7 +140,7 @@ public class CameraPlace {
         private String title;
         private String url;
         private Boolean externalLink;
-        private Double ca = null;
+        private Double ca = -1.0;
         private String username;
         private Double distance = null;
         private Double bearing = null;
@@ -253,7 +253,7 @@ public class CameraPlace {
             return this;
         }
 
-        public CameraPlace createCameraPlace() {
+        public CameraPlace build() {
             return new CameraPlace(type, lat, lon, timestamp, key, title, url, externalLink, ca, username, distance,
                     bearing, imageUrl, imageHiresUrl, topIcon, buttonIcon, buttonText, buttonIconColor, buttonColor,
                     buttonTextColor);

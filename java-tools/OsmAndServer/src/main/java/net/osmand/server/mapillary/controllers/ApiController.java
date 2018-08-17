@@ -5,14 +5,15 @@ import net.osmand.server.mapillary.CameraPlaceCollection;
 import net.osmand.server.mapillary.services.ImageService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.FileSystemResource;
-import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import javax.servlet.http.HttpServletResponse;
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -36,15 +37,16 @@ public class ApiController {
     private CameraPlace createEmptyCameraPlaceWithTypeOnly(String type) {
         CameraPlace.CameraPlaceBuilder builder = new CameraPlace.CameraPlaceBuilder();
         builder.setType(type);
-        return builder.createCameraPlace();
+        return builder.build();
     }
 
-    @GetMapping(path = {"/osmlive_status.php", "/osmlive_status"}, headers = {"Content-Type: text/html; charset=UTF-8"})
+    @GetMapping(path = {"/osmlive_status.php", "/osmlive_status"}, produces = "text/html;charset=UTF-8")
     @ResponseBody
-    public Resource osmLiveStatus() {
+    public String osmLiveStatus() throws IOException  {
         FileSystemResource fsr = new FileSystemResource(PROC_FILE);
         if (fsr.exists()) {
-            return fsr;
+            BufferedReader br = new BufferedReader(new InputStreamReader(fsr.getInputStream()));
+            return br.readLine();
         }
         throw new RuntimeException("File not found");
     }

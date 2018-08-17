@@ -15,7 +15,7 @@ public class WebConfiguration implements WebMvcConfigurer {
 
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        registry.addResourceHandler("/download.php*")
+        registry.addResourceHandler("/download*", "/download.php*")
                 .addResourceLocations("file:/var/www-download/")
                 .resourceChain(false)
                 .addResolver(new IndexResourceResolver());
@@ -25,6 +25,7 @@ public class WebConfiguration implements WebMvcConfigurer {
     FilterRegistrationBean<IndexResourceBalancingFilter> registrationBean(IndexResourceBalancingFilter filter) {
         FilterRegistrationBean<IndexResourceBalancingFilter> registrationBean = new FilterRegistrationBean<>();
         registrationBean.setFilter(filter);
+        registrationBean.addUrlPatterns("/download");
         registrationBean.addUrlPatterns("/download.php");
         return registrationBean;
     }
