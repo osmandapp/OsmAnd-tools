@@ -86,7 +86,7 @@ public class IndexResourceResolver extends AbstractResourceResolver {
                 LOG.error(ex.getMessage(), ex);
             }
         }
-        return resource;
+        return null;
     }
 
     @Override
