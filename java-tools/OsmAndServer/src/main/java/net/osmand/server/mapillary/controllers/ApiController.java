@@ -51,7 +51,7 @@ public class ApiController {
         throw new RuntimeException("File not found");
     }
 
-    @GetMapping(path = {"/cm_place", "/cm_place.php"})
+    @GetMapping(path = {"/cm_place.php", "/cm_place"})
     @ResponseBody
     public CameraPlaceCollection getCmPlace(@RequestParam("lat") double lat,
                                             @RequestParam("lon") double lon,
@@ -85,7 +85,7 @@ public class ApiController {
         return new CameraPlaceCollection(arr);
     }
 
-    @GetMapping(path = {"/mapillary/get_photo.php"})
+    @GetMapping(path = {"/mapillary/get_photo.php", "/mapillary/get_photo"})
     @ResponseBody
     public void getPhoto(@RequestParam("photo_id") String photoId,
                          @RequestParam(value = "hires", required = false) boolean hires,
@@ -102,7 +102,7 @@ public class ApiController {
         }
     }
 
-    @GetMapping(path = {"/mapillary/photo-viewer.php"})
+    @GetMapping(path = {"/mapillary/photo-viewer.php", "/mapillary/photo-viewer"})
     public String getPhotoViewer(@RequestParam("photo_id") String photoId, Model model) {
         model.addAttribute("hello", "Hello World!");
         model.addAttribute("photoId", photoId);
