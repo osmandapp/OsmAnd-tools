@@ -1,5 +1,19 @@
 package net.osmand.server.controllers.pub;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.InetSocketAddress;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
+
+import javax.servlet.ServletOutputStream;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,16 +27,11 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Controller;
 import org.springframework.util.MimeTypeUtils;
 import org.springframework.util.MultiValueMap;
-import org.springframework.web.bind.annotation.*;
-
-import javax.servlet.ServletOutputStream;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import java.io.*;
-import java.net.InetSocketAddress;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.ThreadLocalRandom;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
 
 @Controller
 public class DownloadIndexController {
@@ -237,7 +246,7 @@ public class DownloadIndexController {
 			handleDownload(res, headers, resp);
 			return;
 		}
-		if (hostName.equals(config.getServers().getSelf()) && !self) {
+		if (config.getServers().getSelf().contains(hostName) && !self) {
 			ThreadLocalRandom tlr = ThreadLocalRandom.current();
 			int random = tlr.nextInt(100);
 			boolean isSimple = computeSimpleCondition(params);
@@ -297,17 +306,18 @@ public class DownloadIndexController {
 		}
 
 		public static class DownloadServers {
-			private String self;
+			private List<String> self = new ArrayList<>();
 			private List<String> help = new ArrayList<>();
 			private List<String> main = new ArrayList<>();
 
-			public String getSelf() {
+			public List<String> getSelf() {
 				return self;
 			}
 
-			public void setSelf(String self) {
+			public void setSelf(List<String> self) {
 				this.self = self;
 			}
+
 
 			public List<String> getHelp() {
 				return help;

@@ -13,7 +13,7 @@ google:
     tokenInfoUri:
     preferTokenInfo: true
 
-      
+
 admin:
   emails:
       victor.shcherb@gmail.com, dmpr0.ua@gmail.com, alex.crimean@gmail.com, stetsenko.pavlo@gmail.com
@@ -42,7 +42,8 @@ spring:
 
 download:
   servers:
-    self: builder.osmand.net
+    self: 
+      - localhost
     main:
       - dl6.osmand.net
     help:
@@ -56,6 +57,13 @@ spring.jpa.hibernate.ddl-auto: validate
 logging:
   file: /var/log/osmand-server-logs/error.log
   config: classpath:logback-spring.xml
+  
+download:
+  servers:
+    self: 
+      - osmand.net
+      - live.osmand.net
+      - download.osmand.net
 
 server:
   port: 8090
