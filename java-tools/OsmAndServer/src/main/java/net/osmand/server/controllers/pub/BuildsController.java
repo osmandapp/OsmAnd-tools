@@ -3,6 +3,7 @@ package net.osmand.server.controllers.pub;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Date;
 
@@ -23,7 +24,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.xmlpull.v1.XmlSerializer;
 
-import com.ibm.icu.text.SimpleDateFormat;
 
 @Controller
 public class BuildsController {
@@ -43,13 +43,16 @@ public class BuildsController {
     	XmlSerializer serializer = PlatformUtil.newSerializer();
     	serializer.setOutput(new FileWriter(output));
 		serializer.setFeature("http://xmlpull.org/v1/doc/features.html#indent-output", true);
-		
+		long tm = System.currentTimeMillis();
 		serializer.startDocument("UTF-8", true);
-		serializer.startTag("", "builds");
-		serializer.attribute("", "version", "1.1");
+		serializer.startTag(null, "builds");
+		serializer.attribute(null, "version", "1.1");
 		addBuilds(latestBuilds, serializer);
 		addBuilds(allBuilds, serializer);
 		
+		serializer.startTag(null, "time");
+		serializer.attribute(null, "gentime", String.format("%.1f", System.currentTimeMillis() - tm / 1000.0));
+		serializer.endTag(null, "time");
 		serializer.endDocument();
 		serializer.flush();
 		
