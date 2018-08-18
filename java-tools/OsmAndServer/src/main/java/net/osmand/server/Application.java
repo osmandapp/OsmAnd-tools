@@ -31,5 +31,4 @@ public class Application {
 			telegram.init();
 		};
 	}
-
 }
