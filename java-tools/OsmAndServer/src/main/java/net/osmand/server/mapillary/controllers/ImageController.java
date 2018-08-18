@@ -19,14 +19,14 @@ import java.util.stream.Collectors;
 
 @Controller
 @RequestMapping("/api")
-public class ApiController {
+public class ImageController {
 
     private static final String PROC_FILE = "/var/www-download/.proc_timestamp";
 
     private final ImageService imageService;
 
     @Autowired
-    public ApiController(ImageService imageService) {
+    public ImageController(ImageService imageService) {
         this.imageService = imageService;
     }
 

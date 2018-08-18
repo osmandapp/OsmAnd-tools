@@ -3,7 +3,7 @@ package net.osmand.server.mapillary.services;
 import net.osmand.Location;
 import net.osmand.server.mapillary.CameraPlace;
 import net.osmand.server.mapillary.wikidata.ImageInfo;
-import net.osmand.server.mapillary.wikidata.Page;
+import net.osmand.server.mapillary.wikidata.WikiPage;
 import net.osmand.server.mapillary.wikidata.WikiBatch;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -182,12 +182,12 @@ public class ImageService {
     }
 
     private boolean isWikimediaUrl(String osmImage) {
-        return osmImage.startsWith(WIKI_FILE_PREFIX) || ((osmImage.contains(WIKIMEDIA) || osmImage.contains(WIKIPEDIA))
-                && osmImage.contains(WIKI_FILE_PREFIX));
+        return osmImage != null && (osmImage.startsWith(WIKI_FILE_PREFIX) || ((osmImage.contains(WIKIMEDIA) || osmImage.contains(WIKIPEDIA))
+                && osmImage.contains(WIKI_FILE_PREFIX)));
     }
 
     private boolean isFileMissing(WikiBatch batch) {
-        Page page = batch.getQuery().getPages().get(0);
+        WikiPage page = batch.getQuery().getPages().get(0);
         return page.getMissing() != null && page.getMissing();
     }
 

@@ -7,13 +7,13 @@ import java.util.List;
 @JsonInclude(JsonInclude.Include.NON_EMPTY)
 public class Query {
 
-    private List<Page> pages;
+    private List<WikiPage> pages;
 
-    public List<Page> getPages() {
+    public List<WikiPage> getPages() {
         return pages;
     }
 
-    public void setPages(List<Page> pages) {
+    public void setPages(List<WikiPage> pages) {
         this.pages = pages;
     }
 }
