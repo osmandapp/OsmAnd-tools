@@ -68,4 +68,6 @@ dependencies {
 
     testImplementation "junit:junit"
     testImplementation("org.springframework.boot:spring-boot-starter-test")
+
+    testCompile "com.github.tomakehurst:wiremock-standalone:2.18.0"
 }
