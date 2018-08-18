@@ -255,11 +255,11 @@ public class DownloadIndexController {
 			} else if (servers.getHelp().size() > 0 && isSimple && random < (100 - config.getLoad())) {
 				String host = servers.getHelp().get(random % servers.getHelp().size());
 				resp.setStatus(HttpServletResponse.SC_FOUND);
-				resp.setHeader(HttpHeaders.LOCATION, "http://" + host + "/download.php?" + req.getQueryString());
+				resp.setHeader(HttpHeaders.LOCATION, "http://" + host + "/download?" + req.getQueryString());
 			} else if (servers.getMain().size() > 0) {
 				String host = servers.getMain().get(random % servers.getMain().size());
 				resp.setStatus(HttpServletResponse.SC_FOUND);
-				resp.setHeader(HttpHeaders.LOCATION, "http://" + host + "/download.php?" + req.getQueryString());
+				resp.setHeader(HttpHeaders.LOCATION, "http://" + host + "/download?" + req.getQueryString());
 			} else {
 				handleDownload(findFileResource(params), headers, resp);
 			}
