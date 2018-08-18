@@ -72,10 +72,10 @@ public class IndexResourceBalancingFilter implements Filter {
                 chain.doFilter(request, response);
 			} else if (!servers.getHelp().isEmpty() && isSimple && random < (100 - config.getLoad())) {
 				String host = servers.getHelp().get(random % servers.getHelp().size());
-				httpResponse.sendRedirect("http://" + host + "/download.php?" + httpRequest.getQueryString());
+				httpResponse.sendRedirect("http://" + host + "/download?" + httpRequest.getQueryString());
 			} else if (!servers.getMain().isEmpty()) {
 				String host = servers.getMain().get(random % servers.getMain().size());
-                httpResponse.sendRedirect("http://" + host + "/download.php?" + httpRequest.getQueryString());
+                httpResponse.sendRedirect("http://" + host + "/download?" + httpRequest.getQueryString());
 			} else {
                 chain.doFilter(request, response);
 			}
