@@ -51,7 +51,7 @@ public class BuildsController {
 		addBuilds(allBuilds, serializer);
 		
 		serializer.startTag(null, "time");
-		serializer.attribute(null, "gentime", String.format("%.1f", System.currentTimeMillis() - tm / 1000.0));
+		serializer.attribute(null, "gentime", String.format("%.1f", (System.currentTimeMillis() - tm) / 1000.0));
 		serializer.endTag(null, "time");
 		serializer.endDocument();
 		serializer.flush();
@@ -63,7 +63,7 @@ public class BuildsController {
 		File[] listFiles = !buildsFolder.exists() ? null : buildsFolder.listFiles();
 		if (listFiles != null) {
 			Arrays.sort(listFiles, (File o1, File o2) -> {
-				return Long.compare(o1.lastModified(), o2.lastModified());
+				return -Long.compare(o1.lastModified(), o2.lastModified());
 			});
 			SimpleDateFormat fmt = new SimpleDateFormat("dd.MM.yyyy");
 			for (File f : listFiles) {
