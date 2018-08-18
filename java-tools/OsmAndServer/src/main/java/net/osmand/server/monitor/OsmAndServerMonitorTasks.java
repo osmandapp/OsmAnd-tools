@@ -184,7 +184,8 @@ public class OsmAndServerMonitorTasks {
 				downloadTests.put(host, res);
 			}
 			try {
-				url = new URL("http://"+host+"/download.php?standard=yes&file=Angola_africa_2.obf.zip");
+				url = new URL((host.equals("downlaod.osmand.net") ? "https://" : "http://") + host
+						+ "/download?standard=yes&file=Angola_africa_2.obf.zip");
 				URLConnection conn = url.openConnection();
 				long contentLength = 0;
 				try (InputStream is = conn.getInputStream()) {
