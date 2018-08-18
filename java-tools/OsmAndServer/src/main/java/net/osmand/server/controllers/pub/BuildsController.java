@@ -88,6 +88,7 @@ public class BuildsController {
 				serializer.attribute(null, "date", fmt.format(new Date(f.lastModified())));
 				serializer.attribute(null, "timestamp", f.lastModified() + "");
 				serializer.attribute(null, "type", type);
+				serializer.attribute(null, "tag", tag);
 				serializer.attribute(null, "path", buildsFolder.getName() + "/" + f.getName());
 				serializer.endTag(null, "build");
 			}
