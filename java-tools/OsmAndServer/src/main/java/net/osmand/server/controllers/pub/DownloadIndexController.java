@@ -17,6 +17,7 @@ import javax.servlet.http.HttpServletResponse;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.FileSystemResource;
@@ -41,6 +42,10 @@ public class DownloadIndexController {
 
 
 	private final DownloadProperties config;
+	
+	@Value("${download.files}")
+	private String filesPath;
+	    
 
 	@Autowired
 	public DownloadIndexController(DownloadProperties config) {
@@ -51,10 +56,9 @@ public class DownloadIndexController {
 	 */
 	private static final int DATE_AND_EXT_STR_LEN = 16;
 
-	private final File rootDir = new File("/var/www-download/");
 
 	private Resource getFileAsResource(String dir, String filename) throws FileNotFoundException {
-		File file = new File(rootDir, dir + File.separator + filename);
+		File file = new File(new File(filesPath, dir), filename);
 		if (file.exists()) {
 			return new FileSystemResource(file);
 		}
@@ -220,14 +224,14 @@ public class DownloadIndexController {
 				|| isContainAndEqual("wikivoyage", params);
 	}
 
-	private boolean computeStayHereCondition(MultiValueMap<String, String> params) {
+	private boolean computeLocalCondition(MultiValueMap<String, String> params) {
 		return isContainAndEqual("osmc", params)
 				|| isContainAndEqual("aosmc", params)
 				|| isContainAndEqual("fonts", params)
 				|| isContainAndEqual("inapp", params);
 	}
 
-	@RequestMapping(value = "/download.php", method = RequestMethod.GET)
+	@RequestMapping(value = {"/download.php", "/download"}, method = RequestMethod.GET)
 	@ResponseBody
 	public void downloadIndex(@RequestParam MultiValueMap<String, String> params,
 							  @RequestHeader HttpHeaders headers,
@@ -239,20 +243,13 @@ public class DownloadIndexController {
 			resp.sendError(HttpServletResponse.SC_BAD_REQUEST, "Invalid host name");
 			return;
 		}
-		String hostName = inetHost.getHostName();
-		boolean self = isContainAndEqual("self", "true", params);
-		if (self) {
-			Resource res = findFileResource(params);
-			handleDownload(res, headers, resp);
-			return;
-		}
-		if (config.getServers().getSelf().contains(hostName) && !self) {
+		boolean self = isContainAndEqual("self", "true", params) ||
+				computeLocalCondition(params);
+		if (!self) {
 			ThreadLocalRandom tlr = ThreadLocalRandom.current();
 			int random = tlr.nextInt(100);
 			boolean isSimple = computeSimpleCondition(params);
-			if (computeStayHereCondition(params)) {
-				handleDownload(findFileResource(params), headers, resp);
-			} else if (servers.getHelp().size() > 0 && isSimple && random < (100 - config.getLoad())) {
+			if (servers.getHelp().size() > 0 && isSimple && random < (100 - config.getLoad())) {
 				String host = servers.getHelp().get(random % servers.getHelp().size());
 				resp.setStatus(HttpServletResponse.SC_FOUND);
 				resp.setHeader(HttpHeaders.LOCATION, "http://" + host + "/download?" + req.getQueryString());
@@ -261,12 +258,13 @@ public class DownloadIndexController {
 				resp.setStatus(HttpServletResponse.SC_FOUND);
 				resp.setHeader(HttpHeaders.LOCATION, "http://" + host + "/download?" + req.getQueryString());
 			} else {
-				handleDownload(findFileResource(params), headers, resp);
+				self = true;
 			}
-			return;
 		}
-		Resource res = findFileResource(params);
-		handleDownload(res, headers, resp);
+		if(self) {
+			handleDownload(findFileResource(params), headers, resp);
+		}
+
 	}
 
 	@RequestMapping(value = "/download.php", method = RequestMethod.HEAD)

@@ -42,13 +42,12 @@ spring:
 
 download:
   servers:
-    self: 
-      - localhost
     main:
       - dl6.osmand.net
     help:
       - dl1.osmand.net
       - dl4.osmand.net
+  files: /var/www-download/
   load: 60
 
 ---
@@ -58,13 +57,6 @@ logging:
   file: /var/log/osmand-server-logs/error.log
   config: classpath:logback-spring.xml
   
-download:
-  servers:
-    self: 
-      - osmand.net
-      - live.osmand.net
-      - download.osmand.net
-
 server:
   port: 8090
   tomcat:
