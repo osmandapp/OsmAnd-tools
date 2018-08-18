@@ -19,6 +19,7 @@ import net.osmand.util.Algorithms;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -29,15 +30,8 @@ public class DownloadIndexesService  {
 
 	private static final String INDEX_FILE = "new_indexes.xml";
 	
-	private String getEnvVar(String key, String df) {
-		if(!Algorithms.isEmpty(System.getenv(key))) {
-			return System.getenv(key);
-		}
-		return df;
-	}
-	
-	//@Value("${download.indexes}")
-    private String pathToDownloadFiles = getEnvVar("MAPS_DIR", "/var/www-download/");
+	@Value("${download.files}")
+    private String pathToDownloadFiles;
 
 	// 15 minutes
 	@Scheduled(fixedDelay = 1000 * 60 * 15)
