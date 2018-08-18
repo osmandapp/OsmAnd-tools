@@ -52,6 +52,8 @@ public class BuildsController {
 		
 		serializer.startTag(null, "time");
 		serializer.attribute(null, "gentime", String.format("%.1f", (System.currentTimeMillis() - tm) / 1000.0));
+		SimpleDateFormat fmt = new SimpleDateFormat("dd.MM.yyyy HH:mm:ss");
+		serializer.attribute(null, "time", fmt.format(new Date()));
 		serializer.endTag(null, "time");
 		serializer.endDocument();
 		serializer.flush();
