@@ -10,21 +10,21 @@
         <table border="1">
             <tr>
                 <th>
-                    <a th:href="@{/list.php?sortby=name(asc=${asc})}">File</a>
+                    <a th:href="@{/list?sortby=name(asc=${asc})}">File</a>
                 </th>
                 <th>
-                    <a th:href="@{/list.php?sortby=date(asc=${asc})}">Date</a>
+                    <a th:href="@{/list?sortby=date(asc=${asc})}">Date</a>
                 </th>
                 <th>
-                    <a th:href="@{/list.php?sortby=size(asc=${asc})}">Size</a>
+                    <a th:href="@{/list?sortby=size(asc=${asc})}">Size</a>
                 </th>
                 <th>
-                    <a th:href="@{/list.php?sortby=descr(asc=${asc})}">Description</a>
+                    <a th:href="@{/list?sortby=descr(asc=${asc})}">Description</a>
                 </th>
             </tr>
             <tr th:each="region : ${regions}">
                 <td>
-                    <a th:href="@{/download.php?standard=yes(file=${region.name})}" th:text="${region.name}"></a>
+                    <a th:href="@{/download?standard=yes(file=${region.name})}" th:text="${region.name}"></a>
                 </td>
                 <td th:text="${region.date}"></td>
                 <td th:text="${region.size}"></td>
