@@ -51,7 +51,7 @@ import org.telegram.telegrambots.updateshandlers.SentCallback;
 @Component
 public class OsmAndAssistantBot extends TelegramLongPollingBot {
 
-	public static final String URL_TO_POST_COORDINATES = "http://builder.osmand.net:8090/device/%s/send";
+	public static final String URL_TO_POST_COORDINATES = "https://live.osmand.net/device/%s/send";
 	private static final int LIMIT_CONFIGURATIONS = 3;
 	
 	private static final Log LOG = LogFactory.getLog(OsmAndAssistantBot.class);

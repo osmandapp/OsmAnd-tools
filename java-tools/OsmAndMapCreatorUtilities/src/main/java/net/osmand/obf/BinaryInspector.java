@@ -48,6 +48,7 @@ import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteSubregion;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteTypeRule;
 import net.osmand.binary.BinaryMapTransportReaderAdapter.TransportIndex;
 import net.osmand.binary.OsmandOdb;
+import net.osmand.binary.OsmandOdb.TransportRouteSchedule;
 import net.osmand.binary.RouteDataObject;
 import net.osmand.data.Amenity;
 import net.osmand.data.Building;
@@ -55,6 +56,7 @@ import net.osmand.data.City;
 import net.osmand.data.MapObject;
 import net.osmand.data.Street;
 import net.osmand.data.TransportRoute;
+import net.osmand.data.TransportSchedule;
 import net.osmand.data.TransportStop;
 import net.osmand.osm.MapRenderingTypes;
 import net.osmand.util.MapUtils;
@@ -80,15 +82,15 @@ public class BinaryInspector {
 //					"-vpoi",
 //					"-vmap", "-vmapobjects", 
 //					"-vmapcoordinates",
-					"-vrouting",
-//					"-vtransport",
+//					"-vrouting",
+					"-vtransport", "-vtransportschedule",
 //					"-vaddress", "-vcities","-vstreetgroups",
 //					"-vstreets", "-vbuildings", "-vintersections",
 //					"-lang=ru",
-//					"-bbox=30.4981,50.4424,30.5195,50.4351",
+					"-bbox=4.85694,52.28732,4.86645,52.28321",
 //					"-osm="+System.getProperty("maps.dir")+"/map_full_1.obf.osm",
 //					System.getProperty("maps.dir")+"/diff/Bulgaria_europe_01_00.obf"
-					System.getProperty("maps.dir")+"Map.obf"
+					System.getProperty("maps.dir")+"Transport.obf"
 			});
 		} else {
 			in.inspector(args);
@@ -129,6 +131,7 @@ public class BinaryInspector {
 		boolean vbuildings;
 		boolean vintersections;
 		boolean vtransport;
+		boolean vtransportschedule;
 		boolean vpoi;
 		boolean vmap;
 		boolean vrouting;
@@ -207,6 +210,8 @@ public class BinaryInspector {
 					}
 				} else if (params[i].equals("-vtransport")) {
 					vtransport = true;
+				} else if (params[i].equals("-vtransportschedule")) {
+					vtransportschedule = true;
 				} else if (params[i].startsWith("-lang=")) {
 					lang = params[i].substring("-lang=".length());
 				} else if (params[i].startsWith("-zoom=")) {
@@ -1216,13 +1221,57 @@ public class BinaryInspector {
 			println("  " + s.getName(verbose.lang) + ": " + lrs + " " + s.getLocation());
 		}
 		println("\nRoutes:");
-		for(TransportRoute s : rs.values()) {
+		for(TransportRoute st : rs.values()) {
 			List<String> stopsString = new ArrayList<>();
-			for(TransportStop st : s.getForwardStops()) {
-				stopsString.add(st.getName(verbose.lang));
+			for(TransportStop stop : st.getForwardStops()) {
+				stopsString.add(stop.getName(verbose.lang));
 			}
-			println("  " + s.getRef() + " " + s.getType() + " " + s.getName(verbose.lang) + ": " + stopsString);
+			println("  " + st.getRef() + " " + st.getType() + " " + st.getName(verbose.lang) + ": " + stopsString);
+			if(verbose.vtransportschedule) {
+				TransportSchedule sc = st.getSchedule();
+				if (sc != null) {
+					StringBuilder bld = new StringBuilder();
+					int[] tripIntervalsList = sc.getTripIntervals();
+					int prevTime = 0;
+					for (int i : tripIntervalsList) {
+						i = i + prevTime;
+						String tm = formatTransporTime(i);
+						bld.append(tm);
+						prevTime = i;
+					}
+					println("   " + bld.toString());
+					bld = new StringBuilder();
+					int atm = tripIntervalsList[0];
+					int[] avgStopIntervals = sc.getAvgStopIntervals();
+					int[] avgWaitIntervals = sc.getAvgWaitIntervals();
+					for(int k = 0; k < st.getForwardStops().size(); k++) {
+						TransportStop stp = st.getForwardStops().get(k);
+						if(k == 0) {
+							bld.append(String.format("%6.6s %s, ", stp.getName(), formatTransporTime(atm)));
+						} else {
+							atm += avgStopIntervals[k - 1];
+							if(avgWaitIntervals.length > k && avgWaitIntervals[k] > 0)  {
+								bld.append(String.format("%6.6s %s - %s, ", stp.getName(), formatTransporTime(atm),
+										formatTransporTime(avgWaitIntervals[k] + atm)));
+							} else {
+								bld.append(String.format("%6.6s %s, ", stp.getName(), formatTransporTime(atm)));
+							}
+						}
+					}
+					// %3.3s
+					println("   " + bld.toString());
+				}
+			}
 		}
+	}
+
+	private String formatTransporTime(int i) {
+		int h = i / 60 / 6;
+		int mh = i - h * 60 * 6;
+		int m = mh / 6;
+		int s = (mh - m * 6) * 10;
+		String tm = String.format("%02d:%02d:%02d ", h, m, s);
+		return tm;
 	}
 
 

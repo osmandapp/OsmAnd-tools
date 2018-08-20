@@ -154,8 +154,13 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 
 	public void indexMapRelationsAndMultiPolygons(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 		if (e instanceof Relation) {
+			long ts = System.currentTimeMillis();
 			indexMultiPolygon((Relation) e, ctx);
 			tagsTransformer.handleRelationPropogatedTags((Relation) e, renderingTypes, ctx, EntityConvertApplyType.MAP);
+			long tm = (System.currentTimeMillis() - ts) / 1000;
+			if (tm > 15 ) {
+				log.warn(String.format("Relation %d took %d seconds to process", e.getId(), tm ));
+			}
 		}
 	}
 
@@ -175,8 +180,47 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	private void indexMultiPolygon(Relation e, OsmDbAccessorContext ctx) throws SQLException {
 		// Don't handle things that aren't multipolygon, and nothing administrative
 		if ((!"multipolygon".equals(e.getTag(OSMTagKey.TYPE)) &&  !"protected_area".equals(e.getTag("boundary")))
-				|| e.getTag(OSMTagKey.ADMIN_LEVEL) != null)
+				|| e.getTag(OSMTagKey.ADMIN_LEVEL) != null) {
 			return;
+		}
+		// some big islands are marked as multipolygon - don't process them (only keep coastlines)
+		boolean polygon = "multipolygon".equals(e.getTag(OSMTagKey.TYPE)) && "island".equals(e.getTag(OSMTagKey.PLACE));
+		if (polygon) {
+			int coastlines = 0;
+			int otherWays = 0;
+			ctx.loadEntityRelation((Relation) e);
+			List<Entity> me = e.getMemberEntities("outer");
+
+			for (Entity es : me) {
+				if(es instanceof Way && !((Way) es).getEntityIds().isEmpty()) {
+					boolean coastline = "coastline".equals(es.getTag(OSMTagKey.NATURAL));
+					if (coastline) {
+						coastlines++;
+					} else {
+						otherWays++;
+					}
+				}
+				
+			}
+			if (coastlines > 0) {
+				// don't index all coastlines
+				if (otherWays != 0) {
+					log.error(String.format(
+							"Wrong coastline (island) relation %d has %d coastlines out of %d entries", e.getId(),
+							coastlines, otherWays + coastlines));
+					return;
+				}
+				if (e.getMembers("inner").size() > 0) {
+					log.error(String.format(
+							"Wrong coastline (island) relation %d has inner ways", e.getId()));
+					return;
+				}
+				log.info(String.format("Relation %s %d consists only of coastlines so it was skipped.",
+						e.getTag(OSMTagKey.NAME), e.getId()));
+				return;
+			}
+		}
+		
 		MultipolygonBuilder original = createMultipolygonBuilder(e, ctx);
 		try {
 			renderingTypes.encodeEntityWithType(false, e.getModifiableTags(), mapZooms.getLevel(0).getMaxZoom(), typeUse, addtypeUse, namesUse, tempNameUse);

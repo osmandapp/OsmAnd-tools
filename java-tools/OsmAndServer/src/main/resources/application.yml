@@ -13,7 +13,7 @@ google:
     tokenInfoUri:
     preferTokenInfo: true
 
-      
+
 admin:
   emails:
       victor.shcherb@gmail.com, dmpr0.ua@gmail.com, alex.crimean@gmail.com, stetsenko.pavlo@gmail.com
@@ -42,12 +42,12 @@ spring:
 
 download:
   servers:
-    self: builder.osmand.net
     main:
       - dl6.osmand.net
     help:
       - dl1.osmand.net
       - dl4.osmand.net
+  files: /var/www-download/
   load: 60
 
 mapillary:

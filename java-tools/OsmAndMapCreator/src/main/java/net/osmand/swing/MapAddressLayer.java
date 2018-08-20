@@ -176,7 +176,7 @@ public class MapAddressLayer implements MapPanelLayer {
 		}
 		RoutingConfiguration cfg = DataExtractionSettings.getSettings().getRoutingConfig().build("geocoding", 100,
 				new HashMap<String, String>());
-		RoutingContext ctx = new RoutePlannerFrontEnd(false).buildRoutingContext(cfg, null, list.toArray(new BinaryMapIndexReader[list.size()]));
+		RoutingContext ctx = new RoutePlannerFrontEnd().buildRoutingContext(cfg, null, list.toArray(new BinaryMapIndexReader[list.size()]));
 
 		GeocodingUtilities su = new GeocodingUtilities();
 		double minBuildingDistance = 0;

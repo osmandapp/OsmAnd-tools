@@ -142,7 +142,7 @@ public class MapClusterLayer implements MapPanelLayer {
 				rs.add(new BinaryMapIndexReader(raf, f));
 			}
 		}
-		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd(true);
+		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
 		Builder builder = RoutingConfiguration.getDefault();
 		RoutingConfiguration config = builder.build("car", RoutingConfiguration.DEFAULT_MEMORY_LIMIT * 3);
 		RoutingContext ctx = router.buildRoutingContext(config, NativeSwingRendering.getDefaultFromSettings(), rs
