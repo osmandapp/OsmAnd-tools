@@ -28,7 +28,7 @@ public class ApiController {
     private static final String RESULT_MAP_ARR = "arr";
     private static final String RESULT_MAP_HALFVISARR = "halfvisarr";
 
-    @Value("osmlive.status")
+    @Value("${osmlive.status}")
     private String procFile;
 
     private final ImageService imageService;
@@ -56,8 +56,8 @@ public class ApiController {
             BufferedReader br = new BufferedReader(new InputStreamReader(fsr.getInputStream()));
             return br.readLine();
         }
-        LOGGER.error("proc file not found");
-        throw new RuntimeException("File not found");
+        LOGGER.error("proc file not found at " + procFile);
+        throw new RuntimeException("File not found at " + procFile);
     }
 
     @GetMapping(path = {"/cm_place.php", "/cm_place"})
