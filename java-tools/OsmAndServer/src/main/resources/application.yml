@@ -50,6 +50,9 @@ download:
   files: /var/www-download/
   load: 60
 
+mapillary:
+  clientid: LXJVNHlDOGdMSVgxZG5mVzlHQ3ZqQTo0NjE5OWRiN2EzNTFkNDg4
+
 ---
 spring.jpa.hibernate.ddl-auto: validate
 
