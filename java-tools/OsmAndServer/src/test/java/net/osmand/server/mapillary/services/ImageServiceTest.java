@@ -108,10 +108,31 @@ public class ImageServiceTest {
         Method m = ImageService.class.getDeclaredMethod("isWikimediaUrl", String.class);
         m.setAccessible(true);
         String osmImage = null;
+
         boolean b = (Boolean) m.invoke(service, osmImage);
         assertFalse(b);
+
+        b = (Boolean) m.invoke(service, "Parker Solar Probe.jpg");
+        assertFalse(b);
+
+        b = (Boolean) m.invoke(service, "File:Parker Solar Probe.jpg");
+        assertTrue(b);
+
+        b = (Boolean) m.invoke(service, "https://en.wikipedia.org/wiki/File:Bret_08-22-1999_1431Z.png");
+        assertTrue(b);
     }
 
+    @Test
+    public void testGetFilename() throws Exception {
+        Method m = ImageService.class.getDeclaredMethod("getFilename", String.class);
+        m.setAccessible(true);
+
+        String r = (String) m.invoke(service, "File:Parker Solar Probe.jpg");
+        assertEquals("File:Parker Solar Probe.jpg", r);
+
+        String r2 = (String) m.invoke(service, "https://en.wikipedia.org/wiki/File:Amy_Adams_(29708985502)_(cropped).jpg");
+        assertEquals("File:Amy_Adams_(29708985502)_(cropped).jpg", r2);
 
 
+    }
 }

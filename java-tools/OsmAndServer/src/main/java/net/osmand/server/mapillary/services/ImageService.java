@@ -232,7 +232,7 @@ public class ImageService {
         CameraPlace primaryImage;
         if (isWikimediaUrl(osmImage)) {
             String filename = getFilename(osmImage);
-            if (filename == null) {
+            if (filename.isEmpty()) {
                 return null;
             }
             UriComponentsBuilder uriBuilder = UriComponentsBuilder.fromHttpUrl(WikimediaApiConstants.WIKIMEDIA_API_URL);
@@ -278,8 +278,8 @@ public class ImageService {
     }
 
     private static class OsmandPhotoApiConstants {
-        static final String OSMAND_GET_IMAGE_ROOT_URL = "https://osmand.net/api/mapillary/get_photo.php";
-        static final String OSMAND_PHOTO_VIEWER_ROOT_URL = "https://osmand.net/api/mapillary/photo-viewer.php";
+        static final String OSMAND_GET_IMAGE_ROOT_URL = "https://osmand.net/api/mapillary/get_photo";
+        static final String OSMAND_PHOTO_VIEWER_ROOT_URL = "https://osmand.net/api/mapillary/photo-viewer";
         static final String OSMAND_PARAM_PHOTO_ID = "photo_id";
         static final String OSMAND_PARAM_HIRES = "hires";
     }

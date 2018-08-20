@@ -4,6 +4,7 @@ import net.osmand.server.mapillary.CameraPlace;
 import net.osmand.server.mapillary.CameraPlaceCollection;
 import net.osmand.server.mapillary.services.ImageService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -21,7 +22,8 @@ import java.util.stream.Collectors;
 @RequestMapping("/api")
 public class ImageController {
 
-    private static final String PROC_FILE = "/var/www-download/.proc_timestamp";
+    @Value("osmlive.status")
+    private String procFile;
 
     private final ImageService imageService;
 
@@ -43,7 +45,7 @@ public class ImageController {
     @GetMapping(path = {"/osmlive_status.php", "/osmlive_status"}, produces = "text/html;charset=UTF-8")
     @ResponseBody
     public String osmLiveStatus() throws IOException  {
-        FileSystemResource fsr = new FileSystemResource(PROC_FILE);
+        FileSystemResource fsr = new FileSystemResource(procFile);
         if (fsr.exists()) {
             BufferedReader br = new BufferedReader(new InputStreamReader(fsr.getInputStream()));
             return br.readLine();
