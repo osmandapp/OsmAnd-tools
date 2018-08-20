@@ -22,6 +22,9 @@ import java.util.stream.Collectors;
 @RequestMapping("/api")
 public class ImageController {
 
+    private static final String RESULT_MAP_ARR = "arr";
+    private static final String RESULT_MAP_HALFVISARR = "halfvisarr";
+
     @Value("osmlive.status")
     private String procFile;
 
@@ -68,8 +71,8 @@ public class ImageController {
         List<CameraPlace> arr = new ArrayList<>();
         List<CameraPlace> halfvisarr = new ArrayList<>();
 
-        result.put("arr", arr);
-        result.put("halfvisarr", halfvisarr);
+        result.put(RESULT_MAP_ARR, arr);
+        result.put(RESULT_MAP_HALFVISARR, halfvisarr);
 
         CameraPlace wikimediaPrimaryCameraPlace = imageService.processWikimediaData(lat, lon, osmImage);
         CameraPlace mapillaryPrimaryCameraPlace = imageService.processMapillaryData(lat, lon, osmMapillaryKey, result);
@@ -83,7 +86,9 @@ public class ImageController {
         if (mapillaryPrimaryCameraPlace != null) {
             arr.add(0, mapillaryPrimaryCameraPlace);
         }
-        arr.add(createEmptyCameraPlaceWithTypeOnly("mapillary-contribute"));
+        if (!arr.isEmpty()) {
+            arr.add(createEmptyCameraPlaceWithTypeOnly("mapillary-contribute"));
+        }
         return new CameraPlaceCollection(arr);
     }
 
@@ -111,21 +116,3 @@ public class ImageController {
         return "mapillary/photo-viewer";
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
