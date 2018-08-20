@@ -48,7 +48,6 @@ import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteSubregion;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteTypeRule;
 import net.osmand.binary.BinaryMapTransportReaderAdapter.TransportIndex;
 import net.osmand.binary.OsmandOdb;
-import net.osmand.binary.OsmandOdb.TransportRouteSchedule;
 import net.osmand.binary.RouteDataObject;
 import net.osmand.data.Amenity;
 import net.osmand.data.Building;
@@ -59,6 +58,7 @@ import net.osmand.data.TransportRoute;
 import net.osmand.data.TransportSchedule;
 import net.osmand.data.TransportStop;
 import net.osmand.osm.MapRenderingTypes;
+import net.osmand.router.TransportRoutePlanner;
 import net.osmand.util.MapUtils;
 
 import com.google.protobuf.CodedOutputStream;
@@ -1235,7 +1235,7 @@ public class BinaryInspector {
 					int prevTime = 0;
 					for (int i : tripIntervalsList) {
 						i = i + prevTime;
-						String tm = formatTransporTime(i);
+						String tm = TransportRoutePlanner.formatTransporTime(i);
 						bld.append(tm);
 						prevTime = i;
 					}
@@ -1247,14 +1247,14 @@ public class BinaryInspector {
 					for(int k = 0; k < st.getForwardStops().size(); k++) {
 						TransportStop stp = st.getForwardStops().get(k);
 						if(k == 0) {
-							bld.append(String.format("%6.6s %s, ", stp.getName(), formatTransporTime(atm)));
+							bld.append(String.format("%6.6s %s, ", stp.getName(), TransportRoutePlanner.formatTransporTime(atm)));
 						} else {
 							atm += avgStopIntervals[k - 1];
 							if(avgWaitIntervals.length > k && avgWaitIntervals[k] > 0)  {
-								bld.append(String.format("%6.6s %s - %s, ", stp.getName(), formatTransporTime(atm),
-										formatTransporTime(avgWaitIntervals[k] + atm)));
+								bld.append(String.format("%6.6s %s - %s, ", stp.getName(), TransportRoutePlanner.formatTransporTime(atm),
+										TransportRoutePlanner.formatTransporTime(avgWaitIntervals[k] + atm)));
 							} else {
-								bld.append(String.format("%6.6s %s, ", stp.getName(), formatTransporTime(atm)));
+								bld.append(String.format("%6.6s %s, ", stp.getName(), TransportRoutePlanner.formatTransporTime(atm)));
 							}
 						}
 					}
@@ -1265,14 +1265,6 @@ public class BinaryInspector {
 		}
 	}
 
-	private String formatTransporTime(int i) {
-		int h = i / 60 / 6;
-		int mh = i - h * 60 * 6;
-		int m = mh / 6;
-		int s = (mh - m * 6) * 10;
-		String tm = String.format("%02d:%02d:%02d ", h, m, s);
-		return tm;
-	}
 
 
 	private void printPOIDetailInfo(VerboseInfo verbose, BinaryMapIndexReader index, PoiRegion p) throws IOException {
