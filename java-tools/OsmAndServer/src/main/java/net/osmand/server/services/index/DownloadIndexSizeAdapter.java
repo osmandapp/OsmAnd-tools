@@ -1,4 +1,4 @@
-package net.osmand.server.index;
+package net.osmand.server.services.index;
 
 import javax.xml.bind.annotation.adapters.XmlAdapter;
 import java.util.Locale;

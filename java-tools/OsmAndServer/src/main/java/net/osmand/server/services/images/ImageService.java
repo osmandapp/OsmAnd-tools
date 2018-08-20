@@ -1,10 +1,10 @@
-package net.osmand.server.mapillary.services;
+package net.osmand.server.services.images;
+
+import java.util.List;
+import java.util.Map;
 
 import net.osmand.Location;
-import net.osmand.server.mapillary.CameraPlace;
-import net.osmand.server.mapillary.wikidata.ImageInfo;
-import net.osmand.server.mapillary.wikidata.WikiPage;
-import net.osmand.server.mapillary.wikidata.WikiBatch;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.geojson.Feature;
@@ -20,8 +20,7 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
-import java.util.List;
-import java.util.Map;
+import com.fasterxml.jackson.annotation.JsonInclude;
 
 @Service
 public class ImageService {
@@ -283,4 +282,178 @@ public class ImageService {
         static final String OSMAND_PARAM_PHOTO_ID = "photo_id";
         static final String OSMAND_PARAM_HIRES = "hires";
     }
+    
+    @JsonInclude(JsonInclude.Include.NON_EMPTY)
+    public static class ImageInfo {
+        private String timestamp;
+        private String user;
+        private String thumburl;
+        private Integer thumbwidth;
+        private Integer thumbheight;
+        private String url;
+        private String descriptionurl;
+        private String descriptionshorturl;
+
+        public String getTimestamp() {
+            return timestamp;
+        }
+
+        public void setTimestamp(String timestamp) {
+            this.timestamp = timestamp;
+        }
+
+        public String getUser() {
+            return user;
+        }
+
+        public void setUser(String user) {
+            this.user = user;
+        }
+
+        public String getThumburl() {
+            return thumburl;
+        }
+
+        public void setThumburl(String thumburl) {
+            this.thumburl = thumburl;
+        }
+
+        public Integer getThumbwidth() {
+            return thumbwidth;
+        }
+
+        public void setThumbwidth(Integer thumbwidth) {
+            this.thumbwidth = thumbwidth;
+        }
+
+        public Integer getThumbheight() {
+            return thumbheight;
+        }
+
+        public void setThumbheight(Integer thumbheight) {
+            this.thumbheight = thumbheight;
+        }
+
+        public String getUrl() {
+            return url;
+        }
+
+        public void setUrl(String url) {
+            this.url = url;
+        }
+
+        public String getDescriptionurl() {
+            return descriptionurl;
+        }
+
+        public void setDescriptionurl(String descriptionurl) {
+            this.descriptionurl = descriptionurl;
+        }
+
+        public String getDescriptionshorturl() {
+            return descriptionshorturl;
+        }
+
+        public void setDescriptionshorturl(String descriptionshorturl) {
+            this.descriptionshorturl = descriptionshorturl;
+        }
+    }
+
+    @JsonInclude(JsonInclude.Include.NON_EMPTY)
+    public static class Query {
+
+        private List<WikiPage> pages;
+
+        public List<WikiPage> getPages() {
+            return pages;
+        }
+
+        public void setPages(List<WikiPage> pages) {
+            this.pages = pages;
+        }
+    }
+    
+    @JsonInclude(JsonInclude.Include.NON_EMPTY)
+    public static class WikiBatch {
+
+        private Boolean batchcomplete;
+        private Query query;
+
+        public Boolean getBatchcomplete() {
+            return batchcomplete;
+        }
+
+        public void setBatchcomplete(Boolean batchcomplete) {
+            this.batchcomplete = batchcomplete;
+        }
+
+        public Query getQuery() {
+            return query;
+        }
+
+        public void setQuery(Query query) {
+            this.query = query;
+        }
+    }
+
+    @JsonInclude(JsonInclude.Include.NON_EMPTY)
+    public static class WikiPage {
+        private Integer ns;
+        private String title;
+        private Boolean missing;
+        @JsonInclude(JsonInclude.Include.ALWAYS)
+        private String imagerepository;
+        private Long pageid;
+        private List<ImageInfo> imageinfo;
+
+
+        public Integer getNs() {
+            return ns;
+        }
+
+        public void setNs(Integer ns) {
+            this.ns = ns;
+        }
+
+        public String getTitle() {
+            return title;
+        }
+
+        public void setTitle(String title) {
+            this.title = title;
+        }
+
+        public String getImagerepository() {
+            return imagerepository;
+        }
+
+        public void setImagerepository(String imagerepository) {
+            this.imagerepository = imagerepository;
+        }
+
+        public Long getPageid() {
+            return pageid;
+        }
+
+        public void setPageid(Long pageid) {
+            this.pageid = pageid;
+        }
+
+        public List<ImageInfo> getImageinfo() {
+            return imageinfo;
+        }
+
+        public void setImageinfo(List<ImageInfo> imageinfo) {
+            this.imageinfo = imageinfo;
+        }
+
+        public Boolean getMissing() {
+            return missing;
+        }
+
+        public void setMissing(Boolean missing) {
+            this.missing = missing;
+        }
+    }
+
 }

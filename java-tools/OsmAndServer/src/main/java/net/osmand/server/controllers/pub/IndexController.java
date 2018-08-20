@@ -1,8 +1,9 @@
 package net.osmand.server.controllers.pub;
 
-import net.osmand.server.index.DownloadIndex;
-import net.osmand.server.index.DownloadIndexDocument;
-import net.osmand.server.index.DownloadIndexesService;
+import net.osmand.server.services.index.DownloadIndex;
+import net.osmand.server.services.index.DownloadIndexDocument;
+import net.osmand.server.services.index.DownloadIndexesService;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,6 +21,7 @@ import javax.servlet.http.HttpServletResponse;
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBException;
 import javax.xml.bind.Unmarshaller;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.Comparator;

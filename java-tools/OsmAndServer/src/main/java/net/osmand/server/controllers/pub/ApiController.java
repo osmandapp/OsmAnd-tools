@@ -1,8 +1,9 @@
-package net.osmand.server.mapillary.controllers;
+package net.osmand.server.controllers.pub;
 
-import net.osmand.server.mapillary.CameraPlace;
-import net.osmand.server.mapillary.CameraPlaceCollection;
-import net.osmand.server.mapillary.services.ImageService;
+import net.osmand.server.services.images.CameraPlace;
+import net.osmand.server.services.images.CameraPlaceCollection;
+import net.osmand.server.services.images.ImageService;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import javax.servlet.http.HttpServletResponse;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;

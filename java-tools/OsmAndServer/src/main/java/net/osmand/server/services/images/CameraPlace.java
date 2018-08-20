@@ -1,4 +1,4 @@
-package net.osmand.server.mapillary;
+package net.osmand.server.services.images;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 

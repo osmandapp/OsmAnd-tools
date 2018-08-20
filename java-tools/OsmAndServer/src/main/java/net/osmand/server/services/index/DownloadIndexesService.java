@@ -1,4 +1,4 @@
-package net.osmand.server.index;
+package net.osmand.server.services.index;
 
 import java.io.File;
 import java.io.FileInputStream;

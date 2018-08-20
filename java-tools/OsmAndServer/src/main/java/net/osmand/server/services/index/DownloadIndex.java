@@ -1,9 +1,10 @@
-package net.osmand.server.index;
+package net.osmand.server.services.index;
 
-import net.osmand.server.index.DownloadIndexesService.DownloadType;
+import net.osmand.server.services.index.DownloadIndexesService.DownloadType;
 
 import javax.xml.bind.annotation.XmlAttribute;
 import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
+
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
