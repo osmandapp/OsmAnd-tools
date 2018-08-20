@@ -22,8 +22,8 @@ import java.util.stream.Collectors;
 
 @Controller
 @RequestMapping("/api")
-public class ImageController {
-    private static final Log LOGGER = LogFactory.getLog(ImageController.class);
+public class ApiController {
+    private static final Log LOGGER = LogFactory.getLog(ApiController.class);
 
     private static final String RESULT_MAP_ARR = "arr";
     private static final String RESULT_MAP_HALFVISARR = "halfvisarr";
@@ -34,7 +34,7 @@ public class ImageController {
     private final ImageService imageService;
 
     @Autowired
-    public ImageController(ImageService imageService) {
+    public ApiController(ImageService imageService) {
         this.imageService = imageService;
     }
 
