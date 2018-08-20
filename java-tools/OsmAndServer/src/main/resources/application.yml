@@ -53,6 +53,9 @@ download:
 mapillary:
   clientid: LXJVNHlDOGdMSVgxZG5mVzlHQ3ZqQTo0NjE5OWRiN2EzNTFkNDg4
 
+osmlive:
+  status: /var/www-download/.proc_timestamp
+
 ---
 spring.jpa.hibernate.ddl-auto: validate
 

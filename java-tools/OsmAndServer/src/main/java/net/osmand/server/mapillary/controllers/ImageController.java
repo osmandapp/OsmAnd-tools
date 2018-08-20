@@ -3,6 +3,8 @@ package net.osmand.server.mapillary.controllers;
 import net.osmand.server.mapillary.CameraPlace;
 import net.osmand.server.mapillary.CameraPlaceCollection;
 import net.osmand.server.mapillary.services.ImageService;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
@@ -21,6 +23,7 @@ import java.util.stream.Collectors;
 @Controller
 @RequestMapping("/api")
 public class ImageController {
+    private static final Log LOGGER = LogFactory.getLog(ImageController.class);
 
     private static final String RESULT_MAP_ARR = "arr";
     private static final String RESULT_MAP_HALFVISARR = "halfvisarr";
@@ -53,6 +56,7 @@ public class ImageController {
             BufferedReader br = new BufferedReader(new InputStreamReader(fsr.getInputStream()));
             return br.readLine();
         }
+        LOGGER.error("proc file not found");
         throw new RuntimeException("File not found");
     }
 
