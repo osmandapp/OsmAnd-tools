@@ -6,6 +6,7 @@ import net.osmand.server.services.images.ImageService;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.hibernate.validator.constraints.pl.REGON;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
@@ -21,6 +22,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.InetSocketAddress;
+import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -128,5 +130,16 @@ public class ApiController {
     public String getPhotoViewer(@RequestParam("photo_id") String photoId, Model model) {
         model.addAttribute("photoId", photoId);
         return "mapillary/photo-viewer";
+    }
+
+    @GetMapping(path = {"/motd", "/motd.php"})
+    @ResponseBody
+    public String handleMotd(@RequestParam(required = false) String version,
+                             @RequestParam(required = false) Integer nd,
+                             @RequestParam(required = false) Integer ns,
+                             @RequestParam(required = false) String lang,
+                             @RequestParam(required = false) String os,
+                             @RequestParam(required = false) String aid) {
+        return "{}";
     }
 }
