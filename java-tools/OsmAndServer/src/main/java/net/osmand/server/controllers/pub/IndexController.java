@@ -38,7 +38,6 @@ public class IndexController {
     private DownloadIndexesService downloadIndexes;
 
     private DownloadIndexDocument unmarshallIndexes(File fl) throws IOException {
-		DownloadIndexDocument doc;
 		try {
 			JAXBContext jc = JAXBContext.newInstance(DownloadIndexDocument.class);
 			Unmarshaller unmarshaller = jc.createUnmarshaller();
@@ -71,9 +70,9 @@ public class IndexController {
 	
 	@RequestMapping(path = { "get_indexes.php", "get_indexes"})
 	@ResponseBody
-    public ResponseEntity<Resource> indexesPhp(@RequestParam(defaultValue="", required=false)
-    String gzip, HttpServletResponse resp) throws IOException {
-		boolean gz = gzip != null && !gzip.isEmpty() && gzip.equals("true");
+    public ResponseEntity<Resource> indexesPhp(@RequestParam(required=false) String gzip,
+                                               HttpServletResponse resp) throws IOException {
+		boolean gz = gzip != null;
 		File fl = downloadIndexes.getIndexesXml(false, gz);
         HttpHeaders headers = new HttpHeaders();
         headers.add(HttpHeaders.CONTENT_DISPOSITION, String.format("attachment; filename=\"%s\"", fl.getName()));
@@ -90,10 +89,6 @@ public class IndexController {
     		@RequestParam(required=false)  boolean refresh, Model model) throws IOException {
     	// keep this step
     	File fl = downloadIndexes.getIndexesXml(refresh || update, false);
-    	// TODO print table
-    	// possible algorithm
-    	// 1. read from xml into DownloadIndex Map, Map<DownloadType, List<DownloadIndex> >
-    	// 2. print each section
 		DownloadIndexDocument doc = unmarshallIndexes(fl);
 		model.addAttribute("region", doc.getMaps());
 		model.addAttribute("road_region", doc.getRoadMaps());
