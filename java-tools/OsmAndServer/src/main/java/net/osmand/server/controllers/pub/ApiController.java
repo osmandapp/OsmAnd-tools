@@ -15,6 +15,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import java.io.BufferedReader;
@@ -73,13 +74,23 @@ public class ApiController {
                                             @RequestParam(value = "lang", required = false) String lang,
                                             @RequestParam(value = "osm_image", required = false) String osmImage,
                                             @RequestParam(value = "osm_mapillary_key", required = false) String osmMapillaryKey,
-                                            @RequestHeader HttpHeaders headers) {
-        InetSocketAddress inetHost = headers.getHost();
-        if (inetHost == null) {
-            LOGGER.error("Bad request. Host is null.");
+                                            @RequestHeader HttpHeaders headers,
+                                            HttpServletRequest request) {
+        InetSocketAddress inetAddress = headers.getHost();
+        String host = inetAddress.getHostName();
+        String proto = request.getScheme();
+        // for test
+        LOGGER.info(headers.get("X-Forwarded-Host"));
+        String forwardedHost = headers.getFirst("X-Forwarded-Host");
+        String forwardedProto = headers.getFirst("X-Forwarded-Proto");
+        if (forwardedHost != null && forwardedProto != null) {
+            host = forwardedHost;
+            proto = forwardedProto;
+        }
+        if (host == null) {
+            LOGGER.error("Bad request. Host is null");
             return new CameraPlaceCollection();
         }
-        String host = inetHost.getHostName();
         Map<String, List<CameraPlace>> result = new HashMap<>();
 
         List<CameraPlace> arr = new ArrayList<>();
@@ -90,7 +101,7 @@ public class ApiController {
 
         CameraPlace wikimediaPrimaryCameraPlace = imageService.processWikimediaData(lat, lon, osmImage);
         CameraPlace mapillaryPrimaryCameraPlace = imageService.processMapillaryData(lat, lon, osmMapillaryKey, result,
-                host);
+                host, proto);
         if (arr.isEmpty()) {
             arr.addAll(halfvisarr);
         }

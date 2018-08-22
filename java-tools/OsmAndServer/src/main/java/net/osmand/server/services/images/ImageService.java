@@ -70,7 +70,7 @@ public class ImageService {
         return Double.parseDouble(String.valueOf(cameraAngle));
     }
 
-    private CameraPlace parseFeature(Feature feature, double targetLat, double targetLon, String host) {
+    private CameraPlace parseFeature(Feature feature, double targetLat, double targetLon, String host, String proto) {
         LngLatAlt coordinates = ((Point) feature.getGeometry()).getCoordinates();
         Map<String, Object> properties = feature.getProperties();
         CameraPlace.CameraPlaceBuilder cameraBuilder = new CameraPlace.CameraPlaceBuilder();
@@ -79,9 +79,9 @@ public class ImageService {
         String key = (String) properties.get("key");
         cameraBuilder.setKey(key);
         cameraBuilder.setCa(parseCameraAngle(properties.get("ca")));
-        cameraBuilder.setImageUrl(buildOsmandImageUrl(false, key, host));
-        cameraBuilder.setImageHiresUrl(buildOsmandImageUrl(true, key, host));
-        cameraBuilder.setUrl(buildOsmandPhotoViewerUrl(key, host));
+        cameraBuilder.setImageUrl(buildOsmandImageUrl(false, key, host, proto));
+        cameraBuilder.setImageHiresUrl(buildOsmandImageUrl(true, key, host, proto));
+        cameraBuilder.setUrl(buildOsmandPhotoViewerUrl(key, host, proto));
         cameraBuilder.setExternalLink(false);
         cameraBuilder.setUsername((String) properties.get("username"));
         cameraBuilder.setLat(coordinates.getLatitude());
@@ -95,9 +95,9 @@ public class ImageService {
         return cameraBuilder.build();
     }
 
-    private String buildUrl(String path, boolean hires, String photoIdKey, String host) {
+    private String buildUrl(String path, boolean hires, String photoIdKey, String host, String proto) {
         UriComponentsBuilder uriBuilder = UriComponentsBuilder.newInstance();
-        uriBuilder.scheme(OsmandPhotoApiConstants.OSMAND_SCHEME);
+        uriBuilder.scheme(proto);
         uriBuilder.host(host);
         uriBuilder.path(path);
         if (hires) {
@@ -107,12 +107,12 @@ public class ImageService {
         return uriBuilder.build().toString();
     }
 
-    private String buildOsmandImageUrl(boolean hires, String photoIdKey, String host) {
-        return buildUrl(OsmandPhotoApiConstants.OSMAND_GET_IMAGE_ROOT_PATH, hires, photoIdKey, host);
+    private String buildOsmandImageUrl(boolean hires, String photoIdKey, String host, String proto) {
+        return buildUrl(OsmandPhotoApiConstants.OSMAND_GET_IMAGE_ROOT_PATH, hires, photoIdKey, host, proto);
     }
 
-    private String buildOsmandPhotoViewerUrl(String photoIdKey, String host) {
-        return buildUrl(OsmandPhotoApiConstants.OSMAND_PHOTO_VIEWER_ROOT_PATH, false, photoIdKey, host);
+    private String buildOsmandPhotoViewerUrl(String photoIdKey, String host, String proto) {
+        return buildUrl(OsmandPhotoApiConstants.OSMAND_PHOTO_VIEWER_ROOT_PATH, false, photoIdKey, host, proto);
     }
 
     private boolean angleDiff(double angle, double diff) {
@@ -144,7 +144,7 @@ public class ImageService {
     }
 
     public CameraPlace processMapillaryData(double lat, double lon, String primaryImageKey,
-                                              Map<String, List<CameraPlace>> resultMap, String host) {
+                                              Map<String, List<CameraPlace>> resultMap, String host, String proto) {
         UriComponentsBuilder uriBuilder = UriComponentsBuilder.fromHttpUrl(MapillaryApiConstants.MAPILLARY_API_URL);
         uriBuilder.queryParam(MapillaryApiConstants.MAPILLARY_PARAM_CLOSE_TO, lon, lat);
         uriBuilder.queryParam(MapillaryApiConstants.MAPILLARY_PARAM_RADIUS, SEARCH_RADIUS);
@@ -154,7 +154,7 @@ public class ImageService {
         CameraPlace primaryPlace = null;
         if (featureCollection != null) {
             for (Feature feature : featureCollection.getFeatures()) {
-                CameraPlace cp = parseFeature(feature, lat, lon, host);
+                CameraPlace cp = parseFeature(feature, lat, lon, host, proto);
                 if (isPrimaryCameraPlace(cp, primaryImageKey)) {
                     primaryPlace = cp;
                     continue;
@@ -168,7 +168,7 @@ public class ImageService {
                 uriBuilder.path(primaryImageKey).queryParam(MapillaryApiConstants.MAPILLARY_PARAM_CLIENT_ID,
                         mapillaryClientId);
                 Feature f = restTemplate.getForObject(uriBuilder.build().toString(), Feature.class);
-                primaryPlace = parseFeature(f, lat, lon, host);
+                primaryPlace = parseFeature(f, lat, lon, host, proto);
             } catch (RestClientException ex) {
                 LOGGER.error(ex.getMessage(), ex);
             }
@@ -281,7 +281,6 @@ public class ImageService {
     }
 
     private static class OsmandPhotoApiConstants {
-        static final String OSMAND_SCHEME = "https";
         static final String OSMAND_GET_IMAGE_ROOT_PATH = "/api/mapillary/get_photo";
         static final String OSMAND_PHOTO_VIEWER_ROOT_PATH = "/api/mapillary/photo-viewer";
         static final String OSMAND_PARAM_PHOTO_ID = "photo_id";
