@@ -10,14 +10,6 @@ buildscript {
 apply plugin: 'org.springframework.boot'
 apply plugin: 'io.spring.dependency-management'
 
-bootJar {
-    launchScript()
-
-    baseName = 'osmand-server-boot'
-    version =  version
-    mainClassName = 'net.osmand.server.Application'
-}
-
 
 task generateGitProperties {
     doLast {
@@ -39,6 +31,14 @@ git.commit.time=${timestamp}
     }
 }
 
+bootJar {
+    dependsOn generateGitProperties
+    launchScript()
+
+    baseName = 'osmand-server-boot'
+    version =  version
+    mainClassName = 'net.osmand.server.Application'
+}
 
 
 dependencies {
