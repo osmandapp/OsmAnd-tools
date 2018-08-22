@@ -15,6 +15,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import java.io.BufferedReader;
@@ -73,13 +74,11 @@ public class ApiController {
                                             @RequestParam(value = "lang", required = false) String lang,
                                             @RequestParam(value = "osm_image", required = false) String osmImage,
                                             @RequestParam(value = "osm_mapillary_key", required = false) String osmMapillaryKey,
-                                            @RequestHeader HttpHeaders headers) {
+                                            @RequestHeader HttpHeaders headers,
+                                            HttpServletRequest request) {
         InetSocketAddress inetAddress = headers.getHost();
         String host = inetAddress.getHostName();
-        /*
-            https protocol by default
-         */
-        String proto = "https";
+        String proto = request.getScheme();
         // for test
         LOGGER.info(headers.get("X-Forwarded-Host"));
         String forwardedHost = headers.getFirst("X-Forwarded-Host");
