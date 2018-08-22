@@ -26,8 +26,8 @@ import org.json.JSONObject;
 import org.json.JSONTokener;
 import org.kxml2.io.KXmlParser;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.core.ZSetOperations.TypedTuple;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.xmlpull.v1.XmlPullParser;
@@ -72,6 +72,9 @@ public class OsmAndServerMonitorTasks {
 	}
 	
 
+	@Value("${monitoring.enabled}")
+    private boolean enabled;
+	
 	@Autowired
 	private StringRedisTemplate redisTemplate;
 	
@@ -96,8 +99,11 @@ public class OsmAndServerMonitorTasks {
 	}
 
 	public void checkOsmAndLiveStatus(boolean updateStats) {
+		if(!enabled) {
+			return;
+		}
 		try {
-			URL url = new URL("http://osmand.net/api/osmlive_status");
+			URL url = new URL("https://osmand.net/api/osmlive_status");
 			InputStream is = url.openConnection().getInputStream();
 			BufferedReader br = new BufferedReader(new InputStreamReader(is));
 			String osmlivetime = br.readLine();
@@ -121,6 +127,9 @@ public class OsmAndServerMonitorTasks {
 
 	@Scheduled(fixedRate = MINUTE)
 	public void checkOsmAndBuildServer() {
+		if(!enabled) {
+			return;
+		}
 		try {
 			Set<String> jobsFailed = new TreeSet<String>();
 			URL url = new URL("http://builder.osmand.net:8080/api/json");
@@ -161,6 +170,9 @@ public class OsmAndServerMonitorTasks {
 
 	@Scheduled(fixedRate = DOWNLOAD_MAPS_MINITES * MINUTE)
 	public void checkIndexesValidity() {
+		if(!enabled) {
+			return;
+		}
 		GZIPInputStream gis = null;
 		try {
 			URL url = new URL("http://osmand.net/get_indexes?gzip=true");
@@ -277,6 +289,9 @@ public class OsmAndServerMonitorTasks {
 
 	@Scheduled(fixedRate = DOWNLOAD_TILE_MINUTES * MINUTE)
 	public void tileDownloadTest() {
+		if(!enabled) {
+			return;
+		}
 		double respTimeSum = 0; 
 		int count = 4;
 		long now = System.currentTimeMillis();
