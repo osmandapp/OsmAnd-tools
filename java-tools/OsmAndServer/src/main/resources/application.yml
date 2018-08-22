@@ -39,6 +39,13 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/changeset}
     username: ${DB_USER:test}
     password: ${DB_PWD:test}
+  resources:
+    static-locations: file:${user.dir}/../../../help/website/
+    cache.period: 1
+  thymeleaf:
+    prefix: file:${user.dir}/../../../help/website/templates/
+
+# classpath:/static/ 
 
 download:
   files: ${MAPS_DIR:maps}
@@ -48,7 +55,8 @@ mapillary:
 
 osmlive:
   status: /var/www-download/api/.proc_timestamp
-  
+
+
 monitoring:
   enabled: ${ENABLE_MONITORING:false}
 
@@ -81,3 +89,5 @@ server:
 
 spring:
   profiles: production
+  resources.static-locations: file:/var/www-download/
+  thymeleaf.prefix: file:/var/www-download/templates/
