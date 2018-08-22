@@ -74,14 +74,22 @@ public class ApiController {
                                             @RequestParam(value = "osm_image", required = false) String osmImage,
                                             @RequestParam(value = "osm_mapillary_key", required = false) String osmMapillaryKey,
                                             @RequestHeader HttpHeaders headers) {
+        InetSocketAddress inetAddress = headers.getHost();
+        String host = inetAddress.getHostName();
+        /*
+            https protocol by default
+         */
+        String proto = "https";
+        // for test
+        LOGGER.info(headers.get("X-Forwarded-Host"));
         String forwardedHost = headers.getFirst("X-Forwarded-Host");
-        if (forwardedHost == null) {
-            LOGGER.error("Bad request. Host is null.");
-            return new CameraPlaceCollection();
-        }
         String forwardedProto = headers.getFirst("X-Forwarded-Proto");
-        if (forwardedProto == null) {
-            LOGGER.error("Bad request. Proto is null.");
+        if (forwardedHost != null && forwardedProto != null) {
+            host = forwardedHost;
+            proto = forwardedProto;
+        }
+        if (host == null) {
+            LOGGER.error("Bad request. Host is null");
             return new CameraPlaceCollection();
         }
         Map<String, List<CameraPlace>> result = new HashMap<>();
@@ -94,7 +102,7 @@ public class ApiController {
 
         CameraPlace wikimediaPrimaryCameraPlace = imageService.processWikimediaData(lat, lon, osmImage);
         CameraPlace mapillaryPrimaryCameraPlace = imageService.processMapillaryData(lat, lon, osmMapillaryKey, result,
-                forwardedHost, forwardedProto);
+                host, proto);
         if (arr.isEmpty()) {
             arr.addAll(halfvisarr);
         }
