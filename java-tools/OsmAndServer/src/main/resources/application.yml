@@ -56,6 +56,9 @@ mapillary:
 osmlive:
   status: /var/www-download/api/.proc_timestamp
 
+motd:
+  settings: /var/www-download/api/messages/motd_settings.json
+
 ---
 spring.jpa.hibernate.ddl-auto: validate
 
