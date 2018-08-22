@@ -198,25 +198,16 @@ public class OsmAndServerMonitorTasks {
 			try {
 				url = new URL((host.equals("downlaod.osmand.net") ? "https://" : "http://") + host
 						+ "/download?standard=yes&file=Angola_africa_2.obf.zip");
-				URLConnection conn = url.openConnection();
-				long contentLength = 0;
-				try (InputStream is = conn.getInputStream()) {
-					int read = 0;
-					byte[] buf = new byte[1024 * 1024];
-					long startedAt = System.currentTimeMillis();
-					while ((read = is.read(buf)) != -1) {
-						contentLength += read;
-					}
-					long finishedAt = System.currentTimeMillis();
-					double downloadTimeInSec = (finishedAt - startedAt) / 1000d;
-					double downloadSpeedMBPerSec = (contentLength / downloadTimeInSec) / (1024*1024);
-					res.addSpeedMeasurement(downloadSpeedMBPerSec);
-					if(!res.lastSuccess) {
-						telegram.sendMonitoringAlertMessage(
-								host + " OK. Maps download works fine");
-					}
-					res.lastSuccess = true;
+				// on download servers there is a glitch that randomly it starts downloading very slow, so let's take 3 measurements
+				double spd1 = downloadSpeed(url);
+				double spd2 = downloadSpeed(url);
+				double spd3 = downloadSpeed(url);
+				res.addSpeedMeasurement(Math.max(Math.max(spd1, spd2), spd3));
+				if (!res.lastSuccess) {
+					telegram.sendMonitoringAlertMessage(host + " OK. Maps download works fine");
 				}
+				res.lastSuccess = true;
+
 			} catch (IOException ex) {
 				if(res.lastSuccess ) {
 					telegram.sendMonitoringAlertMessage(
@@ -226,6 +217,26 @@ public class OsmAndServerMonitorTasks {
 				res.lastSuccess = false;
 			}
 		}
+	}
+
+	private double downloadSpeed(URL url) throws IOException {
+		long startedAt = System.currentTimeMillis();
+		long contentLength = 0;
+		URLConnection conn = url.openConnection();
+		try (InputStream is = conn.getInputStream()) {
+			int read = 0;
+			byte[] buf = new byte[1024 * 1024];
+			while ((read = is.read(buf)) != -1) {
+				contentLength += read;
+				if(System.currentTimeMillis() - startedAt > 7000) {
+					break;
+				}
+			}
+		}
+		long finishedAt = System.currentTimeMillis();
+		double downloadTimeInSec = (finishedAt - startedAt) / 1000d;
+		double downloadSpeedMBPerSec = (contentLength / downloadTimeInSec) / (1024 * 1024);
+		return downloadSpeedMBPerSec;
 	}
 
 	private int countMapsInMapIndex(InputStream is) throws IOException, XmlPullParserException {
