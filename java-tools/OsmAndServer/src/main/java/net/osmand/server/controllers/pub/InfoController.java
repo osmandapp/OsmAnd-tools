@@ -16,19 +16,13 @@ public class InfoController {
 	protected static final Log logger = LogFactory.getLog(InfoController.class);
 	
 
-    @Value("${git.commit.id}")
-    private String commitId;
-    
-    @Value("${git.commit.time}")
-    private String commitTime;
-    
-    @Value("${git.branch}")
-    private String commitBranch;
+    @Value("${git.commit.format}")
+    private String commit;
     
 
     @RequestMapping("/info")
     public String index() {
-        return String.format("OsmAnd Live server %s: <b>%s</b> %s.", commitBranch, commitTime, commitId);
+        return String.format("OsmAnd Live server. Revision: %s", commit);
     }
 
 }
