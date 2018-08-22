@@ -9,6 +9,7 @@ import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -19,6 +20,7 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.net.InetSocketAddress;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -70,8 +72,14 @@ public class ApiController {
                                             @RequestParam(value = "app", required = false) String app,
                                             @RequestParam(value = "lang", required = false) String lang,
                                             @RequestParam(value = "osm_image", required = false) String osmImage,
-                                            @RequestParam(value = "osm_mapillary_key", required = false) String osmMapillaryKey) {
-
+                                            @RequestParam(value = "osm_mapillary_key", required = false) String osmMapillaryKey,
+                                            @RequestHeader HttpHeaders headers) {
+        InetSocketAddress inetHost = headers.getHost();
+        if (inetHost == null) {
+            LOGGER.error("Bad request. Host is null.");
+            return new CameraPlaceCollection();
+        }
+        String host = inetHost.getHostName();
         Map<String, List<CameraPlace>> result = new HashMap<>();
 
         List<CameraPlace> arr = new ArrayList<>();
@@ -81,7 +89,8 @@ public class ApiController {
         result.put(RESULT_MAP_HALFVISARR, halfvisarr);
 
         CameraPlace wikimediaPrimaryCameraPlace = imageService.processWikimediaData(lat, lon, osmImage);
-        CameraPlace mapillaryPrimaryCameraPlace = imageService.processMapillaryData(lat, lon, osmMapillaryKey, result);
+        CameraPlace mapillaryPrimaryCameraPlace = imageService.processMapillaryData(lat, lon, osmMapillaryKey, result,
+                host);
         if (arr.isEmpty()) {
             arr.addAll(halfvisarr);
         }
@@ -117,7 +126,6 @@ public class ApiController {
 
     @GetMapping(path = {"/mapillary/photo-viewer.php", "/mapillary/photo-viewer"})
     public String getPhotoViewer(@RequestParam("photo_id") String photoId, Model model) {
-        model.addAttribute("hello", "Hello World!");
         model.addAttribute("photoId", photoId);
         return "mapillary/photo-viewer";
     }
