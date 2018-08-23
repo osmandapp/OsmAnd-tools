@@ -28,7 +28,7 @@ import org.xmlpull.v1.XmlSerializer;
 @Controller
 public class BuildsController {
 
-    private static final Log LOGGER = LogFactory.getLog(BuildsController.class);
+    protected static final Log LOGGER = LogFactory.getLog(BuildsController.class);
 
 
 	private static final String INDEX_FILE = "builds.xml";

@@ -26,8 +26,8 @@ import org.json.JSONObject;
 import org.json.JSONTokener;
 import org.kxml2.io.KXmlParser;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.core.ZSetOperations.TypedTuple;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.xmlpull.v1.XmlPullParser;
@@ -72,6 +72,9 @@ public class OsmAndServerMonitorTasks {
 	}
 	
 
+	@Value("${monitoring.enabled}")
+    private boolean enabled;
+	
 	@Autowired
 	private StringRedisTemplate redisTemplate;
 	
@@ -96,8 +99,11 @@ public class OsmAndServerMonitorTasks {
 	}
 
 	public void checkOsmAndLiveStatus(boolean updateStats) {
+		if(!enabled) {
+			return;
+		}
 		try {
-			URL url = new URL("http://osmand.net/api/osmlive_status");
+			URL url = new URL("https://osmand.net/api/osmlive_status");
 			InputStream is = url.openConnection().getInputStream();
 			BufferedReader br = new BufferedReader(new InputStreamReader(is));
 			String osmlivetime = br.readLine();
@@ -121,6 +127,9 @@ public class OsmAndServerMonitorTasks {
 
 	@Scheduled(fixedRate = MINUTE)
 	public void checkOsmAndBuildServer() {
+		if(!enabled) {
+			return;
+		}
 		try {
 			Set<String> jobsFailed = new TreeSet<String>();
 			URL url = new URL("http://builder.osmand.net:8080/api/json");
@@ -161,6 +170,9 @@ public class OsmAndServerMonitorTasks {
 
 	@Scheduled(fixedRate = DOWNLOAD_MAPS_MINITES * MINUTE)
 	public void checkIndexesValidity() {
+		if(!enabled) {
+			return;
+		}
 		GZIPInputStream gis = null;
 		try {
 			URL url = new URL("http://osmand.net/get_indexes?gzip=true");
@@ -186,25 +198,16 @@ public class OsmAndServerMonitorTasks {
 			try {
 				url = new URL((host.equals("downlaod.osmand.net") ? "https://" : "http://") + host
 						+ "/download?standard=yes&file=Angola_africa_2.obf.zip");
-				URLConnection conn = url.openConnection();
-				long contentLength = 0;
-				try (InputStream is = conn.getInputStream()) {
-					int read = 0;
-					byte[] buf = new byte[1024 * 1024];
-					long startedAt = System.currentTimeMillis();
-					while ((read = is.read(buf)) != -1) {
-						contentLength += read;
-					}
-					long finishedAt = System.currentTimeMillis();
-					double downloadTimeInSec = (finishedAt - startedAt) / 1000d;
-					double downloadSpeedMBPerSec = (contentLength / downloadTimeInSec) / (1024*1024);
-					res.addSpeedMeasurement(downloadSpeedMBPerSec);
-					if(!res.lastSuccess) {
-						telegram.sendMonitoringAlertMessage(
-								host + " OK. Maps download works fine");
-					}
-					res.lastSuccess = true;
+				// on download servers there is a glitch that randomly it starts downloading very slow, so let's take 3 measurements
+				double spd1 = downloadSpeed(url);
+				double spd2 = downloadSpeed(url);
+				double spd3 = downloadSpeed(url);
+				res.addSpeedMeasurement(Math.max(Math.max(spd1, spd2), spd3));
+				if (!res.lastSuccess) {
+					telegram.sendMonitoringAlertMessage(host + " OK. Maps download works fine");
 				}
+				res.lastSuccess = true;
+
 			} catch (IOException ex) {
 				if(res.lastSuccess ) {
 					telegram.sendMonitoringAlertMessage(
@@ -214,6 +217,26 @@ public class OsmAndServerMonitorTasks {
 				res.lastSuccess = false;
 			}
 		}
+	}
+
+	private double downloadSpeed(URL url) throws IOException {
+		long startedAt = System.currentTimeMillis();
+		long contentLength = 0;
+		URLConnection conn = url.openConnection();
+		try (InputStream is = conn.getInputStream()) {
+			int read = 0;
+			byte[] buf = new byte[1024 * 1024];
+			while ((read = is.read(buf)) != -1) {
+				contentLength += read;
+				if(System.currentTimeMillis() - startedAt > 7000) {
+					break;
+				}
+			}
+		}
+		long finishedAt = System.currentTimeMillis();
+		double downloadTimeInSec = (finishedAt - startedAt) / 1000d;
+		double downloadSpeedMBPerSec = (contentLength / downloadTimeInSec) / (1024 * 1024);
+		return downloadSpeedMBPerSec;
 	}
 
 	private int countMapsInMapIndex(InputStream is) throws IOException, XmlPullParserException {
@@ -277,6 +300,9 @@ public class OsmAndServerMonitorTasks {
 
 	@Scheduled(fixedRate = DOWNLOAD_TILE_MINUTES * MINUTE)
 	public void tileDownloadTest() {
+		if(!enabled) {
+			return;
+		}
 		double respTimeSum = 0; 
 		int count = 4;
 		long now = System.currentTimeMillis();

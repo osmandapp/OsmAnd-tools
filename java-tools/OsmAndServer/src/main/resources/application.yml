@@ -39,6 +39,31 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/changeset}
     username: ${DB_USER:test}
     password: ${DB_PWD:test}
+  resources:
+    static-locations: file:${user.dir}/../../../help/website/
+    cache.period: 1
+  thymeleaf:
+    prefix: file:${user.dir}/../../../help/website/templates/
+
+# classpath:/static/
+
+download:
+  files: ${MAPS_DIR:maps}
+
+mapillary:
+  clientid: LXJVNHlDOGdMSVgxZG5mVzlHQ3ZqQTo0NjE5OWRiN2EzNTFkNDg4
+
+osmlive:
+  status: /var/www-download/api/.proc_timestamp
+
+monitoring:
+  enabled: ${ENABLE_MONITORING:false}
+
+motd:
+  settings: /var/www-download/api/messages/motd_settings.json
+
+---
+spring.jpa.hibernate.ddl-auto: validate
 
 download:
   servers:
@@ -55,9 +80,6 @@ mapillary:
 
 osmlive:
   status: /var/www-download/api/.proc_timestamp
-
-motd:
-  settings: /var/www-download/api/messages/motd_settings.json
 
 ---
 spring.jpa.hibernate.ddl-auto: validate
@@ -77,3 +99,5 @@ server:
 
 spring:
   profiles: production
+  resources.static-locations: file:/var/www-download/
+  thymeleaf.prefix: file:/var/www-download/templates/

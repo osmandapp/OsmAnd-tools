@@ -245,6 +245,10 @@ public class DownloadIndexController {
 		}
 		boolean self = isContainAndEqual("self", "true", params) ||
 				computeLocalCondition(params);
+		String proto = headers.getFirst("X-Forwarded-Proto");
+		if(proto == null) {
+			proto = req.getScheme();
+		}
 		if (!self) {
 			ThreadLocalRandom tlr = ThreadLocalRandom.current();
 			int random = tlr.nextInt(100);
@@ -252,11 +256,11 @@ public class DownloadIndexController {
 			if (servers.getHelp().size() > 0 && isSimple && random < (100 - config.getLoad())) {
 				String host = servers.getHelp().get(random % servers.getHelp().size());
 				resp.setStatus(HttpServletResponse.SC_FOUND);
-				resp.setHeader(HttpHeaders.LOCATION, "http://" + host + "/download?" + req.getQueryString());
+				resp.setHeader(HttpHeaders.LOCATION, proto + "://" + host + "/download?" + req.getQueryString());
 			} else if (servers.getMain().size() > 0) {
 				String host = servers.getMain().get(random % servers.getMain().size());
 				resp.setStatus(HttpServletResponse.SC_FOUND);
-				resp.setHeader(HttpHeaders.LOCATION, "http://" + host + "/download?" + req.getQueryString());
+				resp.setHeader(HttpHeaders.LOCATION, proto + "://" + host + "/download?" + req.getQueryString());
 			} else {
 				self = true;
 			}
