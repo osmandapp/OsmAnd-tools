@@ -145,6 +145,8 @@ public class ApiController {
                                    @RequestParam(required = false) String os,
                                    @RequestParam(required = false) String aid,
                                    @RequestParam(required = false) String discount) throws IOException {
+        boolean iosVersion = os != null && os.equals("ios");
+        boolean appVersion3 = version != null && version.startsWith("3.");
     
         return motdService.getSettings();
     }
