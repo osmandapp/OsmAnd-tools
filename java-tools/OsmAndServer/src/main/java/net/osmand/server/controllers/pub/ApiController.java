@@ -79,14 +79,12 @@ public class ApiController {
         InetSocketAddress inetAddress = headers.getHost();
         String host = inetAddress.getHostName();
         String proto = request.getScheme();
-        // for test
-        LOGGER.info("TEST X-Forwarded-Host  : " + headers.get("X-Forwarded-Host"));
-        LOGGER.info("TEST X-Forwarded-Host  : " + headers.get("X-Forwarded-Host"));
-        LOGGER.info("TEST Request scheme    : " + proto);
         String forwardedHost = headers.getFirst("X-Forwarded-Host");
         String forwardedProto = headers.getFirst("X-Forwarded-Proto");
-        if (forwardedHost != null && forwardedProto != null) {
+        if (forwardedHost != null) {
             host = forwardedHost;
+        }
+        if (forwardedProto != null) {
             proto = forwardedProto;
         }
         if (host == null) {
