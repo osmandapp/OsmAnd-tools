@@ -130,7 +130,8 @@ public class ImageService {
         double bearing = cp.getBearing();
         if (ca > 0d && angleDiff(bearing - ca, 30.0)) {
             resultMap.get(RESULT_MAP_ARR).add(cp);
-        } else if (ca > 0d && angleDiff(bearing - ca, 60.0) || ca < 0d) {
+        } else if (!(ca > 0d && !angleDiff(bearing - ca, 60.0))) {
+        	// exclude all with camera angle and angle more than 60 (keep w/o camera and angle < 60)
             resultMap.get(RESULT_MAP_HALFVISARR).add(cp);
         }
     }
