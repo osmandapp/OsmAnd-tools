@@ -4,8 +4,11 @@ import net.osmand.server.services.images.CameraPlace;
 import net.osmand.server.services.images.CameraPlaceCollection;
 import net.osmand.server.services.images.ImageService;
 
+import net.osmand.server.services.motd.MotdService;
+import net.osmand.server.services.motd.MotdSettings;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.hibernate.validator.constraints.pl.REGON;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
@@ -22,6 +25,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.InetSocketAddress;
+import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -37,10 +41,12 @@ public class ApiController {
     private String procFile;
 
     private final ImageService imageService;
+    private final MotdService motdService;
 
     @Autowired
-    public ApiController(ImageService imageService) {
+    public ApiController(ImageService imageService, MotdService motdService) {
         this.imageService = imageService;
+        this.motdService = motdService;
     }
 
     private List<CameraPlace> sortByDistance(List<CameraPlace> arr) {
@@ -139,5 +145,22 @@ public class ApiController {
     public String getPhotoViewer(@RequestParam("photo_id") String photoId, Model model) {
         model.addAttribute("photoId", photoId);
         return "mapillary/photo-viewer";
+    }
+
+    @GetMapping(path = {"/motd", "/motd.php"})
+    @ResponseBody
+    public MotdSettings handleMotd(@RequestParam(required = false) String version,
+                                   @RequestParam(required = false) Integer nd,
+                                   @RequestParam(required = false) Integer ns,
+                                   @RequestParam(required = false) String lang,
+                                   @RequestParam(required = false) String os,
+                                   @RequestParam(required = false) String aid,
+                                   @RequestParam(required = false) String discount) throws IOException {
+        boolean iosVersion = os != null && os.equals("ios");
+        boolean appVersion3 = version != null && version.startsWith("3.");
+
+        System.out.println(System.getProperty("user.dir"));
+    
+        return motdService.getSettings();
     }
 }
