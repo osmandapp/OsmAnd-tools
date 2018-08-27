@@ -5,14 +5,14 @@ import net.osmand.server.services.images.CameraPlaceCollection;
 import net.osmand.server.services.images.ImageService;
 
 import net.osmand.server.services.motd.MotdService;
-import net.osmand.server.services.motd.MotdSettings;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.hibernate.validator.constraints.pl.REGON;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -25,7 +25,6 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.InetSocketAddress;
-import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -149,18 +148,31 @@ public class ApiController {
 
     @GetMapping(path = {"/motd", "/motd.php"})
     @ResponseBody
-    public MotdSettings handleMotd(@RequestParam(required = false) String version,
-                                   @RequestParam(required = false) Integer nd,
-                                   @RequestParam(required = false) Integer ns,
-                                   @RequestParam(required = false) String lang,
-                                   @RequestParam(required = false) String os,
-                                   @RequestParam(required = false) String aid,
-                                   @RequestParam(required = false) String discount) throws IOException {
-        boolean iosVersion = os != null && os.equals("ios");
-        boolean appVersion3 = version != null && version.startsWith("3.");
+    public ResponseEntity<String> getMessage(@RequestParam(required = false) String version,
+                             @RequestParam(required = false) Integer nd,
+                             @RequestParam(required = false) Integer ns,
+                             @RequestParam(required = false) String lang,
+                             @RequestParam(required = false) String os,
+                             @RequestParam(required = false) String aid,
+                             @RequestParam(required = false) String discount,
+                             @RequestHeader HttpHeaders headers) throws IOException {
+        String body = motdService.getMessage(version, os, headers);
+        if (body != null) {
+            return ResponseEntity.ok(body);
+        }
+        return ResponseEntity.noContent().build();
+    }
 
-        System.out.println(System.getProperty("user.dir"));
-    
-        return motdService.getSettings();
+    @PutMapping(path = {"/motd/update"})
+    @ResponseBody
+    public String updateMotdSettings() {
+        return motdService.updateSettings();
+    }
+
+    @ResponseStatus(HttpStatus.I_AM_A_TEAPOT)
+    @ExceptionHandler(MotdService.CannotUpdateMotdSettingsException.class)
+    @ResponseBody
+    public String handleUpdateMotdSettingsFailed(Exception ex) {
+        return ex.getMessage();
     }
 }

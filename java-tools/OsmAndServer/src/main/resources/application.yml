@@ -60,7 +60,7 @@ monitoring:
   enabled: ${ENABLE_MONITORING:false}
 
 motd:
-  settings: /var/www-download/api/messages/motd_settings.json
+  settings: /var/www-download/api/messages/motd_config.json
 
 ---
 spring.jpa.hibernate.ddl-auto: validate
