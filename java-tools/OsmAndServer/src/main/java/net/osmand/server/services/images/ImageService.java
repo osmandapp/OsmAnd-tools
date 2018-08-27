@@ -128,9 +128,10 @@ public class ImageService {
     private void splitCameraPlaceByAngel(CameraPlace cp, Map<String, List<CameraPlace>> resultMap) {
         double ca = cp.getCa();
         double bearing = cp.getBearing();
-        if (ca >= 0 && angleDiff(bearing - ca, 30.0)) {
+        if (ca > 0d && angleDiff(bearing - ca, 30.0)) {
             resultMap.get(RESULT_MAP_ARR).add(cp);
-        } else if (ca >= 0 && angleDiff(bearing - ca, 60.0) || ca < 0) {
+        } else if (!(ca > 0d && !angleDiff(bearing - ca, 60.0))) {
+        	// exclude all with camera angle and angle more than 60 (keep w/o camera and angle < 60)
             resultMap.get(RESULT_MAP_HALFVISARR).add(cp);
         }
     }
