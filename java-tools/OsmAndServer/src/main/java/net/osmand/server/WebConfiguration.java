@@ -15,9 +15,7 @@ public class WebConfiguration {
     @Bean
     public SimpleDateFormat dateFormat() {
         SimpleDateFormat dateFormat = new SimpleDateFormat(DATE_PATTERN);
-        TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
         dateFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
-        System.out.println(dateFormat.getTimeZone());
         return dateFormat;
     }
 }

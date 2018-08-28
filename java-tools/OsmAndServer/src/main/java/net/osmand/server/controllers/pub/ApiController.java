@@ -11,7 +11,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -163,16 +162,10 @@ public class ApiController {
         return ResponseEntity.noContent().build();
     }
 
-    @PutMapping(path = {"/motd/update"})
+    @GetMapping(path = {"/motd/update"})
     @ResponseBody
-    public String updateMotdSettings() {
-        return motdService.updateSettings();
-    }
-
-    @ResponseStatus(HttpStatus.I_AM_A_TEAPOT)
-    @ExceptionHandler(MotdService.CannotUpdateMotdSettingsException.class)
-    @ResponseBody
-    public String handleUpdateMotdSettingsFailed(Exception ex) {
-        return ex.getMessage();
+    public void updateMotdSettings() {
+        List<Exception> errors = new ArrayList<>();
+        motdService.updateSettings(errors);
     }
 }

@@ -1,16 +1,21 @@
 package net.osmand.server.services.motd;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonSubTypes;
-import com.fasterxml.jackson.annotation.JsonSubTypes.Type;
-import com.fasterxml.jackson.annotation.JsonTypeInfo;
-import com.fasterxml.jackson.annotation.JsonTypeInfo.Id;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.ObjectCodec;
+import com.fasterxml.jackson.databind.DeserializationContext;
+import com.fasterxml.jackson.databind.JsonDeserializer;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
+import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
 
 import java.io.File;
@@ -27,7 +32,6 @@ public class MotdService {
     private static final Log LOGGER = LogFactory.getLog(MotdService.class);
 
     private final ObjectMapper mapper;
-    private final SimpleDateFormat dateFormat;
 
     @Value("${motd.settings}")
     private String motdSettingsLocation;
@@ -35,41 +39,31 @@ public class MotdService {
     private MotdSettings settings;
 
     @Autowired
-    public MotdService(ObjectMapper mapper, SimpleDateFormat dateFormat) {
+    public MotdService(ObjectMapper mapper) {
         this.mapper = mapper;
-        this.dateFormat = dateFormat;
-
     }
 
     public String getMessage(String version, String os, HttpHeaders headers) {
-        updateSettings();
         String message = null;
         String hostAddress = getHostAddress(headers);
         for (DiscountSetting setting : settings.getDiscountSettings()) {
-            DiscountCondition condition = setting.getDiscountCondition();
-            if (condition instanceof IpDiscountCondition) {
-                message = handleIpCondition(setting, hostAddress, message);
-            } else if (condition instanceof DateDiscountCondition) {
-                message = handleDateCondition(setting, os, message);
-            } else if (condition instanceof VersionDiscountCondition) {
-                message = handleVersionCondition(setting, version, message);
+            message = handleCondition(setting, os, version, hostAddress);
+            if (message != null) {
+                break;
             }
         }
         return message;
     }
 
-    public String updateSettings() {
+    public void updateSettings(List<Exception> errors) {
         MotdSettings motdSettings;
         try {
             motdSettings = mapper.readValue(new File(motdSettingsLocation), MotdSettings.class);
-        } catch (IOException ex) {
-            LOGGER.error(ex.getMessage(), ex);
-            throw new CannotUpdateMotdSettingsException(ex);
-        }
-        synchronized (this) {
             this.settings = motdSettings;
+        } catch (IOException ex) {
+            errors.add(ex);
+            LOGGER.error(ex.getMessage(), ex);
         }
-        return "{\"type\": \"success\", \"status\": \"OK\"}";
     }
 
     private String getHostAddress(HttpHeaders headers) {
@@ -81,82 +75,35 @@ public class MotdService {
        return host.getAddress().toString();
     }
 
-    private String handleIpCondition(DiscountSetting setting, String hostIp, String message) {
-        if (message != null) {
-            return message;
-        }
-        IpDiscountCondition ipCond = (IpDiscountCondition) setting.getDiscountCondition();
-        if (ipCond.getIp().equals(hostIp)) {
+    private String handleCondition(DiscountSetting setting, String os, String version, String hostAddress) {
+        DiscountCondition condition = setting.getDiscountCondition();
+        if (checkIpAddressCondition(condition, hostAddress)) {
             return setting.getFile();
-        }
-        return null;
-    }
-
-    private String handleDateCondition(DiscountSetting setting, String os, String message) {
-        if (message != null) {
-            return message;
-        }
-        if (!isDiscountActive(setting)) {
-            return message;
-        }
-        if (os != null && os.equals("ios")) {
-            return setting.getIosFile();
-        }
-        return setting.getFile();
-
-    }
-
-    private String handleVersionCondition(DiscountSetting setting, String version, String message) {
-        if (message != null) {
-            return message;
-        }
-        VersionDiscountCondition versionCondition = (VersionDiscountCondition) setting.getDiscountCondition();
-        if (version != null && version.startsWith(versionCondition.getVersion())) {
+        } else if (isDiscountActive(setting)) {
+            if (os != null && os.equals("ios")) {
+                return setting.getIosFile();
+            }
+            return setting.getFile();
+        } else if (checkVersionCondition(condition, version)) {
             return setting.getFile();
         }
         return null;
     }
 
     private boolean isDiscountActive(DiscountSetting setting) {
-        DateDiscountCondition dateCondition = (DateDiscountCondition) setting.getDiscountCondition();
+        DiscountCondition discountCondition = setting.getDiscountCondition();
         Date now = new Date();
-        Date startDate;
-        Date endDate;
-        try {
-            startDate = dateFormat.parse(dateCondition.getStartDate());
-            endDate = dateFormat.parse(dateCondition.getEndDate());
-        } catch (ParseException ex) {
-            LOGGER.error(ex.getMessage(), ex);
-            throw new DiscountDatesParseException(ex);
-        }
-        return now.after(startDate) && now.before(endDate);
+        Date startDate = discountCondition.getStartDate();
+        Date endDate = discountCondition.getEndDate();
+        return startDate != null && endDate != null && now.after(startDate) && now.before(endDate);
     }
 
-
-    public static class CannotUpdateMotdSettingsException extends RuntimeException {
-
-        public CannotUpdateMotdSettingsException() {}
-
-        public CannotUpdateMotdSettingsException(String s) {
-            super(s);
-        }
-
-        public CannotUpdateMotdSettingsException(Throwable throwable) {
-            super(throwable);
-        }
+    private boolean checkIpAddressCondition(DiscountCondition condition, String expectedIpAddress) {
+        return condition.getIp() != null && condition.getIp().equals(expectedIpAddress);
     }
 
-    public static class DiscountDatesParseException extends RuntimeException {
-        public DiscountDatesParseException() {
-        }
-
-        public DiscountDatesParseException(String s) {
-            super(s);
-        }
-
-        public DiscountDatesParseException(Throwable throwable) {
-            super(throwable);
-        }
+    private boolean checkVersionCondition(DiscountCondition condition, String expectedVersion) {
+        return condition.getVersion() != null && expectedVersion != null && condition.getVersion().startsWith(expectedVersion);
     }
 
     public static class MotdSettings {
@@ -173,6 +120,7 @@ public class MotdService {
         }
     }
 
+    @JsonIgnoreProperties(ignoreUnknown = true)
     private static class DiscountSetting {
         @JsonProperty("condition")
         private DiscountCondition discountCondition;
@@ -214,25 +162,16 @@ public class MotdService {
         }
     }
 
-    @JsonTypeInfo(property = "type", use = Id.NAME)
-    @JsonSubTypes(
-            {@Type(value = IpDiscountCondition.class, name = "ip"),
-            @Type(value = DateDiscountCondition.class, name = "date"),
-            @Type(value = VersionDiscountCondition.class, name = "version")})
-    private abstract static class DiscountCondition {
-        private String type;
+    @JsonDeserialize(using = DiscountConditionDeserializer.class)
+    private static class DiscountCondition {
 
-        public String getType() {
-            return type;
-        }
-
-        public void setType(String type) {
-            this.type = type;
-        }
-    }
-
-    private static class IpDiscountCondition extends DiscountCondition {
         private String ip;
+
+        private Date startDate;
+
+        private Date endDate;
+
+        private String version;
 
         public String getIp() {
             return ip;
@@ -241,33 +180,22 @@ public class MotdService {
         public void setIp(String ip) {
             this.ip = ip;
         }
-    }
 
-    private static class DateDiscountCondition extends DiscountCondition {
-        @JsonProperty("start_date")
-        private String startDate;
-        @JsonProperty("end_date")
-        private String endDate;
-
-        public String getStartDate() {
+        public Date getStartDate() {
             return startDate;
         }
 
-        public void setStartDate(String startDate) {
+        public void setStartDate(Date startDate) {
             this.startDate = startDate;
         }
 
-        public String getEndDate() {
+        public Date getEndDate() {
             return endDate;
         }
 
-        public void setEndDate(String endDate) {
+        public void setEndDate(Date endDate) {
             this.endDate = endDate;
         }
-    }
-
-    private static class VersionDiscountCondition extends DiscountCondition {
-        private String version;
 
         public String getVersion() {
             return version;
@@ -275,6 +203,64 @@ public class MotdService {
 
         public void setVersion(String version) {
             this.version = version;
+        }
+    }
+
+    @Component
+    private static class DiscountConditionDeserializer extends JsonDeserializer<DiscountCondition> {
+
+        private static final String START_DATE = "start_date";
+        private static final String END_DATE = "end_date";
+        private static final String IP_ADDR = "ip";
+        private static final String VERSION = "version";
+
+        private final SimpleDateFormat dateFormat;
+
+        @Autowired
+        public DiscountConditionDeserializer(SimpleDateFormat dateFormat) {
+            this.dateFormat = dateFormat;
+        }
+
+        private Date parseDate(JsonNode dateNode) throws ParseException {
+            if (dateNode == null) {
+                return null;
+            }
+            return dateFormat.parse(dateNode.asText());
+        }
+
+        private String parseNodeOrNull(JsonNode node) {
+            if (node == null) {
+                return null;
+            }
+            return node.asText();
+        }
+
+        @Override
+        public DiscountCondition deserialize(JsonParser p, DeserializationContext ctxt)
+                throws IOException, JsonProcessingException {
+            ObjectCodec oc = p.getCodec();
+            JsonNode node = oc.readTree(p);
+            try {
+                Date startDate = parseDate(node.get(START_DATE));
+                Date endDate = parseDate(node.get(END_DATE));
+                String ipAddr = parseNodeOrNull(node.get(IP_ADDR));
+                String version = parseNodeOrNull(node.get(VERSION));
+                DiscountCondition ddc = new DiscountCondition();
+                ddc.setStartDate(startDate);
+                ddc.setEndDate(endDate);
+                ddc.setIp(ipAddr);
+                ddc.setVersion(version);
+                return ddc;
+            } catch (ParseException ex) {
+                throw new DiscountConditionJsonProcessingException(ex.getMessage(), ex);
+            }
+        }
+    }
+
+    private static class DiscountConditionJsonProcessingException extends JsonProcessingException {
+
+        public DiscountConditionJsonProcessingException(String msg, Throwable rootCause) {
+            super(msg, rootCause);
         }
     }
 }
