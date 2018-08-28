@@ -393,9 +393,9 @@ public class OsmAndServerMonitorTasks {
 	public String getStatusMessage() {
 		String msg = getLiveDelayedMessage(live.lastOsmAndLiveDelay) + "\n";
 		if (buildServer.jobsFailed == null || buildServer.jobsFailed.isEmpty()) {
-			msg += "<a href='builder.osmand.net:8080'>builder</a>: <b>OK</b>.\n";
+			msg += "<a href='https://builder.osmand.net:8080'>builder</a>: <b>OK</b>.\n";
 		} else {
-			msg += "<a href='builder.osmand.net:8080'>builder</a>: <b>FAILED</b>. Jobs: " + formatJobNamesAsHref(buildServer.jobsFailed) + "\n";
+			msg += "<a href='https://builder.osmand.net:8080'>builder</a>: <b>FAILED</b>. Jobs: " + formatJobNamesAsHref(buildServer.jobsFailed) + "\n";
 		}
 		for (DownloadTestResult r : downloadTests.values()) {
 			msg += r.fullString() + "\n";
@@ -407,7 +407,7 @@ public class OsmAndServerMonitorTasks {
 	private Set<String> formatJobNamesAsHref(Set<String> jobNames) {
 		Set<String> formatted = new TreeSet<>();
 		for (String jobName : jobNames) {
-			formatted.add(String.format("<a href='builder.osmand.net:8080/job/%1$s/'>%1$s</a>", jobName));
+			formatted.add(String.format("<a href='https://builder.osmand.net:8080/job/%1$s/'>%1$s</a>", jobName));
 		}
 		return formatted;
 	}
