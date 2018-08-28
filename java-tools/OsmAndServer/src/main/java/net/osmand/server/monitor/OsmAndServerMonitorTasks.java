@@ -56,7 +56,7 @@ public class OsmAndServerMonitorTasks {
 
 	private static final String[] HOSTS_TO_TEST = new String[] { "download.osmand.net", "dl4.osmand.net",
 			"dl6.osmand.net", "dl1.osmand.net"};
-	private static final String TILE_SERVER = "http://tile.osmand.net/hd/";
+	private static final String TILE_SERVER = "https://tile.osmand.net/hd/";
 
 	private static final double PERC = 95;
 	private static final double PERC_SMALL = 100 - PERC;
@@ -132,7 +132,7 @@ public class OsmAndServerMonitorTasks {
 		}
 		try {
 			Set<String> jobsFailed = new TreeSet<String>();
-			URL url = new URL("http://builder.osmand.net:8080/api/json");
+			URL url = new URL("https://builder.osmand.net:8080/api/json");
 			InputStream is = url.openConnection().getInputStream();
 			JSONObject object = new JSONObject(new JSONTokener(is));
 			JSONArray jsonArray = object.getJSONArray("jobs");
@@ -175,7 +175,7 @@ public class OsmAndServerMonitorTasks {
 		}
 		GZIPInputStream gis = null;
 		try {
-			URL url = new URL("http://osmand.net/get_indexes?gzip=true");
+			URL url = new URL("https://osmand.net/get_indexes?gzip=true");
 			URLConnection conn = url.openConnection();
 			InputStream is = conn.getInputStream();
 			gis = new GZIPInputStream(is);
@@ -196,7 +196,7 @@ public class OsmAndServerMonitorTasks {
 				downloadTests.put(host, res);
 			}
 			try {
-				url = new URL((host.equals("downlaod.osmand.net") ? "https://" : "http://") + host
+				url = new URL((host.equals("downlaod.osmand.net") ? "https://" : "https://") + host
 						+ "/download?standard=yes&file=Angola_africa_2.obf.zip");
 				// on download servers there is a glitch that randomly it starts downloading very slow, so let's take 3 measurements
 				double spd1 = downloadSpeed(url);
@@ -365,7 +365,7 @@ public class OsmAndServerMonitorTasks {
 
 	private String getTileServerMessage() {
 		DescriptiveStatistics tile24Hours = readStats(RED_KEY_TILE, 24);
-		return String.format("<a href='http://tile.osmand.net/hd/3/4/2.png'>tile</a>: "
+		return String.format("<a href='https://tile.osmand.net/hd/3/4/2.png'>tile</a>: "
 				+ "<b>%s</b>. Response time: 24h — %.1f sec · 95th 24h — %.1f sec.",
 				lastResponseTime < 60 ? "OK" : "FAILED", tile24Hours.getMean(), tile24Hours.getPercentile(PERC));
 	}
