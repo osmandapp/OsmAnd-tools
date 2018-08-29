@@ -28,10 +28,14 @@ public class DownloadIndexesService  {
 	
 	private static final Log LOGGER = LogFactory.getLog(DownloadIndexesService.class);
 
-	private static final String INDEX_FILE = "new_indexes.xml";
+	private static final String INDEX_FILE = "indexes.xml";
 	
-	@Value("${download.files}")
+	@Value("${files.location}")
     private String pathToDownloadFiles;
+	
+	@Value("${gen.location}")
+	private String pathToGenFiles;
+	
 
 	// 15 minutes
 	@Scheduled(fixedDelay = 1000 * 60 * 15)
@@ -95,7 +99,7 @@ public class DownloadIndexesService  {
 	}
 
 	private File getStandardFilePath(boolean gzip) {
-		return new File(pathToDownloadFiles, gzip ? INDEX_FILE + ".gz" : INDEX_FILE);
+		return new File(pathToGenFiles, gzip ? INDEX_FILE + ".gz" : INDEX_FILE);
 	}
 	
 	private synchronized void generateStandardIndexFile() {
