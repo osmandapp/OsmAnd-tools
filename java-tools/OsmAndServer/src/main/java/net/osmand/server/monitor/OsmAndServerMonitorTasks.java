@@ -196,7 +196,7 @@ public class OsmAndServerMonitorTasks {
 				downloadTests.put(host, res);
 			}
 			try {
-				url = new URL((host.equals("downlaod.osmand.net") ? "https://" : "https://") + host
+				url = new URL((host.equals("download.osmand.net") ? "https://" : "https://") + host
 						+ "/download?standard=yes&file=Angola_africa_2.obf.zip");
 				// on download servers there is a glitch that randomly it starts downloading very slow, so let's take 3 measurements
 				double spd1 = downloadSpeed(url);
