@@ -53,14 +53,10 @@ download:
 mapillary:
   clientid: LXJVNHlDOGdMSVgxZG5mVzlHQ3ZqQTo0NjE5OWRiN2EzNTFkNDg4
 
-osmlive:
-  status: /var/www-download/api/.proc_timestamp
-
 monitoring:
   enabled: ${ENABLE_MONITORING:false}
 
-motd:
-  settings: /var/www-download/api/messages/motd_config.json
+website.location: ${user.dir}/../../../help/website/
 
 ---
 spring.jpa.hibernate.ddl-auto: validate
@@ -101,3 +97,5 @@ spring:
   profiles: production
   resources.static-locations: file:/var/www-download/
   thymeleaf.prefix: file:/var/www-download/templates/
+
+website.location: /var/www-download/

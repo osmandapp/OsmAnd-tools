@@ -34,9 +34,10 @@ public class ApiController {
 
     private static final String RESULT_MAP_ARR = "arr";
     private static final String RESULT_MAP_HALFVISARR = "halfvisarr";
+    private static final String PROC_FILE = "api/.proc_timestamp";
 
-    @Value("${osmlive.status}")
-    private String procFile;
+    @Value("${website.location}")
+    private String websiteLocation;
 
     private final ImageService imageService;
     private final MotdService motdService;
@@ -60,6 +61,7 @@ public class ApiController {
     @GetMapping(path = {"/osmlive_status.php", "/osmlive_status"}, produces = "text/html;charset=UTF-8")
     @ResponseBody
     public String osmLiveStatus() throws IOException  {
+        String procFile = websiteLocation.concat(PROC_FILE);
         FileSystemResource fsr = new FileSystemResource(procFile);
         if (fsr.exists()) {
             BufferedReader br = new BufferedReader(new InputStreamReader(fsr.getInputStream()));
@@ -165,7 +167,7 @@ public class ApiController {
     @GetMapping(path = {"/motd/update"})
     @ResponseBody
     public void updateMotdSettings() {
-        List<Exception> errors = new ArrayList<>();
+        List<String> errors = new ArrayList<>();
         motdService.updateSettings(errors);
     }
 }
