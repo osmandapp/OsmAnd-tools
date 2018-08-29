@@ -82,6 +82,7 @@ logging:
 
 server:
   port: 8090
+  address: 127.0.0.1 #keep it behind proxy
   tomcat:
     accesslog:
       directory: /var/log/osmand-server-logs/
