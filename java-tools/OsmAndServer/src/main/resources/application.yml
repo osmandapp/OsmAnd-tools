@@ -55,14 +55,8 @@ web.location: ${files.location}/
 mapillary:
   clientid: LXJVNHlDOGdMSVgxZG5mVzlHQ3ZqQTo0NjE5OWRiN2EzNTFkNDg4
 
-osmlive:
-  status: /var/www-download/api/.proc_timestamp
-
 monitoring:
   enabled: ${ENABLE_MONITORING:false}
-
-motd:
-  settings: /var/www-download/api/messages/motd_config.json
 
 ---
 spring.jpa.hibernate.ddl-auto: validate
@@ -77,12 +71,6 @@ download:
       - dl4.osmand.net
   files: /var/www-download/
   load: 60
-
-mapillary:
-  clientid: LXJVNHlDOGdMSVgxZG5mVzlHQ3ZqQTo0NjE5OWRiN2EzNTFkNDg4
-
-osmlive:
-  status: /var/www-download/api/.proc_timestamp
 
 ---
 spring.jpa.hibernate.ddl-auto: validate

@@ -1,21 +1,11 @@
 package net.osmand.server.services.motd;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.ObjectCodec;
-import com.fasterxml.jackson.databind.DeserializationContext;
-import com.fasterxml.jackson.databind.JsonDeserializer;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
-import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
 
 import java.io.File;
@@ -26,44 +16,55 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.TimeZone;
 
 @Service
 public class MotdService {
     private static final Log LOGGER = LogFactory.getLog(MotdService.class);
+    private static final String MOTD_SETTINGS = "api/messages/motd_config.json";
+    private static final String DATE_PATTERN = "yyyy-MM-dd HH:mm";
+
+    @Value("${files.location}")
+    private String websiteLocation;
 
     private final ObjectMapper mapper;
 
-    @Value("${motd.settings}")
-    private String motdSettingsLocation;
+    public MotdService() {
+        SimpleDateFormat dateFormat = new SimpleDateFormat(DATE_PATTERN);
+        dateFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
+        ObjectMapper objectMapper = new ObjectMapper();
+        objectMapper.setDateFormat(dateFormat);
+        this.mapper = objectMapper;
+    }
 
     private MotdSettings settings;
 
-    @Autowired
-    public MotdService(ObjectMapper mapper) {
-        this.mapper = mapper;
-    }
-
-    public String getMessage(String version, String os, HttpHeaders headers) {
-        String message = null;
+    public MotdMessage getMessage(String version, String os, HttpHeaders headers) throws IOException, ParseException {
+        Date now = new Date();
+        MotdMessage message = null;
         String hostAddress = getHostAddress(headers);
         for (DiscountSetting setting : settings.getDiscountSettings()) {
-            message = handleCondition(setting, os, version, hostAddress);
-            if (message != null) {
-                break;
+            if (setting.getDiscountCondition().checkCondition(now, hostAddress, version)) {
+                String filename = setting.getMotdFileByPlatform(os);
+                message = parseMotdMessageFile(websiteLocation.concat("api/messages/").concat(filename));
+                message = modifyMessageIfNeeded(setting, message);
             }
         }
         return message;
     }
 
-    public void updateSettings(List<Exception> errors) {
+    public String updateSettings(List<String> errors) {
         MotdSettings motdSettings;
+        String msg = "{\"status\": \"OK\", \"message\" : \"New configuration accepted.\"}";
         try {
-            motdSettings = mapper.readValue(new File(motdSettingsLocation), MotdSettings.class);
+            motdSettings = mapper.readValue(new File(websiteLocation.concat(MOTD_SETTINGS)), MotdSettings.class);
             this.settings = motdSettings;
         } catch (IOException ex) {
-            errors.add(ex);
+            errors.add("motd_config.json is invalid.");
+            msg = String.format("{\"status\": \"FAILED\", \"message\": \"%s\"}", ex.getMessage());
             LOGGER.error(ex.getMessage(), ex);
         }
+        return msg;
     }
 
     private String getHostAddress(HttpHeaders headers) {
@@ -75,35 +76,19 @@ public class MotdService {
        return host.getAddress().toString();
     }
 
-    private String handleCondition(DiscountSetting setting, String os, String version, String hostAddress) {
-        DiscountCondition condition = setting.getDiscountCondition();
-        if (checkIpAddressCondition(condition, hostAddress)) {
-            return setting.getFile();
-        } else if (isDiscountActive(setting)) {
-            if (os != null && os.equals("ios")) {
-                return setting.getIosFile();
-            }
-            return setting.getFile();
-        } else if (checkVersionCondition(condition, version)) {
-            return setting.getFile();
+    private MotdMessage modifyMessageIfNeeded(DiscountSetting setting, MotdMessage message) {
+        if (setting.isFieldsPresent()) {
+            Map<String, String> fields = setting.getFields();
+            message.setDescription(fields.get("description"));
+            message.setMessage(fields.get("message"));
+            message.setStartDate(fields.get("start"));
+            message.setEndDate(fields.get("end"));
         }
-        return null;
+        return message;
     }
 
-    private boolean isDiscountActive(DiscountSetting setting) {
-        DiscountCondition discountCondition = setting.getDiscountCondition();
-        Date now = new Date();
-        Date startDate = discountCondition.getStartDate();
-        Date endDate = discountCondition.getEndDate();
-        return startDate != null && endDate != null && now.after(startDate) && now.before(endDate);
-    }
-
-    private boolean checkIpAddressCondition(DiscountCondition condition, String expectedIpAddress) {
-        return condition.getIp() != null && condition.getIp().equals(expectedIpAddress);
-    }
-
-    private boolean checkVersionCondition(DiscountCondition condition, String expectedVersion) {
-        return condition.getVersion() != null && expectedVersion != null && condition.getVersion().startsWith(expectedVersion);
+    private MotdMessage parseMotdMessageFile(String filepath) throws IOException {
+        return mapper.readValue(new File(filepath), MotdMessage.class);
     }
 
     public static class MotdSettings {
@@ -114,13 +99,8 @@ public class MotdService {
         public List<DiscountSetting> getDiscountSettings() {
             return discountSettings;
         }
-
-        public void setDiscountSettings(List<DiscountSetting> discountSettings) {
-            this.discountSettings = discountSettings;
-        }
     }
 
-    @JsonIgnoreProperties(ignoreUnknown = true)
     private static class DiscountSetting {
         @JsonProperty("condition")
         private DiscountCondition discountCondition;
@@ -133,134 +113,98 @@ public class MotdService {
             return discountCondition;
         }
 
-        public void setDiscountCondition(DiscountCondition discountCondition) {
-            this.discountCondition = discountCondition;
-        }
-
         public String getFile() {
             return file;
-        }
-
-        public void setFile(String file) {
-            this.file = file;
         }
 
         public String getIosFile() {
             return iosFile;
         }
 
-        public void setIosFile(String iosFile) {
-            this.iosFile = iosFile;
-        }
-
         public Map<String, String> getFields() {
             return fields;
         }
 
-        public void setFields(Map<String, String> fields) {
-            this.fields = fields;
+        public boolean isFilePresent() {
+            return file != null;
+        }
+
+        public boolean isIosFilePresent() {
+            return iosFile != null;
+        }
+
+        public boolean isFieldsPresent() {
+            return fields != null;
+        }
+
+        public String getMotdFileByPlatform(String os) {
+            if (os != null && os.equals("ios") && isIosFilePresent()) {
+                return iosFile;
+            }
+            return file;
         }
     }
 
-    @JsonDeserialize(using = DiscountConditionDeserializer.class)
     private static class DiscountCondition {
-
         private String ip;
-
+        @JsonProperty("start_date")
         private Date startDate;
-
+        @JsonProperty("end_date")
         private Date endDate;
-
         private String version;
+
+        private boolean isDiscountActive(Date now) {
+            return now.after(getStartDate()) && now.before(getEndDate());
+        }
 
         public String getIp() {
             return ip;
-        }
-
-        public void setIp(String ip) {
-            this.ip = ip;
         }
 
         public Date getStartDate() {
             return startDate;
         }
 
-        public void setStartDate(Date startDate) {
-            this.startDate = startDate;
-        }
-
         public Date getEndDate() {
             return endDate;
-        }
-
-        public void setEndDate(Date endDate) {
-            this.endDate = endDate;
         }
 
         public String getVersion() {
             return version;
         }
 
-        public void setVersion(String version) {
-            this.version = version;
-        }
-    }
-
-    @Component
-    private static class DiscountConditionDeserializer extends JsonDeserializer<DiscountCondition> {
-
-        private static final String START_DATE = "start_date";
-        private static final String END_DATE = "end_date";
-        private static final String IP_ADDR = "ip";
-        private static final String VERSION = "version";
-
-        private final SimpleDateFormat dateFormat;
-
-        @Autowired
-        public DiscountConditionDeserializer(SimpleDateFormat dateFormat) {
-            this.dateFormat = dateFormat;
+        public boolean isIpPresent() {
+            return ip != null;
         }
 
-        private Date parseDate(JsonNode dateNode) throws ParseException {
-            if (dateNode == null) {
-                return null;
+        public boolean isStartDatePresent() {
+            return startDate != null;
+        }
+
+        public boolean isEndDatePresent() {
+            return endDate != null;
+        }
+
+        public boolean isVersionPresent() {
+            return version != null;
+        }
+
+        public boolean checkCondition(Date date, String hostAddress, String version) {
+            boolean result = true;
+            boolean anyCondition = false;
+            if (isIpPresent()) {
+                anyCondition = true;
+                result &= getIp().equals(hostAddress);
             }
-            return dateFormat.parse(dateNode.asText());
-        }
-
-        private String parseNodeOrNull(JsonNode node) {
-            if (node == null) {
-                return null;
+            if (isStartDatePresent() && isEndDatePresent() && isDiscountActive(date)) {
+                anyCondition = true;
+                result &= true;
             }
-            return node.asText();
-        }
-
-        @Override
-        public DiscountCondition deserialize(JsonParser p, DeserializationContext ctxt)
-                throws IOException, JsonProcessingException {
-            ObjectCodec oc = p.getCodec();
-            JsonNode node = oc.readTree(p);
-            try {
-                Date startDate = parseDate(node.get(START_DATE));
-                Date endDate = parseDate(node.get(END_DATE));
-                String ipAddr = parseNodeOrNull(node.get(IP_ADDR));
-                String version = parseNodeOrNull(node.get(VERSION));
-                DiscountCondition ddc = new DiscountCondition();
-                ddc.setStartDate(startDate);
-                ddc.setEndDate(endDate);
-                ddc.setIp(ipAddr);
-                ddc.setVersion(version);
-                return ddc;
-            } catch (ParseException ex) {
-                throw new DiscountConditionJsonProcessingException(ex.getMessage(), ex);
+            if (isVersionPresent()) {
+                anyCondition = true;
+                result &= version != null && getVersion().startsWith(version);
             }
-        }
-    }
-
-    private static class DiscountConditionJsonProcessingException extends JsonProcessingException {
-
-        public DiscountConditionJsonProcessingException(String msg, Throwable rootCause) {
-            super(msg, rootCause);
+            return result && anyCondition;
         }
     }
 }

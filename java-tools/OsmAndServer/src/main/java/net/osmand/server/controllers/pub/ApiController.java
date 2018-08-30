@@ -4,6 +4,7 @@ import net.osmand.server.services.images.CameraPlace;
 import net.osmand.server.services.images.CameraPlaceCollection;
 import net.osmand.server.services.images.ImageService;
 
+import net.osmand.server.services.motd.MotdMessage;
 import net.osmand.server.services.motd.MotdService;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -24,6 +25,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.InetSocketAddress;
+import java.text.ParseException;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -34,18 +36,15 @@ public class ApiController {
 
     private static final String RESULT_MAP_ARR = "arr";
     private static final String RESULT_MAP_HALFVISARR = "halfvisarr";
+    private static final String PROC_FILE = "api/.proc_timestamp";
 
-    @Value("${osmlive.status}")
-    private String procFile;
-
-    private final ImageService imageService;
-    private final MotdService motdService;
+    @Value("${files.location}")
+    private String websiteLocation;
 
     @Autowired
-    public ApiController(ImageService imageService, MotdService motdService) {
-        this.imageService = imageService;
-        this.motdService = motdService;
-    }
+    private ImageService imageService;
+    @Autowired
+    private MotdService motdService;
 
     private List<CameraPlace> sortByDistance(List<CameraPlace> arr) {
         return arr.stream().sorted(Comparator.comparing(CameraPlace::getDistance)).collect(Collectors.toList());
@@ -60,6 +59,7 @@ public class ApiController {
     @GetMapping(path = {"/osmlive_status.php", "/osmlive_status"}, produces = "text/html;charset=UTF-8")
     @ResponseBody
     public String osmLiveStatus() throws IOException  {
+        String procFile = websiteLocation.concat(PROC_FILE);
         FileSystemResource fsr = new FileSystemResource(procFile);
         if (fsr.exists()) {
             BufferedReader br = new BufferedReader(new InputStreamReader(fsr.getInputStream()));
@@ -147,25 +147,18 @@ public class ApiController {
 
     @GetMapping(path = {"/motd", "/motd.php"})
     @ResponseBody
-    public ResponseEntity<String> getMessage(@RequestParam(required = false) String version,
+    public ResponseEntity<MotdMessage> getMessage(@RequestParam(required = false) String version,
                              @RequestParam(required = false) Integer nd,
                              @RequestParam(required = false) Integer ns,
                              @RequestParam(required = false) String lang,
                              @RequestParam(required = false) String os,
                              @RequestParam(required = false) String aid,
                              @RequestParam(required = false) String discount,
-                             @RequestHeader HttpHeaders headers) throws IOException {
-        String body = motdService.getMessage(version, os, headers);
+                             @RequestHeader HttpHeaders headers) throws IOException, ParseException {
+        MotdMessage body = motdService.getMessage(version, os, headers);
         if (body != null) {
             return ResponseEntity.ok(body);
         }
         return ResponseEntity.noContent().build();
-    }
-
-    @GetMapping(path = {"/motd/update"})
-    @ResponseBody
-    public void updateMotdSettings() {
-        List<Exception> errors = new ArrayList<>();
-        motdService.updateSettings(errors);
     }
 }
