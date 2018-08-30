@@ -48,6 +48,7 @@ public class MotdService {
                 String filename = setting.getMotdFileByPlatform(os);
                 message = parseMotdMessageFile(websiteLocation.concat("api/messages/").concat(filename));
                 message = modifyMessageIfNeeded(setting, message);
+                break;
             }
         }
         return message;
@@ -134,7 +135,7 @@ public class MotdService {
         }
 
         public boolean isFieldsPresent() {
-            return fields != null;
+            return fields != null && !fields.isEmpty();
         }
 
         public String getMotdFileByPlatform(String os) {
