@@ -30,11 +30,16 @@ public class BuildsController {
 
     protected static final Log LOGGER = LogFactory.getLog(BuildsController.class);
 
-
 	private static final String INDEX_FILE = "builds.xml";
+
+	private static final long DELAY_TO_REBUILD = 15 * 1000;
 	
-	@Value("${download.files}")
+
+	@Value("${files.location}")
     private String ROOT_FOLDER;
+	
+	@Value("${gen.location}")
+	private String pathToGenFiles;
 	
 	
     private synchronized void updateBuilds(File output) throws IOException {
@@ -102,7 +107,7 @@ public class BuildsController {
 	@ResponseBody
     public FileSystemResource buildsXml(@RequestParam(required=false) boolean update, 
     		@RequestParam(required=false) boolean refresh) throws IOException {
-		File output = new File(ROOT_FOLDER, INDEX_FILE);
+		File output = new File(pathToGenFiles, INDEX_FILE);
         return new FileSystemResource(output); 
     }
 	
@@ -110,8 +115,8 @@ public class BuildsController {
 	@ResponseBody
     public ResponseEntity<Resource> indexesPhp(@RequestParam(defaultValue="", required=false)
     String gzip, HttpServletResponse resp) throws IOException {
-		File output = new File(ROOT_FOLDER, INDEX_FILE);
-		if(System.currentTimeMillis() - output.lastModified()  > 120 * 1000) {
+		File output = new File(pathToGenFiles, INDEX_FILE);
+		if(System.currentTimeMillis() - output.lastModified()  > DELAY_TO_REBUILD) {
 			updateBuilds(output);
 		}
         HttpHeaders headers = new HttpHeaders();

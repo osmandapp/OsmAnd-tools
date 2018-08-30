@@ -25,6 +25,8 @@ logging:
 server:
   port: 8080
 
+files.location: ${user.dir}/../../../help/website/
+
 management:
   endpoints:
     web:
@@ -47,8 +49,8 @@ spring:
 
 # classpath:/static/
 
-download:
-  files: ${MAPS_DIR:maps}
+gen.location: ${files.location}/gen/
+web.location: ${files.location}/
 
 mapillary:
   clientid: LXJVNHlDOGdMSVgxZG5mVzlHQ3ZqQTo0NjE5OWRiN2EzNTFkNDg4
@@ -65,6 +67,7 @@ motd:
 ---
 spring.jpa.hibernate.ddl-auto: validate
 
+files.location: /var/www-download/
 download:
   servers:
     main:
@@ -90,6 +93,7 @@ logging:
 
 server:
   port: 8090
+  address: 127.0.0.1 #keep it behind proxy
   tomcat:
     accesslog:
       directory: /var/log/osmand-server-logs/
@@ -99,5 +103,9 @@ server:
 
 spring:
   profiles: production
-  resources.static-locations: file:/var/www-download/
-  thymeleaf.prefix: file:/var/www-download/templates/
+  resources.static-locations: file:/var/www-download/web/
+  thymeleaf.prefix: file:/var/www-download/web/templates/
+
+files.location: /var/www-download/
+gen.location: ${files.location}/gen/
+web.location: ${files.location}/web/

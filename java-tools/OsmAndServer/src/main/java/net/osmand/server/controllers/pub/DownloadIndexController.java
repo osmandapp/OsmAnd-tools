@@ -43,7 +43,7 @@ public class DownloadIndexController {
 
 	private final DownloadProperties config;
 	
-	@Value("${download.files}")
+	@Value("${files.location}")
 	private String filesPath;
 	    
 
