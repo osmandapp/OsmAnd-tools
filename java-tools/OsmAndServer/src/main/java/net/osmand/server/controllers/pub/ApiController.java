@@ -1,5 +1,7 @@
 package net.osmand.server.controllers.pub;
 
+import net.osmand.server.services.geoip.GeoIpData;
+import net.osmand.server.services.geoip.GeoIpService;
 import net.osmand.server.services.images.CameraPlace;
 import net.osmand.server.services.images.CameraPlaceCollection;
 import net.osmand.server.services.images.ImageService;
@@ -11,6 +13,7 @@ import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
+import org.springframework.data.redis.connection.ReactiveGeoCommands;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
@@ -45,6 +48,8 @@ public class ApiController {
     private ImageService imageService;
     @Autowired
     private MotdService motdService;
+    @Autowired
+    private GeoIpService geoIpService;
 
     private List<CameraPlace> sortByDistance(List<CameraPlace> arr) {
         return arr.stream().sorted(Comparator.comparing(CameraPlace::getDistance)).collect(Collectors.toList());
@@ -160,5 +165,15 @@ public class ApiController {
             return ResponseEntity.ok(body);
         }
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping(path = {"/geo-ip", "/geo-ip.php"})
+    @ResponseBody
+    public GeoIpData getGeoIpData(@RequestHeader HttpHeaders headers) {
+        String address =  headers.getFirst("X-Forwarded-For");
+        if (address == null) {
+            address = headers.getHost().getAddress().toString();
+        }
+        return geoIpService.getGeoIpData(address);
     }
 }
