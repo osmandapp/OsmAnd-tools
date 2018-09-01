@@ -54,7 +54,9 @@ public class MotdService {
             if (setting.checkCondition(now, hostAddress, version)) {
                 String filename = setting.getMotdFileByPlatform(os);
                 message = parseMotdMessageFile(websiteLocation.concat("api/messages/").concat(filename));
-                message = setting.modifyMessageIfNeeded(message);
+				if (message != null) {
+					message = setting.modifyMessageIfNeeded(message);
+				}
                 break;
             }
         }
@@ -76,7 +78,10 @@ public class MotdService {
     
 
     private MotdMessage parseMotdMessageFile(String filepath) throws IOException {
-        return mapper.readValue(new File(filepath), MotdMessage.class);
+    	if(filepath != null && filepath.length() > 0 && new File(filepath).exists() ) {
+    		return mapper.readValue(new File(filepath), MotdMessage.class);
+    	}
+    	return null;
     }
 
     public static class MotdSettings {
