@@ -175,7 +175,7 @@ public class MotdService {
             if(!checkActiveDate(date)) {
             	return false;
             }
-            if (this.version != null && (version == null || !this.version.startsWith(version))) {
+            if (this.version != null && (version == null || !version.startsWith(this.version))) {
                 return false;
             }
             return true;
