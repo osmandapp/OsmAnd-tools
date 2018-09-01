@@ -51,8 +51,7 @@ public class AdminController {
         this.mapper = objectMapper;
 	}
 
-	// TODO POST
-	@RequestMapping(path = { "/publish" }, method = RequestMethod.GET)
+	@RequestMapping(path = { "/publish" }, method = RequestMethod.POST)
 	public String publish(Model model) throws JsonProcessingException {
 		List<String> errors = publish();
         model.addAttribute("update_status", "OK");
