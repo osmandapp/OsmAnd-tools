@@ -152,7 +152,7 @@ public class MotdService {
             if (endDate != null && !date.before(endDate)) {
             	return false;
             }
-            if (version != null && this.version != null && !this.version.startsWith(version)) {
+            if (this.version != null && (version == null || !this.version.startsWith(version))) {
                 return false;
             }
             return true;
