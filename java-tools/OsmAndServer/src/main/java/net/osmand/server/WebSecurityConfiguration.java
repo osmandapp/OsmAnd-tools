@@ -65,7 +65,11 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
 //    							.antMatchers("/", "/*", "/login/**", "/webjars/**", "/error/**",
 //                                        "/device/*/**", "/download.php*", "/download*", "/api/**").permitAll()
     							.anyRequest().permitAll();
-		http.exceptionHandling().authenticationEntryPoint(new LoginUrlAuthenticationEntryPoint("/login"));
+    	LoginUrlAuthenticationEntryPoint login = new LoginUrlAuthenticationEntryPoint("/login");
+    	if(getApplicationContext().getEnvironment().acceptsProfiles("production")){
+    		login.setForceHttps(true);
+    	}
+		http.exceptionHandling().authenticationEntryPoint(login);
 		http.logout().logoutSuccessUrl("/").permitAll();
 		http.addFilterBefore(ssoFilter(), BasicAuthenticationFilter.class);
     	

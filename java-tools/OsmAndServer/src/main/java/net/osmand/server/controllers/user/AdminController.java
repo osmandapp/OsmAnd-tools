@@ -5,6 +5,7 @@ import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
@@ -13,6 +14,7 @@ import net.osmand.server.services.api.MotdService.MotdSettings;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.PropertySource;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.HttpHeaders;
@@ -36,16 +38,20 @@ public class AdminController {
 	@Autowired
 	private MotdService motdService;
 	
+	@Autowired
+	private ApplicationContext appContext;
+	
 	@Value("${git.commit.format}")
 	private String commit;
 
-	private ObjectMapper mapper;
+	protected ObjectMapper mapper;
 	
 	public AdminController() {
 		ObjectMapper objectMapper = new ObjectMapper();
         this.mapper = objectMapper;
 	}
 
+	// TODO POST
 	@RequestMapping(path = { "/publish" }, method = RequestMethod.GET)
 	public String publish(Model model) throws JsonProcessingException {
 		List<String> errors = publish();
@@ -69,6 +75,7 @@ public class AdminController {
 
 	@RequestMapping("/info")
 	public String index(Model model) {
+		model.addAttribute("server_startup", String.format("%1$tF %1$tR", new Date(appContext.getStartupDate())));
 		model.addAttribute("server_commit", commit);
 		model.addAttribute("web_commit", "TODO");
 		if(!model.containsAttribute("update_status")) {
