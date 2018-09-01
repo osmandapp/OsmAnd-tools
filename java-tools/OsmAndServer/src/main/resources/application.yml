@@ -47,16 +47,13 @@ spring:
   thymeleaf:
     prefix: file:${user.dir}/../../../help/website/templates/
 
-# classpath:/static/ 
+# classpath:/static/
 
 gen.location: ${files.location}/gen/
 web.location: ${files.location}/
 
 mapillary:
   clientid: LXJVNHlDOGdMSVgxZG5mVzlHQ3ZqQTo0NjE5OWRiN2EzNTFkNDg4
-
-osmlive:
-  status: /var/www-download/api/.proc_timestamp
 
 monitoring:
   enabled: ${ENABLE_MONITORING:false}
@@ -75,6 +72,8 @@ download:
   files: /var/www-download/
   load: 60
 
+---
+spring.jpa.hibernate.ddl-auto: validate
 
 logging:
   file: /var/log/osmand-server-logs/error.log
