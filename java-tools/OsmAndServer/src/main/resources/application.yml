@@ -46,6 +46,7 @@ spring:
     cache.period: 1
   thymeleaf:
     prefix: file:${user.dir}/../../../help/website/templates/
+    cache: false
 
 # classpath:/static/
 

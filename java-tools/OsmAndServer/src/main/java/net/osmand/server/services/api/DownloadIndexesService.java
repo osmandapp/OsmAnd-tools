@@ -45,48 +45,17 @@ public class DownloadIndexesService  {
 	
 	public DownloadIndexDocument loadDownloadIndexes() {
 		DownloadIndexDocument doc = new DownloadIndexDocument();
-		List<DownloadIndex> list = new ArrayList<>();
 		File rootFolder = new File(pathToDownloadFiles);
-
-		loadIndexesFromDir(list, rootFolder, "indexes", DownloadType.MAP);
-		doc.getMaps().addAll(list);
-		list.clear();
-
-		loadIndexesFromDir(list, rootFolder, ".", DownloadType.MAP);
-		doc.getMaps().addAll(list);
-		list.clear();
-
-		loadIndexesFromDir(list, rootFolder, "indexes", DownloadType.VOICE);
-		doc.getVoices().addAll(list);
-		list.clear();
-
-		loadIndexesFromDir(list, rootFolder, "indexes/fonts", DownloadType.FONTS);
-		doc.getFonts().addAll(list);
-		list.clear();
-
-		loadIndexesFromDir(list, rootFolder, "indexes/inapp/depth", DownloadType.DEPTH);
-		doc.getInapps().addAll(list);
-		list.clear();
-
-		loadIndexesFromDir(list, rootFolder, "wiki", DownloadType.WIKIMAP);
-		doc.getWikimaps().addAll(list);
-		list.clear();
-
-		loadIndexesFromDir(list, rootFolder, "wikivoyage", DownloadType.WIKIVOYAGE);
-		doc.getWikivoyages().addAll(list);
-		list.clear();
-
-		loadIndexesFromDir(list, rootFolder, "road-indexes", DownloadType.ROAD_MAP);
-		doc.getRoadMaps().addAll(list);
-		list.clear();
-
-		loadIndexesFromDir(list, rootFolder, "srtm-countries", DownloadType.SRTM_MAP);
-		doc.getSrtmMaps().addAll(list);
-		list.clear();
-
-		loadIndexesFromDir(list, rootFolder, "hillshade", DownloadType.HILLSHADE);
-		doc.getHillshade().addAll(list);
-		list.clear();
+		loadIndexesFromDir(doc.getMaps(), rootFolder, "indexes", DownloadType.MAP);
+		loadIndexesFromDir(doc.getMaps(), rootFolder, ".", DownloadType.MAP);
+		loadIndexesFromDir(doc.getVoices(), rootFolder, "indexes", DownloadType.VOICE);
+		loadIndexesFromDir(doc.getFonts(), rootFolder, "indexes/fonts", DownloadType.FONTS);
+		loadIndexesFromDir(doc.getInapps(), rootFolder, "indexes/inapp/depth", DownloadType.DEPTH);
+		loadIndexesFromDir(doc.getWikimaps(), rootFolder, "wiki", DownloadType.WIKIMAP);
+		loadIndexesFromDir(doc.getWikivoyages(), rootFolder, "wikivoyage", DownloadType.WIKIVOYAGE);
+		loadIndexesFromDir(doc.getRoadMaps(), rootFolder, "road-indexes", DownloadType.ROAD_MAP);
+		loadIndexesFromDir(doc.getSrtmMaps(), rootFolder, "srtm-countries", DownloadType.SRTM_MAP);
+		loadIndexesFromDir(doc.getHillshade(), rootFolder, "hillshade", DownloadType.HILLSHADE);
 		return doc;
 	}
 	

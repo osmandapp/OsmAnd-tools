@@ -1,18 +1,7 @@
 package net.osmand.server.services.api;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
-
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpHeaders;
-import org.springframework.stereotype.Service;
-
 import java.io.File;
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -20,6 +9,15 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Service
 public class MotdService {
@@ -43,6 +41,12 @@ public class MotdService {
         this.mapper = objectMapper;
     }
 
+    public MotdSettings getSettings() {
+    	if (settings == null) {
+			reloadconfig(new ArrayList<String>());
+		}
+		return settings;
+	}
 
     public MotdMessage getMessage(String version, String os, String hostAddress) throws IOException, ParseException {
         Date now = new Date();
@@ -88,18 +92,22 @@ public class MotdService {
 
         @JsonProperty("settings")
         protected List<DiscountSetting> discountSettings = new ArrayList<MotdService.DiscountSetting>();
+        
+        public List<DiscountSetting> getDiscountSettings() {
+			return discountSettings;
+		}
 
     }
 
     private static class DiscountSetting {
         @JsonProperty("condition")
-        protected DiscountCondition discountCondition;
+        public DiscountCondition discountCondition;
         @JsonProperty("file")
-        protected String file;
+        public String file;
         @JsonProperty("ios_file")
-        protected String iosFile;
+        public String iosFile;
         @JsonProperty("fields")
-        protected Map<String, String> fields;
+        public Map<String, String> fields;
 
 
         protected MotdMessage modifyMessageIfNeeded(MotdMessage message) {
@@ -132,7 +140,7 @@ public class MotdService {
         }
     }
 
-    private static class DiscountCondition {
+    public static class DiscountCondition {
     	@JsonProperty("ip")
     	private String ip;
         @JsonProperty("start_date")
@@ -141,15 +149,30 @@ public class MotdService {
         private Date endDate;
         @JsonProperty("version")
         private String version;
+        
+		public String getFilterCondition() {
+			String filter = "";
+			if (ip != null) {
+				filter += " IP in '" + ip + "' ";
+			}
+			if (startDate != null || endDate != null) {
+				filter += String.format(" Date between %s and %s", 
+						(startDate == null ? "-" : String.format("%1$tF %1$tR", startDate)),
+						(endDate == null ? "-" : String.format("%1$tF %1$tR", endDate)));
+			}
+			if (version != null) {
+				filter += " Version in '" + version + "'";
+			}
+			return filter;
+
+		}
+        
 
         public boolean checkCondition(Date date, String hostAddress, String version) {
             if (ip != null && !ip.contains(hostAddress)) {
                 return false;
             }
-            if (startDate != null && !date.after(startDate)) {
-            	return false;
-            }
-            if (endDate != null && !date.before(endDate)) {
+            if(!checkActiveDate(date)) {
             	return false;
             }
             if (this.version != null && (version == null || !this.version.startsWith(version))) {
@@ -157,5 +180,15 @@ public class MotdService {
             }
             return true;
         }
+
+		public boolean checkActiveDate(Date date) {
+			if (startDate != null && !date.after(startDate)) {
+            	return false;
+            }
+            if (endDate != null && !date.before(endDate)) {
+            	return false;
+            }
+            return true;
+		}
     }
 }

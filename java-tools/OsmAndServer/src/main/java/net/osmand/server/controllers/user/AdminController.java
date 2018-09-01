@@ -9,58 +9,76 @@ import java.util.List;
 import java.util.Map;
 
 import net.osmand.server.services.api.MotdService;
+import net.osmand.server.services.api.MotdService.MotdSettings;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.PropertySource;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.ResponseBody;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Controller
 @RequestMapping("/admin")
-@Configuration
 @PropertySource("classpath:git.properties")
 public class AdminController {
 
 	@Autowired
 	private MotdService motdService;
-
-	// TODO change to POST
-	@RequestMapping(path = { "publish" }, method = RequestMethod.GET)
-	@ResponseBody
-	public String publish() {
-		List<String> errors = new ArrayList<>();
-        motdService.reloadconfig(errors);
-        String msg = "{\"status\": \"OK\", \"message\" : \"Configurations are reloaded.\"}";
-        if(!errors.isEmpty()) {
-        	StringBuilder eb = new StringBuilder();
-        	for(String e : errors) {
-        		if(eb.length() > 0) {
-        			eb.append(", ");
-        		}
-        		eb.append('"').append(e).append('"');
-        	}
-        	msg = String.format("{\"status\": \"FAILED\", \"errors\": [%s]", eb.toString());
-        }
-        return msg;
-	}
-
+	
 	@Value("${git.commit.format}")
 	private String commit;
 
+	private ObjectMapper mapper;
+	
+	public AdminController() {
+		ObjectMapper objectMapper = new ObjectMapper();
+        this.mapper = objectMapper;
+	}
+
+	@RequestMapping(path = { "/publish" }, method = RequestMethod.GET)
+	public String publish(Model model) throws JsonProcessingException {
+		List<String> errors = publish();
+        model.addAttribute("update_status", "OK");
+        model.addAttribute("update_errors", "");
+        model.addAttribute("update_message", "Configurations are reloaded");
+        model.addAttribute("services", new String[]{"motdService"});
+        if(!errors.isEmpty()) {
+        	model.addAttribute("update_status", "FAILED");
+        	model.addAttribute("update_errors", "Errors: " +errors);
+        }
+        return index(model);
+	}
+
+	private List<String> publish() {
+		List<String> errors = new ArrayList<>();
+        motdService.reloadconfig(errors);
+		return errors;
+	}
+
+
 	@RequestMapping("/info")
-	@ResponseBody
-	public String index() {
-		return String.format("OsmAnd Live server. Revision: %s", commit);
+	public String index(Model model) {
+		model.addAttribute("server_commit", commit);
+		model.addAttribute("web_commit", "TODO");
+		if(!model.containsAttribute("update_status")) {
+			model.addAttribute("update_status", "OK");
+	        model.addAttribute("update_errors", "");
+	        model.addAttribute("update_message", "");
+		}
+		MotdSettings settings = motdService.getSettings();
+		model.addAttribute("motdSettings", settings);
+		return "admin/info";
 	}
 
 	@GetMapping("/bitcoins/report.json")
