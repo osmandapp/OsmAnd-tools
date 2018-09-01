@@ -69,7 +69,7 @@ public class ApiController {
     @ResponseBody
     public CameraPlaceCollection getCmPlace(@RequestParam("lat") double lat,
                                             @RequestParam("lon") double lon,
-                                            @RequestParam(value = "myLocation", required = false) String myLocation,
+                                            @RequestParam(value = "mloc", required = false) String mloc,
                                             @RequestParam(value = "app", required = false) String app,
                                             @RequestParam(value = "lang", required = false) String lang,
                                             @RequestParam(value = "osm_image", required = false) String osmImage,
