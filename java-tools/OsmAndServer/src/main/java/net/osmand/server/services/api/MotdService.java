@@ -1,6 +1,7 @@
-package net.osmand.server.services.motd;
+package net.osmand.server.services.api;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.apache.commons.logging.Log;
@@ -30,21 +31,25 @@ public class MotdService {
     private String websiteLocation;
 
     private final ObjectMapper mapper;
+    
+    private MotdSettings settings;
 
     public MotdService() {
         SimpleDateFormat dateFormat = new SimpleDateFormat(DATE_PATTERN);
         dateFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
         ObjectMapper objectMapper = new ObjectMapper();
+        objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
         objectMapper.setDateFormat(dateFormat);
         this.mapper = objectMapper;
     }
 
-    private MotdSettings settings;
 
-    public MotdMessage getMessage(String version, String os, HttpHeaders headers) throws IOException, ParseException {
+    public MotdMessage getMessage(String version, String os, String hostAddress) throws IOException, ParseException {
         Date now = new Date();
         MotdMessage message = null;
-        String hostAddress = getHostAddress(headers);
+		if (settings == null) {
+			reloadconfig(new ArrayList<String>());
+		}
         for (DiscountSetting setting : settings.discountSettings) {
             if (setting.checkCondition(now, hostAddress, version)) {
                 String filename = setting.getMotdFileByPlatform(os);
@@ -67,14 +72,6 @@ public class MotdService {
         return true;
     }
 
-    private String getHostAddress(HttpHeaders headers) {
-       String address = headers.getFirst("X-Forwarded-For");
-       if (address != null) {
-           return address;
-       }
-       InetSocketAddress host = headers.getHost();
-       return host.getAddress().toString();
-    }
 
     
 
@@ -92,9 +89,11 @@ public class MotdService {
     private static class DiscountSetting {
         @JsonProperty("condition")
         protected DiscountCondition discountCondition;
+        @JsonProperty("file")
         protected String file;
         @JsonProperty("ios_file")
         protected String iosFile;
+        @JsonProperty("fields")
         protected Map<String, String> fields;
 
 
@@ -129,11 +128,13 @@ public class MotdService {
     }
 
     private static class DiscountCondition {
-        private String ip;
+    	@JsonProperty("ip")
+    	private String ip;
         @JsonProperty("start_date")
         private Date startDate;
         @JsonProperty("end_date")
         private Date endDate;
+        @JsonProperty("version")
         private String version;
 
         public boolean checkCondition(Date date, String hostAddress, String version) {
@@ -143,7 +144,7 @@ public class MotdService {
             if (startDate != null && !date.after(startDate)) {
             	return false;
             }
-            if (endDate != null && !date.after(endDate)) {
+            if (endDate != null && !date.before(endDate)) {
             	return false;
             }
             if (version != null && this.version != null && !this.version.startsWith(version)) {

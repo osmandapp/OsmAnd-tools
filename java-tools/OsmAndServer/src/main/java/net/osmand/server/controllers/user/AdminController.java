@@ -8,7 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import net.osmand.server.services.motd.MotdService;
+import net.osmand.server.services.api.MotdService;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -58,6 +58,7 @@ public class AdminController {
 	private String commit;
 
 	@RequestMapping("/info")
+	@ResponseBody
 	public String index() {
 		return String.format("OsmAnd Live server. Revision: %s", commit);
 	}

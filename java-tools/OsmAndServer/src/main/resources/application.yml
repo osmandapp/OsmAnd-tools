@@ -62,6 +62,8 @@ monitoring:
 spring.jpa.hibernate.ddl-auto: validate
 
 files.location: /var/www-download/
+gen.location: ${files.location}/gen/
+web.location: ${files.location}/web/
 download:
   servers:
     main:
@@ -71,9 +73,6 @@ download:
       - dl4.osmand.net
   files: /var/www-download/
   load: 60
-
----
-spring.jpa.hibernate.ddl-auto: validate
 
 logging:
   file: /var/log/osmand-server-logs/error.log
@@ -93,7 +92,3 @@ spring:
   profiles: production
   resources.static-locations: file:/var/www-download/web/
   thymeleaf.prefix: file:/var/www-download/web/templates/
-
-files.location: /var/www-download/
-gen.location: ${files.location}/gen/
-web.location: ${files.location}/web/

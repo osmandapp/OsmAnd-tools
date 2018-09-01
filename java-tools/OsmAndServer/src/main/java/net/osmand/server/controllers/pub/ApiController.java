@@ -1,11 +1,10 @@
 package net.osmand.server.controllers.pub;
 
-import net.osmand.server.services.images.CameraPlace;
-import net.osmand.server.services.images.CameraPlaceCollection;
-import net.osmand.server.services.images.ImageService;
+import net.osmand.server.services.api.CameraPlace;
+import net.osmand.server.services.api.ImageService;
+import net.osmand.server.services.api.MotdMessage;
+import net.osmand.server.services.api.MotdService;
 
-import net.osmand.server.services.motd.MotdMessage;
-import net.osmand.server.services.motd.MotdService;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,6 +16,9 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.util.UriComponentsBuilder;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -43,8 +45,17 @@ public class ApiController {
 
     @Autowired
     private ImageService imageService;
+    
     @Autowired
     private MotdService motdService;
+
+	private ObjectMapper jsonMapper;
+    
+    private ApiController() {
+    	 ObjectMapper mapper = new ObjectMapper();
+    	 this.jsonMapper = mapper;
+    }
+    
 
     private List<CameraPlace> sortByDistance(List<CameraPlace> arr) {
         return arr.stream().sorted(Comparator.comparing(CameraPlace::getDistance)).collect(Collectors.toList());
@@ -71,7 +82,7 @@ public class ApiController {
 
     @GetMapping(path = {"/cm_place.php", "/cm_place"})
     @ResponseBody
-    public CameraPlaceCollection getCmPlace(@RequestParam("lat") double lat,
+    public String getCmPlace(@RequestParam("lat") double lat,
                                             @RequestParam("lon") double lon,
                                             @RequestParam(value = "mloc", required = false) String mloc,
                                             @RequestParam(value = "app", required = false) String app,
@@ -79,7 +90,7 @@ public class ApiController {
                                             @RequestParam(value = "osm_image", required = false) String osmImage,
                                             @RequestParam(value = "osm_mapillary_key", required = false) String osmMapillaryKey,
                                             @RequestHeader HttpHeaders headers,
-                                            HttpServletRequest request) {
+                                            HttpServletRequest request) throws JsonProcessingException {
         InetSocketAddress inetAddress = headers.getHost();
         String host = inetAddress.getHostName();
         String proto = request.getScheme();
@@ -93,7 +104,7 @@ public class ApiController {
         }
         if (host == null) {
             LOGGER.error("Bad request. Host is null");
-            return new CameraPlaceCollection();
+			return "{" + jsonMapper.writeValueAsString("features") + ":[]}";
         }
         Map<String, List<CameraPlace>> result = new HashMap<>();
 
@@ -119,7 +130,8 @@ public class ApiController {
         if (!arr.isEmpty()) {
             arr.add(createEmptyCameraPlaceWithTypeOnly("mapillary-contribute"));
         }
-        return new CameraPlaceCollection(arr);
+        return "{"+jsonMapper.writeValueAsString("features")+
+        			":"+jsonMapper.writeValueAsString(arr)+"}";
     }
 
     @GetMapping(path = {"/mapillary/get_photo.php", "/mapillary/get_photo"})
@@ -147,18 +159,23 @@ public class ApiController {
 
     @GetMapping(path = {"/motd", "/motd.php"})
     @ResponseBody
-    public ResponseEntity<MotdMessage> getMessage(@RequestParam(required = false) String version,
+    public String getMessage(@RequestParam(required = false) String version,
                              @RequestParam(required = false) Integer nd,
                              @RequestParam(required = false) Integer ns,
                              @RequestParam(required = false) String lang,
                              @RequestParam(required = false) String os,
                              @RequestParam(required = false) String aid,
                              @RequestParam(required = false) String discount,
-                             @RequestHeader HttpHeaders headers) throws IOException, ParseException {
-        MotdMessage body = motdService.getMessage(version, os, headers);
-        if (body != null) {
-            return ResponseEntity.ok(body);
+                             @RequestHeader HttpHeaders headers,
+                             HttpServletRequest request) throws IOException, ParseException {
+    	String remoteAddr = request.getRemoteAddr();
+        if (headers.getFirst("X-Forwarded-For") != null) {
+            remoteAddr = headers.getFirst("X-Forwarded-For");
         }
-        return ResponseEntity.noContent().build();
+        MotdMessage body = motdService.getMessage(version, os, remoteAddr);
+        if (body != null) {
+            return jsonMapper.writeValueAsString(body);
+        }
+        return "{}";
     }
 }

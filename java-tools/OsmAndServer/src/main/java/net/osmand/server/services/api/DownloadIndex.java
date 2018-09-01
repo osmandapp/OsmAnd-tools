@@ -1,12 +1,14 @@
-package net.osmand.server.services.index;
+package net.osmand.server.services.api;
 
-import net.osmand.server.services.index.DownloadIndexesService.DownloadType;
+import net.osmand.server.services.api.DownloadIndexesService.DownloadType;
 
 import javax.xml.bind.annotation.XmlAttribute;
+import javax.xml.bind.annotation.adapters.XmlAdapter;
 import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.Locale;
 
 public class DownloadIndex {
 
@@ -127,5 +129,53 @@ public class DownloadIndex {
 				", name='" + name + '\'' +
 				", description='" + description + '\'' +
 				'}';
+	}
+	
+	public static class DownloadIndexSizeAdapter extends XmlAdapter<String, Double> {
+
+		private static final double MB =  1 << 20;
+
+		@Override
+		public Double unmarshal(String v) throws Exception {
+			return Double.parseDouble(v);
+		}
+
+		@Override
+		public String marshal(Double v) throws Exception {
+			return String.format(Locale.US, "%.1f", v / MB);
+		}
+	}
+	
+	public static class DownloadIndexTypeAdapter extends XmlAdapter<String, DownloadIndexesService.DownloadType> {
+
+		@Override
+		public DownloadIndexesService.DownloadType unmarshal(String v) throws Exception {
+			DownloadIndexesService.DownloadType dt = null;
+			if (v.equals("map")) {
+				dt = DownloadIndexesService.DownloadType.MAP;
+			} else if (v.equals("voice")) {
+				dt = DownloadIndexesService.DownloadType.VOICE;
+			} else if (v.equals("fonts")) {
+				dt = DownloadIndexesService.DownloadType.FONTS;
+			} else if (v.equals("depth")) {
+				dt = DownloadIndexesService.DownloadType.DEPTH;
+			} else if (v.equals("wikivoyage")) {
+				dt = DownloadIndexesService.DownloadType.WIKIVOYAGE;
+			} else if (v.equals("wikimap")) {
+				dt = DownloadIndexesService.DownloadType.WIKIMAP;
+			} else if (v.equals("srtm_map")) {
+				dt = DownloadIndexesService.DownloadType.SRTM_MAP;
+			} else if (v.equals("hillshade")) {
+				dt = DownloadIndexesService.DownloadType.HILLSHADE;
+			} else if (v.equals("road_map")) {
+				dt = DownloadIndexesService.DownloadType.ROAD_MAP;
+			}
+			return dt;
+		}
+
+		@Override
+		public String marshal(DownloadIndexesService.DownloadType v) throws Exception {
+			return v.getType();
+		}
 	}
 }

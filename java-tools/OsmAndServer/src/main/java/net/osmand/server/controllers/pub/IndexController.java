@@ -1,8 +1,8 @@
 package net.osmand.server.controllers.pub;
 
-import net.osmand.server.services.index.DownloadIndex;
-import net.osmand.server.services.index.DownloadIndexDocument;
-import net.osmand.server.services.index.DownloadIndexesService;
+import net.osmand.server.services.api.DownloadIndex;
+import net.osmand.server.services.api.DownloadIndexDocument;
+import net.osmand.server.services.api.DownloadIndexesService;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
