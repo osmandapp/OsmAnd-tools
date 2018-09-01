@@ -2,6 +2,7 @@ package net.osmand.server.services.motd;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -13,6 +14,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -43,29 +45,26 @@ public class MotdService {
         Date now = new Date();
         MotdMessage message = null;
         String hostAddress = getHostAddress(headers);
-        for (DiscountSetting setting : settings.getDiscountSettings()) {
-            if (setting.getDiscountCondition().checkCondition(now, hostAddress, version)) {
+        for (DiscountSetting setting : settings.discountSettings) {
+            if (setting.checkCondition(now, hostAddress, version)) {
                 String filename = setting.getMotdFileByPlatform(os);
                 message = parseMotdMessageFile(websiteLocation.concat("api/messages/").concat(filename));
-                message = modifyMessageIfNeeded(setting, message);
+                message = setting.modifyMessageIfNeeded(message);
                 break;
             }
         }
         return message;
     }
 
-    public String updateSettings(List<String> errors) {
-        MotdSettings motdSettings;
-        String msg = "{\"status\": \"OK\", \"message\" : \"New configuration accepted.\"}";
-        try {
-            motdSettings = mapper.readValue(new File(websiteLocation.concat(MOTD_SETTINGS)), MotdSettings.class);
-            this.settings = motdSettings;
-        } catch (IOException ex) {
-            errors.add("motd_config.json is invalid.");
-            msg = String.format("{\"status\": \"FAILED\", \"message\": \"%s\"}", ex.getMessage());
-            LOGGER.error(ex.getMessage(), ex);
-        }
-        return msg;
+    public boolean reloadconfig(List<String> errors) {
+    	try {
+    		this.settings = mapper.readValue(new File(websiteLocation.concat(MOTD_SETTINGS)), MotdSettings.class);
+    	} catch (IOException ex) {
+            errors.add("motd_config.json is invalid: " + ex.getMessage());
+            LOGGER.warn(ex.getMessage(), ex);
+            return false;
+    	}
+        return true;
     }
 
     private String getHostAddress(HttpHeaders headers) {
@@ -77,16 +76,7 @@ public class MotdService {
        return host.getAddress().toString();
     }
 
-    private MotdMessage modifyMessageIfNeeded(DiscountSetting setting, MotdMessage message) {
-        if (setting.isFieldsPresent()) {
-            Map<String, String> fields = setting.getFields();
-            message.setDescription(fields.get("description"));
-            message.setMessage(fields.get("message"));
-            message.setStartDate(fields.get("start"));
-            message.setEndDate(fields.get("end"));
-        }
-        return message;
-    }
+    
 
     private MotdMessage parseMotdMessageFile(String filepath) throws IOException {
         return mapper.readValue(new File(filepath), MotdMessage.class);
@@ -95,51 +85,43 @@ public class MotdService {
     public static class MotdSettings {
 
         @JsonProperty("settings")
-        private List<DiscountSetting> discountSettings;
+        protected List<DiscountSetting> discountSettings = new ArrayList<MotdService.DiscountSetting>();
 
-        public List<DiscountSetting> getDiscountSettings() {
-            return discountSettings;
-        }
     }
 
     private static class DiscountSetting {
         @JsonProperty("condition")
-        private DiscountCondition discountCondition;
-        private String file;
+        protected DiscountCondition discountCondition;
+        protected String file;
         @JsonProperty("ios_file")
-        private String iosFile;
-        private Map<String, String> fields;
+        protected String iosFile;
+        protected Map<String, String> fields;
 
-        public DiscountCondition getDiscountCondition() {
-            return discountCondition;
+
+        protected MotdMessage modifyMessageIfNeeded(MotdMessage message) {
+            if (fields != null) {
+            	if(fields.containsKey("description")) {
+            		message.setDescription(fields.get("description"));
+            	}
+            	if(fields.containsKey("message")) {
+            		message.setMessage(fields.get("message"));
+            	}
+            	if(fields.containsKey("start")) {
+            		message.setStartDate(fields.get("start"));
+            	}
+            	if(fields.containsKey("end")) {
+            		message.setEndDate(fields.get("end"));
+            	}
+            }
+            return message;
         }
 
-        public String getFile() {
-            return file;
-        }
+        public boolean checkCondition(Date now, String hostAddress, String version) {
+			return discountCondition.checkCondition(now, hostAddress, version);
+		}
 
-        public String getIosFile() {
-            return iosFile;
-        }
-
-        public Map<String, String> getFields() {
-            return fields;
-        }
-
-        public boolean isFilePresent() {
-            return file != null;
-        }
-
-        public boolean isIosFilePresent() {
-            return iosFile != null;
-        }
-
-        public boolean isFieldsPresent() {
-            return fields != null && !fields.isEmpty();
-        }
-
-        public String getMotdFileByPlatform(String os) {
-            if (os != null && os.equals("ios") && isIosFilePresent()) {
+		public String getMotdFileByPlatform(String os) {
+            if (os != null && os.equals("ios") && iosFile != null) {
                 return iosFile;
             }
             return file;
@@ -154,58 +136,20 @@ public class MotdService {
         private Date endDate;
         private String version;
 
-        private boolean isDiscountActive(Date now) {
-            return now.after(getStartDate()) && now.before(getEndDate());
-        }
-
-        public String getIp() {
-            return ip;
-        }
-
-        public Date getStartDate() {
-            return startDate;
-        }
-
-        public Date getEndDate() {
-            return endDate;
-        }
-
-        public String getVersion() {
-            return version;
-        }
-
-        public boolean isIpPresent() {
-            return ip != null;
-        }
-
-        public boolean isStartDatePresent() {
-            return startDate != null;
-        }
-
-        public boolean isEndDatePresent() {
-            return endDate != null;
-        }
-
-        public boolean isVersionPresent() {
-            return version != null;
-        }
-
         public boolean checkCondition(Date date, String hostAddress, String version) {
-            boolean result = true;
-            boolean anyCondition = false;
-            if (isIpPresent()) {
-                anyCondition = true;
-                result &= getIp().equals(hostAddress);
+            if (ip != null && !ip.contains(hostAddress)) {
+                return false;
             }
-            if (isStartDatePresent() && isEndDatePresent() && isDiscountActive(date)) {
-                anyCondition = true;
-                result &= true;
+            if (startDate != null && !date.after(startDate)) {
+            	return false;
             }
-            if (isVersionPresent()) {
-                anyCondition = true;
-                result &= version != null && getVersion().startsWith(version);
+            if (endDate != null && !date.after(endDate)) {
+            	return false;
             }
-            return result && anyCondition;
+            if (version != null && this.version != null && !this.version.startsWith(version)) {
+                return false;
+            }
+            return true;
         }
     }
 }
