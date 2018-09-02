@@ -76,19 +76,20 @@ public class WebController {
         return "pub/osm_live.html"; 
     }
     
-    @RequestMapping(path = { "/blog", "/blog.html"  })
-    public String blog(HttpServletResponse response) {
+    @RequestMapping(path = { "/downloads", "/downloads.html"  })
+    public String downloads(HttpServletResponse response) {
     	// TODO generate static 
-        return "pub/osm_live.html"; 
+        return "pub/downloads.html"; 
     }
     
-    @RequestMapping(path = { "/features/{articleId}", "/features.html"  })
+    @RequestMapping(path = { "/features/{articleId}" })
     public String featuresSpecific(HttpServletResponse response, @PathVariable(required=false) String articleId,
     		Model model) {
     	// TODO generate static 
     	model.addAttribute("article",articleId);
         return "pub/features.html"; 
     }
+    
     @RequestMapping(path = { "/features", "/features.html"  })
     public String features(HttpServletResponse response, @RequestParam(required=false) String id,
     		Model model) {
@@ -101,4 +102,33 @@ public class WebController {
 		model.addAttribute("article", "main");
         return "pub/features.html"; 
     }
+    
+    
+    @RequestMapping(path = { "/help-online/{articleId}" })
+    public String helpSpecific(HttpServletResponse response, @PathVariable(required=false) String articleId,
+    		Model model) {
+    	// TODO generate static 
+    	model.addAttribute("article",articleId);
+        return "pub/help-online.html"; 
+    }
+    
+    @RequestMapping(path = { "/help-online", "/help-online.html"  })
+    public String help(HttpServletResponse response, @RequestParam(required=false) String id,
+    		Model model) {
+    	if(id != null) {
+			response.setHeader("Location", "/help-online/" + id);
+            response.setStatus(301); 
+            return null;
+    	}
+    	// TODO generate static 
+		model.addAttribute("article", "faq");
+        return "pub/help-online.html"; 
+    }
+    
+
+//    @RequestMapping(path = { "/blog", "/blog.html"  })
+//    public String blog(HttpServletResponse response) {
+//    	// TODO generate static 
+//        return "pub/osm_live.html"; 
+//    }
 }
