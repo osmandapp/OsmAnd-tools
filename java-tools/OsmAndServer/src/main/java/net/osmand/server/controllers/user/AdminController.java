@@ -8,7 +8,10 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 
+import net.osmand.server.controllers.pub.DownloadIndexController;
+import net.osmand.server.controllers.pub.DownloadIndexController.DownloadProperties;
 import net.osmand.server.services.api.MotdService;
 import net.osmand.server.services.api.MotdService.MotdSettings;
 
@@ -39,6 +42,9 @@ public class AdminController {
 	private MotdService motdService;
 	
 	@Autowired
+	private DownloadIndexController downloadControler;
+	
+	@Autowired
 	private ApplicationContext appContext;
 	
 	@Value("${git.commit.format}")
@@ -57,7 +63,7 @@ public class AdminController {
         model.addAttribute("update_status", "OK");
         model.addAttribute("update_errors", "");
         model.addAttribute("update_message", "Configurations are reloaded");
-        model.addAttribute("services", new String[]{"motdService"});
+        model.addAttribute("services", new String[]{"motd", "download"});
         if(!errors.isEmpty()) {
         	model.addAttribute("update_status", "FAILED");
         	model.addAttribute("update_errors", "Errors: " +errors);
@@ -68,6 +74,7 @@ public class AdminController {
 	private List<String> publish() {
 		List<String> errors = new ArrayList<>();
         motdService.reloadconfig(errors);
+        downloadControler.reloadConfig(errors);
 		return errors;
 	}
 
@@ -84,7 +91,35 @@ public class AdminController {
 		}
 		MotdSettings settings = motdService.getSettings();
 		model.addAttribute("motdSettings", settings);
+		
+		List<Map<String, Object>> list = getDownloadSettings();
+		model.addAttribute("downloadServers", list);
 		return "admin/info";
+	}
+
+	private List<Map<String, Object>> getDownloadSettings() {
+		DownloadProperties dProps = downloadControler.getSettings();
+		int ms = dProps.getMainServers().size();
+		int hs = dProps.getHelpServers().size();
+		int mload = ms == 0 ? 0 : dProps.getMainLoad() / ms;
+		int mmload = ms == 0 ? 0 : 100 / ms;
+		int hload = hs == 0 ? 0 : (100-dProps.getMainLoad()) / hs;
+		List<Map<String, Object>> list = new ArrayList<>();
+		for(String s : dProps.getMainServers()) {
+			Map<String, Object> mo = new TreeMap<>();
+			mo.put("name", s);
+			mo.put("mainLoad", mload +"%");
+			mo.put("srtmLoad", mmload +"%");
+			list.add(mo);
+		}
+		for(String s : dProps.getHelpServers()) {
+			Map<String, Object> mo = new TreeMap<>();
+			mo.put("name", s);
+			mo.put("mainLoad", hload +"%");
+			mo.put("srtmLoad", "0%");
+			list.add(mo);
+		}
+		return list;
 	}
 
 	@GetMapping("/bitcoins/report.json")

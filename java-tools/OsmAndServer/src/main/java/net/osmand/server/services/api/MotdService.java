@@ -10,6 +10,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
 
+import javax.annotation.PostConstruct;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -25,7 +27,7 @@ public class MotdService {
     private static final String MOTD_SETTINGS = "api/messages/motd_config.json";
     private static final String DATE_PATTERN = "yyyy-MM-dd HH:mm";
 
-    @Value("${files.location}")
+    @Value("${web.location}")
     private String websiteLocation;
 
     private final ObjectMapper mapper;
@@ -40,38 +42,44 @@ public class MotdService {
         objectMapper.setDateFormat(dateFormat);
         this.mapper = objectMapper;
     }
+    
+    
 
     public MotdSettings getSettings() {
-    	if (settings == null) {
-			reloadconfig(new ArrayList<String>());
-		}
 		return settings;
 	}
 
     public MotdMessage getMessage(String version, String os, String hostAddress) throws IOException, ParseException {
         Date now = new Date();
         MotdMessage message = null;
-		if (settings == null) {
-			reloadconfig(new ArrayList<String>());
-		}
-        for (DiscountSetting setting : settings.discountSettings) {
-            if (setting.checkCondition(now, hostAddress, version)) {
-                String filename = setting.getMotdFileByPlatform(os);
-                message = parseMotdMessageFile(websiteLocation.concat("api/messages/").concat(filename));
-				if (message != null) {
-					message = setting.modifyMessageIfNeeded(message);
+		MotdSettings settings = getSettings();
+		if (settings != null) {
+			for (DiscountSetting setting : settings.discountSettings) {
+				if (setting.checkCondition(now, hostAddress, version)) {
+					String filename = setting.getMotdFileByPlatform(os);
+					message = parseMotdMessageFile(websiteLocation.concat("api/messages/").concat(filename));
+					if (message != null) {
+						message = setting.modifyMessageIfNeeded(message);
+					}
+					break;
 				}
-                break;
-            }
-        }
+			}
+		}
         return message;
     }
 
+    @PostConstruct
+	public boolean reloadconfig() {
+		return reloadconfig(new ArrayList<String>());
+	}
+    
     public boolean reloadconfig(List<String> errors) {
     	try {
     		this.settings = mapper.readValue(new File(websiteLocation.concat(MOTD_SETTINGS)), MotdSettings.class);
     	} catch (IOException ex) {
-            errors.add("motd_config.json is invalid: " + ex.getMessage());
+    		if(errors != null) {
+    			errors.add(MOTD_SETTINGS + " is invalid: " + ex.getMessage());
+    		}
             LOGGER.warn(ex.getMessage(), ex);
             return false;
     	}

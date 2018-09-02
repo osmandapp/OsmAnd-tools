@@ -65,15 +65,6 @@ spring.jpa.hibernate.ddl-auto: validate
 files.location: /var/www-download/
 gen.location: ${files.location}/gen/
 web.location: ${files.location}/web/
-download:
-  servers:
-    main:
-      - dl6.osmand.net
-    help:
-      - dl1.osmand.net
-      - dl4.osmand.net
-  files: /var/www-download/
-  load: 60
 
 logging:
   file: /var/log/osmand-server-logs/error.log

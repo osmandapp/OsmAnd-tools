@@ -8,18 +8,17 @@ import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 
+import javax.annotation.PostConstruct;
 import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -34,28 +33,64 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonRootName;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 @Controller
 public class DownloadIndexController {
 	private static final Log LOGGER = LogFactory.getLog(DownloadIndexController.class);
 
 	private static final int BUFFER_SIZE = 4096;
+	private static final String DOWNLOD_SETTINGS = "api/settings.json";
 
 
-	private final DownloadProperties config;
+	private DownloadProperties settings;
+	
+    @Value("${web.location}")
+    private String websiteLocation;
 	
 	@Value("${files.location}")
 	private String filesPath;
+
+	private ObjectMapper mapper;
 	    
 
-	@Autowired
-	public DownloadIndexController(DownloadProperties config) {
-		this.config = config;
+	public DownloadIndexController() {
+		ObjectMapper objectMapper = new ObjectMapper();
+        objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        objectMapper.configure(DeserializationFeature.UNWRAP_ROOT_VALUE, true);
+
+        this.mapper = objectMapper;
 	}
 	/*
 		DATE_AND_EXT_STR_LEN = "_18_06_02.obf.gz".length()
 	 */
 	private static final int DATE_AND_EXT_STR_LEN = 16;
 
+	@PostConstruct
+	public boolean reloadConfig() {
+		return reloadConfig(new ArrayList<String>());
+	}
+	
+	public boolean reloadConfig(List<String> errors) {
+    	try {
+    		this.settings = mapper.readValue(new File(websiteLocation.concat(DOWNLOD_SETTINGS)),
+    				DownloadProperties.class);
+    	} catch (IOException ex) {
+    		if(errors != null) {
+    			errors.add(DOWNLOD_SETTINGS + " is invalid: " + ex.getMessage());
+    		}
+            LOGGER.warn(ex.getMessage(), ex);
+            return false;
+    	}
+        return true;
+    }
+	
+	public DownloadProperties getSettings() {
+		return settings;
+	}
 
 	private Resource getFileAsResource(String dir, String filename) throws FileNotFoundException {
 		File file = new File(new File(filesPath, dir), filename);
@@ -237,7 +272,7 @@ public class DownloadIndexController {
 							  @RequestHeader HttpHeaders headers,
 							  HttpServletRequest req,
 							  HttpServletResponse resp) throws IOException {
-		DownloadProperties.DownloadServers servers = config.getServers();
+		DownloadProperties servers = settings;
 		InetSocketAddress inetHost = headers.getHost();
 		if (inetHost == null) {
 			resp.sendError(HttpServletResponse.SC_BAD_REQUEST, "Invalid host name");
@@ -253,12 +288,12 @@ public class DownloadIndexController {
 			ThreadLocalRandom tlr = ThreadLocalRandom.current();
 			int random = tlr.nextInt(100);
 			boolean isSimple = computeSimpleCondition(params);
-			if (servers.getHelp().size() > 0 && isSimple && random < (100 - config.getLoad())) {
-				String host = servers.getHelp().get(random % servers.getHelp().size());
+			if (servers.getHelpServers().size() > 0 && isSimple && random < (100 - settings.getMainLoad())) {
+				String host = servers.getHelpServers().get(random % servers.getHelpServers().size());
 				resp.setStatus(HttpServletResponse.SC_FOUND);
 				resp.setHeader(HttpHeaders.LOCATION, proto + "://" + host + "/download?" + req.getQueryString());
-			} else if (servers.getMain().size() > 0) {
-				String host = servers.getMain().get(random % servers.getMain().size());
+			} else if (servers.getMainServers().size() > 0) {
+				String host = servers.getMainServers().get(random % servers.getMainServers().size());
 				resp.setStatus(HttpServletResponse.SC_FOUND);
 				resp.setHeader(HttpHeaders.LOCATION, proto + "://" + host + "/download?" + req.getQueryString());
 			} else {
@@ -285,57 +320,35 @@ public class DownloadIndexController {
 		}
 	}
 
-	@Configuration
-	@ConfigurationProperties(prefix = "download")
+	@JsonRootName("download")
 	public static class DownloadProperties {
-		private int load;
-		private DownloadServers servers = new DownloadServers();
-
-		public int getLoad() {
-			return load;
-		}
-
-		public void setLoad(int load) {
-			this.load = load;
-		}
-
-		public DownloadServers getServers() {
-			return servers;
-		}
-
-		public void setServers(DownloadServers servers) {
-			this.servers = servers;
-		}
-
-		public static class DownloadServers {
-			private List<String> self = new ArrayList<>();
-			private List<String> help = new ArrayList<>();
-			private List<String> main = new ArrayList<>();
-
-			public List<String> getSelf() {
-				return self;
+		@JsonProperty("main_load")
+		private int mainLoad;
+		private List<String> helpServers = new ArrayList<>();
+		private List<String> mainServers = new ArrayList<>();
+		
+		@JsonProperty("servers")
+		private void unpackNameFromNestedObject(Map<String, Object> servers) {
+			if(servers.containsKey("help")) {
+				helpServers = (List<String>) servers.get("help");
 			}
-
-			public void setSelf(List<String> self) {
-				this.self = self;
-			}
-
-
-			public List<String> getHelp() {
-				return help;
-			}
-
-			public void setHelp(List<String> help) {
-				this.help = help;
-			}
-
-			public List<String> getMain() {
-				return main;
-			}
-
-			public void setMain(List<String> main) {
-				this.main = main;
+			if (servers.containsKey("main")) {
+				mainServers = (List<String>) servers.get("main");
 			}
 		}
+		
+
+		public List<String> getMainServers() {
+			return mainServers;
+		}
+		
+		public List<String> getHelpServers() {
+			return helpServers;
+		}
+
+		public int getMainLoad() {
+			return mainLoad;
+		}
+
 	}
 }
