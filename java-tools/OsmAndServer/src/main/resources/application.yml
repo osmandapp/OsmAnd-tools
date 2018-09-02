@@ -59,6 +59,8 @@ mapillary:
 monitoring:
   enabled: ${ENABLE_MONITORING:false}
 
+geoip.url: "http://localhost:8081/json/"
+
 ---
 spring.jpa.hibernate.ddl-auto: validate
 

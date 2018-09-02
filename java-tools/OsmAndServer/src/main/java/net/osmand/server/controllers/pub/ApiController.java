@@ -1,5 +1,23 @@
 package net.osmand.server.controllers.pub;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.InetSocketAddress;
+import java.net.URL;
+import java.net.URLConnection;
+import java.text.ParseException;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
 import net.osmand.server.services.api.CameraPlace;
 import net.osmand.server.services.api.ImageService;
 import net.osmand.server.services.api.MotdMessage;
@@ -11,25 +29,20 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.net.InetSocketAddress;
-import java.text.ParseException;
-import java.util.*;
-import java.util.stream.Collectors;
 
 @Controller
 @RequestMapping("/api")
@@ -38,10 +51,13 @@ public class ApiController {
 
     private static final String RESULT_MAP_ARR = "arr";
     private static final String RESULT_MAP_HALFVISARR = "halfvisarr";
-    private static final String PROC_FILE = "api/.proc_timestamp";
+    private static final String PROC_FILE = ".proc_timestamp";
 
     @Value("${files.location}")
     private String filesLocation;
+    
+    @Value("${geoip.url}")
+    private String geoipURL;
 
     @Autowired
     private ImageService imageService;
@@ -79,7 +95,33 @@ public class ApiController {
         LOGGER.error("proc file not found at " + procFile);
         throw new RuntimeException("File not found at " + procFile);
     }
-
+    
+    @GetMapping(path = {"/geo-ip"}, produces = "application/json")
+    @ResponseBody
+    public String findGeoIP(HttpServletRequest request) throws JsonParseException, JsonMappingException, IOException{
+    	String remoteAddr = request.getRemoteAddr();
+    	Enumeration<String> hs = request.getHeaders("X-Forwarded-For");
+        if (hs != null && hs.hasMoreElements()) {
+            remoteAddr = hs.nextElement();
+        }
+        URLConnection conn = new URL(geoipURL + remoteAddr).openConnection();
+        TypeReference<HashMap<String,Object>> typeRef = new TypeReference<HashMap<String,Object>>() {};
+        HashMap<String,Object> value = jsonMapper.readValue(conn.getInputStream(), typeRef);
+        conn.getInputStream().close();
+        if(value.containsKey("lat") && !value.containsKey("latitude")) {
+        	value.put("latitude", value.get("lat"));
+        } else if(!value.containsKey("lat") && value.containsKey("latitude")) {
+        	value.put("lat", value.get("latitude"));
+        }
+        if(value.containsKey("lon") && !value.containsKey("longitude")) {
+        	value.put("longitude", value.get("lon"));
+        } else if(!value.containsKey("lon") && value.containsKey("longitude")) {
+        	value.put("lon", value.get("longitude"));
+        }
+        
+        return jsonMapper.writeValueAsString(value);
+    }
+    
     @GetMapping(path = {"/cm_place.php", "/cm_place"})
     @ResponseBody
     public String getCmPlace(@RequestParam("lat") double lat,
