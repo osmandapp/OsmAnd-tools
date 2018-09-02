@@ -261,7 +261,7 @@ public class DownloadIndexController {
 
 	private boolean computeLocalCondition(MultiValueMap<String, String> params) {
 		return isContainAndEqual("aosmc", params) ||
-				isContainAndEqual("fonts", params) || isContainAndEqual("inapp", params);
+				isContainAndEqual("fonts", params) || params.getFirst("inapp") != null;
 	}
 
 	@RequestMapping(value = {"/download.php", "/download"}, method = RequestMethod.GET)
