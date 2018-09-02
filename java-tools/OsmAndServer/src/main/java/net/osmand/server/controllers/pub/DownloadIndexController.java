@@ -252,18 +252,20 @@ public class DownloadIndexController {
 		return isContainAndEqual(param, "yes", params);
 	}
 
-	private boolean computeSimpleCondition(MultiValueMap<String, String> params) {
-		return isContainAndEqual("wiki", params)
-				|| isContainAndEqual("standard", params)
-				|| isContainAndEqual("road", params)
-				|| isContainAndEqual("wikivoyage", params);
+	private boolean computeHelpCondition(MultiValueMap<String, String> params) {
+		// "standard", "<empty>", "road" 
+		// "wikivoyage", "wiki"
+		// "aosmc"
+		return !computeOnlyMainCondition(params) && !computeLocalCondition(params);
+	}
+	
+	private boolean computeOnlyMainCondition(MultiValueMap<String, String> params) {
+		return isContainAndEqual("srtmcountry", params) || isContainAndEqual("hillshade", params);
 	}
 
 	private boolean computeLocalCondition(MultiValueMap<String, String> params) {
-		return isContainAndEqual("osmc", params)
-				|| isContainAndEqual("aosmc", params)
-				|| isContainAndEqual("fonts", params)
-				|| isContainAndEqual("inapp", params);
+		return //isContainAndEqual("aosmc", params)
+				isContainAndEqual("fonts", params) || isContainAndEqual("inapp", params);
 	}
 
 	@RequestMapping(value = {"/download.php", "/download"}, method = RequestMethod.GET)
@@ -287,12 +289,13 @@ public class DownloadIndexController {
 		if (!self) {
 			ThreadLocalRandom tlr = ThreadLocalRandom.current();
 			int random = tlr.nextInt(100);
-			boolean isSimple = computeSimpleCondition(params);
-			if (servers.getHelpServers().size() > 0 && isSimple && random < (100 - settings.getMainLoad())) {
+			boolean isHelp = computeHelpCondition(params);
+			boolean isLocal = computeLocalCondition(params);
+			if (servers.getHelpServers().size() > 0 && isHelp && random < (100 - settings.getMainLoad())) {
 				String host = servers.getHelpServers().get(random % servers.getHelpServers().size());
 				resp.setStatus(HttpServletResponse.SC_FOUND);
 				resp.setHeader(HttpHeaders.LOCATION, proto + "://" + host + "/download?" + req.getQueryString());
-			} else if (servers.getMainServers().size() > 0) {
+			} else if (servers.getMainServers().size() > 0 && !isLocal) {
 				String host = servers.getMainServers().get(random % servers.getMainServers().size());
 				resp.setStatus(HttpServletResponse.SC_FOUND);
 				resp.setHeader(HttpHeaders.LOCATION, proto + "://" + host + "/download?" + req.getQueryString());
