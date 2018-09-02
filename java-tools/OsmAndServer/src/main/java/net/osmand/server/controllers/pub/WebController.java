@@ -22,6 +22,7 @@ public class WebController {
     @Value("${web.location}")
     private String websiteLocation;
 
+    // TOP LEVEL API (redirects and static files) 
     @RequestMapping(path = { "tile_sources.php", "tile_sources.xml", "tile_sources"}, produces = {"application/xml"})
 	@ResponseBody
     public FileSystemResource tileSourcesXml(@RequestParam(required=false) boolean update, 
@@ -40,5 +41,34 @@ public class WebController {
     		@RequestParam(required=false) String lang) {
         response.setHeader("Location",  "https://"+lang+".wikivoyage.org/wiki/"+title);
         response.setStatus(302); 
+    }
+    
+    // WEBSITE
+    @RequestMapping(path = { "/apps", "/apps.html" })
+    public String apps(HttpServletResponse response) {
+    	// TODO generate static 
+        return "pub/apps.html"; 
+    }
+    
+    @RequestMapping(path = { "/", "/index.html", "/index" })
+    public String index(HttpServletResponse response) {
+    	// TODO generate static 
+        return "pub/index.html"; 
+    }
+    
+    @RequestMapping(path = { "/build_it", "/build_it.html" })
+    public String buildIt(HttpServletResponse response) {
+    	// TODO generate static 
+        return "pub/build_it.html"; 
+    }
+    @RequestMapping(path = { "/dvr", "/dvr.html"  })
+    public String dvr(HttpServletResponse response) {
+    	// TODO generate static 
+        return "pub/dvr.html"; 
+    }
+    @RequestMapping(path = { "/osm_live", "/osm_live.html"  })
+    public String features(HttpServletResponse response) {
+    	// TODO generate static 
+        return "pub/osm_live.html"; 
     }
 }
