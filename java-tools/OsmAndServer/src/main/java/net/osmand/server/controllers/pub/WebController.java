@@ -11,6 +11,8 @@ import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
@@ -61,14 +63,42 @@ public class WebController {
     	// TODO generate static 
         return "pub/build_it.html"; 
     }
+    
     @RequestMapping(path = { "/dvr", "/dvr.html"  })
     public String dvr(HttpServletResponse response) {
     	// TODO generate static 
         return "pub/dvr.html"; 
     }
+    
     @RequestMapping(path = { "/osm_live", "/osm_live.html"  })
-    public String features(HttpServletResponse response) {
+    public String osmlive(HttpServletResponse response) {
     	// TODO generate static 
         return "pub/osm_live.html"; 
+    }
+    
+    @RequestMapping(path = { "/blog", "/blog.html"  })
+    public String blog(HttpServletResponse response) {
+    	// TODO generate static 
+        return "pub/osm_live.html"; 
+    }
+    
+    @RequestMapping(path = { "/features/{articleId}", "/features.html"  })
+    public String featuresSpecific(HttpServletResponse response, @PathVariable(required=false) String articleId,
+    		Model model) {
+    	// TODO generate static 
+    	model.addAttribute("article",articleId);
+        return "pub/features.html"; 
+    }
+    @RequestMapping(path = { "/features", "/features.html"  })
+    public String features(HttpServletResponse response, @RequestParam(required=false) String id,
+    		Model model) {
+    	if(id != null && !id.equals("main")) {
+			response.setHeader("Location", "/features/" + id);
+            response.setStatus(301); 
+            return null;
+    	}
+    	// TODO generate static 
+		model.addAttribute("article", "main");
+        return "pub/features.html"; 
     }
 }
