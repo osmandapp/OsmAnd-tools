@@ -212,10 +212,6 @@ public class DownloadIndexController {
 		if (params.containsKey("road")) {
 			return getFileAsResource("road-indexes", filename);
 		}
-		if (params.containsKey("osmc")) {
-			String folder = filename.substring(0, filename.length() - DATE_AND_EXT_STR_LEN).toLowerCase();
-			return getFileAsResource("osmc" + File.separator + folder, filename);
-		}
 		if (params.containsKey("aosmc")) {
 			String folder = filename.substring(0, filename.length() - DATE_AND_EXT_STR_LEN).toLowerCase();
 			return getFileAsResource("aosmc" + File.separator + folder, filename);
@@ -235,7 +231,8 @@ public class DownloadIndexController {
 		if (params.containsKey("fonts")) {
 			return getFileAsResource("indexes/fonts", filename);
 		}
-		if (params.containsKey("standard")) {
+		Resource res = getFileAsResource("indexes", filename);
+		if (res.exists()) {
 			return getFileAsResource("indexes", filename);
 		}
 		String msg = "Requested resource is missing or request is incorrect.\nRequest parameters: " + params;
