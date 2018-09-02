@@ -29,10 +29,16 @@ public class WebController {
         return new FileSystemResource(new File(websiteLocation, "tile_sources.xml")); 
     }
     
-    @RequestMapping(path = { "go.php", "go"})
+    @RequestMapping(path = { "go" })
     public void webLocation(HttpServletResponse response, HttpServletRequest request) {
-        response.setHeader("Location", "go.html?"
-        		 + request.getQueryString());
+        response.setHeader("Location", "go.html?" + request.getQueryString());
+        response.setStatus(302); 
+    }
+    
+    @RequestMapping(path = { "travel" })
+    public void travel(HttpServletResponse response, @RequestParam(required=false) String title, 
+    		@RequestParam(required=false) String lang) {
+        response.setHeader("Location",  "https://"+lang+".wikivoyage.org/wiki/"+title);
         response.setStatus(302); 
     }
 }
