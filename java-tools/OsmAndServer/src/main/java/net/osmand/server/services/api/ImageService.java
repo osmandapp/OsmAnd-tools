@@ -190,40 +190,26 @@ public class ImageService {
                 && osmImage.contains(WIKI_FILE_PREFIX)));
     }
 
-    private boolean isFileMissing(WikiBatch batch) {
-        WikiPage page = batch.getQuery().getPages().get(0);
-        return page.getMissing() != null && page.getMissing();
-    }
-
-    private boolean isImageInfoMissing(WikiBatch batch) {
-        return batch.getQuery().getPages().get(0).getImageinfo().isEmpty();
-    }
-
-    private ImageInfo getImageInfo(WikiBatch batch) {
-        return batch.getQuery().getPages().get(0).getImageinfo().get(0);
-    }
-
-    private String parseTitle(WikiBatch batch) {
-        String title = batch.getQuery().getPages().get(0).getTitle();
+    private String parseTitle(WikiPage page) {
+        String title = page.getTitle();
         if (title.contains(WIKI_FILE_PREFIX)) {
             title = title.substring(title.indexOf(WIKI_FILE_PREFIX) + 5);
         }
         return title;
     }
 
-    private CameraPlace parseWikimediaImage(double targetLat, double targetLon, String filename, WikiBatch batch) {
-        String title = parseTitle(batch);
-        ImageInfo imageInfo = getImageInfo(batch);
+    private CameraPlace parseWikimediaImage(double targetLat, double targetLon, String filename, 
+    		String title, ImageInfo imageInfo ) {
         CameraPlace.CameraPlaceBuilder builder = new CameraPlace.CameraPlaceBuilder();
         builder.setType("wikimedia-photo");
-        builder.setTimestamp(imageInfo.getTimestamp());
+        builder.setTimestamp(imageInfo.timestamp);
         builder.setKey(filename);
         builder.setTitle(title);
-        builder.setImageUrl(imageInfo.getThumburl());
-        builder.setImageHiresUrl(imageInfo.getUrl());
-        builder.setUrl(imageInfo.getDescriptionurl());
+        builder.setImageUrl(imageInfo.thumburl);
+        builder.setImageHiresUrl(imageInfo.url);
+        builder.setUrl(imageInfo.descriptionurl);
         builder.setExternalLink(false);
-        builder.setUsername(imageInfo.getUser());
+        builder.setUsername(imageInfo.user);
         builder.setLat(targetLat);
         builder.setLon(targetLon);
         return builder.build();
@@ -242,19 +228,19 @@ public class ImageService {
             UriComponentsBuilder uriBuilder = UriComponentsBuilder.fromHttpUrl(WikimediaApiConstants.WIKIMEDIA_API_URL);
             uriBuilder.queryParam(WikimediaApiConstants.WIKIMEDIA_PARAM_TITLES, filename);
             WikiBatch batch = restTemplate.getForObject(uriBuilder.build().toString(), WikiBatch.class);
-            if (batch == null) {
+            if (batch == null || batch.getQuery().getPages().isEmpty()) {
                 return null;
             }
-            if (batch.getQuery().getPages().isEmpty()) {
+            WikiPage page = batch.getQuery().getPages().get(0);
+            if (page.getMissing() ) {
                 return null;
             }
-            if (isFileMissing(batch)) {
+            if (page.getImageinfo() == null || page.getImageinfo().isEmpty() || 
+            		page.getImageinfo().get(0) == null) {
                 return null;
             }
-            if (isImageInfoMissing(batch)) {
-                return null;
-            }
-            primaryImage = parseWikimediaImage(lat, lon, filename, batch);
+            primaryImage = parseWikimediaImage(lat, lon, filename,
+            		parseTitle(page), page.getImageinfo().get(0));
         } else {
             CameraPlace.CameraPlaceBuilder builder = new CameraPlace.CameraPlaceBuilder();
             builder.setType("url-photo");
@@ -290,78 +276,12 @@ public class ImageService {
     
     @JsonInclude(JsonInclude.Include.NON_EMPTY)
     public static class ImageInfo {
-        private String timestamp;
-        private String user;
-        private String thumburl;
-        private Integer thumbwidth;
-        private Integer thumbheight;
-        private String url;
-        private String descriptionurl;
-        private String descriptionshorturl;
+    	public String timestamp;
+        public String user;
+        public String thumburl;
+        public String url;
+        public String descriptionurl;
 
-        public String getTimestamp() {
-            return timestamp;
-        }
-
-        public void setTimestamp(String timestamp) {
-            this.timestamp = timestamp;
-        }
-
-        public String getUser() {
-            return user;
-        }
-
-        public void setUser(String user) {
-            this.user = user;
-        }
-
-        public String getThumburl() {
-            return thumburl;
-        }
-
-        public void setThumburl(String thumburl) {
-            this.thumburl = thumburl;
-        }
-
-        public Integer getThumbwidth() {
-            return thumbwidth;
-        }
-
-        public void setThumbwidth(Integer thumbwidth) {
-            this.thumbwidth = thumbwidth;
-        }
-
-        public Integer getThumbheight() {
-            return thumbheight;
-        }
-
-        public void setThumbheight(Integer thumbheight) {
-            this.thumbheight = thumbheight;
-        }
-
-        public String getUrl() {
-            return url;
-        }
-
-        public void setUrl(String url) {
-            this.url = url;
-        }
-
-        public String getDescriptionurl() {
-            return descriptionurl;
-        }
-
-        public void setDescriptionurl(String descriptionurl) {
-            this.descriptionurl = descriptionurl;
-        }
-
-        public String getDescriptionshorturl() {
-            return descriptionshorturl;
-        }
-
-        public void setDescriptionshorturl(String descriptionshorturl) {
-            this.descriptionshorturl = descriptionshorturl;
-        }
     }
 
     @JsonInclude(JsonInclude.Include.NON_EMPTY)
@@ -403,62 +323,22 @@ public class ImageService {
 
     @JsonInclude(JsonInclude.Include.NON_EMPTY)
     public static class WikiPage {
-        private Integer ns;
         private String title;
-        private Boolean missing;
-        @JsonInclude(JsonInclude.Include.ALWAYS)
-        private String imagerepository;
-        private Long pageid;
+        private boolean missing;
         private List<ImageInfo> imageinfo;
-
-
-        public Integer getNs() {
-            return ns;
-        }
-
-        public void setNs(Integer ns) {
-            this.ns = ns;
-        }
 
         public String getTitle() {
             return title;
-        }
-
-        public void setTitle(String title) {
-            this.title = title;
-        }
-
-        public String getImagerepository() {
-            return imagerepository;
-        }
-
-        public void setImagerepository(String imagerepository) {
-            this.imagerepository = imagerepository;
-        }
-
-        public Long getPageid() {
-            return pageid;
-        }
-
-        public void setPageid(Long pageid) {
-            this.pageid = pageid;
         }
 
         public List<ImageInfo> getImageinfo() {
             return imageinfo;
         }
 
-        public void setImageinfo(List<ImageInfo> imageinfo) {
-            this.imageinfo = imageinfo;
-        }
-
-        public Boolean getMissing() {
+        public boolean getMissing() {
             return missing;
         }
 
-        public void setMissing(Boolean missing) {
-            this.missing = missing;
-        }
     }
 
 }
