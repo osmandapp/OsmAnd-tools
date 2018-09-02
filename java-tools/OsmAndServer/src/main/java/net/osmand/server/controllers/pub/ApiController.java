@@ -41,7 +41,7 @@ public class ApiController {
     private static final String PROC_FILE = "api/.proc_timestamp";
 
     @Value("${files.location}")
-    private String websiteLocation;
+    private String filesLocation;
 
     @Autowired
     private ImageService imageService;
@@ -70,7 +70,7 @@ public class ApiController {
     @GetMapping(path = {"/osmlive_status.php", "/osmlive_status"}, produces = "text/html;charset=UTF-8")
     @ResponseBody
     public String osmLiveStatus() throws IOException  {
-        String procFile = websiteLocation.concat(PROC_FILE);
+        String procFile = filesLocation.concat(PROC_FILE);
         FileSystemResource fsr = new FileSystemResource(procFile);
         if (fsr.exists()) {
             BufferedReader br = new BufferedReader(new InputStreamReader(fsr.getInputStream()));

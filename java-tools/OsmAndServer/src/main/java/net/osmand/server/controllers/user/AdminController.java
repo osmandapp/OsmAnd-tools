@@ -10,8 +10,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
-import net.osmand.server.controllers.pub.DownloadIndexController;
-import net.osmand.server.controllers.pub.DownloadIndexController.DownloadProperties;
+import net.osmand.server.services.api.DownloadIndexesService;
+import net.osmand.server.services.api.DownloadIndexesService.DownloadProperties;
 import net.osmand.server.services.api.MotdService;
 import net.osmand.server.services.api.MotdService.MotdSettings;
 
@@ -42,7 +42,7 @@ public class AdminController {
 	private MotdService motdService;
 	
 	@Autowired
-	private DownloadIndexController downloadControler;
+	private DownloadIndexesService downloadService;
 	
 	@Autowired
 	private ApplicationContext appContext;
@@ -74,7 +74,7 @@ public class AdminController {
 	private List<String> publish() {
 		List<String> errors = new ArrayList<>();
         motdService.reloadconfig(errors);
-        downloadControler.reloadConfig(errors);
+        downloadService.reloadConfig(errors);
 		return errors;
 	}
 
@@ -98,7 +98,7 @@ public class AdminController {
 	}
 
 	private List<Map<String, Object>> getDownloadSettings() {
-		DownloadProperties dProps = downloadControler.getSettings();
+		DownloadProperties dProps = downloadService.getSettings();
 		int ms = dProps.getMainServers().size();
 		int hs = dProps.getHelpServers().size();
 		int mload = ms == 0 ? 0 : dProps.getMainLoad() / ms;

@@ -16,8 +16,12 @@ import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import net.osmand.server.services.api.DownloadIndexesService;
+import net.osmand.server.services.api.DownloadIndexesService.DownloadProperties;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
@@ -43,54 +47,19 @@ public class DownloadIndexController {
 	private static final Log LOGGER = LogFactory.getLog(DownloadIndexController.class);
 
 	private static final int BUFFER_SIZE = 4096;
-	private static final String DOWNLOD_SETTINGS = "api/settings.json";
-
-
-	private DownloadProperties settings;
 	
-    @Value("${web.location}")
-    private String websiteLocation;
+	@Autowired
+	private DownloadIndexesService downloadService;
 	
 	@Value("${files.location}")
 	private String filesPath;
 
-	private ObjectMapper mapper;
-	    
 
-	public DownloadIndexController() {
-		ObjectMapper objectMapper = new ObjectMapper();
-        objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-        objectMapper.configure(DeserializationFeature.UNWRAP_ROOT_VALUE, true);
-
-        this.mapper = objectMapper;
-	}
 	/*
 		DATE_AND_EXT_STR_LEN = "_18_06_02.obf.gz".length()
 	 */
 	private static final int DATE_AND_EXT_STR_LEN = 16;
 
-	@PostConstruct
-	public boolean reloadConfig() {
-		return reloadConfig(new ArrayList<String>());
-	}
-	
-	public boolean reloadConfig(List<String> errors) {
-    	try {
-    		this.settings = mapper.readValue(new File(websiteLocation.concat(DOWNLOD_SETTINGS)),
-    				DownloadProperties.class);
-    	} catch (IOException ex) {
-    		if(errors != null) {
-    			errors.add(DOWNLOD_SETTINGS + " is invalid: " + ex.getMessage());
-    		}
-            LOGGER.warn(ex.getMessage(), ex);
-            return false;
-    	}
-        return true;
-    }
-	
-	public DownloadProperties getSettings() {
-		return settings;
-	}
 
 	private Resource getFileAsResource(String dir, String filename) throws FileNotFoundException {
 		File file = new File(new File(filesPath, dir), filename);
@@ -270,7 +239,7 @@ public class DownloadIndexController {
 							  @RequestHeader HttpHeaders headers,
 							  HttpServletRequest req,
 							  HttpServletResponse resp) throws IOException {
-		DownloadProperties servers = settings;
+		DownloadProperties servers = downloadService.getSettings();
 		InetSocketAddress inetHost = headers.getHost();
 		if (inetHost == null) {
 			resp.sendError(HttpServletResponse.SC_BAD_REQUEST, "Invalid host name");
@@ -287,7 +256,7 @@ public class DownloadIndexController {
 			int random = tlr.nextInt(100);
 			boolean isHelp = computeHelpCondition(params);
 			boolean isLocal = computeLocalCondition(params);
-			if (servers.getHelpServers().size() > 0 && isHelp && random < (100 - settings.getMainLoad())) {
+			if (servers.getHelpServers().size() > 0 && isHelp && random < (100 - servers.getMainLoad())) {
 				String host = servers.getHelpServers().get(random % servers.getHelpServers().size());
 				resp.setStatus(HttpServletResponse.SC_FOUND);
 				resp.setHeader(HttpHeaders.LOCATION, proto + "://" + host + "/download?" + req.getQueryString());
@@ -319,35 +288,5 @@ public class DownloadIndexController {
 		}
 	}
 
-	@JsonRootName("download")
-	public static class DownloadProperties {
-		@JsonProperty("main_load")
-		private int mainLoad;
-		private List<String> helpServers = new ArrayList<>();
-		private List<String> mainServers = new ArrayList<>();
-		
-		@JsonProperty("servers")
-		private void unpackNameFromNestedObject(Map<String, Object> servers) {
-			if(servers.containsKey("help")) {
-				helpServers = (List<String>) servers.get("help");
-			}
-			if (servers.containsKey("main")) {
-				mainServers = (List<String>) servers.get("main");
-			}
-		}
-		
-
-		public List<String> getMainServers() {
-			return mainServers;
-		}
-		
-		public List<String> getHelpServers() {
-			return helpServers;
-		}
-
-		public int getMainLoad() {
-			return mainLoad;
-		}
-
-	}
+	
 }
