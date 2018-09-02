@@ -252,7 +252,6 @@ public class DownloadIndexController {
 	private boolean computeHelpCondition(MultiValueMap<String, String> params) {
 		// "standard", "<empty>", "road" 
 		// "wikivoyage", "wiki"
-		// "aosmc"
 		return !computeOnlyMainCondition(params) && !computeLocalCondition(params);
 	}
 	
@@ -261,7 +260,7 @@ public class DownloadIndexController {
 	}
 
 	private boolean computeLocalCondition(MultiValueMap<String, String> params) {
-		return //isContainAndEqual("aosmc", params)
+		return isContainAndEqual("aosmc", params) ||
 				isContainAndEqual("fonts", params) || isContainAndEqual("inapp", params);
 	}
 
