@@ -1,11 +1,28 @@
 package net.osmand.server.controllers.pub;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
 import java.io.IOException;
+import java.io.Reader;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.Date;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.TimeZone;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+
+import net.osmand.PlatformUtil;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -21,10 +38,15 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.thymeleaf.context.IContext;
 import org.thymeleaf.context.WebContext;
 import org.thymeleaf.spring5.SpringTemplateEngine;
+import org.xmlpull.v1.XmlPullParser;
 
 @Controller
 public class WebController {
     private static final Log LOGGER = LogFactory.getLog(WebController.class);
+
+	private static final int LATEST_ARTICLES_MAIN = 10;
+	private static final int LATEST_ARTICLES_OTHER = 20;
+	private static final int LATEST_ARTICLES_RSS = 15;
 
     @Value("${web.location}")
     private String websiteLocation;
@@ -142,6 +164,88 @@ public class WebController {
         return "pub/help-online.html"; 
     }
     
+    public static class BlogArticle {
+    	public String url;
+    	public String id;
+    	public String shortTitle;
+    	public String title;
+    	public Date pubdate;
+    	public StringBuilder content = new StringBuilder();
+    	public String dateRSS;
+    }
+    
+    private List<BlogArticle> getBlogArticles() {
+    	// TODO cache
+		File folder = new File(websiteLocation, "blog_articles");
+    	File[] files = folder.listFiles();
+    	List<BlogArticle> blogs = new ArrayList<WebController.BlogArticle>();
+    	Pattern pt = Pattern.compile(" (\\w*)=\\\"([^\\\"]*)\\\"");
+    	SimpleDateFormat dateFormat = new SimpleDateFormat("dd-MM-yyyy HH:mm");
+    	SimpleDateFormat gmtDateFormat = new SimpleDateFormat("dd MMM yyyy HH:mm:ss zzz", Locale.ENGLISH);
+    	gmtDateFormat.setTimeZone(TimeZone.getTimeZone("GMT"));
+    	if(files != null) {
+    		for(File f : files) {
+    			
+    			if(f.getName().endsWith(".html") && !f.getName().equals("osmand_videos.html")) {
+    				String id = f.getName().substring(0, f.getName().length() - ".html".length());
+    				try {
+						BlogArticle ba = new BlogArticle();
+						BufferedReader fr = new BufferedReader(new FileReader(f));
+						String meta = fr.readLine();
+						String header;
+						if(!meta.contains("<meta")) {
+							header = meta;
+							// now we don't need not pubdate articles
+							continue;
+						} else {
+							header = fr.readLine();
+							ba.content.append(header);
+							String line;
+							while((line = fr.readLine()) != null) {
+								ba.content.append(line); 
+							}
+						}
+						header = header.substring(header.indexOf(">") + 1);
+						header = header.substring(0, header.indexOf("</"));
+						ba.title = header;
+						ba.url = "/blog/"+id;
+						ba.id = id;
+						Matcher matcher = pt.matcher(meta);
+						Map<String, String> params = new LinkedHashMap<>();
+						while(matcher.find()) {
+							params.put(matcher.group(1), matcher.group(2));
+						}
+						if(params.containsKey("title")) {
+							ba.shortTitle = params.get("title");
+						} else {
+							ba.shortTitle = header;
+						}
+						if(params.containsKey("pubdate")) {
+							ba.pubdate = dateFormat.parse(params.get("pubdate"));
+							ba.dateRSS = gmtDateFormat.format(ba.pubdate);
+							if(ba.pubdate != null) {
+								blogs.add(ba);
+							}
+						}
+						
+						fr.close();
+					} catch (Exception e) {
+						LOGGER.error("Error reading blog file " + f.getName()  + " " + e.getMessage());
+					}
+    			}
+    		}
+    	}
+    	blogs.sort(new Comparator<BlogArticle>() {
+
+			@Override
+			public int compare(BlogArticle o1, BlogArticle o2) {
+				long l1 = o1.pubdate == null ? 0 : o1.pubdate.getTime();
+				long l2 = o2.pubdate == null ? 0 : o2.pubdate.getTime();
+				return -Long.compare(l1, l2);
+			}
+		});
+		return blogs;
+	}
 
     @RequestMapping(path = { "/blog", "/blog.html"  })
     public String blog(HttpServletResponse response, Model model, @RequestParam(required=false) String id) {
@@ -151,16 +255,50 @@ public class WebController {
             return null;
     	}
     	// TODO generate static 
-    	// TODO evaluate
-        model.addAttribute("article", "osmand-3-1-released");
+    	List<BlogArticle> blogs = getBlogArticles();
+    	if(blogs.size() > LATEST_ARTICLES_MAIN) {
+    		blogs = blogs.subList(0, LATEST_ARTICLES_MAIN);
+    	}
+    	model.addAttribute("articles", blogs);
+        model.addAttribute("article", blogs.get(0).id);
         return "pub/blog.html";
+    }
+    
+    @RequestMapping(path = { "/rss", "/rss.xml"  }, produces = "application/rss+xml")
+    public String rss(HttpServletRequest request, HttpServletResponse response,  
+    		Model model, @RequestParam(required=false) String id) {
+    	if(id != null) {
+			response.setHeader("Location", "/blog/" + id);
+            response.setStatus(301); 
+            return null;
+    	}
+    	// TODO generate static 
+    	final IContext ctx = new WebContext(request, response, request.getServletContext());
+    	String cssItem = templateEngine.process("pub/rss_item.css.html", ctx);
+    	List<BlogArticle> blogs = getBlogArticles();
+    	if(blogs.size() > LATEST_ARTICLES_RSS) {
+    		blogs = blogs.subList(0, LATEST_ARTICLES_RSS);
+    	}
+    	for(BlogArticle b : blogs) {
+    		b.content.insert(0, cssItem);
+    	}
+    	model.addAttribute("articles", blogs);
+
+        return "pub/rss.xml";
     }
     
     @RequestMapping(path = { "/blog/{articleId}" })
     public String blogSpecific(HttpServletResponse response, @PathVariable(required=false) String articleId,
     		Model model) {
-    	// TODO generate static 
-    	model.addAttribute("article",articleId);
+    	// TODO generate static
+    	List<BlogArticle> blogs = getBlogArticles();
+    	if(blogs.size() > LATEST_ARTICLES_OTHER) {
+    		blogs = blogs.subList(0, LATEST_ARTICLES_OTHER);
+    	}
+    	model.addAttribute("articles",blogs);
+    	model.addAttribute("article", articleId);
         return "pub/blog.html"; 
     }
+
+	
 }
