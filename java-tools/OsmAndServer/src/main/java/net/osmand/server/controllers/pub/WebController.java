@@ -280,12 +280,30 @@ public class WebController {
     		blogs = blogs.subList(0, LATEST_ARTICLES_RSS);
     	}
     	for(BlogArticle b : blogs) {
-    		b.content.insert(0, cssItem);
+    		String cont = cssItem + b.content.toString();
+    		cont = cont.replace("src=\"/images/", "src=\"https://osmand.net/images/");
+    		cont = cutTags(cont, "script");
+    		cont = cutTags(cont, "iframe");
+    		b.content = new StringBuilder(cont);
     	}
     	model.addAttribute("articles", blogs);
 
         return "pub/rss.xml";
     }
+
+	private String cutTags(String cont, String tag) {
+		boolean changed = true;
+		while(changed) {
+			changed = false;
+			int i = cont.indexOf("<"+tag);
+			int e = cont.indexOf("</"+tag+">");
+			if(i != -1 && e != -1) {
+				cont = cont.substring(0, i) + cont.substring(e + tag.length() + 3);
+				changed = true;
+			}
+		}
+		return cont;
+	}
     
     @RequestMapping(path = { "/blog/{articleId}" })
     public String blogSpecific(HttpServletResponse response, @PathVariable(required=false) String articleId,
