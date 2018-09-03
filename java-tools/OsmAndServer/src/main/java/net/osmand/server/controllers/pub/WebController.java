@@ -2,10 +2,9 @@ package net.osmand.server.controllers.pub;
 
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
-import java.io.Reader;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -15,14 +14,12 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.TimeZone;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-
-import net.osmand.PlatformUtil;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -38,7 +35,6 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.thymeleaf.context.IContext;
 import org.thymeleaf.context.WebContext;
 import org.thymeleaf.spring5.SpringTemplateEngine;
-import org.xmlpull.v1.XmlPullParser;
 
 @Controller
 public class WebController {
@@ -51,9 +47,22 @@ public class WebController {
     @Value("${web.location}")
     private String websiteLocation;
     
+    @Value("${gen.location}")
+    private String genLocation;
+    
 
     @Autowired
     private SpringTemplateEngine templateEngine;
+    
+    private List<BlogArticle> cacheBlogArticles = null;
+    
+    private ConcurrentHashMap<String, GeneratedResource> staticResources = new ConcurrentHashMap<>();
+    
+    public static class GeneratedResource {
+    	public FileSystemResource staticResource;
+    	public String template;
+    	public String targetFile;
+    }
 
 
     // TOP LEVEL API (redirects and static files) 
@@ -65,7 +74,7 @@ public class WebController {
     }
     
     @RequestMapping(path = { "go" })
-    public void webLocation(HttpServletResponse response, HttpServletRequest request) {
+    public void webLocation(HttpServletRequest request, HttpServletResponse response) {
         response.setHeader("Location", "go.html?" + request.getQueryString());
         response.setStatus(302); 
     }
@@ -77,92 +86,184 @@ public class WebController {
         response.setStatus(302); 
     }
     
-    public void clearCaches() {
+    public void reloadConfigs(List<String> errors) {
     	templateEngine.clearTemplateCache();
-    }
-    // WEBSITE
-    @RequestMapping(path = { "/apps", "/apps.html" })
-    public String apps(HttpServletResponse response) {
-    	// TODO generate static 
-        return "pub/apps.html"; 
+    	cacheBlogArticles = null;
+    	staticResources.clear();
     }
     
-    @RequestMapping(path = { "/", "/index.html", "/index" })
-    public String index(HttpServletRequest request, HttpServletResponse response) {
-    	// TODO generate static 
-    	final IContext ctx = new WebContext(request, response, request.getServletContext());
+    private FileSystemResource generateStaticResource(String template, String file, HttpServletRequest request,
+			HttpServletResponse response) {
+    	return generateStaticResource(template, file, request, response, null);
+    }
+    
+    private FileSystemResource generateStaticResource(String template, String file, HttpServletRequest request,
+			HttpServletResponse response, Model model) {
+    	try {
+			GeneratedResource gr = staticResources.get(file);
+			if(gr == null) {
+				gr = new GeneratedResource();
+				File targetFile = new File(genLocation, file);
+				gr.staticResource = new FileSystemResource(targetFile);
+				gr.template = template;
+				final IContext ctx = new WebContext(request, response, 
+						request.getServletContext(), null, model == null ? null : model.asMap());
+				String content = templateEngine.process(template, ctx);
+				writeToFileSync(targetFile, content);
+				staticResources.put(file, gr);
+			}
+			return gr.staticResource;
+		} catch (Exception e) {
+			LOGGER.error(String.format("Error generating template %s to %s", template, file, e.getMessage()));
+			throw new RuntimeException(e);
+		}
+	}
 
-    	String test = templateEngine.process("pub/dvr.html", ctx);
-    	System.out.println(test);    	
-        return "pub/index.html";
+	private synchronized void writeToFileSync(File targetFile, String content) throws IOException {
+		targetFile.getParentFile().mkdirs();
+		FileWriter fw = new FileWriter(targetFile);
+		fw.write(content);
+		fw.close();
+	}
+    
+    // WEBSITE
+    @RequestMapping(path = { "/apps", "/apps.html" })
+    @ResponseBody
+    public FileSystemResource apps(HttpServletRequest request, HttpServletResponse response) {
+        return generateStaticResource("pub/apps.html", "apps.html", request, response); 
+    }
+    
+    
+
+	@RequestMapping(path = { "/", "/index.html", "/index" })
+	@ResponseBody
+    public FileSystemResource index(HttpServletRequest request, HttpServletResponse response) {
+        return generateStaticResource("pub/index.html", "index.html", request, response);
     }
     
     @RequestMapping(path = { "/build_it", "/build_it.html" })
-    public String buildIt(HttpServletResponse response) {
-    	// TODO generate static 
-        return "pub/build_it.html"; 
+    @ResponseBody
+    public FileSystemResource buildIt(HttpServletRequest request, HttpServletResponse response) {
+        return generateStaticResource("pub/build_it.html", "build_it.html", request, response);
     }
     
     @RequestMapping(path = { "/dvr", "/dvr.html"  })
-    public String dvr(HttpServletResponse response) {
-    	// TODO generate static 
-        return "pub/dvr.html"; 
+    @ResponseBody
+    public FileSystemResource dvr(HttpServletRequest request, HttpServletResponse response) {
+        return generateStaticResource("pub/dvr.html", "dvr.html", request, response);
     }
     
     @RequestMapping(path = { "/osm_live", "/osm_live.html"  })
-    public String osmlive(HttpServletResponse response) {
-    	// TODO generate static 
-        return "pub/osm_live.html"; 
+    @ResponseBody
+    public FileSystemResource osmlive(HttpServletRequest request, HttpServletResponse response) {
+        return generateStaticResource("pub/osm_live.html", "osm_live.html", request, response);
     }
     
     @RequestMapping(path = { "/downloads", "/downloads.html"  })
-    public String downloads(HttpServletResponse response) {
-    	// TODO generate static 
-        return "pub/downloads.html"; 
+    @ResponseBody
+    public FileSystemResource downloads(HttpServletRequest request, HttpServletResponse response) {
+        return generateStaticResource("pub/downloads.html", "downloads.html", request, response);
     }
     
     @RequestMapping(path = { "/features/{articleId}" })
-    public String featuresSpecific(HttpServletResponse response, @PathVariable(required=false) String articleId,
+    @ResponseBody
+    public FileSystemResource featuresSpecific(HttpServletRequest request, HttpServletResponse response, @PathVariable(required=false) String articleId,
     		Model model) {
-    	// TODO generate static 
     	model.addAttribute("article",articleId);
-        return "pub/features.html"; 
+    	return generateStaticResource("pub/features.html", "features/"+articleId+".html", request, response, model);
     }
     
     @RequestMapping(path = { "/features", "/features.html"  })
-    public String features(HttpServletResponse response, @RequestParam(required=false) String id,
+    @ResponseBody
+    public FileSystemResource features(HttpServletRequest request, HttpServletResponse response, @RequestParam(required=false) String id,
     		Model model) {
     	if(id != null && !id.equals("main")) {
 			response.setHeader("Location", "/features/" + id);
             response.setStatus(301); 
             return null;
     	}
-    	// TODO generate static 
 		model.addAttribute("article", "main");
-        return "pub/features.html"; 
+		return generateStaticResource("pub/features.html", "features.html", request, response, model);
     }
     
     
     @RequestMapping(path = { "/help-online/{articleId}" })
-    public String helpSpecific(HttpServletResponse response, @PathVariable(required=false) String articleId,
-    		Model model) {
-    	// TODO generate static 
-    	model.addAttribute("article",articleId);
-        return "pub/help-online.html"; 
-    }
+    @ResponseBody
+	public FileSystemResource helpSpecific(HttpServletRequest request, HttpServletResponse response,
+			@PathVariable(required = false) String articleId, Model model) {
+		model.addAttribute("article", articleId);
+		return generateStaticResource("pub/help-online.html", "help-online/" + articleId + ".html", request, response,
+				model);
+	}
     
     @RequestMapping(path = { "/help-online", "/help-online.html"  })
-    public String help(HttpServletResponse response, @RequestParam(required=false) String id,
+    @ResponseBody
+    public FileSystemResource help(HttpServletRequest request, HttpServletResponse response, @RequestParam(required=false) String id,
     		Model model) {
     	if(id != null) {
 			response.setHeader("Location", "/help-online/" + id);
             response.setStatus(301); 
             return null;
     	}
-    	// TODO generate static 
 		model.addAttribute("article", "faq");
-        return "pub/help-online.html"; 
+		return generateStaticResource("pub/help-online.html", "help-online.html", request, response, model);
     }
+
+
+    @RequestMapping(path = { "/blog", "/blog.html"  })
+    @ResponseBody
+    public FileSystemResource blog(HttpServletRequest request, HttpServletResponse response, Model model, @RequestParam(required=false) String id) {
+    	if(id != null) {
+			response.setHeader("Location", "/blog/" + id);
+            response.setStatus(301); 
+            return null;
+    	}
+    	List<BlogArticle> blogs = getBlogArticles(request, response);
+    	if(blogs.size() > LATEST_ARTICLES_MAIN) {
+    		blogs = blogs.subList(0, LATEST_ARTICLES_MAIN);
+    	}
+    	model.addAttribute("articles", blogs);
+        model.addAttribute("article", blogs.get(0).id);
+        return generateStaticResource("pub/blog.html", "blog.html", request, response, model);
+    }
+    
+
+    
+    @RequestMapping(path = { "/blog/{articleId}" })
+    @ResponseBody
+    public FileSystemResource blogSpecific(HttpServletRequest request, HttpServletResponse response, @PathVariable(required=false) String articleId,
+    		Model model) {
+    	List<BlogArticle> blogs = getBlogArticles(request, response);
+    	if(blogs.size() > LATEST_ARTICLES_OTHER) {
+    		blogs = blogs.subList(0, LATEST_ARTICLES_OTHER);
+    	}
+    	model.addAttribute("articles",blogs);
+    	model.addAttribute("article", articleId);
+    	return generateStaticResource("pub/blog.html", "blog/"+articleId+".html", request, response, model);
+    }
+    
+    @RequestMapping(path = { "/rss", "/rss.xml"  }, produces = "application/rss+xml")
+    @ResponseBody
+    public FileSystemResource rss(HttpServletRequest request, HttpServletResponse response,  
+    		Model model, @RequestParam(required=false) String id) {
+    	if(id != null) {
+			response.setHeader("Location", "/blog/" + id);
+            response.setStatus(301); 
+            return null;
+    	}
+    	List<BlogArticle> blogs = getBlogArticles(request, response);
+    	if(blogs.size() > LATEST_ARTICLES_RSS) {
+    		blogs = blogs.subList(0, LATEST_ARTICLES_RSS);
+    	}
+    	
+    	model.addAttribute("articles", blogs);
+    	return generateStaticResource("pub/rss.xml", "rss.xml", request, response, model);
+    }
+
+	
+
+
+    // BLOG articles
     
     public static class BlogArticle {
     	public String url;
@@ -170,19 +271,37 @@ public class WebController {
     	public String shortTitle;
     	public String title;
     	public Date pubdate;
+    	// rss content
     	public StringBuilder content = new StringBuilder();
     	public String dateRSS;
     }
     
-    private List<BlogArticle> getBlogArticles() {
-    	// TODO cache
+    public List<BlogArticle> getBlogArticles(HttpServletRequest request, HttpServletResponse response) {
+    	List<BlogArticle> articles = this.cacheBlogArticles;
+    	if(articles != null) {
+    		return articles;
+    	}
+    	return loadBlogArticles(request, response);
+    }
+    
+
+    private synchronized List<BlogArticle> loadBlogArticles(HttpServletRequest request, HttpServletResponse response) {
+    	List<BlogArticle> blogs = this.cacheBlogArticles;
+    	// double check that it is not retrieved yet
+    	if(blogs != null) {
+    		return blogs;
+    	}
+    	blogs = new ArrayList<WebController.BlogArticle>();
 		File folder = new File(websiteLocation, "blog_articles");
     	File[] files = folder.listFiles();
-    	List<BlogArticle> blogs = new ArrayList<WebController.BlogArticle>();
     	Pattern pt = Pattern.compile(" (\\w*)=\\\"([^\\\"]*)\\\"");
     	SimpleDateFormat dateFormat = new SimpleDateFormat("dd-MM-yyyy HH:mm");
     	SimpleDateFormat gmtDateFormat = new SimpleDateFormat("dd MMM yyyy HH:mm:ss zzz", Locale.ENGLISH);
     	gmtDateFormat.setTimeZone(TimeZone.getTimeZone("GMT"));
+    	
+    	final IContext ctx = new WebContext(request, response, request.getServletContext());
+    	String cssItem = templateEngine.process("pub/rss_item.css.html", ctx);
+    	
     	if(files != null) {
     		for(File f : files) {
     			
@@ -205,6 +324,12 @@ public class WebController {
 								ba.content.append(line); 
 							}
 						}
+				    	String rssContent = cssItem + ba.content.toString();
+				    	rssContent = rssContent.replace("src=\"/images/", "src=\"https://osmand.net/images/");
+				    	rssContent = cutTags(rssContent, "script");
+				    	rssContent = cutTags(rssContent, "iframe");
+				    	ba.content = new StringBuilder(rssContent);
+				    	
 						header = header.substring(header.indexOf(">") + 1);
 						header = header.substring(0, header.indexOf("</"));
 						ba.title = header;
@@ -244,54 +369,11 @@ public class WebController {
 				return -Long.compare(l1, l2);
 			}
 		});
+    	this.cacheBlogArticles = blogs;
 		return blogs;
 	}
-
-    @RequestMapping(path = { "/blog", "/blog.html"  })
-    public String blog(HttpServletResponse response, Model model, @RequestParam(required=false) String id) {
-    	if(id != null) {
-			response.setHeader("Location", "/blog/" + id);
-            response.setStatus(301); 
-            return null;
-    	}
-    	// TODO generate static 
-    	List<BlogArticle> blogs = getBlogArticles();
-    	if(blogs.size() > LATEST_ARTICLES_MAIN) {
-    		blogs = blogs.subList(0, LATEST_ARTICLES_MAIN);
-    	}
-    	model.addAttribute("articles", blogs);
-        model.addAttribute("article", blogs.get(0).id);
-        return "pub/blog.html";
-    }
     
-    @RequestMapping(path = { "/rss", "/rss.xml"  }, produces = "application/rss+xml")
-    public String rss(HttpServletRequest request, HttpServletResponse response,  
-    		Model model, @RequestParam(required=false) String id) {
-    	if(id != null) {
-			response.setHeader("Location", "/blog/" + id);
-            response.setStatus(301); 
-            return null;
-    	}
-    	// TODO generate static 
-    	final IContext ctx = new WebContext(request, response, request.getServletContext());
-    	String cssItem = templateEngine.process("pub/rss_item.css.html", ctx);
-    	List<BlogArticle> blogs = getBlogArticles();
-    	if(blogs.size() > LATEST_ARTICLES_RSS) {
-    		blogs = blogs.subList(0, LATEST_ARTICLES_RSS);
-    	}
-    	for(BlogArticle b : blogs) {
-    		String cont = cssItem + b.content.toString();
-    		cont = cont.replace("src=\"/images/", "src=\"https://osmand.net/images/");
-    		cont = cutTags(cont, "script");
-    		cont = cutTags(cont, "iframe");
-    		b.content = new StringBuilder(cont);
-    	}
-    	model.addAttribute("articles", blogs);
-
-        return "pub/rss.xml";
-    }
-
-	private String cutTags(String cont, String tag) {
+    private String cutTags(String cont, String tag) {
 		boolean changed = true;
 		while(changed) {
 			changed = false;
@@ -304,19 +386,4 @@ public class WebController {
 		}
 		return cont;
 	}
-    
-    @RequestMapping(path = { "/blog/{articleId}" })
-    public String blogSpecific(HttpServletResponse response, @PathVariable(required=false) String articleId,
-    		Model model) {
-    	// TODO generate static
-    	List<BlogArticle> blogs = getBlogArticles();
-    	if(blogs.size() > LATEST_ARTICLES_OTHER) {
-    		blogs = blogs.subList(0, LATEST_ARTICLES_OTHER);
-    	}
-    	model.addAttribute("articles",blogs);
-    	model.addAttribute("article", articleId);
-        return "pub/blog.html"; 
-    }
-
-	
 }

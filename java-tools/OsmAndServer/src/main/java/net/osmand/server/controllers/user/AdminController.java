@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
+import net.osmand.server.controllers.pub.WebController;
 import net.osmand.server.services.api.DownloadIndexesService;
 import net.osmand.server.services.api.DownloadIndexesService.DownloadProperties;
 import net.osmand.server.services.api.MotdService;
@@ -45,6 +46,9 @@ public class AdminController {
 	private DownloadIndexesService downloadService;
 	
 	@Autowired
+	private WebController web;
+	
+	@Autowired
 	private ApplicationContext appContext;
 	
 	@Value("${git.commit.format}")
@@ -75,6 +79,7 @@ public class AdminController {
 		List<String> errors = new ArrayList<>();
         motdService.reloadconfig(errors);
         downloadService.reloadConfig(errors);
+        web.reloadConfigs(errors);
 		return errors;
 	}
 
