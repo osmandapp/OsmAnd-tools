@@ -188,7 +188,7 @@ public class DownloadIndexController {
 			return getFileAsResource("indexes/inapp/"+type, filename);
 		}
 		if (params.containsKey("wikivoyage")) {
-			return getFileAsResource("wiki", filename);
+			return getFileAsResource("wikivoyage", filename);
 		}
 		if (params.containsKey("fonts")) {
 			return getFileAsResource("indexes/fonts", filename);
@@ -249,14 +249,21 @@ public class DownloadIndexController {
 			int random = tlr.nextInt(100);
 			boolean isHelp = computeHelpCondition(params);
 			boolean isLocal = computeLocalCondition(params);
+			String extraParam = "";
+			if (params.containsKey("aosmc") || params.containsKey("osmc")) {
+				String filename = params.getFirst("file");
+				if (filename != null) {
+					extraParam = "&region=" + filename.substring(0, filename.length() - DATE_AND_EXT_STR_LEN).toLowerCase();
+				}
+			}
 			if (servers.getHelpServers().size() > 0 && isHelp && random < (100 - servers.getMainLoad())) {
 				String host = servers.getHelpServers().get(random % servers.getHelpServers().size());
 				resp.setStatus(HttpServletResponse.SC_FOUND);
-				resp.setHeader(HttpHeaders.LOCATION, proto + "://" + host + "/download?" + req.getQueryString());
+				resp.setHeader(HttpHeaders.LOCATION, proto + "://" + host + "/download?" + req.getQueryString() + extraParam);
 			} else if (servers.getMainServers().size() > 0 && !isLocal) {
 				String host = servers.getMainServers().get(random % servers.getMainServers().size());
 				resp.setStatus(HttpServletResponse.SC_FOUND);
-				resp.setHeader(HttpHeaders.LOCATION, proto + "://" + host + "/download?" + req.getQueryString());
+				resp.setHeader(HttpHeaders.LOCATION, proto + "://" + host + "/download?" + req.getQueryString() + extraParam);
 			} else {
 				self = true;
 			}
