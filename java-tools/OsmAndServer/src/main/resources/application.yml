@@ -25,7 +25,9 @@ logging:
 server:
   port: 8080
 
-files.location: ${user.dir}/../../../help/website/
+files.location: ${user.dir}/../../../help/
+gen.location: ${files.location}/gen/
+web.location: ${files.location}/website/
 
 management:
   endpoints:
@@ -42,16 +44,13 @@ spring:
     username: ${DB_USER:test}
     password: ${DB_PWD:test}
   resources:
-    static-locations: file:${user.dir}/../../../help/website/
+    static-locations: file:${web.location}
     cache.period: 1
   thymeleaf:
-    prefix: file:${user.dir}/../../../help/website/templates/
+    prefix: file:${web.location}/templates/
     cache: false
 
 # classpath:/static/
-
-gen.location: ${files.location}/gen/
-web.location: ${files.location}/
 
 mapillary:
   clientid: LXJVNHlDOGdMSVgxZG5mVzlHQ3ZqQTo0NjE5OWRiN2EzNTFkNDg4
@@ -66,7 +65,7 @@ spring.jpa.hibernate.ddl-auto: validate
 
 files.location: /var/www-download/
 gen.location: ${files.location}/gen/
-web.location: ${files.location}/web/
+web.location: ${files.location}/website/
 
 logging:
   file: /var/log/osmand-server-logs/error.log
@@ -84,5 +83,5 @@ server:
 
 spring:
   profiles: production
-  resources.static-locations: file:/var/www-download/web/
-  thymeleaf.prefix: file:/var/www-download/web/templates/
+  resources.static-locations: file:${web.location}
+  thymeleaf.prefix: file:file:${web.location}/templates/

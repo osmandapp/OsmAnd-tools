@@ -145,37 +145,38 @@ public class ImageService {
     }
 
     public CameraPlace processMapillaryData(double lat, double lon, String primaryImageKey,
-                                              Map<String, List<CameraPlace>> resultMap, String host, String proto) {
-        UriComponentsBuilder uriBuilder = UriComponentsBuilder.fromHttpUrl(MapillaryApiConstants.MAPILLARY_API_URL);
-        uriBuilder.queryParam(MapillaryApiConstants.MAPILLARY_PARAM_CLOSE_TO, lon, lat);
-        uriBuilder.queryParam(MapillaryApiConstants.MAPILLARY_PARAM_RADIUS, SEARCH_RADIUS);
-        uriBuilder.queryParam(MapillaryApiConstants.MAPILLARY_PARAM_CLIENT_ID, mapillaryClientId);
-        FeatureCollection featureCollection = restTemplate.getForObject(uriBuilder.build().toString(),
-                FeatureCollection.class);
-        CameraPlace primaryPlace = null;
-        if (featureCollection != null) {
-            for (Feature feature : featureCollection.getFeatures()) {
-                CameraPlace cp = parseFeature(feature, lat, lon, host, proto);
-                if (isPrimaryCameraPlace(cp, primaryImageKey)) {
-                    primaryPlace = cp;
-                    continue;
-                }
-                splitCameraPlaceByAngel(cp, resultMap);
-            }
-        }
-        if (primaryPlace == null && !isEmpty(primaryImageKey)) {
-            try {
-                uriBuilder = UriComponentsBuilder.fromHttpUrl(MapillaryApiConstants.MAPILLARY_API_URL);
-                uriBuilder.path(primaryImageKey).queryParam(MapillaryApiConstants.MAPILLARY_PARAM_CLIENT_ID,
-                        mapillaryClientId);
-                Feature f = restTemplate.getForObject(uriBuilder.build().toString(), Feature.class);
-                primaryPlace = parseFeature(f, lat, lon, host, proto);
-            } catch (RestClientException ex) {
-                LOGGER.error(ex.getMessage(), ex);
-            }
-        }
-        return primaryPlace;
-    }
+			Map<String, List<CameraPlace>> resultMap, String host, String proto) {
+		UriComponentsBuilder uriBuilder = UriComponentsBuilder.fromHttpUrl(MapillaryApiConstants.MAPILLARY_API_URL);
+		uriBuilder.queryParam(MapillaryApiConstants.MAPILLARY_PARAM_CLOSE_TO, lon, lat);
+		uriBuilder.queryParam(MapillaryApiConstants.MAPILLARY_PARAM_RADIUS, SEARCH_RADIUS);
+		uriBuilder.queryParam(MapillaryApiConstants.MAPILLARY_PARAM_CLIENT_ID, mapillaryClientId);
+		CameraPlace primaryPlace = null;
+		try {
+			FeatureCollection featureCollection = restTemplate.getForObject(uriBuilder.build().toString(),
+					FeatureCollection.class);
+			if (featureCollection != null) {
+				for (Feature feature : featureCollection.getFeatures()) {
+					CameraPlace cp = parseFeature(feature, lat, lon, host, proto);
+					if (isPrimaryCameraPlace(cp, primaryImageKey)) {
+						primaryPlace = cp;
+						continue;
+					}
+					splitCameraPlaceByAngel(cp, resultMap);
+				}
+			}
+			if (primaryPlace == null && !isEmpty(primaryImageKey)) {
+
+				uriBuilder = UriComponentsBuilder.fromHttpUrl(MapillaryApiConstants.MAPILLARY_API_URL);
+				uriBuilder.path(primaryImageKey).queryParam(MapillaryApiConstants.MAPILLARY_PARAM_CLIENT_ID,
+						mapillaryClientId);
+				Feature f = restTemplate.getForObject(uriBuilder.build().toString(), Feature.class);
+				primaryPlace = parseFeature(f, lat, lon, host, proto);
+			}
+		} catch (RestClientException ex) {
+			LOGGER.error("Error Mappillary api " + uriBuilder.build().toString() +": " + ex.getMessage());
+		}
+		return primaryPlace;
+	}
 
     private String getFilename(String osmImage) {
         if (osmImage.startsWith(WIKI_FILE_PREFIX)) {
