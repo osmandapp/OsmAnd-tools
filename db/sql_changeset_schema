@@ -10,7 +10,7 @@ CREATE TABLE supporters(userid text, token text, visiblename text, useremail tex
 CREATE TABLE map_users(aid text, email text, updatetime bigint);
 CREATE TABLE email_blocked(email text, reason text, timestamp bigint);
 CREATE TABLE email_unsubscribed(email text, channel text, updatetime bigint);
-CREATE TABLE email_support_survey(ip text, response text, date timestamp);
+CREATE TABLE email_support_survey(ip text, response text, timestamp timestamp);
 
 CREATE TABLE osm_recipients(osmid text, email text, btcaddr text, updatetime bigint);
 CREATE SEQUENCE supporters_seq START 1000;

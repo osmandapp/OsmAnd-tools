@@ -11,6 +11,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.Enumeration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -83,17 +84,16 @@ public class WebController {
     @GetMapping(path = {"/api/email/support_survey.php", "/api/email/support_survey", "support_survey.php", "support_survey"})
     public String emailSupportSurvey(@RequestHeader HttpHeaders headers,
             HttpServletRequest request, @RequestParam(required=false) String response, Model model) throws IOException  {
-    	InetSocketAddress inetAddress = headers.getHost();
-        String host = inetAddress.getHostName();
-        String forwardedHost = headers.getFirst("X-Forwarded-Host");
-        if (forwardedHost != null) {
-            host = forwardedHost;
+    	String remoteAddr = request.getRemoteAddr();
+    	Enumeration<String> hs = request.getHeaders("X-Forwarded-For");
+        if (hs != null && hs.hasMoreElements()) {
+            remoteAddr = hs.nextElement();
         }
         if(response == null) {
         	response = "good";
         } else {
         	EmailSupportSurveyFeedback feedback = new EmailSupportSurveyRepository.EmailSupportSurveyFeedback();
-        	feedback.ip = host;
+        	feedback.ip = remoteAddr;
         	feedback.timestamp = new Date();
         	feedback.response = response;
         	surveyRepo.save(feedback);
