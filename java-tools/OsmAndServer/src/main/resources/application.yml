@@ -43,9 +43,7 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/changeset}
     username: ${DB_USER:test}
     password: ${DB_PWD:test}
-  resources:
-    static-locations: file:${web.location}
-    cache.period: 1
+  resources.static-locations: file:${web.location}
   thymeleaf:
     prefix: file:${web.location}/templates/
     cache: false
