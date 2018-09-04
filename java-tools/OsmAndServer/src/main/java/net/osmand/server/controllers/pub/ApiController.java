@@ -82,7 +82,9 @@ public class ApiController {
         builder.setType(type);
         return builder.build();
     }
-
+    
+    
+    
     @GetMapping(path = {"/osmlive_status.php", "/osmlive_status"}, produces = "text/html;charset=UTF-8")
     @ResponseBody
     public String osmLiveStatus() throws IOException  {
@@ -121,6 +123,8 @@ public class ApiController {
         
         return jsonMapper.writeValueAsString(value);
     }
+    
+    
     
     @GetMapping(path = {"/cm_place.php", "/cm_place"})
     @ResponseBody

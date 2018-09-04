@@ -6,7 +6,12 @@ CREATE TABLE countries(id int, parentid int, name text, fullname text, downloadn
 CREATE TABLE changeset_country(changesetid text, countryid int, small int);
 CREATE TABLE supporters(userid text, token text, visiblename text, useremail text, preferred_region text, disable int);
 
+# mail group
 CREATE TABLE map_users(aid text, email text, updatetime bigint);
+CREATE TABLE email_blocked(email text, reason text, timestamp bigint);
+CREATE TABLE email_unsubscribed(email text, channel text, updatetime bigint);
+CREATE TABLE email_support_survey(ip text, response text, date timestamp);
+
 CREATE TABLE osm_recipients(osmid text, email text, btcaddr text, updatetime bigint);
 CREATE SEQUENCE supporters_seq START 1000;
 ALTER TABLE supporters ADD PRIMARY KEY (userid);

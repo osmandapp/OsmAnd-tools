@@ -5,6 +5,8 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.URLDecoder;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -21,14 +23,23 @@ import java.util.regex.Pattern;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import net.osmand.server.services.api.EmailSupportSurveyRepository;
+import net.osmand.server.services.api.EmailSupportSurveyRepository.EmailSupportSurveyFeedback;
+import net.osmand.server.services.api.EmailUnsubscribedRepository;
+import net.osmand.server.services.api.EmailUnsubscribedRepository.EmailUnsubscribed;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.util.Base64Utils;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
@@ -64,6 +75,56 @@ public class WebController {
     	public String targetFile;
     }
 
+    
+    // TODO move to APIController and delete top level urls
+    @Autowired 
+    EmailSupportSurveyRepository surveyRepo;
+    
+    @GetMapping(path = {"/api/email/support_survey.php", "/api/email/support_survey", "support_survey.php", "support_survey"})
+    public String emailSupportSurvey(@RequestHeader HttpHeaders headers,
+            HttpServletRequest request, @RequestParam(required=false) String response, Model model) throws IOException  {
+    	InetSocketAddress inetAddress = headers.getHost();
+        String host = inetAddress.getHostName();
+        String forwardedHost = headers.getFirst("X-Forwarded-Host");
+        if (forwardedHost != null) {
+            host = forwardedHost;
+        }
+        if(response == null) {
+        	response = "good";
+        } else {
+        	EmailSupportSurveyFeedback feedback = new EmailSupportSurveyRepository.EmailSupportSurveyFeedback();
+        	feedback.ip = host;
+        	feedback.timestamp = new Date();
+        	feedback.response = response;
+        	surveyRepo.save(feedback);
+        }
+        model.addAttribute("response", response); 
+    	return "pub/email/survey";
+    }
+    
+    @Autowired 
+    EmailUnsubscribedRepository unsubscribedRepo;
+    
+    @GetMapping(path = {"/api/email/unsubscribe.php", "/api/email/unsubscribe", "unsubscribe.php", "unsubscribe"}, produces = "text/html;charset=UTF-8")
+    public String emailUnsubscribe(@RequestParam(required=true) String id, @RequestParam(required=false) String group) throws IOException  {
+		String email = new String(Base64Utils.decodeFromString(URLDecoder.decode(id, "UTF-8")));
+    	EmailUnsubscribed ent = new EmailUnsubscribedRepository.EmailUnsubscribed();
+    	ent.timestamp = System.currentTimeMillis() / 1000;
+    	if(group == null) {
+    		group = "all";
+    	}
+    	ent.channel = group;
+    	ent.email = email;
+    	unsubscribedRepo.save(ent);
+    	return "pub/email/unsubscribe";
+    	
+    }
+    @GetMapping(path = {"/api/email/subscribe.php", "/api/email/subscribe", "subscribe.php", "subscribe"}, produces = "text/html;charset=UTF-8")
+    public String emailSubscribe(@RequestParam(required=true) String id, @RequestParam(required=false) String group) throws IOException  {
+		String email = new String(Base64Utils.decodeFromString(URLDecoder.decode(id, "UTF-8")));
+    	unsubscribedRepo.deleteAllByEmail(email);
+    	return "pub/email/subscribe";
+    }
 
     // TOP LEVEL API (redirects and static files) 
     @RequestMapping(path = { "tile_sources.php", "tile_sources.xml", "tile_sources"}, produces = {"application/xml"})
