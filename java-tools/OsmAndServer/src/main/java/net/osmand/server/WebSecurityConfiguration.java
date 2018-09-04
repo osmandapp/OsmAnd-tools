@@ -1,9 +1,13 @@
 package net.osmand.server;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+
+import javax.servlet.http.HttpServletRequest;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -28,6 +32,10 @@ import org.springframework.security.oauth2.config.annotation.web.configuration.E
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
+import org.springframework.security.web.util.matcher.NegatedRequestMatcher;
+import org.springframework.security.web.util.matcher.OrRequestMatcher;
+import org.springframework.security.web.util.matcher.RequestMatcher;
 
 @Configuration
 @EnableOAuth2Client
@@ -50,6 +58,8 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
     public static final String ROLE_USER = "ROLE_USER";
 
 	
+    
+    
     @Override
 	protected void configure(HttpSecurity http) throws Exception {
     	for(String admin: adminEmails.split(",")) {
@@ -57,7 +67,27 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
     	}
     	LOG.info("Admin logins are:" + adminEmailsSet);
     	// http.csrf().disable().antMatcher("/**");
-    	http.csrf().csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse());
+    	Set<String> enabledMethods = new TreeSet<>(
+    			Arrays.asList("GET", "HEAD", "TRACE", "OPTIONS"));
+    	http.csrf().requireCsrfProtectionMatcher(new RequestMatcher() {
+			
+			@Override
+			public boolean matches(HttpServletRequest request) {
+				String method = request.getMethod();
+				if(method != null && !enabledMethods.contains(method)) {
+					String url = request.getServletPath();
+					if (request.getPathInfo() != null) {
+						url += request.getPathInfo();
+					}
+					if(url.startsWith("/api/") || url.startsWith("/subscription/")) {
+						return false;
+					}
+					return true;
+				}
+				return false;
+			}
+		})
+    	.csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse());
     	
     	// all top level are accessible without login
     	http.authorizeRequests().antMatchers("/actuator/**", "/admin/**").hasAuthority(ROLE_ADMIN)
@@ -65,7 +95,11 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
 //    							.antMatchers("/", "/*", "/login/**", "/webjars/**", "/error/**",
 //                                        "/device/*/**", "/download.php*", "/download*", "/api/**").permitAll()
     							.anyRequest().permitAll();
-		http.exceptionHandling().authenticationEntryPoint(new LoginUrlAuthenticationEntryPoint("/login"));
+    	LoginUrlAuthenticationEntryPoint login = new LoginUrlAuthenticationEntryPoint("/login");
+    	if(getApplicationContext().getEnvironment().acceptsProfiles("production")){
+    		login.setForceHttps(true);
+    	}
+		http.exceptionHandling().authenticationEntryPoint(login);
 		http.logout().logoutSuccessUrl("/").permitAll();
 		http.addFilterBefore(ssoFilter(), BasicAuthenticationFilter.class);
     	

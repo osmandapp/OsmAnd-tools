@@ -1,21 +1,20 @@
 package net.osmand.server.controllers.pub;
 
-import net.osmand.server.services.geoip.GeoIpData;
-import net.osmand.server.services.geoip.GeoIpService;
-import net.osmand.server.services.images.CameraPlace;
-import net.osmand.server.services.images.CameraPlaceCollection;
-import net.osmand.server.services.images.ImageService;
-
-import net.osmand.server.services.motd.MotdMessage;
-import net.osmand.server.services.motd.MotdService;
+import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import net.osmand.server.services.api.CameraPlace;
+import net.osmand.server.services.api.ImageService;
+import net.osmand.server.services.api.MotdMessage;
+import net.osmand.server.services.api.MotdService;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
-import org.springframework.data.redis.connection.ReactiveGeoCommands;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -23,11 +22,12 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.InetSocketAddress;
+import java.net.URL;
+import java.net.URLConnection;
 import java.text.ParseException;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -39,17 +39,27 @@ public class ApiController {
 
     private static final String RESULT_MAP_ARR = "arr";
     private static final String RESULT_MAP_HALFVISARR = "halfvisarr";
-    private static final String PROC_FILE = "api/.proc_timestamp";
+    private static final String PROC_FILE = ".proc_timestamp";
 
     @Value("${files.location}")
-    private String websiteLocation;
+    private String filesLocation;
+
+    @Value("${geoip.url}")
+    private String geoipURL;
 
     @Autowired
     private ImageService imageService;
+
     @Autowired
     private MotdService motdService;
-    @Autowired
-    private GeoIpService geoIpService;
+
+	private ObjectMapper jsonMapper;
+
+    private ApiController() {
+    	 ObjectMapper mapper = new ObjectMapper();
+    	 this.jsonMapper = mapper;
+    }
+
 
     private List<CameraPlace> sortByDistance(List<CameraPlace> arr) {
         return arr.stream().sorted(Comparator.comparing(CameraPlace::getDistance)).collect(Collectors.toList());
@@ -64,7 +74,7 @@ public class ApiController {
     @GetMapping(path = {"/osmlive_status.php", "/osmlive_status"}, produces = "text/html;charset=UTF-8")
     @ResponseBody
     public String osmLiveStatus() throws IOException  {
-        String procFile = websiteLocation.concat(PROC_FILE);
+        String procFile = filesLocation.concat(PROC_FILE);
         FileSystemResource fsr = new FileSystemResource(procFile);
         if (fsr.exists()) {
             BufferedReader br = new BufferedReader(new InputStreamReader(fsr.getInputStream()));
@@ -74,17 +84,43 @@ public class ApiController {
         throw new RuntimeException("File not found at " + procFile);
     }
 
+    @GetMapping(path = {"/geo-ip"}, produces = "application/json")
+    @ResponseBody
+    public String findGeoIP(HttpServletRequest request) throws JsonParseException, JsonMappingException, IOException{
+    	String remoteAddr = request.getRemoteAddr();
+    	Enumeration<String> hs = request.getHeaders("X-Forwarded-For");
+        if (hs != null && hs.hasMoreElements()) {
+            remoteAddr = hs.nextElement();
+        }
+        URLConnection conn = new URL(geoipURL + remoteAddr).openConnection();
+        TypeReference<HashMap<String,Object>> typeRef = new TypeReference<HashMap<String,Object>>() {};
+        HashMap<String,Object> value = jsonMapper.readValue(conn.getInputStream(), typeRef);
+        conn.getInputStream().close();
+        if(value.containsKey("lat") && !value.containsKey("latitude")) {
+        	value.put("latitude", value.get("lat"));
+        } else if(!value.containsKey("lat") && value.containsKey("latitude")) {
+        	value.put("lat", value.get("latitude"));
+        }
+        if(value.containsKey("lon") && !value.containsKey("longitude")) {
+        	value.put("longitude", value.get("lon"));
+        } else if(!value.containsKey("lon") && value.containsKey("longitude")) {
+        	value.put("lon", value.get("longitude"));
+        }
+
+        return jsonMapper.writeValueAsString(value);
+    }
+
     @GetMapping(path = {"/cm_place.php", "/cm_place"})
     @ResponseBody
-    public CameraPlaceCollection getCmPlace(@RequestParam("lat") double lat,
+    public String getCmPlace(@RequestParam("lat") double lat,
                                             @RequestParam("lon") double lon,
-                                            @RequestParam(value = "myLocation", required = false) String myLocation,
+                                            @RequestParam(value = "mloc", required = false) String mloc,
                                             @RequestParam(value = "app", required = false) String app,
                                             @RequestParam(value = "lang", required = false) String lang,
                                             @RequestParam(value = "osm_image", required = false) String osmImage,
                                             @RequestParam(value = "osm_mapillary_key", required = false) String osmMapillaryKey,
                                             @RequestHeader HttpHeaders headers,
-                                            HttpServletRequest request) {
+                                            HttpServletRequest request) throws JsonProcessingException {
         InetSocketAddress inetAddress = headers.getHost();
         String host = inetAddress.getHostName();
         String proto = request.getScheme();
@@ -98,7 +134,7 @@ public class ApiController {
         }
         if (host == null) {
             LOGGER.error("Bad request. Host is null");
-            return new CameraPlaceCollection();
+			return "{" + jsonMapper.writeValueAsString("features") + ":[]}";
         }
         Map<String, List<CameraPlace>> result = new HashMap<>();
 
@@ -124,7 +160,8 @@ public class ApiController {
         if (!arr.isEmpty()) {
             arr.add(createEmptyCameraPlaceWithTypeOnly("mapillary-contribute"));
         }
-        return new CameraPlaceCollection(arr);
+        return "{"+jsonMapper.writeValueAsString("features")+
+        			":"+jsonMapper.writeValueAsString(arr)+"}";
     }
 
     @GetMapping(path = {"/mapillary/get_photo.php", "/mapillary/get_photo"})
@@ -152,28 +189,23 @@ public class ApiController {
 
     @GetMapping(path = {"/motd", "/motd.php"})
     @ResponseBody
-    public ResponseEntity<MotdMessage> getMessage(@RequestParam(required = false) String version,
+    public String getMessage(@RequestParam(required = false) String version,
                              @RequestParam(required = false) Integer nd,
                              @RequestParam(required = false) Integer ns,
                              @RequestParam(required = false) String lang,
                              @RequestParam(required = false) String os,
                              @RequestParam(required = false) String aid,
                              @RequestParam(required = false) String discount,
-                             @RequestHeader HttpHeaders headers) throws IOException, ParseException {
-        MotdMessage body = motdService.getMessage(version, os, headers);
+                             @RequestHeader HttpHeaders headers,
+                             HttpServletRequest request) throws IOException, ParseException {
+    	String remoteAddr = request.getRemoteAddr();
+        if (headers.getFirst("X-Forwarded-For") != null) {
+            remoteAddr = headers.getFirst("X-Forwarded-For");
+        }
+        MotdMessage body = motdService.getMessage(version, os, remoteAddr);
         if (body != null) {
-            return ResponseEntity.ok(body);
+            return jsonMapper.writeValueAsString(body);
         }
-        return ResponseEntity.noContent().build();
-    }
-
-    @GetMapping(path = {"/geo-ip", "/geo-ip.php"})
-    @ResponseBody
-    public GeoIpData getGeoIpData(@RequestHeader HttpHeaders headers) {
-        String address =  headers.getFirst("X-Forwarded-For");
-        if (address == null) {
-            address = headers.getHost().getAddress().toString();
-        }
-        return geoIpService.getGeoIpData(address);
+        return "{}";
     }
 }

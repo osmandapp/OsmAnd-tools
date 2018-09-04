@@ -46,6 +46,7 @@ spring:
     cache.period: 1
   thymeleaf:
     prefix: file:${user.dir}/../../../help/website/templates/
+    cache: false
 
 # classpath:/static/
 
@@ -58,22 +59,14 @@ mapillary:
 monitoring:
   enabled: ${ENABLE_MONITORING:false}
 
+geoip.url: "http://localhost:8081/json/"
+
 ---
 spring.jpa.hibernate.ddl-auto: validate
 
 files.location: /var/www-download/
-download:
-  servers:
-    main:
-      - dl6.osmand.net
-    help:
-      - dl1.osmand.net
-      - dl4.osmand.net
-  files: /var/www-download/
-  load: 60
-
----
-spring.jpa.hibernate.ddl-auto: validate
+gen.location: ${files.location}/gen/
+web.location: ${files.location}/web/
 
 logging:
   file: /var/log/osmand-server-logs/error.log
@@ -93,7 +86,3 @@ spring:
   profiles: production
   resources.static-locations: file:/var/www-download/web/
   thymeleaf.prefix: file:/var/www-download/web/templates/
-
-files.location: /var/www-download/
-gen.location: ${files.location}/gen/
-web.location: ${files.location}/web/

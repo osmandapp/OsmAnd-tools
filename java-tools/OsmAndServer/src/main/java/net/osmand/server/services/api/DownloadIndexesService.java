@@ -1,4 +1,4 @@
-package net.osmand.server.services.index;
+package net.osmand.server.services.api;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -11,6 +11,7 @@ import java.util.zip.GZIPOutputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
+import javax.annotation.PostConstruct;
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBException;
 import javax.xml.bind.Marshaller;
@@ -23,18 +24,63 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonRootName;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 @Service
 public class DownloadIndexesService  {
 	
 	private static final Log LOGGER = LogFactory.getLog(DownloadIndexesService.class);
 
 	private static final String INDEX_FILE = "indexes.xml";
+	private static final String DOWNLOD_SETTINGS = "api/settings.json";
 	
 	@Value("${files.location}")
     private String pathToDownloadFiles;
 	
 	@Value("${gen.location}")
 	private String pathToGenFiles;
+	
+	@Value("${web.location}")
+    private String websiteLocation;
+
+	private ObjectMapper mapper;
+
+	private DownloadProperties settings;
+	
+	public DownloadIndexesService() {
+		ObjectMapper objectMapper = new ObjectMapper();
+        objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        objectMapper.configure(DeserializationFeature.UNWRAP_ROOT_VALUE, true);
+
+        this.mapper = objectMapper;
+	}
+	
+	@PostConstruct
+	public boolean reloadConfig() {
+		return reloadConfig(new ArrayList<String>());
+	}
+	
+	public DownloadProperties getSettings() {
+		return settings;
+	}
+	
+	public boolean reloadConfig(List<String> errors) {
+    	try {
+    		this.settings = mapper.readValue(new File(websiteLocation.concat(DOWNLOD_SETTINGS)),
+    				DownloadProperties.class);
+    	} catch (IOException ex) {
+    		if(errors != null) {
+    			errors.add(DOWNLOD_SETTINGS + " is invalid: " + ex.getMessage());
+    		}
+            LOGGER.warn(ex.getMessage(), ex);
+            return false;
+    	}
+        return true;
+    }
+	
 	
 
 	// 15 minutes
@@ -45,48 +91,17 @@ public class DownloadIndexesService  {
 	
 	public DownloadIndexDocument loadDownloadIndexes() {
 		DownloadIndexDocument doc = new DownloadIndexDocument();
-		List<DownloadIndex> list = new ArrayList<>();
 		File rootFolder = new File(pathToDownloadFiles);
-
-		loadIndexesFromDir(list, rootFolder, "indexes", DownloadType.MAP);
-		doc.getMaps().addAll(list);
-		list.clear();
-
-		loadIndexesFromDir(list, rootFolder, ".", DownloadType.MAP);
-		doc.getMaps().addAll(list);
-		list.clear();
-
-		loadIndexesFromDir(list, rootFolder, "indexes", DownloadType.VOICE);
-		doc.getVoices().addAll(list);
-		list.clear();
-
-		loadIndexesFromDir(list, rootFolder, "indexes/fonts", DownloadType.FONTS);
-		doc.getFonts().addAll(list);
-		list.clear();
-
-		loadIndexesFromDir(list, rootFolder, "indexes/inapp/depth", DownloadType.DEPTH);
-		doc.getInapps().addAll(list);
-		list.clear();
-
-		loadIndexesFromDir(list, rootFolder, "wiki", DownloadType.WIKIMAP);
-		doc.getWikimaps().addAll(list);
-		list.clear();
-
-		loadIndexesFromDir(list, rootFolder, "wikivoyage", DownloadType.WIKIVOYAGE);
-		doc.getWikivoyages().addAll(list);
-		list.clear();
-
-		loadIndexesFromDir(list, rootFolder, "road-indexes", DownloadType.ROAD_MAP);
-		doc.getRoadMaps().addAll(list);
-		list.clear();
-
-		loadIndexesFromDir(list, rootFolder, "srtm-countries", DownloadType.SRTM_MAP);
-		doc.getSrtmMaps().addAll(list);
-		list.clear();
-
-		loadIndexesFromDir(list, rootFolder, "hillshade", DownloadType.HILLSHADE);
-		doc.getHillshade().addAll(list);
-		list.clear();
+		loadIndexesFromDir(doc.getMaps(), rootFolder, "indexes", DownloadType.MAP);
+		loadIndexesFromDir(doc.getMaps(), rootFolder, ".", DownloadType.MAP);
+		loadIndexesFromDir(doc.getVoices(), rootFolder, "indexes", DownloadType.VOICE);
+		loadIndexesFromDir(doc.getFonts(), rootFolder, "indexes/fonts", DownloadType.FONTS);
+		loadIndexesFromDir(doc.getInapps(), rootFolder, "indexes/inapp/depth", DownloadType.DEPTH);
+		loadIndexesFromDir(doc.getWikimaps(), rootFolder, "wiki", DownloadType.WIKIMAP);
+		loadIndexesFromDir(doc.getWikivoyages(), rootFolder, "wikivoyage", DownloadType.WIKIVOYAGE);
+		loadIndexesFromDir(doc.getRoadMaps(), rootFolder, "road-indexes", DownloadType.ROAD_MAP);
+		loadIndexesFromDir(doc.getSrtmMaps(), rootFolder, "srtm-countries", DownloadType.SRTM_MAP);
+		loadIndexesFromDir(doc.getHillshade(), rootFolder, "hillshade", DownloadType.HILLSHADE);
 		return doc;
 	}
 	
@@ -288,5 +303,38 @@ public class DownloadIndexesService  {
 	    public String getType() {
 	    	return name().toLowerCase();
 	    }
+	}
+	
+	@JsonRootName("download")
+	public static class DownloadProperties {
+		@JsonProperty("main_load")
+		private int mainLoad;
+		private List<String> helpServers = new ArrayList<>();
+		private List<String> mainServers = new ArrayList<>();
+		
+		@SuppressWarnings("unchecked")
+		@JsonProperty("servers")
+		private void unpackNameFromNestedObject(Map<String, Object> servers) {
+			if(servers.containsKey("help")) {
+				helpServers = (List<String>) servers.get("help");
+			}
+			if (servers.containsKey("main")) {
+				mainServers = (List<String>) servers.get("main");
+			}
+		}
+		
+
+		public List<String> getMainServers() {
+			return mainServers;
+		}
+		
+		public List<String> getHelpServers() {
+			return helpServers;
+		}
+
+		public int getMainLoad() {
+			return mainLoad;
+		}
+
 	}
 }

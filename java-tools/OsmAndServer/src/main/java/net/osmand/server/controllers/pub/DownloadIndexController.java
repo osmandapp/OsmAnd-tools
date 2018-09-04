@@ -6,7 +6,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -14,12 +13,13 @@ import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import net.osmand.server.services.api.DownloadIndexesService;
+import net.osmand.server.services.api.DownloadIndexesService.DownloadProperties;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -39,18 +39,14 @@ public class DownloadIndexController {
 	private static final Log LOGGER = LogFactory.getLog(DownloadIndexController.class);
 
 	private static final int BUFFER_SIZE = 4096;
-
-
-	private final DownloadProperties config;
+	
+	@Autowired
+	private DownloadIndexesService downloadService;
 	
 	@Value("${files.location}")
 	private String filesPath;
-	    
 
-	@Autowired
-	public DownloadIndexController(DownloadProperties config) {
-		this.config = config;
-	}
+
 	/*
 		DATE_AND_EXT_STR_LEN = "_18_06_02.obf.gz".length()
 	 */
@@ -177,10 +173,6 @@ public class DownloadIndexController {
 		if (params.containsKey("road")) {
 			return getFileAsResource("road-indexes", filename);
 		}
-		if (params.containsKey("osmc")) {
-			String folder = filename.substring(0, filename.length() - DATE_AND_EXT_STR_LEN).toLowerCase();
-			return getFileAsResource("osmc" + File.separator + folder, filename);
-		}
 		if (params.containsKey("aosmc")) {
 			String folder = filename.substring(0, filename.length() - DATE_AND_EXT_STR_LEN).toLowerCase();
 			return getFileAsResource("aosmc" + File.separator + folder, filename);
@@ -200,7 +192,8 @@ public class DownloadIndexController {
 		if (params.containsKey("fonts")) {
 			return getFileAsResource("indexes/fonts", filename);
 		}
-		if (params.containsKey("standard")) {
+		Resource res = getFileAsResource("indexes", filename);
+		if (res.exists()) {
 			return getFileAsResource("indexes", filename);
 		}
 		String msg = "Requested resource is missing or request is incorrect.\nRequest parameters: " + params;
@@ -217,18 +210,19 @@ public class DownloadIndexController {
 		return isContainAndEqual(param, "yes", params);
 	}
 
-	private boolean computeSimpleCondition(MultiValueMap<String, String> params) {
-		return isContainAndEqual("wiki", params)
-				|| isContainAndEqual("standard", params)
-				|| isContainAndEqual("road", params)
-				|| isContainAndEqual("wikivoyage", params);
+	private boolean computeHelpCondition(MultiValueMap<String, String> params) {
+		// "standard", "<empty>", "road" 
+		// "wikivoyage", "wiki"
+		return !computeOnlyMainCondition(params) && !computeLocalCondition(params);
+	}
+	
+	private boolean computeOnlyMainCondition(MultiValueMap<String, String> params) {
+		return isContainAndEqual("srtmcountry", params) || isContainAndEqual("hillshade", params);
 	}
 
 	private boolean computeLocalCondition(MultiValueMap<String, String> params) {
-		return isContainAndEqual("osmc", params)
-				|| isContainAndEqual("aosmc", params)
-				|| isContainAndEqual("fonts", params)
-				|| isContainAndEqual("inapp", params);
+		return isContainAndEqual("aosmc", params) ||
+				isContainAndEqual("fonts", params) || params.getFirst("inapp") != null;
 	}
 
 	@RequestMapping(value = {"/download.php", "/download"}, method = RequestMethod.GET)
@@ -237,7 +231,7 @@ public class DownloadIndexController {
 							  @RequestHeader HttpHeaders headers,
 							  HttpServletRequest req,
 							  HttpServletResponse resp) throws IOException {
-		DownloadProperties.DownloadServers servers = config.getServers();
+		DownloadProperties servers = downloadService.getSettings();
 		InetSocketAddress inetHost = headers.getHost();
 		if (inetHost == null) {
 			resp.sendError(HttpServletResponse.SC_BAD_REQUEST, "Invalid host name");
@@ -252,13 +246,14 @@ public class DownloadIndexController {
 		if (!self) {
 			ThreadLocalRandom tlr = ThreadLocalRandom.current();
 			int random = tlr.nextInt(100);
-			boolean isSimple = computeSimpleCondition(params);
-			if (servers.getHelp().size() > 0 && isSimple && random < (100 - config.getLoad())) {
-				String host = servers.getHelp().get(random % servers.getHelp().size());
+			boolean isHelp = computeHelpCondition(params);
+			boolean isLocal = computeLocalCondition(params);
+			if (servers.getHelpServers().size() > 0 && isHelp && random < (100 - servers.getMainLoad())) {
+				String host = servers.getHelpServers().get(random % servers.getHelpServers().size());
 				resp.setStatus(HttpServletResponse.SC_FOUND);
 				resp.setHeader(HttpHeaders.LOCATION, proto + "://" + host + "/download?" + req.getQueryString());
-			} else if (servers.getMain().size() > 0) {
-				String host = servers.getMain().get(random % servers.getMain().size());
+			} else if (servers.getMainServers().size() > 0 && !isLocal) {
+				String host = servers.getMainServers().get(random % servers.getMainServers().size());
 				resp.setStatus(HttpServletResponse.SC_FOUND);
 				resp.setHeader(HttpHeaders.LOCATION, proto + "://" + host + "/download?" + req.getQueryString());
 			} else {
@@ -285,57 +280,5 @@ public class DownloadIndexController {
 		}
 	}
 
-	@Configuration
-	@ConfigurationProperties(prefix = "download")
-	public static class DownloadProperties {
-		private int load;
-		private DownloadServers servers = new DownloadServers();
-
-		public int getLoad() {
-			return load;
-		}
-
-		public void setLoad(int load) {
-			this.load = load;
-		}
-
-		public DownloadServers getServers() {
-			return servers;
-		}
-
-		public void setServers(DownloadServers servers) {
-			this.servers = servers;
-		}
-
-		public static class DownloadServers {
-			private List<String> self = new ArrayList<>();
-			private List<String> help = new ArrayList<>();
-			private List<String> main = new ArrayList<>();
-
-			public List<String> getSelf() {
-				return self;
-			}
-
-			public void setSelf(List<String> self) {
-				this.self = self;
-			}
-
-
-			public List<String> getHelp() {
-				return help;
-			}
-
-			public void setHelp(List<String> help) {
-				this.help = help;
-			}
-
-			public List<String> getMain() {
-				return main;
-			}
-
-			public void setMain(List<String> main) {
-				this.main = main;
-			}
-		}
-	}
+	
 }

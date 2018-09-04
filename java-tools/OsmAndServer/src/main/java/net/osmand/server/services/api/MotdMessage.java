@@ -1,4 +1,4 @@
-package net.osmand.server.services.motd;
+package net.osmand.server.services.api;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;

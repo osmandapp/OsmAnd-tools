@@ -1,4 +1,4 @@
-package net.osmand.server.services.index;
+package net.osmand.server.services.api;
 
 import javax.xml.bind.annotation.XmlAttribute;
 import javax.xml.bind.annotation.XmlElement;
