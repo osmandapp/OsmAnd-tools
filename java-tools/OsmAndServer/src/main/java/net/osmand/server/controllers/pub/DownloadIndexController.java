@@ -218,12 +218,14 @@ public class DownloadIndexController {
 	}
 	
 	private boolean computeOnlyMainCondition(MultiValueMap<String, String> params) {
-		return isContainAndEqual("srtmcountry", params) || isContainAndEqual("hillshade", params);
+		return isContainAndEqual("srtmcountry", params) || isContainAndEqual("hillshade", params) ||
+				// allow all files
+				isContainAndEqual("aosmc", params) || isContainAndEqual("osmc", params) ||
+				isContainAndEqual("fonts", params) || params.getFirst("inapp") != null;
 	}
 
 	private boolean computeLocalCondition(MultiValueMap<String, String> params) {
-		return isContainAndEqual("aosmc", params) || isContainAndEqual("osmc", params) ||
-				isContainAndEqual("fonts", params) || params.getFirst("inapp") != null;
+		return false;
 	}
 
 	@RequestMapping(value = {"/download.php", "/download"}, method = RequestMethod.GET)
