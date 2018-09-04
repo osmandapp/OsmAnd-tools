@@ -1,7 +1,10 @@
 package net.osmand.server.controllers.user;
 
+import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
@@ -16,6 +19,8 @@ import net.osmand.server.services.api.DownloadIndexesService.DownloadProperties;
 import net.osmand.server.services.api.MotdService;
 import net.osmand.server.services.api.MotdService.MotdSettings;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationContext;
@@ -38,6 +43,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 @RequestMapping("/admin")
 @PropertySource("classpath:git.properties")
 public class AdminController {
+	private static final Log LOGGER = LogFactory.getLog(AdminController.class);
 
 	@Autowired
 	private MotdService motdService;
@@ -52,9 +58,14 @@ public class AdminController {
 	private ApplicationContext appContext;
 	
 	@Value("${git.commit.format}")
-	private String commit;
+	private String serverCommit;
+	
+	@Value("${web.location}")
+	private String websiteLocation;
 
 	protected ObjectMapper mapper;
+	
+	private static final String GIT_LOG_CMD = "git log -1 --pretty=format:\"%h%x09%an%x09%ad%x09%s\"";
 	
 	public AdminController() {
 		ObjectMapper objectMapper = new ObjectMapper();
@@ -80,6 +91,7 @@ public class AdminController {
         motdService.reloadconfig(errors);
         downloadService.reloadConfig(errors);
         web.reloadConfigs(errors);
+        runCmd("git pull", new File(websiteLocation), errors);
 		return errors;
 	}
 
@@ -87,8 +99,9 @@ public class AdminController {
 	@RequestMapping("/info")
 	public String index(Model model) {
 		model.addAttribute("server_startup", String.format("%1$tF %1$tR", new Date(appContext.getStartupDate())));
-		model.addAttribute("server_commit", commit);
-		model.addAttribute("web_commit", "TODO");
+		model.addAttribute("server_commit", serverCommit);
+		String commit = runCmd(GIT_LOG_CMD, new File(websiteLocation), null);
+		model.addAttribute("web_commit", commit);
 		if(!model.containsAttribute("update_status")) {
 			model.addAttribute("update_status", "OK");
 	        model.addAttribute("update_errors", "");
@@ -100,6 +113,31 @@ public class AdminController {
 		List<Map<String, Object>> list = getDownloadSettings();
 		model.addAttribute("downloadServers", list);
 		return "admin/info";
+	}
+
+	private String runCmd(String cmd, File loc, List<String> errors) {
+		try {
+			Process p = Runtime.getRuntime().exec(cmd.split(" "), new String[0], loc);
+			BufferedReader stdInput = new BufferedReader(new InputStreamReader(p.getInputStream()));
+//			BufferedReader stdError = new BufferedReader(new InputStreamReader(p.getErrorStream()));
+			String s, commit = null;
+			// read the output from the command
+			while ((s = stdInput.readLine()) != null) {
+				if (commit == null) {
+					commit = s;
+				}
+			}
+
+			p.waitFor();
+			return commit;
+		} catch (Exception e) {
+			String fmt = String.format("Error running %s: %s", cmd, e.getMessage());
+			LOGGER.warn(fmt);
+			if(errors != null) {
+				errors.add(fmt);
+			}
+			return null;
+		}
 	}
 
 	private List<Map<String, Object>> getDownloadSettings() {
