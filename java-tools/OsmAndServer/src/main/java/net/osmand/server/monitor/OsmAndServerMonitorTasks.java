@@ -196,13 +196,11 @@ public class OsmAndServerMonitorTasks {
 				downloadTests.put(host, res);
 			}
 			try {
-				url = new URL((host.equals("download.osmand.net") ? "https://" : "https://") + host
-						+ "/download?standard=yes&file=Angola_africa_2.obf.zip");
+				url = new URL("https://" + host + "/download?standard=yes&file=Angola_africa_2.obf.zip");
 				// on download servers there is a glitch that randomly it starts downloading very slow, so let's take 3 measurements
 				double spd1 = downloadSpeed(url);
 				double spd2 = downloadSpeed(url);
-				double spd3 = downloadSpeed(url);
-				res.addSpeedMeasurement(Math.max(Math.max(spd1, spd2), spd3));
+				res.addSpeedMeasurement(Math.max(spd1, spd2));
 				if (!res.lastSuccess) {
 					telegram.sendMonitoringAlertMessage(host + " OK. Maps download works fine");
 				}
