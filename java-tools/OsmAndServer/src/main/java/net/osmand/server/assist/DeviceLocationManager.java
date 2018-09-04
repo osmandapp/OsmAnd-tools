@@ -5,17 +5,17 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.Map.Entry;
 import java.util.Optional;
+import java.util.Random;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
-import net.osmand.server.assist.data.DeviceBean;
 import net.osmand.server.assist.data.Device;
+import net.osmand.server.assist.data.DeviceBean;
 import net.osmand.server.assist.data.DeviceRepository;
 import net.osmand.server.assist.data.LocationInfo;
 import net.osmand.server.assist.data.TrackerConfiguration;
@@ -30,7 +30,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.bind.annotation.ResponseStatus;
-import org.telegram.telegrambots.exceptions.TelegramApiException;
 
 import com.google.gson.JsonParser;
 

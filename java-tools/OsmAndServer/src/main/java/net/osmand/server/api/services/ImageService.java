@@ -1,4 +1,4 @@
-package net.osmand.server.services.api;
+package net.osmand.server.api.services;
 
 import java.util.List;
 import java.util.Map;

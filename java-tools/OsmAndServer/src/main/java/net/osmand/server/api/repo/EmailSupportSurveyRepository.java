@@ -1,4 +1,4 @@
-package net.osmand.server.services.api;
+package net.osmand.server.api.repo;
 
 import java.io.Serializable;
 import java.util.Date;
@@ -11,8 +11,8 @@ import javax.persistence.Table;
 import javax.persistence.Temporal;
 import javax.persistence.TemporalType;
 
-import net.osmand.server.services.api.EmailSupportSurveyRepository.EmailSupportSurveyFeedback;
-import net.osmand.server.services.api.EmailSupportSurveyRepository.EmailSupportSurveyFeedbackKey;
+import net.osmand.server.api.repo.EmailSupportSurveyRepository.EmailSupportSurveyFeedback;
+import net.osmand.server.api.repo.EmailSupportSurveyRepository.EmailSupportSurveyFeedbackKey;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;

@@ -1,4 +1,4 @@
-package net.osmand.server.services.api;
+package net.osmand.server.api.repo;
 
 import java.io.Serializable;
 
@@ -9,8 +9,8 @@ import javax.persistence.IdClass;
 import javax.persistence.Table;
 import javax.transaction.Transactional;
 
-import net.osmand.server.services.api.EmailUnsubscribedRepository.EmailUnsubscribed;
-import net.osmand.server.services.api.EmailUnsubscribedRepository.EmailUnsubscribedKey;
+import net.osmand.server.api.repo.EmailUnsubscribedRepository.EmailUnsubscribed;
+import net.osmand.server.api.repo.EmailUnsubscribedRepository.EmailUnsubscribedKey;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;

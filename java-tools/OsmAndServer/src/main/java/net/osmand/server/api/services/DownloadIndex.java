@@ -1,14 +1,14 @@
-package net.osmand.server.services.api;
+package net.osmand.server.api.services;
 
-import net.osmand.server.services.api.DownloadIndexesService.DownloadType;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
 
 import javax.xml.bind.annotation.XmlAttribute;
 import javax.xml.bind.annotation.adapters.XmlAdapter;
 import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
 
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.Locale;
+import net.osmand.server.api.services.DownloadIndexesService.DownloadType;
 
 public class DownloadIndex {
 

@@ -13,11 +13,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
+import net.osmand.server.api.services.DownloadIndexesService;
+import net.osmand.server.api.services.DownloadIndexesService.DownloadProperties;
+import net.osmand.server.api.services.MotdService;
+import net.osmand.server.api.services.MotdService.MotdSettings;
 import net.osmand.server.controllers.pub.WebController;
-import net.osmand.server.services.api.DownloadIndexesService;
-import net.osmand.server.services.api.DownloadIndexesService.DownloadProperties;
-import net.osmand.server.services.api.MotdService;
-import net.osmand.server.services.api.MotdService.MotdSettings;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;

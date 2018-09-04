@@ -13,8 +13,8 @@ import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import net.osmand.server.services.api.DownloadIndexesService;
-import net.osmand.server.services.api.DownloadIndexesService.DownloadProperties;
+import net.osmand.server.api.services.DownloadIndexesService;
+import net.osmand.server.api.services.DownloadIndexesService.DownloadProperties;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;

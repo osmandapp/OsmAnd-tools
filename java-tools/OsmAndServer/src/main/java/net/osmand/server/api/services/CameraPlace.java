@@ -1,4 +1,4 @@
-package net.osmand.server.services.api;
+package net.osmand.server.api.services;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 

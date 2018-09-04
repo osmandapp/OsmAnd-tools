@@ -18,14 +18,14 @@ import java.util.stream.Collectors;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import net.osmand.server.services.api.CameraPlace;
-import net.osmand.server.services.api.EmailSupportSurveyRepository;
-import net.osmand.server.services.api.EmailSupportSurveyRepository.EmailSupportSurveyFeedback;
-import net.osmand.server.services.api.EmailUnsubscribedRepository;
-import net.osmand.server.services.api.EmailUnsubscribedRepository.EmailUnsubscribed;
-import net.osmand.server.services.api.ImageService;
-import net.osmand.server.services.api.MotdMessage;
-import net.osmand.server.services.api.MotdService;
+import net.osmand.server.api.repo.EmailSupportSurveyRepository;
+import net.osmand.server.api.repo.EmailSupportSurveyRepository.EmailSupportSurveyFeedback;
+import net.osmand.server.api.services.CameraPlace;
+import net.osmand.server.api.services.EmailUnsubscribedRepository;
+import net.osmand.server.api.services.EmailUnsubscribedRepository.EmailUnsubscribed;
+import net.osmand.server.api.services.ImageService;
+import net.osmand.server.api.services.MotdMessage;
+import net.osmand.server.api.services.MotdService;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;

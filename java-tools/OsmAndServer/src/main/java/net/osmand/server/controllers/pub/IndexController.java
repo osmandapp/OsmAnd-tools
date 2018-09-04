@@ -1,8 +1,20 @@
 package net.osmand.server.controllers.pub;
 
-import net.osmand.server.services.api.DownloadIndex;
-import net.osmand.server.services.api.DownloadIndexDocument;
-import net.osmand.server.services.api.DownloadIndexesService;
+import java.io.File;
+import java.io.IOException;
+import java.util.Comparator;
+import java.util.List;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+import javax.servlet.http.HttpServletResponse;
+import javax.xml.bind.JAXBContext;
+import javax.xml.bind.JAXBException;
+import javax.xml.bind.Unmarshaller;
+
+import net.osmand.server.api.services.DownloadIndex;
+import net.osmand.server.api.services.DownloadIndexDocument;
+import net.osmand.server.api.services.DownloadIndexesService;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -16,18 +28,6 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
-
-import javax.servlet.http.HttpServletResponse;
-import javax.xml.bind.JAXBContext;
-import javax.xml.bind.JAXBException;
-import javax.xml.bind.Unmarshaller;
-
-import java.io.File;
-import java.io.IOException;
-import java.util.Comparator;
-import java.util.List;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 @Controller
 public class IndexController {
