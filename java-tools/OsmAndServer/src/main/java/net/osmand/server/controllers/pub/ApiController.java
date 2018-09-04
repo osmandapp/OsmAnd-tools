@@ -1,8 +1,6 @@
 package net.osmand.server.controllers.pub;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.net.InetSocketAddress;
 import java.net.URL;
 import java.net.URLConnection;
@@ -22,12 +20,12 @@ import javax.servlet.http.HttpServletResponse;
 
 import net.osmand.server.services.api.CameraPlace;
 import net.osmand.server.services.api.EmailSupportSurveyRepository;
+import net.osmand.server.services.api.EmailSupportSurveyRepository.EmailSupportSurveyFeedback;
 import net.osmand.server.services.api.EmailUnsubscribedRepository;
+import net.osmand.server.services.api.EmailUnsubscribedRepository.EmailUnsubscribed;
 import net.osmand.server.services.api.ImageService;
 import net.osmand.server.services.api.MotdMessage;
 import net.osmand.server.services.api.MotdService;
-import net.osmand.server.services.api.EmailSupportSurveyRepository.EmailSupportSurveyFeedback;
-import net.osmand.server.services.api.EmailUnsubscribedRepository.EmailUnsubscribed;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -101,15 +99,10 @@ public class ApiController {
     
     @GetMapping(path = {"/osmlive_status.php", "/osmlive_status"}, produces = "text/html;charset=UTF-8")
     @ResponseBody
-    public String osmLiveStatus() throws IOException  {
+    public FileSystemResource osmLiveStatus() throws IOException  {
         String procFile = filesLocation.concat(PROC_FILE);
         FileSystemResource fsr = new FileSystemResource(procFile);
-        if (fsr.exists()) {
-            BufferedReader br = new BufferedReader(new InputStreamReader(fsr.getInputStream()));
-            return br.readLine();
-        }
-        LOGGER.error("proc file not found at " + procFile);
-        throw new RuntimeException("File not found at " + procFile);
+        return fsr;
     }
     
     @GetMapping(path = {"/geo-ip"}, produces = "application/json")
