@@ -209,7 +209,6 @@ public class WebController {
 		return generateStaticResource("pub/help-online.html", "help-online.html", request, response, model);
     }
 
-
     @RequestMapping(path = { "/blog", "/blog.html"  })
     @ResponseBody
     public FileSystemResource blog(HttpServletRequest request, HttpServletResponse response, Model model, @RequestParam(required=false) String id) {

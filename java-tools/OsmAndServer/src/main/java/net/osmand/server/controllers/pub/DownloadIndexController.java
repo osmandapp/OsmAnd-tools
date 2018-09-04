@@ -173,7 +173,7 @@ public class DownloadIndexController {
 		if (params.containsKey("road")) {
 			return getFileAsResource("road-indexes", filename);
 		}
-		if (params.containsKey("aosmc")) {
+		if (params.containsKey("aosmc") || params.containsKey("osmc")) {
 			String folder = filename.substring(0, filename.length() - DATE_AND_EXT_STR_LEN).toLowerCase();
 			return getFileAsResource("aosmc" + File.separator + folder, filename);
 		}
@@ -184,7 +184,8 @@ public class DownloadIndexController {
 			return getFileAsResource("hillshade", filename);
 		}
 		if (params.containsKey("inapp")) {
-			return getFileAsResource("indexes/inapp", filename);
+			String type = params.getFirst("inapp");
+			return getFileAsResource("indexes/inapp/"+type, filename);
 		}
 		if (params.containsKey("wikivoyage")) {
 			return getFileAsResource("wiki", filename);
@@ -221,7 +222,7 @@ public class DownloadIndexController {
 	}
 
 	private boolean computeLocalCondition(MultiValueMap<String, String> params) {
-		return isContainAndEqual("aosmc", params) ||
+		return isContainAndEqual("aosmc", params) || isContainAndEqual("osmc", params) ||
 				isContainAndEqual("fonts", params) || params.getFirst("inapp") != null;
 	}
 
