@@ -6,9 +6,11 @@ import java.io.InputStreamReader;
 import java.net.InetSocketAddress;
 import java.net.URL;
 import java.net.URLConnection;
+import java.net.URLDecoder;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.Date;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
@@ -19,9 +21,13 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import net.osmand.server.services.api.CameraPlace;
+import net.osmand.server.services.api.EmailSupportSurveyRepository;
+import net.osmand.server.services.api.EmailUnsubscribedRepository;
 import net.osmand.server.services.api.ImageService;
 import net.osmand.server.services.api.MotdMessage;
 import net.osmand.server.services.api.MotdService;
+import net.osmand.server.services.api.EmailSupportSurveyRepository.EmailSupportSurveyFeedback;
+import net.osmand.server.services.api.EmailUnsubscribedRepository.EmailUnsubscribed;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -31,6 +37,7 @@ import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.util.Base64Utils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -65,7 +72,14 @@ public class ApiController {
     @Autowired
     private MotdService motdService;
 
+    @Autowired 
+    EmailSupportSurveyRepository surveyRepo;
+    
+    @Autowired 
+    EmailUnsubscribedRepository unsubscribedRepo;
+    
 	private ObjectMapper jsonMapper;
+	
     
     private ApiController() {
     	 ObjectMapper mapper = new ObjectMapper();
@@ -224,4 +238,51 @@ public class ApiController {
         }
         return "{}";
     }
+    
+    
+    @GetMapping(path = {"/api/email/support_survey"})
+    public String emailSupportSurvey(@RequestHeader HttpHeaders headers,
+            HttpServletRequest request, @RequestParam(required=false) String response, Model model) throws IOException  {
+    	String remoteAddr = request.getRemoteAddr();
+    	Enumeration<String> hs = request.getHeaders("X-Forwarded-For");
+        if (hs != null && hs.hasMoreElements()) {
+            remoteAddr = hs.nextElement();
+        }
+        if(response == null) {
+        	response = "good";
+        } else {
+        	EmailSupportSurveyFeedback feedback = new EmailSupportSurveyRepository.EmailSupportSurveyFeedback();
+        	feedback.ip = remoteAddr;
+        	feedback.timestamp = new Date();
+        	feedback.response = response;
+        	surveyRepo.save(feedback);
+        }
+        model.addAttribute("response", response); 
+    	return "pub/email/survey";
+    }
+    
+    
+    
+    @GetMapping(path = {"/api/email/unsubscribe"}, produces = "text/html;charset=UTF-8")
+    public String emailUnsubscribe(@RequestParam(required=true) String id, @RequestParam(required=false) String group) throws IOException  {
+		String email = new String(Base64Utils.decodeFromString(URLDecoder.decode(id, "UTF-8")));
+    	EmailUnsubscribed ent = new EmailUnsubscribedRepository.EmailUnsubscribed();
+    	ent.timestamp = System.currentTimeMillis() / 1000;
+    	if(group == null) {
+    		group = "all";
+    	}
+    	ent.channel = group;
+    	ent.email = email;
+    	unsubscribedRepo.save(ent);
+    	return "pub/email/unsubscribe";
+    	
+    }
+    @GetMapping(path = {"/api/email/subscribe"}, produces = "text/html;charset=UTF-8")
+    public String emailSubscribe(@RequestParam(required=true) String id, @RequestParam(required=false) String group) throws IOException  {
+		String email = new String(Base64Utils.decodeFromString(URLDecoder.decode(id, "UTF-8")));
+    	unsubscribedRepo.deleteAllByEmail(email);
+    	return "pub/email/subscribe";
+    }
+
+
 }

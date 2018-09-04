@@ -316,7 +316,7 @@ public class EmailSenderMain {
         MailSettings mailSettings = new MailSettings();
         FooterSetting footerSetting = new FooterSetting();
         footerSetting.setEnable(true);
-        footerSetting.setHtml("<html><center><a href=\"https://osmand.net/unsubscribe?id=" + userHash + "&group=" + p.topic
+        footerSetting.setHtml("<html><center><a href=\"https://osmand.net/api/email/unsubscribe?id=" + userHash + "&group=" + p.topic
                 + "\">Unsubscribe</a></center></html>");
         mailSettings.setFooterSetting(footerSetting);
         mail.setMailSettings(mailSettings);

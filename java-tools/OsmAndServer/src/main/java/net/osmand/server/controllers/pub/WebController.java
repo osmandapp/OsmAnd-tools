@@ -77,55 +77,6 @@ public class WebController {
     }
 
     
-    // TODO move to APIController and delete top level urls
-    @Autowired 
-    EmailSupportSurveyRepository surveyRepo;
-    
-    @GetMapping(path = {"/api/email/support_survey.php", "/api/email/support_survey", "support_survey.php", "support_survey"})
-    public String emailSupportSurvey(@RequestHeader HttpHeaders headers,
-            HttpServletRequest request, @RequestParam(required=false) String response, Model model) throws IOException  {
-    	String remoteAddr = request.getRemoteAddr();
-    	Enumeration<String> hs = request.getHeaders("X-Forwarded-For");
-        if (hs != null && hs.hasMoreElements()) {
-            remoteAddr = hs.nextElement();
-        }
-        if(response == null) {
-        	response = "good";
-        } else {
-        	EmailSupportSurveyFeedback feedback = new EmailSupportSurveyRepository.EmailSupportSurveyFeedback();
-        	feedback.ip = remoteAddr;
-        	feedback.timestamp = new Date();
-        	feedback.response = response;
-        	surveyRepo.save(feedback);
-        }
-        model.addAttribute("response", response); 
-    	return "pub/email/survey";
-    }
-    
-    @Autowired 
-    EmailUnsubscribedRepository unsubscribedRepo;
-    
-    @GetMapping(path = {"/api/email/unsubscribe.php", "/api/email/unsubscribe", "unsubscribe.php", "unsubscribe"}, produces = "text/html;charset=UTF-8")
-    public String emailUnsubscribe(@RequestParam(required=true) String id, @RequestParam(required=false) String group) throws IOException  {
-		String email = new String(Base64Utils.decodeFromString(URLDecoder.decode(id, "UTF-8")));
-    	EmailUnsubscribed ent = new EmailUnsubscribedRepository.EmailUnsubscribed();
-    	ent.timestamp = System.currentTimeMillis() / 1000;
-    	if(group == null) {
-    		group = "all";
-    	}
-    	ent.channel = group;
-    	ent.email = email;
-    	unsubscribedRepo.save(ent);
-    	return "pub/email/unsubscribe";
-    	
-    }
-    @GetMapping(path = {"/api/email/subscribe.php", "/api/email/subscribe", "subscribe.php", "subscribe"}, produces = "text/html;charset=UTF-8")
-    public String emailSubscribe(@RequestParam(required=true) String id, @RequestParam(required=false) String group) throws IOException  {
-		String email = new String(Base64Utils.decodeFromString(URLDecoder.decode(id, "UTF-8")));
-    	unsubscribedRepo.deleteAllByEmail(email);
-    	return "pub/email/subscribe";
-    }
-
     // TOP LEVEL API (redirects and static files) 
     @RequestMapping(path = { "tile_sources.php", "tile_sources.xml", "tile_sources"}, produces = {"application/xml"})
 	@ResponseBody
