@@ -84,4 +84,4 @@ server:
 spring:
   profiles: production
   resources.static-locations: file:${web.location}
-  thymeleaf.prefix: file:file:${web.location}/templates/
+  thymeleaf.prefix: file:${web.location}/templates/
