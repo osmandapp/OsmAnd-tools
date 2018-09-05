@@ -175,9 +175,6 @@ public class MotdService {
 			if (version != null) {
 				filter += " Version in '" + version + "'";
 			}
-			if (version != null) {
-				filter += " Version in '" + version + "'";
-			}
 			return filter;
 
 		}
