@@ -29,6 +29,7 @@ import net.osmand.server.api.services.CameraPlace;
 import net.osmand.server.api.services.ImageService;
 import net.osmand.server.api.services.MotdMessage;
 import net.osmand.server.api.services.MotdService;
+import net.osmand.util.Algorithms;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -137,7 +138,19 @@ public class ApiController {
         
         return jsonMapper.writeValueAsString(value);
     }
-    
+    public static String extractFirstDoubleNumber(String s) {
+		int i = 0;
+		String d = "";
+		for (int k = 0; k < s.length(); k++) {
+			char charAt = s.charAt(k);
+			if ((charAt >= '0' && charAt <= '9')  || charAt == '.') {
+				d += charAt;
+			} else {
+				break;
+			}
+		}
+		return d;
+	}
     
     @PostMapping(path = {"/missing_search"}, produces = "application/json")
     @ResponseBody
@@ -151,8 +164,27 @@ public class ApiController {
         if(query == null && location == null && request.getParameterMap().size() == 1) {
         	Entry<String, String[]> e = request.getParameterMap().entrySet().iterator().next();
         	query = e.getKey();
-        	if(e.getValue() != null && e.getValue().length > 0) { 
-        		location = e.getValue()[0];
+        	if(e.getValue() != null && e.getValue().length > 0 && e.getValue()[0] != null) { 
+        		location = e.getValue()[0].toLowerCase();
+        		String lat = null, lon = null;
+        		try {
+					int i = location.indexOf("latitude=");
+					if(i >= 0) {
+						lat = ((float)Double.parseDouble(extractFirstDoubleNumber(
+								location.substring(i + "latitude=".length())))) + "";
+					}
+					i = location.indexOf("longitude=");
+					if(i >= 0) {
+						lon = ((float)Double.parseDouble(extractFirstDoubleNumber(
+								location.substring(i + "longitude=".length())))) + "";
+					}
+				} catch (NumberFormatException e1) {
+				}
+				if (lat != null && lon != null) {
+					location = lat + "," + lon;
+				} else {
+					location = null;
+				}
         	}
         }
         if(query != null) {
