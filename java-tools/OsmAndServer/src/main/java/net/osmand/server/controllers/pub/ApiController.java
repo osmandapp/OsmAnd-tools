@@ -27,9 +27,7 @@ import net.osmand.server.api.repo.EmailUnsubscribedRepository;
 import net.osmand.server.api.repo.EmailUnsubscribedRepository.EmailUnsubscribed;
 import net.osmand.server.api.services.CameraPlace;
 import net.osmand.server.api.services.ImageService;
-import net.osmand.server.api.services.MotdMessage;
 import net.osmand.server.api.services.MotdService;
-import net.osmand.util.Algorithms;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -292,7 +290,7 @@ public class ApiController {
         if (headers.getFirst("X-Forwarded-For") != null) {
             remoteAddr = headers.getFirst("X-Forwarded-For");
         }
-        MotdMessage body = motdService.getMessage(version, os, remoteAddr);
+        HashMap<String,Object> body = motdService.getMessage(version, os, remoteAddr);
         if (body != null) {
             return jsonMapper.writeValueAsString(body);
         }
