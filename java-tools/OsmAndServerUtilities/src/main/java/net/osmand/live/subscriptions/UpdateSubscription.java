@@ -73,7 +73,6 @@ public class UpdateSubscription {
 				"  SELECT DISTINCT userid, sku,  " +
 				"	first_value(purchaseToken) over (partition by userid, sku order by checktime desc) purchaseToken, " +
 				"	first_value(checktime) over (partition by userid, sku order by checktime desc) checktime, " +
-				"	first_value(time) over (partition by userid, sku order by checktime desc) time_d, " +
 				"	first_value(autorenewing) over (partition by userid, sku order by checktime desc) autorenewing, " +
 				"	first_value(starttime) over (partition by userid, sku order by checktime desc) starttime, " +
 				"	first_value(kind) over (partition by userid, sku order by checktime desc) kind, " +

@@ -17,7 +17,7 @@ CREATE TABLE data_missing_search(ip text, search text, location text, timestamp 
 CREATE TABLE osm_recipients(osmid text, email text, btcaddr text, updatetime bigint);
 CREATE SEQUENCE supporters_seq START 1000;
 ALTER TABLE supporters ADD PRIMARY KEY (userid);
-CREATE TABLE supporters_subscription(userid text, sku text, purchasetoken text, time text, checktime bigint,
+CREATE TABLE supporters_subscription(userid text, sku text, purchasetoken text, checktime bigint,
 			autorenewing text, starttime bigint, expiretime bigint, kind text);
 
 ALTER TABLE changeset_country OWNER TO <user>;
