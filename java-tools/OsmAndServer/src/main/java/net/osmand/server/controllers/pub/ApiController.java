@@ -13,16 +13,19 @@ import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.stream.Collectors;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import net.osmand.server.api.repo.DataMissingSearchRepository;
+import net.osmand.server.api.repo.DataMissingSearchRepository.DataMissingSearchFeedback;
 import net.osmand.server.api.repo.EmailSupportSurveyRepository;
 import net.osmand.server.api.repo.EmailSupportSurveyRepository.EmailSupportSurveyFeedback;
+import net.osmand.server.api.repo.EmailUnsubscribedRepository;
+import net.osmand.server.api.repo.EmailUnsubscribedRepository.EmailUnsubscribed;
 import net.osmand.server.api.services.CameraPlace;
-import net.osmand.server.api.services.EmailUnsubscribedRepository;
-import net.osmand.server.api.services.EmailUnsubscribedRepository.EmailUnsubscribed;
 import net.osmand.server.api.services.ImageService;
 import net.osmand.server.api.services.MotdMessage;
 import net.osmand.server.api.services.MotdService;
@@ -37,6 +40,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.util.Base64Utils;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -75,6 +79,9 @@ public class ApiController {
     
     @Autowired 
     EmailUnsubscribedRepository unsubscribedRepo;
+    
+    @Autowired 
+    DataMissingSearchRepository dataMissingSearch;
     
 	private ObjectMapper jsonMapper;
 	
@@ -131,6 +138,34 @@ public class ApiController {
         return jsonMapper.writeValueAsString(value);
     }
     
+    
+    @PostMapping(path = {"/missing_search"}, produces = "application/json")
+    @ResponseBody
+    public String missingSearch(HttpServletRequest request, @RequestParam(required = false) String query,
+            @RequestParam(required =false) String location) {
+    	String remoteAddr = request.getRemoteAddr();
+    	Enumeration<String> hs = request.getHeaders("X-Forwarded-For");
+        if (hs != null && hs.hasMoreElements()) {
+            remoteAddr = hs.nextElement();
+        }
+        if(query == null && location == null && request.getParameterMap().size() == 1) {
+        	Entry<String, String[]> e = request.getParameterMap().entrySet().iterator().next();
+        	query = e.getKey();
+        	if(e.getValue() != null && e.getValue().length > 0) { 
+        		location = e.getValue()[0];
+        	}
+        }
+        if(query != null) {
+        	DataMissingSearchFeedback feedback = new DataMissingSearchFeedback();
+        	feedback.ip = remoteAddr;
+        	feedback.timestamp = new Date();
+        	feedback.search = query;
+        	feedback.location = location;
+        	dataMissingSearch.save(feedback);
+        }
+    	
+        return "{'status':'OK'}";
+    }
     
     
     @GetMapping(path = {"/cm_place.php", "/cm_place"})

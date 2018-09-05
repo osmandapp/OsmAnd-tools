@@ -12,6 +12,8 @@ CREATE TABLE email_blocked(email text, reason text, timestamp bigint);
 CREATE TABLE email_unsubscribed(email text, channel text, updatetime bigint);
 CREATE TABLE email_support_survey(ip text, response text, timestamp timestamp);
 
+CREATE TABLE data_missing_search(ip text, query text, location text, timestamp timestamp);
+
 CREATE TABLE osm_recipients(osmid text, email text, btcaddr text, updatetime bigint);
 CREATE SEQUENCE supporters_seq START 1000;
 ALTER TABLE supporters ADD PRIMARY KEY (userid);
