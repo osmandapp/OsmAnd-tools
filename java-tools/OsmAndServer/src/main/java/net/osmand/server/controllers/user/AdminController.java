@@ -108,7 +108,9 @@ public class AdminController {
 	        model.addAttribute("update_message", "");
 		}
 		MotdSettings settings = motdService.getSettings();
-		model.addAttribute("motdSettings", settings);
+		if(settings != null) {
+			model.addAttribute("motdSettings", settings);
+		}
 		
 		List<Map<String, Object>> list = getDownloadSettings();
 		model.addAttribute("downloadServers", list);

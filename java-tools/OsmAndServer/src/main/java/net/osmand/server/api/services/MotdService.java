@@ -34,13 +34,14 @@ public class MotdService {
     private String websiteLocation;
 
     private final ObjectMapper mapper;
-    private SimpleDateFormat dateFormat;
+    private static final SimpleDateFormat dateFormat = new SimpleDateFormat("dd-MM-yyyy HH:mm");
+    static {
+    	dateFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
+    }
     
     private MotdSettings settings;
 
     public MotdService() {
-        dateFormat = new SimpleDateFormat("dd-MM-yyyy HH:mm");
-        dateFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
         ObjectMapper objectMapper = new ObjectMapper();
         objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
         objectMapper.setDateFormat(dateFormat);
@@ -60,7 +61,7 @@ public class MotdService {
 		if (settings != null) {
 			for (DiscountSetting setting : settings.discountSettings) {
 				if (setting.checkCondition(now, hostAddress, version, os)) {
-					message = setting.parseMotdMessageFile(websiteLocation.concat("api/messages/"));
+					message = setting.parseMotdMessageFile(mapper, websiteLocation.concat("api/messages/"));
 					break;
 				}
 			}
@@ -102,7 +103,7 @@ public class MotdService {
 
     }
 
-    private  class DiscountSetting {
+    private static   class DiscountSetting {
         @JsonProperty("condition")
         public DiscountCondition discountCondition;
         @JsonProperty("file")
@@ -111,7 +112,7 @@ public class MotdService {
         public Map<String, String> fields;
 
 
-        protected HashMap<String,Object> parseMotdMessageFile(String folder) throws IOException {
+        protected HashMap<String,Object> parseMotdMessageFile(ObjectMapper mapper, String folder) throws IOException {
         	if(file != null && file.length() > 0 && new File(folder, file).exists() ) {
         		TypeReference<HashMap<String,Object>> typeRef = new TypeReference<HashMap<String,Object>>() {};
         		HashMap<String,Object> res = mapper.readValue(new File(folder, file), typeRef);
@@ -159,12 +160,13 @@ public class MotdService {
         
 		public String getFilterCondition() {
 			String filter = "";
+			if (os != null) {
+				filter += " " + os + ": ";
+			}
 			if (ip != null) {
 				filter += " IP in '" + ip + "' ";
 			}
-			if (os != null) {
-				filter += " OS is '" + os + "' ";
-			}
+			
 			if (startDate != null || endDate != null) {
 				filter += String.format(" Date between %s and %s", 
 						(startDate == null ? "-" : String.format("%1$tF %1$tR", startDate)),
