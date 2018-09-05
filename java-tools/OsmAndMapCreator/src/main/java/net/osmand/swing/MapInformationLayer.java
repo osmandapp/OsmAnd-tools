@@ -88,8 +88,8 @@ public class MapInformationLayer implements MapPanelLayer {
 			@Override
 			public void actionPerformed(ActionEvent e) {
 				if(!QtCorePanel.isUnix()) {
-					//JOptionPane.showMessageDialog(OsmExtractionUI.MAIN_APP.getFrame(), "Native rendering supported only on Linux", "Info", JOptionPane.ERROR_MESSAGE);
-					//return;
+					JOptionPane.showMessageDialog(OsmExtractionUI.MAIN_APP.getFrame(), "Native rendering supported only on Linux", "Info", JOptionPane.ERROR_MESSAGE);
+					return;
 				}
 				NativePreferencesDialog dlg = new NativePreferencesDialog(map);
 				dlg.showDialog();
