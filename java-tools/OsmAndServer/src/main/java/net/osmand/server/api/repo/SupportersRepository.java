@@ -2,26 +2,28 @@ package net.osmand.server.api.repo;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.Id;
-import javax.persistence.Table;
+import javax.persistence.*;
+import java.util.Optional;
 
 public interface SupportersRepository extends JpaRepository<SupportersRepository.Supporter, String> {
+
+    Optional<Supporter> findByUserEmail(String userEmail);
 
     @Entity
     @Table(name = "supporters")
     class Supporter {
 
         @Id
+        @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "supporters_seq")
+        @SequenceGenerator(sequenceName = "supporters_seq", allocationSize = 1, name = "supporters_seq")
         @Column(name = "userid")
-        private String userId;
+        private long userId;
 
         @Column(name = "token")
         private String token;
 
         @Column(name = "visiblename")
-        private String visbleName;
+        private String visibleName;
 
         @Column(name = "useremail")
         private String userEmail;
@@ -34,22 +36,17 @@ public interface SupportersRepository extends JpaRepository<SupportersRepository
 
         public Supporter() {}
 
-        public Supporter(String userId, String token, String visbleName, String userEmail, String preferedRegion,
+        public Supporter(String token, String visibleName, String userEmail, String preferedRegion,
                          int disabled) {
-            this.userId = userId;
             this.token = token;
-            this.visbleName = visbleName;
+            this.visibleName = visibleName;
             this.userEmail = userEmail;
             this.preferedRegion = preferedRegion;
             this.disabled = disabled;
         }
 
-        public String getUserId() {
+        public long getUserId() {
             return userId;
-        }
-
-        public void setUserId(String userId) {
-            this.userId = userId;
         }
 
         public String getToken() {
@@ -60,12 +57,12 @@ public interface SupportersRepository extends JpaRepository<SupportersRepository
             this.token = token;
         }
 
-        public String getVisbleName() {
-            return visbleName;
+        public String getVisibleName() {
+            return visibleName;
         }
 
-        public void setVisbleName(String visbleName) {
-            this.visbleName = visbleName;
+        public void setVisibleName(String visibleName) {
+            this.visibleName = visibleName;
         }
 
         public String getUserEmail() {
@@ -97,7 +94,7 @@ public interface SupportersRepository extends JpaRepository<SupportersRepository
             return "Supporter{" +
                     "userId='" + userId + '\'' +
                     ", token='" + token + '\'' +
-                    ", visbleName='" + visbleName + '\'' +
+                    ", visibleName='" + visibleName + '\'' +
                     ", userEmail='" + userEmail + '\'' +
                     ", preferedRegion='" + preferedRegion + '\'' +
                     ", disabled=" + disabled +
