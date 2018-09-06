@@ -304,7 +304,7 @@ public class ApiController {
     }
     
     
-    @GetMapping(path = {"/api/email/support_survey"})
+    @GetMapping(path = {"/email/support_survey"})
     public String emailSupportSurvey(@RequestHeader HttpHeaders headers,
             HttpServletRequest request, @RequestParam(required=false) String response, Model model) throws IOException  {
     	String remoteAddr = request.getRemoteAddr();
@@ -327,7 +327,7 @@ public class ApiController {
     
     
     
-    @GetMapping(path = {"/api/email/unsubscribe"}, produces = "text/html;charset=UTF-8")
+    @GetMapping(path = {"/email/unsubscribe"}, produces = "text/html;charset=UTF-8")
     public String emailUnsubscribe(@RequestParam(required=true) String id, @RequestParam(required=false) String group) throws IOException  {
 		String email = new String(Base64Utils.decodeFromString(URLDecoder.decode(id, "UTF-8")));
     	EmailUnsubscribed ent = new EmailUnsubscribedRepository.EmailUnsubscribed();
@@ -341,7 +341,7 @@ public class ApiController {
     	return "pub/email/unsubscribe";
     	
     }
-    @GetMapping(path = {"/api/email/subscribe"}, produces = "text/html;charset=UTF-8")
+    @GetMapping(path = {"/email/subscribe"}, produces = "text/html;charset=UTF-8")
     public String emailSubscribe(@RequestParam(required=true) String id, @RequestParam(required=false) String group) throws IOException  {
 		String email = new String(Base64Utils.decodeFromString(URLDecoder.decode(id, "UTF-8")));
     	unsubscribedRepo.deleteAllByEmail(email);
