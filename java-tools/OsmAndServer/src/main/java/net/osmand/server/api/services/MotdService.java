@@ -54,13 +54,13 @@ public class MotdService {
 		return settings;
 	}
 
-    public HashMap<String,Object> getMessage(String version, String os, String hostAddress) throws IOException, ParseException {
+    public HashMap<String,Object> getMessage(String version, String os, String hostAddress, String lang) throws IOException, ParseException {
         Date now = new Date();
         HashMap<String,Object> message = null;
 		MotdSettings settings = getSettings();
 		if (settings != null) {
 			for (DiscountSetting setting : settings.discountSettings) {
-				if (setting.checkCondition(now, hostAddress, version, os)) {
+				if (setting.discountCondition.checkCondition(now, hostAddress, version, os, lang)) {
 					message = setting.parseMotdMessageFile(mapper, websiteLocation.concat("api/messages/"));
 					break;
 				}
@@ -103,7 +103,7 @@ public class MotdService {
 
     }
 
-    private static   class DiscountSetting {
+    private static class DiscountSetting {
         @JsonProperty("condition")
         public DiscountCondition discountCondition;
         @JsonProperty("file")
@@ -140,10 +140,6 @@ public class MotdService {
             return message;
         }
 
-        public boolean checkCondition(Date now, String hostAddress, String version, String os) {
-			return discountCondition.checkCondition(now, hostAddress, version, os);
-		}
-
     }
 
     public static class DiscountCondition {
@@ -155,6 +151,8 @@ public class MotdService {
         private Date endDate;
         @JsonProperty("version")
         private String version;
+        @JsonProperty("lang")
+        private String lang;
         @JsonProperty("os")
         private String os;
         
@@ -180,7 +178,7 @@ public class MotdService {
 		}
         
 
-        public boolean checkCondition(Date date, String hostAddress, String version, String osV) {
+        public boolean checkCondition(Date date, String hostAddress, String version, String osV, String lang) {
             if (ip != null && !ip.contains(hostAddress)) {
                 return false;
             }
@@ -194,6 +192,9 @@ public class MotdService {
 				}
             }
             if (this.version != null && (version == null || !version.startsWith(this.version))) {
+                return false;
+            }
+            if (this.lang != null && (lang == null || !this.lang.contains(lang))) {
                 return false;
             }
             return true;

@@ -290,7 +290,13 @@ public class ApiController {
         if (headers.getFirst("X-Forwarded-For") != null) {
             remoteAddr = headers.getFirst("X-Forwarded-For");
         }
-        HashMap<String,Object> body = motdService.getMessage(version, os, remoteAddr);
+		if (version != null) {
+			int i = version.indexOf(" ");
+			if (i >= 0) {
+				version = version.substring(i + 1);
+			}
+		}
+        HashMap<String,Object> body = motdService.getMessage(version, os, remoteAddr, lang);
         if (body != null) {
             return jsonMapper.writeValueAsString(body);
         }
