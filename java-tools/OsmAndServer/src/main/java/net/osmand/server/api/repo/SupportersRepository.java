@@ -5,19 +5,18 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import javax.persistence.*;
 import java.util.Optional;
 
-public interface SupportersRepository extends JpaRepository<SupportersRepository.Supporter, String> {
+public interface SupportersRepository extends JpaRepository<SupportersRepository.Supporter, Long> {
 
     Optional<Supporter> findByUserEmail(String userEmail);
 
-    @Entity
+    @Entity(name = "Supporter")
     @Table(name = "supporters")
     class Supporter {
 
-        @Id
-        @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "supporters_seq")
+        @Id @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "supporters_seq")
         @SequenceGenerator(sequenceName = "supporters_seq", allocationSize = 1, name = "supporters_seq")
         @Column(name = "userid")
-        private long userId;
+        private Long userId;
 
         @Column(name = "token")
         private String token;
@@ -34,10 +33,11 @@ public interface SupportersRepository extends JpaRepository<SupportersRepository
         @Column(name = "disable")
         private int disabled;
 
-        public Supporter() {}
+        protected Supporter() {}
 
-        public Supporter(String token, String visibleName, String userEmail, String preferedRegion,
+        public Supporter(Long userId, String token, String visibleName, String userEmail, String preferedRegion,
                          int disabled) {
+            this.userId = userId;
             this.token = token;
             this.visibleName = visibleName;
             this.userEmail = userEmail;
@@ -45,8 +45,12 @@ public interface SupportersRepository extends JpaRepository<SupportersRepository
             this.disabled = disabled;
         }
 
-        public long getUserId() {
+        public Long getUserId() {
             return userId;
+        }
+
+        public void setUserId(Long userId) {
+            this.userId = userId;
         }
 
         public String getToken() {
