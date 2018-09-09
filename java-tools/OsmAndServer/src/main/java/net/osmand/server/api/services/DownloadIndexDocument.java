@@ -1,6 +1,8 @@
 package net.osmand.server.api.services;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 import javax.xml.bind.annotation.XmlAttribute;
@@ -50,6 +52,25 @@ public class DownloadIndexDocument {
 
 	@XmlElement(name = "hillshade")
 	private List<DownloadIndex> hillshade = new ArrayList<>();
+	
+	public void prepareMaps() {
+		Comparator<DownloadIndex> cmp = new Comparator<DownloadIndex>() {
+
+			@Override
+			public int compare(DownloadIndex o1, DownloadIndex o2) {
+				return o1.getName().compareTo(o2.getName());
+			}
+		};
+		Collections.sort(maps, cmp);
+		Collections.sort(roadMaps, cmp);
+		Collections.sort(srtmMaps, cmp);
+		Collections.sort(hillshade, cmp);
+		Collections.sort(inapps, cmp);
+		Collections.sort(voices, cmp);
+		Collections.sort(fonts, cmp);
+		Collections.sort(depths, cmp);
+		Collections.sort(wikimaps, cmp);
+	}
 
 	public List<DownloadIndex> getMaps() {
 		return maps;

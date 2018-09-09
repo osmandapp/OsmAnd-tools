@@ -109,6 +109,7 @@ public class OsmAndServerMonitorTasks {
 			String osmlivetime = br.readLine();
 			Date dt = TIME_FORMAT_UTC.parse(osmlivetime);
 			br.close();
+			is.close();
 			long currentDelay = System.currentTimeMillis() - dt.getTime();
 			if (currentDelay - live.previousOsmAndLiveDelay > 30 * MINUTE && currentDelay > HOUR) {
 				telegram.sendMonitoringAlertMessage(getLiveDelayedMessage(currentDelay));
@@ -180,6 +181,7 @@ public class OsmAndServerMonitorTasks {
 			InputStream is = conn.getInputStream();
 			gis = new GZIPInputStream(is);
 			validateAndReport(gis);
+			is.close();
 		} catch (IOException ioex) {
 			LOG.error(ioex.getMessage(), ioex);
 			telegram.sendMonitoringAlertMessage("Exception while checking the map index validity.");
