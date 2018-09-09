@@ -325,8 +325,6 @@ public class ApiController {
     	return "pub/email/survey";
     }
     
-    
-    
     @GetMapping(path = {"/email/unsubscribe"}, produces = "text/html;charset=UTF-8")
     public String emailUnsubscribe(@RequestParam(required=true) String id, @RequestParam(required=false) String group) throws IOException  {
 		String email = new String(Base64Utils.decodeFromString(URLDecoder.decode(id, "UTF-8")));
@@ -341,6 +339,7 @@ public class ApiController {
     	return "pub/email/unsubscribe";
     	
     }
+    
     @GetMapping(path = {"/email/subscribe"}, produces = "text/html;charset=UTF-8")
     public String emailSubscribe(@RequestParam(required=true) String id, @RequestParam(required=false) String group) throws IOException  {
 		String email = new String(Base64Utils.decodeFromString(URLDecoder.decode(id, "UTF-8")));
