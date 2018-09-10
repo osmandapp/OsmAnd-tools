@@ -136,13 +136,13 @@ public class UpdateSubscription {
 			} catch (IOException e) {
 				boolean gone = false;
 				if(e instanceof GoogleJsonResponseException) {
-					gone = ((GoogleJsonResponseException) e).getStatusCode() == 401;
+					gone = ((GoogleJsonResponseException) e).getStatusCode() == 410;
 				}
 					
 				String reason = null;
 				if (!pt.contains(".AO")) {
 					reason = "invalid purchase token " + e.getMessage();
-				} else if (tm - expireTime.getTime() > 180 * DAY && gone) {
+				} else if (expireTime != null && tm - expireTime.getTime() > 180 * DAY && gone) {
 					reason = "subscription expired more than 180 days ago";
 				}
 				if (reason != null) {
@@ -158,7 +158,7 @@ public class UpdateSubscription {
 						deletions = 0;
 					}
 				} else {
-					System.err.println(String.format("!! Error updating userid %s and sku %s: ", userid, sku, e.getMessage())) ;
+					System.err.println(String.format("!! Error updating userid %s and sku %s: %s", userid, sku, e.getMessage())) ;
 				}
 				continue;
 			}
