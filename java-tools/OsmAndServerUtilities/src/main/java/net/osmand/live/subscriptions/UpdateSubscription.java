@@ -141,9 +141,10 @@ public class UpdateSubscription {
 			boolean updated = false;
 			upd.setTime(1, new Time(tm));
 			if(subscription.getStartTimeMillis() != null) {
-				if(startTime != null && startTime.getTime() != subscription.getStartTimeMillis().longValue()) {
-					throw new IllegalArgumentException(String.format("Start timestamp changed %s != %s", 
-							new Date(startTime.getTime()), new Date(subscription.getStartTimeMillis().longValue())));
+				if(startTime != null && startTime.getTime() != subscription.getStartTimeMillis().longValue() && 
+						startTime.getTime() != 0) {
+					throw new IllegalArgumentException(String.format("Start timestamp changed %s != %s %s %s", 
+							new Date(startTime.getTime()), new Date(subscription.getStartTimeMillis().longValue()), userid, sku));
 				}
  				upd.setTime(2, new Time(subscription.getStartTimeMillis()));
  				updated = true;
@@ -151,8 +152,8 @@ public class UpdateSubscription {
 				upd.setTime(2, startTime);
 			}
 			if(subscription.getExpiryTimeMillis() != null) {
-				if(expireTime != null && expireTime.getTime() != subscription.getExpiryTimeMillis().longValue()) {
-					System.out.println(String.format("End timestamp changed %s != %s for %s %s", 
+				if(expireTime == null || expireTime.getTime() != subscription.getExpiryTimeMillis().longValue()) {
+					System.out.println(String.format("Expire timestamp changed %s != %s for %s %s", 
 							new Date(startTime.getTime()), new Date(subscription.getStartTimeMillis().longValue()), userid, sku));
 				}
  				upd.setTime(3, new Time(subscription.getExpiryTimeMillis()));
