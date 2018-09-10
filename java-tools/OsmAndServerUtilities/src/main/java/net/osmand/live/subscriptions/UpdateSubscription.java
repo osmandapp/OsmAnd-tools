@@ -110,13 +110,16 @@ public class UpdateSubscription {
 			Timestamp expireTime = rs.getTimestamp("expiretime");
 			boolean valid = rs.getBoolean("valid");
 			long tm = System.currentTimeMillis();
-			// skip everything that was checked 6 hours ago
+
 			long checkDiff = checkTime == null? tm :(tm - checkTime.getTime()) ;
-			if (checkDiff < (DAY / 4.0) & valid) {
-				if (verifyAll) {
-					System.out.println(String.format("Skip userid=%s, sku=%s - recently checked %.1f days", userid,
-							sku, (tm - checkTime.getTime()) / (DAY * 1.0)));
-				}
+
+			
+			// Basically validate non-valid everytime and valid not often than once per 24 hours 
+			if (checkDiff < DAY && valid) {
+//				if (verifyAll) {
+//					System.out.println(String.format("Skip userid=%s, sku=%s - recently checked %.1f days", userid,
+//							sku, (tm - checkTime.getTime()) / (DAY * 1.0)));
+//				}
 				continue;
 			}
 			
@@ -126,8 +129,8 @@ public class UpdateSubscription {
 					activeNow = true;
 				}
 			}
-			// skip if not verify all and subscription is active and checked less than 5 days
-			if (activeNow && !verifyAll && valid && checkDiff < 5 * DAY) {
+			// skip all active and valid if it was validated less than 5 days ago
+			if (activeNow && valid && (checkDiff < 5 * DAY || !verifyAll)) {
 				System.out.println(String.format("Skip userid=%s, sku=%s - subscribtion is active", userid, sku));
 				continue;
 			}
