@@ -142,7 +142,7 @@ public class UpdateSubscription {
 			upd.setTime(1, new Time(tm));
 			if(subscription.getStartTimeMillis() != null) {
 				if(startTime != null && startTime.getTime() != subscription.getStartTimeMillis().longValue() && 
-						startTime.getTime() > 100000) {
+						startTime.getTime() > 1000000) {
 					throw new IllegalArgumentException(String.format("Start timestamp changed %s != %s %s %s", 
 							new Date(startTime.getTime()), new Date(subscription.getStartTimeMillis().longValue()), userid, sku));
 				}
