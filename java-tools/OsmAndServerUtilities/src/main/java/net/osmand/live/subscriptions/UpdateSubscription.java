@@ -126,7 +126,12 @@ public class UpdateSubscription {
 				} else {
 					subscription = purchases.subscriptions().get(GOOGLE_PACKAGE_NAME, sku, pt).execute();
 				}
-			} catch (Exception e) {
+			} catch (IOException e) {
+				if(e.getCause() != null) {
+					e.getCause().printStackTrace();
+				}
+				e.printStackTrace();
+					
 				if (!pt.contains(".AO")) {
 					delStatement.setString(1, userid);
 					delStatement.setString(2, pt);
