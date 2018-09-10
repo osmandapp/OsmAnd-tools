@@ -149,7 +149,7 @@ public class UpdateSubscription {
 					reason = "invalid purchase token " + e.getMessage();
 					kind = "invalid";
 				} else if (expireTime != null && ((tm - expireTime.getTime()) > 15 * DAY) && gone) {
-					reason = String.format("subscription expired more than %1.f days ago", (tm - expireTime.getTime())
+					reason = String.format("subscription expired more than %.1f days ago", (tm - expireTime.getTime())
 							/ (DAY * 1.0d));
 				}
 				if (reason != null) {
