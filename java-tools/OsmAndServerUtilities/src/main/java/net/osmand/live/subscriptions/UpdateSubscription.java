@@ -1,15 +1,19 @@
 package net.osmand.live.subscriptions;
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.SQLType;
-import java.sql.Time;
 import java.sql.Timestamp;
 import java.sql.Types;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import java.util.Properties;
 
 import org.apache.http.NameValuePair;
 import org.apache.http.client.HttpClient;
@@ -22,6 +26,7 @@ import org.json.JSONObject;
 
 import com.google.api.client.auth.oauth2.TokenResponse;
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
+import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.client.http.HttpTransport;
 import com.google.api.client.http.javanet.NetHttpTransport;
@@ -50,6 +55,8 @@ public class UpdateSubscription {
 	
 	private static final String GOOGLE_PACKAGE_NAME = "net.osmand.plus";
 	private static final String GOOGLE_PACKAGE_NAME_FREE = "net.osmand";
+	private static final int BATCH_SIZE = 200;
+	private static final long DAY = 1000l * 60 * 60 * 24;
 	
 	private static HttpTransport HTTP_TRANSPORT = new NetHttpTransport();
 	private static JsonFactory JSON_FACTORY = new com.google.api.client.json.jackson2.JacksonFactory();
@@ -127,20 +134,31 @@ public class UpdateSubscription {
 					subscription = purchases.subscriptions().get(GOOGLE_PACKAGE_NAME, sku, pt).execute();
 				}
 			} catch (IOException e) {
-				if(e.getCause() != null) {
-					e.getCause().printStackTrace();
+				boolean gone = false;
+				if(e instanceof GoogleJsonResponseException) {
+					gone = ((GoogleJsonResponseException) e).getStatusCode() == 401;
 				}
-				e.printStackTrace();
 					
+				String reason = null;
 				if (!pt.contains(".AO")) {
+					reason = "invalid purchase token " + e.getMessage();
+				} else if (tm - expireTime.getTime() > 180 * DAY && gone) {
+					reason = "subscription expired more than 180 days ago";
+				}
+				if (reason != null) {
 					delStatement.setString(1, userid);
 					delStatement.setString(2, pt);
 					delStatement.setString(3, sku);
 					delStatement.addBatch();
 					deletions++;
-					System.out.println("!! Clearing invalid subscription: userid=" + userid + " sku=" + sku + ": " + e.getMessage());
+					System.out.println(String.format(
+							"!! Clearing invalid subscription: userid=%s, sku=%s. Reason: %s ", userid, sku, reason));
+					if (deletions > BATCH_SIZE) {
+						delStatement.executeUpdate();
+						deletions = 0;
+					}
 				} else {
-					System.err.println("!! Error updating userid " + userid + " and sku " + sku + ": " + e.getMessage()) ;
+					System.err.println(String.format("!! Error updating userid %s and sku %s: ", userid, sku, e.getMessage())) ;
 				}
 				continue;
 			}
@@ -188,16 +206,20 @@ public class UpdateSubscription {
 			if(updated) {
 				upd.addBatch();
 				changes++;
+				if (changes > BATCH_SIZE) {
+					upd.executeBatch();
+					changes = 0;
+				}
 			}
+		}
+		if (deletions > 0) {
+			delStatement.executeBatch();
 		}
 		if (changes > 0) {
 			upd.executeBatch();
-			if (deletions > 0) {
-				delStatement.executeBatch();
-			}
-			if (!conn.getAutoCommit()) {
-				conn.commit();
-			}
+		}
+		if (!conn.getAutoCommit()) {
+			conn.commit();
 		}
 	}
 
