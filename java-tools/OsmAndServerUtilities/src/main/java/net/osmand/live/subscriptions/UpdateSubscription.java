@@ -111,7 +111,8 @@ public class UpdateSubscription {
 			Timestamp expireTime = rs.getTimestamp("expiretime");
 			boolean vald = rs.getBoolean("valid");
 			long tm = System.currentTimeMillis();
-			if (checkTime != null && (tm - checkTime.getTime()) < DAY & vald) {
+			// skip everything that was checked 6 hours ago
+			if (checkTime != null && (tm - checkTime.getTime()) < (DAY / 4.0) & vald) {
 				if (verifyAll) {
 					System.out.println(String.format("Skip userid=%s, sku=%s - recently checked %.1f days", userid,
 							sku, (tm - checkTime.getTime()) / (DAY * 1.0)));
@@ -120,12 +121,13 @@ public class UpdateSubscription {
 			}
 			
 			boolean activeNow = false;
-			if(checkTime != null && startTime != null && expireTime != null){
-				if(expireTime.getTime() >= tm) {
+			if (checkTime != null && startTime != null && expireTime != null) {
+				if (expireTime.getTime() >= tm) {
 					activeNow = true;
 				}
 			}
-			if(activeNow && !verifyAll && vald) {
+			// skip if not verify all and subscription is active
+			if (activeNow && !verifyAll && vald) {
 				System.out.println(String.format("Skip userid=%s, sku=%s - subscribtion is active", userid, sku));
 				continue;
 			}
@@ -159,7 +161,6 @@ public class UpdateSubscription {
 						reason = String.format("subscription expired more than %.1f days ago", (tm - expireTime.getTime())
 								/ (DAY * 1.0d));
 					}
-						
 					
 				}
 				if (reason != null) {
@@ -177,7 +178,7 @@ public class UpdateSubscription {
 						deletions = 0;
 					}
 				} else {
-					System.err.println(String.format("!! Error updating userid %s and sku %s: %s", userid, sku, e.getMessage())) ;
+					System.err.println(String.format("?? Error updating userid %s and sku %s: %s", userid, sku, e.getMessage())) ;
 				}
 				continue;
 			}
@@ -226,7 +227,7 @@ public class UpdateSubscription {
 		} else {
 			updSubscrStat.setBoolean(4, subscription.getAutoRenewing());	
 		}
-		updSubscrStat.setString(5, subscription.getKind());
+		updSubscrStat.setString(5, subscription.getOrderId() + " " + subscription.getDeveloperPayload());
 		updSubscrStat.setBoolean(6, true);
 		updSubscrStat.setString(7, userid);
 		updSubscrStat.setString(8, pt);
