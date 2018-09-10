@@ -108,10 +108,11 @@ public class UpdateSubscription {
 			Timestamp checkTime = rs.getTimestamp("checktime");
 			Timestamp startTime = rs.getTimestamp("starttime");
 			Timestamp expireTime = rs.getTimestamp("expiretime");
-			boolean vald = rs.getBoolean("valid");
+			boolean valid = rs.getBoolean("valid");
 			long tm = System.currentTimeMillis();
 			// skip everything that was checked 6 hours ago
-			if (checkTime != null && (tm - checkTime.getTime()) < (DAY / 4.0) & vald) {
+			long checkDiff = checkTime == null? tm :(tm - checkTime.getTime()) ;
+			if (checkDiff < (DAY / 4.0) & valid) {
 				if (verifyAll) {
 					System.out.println(String.format("Skip userid=%s, sku=%s - recently checked %.1f days", userid,
 							sku, (tm - checkTime.getTime()) / (DAY * 1.0)));
@@ -125,8 +126,8 @@ public class UpdateSubscription {
 					activeNow = true;
 				}
 			}
-			// skip if not verify all and subscription is active
-			if (activeNow && !verifyAll && vald) {
+			// skip if not verify all and subscription is active and checked less than 5 days
+			if (activeNow && !verifyAll && valid && checkDiff < 5 * DAY) {
 				System.out.println(String.format("Skip userid=%s, sku=%s - subscribtion is active", userid, sku));
 				continue;
 			}
@@ -141,7 +142,6 @@ public class UpdateSubscription {
 				
 				updateSubscriptionDb(userid, pt, sku, startTime, expireTime, tm, subscription);
 			} catch (IOException e) {
-				
 				boolean gone = false;
 				if(e instanceof GoogleJsonResponseException) {
 					gone = ((GoogleJsonResponseException) e).getStatusCode() == 410;
@@ -171,7 +171,7 @@ public class UpdateSubscription {
 					delStat.addBatch();
 					deletions++;
 					System.out.println(String.format(
-							"!! Clearing invalid subscription: userid=%s, sku=%s. Reason: %s ", userid, sku, reason));
+							"!! Clearing possible invalid subscription: userid=%s, sku=%s. Reason: %s ", userid, sku, reason));
 					if (deletions > BATCH_SIZE) {
 						delStat.executeUpdate();
 						deletions = 0;
