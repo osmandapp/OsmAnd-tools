@@ -7,6 +7,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.SQLType;
 import java.sql.Time;
+import java.sql.Timestamp;
 import java.sql.Types;
 import java.util.*;
 
@@ -106,9 +107,9 @@ public class UpdateSubscription {
 			String userid = rs.getString("userid");
 			String pt = rs.getString("purchaseToken");
 			String sku = rs.getString("sku");
-			Time checkTime = rs.getTime("checktime");
-			Time startTime = rs.getTime("starttime");
-			Time expireTime = rs.getTime("expiretime");
+			Timestamp checkTime = rs.getTimestamp("checktime");
+			Timestamp startTime = rs.getTimestamp("starttime");
+			Timestamp expireTime = rs.getTimestamp("expiretime");
 			long tm = System.currentTimeMillis();
 			// TODO skip active
 			if(checkTime != null && startTime != null && expireTime != null) {
@@ -139,7 +140,7 @@ public class UpdateSubscription {
 				continue;
 			}
 			boolean updated = false;
-			upd.setTime(1, new Time(tm));
+			upd.setTimestamp(1, new Timestamp(tm));
 			if(subscription.getStartTimeMillis() != null) {
 				if(startTime != null && startTime.getTime() != subscription.getStartTimeMillis().longValue() && 
 						startTime.getTime() > 100000*1000l) {
@@ -147,10 +148,10 @@ public class UpdateSubscription {
 							startTime == null ? "" :new Date(startTime.getTime()),
 									new Date(subscription.getStartTimeMillis().longValue()), userid, sku));
 				}
- 				upd.setTime(2, new Time(subscription.getStartTimeMillis()));
+ 				upd.setTimestamp(2, new Timestamp(subscription.getStartTimeMillis()));
  				updated = true;
 			} else {
-				upd.setTime(2, startTime);
+				upd.setTimestamp(2, startTime);
 			}
 			if(subscription.getExpiryTimeMillis() != null) {
 				if(expireTime == null || expireTime.getTime() != subscription.getExpiryTimeMillis().longValue()) {
@@ -158,10 +159,10 @@ public class UpdateSubscription {
 							expireTime == null ? "" :new Date(expireTime.getTime()), 
 									new Date(subscription.getExpiryTimeMillis().longValue()), userid, sku));
 				}
- 				upd.setTime(3, new Time(subscription.getExpiryTimeMillis()));
+ 				upd.setTimestamp(3, new Timestamp(subscription.getExpiryTimeMillis()));
  				updated = true;
 			} else {
-				upd.setTime(3, expireTime);
+				upd.setTimestamp(3, expireTime);
 			}
 			if(subscription.getAutoRenewing() == null) {
 				upd.setNull(4, Types.BOOLEAN);
