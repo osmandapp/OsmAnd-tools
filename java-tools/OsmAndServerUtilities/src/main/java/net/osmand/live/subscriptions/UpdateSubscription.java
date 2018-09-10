@@ -89,7 +89,7 @@ public class UpdateSubscription {
 	
 	private void queryPurchases(AndroidPublisher publisher, Connection conn, boolean verifyAll) throws SQLException {
 		ResultSet rs = conn.createStatement().executeQuery(
-				"SELECT userid, sku, purchaseToken, checktime, starttime, expiretime "
+				"SELECT userid, sku, purchaseToken, checktime, starttime, expiretime, valid "
 				+ "FROM supporters_device_sub S where (valid is null or valid=true) ");
 		updSubscrStat = conn.prepareStatement("UPDATE supporters_device_sub SET "
 				+ "checktime = ?, starttime = ?, expiretime = ?, autorenewing = ?, kind = ?, valid = ? " +
@@ -109,10 +109,13 @@ public class UpdateSubscription {
 			Timestamp checkTime = rs.getTimestamp("checktime");
 			Timestamp startTime = rs.getTimestamp("starttime");
 			Timestamp expireTime = rs.getTimestamp("expiretime");
+			boolean vald = rs.getBoolean("valid");
 			long tm = System.currentTimeMillis();
-			if (checkTime != null && (tm - checkTime.getTime()) < DAY) {
-				System.out.println(String.format("Skip userid=%s, sku=%s - recently checked %.1f days", userid, sku,
+			if (checkTime != null && (tm - checkTime.getTime()) < DAY & vald) {
+				if(verifyAll) {
+					System.out.println(String.format("Skip userid=%s, sku=%s - recently checked %.1f days", userid, sku,
 						(tm - checkTime.getTime()) / (DAY * 1.0)));
+				}
 				continue;
 			}
 			
@@ -122,7 +125,7 @@ public class UpdateSubscription {
 					activeNow = true;
 				}
 			}
-			if(activeNow && !verifyAll) {
+			if(activeNow && !verifyAll && vald) {
 				System.out.println(String.format("Skip userid=%s, sku=%s - subscribtion is active", userid, sku));
 				continue;
 			}
