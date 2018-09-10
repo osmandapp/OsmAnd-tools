@@ -142,7 +142,7 @@ public class UpdateSubscription {
 			boolean updated = false;
 			upd.setTimestamp(1, new Timestamp(tm));
 			if(subscription.getStartTimeMillis() != null) {
-				if(startTime != null && Math.abs(startTime.getTime() - subscription.getStartTimeMillis().longValue()) < 10*1000 && 
+				if(startTime != null && Math.abs(startTime.getTime() - subscription.getStartTimeMillis().longValue()) > 10*1000 && 
 						startTime.getTime() > 100000*1000l) {
 					throw new IllegalArgumentException(String.format("Start timestamp changed %s != %s %s %s", 
 							startTime == null ? "" :new Date(startTime.getTime()),
@@ -154,7 +154,7 @@ public class UpdateSubscription {
 				upd.setTimestamp(2, startTime);
 			}
 			if(subscription.getExpiryTimeMillis() != null) {
-				if(expireTime == null || Math.abs(expireTime.getTime() - subscription.getExpiryTimeMillis().longValue()) < 10 * 1000) {
+				if(expireTime == null || Math.abs(expireTime.getTime() - subscription.getExpiryTimeMillis().longValue()) > 10 * 1000) {
 					System.out.println(String.format("Expire timestamp changed %s != %s for %s %s", 
 							expireTime == null ? "" :new Date(expireTime.getTime()), 
 									new Date(subscription.getExpiryTimeMillis().longValue()), userid, sku));
