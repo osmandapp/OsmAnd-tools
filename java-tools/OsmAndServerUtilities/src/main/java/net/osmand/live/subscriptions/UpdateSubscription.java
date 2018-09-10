@@ -112,9 +112,9 @@ public class UpdateSubscription {
 			boolean vald = rs.getBoolean("valid");
 			long tm = System.currentTimeMillis();
 			if (checkTime != null && (tm - checkTime.getTime()) < DAY & vald) {
-				if(verifyAll) {
-					System.out.println(String.format("Skip userid=%s, sku=%s - recently checked %.1f days", userid, sku,
-						(tm - checkTime.getTime()) / (DAY * 1.0)));
+				if (verifyAll) {
+					System.out.println(String.format("Skip userid=%s, sku=%s - recently checked %.1f days", userid,
+							sku, (tm - checkTime.getTime()) / (DAY * 1.0)));
 				}
 				continue;
 			}
@@ -151,9 +151,16 @@ public class UpdateSubscription {
 				if (!pt.contains(".AO")) {
 					reason = "invalid purchase token " + e.getMessage();
 					kind = "invalid";
-				} else if (expireTime != null && ((tm - expireTime.getTime()) > 15 * DAY) && gone) {
-					reason = String.format("subscription expired more than %.1f days ago", (tm - expireTime.getTime())
-							/ (DAY * 1.0d));
+				} else if(gone) {
+					kind = "gone";
+					if(expireTime == null) {
+						reason = "subscription expired.";
+					} else if(expireTime != null && ((tm - expireTime.getTime()) > 15 * DAY) ) {
+						reason = String.format("subscription expired more than %.1f days ago", (tm - expireTime.getTime())
+								/ (DAY * 1.0d));
+					}
+						
+					
 				}
 				if (reason != null) {
 					delStat.setString(1, kind);
