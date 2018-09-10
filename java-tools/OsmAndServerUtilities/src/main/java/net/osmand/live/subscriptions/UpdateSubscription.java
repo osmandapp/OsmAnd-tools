@@ -138,22 +138,25 @@ public class UpdateSubscription {
 				}
 				continue;
 			}
+			boolean updated = false;
 			upd.setTime(1, new Time(tm));
 			if(subscription.getStartTimeMillis() != null) {
 				if(startTime != null && startTime.getTime() != subscription.getStartTimeMillis().longValue()) {
-					throw new IllegalArgumentException(String.format("Start timestamp changed %lld != %lld", 
-							startTime.getTime(), subscription.getStartTimeMillis().longValue()));
+					throw new IllegalArgumentException(String.format("Start timestamp changed %s != %s", 
+							new Date(startTime.getTime()), new Date(subscription.getStartTimeMillis().longValue())));
 				}
  				upd.setTime(2, new Time(subscription.getStartTimeMillis()));
+ 				updated = true;
 			} else {
 				upd.setTime(2, startTime);
 			}
 			if(subscription.getExpiryTimeMillis() != null) {
 				if(expireTime != null && expireTime.getTime() != subscription.getExpiryTimeMillis().longValue()) {
-					System.out.println(String.format("End timestamp changed %lld != %lld for %s %s", 
-							startTime.getTime(), subscription.getStartTimeMillis().longValue(), userid, sku));
+					System.out.println(String.format("End timestamp changed %s != %s for %s %s", 
+							new Date(startTime.getTime()), new Date(subscription.getStartTimeMillis().longValue()), userid, sku));
 				}
  				upd.setTime(3, new Time(subscription.getExpiryTimeMillis()));
+ 				updated = true;
 			} else {
 				upd.setTime(3, expireTime);
 			}
@@ -167,8 +170,14 @@ public class UpdateSubscription {
 			upd.setString(7, userid);
 			upd.setString(8, pt);
 			upd.setString(9, sku);
-			System.out.println("Update " + userid + " time " + tm + " expire " + subscription.getExpiryTimeMillis());
-			upd.addBatch();
+			if(updated) {
+				System.out.println(String.format("No changes for %s %s start %s expire %s",userid, sku,
+						startTime == null ? "" : new Date(startTime.getTime()),
+						expireTime == null ? "" : new Date(expireTime.getTime())
+				));
+			} else {
+				upd.addBatch();
+			}
 			changes++;
 		}
 		if (changes > 0) {
