@@ -154,7 +154,7 @@ public class UpdateSubscription {
 				upd.setTimestamp(2, startTime);
 			}
 			if(subscription.getExpiryTimeMillis() != null) {
-				if(expireTime == null || Math.abs(expireTime.getTime() -subscription.getExpiryTimeMillis().longValue()) < 10 * 1000) {
+				if(expireTime == null || Math.abs(expireTime.getTime() - subscription.getExpiryTimeMillis().longValue()) < 10 * 1000) {
 					System.out.println(String.format("Expire timestamp changed %s != %s for %s %s", 
 							expireTime == null ? "" :new Date(expireTime.getTime()), 
 									new Date(subscription.getExpiryTimeMillis().longValue()), userid, sku));
