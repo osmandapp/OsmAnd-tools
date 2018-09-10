@@ -66,8 +66,12 @@ public class UpdateSubscription {
 				verifyAll = true;
 			}
 		}
-		
+		// supporters_subscription
+		// supporters_device_sub
 
+//		ResultSet rs = conn.createStatement().executeQuery(
+//				"SELECT sku, userid, purchaseToken FROM supporters_device_sub S where (valid is null or valid=true) " +
+//					" and ";
 		ResultSet rs = conn.createStatement().executeQuery(
 				"SELECT * FROM ( " +
 				"  SELECT DISTINCT userid, sku,  " +
