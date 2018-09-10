@@ -5,6 +5,9 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.SQLType;
+import java.sql.Time;
+import java.sql.Types;
 import java.util.*;
 
 import org.apache.http.NameValuePair;
@@ -69,84 +72,109 @@ public class UpdateSubscription {
 		// supporters_subscription
 		// supporters_device_sub
 
-//		ResultSet rs = conn.createStatement().executeQuery(
-//				"SELECT sku, userid, purchaseToken FROM supporters_device_sub S where (valid is null or valid=true) " +
-//					" and ";
 		ResultSet rs = conn.createStatement().executeQuery(
-				"SELECT * FROM ( " +
-				"  SELECT DISTINCT userid, sku,  " +
-				"	first_value(purchaseToken) over (partition by userid, sku order by checktime desc) purchaseToken, " +
-				"	first_value(checktime) over (partition by userid, sku order by checktime desc) checktime, " +
-				"	first_value(autorenewing) over (partition by userid, sku order by checktime desc) autorenewing, " +
-				"	first_value(starttime) over (partition by userid, sku order by checktime desc) starttime, " +
-				"	first_value(kind) over (partition by userid, sku order by checktime desc) kind, " +
-				"	first_value(expiretime) over (partition by userid, sku order by checktime desc) expiretime " +
-				"  FROM supporters_subscription ) a " +
-				(verifyAll? ";" : "WHERE kind = '' or kind is null;"));
+				"SELECT userid, sku, purchaseToken, checktime, starttime, expiretime "
+				+ "FROM supporters_device_sub S where (valid is null or valid=true) ");
+//		ResultSet rs = conn.createStatement().executeQuery(
+//				"SELECT * FROM ( " +
+//				"  SELECT DISTINCT userid, sku,  " +
+//				"	first_value(purchaseToken) over (partition by userid, sku order by checktime desc) purchaseToken, " +
+//				"	first_value(checktime) over (partition by userid, sku order by checktime desc) checktime, " +
+//				"	first_value(autorenewing) over (partition by userid, sku order by checktime desc) autorenewing, " +
+//				"	first_value(starttime) over (partition by userid, sku order by checktime desc) starttime, " +
+//				"	first_value(kind) over (partition by userid, sku order by checktime desc) kind, " +
+//				"	first_value(expiretime) over (partition by userid, sku order by checktime desc) expiretime " +
+//				"  FROM supporters_subscription ) a " +
+//				(verifyAll? ";" : "WHERE kind = '' or kind is null;"));
 		
-		queryPurchases(publisher, conn, rs);
+		queryPurchases(publisher, conn, rs, verifyAll);
 	}
 	
-	private static void queryPurchases(AndroidPublisher publisher, Connection conn, ResultSet rs) throws SQLException {
-		PreparedStatement ps = conn
-				.prepareStatement("INSERT INTO supporters_subscription(userid, sku, purchaseToken, checktime, autorenewing, starttime, expiretime, kind) "
-						+ " VALUES(?, ?, ?, ?, ?, ?, ?, ?)");
-
-		PreparedStatement updateStatement = conn
-				.prepareStatement("UPDATE supporters_subscription SET kind=?"
-						+ " WHERE userid =?");
+	private static void queryPurchases(AndroidPublisher publisher, Connection conn, ResultSet rs, boolean verifyAll) throws SQLException {
+		PreparedStatement upd = conn
+				.prepareStatement("UPDATE supporters_device_sub SET checktime = ?, starttime = ?, expiretime = ?, autorenewing = ?, kind = ?, valid = ? " +
+							" WHERE userid = ? and purchaseToken = ? and sku = ?");
+		
+		PreparedStatement delStatement = conn
+				.prepareStatement("UPDATE supporters_device_sub SET valid = false, kind = 'invalid'" +
+							" WHERE userid = ? and purchaseToken = ? and sku = ?");
 
 		AndroidPublisher.Purchases purchases = publisher.purchases();
 		int changes = 0;
 		int deletions = 0;
 		while (rs.next()) {
-			if (rs.getString("kind") != null) {
-				if (rs.getString("kind").equals(INVALID_PURCHASE)) {
+			String userid = rs.getString("userid");
+			String pt = rs.getString("purchaseToken");
+			String sku = rs.getString("sku");
+			Time checkTime = rs.getTime("checktime");
+			Time startTime = rs.getTime("starttime");
+			Time expireTime = rs.getTime("expiretime");
+			long tm = System.currentTimeMillis();
+			// TODO skip active
+			if(checkTime != null && startTime != null && expireTime != null) {
+				if(expireTime.getTime() > tm) {
+					System.out.println(String.format("Skip userid=%s, sku=%s - subscribtion is active", userid, sku));
 					continue;
 				}
-
 			}
-			String userid = rs.getString("userid");
-			String pt = rs.getString("purchasetoken");
-			String subscriptionId = rs.getString("sku");
+			
 			SubscriptionPurchase subscription;
 			try {
-				if(subscriptionId.startsWith("osm_free")) {
-					subscription = purchases.subscriptions().get(GOOGLE_PACKAGE_NAME_FREE, subscriptionId, pt).execute();
+				if(sku.startsWith("osm_free")) {
+					subscription = purchases.subscriptions().get(GOOGLE_PACKAGE_NAME_FREE, sku, pt).execute();
 				} else {
-					subscription = purchases.subscriptions().get(GOOGLE_PACKAGE_NAME, subscriptionId, pt).execute();
+					subscription = purchases.subscriptions().get(GOOGLE_PACKAGE_NAME, sku, pt).execute();
 				}
 			} catch (Exception e) {
 				if (!pt.contains(".AO")) {
-					updateStatement.setString(1, INVALID_PURCHASE);
-					updateStatement.setString(2, userid);
-					updateStatement.addBatch();
+					delStatement.setString(1, userid);
+					delStatement.setString(2, pt);
+					delStatement.setString(3, sku);
+					delStatement.addBatch();
 					deletions++;
-					System.out.println("Clearing invalid subscription: userid=" + userid + " sku=" + subscriptionId);
-				}
-				else {
-					System.err.println("Error updating userid " + userid + " and sku " + subscriptionId);
-					e.printStackTrace();
+					System.out.println("Clearing invalid subscription: userid=" + userid + " sku=" + sku);
+				} else {
+					System.err.println("!! Error updating userid " + userid + " and sku " + sku);
 				}
 				continue;
 			}
-			long tm = System.currentTimeMillis();
-			ps.setString(1, userid);
-			ps.setString(2, subscriptionId);
-			ps.setString(3, pt);
-			ps.setLong(4, tm);
-			ps.setString(5, subscription.getAutoRenewing() + "");
-			ps.setLong(6, subscription.getStartTimeMillis());
-			ps.setLong(7, subscription.getExpiryTimeMillis());
-			ps.setString(8, subscription.getKind());
+			upd.setTime(1, new Time(tm));
+			if(subscription.getStartTimeMillis() != null) {
+				if(startTime != null && startTime.getTime() != subscription.getStartTimeMillis().longValue()) {
+					throw new IllegalArgumentException(String.format("Start timestamp changed %lld != %lld", 
+							startTime.getTime(), subscription.getStartTimeMillis().longValue()));
+				}
+ 				upd.setTime(2, new Time(subscription.getStartTimeMillis()));
+			} else {
+				upd.setTime(2, startTime);
+			}
+			if(subscription.getExpiryTimeMillis() != null) {
+				if(expireTime != null && expireTime.getTime() != subscription.getExpiryTimeMillis().longValue()) {
+					System.out.println(String.format("End timestamp changed %lld != %lld for %s %s", 
+							startTime.getTime(), subscription.getStartTimeMillis().longValue(), userid, sku));
+				}
+ 				upd.setTime(3, new Time(subscription.getExpiryTimeMillis()));
+			} else {
+				upd.setTime(3, expireTime);
+			}
+			if(subscription.getAutoRenewing() == null) {
+				upd.setNull(4, Types.BOOLEAN);
+			} else {
+				upd.setBoolean(4, subscription.getAutoRenewing());	
+			}
+			upd.setString(5, subscription.getKind());
+			upd.setBoolean(6, true);
+			upd.setString(7, userid);
+			upd.setString(8, pt);
+			upd.setString(9, sku);
 			System.out.println("Update " + userid + " time " + tm + " expire " + subscription.getExpiryTimeMillis());
-			ps.addBatch();
+			upd.addBatch();
 			changes++;
 		}
 		if (changes > 0) {
-			ps.executeBatch();
+			upd.executeBatch();
 			if (deletions > 0) {
-				updateStatement.executeBatch();
+				delStatement.executeBatch();
 			}
 			if (!conn.getAutoCommit()) {
 				conn.commit();
