@@ -133,9 +133,9 @@ public class UpdateSubscription {
 					delStatement.setString(3, sku);
 					delStatement.addBatch();
 					deletions++;
-					System.out.println("Clearing invalid subscription: userid=" + userid + " sku=" + sku);
+					System.out.println("!! Clearing invalid subscription: userid=" + userid + " sku=" + sku + ": " + e.getMessage());
 				} else {
-					System.err.println("!! Error updating userid " + userid + " and sku " + sku);
+					System.err.println("!! Error updating userid " + userid + " and sku " + sku + ": " + e.getMessage()) ;
 				}
 				continue;
 			}
