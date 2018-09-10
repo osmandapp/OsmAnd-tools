@@ -65,7 +65,7 @@ public class UpdateSubscription {
 	int deletions = 0;
 	private PreparedStatement updSubscrStat;
 	private PreparedStatement delStat;
-	private PreparedStatement updCheckStat;
+//	private PreparedStatement updCheckStat;
 
 	public static void main(String[] args) throws JSONException, IOException, SQLException, ClassNotFoundException {
 		AndroidPublisher publisher = getPublisherApi(args[0]);
@@ -92,13 +92,12 @@ public class UpdateSubscription {
 				"SELECT userid, sku, purchaseToken, checktime, starttime, expiretime, valid "
 				+ "FROM supporters_device_sub S where (valid is null or valid=true) ");
 		updSubscrStat = conn.prepareStatement("UPDATE supporters_device_sub SET "
-				+ "checktime = ?, starttime = ?, expiretime = ?, autorenewing = ?, kind = ?, valid = ? " +
+				+ "checktime = ?, starttime = ?, expiretime = ?, autorenewing = ?, kind = ?, orderid = ?, payload = ?, valid = ? " +
 				  " WHERE userid = ? and purchaseToken = ? and sku = ?");
-		
 		delStat = conn.prepareStatement("UPDATE supporters_device_sub SET valid = false, kind = ?, checktime = ?" +
 							" WHERE userid = ? and purchaseToken = ? and sku = ?");
-		updCheckStat = conn.prepareStatement("UPDATE supporters_device_sub SET checktime = ? " +
-							" WHERE userid = ? and purchaseToken = ? and sku = ?");
+//		updCheckStat = conn.prepareStatement("UPDATE supporters_device_sub SET checktime = ? " +
+//							" WHERE userid = ? and purchaseToken = ? and sku = ?");
 
 		AndroidPublisher.Purchases purchases = publisher.purchases();
 		
@@ -198,7 +197,8 @@ public class UpdateSubscription {
 	private void updateSubscriptionDb(String userid, String pt, String sku, Timestamp startTime, Timestamp expireTime,
 			long tm, SubscriptionPurchase subscription) throws SQLException {
 		boolean updated = false;
-		updSubscrStat.setTimestamp(1, new Timestamp(tm));
+		int ind = 1;
+		updSubscrStat.setTimestamp(ind++, new Timestamp(tm));
 		if(subscription.getStartTimeMillis() != null) {
 			if(startTime != null && Math.abs(startTime.getTime() - subscription.getStartTimeMillis().longValue()) > 10*1000 && 
 					startTime.getTime() > 100000*1000l) {
@@ -206,10 +206,10 @@ public class UpdateSubscription {
 						startTime == null ? "" :new Date(startTime.getTime()),
 								new Date(subscription.getStartTimeMillis().longValue()), userid, sku));
 			}
-			updSubscrStat.setTimestamp(2, new Timestamp(subscription.getStartTimeMillis()));
+			updSubscrStat.setTimestamp(ind++, new Timestamp(subscription.getStartTimeMillis()));
 			updated = true;
 		} else {
-			updSubscrStat.setTimestamp(2, startTime);
+			updSubscrStat.setTimestamp(ind++, startTime);
 		}
 		if(subscription.getExpiryTimeMillis() != null) {
 			if(expireTime == null || Math.abs(expireTime.getTime() - subscription.getExpiryTimeMillis().longValue()) > 10 * 1000) {
@@ -217,21 +217,23 @@ public class UpdateSubscription {
 						expireTime == null ? "" :new Date(expireTime.getTime()), 
 								new Date(subscription.getExpiryTimeMillis().longValue()), userid, sku));
 			}
-			updSubscrStat.setTimestamp(3, new Timestamp(subscription.getExpiryTimeMillis()));
+			updSubscrStat.setTimestamp(ind++, new Timestamp(subscription.getExpiryTimeMillis()));
 			updated = true;
 		} else {
-			updSubscrStat.setTimestamp(3, expireTime);
+			updSubscrStat.setTimestamp(ind++, expireTime);
 		}
 		if(subscription.getAutoRenewing() == null) {
-			updSubscrStat.setNull(4, Types.BOOLEAN);
+			updSubscrStat.setNull(ind++, Types.BOOLEAN);
 		} else {
-			updSubscrStat.setBoolean(4, subscription.getAutoRenewing());	
+			updSubscrStat.setBoolean(ind++, subscription.getAutoRenewing());	
 		}
-		updSubscrStat.setString(5, subscription.getOrderId() + " " + subscription.getDeveloperPayload());
-		updSubscrStat.setBoolean(6, true);
-		updSubscrStat.setString(7, userid);
-		updSubscrStat.setString(8, pt);
-		updSubscrStat.setString(9, sku);
+		updSubscrStat.setString(ind++, subscription.getKind());
+		updSubscrStat.setString(ind++, subscription.getOrderId());
+		updSubscrStat.setString(ind++, subscription.getDeveloperPayload());
+		updSubscrStat.setBoolean(ind++, true);
+		updSubscrStat.setString(ind++, userid);
+		updSubscrStat.setString(ind++, pt);
+		updSubscrStat.setString(ind++, sku);
 		System.out.println(String.format("%s for %s %s start %s expire %s",
 				updated ? "Updates " :  "No changes ",
 				userid, sku,
