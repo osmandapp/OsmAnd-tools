@@ -95,7 +95,7 @@ public class UpdateSubscription {
 				+ "checktime = ?, starttime = ?, expiretime = ?, autorenewing = ?, kind = ?, valid = ? " +
 				  " WHERE userid = ? and purchaseToken = ? and sku = ?");
 		
-		delStat = conn.prepareStatement("UPDATE supporters_device_sub SET valid = false, kind = ?" +
+		delStat = conn.prepareStatement("UPDATE supporters_device_sub SET valid = false, kind = ?, checktime = ?" +
 							" WHERE userid = ? and purchaseToken = ? and sku = ?");
 		updCheckStat = conn.prepareStatement("UPDATE supporters_device_sub SET checktime = ? " +
 							" WHERE userid = ? and purchaseToken = ? and sku = ?");
@@ -164,9 +164,10 @@ public class UpdateSubscription {
 				}
 				if (reason != null) {
 					delStat.setString(1, kind);
-					delStat.setString(2, userid);
-					delStat.setString(3, pt);
-					delStat.setString(4, sku);
+					delStat.setTimestamp(2, new Timestamp(tm));
+					delStat.setString(3, userid);
+					delStat.setString(4, pt);
+					delStat.setString(5, sku);
 					delStat.addBatch();
 					deletions++;
 					System.out.println(String.format(
