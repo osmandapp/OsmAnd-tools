@@ -173,15 +173,16 @@ public class UpdateSubscription {
 			upd.setString(7, userid);
 			upd.setString(8, pt);
 			upd.setString(9, sku);
+			System.out.println(String.format("%s for %s %s start %s expire %s",
+					updated ? "Updates " :  "No changes ",
+					userid, sku,
+					startTime == null ? "" : new Date(startTime.getTime()),
+					expireTime == null ? "" : new Date(expireTime.getTime())
+			));
 			if(updated) {
-				System.out.println(String.format("No changes for %s %s start %s expire %s",userid, sku,
-						startTime == null ? "" : new Date(startTime.getTime()),
-						expireTime == null ? "" : new Date(expireTime.getTime())
-				));
-			} else {
 				upd.addBatch();
+				changes++;
 			}
-			changes++;
 		}
 		if (changes > 0) {
 			upd.executeBatch();
