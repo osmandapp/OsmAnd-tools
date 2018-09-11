@@ -41,7 +41,9 @@ public class IndexController {
 		try {
 			JAXBContext jc = JAXBContext.newInstance(DownloadIndexDocument.class);
 			Unmarshaller unmarshaller = jc.createUnmarshaller();
-			return (DownloadIndexDocument) unmarshaller.unmarshal(fl);
+			DownloadIndexDocument did = (DownloadIndexDocument) unmarshaller.unmarshal(fl);;
+			did.prepareMaps();
+			return did;
 		} catch (JAXBException ex) {
 			LOGGER.error(ex.getMessage(), ex);
 			throw new IOException(ex);

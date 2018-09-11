@@ -40,7 +40,7 @@ public class TransactionAnalyzer {
     
     private static final double UNDERPAYED_THRESHOLD = CoinSenderMain.getMinPayInBTC() * BITCOIN_SATOSHI; // 5$: 1BTC=10000$ (0.5 mBTC)   
     private static final double OVERPAYED_THRESHOLD = CoinSenderMain.getMinPayInBTC() * BITCOIN_SATOSHI / 5; // 1$: 1BTC=10000$  (0.1 mBTC)
-	private static final String REPORT_URL = "http://builder.osmand.net/reports/query_month_report.php?report=getPayouts&month=";
+	private static final String REPORT_URL = "https://osmand.net/reports/query_month_report?report=getPayouts&month=";
 	private static final String TRANSACTIONS = "https://raw.githubusercontent.com/osmandapp/osmandapp.github.io/master/website/reports/transactions.json";
     public static void main(String[] args) throws IOException {
     	int FINAL_YEAR = Calendar.getInstance().get(Calendar.YEAR);

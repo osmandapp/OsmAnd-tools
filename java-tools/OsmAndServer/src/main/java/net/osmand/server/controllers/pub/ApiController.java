@@ -27,9 +27,7 @@ import net.osmand.server.api.repo.EmailUnsubscribedRepository;
 import net.osmand.server.api.repo.EmailUnsubscribedRepository.EmailUnsubscribed;
 import net.osmand.server.api.services.CameraPlace;
 import net.osmand.server.api.services.ImageService;
-import net.osmand.server.api.services.MotdMessage;
 import net.osmand.server.api.services.MotdService;
-import net.osmand.util.Algorithms;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -292,7 +290,13 @@ public class ApiController {
         if (headers.getFirst("X-Forwarded-For") != null) {
             remoteAddr = headers.getFirst("X-Forwarded-For");
         }
-        MotdMessage body = motdService.getMessage(version, os, remoteAddr);
+		if (version != null) {
+			int i = version.indexOf(" ");
+			if (i >= 0) {
+				version = version.substring(i + 1);
+			}
+		}
+        HashMap<String,Object> body = motdService.getMessage(version, os, remoteAddr, lang);
         if (body != null) {
             return jsonMapper.writeValueAsString(body);
         }
@@ -300,7 +304,7 @@ public class ApiController {
     }
     
     
-    @GetMapping(path = {"/api/email/support_survey"})
+    @GetMapping(path = {"/email/support_survey"})
     public String emailSupportSurvey(@RequestHeader HttpHeaders headers,
             HttpServletRequest request, @RequestParam(required=false) String response, Model model) throws IOException  {
     	String remoteAddr = request.getRemoteAddr();
@@ -321,9 +325,7 @@ public class ApiController {
     	return "pub/email/survey";
     }
     
-    
-    
-    @GetMapping(path = {"/api/email/unsubscribe"}, produces = "text/html;charset=UTF-8")
+    @GetMapping(path = {"/email/unsubscribe"}, produces = "text/html;charset=UTF-8")
     public String emailUnsubscribe(@RequestParam(required=true) String id, @RequestParam(required=false) String group) throws IOException  {
 		String email = new String(Base64Utils.decodeFromString(URLDecoder.decode(id, "UTF-8")));
     	EmailUnsubscribed ent = new EmailUnsubscribedRepository.EmailUnsubscribed();
@@ -337,7 +339,8 @@ public class ApiController {
     	return "pub/email/unsubscribe";
     	
     }
-    @GetMapping(path = {"/api/email/subscribe"}, produces = "text/html;charset=UTF-8")
+    
+    @GetMapping(path = {"/email/subscribe"}, produces = "text/html;charset=UTF-8")
     public String emailSubscribe(@RequestParam(required=true) String id, @RequestParam(required=false) String group) throws IOException  {
 		String email = new String(Base64Utils.decodeFromString(URLDecoder.decode(id, "UTF-8")));
     	unsubscribedRepo.deleteAllByEmail(email);

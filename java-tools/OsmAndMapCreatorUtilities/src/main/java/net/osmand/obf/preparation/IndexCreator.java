@@ -839,7 +839,7 @@ public class IndexCreator {
 //		settings.indexAddress = true;
 //		settings.indexPOI = true;
 //		settings.indexTransport = true;
-//		settings.indexRouting = true;
+		settings.indexRouting = true;
 		
 		settings.srtmDataFolder = new File(rootFolder + "/maps/srtm/");
 //		settings.gtfsData = new File(rootFolder + "/maps/transport/Netherlands.sqlite");

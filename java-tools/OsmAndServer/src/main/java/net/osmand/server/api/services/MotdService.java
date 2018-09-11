@@ -6,8 +6,11 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.TimeZone;
 
 import javax.annotation.PostConstruct;
@@ -18,6 +21,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -25,18 +29,19 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 public class MotdService {
     private static final Log LOGGER = LogFactory.getLog(MotdService.class);
     private static final String MOTD_SETTINGS = "api/messages/motd_config.json";
-    private static final String DATE_PATTERN = "yyyy-MM-dd HH:mm";
 
     @Value("${web.location}")
     private String websiteLocation;
 
     private final ObjectMapper mapper;
+    private static final SimpleDateFormat dateFormat = new SimpleDateFormat("dd-MM-yyyy HH:mm");
+    static {
+    	dateFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
+    }
     
     private MotdSettings settings;
 
     public MotdService() {
-        SimpleDateFormat dateFormat = new SimpleDateFormat(DATE_PATTERN);
-        dateFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
         ObjectMapper objectMapper = new ObjectMapper();
         objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
         objectMapper.setDateFormat(dateFormat);
@@ -49,18 +54,14 @@ public class MotdService {
 		return settings;
 	}
 
-    public MotdMessage getMessage(String version, String os, String hostAddress) throws IOException, ParseException {
+    public HashMap<String,Object> getMessage(String version, String os, String hostAddress, String lang) throws IOException, ParseException {
         Date now = new Date();
-        MotdMessage message = null;
+        HashMap<String,Object> message = null;
 		MotdSettings settings = getSettings();
 		if (settings != null) {
 			for (DiscountSetting setting : settings.discountSettings) {
-				if (setting.checkCondition(now, hostAddress, version)) {
-					String filename = setting.getMotdFileByPlatform(os);
-					message = parseMotdMessageFile(websiteLocation.concat("api/messages/").concat(filename));
-					if (message != null) {
-						message = setting.modifyMessageIfNeeded(message);
-					}
+				if (setting.discountCondition.checkCondition(now, hostAddress, version, os, lang)) {
+					message = setting.parseMotdMessageFile(mapper, websiteLocation.concat("api/messages/"));
 					break;
 				}
 			}
@@ -89,12 +90,7 @@ public class MotdService {
 
     
 
-    private MotdMessage parseMotdMessageFile(String filepath) throws IOException {
-    	if(filepath != null && filepath.length() > 0 && new File(filepath).exists() ) {
-    		return mapper.readValue(new File(filepath), MotdMessage.class);
-    	}
-    	return null;
-    }
+    
 
     public static class MotdSettings {
 
@@ -112,40 +108,38 @@ public class MotdService {
         public DiscountCondition discountCondition;
         @JsonProperty("file")
         public String file;
-        @JsonProperty("ios_file")
-        public String iosFile;
         @JsonProperty("fields")
         public Map<String, String> fields;
 
 
-        protected MotdMessage modifyMessageIfNeeded(MotdMessage message) {
+        protected HashMap<String,Object> parseMotdMessageFile(ObjectMapper mapper, String folder) throws IOException {
+        	if(file != null && file.length() > 0 && new File(folder, file).exists() ) {
+        		TypeReference<HashMap<String,Object>> typeRef = new TypeReference<HashMap<String,Object>>() {};
+        		HashMap<String,Object> res = mapper.readValue(new File(folder, file), typeRef);
+        		if(res != null) {
+        			res = modifyMessageIfNeeded(res, discountCondition.startDate, discountCondition.endDate);
+        		}
+        		return res;
+        	}
+        	return null;
+        }
+        protected HashMap<String,Object> modifyMessageIfNeeded(HashMap<String,Object> message, Date start, Date end) {
             if (fields != null) {
-            	if(fields.containsKey("description")) {
-            		message.setDescription(fields.get("description"));
+            	Iterator<Entry<String, String>> it = fields.entrySet().iterator();
+            	while(it.hasNext()) {
+            		Entry<String, String> e = it.next();
+            		message.put(e.getKey(), e.getValue());
             	}
-            	if(fields.containsKey("message")) {
-            		message.setMessage(fields.get("message"));
-            	}
-            	if(fields.containsKey("start")) {
-            		message.setStartDate(fields.get("start"));
-            	}
-            	if(fields.containsKey("end")) {
-            		message.setEndDate(fields.get("end"));
-            	}
+            }
+            if(start != null) {
+            	message.put("start", dateFormat.format(start));
+            }
+            if(start != null) {
+            	message.put("end", dateFormat.format(end));
             }
             return message;
         }
 
-        public boolean checkCondition(Date now, String hostAddress, String version) {
-			return discountCondition.checkCondition(now, hostAddress, version);
-		}
-
-		public String getMotdFileByPlatform(String os) {
-            if (os != null && os.equals("ios") && iosFile != null) {
-                return iosFile;
-            }
-            return file;
-        }
     }
 
     public static class DiscountCondition {
@@ -157,12 +151,20 @@ public class MotdService {
         private Date endDate;
         @JsonProperty("version")
         private String version;
+        @JsonProperty("lang")
+        private String lang;
+        @JsonProperty("os")
+        private String os;
         
 		public String getFilterCondition() {
 			String filter = "";
+			if (os != null) {
+				filter += " " + os + ": ";
+			}
 			if (ip != null) {
 				filter += " IP in '" + ip + "' ";
 			}
+			
 			if (startDate != null || endDate != null) {
 				filter += String.format(" Date between %s and %s", 
 						(startDate == null ? "-" : String.format("%1$tF %1$tR", startDate)),
@@ -176,14 +178,23 @@ public class MotdService {
 		}
         
 
-        public boolean checkCondition(Date date, String hostAddress, String version) {
+        public boolean checkCondition(Date date, String hostAddress, String version, String osV, String lang) {
             if (ip != null && !ip.contains(hostAddress)) {
                 return false;
             }
             if(!checkActiveDate(date)) {
             	return false;
             }
+            if (this.os != null && this.os.length() > 0) {
+				String osVersion = osV != null && osV.equals("ios") ? "ios" : "android";
+				if(!osVersion.equals(this.os)) {
+					return false;
+				}
+            }
             if (this.version != null && (version == null || !version.startsWith(this.version))) {
+                return false;
+            }
+            if (this.lang != null && (lang == null || !this.lang.contains(lang))) {
                 return false;
             }
             return true;
