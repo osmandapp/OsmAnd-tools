@@ -1,26 +1,21 @@
 package net.osmand.server.controllers.pub;
 
-import net.osmand.server.api.repo.MapUserRepository;
+import net.osmand.server.api.repo.*;
 import net.osmand.server.api.repo.MapUserRepository.MapUser;
-import net.osmand.server.api.repo.OsmRecipientsRepository;
 import net.osmand.server.api.repo.OsmRecipientsRepository.OsmRecipient;
-import net.osmand.server.api.repo.SupporterSubscriptionRepository;
-import net.osmand.server.api.repo.SupportersRepository;
 import net.osmand.server.api.repo.SupportersRepository.Supporter;
-import net.osmand.server.api.repo.SupporterSubscriptionRepository.SupporterSubscription;
+import net.osmand.server.utils.BTCAddrValidator;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.web.client.RestTemplateBuilder;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.*;
 import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
 
-import java.io.IOException;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.Arrays;
+import java.sql.Timestamp;
 import java.util.Base64;
 import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
@@ -32,6 +27,8 @@ public class SubscriptionController {
 
     private static final String ERROR_MESSAGE_TEMPLATE = "{\"error\": \"%s is not specified\"}";
 
+    private static final String REDIS_KEY_INVALID_TOKEN = "invalid_token";
+
     @Autowired
     private SupportersRepository supportersRepository;
     @Autowired
@@ -40,6 +37,10 @@ public class SubscriptionController {
     private MapUserRepository mapUserRepository;
     @Autowired
     private OsmRecipientsRepository osmRecipientsRepository;
+    @Autowired
+    private SupportersDeviceSubscriptionRepository supportersDeviceSubscriptionRepository;
+    @Autowired
+    private StringRedisTemplate redisTemplate;
 
     private final RestTemplate restTemplate;
 
@@ -91,19 +92,25 @@ public class SubscriptionController {
                 HttpMethod.GET, requestEntity, String.class);
     }
 
+    private void validateSupporterToken(Supporter supporter, String token) {
+        if (!supporter.token.equals(token)) {
+            throw new InvalidTokenException("Token is invalid.", token);
+        }
+    }
+
     @PostMapping(path = {"/register_email", "/register_email.php"},
             consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<MapUser> registerEmail(@RequestParam("aid") String aid,
-                                                                   @RequestParam("email") String email) {
+                                                 @RequestParam("email") String email) {
         checkParameter("aid", aid);
         checkParameter("E-mail", email);
-        long timestamp = System.currentTimeMillis();
+        long updateTime = System.currentTimeMillis();
         MapUser mapUser = new MapUser();
-        mapUser.setAid(aid);
-        mapUser.setEmail(email);
-        mapUser.setUpdateTime(timestamp);
-        mapUser = mapUserRepository.save(mapUser);
+        mapUser.aid = aid;
+        mapUser.email = email;
+        mapUser.updateTime = updateTime;
+        mapUser = mapUserRepository.saveAndFlush(mapUser);
         return ResponseEntity.ok(mapUser);
     }
 
@@ -118,13 +125,17 @@ public class SubscriptionController {
         checkParameter("Preferred Country", preferredCountry);
         Optional<Supporter> optionalSupporter = supportersRepository.findByUserEmail(email);
         if (optionalSupporter.isPresent()) {
-            Supporter supporter = optionalSupporter.get();
-            return ResponseEntity.ok(supporter);
+            return ResponseEntity.ok(optionalSupporter.get());
         }
         ThreadLocalRandom tlr = ThreadLocalRandom.current();
         int token = tlr.nextInt(100000, 1000000);
-        Supporter supporter = new Supporter(0L , String.valueOf(token),
-                visibleName, email, preferredCountry, 0);
+        Supporter supporter = new Supporter();
+        supporter.userId = 0L;
+        supporter.token = String.valueOf(token);
+        supporter.visibleName = visibleName;
+        supporter.userEmail = email;
+        supporter.preferedRegion = preferredCountry;
+        supporter.disabled = 0;
         supporter = supportersRepository.saveAndFlush(supporter);
         return ResponseEntity.ok(supporter);
     }
@@ -141,7 +152,13 @@ public class SubscriptionController {
         checkParameter("E-mail", email);
         checkParameter("Token", token);
         checkParameter("Preferred Country", preferredCountry);
-        Supporter supporter = new Supporter(userid, token, visibleName, email, preferredCountry, 0);
+        Supporter supporter = new Supporter();
+        supporter.userId = userid;
+        supporter.token = token;
+        supporter.visibleName = visibleName;
+        supporter.userEmail = email;
+        supporter.preferedRegion = preferredCountry;
+        supporter.disabled = 0;
         supporter = supportersRepository.saveAndFlush(supporter);
         return ResponseEntity.ok(supporter);
     }
@@ -162,29 +179,33 @@ public class SubscriptionController {
         String credentials = encodeCredentialsToBase64(username, osmPassword);
         authenticateUser(credentials);
         long registerTimestamp = System.currentTimeMillis();
-        OsmRecipient recipient = new OsmRecipient(osmUser, email, bitcoinAddress, registerTimestamp);
-        recipient = osmRecipientsRepository.save(recipient);
+        OsmRecipient recipient = new OsmRecipient();
+        recipient.osmId = osmUser;
+        recipient.email = email;
+        recipient.bitcoinAddress = bitcoinAddress;
+        recipient.updateTime = registerTimestamp;
+        recipient = osmRecipientsRepository.saveAndFlush(recipient);
         return ResponseEntity.ok(recipient);
     }
 
     @PostMapping(path = {"/purchased", "/purchased.php"})
     public ResponseEntity<Supporter> purchased(@RequestParam("userid") Long userId,
-                                            @RequestParam("sku") String sku,
-                                            @RequestParam("purchaseToken") String purchaseToken) {
+                                               @RequestParam("token") String token,
+                                               @RequestParam("sku") String sku,
+                                               @RequestParam("purchaseToken") String purchaseToken) {
+        checkParameter("token", token);
         checkParameter("sku", sku);
         checkParameter("purchase token", purchaseToken);
         Optional<Supporter> supporterOptional = supportersRepository.findById(userId);
         if (!supporterOptional.isPresent()) {
-            throw new SupporterSubscriptionNotFoundException("User not found with given id : " + userId);
+            throw new SupporterNotFoundException("User not found with given id : " + userId);
         }
-        long checkTime = System.currentTimeMillis();
-        SupporterSubscription subscription = new SupporterSubscription();
-        subscription.setUserId(userId);
-        subscription.setSku(sku);
-        subscription.setPurchaseToken(purchaseToken);
-        subscription.setCheckTime(checkTime);
-        supporterSubscriptionRepository.save(subscription);
-        return ResponseEntity.ok(supporterOptional.get());
+        Supporter supporter = supporterOptional.get();
+        validateSupporterToken(supporter, token);
+        long timestamp = System.currentTimeMillis();
+        supportersDeviceSubscriptionRepository.createSupporterDeviceSubscriptionIfNotExists(
+                userId, sku, purchaseToken, new Timestamp(timestamp));
+        return ResponseEntity.ok(supporter);
     }
 
     @ExceptionHandler(MissingRequestParameterException.class)
@@ -199,11 +220,18 @@ public class SubscriptionController {
         return ResponseEntity.badRequest().body("{\"error\": \"%s\"}");
     }
 
-    @ExceptionHandler(SupporterSubscriptionNotFoundException.class)
-    public ResponseEntity<String> supporterSubscriptionNotFoundHandler(SupporterSubscriptionNotFoundException ex) {
+    @ExceptionHandler(SupporterNotFoundException.class)
+    public ResponseEntity<String> supporterNotFoundHandler(SupporterNotFoundException ex) {
         LOGGER.error(ex.getMessage(), ex);
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(
-                "{\"error\": \"Supporter subscription not found. Check user id\"}");
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body("{\"error\": \"User not found with given userid.\"}");
+    }
+
+    @ExceptionHandler(InvalidTokenException.class)
+    public ResponseEntity<String> invalidTokenHandler(InvalidTokenException ex) {
+        LOGGER.error(ex.getMessage(), ex);
+        String token = ex.getToken();
+        redisTemplate.opsForZSet().add(REDIS_KEY_INVALID_TOKEN, token, token.hashCode());
+        return ResponseEntity.badRequest().body(String.format("{\"error\": \"%s\"}", ex.getToken()));
     }
 
     private static class MissingRequestParameterException extends RuntimeException {
@@ -218,141 +246,23 @@ public class SubscriptionController {
         }
     }
 
-    private static class SupporterSubscriptionNotFoundException extends RuntimeException {
-        SupporterSubscriptionNotFoundException(String s) {
+    private static class SupporterNotFoundException extends RuntimeException {
+        SupporterNotFoundException(String s) {
             super(s);
         }
     }
 
+    private static class InvalidTokenException extends RuntimeException {
 
-    private static class BTCAddrValidator {
+        private final String token;
 
-        private static final char[] ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz".toCharArray();
-
-        private static final int[] INDEXES = new int[128];
-
-        private static final MessageDigest digest;
-
-        static {
-            try {
-                digest = MessageDigest.getInstance("SHA-256");
-            } catch (NoSuchAlgorithmException e) {
-                throw new RuntimeException(e);
-            }
-
-            for (int i = 0; i < INDEXES.length; i++) {
-                INDEXES[i] = -1;
-            }
-            for (int i = 0; i < ALPHABET.length; i++) {
-                INDEXES[ALPHABET[i]] = i;
-            }
+        InvalidTokenException(String s, String token) {
+            super(s);
+            this.token = token;
         }
 
-        public static boolean validate(String addr) {
-            try {
-                int addressHeader = getAddressHeader(addr);
-                return (addressHeader == 0 || addressHeader == 5);
-            } catch (Exception x) {
-                x.printStackTrace();
-            }
-            return false;
-        }
-
-        private static int getAddressHeader(String address) throws IOException {
-            byte[] tmp = decodeChecked(address);
-            return tmp[0] & 0xFF;
-        }
-
-        private static byte[] decodeChecked(String input) throws IOException {
-            byte[] tmp = decode(input);
-            if (tmp.length < 4)
-                throw new IOException("BTC AddressFormatException Input too short");
-            byte[] bytes = copyOfRange(tmp, 0, tmp.length - 4);
-            byte[] checksum = copyOfRange(tmp, tmp.length - 4, tmp.length);
-
-            tmp = doubleDigest(bytes);
-            byte[] hash = copyOfRange(tmp, 0, 4);
-            if (!Arrays.equals(checksum, hash))
-                throw new IOException("BTC AddressFormatException Checksum does not validate");
-
-            return bytes;
-        }
-
-        private static byte[] doubleDigest(byte[] input) {
-            return doubleDigest(input, 0, input.length);
-        }
-
-        private static byte[] doubleDigest(byte[] input, int offset, int length) {
-            synchronized (digest) {
-                digest.reset();
-                digest.update(input, offset, length);
-                byte[] first = digest.digest();
-                return digest.digest(first);
-            }
-        }
-
-        private static byte[] decode(String input) throws IOException {
-            if (input.length() == 0) {
-                return new byte[0];
-            }
-            byte[] input58 = new byte[input.length()];
-            // Transform the String to a base58 byte sequence
-            for (int i = 0; i < input.length(); ++i) {
-                char c = input.charAt(i);
-                int digit58 = -1;
-                if (c >= 0 && c < 128) {
-                    digit58 = INDEXES[c];
-                }
-                if (digit58 < 0) {
-                    throw new IOException("Bitcoin AddressFormatException Illegal character " + c + " at " + i);
-                }
-
-                input58[i] = (byte) digit58;
-            }
-
-            // Count leading zeroes
-            int zeroCount = 0;
-            while (zeroCount < input58.length && input58[zeroCount] == 0) {
-                ++zeroCount;
-            }
-            // The encoding
-            byte[] temp = new byte[input.length()];
-            int j = temp.length;
-
-            int startAt = zeroCount;
-            while (startAt < input58.length) {
-                byte mod = divmod256(input58, startAt);
-                if (input58[startAt] == 0) {
-                    ++startAt;
-                }
-
-                temp[--j] = mod;
-            }
-            // Do no add extra leading zeroes, move j to first non null byte.
-            while (j < temp.length && temp[j] == 0) {
-                ++j;
-            }
-
-            return copyOfRange(temp, j - zeroCount, temp.length);
-        }
-
-        private static byte divmod256(byte[] number58, int startAt) {
-            int remainder = 0;
-            for (int i = startAt; i < number58.length; i++) {
-                int digit58 = (int) number58[i] & 0xFF;
-                int temp = remainder * 58 + digit58;
-
-                number58[i] = (byte) (temp / 256);
-
-                remainder = temp % 256;
-            }
-            return (byte) remainder;
-        }
-
-        private static byte[] copyOfRange(byte[] source, int from, int to) {
-            byte[] range = new byte[to - from];
-            System.arraycopy(source, from, range, 0, range.length);
-            return range;
+        String getToken() {
+            return token;
         }
     }
 }

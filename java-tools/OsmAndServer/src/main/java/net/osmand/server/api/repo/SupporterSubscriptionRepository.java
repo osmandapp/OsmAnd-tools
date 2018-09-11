@@ -17,49 +17,15 @@ public interface SupporterSubscriptionRepository extends JpaRepository<Supporter
 
         @Id
         @Column(name = "userid")
-        private Long userId;
+        public Long userId;
 
         @Column(name = "sku")
-        private String sku;
+        public String sku;
 
         @Column(name = "purchasetoken")
-        private String purchaseToken;
+        public String purchaseToken;
 
         @Column(name = "checktime")
-        private long checkTime;
-
-        public SupporterSubscription() {}
-
-        public Long getUserId() {
-            return userId;
-        }
-
-        public void setUserId(Long userId) {
-            this.userId = userId;
-        }
-
-        public String getSku() {
-            return sku;
-        }
-
-        public void setSku(String sku) {
-            this.sku = sku;
-        }
-
-        public String getPurchaseToken() {
-            return purchaseToken;
-        }
-
-        public void setPurchaseToken(String purchaseToken) {
-            this.purchaseToken = purchaseToken;
-        }
-
-        public long getCheckTime() {
-            return checkTime;
-        }
-
-        public void setCheckTime(long checkTime) {
-            this.checkTime = checkTime;
-        }
+        public long checkTime;
     }
 }
