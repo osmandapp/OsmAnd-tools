@@ -32,8 +32,6 @@ public class SubscriptionController {
     @Autowired
     private SupportersRepository supportersRepository;
     @Autowired
-    private SupporterSubscriptionRepository supporterSubscriptionRepository;
-    @Autowired
     private MapUserRepository mapUserRepository;
     @Autowired
     private OsmRecipientsRepository osmRecipientsRepository;
