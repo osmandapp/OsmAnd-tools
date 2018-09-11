@@ -29,21 +29,20 @@ public class ImageService {
 
     private static final int SEARCH_RADIUS = 50;
 
-    private static final String RESULT_MAP_ARR = "arr";
-    private static final String RESULT_MAP_HALFVISARR = "halfvisarr";
-
     private static final String WIKIMEDIA = "wikimedia.org";
     private static final String WIKIPEDIA = "wikipedia.org";
     private static final String WIKI_FILE_PREFIX = "File:";
 
     @Value("${mapillary.clientid}")
     private String mapillaryClientId;
+    private static final int TIMEOUT = 3000;
 
     private final RestTemplate restTemplate;
 
     @Autowired
     public ImageService(RestTemplateBuilder builder) {
-        this.restTemplate = builder.requestFactory(HttpComponentsClientHttpRequestFactory.class).build();
+        this.restTemplate = builder.requestFactory(HttpComponentsClientHttpRequestFactory.class)
+        		.setConnectTimeout(TIMEOUT).setReadTimeout(TIMEOUT).build();
     }
 
     private double computeInitialBearing(double cameraLat, double cameraLon, double targetLat, double targetLon) {
@@ -125,14 +124,14 @@ public class ImageService {
         return Math.abs(angle) < diff;
     }
 
-    private void splitCameraPlaceByAngel(CameraPlace cp, Map<String, List<CameraPlace>> resultMap) {
+    private void splitCameraPlaceByAngel(CameraPlace cp, List<CameraPlace> main, List<CameraPlace> rest) {
         double ca = cp.getCa();
         double bearing = cp.getBearing();
         if (ca > 0d && angleDiff(bearing - ca, 30.0)) {
-            resultMap.get(RESULT_MAP_ARR).add(cp);
+            main.add(cp);
         } else if (!(ca > 0d && !angleDiff(bearing - ca, 60.0))) {
         	// exclude all with camera angle and angle more than 60 (keep w/o camera and angle < 60)
-            resultMap.get(RESULT_MAP_HALFVISARR).add(cp);
+            rest.add(cp);
         }
     }
 
@@ -145,7 +144,7 @@ public class ImageService {
     }
 
     public CameraPlace processMapillaryData(double lat, double lon, String primaryImageKey,
-			Map<String, List<CameraPlace>> resultMap, String host, String proto) {
+    		List<CameraPlace> main, List<CameraPlace> rest, String host, String proto) {
 		UriComponentsBuilder uriBuilder = UriComponentsBuilder.fromHttpUrl(MapillaryApiConstants.MAPILLARY_API_URL);
 		uriBuilder.queryParam(MapillaryApiConstants.MAPILLARY_PARAM_CLOSE_TO, lon, lat);
 		uriBuilder.queryParam(MapillaryApiConstants.MAPILLARY_PARAM_RADIUS, SEARCH_RADIUS);
@@ -161,7 +160,7 @@ public class ImageService {
 						primaryPlace = cp;
 						continue;
 					}
-					splitCameraPlaceByAngel(cp, resultMap);
+					splitCameraPlaceByAngel(cp, main, rest);
 				}
 			}
 			if (primaryPlace == null && !isEmpty(primaryImageKey)) {
@@ -178,7 +177,8 @@ public class ImageService {
 		return primaryPlace;
 	}
 
-    private String getFilename(String osmImage) {
+
+	private String getFilename(String osmImage) {
         if (osmImage.startsWith(WIKI_FILE_PREFIX)) {
             return osmImage;
         }

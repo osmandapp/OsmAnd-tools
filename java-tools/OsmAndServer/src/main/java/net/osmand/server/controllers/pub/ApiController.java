@@ -12,7 +12,6 @@ import java.util.Date;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Map.Entry;
 import java.util.stream.Collectors;
 
@@ -224,18 +223,13 @@ public class ApiController {
             LOGGER.error("Bad request. Host is null");
 			return "{" + jsonMapper.writeValueAsString("features") + ":[]}";
         }
-        Map<String, List<CameraPlace>> result = new HashMap<>();
-
         List<CameraPlace> arr = new ArrayList<>();
         List<CameraPlace> halfvisarr = new ArrayList<>();
 
-        result.put(RESULT_MAP_ARR, arr);
-        result.put(RESULT_MAP_HALFVISARR, halfvisarr);
-
         // FIXME disable mapillary
         CameraPlace wikimediaPrimaryCameraPlace = imageService.processWikimediaData(lat, lon, osmImage);
-//        CameraPlace mapillaryPrimaryCameraPlace = imageService.processMapillaryData(lat, lon, osmMapillaryKey, result,
-//                host, proto);
+        CameraPlace mapillaryPrimaryCameraPlace = imageService.processMapillaryData(lat, lon, osmMapillaryKey, arr, halfvisarr,
+                host, proto);
         if (arr.isEmpty()) {
             arr.addAll(halfvisarr);
         }
