@@ -232,9 +232,10 @@ public class ApiController {
         result.put(RESULT_MAP_ARR, arr);
         result.put(RESULT_MAP_HALFVISARR, halfvisarr);
 
+        // FIXME disable mapillary
         CameraPlace wikimediaPrimaryCameraPlace = imageService.processWikimediaData(lat, lon, osmImage);
-        CameraPlace mapillaryPrimaryCameraPlace = imageService.processMapillaryData(lat, lon, osmMapillaryKey, result,
-                host, proto);
+//        CameraPlace mapillaryPrimaryCameraPlace = imageService.processMapillaryData(lat, lon, osmMapillaryKey, result,
+//                host, proto);
         if (arr.isEmpty()) {
             arr.addAll(halfvisarr);
         }
@@ -242,14 +243,13 @@ public class ApiController {
         if (wikimediaPrimaryCameraPlace != null) {
             arr.add(0, wikimediaPrimaryCameraPlace);
         }
-        if (mapillaryPrimaryCameraPlace != null) {
-            arr.add(0, mapillaryPrimaryCameraPlace);
-        }
+//        if (mapillaryPrimaryCameraPlace != null) {
+//            arr.add(0, mapillaryPrimaryCameraPlace);
+//        }
         if (!arr.isEmpty()) {
             arr.add(createEmptyCameraPlaceWithTypeOnly("mapillary-contribute"));
         }
-        return "{"+jsonMapper.writeValueAsString("features")+
-        			":"+jsonMapper.writeValueAsString(arr)+"}";
+		return "{" + jsonMapper.writeValueAsString("features") + ":" + jsonMapper.writeValueAsString(arr) + "}";
     }
 
     @GetMapping(path = {"/mapillary/get_photo.php", "/mapillary/get_photo"})
