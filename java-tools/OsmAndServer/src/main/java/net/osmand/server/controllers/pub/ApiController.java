@@ -1,19 +1,14 @@
 package net.osmand.server.controllers.pub;
 
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.net.URL;
 import java.net.URLConnection;
 import java.net.URLDecoder;
 import java.text.ParseException;
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.Date;
 import java.util.Enumeration;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map.Entry;
-import java.util.stream.Collectors;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -24,9 +19,8 @@ import net.osmand.server.api.repo.EmailSupportSurveyRepository;
 import net.osmand.server.api.repo.EmailSupportSurveyRepository.EmailSupportSurveyFeedback;
 import net.osmand.server.api.repo.EmailUnsubscribedRepository;
 import net.osmand.server.api.repo.EmailUnsubscribedRepository.EmailUnsubscribed;
-import net.osmand.server.api.services.CameraPlace;
-import net.osmand.server.api.services.ImageService;
 import net.osmand.server.api.services.MotdService;
+import net.osmand.server.api.services.PlacesService;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -56,8 +50,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 public class ApiController {
     private static final Log LOGGER = LogFactory.getLog(ApiController.class);
 
-    private static final String RESULT_MAP_ARR = "arr";
-    private static final String RESULT_MAP_HALFVISARR = "halfvisarr";
     private static final String PROC_FILE = ".proc_timestamp";
 
     @Value("${files.location}")
@@ -67,7 +59,7 @@ public class ApiController {
     private String geoipURL;
 
     @Autowired
-    private ImageService imageService;
+    private PlacesService placesService;
     
     @Autowired
     private MotdService motdService;
@@ -82,26 +74,14 @@ public class ApiController {
     DataMissingSearchRepository dataMissingSearch;
     
 	private ObjectMapper jsonMapper;
-	
+
     
     private ApiController() {
-    	 ObjectMapper mapper = new ObjectMapper();
-    	 this.jsonMapper = mapper;
+    	ObjectMapper mapper = new ObjectMapper();
+    	this.jsonMapper = mapper;
     }
     
 
-    private List<CameraPlace> sortByDistance(List<CameraPlace> arr) {
-        return arr.stream().sorted(Comparator.comparing(CameraPlace::getDistance)).collect(Collectors.toList());
-    }
-
-    private CameraPlace createEmptyCameraPlaceWithTypeOnly(String type) {
-        CameraPlace.CameraPlaceBuilder builder = new CameraPlace.CameraPlaceBuilder();
-        builder.setType(type);
-        return builder.build();
-    }
-    
-    
-    
     @GetMapping(path = {"/osmlive_status.php", "/osmlive_status"}, produces = "text/html;charset=UTF-8")
     @ResponseBody
     public FileSystemResource osmLiveStatus() throws IOException  {
@@ -135,8 +115,8 @@ public class ApiController {
         
         return jsonMapper.writeValueAsString(value);
     }
+    
     public static String extractFirstDoubleNumber(String s) {
-		int i = 0;
 		String d = "";
 		for (int k = 0; k < s.length(); k++) {
 			char charAt = s.charAt(k);
@@ -198,53 +178,11 @@ public class ApiController {
     
     
     @GetMapping(path = {"/cm_place.php", "/cm_place"})
-    @ResponseBody
-    public String getCmPlace(@RequestParam("lat") double lat,
-                                            @RequestParam("lon") double lon,
-                                            @RequestParam(value = "mloc", required = false) String mloc,
-                                            @RequestParam(value = "app", required = false) String app,
-                                            @RequestParam(value = "lang", required = false) String lang,
-                                            @RequestParam(value = "osm_image", required = false) String osmImage,
-                                            @RequestParam(value = "osm_mapillary_key", required = false) String osmMapillaryKey,
-                                            @RequestHeader HttpHeaders headers,
-                                            HttpServletRequest request) throws JsonProcessingException {
-        InetSocketAddress inetAddress = headers.getHost();
-        String host = inetAddress.getHostName();
-        String proto = request.getScheme();
-        String forwardedHost = headers.getFirst("X-Forwarded-Host");
-        String forwardedProto = headers.getFirst("X-Forwarded-Proto");
-        if (forwardedHost != null) {
-            host = forwardedHost;
-        }
-        if (forwardedProto != null) {
-            proto = forwardedProto;
-        }
-        if (host == null) {
-            LOGGER.error("Bad request. Host is null");
-			return "{" + jsonMapper.writeValueAsString("features") + ":[]}";
-        }
-        List<CameraPlace> arr = new ArrayList<>();
-        List<CameraPlace> halfvisarr = new ArrayList<>();
-
-        // FIXME disable mapillary
-        CameraPlace wikimediaPrimaryCameraPlace = imageService.processWikimediaData(lat, lon, osmImage);
-        CameraPlace mapillaryPrimaryCameraPlace = imageService.processMapillaryData(lat, lon, osmMapillaryKey, arr, halfvisarr,
-                host, proto);
-        if (arr.isEmpty()) {
-            arr.addAll(halfvisarr);
-        }
-        arr = sortByDistance(arr);
-        if (wikimediaPrimaryCameraPlace != null) {
-            arr.add(0, wikimediaPrimaryCameraPlace);
-        }
-//        if (mapillaryPrimaryCameraPlace != null) {
-//            arr.add(0, mapillaryPrimaryCameraPlace);
-//        }
-        if (!arr.isEmpty()) {
-            arr.add(createEmptyCameraPlaceWithTypeOnly("mapillary-contribute"));
-        }
-		return "{" + jsonMapper.writeValueAsString("features") + ":" + jsonMapper.writeValueAsString(arr) + "}";
-    }
+	public void getCmPlace(@RequestParam("lat") double lat, @RequestParam("lon") double lon,
+			@RequestHeader HttpHeaders headers, HttpServletRequest request, HttpServletResponse response)
+			throws JsonProcessingException {
+		placesService.processPlacesAround(headers, request, response, jsonMapper, lat, lon);
+	}
 
     @GetMapping(path = {"/mapillary/get_photo.php", "/mapillary/get_photo"})
     @ResponseBody
