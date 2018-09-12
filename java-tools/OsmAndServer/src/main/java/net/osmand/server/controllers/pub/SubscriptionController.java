@@ -99,7 +99,7 @@ public class SubscriptionController {
     
     private ResponseEntity<String> error(String txt) {
     	// clients don't accept error requests (neither mobile, neither http)
-    	return ResponseEntity.ok().body(String.format("{\"error\": \"%s.\"}", txt));
+    	return ResponseEntity.ok().body(String.format("{\"error\": \"%s.\"}", txt.replace('"', '\'')));
 	}
     
     @PostMapping(path = {"/register_email", "/register_email.php"},
@@ -150,7 +150,7 @@ public class SubscriptionController {
         supporter.visibleName = visibleName;
         supporter.userEmail = email;
         supporter.preferredRegion = preferredCountry;
-        supporter = supportersRepository.save(supporter);
+        supporter = supportersRepository.saveAndFlush(supporter);
         return ResponseEntity.ok(userInfoAsJson(supporter));
     }
 
