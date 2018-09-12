@@ -12,7 +12,7 @@ import javax.persistence.Table;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
-public interface SupportersRepository extends JpaRepository<SupportersRepository.Supporter, String> {
+public interface SupportersRepository extends JpaRepository<SupportersRepository.Supporter, Long> {
 
     Optional<Supporter> findByUserEmail(String userEmail);
 

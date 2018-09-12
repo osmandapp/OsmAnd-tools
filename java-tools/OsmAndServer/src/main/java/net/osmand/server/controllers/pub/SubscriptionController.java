@@ -166,7 +166,7 @@ public class SubscriptionController {
     	if (isEmpty(token)) {
         	return error("Token is not present: fix will be in OsmAnd 3.2");
         }
-        Optional<Supporter> sup = supportersRepository.findById(userId);
+        Optional<Supporter> sup = supportersRepository.findById(Long.parseLong(userId));
         if(!sup.isPresent() ) {
         	return error("Couldn't find your user id: " + userId);
         }
@@ -235,7 +235,7 @@ public class SubscriptionController {
     		LOGGER.warn("Token was not provided: " + request.getParameterMap());
 //        	return error("Token is not present: fix will be in OsmAnd 3.2");
         }
-        Optional<Supporter> sup = supportersRepository.findById(userId);
+        Optional<Supporter> sup = supportersRepository.findById(Long.parseLong(userId));
         if(!sup.isPresent() ) {
         	return error("Couldn't find your user id: " + userId);
         }
