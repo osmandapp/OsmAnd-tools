@@ -245,7 +245,7 @@ public class SubscriptionController {
 //        	return error("Couldn't validate the token: " + token);
         }
         SupporterDeviceSubscription subscr = new SupporterDeviceSubscription();
-        subscr.userId = supporter.userId;
+        subscr.userId = supporter.userId.toString();
         subscr.sku = request.getParameter("sku");
         subscr.purchaseToken = request.getParameter("purchaseToken");
         subscr.timestamp = new Date();
