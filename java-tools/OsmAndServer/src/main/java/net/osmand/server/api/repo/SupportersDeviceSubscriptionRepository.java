@@ -16,10 +16,10 @@ public interface SupportersDeviceSubscriptionRepository extends JpaRepository<Su
     @Transactional
     @Modifying
     @Query(value = "INSERT INTO supporters_device_sub(userid, sku, purchasetoken, timestamp)\n" +
-            "      SELECT ?1, ?2, ?3, ?4\n" +
+            "      SELECT ?1, ?2, ?3, to_timestamp(?4)\n" +
             "      WHERE NOT EXISTS (SELECT 1 FROM supporters_device_sub\n" +
             "             WHERE userid = ?1 AND sku = ?2 AND purchasetoken = ?3)", nativeQuery = true)
-    int createSupporterDeviceSubscriptionIfNotExists(Long userId, String sku, String purchaseToken, Timestamp timestamp);
+    int createSupporterDeviceSubscriptionIfNotExists(Long userId, String sku, String purchaseToken, long timestamp);
 
     @Entity
     @Table(name = "supporters_device_sub")

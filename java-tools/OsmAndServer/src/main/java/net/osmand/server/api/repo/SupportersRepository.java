@@ -2,15 +2,18 @@ package net.osmand.server.api.repo;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
 
 import javax.persistence.*;
+import javax.transaction.Transactional;
 import java.util.Optional;
 
 public interface SupportersRepository extends JpaRepository<SupportersRepository.Supporter, Long> {
 
     Optional<Supporter> findByUserEmail(String userEmail);
 
-    @Entity(name = "Supporter")
+    @Entity
     @Table(name = "supporters")
     class Supporter {
 
@@ -29,11 +32,23 @@ public interface SupportersRepository extends JpaRepository<SupportersRepository
         @Column(name = "useremail")
         public String userEmail;
 
-        @Column(name = "prefered_region")
-        public String preferedRegion;
+        @Column(name = "preferred_region")
+        public String preferredRegion;
 
         @Column(name = "disable")
         @JsonIgnore
         public int disabled;
+
+        @Override
+        public String toString() {
+            return "Supporter{" +
+                    "userId=" + userId +
+                    ", token='" + token + '\'' +
+                    ", visibleName='" + visibleName + '\'' +
+                    ", userEmail='" + userEmail + '\'' +
+                    ", preferredRegion='" + preferredRegion + '\'' +
+                    ", disabled=" + disabled +
+                    '}';
+        }
     }
 }

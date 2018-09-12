@@ -1,5 +1,6 @@
 package net.osmand.server.api.repo;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.springframework.data.jpa.repository.JpaRepository;
 import net.osmand.server.api.repo.OsmRecipientsRepository.OsmRecipient;
 
@@ -19,6 +20,7 @@ public interface OsmRecipientsRepository extends JpaRepository<OsmRecipient, Str
         public String osmId;
 
         @Column(name = "email")
+        @JsonIgnore
         public String email;
 
         @Column(name = "btcaddr")

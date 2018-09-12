@@ -1,21 +1,32 @@
 package net.osmand.server.controllers.pub;
 
-import net.osmand.server.api.repo.*;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import net.osmand.server.api.repo.MapUserRepository;
 import net.osmand.server.api.repo.MapUserRepository.MapUser;
+import net.osmand.server.api.repo.OsmRecipientsRepository;
 import net.osmand.server.api.repo.OsmRecipientsRepository.OsmRecipient;
+import net.osmand.server.api.repo.SupportersDeviceSubscriptionRepository;
+import net.osmand.server.api.repo.SupportersRepository;
 import net.osmand.server.api.repo.SupportersRepository.Supporter;
 import net.osmand.server.utils.BTCAddrValidator;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.http.client.HttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
+import org.hibernate.validator.internal.constraintvalidators.bv.EmailValidator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.*;
 import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
-import java.sql.Timestamp;
+import javax.servlet.http.HttpServletRequest;
 import java.util.Base64;
 import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
@@ -25,9 +36,10 @@ import java.util.concurrent.ThreadLocalRandom;
 public class SubscriptionController {
     private static final Log LOGGER = LogFactory.getLog(SubscriptionController.class);
 
-    private static final String ERROR_MESSAGE_TEMPLATE = "{\"error\": \"%s is not specified\"}";
-
     private static final String REDIS_KEY_INVALID_TOKEN = "invalid_token";
+
+    private static final int CONNECTION_POOL_SIZE = 5;
+    private static final int TIMEOUT = 20000;
 
     @Autowired
     private SupportersRepository supportersRepository;
@@ -39,23 +51,25 @@ public class SubscriptionController {
     private SupportersDeviceSubscriptionRepository supportersDeviceSubscriptionRepository;
     @Autowired
     private StringRedisTemplate redisTemplate;
+    @Autowired
+    private ObjectMapper mapper;
 
     private final RestTemplate restTemplate;
 
+    @Autowired
     public SubscriptionController(RestTemplateBuilder builder) {
-        this.restTemplate = builder.requestFactory(HttpComponentsClientHttpRequestFactory.class).build();
+        this.restTemplate = builder.requestFactory(
+                () -> new HttpComponentsClientHttpRequestFactory(buildHttpClient()))
+                .setConnectTimeout(TIMEOUT)
+                .setReadTimeout(TIMEOUT)
+                .build();
     }
 
-    private void checkParameter(String paramName, String paramValue) {
-        if (paramValue.isEmpty()) {
-            throw new MissingRequestParameterException(paramName);
-        }
-    }
-
-    private void validateBitcoinAddress(String bitcoinAddress) {
-        if (!BTCAddrValidator.validate(bitcoinAddress)) {
-            throw new BitcoinAddressInvalidException("Address is invalid");
-        }
+    private HttpClient buildHttpClient() {
+        PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager();
+        connectionManager.setDefaultMaxPerRoute(CONNECTION_POOL_SIZE);
+        connectionManager.setMaxTotal(CONNECTION_POOL_SIZE);
+        return HttpClients.custom().setConnectionManager(connectionManager).build();
     }
 
     private String encodeCredentialsToBase64(String userName, String password) {
@@ -90,40 +104,39 @@ public class SubscriptionController {
                 HttpMethod.GET, requestEntity, String.class);
     }
 
-    private void validateSupporterToken(Supporter supporter, String token) {
-        if (!supporter.token.equals(token)) {
-            throw new InvalidTokenException("Token is invalid.", token);
-        }
-    }
-
     @PostMapping(path = {"/register_email", "/register_email.php"},
             consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<MapUser> registerEmail(@RequestParam("aid") String aid,
-                                                 @RequestParam("email") String email) {
-        checkParameter("aid", aid);
-        checkParameter("E-mail", email);
+    public ResponseEntity<String> registerEmail(HttpServletRequest request) {
         long updateTime = System.currentTimeMillis();
         MapUser mapUser = new MapUser();
-        mapUser.aid = aid;
-        mapUser.email = email;
+        mapUser.aid = request.getParameter("aid");
+        mapUser.email = request.getParameter("email");
         mapUser.updateTime = updateTime;
         mapUser = mapUserRepository.saveAndFlush(mapUser);
-        return ResponseEntity.ok(mapUser);
+        return ResponseEntity.ok().body(String.format("{\"email\": \"%s\", \"time\": \"%d\"}", mapUser.email,
+                mapUser.updateTime));
     }
 
     @PostMapping(path = {"/register", "/register.php"},
         consumes =  MediaType.APPLICATION_FORM_URLENCODED_VALUE,
         produces =  MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<Supporter> register(@RequestParam("visibleName") String visibleName,
-                                              @RequestParam("email") String email,
-                                              @RequestParam("preferredCountry") String preferredCountry) {
-        checkParameter("Visible Name", visibleName);
-        checkParameter("E-mail", email);
-        checkParameter("Preferred Country", preferredCountry);
+    public ResponseEntity<String> register(HttpServletRequest request) {
+        String email = request.getParameter("email");
+        String visibleName = request.getParameter("visibleName");
+        String preferredCountry = request.getParameter("preferredCountry");
+        EmailValidator emailValidator = new EmailValidator();
+        if (!emailValidator.isValid(email, null)) {
+            return ResponseEntity.badRequest().body("{\"error\": \"Please validate email address.\"}");
+        }
         Optional<Supporter> optionalSupporter = supportersRepository.findByUserEmail(email);
         if (optionalSupporter.isPresent()) {
-            return ResponseEntity.ok(optionalSupporter.get());
+            Supporter supporter = optionalSupporter.get();
+            String response = String.format(
+                    "{\"userid\": \"%d\", \"token\": \"%s\", \"visibleName\": \"%s\", \"email\": \"%s\", " +
+                            "\"preferredCountry\": \"%s\"}",
+                    supporter.userId, supporter.token, supporter.visibleName, supporter.userEmail, supporter.preferredRegion);
+            return ResponseEntity.ok(response);
         }
         ThreadLocalRandom tlr = ThreadLocalRandom.current();
         int token = tlr.nextInt(100000, 1000000);
@@ -132,50 +145,51 @@ public class SubscriptionController {
         supporter.token = String.valueOf(token);
         supporter.visibleName = visibleName;
         supporter.userEmail = email;
-        supporter.preferedRegion = preferredCountry;
+        supporter.preferredRegion = preferredCountry;
         supporter.disabled = 0;
         supporter = supportersRepository.saveAndFlush(supporter);
-        return ResponseEntity.ok(supporter);
+        String response = String.format(
+                "{\"userid\": \"%d\", \"token\": \"%s\", \"visibleName\": \"%s\", \"email\": \"%s\", " +
+                        "\"preferredCountry\": \"%s\"}",
+                supporter.userId, supporter.token, supporter.visibleName, supporter.userEmail, supporter.preferredRegion);
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping(path = {"/update", "/update.php"},
             consumes =  MediaType.APPLICATION_FORM_URLENCODED_VALUE,
             produces =  MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<Supporter> update(@RequestParam("visibleName") String visibleName,
-                                            @RequestParam("email") String email,
-                                            @RequestParam("token") String token,
-                                            @RequestParam("preferredCountry") String preferredCountry,
-                                            @RequestParam("userid") Long userid) {
-        checkParameter("Visible Name", visibleName);
-        checkParameter("E-mail", email);
-        checkParameter("Token", token);
-        checkParameter("Preferred Country", preferredCountry);
+    public ResponseEntity<String> update(HttpServletRequest request) {
         Supporter supporter = new Supporter();
-        supporter.userId = userid;
-        supporter.token = token;
-        supporter.visibleName = visibleName;
-        supporter.userEmail = email;
-        supporter.preferedRegion = preferredCountry;
-        supporter.disabled = 0;
+        supporter.userId = Long.parseLong(request.getParameter("userid"));
+        supporter.token = request.getParameter("token");
+        supporter.visibleName = request.getParameter("visibleName");
+        supporter.userEmail = request.getParameter("email");
+        supporter.preferredRegion = request.getParameter("preferredCountry");
         supporter = supportersRepository.saveAndFlush(supporter);
-        return ResponseEntity.ok(supporter);
+        return ResponseEntity.ok(String.format("{\"userid\": \"%d\", \"token\": \"%s\", \"visibleName\": \"%s\", " +
+                "\"email\": \"%s\", \"preferredCountry\": \"%s\"}", supporter.userId, supporter.token,
+                supporter.visibleName, supporter.userEmail, supporter.preferredRegion));
     }
 
     @PostMapping(path = {"/register_osm", "/register_osm.php"},
             consumes =  MediaType.APPLICATION_FORM_URLENCODED_VALUE,
             produces =  MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<OsmRecipient> registerOsm(@RequestParam("bitcoin_addr") String bitcoinAddress,
-                                                    @RequestParam("osm_usr") String osmUser,
-                                                    @RequestParam("osm_pwd") String osmPassword,
-                                                    @RequestParam("email") String email) {
-        checkParameter("Bitcoin address", bitcoinAddress);
-        validateBitcoinAddress(bitcoinAddress);
-        checkParameter("E-mail", email);
-        checkParameter("Osm user", osmUser);
-        checkParameter("Osm password", osmPassword);
+    public ResponseEntity<String> registerOsm(HttpServletRequest request) {
+        String bitcoinAddress = request.getParameter("bitcoin_addr");
+        if (!bitcoinAddress.startsWith("3") && !BTCAddrValidator.validate(bitcoinAddress)) {
+            return ResponseEntity.badRequest().body("{\"error\": \"Please validate bitcoin address.\"}");
+        }
+        String osmUser = request.getParameter("osm_usr");
+        String osmPassword = request.getParameter("osm_pwd");
+        String email = request.getParameter("email");
         String username = processOsmUsername(osmUser);
         String credentials = encodeCredentialsToBase64(username, osmPassword);
-        authenticateUser(credentials);
+        try {
+            authenticateUser(credentials);
+        } catch (RestClientException ex) {
+            LOGGER.error(ex.getMessage(), ex);
+            return ResponseEntity.badRequest().body("{\"error\": \"Couldn't authenticate on osm server\"}");
+        }
         long registerTimestamp = System.currentTimeMillis();
         OsmRecipient recipient = new OsmRecipient();
         recipient.osmId = osmUser;
@@ -183,84 +197,38 @@ public class SubscriptionController {
         recipient.bitcoinAddress = bitcoinAddress;
         recipient.updateTime = registerTimestamp;
         recipient = osmRecipientsRepository.saveAndFlush(recipient);
-        return ResponseEntity.ok(recipient);
+        String response = String.format("{\"osm_user\": \"%s\", \"bitcoin_addr\": \"%s\", \"time\": \"%d\"}",
+                recipient.osmId, recipient.bitcoinAddress, recipient.updateTime);
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping(path = {"/purchased", "/purchased.php"})
-    public ResponseEntity<Supporter> purchased(@RequestParam("userid") Long userId,
-                                               @RequestParam("token") String token,
-                                               @RequestParam("sku") String sku,
-                                               @RequestParam("purchaseToken") String purchaseToken) {
-        checkParameter("token", token);
-        checkParameter("sku", sku);
-        checkParameter("purchase token", purchaseToken);
+    public ResponseEntity<String> purchased(HttpServletRequest request) {
+        long userId = Long.parseLong(request.getParameter("userid"));
         Optional<Supporter> supporterOptional = supportersRepository.findById(userId);
         if (!supporterOptional.isPresent()) {
-            throw new SupporterNotFoundException("User not found with given id : " + userId);
+            return ResponseEntity.badRequest().body("{\"error\": \"User not found with given id.\"}");
         }
         Supporter supporter = supporterOptional.get();
-        validateSupporterToken(supporter, token);
+        String token = request.getParameter("token");
+        if (!supporter.token.equals(token)) {
+            redisTemplate.opsForZSet().add(REDIS_KEY_INVALID_TOKEN, token, token.hashCode());
+            return ResponseEntity.badRequest().body("{\"error\": \"Wrong token.\"}");
+        }
+        String purchaseToken = request.getParameter("purchaseToken");
+        if (purchaseToken == null || purchaseToken.isEmpty()) {
+            return ResponseEntity.badRequest().body("{\"error\": \"Purchase token is not specified.\"}");
+        }
+        String sku = request.getParameter("sku");
+        if (sku == null || sku.isEmpty()) {
+            return ResponseEntity.badRequest().body("{\"error\": \"Subscription id is not specified.\"}");
+        }
         long timestamp = System.currentTimeMillis();
         supportersDeviceSubscriptionRepository.createSupporterDeviceSubscriptionIfNotExists(
-                userId, sku, purchaseToken, new Timestamp(timestamp));
-        return ResponseEntity.ok(supporter);
-    }
-
-    @ExceptionHandler(MissingRequestParameterException.class)
-    public ResponseEntity<String> missingParameterHandler(MissingRequestParameterException ex) {
-        LOGGER.error(ex.getMessage(), ex);
-        return ResponseEntity.badRequest().body(String.format(ERROR_MESSAGE_TEMPLATE, ex.getMessage()));
-    }
-
-    @ExceptionHandler(BitcoinAddressInvalidException.class)
-    public ResponseEntity<String> bitcoinAddressInvalidHandler(BitcoinAddressInvalidException ex) {
-        LOGGER.error(ex.getMessage(), ex);
-        return ResponseEntity.badRequest().body("{\"error\": \"%s\"}");
-    }
-
-    @ExceptionHandler(SupporterNotFoundException.class)
-    public ResponseEntity<String> supporterNotFoundHandler(SupporterNotFoundException ex) {
-        LOGGER.error(ex.getMessage(), ex);
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body("{\"error\": \"User not found with given userid.\"}");
-    }
-
-    @ExceptionHandler(InvalidTokenException.class)
-    public ResponseEntity<String> invalidTokenHandler(InvalidTokenException ex) {
-        LOGGER.error(ex.getMessage(), ex);
-        String token = ex.getToken();
-        redisTemplate.opsForZSet().add(REDIS_KEY_INVALID_TOKEN, token, token.hashCode());
-        return ResponseEntity.badRequest().body(String.format("{\"error\": \"%s\"}", ex.getToken()));
-    }
-
-    private static class MissingRequestParameterException extends RuntimeException {
-        MissingRequestParameterException(String s) {
-            super(s);
-        }
-    }
-
-    private static class BitcoinAddressInvalidException extends RuntimeException {
-        BitcoinAddressInvalidException(String s) {
-            super(s);
-        }
-    }
-
-    private static class SupporterNotFoundException extends RuntimeException {
-        SupporterNotFoundException(String s) {
-            super(s);
-        }
-    }
-
-    private static class InvalidTokenException extends RuntimeException {
-
-        private final String token;
-
-        InvalidTokenException(String s, String token) {
-            super(s);
-            this.token = token;
-        }
-
-        String getToken() {
-            return token;
-        }
+                userId, sku, purchaseToken, timestamp);
+        String response = String.format(
+                "{\"status\": \"OK\", \"visibleName\": \"%s\", \"email\": \"%s\", \"preferredCountry\": \"%s\"}",
+                supporter.visibleName, supporter.userEmail, supporter.preferredRegion);
+        return ResponseEntity.ok(response);
     }
 }
