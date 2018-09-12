@@ -24,7 +24,7 @@ public interface SupportersRepository extends JpaRepository<SupportersRepository
         @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "supporters_seq")
         @SequenceGenerator(sequenceName = "supporters_seq", allocationSize = 1, name = "supporters_seq")
         @Column(name = "userid")
-        public Long userId;
+        public String userId;
 
         @Column(name = "token")
         public String token;

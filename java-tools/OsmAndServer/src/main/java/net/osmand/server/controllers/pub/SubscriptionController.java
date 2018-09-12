@@ -144,7 +144,7 @@ public class SubscriptionController {
         ThreadLocalRandom tlr = ThreadLocalRandom.current();
         int token = tlr.nextInt(100000, 1000000);
         Supporter supporter = new Supporter();
-        supporter.userId = 1L;
+        supporter.userId = null;
         supporter.token = String.valueOf(token);
         supporter.visibleName = visibleName;
         supporter.userEmail = email;

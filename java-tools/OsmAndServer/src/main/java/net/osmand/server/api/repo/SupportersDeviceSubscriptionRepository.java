@@ -36,7 +36,7 @@ public interface SupportersDeviceSubscriptionRepository extends JpaRepository<Su
 
         @Id
         @Column(name = "userid")
-        public Long userId;
+        public String userId;
 
         @Id
         @Column(name = "sku")
@@ -55,9 +55,54 @@ public interface SupportersDeviceSubscriptionRepository extends JpaRepository<Su
     class SupporterDeviceSubscriptionPrimaryKey implements Serializable {
         private static final long serialVersionUID = 7941117922381685104L;
 
-        public Long userId;
+        public String userId;
         public String sku;
         public String purchaseToken;
+		@Override
+		public int hashCode() {
+			final int prime = 31;
+			int result = 1;
+			result = prime * result + ((purchaseToken == null) ? 0 : purchaseToken.hashCode());
+			result = prime * result + ((sku == null) ? 0 : sku.hashCode());
+			result = prime * result + ((userId == null) ? 0 : userId.hashCode());
+			return result;
+		}
+		
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj) {
+				return true;
+			}
+			if (obj == null) {
+				return false;
+			}
+			if (getClass() != obj.getClass()) {
+				return false;
+			}
+			SupporterDeviceSubscriptionPrimaryKey other = (SupporterDeviceSubscriptionPrimaryKey) obj;
+			if (purchaseToken == null) {
+				if (other.purchaseToken != null) {
+					return false;
+				}
+			} else if (!purchaseToken.equals(other.purchaseToken)) {
+				return false;
+			}
+			if (sku == null) {
+				if (other.sku != null) {
+					return false;
+				}
+			} else if (!sku.equals(other.sku)) {
+				return false;
+			}
+			if (userId == null) {
+				if (other.userId != null) {
+					return false;
+				}
+			} else if (!userId.equals(other.userId)) {
+				return false;
+			}
+			return true;
+		}
 
     }
 }
