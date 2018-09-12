@@ -1,6 +1,5 @@
 package net.osmand.server.controllers.pub;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import net.osmand.server.api.repo.MapUserRepository;
 import net.osmand.server.api.repo.MapUserRepository.MapUser;
 import net.osmand.server.api.repo.OsmRecipientsRepository;
@@ -51,8 +50,6 @@ public class SubscriptionController {
     private SupportersDeviceSubscriptionRepository supportersDeviceSubscriptionRepository;
     @Autowired
     private StringRedisTemplate redisTemplate;
-    @Autowired
-    private ObjectMapper mapper;
 
     private final RestTemplate restTemplate;
 

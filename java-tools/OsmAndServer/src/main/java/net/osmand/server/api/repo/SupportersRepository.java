@@ -2,11 +2,8 @@ package net.osmand.server.api.repo;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Modifying;
-import org.springframework.data.jpa.repository.Query;
 
 import javax.persistence.*;
-import javax.transaction.Transactional;
 import java.util.Optional;
 
 public interface SupportersRepository extends JpaRepository<SupportersRepository.Supporter, Long> {
@@ -38,17 +35,5 @@ public interface SupportersRepository extends JpaRepository<SupportersRepository
         @Column(name = "disable")
         @JsonIgnore
         public int disabled;
-
-        @Override
-        public String toString() {
-            return "Supporter{" +
-                    "userId=" + userId +
-                    ", token='" + token + '\'' +
-                    ", visibleName='" + visibleName + '\'' +
-                    ", userEmail='" + userEmail + '\'' +
-                    ", preferredRegion='" + preferredRegion + '\'' +
-                    ", disabled=" + disabled +
-                    '}';
-        }
     }
 }
