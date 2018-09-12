@@ -25,7 +25,7 @@ public interface SupportersDeviceSubscriptionRepository extends JpaRepository<Su
 
         @Id
         @Column(name = "userid")
-        public String userId;
+        public Long userId;
 
         @Id
         @Column(name = "sku")
@@ -41,12 +41,21 @@ public interface SupportersDeviceSubscriptionRepository extends JpaRepository<Su
 		
     }
 
-    class SupporterDeviceSubscriptionPrimaryKey implements Serializable {
+    public class SupporterDeviceSubscriptionPrimaryKey implements Serializable {
         private static final long serialVersionUID = 7941117922381685104L;
 
-        public String userId;
+        public Long userId;
         public String sku;
         public String purchaseToken;
+        
+        
+		public SupporterDeviceSubscriptionPrimaryKey(Long userId, String sku, String purchaseToken) {
+			super();
+			this.userId = userId;
+			this.sku = sku;
+			this.purchaseToken = purchaseToken;
+		}
+
 		@Override
 		public int hashCode() {
 			final int prime = 31;

@@ -13,6 +13,7 @@ import net.osmand.server.api.repo.OsmRecipientsRepository;
 import net.osmand.server.api.repo.OsmRecipientsRepository.OsmRecipient;
 import net.osmand.server.api.repo.SupportersDeviceSubscriptionRepository;
 import net.osmand.server.api.repo.SupportersDeviceSubscriptionRepository.SupporterDeviceSubscription;
+import net.osmand.server.api.repo.SupportersDeviceSubscriptionRepository.SupporterDeviceSubscriptionPrimaryKey;
 import net.osmand.server.api.repo.SupportersRepository;
 import net.osmand.server.api.repo.SupportersRepository.Supporter;
 import net.osmand.server.utils.BTCAddrValidator;
@@ -21,6 +22,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.web.client.RestTemplateBuilder;
+import org.springframework.data.domain.Example;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -120,6 +122,13 @@ public class SubscriptionController {
 				"{\"userid\": \"%d\", \"token\": \"%s\", \"visibleName\": \"%s\", \"email\": \"%s\", "
 						+ "\"preferredCountry\": \"%s\"}", 
 				s.userId, s.token, s.visibleName, s.userEmail, s.preferredRegion);
+		return response;
+	}
+	
+	private String userShortInfoAsJson(Supporter s) {
+		String response = String.format(
+				"{\"userid\": \"%d\", \"visibleName\": \"%s\",\"preferredCountry\": \"%s\"}", 
+				s.userId, s.visibleName, s.preferredRegion);
 		return response;
 	}
 
@@ -231,7 +240,9 @@ public class SubscriptionController {
         	return error("Please validate user id.");
         }
     	String token = request.getParameter("token");
+    	boolean tokenValidation = true;
     	if (isEmpty(token)) {
+    		tokenValidation = false;
     		LOGGER.warn("Token was not provided: " + request.getParameterMap());
 //        	return error("Token is not present: fix will be in OsmAnd 3.2");
         }
@@ -240,16 +251,24 @@ public class SubscriptionController {
         	return error("Couldn't find your user id: " + userId);
         }
         Supporter supporter = sup.get();
+        
         if(token != null && !token.equals(supporter.token)) {
+        	tokenValidation = false;
     		LOGGER.warn("Token failed validation: " + request.getParameterMap());
 //        	return error("Couldn't validate the token: " + token);
         }
         SupporterDeviceSubscription subscr = new SupporterDeviceSubscription();
-        subscr.userId = supporter.userId.toString();
+        subscr.userId = supporter.userId;
         subscr.sku = request.getParameter("sku");
         subscr.purchaseToken = request.getParameter("purchaseToken");
         subscr.timestamp = new Date();
+        if(supportersDeviceSubscriptionRepository.existsById(new SupporterDeviceSubscriptionPrimaryKey(
+        		subscr.userId, subscr.sku, subscr.purchaseToken))) {
+        	return ResponseEntity.ok("{'res':'OK'}");
+        }
         supportersDeviceSubscriptionRepository.save(subscr);
-        return ResponseEntity.ok(userInfoAsJson(supporter));
+        return ResponseEntity.ok(tokenValidation ? 
+    			userShortInfoAsJson(supporter) :
+    			userInfoAsJson(supporter));
     }
 }
