@@ -1,21 +1,24 @@
 package net.osmand.server.api.repo;
 
-import org.apache.commons.lang3.builder.EqualsBuilder;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
+import java.io.Serializable;
+
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.Id;
+import javax.persistence.IdClass;
+import javax.persistence.Table;
 
 import net.osmand.server.api.repo.MapUserRepository.MapUser;
 import net.osmand.server.api.repo.MapUserRepository.MapUserPrimaryKey;
 
-import javax.persistence.*;
-
-import java.io.Serializable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
 
 @Repository
 public interface MapUserRepository extends JpaRepository<MapUser, MapUserPrimaryKey> {
 
     @Entity
-    @Table(name = "map_users")
+    @Table(name = "email_free_users")
     @IdClass(MapUserPrimaryKey.class)
     class MapUser {
 
