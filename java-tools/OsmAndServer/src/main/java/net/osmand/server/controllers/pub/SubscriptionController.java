@@ -241,9 +241,9 @@ public class SubscriptionController {
         	return error("Please validate user id.");
         }
     	String token = request.getParameter("token");
-    	boolean tokenValidation = true;
+    	boolean tokenValid = true;
     	if (isEmpty(token)) {
-    		tokenValidation = false;
+    		tokenValid = false;
     		LOGGER.warn("Token was not provided: " + toString(request.getParameterMap()));
 //        	return error("Token is not present: fix will be in OsmAnd 3.2");
         }
@@ -254,7 +254,7 @@ public class SubscriptionController {
         Supporter supporter = sup.get();
         
         if(token != null && !token.equals(supporter.token)) {
-        	tokenValidation = false;
+        	tokenValid = false;
     		LOGGER.warn("Token failed validation: " + toString(request.getParameterMap()));
 //        	return error("Couldn't validate the token: " + token);
         }
@@ -268,7 +268,7 @@ public class SubscriptionController {
         	return ResponseEntity.ok("{'res':'OK'}");
         }
         supportersDeviceSubscriptionRepository.save(subscr);
-        return ResponseEntity.ok(tokenValidation ? 
+        return ResponseEntity.ok(!tokenValid ? 
     			userShortInfoAsJson(supporter) :
     			userInfoAsJson(supporter));
     }
