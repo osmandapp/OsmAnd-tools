@@ -48,6 +48,8 @@ public interface SupportersDeviceSubscriptionRepository extends JpaRepository<Su
         public String sku;
         public String purchaseToken;
         
+        public SupporterDeviceSubscriptionPrimaryKey() {
+        }
         
 		public SupporterDeviceSubscriptionPrimaryKey(Long userId, String sku, String purchaseToken) {
 			super();

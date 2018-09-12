@@ -1,7 +1,9 @@
 package net.osmand.server.controllers.pub;
 
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.Date;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -22,7 +24,6 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.web.client.RestTemplateBuilder;
-import org.springframework.data.domain.Example;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -243,7 +244,7 @@ public class SubscriptionController {
     	boolean tokenValidation = true;
     	if (isEmpty(token)) {
     		tokenValidation = false;
-    		LOGGER.warn("Token was not provided: " + request.getParameterMap());
+    		LOGGER.warn("Token was not provided: " + toString(request.getParameterMap()));
 //        	return error("Token is not present: fix will be in OsmAnd 3.2");
         }
         Optional<Supporter> sup = supportersRepository.findById(Long.parseLong(userId));
@@ -254,7 +255,7 @@ public class SubscriptionController {
         
         if(token != null && !token.equals(supporter.token)) {
         	tokenValidation = false;
-    		LOGGER.warn("Token failed validation: " + request.getParameterMap());
+    		LOGGER.warn("Token failed validation: " + toString(request.getParameterMap()));
 //        	return error("Couldn't validate the token: " + token);
         }
         SupporterDeviceSubscription subscr = new SupporterDeviceSubscription();
@@ -271,4 +272,12 @@ public class SubscriptionController {
     			userShortInfoAsJson(supporter) :
     			userInfoAsJson(supporter));
     }
+
+	private String toString(Map<String, String[]> parameterMap) {
+		StringBuilder bld = new StringBuilder();
+		for(String s : parameterMap.keySet()) {
+			bld.append(" ").append(s).append("=").append(Arrays.toString(parameterMap.get(s)));
+		}
+		return bld.toString();
+	}
 }
