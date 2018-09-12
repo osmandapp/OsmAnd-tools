@@ -1,7 +1,16 @@
 package net.osmand.server.api.services;
 
+import java.net.InetSocketAddress;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.stream.Collectors;
+
+import javax.servlet.AsyncContext;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 
 import net.osmand.Location;
 
@@ -14,23 +23,26 @@ import org.geojson.Point;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.client.RestTemplateBuilder;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Service
-public class ImageService {
+public class PlacesService {
 
-    private static final Log LOGGER = LogFactory.getLog(ImageService.class);
+    private static final int TIMEOUT = 20000;
+    private static final int THREADS_FOR_PROC = 30;
+    
+    private static final Log LOGGER = LogFactory.getLog(PlacesService.class);
 
     private static final int SEARCH_RADIUS = 50;
-
-    private static final String RESULT_MAP_ARR = "arr";
-    private static final String RESULT_MAP_HALFVISARR = "halfvisarr";
 
     private static final String WIKIMEDIA = "wikimedia.org";
     private static final String WIKIPEDIA = "wikipedia.org";
@@ -39,12 +51,102 @@ public class ImageService {
     @Value("${mapillary.clientid}")
     private String mapillaryClientId;
 
+
     private final RestTemplate restTemplate;
 
+	private ThreadPoolTaskExecutor executor;
+
     @Autowired
-    public ImageService(RestTemplateBuilder builder) {
-        this.restTemplate = builder.requestFactory(HttpComponentsClientHttpRequestFactory.class).build();
+    public PlacesService(RestTemplateBuilder builder) {
+        this.restTemplate = builder.requestFactory(HttpComponentsClientHttpRequestFactory.class)
+        		.setConnectTimeout(TIMEOUT).setReadTimeout(TIMEOUT).build();
+        
+        this.executor = new ThreadPoolTaskExecutor();
+    	executor.setThreadNamePrefix("ImageService");
+ 		executor.setCorePoolSize(THREADS_FOR_PROC);
+ 		executor.setKeepAliveSeconds(60);
+ 		executor.setAllowCoreThreadTimeOut(true);
+ 		executor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
+ 		executor.initialize();
     }
+    
+	public void processPlacesAround(HttpHeaders headers,
+            HttpServletRequest request,
+            HttpServletResponse response, ObjectMapper jsonMapper, double lat, double lon) {
+		AsyncContext asyncCtx = request.startAsync(request, response);
+		long start = System.currentTimeMillis();
+		executor.submit(() -> {
+			try {
+				if(System.currentTimeMillis() - start > TIMEOUT * 3) {
+					// waited too long (speedup queue processing)
+					response.getWriter().println("{'features':[]}");
+					asyncCtx.complete();
+					return;
+				}
+				// request.getParameter("mloc")
+				// request.getParameter("app")
+				// request.getParameter("lang")
+				String osmImage = request.getParameter("osm_image");
+				String osmMapillaryKey = request.getParameter("osm_mapillary_key");
+
+				InetSocketAddress inetAddress = headers.getHost();
+				String host = inetAddress.getHostName();
+				String proto = request.getScheme();
+				String forwardedHost = headers.getFirst("X-Forwarded-Host");
+				String forwardedProto = headers.getFirst("X-Forwarded-Proto");
+				if (forwardedHost != null) {
+					host = forwardedHost;
+				}
+				if (forwardedProto != null) {
+					proto = forwardedProto;
+				}
+				if (host == null) {
+					LOGGER.error("Bad request. Host is null");
+					response.getWriter().println("{'features':[]}");
+					asyncCtx.complete();
+					return;
+				}
+				List<CameraPlace> arr = new ArrayList<>();
+				List<CameraPlace> halfvisarr = new ArrayList<>();
+
+				CameraPlace wikimediaPrimaryCameraPlace = processWikimediaData(lat, lon, osmImage);
+				CameraPlace mapillaryPrimaryCameraPlace = processMapillaryData(lat, lon, osmMapillaryKey, arr, halfvisarr,
+						host, proto);
+				if (arr.isEmpty()) {
+					arr.addAll(halfvisarr);
+				}
+				arr = sortByDistance(arr);
+				if (wikimediaPrimaryCameraPlace != null) {
+					arr.add(0, wikimediaPrimaryCameraPlace);
+				}
+				if (mapillaryPrimaryCameraPlace != null) {
+					arr.add(0, mapillaryPrimaryCameraPlace);
+				}
+				if (!arr.isEmpty()) {
+					arr.add(createEmptyCameraPlaceWithTypeOnly("mapillary-contribute"));
+				}
+				response.getWriter().println(
+						String.format("{%s:%s}", jsonMapper.writeValueAsString("features"),
+								jsonMapper.writeValueAsString(arr)));
+				asyncCtx.complete();
+			} catch (Exception e) {
+				LOGGER.error("Error processing places: " + e.getMessage());
+			}
+		});
+	}
+
+	private List<CameraPlace> sortByDistance(List<CameraPlace> arr) {
+        return arr.stream().sorted(Comparator.comparing(CameraPlace::getDistance)).collect(Collectors.toList());
+    }
+
+    private CameraPlace createEmptyCameraPlaceWithTypeOnly(String type) {
+        CameraPlace.CameraPlaceBuilder builder = new CameraPlace.CameraPlaceBuilder();
+        builder.setType(type);
+        return builder.build();
+    }
+    
+    
+
 
     private double computeInitialBearing(double cameraLat, double cameraLon, double targetLat, double targetLon) {
         Location cameraLocation = new Location("mapillary");
@@ -125,14 +227,14 @@ public class ImageService {
         return Math.abs(angle) < diff;
     }
 
-    private void splitCameraPlaceByAngel(CameraPlace cp, Map<String, List<CameraPlace>> resultMap) {
+    private void splitCameraPlaceByAngel(CameraPlace cp, List<CameraPlace> main, List<CameraPlace> rest) {
         double ca = cp.getCa();
         double bearing = cp.getBearing();
         if (ca > 0d && angleDiff(bearing - ca, 30.0)) {
-            resultMap.get(RESULT_MAP_ARR).add(cp);
+            main.add(cp);
         } else if (!(ca > 0d && !angleDiff(bearing - ca, 60.0))) {
         	// exclude all with camera angle and angle more than 60 (keep w/o camera and angle < 60)
-            resultMap.get(RESULT_MAP_HALFVISARR).add(cp);
+            rest.add(cp);
         }
     }
 
@@ -145,7 +247,7 @@ public class ImageService {
     }
 
     public CameraPlace processMapillaryData(double lat, double lon, String primaryImageKey,
-			Map<String, List<CameraPlace>> resultMap, String host, String proto) {
+    		List<CameraPlace> main, List<CameraPlace> rest, String host, String proto) {
 		UriComponentsBuilder uriBuilder = UriComponentsBuilder.fromHttpUrl(MapillaryApiConstants.MAPILLARY_API_URL);
 		uriBuilder.queryParam(MapillaryApiConstants.MAPILLARY_PARAM_CLOSE_TO, lon, lat);
 		uriBuilder.queryParam(MapillaryApiConstants.MAPILLARY_PARAM_RADIUS, SEARCH_RADIUS);
@@ -161,7 +263,7 @@ public class ImageService {
 						primaryPlace = cp;
 						continue;
 					}
-					splitCameraPlaceByAngel(cp, resultMap);
+					splitCameraPlaceByAngel(cp, main, rest);
 				}
 			}
 			if (primaryPlace == null && !isEmpty(primaryImageKey)) {
@@ -178,7 +280,8 @@ public class ImageService {
 		return primaryPlace;
 	}
 
-    private String getFilename(String osmImage) {
+
+	private String getFilename(String osmImage) {
         if (osmImage.startsWith(WIKI_FILE_PREFIX)) {
             return osmImage;
         }
@@ -341,5 +444,6 @@ public class ImageService {
         }
 
     }
+
 
 }

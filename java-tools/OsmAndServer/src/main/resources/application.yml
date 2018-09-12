@@ -24,7 +24,7 @@ logging:
 
 server:
   port: 8080
-
+  tomcat.max-threads: 5
 files.location: ${user.dir}/../../../help/
 gen.location: ${files.location}/gen/
 web.location: ${files.location}/website/
@@ -71,6 +71,7 @@ logging:
 
 server:
   port: 8090
+  tomcat.max-threads: 50
   address: 127.0.0.1 #keep it behind proxy
   tomcat:
     accesslog:
