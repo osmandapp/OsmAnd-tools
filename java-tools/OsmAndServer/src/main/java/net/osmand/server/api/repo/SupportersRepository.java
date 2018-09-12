@@ -1,10 +1,16 @@
 package net.osmand.server.api.repo;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import org.springframework.data.jpa.repository.JpaRepository;
-
-import javax.persistence.*;
 import java.util.Optional;
+
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.SequenceGenerator;
+import javax.persistence.Table;
+
+import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface SupportersRepository extends JpaRepository<SupportersRepository.Supporter, Long> {
 
@@ -32,8 +38,5 @@ public interface SupportersRepository extends JpaRepository<SupportersRepository
         @Column(name = "preferred_region")
         public String preferredRegion;
 
-        @Column(name = "disable")
-        @JsonIgnore
-        public int disabled;
     }
 }

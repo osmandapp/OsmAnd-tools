@@ -1,12 +1,16 @@
 package net.osmand.server.api.repo;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
 import net.osmand.server.api.repo.MapUserRepository.MapUser;
 import net.osmand.server.api.repo.MapUserRepository.MapUserPrimaryKey;
 
 import javax.persistence.*;
+
 import java.io.Serializable;
 
+@Repository
 public interface MapUserRepository extends JpaRepository<MapUser, MapUserPrimaryKey> {
 
     @Entity

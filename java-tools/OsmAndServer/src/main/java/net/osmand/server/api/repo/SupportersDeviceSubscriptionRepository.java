@@ -1,15 +1,23 @@
 package net.osmand.server.api.repo;
 
-import org.springframework.data.jpa.repository.JpaRepository;
+import java.io.Serializable;
+import java.util.Date;
+
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.Id;
+import javax.persistence.IdClass;
+import javax.persistence.Table;
+import javax.persistence.Temporal;
+import javax.persistence.TemporalType;
+import javax.transaction.Transactional;
+
 import net.osmand.server.api.repo.SupportersDeviceSubscriptionRepository.SupporterDeviceSubscription;
 import net.osmand.server.api.repo.SupportersDeviceSubscriptionRepository.SupporterDeviceSubscriptionPrimaryKey;
+
+import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
-
-import javax.persistence.*;
-import javax.transaction.Transactional;
-import java.io.Serializable;
-import java.sql.Timestamp;
 
 public interface SupportersDeviceSubscriptionRepository extends JpaRepository<SupporterDeviceSubscription, SupporterDeviceSubscriptionPrimaryKey> {
 
@@ -24,7 +32,7 @@ public interface SupportersDeviceSubscriptionRepository extends JpaRepository<Su
     @Entity
     @Table(name = "supporters_device_sub")
     @IdClass(SupporterDeviceSubscriptionPrimaryKey.class)
-    class SupporterDeviceSubscription {
+    public class SupporterDeviceSubscription {
 
         @Id
         @Column(name = "userid")
@@ -39,7 +47,9 @@ public interface SupportersDeviceSubscriptionRepository extends JpaRepository<Su
         public String purchaseToken;
 
         @Column(name = "timestamp")
-        public Timestamp timestamp;
+        @Temporal(TemporalType.TIMESTAMP)
+        public Date timestamp;
+		
     }
 
     class SupporterDeviceSubscriptionPrimaryKey implements Serializable {

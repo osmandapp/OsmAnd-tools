@@ -1,13 +1,13 @@
 package net.osmand.server.api.repo;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import org.springframework.data.jpa.repository.JpaRepository;
-import net.osmand.server.api.repo.OsmRecipientsRepository.OsmRecipient;
-
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.Id;
 import javax.persistence.Table;
+
+import net.osmand.server.api.repo.OsmRecipientsRepository.OsmRecipient;
+
+import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface OsmRecipientsRepository extends JpaRepository<OsmRecipient, String> {
 
@@ -20,7 +20,6 @@ public interface OsmRecipientsRepository extends JpaRepository<OsmRecipient, Str
         public String osmId;
 
         @Column(name = "email")
-        @JsonIgnore
         public String email;
 
         @Column(name = "btcaddr")

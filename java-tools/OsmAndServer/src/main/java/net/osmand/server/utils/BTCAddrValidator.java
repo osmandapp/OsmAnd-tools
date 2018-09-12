@@ -32,6 +32,9 @@ public class BTCAddrValidator {
     }
 
     public static boolean validate(String addr) {
+    	if(addr == null) {
+    		return false;
+    	}
         try {
             int addressHeader = getAddressHeader(addr);
             return (addressHeader == 0 || addressHeader == 5);
