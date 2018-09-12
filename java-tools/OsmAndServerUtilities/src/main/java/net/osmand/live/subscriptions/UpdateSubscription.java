@@ -102,7 +102,7 @@ public class UpdateSubscription {
 		AndroidPublisher.Purchases purchases = publisher.purchases();
 		
 		while (rs.next()) {
-			String userid = rs.getString("userid");
+			long userid = rs.getLong("userid");
 			String pt = rs.getString("purchaseToken");
 			String sku = rs.getString("sku");
 			Timestamp checkTime = rs.getTimestamp("checktime");
@@ -117,7 +117,7 @@ public class UpdateSubscription {
 			// Basically validate non-valid everytime and valid not often than once per 24 hours 
 			if (checkDiff < DAY && valid) {
 //				if (verifyAll) {
-//					System.out.println(String.format("Skip userid=%s, sku=%s - recently checked %.1f days", userid,
+//					System.out.println(String.format("Skip userid=%d, sku=%s - recently checked %.1f days", userid,
 //							sku, (tm - checkTime.getTime()) / (DAY * 1.0)));
 //				}
 				continue;
@@ -131,7 +131,7 @@ public class UpdateSubscription {
 			}
 			// skip all active and valid if it was validated less than 5 days ago
 			if (activeNow && valid && (checkDiff < 5 * DAY || !verifyAll)) {
-				System.out.println(String.format("Skip userid=%s, sku=%s - subscribtion is active", userid, sku));
+				System.out.println(String.format("Skip userid=%d, sku=%s - subscribtion is active", userid, sku));
 				continue;
 			}
 			
@@ -168,7 +168,7 @@ public class UpdateSubscription {
 				if (reason != null) {
 					delStat.setString(1, kind);
 					delStat.setTimestamp(2, new Timestamp(tm));
-					delStat.setString(3, userid);
+					delStat.setLong(3, userid);
 					delStat.setString(4, pt);
 					delStat.setString(5, sku);
 					delStat.addBatch();
@@ -197,7 +197,7 @@ public class UpdateSubscription {
 		}
 	}
 
-	private void updateSubscriptionDb(String userid, String pt, String sku, Timestamp startTime, Timestamp expireTime,
+	private void updateSubscriptionDb(long userid, String pt, String sku, Timestamp startTime, Timestamp expireTime,
 			long tm, SubscriptionPurchase subscription) throws SQLException {
 		boolean updated = false;
 		int ind = 1;
@@ -234,7 +234,7 @@ public class UpdateSubscription {
 		updSubscrStat.setString(ind++, subscription.getOrderId());
 		updSubscrStat.setString(ind++, subscription.getDeveloperPayload());
 		updSubscrStat.setBoolean(ind++, true);
-		updSubscrStat.setString(ind++, userid);
+		updSubscrStat.setLong(ind++, userid);
 		updSubscrStat.setString(ind++, pt);
 		updSubscrStat.setString(ind++, sku);
 		System.out.println(String.format("%s for %s %s start %s expire %s",
