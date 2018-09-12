@@ -98,7 +98,8 @@ public class SubscriptionController {
 	}
     
     private ResponseEntity<String> error(String txt) {
-		return ResponseEntity.badRequest().body(String.format("{\"error\": \"%s.\"}", txt));
+    	// clients don't accept error requests (neither mobile, neither http)
+    	return ResponseEntity.ok().body(String.format("{\"error\": \"%s.\"}", txt));
 	}
     
     @PostMapping(path = {"/register_email", "/register_email.php"},
