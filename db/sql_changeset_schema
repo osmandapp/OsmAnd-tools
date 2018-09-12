@@ -4,22 +4,20 @@ CREATE TABLE pending_changesets (id text, created_at text) ;
 CREATE TABLE changesets (id text, bot int, created_at timestamp, closed_at timestamp, username text, closed_at_day text, uid text, created_by text, minlat float, minlon float, maxlat float, maxlon float, PRIMARY KEY(id));
 CREATE TABLE countries(id int, parentid int, name text, fullname text, downloadname text, clat float, clon float,  map int, PRIMARY KEY(id));
 CREATE TABLE changeset_country(changesetid text, countryid int, small int);
-CREATE TABLE supporters(userid text, token text, visiblename text, useremail text, preferred_region text, disable int);
+CREATE TABLE supporters(userid text, token text, visiblename text, useremail text, preferred_region text);
 
 # mail group
-CREATE TABLE map_users(aid text, email text, updatetime bigint);
-CREATE TABLE email_blocked(email text, reason text, timestamp bigint);
-CREATE TABLE email_unsubscribed(email text, channel text, updatetime bigint);
+CREATE TABLE email_free_users(aid text, email text, updatetime timestamp);
+CREATE TABLE email_blocked(email text, reason text, timestamp timestamp);
+CREATE TABLE email_unsubscribed(email text, channel text, updatetime timestamp);
 CREATE TABLE email_support_survey(ip text, response text, timestamp timestamp);
 
 CREATE TABLE data_missing_search(ip text, search text, location text, timestamp timestamp);
 
-CREATE TABLE osm_recipients(osmid text, email text, btcaddr text, updatetime bigint);
+CREATE TABLE osm_recipients(osmid text, email text, btcaddr text, updatetime timestamp);
 CREATE SEQUENCE supporters_seq START 1000;
 ALTER TABLE supporters ADD PRIMARY KEY (userid);
-CREATE TABLE supporters_subscription(userid text, sku text, purchasetoken text, checktime bigint,
-			autorenewing text, starttime bigint, expiretime bigint, kind text);
-CREATE TABLE supporters_device_sub(userid text, sku text, purchasetoken text, timestamp timestamp,
+CREATE TABLE supporters_device_sub(userid bigint, sku text, purchasetoken text, timestamp timestamp,
         autorenewing boolean, starttime timestamp, expiretime timestamp, kind text, payload text, orderid text,
         valid boolean, checktime timestamp);
 
