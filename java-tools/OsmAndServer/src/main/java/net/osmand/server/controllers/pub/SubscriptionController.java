@@ -196,7 +196,9 @@ public class SubscriptionController {
             produces =  MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<String> registerOsm(HttpServletRequest request) {
         String bitcoinAddress = request.getParameter("bitcoin_addr");
-        if (!BTCAddrValidator.validate(bitcoinAddress)) {
+        // empty means deleted (keep it)
+        if (bitcoinAddress != null && bitcoinAddress.length() > 0 && 
+        		!BTCAddrValidator.validate(bitcoinAddress) ) {
         	return error("Please validate bitcoin address.");
         }
         String osmUser = request.getParameter("osm_usr");
