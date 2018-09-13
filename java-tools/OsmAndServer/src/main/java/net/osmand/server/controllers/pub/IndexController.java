@@ -31,18 +31,20 @@ import java.io.File;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.text.SimpleDateFormat;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Controller
 public class IndexController {
 
     private static final Log LOGGER = LogFactory.getLog(IndexController.class);
 
-    private final SimpleDateFormat dateFormat = new SimpleDateFormat("d.M.Y");
+    private final SimpleDateFormat dateFormat = new SimpleDateFormat("dd.MM.yyyy");
 
     @Value("${files.location}")
     private String filesLocation;
@@ -77,6 +79,9 @@ public class IndexController {
 
     private String getFileSizeInMBFormatted(File file) {
         double size = file.length() / (1024.0 * 1024.0);
+        if (size < 0.05) {
+            size = 0.1;
+        }
         return String.format("%.1f", size);
     }
 
@@ -226,7 +231,9 @@ public class IndexController {
             String folder = "aosmc".concat(File.separator).concat(file.toLowerCase()).concat(File.separator);
             File dir = new File(filesLocation, folder);
             if (dir.isDirectory()) {
-                for (File mapFile : dir.listFiles()) {
+                Stream<File> files = Arrays.stream(dir.listFiles());
+                List<File> sortedFiles = files.sorted(Comparator.comparing(File::getName)).collect(Collectors.toList());
+                for (File mapFile : sortedFiles) {
                     String filename = mapFile.getName().toLowerCase();
                     if (filename.startsWith(file)) {
                         writeAttributes(xmlWriter, mapFile, timestamp);
