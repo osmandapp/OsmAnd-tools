@@ -1,9 +1,13 @@
 package net.osmand.server.api.repo;
 
+import java.util.Date;
+
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.Id;
 import javax.persistence.Table;
+import javax.persistence.Temporal;
+import javax.persistence.TemporalType;
 
 import net.osmand.server.api.repo.OsmRecipientsRepository.OsmRecipient;
 
@@ -26,6 +30,7 @@ public interface OsmRecipientsRepository extends JpaRepository<OsmRecipient, Str
         public String bitcoinAddress;
 
         @Column(name = "updatetime")
-        public long updateTime;
+        @Temporal(TemporalType.TIMESTAMP)
+        public Date updateTime;
     }
 }

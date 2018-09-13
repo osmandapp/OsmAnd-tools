@@ -1,12 +1,15 @@
 package net.osmand.server.api.repo;
 
 import java.io.Serializable;
+import java.util.Date;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.Id;
 import javax.persistence.IdClass;
 import javax.persistence.Table;
+import javax.persistence.Temporal;
+import javax.persistence.TemporalType;
 
 import net.osmand.server.api.repo.MapUserRepository.MapUser;
 import net.osmand.server.api.repo.MapUserRepository.MapUserPrimaryKey;
@@ -31,7 +34,8 @@ public interface MapUserRepository extends JpaRepository<MapUser, MapUserPrimary
         public String email;
 
         @Column(name = "updatetime")
-        public long updateTime;
+        @Temporal(TemporalType.TIMESTAMP)
+        public Date updateTime;
     }
 
     class MapUserPrimaryKey implements Serializable {

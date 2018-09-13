@@ -109,11 +109,10 @@ public class SubscriptionController {
             consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<String> registerEmail(HttpServletRequest request) {
-        long updateTime = System.currentTimeMillis();
         MapUser mapUser = new MapUser();
         mapUser.aid = request.getParameter("aid");
         mapUser.email = request.getParameter("email");
-        mapUser.updateTime = updateTime;
+        mapUser.updateTime = new Date();
         mapUser = mapUserRepository.save(mapUser);
         return ok("{\"email\": \"%s\", \"time\": \"%d\"}", mapUser.email, mapUser.updateTime);
     }
@@ -220,12 +219,11 @@ public class SubscriptionController {
         } catch (Exception ex) {
             return error("Please validate osm user/pwd (couldn't authenticate): " + ex.getMessage());
         }
-        long registerTimestamp = System.currentTimeMillis();
         OsmRecipient recipient = new OsmRecipient();
         recipient.osmId = osmUser;
         recipient.email = email;
         recipient.bitcoinAddress = bitcoinAddress;
-        recipient.updateTime = registerTimestamp;
+        recipient.updateTime = new Date();
         recipient = osmRecipientsRepository.save(recipient);
         String response = String.format("{\"osm_user\": \"%s\", \"bitcoin_addr\": \"%s\", \"time\": \"%s\"}",
                 recipient.osmId, recipient.bitcoinAddress, recipient.updateTime +"");

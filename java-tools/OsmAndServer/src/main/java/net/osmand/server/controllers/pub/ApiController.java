@@ -267,7 +267,7 @@ public class ApiController {
     public String emailUnsubscribe(@RequestParam(required=true) String id, @RequestParam(required=false) String group) throws IOException  {
 		String email = new String(Base64Utils.decodeFromString(URLDecoder.decode(id, "UTF-8")));
     	EmailUnsubscribed ent = new EmailUnsubscribedRepository.EmailUnsubscribed();
-    	ent.timestamp = System.currentTimeMillis() / 1000;
+    	ent.timestamp = new Date();
     	if(group == null) {
     		group = "all";
     	}
