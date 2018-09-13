@@ -114,7 +114,7 @@ public class SubscriptionController {
         mapUser.email = request.getParameter("email");
         mapUser.updateTime = new Date();
         mapUser = mapUserRepository.save(mapUser);
-        return ok("{\"email\": \"%s\", \"time\": \"%d\"}", mapUser.email, mapUser.updateTime);
+        return ok("{\"email\": \"%s\", \"time\": \"%d\"}", mapUser.email, mapUser.updateTime.getTime());
     }
     
 	private String userInfoAsJson(Supporter s) {
@@ -226,7 +226,7 @@ public class SubscriptionController {
         recipient.updateTime = new Date();
         recipient = osmRecipientsRepository.save(recipient);
         String response = String.format("{\"osm_user\": \"%s\", \"bitcoin_addr\": \"%s\", \"time\": \"%s\"}",
-                recipient.osmId, recipient.bitcoinAddress, recipient.updateTime +"");
+                recipient.osmId, recipient.bitcoinAddress, recipient.updateTime.getTime()+"");
         return ResponseEntity.ok(response);
     }
 
