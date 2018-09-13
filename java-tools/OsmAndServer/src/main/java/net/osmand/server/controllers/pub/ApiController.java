@@ -118,9 +118,15 @@ public class ApiController {
     
     public static String extractFirstDoubleNumber(String s) {
 		String d = "";
+		boolean dot = true;
 		for (int k = 0; k < s.length(); k++) {
 			char charAt = s.charAt(k);
-			if ((charAt >= '0' && charAt <= '9')  || charAt == '.') {
+			if(k == 0 && charAt =='-') {
+				d += charAt;
+			} else if(charAt == '.' && dot) {
+				d += charAt;
+				dot = false;
+			} else if ((charAt >= '0' && charAt <= '9') ) {
 				d += charAt;
 			} else {
 				break;
