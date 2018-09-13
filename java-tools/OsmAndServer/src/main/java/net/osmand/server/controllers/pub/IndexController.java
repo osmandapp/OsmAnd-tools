@@ -77,7 +77,7 @@ public class IndexController {
 
     private String getFileSizeInMBFormatted(File file) {
         double size = file.length() / (1024.0 * 1024.0);
-        return String.format("%.0f", size);
+        return String.format("%.1f", size);
     }
 
     private String formatDate(File file) {
@@ -237,7 +237,7 @@ public class IndexController {
             xmlWriter.writeEndDocument();
             xmlWriter.flush();
         } catch (XMLStreamException ex) {
-            LOGGER.error(ex.getMessage(), ex);
+            LOGGER.error("Error within checklive: " + ex.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Can't process request");
         }
         finally {
