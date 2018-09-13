@@ -235,7 +235,7 @@ public class IndexController {
                 List<File> sortedFiles = files.sorted(Comparator.comparing(File::getName)).collect(Collectors.toList());
                 for (File mapFile : sortedFiles) {
                     String filename = mapFile.getName().toLowerCase();
-                    if (filename.startsWith(file)) {
+                    if (filename.startsWith(file.toLowerCase())) {
                         writeAttributes(xmlWriter, mapFile, timestamp);
                     }
                 }
