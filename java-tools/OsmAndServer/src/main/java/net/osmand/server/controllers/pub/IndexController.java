@@ -1,38 +1,51 @@
 package net.osmand.server.controllers.pub;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.Comparator;
-import java.util.List;
-import java.util.function.Function;
-import java.util.stream.Collectors;
+import net.osmand.server.api.services.DownloadIndex;
+import net.osmand.server.api.services.DownloadIndexDocument;
+import net.osmand.server.api.services.DownloadIndexesService;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
 
 import javax.servlet.http.HttpServletResponse;
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBException;
 import javax.xml.bind.Unmarshaller;
-
-import net.osmand.server.api.services.DownloadIndex;
-import net.osmand.server.api.services.DownloadIndexDocument;
-import net.osmand.server.api.services.DownloadIndexesService;
-
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.core.io.FileSystemResource;
-import org.springframework.core.io.Resource;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.ResponseEntity;
-import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.ResponseBody;
+import javax.xml.stream.XMLOutputFactory;
+import javax.xml.stream.XMLStreamException;
+import javax.xml.stream.XMLStreamWriter;
+import java.io.File;
+import java.io.IOException;
+import java.io.StringWriter;
+import java.text.SimpleDateFormat;
+import java.util.Comparator;
+import java.util.Date;
+import java.util.List;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Controller
 public class IndexController {
 
     private static final Log LOGGER = LogFactory.getLog(IndexController.class);
+
+    private final SimpleDateFormat dateFormat = new SimpleDateFormat("d.M.Y");
+
+    @Value("${files.location}")
+    private String filesLocation;
 
     @Autowired
     private DownloadIndexesService downloadIndexes;
@@ -41,7 +54,7 @@ public class IndexController {
 		try {
 			JAXBContext jc = JAXBContext.newInstance(DownloadIndexDocument.class);
 			Unmarshaller unmarshaller = jc.createUnmarshaller();
-			DownloadIndexDocument did = (DownloadIndexDocument) unmarshaller.unmarshal(fl);;
+			DownloadIndexDocument did = (DownloadIndexDocument) unmarshaller.unmarshal(fl);
 			did.prepareMaps();
 			return did;
 		} catch (JAXBException ex) {
@@ -59,6 +72,60 @@ public class IndexController {
             return list.stream().sorted(comparator).collect(Collectors.toList());
         } else {
             return list.stream().sorted(comparator.reversed()).collect(Collectors.toList());
+        }
+    }
+
+    private String getFileSizeInMBFormatted(File file) {
+        double size = file.length() / (1024.0 * 1024.0);
+        return String.format("%.0f", size);
+    }
+
+    private String formatDate(File file) {
+        return dateFormat.format(new Date(file.lastModified()));
+    }
+
+    private boolean isUpdateAvailable(long fileTimestamp, long timestamp) {
+        return fileTimestamp > timestamp;
+    }
+
+    private String getFileUpdateDate(File file) {
+        String fname = file.getName();
+        int len = fname.length();
+        return fname.substring(len - 15, len - 7);
+    }
+
+    private void writeAttributes(XMLStreamWriter writer, File file, long timestamp) throws XMLStreamException {
+        String size = getFileSizeInMBFormatted(file);
+        long containerSize = file.length();
+        long contentSize = 2 * containerSize;
+        long fileTimestamp = file.lastModified();
+        if (isUpdateAvailable(fileTimestamp, timestamp)) {
+            writer.writeEmptyElement("update");
+        } else {
+            writer.writeEmptyElement("outdate");
+        }
+        writer.writeAttribute("updateDate", getFileUpdateDate(file));
+        writer.writeAttribute("containerSize", String.valueOf(containerSize));
+        writer.writeAttribute("contentSize", String.valueOf(contentSize));
+        writer.writeAttribute("timestamp", String.valueOf(fileTimestamp));
+        writer.writeAttribute("date", formatDate(file));
+        writer.writeAttribute("size", size);
+        writer.writeAttribute("name", file.getName());
+    }
+
+    private void close(XMLStreamWriter writer) {
+        try {
+            writer.close();
+        } catch (XMLStreamException ex) {
+            LOGGER.error(ex.getMessage(), ex);
+        }
+    }
+
+    private void close(StringWriter writer) {
+        try {
+            writer.close();
+        } catch (IOException ex) {
+            LOGGER.error(ex.getMessage(), ex);
         }
     }
 
@@ -137,5 +204,50 @@ public class IndexController {
         model.addAttribute("regions", regions);
         model.addAttribute("asc", asc);
         return "pub/list";
+    }
+
+    @GetMapping(path = {"check_live", "check_live.php"}, produces = MediaType.APPLICATION_XML_VALUE)
+    @ResponseBody
+    public ResponseEntity<String> checkLive(@RequestParam("file") String file,
+                                            @RequestParam("timestamp") Long timestamp) {
+        if (file.isEmpty() || timestamp == null) {
+            return ResponseEntity.badRequest().body("BadRequest");
+        }
+        XMLOutputFactory output = XMLOutputFactory.newInstance();
+        XMLStreamWriter xmlWriter = null;
+        StringWriter stringWriter = null;
+        try {
+            stringWriter = new StringWriter();
+            xmlWriter = output.createXMLStreamWriter(stringWriter);
+            xmlWriter.writeStartDocument();
+            xmlWriter.writeStartElement("updates");
+            xmlWriter.writeAttribute("file", file);
+            xmlWriter.writeAttribute("timestamp", String.valueOf(timestamp));
+            String folder = "aosmc".concat(File.separator).concat(file.toLowerCase()).concat(File.separator);
+            File dir = new File(filesLocation, folder);
+            if (dir.isDirectory()) {
+                for (File mapFile : dir.listFiles()) {
+                    String filename = mapFile.getName().toLowerCase();
+                    if (filename.startsWith(file)) {
+                        writeAttributes(xmlWriter, mapFile, timestamp);
+                    }
+                }
+            }
+            xmlWriter.writeEndElement();
+            xmlWriter.writeEndDocument();
+            xmlWriter.flush();
+        } catch (XMLStreamException ex) {
+            LOGGER.error(ex.getMessage(), ex);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Can't process request");
+        }
+        finally {
+            if (xmlWriter != null) {
+                close(xmlWriter);
+            }
+            if (stringWriter != null) {
+                close(stringWriter);
+            }
+        }
+        return ResponseEntity.ok(stringWriter.getBuffer().toString());
     }
 }
