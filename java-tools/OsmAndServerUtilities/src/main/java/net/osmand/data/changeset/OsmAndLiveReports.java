@@ -196,15 +196,15 @@ public class OsmAndLiveReports {
 		if(!isEmpty(region)) {
 			String r = "select count(distinct ch.username) users, count(distinct ch.id) changes" + 
 					  " from changesets_view ch, changeset_country_view cc where ch.id = cc.changesetid"+ 
-					  " and cc.countryid = (select id from countries where downloadname= '?')"+
-					  " and substr(ch.closed_at_day, 0, 8) = '?'";
+					  " and cc.countryid = (select id from countries where downloadname= ?)"+
+					  " and substr(ch.closed_at_day, 0, 8) = ?";
 			PreparedStatement ps = conn.prepareStatement(r);
 			ps.setString(1, region);
 			ps.setString(2, month);
 			rs = ps.executeQuery();
 		} else {
 			String r = "select count ( distinct username) users, count(*) changes from changesets_view"+
-						" where substr(closed_at_day, 0, 8) = '?'";
+						" where substr(closed_at_day, 0, 8) = ?";
 			PreparedStatement ps = conn.prepareStatement(r);
 			ps.setString(1, month);
 			rs = ps.executeQuery();
@@ -226,10 +226,10 @@ public class OsmAndLiveReports {
 			rankingRange = getRegionRankingRange();
 		    String r =  " SELECT data.cnt changes, count(*) group_size FROM ("+
 		    			"  		SELECT username, count(*) cnt FROM changesets_view ch, changeset_country_view cc " + 
-		    			"		WHERE substr(ch.closed_at_day, 0, 8) = '?' and ch.id = cc.changesetid  "+
-		    			"  			and cc.countryid = (SELECT id from countries where downloadname = '?' )" +
-		    			" 		GROUP BY ch.username having count(*) >= ? ORDER by count(*) desc )" +
-		    			" data group by data.cnt order by changes desc";
+		    			"		WHERE substr(ch.closed_at_day, 0, 8) = ? and ch.id = cc.changesetid  "+
+		    			"  			and cc.countryid = (SELECT id from countries where downloadname = ? )" +
+		    			" 		GROUP by ch.username HAVING count(*) >= ? ORDER by count(*) desc )" +
+		    			" data GROUP by data.cnt ORDER by changes desc";
 			PreparedStatement ps = conn.prepareStatement(r);
 			ps.setString(1, month);
 			ps.setString(2, region);
@@ -239,9 +239,9 @@ public class OsmAndLiveReports {
 			rankingRange = getRankingRange();
 			String r = "SELECT data.cnt changes, count(*) group_size FROM ( "+
 					   "	SELECT username, count(*) cnt FROM changesets_view ch " +
-					   "    WHERE substr(ch.closed_at_day, 0, 8) = '?' " +
-					   " 	GROUP BY by ch.username having count(*) >= ? ORDER by count(*) desc) " +
-					   " data group by data.cnt order by changes desc";
+					   "    WHERE substr(ch.closed_at_day, 0, 8) = ? " +
+					   " 	GROUP by  ch.username HAVING count(*) >= ? ORDER by count(*) desc) " +
+					   " data GROUP by data.cnt ORDER by changes desc";
 			PreparedStatement ps = conn.prepareStatement(r);
 			ps.setString(1, month);
 			ps.setInt(2, minChanges);
@@ -294,12 +294,12 @@ public class OsmAndLiveReports {
 		report.region = region;
 		String q = "SELECT  t.username user, t.size changes , s.size gchanges FROM "+ 
 				 	" ( SELECT username, count(*) size from changesets_view ch, changeset_country_view cc "+
-				 	" 	WHERE ch.id = cc.changesetid and substr(ch.closed_at_day, 0, 8) = '?' " +
-				 	"   and cc.countryid = (select id from countries where downloadname= '?')"+
+				 	" 	WHERE ch.id = cc.changesetid and substr(ch.closed_at_day, 0, 8) = ? " +
+				 	"   and cc.countryid = (select id from countries where downloadname= ?)"+
 				 	" GROUP by ch.username having count(*) >= ? " +
 				 	" ORDER by count(*) desc ) t join " +
 				 	" (SELECT username, count(*) size from changesets_view ch " +
-				 	"	WHERE substr(ch.closed_at_day, 0, 8) = '?' GROUP by ch.username " +
+				 	"	WHERE substr(ch.closed_at_day, 0, 8) = ? GROUP by ch.username " +
 				 	" ) s on s.username = t.username order by t.size desc";
 		PreparedStatement ps = conn.prepareStatement(q);
 		ps.setString(1, month);
@@ -351,14 +351,14 @@ public class OsmAndLiveReports {
 					" 	(SELECT count(*) size, ch.username " +
 					" 	 FROM changesets_view ch ";
 		if(eregion) {
-				q += "   WHERE substr(ch.closed_at_day, 0, 8) = '?' " +
+				q += "   WHERE substr(ch.closed_at_day, 0, 8) = ? " +
 		
 					 "	 GROUP by username) "+
 					 "t on t.username = s.osmid WHERE t.size is not null ORDER by changes desc"; 
 		} else {
 				q += "   						 , changeset_country_view cc " +
-					 "   WHERE ch.id = cc.changesetid  and substr(ch.closed_at_day, 0, 8) = '?' "+
-					 " 		   and cc.countryid = (select id from countries where downloadname = '?') " +
+					 "   WHERE ch.id = cc.changesetid  and substr(ch.closed_at_day, 0, 8) = ? "+
+					 " 		   and cc.countryid = (select id from countries where downloadname = ?) " +
 					 
 					 "	 GROUP by username) "+
 					 "t on t.username = s.osmid WHERE t.size is not null ORDER by changes desc";
