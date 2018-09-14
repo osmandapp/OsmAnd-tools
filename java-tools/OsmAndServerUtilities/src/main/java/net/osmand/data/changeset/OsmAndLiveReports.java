@@ -32,7 +32,14 @@ public class OsmAndLiveReports {
 				isEmpty(System.getenv("DB_PWD")) ? "test" : System.getenv("DB_PWD"));
 		OsmAndLiveReports reports = new OsmAndLiveReports();
 		reports.conn = conn;
-		reports.month = "2018-07";
+		reports.month = "2018-08";
+		
+		System.out.println(reports.getJsonReport(OsmAndLiveReportType.COUNTRIES, null));
+		System.out.println(reports.getJsonReport(OsmAndLiveReportType.RANKING, null));
+		System.out.println(reports.getJsonReport(OsmAndLiveReportType.SUPPORTERS, null));
+		System.out.println(reports.getJsonReport(OsmAndLiveReportType.TOTAL_CHANGES, null));
+		System.out.println(reports.getJsonReport(OsmAndLiveReportType.USERS_RANKING, null));
+		
 //		reports.buildReports(conn);
 	}
 	
