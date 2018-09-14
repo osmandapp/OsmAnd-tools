@@ -10,11 +10,11 @@ public enum OsmAndLiveReportType {
 	
 	SUPPORTERS("getSupporters"),
 	COUNTRIES("getCountries"),
-	RECIPIENTS("getRecipients"),
 	TOTAL_CHANGES("getTotalChanges"),
+	RANKING("calculateRanking"),
 	USERS_RANKING("calculateUsersRanking"),
-	USER_RANKING("calculateUserRanking"),
-	RANKING("calculateRanking");
+	RECIPIENTS("getRecipients"),
+	PAYOUTS("getPayouts");
 	
 	private final String sqlName;
 	private final boolean numberReport;

@@ -1,53 +1,26 @@
 package net.osmand.data.changeset;
 
 import java.io.IOException;
-import java.io.StringReader;
-import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
-import java.security.SecureRandom;
-import java.security.cert.CertificateException;
-import java.security.cert.X509Certificate;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
-import java.sql.Timestamp;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.TimeZone;
 import java.util.TreeMap;
 
-import javax.net.ssl.HostnameVerifier;
-import javax.net.ssl.HttpsURLConnection;
-import javax.net.ssl.KeyManager;
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.SSLSession;
-import javax.net.ssl.X509TrustManager;
-
 import net.osmand.PlatformUtil;
-import net.osmand.binary.BinaryMapDataObject;
-import net.osmand.map.OsmandRegions;
-import net.osmand.map.WorldRegion;
 import net.osmand.util.Algorithms;
-import net.osmand.util.MapUtils;
 
 import org.apache.commons.logging.Log;
-import org.json.JSONArray;
 import org.json.JSONObject;
-import org.kxml2.io.KXmlParser;
-import org.xmlpull.v1.XmlPullParser;
 
 import com.google.gson.Gson;
-import com.google.gson.JsonArray;
-import com.google.gson.stream.JsonReader;
 
 public class OsmAndLiveReports {
 
@@ -100,7 +73,7 @@ public class OsmAndLiveReports {
 		return obj.getJSONObject("EUR").getDouble("sell");
 	}
 
-	private double getBtcValue() throws IOException {
+	private double getBtcValue() throws IOException, SQLException {
 		double rt = getEurBTCRate();
 		double eur = getEurValue();
 		if (rt != 0) {
@@ -110,8 +83,9 @@ public class OsmAndLiveReports {
 	}
 
 
-	private double getEurValue() {
-		throw new UnsupportedOperationException();
+	private double getEurValue() throws SQLException {
+		SupportersReport supporters = getSupporters();
+		return supporters.activeCount * 0.4 ; // 1 EUR - 20% (GPlay) - 50% (OsmAnd)
 	}
 	
 	
@@ -296,150 +270,172 @@ public class OsmAndLiveReports {
 		}
 		return report;
 	}
-
-//		function calculateUserRanking($useReport = true, $saveReport = 0 ) {
-//		  global $iregion, $imonth, $iuser, $month, $dbconn;
-//		  $finalReport = getReport('calculateUserRanking', $iregion);
-//		  if($finalReport != NULL && $useReport ) {
-//		    return $finalReport;
-//		  }
-//		  $gar = calculateRanking('', $useReport, -1)->rows;
-//		  $ar = calculateRanking(NULL, $useReport, -1)->rows;
-//		  $region =  pg_escape_string($iregion);
-//		  $user =  pg_escape_string($iuser);
-//		  
-//		    
-//		  $result = pg_query($dbconn, "
-//		    SELECT  t.username, t.size changes , s.size gchanges FROM
-//		     ( SELECT username, count(*) size 
-//		        from changesets_view ch, changeset_country_view cc where ch.id = cc.changesetid 
-//		        and substr(ch.closed_at_day, 0, 8) = '{$month}'
-//		        and cc.countryid = (select id from countries where downloadname= '${region}')
-//		        and username= '${user}'
-//		        group by ch.username) t join 
-//		     (SELECT username, count(*) size from changesets_view ch where 
-//		      substr(ch.closed_at_day, 0, 8) = '{$month}'
-//		      and username= '${user}'
-//		      group by ch.username
-//		      ) s on s.username = t.username order by t.size desc;
-//		        ");
-//		  if (!$result) {
-//		    $res = new stdClass();
-//		    $res->error ='No result';
-//		    return $res;
-//		  }
-//		  
-//		  
-//		  $res = new stdClass();
-//		  $res->month = $month;
-//		  $res->rows = array();
-//		  while ($row = pg_fetch_row($result)) {
-//		    $rw = new stdClass();
-//		    array_push($res->rows, $rw);
-//		    $rw->user = $row[0];
-//		    $rw->changes = $row[1];
-//		    $rw->globalchanges = $row[2];
-//		    $rw->rank = '';
-//		    for($i = 0; $i < count($ar); $i++) {
-//		      if($ar[$i]->minChanges <= $row[1]  && $ar[$i]->maxChanges >= $row[1] ){
-//		        $rw->rank = $ar[$i]->rank;
-//		        // $rw->min = $ar[$i]->minChanges ;
-//		        // $rw->max = $ar[$i]->maxChanges ;
-//		        break;
-//		      }
-//		    }
-//		    $rw->grank = '';
-//		    for($i = 0; $i < count($gar); $i++) {
-//		      if($gar[$i]->minChanges <= $row[2]  && $gar[$i]->maxChanges >= $row[2] ){
-//		        $rw->grank = $gar[$i]->rank;
-//		        // $rw->gmin = $gar[$i]->minChanges ;
-//		        // $rw->gmax = $gar[$i]->maxChanges ;
-//
-//		        break;
-//		      }
-//		    }
-//		  }
-//		  if($saveReport >= 0) {
-//		    saveReport('calculateUserRanking', $res, $imonth, $iregion, $timeReport);
-//		  }
-//		  return $res;
-//
-//		}
-//
-//
-//		function calculateUsersRanking($useReport = true, $saveReport = 0) {
-//		  global $iregion, $imonth, $month, $dbconn;
-//		  $finalReport = getReport('calculateUsersRanking', $iregion);
-//		  if($finalReport != NULL && $useReport) {
-//		    return $finalReport;
-//		  }
-//		  $gar = calculateRanking('', true, -1)->rows;
-//		  $ar = calculateRanking(NULL, true, -1)->rows;
-//		  $region =  pg_escape_string($iregion);
-//		  $min_changes = getMinChanges();
-//		  
-//		    
-//		  $result = pg_query($dbconn, "
-//		    SELECT  t.username, t.size changes , s.size gchanges FROM
-//		     ( SELECT username, count(*) size 
-//		        from changesets_view ch, changeset_country_view cc where ch.id = cc.changesetid 
-//		        and substr(ch.closed_at_day, 0, 8) = '{$month}'
-//		        and cc.countryid = (select id from countries where downloadname= '${region}')
-//		        group by ch.username
-//		        having count(*) >= {$min_changes}
-//		        order by count(*) desc ) t join 
-//		     (SELECT username, count(*) size from changesets_view ch where 
-//		      substr(ch.closed_at_day, 0, 8) = '{$month}'
-//		      group by ch.username
-//		      ) s on s.username = t.username order by t.size desc;
-//		        ");
-//		  if (!$result) {
-//		    $res = new stdClass();
-//		    $res->error ='No result';
-//		    return $res;
-//		  }
-//		  
-//		  
-//		  $res = new stdClass();
-//		  $res->month = $month;
-//		  $res->rows = array();
-//		  while ($row = pg_fetch_row($result)) {
-//		    $rw = new stdClass();
-//		    array_push($res->rows, $rw);
-//		    $rw->user = $row[0];
-//		    $rw->changes = $row[1];
-//		    $rw->globalchanges = $row[2];
-//		    $rw->rank = '';
-//		    for($i = 0; $i < count($ar); $i++) {
-//		      if($ar[$i]->minChanges <= $row[1]  && $ar[$i]->maxChanges >= $row[1] ){
-//		        $rw->rank = $ar[$i]->rank;
-//		        // $rw->min = $ar[$i]->minChanges ;
-//		        // $rw->max = $ar[$i]->maxChanges ;
-//		        break;
-//		      }
-//		    }
-//		    $rw->grank = '';
-//		    for($i = 0; $i < count($gar); $i++) {
-//		      if($gar[$i]->minChanges <= $row[2]  && $gar[$i]->maxChanges >= $row[2] ){
-//		        $rw->grank = $gar[$i]->rank;
-//		        // $rw->gmin = $gar[$i]->minChanges ;
-//		        // $rw->gmax = $gar[$i]->maxChanges ;
-//
-//		        break;
-//		      }
-//		    }
-//		    
-//		  }
-//		  if($saveReport >= 0) {
-//		    saveReport('calculateUsersRanking', $res, $imonth, $iregion, $saveReport);
-//		  }
-//		  return $res;
-//
-//		}
-
-
 	
-	public String getJsonReport(OsmAndLiveReportType type, String region) throws SQLException {
+	public UserRankingReport getUserWorldRanking(String region) throws SQLException {
+		UserRankingReport report = new UserRankingReport();
+		
+		RankingReport ranking = getRanking(region);
+		RankingReport granking = getRanking(null);
+		report.month = month;
+		report.region = region;
+		String q = "SELECT  t.username user, t.size changes , s.size gchanges FROM "+ 
+				 	" ( SELECT username, count(*) size from changesets_view ch, changeset_country_view cc "+
+				 	" 	WHERE ch.id = cc.changesetid and substr(ch.closed_at_day, 0, 8) = '?' " +
+				 	"   and cc.countryid = (select id from countries where downloadname= '?')"+
+				 	" GROUP by ch.username having count(*) >= ? " +
+				 	" ORDER by count(*) desc ) t join " +
+				 	" (SELECT username, count(*) size from changesets_view ch " +
+				 	"	WHERE substr(ch.closed_at_day, 0, 8) = '?' GROUP by ch.username " +
+				 	" ) s on s.username = t.username order by t.size desc";
+		PreparedStatement ps = conn.prepareStatement(q);
+		ps.setString(1, month);
+		ps.setString(2, region);
+		ps.setInt(3, getMinChanges());
+		ps.setString(4, month);
+		ResultSet rs = ps.executeQuery();
+
+		while(rs.next()) {
+			UserRanking r = new UserRanking();
+			
+			r.name = rs.getString("user");
+			r.changes= rs.getInt("changes");
+			r.globalchanges= rs.getInt("gchanges");
+			r.rank = 0;
+			r.grank = 0;
+			for (int i = 0; i < granking.rows.size(); i++) {
+				RankingRange range = granking.rows.get(i);
+				if (range.minChanges <= r.globalchanges && r.globalchanges <= range.maxChanges) {
+					r.grank = range.rank;
+				}
+			}
+			for (int i = 0; i < ranking.rows.size(); i++) {
+				RankingRange range = ranking.rows.get(i);
+				if (range.minChanges <= r.globalchanges && r.globalchanges <= range.maxChanges) {
+					r.rank = range.rank;
+				}
+			}
+			if(r.rank > 0) {
+				report.rows.add(r);
+			}
+		}
+		return report;
+	}
+	
+	public RecipientsReport getRecipients(String region) throws SQLException, IOException {
+		SupportersReport supporters = getSupporters();
+		RankingReport ranking = getRanking(null);
+		double eurValue = getEurValue();
+		double btcValue = getBtcValue();
+		double eurBTCRate = getEurBTCRate();
+		RecipientsReport report = new RecipientsReport();
+		report.month = month;
+		report.region = region;
+		boolean eregion = isEmpty(region);
+		String q = " SELECT distinct s.osmid osmid, t.size changes," + 
+					" first_value(s.btcaddr) over (partition by osmid order by updatetime desc) btcaddr " + 
+					" FROM osm_recipients s left join " + 
+					" 	(SELECT count(*) size, ch.username " +
+					" 	 FROM changesets_view ch ";
+		if(eregion) {
+				q += "   WHERE substr(ch.closed_at_day, 0, 8) = '?' " +
+		
+					 "	 GROUP by username) "+
+					 "t on t.username = s.osmid WHERE t.size is not null ORDER by changes desc"; 
+		} else {
+				q += "   						 , changeset_country_view cc " +
+					 "   WHERE ch.id = cc.changesetid  and substr(ch.closed_at_day, 0, 8) = '?' "+
+					 " 		   and cc.countryid = (select id from countries where downloadname = '?') " +
+					 
+					 "	 GROUP by username) "+
+					 "t on t.username = s.osmid WHERE t.size is not null ORDER by changes desc";
+		}
+		PreparedStatement ps = conn.prepareStatement(q);
+		ps.setString(1, month);
+		if(!eregion) {
+			ps.setString(2, region);
+		}
+		ResultSet rs = ps.executeQuery();
+		
+		report.regionPercentage = 0;
+		SupportersRegion sr = supporters.regions.get(isEmpty(region) ? "" : region);
+		if(sr != null) {
+			report.regionPercentage = sr.percent;
+		}
+		report.regionCount = 0;
+		report.regionTotalWeight = 0;
+		while(rs.next()) {
+			Recipient recipient = new Recipient();
+			recipient.osmid = rs.getString("osmid");
+			recipient.changes = rs.getInt("changes");
+			recipient.btcaddress = rs.getString("btcaddr");
+			if(isEmpty(recipient.btcaddress)) {
+				continue;
+			}
+			report.regionCount++;
+			for (int i = 0; i < ranking.rows.size() ; ++i) {
+				RankingRange range = ranking.rows.get(i);
+				if(recipient.changes >= range.minChanges && recipient.changes <= range.maxChanges) {
+					recipient.rank = range.rank;
+					if(eregion) {
+						recipient.weight = getRankingRange() + 1 - recipient.rank; 
+					} else {
+						recipient.weight = getRankingRange() + 1 - recipient.rank;
+					}
+					report.regionTotalWeight += recipient.weight;
+					break;
+				}
+			}
+			report.rows.add(recipient);
+		}
+		report.eur = (float) eurValue;
+		report.rate = (float) eurBTCRate;
+		report.btc = (float) btcValue;
+		report.regionBtc = report.regionPercentage * report.btc;
+		for(int i = 0; i < report.rows.size(); i++) {
+			Recipient r = report.rows.get(i);
+			if(report.regionTotalWeight > 0) {
+				r.btc = report.btc  * r.weight / report.regionTotalWeight; 
+			} else {
+				r.btc = 0f;
+			}
+		}
+		return report;
+	}
+	
+	
+	public PayoutsReport getPayouts() throws IOException, SQLException {
+		PayoutsReport report = new PayoutsReport();
+		CountriesReport countries = getCountries();
+		report.payoutTotal = 0d;
+		report.payoutBTCAvailable = getBtcValue();
+		report.payoutEurAvailable = getEurValue();
+		if (report.payoutBTCAvailable > 0) {
+			report.rate = report.payoutEurAvailable / report.payoutBTCAvailable;
+		}
+		for(int i = 0; i < countries.rows.size(); i++) {
+			Country c = countries.rows.get(i);
+			String reg = null;
+			if(!"World".equals(c.name)) {
+				if("0".equals(c.map)) {
+					continue;
+				}
+				reg = c.downloadname;
+			}
+			RecipientsReport recipients = getRecipients(reg);
+			for(int j = 0; j < recipients.rows.size(); j++) {
+				Recipient recipient = recipients.rows.get(j);
+				Payout p = new Payout();
+				p.btc = recipient.btc;
+				p.osmid = recipient.osmid;
+				p.btcaddress = recipient.btcaddress;
+				report.payoutTotal += p.btc;
+				report.payouts.add(p);
+			}
+		}
+		return report;
+	}
+
+	public String getJsonReport(OsmAndLiveReportType type, String region) throws SQLException, IOException {
 		Gson gson = new Gson();
 		if(type == OsmAndLiveReportType.COUNTRIES) {
 			return gson.toJson(getCountries());
@@ -450,17 +446,17 @@ public class OsmAndLiveReports {
 		} else if(type == OsmAndLiveReportType.RANKING) {
 			return gson.toJson(getRanking(region));
 		} else if(type == OsmAndLiveReportType.USERS_RANKING) {
-			throw new UnsupportedOperationException();
-		} else if(type == OsmAndLiveReportType.USER_RANKING) {
-			throw new UnsupportedOperationException();
+			return gson.toJson(getUserWorldRanking(region));
 		} else if(type == OsmAndLiveReportType.RECIPIENTS) {
-			throw new UnsupportedOperationException();
+			return gson.toJson(getRecipients(region));
+		} else if(type == OsmAndLiveReportType.PAYOUTS) {
+			return gson.toJson(getPayouts());
 		} else {
 			throw new UnsupportedOperationException();
 		}
 	}
 	
-	public Number getNumberReport(OsmAndLiveReportType type) throws IOException {
+	public Number getNumberReport(OsmAndLiveReportType type) throws IOException, SQLException {
 		if(type == OsmAndLiveReportType.MIN_CHANGES) {
 			return getMinChanges();
 		} else if(type == OsmAndLiveReportType.REGION_RANKING_RANGE) {
@@ -548,6 +544,68 @@ public class OsmAndLiveReports {
 		public int totalChanges;
 		public float avgChanges;
 	}
+	
+	
+
+	protected class UserRankingReport {
+		public String month;
+		public String region;		
+		List<UserRanking> rows = new ArrayList<UserRanking>();
+	}
+	
+	protected class UserRanking {
+		public String name;		
+		public int rank;
+		public int grank;
+		public int globalchanges;
+		public int changes;
+	}
+	
+	
+	protected class Recipient {
+
+		public float btc;
+		public int weight;
+		public int rank;
+		public String btcaddress;
+		public String osmid;
+		public int changes;
+		
+	}
+	
+	protected class RecipientsReport {
+		public String region;
+		public String month;
+		
+		public int regionTotalWeight;
+		public int regionCount;
+		public float regionPercentage;
+		
+		public float regionBtc;
+		public float btc;
+		public float rate;
+		public float eur;
+		
+		public List<Recipient> rows = new ArrayList<Recipient>();
+	}
+	
+	protected class PayoutsReport {
+		public double rate;
+		public double payoutBTCAvailable;
+		public double payoutEurAvailable;
+		public double payoutTotal;
+		public String month;
+		public List<Payout> payouts = new ArrayList<Payout>();
+		
+	}
+	
+	protected class Payout {
+		public String osmid;
+		public String btcaddress;
+		public float btc;
+	}
+	
+	
 	
 
 }
