@@ -34,11 +34,13 @@ public class OsmAndLiveReports {
 		reports.conn = conn;
 		reports.month = "2018-08";
 		
-		System.out.println(reports.getJsonReport(OsmAndLiveReportType.COUNTRIES, null));
+//		System.out.println(reports.getJsonReport(OsmAndLiveReportType.COUNTRIES, null));
+		System.out.println(reports.getJsonReport(OsmAndLiveReportType.TOTAL_CHANGES, null));
 		System.out.println(reports.getJsonReport(OsmAndLiveReportType.RANKING, null));
 		System.out.println(reports.getJsonReport(OsmAndLiveReportType.SUPPORTERS, null));
-		System.out.println(reports.getJsonReport(OsmAndLiveReportType.TOTAL_CHANGES, null));
 		System.out.println(reports.getJsonReport(OsmAndLiveReportType.USERS_RANKING, null));
+		System.out.println(reports.getJsonReport(OsmAndLiveReportType.RECIPIENTS, null));
+//		System.out.println(reports.getJsonReport(OsmAndLiveReportType.PAYOUTS, null));
 		
 //		reports.buildReports(conn);
 	}
@@ -174,13 +176,13 @@ public class OsmAndLiveReports {
 				worldwide.count++;
 				supportersReport.activeCount++;
 			}
-
+			supportersReport.rows.add(s);
 			supportersReport.count++;
 		}
 		for (String s : supportersReport.regions.keySet()) {
 			SupportersRegion r = supportersReport.regions.get(s);
 			if (supportersReport.activeCount > 0) {
-				r.percent = r.count / (2 * supportersReport.activeCount);
+				r.percent = ((float)r.count) / (2 * supportersReport.activeCount);
 			} else {
 				r.percent = 0;
 			}
@@ -292,15 +294,15 @@ public class OsmAndLiveReports {
 		RankingReport granking = getRanking(null);
 		report.month = month;
 		report.region = region;
-		String q = "SELECT  t.username user, t.size changes , s.size gchanges FROM "+ 
+		String q = "SELECT  t.username username, t.size changes , s.size gchanges FROM "+ 
 				 	" ( SELECT username, count(*) size from changesets_view ch, changeset_country_view cc "+
 				 	" 	WHERE ch.id = cc.changesetid and substr(ch.closed_at_day, 0, 8) = ? " +
 				 	"   and cc.countryid = (select id from countries where downloadname= ?)"+
-				 	" GROUP by ch.username having count(*) >= ? " +
-				 	" ORDER by count(*) desc ) t join " +
+				 	" GROUP by ch.username HAVING count(*) >= ? " +
+				 	" ORDER by count(*) desc ) t JOIN " +
 				 	" (SELECT username, count(*) size from changesets_view ch " +
 				 	"	WHERE substr(ch.closed_at_day, 0, 8) = ? GROUP by ch.username " +
-				 	" ) s on s.username = t.username order by t.size desc";
+				 	" ) s on s.username = t.username ORDER by t.size desc";
 		PreparedStatement ps = conn.prepareStatement(q);
 		ps.setString(1, month);
 		ps.setString(2, region);
@@ -311,7 +313,7 @@ public class OsmAndLiveReports {
 		while(rs.next()) {
 			UserRanking r = new UserRanking();
 			
-			r.name = rs.getString("user");
+			r.name = rs.getString("username");
 			r.changes= rs.getInt("changes");
 			r.globalchanges= rs.getInt("gchanges");
 			r.rank = 0;
