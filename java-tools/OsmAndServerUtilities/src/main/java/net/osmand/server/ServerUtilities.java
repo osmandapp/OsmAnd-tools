@@ -6,6 +6,7 @@ import java.util.List;
 
 import net.osmand.bitcoinsender.TransactionAnalyzer;
 import net.osmand.data.changeset.CalculateOsmChangesets;
+import net.osmand.data.changeset.OsmAndLiveReports;
 import net.osmand.live.subscriptions.UpdateSubscription;
 import net.osmand.mailsender.EmailSenderMain;
 
@@ -25,6 +26,8 @@ public class ServerUtilities {
 			CalculateOsmChangesets.calculateCountries();
 		} else if (utl.equals("download-changeset")) {
 			CalculateOsmChangesets.downloadChangesets();
+		} else if (utl.equals("generate-reports")) {
+			OsmAndLiveReports.main(subArgsArray);
 		} else {
 			System.err.println("Uknown command");
 			System.exit(1);
