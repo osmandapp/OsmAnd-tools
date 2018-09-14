@@ -38,7 +38,7 @@ public class OsmAndLiveReports {
 		System.out.println(reports.getJsonReport(OsmAndLiveReportType.TOTAL_CHANGES, null));
 		System.out.println(reports.getJsonReport(OsmAndLiveReportType.RANKING, null));
 		System.out.println(reports.getJsonReport(OsmAndLiveReportType.SUPPORTERS, null));
-		System.out.println(reports.getJsonReport(OsmAndLiveReportType.USERS_RANKING, null));
+		System.out.println(reports.getJsonReport(OsmAndLiveReportType.USERS_RANKING, "belarus_europe"));
 		System.out.println(reports.getJsonReport(OsmAndLiveReportType.RECIPIENTS, null));
 //		System.out.println(reports.getJsonReport(OsmAndLiveReportType.PAYOUTS, null));
 		
@@ -182,7 +182,7 @@ public class OsmAndLiveReports {
 		for (String s : supportersReport.regions.keySet()) {
 			SupportersRegion r = supportersReport.regions.get(s);
 			if (supportersReport.activeCount > 0) {
-				r.percent = ((float)r.count) / (2 * supportersReport.activeCount);
+				r.percent = ((float) r.count) / (2 * supportersReport.activeCount);
 			} else {
 				r.percent = 0;
 			}
@@ -540,7 +540,6 @@ public class OsmAndLiveReports {
 		public String regionName;
 		public String sku;
 		
-		public float percent;
 	}
 	
 	
