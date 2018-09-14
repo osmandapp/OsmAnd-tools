@@ -224,11 +224,11 @@ public class OsmAndLiveReports {
 		ResultSet rs;
 		if(!isEmpty(region)) {
 			rankingRange = getRegionRankingRange();
-		    String r =  " SELECT data.cnt changes, count(*) group_size from ("+
-		    			"  		SELECT username, count(*) cnt from changesets_view ch, changeset_country_view cc " + 
+		    String r =  " SELECT data.cnt changes, count(*) group_size FROM ("+
+		    			"  		SELECT username, count(*) cnt FROM changesets_view ch, changeset_country_view cc " + 
 		    			"		WHERE substr(ch.closed_at_day, 0, 8) = '?' and ch.id = cc.changesetid  "+
-		    			"  			and cc.countryid = (select id from countries where downloadname= '?' )" +
-		    			" 		GROUP BY ch.username having count(*) >= ? order by count(*) desc )" +
+		    			"  			and cc.countryid = (SELECT id from countries where downloadname = '?' )" +
+		    			" 		GROUP BY ch.username having count(*) >= ? ORDER by count(*) desc )" +
 		    			" data group by data.cnt order by changes desc";
 			PreparedStatement ps = conn.prepareStatement(r);
 			ps.setString(1, month);
@@ -237,9 +237,10 @@ public class OsmAndLiveReports {
 			rs = ps.executeQuery();
 		} else {
 			rankingRange = getRankingRange();
-			String r = "SELECT data.cnt changes, count(*) group_size from ( "+
-					   "	SELECT username, count(*) cnt from changesets_view ch where substr(ch.closed_at_day, 0, 8) = ? " +
-					   " 	GROUP BY by ch.username having count(*) >= ? order by count(*) desc) " +
+			String r = "SELECT data.cnt changes, count(*) group_size FROM ( "+
+					   "	SELECT username, count(*) cnt FROM changesets_view ch " +
+					   "    WHERE substr(ch.closed_at_day, 0, 8) = '?' " +
+					   " 	GROUP BY by ch.username having count(*) >= ? ORDER by count(*) desc) " +
 					   " data group by data.cnt order by changes desc";
 			PreparedStatement ps = conn.prepareStatement(r);
 			ps.setString(1, month);
