@@ -30,10 +30,7 @@ public class OsmAndLiveReports {
 		Connection conn = DriverManager.getConnection("jdbc:postgresql://localhost:5433/changeset",
 				isEmpty(System.getenv("DB_USER")) ? "test" : System.getenv("DB_USER"),
 				isEmpty(System.getenv("DB_PWD")) ? "test" : System.getenv("DB_PWD"));
-		OsmAndLiveReports reports = new OsmAndLiveReports();
-		reports.conn = conn;
-		reports.month = "2018-08";
-		
+		OsmAndLiveReports reports = new OsmAndLiveReports(conn, "2018-08");
 //		System.out.println(reports.getJsonReport(OsmAndLiveReportType.COUNTRIES, null));
 		System.out.println(reports.getJsonReport(OsmAndLiveReportType.TOTAL_CHANGES, null));
 		System.out.println(reports.getJsonReport(OsmAndLiveReportType.RANKING, null));
@@ -41,12 +38,18 @@ public class OsmAndLiveReports {
 		System.out.println(reports.getJsonReport(OsmAndLiveReportType.USERS_RANKING, "belarus_europe"));
 		System.out.println(reports.getJsonReport(OsmAndLiveReportType.RECIPIENTS, null));
 //		System.out.println(reports.getJsonReport(OsmAndLiveReportType.PAYOUTS, null));
-		
 //		reports.buildReports(conn);
 	}
 	
+	
 	private String month;
 	private Connection conn;
+
+	public OsmAndLiveReports(Connection conn, String month) {
+		this.conn = conn;
+		this.month = month;
+	}
+	
 	private CountriesReport countriesReport;
 	private SupportersReport supportersReport;
 	
@@ -314,7 +317,7 @@ public class OsmAndLiveReports {
 			UserRanking r = new UserRanking();
 			
 			r.name = rs.getString("username");
-			r.changes= rs.getInt("changes");
+			r.changes = rs.getInt("changes");
 			r.globalchanges= rs.getInt("gchanges");
 			r.rank = 0;
 			r.grank = 0;
