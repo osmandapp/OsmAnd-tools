@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/nreports")
+@RequestMapping("/reports")
 public class ReportsController {
     private static final Log LOGGER = LogFactory.getLog(ReportsController.class);
 
@@ -47,7 +47,7 @@ public class ReportsController {
 //    }
 
     // TODO query_report and query_report.php
-    @RequestMapping(path = { "query_report_new"})
+    @RequestMapping(path = { "/query_report_new"})
     @ResponseBody
 	public String helpSpecific(HttpServletRequest request, @RequestParam(required = true) String report,
 			@RequestParam(required = false) String month, @RequestParam(required = false) String region) throws SQLException, IOException {
