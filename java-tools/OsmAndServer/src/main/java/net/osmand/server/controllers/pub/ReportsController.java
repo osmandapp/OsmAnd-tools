@@ -36,6 +36,10 @@ public class ReportsController {
     
     // TODO recipients_by_month (transactions.json + text + underpayd)
     
+    // TODO empty month (supporters for previous month)
+    
+    // TODO getTotalReport
+    
     // TODO query_month_report
 //    header("Content-Description: Json report");
 //    header("Content-Disposition: attachment; filename=report-$rregion-".$_REQUEST["month"].".json");

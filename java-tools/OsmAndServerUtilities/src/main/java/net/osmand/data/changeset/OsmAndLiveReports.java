@@ -9,6 +9,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -26,6 +27,7 @@ public class OsmAndLiveReports {
 
 	private static final int BATCH_SIZE = 1000;
 	private static final Log LOG = PlatformUtil.getLog(OsmAndLiveReports.class);
+	
 	public static void main(String[] args) throws Exception {
 		Connection conn = DriverManager.getConnection("jdbc:postgresql://localhost:5433/changeset",
 				isEmpty(System.getenv("DB_USER")) ? "test" : System.getenv("DB_USER"),
@@ -43,11 +45,16 @@ public class OsmAndLiveReports {
 	
 	
 	private String month;
+	private String currentMonth;
 	private Connection conn;
 
 	public OsmAndLiveReports(Connection conn, String month) {
 		this.conn = conn;
 		this.month = month;
+		this.currentMonth = String.format("%1$tY-%1$tm", new Date());
+		if(isEmpty(month)) {
+			this.month = this.currentMonth;
+		}
 	}
 	
 	private CountriesReport countriesReport;
@@ -316,7 +323,7 @@ public class OsmAndLiveReports {
 		while(rs.next()) {
 			UserRanking r = new UserRanking();
 			
-			r.name = rs.getString("username");
+			r.user = rs.getString("username");
 			r.changes = rs.getInt("changes");
 			r.globalchanges= rs.getInt("gchanges");
 			r.rank = 0;
@@ -572,6 +579,7 @@ public class OsmAndLiveReports {
 	}
 	
 	protected class UserRanking {
+		public String user;
 		public String name;		
 		public int rank;
 		public int grank;
