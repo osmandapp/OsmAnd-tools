@@ -297,7 +297,7 @@ public class OsmAndLiveReports {
 		return report;
 	}
 	
-	public UserRankingReport getUserWorldRanking(String region) throws SQLException {
+	public UserRankingReport getUsersRanking(String region) throws SQLException {
 		UserRankingReport report = new UserRankingReport();
 		
 		RankingReport ranking = getRanking(region);
@@ -336,7 +336,7 @@ public class OsmAndLiveReports {
 			}
 			for (int i = 0; i < ranking.rows.size(); i++) {
 				RankingRange range = ranking.rows.get(i);
-				if (range.minChanges <= r.globalchanges && r.globalchanges <= range.maxChanges) {
+				if (range.minChanges <= r.changes && r.changes <= range.maxChanges) {
 					r.rank = range.rank;
 				}
 			}
@@ -349,7 +349,7 @@ public class OsmAndLiveReports {
 	
 	public RecipientsReport getRecipients(String region) throws SQLException, IOException {
 		SupportersReport supporters = getSupporters();
-		RankingReport ranking = getRanking(null);
+		RankingReport ranking = getRanking(region);
 		double eurValue = getEurValue();
 		double btcValue = getBtcValue();
 		double eurBTCRate = getEurBTCRate();
@@ -405,7 +405,7 @@ public class OsmAndLiveReports {
 					if(eregion) {
 						recipient.weight = getRankingRange() + 1 - recipient.rank; 
 					} else {
-						recipient.weight = getRankingRange() + 1 - recipient.rank;
+						recipient.weight = getRegionRankingRange() + 1 - recipient.rank;
 					}
 					report.regionTotalWeight += recipient.weight;
 					break;
@@ -472,7 +472,7 @@ public class OsmAndLiveReports {
 		} else if(type == OsmAndLiveReportType.RANKING) {
 			return gson.toJson(getRanking(region));
 		} else if(type == OsmAndLiveReportType.USERS_RANKING) {
-			return gson.toJson(getUserWorldRanking(region));
+			return gson.toJson(getUsersRanking(region));
 		} else if(type == OsmAndLiveReportType.RECIPIENTS) {
 			return gson.toJson(getRecipients(region));
 		} else if(type == OsmAndLiveReportType.PAYOUTS) {
