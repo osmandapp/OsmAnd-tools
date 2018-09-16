@@ -470,10 +470,11 @@ public class OsmAndLiveReports {
 		report.rate = (float) eurBTCRate;
 		report.btc = (float) btcValue;
 		report.regionBtc = report.regionPercentage * report.btc;
+		report.toPay = !currentMonth.equals(month);
 		for(int i = 0; i < report.rows.size(); i++) {
 			Recipient r = report.rows.get(i);
-			if(report.regionTotalWeight > 0) {
-				r.btc = report.regionBtc  * r.weight / report.regionTotalWeight; 
+			if (report.regionTotalWeight > 0) {
+				r.btc = report.regionBtc * r.weight / report.regionTotalWeight;
 			} else {
 				r.btc = 0f;
 			}

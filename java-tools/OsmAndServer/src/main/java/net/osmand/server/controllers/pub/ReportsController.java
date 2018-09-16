@@ -66,16 +66,19 @@ public class ReportsController {
     @RequestMapping(path = { "/query_report", "/query_report.php", 
     		"/query_month_report", "/query_month_report.php"})
     @ResponseBody
+    @SuppressWarnings("unchecked")
 	public String getReport(HttpServletRequest request, HttpServletResponse response, 
 			@RequestParam(required = true) String report,
 			@RequestParam(required = false) String month, @RequestParam(required = false) String region) throws SQLException, IOException {
     	Connection conn = DataSourceUtils.getConnection(dataSource);
     	
 		try {
-			response.setHeader("Content-Description", "json report");
-			response.setHeader("Content-Disposition",
-					String.format("attachment; filename=report-%s-%s.json", month, region));
-			response.setHeader("Content-Type", "application/json");
+			if (request.getServletPath().contains("_month_")) {
+				response.setHeader("Content-Description", "json report");
+				response.setHeader("Content-Disposition", String.format("attachment; filename=%s%s%s.json", report,
+						isEmpty(month) ? "" : month, isEmpty(region) ? "" : region));
+				response.setHeader("Content-Type", "application/json");
+			}
 			OsmAndLiveReports reports = new OsmAndLiveReports(conn, month);
 			OsmAndLiveReportType type = null;
 			switch (report) {
@@ -130,9 +133,9 @@ public class ReportsController {
 					}
 				}
 				String worldCollectedMessage = String.format("<p>%.3f mBTC</p><span>total collected%s</span>",
-						rec.btc*1000, rec.toPay ? "" : " (may change in the final report)");
+						rec.btc * 1000, rec.toPay ? "" : " (may change in the final report)");
 				String regionCollectedMessage = String.format("<p>%.3f mBTC</p><span>collected for </span>",
-						rec.btc*1000);
+						rec.btc * 1000);
 				mapReport.put("worldCollectedMessage", worldCollectedMessage);
 				mapReport.put("regionCollectedMessage", regionCollectedMessage);
 				mapReport.put("payouts", payouts.toString());
@@ -155,6 +158,10 @@ public class ReportsController {
 		} finally {
     		DataSourceUtils.releaseConnection(conn, dataSource);
     	}
+	}
+
+	private boolean isEmpty(String month) {
+		return month == null || month.length() == 0;
 	}
 
 
