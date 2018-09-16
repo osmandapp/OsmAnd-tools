@@ -76,7 +76,7 @@ public class ReportsController {
 			if (request.getServletPath().contains("_month_")) {
 				response.setHeader("Content-Description", "json report");
 				response.setHeader("Content-Disposition", String.format("attachment; filename=%s%s%s.json", report,
-						isEmpty(month) ? "" : month, isEmpty(region) ? "" : region));
+						isEmpty(month) ? "" : ("-"+month), isEmpty(region) ? "" : ("-"+region)));
 				response.setHeader("Content-Type", "application/json");
 			}
 			OsmAndLiveReports reports = new OsmAndLiveReports(conn, month);
@@ -117,7 +117,7 @@ public class ReportsController {
 			}
 			if(report.equals("recipients_by_month")) {
 				Gson gson = reports.getJsonFormatter();
-				RecipientsReport rec = reports.getRecipients(region);
+				RecipientsReport rec =(RecipientsReport) reports.getReport(OsmAndLiveReportType.RECIPIENTS, region);
 				Map<String, Object> mapReport = new LinkedHashMap<String, Object>(); 
 				Map<String, Object> txs = (Map<String, Object>) getTransactions().get(month);
 				StringBuilder payouts = new StringBuilder(); 
@@ -127,6 +127,9 @@ public class ReportsController {
 						int i = 1;
 						payouts.append("Payouts:&nbsp;");
 						for(String s : ar) {
+							if( i > 1) {
+								payouts.append(",&nbsp;");
+							}
 							payouts.append(
 									String.format("<a href='https://blockchain.info/tx/%s'>Transaction #%d</a>", s, i++)); 
 						}
@@ -134,7 +137,7 @@ public class ReportsController {
 				}
 				String worldCollectedMessage = String.format("<p>%.3f mBTC</p><span>total collected%s</span>",
 						rec.btc * 1000, rec.toPay ? "" : " (may change in the final report)");
-				String regionCollectedMessage = String.format("<p>%.3f mBTC</p><span>collected for </span>",
+				String regionCollectedMessage = String.format("<p>%.3f mBTC</p><span>collected for</span>",
 						rec.btc * 1000);
 				mapReport.put("worldCollectedMessage", worldCollectedMessage);
 				mapReport.put("regionCollectedMessage", regionCollectedMessage);
