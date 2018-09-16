@@ -175,8 +175,9 @@ public class OsmAndLiveReports {
 	}
 	
 	
-	private String reportTime() {
-		return reportTime.format(new Date());
+	private long reportTime() {
+		return System.currentTimeMillis() / 1000;
+		//return reportTime.format(new Date());
 	}
 
 	private static String supportersQuery(String cond) {
@@ -567,7 +568,7 @@ public class OsmAndLiveReports {
 	
 	protected static class CountriesReport {
 		public String month;
-		public String date;
+		public long date;
 		public List<Country> rows = new ArrayList<Country>();
 		public Map<String, Country> mapId = new HashMap<String, Country>();
 		public Map<String, String> map = new TreeMap<String, String>();
@@ -600,7 +601,7 @@ public class OsmAndLiveReports {
 	
 	protected static class SupportersReport {
 		public String month;
-		public String date;
+		public long date;
 		public Map<String, SupportersRegion> regions = new HashMap<String, SupportersRegion>();
 		public List<Supporter> rows = new ArrayList<OsmAndLiveReports.Supporter>();
 		public int count;
@@ -617,7 +618,7 @@ public class OsmAndLiveReports {
 	protected class TotalChangesReport {
 		public String month;
 		public String region;		
-		public String date;
+		public long date;
 		public int users;
 		public int changes;
 	}
@@ -636,7 +637,7 @@ public class OsmAndLiveReports {
 	protected static class RankingReport {
 		public String month;
 		public String region;		
-		public String date;
+		public long date;
 		public int users;
 		public int changes;
 		List<RankingRange> rows = new ArrayList<RankingRange>();
@@ -655,7 +656,7 @@ public class OsmAndLiveReports {
 
 	protected static class UserRankingReport {
 		public String month;
-		public String date;
+		public long date;
 		public String region;		
 		List<UserRanking> rows = new ArrayList<UserRanking>();
 	}
@@ -684,7 +685,7 @@ public class OsmAndLiveReports {
 	public static class RecipientsReport {
 		public String region;
 		public String month;
-		public String date;
+		public long date;
 		
 		public int regionTotalWeight;
 		public int regionCount;
@@ -700,7 +701,7 @@ public class OsmAndLiveReports {
 	}
 	
 	protected static class PayoutsReport {
-		public String date;
+		public long date;
 		public double rate;
 		public double payoutBTCAvailable;
 		public double payoutEurAvailable;
