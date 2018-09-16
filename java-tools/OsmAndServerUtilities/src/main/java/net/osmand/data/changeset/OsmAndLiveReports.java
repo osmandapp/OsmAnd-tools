@@ -515,6 +515,26 @@ public class OsmAndLiveReports {
 		}
 		return report;
 	}
+	
+	public Map<String, Object> getTotal() throws SQLException {
+		Map<String, Object> res = new HashMap<>();
+		List<Map<String, Object>> reports = new ArrayList<>();
+			String r = "select report,region,name from final_reports where month = ?";
+			PreparedStatement ps = conn.prepareStatement(r);
+			ps.setString(1, month);
+			ResultSet rs = ps.executeQuery();
+			Gson gson = getJsonFormatter();
+		while(rs.next()) {
+			Map<String, Object> rt = new HashMap<>();
+			rt.put("month", month);
+			rt.put("region", rs.getString("region"));
+			rt.put("name", rs.getString("name"));
+			rt.put("report", gson.fromJson(rs.getString("report"), rt.getClass()));
+			reports.add(rt);
+		}
+		res.put("reports", reports);
+		return res;
+	}
 
 	public String getJsonReport(OsmAndLiveReportType type, String region) throws SQLException, IOException {
 		Gson gson = getJsonFormatter();
@@ -532,6 +552,8 @@ public class OsmAndLiveReports {
 			return gson.toJson(getRecipients(region));
 		} else if(type == OsmAndLiveReportType.PAYOUTS) {
 			return gson.toJson(getPayouts());
+		} else if(type == OsmAndLiveReportType.TOTAL) {
+			return gson.toJson(getTotal());
 		} else {
 			throw new UnsupportedOperationException();
 		}
