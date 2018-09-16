@@ -17,6 +17,7 @@ import net.osmand.server.api.services.DownloadIndexesService;
 import net.osmand.server.api.services.DownloadIndexesService.DownloadProperties;
 import net.osmand.server.api.services.MotdService;
 import net.osmand.server.api.services.MotdService.MotdSettings;
+import net.osmand.server.controllers.pub.ReportsController;
 import net.osmand.server.controllers.pub.WebController;
 
 import org.apache.commons.logging.Log;
@@ -55,6 +56,9 @@ public class AdminController {
 	private WebController web;
 	
 	@Autowired
+	private ReportsController reports;
+	
+	@Autowired
 	private ApplicationContext appContext;
 	
 	@Value("${git.commit.format}")
@@ -91,6 +95,7 @@ public class AdminController {
         motdService.reloadconfig(errors);
         downloadService.reloadConfig(errors);
         web.reloadConfigs(errors);
+        reports.reloadConfigs(errors);
         runCmd("git pull", new File(websiteLocation), errors);
 		return errors;
 	}

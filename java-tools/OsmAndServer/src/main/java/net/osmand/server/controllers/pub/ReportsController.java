@@ -50,7 +50,7 @@ public class ReportsController {
     
     @SuppressWarnings("unchecked")
 	public Map<String, Object> getTransactions() throws FileNotFoundException {
-    	if(transactionsMap.isEmpty()) {
+    	if(!transactionsMap.isEmpty()) {
     		return transactionsMap;
     	}
 		File transactions = new File(websiteLocation, "reports/transactions.json");
