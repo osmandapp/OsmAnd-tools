@@ -14,6 +14,7 @@
 		<!--  <logger name="org.hibernate.type" level="TRACE" />  -->	
 		<root level="INFO">
 			<appender-ref ref="CONSOLE" />
+			<pattern>%d %-5level [%thread]: %message%n%ex{2}</pattern>
 		</root>
 	</springProfile>
 
@@ -38,7 +39,7 @@
 				<level>ERROR</level>
 			</filter>
 			<encoder>
-			    <pattern>%d %-5level [%thread]: %message%n%ex{short}</pattern>
+			    <pattern>%d %-5level [%thread]: %message%n%ex{2}</pattern>
 				<!--   <pattern>${FILE_LOG_PATTERN}</pattern> -->
 			</encoder>
     	</appender>

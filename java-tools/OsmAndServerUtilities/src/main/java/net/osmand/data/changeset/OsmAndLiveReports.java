@@ -561,8 +561,9 @@ public class OsmAndLiveReports {
 		
 		public int depth(Country c) {
 			// 0 is World, 1 - continents
-			if(mapId.containsKey(c.parentid)) {
-				return depth(c) + 1;
+			Country parent = parent(c);
+			if(parent != null) {
+				return depth(parent) + 1;
 			}
 			return 0;
 		}
