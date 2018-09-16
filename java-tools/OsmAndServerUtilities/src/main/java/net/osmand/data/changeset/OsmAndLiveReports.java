@@ -141,7 +141,7 @@ public class OsmAndLiveReports {
 			if("1".equals(c.map)) {
 				int depth = countriesReport.depth(c);
 				Country parent = countriesReport.parent(c);
-				Country grandParent = countriesReport.parent(c);
+				Country grandParent = countriesReport.parent(parent);
 				if(parent.name.equalsIgnoreCase("russia")) {
 					name = parent.name + " " + name;
 				} else if(grandParent.name.equalsIgnoreCase("russia")) {

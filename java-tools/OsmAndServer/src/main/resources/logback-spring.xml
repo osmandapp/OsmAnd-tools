@@ -14,7 +14,6 @@
 		<!--  <logger name="org.hibernate.type" level="TRACE" />  -->	
 		<root level="INFO">
 			<appender-ref ref="CONSOLE" />
-			<pattern>%d %-5level [%thread]: %message%n%ex{2}</pattern>
 		</root>
 	</springProfile>
 
