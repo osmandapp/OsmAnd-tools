@@ -37,10 +37,8 @@ public class ReportsController {
 
     
     // TODO recipients_by_month (transactions.json + text + underpayd)
-    
-    // TODO supporters for previous month
-    
     // TODO getTotalReport
+    
     
     // TODO query_month_report
 //    header("Content-Description: Json report");

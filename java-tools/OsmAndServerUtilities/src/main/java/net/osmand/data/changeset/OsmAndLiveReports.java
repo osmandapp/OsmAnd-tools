@@ -4,11 +4,9 @@ import java.io.IOException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -130,12 +128,43 @@ public class OsmAndLiveReports {
 			if("World".equals(c.name)) {
 				c.downloadname = "";
 			} else if("0".equals(c.map)) {
-				continue;
+				c.downloadname = "<none>";
 			} else {
 				c.downloadname = rs.getString("downloadname");
 			}
-			countriesReport.map.put(c.downloadname, c.name);
+			countriesReport.mapId.put(c.id, c);
 			countriesReport.rows.add(c);
+		}
+		for(Country c : countriesReport.rows) {
+			String name = c.name;
+			if("1".equals(c.map)) {
+				int depth = countriesReport.depth(c);
+				Country parent = countriesReport.parent(c);
+				Country grandParent = countriesReport.parent(c);
+				if(parent.name.equalsIgnoreCase("russia")) {
+					name = parent.name + " " + name;
+				} else if(grandParent.name.equalsIgnoreCase("russia")) {
+					name = grandParent.name + " " + name;
+				} else {
+					if(depth == 2) {
+						// country name 
+					} else if(depth == 3) {
+						// county name
+						if(!"gb_europe".equals(parent.downloadname)) {
+							name = parent.name + " " + name;
+						}
+					} else if(depth == 4) {
+						if("gb_europe".equals(grandParent.downloadname)) {
+							name = parent.name + " " + name;
+						} else {
+							name = grandParent.name + " " + parent.name + " " + name;
+						}
+					}
+					
+				}
+				c.visiblename = name;
+				countriesReport.map.put(c.downloadname, name);
+			}
 		}
 		return countriesReport;
 	}
@@ -519,7 +548,23 @@ public class OsmAndLiveReports {
 	protected static class CountriesReport {
 		public String month;
 		public List<Country> rows = new ArrayList<Country>();
+		public Map<String, Country> mapId = new HashMap<String, Country>();
 		public Map<String, String> map = new TreeMap<String, String>();
+		
+		public Country parent(Country c) {
+			if(c != null && mapId.containsKey(c.parentid)) {
+				return mapId.get(c.parentid);
+			}
+			return null;
+		}
+		
+		public int depth(Country c) {
+			// 0 is World, 1 - continents
+			if(mapId.containsKey(c.parentid)) {
+				return depth(c) + 1;
+			}
+			return 0;
+		}
 	}
 	
 	protected static class Country {
@@ -528,6 +573,7 @@ public class OsmAndLiveReports {
 		public String parentid;
 		public String downloadname;
 		public String name;
+		public String visiblename;
 	}
 	
 	protected static class SupportersReport {
