@@ -7,6 +7,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -50,11 +51,13 @@ public class OsmAndLiveReports {
 	private String month;
 	private String currentMonth;
 	private Connection conn;
+	private SimpleDateFormat reportTime = new SimpleDateFormat();
 
 	public OsmAndLiveReports(Connection conn, String month) {
 		this.conn = conn;
 		this.month = month;
 		this.currentMonth = String.format("%1$tY-%1$tm", new Date());
+		reportTime = new SimpleDateFormat("dd MMM yyyy HH:mm");
 		if(isEmpty(month)) {
 			this.month = this.currentMonth;
 		}
@@ -119,6 +122,7 @@ public class OsmAndLiveReports {
 		ResultSet rs = ctrs.executeQuery();
 		countriesReport = new CountriesReport();
 		countriesReport.month = month;
+		countriesReport.date = reportTime();
 		while(rs.next()) {
 			Country c = new Country();
 			c.id = rs.getString("id");
@@ -171,6 +175,10 @@ public class OsmAndLiveReports {
 	}
 	
 	
+	private String reportTime() {
+		return reportTime.format(new Date());
+	}
+
 	private static String supportersQuery(String cond) {
 		return "select s.userid uid, s.visiblename visiblename, s.preferred_region region, s.useremail email, "+
            " t.sku sku, t.checktime checktime, t.starttime starttime, t.expiretime expiretime from supporters s " +
@@ -186,6 +194,7 @@ public class OsmAndLiveReports {
 		CountriesReport countries = getCountries();
 		supportersReport = new SupportersReport();
 		supportersReport.month = month;
+		supportersReport.date = reportTime();
 		SupportersRegion worldwide = new SupportersRegion();
 		worldwide.id = "";
 		worldwide.name = "Worldwide";
@@ -244,6 +253,7 @@ public class OsmAndLiveReports {
 		TotalChangesReport report = new TotalChangesReport();
 		report.month = month;
 		report.region = region;
+		report.date = reportTime();
 		ResultSet rs;
 		if(!isEmpty(region)) {
 			String r = "select count(distinct ch.username) users, count(distinct ch.id) changes" + 
@@ -271,6 +281,7 @@ public class OsmAndLiveReports {
 		RankingReport report = new RankingReport();
 		report.month = month;
 		report.region = region;
+		report.date = reportTime();
 		int minChanges = getMinChanges();
 		int rankingRange;
 		ResultSet rs;
@@ -344,6 +355,7 @@ public class OsmAndLiveReports {
 		RankingReport granking = getRanking(null);
 		report.month = month;
 		report.region = region;
+		report.date = reportTime();
 		String q = "SELECT  t.username username, t.size changes , s.size gchanges FROM "+ 
 				 	" ( SELECT username, count(*) size from changesets_view ch, changeset_country_view cc "+
 				 	" 	WHERE ch.id = cc.changesetid and substr(ch.closed_at_day, 0, 8) = ? " +
@@ -396,6 +408,7 @@ public class OsmAndLiveReports {
 		RecipientsReport report = new RecipientsReport();
 		report.month = month;
 		report.region = region;
+		report.date = reportTime();
 		boolean eregion = isEmpty(region);
 		String q = " SELECT distinct s.osmid osmid, t.size changes," + 
 					" first_value(s.btcaddr) over (partition by osmid order by updatetime desc) btcaddr " + 
@@ -502,7 +515,7 @@ public class OsmAndLiveReports {
 	}
 
 	public String getJsonReport(OsmAndLiveReportType type, String region) throws SQLException, IOException {
-		Gson gson = new Gson();
+		Gson gson = getJsonFormatter();
 		if(type == OsmAndLiveReportType.COUNTRIES) {
 			return gson.toJson(getCountries());
 		} else if(type == OsmAndLiveReportType.SUPPORTERS) {
@@ -521,6 +534,11 @@ public class OsmAndLiveReports {
 			throw new UnsupportedOperationException();
 		}
 	}
+	
+	public Gson getJsonFormatter() {
+		return new Gson();
+	}
+	
 	
 	public Number getNumberReport(OsmAndLiveReportType type) throws IOException, SQLException {
 		if(type == OsmAndLiveReportType.MIN_CHANGES) {
@@ -548,6 +566,7 @@ public class OsmAndLiveReports {
 	
 	protected static class CountriesReport {
 		public String month;
+		public String date;
 		public List<Country> rows = new ArrayList<Country>();
 		public Map<String, Country> mapId = new HashMap<String, Country>();
 		public Map<String, String> map = new TreeMap<String, String>();
@@ -580,6 +599,7 @@ public class OsmAndLiveReports {
 	
 	protected static class SupportersReport {
 		public String month;
+		public String date;
 		public Map<String, SupportersRegion> regions = new HashMap<String, SupportersRegion>();
 		public List<Supporter> rows = new ArrayList<OsmAndLiveReports.Supporter>();
 		public int count;
@@ -596,6 +616,7 @@ public class OsmAndLiveReports {
 	protected class TotalChangesReport {
 		public String month;
 		public String region;		
+		public String date;
 		public int users;
 		public int changes;
 	}
@@ -611,15 +632,16 @@ public class OsmAndLiveReports {
 	}
 	
 	
-	protected class RankingReport {
+	protected static class RankingReport {
 		public String month;
 		public String region;		
+		public String date;
 		public int users;
 		public int changes;
 		List<RankingRange> rows = new ArrayList<RankingRange>();
 	}
 	
-	protected class RankingRange{
+	protected static class RankingRange {
 		public int minChanges;
 		public int maxChanges;
 		public int countUsers;
@@ -630,13 +652,14 @@ public class OsmAndLiveReports {
 	
 	
 
-	protected class UserRankingReport {
+	protected static class UserRankingReport {
 		public String month;
+		public String date;
 		public String region;		
 		List<UserRanking> rows = new ArrayList<UserRanking>();
 	}
 	
-	protected class UserRanking {
+	protected static class UserRanking {
 		public String user;
 		public String name;		
 		public int rank;
@@ -646,7 +669,7 @@ public class OsmAndLiveReports {
 	}
 	
 	
-	protected class Recipient {
+	protected static class Recipient {
 
 		public float btc;
 		public int weight;
@@ -657,9 +680,10 @@ public class OsmAndLiveReports {
 		
 	}
 	
-	protected class RecipientsReport {
+	public static class RecipientsReport {
 		public String region;
 		public String month;
+		public String date;
 		
 		public int regionTotalWeight;
 		public int regionCount;
@@ -669,11 +693,13 @@ public class OsmAndLiveReports {
 		public float btc;
 		public float rate;
 		public float eur;
+		public boolean toPay;
 		
 		public List<Recipient> rows = new ArrayList<Recipient>();
 	}
 	
-	protected class PayoutsReport {
+	protected static class PayoutsReport {
+		public String date;
 		public double rate;
 		public double payoutBTCAvailable;
 		public double payoutEurAvailable;
