@@ -8,6 +8,7 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -136,11 +137,11 @@ public class OsmAndLiveReports {
 	}
 	
 	
-	private static String supportersQuery() {
+	private static String supportersQuery(String cond) {
 		return "select s.userid uid, s.visiblename visiblename, s.preferred_region region, s.useremail email, "+
            " t.sku sku, t.checktime checktime, t.starttime starttime, t.expiretime expiretime from supporters s " +
            " join (select userid, sku, max(checktime) checktime, max(starttime) starttime, max(expiretime) expiretime " +
-           "  from supporters_device_sub where expiretime is not null and expiretime > now() group by userid, sku) t " +  
+           "  from supporters_device_sub where expiretime is not null and " + cond +" group by userid, sku) t " +  
            " on s.userid = t.userid where s.preferred_region is not null and s.preferred_region <> 'none' order by s.userid;";
 	}
 
@@ -155,7 +156,12 @@ public class OsmAndLiveReports {
 		worldwide.id = "";
 		worldwide.name = "Worldwide";
 		supportersReport.regions.put("", worldwide);
-		PreparedStatement q = conn.prepareStatement(supportersQuery());
+		String cond = "expiretime > now()";
+		if(!this.month.equals(currentMonth)) {
+			String dt = this.month +"-01";
+			cond = String.format("starttime < '%s' and expiretime >= '%s' ", dt, dt);
+		}
+		PreparedStatement q = conn.prepareStatement(supportersQuery(cond));
 		ResultSet rs = q.executeQuery();
 		while (rs.next()) {
 			Supporter s = new Supporter();
