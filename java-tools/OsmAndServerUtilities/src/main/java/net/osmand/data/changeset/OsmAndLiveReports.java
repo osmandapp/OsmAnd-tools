@@ -125,14 +125,15 @@ public class OsmAndLiveReports {
 			c.parentid = rs.getString("parentid");
 			c.name = rs.getString("name");
 			c.map = rs.getString("map");
+			countriesReport.mapId.put(c.id, c);
 			if("World".equals(c.name)) {
 				c.downloadname = "";
 			} else if("0".equals(c.map)) {
-				c.downloadname = "<none>";
+				continue;
+//				c.downloadname = "<none>";
 			} else {
 				c.downloadname = rs.getString("downloadname");
 			}
-			countriesReport.mapId.put(c.id, c);
 			countriesReport.rows.add(c);
 		}
 		for(Country c : countriesReport.rows) {
