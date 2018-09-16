@@ -366,7 +366,7 @@ public class OsmAndLiveReports {
 				q += "   WHERE substr(ch.closed_at_day, 0, 8) = ? " +
 		
 					 "	 GROUP by username) "+
-					 "t on t.username = s.osmid WHERE t.size is not null ORDER by changes desc"; 
+					 "t on t.username = s.osmid ORDER by changes desc"; 
 		} else {
 				q += "   						 , changeset_country_view cc " +
 					 "   WHERE ch.id = cc.changesetid  and substr(ch.closed_at_day, 0, 8) = ? "+
@@ -420,7 +420,7 @@ public class OsmAndLiveReports {
 		for(int i = 0; i < report.rows.size(); i++) {
 			Recipient r = report.rows.get(i);
 			if(report.regionTotalWeight > 0) {
-				r.btc = report.btc  * r.weight / report.regionTotalWeight; 
+				r.btc = report.regionBtc  * r.weight / report.regionTotalWeight; 
 			} else {
 				r.btc = 0f;
 			}

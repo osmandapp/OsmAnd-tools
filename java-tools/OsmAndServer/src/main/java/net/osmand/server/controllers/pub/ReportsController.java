@@ -36,7 +36,7 @@ public class ReportsController {
     
     // TODO recipients_by_month (transactions.json + text + underpayd)
     
-    // TODO empty month (supporters for previous month)
+    // TODO supporters for previous month
     
     // TODO getTotalReport
     
@@ -53,7 +53,7 @@ public class ReportsController {
     // TODO query_report and query_report.php
     @RequestMapping(path = { "/query_report_new"})
     @ResponseBody
-	public String helpSpecific(HttpServletRequest request, @RequestParam(required = true) String report,
+	public String getReport(HttpServletRequest request, @RequestParam(required = true) String report,
 			@RequestParam(required = false) String month, @RequestParam(required = false) String region) throws SQLException, IOException {
     	OsmAndLiveReports query = new OsmAndLiveReports(jdbcTemplate.getDataSource().getConnection(), month);
     	OsmAndLiveReportType type = null;
