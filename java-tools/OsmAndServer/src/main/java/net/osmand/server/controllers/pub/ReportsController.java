@@ -5,6 +5,7 @@ import java.sql.Connection;
 import java.sql.SQLException;
 
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import javax.sql.DataSource;
 
 import net.osmand.data.changeset.OsmAndLiveReportType;
@@ -39,24 +40,20 @@ public class ReportsController {
     // TODO recipients_by_month (transactions.json + text + underpayd)
     // TODO getTotalReport
     
-    
-    // TODO query_month_report
-//    header("Content-Description: Json report");
-//    header("Content-Disposition: attachment; filename=report-$rregion-".$_REQUEST["month"].".json");
-//    header("Content-Type: mime/type");
-//    if($_REQUEST["report"] == "total") {
-//    	echo json_encode(getTotalReport());	
-//    } else {
-//    	echo json_encode(getReport($_REQUEST["report"], $rregion));
-//    }
-
     // TODO query_report and query_report.php
-    @RequestMapping(path = { "/query_report_new"})
+    @RequestMapping(path = { "/query_report_new", "/query_report_new.php", 
+    		"/query_month_report", "/query_month_report.php"})
     @ResponseBody
-	public String getReport(HttpServletRequest request, @RequestParam(required = true) String report,
+	public String getReport(HttpServletRequest request, HttpServletResponse response, 
+			@RequestParam(required = true) String report,
 			@RequestParam(required = false) String month, @RequestParam(required = false) String region) throws SQLException, IOException {
     	Connection conn = DataSourceUtils.getConnection(dataSource);
+    	
 		try {
+			response.setHeader("Content-Description", "json report");
+			response.setHeader("Content-Disposition",
+					String.format("attachment; filename=report-%s-%s.json", month, region));
+			response.setHeader("Content-Type", "application/json");
 			OsmAndLiveReports query = new OsmAndLiveReports(conn, month);
 			OsmAndLiveReportType type = null;
 			switch (report) {
@@ -75,6 +72,9 @@ public class ReportsController {
 				break;
 			case "total_changes_by_month":
 				type = OsmAndLiveReportType.TOTAL_CHANGES;
+				break;
+			case "total":
+				type = OsmAndLiveReportType.TOTAL;
 				break;
 			case "payouts":
 				type = OsmAndLiveReportType.PAYOUTS;

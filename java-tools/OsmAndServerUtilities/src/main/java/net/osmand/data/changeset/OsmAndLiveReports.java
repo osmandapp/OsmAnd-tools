@@ -151,11 +151,11 @@ public class OsmAndLiveReports {
 						// country name 
 					} else if(depth == 3) {
 						// county name
-						if(!"gb_europe".equals(parent.downloadname)) {
+						if(!"gb_england_europe".equals(parent.downloadname)) {
 							name = parent.name + " " + name;
 						}
 					} else if(depth == 4) {
-						if("gb_europe".equals(grandParent.downloadname)) {
+						if("gb_england_europe".equals(grandParent.downloadname)) {
 							name = parent.name + " " + name;
 						} else {
 							name = grandParent.name + " " + parent.name + " " + name;

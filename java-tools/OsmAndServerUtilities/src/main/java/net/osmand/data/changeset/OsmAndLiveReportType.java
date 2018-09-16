@@ -14,7 +14,8 @@ public enum OsmAndLiveReportType {
 	RANKING("calculateRanking"),
 	USERS_RANKING("calculateUsersRanking"),
 	RECIPIENTS("getRecipients"),
-	PAYOUTS("getPayouts");
+	PAYOUTS("getPayouts"),
+	TOTAL("total");
 	
 	private final String sqlName;
 	private final boolean numberReport;
