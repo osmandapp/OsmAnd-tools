@@ -20,6 +20,8 @@ ALTER TABLE supporters ADD PRIMARY KEY (userid);
 CREATE TABLE supporters_device_sub(userid bigint, sku text, purchasetoken text, timestamp timestamp,
         autorenewing boolean, starttime timestamp, expiretime timestamp, kind text, payload text, orderid text,
         valid boolean, checktime timestamp);
+CREATE INDEX supporters_device_sub_starttime_idx on supporters_device_sub(starttime);        
+CREATE INDEX supporters_device_sub_expiretime_idx on supporters_device_sub(expiretime);        
 
 ALTER TABLE changeset_country OWNER TO <user>;
 

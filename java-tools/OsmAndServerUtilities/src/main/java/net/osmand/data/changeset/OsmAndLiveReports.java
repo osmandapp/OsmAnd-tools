@@ -30,16 +30,20 @@ public class OsmAndLiveReports {
 	private static final Log LOG = PlatformUtil.getLog(OsmAndLiveReports.class);
 	
 	public static void main(String[] args) throws Exception {
-		Connection conn = DriverManager.getConnection("jdbc:postgresql://localhost:5433/changeset",
-				isEmpty(System.getenv("DB_USER")) ? "test" : System.getenv("DB_USER"),
-				isEmpty(System.getenv("DB_PWD")) ? "test" : System.getenv("DB_PWD"));
-		OsmAndLiveReports reports = new OsmAndLiveReports(conn, "2018-08");
-//		System.out.println(reports.getJsonReport(OsmAndLiveReportType.COUNTRIES, null));
-		System.out.println(reports.getJsonReport(OsmAndLiveReportType.TOTAL_CHANGES, null));
-		System.out.println(reports.getJsonReport(OsmAndLiveReportType.RANKING, null));
-		System.out.println(reports.getJsonReport(OsmAndLiveReportType.SUPPORTERS, null));
-		System.out.println(reports.getJsonReport(OsmAndLiveReportType.USERS_RANKING, "belarus_europe"));
-		System.out.println(reports.getJsonReport(OsmAndLiveReportType.RECIPIENTS, null));
+//		Connection conn = DriverManager.getConnection("jdbc:postgresql://localhost:5433/changeset",
+//		isEmpty(System.getenv("DB_USER")) ? "test" : System.getenv("DB_USER"),
+//		isEmpty(System.getenv("DB_PWD")) ? "test" : System.getenv("DB_PWD"));
+		Connection conn = null;
+		OsmAndLiveReports reports = new OsmAndLiveReports(null, "2018-08");
+		String cond = String.format("starttime < '%s' and expiretime >= '%s' ", "2017-01-01", "2017-01-01");
+		System.out.println(reports.supportersQuery(cond));
+//		OsmAndLiveReports reports = new OsmAndLiveReports(conn, "2018-08");
+////		System.out.println(reports.getJsonReport(OsmAndLiveReportType.COUNTRIES, null));
+//		System.out.println(reports.getJsonReport(OsmAndLiveReportType.TOTAL_CHANGES, null));
+//		System.out.println(reports.getJsonReport(OsmAndLiveReportType.RANKING, null));
+//		System.out.println(reports.getJsonReport(OsmAndLiveReportType.SUPPORTERS, null));
+//		System.out.println(reports.getJsonReport(OsmAndLiveReportType.USERS_RANKING, "belarus_europe"));
+//		System.out.println(reports.getJsonReport(OsmAndLiveReportType.RECIPIENTS, null));
 //		System.out.println(reports.getJsonReport(OsmAndLiveReportType.PAYOUTS, null));
 //		reports.buildReports(conn);
 	}
