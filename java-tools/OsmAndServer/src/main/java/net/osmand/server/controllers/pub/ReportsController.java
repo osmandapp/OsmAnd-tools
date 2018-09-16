@@ -50,7 +50,7 @@ public class ReportsController {
     
     @SuppressWarnings("unchecked")
 	public Map<String, Object> getTransactions() throws FileNotFoundException {
-    	if(transactionsMap != null) {
+    	if(transactionsMap.isEmpty()) {
     		return transactionsMap;
     	}
 		File transactions = new File(websiteLocation, "reports/transactions.json");
@@ -59,7 +59,7 @@ public class ReportsController {
 	}
     
     public void reloadConfigs(List<String> errors) {
-    	transactionsMap = null;
+    	transactionsMap = new HashMap<String, Object>();
 	}
 
     
@@ -145,7 +145,7 @@ public class ReportsController {
 							String.format("<a type='application/json' "
 									+ "href='/reports/query_month_report?report=total&month=%1$s'  "
 									+ "download='report-%1$s.json' >Download all json reports for %1$s</a>",month));
-					reportBld.append("&nbsp;");
+					reportBld.append(".&nbsp;&nbsp;");
 					reportBld.append("<a type='application/json' "
 							+ "href='https://builder.osmand.net/reports/report_underpaid.json.html'>"
 							+ "Cumulative underpaid report</a>");
