@@ -16,7 +16,6 @@ import javax.persistence.Transient;
 import net.osmand.server.assist.ext.ITrackerManager;
 import net.osmand.util.Algorithms;
 
-import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.hibernate.annotations.Type;
 import org.springframework.data.annotation.CreatedDate;
