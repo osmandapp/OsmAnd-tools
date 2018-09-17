@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.sql.Connection;
+import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -29,11 +30,11 @@ public class OsmAndLiveReports {
 	private static final Log LOG = PlatformUtil.getLog(OsmAndLiveReports.class);
 	
 	public static void main(String[] args) throws Exception {
-//		Connection conn = DriverManager.getConnection("jdbc:postgresql://localhost:5433/changeset",
-//		isEmpty(System.getenv("DB_USER")) ? "test" : System.getenv("DB_USER"),
-//		isEmpty(System.getenv("DB_PWD")) ? "test" : System.getenv("DB_PWD"));
-		Connection conn = null;
+		Connection conn = DriverManager.getConnection("jdbc:postgresql://localhost:5433/changeset",
+				isEmpty(System.getenv("DB_USER")) ? "test" : System.getenv("DB_USER"),
+						isEmpty(System.getenv("DB_PWD")) ? "test" : System.getenv("DB_PWD"));
 		OsmAndLiveReports reports = new OsmAndLiveReports(null, "2018-08");
+		
 		String cond = String.format("starttime < '%s' and expiretime >= '%s' ", "2017-01-01", "2017-01-01");
 		System.out.println(reports.supportersQuery(cond));
 //		OsmAndLiveReports reports = new OsmAndLiveReports(conn, "2018-08");
@@ -106,7 +107,7 @@ public class OsmAndLiveReports {
 
 
 	private double getEurValue() throws SQLException, IOException {
-		SupportersReport supporters = (SupportersReport) getReport(OsmAndLiveReportType.SUPPORTERS, null);
+		SupportersReport supporters = getReport(OsmAndLiveReportType.SUPPORTERS, null, SupportersReport.class);
 		return supporters.activeCount * 0.4 ; // 1 EUR - 20% (GPlay) - 50% (OsmAnd)
 	}
 	
@@ -183,7 +184,7 @@ public class OsmAndLiveReports {
 	}
 
 	public SupportersReport getSupporters() throws SQLException, IOException {
-		CountriesReport countries = (CountriesReport) getReport(OsmAndLiveReportType.COUNTRIES, null);
+		CountriesReport countries = getReport(OsmAndLiveReportType.COUNTRIES, null, CountriesReport.class);
 		SupportersReport supportersReport = new SupportersReport();
 		supportersReport.month = month;
 		supportersReport.date = reportTime();
@@ -343,8 +344,8 @@ public class OsmAndLiveReports {
 	public UserRankingReport getUsersRanking(String region) throws SQLException, IOException {
 		UserRankingReport report = new UserRankingReport();
 		
-		RankingReport ranking = (RankingReport) getReport(OsmAndLiveReportType.RANKING, region); 
-		RankingReport granking = (RankingReport) getReport(OsmAndLiveReportType.RANKING, null);
+		RankingReport ranking = getReport(OsmAndLiveReportType.RANKING, region, RankingReport.class); 
+		RankingReport granking = getReport(OsmAndLiveReportType.RANKING, null, RankingReport.class);
 		int minChanges = getNumberReport(OsmAndLiveReportType.RANKING_RANGE).intValue();
 		report.month = month;
 		report.region = region;
@@ -395,8 +396,8 @@ public class OsmAndLiveReports {
 	public RecipientsReport getRecipients(String region) throws SQLException, IOException {
 		RecipientsReport report = new RecipientsReport();
 		
-		SupportersReport supporters = (SupportersReport) getReport(OsmAndLiveReportType.SUPPORTERS, null);
-		RankingReport ranking = (RankingReport) getReport(OsmAndLiveReportType.RANKING, region);
+		SupportersReport supporters = getReport(OsmAndLiveReportType.SUPPORTERS, null, SupportersReport.class);
+		RankingReport ranking = getReport(OsmAndLiveReportType.RANKING, null, RankingReport.class);
 		double eurValue = getNumberReport(OsmAndLiveReportType.EUR_VALUE).doubleValue();
 		double btcValue = getNumberReport(OsmAndLiveReportType.BTC_VALUE).doubleValue();
 		double eurBTCRate = getNumberReport(OsmAndLiveReportType.EUR_BTC_RATE).doubleValue();
@@ -479,7 +480,7 @@ public class OsmAndLiveReports {
 	
 	public PayoutsReport getPayouts() throws IOException, SQLException {
 		PayoutsReport report = new PayoutsReport();
-		CountriesReport countries = (CountriesReport) getReport(OsmAndLiveReportType.COUNTRIES, null);
+		CountriesReport countries = getReport(OsmAndLiveReportType.COUNTRIES, null, CountriesReport.class);
 		report.payoutTotal = 0d;
 		report.payoutBTCAvailable = getNumberReport(OsmAndLiveReportType.BTC_VALUE).doubleValue();
 		report.payoutEurAvailable = getNumberReport(OsmAndLiveReportType.EUR_VALUE).doubleValue();
@@ -495,7 +496,7 @@ public class OsmAndLiveReports {
 				}
 				reg = c.downloadname;
 			}
-			RecipientsReport recipients = (RecipientsReport) getReport(OsmAndLiveReportType.RECIPIENTS, reg);
+			RecipientsReport recipients = getReport(OsmAndLiveReportType.RECIPIENTS, reg, RecipientsReport.class);
 			for(int j = 0; j < recipients.rows.size(); j++) {
 				Recipient recipient = recipients.rows.get(j);
 				Payout p = new Payout();
@@ -530,10 +531,6 @@ public class OsmAndLiveReports {
 	}
 	
 	
-	public String getJsonReport(OsmAndLiveReportType type, String region) throws SQLException, IOException {
-		Gson gson = getJsonFormatter();
-		return gson.toJson(getReport(type, region));
-	}
 	
 	private void saveReport(Object report, OsmAndLiveReportType type, String region) throws SQLException {
 		Map<String, Object> rt = new HashMap<>();
@@ -560,7 +557,11 @@ public class OsmAndLiveReports {
 		
 	}
 	
-	public Object getReport(OsmAndLiveReportType type, String region) throws SQLException, IOException {
+	public <T> T getReport(OsmAndLiveReportType type, String region, Class<T> cl) throws SQLException, IOException {
+		return getJsonFormatter().fromJson(getJsonReport(type, region), cl);
+	}
+	
+	public String getJsonReport(OsmAndLiveReportType type, String region) throws SQLException, IOException {
 		Object report = null;
 		Gson gson = getJsonFormatter();
 		PreparedStatement ps = conn.prepareStatement("select report, time, accesstime from final_reports where month = ? and name = ? and region = ?");
@@ -569,7 +570,6 @@ public class OsmAndLiveReports {
 		ps.setString(3, isEmpty(region) ? "": region);
 		ResultSet rs = ps.executeQuery();
 		if (rs.next()) {
-			Map<String, Object> rt = new HashMap<>();
 			if (thisMonth) {
 				// TODO
 				// set current time if a report was not accessed more than X minutes
@@ -578,7 +578,7 @@ public class OsmAndLiveReports {
 				// and region = '${rregion}' and name='${name}';");
 				// }
 			}
-			return gson.fromJson(rs.getString("report"), rt.getClass());
+			return rs.getString("report");
 		}
 		
 		if(type == OsmAndLiveReportType.COUNTRIES) {
@@ -604,7 +604,7 @@ public class OsmAndLiveReports {
 //		if(thisMonth) {
 //			saveReport(report, type, region);
 //		}
-		return report;
+		return gson.toJson(report);
 	}
 	
 	
@@ -615,6 +615,7 @@ public class OsmAndLiveReports {
 	
 	
 	public Number getNumberReport(OsmAndLiveReportType type) throws IOException, SQLException {
+		// TODO cache final reports
 		if(type == OsmAndLiveReportType.MIN_CHANGES) {
 			return getMinChanges();
 		} else if(type == OsmAndLiveReportType.REGION_RANKING_RANGE) {

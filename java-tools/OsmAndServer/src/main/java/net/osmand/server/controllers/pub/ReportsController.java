@@ -117,7 +117,7 @@ public class ReportsController {
 			}
 			if(report.equals("recipients_by_month")) {
 				Gson gson = reports.getJsonFormatter();
-				RecipientsReport rec =(RecipientsReport) reports.getReport(OsmAndLiveReportType.RECIPIENTS, region);
+				RecipientsReport rec = reports.getReport(OsmAndLiveReportType.RECIPIENTS, region, RecipientsReport.class);
 				Map<String, Object> mapReport = new LinkedHashMap<String, Object>(); 
 				Map<String, Object> txs = (Map<String, Object>) getTransactions().get(month);
 				StringBuilder payouts = new StringBuilder(); 
