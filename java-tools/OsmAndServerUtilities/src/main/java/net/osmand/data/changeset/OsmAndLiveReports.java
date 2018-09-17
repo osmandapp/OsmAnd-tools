@@ -36,6 +36,24 @@ public class OsmAndLiveReports {
 						isEmpty(System.getenv("DB_PWD")) ? "test" : System.getenv("DB_PWD"));
 		PreparedStatement ps = conn.prepareStatement("select report, time, accesstime from final_reports where month = ? and name = ? and region = ?");
 		
+		checkMissingReports(conn, ps);
+//		migrateData(conn);
+		
+//		String cond = String.format("starttime < '%s' and expiretime >= '%s' ", "2017-01-01", "2017-01-01");
+//		System.out.println(reports.supportersQuery(cond));
+//		OsmAndLiveReports reports = new OsmAndLiveReports(conn, "2018-08");
+////		System.out.println(reports.getJsonReport(OsmAndLiveReportType.COUNTRIES, null));
+//		System.out.println(reports.getJsonReport(OsmAndLiveReportType.TOTAL_CHANGES, null));
+//		System.out.println(reports.getJsonReport(OsmAndLiveReportType.RANKING, null));
+//		System.out.println(reports.getJsonReport(OsmAndLiveReportType.SUPPORTERS, null));
+//		System.out.println(reports.getJsonReport(OsmAndLiveReportType.USERS_RANKING, "belarus_europe"));
+//		System.out.println(reports.getJsonReport(OsmAndLiveReportType.RECIPIENTS, null));
+//		System.out.println(reports.getJsonReport(OsmAndLiveReportType.PAYOUTS, null));
+//		reports.buildReports(conn);
+	}
+
+	protected static void checkMissingReports(Connection conn, PreparedStatement ps) throws SQLException, IOException,
+			ParseException {
 		for (int y = 2016; y <= 2018; y++) {
 			int si = y == 2015 ? 8 : 1;
 			int ei = y == 2018 ? 8 : 12;
@@ -52,16 +70,22 @@ public class OsmAndLiveReports {
 					reports.saveReport(sups, OsmAndLiveReportType.SUPPORTERS, null, 0);
 				}
 				checkReport(ps, month, OsmAndLiveReportType.PAYOUTS, null);
-				checkReport(ps, month, OsmAndLiveReportType.RANKING, null);
-				checkReport(ps, month, OsmAndLiveReportType.TOTAL_CHANGES, null);
-				checkReport(ps, month, OsmAndLiveReportType.USERS_RANKING, null);
-				checkReport(ps, month, OsmAndLiveReportType.RECIPIENTS, null);
-				s+=7;
+				
+				s+=3;
 				for (Country reg : cntrs.rows) {
-					if(reg.map.equals("1")) {
-						checkReport(ps, month, OsmAndLiveReportType.RANKING, reg.downloadname);
-						checkReport(ps, month, OsmAndLiveReportType.TOTAL_CHANGES, reg.downloadname);
-						checkReport(ps, month, OsmAndLiveReportType.USERS_RANKING, reg.downloadname);
+					if(reg.map.equals("1") || isEmpty(reg.downloadname)) {
+						if(!checkReport(ps, month, OsmAndLiveReportType.RANKING, reg.downloadname)) {
+							reports.saveReport(reports.getRanking(reg.downloadname), 
+									OsmAndLiveReportType.RANKING, reg.downloadname, 0);		
+						}
+						if(!checkReport(ps, month, OsmAndLiveReportType.TOTAL_CHANGES, reg.downloadname)) {
+							reports.saveReport(reports.getTotalChanges(reg.downloadname), 
+									OsmAndLiveReportType.TOTAL_CHANGES, reg.downloadname, 0);	
+						}
+						if(!checkReport(ps, month, OsmAndLiveReportType.USERS_RANKING, reg.downloadname)) {
+							reports.saveReport(reports.getUsersRanking(reg.downloadname), 
+									OsmAndLiveReportType.USERS_RANKING, reg.downloadname, 0);	
+						}
 						checkReport(ps, month, OsmAndLiveReportType.RECIPIENTS, reg.downloadname);
 					}
 					s+=4;
@@ -86,19 +110,6 @@ public class OsmAndLiveReports {
 				System.out.println(String.format("TESTED %d reports", s));
 			}
 		}
-//		migrateData(conn);
-		
-//		String cond = String.format("starttime < '%s' and expiretime >= '%s' ", "2017-01-01", "2017-01-01");
-//		System.out.println(reports.supportersQuery(cond));
-//		OsmAndLiveReports reports = new OsmAndLiveReports(conn, "2018-08");
-////		System.out.println(reports.getJsonReport(OsmAndLiveReportType.COUNTRIES, null));
-//		System.out.println(reports.getJsonReport(OsmAndLiveReportType.TOTAL_CHANGES, null));
-//		System.out.println(reports.getJsonReport(OsmAndLiveReportType.RANKING, null));
-//		System.out.println(reports.getJsonReport(OsmAndLiveReportType.SUPPORTERS, null));
-//		System.out.println(reports.getJsonReport(OsmAndLiveReportType.USERS_RANKING, "belarus_europe"));
-//		System.out.println(reports.getJsonReport(OsmAndLiveReportType.RECIPIENTS, null));
-//		System.out.println(reports.getJsonReport(OsmAndLiveReportType.PAYOUTS, null));
-//		reports.buildReports(conn);
 	}
 
 	private static boolean checkReport(PreparedStatement ps, String mnth, OsmAndLiveReportType tp, String reg) throws SQLException {
