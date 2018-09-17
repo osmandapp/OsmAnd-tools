@@ -471,7 +471,7 @@ public class OsmAndLiveReports {
 		
 		RankingReport ranking = getReport(OsmAndLiveReportType.RANKING, region, RankingReport.class); 
 		RankingReport granking = getReport(OsmAndLiveReportType.RANKING, null, RankingReport.class);
-		int minChanges = getNumberReport(OsmAndLiveReportType.RANKING_RANGE).intValue();
+		int minChanges = getNumberReport(OsmAndLiveReportType.MIN_CHANGES).intValue();
 		report.month = month;
 		report.region = region;
 		report.date = reportTime();
