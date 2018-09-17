@@ -4,50 +4,34 @@ import com.google.gson.*;
 
 import java.lang.reflect.Type;
 
-import org.apache.commons.logging.Log;
-
-import net.osmand.PlatformUtil;
-
 public class ArticleMapper implements JsonDeserializer<ArticleMapper.Article> {
-    private static final long ERROR_BATCH_SIZE = 5000l;
-	private static int errorCount;
-	private static Log log = PlatformUtil.getLog(ArticleMapper.class);
-
-	@Override
+    @Override
     public Article deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context) throws JsonParseException {
         Article article = new Article();
         try {
             JsonObject obj = (JsonObject) json;
-            JsonArray prop625 = obj.getAsJsonObject("claims").getAsJsonArray("P625");
-			if (prop625 != null) {
-				JsonObject coordinates = prop625.get(0).getAsJsonObject().getAsJsonObject("mainsnak")
-						.getAsJsonObject("datavalue").getAsJsonObject("value");
-				double lat = coordinates.getAsJsonPrimitive("latitude").getAsDouble();
-				double lon = coordinates.getAsJsonPrimitive("longitude").getAsDouble();
-				JsonObject links = obj.getAsJsonObject("sitelinks");
-				article.setLinks(links);
-				article.setLat(lat);
-				article.setLon(lon);
-			}
+            JsonObject labels = obj.getAsJsonObject("labels");
+            JsonObject coordinates = obj.getAsJsonObject("claims").getAsJsonArray("P625")
+                    .get(0).getAsJsonObject().getAsJsonObject("mainsnak").getAsJsonObject("datavalue")
+                    .getAsJsonObject("value");
+            double lat = coordinates.getAsJsonPrimitive("latitude").getAsDouble();
+            double lon = coordinates.getAsJsonPrimitive("longitude").getAsDouble();
+            article.setLabels(labels);
+            article.setLat(lat);
+            article.setLon(lon);
         } catch (Exception e) {
-        	errorCount++;
-			if(errorCount == ERROR_BATCH_SIZE) {
-				log.error(e.getMessage(), e);
-			}
-			if(errorCount % ERROR_BATCH_SIZE == 0) {
-				log.error(String.format("Error json pages %s (total %d)", json.toString(), errorCount));
-			}
+            // Missing the required fields or has invalid structure
         }
         return article;
     }
 
     public class Article {
-        private JsonObject links;
+        private JsonObject labels;
         private double lat;
         private double lon;
 
-        public JsonObject getLinks() {
-            return links;
+        public JsonObject getLabels() {
+            return labels;
         }
 
         public double getLon() {
@@ -66,8 +50,8 @@ public class ArticleMapper implements JsonDeserializer<ArticleMapper.Article> {
             this.lat = lat;
         }
 
-        public void setLinks(JsonObject labels) {
-            this.links = labels;
+        public void setLabels(JsonObject labels) {
+            this.labels = labels;
         }
     }
 }

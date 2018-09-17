@@ -63,9 +63,8 @@ public class WikivoyageLangPreparation {
 		BANNER("pagebanner"),
 		REGION_LIST("regionlist"), 
 		WARNING("warningbox"),
-		CITATION("citation"),
-		METRIC_DATA("metric");
-
+		CITATION("citation");
+		
 		private String type;
 		WikivoyageTemplates(String s) {
 			type = s;
@@ -92,7 +91,7 @@ public class WikivoyageLangPreparation {
 		String folder = "";
 		if(args.length == 0) {
 			lang = "en";
-			folder = "/Users/paul/osmand/wikivoyage/";
+			folder = "/home/user/osmand/wikivoyage/";
 			uncompressed = true;
 		}
 		if(args.length > 0) {

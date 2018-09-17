@@ -19,6 +19,7 @@ public class UserInfoController {
 			OAuth2Authentication oAuth2Authentication = (OAuth2Authentication) user;
 			Authentication authentication = oAuth2Authentication.getUserAuthentication();
 			pg += authentication.getDetails();
+			pg += "\n SECRET: " + System.getenv("SECRET_ARG");
 			pg += authentication.getAuthorities();
 		}
 		

@@ -13,7 +13,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
-import net.osmand.server.assist.data.Device;
+import net.osmand.server.assist.data.DeviceMonitor;
 import net.osmand.server.assist.data.LocationInfo;
 import net.osmand.server.assist.data.TrackerConfiguration;
 
@@ -85,7 +85,7 @@ public class MegaGPSTracker implements ITrackerManager {
 	
 	
 	@Override
-	public void updateDeviceMonitors(TrackerConfiguration ext, Map<String, List<Device>> mp) {
+	public void updateDeviceMonitors(TrackerConfiguration ext, Map<String, List<DeviceMonitor>> mp) {
 		try {
 			List<MegaGPSDevice> allDevices = getDevices(ext, true, null);
 			long time = System.currentTimeMillis();
@@ -93,7 +93,7 @@ public class MegaGPSTracker implements ITrackerManager {
 				if (dd.timeLastValid < time / 1000  - 90 * 24 * 60 * 60) {
 					continue;
 				}
-				List<Device> list = mp.get(dd.id);
+				List<DeviceMonitor> list = mp.get(dd.id);
 				if (list != null) {
 					LocationInfo li = new LocationInfo(dd.timeLastReceived * 1000);
 					LocationInfo location = new LocationInfo(dd.timeLastValid * 1000);
@@ -117,7 +117,7 @@ public class MegaGPSTracker implements ITrackerManager {
 						li.setTemperature(dd.temparature);
 					}
 					// li.setIpSender(ipSender);
-					for (Device dm : list) {
+					for (DeviceMonitor dm : list) {
 						LocationInfo lastSignal = dm.getLastSignal();
 						if (lastSignal != null && li.getTimestamp() == lastSignal.getTimestamp()) {
 							continue;

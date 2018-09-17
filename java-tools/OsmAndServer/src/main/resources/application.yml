@@ -13,7 +13,6 @@ google:
     tokenInfoUri:
     preferTokenInfo: true
 
-
 admin:
   emails:
       victor.shcherb@gmail.com, dmpr0.ua@gmail.com, alex.crimean@gmail.com, stetsenko.pavlo@gmail.com
@@ -21,15 +20,9 @@ admin:
 logging:
   file: logs/server.log
   config: classpath:logback-spring.xml
-  pattern.console: "%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){yellow} %-5level [%thread]: %message%n%ex{4}"
-  
 
 server:
   port: 8080
-  tomcat.max-threads: 5
-files.location: ${user.dir}/../../../help/
-gen.location: ${files.location}/gen/
-web.location: ${files.location}/website/
 
 management:
   endpoints:
@@ -45,27 +38,9 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/changeset}
     username: ${DB_USER:test}
     password: ${DB_PWD:test}
-  resources.static-locations: file:${web.location}
-  thymeleaf:
-    prefix: file:${web.location}/templates/
-    cache: false
-
-# classpath:/static/
-
-mapillary:
-  clientid: LXJVNHlDOGdMSVgxZG5mVzlHQ3ZqQTo0NjE5OWRiN2EzNTFkNDg4
-
-monitoring:
-  enabled: ${ENABLE_MONITORING:false}
-
-geoip.url: "http://localhost:8081/json/"
 
 ---
 spring.jpa.hibernate.ddl-auto: validate
-
-files.location: /var/www-download/
-gen.location: ${files.location}/gen/
-web.location: ${files.location}/website/
 
 logging:
   file: /var/log/osmand-server-logs/error.log
@@ -73,8 +48,6 @@ logging:
 
 server:
   port: 8090
-  tomcat.max-threads: 50
-  address: 127.0.0.1 #keep it behind proxy
   tomcat:
     accesslog:
       directory: /var/log/osmand-server-logs/
@@ -84,5 +57,3 @@ server:
 
 spring:
   profiles: production
-  resources.static-locations: file:${web.location}
-  thymeleaf.prefix: file:${web.location}/templates/

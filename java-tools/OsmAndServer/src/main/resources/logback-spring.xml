@@ -38,8 +38,7 @@
 				<level>ERROR</level>
 			</filter>
 			<encoder>
-			    <pattern>%d %-5level [%thread]: %message%n%ex{2}</pattern>
-				<!--   <pattern>${FILE_LOG_PATTERN}</pattern> -->
+				<pattern>${FILE_LOG_PATTERN}</pattern>
 			</encoder>
     	</appender>
 		<root level="INFO">

@@ -73,7 +73,7 @@ public class WikipediaByCountryDivider {
 			}
 		}
 		
-		ResultSet rs = conn.createStatement().executeQuery("SELECT DISTINCT regionName FROM wiki_region");
+		ResultSet rs = conn.createStatement().executeQuery("SELECT DISTINCT regionName  FROM wiki_region");
 		while (rs.next()) {
 			String lcRegionName = rs.getString(1);
 			if(lcRegionName == null) {
@@ -166,9 +166,6 @@ public class WikipediaByCountryDivider {
 			contentStr = contentStr.replace((char) 0, ' ');
 			contentStr = contentStr.replace((char) 22, ' ');
 			contentStr = contentStr.replace((char) 27, ' ');
-			if(contentStr.trim().length() == 0) {
-				continue;
-			}
 			if (osmId != prevOsmId) {
 				if (prevOsmId != -1) {
 					closeOsmWikiNode(serializer, nameUnique, nameAdded);

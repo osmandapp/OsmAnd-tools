@@ -28,7 +28,6 @@ import javax.swing.AbstractAction;
 import javax.swing.Action;
 import javax.swing.JButton;
 import javax.swing.JFileChooser;
-import javax.swing.JMenu;
 import javax.swing.JOptionPane;
 import javax.swing.JPopupMenu;
 import javax.swing.SwingUtilities;
@@ -71,6 +70,7 @@ import org.xml.sax.SAXException;
 public class MapRouterLayer implements MapPanelLayer {
 
 	private final static Log log = PlatformUtil.getLog(MapRouterLayer.class);
+	private boolean USE_OLD_ROUTING = false;
 
 	private MapPanel map;
 	private LatLon startRoute ;
@@ -198,65 +198,7 @@ public class MapRouterLayer implements MapPanelLayer {
 			}
 		};
 		menu.add(end);
-		final JMenu points = new JMenu("Transit Points"); //$NON-NLS-1$
-		Action swapLocations = new AbstractAction("Swap locations") {
-			private static final long serialVersionUID = 507156107455281238L;
-
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				LatLon l = endRoute;
-				endRoute = startRoute;
-				startRoute = l;
-				map.repaint();
-			}
-		};
-		points.add(swapLocations);
-		Action addIntermediate = new AbstractAction("Add transit point") {
-
-			private static final long serialVersionUID = 1021949691943312782L;
-
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				Point popupMenuPoint = map.getPopupMenuPoint();
-				double fy = (popupMenuPoint.y - map.getCenterPointY()) / map.getTileSize();
-				double fx = (popupMenuPoint.x - map.getCenterPointX()) / map.getTileSize();
-				double latitude = MapUtils.getLatitudeFromTile(map.getZoom(), map.getYTile() + fy);
-				double longitude = MapUtils.getLongitudeFromTile(map.getZoom(), map.getXTile() + fx);
-				intermediates.add(new LatLon(latitude, longitude));
-				map.repaint();
-			}
-		};
-		points.add(addIntermediate);
-
-		Action remove = new AbstractAction("Remove transit point") {
-
-			private static final long serialVersionUID = 1L;
-
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				if(intermediates.size() > 0){
-					intermediates.remove(0);
-				}
-				map.repaint();
-			}
-		};
-		points.add(remove);
-		menu.add(points);
-		final JMenu directions = new JMenu("Directions"); //$NON-NLS-1$
-		menu.add(directions);
-		Action complexRoute = new AbstractAction("Build route (OsmAnd standard)") {
-			private static final long serialVersionUID = 8049785829806139142L;
-
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				previousRoute = null;
-				calcRoute(RouteCalculationMode.COMPLEX);
-			}
-		};
-		directions.add(complexRoute);
-
-
-		Action selfRoute = new AbstractAction("Build route (OsmAnd short)") {
+		Action selfRoute = new AbstractAction("Calculate OsmAnd route") {
 			private static final long serialVersionUID = 507156107455281238L;
 
 			@Override
@@ -265,9 +207,9 @@ public class MapRouterLayer implements MapPanelLayer {
 				calcRoute(RouteCalculationMode.NORMAL);
 			}
 		};
-		directions.add(selfRoute);
+		menu.add(selfRoute);
 
-		Action selfBaseRoute = new AbstractAction("Build route (OsmAnd long)") {
+		Action selfBaseRoute = new AbstractAction("Calculate OsmAnd base route") {
 			private static final long serialVersionUID = 8049785829806139142L;
 
 			@Override
@@ -276,9 +218,20 @@ public class MapRouterLayer implements MapPanelLayer {
 				calcRoute(RouteCalculationMode.BASE);
 			}
 		};
-		directions.add(selfBaseRoute);
+		menu.add(selfBaseRoute);
 
-		Action recalculate = new AbstractAction("Rebuild route (OsmAnd)") {
+		Action complexRoute = new AbstractAction("Calculate OsmAnd complex route") {
+			private static final long serialVersionUID = 8049785829806139142L;
+
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				previousRoute = null;
+				calcRoute(RouteCalculationMode.COMPLEX);
+			}
+		};
+		menu.add(complexRoute);
+
+		Action recalculate = new AbstractAction("Recalculate OsmAnd route") {
 			private static final long serialVersionUID = 507156107455281238L;
 
 			@Override
@@ -292,9 +245,9 @@ public class MapRouterLayer implements MapPanelLayer {
 				calcRoute(RouteCalculationMode.NORMAL);
 			}
 		};
-		directions.add(recalculate);
+		menu.add(recalculate);
 
-		Action route_YOURS = new AbstractAction("Build route (YOURS)") {
+		Action route_YOURS = new AbstractAction("Calculate YOURS route") {
 			private static final long serialVersionUID = 507156107455281238L;
 
 			@Override
@@ -313,7 +266,7 @@ public class MapRouterLayer implements MapPanelLayer {
 				}.start();
 			}
 		};
-		directions.add(route_YOURS);
+		menu.add(route_YOURS);
 		Action loadGPXFile = new AbstractAction("Load GPX file...") {
 			private static final long serialVersionUID = 507156107455281238L;
 
@@ -339,7 +292,45 @@ public class MapRouterLayer implements MapPanelLayer {
 			}
 		};
 		menu.add(loadGPXFile);
-		
+			Action swapLocations = new AbstractAction("Swap locations") {
+			private static final long serialVersionUID = 507156107455281238L;
+
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				LatLon l = endRoute;
+				endRoute = startRoute;
+				startRoute = l;
+				map.repaint();
+			}
+		};
+		menu.add(swapLocations);
+		Action addIntermediate = new AbstractAction("Add transit point") {
+
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				Point popupMenuPoint = map.getPopupMenuPoint();
+				double fy = (popupMenuPoint.y - map.getCenterPointY()) / map.getTileSize();
+				double fx = (popupMenuPoint.x - map.getCenterPointX()) / map.getTileSize();
+				double latitude = MapUtils.getLatitudeFromTile(map.getZoom(), map.getYTile() + fy);
+				double longitude = MapUtils.getLongitudeFromTile(map.getZoom(), map.getXTile() + fx);
+				intermediates.add(new LatLon(latitude, longitude));
+				map.repaint();
+			}
+		};
+		menu.add(addIntermediate);
+
+		Action remove = new AbstractAction("Remove transit point") {
+
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				if(intermediates.size() > 0){
+					intermediates.remove(0);
+				}
+				map.repaint();
+			}
+		};
+		menu.add(remove);
+
 	}
 
 
@@ -686,7 +677,7 @@ public class MapRouterLayer implements MapPanelLayer {
 				}
 				String m = DataExtractionSettings.getSettings().getRouteMode();
 				String[] props = m.split("\\,");
-				RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
+				RoutePlannerFrontEnd router = new RoutePlannerFrontEnd(USE_OLD_ROUTING);
 
 				Map<String, String> paramsR = new LinkedHashMap<String, String>();
 				for(String p : props) {

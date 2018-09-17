@@ -3,7 +3,7 @@ package net.osmand.server.assist.ext;
 import java.util.List;
 import java.util.Map;
 
-import net.osmand.server.assist.data.Device;
+import net.osmand.server.assist.data.DeviceMonitor;
 import net.osmand.server.assist.data.TrackerConfiguration;
 
 public interface ITrackerManager {
@@ -23,6 +23,6 @@ public interface ITrackerManager {
 	}
 
 
-	public void updateDeviceMonitors(TrackerConfiguration ext, Map<String, List<Device>> mp);
+	public void updateDeviceMonitors(TrackerConfiguration ext, Map<String, List<DeviceMonitor>> mp);
 	
 }

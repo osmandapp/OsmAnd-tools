@@ -21,9 +21,6 @@ public class IndexCreatorSettings {
 	// srtm data folder to amend roads with height profile
 	public File srtmDataFolder;
 	
-	// gtfs data for public transport
-	public File gtfsData;
-	
 	
 	// limit entities by multipolygon (used by srtm)  
 	public Multipolygon boundary;

@@ -49,7 +49,7 @@ public class ImproveRoadConnectivity {
 
 	public void clustering(final ClusteringContext clusterCtx, BinaryMapIndexReader reader)
 			throws IOException {
-		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
+		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd(false);
 		Builder builder = RoutingConfiguration.getDefault();
 		RoutingConfiguration config = builder.build("car", RoutingConfiguration.DEFAULT_MEMORY_LIMIT * 3);
 		RoutingContext ctx = router.buildRoutingContext(config, null, new BinaryMapIndexReader[] { reader },
@@ -85,7 +85,7 @@ public class ImproveRoadConnectivity {
 			TLongObjectHashMap<List<RouteDataObject>> all, TLongObjectHashMap<List<RouteDataObject>> onlyRoads,
 			TLongHashSet registeredRoadIds)
 			throws IOException {
-		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
+		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd(false);
 		Builder builder = RoutingConfiguration.getDefault();
 		RoutingConfiguration config = builder.build("car", RoutingConfiguration.DEFAULT_MEMORY_LIMIT * 3);
 		RoutingContext ctx = router.buildRoutingContext(config, null, new BinaryMapIndexReader[] { reader },
@@ -138,7 +138,7 @@ public class ImproveRoadConnectivity {
 
 	private TLongObjectHashMap<RouteDataObject> calculateDisconnectedRoadsToAddAndDelete(TLongObjectHashMap<List<RouteDataObject>> mapOfObjectToCheck,
 			TLongObjectHashMap<List<RouteDataObject>> all, BinaryMapIndexReader reader, TLongHashSet setToRemove, TLongHashSet registeredIds) {
-		RoutePlannerFrontEnd frontEnd = new RoutePlannerFrontEnd();
+		RoutePlannerFrontEnd frontEnd = new RoutePlannerFrontEnd(false);
 		RoutingConfiguration config = RoutingConfiguration.getDefault().build("car", 1000);
 
 		long[] keys = mapOfObjectToCheck.keys();
