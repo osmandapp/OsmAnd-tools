@@ -34,31 +34,40 @@ public class OsmAndLiveReports {
 	public static final String CHANGESETS_VIEW = "changesets_view";
 	// changeset_country_view (quick) or changeset_country (if we need to generate older > 3 months)
 	public static final String CHANGESET_COUNTRY_VIEW = "changeset_country_view"; 
+	
+	public static final int REFRESH_ACCESSTIME = 15 * 60; // 30 minutes
+	public static final int REPORTS_DELETE_DEPRECATED = 6 * 60 * 60; // 6 hours 
+	
+	
 	public static void main(String[] args) throws Exception {
 		Connection conn = DriverManager.getConnection("jdbc:postgresql://localhost:5433/changeset",
 				isEmpty(System.getenv("DB_USER")) ? "test" : System.getenv("DB_USER"),
 						isEmpty(System.getenv("DB_PWD")) ? "test" : System.getenv("DB_PWD"));
-		PreparedStatement ps = conn.prepareStatement("select report, time, accesstime from final_reports where month = ? and name = ? and region = ?");
-		
-		checkMissingReports(conn, ps);
-//		migrateData(conn);
-		
-//		String cond = String.format("starttime < '%s' and expiretime >= '%s' ", "2017-01-01", "2017-01-01");
-//		System.out.println(reports.supportersQuery(cond));
-//		OsmAndLiveReports reports = new OsmAndLiveReports(conn, "2018-08");
-////		System.out.println(reports.getJsonReport(OsmAndLiveReportType.COUNTRIES, null));
-//		System.out.println(reports.getJsonReport(OsmAndLiveReportType.TOTAL_CHANGES, null));
-//		System.out.println(reports.getJsonReport(OsmAndLiveReportType.RANKING, null));
-//		System.out.println(reports.getJsonReport(OsmAndLiveReportType.SUPPORTERS, null));
-//		System.out.println(reports.getJsonReport(OsmAndLiveReportType.USERS_RANKING, "belarus_europe"));
-//		System.out.println(reports.getJsonReport(OsmAndLiveReportType.RECIPIENTS, null));
-//		System.out.println(reports.getJsonReport(OsmAndLiveReportType.PAYOUTS, null));
-//		reports.buildReports(conn);
+		if(args != null && args.length > 0) {
+			if(args[0].equals("check-missing-reports")) {
+				checkMissingReports(conn);
+			} else if(args[0].equals("refresh-current-month")) {
+				refreshCurrentMonth(conn);
+			} else {
+				throw new UnsupportedOperationException();
+			}
+		} else {
+			System.out.println("Please specify parameter: check-missing-reports (checks reports in past months and generates), "
+					+ "refresh-current-month (refreshes views and generated reports for this month)");
+		}
 	}
-	
 
-	protected static void checkMissingReports(Connection conn, PreparedStatement ps) throws SQLException, IOException,
+	private static void refreshCurrentMonth(Connection conn) throws SQLException {
+		LOG.info("Refreshing materialized views ");
+		conn.createStatement().execute("REFRESH MATERIALIZED VIEW  changesets_view");
+		LOG.info("changesets_view refreshed");
+		conn.createStatement().execute("REFRESH MATERIALIZED VIEW  changeset_country_view");
+		LOG.info("changeset_country_view refreshed");
+	}
+
+	protected static void checkMissingReports(Connection conn) throws SQLException, IOException,
 			ParseException {
+		PreparedStatement ps = conn.prepareStatement("select report, time, accesstime from final_reports where month = ? and name = ? and region = ?");
 		for (int y = 2016; y <= 2018; y++) {
 			int si = y == 2015 ? 8 : 1;
 			int ei = y == 2018 ? 8 : 12;
@@ -708,15 +717,25 @@ public class OsmAndLiveReports {
 		long accesstime = 0;
 		if (rs.next()) {
 			accesstime = rs.getLong(3);
+			String retReport = rs.getString("report");
+			rs.close();
+			ps.close();
 			if (thisMonth) {
-				// TODO
+				long time = System.currentTimeMillis() / 1000;
 				// set current time if a report was not accessed more than X minutes
-				// if ((time() - $row[2]) > Constants::REFRESH_ACCESSTIME) {
-				// pg_query($dbconn, "update final_reports set accesstime=".time()." where month = '${month}'
-				// and region = '${rregion}' and name='${name}';");
-				// }
+				if (time - accesstime > REFRESH_ACCESSTIME) {
+					PreparedStatement upd = conn
+							.prepareStatement("update final_reports set accesstime = ? where month = ? and region = ? and name = ?");
+					upd.setLong(1, time);
+					upd.setString(2, month);
+					upd.setString(3, type.getSqlName());
+					upd.setString(4, isEmpty(region) ? "" : region);
+					upd.executeUpdate();
+					upd.close();
+				}
 			}
-			return rs.getString("report");
+			
+			return retReport;
 		}
 		
 		if(type == OsmAndLiveReportType.COUNTRIES) {
