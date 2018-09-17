@@ -76,7 +76,7 @@ public class OsmAndLiveReports {
 				if(!checkReport(ps, month, OsmAndLiveReportType.EUR_BTC_RATE, null)){
 					Number eur = reports.getNumberReport(OsmAndLiveReportType.EUR_VALUE);
 					Number btc = reports.getNumberReport(OsmAndLiveReportType.BTC_VALUE);
-					reports.saveReport(eur.doubleValue() / btc.doubleValue(), OsmAndLiveReportType.EUR_BTC_RATE, null);
+					reports.saveReport(eur.doubleValue() / btc.doubleValue(), OsmAndLiveReportType.EUR_BTC_RATE, null, 0);
 				}
 				s+=6;
 				System.out.println(String.format("TESTED %d reports", s));
@@ -642,7 +642,8 @@ public class OsmAndLiveReports {
 	
 	
 	
-	private void saveReport(Object report, OsmAndLiveReportType type, String region) throws SQLException, ParseException {
+	private void saveReport(Object report, OsmAndLiveReportType type, String region, 
+			long accessTime) throws SQLException, ParseException {
 		Map<String, Object> rt = new HashMap<>();
 		String r = isEmpty(region) ? "" : region;
 		Gson gson = getJsonFormatter();
@@ -651,6 +652,14 @@ public class OsmAndLiveReports {
 		rt.put("month", month);
 		rt.put("region", r);
 		PreparedStatement p = conn.prepareStatement(
+				"delete from final_reports where month = ? and region = ? and name = ?");
+		p.setString(1, month);
+		p.setString(2, r);
+		p.setString(3, type.getSqlName());
+		p.executeUpdate();
+		
+		
+		p = conn.prepareStatement(
 				"insert into final_reports(month, region, name, report, time, accesstime) values (?, ?, ?, ?, ?, ?)");
 		p.setString(1, month);
 		p.setString(2, r);
@@ -663,9 +672,12 @@ public class OsmAndLiveReports {
 			
 		}
 		p.setLong(5, time);
-		// TODO keep original accesstime
-		p.setLong(6, time);
-		
+		if(accessTime == 0) {
+			p.setLong(6, time);
+		}  else {
+			p.setLong(6, accessTime);
+		}
+		p.executeUpdate();
 	}
 	
 	public <T> T getReport(OsmAndLiveReportType type, String region, Class<T> cl) throws SQLException, IOException {
