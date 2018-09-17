@@ -37,7 +37,6 @@ public class OsmAndLiveReports {
 		PreparedStatement ps = conn.prepareStatement("select report, time, accesstime from final_reports where month = ? and name = ? and region = ?");
 		
 		// TODO if (y == 2017 && i == 10) {
-		// TODO if (y == 2015) {
 		for (int y = 2016; y <= 2018; y++) {
 			int si = y == 2015 ? 8 : 1;
 			int ei = y == 2018 ? 8 : 12;
@@ -72,9 +71,13 @@ public class OsmAndLiveReports {
 				checkReport(ps, month, OsmAndLiveReportType.REGION_RANKING_RANGE, null);
 				checkReport(ps, month, OsmAndLiveReportType.RANKING_RANGE, null);
 				checkReport(ps, month, OsmAndLiveReportType.MIN_CHANGES, null);
-				checkReport(ps, month, OsmAndLiveReportType.EUR_BTC_RATE, null);
 				checkReport(ps, month, OsmAndLiveReportType.BTC_VALUE, null);
 				checkReport(ps, month, OsmAndLiveReportType.EUR_VALUE, null);
+				if(!checkReport(ps, month, OsmAndLiveReportType.EUR_BTC_RATE, null)){
+					Number eur = reports.getNumberReport(OsmAndLiveReportType.EUR_VALUE);
+					Number btc = reports.getNumberReport(OsmAndLiveReportType.BTC_VALUE);
+					reports.saveReport(eur.doubleValue() / btc.doubleValue(), OsmAndLiveReportType.EUR_BTC_RATE, null);
+				}
 				s+=6;
 				System.out.println(String.format("TESTED %d reports", s));
 			}
@@ -94,7 +97,7 @@ public class OsmAndLiveReports {
 //		reports.buildReports(conn);
 	}
 
-	private static void checkReport(PreparedStatement ps, String mnth, OsmAndLiveReportType tp, String reg) throws SQLException {
+	private static boolean checkReport(PreparedStatement ps, String mnth, OsmAndLiveReportType tp, String reg) throws SQLException {
 		ps.setString(1, mnth);
 		ps.setString(2, tp.getSqlName());
 		String r = isEmpty(reg) ? "" : reg;
@@ -104,10 +107,13 @@ public class OsmAndLiveReports {
 			String report = rs.getString(1);
 			if(isEmpty(report)) {
 				System.out.println(String.format("EMPTY REPORT '%s' for '%s' in '%s'", tp.getSqlName(), r, mnth) );
+				return false;
 			}
 		} else {
 			System.out.println(String.format("MISSING '%s' for '%s' in '%s'", tp.getSqlName(), r, mnth) );
+			return false;
 		}
+		return true;
 	}
 
 	private static void migrateData(Connection conn) throws SQLException, ParseException {
@@ -636,7 +642,7 @@ public class OsmAndLiveReports {
 	
 	
 	
-	private void saveReport(Object report, OsmAndLiveReportType type, String region) throws SQLException {
+	private void saveReport(Object report, OsmAndLiveReportType type, String region) throws SQLException, ParseException {
 		Map<String, Object> rt = new HashMap<>();
 		String r = isEmpty(region) ? "" : region;
 		Gson gson = getJsonFormatter();
@@ -650,10 +656,15 @@ public class OsmAndLiveReports {
 		p.setString(2, r);
 		p.setString(3, type.getSqlName());
 		p.setString(4, gson.toJson(rt));
-		
-		p.setLong(5, System.currentTimeMillis() / 1000);
+		long time = System.currentTimeMillis() / 1000;
+		if(!thisMonth) {
+			SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+			time = sdf.parse(month+"-01").getTime() / 1000;
+			
+		}
+		p.setLong(5, time);
 		// TODO keep original accesstime
-		p.setLong(6, System.currentTimeMillis() / 1000);
+		p.setLong(6, time);
 		
 	}
 	
