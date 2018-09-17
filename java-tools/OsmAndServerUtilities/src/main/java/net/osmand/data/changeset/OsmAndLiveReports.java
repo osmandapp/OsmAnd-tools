@@ -87,16 +87,13 @@ public class OsmAndLiveReports {
 		String r = isEmpty(reg) ? "" : reg;
 		ps.setString(3, r);
 		ResultSet rs = ps.executeQuery();
-		boolean missing = true;
 		if(rs.next()) {
 			String report = rs.getString(1);
-			if(isEmpty(report)) {
-				missing = false;
+			if(!isEmpty(report)) {
+				System.out.println(String.format("EMPTY REPORT '%s' for '%s' in '%'", tp.getSqlName(), r, mnth) );
 			}
-		}
-		
-		if(missing) {
-			System.out.println(String.format("MISSING %s for %s", tp.toString(), r) );
+		} else {
+			System.out.println(String.format("MISSING '%s' for '%s' in '%'", tp.getSqlName(), r, mnth) );
 		}
 	}
 
