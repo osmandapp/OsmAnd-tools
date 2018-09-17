@@ -35,7 +35,7 @@ public class OsmAndLiveReports {
 				isEmpty(System.getenv("DB_USER")) ? "test" : System.getenv("DB_USER"),
 						isEmpty(System.getenv("DB_PWD")) ? "test" : System.getenv("DB_PWD"));
 		PreparedStatement ps = conn.prepareStatement("select report, time, accesstime from final_reports where month = ? and name = ? and region = ?");
-		OsmAndLiveReports reports = new OsmAndLiveReports(null, "2018-08");
+		
 		for(int y= 2015; y <= 2018; y++) {
 			int si = y == 2015 ? 8 : 1;
 			int ei = y == 2018 ? 8 : 12;
@@ -43,6 +43,7 @@ public class OsmAndLiveReports {
 				String m = i < 10 ? "0" + i : i + "";
 				String month = y + "-" + m;
 				System.out.println("TEST " + month);
+				OsmAndLiveReports reports = new OsmAndLiveReports(conn, month);
 				CountriesReport cntrs = reports.getReport(OsmAndLiveReportType.COUNTRIES, null, CountriesReport.class);
 				checkReport(ps, month, OsmAndLiveReportType.SUPPORTERS, null);
 				checkReport(ps, month, OsmAndLiveReportType.PAYOUTS, null);
@@ -62,10 +63,6 @@ public class OsmAndLiveReports {
 			}
 		}
 //		migrateData(conn);
-		
-		
-		
-		
 		
 //		String cond = String.format("starttime < '%s' and expiretime >= '%s' ", "2017-01-01", "2017-01-01");
 //		System.out.println(reports.supportersQuery(cond));
