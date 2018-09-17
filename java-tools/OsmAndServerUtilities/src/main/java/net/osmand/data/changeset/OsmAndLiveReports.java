@@ -36,16 +36,11 @@ public class OsmAndLiveReports {
 						isEmpty(System.getenv("DB_PWD")) ? "test" : System.getenv("DB_PWD"));
 		PreparedStatement ps = conn.prepareStatement("select report, time, accesstime from final_reports where month = ? and name = ? and region = ?");
 		
-		// TODO if (y == 2017 && i == 10) {
 		for (int y = 2016; y <= 2018; y++) {
 			int si = y == 2015 ? 8 : 1;
 			int ei = y == 2018 ? 8 : 12;
 			for (int i = si; i <= ei; i++) {
 				int s = 0;
-				if (y == 2017 && i == 10) {
-					// TODO
-					continue;
-				}
 				String m = i < 10 ? "0" + i : i + "";
 				String month = y + "-" + m;
 				System.out.println("TEST " + month);
@@ -73,8 +68,7 @@ public class OsmAndLiveReports {
 				checkReport(ps, month, OsmAndLiveReportType.MIN_CHANGES, null);
 				checkReport(ps, month, OsmAndLiveReportType.BTC_VALUE, null);
 				checkReport(ps, month, OsmAndLiveReportType.EUR_VALUE, null);
-				checkReport(ps, month, OsmAndLiveReportType.EUR_BTC_RATE, null);
-				if(true){
+				if(!checkReport(ps, month, OsmAndLiveReportType.EUR_BTC_RATE, null)){
 					Number eur = reports.getNumberReport(OsmAndLiveReportType.EUR_VALUE);
 					Number btc = reports.getNumberReport(OsmAndLiveReportType.BTC_VALUE);
 					reports.saveReport(eur.doubleValue() / btc.doubleValue(), OsmAndLiveReportType.EUR_BTC_RATE, null, 0);
@@ -117,7 +111,7 @@ public class OsmAndLiveReports {
 		return true;
 	}
 
-	private static void migrateData(Connection conn) throws SQLException, ParseException {
+	protected static void migrateData(Connection conn) throws SQLException, ParseException {
 		PreparedStatement ins = conn.prepareStatement(
 				"insert into final_reports(month, region, name, report, time, accesstime) values (?, ?, ?, ?, ?, ?)");
 		SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
