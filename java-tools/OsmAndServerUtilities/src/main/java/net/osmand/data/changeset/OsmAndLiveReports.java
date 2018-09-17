@@ -90,10 +90,10 @@ public class OsmAndLiveReports {
 		if(rs.next()) {
 			String report = rs.getString(1);
 			if(!isEmpty(report)) {
-				System.out.println(String.format("EMPTY REPORT '%s' for '%s' in '%'", tp.getSqlName(), r, mnth) );
+				System.out.println(String.format("EMPTY REPORT '%s' for '%s' in '%s'", tp.getSqlName(), r, mnth) );
 			}
 		} else {
-			System.out.println(String.format("MISSING '%s' for '%s' in '%'", tp.getSqlName(), r, mnth) );
+			System.out.println(String.format("MISSING '%s' for '%s' in '%s'", tp.getSqlName(), r, mnth) );
 		}
 	}
 
