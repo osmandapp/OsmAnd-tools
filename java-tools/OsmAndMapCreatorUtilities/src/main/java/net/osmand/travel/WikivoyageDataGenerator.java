@@ -412,7 +412,7 @@ public class WikivoyageDataGenerator {
 					Long genId = currMapping.get(id);
 					if (genId == null) {
 						if (ids.contains(id)) {
-							genId = maxId++;
+							genId = ++maxId;
 							currMapping.put(id, genId);
 						}
 					}
