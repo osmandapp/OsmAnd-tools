@@ -661,16 +661,16 @@ public class OsmAndLiveReports {
 		p.setString(3, type.getSqlName());
 		
 		if (report instanceof Number) {
+			Number nm = (Number) report;
+			p.setString(4, (nm.intValue() == nm.doubleValue() ? nm.intValue() : nm.doubleValue()) + "");
+		} else {
 			Map<String, Object> rt = new HashMap<>();
 			Gson gson = getJsonFormatter();
 			rt.put("name", type.getSqlName());
 			rt.put("report", report);
 			rt.put("month", month);
 			rt.put("region", r);
-			p.setString(4, gson.toJson(rt));
-		} else {
-			Number nm = (Number) report;
-			p.setString(4, (nm.intValue() == nm.doubleValue() ? nm.intValue() : nm.doubleValue()) + "");
+			p.setString(4, gson.toJson(rt));			
 		}
 		long time = System.currentTimeMillis() / 1000;
 		if(!thisMonth) {
