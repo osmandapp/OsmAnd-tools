@@ -136,14 +136,14 @@ public class ReportsController {
 					}
 				}
 				String worldCollectedMessage = String.format("<p>%.3f mBTC</p><span>total collected%s</span>",
-						rec.btc * 1000, rec.toPay ? "" : " (may change in the final report)");
+						rec.btc * 1000, !rec.notPaid ? "" : " (may change in the final report)");
 				String regionCollectedMessage = String.format("<p>%.3f mBTC</p><span>collected for</span>",
 						rec.btc * 1000);
 				mapReport.put("worldCollectedMessage", worldCollectedMessage);
 				mapReport.put("regionCollectedMessage", regionCollectedMessage);
 				mapReport.put("payouts", payouts.toString());
 				StringBuilder reportBld = new StringBuilder();
-				if(rec.toPay) {
+				if(!rec.notPaid) {
 					reportBld.append(
 							String.format("<a type='application/json' "
 									+ "href='/reports/query_month_report?report=total&month=%1$s'  "
