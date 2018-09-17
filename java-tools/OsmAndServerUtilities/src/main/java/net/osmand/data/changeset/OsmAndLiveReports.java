@@ -645,13 +645,8 @@ public class OsmAndLiveReports {
 	
 	private void saveReport(Object report, OsmAndLiveReportType type, String region, 
 			long accessTime) throws SQLException, ParseException {
-		Map<String, Object> rt = new HashMap<>();
+		
 		String r = isEmpty(region) ? "" : region;
-		Gson gson = getJsonFormatter();
-		rt.put("name", type.getSqlName());
-		rt.put("report", report);
-		rt.put("month", month);
-		rt.put("region", r);
 		PreparedStatement p = conn.prepareStatement(
 				"delete from final_reports where month = ? and region = ? and name = ?");
 		p.setString(1, month);
@@ -659,13 +654,24 @@ public class OsmAndLiveReports {
 		p.setString(3, type.getSqlName());
 		p.executeUpdate();
 		
-		
 		p = conn.prepareStatement(
 				"insert into final_reports(month, region, name, report, time, accesstime) values (?, ?, ?, ?, ?, ?)");
 		p.setString(1, month);
 		p.setString(2, r);
 		p.setString(3, type.getSqlName());
-		p.setString(4, gson.toJson(rt));
+		
+		if (report instanceof Number) {
+			Map<String, Object> rt = new HashMap<>();
+			Gson gson = getJsonFormatter();
+			rt.put("name", type.getSqlName());
+			rt.put("report", report);
+			rt.put("month", month);
+			rt.put("region", r);
+			p.setString(4, gson.toJson(rt));
+		} else {
+			Number nm = (Number) report;
+			p.setString(4, (nm.intValue() == nm.doubleValue() ? nm.intValue() : nm.doubleValue()) + "");
+		}
 		long time = System.currentTimeMillis() / 1000;
 		if(!thisMonth) {
 			SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
@@ -739,7 +745,6 @@ public class OsmAndLiveReports {
 	
 	
 	public Number getNumberReport(OsmAndLiveReportType type) throws IOException, SQLException {
-		// TODO cache final reports
 		if (!thisMonth) {
 			PreparedStatement ps = conn
 					.prepareStatement("select report from final_reports where month = ? and name = ? ");
@@ -747,12 +752,9 @@ public class OsmAndLiveReports {
 			ps.setString(2, type.getSqlName());
 			ResultSet q = ps.executeQuery();
 			if (q.next()) {
-				Map<String, String> mp = new HashMap<String, String>();
-				Map<?, ?> rep = getJsonFormatter().fromJson(q.getString(1), mp.getClass());
-				return Double.parseDouble((String) rep.get("report"));
+				return Double.parseDouble(q.getString(1));
 			}
 		}
-		
 		
 		if(type == OsmAndLiveReportType.MIN_CHANGES) {
 			return getMinChanges();
