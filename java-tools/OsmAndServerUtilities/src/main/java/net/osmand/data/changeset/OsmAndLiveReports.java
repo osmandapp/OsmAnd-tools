@@ -47,7 +47,10 @@ public class OsmAndLiveReports {
 				OsmAndLiveReports reports = new OsmAndLiveReports(conn, month);
 				CountriesReport cntrs = reports.getReport(OsmAndLiveReportType.COUNTRIES, null, CountriesReport.class);
 				checkReport(ps, month, OsmAndLiveReportType.COUNTRIES, null);
-				checkReport(ps, month, OsmAndLiveReportType.SUPPORTERS, null);
+				if(!checkReport(ps, month, OsmAndLiveReportType.SUPPORTERS, null)) {
+					SupportersReport sups = reports.getReport(OsmAndLiveReportType.SUPPORTERS, null, SupportersReport.class);
+					reports.saveReport(sups, OsmAndLiveReportType.SUPPORTERS, null, 0);
+				}
 				checkReport(ps, month, OsmAndLiveReportType.PAYOUTS, null);
 				checkReport(ps, month, OsmAndLiveReportType.RANKING, null);
 				checkReport(ps, month, OsmAndLiveReportType.TOTAL_CHANGES, null);
@@ -63,9 +66,15 @@ public class OsmAndLiveReports {
 					}
 					s+=4;
 				}
-				checkReport(ps, month, OsmAndLiveReportType.REGION_RANKING_RANGE, null);
-				checkReport(ps, month, OsmAndLiveReportType.RANKING_RANGE, null);
-				checkReport(ps, month, OsmAndLiveReportType.MIN_CHANGES, null);
+				if(!checkReport(ps, month, OsmAndLiveReportType.REGION_RANKING_RANGE, null)){
+					reports.saveReport(reports.getRegionRankingRange(), OsmAndLiveReportType.REGION_RANKING_RANGE, null, 0);
+				}
+				if(!checkReport(ps, month, OsmAndLiveReportType.RANKING_RANGE, null)){
+					reports.saveReport(reports.getRankingRange(), OsmAndLiveReportType.RANKING_RANGE, null, 0);
+				}
+				if(!checkReport(ps, month, OsmAndLiveReportType.MIN_CHANGES, null)) {
+					reports.saveReport(reports.getMinChanges(), OsmAndLiveReportType.MIN_CHANGES, null, 0);
+				}
 				checkReport(ps, month, OsmAndLiveReportType.BTC_VALUE, null);
 				checkReport(ps, month, OsmAndLiveReportType.EUR_VALUE, null);
 				if(!checkReport(ps, month, OsmAndLiveReportType.EUR_BTC_RATE, null)){
@@ -641,6 +650,7 @@ public class OsmAndLiveReports {
 			long accessTime) throws SQLException, ParseException {
 		
 		String r = isEmpty(region) ? "" : region;
+		LOG.info(String.format("Saving report '%s' '%s' region '%s' ", type.getSqlName(), month, region));
 		PreparedStatement p = conn.prepareStatement(
 				"delete from final_reports where month = ? and region = ? and name = ?");
 		p.setString(1, month);
