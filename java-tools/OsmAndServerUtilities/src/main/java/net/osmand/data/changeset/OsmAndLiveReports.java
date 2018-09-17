@@ -54,11 +54,11 @@ public class OsmAndLiveReports {
 				checkReport(ps, month, OsmAndLiveReportType.SUPPORTERS, null);
 				checkReport(ps, month, OsmAndLiveReportType.PAYOUTS, null);
 				s+=3;
-				for (String reg : cntrs.map.keySet()) {
-					checkReport(ps, month, OsmAndLiveReportType.RANKING, reg);
-					checkReport(ps, month, OsmAndLiveReportType.TOTAL_CHANGES, reg);
-					checkReport(ps, month, OsmAndLiveReportType.USERS_RANKING, reg);
-					checkReport(ps, month, OsmAndLiveReportType.RECIPIENTS, reg);
+				for (Country reg : cntrs.rows) {
+					checkReport(ps, month, OsmAndLiveReportType.RANKING, reg.downloadname);
+					checkReport(ps, month, OsmAndLiveReportType.TOTAL_CHANGES, reg.downloadname);
+					checkReport(ps, month, OsmAndLiveReportType.USERS_RANKING, reg.downloadname);
+					checkReport(ps, month, OsmAndLiveReportType.RECIPIENTS, reg.downloadname);
 					s+=4;
 				}
 				checkReport(ps, month, OsmAndLiveReportType.REGION_RANKING_RANGE, null);
