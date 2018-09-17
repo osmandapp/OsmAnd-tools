@@ -73,7 +73,8 @@ public class OsmAndLiveReports {
 				checkReport(ps, month, OsmAndLiveReportType.MIN_CHANGES, null);
 				checkReport(ps, month, OsmAndLiveReportType.BTC_VALUE, null);
 				checkReport(ps, month, OsmAndLiveReportType.EUR_VALUE, null);
-				if(!checkReport(ps, month, OsmAndLiveReportType.EUR_BTC_RATE, null)){
+				checkReport(ps, month, OsmAndLiveReportType.EUR_BTC_RATE, null);
+				if(true){
 					Number eur = reports.getNumberReport(OsmAndLiveReportType.EUR_VALUE);
 					Number btc = reports.getNumberReport(OsmAndLiveReportType.BTC_VALUE);
 					reports.saveReport(eur.doubleValue() / btc.doubleValue(), OsmAndLiveReportType.EUR_BTC_RATE, null, 0);
@@ -739,6 +740,19 @@ public class OsmAndLiveReports {
 	
 	public Number getNumberReport(OsmAndLiveReportType type) throws IOException, SQLException {
 		// TODO cache final reports
+		if (!thisMonth) {
+			PreparedStatement ps = conn
+					.prepareStatement("select report from final_reports where month = ? and name = ? ");
+			ps.setString(1, month);
+			ps.setString(2, type.getSqlName());
+			ResultSet q = ps.executeQuery();
+			if (q.next()) {
+				Map<?, ?> rep = getJsonFormatter().fromJson(q.getString(1), Map.class);
+				return Double.parseDouble((String) rep.get("report"));
+			}
+		}
+		
+		
 		if(type == OsmAndLiveReportType.MIN_CHANGES) {
 			return getMinChanges();
 		} else if(type == OsmAndLiveReportType.REGION_RANKING_RANGE) {
