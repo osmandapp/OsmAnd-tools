@@ -747,7 +747,8 @@ public class OsmAndLiveReports {
 			ps.setString(2, type.getSqlName());
 			ResultSet q = ps.executeQuery();
 			if (q.next()) {
-				Map<?, ?> rep = getJsonFormatter().fromJson(q.getString(1), Map.class);
+				Map<String, String> mp = new HashMap<String, String>();
+				Map<?, ?> rep = getJsonFormatter().fromJson(q.getString(1), mp.getClass());
 				return Double.parseDouble((String) rep.get("report"));
 			}
 		}
