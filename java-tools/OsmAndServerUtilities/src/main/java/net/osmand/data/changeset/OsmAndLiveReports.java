@@ -8,6 +8,7 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -33,6 +34,72 @@ public class OsmAndLiveReports {
 		Connection conn = DriverManager.getConnection("jdbc:postgresql://localhost:5433/changeset",
 				isEmpty(System.getenv("DB_USER")) ? "test" : System.getenv("DB_USER"),
 						isEmpty(System.getenv("DB_PWD")) ? "test" : System.getenv("DB_PWD"));
+		PreparedStatement ps = conn.prepareStatement("select report, time, accesstime from final_reports where month = ? and name = ? and region = ?");
+		OsmAndLiveReports reports = new OsmAndLiveReports(null, "2018-08");
+		for(int y= 2015; y <= 2018; y++) {
+			int si = y == 2015 ? 8 : 1;
+			int ei = y == 2018 ? 8 : 12;
+			for (int i = si; i <= ei; i++) {
+				String m = i < 10 ? "0" + i : i + "";
+				String month = y + "-" + m;
+				System.out.println("TEST " + month);
+				CountriesReport cntrs = reports.getReport(OsmAndLiveReportType.COUNTRIES, null, CountriesReport.class);
+				checkReport(ps, month, OsmAndLiveReportType.SUPPORTERS, null);
+				checkReport(ps, month, OsmAndLiveReportType.PAYOUTS, null);
+				for(String reg: cntrs.map.keySet()) {
+					checkReport(ps, month, OsmAndLiveReportType.RANKING, reg);
+					checkReport(ps, month, OsmAndLiveReportType.TOTAL_CHANGES, reg);
+					checkReport(ps, month, OsmAndLiveReportType.USERS_RANKING, reg);
+					checkReport(ps, month, OsmAndLiveReportType.RECIPIENTS, reg);
+				}
+				checkReport(ps, month, OsmAndLiveReportType.REGION_RANKING_RANGE, null);
+				checkReport(ps, month, OsmAndLiveReportType.RANKING_RANGE, null);
+				checkReport(ps, month, OsmAndLiveReportType.MIN_CHANGES, null);
+				checkReport(ps, month, OsmAndLiveReportType.EUR_BTC_RATE, null);
+				checkReport(ps, month, OsmAndLiveReportType.BTC_VALUE, null);
+				checkReport(ps, month, OsmAndLiveReportType.EUR_VALUE, null);
+				
+			}
+		}
+//		migrateData(conn);
+		
+		
+		
+		
+		
+//		String cond = String.format("starttime < '%s' and expiretime >= '%s' ", "2017-01-01", "2017-01-01");
+//		System.out.println(reports.supportersQuery(cond));
+//		OsmAndLiveReports reports = new OsmAndLiveReports(conn, "2018-08");
+////		System.out.println(reports.getJsonReport(OsmAndLiveReportType.COUNTRIES, null));
+//		System.out.println(reports.getJsonReport(OsmAndLiveReportType.TOTAL_CHANGES, null));
+//		System.out.println(reports.getJsonReport(OsmAndLiveReportType.RANKING, null));
+//		System.out.println(reports.getJsonReport(OsmAndLiveReportType.SUPPORTERS, null));
+//		System.out.println(reports.getJsonReport(OsmAndLiveReportType.USERS_RANKING, "belarus_europe"));
+//		System.out.println(reports.getJsonReport(OsmAndLiveReportType.RECIPIENTS, null));
+//		System.out.println(reports.getJsonReport(OsmAndLiveReportType.PAYOUTS, null));
+//		reports.buildReports(conn);
+	}
+
+	private static void checkReport(PreparedStatement ps, String mnth, OsmAndLiveReportType tp, String reg) throws SQLException {
+		ps.setString(1, mnth);
+		ps.setString(2, tp.getSqlName());
+		String r = isEmpty(reg) ? "" : reg;
+		ps.setString(3, r);
+		ResultSet rs = ps.executeQuery();
+		boolean missing = true;
+		if(rs.next()) {
+			String report = rs.getString(1);
+			if(isEmpty(report)) {
+				missing = false;
+			}
+		}
+		
+		if(missing) {
+			System.out.println(String.format("MISSING %s for %s", tp.toString(), r) );
+		}
+	}
+
+	private static void migrateData(Connection conn) throws SQLException, ParseException {
 		PreparedStatement ins = conn.prepareStatement(
 				"insert into final_reports(month, region, name, report, time, accesstime) values (?, ?, ?, ?, ?, ?)");
 		SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
@@ -71,23 +138,6 @@ public class OsmAndLiveReports {
 			}
 		}
 		ins.close();
-		
-		OsmAndLiveReports reports = new OsmAndLiveReports(null, "2018-08");
-		
-		
-		
-		
-//		String cond = String.format("starttime < '%s' and expiretime >= '%s' ", "2017-01-01", "2017-01-01");
-//		System.out.println(reports.supportersQuery(cond));
-//		OsmAndLiveReports reports = new OsmAndLiveReports(conn, "2018-08");
-////		System.out.println(reports.getJsonReport(OsmAndLiveReportType.COUNTRIES, null));
-//		System.out.println(reports.getJsonReport(OsmAndLiveReportType.TOTAL_CHANGES, null));
-//		System.out.println(reports.getJsonReport(OsmAndLiveReportType.RANKING, null));
-//		System.out.println(reports.getJsonReport(OsmAndLiveReportType.SUPPORTERS, null));
-//		System.out.println(reports.getJsonReport(OsmAndLiveReportType.USERS_RANKING, "belarus_europe"));
-//		System.out.println(reports.getJsonReport(OsmAndLiveReportType.RECIPIENTS, null));
-//		System.out.println(reports.getJsonReport(OsmAndLiveReportType.PAYOUTS, null));
-//		reports.buildReports(conn);
 	}
 	
 	
