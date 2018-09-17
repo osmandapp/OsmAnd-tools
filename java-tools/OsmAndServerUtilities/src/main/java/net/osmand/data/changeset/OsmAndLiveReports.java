@@ -51,6 +51,7 @@ public class OsmAndLiveReports {
 //		System.out.println(reports.getJsonReport(OsmAndLiveReportType.PAYOUTS, null));
 //		reports.buildReports(conn);
 	}
+	
 
 	protected static void checkMissingReports(Connection conn, PreparedStatement ps) throws SQLException, IOException,
 			ParseException {
@@ -66,8 +67,7 @@ public class OsmAndLiveReports {
 				CountriesReport cntrs = reports.getReport(OsmAndLiveReportType.COUNTRIES, null, CountriesReport.class);
 				checkReport(ps, month, OsmAndLiveReportType.COUNTRIES, null);
 				if(!checkReport(ps, month, OsmAndLiveReportType.SUPPORTERS, null)) {
-					SupportersReport sups = reports.getReport(OsmAndLiveReportType.SUPPORTERS, null, SupportersReport.class);
-					reports.saveReport(sups, OsmAndLiveReportType.SUPPORTERS, null, 0);
+					reports.getJsonReport(OsmAndLiveReportType.SUPPORTERS, null, true);
 				}
 				checkReport(ps, month, OsmAndLiveReportType.PAYOUTS, null);
 				
@@ -75,36 +75,33 @@ public class OsmAndLiveReports {
 				for (Country reg : cntrs.rows) {
 					if(reg.map.equals("1") || isEmpty(reg.downloadname)) {
 						if(!checkReport(ps, month, OsmAndLiveReportType.RANKING, reg.downloadname)) {
-							reports.saveReport(reports.getRanking(reg.downloadname), 
-									OsmAndLiveReportType.RANKING, reg.downloadname, 0);		
+							reports.getJsonReport(OsmAndLiveReportType.RANKING, reg.downloadname, true);
 						}
 						if(!checkReport(ps, month, OsmAndLiveReportType.TOTAL_CHANGES, reg.downloadname)) {
-							reports.saveReport(reports.getTotalChanges(reg.downloadname), 
-									OsmAndLiveReportType.TOTAL_CHANGES, reg.downloadname, 0);	
+							reports.getJsonReport(OsmAndLiveReportType.TOTAL_CHANGES, reg.downloadname, true);
 						}
 						if(!checkReport(ps, month, OsmAndLiveReportType.USERS_RANKING, reg.downloadname)) {
-							reports.saveReport(reports.getUsersRanking(reg.downloadname), 
-									OsmAndLiveReportType.USERS_RANKING, reg.downloadname, 0);	
+							reports.getJsonReport(OsmAndLiveReportType.USERS_RANKING, reg.downloadname, true);
 						}
 						checkReport(ps, month, OsmAndLiveReportType.RECIPIENTS, reg.downloadname);
 					}
 					s+=4;
 				}
 				if(!checkReport(ps, month, OsmAndLiveReportType.REGION_RANKING_RANGE, null)){
-					reports.saveReport(reports.getRegionRankingRange(), OsmAndLiveReportType.REGION_RANKING_RANGE, null, 0);
+					reports.saveReport(reports.getRegionRankingRange()+"", OsmAndLiveReportType.REGION_RANKING_RANGE, null, 0);
 				}
 				if(!checkReport(ps, month, OsmAndLiveReportType.RANKING_RANGE, null)){
-					reports.saveReport(reports.getRankingRange(), OsmAndLiveReportType.RANKING_RANGE, null, 0);
+					reports.saveReport(reports.getRankingRange()+"", OsmAndLiveReportType.RANKING_RANGE, null, 0);
 				}
 				if(!checkReport(ps, month, OsmAndLiveReportType.MIN_CHANGES, null)) {
-					reports.saveReport(reports.getMinChanges(), OsmAndLiveReportType.MIN_CHANGES, null, 0);
+					reports.saveReport(reports.getMinChanges()+"", OsmAndLiveReportType.MIN_CHANGES, null, 0);
 				}
 				checkReport(ps, month, OsmAndLiveReportType.BTC_VALUE, null);
 				checkReport(ps, month, OsmAndLiveReportType.EUR_VALUE, null);
 				if(!checkReport(ps, month, OsmAndLiveReportType.EUR_BTC_RATE, null)){
 					Number eur = reports.getNumberReport(OsmAndLiveReportType.EUR_VALUE);
 					Number btc = reports.getNumberReport(OsmAndLiveReportType.BTC_VALUE);
-					reports.saveReport(eur.doubleValue() / btc.doubleValue(), OsmAndLiveReportType.EUR_BTC_RATE, null, 0);
+					reports.saveReport(((float)eur.doubleValue() / btc.doubleValue())+"", OsmAndLiveReportType.EUR_BTC_RATE, null, 0);
 				}
 				s+=6;
 				System.out.println(String.format("TESTED %d reports", s));
@@ -657,7 +654,7 @@ public class OsmAndLiveReports {
 	
 	
 	
-	private void saveReport(Object report, OsmAndLiveReportType type, String region, 
+	private void saveReport(String report, OsmAndLiveReportType type, String region, 
 			long accessTime) throws SQLException, ParseException {
 		
 		String r = isEmpty(region) ? "" : region;
@@ -674,24 +671,11 @@ public class OsmAndLiveReports {
 		p.setString(1, month);
 		p.setString(2, r);
 		p.setString(3, type.getSqlName());
-		
-		if (report instanceof Number) {
-			Number nm = (Number) report;
-			p.setString(4, nm.toString());
-		} else {
-			Map<String, Object> rt = new HashMap<>();
-			Gson gson = getJsonFormatter();
-			rt.put("name", type.getSqlName());
-			rt.put("report", report);
-			rt.put("month", month);
-			rt.put("region", r);
-			p.setString(4, gson.toJson(rt));			
-		}
+		p.setString(4, report);			
 		long time = System.currentTimeMillis() / 1000;
 		if(!thisMonth) {
 			SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
 			time = sdf.parse(month+"-01").getTime() / 1000;
-			
 		}
 		p.setLong(5, time);
 		if(accessTime == 0) {
@@ -707,6 +691,9 @@ public class OsmAndLiveReports {
 	}
 	
 	public String getJsonReport(OsmAndLiveReportType type, String region) throws SQLException, IOException {
+		return getJsonReport(type, region, false);
+	}
+	public String getJsonReport(OsmAndLiveReportType type, String region, boolean forceSave) throws SQLException, IOException {
 		Object report = null;
 		Gson gson = getJsonFormatter();
 		PreparedStatement ps = conn.prepareStatement("select report, time, accesstime from final_reports where month = ? and name = ? and region = ?");
@@ -714,7 +701,9 @@ public class OsmAndLiveReports {
 		ps.setString(2, type.getSqlName());
 		ps.setString(3, isEmpty(region) ? "": region);
 		ResultSet rs = ps.executeQuery();
+		long accesstime = 0;
 		if (rs.next()) {
+			accesstime = rs.getLong(3);
 			if (thisMonth) {
 				// TODO
 				// set current time if a report was not accessed more than X minutes
@@ -745,11 +734,15 @@ public class OsmAndLiveReports {
 		} else {
 			throw new UnsupportedOperationException();
 		}
-		// TODO save report
-//		if(thisMonth) {
-//			saveReport(report, type, region);
-//		}
-		return gson.toJson(report);
+		String jsonReport = gson.toJson(report);
+		if (thisMonth || forceSave) {
+			try {
+				saveReport(jsonReport, type, region, accesstime);
+			} catch (ParseException e) {
+				throw new IOException(e);
+			}
+		}
+		return jsonReport;
 	}
 	
 	
