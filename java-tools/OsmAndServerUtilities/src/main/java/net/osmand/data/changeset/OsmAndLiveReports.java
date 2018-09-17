@@ -666,7 +666,7 @@ public class OsmAndLiveReports {
 		
 		if (report instanceof Number) {
 			Number nm = (Number) report;
-			p.setString(4, (nm.intValue() == nm.doubleValue() ? nm.intValue() : nm.doubleValue()) + "");
+			p.setString(4, nm.toString());
 		} else {
 			Map<String, Object> rt = new HashMap<>();
 			Gson gson = getJsonFormatter();
