@@ -35,6 +35,7 @@ public class OsmAndLiveReports {
 						isEmpty(System.getenv("DB_PWD")) ? "test" : System.getenv("DB_PWD"));
 		PreparedStatement ins = conn.prepareStatement(
 				"insert into final_reports(month, region, name, report, time, accesstime) values (?, ?, ?, ?, ?, ?)");
+		SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
 		for(int y= 2015; y <= 2018; y++) {
 			int si = y == 2015 ? 8 : 1;
 			int ei = y == 2018 ? 8 : 12;
@@ -46,18 +47,19 @@ public class OsmAndLiveReports {
 				Connection connFrom = DriverManager.getConnection("jdbc:postgresql://localhost:5433/changeset_" + y
 						+ "_" + m, isEmpty(System.getenv("DB_USER")) ? "test" : System.getenv("DB_USER"),
 						isEmpty(System.getenv("DB_PWD")) ? "test" : System.getenv("DB_PWD"));
-				String r = "select report,region,name,time,accesstime from final_reports where month = ?";
+				String r = "select report,region,name from final_reports where month = ?";
 				PreparedStatement p = connFrom.prepareStatement(r);
 				p.setString(1, month);
 				int reports = 0;
 				ResultSet rs = p.executeQuery();
+				Date dt = sdf.parse(month+"-01");
 				while (rs.next()) {
 					ins.setString(1, month);
 					ins.setString(2, rs.getString("region"));
 					ins.setString(3, rs.getString("name"));
 					ins.setString(4, rs.getString("report"));
-					ins.setLong(5, rs.getLong("time"));
-					ins.setLong(6, rs.getLong("accesstime"));
+					ins.setLong(5, dt.getTime() / 1000l);
+					ins.setLong(6, dt.getTime() / 1000l);
 					ins.addBatch();
 					reports++;
 
