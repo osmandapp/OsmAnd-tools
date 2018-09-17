@@ -33,10 +33,50 @@ public class OsmAndLiveReports {
 		Connection conn = DriverManager.getConnection("jdbc:postgresql://localhost:5433/changeset",
 				isEmpty(System.getenv("DB_USER")) ? "test" : System.getenv("DB_USER"),
 						isEmpty(System.getenv("DB_PWD")) ? "test" : System.getenv("DB_PWD"));
+		PreparedStatement ins = conn.prepareStatement(
+				"insert into final_reports(month, region, name, report, time, accesstime) values (?, ?, ?, ?, ?, ?)");
+		for(int y= 2015; y <= 2018; y++) {
+			int si = y == 2015 ? 8 : 1;
+			int ei = y == 2018 ? 8 : 12;
+			
+			
+			for (int i = si; i <= ei; i++) {
+				String m = i < 10 ? "0" + i : i + "";
+				String month = y + "-" + m;
+				Connection connFrom = DriverManager.getConnection("jdbc:postgresql://localhost:5433/changeset_" + y
+						+ "_" + m, isEmpty(System.getenv("DB_USER")) ? "test" : System.getenv("DB_USER"),
+						isEmpty(System.getenv("DB_PWD")) ? "test" : System.getenv("DB_PWD"));
+				String r = "select report,region,name,time,accesstime from final_reports where month = ?";
+				PreparedStatement p = connFrom.prepareStatement(r);
+				p.setString(1, month);
+				int reports = 0;
+				ResultSet rs = p.executeQuery();
+				while (rs.next()) {
+					ins.setString(1, month);
+					ins.setString(2, rs.getString("region"));
+					ins.setString(3, rs.getString("name"));
+					ins.setString(4, rs.getString("report"));
+					ins.setLong(5, rs.getLong("time"));
+					ins.setLong(6, rs.getLong("accesstime"));
+					ins.addBatch();
+					reports++;
+
+				}
+				ins.executeBatch();
+				System.out.println("Processs " + month + " " + reports + " reports");
+				connFrom.close();
+
+			}
+		}
+		ins.close();
+		
 		OsmAndLiveReports reports = new OsmAndLiveReports(null, "2018-08");
 		
-		String cond = String.format("starttime < '%s' and expiretime >= '%s' ", "2017-01-01", "2017-01-01");
-		System.out.println(reports.supportersQuery(cond));
+		
+		
+		
+//		String cond = String.format("starttime < '%s' and expiretime >= '%s' ", "2017-01-01", "2017-01-01");
+//		System.out.println(reports.supportersQuery(cond));
 //		OsmAndLiveReports reports = new OsmAndLiveReports(conn, "2018-08");
 ////		System.out.println(reports.getJsonReport(OsmAndLiveReportType.COUNTRIES, null));
 //		System.out.println(reports.getJsonReport(OsmAndLiveReportType.TOTAL_CHANGES, null));
