@@ -30,6 +30,10 @@ public class OsmAndLiveReports {
 	private static final int BATCH_SIZE = 1000;
 	private static final Log LOG = PlatformUtil.getLog(OsmAndLiveReports.class);
 	
+	// changesets_view or changesets if we need to generate > 3 months
+	public static final String CHANGESETS_VIEW = "changesets";
+	// changeset_country_view or changeset_country if we need to generate > 3 months
+	public static final String CHANGESET_COUNTRY_VIEW = "changeset_country"; 
 	public static void main(String[] args) throws Exception {
 		Connection conn = DriverManager.getConnection("jdbc:postgresql://localhost:5433/changeset",
 				isEmpty(System.getenv("DB_USER")) ? "test" : System.getenv("DB_USER"),
@@ -371,7 +375,7 @@ public class OsmAndLiveReports {
 		ResultSet rs;
 		if(!isEmpty(region)) {
 			String r = "select count(distinct ch.username) users, count(distinct ch.id) changes" + 
-					  " from changesets_view ch, changeset_country_view cc where ch.id = cc.changesetid"+ 
+					  " from "+CHANGESETS_VIEW+" ch, "+CHANGESET_COUNTRY_VIEW+" cc where ch.id = cc.changesetid"+ 
 					  " and cc.countryid = (select id from countries where downloadname= ?)"+
 					  " and substr(ch.closed_at_day, 0, 8) = ?";
 			PreparedStatement ps = conn.prepareStatement(r);
@@ -379,7 +383,7 @@ public class OsmAndLiveReports {
 			ps.setString(2, month);
 			rs = ps.executeQuery();
 		} else {
-			String r = "select count ( distinct username) users, count(*) changes from changesets_view"+
+			String r = "select count ( distinct username) users, count(*) changes from "+CHANGESETS_VIEW+
 						" where substr(closed_at_day, 0, 8) = ?";
 			PreparedStatement ps = conn.prepareStatement(r);
 			ps.setString(1, month);
@@ -402,7 +406,7 @@ public class OsmAndLiveReports {
 		if(!isEmpty(region)) {
 			rankingRange = getNumberReport(OsmAndLiveReportType.REGION_RANKING_RANGE).intValue();
 		    String r =  " SELECT data.cnt changes, count(*) group_size FROM ("+
-		    			"  		SELECT username, count(*) cnt FROM changesets_view ch, changeset_country_view cc " + 
+		    			"  		SELECT username, count(*) cnt FROM "+CHANGESETS_VIEW+" ch, "+CHANGESET_COUNTRY_VIEW+" cc " + 
 		    			"		WHERE substr(ch.closed_at_day, 0, 8) = ? and ch.id = cc.changesetid  "+
 		    			"  			and cc.countryid = (SELECT id from countries where downloadname = ? )" +
 		    			" 		GROUP by ch.username HAVING count(*) >= ? ORDER by count(*) desc )" +
@@ -415,7 +419,7 @@ public class OsmAndLiveReports {
 		} else {
 			rankingRange = getNumberReport(OsmAndLiveReportType.RANKING_RANGE).intValue();
 			String r = "SELECT data.cnt changes, count(*) group_size FROM ( "+
-					   "	SELECT username, count(*) cnt FROM changesets_view ch " +
+					   "	SELECT username, count(*) cnt FROM "+CHANGESETS_VIEW+" ch " +
 					   "    WHERE substr(ch.closed_at_day, 0, 8) = ? " +
 					   " 	GROUP by  ch.username HAVING count(*) >= ? ORDER by count(*) desc) " +
 					   " data GROUP by data.cnt ORDER by changes desc";
@@ -472,12 +476,12 @@ public class OsmAndLiveReports {
 		report.region = region;
 		report.date = reportTime();
 		String q = "SELECT  t.username username, t.size changes , s.size gchanges FROM "+ 
-				 	" ( SELECT username, count(*) size from changesets_view ch, changeset_country_view cc "+
+				 	" ( SELECT username, count(*) size from "+CHANGESETS_VIEW+" ch, "+CHANGESET_COUNTRY_VIEW+" cc "+
 				 	" 	WHERE ch.id = cc.changesetid and substr(ch.closed_at_day, 0, 8) = ? " +
 				 	"   and cc.countryid = (select id from countries where downloadname= ?)"+
 				 	" GROUP by ch.username HAVING count(*) >= ? " +
 				 	" ORDER by count(*) desc ) t JOIN " +
-				 	" (SELECT username, count(*) size from changesets_view ch " +
+				 	" (SELECT username, count(*) size from "+CHANGESETS_VIEW+" ch " +
 				 	"	WHERE substr(ch.closed_at_day, 0, 8) = ? GROUP by ch.username " +
 				 	" ) s on s.username = t.username ORDER by t.size desc";
 		PreparedStatement ps = conn.prepareStatement(q);
@@ -531,14 +535,14 @@ public class OsmAndLiveReports {
 					" first_value(s.btcaddr) over (partition by osmid order by updatetime desc) btcaddr " + 
 					" FROM osm_recipients s left join " + 
 					" 	(SELECT count(*) size, ch.username " +
-					" 	 FROM changesets_view ch ";
+					" 	 FROM "+CHANGESETS_VIEW+" ch ";
 		if(eregion) {
 				q += "   WHERE substr(ch.closed_at_day, 0, 8) = ? " +
 		
 					 "	 GROUP by username) "+
 					 "t on t.username = s.osmid ORDER by changes desc"; 
 		} else {
-				q += "   						 , changeset_country_view cc " +
+				q += "   						 , "+CHANGESET_COUNTRY_VIEW+" cc " +
 					 "   WHERE ch.id = cc.changesetid  and substr(ch.closed_at_day, 0, 8) = ? "+
 					 " 		   and cc.countryid = (select id from countries where downloadname = ?) " +
 					 
