@@ -445,7 +445,7 @@ public class OsmAndLiveReports {
 		double eurBTCRate = getNumberReport(OsmAndLiveReportType.EUR_BTC_RATE).doubleValue();
 		report.month = month;
 		report.region = region;
-		report.notPaid = true;
+		report.notReadyToPay = true;
 		report.date = reportTime();
 		boolean eregion = isEmpty(region);
 		String q = " SELECT distinct s.osmid osmid, t.size changes," + 
@@ -508,7 +508,7 @@ public class OsmAndLiveReports {
 		report.rate = (float) eurBTCRate;
 		report.btc = (float) btcValue;
 		report.regionBtc = report.regionPercentage * report.btc;
-		report.notPaid = !thisMonth;
+		report.notReadyToPay = !thisMonth;
 		for(int i = 0; i < report.rows.size(); i++) {
 			Recipient r = report.rows.get(i);
 			if (report.regionTotalWeight > 0) {
@@ -577,10 +577,6 @@ public class OsmAndLiveReports {
 	
 	private void saveReport(Object report, OsmAndLiveReportType type, String region) throws SQLException {
 		Map<String, Object> rt = new HashMap<>();
-		// TODO 
-//		  if(!is_scalar($value)){
-//	    $report->date = $time > 0 ? $time : time();
-//	  }		
 		String r = isEmpty(region) ? "" : region;
 		Gson gson = getJsonFormatter();
 		rt.put("name", type.getSqlName());
@@ -811,7 +807,7 @@ public class OsmAndLiveReports {
 		public float btc;
 		public float rate;
 		public float eur;
-		public boolean notPaid;
+		public boolean notReadyToPay;
 		
 		public List<Recipient> rows = new ArrayList<Recipient>();
 	}
