@@ -55,12 +55,18 @@ public class OsmAndLiveReports {
 				checkReport(ps, month, OsmAndLiveReportType.COUNTRIES, null);
 				checkReport(ps, month, OsmAndLiveReportType.SUPPORTERS, null);
 				checkReport(ps, month, OsmAndLiveReportType.PAYOUTS, null);
-				s+=3;
+				checkReport(ps, month, OsmAndLiveReportType.RANKING, null);
+				checkReport(ps, month, OsmAndLiveReportType.TOTAL_CHANGES, null);
+				checkReport(ps, month, OsmAndLiveReportType.USERS_RANKING, null);
+				checkReport(ps, month, OsmAndLiveReportType.RECIPIENTS, null);
+				s+=7;
 				for (Country reg : cntrs.rows) {
-					checkReport(ps, month, OsmAndLiveReportType.RANKING, reg.downloadname);
-					checkReport(ps, month, OsmAndLiveReportType.TOTAL_CHANGES, reg.downloadname);
-					checkReport(ps, month, OsmAndLiveReportType.USERS_RANKING, reg.downloadname);
-					checkReport(ps, month, OsmAndLiveReportType.RECIPIENTS, reg.downloadname);
+					if(reg.map.equals("1")) {
+						checkReport(ps, month, OsmAndLiveReportType.RANKING, reg.downloadname);
+						checkReport(ps, month, OsmAndLiveReportType.TOTAL_CHANGES, reg.downloadname);
+						checkReport(ps, month, OsmAndLiveReportType.USERS_RANKING, reg.downloadname);
+						checkReport(ps, month, OsmAndLiveReportType.RECIPIENTS, reg.downloadname);
+					}
 					s+=4;
 				}
 				checkReport(ps, month, OsmAndLiveReportType.REGION_RANKING_RANGE, null);
