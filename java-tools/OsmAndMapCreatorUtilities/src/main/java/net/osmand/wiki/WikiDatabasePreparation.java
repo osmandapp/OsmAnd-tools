@@ -111,8 +111,7 @@ public class WikiDatabasePreparation {
 			int nt = text.length() - i - 1;
 			if ((nt > 0 && text.charAt(i) == '{' && text.charAt(i + 1) == '{') || (nt > 1 && text.charAt(i) == '[' && text.charAt(i + 1) == '[' && text.charAt(i + 2) == 'ק')
 					|| (nt > 4 && text.charAt(i) == '<' && text.charAt(i + 1) == 'm' && text.charAt(i + 2) == 'a' && text.charAt(i + 3) == 'p'
-					&& text.charAt(i + 4) == 'l' && text.charAt(i + 5) == 'i') 
-					|| (nt > 2 && text.charAt(i) == '<' && text.charAt(i + 1) == 'g' && text.charAt(i + 2) == 'a' && text.charAt(i + 3) == 'l')
+					&& text.charAt(i + 4) == 'l' && text.charAt(i + 5) == 'i')
 					|| (nt > 2 && text.charAt(i) == '<' && text.charAt(i + 1) == '!' && text.charAt(i + 2) == '-' && text.charAt(i + 3) == '-')) {
 				hebrew = nt > 1 && text.charAt(i + 2) == 'ק';
 				beginInd = beginInd == 0 ? i + 2 : beginInd;
@@ -120,8 +119,7 @@ public class WikiDatabasePreparation {
 				i++;
 			} else if (nt > 0 && ((text.charAt(i) == '}' && text.charAt(i + 1) == '}') || (hebrew && text.charAt(i) == ']' && text.charAt(i + 1) == ']')
 					|| (i > 4 && text.charAt(i) == '>' && text.charAt(i - 1) == 'k' && text.charAt(i - 2) == 'n' && text.charAt(i - 3) == 'i'
-					&& text.charAt(i - 4) == 'l' && text.charAt(i - 5) == 'p') 
-					|| (i > 2 && text.charAt(i) == '>' && text.charAt(i - 1) == 'y' && text.charAt(i - 2) == 'r' && text.charAt(i - 3) == 'e')
+					&& text.charAt(i - 4) == 'l' && text.charAt(i - 5) == 'p')
 					|| (i > 1 && text.charAt(i) == '>' && text.charAt(i - 1) == '-' && text.charAt(i - 2) == '-'))) {
 				if (openCnt > 1) {
 					openCnt--;
@@ -132,7 +130,7 @@ public class WikiDatabasePreparation {
 				endInd = i;
 				String val = text.substring(beginInd, endInd);
 				if (val.startsWith("allery")) {
-					bld.append(parseGallery(val));
+					bld.append(parseGalleryString(val));
 				} else if (val.toLowerCase().startsWith("weather box")) {
 					parseAndAppendWeatherTable(val, bld);
 				} else if (val.toLowerCase().startsWith("lang-")) {
@@ -147,6 +145,8 @@ public class WikiDatabasePreparation {
 					appendWarning(bld, val);
 				} else if (key.equals(WikivoyageTemplates.CITATION.getType())) {
 					parseAndAppendCitation(val, bld);
+				} else if (key.equals(WikivoyageTemplates.METRIC_DATA.getType())) {
+					parseAndAppendMetricData(val, bld);
 				}
 				if (!key.isEmpty()) {
 					if (key.contains("|")) {
@@ -161,6 +161,8 @@ public class WikiDatabasePreparation {
 			} else if (nt > 2 && text.charAt(i) == '<' && text.charAt(i + 1) == 'r' && text.charAt(i + 2) == 'e'
 					&& text.charAt(i + 3) == 'f' && openCnt == 0) {
 				i = parseRef(text, bld, i);
+			} else if (nt > 2 && text.charAt(i) == '<' && text.charAt(i + 1) == 'g' && text.charAt(i + 2) == 'a' && text.charAt(i + 3) == 'l') {
+				i = parseGallery(text, bld, i);
 			} else {
 				if (openCnt == 0) {
 					int headerLvl = 0;
@@ -199,6 +201,17 @@ public class WikiDatabasePreparation {
 			}
 		}
 		return bld.toString();
+	}
+
+	private static int parseGallery(String text, StringBuilder bld, int i) {
+		int closeTag = text.indexOf("</gallery>", i);
+		int endInd = closeTag + "</gallery>".length();
+		if (endInd > text.length() - 1 || closeTag < i) {
+			return i;
+		}
+		String val = text.substring(i, closeTag);
+		bld.append(parseGalleryString(val));
+		return --endInd;
 	}
 
 	private static void parseAndAppendLangSpelling(String val, StringBuilder bld) {
@@ -259,6 +272,13 @@ public class WikiDatabasePreparation {
 			}
 		}
 		bld.append("|}");
+	}
+
+	private static void parseAndAppendMetricData(String val, StringBuilder bld) {
+		String[] parts = val.split("\\|");
+		if (parts.length == 2) {
+			bld.append(String.format("%s %s", parts[1], parts[0]));
+		}
 	}
 
 	private static int getIndex(String part) {
@@ -357,7 +377,7 @@ public class WikiDatabasePreparation {
 		bld.append("</p>");
 	}
 
-	private static String parseGallery(String val) {
+	private static String parseGalleryString(String val) {
 		String[] parts = val.split("\n");
 		StringBuilder bld = new StringBuilder();
 		for (String part : parts) {
@@ -412,6 +432,7 @@ public class WikiDatabasePreparation {
 	
 	private static String parseListing(String val, WikidataConnection wikiDataconn, String wikiLang) throws IOException, SQLException {
 		StringBuilder bld = new StringBuilder();
+		val = val.replaceAll("\\{\\{.*}}", "");
 		String[] parts = val.split("\\|");
 		String lat = null;
 		String lon = null;
@@ -568,6 +589,8 @@ public class WikiDatabasePreparation {
 			return WikivoyageTemplates.WARNING.getType();
 		} else if (str.startsWith("cite")) {
 			return WikivoyageTemplates.CITATION.getType();
+		} else if (str.startsWith("m|") || str.startsWith("km|")) {
+			return WikivoyageTemplates.METRIC_DATA.getType();
 		}
 		return "";
 	}
@@ -875,13 +898,12 @@ public class WikiDatabasePreparation {
 							selectPrep.setString(1, title.toString());
 							selectPrep.setString(2, lang);
 							ResultSet rs = selectPrep.executeQuery();
-							String id = null;
+							long wikiId = 0;
 							if (rs.next()) {
-								id = rs.getString(1);
+								wikiId = rs.getLong(1);
 							}
 							selectPrep.clearParameters();
-							if (id != null ) {
-								long wikiId = Long.parseLong(id.substring(1));
+							if (wikiId != 0 ) {
 								String text = removeMacroBlocks(ctext.toString(), new HashMap<>(),
 										lang, null);
 								final HTMLConverter converter = new HTMLConverter(false);

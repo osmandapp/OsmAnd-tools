@@ -56,6 +56,9 @@ public class OsmAndServerMonitoringBot extends TelegramLongPollingBot {
 
 	@Override
 	public String getBotUsername() {
+		if(System.getenv("OSMAND_DEV_TEST_BOT_TOKEN_MON") != null) {
+			return System.getenv("OSMAND_DEV_TEST_BOT"); 
+		}
 		return "osmand_server_bot";
 	}
 
@@ -65,6 +68,9 @@ public class OsmAndServerMonitoringBot extends TelegramLongPollingBot {
 
 	@Override
 	public String getBotToken() {
+		if(System.getenv("OSMAND_DEV_TEST_BOT_TOKEN_MON") != null) {
+			return System.getenv("OSMAND_DEV_TEST_BOT_TOKEN_MON");
+		}
 		return System.getenv("OSMAND_SERVER_BOT_TOKEN");
 	}
 

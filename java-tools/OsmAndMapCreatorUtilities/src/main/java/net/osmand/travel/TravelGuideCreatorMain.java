@@ -68,11 +68,22 @@ public class TravelGuideCreatorMain {
         WikivoyageDataGenerator dataGenerator = new WikivoyageDataGenerator();
         generateTravelSqlite(mapping, conn);
         dataGenerator.generateSearchTable(conn);
+        createPopularArticlesTable(conn);
         conn.close();
+    }
+
+    private void createPopularArticlesTable(Connection conn) throws SQLException {
+        conn.createStatement().execute("CREATE TABLE popular_articles(title text, trip_id long,"
+                + " population long, order_index long, popularity_index long, lat double, lon double, lang text)");
     }
 
     private void generateTravelSqlite(Map<String,List<File>> mapping, Connection conn) throws SQLException, IOException {
     	WikivoyageLangPreparation.createInitialDbStructure(conn, false);
+        try {
+            conn.createStatement().execute("ALTER TABLE travel_articles ADD COLUMN aggregated_part_of");
+        } catch (Exception e) {
+            System.err.println("Column aggregated_part_of already exists");
+        }
         PreparedStatement prep = WikivoyageLangPreparation.generateInsertPrep(conn, false);
         int count = 0;
         int batch = 0;
@@ -105,7 +116,6 @@ public class TravelGuideCreatorMain {
             prep.setLong(column++, ++count);
             prep.setLong(column++, count);
             prep.setString(column++, "en");
-            prep.setString(column++, "");
             prep.setString(column, "");
             prep.addBatch();
             if(batch++ > BATCH_SIZE) {

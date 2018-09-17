@@ -345,7 +345,12 @@ public class ObfFileInMemory {
 			File inputFile = files.get(i);
 			File nonGzip = inputFile;
 			boolean gzip = false;
-			LOG.info("Reading " + inputFile.getName());
+			if(inputFile == null) {
+				continue;
+			}
+			File parentFile = inputFile.getParentFile();
+			LOG.info(String.format("Reading %s / %s ", parentFile == null ? "" : parentFile.getName(),
+					inputFile.getName()));
 			if(inputFile.getName().endsWith(".gz")) {
 				nonGzip = new File(inputFile.getParentFile(), inputFile.getName().substring(0, inputFile.getName().length() - 3));
 				GZIPInputStream gzin = new GZIPInputStream(new FileInputStream(inputFile));
