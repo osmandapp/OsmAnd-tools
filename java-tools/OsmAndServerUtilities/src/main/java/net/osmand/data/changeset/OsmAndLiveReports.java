@@ -40,6 +40,7 @@ public class OsmAndLiveReports {
 			int si = y == 2015 ? 8 : 1;
 			int ei = y == 2018 ? 8 : 12;
 			for (int i = si; i <= ei; i++) {
+				int s = 0;
 				if (y == 2017 && i == 10) {
 					// TODO
 					continue;
@@ -49,13 +50,16 @@ public class OsmAndLiveReports {
 				System.out.println("TEST " + month);
 				OsmAndLiveReports reports = new OsmAndLiveReports(conn, month);
 				CountriesReport cntrs = reports.getReport(OsmAndLiveReportType.COUNTRIES, null, CountriesReport.class);
+				checkReport(ps, month, OsmAndLiveReportType.COUNTRIES, null);
 				checkReport(ps, month, OsmAndLiveReportType.SUPPORTERS, null);
 				checkReport(ps, month, OsmAndLiveReportType.PAYOUTS, null);
+				s+=3;
 				for (String reg : cntrs.map.keySet()) {
 					checkReport(ps, month, OsmAndLiveReportType.RANKING, reg);
 					checkReport(ps, month, OsmAndLiveReportType.TOTAL_CHANGES, reg);
 					checkReport(ps, month, OsmAndLiveReportType.USERS_RANKING, reg);
 					checkReport(ps, month, OsmAndLiveReportType.RECIPIENTS, reg);
+					s+=4;
 				}
 				checkReport(ps, month, OsmAndLiveReportType.REGION_RANKING_RANGE, null);
 				checkReport(ps, month, OsmAndLiveReportType.RANKING_RANGE, null);
@@ -63,7 +67,8 @@ public class OsmAndLiveReports {
 				checkReport(ps, month, OsmAndLiveReportType.EUR_BTC_RATE, null);
 				checkReport(ps, month, OsmAndLiveReportType.BTC_VALUE, null);
 				checkReport(ps, month, OsmAndLiveReportType.EUR_VALUE, null);
-
+				s+=6;
+				System.out.println(String.format("TESTED %d reports", s));
 			}
 		}
 //		migrateData(conn);
