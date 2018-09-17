@@ -89,7 +89,7 @@ public class OsmAndLiveReports {
 		ResultSet rs = ps.executeQuery();
 		if(rs.next()) {
 			String report = rs.getString(1);
-			if(!isEmpty(report)) {
+			if(isEmpty(report)) {
 				System.out.println(String.format("EMPTY REPORT '%s' for '%s' in '%s'", tp.getSqlName(), r, mnth) );
 			}
 		} else {
