@@ -30,10 +30,10 @@ public class OsmAndLiveReports {
 	private static final int BATCH_SIZE = 1000;
 	private static final Log LOG = PlatformUtil.getLog(OsmAndLiveReports.class);
 	
-	// changesets_view or changesets if we need to generate > 3 months
-	public static final String CHANGESETS_VIEW = "changesets";
-	// changeset_country_view or changeset_country if we need to generate > 3 months
-	public static final String CHANGESET_COUNTRY_VIEW = "changeset_country"; 
+	// changesets_view (quick) or changesets (if we need to generate older > 3 months)
+	public static final String CHANGESETS_VIEW = "changesets_view";
+	// changeset_country_view (quick) or changeset_country (if we need to generate older > 3 months)
+	public static final String CHANGESET_COUNTRY_VIEW = "changeset_country_view"; 
 	public static void main(String[] args) throws Exception {
 		Connection conn = DriverManager.getConnection("jdbc:postgresql://localhost:5433/changeset",
 				isEmpty(System.getenv("DB_USER")) ? "test" : System.getenv("DB_USER"),
