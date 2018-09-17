@@ -36,7 +36,9 @@ public class OsmAndLiveReports {
 						isEmpty(System.getenv("DB_PWD")) ? "test" : System.getenv("DB_PWD"));
 		PreparedStatement ps = conn.prepareStatement("select report, time, accesstime from final_reports where month = ? and name = ? and region = ?");
 		
-		for(int y= 2015; y <= 2018; y++) {
+		// TODO if (y == 2017 && i == 10) {
+		// TODO if (y == 2015) {
+		for (int y = 2016; y <= 2018; y++) {
 			int si = y == 2015 ? 8 : 1;
 			int ei = y == 2018 ? 8 : 12;
 			for (int i = si; i <= ei; i++) {

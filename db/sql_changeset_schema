@@ -32,6 +32,7 @@ CREATE INDEX changesets_country_country_idx on changeset_country(countryid);
 CREATE INDEX changesets_country_changeset_idx on changeset_country(changesetid);
 
 CREATE TABLE final_reports (name text, month text, region text, report text, time int) ;
+CREATE INDEX final_reports_grp_idx on final_reports(name,month,region) ;
 
 # CURRENT MONTH MATERIALIZED VIEW
 CREATE MATERIALIZED VIEW changesets_view AS SELECT * FROM changesets where 
