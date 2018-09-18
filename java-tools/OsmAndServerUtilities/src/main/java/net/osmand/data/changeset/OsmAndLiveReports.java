@@ -93,6 +93,7 @@ public class OsmAndLiveReports {
 				dl.setString(2, region);
 				dl.setString(3, name);
 				dl.execute();
+				LOG.info(String.format("Deleting report '%s' '%s' region '%s' outdated ", name, reports.month, region));
 			} else {
 				reports.getJsonReport(OsmAndLiveReportType.fromSqlName(name), region, false, true);
 			}
