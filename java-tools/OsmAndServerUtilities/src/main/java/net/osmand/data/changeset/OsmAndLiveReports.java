@@ -35,7 +35,7 @@ public class OsmAndLiveReports {
 	// changeset_country_view (quick) or changeset_country (if we need to generate older > 3 months)
 	public static final String CHANGESET_COUNTRY_VIEW = "changeset_country_view"; 
 	
-	public static final int REFRESH_ACCESSTIME = 15 * 60 * 1000; // 30 minutes
+	public static final int REFRESH_ACCESSTIME = 15 * 60 * 1000; // 15 minutes
 	public static final int REPORTS_DELETE_DEPRECATED = 6 * 60 * 60 * 1000; // 6 hours 
 	
 	
@@ -758,21 +758,21 @@ public class OsmAndLiveReports {
 			String retReport = rs.getString("report");
 			rs.close();
 			ps.close();
-			if (thisMonth && useCache) {
-				long time = System.currentTimeMillis() ;
-				// set current time if a report was not accessed more than X minutes
-				if (accesstime == null || time - accesstime.getTime() > REFRESH_ACCESSTIME) {
-					PreparedStatement upd = conn
-							.prepareStatement("update final_reports set accesstime = ? where month = ? and region = ? and name = ?");
-					upd.setTimestamp(1, new Timestamp(time));
-					upd.setString(2, month);
-					upd.setString(3, type.getSqlName());
-					upd.setString(4, isEmpty(region) ? "" : region);
-					upd.executeUpdate();
-					upd.close();
-				}
-			}
 			if (useCache) {
+				if (thisMonth) {
+					long time = System.currentTimeMillis();
+					// set current time if a report was not accessed more than X minutes
+					if (accesstime == null || time - accesstime.getTime() > REFRESH_ACCESSTIME) {
+						PreparedStatement upd = conn
+								.prepareStatement("update final_reports set accesstime = ? where month = ? and region = ? and name = ?");
+						upd.setTimestamp(1, new Timestamp(time));
+						upd.setString(2, month);
+						upd.setString(3, isEmpty(region) ? "" : region);
+						upd.setString(4, type.getSqlName());
+						upd.executeUpdate();
+						upd.close();
+					}
+				}
 				return retReport;
 			}
 		}
