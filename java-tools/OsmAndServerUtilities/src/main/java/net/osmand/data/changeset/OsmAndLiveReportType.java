@@ -29,6 +29,15 @@ public enum OsmAndLiveReportType {
 		this(sqlName, false);
 	}
 	
+	public static OsmAndLiveReportType fromSqlName(String sql) {
+		for(OsmAndLiveReportType t : values()) {
+			if(t.getSqlName().equals(sql)) {
+				return t;
+			}
+		}
+		throw new IllegalArgumentException(sql);
+	}
+	
 	public boolean isNumberReport() {
 		return numberReport;
 	}

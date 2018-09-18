@@ -8,6 +8,7 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Savepoint;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -57,12 +58,49 @@ public class OsmAndLiveReports {
 		}
 	}
 
-	private static void refreshCurrentMonth(Connection conn) throws SQLException {
+	private static void refreshCurrentMonth(Connection conn) throws SQLException, IOException {
 		LOG.info("Refreshing materialized views ");
 		conn.createStatement().execute("REFRESH MATERIALIZED VIEW  changesets_view");
 		LOG.info("changesets_view refreshed");
 		conn.createStatement().execute("REFRESH MATERIALIZED VIEW  changeset_country_view");
 		LOG.info("changeset_country_view refreshed");
+		OsmAndLiveReports reports = new OsmAndLiveReports(conn, null);
+		// saveReport('getRegionRankingRange', getRegionRankingRange(), $imonth, '', $timeReport);
+		  // saveReport('getRankingRange', getRankingRange(), $imonth, '', $timeReport);
+		  // saveReport('getMinChanges', getMinChanges(), $imonth, '', $timeReport);
+		reports.getJsonReport(OsmAndLiveReportType.COUNTRIES, null, false, true);
+		reports.getJsonReport(OsmAndLiveReportType.SUPPORTERS, null, false, true);
+		
+		reports.getJsonReport(OsmAndLiveReportType.TOTAL_CHANGES, null, false, true);
+		reports.getJsonReport(OsmAndLiveReportType.RANKING, null, false, true);
+		reports.getJsonReport(OsmAndLiveReportType.USERS_RANKING, null, false, true);
+		reports.getJsonReport(OsmAndLiveReportType.RECIPIENTS, null, false, true);
+		
+		PreparedStatement dl = conn.prepareStatement("delete from final_reports where month = ? and region = ? and name = ?");
+		PreparedStatement ps = conn.prepareStatement("select name, accesstime, region, time from final_reports where month = ?");
+		ps.setString(1, reports.month);
+		ResultSet rs = ps.executeQuery();
+		while (rs.next()) {
+			String name = rs.getString("name");
+			String region = rs.getString("region");
+			long time = rs.getLong("time");
+			long accesstime = rs.getLong("accesstime");
+			if (isEmpty(region)) {
+				continue;
+			}
+			if (time - accesstime > REPORTS_DELETE_DEPRECATED) {
+				dl.setString(1, reports.month);
+				dl.setString(2, region);
+				dl.setString(3, name);
+				dl.execute();
+			} else {
+				reports.getJsonReport(OsmAndLiveReportType.fromSqlName(name), region, false, true);
+			}
+		}
+		dl.close();
+		ps.close();
+
+		System.out.println(reports.getJsonReport(OsmAndLiveReportType.PAYOUTS, null));
 	}
 
 	protected static void checkMissingReports(Connection conn) throws SQLException, IOException,
@@ -80,7 +118,7 @@ public class OsmAndLiveReports {
 				CountriesReport cntrs = reports.getReport(OsmAndLiveReportType.COUNTRIES, null, CountriesReport.class);
 				checkReport(ps, month, OsmAndLiveReportType.COUNTRIES, null);
 				if(!checkReport(ps, month, OsmAndLiveReportType.SUPPORTERS, null)) {
-					reports.getJsonReport(OsmAndLiveReportType.SUPPORTERS, null, true);
+					reports.getJsonReport(OsmAndLiveReportType.SUPPORTERS, null, false, true);
 				}
 				checkReport(ps, month, OsmAndLiveReportType.PAYOUTS, null);
 				
@@ -88,13 +126,13 @@ public class OsmAndLiveReports {
 				for (Country reg : cntrs.rows) {
 					if(reg.map.equals("1") || isEmpty(reg.downloadname)) {
 						if(!checkReport(ps, month, OsmAndLiveReportType.RANKING, reg.downloadname)) {
-							reports.getJsonReport(OsmAndLiveReportType.RANKING, reg.downloadname, true);
+							reports.getJsonReport(OsmAndLiveReportType.RANKING, reg.downloadname, false, true);
 						}
 						if(!checkReport(ps, month, OsmAndLiveReportType.TOTAL_CHANGES, reg.downloadname)) {
-							reports.getJsonReport(OsmAndLiveReportType.TOTAL_CHANGES, reg.downloadname, true);
+							reports.getJsonReport(OsmAndLiveReportType.TOTAL_CHANGES, reg.downloadname, false, true);
 						}
 						if(!checkReport(ps, month, OsmAndLiveReportType.USERS_RANKING, reg.downloadname)) {
-							reports.getJsonReport(OsmAndLiveReportType.USERS_RANKING, reg.downloadname, true);
+							reports.getJsonReport(OsmAndLiveReportType.USERS_RANKING, reg.downloadname, false, true);
 						}
 						checkReport(ps, month, OsmAndLiveReportType.RECIPIENTS, reg.downloadname);
 					}
@@ -704,15 +742,18 @@ public class OsmAndLiveReports {
 	}
 	
 	public String getJsonReport(OsmAndLiveReportType type, String region) throws SQLException, IOException {
-		return getJsonReport(type, region, false);
+		return getJsonReport(type, region, true, false);
 	}
-	public String getJsonReport(OsmAndLiveReportType type, String region, boolean forceSave) throws SQLException, IOException {
+
+	public String getJsonReport(OsmAndLiveReportType type, String region, boolean useCache, boolean forceSave)
+			throws SQLException, IOException {
 		Object report = null;
 		Gson gson = getJsonFormatter();
-		PreparedStatement ps = conn.prepareStatement("select report, time, accesstime from final_reports where month = ? and name = ? and region = ?");
+		PreparedStatement ps = conn
+				.prepareStatement("select report, time, accesstime from final_reports where month = ? and name = ? and region = ?");
 		ps.setString(1, month);
 		ps.setString(2, type.getSqlName());
-		ps.setString(3, isEmpty(region) ? "": region);
+		ps.setString(3, isEmpty(region) ? "" : region);
 		ResultSet rs = ps.executeQuery();
 		long accesstime = 0;
 		if (rs.next()) {
@@ -720,7 +761,7 @@ public class OsmAndLiveReports {
 			String retReport = rs.getString("report");
 			rs.close();
 			ps.close();
-			if (thisMonth) {
+			if (thisMonth && useCache) {
 				long time = System.currentTimeMillis() / 1000;
 				// set current time if a report was not accessed more than X minutes
 				if (time - accesstime > REFRESH_ACCESSTIME) {
@@ -734,25 +775,26 @@ public class OsmAndLiveReports {
 					upd.close();
 				}
 			}
-			
-			return retReport;
+			if (useCache) {
+				return retReport;
+			}
 		}
-		
-		if(type == OsmAndLiveReportType.COUNTRIES) {
+
+		if (type == OsmAndLiveReportType.COUNTRIES) {
 			report = getCountries();
-		} else if(type == OsmAndLiveReportType.SUPPORTERS) {
+		} else if (type == OsmAndLiveReportType.SUPPORTERS) {
 			report = getSupporters();
-		} else if(type == OsmAndLiveReportType.TOTAL_CHANGES) {
+		} else if (type == OsmAndLiveReportType.TOTAL_CHANGES) {
 			report = getTotalChanges(region);
-		} else if(type == OsmAndLiveReportType.RANKING) {
+		} else if (type == OsmAndLiveReportType.RANKING) {
 			report = getRanking(region);
-		} else if(type == OsmAndLiveReportType.USERS_RANKING) {
+		} else if (type == OsmAndLiveReportType.USERS_RANKING) {
 			report = getUsersRanking(region);
-		} else if(type == OsmAndLiveReportType.RECIPIENTS) {
+		} else if (type == OsmAndLiveReportType.RECIPIENTS) {
 			report = getRecipients(region);
-		} else if(type == OsmAndLiveReportType.PAYOUTS) {
+		} else if (type == OsmAndLiveReportType.PAYOUTS) {
 			report = getPayouts();
-		} else if(type == OsmAndLiveReportType.TOTAL) {
+		} else if (type == OsmAndLiveReportType.TOTAL) {
 			report = getTotal();
 		} else {
 			throw new UnsupportedOperationException();
