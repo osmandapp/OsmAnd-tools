@@ -100,7 +100,6 @@ public class OsmAndLiveReports {
 		dl.close();
 		ps.close();
 
-		System.out.println(reports.getJsonReport(OsmAndLiveReportType.PAYOUTS, null));
 	}
 
 	protected static void checkMissingReports(Connection conn) throws SQLException, IOException,
