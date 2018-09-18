@@ -8,7 +8,7 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Savepoint;
+import java.sql.Timestamp;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -28,7 +28,6 @@ import com.google.gson.Gson;
 
 public class OsmAndLiveReports {
 
-	private static final int BATCH_SIZE = 1000;
 	private static final Log LOG = PlatformUtil.getLog(OsmAndLiveReports.class);
 	
 	// changesets_view (quick) or changesets (if we need to generate older > 3 months)
@@ -36,8 +35,8 @@ public class OsmAndLiveReports {
 	// changeset_country_view (quick) or changeset_country (if we need to generate older > 3 months)
 	public static final String CHANGESET_COUNTRY_VIEW = "changeset_country_view"; 
 	
-	public static final int REFRESH_ACCESSTIME = 15 * 60; // 30 minutes
-	public static final int REPORTS_DELETE_DEPRECATED = 6 * 60 * 60; // 6 hours 
+	public static final int REFRESH_ACCESSTIME = 15 * 60 * 1000; // 30 minutes
+	public static final int REPORTS_DELETE_DEPRECATED = 6 * 60 * 60 * 1000; // 6 hours 
 	
 	
 	public static void main(String[] args) throws Exception {
@@ -83,12 +82,11 @@ public class OsmAndLiveReports {
 		while (rs.next()) {
 			String name = rs.getString("name");
 			String region = rs.getString("region");
-			long time = rs.getLong("time");
-			long accesstime = rs.getLong("accesstime");
+			Timestamp accesstime = rs.getTimestamp("accesstime");
 			if (isEmpty(region)) {
 				continue;
 			}
-			if (time - accesstime > REPORTS_DELETE_DEPRECATED) {
+			if (accesstime == null || System.currentTimeMillis() - accesstime.getTime() > REPORTS_DELETE_DEPRECATED) {
 				dl.setString(1, reports.month);
 				dl.setString(2, region);
 				dl.setString(3, name);
@@ -139,20 +137,20 @@ public class OsmAndLiveReports {
 					s+=4;
 				}
 				if(!checkReport(ps, month, OsmAndLiveReportType.REGION_RANKING_RANGE, null)){
-					reports.saveReport(reports.getRegionRankingRange()+"", OsmAndLiveReportType.REGION_RANKING_RANGE, null, 0);
+					reports.saveReport(reports.getRegionRankingRange()+"", OsmAndLiveReportType.REGION_RANKING_RANGE, null, null);
 				}
 				if(!checkReport(ps, month, OsmAndLiveReportType.RANKING_RANGE, null)){
-					reports.saveReport(reports.getRankingRange()+"", OsmAndLiveReportType.RANKING_RANGE, null, 0);
+					reports.saveReport(reports.getRankingRange()+"", OsmAndLiveReportType.RANKING_RANGE, null, null);
 				}
 				if(!checkReport(ps, month, OsmAndLiveReportType.MIN_CHANGES, null)) {
-					reports.saveReport(reports.getMinChanges()+"", OsmAndLiveReportType.MIN_CHANGES, null, 0);
+					reports.saveReport(reports.getMinChanges()+"", OsmAndLiveReportType.MIN_CHANGES, null, null);
 				}
 				checkReport(ps, month, OsmAndLiveReportType.BTC_VALUE, null);
 				checkReport(ps, month, OsmAndLiveReportType.EUR_VALUE, null);
 				if(!checkReport(ps, month, OsmAndLiveReportType.EUR_BTC_RATE, null)){
 					Number eur = reports.getNumberReport(OsmAndLiveReportType.EUR_VALUE);
 					Number btc = reports.getNumberReport(OsmAndLiveReportType.BTC_VALUE);
-					reports.saveReport(((float)eur.doubleValue() / btc.doubleValue())+"", OsmAndLiveReportType.EUR_BTC_RATE, null, 0);
+					reports.saveReport(((float)eur.doubleValue() / btc.doubleValue())+"", OsmAndLiveReportType.EUR_BTC_RATE, null, null);
 				}
 				s+=6;
 				System.out.println(String.format("TESTED %d reports", s));
@@ -205,8 +203,8 @@ public class OsmAndLiveReports {
 					ins.setString(2, rs.getString("region"));
 					ins.setString(3, rs.getString("name"));
 					ins.setString(4, rs.getString("report"));
-					ins.setLong(5, dt.getTime() / 1000l);
-					ins.setLong(6, dt.getTime() / 1000l);
+					ins.setTimestamp(5, new Timestamp(dt.getTime()));
+					ins.setTimestamp(6, new Timestamp(dt.getTime()));
 					ins.addBatch();
 					reports++;
 
@@ -705,8 +703,7 @@ public class OsmAndLiveReports {
 	
 	
 	
-	private void saveReport(String report, OsmAndLiveReportType type, String region, 
-			long accessTime) throws SQLException, ParseException {
+	private void saveReport(String report, OsmAndLiveReportType type, String region, Timestamp accessTime) throws SQLException, ParseException {
 		
 		String r = isEmpty(region) ? "" : region;
 		LOG.info(String.format("Saving report '%s' '%s' region '%s' ", type.getSqlName(), month, region));
@@ -723,16 +720,16 @@ public class OsmAndLiveReports {
 		p.setString(2, r);
 		p.setString(3, type.getSqlName());
 		p.setString(4, report);			
-		long time = System.currentTimeMillis() / 1000;
+		Timestamp time = new Timestamp(System.currentTimeMillis());
 		if(!thisMonth) {
 			SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
-			time = sdf.parse(month+"-01").getTime() / 1000;
+			time = new Timestamp(sdf.parse(month+"-01").getTime());
 		}
-		p.setLong(5, time);
-		if(accessTime == 0) {
-			p.setLong(6, time);
+		p.setTimestamp(5, time);
+		if(accessTime == null) {
+			p.setTimestamp(6, time);
 		}  else {
-			p.setLong(6, accessTime);
+			p.setTimestamp(6, accessTime);
 		}
 		p.executeUpdate();
 	}
@@ -755,19 +752,19 @@ public class OsmAndLiveReports {
 		ps.setString(2, type.getSqlName());
 		ps.setString(3, isEmpty(region) ? "" : region);
 		ResultSet rs = ps.executeQuery();
-		long accesstime = 0;
+		Timestamp accesstime = null;
 		if (rs.next()) {
-			accesstime = rs.getLong(3);
+			accesstime = rs.getTimestamp("accesstime");
 			String retReport = rs.getString("report");
 			rs.close();
 			ps.close();
 			if (thisMonth && useCache) {
-				long time = System.currentTimeMillis() / 1000;
+				long time = System.currentTimeMillis() ;
 				// set current time if a report was not accessed more than X minutes
-				if (time - accesstime > REFRESH_ACCESSTIME) {
+				if (accesstime == null || time - accesstime.getTime() > REFRESH_ACCESSTIME) {
 					PreparedStatement upd = conn
 							.prepareStatement("update final_reports set accesstime = ? where month = ? and region = ? and name = ?");
-					upd.setLong(1, time);
+					upd.setTimestamp(1, new Timestamp(time));
 					upd.setString(2, month);
 					upd.setString(3, type.getSqlName());
 					upd.setString(4, isEmpty(region) ? "" : region);
