@@ -234,7 +234,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		if (typeUse.size() == 0)
 			return;
 		excludeFromMainIteration(original.getOuterWays());
-		excludeFromMainIteration(original.getInnerWays());
+//		excludeFromMainIteration(original.getInnerWays()); // fix issue with different type of swamp inside each other (inner ring has same tag as multipolygon but has a different meaning)
 
 
 		// Rings with different types (inner or outer) in one ring will be logged in the previous case
