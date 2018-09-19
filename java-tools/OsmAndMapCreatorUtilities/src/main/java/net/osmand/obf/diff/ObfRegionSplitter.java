@@ -65,6 +65,7 @@ public class ObfRegionSplitter {
 			TreeSet<String> regionNames = new TreeSet<>();
 			regionNames.addAll(regionsMapData.keySet());
 			regionNames.addAll(regionsRouteData.keySet());
+			regionNames.addAll(regionsPoiData.keySet());
 
 			for (String regionName : regionNames) {
 				File folder = new File(dir, regionName);
