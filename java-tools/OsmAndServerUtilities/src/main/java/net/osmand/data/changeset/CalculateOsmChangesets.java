@@ -14,6 +14,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -324,7 +325,7 @@ public class CalculateOsmChangesets {
 	}
 	
 	private static boolean testMissing = true;
-	private static boolean insertMissing = false;
+	private static boolean insertMissing = true;
 
 	private static OsmandRegions initCountriesTable(Connection conn, boolean empty, Map<WorldRegion, Integer> map) throws IOException, SQLException {
 
@@ -332,11 +333,12 @@ public class CalculateOsmChangesets {
 		or.prepareFile();
 		or.cacheAllCountries();
 		WorldRegion worldRegion = or.getWorldRegion();
+		boolean newCountriesInserted = false;
 		if (testMissing) {
 			ResultSet rs = conn.createStatement().executeQuery("SELECT max(id) from countries");
 			int id = 0;
 			if(rs.next()) {
-				id = rs.getInt(1) + 1;
+				id = rs.getInt(1);
 			}
 			rs.close();
 			PreparedStatement insert = conn
@@ -350,8 +352,9 @@ public class CalculateOsmChangesets {
 				WorldRegion wr = queue.pollFirst();
 				test.setString(1, wr.getRegionId());
 				if(!test.execute()) {
-					System.err.println(String.format("MISSING country %s ", wr.getRegionId()));
+					LOG.info(String.format("Insert MISSING country %s with id %d", wr.getRegionId(), id + 1));
 					if(insertMissing) {
+						newCountriesInserted = true;
 						id++;
 						insertRegion(map, id, insert, wr);
 					}	
@@ -365,6 +368,16 @@ public class CalculateOsmChangesets {
 			}
 			insert.executeBatch();
 			insert.close();
+		}
+		if(newCountriesInserted) {
+			PreparedStatement del =
+					conn.prepareStatement("delete from changeset_country where changesetid in (select id from changesets where closed_at_day > ?)");
+			String currentMonth = String.format("%1$tY-%1$tm", new Date());
+			LOG.info(String.format("Regenerate all countries changeset since %s", currentMonth + "-01"));
+			del.setString(1, currentMonth+"-01");
+			del.executeUpdate();
+			del.close();
+//			
 		}
 		map.clear();
 		ResultSet rs = conn.createStatement().executeQuery("select id, fullname from countries");
