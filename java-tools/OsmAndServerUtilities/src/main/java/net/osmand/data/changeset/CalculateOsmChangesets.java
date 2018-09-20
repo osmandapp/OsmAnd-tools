@@ -43,7 +43,7 @@ public class CalculateOsmChangesets {
 
 	private static final int BATCH_SIZE = 1000;
 	private static final int FETCH_LIMIT = 1000000;
-	private static final int MAX_COUNTRY_SIZE = 5;
+	private static final int MAX_COUNTRY_SIZE = 7;
 	private static final long INITIAL_CHANGESET = 60714185l;
 	private static final Log LOG = PlatformUtil.getLog(CalculateOsmChangesets.class);
 	private static final int MAX_QUERIES = 10;
@@ -322,6 +322,9 @@ public class CalculateOsmChangesets {
 		}
 
 	}
+	
+	private static boolean testMissing = true;
+	private static boolean insertMissing = false;
 
 	private static OsmandRegions initCountriesTable(Connection conn, boolean empty, Map<WorldRegion, Integer> map) throws IOException, SQLException {
 
@@ -329,44 +332,39 @@ public class CalculateOsmChangesets {
 		or.prepareFile();
 		or.cacheAllCountries();
 		WorldRegion worldRegion = or.getWorldRegion();
-		if (empty) {
+		if (testMissing) {
+			ResultSet rs = conn.createStatement().executeQuery("SELECT max(id) from countries");
 			int id = 0;
-			PreparedStatement ps = conn
+			if(rs.next()) {
+				id = rs.getInt(1) + 1;
+			}
+			rs.close();
+			PreparedStatement insert = conn
 					.prepareStatement("INSERT INTO countries(id, parentid, name, fullname, downloadname, clat, clon, map)"
 							+ " VALUES(?, ?, ?, ?, ?, ?, ?, ?)");
+			PreparedStatement test = conn
+					.prepareStatement("select id from countries where fullname = ?");
 			LinkedList<WorldRegion> queue = new LinkedList<WorldRegion>();
 			queue.add(worldRegion);
 			while (!queue.isEmpty()) {
 				WorldRegion wr = queue.pollFirst();
-				id++;
-				map.put(wr, id);
-				ps.setInt(1, id);
-				WorldRegion parent = wr.getSuperregion();
-				if(parent != null) {
-					ps.setInt(2, map.get(parent));
-				} else {
-					ps.setInt(2, 0);
+				test.setString(1, wr.getRegionId());
+				if(!test.execute()) {
+					System.err.println(String.format("MISSING country %s ", wr.getRegionId()));
+					if(insertMissing) {
+						id++;
+						insertRegion(map, id, insert, wr);
+					}	
 				}
-
-				ps.setString(3, wr.getLocaleName());
-				ps.setString(4, wr.getRegionId());
-				ps.setString(5, wr.getRegionDownloadName());
-				if(wr.getRegionCenter() != null) {
-					ps.setDouble(6, wr.getRegionCenter().getLatitude());
-					ps.setDouble(7, wr.getRegionCenter().getLongitude());
-				} else {
-					ps.setDouble(6, 0);
-					ps.setDouble(7, 0);
-				}
-				ps.setInt(8, wr.isRegionMapDownload() ? 1 : 0);
-				ps.addBatch();
+				
 				List<WorldRegion> lst = wr.getSubregions();
 				if(lst != null) {
 					queue.addAll(lst);
 				}
+				
 			}
-			ps.executeBatch();
-			ps.close();
+			insert.executeBatch();
+			insert.close();
 		}
 		map.clear();
 		ResultSet rs = conn.createStatement().executeQuery("select id, fullname from countries");
@@ -390,6 +388,35 @@ public class CalculateOsmChangesets {
 //		}
 
 		return or;
+	}
+
+
+	private static void insertRegion(Map<WorldRegion, Integer> map, int id, PreparedStatement ps, WorldRegion wr)
+			throws SQLException {
+		map.put(wr, id);
+		ps.setInt(1, id);
+		WorldRegion parent = wr.getSuperregion();
+		if(parent != null) {
+			if(!map.containsKey(parent)) {
+				throw new IllegalStateException(String.format("Regions are disconnected %s %s", wr.getLocaleName(), parent.getLocaleName()));
+			}
+			ps.setInt(2, map.get(parent));
+		} else {
+			ps.setInt(2, 0);
+		}
+
+		ps.setString(3, wr.getLocaleName());
+		ps.setString(4, wr.getRegionId());
+		ps.setString(5, wr.getRegionDownloadName());
+		if(wr.getRegionCenter() != null) {
+			ps.setDouble(6, wr.getRegionCenter().getLatitude());
+			ps.setDouble(7, wr.getRegionCenter().getLongitude());
+		} else {
+			ps.setDouble(6, 0);
+			ps.setDouble(7, 0);
+		}
+		ps.setInt(8, wr.isRegionMapDownload() ? 1 : 0);
+		ps.addBatch();
 	}
 
 	
