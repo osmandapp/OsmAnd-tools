@@ -10,7 +10,9 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
@@ -311,7 +313,7 @@ public class OsmAndServerMonitorTasks {
 		long period = (((now / 1000) - INITIAL_TIMESTAMP_S) / 60 ) / DOWNLOAD_TILE_MINUTES;
 		long yShift = period % 14400;
 		long xShift = period / 14400;
-		TFloatArrayList times = new TFloatArrayList();
+		List<Float> times = new ArrayList<Float>(); 
 		int failed = 0;
 		for (int i = 0; i < count; i++) {
 			String tileUrl = new StringBuilder().append(TILE_SERVER).append(TILE_ZOOM).append("/").
