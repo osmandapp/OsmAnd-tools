@@ -35,8 +35,11 @@ public class OsmAndLiveReports {
 	// changeset_country_view (quick) or changeset_country (if we need to generate older > 3 months)
 	public static final String CHANGESET_COUNTRY_VIEW = "changeset_country_view"; 
 	
-	public static final int REFRESH_ACCESSTIME = 15 * 60 * 1000; // 15 minutes
-	public static final int REPORTS_DELETE_DEPRECATED = 6 * 60 * 60 * 1000; // 6 hours 
+	public static final long MINUTE = 60 * 1000l; // 15 minutes
+	public static final long HOUR = 60 * MINUTE; // 15 minutes
+	
+	public static final long REFRESH_ACCESSTIME = 15 * MINUTE;
+	public static final long REPORTS_DELETE_DEPRECATED = 6 * HOUR; 
 	
 	
 	public static void main(String[] args) throws Exception {
@@ -48,6 +51,35 @@ public class OsmAndLiveReports {
 				checkMissingReports(conn);
 			} else if(args[0].equals("refresh-current-month")) {
 				refreshCurrentMonth(conn);
+			} else if(args[0].equals("finalize-previous-month")) {
+				double btc = Double.NaN;
+				double eur = Double.NaN;
+				Date firstDayThisMonth = 
+						new SimpleDateFormat("yyyy-MM-dd").parse(String.format("%1$tY-%1$tm-01", new Date()));
+				String prevMonth = new SimpleDateFormat("yyyy-MM").format(firstDayThisMonth.getTime() - 5 * 24 * HOUR);
+				String currentMonth = String.format("%1$tY-%1$tm", new Date());
+				String month = prevMonth;
+				System.out.println("Processing month is " + month);
+				for(int i = 1; i < args.length; i++) {
+					String value = args[i];
+					String key = "";
+					if(value.contains("=")) {
+						key = value.substring(0, value.indexOf('='));
+						value = value.substring(value.indexOf('=') + 1);
+					}
+					if(key.equals("--btc")) {
+						btc = Double.parseDouble(value);
+					} else if(key.equals("--eur")) {
+						eur = Double.parseDouble(value);
+					}
+				}
+				if(Double.isNaN(btc)) {
+					throw new IllegalArgumentException("You didn't specify amount btc to pay");
+				}
+				if(Double.isNaN(eur)) {
+					throw new IllegalArgumentException("You didn't specify amount eur to pay");
+				}
+				finalizeMonth(conn, month, btc, eur);
 			} else {
 				throw new UnsupportedOperationException();
 			}
@@ -55,6 +87,20 @@ public class OsmAndLiveReports {
 			System.out.println("Please specify parameter: check-missing-reports (checks reports in past months and generates), "
 					+ "refresh-current-month (refreshes views and generated reports for this month)");
 		}
+	}
+	
+	private static void finalizeMonth(Connection conn, String month, double btc, double eur) throws SQLException, IOException, ParseException {
+		LOG.info("Refreshing materialized views ");
+		conn.createStatement().execute("REFRESH MATERIALIZED VIEW  changesets_view");
+		LOG.info("changesets_view refreshed");
+		conn.createStatement().execute("REFRESH MATERIALIZED VIEW  changeset_country_view");
+		LOG.info("changeset_country_view refreshed");
+		OsmAndLiveReports reports = new OsmAndLiveReports(conn, month);
+		reports.getJsonReport(OsmAndLiveReportType.COUNTRIES, null, false, true);
+
+		reports.saveReport(btc +"", OsmAndLiveReportType.BTC_VALUE, null, null);
+		reports.saveReport(eur +"", OsmAndLiveReportType.EUR_VALUE, null, null);
+		reports.saveReport(((float)eur / btc)+"", OsmAndLiveReportType.EUR_BTC_RATE, null, null);
 	}
 
 	private static void refreshCurrentMonth(Connection conn) throws SQLException, IOException {
@@ -64,9 +110,6 @@ public class OsmAndLiveReports {
 		conn.createStatement().execute("REFRESH MATERIALIZED VIEW  changeset_country_view");
 		LOG.info("changeset_country_view refreshed");
 		OsmAndLiveReports reports = new OsmAndLiveReports(conn, null);
-		// saveReport('getRegionRankingRange', getRegionRankingRange(), $imonth, '', $timeReport);
-		  // saveReport('getRankingRange', getRankingRange(), $imonth, '', $timeReport);
-		  // saveReport('getMinChanges', getMinChanges(), $imonth, '', $timeReport);
 		reports.getJsonReport(OsmAndLiveReportType.COUNTRIES, null, false, true);
 		reports.getJsonReport(OsmAndLiveReportType.SUPPORTERS, null, false, true);
 		

@@ -1,5 +1,7 @@
 package net.osmand.server.monitor;
 
+import gnu.trove.list.array.TFloatArrayList;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -309,18 +311,24 @@ public class OsmAndServerMonitorTasks {
 		long period = (((now / 1000) - INITIAL_TIMESTAMP_S) / 60 ) / DOWNLOAD_TILE_MINUTES;
 		long yShift = period % 14400;
 		long xShift = period / 14400;
-		
+		TFloatArrayList times = new TFloatArrayList();
+		int failed = 0;
 		for (int i = 0; i < count; i++) {
 			String tileUrl = new StringBuilder().append(TILE_SERVER).append(TILE_ZOOM).append("/").
 					append(TILEX_NUMBER + (i + count * xShift) * NEXT_TILE).append("/").
 					append(TILEY_NUMBER + yShift * NEXT_TILE).append(".png").toString();
 			double tileDownload = estimateResponse(tileUrl);
-			if(tileDownload < 0) {
-				telegram.sendMonitoringAlertMessage("tile.osmand.net: problems with downloading tiles.");
-				return;
-			}
 			LOG.info("Downloaded " + tileUrl + " " + tileDownload + " seconds.");
-			respTimeSum += tileDownload;
+			times.add((float)tileDownload);
+			if(tileDownload > 0 ) {
+				respTimeSum += tileDownload;
+			 } else {
+				 failed ++;
+			 }
+		}
+		if(failed >= count / 2) {
+			telegram.sendMonitoringAlertMessage("tile.osmand.net: problems with downloading tiles: " + times);
+			return;
 		}
 		lastResponseTime = respTimeSum / count;
 		if (lastResponseTime > 0) {
@@ -339,8 +347,8 @@ public class OsmAndServerMonitorTasks {
 		double respTime = -1d;
 		HttpURLConnection conn = null;
 		InputStream is = null;
+		long startedAt = System.currentTimeMillis();
 		try {
-			long startedAt = System.currentTimeMillis();
 			URL url = new URL(tileUrl);
 			conn = (HttpURLConnection) url.openConnection();
 			conn.setConnectTimeout(15 * MINUTE);
@@ -358,6 +366,10 @@ public class OsmAndServerMonitorTasks {
 			}
 			if (conn != null) {
 				conn.disconnect();
+			}
+			if(respTime < 0) {
+				long finishedAt = System.currentTimeMillis();
+				respTime = -(finishedAt - startedAt) / 1000d;
 			}
 		}
 		return respTime;
