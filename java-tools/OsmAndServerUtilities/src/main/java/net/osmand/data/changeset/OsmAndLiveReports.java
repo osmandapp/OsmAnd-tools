@@ -58,8 +58,8 @@ public class OsmAndLiveReports {
 						new SimpleDateFormat("yyyy-MM-dd").parse(String.format("%1$tY-%1$tm-01", new Date()));
 				String prevMonth = new SimpleDateFormat("yyyy-MM").format(firstDayThisMonth.getTime() - 5 * 24 * HOUR);
 				System.out.println("Previous month is " + prevMonth);
-				String currentMonth = String.format("%1$tY-%1$tm", new Date());
-				String month = currentMonth;
+//				String currentMonth = String.format("%1$tY-%1$tm", new Date());
+				String month = prevMonth;
 				System.out.println("Processing month is " + month);
 				for(int i = 1; i < args.length; i++) {
 					String value = args[i];
@@ -124,6 +124,7 @@ public class OsmAndLiveReports {
 			}
 		}
 		reports.getJsonReport(OsmAndLiveReportType.PAYOUTS, null, false, true);
+		reports.getJsonReport(OsmAndLiveReportType.TOTAL, null, false, true);
 		
 	}
 
