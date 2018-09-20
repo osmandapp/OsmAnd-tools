@@ -56,7 +56,8 @@ public class OsmAndLiveReports {
 				double eur = Double.NaN;
 				Date firstDayThisMonth = 
 						new SimpleDateFormat("yyyy-MM-dd").parse(String.format("%1$tY-%1$tm-01", new Date()));
-//				String prevMonth = new SimpleDateFormat("yyyy-MM").format(firstDayThisMonth.getTime() - 5 * 24 * HOUR);
+				String prevMonth = new SimpleDateFormat("yyyy-MM").format(firstDayThisMonth.getTime() - 5 * 24 * HOUR);
+				System.out.println("Previous month is " + prevMonth);
 				String currentMonth = String.format("%1$tY-%1$tm", new Date());
 				String month = currentMonth;
 				System.out.println("Processing month is " + month);
