@@ -56,9 +56,9 @@ public class OsmAndLiveReports {
 				double eur = Double.NaN;
 				Date firstDayThisMonth = 
 						new SimpleDateFormat("yyyy-MM-dd").parse(String.format("%1$tY-%1$tm-01", new Date()));
-				String prevMonth = new SimpleDateFormat("yyyy-MM").format(firstDayThisMonth.getTime() - 5 * 24 * HOUR);
+//				String prevMonth = new SimpleDateFormat("yyyy-MM").format(firstDayThisMonth.getTime() - 5 * 24 * HOUR);
 				String currentMonth = String.format("%1$tY-%1$tm", new Date());
-				String month = prevMonth;
+				String month = currentMonth;
 				System.out.println("Processing month is " + month);
 				for(int i = 1; i < args.length; i++) {
 					String value = args[i];
@@ -101,6 +101,29 @@ public class OsmAndLiveReports {
 		reports.saveReport(btc +"", OsmAndLiveReportType.BTC_VALUE, null, null);
 		reports.saveReport(eur +"", OsmAndLiveReportType.EUR_VALUE, null, null);
 		reports.saveReport(((float)eur / btc)+"", OsmAndLiveReportType.EUR_BTC_RATE, null, null);
+		reports.saveReport(reports.getRegionRankingRange() +"", OsmAndLiveReportType.REGION_RANKING_RANGE, null, null);
+		reports.saveReport(reports.getRankingRange() + "", OsmAndLiveReportType.RANKING_RANGE, null, null);
+		reports.saveReport(reports.getMinChanges() + "", OsmAndLiveReportType.MIN_CHANGES, null, null);
+		
+		reports.getJsonReport(OsmAndLiveReportType.COUNTRIES, null, false, true);
+		reports.getJsonReport(OsmAndLiveReportType.SUPPORTERS, null, false, true);
+		
+		reports.getJsonReport(OsmAndLiveReportType.TOTAL_CHANGES, null, false, true);
+		reports.getJsonReport(OsmAndLiveReportType.RANKING, null, false, true);
+		reports.getJsonReport(OsmAndLiveReportType.USERS_RANKING, null, false, true);
+		reports.getJsonReport(OsmAndLiveReportType.RECIPIENTS, null, false, true);
+		
+		CountriesReport cntrs = reports.getReport(OsmAndLiveReportType.COUNTRIES, null, CountriesReport.class);
+		for (Country reg : cntrs.rows) {
+			if(reg.map.equals("1")) {
+				reports.getJsonReport(OsmAndLiveReportType.TOTAL_CHANGES, reg.downloadname, false, true);
+				reports.getJsonReport(OsmAndLiveReportType.RANKING, reg.downloadname, false, true);
+				reports.getJsonReport(OsmAndLiveReportType.USERS_RANKING, reg.downloadname, false, true);
+				reports.getJsonReport(OsmAndLiveReportType.RECIPIENTS, reg.downloadname, false, true);
+			}
+		}
+		reports.getJsonReport(OsmAndLiveReportType.PAYOUTS, null, false, true);
+		
 	}
 
 	private static void refreshCurrentMonth(Connection conn) throws SQLException, IOException {
@@ -616,7 +639,7 @@ public class OsmAndLiveReports {
 		double eurBTCRate = getNumberReport(OsmAndLiveReportType.EUR_BTC_RATE).doubleValue();
 		report.month = month;
 		report.region = region;
-		report.notReadyToPay = true;
+		report.notReadyToPay = Double.isNaN(loadNumberReport(OsmAndLiveReportType.BTC_VALUE));
 		report.date = reportTime();
 		boolean eregion = isEmpty(region);
 		String q = " SELECT distinct s.osmid osmid, t.size changes," + 
@@ -859,13 +882,9 @@ public class OsmAndLiveReports {
 	
 	public Number getNumberReport(OsmAndLiveReportType type) throws IOException, SQLException {
 		if (!thisMonth) {
-			PreparedStatement ps = conn
-					.prepareStatement("select report from final_reports where month = ? and name = ? ");
-			ps.setString(1, month);
-			ps.setString(2, type.getSqlName());
-			ResultSet q = ps.executeQuery();
-			if (q.next()) {
-				return Double.parseDouble(q.getString(1));
+			double ret = loadNumberReport(type);
+			if(!Double.isNaN(ret)) {
+				return ret;
 			}
 		}
 		
@@ -884,6 +903,18 @@ public class OsmAndLiveReports {
 		} else {
 			throw new UnsupportedOperationException();
 		}
+	}
+
+	private double loadNumberReport(OsmAndLiveReportType type) throws SQLException {
+		PreparedStatement ps = conn
+				.prepareStatement("select report from final_reports where month = ? and name = ? ");
+		ps.setString(1, month);
+		ps.setString(2, type.getSqlName());
+		ResultSet q = ps.executeQuery();
+		if (q.next()) {
+			return Double.parseDouble(q.getString(1));
+		}
+		return Double.NaN;
 	}
 
 
