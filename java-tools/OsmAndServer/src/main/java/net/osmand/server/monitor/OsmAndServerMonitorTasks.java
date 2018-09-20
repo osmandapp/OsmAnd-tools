@@ -1,7 +1,5 @@
 package net.osmand.server.monitor;
 
-import gnu.trove.list.array.TFloatArrayList;
-
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
