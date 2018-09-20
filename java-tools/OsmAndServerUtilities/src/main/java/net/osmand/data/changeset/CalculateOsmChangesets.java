@@ -351,14 +351,18 @@ public class CalculateOsmChangesets {
 			while (!queue.isEmpty()) {
 				WorldRegion wr = queue.pollFirst();
 				test.setString(1, wr.getRegionId());
-				if(!test.execute()) {
-					LOG.info(String.format("Insert MISSING country %s with id %d", wr.getRegionId(), id + 1));
+				rs = test.executeQuery();
+				if(rs.next()) {
+					map.put(wr, rs.getInt(1));
+				} else {
+					id++;
+					LOG.info(String.format("Insert MISSING country %s with id %d", wr.getRegionId(), id));
 					if(insertMissing) {
 						newCountriesInserted = true;
-						id++;
 						insertRegion(map, id, insert, wr);
 					}	
 				}
+				rs.close();
 				
 				List<WorldRegion> lst = wr.getSubregions();
 				if(lst != null) {
