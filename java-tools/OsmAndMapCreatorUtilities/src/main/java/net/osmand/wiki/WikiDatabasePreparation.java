@@ -22,12 +22,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
@@ -70,6 +65,8 @@ import com.google.gson.JsonObject;
 
 public class WikiDatabasePreparation {
 	private static final Log log = PlatformUtil.getLog(WikiDatabasePreparation.class);
+
+	private static final Set<String> unitsOfDistance = new HashSet<>(Arrays.asList("mm", "cm", "m", "km", "in", "ft", "yd", "mi", "nmi"));
 	
 	public static class LatLon {
 		private final double longitude;
@@ -276,9 +273,22 @@ public class WikiDatabasePreparation {
 
 	private static void parseAndAppendMetricData(String val, StringBuilder bld) {
 		String[] parts = val.split("\\|");
-		if (parts.length == 2) {
-			bld.append(String.format("%s %s", parts[1], parts[0]));
+		String value = "";
+		String units = "";
+		for (String part : parts) {
+			if (value.isEmpty() && StringUtils.isNumeric(part)) {
+				value = part;
+			}
+			if (units.isEmpty() && stringIsMetricUnit(part)) {
+				units = part;
+			}
 		}
+		if (!value.isEmpty() && !units.isEmpty())
+			bld.append(String.format("%s %s", value, units));
+	}
+
+	private static boolean stringIsMetricUnit(String part) {
+		return unitsOfDistance.contains(part);
 	}
 
 	private static int getIndex(String part) {
@@ -589,8 +599,15 @@ public class WikiDatabasePreparation {
 			return WikivoyageTemplates.WARNING.getType();
 		} else if (str.startsWith("cite")) {
 			return WikivoyageTemplates.CITATION.getType();
-		} else if (str.startsWith("m|") || str.startsWith("km|")) {
-			return WikivoyageTemplates.METRIC_DATA.getType();
+		} else {
+			Set<String> parts = new HashSet<>(Arrays.asList(str.split("\\|")));
+			if (parts.contains("convert") || parts.contains("unité")) {
+				return WikivoyageTemplates.METRIC_DATA.getType();
+			} else {
+				parts.retainAll(unitsOfDistance);
+				if (!parts.isEmpty())
+					return WikivoyageTemplates.METRIC_DATA.getType();
+			}
 		}
 		return "";
 	}
