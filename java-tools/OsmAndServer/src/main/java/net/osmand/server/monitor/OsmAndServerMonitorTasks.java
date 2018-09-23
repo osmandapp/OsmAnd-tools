@@ -301,7 +301,7 @@ public class OsmAndServerMonitorTasks {
 	
 
 	@Scheduled(fixedRate = DOWNLOAD_TILE_MINUTES * MINUTE)
-	public void tileDownloadTest() throws InterruptedException {
+	public void tileDownloadTest() {
 		if(!enabled) {
 			return;
 		}
@@ -334,7 +334,11 @@ public class OsmAndServerMonitorTasks {
 					telegram.sendMonitoringAlertMessage("tile.osmand.net: problems with downloading tiles: " + times);
 					return;
 				} else {
-					Thread.sleep(15000);
+					try {
+						Thread.sleep(15000);
+					} catch (Exception e) {
+						throw new IllegalStateException(e);
+					}
 				}
 			} else {
 				succeed = true;
