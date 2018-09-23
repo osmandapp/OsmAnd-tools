@@ -301,7 +301,7 @@ public class OsmAndServerMonitorTasks {
 	
 
 	@Scheduled(fixedRate = DOWNLOAD_TILE_MINUTES * MINUTE)
-	public void tileDownloadTest() {
+	public void tileDownloadTest() throws InterruptedException {
 		if(!enabled) {
 			return;
 		}
@@ -313,22 +313,33 @@ public class OsmAndServerMonitorTasks {
 		long xShift = period / 14400;
 		List<Float> times = new ArrayList<Float>(); 
 		int failed = 0;
-		for (int i = 0; i < count; i++) {
-			String tileUrl = new StringBuilder().append(TILE_SERVER).append(TILE_ZOOM).append("/").
-					append(TILEX_NUMBER + (i + count * xShift) * NEXT_TILE).append("/").
-					append(TILEY_NUMBER + yShift * NEXT_TILE).append(".png").toString();
-			double tileDownload = estimateResponse(tileUrl);
-			LOG.info("Downloaded " + tileUrl + " " + tileDownload + " seconds.");
-			times.add((float)tileDownload);
-			if(tileDownload > 0 ) {
-				respTimeSum += tileDownload;
-			 } else {
-				 failed ++;
-			 }
-		}
-		if(failed >= count / 2) {
-			telegram.sendMonitoringAlertMessage("tile.osmand.net: problems with downloading tiles: " + times);
-			return;
+		int retry = 2;
+		boolean succeed = false;
+		while (!succeed) {
+			for (int i = 0; i < count; i++) {
+				String tileUrl = new StringBuilder().append(TILE_SERVER).append(TILE_ZOOM).append("/")
+						.append(TILEX_NUMBER + (i + count * xShift) * NEXT_TILE).append("/")
+						.append(TILEY_NUMBER + yShift * NEXT_TILE).append(".png").toString();
+				double tileDownload = estimateResponse(tileUrl);
+				LOG.info("Downloaded " + tileUrl + " " + tileDownload + " seconds.");
+				times.add((float) tileDownload);
+				if (tileDownload > 0) {
+					respTimeSum += tileDownload;
+				} else {
+					failed++;
+				}
+			}
+			if (failed >= count / 2) {
+				if(retry-- > 0) {
+					telegram.sendMonitoringAlertMessage("tile.osmand.net: problems with downloading tiles: " + times);
+					return;
+				} else {
+					Thread.sleep(15000);
+				}
+			} else {
+				succeed = true;
+				break;
+			}
 		}
 		lastResponseTime = respTimeSum / count;
 		if (lastResponseTime > 0) {
