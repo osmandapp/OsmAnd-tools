@@ -102,6 +102,7 @@ public class ReportsController {
 				type = OsmAndLiveReportType.TOTAL;
 				break;
 			case "payouts":
+			case "getPayouts":
 				type = OsmAndLiveReportType.PAYOUTS;
 				break;
 			case "ranking":
