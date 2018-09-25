@@ -319,6 +319,7 @@ public class OsmAndServerMonitorTasks {
 		int retry = retryCount;
 		boolean succeed = false;
 		while (!succeed) {
+			failed = 0;
 			for (int i = 0; i < count; i++) {
 				String tileUrl = new StringBuilder().append(TILE_SERVER).append(TILE_ZOOM).append("/")
 						.append(TILEX_NUMBER + (i + count * xShift) * NEXT_TILE).append("/")
@@ -362,7 +363,7 @@ public class OsmAndServerMonitorTasks {
 		if(res != null) {
 			try {
 				JSONObject jsonObject = new JSONObject(res);
-				return jsonObject.getJSONObject("queue").toMap().toString();
+				return jsonObject.getJSONObject("queue").toString();
 			} catch (JSONException e) {
 				LOG.warn("Error reading json from tirex " + res);
 			}
