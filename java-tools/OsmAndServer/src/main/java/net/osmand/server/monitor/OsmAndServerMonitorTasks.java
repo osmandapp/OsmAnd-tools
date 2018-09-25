@@ -1,6 +1,7 @@
 package net.osmand.server.monitor;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -24,6 +25,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 import org.json.JSONTokener;
 import org.kxml2.io.KXmlParser;
@@ -307,13 +309,14 @@ public class OsmAndServerMonitorTasks {
 		}
 		double respTimeSum = 0; 
 		int count = 4;
+		int retryCount = 3;		
 		long now = System.currentTimeMillis();
 		long period = (((now / 1000) - INITIAL_TIMESTAMP_S) / 60 ) / DOWNLOAD_TILE_MINUTES;
 		long yShift = period % 14400;
 		long xShift = period / 14400;
 		List<Float> times = new ArrayList<Float>(); 
 		int failed = 0;
-		int retry = 2;
+		int retry = retryCount;
 		boolean succeed = false;
 		while (!succeed) {
 			for (int i = 0; i < count; i++) {
@@ -330,12 +333,14 @@ public class OsmAndServerMonitorTasks {
 				}
 			}
 			if (failed >= count / 2) {
-				if(retry-- > 0) {
-					telegram.sendMonitoringAlertMessage("tile.osmand.net: problems with downloading tiles: " + times);
+				if(retry-- < 0) {
+					String txStatus = getTirexStatus();
+					telegram.sendMonitoringAlertMessage(
+							String.format("tile.osmand.net: problems with downloading tiles: %s (%d) - %s", times, retryCount, txStatus));
 					return;
 				} else {
 					try {
-						Thread.sleep(15000);
+						Thread.sleep(20000);
 					} catch (Exception e) {
 						throw new IllegalStateException(e);
 					}
@@ -349,6 +354,20 @@ public class OsmAndServerMonitorTasks {
 		if (lastResponseTime > 0) {
 			addStat(RED_KEY_TILE, lastResponseTime);
 		}
+	}
+
+	private String getTirexStatus() {
+		String txStatus = "tirex-status -r";
+		String res = runCmd(txStatus, new File("."), null);
+		if(res != null) {
+			try {
+				JSONObject jsonObject = new JSONObject(res);
+				return jsonObject.getJSONObject("queue").toMap().toString();
+			} catch (JSONException e) {
+				LOG.warn("Error reading json from tirex " + res);
+			}
+		}
+		return "error tirex";
 	}
 
 	private void addStat(String key, double score) {
@@ -518,6 +537,31 @@ public class OsmAndServerMonitorTasks {
 		@Override
 		public int hashCode() {
 			return host != null ? host.hashCode() : 0;
+		}
+	}
+	
+	private String runCmd(String cmd, File loc, List<String> errors) {
+		try {
+			Process p = Runtime.getRuntime().exec(cmd.split(" "), new String[0], loc);
+			BufferedReader stdInput = new BufferedReader(new InputStreamReader(p.getInputStream()));
+//			BufferedReader stdError = new BufferedReader(new InputStreamReader(p.getErrorStream()));
+			String s, commit = null;
+			// read the output from the command
+			while ((s = stdInput.readLine()) != null) {
+				if (commit == null) {
+					commit = s;
+				}
+			}
+
+			p.waitFor();
+			return commit;
+		} catch (Exception e) {
+			String fmt = String.format("Error running %s: %s", cmd, e.getMessage());
+			LOG.warn(fmt);
+			if(errors != null) {
+				errors.add(fmt);
+			}
+			return null;
 		}
 	}
 }
