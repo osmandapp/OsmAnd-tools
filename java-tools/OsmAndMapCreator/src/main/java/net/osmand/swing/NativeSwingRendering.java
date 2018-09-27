@@ -390,7 +390,7 @@ public class NativeSwingRendering extends NativeLibrary {
 	public void enableBaseFile(MapDiff m, boolean enable) {
 		if(enable) {
 			if(!m.enableBaseMap) {
-				initBinaryMapFile(m.baseFile.getAbsolutePath(), true);
+				initBinaryMapFile(m.baseFile.getAbsolutePath(), true, false);
 				m.enableBaseMap = true;
 			}
 		} else {
