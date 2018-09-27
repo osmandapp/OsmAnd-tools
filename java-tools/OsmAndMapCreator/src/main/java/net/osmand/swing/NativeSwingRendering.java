@@ -424,7 +424,7 @@ public class NativeSwingRendering extends NativeLibrary {
 				}
 			} else {
 				if(md.disabled.contains(fp)) {
-					initBinaryMapFile(fp, true);
+					initBinaryMapFile(fp, true, false);
 					md.disabled.remove(fp);
 				}
 			}
@@ -432,7 +432,7 @@ public class NativeSwingRendering extends NativeLibrary {
 		}
 		md.selected = df;
 		if(md.enableBaseMap) {
-			initBinaryMapFile(md.baseFile.getAbsolutePath(), true);
+			initBinaryMapFile(md.baseFile.getAbsolutePath(), true, false);
 		}
 	}
 	
