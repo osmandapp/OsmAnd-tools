@@ -496,7 +496,7 @@ public class OsmAndLiveReports {
 			ps.setString(2, month);
 			rs = ps.executeQuery();
 		} else {
-			String r = "select count ( distinct username) users, count(*) changes from "+CHANGESETS_VIEW+
+			String r = "select count ( distinct username) users, count(*) changes, sum(changes_count) achanges from "+CHANGESETS_VIEW+
 						" where substr(closed_at_day, 0, 8) = ?";
 			PreparedStatement ps = conn.prepareStatement(r);
 			ps.setString(1, month);
