@@ -519,8 +519,8 @@ public class OsmAndLiveReports {
 		ResultSet rs;
 		if(!isEmpty(region)) {
 			rankingRange = getNumberReport(OsmAndLiveReportType.REGION_RANKING_RANGE).intValue();
-		    String r =  " SELECT data.cnt changes, count(*) group_size FROM ("+
-		    			"  		SELECT username, count(*) cnt FROM "+CHANGESETS_VIEW+" ch, "+CHANGESET_COUNTRY_VIEW+" cc " + 
+		    String r =  " SELECT data.cnt changes, count(*) group_size, sum(cnt_changes) achanges FROM ("+
+		    			"  		SELECT username, count(*) cnt, sum(ch.changes_count) cnt_changes  FROM "+CHANGESETS_VIEW+" ch, "+CHANGESET_COUNTRY_VIEW+" cc " + 
 		    			"		WHERE substr(ch.closed_at_day, 0, 8) = ? and ch.id = cc.changesetid  "+
 		    			"  			and cc.countryid = (SELECT id from countries where downloadname = ? )" +
 		    			" 		GROUP by ch.username HAVING count(*) >= ? ORDER by count(*) desc )" +
@@ -532,8 +532,8 @@ public class OsmAndLiveReports {
 			rs = ps.executeQuery();
 		} else {
 			rankingRange = getNumberReport(OsmAndLiveReportType.RANKING_RANGE).intValue();
-			String r = "SELECT data.cnt changes, count(*) group_size, sum(count_changes) achanges FROM ( "+
-					   "	SELECT username, count(*) cnt, sum(count_changes) count_changes FROM "+CHANGESETS_VIEW+" ch " +
+			String r = "SELECT data.cnt changes, count(*) group_size, sum(cnt_changes) achanges FROM ( "+
+					   "	SELECT username, count(*) cnt, sum(changes_count) cnt_changes FROM "+CHANGESETS_VIEW+" ch " +
 					   "    WHERE substr(ch.closed_at_day, 0, 8) = ? " +
 					   " 	GROUP by  ch.username HAVING count(*) >= ? ORDER by count(*) desc) " +
 					   " data GROUP by data.cnt ORDER by changes desc";
