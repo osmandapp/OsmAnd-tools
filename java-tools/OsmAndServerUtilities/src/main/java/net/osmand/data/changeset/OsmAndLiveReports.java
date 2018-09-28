@@ -533,7 +533,7 @@ public class OsmAndLiveReports {
 		} else {
 			rankingRange = getNumberReport(OsmAndLiveReportType.RANKING_RANGE).intValue();
 			String r = "SELECT data.cnt changes, count(*) group_size, sum(count_changes) achanges FROM ( "+
-					   "	SELECT username, count(*) cnt FROM "+CHANGESETS_VIEW+" ch " +
+					   "	SELECT username, count(*) cnt, sum(count_changes) count_changes FROM "+CHANGESETS_VIEW+" ch " +
 					   "    WHERE substr(ch.closed_at_day, 0, 8) = ? " +
 					   " 	GROUP by  ch.username HAVING count(*) >= ? ORDER by count(*) desc) " +
 					   " data GROUP by data.cnt ORDER by changes desc";
