@@ -487,7 +487,7 @@ public class OsmAndLiveReports {
 		report.date = reportTime();
 		ResultSet rs;
 		if(!isEmpty(region)) {
-			String r = "select count(distinct ch.username) users, count(distinct ch.id) changes, sum(distinct ch.changes_count) achanges," + 
+			String r = "select count(distinct ch.username) users, count(distinct ch.id) changes, sum(distinct ch.changes_count) achanges " + 
 					  " from "+CHANGESETS_VIEW + " ch, " + CHANGESET_COUNTRY_VIEW+" cc where ch.id = cc.changesetid"+ 
 					  " and cc.countryid = (select id from countries where downloadname= ?)"+
 					  " and substr(ch.closed_at_day, 0, 8) = ?";
