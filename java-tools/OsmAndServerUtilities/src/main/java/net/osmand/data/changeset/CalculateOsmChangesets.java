@@ -86,8 +86,8 @@ public class CalculateOsmChangesets {
 		long start = INITIAL_CHANGESET;
 		PreparedStatement insChangeset = conn
 				.prepareStatement("INSERT INTO changesets(id, bot, created_at, closed_at, closed_at_day, "
-						+ "minlat, minlon, maxlat, maxlon, username, uid, created_by)"
-						+ " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+						+ "minlat, minlon, maxlat, maxlon, username, uid, created_by, changes_count)"
+						+ " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 		PreparedStatement selChangeset = conn.prepareStatement("SELECT 1 from changesets where id = ?");
 		PreparedStatement delPrepare = conn.prepareStatement("DELETE FROM pending_changesets where id = ?");
 		PreparedStatement selPrepare = conn.prepareStatement("SELECT 1 from pending_changesets where id = ?");
@@ -149,6 +149,7 @@ public class CalculateOsmChangesets {
 						if(parser.getName().equals("changeset")) {
 							p = new ChangesetProps();
 							p.closedAt = parser.getAttributeValue("", "closed_at");
+							p.changesCount = Integer.parseInt(parser.getAttributeValue("", "changes_count"));
 							p.minLat = getAttributeDoubleValue(parser, "min_lat");
 							p.minLon = getAttributeDoubleValue(parser, "min_lon");
 							p.maxLat = getAttributeDoubleValue(parser, "max_lat");
@@ -183,6 +184,7 @@ public class CalculateOsmChangesets {
 									insChangeset.setString(10, p.user);
 									insChangeset.setString(11, p.uid);
 									insChangeset.setString(12, p.createdBy);
+									insChangeset.setInt(13, p.changesCount);
 									// p.tags.remove("comment");
 									// insChangeset.setObject(13, new JSONObject(p.tags).toString(), Types.OTHER);
 									insChangeset.executeUpdate();
@@ -446,6 +448,7 @@ public class CalculateOsmChangesets {
 		public String createdAt;
 		public String id;
 		public int bot;
+		public int changesCount;
 		public String closedAt;
 		public String minLat;
 		public String minLon;
