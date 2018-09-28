@@ -532,7 +532,7 @@ public class OsmAndLiveReports {
 			rs = ps.executeQuery();
 		} else {
 			rankingRange = getNumberReport(OsmAndLiveReportType.RANKING_RANGE).intValue();
-			String r = "SELECT data.cnt changes, count(*) group_size FROM ( "+
+			String r = "SELECT data.cnt changes, count(*) group_size, sum(count_changes) achanges FROM ( "+
 					   "	SELECT username, count(*) cnt FROM "+CHANGESETS_VIEW+" ch " +
 					   "    WHERE substr(ch.closed_at_day, 0, 8) = ? " +
 					   " 	GROUP by  ch.username HAVING count(*) >= ? ORDER by count(*) desc) " +
@@ -548,6 +548,7 @@ public class OsmAndLiveReports {
 			r.minChanges = rs.getInt(1);
 			r.maxChanges = rs.getInt(1);
 			r.countUsers = rs.getInt(2);
+			r.atomTotalChanges = rs.getInt(3);
 			r.totalChanges = r.minChanges * r.countUsers;
 			lst.add(r);
 		}
@@ -564,11 +565,13 @@ public class OsmAndLiveReports {
 			int min = Math.min(lst.get(minind).minChanges, lst.get(minind+1).minChanges);
 			int max = Math.max(lst.get(minind).maxChanges, lst.get(minind+1).maxChanges);
 			int changes = lst.get(minind).totalChanges + lst.get(minind + 1).totalChanges;
+			int atomTotalChanges = lst.get(minind).atomTotalChanges + lst.get(minind + 1).atomTotalChanges;
 			lst.remove(minind);
 			lst.get(minind).minChanges = min;
 			lst.get(minind).maxChanges = max;
 			lst.get(minind).countUsers = minsum;
 			lst.get(minind).totalChanges = changes;
+			lst.get(minind).atomTotalChanges = atomTotalChanges;
 		}
 		for(int i = 0; i < lst.size(); i++) {
 			RankingRange r = lst.get(i);
@@ -1007,6 +1010,7 @@ public class OsmAndLiveReports {
 	}
 	
 	protected static class RankingRange {
+		public int atomTotalChanges;
 		public int minChanges;
 		public int maxChanges;
 		public int countUsers;
