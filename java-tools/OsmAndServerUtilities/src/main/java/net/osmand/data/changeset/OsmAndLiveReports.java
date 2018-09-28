@@ -487,8 +487,8 @@ public class OsmAndLiveReports {
 		report.date = reportTime();
 		ResultSet rs;
 		if(!isEmpty(region)) {
-			String r = "select count(distinct ch.username) users, count(distinct ch.id) changes" + 
-					  " from "+CHANGESETS_VIEW+" ch, "+CHANGESET_COUNTRY_VIEW+" cc where ch.id = cc.changesetid"+ 
+			String r = "select count(distinct ch.username) users, count(distinct ch.id) changes, sum(distinct ch.changes_count) achanges," + 
+					  " from "+CHANGESETS_VIEW + " ch, " + CHANGESET_COUNTRY_VIEW+" cc where ch.id = cc.changesetid"+ 
 					  " and cc.countryid = (select id from countries where downloadname= ?)"+
 					  " and substr(ch.closed_at_day, 0, 8) = ?";
 			PreparedStatement ps = conn.prepareStatement(r);
@@ -505,6 +505,7 @@ public class OsmAndLiveReports {
 		rs.next();
 		report.users = rs.getInt("users");
 		report.changes = rs.getInt("changes");
+		report.allchanges = rs.getInt("achanges");
 		return report;
 	}
 	
@@ -588,13 +589,13 @@ public class OsmAndLiveReports {
 		report.month = month;
 		report.region = region;
 		report.date = reportTime();
-		String q = "SELECT  t.username username, t.size changes , s.size gchanges FROM "+ 
-				 	" ( SELECT username, count(*) size from "+CHANGESETS_VIEW+" ch, "+CHANGESET_COUNTRY_VIEW+" cc "+
+		String q = "SELECT  t.username username, t.size changes, s.size gchanges, t.asize achanges, s.asize agchanges FROM "+ 
+				 	" ( SELECT username, count(*) size, sum(changes_count) asize from "+CHANGESETS_VIEW+" ch, "+CHANGESET_COUNTRY_VIEW+" cc "+
 				 	" 	WHERE ch.id = cc.changesetid and substr(ch.closed_at_day, 0, 8) = ? " +
 				 	"   and cc.countryid = (select id from countries where downloadname= ?)"+
 				 	" GROUP by ch.username HAVING count(*) >= ? " +
 				 	" ORDER by count(*) desc ) t JOIN " +
-				 	" (SELECT username, count(*) size from "+CHANGESETS_VIEW+" ch " +
+				 	" (SELECT username, count(*) size, sum(changes_count) asize from "+CHANGESETS_VIEW+" ch " +
 				 	"	WHERE substr(ch.closed_at_day, 0, 8) = ? GROUP by ch.username " +
 				 	" ) s on s.username = t.username ORDER by t.size desc";
 		PreparedStatement ps = conn.prepareStatement(q);
@@ -609,7 +610,9 @@ public class OsmAndLiveReports {
 			
 			r.user = rs.getString("username");
 			r.changes = rs.getInt("changes");
-			r.globalchanges= rs.getInt("gchanges");
+			r.globalchanges = rs.getInt("gchanges");
+			r.atomglobalchanges = rs.getInt("achanges");
+			r.atomchanges = rs.getInt("agchanges");
 			r.rank = 0;
 			r.grank = 0;
 			for (int i = 0; i < granking.rows.size(); i++) {
@@ -980,6 +983,7 @@ public class OsmAndLiveReports {
 		public long date;
 		public int users;
 		public int changes;
+		public int allchanges;
 	}
 	
 	protected static class Supporter {
@@ -1027,6 +1031,8 @@ public class OsmAndLiveReports {
 		public int grank;
 		public int globalchanges;
 		public int changes;
+		public int atomchanges;
+		public int atomglobalchanges;
 	}
 	
 	
