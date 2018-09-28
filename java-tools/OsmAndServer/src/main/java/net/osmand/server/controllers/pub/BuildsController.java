@@ -75,7 +75,7 @@ public class BuildsController {
 			SimpleDateFormat fmt = new SimpleDateFormat("dd.MM.yyyy");
 			for (File f : listFiles) {
 				String nm = f.getName().toLowerCase();
-				if(!nm.contains("osmand-") || nm.endsWith(".bar")) {
+				if ((!nm.contains("osmand-") && !nm.contains("osmandcore-")) || nm.endsWith(".bar")) {
 					continue;
 				}
 				String type = "OsmAnd";
