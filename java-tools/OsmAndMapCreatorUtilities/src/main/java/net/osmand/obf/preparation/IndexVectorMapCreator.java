@@ -259,6 +259,9 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 				// don't index this
 				continue;
 			}
+			if(settings.keepOnlySeaObjects && !checkBelongsToSea(out.getBorder())) {
+				continue;
+			}
 
 			// innerWays are new closed ways
 			List<List<Node>> innerWays = new ArrayList<List<Node>>();
@@ -619,27 +622,32 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 
 	}
 	
-	private boolean checkBelongsToSea(Entity e) {
+	private boolean checkBelongsToSea(List<Node> nodes) {
+		if(nodes == null || nodes.isEmpty()) {
+			return false;
+		}
 		if(checkSeaTile == null) {
 			checkSeaTile = new BasemapProcessor();
 			checkSeaTile.constructBitSetInfo(null);
 		}
-		int minX, minY, maxX, maxY;
-		if(e instanceof Node) {
-			minX = maxX = MapUtils.get31TileNumberX(((Node)e).getLongitude());
-			minY = maxY = MapUtils.get31TileNumberY(((Node)e).getLatitude());
-		} else if(e instanceof Way) {
-			List<Node> l = ((Way)e).getNodes();
-			if(l == null || l.isEmpty()) {
-				return false;
+		int minX = 0, minY = 0, maxX = 0, maxY = 0;
+		for (Node n : nodes) {
+			int x = MapUtils.get31TileNumberX(n.getLongitude());
+			int y = MapUtils.get31TileNumberY(n.getLatitude());
+			if (minX == maxX && minX == 0) {
+				minX = maxX = x;
+				minY = maxY = y;
 			}
-			QuadRect ll = ((Way)e).getLatLonBBox();
-			minX = MapUtils.get31TileNumberX(ll.left);
-			maxX = MapUtils.get31TileNumberX(ll.right);
-			minY = MapUtils.get31TileNumberY(ll.top); 
-			maxY = MapUtils.get31TileNumberY(ll.bottom);
-		} else {
-			return false;
+			if (maxX < x) {
+				maxX = x;
+			} else if (x < minX) {
+				minX = x;
+			}
+			if (maxY < y) {
+				maxY = y;
+			} else if (y < minY) {
+				minY = y;
+			}
 		}
 		int zoom = 31;
 		while(minX != maxX && minY != maxY) {
@@ -690,7 +698,9 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			if("coastline".equals(tags.get("natural"))) {
 				tags.remove("natural", "coastline");
 			}
-			if(!checkBelongsToSea(e)) {
+			if(e instanceof Node && !checkBelongsToSea(Collections.singletonList((Node)e))) {
+				return;
+			} else if(e instanceof Way && !checkBelongsToSea(((Way) e).getNodes())) {
 				return;
 			}
 		}
