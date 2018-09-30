@@ -46,6 +46,7 @@ public class DeviceController {
 				db.userId = b.userId;
 				db.deviceName = b.deviceName;
 				db.externalId = b.getEncodedId();
+				result.devices.add(db);
 			}
 		}
 		return gson.toJson(result);
