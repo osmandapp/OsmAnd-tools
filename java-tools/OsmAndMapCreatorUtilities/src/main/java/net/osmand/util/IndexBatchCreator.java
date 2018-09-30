@@ -515,7 +515,7 @@ public class IndexBatchCreator {
 				settings.zoomWaySmoothness = zoomWaySmoothness;
 			}
 			boolean worldMaps = rName.toLowerCase().contains("world") ;
-			if(worldMaps && rName.toLowerCase().contains("basemap")) {
+			if(worldMaps) {
 				if(rName.toLowerCase().contains("basemap")) {
 					return;
 				}
