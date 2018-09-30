@@ -650,7 +650,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			}
 		}
 		int zoom = 31;
-		while(minX != maxX && minY != maxY) {
+		while((minX != maxX && minY != maxY) || zoom >= 9) {
 			zoom --;
 			minX = minX >>1;
 			maxX = maxX >>1;
