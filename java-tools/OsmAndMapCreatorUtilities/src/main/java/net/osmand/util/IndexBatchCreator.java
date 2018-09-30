@@ -521,6 +521,8 @@ public class IndexBatchCreator {
 				}
 				if(rName.toLowerCase().contains("seamarks")) {
 					settings.keepOnlySeaObjects = true;
+					settings.indexTransport = false;
+					settings.indexAddress = false;
 				}
 			} else {
 				if (srtmDir != null && (rdata == null || rdata.indexSRTM)) {
