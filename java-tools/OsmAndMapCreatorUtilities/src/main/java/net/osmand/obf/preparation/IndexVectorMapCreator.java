@@ -687,7 +687,9 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			throws SQLException {
 		if(settings.keepOnlySeaObjects) {
 			// fix issue with duplicate coastlines from seamarks
-			tags.remove("natural", "coastline");
+			if("coastline".equals(tags.get("natural"))) {
+				tags.remove("natural", "coastline");
+			}
 			if(!checkBelongsToSea(e)) {
 				return;
 			}
