@@ -1,10 +1,14 @@
 package net.osmand.server.controllers.pub;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 import javax.servlet.http.HttpServletRequest;
 
 import net.osmand.server.assist.DeviceLocationManager;
+import net.osmand.server.assist.data.DeviceBean;
+import net.osmand.server.assist.data.DeviceRepository;
 import net.osmand.server.assist.data.LocationInfo;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,12 +18,38 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.google.gson.Gson;
+
 @RestController
 public class DeviceController {
 	
 	@Autowired
 	DeviceLocationManager deviceLocationManager;
+	
+	@Autowired
+	DeviceRepository deviceRepo;
+	
+	Gson gson = new Gson();
+	
+	public static class DevicesInfo {
+		public List<DeviceBean> devices = new ArrayList<DeviceBean>();
+	}
 
+	@RequestMapping("/device/send-devices")
+	public @ResponseBody String getDevicesByUserId(@RequestParam(required = false) String userId) {
+		List<DeviceBean> devices = deviceRepo.findByUserIdOrderByCreatedDate(Long.parseLong(userId));
+		DevicesInfo result = new DevicesInfo();
+		for(DeviceBean b : devices) {
+			if(b.externalConfiguration == null && b.externalId == null) {
+				DeviceBean db = new DeviceBean();
+				db.userId = b.userId;
+				db.deviceName = b.deviceName;
+				db.externalId = b.getEncodedId();
+			}
+		}
+		return gson.toJson(result);
+	}
+	
 	@RequestMapping("/device/{deviceId}/send")
 	public @ResponseBody String sendLocation(@PathVariable("deviceId") String deviceId,
 			@RequestParam Map<String,String> allRequestParams,  HttpServletRequest request) {
