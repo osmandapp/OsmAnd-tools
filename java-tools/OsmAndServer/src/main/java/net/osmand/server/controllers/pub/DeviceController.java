@@ -42,6 +42,7 @@ public class DeviceController {
 		for(DeviceBean b : devices) {
 			if(b.externalConfiguration == null && b.externalId == null) {
 				DeviceBean db = new DeviceBean();
+				db.id = b.id;
 				db.userId = b.userId;
 				db.deviceName = b.deviceName;
 				db.externalId = b.getEncodedId();
