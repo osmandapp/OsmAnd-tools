@@ -560,7 +560,7 @@ public class IndexCreator {
 		this.indexPoiCreator = new IndexPoiCreator(settings, renderingTypes, overwriteIds);
 		this.indexAddressCreator = new IndexAddressCreator(logMapDataWarn, settings);
 		this.indexMapCreator = new IndexVectorMapCreator(logMapDataWarn, mapZooms, renderingTypes,
-				settings.zoomWaySmoothness);
+				settings);
 		this.indexRouteCreator = new IndexRouteCreator(renderingTypes, logMapDataWarn, settings);
 
 		// Main generation method

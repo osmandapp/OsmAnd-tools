@@ -80,17 +80,16 @@ public class BinaryInspector {
 		if ("test".equals(args[0])) {
 			in.inspector(new String[] {
 //					"-vpoi",
-//					"-vmap", "-vmapobjects", 
+					"-vmap", "-vmapobjects", 
 //					"-vmapcoordinates",
 //					"-vrouting",
-					"-vtransport", "-vtransportschedule",
+//					"-vtransport", "-vtransportschedule",
 //					"-vaddress", "-vcities","-vstreetgroups",
 //					"-vstreets", "-vbuildings", "-vintersections",
 //					"-lang=ru",
-					"-bbox=4.85694,52.28732,4.86645,52.28321",
-//					"-osm="+System.getProperty("maps.dir")+"/map_full_1.obf.osm",
-//					System.getProperty("maps.dir")+"/diff/Bulgaria_europe_01_00.obf"
-					System.getProperty("maps.dir")+"Transport.obf"
+					"-bbox=-2.029,48.641,-2.027,48.640",
+					"-osm="+System.getProperty("maps.dir")+"/map.obf.osm",
+					System.getProperty("maps.dir")+"France_brittany_europe_2.obf"
 			});
 		} else {
 			in.inspector(args);

@@ -33,6 +33,7 @@ import net.osmand.binary.OsmandOdb.MapDataBlock;
 import net.osmand.data.LatLon;
 import net.osmand.data.Multipolygon;
 import net.osmand.data.MultipolygonBuilder;
+import net.osmand.data.QuadRect;
 import net.osmand.data.Ring;
 import net.osmand.osm.MapRenderingTypes.MapRulType;
 import net.osmand.osm.MapRenderingTypesEncoder;
@@ -101,6 +102,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	private Connection mapConnection;
 
 	private int zoomWaySmoothness = 0;
+	private IndexCreatorSettings settings;
 	private final Log logMapDataWarn;
 
 	public TLongHashSet generatedIds = new TLongHashSet();
@@ -110,6 +112,8 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	private static int DUPLICATE_SPLIT = 5;
 	private static boolean VALIDATE_DUPLICATE = false;
 	private TLongObjectHashMap<Long> duplicateIds = new TLongObjectHashMap<Long>();
+	private BasemapProcessor checkSeaTile;
+	
 	private long assignIdForMultipolygon(Relation orig) {
 		long ll = orig.getId();
 		long sum = 0;
@@ -144,10 +148,11 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	}
 
 	public IndexVectorMapCreator(Log logMapDataWarn, MapZooms mapZooms, MapRenderingTypesEncoder renderingTypes,
-	                             int zoomWaySmoothness) {
+	                             IndexCreatorSettings settings) {
 		this.logMapDataWarn = logMapDataWarn;
 		this.mapZooms = mapZooms;
-		this.zoomWaySmoothness = zoomWaySmoothness;
+		this.settings = settings;
+		this.zoomWaySmoothness = settings.zoomWaySmoothness;
 		this.renderingTypes = renderingTypes;
 		lowLevelWays = -1;
 	}
@@ -613,6 +618,42 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		return ((maxX - minX) <= minz && (maxY - minY) <= maxz) || ((maxX - minX) <= maxz && (maxY - minY) <= minz);
 
 	}
+	
+	private boolean checkBelongsToSea(Entity e) {
+		if(checkSeaTile == null) {
+			checkSeaTile = new BasemapProcessor();
+			checkSeaTile.constructBitSetInfo(null);
+		}
+		int minX, minY, maxX, maxY;
+		if(e instanceof Node) {
+			minX = maxX = MapUtils.get31TileNumberX(((Node)e).getLongitude());
+			minY = maxY = MapUtils.get31TileNumberY(((Node)e).getLatitude());
+		} else if(e instanceof Way) {
+			List<Node> l = ((Way)e).getNodes();
+			if(l == null || l.isEmpty()) {
+				return false;
+			}
+			QuadRect ll = ((Way)e).getLatLonBBox();
+			minX = MapUtils.get31TileNumberX(ll.left);
+			maxX = MapUtils.get31TileNumberX(ll.right);
+			minY = MapUtils.get31TileNumberY(ll.top); 
+			maxY = MapUtils.get31TileNumberY(ll.bottom);
+		} else {
+			return false;
+		}
+		int zoom = 31;
+		while(minX != maxX && minY != maxY) {
+			zoom --;
+			minX = minX >>1;
+			maxX = maxX >>1;
+			minY = minY >>1;
+			maxY = maxY >>1;
+		}
+		if(checkSeaTile.isLandTile(minX, maxX, zoom)) {
+			return false;
+		}
+		return true;
+	}
 
 	public void iterateMainEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 		if (e instanceof Way || e instanceof Node) {
@@ -644,6 +685,13 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 
 	protected void processMainEntity(Entity e, long originalId, long assignedId, int level, Map<String, String> tags)
 			throws SQLException {
+		if(settings.keepOnlySeaObjects) {
+			// fix issue with duplicate coastlines from seamarks
+			tags.remove("natural", "coastline");
+			if(!checkBelongsToSea(e)) {
+				return;
+			}
+		}
 		boolean area = renderingTypes.encodeEntityWithType(e instanceof Node,
 				tags, mapZooms.getLevel(level).getMaxZoom(), typeUse, addtypeUse, namesUse,
 				tempNameUse);
@@ -686,6 +734,8 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			insertBinaryMapRenderObjectIndex(mapTree[level], res, null, namesUse, id, area, typeUse, addtypeUse, true);
 		}
 	}
+
+	
 
 	private void validateDuplicate(long originalId, long assignedId) {
 		if(VALIDATE_DUPLICATE) {

@@ -24,6 +24,9 @@ public class IndexCreatorSettings {
 	// gtfs data for public transport
 	public File gtfsData;
 	
+	// for seamarks generation
+	public boolean keepOnlySeaObjects;
+	
 	
 	// limit entities by multipolygon (used by srtm)  
 	public Multipolygon boundary;

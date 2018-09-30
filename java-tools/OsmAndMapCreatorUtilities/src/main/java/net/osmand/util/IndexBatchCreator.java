@@ -515,8 +515,17 @@ public class IndexBatchCreator {
 				settings.zoomWaySmoothness = zoomWaySmoothness;
 			}
 			boolean worldMaps = rName.toLowerCase().contains("world") ;
-			if(srtmDir != null && (rdata == null || rdata.indexSRTM) && !worldMaps) {
-				settings.srtmDataFolder = srtmDir;
+			if(worldMaps && rName.toLowerCase().contains("basemap")) {
+				if(rName.toLowerCase().contains("basemap")) {
+					return;
+				}
+				if(rName.toLowerCase().contains("seamarks")) {
+					settings.keepOnlySeaObjects = true;
+				}
+			} else {
+				if (srtmDir != null && (rdata == null || rdata.indexSRTM)) {
+					settings.srtmDataFolder = srtmDir;
+				}
 			}
 			IndexCreator indexCreator = new IndexCreator(workDir, settings);
 			
