@@ -36,8 +36,8 @@ public class DeviceController {
 	}
 
 	@RequestMapping("/device/send-devices")
-	public @ResponseBody String getDevicesByUserId(@RequestParam(required = false) String userId) {
-		List<DeviceBean> devices = deviceRepo.findByUserIdOrderByCreatedDate(Long.parseLong(userId));
+	public @ResponseBody String getDevicesByUserId(@RequestParam(required = false) String uid) {
+		List<DeviceBean> devices = deviceRepo.findByUserIdOrderByCreatedDate(Long.parseLong(uid));
 		DevicesInfo result = new DevicesInfo();
 		for(DeviceBean b : devices) {
 			if(b.externalConfiguration == null && b.externalId == null) {
