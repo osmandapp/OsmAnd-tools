@@ -683,7 +683,7 @@ public class OsmAndLiveReports {
 		report.regionCount = 0;
 		report.regionTotalWeight = 0;
 		int rankingNum = getNumberReport(OsmAndLiveReportType.RANKING_RANGE).intValue();
-		if(eregion) {
+		if(!eregion) {
 			rankingNum = getNumberReport(OsmAndLiveReportType.REGION_RANKING_RANGE).intValue();
 		}
 		while(rs.next()) {
