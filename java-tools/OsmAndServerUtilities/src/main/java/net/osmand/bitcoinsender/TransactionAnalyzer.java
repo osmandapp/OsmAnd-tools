@@ -69,18 +69,20 @@ public class TransactionAnalyzer {
 					continue;
 				}
 				List<Map<?, ?>> outputs = (List<Map<?, ?>>) payoutObjects.get("payments");
-				for (Map<?, ?> payout : outputs) {
-					String inputAddress = (String) payout.get("btcaddress");
-					String address = simplifyBTC(inputAddress);
-					if(address == null) {
-						address = inputAddress;
-					}
-					osmid.put(address, payout.get("osmid").toString());
-					Double sum = ((Double) payout.get("btc")) * BITCOIN_SATOSHI;
-					if (toPay.containsKey(address)) {
-						toPay.put(address, toPay.get(address) + sum);
-					} else {
-						toPay.put(address, sum);
+				if (outputs != null) {
+					for (Map<?, ?> payout : outputs) {
+						String inputAddress = (String) payout.get("btcaddress");
+						String address = simplifyBTC(inputAddress);
+						if (address == null) {
+							address = inputAddress;
+						}
+						osmid.put(address, payout.get("osmid").toString());
+						Double sum = ((Double) payout.get("btc")) * BITCOIN_SATOSHI;
+						if (toPay.containsKey(address)) {
+							toPay.put(address, toPay.get(address) + sum);
+						} else {
+							toPay.put(address, sum);
+						}
 					}
 				}
 				
