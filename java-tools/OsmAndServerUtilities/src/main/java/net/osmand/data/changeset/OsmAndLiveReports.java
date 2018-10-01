@@ -775,7 +775,11 @@ public class OsmAndLiveReports {
 			rt.put("month", month);
 			rt.put("region", rs.getString("region"));
 			rt.put("name", rs.getString("name"));
-			rt.put("report", gson.fromJson(rs.getString("report"), rt.getClass()));
+			if(OsmAndLiveReportType.fromSqlName(rs.getString("name")).isNumberReport()) {
+				rt.put("report", rs.getDouble("report"));
+			} else {
+				rt.put("report", gson.fromJson(rs.getString("report"), rt.getClass()));
+			}
 			reports.add(rt);
 		}
 		res.put("reports", reports);
