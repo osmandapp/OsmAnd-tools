@@ -58,6 +58,7 @@ public class OsmAndLiveReports {
 				refreshCurrentMonth(conn);
 				System.out.println("Previous month is " + prevMonth);
 				OsmAndLiveReports reports = new OsmAndLiveReports(conn, prevMonth);
+				reports.getJsonReport(OsmAndLiveReportType.PAYOUTS, null, false, true);
 				reports.getJsonReport(OsmAndLiveReportType.TOTAL, null, false, true);
 			} else if(args[0].equals("finalize-previous-month")) {
 				double btc = Double.NaN;
