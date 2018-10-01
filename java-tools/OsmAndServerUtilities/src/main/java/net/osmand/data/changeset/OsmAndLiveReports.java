@@ -641,7 +641,7 @@ public class OsmAndLiveReports {
 		RecipientsReport report = new RecipientsReport();
 		
 		SupportersReport supporters = getReport(OsmAndLiveReportType.SUPPORTERS, null, SupportersReport.class);
-		RankingReport ranking = getReport(OsmAndLiveReportType.RANKING, null, RankingReport.class);
+		RankingReport ranking = getReport(OsmAndLiveReportType.RANKING, region, RankingReport.class);
 		double eurValue = getNumberReport(OsmAndLiveReportType.EUR_VALUE).doubleValue();
 		double btcValue = getNumberReport(OsmAndLiveReportType.BTC_VALUE).doubleValue();
 		double eurBTCRate = getNumberReport(OsmAndLiveReportType.EUR_BTC_RATE).doubleValue();
@@ -682,6 +682,10 @@ public class OsmAndLiveReports {
 		}
 		report.regionCount = 0;
 		report.regionTotalWeight = 0;
+		int rankingNum = getNumberReport(OsmAndLiveReportType.RANKING_RANGE).intValue();
+		if(eregion) {
+			rankingNum = getNumberReport(OsmAndLiveReportType.REGION_RANKING_RANGE).intValue();
+		}
 		while(rs.next()) {
 			Recipient recipient = new Recipient();
 			recipient.osmid = rs.getString("osmid");
@@ -695,11 +699,7 @@ public class OsmAndLiveReports {
 				RankingRange range = ranking.rows.get(i);
 				if(recipient.changes >= range.minChanges && recipient.changes <= range.maxChanges) {
 					recipient.rank = range.rank;
-					if(eregion) {
-						recipient.weight = getNumberReport(OsmAndLiveReportType.RANKING_RANGE).intValue() + 1 - recipient.rank; 
-					} else {
-						recipient.weight = getNumberReport(OsmAndLiveReportType.REGION_RANKING_RANGE).intValue() + 1 - recipient.rank;
-					}
+					recipient.weight = rankingNum + 1 - recipient.rank; 
 					report.regionTotalWeight += recipient.weight;
 					break;
 				}
