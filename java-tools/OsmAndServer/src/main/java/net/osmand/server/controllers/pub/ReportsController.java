@@ -137,7 +137,7 @@ public class ReportsController {
 					}
 				}
 				String worldCollectedMessage = String.format("<p>%.3f mBTC</p><span>total collected%s</span>",
-						rec.btc * 1000, !rec.notReadyToPay ? "" : " (may change in the final report)");
+						rec.btc * 1000, rec.notReadyToPay ? " (may change in the final report)" : "" );
 				String regionCollectedMessage = String.format("<p>%.3f mBTC</p><span>collected for</span>",
 						rec.regionBtc * 1000);
 				mapReport.put("worldCollectedMessage", worldCollectedMessage);

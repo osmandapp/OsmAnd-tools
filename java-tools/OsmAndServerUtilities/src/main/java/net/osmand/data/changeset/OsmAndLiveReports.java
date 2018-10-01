@@ -47,16 +47,21 @@ public class OsmAndLiveReports {
 				isEmpty(System.getenv("DB_USER")) ? "test" : System.getenv("DB_USER"),
 						isEmpty(System.getenv("DB_PWD")) ? "test" : System.getenv("DB_PWD"));
 		if(args != null && args.length > 0) {
+			Date firstDayThisMonth = 
+					new SimpleDateFormat("yyyy-MM-dd").parse(String.format("%1$tY-%1$tm-01", new Date()));
+			String prevMonth = new SimpleDateFormat("yyyy-MM").format(firstDayThisMonth.getTime() - 5 * 24 * HOUR);
 			if(args[0].equals("check-missing-reports")) {
 				checkMissingReports(conn);
 			} else if(args[0].equals("refresh-current-month")) {
 				refreshCurrentMonth(conn);
+			} else if(args[0].equals("finalize-previous-month-total")) {
+				refreshCurrentMonth(conn);
+				System.out.println("Previous month is " + prevMonth);
+				OsmAndLiveReports reports = new OsmAndLiveReports(conn, prevMonth);
+				reports.getJsonReport(OsmAndLiveReportType.TOTAL, null, false, true);
 			} else if(args[0].equals("finalize-previous-month")) {
 				double btc = Double.NaN;
 				double eur = Double.NaN;
-				Date firstDayThisMonth = 
-						new SimpleDateFormat("yyyy-MM-dd").parse(String.format("%1$tY-%1$tm-01", new Date()));
-				String prevMonth = new SimpleDateFormat("yyyy-MM").format(firstDayThisMonth.getTime() - 5 * 24 * HOUR);
 				System.out.println("Previous month is " + prevMonth);
 //				String currentMonth = String.format("%1$tY-%1$tm", new Date());
 				String month = prevMonth;
@@ -647,7 +652,6 @@ public class OsmAndLiveReports {
 		double eurBTCRate = getNumberReport(OsmAndLiveReportType.EUR_BTC_RATE).doubleValue();
 		report.month = month;
 		report.region = region;
-		report.notReadyToPay = Double.isNaN(loadNumberReport(OsmAndLiveReportType.BTC_VALUE));
 		report.date = reportTime();
 		boolean eregion = isEmpty(region);
 		String q = " SELECT distinct s.osmid osmid, t.size changes," + 
@@ -710,7 +714,8 @@ public class OsmAndLiveReports {
 		report.rate = (float) eurBTCRate;
 		report.btc = (float) btcValue;
 		report.regionBtc = report.regionPercentage * report.btc;
-		report.notReadyToPay = !thisMonth;
+		report.notReadyToPay = Double.isNaN(
+				loadNumberReport(OsmAndLiveReportType.BTC_VALUE));
 		for(int i = 0; i < report.rows.size(); i++) {
 			Recipient r = report.rows.get(i);
 			if (report.regionTotalWeight > 0) {
