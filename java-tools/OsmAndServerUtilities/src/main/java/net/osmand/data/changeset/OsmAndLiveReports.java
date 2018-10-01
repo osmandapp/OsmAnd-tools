@@ -1084,7 +1084,7 @@ public class OsmAndLiveReports {
 		public double payoutEurAvailable;
 		public double payoutTotal;
 		public String month;
-		public List<Payout> payouts = new ArrayList<Payout>();
+		public List<Payout> payments = new ArrayList<Payout>();
 		
 	}
 	
