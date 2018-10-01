@@ -756,7 +756,7 @@ public class OsmAndLiveReports {
 				p.btcaddress = recipient.btcaddress;
 				if(p.btc > 0) {
 					report.payoutTotal += p.btc;
-					report.payouts.add(p);
+					report.payments.add(p);
 				}
 			}
 		}
