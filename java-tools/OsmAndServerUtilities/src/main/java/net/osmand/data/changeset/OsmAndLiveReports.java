@@ -57,6 +57,12 @@ public class OsmAndLiveReports {
 			} else if(args[0].equals("finalize-previous-month-total")) {
 				System.out.println("Previous month is " + prevMonth);
 				OsmAndLiveReports reports = new OsmAndLiveReports(conn, prevMonth);
+				CountriesReport cntrs = reports.getReport(OsmAndLiveReportType.COUNTRIES, null, CountriesReport.class);
+				for (Country reg : cntrs.rows) {
+					if(reg.map.equals("1")) {
+						reports.getJsonReport(OsmAndLiveReportType.RECIPIENTS, reg.downloadname, false, true);
+					}
+				}
 				reports.getJsonReport(OsmAndLiveReportType.PAYOUTS, null, false, true);
 				reports.getJsonReport(OsmAndLiveReportType.TOTAL, null, false, true);
 			} else if(args[0].equals("finalize-previous-month")) {
