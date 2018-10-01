@@ -55,8 +55,8 @@ public class TransactionAnalyzer {
     	// transactions url 
     	Map<String, Double> toPay = new HashMap<>();
     	Map<String, String> osmid = new HashMap<>();
-    	for(int year = BEGIN_YEAR; year <= FINAL_YEAR; year++) {
-    		int fMonth = year == FINAL_YEAR ? FINAL_MONTH : 12;
+		for (int year = BEGIN_YEAR; year <= FINAL_YEAR; year++) {
+			int fMonth = year == FINAL_YEAR ? FINAL_MONTH : 12;
 			for (int month = 1; month <= fMonth; month++) {
 				String period = year + "-";
 				if (month < 10) {
@@ -64,30 +64,29 @@ public class TransactionAnalyzer {
 				}
 				period += month;
 				System.out.println("Processing " + period + "... ");
-				Map<?, ?> payoutObjects = gson.fromJson(readJsonUrl(REPORT_URL, period, "payout_", CACHE_BUILDER_REPORTS), Map.class);
+				Map<?, ?> payoutObjects = gson.fromJson(
+						readJsonUrl(REPORT_URL, period, "payout_", CACHE_BUILDER_REPORTS), Map.class);
 				if (payoutObjects == null) {
 					continue;
 				}
 				List<Map<?, ?>> outputs = (List<Map<?, ?>>) payoutObjects.get("payments");
-				if (outputs != null) {
-					for (Map<?, ?> payout : outputs) {
-						String inputAddress = (String) payout.get("btcaddress");
-						String address = simplifyBTC(inputAddress);
-						if (address == null) {
-							address = inputAddress;
-						}
-						osmid.put(address, payout.get("osmid").toString());
-						Double sum = ((Double) payout.get("btc")) * BITCOIN_SATOSHI;
-						if (toPay.containsKey(address)) {
-							toPay.put(address, toPay.get(address) + sum);
-						} else {
-							toPay.put(address, sum);
-						}
+				for (Map<?, ?> payout : outputs) {
+					String inputAddress = (String) payout.get("btcaddress");
+					String address = simplifyBTC(inputAddress);
+					if (address == null) {
+						address = inputAddress;
+					}
+					osmid.put(address, payout.get("osmid").toString());
+					Double sum = ((Double) payout.get("btc")) * BITCOIN_SATOSHI;
+					if (toPay.containsKey(address)) {
+						toPay.put(address, toPay.get(address) + sum);
+					} else {
+						toPay.put(address, sum);
 					}
 				}
-				
+
 			}
-    	}
+		}
     	Map<String, Object> results = new LinkedHashMap<String, Object>();
     	Date dt = new java.util.Date();
     	results.put("timestamp", dt.getTime());
