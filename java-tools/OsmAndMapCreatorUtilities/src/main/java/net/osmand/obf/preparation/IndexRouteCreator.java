@@ -88,7 +88,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 
 
 	private TLongObjectHashMap<List<RestrictionInfo>> highwayRestrictions = new TLongObjectHashMap<List<RestrictionInfo>>();
-	private TLongObjectHashMap<Long> basemapRemovedNodes = new TLongObjectHashMap<Long>();
+	private TLongObjectHashMap<WayNodeId> basemapRemovedNodes = new TLongObjectHashMap<WayNodeId>();
 	private TLongObjectHashMap<RouteMissingPoints> basemapNodesToReinsert = new TLongObjectHashMap<RouteMissingPoints> ();
 
 	// local purpose to speed up processing cache allocation
@@ -137,7 +137,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 			pointsXToInsert = new TIntArrayList[targetLength];
 			pointsYToInsert = new TIntArrayList[targetLength];
 			for(Map.Entry<Integer, Long> p : pointsMap.entrySet()) {
-				int insertAfter = p.getKey() & ((1 << SHIFT_INSERT_AT) -1);
+				int insertAfter = p.getKey();// & ((1 << SHIFT_INSERT_AT) -1);
 				if(pointsXToInsert[insertAfter] == null ) {
 					pointsXToInsert[insertAfter] = new TIntArrayList();
 					pointsYToInsert[insertAfter] = new TIntArrayList();
@@ -222,8 +222,13 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 				long y31 = MapUtils.get31TileNumberY(n.getLatitude());
 				long x31 = MapUtils.get31TileNumberX(n.getLongitude());
 				long point = (x31 << 31) + y31;
-				registerBaseIntersectionPoint(point, !kept[i], id, indexToInsertAt, originalInd);
+				boolean forceKeep =
+						registerBaseIntersectionPoint(point, !kept[i], id, indexToInsertAt, originalInd);
 				originalInd++;
+				if(!kept[i] && forceKeep) {
+					kept[i] = true;
+					result.add(indexToInsertAt, n);
+				}
 				if(kept[i]) {
 					indexToInsertAt ++;
 				}
@@ -232,52 +237,40 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		return result;
 	}
 
-	private static long SHIFT_INSERT_AT = 12;
-	private static long SHIFT_ORIGINAL = 16;
-	private static long SHIFT_ID = 64 - (SHIFT_INSERT_AT + SHIFT_ORIGINAL);
+	private static class WayNodeId {
+		long wayId;
+		int originalInd;
+		int insertAt;
 
-	private void registerBaseIntersectionPoint(long pointLoc, boolean register, long wayId, int insertAt, int originalInd) {
-		Long exNode = basemapRemovedNodes.get(pointLoc);
-		if(insertAt > (1l << SHIFT_INSERT_AT)) {
-			throw new IllegalStateException("Way index too big");
+		public WayNodeId(long wayId, int originalInd, int insertAt) {
+			this.wayId = wayId;
+			this.originalInd = originalInd;
+			this.insertAt = insertAt;
 		}
-		if(originalInd > (1l << SHIFT_ORIGINAL)) {
-			throw new IllegalStateException("Way index 2 too big");
-		}
-		if(wayId > (1l << SHIFT_ID)) {
-			throw new IllegalStateException("Way id too big");
-		}
-		long genKey = register ? ((wayId << (SHIFT_ORIGINAL+SHIFT_INSERT_AT)) + (originalInd << SHIFT_INSERT_AT) + insertAt) : -1l;
-		if(exNode == null) {
-			basemapRemovedNodes.put(pointLoc, genKey);
-		} else {
-			if(exNode != -1) {
-				putIntersection(pointLoc, exNode);
-			}
-			basemapRemovedNodes.put(pointLoc, -1l);
-			if(genKey != -1) {
-				putIntersection(pointLoc, genKey);
-			}
-		}
+
 
 	}
 
-	private void putIntersection(long point, long wayNodeId) {
-		if(wayNodeId != -1){
-//			long x = point >> 31;
-//			long y = point - (x << 31);
-//			System.out.println("Put intersection at " + (float) MapUtils.get31LatitudeY((int) y) + " " + (float)MapUtils.get31LongitudeX((int) x));
-			long SHIFT = SHIFT_INSERT_AT + SHIFT_ORIGINAL;
-			int ind = (int) (wayNodeId & ((1 << SHIFT) - 1));
-			long wayId = wayNodeId >> SHIFT;
-			if(!basemapNodesToReinsert.containsKey(wayId)) {
-				basemapNodesToReinsert.put(wayId, new RouteMissingPoints());
+	private boolean registerBaseIntersectionPoint(long pointLoc, boolean register, long wayId, int insertAt, int originalInd) {
+		if(basemapRemovedNodes.containsKey(pointLoc)) {
+			WayNodeId exNode = basemapRemovedNodes.get(pointLoc);
+			if(exNode != null) {
+				int ind = exNode.insertAt;
+				if(!basemapNodesToReinsert.containsKey(exNode.wayId)) {
+					basemapNodesToReinsert.put(exNode.wayId, new RouteMissingPoints());
+				}
+				RouteMissingPoints mp = basemapNodesToReinsert.get(exNode.wayId);
+				mp.pointsMap.put(ind, pointLoc);
+				basemapRemovedNodes.put(pointLoc, null);
 			}
-			RouteMissingPoints mp = basemapNodesToReinsert.get(wayId);
-			mp.pointsMap.put(ind, point);
+			return true;
 		}
-
+		WayNodeId genKey = register ?
+				new WayNodeId(wayId ,originalInd, insertAt) : null;
+		basemapRemovedNodes.put(pointLoc, genKey);
+		return false;
 	}
+
 	private void addWayToIndex(long id, List<Node> nodes, PreparedStatement insertStat, RTree rTree,
 			TIntArrayList outTypes,	TLongObjectHashMap<TIntArrayList> pointTypes,
 			TLongObjectHashMap<TIntObjectHashMap<String>> pointNamesRaw, Map<MapRoutingTypes.MapRouteType, String> names ) throws SQLException {

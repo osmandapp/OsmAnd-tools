@@ -80,14 +80,14 @@ public class BinaryInspector {
 		if ("test".equals(args[0])) {
 			in.inspector(new String[] {
 //					"-vpoi",
-					"-vmap", "-vmapobjects", 
+//					"-vmap", "-vmapobjects",
 //					"-vmapcoordinates",
-//					"-vrouting",
+					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
 //					"-vaddress", "-vcities","-vstreetgroups",
 //					"-vstreets", "-vbuildings", "-vintersections",
 //					"-lang=ru",
-					"-bbox=27.1865,54.1691,28.4059,53.6742",
+//					"-bbox=27.1865,54.1691,28.4059,53.6742",
 					"-osm="+System.getProperty("maps.dir")+"/map.obf.osm",
 					System.getProperty("maps.dir")+"World_seamarks_2.obf"
 			});
@@ -550,7 +550,7 @@ public class BinaryInspector {
 				BinaryMapIndexReader.buildSearchRequest(MapUtils.get31TileNumberX(vInfo.lonleft),
 						MapUtils.get31TileNumberX(vInfo.lonright), MapUtils.get31TileNumberY(vInfo.lattop),
 						MapUtils.get31TileNumberY(vInfo.latbottom), vInfo.getZoom(), null),
-				p.getSubregions());
+				vInfo.getZoom() < 15 ? p.getBaseSubregions() : p.getSubregions());
 		if (vInfo.osm) {
 			printToFile("<?xml version='1.0' encoding='UTF-8'?>\n" +
 					"<osm version='0.6'>\n");
