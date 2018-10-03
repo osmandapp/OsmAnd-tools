@@ -1046,7 +1046,7 @@ public class BinaryInspector {
 				for (int j = 0; j < keys.length; j++) {
 					RouteTypeRule rt = obj.region.quickGetEncodingRule(keys[j]);
 					String name = quoteName(vs[j]);
-					tags.append("\t\t<tag k='").append(rt.getTag()).append("' v='").append(name).append("' />\n");
+					b.append("\t\t<tag k='").append(rt.getTag()).append("' v='").append(name).append("' />\n");
 				}
 			}
 			if (obj.getPointTypes(i) != null) {
@@ -1054,7 +1054,7 @@ public class BinaryInspector {
 				for (int j = 0; j < keys.length; j++) {
 					RouteTypeRule rt = obj.region.quickGetEncodingRule(keys[j]);
 					String value = quoteName(rt.getValue());
-					tags.append("\t\t<tag k='").append(rt.getTag()).append("' v='").append(value).append("' />\n");
+					b.append("\t\t<tag k='").append(rt.getTag()).append("' v='").append(value).append("' />\n");
 				}
 			}
 			b.append("\t</node >\n");
