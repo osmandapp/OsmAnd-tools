@@ -129,25 +129,18 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 
 
 	private class RouteMissingPoints {
-		Map<Integer, Long> pointsMap = new TreeMap<Integer, Long>();
-		TIntArrayList[] pointsXToInsert = null;
-		TIntArrayList[] pointsYToInsert = null;
+		List<Map<Integer, Long>> pointsMap = new ArrayList<>();
 
-		void buildPointsToInsert(int targetLength){
-			pointsXToInsert = new TIntArrayList[targetLength];
-			pointsYToInsert = new TIntArrayList[targetLength];
-			for(Map.Entry<Integer, Long> p : pointsMap.entrySet()) {
-				int insertAfter = p.getKey();// & ((1 << SHIFT_INSERT_AT) -1);
-				if(pointsXToInsert[insertAfter] == null ) {
-					pointsXToInsert[insertAfter] = new TIntArrayList();
-					pointsYToInsert[insertAfter] = new TIntArrayList();
-				}
-				long x = p.getValue() >> 31;
-				long y = p.getValue() - (x << 31);
-				pointsXToInsert[insertAfter].add((int) x);
-				pointsYToInsert[insertAfter].add((int) y);
+		private void addPoint(int originalInd, int insertAt, long loc) {
+			while(pointsMap.size() <= insertAt) {
+				pointsMap.add(null);
 			}
+			if(pointsMap.get(insertAt) == null) {
+				pointsMap.set(insertAt, new TreeMap<>());
+			}
+			pointsMap.get(insertAt).put(originalInd, loc);
 		}
+
 	}
 
 	public IndexRouteCreator(MapRenderingTypesEncoder renderingTypes, Log logMapDataWarn, IndexCreatorSettings settings) {
@@ -255,12 +248,11 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		if(basemapRemovedNodes.containsKey(pointLoc)) {
 			WayNodeId exNode = basemapRemovedNodes.get(pointLoc);
 			if(exNode != null) {
-				int ind = exNode.insertAt;
 				if(!basemapNodesToReinsert.containsKey(exNode.wayId)) {
 					basemapNodesToReinsert.put(exNode.wayId, new RouteMissingPoints());
 				}
 				RouteMissingPoints mp = basemapNodesToReinsert.get(exNode.wayId);
-				mp.pointsMap.put(ind, pointLoc);
+				mp.addPoint(exNode.originalInd, exNode.insertAt, pointLoc);
 				basemapRemovedNodes.put(pointLoc, null);
 			}
 			return true;
@@ -1260,18 +1252,18 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 					RouteMissingPoints missingPoints = null;
 					if(basemapNodesToReinsert != null && basemapNodesToReinsert.containsKey(id) ) {
 						missingPoints = basemapNodesToReinsert.get(id);
-						missingPoints.buildPointsToInsert(pointsLength);
 					}
 					
 					int typeInd = 0;
 					points = new ArrayList<RoutePointToWrite>(pointsLength);
 					for (int j = 0; j < pointsLength; j++) {
-						if(missingPoints != null && missingPoints.pointsXToInsert[j] != null) {
-							for(int k = 0; k < missingPoints.pointsXToInsert[j].size(); k++) {
+						if(missingPoints != null && j < missingPoints.pointsMap.size() &&
+								missingPoints.pointsMap.get(j) != null) {
+							for(Long loc: missingPoints.pointsMap.get(j).values()) {
 								RoutePointToWrite point = new RoutePointToWrite();
+								point.x = (int) (loc >> 31);
+								point.y = (int) (loc - (point.x << 31));
 								points.add(point);
-								point.x = missingPoints.pointsXToInsert[j].get(k);
-								point.y = missingPoints.pointsYToInsert[j].get(k);
 							}
 						}
 						RoutePointToWrite point = new RoutePointToWrite();
