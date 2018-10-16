@@ -80,16 +80,16 @@ public class BinaryInspector {
 		if ("test".equals(args[0])) {
 			in.inspector(new String[] {
 //					"-vpoi",
-					"-vmap", "-vmapobjects", 
+//					"-vmap", "-vmapobjects",
 //					"-vmapcoordinates",
-//					"-vrouting",
+					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
 //					"-vaddress", "-vcities","-vstreetgroups",
 //					"-vstreets", "-vbuildings", "-vintersections",
 //					"-lang=ru",
-					"-zoom=11",
+//					"-zoom=11",
 //					"-bbox=0,50,5,45",
-					"-osm="+System.getProperty("maps.dir")+"/map.obf.osm",
+//					"-osm="+System.getProperty("maps.dir")+"/map.obf.osm",
 					System.getProperty("maps.dir")+"World_seamarks.obf"
 			});
 		} else {
@@ -551,7 +551,7 @@ public class BinaryInspector {
 				BinaryMapIndexReader.buildSearchRequest(MapUtils.get31TileNumberX(vInfo.lonleft),
 						MapUtils.get31TileNumberX(vInfo.lonright), MapUtils.get31TileNumberY(vInfo.lattop),
 						MapUtils.get31TileNumberY(vInfo.latbottom), vInfo.getZoom(), null),
-				p.getSubregions());
+				vInfo.getZoom() < 15 ? p.getBaseSubregions() : p.getSubregions());
 		if (vInfo.osm) {
 			printToFile("<?xml version='1.0' encoding='UTF-8'?>\n" +
 					"<osm version='0.6'>\n");
@@ -1047,7 +1047,7 @@ public class BinaryInspector {
 				for (int j = 0; j < keys.length; j++) {
 					RouteTypeRule rt = obj.region.quickGetEncodingRule(keys[j]);
 					String name = quoteName(vs[j]);
-					tags.append("\t\t<tag k='").append(rt.getTag()).append("' v='").append(name).append("' />\n");
+					b.append("\t\t<tag k='").append(rt.getTag()).append("' v='").append(name).append("' />\n");
 				}
 			}
 			if (obj.getPointTypes(i) != null) {
@@ -1055,7 +1055,7 @@ public class BinaryInspector {
 				for (int j = 0; j < keys.length; j++) {
 					RouteTypeRule rt = obj.region.quickGetEncodingRule(keys[j]);
 					String value = quoteName(rt.getValue());
-					tags.append("\t\t<tag k='").append(rt.getTag()).append("' v='").append(value).append("' />\n");
+					b.append("\t\t<tag k='").append(rt.getTag()).append("' v='").append(value).append("' />\n");
 				}
 			}
 			b.append("\t</node >\n");
