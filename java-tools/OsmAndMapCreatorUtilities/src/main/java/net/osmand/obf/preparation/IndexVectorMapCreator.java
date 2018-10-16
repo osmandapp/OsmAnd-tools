@@ -236,9 +236,13 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		List<Map<String, String>> splitEntities = renderingTypes.splitTags(e.getModifiableTags(), EntityType.valueOf(e));
 
 		// Don't add multipolygons with an unknown type
-		if (typeUse.size() == 0)
+		if (typeUse.size() == 0) {
 			return;
+		}
 		excludeFromMainIteration(original.getOuterWays());
+		if(settings.keepOnlySeaObjects && !checkBelongsToSeaWays(original.getOuterWays())) {
+			return;
+		}
 //		excludeFromMainIteration(original.getInnerWays()); // fix issue with different type of swamp inside each other (inner ring has same tag as multipolygon but has a different meaning)
 
 
@@ -257,9 +261,6 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			if(out.getBorder().size() == 0) {
 				logMapDataWarn.warn("Multipolygon has an outer ring that can't be formed: "+e.getId());
 				// don't index this
-				continue;
-			}
-			if(settings.keepOnlySeaObjects && !checkBelongsToSea(out.getBorder())) {
 				continue;
 			}
 
@@ -622,6 +623,19 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 
 	}
 	
+	private boolean checkBelongsToSeaWays(List<Way> ways) {
+		List<Node> nodes = new ArrayList<Node>();
+		for(Way w : ways) {
+			if(w != null) {
+				for(Node n : w.getNodes()) {
+					if(n != null) {
+						nodes.add(n);
+					}
+				}
+			}
+		}
+		return checkBelongsToSea(nodes);
+	}
 	private boolean checkBelongsToSea(List<Node> nodes) {
 		if(nodes == null || nodes.isEmpty()) {
 			return false;
@@ -630,34 +644,32 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			checkSeaTile = new BasemapProcessor();
 			checkSeaTile.constructBitSetInfo(null);
 		}
-		int minX = 0, minY = 0, maxX = 0, maxY = 0;
+		int x = MapUtils.get31TileNumberX(nodes.get(0).getLongitude());
+		int y = MapUtils.get31TileNumberY(nodes.get(0).getLatitude());
+		int minX = x, minY = y, maxX = x, maxY = y;
 		for (Node n : nodes) {
-			int x = MapUtils.get31TileNumberX(n.getLongitude());
-			int y = MapUtils.get31TileNumberY(n.getLatitude());
-			if (minX == maxX && minX == 0) {
-				minX = maxX = x;
-				minY = maxY = y;
+			int sx = MapUtils.get31TileNumberX(n.getLongitude());
+			int sy = MapUtils.get31TileNumberY(n.getLatitude());
+			if (maxX < sx) {
+				maxX = sx;
+			} else if (sx < minX) {
+				minX = sx;
 			}
-			if (maxX < x) {
-				maxX = x;
-			} else if (x < minX) {
-				minX = x;
-			}
-			if (maxY < y) {
-				maxY = y;
-			} else if (y < minY) {
-				minY = y;
+			if (maxY < sy) {
+				maxY = sy;
+			} else if (sy < minY) {
+				minY = sy;
 			}
 		}
 		int zoom = 31;
-		while((minX != maxX && minY != maxY) || zoom >= 9) {
-			zoom --;
-			minX = minX >>1;
-			maxX = maxX >>1;
-			minY = minY >>1;
-			maxY = maxY >>1;
+		while ((minX != maxX && minY != maxY) || zoom >= 11) {
+			zoom--;
+			minX = minX >> 1;
+			maxX = maxX >> 1;
+			minY = minY >> 1;
+			maxY = maxY >> 1;
 		}
-		if(checkSeaTile.isLandTile(minX, maxX, zoom)) {
+		if(checkSeaTile.isLandTile(minX, minY, zoom)) {
 			return false;
 		}
 		return true;

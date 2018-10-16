@@ -837,11 +837,11 @@ public class IndexCreator {
 		settings.poiZipLongStrings = false;
 		settings.indexMap = true;
 //		settings.indexAddress = true;
-//		settings.indexPOI = true;
+		settings.indexPOI = true;
 //		settings.indexTransport = true;
-		settings.indexRouting = true;
-		
-		settings.srtmDataFolder = new File(rootFolder + "/maps/srtm/");
+//		settings.indexRouting = true;
+//		settings.keepOnlySeaObjects = true;
+//		settings.srtmDataFolder = new File(rootFolder + "/maps/srtm/");
 //		settings.gtfsData = new File(rootFolder + "/maps/transport/Netherlands.sqlite");
 		
 //		settings.zoomWaySmoothness = 2;
@@ -854,15 +854,15 @@ public class IndexCreator {
 
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 		String file = rootFolder + "/temp/map.osm";
-//		String file = rootFolder + "/maps/transport/transport.osm";
+//		String file = rootFolder + "/maps/World_seamarks.pbf";
 //		String file = rootFolder + "/repos/resources/test-resources/synthetic_test_rendering.osm";
 //		String file = rootFolder + "/repos/resources/test-resources/turn_lanes_test.osm";
 		int st = file.lastIndexOf('/');
 		int e = file.indexOf('.', st);
 		creator.setNodesDBFile(new File(rootFolder + "/maps/" + file.substring(st, e) + ".tmp.odb"));
-		MapPoiTypes.setDefault(new MapPoiTypes(rootFolder + "/repos//resources/poi/poi_types.xml"));
+		MapPoiTypes.setDefault(new MapPoiTypes(rootFolder + "/repos/resources/poi/poi_types.xml"));
 		MapRenderingTypesEncoder rt =
-				new MapRenderingTypesEncoder(rootFolder + "/repos//resources/obf_creation/rendering_types.xml",
+				new MapRenderingTypesEncoder(rootFolder + "/repos/resources/obf_creation/rendering_types.xml",
 						new File(file).getName());
 //		creator.setLastModifiedDate(1504224000000l);
 		creator.generateIndexes(new File(file),

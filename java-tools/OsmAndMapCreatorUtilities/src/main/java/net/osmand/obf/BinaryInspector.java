@@ -87,9 +87,10 @@ public class BinaryInspector {
 //					"-vaddress", "-vcities","-vstreetgroups",
 //					"-vstreets", "-vbuildings", "-vintersections",
 //					"-lang=ru",
-					"-bbox=27.1865,54.1691,28.4059,53.6742",
+					"-zoom=11",
+//					"-bbox=0,50,5,45",
 					"-osm="+System.getProperty("maps.dir")+"/map.obf.osm",
-					System.getProperty("maps.dir")+"World_seamarks_2.obf"
+					System.getProperty("maps.dir")+"World_seamarks.obf"
 			});
 		} else {
 			in.inspector(args);
