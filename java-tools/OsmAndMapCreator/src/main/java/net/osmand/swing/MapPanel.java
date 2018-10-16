@@ -189,6 +189,7 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 
 	public MapPanel(File fileWithTiles) {
 		ImageIO.setUseCache(false);
+		downloader.setNoHttps(true);
 
 		tilesLocation = fileWithTiles;
 		loadSettingsLocation();
@@ -298,7 +299,7 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 		final JMenu downloadedMenu = new JMenu("Additional"); //$NON-NLS-1$
 		final File tilesDirectory = DataExtractionSettings.getSettings().getTilesDirectory();
 		Map<String, TileSourceTemplate> udf = getCommonTemplates(tilesDirectory);
-		final List<TileSourceTemplate> downloaded = TileSourceManager.downloadTileSourceTemplates(MapCreatorVersion.APP_VERSION);
+		final List<TileSourceTemplate> downloaded = TileSourceManager.downloadTileSourceTemplates(MapCreatorVersion.APP_VERSION, false);
 		final Map<TileSourceTemplate, JCheckBoxMenuItem> items = new IdentityHashMap<TileSourceTemplate, JCheckBoxMenuItem>();
 
 		tiles.add(downloadedMenu);
