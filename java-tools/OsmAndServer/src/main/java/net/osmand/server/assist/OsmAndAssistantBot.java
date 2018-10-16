@@ -52,6 +52,7 @@ import org.telegram.telegrambots.updateshandlers.SentCallback;
 public class OsmAndAssistantBot extends TelegramLongPollingBot {
 
 	public static final String URL_TO_POST_COORDINATES = "https://live.osmand.net/device/%s/send";
+
 	private static final int LIMIT_CONFIGURATIONS = 3;
 	
 	private static final Log LOG = LogFactory.getLog(OsmAndAssistantBot.class);
@@ -810,6 +811,8 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 	public String createNewDevice(UserChatIdentifier chatIdentifier, String name) {
 		return deviceLocManager.registerNewDevice(chatIdentifier, name);
 	}
+
+
 
 	
 	

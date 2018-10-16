@@ -1,19 +1,34 @@
 package net.osmand.server.assist.data;
 
+
+import javax.persistence.*;
+
+@Embeddable
 public class LocationInfo {
+
 	// location based
+	@Column(name = "lat")
 	double lat = Double.NaN;
+
+	@Column(name = "lon")
 	double lon = Double.NaN;
+	@Transient
 	double speed = Double.NaN;
+	@Transient
 	double altitude = Double.NaN;
+	@Transient
 	double hdop = Double.NaN;
+	@Transient
 	double satellites= Double.NaN;
+	@Transient
 	double azi = Double.NaN;
 	// other
+	@Transient
 	double temperature = Double.NaN;
-	
+	@Transient
 	String ipSender;
-	
+
+	@Column(name = "timestamp")
 	long timestamp;
 	
 	public LocationInfo() {
