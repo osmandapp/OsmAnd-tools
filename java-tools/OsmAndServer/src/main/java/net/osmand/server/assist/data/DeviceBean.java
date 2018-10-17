@@ -12,8 +12,7 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import com.google.common.primitives.Longs;
 import com.google.gson.JsonObject;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 @Entity
 @Table(name = "telegram_devices")
@@ -89,5 +88,5 @@ public class DeviceBean {
 
 	@OneToMany(fetch = FetchType.EAGER, cascade = CascadeType.ALL)
 	@JoinColumn(name = "device_id")
-	public List<Device.LocationChatMessage> chatMessages = new ArrayList<>();
+	public Set<Device.LocationChatMessage> chatMessages = new HashSet<>();
 }

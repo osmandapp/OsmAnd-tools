@@ -51,7 +51,10 @@ import org.telegram.telegrambots.updateshandlers.SentCallback;
 @Component
 public class OsmAndAssistantBot extends TelegramLongPollingBot {
 
-	public static final String URL_TO_POST_COORDINATES = "https://live.osmand.net/device/%s/send";
+	//public static final String URL_TO_POST_COORDINATES = "https://live.osmand.net/device/%s/send";
+
+	public static final String NGROK = "https://7843121d.ngrok.io";
+	public static final String URL_TO_POST_COORDINATES = NGROK + "/device/%s/send";
 
 	private static final int LIMIT_CONFIGURATIONS = 3;
 	
@@ -91,10 +94,11 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 
 	@Override
 	public String getBotToken() {
-		if(System.getenv("OSMAND_DEV_TEST_BOT_TOKEN") != null) {
-			return System.getenv("OSMAND_DEV_TEST_BOT_TOKEN");
-		}
-		return System.getenv("OSMAND_ASSISTANT_BOT_TOKEN");
+//		if(System.getenv("OSMAND_DEV_TEST_BOT_TOKEN") != null) {
+//			return System.getenv("OSMAND_DEV_TEST_BOT_TOKEN");
+//		}
+//		return System.getenv("OSMAND_ASSISTANT_BOT_TOKEN");
+		return "669709335:AAGJXJeiLW6DZbPkWxMCgOEDBOSyYGwaotc";
 	}
 	
 	private static class ChatCommandParams {

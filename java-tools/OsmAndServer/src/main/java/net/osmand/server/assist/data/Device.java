@@ -25,7 +25,7 @@ import java.util.*;
 public class Device {
 
 	private final OsmAndAssistantBot bot;
-	private final DeviceBean deviceBean;
+	private DeviceBean deviceBean;
 	private final DeviceRepository deviceRepository;
 
 
@@ -37,14 +37,14 @@ public class Device {
 		MAP_INLINE,
 	}
 
-	private List<LocationChatMessage> chats;
+	private Set<LocationChatMessage> chats;
 
 
-	// signal with last location 
+	// signal with last location
 	LocationInfo lastSignal = new LocationInfo();
-	// signal with last location 
+	// signal with last location
 	LocationInfo lastLocationSignal = null;
-	
+
 	private boolean enabled;
 	private long disabledTimestamp;
 
@@ -52,31 +52,31 @@ public class Device {
 		this.deviceBean = deviceBean;
 		this.bot = bot;
 		this.deviceRepository = deviceRepository;
-		this.chats = new ArrayList<>(deviceBean.chatMessages);
+		this.chats = new HashSet<>(deviceBean.chatMessages);
 	}
 
 
 	public String getExternalId() {
 		return deviceBean.externalId;
 	}
-	
+
 	public String getDeviceName() {
 		return deviceBean.deviceName;
 	}
-	
+
 	public String getStringId() {
 		return deviceBean.getEncodedId();
 	}
-	
+
 	public Date getCreatedDate() {
 		return deviceBean.createdDate;
 	}
-	
-	
+
+
 	public TrackerConfiguration getExternalConfiguration() {
 		return deviceBean.externalConfiguration;
 	}
-	
+
 	public JsonObject getMessageJson(int updateId) {
 		JsonObject obj = new JsonObject();
 		LocationInfo lastSignal = this.lastSignal;
@@ -97,7 +97,7 @@ public class Device {
 		if (!Double.isNaN(lastSignal.altitude) && locationCurrentlyPresent) {
 			obj.addProperty("alt", (float) lastSignal.altitude);
 		}
-		
+
 		if (!Double.isNaN(lastSignal.azi) && locationCurrentlyPresent) {
 			obj.addProperty("azi", (float) lastSignal.azi);
 		}
@@ -117,7 +117,7 @@ public class Device {
 		obj.addProperty("updId", updateId++);
 		return obj;
 	}
-	
+
 	public String getMessageTxt(int updateId) {
 		LocationInfo lastSignal = this.lastSignal;
 		LocationInfo lastLocSig = this.lastLocationSignal;
@@ -152,9 +152,9 @@ public class Device {
 			bld.append(String.format("Updated: %s (%d)\n", bot.formatFullTime(lastSignal.getTimestamp()) ,updateId));
 		}
 		return bld.toString().trim();
-	
+
 	}
-	
+
 	public void sendLocation(LocationInfo info) {
 		LocationInfo locSignal = lastLocationSignal;
 		if(info.isLocationPresent()) {
@@ -167,7 +167,7 @@ public class Device {
 		lastSignal = info;
 		lastLocationSignal = locSignal;
 		long now = System.currentTimeMillis();
-		List<LocationChatMessage> ch = this.chats;
+		Set<LocationChatMessage> ch = this.chats;
 		for(LocationChatMessage m : ch) {
 			if(m.isEnabled(now)) {
 				m.sendMessage(this);
@@ -175,19 +175,19 @@ public class Device {
 
 		}
 	}
-	
+
 	public void startMonitoring() {
 		this.enabled = true;
 	}
-	
+
 	private void addChatMessage(LocationChatMessage lm) {
-		List<LocationChatMessage>  n = new ArrayList<>(chats);
+		Set<LocationChatMessage>  n = new HashSet<>(chats);
 		n.add(lm);
 		setNewChats(n);
 	}
 
 
-	private void setNewChats(List<LocationChatMessage> n) {
+	private void setNewChats(Set<LocationChatMessage> n) {
 		long now = System.currentTimeMillis();
 		Iterator<LocationChatMessage> it = n.iterator();
 		while(it.hasNext()) {
@@ -198,7 +198,7 @@ public class Device {
 		}
 		this.chats = n;
 	}
-	
+
 	private LocationChatMessage getOrCreate(ChatType tp, Long chatId) {
 		for(LocationChatMessage lm : chats) {
 			if(lm.chatId == chatId && lm.type == tp) {
@@ -209,7 +209,7 @@ public class Device {
 		addChatMessage(lm);
 		return lm;
 	}
-	
+
 	private LocationChatMessage getOrCreate(ChatType tp, String inlineMsgId) {
 		for(LocationChatMessage lm : chats) {
 			if(Algorithms.objectEquals(inlineMsgId, lm.inlineMessageId) && lm.type == tp) {
@@ -220,19 +220,19 @@ public class Device {
 		addChatMessage(lm);
 		return lm;
 	}
-	
+
 	public void showLiveMap(Long chatId) {
 		getOrCreate(ChatType.MAP_CHAT, chatId).sendMessage(this);
 	}
-	
+
 	public void showLiveMessage(Long chatId) {
 		getOrCreate(ChatType.MESSAGE_CHAT, chatId).sendMessage(this);
 	}
-	
+
 	public void showLiveMessage(String inlineMsgId) {
 		getOrCreate(ChatType.MESSAGE_INLINE, inlineMsgId).sendMessage(this);
 	}
-	
+
 	public void showLiveMap(String inlineMsgId) {
 		getOrCreate(ChatType.MAP_INLINE, inlineMsgId).sendMessage(this);
 	}
@@ -244,9 +244,9 @@ public class Device {
 			}
 		}
 		// refresh list to delete hidden
-		setNewChats(new ArrayList<>(chats));
+		setNewChats(new HashSet<>(chats));
 	}
-	
+
 	public void stopMonitoring() {
 		disable();
 	}
@@ -255,15 +255,15 @@ public class Device {
 	public DeviceBean getDevice() {
 		return deviceBean;
 	}
-	
+
 	public long getOwnerId() {
 		return deviceBean.userId;
 	}
-	
+
 	public LocationInfo getLastSignal() {
 		return lastSignal;
 	}
-	
+
 	public LocationInfo getLastLocationSignal() {
 		return lastLocationSignal;
 	}
@@ -277,7 +277,7 @@ public class Device {
 		disabledTimestamp = System.currentTimeMillis();
 		enabled = false;
 	}
-	
+
 	public boolean isLocationMonitored() {
 		return enabled;
 	}
@@ -286,9 +286,11 @@ public class Device {
 	@Entity(name = "LocationChatMessage")
 	@Table(name = "telegram_chat_messages")
 	public static class LocationChatMessage {
-		protected static final int ERROR_THRESHOLD = 3;
+
 		private static final Integer DEFAULT_UPD_PERIOD = 86400;
-		private static final Log LOG = LogFactory.getLog(DeviceBean.class);
+		private static final Log LOG = LogFactory.getLog(LocationChatMessage.class);
+
+		protected static final int ERROR_THRESHOLD = 3;
 
 		@Id
 		@GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -321,7 +323,24 @@ public class Device {
 		@Column(name = "error_count")
 		public int errorCount;
 
+		@OneToOne(fetch = FetchType.EAGER, cascade = CascadeType.ALL)
+		@JoinColumn(name = "location_info_id")
 		LocationInfo lastSentLoc;
+
+		@Override
+		public boolean equals(Object o) {
+			if (this == o) return true;
+			if (o == null || getClass() != o.getClass()) return false;
+			LocationChatMessage that = (LocationChatMessage) o;
+			return chatId == that.chatId &&
+					initialTimestamp == that.initialTimestamp &&
+					type == that.type;
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hash(type, chatId, initialTimestamp);
+		}
 
 		public LocationChatMessage() { }
 
@@ -485,12 +504,19 @@ public class Device {
 			return new SentCallback<T>() {
 				@Override
 				public void onResult(BotApiMethod<T> method, T response) {
-					DeviceBean bean = device.deviceBean;
+					long locationId = 0;
+					if (lastSentLoc != null) {
+						locationId = lastSentLoc.id;
+					}
 					lastSentLoc = locSig;
+					lastSentLoc.id = locationId;
 					if(response instanceof Message) {
+						DeviceBean bean = device.deviceBean;
 						messageId = ((Message)response).getMessageId();
-						bean.chatMessages.add(LocationChatMessage.this);
-						device.deviceRepository.save(bean);
+						bean.chatMessages.addAll(device.chats);
+						bean = device.deviceRepository.save(bean);
+						device.deviceBean = bean;
+						device.chats = bean.chatMessages;
 					}
 				}
 

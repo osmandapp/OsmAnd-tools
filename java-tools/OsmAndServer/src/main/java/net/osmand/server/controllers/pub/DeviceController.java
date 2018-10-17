@@ -7,16 +7,12 @@ import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
 
 import net.osmand.server.assist.DeviceLocationManager;
-import net.osmand.server.assist.data.DeviceBean;
-import net.osmand.server.assist.data.DeviceRepository;
-import net.osmand.server.assist.data.LocationInfo;
+import net.osmand.server.assist.data.*;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.ResponseBody;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
 
 import com.google.gson.Gson;
 
@@ -33,6 +29,20 @@ public class DeviceController {
 	
 	public static class DevicesInfo {
 		public List<DeviceBean> devices = new ArrayList<DeviceBean>();
+	}
+
+	/*
+		Without tracker configuration
+	 */
+	@PostMapping(value = "/device/new",
+			consumes = MediaType.APPLICATION_JSON_UTF8_VALUE,
+			produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
+	public ResponseEntity<String> registerNewDevice(@RequestBody NewDevice newDevice) {
+		UserChatIdentifier uci = new UserChatIdentifier();
+		uci.setChatId(newDevice.getChatId());
+		uci.setUser(newDevice.getUser());
+		deviceLocationManager.registerNewDevice(uci, newDevice.getDeviceName());
+		return ResponseEntity.ok().build();
 	}
 
 	@RequestMapping("/device/send-devices")
