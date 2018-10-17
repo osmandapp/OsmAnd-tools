@@ -1184,7 +1184,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 
 
 	private Map<String, String> processExtraTags(Map<String, String> tags) {
-		if(tags.containsKey("osmc:symbol") && ((if(tags.containsKey("route") && tags.get("route").equals("hiking"))) || (if(tags.containsKey("route") && tags.get("route").equals("walking"))) || (if(tags.containsKey("route") && tags.get("route").equals("foot"))))) {
+		if(tags.containsKey("osmc:symbol") && (tags.containsKey("route") && tags.get("route").equals("hiking")) || (tags.containsKey("route") && tags.get("route").equals("walking")) || (tags.containsKey("route") && tags.get("route").equals("foot"))) {
 			tags = new TreeMap<String, String>(tags);
 			// osmc:symbol=black:red:blue_rectangle ->
 			// 1.For backwards compatibility (already done) - osmc_shape=bar, osmc_symbol=black, osmc_symbol_red_blue_name=.
