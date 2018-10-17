@@ -610,7 +610,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		}
 		if (color != null) {
 			String tmp = MapRenderingTypesEncoder.formatColorToPalette(color, false).replaceAll("_", "");
-			color = "subwayText" + tmp.substring(0, 1).toUpperCase() + tmp.substring(1) + "Color";
+			color = "subwayText" + Algorithms.capitalizeFirstLetter(tmp) + "Color";
 		}
 		TransportRoute directRoute = EntityParser.parserRoute(rel, ref);
 		directRoute.setOperator(operator);
