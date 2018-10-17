@@ -805,6 +805,9 @@ public class OsmExtractionUI implements IMapLocationListener {
 					IndexCreator creator = new IndexCreator(dir, settings);
 					try {
 						String fn = DataExtractionSettings.getSettings().getMapRenderingTypesFile();
+						if(!Algorithms.isEmpty(DataExtractionSettings.getSettings().getPoiTypesFile())) {
+							MapPoiTypes.setDefault(new MapPoiTypes(DataExtractionSettings.getSettings().getPoiTypesFile()));
+						}
 						MapRenderingTypesEncoder types;
 						types = new MapRenderingTypesEncoder(fn, f.getName());
 						RTree.clearCache();

@@ -80,17 +80,17 @@ public class BinaryInspector {
 		if ("test".equals(args[0])) {
 			in.inspector(new String[] {
 //					"-vpoi",
-//					"-vmap", "-vmapobjects",
+					"-vmap", "-vmapobjects",
 //					"-vmapcoordinates",
-					"-vrouting",
+//					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
 //					"-vaddress", "-vcities","-vstreetgroups",
 //					"-vstreets", "-vbuildings", "-vintersections",
 //					"-lang=ru",
 //					"-zoom=11",
-//					"-bbox=0,50,5,45",
-//					"-osm="+System.getProperty("maps.dir")+"/map.obf.osm",
-					System.getProperty("maps.dir")+"World_seamarks.obf"
+					"-bbox=0,50,5,45",
+					"-osm="+System.getProperty("maps.dir")+"/map.obf.osm",
+					System.getProperty("maps.dir")+"World_seamarks_2.obf"
 			});
 		} else {
 			in.inspector(args);

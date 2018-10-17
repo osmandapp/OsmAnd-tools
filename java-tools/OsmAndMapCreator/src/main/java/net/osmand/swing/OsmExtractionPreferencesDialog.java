@@ -36,6 +36,7 @@ public class OsmExtractionPreferencesDialog extends JDialog {
 	private JTextField routingMode;
 	private JTextField lineSmoothness;
 	private JTextField renderingTypesFile;
+	private JTextField poiTypesFile;
 	private JTextField nativeLibFile;
 	private JTextField nativeQtLib;
 	private JTextField nativeFilesDirectory;
@@ -300,7 +301,7 @@ public class OsmExtractionPreferencesDialog extends JDialog {
 		
 //		root.add(panel);
 		
-		JLabel label = new JLabel("Map zooms (specify zoom levels in binary map) ");
+		JLabel label = new JLabel("Map zooms (specify zoom levels in binary map):");
 		panel.add(label);
 		GridBagConstraints constr = new GridBagConstraints();
 		constr.ipadx = 5;
@@ -320,7 +321,7 @@ public class OsmExtractionPreferencesDialog extends JDialog {
 		constr.gridy = 2;
 		l.setConstraints(mapZooms, constr);
 
-		label = new JLabel("Line smoothness for low zooms (value 0-3) : ");
+		label = new JLabel("Line smoothness for low zooms (value 0-3):");
 		panel.add(label);
 		constr = new GridBagConstraints();
 		constr.ipadx = 5;
@@ -340,13 +341,32 @@ public class OsmExtractionPreferencesDialog extends JDialog {
 		constr.gridy = 3;
 		l.setConstraints(lineSmoothness, constr);
 
-
-		label = new JLabel("Rendering types (xml config to extract osm data) file path");
+		label = new JLabel("Path to custom POI types (poi_types.xml):");
 		panel.add(label);
 		constr = new GridBagConstraints();
 		constr.ipadx = 5;
 		constr.gridx = 0;
 		constr.gridy = 4;
+		constr.anchor = GridBagConstraints.WEST;
+		l.setConstraints(label, constr);
+		
+		poiTypesFile = new JTextField();
+		poiTypesFile.setText(DataExtractionSettings.getSettings().getPoiTypesFile());
+		panel.add(poiTypesFile);
+		constr = new GridBagConstraints();
+		constr.weightx = 1;
+		constr.fill = GridBagConstraints.HORIZONTAL;
+		constr.ipadx = 5;
+		constr.gridx = 1;
+		constr.gridy = 4;
+		l.setConstraints(poiTypesFile, constr);
+
+		label = new JLabel("Path to rendering types xml (rendering_types.xml):");
+		panel.add(label);
+		constr = new GridBagConstraints();
+		constr.ipadx = 5;
+		constr.gridx = 0;
+		constr.gridy = 5;
 		constr.anchor = GridBagConstraints.WEST;
 		l.setConstraints(label, constr);
 
@@ -358,7 +378,7 @@ public class OsmExtractionPreferencesDialog extends JDialog {
 		constr.fill = GridBagConstraints.HORIZONTAL;
 		constr.ipadx = 5;
 		constr.gridx = 1;
-		constr.gridy = 4;
+		constr.gridy = 5;
 		l.setConstraints(renderingTypesFile, constr);
 
 		root.add(panel);
@@ -434,6 +454,9 @@ public class OsmExtractionPreferencesDialog extends JDialog {
 		}
 		if(!settings.getMapRenderingTypesFile().equals(renderingTypesFile.getText())){
 			settings.setMapRenderingTypesFile(renderingTypesFile.getText());
+		}
+		if(!settings.getPoiTypesFile().equals(poiTypesFile.getText())){
+			settings.setPoiTypesFile(poiTypesFile.getText());
 		}
 		if(!settings.getBinaryFilesDir().equals(nativeFilesDirectory.getText())){
 			settings.setBinaryFilesDir(nativeFilesDirectory.getText());

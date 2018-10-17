@@ -115,6 +115,14 @@ public class DataExtractionSettings {
 		preferences.put("line_smoothness", smooth);
 	}
 
+	
+	public String getPoiTypesFile(){
+		return preferences.get("poi_types_file", "");
+	}
+	
+	public void setPoiTypesFile(String fileName){
+		preferences.put("poi_types_file", fileName);
+	}
 
 	public String getMapRenderingTypesFile(){
 		return preferences.get("rendering_types_file", "");
