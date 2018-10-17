@@ -14,12 +14,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
-import net.osmand.server.assist.data.Device;
-import net.osmand.server.assist.data.DeviceBean;
-import net.osmand.server.assist.data.DeviceRepository;
-import net.osmand.server.assist.data.LocationInfo;
-import net.osmand.server.assist.data.TrackerConfiguration;
-import net.osmand.server.assist.data.UserChatIdentifier;
+import net.osmand.server.assist.data.*;
 import net.osmand.server.assist.ext.ITrackerManager;
 import net.osmand.server.assist.ext.ITrackerManager.DeviceInfo;
 
@@ -74,7 +69,7 @@ public class DeviceLocationManager {
 	private Device getFromCache(DeviceBean db) {
 		Device ch = devicesCache.get(db.id);
 		if(ch == null) {
-			ch = new Device(db, assistantBot);
+			ch = new Device(db, assistantBot, deviceRepo);
 			devicesCache.put(db.id, ch);
 		}
 		return ch;
