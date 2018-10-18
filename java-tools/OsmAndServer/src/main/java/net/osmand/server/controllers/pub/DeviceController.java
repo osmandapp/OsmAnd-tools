@@ -31,6 +31,22 @@ public class DeviceController {
 		public List<DeviceBean> devices = new ArrayList<DeviceBean>();
 	}
 
+	private boolean isUserDeviceNameUnique(List<DeviceBean> devices, String deviceName) {
+		 for (DeviceBean device : devices) {
+		 	if (device.deviceName.equals(deviceName)) {
+		 		return false;
+			}
+		 }
+		 return true;
+	}
+
+	private UserChatIdentifier createUserChatIdentifier(NewDevice newDevice) {
+		UserChatIdentifier uci = new UserChatIdentifier();
+		uci.setChatId(newDevice.getChatId());
+		uci.setUser(newDevice.getUser());
+		return uci;
+	}
+
 	/*
 		Without tracker configuration
 	 */
@@ -38,11 +54,35 @@ public class DeviceController {
 			consumes = MediaType.APPLICATION_JSON_UTF8_VALUE,
 			produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
 	public ResponseEntity<String> registerNewDevice(@RequestBody NewDevice newDevice) {
-		UserChatIdentifier uci = new UserChatIdentifier();
-		uci.setChatId(newDevice.getChatId());
-		uci.setUser(newDevice.getUser());
-		deviceLocationManager.registerNewDevice(uci, newDevice.getDeviceName());
-		return ResponseEntity.ok().build();
+		long userId = newDevice.getUser().getId();
+		String newDeviceName = newDevice.getDeviceName();
+		List<DeviceBean> devices = deviceRepo.findByUserIdOrderByCreatedDate(userId);
+		if (devices.size() > DeviceLocationManager.LIMIT_DEVICES_PER_USER) {
+			String response = String.format("{\"status\": \"FAILED\", \"message\": \"Currently 1 user is allowed to have maximum '%d' devices.\"}",
+					DeviceLocationManager.LIMIT_DEVICES_PER_USER);
+			return ResponseEntity.badRequest()
+					.body(response);
+		}
+		if (isUserDeviceNameUnique(devices, newDeviceName)) {
+			UserChatIdentifier uci = createUserChatIdentifier(newDevice);
+			DeviceBean newDeviceBean = deviceLocationManager.newDevice(uci	, newDeviceName);
+			newDeviceBean = deviceRepo.save(newDeviceBean);
+			String response = String.format("{\"status\": \"OK\", \"device_id\": \"%d\"}", newDeviceBean.id);
+			return ResponseEntity.ok().body(response);
+		}
+		String response = "{\"status\": \"FAILED\", \"message\": \"Device with this name already exsits\"}";
+		return ResponseEntity.badRequest().body(response);
+	}
+
+	@DeleteMapping(value = "/device/{deviceId}",
+			produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
+	public ResponseEntity<String> deleteDeviceById(@PathVariable(name = "deviceId") Long deviceId) {
+		boolean isDeviceExists = deviceRepo.existsById(deviceId);
+		if (isDeviceExists) {
+			deviceLocationManager.delete(deviceId);
+			return ResponseEntity.ok().body("{\"status\": \"OK\", \"message\": \"Device deleted successfully\"}");
+		}
+		return ResponseEntity.badRequest().body("{\"status\": \"FAILED\", \"message\": \"Device deleted or does not exist\"}");
 	}
 
 	@RequestMapping("/device/send-devices")

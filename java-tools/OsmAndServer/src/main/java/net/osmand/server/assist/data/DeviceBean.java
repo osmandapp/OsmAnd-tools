@@ -15,7 +15,11 @@ import com.google.gson.JsonObject;
 import java.util.*;
 
 @Entity
-@Table(name = "telegram_devices")
+@Table(name = "telegram_devices"
+		/*uniqueConstraints = @UniqueConstraint(
+				name = "device_name_unique",
+				columnNames = {"device_name"})*/
+)
 @EntityListeners(AuditingEntityListener.class)
 public class DeviceBean {
 

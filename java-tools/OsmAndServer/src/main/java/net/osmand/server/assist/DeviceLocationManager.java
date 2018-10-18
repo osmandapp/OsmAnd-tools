@@ -37,7 +37,7 @@ public class DeviceLocationManager {
 	@Autowired
 	DeviceRepository deviceRepo;
 	
-	private static final int LIMIT_DEVICES_PER_USER = 200;
+	public static final int LIMIT_DEVICES_PER_USER = 200;
 	public static final long INTERVAL_TO_UPDATE_GROUPS = 20000;
 	public static final long INTERVAL_TO_RUN_UPDATES = 15000;
 	public static final long INITIAL_TIMESTAMP_TO_DISPLAY = 120000;
@@ -102,7 +102,7 @@ public class DeviceLocationManager {
 		return saveDevice(device);
 	}
 	
-	private DeviceBean newDevice(UserChatIdentifier chatIdentifier, String name) {
+	public DeviceBean newDevice(UserChatIdentifier chatIdentifier, String name) {
 		String js = chatIdentifier.getUserJsonString();
 		DeviceBean device = new DeviceBean();
 		device.data.add(DeviceBean.USER_INFO, new JsonParser().parse(js));
@@ -125,6 +125,11 @@ public class DeviceLocationManager {
 	public void delete(Device d) {
 		deviceRepo.delete(d.getDevice());	
 		devicesCache.remove(d.getDevice().id);
+	}
+
+	public void delete(long deviceId) {
+		deviceRepo.deleteDeviceById(deviceId);
+		devicesCache.remove(deviceId);
 	}
 	
 	public void deleteAllByExternalConfiguration(TrackerConfiguration config) {
