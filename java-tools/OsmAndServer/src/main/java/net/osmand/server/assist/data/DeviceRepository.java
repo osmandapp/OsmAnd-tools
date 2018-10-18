@@ -12,9 +12,11 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 public interface DeviceRepository extends JpaRepository<DeviceBean, Long> {
 	
 	List<DeviceBean> findByUserIdOrderByCreatedDate(long userId);
-	
-	
+
 	@Transactional
 	void deleteAllByExternalConfiguration(TrackerConfiguration cfg);
+
+	@Transactional
+	void deleteDeviceById(long id);
 
 }

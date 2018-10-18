@@ -1,21 +1,43 @@
 package net.osmand.server.assist.data;
 
+
+import javax.persistence.*;
+
+
+@Table(name = "telegram_location_info")
+@Entity(name = "LocationInfo")
 public class LocationInfo {
+
+	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
+	@Column(name = "id")
+	long id;
 	// location based
+	@Column(name = "lat")
 	double lat = Double.NaN;
+
+	@Column(name = "lon")
 	double lon = Double.NaN;
+	@Column(name = "speed")
 	double speed = Double.NaN;
+	@Column(name = "altitude")
 	double altitude = Double.NaN;
+	@Column(name = "hdop")
 	double hdop = Double.NaN;
+	@Column(name = "satellites")
 	double satellites= Double.NaN;
+	@Column(name = "azi")
 	double azi = Double.NaN;
 	// other
+	@Column(name = "temperature")
 	double temperature = Double.NaN;
-	
+
+	@Column(name = "ip_sender")
 	String ipSender;
-	
+
+	@Column(name = "tmstmp")
 	long timestamp;
-	
+
 	public LocationInfo() {
 		this(System.currentTimeMillis());
 	}
