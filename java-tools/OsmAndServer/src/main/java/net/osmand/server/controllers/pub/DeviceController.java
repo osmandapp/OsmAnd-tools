@@ -47,6 +47,15 @@ public class DeviceController {
 		return uci;
 	}
 
+	private DeviceBean simplifyDevice(DeviceBean deviceBean) {
+		DeviceBean db = new DeviceBean();
+		db.id = deviceBean.id;
+		db.userId = deviceBean.userId;
+		db.deviceName = deviceBean.deviceName;
+		db.externalId = deviceBean.getEncodedId();
+		return db;
+	}
+
 	/*
 		Without tracker configuration
 	 */
@@ -58,7 +67,8 @@ public class DeviceController {
 		String newDeviceName = newDevice.getDeviceName();
 		List<DeviceBean> devices = deviceRepo.findByUserIdOrderByCreatedDate(userId);
 		if (devices.size() > DeviceLocationManager.LIMIT_DEVICES_PER_USER) {
-			String response = String.format("{\"status\": \"FAILED\", \"message\": \"Currently 1 user is allowed to have maximum '%d' devices.\"}",
+			String response = String.format("{\"status\": \"FAILED\", " +
+							"\"message\": \"Currently 1 user is allowed to have maximum '%d' devices.\"}",
 					DeviceLocationManager.LIMIT_DEVICES_PER_USER);
 			return ResponseEntity.badRequest()
 					.body(response);
@@ -67,7 +77,8 @@ public class DeviceController {
 			UserChatIdentifier uci = createUserChatIdentifier(newDevice);
 			DeviceBean newDeviceBean = deviceLocationManager.newDevice(uci	, newDeviceName);
 			newDeviceBean = deviceRepo.save(newDeviceBean);
-			String response = String.format("{\"status\": \"OK\", \"device_id\": \"%d\"}", newDeviceBean.id);
+			String response = String.format("{\"status\": \"OK\", \"device\":%s}", gson.toJson(simplifyDevice(newDeviceBean)));
+			System.out.println(response);
 			return ResponseEntity.ok().body(response);
 		}
 		String response = "{\"status\": \"FAILED\", \"message\": \"Device with this name already exsits\"}";
@@ -91,11 +102,7 @@ public class DeviceController {
 		DevicesInfo result = new DevicesInfo();
 		for(DeviceBean b : devices) {
 			if(b.externalConfiguration == null && b.externalId == null) {
-				DeviceBean db = new DeviceBean();
-				db.id = b.id;
-				db.userId = b.userId;
-				db.deviceName = b.deviceName;
-				db.externalId = b.getEncodedId();
+				DeviceBean db = simplifyDevice(b);
 				result.devices.add(db);
 			}
 		}
