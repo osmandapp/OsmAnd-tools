@@ -17,4 +17,7 @@ public interface DeviceRepository extends JpaRepository<DeviceBean, Long> {
 	@Transactional
 	void deleteAllByExternalConfiguration(TrackerConfiguration cfg);
 
+	@Transactional
+	void deleteDeviceById(long id);
+
 }

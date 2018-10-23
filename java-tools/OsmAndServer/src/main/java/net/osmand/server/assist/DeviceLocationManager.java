@@ -42,26 +42,26 @@ public class DeviceLocationManager {
 	@Autowired
 	DeviceRepository deviceRepo;
 	
-	private static final int LIMIT_DEVICES_PER_USER = 200;
+	public static final int LIMIT_DEVICES_PER_USER = 200;
 	public static final long INTERVAL_TO_UPDATE_GROUPS = 20000;
 	public static final long INTERVAL_TO_RUN_UPDATES = 15000;
 	public static final long INITIAL_TIMESTAMP_TO_DISPLAY = 120000;
 	public static final Integer DEFAULT_LIVE_PERIOD = 24 * 60 * 60;
 	private static final int USER_UNIQUENESS = 1 << 20;
 	private static final Log LOG = LogFactory.getLog(DeviceLocationManager.class);
-	
+
 	// it could be stored in redis so information won't be lost after restart
 	ConcurrentHashMap<Long, Device> devicesCache = new ConcurrentHashMap<>();
-	
+
 	Random rnd = new Random();
-	
+
 	private ThreadPoolExecutor exe;
-	
+
 	public DeviceLocationManager() {
 		this.exe = new ThreadPoolExecutor(5, 5, 1L, TimeUnit.MINUTES,
                 new LinkedBlockingQueue<Runnable>());
 	}
-	
+
 	public List<Device> getDevicesByUserId(long userId) {
 		List<DeviceBean> beans = deviceRepo.findByUserIdOrderByCreatedDate(userId);
 		ArrayList<Device> dvs = new ArrayList<Device>();
@@ -70,7 +70,7 @@ public class DeviceLocationManager {
 		}
 		return dvs;
 	}
-	
+
 	private Device getFromCache(DeviceBean db) {
 		Device ch = devicesCache.get(db.id);
 		if(ch == null) {
@@ -79,7 +79,7 @@ public class DeviceLocationManager {
 		}
 		return ch;
 	}
-	
+
 	public Device getDevice(String strDeviceId) {
 		long deviceId = DeviceBean.getDecodedId(strDeviceId);
 		Device dv = devicesCache.get(deviceId);
@@ -91,23 +91,23 @@ public class DeviceLocationManager {
 		}
 		return dv;
 	}
-	
 
-	
-	/// CRUD 
+
+
+	/// CRUD
 	public String registerNewDevice(UserChatIdentifier chatIdentifier, String name) {
 		DeviceBean d = newDevice(chatIdentifier, name);
-		return saveDevice(d);		
+		return saveDevice(d);
 	}
-	
+
 	public String registerNewDevice(UserChatIdentifier ci, TrackerConfiguration trackerConfiguration, DeviceInfo info) {
 		DeviceBean device = newDevice(ci, info.getName());
 		device.externalConfiguration = trackerConfiguration;
 		device.externalId = info.getId();
 		return saveDevice(device);
 	}
-	
-	private DeviceBean newDevice(UserChatIdentifier chatIdentifier, String name) {
+
+	public DeviceBean newDevice(UserChatIdentifier chatIdentifier, String name) {
 		String js = chatIdentifier.getUserJsonString();
 		DeviceBean device = new DeviceBean();
 		device.data.add(DeviceBean.USER_INFO, new JsonParser().parse(js));
@@ -125,11 +125,16 @@ public class DeviceLocationManager {
 		deviceRepo.save(device);
 		return String.format("Device '%s' is successfully added. Check it with /mydevices", device.deviceName);
 	}
-	
-	
+
+
 	public void delete(Device d) {
-		deviceRepo.delete(d.getDevice());	
+		deviceRepo.delete(d.getDevice());
 		devicesCache.remove(d.getDevice().id);
+	}
+
+	public void delete(long deviceId) {
+		deviceRepo.deleteDeviceById(deviceId);
+		devicesCache.remove(deviceId);
 	}
 	
 	public void deleteAllByExternalConfiguration(TrackerConfiguration config) {

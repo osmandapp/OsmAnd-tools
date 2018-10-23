@@ -64,7 +64,7 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
     	LOG.info("Admin logins are:" + adminEmailsSet);
     	// http.csrf().disable().antMatcher("/**");
     	Set<String> enabledMethods = new TreeSet<>(
-    			Arrays.asList("GET", "HEAD", "TRACE", "OPTIONS"));
+    			Arrays.asList("GET", "HEAD", "TRACE", "OPTIONS", "POST", "DELETE"));
     	http.csrf().requireCsrfProtectionMatcher(new RequestMatcher() {
 			
 			@Override
