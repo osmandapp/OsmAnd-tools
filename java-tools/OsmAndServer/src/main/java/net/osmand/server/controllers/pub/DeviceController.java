@@ -6,6 +6,7 @@ import java.util.Map;
 
 import javax.servlet.http.HttpServletRequest;
 
+import com.google.gson.*;
 import net.osmand.server.assist.DeviceLocationManager;
 import net.osmand.server.assist.data.*;
 
@@ -14,11 +15,15 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import com.google.gson.Gson;
+import org.telegram.telegrambots.api.objects.User;
 
 @RestController
 public class DeviceController {
-	
+
+	private static final String DEVICE_NAME = "deviceName";
+	private static final String USER = "user";
+	private static final String CHAT_ID = "chatId";
+
 	@Autowired
 	DeviceLocationManager deviceLocationManager;
 	
@@ -40,10 +45,10 @@ public class DeviceController {
 		 return true;
 	}
 
-	private UserChatIdentifier createUserChatIdentifier(NewDevice newDevice) {
+	private UserChatIdentifier createUserChatIdentifier(User telegramUser, long chatId) {
 		UserChatIdentifier uci = new UserChatIdentifier();
-		uci.setChatId(newDevice.getChatId());
-		uci.setUser(newDevice.getUser());
+		uci.setChatId(chatId);
+		uci.setUser(telegramUser);
 		return uci;
 	}
 
@@ -53,7 +58,13 @@ public class DeviceController {
 		db.userId = deviceBean.userId;
 		db.deviceName = deviceBean.deviceName;
 		db.externalId = deviceBean.getEncodedId();
+		db.data = deviceBean.data.deepCopy();
 		return db;
+	}
+
+	private ResponseEntity<String> missingParameterResponse(String param) {
+		String response = String.format("{\"status\": \"FAILED\", \"message\": \"%s is missing.\"}", param);
+		return ResponseEntity.badRequest().body(response);
 	}
 
 	/*
@@ -62,10 +73,24 @@ public class DeviceController {
 	@PostMapping(value = "/device/new",
 			consumes = MediaType.APPLICATION_JSON_UTF8_VALUE,
 			produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
-	public ResponseEntity<String> registerNewDevice(@RequestBody NewDevice newDevice) {
-		long userId = newDevice.getUser().getId();
-		String newDeviceName = newDevice.getDeviceName();
-		List<DeviceBean> devices = deviceRepo.findByUserIdOrderByCreatedDate(userId);
+	public ResponseEntity<String> registerNewDevice(@RequestBody String body) {
+		long chatId = 0;
+		JsonObject json = new JsonParser().parse(body).getAsJsonObject();
+		JsonElement deviceNameElem = json.get(DEVICE_NAME);
+		if (deviceNameElem == null) {
+			return missingParameterResponse(DEVICE_NAME);
+		}
+		String deviceName = deviceNameElem.getAsString();
+		JsonElement userDataElem = json.get(USER);
+		if (userDataElem == null) {
+			return missingParameterResponse(USER);
+		}
+		User telegramUser = gson.fromJson(userDataElem.getAsJsonObject(), User.class);
+		JsonElement chatIdElem = json.get(CHAT_ID);
+		if (chatIdElem != null) {
+			chatId = chatIdElem.getAsLong();
+		}
+		List<DeviceBean> devices = deviceRepo.findByUserIdOrderByCreatedDate(telegramUser.getId());
 		if (devices.size() > DeviceLocationManager.LIMIT_DEVICES_PER_USER) {
 			String response = String.format("{\"status\": \"FAILED\", " +
 							"\"message\": \"Currently 1 user is allowed to have maximum '%d' devices.\"}",
@@ -73,12 +98,11 @@ public class DeviceController {
 			return ResponseEntity.badRequest()
 					.body(response);
 		}
-		if (isUserDeviceNameUnique(devices, newDeviceName)) {
-			UserChatIdentifier uci = createUserChatIdentifier(newDevice);
-			DeviceBean newDeviceBean = deviceLocationManager.newDevice(uci	, newDeviceName);
+		if (isUserDeviceNameUnique(devices, deviceName)) {
+			UserChatIdentifier uci = createUserChatIdentifier(telegramUser, chatId);
+			DeviceBean newDeviceBean = deviceLocationManager.newDevice(uci, deviceName);
 			newDeviceBean = deviceRepo.save(newDeviceBean);
 			String response = String.format("{\"status\": \"OK\", \"device\":%s}", gson.toJson(simplifyDevice(newDeviceBean)));
-			System.out.println(response);
 			return ResponseEntity.ok().body(response);
 		}
 		String response = "{\"status\": \"FAILED\", \"message\": \"Device with this name already exsits\"}";
