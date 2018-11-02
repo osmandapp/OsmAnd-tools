@@ -84,13 +84,13 @@ public class AdminController {
 	@RequestMapping(path = { "/publish" }, method = RequestMethod.POST)
 	public String publish(Model model, final RedirectAttributes redirectAttrs) throws JsonProcessingException {
 		List<String> errors = publish();
-		redirectAttrs.addAttribute("update_status", "OK");
-		redirectAttrs.addAttribute("update_errors", "");
-		redirectAttrs.addAttribute("update_message", "Configurations are reloaded");
-		redirectAttrs.addAttribute("services", new String[]{"motd", "download"});
+		redirectAttrs.addFlashAttribute("update_status", "OK");
+		redirectAttrs.addFlashAttribute("update_errors", "");
+		redirectAttrs.addFlashAttribute("update_message", "Configurations are reloaded");
+		redirectAttrs.addFlashAttribute("services", new String[]{"motd", "download"});
         if(!errors.isEmpty()) {
-        	redirectAttrs.addAttribute("update_status", "FAILED");
-        	redirectAttrs.addAttribute("update_errors", "Errors: " +errors);
+        	redirectAttrs.addFlashAttribute("update_status", "FAILED");
+        	redirectAttrs.addFlashAttribute("update_errors", "Errors: " +errors);
         }
         //return index(model);
         return "redirect:info";
