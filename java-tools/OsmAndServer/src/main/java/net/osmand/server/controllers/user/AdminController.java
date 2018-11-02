@@ -4,6 +4,10 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -13,6 +17,7 @@ import java.util.Map;
 import java.util.TreeMap;
 
 import javax.servlet.http.HttpServletResponse;
+import javax.sql.DataSource;
 
 import net.osmand.server.api.services.DownloadIndexesService;
 import net.osmand.server.api.services.DownloadIndexesService.DownloadProperties;
@@ -31,6 +36,7 @@ import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.datasource.DataSourceUtils;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -47,6 +53,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 @PropertySource("classpath:git.properties")
 public class AdminController {
 	private static final Log LOGGER = LogFactory.getLog(AdminController.class);
+	private static final String REPORTS_FOLDER = "reports";
 
 	@Autowired
 	private MotdService motdService;
@@ -72,7 +79,8 @@ public class AdminController {
 	@Value("${files.location}")
     private String filesLocation;
 	
-	private static final String REPORTS_FOLDER = "reports";
+	@Autowired
+    private DataSource dataSource;
 
 	protected ObjectMapper mapper;
 	
@@ -110,25 +118,71 @@ public class AdminController {
 
 
 	@RequestMapping("/info")
-	public String index(Model model) {
-		model.addAttribute("server_startup", String.format("%1$tF %1$tR", new Date(appContext.getStartupDate())));
-		model.addAttribute("server_commit", serverCommit);
-		String commit = runCmd(GIT_LOG_CMD, new File(websiteLocation), null);
-		model.addAttribute("web_commit", commit);
-		if(!model.containsAttribute("update_status")) {
-			model.addAttribute("update_status", "OK");
-	        model.addAttribute("update_errors", "");
-	        model.addAttribute("update_message", "");
-		}
-		MotdSettings settings = motdService.getSettings();
-		if(settings != null) {
-			model.addAttribute("motdSettings", settings);
-		}
-		
-		model.addAttribute("downloadServers", getDownloadSettings());
-		model.addAttribute("reports", getReports());
-		return "admin/info";
+	public String index(Model model) throws SQLException {
+		Connection conn = DataSourceUtils.getConnection(dataSource);
+		try {
+			model.addAttribute("server_startup", String.format("%1$tF %1$tR", new Date(appContext.getStartupDate())));
+			model.addAttribute("server_commit", serverCommit);
+			String commit = runCmd(GIT_LOG_CMD, new File(websiteLocation), null);
+			model.addAttribute("web_commit", commit);
+			if (!model.containsAttribute("update_status")) {
+				model.addAttribute("update_status", "OK");
+				model.addAttribute("update_errors", "");
+				model.addAttribute("update_message", "");
+			}
+			MotdSettings settings = motdService.getSettings();
+			if (settings != null) {
+				model.addAttribute("motdSettings", settings);
+			}
+
+			model.addAttribute("downloadServers", getDownloadSettings());
+			model.addAttribute("reports", getReports());
+			model.addAttribute("surveyReport", getSurveyReport(conn));
+			model.addAttribute("subscriptionsReport", getSubscriptionsReport(conn));
+			return "admin/info";
+		} finally {
+    		DataSourceUtils.releaseConnection(conn, dataSource);
+    	}
 	}
+	
+	 
+	
+	private List<Map<String, Object>> getSubscriptionsReport(Connection conn) throws SQLException {
+		List<Map<String, Object>> list = new ArrayList<>();
+		PreparedStatement ps = conn
+				.prepareStatement("SELECT date_trunc('day', now() - a.month * interval '1 month'), count(*) from "
+						+ "(select generate_series(0, 12) as month) a join supporters_device_sub t "
+						+ " on  t.expiretime > now()  - a.month * interval '1 month' and t.starttime < now() -  a.month * interval '1 month'"
+						+ " group by a.month order by 1 desc");
+		ResultSet rs = ps.executeQuery();
+		while (rs.next()) {
+			Map<String, Object> mo = new TreeMap<>();
+			mo.put("date", String.format("%1$tF", rs.getDate(1)));
+			mo.put("count", rs.getInt(2));
+			list.add(mo);
+		}
+		rs.close();
+		ps.close();
+		return list;
+	}
+	 
+	 private List<Map<String, Object>> getSurveyReport(Connection conn) throws SQLException {
+		List<Map<String, Object>> list = new ArrayList<>();
+		PreparedStatement ps = conn.prepareStatement("SELECT date_trunc('week', \"timestamp\"), response, count(*) from email_support_survey "
+				+ "group by  date_trunc('week', \"timestamp\"), response order by 1 desc,2 desc");
+		ResultSet rs = ps.executeQuery();
+		while(rs.next()) {
+			Map<String, Object> mo = new TreeMap<>();
+			mo.put("date", String.format("%1$tF", rs.getDate(1)));
+			mo.put("response", rs.getString(2));
+			mo.put("count", rs.getInt(3));
+			list.add(mo);
+		}
+		rs.close();
+		ps.close();
+		return list;
+	}
+	
 
 	private List<Map<String, Object>> getReports() {
 		List<Map<String, Object>> list = new ArrayList<>();
