@@ -5,6 +5,8 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -133,6 +135,13 @@ public class AdminController {
 		File reports = new File(filesLocation, REPORTS_FOLDER);
 		File[] files = reports.listFiles();
 		if(files != null && reports.exists()) {
+			Arrays.sort(files, new Comparator<File>() {
+
+				@Override
+				public int compare(File o1, File o2) {
+					return o1.getName().compareTo(o2.getName());
+				}
+			});
 			for(File f : files) {
 				if(f.getName().startsWith("report_")) {
 					Map<String, Object> mo = new TreeMap<>();
@@ -200,7 +209,7 @@ public class AdminController {
 	@ResponseBody
     public ResponseEntity<Resource> downloadReport(@RequestParam(required=true) String file,
                                                HttpServletResponse resp) throws IOException {
-		File fl = new File(new File(websiteLocation, REPORTS_FOLDER), file) ;
+		File fl = new File(new File(filesLocation, REPORTS_FOLDER), file) ;
         HttpHeaders headers = new HttpHeaders();
         // headers.add(HttpHeaders.CONTENT_DISPOSITION, String.format("attachment; filename=\"%s\"", fl.getName()));
         headers.add(HttpHeaders.CONTENT_TYPE, "text/plain");
