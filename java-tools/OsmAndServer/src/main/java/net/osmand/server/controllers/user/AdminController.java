@@ -35,6 +35,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -76,17 +77,18 @@ public class AdminController {
 	}
 
 	@RequestMapping(path = { "/publish" }, method = RequestMethod.POST)
-	public String publish(Model model) throws JsonProcessingException {
+	public String publish(Model model, final RedirectAttributes redirectAttrs) throws JsonProcessingException {
 		List<String> errors = publish();
-        model.addAttribute("update_status", "OK");
-        model.addAttribute("update_errors", "");
-        model.addAttribute("update_message", "Configurations are reloaded");
-        model.addAttribute("services", new String[]{"motd", "download"});
+		redirectAttrs.addAttribute("update_status", "OK");
+		redirectAttrs.addAttribute("update_errors", "");
+		redirectAttrs.addAttribute("update_message", "Configurations are reloaded");
+		redirectAttrs.addAttribute("services", new String[]{"motd", "download"});
         if(!errors.isEmpty()) {
-        	model.addAttribute("update_status", "FAILED");
-        	model.addAttribute("update_errors", "Errors: " +errors);
+        	redirectAttrs.addAttribute("update_status", "FAILED");
+        	redirectAttrs.addAttribute("update_errors", "Errors: " +errors);
         }
-        return index(model);
+        //return index(model);
+        return "redirect:info";
 	}
 
 	private List<String> publish() {
