@@ -52,11 +52,12 @@ public class OceanTilesCreator {
      */
     public static void main(String[] args) throws Exception{
 //    	System.out.println("Tiles generated ");
-    	createTilesFile("/Users/victorshcherb/osmand/maps/coastline.osm.bz2",
-    			"/Users/victorshcherb/osmand/maps/oceantiles_"+TILE_ZOOMLEVEL+".dat");
+//    	createTilesFile("/Users/victorshcherb/osmand/maps/coastline.osm.bz2",
+//    			"/Users/victorshcherb/osmand/maps/oceantiles_"+TILE_ZOOMLEVEL+".dat");
     	createJOSMFile(new String[] {
     			"/Users/victorshcherb/osmand/maps/oceantiles.osm",
-    			"/Users/victorshcherb/osmand/maps/oceantiles_"+TILE_ZOOMLEVEL+".dat"
+    			null
+//    			"/Users/victorshcherb/osmand/maps/oceantiles_"+TILE_ZOOMLEVEL+".dat"
     	});
 //        if(args.length > 0 && args[0].equals("generate")) {
 //        	createTilesFile(args[1], args[2]);

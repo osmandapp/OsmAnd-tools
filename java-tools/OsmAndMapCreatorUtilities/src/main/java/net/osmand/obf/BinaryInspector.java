@@ -79,18 +79,18 @@ public class BinaryInspector {
 		// test cases show info
 		if ("test".equals(args[0])) {
 			in.inspector(new String[] {
-//					"-vpoi",
-					"-vmap", "-vmapobjects",
+					"-vpoi",
+//					"-vmap", "-vmapobjects",
 //					"-vmapcoordinates",
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
 //					"-vaddress", "-vcities","-vstreetgroups",
 //					"-vstreets", "-vbuildings", "-vintersections",
 //					"-lang=ru",
-//					"-zoom=11",
-					"-bbox=0,50,5,45",
-					"-osm="+System.getProperty("maps.dir")+"/map.obf.osm",
-					System.getProperty("maps.dir")+"World_seamarks_2.obf"
+					"-zoom=15",
+					"-bbox=30.51,50.5,30.53,50.4",
+//					"-osm="+System.getProperty("maps.dir")+"/map.obf.osm",
+					System.getProperty("maps.dir")+"Ukraine_kiev-city_europe.obf"
 			});
 		} else {
 			in.inspector(args);

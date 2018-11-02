@@ -117,9 +117,27 @@ public class AdminController {
 			model.addAttribute("motdSettings", settings);
 		}
 		
-		List<Map<String, Object>> list = getDownloadSettings();
-		model.addAttribute("downloadServers", list);
+		model.addAttribute("downloadServers", getDownloadSettings());
+		model.addAttribute("reports", getReports());
 		return "admin/info";
+	}
+
+	private List<Map<String, Object>> getReports() {
+		List<Map<String, Object>> list = new ArrayList<>();
+		File reports = new File(websiteLocation, "reports");
+		File[] files = reports.listFiles();
+		if(files != null && reports.exists()) {
+			for(File f : files) {
+				if(f.getName().startsWith("report_")) {
+					Map<String, Object> mo = new TreeMap<>();
+					mo.put("name", f.getName().substring("report_".length()));
+					mo.put("date", String.format("%1$tF %1$tR", new Date(f.lastModified())));
+					mo.put("fullname", f.getName());
+					list.add(mo);		
+				}
+			}
+		}
+		return list;
 	}
 
 	private String runCmd(String cmd, File loc, List<String> errors) {
