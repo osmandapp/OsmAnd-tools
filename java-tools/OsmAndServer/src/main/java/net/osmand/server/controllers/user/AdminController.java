@@ -66,6 +66,11 @@ public class AdminController {
 	
 	@Value("${web.location}")
 	private String websiteLocation;
+	
+	@Value("${files.location}")
+    private String filesLocation;
+	
+	private static final String REPORTS_FOLDER = "reports";
 
 	protected ObjectMapper mapper;
 	
@@ -125,7 +130,7 @@ public class AdminController {
 
 	private List<Map<String, Object>> getReports() {
 		List<Map<String, Object>> list = new ArrayList<>();
-		File reports = new File(websiteLocation, "reports");
+		File reports = new File(filesLocation, REPORTS_FOLDER);
 		File[] files = reports.listFiles();
 		if(files != null && reports.exists()) {
 			for(File f : files) {
@@ -195,7 +200,7 @@ public class AdminController {
 	@ResponseBody
     public ResponseEntity<Resource> downloadReport(@RequestParam(required=true) String file,
                                                HttpServletResponse resp) throws IOException {
-		File fl = new File(new File(websiteLocation, "reports"), file) ;
+		File fl = new File(new File(websiteLocation, REPORTS_FOLDER), file) ;
         HttpHeaders headers = new HttpHeaders();
         // headers.add(HttpHeaders.CONTENT_DISPOSITION, String.format("attachment; filename=\"%s\"", fl.getName()));
         headers.add(HttpHeaders.CONTENT_TYPE, "text/plain");
