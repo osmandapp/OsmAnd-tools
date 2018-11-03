@@ -185,9 +185,9 @@ public class AdminController {
 	
 	private void addEmailReport(List<EmailReport> er, String categoryId, String category, String table) {
 		final EmailReport re = new EmailReport();
-		re.category = "Free users with 3 maps";
-		re.categoryId = "email_free_users";
-		jdbcTemplate.query("select count(distinct A.email), U.channel from email_free_users A "
+		re.category = category;
+		re.categoryId = categoryId;
+		jdbcTemplate.query("select count(distinct A.email), U.channel from "+table+ " A "
 				+ " left join email_unsubscribed U on A.email = U.email "
 				+ " where A.email not in (select email from email_blocked ) group by U.channel",
 				new RowCallbackHandler() {
