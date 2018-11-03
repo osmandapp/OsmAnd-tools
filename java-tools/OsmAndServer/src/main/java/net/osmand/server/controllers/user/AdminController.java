@@ -183,13 +183,13 @@ public class AdminController {
 		}
 	}
 	
-	private void addEmailReport(List<EmailReport> er, String categoryId, String category, String table) {
+	private void addEmailReport(List<EmailReport> er, String categoryId, String category, String table, String mailCol) {
 		final EmailReport re = new EmailReport();
 		re.category = category;
 		re.categoryId = categoryId;
-		jdbcTemplate.query("select count(distinct A.email), U.channel from "+table+ " A "
-				+ " left join email_unsubscribed U on A.email = U.email "
-				+ " where A.email not in (select email from email_blocked ) group by U.channel",
+		jdbcTemplate.query("select count(distinct A."+mailCol+"), U.channel from "+table+ " A "
+				+ " left join email_unsubscribed U on A."+mailCol+" = U.email "
+				+ " where A."+mailCol+" not in (select email from email_blocked ) group by U.channel",
 				new RowCallbackHandler() {
 					
 					@Override
@@ -204,9 +204,9 @@ public class AdminController {
 	
 	private List<EmailReport> getEmailsDBReport() {
 		List<EmailReport> er = new ArrayList<EmailReport>();
-		addEmailReport(er, "Free users with 3 maps", "email_free_users", "email_free_users");
-		addEmailReport(er, "OSM editors (OsmAnd Live)", "osm_recipients", "osm_recipients");
-		addEmailReport(er, "OsmAnd Live subscriptions", "supporters", "supporters");
+		addEmailReport(er, "Free users with 3 maps", "email_free_users", "email_free_users", "email");
+		addEmailReport(er, "OSM editors (OsmAnd Live)", "osm_recipients", "osm_recipients", "email");
+		addEmailReport(er, "OsmAnd Live subscriptions", "supporters", "supporters", "useremail");
 		return er;
 	}
 
