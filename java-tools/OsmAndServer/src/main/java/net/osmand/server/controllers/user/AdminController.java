@@ -38,6 +38,7 @@ import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowCallbackHandler;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.datasource.DataSourceUtils;
 import org.springframework.stereotype.Controller;
@@ -140,8 +141,77 @@ public class AdminController {
 			model.addAttribute("reports", getReports());
 			model.addAttribute("surveyReport", getSurveyReport());
 			model.addAttribute("subscriptionsReport", getSubscriptionsReport());
+			model.addAttribute("emailsReport", getEmailsDBReport());
 			return "admin/info";
 	}
+	
+	public static class EmailReport {
+		public String category;
+		public String categoryId;
+		public int totalCount;
+		public int activeMarketing;
+		public int activeOsmAndLive;
+		public int activeNews;
+		
+		public int filterMarketing;
+		public int filterOsmAndLive;
+		public int filterNews;
+		public int filterAll;
+		
+		public void addChannel(String channel, int total) {
+			totalCount += total;
+			if(channel == null || channel.isEmpty()) {
+				// skip
+			} else if("marketing".equals(channel)) {
+				filterMarketing += total;
+			} else if("all".equals(channel)) {
+				filterAll += total;
+			} else if("osmand_live".equals(channel)) {
+				filterOsmAndLive += total;
+			} else if("news".equals(channel)) {
+				filterNews += total;
+			} else {
+				filterNews += total;
+			}
+		}
+		
+		public EmailReport calculateActive() {
+			activeMarketing = totalCount - filterAll - filterMarketing;
+			activeOsmAndLive = totalCount - filterAll - filterOsmAndLive;
+			activeNews = totalCount - filterAll - filterNews;
+			return this;
+		}
+	}
+	
+	private void addEmailReport(List<EmailReport> er, String categoryId, String category, String table) {
+		final EmailReport re = new EmailReport();
+		re.category = "Free users with 3 maps";
+		re.categoryId = "email_free_users";
+		jdbcTemplate.query("select count(distinct A.email), U.channel from email_free_users A "
+				+ " left join email_unsubscribed U on A.email = U.email "
+				+ " where A.email not in (select email from email_blocked ) group by U.channel",
+				new RowCallbackHandler() {
+					
+					@Override
+					public void processRow(ResultSet rs) throws SQLException {
+						re.addChannel(rs.getString(2), rs.getInt(1));
+					}
+				});
+		
+		er.add(re.calculateActive());
+	}
+	
+	
+	private List<EmailReport> getEmailsDBReport() {
+		List<EmailReport> er = new ArrayList<EmailReport>();
+		addEmailReport(er, "Free users with 3 maps", "email_free_users", "email_free_users");
+		addEmailReport(er, "OSM editors (OsmAnd Live)", "osm_recipients", "osm_recipients");
+		addEmailReport(er, "OsmAnd Live subscriptions", "supporters", "supporters");
+		return er;
+	}
+
+	
+	
 	public static class SubscriptionReport {
 		public String date;
 		public int count;
@@ -185,7 +255,7 @@ public class AdminController {
 	 
 	private List<SurveyReport> getSurveyReport() {
 		List<SurveyReport> result = jdbcTemplate.query(
-				"SELECT date_trunc('week', \"timestamp\"), response, count(*) from email_support_survey "
+				"SELECT date_trunc('week', \"timestamp\"), response, count(distinct ip) from email_support_survey "
 						+ "group by  date_trunc('week', \"timestamp\"), response order by 1 desc,2 desc",
 				new RowMapper<SurveyReport>() {
 
