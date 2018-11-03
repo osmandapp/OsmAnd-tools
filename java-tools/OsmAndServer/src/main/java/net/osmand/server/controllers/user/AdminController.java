@@ -183,7 +183,7 @@ public class AdminController {
 		}
 	}
 	
-	private void addEmailReport(List<EmailReport> er, String categoryId, String category, String table, String mailCol) {
+	private void addEmailReport(List<EmailReport> er, String category, String categoryId, String table, String mailCol) {
 		final EmailReport re = new EmailReport();
 		re.category = category;
 		re.categoryId = categoryId;
