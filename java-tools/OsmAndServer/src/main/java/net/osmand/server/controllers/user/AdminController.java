@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -36,6 +37,8 @@ import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.datasource.DataSourceUtils;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -80,7 +83,7 @@ public class AdminController {
     private String filesLocation;
 	
 	@Autowired
-    private DataSource dataSource;
+    private JdbcTemplate jdbcTemplate;
 
 	protected ObjectMapper mapper;
 	
@@ -119,8 +122,6 @@ public class AdminController {
 
 	@RequestMapping("/info")
 	public String index(Model model) throws SQLException {
-		Connection conn = DataSourceUtils.getConnection(dataSource);
-		try {
 			model.addAttribute("server_startup", String.format("%1$tF %1$tR", new Date(appContext.getStartupDate())));
 			model.addAttribute("server_commit", serverCommit);
 			String commit = runCmd(GIT_LOG_CMD, new File(websiteLocation), null);
@@ -137,50 +138,84 @@ public class AdminController {
 
 			model.addAttribute("downloadServers", getDownloadSettings());
 			model.addAttribute("reports", getReports());
-			model.addAttribute("surveyReport", getSurveyReport(conn));
-			model.addAttribute("subscriptionsReport", getSubscriptionsReport(conn));
+			model.addAttribute("surveyReport", getSurveyReport());
+			model.addAttribute("subscriptionsReport", getSubscriptionsReport());
 			return "admin/info";
-		} finally {
-    		DataSourceUtils.releaseConnection(conn, dataSource);
-    	}
+	}
+	public static class SubscriptionReport {
+		public String date;
+		public int count;
 	}
 	
-	 
-	
-	private List<Map<String, Object>> getSubscriptionsReport(Connection conn) throws SQLException {
-		List<Map<String, Object>> list = new ArrayList<>();
-		PreparedStatement ps = conn
-				.prepareStatement("SELECT date_trunc('day', now() - a.month * interval '1 month'), count(*) from "
+	private List<SubscriptionReport> getSubscriptionsReport() {
+		List<SubscriptionReport> result = jdbcTemplate
+				.query("SELECT date_trunc('day', now() - a.month * interval '1 month'), count(*) from "
 						+ "(select generate_series(0, 12) as month) a join supporters_device_sub t "
 						+ " on  t.expiretime > now()  - a.month * interval '1 month' and t.starttime < now() -  a.month * interval '1 month'"
-						+ " group by a.month order by 1 desc");
-		ResultSet rs = ps.executeQuery();
-		while (rs.next()) {
-			Map<String, Object> mo = new TreeMap<>();
-			mo.put("date", String.format("%1$tF", rs.getDate(1)));
-			mo.put("count", rs.getInt(2));
-			list.add(mo);
+						+ " group by a.month order by 1 desc", new RowMapper<SubscriptionReport>() {
+
+					@Override
+					public SubscriptionReport mapRow(ResultSet rs, int rowNum) throws SQLException {
+						SubscriptionReport sr = new SubscriptionReport();
+						sr.date = String.format("%1$tF", rs.getDate(1));
+						sr.count = rs.getInt(2);
+						return sr;
+					}
+
+				});
+		return result;
+	}
+	
+	private static class SurveyReport {
+		public String date;
+		public int goodCount;
+		public int averageCount;
+		public int badCount;
+
+		public boolean merge(SurveyReport s) {
+			if (this.date.equals(s.date)) {
+				this.goodCount += s.goodCount;
+				this.averageCount += s.averageCount;
+				this.badCount += s.badCount;
+				return true;
+			}
+			return false;
 		}
-		rs.close();
-		ps.close();
-		return list;
 	}
 	 
-	 private List<Map<String, Object>> getSurveyReport(Connection conn) throws SQLException {
-		List<Map<String, Object>> list = new ArrayList<>();
-		PreparedStatement ps = conn.prepareStatement("SELECT date_trunc('week', \"timestamp\"), response, count(*) from email_support_survey "
-				+ "group by  date_trunc('week', \"timestamp\"), response order by 1 desc,2 desc");
-		ResultSet rs = ps.executeQuery();
-		while(rs.next()) {
-			Map<String, Object> mo = new TreeMap<>();
-			mo.put("date", String.format("%1$tF", rs.getDate(1)));
-			mo.put("response", rs.getString(2));
-			mo.put("count", rs.getInt(3));
-			list.add(mo);
+	private List<SurveyReport> getSurveyReport() {
+		List<SurveyReport> result = jdbcTemplate.query(
+				"SELECT date_trunc('week', \"timestamp\"), response, count(*) from email_support_survey "
+						+ "group by  date_trunc('week', \"timestamp\"), response order by 1 desc,2 desc",
+				new RowMapper<SurveyReport>() {
+
+					@Override
+					public SurveyReport mapRow(ResultSet rs, int rowNum) throws SQLException {
+						SurveyReport sr = new SurveyReport();
+						sr.date = String.format("%1$tF", rs.getDate(1));
+						if (rs.getString(2).equals("average")) {
+							sr.averageCount = rs.getInt(3);
+						} else if (rs.getString(2).equals("bad")) {
+							sr.badCount = rs.getInt(3);
+						} else if (rs.getString(2).equals("good")) {
+							sr.goodCount = rs.getInt(3);
+						}
+						return sr;
+					}
+
+				});
+		Iterator<SurveyReport> it = result.iterator();
+		SurveyReport p = null;
+		while (it.hasNext()) {
+			SurveyReport c = it.next();
+			if (p != null && p.merge(c)) {
+				it.remove();
+			} else {
+				p = c;
+			}
+
 		}
-		rs.close();
-		ps.close();
-		return list;
+		return result;
 	}
 	
 
