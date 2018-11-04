@@ -261,6 +261,8 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 					d.showLiveMessage(inlineMsgId);
 				} else if(pm.equals("startmap") || pm.equals("updmap")) {
 					d.showLiveMap(inlineMsgId);
+				} else if(pm.equals("hide")) {
+					d.hideInlineMsg(inlineMsgId);
 				}
 				return true;
 			}

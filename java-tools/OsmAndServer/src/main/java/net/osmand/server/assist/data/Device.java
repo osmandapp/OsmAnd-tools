@@ -72,6 +72,7 @@ public class Device {
 				LocationChatMessage msg = new LocationChatMessage(this, e.getAsJsonObject());
 				this.chats.add(msg);
 			} catch (RuntimeException es) {
+				LOG.warn("Error parsing " + e.toString(), es);
 			}
 		}
 	}
@@ -206,6 +207,11 @@ public class Device {
 		n.add(lm);
 		setNewChats(n);
 	}
+	
+	private void removeHiddenChats() {
+		List<LocationChatMessage> n = new ArrayList<>(chats);
+		setNewChats(n);
+	}
 
 
 	private void setNewChats(List<LocationChatMessage> n) {
@@ -262,6 +268,19 @@ public class Device {
 	
 	public void showLiveMap(String inlineMsgId) {
 		getOrCreate(ChatType.MAP_INLINE, inlineMsgId).sendMessage();
+	}
+	
+	public void hideInlineMsg(String inlineMsgId) {
+		boolean hd = false;
+		for(LocationChatMessage lm : chats) {
+			if(Algorithms.objectEquals(inlineMsgId, lm.inlineMessageId) ) {
+				lm.hide();
+				hd = true;
+			}
+		}
+		if(hd) {
+			removeHiddenChats();
+		}
 	}
 	
 	
@@ -364,7 +383,7 @@ public class Device {
 			JsonObject json = new JsonObject();
 			json.addProperty(CHAT_TYPE, type.name());
 			json.addProperty(CHAT_ID, chatId +"");
-			json.addProperty(INITIAL_TIMESTAMP, INITIAL_TIMESTAMP +"");
+			json.addProperty(INITIAL_TIMESTAMP, initialTimestamp +"");
 			if(inlineMessageId != null) {
 				json.addProperty(INLINE_MSG_ID, inlineMessageId +"");
 			}
@@ -438,8 +457,12 @@ public class Device {
 
 		private void sendInlineMap(OsmAndAssistantBot bot, LocationInfo locSig) {
 			InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
-			markup.getKeyboard().add(Collections.singletonList(new InlineKeyboardButton("Update " + device.getDeviceName()).setCallbackData(
-					"msg|" + device.getStringId() + "|updmap")));
+			List<InlineKeyboardButton> lst = new ArrayList<>();
+			lst.add(new InlineKeyboardButton("Update " + device.getDeviceName()).setCallbackData(
+					"msg|" + device.getStringId() + "|updmap"));
+			lst.add(new InlineKeyboardButton("Hide").setCallbackData(
+					"msg|" + device.getStringId() + "|hide"));
+			markup.getKeyboard().add(lst);
 			if (locSig != null && locSig.isLocationPresent()) {
 				if (lastSentLoc == null
 						|| MapUtils.getDistance(lastSentLoc.getLat(), lastSentLoc.getLon(), locSig.getLat(),
@@ -459,8 +482,12 @@ public class Device {
 		
 		private void sendInline(OsmAndAssistantBot bot, LocationInfo lastLocationSignal) {
 			InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
-			markup.getKeyboard().add(Collections.singletonList(new InlineKeyboardButton("Update " + device.getDeviceName()).setCallbackData(
-					"msg|" + device.getStringId() + "|updtxt")));
+			List<InlineKeyboardButton> lst = new ArrayList<>();
+			lst.add(new InlineKeyboardButton("Update " + device.getDeviceName()).setCallbackData(
+					"msg|" + device.getStringId() + "|updtxt"));
+			lst.add(new InlineKeyboardButton("Hide").setCallbackData(
+					"msg|" + device.getStringId() + "|hide"));
+			markup.getKeyboard().add(lst);
 			EditMessageText editMessageText = new EditMessageText();
 			editMessageText.setText(getMessageTxt(updateId));
 			editMessageText.enableHtml(true);
