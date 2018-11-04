@@ -21,6 +21,8 @@ import java.util.regex.Pattern;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import net.osmand.server.controllers.pub.PollsService.PollQuestion;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -53,6 +55,9 @@ public class WebController {
 
     @Autowired
     private SpringTemplateEngine templateEngine;
+    
+    @Autowired
+    private PollsService pollService;
     
     private List<BlogArticle> cacheBlogArticles = null;
     
@@ -89,6 +94,7 @@ public class WebController {
     public void reloadConfigs(List<String> errors) {
     	templateEngine.clearTemplateCache();
     	cacheBlogArticles = null;
+    	pollService.reloadConfigs(errors);
     	staticResources.clear();
     }
     
@@ -137,10 +143,28 @@ public class WebController {
 
 	@RequestMapping(path = { "/", "/index.html", "/index" })
 	@ResponseBody
-    public FileSystemResource index(HttpServletRequest request, HttpServletResponse response) {
-        return generateStaticResource("pub/index.html", "index.html", request, response);
+    public FileSystemResource index(HttpServletRequest request, HttpServletResponse response, Model model) {
+		Map<String, PollQuestion> polls = pollService.getPollsConfig(false);
+		model.addAttribute("poll", polls.get("website"));
+        return generateStaticResource("pub/index.html", "index.html", request, response, model);
     }
-    
+
+	@RequestMapping(path = { "/android-poll.html" })
+	@ResponseBody
+    public FileSystemResource androidPoll(HttpServletRequest request, HttpServletResponse response, Model model) {
+		Map<String, PollQuestion> polls = pollService.getPollsConfig(false);
+		model.addAttribute("poll", polls.get("android"));
+        return generateStaticResource("pub/mobile-poll.html", "android-poll.html", request, response, model);
+    }
+
+	@RequestMapping(path = { "/ios-poll.html" })
+	@ResponseBody
+    public FileSystemResource iosPoll(HttpServletRequest request, HttpServletResponse response, Model model) {
+		Map<String, PollQuestion> polls = pollService.getPollsConfig(false);
+		model.addAttribute("poll", polls.get("ios"));
+        return generateStaticResource("pub/mobile-poll.html", "ios-poll.html", request, response, model);
+    }
+	
     @RequestMapping(path = { "/build_it", "/build_it.html" })
     @ResponseBody
     public FileSystemResource buildIt(HttpServletRequest request, HttpServletResponse response) {

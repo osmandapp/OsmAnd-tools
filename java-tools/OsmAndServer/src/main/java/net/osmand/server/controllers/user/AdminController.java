@@ -4,8 +4,6 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -18,12 +16,12 @@ import java.util.Map;
 import java.util.TreeMap;
 
 import javax.servlet.http.HttpServletResponse;
-import javax.sql.DataSource;
 
 import net.osmand.server.api.services.DownloadIndexesService;
 import net.osmand.server.api.services.DownloadIndexesService.DownloadProperties;
 import net.osmand.server.api.services.MotdService;
 import net.osmand.server.api.services.MotdService.MotdSettings;
+import net.osmand.server.controllers.pub.PollsService;
 import net.osmand.server.controllers.pub.ReportsController;
 import net.osmand.server.controllers.pub.WebController;
 
@@ -40,7 +38,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowCallbackHandler;
 import org.springframework.jdbc.core.RowMapper;
-import org.springframework.jdbc.datasource.DataSourceUtils;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -70,6 +67,9 @@ public class AdminController {
 	
 	@Autowired
 	private ReportsController reports;
+	
+	@Autowired
+	private PollsService pollsService;
 	
 	@Autowired
 	private ApplicationContext appContext;
@@ -142,6 +142,7 @@ public class AdminController {
 			model.addAttribute("surveyReport", getSurveyReport());
 			model.addAttribute("subscriptionsReport", getSubscriptionsReport());
 			model.addAttribute("emailsReport", getEmailsDBReport());
+			model.addAttribute("polls", pollsService.getPollsConfig(false));
 			return "admin/info";
 	}
 	
