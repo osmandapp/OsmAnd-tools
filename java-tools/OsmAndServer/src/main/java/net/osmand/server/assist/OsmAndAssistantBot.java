@@ -15,6 +15,7 @@ import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 
 import net.osmand.server.assist.data.Device;
+import net.osmand.server.assist.data.DeviceBean;
 import net.osmand.server.assist.data.LocationInfo;
 import net.osmand.server.assist.data.TrackerConfiguration;
 import net.osmand.server.assist.data.TrackerConfigurationRepository;
@@ -554,6 +555,11 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 		trackerRepo.delete(config);
 		return config;
 	}
+	
+	public void saveDeviceInfo(DeviceBean device) {
+		deviceLocManager.saveNoCheck(device);
+		
+	}
 
 	public static class MyDevicesOptions {
 		public long filterLocationTime;
@@ -810,6 +816,8 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 	public String createNewDevice(UserChatIdentifier chatIdentifier, String name) {
 		return deviceLocManager.registerNewDevice(chatIdentifier, name);
 	}
+
+	
 
 	
 	

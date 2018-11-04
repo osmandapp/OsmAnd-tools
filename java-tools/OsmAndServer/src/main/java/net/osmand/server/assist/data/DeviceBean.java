@@ -89,6 +89,8 @@ public class DeviceBean {
 	
 	public static final String USER_INFO = "user";
 	
+	public static final String CHATS_INFO = "chats";
+	
 	@Column(name = "data", columnDefinition = "jsonb")
     @Type(type = "net.osmand.server.assist.data.JsonbType") 
 	public JsonObject data = new JsonObject();

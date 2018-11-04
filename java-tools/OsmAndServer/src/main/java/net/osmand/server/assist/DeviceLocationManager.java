@@ -50,7 +50,6 @@ public class DeviceLocationManager {
 	private static final int USER_UNIQUENESS = 1 << 20;
 	private static final Log LOG = LogFactory.getLog(DeviceLocationManager.class);
 
-	// it could be stored in redis so information won't be lost after restart
 	ConcurrentHashMap<Long, Device> devicesCache = new ConcurrentHashMap<>();
 
 	Random rnd = new Random();
@@ -118,10 +117,14 @@ public class DeviceLocationManager {
 		return device;
 	}
 
-	private String saveDevice(DeviceBean device) {
+	public String saveDevice(DeviceBean device) {
 		if (deviceRepo.findByUserIdOrderByCreatedDate(device.userId).size() > LIMIT_DEVICES_PER_USER) {
 			return String.format("Currently 1 user is allowed to have maximum '%d' devices.", LIMIT_DEVICES_PER_USER);
 		}
+		return saveNoCheck(device);
+	}
+
+	public String saveNoCheck(DeviceBean device) {
 		deviceRepo.save(device);
 		return String.format("Device '%s' is successfully added. Check it with /mydevices", device.deviceName);
 	}

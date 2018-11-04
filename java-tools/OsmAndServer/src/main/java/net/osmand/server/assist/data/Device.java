@@ -26,6 +26,8 @@ import org.telegram.telegrambots.api.objects.replykeyboard.buttons.InlineKeyboar
 import org.telegram.telegrambots.exceptions.TelegramApiRequestException;
 import org.telegram.telegrambots.updateshandlers.SentCallback;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
 public class Device {
@@ -57,9 +59,24 @@ public class Device {
 	public Device(DeviceBean device, OsmAndAssistantBot bot) {
 		this.device = device;
 		this.bot = bot;
+		
+		if(device.data.has(DeviceBean.CHATS_INFO)) {
+			loadChatsFromCache(device.data.get(DeviceBean.CHATS_INFO).getAsJsonArray());
+		}
 	}
 	
 	
+	private void loadChatsFromCache(JsonArray ar) {
+		for (JsonElement e : ar) {
+			try {
+				LocationChatMessage msg = new LocationChatMessage(this, e.getAsJsonObject());
+				this.chats.add(msg);
+			} catch (RuntimeException es) {
+			}
+		}
+	}
+
+
 	public String getExternalId() {
 		return device.externalId;
 	}
@@ -201,6 +218,12 @@ public class Device {
 			}
 		}
 		this.chats = n;
+		JsonArray ar = new JsonArray();
+		for(LocationChatMessage l : n) {
+			ar.add(l.getAsJsonObject());
+		}
+		device.data.add(DeviceBean.CHATS_INFO, ar);
+		bot.saveDeviceInfo(device);
 	}
 	
 	private LocationChatMessage getOrCreate(ChatType tp, Long chatId) {
@@ -290,6 +313,12 @@ public class Device {
 
 	public class LocationChatMessage {
 		protected static final int ERROR_THRESHOLD = 3;
+		
+		protected static final String CHAT_TYPE = "chat_type";
+		protected static final String CHAT_ID = "chat_id";
+		protected static final String INLINE_MSG_ID = "inline_msg_id";
+		protected static final String MSG_ID = "msg_id";
+		protected static final String INITIAL_TIMESTAMP = "initial_timestamp";
 
 		final Device device;
 		final ChatType type;
@@ -303,7 +332,17 @@ public class Device {
 		long updateTime;
 		int updateId = 1;
 		int errorCount = 0;
-
+		
+		public LocationChatMessage(Device d, JsonObject e) {
+			device = d;
+			this.type = ChatType.valueOf(e.get(CHAT_TYPE).getAsString());
+			this.chatId = Long.parseLong(e.get(CHAT_ID).getAsString());
+			this.inlineMessageId = e.has(INLINE_MSG_ID) ?  e.get(INLINE_MSG_ID).getAsString() : null;
+			this.initialTimestamp = Long.parseLong(e.get(INITIAL_TIMESTAMP).getAsString());
+			if(e.has(MSG_ID)) {
+				this.messageId = Integer.parseInt(e.get(MSG_ID).getAsString());
+			}
+		}
 		
 		public LocationChatMessage(Device d, ChatType type, long chatId) {
 			device = d;
@@ -319,6 +358,20 @@ public class Device {
 			this.chatId = 0;
 			this.inlineMessageId = inlineMessageId;
 			this.initialTimestamp = System.currentTimeMillis();
+		}
+		
+		public JsonObject getAsJsonObject() {
+			JsonObject json = new JsonObject();
+			json.addProperty(CHAT_TYPE, type.name());
+			json.addProperty(CHAT_ID, chatId +"");
+			json.addProperty(INITIAL_TIMESTAMP, INITIAL_TIMESTAMP +"");
+			if(inlineMessageId != null) {
+				json.addProperty(INLINE_MSG_ID, inlineMessageId +"");
+			}
+			if(messageId != 0) {
+				json.addProperty(MSG_ID, messageId +"");
+			}
+			return json;
 		}
 		
 		public void hide() {
