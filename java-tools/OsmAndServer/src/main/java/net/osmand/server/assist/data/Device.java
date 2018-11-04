@@ -274,6 +274,11 @@ public class Device {
 		boolean hd = false;
 		for(LocationChatMessage lm : chats) {
 			if(Algorithms.objectEquals(inlineMsgId, lm.inlineMessageId) ) {
+				if(lm.type == ChatType.MAP_INLINE) {
+					lm.sendInlineMap(bot, null, true);
+				} else if(lm.type == ChatType.MESSAGE_INLINE) {
+					lm.sendInline(bot, null, true);
+				}
 				lm.hide();
 				hd = true;
 			}
@@ -448,20 +453,25 @@ public class Device {
 			} else if(type == ChatType.MAP_CHAT) {
 				sendMsg(bot, device.getMessageTxt(updateId), lastSignal);
 			} else if(type == ChatType.MAP_INLINE) {
-				sendInlineMap(bot, lastSignal);
+				sendInlineMap(bot, lastSignal, false);
 			} else if(type == ChatType.MESSAGE_INLINE) {
-				sendInline(bot, lastSignal);
+				sendInline(bot, lastSignal, false);
 			}
 			updateId++;
 		}
 
-		private void sendInlineMap(OsmAndAssistantBot bot, LocationInfo locSig) {
+		private void sendInlineMap(OsmAndAssistantBot bot, LocationInfo locSig, boolean hide) {
 			InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
 			List<InlineKeyboardButton> lst = new ArrayList<>();
-			lst.add(new InlineKeyboardButton("Update " + device.getDeviceName()).setCallbackData(
+			if(hide) {
+				lst.add(new InlineKeyboardButton("Start update " + device.getDeviceName()).setCallbackData(
+						"msg|" + device.getStringId() + "|startmap"));
+			} else {
+				lst.add(new InlineKeyboardButton("Update " + device.getDeviceName()).setCallbackData(
 					"msg|" + device.getStringId() + "|updmap"));
-			lst.add(new InlineKeyboardButton("Hide").setCallbackData(
+				lst.add(new InlineKeyboardButton("Stop").setCallbackData(
 					"msg|" + device.getStringId() + "|hide"));
+			}
 			markup.getKeyboard().add(lst);
 			if (locSig != null && locSig.isLocationPresent()) {
 				if (lastSentLoc == null
@@ -480,13 +490,18 @@ public class Device {
 			}
 		}
 		
-		private void sendInline(OsmAndAssistantBot bot, LocationInfo lastLocationSignal) {
+		private void sendInline(OsmAndAssistantBot bot, LocationInfo lastLocationSignal, boolean hide) {
 			InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
 			List<InlineKeyboardButton> lst = new ArrayList<>();
-			lst.add(new InlineKeyboardButton("Update " + device.getDeviceName()).setCallbackData(
-					"msg|" + device.getStringId() + "|updtxt"));
-			lst.add(new InlineKeyboardButton("Hide").setCallbackData(
-					"msg|" + device.getStringId() + "|hide"));
+			if(hide) {
+				lst.add(new InlineKeyboardButton("Start update " + device.getDeviceName()).setCallbackData(
+						"msg|" + device.getStringId() + "|starttxt"));
+			} else {
+				lst.add(new InlineKeyboardButton("Update " + device.getDeviceName()).setCallbackData(
+						"msg|" + device.getStringId() + "|updtxt"));
+					lst.add(new InlineKeyboardButton("Stop").setCallbackData(
+						"msg|" + device.getStringId() + "|hide"));
+			}
 			markup.getKeyboard().add(lst);
 			EditMessageText editMessageText = new EditMessageText();
 			editMessageText.setText(getMessageTxt(updateId));
