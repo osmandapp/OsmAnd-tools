@@ -137,7 +137,7 @@ public class UpdateSubscription {
 			
 			SubscriptionPurchase subscription;
 			try {
-				if(sku.startsWith("osm_free")) {
+				if(sku.startsWith("osm_free") || sku.contains("_free_")) {
 					subscription = purchases.subscriptions().get(GOOGLE_PACKAGE_NAME_FREE, sku, pt).execute();
 				} else {
 					subscription = purchases.subscriptions().get(GOOGLE_PACKAGE_NAME, sku, pt).execute();
