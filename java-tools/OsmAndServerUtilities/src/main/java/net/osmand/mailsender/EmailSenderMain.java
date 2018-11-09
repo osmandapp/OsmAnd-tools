@@ -32,6 +32,8 @@ public class EmailSenderMain {
         String testAddresses = null;
         String subject = null;
         String mailFrom;
+        int sentSuccess = 0;
+        int sentFailed = 0;
     }
 
     public static void main(String[] args) throws SQLException {
@@ -176,6 +178,7 @@ public class EmailSenderMain {
                 sendMail(address, p);
             }
         }
+        LOGGER.warning(String.format("Sending mails finished: %d success, %d failed", p.sentSuccess, p.sentFailed));
     }
 
     private static String buildQuery(String mailingGroups) {
@@ -293,6 +296,9 @@ public class EmailSenderMain {
     }
 
     private static void sendMail(String mailTo, EmailParams p) {
+    	if(mailTo == null || mailTo.isEmpty()) {
+    		return;
+    	}
         LOGGER.info("Sending mail to: " + mailTo);
         String userHash;
         try {
@@ -328,7 +334,9 @@ public class EmailSenderMain {
             request.setBody(mail.build());
             Response response = sendGridClient.api(request);
             LOGGER.info("Response code: " + response.getStatusCode());
+            p.sentSuccess++;
         } catch (IOException ex) {
+        	p.sentFailed++;
             System.err.println(ex.getMessage());
         }
     }
