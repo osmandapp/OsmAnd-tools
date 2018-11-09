@@ -139,7 +139,7 @@ public class MainUtilities {
 				ObfDiffMerger.main(subArgsArray);
 			} else if (utl.equals("generate-wikivoyage-raw-lang")) {
 				WikivoyageLangPreparation.main(subArgsArray);
-			} else if (utl.equals("proccess-wikivoyage")) {
+			} else if (utl.equals("process-wikivoyage")) {
 				WikivoyageDataGenerator.main(subArgsArray);
 			} else if (utl.equals("generate-obf-extract-script")) {
 				GenerateExtractScript.main(subArgsArray);
