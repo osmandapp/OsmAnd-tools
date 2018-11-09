@@ -216,6 +216,7 @@ public class AdminController {
 		public String date;
 		public int monthCount;
 		public int annualCount;
+		public int total;
 	}
 	
 	private List<NewSubscriptionReport> getNewSubsReport() {
@@ -237,6 +238,7 @@ public class AdminController {
 						sr.date = rs.getString(1);
 						sr.monthCount = rs.getInt(2);
 						sr.annualCount = rs.getInt(3);
+						sr.total = rs.getInt(4);
 						return sr;
 					}
 
