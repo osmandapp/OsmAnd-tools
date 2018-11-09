@@ -142,6 +142,7 @@ public class AdminController {
 			model.addAttribute("surveyReport", getSurveyReport());
 			model.addAttribute("subscriptionsReport", getSubscriptionsReport());
 			model.addAttribute("emailsReport", getEmailsDBReport());
+			model.addAttribute("newSubsReport", getNewSubsReport());
 			model.addAttribute("polls", pollsService.getPollsConfig(false));
 			return "admin/info";
 	}
@@ -211,12 +212,43 @@ public class AdminController {
 		return er;
 	}
 
+	public static class NewSubscriptionReport {
+		public String date;
+		public int monthCount;
+		public int annualCount;
+	}
 	
+	private List<NewSubscriptionReport> getNewSubsReport() {
+		List<NewSubscriptionReport> result = jdbcTemplate
+				.query("select A.d, A.cnt monthly_subscriptions, B.cnt annual_subscriptions, A.cnt + B.cnt total from ( " +
+						"select date_trunc('day', starttime) d,  count(*) cnt from supporters_device_sub where  " +
+						"starttime > now() -  interval '30 days' and sku not like '%annual%'  " +
+						"group by date_trunc('day', starttime) " +
+						") A full outer join ( " +
+						"select date_trunc('day', starttime) d,  count(*) cnt from supporters_device_sub where  " +
+						"starttime > now() -  interval '30 days' and sku like '%annual%'  " +
+						"group by date_trunc('day', starttime) " +
+						") B on B.d = A.d " +
+						"order by 1 desc" , new RowMapper<NewSubscriptionReport>() {
+
+					@Override
+					public NewSubscriptionReport mapRow(ResultSet rs, int rowNum) throws SQLException {
+						NewSubscriptionReport sr = new NewSubscriptionReport();
+						sr.date = rs.getString(1);
+						sr.monthCount = rs.getInt(2);
+						sr.annualCount = rs.getInt(3);
+						return sr;
+					}
+
+				});
+		return result;
+	}
 	
 	public static class SubscriptionReport {
 		public String date;
 		public int count;
 	}
+	
 	
 	private List<SubscriptionReport> getSubscriptionsReport() {
 		List<SubscriptionReport> result = jdbcTemplate
