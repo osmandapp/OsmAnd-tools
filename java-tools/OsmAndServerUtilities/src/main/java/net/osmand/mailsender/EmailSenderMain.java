@@ -303,6 +303,7 @@ public class EmailSenderMain {
             return;
         }
         Email from = new Email(p.mailFrom);
+        from.setName("OsmAnd");
         Email to = new Email(mailTo);
         Mail mail = new Mail();
         mail.from = from;
