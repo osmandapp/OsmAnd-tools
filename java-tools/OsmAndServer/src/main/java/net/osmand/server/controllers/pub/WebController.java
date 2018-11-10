@@ -141,7 +141,7 @@ public class WebController {
     		}
     		
 			GeneratedResource gr = staticResources.get(file);
-			if(gr == null) {
+			if(gr == null || true) {
 				Map<String, Object> variables = new TreeMap<String, Object>();
 				if(model != null) {
 					variables.putAll(model.asMap());
@@ -286,12 +286,29 @@ public class WebController {
     	}
     	model.addAttribute("articles", blogs);
         model.addAttribute("article", blogs.get(0).id);
+        model.addAttribute("article_template", getLocaleTemplate("blog_articles/", request, blogs.get(0).id));
+        
         return generateStaticResource("pub/blog.html", "blog.html", request, response, model);
     }
     
 
     
-    @RequestMapping(path = { "/blog/{articleId}" })
+    private String getLocaleTemplate(String resourcePath, HttpServletRequest request, String id) {
+    	String pth = request.getRequestURI();
+		for(String loc : locales) {
+			if(pth.startsWith("/" + loc +"/")) {
+				String fullPath = resourcePath + loc +"/" + id;
+				if(new File(websiteLocation, fullPath).exists() || 
+						new File(websiteLocation, fullPath + ".html").exists()) {
+					return fullPath;
+				}
+			}
+		}
+		return resourcePath + id;
+	}
+
+
+	@RequestMapping(path = { "/blog/{articleId}" })
     @ResponseBody
     public FileSystemResource blogSpecific(HttpServletRequest request, HttpServletResponse response, @PathVariable(required=false) String articleId,
     		Model model) {
@@ -301,6 +318,7 @@ public class WebController {
     	}
     	model.addAttribute("articles",blogs);
     	model.addAttribute("article", articleId);
+    	model.addAttribute("article_template", getLocaleTemplate("blog_articles/", request, articleId));
     	return generateStaticResource("pub/blog.html", "blog/"+articleId+".html", request, response, model);
     }
     
@@ -395,7 +413,7 @@ public class WebController {
 						header = header.substring(header.indexOf(">") + 1);
 						header = header.substring(0, header.indexOf("</"));
 						ba.title = header;
-						ba.url = "/blog/"+id;
+						ba.url = "blog/"+id;
 						ba.id = id;
 						Matcher matcher = pt.matcher(meta);
 						Map<String, String> params = new LinkedHashMap<>();
