@@ -5,6 +5,7 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.lang.annotation.Annotation;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -13,7 +14,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.TimeZone;
+import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -39,8 +43,11 @@ import org.thymeleaf.context.WebContext;
 import org.thymeleaf.spring5.SpringTemplateEngine;
 
 @Controller
+@RequestMapping(path = {"", "ru", "de"})
 public class WebController {
     private static final Log LOGGER = LogFactory.getLog(WebController.class);
+    
+	public static final String[] SUPPORTED_LOCALES = new String[] { "", "ru", "de" };
 
 	private static final int LATEST_ARTICLES_MAIN = 10;
 	private static final int LATEST_ARTICLES_OTHER = 20;
@@ -63,10 +70,24 @@ public class WebController {
     
     private ConcurrentHashMap<String, GeneratedResource> staticResources = new ConcurrentHashMap<>();
     
+    private Set<String> locales = new TreeSet<>();
+    
     public static class GeneratedResource {
     	public FileSystemResource staticResource;
     	public String template;
     	public String targetFile;
+    }
+    
+    public WebController() {
+    	 for (Annotation annotation : WebController.class.getAnnotations()) {
+             if(annotation instanceof RequestMapping) {
+            	 for(String p : ((RequestMapping)annotation).path()) {
+            		 if(!p.equals("")) {
+            			 locales.add(p);
+            		 }
+            	 }
+             }
+    	 }
     }
 
     
@@ -106,14 +127,32 @@ public class WebController {
     private FileSystemResource generateStaticResource(String template, String file, HttpServletRequest request,
 			HttpServletResponse response, Model model) {
     	try {
+    		
+    		String localePath = "";
+    		Locale locale = null;
+    		String pth = request.getRequestURI();
+    		for(String loc : locales) {
+    			if(pth.startsWith("/" + loc +"/")) {
+    				file = loc +"_" + file;
+    				localePath = loc + "/";
+    				locale = new Locale("ru");
+    				break;
+    			}
+    		}
+    		
 			GeneratedResource gr = staticResources.get(file);
 			if(gr == null) {
+				Map<String, Object> variables = new TreeMap<String, Object>();
+				if(model != null) {
+					variables.putAll(model.asMap());
+				}
+				variables.put("locale_path", localePath);
 				gr = new GeneratedResource();
 				File targetFile = new File(genLocation, file);
 				gr.staticResource = new FileSystemResource(targetFile);
 				gr.template = template;
 				final IContext ctx = new WebContext(request, response, 
-						request.getServletContext(), null, model == null ? null : model.asMap());
+						request.getServletContext(), locale, variables);
 				String content = templateEngine.process(template, ctx);
 				writeToFileSync(targetFile, content);
 				staticResources.put(file, gr);
