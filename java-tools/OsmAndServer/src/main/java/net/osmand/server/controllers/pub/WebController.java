@@ -43,11 +43,11 @@ import org.thymeleaf.context.WebContext;
 import org.thymeleaf.spring5.SpringTemplateEngine;
 
 @Controller
-@RequestMapping(path = {"", "ru", "de"})
+@RequestMapping(path = {"", "ru"})
 public class WebController {
     private static final Log LOGGER = LogFactory.getLog(WebController.class);
     
-	public static final String[] SUPPORTED_LOCALES = new String[] { "", "ru", "de" };
+	public static final String[] SUPPORTED_LOCALES = new String[] { "", "ru" };
 
 	private static final int LATEST_ARTICLES_MAIN = 10;
 	private static final int LATEST_ARTICLES_OTHER = 20;
@@ -135,13 +135,13 @@ public class WebController {
     			if(pth.startsWith("/" + loc +"/")) {
     				file = loc +"_" + file;
     				localePath = loc + "/";
-    				locale = new Locale("ru");
+    				locale = new Locale(loc);
     				break;
     			}
     		}
     		
 			GeneratedResource gr = staticResources.get(file);
-			if(gr == null) {
+			if(gr == null || true) {
 				Map<String, Object> variables = new TreeMap<String, Object>();
 				if(model != null) {
 					variables.putAll(model.asMap());
@@ -233,6 +233,7 @@ public class WebController {
     public FileSystemResource featuresSpecific(HttpServletRequest request, HttpServletResponse response, @PathVariable(required=false) String articleId,
     		Model model) {
     	model.addAttribute("article",articleId);
+    	model.addAttribute("article_template", getLocaleTemplate("feature_articles/", request, articleId));
     	return generateStaticResource("pub/features.html", "features/"+articleId+".html", request, response, model);
     }
     
@@ -246,6 +247,7 @@ public class WebController {
             return null;
     	}
 		model.addAttribute("article", "main");
+		model.addAttribute("article_template", getLocaleTemplate("feature_articles/", request, "main"));
 		return generateStaticResource("pub/features.html", "features.html", request, response, model);
     }
     
