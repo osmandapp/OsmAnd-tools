@@ -5,7 +5,6 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.lang.annotation.Annotation;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -14,10 +13,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
 import java.util.TimeZone;
 import java.util.TreeMap;
-import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -43,7 +40,7 @@ import org.thymeleaf.context.WebContext;
 import org.thymeleaf.spring5.SpringTemplateEngine;
 
 @Controller
-@RequestMapping(path = {"", "ru"})
+@RequestMapping(path = {"", "ru" })
 public class WebController {
     private static final Log LOGGER = LogFactory.getLog(WebController.class);
     
@@ -70,8 +67,6 @@ public class WebController {
     
     private ConcurrentHashMap<String, GeneratedResource> staticResources = new ConcurrentHashMap<>();
     
-    private Set<String> locales = new TreeSet<>();
-    
     public static class GeneratedResource {
     	public FileSystemResource staticResource;
     	public String template;
@@ -79,15 +74,6 @@ public class WebController {
     }
     
     public WebController() {
-    	 for (Annotation annotation : WebController.class.getAnnotations()) {
-             if(annotation instanceof RequestMapping) {
-            	 for(String p : ((RequestMapping)annotation).path()) {
-            		 if(!p.equals("")) {
-            			 locales.add(p);
-            		 }
-            	 }
-             }
-    	 }
     }
 
     
@@ -131,7 +117,7 @@ public class WebController {
     		String localePath = "";
     		Locale locale = null;
     		String pth = request.getRequestURI();
-    		for(String loc : locales) {
+    		for(String loc : SUPPORTED_LOCALES) {
     			if(pth.startsWith("/" + loc +"/")) {
     				file = loc +"_" + file;
     				localePath = loc + "/";
@@ -297,7 +283,7 @@ public class WebController {
     
     private String getLocaleTemplate(String resourcePath, HttpServletRequest request, String id) {
     	String pth = request.getRequestURI();
-		for(String loc : locales) {
+		for(String loc : SUPPORTED_LOCALES) {
 			if(pth.startsWith("/" + loc +"/")) {
 				String fullPath = resourcePath + loc +"/" + id;
 				if(new File(websiteLocation, fullPath).exists() || 
