@@ -141,7 +141,7 @@ public class WebController {
     		}
     		
 			GeneratedResource gr = staticResources.get(file);
-			if(gr == null || true) {
+			if(gr == null) {
 				Map<String, Object> variables = new TreeMap<String, Object>();
 				if(model != null) {
 					variables.putAll(model.asMap());
