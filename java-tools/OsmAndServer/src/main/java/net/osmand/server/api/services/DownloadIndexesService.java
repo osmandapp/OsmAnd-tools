@@ -186,6 +186,7 @@ public class DownloadIndexesService  {
 								di.setDescription(tp.getDefaultTitle(name));
 							}
 						}
+						list.add(di);
 						zipFile.close();
 					} catch (Exception e) {
 						LOGGER.error(lf.getName() + ": " + e.getMessage(), e);
@@ -197,8 +198,6 @@ public class DownloadIndexesService  {
 					di.setContentSize(lf.length());
 					di.setTargetsize(lf.length());
 					di.setDescription(tp.getDefaultTitle(name));
-				}
-				if(isValid(lf)) {
 					list.add(di);
 				}
 			}
@@ -209,7 +208,8 @@ public class DownloadIndexesService  {
 		boolean isValid = true;
 		if (isZip(file)) {
 			try {
-				new ZipFile(file);
+				ZipFile fl = new ZipFile(file);
+				fl.close();
 			} catch (IOException ex) {
 				isValid = false;
 			}
