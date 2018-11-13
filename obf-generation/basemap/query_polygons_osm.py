@@ -40,11 +40,19 @@ def process_polygons(tags, filename):
 		if tag == "natural" :
 			array.append("natural")
 			queryFields += ", \"natural\""
-			conditions += " or (\"natural\" <> '' and \"natural\" <> 'water')"
+			conditions += " or (\"natural\" <> '' and \"natural\" <> 'water') and \"natural\" <> 'bare_rock' and \"natural\" <> 'rock' and \"natural\" <> 'stone' and \"natural\" <> 'cave_entrance' and \"natural\" <> 'scree' and \"natural\" <> 'fell' and \"natural\" <> 'scrub' and \"natural\" <> 'heath' and \"natural\" <> 'grassland'"
 		elif tag == "wetland" :
 			array.append("wetland")
 			queryFields += ",  wetland"
 			conditions += " or wetland in ('tidalflat')"
+		elif tag == "landuse" :
+			array.append("landuse")
+			queryFields += ", \"landuse\""
+			conditions += " or (\"landuse\" = 'residential' or \"landuse\" = 'allotments' or \"landuse\" = 'industrial' or \"landuse\" = 'forest' or \"landuse\" = 'military')"
+		elif tag == "leisure" :
+			array.append("leisure")
+			queryFields += ", \"leisure\""
+			conditions += " or (\"leisure\" = 'nature_reserve' or \"leisure\" = 'ski_resort')"
 		elif tag == "admin_level" :
 			array.append("admin_level")
 			queryFields += ", admin_level"
