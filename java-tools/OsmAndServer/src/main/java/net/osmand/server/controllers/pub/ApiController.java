@@ -55,6 +55,9 @@ public class ApiController {
     @Value("${files.location}")
     private String filesLocation;
     
+    @Value("${web.location}")
+    private String websiteLocation;
+    
     @Value("${geoip.url}")
     private String geoipURL;
 
@@ -213,6 +216,14 @@ public class ApiController {
         return "mapillary/photo-viewer";
     }
 
+    @GetMapping(path = {"/subscriptions/active"})
+    @ResponseBody
+    public FileSystemResource getActiveSubscriptions() {
+    	String procFile = websiteLocation.concat("api/subscriptions.json");
+        FileSystemResource fsr = new FileSystemResource(procFile);
+        return fsr;
+    }
+    
     @GetMapping(path = {"/motd", "/motd.php"})
     @ResponseBody
     public String getMessage(@RequestParam(required = false) String version,
