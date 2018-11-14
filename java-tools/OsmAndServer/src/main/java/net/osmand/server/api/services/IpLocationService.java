@@ -37,6 +37,10 @@ public class IpLocationService {
     public static final String LATITUDE = "latitude"; // 
     public static final String LONGITUDE = "longitude"; // 
     
+    private IpLocationService() {
+    	ObjectMapper mapper = new ObjectMapper();
+    	this.jsonMapper = mapper;
+    }
 	
 	public String getLocationAsJson(String remoteAddr) throws IOException {
 		HashMap<String, Object> value = getRawData(remoteAddr);
