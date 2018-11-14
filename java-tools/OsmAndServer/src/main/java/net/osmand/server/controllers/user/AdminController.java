@@ -112,11 +112,11 @@ public class AdminController {
 
 	private List<String> publish() {
 		List<String> errors = new ArrayList<>();
+		runCmd("git pull", new File(websiteLocation), errors);
         motdService.reloadconfig(errors);
         downloadService.reloadConfig(errors);
         web.reloadConfigs(errors);
         reports.reloadConfigs(errors);
-        runCmd("git pull", new File(websiteLocation), errors);
 		return errors;
 	}
 
