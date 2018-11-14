@@ -65,7 +65,7 @@ public class MotdService {
 		MotdSettings settings = getSettings();
 		if (settings != null) {
 			for (DiscountSetting setting : settings.discountSettings) {
-				if (setting.discountCondition.checkCondition(now, hostAddress, version, os, lang)) {
+				if (setting.discountCondition.checkCondition(now, hostAddress, version, os, lang, locationService)) {
 					message = setting.parseMotdMessageFile(mapper, websiteLocation.concat("api/messages/"));
 					break;
 				}
