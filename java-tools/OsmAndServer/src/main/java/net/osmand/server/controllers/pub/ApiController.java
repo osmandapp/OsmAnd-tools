@@ -218,8 +218,15 @@ public class ApiController {
 
     @GetMapping(path = {"/subscriptions/active"})
     @ResponseBody
-    public FileSystemResource getActiveSubscriptions() {
-    	String procFile = websiteLocation.concat("api/subscriptions.json");
+    public FileSystemResource getActiveSubscriptions(@RequestParam(required = false) String version,
+    		@RequestParam(required = false) String androidPackage,
+            @RequestParam(required = false) String lang,
+            @RequestParam(required = false) String os,
+            @RequestParam(required = false) String aid) {
+    	String procFile = websiteLocation.concat("api/subscriptions/free.json");
+    	if("net.osmand.plus".equals(androidPackage)) {
+    		procFile = websiteLocation.concat("api/subscriptions/paid.json");
+    	}
         FileSystemResource fsr = new FileSystemResource(procFile);
         return fsr;
     }
