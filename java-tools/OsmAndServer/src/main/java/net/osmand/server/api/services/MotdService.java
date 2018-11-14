@@ -17,6 +17,7 @@ import javax.annotation.PostConstruct;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -32,6 +33,10 @@ public class MotdService {
 
     @Value("${web.location}")
     private String websiteLocation;
+    
+
+    @Autowired
+	private IpLocationService locationService;
 
     private final ObjectMapper mapper;
     private static final SimpleDateFormat dateFormat = new SimpleDateFormat("dd-MM-yyyy HH:mm");
@@ -153,6 +158,10 @@ public class MotdService {
         private String version;
         @JsonProperty("lang")
         private String lang;
+        @JsonProperty("country")
+        private String country;
+        @JsonProperty("city")
+        private String city;
         @JsonProperty("os")
         private String os;
         
@@ -163,6 +172,15 @@ public class MotdService {
 			}
 			if (ip != null) {
 				filter += " IP in '" + ip + "' ";
+			}
+			if (lang != null) {
+				filter += " Language is '" + lang + "' ";
+			}
+			if (country != null) {
+				filter += " Country is '" + country + "' ";
+			}
+			if (city != null) {
+				filter += " City is '" + city + "' ";
 			}
 			
 			if (startDate != null || endDate != null) {
@@ -178,12 +196,25 @@ public class MotdService {
 		}
         
 
-        public boolean checkCondition(Date date, String hostAddress, String version, String osV, String lang) {
+        public boolean checkCondition(Date date, String hostAddress, String version, String osV, String lang, 
+        		IpLocationService locationService ) {
             if (ip != null && !ip.contains(hostAddress)) {
                 return false;
             }
             if(!checkActiveDate(date)) {
             	return false;
+            }
+            if(country != null) {
+				String cnt = locationService.getField(hostAddress, IpLocationService.COUNTRY_NAME);
+            	if(!cnt.equalsIgnoreCase(country)) {
+            		return false;
+            	}
+            }
+            if(city != null) {
+				String cnt = locationService.getField(hostAddress, IpLocationService.CITY);
+            	if(!cnt.equalsIgnoreCase(city)) {
+            		return false;
+            	}
             }
             if (this.os != null && this.os.length() > 0) {
 				String osVersion = osV != null && osV.equals("ios") ? "ios" : "android";

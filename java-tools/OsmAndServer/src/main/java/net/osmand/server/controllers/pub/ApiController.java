@@ -19,6 +19,7 @@ import net.osmand.server.api.repo.EmailSupportSurveyRepository;
 import net.osmand.server.api.repo.EmailSupportSurveyRepository.EmailSupportSurveyFeedback;
 import net.osmand.server.api.repo.EmailUnsubscribedRepository;
 import net.osmand.server.api.repo.EmailUnsubscribedRepository.EmailUnsubscribed;
+import net.osmand.server.api.services.IpLocationService;
 import net.osmand.server.api.services.MotdService;
 import net.osmand.server.api.services.PlacesService;
 
@@ -58,8 +59,6 @@ public class ApiController {
     @Value("${web.location}")
     private String websiteLocation;
     
-    @Value("${geoip.url}")
-    private String geoipURL;
 
     @Autowired
     private PlacesService placesService;
@@ -76,6 +75,9 @@ public class ApiController {
     @Autowired 
     DataMissingSearchRepository dataMissingSearch;
     
+    @Autowired
+	private IpLocationService locationService;
+
 	private ObjectMapper jsonMapper;
 
     
@@ -101,22 +103,7 @@ public class ApiController {
         if (hs != null && hs.hasMoreElements()) {
             remoteAddr = hs.nextElement();
         }
-        URLConnection conn = new URL(geoipURL + remoteAddr).openConnection();
-        TypeReference<HashMap<String,Object>> typeRef = new TypeReference<HashMap<String,Object>>() {};
-        HashMap<String,Object> value = jsonMapper.readValue(conn.getInputStream(), typeRef);
-        conn.getInputStream().close();
-        if(value.containsKey("lat") && !value.containsKey("latitude")) {
-        	value.put("latitude", value.get("lat"));
-        } else if(!value.containsKey("lat") && value.containsKey("latitude")) {
-        	value.put("lat", value.get("latitude"));
-        }
-        if(value.containsKey("lon") && !value.containsKey("longitude")) {
-        	value.put("longitude", value.get("lon"));
-        } else if(!value.containsKey("lon") && value.containsKey("longitude")) {
-        	value.put("lon", value.get("longitude"));
-        }
-        
-        return jsonMapper.writeValueAsString(value);
+        return locationService.getLocationAsJson(remoteAddr);
     }
     
     public static String extractFirstDoubleNumber(String s) {
