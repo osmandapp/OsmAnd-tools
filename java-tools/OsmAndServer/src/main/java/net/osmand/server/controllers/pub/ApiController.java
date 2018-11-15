@@ -1,8 +1,6 @@
 package net.osmand.server.controllers.pub;
 
 import java.io.IOException;
-import java.net.URL;
-import java.net.URLConnection;
 import java.net.URLDecoder;
 import java.text.ParseException;
 import java.util.Date;
@@ -42,7 +40,6 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
