@@ -217,20 +217,31 @@ public class AdminController {
 		public int monthCount;
 		public int annualCount;
 		public int total;
+		public int cancelTotal;
+		public int cancelMonthCount;
+		public int cancelAnnualCount;
 	}
 	
 	private List<NewSubscriptionReport> getNewSubsReport() {
 		List<NewSubscriptionReport> result = jdbcTemplate
-				.query("select A.d, A.cnt monthly_subscriptions, B.cnt annual_subscriptions, A.cnt + B.cnt total from ( " +
-						"select date_trunc('day', starttime) d,  count(*) cnt from supporters_device_sub where  " +
-						"starttime > now() -  interval '30 days' and sku not like '%annual%'  " +
-						"group by date_trunc('day', starttime) " +
-						") A full outer join ( " +
-						"select date_trunc('day', starttime) d,  count(*) cnt from supporters_device_sub where  " +
-						"starttime > now() -  interval '30 days' and sku like '%annual%'  " +
-						"group by date_trunc('day', starttime) " +
-						") B on B.d = A.d " +
-						"order by 1 desc" , new RowMapper<NewSubscriptionReport>() {
+				.query(
+								"	select A.d, A.cnt monthSub, B.cnt annualSub, C.cnt expMSub, D.cnt expYSub from ( " +
+								"		select date_trunc('day', starttime) d,  count(*) cnt from supporters_device_sub where  " +
+								"		starttime > now() -  interval '90 days' and sku not like '%annual%'  " +
+								"		group by date_trunc('day', starttime) " +
+								"	) A full outer join ( " +
+								"		select date_trunc('day', starttime) d,  count(*) cnt from supporters_device_sub where  " +
+								"		starttime > now() -  interval '90 days' and sku like '%annual%' " +
+								"		group by date_trunc('day', starttime) " +
+								"	) B on B.d = A.d full outer join ( " +
+								"		select date_trunc('day', expiretime) d,  count(*) cnt from supporters_device_sub where  " +
+								"		expiretime < now() -  interval '3 days' and expiretime > now() -  interval '90 days' and sku not like '%annual%'  " +
+								"		group by date_trunc('day', expiretime) " +
+								"	) C on C.d = A.d full outer join ( " +
+								"		select date_trunc('day', expiretime) d,  count(*) cnt from supporters_device_sub where  " +
+								"		expiretime < now() -  interval '3 days' and expiretime > now() -  interval '90 days' and sku like '%annual%' " +
+								"		group by date_trunc('day', expiretime) " +
+								"	) D on D.d = A.d order by 1 desc", new RowMapper<NewSubscriptionReport>() {
 
 					@Override
 					public NewSubscriptionReport mapRow(ResultSet rs, int rowNum) throws SQLException {
@@ -238,7 +249,10 @@ public class AdminController {
 						sr.date = rs.getString(1);
 						sr.monthCount = rs.getInt(2);
 						sr.annualCount = rs.getInt(3);
-						sr.total = rs.getInt(4);
+						sr.cancelMonthCount = rs.getInt(3);
+						sr.cancelAnnualCount = rs.getInt(4);
+						sr.total = sr.monthCount + sr.annualCount;
+						sr.cancelTotal = sr.cancelMonthCount + sr.cancelAnnualCount;
 						return sr;
 					}
 
