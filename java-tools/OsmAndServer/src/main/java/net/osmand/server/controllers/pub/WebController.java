@@ -7,6 +7,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.LinkedHashMap;
@@ -279,17 +280,23 @@ public class WebController {
         return generateStaticResource("pub/blog.html", "blog.html", request, response, model);
     }
     
-
-    
-    private String getLocaleTemplate(String resourcePath, HttpServletRequest request, String id) {
+    public String getLocaleFromRequest(HttpServletRequest request) {
     	String pth = request.getRequestURI();
 		for(String loc : SUPPORTED_LOCALES) {
 			if(pth.startsWith("/" + loc +"/")) {
-				String fullPath = resourcePath + loc +"/" + id;
-				if(new File(websiteLocation, fullPath).exists() || 
-						new File(websiteLocation, fullPath + ".html").exists()) {
-					return fullPath;
-				}
+				return loc;
+			}
+		}
+		return "";
+    	
+    }
+    
+	private String getLocaleTemplate(String resourcePath, HttpServletRequest request, String id) {
+		String l = getLocaleFromRequest(request);
+		if (l.length() > 0) {
+			String fullPath = resourcePath + l + "/" + id;
+			if (new File(websiteLocation, fullPath).exists() || new File(websiteLocation, fullPath + ".html").exists()) {
+				return fullPath;
 			}
 		}
 		return resourcePath + id;
@@ -342,11 +349,26 @@ public class WebController {
     	// rss content
     	public StringBuilder content = new StringBuilder();
     	public String dateRSS;
+    	
+    	public Map<String, BlogArticle> translations = Collections.emptyMap();
     }
     
     public List<BlogArticle> getBlogArticles(HttpServletRequest request, HttpServletResponse response) {
     	List<BlogArticle> articles = this.cacheBlogArticles;
     	if(articles != null) {
+    		String locale = getLocaleFromRequest(request);
+    		if(locale.length() > 0) {
+    			ArrayList<BlogArticle> res = new ArrayList<WebController.BlogArticle>();
+    			for(BlogArticle b : articles) {
+    				if(b.translations.containsKey(locale)) {
+    					res.add(b.translations.get(locale)); 
+    				} else {
+    					res.add(b);
+    				}
+    			}
+    			return res;
+    		}
+    		
     		return articles;
     	}
     	return loadBlogArticles(request, response);
@@ -361,15 +383,54 @@ public class WebController {
     	}
     	blogs = new ArrayList<WebController.BlogArticle>();
 		File folder = new File(websiteLocation, "blog_articles");
-    	File[] files = folder.listFiles();
-    	Pattern pt = Pattern.compile(" (\\w*)=\\\"([^\\\"]*)\\\"");
-    	SimpleDateFormat dateFormat = new SimpleDateFormat("dd-MM-yyyy HH:mm");
-    	SimpleDateFormat gmtDateFormat = new SimpleDateFormat("dd MMM yyyy HH:mm:ss zzz", Locale.ENGLISH);
-    	gmtDateFormat.setTimeZone(TimeZone.getTimeZone("GMT"));
+    	loadArticles(request, response, blogs, folder);
+    	Map<String, BlogArticle> articleById = new TreeMap<String, WebController.BlogArticle>(); 
+    	for(BlogArticle b : blogs) {
+    		articleById.put(b.id, b);
+    	}
+    	for(String loc : SUPPORTED_LOCALES) {
+    		if(!loc.equals("")) {
+    			List<BlogArticle> localeBlogs = new ArrayList<WebController.BlogArticle>();
+    			loadArticles(request, response, localeBlogs, new File(folder, loc));
+    			for(BlogArticle b : localeBlogs) {
+    				BlogArticle original = articleById.get(b.id);
+    				if(original != null) {
+    					if(original.translations.size() == 0) {
+    						original.translations = new TreeMap<String, WebController.BlogArticle>();
+    					}
+    					original.translations.put(loc, b);
+    				}
+    			}
+    		}
+    	}
     	
+    	blogs.sort(new Comparator<BlogArticle>() {
+
+			@Override
+			public int compare(BlogArticle o1, BlogArticle o2) {
+				long l1 = o1.pubdate == null ? 0 : o1.pubdate.getTime();
+				long l2 = o2.pubdate == null ? 0 : o2.pubdate.getTime();
+				return -Long.compare(l1, l2);
+			}
+		});
+    	this.cacheBlogArticles = blogs;
+		return blogs;
+	}
+
+
+	private void loadArticles(HttpServletRequest request, HttpServletResponse response, List<BlogArticle> blogs,
+			File folder) {
+		if(!folder.exists()) {
+			return;
+		}
+		Pattern pt = Pattern.compile(" (\\w*)=\\\"([^\\\"]*)\\\"");
     	final IContext ctx = new WebContext(request, response, request.getServletContext());
     	String cssItem = templateEngine.process("pub/rss_item.css.html", ctx);
     	
+    	File[] files = folder.listFiles();
+    	SimpleDateFormat dateFormat = new SimpleDateFormat("dd-MM-yyyy HH:mm");
+    	SimpleDateFormat gmtDateFormat = new SimpleDateFormat("dd MMM yyyy HH:mm:ss zzz", Locale.ENGLISH);
+    	gmtDateFormat.setTimeZone(TimeZone.getTimeZone("GMT"));
     	if(files != null) {
     		for(File f : files) {
     			
@@ -428,17 +489,6 @@ public class WebController {
     			}
     		}
     	}
-    	blogs.sort(new Comparator<BlogArticle>() {
-
-			@Override
-			public int compare(BlogArticle o1, BlogArticle o2) {
-				long l1 = o1.pubdate == null ? 0 : o1.pubdate.getTime();
-				long l2 = o2.pubdate == null ? 0 : o2.pubdate.getTime();
-				return -Long.compare(l1, l2);
-			}
-		});
-    	this.cacheBlogArticles = blogs;
-		return blogs;
 	}
     
     private String cutTags(String cont, String tag) {
