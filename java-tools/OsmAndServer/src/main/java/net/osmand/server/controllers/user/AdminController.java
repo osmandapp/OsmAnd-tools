@@ -218,6 +218,7 @@ public class AdminController {
 		public int annualCount;
 		public int total;
 		public int cancelTotal;
+		public int delta;
 		public int cancelMonthCount;
 		public int cancelAnnualCount;
 	}
@@ -253,6 +254,7 @@ public class AdminController {
 						sr.cancelAnnualCount = rs.getInt(5);
 						sr.total = sr.monthCount + sr.annualCount;
 						sr.cancelTotal = sr.cancelMonthCount + sr.cancelAnnualCount;
+						sr.delta = sr.total - sr.cancelTotal;
 						return sr;
 					}
 
