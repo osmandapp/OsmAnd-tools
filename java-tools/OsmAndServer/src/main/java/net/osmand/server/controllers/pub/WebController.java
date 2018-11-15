@@ -355,23 +355,22 @@ public class WebController {
     
     public List<BlogArticle> getBlogArticles(HttpServletRequest request, HttpServletResponse response) {
     	List<BlogArticle> articles = this.cacheBlogArticles;
-    	if(articles != null) {
-    		String locale = getLocaleFromRequest(request);
-    		if(locale.length() > 0) {
-    			ArrayList<BlogArticle> res = new ArrayList<WebController.BlogArticle>();
-    			for(BlogArticle b : articles) {
-    				if(b.translations.containsKey(locale)) {
-    					res.add(b.translations.get(locale)); 
-    				} else {
-    					res.add(b);
-    				}
-    			}
-    			return res;
-    		}
-    		
-    		return articles;
+    	if(articles == null) {
+    		articles = loadBlogArticles(request, response);
     	}
-    	return loadBlogArticles(request, response);
+    	String locale = getLocaleFromRequest(request);
+		if (locale.length() > 0) {
+			ArrayList<BlogArticle> res = new ArrayList<WebController.BlogArticle>();
+			for (BlogArticle b : articles) {
+				if (b.translations.containsKey(locale)) {
+					res.add(b.translations.get(locale));
+				} else {
+					res.add(b);
+				}
+			}
+			return res;
+		}
+		return articles;
     }
     
 
