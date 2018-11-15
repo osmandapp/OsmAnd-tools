@@ -249,8 +249,8 @@ public class AdminController {
 						sr.date = rs.getString(1);
 						sr.monthCount = rs.getInt(2);
 						sr.annualCount = rs.getInt(3);
-						sr.cancelMonthCount = rs.getInt(3);
-						sr.cancelAnnualCount = rs.getInt(4);
+						sr.cancelMonthCount = rs.getInt(4);
+						sr.cancelAnnualCount = rs.getInt(5);
 						sr.total = sr.monthCount + sr.annualCount;
 						sr.cancelTotal = sr.cancelMonthCount + sr.cancelAnnualCount;
 						return sr;
