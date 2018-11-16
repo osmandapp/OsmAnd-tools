@@ -214,7 +214,7 @@ public class MotdService {
 						(endDate == null ? "-" : String.format("%1$tF %1$tR", endDate)));
 			}
 			if (appPackage != null) {
-				filter += " appPackage '" + appVersion + "'";
+				filter += " appPackage '" + appPackage + "'";
 			}
 			if (appVersion != null) {
 				filter += " AppVersion '" + appVersion + "'";
