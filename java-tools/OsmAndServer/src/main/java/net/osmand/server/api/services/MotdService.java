@@ -59,13 +59,15 @@ public class MotdService {
 		return settings;
 	}
 
-    public HashMap<String,Object> getMessage(String version, String os, String hostAddress, String lang) throws IOException, ParseException {
+    public HashMap<String,Object> getMessage(String appVersion, 
+    		String version, String os, String hostAddress, String lang) throws IOException, ParseException {
         Date now = new Date();
         HashMap<String,Object> message = null;
 		MotdSettings settings = getSettings();
 		if (settings != null) {
 			for (DiscountSetting setting : settings.discountSettings) {
-				if (setting.discountCondition.checkCondition(now, hostAddress, version, os, lang, locationService)) {
+				if (setting.discountCondition.checkCondition(now, hostAddress, 
+						appVersion, version, os, lang, locationService)) {
 					message = setting.parseMotdMessageFile(mapper, websiteLocation.concat("api/messages/"));
 					break;
 				}
@@ -156,6 +158,8 @@ public class MotdService {
         private Date endDate;
         @JsonProperty("version")
         private String version;
+        @JsonProperty("app_version")
+        private String appVersion;
         @JsonProperty("lang")
         private String lang;
         @JsonProperty("country")
@@ -188,6 +192,9 @@ public class MotdService {
 						(startDate == null ? "-" : String.format("%1$tF %1$tR", startDate)),
 						(endDate == null ? "-" : String.format("%1$tF %1$tR", endDate)));
 			}
+			if (appVersion != null) {
+				filter += " AppVersion '" + appVersion + "'";
+			}
 			if (version != null) {
 				filter += " Version in '" + version + "'";
 			}
@@ -196,8 +203,9 @@ public class MotdService {
 		}
         
 
-        public boolean checkCondition(Date date, String hostAddress, String version, String osV, String lang, 
-        		IpLocationService locationService ) {
+        public boolean checkCondition(Date date, String hostAddress, 
+        		String appVersion, String version, String osV, String lang, 
+        		IpLocationService locationService) {
             if (ip != null && !ip.contains(hostAddress)) {
                 return false;
             }
@@ -221,6 +229,9 @@ public class MotdService {
 				if(!osVersion.equals(this.os)) {
 					return false;
 				}
+            }
+            if (this.appVersion != null && (appVersion == null || !appVersion.equalsIgnoreCase(this.appVersion))) {
+                return false;
             }
             if (this.version != null && (version == null || !version.startsWith(this.version))) {
                 return false;
