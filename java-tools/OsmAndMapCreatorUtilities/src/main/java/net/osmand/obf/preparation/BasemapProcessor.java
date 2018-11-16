@@ -87,7 +87,7 @@ public class BasemapProcessor {
     private final MapZooms mapZooms;
     private final Log logMapDataWarn;
     private SimplisticQuadTree[] quadTrees;
-    private static int MOST_DETAILED_APPROXIMATION = 11;
+    private static int MOST_DETAILED_APPROXIMATION = 9;
 
     protected static class SimplisticQuadTree {
         int zoom;
@@ -715,8 +715,8 @@ public class BasemapProcessor {
 			}
 			// MapZooms zooms = MapZooms.parseZooms("1-2;3;4-5;6-7;8-9;10-");
 			int zoomSmoothness = mini ? 2 : 2;
-			MapZooms zooms = mini ? MapZooms.parseZooms("1-2;3;4-5;6-") : MapZooms.parseZooms("1-2;3;4-5;6-7;8;9-");
-			MOST_DETAILED_APPROXIMATION = mini ? 6 : 11;
+			MapZooms zooms = mini ? MapZooms.parseZooms("1-2;3;4-5;6-") : MapZooms.parseZooms("1-2;3;4-5;6-7;8-");
+			MOST_DETAILED_APPROXIMATION = mini ? 6 : 9;
 			IndexCreatorSettings settings = new IndexCreatorSettings();
 			settings.indexMap = true;
 			settings.indexAddress = false;
