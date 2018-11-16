@@ -113,10 +113,10 @@ public class AdminController {
 	private List<String> publish() {
 		List<String> errors = new ArrayList<>();
 		runCmd("git pull", new File(websiteLocation), errors);
-        motdService.reloadconfig(errors);
-        downloadService.reloadConfig(errors);
-        web.reloadConfigs(errors);
-        reports.reloadConfigs(errors);
+		motdService.reloadconfig(errors);
+		downloadService.reloadConfig(errors);
+		web.reloadConfigs(errors);
+		reports.reloadConfigs(errors);
 		return errors;
 	}
 
@@ -236,11 +236,11 @@ public class AdminController {
 								"		group by date_trunc('day', starttime) " +
 								"	) B on B.d = A.d full outer join ( " +
 								"		select date_trunc('day', expiretime) d,  count(*) cnt from supporters_device_sub where  " +
-								"		expiretime < now() -  interval '1 days' and expiretime > now() -  interval '90 days' and sku not like '%annual%'  " +
+								"		expiretime < now() and expiretime > now() -  interval '90 days' and sku not like '%annual%'  " +
 								"		group by date_trunc('day', expiretime) " +
 								"	) C on C.d = A.d full outer join ( " +
 								"		select date_trunc('day', expiretime) d,  count(*) cnt from supporters_device_sub where  " +
-								"		expiretime < now() -  interval '1 days' and expiretime > now() -  interval '90 days' and sku like '%annual%' " +
+								"		expiretime < now() and expiretime > now() -  interval '90 days' and sku like '%annual%' " +
 								"		group by date_trunc('day', expiretime) " +
 								"	) D on D.d = A.d order by 1 desc", new RowMapper<NewSubscriptionReport>() {
 
