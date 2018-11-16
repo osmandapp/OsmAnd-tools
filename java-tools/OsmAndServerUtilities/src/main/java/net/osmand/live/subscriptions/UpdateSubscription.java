@@ -203,7 +203,7 @@ public class UpdateSubscription {
 		int ind = 1;
 		updSubscrStat.setTimestamp(ind++, new Timestamp(tm));
 		if(subscription.getStartTimeMillis() != null) {
-			if(startTime != null && Math.abs(startTime.getTime() - subscription.getStartTimeMillis().longValue()) > 10*1000 && 
+			if(startTime != null && Math.abs(startTime.getTime() - subscription.getStartTimeMillis().longValue()) > 5*60*60*1000 && 
 					startTime.getTime() > 100000*1000l) {
 				throw new IllegalArgumentException(String.format("Start timestamp changed %s != %s %s %s", 
 						startTime == null ? "" :new Date(startTime.getTime()),
