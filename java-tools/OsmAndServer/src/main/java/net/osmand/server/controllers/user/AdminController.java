@@ -136,6 +136,10 @@ public class AdminController {
 			if (settings != null) {
 				model.addAttribute("motdSettings", settings);
 			}
+			settings = motdService.getSubscriptionSettings();
+			if (settings != null) {
+				model.addAttribute("subSettings", settings);
+			}
 
 			model.addAttribute("downloadServers", getDownloadSettings());
 			model.addAttribute("reports", getReports());

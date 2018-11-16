@@ -30,6 +30,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 public class MotdService {
     private static final Log LOGGER = LogFactory.getLog(MotdService.class);
     private static final String MOTD_SETTINGS = "api/messages/motd_config.json";
+    private static final String SUBSCRIPTION_SETTINGS = "api/subscriptions/config.json";
 
     @Value("${web.location}")
     private String websiteLocation;
@@ -45,6 +46,7 @@ public class MotdService {
     }
     
     private MotdSettings settings;
+    private MotdSettings subscriptionSettings;
 
     public MotdService() {
         ObjectMapper objectMapper = new ObjectMapper();
@@ -54,11 +56,16 @@ public class MotdService {
     }
     
     
+    public MotdSettings getSubscriptionSettings() {
+		return subscriptionSettings;
+	}
+    
 
     public MotdSettings getSettings() {
 		return settings;
 	}
 
+    
     public HashMap<String,Object> getMessage(String appVersion, 
     		String version, String os, String hostAddress, String lang) throws IOException, ParseException {
         Date now = new Date();
@@ -67,7 +74,7 @@ public class MotdService {
 		if (settings != null) {
 			for (DiscountSetting setting : settings.discountSettings) {
 				if (setting.discountCondition.checkCondition(now, hostAddress, 
-						appVersion, version, os, lang, locationService)) {
+						appVersion, version, os, lang, "", locationService)) {
 					message = setting.parseMotdMessageFile(mapper, websiteLocation.concat("api/messages/"));
 					break;
 				}
@@ -75,6 +82,21 @@ public class MotdService {
 		}
         return message;
     }
+    
+    public String getSubscriptions(String appVersion, String version, String os, String hostAddress, String lang, String androidPackage)
+			throws IOException, ParseException {
+		Date now = new Date();
+		MotdSettings settings = getSubscriptionSettings();
+		if (settings != null) {
+			for (DiscountSetting setting : settings.discountSettings) {
+				if (setting.discountCondition.checkCondition(now, hostAddress, appVersion, version, os, lang,
+						androidPackage, locationService)) {
+					return websiteLocation.concat("api/subscriptions/" + setting.file);
+				}
+			}
+		}
+		return websiteLocation.concat("api/subscriptions/empty.json");
+	}
 
     @PostConstruct
 	public boolean reloadconfig() {
@@ -84,6 +106,7 @@ public class MotdService {
     public boolean reloadconfig(List<String> errors) {
     	try {
     		this.settings = mapper.readValue(new File(websiteLocation.concat(MOTD_SETTINGS)), MotdSettings.class);
+    		this.subscriptionSettings = mapper.readValue(new File(websiteLocation.concat(SUBSCRIPTION_SETTINGS)), MotdSettings.class);
     	} catch (IOException ex) {
     		if(errors != null) {
     			errors.add(MOTD_SETTINGS + " is invalid: " + ex.getMessage());
@@ -93,11 +116,6 @@ public class MotdService {
     	}
         return true;
     }
-
-
-    
-
-    
 
     public static class MotdSettings {
 
@@ -117,8 +135,7 @@ public class MotdService {
         public String file;
         @JsonProperty("fields")
         public Map<String, String> fields;
-
-
+        
         protected HashMap<String,Object> parseMotdMessageFile(ObjectMapper mapper, String folder) throws IOException {
         	if(file != null && file.length() > 0 && new File(folder, file).exists() ) {
         		TypeReference<HashMap<String,Object>> typeRef = new TypeReference<HashMap<String,Object>>() {};
@@ -160,6 +177,10 @@ public class MotdService {
         private String version;
         @JsonProperty("app_version")
         private String appVersion;
+        @JsonProperty("app_package")
+        private String appPackage;
+        
+        
         @JsonProperty("lang")
         private String lang;
         @JsonProperty("country")
@@ -192,6 +213,9 @@ public class MotdService {
 						(startDate == null ? "-" : String.format("%1$tF %1$tR", startDate)),
 						(endDate == null ? "-" : String.format("%1$tF %1$tR", endDate)));
 			}
+			if (appPackage != null) {
+				filter += " appPackage '" + appVersion + "'";
+			}
 			if (appVersion != null) {
 				filter += " AppVersion '" + appVersion + "'";
 			}
@@ -205,7 +229,7 @@ public class MotdService {
 
         public boolean checkCondition(Date date, String hostAddress, 
         		String appVersion, String version, String osV, String lang, 
-        		IpLocationService locationService) {
+        		String appPackage, IpLocationService locationService) {
             if (ip != null && !ip.contains(hostAddress)) {
                 return false;
             }
@@ -229,6 +253,9 @@ public class MotdService {
 				if(!osVersion.equals(this.os)) {
 					return false;
 				}
+            }
+            if (this.appPackage != null && (appPackage == null || !appPackage.equalsIgnoreCase(this.appPackage))) {
+                return false;
             }
             if (this.appVersion != null && (appVersion == null || !appVersion.equalsIgnoreCase(this.appVersion))) {
                 return false;

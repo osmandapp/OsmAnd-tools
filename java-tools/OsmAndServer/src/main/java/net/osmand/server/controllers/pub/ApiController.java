@@ -210,12 +210,23 @@ public class ApiController {
     		@RequestParam(required = false) String androidPackage,
             @RequestParam(required = false) String lang,
             @RequestParam(required = false) String os,
-            @RequestParam(required = false) String aid) {
-    	String procFile = websiteLocation.concat("api/subscriptions/free.json");
-    	if("net.osmand.plus".equals(androidPackage)) {
-    		procFile = websiteLocation.concat("api/subscriptions/paid.json");
-    	}
-        FileSystemResource fsr = new FileSystemResource(procFile);
+            @RequestParam(required = false) String aid, @RequestHeader HttpHeaders headers,
+            HttpServletRequest request) throws IOException, ParseException {
+    	
+    	String remoteAddr = request.getRemoteAddr();
+        if (headers.getFirst("X-Forwarded-For") != null) {
+            remoteAddr = headers.getFirst("X-Forwarded-For");
+        }
+        String appVersion = "";
+		if (version != null) {
+			int i = version.indexOf(" ");
+			if (i >= 0) {
+				appVersion = version.substring(0, i);
+				version = version.substring(i + 1);
+			}
+		}
+		String file = motdService.getSubscriptions(appVersion, version, os, remoteAddr, lang, androidPackage);
+        FileSystemResource fsr = new FileSystemResource(file);
         return fsr;
     }
     
