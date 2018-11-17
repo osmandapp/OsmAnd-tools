@@ -375,7 +375,7 @@ public class OsmAndServerMonitorTasks {
 				
 				return msg.trim();
 			} catch (JSONException e) {
-				LOG.warn("Error reading json from tirex " + (jsonObject != null ? jsonObject.toString() : res));
+				LOG.warn("Error reading json from tirex " + (jsonObject != null ? jsonObject.toString() : res) + " " + e.getMessage());
 			}
 		}
 		return "Rendering service (tirex) is down!";
