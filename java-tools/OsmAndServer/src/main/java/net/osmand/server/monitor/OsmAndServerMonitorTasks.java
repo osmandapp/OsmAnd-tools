@@ -555,16 +555,14 @@ public class OsmAndServerMonitorTasks {
 			Process p = Runtime.getRuntime().exec(cmd.split(" "), new String[0], loc);
 			BufferedReader stdInput = new BufferedReader(new InputStreamReader(p.getInputStream()));
 //			BufferedReader stdError = new BufferedReader(new InputStreamReader(p.getErrorStream()));
-			String s, commit = null;
+			String s, commit = "";
 			// read the output from the command
 			while ((s = stdInput.readLine()) != null) {
-				if (commit == null) {
-					commit += s +"\n";
-				}
+				commit += s +"\n";
 			}
 
 			p.waitFor();
-			return commit;
+			return commit.trim();
 		} catch (Exception e) {
 			String fmt = String.format("Error running %s: %s", cmd, e.getMessage());
 			LOG.warn(fmt);
