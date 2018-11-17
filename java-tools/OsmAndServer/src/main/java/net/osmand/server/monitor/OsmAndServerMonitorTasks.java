@@ -361,10 +361,12 @@ public class OsmAndServerMonitorTasks {
 		String txStatus = "tirex-status -r";
 		String res = runCmd(txStatus, new File("."), null);
 		if(res != null) {
+			JSONObject jsonObject = null;
 			try {
 				String msg = "";
-				JSONObject jsonObject = new JSONObject(res);
-				JSONArray queue = jsonObject.getJSONObject("queue").getJSONArray("prioqueues");
+				jsonObject = new JSONObject(res);
+				jsonObject = jsonObject.getJSONObject("queue");
+				JSONArray queue = jsonObject.getJSONArray("prioqueues");
 				for(int i = 0; i < queue.length(); i++) {
 					JSONObject o = queue.getJSONObject(i);
 					msg += String.format("Tiles queue %d - size %d (%d -%d s)\n", 
@@ -373,7 +375,7 @@ public class OsmAndServerMonitorTasks {
 				
 				return msg.trim();
 			} catch (JSONException e) {
-				LOG.warn("Error reading json from tirex " + res);
+				LOG.warn("Error reading json from tirex " + (jsonObject != null ? jsonObject.toString() : res));
 			}
 		}
 		return "Rendering service (tirex) is down!";
