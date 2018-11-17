@@ -363,14 +363,19 @@ public class OsmAndServerMonitorTasks {
 		if(res != null) {
 			JSONObject jsonObject = null;
 			try {
-				String msg = "";
 				jsonObject = new JSONObject(res);
-				jsonObject = jsonObject.getJSONObject("queue");
-				JSONArray queue = jsonObject.getJSONArray("prioqueues");
+//				"num_rendering": 7,
+//				  "load": 13.26,
+				JSONObject tls = jsonObject.getJSONObject("rm");
+				String msg = String.format("Currently rendered %d - current load %s\n", 
+						tls.getInt("num_rendering"), tls.getDouble("load") +"");
+				JSONArray queue = jsonObject.getJSONObject("queue").getJSONArray("prioqueues");
 				for(int i = 0; i < queue.length(); i++) {
 					JSONObject o = queue.getJSONObject(i);
-					msg += String.format("Tiles queue %d - size %d (%d -%d s)\n", 
+					if(o.getInt("size") > 0) {
+						msg += String.format("Tiles queue %d - size %d (%d -%d s)\n", 
 							o.getInt("prio"), o.getInt("size"), o.getInt("age_last"), o.getInt("age_first"));
+					}
 				}
 				
 				return msg.trim();
@@ -457,7 +462,7 @@ public class OsmAndServerMonitorTasks {
 		for (DownloadTestResult r : downloadTests.values()) {
 			msg += r.fullString() + "\n";
 		}
-		msg += getTileServerMessage();
+		msg += getTileServerMessage() + "\n";
 		msg += getTirexStatus();
 		return msg;
 	}
