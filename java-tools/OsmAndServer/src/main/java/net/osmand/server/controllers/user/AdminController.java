@@ -147,6 +147,7 @@ public class AdminController {
 			model.addAttribute("subscriptionsReport", getSubscriptionsReport());
 			model.addAttribute("emailsReport", getEmailsDBReport());
 			model.addAttribute("newSubsReport", getNewSubsReport());
+			model.addAttribute("futureCancelReport", getFutureCancelReport());
 			model.addAttribute("polls", pollsService.getPollsConfig(false));
 			return "admin/info";
 	}
@@ -227,6 +228,25 @@ public class AdminController {
 		public int cancelAnnualCount;
 	}
 	
+	private List<NewSubscriptionReport> getFutureCancelReport() {
+		List<NewSubscriptionReport> result = jdbcTemplate
+				.query(
+						"select date_trunc('day', expiretime) d,  count(*) cnt from supporters_device_sub where   " +
+						"expiretime > now() +  interval '1 days' and expiretime < now() +  interval '40 days' " +
+						"group by date_trunc('day', expiretime) order by 1 asc" , new RowMapper<NewSubscriptionReport>() {
+
+					@Override
+					public NewSubscriptionReport mapRow(ResultSet rs, int rowNum) throws SQLException {
+						NewSubscriptionReport sr = new NewSubscriptionReport();
+						sr.date = String.format("%1$tF", rs.getDate(1)); 
+						sr.cancelMonthCount = rs.getInt(2);
+						return sr;
+					}
+
+				});
+		return result;
+	}	
+	
 	private List<NewSubscriptionReport> getNewSubsReport() {
 		List<NewSubscriptionReport> result = jdbcTemplate
 				.query(
@@ -240,18 +260,18 @@ public class AdminController {
 								"		group by date_trunc('day', starttime) " +
 								"	) B on B.d = A.d full outer join ( " +
 								"		select date_trunc('day', expiretime) d,  count(*) cnt from supporters_device_sub where  " +
-								"		expiretime < now() and expiretime > now() -  interval '90 days' and sku not like '%annual%'  " +
+								"		expiretime < now() - interval '9 hours' and expiretime > now() -  interval '90 days' and sku not like '%annual%'  " +
 								"		group by date_trunc('day', expiretime) " +
 								"	) C on C.d = A.d full outer join ( " +
 								"		select date_trunc('day', expiretime) d,  count(*) cnt from supporters_device_sub where  " +
-								"		expiretime < now() and expiretime > now() -  interval '90 days' and sku like '%annual%' " +
+								"		expiretime < now() - interval '9 hours' and expiretime > now() -  interval '90 days' and sku like '%annual%' " +
 								"		group by date_trunc('day', expiretime) " +
 								"	) D on D.d = A.d order by 1 desc", new RowMapper<NewSubscriptionReport>() {
 
 					@Override
 					public NewSubscriptionReport mapRow(ResultSet rs, int rowNum) throws SQLException {
 						NewSubscriptionReport sr = new NewSubscriptionReport();
-						sr.date = rs.getString(1);
+						sr.date = String.format("%1$tF", rs.getDate(1)); 
 						sr.monthCount = rs.getInt(2);
 						sr.annualCount = rs.getInt(3);
 						sr.cancelMonthCount = rs.getInt(4);
