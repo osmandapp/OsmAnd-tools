@@ -364,21 +364,18 @@ public class OsmAndServerMonitorTasks {
 			JSONObject jsonObject = null;
 			try {
 				jsonObject = new JSONObject(res);
-//				"num_rendering": 7,
-//				  "load": 13.26,
 				JSONObject tls = jsonObject.getJSONObject("rm");
-				String msg = String.format("Currently rendered %d - current load %s\n", 
+				String msg = String.format("(Now: %d tiles, load %s. ", 
 						tls.getInt("num_rendering"), tls.getDouble("load") +"");
 				JSONArray queue = jsonObject.getJSONObject("queue").getJSONArray("prioqueues");
-				for(int i = 0; i < queue.length(); i++) {
+				for (int i = 0; i < queue.length(); i++) {
 					JSONObject o = queue.getJSONObject(i);
-					if(o.getInt("size") > 0) {
-						msg += String.format("Tiles queue %d - size %d (%d -%d s)\n", 
-							o.getInt("prio"), o.getInt("size"), o.getInt("age_last"), o.getInt("age_first"));
+					if (o.getInt("size") > 0) {
+						msg += String.format(", queue-%d - %d", o.getInt("prio"), o.getInt("size"));
 					}
 				}
-				
-				return msg.trim();
+				msg +=")";
+				return msg;
 			} catch (JSONException e) {
 				LOG.warn("Error reading json from tirex " + (jsonObject != null ? jsonObject.toString() : res) + " " + e.getMessage());
 			}
@@ -428,8 +425,8 @@ public class OsmAndServerMonitorTasks {
 	private String getTileServerMessage() {
 		DescriptiveStatistics tile24Hours = readStats(RED_KEY_TILE, 24);
 		return String.format("<a href='https://tile.osmand.net/hd/3/4/2.png'>tile</a>: "
-				+ "<b>%s</b>. Response time: 24h — %.1f sec · 95th 24h — %.1f sec.",
-				lastResponseTime < 60 ? "OK" : "FAILED", tile24Hours.getMean(), tile24Hours.getPercentile(PERC));
+				+ "<b>%s</b>. Response time: 24h — %.1f sec · 95th 24h — %.1f sec. %s",
+				lastResponseTime < 60 ? "OK" : "FAILED", tile24Hours.getMean(), tile24Hours.getPercentile(PERC), getTirexStatus());
 	}
 
 	private DescriptiveStatistics readStats(String key, double hour) {
@@ -462,8 +459,7 @@ public class OsmAndServerMonitorTasks {
 		for (DownloadTestResult r : downloadTests.values()) {
 			msg += r.fullString() + "\n";
 		}
-		msg += getTileServerMessage() + "\n";
-		msg += getTirexStatus();
+		msg += getTileServerMessage();
 		return msg;
 	}
 
