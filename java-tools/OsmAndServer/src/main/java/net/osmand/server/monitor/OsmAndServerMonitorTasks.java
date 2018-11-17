@@ -362,13 +362,21 @@ public class OsmAndServerMonitorTasks {
 		String res = runCmd(txStatus, new File("."), null);
 		if(res != null) {
 			try {
+				String msg = "";
 				JSONObject jsonObject = new JSONObject(res);
-				return jsonObject.getJSONObject("queue").toString();
+				JSONArray queue = jsonObject.getJSONObject("queue").getJSONArray("prioqueues");
+				for(int i = 0; i < queue.length(); i++) {
+					JSONObject o = queue.getJSONObject(i);
+					msg += String.format("Tiles queue %d - size %d (%d -%d s)\n", 
+							o.getInt("prio"), o.getInt("size"), o.getInt("age_last"), o.getInt("age_first"));
+				}
+				
+				return msg.trim();
 			} catch (JSONException e) {
 				LOG.warn("Error reading json from tirex " + res);
 			}
 		}
-		return "error tirex";
+		return "Rendering service (tirex) is down!";
 	}
 
 	private void addStat(String key, double score) {
@@ -448,6 +456,7 @@ public class OsmAndServerMonitorTasks {
 			msg += r.fullString() + "\n";
 		}
 		msg += getTileServerMessage();
+		msg += getTirexStatus();
 		return msg;
 	}
 
@@ -550,7 +559,7 @@ public class OsmAndServerMonitorTasks {
 			// read the output from the command
 			while ((s = stdInput.readLine()) != null) {
 				if (commit == null) {
-					commit = s;
+					commit += s +"\n";
 				}
 			}
 
