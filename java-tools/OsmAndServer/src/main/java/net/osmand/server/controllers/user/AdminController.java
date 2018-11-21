@@ -250,23 +250,26 @@ public class AdminController {
 	private List<NewSubscriptionReport> getNewSubsReport() {
 		List<NewSubscriptionReport> result = jdbcTemplate
 				.query(
-								"	select A.d, A.cnt monthSub, B.cnt annualSub, C.cnt expMSub, D.cnt expYSub from ( " +
+								"	select O.d, A.cnt monthSub, B.cnt annualSub, C.cnt expMSub, D.cnt expYSub from ( " +
+								"		SELECT date_trunc('day', generate_series(now() - '90 days'::interval, now(), '1 day'::interval)) as d" +
+								"	) O left join ( " +
 								"		select date_trunc('day', starttime) d,  count(*) cnt from supporters_device_sub where  " +
 								"		starttime > now() -  interval '90 days' and sku not like '%annual%'  " +
 								"		group by date_trunc('day', starttime) " +
-								"	) A full outer join ( " +
+								"	) A on A.d = O.d left join ( " +
 								"		select date_trunc('day', starttime) d,  count(*) cnt from supporters_device_sub where  " +
 								"		starttime > now() -  interval '90 days' and sku like '%annual%' " +
 								"		group by date_trunc('day', starttime) " +
-								"	) B on B.d = A.d full outer join ( " +
+								"	) B on B.d = O.d left join ( " +
 								"		select date_trunc('day', expiretime) d,  count(*) cnt from supporters_device_sub where  " +
 								"		expiretime < now() - interval '9 hours' and expiretime > now() -  interval '90 days' and sku not like '%annual%'  " +
 								"		group by date_trunc('day', expiretime) " +
-								"	) C on C.d = A.d full outer join ( " +
+								"	) C on C.d = O.d left join ( " +
 								"		select date_trunc('day', expiretime) d,  count(*) cnt from supporters_device_sub where  " +
 								"		expiretime < now() - interval '9 hours' and expiretime > now() -  interval '90 days' and sku like '%annual%' " +
 								"		group by date_trunc('day', expiretime) " +
-								"	) D on D.d = A.d order by 1 desc", new RowMapper<NewSubscriptionReport>() {
+								"	) D on A.d = O.d order by 1 desc", 
+								new RowMapper<NewSubscriptionReport>() {
 
 					@Override
 					public NewSubscriptionReport mapRow(ResultSet rs, int rowNum) throws SQLException {
