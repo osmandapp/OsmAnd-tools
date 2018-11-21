@@ -268,7 +268,7 @@ public class AdminController {
 								"		select date_trunc('day', expiretime) d,  count(*) cnt from supporters_device_sub where  " +
 								"		expiretime < now() - interval '9 hours' and expiretime > now() -  interval '90 days' and sku like '%annual%' " +
 								"		group by date_trunc('day', expiretime) " +
-								"	) D on A.d = O.d order by 1 desc", 
+								"	) D on D.d = O.d order by 1 desc", 
 								new RowMapper<NewSubscriptionReport>() {
 
 					@Override
