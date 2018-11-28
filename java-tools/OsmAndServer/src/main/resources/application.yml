@@ -76,8 +76,8 @@ server:
   tomcat.max-threads: 50
   address: 127.0.0.1 #keep it behind proxy
   tomcat:
-  	protocol_header: x-forwarded-proto
-  	remote_ip_header: x-forwarded-for
+    protocol_header: x-forwarded-proto
+    remote_ip_header: x-forwarded-for
     accesslog:
       directory: /var/log/osmand-server-logs/
       enabled: true
