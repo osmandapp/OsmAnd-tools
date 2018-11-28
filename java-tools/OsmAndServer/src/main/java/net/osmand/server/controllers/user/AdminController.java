@@ -5,6 +5,8 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.text.ParseException;
@@ -21,6 +23,7 @@ import java.util.TreeMap;
 import javax.servlet.http.HttpServletResponse;
 
 import net.osmand.server.api.services.DownloadIndexesService;
+import net.osmand.server.api.services.IpLocationService;
 import net.osmand.server.api.services.DownloadIndexesService.DownloadProperties;
 import net.osmand.server.api.services.MotdService;
 import net.osmand.server.api.services.MotdService.MotdSettings;
@@ -30,9 +33,6 @@ import net.osmand.server.controllers.pub.WebController;
 import nl.basjes.parse.core.Field;
 import nl.basjes.parse.core.Parser;
 import nl.basjes.parse.core.Parser.SetterPolicy;
-import nl.basjes.parse.core.exceptions.DissectionFailure;
-import nl.basjes.parse.core.exceptions.InvalidDissectorException;
-import nl.basjes.parse.core.exceptions.MissingDissectorsException;
 import nl.basjes.parse.httpdlog.HttpdLoglineParser;
 import nl.basjes.parse.httpdlog.dissectors.TimeStampDissector;
 
@@ -96,6 +96,10 @@ public class AdminController {
 	
 	@Autowired
     private JdbcTemplate jdbcTemplate;
+	
+	@Autowired
+	private IpLocationService locationService;
+
 
 	protected ObjectMapper mapper;
 	
@@ -133,14 +137,14 @@ public class AdminController {
 		reports.reloadConfigs(errors);
 		return errors;
 	}
-
+	
 
 	@RequestMapping("/access-logs")
 	public void loadLogs(@RequestParam(required=false) String starttime, 
 			@RequestParam(required=false) String endtime, 
 			@RequestParam(required=false) String region,
-			@RequestParam(required = false) int limit, HttpServletResponse response) throws SQLException, IOException,
-			DissectionFailure, InvalidDissectorException, MissingDissectorsException, ParseException {
+			@RequestParam(required=false) String filter,
+			@RequestParam(required = false) int limit, HttpServletResponse response) throws SQLException, IOException, ParseException {
 		Parser<LogEntry> parser = new HttpdLoglineParser<>(LogEntry.class, APACHE_LOG_FORMAT);
 		File logFile = new File(DEFAULT_LOG_LOCATION, "access.log");
 		Date startTime = starttime != null && starttime.length() > 0 ? timeInputFormat.parse(starttime) : null;
@@ -152,10 +156,23 @@ public class AdminController {
 			String ln = null;
 			LogEntry l = new LogEntry();
 			int r = 0;
+			int err = 0;
 			response.getOutputStream().write((LogEntry.toCSVHeader()+"\n").getBytes());
 			while ((ln = br.readLine()) != null) {
 				l.clear();
-				parser.parse(l, ln);
+				try {
+					parser.parse(l, ln);
+				} catch (Exception e) {
+					if (err++ >= 100) {
+						response.getOutputStream().write("Error parsing\n".getBytes());
+						break;
+					}
+				}
+				if(filter != null && filter.length() > 0) {
+					if(!l.uri.contains(filter)) {
+						continue;
+					}
+				}
 				if(startTime != null && startTime.getTime() > l.date.getTime()) {
 					continue;
 				}
@@ -163,6 +180,9 @@ public class AdminController {
 					break;
 				}
 				r++;
+				if(parseRegion) {
+					l.referrer = locationService.getField(l.ip, IpLocationService.COUNTRY_NAME);
+				}
 				response.getOutputStream().write((l.toCSVString()+"\n").getBytes());
 				if(r > limit && limit != -1) {
 					break;
@@ -518,6 +538,7 @@ public class AdminController {
 		private String userAgent;
 		private String status;
 		private String referrer;
+		private String region;
 		private static final SimpleDateFormat format = new SimpleDateFormat(TimeStampDissector.DEFAULT_APACHE_DATE_TIME_PATTERN);
 		
 	    @Field("IP:connection.client.host")
@@ -551,11 +572,41 @@ public class AdminController {
 	    
 	    public static String toCSVHeader() {
 	    	// add nd, aid, np, ...
-	    	return "IP, Region, Date, Time, Status, User-Agent, Referrer, URL"; 
+	    	return "IP,Region,Date,Time,Status,User-Agent,Referrer,Path,Version,Lang,Query,URL"; 
 	    }
 	    
 	    public String toCSVString() {
-			return String.format("%s,%s, %tF %tT, %s,%s,%s,%s", ip, "", date, date, status, userAgent, referrer, uri);
+	    	String path = "";
+	    	String query = "";
+	    	String version = "";
+	    	String lang = "";
+//	    	String nd = "";
+//	    	String ns = "";
+//	    	String aid = "";
+	    	if(uri != null && uri.length() > 0) {
+				try {
+					URL l = new URL("http://127.0.0.1" + uri);
+					path = l.getPath();
+					query = l.getQuery();
+					String[] params = query.split("&");
+					for (String param : params) {
+						String name = param.split("=")[0];
+						String value = param.split("=")[1];
+						if ("version".equals(name)) {
+							version = value;
+						} else if ("lang".equals(name)) {
+							lang = value;
+						}
+					}
+					uri = "";
+				} catch (MalformedURLException e) {
+				}
+	    		
+	    	}
+	    	
+			return String.format("%s,%s,%tF,%tT,%s,%s,%s,%s,%s,%s", 
+					ip, "", date, date, status, userAgent.replace(",", ";"), referrer, 
+					path, version, lang, query, uri);
 	    }
 	    
 	    public String toString() {
@@ -564,7 +615,9 @@ public class AdminController {
 
 	    public void clear() {
 	    	this.ip = "";
+	    	this.date = null;
 	    	this.referrer = "";
+	    	this.region = "";
 	    	this.userAgent = "";
 	    	this.status = "";
 	    	this.uri = "";
