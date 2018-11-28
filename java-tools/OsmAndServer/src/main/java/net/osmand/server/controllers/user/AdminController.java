@@ -597,8 +597,12 @@ public class AdminController {
 						query = l.getQuery();
 						String[] params = query.split("&");
 						for (String param : params) {
-							String name = param.split("=")[0];
-							String value = param.split("=")[1];
+							int ind = param.indexOf('=');
+							if(ind == -1) {
+								continue;
+							}
+							String name = param.substring(0, ind);
+							String value = param.substring(ind + 1);
 							if ("version".equals(name)) {
 								version = value;
 							} else if ("lang".equals(name)) {
