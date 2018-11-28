@@ -617,7 +617,7 @@ public class AdminController {
 	    		
 	    	}
 	    	
-			return String.format("%s,%s,%tF,%tT,%s,%s,%s,%s,%s,%s", 
+			return String.format("%s,%s,%tF,%tT,%s,%s,%s,%s,%s,%s,%s,%s", 
 					ip, "", date, date, status, userAgent.replace(",", ";"), referrer, 
 					path, version, lang, query, uri);
 	    }
