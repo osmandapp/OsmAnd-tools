@@ -586,19 +586,24 @@ public class AdminController {
 	    	if(uri != null && uri.length() > 0) {
 				try {
 					URL l = new URL("http://127.0.0.1" + uri);
-					path = l.getPath();
-					query = l.getQuery();
-					String[] params = query.split("&");
-					for (String param : params) {
-						String name = param.split("=")[0];
-						String value = param.split("=")[1];
-						if ("version".equals(name)) {
-							version = value;
-						} else if ("lang".equals(name)) {
-							lang = value;
+					if (l.getPath() != null) {
+						path = l.getPath();
+					}
+					if (l.getQuery() != null) {
+						query = l.getQuery();
+						String[] params = query.split("&");
+						for (String param : params) {
+							String name = param.split("=")[0];
+							String value = param.split("=")[1];
+							if ("version".equals(name)) {
+								version = value;
+							} else if ("lang".equals(name)) {
+								lang = value;
+							}
 						}
 					}
 					uri = "";
+					
 				} catch (MalformedURLException e) {
 				}
 	    		
