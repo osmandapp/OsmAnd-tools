@@ -3,3 +3,23 @@ build/
 fonts/
 src/main/resources/resources/*
 regions.ocbf
+
+gradle
+gradlew
+gradlew.bat
+
+# Android Studio
+/.idea
+*.iml
+
+# Gradle
+.gradle
+/local.properties
+
+# MacOSX
+.DS_Store
+
+.project
+.classpath
+
+/*.log
