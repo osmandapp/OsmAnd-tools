@@ -185,7 +185,7 @@ public class AdminController {
 				}
 				r++;
 				if(parseRegion) {
-					l.referrer = locationService.getField(l.ip, IpLocationService.COUNTRY_NAME);
+					l.region = locationService.getField(l.ip, IpLocationService.COUNTRY_NAME);
 				}
 				response.getOutputStream().write((l.toCSVString()+"\n").getBytes());
 				if(r > limit && limit != -1) {
@@ -618,7 +618,7 @@ public class AdminController {
 	    	}
 	    	
 			return String.format("%s,%s,%tF,%tT,%s,%s,%s,%s,%s,%s,%s,%s", 
-					ip, "", date, date, status, userAgent.replace(",", ";"), referrer, 
+					ip, region, date, date, status, userAgent.replace(",", ";"), referrer, 
 					path, version, lang, query, uri);
 	    }
 	    
