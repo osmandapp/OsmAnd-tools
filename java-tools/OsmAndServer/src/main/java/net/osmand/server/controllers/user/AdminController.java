@@ -2,10 +2,13 @@ package net.osmand.server.controllers.user;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -24,6 +27,14 @@ import net.osmand.server.api.services.MotdService.MotdSettings;
 import net.osmand.server.controllers.pub.PollsService;
 import net.osmand.server.controllers.pub.ReportsController;
 import net.osmand.server.controllers.pub.WebController;
+import nl.basjes.parse.core.Field;
+import nl.basjes.parse.core.Parser;
+import nl.basjes.parse.core.Parser.SetterPolicy;
+import nl.basjes.parse.core.exceptions.DissectionFailure;
+import nl.basjes.parse.core.exceptions.InvalidDissectorException;
+import nl.basjes.parse.core.exceptions.MissingDissectorsException;
+import nl.basjes.parse.httpdlog.HttpdLoglineParser;
+import nl.basjes.parse.httpdlog.dissectors.TimeStampDissector;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -89,6 +100,9 @@ public class AdminController {
 	protected ObjectMapper mapper;
 	
 	private static final String GIT_LOG_CMD = "git log -1 --pretty=format:\"%h%x09%an%x09%ad%x09%s\"";
+	private static final String APACHE_LOG_FORMAT = "%h %l %u %t \"%r\" %>s %O \"%{Referer}i\" \"%{User-Agent}i\"";
+	private static final String DEFAULT_LOG_LOCATION = "/var/log/nginx/";
+	private static final SimpleDateFormat timeInputFormat = new SimpleDateFormat("yyyy-MM-ddTHH:mm");
 	
 	public AdminController() {
 		ObjectMapper objectMapper = new ObjectMapper();
@@ -121,6 +135,50 @@ public class AdminController {
 	}
 
 
+	@RequestMapping("/access-logs")
+	public void loadLogs(@RequestParam(required=false) String starttime, 
+			@RequestParam(required=false) String endtime, 
+			@RequestParam(required=false) String region,
+			@RequestParam(required = false) int limit, HttpServletResponse response) throws SQLException, IOException,
+			DissectionFailure, InvalidDissectorException, MissingDissectorsException, ParseException {
+		Parser<LogEntry> parser = new HttpdLoglineParser<>(LogEntry.class, APACHE_LOG_FORMAT);
+		File logFile = new File(DEFAULT_LOG_LOCATION, "access.log");
+		Date startTime = starttime != null && starttime.length() > 0 ? timeInputFormat.parse(starttime) : null;
+		Date endTime = endtime != null && endtime.length() > 0 ? timeInputFormat.parse(endtime) : null;
+		boolean parseRegion = "on".equals(region);
+		FileReader fr = new FileReader(logFile);
+		try {
+			BufferedReader br = new BufferedReader(fr);
+			String ln = null;
+			LogEntry l = new LogEntry();
+			int r = 0;
+			response.getOutputStream().write((LogEntry.toCSVHeader()+"\n").getBytes());
+			while ((ln = br.readLine()) != null) {
+				l.clear();
+				parser.parse(l, ln);
+				if(startTime != null && startTime.getTime() > l.date.getTime()) {
+					continue;
+				}
+				if(endTime != null && endTime.getTime() < l.date.getTime()) {
+					break;
+				}
+				r++;
+				response.getOutputStream().write((l.toCSVString()+"\n").getBytes());
+				if(r > limit && limit != -1) {
+					break;
+				}
+				if(r % 100 == 0) {
+					response.flushBuffer();
+				}
+			}
+			response.flushBuffer();
+			br.close();
+		} finally {
+			fr.close();
+		}
+	}
+	
+	
 	@RequestMapping("/info")
 	public String index(Model model) throws SQLException {
 			model.addAttribute("server_startup", String.format("%1$tF %1$tR", new Date(appContext.getStartupDate())));
@@ -451,5 +509,65 @@ public class AdminController {
         // headers.add(HttpHeaders.CONTENT_DISPOSITION, String.format("attachment; filename=\"%s\"", fl.getName()));
         headers.add(HttpHeaders.CONTENT_TYPE, "text/plain");
 		return  ResponseEntity.ok().headers(headers).body(new FileSystemResource(fl));
+	}
+	
+	public static class LogEntry {
+		public String ip;
+		public Date date;
+		public String uri;
+		private String userAgent;
+		private String status;
+		private String referrer;
+		private static final SimpleDateFormat format = new SimpleDateFormat(TimeStampDissector.DEFAULT_APACHE_DATE_TIME_PATTERN);
+		
+	    @Field("IP:connection.client.host")
+	    public void setIP(final String value) {
+	        ip =  value;
+	    }
+	    
+	    @Field("TIME.STAMP:request.receive.time")
+	    public void setTime(final String value) throws ParseException {
+			date = format.parse(value);
+	    }
+	    
+	    @Field("HTTP.URI:request.firstline.uri")
+	    public void setURI(String value) {
+	    	uri = value;
+	    }
+	    
+	    @Field("HTTP.USERAGENT:request.user-agent")
+	    public void setUserAgent(String value) {
+	    	userAgent = value;
+	    }
+	    
+	    @Field("STRING:request.status.last")
+	    public void setStatusCode(String value) {
+	    	status = value;
+	    }
+	    @Field(value = {"HTTP.URI:request.referer"}, setterPolicy = SetterPolicy.ALWAYS)
+	    public void setReferrer(String value) {
+	    	referrer = value == null  ? "" : value;
+	    }
+	    
+	    public static String toCSVHeader() {
+	    	// add nd, aid, np, ...
+	    	return "IP, Region, Date, Time, Status, User-Agent, Referrer, URL"; 
+	    }
+	    
+	    public String toCSVString() {
+			return String.format("%s,%s, %tF %tT, %s,%s,%s,%s", ip, "", date, date, status, userAgent, referrer, uri);
+	    }
+	    
+	    public String toString() {
+	        return String.format("Request %s %tF %2$tT %s (user-agent %s, referrer %s): %s", ip, date, status, userAgent, referrer, uri);
+	    }
+
+	    public void clear() {
+	    	this.ip = "";
+	    	this.referrer = "";
+	    	this.userAgent = "";
+	    	this.status = "";
+	    	this.uri = "";
+	    }
 	}
 }
