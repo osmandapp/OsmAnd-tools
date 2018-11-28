@@ -102,13 +102,13 @@ public class AdminController {
 	private static final String GIT_LOG_CMD = "git log -1 --pretty=format:\"%h%x09%an%x09%ad%x09%s\"";
 	private static final String APACHE_LOG_FORMAT = "%h %l %u %t \"%r\" %>s %O \"%{Referer}i\" \"%{User-Agent}i\"";
 	private static final String DEFAULT_LOG_LOCATION = "/var/log/nginx/";
-	private static final SimpleDateFormat timeInputFormat = new SimpleDateFormat("yyyy-MM-ddTHH:mm");
+	private static final SimpleDateFormat timeInputFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm");
 	
 	public AdminController() {
 		ObjectMapper objectMapper = new ObjectMapper();
         this.mapper = objectMapper;
 	}
-
+	
 	@RequestMapping(path = { "/publish" }, method = RequestMethod.POST)
 	public String publish(Model model, final RedirectAttributes redirectAttrs) throws JsonProcessingException {
 		List<String> errors = publish();
