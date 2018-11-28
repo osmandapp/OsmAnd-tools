@@ -167,6 +167,10 @@ public class AdminController {
 						response.getOutputStream().write("Error parsing\n".getBytes());
 						break;
 					}
+					continue;
+				}
+				if(l.date == null) {
+					continue;
 				}
 				if(filter != null && filter.length() > 0) {
 					if(!l.uri.contains(filter)) {
