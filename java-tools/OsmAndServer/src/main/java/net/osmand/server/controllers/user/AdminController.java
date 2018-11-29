@@ -2,7 +2,6 @@ package net.osmand.server.controllers.user;
 
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
@@ -23,7 +22,6 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.zip.GZIPOutputStream;
 
-import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServletResponse;
 
 import net.osmand.server.api.services.DownloadIndexesService;
@@ -199,6 +197,8 @@ public class AdminController {
 				}
 			}
 			out.write((LogEntry.toCSVHeader()+"\n").getBytes());
+			out.flush();
+			response.flushBuffer();
 			while (found && (ln = raf.readLine()) != null) {
 				if(raf.getFilePointer() > currentLimit) {
 					break;
@@ -235,12 +235,14 @@ public class AdminController {
 				if(rows > limit && limit != -1) {
 					break;
 				}
-				if(rows % 100 == 0) {
+				if(rows % 1000 == 0) {
+					out.flush();
 					response.flushBuffer();
 				}
 			}
 			out.close();
 			response.flushBuffer();
+			response.getOutputStream().close();
 		} finally {
 			raf.close();
 		}

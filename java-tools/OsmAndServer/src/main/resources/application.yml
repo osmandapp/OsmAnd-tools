@@ -27,6 +27,7 @@ logging:
 server:
   port: 8080
   tomcat.max-threads: 5
+  connection-timeout: 120000
 files.location: ${user.dir}/../../../help/
 gen.location: ${files.location}/gen/
 web.location: ${files.location}/website/
