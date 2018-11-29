@@ -149,7 +149,7 @@ public class AdminController {
 			@RequestParam(required=false) String region,
 			@RequestParam(required=false) String filter,
 			@RequestParam(required = false) int limit,
-			@RequestParam(required = false) Boolean gzip,
+			@RequestParam(required = false) String gzip,
 			HttpServletResponse response) throws SQLException, IOException, ParseException {
 		Parser<LogEntry> parser = new HttpdLoglineParser<>(LogEntry.class, APACHE_LOG_FORMAT);
 		File logFile = new File(DEFAULT_LOG_LOCATION, "access.log");
@@ -157,7 +157,7 @@ public class AdminController {
 		Date endTime = endtime != null && endtime.length() > 0 ? timeInputFormat.parse(endtime) : null;
 		boolean parseRegion = "on".equals(region);
 		RandomAccessFile raf = new RandomAccessFile(logFile, "r");
-		boolean gzipFile = gzip != null && gzip.booleanValue();
+		boolean gzipFile = "on".equals(gzip);
 		try {
 			String ln = null;
 			LogEntry l = new LogEntry();
