@@ -5,6 +5,7 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.RandomAccessFile;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.sql.ResultSet;
@@ -23,8 +24,8 @@ import java.util.TreeMap;
 import javax.servlet.http.HttpServletResponse;
 
 import net.osmand.server.api.services.DownloadIndexesService;
-import net.osmand.server.api.services.IpLocationService;
 import net.osmand.server.api.services.DownloadIndexesService.DownloadProperties;
+import net.osmand.server.api.services.IpLocationService;
 import net.osmand.server.api.services.MotdService;
 import net.osmand.server.api.services.MotdService.MotdSettings;
 import net.osmand.server.controllers.pub.PollsService;
@@ -150,15 +151,46 @@ public class AdminController {
 		Date startTime = starttime != null && starttime.length() > 0 ? timeInputFormat.parse(starttime) : null;
 		Date endTime = endtime != null && endtime.length() > 0 ? timeInputFormat.parse(endtime) : null;
 		boolean parseRegion = "on".equals(region);
-		FileReader fr = new FileReader(logFile);
+		RandomAccessFile raf = new RandomAccessFile(logFile, "r");
 		try {
-			BufferedReader br = new BufferedReader(fr);
 			String ln = null;
 			LogEntry l = new LogEntry();
-			int r = 0;
+			int rows = 0;
 			int err = 0;
+			long currentLimit = raf.length();
+			
+			// seek position
+			long pos = 0;
+			long step = 1 << 26; // 64 MB
+			while(startTime != null) {
+				boolean found = false;
+				if(currentLimit > pos + step) {
+					raf.seek(pos + step);
+					// skip incomplete line
+					raf.readLine();
+					try {
+						parser.parse(l, raf.readLine());
+						if(startTime.getTime() > l.date.getTime()) {
+							found = true;
+						}
+					} catch (Exception e) {
+					}
+				} else {
+					found = true;
+				}
+				if(found) {
+					raf.seek(pos);
+					// skip incomplete line
+					raf.readLine();
+				} else {
+					pos += step;
+				}
+			}
 			response.getOutputStream().write((LogEntry.toCSVHeader()+"\n").getBytes());
-			while ((ln = br.readLine()) != null) {
+			while ((ln = raf.readLine()) != null) {
+				if(raf.getFilePointer() > currentLimit) {
+					break;
+				}
 				l.clear();
 				try {
 					parser.parse(l, ln);
@@ -183,22 +215,21 @@ public class AdminController {
 				if(endTime != null && endTime.getTime() < l.date.getTime()) {
 					break;
 				}
-				r++;
+				rows++;
 				if(parseRegion) {
 					l.region = locationService.getField(l.ip, IpLocationService.COUNTRY_NAME);
 				}
 				response.getOutputStream().write((l.toCSVString()+"\n").getBytes());
-				if(r > limit && limit != -1) {
+				if(rows > limit && limit != -1) {
 					break;
 				}
-				if(r % 100 == 0) {
+				if(rows % 100 == 0) {
 					response.flushBuffer();
 				}
 			}
 			response.flushBuffer();
-			br.close();
 		} finally {
-			fr.close();
+			raf.close();
 		}
 	}
 	
