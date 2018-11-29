@@ -161,33 +161,31 @@ public class AdminController {
 			
 			// seek position
 			long pos = 0;
-			long step = 1 << 26; // 64 MB
-			while(startTime != null) {
-				boolean found = false;
+			long step = 1 << 24; // 16 MB
+			boolean found = startTime == null;
+			while(!found) {
 				if(currentLimit > pos + step) {
 					raf.seek(pos + step);
 					// skip incomplete line
 					raf.readLine();
 					try {
 						parser.parse(l, raf.readLine());
-						if(startTime.getTime() > l.date.getTime()) {
+						if(startTime.getTime() < l.date.getTime()) {
+							raf.seek(pos);
+							// skip incomplete line
+							raf.readLine();
 							found = true;
+							break;
 						}
 					} catch (Exception e) {
 					}
-				} else {
-					found = true;
-				}
-				if(found) {
-					raf.seek(pos);
-					// skip incomplete line
-					raf.readLine();
-				} else {
 					pos += step;
+				} else {
+					break;
 				}
 			}
 			response.getOutputStream().write((LogEntry.toCSVHeader()+"\n").getBytes());
-			while ((ln = raf.readLine()) != null) {
+			while (found && (ln = raf.readLine()) != null) {
 				if(raf.getFilePointer() > currentLimit) {
 					break;
 				}
