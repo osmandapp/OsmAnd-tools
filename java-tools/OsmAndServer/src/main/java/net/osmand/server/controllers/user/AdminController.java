@@ -5,6 +5,7 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -20,7 +21,9 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.zip.GZIPOutputStream;
 
+import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServletResponse;
 
 import net.osmand.server.api.services.DownloadIndexesService;
@@ -145,13 +148,16 @@ public class AdminController {
 			@RequestParam(required=false) String endtime, 
 			@RequestParam(required=false) String region,
 			@RequestParam(required=false) String filter,
-			@RequestParam(required = false) int limit, HttpServletResponse response) throws SQLException, IOException, ParseException {
+			@RequestParam(required = false) int limit,
+			@RequestParam(required = false) Boolean gzip,
+			HttpServletResponse response) throws SQLException, IOException, ParseException {
 		Parser<LogEntry> parser = new HttpdLoglineParser<>(LogEntry.class, APACHE_LOG_FORMAT);
 		File logFile = new File(DEFAULT_LOG_LOCATION, "access.log");
 		Date startTime = starttime != null && starttime.length() > 0 ? timeInputFormat.parse(starttime) : null;
 		Date endTime = endtime != null && endtime.length() > 0 ? timeInputFormat.parse(endtime) : null;
 		boolean parseRegion = "on".equals(region);
 		RandomAccessFile raf = new RandomAccessFile(logFile, "r");
+		boolean gzipFile = gzip != null && gzip.booleanValue();
 		try {
 			String ln = null;
 			LogEntry l = new LogEntry();
@@ -163,6 +169,14 @@ public class AdminController {
 			long pos = 0;
 			long step = 1 << 24; // 16 MB
 			boolean found = startTime == null;
+			OutputStream out;
+			if(gzipFile) {
+				response.setHeader("Content-Disposition", "attachment; filename=logs.csv.gz");
+				response.setHeader("Content-Type", "application/x-gzip");
+				out = new GZIPOutputStream(response.getOutputStream());
+			} else {
+				out = response.getOutputStream();;
+			}
 			while(!found) {
 				if(currentLimit > pos + step) {
 					raf.seek(pos + step);
@@ -184,7 +198,7 @@ public class AdminController {
 					break;
 				}
 			}
-			response.getOutputStream().write((LogEntry.toCSVHeader()+"\n").getBytes());
+			out.write((LogEntry.toCSVHeader()+"\n").getBytes());
 			while (found && (ln = raf.readLine()) != null) {
 				if(raf.getFilePointer() > currentLimit) {
 					break;
@@ -194,7 +208,7 @@ public class AdminController {
 					parser.parse(l, ln);
 				} catch (Exception e) {
 					if (err++ >= 100) {
-						response.getOutputStream().write("Error parsing\n".getBytes());
+						out.write("Error parsing\n".getBytes());
 						break;
 					}
 					continue;
@@ -217,7 +231,7 @@ public class AdminController {
 				if(parseRegion) {
 					l.region = locationService.getField(l.ip, IpLocationService.COUNTRY_NAME);
 				}
-				response.getOutputStream().write((l.toCSVString()+"\n").getBytes());
+				out.write((l.toCSVString()+"\n").getBytes());
 				if(rows > limit && limit != -1) {
 					break;
 				}
@@ -225,6 +239,7 @@ public class AdminController {
 					response.flushBuffer();
 				}
 			}
+			out.close();
 			response.flushBuffer();
 		} finally {
 			raf.close();
