@@ -14,6 +14,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Random;
 import java.util.TimeZone;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
@@ -50,6 +51,8 @@ public class WebController {
 	private static final int LATEST_ARTICLES_MAIN = 10;
 	private static final int LATEST_ARTICLES_OTHER = 20;
 	private static final int LATEST_ARTICLES_RSS = 15;
+	
+	private Random random = new Random();
 
     @Value("${web.location}")
     private String websiteLocation;
@@ -171,7 +174,16 @@ public class WebController {
 	@ResponseBody
     public FileSystemResource index(HttpServletRequest request, HttpServletResponse response, Model model) {
 		Map<String, PollQuestion> polls = pollService.getPollsConfig(false);
-		model.addAttribute("poll", polls.get("website"));
+		List<String> keys = new ArrayList<String>();
+		for(String web : polls.keySet()) {
+			if(web.startsWith("website")) {
+				keys.add(web);
+			}
+		}
+		if(keys.size() > 0) {
+			String key = keys.get(random.nextInt(keys.size()));
+			model.addAttribute("poll", polls.get(key));
+		} 
         return generateStaticResource("pub/index.html", "index.html", request, response, model);
     }
 
