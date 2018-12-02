@@ -20,7 +20,7 @@ def esc(s):
 
 def process_points(cond, filename, array):
 	f = open(filename,'w')
-	conn_string = "host='127.0.0.1' dbname='gis' user='gisuser' password='gisuser' port='5432'"
+		conn_string = "host='127.0.0.1' dbname='osm' user='"+os.environ['DB_USER']+"' password='"+os.environ['DB_PWD']+"' port='5433'"
 	f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
 	f.write('<osm version="0.6">\n')
  
