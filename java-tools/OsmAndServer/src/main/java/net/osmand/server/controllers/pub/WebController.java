@@ -180,11 +180,12 @@ public class WebController {
 				keys.add(web);
 			}
 		}
+		int v = 0; 
 		if(keys.size() > 0) {
-			String key = keys.get(random.nextInt(keys.size()));
-			model.addAttribute("poll", polls.get(key));
+			v = random.nextInt(keys.size());
+			model.addAttribute("poll", polls.get(keys.get(v)));
 		} 
-        return generateStaticResource("pub/index.html", "index.html", request, response, model);
+		return generateStaticResource("pub/index.html", "index_" + v + ".html", request, response, model);
     }
 
 	@RequestMapping(path = { "/android-poll.html" })
