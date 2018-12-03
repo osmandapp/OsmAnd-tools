@@ -12,12 +12,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
@@ -38,9 +36,11 @@ import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.Node;
+import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.osm.edit.OsmMapUtils;
 import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Way;
+import net.osmand.osm.io.IOsmStorageFilter;
 import net.osmand.osm.io.OsmBaseStorage;
 import net.osmand.osm.io.OsmStorageWriter;
 
@@ -49,15 +49,23 @@ import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlPullParserException;
 
 public class FixBasemapRoads {
-    private static float MINIMAL_DISTANCE = 500;
-    private static float MAXIMAL_DISTANCE_CUT = 3000;
+    private static float MINIMAL_DISTANCE = 2500;
+    private static float MAXIMAL_DISTANCE_CUT = 300;
     private final static Log LOG = PlatformUtil.getLog(FixBasemapRoads.class);
+    
+    private static boolean FILTER_BBOX = true;  
+	private static double LEFT_LON = 4;
+	private static double RIGHT_LON = 7;
+	private static double TOP_LAT = 54;
+	private static double BOTTOM_LAT = 51;
 
 	public static void main(String[] args) throws Exception {
 		if(args == null || args.length == 0) {
+			String line = "motorway";
+			line = "primary";	
 			args = new String[] {
-					System.getProperty("maps.dir") + "admin_level_2_flt.osm",
-					System.getProperty("maps.dir") + "admin_level_2_fixed.osm",
+					System.getProperty("maps.dir") + "basemap/line_" + line + ".osm.gz",
+					System.getProperty("maps.dir") + "basemap/proc/proc_line_" + line + ".osm",
 					//System.getProperty("maps.dir") + "route_road.osm.gz"
 					
 			};
@@ -104,10 +112,22 @@ public class FixBasemapRoads {
 		for(EntityId e : entities.keySet()){
 			if(e.getType() == EntityType.WAY){
 				Way es = (Way) storage.getRegisteredEntities().get(e);
+				boolean missingNode = false;
+				for(Node n : es.getNodes()) {
+					if(n == null) {
+						missingNode = true;
+						break;
+					}
+				}
+				if(missingNode) {
+					continue;
+				}
 				total++;
 				if(total % 1000 == 0) {
 					LOG.info("Processed " + total + " ways");
 				}
+				
+				
 				addRegionTag(or, es);
 				transformer.addPropogatedTags(es);
 				Map<String, String> ntags = renderingTypes.transformTags(es.getModifiableTags(), EntityType.WAY, EntityConvertApplyType.MAP);
@@ -133,6 +153,7 @@ public class FixBasemapRoads {
 		return or;
 	}
 
+	
 	private OsmBaseStorage parseOsmFile(File read) throws FileNotFoundException, IOException, XmlPullParserException {
 		OsmBaseStorage storage = new OsmBaseStorage();
         InputStream stream = new BufferedInputStream(new FileInputStream(read), 8192 * 4);
@@ -142,6 +163,37 @@ public class FixBasemapRoads {
         } else if (read.getName().endsWith(".gz")) { //$NON-NLS-1$
         	stream = new GZIPInputStream(stream);
         }
+        
+        
+        storage.getFilters().add(new IOsmStorageFilter() {
+			boolean nodeAccepted = true;
+			@Override
+			public boolean acceptEntityToLoad(OsmBaseStorage storage, EntityId entityId, Entity entity) {
+				if(!FILTER_BBOX) {
+					return true;
+				}
+				if(entity instanceof Node) {
+					double lat = ((Node) entity).getLatitude();
+					double lon = ((Node) entity).getLongitude();
+					if(lat > TOP_LAT || lat < BOTTOM_LAT) {
+						nodeAccepted = false;
+						return false;
+					}
+					if(lon > RIGHT_LON || lon < LEFT_LON) {
+						nodeAccepted = false;
+						return false;
+					}
+					return true;
+				} else {
+					if(nodeAccepted) {
+						return true;
+					} else {
+						nodeAccepted = true;
+						return false;
+					}
+				}
+			}
+		});
 		storage.parseOSM(stream, new ConsoleProgressImplementation(), streamFile, true);
 		return storage;
 	}
@@ -154,39 +206,47 @@ public class FixBasemapRoads {
 
     static class RoadLine {
         ArrayList<Way> combinedWays = new ArrayList<Way>();
-        long beginPoint;
         Node last;
+        long beginPoint;
         Node first;
         long endPoint;
         double distance = 0;
-
-        public void updateData() {
-            distance = 0;
-            first = null;
-            last = null;
-            for(int j = 0; j < combinedWays.size(); j++) {
-                Way w = combinedWays.get(j);
-                List<Node> nodes = w.getNodes();
-                for(int i = 1; i < nodes.size(); i++) {
-                    if(first == null )  {
-                        first = nodes.get(i - 1);
-                    }
-                    last = nodes.get(i);
-                    if(nodes.get(i - 1) != null && nodes.get(i) != null) {
-                        distance += OsmMapUtils.getDistance(nodes.get(i - 1), nodes.get(i));
-                    }
-                }
-            }
-//            beginPoint = combinedWays.get(0).getFirstNodeId();
-//            endPoint = combinedWays.get(combinedWays.size() - 1).getLastNodeId();
-	        beginPoint =  convertLatLon(combinedWays.get(0).getFirstNode().getLatLon());
-	        endPoint =  convertLatLon( combinedWays.get(combinedWays.size() - 1).getLastNode().getLatLon());
-        }
+        boolean deleted = false;
+        boolean isLink = false;
 
         RoadLine(Way w) {
             combinedWays.add(w);
-            updateData( );
+            String hw = w.getTag("highway");
+            isLink = hw != null && hw.endsWith("_link");
+			updateData();
         }
+        
+		private void updateData() {
+			distance = 0;
+			first = null;
+			last = null;
+			for (int j = 0; j < combinedWays.size(); j++) {
+				Way w = combinedWays.get(j);
+				List<Node> nodes = w.getNodes();
+				for (int i = 1; i < nodes.size(); i++) {
+					if (first == null) {
+						first = nodes.get(i - 1);
+					}
+					last = nodes.get(i);
+					if (nodes.get(i - 1) != null && nodes.get(i) != null) {
+						distance += OsmMapUtils.getDistance(nodes.get(i - 1), nodes.get(i));
+					}
+				}
+			}
+			// beginPoint = combinedWays.get(0).getFirstNodeId();
+			// endPoint = combinedWays.get(combinedWays.size() - 1).getLastNodeId();
+			if(first != null) {
+				beginPoint = convertLatLon(first.getLatLon());
+			}
+			if(last != null) {
+				endPoint = convertLatLon(last.getLatLon());
+			}
+		}
 
         EntityId getFirstWayId() {
             return EntityId.valueOf(combinedWays.get(0));
@@ -198,6 +258,14 @@ public class FixBasemapRoads {
 
         Way getLastWay(){
             return combinedWays.get(combinedWays.size() - 1);
+        }
+        
+        void delete() {
+        	deleted = true;
+        }
+        
+        boolean isDeleted() {
+        	return deleted;
         }
 
         List<Node> getFirstPoints(double distance) {
@@ -248,10 +316,12 @@ public class FixBasemapRoads {
             return ns;
         }
 
-
-        void insertInBeginning(RoadLine toMerge) {
+        public void insertInBeginning(RoadLine toMerge) {
             combinedWays.addAll(0, toMerge.combinedWays);
-            updateData();
+            first = toMerge.first;
+            distance += toMerge.distance;
+            this.beginPoint = toMerge.beginPoint;
+            isLink = toMerge.isLink && isLink;
         }
 
         public void combineWaysIntoOneWay() {
@@ -275,23 +345,53 @@ public class FixBasemapRoads {
             for(Way w : combinedWays) {
                 w.reverseNodes();
             }
-            updateData();
+            Node n = first;
+            first = last;
+            last = n;
+            long np = beginPoint;
+            beginPoint = endPoint;
+            endPoint = np;
         }
     }
 
     class RoadInfo {
-	    //String ref;
-        Collection<RoadLine> roadLines = new LinkedHashSet<RoadLine>();
+	    String ref;
+        List<RoadLine> roadLines = new ArrayList<RoadLine>();
         TLongObjectHashMap<List<RoadLine>> startPoints = new TLongObjectHashMap<List<RoadLine>>();
         TLongObjectHashMap<List<RoadLine>> endPoints = new TLongObjectHashMap<List<RoadLine>>();
 		boolean adminLevel;
+		
+		public RoadInfo(String rf) {
+			this.ref = rf;
+		}
+		
+		public int countRoadLines() {
+			int i = 0; 
+			for(RoadLine r : roadLines) {
+				if(!r.isDeleted()) {
+					i++;
+				}
+			}
+			return i;
+		}
 
-        void registerRoadLine(RoadLine r){
-            roadLines.add(r);
-            registerPoints(r);
-
+        public void compactDeleted() {
+        	Iterator<RoadLine> it = roadLines.iterator();
+        	while(it.hasNext()) {
+        		if(it.next().isDeleted()) {
+        			it.remove();
+        		}
+        	}
         }
 
+        
+        private void registerRoadLine(RoadLine r){
+        	if(r.first != null && r.last != null) {
+        		roadLines.add(r);
+        		registerPoints(r);
+        	}
+        }
+        
         private void registerPoints(RoadLine r) {
             if(!startPoints.containsKey(r.beginPoint)){
                 startPoints.put(r.beginPoint, new ArrayList<RoadLine>());
@@ -304,26 +404,24 @@ public class FixBasemapRoads {
         }
 
         public void mergeRoadInto(RoadLine toMerge, RoadLine toKeep) {
-            deleteRoadLine(toMerge);
-            deleteRoadLine(toKeep);
+        	long op = toKeep.beginPoint;
             toKeep.insertInBeginning(toMerge);
-            registerRoadLine(toKeep);
-        }
-
-        private void deleteRoadLine(RoadLine roadLine) {
-            roadLines.remove(roadLine);
-            deletePoints(roadLine);
-        }
-
-        private void deletePoints(RoadLine roadLine) {
-            startPoints.get(roadLine.beginPoint).remove(roadLine);
-            endPoints.get(roadLine.endPoint).remove(roadLine);
+            startPoints.get(op).remove(toKeep);
+            startPoints.get(toKeep.beginPoint).add(toKeep);
+            
+            startPoints.get(toMerge.beginPoint).remove(toMerge);
+            endPoints.get(toMerge.endPoint).remove(toMerge);
+            toMerge.delete();
         }
 
         public List<RoadLine> getConnectedLinesStart(long point) {
             TLongArrayList rs = roundabouts.get(point);
             if(rs == null) {
-                return startPoints.get(point);
+                List<RoadLine> res = startPoints.get(point);
+                if(res != null) {
+                	return res;
+                }
+                return Collections.emptyList();
             }
             List<RoadLine> newL = new ArrayList<RoadLine>();
             for(int i = 0; i < rs.size(); i++){
@@ -338,7 +436,11 @@ public class FixBasemapRoads {
         public List<RoadLine> getConnectedLinesEnd(long point) {
             TLongArrayList rs = roundabouts.get(point);
             if(rs == null) {
-                return endPoints.get(point);
+            	List<RoadLine> res = endPoints.get(point);
+                if(res != null) {
+                	return res;
+                }
+                return Collections.emptyList();
             }
             List<RoadLine> newL = new ArrayList<RoadLine>();
             for(int i = 0; i < rs.size(); i++){
@@ -351,10 +453,56 @@ public class FixBasemapRoads {
         }
 
         public void reverseRoad(RoadLine roadLine) {
-            deletePoints(roadLine);
+            startPoints.get(roadLine.beginPoint).remove(roadLine);
+            endPoints.get(roadLine.endPoint).remove(roadLine);
             roadLine.reverse();
             registerPoints(roadLine);
         }
+
+        public double getTotalDistance() {
+        	double d = 0;
+        	for(RoadLine rl : roadLines) {
+        		if(!rl.isDeleted()) {
+        			d += rl.distance;
+        		}
+        	}
+			return d;
+		}
+        
+        public boolean isRoute1HigherPriority(RoadLine r1, RoadLine r2) {
+        	if(r1.isLink == r2.isLink) {
+        		if(r1.distance > r2.distance) {
+        			return true;
+        		}
+        		return false;
+			} else {
+				if (r1.isLink) {
+					return false;
+				} else {
+					return true;
+				}
+			}
+        }
+
+		public boolean isMaxRouteInTheEnd(RoadLine roadLine) {
+            boolean maxRoute = true;
+            for (RoadLine rt : getConnectedLinesEnd(roadLine.endPoint)) {
+                if (!rt.isDeleted() && rt != roadLine && isRoute1HigherPriority(rt, roadLine)
+                		&& !inOppositeDirection(roadLine, rt)) {
+                    maxRoute = false;
+                    break;
+                }
+
+            }
+			return maxRoute;
+		}
+
+		public String toString(String msg) {
+			return String.format("Road %s - %s %d - segments, %.2f dist", 
+					ref, msg, countRoadLines(), getTotalDistance());
+		}
+
+		
     }
 
 
@@ -366,16 +514,28 @@ public class FixBasemapRoads {
 	private void processRegion(List<EntityId> toWrite) throws IOException {
 		for (String ref : roadInfoMap.keySet()) {
 			RoadInfo ri = roadInfoMap.get(ref);
+			boolean verbose = ri.getTotalDistance() > 40000;
+			if(verbose) System.out.println(ri.toString("Initial:"));
 			// combine unique roads
 			combineUniqueIdentifyRoads(ri);
+			if(verbose) System.out.println(ri.toString("After combine unique: "));
 			reverseWrongPositionedRoads(ri);
 			combineUniqueIdentifyRoads(ri);
+			if(verbose) System.out.println(ri.toString("After combine reverse unique: "));
 			// last step not definite
 			combineIntoLongestRoad(ri);
+			if(verbose) System.out.println(ri.toString("After combine longest: "));
 			combineRoadsWithCut(ri);
+			
+//			ri.compactDeleted();
 			for (RoadLine ls : ri.roadLines) {
-				if (ls.distance > MINIMAL_DISTANCE) {
+				if (ls.distance > MINIMAL_DISTANCE && !ls.isDeleted()) {
 					ls.combineWaysIntoOneWay();
+					Way w = ls.getFirstWay();
+					String hw = w.getTag(OSMTagKey.HIGHWAY);
+					if(hw != null && hw.endsWith("_link")) {
+						w.putTag("highway", hw.substring(0, hw.length() - "_link".length()));
+					}
 					toWrite.add(ls.getFirstWayId());
 				}
 			}
@@ -419,9 +579,12 @@ public class FixBasemapRoads {
 
     private void reverseWrongPositionedRoads(RoadInfo ri) {
         for (RoadLine roadLine : ri.roadLines) {
+        	if(roadLine.isDeleted()) {
+        		continue;
+        	}
             List<RoadLine> ps = ri.getConnectedLinesEnd(roadLine.beginPoint);
             List<RoadLine> ws = ri.getConnectedLinesStart(roadLine.endPoint);
-            if((ps == null || ps.size() == 0)  && (ws == null || ws.size() == 0) ) {
+			if (ps.size() == 0 && ws.size() == 0) {
                 ri.reverseRoad(roadLine);
             }
         }
@@ -464,88 +627,82 @@ public class FixBasemapRoads {
 
     private void combineIntoLongestRoad(RoadInfo ri) {
         boolean merged = true;
-        while(merged) {
-            merged = false;
-            for (RoadLine roadLine : new ArrayList<RoadLine>(ri.roadLines)) {
-                if (!ri.roadLines.contains(roadLine)) {
-                    continue;
-                }
-
-                List<RoadLine> list = ri.getConnectedLinesStart(roadLine.endPoint);
-                double maxDist = 0;
-                if (list != null && list.size() > 0) {
-                    RoadLine longest = null;
-                    for (RoadLine rs : list) {
-                        if (inOppositeDirection(roadLine, rs)) {
-                            continue;
-                        }
-                        boolean maxRoute = true;
-                        for (RoadLine rt : ri.getConnectedLinesEnd(roadLine.endPoint)) {
-                            if (rt.distance > roadLine.distance && !inOppositeDirection(roadLine, rt)) {
-                                maxRoute = false;
-                                break;
-                            }
-
-                        }
-                        if (!maxRoute) {
-                            continue;
-                        }
-                        if (rs.distance > maxDist) {
-                            maxDist = rs.distance;
-                            longest = rs;
-                        }
-                    }
-                    if (longest != roadLine && longest != null) {
-                        merged = true;
-                        ri.mergeRoadInto(roadLine, longest);
-                    }
-                }
-            }
-        }
+		while (merged) {
+			merged = false;
+			for (RoadLine start : ri.roadLines) {
+				if (start.isDeleted()) {
+					continue;
+				}
+				List<RoadLine> list = ri.getConnectedLinesStart(start.endPoint);
+				double maxDist = 0;
+				RoadLine longest = null;
+				for (RoadLine end : list) {
+					if(end.isDeleted() || start == end || inOppositeDirection(start, end)) {
+						continue;
+					}
+		            if(!ri.isMaxRouteInTheEnd(start)) {
+		            	continue;
+		            }
+					if (end.distance > maxDist) {
+						maxDist = end.distance;
+						longest = end;
+					}
+				}
+				if (longest != null) {
+					merged = true;
+					ri.mergeRoadInto(start, longest);
+				}
+			}
+		}
     }
 
     private void combineUniqueIdentifyRoads(RoadInfo ri) {
         boolean merged = true;
-        while(merged) {
-            merged = false;
-            for (RoadLine ls : new ArrayList<RoadLine>(ri.roadLines)) {
-                if(!ri.roadLines.contains(ls)){
-                	// line already merged and deleted
-                    continue;
-                }
-                List<RoadLine> endedInSamePoint = ri.getConnectedLinesEnd(ls.endPoint);
-                List<RoadLine> list = ri.getConnectedLinesStart(ls.endPoint);
-                if (list != null && list.size() == 1 && endedInSamePoint.size() == 1) {
-                    if (list.get(0) != ls && (!inOppositeDirection(ls, list.get(0)) || ri.adminLevel)) {
-                        merged = true;
-                        ri.mergeRoadInto(ls, list.get(0));
-                    }
-                }
-            }
-        }
+		while (merged) {
+			merged = false;
+			for (RoadLine start : ri.roadLines) {
+				if (start.isDeleted()) {
+					// line already merged and deleted
+					continue;
+				}
+				List<RoadLine> list = ri.getConnectedLinesStart(start.endPoint);
+				if(ri.isMaxRouteInTheEnd(start)) {
+					RoadLine uniqueToCombine = null;
+					for(RoadLine end : list) {
+						if(end.isDeleted() || end == start) {
+							continue;
+						}
+						if(uniqueToCombine == null) {
+							uniqueToCombine = end;
+						} else {
+							// not unique!
+							uniqueToCombine = null;
+							break;
+						}
+					}
+					if(uniqueToCombine != null) {
+						merged = true;
+						ri.mergeRoadInto(start, uniqueToCombine);
+					}
+				}
+			}
+		}
     }
 
     private void combineRoadsWithCut(RoadInfo ri) {
-        for (RoadLine roadLine : new ArrayList<RoadLine>(ri.roadLines)) {
-            if (!ri.roadLines.contains(roadLine)) {
+        for (RoadLine roadLine : ri.roadLines) {
+            if (roadLine.isDeleted()) {
                 continue;
             }
-            boolean maxRoute = true;
-            for (RoadLine rt : ri.getConnectedLinesEnd(roadLine.endPoint)) {
-                if (rt.distance > roadLine.distance && !inOppositeDirection(roadLine, rt)) {
-                    maxRoute = false;
-                    break;
-                }
-
+            if(!ri.isMaxRouteInTheEnd(roadLine)) {
+            	continue;
             }
-            if (maxRoute && roadLine.last != null && roadLine.distance > MAXIMAL_DISTANCE_CUT / 2) {
-                List<Node> ps = roadLine.getLastPoints(50);
-                Node last = ps.get(ps.size() - 1);
+            if (roadLine.distance > MAXIMAL_DISTANCE_CUT / 2) {
                 for (RoadLine rl : ri.roadLines) {
-                    if (roadLine != rl && rl.distance > MAXIMAL_DISTANCE_CUT / 2
-                            &&
-                            OsmMapUtils.getDistance(roadLine.last, rl.first) < MAXIMAL_DISTANCE_CUT &&
-                            continuation(roadLine, rl)) {
+                    if (!rl.isDeleted() && roadLine != rl 
+                    		&& rl.distance > MAXIMAL_DISTANCE_CUT / 2
+                            && OsmMapUtils.getDistance(roadLine.last, rl.first) < MAXIMAL_DISTANCE_CUT 
+                            && continuation(roadLine, rl)) {
                         roadLine.getLastWay().addNode(rl.first);
                         ri.mergeRoadInto(roadLine, rl);
                         break;
@@ -594,7 +751,7 @@ public class FixBasemapRoads {
 		}
 
 		if (!roadInfoMap.containsKey(ref)) {
-			roadInfoMap.put(ref, new RoadInfo());
+			roadInfoMap.put(ref, new RoadInfo(ref));
 		}
 		RoadInfo ri = roadInfoMap.get(ref);
 		ri.adminLevel = adminLevel;

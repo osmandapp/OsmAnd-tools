@@ -706,7 +706,6 @@ public class BasemapProcessor {
 	        System.out.println("Please specify folder with basemap *.osm or *.osm.bz2 files");
 		} else {
 			boolean mini = false;
-			long time = System.currentTimeMillis();
 			MapRenderingTypesEncoder rt = new MapRenderingTypesEncoder("basemap");
 			// BASEMAP generation
 			File folder = new File(args[0]);
@@ -716,7 +715,7 @@ public class BasemapProcessor {
 			// MapZooms zooms = MapZooms.parseZooms("1-2;3;4-5;6-7;8-9;10-");
 			int zoomSmoothness = mini ? 2 : 2;
 			MapZooms zooms = mini ? MapZooms.parseZooms("1-2;3;4-5;6-") : MapZooms.parseZooms("1-2;3;4-5;6-7;8-");
-			MOST_DETAILED_APPROXIMATION = mini ? 6 : 9;
+			MOST_DETAILED_APPROXIMATION = mini ? 6 : 11;
 			IndexCreatorSettings settings = new IndexCreatorSettings();
 			settings.indexMap = true;
 			settings.indexAddress = false;
@@ -730,7 +729,9 @@ public class BasemapProcessor {
 			creator.setMapFileName(mini ? "World_basemap_mini_test_2.obf" : "World_basemap_2.obf");
 			ArrayList<File> src = new ArrayList<File>();
 			for (File f : folder.listFiles()) {
-				if (f.getName().endsWith(".osm") || f.getName().endsWith(".osm.bz2")) {
+				if (f.getName().endsWith(".osm") || 
+						f.getName().endsWith(".osm.bz2") || 
+						f.getName().endsWith(".osm.gz")) {
 					src.add(f);
 				}
 			}
