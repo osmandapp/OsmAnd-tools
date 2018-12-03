@@ -3,6 +3,7 @@ import psycopg2
 import sys
 import pprint
 import re
+import os
 
 def num(s, df):
 	if s is None:
