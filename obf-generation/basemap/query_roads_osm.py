@@ -3,6 +3,7 @@ import psycopg2
 import sys
 import pprint
 import re
+import os
 
 regSpaces = re.compile('\s+')
 def Point(geoStr):
