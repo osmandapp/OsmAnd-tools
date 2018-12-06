@@ -49,11 +49,11 @@ import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlPullParserException;
 
 public class FixBasemapRoads {
-    private static float MINIMAL_DISTANCE = 2500;
+    private static float MINIMAL_DISTANCE = 100; // -> 1500? primary
     private static float MAXIMAL_DISTANCE_CUT = 300;
     private final static Log LOG = PlatformUtil.getLog(FixBasemapRoads.class);
     
-    private static boolean FILTER_BBOX = true;  
+    private static boolean FILTER_BBOX = false;  
 	private static double LEFT_LON = 4;
 	private static double RIGHT_LON = 7;
 	private static double TOP_LAT = 54;
@@ -62,7 +62,12 @@ public class FixBasemapRoads {
 	public static void main(String[] args) throws Exception {
 		if(args == null || args.length == 0) {
 			String line = "motorway";
-			line = "primary";	
+			line = "trunk";
+//			line = "primary";
+//			line = "secondary";
+//			line = "tertiary";
+//			line = "nlprimary";
+//			line = "nlsecondary";
 			args = new String[] {
 					System.getProperty("maps.dir") + "basemap/line_" + line + ".osm.gz",
 					System.getProperty("maps.dir") + "basemap/proc/proc_line_" + line + ".osm",
@@ -469,6 +474,7 @@ public class FixBasemapRoads {
 			return d;
 		}
         
+        // ref = way.getTag("name"); compare name ?
         public boolean isRoute1HigherPriority(RoadLine r1, RoadLine r2) {
         	if(r1.isLink == r2.isLink) {
         		if(r1.distance > r2.distance) {
@@ -667,9 +673,12 @@ public class FixBasemapRoads {
 				}
 				List<RoadLine> list = ri.getConnectedLinesStart(start.endPoint);
 				if(ri.isMaxRouteInTheEnd(start)) {
-					RoadLine uniqueToCombine = null;
+					RoadLine uniqueToCombine = null; 
 					for(RoadLine end : list) {
 						if(end.isDeleted() || end == start) {
+							continue;
+						}
+						if(inOppositeDirection(start, end)) {
 							continue;
 						}
 						if(uniqueToCombine == null) {
@@ -728,7 +737,8 @@ public class FixBasemapRoads {
 			ref = way.getTag("int_ref");
 		}
 		if (ref == null || ref.isEmpty()) {
-			ref = way.getTag("name");
+			// too many breaks in between names
+//			ref = way.getTag("name");
 		} else {
 			// fix road inconsistency
 			ref = ref.replace('-', ' ');
@@ -737,7 +747,7 @@ public class FixBasemapRoads {
 			}
 		}
 		boolean adminLevel = false;
-		if(ref == null || ref.isEmpty()) {
+		if((ref == null || ref.isEmpty()) && way.getTag("admin_level") != null) {
 			ref = way.getTag("admin_level");
 			LatLon lt = way.getLatLon();
 			ref += ((int) MapUtils.getTileNumberY(4, lt.getLatitude())) + " "
