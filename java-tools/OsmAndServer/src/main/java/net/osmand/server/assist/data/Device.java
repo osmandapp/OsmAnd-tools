@@ -151,22 +151,22 @@ public class Device {
 		}
 		boolean locationCurrentlyPresent = lastSignal.isLocationPresent();
 		if (!Double.isNaN(lastSignal.altitude) && lastSignal.isLocationPresent()) {
-			bld.append(String.format("<b>Altitude</b>: %.1f\n", (float) lastSignal.altitude));
+			bld.append(String.format("<b>Altitude</b>: %.1f m\n", (float) lastSignal.altitude));
 		}
 		if (!Double.isNaN(lastSignal.azi) && locationCurrentlyPresent) {
 			bld.append(String.format("<b>Bearing</b>: %.1f\n", (float) lastSignal.azi));
 		}
 		if (!Double.isNaN(lastSignal.speed) && locationCurrentlyPresent) {
-			bld.append(String.format("<b>Speed</b>: %.1f\n", lastSignal.speed));
+			bld.append(String.format("<b>Speed</b>: %.1f m/s\n", lastSignal.speed));
 		}
 		if (!Double.isNaN(lastSignal.satellites) && locationCurrentlyPresent) {
 			bld.append(String.format("<b>Sattelites</b>: %d\n", (int) (int) lastSignal.satellites));
 		}
 		if (!Double.isNaN(lastSignal.hdop) && locationCurrentlyPresent) {
-			bld.append(String.format("<b>Horizontal precision</b>: %d\n", (int) lastSignal.hdop));
+			bld.append(String.format("<b>Horizontal precision</b>: %d m\n", (int) lastSignal.hdop));
 		}
 		if (!Double.isNaN(lastSignal.temperature)) {
-			bld.append(String.format("<b>Temperature</b>: %.1f\n", lastSignal.temperature));
+			bld.append(String.format("<b>Temperature</b>: %.1f °\n", lastSignal.temperature));
 		}
 		if(updateId == 0) {
 			bld.append(String.format("Updated: %s\n", bot.formatFullTime(lastSignal.getTimestamp())));
