@@ -30,13 +30,24 @@ public class BTCAddrValidator {
             INDEXES[ALPHABET[i]] = i;
         }
     }
+    
+    public static void main(String[] args) {
+    	System.out.println(validate("bc1qs5q679tac0uvfunt0gdwuymves5re7v7q8fntv"));
+		System.out.println(validate("3LrXizKejCGYyGUxYzGweyuxFVtfs3odEe"));
+	}
 
     public static boolean validate(String addr) {
         try {
             int addressHeader = getAddressHeader(addr);
             return (addressHeader == 0 || addressHeader == 5);
-        } catch (Exception x) {
-            x.printStackTrace();
+        } catch (Exception x1) {
+        	try {
+				if (Bech32.decode(addr).hrp != null) {
+					return true;
+				}
+        	} catch (Exception x) {
+        		x.printStackTrace();
+        	}
         }
         return false;
     }
