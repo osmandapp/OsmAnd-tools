@@ -11,7 +11,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -20,7 +19,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -29,6 +27,7 @@ import net.osmand.data.QuadRect;
 import net.osmand.data.TransportRoute;
 import net.osmand.data.TransportSchedule;
 import net.osmand.data.TransportStop;
+import net.osmand.data.TransportStopExit;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
@@ -72,6 +71,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	// Note: in future when we need more information from stop_area relation, it is better to memorize relations itself
 	// now we need only specific names of stops and platforms
 	private Map<EntityId, Relation> stopAreas = new HashMap<EntityId, Relation>();
+	private Map<EntityId, List<TransportStopExit>> exits = new HashMap<EntityId, List<TransportStopExit>>();
 
 
 	private static Set<String> acceptedRoutes = new HashSet<String>();
@@ -146,7 +146,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 						}
 					}
 					rset.close();
-					writer.writeTransportStop(id, x24, y24, name, nameEn, stringTable, routes);
+					writer.writeTransportStop(id, x24, y24, name, nameEn, stringTable, routes, exits);
 				} else {
 					log.error("Something goes wrong with transport id = " + id); //$NON-NLS-1$
 				}
@@ -188,6 +188,31 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 					if (entry.getEntity() != null && 
 							entry.getEntity().getTag(OSMTagKey.NAME) == null) {
 						stopAreas.put(entry.getEntityId(), e);
+					}
+				}
+			}
+			for (RelationMember entry : e.getMembers()) {
+				String role = entry.getRole();
+				if ((entry.getEntity() != null && "".equals(role)) && ("station".equals(entry.getEntity().getTag(OSMTagKey.RAILWAY)))) {
+					List<TransportStopExit> stopExitList = new ArrayList<>();
+					for (RelationMember entryAlt : e.getMembers()) {
+						if ((entryAlt.getEntity() != null && "".equals(role)) && ("subway_entrance".equals(entryAlt.getEntity().getTag(OSMTagKey.RAILWAY)))) {
+							TransportStopExit exit = new TransportStopExit();
+							exit.setId(entryAlt.getEntity().getId());
+							if (entryAlt.getEntity().getTag("name") != null) {
+								exit.setName(entryAlt.getEntity().getTag("name"));
+							}
+							if (entryAlt.getEntity().getNameTags() != null) {
+								exit.setEnName(entryAlt.getEntity().getNameTags().get("name:en"));
+							}
+							exit.setLocation(entryAlt.getEntity().getLatitude(),entryAlt.getEntity().getLongitude());
+							if (exit != null) {
+								stopExitList.add(exit);
+							}
+						}
+					}
+					if ((entry.getEntity() != null) && (stopExitList != null)) {
+						exits.put(entry.getEntityId(),stopExitList);
 					}
 				}
 			}
@@ -823,6 +848,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		List<Entity> platformsAndStops = new ArrayList<Entity>();
 		List<Entity> platforms = new ArrayList<Entity>();
 		List<Entity> stops = new ArrayList<Entity>();
+
 		Map<EntityId, Entity> platformNames = new LinkedHashMap<>();
 		for (RelationMember entry : rel.getMembers()) {
 			String role = entry.getRole();
