@@ -87,10 +87,10 @@ public class BinaryInspector {
 //					"-vaddress", "-vcities","-vstreetgroups",
 //					"-vstreets", "-vbuildings", "-vintersections",
 //					"-lang=ru",
-					"-zoom=11",
+					"-zoom=15",
 //					"-bbox=30.51,50.5,30.53,50.4",
-					"-osm="+System.getProperty("maps.dir")+"/basemap/proc/map.obf.osm",
-					System.getProperty("maps.dir")+"/basemap/proc/World_basemap_2.obf"
+					"-osm="+System.getProperty("maps.dir")+"/basemap/map.obf.osm",
+					System.getProperty("maps.dir")+"/basemap/Transport.obf"
 			});
 		} else {
 			in.inspector(args);

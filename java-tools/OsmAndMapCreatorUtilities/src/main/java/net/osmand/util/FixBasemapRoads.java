@@ -50,14 +50,14 @@ import org.xmlpull.v1.XmlPullParserException;
 
 public class FixBasemapRoads {
     private static float MINIMAL_DISTANCE = 100; // -> 1500? primary
-    private static float MAXIMAL_DISTANCE_CUT = 300;
+    private static float MAXIMAL_DISTANCE_CUT = 400;
     private final static Log LOG = PlatformUtil.getLog(FixBasemapRoads.class);
     
-    private static boolean FILTER_BBOX = false;  
-	private static double LEFT_LON = 4;
-	private static double RIGHT_LON = 7;
-	private static double TOP_LAT = 54;
-	private static double BOTTOM_LAT = 51;
+    private static boolean FILTER_BBOX = true;  
+	private static double LEFT_LON = -3;
+	private static double RIGHT_LON = -1;
+	private static double TOP_LAT = 53;
+	private static double BOTTOM_LAT = 50;
 
 	public static void main(String[] args) throws Exception {
 		if(args == null || args.length == 0) {
@@ -527,6 +527,7 @@ public class FixBasemapRoads {
 			if(verbose) System.out.println(ri.toString("After combine unique: "));
 			reverseWrongPositionedRoads(ri);
 			combineUniqueIdentifyRoads(ri);
+			
 			if(verbose) System.out.println(ri.toString("After combine reverse unique: "));
 			// last step not definite
 			combineIntoLongestRoad(ri);
@@ -603,14 +604,26 @@ public class FixBasemapRoads {
 	    return Math.abs(diff) < Math.PI / 4;
     }
 
-    private boolean continuation(RoadLine end, RoadLine begin) {
+    private boolean continuation(RoadLine end, RoadLine begin, boolean reverse) {
         List<Node> lv = end.getLastPoints(150);
         double last = directionRoute(lv, false);
         List<Node> ltv = new ArrayList<Node>();
         ltv.add(end.last);
-        ltv.add(begin.first);
+        if(reverse) {
+        	ltv.add(begin.last);
+        } else {
+        	ltv.add(begin.first);
+        }
         double cut = directionRoute(ltv, true);
-        double first = directionRoute(begin.getFirstPoints(150), true);
+        
+        double first;
+        if(reverse){
+        	List<Node> rv = begin.getLastPoints(150);
+        	Collections.reverse(rv);
+        	first = directionRoute(rv, true);
+        } else {
+        	first = directionRoute(begin.getFirstPoints(150), true);
+        }
         double diff = MapUtils.alignAngleDifference(first - last - Math.PI);
         double diff2 = MapUtils.alignAngleDifference(cut - last - Math.PI);
         return Math.abs(diff) < Math.PI / 4 && Math.abs(diff2) < Math.PI / 4;
@@ -709,12 +722,19 @@ public class FixBasemapRoads {
             if (roadLine.distance > MAXIMAL_DISTANCE_CUT / 2) {
                 for (RoadLine rl : ri.roadLines) {
                     if (!rl.isDeleted() && roadLine != rl 
-                    		&& rl.distance > MAXIMAL_DISTANCE_CUT / 2
-                            && OsmMapUtils.getDistance(roadLine.last, rl.first) < MAXIMAL_DISTANCE_CUT 
-                            && continuation(roadLine, rl)) {
-                        roadLine.getLastWay().addNode(rl.first);
-                        ri.mergeRoadInto(roadLine, rl);
-                        break;
+                    		&& rl.distance > MAXIMAL_DISTANCE_CUT / 2){
+                         if(OsmMapUtils.getDistance(roadLine.last, rl.first) < MAXIMAL_DISTANCE_CUT 
+								&& continuation(roadLine, rl, false)) {
+							roadLine.getLastWay().addNode(rl.first);
+							ri.mergeRoadInto(roadLine, rl);
+							break;
+						} else if(OsmMapUtils.getDistance(roadLine.last, rl.last) < MAXIMAL_DISTANCE_CUT 
+								&& continuation(roadLine, rl, true)) {
+							ri.reverseRoad(rl);
+							roadLine.getLastWay().addNode(rl.first);
+							ri.mergeRoadInto(roadLine, rl);
+							break;
+						}
                     }
                 }
 
