@@ -57,6 +57,7 @@ import net.osmand.data.Street;
 import net.osmand.data.TransportRoute;
 import net.osmand.data.TransportSchedule;
 import net.osmand.data.TransportStop;
+import net.osmand.data.TransportStopExit;
 import net.osmand.osm.MapRenderingTypes;
 import net.osmand.router.TransportRoutePlanner;
 import net.osmand.util.MapUtils;
@@ -1217,8 +1218,8 @@ public class BinaryInspector {
 					lrs.add(route.getRef() + " " + route.getType());
 				}
 			}
-
-			println("  " + s.getName(verbose.lang) + ": " + lrs + " " + s.getLocation());
+			String exitsString = s.getExitsString();
+			println("  " + s.getName(verbose.lang) + ": " + lrs + " " + s.getLocation() + exitsString);
 		}
 		println("\nRoutes:");
 		for(TransportRoute st : rs.values()) {
