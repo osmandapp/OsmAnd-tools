@@ -1350,6 +1350,7 @@ public class BinaryMapIndexWriter {
 					int exitY24 = (int) MapUtils.getTileNumberY(24, location.getLatitude());
 					exit.setName(registerString(stringTable, e.getName()));
 					exit.setNameEn(registerString(stringTable, e.getName("en")));
+					exit.setRef(registerString(stringTable, e.getRef()));
 					exit.setDx(exitX24 - bounds.leftX);
 					exit.setDy(exitY24 - bounds.topY);
 					ts.addExits(exit);

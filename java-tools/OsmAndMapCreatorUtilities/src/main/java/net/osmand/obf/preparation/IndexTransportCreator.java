@@ -199,19 +199,20 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 						if ((entryAlt.getEntity() != null && "".equals(role)) && ("subway_entrance".equals(entryAlt.getEntity().getTag(OSMTagKey.RAILWAY)))) {
 							TransportStopExit exit = new TransportStopExit();
 							exit.setId(entryAlt.getEntity().getId());
-							if (entryAlt.getEntity().getTag("name") != null) {
-								exit.setName(entryAlt.getEntity().getTag("name"));
-							}
-							if (entryAlt.getEntity().getNameTags() != null) {
-								exit.setEnName(entryAlt.getEntity().getNameTags().get("name:en"));
+//							if (entryAlt.getEntity().getTag("name") != null) {
+//								exit.setName(entryAlt.getEntity().getTag("name"));
+//							}
+//							if (entryAlt.getEntity().getNameTags() != null) {
+//								exit.setEnName(entryAlt.getEntity().getNameTags().get("name:en"));
+//							}
+							if (entryAlt.getEntity().getTag("ref") != null) {
+								exit.setRef(entryAlt.getEntity().getTag("ref"));
 							}
 							exit.setLocation(entryAlt.getEntity().getLatitude(),entryAlt.getEntity().getLongitude());
-							if (exit != null) {
-								stopExitList.add(exit);
-							}
+							stopExitList.add(exit);
 						}
 					}
-					if ((entry.getEntity() != null) && (stopExitList != null)) {
+					if (entry.getEntity() != null) {
 						exits.put(entry.getEntityId(),stopExitList);
 					}
 				}
