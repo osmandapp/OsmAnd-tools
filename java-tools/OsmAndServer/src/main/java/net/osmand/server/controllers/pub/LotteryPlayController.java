@@ -96,6 +96,7 @@ public class LotteryPlayController {
 		for (LotteryRoundsRepository.LotteryRound rnd : roundsRepo.findByMonthOrderByUpdateTimeDesc(month)) {
 			rnd.message = "Round " + rnd.roundId + " - " + 
 						String.format("%1$tm/%1$td %1$tH:%1$tM", rnd.updateTime);
+			rnd.seedInteger = new BigInteger(rnd.seed, 16).toString();
 			res.rounds.add(rnd);
 		}
 		

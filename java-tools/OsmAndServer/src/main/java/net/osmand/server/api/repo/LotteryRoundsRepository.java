@@ -60,6 +60,8 @@ public interface LotteryRoundsRepository extends JpaRepository<LotteryRound, Lot
         // for Rest api
         @Transient
         public String message;
+        @Transient
+        public String seedInteger;
     }
 
     class LotteryUserPrimaryKey implements Serializable {
