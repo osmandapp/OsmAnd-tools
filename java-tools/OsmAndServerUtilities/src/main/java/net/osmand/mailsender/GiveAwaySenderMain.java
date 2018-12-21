@@ -55,8 +55,6 @@ public class GiveAwaySenderMain {
                 p.templateId = val;
             } else if (arg.startsWith("--sender_mail=")) {
             	p.mailFrom = val;
-            } else if (arg.startsWith("--subject=")) {
-            	p.subject = val;
             } else if (arg.startsWith("--test_addr=")) {
             	p.testAddress = val;
             } else if (arg.startsWith("--promocodes=")) {
@@ -107,7 +105,7 @@ public class GiveAwaySenderMain {
     }
 
     private static void printUsage() {
-        LOGGER.info("Usage: --id=$TEMPLATE_ID --promocodes=$PROMOCODES --sender_mail=$SENDER_EMAIL --subject=$SUBJECT --test_addr=$TEST_EMAIL_GROUP");
+        LOGGER.info("Usage: --id=$TEMPLATE_ID --promocodes=$PROMOCODES --sender_mail=$SENDER_EMAIL --test_addr=$TEST_EMAIL_GROUP");
         System.exit(1);
     }
 
@@ -148,9 +146,6 @@ public class GiveAwaySenderMain {
         personalization.addTo(to);
         mail.addPersonalization(personalization);
         mail.setTemplateId(p.templateId);
-        if(p.subject != null) {
-        	mail.setSubject(p.subject);
-        }
         String promo = null;
         if(p.promocodes.length > p.promocodeInd) {
         	promo = p.promocodes[p.promocodeInd];
