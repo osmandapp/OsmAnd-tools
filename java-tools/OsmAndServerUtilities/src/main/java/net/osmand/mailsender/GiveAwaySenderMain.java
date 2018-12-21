@@ -11,6 +11,8 @@ import java.util.logging.Logger;
 
 import javax.annotation.Nullable;
 
+import net.osmand.util.Algorithms;
+
 import com.sendgrid.Email;
 import com.sendgrid.FooterSetting;
 import com.sendgrid.Mail;
@@ -58,7 +60,10 @@ public class GiveAwaySenderMain {
             } else if (arg.startsWith("--test_addr=")) {
             	p.testAddress = val;
             } else if (arg.startsWith("--promocodes=")) {
-            	p.promocodes = val.split(",");
+            	if(!Algorithms.isEmpty(val)) {
+            		p.promocodes = val.split(",");
+            	}
+            	
             }
         }
         final String apiKey = System.getenv("SENDGRID_KEY");
