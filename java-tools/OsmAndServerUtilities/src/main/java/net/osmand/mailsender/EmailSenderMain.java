@@ -346,8 +346,9 @@ public class EmailSenderMain {
             request.setEndpoint("mail/send");
             String body = mail.build();
             body = body.replace("https://osmand.net/giveaway?email=", "https://osmand.net/giveaway?email="+URLEncoder.encode(mailTo));
-            body = body.replace("---unsubscribe---", 
-            		"https://osmand.net/api/email/unsubscribe?id=" + userHash + "&group=" + p.topic);
+            body = body.replace(">Unsubscribe", 
+            		" href='https://osmand.net/api/email/unsubscribe?id=" + userHash + "&group=" + p.topic+"'>Unsubscribe");
+            System.out.println(body);
             request.setBody(body);
             Response response = sendGridClient.api(request);
             LOGGER.info("Response code: " + response.getStatusCode());
