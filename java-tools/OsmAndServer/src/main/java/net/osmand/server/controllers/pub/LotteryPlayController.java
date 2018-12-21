@@ -66,7 +66,7 @@ public class LotteryPlayController {
 		LotteryResult res = new LotteryResult();
 		res.month = month;
 		res.date = System.currentTimeMillis() / 1000;
-		
+		res.message = "";
 		if(Algorithms.isEmpty(month)) {
 			month = String.format("%1$tY-%1$tm", new Date());
 			if(!Algorithms.isEmpty(email)) {
@@ -125,9 +125,9 @@ public class LotteryPlayController {
 		usr.updateTime = new Date();
 		List<LotteryUser> col = usersRepo.findByMonthAndHashcodeOrderByUpdateTime(month, usr.hashcode);
 		if(col.size() > 0) {
-			usr.message = String.format("User is already subscribed as '%s'", usr.hashcode);
+			usr.message = String.format("You are already subscribed as '%s'", usr.hashcode);
 		}  else {
-			usr.message = String.format("User is subscribed as '%s'", usr.hashcode);
+			usr.message = String.format("You are subscribed as '%s'", usr.hashcode);
 			usersRepo.save(usr);
 		}
 		return usr;
