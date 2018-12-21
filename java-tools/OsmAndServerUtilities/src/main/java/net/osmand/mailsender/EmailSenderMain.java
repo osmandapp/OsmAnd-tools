@@ -300,7 +300,11 @@ public class EmailSenderMain {
     	if(mailTo == null || mailTo.isEmpty()) {
     		return;
     	}
-        LOGGER.info("Sending mail to: " + mailTo);
+    	String mailHsh = mailTo;
+    	if(mailTo.length() > 5) {
+    		mailHsh = "....." + mailTo.substring(5);
+    	}
+        LOGGER.info("Sending mail to: " + mailHsh);
         String userHash;
         try {
             userHash = URLEncoder.encode(Base64.getEncoder().encodeToString(mailTo.getBytes()), "UTF-8");
