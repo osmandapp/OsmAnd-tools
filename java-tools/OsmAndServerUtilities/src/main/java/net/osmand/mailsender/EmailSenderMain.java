@@ -329,7 +329,7 @@ public class EmailSenderMain {
         if("giveaway".equals(p.topic)) {
         	String giv = String.format(
         			"<table border='0' cellPadding='0' cellSpacing='0' class='module' data-role='module-button' data-type='button' role='module' "
-        			+ "style='table-layout:fixed' width='100%%'><tbody><tr><td align='center' bgcolor=' class='outer-td' style='padding:0px 0px 0px 0px'>"
+        			+ "style='table-layout:fixed' width='100%%'><tbody><tr><td align='center' class='outer-td' style='padding:0px 0px 0px 0px'>"
         			+ "<table border='0' cellPadding='0' cellSpacing='0' class='button-css__deep-table___2OZyb wrapper-mobile' style='text-align:center'>"
         			+ "<tbody><tr><td align='center' bgcolor='#333333' class='inner-td' style='border-radius:6px;font-size:16px;text-align:center;background-color:inherit'>"
         			+ "<a href='%s' style='background-color:#333333;border:1px solid #333333;border-color:#333333;border-radius:6px;border-width:1px;color:#ffffff;display:inline-block;font-family:arial,helvetica,sans-serif;font-size:16px;font-weight:normal;letter-spacing:0px;line-height:16px;padding:12px 18px 12px 18px;text-align:center;text-decoration:none' "
