@@ -178,9 +178,11 @@ public class GiveAwaySenderMain {
             Response response = sendGridClient.api(request);
             LOGGER.info("Response code: " + response.getStatusCode());
             p.sentSuccess++;
-            p.updateStatement.setString(1, promo);
-            p.updateStatement.setString(2, mailTo);
-            p.updateStatement.execute();
+            if(p.testAddress == null) {
+            	p.updateStatement.setString(1, promo);
+            	p.updateStatement.setString(2, mailTo);
+            	p.updateStatement.execute();
+            }
         } catch (IOException ex) {
         	p.sentFailed++;
         	p.promocodeInd--;
