@@ -90,6 +90,12 @@ ALTER TABLE ONLY telegram_tracker_configuration ALTER COLUMN id SET DEFAULT next
 ALTER SEQUENCE telegram_tracker_configuration_id_seq OWNED BY telegram_tracker_configuration.id;
 
 
+CREATE TABLE lottery_users (email text, month text, hashcode text, ip text,
+        promocode text, round integer, updatetime timestamp);
+
+CREATE TABLE lottery_rounds ( month text, participants text, seed text,
+        winner text, size integer, selection integer, round_id integer, updatetime timestamp);
+
 GRANT ALL privileges ON ALL TABLES IN SCHEMA public to <user>;
 GRANT ALL privileges ON supporters_seq to <user>;
 GRANT ALL privileges ON telegram_tracker_configuration_id_seq to <user>;

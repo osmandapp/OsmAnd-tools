@@ -11,6 +11,7 @@ import javax.persistence.IdClass;
 import javax.persistence.Table;
 import javax.persistence.Temporal;
 import javax.persistence.TemporalType;
+import javax.persistence.Transient;
 
 import net.osmand.server.api.repo.LotteryUsersRepository.LotteryUser;
 import net.osmand.server.api.repo.LotteryUsersRepository.LotteryUserPrimaryKey;
@@ -56,7 +57,10 @@ public interface LotteryUsersRepository extends JpaRepository<LotteryUser, Lotte
         @Temporal(TemporalType.TIMESTAMP)
         public Date updateTime;
 
+        @Transient
 		public String message;
+        
+        @Transient
 		public String status;
     }
 
