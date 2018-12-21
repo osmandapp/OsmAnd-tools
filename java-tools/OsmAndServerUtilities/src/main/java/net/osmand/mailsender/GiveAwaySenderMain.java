@@ -104,7 +104,7 @@ public class GiveAwaySenderMain {
         	}
         }
         sendProductionEmails(conn, p);
-        LOGGER.info(String.format("Promocodes: %d left, %d total.", total, p.dbPromocodes.size()));
+        LOGGER.info(String.format("Promocodes: %d left, %d used, %d total.", p.dbPromocodes.size(), total - p.dbPromocodes.size(), total));
         conn.close();
     }
 
