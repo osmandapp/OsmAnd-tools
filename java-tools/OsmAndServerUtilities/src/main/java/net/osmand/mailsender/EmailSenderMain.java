@@ -321,25 +321,26 @@ public class EmailSenderMain {
         if(p.subject != null) {
         	mail.setSubject(p.subject);
         }
-//        MailSettings mailSettings = new MailSettings();
-//        FooterSetting footerSetting = new FooterSetting();
-//        footerSetting.setEnable(true);
-//        String footer = "<center><a href=\"https://osmand.net/api/email/unsubscribe?id=" + 
-//        		userHash + "&group=" + p.topic + "\">Unsubscribe</a></center>";
-//        if("giveaway".equals(p.topic)) {
-//        	String giv = String.format(
-//        			"<table border='0' cellPadding='0' cellSpacing='0' class='module' data-role='module-button' data-type='button' role='module' "
-//        			+ "style='table-layout:fixed' width='100%%'><tbody><tr><td align='center' class='outer-td' style='padding:0px 0px 0px 0px'>"
-//        			+ "<table border='0' cellPadding='0' cellSpacing='0' class='button-css__deep-table___2OZyb wrapper-mobile' style='text-align:center'>"
-//        			+ "<tbody><tr><td align='center' bgcolor='#333333' class='inner-td' style='border-radius:6px;font-size:16px;text-align:center;background-color:inherit'>"
-//        			+ "<a href='%s' style='background-color:#333333;border:1px solid #333333;border-color:#333333;border-radius:6px;border-width:1px;color:#ffffff;display:inline-block;font-family:arial,helvetica,sans-serif;font-size:16px;font-weight:normal;letter-spacing:0px;line-height:16px;padding:12px 18px 12px 18px;text-align:center;text-decoration:none' "
-//        			+ "target='_blank'>%s</a></td></tr></tbody>"
-//        			+ "</table></td></tr></tbody></table></td></tr></table>",
-//            		"https://osmand.net/giveaway?email=" + URLEncoder.encode(mailTo),"Participate in a Giveaway!" );
-//        }
-//        footerSetting.setHtml("<html>"+footer+"</html>");
-//        mailSettings.setFooterSetting(footerSetting);
-//        mail.setMailSettings(mailSettings);
+        MailSettings mailSettings = new MailSettings();
+        FooterSetting footerSetting = new FooterSetting();
+        footerSetting.setEnable(true);
+        String footer = "<center style='margin:5px 0px 5px 0px'><a href=\"https://osmand.net/api/email/unsubscribe?id=" + 
+        		userHash + "&group=" + p.topic + "\">Unsubscribe</a></center>";
+        if("giveaway".equals(p.topic)) {
+        	String giv = String.format(
+        			"<table border='0' cellPadding='0' cellSpacing='0' class='module' data-role='module-button' data-type='button' role='module' "
+        			+ "style='table-layout:fixed' width='100%%'><tbody><tr><td align='center' class='outer-td' style='padding:0px 0px 0px 0px'>"
+        			+ "<table border='0' cellPadding='0' cellSpacing='0' class='button-css__deep-table___2OZyb wrapper-mobile' style='text-align:center'>"
+        			+ "<tbody><tr><td align='center' bgcolor='#333333' class='inner-td' style='border-radius:6px;font-size:16px;text-align:center;background-color:inherit'>"
+        			+ "<a href='%s' style='background-color:#333333;border:1px solid #333333;border-color:#333333;border-radius:6px;border-width:1px;color:#ffffff;display:inline-block;font-family:arial,helvetica,sans-serif;font-size:16px;font-weight:normal;letter-spacing:0px;line-height:16px;padding:12px 18px 12px 18px;text-align:center;text-decoration:none' "
+        			+ "target='_blank'>%s</a></td></tr></tbody>"
+        			+ "</table></td></tr></tbody></table></td></tr></table>",
+            		"https://osmand.net/giveaway?email=" + URLEncoder.encode(mailTo),"Participate in a Giveaway!" );
+        	footer = giv + footer;
+        }
+        footerSetting.setHtml("<html>"+footer+"</html>");
+        mailSettings.setFooterSetting(footerSetting);
+        mail.setMailSettings(mailSettings);
         Request request = new Request();
         try {
             request.setMethod(Method.POST);
@@ -348,8 +349,6 @@ public class EmailSenderMain {
             body = body.replace("https://osmand.net/giveaway?email=", "https://osmand.net/giveaway?email="+URLEncoder.encode(mailTo));
             body = body.replace(">Unsubscribe", 
             		" href='https://osmand.net/api/email/unsubscribe?id=" + userHash + "&group=" + p.topic+"'>Unsubscribe");
-            LOGGER.info(body);
-            request.setBody(body);
             Response response = sendGridClient.api(request);
             LOGGER.info("Response code: " + response.getStatusCode());
             p.sentSuccess++;
