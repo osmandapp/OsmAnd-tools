@@ -323,8 +323,13 @@ public class EmailSenderMain {
         MailSettings mailSettings = new MailSettings();
         FooterSetting footerSetting = new FooterSetting();
         footerSetting.setEnable(true);
-        footerSetting.setHtml("<html><center><a href=\"https://osmand.net/api/email/unsubscribe?id=" + userHash + "&group=" + p.topic
-                + "\">Unsubscribe</a></center></html>");
+        String footer = "<center><a href=\"https://osmand.net/api/email/unsubscribe?id=" + 
+        		userHash + "&group=" + p.topic + "\">Unsubscribe</a></center>";
+        if("giveaway".equals(p.topic)) {
+			footer = "<center><a href=\"https://osmand.net/giveaway?email=" + URLEncoder.encode(mailTo) +
+						"\">Participate in Giveaway!</a></center>" + footer;
+        }
+        footerSetting.setHtml("<html>"+footer+"</html>");
         mailSettings.setFooterSetting(footerSetting);
         mail.setMailSettings(mailSettings);
         Request request = new Request();
