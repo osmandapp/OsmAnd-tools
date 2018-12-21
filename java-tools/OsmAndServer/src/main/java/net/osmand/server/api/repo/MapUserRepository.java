@@ -19,6 +19,9 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface MapUserRepository extends JpaRepository<MapUser, MapUserPrimaryKey> {
+	
+	
+    boolean existsByEmail(String email);
 
     @Entity
     @Table(name = "email_free_users")

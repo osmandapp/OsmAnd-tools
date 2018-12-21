@@ -222,6 +222,12 @@ public class WebController {
         return generateStaticResource("pub/osm_live.html", "osm_live.html", request, response);
     }
     
+    @RequestMapping(path = { "/giveaway", "/giveaway.html"  })
+    @ResponseBody
+    public FileSystemResource giveaway(HttpServletRequest request, HttpServletResponse response) {
+        return generateStaticResource("pub/giveaway.html", "giveaway.html", request, response);
+    }
+    
     @RequestMapping(path = { "/downloads", "/downloads.html"  })
     @ResponseBody
     public FileSystemResource downloads(HttpServletRequest request, HttpServletResponse response) {
