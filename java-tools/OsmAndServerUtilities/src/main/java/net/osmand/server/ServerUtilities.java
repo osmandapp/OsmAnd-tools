@@ -9,6 +9,7 @@ import net.osmand.data.changeset.CalculateOsmChangesets;
 import net.osmand.data.changeset.OsmAndLiveReports;
 import net.osmand.live.subscriptions.UpdateSubscription;
 import net.osmand.mailsender.EmailSenderMain;
+import net.osmand.mailsender.GiveAwaySenderMain;
 
 public class ServerUtilities {
 
@@ -22,6 +23,8 @@ public class ServerUtilities {
 			UpdateSubscription.main(subArgsArray);
 		} else if (utl.equals("send-email")) {
 			EmailSenderMain.main(subArgsArray);
+		} else if (utl.equals("giveaway-send-email")) {
+			GiveAwaySenderMain.main(subArgsArray);
 		} else if (utl.equals("update-countries-for-changeset")) {
 			CalculateOsmChangesets.calculateCountries();
 		} else if (utl.equals("download-changeset")) {

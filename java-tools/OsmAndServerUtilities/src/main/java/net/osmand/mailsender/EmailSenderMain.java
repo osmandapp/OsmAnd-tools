@@ -1,20 +1,33 @@
 package net.osmand.mailsender;
 
-import com.google.gson.Gson;
-import com.sendgrid.*;
-
-import net.osmand.mailsender.data.BlockedUser;
-
-import javax.annotation.Nullable;
-
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
-import java.sql.*;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.util.Base64;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.logging.Logger;
+
+import javax.annotation.Nullable;
+
+import net.osmand.mailsender.data.BlockedUser;
+
+import com.google.gson.Gson;
+import com.sendgrid.Email;
+import com.sendgrid.FooterSetting;
+import com.sendgrid.Mail;
+import com.sendgrid.MailSettings;
+import com.sendgrid.Method;
+import com.sendgrid.Personalization;
+import com.sendgrid.Request;
+import com.sendgrid.Response;
+import com.sendgrid.SendGrid;
 
 
 // Uses SendGrid's Java Library
