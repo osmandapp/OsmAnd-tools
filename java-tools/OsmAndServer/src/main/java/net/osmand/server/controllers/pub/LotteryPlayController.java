@@ -4,10 +4,12 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigInteger;
 import java.net.URL;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.Enumeration;
 import java.util.List;
+import java.util.TimeZone;
 
 import javax.servlet.http.HttpServletRequest;
 
@@ -46,6 +48,11 @@ public class LotteryPlayController {
 	
 	@Autowired
 	MapUserRepository mapUsers;
+	
+	static SimpleDateFormat FORMAT = new SimpleDateFormat("MM/dd HH:mm");
+	static {
+		FORMAT.setTimeZone(TimeZone.getTimeZone("UTC"));
+	}
 	
 	public static class LotteryResult {
 		String month;
@@ -94,8 +101,7 @@ public class LotteryPlayController {
 			res.users.add(c);
 		}
 		for (LotteryRoundsRepository.LotteryRound rnd : roundsRepo.findByMonthOrderByUpdateTimeDesc(month)) {
-			rnd.message = "Round " + rnd.roundId + " - " + 
-						String.format("%1$tm/%1$td %1$tH:%1$tM", rnd.updateTime);
+			rnd.message = "Round " + rnd.roundId + " - " + FORMAT.format(rnd.updateTime) + " UTC";
 			rnd.seedInteger = new BigInteger(rnd.seed, 16).toString();
 			res.rounds.add(rnd);
 		}

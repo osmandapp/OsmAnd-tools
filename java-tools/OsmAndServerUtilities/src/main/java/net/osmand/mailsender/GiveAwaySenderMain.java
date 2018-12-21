@@ -7,6 +7,8 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Date;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.logging.Logger;
 
 import javax.annotation.Nullable;
@@ -36,11 +38,11 @@ public class GiveAwaySenderMain {
     	String templateId = null;
         String testAddress = null;
         String[] promocodes = new String[0];
+        Set<String> dbPromocodes = new TreeSet<>();
         
         String month;
         PreparedStatement updateStatement;
         
-        int promocodeInd = 0;
         String mailFrom;
         int sentSuccess = 0;
         int sentFailed = 0;
@@ -76,7 +78,29 @@ public class GiveAwaySenderMain {
             System.exit(1);
         }
 
+        ResultSet rs = conn.createStatement().executeQuery("select distinct promo from lottery_promocodes where month='"+p.month+"'" );
+        int total = 0;
+        while(rs.next()) {
+        	total++;
+        	p.dbPromocodes.add(rs.getString(1));
+        }
+        if(p.promocodes.length > 0) {
+        	PreparedStatement ps = conn.prepareStatement("insert into lottery_promocodes(month, promo) values (?, ?)");
+        	for(String prom : p.promocodes) {
+        		if(!p.dbPromocodes.contains(prom)) {
+        			ps.setString(1, p.month);
+        			ps.setString(2, prom);
+        			ps.execute();
+        			p.dbPromocodes.add(prom);
+        		}
+        	}
+        }
+        rs = conn.createStatement().executeQuery("select distinct promocode from lottery_users where month='"+p.month+"'" );
+        while(rs.next()) {
+        	p.dbPromocodes.remove(rs.getString(1));
+        }
         sendProductionEmails(conn, p);
+        LOGGER.info(String.format("Promocodes: %d left, %d total.", total, p.dbPromocodes.size()));
         conn.close();
     }
 
@@ -91,12 +115,9 @@ public class GiveAwaySenderMain {
             String address = resultSet.getString(1);
             sendMail(address, p);
         }
-        int used = Math.min(p.promocodes.length, p.promocodeInd);
-        int left = p.promocodes.length - used;
-        int missing = Math.max(p.promocodeInd  - p.promocodes.length, 0); 
         LOGGER.warning(String.format(
-        		"Sending mails finished: %d success, %d failed. Promocodes: %d used, %d left, %d missing", 
-        		p.sentSuccess, p.sentFailed, used, left, missing));
+        		"Sending mails finished: %d success, %d failed", 
+        		p.sentSuccess, p.sentFailed));
     }
 
 
@@ -149,15 +170,10 @@ public class GiveAwaySenderMain {
         personalization.addTo(to);
         mail.addPersonalization(personalization);
         mail.setTemplateId(p.templateId);
-        String promo = null;
-        if(p.promocodes.length > p.promocodeInd) {
-        	promo = p.promocodes[p.promocodeInd];
-        }
-        p.promocodeInd++;
-        if(promo == null || promo.length() == 0 || p.testSent) {
+        if(p.testSent) {
         	return;
         }
-        
+        String promo = p.dbPromocodes.iterator().next();
         MailSettings mailSettings = new MailSettings();
         FooterSetting footerSetting = new FooterSetting();
         footerSetting.setEnable(true);
@@ -177,6 +193,7 @@ public class GiveAwaySenderMain {
             LOGGER.info("Response code: " + response.getStatusCode());
             p.sentSuccess++;
             if(p.testAddress == null) {
+            	p.dbPromocodes.remove(promo);
             	p.updateStatement.setString(1, promo);
             	p.updateStatement.setString(2, mailTo);
             	p.updateStatement.execute();
@@ -185,7 +202,6 @@ public class GiveAwaySenderMain {
             }
         } catch (IOException ex) {
         	p.sentFailed++;
-        	p.promocodeInd--;
             System.err.println(ex.getMessage());
         } catch (SQLException e) {
         	p.sentFailed++;

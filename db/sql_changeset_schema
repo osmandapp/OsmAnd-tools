@@ -96,6 +96,8 @@ CREATE TABLE lottery_users (email text, month text, hashcode text, ip text,
 CREATE TABLE lottery_rounds ( month text, participants text, seed text,
         winner text, size integer, selection integer, round_id integer, updatetime timestamp);
 
+CREATE TABLE lottery_promocodes ( month text, promo text);
+
 GRANT ALL privileges ON ALL TABLES IN SCHEMA public to <user>;
 GRANT ALL privileges ON supporters_seq to <user>;
 GRANT ALL privileges ON telegram_tracker_configuration_id_seq to <user>;
