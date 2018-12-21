@@ -35,7 +35,6 @@ public class GiveAwaySenderMain {
     private static class EmailParams {
     	String templateId = null;
         String testAddress = null;
-        String subject = null;
         String[] promocodes = new String[0];
         
         String month;
@@ -53,6 +52,9 @@ public class GiveAwaySenderMain {
         EmailParams p = new EmailParams(); 
         for (String arg : args) {
             String val = arg.substring(arg.indexOf("=") + 1);
+            if(Algorithms.isEmpty(val)) {
+            	continue;
+            }
             if (arg.startsWith("--id=")) {
                 p.templateId = val;
             } else if (arg.startsWith("--sender_mail=")) {
@@ -60,10 +62,7 @@ public class GiveAwaySenderMain {
             } else if (arg.startsWith("--test_addr=")) {
             	p.testAddress = val;
             } else if (arg.startsWith("--promocodes=")) {
-            	if(!Algorithms.isEmpty(val)) {
-            		p.promocodes = val.split(",");
-            	}
-            	
+            	p.promocodes = val.split(",");
             }
         }
         final String apiKey = System.getenv("SENDGRID_KEY");
