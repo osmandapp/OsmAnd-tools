@@ -151,7 +151,7 @@ public class GiveAwaySenderMain {
         	promo = p.promocodes[p.promocodeInd];
         }
         p.promocodeInd++;
-        if(promo == null || p.testSent) {
+        if(promo == null || promo.length() == 0 || p.testSent) {
         	return;
         }
         
