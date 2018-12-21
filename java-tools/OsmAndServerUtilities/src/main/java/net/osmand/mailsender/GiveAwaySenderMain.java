@@ -143,7 +143,6 @@ public class GiveAwaySenderMain {
         Email to = new Email(mailTo);
         if(p.testAddress != null) {
         	to = new Email(p.testAddress);
-        	p.testSent = true;
         }
         Mail mail = new Mail();
         mail.from = from;
@@ -182,6 +181,8 @@ public class GiveAwaySenderMain {
             	p.updateStatement.setString(1, promo);
             	p.updateStatement.setString(2, mailTo);
             	p.updateStatement.execute();
+            } else {
+            	p.testSent = true;
             }
         } catch (IOException ex) {
         	p.sentFailed++;
