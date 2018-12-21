@@ -81,8 +81,10 @@ public class GiveAwaySenderMain {
         ResultSet rs = conn.createStatement().executeQuery("select distinct promo from lottery_promocodes where month='"+p.month+"'" );
         int total = 0;
         while(rs.next()) {
-        	total++;
-        	p.dbPromocodes.add(rs.getString(1));
+        	if(rs.getString(1) != null) {
+        		total++;
+        		p.dbPromocodes.add(rs.getString(1));
+        	}
         }
         if(p.promocodes.length > 0) {
         	PreparedStatement ps = conn.prepareStatement("insert into lottery_promocodes(month, promo) values (?, ?)");
@@ -97,7 +99,9 @@ public class GiveAwaySenderMain {
         }
         rs = conn.createStatement().executeQuery("select distinct promocode from lottery_users where month='"+p.month+"'" );
         while(rs.next()) {
-        	p.dbPromocodes.remove(rs.getString(1));
+        	if(rs.getString(1) != null) {
+        		p.dbPromocodes.remove(rs.getString(1));
+        	}
         }
         sendProductionEmails(conn, p);
         LOGGER.info(String.format("Promocodes: %d left, %d total.", total, p.dbPromocodes.size()));
