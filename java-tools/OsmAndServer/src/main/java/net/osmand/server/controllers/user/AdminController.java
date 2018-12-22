@@ -420,13 +420,16 @@ public class AdminController {
 	public static class SubscriptionReport {
 		public String date;
 		public int count;
+		public int annualCount;
+		public int monthCount;
 	}
 	
 	
 	private List<SubscriptionReport> getSubscriptionsReport() {
 		List<SubscriptionReport> result = jdbcTemplate
-				.query("SELECT date_trunc('day', now() - a.month * interval '1 month'), count(*) from "
-						+ "(select generate_series(0, 12) as month) a join supporters_device_sub t "
+				.query("SELECT date_trunc('day', now() - a.month * interval '1 month'), count(*) "
+						+ ", count(*) FILTER (WHERE t.sku like '%annual%'), count(*) FILTER (WHERE t.sku not like '%annual%') "
+						+ " from  (select generate_series(0, 12) as month) a join supporters_device_sub t "
 						+ " on  t.expiretime > now()  - a.month * interval '1 month' and t.starttime < now() -  a.month * interval '1 month'"
 						+ " group by a.month order by 1 desc", new RowMapper<SubscriptionReport>() {
 
@@ -435,6 +438,8 @@ public class AdminController {
 						SubscriptionReport sr = new SubscriptionReport();
 						sr.date = String.format("%1$tF", rs.getDate(1));
 						sr.count = rs.getInt(2);
+						sr.annualCount = rs.getInt(3);
+						sr.monthCount = rs.getInt(4);
 						return sr;
 					}
 
