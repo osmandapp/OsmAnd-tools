@@ -110,6 +110,10 @@ public class UpdateSubscription {
 			Timestamp expireTime = rs.getTimestamp("expiretime");
 			boolean valid = rs.getBoolean("valid");
 			long tm = System.currentTimeMillis();
+			if(!sku.startsWith("osm")) {
+				// this is ios
+				continue;
+			}
 
 			long checkDiff = checkTime == null? tm :(tm - checkTime.getTime()) ;
 
