@@ -431,7 +431,7 @@ public class AdminController {
 				.query("SELECT date_trunc('day', now() - a.month * interval '1 month'), count(*) "
 						+ ", count(*) FILTER (WHERE t.sku like '%annual%v1'), count(*) FILTER (WHERE t.sku like '%annual%v2'), "
 						+ " count(*) FILTER (WHERE t.sku not like '%annual%') "
-						+ " from  (select generate_series(0, 12) as month) a join supporters_device_sub t "
+						+ " from  (select generate_series(0, 18) as month) a join supporters_device_sub t "
 						+ " on  t.expiretime > now()  - a.month * interval '1 month' and t.starttime < now() -  a.month * interval '1 month'"
 						+ " group by a.month order by 1 desc", new RowMapper<SubscriptionReport>() {
 
