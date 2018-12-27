@@ -54,7 +54,7 @@ public interface LotteryUsersRepository extends JpaRepository<LotteryUser, Lotte
         public Integer roundId;
         
         @Column(name = "sent")
-        public boolean sent;
+        public Boolean sent;
 
         @Column(name = "updatetime")
         @Temporal(TemporalType.TIMESTAMP)
