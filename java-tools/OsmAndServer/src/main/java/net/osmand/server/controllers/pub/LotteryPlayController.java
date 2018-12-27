@@ -162,9 +162,12 @@ public class LotteryPlayController {
 			return usr;
 		}
 		Optional<LotterySeries> seriesObject = seriesRepo.findById(series);
-		if(!seriesObject.isPresent() || 
-				!seriesObject.get().isOpenForRegistration()) {
-			usr.message = String.format("Active giveaway '%s' is not found", series);
+		if(!seriesObject.isPresent()) {
+			usr.message = String.format("Giveaway '%s' is not found", series);
+			return usr;
+		}
+		if(!seriesObject.get().isOpenForRegistration()) {
+			usr.message = String.format("Giveaway is not active anymore", series);
 			return usr;
 		}
 		usr.email = email;
