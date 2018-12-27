@@ -142,7 +142,6 @@ public class SubscriptionController {
         String email = request.getParameter("email");
         String visibleName = request.getParameter("visibleName");
         String preferredCountry = request.getParameter("preferredCountry");
-        boolean ios = "ios".equals(request.getParameter("os"));
         // no email validation cause client doesn't provide it 99%
         // avoid all nulls, empty, none
         boolean emailValid = email != null && email.contains("@");
@@ -157,7 +156,7 @@ public class SubscriptionController {
         int token = tlr.nextInt(100000, 1000000);
         Supporter supporter = new Supporter();
         supporter.userId = null;
-        supporter.ios = ios;
+        supporter.os = request.getParameter("os");
         supporter.token = String.valueOf(token);
         supporter.visibleName = visibleName;
         supporter.userEmail = email;

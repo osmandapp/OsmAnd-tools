@@ -39,7 +39,7 @@ public interface SupportersRepository extends JpaRepository<SupportersRepository
         public String preferredRegion;
         
         @Column(name = "os")
-        public boolean ios;
+        public String os;
 
     }
 }
