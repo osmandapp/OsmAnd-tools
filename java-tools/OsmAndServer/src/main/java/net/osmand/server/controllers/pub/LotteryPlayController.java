@@ -67,16 +67,24 @@ public class LotteryPlayController {
 	
 	public static class LotteryResult {
 		String series;
-		long date;
+		String type;
+		LotteryStatus status;
+		String date;
+		int totalRounds;
+		
+		
 		String message;
 		String user;
+		
 		int participants;
 		int activeParticipants;
-		int totalRounds;
 		int winners;
+		
+		
 		List<LotteryUsersRepository.LotteryUser> users = new ArrayList<LotteryUsersRepository.LotteryUser>();
 		List<LotteryRoundsRepository.LotteryRound> rounds = new ArrayList<LotteryRoundsRepository.LotteryRound>();
 		List<LotterySeries> seriesList;
+		
 	}
 	
 	@GetMapping(path = {"/series"}, produces = "application/json")
@@ -101,7 +109,6 @@ public class LotteryPlayController {
 			@RequestParam(required = true) String series) throws IOException {
 		LotteryResult res = new LotteryResult();
 		res.series = series;
-		res.date = System.currentTimeMillis() / 1000;
 		res.message = "";
 		if (!Algorithms.isEmpty(email)) {
 			LotteryUser user = participate(request, email, series);
@@ -113,12 +120,16 @@ public class LotteryPlayController {
 		Optional<LotterySeries> s = seriesRepo.findById(series);
 		if(s.isPresent()) {
 			res.totalRounds = s.get().rounds;
+			res.status = s.get().status;
+			res.type = s.get().type;
+			res.date = FORMAT.format(s.get().updateTime);
 		}
 		
 		for (LotteryUsersRepository.LotteryUser u : usersRepo.findBySeriesOrderByUpdateTime(series)) {
 			LotteryUsersRepository.LotteryUser c = new LotteryUser();
 			c.hashcode = u.hashcode;
 			c.roundId = u.roundId;
+			c.date = FORMAT.format(u.updateTime);
 			res.participants ++;
 			if (Algorithms.isEmpty(u.promocode)) {
 				c.status = "Participating";

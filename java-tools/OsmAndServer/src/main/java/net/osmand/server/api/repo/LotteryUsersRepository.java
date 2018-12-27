@@ -65,6 +65,9 @@ public interface LotteryUsersRepository extends JpaRepository<LotteryUser, Lotte
         
         @Transient
 		public String status;
+
+        @Transient
+		public String date;
     }
 
     class LotteryUserPrimaryKey implements Serializable {
