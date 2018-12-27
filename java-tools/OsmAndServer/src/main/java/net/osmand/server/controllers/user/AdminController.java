@@ -20,6 +20,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.zip.GZIPOutputStream;
 
@@ -30,6 +31,7 @@ import net.osmand.server.api.repo.LotterySeriesRepository.LotterySeries;
 import net.osmand.server.api.repo.LotterySeriesRepository.LotteryStatus;
 import net.osmand.server.api.services.DownloadIndexesService;
 import net.osmand.server.api.services.DownloadIndexesService.DownloadProperties;
+import net.osmand.server.api.services.EmailSenderService;
 import net.osmand.server.api.services.IpLocationService;
 import net.osmand.server.api.services.MotdService;
 import net.osmand.server.api.services.MotdService.MotdSettings;
@@ -65,6 +67,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sendgrid.Email;
 
 @Controller
 @RequestMapping("/admin")
@@ -108,6 +111,9 @@ public class AdminController {
 	
 	@Autowired
 	private LotterySeriesRepository seriesRepo;
+	
+	@Autowired
+	private EmailSenderService emailSender;
 
 
 	protected ObjectMapper mapper;
@@ -184,6 +190,37 @@ public class AdminController {
 		redirectAttrs.addFlashAttribute("update_errors", "");
 		redirectAttrs.addFlashAttribute("update_message", "Givewaway registered");
         return "redirect:info#giveaway";
+	}
+	
+	
+	@RequestMapping(path = { "/send-private-giveaway" }, method = RequestMethod.POST)
+	public String sendGiveaway(Model model,
+			@RequestParam(required = true) String name, 
+			@RequestParam(required = true) String email, 
+			@RequestParam(required = true) int promocodes, 
+			final RedirectAttributes redirectAttrs) throws JsonProcessingException {
+		// seriesRepo
+		Optional<LotterySeries> obj = seriesRepo.findById(name);
+		if(!obj.isPresent() || obj.get().status != LotteryStatus.NOTPUBLIC) {
+			throw new IllegalArgumentException("Illegal giveaway name is specified");
+		}
+		LotterySeries s = obj.get();
+		Set<String> nonUsedPromos = s.getNonUsedPromos();
+		List<String> promos = new ArrayList<String>();
+		Iterator<String> it = nonUsedPromos.iterator();
+		while(promocodes > 0 && it.hasNext()) {
+			String p = it.next();
+			promos.add(p);
+			s.usePromo(p);
+			promocodes--;
+		}
+		boolean sent = emailSender.sendPromocodesEmails(email, s.emailTemplate, String.join(",", promos));
+		seriesRepo.save(s);
+		
+		redirectAttrs.addFlashAttribute("update_status", sent ? "OK" : "Something went wrong!");
+		redirectAttrs.addFlashAttribute("update_errors", "");
+		redirectAttrs.addFlashAttribute("update_message", sent ? "Givewaway sent" : "Something went wrong!");
+        return "redirect:info";
 	}
 	
 

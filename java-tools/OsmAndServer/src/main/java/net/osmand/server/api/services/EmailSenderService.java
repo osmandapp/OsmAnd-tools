@@ -1,5 +1,7 @@
 package net.osmand.server.api.services;
 
+import net.osmand.util.Algorithms;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.stereotype.Service;
@@ -37,11 +39,14 @@ public class EmailSenderService {
     	LOGGER.info("Sending mail to: " + mailTo);
         Email from = new Email(DEFAULT_MAIL_FROM);
         from.setName("OsmAnd");
-        Email to = new Email(mailTo);
         Mail mail = new Mail();
         mail.from = from;
         Personalization personalization = new Personalization();
-        personalization.addTo(to);
+        for(String mt : mailTo.split(",")) {
+        	if(!Algorithms.isEmpty(mt)) {
+        		personalization.addTo(new Email(mt));
+        	}
+        }
         mail.addPersonalization(personalization);
         mail.setTemplateId(templateId);
         MailSettings mailSettings = new MailSettings();
