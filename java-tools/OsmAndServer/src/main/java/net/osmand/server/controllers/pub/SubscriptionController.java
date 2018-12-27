@@ -112,6 +112,7 @@ public class SubscriptionController {
         MapUser mapUser = new MapUser();
         mapUser.aid = request.getParameter("aid");
         mapUser.email = request.getParameter("email");
+        mapUser.os = request.getParameter("os");
         mapUser.updateTime = new Date();
         mapUser = mapUserRepository.save(mapUser);
         return ok("{\"email\": \"%s\", \"time\": \"%d\"}", mapUser.email, mapUser.updateTime.getTime());
@@ -141,6 +142,7 @@ public class SubscriptionController {
         String email = request.getParameter("email");
         String visibleName = request.getParameter("visibleName");
         String preferredCountry = request.getParameter("preferredCountry");
+        boolean ios = "ios".equals(request.getParameter("os"));
         // no email validation cause client doesn't provide it 99%
         // avoid all nulls, empty, none
         boolean emailValid = email != null && email.contains("@");
@@ -155,6 +157,7 @@ public class SubscriptionController {
         int token = tlr.nextInt(100000, 1000000);
         Supporter supporter = new Supporter();
         supporter.userId = null;
+        supporter.ios = ios;
         supporter.token = String.valueOf(token);
         supporter.visibleName = visibleName;
         supporter.userEmail = email;

@@ -7,7 +7,7 @@ CREATE TABLE changeset_country(changesetid text, countryid int, small int);
 CREATE TABLE supporters(userid text, token text, visiblename text, useremail text, preferred_region text);
 
 # mail group
-CREATE TABLE email_free_users(aid text, email text, updatetime timestamp);
+CREATE TABLE email_free_users(aid text, email text, os text, updatetime timestamp);
 CREATE TABLE email_blocked(email text, reason text, timestamp timestamp);
 CREATE TABLE email_unsubscribed(email text, channel text, updatetime timestamp);
 CREATE TABLE email_support_survey(ip text, response text, timestamp timestamp);
@@ -22,8 +22,6 @@ CREATE TABLE supporters_device_sub(userid bigint, sku text, purchasetoken text, 
         valid boolean, checktime timestamp);
 CREATE INDEX supporters_device_sub_starttime_idx on supporters_device_sub(starttime);        
 CREATE INDEX supporters_device_sub_expiretime_idx on supporters_device_sub(expiretime);        
-
-ALTER TABLE changeset_country OWNER TO <user>;
 
 CREATE INDEX changesets_id_idx on changesets(id);
 CREATE INDEX changesets_closed_at_day_idx on changesets(closed_at_day);
@@ -90,14 +88,18 @@ ALTER TABLE ONLY telegram_tracker_configuration ALTER COLUMN id SET DEFAULT next
 ALTER SEQUENCE telegram_tracker_configuration_id_seq OWNED BY telegram_tracker_configuration.id;
 
 
-CREATE TABLE lottery_users (email text, month text, hashcode text, ip text,
-        promocode text, round integer, updatetime timestamp);
+CREATE TABLE lottery_users (email text, series text, hashcode text, ip text,
+        promocode text, round integer, sent boolean, updatetime timestamp);
+CREATE INDEX lottery_users_series_idx on lottery_users(series);
 
-CREATE TABLE lottery_rounds ( month text, participants text, seed text,
+CREATE TABLE lottery_rounds( series text, participants text, seed text,
         winner text, size integer, selection integer, round_id integer, updatetime timestamp);
+CREATE INDEX lottery_rounds_series_idx on lottery_rounds(series);
 
-CREATE TABLE lottery_promocodes ( month text, promo text);
+CREATE TABLE lottery_series(name text, type text, promocodes text, usedpromos text, rounds integer, status text, emailtemplate text, updatetime timestamp);
 
+
+ALTER TABLE <table_name> OWNER TO <user>;
 GRANT ALL privileges ON ALL TABLES IN SCHEMA public to <user>;
 GRANT ALL privileges ON supporters_seq to <user>;
 GRANT ALL privileges ON telegram_tracker_configuration_id_seq to <user>;

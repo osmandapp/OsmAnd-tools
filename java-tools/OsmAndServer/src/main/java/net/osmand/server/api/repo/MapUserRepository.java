@@ -35,6 +35,9 @@ public interface MapUserRepository extends JpaRepository<MapUser, MapUserPrimary
         @Id
         @Column(name = "email")
         public String email;
+        
+        @Column(name = "os")
+        public String os;
 
         @Column(name = "updatetime")
         @Temporal(TemporalType.TIMESTAMP)

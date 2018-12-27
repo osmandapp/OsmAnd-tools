@@ -19,11 +19,15 @@ import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.TreeMap;
 import java.util.zip.GZIPOutputStream;
 
 import javax.servlet.http.HttpServletResponse;
 
+import net.osmand.server.api.repo.LotterySeriesRepository;
+import net.osmand.server.api.repo.LotterySeriesRepository.LotterySeries;
+import net.osmand.server.api.repo.LotterySeriesRepository.LotteryStatus;
 import net.osmand.server.api.services.DownloadIndexesService;
 import net.osmand.server.api.services.DownloadIndexesService.DownloadProperties;
 import net.osmand.server.api.services.IpLocationService;
@@ -101,6 +105,9 @@ public class AdminController {
 	
 	@Autowired
 	private IpLocationService locationService;
+	
+	@Autowired
+	private LotterySeriesRepository seriesRepo;
 
 
 	protected ObjectMapper mapper;
@@ -114,6 +121,7 @@ public class AdminController {
 		ObjectMapper objectMapper = new ObjectMapper();
         this.mapper = objectMapper;
 	}
+	
 	
 	@RequestMapping(path = { "/publish" }, method = RequestMethod.POST)
 	public String publish(Model model, final RedirectAttributes redirectAttrs) throws JsonProcessingException {
@@ -129,6 +137,55 @@ public class AdminController {
         //return index(model);
         return "redirect:info";
 	}
+
+	
+	
+	@RequestMapping(path = { "/register-giveaway" }, method = RequestMethod.POST)
+	public String registerGiveaway(Model model,
+			@RequestParam(required = true) String name, 
+			@RequestParam(required = true) String type, 
+			@RequestParam(name="public", required = false) String asPublic,
+			@RequestParam(required = true) String emailTemplate,
+			@RequestParam(required = true) String promocodes, 
+			final RedirectAttributes redirectAttrs) throws JsonProcessingException {
+		// seriesRepo
+		LotterySeries lotterySeries = new LotterySeries();
+		lotterySeries.name = String.format("%1$tY-%1$tm", new Date()) + "-" + name.trim();
+		lotterySeries.promocodes = promocodes.trim();
+		lotterySeries.emailTemplate = emailTemplate.trim();
+		lotterySeries.rounds = "on".equals(asPublic) ? lotterySeries.promocodesSize() : 0;
+		lotterySeries.status = "on".equals(asPublic) ? LotteryStatus.DRAFT :
+			LotteryStatus.NOTPUBLIC;
+		lotterySeries.type = type;
+		lotterySeries.updateTime = new Date();
+		if(seriesRepo.existsById(lotterySeries.name)) {
+			throw new IllegalStateException("Giveaway already exists");
+		}
+		seriesRepo.save(lotterySeries);
+		
+		redirectAttrs.addFlashAttribute("update_status", "OK");
+		redirectAttrs.addFlashAttribute("update_errors", "");
+		redirectAttrs.addFlashAttribute("update_message", "Givewaway registered");
+        return "redirect:info#giveaway";
+	}
+	
+
+	@RequestMapping(path = { "/update-giveaway-status" }, method = RequestMethod.POST)
+	public String updateStatusGiveaway(Model model,
+			@RequestParam(required = true) String name, 
+			@RequestParam(required = true) String status, 
+			final RedirectAttributes redirectAttrs) throws JsonProcessingException {
+		// seriesRepo
+		Optional<LotterySeries> obj = seriesRepo.findById(name);
+		obj.get().status =  LotteryStatus.valueOf(status.toUpperCase());
+		seriesRepo.save(obj.get());
+		
+		redirectAttrs.addFlashAttribute("update_status", "OK");
+		redirectAttrs.addFlashAttribute("update_errors", "");
+		redirectAttrs.addFlashAttribute("update_message", "Givewaway registered");
+        return "redirect:info#giveaway";
+	}
+	
 
 	private List<String> publish() {
 		List<String> errors = new ArrayList<>();
@@ -251,35 +308,36 @@ public class AdminController {
 	
 	@RequestMapping("/info")
 	public String index(Model model) throws SQLException {
-			model.addAttribute("server_startup", String.format("%1$tF %1$tR", new Date(appContext.getStartupDate())));
-			model.addAttribute("server_commit", serverCommit);
-			String commit = runCmd(GIT_LOG_CMD, new File(websiteLocation), null);
-			model.addAttribute("web_commit", commit);
-			if (!model.containsAttribute("update_status")) {
-				model.addAttribute("update_status", "OK");
-				model.addAttribute("update_errors", "");
-				model.addAttribute("update_message", "");
-			}
-			MotdSettings settings = motdService.getSettings();
-			if (settings != null) {
-				model.addAttribute("motdSettings", settings);
-			}
-			settings = motdService.getSubscriptionSettings();
-			if (settings != null) {
-				model.addAttribute("subSettings", settings);
-			}
-
-			model.addAttribute("downloadServers", getDownloadSettings());
-			model.addAttribute("reports", getReports());
-			model.addAttribute("surveyReport", getSurveyReport());
-			model.addAttribute("subscriptionsReport", getSubscriptionsReport());
-			model.addAttribute("emailsReport", getEmailsDBReport());
-			model.addAttribute("newSubsReport", getNewSubsReport());
-			model.addAttribute("futureCancelReport", getFutureCancelReport());
-			model.addAttribute("polls", pollsService.getPollsConfig(false));
-			return "admin/info";
+		model.addAttribute("server_startup", String.format("%1$tF %1$tR", new Date(appContext.getStartupDate())));
+		model.addAttribute("server_commit", serverCommit);
+		String commit = runCmd(GIT_LOG_CMD, new File(websiteLocation), null);
+		model.addAttribute("web_commit", commit);
+		if (!model.containsAttribute("update_status")) {
+			model.addAttribute("update_status", "OK");
+			model.addAttribute("update_errors", "");
+			model.addAttribute("update_message", "");
+		}
+		MotdSettings settings = motdService.getSettings();
+		if (settings != null) {
+			model.addAttribute("motdSettings", settings);
+		}
+		settings = motdService.getSubscriptionSettings();
+		if (settings != null) {
+			model.addAttribute("subSettings", settings);
+		}
+		model.addAttribute("giveaways", seriesRepo.findAllByOrderByUpdateTimeDesc());
+		model.addAttribute("downloadServers", getDownloadSettings());
+		model.addAttribute("reports", getReports());
+		model.addAttribute("surveyReport", getSurveyReport());
+		model.addAttribute("subscriptionsReport", getSubscriptionsReport());
+		model.addAttribute("emailsReport", getEmailsDBReport());
+		model.addAttribute("newSubsReport", getNewSubsReport());
+		model.addAttribute("futureCancelReport", getFutureCancelReport());
+		model.addAttribute("polls", pollsService.getPollsConfig(false));
+		return "admin/info";
 	}
 	
+
 	public static class EmailReport {
 		public String category;
 		public String categoryId;
@@ -553,6 +611,7 @@ public class AdminController {
 		}
 	}
 
+	
 	private List<Map<String, Object>> getDownloadSettings() {
 		DownloadProperties dProps = downloadService.getSettings();
 		int ms = dProps.getMainServers().size();

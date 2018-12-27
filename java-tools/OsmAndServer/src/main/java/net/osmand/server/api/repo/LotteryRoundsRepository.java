@@ -14,24 +14,24 @@ import javax.persistence.TemporalType;
 import javax.persistence.Transient;
 
 import net.osmand.server.api.repo.LotteryRoundsRepository.LotteryRound;
-import net.osmand.server.api.repo.LotteryRoundsRepository.LotteryUserPrimaryKey;
+import net.osmand.server.api.repo.LotteryRoundsRepository.LotteryRoundPrimaryKey;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public interface LotteryRoundsRepository extends JpaRepository<LotteryRound, LotteryUserPrimaryKey> {
+public interface LotteryRoundsRepository extends JpaRepository<LotteryRound, LotteryRoundPrimaryKey> {
 	
-	List<LotteryRound> findByMonthOrderByUpdateTimeDesc(String month);
+	List<LotteryRound> findBySeriesOrderByUpdateTimeDesc(String series);
 	
     @Entity
     @Table(name = "lottery_rounds")
-    @IdClass(LotteryUserPrimaryKey.class)
+    @IdClass(LotteryRoundPrimaryKey.class)
     class LotteryRound {
 
         @Id
-        @Column(name = "month")
-        public String month;
+        @Column(name = "series")
+        public String series;
 
         @Id
         @Column(name = "roundId")
@@ -64,18 +64,18 @@ public interface LotteryRoundsRepository extends JpaRepository<LotteryRound, Lot
         public String seedInteger;
     }
 
-    class LotteryUserPrimaryKey implements Serializable {
+    class LotteryRoundPrimaryKey implements Serializable {
 
 		private static final long serialVersionUID = 7950645758626335237L;
 		
-		public String month;
+		public String series;
         public int roundId;
         
 		@Override
 		public int hashCode() {
 			final int prime = 31;
 			int result = 1;
-			result = prime * result + ((month == null) ? 0 : month.hashCode());
+			result = prime * result + ((series == null) ? 0 : series.hashCode());
 			result = prime * result + roundId;
 			return result;
 		}
@@ -87,11 +87,11 @@ public interface LotteryRoundsRepository extends JpaRepository<LotteryRound, Lot
 				return false;
 			if (getClass() != obj.getClass())
 				return false;
-			LotteryUserPrimaryKey other = (LotteryUserPrimaryKey) obj;
-			if (month == null) {
-				if (other.month != null)
+			LotteryRoundPrimaryKey other = (LotteryRoundPrimaryKey) obj;
+			if (series == null) {
+				if (other.series != null)
 					return false;
-			} else if (!month.equals(other.month))
+			} else if (!series.equals(other.series))
 				return false;
 			if (roundId != other.roundId)
 				return false;

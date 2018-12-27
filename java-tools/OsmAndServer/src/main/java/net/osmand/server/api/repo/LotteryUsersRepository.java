@@ -23,10 +23,10 @@ import org.springframework.stereotype.Repository;
 public interface LotteryUsersRepository extends JpaRepository<LotteryUser, LotteryUserPrimaryKey> {
 
 	
-	List<LotteryUser> findByMonthOrderByUpdateTime(String month);
+	List<LotteryUser> findBySeriesOrderByUpdateTime(String series);
 	
 	
-	List<LotteryUser> findByMonthAndHashcodeOrderByUpdateTime(String month, String hashcode);
+	List<LotteryUser> findBySeriesAndHashcodeOrderByUpdateTime(String series, String hashcode);
 	
     @Entity
     @Table(name = "lottery_users")
@@ -41,8 +41,8 @@ public interface LotteryUsersRepository extends JpaRepository<LotteryUser, Lotte
         public String email;
         
         @Id
-        @Column(name = "month")
-        public String month;
+        @Column(name = "series")
+        public String series;
         
         @Column(name = "promocode")
         public String promocode;
@@ -52,6 +52,9 @@ public interface LotteryUsersRepository extends JpaRepository<LotteryUser, Lotte
         
         @Column(name = "round")
         public Integer roundId;
+        
+        @Column(name = "sent")
+        public boolean sent;
 
         @Column(name = "updatetime")
         @Temporal(TemporalType.TIMESTAMP)
@@ -67,14 +70,14 @@ public interface LotteryUsersRepository extends JpaRepository<LotteryUser, Lotte
     class LotteryUserPrimaryKey implements Serializable {
 
 		private static final long serialVersionUID = 1560021253924781406L;
-		public String month;
+		public String series;
         public String email;
         
 		@Override
 		public int hashCode() {
 			final int prime = 31;
 			int result = 1;
-			result = prime * result + ((month == null) ? 0 : month.hashCode());
+			result = prime * result + ((series == null) ? 0 : series.hashCode());
 			result = prime * result + ((email == null) ? 0 : email.hashCode());
 			return result;
 		}
@@ -91,11 +94,11 @@ public interface LotteryUsersRepository extends JpaRepository<LotteryUser, Lotte
 				return false;
 			}
 			LotteryUserPrimaryKey other = (LotteryUserPrimaryKey) obj;
-			if (month == null) {
-				if (other.month != null) {
+			if (series == null) {
+				if (other.series != null) {
 					return false;
 				}
-			} else if (!month.equals(other.month)) {
+			} else if (!series.equals(other.series)) {
 				return false;
 			}
 			if (email == null) {
