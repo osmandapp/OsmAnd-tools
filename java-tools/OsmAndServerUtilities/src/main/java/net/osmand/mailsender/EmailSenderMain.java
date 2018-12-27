@@ -48,6 +48,7 @@ public class EmailSenderMain {
         String mailFrom;
         int sentSuccess = 0;
         int sentFailed = 0;
+		public String giveawaySeries;
     }
 
     public static void main(String[] args) throws SQLException {
@@ -62,6 +63,8 @@ public class EmailSenderMain {
             	p.mailingGroups = val;
             } else if (arg.startsWith("--sender_mail=")) {
             	p.mailFrom = val;
+            } else if (arg.startsWith("--giveaway-series=")) {
+            	p.giveawaySeries = val;
             } else if (arg.startsWith("--subject=")) {
             	p.subject = val;
             } else if (arg.startsWith("--topic=")) {
@@ -197,26 +200,27 @@ public class EmailSenderMain {
 
     private static String buildQuery(String mailingGroups) {
         String[] groups = mailingGroups.split(",");
-        if (groups.length == 1) {
-            return "SELECT " +
-                    (mailingGroups.equals("supporters") ? "useremail" : "email") + " FROM " + mailingGroups;
-        } else {
-            StringBuilder sb = new StringBuilder();
-            for (int i = 0; i < groups.length - 1; i++) {
-                sb.append("SELECT ");
-                String trimmed = groups[i].trim();
-                sb.append((trimmed.equals("supporters") ? "useremail" : "email"));
-                sb.append(" FROM ");
-                sb.append(trimmed);
-                sb.append(" UNION ");
-            }
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < groups.length - 1; i++) {
+			if (i > 0) {
+				sb.append(" UNION ");
+			}
             sb.append("SELECT ");
-            String trimmed = groups[groups.length - 1].trim();
-            sb.append((trimmed.equals("supporters") ? "useremail" : "email"));
+            String table = groups[i].trim();
+            sb.append((table.equals("supporters") ? "useremail" : "email"));
             sb.append(" FROM ");
-            sb.append(trimmed);
-            return sb.toString();
+            if(table.startsWith("email_free")) {
+            	sb.append(" email_free_users ");
+            	if(table.contains("ios")) {
+            		sb.append(" WHERE os <> 'ios' or os is null");
+            	} else {
+            		sb.append(" WHERE os = 'ios' ");
+            	}
+            } else {
+            	sb.append(table);	
+            }
         }
+        return sb.toString();
     }
 
     private static void printStats(Connection conn, EmailParams p, Set<String> unsubscribed ) throws SQLException {
@@ -269,6 +273,9 @@ public class EmailSenderMain {
                 || p.topic.isEmpty() || p.runMode.isEmpty()) {
             printUsage();
             throw new RuntimeException("Correct arguments weren't supplied");
+        }
+        if(p.giveawaySeries == null && "giveaway".equals(p.topic)) {
+        	throw new RuntimeException("Giveaway series is required");
         }
         if (p.runMode.equals("send_to_test_email_group") &&
                 (p.testAddresses == null || p.testAddresses.isEmpty())) {
@@ -352,7 +359,8 @@ public class EmailSenderMain {
         			+ "<a href='%s' style='background-color:#333333;border:1px solid #333333;border-color:#333333;border-radius:6px;border-width:1px;color:#ffffff;display:inline-block;font-family:arial,helvetica,sans-serif;font-size:16px;font-weight:normal;letter-spacing:0px;line-height:16px;padding:12px 18px 12px 18px;text-align:center;text-decoration:none' "
         			+ "target='_blank'>%s</a></td></tr></tbody>"
         			+ "</table></td></tr></tbody></table></td></tr></table>",
-            		"https://osmand.net/giveaway?email=" + URLEncoder.encode(mailTo),"Participate in a Giveaway!" );
+							"https://osmand.net/giveaway?series=" + URLEncoder.encode(p.giveawaySeries) + "&email="
+									+ URLEncoder.encode(mailTo), "Participate in a Giveaway!");
         	footer = giv + footer;
         }
         footerSetting.setHtml("<html>"+footer+"</html>");
