@@ -1316,7 +1316,7 @@ public class BinaryMapIndexWriter {
 		writeInt32Size();
 	}
 
-	public void writeTransportStop(long id, int x24, int y24, String name, String nameEn, Map<String, Integer> stringTable,
+	public void writeTransportStop(long id, int x24, int y24, String name, String nameEn, Map<String, String> names, Map<String, Integer> stringTable,
 								   List<Long> routes, Map<Entity.EntityId, List<TransportStopExit>> exits) throws IOException {
 		checkPeekState(TRANSPORT_STOPS_TREE);
 
@@ -1336,6 +1336,13 @@ public class BinaryMapIndexWriter {
 		ts.setDx(x24 - bounds.leftX);
 		ts.setDy(y24 - bounds.topY);
 		ts.setId(id - stackBaseIds.peek());
+		List<Integer> l = new ArrayList<>();
+		for (Map.Entry<String, String> entry : names.entrySet())
+		{
+			l.add(registerString(stringTable,entry.getKey()));
+			l.add(registerString(stringTable,entry.getValue()));
+		}
+		ts.addAllAdditionalNamePairs(l);
 		for (Long i : routes) {
 			ts.addRoutes((int) (fp - i));
 		}
@@ -1348,8 +1355,6 @@ public class BinaryMapIndexWriter {
 					LatLon location = e.getLocation();
 					int exitX24 = (int) MapUtils.getTileNumberX(24, location.getLongitude());
 					int exitY24 = (int) MapUtils.getTileNumberY(24, location.getLatitude());
-					exit.setName(registerString(stringTable, e.getName()));
-					exit.setNameEn(registerString(stringTable, e.getName("en")));
 					exit.setRef(registerString(stringTable, e.getRef()));
 					exit.setDx(exitX24 - bounds.leftX);
 					exit.setDy(exitY24 - bounds.topY);
