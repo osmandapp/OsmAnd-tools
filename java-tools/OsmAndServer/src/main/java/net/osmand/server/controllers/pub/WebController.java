@@ -24,7 +24,8 @@ import java.util.regex.Pattern;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import net.osmand.server.controllers.pub.PollsService.PollQuestion;
+import net.osmand.server.api.services.PollsService;
+import net.osmand.server.api.services.PollsService.PollQuestion;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;

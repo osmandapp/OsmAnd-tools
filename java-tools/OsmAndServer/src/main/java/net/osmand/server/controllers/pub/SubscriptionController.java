@@ -3,6 +3,7 @@ package net.osmand.server.controllers.pub;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
@@ -18,7 +19,9 @@ import net.osmand.server.api.repo.SupportersDeviceSubscriptionRepository.Support
 import net.osmand.server.api.repo.SupportersDeviceSubscriptionRepository.SupporterDeviceSubscriptionPrimaryKey;
 import net.osmand.server.api.repo.SupportersRepository;
 import net.osmand.server.api.repo.SupportersRepository.Supporter;
+import net.osmand.server.api.services.ReceiptValidationService;
 import net.osmand.server.utils.BTCAddrValidator;
+import net.osmand.util.Algorithms;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -32,8 +35,11 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 @RestController
 @RequestMapping("/subscription")
@@ -55,7 +61,13 @@ public class SubscriptionController {
     private SupportersDeviceSubscriptionRepository supportersDeviceSubscriptionRepository;
     
     @Autowired
+    private ReceiptValidationService validationService;
+    
+    @Autowired
     private StringRedisTemplate redisTemplate;
+    
+    private ObjectMapper jsonMapper = new ObjectMapper();
+
 
     private final RestTemplate restTemplate;
 
@@ -235,6 +247,13 @@ public class SubscriptionController {
     private boolean isEmpty(String s) {
 		return s == null || s.length() == 0;
 	}
+    
+    @PostMapping(path = {"/ios-validate"})
+    public ResponseEntity<String> validateIos(HttpServletRequest request, 
+    		@RequestParam(required=false) String receipt, @RequestParam(required=false) String sandbox) throws Exception {
+		Map<String, Object> res = validationService.validateReceipt(receipt, !Algorithms.isEmpty(sandbox));
+		return ResponseEntity.ok(jsonMapper.writeValueAsString(res));
+    }
 
 	@PostMapping(path = {"/purchased", "/purchased.php"})
     public ResponseEntity<String> purchased(HttpServletRequest request) {
