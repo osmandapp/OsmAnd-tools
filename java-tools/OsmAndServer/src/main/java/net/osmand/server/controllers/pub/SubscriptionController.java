@@ -33,6 +33,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -248,9 +249,10 @@ public class SubscriptionController {
 		return s == null || s.length() == 0;
 	}
     
-    @PostMapping(path = {"/ios-validate"})
-    public ResponseEntity<String> validateIos(HttpServletRequest request, 
-    		@RequestParam(required=false) String receipt, @RequestParam(required=false) String sandbox) throws Exception {
+    @GetMapping(path = {"/ios-receipt-validate"})
+	public ResponseEntity<String> validateIos(HttpServletRequest request,
+			@RequestParam(required = true) String receipt, @RequestParam(required = false) String sandbox)
+			throws Exception {
 		Map<String, Object> res = validationService.validateReceipt(receipt, !Algorithms.isEmpty(sandbox));
 		return ResponseEntity.ok(jsonMapper.writeValueAsString(res));
     }
