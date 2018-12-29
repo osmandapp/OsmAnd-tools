@@ -250,9 +250,9 @@ public class SubscriptionController {
 	}
     
     @PostMapping(path = {"/ios-receipt-validate"})
-	public ResponseEntity<String> validateIos(HttpServletRequest request,
-			@RequestParam(required = true) String receipt, @RequestParam(required = false) String sandbox)
-			throws Exception {
+	public ResponseEntity<String> validateIos(HttpServletRequest request) throws Exception {
+		String receipt = request.getParameter("receipt");
+		String sandbox = request.getParameter("sandbox");
 		Map<String, Object> res = validationService.validateReceipt(receipt, !Algorithms.isEmpty(sandbox));
 		return ResponseEntity.ok(jsonMapper.writeValueAsString(res));
     }
