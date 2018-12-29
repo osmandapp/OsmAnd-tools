@@ -26,7 +26,8 @@ public class ReceiptValidationService {
 		try {
 			JsonParser parser = new JsonParser();
 
-			JsonObject receiptObj = parser.parse(receipt).getAsJsonObject();
+			JsonObject receiptObj = new JsonObject();
+			receiptObj.addProperty("receipt-data", receipt);
 			receiptObj.addProperty("password", System.getenv().get("IOS_SUBSCRIPTION_SECRET"));
 			String receiptWithSecret = receiptObj.toString();
 
