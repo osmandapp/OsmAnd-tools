@@ -249,7 +249,7 @@ public class SubscriptionController {
 		return s == null || s.length() == 0;
 	}
     
-    @GetMapping(path = {"/ios-receipt-validate"})
+    @PostMapping(path = {"/ios-receipt-validate"})
 	public ResponseEntity<String> validateIos(HttpServletRequest request,
 			@RequestParam(required = true) String receipt, @RequestParam(required = false) String sandbox)
 			throws Exception {
