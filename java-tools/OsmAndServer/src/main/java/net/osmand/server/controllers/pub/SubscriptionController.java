@@ -269,6 +269,9 @@ public class SubscriptionController {
         		subscr.userId, subscr.sku, subscr.purchaseToken))) {
         	return ResponseEntity.ok("{'res':'OK'}");
         }
+//        if("yes".equals(request.getParameter("update"))) {
+//        	// apple store possibly changes receipt-data ?  
+//        }
         supportersDeviceSubscriptionRepository.save(subscr);
         return ResponseEntity.ok(!tokenValid ? 
     			userShortInfoAsJson(supporter) :

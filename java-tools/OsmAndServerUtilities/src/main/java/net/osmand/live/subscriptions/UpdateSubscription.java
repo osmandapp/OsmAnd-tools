@@ -110,7 +110,7 @@ public class UpdateSubscription {
 			Timestamp expireTime = rs.getTimestamp("expiretime");
 			boolean valid = rs.getBoolean("valid");
 			long tm = System.currentTimeMillis();
-			if(!sku.startsWith("osm")) {
+			if(sku.startsWith("net.osmand.maps.subscription.")) {
 				// this is ios
 				continue;
 			}
