@@ -520,7 +520,7 @@ public class AdminController {
 						sr.total = sr.monthCount + sr.annualCount + sr.annualDiscountCount;
 						sr.totalWeighted = sr.monthCount + sr.annualCount / 2 + sr.annualDiscountCount / 4;
 						sr.cancelTotal = sr.cancelMonthCount + sr.cancelAnnualCount + sr.cancelAnnualDiscountCount;
-						sr.cancelTotal = sr.cancelMonthCount + sr.cancelAnnualCount / 2 + sr.cancelAnnualDiscountCount / 4;
+						sr.cancelTotalWeighted = sr.cancelMonthCount + sr.cancelAnnualCount / 2 + sr.cancelAnnualDiscountCount / 4;
 						sr.delta = sr.total - sr.cancelTotal;
 						sr.deltaWeighted = sr.totalWeighted - sr.cancelTotalWeighted; 
 						return sr;
