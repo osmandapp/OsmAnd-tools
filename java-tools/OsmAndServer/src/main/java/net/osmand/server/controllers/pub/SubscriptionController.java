@@ -3,7 +3,7 @@ package net.osmand.server.controllers.pub;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Date;
-import java.util.HashMap;
+import java.util.Enumeration;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
@@ -33,10 +33,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
 
@@ -124,13 +122,34 @@ public class SubscriptionController {
     public ResponseEntity<String> registerEmail(HttpServletRequest request) {
         MapUser mapUser = new MapUser();
         mapUser.aid = request.getParameter("aid");
+        String remoteAddr = request.getRemoteAddr();
+    	Enumeration<String> hs = request.getHeaders("X-Forwarded-For");
+        if (hs != null && hs.hasMoreElements()) {
+            remoteAddr = hs.nextElement();
+        }
+        if(Algorithms.isEmpty(mapUser.aid)) {
+        	mapUser.aid = remoteAddr;
+        }
         mapUser.email = request.getParameter("email");
+        if(!validateEmail(mapUser.email)) {
+        	throw new IllegalStateException(String.format("Email '%s' is not valid.", mapUser.email));
+        }
         mapUser.os = request.getParameter("os");
         mapUser.updateTime = new Date();
         mapUser = mapUserRepository.save(mapUser);
         return ok("{\"email\": \"%s\", \"time\": \"%d\"}", mapUser.email, mapUser.updateTime.getTime());
     }
     
+	private boolean validateEmail(String email) {
+		if(Algorithms.isEmpty(email)) {
+			return false;
+		}
+		if(!email.contains("@")) {
+			return false;
+		}
+		return true;
+	}
+
 	private String userInfoAsJson(Supporter s) {
 		String response = String.format(
 				"{\"userid\": \"%d\", \"token\": \"%s\", \"visibleName\": \"%s\", \"email\": \"%s\", "
