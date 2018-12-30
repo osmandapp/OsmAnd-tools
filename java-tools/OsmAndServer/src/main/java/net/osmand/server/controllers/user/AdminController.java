@@ -478,7 +478,7 @@ public class AdminController {
 	private List<NewSubscriptionReport> getNewSubsReport() {
 		List<NewSubscriptionReport> result = jdbcTemplate
 				.query(
-								"	select O.d, A.cnt monthSub, B.cnt annualSub, C.cnt expMSub, D.cnt expYSub from ( " +
+								"	select O.d, A.cnt, B.cnt, C.cnt, D.cnt, E.cnt, F.cnt from ( " +
 								"		SELECT date_trunc('day', generate_series(now() - '90 days'::interval, now(), '1 day'::interval)) as d" +
 								"	) O left join ( " +
 								"		select date_trunc('day', starttime) d,  count(*) cnt from supporters_device_sub where  " +
