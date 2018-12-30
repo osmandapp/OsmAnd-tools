@@ -444,11 +444,16 @@ public class AdminController {
 		public String date;
 		public int monthCount;
 		public int annualCount;
+		public int annualDiscountCount;
 		public int total;
-		public int cancelTotal;
-		public int delta;
+		public int totalWeighted;
 		public int cancelMonthCount;
 		public int cancelAnnualCount;
+		public int cancelAnnualDiscountCount;
+		public int cancelTotal;
+		public int cancelTotalWeighted;
+		public int delta;
+		public int deltaWeighted;
 	}
 	
 	private List<NewSubscriptionReport> getFutureCancelReport() {
@@ -481,17 +486,25 @@ public class AdminController {
 								"		group by date_trunc('day', starttime) " +
 								"	) A on A.d = O.d left join ( " +
 								"		select date_trunc('day', starttime) d,  count(*) cnt from supporters_device_sub where  " +
-								"		starttime > now() -  interval '90 days' and sku like '%annual%' " +
+								"		starttime > now() -  interval '90 days' and sku like '%annual%v1' " +
 								"		group by date_trunc('day', starttime) " +
 								"	) B on B.d = O.d left join ( " +
+								"		select date_trunc('day', starttime) d,  count(*) cnt from supporters_device_sub where  " +
+								"		starttime > now() -  interval '90 days' and sku like '%annual%v2' " +
+								"		group by date_trunc('day', starttime) " +
+								"	) C on C.d = O.d left join ( " +
 								"		select date_trunc('day', expiretime) d,  count(*) cnt from supporters_device_sub where  " +
 								"		expiretime < now() - interval '9 hours' and expiretime > now() -  interval '90 days' and sku not like '%annual%'  " +
 								"		group by date_trunc('day', expiretime) " +
-								"	) C on C.d = O.d left join ( " +
+								"	) D on D.d = O.d left join ( " +
 								"		select date_trunc('day', expiretime) d,  count(*) cnt from supporters_device_sub where  " +
-								"		expiretime < now() - interval '9 hours' and expiretime > now() -  interval '90 days' and sku like '%annual%' " +
+								"		expiretime < now() - interval '9 hours' and expiretime > now() -  interval '90 days' and sku like '%annual%v1' " +
 								"		group by date_trunc('day', expiretime) " +
-								"	) D on D.d = O.d order by 1 desc", 
+								"	) E on E.d = O.d left join ( " +
+								"		select date_trunc('day', expiretime) d,  count(*) cnt from supporters_device_sub where  " +
+								"		expiretime < now() - interval '9 hours' and expiretime > now() -  interval '90 days' and sku like '%annual%v2' " +
+								"		group by date_trunc('day', expiretime) " +
+								"	) F on F.d = O.d order by 1 desc", 
 								new RowMapper<NewSubscriptionReport>() {
 
 					@Override
@@ -500,11 +513,16 @@ public class AdminController {
 						sr.date = String.format("%1$tF", rs.getDate(1)); 
 						sr.monthCount = rs.getInt(2);
 						sr.annualCount = rs.getInt(3);
-						sr.cancelMonthCount = rs.getInt(4);
-						sr.cancelAnnualCount = rs.getInt(5);
-						sr.total = sr.monthCount + sr.annualCount;
-						sr.cancelTotal = sr.cancelMonthCount + sr.cancelAnnualCount;
+						sr.annualDiscountCount = rs.getInt(4);
+						sr.cancelMonthCount = rs.getInt(5);
+						sr.cancelAnnualCount = rs.getInt(6);
+						sr.cancelAnnualDiscountCount = rs.getInt(7);
+						sr.total = sr.monthCount + sr.annualCount + sr.annualDiscountCount;
+						sr.totalWeighted = sr.monthCount + sr.annualCount / 2 + sr.annualDiscountCount / 4;
+						sr.cancelTotal = sr.cancelMonthCount + sr.cancelAnnualCount + sr.cancelAnnualDiscountCount;
+						sr.cancelTotal = sr.cancelMonthCount + sr.cancelAnnualCount / 2 + sr.cancelAnnualDiscountCount / 4;
 						sr.delta = sr.total - sr.cancelTotal;
+						sr.deltaWeighted = sr.totalWeighted - sr.cancelTotalWeighted; 
 						return sr;
 					}
 
