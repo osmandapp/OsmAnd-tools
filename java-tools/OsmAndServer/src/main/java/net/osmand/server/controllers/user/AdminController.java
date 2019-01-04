@@ -17,11 +17,15 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.zip.GZIPOutputStream;
 
 import javax.servlet.http.HttpServletResponse;
@@ -235,32 +239,37 @@ public class AdminController {
 	}
 	
 
+	private static class Account {
+		Set<String> ips = new LinkedHashSet<String>();
+		Set<String> regions = new LinkedHashSet<String>();
+		StringBuilder actions = new StringBuilder();
+		int count = 0;
+		Date mindate;
+		Date maxdate;
+	}
 	@RequestMapping("/access-logs")
 	public void loadLogs(@RequestParam(required=false) String starttime, 
-			@RequestParam(required=false) String endtime, 
-			@RequestParam(required=false) String region,
-			@RequestParam(required=false) String filter,
+			@RequestParam(required = false) String endtime,
+			@RequestParam(required = false) String region,
+			@RequestParam(required = false) String filter,
 			@RequestParam(required = false) int limit,
 			@RequestParam(required = false) String gzip,
+			@RequestParam(required = false) String behavior,
 			HttpServletResponse response) throws SQLException, IOException, ParseException {
 		Parser<LogEntry> parser = new HttpdLoglineParser<>(LogEntry.class, APACHE_LOG_FORMAT);
 		File logFile = new File(DEFAULT_LOG_LOCATION, "access.log");
 		Date startTime = starttime != null && starttime.length() > 0 ? timeInputFormat.parse(starttime) : null;
 		Date endTime = endtime != null && endtime.length() > 0 ? timeInputFormat.parse(endtime) : null;
 		boolean parseRegion = "on".equals(region);
+		boolean behaviorAnalysis = "on".equals(behavior);
 		RandomAccessFile raf = new RandomAccessFile(logFile, "r");
 		boolean gzipFile = "on".equals(gzip);
 		try {
 			String ln = null;
 			LogEntry l = new LogEntry();
+			long currentLimit = raf.length();
 			int rows = 0;
 			int err = 0;
-			long currentLimit = raf.length();
-			
-			// seek position
-			long pos = 0;
-			long step = 1 << 24; // 16 MB
-			boolean found = startTime == null;
 			OutputStream out;
 			if(gzipFile) {
 				response.setHeader("Content-Disposition", "attachment; filename=logs.csv.gz");
@@ -269,28 +278,16 @@ public class AdminController {
 			} else {
 				out = response.getOutputStream();;
 			}
-			while(!found) {
-				if(currentLimit > pos + step) {
-					raf.seek(pos + step);
-					// skip incomplete line
-					raf.readLine();
-					try {
-						parser.parse(l, raf.readLine());
-						if(startTime.getTime() < l.date.getTime()) {
-							raf.seek(pos);
-							// skip incomplete line
-							raf.readLine();
-							found = true;
-							break;
-						}
-					} catch (Exception e) {
-					}
-					pos += step;
-				} else {
-					break;
-				}
+			boolean found = true;
+			if(startTime != null) {
+				found = seekStartTime(parser, startTime, raf);
 			}
-			out.write((LogEntry.toCSVHeader()+"\n").getBytes());
+			Map<String, Account> beh = new LinkedHashMap<String, Account>();
+			if(behaviorAnalysis) {
+				out.write("Id,Count,Day,Time,Duration,Regions,Actions\n".getBytes());
+			} else {
+				out.write((LogEntry.toCSVHeader()+"\n").getBytes());
+			}
 			out.flush();
 			response.flushBuffer();
 			while (found && (ln = raf.readLine()) != null) {
@@ -325,7 +322,23 @@ public class AdminController {
 				if(parseRegion) {
 					l.region = locationService.getField(l.ip, IpLocationService.COUNTRY_NAME);
 				}
-				out.write((l.toCSVString()+"\n").getBytes());
+				if(!behaviorAnalysis) {
+					out.write((l.toCSVString() + "\n").getBytes());
+				} else {
+					Account account = beh.get(l.ip);
+					if(account == null) {
+						account = new Account();
+						beh.put(l.ip, account);
+						account.mindate = l.date;
+					}
+					account.maxdate = l.date;
+					account.ips.add(l.ip);
+					if(parseRegion) {
+						account.regions.add(l.region);
+					}
+					account.actions.append(l.uri + ";");
+					account.count++;
+				}
 				if(rows > limit && limit != -1) {
 					break;
 				}
@@ -334,12 +347,54 @@ public class AdminController {
 					response.flushBuffer();
 				}
 			}
+			Iterator<Entry<String, Account>> i = beh.entrySet().iterator();
+			while(i.hasNext()) {
+				Entry<String, Account> nxt = i.next();
+				Account v = nxt.getValue();
+				int minutes = (int) ((v.maxdate.getTime() - v.mindate.getTime())/(60*1000l)); 
+				out.write(String.format("%s,%d,%tF,%tT,%02d:%02d,%s,%s\n", nxt.getKey(), v.count,
+						v.mindate, v.mindate, minutes / 60, minutes % 60, v.regions, v.actions).getBytes());
+			}
 			out.close();
 			response.flushBuffer();
 			response.getOutputStream().close();
 		} finally {
 			raf.close();
 		}
+	}
+
+
+	private boolean seekStartTime(Parser<LogEntry> parser, Date startTime, RandomAccessFile raf)
+			throws IOException {
+		long currentLimit = raf.length();
+		long pos = 0;
+		boolean found = false;
+		// seek position
+		long step = 1 << 24; // 16 MB
+		LogEntry lt = new LogEntry();
+
+		while(!found) {
+			if(currentLimit > pos + step) {
+				raf.seek(pos + step);
+				// skip incomplete line
+				raf.readLine();
+				try {
+					parser.parse(lt, raf.readLine());
+					if(startTime.getTime() < lt.date.getTime()) {
+						raf.seek(pos);
+						// skip incomplete line
+						raf.readLine();
+						found = true;
+						break;
+					}
+				} catch (Exception e) {
+				}
+				pos += step;
+			} else {
+				break;
+			}
+		}
+		return found;
 	}
 	
 	
