@@ -46,7 +46,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 @Controller
 @RequestMapping("/api")
 public class ApiController {
-    private static final Log LOGGER = LogFactory.getLog(ApiController.class);
+    protected static final Log LOGGER = LogFactory.getLog(ApiController.class);
 
     private static final String PROC_FILE = ".proc_timestamp";
 

@@ -14,6 +14,7 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.Iterator;
@@ -25,7 +26,8 @@ import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
-import java.util.TreeSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.zip.GZIPOutputStream;
 
 import javax.servlet.http.HttpServletResponse;
@@ -38,8 +40,8 @@ import net.osmand.server.api.services.DownloadIndexesService.DownloadProperties;
 import net.osmand.server.api.services.EmailSenderService;
 import net.osmand.server.api.services.IpLocationService;
 import net.osmand.server.api.services.MotdService;
-import net.osmand.server.api.services.PollsService;
 import net.osmand.server.api.services.MotdService.MotdSettings;
+import net.osmand.server.api.services.PollsService;
 import net.osmand.server.controllers.pub.ReportsController;
 import net.osmand.server.controllers.pub.WebController;
 import nl.basjes.parse.core.Field;
@@ -71,7 +73,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.sendgrid.Email;
+import com.google.gson.Gson;
 
 @Controller
 @RequestMapping("/admin")
@@ -120,16 +122,14 @@ public class AdminController {
 	private EmailSenderService emailSender;
 
 
-	protected ObjectMapper mapper;
-	
 	private static final String GIT_LOG_CMD = "git log -1 --pretty=format:\"%h%x09%an%x09%ad%x09%s\"";
 	private static final String APACHE_LOG_FORMAT = "%h %l %u %t \"%r\" %>s %O \"%{Referer}i\" \"%{User-Agent}i\"";
 	private static final String DEFAULT_LOG_LOCATION = "/var/log/nginx/";
 	private static final SimpleDateFormat timeInputFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm");
+	private Gson gson;
 	
 	public AdminController() {
-		ObjectMapper objectMapper = new ObjectMapper();
-        this.mapper = objectMapper;
+		gson = new Gson();
 	}
 	
 	
@@ -238,15 +238,81 @@ public class AdminController {
 		return errors;
 	}
 	
+	
+	
+	protected static class UserAction {
+		String ip;
+		long time;
+		String uri;
+		String timeFormat;
+		String region;
+		Map<String, String> params = new TreeMap<String, String>();
+		public UserAction(LogEntry l) {
+			time = l.date.getTime();
+			this.region = l.region;
+			timeFormat = String.format("%1$tF %1$tR", l.date);
+			ip = l.ip;
+			uri = l.uri;
+			int i = uri.indexOf('?');
+			if(i > 0) {
+				uri = uri.substring(0, i);
+				String[] ls = l.uri.substring(i+1).split("&");
+				for (String lt : ls) {
+					String[] ks = lt.split("=");
+					if (ks.length > 1) {
+						params.put(ks[0], ks[1]);
+					} else if (ks.length > 0) {
+						params.put(ks[0], "");
+					}
+				}
+			}
+		}
+		
+	}
+	
 
-	private static class Account {
+	protected static class UserAccount {
+		String aid;
 		Set<String> ips = new LinkedHashSet<String>();
 		Set<String> regions = new LinkedHashSet<String>();
-		StringBuilder actions = new StringBuilder();
-		int count = 0;
-		Date mindate;
-		Date maxdate;
+		long mindate;
+		long maxdate;
+		String duration = "";
+		List<UserAction> actions = new ArrayList<UserAction>();
+		
+		public UserAccount(String aid, String ip, Date date) {
+			this.aid = aid == null ? ip : aid;
+			ips.add(ip);
+			mindate = maxdate = date.getTime();
+		}
+		
+		public UserAccount merge(UserAccount accountIp) {
+			ips.addAll(accountIp.ips);
+			regions.addAll(accountIp.regions);
+			actions.addAll(accountIp.actions);
+			this.mindate = Math.min(accountIp.mindate, this.mindate);
+			this.maxdate = Math.max(accountIp.maxdate, this.maxdate);
+			Collections.sort(actions, new Comparator<UserAction>() {
+
+				@Override
+				public int compare(UserAction o1, UserAction o2) {
+					return Long.compare(o1.time, o2.time);
+				}
+				
+			});
+			return this;
+		}
+
+		public void add(LogEntry l) {
+			this.mindate = Math.min(l.date.getTime(), this.mindate);
+			this.maxdate = Math.max(l.date.getTime(), this.maxdate);
+			actions.add(new UserAction(l));
+		}
+		
+		
 	}
+	
+	
 	@RequestMapping("/access-logs")
 	public void loadLogs(@RequestParam(required=false) String starttime, 
 			@RequestParam(required = false) String endtime,
@@ -264,6 +330,7 @@ public class AdminController {
 		boolean behaviorAnalysis = "on".equals(behavior);
 		RandomAccessFile raf = new RandomAccessFile(logFile, "r");
 		boolean gzipFile = "on".equals(gzip);
+		Pattern aidPattern = Pattern.compile("aid=([a-z,0-9]*)");
 		try {
 			String ln = null;
 			LogEntry l = new LogEntry();
@@ -276,16 +343,14 @@ public class AdminController {
 				response.setHeader("Content-Type", "application/x-gzip");
 				out = new GZIPOutputStream(response.getOutputStream());
 			} else {
-				out = response.getOutputStream();;
+				out = response.getOutputStream();
 			}
 			boolean found = true;
 			if(startTime != null) {
 				found = seekStartTime(parser, startTime, raf);
 			}
-			Map<String, Account> beh = new LinkedHashMap<String, Account>();
-			if(behaviorAnalysis) {
-				out.write("Id,Count,Day,Time,Duration,Regions,Actions\n".getBytes());
-			} else {
+			Map<String, UserAccount> behaviorMap = new LinkedHashMap<String, UserAccount>();
+			if(!behaviorAnalysis) {
 				out.write((LogEntry.toCSVHeader()+"\n").getBytes());
 			}
 			out.flush();
@@ -307,37 +372,53 @@ public class AdminController {
 				if(l.date == null) {
 					continue;
 				}
-				if(filter != null && filter.length() > 0) {
-					if(!l.uri.contains(filter)) {
-						continue;
-					}
-				}
 				if(startTime != null && startTime.getTime() > l.date.getTime()) {
 					continue;
 				}
 				if(endTime != null && endTime.getTime() < l.date.getTime()) {
 					break;
 				}
+				UserAccount accountIp = behaviorMap.get(l.ip);
+				Matcher aidMatcher = aidPattern.matcher(l.uri);
+				String aid = aidMatcher.find() ? aidMatcher.group(1) : null ;
+				UserAccount accountAid = behaviorMap.get(aid);
+				if(filter != null && filter.length() > 0) {
+					if(behaviorAnalysis && (accountIp != null || accountAid != null)) {
+						// process
+					} else if(!l.uri.contains(filter) ) {
+						continue;
+					}
+				}
+				if(aid == null) {
+					if(accountIp == null) {
+						accountIp = new UserAccount(aid, l.ip, l.date);
+						behaviorMap.put(l.ip, accountIp);
+					}
+					accountAid = accountIp;
+				} else {
+					if(accountAid == null) {
+						accountAid = new UserAccount(aid, l.ip, l.date);
+						behaviorMap.put(aid, accountAid);
+					}
+					if(accountIp == null) {
+						accountIp = accountAid; 
+						behaviorMap.put(l.ip, accountIp);
+					} else if(accountIp != accountAid){
+						accountIp = accountAid.merge(accountIp);
+						behaviorMap.put(l.ip, accountIp);
+					}
+				}
 				rows++;
 				if(parseRegion) {
 					l.region = locationService.getField(l.ip, IpLocationService.COUNTRY_NAME);
+					if(accountAid != null) {
+						accountAid.regions.add(l.region);
+					}
 				}
 				if(!behaviorAnalysis) {
 					out.write((l.toCSVString() + "\n").getBytes());
 				} else {
-					Account account = beh.get(l.ip);
-					if(account == null) {
-						account = new Account();
-						beh.put(l.ip, account);
-						account.mindate = l.date;
-					}
-					account.maxdate = l.date;
-					account.ips.add(l.ip);
-					if(parseRegion) {
-						account.regions.add(l.region);
-					}
-					account.actions.append(l.uri + ";");
-					account.count++;
+					accountAid.add(l);
 				}
 				if(rows > limit && limit != -1) {
 					break;
@@ -347,13 +428,26 @@ public class AdminController {
 					response.flushBuffer();
 				}
 			}
-			Iterator<Entry<String, Account>> i = beh.entrySet().iterator();
-			while(i.hasNext()) {
-				Entry<String, Account> nxt = i.next();
-				Account v = nxt.getValue();
-				int minutes = (int) ((v.maxdate.getTime() - v.mindate.getTime())/(60*1000l)); 
-				out.write(String.format("%s,%d,%tF,%tT,%02d:%02d,%s,%s\n", nxt.getKey(), v.count,
-						v.mindate, v.mindate, minutes / 60, minutes % 60, v.regions, v.actions).getBytes());
+			if (behaviorAnalysis) {
+				out.write("{\"accounts\" : [".getBytes());
+				Iterator<Entry<String, UserAccount>> i = behaviorMap.entrySet().iterator();
+				boolean f = true;
+				while (i.hasNext()) {
+					Entry<String, UserAccount> nxt = i.next();
+					UserAccount v = nxt.getValue();
+					if (!nxt.getKey().equals(v.aid)) {
+						continue;
+					}
+					if(!f) {
+						out.write(",\n".getBytes());
+					} else {
+						f = false;
+					}
+					int duration = (int) ((v.maxdate - v.mindate) / (60 * 1000l));
+					v.duration = String.format("%02d:%02d", duration, duration);
+					out.write(gson.toJson(v).getBytes());
+				}
+				out.write("]}".getBytes());
 			}
 			out.close();
 			response.flushBuffer();
