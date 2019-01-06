@@ -5,29 +5,20 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.io.RandomAccessFile;
-import java.net.MalformedURLException;
-import java.net.URL;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.zip.GZIPOutputStream;
 
 import javax.servlet.http.HttpServletResponse;
@@ -39,16 +30,13 @@ import net.osmand.server.api.services.DownloadIndexesService;
 import net.osmand.server.api.services.DownloadIndexesService.DownloadProperties;
 import net.osmand.server.api.services.EmailSenderService;
 import net.osmand.server.api.services.IpLocationService;
+import net.osmand.server.api.services.LogsAccessService;
+import net.osmand.server.api.services.LogsAccessService.LogsPresentation;
 import net.osmand.server.api.services.MotdService;
 import net.osmand.server.api.services.MotdService.MotdSettings;
 import net.osmand.server.api.services.PollsService;
 import net.osmand.server.controllers.pub.ReportsController;
 import net.osmand.server.controllers.pub.WebController;
-import nl.basjes.parse.core.Field;
-import nl.basjes.parse.core.Parser;
-import nl.basjes.parse.core.Parser.SetterPolicy;
-import nl.basjes.parse.httpdlog.HttpdLoglineParser;
-import nl.basjes.parse.httpdlog.dissectors.TimeStampDissector;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -72,7 +60,6 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 
 @Controller
@@ -121,16 +108,11 @@ public class AdminController {
 	@Autowired
 	private EmailSenderService emailSender;
 
-
-	private static final String GIT_LOG_CMD = "git log -1 --pretty=format:\"%h%x09%an%x09%ad%x09%s\"";
-	private static final String APACHE_LOG_FORMAT = "%h %l %u %t \"%r\" %>s %O \"%{Referer}i\" \"%{User-Agent}i\"";
-	private static final String DEFAULT_LOG_LOCATION = "/var/log/nginx/";
-	private static final SimpleDateFormat timeInputFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm");
-	private Gson gson;
+	@Autowired
+	private LogsAccessService logsAccessService;
 	
-	public AdminController() {
-		gson = new Gson();
-	}
+	private static final String GIT_LOG_CMD = "git log -1 --pretty=format:\"%h%x09%an%x09%ad%x09%s\"";
+	private static final SimpleDateFormat timeInputFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm");
 	
 	
 	@RequestMapping(path = { "/publish" }, method = RequestMethod.POST)
@@ -240,79 +222,7 @@ public class AdminController {
 	
 	
 	
-	protected static class UserAction {
-		String ip;
-		long time;
-		String uri;
-		String timeFormat;
-		String region;
-		Map<String, String> params = new TreeMap<String, String>();
-		public UserAction(LogEntry l) {
-			time = l.date.getTime();
-			this.region = l.region;
-			timeFormat = String.format("%1$tF %1$tR", l.date);
-			ip = l.ip;
-			uri = l.uri;
-			int i = uri.indexOf('?');
-			if(i > 0) {
-				uri = uri.substring(0, i);
-				String[] ls = l.uri.substring(i+1).split("&");
-				for (String lt : ls) {
-					String[] ks = lt.split("=");
-					if (ks.length > 1) {
-						params.put(ks[0], ks[1]);
-					} else if (ks.length > 0) {
-						params.put(ks[0], "");
-					}
-				}
-			}
-		}
 		
-	}
-	
-
-	protected static class UserAccount {
-		String aid;
-		Set<String> ips = new LinkedHashSet<String>();
-		Set<String> regions = new LinkedHashSet<String>();
-		long mindate;
-		long maxdate;
-		String duration = "";
-		List<UserAction> actions = new ArrayList<UserAction>();
-		
-		public UserAccount(String aid, String ip, Date date) {
-			this.aid = aid == null ? ip : aid;
-			ips.add(ip);
-			mindate = maxdate = date.getTime();
-		}
-		
-		public UserAccount merge(UserAccount accountIp) {
-			ips.addAll(accountIp.ips);
-			regions.addAll(accountIp.regions);
-			actions.addAll(accountIp.actions);
-			this.mindate = Math.min(accountIp.mindate, this.mindate);
-			this.maxdate = Math.max(accountIp.maxdate, this.maxdate);
-			Collections.sort(actions, new Comparator<UserAction>() {
-
-				@Override
-				public int compare(UserAction o1, UserAction o2) {
-					return Long.compare(o1.time, o2.time);
-				}
-				
-			});
-			return this;
-		}
-
-		public void add(LogEntry l) {
-			this.mindate = Math.min(l.date.getTime(), this.mindate);
-			this.maxdate = Math.max(l.date.getTime(), this.maxdate);
-			actions.add(new UserAction(l));
-		}
-		
-		
-	}
-	
-	
 	@RequestMapping("/access-logs")
 	public void loadLogs(@RequestParam(required=false) String starttime, 
 			@RequestParam(required = false) String endtime,
@@ -321,175 +231,39 @@ public class AdminController {
 			@RequestParam(required = false) int limit,
 			@RequestParam(required = false) String gzip,
 			@RequestParam(required = false) String behavior,
+			@RequestParam(required = false) String stats,
 			HttpServletResponse response) throws SQLException, IOException, ParseException {
-		Parser<LogEntry> parser = new HttpdLoglineParser<>(LogEntry.class, APACHE_LOG_FORMAT);
-		File logFile = new File(DEFAULT_LOG_LOCATION, "access.log");
 		Date startTime = starttime != null && starttime.length() > 0 ? timeInputFormat.parse(starttime) : null;
 		Date endTime = endtime != null && endtime.length() > 0 ? timeInputFormat.parse(endtime) : null;
 		boolean parseRegion = "on".equals(region);
 		boolean behaviorAnalysis = "on".equals(behavior);
-		RandomAccessFile raf = new RandomAccessFile(logFile, "r");
-		boolean gzipFile = "on".equals(gzip);
-		Pattern aidPattern = Pattern.compile("aid=([a-z,0-9]*)");
-		try {
-			String ln = null;
-			LogEntry l = new LogEntry();
-			long currentLimit = raf.length();
-			int rows = 0;
-			int err = 0;
-			OutputStream out;
-			if(gzipFile) {
+		boolean statAnalysis = "on".equals(stats);
+		
+		boolean gzipFlag = "on".equals(gzip);
+		OutputStream out;
+		if(gzipFlag) {
+			if(behaviorAnalysis) {
+				response.setHeader("Content-Disposition", "attachment; filename=logs.json.gz");
+			} else {
 				response.setHeader("Content-Disposition", "attachment; filename=logs.csv.gz");
-				response.setHeader("Content-Type", "application/x-gzip");
-				out = new GZIPOutputStream(response.getOutputStream());
-			} else {
-				out = response.getOutputStream();
 			}
-			boolean found = true;
-			if(startTime != null) {
-				found = seekStartTime(parser, startTime, raf);
-			}
-			Map<String, UserAccount> behaviorMap = new LinkedHashMap<String, UserAccount>();
-			if(!behaviorAnalysis) {
-				out.write((LogEntry.toCSVHeader()+"\n").getBytes());
-			}
-			out.flush();
-			response.flushBuffer();
-			while (found && (ln = raf.readLine()) != null) {
-				if(raf.getFilePointer() > currentLimit) {
-					break;
-				}
-				l.clear();
-				try {
-					parser.parse(l, ln);
-				} catch (Exception e) {
-					if (err++ >= 100) {
-						out.write("Error parsing\n".getBytes());
-						break;
-					}
-					continue;
-				}
-				if(l.date == null) {
-					continue;
-				}
-				if(startTime != null && startTime.getTime() > l.date.getTime()) {
-					continue;
-				}
-				if(endTime != null && endTime.getTime() < l.date.getTime()) {
-					break;
-				}
-				UserAccount accountIp = behaviorMap.get(l.ip);
-				Matcher aidMatcher = aidPattern.matcher(l.uri);
-				String aid = aidMatcher.find() ? aidMatcher.group(1) : null ;
-				UserAccount accountAid = behaviorMap.get(aid);
-				if(filter != null && filter.length() > 0) {
-					if(behaviorAnalysis && (accountIp != null || accountAid != null)) {
-						// process
-					} else if(!l.uri.contains(filter) ) {
-						continue;
-					}
-				}
-				if(aid == null) {
-					if(accountIp == null) {
-						accountIp = new UserAccount(aid, l.ip, l.date);
-						behaviorMap.put(l.ip, accountIp);
-					}
-					accountAid = accountIp;
-				} else {
-					if(accountAid == null) {
-						accountAid = new UserAccount(aid, l.ip, l.date);
-						behaviorMap.put(aid, accountAid);
-					}
-					if(accountIp == null) {
-						accountIp = accountAid; 
-						behaviorMap.put(l.ip, accountIp);
-					} else if(accountIp != accountAid){
-						accountIp = accountAid.merge(accountIp);
-						behaviorMap.put(l.ip, accountIp);
-					}
-				}
-				rows++;
-				if(parseRegion) {
-					l.region = locationService.getField(l.ip, IpLocationService.COUNTRY_NAME);
-					if(accountAid != null) {
-						accountAid.regions.add(l.region);
-					}
-				}
-				if(!behaviorAnalysis) {
-					out.write((l.toCSVString() + "\n").getBytes());
-				} else {
-					accountAid.add(l);
-				}
-				if(rows > limit && limit != -1) {
-					break;
-				}
-				if(rows % 1000 == 0) {
-					out.flush();
-					response.flushBuffer();
-				}
-			}
-			if (behaviorAnalysis) {
-				out.write("{\"accounts\" : [".getBytes());
-				Iterator<Entry<String, UserAccount>> i = behaviorMap.entrySet().iterator();
-				boolean f = true;
-				while (i.hasNext()) {
-					Entry<String, UserAccount> nxt = i.next();
-					UserAccount v = nxt.getValue();
-					if (!nxt.getKey().equals(v.aid)) {
-						continue;
-					}
-					if(!f) {
-						out.write(",\n".getBytes());
-					} else {
-						f = false;
-					}
-					int duration = (int) ((v.maxdate - v.mindate) / (60 * 1000l));
-					v.duration = String.format("%02d:%02d", duration, duration);
-					out.write(gson.toJson(v).getBytes());
-				}
-				out.write("]}".getBytes());
-			}
-			out.close();
-			response.flushBuffer();
-			response.getOutputStream().close();
-		} finally {
-			raf.close();
+			response.setHeader("Content-Type", "application/x-gzip");
+			out = new GZIPOutputStream(response.getOutputStream());
+		} else {
+			out = response.getOutputStream();
 		}
+		LogsPresentation presentation = LogsPresentation.PLAIN;
+		if(behaviorAnalysis) {
+			presentation = LogsPresentation.BEHAVIOR;
+		} else if(statAnalysis) {
+			presentation = LogsPresentation.STATS;
+		}
+		logsAccessService.parseLogs(startTime, endTime, parseRegion, limit, filter, presentation, out);
+		response.flushBuffer();
+		response.getOutputStream().close();
+		
 	}
 
-
-	private boolean seekStartTime(Parser<LogEntry> parser, Date startTime, RandomAccessFile raf)
-			throws IOException {
-		long currentLimit = raf.length();
-		long pos = 0;
-		boolean found = false;
-		// seek position
-		long step = 1 << 24; // 16 MB
-		LogEntry lt = new LogEntry();
-
-		while(!found) {
-			if(currentLimit > pos + step) {
-				raf.seek(pos + step);
-				// skip incomplete line
-				raf.readLine();
-				try {
-					parser.parse(lt, raf.readLine());
-					if(startTime.getTime() < lt.date.getTime()) {
-						raf.seek(pos);
-						// skip incomplete line
-						raf.readLine();
-						found = true;
-						break;
-					}
-				} catch (Exception e) {
-				}
-				pos += step;
-			} else {
-				break;
-			}
-		}
-		return found;
-	}
 	
 	
 	@RequestMapping("/info")
@@ -852,105 +626,5 @@ public class AdminController {
 		return  ResponseEntity.ok().headers(headers).body(new FileSystemResource(fl));
 	}
 	
-	public static class LogEntry {
-		public String ip;
-		public Date date;
-		public String uri;
-		private String userAgent;
-		private String status;
-		private String referrer;
-		private String region;
-		private static final SimpleDateFormat format = new SimpleDateFormat(TimeStampDissector.DEFAULT_APACHE_DATE_TIME_PATTERN);
-		
-	    @Field("IP:connection.client.host")
-	    public void setIP(final String value) {
-	        ip =  value;
-	    }
-	    
-	    @Field("TIME.STAMP:request.receive.time")
-	    public void setTime(final String value) throws ParseException {
-			date = format.parse(value);
-	    }
-	    
-	    @Field("HTTP.URI:request.firstline.uri")
-	    public void setURI(String value) {
-	    	uri = value;
-	    }
-	    
-	    @Field("HTTP.USERAGENT:request.user-agent")
-	    public void setUserAgent(String value) {
-	    	userAgent = value;
-	    }
-	    
-	    @Field("STRING:request.status.last")
-	    public void setStatusCode(String value) {
-	    	status = value;
-	    }
-	    @Field(value = {"HTTP.URI:request.referer"}, setterPolicy = SetterPolicy.ALWAYS)
-	    public void setReferrer(String value) {
-	    	referrer = value == null  ? "" : value;
-	    }
-	    
-	    public static String toCSVHeader() {
-	    	// add nd, aid, np, ...
-	    	return "IP,Region,Date,Time,Status,User-Agent,Referrer,Path,Version,Lang,Query,URL"; 
-	    }
-	    
-	    public String toCSVString() {
-	    	String path = "";
-	    	String query = "";
-	    	String version = "";
-	    	String lang = "";
-//	    	String nd = "";
-//	    	String ns = "";
-//	    	String aid = "";
-	    	if(uri != null && uri.length() > 0) {
-				try {
-					URL l = new URL("http://127.0.0.1" + uri);
-					if (l.getPath() != null) {
-						path = l.getPath();
-					}
-					if (l.getQuery() != null) {
-						query = l.getQuery();
-						String[] params = query.split("&");
-						for (String param : params) {
-							int ind = param.indexOf('=');
-							if(ind == -1) {
-								continue;
-							}
-							String name = param.substring(0, ind);
-							String value = param.substring(ind + 1);
-							if ("version".equals(name)) {
-								version = value;
-							} else if ("lang".equals(name)) {
-								lang = value;
-							}
-						}
-					}
-					uri = "";
-					
-				} catch (MalformedURLException e) {
-				}
-	    		
-	    	}
-	    	
-			return String.format("%s,%s,%tF,%tT,%s,%s,%s,%s,%s,%s,%s,%s", 
-					ip, region, date, date, status, userAgent == null ? "" : userAgent.replace(",", ";"), referrer, 
-					path, version, lang, query, uri);
-	    }
-	    
-	    public String toString() {
-	        return String.format("Request %s %tF %2$tT %s (user-agent %s, referrer %s): %s", ip, date, status, userAgent, referrer, uri);
-	    }
-
-	    public void clear() {
-	    	this.ip = "";
-	    	this.date = null;
-	    	this.referrer = "";
-	    	this.region = "";
-	    	this.userAgent = "";
-	    	this.status = "";
-	    	this.uri = "";
-	    }
-	}
+	
 }

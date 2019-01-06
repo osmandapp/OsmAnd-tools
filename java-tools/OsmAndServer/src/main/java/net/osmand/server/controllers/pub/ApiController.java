@@ -58,10 +58,10 @@ public class ApiController {
     
 
     @Autowired
-    private PlacesService placesService;
+    PlacesService placesService;
     
     @Autowired
-    private MotdService motdService;
+    MotdService motdService;
 
     @Autowired 
     EmailSupportSurveyRepository surveyRepo;
