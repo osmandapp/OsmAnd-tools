@@ -33,6 +33,7 @@ import nl.basjes.parse.httpdlog.dissectors.TimeStampDissector;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -333,6 +334,7 @@ public class LogsAccessService {
 		String uri;
 		int count;
 		int uniqueCount;
+		int session = 0;
 		
 		@Expose(serialize = false)
 		transient Map<String, Long> aids = new TreeMap<String, Long>();
@@ -340,10 +342,22 @@ public class LogsAccessService {
 		transient Map<String, Long> ips = new TreeMap<String, Long>();
 		
 		Map<String, Integer> followUps = new LinkedHashMap<String, Integer>();
+		Map<String, Integer> followUpTimes = new LinkedHashMap<String, Integer>();
 		
 		public void calculateFollowUps(Collection<Stat> stats) {
-			
+			DescriptiveStatistics session = new DescriptiveStatistics();
+			for(String ip : ips.keySet()) {
+				Long l1 = ips.get(ip);
+				for(Stat m : stats) {
+					Long l2 = m.ips.get(ip);
+					if(l2 != null && l2.longValue() > l1.longValue()) {
+						session.addValue(l2.longValue() / 1000 - l1.longValue() / 1000);
+					}
+				}
+			}
+			this.session = (int) session.getPercentile(50);
 			for(Stat m : stats) {
+				DescriptiveStatistics delay = new DescriptiveStatistics();
 				int count = 0;
 				if(m == this) {
 					continue;
@@ -358,12 +372,15 @@ public class LogsAccessService {
 				while(vl.hasNext()) {
 					Entry<String, Long> e = vl.next();
 					Long tm2 = thatit.get(e.getKey());
-					if(tm2 != null && e.getValue().longValue() < tm2.longValue()) {
-						count ++;
+					
+					if (tm2 != null && e.getValue().longValue() < tm2.longValue()) {
+						count++;
+						delay.addValue(tm2.longValue() / 1000 - e.getValue().longValue() / 1000);
 					}
 				}
 				if(count > 0 && 100 * count > uniqueCount ) {
 					followUps.put(m.uri, count);
+					followUpTimes.put(m.uri, (int) delay.getPercentile(50));
 				}
 			}
 			List<String> sortedList = new ArrayList<String>(followUps.keySet());
