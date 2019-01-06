@@ -68,6 +68,9 @@ public class LogsAccessService {
 		Pattern aidPattern = Pattern.compile("aid=([a-z,0-9]*)");
 		Map<String, UserAccount> behaviorMap = new LinkedHashMap<String, UserAccount>();
 		Map<String, Stat> stats = new LinkedHashMap<String, Stat>();
+		if(presentation == LogsPresentation.BEHAVIOR && limit < 0) {
+			limit = 100000;
+		}
 		Date beginDate = null;
 		Date endDate = null;
 		try {
