@@ -21,7 +21,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
-import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -69,6 +68,8 @@ public class LogsAccessService {
 		Pattern aidPattern = Pattern.compile("aid=([a-z,0-9]*)");
 		Map<String, UserAccount> behaviorMap = new LinkedHashMap<String, UserAccount>();
 		Map<String, Stat> stats = new LinkedHashMap<String, Stat>();
+		Date beginDate = null;
+		Date endDate = null;
 		try {
 			String ln = null;
 			LogEntry l = new LogEntry();
@@ -102,6 +103,10 @@ public class LogsAccessService {
 				if(l.date == null) {
 					continue;
 				}
+				if(beginDate == null) {
+					beginDate = l.date;
+				}
+				endDate = l.date;
 				if(startTime != null && startTime.getTime() > l.date.getTime()) {
 					continue;
 				}
@@ -174,8 +179,9 @@ public class LogsAccessService {
 					v.duration = String.format("%02d:%02d", duration / 60, duration % 60);
 					out.write(gson.toJson(v).getBytes());
 				}
-				out.write("]}".getBytes());
+				out.write(String.format(", \"begin\":\"%1$tF %1$tT\", \"end\":\"%2$tF %2$tT\"}", beginDate, endDate).getBytes());
 			} else if(presentation == LogsPresentation.STATS) {
+				out.write("{\"stats\" : ".getBytes());
 				List<Stat> sortStats = new ArrayList<Stat>(stats.values());
 				stats.clear();
 				Collections.sort(sortStats, new Comparator<Stat>(){
@@ -192,6 +198,7 @@ public class LogsAccessService {
 				}
 
 				out.write(gson.toJson(stats).getBytes());
+				out.write(String.format(", \"begin\":\"%1$tF %1$tT\", \"end\":\"%2$tF %2$tT\"}", beginDate, endDate).getBytes());
 			}
 			out.close();
 		} finally {
