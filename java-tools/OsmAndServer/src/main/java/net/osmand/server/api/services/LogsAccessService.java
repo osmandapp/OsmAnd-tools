@@ -9,6 +9,7 @@ import java.net.URL;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
@@ -79,8 +80,8 @@ public class LogsAccessService {
 				found = seekStartTime(parser, startTime, raf);
 			}
 			
-			if(presentation == LogsPresentation.PLAIN) {
-				out.write((LogEntry.toCSVHeader()+"\n").getBytes());
+			if (presentation == LogsPresentation.PLAIN) {
+				out.write((LogEntry.toCSVHeader() + "\n").getBytes());
 			}
 			out.flush();
 			while (found && (ln = raf.readLine()) != null) {
@@ -139,6 +140,7 @@ public class LogsAccessService {
 					Stat stat = stats.get(uri);
 					if(stat == null) {
 						stat = new Stat();
+						stat.uri = uri;
 						stats.put(uri, stat);
 					}
 					stat.add(aid, l);
@@ -173,6 +175,21 @@ public class LogsAccessService {
 				}
 				out.write("]}".getBytes());
 			} else if(presentation == LogsPresentation.STATS) {
+				List<Stat> sortStats = new ArrayList<Stat>(stats.values());
+				stats.clear();
+				Collections.sort(sortStats, new Comparator<Stat>(){
+
+					@Override
+					public int compare(Stat o1, Stat o2) {
+						return -Integer.compare(o1.uniqueCount, o2.uniqueCount);
+					}
+					
+				});
+				for(Stat s : sortStats) {
+					s.calculateFollowUps(sortStats);
+					stats.put(s.uri, s);
+				}
+
 				out.write(gson.toJson(stats).getBytes());
 			}
 			out.close();
@@ -317,16 +334,60 @@ public class LogsAccessService {
 		int count;
 		int uniqueCount;
 		
-		@Expose(serialize=false)
-		Set<String> aids = new TreeSet<String>();
-		@Expose(serialize=false)
-		Set<String> ips = new TreeSet<String>();
+		@Expose(serialize = false)
+		transient Map<String, Long> aids = new TreeMap<String, Long>();
+		@Expose(serialize = false)
+		transient Map<String, Long> ips = new TreeMap<String, Long>();
+		
+		Map<String, Integer> followUps = new LinkedHashMap<String, Integer>();
+		
+		public void calculateFollowUps(Collection<Stat> stats) {
+			
+			for(Stat m : stats) {
+				int count = 0;
+				if(m == this) {
+					continue;
+				}
+				Map<String, Long> thisit = ips;
+				Map<String, Long> thatit = m.ips;
+				if(m.aids.size() > 0 && aids.size() > 0) {
+					thisit = aids;
+					thatit = m.aids;
+				}
+				Iterator<Entry<String, Long>> vl = thisit.entrySet().iterator();
+				while(vl.hasNext()) {
+					Entry<String, Long> e = vl.next();
+					Long tm2 = thatit.get(e.getKey());
+					if(tm2 != null && e.getValue().longValue() < tm2.longValue()) {
+						count ++;
+					}
+				}
+				if(count > 0 && 100 * count > uniqueCount ) {
+					followUps.put(m.uri, count);
+				}
+			}
+			List<String> sortedList = new ArrayList<String>(followUps.keySet());
+			Collections.sort(sortedList, new Comparator<String>() {
+
+				@Override
+				public int compare(String o1, String o2) {
+					return -Integer.compare(followUps.get(o1), followUps.get(o2));
+				}
+			});
+			for(String k : sortedList) {
+				Integer ct = followUps.remove(k);
+				followUps.put(k, ct * 1000 / uniqueCount);
+			}
+
+			
+			
+		}
 		
 		public void add(String aid, LogEntry l) {
 			if(aid != null) {
-				aids.add(aid);
+				aids.putIfAbsent(aid, l.date.getTime());
 			}
-			ips.add(l.ip);
+			ips.putIfAbsent(l.ip, l.date.getTime());
 			count++;
 			uniqueCount = getUniqueCount();
 		}
