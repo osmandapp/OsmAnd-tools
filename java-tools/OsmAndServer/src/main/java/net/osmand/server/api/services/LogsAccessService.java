@@ -134,8 +134,14 @@ public class LogsAccessService {
 					}
 				}
 				if(presentation == LogsPresentation.BEHAVIOR) {
+					if(l.status.startsWith("4")) {
+						continue;
+					}
 					accountAid.add(l);
 				} else if(presentation == LogsPresentation.STATS) {
+					if(l.status.startsWith("4")) {
+						continue;
+					}
 					String uri = l.uri;
 					int i = uri.indexOf('?');
 					if(i > 0) {
