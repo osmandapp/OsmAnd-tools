@@ -103,6 +103,12 @@ public class LogsAccessService {
 					}
 					continue;
 				}
+				if(startTime != null && startTime.getTime() > l.date.getTime()) {
+					continue;
+				}
+				if(endTime != null && endTime.getTime() < l.date.getTime()) {
+					break;
+				}
 				if(l.date == null) {
 					continue;
 				}
@@ -110,12 +116,7 @@ public class LogsAccessService {
 					beginDate = l.date;
 				}
 				endDate = l.date;
-				if(startTime != null && startTime.getTime() > l.date.getTime()) {
-					continue;
-				}
-				if(endTime != null && endTime.getTime() < l.date.getTime()) {
-					break;
-				}
+				
 				Matcher aidMatcher = aidPattern.matcher(l.uri);
 				String aid = aidMatcher.find() ? aidMatcher.group(1) : null ;
 				if(filter != null && filter.length() > 0) {
