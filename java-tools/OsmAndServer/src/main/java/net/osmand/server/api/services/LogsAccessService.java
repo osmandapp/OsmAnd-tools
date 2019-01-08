@@ -97,11 +97,10 @@ public class LogsAccessService {
 				try {
 					parser.parse(l, ln);
 				} catch (Exception e) {
-					if (err++ >= 100) {
+					if (err++ % 100 == 0) {
 						if(presentation == LogsPresentation.PLAIN) {
-							out.write("Error parsing\n".getBytes());
+							out.write(String.format("Error parsing %d\n", err).getBytes());
 						}
-						break;
 					}
 					continue;
 				}
