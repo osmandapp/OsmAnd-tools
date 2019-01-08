@@ -190,7 +190,7 @@ public class LogsAccessService {
 					v.duration = String.format("%02d:%02d", duration / 60, duration % 60);
 					out.write(gson.toJson(v).getBytes());
 				}
-				out.write(String.format("], \"errors\" : %d, \"begin\":\"%1$tF %1$tT\", \"end\":\"%2$tF %2$tT\"}", err, beginDate, endDate).getBytes());
+				out.write(String.format("], \"errors\" : %d, \"begin\":\"%2$tF %2$tT\", \"end\":\"%3$tF %3$tT\"}", err, beginDate, endDate).getBytes());
 			} else if(presentation == LogsPresentation.STATS) {
 				out.write("{\"stats\" : ".getBytes());
 				List<Stat> sortStats = new ArrayList<Stat>(stats.values());
@@ -209,7 +209,7 @@ public class LogsAccessService {
 				}
 
 				out.write(gson.toJson(stats).getBytes());
-				out.write(String.format(", \"errors\" : %d,  \"begin\":\"%1$tF %1$tT\", \"end\":\"%2$tF %2$tT\"}", err, beginDate, endDate).getBytes());
+				out.write(String.format(", \"errors\" : %d,  \"begin\":\"%2$tF %2$tT\", \"end\":\"%3$tF %3$tT\"}", err, beginDate, endDate).getBytes());
 			}
 			out.close();
 		} finally {
