@@ -127,7 +127,8 @@ public class LogsAccessService {
 					}
 				}
 				rows++;
-				UserAccount accountAid = presentation == LogsPresentation.BEHAVIOR? retrieveUniqueAccount(aid, l, behaviorMap) : null;
+				UserAccount accountAid = presentation == LogsPresentation.BEHAVIOR ? retrieveUniqueAccount(aid, l,
+						behaviorMap) : null;
 				if(parseRegion) {
 					l.region = locationService.getField(l.ip, IpLocationService.COUNTRY_NAME);
 					if(accountAid != null) {
@@ -164,15 +165,19 @@ public class LogsAccessService {
 				} else {
 					out.write((l.toCSVString() + "\n").getBytes());
 				}
-				if(rows > limit && limit != -1) {
+				if(rows >= limit && limit != -1) {
 					break;
 				}
 				if(rows % 1000 == 0) {
 					out.flush();
 				}
 			}
+			if(presentation != LogsPresentation.PLAIN) {
+				out.write(String.format("{\"errors\" : %d, \"rows\" : %d, "
+						+ "\"begin\":\"%3$tF %3$tT\", \"end\":\"%4$tF %4$tT\", ", err, rows, beginDate, endDate).getBytes());
+			}
 			if(presentation == LogsPresentation.BEHAVIOR) {
-				out.write("{\"accounts\" : [".getBytes());
+				out.write("\n\"accounts\" : [".getBytes());
 				Iterator<Entry<String, UserAccount>> i = behaviorMap.entrySet().iterator();
 				boolean f = true;
 				while (i.hasNext()) {
@@ -190,9 +195,10 @@ public class LogsAccessService {
 					v.duration = String.format("%02d:%02d", duration / 60, duration % 60);
 					out.write(gson.toJson(v).getBytes());
 				}
-				out.write(String.format("], \"errors\" : %d, \"begin\":\"%2$tF %2$tT\", \"end\":\"%3$tF %3$tT\"}", err, beginDate, endDate).getBytes());
+				
+				out.write("]}".getBytes());
 			} else if(presentation == LogsPresentation.STATS) {
-				out.write("{\"stats\" : ".getBytes());
+				out.write("\n\"stats\" : ".getBytes());
 				List<Stat> sortStats = new ArrayList<Stat>(stats.values());
 				stats.clear();
 				Collections.sort(sortStats, new Comparator<Stat>(){
@@ -209,7 +215,7 @@ public class LogsAccessService {
 				}
 
 				out.write(gson.toJson(stats).getBytes());
-				out.write(String.format(", \"errors\" : %d,  \"begin\":\"%2$tF %2$tT\", \"end\":\"%3$tF %3$tT\"}", err, beginDate, endDate).getBytes());
+				out.write("}".getBytes());
 			}
 			out.close();
 		} finally {
@@ -219,24 +225,28 @@ public class LogsAccessService {
 	
 	private UserAccount retrieveUniqueAccount(String aid, LogEntry l, Map<String, UserAccount> behaviorMap) {
 		UserAccount accountAid = behaviorMap.get(aid);
-		UserAccount accountIp = behaviorMap.get(l.ip);
+		String ip =  l.ip;
+		if(l.ip.equals("127.0.0.1")) {
+			ip = "127." + l.date.getTime();
+		}
+		UserAccount accountIp =  behaviorMap.get(ip);
 		if(aid == null) {
 			if(accountIp == null) {
-				accountIp = new UserAccount(aid, l.ip, l.date);
-				behaviorMap.put(l.ip, accountIp);
+				accountIp = new UserAccount(aid, ip, l.date);
+				behaviorMap.put(ip, accountIp);
 			}
 			accountAid = accountIp;
 		} else {
 			if(accountAid == null) {
-				accountAid = new UserAccount(aid, l.ip, l.date);
+				accountAid = new UserAccount(aid, ip, l.date);
 				behaviorMap.put(aid, accountAid);
 			}
 			if(accountIp == null) {
 				accountIp = accountAid; 
-				behaviorMap.put(l.ip, accountIp);
+				behaviorMap.put(ip, accountIp);
 			} else if(accountIp != accountAid){
 				accountIp = accountAid.merge(accountIp);
-				behaviorMap.put(l.ip, accountIp);
+				behaviorMap.put(ip, accountIp);
 			}
 		}
 		return accountAid;
