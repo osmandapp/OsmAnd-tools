@@ -11,7 +11,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -20,7 +19,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -29,6 +27,7 @@ import net.osmand.data.QuadRect;
 import net.osmand.data.TransportRoute;
 import net.osmand.data.TransportSchedule;
 import net.osmand.data.TransportStop;
+import net.osmand.data.TransportStopExit;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
@@ -53,6 +52,10 @@ import rtree.RTreeException;
 import rtree.RTreeInsertException;
 import rtree.Rect;
 
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
+import java.lang.reflect.Type;
+
 public class IndexTransportCreator extends AbstractIndexPartCreator {
 
 	private static final Log log = LogFactory.getLog(IndexTransportCreator.class);
@@ -72,6 +75,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	// Note: in future when we need more information from stop_area relation, it is better to memorize relations itself
 	// now we need only specific names of stops and platforms
 	private Map<EntityId, Relation> stopAreas = new HashMap<EntityId, Relation>();
+	private Map<EntityId, List<TransportStopExit>> exits = new HashMap<EntityId, List<TransportStopExit>>();
 
 
 	private static Set<String> acceptedRoutes = new HashSet<String>();
@@ -124,10 +128,13 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 				selectTransportRouteStop.setLong(1, id);
 				ResultSet rs = selectTransportStop.executeQuery();
 				if (rs.next()) {
+					Gson gson = new Gson();
+					Type t = new TypeToken<Map<String, String>>(){}.getType();
 					int x24 = (int) MapUtils.getTileNumberX(24, rs.getDouble(3));
 					int y24 = (int) MapUtils.getTileNumberY(24, rs.getDouble(2));
 					String name = rs.getString(4);
 					String nameEn = rs.getString(5);
+					Map<String, String> names = gson.fromJson(rs.getString(6),t);
 					if (nameEn != null && nameEn.equals(Junidecode.unidecode(name))) {
 						nameEn = null;
 					}
@@ -146,7 +153,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 						}
 					}
 					rset.close();
-					writer.writeTransportStop(id, x24, y24, name, nameEn, stringTable, routes);
+					writer.writeTransportStop(id, x24, y24, name, nameEn, names, stringTable, routes, exits);
 				} else {
 					log.error("Something goes wrong with transport id = " + id); //$NON-NLS-1$
 				}
@@ -191,6 +198,26 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 					}
 				}
 			}
+			for (RelationMember entry : e.getMembers()) {
+				String role = entry.getRole();
+				if ((entry.getEntity() != null && "".equals(role)) && ("station".equals(entry.getEntity().getTag(OSMTagKey.RAILWAY)))) {
+					List<TransportStopExit> stopExitList = new ArrayList<>();
+					for (RelationMember entryAlt : e.getMembers()) {
+						if ((entryAlt.getEntity() != null && "".equals(role)) && ("subway_entrance".equals(entryAlt.getEntity().getTag(OSMTagKey.RAILWAY)))) {
+							TransportStopExit exit = new TransportStopExit();
+							exit.setId(entryAlt.getEntity().getId());
+							if (entryAlt.getEntity().getTag("ref") != null) {
+								exit.setRef(entryAlt.getEntity().getTag("ref"));
+							}
+							exit.setLocation(entryAlt.getEntity().getLatitude(),entryAlt.getEntity().getLongitude());
+							stopExitList.add(exit);
+						}
+					}
+					if (entry.getEntity() != null) {
+						exits.put(entry.getEntityId(),stopExitList);
+					}
+				}
+			}
 		}
 	}
 
@@ -220,7 +247,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		stat.executeUpdate("create index transport_route_geometry_route on transport_route_geometry (route)");
 		
 
-		stat.executeUpdate("create table transport_stop (id bigint primary key, latitude double, longitude double, name varchar(1024), name_en varchar(1024))");
+		stat.executeUpdate("create table transport_stop (id bigint primary key, latitude double, longitude double, name varchar(1024), name_en varchar(1024), names varchar(8096))");
 		stat.executeUpdate("create index transport_stop_id on transport_stop (id)");
 		stat.executeUpdate("create index transport_stop_location on transport_stop (latitude, longitude)");
 
@@ -240,7 +267,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		}
 		transRouteStat = conn.prepareStatement("insert into transport_route(id, type, operator, ref, name, name_en, dist, color) values(?, ?, ?, ?, ?, ?, ?, ?)");
 		transRouteStopsStat = conn.prepareStatement("insert into transport_route_stop(route, stop, ord) values(?, ?, ?)");
-		transStopsStat = conn.prepareStatement("insert into transport_stop(id, latitude, longitude, name, name_en) values(?, ?, ?, ?, ?)");
+		transStopsStat = conn.prepareStatement("insert into transport_stop(id, latitude, longitude, name, name_en, names) values(?, ?, ?, ?, ?, ?)");
 		transRouteGeometryStat = conn.prepareStatement("insert into transport_route_geometry(route, geometry) values(?, ?)");
 		pStatements.put(transRouteStat, 0);
 		pStatements.put(transRouteStopsStat, 0);
@@ -394,11 +421,13 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		int i = 0;
 		for (TransportStop s : stops) {
 			if (!visitedStops.contains(s.getId())) {
+				Gson gson = new Gson();
 				transStopsStat.setLong(1, s.getId());
 				transStopsStat.setDouble(2, s.getLocation().getLatitude());
 				transStopsStat.setDouble(3, s.getLocation().getLongitude());
 				transStopsStat.setString(4, s.getName());
 				transStopsStat.setString(5, s.getEnName(false));
+				transStopsStat.setString(6, gson.toJson(s.getNamesMap(false)));
 				int x = (int) MapUtils.getTileNumberX(24, s.getLocation().getLongitude());
 				int y = (int) MapUtils.getTileNumberY(24, s.getLocation().getLatitude());
 				addBatch(transStopsStat);
@@ -431,7 +460,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			PreparedStatement selectTransportRouteData = mapConnection.prepareStatement(
 					"SELECT id, dist, name, name_en, ref, operator, type, color FROM transport_route"); //$NON-NLS-1$
 			PreparedStatement selectTransportData = mapConnection.prepareStatement("SELECT S.stop, " + //$NON-NLS-1$
-					"  A.latitude,  A.longitude, A.name, A.name_en " + //$NON-NLS-1$
+					"  A.latitude,  A.longitude, A.name, A.name_en, A.names " + //$NON-NLS-1$
 					"FROM transport_route_stop S INNER JOIN transport_stop A ON A.id = S.stop WHERE S.route = ? ORDER BY S.ord asc"); //$NON-NLS-1$
 			PreparedStatement selectTransportRouteGeometry = mapConnection.prepareStatement("SELECT S.geometry " + 
 					"FROM transport_route_geometry S WHERE S.route = ?"); //$NON-NLS-1$
@@ -470,10 +499,15 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 					long idStop = rset.getInt(1);
 					String stopName = rset.getString(4);
 					String stopEnName = rset.getString(5);
+					Gson gson = new Gson();
+					String names = rset.getString(6);
+					Type t = new TypeToken<Map<String, String>>(){}.getType();
+					Map<String, String> map = gson.fromJson(names, t);
 					if (stopEnName != null && stopEnName.equals(Junidecode.unidecode(stopName))) {
 						stopEnName = null;
 					}
 					TransportStop st = new TransportStop();
+					st.setNames(map);
 					st.setId(idStop);
 					st.setName(stopName);
 					st.setLocation(rset.getDouble(2), rset.getDouble(3));
@@ -498,7 +532,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			writer.endWriteTransportRoutes();
 
 			PreparedStatement selectTransportStop = mapConnection.prepareStatement(
-					"SELECT A.id,  A.latitude,  A.longitude, A.name, A.name_en FROM transport_stop A where A.id = ?"); //$NON-NLS-1$
+					"SELECT A.id,  A.latitude,  A.longitude, A.name, A.name_en, A.names FROM transport_stop A where A.id = ?"); //$NON-NLS-1$
 			PreparedStatement selectTransportRouteStop = mapConnection.prepareStatement(
 					"SELECT DISTINCT S.route FROM transport_route_stop S join transport_route R  on R.id = S.route WHERE S.stop = ? ORDER BY R.type, R.ref "); //$NON-NLS-1$
 			long rootIndex = transportStopsTree.getFileHdr().getRootIndex();
@@ -823,6 +857,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		List<Entity> platformsAndStops = new ArrayList<Entity>();
 		List<Entity> platforms = new ArrayList<Entity>();
 		List<Entity> stops = new ArrayList<Entity>();
+
 		Map<EntityId, Entity> platformNames = new LinkedHashMap<>();
 		for (RelationMember entry : rel.getMembers()) {
 			String role = entry.getRole();

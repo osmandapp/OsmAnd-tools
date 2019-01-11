@@ -71,12 +71,14 @@ import net.osmand.data.MapObject;
 import net.osmand.data.Street;
 import net.osmand.data.TransportSchedule;
 import net.osmand.data.TransportStop;
+import net.osmand.data.TransportStopExit;
 import net.osmand.obf.preparation.IndexPoiCreator.PoiAdditionalType;
 import net.osmand.obf.preparation.IndexPoiCreator.PoiCreatorCategories;
 import net.osmand.obf.preparation.IndexPoiCreator.PoiTileBox;
 import net.osmand.osm.MapRenderingTypes.MapRulType;
 import net.osmand.osm.MapRoutingTypes.MapPointName;
 import net.osmand.osm.MapRoutingTypes.MapRouteType;
+import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Node;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
@@ -1314,8 +1316,8 @@ public class BinaryMapIndexWriter {
 		writeInt32Size();
 	}
 
-	public void writeTransportStop(long id, int x24, int y24, String name, String nameEn, Map<String, Integer> stringTable,
-			List<Long> routes) throws IOException {
+	public void writeTransportStop(long id, int x24, int y24, String name, String nameEn, Map<String, String> names, Map<String, Integer> stringTable,
+								   List<Long> routes, Map<Entity.EntityId, List<TransportStopExit>> exits) throws IOException {
 		checkPeekState(TRANSPORT_STOPS_TREE);
 
 		Bounds bounds = stackBounds.peek();
@@ -1334,9 +1336,32 @@ public class BinaryMapIndexWriter {
 		ts.setDx(x24 - bounds.leftX);
 		ts.setDy(y24 - bounds.topY);
 		ts.setId(id - stackBaseIds.peek());
+		mapDataBuf.clear();
+		for (Map.Entry<String, String> entry : names.entrySet()) {
+			writeRawVarint32(mapDataBuf, registerString(stringTable,entry.getKey()));
+			writeRawVarint32(mapDataBuf, registerString(stringTable,entry.getValue()));
+		}
+		ts.setAdditionalNamePairs(ByteString.copyFrom(mapDataBuf.toArray()));
+
 		for (Long i : routes) {
 			ts.addRoutes((int) (fp - i));
 		}
+		for (Entry<Entity.EntityId, List<TransportStopExit>> i : exits.entrySet()) {
+			if (id == i.getKey().getId()) {
+				List<TransportStopExit> list = i.getValue();
+				for ( TransportStopExit e : list) {
+					OsmandOdb.TransportStopExit.Builder exit = OsmandOdb.TransportStopExit.newBuilder();
+					LatLon location = e.getLocation();
+					int exitX24 = (int) MapUtils.getTileNumberX(24, location.getLongitude());
+					int exitY24 = (int) MapUtils.getTileNumberY(24, location.getLatitude());
+					exit.setRef(registerString(stringTable, e.getRef()));
+					exit.setDx(exitX24 - bounds.leftX);
+					exit.setDy(exitY24 - bounds.topY);
+					ts.addExits(exit);
+				}
+			}
+		}
+
 
 		codedOutStream.writeMessageNoTag(ts.build());
 	}
