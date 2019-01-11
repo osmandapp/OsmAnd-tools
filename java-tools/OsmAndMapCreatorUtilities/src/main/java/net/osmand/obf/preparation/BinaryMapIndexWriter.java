@@ -1346,8 +1346,7 @@ public class BinaryMapIndexWriter {
 		for (Long i : routes) {
 			ts.addRoutes((int) (fp - i));
 		}
-		for (Entry<Entity.EntityId, List<TransportStopExit>> i : exits.entrySet())
-		{
+		for (Entry<Entity.EntityId, List<TransportStopExit>> i : exits.entrySet()) {
 			if (id == i.getKey().getId()) {
 				List<TransportStopExit> list = i.getValue();
 				for ( TransportStopExit e : list) {
