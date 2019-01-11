@@ -5,6 +5,8 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -15,6 +17,8 @@ import java.util.*;
 
 @Service
 public class ReceiptValidationService {
+
+	private static final Log LOGGER = LogFactory.getLog(ReceiptValidationService.class);
 
 	private final static String SANDBOX_URL = "https://sandbox.itunes.apple.com/verifyReceipt";
 	private final static String PRODUCTION_URL = "https://buy.itunes.apple.com/verifyReceipt";
@@ -30,6 +34,7 @@ public class ReceiptValidationService {
 			receiptObj.addProperty("receipt-data", receipt);
 			receiptObj.addProperty("password", System.getenv().get("IOS_SUBSCRIPTION_SECRET"));
 			String receiptWithSecret = receiptObj.toString();
+			LOGGER.debug("!!! 111 = " + receiptWithSecret);
 
 			RestTemplate restTemplate = new RestTemplate();
 			HttpHeaders headers = new HttpHeaders();
