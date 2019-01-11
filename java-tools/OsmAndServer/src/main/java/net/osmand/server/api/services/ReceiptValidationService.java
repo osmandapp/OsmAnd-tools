@@ -34,7 +34,7 @@ public class ReceiptValidationService {
 			receiptObj.addProperty("receipt-data", receipt);
 			receiptObj.addProperty("password", System.getenv().get("IOS_SUBSCRIPTION_SECRET"));
 			String receiptWithSecret = receiptObj.toString();
-			LOGGER.debug("!!! 111 = " + receiptWithSecret);
+			LOGGER.error("!!! 111 = " + receiptWithSecret);
 
 			RestTemplate restTemplate = new RestTemplate();
 			HttpHeaders headers = new HttpHeaders();
