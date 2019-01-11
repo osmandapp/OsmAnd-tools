@@ -1336,13 +1336,13 @@ public class BinaryMapIndexWriter {
 		ts.setDx(x24 - bounds.leftX);
 		ts.setDy(y24 - bounds.topY);
 		ts.setId(id - stackBaseIds.peek());
-		List<Integer> l = new ArrayList<>();
-		for (Map.Entry<String, String> entry : names.entrySet())
-		{
-			l.add(registerString(stringTable,entry.getKey()));
-			l.add(registerString(stringTable,entry.getValue()));
+		mapDataBuf.clear();
+		for (Map.Entry<String, String> entry : names.entrySet()) {
+			writeRawVarint32(mapDataBuf, registerString(stringTable,entry.getKey()));
+			writeRawVarint32(mapDataBuf, registerString(stringTable,entry.getValue()));
 		}
-		ts.addAllAdditionalNamePairs(l);
+		ts.setAdditionalNamePairs(ByteString.copyFrom(mapDataBuf.toArray()));
+
 		for (Long i : routes) {
 			ts.addRoutes((int) (fp - i));
 		}
