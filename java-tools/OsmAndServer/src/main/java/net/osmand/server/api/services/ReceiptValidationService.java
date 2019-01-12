@@ -31,6 +31,15 @@ public class ReceiptValidationService {
 
 	public static class InAppReceipt {
 		public Map<String, String> fields = new HashMap<>();
+
+		public String getProductId() {
+			return fields.get("product_id");
+		}
+
+		public boolean isSubscription() {
+			String productId = getProductId();
+			return productId != null && productId.contains("subscription");
+		}
 	}
 
 	@NonNull

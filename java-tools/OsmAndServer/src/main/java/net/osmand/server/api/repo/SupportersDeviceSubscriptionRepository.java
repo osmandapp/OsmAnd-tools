@@ -1,14 +1,8 @@
 package net.osmand.server.api.repo;
 
-import net.osmand.server.api.repo.SupportersDeviceSubscriptionRepository.SupporterDeviceSubscription;
-import net.osmand.server.api.repo.SupportersDeviceSubscriptionRepository.SupporterDeviceSubscriptionPrimaryKey;
-
-import org.springframework.data.jpa.repository.JpaRepository;
-
 import java.io.Serializable;
 import java.util.Collection;
 import java.util.Date;
-import java.util.List;
 import java.util.Optional;
 
 import javax.persistence.Column;
@@ -19,9 +13,17 @@ import javax.persistence.Table;
 import javax.persistence.Temporal;
 import javax.persistence.TemporalType;
 
+import net.osmand.server.api.repo.SupportersDeviceSubscriptionRepository.SupporterDeviceSubscription;
+import net.osmand.server.api.repo.SupportersDeviceSubscriptionRepository.SupporterDeviceSubscriptionPrimaryKey;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+
 public interface SupportersDeviceSubscriptionRepository extends JpaRepository<SupporterDeviceSubscription, SupporterDeviceSubscriptionPrimaryKey> {
 
-	Optional<SupporterDeviceSubscription> findTopByUserIdOrderByTimestampDesc(Long userId);
+	// AS OF JANUARY 2019
+	// userId + sku is a key by design and by new data (due to historical mistake, currently key is userId + sku + purchaseToken)
+	Optional<SupporterDeviceSubscription> findTopByUserIdAndSkuOrderByTimestampDesc(Long userId, String sku);
+	
 	Optional<SupporterDeviceSubscription> findByPurchaseTokenIn(Collection<String> purchaseTokens);
 
 	@Entity
@@ -37,13 +39,12 @@ public interface SupportersDeviceSubscriptionRepository extends JpaRepository<Su
         @Column(name = "sku")
         public String sku;
 
-		@Id
-		@Column(name = "payload")
-		public String payload;
-
         @Id
         @Column(name = "purchasetoken")
         public String purchaseToken;
+        
+		@Column(name = "payload")
+		public String payload;
 
         @Column(name = "timestamp")
         @Temporal(TemporalType.TIMESTAMP)

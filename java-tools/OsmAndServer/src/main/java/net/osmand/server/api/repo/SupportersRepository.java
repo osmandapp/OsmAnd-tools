@@ -14,7 +14,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface SupportersRepository extends JpaRepository<SupportersRepository.Supporter, Long> {
 
-    Optional<Supporter> findByUserId(Long userId);
     Optional<Supporter> findByUserEmail(String userEmail);
 
     @Entity
