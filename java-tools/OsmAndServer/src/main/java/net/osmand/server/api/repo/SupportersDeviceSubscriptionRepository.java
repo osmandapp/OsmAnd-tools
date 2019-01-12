@@ -29,39 +29,39 @@ public interface SupportersDeviceSubscriptionRepository extends JpaRepository<Su
 	@Entity
     @Table(name = "supporters_device_sub")
     @IdClass(SupporterDeviceSubscriptionPrimaryKey.class)
-    public class SupporterDeviceSubscription {
+	public class SupporterDeviceSubscription {
 
-        @Id
-        @Column(name = "userid")
-        public Long userId;
+		@Id
+		@Column(name = "userid")
+		public Long userId;
 
-        @Id
-        @Column(name = "sku")
-        public String sku;
+		@Id
+		@Column(name = "sku")
+		public String sku;
 
-        @Id
-        @Column(name = "purchasetoken")
-        public String purchaseToken;
-        
+		@Id
+		@Column(name = "purchasetoken")
+		public String purchaseToken;
+
 		@Column(name = "payload")
 		public String payload;
 
-        @Column(name = "timestamp")
-        @Temporal(TemporalType.TIMESTAMP)
-        public Date timestamp;
-		
-    }
+		@Column(name = "timestamp")
+		@Temporal(TemporalType.TIMESTAMP)
+		public Date timestamp;
 
-    public class SupporterDeviceSubscriptionPrimaryKey implements Serializable {
-        private static final long serialVersionUID = 7941117922381685104L;
+	}
 
-        public Long userId;
-        public String sku;
-        public String purchaseToken;
-        
-        public SupporterDeviceSubscriptionPrimaryKey() {
-        }
-        
+	public class SupporterDeviceSubscriptionPrimaryKey implements Serializable {
+		private static final long serialVersionUID = 7941117922381685104L;
+
+		public Long userId;
+		public String sku;
+		public String purchaseToken;
+
+		public SupporterDeviceSubscriptionPrimaryKey() {
+		}
+
 		public SupporterDeviceSubscriptionPrimaryKey(Long userId, String sku, String purchaseToken) {
 			super();
 			this.userId = userId;
@@ -78,7 +78,7 @@ public interface SupportersDeviceSubscriptionRepository extends JpaRepository<Su
 			result = prime * result + ((userId == null) ? 0 : userId.hashCode());
 			return result;
 		}
-		
+
 		@Override
 		public boolean equals(Object obj) {
 			if (this == obj) {
@@ -115,5 +115,5 @@ public interface SupportersDeviceSubscriptionRepository extends JpaRepository<Su
 			return true;
 		}
 
-    }
+	}
 }
