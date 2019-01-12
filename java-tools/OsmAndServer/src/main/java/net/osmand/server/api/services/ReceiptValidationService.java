@@ -64,16 +64,19 @@ public class ReceiptValidationService {
 
 	@Nullable
 	public Map<String, InAppReceipt> loadInAppReceipts(@NonNull JsonObject receiptObj) {
-		Map<String, InAppReceipt> result = new HashMap<>();
-		JsonArray receiptArray = receiptObj.getAsJsonArray("in_app");
-		for (JsonElement elem : receiptArray) {
-			JsonObject recObj = elem.getAsJsonObject();
-			String transactionId = recObj.get("original_transaction_id").getAsString();
-			InAppReceipt receipt = new InAppReceipt();
-			for (Map.Entry<String, JsonElement> entry : recObj.entrySet()) {
-				receipt.fields.put(entry.getKey(), entry.getValue().getAsString());
+		Map<String, InAppReceipt> result = null;
+		JsonArray receiptArray = receiptObj.get("receipt").getAsJsonObject().get("in_app").getAsJsonArray();
+		if (receiptArray != null) {
+			result = new HashMap<>();
+			for (JsonElement elem : receiptArray) {
+				JsonObject recObj = elem.getAsJsonObject();
+				String transactionId = recObj.get("original_transaction_id").getAsString();
+				InAppReceipt receipt = new InAppReceipt();
+				for (Map.Entry<String, JsonElement> entry : recObj.entrySet()) {
+					receipt.fields.put(entry.getKey(), entry.getValue().getAsString());
+				}
+				result.put(transactionId, receipt);
 			}
-			result.put(transactionId, receipt);
 		}
 		return result;
 	}
