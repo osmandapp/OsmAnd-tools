@@ -1,14 +1,7 @@
 package net.osmand.server.controllers.pub;
 
-import java.util.Arrays;
-import java.util.Base64;
-import java.util.Date;
-import java.util.Enumeration;
-import java.util.Map;
-import java.util.Optional;
-import java.util.concurrent.ThreadLocalRandom;
-
-import javax.servlet.http.HttpServletRequest;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.gson.JsonObject;
 
 import net.osmand.server.api.repo.MapUserRepository;
 import net.osmand.server.api.repo.MapUserRepository.MapUser;
@@ -20,6 +13,7 @@ import net.osmand.server.api.repo.SupportersDeviceSubscriptionRepository.Support
 import net.osmand.server.api.repo.SupportersRepository;
 import net.osmand.server.api.repo.SupportersRepository.Supporter;
 import net.osmand.server.api.services.ReceiptValidationService;
+import net.osmand.server.api.services.ReceiptValidationService.InAppReceipt;
 import net.osmand.server.utils.BTCAddrValidator;
 import net.osmand.util.Algorithms;
 
@@ -38,12 +32,26 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Base64;
+import java.util.Date;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.ThreadLocalRandom;
+
+import javax.servlet.http.HttpServletRequest;
 
 @RestController
 @RequestMapping("/subscription")
 public class SubscriptionController {
     private static final Log LOGGER = LogFactory.getLog(SubscriptionController.class);
+
+	private static final String RECEIPT = "receipt";
+	private static final String SANDBOX = "sandbox";
 
     private static final int TIMEOUT = 20000;
 
@@ -157,7 +165,17 @@ public class SubscriptionController {
 				s.userId, s.token, s.visibleName, s.userEmail, s.preferredRegion);
 		return response;
 	}
-	
+
+	private Map<String, String> userInfoAsMap(Supporter s) {
+    	Map<String, String> res = new HashMap<>();
+    	res.put("userid", "" + s.userId);
+		res.put("token", s.token);
+		res.put("visibleName", s.visibleName);
+		res.put("email", s.userEmail);
+		res.put("preferredCountry", s.preferredRegion);
+		return res;
+	}
+
 	private String userShortInfoAsJson(Supporter s) {
 		String response = String.format(
 				"{\"userid\": \"%d\", \"visibleName\": \"%s\",\"preferredCountry\": \"%s\"}", 
@@ -270,10 +288,57 @@ public class SubscriptionController {
     
     @PostMapping(path = {"/ios-receipt-validate"})
 	public ResponseEntity<String> validateIos(HttpServletRequest request) throws Exception {
+		String userId = request.getParameter("userId");
 		String receipt = request.getParameter("receipt");
 		String sandbox = request.getParameter("sandbox");
-		Map<String, Object> res = validationService.validateReceipt(receipt, !Algorithms.isEmpty(sandbox));
-		return ResponseEntity.ok(jsonMapper.writeValueAsString(res));
+		JsonObject receiptObj = validationService.loadReceiptJsonObject(receipt, !Algorithms.isEmpty(sandbox));
+		if (receiptObj != null) {
+			long uId = -1;
+			Map<String, Object> result = new HashMap<>();
+			Map<String, InAppReceipt> inAppReceipts = validationService.loadInAppReceipts(receiptObj);
+			if (inAppReceipts != null && inAppReceipts.size() > 0) {
+				if (Algorithms.isEmpty(userId)) {
+					Optional<SupporterDeviceSubscription> subscriptionOpt =
+							supportersDeviceSubscriptionRepository.findByPurchaseTokenIn(inAppReceipts.keySet());
+					if (subscriptionOpt.isPresent()) {
+						SupporterDeviceSubscription subscription = subscriptionOpt.get();
+						uId = subscription.userId;
+						Optional<Supporter> supporter = supportersRepository.findByUserId(uId);
+						if (supporter.isPresent()) {
+							Supporter s = supporter.get();
+							result.put("user", userInfoAsMap(s));
+						}
+					}
+				} else {
+					uId = Long.valueOf(userId);
+				}
+				if (uId != -1) {
+					Optional<SupporterDeviceSubscription> lastSubscription =
+							supportersDeviceSubscriptionRepository.findTopByUserIdOrderBytimestampDesc(uId);
+					if (lastSubscription.isPresent()) {
+						SupporterDeviceSubscription s = lastSubscription.get();
+						s.payload = receipt;
+						supportersDeviceSubscriptionRepository.saveAndFlush(s);
+					}
+				}
+				List<String> activeInApps = new ArrayList<>();
+				for (InAppReceipt t : inAppReceipts.values()) {
+					String productId = t.fields.get("product_id");
+					if (!productId.contains("subscription")) {
+						activeInApps.add(productId);
+					}
+				}
+				if (activeInApps.size() > 0) {
+					result.put("in_apps", activeInApps);
+				}
+
+				Map<String, Object> validationResult = validationService.validateReceipt(receiptObj);
+				result.putAll(validationResult);
+
+				return ResponseEntity.ok(jsonMapper.writeValueAsString(result));
+			}
+		}
+		return error("Cannot load receipt.");
     }
 
 	@PostMapping(path = {"/purchased", "/purchased.php"})
@@ -303,6 +368,10 @@ public class SubscriptionController {
         SupporterDeviceSubscription subscr = new SupporterDeviceSubscription();
         subscr.userId = supporter.userId;
         subscr.sku = request.getParameter("sku");
+		String payload = request.getParameter("payload");
+		if (payload != null) {
+			subscr.payload = payload;
+		}
         subscr.purchaseToken = request.getParameter("purchaseToken");
         subscr.timestamp = new Date();
         if(supportersDeviceSubscriptionRepository.existsById(new SupporterDeviceSubscriptionPrimaryKey(

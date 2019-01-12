@@ -1,7 +1,15 @@
 package net.osmand.server.api.repo;
 
+import net.osmand.server.api.repo.SupportersDeviceSubscriptionRepository.SupporterDeviceSubscription;
+import net.osmand.server.api.repo.SupportersDeviceSubscriptionRepository.SupporterDeviceSubscriptionPrimaryKey;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+
 import java.io.Serializable;
+import java.util.Collection;
 import java.util.Date;
+import java.util.List;
+import java.util.Optional;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;
@@ -11,14 +19,12 @@ import javax.persistence.Table;
 import javax.persistence.Temporal;
 import javax.persistence.TemporalType;
 
-import net.osmand.server.api.repo.SupportersDeviceSubscriptionRepository.SupporterDeviceSubscription;
-import net.osmand.server.api.repo.SupportersDeviceSubscriptionRepository.SupporterDeviceSubscriptionPrimaryKey;
-
-import org.springframework.data.jpa.repository.JpaRepository;
-
 public interface SupportersDeviceSubscriptionRepository extends JpaRepository<SupporterDeviceSubscription, SupporterDeviceSubscriptionPrimaryKey> {
 
-    @Entity
+	Optional<SupporterDeviceSubscription> findTopByUserIdOrderBytimestampDesc(Long userId);
+	Optional<SupporterDeviceSubscription> findByPurchaseTokenIn(Collection<String> purchaseTokens);
+
+	@Entity
     @Table(name = "supporters_device_sub")
     @IdClass(SupporterDeviceSubscriptionPrimaryKey.class)
     public class SupporterDeviceSubscription {
@@ -30,6 +36,10 @@ public interface SupportersDeviceSubscriptionRepository extends JpaRepository<Su
         @Id
         @Column(name = "sku")
         public String sku;
+
+		@Id
+		@Column(name = "payload")
+		public String payload;
 
         @Id
         @Column(name = "purchasetoken")

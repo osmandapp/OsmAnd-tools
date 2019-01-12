@@ -10,6 +10,8 @@ import org.apache.commons.logging.LogFactory;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.lang.NonNull;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
@@ -25,117 +27,177 @@ public class ReceiptValidationService {
 	private final static String BUNDLE_ID = "net.osmand.maps";
 	//private final static String APPLICATION_VERSION = "1";
 
+	public final static int CANNOT_LOAD_RECEIPT_ERROR_CODE = 50000;
 
-	public Map<String, Object> validateReceipt(final String receipt, boolean sandbox) throws Exception {
+	public static class InAppReceipt {
+		public Map<String, String> fields = new HashMap<>();
+	}
+
+	@NonNull
+	public Map<String, Object> validateReceipt(@NonNull JsonObject receiptObj) {
 		try {
-			JsonParser parser = new JsonParser();
-
-			JsonObject receiptObj = new JsonObject();
-			receiptObj.addProperty("receipt-data", receipt);
-			receiptObj.addProperty("password", System.getenv().get("IOS_SUBSCRIPTION_SECRET"));
-			String receiptWithSecret = receiptObj.toString();
-			LOGGER.error("!!! 111 = " + receiptWithSecret);
-
-			RestTemplate restTemplate = new RestTemplate();
-			HttpHeaders headers = new HttpHeaders();
-			headers.setContentType(MediaType.APPLICATION_JSON);
-
-			HttpEntity<String> entity = new HttpEntity<>(receiptWithSecret, headers);
-			String jsonAnswer = restTemplate
-					.postForObject(sandbox ? SANDBOX_URL : PRODUCTION_URL, entity, String.class);
-
-			JsonObject root = new JsonParser().parse(jsonAnswer).getAsJsonObject();
-			Integer status = root.get("status").getAsInt();
+			Integer status = receiptObj.get("status").getAsInt();
 			if (status != 0) {
 				return mapStatus(status);
 			}
-			return checkValidation(root);
+			return checkValidation(receiptObj);
 		} catch (Exception e) {
-			throw new Exception(e.getMessage());
+			LOGGER.error(e);
+			return mapStatus(-1);
 		}
 	}
 
-	private HashMap<String, Object> checkValidation(JsonObject root) {
-		HashMap<String, Object> resultMap = new HashMap<>();
+	@NonNull
+	public Map<String, Object> validateReceipt(String receipt, boolean sandbox) {
+		try {
+			JsonObject receiptObj = loadReceiptJsonObject(receipt, sandbox);
+			if (receiptObj != null) {
+				return validateReceipt(receiptObj);
+			} else {
+				return mapStatus(CANNOT_LOAD_RECEIPT_ERROR_CODE);
+			}
+		} catch (Exception e) {
+			LOGGER.error(e);
+			return mapStatus(-1);
+		}
+	}
+
+	@Nullable
+	public Map<String, InAppReceipt> loadInAppReceipts(@NonNull JsonObject receiptObj) {
+		Map<String, InAppReceipt> result = new HashMap<>();
+		JsonArray receiptArray = receiptObj.getAsJsonArray("in_app");
+		for (JsonElement elem : receiptArray) {
+			JsonObject recObj = elem.getAsJsonObject();
+			String transactionId = recObj.get("original_transaction_id").getAsString();
+			InAppReceipt receipt = new InAppReceipt();
+			for (Map.Entry<String, JsonElement> entry : recObj.entrySet()) {
+				receipt.fields.put(entry.getKey(), entry.getValue().getAsString());
+			}
+			result.put(transactionId, receipt);
+		}
+		return result;
+	}
+
+	@Nullable
+	public Map<String, InAppReceipt> loadInAppReceipts(String receipt, boolean sandbox) {
+		try {
+			JsonObject receiptObj = loadReceiptJsonObject(receipt, sandbox);
+			if (receiptObj != null) {
+				return loadInAppReceipts(receiptObj);
+			}
+		} catch (Exception e) {
+			LOGGER.error(e);
+		}
+		return null;
+	}
+
+	@Nullable
+	public JsonObject loadReceiptJsonObject(String receipt, boolean sandbox) {
+		JsonObject receiptObj = new JsonObject();
+		receiptObj.addProperty("receipt-data", receipt);
+		receiptObj.addProperty("password", System.getenv().get("IOS_SUBSCRIPTION_SECRET"));
+		String receiptWithSecret = receiptObj.toString();
+
+		RestTemplate restTemplate = new RestTemplate();
+		HttpHeaders headers = new HttpHeaders();
+		headers.setContentType(MediaType.APPLICATION_JSON);
+
+		HttpEntity<String> entity = new HttpEntity<>(receiptWithSecret, headers);
+		String jsonAnswer = restTemplate
+				.postForObject(sandbox ? SANDBOX_URL : PRODUCTION_URL, entity, String.class);
+
+		if (jsonAnswer != null) {
+			return new JsonParser().parse(jsonAnswer).getAsJsonObject();
+		}
+		return null;
+	}
+
+	@NonNull
+	private HashMap<String, Object> checkValidation(JsonObject receiptObj) {
+		HashMap<String, Object> result = new HashMap<>();
 		//To be determined with which field to compare
-		String bundleId = root.get("receipt").getAsJsonObject().get("bundle_id").getAsString();
-		//String applicationVersion = root.get("receipt").getAsJsonObject().get("application_version").getAsString();
-		JsonArray latestReceiptInfoArray = root.get("latest_receipt_info").getAsJsonArray();
+		String bundleId = receiptObj.get("receipt").getAsJsonObject().get("bundle_id").getAsString();
+		//String applicationVersion = receiptObj.get("receipt").getAsJsonObject().get("application_version").getAsString();
+		JsonArray latestReceiptInfoArray = receiptObj.get("latest_receipt_info").getAsJsonArray();
 
 		if (/*applicationVersion.equals(APPLICATION_VERSION) && */bundleId.equals(BUNDLE_ID)) {
 			if (latestReceiptInfoArray.size() > 0) {
-				resultMap.put("result", true);
-				JsonArray inAppsArray = new JsonArray();
+				result.put("result", true);
+				JsonArray subscriptionArray = new JsonArray();
 				for (JsonElement jsonElement : latestReceiptInfoArray) {
-					JsonObject inAppObj = new JsonObject();
+					JsonObject subscriptionObj = new JsonObject();
 					JsonObject receipt = jsonElement.getAsJsonObject();
 					String productId = receipt.get("product_id").getAsString();
-					inAppObj.addProperty("product_id", productId);
+					subscriptionObj.addProperty("product_id", productId);
 					JsonElement expiresDateElement = receipt.get("expires_date_ms");
 					if (expiresDateElement != null) {
 						Long expiresDateMs = expiresDateElement.getAsLong();
 						if (expiresDateMs > System.currentTimeMillis()) {
 							//Subscription is valid
-							inAppObj.addProperty("expiration_date", expiresDateMs);
-							inAppsArray.add(inAppObj);
+							subscriptionObj.addProperty("expiration_date", expiresDateMs);
+							subscriptionArray.add(subscriptionObj);
 						}
 					} else {
-						inAppsArray.add(inAppObj);
+						subscriptionArray.add(subscriptionObj);
 					}
 				}
-				resultMap.put("products", inAppsArray);
-				return resultMap;
+				result.put("subscriptions", subscriptionArray);
+				return result;
 			} else {
 				//No items in latest_receipt, considered valid
-				resultMap.put("result", false);
-				resultMap.put("message", "All expired");
-				resultMap.put("status", 100);
-				return resultMap;
+				result.put("result", false);
+				result.put("message", "All expired");
+				result.put("status", 100);
+				return result;
 			}
 		} else {
-			resultMap.put("result", false);
-			resultMap.put("message", "Inconsistency in receipt information");
-			resultMap.put("status", 200);
-			return resultMap;
+			result.put("result", false);
+			result.put("message", "Inconsistency in receipt information");
+			result.put("status", 200);
+			return result;
 		}
 	}
 
 	private HashMap<String, Object> mapStatus(int status) {
-		HashMap<String, Object> resultMap = new HashMap<>();
+		HashMap<String, Object> result = new HashMap<>();
 		switch (status) {
 			case 0:
-				resultMap.put("result", true);
-				resultMap.put("message", "Success");
-				return resultMap;
+				result.put("result", true);
+				result.put("message", "Success");
+				return result;
 			case 21000:
-				resultMap.put("message", "App store could not read");
+				result.put("message", "App store could not read");
 				break;
 			case 21002:
-				resultMap.put("message", "Data was malformed");
+				result.put("message", "Data was malformed");
 				break;
 			case 21003:
-				resultMap.put("message", "Receipt not authenticated");
+				result.put("message", "Receipt not authenticated");
 				break;
 			case 21004:
-				resultMap.put("message", "Shared secret does not match");
+				result.put("message", "Shared secret does not match");
 				break;
 			case 21005:
-				resultMap.put("message", "Receipt server unavailable");
+				result.put("message", "Receipt server unavailable");
 				break;
 			case 21006:
-				resultMap.put("message", "Receipt valid but sub expired");
+				result.put("message", "Receipt valid but sub expired");
 				break;
 			case 21007:
-				resultMap.put("message", "Sandbox receipt sent to Production environment");
+				result.put("message", "Sandbox receipt sent to Production environment");
 				break;
 			case 21008:
-				resultMap.put("message", "Production receipt sent to Sandbox environment");
+				result.put("message", "Production receipt sent to Sandbox environment");
+				break;
+
+			case CANNOT_LOAD_RECEIPT_ERROR_CODE:
+				result.put("message", "Cannot load receipt json");
 				break;
 			default:
-				resultMap.put("message", "Unknown error: status code");
+				result.put("message", "Unknown error: status code");
 		}
-		resultMap.put("result", false);
-		resultMap.put("status", status);
-		return resultMap;
+		result.put("result", false);
+		result.put("status", status);
+		return result;
 	}
 }
