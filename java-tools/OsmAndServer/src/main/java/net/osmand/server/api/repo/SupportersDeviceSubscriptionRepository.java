@@ -21,7 +21,7 @@ import javax.persistence.TemporalType;
 
 public interface SupportersDeviceSubscriptionRepository extends JpaRepository<SupporterDeviceSubscription, SupporterDeviceSubscriptionPrimaryKey> {
 
-	Optional<SupporterDeviceSubscription> findTopByUserIdOrderBytimestampDesc(Long userId);
+	Optional<SupporterDeviceSubscription> findTopByUserIdOrderByTimestampDesc(Long userId);
 	Optional<SupporterDeviceSubscription> findByPurchaseTokenIn(Collection<String> purchaseTokens);
 
 	@Entity

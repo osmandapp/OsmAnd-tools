@@ -50,9 +50,6 @@ import javax.servlet.http.HttpServletRequest;
 public class SubscriptionController {
     private static final Log LOGGER = LogFactory.getLog(SubscriptionController.class);
 
-	private static final String RECEIPT = "receipt";
-	private static final String SANDBOX = "sandbox";
-
     private static final int TIMEOUT = 20000;
 
     @Autowired
@@ -314,7 +311,7 @@ public class SubscriptionController {
 				}
 				if (uId != -1) {
 					Optional<SupporterDeviceSubscription> lastSubscription =
-							supportersDeviceSubscriptionRepository.findTopByUserIdOrderBytimestampDesc(uId);
+							supportersDeviceSubscriptionRepository.findTopByUserIdOrderByTimestampDesc(uId);
 					if (lastSubscription.isPresent()) {
 						SupporterDeviceSubscription s = lastSubscription.get();
 						s.payload = receipt;
