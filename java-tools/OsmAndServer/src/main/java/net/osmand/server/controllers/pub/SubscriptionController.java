@@ -307,10 +307,10 @@ public class SubscriptionController {
 				if (uId != -1) {
 					for (InAppReceipt r : inAppReceipts.values()) {
 						if (r.isSubscription()) {
-							Optional<SupporterDeviceSubscription> subscritionn = 
+							Optional<SupporterDeviceSubscription> subscription =
 									subscriptionsRepository.findTopByUserIdAndSkuOrderByTimestampDesc(uId, r.getProductId());
-							if (subscritionn.isPresent()) {
-								SupporterDeviceSubscription s = subscritionn.get();
+							if (subscription.isPresent()) {
+								SupporterDeviceSubscription s = subscription.get();
 								s.payload = receipt;
 								subscriptionsRepository.saveAndFlush(s);
 							}
