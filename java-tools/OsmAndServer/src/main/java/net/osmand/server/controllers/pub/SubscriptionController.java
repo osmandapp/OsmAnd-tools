@@ -303,8 +303,10 @@ public class SubscriptionController {
 					uId = Long.valueOf(userId);
 				}
 
-				// update existing subscription payload
-				if (uId != -1) {
+				if (uId == -1) {
+					return error("Couldn't find your user id");
+				} else {
+					// update existing subscription payload
 					for (InAppReceipt r : inAppReceipts.values()) {
 						if (r.isSubscription()) {
 							Optional<SupporterDeviceSubscription> subscription =
@@ -317,14 +319,6 @@ public class SubscriptionController {
 						}
 					}
 				}
-				
-				List<String> activeInApps = new ArrayList<>();
-				for (InAppReceipt t : inAppReceipts.values()) {
-					if (!t.isSubscription()) {
-						activeInApps.add(t.getProductId());
-					}
-				}
-				result.put("in_apps", activeInApps);
 
 				Map<String, Object> validationResult = validationService.validateReceipt(receiptObj);
 				result.putAll(validationResult);
@@ -366,8 +360,14 @@ public class SubscriptionController {
 		}
 		subscr.purchaseToken = request.getParameter("purchaseToken");
 		subscr.timestamp = new Date();
-		if (subscriptionsRepository.existsById(new SupporterDeviceSubscriptionPrimaryKey(subscr.userId, subscr.sku,
-				subscr.purchaseToken))) {
+		Optional<SupporterDeviceSubscription> subscrOpt = subscriptionsRepository.findById(
+						new SupporterDeviceSubscriptionPrimaryKey(subscr.userId, subscr.sku, subscr.purchaseToken));
+		if (subscrOpt.isPresent()) {
+			if (subscr.payload != null) {
+				SupporterDeviceSubscription deviceSubscription = subscrOpt.get();
+				deviceSubscription.payload = subscr.payload;
+				subscriptionsRepository.save(deviceSubscription);
+			}
 			return ResponseEntity.ok("{'res':'OK'}");
 		}
 		subscriptionsRepository.save(subscr);

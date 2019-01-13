@@ -79,7 +79,7 @@ public class ReceiptValidationService {
 		if (status == 0) {
 			String bundleId = receiptObj.get("receipt").getAsJsonObject().get("bundle_id").getAsString();
 			if (bundleId.equals(BUNDLE_ID)) {
-				JsonArray receiptArray = receiptObj.get("receipt").getAsJsonObject().get("in_app").getAsJsonArray();
+				JsonArray receiptArray = receiptObj.get("latest_receipt_info").getAsJsonArray();
 				if (receiptArray != null) {
 					result = new HashMap<>();
 					for (JsonElement elem : receiptArray) {
@@ -140,6 +140,7 @@ public class ReceiptValidationService {
 		if (bundleId.equals(BUNDLE_ID)) {
 			if (latestReceiptInfoArray.size() > 0) {
 				result.put("result", true);
+				List<String> inAppArray = new ArrayList<>();
 				List<Map<String, String>> subscriptionArray = new ArrayList<>();
 				for (JsonElement jsonElement : latestReceiptInfoArray) {
 					Map<String, String> subscriptionObj = new HashMap<>();
@@ -155,9 +156,10 @@ public class ReceiptValidationService {
 							subscriptionArray.add(subscriptionObj);
 						}
 					} else {
-						subscriptionArray.add(subscriptionObj);
+						inAppArray.add(productId);
 					}
 				}
+				result.put("in_apps", inAppArray);
 				result.put("subscriptions", subscriptionArray);
 				result.put("status", 0);
 				return result;
