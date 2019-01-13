@@ -146,7 +146,7 @@ public class ReceiptValidationService {
 						Long expiresDateMs = expiresDateElement.getAsLong();
 						if (expiresDateMs > System.currentTimeMillis()) {
 							//Subscription is valid
-							subscriptionObj.addProperty("expiration_date", expiresDateMs);
+							subscriptionObj.addProperty("expiration_date", expiresDateMs.toString());
 							subscriptionArray.add(subscriptionObj);
 						}
 					} else {
