@@ -324,9 +324,7 @@ public class SubscriptionController {
 						activeInApps.add(t.getProductId());
 					}
 				}
-				if (activeInApps.size() > 0) {
-					result.put("in_apps", activeInApps);
-				}
+				result.put("in_apps", activeInApps);
 
 				Map<String, Object> validationResult = validationService.validateReceipt(receiptObj);
 				result.putAll(validationResult);
