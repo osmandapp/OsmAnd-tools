@@ -135,18 +135,18 @@ public class ReceiptValidationService {
 		if (/*applicationVersion.equals(APPLICATION_VERSION) && */bundleId.equals(BUNDLE_ID)) {
 			if (latestReceiptInfoArray.size() > 0) {
 				result.put("result", true);
-				JsonArray subscriptionArray = new JsonArray();
+				List<Map<String, String>> subscriptionArray = new ArrayList<>();
 				for (JsonElement jsonElement : latestReceiptInfoArray) {
-					JsonObject subscriptionObj = new JsonObject();
+					Map<String, String> subscriptionObj = new HashMap<>();
 					JsonObject receipt = jsonElement.getAsJsonObject();
 					String productId = receipt.get("product_id").getAsString();
-					subscriptionObj.addProperty("product_id", productId);
+					subscriptionObj.put("product_id", productId);
 					JsonElement expiresDateElement = receipt.get("expires_date_ms");
 					if (expiresDateElement != null) {
 						Long expiresDateMs = expiresDateElement.getAsLong();
 						if (expiresDateMs > System.currentTimeMillis()) {
 							//Subscription is valid
-							subscriptionObj.addProperty("expiration_date", expiresDateMs.toString());
+							subscriptionObj.put("expiration_date", expiresDateMs.toString());
 							subscriptionArray.add(subscriptionObj);
 						}
 					} else {
