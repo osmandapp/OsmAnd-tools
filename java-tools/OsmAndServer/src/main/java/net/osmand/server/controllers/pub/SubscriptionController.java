@@ -293,6 +293,7 @@ public class SubscriptionController {
 			long uId = -1;
 			Map<String, Object> result = new HashMap<>();
 			Map<String, InAppReceipt> inAppReceipts = validationService.loadInAppReceipts(receiptObj);
+			LOGGER.error(inAppReceipts == null ? "inAppReceipts == null" : "inAppReceipts = " + inAppReceipts.size());
 			if (inAppReceipts != null && inAppReceipts.size() > 0) {
 				if (Algorithms.isEmpty(userId)) {
 					Supporter s = restoreUserIdByPurchaseToken(result, inAppReceipts);
@@ -332,9 +333,17 @@ public class SubscriptionController {
 	private Supporter restoreUserIdByPurchaseToken(Map<String, Object> result, Map<String, InAppReceipt> inAppReceipts) {
 		Optional<SupporterDeviceSubscription> subscriptionOpt = subscriptionsRepository
 				.findByPurchaseTokenIn(inAppReceipts.keySet());
+
+		StringBuilder tList = new StringBuilder();
+		for (String tId : inAppReceipts.keySet()) {
+			tList.append(" ").append(tId);
+		}
+		LOGGER.error("transactions =" + tList);
+		LOGGER.error(subscriptionOpt.isPresent() ? "Found userId = " + subscriptionOpt.get().userId : "No records found");
 		if (subscriptionOpt.isPresent()) {
 			SupporterDeviceSubscription subscription = subscriptionOpt.get();
 			Optional<Supporter> supporter = supportersRepository.findById(subscription.userId);
+			LOGGER.error(supporter.isPresent() ? "Found supporter = " + supporter.get().userId : "No supporter found");
 			if (supporter.isPresent()) {
 				Supporter s = supporter.get();
 				result.put("user", userInfoAsMap(s));
