@@ -368,7 +368,7 @@ public class SubscriptionController {
 				deviceSubscription.payload = subscr.payload;
 				subscriptionsRepository.save(deviceSubscription);
 			}
-			return ResponseEntity.ok("{'res':'OK'}");
+			return ResponseEntity.ok("{ \"res\" : \"OK\" }");
 		}
 		subscriptionsRepository.save(subscr);
 		return ResponseEntity.ok(!suser.tokenValid ? userShortInfoAsJson(suser.supporter)
