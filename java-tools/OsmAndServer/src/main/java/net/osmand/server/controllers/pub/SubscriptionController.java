@@ -45,6 +45,8 @@ import java.util.concurrent.ThreadLocalRandom;
 
 import javax.servlet.http.HttpServletRequest;
 
+import static net.osmand.server.api.services.ReceiptValidationService.USER_NOT_FOUND_STATUS;
+
 @RestController
 @RequestMapping("/subscription")
 public class SubscriptionController {
@@ -304,7 +306,9 @@ public class SubscriptionController {
 				}
 
 				if (uId == -1) {
-					return error("Couldn't find your user id");
+					result.put("result", false);
+					result.put("status", USER_NOT_FOUND_STATUS);
+					return ResponseEntity.ok(jsonMapper.writeValueAsString(result));
 				} else {
 					// update existing subscription payload
 					for (InAppReceipt r : inAppReceipts.values()) {

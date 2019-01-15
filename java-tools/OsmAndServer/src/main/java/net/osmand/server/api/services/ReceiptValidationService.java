@@ -29,6 +29,7 @@ public class ReceiptValidationService {
 	public final static int CANNOT_LOAD_RECEIPT_STATUS = 50000;
 	public final static int ALL_SUBSCRIPTIONS_EXPIRED_STATUS = 100;
 	public final static int INCONSISTENT_RECEIPT_STATUS = 200;
+	public final static int USER_NOT_FOUND_STATUS = 300;
 
 	public static class InAppReceipt {
 		public Map<String, String> fields = new HashMap<>();
