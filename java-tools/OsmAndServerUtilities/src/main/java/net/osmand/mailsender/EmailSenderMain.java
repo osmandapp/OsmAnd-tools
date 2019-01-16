@@ -202,7 +202,7 @@ public class EmailSenderMain {
     private static String buildQuery(String mailingGroups) {
         String[] groups = mailingGroups.split(",");
         StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < groups.length - 1; i++) {
+        for (int i = 0; i < groups.length; i++) {
 			if (i > 0) {
 				sb.append(" UNION ");
 			}
