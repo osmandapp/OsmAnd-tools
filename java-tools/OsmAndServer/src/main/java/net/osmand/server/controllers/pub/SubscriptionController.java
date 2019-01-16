@@ -45,6 +45,8 @@ import java.util.concurrent.ThreadLocalRandom;
 
 import javax.servlet.http.HttpServletRequest;
 
+import static net.osmand.server.api.services.ReceiptValidationService.USER_NOT_FOUND_STATUS;
+
 @RestController
 @RequestMapping("/subscription")
 public class SubscriptionController {
@@ -303,29 +305,23 @@ public class SubscriptionController {
 					uId = Long.valueOf(userId);
 				}
 
-				// update existing subscription payload
-				if (uId != -1) {
+				if (uId == -1) {
+					result.put("result", false);
+					result.put("status", USER_NOT_FOUND_STATUS);
+					return ResponseEntity.ok(jsonMapper.writeValueAsString(result));
+				} else {
+					// update existing subscription payload
 					for (InAppReceipt r : inAppReceipts.values()) {
 						if (r.isSubscription()) {
-							Optional<SupporterDeviceSubscription> subscritionn = 
+							Optional<SupporterDeviceSubscription> subscription =
 									subscriptionsRepository.findTopByUserIdAndSkuOrderByTimestampDesc(uId, r.getProductId());
-							if (subscritionn.isPresent()) {
-								SupporterDeviceSubscription s = subscritionn.get();
+							if (subscription.isPresent()) {
+								SupporterDeviceSubscription s = subscription.get();
 								s.payload = receipt;
 								subscriptionsRepository.saveAndFlush(s);
 							}
 						}
 					}
-				}
-				
-				List<String> activeInApps = new ArrayList<>();
-				for (InAppReceipt t : inAppReceipts.values()) {
-					if (!t.isSubscription()) {
-						activeInApps.add(t.getProductId());
-					}
-				}
-				if (activeInApps.size() > 0) {
-					result.put("in_apps", activeInApps);
 				}
 
 				Map<String, Object> validationResult = validationService.validateReceipt(receiptObj);
@@ -368,9 +364,15 @@ public class SubscriptionController {
 		}
 		subscr.purchaseToken = request.getParameter("purchaseToken");
 		subscr.timestamp = new Date();
-		if (subscriptionsRepository.existsById(new SupporterDeviceSubscriptionPrimaryKey(subscr.userId, subscr.sku,
-				subscr.purchaseToken))) {
-			return ResponseEntity.ok("{'res':'OK'}");
+		Optional<SupporterDeviceSubscription> subscrOpt = subscriptionsRepository.findById(
+						new SupporterDeviceSubscriptionPrimaryKey(subscr.userId, subscr.sku, subscr.purchaseToken));
+		if (subscrOpt.isPresent()) {
+			if (subscr.payload != null) {
+				SupporterDeviceSubscription deviceSubscription = subscrOpt.get();
+				deviceSubscription.payload = subscr.payload;
+				subscriptionsRepository.save(deviceSubscription);
+			}
+			return ResponseEntity.ok("{ \"res\" : \"OK\" }");
 		}
 		subscriptionsRepository.save(subscr);
 		return ResponseEntity.ok(!suser.tokenValid ? userShortInfoAsJson(suser.supporter)
