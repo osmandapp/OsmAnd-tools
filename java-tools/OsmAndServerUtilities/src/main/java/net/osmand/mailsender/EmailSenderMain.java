@@ -187,6 +187,7 @@ public class EmailSenderMain {
 
     private static void sendProductionEmails(Connection conn, EmailParams p, Set<String> unsubscribed) throws SQLException {
         String query = buildQuery(p.mailingGroups);
+        LOGGER.info("SQL query is " + query);
         PreparedStatement ps = conn.prepareStatement(query);
         ResultSet resultSet = ps.executeQuery();
         while (resultSet.next()) {
