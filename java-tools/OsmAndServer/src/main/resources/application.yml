@@ -78,7 +78,7 @@ server:
   session:
      timeout: 432000
      persistent: true
-     store-dir: sessions
+     store-dir: /var/osmand-server/sessions/
   address: 127.0.0.1 #keep it behind proxy
   tomcat:
     protocol_header: x-forwarded-proto
