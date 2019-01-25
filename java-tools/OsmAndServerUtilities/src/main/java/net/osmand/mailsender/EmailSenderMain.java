@@ -212,7 +212,7 @@ public class EmailSenderMain {
             sb.append(" FROM ");
             if(table.startsWith("email_free")) {
             	sb.append(" email_free_users ");
-            	if(table.contains("ios")) {
+            	if(!table.contains("ios")) {
             		sb.append(" WHERE os <> 'ios' or os is null");
             	} else {
             		sb.append(" WHERE os = 'ios' ");
