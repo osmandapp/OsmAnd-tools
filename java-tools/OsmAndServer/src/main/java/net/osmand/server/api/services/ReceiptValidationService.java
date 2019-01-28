@@ -127,7 +127,14 @@ public class ReceiptValidationService {
 				.postForObject(sandbox ? SANDBOX_URL : PRODUCTION_URL, entity, String.class);
 
 		if (jsonAnswer != null) {
-			return new JsonParser().parse(jsonAnswer).getAsJsonObject();
+			JsonObject responseObj = new JsonParser().parse(jsonAnswer).getAsJsonObject();
+			JsonElement statusElement = responseObj.get("status");
+			int status = statusElement != null ? statusElement.getAsInt() : 0;
+			if (status == 21007 && !sandbox) {
+				return loadReceiptJsonObject(receipt, true);
+			}
+			return responseObj;
+
 		}
 		return null;
 	}
