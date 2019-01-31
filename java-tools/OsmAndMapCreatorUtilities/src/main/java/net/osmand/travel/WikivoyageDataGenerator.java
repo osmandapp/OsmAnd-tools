@@ -101,8 +101,8 @@ public class WikivoyageDataGenerator {
 		generator.generateSameTripIdForDifferentLang(langlinkFile, conn);
 		printStep("Generate missing ids");
 		generator.generateIdsIfMissing(conn, langlinkFile);
-		printStep("Download/Copy proper headers for articles");
-		generator.updateProperHeaderForArticles(conn, workingDir);
+		//printStep("Download/Copy proper headers for articles");
+		//generator.updateProperHeaderForArticles(conn, workingDir);
 		printStep("Copy headers between lang");
 		generator.copyHeaders(conn);
 		printStep("Generate agg part of");
@@ -683,7 +683,7 @@ public class WikivoyageDataGenerator {
 			updateStatement.setLong(column++, acceptedResult.getId() >> 1);
 			updateStatement.setString(column++, acceptedResult.getSubType());
 			String population = acceptedResult.getAdditionalInfo("population");
-			updateStatement.setLong(column++, (population == null || population.isEmpty()) ? 0 : Long.parseLong(population.replaceAll("[-,. \\)\\(]", "")));
+			updateStatement.setLong(column++, (population == null || population.isEmpty() || !population.matches("[0-9]+")) ? 0 : Long.parseLong(population.replaceAll("[-,. \\)\\(]", "")));
 		}
 		List<String> regionsList = getRegions(coords.getLatitude(), coords.getLongitude());
 		WorldRegion country = null;
