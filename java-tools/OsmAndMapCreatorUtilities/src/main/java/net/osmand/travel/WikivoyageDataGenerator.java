@@ -101,8 +101,8 @@ public class WikivoyageDataGenerator {
 		generator.generateSameTripIdForDifferentLang(langlinkFile, conn);
 		printStep("Generate missing ids");
 		generator.generateIdsIfMissing(conn, langlinkFile);
-		//printStep("Download/Copy proper headers for articles");
-		//generator.updateProperHeaderForArticles(conn, workingDir);
+		printStep("Download/Copy proper headers for articles");
+		generator.updateProperHeaderForArticles(conn, workingDir);
 		printStep("Copy headers between lang");
 		generator.copyHeaders(conn);
 		printStep("Generate agg part of");
