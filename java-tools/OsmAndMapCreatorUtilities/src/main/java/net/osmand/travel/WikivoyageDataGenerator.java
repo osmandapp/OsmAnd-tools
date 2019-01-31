@@ -683,7 +683,8 @@ public class WikivoyageDataGenerator {
 			updateStatement.setLong(column++, acceptedResult.getId() >> 1);
 			updateStatement.setString(column++, acceptedResult.getSubType());
 			String population = acceptedResult.getAdditionalInfo("population");
-			updateStatement.setLong(column++, (population == null || population.isEmpty() || !population.matches("[0-9]+")) ? 0 : Long.parseLong(population.replaceAll("[-,. \\)\\(]", "")));
+			population = population == null ? "" : population.replaceAll("[-,. \\)\\(]", "");
+			updateStatement.setLong(column++, (population.isEmpty() || !population.matches("[0-9]+")) ? 0 : Long.parseLong(population));
 		}
 		List<String> regionsList = getRegions(coords.getLatitude(), coords.getLongitude());
 		WorldRegion country = null;
