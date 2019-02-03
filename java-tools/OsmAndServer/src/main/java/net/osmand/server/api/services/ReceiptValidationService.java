@@ -15,7 +15,10 @@ import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 @Service
 public class ReceiptValidationService {
@@ -28,6 +31,7 @@ public class ReceiptValidationService {
 
 	public final static int CANNOT_LOAD_RECEIPT_STATUS = 50000;
 	public final static int ALL_SUBSCRIPTIONS_EXPIRED_STATUS = 100;
+	public final static int NO_SUBSCRIPTIONS_FOUND_STATUS = 110;
 	public final static int INCONSISTENT_RECEIPT_STATUS = 200;
 	public final static int USER_NOT_FOUND_STATUS = 300;
 
@@ -47,7 +51,7 @@ public class ReceiptValidationService {
 	@NonNull
 	public Map<String, Object> validateReceipt(@NonNull JsonObject receiptObj) {
 		try {
-			Integer status = receiptObj.get("status").getAsInt();
+			int status = receiptObj.get("status").getAsInt();
 			if (status != 0) {
 				return mapStatus(status);
 			}
@@ -58,31 +62,17 @@ public class ReceiptValidationService {
 		}
 	}
 
-	@NonNull
-	public Map<String, Object> validateReceipt(String receipt, boolean sandbox) {
-		try {
-			JsonObject receiptObj = loadReceiptJsonObject(receipt, sandbox);
-			if (receiptObj != null) {
-				return validateReceipt(receiptObj);
-			} else {
-				return mapStatus(CANNOT_LOAD_RECEIPT_STATUS);
-			}
-		} catch (Exception e) {
-			LOGGER.error(e);
-			return mapStatus(CANNOT_LOAD_RECEIPT_STATUS);
-		}
-	}
-
 	@Nullable
 	public Map<String, InAppReceipt> loadInAppReceipts(@NonNull JsonObject receiptObj) {
 		Map<String, InAppReceipt> result = null;
-		Integer status = receiptObj.get("status").getAsInt();
+		int status = receiptObj.get("status").getAsInt();
 		if (status == 0) {
 			String bundleId = receiptObj.get("receipt").getAsJsonObject().get("bundle_id").getAsString();
 			if (bundleId.equals(BUNDLE_ID)) {
-				JsonArray receiptArray = receiptObj.get("latest_receipt_info").getAsJsonArray();
-				if (receiptArray != null) {
-					result = new HashMap<>();
+				result = new HashMap<>();
+				JsonElement receiptInfo = receiptObj.get("latest_receipt_info");
+				if (receiptInfo != null) {
+					JsonArray receiptArray = receiptInfo.getAsJsonArray();
 					for (JsonElement elem : receiptArray) {
 						JsonObject recObj = elem.getAsJsonObject();
 						String transactionId = recObj.get("original_transaction_id").getAsString();
@@ -96,19 +86,6 @@ public class ReceiptValidationService {
 			}
 		}
 		return result;
-	}
-
-	@Nullable
-	public Map<String, InAppReceipt> loadInAppReceipts(String receipt, boolean sandbox) {
-		try {
-			JsonObject receiptObj = loadReceiptJsonObject(receipt, sandbox);
-			if (receiptObj != null) {
-				return loadInAppReceipts(receiptObj);
-			}
-		} catch (Exception e) {
-			LOGGER.error(e);
-		}
-		return null;
 	}
 
 	@Nullable
@@ -157,10 +134,10 @@ public class ReceiptValidationService {
 					subscriptionObj.put("product_id", productId);
 					JsonElement expiresDateElement = receipt.get("expires_date_ms");
 					if (expiresDateElement != null) {
-						Long expiresDateMs = expiresDateElement.getAsLong();
+						long expiresDateMs = expiresDateElement.getAsLong();
 						if (expiresDateMs > System.currentTimeMillis()) {
 							//Subscription is valid
-							subscriptionObj.put("expiration_date", expiresDateMs.toString());
+							subscriptionObj.put("expiration_date", Long.toString(expiresDateMs));
 							subscriptionArray.add(subscriptionObj);
 						}
 					} else {

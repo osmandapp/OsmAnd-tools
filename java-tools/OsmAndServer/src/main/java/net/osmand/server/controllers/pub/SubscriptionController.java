@@ -32,19 +32,18 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Date;
 import java.util.Enumeration;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
 
 import javax.servlet.http.HttpServletRequest;
 
+import static net.osmand.server.api.services.ReceiptValidationService.NO_SUBSCRIPTIONS_FOUND_STATUS;
 import static net.osmand.server.api.services.ReceiptValidationService.USER_NOT_FOUND_STATUS;
 
 @RestController
@@ -288,46 +287,51 @@ public class SubscriptionController {
 	@PostMapping(path = { "/ios-receipt-validate" })
 	public ResponseEntity<String> validateIos(HttpServletRequest request) throws Exception {
 		String receipt = request.getParameter("receipt");
-		String sandbox = request.getParameter("sandbox");
-		JsonObject receiptObj = validationService.loadReceiptJsonObject(receipt, !Algorithms.isEmpty(sandbox));
+		JsonObject receiptObj = validationService.loadReceiptJsonObject(receipt, false);
 		if (receiptObj != null) {
 			String userId = request.getParameter("userid");
 			long uId = -1;
 			Map<String, Object> result = new HashMap<>();
 			Map<String, InAppReceipt> inAppReceipts = validationService.loadInAppReceipts(receiptObj);
-			if (inAppReceipts != null && inAppReceipts.size() > 0) {
-				if (Algorithms.isEmpty(userId)) {
-					Supporter s = restoreUserIdByPurchaseToken(result, inAppReceipts);
-					if(s != null) {
-						uId = s.userId;
-					}
-				} else {
-					uId = Long.valueOf(userId);
-				}
-
-				if (uId == -1) {
+			if (inAppReceipts != null) {
+				if (inAppReceipts.size() == 0) {
 					result.put("result", false);
-					result.put("status", USER_NOT_FOUND_STATUS);
+					result.put("status", NO_SUBSCRIPTIONS_FOUND_STATUS);
 					return ResponseEntity.ok(jsonMapper.writeValueAsString(result));
 				} else {
-					// update existing subscription payload
-					for (InAppReceipt r : inAppReceipts.values()) {
-						if (r.isSubscription()) {
-							Optional<SupporterDeviceSubscription> subscription =
-									subscriptionsRepository.findTopByUserIdAndSkuOrderByTimestampDesc(uId, r.getProductId());
-							if (subscription.isPresent()) {
-								SupporterDeviceSubscription s = subscription.get();
-								s.payload = receipt;
-								subscriptionsRepository.saveAndFlush(s);
+					if (Algorithms.isEmpty(userId)) {
+						Supporter s = restoreUserIdByPurchaseToken(result, inAppReceipts);
+						if (s != null) {
+							uId = s.userId;
+						}
+					} else {
+						uId = Long.valueOf(userId);
+					}
+
+					if (uId == -1) {
+						result.put("result", false);
+						result.put("status", USER_NOT_FOUND_STATUS);
+						return ResponseEntity.ok(jsonMapper.writeValueAsString(result));
+					} else {
+						// update existing subscription payload
+						for (InAppReceipt r : inAppReceipts.values()) {
+							if (r.isSubscription()) {
+								Optional<SupporterDeviceSubscription> subscription =
+										subscriptionsRepository.findTopByUserIdAndSkuOrderByTimestampDesc(uId, r.getProductId());
+								if (subscription.isPresent()) {
+									SupporterDeviceSubscription s = subscription.get();
+									s.payload = receipt;
+									subscriptionsRepository.saveAndFlush(s);
+								}
 							}
 						}
 					}
+
+					Map<String, Object> validationResult = validationService.validateReceipt(receiptObj);
+					result.putAll(validationResult);
+
+					return ResponseEntity.ok(jsonMapper.writeValueAsString(result));
 				}
-
-				Map<String, Object> validationResult = validationService.validateReceipt(receiptObj);
-				result.putAll(validationResult);
-
-				return ResponseEntity.ok(jsonMapper.writeValueAsString(result));
 			}
 		}
 		return error("Cannot load receipt.");
