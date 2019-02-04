@@ -24,7 +24,7 @@ public interface SupportersDeviceSubscriptionRepository extends JpaRepository<Su
 	// userId + sku is a key by design and by new data (due to historical mistake, currently key is userId + sku + purchaseToken)
 	Optional<SupporterDeviceSubscription> findTopByUserIdAndSkuOrderByTimestampDesc(Long userId, String sku);
 	
-	Optional<SupporterDeviceSubscription> findByPurchaseTokenIn(Collection<String> purchaseTokens);
+	Optional<SupporterDeviceSubscription> findTopByPurchaseTokenIn(Collection<String> purchaseTokens);
 
 	@Entity
     @Table(name = "supporters_device_sub")

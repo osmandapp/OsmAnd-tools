@@ -339,7 +339,7 @@ public class SubscriptionController {
 
 	private Supporter restoreUserIdByPurchaseToken(Map<String, Object> result, Map<String, InAppReceipt> inAppReceipts) {
 		Optional<SupporterDeviceSubscription> subscriptionOpt = subscriptionsRepository
-				.findByPurchaseTokenIn(inAppReceipts.keySet());
+				.findTopByPurchaseTokenIn(inAppReceipts.keySet());
 		if (subscriptionOpt.isPresent()) {
 			SupporterDeviceSubscription subscription = subscriptionOpt.get();
 			Optional<Supporter> supporter = supportersRepository.findById(subscription.userId);
