@@ -540,7 +540,7 @@ public class WikiDatabasePreparation {
 		}
 		try {
 			JsonObject ks = metadata.get("entities").getAsJsonObject();
-			JsonElement siteLinksElement = ks.get(ks.keySet().iterator().next()).getAsJsonObject().get("sitelinks");
+			JsonElement siteLinksElement = ks.get(ks.entrySet().iterator().next().getKey()).getAsJsonObject().get("sitelinks");
 			if(siteLinksElement.isJsonObject() &&  siteLinksElement.getAsJsonObject().has(wikiLang + "wiki")) {
 
 				return siteLinksElement.getAsJsonObject().get(wikiLang + "wiki").getAsJsonObject().get("title").getAsString();
