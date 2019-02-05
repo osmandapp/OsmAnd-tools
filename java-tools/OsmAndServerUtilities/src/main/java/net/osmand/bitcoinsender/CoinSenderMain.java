@@ -26,6 +26,7 @@ public class CoinSenderMain {
     private static String guid;
     private static String pass;
 	public static int PART_SIZE = 200;
+	public static String DEFAULT_KEY = "742b-a0a3-9a73-e49a";
 	// MIN PAY FORMULA
 	// FEE_KB - avg fee per KB in mBTC, currently 1.0 mBTC/KB
 	// AVG_TX_SIZE - 50 bytes = 0.05 KB
@@ -49,11 +50,14 @@ public class CoinSenderMain {
             return;
         }
         Scanner in = new Scanner(System.in);
-        System.out.print("Enter your API key: ");
+        System.out.print(String.format("Enter your API key (default %s): ", DEFAULT_KEY));
         guid = in.nextLine();
+        if(guid.trim().length() == 0) {
+        	guid = DEFAULT_KEY;
+        }
         System.out.print("Enter your PIN: ");
         pass = in.nextLine();
-        System.out.print("Enter your part size (default "+PART_SIZE+"): ");
+        System.out.print(String.format("Enter your part size (default %d): ", PART_SIZE));
         String ll = in.nextLine();
         if(ll.trim().length() > 0) {
         	PART_SIZE = Integer.parseInt(ll);
@@ -64,7 +68,7 @@ public class CoinSenderMain {
         	FEE_BYTE_SATOSHI = Double.parseDouble(ll);
         }
         double MIN_PAY = getMinPayInBTC();
-        System.out.println("Minimal payment in BTC: " + MIN_PAY);
+        System.out.println(String.format("Minimal payment in mBTC: %.4f", MIN_PAY * 1000));
 
         if (guid.equals("") || pass.equals("")) {
             System.out.println("You forgot to enter Client_ID or Secret. Exiting...");
@@ -149,11 +153,10 @@ public class CoinSenderMain {
                         
                     }
                     Scanner scanner = new Scanner(System.in);
-                    String totalString = String.format("%.12f", total);
-                    
+                    String totalString = String.format("%.10f", total);
                     System.out.println("Total: " + totalString);
                     System.out.println();
-                    api.printFeeForTransaction(currentPayment);
+                   
                     System.out.println();
                     int chunkUI = (chunk + 1);
                     System.out.println("Prepare to pay for chunk " + chunkUI + " (" + (chunk * PART_SIZE + 1) + "-"
@@ -161,7 +164,8 @@ public class CoinSenderMain {
                     int numberOfInputs = 1;
                     int txSize = currentPayment.size() * 34 + numberOfInputs * 180 + 10 + 40;
                     float calculatedFee = (float) (((float)txSize * FEE_BYTE_SATOSHI) / BITCOIN_SATOSHI);
-                    System.out.println("!!! Double check that estimated fee is close to and not less than (!): " + calculatedFee + " BTC!!!");
+                    api.printFeeForTransaction(currentPayment);
+                    System.out.println(String.format("!!! Double check that estimated fee is almost EQUALS to (!): %.10f BTC !!!", calculatedFee ));
                     System.out.print("Are you sure you want to pay " + totalString + " BTC? [y/n]: ");
                     String answer = scanner.nextLine();
 
@@ -169,7 +173,7 @@ public class CoinSenderMain {
                         continue;
                     }
 					System.out.println("Paying for chunk " + chunkUI + " (" + (chunk * PART_SIZE + 1) + "-"
-							+ ((chunk + 1)* PART_SIZE) + ") ...");
+							+ ((chunk + 1) * PART_SIZE) + ") ...");
 
                     Withdrawal withdrawal = null;
                     try {
@@ -228,7 +232,9 @@ public class CoinSenderMain {
         		cnt ++;
         	}
         }
-		System.out.println("Skipped " + cnt + " payments ( tx  < minimal = " + MIN_PAY + ") in total " + skip * 1000 + " mBTC");
+		System.out.println(
+				String.format("Skipped %d payments ( tx  < minimal = %.3f mBTC) in total %.3f mBTC",
+						cnt, MIN_PAY * 1000, skip * 1000 ));
         
         
         return payments;
