@@ -11,6 +11,10 @@ import com.google.api.services.androidpublisher.AndroidPublisher;
 import com.google.api.services.androidpublisher.model.InAppProduct;
 import com.google.api.services.androidpublisher.model.InappproductsListResponse;
 import com.google.api.services.androidpublisher.model.SubscriptionPurchase;
+import com.google.gson.JsonObject;
+
+import net.osmand.live.subscriptions.ReceiptValidationHelper.InAppReceipt;
+import net.osmand.util.Algorithms;
 
 import org.apache.http.NameValuePair;
 import org.apache.http.client.HttpClient;
@@ -35,6 +39,7 @@ import java.sql.Types;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 
 
@@ -64,9 +69,14 @@ public class UpdateSubscription {
 
 	int changes = 0;
 	int deletions = 0;
-	private PreparedStatement updSubscrStat;
-	private PreparedStatement delStat;
-//	private PreparedStatement updCheckStat;
+	protected String selQuery;
+	protected String updQuery;
+	protected String delQuery;
+//	protected String updCheckQuery;
+	protected PreparedStatement updStat;
+	protected PreparedStatement delStat;
+//	protected PreparedStatement updCheckStat;
+	protected boolean ios;
 
 	public static void main(String[] args) throws JSONException, IOException, SQLException, ClassNotFoundException {
 		AndroidPublisher publisher = getPublisherApi(args[0]);
@@ -84,42 +94,84 @@ public class UpdateSubscription {
 				verifyAll = true;
 			}
 		}
-		UpdateSubscription upd = new UpdateSubscription();
-		upd.queryPurchases(publisher, conn, verifyAll);
+		new UpdateAndroidSubscription(publisher).queryPurchases(conn, verifyAll);
+		new UpdateIosSubscription().queryPurchases(conn, verifyAll);
 	}
 
-	private void queryPurchases(AndroidPublisher publisher, Connection conn, boolean verifyAll) throws SQLException {
-		ResultSet rs = conn.createStatement().executeQuery(
-				"SELECT userid, sku, purchaseToken, checktime, starttime, expiretime, valid "
-						+ "FROM supporters_device_sub S where (valid is null or valid=true) ");
-		updSubscrStat = conn.prepareStatement("UPDATE supporters_device_sub SET "
-				+ "checktime = ?, starttime = ?, expiretime = ?, autorenewing = ?, kind = ?, orderid = ?, payload = ?, valid = ? " +
-				" WHERE userid = ? and purchaseToken = ? and sku = ?");
-		delStat = conn.prepareStatement("UPDATE supporters_device_sub SET valid = false, kind = ?, checktime = ?" +
-				" WHERE userid = ? and purchaseToken = ? and sku = ?");
-//		updCheckStat = conn.prepareStatement("UPDATE supporters_device_sub SET checktime = ? " +
-//							" WHERE userid = ? and purchaseToken = ? and sku = ?");
+	public UpdateSubscription() {
+		delQuery = "UPDATE supporters_device_sub SET valid = false, kind = ?, checktime = ? " +
+				"WHERE userid = ? and purchaseToken = ? and sku = ?";
+//			updCheckQuery = "UPDATE supporters_device_sub SET checktime = ? " +
+//					"WHERE userid = ? and purchaseToken = ? and sku = ?";
+	}
 
-		AndroidPublisher.Purchases purchases = publisher.purchases();
+	private static class UpdateAndroidSubscription extends UpdateSubscription {
+		private AndroidPublisher publisher;
+
+		UpdateAndroidSubscription(AndroidPublisher publisher) {
+			super();
+			this.publisher = publisher;
+			this.ios = false;
+			selQuery = "SELECT userid, sku, purchaseToken, checktime, starttime, expiretime, valid " +
+					"FROM supporters_device_sub S where (valid is null or valid=true) ";
+			updQuery = "UPDATE supporters_device_sub SET " +
+					"checktime = ?, starttime = ?, expiretime = ?, autorenewing = ?, kind = ?, orderid = ?, payload = ?, valid = ? " +
+					"WHERE userid = ? and purchaseToken = ? and sku = ?";
+		}
+
+		@Override
+		void queryPurchases(Connection conn, boolean verifyAll) throws SQLException {
+			queryPurchasesImpl(publisher, conn, verifyAll);
+		}
+	}
+
+	private static class UpdateIosSubscription extends UpdateSubscription {
+		UpdateIosSubscription() {
+			super();
+			this.ios = true;
+			selQuery = "SELECT userid, sku, purchaseToken, payload, checktime, starttime, expiretime, valid " +
+					"FROM supporters_device_sub S where (valid is null or valid=true) ";
+			updQuery = "UPDATE supporters_device_sub SET " +
+					"checktime = ?, starttime = ?, expiretime = ?, valid = ? " +
+					"WHERE userid = ? and purchaseToken = ? and sku = ?";
+		}
+
+		@Override
+		void queryPurchases(Connection conn, boolean verifyAll) throws SQLException {
+			queryPurchasesImpl(null, conn, verifyAll);
+		}
+	}
+
+	void queryPurchases(Connection conn, boolean verifyAll) throws SQLException {
+		// non implemented
+	}
+
+	void queryPurchasesImpl(AndroidPublisher publisher, Connection conn, boolean verifyAll) throws SQLException {
+		ResultSet rs = conn.createStatement().executeQuery(selQuery);
+		updStat = conn.prepareStatement(updQuery);
+		delStat = conn.prepareStatement(delQuery);
+//		updCheckStat = conn.prepareStatement(updCheckQuery);
+
+		AndroidPublisher.Purchases purchases = publisher != null ? publisher.purchases() : null;
+		ReceiptValidationHelper receiptValidationHelper = this.ios ? new ReceiptValidationHelper() : null;
 
 		while (rs.next()) {
 			long userid = rs.getLong("userid");
 			String pt = rs.getString("purchaseToken");
 			String sku = rs.getString("sku");
+			String payload = this.ios ? rs.getString("payload") : null;
 			Timestamp checkTime = rs.getTimestamp("checktime");
 			Timestamp startTime = rs.getTimestamp("starttime");
 			Timestamp expireTime = rs.getTimestamp("expiretime");
 			boolean valid = rs.getBoolean("valid");
 			long tm = System.currentTimeMillis();
-			if (sku.startsWith("net.osmand.maps.subscription.")) {
-				// this is ios
+			boolean ios = sku.startsWith("net.osmand.maps.subscription.");
+			if ((this.ios && !ios) || (!this.ios && ios)) {
 				continue;
 			}
 
 			long checkDiff = checkTime == null ? tm : (tm - checkTime.getTime());
-
-
-			// Basically validate non-valid everytime and valid not often than once per 24 hours 
+			// Basically validate non-valid everytime and valid not often than once per 24 hours
 			if (checkDiff < DAY && valid) {
 //				if (verifyAll) {
 //					System.out.println(String.format("Skip userid=%d, sku=%s - recently checked %.1f days", userid,
@@ -140,64 +192,143 @@ public class UpdateSubscription {
 				continue;
 			}
 
-			SubscriptionPurchase subscription;
-			try {
-				if (sku.startsWith("osm_free") || sku.contains("_free_")) {
-					subscription = purchases.subscriptions().get(GOOGLE_PACKAGE_NAME_FREE, sku, pt).execute();
-				} else {
-					subscription = purchases.subscriptions().get(GOOGLE_PACKAGE_NAME, sku, pt).execute();
-				}
-
-				updateSubscriptionDb(userid, pt, sku, startTime, expireTime, tm, subscription);
-			} catch (IOException e) {
-				boolean gone = false;
-				if (e instanceof GoogleJsonResponseException) {
-					gone = ((GoogleJsonResponseException) e).getStatusCode() == 410;
-				}
-
-				String reason = null;
-				String kind = "";
-				if (!pt.contains(".AO")) {
-					reason = "invalid purchase token " + e.getMessage();
-					kind = "invalid";
-				} else if (gone) {
-					kind = "gone";
-					if (expireTime == null) {
-						reason = "subscription expired.";
-					} else if (tm - expireTime.getTime() > 15 * DAY) {
-						reason = String.format("subscription expired more than %.1f days ago", (tm - expireTime.getTime())
-								/ (DAY * 1.0d));
-					}
-
-				}
-				if (reason != null) {
-					delStat.setString(1, kind);
-					delStat.setTimestamp(2, new Timestamp(tm));
-					delStat.setLong(3, userid);
-					delStat.setString(4, pt);
-					delStat.setString(5, sku);
-					delStat.addBatch();
-					deletions++;
-					System.out.println(String.format(
-							"!! Clearing possible invalid subscription: userid=%s, sku=%s. Reason: %s ", userid, sku, reason));
-					if (deletions > BATCH_SIZE) {
-						delStat.executeUpdate();
-						deletions = 0;
-					}
-				} else {
-					System.err.println(String.format("?? Error updating userid %s and sku %s: %s", userid, sku, e.getMessage()));
-				}
+			if (this.ios) {
+				processIosSubscription(receiptValidationHelper, userid, pt, sku, payload, startTime, expireTime, tm);
+			} else {
+				processAndroidSubscription(purchases, userid, pt, sku, startTime, expireTime, tm);
 			}
-
 		}
 		if (deletions > 0) {
 			delStat.executeBatch();
 		}
 		if (changes > 0) {
-			updSubscrStat.executeBatch();
+			updStat.executeBatch();
 		}
 		if (!conn.getAutoCommit()) {
 			conn.commit();
+		}
+	}
+
+	private void processIosSubscription(ReceiptValidationHelper receiptValidationHelper, long userid, String pt, String sku, String payload, Timestamp startTime, Timestamp expireTime, long tm) throws SQLException {
+		try {
+			String reason = null;
+			String kind = "";
+
+			Map<String, Object> map = receiptValidationHelper.loadReceipt(payload);
+			Object result = map.get("result");
+			Object error = map.get("error");
+			if (result.equals(true)) {
+				JsonObject receiptObj = (JsonObject) map.get("response");
+				if (receiptObj != null) {
+					Map<String, InAppReceipt> inAppReceipts = receiptValidationHelper.loadInAppReceipts(receiptObj);
+					if (inAppReceipts != null) {
+						if (inAppReceipts.size() == 0) {
+							kind = "gone";
+							reason = "subscription expired.";
+						} else {
+							InAppReceipt foundReceipt = null;
+							for (InAppReceipt receipt : inAppReceipts.values()) {
+								if (sku.equals(receipt.getProductId())) {
+									foundReceipt = receipt;
+									break;
+								}
+							}
+							if (foundReceipt != null) {
+								Map<String, String> fields = foundReceipt.fields;
+								String purchaseDateStr = fields.get("original_purchase_date_ms");
+								String expiresDateStr = fields.get("expires_date_ms");
+								if (!Algorithms.isEmpty(expiresDateStr)) {
+									try {
+										long purchaseDateMs = Long.parseLong(purchaseDateStr);
+										long expiresDateMs = Long.parseLong(expiresDateStr);
+										SubscriptionPurchase subscription = new SubscriptionPurchase()
+												.setStartTimeMillis(purchaseDateMs)
+												.setExpiryTimeMillis(expiresDateMs);
+
+										updateSubscriptionDb(userid, pt, sku, startTime, expireTime, tm, subscription);
+
+										if (tm - expiresDateMs > 15 * DAY) {
+											kind = "gone";
+											reason = String.format("subscription expired more than %.1f days ago",
+													(tm - expiresDateMs) / (DAY * 1.0d));
+										}
+									} catch (NumberFormatException e) {
+										e.printStackTrace();
+										kind = "gone";
+										reason = "subscription expired.";
+									}
+								}
+							} else {
+								kind = "gone";
+								reason = "subscription expired.";
+							}
+						}
+					}
+				}
+			} else if (error.equals(ReceiptValidationHelper.SANDBOX_ERROR_CODE)) {
+				// sandbox: do not update anymore
+				kind = "invalid";
+				reason = "receipt from sandbox environment";
+			}
+			if (reason != null) {
+				deleteSubscription(userid, pt, sku, tm, reason, kind);
+			}
+		} catch (Exception e) {
+			System.err.println(String.format("?? Error updating userid %s and sku %s: %s", userid, sku, e.getMessage()));
+		}
+	}
+
+	private void processAndroidSubscription(AndroidPublisher.Purchases purchases, long userid, String pt, String sku, Timestamp startTime, Timestamp expireTime, long tm) throws SQLException {
+		SubscriptionPurchase subscription;
+		try {
+			if (sku.startsWith("osm_free") || sku.contains("_free_")) {
+				subscription = purchases.subscriptions().get(GOOGLE_PACKAGE_NAME_FREE, sku, pt).execute();
+			} else {
+				subscription = purchases.subscriptions().get(GOOGLE_PACKAGE_NAME, sku, pt).execute();
+			}
+			updateSubscriptionDb(userid, pt, sku, startTime, expireTime, tm, subscription);
+		} catch (IOException e) {
+			boolean gone = false;
+			if (e instanceof GoogleJsonResponseException) {
+				gone = ((GoogleJsonResponseException) e).getStatusCode() == 410;
+			}
+
+			String reason = null;
+			String kind = "";
+			if (!pt.contains(".AO")) {
+				reason = "invalid purchase token " + e.getMessage();
+				kind = "invalid";
+			} else if (gone) {
+				kind = "gone";
+				if (expireTime == null) {
+					reason = "subscription expired.";
+				} else if (tm - expireTime.getTime() > 15 * DAY) {
+					reason = String.format("subscription expired more than %.1f days ago",
+							(tm - expireTime.getTime()) / (DAY * 1.0d));
+				}
+
+			}
+			if (reason != null) {
+				deleteSubscription(userid, pt, sku, tm, reason, kind);
+			} else {
+				System.err.println(String.format("?? Error updating userid %s and sku %s: %s", userid, sku, e.getMessage()));
+			}
+		}
+	}
+
+	private void deleteSubscription(long userid, String pt, String sku, long tm, String reason, String kind) throws SQLException {
+		delStat.setString(1, kind);
+		delStat.setTimestamp(2, new Timestamp(tm));
+		delStat.setLong(3, userid);
+		delStat.setString(4, pt);
+		delStat.setString(5, sku);
+		delStat.addBatch();
+		deletions++;
+		System.out.println(String.format(
+				"!! Clearing possible invalid subscription: userid=%s, sku=%s. Reason: %s ", userid, sku, reason));
+		if (deletions > BATCH_SIZE) {
+			delStat.executeUpdate();
+			deletions = 0;
 		}
 	}
 
@@ -205,7 +336,7 @@ public class UpdateSubscription {
 									  long tm, SubscriptionPurchase subscription) throws SQLException {
 		boolean updated = false;
 		int ind = 1;
-		updSubscrStat.setTimestamp(ind++, new Timestamp(tm));
+		updStat.setTimestamp(ind++, new Timestamp(tm));
 		if (subscription.getStartTimeMillis() != null) {
 			if (startTime != null && Math.abs(startTime.getTime() - subscription.getStartTimeMillis()) > 5 * 60 * 60 * 1000 &&
 					startTime.getTime() > 100000 * 1000L) {
@@ -213,10 +344,10 @@ public class UpdateSubscription {
 						new Date(startTime.getTime()),
 						new Date(subscription.getStartTimeMillis()), userid, sku));
 			}
-			updSubscrStat.setTimestamp(ind++, new Timestamp(subscription.getStartTimeMillis()));
+			updStat.setTimestamp(ind++, new Timestamp(subscription.getStartTimeMillis()));
 			updated = true;
 		} else {
-			updSubscrStat.setTimestamp(ind++, startTime);
+			updStat.setTimestamp(ind++, startTime);
 		}
 		if (subscription.getExpiryTimeMillis() != null) {
 			if (expireTime == null || Math.abs(expireTime.getTime() - subscription.getExpiryTimeMillis()) > 10 * 1000) {
@@ -224,23 +355,25 @@ public class UpdateSubscription {
 						expireTime == null ? "" : new Date(expireTime.getTime()),
 						new Date(subscription.getExpiryTimeMillis()), userid, sku));
 			}
-			updSubscrStat.setTimestamp(ind++, new Timestamp(subscription.getExpiryTimeMillis()));
+			updStat.setTimestamp(ind++, new Timestamp(subscription.getExpiryTimeMillis()));
 			updated = true;
 		} else {
-			updSubscrStat.setTimestamp(ind++, expireTime);
+			updStat.setTimestamp(ind++, expireTime);
 		}
-		if (subscription.getAutoRenewing() == null) {
-			updSubscrStat.setNull(ind++, Types.BOOLEAN);
-		} else {
-			updSubscrStat.setBoolean(ind++, subscription.getAutoRenewing());
+		if (!ios) {
+			if (subscription.getAutoRenewing() == null) {
+				updStat.setNull(ind++, Types.BOOLEAN);
+			} else {
+				updStat.setBoolean(ind++, subscription.getAutoRenewing());
+			}
+			updStat.setString(ind++, subscription.getKind());
+			updStat.setString(ind++, subscription.getOrderId());
+			updStat.setString(ind++, subscription.getDeveloperPayload());
 		}
-		updSubscrStat.setString(ind++, subscription.getKind());
-		updSubscrStat.setString(ind++, subscription.getOrderId());
-		updSubscrStat.setString(ind++, subscription.getDeveloperPayload());
-		updSubscrStat.setBoolean(ind++, true);
-		updSubscrStat.setLong(ind++, userid);
-		updSubscrStat.setString(ind++, pt);
-		updSubscrStat.setString(ind, sku);
+		updStat.setBoolean(ind++, true);
+		updStat.setLong(ind++, userid);
+		updStat.setString(ind++, pt);
+		updStat.setString(ind, sku);
 		System.out.println(String.format("%s for %s %s start %s expire %s",
 				updated ? "Updates " : "No changes ",
 				userid, sku,
@@ -248,10 +381,10 @@ public class UpdateSubscription {
 				expireTime == null ? "" : new Date(expireTime.getTime())
 		));
 		if (updated) {
-			updSubscrStat.addBatch();
+			updStat.addBatch();
 			changes++;
 			if (changes > BATCH_SIZE) {
-				updSubscrStat.executeBatch();
+				updStat.executeBatch();
 				changes = 0;
 			}
 		}
