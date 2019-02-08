@@ -963,11 +963,10 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	protected String simplifyDirection(String val) {
 		if("down".equals(val) || "forward".equals(val) || "backward".equals(val) ||
 				"anticlockwise".equals(val)  || "clockwise".equals(val)  ||
-				"up".equals(val) || "down".equals(val) || "all".equals(val)) {
+				"up".equals(val) || "all".equals(val)) {
 			return val;
 		}
-		
-		
+
 		if ("N".equalsIgnoreCase(val) || "NNW".equalsIgnoreCase(val) || "NW".equalsIgnoreCase(val)
 				|| "NNE".equalsIgnoreCase(val) || "NE".equalsIgnoreCase(val) 
 				|| "E".equalsIgnoreCase(val) || "ESE".equalsIgnoreCase(val) || "ENE".equalsIgnoreCase(val) 
@@ -1013,7 +1012,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 				case "360": val = "n"; break;
 			}
 		} catch (NumberFormatException e) {
-			log.error("Wrong value of \"direction\" " + val);
+//			log.error("Wrong value of \"direction\" " + val);
 		}
 		return val;
 	}
