@@ -1,4 +1,26 @@
 package net.osmand.live.subscriptions;
+
+import com.google.api.client.auth.oauth2.TokenResponse;
+import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
+import com.google.api.client.googleapis.json.GoogleJsonResponseException;
+import com.google.api.client.http.HttpRequestInitializer;
+import com.google.api.client.http.HttpTransport;
+import com.google.api.client.http.javanet.NetHttpTransport;
+import com.google.api.client.json.JsonFactory;
+import com.google.api.services.androidpublisher.AndroidPublisher;
+import com.google.api.services.androidpublisher.model.InAppProduct;
+import com.google.api.services.androidpublisher.model.InappproductsListResponse;
+import com.google.api.services.androidpublisher.model.SubscriptionPurchase;
+
+import org.apache.http.NameValuePair;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.entity.UrlEncodedFormEntity;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.message.BasicNameValuePair;
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.io.BufferedReader;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -15,27 +37,6 @@ import java.util.Date;
 import java.util.List;
 import java.util.Properties;
 
-import org.apache.http.NameValuePair;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.entity.UrlEncodedFormEntity;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.impl.client.DefaultHttpClient;
-import org.apache.http.message.BasicNameValuePair;
-import org.json.JSONException;
-import org.json.JSONObject;
-
-import com.google.api.client.auth.oauth2.TokenResponse;
-import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
-import com.google.api.client.googleapis.json.GoogleJsonResponseException;
-import com.google.api.client.http.HttpRequestInitializer;
-import com.google.api.client.http.HttpTransport;
-import com.google.api.client.http.javanet.NetHttpTransport;
-import com.google.api.client.json.JsonFactory;
-import com.google.api.services.androidpublisher.AndroidPublisher;
-import com.google.api.services.androidpublisher.model.InAppProduct;
-import com.google.api.services.androidpublisher.model.InappproductsListResponse;
-import com.google.api.services.androidpublisher.model.SubscriptionPurchase;
-
 
 public class UpdateSubscription {
 
@@ -43,24 +44,24 @@ public class UpdateSubscription {
 	private static final String INVALID_PURCHASE = "invalid";
 	private static String PATH_TO_KEY = "";
 	// init one time
-	private static String GOOGLE_CLIENT_CODE="";
+	private static String GOOGLE_CLIENT_CODE = "";
 	private static String GOOGLE_CLIENT_ID = "";
 	private static String GOOGLE_CLIENT_SECRET = "";
 	private static String GOOGLE_REDIRECT_URI = "";
 	private static String TOKEN = "";
-	
-	
+
+
 	private static final String GOOGLE_PRODUCT_NAME = "OsmAnd+";
 	private static final String GOOGLE_PRODUCT_NAME_FREE = "OsmAnd";
-	
+
 	private static final String GOOGLE_PACKAGE_NAME = "net.osmand.plus";
 	private static final String GOOGLE_PACKAGE_NAME_FREE = "net.osmand";
 	private static final int BATCH_SIZE = 200;
 	private static final long DAY = 1000l * 60 * 60 * 24;
-	
+
 	private static HttpTransport HTTP_TRANSPORT = new NetHttpTransport();
 	private static JsonFactory JSON_FACTORY = new com.google.api.client.json.jackson2.JacksonFactory();
-	
+
 	int changes = 0;
 	int deletions = 0;
 	private PreparedStatement updSubscrStat;
@@ -73,7 +74,7 @@ public class UpdateSubscription {
 //			test(publisher, "","");
 //			return;
 //		}
-		
+
 		Class.forName("org.postgresql.Driver");
 		Connection conn = DriverManager.getConnection("jdbc:postgresql://localhost:5433/changeset",
 				System.getenv("DB_USER"), System.getenv("DB_PWD"));
@@ -86,21 +87,21 @@ public class UpdateSubscription {
 		UpdateSubscription upd = new UpdateSubscription();
 		upd.queryPurchases(publisher, conn, verifyAll);
 	}
-	
+
 	private void queryPurchases(AndroidPublisher publisher, Connection conn, boolean verifyAll) throws SQLException {
 		ResultSet rs = conn.createStatement().executeQuery(
 				"SELECT userid, sku, purchaseToken, checktime, starttime, expiretime, valid "
-				+ "FROM supporters_device_sub S where (valid is null or valid=true) ");
+						+ "FROM supporters_device_sub S where (valid is null or valid=true) ");
 		updSubscrStat = conn.prepareStatement("UPDATE supporters_device_sub SET "
 				+ "checktime = ?, starttime = ?, expiretime = ?, autorenewing = ?, kind = ?, orderid = ?, payload = ?, valid = ? " +
-				  " WHERE userid = ? and purchaseToken = ? and sku = ?");
+				" WHERE userid = ? and purchaseToken = ? and sku = ?");
 		delStat = conn.prepareStatement("UPDATE supporters_device_sub SET valid = false, kind = ?, checktime = ?" +
-							" WHERE userid = ? and purchaseToken = ? and sku = ?");
+				" WHERE userid = ? and purchaseToken = ? and sku = ?");
 //		updCheckStat = conn.prepareStatement("UPDATE supporters_device_sub SET checktime = ? " +
 //							" WHERE userid = ? and purchaseToken = ? and sku = ?");
 
 		AndroidPublisher.Purchases purchases = publisher.purchases();
-		
+
 		while (rs.next()) {
 			long userid = rs.getLong("userid");
 			String pt = rs.getString("purchaseToken");
@@ -110,14 +111,14 @@ public class UpdateSubscription {
 			Timestamp expireTime = rs.getTimestamp("expiretime");
 			boolean valid = rs.getBoolean("valid");
 			long tm = System.currentTimeMillis();
-			if(sku.startsWith("net.osmand.maps.subscription.")) {
+			if (sku.startsWith("net.osmand.maps.subscription.")) {
 				// this is ios
 				continue;
 			}
 
-			long checkDiff = checkTime == null? tm :(tm - checkTime.getTime()) ;
+			long checkDiff = checkTime == null ? tm : (tm - checkTime.getTime());
 
-			
+
 			// Basically validate non-valid everytime and valid not often than once per 24 hours 
 			if (checkDiff < DAY && valid) {
 //				if (verifyAll) {
@@ -126,7 +127,7 @@ public class UpdateSubscription {
 //				}
 				continue;
 			}
-			
+
 			boolean activeNow = false;
 			if (checkTime != null && startTime != null && expireTime != null) {
 				if (expireTime.getTime() >= tm) {
@@ -138,36 +139,36 @@ public class UpdateSubscription {
 				System.out.println(String.format("Skip userid=%d, sku=%s - subscribtion is active", userid, sku));
 				continue;
 			}
-			
+
 			SubscriptionPurchase subscription;
 			try {
-				if(sku.startsWith("osm_free") || sku.contains("_free_")) {
+				if (sku.startsWith("osm_free") || sku.contains("_free_")) {
 					subscription = purchases.subscriptions().get(GOOGLE_PACKAGE_NAME_FREE, sku, pt).execute();
 				} else {
 					subscription = purchases.subscriptions().get(GOOGLE_PACKAGE_NAME, sku, pt).execute();
 				}
-				
+
 				updateSubscriptionDb(userid, pt, sku, startTime, expireTime, tm, subscription);
 			} catch (IOException e) {
 				boolean gone = false;
-				if(e instanceof GoogleJsonResponseException) {
+				if (e instanceof GoogleJsonResponseException) {
 					gone = ((GoogleJsonResponseException) e).getStatusCode() == 410;
 				}
-					
+
 				String reason = null;
 				String kind = "";
 				if (!pt.contains(".AO")) {
 					reason = "invalid purchase token " + e.getMessage();
 					kind = "invalid";
-				} else if(gone) {
+				} else if (gone) {
 					kind = "gone";
-					if(expireTime == null) {
+					if (expireTime == null) {
 						reason = "subscription expired.";
-					} else if(expireTime != null && ((tm - expireTime.getTime()) > 15 * DAY) ) {
+					} else if (tm - expireTime.getTime() > 15 * DAY) {
 						reason = String.format("subscription expired more than %.1f days ago", (tm - expireTime.getTime())
 								/ (DAY * 1.0d));
 					}
-					
+
 				}
 				if (reason != null) {
 					delStat.setString(1, kind);
@@ -184,11 +185,10 @@ public class UpdateSubscription {
 						deletions = 0;
 					}
 				} else {
-					System.err.println(String.format("?? Error updating userid %s and sku %s: %s", userid, sku, e.getMessage())) ;
+					System.err.println(String.format("?? Error updating userid %s and sku %s: %s", userid, sku, e.getMessage()));
 				}
-				continue;
 			}
-			
+
 		}
 		if (deletions > 0) {
 			delStat.executeBatch();
@@ -202,37 +202,37 @@ public class UpdateSubscription {
 	}
 
 	private void updateSubscriptionDb(long userid, String pt, String sku, Timestamp startTime, Timestamp expireTime,
-			long tm, SubscriptionPurchase subscription) throws SQLException {
+									  long tm, SubscriptionPurchase subscription) throws SQLException {
 		boolean updated = false;
 		int ind = 1;
 		updSubscrStat.setTimestamp(ind++, new Timestamp(tm));
-		if(subscription.getStartTimeMillis() != null) {
-			if(startTime != null && Math.abs(startTime.getTime() - subscription.getStartTimeMillis().longValue()) > 5*60*60*1000 && 
-					startTime.getTime() > 100000*1000l) {
-				throw new IllegalArgumentException(String.format("Start timestamp changed %s != %s %s %s", 
-						startTime == null ? "" :new Date(startTime.getTime()),
-								new Date(subscription.getStartTimeMillis().longValue()), userid, sku));
+		if (subscription.getStartTimeMillis() != null) {
+			if (startTime != null && Math.abs(startTime.getTime() - subscription.getStartTimeMillis()) > 5 * 60 * 60 * 1000 &&
+					startTime.getTime() > 100000 * 1000L) {
+				throw new IllegalArgumentException(String.format("Start timestamp changed %s != %s %s %s",
+						new Date(startTime.getTime()),
+						new Date(subscription.getStartTimeMillis()), userid, sku));
 			}
 			updSubscrStat.setTimestamp(ind++, new Timestamp(subscription.getStartTimeMillis()));
 			updated = true;
 		} else {
 			updSubscrStat.setTimestamp(ind++, startTime);
 		}
-		if(subscription.getExpiryTimeMillis() != null) {
-			if(expireTime == null || Math.abs(expireTime.getTime() - subscription.getExpiryTimeMillis().longValue()) > 10 * 1000) {
-				System.out.println(String.format("Expire timestamp changed %s != %s for %s %s", 
-						expireTime == null ? "" :new Date(expireTime.getTime()), 
-								new Date(subscription.getExpiryTimeMillis().longValue()), userid, sku));
+		if (subscription.getExpiryTimeMillis() != null) {
+			if (expireTime == null || Math.abs(expireTime.getTime() - subscription.getExpiryTimeMillis()) > 10 * 1000) {
+				System.out.println(String.format("Expire timestamp changed %s != %s for %s %s",
+						expireTime == null ? "" : new Date(expireTime.getTime()),
+						new Date(subscription.getExpiryTimeMillis()), userid, sku));
 			}
 			updSubscrStat.setTimestamp(ind++, new Timestamp(subscription.getExpiryTimeMillis()));
 			updated = true;
 		} else {
 			updSubscrStat.setTimestamp(ind++, expireTime);
 		}
-		if(subscription.getAutoRenewing() == null) {
+		if (subscription.getAutoRenewing() == null) {
 			updSubscrStat.setNull(ind++, Types.BOOLEAN);
 		} else {
-			updSubscrStat.setBoolean(ind++, subscription.getAutoRenewing());	
+			updSubscrStat.setBoolean(ind++, subscription.getAutoRenewing());
 		}
 		updSubscrStat.setString(ind++, subscription.getKind());
 		updSubscrStat.setString(ind++, subscription.getOrderId());
@@ -240,14 +240,14 @@ public class UpdateSubscription {
 		updSubscrStat.setBoolean(ind++, true);
 		updSubscrStat.setLong(ind++, userid);
 		updSubscrStat.setString(ind++, pt);
-		updSubscrStat.setString(ind++, sku);
+		updSubscrStat.setString(ind, sku);
 		System.out.println(String.format("%s for %s %s start %s expire %s",
-				updated ? "Updates " :  "No changes ",
+				updated ? "Updates " : "No changes ",
 				userid, sku,
 				startTime == null ? "" : new Date(startTime.getTime()),
 				expireTime == null ? "" : new Date(expireTime.getTime())
 		));
-		if(updated) {
+		if (updated) {
 			updSubscrStat.addBatch();
 			changes++;
 			if (changes > BATCH_SIZE) {
@@ -266,14 +266,14 @@ public class UpdateSubscription {
 		GOOGLE_CLIENT_SECRET = properties.getProperty("GOOGLE_CLIENT_SECRET");
 		GOOGLE_REDIRECT_URI = properties.getProperty("GOOGLE_REDIRECT_URI");
 		TOKEN = properties.getProperty("TOKEN");
-		
+
 		String token = TOKEN;//getRefreshToken();
 		String accessToken = getAccessToken(token);
 		TokenResponse tokenResponse = new TokenResponse();
-		
+
 //		System.out.println("refresh token=" + token);
 //		System.out.println("access token=" + accessToken);
-		
+
 		tokenResponse.setAccessToken(accessToken);
 		tokenResponse.setRefreshToken(token);
 		tokenResponse.setExpiresInSeconds(3600L);
@@ -289,19 +289,18 @@ public class UpdateSubscription {
 
 		return publisher;
 	}
-	
 
-	private static void test(AndroidPublisher publisher, String subscriptionId,String purchaseToken) {
+
+	private static void test(AndroidPublisher publisher, String subscriptionId, String purchaseToken) {
 		try {
-
 			com.google.api.services.androidpublisher.AndroidPublisher.Inappproducts.List lst = publisher.inappproducts().list(GOOGLE_PACKAGE_NAME_FREE);
 			InappproductsListResponse response = lst.execute();
-			for(InAppProduct p : response.getInappproduct()) {
-				System.out.println("SKU="+p.getSku() +
+			for (InAppProduct p : response.getInappproduct()) {
+				System.out.println("SKU=" + p.getSku() +
 						" type=" + p.getPurchaseType() +
 						" LNG=" + p.getDefaultLanguage() +
 						//" P="+p.getPrices()+
-						" Period=" +p.getSubscriptionPeriod() + " Status="+p.getStatus());
+						" Period=" + p.getSubscriptionPeriod() + " Status=" + p.getStatus());
 			}
 			AndroidPublisher.Purchases purchases = publisher.purchases();
 			SubscriptionPurchase subscription = purchases.subscriptions().get(GOOGLE_PACKAGE_NAME_FREE, subscriptionId, purchaseToken).execute();
@@ -312,14 +311,12 @@ public class UpdateSubscription {
 			System.out.println(new Date(subscription.getStartTimeMillis()));
 //			return subscription.getExpiryTimeMillis();
 //			return subscripcion.getValidUntilTimestampMsec();
-
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
 	}
 
 	private static String getAccessToken(String refreshToken) throws JSONException {
-
 		HttpClient client = new DefaultHttpClient();
 		HttpPost post = new HttpPost("https://www.googleapis.com/oauth2/v4/token");
 		try {
@@ -339,18 +336,15 @@ public class UpdateSubscription {
 
 			JSONObject json = new JSONObject(buffer.toString());
 			String accessToken = json.getString("access_token");
-
 			return accessToken;
-
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
 
 		return null;
 	}
-	
-	public static String getRefreshToken() {
 
+	public static String getRefreshToken() {
 		HttpClient client = new DefaultHttpClient();
 		HttpPost post = new HttpPost("https://accounts.google.com/o/oauth2/token");
 		try {
