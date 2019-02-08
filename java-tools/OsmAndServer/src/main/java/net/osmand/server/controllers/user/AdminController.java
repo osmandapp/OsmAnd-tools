@@ -475,8 +475,8 @@ public class AdminController {
 						" count(*) FILTER (WHERE t.sku like 'osm%3_months%'), " +
 						" count(*) FILTER (WHERE t.sku like 'osm%'), " +
 						" count(*) FILTER (WHERE t.sku like 'net.osmand.maps.subscription.annual%'), " +
-						" count(*) FILTER (WHERE t.sku like 'net.osmand.maps.subscription.3month%')  " +
-						" count(*) FILTER (WHERE t.sku like 'net.osmand.maps.subscription.monthly%'), " +
+						" count(*) FILTER (WHERE t.sku like 'net.osmand.maps.subscription.3month%'), " +
+						" count(*) FILTER (WHERE t.sku like 'net.osmand.maps.subscription.monthly%') " +
 						" from  (select generate_series(0, 18) as month) a join supporters_device_sub t  " +
 						" on  t.expiretime > now()  - a.month * interval '1 month' and t.starttime < now() -  a.month * interval '1 month' " +
 						" group by a.month order by 1 desc ", new RowMapper<SubscriptionReport>() {
