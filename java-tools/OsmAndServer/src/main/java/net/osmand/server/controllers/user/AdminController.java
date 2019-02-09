@@ -497,18 +497,18 @@ public class AdminController {
 						sr.count += cnt;
 						String sku = rs.getString(3);
 						switch(sku) {
-						case "osm_live_subscription_2": sr.monthCount+=cnt; sr.annualValueCount+=18*cnt; break;
-						case "osm_free_live_subscription_2": sr.monthCount+=cnt; sr.annualValueCount+=24*cnt; break;
+						case "osm_live_subscription_2": sr.monthCount+=cnt; sr.annualValueCount+=(1.2*12*cnt); break;
+						case "osm_free_live_subscription_2": sr.monthCount+=cnt; sr.annualValueCount+=(1.8*12)*cnt; break;
 						case "osm_live_subscription_annual_free_v1": sr.annualCount+=cnt; sr.annualValueCount+=8*cnt; break;
 						case "osm_live_subscription_annual_free_v2": sr.annualDiscountCount+=cnt; sr.annualValueCount+=4*cnt; break;
 						case "osm_live_subscription_annual_full_v1": sr.annualCount+=cnt; sr.annualValueCount+=6*cnt; break;
 						case "osm_live_subscription_annual_full_v2": sr.annualDiscountCount+=cnt; sr.annualValueCount+=3*cnt; break;
-						case "osm_live_subscription_monthly_free_v1": sr.monthCount+=cnt; sr.annualValueCount+=24*cnt; break;
-						case "osm_live_subscription_monthly_full_v1": sr.monthCount+=cnt; sr.annualValueCount+=18*cnt; break;
-						case "osm_live_subscription_3_months_free_v1": sr.quarterCount+=cnt; sr.annualValueCount+=16*cnt; break;
-						case "osm_live_subscription_3_months_full_v1": sr.quarterCount+=cnt; sr.annualValueCount+=12*cnt; break;
-						case "net.osmand.maps.subscription.monthly_v1": sr.iosMonthCount+=cnt; sr.annualValueCount+=24*cnt; break;
-						case "net.osmand.maps.subscription.3months_v1": sr.iosQuarterCount+=cnt; sr.annualValueCount+=16*cnt; break;
+						case "osm_live_subscription_monthly_free_v1": sr.monthCount+=cnt; sr.annualValueCount+=(2*12)*cnt; break;
+						case "osm_live_subscription_monthly_full_v1": sr.monthCount+=cnt; sr.annualValueCount+=(1.5*12)*cnt; break;
+						case "osm_live_subscription_3_months_free_v1": sr.quarterCount+=cnt; sr.annualValueCount+=(4*4)*cnt; break;
+						case "osm_live_subscription_3_months_full_v1": sr.quarterCount+=cnt; sr.annualValueCount+=(4*3)*cnt; break;
+						case "net.osmand.maps.subscription.monthly_v1": sr.iosMonthCount+=cnt; sr.annualValueCount+=(2*12)*cnt; break;
+						case "net.osmand.maps.subscription.3months_v1": sr.iosQuarterCount+=cnt; sr.annualValueCount+=(4*4)*cnt; break;
 						case "net.osmand.maps.subscription.annual_v1": sr.iosAnnualCount+=cnt; sr.annualValueCount+=8*cnt; break;
 						default: throw new UnsupportedOperationException("");
 						};
