@@ -524,6 +524,8 @@ public class AdminController {
 				if(c.date.equals(prev.date)) {
 					prev.merge(c);
 					it.remove();
+				} else {
+					prev = c;
 				}
 			}
 		}
