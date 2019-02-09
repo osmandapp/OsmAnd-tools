@@ -464,40 +464,69 @@ public class AdminController {
 		public int iosAnnualDiscountCount;
 		public int iosQuarterCount;
 		public int iosMonthCount;
+		public int annualValueCount;
+		
+		public void merge(SubscriptionReport c) {
+			count += c.count;
+			annualCount += c.annualCount;
+			monthCount += c.monthCount;
+			annualDiscountCount += c.annualDiscountCount;
+			quarterCount += c.quarterCount;
+			iosAnnualCount += c.iosAnnualCount;
+			iosAnnualDiscountCount += c.iosAnnualDiscountCount;
+			iosQuarterCount += c.iosQuarterCount;
+			iosMonthCount += c.iosMonthCount;
+			annualValueCount += c.annualValueCount;
+			
+		}
 	}
 	
 	
 	private List<SubscriptionReport> getSubscriptionsReport() {
 		List<SubscriptionReport> result = jdbcTemplate
-				.query(  "SELECT date_trunc('day', now() - a.month * interval '1 month'), count(*), " +
-						" count(*) FILTER (WHERE t.sku like 'osm%annual%v1'),  " +
-						" count(*) FILTER (WHERE t.sku like 'osm%annual%v2'),  " +
-						" count(*) FILTER (WHERE t.sku like 'osm%3_months%'), " +
-						" count(*) FILTER (WHERE t.sku like 'osm%'), " +
-						" count(*) FILTER (WHERE t.sku like 'net.osmand.maps.subscription.annual%'), " +
-						" count(*) FILTER (WHERE t.sku like 'net.osmand.maps.subscription.3month%'), " +
-						" count(*) FILTER (WHERE t.sku like 'net.osmand.maps.subscription.monthly%') " +
-						" from  (select generate_series(0, 18) as month) a join supporters_device_sub t  " +
-						" on  t.expiretime > now()  - a.month * interval '1 month' and t.starttime < now() -  a.month * interval '1 month' " +
-						" group by a.month order by 1 desc ", new RowMapper<SubscriptionReport>() {
+				.query(  "SELECT date_trunc('day', now() - a.month * interval '1 month'), count(*), t.sku"	+
+						 "from  (select generate_series(0, 18) as month) a join supporters_device_sub t  "	+
+						 "on  t.expiretime > now()  - a.month * interval '1 month' and t.starttime < now() - a.month * interval '1 month' "	+
+						 "group by a.month, t.sku order by 1, 2 desc", new RowMapper<SubscriptionReport>() {
 
 					@Override
 					public SubscriptionReport mapRow(ResultSet rs, int rowNum) throws SQLException {
 						SubscriptionReport sr = new SubscriptionReport();
 						sr.date = String.format("%1$tF", rs.getDate(1));
-						sr.count = rs.getInt(2);
-						sr.annualCount = rs.getInt(3);
-						sr.annualDiscountCount = rs.getInt(4);
-						sr.quarterCount = rs.getInt(5);
-						sr.monthCount = rs.getInt(6) - sr.quarterCount - sr.annualDiscountCount - sr.annualCount;
-						sr.iosAnnualCount = rs.getInt(7);
-						sr.iosAnnualDiscountCount = 0;
-						sr.iosQuarterCount = rs.getInt(8);
-						sr.iosMonthCount = rs.getInt(9);
+						int cnt = rs.getInt(2);
+						sr.count += cnt;
+						String sku = rs.getString(3);
+						switch(sku) {
+						case "osm_live_subscription_2": sr.monthCount+=cnt; sr.annualValueCount+=12*cnt; break;
+						case "osm_free_live_subscription_2": sr.monthCount+=cnt; sr.annualValueCount+=16*cnt; break;
+						case "osm_live_subscription_annual_free_v1": sr.annualCount+=cnt; sr.annualValueCount+=8*cnt; break;
+						case "osm_live_subscription_annual_free_v2": sr.annualDiscountCount+=cnt; sr.annualValueCount+=4*cnt; break;
+						case "osm_live_subscription_annual_full_v1": sr.annualCount+=cnt; sr.annualValueCount+=3*cnt; break;
+						case "osm_live_subscription_annual_full_v2": sr.annualDiscountCount+=cnt; sr.annualValueCount+=6*cnt; break;
+						case "osm_live_subscription_monthly_free_v1": sr.monthCount+=cnt; sr.annualValueCount+=24*cnt; break;
+						case "osm_live_subscription_monthly_full_v1": sr.monthCount+=cnt; sr.annualValueCount+=18*cnt; break;
+						case "osm_live_subscription_3_months_free_v1": sr.quarterCount+=cnt; sr.annualValueCount+=16*cnt; break;
+						case "osm_live_subscription_3_months_full_v1": sr.quarterCount+=cnt; sr.annualValueCount+=12*cnt; break;
+						case "net.osmand.maps.subscription.monthly_v1": sr.monthCount+=cnt; sr.annualValueCount+=24*cnt; break;
+						case "net.osmand.maps.subscription.3months_v1": sr.quarterCount+=cnt; sr.annualValueCount+=16*cnt; break;
+						case "net.osmand.maps.subscription.annual_v1": sr.annualCount+=cnt; sr.annualValueCount+=8*cnt; break;
+						default: throw new UnsupportedOperationException("");
+						};
 						return sr;
 					}
 
 				});
+		Iterator<SubscriptionReport> it = result.iterator();
+		if(it.hasNext()) {
+			SubscriptionReport prev = it.next();
+			while(it.hasNext()) {
+				SubscriptionReport c = it.next();
+				if(c.date.equals(prev.date)) {
+					prev.merge(c);
+					it.remove();
+				}
+			}
+		}
 		return result;
 	}
 	
