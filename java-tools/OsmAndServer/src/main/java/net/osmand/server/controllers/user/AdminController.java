@@ -487,7 +487,7 @@ public class AdminController {
 				.query(  "SELECT date_trunc('day', now() - a.month * interval '1 month'), count(*), t.sku "	+
 						 "from  (select generate_series(0, 18) as month) a join supporters_device_sub t  "	+
 						 "on  t.expiretime > now()  - a.month * interval '1 month' and t.starttime < now() - a.month * interval '1 month' "	+
-						 "group by a.month, t.sku order by 1, 2 desc", new RowMapper<SubscriptionReport>() {
+						 "group by a.month, t.sku order by 1 desc, 2 desc", new RowMapper<SubscriptionReport>() {
 
 					@Override
 					public SubscriptionReport mapRow(ResultSet rs, int rowNum) throws SQLException {
@@ -507,9 +507,9 @@ public class AdminController {
 						case "osm_live_subscription_monthly_full_v1": sr.monthCount+=cnt; sr.annualValueCount+=18*cnt; break;
 						case "osm_live_subscription_3_months_free_v1": sr.quarterCount+=cnt; sr.annualValueCount+=16*cnt; break;
 						case "osm_live_subscription_3_months_full_v1": sr.quarterCount+=cnt; sr.annualValueCount+=12*cnt; break;
-						case "net.osmand.maps.subscription.monthly_v1": sr.monthCount+=cnt; sr.annualValueCount+=24*cnt; break;
-						case "net.osmand.maps.subscription.3months_v1": sr.quarterCount+=cnt; sr.annualValueCount+=16*cnt; break;
-						case "net.osmand.maps.subscription.annual_v1": sr.annualCount+=cnt; sr.annualValueCount+=8*cnt; break;
+						case "net.osmand.maps.subscription.monthly_v1": sr.iosMonthCount+=cnt; sr.annualValueCount+=24*cnt; break;
+						case "net.osmand.maps.subscription.3months_v1": sr.iosQuarterCount+=cnt; sr.annualValueCount+=16*cnt; break;
+						case "net.osmand.maps.subscription.annual_v1": sr.iosAnnualCount+=cnt; sr.annualValueCount+=8*cnt; break;
 						default: throw new UnsupportedOperationException("");
 						};
 						return sr;
