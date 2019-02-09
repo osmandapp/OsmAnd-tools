@@ -484,7 +484,7 @@ public class AdminController {
 	
 	private List<SubscriptionReport> getSubscriptionsReport() {
 		List<SubscriptionReport> result = jdbcTemplate
-				.query(  "SELECT date_trunc('day', now() - a.month * interval '1 month'), count(*), t.sku"	+
+				.query(  "SELECT date_trunc('day', now() - a.month * interval '1 month'), count(*), t.sku "	+
 						 "from  (select generate_series(0, 18) as month) a join supporters_device_sub t  "	+
 						 "on  t.expiretime > now()  - a.month * interval '1 month' and t.starttime < now() - a.month * interval '1 month' "	+
 						 "group by a.month, t.sku order by 1, 2 desc", new RowMapper<SubscriptionReport>() {
