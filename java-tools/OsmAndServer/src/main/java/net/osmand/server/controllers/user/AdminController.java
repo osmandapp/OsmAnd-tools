@@ -419,7 +419,7 @@ public class AdminController {
 						") O left join ( " +
 						"	SELECT date_trunc('day', starttime) d,  count(*) cnt, sku from supporters_device_sub  " +
 						"	WHERE starttime > now() -  interval '90 days' " +
-						"	GROUP BY date_trunc('day', expiretime), sku " +
+						"	GROUP BY date_trunc('day', starttime), sku " +
 						") A on A.d = O.d order by 1 desc", getRowMapper());
 		mergeSubscriptionReports(newActive);
 		List<NewSubscriptionReport> result = new ArrayList<AdminController.NewSubscriptionReport>();
