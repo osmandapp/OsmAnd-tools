@@ -60,7 +60,6 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.google.gson.Gson;
 
 @Controller
 @RequestMapping("/admin")
@@ -366,15 +365,21 @@ public class AdminController {
 	public static class NewSubscriptionReport {
 		public String date;
 		public int monthCount;
+		public int quarterCount;
 		public int annualCount;
 		public int annualDiscountCount;
+		
 		public int total;
 		public int totalWeighted;
+		
 		public int cancelMonthCount;
+		public int cancelQuarterCount;
 		public int cancelAnnualCount;
 		public int cancelAnnualDiscountCount;
+		
 		public int cancelTotal;
 		public int cancelTotalWeighted;
+		
 		public int delta;
 		public int deltaWeighted;
 	}
@@ -399,57 +404,52 @@ public class AdminController {
 	}	
 	
 	private List<NewSubscriptionReport> getNewSubsReport() {
-		List<NewSubscriptionReport> result = jdbcTemplate
-				.query(
-								"	select O.d, A.cnt, B.cnt, C.cnt, D.cnt, E.cnt, F.cnt from ( " +
-								"		SELECT date_trunc('day', generate_series(now() - '90 days'::interval, now(), '1 day'::interval)) as d" +
-								"	) O left join ( " +
-								"		select date_trunc('day', starttime) d,  count(*) cnt from supporters_device_sub where  " +
-								"		starttime > now() -  interval '90 days' and sku not like '%annual%'  " +
-								"		group by date_trunc('day', starttime) " +
-								"	) A on A.d = O.d left join ( " +
-								"		select date_trunc('day', starttime) d,  count(*) cnt from supporters_device_sub where  " +
-								"		starttime > now() -  interval '90 days' and sku like '%annual%v1' " +
-								"		group by date_trunc('day', starttime) " +
-								"	) B on B.d = O.d left join ( " +
-								"		select date_trunc('day', starttime) d,  count(*) cnt from supporters_device_sub where  " +
-								"		starttime > now() -  interval '90 days' and sku like '%annual%v2' " +
-								"		group by date_trunc('day', starttime) " +
-								"	) C on C.d = O.d left join ( " +
-								"		select date_trunc('day', expiretime) d,  count(*) cnt from supporters_device_sub where  " +
-								"		expiretime < now() - interval '9 hours' and expiretime > now() -  interval '90 days' and sku not like '%annual%'  " +
-								"		group by date_trunc('day', expiretime) " +
-								"	) D on D.d = O.d left join ( " +
-								"		select date_trunc('day', expiretime) d,  count(*) cnt from supporters_device_sub where  " +
-								"		expiretime < now() - interval '9 hours' and expiretime > now() -  interval '90 days' and sku like '%annual%v1' " +
-								"		group by date_trunc('day', expiretime) " +
-								"	) E on E.d = O.d left join ( " +
-								"		select date_trunc('day', expiretime) d,  count(*) cnt from supporters_device_sub where  " +
-								"		expiretime < now() - interval '9 hours' and expiretime > now() -  interval '90 days' and sku like '%annual%v2' " +
-								"		group by date_trunc('day', expiretime) " +
-								"	) F on F.d = O.d order by 1 desc", 
-								new RowMapper<NewSubscriptionReport>() {
-
-					@Override
-					public NewSubscriptionReport mapRow(ResultSet rs, int rowNum) throws SQLException {
-						NewSubscriptionReport sr = new NewSubscriptionReport();
-						sr.date = String.format("%1$tF", rs.getDate(1)); 
-						sr.monthCount = rs.getInt(2);
-						sr.annualCount = rs.getInt(3);
-						sr.annualDiscountCount = rs.getInt(4);
-						sr.cancelMonthCount = rs.getInt(5);
-						sr.cancelAnnualCount = rs.getInt(6);
-						sr.cancelAnnualDiscountCount = rs.getInt(7);
-						sr.total = sr.monthCount + sr.annualCount + sr.annualDiscountCount;
-						sr.totalWeighted = sr.monthCount + sr.annualCount / 2 + sr.annualDiscountCount / 4;
-						sr.cancelTotal = sr.cancelMonthCount + sr.cancelAnnualCount + sr.cancelAnnualDiscountCount;
-						sr.cancelTotalWeighted = sr.cancelMonthCount + sr.cancelAnnualCount / 2 + sr.cancelAnnualDiscountCount / 4;
-						sr.delta = sr.total - sr.cancelTotal;
-						sr.deltaWeighted = sr.totalWeighted - sr.cancelTotalWeighted; 
-						return sr;
-					}
-
-				});
+		List<SubscriptionReport> cancelled = jdbcTemplate
+				.query(	"SELECT O.d, A.cnt, A.sku from ( " +
+						"	SELECT date_trunc('day', generate_series(now() - '90 days'::interval, now(), '1 day'::interval)) as d" +
+						") O left join ( " +
+						"	SELECT date_trunc('day', expiretime) d,  count(*) cnt, sku from supporters_device_sub " +
+						"	WHERE expiretime < now() - interval '9 hours' and expiretime > now() -  interval '90 days' " +
+						"	GROUP BY date_trunc('day', expiretime), sku " +
+						") A on A.d = O.d order by 1 desc", getRowMapper());
+		mergeSubscriptionReports(cancelled);
+		List<SubscriptionReport> newActive = jdbcTemplate
+				.query(	"SELECT O.d, A.cnt, A.sku from ( " +
+						"	SELECT date_trunc('day', generate_series(now() - '90 days'::interval, now(), '1 day'::interval)) as d" +
+						") O left join ( " +
+						"	SELECT date_trunc('day', expiretime) d,  count(*) cnt, sku from supporters_device_sub " +
+						"	WHERE starttime > now() -  interval '90 days' " +
+						"	GROUP BY date_trunc('day', expiretime), sku " +
+						") A on A.d = O.d order by 1 desc", getRowMapper());
+		mergeSubscriptionReports(newActive);
+		List<NewSubscriptionReport> result = new ArrayList<AdminController.NewSubscriptionReport>();
+		if(newActive.size() == cancelled.size()) {
+		for(int i = 0; i < newActive.size(); i++) {
+			SubscriptionReport na = newActive.get(i);
+			SubscriptionReport ca = cancelled.get(i);
+			if(!ca.date.equals(na.date)) {
+				continue;
+			}
+			NewSubscriptionReport sr = new NewSubscriptionReport();
+			sr.date = na.date; 
+			sr.monthCount = na.monthCount + na.iosMonthCount ;
+			sr.annualCount = na.annualCount + na.iosAnnualCount;
+			sr.quarterCount = na.quarterCount + na.iosQuarterCount;
+			sr.annualDiscountCount = na.annualDiscountCount + na.iosAnnualDiscountCount;
+			sr.cancelMonthCount = ca.monthCount + ca.iosMonthCount ;
+			sr.cancelAnnualCount = ca.annualCount + ca.iosAnnualCount;
+			sr.cancelQuarterCount = ca.quarterCount + ca.iosQuarterCount;
+			sr.cancelAnnualDiscountCount = ca.annualDiscountCount + ca.iosAnnualDiscountCount;
+			sr.total = sr.monthCount + sr.annualCount + sr.annualDiscountCount + sr.quarterCount;
+			sr.cancelTotal = sr.cancelMonthCount + sr.cancelAnnualCount + sr.cancelAnnualDiscountCount + sr.cancelQuarterCount;
+			
+			sr.totalWeighted = na.annualValueCount;
+			sr.cancelTotalWeighted = ca.annualValueCount;
+			sr.delta = sr.total - sr.cancelTotal;
+			sr.deltaWeighted = sr.totalWeighted - sr.cancelTotalWeighted;
+			result.add(sr);
+		}
+		}
 		return result;
 	}
 	
@@ -481,41 +481,59 @@ public class AdminController {
 		}
 	}
 	
+	private void addSubCount(SubscriptionReport sr, int cnt, String sku) {
+		switch(sku) {
+		case "osm_live_subscription_2": sr.monthCount+=cnt; sr.annualValueCount+=(1.2*12*cnt); break;
+		case "osm_free_live_subscription_2": sr.monthCount+=cnt; sr.annualValueCount+=(1.8*12)*cnt; break;
+		case "osm_live_subscription_annual_free_v1": sr.annualCount+=cnt; sr.annualValueCount+=8*cnt; break;
+		case "osm_live_subscription_annual_free_v2": sr.annualDiscountCount+=cnt; sr.annualValueCount+=4*cnt; break;
+		case "osm_live_subscription_annual_full_v1": sr.annualCount+=cnt; sr.annualValueCount+=6*cnt; break;
+		case "osm_live_subscription_annual_full_v2": sr.annualDiscountCount+=cnt; sr.annualValueCount+=3*cnt; break;
+		case "osm_live_subscription_monthly_free_v1": sr.monthCount+=cnt; sr.annualValueCount+=(2*12)*cnt; break;
+		case "osm_live_subscription_monthly_full_v1": sr.monthCount+=cnt; sr.annualValueCount+=(1.5*12)*cnt; break;
+		case "osm_live_subscription_3_months_free_v1": sr.quarterCount+=cnt; sr.annualValueCount+=(4*4)*cnt; break;
+		case "osm_live_subscription_3_months_full_v1": sr.quarterCount+=cnt; sr.annualValueCount+=(4*3)*cnt; break;
+		case "net.osmand.maps.subscription.monthly_v1": sr.iosMonthCount+=cnt; sr.annualValueCount+=(2*12)*cnt; break;
+		case "net.osmand.maps.subscription.3months_v1": sr.iosQuarterCount+=cnt; sr.annualValueCount+=(4*4)*cnt; break;
+		case "net.osmand.maps.subscription.annual_v1": sr.iosAnnualCount+=cnt; sr.annualValueCount+=8*cnt; break;
+		default: throw new UnsupportedOperationException("Unsupported subscription " + sku);
+		};
+	}
+	
 	
 	private List<SubscriptionReport> getSubscriptionsReport() {
 		List<SubscriptionReport> result = jdbcTemplate
 				.query(  "SELECT date_trunc('day', now() - a.month * interval '1 month'), count(*), t.sku "	+
 						 "from  (select generate_series(0, 18) as month) a join supporters_device_sub t  "	+
 						 "on  t.expiretime > now()  - a.month * interval '1 month' and t.starttime < now() - a.month * interval '1 month' "	+
-						 "group by a.month, t.sku order by 1 desc, 2 desc", new RowMapper<SubscriptionReport>() {
+						 "group by a.month, t.sku order by 1 desc, 2 desc", getRowMapper());
+		mergeSubscriptionReports(result);
+		return result;
+	}
 
-					@Override
-					public SubscriptionReport mapRow(ResultSet rs, int rowNum) throws SQLException {
-						SubscriptionReport sr = new SubscriptionReport();
-						sr.date = String.format("%1$tF", rs.getDate(1));
-						int cnt = rs.getInt(2);
-						sr.count += cnt;
-						String sku = rs.getString(3);
-						switch(sku) {
-						case "osm_live_subscription_2": sr.monthCount+=cnt; sr.annualValueCount+=(1.2*12*cnt); break;
-						case "osm_free_live_subscription_2": sr.monthCount+=cnt; sr.annualValueCount+=(1.8*12)*cnt; break;
-						case "osm_live_subscription_annual_free_v1": sr.annualCount+=cnt; sr.annualValueCount+=8*cnt; break;
-						case "osm_live_subscription_annual_free_v2": sr.annualDiscountCount+=cnt; sr.annualValueCount+=4*cnt; break;
-						case "osm_live_subscription_annual_full_v1": sr.annualCount+=cnt; sr.annualValueCount+=6*cnt; break;
-						case "osm_live_subscription_annual_full_v2": sr.annualDiscountCount+=cnt; sr.annualValueCount+=3*cnt; break;
-						case "osm_live_subscription_monthly_free_v1": sr.monthCount+=cnt; sr.annualValueCount+=(2*12)*cnt; break;
-						case "osm_live_subscription_monthly_full_v1": sr.monthCount+=cnt; sr.annualValueCount+=(1.5*12)*cnt; break;
-						case "osm_live_subscription_3_months_free_v1": sr.quarterCount+=cnt; sr.annualValueCount+=(4*4)*cnt; break;
-						case "osm_live_subscription_3_months_full_v1": sr.quarterCount+=cnt; sr.annualValueCount+=(4*3)*cnt; break;
-						case "net.osmand.maps.subscription.monthly_v1": sr.iosMonthCount+=cnt; sr.annualValueCount+=(2*12)*cnt; break;
-						case "net.osmand.maps.subscription.3months_v1": sr.iosQuarterCount+=cnt; sr.annualValueCount+=(4*4)*cnt; break;
-						case "net.osmand.maps.subscription.annual_v1": sr.iosAnnualCount+=cnt; sr.annualValueCount+=8*cnt; break;
-						default: throw new UnsupportedOperationException("");
-						};
-						return sr;
-					}
 
-				});
+
+	private RowMapper<SubscriptionReport> getRowMapper() {
+		return new RowMapper<SubscriptionReport>() {
+
+			@Override
+			public SubscriptionReport mapRow(ResultSet rs, int rowNum) throws SQLException {
+				SubscriptionReport sr = new SubscriptionReport();
+				sr.date = String.format("%1$tF", rs.getDate(1));
+				String sku = rs.getString(3);
+				if (sku != null && sku.length() > 0) {
+					int cnt = rs.getInt(2);
+					sr.count += cnt;
+					addSubCount(sr, cnt, sku);
+				}
+				return sr;
+			}
+		};
+	}
+
+
+
+	private void mergeSubscriptionReports(List<SubscriptionReport> result) {
 		Iterator<SubscriptionReport> it = result.iterator();
 		if(it.hasNext()) {
 			SubscriptionReport prev = it.next();
@@ -529,7 +547,6 @@ public class AdminController {
 				}
 			}
 		}
-		return result;
 	}
 	
 	private static class SurveyReport {
