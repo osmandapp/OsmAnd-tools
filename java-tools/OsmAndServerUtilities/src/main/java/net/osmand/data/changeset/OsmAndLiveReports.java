@@ -782,12 +782,17 @@ public class OsmAndLiveReports {
 			rt.put("month", month);
 			rt.put("region", rs.getString("region"));
 			rt.put("name", rs.getString("name"));
-			if(OsmAndLiveReportType.fromSqlName(rs.getString("name")).isNumberReport()) {
-				rt.put("report", rs.getDouble("report"));
-			} else {
-				rt.put("report", gson.fromJson(rs.getString("report"), rt.getClass()));
+			try {
+				if (OsmAndLiveReportType.fromSqlName(rs.getString("name")).isNumberReport()) {
+					rt.put("report", rs.getDouble("report"));
+				} else {
+					rt.put("report", gson.fromJson(rs.getString("report"), rt.getClass()));
+				}
+				reports.add(rt);
+			} catch(IllegalArgumentException e) {
+				// don't add report if it is too unknown type
+				
 			}
-			reports.add(rt);
 		}
 		res.put("reports", reports);
 		return res;
