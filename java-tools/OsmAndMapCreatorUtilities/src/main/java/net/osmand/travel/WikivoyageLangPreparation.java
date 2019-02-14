@@ -31,11 +31,12 @@ import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 
+import net.osmand.GPXUtilities;
+import net.osmand.GPXUtilities.GPXFile;
+import net.osmand.GPXUtilities.WptPt;
 import net.osmand.PlatformUtil;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.obf.preparation.DBDialect;
-import net.osmand.travel.GPXUtils.GPXFile;
-import net.osmand.travel.GPXUtils.WptPt;
 import net.osmand.wiki.CustomWikiModel;
 import net.osmand.wiki.WikiDatabasePreparation;
 import net.osmand.wiki.WikiDatabasePreparation.LatLon;
@@ -433,13 +434,23 @@ public class WikivoyageLangPreparation {
 						}
 					}
 					if (point.hasLocation() && point.name != null && !point.name.isEmpty()) {
-						point.setColor();
+						if (point.category != null) {
+							if (category.equalsIgnoreCase("see") || category.equalsIgnoreCase("do")) {
+								point.setColor(15461130);
+							} else if (category.equalsIgnoreCase("eat") || category.equalsIgnoreCase("drink")) {
+								point.setColor(15400960);
+							} else if (category.equalsIgnoreCase("sleep")) {
+								point.setColor(3279595);
+							} else if (category.equalsIgnoreCase("buy") || category.equalsIgnoreCase("listing")) {
+								point.setColor(3336970);
+							}
+						}
 						points.add(point);
 					}
 				}
 				if (!points.isEmpty()) {
 					f.addPoints(points);
-					return GPXUtils.asString(f);
+					return GPXUtilities.asString(f);
 				}
 			}
 			return "";
