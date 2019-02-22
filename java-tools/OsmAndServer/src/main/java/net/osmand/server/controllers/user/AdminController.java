@@ -556,10 +556,16 @@ public class AdminController {
 					prev.merge(c);
 					it.remove();
 				} else {
-					prev.nextValue = c.value;
-					prev.nextAnnualValue = c.annualValue;
 					prev = c;
 				}
+			}
+			it = result.iterator();
+			prev = it.next();
+			while(it.hasNext()) {
+				SubscriptionReport c = it.next();
+				prev.nextValue = c.value;
+				prev.nextAnnualValue = c.annualValue;
+				prev = c;
 			}
 		}
 	}
