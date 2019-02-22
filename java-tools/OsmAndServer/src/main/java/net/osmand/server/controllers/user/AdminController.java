@@ -371,6 +371,7 @@ public class AdminController {
 		
 		public int total;
 		public int totalWeighted;
+		public int totalGain;
 		
 		public int cancelMonthCount;
 		public int cancelQuarterCount;
@@ -379,6 +380,7 @@ public class AdminController {
 		
 		public int cancelTotal;
 		public int cancelTotalWeighted;
+		public int cancelLoss;
 		
 		public int delta;
 		public int deltaWeighted;
@@ -443,10 +445,13 @@ public class AdminController {
 			sr.total = sr.monthCount + sr.annualCount + sr.annualDiscountCount + sr.quarterCount;
 			sr.cancelTotal = sr.cancelMonthCount + sr.cancelAnnualCount + sr.cancelAnnualDiscountCount + sr.cancelQuarterCount;
 			
-			sr.totalWeighted = na.annualValueCount;
-			sr.cancelTotalWeighted = ca.annualValueCount;
+			sr.totalWeighted = (int) na.annualValue;
+			sr.cancelTotalWeighted = (int) ca.annualValue;
+			sr.totalGain = (int) na.value;
+			sr.cancelLoss = (int) ca.value;
 			sr.delta = sr.total - sr.cancelTotal;
 			sr.deltaWeighted = sr.totalWeighted - sr.cancelTotalWeighted;
+			
 			result.add(sr);
 		}
 		}
@@ -464,7 +469,8 @@ public class AdminController {
 		public int iosAnnualDiscountCount;
 		public int iosQuarterCount;
 		public int iosMonthCount;
-		public int annualValueCount;
+		public double annualValue;
+		public double value;
 		
 		public void merge(SubscriptionReport c) {
 			count += c.count;
@@ -476,28 +482,33 @@ public class AdminController {
 			iosAnnualDiscountCount += c.iosAnnualDiscountCount;
 			iosQuarterCount += c.iosQuarterCount;
 			iosMonthCount += c.iosMonthCount;
-			annualValueCount += c.annualValueCount;
+			annualValue += c.annualValue;
+			value += c.value;
 			
 		}
 	}
 	
 	private void addSubCount(SubscriptionReport sr, int cnt, String sku) {
+		double value = 0;
+		int periodMonth = 0;
 		switch(sku) {
-		case "osm_live_subscription_2": sr.monthCount+=cnt; sr.annualValueCount+=(1.2*12*cnt); break;
-		case "osm_free_live_subscription_2": sr.monthCount+=cnt; sr.annualValueCount+=(1.8*12)*cnt; break;
-		case "osm_live_subscription_annual_free_v1": sr.annualCount+=cnt; sr.annualValueCount+=8*cnt; break;
-		case "osm_live_subscription_annual_free_v2": sr.annualDiscountCount+=cnt; sr.annualValueCount+=4*cnt; break;
-		case "osm_live_subscription_annual_full_v1": sr.annualCount+=cnt; sr.annualValueCount+=6*cnt; break;
-		case "osm_live_subscription_annual_full_v2": sr.annualDiscountCount+=cnt; sr.annualValueCount+=3*cnt; break;
-		case "osm_live_subscription_monthly_free_v1": sr.monthCount+=cnt; sr.annualValueCount+=(2*12)*cnt; break;
-		case "osm_live_subscription_monthly_full_v1": sr.monthCount+=cnt; sr.annualValueCount+=(1.5*12)*cnt; break;
-		case "osm_live_subscription_3_months_free_v1": sr.quarterCount+=cnt; sr.annualValueCount+=(4*4)*cnt; break;
-		case "osm_live_subscription_3_months_full_v1": sr.quarterCount+=cnt; sr.annualValueCount+=(4*3)*cnt; break;
-		case "net.osmand.maps.subscription.monthly_v1": sr.iosMonthCount+=cnt; sr.annualValueCount+=(2*12)*cnt; break;
-		case "net.osmand.maps.subscription.3months_v1": sr.iosQuarterCount+=cnt; sr.annualValueCount+=(4*4)*cnt; break;
-		case "net.osmand.maps.subscription.annual_v1": sr.iosAnnualCount+=cnt; sr.annualValueCount+=8*cnt; break;
+		case "osm_live_subscription_2": sr.monthCount+=cnt; periodMonth = 1; value = 1.2; break; 
+		case "osm_free_live_subscription_2": sr.monthCount+=cnt; periodMonth = 1; value = 1.8; break;
+		case "osm_live_subscription_annual_free_v1": sr.annualCount+=cnt; periodMonth = 12; value = 8; break;
+		case "osm_live_subscription_annual_free_v2": sr.annualDiscountCount+=cnt; periodMonth = 12; value = 4; break;
+		case "osm_live_subscription_annual_full_v1": sr.annualCount+=cnt; periodMonth = 12; value = 6; break;
+		case "osm_live_subscription_annual_full_v2": sr.annualDiscountCount+=cnt; periodMonth = 12; value = 3; break;
+		case "osm_live_subscription_monthly_free_v1": sr.monthCount+=cnt; periodMonth = 1; value = 2; break;
+		case "osm_live_subscription_monthly_full_v1": sr.monthCount+=cnt; periodMonth = 1; value = 1.5; break;
+		case "osm_live_subscription_3_months_free_v1": sr.quarterCount+=cnt; periodMonth = 3; value = 4; break;
+		case "osm_live_subscription_3_months_full_v1": sr.quarterCount+=cnt; periodMonth = 3; value = 3; break;
+		case "net.osmand.maps.subscription.monthly_v1": sr.iosMonthCount+=cnt; periodMonth = 1; value = 2; break;
+		case "net.osmand.maps.subscription.3months_v1": sr.iosQuarterCount+=cnt; periodMonth = 3; value =4; break;
+		case "net.osmand.maps.subscription.annual_v1": sr.iosAnnualCount+=cnt; periodMonth = 12; value = 8; break;
 		default: throw new UnsupportedOperationException("Unsupported subscription " + sku);
 		};
+		sr.annualValue += cnt * (value * (12 / periodMonth));
+		sr.value += cnt * value;
 	}
 	
 	
