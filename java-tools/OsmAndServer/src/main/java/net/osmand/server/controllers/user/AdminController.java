@@ -546,7 +546,7 @@ public class AdminController {
 			if(i + 12 < result.size()) {
 				SubscriptionReport prevYearMonth = result.get(i + 12);
 				// prevYearMonth.valueOfAnnuals already has revenue instead of value
-				currentMonth.valueOfAnnuals += prevYearMonth.valueOfAnnuals;
+//				currentMonth.valueOfAnnuals += prevYearMonth.valueOfAnnuals;
 			}
 		}
 		
@@ -555,7 +555,7 @@ public class AdminController {
 			if(i + 3 < result.size()) {
 				SubscriptionReport prevQuarterMonth = result.get(i + 3);
 				// prevYearMonth.valueOfAnnuals already has revenue instead of value
-				currentMonth.valueOfQuarterly += prevQuarterMonth.valueOfQuarterly;
+//				currentMonth.valueOfQuarterly += prevQuarterMonth.valueOfQuarterly;
 			}
 		}
 		
@@ -564,7 +564,7 @@ public class AdminController {
 			if(i + 1 < result.size()) {
 				SubscriptionReport prevMonth = result.get(i + 1);
 				// prevYearMonth.valueOfAnnuals already has revenue instead of value
-				currentMonth.valueOfMonthly += prevMonth.valueOfMonthly;
+//				currentMonth.valueOfMonthly += prevMonth.valueOfMonthly;
 			}
 		}
 		
