@@ -538,13 +538,13 @@ public class AdminController {
 			// the operation could be inverted by restoring from last value
 			currentMonth.valueOfAnnuals = currentMonth.valueOfAnnuals - prevMonth.valueOfAnnuals;
 			currentMonth.valueOfQuarterly = currentMonth.valueOfQuarterly - prevMonth.valueOfQuarterly;
-			currentMonth.valueOfMonthly = currentMonth.valueOfQuarterly - prevMonth.valueOfMonthly;
+			currentMonth.valueOfMonthly = currentMonth.valueOfMonthly - prevMonth.valueOfMonthly;
 		}
 		// calculate revenue by going from the end 
 		for(int i = result.size() - 1; i >= 0; i--) {
 			SubscriptionReport currentMonth = result.get(i);
 			if(i + 12 < result.size()) {
-				SubscriptionReport prevYearMonth = result.get(i + 1);
+				SubscriptionReport prevYearMonth = result.get(i + 12);
 				// prevYearMonth.valueOfAnnuals already has revenue instead of value
 				currentMonth.valueOfAnnuals += prevYearMonth.valueOfAnnuals;
 			}
