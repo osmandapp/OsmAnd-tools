@@ -471,6 +471,8 @@ public class AdminController {
 		public int iosMonthCount;
 		public double annualValue;
 		public double value;
+		public double nextValue;
+		public double nextAnnualValue;
 		
 		public void merge(SubscriptionReport c) {
 			count += c.count;
@@ -554,6 +556,8 @@ public class AdminController {
 					prev.merge(c);
 					it.remove();
 				} else {
+					prev.nextValue = c.value;
+					prev.nextAnnualValue = c.annualValue;
 					prev = c;
 				}
 			}
