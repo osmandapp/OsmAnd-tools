@@ -371,7 +371,6 @@ public class AdminController {
 		
 		public int total;
 		public int totalWeighted;
-		public int totalGain;
 		
 		public int cancelMonthCount;
 		public int cancelQuarterCount;
@@ -380,10 +379,10 @@ public class AdminController {
 		
 		public int cancelTotal;
 		public int cancelTotalWeighted;
-		public int cancelLoss;
 		
 		public int delta;
 		public int deltaWeighted;
+		public int revenueGain;
 	}
 	
 	private List<NewSubscriptionReport> getFutureCancelReport() {
@@ -447,8 +446,7 @@ public class AdminController {
 			
 			sr.totalWeighted = (int) na.annualValue;
 			sr.cancelTotalWeighted = (int) ca.annualValue;
-			sr.totalGain = (int) na.value;
-			sr.cancelLoss = (int) ca.value;
+			sr.revenueGain = (int) (na.value - ca.value);
 			sr.delta = sr.total - sr.cancelTotal;
 			sr.deltaWeighted = sr.totalWeighted - sr.cancelTotalWeighted;
 			
@@ -471,8 +469,9 @@ public class AdminController {
 		public int iosMonthCount;
 		public double annualValue;
 		public double value;
-		public double nextValue;
-		public double nextAnnualValue;
+		public double valueOfAnnuals;
+		public double valueOfQuarterly;
+		public double valueOfMonthly;
 		
 		public void merge(SubscriptionReport c) {
 			count += c.count;
@@ -485,6 +484,9 @@ public class AdminController {
 			iosQuarterCount += c.iosQuarterCount;
 			iosMonthCount += c.iosMonthCount;
 			annualValue += c.annualValue;
+			valueOfAnnuals += c.valueOfAnnuals;
+			valueOfMonthly += c.valueOfMonthly;
+			valueOfQuarterly += c.valueOfQuarterly;
 			value += c.value;
 			
 		}
@@ -509,18 +511,63 @@ public class AdminController {
 		case "net.osmand.maps.subscription.annual_v1": sr.iosAnnualCount+=cnt; periodMonth = 12; value = 8; break;
 		default: throw new UnsupportedOperationException("Unsupported subscription " + sku);
 		};
-		sr.annualValue += cnt * (value * (12 / periodMonth));
-		sr.value += cnt * value;
+		double revenuePerPeriod = cnt * value;
+		sr.annualValue += revenuePerPeriod * (12 / periodMonth);
+		sr.value += revenuePerPeriod;
+		if(periodMonth == 12) {
+			sr.valueOfAnnuals += revenuePerPeriod; 	
+		} else if(periodMonth == 3) {
+			sr.valueOfQuarterly += revenuePerPeriod;
+		} else if(periodMonth == 1) {
+			sr.valueOfMonthly += revenuePerPeriod;
+		}
 	}
 	
 	
 	private List<SubscriptionReport> getSubscriptionsReport() {
 		List<SubscriptionReport> result = jdbcTemplate
 				.query(  "SELECT date_trunc('day', now() - a.month * interval '1 month'), count(*), t.sku "	+
-						 "from  (select generate_series(0, 18) as month) a join supporters_device_sub t  "	+
+						 "from  (select generate_series(0, 24) as month) a join supporters_device_sub t  "	+
 						 "on  t.expiretime > now()  - a.month * interval '1 month' and t.starttime < now() - a.month * interval '1 month' "	+
 						 "group by a.month, t.sku order by 1 desc, 2 desc", getRowMapper());
 		mergeSubscriptionReports(result);
+		for(int i = 0; i < result.size() - 1; i++) {
+			SubscriptionReport currentMonth = result.get(i);
+			SubscriptionReport prevMonth = result.get(i + 1);
+			// store difference of value instead of value
+			// the operation could be inverted by restoring from last value
+			currentMonth.valueOfAnnuals = currentMonth.valueOfAnnuals - prevMonth.valueOfAnnuals;
+			currentMonth.valueOfQuarterly = currentMonth.valueOfQuarterly - prevMonth.valueOfQuarterly;
+			currentMonth.valueOfMonthly = currentMonth.valueOfQuarterly - prevMonth.valueOfMonthly;
+		}
+		// calculate revenue by going from the end 
+		for(int i = result.size() - 1; i >= 0; i--) {
+			SubscriptionReport currentMonth = result.get(i);
+			if(i + 12 < result.size()) {
+				SubscriptionReport prevYearMonth = result.get(i + 1);
+				// prevYearMonth.valueOfAnnuals already has revenue instead of value
+				currentMonth.valueOfAnnuals += prevYearMonth.valueOfAnnuals;
+			}
+		}
+		
+		for(int i = result.size() - 1; i >= 0; i--) {
+			SubscriptionReport currentMonth = result.get(i);
+			if(i + 3 < result.size()) {
+				SubscriptionReport prevQuarterMonth = result.get(i + 3);
+				// prevYearMonth.valueOfAnnuals already has revenue instead of value
+				currentMonth.valueOfQuarterly += prevQuarterMonth.valueOfQuarterly;
+			}
+		}
+		
+		for(int i = result.size() - 1; i >= 0; i--) {
+			SubscriptionReport currentMonth = result.get(i);
+			if(i + 1 < result.size()) {
+				SubscriptionReport prevMonth = result.get(i + 1);
+				// prevYearMonth.valueOfAnnuals already has revenue instead of value
+				currentMonth.valueOfMonthly += prevMonth.valueOfMonthly;
+			}
+		}
+		
 		return result;
 	}
 
@@ -558,14 +605,6 @@ public class AdminController {
 				} else {
 					prev = c;
 				}
-			}
-			it = result.iterator();
-			prev = it.next();
-			while(it.hasNext()) {
-				SubscriptionReport c = it.next();
-				prev.nextValue = c.value;
-				prev.nextAnnualValue = c.annualValue;
-				prev = c;
 			}
 		}
 	}
