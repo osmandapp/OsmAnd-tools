@@ -371,6 +371,7 @@ public class AdminController {
 		
 		public int total;
 		public int totalWeighted;
+		public int totalAvgDuration;
 		
 		public int cancelMonthCount;
 		public int cancelQuarterCount;
@@ -379,16 +380,19 @@ public class AdminController {
 		
 		public int cancelTotal;
 		public int cancelTotalWeighted;
+		public int cancelTotalAvgDuration;
 		
 		public int delta;
 		public int deltaWeighted;
 		public int revenueGain;
+		
 	}
 	
 	private List<NewSubscriptionReport> getFutureCancelReport() {
 		List<NewSubscriptionReport> result = jdbcTemplate
 				.query(
-						"select date_trunc('day', expiretime) d,  count(*) cnt from supporters_device_sub where   " +
+						"select date_trunc('day', expiretime) d,  count(*), count(autorenewing),  EXTRACT(DAY FROM avg(expiretime-starttime)) " +
+						"from supporters_device_sub where  " +
 						"expiretime > now() +  interval '1 days' and expiretime < now() +  interval '40 days' " +
 						"group by date_trunc('day', expiretime) order by 1 asc" , new RowMapper<NewSubscriptionReport>() {
 
@@ -396,7 +400,9 @@ public class AdminController {
 					public NewSubscriptionReport mapRow(ResultSet rs, int rowNum) throws SQLException {
 						NewSubscriptionReport sr = new NewSubscriptionReport();
 						sr.date = String.format("%1$tF", rs.getDate(1)); 
-						sr.cancelMonthCount = rs.getInt(2);
+						sr.cancelTotal = sr.cancelMonthCount = rs.getInt(2);
+						// int autorenewingCount = rs.getInt(3);
+						sr.cancelAverageDurationDays = rs.getInt(4);  
 						return sr;
 					}
 
@@ -409,7 +415,8 @@ public class AdminController {
 				.query(	"SELECT O.d, A.cnt, A.sku from ( " +
 						"	SELECT date_trunc('day', generate_series(now() - '90 days'::interval, now(), '1 day'::interval)) as d" +
 						") O left join ( " +
-						"	SELECT date_trunc('day', expiretime) d,  count(*) cnt, sku from supporters_device_sub " +
+						"	SELECT date_trunc('day', expiretime) d,  count(*) cnt, sku, extract(day FROM sum(expiretime-starttime) ) "+
+						"   FROM supporters_device_sub " +
 						"	WHERE expiretime < now() - interval '9 hours' and expiretime > now() -  interval '90 days' " +
 						"	GROUP BY date_trunc('day', expiretime), sku " +
 						") A on A.d = O.d order by 1 desc", getRowMapper());
@@ -418,7 +425,8 @@ public class AdminController {
 				.query(	"SELECT O.d, A.cnt, A.sku from ( " +
 						"	SELECT date_trunc('day', generate_series(now() - '90 days'::interval, now(), '1 day'::interval)) as d" +
 						") O left join ( " +
-						"	SELECT date_trunc('day', starttime) d,  count(*) cnt, sku from supporters_device_sub  " +
+						"	SELECT date_trunc('day', starttime) d,  count(*) cnt, sku, extract(day FROM sum(expiretime-starttime) ) " +
+						"   FROM supporters_device_sub  " +
 						"	WHERE starttime > now() -  interval '90 days' " +
 						"	GROUP BY date_trunc('day', starttime), sku " +
 						") A on A.d = O.d order by 1 desc", getRowMapper());
@@ -442,7 +450,9 @@ public class AdminController {
 			sr.cancelQuarterCount = ca.quarterCount + ca.iosQuarterCount;
 			sr.cancelAnnualDiscountCount = ca.annualDiscountCount + ca.iosAnnualDiscountCount;
 			sr.total = sr.monthCount + sr.annualCount + sr.annualDiscountCount + sr.quarterCount;
+			sr.totalAvgDuration = na.count > 0 ? na.duration / na.count : 0;
 			sr.cancelTotal = sr.cancelMonthCount + sr.cancelAnnualCount + sr.cancelAnnualDiscountCount + sr.cancelQuarterCount;
+			sr.cancelTotalAvgDuration = ca.count > 0 ? ca.duration / ca.count : 0;
 			
 			sr.totalWeighted = (int) na.annualValue;
 			sr.cancelTotalWeighted = (int) ca.annualValue;
@@ -459,6 +469,8 @@ public class AdminController {
 	public static class SubscriptionReport {
 		public String date;
 		public int count;
+		public int duration;
+		
 		public int annualCount;
 		public int monthCount;
 		public int annualDiscountCount;
@@ -475,6 +487,7 @@ public class AdminController {
 		
 		public void merge(SubscriptionReport c) {
 			count += c.count;
+			duration += c.duration;
 			annualCount += c.annualCount;
 			monthCount += c.monthCount;
 			annualDiscountCount += c.annualDiscountCount;
@@ -526,10 +539,10 @@ public class AdminController {
 	
 	private List<SubscriptionReport> getSubscriptionsReport() {
 		List<SubscriptionReport> result = jdbcTemplate
-				.query(  "SELECT date_trunc('day', now() - a.month * interval '1 month'), count(*), t.sku "	+
-						 "from  (select generate_series(0, 24) as month) a join supporters_device_sub t  "	+
-						 "on  t.expiretime > now()  - a.month * interval '1 month' and t.starttime < now() - a.month * interval '1 month' "	+
-						 "group by a.month, t.sku order by 1 desc, 2 desc", getRowMapper());
+				.query(  "SELECT date_trunc('day', now() - a.month * interval '1 month'), count(*), t.sku, extract(day FROM sum(t.expiretime-t.starttime) ) "	+
+						 "FROM (select generate_series(0, 24) as month) a join supporters_device_sub t  "	+
+						 "ON t.expiretime > now()  - a.month * interval '1 month' and t.starttime < now() - a.month * interval '1 month' "	+
+						 "GROUP BY a.month, t.sku ORDER BY 1 desc, 2 desc", getRowMapper());
 		mergeSubscriptionReports(result);
 		for(int i = 0; i < result.size() - 1; i++) {
 			SubscriptionReport currentMonth = result.get(i);
@@ -580,6 +593,7 @@ public class AdminController {
 			public SubscriptionReport mapRow(ResultSet rs, int rowNum) throws SQLException {
 				SubscriptionReport sr = new SubscriptionReport();
 				sr.date = String.format("%1$tF", rs.getDate(1));
+				sr.duration += rs.getInt(4);
 				String sku = rs.getString(3);
 				if (sku != null && sku.length() > 0) {
 					int cnt = rs.getInt(2);
