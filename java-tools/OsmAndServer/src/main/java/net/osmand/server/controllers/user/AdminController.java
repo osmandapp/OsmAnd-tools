@@ -402,7 +402,7 @@ public class AdminController {
 						sr.date = String.format("%1$tF", rs.getDate(1)); 
 						sr.cancelTotal = sr.cancelMonthCount = rs.getInt(2);
 						// int autorenewingCount = rs.getInt(3);
-						sr.cancelAverageDurationDays = rs.getInt(4);  
+						sr.cancelTotalAvgDuration = rs.getInt(4);  
 						return sr;
 					}
 
