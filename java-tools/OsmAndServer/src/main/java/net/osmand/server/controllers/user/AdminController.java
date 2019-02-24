@@ -412,20 +412,20 @@ public class AdminController {
 	
 	private List<NewSubscriptionReport> getNewSubsReport() {
 		List<SubscriptionReport> cancelled = jdbcTemplate
-				.query(	"SELECT O.d, A.cnt, A.sku from ( " +
+				.query(	"SELECT O.d, A.cnt, A.sku, A.dur from ( " +
 						"	SELECT date_trunc('day', generate_series(now() - '90 days'::interval, now(), '1 day'::interval)) as d" +
 						") O left join ( " +
-						"	SELECT date_trunc('day', expiretime) d,  count(*) cnt, sku, extract(day FROM sum(expiretime-starttime) ) "+
+						"	SELECT date_trunc('day', expiretime) d,  count(*) cnt, sku, extract(day FROM sum(expiretime-starttime) ) dur "+
 						"   FROM supporters_device_sub " +
 						"	WHERE expiretime < now() - interval '9 hours' and expiretime > now() -  interval '90 days' " +
 						"	GROUP BY date_trunc('day', expiretime), sku " +
 						") A on A.d = O.d order by 1 desc", getRowMapper());
 		mergeSubscriptionReports(cancelled);
 		List<SubscriptionReport> newActive = jdbcTemplate
-				.query(	"SELECT O.d, A.cnt, A.sku from ( " +
+				.query(	"SELECT O.d, A.cnt, A.sku, A.dur from ( " +
 						"	SELECT date_trunc('day', generate_series(now() - '90 days'::interval, now(), '1 day'::interval)) as d" +
 						") O left join ( " +
-						"	SELECT date_trunc('day', starttime) d,  count(*) cnt, sku, extract(day FROM sum(expiretime-starttime) ) " +
+						"	SELECT date_trunc('day', starttime) d,  count(*) cnt, sku, extract(day FROM sum(expiretime-starttime) ) dur " +
 						"   FROM supporters_device_sub  " +
 						"	WHERE starttime > now() -  interval '90 days' " +
 						"	GROUP BY date_trunc('day', starttime), sku " +
