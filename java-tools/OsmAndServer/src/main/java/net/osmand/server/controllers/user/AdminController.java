@@ -390,25 +390,27 @@ public class AdminController {
 		
 	}
 	
-	private List<NewSubscriptionReport> getFutureCancelReport() {
-		List<NewSubscriptionReport> result = jdbcTemplate
+	private List<SubscriptionReport> getFutureCancelReport() {
+		RowMapper<NewSubscriptionReport> oldRm = new RowMapper<NewSubscriptionReport>() {
+
+			@Override
+			public NewSubscriptionReport mapRow(ResultSet rs, int rowNum) throws SQLException {
+				NewSubscriptionReport sr = new NewSubscriptionReport();
+				sr.date = String.format("%1$tF", rs.getDate(1)); 
+				sr.cancelTotal = sr.cancelMonthCount = rs.getInt(2);
+				// int autorenewingCount = rs.getInt(3);
+				sr.cancelTotalAvgDuration = rs.getInt(4);  
+				return sr;
+			}
+
+		};
+		List<SubscriptionReport> result = jdbcTemplate
 				.query(
-						"select date_trunc('day', expiretime) d,  count(*), count(autorenewing),  EXTRACT(DAY FROM avg(expiretime-starttime)) " +
+						"select date_trunc('day', expiretime) d,  count(*), sku,  EXTRACT(DAY FROM avg(expiretime-starttime)) " +
 						"from supporters_device_sub where  " +
 						"expiretime > now() +  interval '1 days' and expiretime < now() +  interval '40 days' " +
-						"group by date_trunc('day', expiretime) order by 1 asc" , new RowMapper<NewSubscriptionReport>() {
-
-					@Override
-					public NewSubscriptionReport mapRow(ResultSet rs, int rowNum) throws SQLException {
-						NewSubscriptionReport sr = new NewSubscriptionReport();
-						sr.date = String.format("%1$tF", rs.getDate(1)); 
-						sr.cancelTotal = sr.cancelMonthCount = rs.getInt(2);
-						// int autorenewingCount = rs.getInt(3);
-						sr.cancelTotalAvgDuration = rs.getInt(4);  
-						return sr;
-					}
-
-				});
+						"group by date_trunc('day', expiretime), sku order by 1 asc" , getRowMapper());
+		mergeSubscriptionReports(result);
 		return result;
 	}	
 	
