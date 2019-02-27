@@ -406,7 +406,7 @@ public class AdminController {
 		};
 		List<SubscriptionReport> result = jdbcTemplate
 				.query(
-						"select date_trunc('day', expiretime) d,  count(*), sku,  EXTRACT(DAY FROM avg(expiretime-starttime)) " +
+						"select date_trunc('day', expiretime) d,  count(*), sku,  EXTRACT(DAY FROM sum(expiretime-starttime)) " +
 						"from supporters_device_sub where  " +
 						"expiretime > now() +  interval '1 days' and expiretime < now() +  interval '40 days' " +
 						"group by date_trunc('day', expiretime), sku order by 1 asc" , getRowMapper());
