@@ -385,6 +385,8 @@ public class AdminController {
 		public int delta;
 		public int deltaWeighted;
 		public int revenueGain;
+		public int totalLifeValue;
+		public int cancelTotalLifeValue;
 		
 	}
 	
@@ -456,6 +458,9 @@ public class AdminController {
 			
 			sr.totalWeighted = (int) na.annualValue;
 			sr.cancelTotalWeighted = (int) ca.annualValue;
+			sr.totalLifeValue = (int) na.totalLifeValue;
+			sr.cancelTotalLifeValue = (int) ca.totalLifeValue;
+			
 			sr.revenueGain = (int) (na.value - ca.value);
 			sr.delta = sr.total - sr.cancelTotal;
 			sr.deltaWeighted = sr.totalWeighted - sr.cancelTotalWeighted;
@@ -481,6 +486,7 @@ public class AdminController {
 		public int iosMonthCount;
 		public double annualValue;
 		public double value;
+		public double totalLifeValue;
 		public double valueOfAnnuals;
 		public double valueOfQuarterly;
 		public double valueOfMonthly;
@@ -497,6 +503,7 @@ public class AdminController {
 			iosQuarterCount += c.iosQuarterCount;
 			iosMonthCount += c.iosMonthCount;
 			annualValue += c.annualValue;
+			totalLifeValue += c.totalLifeValue;
 			valueOfAnnuals += c.valueOfAnnuals;
 			valueOfMonthly += c.valueOfMonthly;
 			valueOfQuarterly += c.valueOfQuarterly;
@@ -505,7 +512,7 @@ public class AdminController {
 		}
 	}
 	
-	private void addSubCount(SubscriptionReport sr, int cnt, String sku) {
+	private void addSubCount(SubscriptionReport sr, int cnt, String sku, int duration) {
 		double value = 0;
 		int periodMonth = 0;
 		switch(sku) {
@@ -527,6 +534,7 @@ public class AdminController {
 		double revenuePerPeriod = cnt * value;
 		sr.annualValue += revenuePerPeriod * (12 / periodMonth);
 		sr.value += revenuePerPeriod;
+		sr.totalLifeValue += value * duration / (periodMonth * 30.0);
 		if(periodMonth == 12) {
 			sr.valueOfAnnuals += revenuePerPeriod; 	
 		} else if(periodMonth == 3) {
@@ -598,7 +606,7 @@ public class AdminController {
 				if (sku != null && sku.length() > 0) {
 					int cnt = rs.getInt(2);
 					sr.count += cnt;
-					addSubCount(sr, cnt, sku);
+					addSubCount(sr, cnt, sku, sr.duration);
 				}
 				return sr;
 			}
