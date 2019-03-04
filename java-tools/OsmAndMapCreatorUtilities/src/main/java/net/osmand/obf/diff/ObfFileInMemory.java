@@ -61,6 +61,7 @@ import java.util.zip.GZIPOutputStream;
 
 import gnu.trove.iterator.TLongObjectIterator;
 import gnu.trove.list.array.TIntArrayList;
+import gnu.trove.map.hash.TIntLongHashMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.map.hash.TLongObjectHashMap;
 import rtree.LeafElement;
@@ -87,6 +88,7 @@ public class ObfFileInMemory {
 	
 	private TLongObjectHashMap<TransportStop> transportStops = new TLongObjectHashMap<>();
 	private TIntObjectHashMap<TransportRoute> transportRoutes = new TIntObjectHashMap<>();
+	private TIntLongHashMap routesIds = new TIntLongHashMap();
 
 	public TLongObjectHashMap<BinaryMapDataObject> get(MapZooms.MapZoomPair zoom) {
 		if (!mapObjects.containsKey(zoom)) {
@@ -225,6 +227,7 @@ public class ObfFileInMemory {
 			settings.indexTransport = true;
 			IndexTransportCreator indexCreator = new IndexTransportCreator(settings);
 			Map<String, Integer> stringTable = indexCreator.createStringTableForTransport();
+			Map<Long, Long> newRoutesIds = new LinkedHashMap<>();
 
 			writer.startWriteTransportIndex(Algorithms.capitalizeFirstLetter(name));
 			if (transportRoutes.size() > 0) {
@@ -245,9 +248,33 @@ public class ObfFileInMemory {
 					writer.writeTransportRoute(route.getId(), route.getName(), route.getEnName(false),
 							route.getRef(), route.getOperator(), route.getType(), route.getDistance(),
 							route.getColor(), route.getForwardStops(), directGeometry,
-							stringTable, null, route.getSchedule());
+							stringTable, newRoutesIds, route.getSchedule());
 				}
 				writer.endWriteTransportRoutes();
+			}
+			for (TransportStop stop : transportStops.valueCollection()) {
+				int[] referencesToRoutes = stop.getReferencesToRoutes();
+				if (referencesToRoutes != null && referencesToRoutes.length > 0) {
+					List<Integer> newReferencesToRoutes = new ArrayList<>();
+					for (int referencesToRoute : referencesToRoutes) {
+						long routeId = routesIds.get(referencesToRoute);
+						if (routeId != routesIds.getNoEntryValue()) {
+							Long newOffset = newRoutesIds.get(routeId);
+							if (newOffset != null) {
+								newReferencesToRoutes.add(newOffset.intValue());
+							}
+						}
+					}
+					if (newReferencesToRoutes.size() == 0) {
+						stop.setReferencesToRoutes(null);
+					} else {
+						int[] refs = new int[newReferencesToRoutes.size()];
+						for (int i = 0; i < newReferencesToRoutes.size(); i++) {
+							refs[i] = newReferencesToRoutes.get(i);
+						}
+						stop.setReferencesToRoutes(refs);
+					}
+				}
 			}
 
 			writeTransportStops(indexCreator, writer, transportStops, stringTable, targetFile);
@@ -280,8 +307,10 @@ public class ObfFileInMemory {
 		try {
 			rtree = new RTree(nonpackRtree.getAbsolutePath());
 			for (TransportStop s : transportStops.valueCollection()) {
+				int x = (int) MapUtils.getTileNumberX(24, s.getLocation().getLongitude());
+				int y = (int) MapUtils.getTileNumberY(24, s.getLocation().getLatitude());
 				try {
-					rtree.insert(new LeafElement(new Rect(s.x31, s.y31, s.x31, s.y31), s.getId()));
+					rtree.insert(new LeafElement(new Rect(x, y, x, y), s.getId()));
 				} catch (Exception e) {
 					throw new RuntimeException(e);
 				}
@@ -484,6 +513,7 @@ public class ObfFileInMemory {
 				-1, null);
 		List<TransportStop> sti = indexReader.searchTransportIndex(sr);
 		List<Integer> routesData = new ArrayList<>();
+		routesIds.clear();
 		putTransportData(sti, routesData, override);
 		if (routesData.size() > 0) {
 			int[] array = new int[routesData.size()];
@@ -491,6 +521,10 @@ public class ObfFileInMemory {
 				array[i] = routesData.get(i);
 			}
 			transportRoutes = indexReader.getTransportRoutes(array);
+			for (int k : transportRoutes.keys()) {
+				TransportRoute route = transportRoutes.get(k);
+				routesIds.put(k, route.getId());
+			}
 		}
 	}
 	
@@ -499,7 +533,7 @@ public class ObfFileInMemory {
 			int[] referencesToRoutes = ts.getReferencesToRoutes();
 			if (referencesToRoutes != null && referencesToRoutes.length > 0) {
 				for (int ref : referencesToRoutes) {
-					if (override || !transportRoutes.containsKey(ref)) {
+					if (override || !routesData.contains(ref)) {
 						routesData.add(ref);
 					}
 				}
