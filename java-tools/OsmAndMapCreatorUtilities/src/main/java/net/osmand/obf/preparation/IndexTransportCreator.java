@@ -1,26 +1,7 @@
 package net.osmand.obf.preparation;
 
-import gnu.trove.list.array.TIntArrayList;
-
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.IOException;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 
 import net.osmand.data.LatLon;
 import net.osmand.data.QuadRect;
@@ -44,6 +25,29 @@ import net.sf.junidecode.Junidecode;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.lang.reflect.Type;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import gnu.trove.list.array.TIntArrayList;
+import gnu.trove.map.hash.TLongObjectHashMap;
 import rtree.Element;
 import rtree.IllegalValueException;
 import rtree.LeafElement;
@@ -51,10 +55,6 @@ import rtree.RTree;
 import rtree.RTreeException;
 import rtree.RTreeInsertException;
 import rtree.Rect;
-
-import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
-import java.lang.reflect.Type;
 
 public class IndexTransportCreator extends AbstractIndexPartCreator {
 
@@ -168,6 +168,42 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		}
 	}
 
+	public void writeBinaryTransportTree(rtree.Node parent, RTree r, BinaryMapIndexWriter writer,
+										 TLongObjectHashMap<TransportStop> transportStops,
+										 Map<String, Integer> stringTable) throws IOException, RTreeException, SQLException {
+		Element[] e = parent.getAllElements();
+		List<Long> routes = null;
+		for (int i = 0; i < parent.getTotalElements(); i++) {
+			Rect re = e[i].getRect();
+			if (e[i].getElementType() == rtree.Node.LEAF_NODE) {
+				long id = e[i].getPtr();
+				TransportStop stop = transportStops.get(id);
+				if (stop != null) {
+					int x24 = (int) MapUtils.getTileNumberX(24, stop.getLocation().getLongitude());
+					int y24 = (int) MapUtils.getTileNumberY(24, stop.getLocation().getLatitude());
+					int[] referencesToRoutes = stop.getReferencesToRoutes();
+					if (referencesToRoutes != null && referencesToRoutes.length > 0) {
+						routes = new ArrayList<>();
+						for (int referencesToRoute : referencesToRoutes) {
+							routes.add((long) referencesToRoute);
+						}
+					}
+					Map<Entity.EntityId, List<TransportStopExit>> exits = new HashMap<>();
+					exits.put(new EntityId(Entity.EntityType.NODE, stop.getId()), stop.getExits());
+					writer.writeTransportStop(id, x24, y24, stop.getName(), stop.getEnName(false), stop.getNamesMap(false), stringTable, routes, exits);
+				} else {
+					log.error("Something goes wrong with transport id = " + id);
+				}
+			} else {
+				long ptr = e[i].getPtr();
+				rtree.Node ns = r.getReadNode(ptr);
+
+				writer.startTransportTreeElement(re.getMinX(), re.getMaxX(), re.getMinY(), re.getMaxY());
+				writeBinaryTransportTree(ns, r, writer, transportStops, stringTable);
+				writer.endWriteTransportTreeElement();
+			}
+		}
+	}
 
 	public void packRTree(String rtreeTransportStopsFileName, String rtreeTransportStopsPackFileName) throws IOException {
 		transportStopsTree = packRtreeFile(transportStopsTree, rtreeTransportStopsFileName, rtreeTransportStopsPackFileName);
@@ -397,12 +433,18 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 
 
 	private void addBatch(TransportRoute route, ByteArrayOutputStream ous, Way tr) throws SQLException {
-		if(tr.getNodes().size() == 0) {
+		if (tr.getNodes().size() == 0) {
 			return;
 		}
 		transRouteGeometryStat.setLong(1, route.getId());
+		writeWay(ous, tr);
+		transRouteGeometryStat.setBytes(2, ous.toByteArray());
+		addBatch(transRouteGeometryStat);
+	}
+
+	public void writeWay(ByteArrayOutputStream ous, Way way) {
 		ous.reset();
-		for (Node n : tr.getNodes()) {
+		for (Node n : way.getNodes()) {
 			int y = MapUtils.get31TileNumberY(n.getLatitude());
 			int x = MapUtils.get31TileNumberX(n.getLongitude());
 			try {
@@ -412,8 +454,6 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 				e.printStackTrace();
 			}
 		}
-		transRouteGeometryStat.setBytes(2, ous.toByteArray());
-		addBatch(transRouteGeometryStat);
 	}
 
 
@@ -584,7 +624,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		return size;
 	}
 
-	private Map<String, Integer> createStringTableForTransport() {
+	public Map<String, Integer> createStringTableForTransport() {
 		Map<String, Integer> stringTable = new LinkedHashMap<String, Integer>();
 		registerString(stringTable, "bus"); //$NON-NLS-1$
 		registerString(stringTable, "trolleybus"); //$NON-NLS-1$

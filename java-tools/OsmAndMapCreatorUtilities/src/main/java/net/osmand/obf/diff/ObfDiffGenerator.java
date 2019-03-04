@@ -1,5 +1,22 @@
 package net.osmand.obf.diff;
 
+import net.osmand.PlatformUtil;
+import net.osmand.binary.BinaryMapDataObject;
+import net.osmand.binary.BinaryMapIndexReader.MapIndex;
+import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
+import net.osmand.binary.MapZooms.MapZoomPair;
+import net.osmand.binary.RouteDataObject;
+import net.osmand.data.Amenity;
+import net.osmand.data.MapObject;
+import net.osmand.data.TransportRoute;
+import net.osmand.data.TransportStop;
+import net.osmand.obf.BinaryInspector;
+import net.osmand.osm.edit.Entity.EntityId;
+import net.osmand.osm.edit.Entity.EntityType;
+
+import org.xmlpull.v1.XmlPullParser;
+import org.xmlpull.v1.XmlPullParserException;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -11,25 +28,12 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.zip.GZIPInputStream;
 import java.util.Set;
-
-import org.xmlpull.v1.XmlPullParser;
-import org.xmlpull.v1.XmlPullParserException;
-
 import java.util.TreeMap;
+import java.util.zip.GZIPInputStream;
 
+import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.map.hash.TLongObjectHashMap;
-import net.osmand.PlatformUtil;
-import net.osmand.binary.BinaryMapDataObject;
-import net.osmand.binary.BinaryMapIndexReader.MapIndex;
-import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
-import net.osmand.binary.MapZooms.MapZoomPair;
-import net.osmand.binary.RouteDataObject;
-import net.osmand.data.Amenity;
-import net.osmand.obf.BinaryInspector;
-import net.osmand.osm.edit.Entity.EntityId;
-import net.osmand.osm.edit.Entity.EntityType;
 import rtree.RTreeException;
 
 public class ObfDiffGenerator {
@@ -43,8 +47,10 @@ public class ObfDiffGenerator {
 	public static void main(String[] args) throws IOException, RTreeException {
 		if(args.length == 1 && args[0].equals("test")) {
 			args = new String[3];
-			args[0] = "/Users/victorshcherb/osmand/maps/diff/17_10_01_03_45__new.obf";
-			args[1] = "/Users/victorshcherb/osmand/maps/diff/17_10_01_03_45__old.obf";
+			args[0] = "/Users/alexey/tmp/maps/new/Ukraine_kiev_europe.obf";
+			args[1] = "/Users/alexey/tmp/maps/old/Ukraine_kiev_europe.obf";
+			args[0] = "/Users/alexey/tmp/maps/new/Ukraine_crimea_europe.obf";
+			args[1] = "/Users/alexey/tmp/maps/old/Ukraine_crimea_europe.obf";
 //			args[2] = "/Users/victorshcherb/osmand/maps/diff/Diff.obf";
 			args[2] = "stdout";
 		}
@@ -99,8 +105,7 @@ public class ObfDiffGenerator {
 		compareMapData(fStart, fEnd, result == null, modifiedObjIds);
 		compareRouteData(fStart, fEnd, result == null, modifiedObjIds);
 		comparePOI(fStart, fEnd, result == null, modifiedObjIds);
-		// TODO Compare Transport
-		//compareTransport(fStart, fEnd);
+		compareTransport(fStart, fEnd, result == null, modifiedObjIds);
 		
 		System.out.println("Finished comparing.");
 		if (result != null) {
@@ -110,22 +115,96 @@ public class ObfDiffGenerator {
 			fEnd.writeFile(result, false);
 		}
 	}
-	
+
+	private void compareTransport(ObfFileInMemory fStart, ObfFileInMemory fEnd, boolean print, Set<EntityId> modifiedObjIds) {
+		TLongObjectHashMap<TransportStop> startStopData = fStart.getTransportStops();
+		TLongObjectHashMap<TransportStop> endStopData = fEnd.getTransportStops();
+		if (endStopData == null) {
+			return;
+		}
+		TIntObjectHashMap<TransportRoute> startRouteData = fStart.getTransportRoutes();
+		TIntObjectHashMap<TransportRoute> endRouteData = fEnd.getTransportRoutes();
+		if (endRouteData == null) {
+			return;
+		}
+		for (Long idx : startStopData.keys()) {
+			TransportStop objS = startStopData.get(idx);
+			TransportStop objE = endStopData.get(idx);
+			EntityId aid = getMapObjectId(objS);
+			if (print) {
+				if (objE == null) {
+					System.out.println("Transport stop " + idx + " is missing in (2): " + objS);
+				} else {
+					if (!objE.compareStop(objS) || !compareRoutes(objS, startRouteData, objE, endRouteData)) {
+						System.out.println("Transport stop " + idx + " is not equal: " + objS + " != " + objE);
+					}
+					endStopData.remove(idx);
+				}
+			} else {
+				if (objE == null) {
+					if (modifiedObjIds == null || modifiedObjIds.contains(aid) || aid == null) {
+						objS.setDeleted();
+						endStopData.put(idx, objS);
+					}
+				} else if (objE.compareStop(objS) && compareRoutes(objS, startRouteData, objE, endRouteData)) {
+					endStopData.remove(idx);
+				}
+			}
+		}
+		if (print) {
+			for (TransportStop e : endStopData.valueCollection()) {
+				System.out.println("Transport stop " + e.getId() + " is missing in (1): " + e);
+			}
+		}
+	}
+
+	private boolean compareRoutes(TransportStop stopS, TIntObjectHashMap<TransportRoute> routesS,
+								  TransportStop stopE, TIntObjectHashMap<TransportRoute> routesE) {
+		int[] refsS = stopS.getReferencesToRoutes();
+		int[] refsE = stopE.getReferencesToRoutes();
+		if (refsS != null && refsE != null && refsS.length == refsE.length) {
+			TLongObjectHashMap<TransportRoute> startRoutes = new TLongObjectHashMap<>();
+			TLongObjectHashMap<TransportRoute> endRoutes = new TLongObjectHashMap<>();
+			for (int ref : refsS) {
+				TransportRoute r = routesS.get(ref);
+				if (r != null) {
+					startRoutes.put(r.getId(), r);
+				}
+			}
+			for (int ref : refsE) {
+				TransportRoute r = routesE.get(ref);
+				if (r != null) {
+					endRoutes.put(r.getId(), r);
+				}
+			}
+			if (startRoutes.size() == endRoutes.size()) {
+				for (TransportRoute startRoute : startRoutes.valueCollection()) {
+					TransportRoute endRoute = endRoutes.get(startRoute.getId());
+					if (!startRoute.compareRoute(endRoute)) {
+						return false;
+					}
+				}
+			}
+			return true;
+		}
+		return refsS == null && refsE == null;
+	}
+
 	private void comparePOI(ObfFileInMemory fStart, ObfFileInMemory fEnd, boolean print, Set<EntityId> modifiedObjIds) {
-	 	TLongObjectHashMap<Map<String, Amenity>> startPoiSource = fStart.getPoiObjects();
-	 	TLongObjectHashMap<Map<String, Amenity>> endPoiSource = fEnd.getPoiObjects();
-	 	if (endPoiSource == null) {
-	 		return;
-	 	}
-	 	Map<String, Amenity> startPoi = buildPoiMap(startPoiSource);
-	 	Map<String, Amenity> endPoi = buildPoiMap(endPoiSource);
-	 	if(print) {
+		TLongObjectHashMap<Map<String, Amenity>> startPoiSource = fStart.getPoiObjects();
+		TLongObjectHashMap<Map<String, Amenity>> endPoiSource = fEnd.getPoiObjects();
+		if (endPoiSource == null) {
+			return;
+		}
+		Map<String, Amenity> startPoi = buildPoiMap(startPoiSource);
+		Map<String, Amenity> endPoi = buildPoiMap(endPoiSource);
+		if (print) {
 			System.out.println("Compare POI");
 		}
 		for (String idx : startPoi.keySet()) {
 			Amenity objE = endPoi.get(idx);
 			Amenity objS = startPoi.get(idx);
-			EntityId aid = getAmenityId(objS);
+			EntityId aid = getMapObjectId(objS);
 			if (print) {
 				if (objE == null) {
 					System.out.println("POI " + idx + " is missing in (2): " + objS);
@@ -145,7 +224,7 @@ public class ObfDiffGenerator {
 						}
 						endPoiSource.get(objS.getId()).put(objS.getType().getKeyName(), objS);
 					}
-					
+
 				} else {
 					if (objS.comparePoi(objE)) {
 						endPoi.remove(idx);
@@ -154,7 +233,7 @@ public class ObfDiffGenerator {
 				}
 			}
 		}
-	 	
+
 		if (print) {
 			Iterator<Entry<String, Amenity>> it = endPoi.entrySet().iterator();
 			while (it.hasNext()) {
@@ -162,10 +241,7 @@ public class ObfDiffGenerator {
 				System.out.println("POI " + e.getKey() + " is missing in (1): " + e.getValue());
 			}
 		}
-	 	
-	 }
-
-	
+	}
 
 	private Map<String, Amenity> buildPoiMap(TLongObjectHashMap<Map<String, Amenity>> startPoiSource) {
 		HashMap<String, Amenity> map = new HashMap<>();
@@ -237,7 +313,7 @@ public class ObfDiffGenerator {
 
 	}
 
-	private EntityId getAmenityId(Amenity objS) {
+	private EntityId getMapObjectId(MapObject objS) {
 		Long id = objS.getId();
 		if (id < ID_MULTIPOLYGON_LIMIT && id > 0) {
 			if ((id % 2) == 0) {
