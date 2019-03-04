@@ -279,17 +279,24 @@ public class ObfFileInMemory {
 		RTree rtree = null;
 		try {
 			rtree = new RTree(nonpackRtree.getAbsolutePath());
-			TransportStop stop = transportStops.get(0);
-			int minX = stop.x31;
-			int maxX = stop.x31;
-			int maxY = stop.y31;
-			int minY = stop.y31;
-			for (int i = 1; i < transportStops.size(); i++) {
-				stop = transportStops.get(i);
-				minX = Math.min(minX, stop.x31);
-				minY = Math.min(minY, stop.y31);
-				maxX = Math.max(maxX, stop.x31);
-				maxY = Math.max(maxY, stop.y31);
+			int minX = Integer.MAX_VALUE;
+			int maxX = Integer.MIN_VALUE;
+			int maxY = Integer.MIN_VALUE;
+			int minY = Integer.MAX_VALUE;
+			TransportStop stop = null;
+			for (TransportStop s : transportStops.valueCollection()) {
+				if (minX == Integer.MAX_VALUE) {
+					minX = s.x31;
+					maxX = s.x31;
+					maxY = s.y31;
+					minY = s.y31;
+					stop = s;
+				} else {
+					minX = Math.min(minX, s.x31);
+					minY = Math.min(minY, s.y31);
+					maxX = Math.max(maxX, s.x31);
+					maxY = Math.max(maxY, s.y31);
+				}
 			}
 			try {
 				rtree.insert(new LeafElement(new Rect(minX, minY, maxX, maxY), stop.getId()));
