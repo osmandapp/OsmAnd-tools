@@ -226,7 +226,7 @@ public class ObfFileInMemory {
 			IndexTransportCreator indexCreator = new IndexTransportCreator(settings);
 			Map<String, Integer> stringTable = indexCreator.createStringTableForTransport();
 
-			writer.startWriteTransportIndex(name);
+			writer.startWriteTransportIndex(Algorithms.capitalizeFirstLetter(name));
 			if (transportRoutes.size() > 0) {
 				writer.startWriteTransportRoutes();
 				ByteArrayOutputStream ows = new ByteArrayOutputStream();
@@ -279,29 +279,12 @@ public class ObfFileInMemory {
 		RTree rtree = null;
 		try {
 			rtree = new RTree(nonpackRtree.getAbsolutePath());
-			int minX = Integer.MAX_VALUE;
-			int maxX = Integer.MIN_VALUE;
-			int maxY = Integer.MIN_VALUE;
-			int minY = Integer.MAX_VALUE;
-			TransportStop stop = null;
 			for (TransportStop s : transportStops.valueCollection()) {
-				if (minX == Integer.MAX_VALUE) {
-					minX = s.x31;
-					maxX = s.x31;
-					maxY = s.y31;
-					minY = s.y31;
-					stop = s;
-				} else {
-					minX = Math.min(minX, s.x31);
-					minY = Math.min(minY, s.y31);
-					maxX = Math.max(maxX, s.x31);
-					maxY = Math.max(maxY, s.y31);
+				try {
+					rtree.insert(new LeafElement(new Rect(s.x31, s.y31, s.x31, s.y31), s.getId()));
+				} catch (Exception e) {
+					throw new RuntimeException(e);
 				}
-			}
-			try {
-				rtree.insert(new LeafElement(new Rect(minX, minY, maxX, maxY), stop.getId()));
-			} catch (Exception e) {
-				throw new RuntimeException(e);
 			}
 			rtree = AbstractIndexPartCreator.packRtreeFile(rtree, nonpackRtree.getAbsolutePath(),
 					packRtree.getAbsolutePath());
