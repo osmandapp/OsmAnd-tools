@@ -1,28 +1,6 @@
 package net.osmand.obf.diff;
 
-import gnu.trove.iterator.TLongObjectIterator;
-import gnu.trove.list.array.TIntArrayList;
-import gnu.trove.map.hash.TLongObjectHashMap;
-
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.io.RandomAccessFile;
-import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.TreeMap;
-import java.util.zip.GZIPInputStream;
-import java.util.zip.GZIPOutputStream;
-
-import org.apache.commons.logging.Log;
+import com.google.protobuf.CodedOutputStream;
 
 import net.osmand.IndexConstants;
 import net.osmand.PlatformUtil;
@@ -43,6 +21,7 @@ import net.osmand.binary.MapZooms.MapZoomPair;
 import net.osmand.binary.OsmandOdb;
 import net.osmand.binary.RouteDataObject;
 import net.osmand.data.Amenity;
+import net.osmand.data.TransportRoute;
 import net.osmand.data.TransportStop;
 import net.osmand.obf.preparation.AbstractIndexPartCreator;
 import net.osmand.obf.preparation.BinaryFileReference;
@@ -52,16 +31,43 @@ import net.osmand.obf.preparation.IndexCreatorSettings;
 import net.osmand.obf.preparation.IndexPoiCreator;
 import net.osmand.obf.preparation.IndexRouteCreator;
 import net.osmand.obf.preparation.IndexRouteCreator.RouteWriteContext;
+import net.osmand.obf.preparation.IndexTransportCreator;
 import net.osmand.obf.preparation.IndexVectorMapCreator;
 import net.osmand.osm.MapRenderingTypesEncoder;
+import net.osmand.osm.edit.Way;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
+
+import org.apache.commons.logging.Log;
+
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.RandomAccessFile;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.TreeMap;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
+
+import gnu.trove.iterator.TLongObjectIterator;
+import gnu.trove.list.array.TIntArrayList;
+import gnu.trove.map.hash.TIntLongHashMap;
+import gnu.trove.map.hash.TIntObjectHashMap;
+import gnu.trove.map.hash.TLongObjectHashMap;
 import rtree.LeafElement;
 import rtree.RTree;
 import rtree.RTreeException;
 import rtree.Rect;
-
-import com.google.protobuf.CodedOutputStream;
 
 public class ObfFileInMemory {
 	private static final int ZOOM_LEVEL_POI = 15;
@@ -77,10 +83,12 @@ public class ObfFileInMemory {
 	private long timestamp = 0;
 	private MapIndex mapIndex = new MapIndex(); 
 	private RouteRegion routeIndex = new RouteRegion();
-	
+
 	private TLongObjectHashMap<Map<String, Amenity>> poiObjects = new TLongObjectHashMap<>();
 	
-	private List<TransportStop> transportObjects = new ArrayList<>();
+	private TLongObjectHashMap<TransportStop> transportStops = new TLongObjectHashMap<>();
+	private TIntObjectHashMap<TransportRoute> transportRoutes = new TIntObjectHashMap<>();
+	private TIntLongHashMap routesIds = new TIntLongHashMap();
 
 	public TLongObjectHashMap<BinaryMapDataObject> get(MapZooms.MapZoomPair zoom) {
 		if (!mapObjects.containsKey(zoom)) {
@@ -109,11 +117,14 @@ public class ObfFileInMemory {
 		return poiObjects;
 	}
 	
-	public List<TransportStop> getTransportObjects() {
-		return transportObjects;
+	public TLongObjectHashMap<TransportStop> getTransportStops() {
+		return transportStops;
 	}
-	
-	
+
+	public TIntObjectHashMap<TransportRoute> getTransportRoutes() {
+		return transportRoutes;
+	}
+
 	public void putMapObjects(MapZoomPair pair, Collection<BinaryMapDataObject> objects, boolean override) {
 		TLongObjectHashMap<BinaryMapDataObject> res = get(pair);
 		for(BinaryMapDataObject o: objects) {
@@ -131,7 +142,7 @@ public class ObfFileInMemory {
 		boolean gzip = targetFile.getName().endsWith(".gz");
 		File nonGzip = targetFile;
 		if(gzip) {
-			nonGzip = new File(targetFile.getParentFile(), 
+			nonGzip = new File(targetFile.getParentFile(),
 				targetFile.getName().substring(0, targetFile.getName().length() - 3));
 		}
 		final RandomAccessFile raf = new RandomAccessFile(nonGzip, "rw");
@@ -182,10 +193,10 @@ public class ObfFileInMemory {
 			writer.startWriteRouteIndex(name);
 			writer.writeRouteRawEncodingRules(routeIndex.routeEncodingRules);
 			writeRouteData(writer, routeObjects, targetFile);
-			
+
 			writer.endWriteRouteIndex();
 		}
-		if(poiObjects.size() > 0) {
+		if (poiObjects.size() > 0) {
 			String name = "";
 			boolean overwriteIds = false;
 			if(Algorithms.isEmpty(name)) {
@@ -197,8 +208,8 @@ public class ObfFileInMemory {
 			final IndexPoiCreator indexPoiCreator = new IndexPoiCreator(settings, renderingTypes, overwriteIds);
 			File poiFile = new File(targetFile.getParentFile(), IndexCreator.getPoiFileName(name));
 			indexPoiCreator.createDatabaseStructure(poiFile);
-			for(Map<String, Amenity> mp : poiObjects.valueCollection()) {
-				for(Amenity a : mp.values()) {
+			for (Map<String, Amenity> mp : poiObjects.valueCollection()) {
+				for (Amenity a : mp.values()) {
 					indexPoiCreator.insertAmenityIntoPoi(a);
 				}
 			}
@@ -206,7 +217,70 @@ public class ObfFileInMemory {
 			indexPoiCreator.commitAndClosePoiFile(System.currentTimeMillis());
 			indexPoiCreator.removePoiFile();
 		}
-		// TODO Write Transport
+		if (transportStops.size() > 0) {
+			String name = mapIndex.getName();
+			if(Algorithms.isEmpty(name)) {
+				name = defName;
+			}
+
+			IndexCreatorSettings settings = new IndexCreatorSettings();
+			settings.indexTransport = true;
+			IndexTransportCreator indexCreator = new IndexTransportCreator(settings);
+			Map<String, Integer> stringTable = indexCreator.createStringTableForTransport();
+			Map<Long, Long> newRoutesIds = new LinkedHashMap<>();
+
+			writer.startWriteTransportIndex(Algorithms.capitalizeFirstLetter(name));
+			if (transportRoutes.size() > 0) {
+				writer.startWriteTransportRoutes();
+				ByteArrayOutputStream ows = new ByteArrayOutputStream();
+				List<byte[]> directGeometry = new ArrayList<>();
+				for (TransportRoute route : transportRoutes.valueCollection()) {
+					directGeometry.clear();
+					List<Way> ways = route.getForwardWays();
+					if (ways != null && ways.size() > 0) {
+						for (Way w : ways) {
+							if (w.getNodes().size() > 0) {
+								indexCreator.writeWay(ows, w);
+								directGeometry.add(ows.toByteArray());
+							}
+						}
+					}
+					writer.writeTransportRoute(route.getId(), route.getName(), route.getEnName(false),
+							route.getRef(), route.getOperator(), route.getType(), route.getDistance(),
+							route.getColor(), route.getForwardStops(), directGeometry,
+							stringTable, newRoutesIds, route.getSchedule());
+				}
+				writer.endWriteTransportRoutes();
+			}
+			for (TransportStop stop : transportStops.valueCollection()) {
+				int[] referencesToRoutes = stop.getReferencesToRoutes();
+				if (referencesToRoutes != null && referencesToRoutes.length > 0) {
+					List<Integer> newReferencesToRoutes = new ArrayList<>();
+					for (int referencesToRoute : referencesToRoutes) {
+						long routeId = routesIds.get(referencesToRoute);
+						if (routeId != routesIds.getNoEntryValue()) {
+							Long newOffset = newRoutesIds.get(routeId);
+							if (newOffset != null) {
+								newReferencesToRoutes.add(newOffset.intValue());
+							}
+						}
+					}
+					if (newReferencesToRoutes.size() == 0) {
+						stop.setReferencesToRoutes(null);
+					} else {
+						int[] refs = new int[newReferencesToRoutes.size()];
+						for (int i = 0; i < newReferencesToRoutes.size(); i++) {
+							refs[i] = newReferencesToRoutes.get(i);
+						}
+						stop.setReferencesToRoutes(refs);
+					}
+				}
+			}
+
+			writeTransportStops(indexCreator, writer, transportStops, stringTable, targetFile);
+			writer.writeTransportStringTable(stringTable);
+			writer.endWriteTransportIndex();
+		}
 		ous.writeInt32(OsmandOdb.OsmAndStructure.VERSIONCONFIRM_FIELD_NUMBER, version);
 		ous.flush();
 		raf.close();
@@ -223,7 +297,45 @@ public class ObfFileInMemory {
 		}
 		targetFile.setLastModified(timestamp);
 	}
-	
+
+	private void writeTransportStops(IndexTransportCreator indexCreator, BinaryMapIndexWriter writer,
+									 TLongObjectHashMap<TransportStop> transportStops, Map<String, Integer> stringTable,
+									 File fileToWrite) throws IOException, RTreeException, SQLException {
+		File nonpackRtree = new File(fileToWrite.getParentFile(), "nonpacktrans." + fileToWrite.getName() + ".rtree");
+		File packRtree = new File(fileToWrite.getParentFile(), "packtrans." + fileToWrite.getName() + ".rtree");
+		RTree rtree = null;
+		try {
+			rtree = new RTree(nonpackRtree.getAbsolutePath());
+			for (TransportStop s : transportStops.valueCollection()) {
+				int x = (int) MapUtils.getTileNumberX(24, s.getLocation().getLongitude());
+				int y = (int) MapUtils.getTileNumberY(24, s.getLocation().getLatitude());
+				try {
+					rtree.insert(new LeafElement(new Rect(x, y, x, y), s.getId()));
+				} catch (Exception e) {
+					throw new RuntimeException(e);
+				}
+			}
+			rtree = AbstractIndexPartCreator.packRtreeFile(rtree, nonpackRtree.getAbsolutePath(),
+					packRtree.getAbsolutePath());
+
+			long rootIndex = rtree.getFileHdr().getRootIndex();
+			rtree.Node root = rtree.getReadNode(rootIndex);
+			Rect rootBounds = IndexVectorMapCreator.calcBounds(root);
+			if (rootBounds != null) {
+				writer.startTransportTreeElement(rootBounds.getMinX(), rootBounds.getMaxX(), rootBounds.getMinY(), rootBounds.getMaxY());
+				indexCreator.writeBinaryTransportTree(root, rtree, writer, transportStops, stringTable);
+				writer.endWriteTransportTreeElement();
+			}
+		} finally {
+			if (rtree != null) {
+				RandomAccessFile file = rtree.getFileHdr().getFile();
+				file.close();
+			}
+			nonpackRtree.delete();
+			packRtree.delete();
+			RTree.clearCache();
+		}
+	}
 
 	private void writeRouteData(BinaryMapIndexWriter writer, TLongObjectHashMap<RouteDataObject> routeObjs, File fileToWrite) throws IOException, RTreeException, SQLException {
 		File nonpackRtree = new File(fileToWrite.getParentFile(), "nonpackroute."
@@ -392,7 +504,7 @@ public class ObfFileInMemory {
 		}
 	}
 	
-	public void readTransportData(BinaryMapIndexReader indexReader, boolean b) throws IOException {
+	public void readTransportData(BinaryMapIndexReader indexReader, boolean override) throws IOException {
 		SearchRequest<TransportStop> sr = BinaryMapIndexReader.buildSearchTransportRequest(
 				MapUtils.get31TileNumberX(lonleft),
 				MapUtils.get31TileNumberX(lonright),
@@ -400,15 +512,34 @@ public class ObfFileInMemory {
 				MapUtils.get31TileNumberY(latbottom),
 				-1, null);
 		List<TransportStop> sti = indexReader.searchTransportIndex(sr);
-		putTransportData(sti, true);
+		List<Integer> routesData = new ArrayList<>();
+		routesIds.clear();
+		putTransportData(sti, routesData, override);
+		if (routesData.size() > 0) {
+			int[] array = new int[routesData.size()];
+			for(int i = 0; i < routesData.size(); i++) {
+				array[i] = routesData.get(i);
+			}
+			transportRoutes = indexReader.getTransportRoutes(array);
+			for (int k : transportRoutes.keys()) {
+				TransportRoute route = transportRoutes.get(k);
+				routesIds.put(k, route.getId());
+			}
+		}
 	}
 	
-	public void putTransportData(List<TransportStop> newData, boolean override) {
-		// TODO Load transport routes !
-		// TODO Adopt transport stops !
+	public void putTransportData(List<TransportStop> newData, List<Integer> routesData, boolean override) {
 		for (TransportStop ts : newData) {
-			if (override || !transportObjects.contains(ts)) {
-				transportObjects.add(ts);
+			int[] referencesToRoutes = ts.getReferencesToRoutes();
+			if (referencesToRoutes != null && referencesToRoutes.length > 0) {
+				for (int ref : referencesToRoutes) {
+					if (override || !routesData.contains(ref)) {
+						routesData.add(ref);
+					}
+				}
+			}
+			if (override || !transportStops.contains(ts.getId())) {
+				transportStops.put(ts.getId(), ts);
 			}
 		}
 	}
