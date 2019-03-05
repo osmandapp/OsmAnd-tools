@@ -182,8 +182,8 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 					int x24 = (int) MapUtils.getTileNumberX(24, stop.getLocation().getLongitude());
 					int y24 = (int) MapUtils.getTileNumberY(24, stop.getLocation().getLatitude());
 					int[] referencesToRoutes = stop.getReferencesToRoutes();
+					routes = new ArrayList<>();
 					if (referencesToRoutes != null && referencesToRoutes.length > 0) {
-						routes = new ArrayList<>();
 						for (int referencesToRoute : referencesToRoutes) {
 							routes.add((long) referencesToRoute);
 						}
