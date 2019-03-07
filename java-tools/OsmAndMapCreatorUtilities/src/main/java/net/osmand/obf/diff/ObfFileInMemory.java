@@ -125,6 +125,18 @@ public class ObfFileInMemory {
 		return transportRoutes;
 	}
 
+	public void setTransportRoutes(TIntObjectHashMap<TransportRoute> transportRoutes) {
+		this.transportRoutes = transportRoutes;
+	}
+
+	public TIntLongHashMap getRoutesIds() {
+		return routesIds;
+	}
+
+	public void setRoutesIds(TIntLongHashMap routesIds) {
+		this.routesIds = routesIds;
+	}
+
 	public void putMapObjects(MapZoomPair pair, Collection<BinaryMapDataObject> objects, boolean override) {
 		TLongObjectHashMap<BinaryMapDataObject> res = get(pair);
 		for(BinaryMapDataObject o: objects) {
@@ -528,13 +540,15 @@ public class ObfFileInMemory {
 		}
 	}
 	
-	public void putTransportData(List<TransportStop> newData, List<Integer> routesData, boolean override) {
+	public void putTransportData(Collection<TransportStop> newData, Collection<Integer> routesData, boolean override) {
 		for (TransportStop ts : newData) {
-			int[] referencesToRoutes = ts.getReferencesToRoutes();
-			if (referencesToRoutes != null && referencesToRoutes.length > 0) {
-				for (int ref : referencesToRoutes) {
-					if (override || !routesData.contains(ref)) {
-						routesData.add(ref);
+			if (routesData != null) {
+				int[] referencesToRoutes = ts.getReferencesToRoutes();
+				if (referencesToRoutes != null && referencesToRoutes.length > 0) {
+					for (int ref : referencesToRoutes) {
+						if (override || !routesData.contains(ref)) {
+							routesData.add(ref);
+						}
 					}
 				}
 			}

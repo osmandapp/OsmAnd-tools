@@ -4,6 +4,8 @@ import gnu.trove.map.hash.TLongObjectHashMap;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -15,6 +17,7 @@ import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.binary.MapZooms.MapZoomPair;
 import net.osmand.binary.RouteDataObject;
 import net.osmand.data.Amenity;
+import net.osmand.data.TransportStop;
 import net.osmand.map.OsmandRegions;
 import net.osmand.map.WorldRegion;
 import net.osmand.util.Algorithms;
@@ -62,10 +65,12 @@ public class ObfRegionSplitter {
 			Map<String, Map<MapZoomPair, TLongObjectHashMap<BinaryMapDataObject>>> regionsMapData = splitRegionMapData(fl,osmandRegions);
 			Map<String, TLongObjectHashMap<RouteDataObject>> regionsRouteData = splitRegionRouteData(fl, osmandRegions);
 			Map<String, TLongObjectHashMap<Map<String, Amenity>>> regionsPoiData = splitRegionPoiData(fl, osmandRegions);
+			Map<String, TLongObjectHashMap<TransportStop>> regionsTransportData = splitRegionTransportData(fl, osmandRegions);
 			TreeSet<String> regionNames = new TreeSet<>();
 			regionNames.addAll(regionsMapData.keySet());
 			regionNames.addAll(regionsRouteData.keySet());
 			regionNames.addAll(regionsPoiData.keySet());
+			regionNames.addAll(regionsTransportData.keySet());
 
 			for (String regionName : regionNames) {
 				File folder = new File(dir, regionName);
@@ -84,17 +89,44 @@ public class ObfRegionSplitter {
 				}
 				
 				TLongObjectHashMap<RouteDataObject> ro = regionsRouteData.get(regionName);
-				if(ro != null) {
+				if (ro != null) {
 					obf.putRoutingData(ro, true);
 				}
 				TLongObjectHashMap<Map<String, Amenity>> poi = regionsPoiData.get(regionName);
-				if(poi != null) {
+				if (poi != null) {
 					obf.putPoiData(poi, true);
 				}
-				// TODO split Transport
+				TLongObjectHashMap<TransportStop> stops = regionsTransportData.get(regionName);
+				Map<Long, int[]> stopRefs = null;
+				if (stops != null) {
+					stopRefs = new HashMap<>();
+					Collection<TransportStop> stopsCollection = stops.valueCollection();
+					// save references to routes to be restored before next step
+					for (TransportStop stop : stopsCollection) {
+						int[] referencesToRoutes = stop.getReferencesToRoutes();
+						if (referencesToRoutes != null && referencesToRoutes.length > 0) {
+							int[] refsCopy = new int[referencesToRoutes.length];
+							System.arraycopy(referencesToRoutes, 0, refsCopy, 0, referencesToRoutes.length);
+							stopRefs.put(stop.getId(), refsCopy);
+						}
+					}
+					obf.setTransportRoutes(fl.getTransportRoutes());
+					obf.setRoutesIds(fl.getRoutesIds());
+					obf.putTransportData(stopsCollection, null, true);
+				}
 				
 				obf.updateTimestamp(fl.getTimestamp());
 				obf.writeFile(result, true);
+
+				if (stopRefs != null) {
+					// restore references to routes
+					for (TransportStop stop : stops.valueCollection()) {
+						int[] refs = stopRefs.get(stop.getId());
+						if (refs != null) {
+							stop.setReferencesToRoutes(refs);
+						}
+					}
+				}
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -132,7 +164,7 @@ public class ObfRegionSplitter {
  		}
  		return result;
  	}
-	
+
 	private Map<String, TLongObjectHashMap<RouteDataObject>> splitRegionRouteData(ObfFileInMemory fl,
 			OsmandRegions osmandRegions) throws IOException {
 		Map<String, TLongObjectHashMap<RouteDataObject>> result = new HashMap<>();
@@ -158,6 +190,35 @@ public class ObfRegionSplitter {
 							result.put(dw, mp);
 						}
 						mp.put(obj.getId(), obj);
+					}
+				}
+			}
+		}
+		return result;
+	}
+
+	private Map<String, TLongObjectHashMap<TransportStop>> splitRegionTransportData(ObfFileInMemory fl,
+			OsmandRegions osmandRegions) throws IOException {
+		Map<String, TLongObjectHashMap<TransportStop>> result = new HashMap<>();
+		TLongObjectHashMap<TransportStop> transportStops = fl.getTransportStops();
+		for (TransportStop stop : transportStops.valueCollection()) {
+			int x = stop.x31;
+			int y = stop.y31;
+			List<BinaryMapDataObject> l = osmandRegions.query(x, y);
+			for (BinaryMapDataObject b : l) {
+				if (osmandRegions.contain(b, x, y)) {
+					String dw = osmandRegions.getDownloadName(b);
+					WorldRegion wr = osmandRegions.getRegionDataByDownloadName(dw);
+					if (dw == null || wr == null) {
+						continue;
+					}
+					if (!Algorithms.isEmpty(dw) && wr.isRegionMapDownload()) {
+						TLongObjectHashMap<TransportStop> mp = result.get(dw);
+						if (mp == null) {
+							mp = new TLongObjectHashMap<>();
+							result.put(dw, mp);
+						}
+						mp.put(stop.getId(), stop);
 					}
 				}
 			}
