@@ -205,20 +205,25 @@ public class ApiController {
         return "mapillary/photo-viewer";
     }
 
-    @GetMapping(path = {"/subscriptions/active"})
-    @ResponseBody
-    public FileSystemResource getActiveSubscriptions(@RequestParam(required = false) String version,
-    		@RequestParam(required = false) String androidPackage,
-            @RequestParam(required = false) String lang,
-            @RequestParam(required = false) String os,
-            @RequestParam(required = false) String aid, @RequestHeader HttpHeaders headers, HttpServletRequest request) throws IOException, ParseException {
-		MessageParams params = new MessageParams();
+	@GetMapping(path = { "/subscriptions/active" })
+	@ResponseBody
+	public FileSystemResource getActiveSubscriptions(@RequestParam(required = false) String version,
+			@RequestParam(required = false) String androidPackage, 
+			@RequestParam(required = false) Integer nd,
+			@RequestParam(required = false) Integer ns, 
+			@RequestParam(required = false) String lang,
+			@RequestParam(required = false) String os, 
+			@RequestParam(required = false) String aid,
+			@RequestHeader HttpHeaders headers, HttpServletRequest request) throws IOException, ParseException {
+	MessageParams params = new MessageParams();
 		params.hostAddress = request.getRemoteAddr();
 		if (headers.getFirst("X-Forwarded-For") != null) {
 			params.hostAddress = headers.getFirst("X-Forwarded-For");
 		}
 		params.os = os;
 		params.lang = lang;
+		params.numberOfDays = nd;
+		params.numberOfStarts = ns;
 		params.appVersion = "";
 		params.appPackage = androidPackage;
 		if (version != null) {
