@@ -211,29 +211,28 @@ public class ApiController {
     		@RequestParam(required = false) String androidPackage,
             @RequestParam(required = false) String lang,
             @RequestParam(required = false) String os,
-            @RequestParam(required = false) String aid, @RequestHeader HttpHeaders headers,
-            HttpServletRequest request) throws IOException, ParseException {
-    	MessageParams params = new MessageParams();
-    	params.hostAddress = request.getRemoteAddr();
-        if (headers.getFirst("X-Forwarded-For") != null) {
-            params.hostAddress = headers.getFirst("X-Forwarded-For");
-        }
-        params.os = os;
-        params.lang= lang;
-        params.appVersion = "";
-        params.appPackage = androidPackage;
+            @RequestParam(required = false) String aid, @RequestHeader HttpHeaders headers, HttpServletRequest request) throws IOException, ParseException {
+		MessageParams params = new MessageParams();
+		params.hostAddress = request.getRemoteAddr();
+		if (headers.getFirst("X-Forwarded-For") != null) {
+			params.hostAddress = headers.getFirst("X-Forwarded-For");
+		}
+		params.os = os;
+		params.lang = lang;
+		params.appVersion = "";
+		params.appPackage = androidPackage;
 		if (version != null) {
 			int i = version.indexOf(" ");
 			if (i >= 0) {
 				params.appVersion = version.substring(0, i);
-				version = version.substring(i + 1);
+				params.version = version.substring(i + 1);
 			}
 		}
-		
+
 		String file = motdService.getSubscriptions(params);
-        FileSystemResource fsr = new FileSystemResource(file);
-        return fsr;
-    }
+		FileSystemResource fsr = new FileSystemResource(file);
+		return fsr;
+	}
     
     @GetMapping(path = {"/motd", "/motd.php"})
     @ResponseBody
@@ -251,11 +250,11 @@ public class ApiController {
         if (headers.getFirst("X-Forwarded-For") != null) {
         	params.hostAddress = headers.getFirst("X-Forwarded-For");
         }
-        params.numberOfDays = nd;
-        params.numberOfStarts = ns;
-        params.appVersion = "";
-        params.os = os;
-        params.lang= lang;
+		params.numberOfDays = nd;
+		params.numberOfStarts = ns;
+		params.appVersion = "";
+		params.os = os;
+		params.lang = lang;
 		if (version != null) {
 			int i = version.indexOf(" ");
 			if (i >= 0) {
