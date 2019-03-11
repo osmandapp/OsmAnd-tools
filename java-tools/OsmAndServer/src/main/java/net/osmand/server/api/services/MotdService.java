@@ -65,16 +65,25 @@ public class MotdService {
 		return settings;
 	}
 
+	public static class MessageParams {
+		public Date now = new Date();
+		public String appVersion;
+		public String appPackage;
+		public String hostAddress;
+		public String os;
+		public String version;
+		public String lang;
+		public Integer numberOfDays;
+		public Integer numberOfStarts;
+	}
     
-    public HashMap<String,Object> getMessage(String appVersion, 
-    		String version, String os, String hostAddress, String lang) throws IOException, ParseException {
-        Date now = new Date();
+    public HashMap<String,Object> getMessage(MessageParams params) throws IOException, ParseException {
+        
         HashMap<String,Object> message = null;
 		MotdSettings settings = getSettings();
 		if (settings != null) {
 			for (DiscountSetting setting : settings.discountSettings) {
-				if (setting.discountCondition.checkCondition(now, hostAddress, 
-						appVersion, version, os, lang, "", locationService)) {
+				if (setting.discountCondition.checkCondition(params, locationService)) {
 					message = setting.parseMotdMessageFile(mapper, websiteLocation.concat("api/messages/"));
 					break;
 				}
@@ -83,14 +92,12 @@ public class MotdService {
         return message;
     }
     
-    public String getSubscriptions(String appVersion, String version, String os, String hostAddress, String lang, String androidPackage)
+    public String getSubscriptions(MessageParams params)
 			throws IOException, ParseException {
-		Date now = new Date();
 		MotdSettings settings = getSubscriptionSettings();
 		if (settings != null) {
 			for (DiscountSetting setting : settings.discountSettings) {
-				if (setting.discountCondition.checkCondition(now, hostAddress, appVersion, version, os, lang,
-						androidPackage, locationService)) {
+				if (setting.discountCondition.checkCondition(params, locationService)) {
 					return websiteLocation.concat("api/subscriptions/" + setting.file);
 				}
 			}
@@ -106,7 +113,9 @@ public class MotdService {
     public boolean reloadconfig(List<String> errors) {
     	try {
     		this.settings = mapper.readValue(new File(websiteLocation.concat(MOTD_SETTINGS)), MotdSettings.class);
+    		this.settings.prepare();
     		this.subscriptionSettings = mapper.readValue(new File(websiteLocation.concat(SUBSCRIPTION_SETTINGS)), MotdSettings.class);
+    		this.subscriptionSettings.prepare();
     	} catch (IOException ex) {
     		if(errors != null) {
     			errors.add(MOTD_SETTINGS + " is invalid: " + ex.getMessage());
@@ -122,6 +131,13 @@ public class MotdService {
         @JsonProperty("settings")
         protected List<DiscountSetting> discountSettings = new ArrayList<MotdService.DiscountSetting>();
         
+        public void prepare() {
+        	for(DiscountSetting s : discountSettings) {
+        		if(s.discountCondition != null) {
+        			s.discountCondition.prepare();
+        		}
+        	}
+        }
         public List<DiscountSetting> getDiscountSettings() {
 			return discountSettings;
 		}
@@ -135,6 +151,7 @@ public class MotdService {
         public String file;
         @JsonProperty("fields")
         public Map<String, String> fields;
+        
         
         protected HashMap<String,Object> parseMotdMessageFile(ObjectMapper mapper, String folder) throws IOException {
         	if(file != null && file.length() > 0 && new File(folder, file).exists() ) {
@@ -179,6 +196,10 @@ public class MotdService {
         private String appVersion;
         @JsonProperty("app_package")
         private String appPackage;
+        @JsonProperty("number_of_starts")
+        private String numberOfStarts;
+        @JsonProperty("number_of_days")
+        private String numberOfDays;
         
         
         @JsonProperty("lang")
@@ -189,6 +210,32 @@ public class MotdService {
         private String city;
         @JsonProperty("os")
         private String os;
+        
+		private int numberOfDaysStart;
+		private int numberOfDaysEnd;
+		private int numberOfStartsStart;
+		private int numberOfStartsEnd;
+		
+		public void prepare() {
+			if (numberOfDays != null) {
+				String[] s = numberOfDays.split("-");
+				if (s.length == 2) {
+					numberOfDaysStart = Integer.parseInt(s[0]);
+					numberOfDaysEnd = Integer.parseInt(s[1]);
+				} else {
+					numberOfDaysEnd = numberOfDaysStart = Integer.parseInt(s[0]);
+				}
+			}
+			if (numberOfStarts != null) {
+				String[] s = numberOfStarts.split("-");
+				if (s.length == 2) {
+					numberOfStartsStart = Integer.parseInt(s[0]);
+					numberOfStartsEnd = Integer.parseInt(s[1]);
+				} else {
+					numberOfStartsEnd = numberOfStartsStart = Integer.parseInt(s[0]);
+				}
+			}
+		}
         
 		public String getFilterCondition() {
 			String filter = "";
@@ -206,6 +253,12 @@ public class MotdService {
 			}
 			if (city != null) {
 				filter += " City is '" + city + "' ";
+			}
+			if (numberOfStartsStart != 0 && numberOfStartsEnd != 0) {
+				filter += " Number of starts '" + numberOfStartsStart + "-" + numberOfStartsEnd + "' ";
+			}
+			if (numberOfDaysStart != 0 && numberOfDaysEnd != 0) {
+				filter += " Number of days '" + numberOfDaysStart + "-" + numberOfDaysEnd + "' ";
 			}
 			
 			if (startDate != null || endDate != null) {
@@ -227,29 +280,41 @@ public class MotdService {
 		}
         
 
-        public boolean checkCondition(Date date, String hostAddress, 
-        		String appVersion, String version, String osV, String lang, 
-        		String appPackage, IpLocationService locationService) {
-            if (ip != null && !ip.contains(hostAddress)) {
+        public boolean checkCondition(MessageParams params, IpLocationService locationService) {
+            if (ip != null && !ip.contains(params.hostAddress)) {
                 return false;
             }
-            if(!checkActiveDate(date)) {
+            if(!checkActiveDate(params.now)) {
             	return false;
             }
             if(country != null) {
-				String cnt = locationService.getField(hostAddress, IpLocationService.COUNTRY_NAME);
+				String cnt = locationService.getField(params.hostAddress, IpLocationService.COUNTRY_NAME);
             	if(!cnt.equalsIgnoreCase(country)) {
             		return false;
             	}
+            } 
+            if (numberOfDaysStart != 0 && numberOfDaysEnd != 0) {
+            	if(params.numberOfDays == null || params.numberOfDays.intValue() > numberOfDaysEnd || 
+            			params.numberOfDays.intValue() < numberOfDaysStart) {
+            		return false;
+            	}
             }
+            
+            if (numberOfStartsStart != 0 && numberOfStartsEnd != 0) {
+            	if(params.numberOfStarts == null || params.numberOfStarts.intValue() > numberOfStartsEnd || 
+            			params.numberOfStarts.intValue() < numberOfDaysStart) {
+            		return false;
+            	}
+            }
+            
             if(city != null) {
-				String cnt = locationService.getField(hostAddress, IpLocationService.CITY);
+				String cnt = locationService.getField(params.hostAddress, IpLocationService.CITY);
             	if(!cnt.equalsIgnoreCase(city)) {
             		return false;
             	}
             }
             if (this.os != null && this.os.length() > 0) {
-				String osVersion = osV != null && osV.equals("ios") ? "ios" : "android";
+				String osVersion = params.os != null && params.os.equals("ios") ? "ios" : "android";
 				if(!osVersion.equals(this.os)) {
 					return false;
 				}

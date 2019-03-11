@@ -19,6 +19,7 @@ import net.osmand.server.api.repo.EmailUnsubscribedRepository;
 import net.osmand.server.api.repo.EmailUnsubscribedRepository.EmailUnsubscribed;
 import net.osmand.server.api.services.IpLocationService;
 import net.osmand.server.api.services.MotdService;
+import net.osmand.server.api.services.MotdService.MessageParams;
 import net.osmand.server.api.services.PlacesService;
 
 import org.apache.commons.logging.Log;
@@ -212,20 +213,24 @@ public class ApiController {
             @RequestParam(required = false) String os,
             @RequestParam(required = false) String aid, @RequestHeader HttpHeaders headers,
             HttpServletRequest request) throws IOException, ParseException {
-    	
-    	String remoteAddr = request.getRemoteAddr();
+    	MessageParams params = new MessageParams();
+    	params.hostAddress = request.getRemoteAddr();
         if (headers.getFirst("X-Forwarded-For") != null) {
-            remoteAddr = headers.getFirst("X-Forwarded-For");
+            params.hostAddress = headers.getFirst("X-Forwarded-For");
         }
-        String appVersion = "";
+        params.os = os;
+        params.lang= lang;
+        params.appVersion = "";
+        params.appPackage = androidPackage;
 		if (version != null) {
 			int i = version.indexOf(" ");
 			if (i >= 0) {
-				appVersion = version.substring(0, i);
+				params.appVersion = version.substring(0, i);
 				version = version.substring(i + 1);
 			}
 		}
-		String file = motdService.getSubscriptions(appVersion, version, os, remoteAddr, lang, androidPackage);
+		
+		String file = motdService.getSubscriptions(params);
         FileSystemResource fsr = new FileSystemResource(file);
         return fsr;
     }
@@ -241,19 +246,25 @@ public class ApiController {
                              @RequestParam(required = false) String discount,
                              @RequestHeader HttpHeaders headers,
                              HttpServletRequest request) throws IOException, ParseException {
-    	String remoteAddr = request.getRemoteAddr();
+    	MessageParams params = new MessageParams();
+    	params.hostAddress = request.getRemoteAddr();
         if (headers.getFirst("X-Forwarded-For") != null) {
-            remoteAddr = headers.getFirst("X-Forwarded-For");
+        	params.hostAddress = headers.getFirst("X-Forwarded-For");
         }
-        String appVersion = "";
+        params.numberOfDays = nd;
+        params.numberOfStarts = ns;
+        params.appVersion = "";
+        params.os = os;
+        params.lang= lang;
 		if (version != null) {
 			int i = version.indexOf(" ");
 			if (i >= 0) {
-				appVersion = version.substring(0, i);
-				version = version.substring(i + 1);
+				params.appVersion = version.substring(0, i);
+				params.version = version.substring(i + 1);
 			}
 		}
-        HashMap<String,Object> body = motdService.getMessage(appVersion, version, os, remoteAddr, lang);
+		
+        HashMap<String,Object> body = motdService.getMessage(params);
         if (body != null) {
             return jsonMapper.writeValueAsString(body);
         }
