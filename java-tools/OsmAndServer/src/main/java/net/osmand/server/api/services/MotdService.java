@@ -319,16 +319,16 @@ public class MotdService {
 					return false;
 				}
             }
-            if (this.appPackage != null && (appPackage == null || !appPackage.equalsIgnoreCase(this.appPackage))) {
+            if (this.appPackage != null && (params.appPackage == null || !params.appPackage.equalsIgnoreCase(this.appPackage))) {
                 return false;
             }
-            if (this.appVersion != null && (appVersion == null || !appVersion.equalsIgnoreCase(this.appVersion))) {
+            if (this.appVersion != null && (params.appVersion == null || !params.appVersion.equalsIgnoreCase(this.appVersion))) {
                 return false;
             }
-            if (this.version != null && (version == null || !version.startsWith(this.version))) {
+            if (this.version != null && (params.version == null || !params.version.startsWith(this.version))) {
                 return false;
             }
-            if (this.lang != null && (lang == null || !this.lang.contains(lang))) {
+            if (this.lang != null && (params.lang == null || !this.lang.contains(params.lang))) {
                 return false;
             }
             return true;
