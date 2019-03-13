@@ -1255,21 +1255,15 @@ public class BinaryMapIndexWriter {
 			}
 		}
 		// simple merge lines
-		boolean merged = true;
-		while (merged) {
-			merged = false;
-			for (int i = 0; i < ct.size() && !merged; i++) {
-				TLongArrayList head = ct.get(i);
-				for (int j = 0; j < ct.size() && !merged; j++) {
-					if (j != i) {
-						TLongArrayList tail = ct.get(j);
-						if (head.get(head.size() - 1) == tail.get(0)) {
-							head.addAll(tail.subList(1, tail.size()));
-							ct.remove(j);
-							merged = true;
-						}
-					}
-				}
+		for (int i = 0; i < ct.size() -1;) {
+			TLongArrayList head = ct.get(i);
+			int j = i + 1;
+			TLongArrayList tail = ct.get(j);
+			if (head.get(head.size() - 1) == tail.get(0)) {
+				head.addAll(tail.subList(1, tail.size()));
+				ct.remove(j);
+			} else {
+				i++;
 			}
 		}
 		Collections.sort(ct, new Comparator<TLongArrayList>() {
