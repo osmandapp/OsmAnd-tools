@@ -838,7 +838,7 @@ public class IndexCreator {
 		settings.indexMap = true;
 //		settings.indexAddress = true;
 		settings.indexPOI = true;
-//		settings.indexTransport = true;
+		settings.indexTransport = true;
 		settings.indexRouting = true;
 //		settings.keepOnlySeaObjects = true;
 //		settings.srtmDataFolder = new File(rootFolder + "/maps/srtm/");

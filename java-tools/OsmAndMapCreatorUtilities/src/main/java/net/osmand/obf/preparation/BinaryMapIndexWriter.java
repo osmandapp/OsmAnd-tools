@@ -1266,15 +1266,6 @@ public class BinaryMapIndexWriter {
 				i++;
 			}
 		}
-		Collections.sort(ct, new Comparator<TLongArrayList>() {
-
-			@Override
-			public int compare(TLongArrayList o1, TLongArrayList o2) {
-				long l1 = o1.size() > 0 ? o1.get(0) : 0;
-				long l2 = o1.size() > 0 ? o2.get(0) : 0;
-				return Algorithms.compare(l1, l2);
-			}
-		});
 		return ct;
 	}
 
