@@ -47,6 +47,8 @@ public class MapTransportLayer implements MapPanelLayer {
 
 	private final static Log log = PlatformUtil.getLog(MapTransportLayer.class);
 
+	private static final boolean DRAW_WALK_SEGMENTS = false;
+
 	private MapPanel map;
 	private JButton prevRoute;
 	private JButton infoButton;
@@ -296,7 +298,9 @@ public class MapTransportLayer implements MapPanelLayer {
 			LatLon p = start; 
 			for (TransportRouteResultSegment s : r.getSegments()) {
 				LatLon floc = s.getStart().getLocation();
-				addWalk(res, p, floc);
+				if(DRAW_WALK_SEGMENTS) {
+					addWalk(res, p, floc);
+				}
 				
 				res.addAll(s.getGeometry());
 				// String name = String.format("time %.2f ", s.getSegmentTime());
@@ -312,7 +316,9 @@ public class MapTransportLayer implements MapPanelLayer {
 				
 				p = s.getEnd().getLocation();
 			}
-			addWalk(res, p, end);
+			if(DRAW_WALK_SEGMENTS) {
+				addWalk(res, p, end);
+			}
 
 		}
 	}

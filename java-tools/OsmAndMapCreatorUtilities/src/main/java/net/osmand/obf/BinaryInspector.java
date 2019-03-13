@@ -57,7 +57,6 @@ import net.osmand.data.Street;
 import net.osmand.data.TransportRoute;
 import net.osmand.data.TransportSchedule;
 import net.osmand.data.TransportStop;
-import net.osmand.data.TransportStopExit;
 import net.osmand.osm.MapRenderingTypes;
 import net.osmand.router.TransportRoutePlanner;
 import net.osmand.util.MapUtils;
