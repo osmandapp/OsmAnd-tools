@@ -1,6 +1,7 @@
 package net.osmand.obf.preparation;
 
 
+import gnu.trove.list.TLongList;
 import gnu.trove.list.array.TByteArrayList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.list.array.TLongArrayList;
@@ -1255,16 +1256,26 @@ public class BinaryMapIndexWriter {
 			}
 		}
 		// simple merge lines
-		for (int i = 0; i < ct.size() -1;) {
+		int beforeCompression = ct.size();
+		for (int i = 0; i < ct.size() - 1;) {
 			TLongArrayList head = ct.get(i);
 			int j = i + 1;
 			TLongArrayList tail = ct.get(j);
 			if (head.get(head.size() - 1) == tail.get(0)) {
 				head.addAll(tail.subList(1, tail.size()));
 				ct.remove(j);
+			} else if (head.get(head.size() - 1) == tail.get(tail.size() - 1)) {
+				TLongList subl = tail.subList(0, tail.size() - 1);
+				subl.reverse();
+				head.addAll(subl);
+				ct.remove(j);
 			} else {
 				i++;
 			}
+		}
+		int afterCompression = ct.size();
+		if(false) {
+			System.out.println(String.format("Compressed routes from %d to %d", beforeCompression, afterCompression));
 		}
 		return ct;
 	}

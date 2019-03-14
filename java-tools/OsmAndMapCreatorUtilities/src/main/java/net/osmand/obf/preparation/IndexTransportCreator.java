@@ -1,7 +1,28 @@
 package net.osmand.obf.preparation;
 
-import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
+import gnu.trove.list.array.TIntArrayList;
+import gnu.trove.map.hash.TLongObjectHashMap;
+
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.lang.reflect.Type;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import net.osmand.data.LatLon;
 import net.osmand.data.QuadRect;
@@ -25,29 +46,6 @@ import net.sf.junidecode.Junidecode;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.IOException;
-import java.lang.reflect.Type;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
-import gnu.trove.list.array.TIntArrayList;
-import gnu.trove.map.hash.TLongObjectHashMap;
 import rtree.Element;
 import rtree.IllegalValueException;
 import rtree.LeafElement;
@@ -55,6 +53,9 @@ import rtree.RTree;
 import rtree.RTreeException;
 import rtree.RTreeInsertException;
 import rtree.Rect;
+
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 
 public class IndexTransportCreator extends AbstractIndexPartCreator {
 
@@ -279,7 +280,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		stat.executeUpdate("create index transport_route_stop_stop on transport_route_stop (stop)");
 		stat.executeUpdate("create index transport_route_stop_route on transport_route_stop (route)");
 		
-		stat.executeUpdate("create table transport_route_geometry (geometry bytes, route bigint)");
+		stat.executeUpdate("create table transport_route_geometry (geometry bytes, route bigint, ind int)");
 		stat.executeUpdate("create index transport_route_geometry_route on transport_route_geometry (route)");
 		
 
@@ -304,7 +305,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		transRouteStat = conn.prepareStatement("insert into transport_route(id, type, operator, ref, name, name_en, dist, color) values(?, ?, ?, ?, ?, ?, ?, ?)");
 		transRouteStopsStat = conn.prepareStatement("insert into transport_route_stop(route, stop, ord) values(?, ?, ?)");
 		transStopsStat = conn.prepareStatement("insert into transport_stop(id, latitude, longitude, name, name_en, names) values(?, ?, ?, ?, ?, ?)");
-		transRouteGeometryStat = conn.prepareStatement("insert into transport_route_geometry(route, geometry) values(?, ?)");
+		transRouteGeometryStat = conn.prepareStatement("insert into transport_route_geometry(route, geometry, ind) values(?, ?, ?)");
 		pStatements.put(transRouteStat, 0);
 		pStatements.put(transRouteStopsStat, 0);
 		pStatements.put(transStopsStat, 0);
@@ -424,21 +425,23 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		
 		ByteArrayOutputStream ous = new ByteArrayOutputStream();
 		if (route.getForwardWays() != null) {
+			int ind = 0;
 			for (Way tr : route.getForwardWays()) {
-				addBatch(route, ous, tr);
+				addBatch(route, ous, tr, ind++);
 			}
 		}
 		writeRouteStops(route, route.getForwardStops());
 	}
 
 
-	private void addBatch(TransportRoute route, ByteArrayOutputStream ous, Way tr) throws SQLException {
+	private void addBatch(TransportRoute route, ByteArrayOutputStream ous, Way tr, int ind) throws SQLException {
 		if (tr.getNodes().size() == 0) {
 			return;
 		}
 		transRouteGeometryStat.setLong(1, route.getId());
 		writeWay(ous, tr);
 		transRouteGeometryStat.setBytes(2, ous.toByteArray());
+		transRouteGeometryStat.setInt(3, ind);
 		addBatch(transRouteGeometryStat);
 	}
 
@@ -503,7 +506,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 					"  A.latitude,  A.longitude, A.name, A.name_en, A.names " + //$NON-NLS-1$
 					"FROM transport_route_stop S INNER JOIN transport_stop A ON A.id = S.stop WHERE S.route = ? ORDER BY S.ord asc"); //$NON-NLS-1$
 			PreparedStatement selectTransportRouteGeometry = mapConnection.prepareStatement("SELECT S.geometry " + 
-					"FROM transport_route_geometry S WHERE S.route = ?"); //$NON-NLS-1$
+					"FROM transport_route_geometry S WHERE S.route = ? order by S.ind"); //$NON-NLS-1$
 
 			writer.startWriteTransportIndex(regionName);
 
