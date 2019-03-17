@@ -13,6 +13,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Timestamp;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.LinkedHashMap;
@@ -51,8 +52,10 @@ public class CalculateOsmChangesets {
 	private static final int MAX_QUERY_1 = 99;
 
 	static SimpleDateFormat FORMAT = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
+	static SimpleDateFormat FORMAT2 = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss z");
 	static {
 		FORMAT.setTimeZone(TimeZone.getTimeZone("UTC"));
+		FORMAT2.setTimeZone(TimeZone.getTimeZone("UTC"));
 	}
 	public static void main(String[] args) throws Exception {
 		downloadChangesets();
@@ -174,8 +177,8 @@ public class CalculateOsmChangesets {
 								if (!selChangeset.executeQuery().next()) {
 									insChangeset.setString(1, p.id);
 									insChangeset.setInt(2, p.bot);
-									insChangeset.setTimestamp(3, new Timestamp(FORMAT.parse(p.createdAt).getTime()));
-									insChangeset.setTimestamp(4, new Timestamp(FORMAT.parse(p.closedAt).getTime()));
+									insChangeset.setTimestamp(3, parseTimestamp(p.createdAt));
+									insChangeset.setTimestamp(4, parseTimestamp(p.closedAt));
 									insChangeset.setString(5, p.closedAt.substring(0, 10));
 									insChangeset.setDouble(6, Double.parseDouble(p.minLat));
 									insChangeset.setDouble(7, Double.parseDouble(p.minLon));
@@ -232,6 +235,15 @@ public class CalculateOsmChangesets {
 			conn.close();
 		}
 
+	}
+
+
+	private static Timestamp parseTimestamp(String p) throws ParseException {
+		try {
+			return new Timestamp(FORMAT2.parse(p).getTime());
+		} catch (ParseException e) {
+			return new Timestamp(FORMAT.parse(p).getTime());
+		}
 	}
 		
 	private static String getAttributeDoubleValue(XmlPullParser parser, String key) {

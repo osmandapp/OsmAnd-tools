@@ -10,7 +10,9 @@ import java.io.File;
 import java.io.RandomAccessFile;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import javax.swing.AbstractAction;
 import javax.swing.Action;
@@ -31,6 +33,7 @@ import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.osm.edit.Way;
 import net.osmand.router.RoutingConfiguration.Builder;
+import net.osmand.router.RoutingConfiguration;
 import net.osmand.router.TransportRoutePlanner;
 import net.osmand.router.TransportRoutePlanner.TransportRouteResult;
 import net.osmand.router.TransportRoutePlanner.TransportRouteResultSegment;
@@ -217,26 +220,20 @@ public class MapTransportLayer implements MapPanelLayer {
 					rs[it++] = new BinaryMapIndexReader(raf, f);
 				}
 				Builder builder = DataExtractionSettings.getSettings().getRoutingConfig();
-				TransportRoutingConfiguration cfg = new TransportRoutingConfiguration(builder);
+				String m = DataExtractionSettings.getSettings().getRouteMode();
+				String[] props = m.split("\\,");
+				Map<String, String> paramsR = new LinkedHashMap<String, String>();
+				for(String p : props) {
+					if(p.contains("=")) {
+						paramsR.put(p.split("=")[0], p.split("=")[1]);
+					} else {
+						paramsR.put(p, "true");
+					}
+				}
+				TransportRoutingConfiguration cfg = new TransportRoutingConfiguration(builder, paramsR);
 				cfg.useSchedule = schedule;
 				TransportRoutePlanner planner = new TransportRoutePlanner();
-//				cfg.maxNumberOfChanges = 2;
 				TransportRoutingContext ctx = new TransportRoutingContext(cfg, rs);
-				
-				
-//				String m = DataExtractionSettings.getSettings().getRouteMode();
-//				String[] props = m.split("\\,");
-//				RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
-//				Map<String, String> paramsR = new LinkedHashMap<String, String>();
-//				for(String p : props) {
-//					if(p.contains("=")) {
-//						paramsR.put(p.split("=")[0], p.split("=")[1]);
-//					} else {
-//						paramsR.put(p, "true");
-//					}
-//				}
-//				RoutingConfiguration config = DataExtractionSettings.getSettings().getRoutingConfig().build(props[0],
-//						/*RoutingConfiguration.DEFAULT_MEMORY_LIMIT*/ 1000, paramsR);
 				startProgressThread(ctx);
 				this.results = planner.buildRoute(ctx, start, end);
 				this.currentRoute = 0;
