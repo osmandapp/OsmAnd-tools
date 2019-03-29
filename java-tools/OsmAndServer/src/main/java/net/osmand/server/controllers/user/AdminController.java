@@ -362,6 +362,13 @@ public class AdminController {
 		return er;
 	}
 
+	public static class ActiveSubscriptionReport {
+		public String date;
+		public SubscriptionReport a; // active 
+		public SubscriptionReport n; // new
+		public SubscriptionReport c; // cancelled
+	}
+	
 	public static class NewSubscriptionReport {
 		public String date;
 		public int monthCount;
@@ -424,39 +431,40 @@ public class AdminController {
 						") A on A.d = O.d order by 1 desc", getRowMapper());
 		mergeSubscriptionReports(newActive);
 		List<NewSubscriptionReport> result = new ArrayList<AdminController.NewSubscriptionReport>();
-		if(newActive.size() == cancelled.size()) {
-		for(int i = 0; i < newActive.size(); i++) {
-			SubscriptionReport na = newActive.get(i);
-			SubscriptionReport ca = cancelled.get(i);
-			if(!ca.date.equals(na.date)) {
-				continue;
+		if (newActive.size() == cancelled.size()) {
+			for (int i = 0; i < newActive.size(); i++) {
+				SubscriptionReport na = newActive.get(i);
+				SubscriptionReport ca = cancelled.get(i);
+				if (!ca.date.equals(na.date)) {
+					continue;
+				}
+				NewSubscriptionReport sr = new NewSubscriptionReport();
+				sr.date = na.date;
+				sr.monthCount = na.monthCount + na.iosMonthCount;
+				sr.annualCount = na.annualCount + na.iosAnnualCount;
+				sr.quarterCount = na.quarterCount + na.iosQuarterCount;
+				sr.annualDiscountCount = na.annualDiscountCount + na.iosAnnualDiscountCount;
+				sr.cancelMonthCount = ca.monthCount + ca.iosMonthCount;
+				sr.cancelAnnualCount = ca.annualCount + ca.iosAnnualCount;
+				sr.cancelQuarterCount = ca.quarterCount + ca.iosQuarterCount;
+				sr.cancelAnnualDiscountCount = ca.annualDiscountCount + ca.iosAnnualDiscountCount;
+				sr.total = sr.monthCount + sr.annualCount + sr.annualDiscountCount + sr.quarterCount;
+				sr.totalAvgDuration = na.count > 0 ? na.duration / na.count : 0;
+				sr.cancelTotal = sr.cancelMonthCount + sr.cancelAnnualCount + sr.cancelAnnualDiscountCount
+						+ sr.cancelQuarterCount;
+				sr.cancelTotalAvgDuration = ca.count > 0 ? ca.duration / ca.count : 0;
+
+				sr.totalWeighted = (int) na.annualValue;
+				sr.cancelTotalWeighted = (int) ca.annualValue;
+				sr.totalLifeValue = (int) na.totalLifeValue;
+				sr.cancelTotalLifeValue = (int) ca.totalLifeValue;
+
+				sr.revenueGain = (int) (na.value - ca.value);
+				sr.delta = sr.total - sr.cancelTotal;
+				sr.deltaWeighted = sr.totalWeighted - sr.cancelTotalWeighted;
+
+				result.add(sr);
 			}
-			NewSubscriptionReport sr = new NewSubscriptionReport();
-			sr.date = na.date; 
-			sr.monthCount = na.monthCount + na.iosMonthCount ;
-			sr.annualCount = na.annualCount + na.iosAnnualCount;
-			sr.quarterCount = na.quarterCount + na.iosQuarterCount;
-			sr.annualDiscountCount = na.annualDiscountCount + na.iosAnnualDiscountCount;
-			sr.cancelMonthCount = ca.monthCount + ca.iosMonthCount ;
-			sr.cancelAnnualCount = ca.annualCount + ca.iosAnnualCount;
-			sr.cancelQuarterCount = ca.quarterCount + ca.iosQuarterCount;
-			sr.cancelAnnualDiscountCount = ca.annualDiscountCount + ca.iosAnnualDiscountCount;
-			sr.total = sr.monthCount + sr.annualCount + sr.annualDiscountCount + sr.quarterCount;
-			sr.totalAvgDuration = na.count > 0 ? na.duration / na.count : 0;
-			sr.cancelTotal = sr.cancelMonthCount + sr.cancelAnnualCount + sr.cancelAnnualDiscountCount + sr.cancelQuarterCount;
-			sr.cancelTotalAvgDuration = ca.count > 0 ? ca.duration / ca.count : 0;
-			
-			sr.totalWeighted = (int) na.annualValue;
-			sr.cancelTotalWeighted = (int) ca.annualValue;
-			sr.totalLifeValue = (int) na.totalLifeValue;
-			sr.cancelTotalLifeValue = (int) ca.totalLifeValue;
-			
-			sr.revenueGain = (int) (na.value - ca.value);
-			sr.delta = sr.total - sr.cancelTotal;
-			sr.deltaWeighted = sr.totalWeighted - sr.cancelTotalWeighted;
-			
-			result.add(sr);
-		}
 		}
 		return result;
 	}
@@ -535,16 +543,31 @@ public class AdminController {
 	}
 	
 	
-	private List<SubscriptionReport> getSubscriptionsReport() {
-		List<SubscriptionReport> result = jdbcTemplate
+	private List<ActiveSubscriptionReport> getSubscriptionsReport() {
+		List<SubscriptionReport> news = jdbcTemplate
+				.query(  "SELECT date_trunc('day', now() - a.month * interval '1 month'), count(*), t.sku, extract(day FROM sum(t.expiretime-t.starttime) ) "	+
+						 "FROM (select generate_series(0, 24) as month) a join supporters_device_sub t  "	+
+						 "ON t.starttime > now()  - (a.month + 1) * interval '1 month' and t.starttime < now() - a.month * interval '1 month' "	+
+						 "GROUP BY a.month, t.sku ORDER BY 1 desc, 2 desc", getRowMapper());
+		mergeSubscriptionReports(news);
+		
+		List<SubscriptionReport> cancelled = jdbcTemplate
+				.query(  "SELECT date_trunc('day', now() - a.month * interval '1 month'), count(*), t.sku, extract(day FROM sum(t.expiretime-t.starttime) ) "	+
+						 "FROM (select generate_series(0, 24) as month) a join supporters_device_sub t  "	+
+						 "ON t.expiretime > now()  - (a.month + 1) * interval '1 month' and t.expiretime < now() - a.month * interval '1 month' "	+
+						 "GROUP BY a.month, t.sku ORDER BY 1 desc, 2 desc", getRowMapper());
+		mergeSubscriptionReports(cancelled);
+		
+		List<SubscriptionReport> active = jdbcTemplate
 				.query(  "SELECT date_trunc('day', now() - a.month * interval '1 month'), count(*), t.sku, extract(day FROM sum(t.expiretime-t.starttime) ) "	+
 						 "FROM (select generate_series(0, 24) as month) a join supporters_device_sub t  "	+
 						 "ON t.expiretime > now()  - a.month * interval '1 month' and t.starttime < now() - a.month * interval '1 month' "	+
 						 "GROUP BY a.month, t.sku ORDER BY 1 desc, 2 desc", getRowMapper());
-		mergeSubscriptionReports(result);
-		for(int i = 0; i < result.size() - 1; i++) {
-			SubscriptionReport currentMonth = result.get(i);
-			SubscriptionReport prevMonth = result.get(i + 1);
+		mergeSubscriptionReports(active);
+		
+		for(int i = 0; i < active.size() - 1; i++) {
+			SubscriptionReport currentMonth = active.get(i);
+			SubscriptionReport prevMonth = active.get(i + 1);
 			// store difference of value instead of value
 			// the operation could be inverted by restoring from last value
 			currentMonth.valueOfAnnuals = currentMonth.valueOfAnnuals - prevMonth.valueOfAnnuals;
@@ -552,34 +575,46 @@ public class AdminController {
 			currentMonth.valueOfMonthly = currentMonth.valueOfMonthly - prevMonth.valueOfMonthly;
 		}
 		// calculate revenue by going from the end 
-		for(int i = result.size() - 1; i >= 0; i--) {
-			SubscriptionReport currentMonth = result.get(i);
-			if(i + 12 < result.size()) {
-				SubscriptionReport prevYearMonth = result.get(i + 12);
+		for(int i = active.size() - 1; i >= 0; i--) {
+			SubscriptionReport currentMonth = active.get(i);
+			if(i + 12 < active.size()) {
+				SubscriptionReport prevYearMonth = active.get(i + 12);
 				// prevYearMonth.valueOfAnnuals already has revenue instead of value
 				currentMonth.valueOfAnnuals += prevYearMonth.valueOfAnnuals;
 			}
 		}
 		
-		for(int i = result.size() - 1; i >= 0; i--) {
-			SubscriptionReport currentMonth = result.get(i);
-			if(i + 3 < result.size()) {
-				SubscriptionReport prevQuarterMonth = result.get(i + 3);
+		for(int i = active.size() - 1; i >= 0; i--) {
+			SubscriptionReport currentMonth = active.get(i);
+			if(i + 3 < active.size()) {
+				SubscriptionReport prevQuarterMonth = active.get(i + 3);
 				// prevYearMonth.valueOfAnnuals already has revenue instead of value
 				currentMonth.valueOfQuarterly += prevQuarterMonth.valueOfQuarterly;
 			}
 		}
 		
-		for(int i = result.size() - 1; i >= 0; i--) {
-			SubscriptionReport currentMonth = result.get(i);
-			if (i + 1 < result.size()) {
-				SubscriptionReport prevMonth = result.get(i + 1);
+		for(int i = active.size() - 1; i >= 0; i--) {
+			SubscriptionReport currentMonth = active.get(i);
+			if (i + 1 < active.size()) {
+				SubscriptionReport prevMonth = active.get(i + 1);
 				// prevYearMonth.valueOfAnnuals already has revenue instead of value
 				currentMonth.valueOfMonthly += prevMonth.valueOfMonthly;
 			}
 		}
 		
-		return result;
+		List<ActiveSubscriptionReport> res = new ArrayList<ActiveSubscriptionReport>();
+		if(news.size() == active.size() && active.size() == cancelled.size()) {
+			for(int i = 0; i < active.size(); i++) {
+				ActiveSubscriptionReport a = new ActiveSubscriptionReport();
+				a.date = active.get(i).date;
+				a.a = active.get(i);
+				a.n = news.get(i);
+				a.c = cancelled.get(i);
+				res.add(a);
+			}
+		}
+		
+		return res;
 	}
 
 
