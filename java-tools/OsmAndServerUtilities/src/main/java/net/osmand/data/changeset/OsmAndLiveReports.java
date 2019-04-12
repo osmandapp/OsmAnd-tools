@@ -1090,6 +1090,11 @@ public class OsmAndLiveReports {
 		public boolean notReadyToPay;
 		
 		public List<Recipient> rows = new ArrayList<Recipient>();
+		// UI Fields
+		public String payouts;
+		public String regionCollectedMessage;
+		public String worldCollectedMessage;
+		public String reports;
 	}
 	
 	protected static class PayoutsReport {

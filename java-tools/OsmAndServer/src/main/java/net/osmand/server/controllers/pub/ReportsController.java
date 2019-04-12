@@ -7,17 +7,12 @@ import java.io.IOException;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.sql.DataSource;
-
-import net.osmand.data.changeset.OsmAndLiveReportType;
-import net.osmand.data.changeset.OsmAndLiveReports;
-import net.osmand.data.changeset.OsmAndLiveReports.RecipientsReport;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -31,10 +26,14 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.google.gson.Gson;
 
+import net.osmand.data.changeset.OsmAndLiveReportType;
+import net.osmand.data.changeset.OsmAndLiveReports;
+import net.osmand.data.changeset.OsmAndLiveReports.RecipientsReport;
+
 @RestController
 @RequestMapping("/reports")
 public class ReportsController {
-    private static final Log LOGGER = LogFactory.getLog(ReportsController.class);
+    protected static final Log LOGGER = LogFactory.getLog(ReportsController.class);
 
 
     @Value("${web.location}")
@@ -119,7 +118,6 @@ public class ReportsController {
 			if(report.equals("recipients_by_month")) {
 				Gson gson = reports.getJsonFormatter();
 				RecipientsReport rec = reports.getReport(OsmAndLiveReportType.RECIPIENTS, region, RecipientsReport.class);
-				Map<String, Object> mapReport = new LinkedHashMap<String, Object>(); 
 				Map<String, Object> txs = (Map<String, Object>) getTransactions().get(month);
 				StringBuilder payouts = new StringBuilder(); 
 				if(txs != null && txs.get("transactions") != null) {
@@ -140,9 +138,9 @@ public class ReportsController {
 						rec.btc * 1000, rec.notReadyToPay ? " (may change in the final report)" : "" );
 				String regionCollectedMessage = String.format("<p>%.3f mBTC</p><span>collected for</span>",
 						rec.regionBtc * 1000);
-				mapReport.put("worldCollectedMessage", worldCollectedMessage);
-				mapReport.put("regionCollectedMessage", regionCollectedMessage);
-				mapReport.put("payouts", payouts.toString());
+				rec.worldCollectedMessage = worldCollectedMessage;
+				rec.regionCollectedMessage = regionCollectedMessage;
+				rec.payouts = payouts.toString();
 				StringBuilder reportBld = new StringBuilder();
 				if(!rec.notReadyToPay) {
 					reportBld.append(
@@ -154,9 +152,8 @@ public class ReportsController {
 							+ "href='https://builder.osmand.net/reports/report_underpaid.json.html'>"
 							+ "Cumulative underpaid report</a>");
 				}
-				mapReport.put("reports", reportBld.toString());
-				mapReport.put("recipients", rec);
-				return gson.toJson(mapReport);
+				rec.reports =reportBld.toString();
+				return gson.toJson(rec);
 			}
 			return reports.getJsonReport(type, region);
 		} finally {
