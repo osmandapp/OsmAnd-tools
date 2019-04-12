@@ -380,8 +380,8 @@ public class CalculateOsmChangesets {
 								downloadName, wr.getRegionDownloadName()));
 					} 
 					
-					if((wr.isRegionMapDownload() ? 1 : 0)  != mp) {
-						LOG.error(String.format("Country download map %s name doesn't match '%d' != '%d'", 
+					if(!wr.isRegionMapDownload() && mp != 0) {
+						LOG.error(String.format("Country '%s' couldn't be downloaded anymore, so database should be updated! '%d' != '%d'", 
 								downloadName, (wr.isRegionMapDownload() ? 1 : 0), mp));
 					} 
 					
