@@ -275,7 +275,7 @@ public class EmailSenderMain {
             printUsage();
             throw new RuntimeException("Correct arguments weren't supplied");
         }
-        if(p.giveawaySeries == null && "giveaway".equals(p.topic)) {
+        if((p.giveawaySeries == null || p.giveawaySeries.length() == 0) && "giveaway".equals(p.topic)) {
         	throw new RuntimeException("Giveaway series is required");
         }
         if (p.runMode.equals("send_to_test_email_group") &&
