@@ -20,8 +20,10 @@ import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TimeZone;
 import java.util.TreeMap;
+import java.util.TreeSet;
 
 import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.HttpsURLConnection;
@@ -349,17 +351,19 @@ public class CalculateOsmChangesets {
 		WorldRegion worldRegion = or.getWorldRegion();
 		boolean newCountriesInserted = false;
 		if (testMissing) {
-			ResultSet rs = conn.createStatement().executeQuery("SELECT max(id) from countries");
+			ResultSet rs = conn.createStatement().executeQuery("SELECT id, fullname from countries");
+			Set<String> existingMaps = new TreeSet<>();
 			int id = 0;
-			if(rs.next()) {
-				id = rs.getInt(1);
+			while(rs.next()) {
+				id = Math.max(id, rs.getInt(1));
+				existingMaps.add(rs.getString(2));
 			}
 			rs.close();
 			PreparedStatement insert = conn
 					.prepareStatement("INSERT INTO countries(id, parentid, name, fullname, downloadname, clat, clon, map)"
 							+ " VALUES(?, ?, ?, ?, ?, ?, ?, ?)");
 			PreparedStatement test = conn
-					.prepareStatement("select id from countries where fullname = ?");
+					.prepareStatement("select id, downloadname, map from countries where fullname = ?");
 			LinkedList<WorldRegion> queue = new LinkedList<WorldRegion>();
 			queue.add(worldRegion);
 			while (!queue.isEmpty()) {
@@ -367,7 +371,20 @@ public class CalculateOsmChangesets {
 				test.setString(1, wr.getRegionId());
 				rs = test.executeQuery();
 				if(rs.next()) {
+					existingMaps.remove(wr.getRegionId());
 					map.put(wr, rs.getInt(1));
+					String downloadName = rs.getString(2);
+					int mp = rs.getInt(3);
+					if(!Algorithms.objectEquals(downloadName, wr.getRegionDownloadName())) {
+						LOG.error(String.format("Country download name doesn't match '%s' != '%s'", 
+								downloadName, wr.getRegionDownloadName()));
+					} 
+					
+					if((wr.isRegionMapDownload() ? 1 : 0)  != mp) {
+						LOG.error(String.format("Country download map %s name doesn't match '%d' != '%d'", 
+								downloadName, (wr.isRegionMapDownload() ? 1 : 0), mp));
+					} 
+					
 				} else {
 					id++;
 					LOG.info(String.format("Insert MISSING country %s with id %d", wr.getRegionId(), id));
@@ -386,7 +403,13 @@ public class CalculateOsmChangesets {
 			}
 			insert.executeBatch();
 			insert.close();
+			if(!existingMaps.isEmpty()) {
+				for(String mp : existingMaps) {
+					LOG.error(String.format("Country '%s' should be deleted", mp));
+				}
+			}
 		}
+		
 		if(newCountriesInserted) {
 			PreparedStatement del =
 					conn.prepareStatement("delete from changeset_country where changesetid in (select id from changesets where closed_at_day > ?)");
