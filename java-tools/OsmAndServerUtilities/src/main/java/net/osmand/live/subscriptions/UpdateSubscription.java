@@ -53,6 +53,11 @@ public class UpdateSubscription {
 	private static String GOOGLE_CLIENT_ID = "";
 	private static String GOOGLE_CLIENT_SECRET = "";
 	private static String GOOGLE_REDIRECT_URI = "";
+	// https://accounts.google.com/o/oauth2/token
+	public final static String GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
+	public final static String GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/auth";
+	public final static String GOOGLE_ACCESS_TOKEN_URL = "https://www.googleapis.com/oauth2/v4/token";
+	
 	private static String TOKEN = "";
 
 
@@ -405,6 +410,7 @@ public class UpdateSubscription {
 		GOOGLE_REDIRECT_URI = properties.getProperty("GOOGLE_REDIRECT_URI");
 		TOKEN = properties.getProperty("TOKEN");
 
+		generateAuthUrl();
 		String token = getRefreshToken();
 		String accessToken = getAccessToken(token);
 		TokenResponse tokenResponse = new TokenResponse();
@@ -456,7 +462,7 @@ public class UpdateSubscription {
 
 	private static String getAccessToken(String refreshToken) throws JSONException {
 		HttpClient client = new DefaultHttpClient();
-		HttpPost post = new HttpPost("https://www.googleapis.com/oauth2/v4/token");
+		HttpPost post = new HttpPost(GOOGLE_ACCESS_TOKEN_URL);
 		try {
 			List<NameValuePair> nameValuePairs = new ArrayList<NameValuePair>(4);
 			nameValuePairs.add(new BasicNameValuePair("grant_type", "refresh_token"));
@@ -482,9 +488,35 @@ public class UpdateSubscription {
 		return null;
 	}
 
+	private static String generateAuthUrl() throws JSONException {
+		HttpClient client = new DefaultHttpClient();
+		HttpPost post = new HttpPost(GOOGLE_AUTH_URL);
+		try {
+			List<NameValuePair> nameValuePairs = new ArrayList<NameValuePair>(4);
+			nameValuePairs.add(new BasicNameValuePair("redirect_uri", GOOGLE_REDIRECT_URI));
+			nameValuePairs.add(new BasicNameValuePair("client_id", GOOGLE_CLIENT_ID));
+			nameValuePairs.add(new BasicNameValuePair("access_type", "offline"));
+			nameValuePairs.add(new BasicNameValuePair("response_type", "code"));
+			post.setEntity(new UrlEncodedFormEntity(nameValuePairs));
+
+			org.apache.http.HttpResponse response = client.execute(post);
+			BufferedReader reader = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
+			StringBuffer buffer = new StringBuffer();
+			for (String line = reader.readLine(); line != null; line = reader.readLine()) {
+				buffer.append(line);
+			}
+			System.out.println(buffer);
+			throw new UnsupportedOperationException("Follow url to active code " + buffer);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		return null;
+	}
+	
 	public static String getRefreshToken() {
 		HttpClient client = new DefaultHttpClient();
-		HttpPost post = new HttpPost("https://accounts.google.com/o/oauth2/token");
+									
+		HttpPost post = new HttpPost(GOOGLE_TOKEN_URL);
 		try {
 			List<NameValuePair> nameValuePairs = new ArrayList<NameValuePair>(5);
 			nameValuePairs.add(new BasicNameValuePair("grant_type", "authorization_code"));
