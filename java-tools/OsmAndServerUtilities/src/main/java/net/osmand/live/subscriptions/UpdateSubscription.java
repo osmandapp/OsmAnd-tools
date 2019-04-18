@@ -500,7 +500,7 @@ public class UpdateSubscription {
 			for (String line = reader.readLine(); line != null; line = reader.readLine()) {
 				buffer.append(line);
 			}
-
+			System.out.println(buffer.toString());
 			JSONObject json = new JSONObject(buffer.toString());
 			String refreshToken = json.getString("refresh_token");
 			return refreshToken;
