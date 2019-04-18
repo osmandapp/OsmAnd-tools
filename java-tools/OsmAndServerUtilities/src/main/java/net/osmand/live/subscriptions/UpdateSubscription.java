@@ -441,6 +441,7 @@ public class UpdateSubscription {
 		
 	    GoogleClientSecrets clientSecrets = GoogleClientSecrets.load(jsonFactory, new InputStreamReader(new FileInputStream(file)));
 	    NetHttpTransport httpTransport = GoogleNetHttpTransport.newTrustedTransport();
+
 		// Build flow and trigger user authorization request.
 		GoogleAuthorizationCodeFlow flow = new GoogleAuthorizationCodeFlow.Builder(
 				httpTransport, jsonFactory, clientSecrets, scopes)
@@ -449,6 +450,9 @@ public class UpdateSubscription {
 						.build();
 		Builder bld = new LocalServerReceiver.Builder();
 		bld.setPort(5000);
+		if(System.getenv("HOSTNAME") != null) {
+			bld.setHost(System.getenv("HOSTNAME"));
+		}
 		Credential credential = new AuthorizationCodeInstalledApp(flow, bld.build()).authorize("user");
 		System.out.println("Credentials saved to " + dataStoreDir.getAbsolutePath());		
 		
