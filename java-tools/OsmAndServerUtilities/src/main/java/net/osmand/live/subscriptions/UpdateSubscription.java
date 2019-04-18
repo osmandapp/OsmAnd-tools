@@ -1,30 +1,5 @@
 package net.osmand.live.subscriptions;
 
-import com.google.api.client.auth.oauth2.TokenResponse;
-import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
-import com.google.api.client.googleapis.json.GoogleJsonResponseException;
-import com.google.api.client.http.HttpRequestInitializer;
-import com.google.api.client.http.HttpTransport;
-import com.google.api.client.http.javanet.NetHttpTransport;
-import com.google.api.client.json.JsonFactory;
-import com.google.api.services.androidpublisher.AndroidPublisher;
-import com.google.api.services.androidpublisher.model.InAppProduct;
-import com.google.api.services.androidpublisher.model.InappproductsListResponse;
-import com.google.api.services.androidpublisher.model.SubscriptionPurchase;
-import com.google.gson.JsonObject;
-
-import net.osmand.live.subscriptions.ReceiptValidationHelper.InAppReceipt;
-import net.osmand.util.Algorithms;
-
-import org.apache.http.NameValuePair;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.entity.UrlEncodedFormEntity;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.impl.client.DefaultHttpClient;
-import org.apache.http.message.BasicNameValuePair;
-import org.json.JSONException;
-import org.json.JSONObject;
-
 import java.io.BufferedReader;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -41,6 +16,31 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+
+import org.apache.http.NameValuePair;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.entity.UrlEncodedFormEntity;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.message.BasicNameValuePair;
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import com.google.api.client.auth.oauth2.TokenResponse;
+import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
+import com.google.api.client.googleapis.json.GoogleJsonResponseException;
+import com.google.api.client.http.HttpRequestInitializer;
+import com.google.api.client.http.HttpTransport;
+import com.google.api.client.http.javanet.NetHttpTransport;
+import com.google.api.client.json.JsonFactory;
+import com.google.api.services.androidpublisher.AndroidPublisher;
+import com.google.api.services.androidpublisher.model.InAppProduct;
+import com.google.api.services.androidpublisher.model.InappproductsListResponse;
+import com.google.api.services.androidpublisher.model.SubscriptionPurchase;
+import com.google.gson.JsonObject;
+
+import net.osmand.live.subscriptions.ReceiptValidationHelper.InAppReceipt;
+import net.osmand.util.Algorithms;
 
 
 public class UpdateSubscription {
@@ -187,9 +187,13 @@ public class UpdateSubscription {
 				}
 			}
 			// skip all active and valid if it was validated less than 5 days ago
-			if (activeNow && valid && (checkDiff < 5 * DAY || !verifyAll)) {
-				System.out.println(String.format("Skip userid=%d, sku=%s - subscribtion is active", userid, sku));
-				continue;
+			if (activeNow && valid) {
+				if(checkDiff < 5 * DAY || !verifyAll) {
+					if(verifyAll) {
+						System.out.println(String.format("Skip userid=%d, sku=%s - subscribtion is active", userid, sku));
+					}
+					continue;
+				}
 			}
 
 			if (this.ios) {
@@ -400,12 +404,12 @@ public class UpdateSubscription {
 		GOOGLE_REDIRECT_URI = properties.getProperty("GOOGLE_REDIRECT_URI");
 		TOKEN = properties.getProperty("TOKEN");
 
-		String token = TOKEN;//getRefreshToken();
+		String token = getRefreshToken();
 		String accessToken = getAccessToken(token);
 		TokenResponse tokenResponse = new TokenResponse();
 
-//		System.out.println("refresh token=" + token);
-//		System.out.println("access token=" + accessToken);
+		System.out.println("refresh token=" + token);
+		System.out.println("access token=" + accessToken);
 
 		tokenResponse.setAccessToken(accessToken);
 		tokenResponse.setRefreshToken(token);
