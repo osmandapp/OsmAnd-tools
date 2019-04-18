@@ -307,7 +307,7 @@ public class UpdateSubscription {
 			if (reason != null) {
 				deleteSubscription(userid, pt, sku, tm, reason, kind);
 			} else {
-				System.err.println(String.format("?? Error updating userid %s and sku %s: %s", userid, sku, e.getMessage()));
+				System.err.println(String.format("?? Error updating userid %s and sku %s pt '%s': %s", userid, sku, pt, e.getMessage()));
 				int ind = 1;
 				updCheckStat.setTimestamp(ind++, new Timestamp(tm));
 				updCheckStat.setLong(ind++, userid);
