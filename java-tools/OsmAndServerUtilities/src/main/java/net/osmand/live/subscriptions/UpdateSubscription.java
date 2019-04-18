@@ -56,14 +56,15 @@ public class UpdateSubscription {
 	private static final long HOUR = 1000l * 60 * 60;
 
 	int changes = 0;
+	int checkChanges = 0;
 	int deletions = 0;
 	protected String selQuery;
 	protected String updQuery;
 	protected String delQuery;
-//	protected String updCheckQuery;
+	protected String updCheckQuery;
 	protected PreparedStatement updStat;
 	protected PreparedStatement delStat;
-//	protected PreparedStatement updCheckStat;
+	protected PreparedStatement updCheckStat;
 	protected boolean ios;
 
 	public static void main(String[] args) throws JSONException, IOException, SQLException, ClassNotFoundException, GeneralSecurityException {
@@ -89,8 +90,8 @@ public class UpdateSubscription {
 	public UpdateSubscription() {
 		delQuery = "UPDATE supporters_device_sub SET valid = false, kind = ?, checktime = ? " +
 				"WHERE userid = ? and purchaseToken = ? and sku = ?";
-//			updCheckQuery = "UPDATE supporters_device_sub SET checktime = ? " +
-//					"WHERE userid = ? and purchaseToken = ? and sku = ?";
+		updCheckQuery = "UPDATE supporters_device_sub SET checktime = ? " +
+					"WHERE userid = ? and purchaseToken = ? and sku = ?";
 	}
 
 	private static class UpdateAndroidSubscription extends UpdateSubscription {
@@ -101,7 +102,7 @@ public class UpdateSubscription {
 			this.publisher = publisher;
 			this.ios = false;
 			selQuery = "SELECT userid, sku, purchaseToken, checktime, starttime, expiretime, valid " +
-					"FROM supporters_device_sub S where (valid is null or valid=true) ";
+					"FROM supporters_device_sub S where (valid is null or valid=true) order by userid asc";
 			updQuery = "UPDATE supporters_device_sub SET " +
 					"checktime = ?, starttime = ?, expiretime = ?, autorenewing = ?, kind = ?, orderid = ?, payload = ?, valid = ? " +
 					"WHERE userid = ? and purchaseToken = ? and sku = ?";
@@ -118,7 +119,7 @@ public class UpdateSubscription {
 			super();
 			this.ios = true;
 			selQuery = "SELECT userid, sku, purchaseToken, payload, checktime, starttime, expiretime, valid " +
-					"FROM supporters_device_sub S where (valid is null or valid=true) ";
+					"FROM supporters_device_sub S where (valid is null or valid=true) order by userid asc";
 			updQuery = "UPDATE supporters_device_sub SET " +
 					"checktime = ?, starttime = ?, expiretime = ?, valid = ? " +
 					"WHERE userid = ? and purchaseToken = ? and sku = ?";
@@ -138,7 +139,7 @@ public class UpdateSubscription {
 		ResultSet rs = conn.createStatement().executeQuery(selQuery);
 		updStat = conn.prepareStatement(updQuery);
 		delStat = conn.prepareStatement(delQuery);
-//		updCheckStat = conn.prepareStatement(updCheckQuery);
+		updCheckStat = conn.prepareStatement(updCheckQuery);
 
 		AndroidPublisher.Purchases purchases = publisher != null ? publisher.purchases() : null;
 		ReceiptValidationHelper receiptValidationHelper = this.ios ? new ReceiptValidationHelper() : null;
@@ -195,6 +196,9 @@ public class UpdateSubscription {
 		}
 		if (changes > 0) {
 			updStat.executeBatch();
+		}
+		if (checkChanges > 0) {
+			updCheckStat.executeBatch();
 		}
 		if (!conn.getAutoCommit()) {
 			conn.commit();
@@ -304,6 +308,17 @@ public class UpdateSubscription {
 				deleteSubscription(userid, pt, sku, tm, reason, kind);
 			} else {
 				System.err.println(String.format("?? Error updating userid %s and sku %s: %s", userid, sku, e.getMessage()));
+				int ind = 1;
+				updCheckStat.setTimestamp(ind++, new Timestamp(tm));
+				updCheckStat.setLong(ind++, userid);
+				updCheckStat.setString(ind++, pt);
+				updCheckStat.setString(ind++, sku);
+				updCheckStat.addBatch();
+				checkChanges++;
+				if (checkChanges > BATCH_SIZE) {
+					updCheckStat.executeBatch();
+					checkChanges = 0;
+				}
 			}
 		}
 	}
@@ -441,7 +456,7 @@ public class UpdateSubscription {
 	}
 
 
-	private static void test(AndroidPublisher publisher, String subscriptionId, String purchaseToken) {
+	protected static void test(AndroidPublisher publisher, String subscriptionId, String purchaseToken) {
 		try {
 			com.google.api.services.androidpublisher.AndroidPublisher.Inappproducts.List lst = publisher.inappproducts().list(GOOGLE_PACKAGE_NAME_FREE);
 			InappproductsListResponse response = lst.execute();
