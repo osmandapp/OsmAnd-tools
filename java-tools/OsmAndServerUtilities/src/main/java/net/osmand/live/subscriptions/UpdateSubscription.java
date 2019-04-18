@@ -1,6 +1,5 @@
 package net.osmand.live.subscriptions;
 
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -18,14 +17,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.http.NameValuePair;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.entity.UrlEncodedFormEntity;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.impl.client.DefaultHttpClient;
-import org.apache.http.message.BasicNameValuePair;
 import org.json.JSONException;
-import org.json.JSONObject;
 
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.extensions.java6.auth.oauth2.AuthorizationCodeInstalledApp;
@@ -35,9 +27,7 @@ import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeFlow;
 import com.google.api.client.googleapis.auth.oauth2.GoogleClientSecrets;
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
-import com.google.api.client.http.HttpTransport;
 import com.google.api.client.http.javanet.NetHttpTransport;
-import com.google.api.client.json.JsonFactory;
 import com.google.api.client.json.jackson2.JacksonFactory;
 import com.google.api.client.util.store.FileDataStoreFactory;
 import com.google.api.services.androidpublisher.AndroidPublisher;
@@ -56,18 +46,6 @@ public class UpdateSubscription {
 	private static final String INVALID_PURCHASE = "invalid";
 	private static String PATH_TO_KEY = "";
 	// init one time
-	private static String GOOGLE_CLIENT_CODE = "";
-	private static String GOOGLE_CLIENT_ID = "";
-	private static String GOOGLE_CLIENT_SECRET = "";
-	private static String GOOGLE_REDIRECT_URI = "";
-	// https://accounts.google.com/o/oauth2/token
-	public final static String GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
-	public final static String GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/auth";
-	public final static String GOOGLE_ACCESS_TOKEN_URL = "https://www.googleapis.com/oauth2/v4/token";
-	
-	private static String TOKEN = "";
-
-
 	private static final String GOOGLE_PRODUCT_NAME = "OsmAnd+";
 	private static final String GOOGLE_PRODUCT_NAME_FREE = "OsmAnd";
 
@@ -76,9 +54,6 @@ public class UpdateSubscription {
 	private static final int BATCH_SIZE = 200;
 	private static final long DAY = 1000l * 60 * 60 * 24;
 	private static final long HOUR = 1000l * 60 * 60;
-
-	private static HttpTransport HTTP_TRANSPORT = new NetHttpTransport();
-	private static JsonFactory JSON_FACTORY = new com.google.api.client.json.jackson2.JacksonFactory();
 
 	int changes = 0;
 	int deletions = 0;
@@ -94,7 +69,7 @@ public class UpdateSubscription {
 	public static void main(String[] args) throws JSONException, IOException, SQLException, ClassNotFoundException, GeneralSecurityException {
 		AndroidPublisher publisher = getPublisherApi(args[0]);
 		if (true) {
-			test(publisher, "", "");
+			test(publisher, "osm_live_subscription_annual_free_v2", args[1]);
 			return;
 		}
 
@@ -477,101 +452,22 @@ public class UpdateSubscription {
 						//" P="+p.getPrices()+
 						" Period=" + p.getSubscriptionPeriod() + " Status=" + p.getStatus());
 			}
-			AndroidPublisher.Purchases purchases = publisher.purchases();
-			SubscriptionPurchase subscription = purchases.subscriptions().get(GOOGLE_PACKAGE_NAME_FREE, subscriptionId, purchaseToken).execute();
-			System.out.println(subscription.getUnknownKeys());
-			System.out.println(subscription.getAutoRenewing());
-			System.out.println(subscription.getKind());
-			System.out.println(new Date(subscription.getExpiryTimeMillis()));
-			System.out.println(new Date(subscription.getStartTimeMillis()));
-//			return subscription.getExpiryTimeMillis();
-//			return subscripcion.getValidUntilTimestampMsec();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-	}
-
-	private static String getAccessToken(String refreshToken) throws JSONException {
-		HttpClient client = new DefaultHttpClient();
-		HttpPost post = new HttpPost(GOOGLE_ACCESS_TOKEN_URL);
-		try {
-			List<NameValuePair> nameValuePairs = new ArrayList<NameValuePair>(4);
-			nameValuePairs.add(new BasicNameValuePair("grant_type", "refresh_token"));
-			nameValuePairs.add(new BasicNameValuePair("client_id", GOOGLE_CLIENT_ID));
-			nameValuePairs.add(new BasicNameValuePair("client_secret", GOOGLE_CLIENT_SECRET));
-			nameValuePairs.add(new BasicNameValuePair("refresh_token", refreshToken));
-			post.setEntity(new UrlEncodedFormEntity(nameValuePairs));
-
-			org.apache.http.HttpResponse response = client.execute(post);
-			BufferedReader reader = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
-			StringBuffer buffer = new StringBuffer();
-			for (String line = reader.readLine(); line != null; line = reader.readLine()) {
-				buffer.append(line);
+			if(subscriptionId.length() > 0 && purchaseToken.length() > 0) {
+				AndroidPublisher.Purchases purchases = publisher.purchases();
+				SubscriptionPurchase subscription = purchases.subscriptions().get(GOOGLE_PACKAGE_NAME_FREE, subscriptionId, purchaseToken).execute();
+				System.out.println(subscription.getUnknownKeys());
+				System.out.println(subscription.getAutoRenewing());
+				System.out.println(subscription.getKind());
+				System.out.println(new Date(subscription.getExpiryTimeMillis()));
+				System.out.println(new Date(subscription.getStartTimeMillis()));
 			}
-
-			JSONObject json = new JSONObject(buffer.toString());
-			String accessToken = json.getString("access_token");
-			return accessToken;
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-
-		return null;
 	}
 
-	private static String generateAuthUrl() throws JSONException {
-		HttpClient client = new DefaultHttpClient();
-		HttpPost post = new HttpPost(GOOGLE_AUTH_URL);
-		try {
-			List<NameValuePair> nameValuePairs = new ArrayList<NameValuePair>(4);
-			nameValuePairs.add(new BasicNameValuePair("redirect_uri", GOOGLE_REDIRECT_URI));
-			nameValuePairs.add(new BasicNameValuePair("client_id", GOOGLE_CLIENT_ID));
-			nameValuePairs.add(new BasicNameValuePair("access_type", "offline"));
-			nameValuePairs.add(new BasicNameValuePair("response_type", "code"));
-			post.setEntity(new UrlEncodedFormEntity(nameValuePairs));
-
-			org.apache.http.HttpResponse response = client.execute(post);
-			BufferedReader reader = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
-			StringBuffer buffer = new StringBuffer();
-			for (String line = reader.readLine(); line != null; line = reader.readLine()) {
-				buffer.append(line);
-			}
-			System.out.println(buffer);
-			throw new UnsupportedOperationException("Follow url to active code " + buffer);
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-		return null;
-	}
 	
-	public static String getRefreshToken() {
-		HttpClient client = new DefaultHttpClient();
-									
-		HttpPost post = new HttpPost(GOOGLE_TOKEN_URL);
-		try {
-			List<NameValuePair> nameValuePairs = new ArrayList<NameValuePair>(5);
-			nameValuePairs.add(new BasicNameValuePair("grant_type", "authorization_code"));
-			nameValuePairs.add(new BasicNameValuePair("client_id", GOOGLE_CLIENT_ID));
-			nameValuePairs.add(new BasicNameValuePair("client_secret", GOOGLE_CLIENT_SECRET));
-			nameValuePairs.add(new BasicNameValuePair("code", GOOGLE_CLIENT_CODE));
-			nameValuePairs.add(new BasicNameValuePair("redirect_uri", GOOGLE_REDIRECT_URI));
-			post.setEntity(new UrlEncodedFormEntity(nameValuePairs));
 
-			org.apache.http.HttpResponse response = client.execute(post);
-			BufferedReader reader = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
-			StringBuffer buffer = new StringBuffer();
-			for (String line = reader.readLine(); line != null; line = reader.readLine()) {
-				buffer.append(line);
-			}
-			System.out.println(buffer.toString());
-			JSONObject json = new JSONObject(buffer.toString());
-			String refreshToken = json.getString("refresh_token");
-			return refreshToken;
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-
-		return null;
-	}
+	
 
 }
