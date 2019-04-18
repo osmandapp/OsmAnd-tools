@@ -63,6 +63,7 @@ public class UpdateSubscription {
 	private static final String GOOGLE_PACKAGE_NAME_FREE = "net.osmand";
 	private static final int BATCH_SIZE = 200;
 	private static final long DAY = 1000l * 60 * 60 * 24;
+	private static final long HOUR = 1000l * 60 * 60;
 
 	private static HttpTransport HTTP_TRANSPORT = new NetHttpTransport();
 	private static JsonFactory JSON_FACTORY = new com.google.api.client.json.jackson2.JacksonFactory();
@@ -172,7 +173,7 @@ public class UpdateSubscription {
 
 			long checkDiff = checkTime == null ? tm : (tm - checkTime.getTime());
 			// Basically validate non-valid everytime and valid not often than once per 24 hours
-			if (checkDiff < DAY && valid) {
+			if (checkDiff < HOUR || (valid && checkDiff < DAY)) {
 //				if (verifyAll) {
 //					System.out.println(String.format("Skip userid=%d, sku=%s - recently checked %.1f days", userid,
 //							sku, (tm - checkTime.getTime()) / (DAY * 1.0)));
