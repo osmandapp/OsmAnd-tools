@@ -93,10 +93,10 @@ public class UpdateSubscription {
 
 	public static void main(String[] args) throws JSONException, IOException, SQLException, ClassNotFoundException, GeneralSecurityException {
 		AndroidPublisher publisher = getPublisherApi(args[0]);
-//		if(true ){
-//			test(publisher, "","");
-//			return;
-//		}
+		if (true) {
+			test(publisher, "", "");
+			return;
+		}
 
 		Class.forName("org.postgresql.Driver");
 		Connection conn = DriverManager.getConnection("jdbc:postgresql://localhost:5433/changeset",
@@ -107,8 +107,8 @@ public class UpdateSubscription {
 				verifyAll = true;
 			}
 		}
-		new UpdateAndroidSubscription(publisher).queryPurchases(conn, verifyAll);
-		new UpdateIosSubscription().queryPurchases(conn, verifyAll);
+//		new UpdateAndroidSubscription(publisher).queryPurchases(conn, verifyAll);
+//		new UpdateIosSubscription().queryPurchases(conn, verifyAll);
 	}
 
 	public UpdateSubscription() {
