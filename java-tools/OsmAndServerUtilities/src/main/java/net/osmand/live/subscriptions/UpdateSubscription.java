@@ -68,10 +68,10 @@ public class UpdateSubscription {
 
 	public static void main(String[] args) throws JSONException, IOException, SQLException, ClassNotFoundException, GeneralSecurityException {
 		AndroidPublisher publisher = getPublisherApi(args[0]);
-		if (true) {
-			test(publisher, "osm_live_subscription_annual_free_v2", args[1]);
-			return;
-		}
+//		if (true) {
+//			test(publisher, "osm_live_subscription_annual_free_v2", args[1]);
+//			return;
+//		}
 
 		Class.forName("org.postgresql.Driver");
 		Connection conn = DriverManager.getConnection("jdbc:postgresql://localhost:5433/changeset",
@@ -82,8 +82,8 @@ public class UpdateSubscription {
 				verifyAll = true;
 			}
 		}
-//		new UpdateAndroidSubscription(publisher).queryPurchases(conn, verifyAll);
-//		new UpdateIosSubscription().queryPurchases(conn, verifyAll);
+		new UpdateAndroidSubscription(publisher).queryPurchases(conn, verifyAll);
+		new UpdateIosSubscription().queryPurchases(conn, verifyAll);
 	}
 
 	public UpdateSubscription() {
@@ -160,7 +160,7 @@ public class UpdateSubscription {
 
 			long checkDiff = checkTime == null ? tm : (tm - checkTime.getTime());
 			// Basically validate non-valid everytime and valid not often than once per 24 hours
-			if (checkDiff < HOUR || (valid && checkDiff < DAY)) {
+			if (checkDiff < 6 * HOUR || (valid && checkDiff < DAY)) {
 //				if (verifyAll) {
 //					System.out.println(String.format("Skip userid=%d, sku=%s - recently checked %.1f days", userid,
 //							sku, (tm - checkTime.getTime()) / (DAY * 1.0)));
