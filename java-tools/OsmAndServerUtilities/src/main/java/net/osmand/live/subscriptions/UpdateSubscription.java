@@ -1,9 +1,11 @@
 package net.osmand.live.subscriptions;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.security.GeneralSecurityException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -15,7 +17,6 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 
 import org.apache.http.NameValuePair;
 import org.apache.http.client.HttpClient;
@@ -26,13 +27,19 @@ import org.apache.http.message.BasicNameValuePair;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import com.google.api.client.auth.oauth2.TokenResponse;
-import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
+import com.google.api.client.auth.oauth2.Credential;
+import com.google.api.client.extensions.java6.auth.oauth2.AuthorizationCodeInstalledApp;
+import com.google.api.client.extensions.jetty.auth.oauth2.LocalServerReceiver;
+import com.google.api.client.extensions.jetty.auth.oauth2.LocalServerReceiver.Builder;
+import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeFlow;
+import com.google.api.client.googleapis.auth.oauth2.GoogleClientSecrets;
+import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
-import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.client.http.HttpTransport;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.JsonFactory;
+import com.google.api.client.json.jackson2.JacksonFactory;
+import com.google.api.client.util.store.FileDataStoreFactory;
 import com.google.api.services.androidpublisher.AndroidPublisher;
 import com.google.api.services.androidpublisher.model.InAppProduct;
 import com.google.api.services.androidpublisher.model.InappproductsListResponse;
@@ -84,7 +91,7 @@ public class UpdateSubscription {
 //	protected PreparedStatement updCheckStat;
 	protected boolean ios;
 
-	public static void main(String[] args) throws JSONException, IOException, SQLException, ClassNotFoundException {
+	public static void main(String[] args) throws JSONException, IOException, SQLException, ClassNotFoundException, GeneralSecurityException {
 		AndroidPublisher publisher = getPublisherApi(args[0]);
 //		if(true ){
 //			test(publisher, "","");
@@ -401,34 +408,54 @@ public class UpdateSubscription {
 	}
 
 
-	private static AndroidPublisher getPublisherApi(String file) throws JSONException, IOException {
-		Properties properties = new Properties();
-		properties.load(new FileInputStream(file));
-		GOOGLE_CLIENT_CODE = properties.getProperty("GOOGLE_CLIENT_CODE");
-		GOOGLE_CLIENT_ID = properties.getProperty("GOOGLE_CLIENT_ID");
-		GOOGLE_CLIENT_SECRET = properties.getProperty("GOOGLE_CLIENT_SECRET");
-		GOOGLE_REDIRECT_URI = properties.getProperty("GOOGLE_REDIRECT_URI");
-		TOKEN = properties.getProperty("TOKEN");
+	
+	private static AndroidPublisher getPublisherApi(String file) throws JSONException, IOException, GeneralSecurityException {
+//		Properties properties = new Properties();
+//		properties.load(new FileInputStream(file));
+//		GOOGLE_CLIENT_CODE = properties.getProperty("GOOGLE_CLIENT_CODE");
+//		GOOGLE_CLIENT_ID = properties.getProperty("GOOGLE_CLIENT_ID");
+//		GOOGLE_CLIENT_SECRET = properties.getProperty("GOOGLE_CLIENT_SECRET");
+//		GOOGLE_REDIRECT_URI = properties.getProperty("GOOGLE_REDIRECT_URI");
+//		TOKEN = properties.getProperty("TOKEN");
+//		generateAuthUrl();
+//		String token = getRefreshToken();
+//		String accessToken = getAccessToken(token);
+//		TokenResponse tokenResponse = new TokenResponse();
+//
+//		System.out.println("refresh token=" + token);
+//		System.out.println("access token=" + accessToken);
+//
+//		tokenResponse.setAccessToken(accessToken);
+//		tokenResponse.setRefreshToken(token);
+//		tokenResponse.setExpiresInSeconds(3600L);
+//		tokenResponse.setScope("https://www.googleapis.com/auth/androidpublisher");
+//		tokenResponse.setTokenType("Bearer");
+//		HttpRequestInitializer credential = new GoogleCredential.Builder().setTransport(httpTransport)
+//		.setJsonFactory(jsonFactory).setClientSecrets(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET).build()
+//		.setFromTokenResponse(tokenResponse);
 
-		generateAuthUrl();
-		String token = getRefreshToken();
-		String accessToken = getAccessToken(token);
-		TokenResponse tokenResponse = new TokenResponse();
+		List<String> scopes = new ArrayList<String>();
+		scopes.add("https://www.googleapis.com/auth/androidpublisher");
+	    File dataStoreDir = new File(new File(file).getParentFile(), ".credentials");
+	    JacksonFactory jsonFactory = new com.google.api.client.json.jackson2.JacksonFactory();
+		
+	    GoogleClientSecrets clientSecrets = GoogleClientSecrets.load(jsonFactory, new InputStreamReader(new FileInputStream(file)));
+	    NetHttpTransport httpTransport = GoogleNetHttpTransport.newTrustedTransport();
+		// Build flow and trigger user authorization request.
+		GoogleAuthorizationCodeFlow flow = new GoogleAuthorizationCodeFlow.Builder(
+				httpTransport, jsonFactory, clientSecrets, scopes)
+						.setDataStoreFactory(new FileDataStoreFactory(dataStoreDir))
+						.setAccessType("offline")
+						.build();
+		Builder bld = new LocalServerReceiver.Builder();
+		bld.setPort(5000);
+		Credential credential = new AuthorizationCodeInstalledApp(flow, bld.build()).authorize("user");
+		System.out.println("Credentials saved to " + dataStoreDir.getAbsolutePath());		
+		
 
-		System.out.println("refresh token=" + token);
-		System.out.println("access token=" + accessToken);
+//
 
-		tokenResponse.setAccessToken(accessToken);
-		tokenResponse.setRefreshToken(token);
-		tokenResponse.setExpiresInSeconds(3600L);
-		tokenResponse.setScope("https://www.googleapis.com/auth/androidpublisher");
-		tokenResponse.setTokenType("Bearer");
-
-		HttpRequestInitializer credential = new GoogleCredential.Builder().setTransport(HTTP_TRANSPORT)
-				.setJsonFactory(JSON_FACTORY).setClientSecrets(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET).build()
-				.setFromTokenResponse(tokenResponse);
-
-		AndroidPublisher publisher = new AndroidPublisher.Builder(HTTP_TRANSPORT, JSON_FACTORY, credential)
+		AndroidPublisher publisher = new AndroidPublisher.Builder(httpTransport, jsonFactory, credential)
 				.setApplicationName(GOOGLE_PRODUCT_NAME).build();
 
 		return publisher;
