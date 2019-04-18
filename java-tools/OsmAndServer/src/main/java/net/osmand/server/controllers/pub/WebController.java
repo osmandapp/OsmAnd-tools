@@ -43,11 +43,11 @@ import org.thymeleaf.context.WebContext;
 import org.thymeleaf.spring5.SpringTemplateEngine;
 
 @Controller
-@RequestMapping(path = {"", "ru" })
+@RequestMapping(path = {"", "ru", "de"  })
 public class WebController {
     private static final Log LOGGER = LogFactory.getLog(WebController.class);
     
-	public static final String[] SUPPORTED_LOCALES = new String[] { "", "ru" };
+	public static final String[] SUPPORTED_LOCALES = new String[] { "", "ru", "de"  };
 
 	private static final int LATEST_ARTICLES_MAIN = 10;
 	private static final int LATEST_ARTICLES_OTHER = 20;
