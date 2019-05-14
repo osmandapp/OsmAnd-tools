@@ -122,6 +122,9 @@ public class WebController {
     		String localePath = "";
     		Locale locale = null;
     		String pth = request.getRequestURI();
+    		if(request.getParameter("tr") != null) {
+    			file = "tr_"+ file;
+    		}
     		for(String loc : SUPPORTED_LOCALES) {
     			if(pth.startsWith("/" + loc +"/")) {
     				file = loc +"_" + file;
