@@ -328,7 +328,7 @@ public class ApiController {
     	return "pub/email/subscribe";
     }
 
-	@PostMapping(path = {"/submit_analytics"}, consumes = {"multipart/form-data"}, produces = "application/json")
+	@PostMapping(path = {"/submit_analytics"}, consumes = {"multipart/form-data"})
 	@ResponseBody
 	public String submitAnalytics(HttpServletRequest request,
 								  @RequestParam() Long startDate,
@@ -349,7 +349,7 @@ public class ApiController {
 			try {
 				PreparedStatement p = conn.prepareStatement(
 						"insert into analytics " +
-								"(remote_addr, date, aid, nd, ns, version, lang, start_date, finish_date, analytics_data) " +
+								"(ip, date, aid, nd, ns, version, lang, start_date, finish_date, analytics_data) " +
 								"values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 				p.setString(1, remoteAddr);
 				p.setTimestamp(2, new Timestamp(System.currentTimeMillis()));
@@ -358,8 +358,8 @@ public class ApiController {
 				p.setInt(5, ns);
 				p.setString(6, version);
 				p.setString(7, lang);
-				p.setLong(8, startDate);
-				p.setLong(9, finishDate);
+				p.setTimestamp(8, new Timestamp(startDate));
+				p.setTimestamp(9, new Timestamp(finishDate));
 				p.setBinaryStream(10, file.getInputStream());
 				p.executeUpdate();
 			} finally {
@@ -368,6 +368,6 @@ public class ApiController {
 		} else {
 			throw new IllegalArgumentException("File is empty");
 		}
-		return "{'status':'OK'}";
+		return "OK";
 	}
 }
