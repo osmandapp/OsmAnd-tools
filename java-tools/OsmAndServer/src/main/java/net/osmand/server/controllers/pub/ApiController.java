@@ -19,7 +19,6 @@ import net.osmand.util.Algorithms;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.postgresql.util.PGobject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
@@ -367,7 +366,7 @@ public class ApiController {
 				PreparedStatement p = conn.prepareStatement(
 						"insert into analytics " +
 								"(ip, date, aid, nd, ns, version, lang, start_date, finish_date, analytics_json) " +
-								"values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+								"values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?::json)");
 				p.setString(1, remoteAddr);
 				p.setTimestamp(2, new Timestamp(System.currentTimeMillis()));
 				p.setString(3, aid);
@@ -377,10 +376,7 @@ public class ApiController {
 				p.setString(7, lang);
 				p.setTimestamp(8, new Timestamp(startDate));
 				p.setTimestamp(9, new Timestamp(finishDate));
-				PGobject jsonObject = new PGobject();
-				jsonObject.setType("jsonb");
-				jsonObject.setValue(json);
-				p.setObject(10, jsonObject);
+				p.setString(10, json);
 				p.executeUpdate();
 			} finally {
 				DataSourceUtils.releaseConnection(conn, dataSource);
