@@ -1,20 +1,9 @@
 package net.osmand.server.controllers.pub;
 
-import java.io.IOException;
-import java.net.URLDecoder;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.SQLException;
-import java.sql.Timestamp;
-import java.text.ParseException;
-import java.util.Date;
-import java.util.Enumeration;
-import java.util.HashMap;
-import java.util.Map.Entry;
-
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import javax.sql.DataSource;
+import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import net.osmand.server.api.repo.DataMissingSearchRepository;
 import net.osmand.server.api.repo.DataMissingSearchRepository.DataMissingSearchFeedback;
@@ -26,9 +15,11 @@ import net.osmand.server.api.services.IpLocationService;
 import net.osmand.server.api.services.MotdService;
 import net.osmand.server.api.services.MotdService.MessageParams;
 import net.osmand.server.api.services.PlacesService;
+import net.osmand.util.Algorithms;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.postgresql.util.PGobject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
@@ -46,10 +37,21 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.util.UriComponentsBuilder;
 
-import com.fasterxml.jackson.core.JsonParseException;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonMappingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.IOException;
+import java.net.URLDecoder;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.text.ParseException;
+import java.util.Date;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.Map.Entry;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.sql.DataSource;
 
 @Controller
 @RequestMapping("/api")
@@ -345,11 +347,26 @@ public class ApiController {
 			remoteAddr = hs.nextElement();
 		}
 		if (!file.isEmpty()) {
+			String json = null;
+			String fileName = file.getOriginalFilename();
+			if (!Algorithms.isEmpty(fileName)) {
+				if (fileName.endsWith(".json.gz")) {
+					json = Algorithms.gzipToString(file.getBytes());
+				} else if (fileName.endsWith(".json")) {
+					json = new String(file.getBytes(), "UTF-8");
+				} else {
+					throw new IllegalArgumentException("Json file required");
+				}
+			}
+			if (Algorithms.isEmpty(json)) {
+				throw new IllegalArgumentException("Json file is empty");
+			}
+
 			Connection conn = DataSourceUtils.getConnection(dataSource);
 			try {
 				PreparedStatement p = conn.prepareStatement(
 						"insert into analytics " +
-								"(ip, date, aid, nd, ns, version, lang, start_date, finish_date, analytics_data) " +
+								"(ip, date, aid, nd, ns, version, lang, start_date, finish_date, analytics_json) " +
 								"values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 				p.setString(1, remoteAddr);
 				p.setTimestamp(2, new Timestamp(System.currentTimeMillis()));
@@ -360,13 +377,16 @@ public class ApiController {
 				p.setString(7, lang);
 				p.setTimestamp(8, new Timestamp(startDate));
 				p.setTimestamp(9, new Timestamp(finishDate));
-				p.setBinaryStream(10, file.getInputStream());
+				PGobject jsonObject = new PGobject();
+				jsonObject.setType("jsonb");
+				jsonObject.setValue(json);
+				p.setObject(10, jsonObject);
 				p.executeUpdate();
 			} finally {
 				DataSourceUtils.releaseConnection(conn, dataSource);
 			}
 		} else {
-			throw new IllegalArgumentException("File is empty");
+			throw new IllegalArgumentException("Json file is empty");
 		}
 		return "OK";
 	}
