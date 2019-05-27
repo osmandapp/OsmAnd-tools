@@ -43,8 +43,6 @@ import net.osmand.util.Algorithms;
 public class UpdateSubscription {
 
 
-	private static final String INVALID_PURCHASE = "invalid";
-	private static String PATH_TO_KEY = "";
 	// init one time
 	private static final String GOOGLE_PRODUCT_NAME = "OsmAnd+";
 	private static final String GOOGLE_PRODUCT_NAME_FREE = "OsmAnd";
