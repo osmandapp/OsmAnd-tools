@@ -15,7 +15,6 @@ import net.osmand.server.api.services.IpLocationService;
 import net.osmand.server.api.services.MotdService;
 import net.osmand.server.api.services.MotdService.MessageParams;
 import net.osmand.server.api.services.PlacesService;
-import net.osmand.util.Algorithms;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -346,27 +345,12 @@ public class ApiController {
 			remoteAddr = hs.nextElement();
 		}
 		if (!file.isEmpty()) {
-			String json = null;
-			String fileName = file.getOriginalFilename();
-			if (!Algorithms.isEmpty(fileName)) {
-				if (fileName.endsWith(".json.gz")) {
-					json = Algorithms.gzipToString(file.getBytes());
-				} else if (fileName.endsWith(".json")) {
-					json = new String(file.getBytes(), "UTF-8");
-				} else {
-					throw new IllegalArgumentException("Json file required");
-				}
-			}
-			if (Algorithms.isEmpty(json)) {
-				throw new IllegalArgumentException("Json file is empty");
-			}
-
 			Connection conn = DataSourceUtils.getConnection(dataSource);
 			try {
 				PreparedStatement p = conn.prepareStatement(
 						"insert into analytics " +
-								"(ip, date, aid, nd, ns, version, lang, start_date, finish_date, analytics_json) " +
-								"values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?::json)");
+								"(ip, date, aid, nd, ns, version, lang, start_date, finish_date, data) " +
+								"values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 				p.setString(1, remoteAddr);
 				p.setTimestamp(2, new Timestamp(System.currentTimeMillis()));
 				p.setString(3, aid);
@@ -376,13 +360,13 @@ public class ApiController {
 				p.setString(7, lang);
 				p.setTimestamp(8, new Timestamp(startDate));
 				p.setTimestamp(9, new Timestamp(finishDate));
-				p.setString(10, json);
+				p.setBinaryStream(10, file.getInputStream());
 				p.executeUpdate();
 			} finally {
 				DataSourceUtils.releaseConnection(conn, dataSource);
 			}
 		} else {
-			throw new IllegalArgumentException("Json file is empty");
+			throw new IllegalArgumentException("File is empty");
 		}
 		return "OK";
 	}
