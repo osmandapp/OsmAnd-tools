@@ -43,11 +43,11 @@ import org.thymeleaf.context.WebContext;
 import org.thymeleaf.spring5.SpringTemplateEngine;
 
 @Controller
-@RequestMapping(path = {"", "ru" })
+@RequestMapping(path = {"", "ru", "de"  })
 public class WebController {
     private static final Log LOGGER = LogFactory.getLog(WebController.class);
     
-	public static final String[] SUPPORTED_LOCALES = new String[] { "", "ru" };
+	public static final String[] SUPPORTED_LOCALES = new String[] { "", "ru", "de"  };
 
 	private static final int LATEST_ARTICLES_MAIN = 10;
 	private static final int LATEST_ARTICLES_OTHER = 20;
@@ -118,10 +118,13 @@ public class WebController {
     private FileSystemResource generateStaticResource(String template, String file, HttpServletRequest request,
 			HttpServletResponse response, Model model) {
     	try {
-    		
+    		boolean enableTranslation = request.getParameter("tr") != null;
     		String localePath = "";
     		Locale locale = null;
     		String pth = request.getRequestURI();
+    		if(enableTranslation) {
+    			file = "tr_"+ file;
+    		}
     		for(String loc : SUPPORTED_LOCALES) {
     			if(pth.startsWith("/" + loc +"/")) {
     				file = loc +"_" + file;
@@ -137,6 +140,7 @@ public class WebController {
 				if(model != null) {
 					variables.putAll(model.asMap());
 				}
+				variables.put("translation", enableTranslation);
 				variables.put("locale_path", localePath);
 				gr = new GeneratedResource();
 				File targetFile = new File(genLocation, file);
@@ -481,7 +485,7 @@ public class WebController {
 						header = header.substring(header.indexOf(">") + 1);
 						header = header.substring(0, header.indexOf("</"));
 						ba.title = header;
-						ba.url = "blog/"+id;
+						ba.url = "blog/" + id;
 						ba.id = id;
 						Matcher matcher = pt.matcher(meta);
 						Map<String, String> params = new LinkedHashMap<>();

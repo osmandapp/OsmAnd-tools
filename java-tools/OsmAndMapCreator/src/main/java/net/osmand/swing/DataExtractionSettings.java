@@ -6,14 +6,12 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.prefs.Preferences;
 
+import org.xmlpull.v1.XmlPullParserException;
+
 import net.osmand.binary.MapZooms;
 import net.osmand.data.LatLon;
-import net.osmand.obf.preparation.IndexCreator;
-import net.osmand.obf.preparation.IndexCreatorSettings;
 import net.osmand.router.RoutingConfiguration;
 import net.osmand.router.RoutingConfiguration.Builder;
-
-import org.xmlpull.v1.XmlPullParserException;
 
 
 public class DataExtractionSettings {

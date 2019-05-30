@@ -103,3 +103,17 @@ ALTER TABLE <table_name> OWNER TO <user>;
 GRANT ALL privileges ON ALL TABLES IN SCHEMA public to <user>;
 GRANT ALL privileges ON supporters_seq to <user>;
 GRANT ALL privileges ON telegram_tracker_configuration_id_seq to <user>;
+
+###### ANALYTICS ########
+CREATE TABLE analytics (
+    ip text,
+    date timestamp,
+    aid text,
+    nd integer,
+    ns integer,
+    version text,
+    lang text,
+    start_date timestamp,
+    finish_date timestamp,
+    data bytea
+);

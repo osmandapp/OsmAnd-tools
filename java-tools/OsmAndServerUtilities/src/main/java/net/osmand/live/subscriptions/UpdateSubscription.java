@@ -1,34 +1,10 @@
 package net.osmand.live.subscriptions;
 
-import com.google.api.client.auth.oauth2.TokenResponse;
-import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
-import com.google.api.client.googleapis.json.GoogleJsonResponseException;
-import com.google.api.client.http.HttpRequestInitializer;
-import com.google.api.client.http.HttpTransport;
-import com.google.api.client.http.javanet.NetHttpTransport;
-import com.google.api.client.json.JsonFactory;
-import com.google.api.services.androidpublisher.AndroidPublisher;
-import com.google.api.services.androidpublisher.model.InAppProduct;
-import com.google.api.services.androidpublisher.model.InappproductsListResponse;
-import com.google.api.services.androidpublisher.model.SubscriptionPurchase;
-import com.google.gson.JsonObject;
-
-import net.osmand.live.subscriptions.ReceiptValidationHelper.InAppReceipt;
-import net.osmand.util.Algorithms;
-
-import org.apache.http.NameValuePair;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.entity.UrlEncodedFormEntity;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.impl.client.DefaultHttpClient;
-import org.apache.http.message.BasicNameValuePair;
-import org.json.JSONException;
-import org.json.JSONObject;
-
-import java.io.BufferedReader;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.security.GeneralSecurityException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -40,22 +16,34 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
+
+import org.json.JSONException;
+
+import com.google.api.client.auth.oauth2.Credential;
+import com.google.api.client.extensions.java6.auth.oauth2.AuthorizationCodeInstalledApp;
+import com.google.api.client.extensions.jetty.auth.oauth2.LocalServerReceiver;
+import com.google.api.client.extensions.jetty.auth.oauth2.LocalServerReceiver.Builder;
+import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeFlow;
+import com.google.api.client.googleapis.auth.oauth2.GoogleClientSecrets;
+import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
+import com.google.api.client.googleapis.json.GoogleJsonResponseException;
+import com.google.api.client.http.javanet.NetHttpTransport;
+import com.google.api.client.json.jackson2.JacksonFactory;
+import com.google.api.client.util.store.FileDataStoreFactory;
+import com.google.api.services.androidpublisher.AndroidPublisher;
+import com.google.api.services.androidpublisher.model.InAppProduct;
+import com.google.api.services.androidpublisher.model.InappproductsListResponse;
+import com.google.api.services.androidpublisher.model.SubscriptionPurchase;
+import com.google.gson.JsonObject;
+
+import net.osmand.live.subscriptions.ReceiptValidationHelper.InAppReceipt;
+import net.osmand.util.Algorithms;
 
 
 public class UpdateSubscription {
 
 
-	private static final String INVALID_PURCHASE = "invalid";
-	private static String PATH_TO_KEY = "";
 	// init one time
-	private static String GOOGLE_CLIENT_CODE = "";
-	private static String GOOGLE_CLIENT_ID = "";
-	private static String GOOGLE_CLIENT_SECRET = "";
-	private static String GOOGLE_REDIRECT_URI = "";
-	private static String TOKEN = "";
-
-
 	private static final String GOOGLE_PRODUCT_NAME = "OsmAnd+";
 	private static final String GOOGLE_PRODUCT_NAME_FREE = "OsmAnd";
 
@@ -63,25 +51,24 @@ public class UpdateSubscription {
 	private static final String GOOGLE_PACKAGE_NAME_FREE = "net.osmand";
 	private static final int BATCH_SIZE = 200;
 	private static final long DAY = 1000l * 60 * 60 * 24;
-
-	private static HttpTransport HTTP_TRANSPORT = new NetHttpTransport();
-	private static JsonFactory JSON_FACTORY = new com.google.api.client.json.jackson2.JacksonFactory();
+	private static final long HOUR = 1000l * 60 * 60;
 
 	int changes = 0;
+	int checkChanges = 0;
 	int deletions = 0;
 	protected String selQuery;
 	protected String updQuery;
 	protected String delQuery;
-//	protected String updCheckQuery;
+	protected String updCheckQuery;
 	protected PreparedStatement updStat;
 	protected PreparedStatement delStat;
-//	protected PreparedStatement updCheckStat;
+	protected PreparedStatement updCheckStat;
 	protected boolean ios;
 
-	public static void main(String[] args) throws JSONException, IOException, SQLException, ClassNotFoundException {
+	public static void main(String[] args) throws JSONException, IOException, SQLException, ClassNotFoundException, GeneralSecurityException {
 		AndroidPublisher publisher = getPublisherApi(args[0]);
-//		if(true ){
-//			test(publisher, "","");
+//		if (true) {
+//			test(publisher, "osm_live_subscription_annual_free_v2", args[1]);
 //			return;
 //		}
 
@@ -101,8 +88,8 @@ public class UpdateSubscription {
 	public UpdateSubscription() {
 		delQuery = "UPDATE supporters_device_sub SET valid = false, kind = ?, checktime = ? " +
 				"WHERE userid = ? and purchaseToken = ? and sku = ?";
-//			updCheckQuery = "UPDATE supporters_device_sub SET checktime = ? " +
-//					"WHERE userid = ? and purchaseToken = ? and sku = ?";
+		updCheckQuery = "UPDATE supporters_device_sub SET checktime = ? " +
+					"WHERE userid = ? and purchaseToken = ? and sku = ?";
 	}
 
 	private static class UpdateAndroidSubscription extends UpdateSubscription {
@@ -113,7 +100,7 @@ public class UpdateSubscription {
 			this.publisher = publisher;
 			this.ios = false;
 			selQuery = "SELECT userid, sku, purchaseToken, checktime, starttime, expiretime, valid " +
-					"FROM supporters_device_sub S where (valid is null or valid=true) ";
+					"FROM supporters_device_sub S where (valid is null or valid=true) order by userid asc";
 			updQuery = "UPDATE supporters_device_sub SET " +
 					"checktime = ?, starttime = ?, expiretime = ?, autorenewing = ?, kind = ?, orderid = ?, payload = ?, valid = ? " +
 					"WHERE userid = ? and purchaseToken = ? and sku = ?";
@@ -130,7 +117,7 @@ public class UpdateSubscription {
 			super();
 			this.ios = true;
 			selQuery = "SELECT userid, sku, purchaseToken, payload, checktime, starttime, expiretime, valid " +
-					"FROM supporters_device_sub S where (valid is null or valid=true) ";
+					"FROM supporters_device_sub S where (valid is null or valid=true) order by userid asc";
 			updQuery = "UPDATE supporters_device_sub SET " +
 					"checktime = ?, starttime = ?, expiretime = ?, valid = ? " +
 					"WHERE userid = ? and purchaseToken = ? and sku = ?";
@@ -150,7 +137,7 @@ public class UpdateSubscription {
 		ResultSet rs = conn.createStatement().executeQuery(selQuery);
 		updStat = conn.prepareStatement(updQuery);
 		delStat = conn.prepareStatement(delQuery);
-//		updCheckStat = conn.prepareStatement(updCheckQuery);
+		updCheckStat = conn.prepareStatement(updCheckQuery);
 
 		AndroidPublisher.Purchases purchases = publisher != null ? publisher.purchases() : null;
 		ReceiptValidationHelper receiptValidationHelper = this.ios ? new ReceiptValidationHelper() : null;
@@ -172,7 +159,7 @@ public class UpdateSubscription {
 
 			long checkDiff = checkTime == null ? tm : (tm - checkTime.getTime());
 			// Basically validate non-valid everytime and valid not often than once per 24 hours
-			if (checkDiff < DAY && valid) {
+			if (checkDiff < 6 * HOUR || (valid && checkDiff < DAY)) {
 //				if (verifyAll) {
 //					System.out.println(String.format("Skip userid=%d, sku=%s - recently checked %.1f days", userid,
 //							sku, (tm - checkTime.getTime()) / (DAY * 1.0)));
@@ -187,9 +174,13 @@ public class UpdateSubscription {
 				}
 			}
 			// skip all active and valid if it was validated less than 5 days ago
-			if (activeNow && valid && (checkDiff < 5 * DAY || !verifyAll)) {
-				System.out.println(String.format("Skip userid=%d, sku=%s - subscribtion is active", userid, sku));
-				continue;
+			if (activeNow && valid) {
+				if(checkDiff < 5 * DAY || !verifyAll) {
+					if(verifyAll) {
+						System.out.println(String.format("Skip userid=%d, sku=%s - subscribtion is active", userid, sku));
+					}
+					continue;
+				}
 			}
 
 			if (this.ios) {
@@ -203,6 +194,9 @@ public class UpdateSubscription {
 		}
 		if (changes > 0) {
 			updStat.executeBatch();
+		}
+		if (checkChanges > 0) {
+			updCheckStat.executeBatch();
 		}
 		if (!conn.getAutoCommit()) {
 			conn.commit();
@@ -311,7 +305,18 @@ public class UpdateSubscription {
 			if (reason != null) {
 				deleteSubscription(userid, pt, sku, tm, reason, kind);
 			} else {
-				System.err.println(String.format("?? Error updating userid %s and sku %s: %s", userid, sku, e.getMessage()));
+				System.err.println(String.format("?? Error updating userid %s and sku %s pt '%s': %s", userid, sku, pt, e.getMessage()));
+				int ind = 1;
+				updCheckStat.setTimestamp(ind++, new Timestamp(tm));
+				updCheckStat.setLong(ind++, userid);
+				updCheckStat.setString(ind++, pt);
+				updCheckStat.setString(ind++, sku);
+				updCheckStat.addBatch();
+				checkChanges++;
+				if (checkChanges > BATCH_SIZE) {
+					updCheckStat.executeBatch();
+					checkChanges = 0;
+				}
 			}
 		}
 	}
@@ -391,40 +396,65 @@ public class UpdateSubscription {
 	}
 
 
-	private static AndroidPublisher getPublisherApi(String file) throws JSONException, IOException {
-		Properties properties = new Properties();
-		properties.load(new FileInputStream(file));
-		GOOGLE_CLIENT_CODE = properties.getProperty("GOOGLE_CLIENT_CODE");
-		GOOGLE_CLIENT_ID = properties.getProperty("GOOGLE_CLIENT_ID");
-		GOOGLE_CLIENT_SECRET = properties.getProperty("GOOGLE_CLIENT_SECRET");
-		GOOGLE_REDIRECT_URI = properties.getProperty("GOOGLE_REDIRECT_URI");
-		TOKEN = properties.getProperty("TOKEN");
-
-		String token = TOKEN;//getRefreshToken();
-		String accessToken = getAccessToken(token);
-		TokenResponse tokenResponse = new TokenResponse();
-
+	
+	private static AndroidPublisher getPublisherApi(String file) throws JSONException, IOException, GeneralSecurityException {
+//		Properties properties = new Properties();
+//		properties.load(new FileInputStream(file));
+//		GOOGLE_CLIENT_CODE = properties.getProperty("GOOGLE_CLIENT_CODE");
+//		GOOGLE_CLIENT_ID = properties.getProperty("GOOGLE_CLIENT_ID");
+//		GOOGLE_CLIENT_SECRET = properties.getProperty("GOOGLE_CLIENT_SECRET");
+//		GOOGLE_REDIRECT_URI = properties.getProperty("GOOGLE_REDIRECT_URI");
+//		TOKEN = properties.getProperty("TOKEN");
+//		generateAuthUrl();
+//		String token = getRefreshToken();
+//		String accessToken = getAccessToken(token);
+//		TokenResponse tokenResponse = new TokenResponse();
+//
 //		System.out.println("refresh token=" + token);
 //		System.out.println("access token=" + accessToken);
+//
+//		tokenResponse.setAccessToken(accessToken);
+//		tokenResponse.setRefreshToken(token);
+//		tokenResponse.setExpiresInSeconds(3600L);
+//		tokenResponse.setScope("https://www.googleapis.com/auth/androidpublisher");
+//		tokenResponse.setTokenType("Bearer");
+//		HttpRequestInitializer credential = new GoogleCredential.Builder().setTransport(httpTransport)
+//		.setJsonFactory(jsonFactory).setClientSecrets(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET).build()
+//		.setFromTokenResponse(tokenResponse);
 
-		tokenResponse.setAccessToken(accessToken);
-		tokenResponse.setRefreshToken(token);
-		tokenResponse.setExpiresInSeconds(3600L);
-		tokenResponse.setScope("https://www.googleapis.com/auth/androidpublisher");
-		tokenResponse.setTokenType("Bearer");
+		List<String> scopes = new ArrayList<String>();
+		scopes.add("https://www.googleapis.com/auth/androidpublisher");
+	    File dataStoreDir = new File(new File(file).getParentFile(), ".credentials");
+	    JacksonFactory jsonFactory = new com.google.api.client.json.jackson2.JacksonFactory();
+		
+	    GoogleClientSecrets clientSecrets = GoogleClientSecrets.load(jsonFactory, new InputStreamReader(new FileInputStream(file)));
+	    NetHttpTransport httpTransport = GoogleNetHttpTransport.newTrustedTransport();
 
-		HttpRequestInitializer credential = new GoogleCredential.Builder().setTransport(HTTP_TRANSPORT)
-				.setJsonFactory(JSON_FACTORY).setClientSecrets(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET).build()
-				.setFromTokenResponse(tokenResponse);
+		// Build flow and trigger user authorization request.
+		GoogleAuthorizationCodeFlow flow = new GoogleAuthorizationCodeFlow.Builder(
+				httpTransport, jsonFactory, clientSecrets, scopes)
+						.setDataStoreFactory(new FileDataStoreFactory(dataStoreDir))
+						.setAccessType("offline")
+						.build();
+		Builder bld = new LocalServerReceiver.Builder();
+		bld.setPort(5000);
+//		if(System.getenv("HOSTNAME") != null) {
+//			bld.setHost(System.getenv("HOSTNAME"));
+//		}
+		Credential credential = new AuthorizationCodeInstalledApp(flow, bld.build()).authorize("user");
+		System.out.println("Credentials saved to " + dataStoreDir.getAbsolutePath());		
+		
 
-		AndroidPublisher publisher = new AndroidPublisher.Builder(HTTP_TRANSPORT, JSON_FACTORY, credential)
+//
+
+		AndroidPublisher publisher = new AndroidPublisher.Builder(httpTransport, jsonFactory, credential)
 				.setApplicationName(GOOGLE_PRODUCT_NAME).build();
 
 		return publisher;
 	}
 
 
-	private static void test(AndroidPublisher publisher, String subscriptionId, String purchaseToken) {
+	protected static void test(AndroidPublisher publisher, String subscriptionId, String purchaseToken) {
 		try {
 			com.google.api.services.androidpublisher.AndroidPublisher.Inappproducts.List lst = publisher.inappproducts().list(GOOGLE_PACKAGE_NAME_FREE);
 			InappproductsListResponse response = lst.execute();
@@ -435,75 +465,22 @@ public class UpdateSubscription {
 						//" P="+p.getPrices()+
 						" Period=" + p.getSubscriptionPeriod() + " Status=" + p.getStatus());
 			}
-			AndroidPublisher.Purchases purchases = publisher.purchases();
-			SubscriptionPurchase subscription = purchases.subscriptions().get(GOOGLE_PACKAGE_NAME_FREE, subscriptionId, purchaseToken).execute();
-			System.out.println(subscription.getUnknownKeys());
-			System.out.println(subscription.getAutoRenewing());
-			System.out.println(subscription.getKind());
-			System.out.println(new Date(subscription.getExpiryTimeMillis()));
-			System.out.println(new Date(subscription.getStartTimeMillis()));
-//			return subscription.getExpiryTimeMillis();
-//			return subscripcion.getValidUntilTimestampMsec();
+			if(subscriptionId.length() > 0 && purchaseToken.length() > 0) {
+				AndroidPublisher.Purchases purchases = publisher.purchases();
+				SubscriptionPurchase subscription = purchases.subscriptions().get(GOOGLE_PACKAGE_NAME_FREE, subscriptionId, purchaseToken).execute();
+				System.out.println(subscription.getUnknownKeys());
+				System.out.println(subscription.getAutoRenewing());
+				System.out.println(subscription.getKind());
+				System.out.println(new Date(subscription.getExpiryTimeMillis()));
+				System.out.println(new Date(subscription.getStartTimeMillis()));
+			}
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
 	}
 
-	private static String getAccessToken(String refreshToken) throws JSONException {
-		HttpClient client = new DefaultHttpClient();
-		HttpPost post = new HttpPost("https://www.googleapis.com/oauth2/v4/token");
-		try {
-			List<NameValuePair> nameValuePairs = new ArrayList<NameValuePair>(4);
-			nameValuePairs.add(new BasicNameValuePair("grant_type", "refresh_token"));
-			nameValuePairs.add(new BasicNameValuePair("client_id", GOOGLE_CLIENT_ID));
-			nameValuePairs.add(new BasicNameValuePair("client_secret", GOOGLE_CLIENT_SECRET));
-			nameValuePairs.add(new BasicNameValuePair("refresh_token", refreshToken));
-			post.setEntity(new UrlEncodedFormEntity(nameValuePairs));
+	
 
-			org.apache.http.HttpResponse response = client.execute(post);
-			BufferedReader reader = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
-			StringBuffer buffer = new StringBuffer();
-			for (String line = reader.readLine(); line != null; line = reader.readLine()) {
-				buffer.append(line);
-			}
-
-			JSONObject json = new JSONObject(buffer.toString());
-			String accessToken = json.getString("access_token");
-			return accessToken;
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-
-		return null;
-	}
-
-	public static String getRefreshToken() {
-		HttpClient client = new DefaultHttpClient();
-		HttpPost post = new HttpPost("https://accounts.google.com/o/oauth2/token");
-		try {
-			List<NameValuePair> nameValuePairs = new ArrayList<NameValuePair>(5);
-			nameValuePairs.add(new BasicNameValuePair("grant_type", "authorization_code"));
-			nameValuePairs.add(new BasicNameValuePair("client_id", GOOGLE_CLIENT_ID));
-			nameValuePairs.add(new BasicNameValuePair("client_secret", GOOGLE_CLIENT_SECRET));
-			nameValuePairs.add(new BasicNameValuePair("code", GOOGLE_CLIENT_CODE));
-			nameValuePairs.add(new BasicNameValuePair("redirect_uri", GOOGLE_REDIRECT_URI));
-			post.setEntity(new UrlEncodedFormEntity(nameValuePairs));
-
-			org.apache.http.HttpResponse response = client.execute(post);
-			BufferedReader reader = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
-			StringBuffer buffer = new StringBuffer();
-			for (String line = reader.readLine(); line != null; line = reader.readLine()) {
-				buffer.append(line);
-			}
-
-			JSONObject json = new JSONObject(buffer.toString());
-			String refreshToken = json.getString("refresh_token");
-			return refreshToken;
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-
-		return null;
-	}
+	
 
 }

@@ -1,15 +1,9 @@
 package net.osmand.server.controllers.pub;
 
-import java.io.IOException;
-import java.net.URLDecoder;
-import java.text.ParseException;
-import java.util.Date;
-import java.util.Enumeration;
-import java.util.HashMap;
-import java.util.Map.Entry;
-
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import net.osmand.server.api.repo.DataMissingSearchRepository;
 import net.osmand.server.api.repo.DataMissingSearchRepository.DataMissingSearchFeedback;
@@ -28,6 +22,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.HttpHeaders;
+import org.springframework.jdbc.datasource.DataSourceUtils;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.util.Base64Utils;
@@ -37,12 +32,24 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.util.UriComponentsBuilder;
 
-import com.fasterxml.jackson.core.JsonParseException;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonMappingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.IOException;
+import java.net.URLDecoder;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.text.ParseException;
+import java.util.Date;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.Map.Entry;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.sql.DataSource;
 
 @Controller
 @RequestMapping("/api")
@@ -56,7 +63,9 @@ public class ApiController {
     
     @Value("${web.location}")
     private String websiteLocation;
-    
+
+	@Autowired
+	private DataSource dataSource;
 
     @Autowired
     PlacesService placesService;
@@ -319,5 +328,46 @@ public class ApiController {
     	return "pub/email/subscribe";
     }
 
-
+	@PostMapping(path = {"/submit_analytics"}, consumes = {"multipart/form-data"})
+	@ResponseBody
+	public String submitAnalytics(HttpServletRequest request,
+								  @RequestParam() Long startDate,
+								  @RequestParam() Long finishDate,
+								  @RequestParam() Integer nd,
+								  @RequestParam() Integer ns,
+								  @RequestParam() String aid,
+								  @RequestParam() String version,
+								  @RequestParam() String lang,
+								  @RequestParam() MultipartFile file) throws IOException, SQLException {
+		String remoteAddr = request.getRemoteAddr();
+		Enumeration<String> hs = request.getHeaders("X-Forwarded-For");
+		if (hs != null && hs.hasMoreElements()) {
+			remoteAddr = hs.nextElement();
+		}
+		if (!file.isEmpty()) {
+			Connection conn = DataSourceUtils.getConnection(dataSource);
+			try {
+				PreparedStatement p = conn.prepareStatement(
+						"insert into analytics " +
+								"(ip, date, aid, nd, ns, version, lang, start_date, finish_date, data) " +
+								"values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+				p.setString(1, remoteAddr);
+				p.setTimestamp(2, new Timestamp(System.currentTimeMillis()));
+				p.setString(3, aid);
+				p.setInt(4, nd);
+				p.setInt(5, ns);
+				p.setString(6, version);
+				p.setString(7, lang);
+				p.setTimestamp(8, new Timestamp(startDate));
+				p.setTimestamp(9, new Timestamp(finishDate));
+				p.setBinaryStream(10, file.getInputStream());
+				p.executeUpdate();
+			} finally {
+				DataSourceUtils.releaseConnection(conn, dataSource);
+			}
+		} else {
+			throw new IllegalArgumentException("File is empty");
+		}
+		return "OK";
+	}
 }
