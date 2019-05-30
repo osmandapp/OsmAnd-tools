@@ -274,9 +274,11 @@ public class IndexHeightData {
 	}
 	
 	public void proccess(Way e) {
-		if(e.getTag("highway") == null && 
+		if(e.getTag("highway") == null &&
 				e.getTag("cycleway") == null &&
-				e.getTag("footway") == null) {
+				e.getTag("footway") == null &&
+				e.getTag("waterway") == null
+		) {
 			return;
 		}
 		if(e.getTag("tunnel") != null || e.getTag("bridge") != null) {
