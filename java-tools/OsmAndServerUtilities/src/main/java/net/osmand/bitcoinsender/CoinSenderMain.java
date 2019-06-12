@@ -38,7 +38,7 @@ public class CoinSenderMain {
 	public static final long BITCOIN_SATOSHI = 1000 * 1000 * 100;
     public static final int MBTC_SATOSHI = 100 * 1000;
     public static final String URL_TO_PAY = "http://builder.osmand.net/reports/report_underpaid.json.html";
-	private static final float FACTOR_MULT_ALLOWED_FEE = 4;
+	private static final float FACTOR_MULT_ALLOWED_FEE = 2;
 	
 	public static double getMinPayInBTC() {
 		return (((double)AVG_TX_SIZE * FEE_BYTE_SATOSHI) / BITCOIN_SATOSHI) * 10; // 0.5 mBTC: 5$ 1 BTC-10000$;
