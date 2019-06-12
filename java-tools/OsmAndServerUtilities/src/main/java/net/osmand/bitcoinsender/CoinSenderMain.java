@@ -169,13 +169,15 @@ public class CoinSenderMain {
                     api.printFeeForTransaction(currentPayment);
                     System.out.println(String.format("!!! Estimated fee should be around : %.10f BTC !!!", calculatedFee ));
                     FeeResponse feeForTransaction = api.getFeeForTransaction(currentPayment);
+                    String pm = String.format(
+							"Actual fee to pay %.1f satoshi per byte (total %s BTC) - set as %.1f satoshi per byte",
+							Double.parseDouble(feeForTransaction.fee) / calculatedFee * FEE_BYTE_SATOSHI,
+							feeForTransaction.fee, FEE_BYTE_SATOSHI);
                     if(Double.parseDouble(feeForTransaction.fee) > FACTOR_MULT_ALLOWED_FEE * calculatedFee) {
-						System.out.println(String.format(
-								"Payment won't proceed, actual fee to pay %.1f satoshi per byte (total %s BTC) - set as %.1f satoshi per byte",
-								Double.parseDouble(feeForTransaction.fee) / calculatedFee * FEE_BYTE_SATOSHI,
-								feeForTransaction.fee, FEE_BYTE_SATOSHI));
+						System.out.println("Payment won't proceed: " + pm);
                     	continue;
                     }
+                    System.out.println(pm);
                     System.out.print("Are you sure you want to pay " + totalString + " BTC? [y/n]: ");
                     String answer = scanner.nextLine();
 
