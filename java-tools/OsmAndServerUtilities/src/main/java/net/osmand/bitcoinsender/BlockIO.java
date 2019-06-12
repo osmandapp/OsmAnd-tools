@@ -147,7 +147,7 @@ public class BlockIO {
         return withdraw(null, null, target, ParamType.ADDRS, secretPin);
     }
 
-    public void printFeeForTransaction(Map<String, Double> targetsAndAmounts) {
+    public FeeResponse getFeeForTransaction(Map<String, Double> targetsAndAmounts) {
         String method = Constants.Methods.GET_FEE;
 
         HashMap<String, String> params = null;
@@ -161,12 +161,17 @@ public class BlockIO {
         try {
             Response.FeeResponse signRequestResponse = (Response.FeeResponse) doPostApiCall(method, params, Response.FeeResponse.class);
             FeeResponse resp = signRequestResponse.feeResponse;
-            System.out.println("Estimated fee for the transaction: " + resp.fee + " " + resp.ntwrk);
-
+            return resp;
         } catch (BlockIOException e) {
             e.printStackTrace();
         }
+        return null;
 
+    }
+    
+    public void printFeeForTransaction(Map<String, Double> targetsAndAmounts) {
+    	FeeResponse resp = getFeeForTransaction(targetsAndAmounts);
+        System.out.println("Estimated fee for the transaction: " + resp.fee + " " + resp.ntwrk);
     }
 
     /**

@@ -10,13 +10,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
 
-import net.osmand.bitcoinsender.model.AccountBalance;
-import net.osmand.bitcoinsender.model.Withdrawal;
-import net.osmand.bitcoinsender.utils.BlockIOException;
-
 import com.google.gson.Gson;
 import com.google.gson.internal.LinkedTreeMap;
 import com.google.gson.stream.JsonReader;
+
+import net.osmand.bitcoinsender.model.AccountBalance;
+import net.osmand.bitcoinsender.model.FeeResponse;
+import net.osmand.bitcoinsender.model.Withdrawal;
+import net.osmand.bitcoinsender.utils.BlockIOException;
 
 /**
  * Created by Paul on 07.06.17.
@@ -25,7 +26,7 @@ public class CoinSenderMain {
 
     private static String guid;
     private static String pass;
-	public static int PART_SIZE = 200;
+	public static int PART_SIZE = 250;
 	public static String DEFAULT_KEY = "742b-a0a3-9a73-e49a";
 	// MIN PAY FORMULA
 	// FEE_KB - avg fee per KB in mBTC, currently 1.0 mBTC/KB
@@ -33,10 +34,11 @@ public class CoinSenderMain {
 	// MIN_PAY = TX_FEE * 10 - so that TX_FEE <= 10% PAYMENT
 	// MIN_PAY =  AVG_TX_SIZE * FEE_KB * 10 - Transaction not more than 10% of fees
 	public static int AVG_TX_SIZE = 50; // 50 byte
-	public static double FEE_BYTE_SATOSHI = 30;
+	public static double FEE_BYTE_SATOSHI = 20;
 	public static final long BITCOIN_SATOSHI = 1000 * 1000 * 100;
     public static final int MBTC_SATOSHI = 100 * 1000;
     public static final String URL_TO_PAY = "http://builder.osmand.net/reports/report_underpaid.json.html";
+	private static final float FACTOR_MULT_ALLOWED_FEE = 4;
 	
 	public static double getMinPayInBTC() {
 		return (((double)AVG_TX_SIZE * FEE_BYTE_SATOSHI) / BITCOIN_SATOSHI) * 10; // 0.5 mBTC: 5$ 1 BTC-10000$;
@@ -165,7 +167,15 @@ public class CoinSenderMain {
                     int txSize = currentPayment.size() * 34 + numberOfInputs * 180 + 10 + 40;
                     float calculatedFee = (float) (((float)txSize * FEE_BYTE_SATOSHI) / BITCOIN_SATOSHI);
                     api.printFeeForTransaction(currentPayment);
-                    System.out.println(String.format("!!! Double check that estimated fee is almost EQUALS to (!): %.10f BTC !!!", calculatedFee ));
+                    System.out.println(String.format("!!! Estimated fee should be around : %.10f BTC !!!", calculatedFee ));
+                    FeeResponse feeForTransaction = api.getFeeForTransaction(currentPayment);
+                    if(Double.parseDouble(feeForTransaction.fee) > FACTOR_MULT_ALLOWED_FEE * calculatedFee) {
+						System.out.println(String.format(
+								"Payment won't proceed, actual fee to pay %.1f satoshi per byte (total %s BTC) - set as %.1f satoshi per byte",
+								Double.parseDouble(feeForTransaction.fee) / calculatedFee * FEE_BYTE_SATOSHI,
+								feeForTransaction.fee, FEE_BYTE_SATOSHI));
+                    	continue;
+                    }
                     System.out.print("Are you sure you want to pay " + totalString + " BTC? [y/n]: ");
                     String answer = scanner.nextLine();
 
