@@ -188,8 +188,10 @@ public class CombineSRTMIntoFile {
 		IndexCreator ic = new IndexCreator(targetFile.getParentFile(), settings);
 		if(srtmFileNames.size() > NUMBER_OF_FILES_TO_PROCESS_ON_DISK) {
 			ic.setDialects(DBDialect.SQLITE, DBDialect.SQLITE);
+			System.out.println("SQLITE on disk is used.");
 		} else {
 			ic.setDialects(DBDialect.SQLITE_IN_MEMORY, DBDialect.SQLITE_IN_MEMORY);
+			System.out.println("SQLITE in memory used: be aware whole database is stored in memory.");
 		}
 		ic.setRegionName(name +" contour lines");
 		ic.setMapFileName(targetFile.getName());
