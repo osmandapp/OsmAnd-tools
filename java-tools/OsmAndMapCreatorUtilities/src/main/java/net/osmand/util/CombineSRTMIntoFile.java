@@ -38,6 +38,7 @@ import rtree.RTree;
 
 public class CombineSRTMIntoFile {
 	private static final Log log = PlatformUtil.getLog(CombineSRTMIntoFile.class);
+	private static final int NUMBER_OF_FILES_TO_PROCESS_ON_DISK = 20;
 
 	public static void main(String[] args) throws IOException {
 		File directoryWithSRTMFiles = new File(args[0]);
@@ -185,7 +186,7 @@ public class CombineSRTMIntoFile {
 		settings.zoomWaySmoothness = 2;
 		settings.boundary = polygon;
 		IndexCreator ic = new IndexCreator(targetFile.getParentFile(), settings);
-		if(srtmFileNames.size() > 100) {
+		if(srtmFileNames.size() > NUMBER_OF_FILES_TO_PROCESS_ON_DISK) {
 			ic.setDialects(DBDialect.SQLITE, DBDialect.SQLITE);
 		} else {
 			ic.setDialects(DBDialect.SQLITE_IN_MEMORY, DBDialect.SQLITE_IN_MEMORY);
