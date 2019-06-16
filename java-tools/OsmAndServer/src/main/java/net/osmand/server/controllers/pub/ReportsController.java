@@ -94,6 +94,7 @@ public class ReportsController {
 		public long total;
 		public long fee;
 		public Map<String, Long> totalPayouts;
+		public int size = 1;
     }
     
     @SuppressWarnings("unchecked")
@@ -277,6 +278,7 @@ public class ReportsController {
 				tx.size = ((Number) payoutObjects.get("size")).intValue();
 				tx.blockIndex = ((Number) payoutObjects.get("block_index")).intValue();
 				
+				t.size += tx.size;
 				t.fee += tx.fee;
 				t.total += tx.total;
 			} finally {
