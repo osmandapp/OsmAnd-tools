@@ -45,7 +45,7 @@ import net.osmand.data.changeset.OsmAndLiveReports.RecipientsReport;
 public class ReportsController {
     protected static final Log LOGGER = LogFactory.getLog(ReportsController.class);
     public static final String REPORTS_FOLDER = "reports";
-    public static final String TXS_FOLDER = REPORTS_FOLDER + "txs";
+    public static final String TXS_FOLDER = REPORTS_FOLDER + "/txs";
     public static final String TRANSACTIONS_FILE = REPORTS_FOLDER + "/transactions.json";
 
     public static final long BITCOIN_SATOSHI = 1000 * 1000 * 100;
@@ -82,6 +82,7 @@ public class ReportsController {
     	public String id;
     	public long total;
     	public long fee;
+    	public int size = 1;
     	public int blockIndex = -1;
 		public String url;
     }
@@ -273,6 +274,7 @@ public class ReportsController {
 					}
 				}
 				tx.fee = totalIn - totalOut;
+				tx.size = ((Number) payoutObjects.get("size")).intValue();
 				tx.blockIndex = ((Number) payoutObjects.get("block_index")).intValue();
 				
 				t.fee += tx.fee;
