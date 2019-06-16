@@ -264,16 +264,17 @@ public class ReportsController {
 			params.put("params", Arrays.asList(pms));
 		}
 		StringEntity entity = new StringEntity(gson.toJson(params));
+		LOGGER.info("Btc rpc send with content: " +  gson.toJson(params));
 		httppost.setEntity(entity);
 		try (CloseableHttpResponse response = httpclient.execute(httppost)) {
 			HttpEntity ht = response.getEntity();
 			BufferedHttpEntity buf = new BufferedHttpEntity(ht);
 			String result = EntityUtils.toString(buf, StandardCharsets.UTF_8);
 			Map<?, ?> res = gson.fromJson(new JsonReader(new StringReader(result)), Map.class);
+			LOGGER.info("Result: " + result);
 			if(res.get("result") != null) {
 				return res.get("result");
 			} else {
-				LOGGER.info(result);
 				return null;
 			}
 		}
