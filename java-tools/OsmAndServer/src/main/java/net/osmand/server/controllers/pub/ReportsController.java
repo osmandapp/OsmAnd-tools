@@ -60,6 +60,7 @@ import net.osmand.bitcoinsender.TransactionAnalyzer;
 import net.osmand.data.changeset.OsmAndLiveReportType;
 import net.osmand.data.changeset.OsmAndLiveReports;
 import net.osmand.data.changeset.OsmAndLiveReports.RecipientsReport;
+import net.osmand.util.Algorithms;
 
 @RestController
 @RequestMapping("/reports")
@@ -74,7 +75,7 @@ public class ReportsController {
     protected static final String OSMAND_BTC_ADDR_TO_PAYOUT = "3JL2aMR8jTKLzMxgJdZfqEJ97GPV6iUETv";
     
     private static final String FEE_ESTIMATED_MODE = "CONSERVATIVE";
-    private static final int TARGET_NUMBER_OF_BLOCKS = 50;
+    private static int TARGET_NUMBER_OF_BLOCKS = 50;
     public static final int SOCKET_TIMEOUT = 15 * 1000;
 
     private static final int BEGIN_YEAR = 2016;
@@ -82,8 +83,8 @@ public class ReportsController {
 	public static final int MBTC_SATOSHI = 100 * 1000;
     
 	// MIN PAY FORMULA
-	public static int AVG_TX_SIZE = 50; // 50 bytes
-	public static double FEE_PERCENT = 0.05; // fee shouldn't exceed 5%
+	public static final int AVG_TX_SIZE = 50; // 50 bytes
+	public static final double FEE_PERCENT = 0.05; // fee shouldn't exceed 5%
 	public static int FEE_BYTE_SATOSHI = 5; // varies over time in Bitcoin
 	
 	private final String btcJsonRpcUser;
@@ -166,6 +167,7 @@ public class ReportsController {
 		// Current local balance
 		public long walletBalance;
 		public Map<String,Float> walletAddresses = new TreeMap<>();
+		public int walletWaitingBlocks;
 		public long walletTxFee;
 		public int walletEstBlocks;
 		public long walletEstFee;
@@ -247,10 +249,11 @@ public class ReportsController {
 					btcTransactionReport.walletBalance = (long) (((Number) winfo.get("balance")).doubleValue()
 							* BITCOIN_SATOSHI);
 				}
+				btcTransactionReport.walletWaitingBlocks = TARGET_NUMBER_OF_BLOCKS;
 				Map<?, ?> estFee = (Map<?, ?>) btcRpcCall("estimatesmartfee", TARGET_NUMBER_OF_BLOCKS, FEE_ESTIMATED_MODE);
 				if (estFee != null) {
-					btcTransactionReport.walletEstFee = (long) (((Number) winfo.get("feerate")).doubleValue() * MBTC_SATOSHI);
-					btcTransactionReport.walletEstBlocks = (((Number) winfo.get("blocks")).intValue());
+					btcTransactionReport.walletEstFee = (long) (((Number) estFee.get("feerate")).doubleValue() * MBTC_SATOSHI);
+					btcTransactionReport.walletEstBlocks = (((Number) estFee.get("blocks")).intValue());
 				}
 			} catch (Exception e) {
 				LOGGER.error("Error to request balance: " + e.getMessage(), e);
@@ -304,8 +307,9 @@ public class ReportsController {
     	loadTransactions(false);
 	}
     
-    public void updateBitcoinReport(int defaultFee) {
-    	FEE_BYTE_SATOSHI = defaultFee;
+    public void updateBitcoinReport(String defaultFee, String waitingBlocks) {
+    	FEE_BYTE_SATOSHI = Algorithms.parseIntSilently(defaultFee, FEE_BYTE_SATOSHI) ;
+    	TARGET_NUMBER_OF_BLOCKS = Algorithms.parseIntSilently(waitingBlocks, TARGET_NUMBER_OF_BLOCKS) ;
     	loadTransactions(true);
     }
     

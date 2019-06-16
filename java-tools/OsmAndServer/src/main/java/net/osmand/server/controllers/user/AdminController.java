@@ -135,8 +135,10 @@ public class AdminController {
 	
 	
 	@RequestMapping(path = { "/update-btc-report" }, method = RequestMethod.POST)
-	public String publish(Model model, @RequestParam(required = true) int defaultFee, final RedirectAttributes redirectAttrs) throws JsonProcessingException {
-		reports.updateBitcoinReport(defaultFee);
+	public String publish(Model model, 
+			@RequestParam(required = false) String defaultFee, 
+			@RequestParam(required = false) String waitingBlocks, final RedirectAttributes redirectAttrs) throws JsonProcessingException {
+		reports.updateBitcoinReport(defaultFee, waitingBlocks);
 		redirectAttrs.addFlashAttribute("update_status", "OK");
 		redirectAttrs.addFlashAttribute("update_errors", "");
 		redirectAttrs.addFlashAttribute("update_message", "Bitcoin report is regenerated");
