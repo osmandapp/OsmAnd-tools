@@ -23,9 +23,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.TreeMap;
-import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 
 import javax.servlet.http.HttpServletRequest;
@@ -35,10 +33,8 @@ import javax.sql.DataSource;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.http.HttpEntity;
-import org.apache.http.NameValuePair;
 import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.config.RequestConfig;
-import org.apache.http.client.entity.UrlEncodedFormEntity;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.conn.ssl.NoopHostnameVerifier;
@@ -46,8 +42,8 @@ import org.apache.http.entity.BufferedHttpEntity;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
-import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.util.EntityUtils;
+import org.assertj.core.util.Arrays;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.datasource.DataSourceUtils;
@@ -215,6 +211,13 @@ public class ReportsController {
 					}
 				}
 				if(loadReports) {
+					if (btcJsonRpcUser != null) {
+						try {
+							btcRpcCall("settxfee", ((double)FEE_BYTE_SATOSHI ) / MBTC_SATOSHI);
+						} catch (Exception e) {
+							LOGGER.error("Error to set fee: " + e.getMessage(), e);
+						}
+					}
 					rep.balance = generateBalanceToPay(rep);
 				} else {
 					rep.balance = btcTransactionReport.balance;
@@ -246,17 +249,20 @@ public class ReportsController {
 		return btcTransactionReport;
 	}
 
-	private Object btcRpcCall(String method) throws UnsupportedEncodingException, IOException, ClientProtocolException {
+
+	private Object btcRpcCall(String method, Object... pms) throws UnsupportedEncodingException, IOException, ClientProtocolException {
 		Gson gson = new Gson();
 		HttpPost httppost = new HttpPost("http://" + btcJsonRpcUser + ":" + btcJsonRpcPwd + "@127.0.0.1:8332/");
 		httppost.setConfig(requestConfig);
 		httppost.addHeader("charset", StandardCharsets.UTF_8.name());
 
-		Map<String, String> params = new HashMap<String, String>();
+		Map<String, Object> params = new HashMap<>();
 		params.put("jsonrpc", "1.0");
 		params.put("id", "server");
 		params.put("method", method);
-		// params.add(new BasicNameValuePair("params", "params"));
+		if(pms != null && pms.length > 0) {
+			params.put("params", Arrays.asList(pms));
+		}
 		StringEntity entity = new StringEntity(gson.toJson(params));
 		httppost.setEntity(entity);
 		try (CloseableHttpResponse response = httpclient.execute(httppost)) {
