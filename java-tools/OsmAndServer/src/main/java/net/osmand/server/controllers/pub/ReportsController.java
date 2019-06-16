@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.StringReader;
+import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Type;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
@@ -35,6 +36,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.http.HttpEntity;
 import org.apache.http.NameValuePair;
+import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.entity.UrlEncodedFormEntity;
 import org.apache.http.client.methods.CloseableHttpResponse;
@@ -163,8 +165,9 @@ public class ReportsController {
 		public BtcToPayBalance balance = new BtcToPayBalance();
 		
 		// Current local balance
-		public long currentBalance;
-		public Set<String> addresses = new TreeSet<>();
+		public long walletBalance;
+		public Map<String,Float> walletAddresses = new TreeMap<>();
+		public long walletTxFee;
 		
 		
     }
@@ -223,40 +226,51 @@ public class ReportsController {
 		}
 		if (btcJsonRpcUser != null) {
 			try {
-				Gson gson = new Gson();
-				HttpPost httppost = new HttpPost("http://" + btcJsonRpcUser + ":" + btcJsonRpcPwd + "@127.0.0.1:8332/");
-				httppost.setConfig(requestConfig);
-				httppost.addHeader("charset", StandardCharsets.UTF_8.name());
-
-				Map<String, String> params = new HashMap<String, String>();
-				params.put("jsonrpc", "1.0");
-				params.put("id", "server");
-				params.put("method", "listreceivedbyaddress");
-				// params.add(new BasicNameValuePair("params", "params"));
-				StringEntity entity = new StringEntity(gson.toJson(params));
-				httppost.setEntity(entity);
-				try (CloseableHttpResponse response = httpclient.execute(httppost)) {
-					HttpEntity ht = response.getEntity();
-					BufferedHttpEntity buf = new BufferedHttpEntity(ht);
-					String result = EntityUtils.toString(buf, StandardCharsets.UTF_8);
-					Map<?, ?> res = gson.fromJson(new JsonReader(new StringReader(result)), Map.class);
-					if(res.get("result") != null) {
-						List<Map<?, ?>> adrs = (List<Map<?, ?>>) res.get("result");
-						for(Map<?, ?> addr: adrs) {
-							btcTransactionReport.addresses.add(addr.get("address").toString());
-							btcTransactionReport.currentBalance += (long) (Double.parseDouble(addr.get("amount").toString())
-									* BITCOIN_SATOSHI);	
-						}
-						
-					} else {
-						LOGGER.info(result);
+				List<Map<?, ?>> adrs = (List<Map<?, ?>>) btcRpcCall("listreceivedbyaddress");
+				if (adrs != null) {
+					for (Map<?, ?> addr : adrs) {
+						btcTransactionReport.walletAddresses.put(addr.get("address").toString(), ((Number)addr.get("amount")).floatValue());
 					}
+				}
+				Map<?, ?> winfo = (Map<?, ?>) btcRpcCall("getwalletinfo");
+				if (winfo != null) {
+					btcTransactionReport.walletTxFee = (long) (((Number) winfo.get("paytxfee")).doubleValue()
+							* MBTC_SATOSHI);
+					btcTransactionReport.walletBalance = (long) (((Number) winfo.get("balance")).doubleValue()
+							* BITCOIN_SATOSHI);
 				}
 			} catch (Exception e) {
 				LOGGER.error("Error to request balance: " + e.getMessage(), e);
 			}
 		}
 		return btcTransactionReport;
+	}
+
+	private Object btcRpcCall(String method) throws UnsupportedEncodingException, IOException, ClientProtocolException {
+		Gson gson = new Gson();
+		HttpPost httppost = new HttpPost("http://" + btcJsonRpcUser + ":" + btcJsonRpcPwd + "@127.0.0.1:8332/");
+		httppost.setConfig(requestConfig);
+		httppost.addHeader("charset", StandardCharsets.UTF_8.name());
+
+		Map<String, String> params = new HashMap<String, String>();
+		params.put("jsonrpc", "1.0");
+		params.put("id", "server");
+		params.put("method", method);
+		// params.add(new BasicNameValuePair("params", "params"));
+		StringEntity entity = new StringEntity(gson.toJson(params));
+		httppost.setEntity(entity);
+		try (CloseableHttpResponse response = httpclient.execute(httppost)) {
+			HttpEntity ht = response.getEntity();
+			BufferedHttpEntity buf = new BufferedHttpEntity(ht);
+			String result = EntityUtils.toString(buf, StandardCharsets.UTF_8);
+			Map<?, ?> res = gson.fromJson(new JsonReader(new StringReader(result)), Map.class);
+			if(res.get("result") != null) {
+				return res.get("result");
+			} else {
+				LOGGER.info(result);
+				return null;
+			}
+		}
 	}
     
     public BtcTransactionReport getBitcoinTransactionReport() {
