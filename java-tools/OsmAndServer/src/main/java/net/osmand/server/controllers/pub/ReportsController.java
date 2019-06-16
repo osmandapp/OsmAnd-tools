@@ -251,7 +251,8 @@ public class ReportsController {
 				long totalIn = 0;
 				long totalOut = 0;
 				List<Map<?, ?>> inputs = (List<Map<?, ?>>) payoutObjects.get("inputs");
-				for (Map<?, ?> in: inputs) {
+				for (Map<?, ?> inp: inputs) {
+					Map<?, ?> in = (Map<?, ?>) inp.get("prev_out");
 					String address = (String) in.get("addr");
 					totalIn += ((Number) in.get("value")).longValue();
 					ins.put(address, in.get("value").toString());
