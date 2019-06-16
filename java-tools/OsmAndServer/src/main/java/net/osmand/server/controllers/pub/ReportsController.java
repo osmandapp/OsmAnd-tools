@@ -22,7 +22,9 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 
 import javax.servlet.http.HttpServletRequest;
@@ -162,6 +164,7 @@ public class ReportsController {
 		
 		// Current local balance
 		public long currentBalance;
+		public Set<String> addresses = new TreeSet<>();
 		
 		
     }
@@ -228,7 +231,7 @@ public class ReportsController {
 				Map<String, String> params = new HashMap<String, String>();
 				params.put("jsonrpc", "1.0");
 				params.put("id", "server");
-				params.put("method", "getbalance");
+				params.put("method", "listreceivedbyaddress");
 				// params.add(new BasicNameValuePair("params", "params"));
 				StringEntity entity = new StringEntity(gson.toJson(params));
 				httppost.setEntity(entity);
@@ -238,10 +241,15 @@ public class ReportsController {
 					String result = EntityUtils.toString(buf, StandardCharsets.UTF_8);
 					Map<?, ?> res = gson.fromJson(new JsonReader(new StringReader(result)), Map.class);
 					if(res.get("result") != null) {
-						btcTransactionReport.currentBalance = (long) (Double.parseDouble(res.get("result").toString())
-							* BITCOIN_SATOSHI);
+						List<Map<?, ?>> adrs = (List<Map<?, ?>>) res.get("result");
+						for(Map<?, ?> addr: adrs) {
+							btcTransactionReport.addresses.add(addr.get("address").toString());
+							btcTransactionReport.currentBalance += (long) (Double.parseDouble(addr.get("amount").toString())
+									* BITCOIN_SATOSHI);	
+						}
+						
 					} else {
-						LOGGER.info(result);	
+						LOGGER.info(result);
 					}
 				}
 			} catch (Exception e) {
