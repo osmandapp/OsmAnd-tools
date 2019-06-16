@@ -1,14 +1,14 @@
 package net.osmand.server.controllers.pub;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -45,27 +45,44 @@ public class ReportsController {
     @Autowired
     private DataSource dataSource;
     
-    private Map<String, Object> transactionsMap = new HashMap<String, Object>();
+    private Map<String, TransactionsMonth> transactionsMap = new TreeMap<>();
+    
+    public static class TransactionsMonth {
+    	public List<String> transactions = new ArrayList<String>();
+		public String month;
+    }
     
     @SuppressWarnings("unchecked")
-	public Map<String, Object> getTransactions() throws FileNotFoundException {
-    	if(!transactionsMap.isEmpty()) {
-    		return transactionsMap;
-    	}
+	public Map<String, TransactionsMonth> loadTransactions() {
 		File transactions = new File(websiteLocation, "reports/transactions.json");
-		transactionsMap = (Map<String, Object>) new Gson().fromJson(new FileReader(transactions), transactionsMap.getClass());
+		if(transactions.exists()) {
+			try {
+				transactionsMap = (Map<String, TransactionsMonth>) new Gson().fromJson(new FileReader(transactions), transactionsMap.getClass());
+				for(Map.Entry<String, TransactionsMonth> key : transactionsMap.entrySet()) {
+					key.getValue().month = key.getKey();
+				}
+			} catch (Exception e) {
+				LOGGER.error("Fails to read transactions.json: " + e.getMessage(), e);
+			}
+		}
+		return transactionsMap;
+	}
+    
+    public Map<String, TransactionsMonth> getTransactionsMap() {
+    	if(transactionsMap.isEmpty()) {
+    		loadTransactions();
+    	}
 		return transactionsMap;
 	}
     
     public void reloadConfigs(List<String> errors) {
-    	transactionsMap = new HashMap<String, Object>();
+    	loadTransactions();
 	}
-
+    
     
     @RequestMapping(path = { "/query_report", "/query_report.php", 
     		"/query_month_report", "/query_month_report.php"})
     @ResponseBody
-    @SuppressWarnings("unchecked")
 	public String getReport(HttpServletRequest request, HttpServletResponse response, 
 			@RequestParam(required = true) String report,
 			@RequestParam(required = false) String month, @RequestParam(required = false) String region) throws SQLException, IOException {
@@ -118,14 +135,13 @@ public class ReportsController {
 			if(report.equals("recipients_by_month")) {
 				Gson gson = reports.getJsonFormatter();
 				RecipientsReport rec = reports.getReport(OsmAndLiveReportType.RECIPIENTS, region, RecipientsReport.class);
-				Map<String, Object> txs = (Map<String, Object>) getTransactions().get(month);
+				TransactionsMonth txs = loadTransactions().get(month);
 				StringBuilder payouts = new StringBuilder(); 
-				if(txs != null && txs.get("transactions") != null) {
-					List<String> ar = (List<String>) txs.get("transactions");
-					if(ar.size() > 0) {
+				if(txs != null && txs != null) {
+					if(txs.transactions.size() > 0) {
 						int i = 1;
 						payouts.append("Payouts:&nbsp;");
-						for(String s : ar) {
+						for(String s : txs.transactions) {
 							if( i > 1) {
 								payouts.append(",&nbsp;");
 							}

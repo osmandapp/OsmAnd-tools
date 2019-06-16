@@ -11,6 +11,7 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.Iterator;
@@ -36,6 +37,7 @@ import net.osmand.server.api.services.MotdService;
 import net.osmand.server.api.services.MotdService.MotdSettings;
 import net.osmand.server.api.services.PollsService;
 import net.osmand.server.controllers.pub.ReportsController;
+import net.osmand.server.controllers.pub.ReportsController.TransactionsMonth;
 import net.osmand.server.controllers.pub.WebController;
 
 import org.apache.commons.logging.Log;
@@ -67,6 +69,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 public class AdminController {
 	private static final Log LOGGER = LogFactory.getLog(AdminController.class);
 	private static final String REPORTS_FOLDER = "reports";
+	private static final String BTC_REPORT = REPORTS_FOLDER + "/report_underpaid.json.html";
+	private static final String BTC_BACKUP_REPORT = REPORTS_FOLDER + "/btc-backup";
 
 	@Autowired
 	private MotdService motdService;
@@ -292,10 +296,13 @@ public class AdminController {
 		model.addAttribute("emailsReport", getEmailsDBReport());
 		model.addAttribute("newSubsReport", getNewSubsReport());
 		model.addAttribute("futureCancelReport", getFutureCancelReport());
+		model.addAttribute("btc", getBitcoinReport());
 		model.addAttribute("polls", pollsService.getPollsConfig(false));
 		return "admin/info";
 	}
 	
+
+
 
 	public static class EmailReport {
 		public String category;
@@ -354,12 +361,33 @@ public class AdminController {
 	}
 	
 	
+	private BitcoinReport getBitcoinReport() {
+		BitcoinReport btc = new BitcoinReport();
+		new File(websiteLocation, BTC_REPORT);
+		btc.txs = reports.getTransactionsMap().values();
+		return btc;
+	}
 	private List<EmailReport> getEmailsDBReport() {
 		List<EmailReport> er = new ArrayList<EmailReport>();
 		addEmailReport(er, "Free users with 3 maps", "email_free_users", "email_free_users", "email");
 		addEmailReport(er, "OSM editors (OsmAnd Live)", "osm_recipients", "osm_recipients", "email");
 		addEmailReport(er, "OsmAnd Live subscriptions", "supporters", "supporters", "useremail");
 		return er;
+	}
+	
+	public static class BitcoinReport {
+		
+		public double balance;
+		public double defaultFee;
+		public double payWithFeeMbtc;
+		public int payWithFeeCnt;
+		public double payNoFeeMbtc;
+		public int payNoFeeCnt;
+		public int overpaidCnt;
+		public int overpaidMbtc;
+		
+		public Collection<TransactionsMonth> txs;
+		
 	}
 
 	public static class ActiveSubscriptionReport {
