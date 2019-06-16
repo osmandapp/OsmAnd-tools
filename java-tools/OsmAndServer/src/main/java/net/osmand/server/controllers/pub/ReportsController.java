@@ -13,6 +13,10 @@ import java.net.URL;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,6 +40,7 @@ import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import com.google.gson.stream.JsonReader;
 
+import net.osmand.bitcoinsender.TransactionAnalyzer;
 import net.osmand.data.changeset.OsmAndLiveReportType;
 import net.osmand.data.changeset.OsmAndLiveReports;
 import net.osmand.data.changeset.OsmAndLiveReports.RecipientsReport;
@@ -45,12 +50,21 @@ import net.osmand.data.changeset.OsmAndLiveReports.RecipientsReport;
 public class ReportsController {
     protected static final Log LOGGER = LogFactory.getLog(ReportsController.class);
     public static final String REPORTS_FOLDER = "reports";
-    public static final String TXS_FOLDER = REPORTS_FOLDER + "/txs";
     public static final String TRANSACTIONS_FILE = REPORTS_FOLDER + "/transactions.json";
+    private static final String REPORT_URL = "https://osmand.net/reports/query_month_report?report=getPayouts&month=";
+    private static final String TXS_CACHE = REPORTS_FOLDER + "/txs/btc_";
+    private static final String PAYOUTS_CACHE_ID = REPORTS_FOLDER + "/payouts/payout_";
+    private static final String OSMAND_BTC_DONATION_ADDR = "1GRgEnKujorJJ9VBa76g8cp3sfoWtQqSs4";
 
+    private static final int BEGIN_YEAR = 2016;
     public static final long BITCOIN_SATOSHI = 1000 * 1000 * 100;
 	public static final int MBTC_SATOSHI = 100 * 1000;
     
+	// MIN PAY FORMULA
+	public static int AVG_TX_SIZE = 50; // 50 bytes
+	public static double FEE_PERCENT = 0.05; // fee shouldn't exceed 5%
+	public static int FEE_BYTE_SATOSHI = 5; // varies over time in Bitcoin
+	
     @Value("${web.location}")
     private String websiteLocation;
     
@@ -62,20 +76,55 @@ public class ReportsController {
     
     private BtcTransactionReport btcTransactionReport = new BtcTransactionReport();
     
+    public static class AddrToPay {
+    	public long totalPaid;
+    	public long toPay;
+    	public long totalToPay;
+    	public String osmId = "";
+		public String btcAddress;
+    }
+    
+    public static class BtcToPayBalance {
+    	public Map<String, Long> totalToPay = new TreeMap<>();
+    	public Map<String, String> osmid = new HashMap<>();
+    	public List<AddrToPay> toPay = new ArrayList<AddrToPay>();
+    	public int defaultFee ;
+    	public long minToPayoutSat;
+    	
+    	public long date;
+    	public String generatedDate;
+    	
+    	public BtcToPayBalance () {
+    		defaultFee = FEE_BYTE_SATOSHI;
+    		minToPayoutSat = getMinSatoshiPay();
+    		
+    	}
+    	
+    	public long payWithFeeSat;
+		public int payWithFeeCnt;
+		
+		public long payNoFeeSat;
+		public int payNoFeeCnt;
+		
+		public int overpaidCnt;
+		public long overpaidSat;
+		
+    }
+    
     public static class BtcTransactionReport {
+    	// Payouts 
     	public Map<String, BtcTransactionsMonth> mapTransactions = new TreeMap<>();
     	public List<BtcTransactionsMonth> txs = new ArrayList<>();
 		public long total;
+		public Map<String, Long> totalPayouts = new HashMap<>();
 		
-
-		public long balance;
-		public int defaultFee;
-		public long payWithFeeSat;
-		public int payWithFeeCnt;
-		public long payNoFeeSat;
-		public int payNoFeeCnt;
-		public int overpaidCnt;
-		public long overpaidSat;
+		// To be paid
+		public BtcToPayBalance balance = new BtcToPayBalance();
+		
+		// Current local balance
+		public long currentBalance;
+		
+		
     }
     
     public static class BtcTransaction {
@@ -85,6 +134,7 @@ public class ReportsController {
     	public int size = 1;
     	public int blockIndex = -1;
 		public String url;
+		public String rawurl;
     }
     
     public static class BtcTransactionsMonth {
@@ -98,7 +148,7 @@ public class ReportsController {
     }
     
     @SuppressWarnings("unchecked")
-	public BtcTransactionReport loadTransactions() {
+	public BtcTransactionReport loadTransactions(boolean loadReports) {
 		File transactions = new File(websiteLocation, TRANSACTIONS_FILE);
 		if(transactions.exists()) {
 			try {
@@ -113,7 +163,13 @@ public class ReportsController {
 				for (BtcTransactionsMonth t : rep.txs) {
 					loadPayouts(t);
 					rep.total += t.total;
+					for(String addr: t.totalPayouts.keySet()) {
+						long paid = t.totalPayouts.get(addr);
+						Long pd = rep.totalPayouts.get(addr);
+						rep.totalPayouts.put(addr, (pd == null ? 0 : pd.longValue()) + paid);
+					}
 				}
+				rep.balance = generateBalanceToPay(rep);
 				btcTransactionReport = rep;
 			} catch (Exception e) {
 				LOGGER.error("Fails to read transactions.json: " + e.getMessage(), e);
@@ -124,13 +180,16 @@ public class ReportsController {
     
     public BtcTransactionReport getBitcoinTransactionReport() {
     	if(btcTransactionReport.mapTransactions.isEmpty()) {
-    		loadTransactions();
+    		loadTransactions(false);
     	}
 		return btcTransactionReport;
 	}
     
+    
+    
+    
     public void reloadConfigs(List<String> errors) {
-    	loadTransactions();
+    	loadTransactions(true);
 	}
     
     
@@ -189,7 +248,7 @@ public class ReportsController {
 			if(report.equals("recipients_by_month")) {
 				Gson gson = reports.getJsonFormatter();
 				RecipientsReport rec = reports.getReport(OsmAndLiveReportType.RECIPIENTS, region, RecipientsReport.class);
-				BtcTransactionsMonth txs = loadTransactions().mapTransactions.get(month);
+				BtcTransactionsMonth txs = loadTransactions(false).mapTransactions.get(month);
 				StringBuilder payouts = new StringBuilder(); 
 				if(txs != null && txs != null) {
 					if(txs.transactions.size() > 0) {
@@ -243,12 +302,13 @@ public class ReportsController {
 		for (String tid : t.transactions) {
 			BtcTransaction tx = new BtcTransaction();
 			tx.id = tid;
-			tx.url = "https://blockchain.info/rawtx/" + tid;
+			tx.rawurl = "https://blockchain.info/rawtx/" + tid;
+			tx.url = "https://blockchain.info/btc/tx/" + tid;
+			String cacheId = TXS_CACHE + tid;
 			tx.total = 0;
 			t.txValues.add(tx);
 			try {
-
-				Map<?, ?> payoutObjects = gson.fromJson(readJsonUrl(tx.url, tid.toString(), true), Map.class);
+				Map<?, ?> payoutObjects = gson.fromJson(readJsonUrl(tx.rawurl, cacheId, true), Map.class);
 				// Map<?, ?> data = (Map<?, ?>) payoutObjects.get("data");
 				Map<String, String> ins = new TreeMap<String, String>();
 				long totalIn = 0;
@@ -284,11 +344,107 @@ public class ReportsController {
 				t.total += tx.total;
 			} finally {
 				if (tx.blockIndex <= 0) {
-					getCacheFile(tid).delete();
+					getCacheFile(cacheId).delete();
 				}
 			}
 		}
 	}
+
+	
+	
+	public static long getMinSatoshiPay() {
+		// !!! PAYOUT * FEE_PERCENT >= AVG_TX_SIZE * FEE_BYTE_SATOSHI ;
+		long minPayout = (long) (AVG_TX_SIZE * FEE_BYTE_SATOSHI / FEE_PERCENT);
+		return minPayout;
+	}
+	
+	protected BtcToPayBalance generateBalanceToPay(BtcTransactionReport report) throws IOException {
+		BtcToPayBalance balance = new BtcToPayBalance();
+		Date dt = new Date();
+		balance.date = dt.getTime();
+		balance.generatedDate = dt.toString();
+    	collectAllNeededPayouts(balance);
+    	for(String addrToPay : balance.totalToPay.keySet()) {
+			AddrToPay a = new AddrToPay();
+    		a.btcAddress = addrToPay;
+    		a.totalToPay = balance.totalToPay.get(addrToPay);
+    		Long paid = report.totalPayouts.get(addrToPay);
+    		if(paid != null) {
+    			a.totalPaid = paid.longValue();
+    		}
+    		a.toPay = a.totalToPay - a.totalPaid;
+    		balance.toPay.add(a);
+    		if(addrToPay.equals(OSMAND_BTC_DONATION_ADDR)) {
+    			continue;
+    		}
+    		if(balance.osmid.containsKey(addrToPay)) {
+    			a.osmId = balance.osmid.get(addrToPay);
+    		}
+    		if(a.toPay < 0) {
+    			balance.overpaidCnt++;
+    			balance.overpaidSat = balance.overpaidSat  - a.toPay; 
+    		} else if(a.toPay > 0) {
+    			balance.payNoFeeCnt++;
+    			balance.payNoFeeSat = balance.payNoFeeSat + a.toPay;
+    			if(a.toPay >= balance.minToPayoutSat) {
+    				balance.payWithFeeCnt++;
+        			balance.payWithFeeSat = balance.payWithFeeSat + a.toPay;
+    			}
+    		}
+    	}
+    	Collections.sort(balance.toPay, new Comparator<AddrToPay>() {
+
+			@Override
+			public int compare(AddrToPay o1, AddrToPay o2) {
+				return Long.compare(o1.toPay, o2.toPay);
+			}
+		});
+		return balance;
+	}
+
+	@SuppressWarnings("unchecked")
+	private void collectAllNeededPayouts(BtcToPayBalance toBePaid) throws IOException {
+		int FINAL_YEAR = Calendar.getInstance().get(Calendar.YEAR);
+		int FINAL_MONTH = Calendar.getInstance().get(Calendar.MONTH);
+		if (FINAL_MONTH == 0) {
+			FINAL_MONTH = 12;
+			FINAL_YEAR--;
+		}
+		Gson gson = new Gson();
+		for (int year = BEGIN_YEAR; year <= FINAL_YEAR; year++) {
+			int fMonth = year == FINAL_YEAR ? FINAL_MONTH : 12;
+			for (int month = 1; month <= fMonth; month++) {
+				String period = year + "-";
+				if (month < 10) {
+					period += "0";
+				}
+				period += month;
+				Map<?, ?> payoutObjects = gson
+						.fromJson(readJsonUrl(REPORT_URL + period, PAYOUTS_CACHE_ID + month, false), Map.class);
+				if (payoutObjects == null) {
+					continue;
+				}
+				List<Map<?, ?>> outputs = (List<Map<?, ?>>) payoutObjects.get("payments");
+				for (Map<?, ?> payout : outputs) {
+					String inputAddress = (String) payout.get("btcaddress");
+					String address = TransactionAnalyzer.simplifyBTC(inputAddress);
+					if (address == null) {
+						address = inputAddress;
+					}
+					String osmId = payout.get("osmid").toString();
+					long sum = (long) (((Double) payout.get("btc")) * BITCOIN_SATOSHI);
+					toBePaid.osmid.put(address, osmId);
+					if (toBePaid.totalToPay.containsKey(address)) {
+						toBePaid.totalToPay.put(address, toBePaid.totalToPay.get(address) + sum);
+					} else {
+						toBePaid.totalToPay.put(address, sum);
+					}
+				}
+
+			}
+		}
+	}
+	
 	
 	private JsonReader readJsonUrl(String rurl, String id, boolean cache)
 			throws IOException {
@@ -316,7 +472,7 @@ public class ReportsController {
 	}
 
 	private File getCacheFile(String id) {
-		return new File(websiteLocation, TXS_FOLDER + "/btc_" + id);
+		return new File(websiteLocation, id);
 	}
 
 
