@@ -236,7 +236,7 @@ public class ReportsController {
 					BufferedHttpEntity buf = new BufferedHttpEntity(ht);
 					String result = EntityUtils.toString(buf, StandardCharsets.UTF_8);
 					Map<?, ?> res = gson.fromJson(new JsonReader(new StringReader(result)), Map.class);
-					if(res.get("result") == null) {
+					if(res.get("result") != null) {
 						btcTransactionReport.currentBalance = (long) (Double.parseDouble(res.get("result").toString())
 							* BITCOIN_SATOSHI);
 					} else {
