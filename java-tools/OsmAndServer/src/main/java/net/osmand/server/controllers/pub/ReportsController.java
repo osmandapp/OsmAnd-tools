@@ -169,7 +169,11 @@ public class ReportsController {
 						rep.totalPayouts.put(addr, (pd == null ? 0 : pd.longValue()) + paid);
 					}
 				}
-				rep.balance = generateBalanceToPay(rep);
+				if(loadReports) {
+					rep.balance = generateBalanceToPay(rep);
+				} else {
+					rep.balance = btcTransactionReport.balance;
+				}
 				btcTransactionReport = rep;
 			} catch (Exception e) {
 				LOGGER.error("Fails to read transactions.json: " + e.getMessage(), e);
@@ -189,8 +193,13 @@ public class ReportsController {
     
     
     public void reloadConfigs(List<String> errors) {
-    	loadTransactions(true);
+    	loadTransactions(false);
 	}
+    
+    public void updateBitcoinReport(int defaultFee) {
+    	FEE_BYTE_SATOSHI = defaultFee;
+    	loadTransactions(true);
+    }
     
     
     @RequestMapping(path = { "/query_report", "/query_report.php", 
