@@ -89,6 +89,7 @@ public class ReportsController {
     	public List<BtcTransaction> txValues = new ArrayList<BtcTransaction>();
 		public String month;
 		public long total;
+		public long fee;
 		public Map<String, Long> totalPayouts;
     }
     
@@ -244,10 +245,23 @@ public class ReportsController {
 
 				Map<?, ?> payoutObjects = gson.fromJson(readJsonUrl(tx.url, tid.toString(), true), Map.class);
 				// Map<?, ?> data = (Map<?, ?>) payoutObjects.get("data");
+				Map<String, String> ins = new TreeMap<String, String>();
+				long totalIn = 0;
+				long totalOut = 0;
+				List<Map<?, ?>> inputs = (List<Map<?, ?>>) payoutObjects.get("inputs");
+				for (Map<?, ?> in: inputs) {
+					String address = (String) in.get("addr");
+					totalIn += ((Number) in.get("value")).longValue();
+					ins.put(address, in.get("value").toString());
+				}
 				List<Map<?, ?>> outputs = (List<Map<?, ?>>) payoutObjects.get("out");
 				for (Map<?, ?> payout : outputs) {
 					String address = (String) payout.get("addr");
 					long sum = ((Number) payout.get("value")).longValue();
+					totalOut += sum;
+					if(ins.containsKey(address)) {
+						continue;
+					}
 					tx.total += sum;
 					if (t.totalPayouts.containsKey(address)) {
 						t.totalPayouts.put(address, t.totalPayouts.get(address) + sum);
@@ -255,7 +269,10 @@ public class ReportsController {
 						t.totalPayouts.put(address, sum);
 					}
 				}
+				tx.fee = totalIn - totalOut;
 				tx.blockIndex = ((Number) payoutObjects.get("block_index")).intValue();
+				
+				t.fee += tx.fee;
 				t.total += tx.total;
 			} finally {
 				if (tx.blockIndex <= 0) {

@@ -11,7 +11,6 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.Iterator;
@@ -60,7 +59,7 @@ import net.osmand.server.api.services.MotdService;
 import net.osmand.server.api.services.MotdService.MotdSettings;
 import net.osmand.server.api.services.PollsService;
 import net.osmand.server.controllers.pub.ReportsController;
-import net.osmand.server.controllers.pub.ReportsController.BtcTransactionsMonth;
+import net.osmand.server.controllers.pub.ReportsController.BtcTransactionReport;
 import net.osmand.server.controllers.pub.WebController;
 
 @Controller
@@ -362,11 +361,9 @@ public class AdminController {
 	}
 	
 	
-	private BitcoinReport getBitcoinReport() {
-		BitcoinReport btc = new BitcoinReport();
+	private BtcTransactionReport getBitcoinReport() {
 		new File(websiteLocation, BTC_REPORT);
-		btc.txs = reports.getTransactionsMap().values();
-		return btc;
+		return reports.getBitcoinTransactionReport();
 	}
 	private List<EmailReport> getEmailsDBReport() {
 		List<EmailReport> er = new ArrayList<EmailReport>();
@@ -376,22 +373,6 @@ public class AdminController {
 		return er;
 	}
 	
-	public static class BitcoinReport {
-		
-		public double balance;
-		public double defaultFee;
-		public double payWithFeeMbtc;
-		public int payWithFeeCnt;
-		public double payNoFeeMbtc;
-		public int payNoFeeCnt;
-		public int overpaidCnt;
-		public int overpaidMbtc;
-		public double totalMbtc;
-		
-		public Collection<BtcTransactionsMonth> txs;
-		
-	}
-
 	public static class ActiveSubscriptionReport {
 		public String date;
 		public SubscriptionReport a; // active 
