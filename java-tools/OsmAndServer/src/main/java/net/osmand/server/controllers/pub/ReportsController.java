@@ -109,6 +109,9 @@ public class ReportsController {
 		public int overpaidCnt;
 		public long overpaidSat;
 		
+		public int overpaidFeeCnt;
+		public long overpaidFeeSat;
+		
     }
     
     public static class BtcTransactionReport {
@@ -391,7 +394,11 @@ public class ReportsController {
     		}
     		if(a.toPay < 0) {
     			balance.overpaidCnt++;
-    			balance.overpaidSat = balance.overpaidSat  - a.toPay; 
+    			balance.overpaidSat = balance.overpaidSat - a.toPay;
+    			if(a.toPay <= -balance.minToPayoutSat) {
+    				balance.overpaidCnt++;
+        			balance.overpaidFeeSat = balance.overpaidFeeSat - a.toPay;
+    			}
     		} else if(a.toPay > 0) {
     			balance.payNoFeeCnt++;
     			balance.payNoFeeSat = balance.payNoFeeSat + a.toPay;
