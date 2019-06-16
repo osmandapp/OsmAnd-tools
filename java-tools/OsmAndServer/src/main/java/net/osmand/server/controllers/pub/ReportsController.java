@@ -236,8 +236,12 @@ public class ReportsController {
 					BufferedHttpEntity buf = new BufferedHttpEntity(ht);
 					String result = EntityUtils.toString(buf, StandardCharsets.UTF_8);
 					Map<?, ?> res = gson.fromJson(new JsonReader(new StringReader(result)), Map.class);
-					btcTransactionReport.currentBalance = (long) (Double.parseDouble(res.get("result").toString())
+					if(res.get("result") == null) {
+						btcTransactionReport.currentBalance = (long) (Double.parseDouble(res.get("result").toString())
 							* BITCOIN_SATOSHI);
+					} else {
+						LOGGER.info(result);	
+					}
 				}
 			} catch (Exception e) {
 				LOGGER.error("Error to request balance: " + e.getMessage(), e);
