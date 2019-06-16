@@ -39,6 +39,7 @@ import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.conn.ssl.NoopHostnameVerifier;
 import org.apache.http.entity.BufferedHttpEntity;
+import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.message.BasicNameValuePair;
@@ -219,19 +220,19 @@ public class ReportsController {
 		}
 		if (btcJsonRpcUser != null) {
 			try {
+				Gson gson = new Gson();
 				HttpPost httppost = new HttpPost("http://" + btcJsonRpcUser + ":" + btcJsonRpcPwd + "@127.0.0.1:8332/");
 				httppost.setConfig(requestConfig);
 				httppost.addHeader("charset", StandardCharsets.UTF_8.name());
 
-				List<NameValuePair> params = new ArrayList<NameValuePair>();
-				params.add(new BasicNameValuePair("jsonrpc", "1.0"));
-				params.add(new BasicNameValuePair("id", "server"));
-				params.add(new BasicNameValuePair("method", "getbalance"));
-				//
+				Map<String, String> params = new HashMap<String, String>();
+				params.put("jsonrpc", "1.0");
+				params.put("id", "server");
+				params.put("method", "getbalance");
 				// params.add(new BasicNameValuePair("params", "params"));
-				httppost.setEntity(new UrlEncodedFormEntity(params));
+				StringEntity entity = new StringEntity(gson.toJson(params));
+				httppost.setEntity(entity);
 				try (CloseableHttpResponse response = httpclient.execute(httppost)) {
-					Gson gson = new Gson();
 					HttpEntity ht = response.getEntity();
 					BufferedHttpEntity buf = new BufferedHttpEntity(ht);
 					String result = EntityUtils.toString(buf, StandardCharsets.UTF_8);
