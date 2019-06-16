@@ -1,11 +1,18 @@
 package net.osmand.server.controllers.pub;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.URL;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -25,6 +32,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.google.gson.Gson;
+import com.google.gson.stream.JsonReader;
 
 import net.osmand.data.changeset.OsmAndLiveReportType;
 import net.osmand.data.changeset.OsmAndLiveReports;
@@ -34,8 +42,13 @@ import net.osmand.data.changeset.OsmAndLiveReports.RecipientsReport;
 @RequestMapping("/reports")
 public class ReportsController {
     protected static final Log LOGGER = LogFactory.getLog(ReportsController.class);
+    public static final String REPORTS_FOLDER = "reports";
+    public static final String TXS_FOLDER = REPORTS_FOLDER + "txs";
+    public static final String TRANSACTIONS_FILE = REPORTS_FOLDER + "/transactions.json";
 
-
+    public static final long BITCOIN_SATOSHI = 1000 * 1000 * 100;
+	public static final int MBTC_SATOSHI = 100 * 1000;
+    
     @Value("${web.location}")
     private String websiteLocation;
     
@@ -45,34 +58,70 @@ public class ReportsController {
     @Autowired
     private DataSource dataSource;
     
-    private Map<String, TransactionsMonth> transactionsMap = new TreeMap<>();
+    private BtcTransactionReport btcTransactionReport = new BtcTransactionReport();
     
-    public static class TransactionsMonth {
+    public static class BtcTransactionReport {
+    	public Map<String, BtcTransactionsMonth> mapTransactions = new TreeMap<>();
+    	public List<BtcTransactionsMonth> txs = new ArrayList<>();
+		public long total;
+		
+
+		public long balance;
+		public int defaultFee;
+		public long payWithFeeSat;
+		public int payWithFeeCnt;
+		public long payNoFeeSat;
+		public int payNoFeeCnt;
+		public int overpaidCnt;
+		public long overpaidSat;
+    }
+    
+    public static class BtcTransaction {
+    	public String id;
+    	public long total;
+    	public long fee;
+    	public int blockIndex = -1;
+		public String url;
+    }
+    
+    public static class BtcTransactionsMonth {
     	public List<String> transactions = new ArrayList<String>();
+    	public List<BtcTransaction> txValues = new ArrayList<BtcTransaction>();
 		public String month;
+		public long total;
+		public Map<String, Long> totalPayouts;
     }
     
     @SuppressWarnings("unchecked")
-	public Map<String, TransactionsMonth> loadTransactions() {
-		File transactions = new File(websiteLocation, "reports/transactions.json");
+	public BtcTransactionReport loadTransactions() {
+		File transactions = new File(websiteLocation, TRANSACTIONS_FILE);
 		if(transactions.exists()) {
 			try {
-				transactionsMap = (Map<String, TransactionsMonth>) new Gson().fromJson(new FileReader(transactions), transactionsMap.getClass());
-				for(Map.Entry<String, TransactionsMonth> key : transactionsMap.entrySet()) {
-					key.getValue().month = key.getKey();
+				BtcTransactionReport rep = new BtcTransactionReport();
+				rep.mapTransactions = (Map<String, BtcTransactionsMonth>) new Gson().fromJson(new FileReader(transactions), 
+						rep.mapTransactions.getClass());
+				for(Map.Entry<String, BtcTransactionsMonth> key : rep.mapTransactions.entrySet()) {
+					BtcTransactionsMonth t = key.getValue();
+					t.month = key.getKey();
+					rep.txs.add(t);
 				}
+				for (BtcTransactionsMonth t : rep.txs) {
+					loadPayouts(t);
+					rep.total += t.total;
+				}
+				btcTransactionReport = rep;
 			} catch (Exception e) {
 				LOGGER.error("Fails to read transactions.json: " + e.getMessage(), e);
 			}
 		}
-		return transactionsMap;
+		return btcTransactionReport;
 	}
     
-    public Map<String, TransactionsMonth> getTransactionsMap() {
-    	if(transactionsMap.isEmpty()) {
+    public BtcTransactionReport getBitcoinTransactionReport() {
+    	if(btcTransactionReport.mapTransactions.isEmpty()) {
     		loadTransactions();
     	}
-		return transactionsMap;
+		return btcTransactionReport;
 	}
     
     public void reloadConfigs(List<String> errors) {
@@ -135,7 +184,7 @@ public class ReportsController {
 			if(report.equals("recipients_by_month")) {
 				Gson gson = reports.getJsonFormatter();
 				RecipientsReport rec = reports.getReport(OsmAndLiveReportType.RECIPIENTS, region, RecipientsReport.class);
-				TransactionsMonth txs = loadTransactions().get(month);
+				BtcTransactionsMonth txs = loadTransactions().mapTransactions.get(month);
 				StringBuilder payouts = new StringBuilder(); 
 				if(txs != null && txs != null) {
 					if(txs.transactions.size() > 0) {
@@ -179,6 +228,70 @@ public class ReportsController {
 
 	private boolean isEmpty(String month) {
 		return month == null || month.length() == 0;
+	}
+	
+	@SuppressWarnings("unchecked")
+	private void loadPayouts(BtcTransactionsMonth t) throws IOException {
+		Gson gson = new Gson();
+		t.totalPayouts = new HashMap<>();
+		t.total = 0;
+		for (String tid : t.transactions) {
+			BtcTransaction tx = new BtcTransaction();
+			tx.id = tid;
+			tx.url = "https://blockchain.info/rawtx/" + tid;
+			tx.total = 0;
+			try {
+
+				Map<?, ?> payoutObjects = gson.fromJson(readJsonUrl(tx.url, tid.toString(), true), Map.class);
+				// Map<?, ?> data = (Map<?, ?>) payoutObjects.get("data");
+				List<Map<?, ?>> outputs = (List<Map<?, ?>>) payoutObjects.get("out");
+				for (Map<?, ?> payout : outputs) {
+					String address = (String) payout.get("addr");
+					long sum = ((Number) payout.get("value")).longValue();
+					tx.total += sum;
+					if (t.totalPayouts.containsKey(address)) {
+						t.totalPayouts.put(address, t.totalPayouts.get(address) + sum);
+					} else {
+						t.totalPayouts.put(address, sum);
+					}
+				}
+				tx.blockIndex = ((Number) payoutObjects.get("block_index")).intValue();
+				t.total += tx.total;
+			} finally {
+				if (tx.blockIndex <= 0) {
+					getCacheFile(tid).delete();
+				}
+			}
+		}
+	}
+	
+	private JsonReader readJsonUrl(String rurl, String id, boolean cache)
+			throws IOException {
+		File fl = getCacheFile(id);
+		fl.getParentFile().mkdirs();
+		if (fl.exists() && cache) {
+			return new JsonReader(new FileReader(fl));
+		}
+		URL url = new URL(rurl);
+		InputStream is = url.openStream();
+		ByteArrayOutputStream bous = new ByteArrayOutputStream();
+		byte[] bs = new byte[1024];
+		int l;
+		while ((l = is.read(bs)) != -1) {
+			bous.write(bs, 0, l);
+		}
+		is.close();
+		if (cache) {
+			FileOutputStream fous = new FileOutputStream(fl);
+			fous.write(bous.toByteArray());
+			fous.close();
+		}
+		JsonReader reader = new JsonReader(new InputStreamReader(new ByteArrayInputStream(bous.toByteArray())));
+		return reader;
+	}
+
+	private File getCacheFile(String id) {
+		return new File(websiteLocation, TXS_FOLDER + "/btc_" + id);
 	}
 
 

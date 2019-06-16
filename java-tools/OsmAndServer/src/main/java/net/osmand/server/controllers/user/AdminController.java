@@ -24,22 +24,6 @@ import java.util.zip.GZIPOutputStream;
 
 import javax.servlet.http.HttpServletResponse;
 
-import net.osmand.server.api.repo.LotterySeriesRepository;
-import net.osmand.server.api.repo.LotterySeriesRepository.LotterySeries;
-import net.osmand.server.api.repo.LotterySeriesRepository.LotteryStatus;
-import net.osmand.server.api.services.DownloadIndexesService;
-import net.osmand.server.api.services.DownloadIndexesService.DownloadProperties;
-import net.osmand.server.api.services.EmailSenderService;
-import net.osmand.server.api.services.IpLocationService;
-import net.osmand.server.api.services.LogsAccessService;
-import net.osmand.server.api.services.LogsAccessService.LogsPresentation;
-import net.osmand.server.api.services.MotdService;
-import net.osmand.server.api.services.MotdService.MotdSettings;
-import net.osmand.server.api.services.PollsService;
-import net.osmand.server.controllers.pub.ReportsController;
-import net.osmand.server.controllers.pub.ReportsController.TransactionsMonth;
-import net.osmand.server.controllers.pub.WebController;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -63,14 +47,31 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 
+import net.osmand.server.api.repo.LotterySeriesRepository;
+import net.osmand.server.api.repo.LotterySeriesRepository.LotterySeries;
+import net.osmand.server.api.repo.LotterySeriesRepository.LotteryStatus;
+import net.osmand.server.api.services.DownloadIndexesService;
+import net.osmand.server.api.services.DownloadIndexesService.DownloadProperties;
+import net.osmand.server.api.services.EmailSenderService;
+import net.osmand.server.api.services.IpLocationService;
+import net.osmand.server.api.services.LogsAccessService;
+import net.osmand.server.api.services.LogsAccessService.LogsPresentation;
+import net.osmand.server.api.services.MotdService;
+import net.osmand.server.api.services.MotdService.MotdSettings;
+import net.osmand.server.api.services.PollsService;
+import net.osmand.server.controllers.pub.ReportsController;
+import net.osmand.server.controllers.pub.ReportsController.BtcTransactionsMonth;
+import net.osmand.server.controllers.pub.WebController;
+
 @Controller
 @RequestMapping("/admin")
 @PropertySource("classpath:git.properties")
 public class AdminController {
 	private static final Log LOGGER = LogFactory.getLog(AdminController.class);
-	private static final String REPORTS_FOLDER = "reports";
-	private static final String BTC_REPORT = REPORTS_FOLDER + "/report_underpaid.json.html";
-	private static final String BTC_BACKUP_REPORT = REPORTS_FOLDER + "/btc-backup";
+	
+	private static final String ACCESS_LOG_REPORTS_FOLDER = "reports";
+	private static final String BTC_REPORT = ReportsController.REPORTS_FOLDER + "/report_underpaid.json.html";
+	private static final String BTC_BACKUP_REPORT = ReportsController.REPORTS_FOLDER + "/btc-backup";
 
 	@Autowired
 	private MotdService motdService;
@@ -385,8 +386,9 @@ public class AdminController {
 		public int payNoFeeCnt;
 		public int overpaidCnt;
 		public int overpaidMbtc;
+		public double totalMbtc;
 		
-		public Collection<TransactionsMonth> txs;
+		public Collection<BtcTransactionsMonth> txs;
 		
 	}
 
@@ -739,7 +741,7 @@ public class AdminController {
 
 	private List<Map<String, Object>> getReports() {
 		List<Map<String, Object>> list = new ArrayList<>();
-		File reports = new File(filesLocation, REPORTS_FOLDER);
+		File reports = new File(filesLocation, ACCESS_LOG_REPORTS_FOLDER);
 		File[] files = reports.listFiles();
 		if(files != null && reports.exists()) {
 			Arrays.sort(files, new Comparator<File>() {
@@ -817,7 +819,7 @@ public class AdminController {
 	@ResponseBody
     public ResponseEntity<Resource> downloadReport(@RequestParam(required=true) String file,
                                                HttpServletResponse resp) throws IOException {
-		File fl = new File(new File(filesLocation, REPORTS_FOLDER), file) ;
+		File fl = new File(new File(filesLocation, ACCESS_LOG_REPORTS_FOLDER), file) ;
         HttpHeaders headers = new HttpHeaders();
         // headers.add(HttpHeaders.CONTENT_DISPOSITION, String.format("attachment; filename=\"%s\"", fl.getName()));
         headers.add(HttpHeaders.CONTENT_TYPE, "text/plain");
