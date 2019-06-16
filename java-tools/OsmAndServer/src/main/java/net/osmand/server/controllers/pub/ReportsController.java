@@ -8,8 +8,10 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.StringReader;
 import java.lang.reflect.Type;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -21,6 +23,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.concurrent.TimeUnit;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -28,6 +31,18 @@ import javax.sql.DataSource;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.http.HttpEntity;
+import org.apache.http.NameValuePair;
+import org.apache.http.client.config.RequestConfig;
+import org.apache.http.client.entity.UrlEncodedFormEntity;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.conn.ssl.NoopHostnameVerifier;
+import org.apache.http.entity.BufferedHttpEntity;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.message.BasicNameValuePair;
+import org.apache.http.util.EntityUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.datasource.DataSourceUtils;
@@ -55,6 +70,8 @@ public class ReportsController {
     private static final String TXS_CACHE = REPORTS_FOLDER + "/txs/btc_";
     private static final String PAYOUTS_CACHE_ID = REPORTS_FOLDER + "/payouts/payout_";
     private static final String OSMAND_BTC_DONATION_ADDR = "1GRgEnKujorJJ9VBa76g8cp3sfoWtQqSs4";
+    protected static final String OSMAND_BTC_ADDR_TO_PAYOUT = "3JL2aMR8jTKLzMxgJdZfqEJ97GPV6iUETv";
+    public static final int SOCKET_TIMEOUT = 15 * 1000;
 
     private static final int BEGIN_YEAR = 2016;
     public static final long BITCOIN_SATOSHI = 1000 * 1000 * 100;
@@ -64,6 +81,9 @@ public class ReportsController {
 	public static int AVG_TX_SIZE = 50; // 50 bytes
 	public static double FEE_PERCENT = 0.05; // fee shouldn't exceed 5%
 	public static int FEE_BYTE_SATOSHI = 5; // varies over time in Bitcoin
+	
+	private final String btcJsonRpcUser;
+	private final String btcJsonRpcPwd;
 	
     @Value("${web.location}")
     private String websiteLocation;
@@ -75,6 +95,21 @@ public class ReportsController {
     private DataSource dataSource;
     
     private BtcTransactionReport btcTransactionReport = new BtcTransactionReport();
+    
+	private CloseableHttpClient httpclient;
+	private RequestConfig requestConfig;
+    
+    
+    private ReportsController() {
+    	btcJsonRpcUser = System.getenv("BTC_JSON_RPC_USER");
+    	btcJsonRpcPwd = System.getenv("BTC_JSON_RPC_PWD");
+		if (btcJsonRpcUser != null) {
+			httpclient = HttpClientBuilder.create().setSSLHostnameVerifier(new NoopHostnameVerifier())
+					.setConnectionTimeToLive(SOCKET_TIMEOUT, TimeUnit.MILLISECONDS).setMaxConnTotal(20).build();
+			requestConfig = RequestConfig.copy(RequestConfig.custom().build()).setSocketTimeout(SOCKET_TIMEOUT)
+					.setConnectTimeout(SOCKET_TIMEOUT).setConnectionRequestTimeout(SOCKET_TIMEOUT).build();
+		}
+    }
     
     public static class AddrToPay {
     	public long totalPaid;
@@ -180,6 +215,32 @@ public class ReportsController {
 				btcTransactionReport = rep;
 			} catch (Exception e) {
 				LOGGER.error("Fails to read transactions.json: " + e.getMessage(), e);
+			}
+		}
+		if (btcJsonRpcUser != null) {
+			try {
+				HttpPost httppost = new HttpPost("http://" + btcJsonRpcUser + ":" + btcJsonRpcPwd + "@127.0.0.1:8332/");
+				httppost.setConfig(requestConfig);
+				httppost.addHeader("charset", StandardCharsets.UTF_8.name());
+
+				List<NameValuePair> params = new ArrayList<NameValuePair>();
+				params.add(new BasicNameValuePair("jsonrpc", "1.0"));
+				params.add(new BasicNameValuePair("id", "server"));
+				params.add(new BasicNameValuePair("method", "getbalance"));
+				//
+				// params.add(new BasicNameValuePair("params", "params"));
+				httppost.setEntity(new UrlEncodedFormEntity(params));
+				try (CloseableHttpResponse response = httpclient.execute(httppost)) {
+					Gson gson = new Gson();
+					HttpEntity ht = response.getEntity();
+					BufferedHttpEntity buf = new BufferedHttpEntity(ht);
+					String result = EntityUtils.toString(buf, StandardCharsets.UTF_8);
+					Map<?, ?> res = gson.fromJson(new JsonReader(new StringReader(result)), Map.class);
+					btcTransactionReport.currentBalance = (long) (Double.parseDouble(res.get("result").toString())
+							* BITCOIN_SATOSHI);
+				}
+			} catch (Exception e) {
+				LOGGER.error("Error to request balance: " + e.getMessage(), e);
 			}
 		}
 		return btcTransactionReport;
