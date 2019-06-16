@@ -72,6 +72,9 @@ public class ReportsController {
     private static final String PAYOUTS_CACHE_ID = REPORTS_FOLDER + "/payouts/payout_";
     private static final String OSMAND_BTC_DONATION_ADDR = "1GRgEnKujorJJ9VBa76g8cp3sfoWtQqSs4";
     protected static final String OSMAND_BTC_ADDR_TO_PAYOUT = "3JL2aMR8jTKLzMxgJdZfqEJ97GPV6iUETv";
+    
+    private static final String FEE_ESTIMATED_MODE = "CONSERVATIVE";
+    private static final int TARGET_NUMBER_OF_BLOCKS = 50;
     public static final int SOCKET_TIMEOUT = 15 * 1000;
 
     private static final int BEGIN_YEAR = 2016;
@@ -164,6 +167,8 @@ public class ReportsController {
 		public long walletBalance;
 		public Map<String,Float> walletAddresses = new TreeMap<>();
 		public long walletTxFee;
+		public int walletEstBlocks;
+		public long walletEstFee;
 		
 		
     }
@@ -241,6 +246,11 @@ public class ReportsController {
 							* MBTC_SATOSHI);
 					btcTransactionReport.walletBalance = (long) (((Number) winfo.get("balance")).doubleValue()
 							* BITCOIN_SATOSHI);
+				}
+				Map<?, ?> estFee = (Map<?, ?>) btcRpcCall("estimatesmartfee", TARGET_NUMBER_OF_BLOCKS, FEE_ESTIMATED_MODE);
+				if (estFee != null) {
+					btcTransactionReport.walletEstFee = (long) (((Number) winfo.get("feerate")).doubleValue() * MBTC_SATOSHI);
+					btcTransactionReport.walletEstBlocks = (((Number) winfo.get("blocks")).intValue());
 				}
 			} catch (Exception e) {
 				LOGGER.error("Error to request balance: " + e.getMessage(), e);
