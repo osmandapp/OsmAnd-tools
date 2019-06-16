@@ -245,6 +245,7 @@ public class ReportsController {
 			tx.id = tid;
 			tx.url = "https://blockchain.info/rawtx/" + tid;
 			tx.total = 0;
+			t.txValues.add(tx);
 			try {
 
 				Map<?, ?> payoutObjects = gson.fromJson(readJsonUrl(tx.url, tid.toString(), true), Map.class);
