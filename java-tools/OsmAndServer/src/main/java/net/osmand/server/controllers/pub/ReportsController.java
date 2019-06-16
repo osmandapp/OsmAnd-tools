@@ -8,6 +8,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.lang.reflect.Type;
 import java.net.URL;
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -32,6 +33,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 import com.google.gson.stream.JsonReader;
 
 import net.osmand.data.changeset.OsmAndLiveReportType;
@@ -99,8 +101,8 @@ public class ReportsController {
 		if(transactions.exists()) {
 			try {
 				BtcTransactionReport rep = new BtcTransactionReport();
-				rep.mapTransactions = (Map<String, BtcTransactionsMonth>) new Gson().fromJson(new FileReader(transactions), 
-						rep.mapTransactions.getClass());
+				Type tp = new TypeToken<Map<String, BtcTransactionsMonth> >() {}.getType();
+				rep.mapTransactions = (Map<String, BtcTransactionsMonth>) new Gson().fromJson(new FileReader(transactions),tp);
 				for(Map.Entry<String, BtcTransactionsMonth> key : rep.mapTransactions.entrySet()) {
 					BtcTransactionsMonth t = key.getValue();
 					t.month = key.getKey();
