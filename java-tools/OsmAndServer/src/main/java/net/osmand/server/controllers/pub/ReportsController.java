@@ -385,8 +385,8 @@ public class ReportsController {
     			a.totalPaid = paid.longValue();
     		}
     		a.toPay = a.totalToPay - a.totalPaid;
-    		balance.toPay.add(a);
     		if(addrToPay.equals(OSMAND_BTC_DONATION_ADDR)) {
+    			balance.toPay.add(a);
     			continue;
     		}
     		if(balance.osmid.containsKey(addrToPay)) {
@@ -396,8 +396,9 @@ public class ReportsController {
     			balance.overpaidCnt++;
     			balance.overpaidSat = balance.overpaidSat - a.toPay;
     			if(a.toPay <= -balance.minToPayoutSat) {
-    				balance.overpaidCnt++;
+    				balance.overpaidFeeCnt++;
         			balance.overpaidFeeSat = balance.overpaidFeeSat - a.toPay;
+        			balance.toPay.add(a);
     			}
     		} else if(a.toPay > 0) {
     			balance.payNoFeeCnt++;
@@ -406,13 +407,14 @@ public class ReportsController {
     				balance.payWithFeeCnt++;
         			balance.payWithFeeSat = balance.payWithFeeSat + a.toPay;
     			}
+    			balance.toPay.add(a);
     		}
     	}
     	Collections.sort(balance.toPay, new Comparator<AddrToPay>() {
 
 			@Override
 			public int compare(AddrToPay o1, AddrToPay o2) {
-				return Long.compare(o1.toPay, o2.toPay);
+				return -Long.compare(o1.toPay, o2.toPay);
 			}
 		});
 		return balance;
