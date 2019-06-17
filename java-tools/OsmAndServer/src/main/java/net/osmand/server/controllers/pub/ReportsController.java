@@ -328,7 +328,38 @@ public class ReportsController {
     	generateBtcReport(false);
 	}
     
-    public String payOutBitcoin(BtcTransactionReport rep, int batchSize) throws IOException {
+    public static class PayoutResult {
+    	public String validationError;
+    	public String txId;
+    }
+    
+    public PayoutResult payOutBitcoin(BtcTransactionReport rep, int batchSize) throws IOException {
+    	PayoutResult res = new PayoutResult();
+    	if(System.currentTimeMillis() - rep.balance.date > 1000 * 60 * 10) {
+			res.validationError = "Generated report is too old";
+			return res;
+		}
+		if(Math.abs(rep.walletTxFee - rep.balance.defaultFee ) > 1) {
+			res.validationError = String.format("Wallet fee %d is not equal to default fee %d", rep.walletTxFee,
+					rep.balance.defaultFee);
+			return res;
+		}
+		if(rep.walletEstFee > rep.balance.defaultFee) {
+			res.validationError = 
+					String.format("Wallet estimated fee %d is too high (comparing with set %d), try to put increase max waiting blocks or wait some time",
+							rep.walletEstFee, rep.balance.defaultFee);
+			return res;
+		}
+		if(rep.txs.size() > 0 && !rep.txs.get(0).transactions.get(0).equals(rep.walletLasttx)) {
+			res.validationError =  
+					String.format("Last wallet tx '%s' is not equal to the last transaction in report '%s', update transactions.json and rerun report.",
+							rep.walletLasttx, rep.txs.get(0).transactions.get(0));
+			return res;
+		}
+		if(batchSize < 50) {
+			res.validationError = "Don't use batch size less than 50";
+			return res;
+		}
     	Map<String, String> toPay = new LinkedHashMap<String, String>();
     	for(int i = 0; i < batchSize && i < rep.balance.toPay.size(); i++) {
     		AddrToPay add = rep.balance.toPay.get(i);
@@ -337,17 +368,18 @@ public class ReportsController {
     		}
     		toPay.put(add.btcAddress, ((double)add.toPay / BITCOIN_SATOSHI) + "");
     	}
-    	String txId = (String) btcRpcCall("sendmany", 
-    			"", // dummy default
-    			toPay, // map to pay 
-    			TARGET_NUMBER_OF_BLOCKS, // dummy wait confirmations 
-    			"https://osmand.net/osm_live", // comment
-    			new String[0], // subtractfeefrom - don't substract
-    			true, // replaceable
-    			TARGET_NUMBER_OF_BLOCKS, // conf_target
-    			FEE_ESTIMATED_MODE // estimate_mode
-    			);
-    	return txId;
+		if (toPay.size() > 0) {
+			res.txId = (String) btcRpcCall("sendmany", "", // dummy default
+					toPay, // map to pay
+					TARGET_NUMBER_OF_BLOCKS, // dummy wait confirmations
+					"https://osmand.net/osm_live", // comment
+					new String[0], // subtractfeefrom - don't substract
+					true, // replaceable
+					TARGET_NUMBER_OF_BLOCKS, // conf_target
+					FEE_ESTIMATED_MODE // estimate_mode
+			);
+		}
+    	return res;
     }
     
     public void updateBitcoinReport(String defaultFee, String waitingBlocks) {

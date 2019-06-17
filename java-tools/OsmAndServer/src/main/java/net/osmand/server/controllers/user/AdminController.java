@@ -60,6 +60,7 @@ import net.osmand.server.api.services.MotdService.MotdSettings;
 import net.osmand.server.api.services.PollsService;
 import net.osmand.server.controllers.pub.ReportsController;
 import net.osmand.server.controllers.pub.ReportsController.BtcTransactionReport;
+import net.osmand.server.controllers.pub.ReportsController.PayoutResult;
 import net.osmand.server.controllers.pub.WebController;
 
 @Controller
@@ -148,29 +149,13 @@ public class AdminController {
 	public String publish(Model model, 
 			@RequestParam(required = true) int batchSize, final RedirectAttributes redirectAttrs) throws IOException {
 		BtcTransactionReport rep = reports.getBitcoinTransactionReport();
-		if(System.currentTimeMillis() - rep.balance.date > 1000 * 60 * 10) {
-			return err(redirectAttrs, "Generated report is too old");
+		PayoutResult res = reports.payOutBitcoin(rep, batchSize);
+		if(res.validationError != null) {
+			return err(redirectAttrs, res.validationError);
 		}
-		if(rep.walletTxFee != rep.balance.defaultFee) {
-			return err(redirectAttrs, "Wallet fee is not equal to default fee");
-		}
-		if(rep.walletEstFee > rep.balance.defaultFee) {
-			return err(redirectAttrs,
-					String.format("Wallet estimated fee %d is too high (comparing with set %d), try to put increase max waiting blocks or wait some time",
-							rep.walletEstFee, rep.balance.defaultFee));
-		}
-		if(rep.txs.size() > 0 && !rep.txs.get(0).transactions.get(0).equals(rep.walletLasttx)) {
-			return err(redirectAttrs, 
-					String.format("Last wallet tx '%s' is not equal to the last transaction in report '%s', update transactions.json and rerun report.",
-							rep.walletLasttx, rep.txs.get(0).transactions.get(0)));
-		}
-		if(batchSize < 50) {
-			return err(redirectAttrs, "Don't use batch size less than 50");
-		}
-		String txId = reports.payOutBitcoin(rep, batchSize);
 		redirectAttrs.addFlashAttribute("update_status", "OK");
 		redirectAttrs.addFlashAttribute("update_errors", "");
-		redirectAttrs.addFlashAttribute("update_message", "Payment successful! Bitcoin transaction id is: " + txId);
+		redirectAttrs.addFlashAttribute("update_message", "Payment successful! Bitcoin transaction id is: " + res.txId);
         return "redirect:info";
 	}
 
