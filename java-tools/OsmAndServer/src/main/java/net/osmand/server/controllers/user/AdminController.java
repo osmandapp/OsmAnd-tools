@@ -141,12 +141,42 @@ public class AdminController {
 		redirectAttrs.addFlashAttribute("update_status", "OK");
 		redirectAttrs.addFlashAttribute("update_errors", "");
 		redirectAttrs.addFlashAttribute("update_message", "Bitcoin report is regenerated");
-        //return index(model);
+        return "redirect:info#bitcoin";
+	}
+	
+	@RequestMapping(path = { "/make-btc-payout" }, method = RequestMethod.POST)
+	public String publish(Model model, 
+			@RequestParam(required = true) int batchSize, final RedirectAttributes redirectAttrs) throws IOException {
+		BtcTransactionReport rep = reports.getBitcoinTransactionReport();
+		if(System.currentTimeMillis() - rep.balance.date > 1000 * 60 * 10) {
+			return err(redirectAttrs, "Generated report is too old");
+		}
+		if(rep.walletTxFee != rep.balance.defaultFee) {
+			return err(redirectAttrs, "Wallet fee is not equal to default fee");
+		}
+		if(rep.walletEstFee > rep.balance.defaultFee * 3) {
+			return err(redirectAttrs, "Wallet estimated fee is very high, target to put maximum waiting blocks higher or wait sometime");
+		}
+		if(batchSize < 50) {
+			return err(redirectAttrs, "Don't use batch size less than 50");
+		}
+		String txId = reports.payOutBitcoin(rep, batchSize);
+		redirectAttrs.addFlashAttribute("update_status", "OK");
+		redirectAttrs.addFlashAttribute("update_errors", "");
+		redirectAttrs.addFlashAttribute("update_message", "Payment successful! Bitcoin transaction id is: " + txId);
         return "redirect:info";
 	}
 
 	
 	
+	private String err(RedirectAttributes redirectAttrs, String string) {
+		redirectAttrs.addFlashAttribute("update_status", "ERROR");
+		redirectAttrs.addFlashAttribute("update_errors", "");
+		redirectAttrs.addFlashAttribute("update_message", string);
+		return "redirect:info";
+	}
+
+
 	@RequestMapping(path = { "/register-giveaway" }, method = RequestMethod.POST)
 	public String registerGiveaway(Model model,
 			@RequestParam(required = true) String name, 

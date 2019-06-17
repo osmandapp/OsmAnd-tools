@@ -22,6 +22,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -72,7 +73,6 @@ public class ReportsController {
     private static final String TXS_CACHE = REPORTS_FOLDER + "/txs/btc_";
     private static final String PAYOUTS_CACHE_ID = REPORTS_FOLDER + "/payouts/payout_";
     private static final String OSMAND_BTC_DONATION_ADDR = "1GRgEnKujorJJ9VBa76g8cp3sfoWtQqSs4";
-    protected static final String OSMAND_BTC_ADDR_TO_PAYOUT = "3JL2aMR8jTKLzMxgJdZfqEJ97GPV6iUETv";
     
     private static final String FEE_ESTIMATED_MODE = "ECONOMICAL";
     private static int TARGET_NUMBER_OF_BLOCKS = 50;
@@ -306,6 +306,28 @@ public class ReportsController {
     public void reloadConfigs(List<String> errors) {
     	loadTransactions(false);
 	}
+    
+    public String payOutBitcoin(BtcTransactionReport rep, int batchSize) throws IOException {
+    	Map<String, String> toPay = new LinkedHashMap<String, String>();
+    	for(int i = 0; i < batchSize && i < rep.balance.toPay.size(); i++) {
+    		AddrToPay add = rep.balance.toPay.get(i);
+    		if(add.btcAddress.equals(OSMAND_BTC_DONATION_ADDR)) {
+    			continue;
+    		}
+    		toPay.put(add.btcAddress, ((double)add.toPay / BITCOIN_SATOSHI) + "");
+    	}
+    	String txId = (String) btcRpcCall("sendmany", 
+    			"", // dummy default
+    			toPay, // map to pay 
+    			TARGET_NUMBER_OF_BLOCKS, // dummy wait confirmations 
+    			"https://osmand.net/osm_live", // comment
+    			new String[0], // subtractfeefrom - don't substract
+    			true, // replaceable
+    			TARGET_NUMBER_OF_BLOCKS, // conf_target
+    			FEE_ESTIMATED_MODE // estimate_mode
+    			);
+    	return txId;
+    }
     
     public void updateBitcoinReport(String defaultFee, String waitingBlocks) {
     	FEE_BYTE_SATOSHI = Algorithms.parseIntSilently(defaultFee, FEE_BYTE_SATOSHI) ;
