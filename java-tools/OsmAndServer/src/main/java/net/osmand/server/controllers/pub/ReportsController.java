@@ -237,10 +237,13 @@ public class ReportsController {
 		}
 		if (btcJsonRpcUser != null) {
 			try {
-				List<Map<?, ?>> adrs = (List<Map<?, ?>>) btcRpcCall("listreceivedbyaddress");
+				List<Map<?, ?>> adrs = (List<Map<?, ?>>) btcRpcCall("listunspent");
 				if (adrs != null) {
 					for (Map<?, ?> addr : adrs) {
-						btcTransactionReport.walletAddresses.put(addr.get("address").toString(), ((Number)addr.get("amount")).floatValue());
+						String address = addr.get("address").toString();
+						Float f = btcTransactionReport.walletAddresses.get(address);
+ 						btcTransactionReport.walletAddresses.put(address, ((Number)addr.get("amount")).floatValue() + 
+ 								(f == null ? 0 : f.floatValue()));
 					}
 				}
 				Map<?, ?> winfo = (Map<?, ?>) btcRpcCall("getwalletinfo");
