@@ -154,8 +154,15 @@ public class AdminController {
 		if(rep.walletTxFee != rep.balance.defaultFee) {
 			return err(redirectAttrs, "Wallet fee is not equal to default fee");
 		}
-		if(rep.walletEstFee > rep.balance.defaultFee * 3) {
-			return err(redirectAttrs, "Wallet estimated fee is very high, target to put maximum waiting blocks higher or wait sometime");
+		if(rep.walletEstFee > rep.balance.defaultFee) {
+			return err(redirectAttrs,
+					String.format("Wallet estimated fee %d is too high (comparing with set %d), try to put increase max waiting blocks or wait some time",
+							rep.walletEstFee, rep.balance.defaultFee));
+		}
+		if(rep.txs.size() > 0 && !rep.txs.get(0).transactions.get(0).equals(rep.walletLasttx)) {
+			return err(redirectAttrs, 
+					String.format("Last wallet tx '%s' is not equal to the last transaction in report '%s', update transactions.json and rerun report.",
+							rep.walletLasttx, rep.txs.get(0).transactions.get(0)));
 		}
 		if(batchSize < 50) {
 			return err(redirectAttrs, "Don't use batch size less than 50");

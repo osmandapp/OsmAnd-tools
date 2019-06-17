@@ -171,6 +171,7 @@ public class ReportsController {
 		public long walletTxFee;
 		public int walletEstBlocks;
 		public long walletEstFee;
+		public String walletLasttx;
 		
 		
     }
@@ -254,6 +255,10 @@ public class ReportsController {
 				if (estFee != null) {
 					btcTransactionReport.walletEstFee = (long) (((Number) estFee.get("feerate")).doubleValue() * MBTC_SATOSHI);
 					btcTransactionReport.walletEstBlocks = (((Number) estFee.get("blocks")).intValue());
+				}
+				List<Map<?, ?>> lastTx = (List<Map<?, ?>>) btcRpcCall("listtransactions", "*", 1);
+				if (lastTx != null) {
+					btcTransactionReport.walletLasttx = (String) lastTx.get(0).get("txid");
 				}
 			} catch (Exception e) {
 				LOGGER.error("Error to request balance: " + e.getMessage(), e);
