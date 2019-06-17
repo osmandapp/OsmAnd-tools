@@ -258,7 +258,7 @@ public class ReportsController {
 	@SuppressWarnings("unchecked")
 	private void generateWalletStatus(BtcTransactionReport rep) {
 		try {
-			List<Map<?, ?>> adrs = (List<Map<?, ?>>) btcRpcCall("listunspent");
+			List<Map<?, ?>> adrs = (List<Map<?, ?>>) btcRpcCall("listunspent", 0);
 			if (adrs != null) {
 				for (Map<?, ?> addr : adrs) {
 					String address = addr.get("address").toString();
@@ -271,7 +271,7 @@ public class ReportsController {
 			if (winfo != null) {
 				rep.walletTxFee = (long) (((Number) winfo.get("paytxfee")).doubleValue()
 						* MBTC_SATOSHI);
-				btcTransactionReport.walletBalance = (long) (((Number) winfo.get("balance")).doubleValue()
+				rep.walletBalance = (long) (((Number) winfo.get("balance")).doubleValue()
 						* BITCOIN_SATOSHI);
 			}
 			rep.walletWaitingBlocks = TARGET_NUMBER_OF_BLOCKS;
