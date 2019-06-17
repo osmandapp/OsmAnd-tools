@@ -480,7 +480,9 @@ public class ReportsController {
 				}
 				tx.fee = totalIn - totalOut;
 				tx.size = ((Number) payoutObjects.get("size")).intValue();
-				tx.blockIndex = ((Number) payoutObjects.get("block_index")).intValue();
+				if(payoutObjects.get("block_index") != null) { 
+					tx.blockIndex = ((Number) payoutObjects.get("block_index")).intValue();
+				}
 				
 				t.size += tx.size;
 				t.fee += tx.fee;
