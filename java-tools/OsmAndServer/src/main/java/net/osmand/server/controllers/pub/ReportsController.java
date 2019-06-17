@@ -70,7 +70,7 @@ import net.osmand.util.Algorithms;
 public class ReportsController {
     protected static final Log LOGGER = LogFactory.getLog(ReportsController.class);
     public static final String REPORTS_FOLDER = "reports";
-    public static final String TRANSACTIONS_FILE = REPORTS_FOLDER + "/transactions.json";
+    public static final String TRANSACTIONS_FILE = REPORTS_FOLDER + "/transactions_github.json";
     private static final String REPORT_URL = "https://osmand.net/reports/query_month_report?report=getPayouts&month=";
     private static final String TXS_CACHE = REPORTS_FOLDER + "/txs/btc_";
     private static final String PAYOUTS_CACHE_ID = REPORTS_FOLDER + "/payouts/payout_";
@@ -206,8 +206,6 @@ public class ReportsController {
     
     @SuppressWarnings("unchecked")
 	public BtcTransactionReport generateBtcReport(boolean genBalanceReport) {
-		File transactions = new File(websiteLocation, TRANSACTIONS_FILE);
-		if(transactions.exists()) {
 			try {
 				BtcTransactionReport rep = new BtcTransactionReport();
 				if (btcJsonRpcUser != null) {
@@ -221,7 +219,12 @@ public class ReportsController {
 					}
 				}
 				Type tp = new TypeToken<Map<String, BtcTransactionsMonth> >() {}.getType();
-				rep.mapTransactions = (Map<String, BtcTransactionsMonth>) formatter.fromJson(new FileReader(transactions),tp);
+				if(genBalanceReport) {
+					getCacheFile(TRANSACTIONS_FILE).delete();
+				}
+				JsonReader reader = readJsonUrl("https://raw.githubusercontent.com/osmandapp/osmandapp.github.io/master/website/reports/transactions.json", 
+						TRANSACTIONS_FILE, true);
+				rep.mapTransactions = (Map<String, BtcTransactionsMonth>) formatter.fromJson(reader, tp);
 				for(Map.Entry<String, BtcTransactionsMonth> key : rep.mapTransactions.entrySet()) {
 					BtcTransactionsMonth t = key.getValue();
 					t.month = key.getKey();
@@ -247,7 +250,6 @@ public class ReportsController {
 			} catch (Exception e) {
 				LOGGER.error("Fails to read transactions.json: " + e.getMessage(), e);
 			}
-		}
 		
 		return btcTransactionReport;
 	}
@@ -369,6 +371,7 @@ public class ReportsController {
     		toPay.put(add.btcAddress, ((double)add.toPay / BITCOIN_SATOSHI) + "");
     	}
 		if (toPay.size() > 0) {
+			rep.balance.date = 0;
 			res.txId = (String) btcRpcCall("sendmany", "", // dummy default
 					toPay, // map to pay
 					TARGET_NUMBER_OF_BLOCKS, // dummy wait confirmations
@@ -378,6 +381,7 @@ public class ReportsController {
 					TARGET_NUMBER_OF_BLOCKS, // conf_target
 					FEE_ESTIMATED_MODE // estimate_mode
 			);
+			generateBtcReport(true);
 		}
     	return res;
     }
