@@ -70,7 +70,6 @@ public class AdminController {
 	
 	private static final String ACCESS_LOG_REPORTS_FOLDER = "reports";
 	private static final String BTC_REPORT = ReportsController.REPORTS_FOLDER + "/report_underpaid.json.html";
-	private static final String BTC_BACKUP_REPORT = ReportsController.REPORTS_FOLDER + "/btc-backup";
 
 	@Autowired
 	private MotdService motdService;

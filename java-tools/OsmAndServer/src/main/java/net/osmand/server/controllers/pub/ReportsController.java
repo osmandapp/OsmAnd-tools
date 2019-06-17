@@ -74,7 +74,7 @@ public class ReportsController {
     private static final String OSMAND_BTC_DONATION_ADDR = "1GRgEnKujorJJ9VBa76g8cp3sfoWtQqSs4";
     protected static final String OSMAND_BTC_ADDR_TO_PAYOUT = "3JL2aMR8jTKLzMxgJdZfqEJ97GPV6iUETv";
     
-    private static final String FEE_ESTIMATED_MODE = "CONSERVATIVE";
+    private static final String FEE_ESTIMATED_MODE = "ECONOMICAL";
     private static int TARGET_NUMBER_OF_BLOCKS = 50;
     public static final int SOCKET_TIMEOUT = 15 * 1000;
 
