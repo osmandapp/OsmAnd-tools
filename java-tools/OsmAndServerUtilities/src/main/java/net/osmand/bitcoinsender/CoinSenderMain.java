@@ -22,6 +22,7 @@ import net.osmand.bitcoinsender.utils.BlockIOException;
 /**
  * Created by Paul on 07.06.17.
  */
+@Deprecated
 public class CoinSenderMain {
 
     private static String guid;

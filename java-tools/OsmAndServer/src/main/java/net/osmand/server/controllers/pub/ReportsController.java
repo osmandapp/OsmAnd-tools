@@ -209,7 +209,6 @@ public class ReportsController {
 			try {
 				BtcTransactionReport rep = new BtcTransactionReport();
 				if (btcJsonRpcUser != null) {
-					generateWalletStatus(rep);
 					if(genBalanceReport) {
 						try {
 							btcRpcCall("settxfee", ((double)FEE_BYTE_SATOSHI ) / MBTC_SATOSHI);
@@ -217,6 +216,7 @@ public class ReportsController {
 							LOGGER.error("Error to set fee: " + e.getMessage(), e);
 						}
 					}
+					generateWalletStatus(rep);
 				}
 				Type tp = new TypeToken<Map<String, BtcTransactionsMonth> >() {}.getType();
 				if(genBalanceReport) {
@@ -656,7 +656,7 @@ public class ReportsController {
 				List<Map<?, ?>> outputs = (List<Map<?, ?>>) payoutObjects.get("payments");
 				for (Map<?, ?> payout : outputs) {
 					String inputAddress = (String) payout.get("btcaddress");
-					String address = TransactionAnalyzer.simplifyBTC(inputAddress);
+					String address = processBTCAddress(inputAddress);
 					if (address == null) {
 						address = inputAddress;
 					}
@@ -674,6 +674,24 @@ public class ReportsController {
 		}
 	}
 	
+	// Took from net.osmand.bitcoinsender.TransactionAnalyzer (for history)
+	public static String processBTCAddress(String specifiedBtc) {
+		String res = specifiedBtc.replace("-", "").replace(" ", "").trim();
+		if (res.equals("3c9e8e73bff140b391e71eae311cdcce")) {
+			return "1GRgEnKujorJJ9VBa76g8cp3sfoWtQqSs4";
+		} else if (res.equals("3")) {
+			// not valid address dmpr0
+			return "1GRgEnKujorJJ9VBa76g8cp3sfoWtQqSs4";
+		} else if (res.equals("13H8LERRKFUTqr2YM9J9bdy6xshzjwSAfw")) {
+			return "1A2PRCVN2tFnF5AXBwXmPyV52gH11uCFaS";
+		} else if (res.equals("3d347aae368d426aae104d50d3bdd695") || 
+				res.equals("3d347aae368d426aae104b50d3bdd695")) {
+			return "18btnN8JczdC5QyYfyv5WBksMTWTPAiqor";
+		} else if (res.equals("1AaUeDeLWvya7ZeZfRubeGXwaVB5v7aToK")) {
+			return null;
+		}
+		return res;
+	}
 	
 	private JsonReader readJsonUrl(String rurl, String id, boolean cache)
 			throws IOException {

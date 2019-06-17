@@ -24,6 +24,7 @@ import com.google.gson.JsonIOException;
 import com.google.gson.JsonSyntaxException;
 import com.google.gson.stream.JsonReader;
 
+@Deprecated
 public class TransactionAnalyzer {
 
 	public static final long BITCOIN_SATOSHI = 1000 * 1000 * 100;
