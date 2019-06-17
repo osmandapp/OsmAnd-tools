@@ -445,7 +445,7 @@ public class ReportsController {
 									+ "download='report-%1$s.json' >Download all json reports for %1$s</a>",month));
 					reportBld.append(".&nbsp;&nbsp;");
 					reportBld.append("<a type='application/json' "
-							+ "href='https://builder.osmand.net/reports/report_underpaid.json.html'>"
+							+ "href='https://builder.osmand.net/reports/query_btc_balance_report'>"
 							+ "Cumulative underpaid report</a>");
 				}
 				rec.reports =reportBld.toString();
