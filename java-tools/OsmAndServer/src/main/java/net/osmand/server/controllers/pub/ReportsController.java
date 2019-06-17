@@ -451,7 +451,7 @@ public class ReportsController {
 			BtcTransaction tx = new BtcTransaction();
 			tx.id = tid;
 			tx.rawurl = "https://blockchain.info/rawtx/" + tid;
-			tx.url = "https://blockchain.info/btc/tx/" + tid;
+			tx.url = "https://blockchain.info/tx/" + tid;
 			String cacheId = TXS_CACHE + tid;
 			tx.total = 0;
 			t.txValues.add(tx);
