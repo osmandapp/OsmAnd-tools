@@ -86,7 +86,7 @@ public class ReportsController {
     
 	// MIN PAY FORMULA
 	public static final int AVG_TX_SIZE = 35; // 35 bytes
-	public static final double FEE_PERCENT = 0.8; // fee shouldn't exceed 8%
+	public static final double FEE_PERCENT = 0.08; // fee shouldn't exceed 8%
 	public static int FEE_BYTE_SATOSHI = 5; // varies over time in Bitcoin
 	
 	private final String btcJsonRpcUser;
