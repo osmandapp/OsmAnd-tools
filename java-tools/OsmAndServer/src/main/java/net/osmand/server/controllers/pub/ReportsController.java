@@ -103,11 +103,13 @@ public class ReportsController {
     
 	private CloseableHttpClient httpclient;
 	private RequestConfig requestConfig;
+	private Gson formatter;
     
     
     private ReportsController() {
     	btcJsonRpcUser = System.getenv("BTC_JSON_RPC_USER");
     	btcJsonRpcPwd = System.getenv("BTC_JSON_RPC_PWD");
+    	formatter = new Gson();
 		if (btcJsonRpcUser != null) {
 			httpclient = HttpClientBuilder.create().setSSLHostnameVerifier(new NoopHostnameVerifier())
 					.setConnectionTimeToLive(SOCKET_TIMEOUT, TimeUnit.MILLISECONDS).setMaxConnTotal(20).build();
@@ -197,13 +199,13 @@ public class ReportsController {
     }
     
     @SuppressWarnings("unchecked")
-	public BtcTransactionReport loadTransactions(boolean loadReports) {
+	public BtcTransactionReport generateBtcReport(boolean genBalanceReport) {
 		File transactions = new File(websiteLocation, TRANSACTIONS_FILE);
 		if(transactions.exists()) {
 			try {
 				BtcTransactionReport rep = new BtcTransactionReport();
 				Type tp = new TypeToken<Map<String, BtcTransactionsMonth> >() {}.getType();
-				rep.mapTransactions = (Map<String, BtcTransactionsMonth>) new Gson().fromJson(new FileReader(transactions),tp);
+				rep.mapTransactions = (Map<String, BtcTransactionsMonth>) formatter.fromJson(new FileReader(transactions),tp);
 				for(Map.Entry<String, BtcTransactionsMonth> key : rep.mapTransactions.entrySet()) {
 					BtcTransactionsMonth t = key.getValue();
 					t.month = key.getKey();
@@ -218,14 +220,18 @@ public class ReportsController {
 						rep.totalPayouts.put(addr, (pd == null ? 0 : pd.longValue()) + paid);
 					}
 				}
-				if(loadReports) {
-					if (btcJsonRpcUser != null) {
+				
+				if (btcJsonRpcUser != null) {
+					generateWalletStatus(rep);
+					if(genBalanceReport) {
 						try {
 							btcRpcCall("settxfee", ((double)FEE_BYTE_SATOSHI ) / MBTC_SATOSHI);
 						} catch (Exception e) {
 							LOGGER.error("Error to set fee: " + e.getMessage(), e);
 						}
 					}
+				}
+				if(genBalanceReport) {
 					rep.balance = generateBalanceToPay(rep);
 				} else {
 					rep.balance = btcTransactionReport.balance;
@@ -235,44 +241,47 @@ public class ReportsController {
 				LOGGER.error("Fails to read transactions.json: " + e.getMessage(), e);
 			}
 		}
-		if (btcJsonRpcUser != null) {
-			try {
-				List<Map<?, ?>> adrs = (List<Map<?, ?>>) btcRpcCall("listunspent");
-				if (adrs != null) {
-					for (Map<?, ?> addr : adrs) {
-						String address = addr.get("address").toString();
-						Float f = btcTransactionReport.walletAddresses.get(address);
- 						btcTransactionReport.walletAddresses.put(address, ((Number)addr.get("amount")).floatValue() + 
- 								(f == null ? 0 : f.floatValue()));
-					}
-				}
-				Map<?, ?> winfo = (Map<?, ?>) btcRpcCall("getwalletinfo");
-				if (winfo != null) {
-					btcTransactionReport.walletTxFee = (long) (((Number) winfo.get("paytxfee")).doubleValue()
-							* MBTC_SATOSHI);
-					btcTransactionReport.walletBalance = (long) (((Number) winfo.get("balance")).doubleValue()
-							* BITCOIN_SATOSHI);
-				}
-				btcTransactionReport.walletWaitingBlocks = TARGET_NUMBER_OF_BLOCKS;
-				Map<?, ?> estFee = (Map<?, ?>) btcRpcCall("estimatesmartfee", TARGET_NUMBER_OF_BLOCKS, FEE_ESTIMATED_MODE);
-				if (estFee != null) {
-					btcTransactionReport.walletEstFee = (long) (((Number) estFee.get("feerate")).doubleValue() * MBTC_SATOSHI);
-					btcTransactionReport.walletEstBlocks = (((Number) estFee.get("blocks")).intValue());
-				}
-				List<Map<?, ?>> lastTx = (List<Map<?, ?>>) btcRpcCall("listtransactions", "*", 1);
-				if (lastTx != null) {
-					btcTransactionReport.walletLasttx = (String) lastTx.get(0).get("txid");
-				}
-			} catch (Exception e) {
-				LOGGER.error("Error to request balance: " + e.getMessage(), e);
-			}
-		}
+		
 		return btcTransactionReport;
 	}
 
 
+	@SuppressWarnings("unchecked")
+	private void generateWalletStatus(BtcTransactionReport rep) {
+		try {
+			List<Map<?, ?>> adrs = (List<Map<?, ?>>) btcRpcCall("listunspent");
+			if (adrs != null) {
+				for (Map<?, ?> addr : adrs) {
+					String address = addr.get("address").toString();
+					Float f = rep.walletAddresses.get(address);
+					rep.walletAddresses.put(address, ((Number)addr.get("amount")).floatValue() + 
+							(f == null ? 0 : f.floatValue()));
+				}
+			}
+			Map<?, ?> winfo = (Map<?, ?>) btcRpcCall("getwalletinfo");
+			if (winfo != null) {
+				rep.walletTxFee = (long) (((Number) winfo.get("paytxfee")).doubleValue()
+						* MBTC_SATOSHI);
+				btcTransactionReport.walletBalance = (long) (((Number) winfo.get("balance")).doubleValue()
+						* BITCOIN_SATOSHI);
+			}
+			rep.walletWaitingBlocks = TARGET_NUMBER_OF_BLOCKS;
+			Map<?, ?> estFee = (Map<?, ?>) btcRpcCall("estimatesmartfee", TARGET_NUMBER_OF_BLOCKS, FEE_ESTIMATED_MODE);
+			if (estFee != null) {
+				rep.walletEstFee = (long) (((Number) estFee.get("feerate")).doubleValue() * MBTC_SATOSHI);
+				rep.walletEstBlocks = (((Number) estFee.get("blocks")).intValue());
+			}
+			List<Map<?, ?>> lastTx = (List<Map<?, ?>>) btcRpcCall("listtransactions", "*", 1);
+			if (lastTx != null) {
+				rep.walletLasttx = (String) lastTx.get(0).get("txid");
+			}
+		} catch (Exception e) {
+			LOGGER.error("Error to request balance: " + e.getMessage(), e);
+		}
+	}
+
+
 	private Object btcRpcCall(String method, Object... pms) throws UnsupportedEncodingException, IOException, ClientProtocolException {
-		Gson gson = new Gson();
 		HttpPost httppost = new HttpPost("http://" + btcJsonRpcUser + ":" + btcJsonRpcPwd + "@127.0.0.1:8332/");
 		httppost.setConfig(requestConfig);
 		httppost.addHeader("charset", StandardCharsets.UTF_8.name());
@@ -284,14 +293,14 @@ public class ReportsController {
 		if(pms != null && pms.length > 0) {
 			params.put("params", Arrays.asList(pms));
 		}
-		StringEntity entity = new StringEntity(gson.toJson(params));
-		LOGGER.info("Btc rpc send with content: " +  gson.toJson(params));
+		StringEntity entity = new StringEntity(formatter.toJson(params));
+		LOGGER.info("Btc rpc send with content: " +  formatter.toJson(params));
 		httppost.setEntity(entity);
 		try (CloseableHttpResponse response = httpclient.execute(httppost)) {
 			HttpEntity ht = response.getEntity();
 			BufferedHttpEntity buf = new BufferedHttpEntity(ht);
 			String result = EntityUtils.toString(buf, StandardCharsets.UTF_8);
-			Map<?, ?> res = gson.fromJson(new JsonReader(new StringReader(result)), Map.class);
+			Map<?, ?> res = formatter.fromJson(new JsonReader(new StringReader(result)), Map.class);
 			LOGGER.info("Result: " + result);
 			if(res.get("result") != null) {
 				return res.get("result");
@@ -303,16 +312,13 @@ public class ReportsController {
     
     public BtcTransactionReport getBitcoinTransactionReport() {
     	if(btcTransactionReport.mapTransactions.isEmpty()) {
-    		loadTransactions(false);
+    		generateBtcReport(false);
     	}
 		return btcTransactionReport;
 	}
     
-    
-    
-    
     public void reloadConfigs(List<String> errors) {
-    	loadTransactions(false);
+    	generateBtcReport(false);
 	}
     
     public String payOutBitcoin(BtcTransactionReport rep, int batchSize) throws IOException {
@@ -340,9 +346,19 @@ public class ReportsController {
     public void updateBitcoinReport(String defaultFee, String waitingBlocks) {
     	FEE_BYTE_SATOSHI = Algorithms.parseIntSilently(defaultFee, FEE_BYTE_SATOSHI) ;
     	TARGET_NUMBER_OF_BLOCKS = Algorithms.parseIntSilently(waitingBlocks, TARGET_NUMBER_OF_BLOCKS) ;
-    	loadTransactions(true);
+    	generateBtcReport(true);
     }
     
+    
+    @RequestMapping(path = { "/query_btc_balance_report"})
+    @ResponseBody
+	public String getBtcBalanceReport(HttpServletRequest request, HttpServletResponse response) throws SQLException, IOException {
+    	BtcToPayBalance blnc = getBitcoinTransactionReport().balance;
+    	if(blnc.totalToPay.isEmpty()) {
+    		generateBtcReport(true);
+    	}
+    	return formatter.toJson(getBitcoinTransactionReport().balance);    	
+    }
     
     @RequestMapping(path = { "/query_report", "/query_report.php", 
     		"/query_month_report", "/query_month_report.php"})
@@ -399,7 +415,7 @@ public class ReportsController {
 			if(report.equals("recipients_by_month")) {
 				Gson gson = reports.getJsonFormatter();
 				RecipientsReport rec = reports.getReport(OsmAndLiveReportType.RECIPIENTS, region, RecipientsReport.class);
-				BtcTransactionsMonth txs = loadTransactions(false).mapTransactions.get(month);
+				BtcTransactionsMonth txs = generateBtcReport(false).mapTransactions.get(month);
 				StringBuilder payouts = new StringBuilder(); 
 				if(txs != null && txs != null) {
 					if(txs.transactions.size() > 0) {
@@ -447,7 +463,6 @@ public class ReportsController {
 	
 	@SuppressWarnings("unchecked")
 	private void loadPayouts(BtcTransactionsMonth t) throws IOException {
-		Gson gson = new Gson();
 		t.totalPayouts = new HashMap<>();
 		t.total = 0;
 		for (String tid : t.transactions) {
@@ -459,7 +474,7 @@ public class ReportsController {
 			tx.total = 0;
 			t.txValues.add(tx);
 			try {
-				Map<?, ?> payoutObjects = gson.fromJson(readJsonUrl(tx.rawurl, cacheId, true), Map.class);
+				Map<?, ?> payoutObjects = formatter.fromJson(readJsonUrl(tx.rawurl, cacheId, true), Map.class);
 				// Map<?, ?> data = (Map<?, ?>) payoutObjects.get("data");
 				Map<String, String> ins = new TreeMap<String, String>();
 				long totalIn = 0;
@@ -551,6 +566,16 @@ public class ReportsController {
     			balance.toPay.add(a);
     		}
     	}
+    	for(String addrPaid : report.totalPayouts.keySet()) {
+    		if(!balance.totalToPay.containsKey(addrPaid)) {
+    			AddrToPay a = new AddrToPay();
+        		a.btcAddress = addrPaid;
+        		a.totalPaid = report.totalPayouts.get(addrPaid);
+        		a.totalToPay = 0;
+        		a.toPay = - a.totalPaid;
+        		balance.toPay.add(a);
+    		}
+    	}
     	Collections.sort(balance.toPay, new Comparator<AddrToPay>() {
 
 			@Override
@@ -569,7 +594,6 @@ public class ReportsController {
 			FINAL_MONTH = 12;
 			FINAL_YEAR--;
 		}
-		Gson gson = new Gson();
 		for (int year = BEGIN_YEAR; year <= FINAL_YEAR; year++) {
 			int fMonth = year == FINAL_YEAR ? FINAL_MONTH : 12;
 			for (int month = 1; month <= fMonth; month++) {
@@ -578,7 +602,7 @@ public class ReportsController {
 					period += "0";
 				}
 				period += month;
-				Map<?, ?> payoutObjects = gson
+				Map<?, ?> payoutObjects = formatter
 						.fromJson(readJsonUrl(REPORT_URL + period, PAYOUTS_CACHE_ID + month, false), Map.class);
 				if (payoutObjects == null) {
 					continue;
