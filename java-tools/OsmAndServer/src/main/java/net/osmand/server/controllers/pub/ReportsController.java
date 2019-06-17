@@ -129,20 +129,12 @@ public class ReportsController {
     }
     
     public static class BtcToPayBalance {
-    	public transient Map<String, Long> zTotalToPay = new TreeMap<>();
-    	public transient Map<String, String> zOsmid = new HashMap<>();
-    	public List<AddrToPay> toPay = new ArrayList<AddrToPay>();
     	public int defaultFee ;
     	public long minToPayoutSat;
     	
     	public long date;
     	public String generatedDate;
     	
-    	public BtcToPayBalance () {
-    		defaultFee = FEE_BYTE_SATOSHI;
-    		minToPayoutSat = getMinSatoshiPay();
-    		
-    	}
     	
     	public long payWithFeeSat;
 		public int payWithFeeCnt;
@@ -156,6 +148,15 @@ public class ReportsController {
 		public int overpaidFeeCnt;
 		public long overpaidFeeSat;
 		
+    	public List<AddrToPay> toPay = new ArrayList<AddrToPay>();
+    	public List<AddrToPay> allAccounts = new ArrayList<AddrToPay>();
+    	public transient Map<String, Long> totalToPay = new TreeMap<>();
+    	public transient Map<String, String> osmid = new HashMap<>();
+    	
+    	public BtcToPayBalance () {
+    		defaultFee = FEE_BYTE_SATOSHI;
+    		minToPayoutSat = getMinSatoshiPay();
+    	}		
 		
 		
     }
@@ -360,7 +361,7 @@ public class ReportsController {
     @ResponseBody
 	public String getBtcBalanceReport(HttpServletRequest request, HttpServletResponse response) throws SQLException, IOException {
     	BtcToPayBalance blnc = getBitcoinTransactionReport().balance;
-    	if(blnc.zTotalToPay.isEmpty()) {
+    	if(blnc.totalToPay.isEmpty()) {
     		generateBtcReport(true);
     	}
     	return formatter.toJson(getBitcoinTransactionReport().balance);    	
@@ -539,21 +540,22 @@ public class ReportsController {
 		balance.date = dt.getTime();
 		balance.generatedDate = dt.toString();
     	collectAllNeededPayouts(balance);
-    	for(String addrToPay : balance.zTotalToPay.keySet()) {
+    	for(String addrToPay : balance.totalToPay.keySet()) {
 			AddrToPay a = new AddrToPay();
     		a.btcAddress = addrToPay;
-    		a.totalToPay = balance.zTotalToPay.get(addrToPay);
+    		a.totalToPay = balance.totalToPay.get(addrToPay);
     		Long paid = report.totalPayouts.get(addrToPay);
     		if(paid != null) {
     			a.totalPaid = paid.longValue();
     		}
     		a.toPay = a.totalToPay - a.totalPaid;
+    		balance.allAccounts.add(a);
     		if(addrToPay.equals(OSMAND_BTC_DONATION_ADDR)) {
     			balance.toPay.add(a);
     			continue;
     		}
-    		if(balance.zOsmid.containsKey(addrToPay)) {
-    			a.osmId = balance.zOsmid.get(addrToPay);
+    		if(balance.osmid.containsKey(addrToPay)) {
+    			a.osmId = balance.osmid.get(addrToPay);
     		}
     		if(a.toPay < 0) {
     			balance.overpaidCnt++;
@@ -580,8 +582,9 @@ public class ReportsController {
 				return -Long.compare(o1.toPay, o2.toPay);
 			}
 		});
+    	// Check extra payments
     	for(String addrPaid : report.totalPayouts.keySet()) {
-    		if(!balance.zTotalToPay.containsKey(addrPaid)) {
+    		if(!balance.totalToPay.containsKey(addrPaid)) {
     			AddrToPay a = new AddrToPay();
         		a.btcAddress = addrPaid;
         		a.totalPaid = report.totalPayouts.get(addrPaid);
@@ -623,11 +626,11 @@ public class ReportsController {
 					}
 					String osmId = payout.get("osmid").toString();
 					long sum = (long) (((Double) payout.get("btc")) * BITCOIN_SATOSHI);
-					toBePaid.zOsmid.put(address, osmId);
-					if (toBePaid.zTotalToPay.containsKey(address)) {
-						toBePaid.zTotalToPay.put(address, toBePaid.zTotalToPay.get(address) + sum);
+					toBePaid.osmid.put(address, osmId);
+					if (toBePaid.totalToPay.containsKey(address)) {
+						toBePaid.totalToPay.put(address, toBePaid.totalToPay.get(address) + sum);
 					} else {
-						toBePaid.zTotalToPay.put(address, sum);
+						toBePaid.totalToPay.put(address, sum);
 					}
 				}
 
