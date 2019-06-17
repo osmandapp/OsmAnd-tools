@@ -25,7 +25,9 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 
 import javax.servlet.http.HttpServletRequest;
@@ -127,8 +129,8 @@ public class ReportsController {
     }
     
     public static class BtcToPayBalance {
-    	public Map<String, Long> totalToPay = new TreeMap<>();
-    	public Map<String, String> osmid = new HashMap<>();
+    	public transient Map<String, Long> zTotalToPay = new TreeMap<>();
+    	public transient Map<String, String> zOsmid = new HashMap<>();
     	public List<AddrToPay> toPay = new ArrayList<AddrToPay>();
     	public int defaultFee ;
     	public long minToPayoutSat;
@@ -154,12 +156,15 @@ public class ReportsController {
 		public int overpaidFeeCnt;
 		public long overpaidFeeSat;
 		
+		
+		
     }
     
     public static class BtcTransactionReport {
     	// Payouts 
     	public Map<String, BtcTransactionsMonth> mapTransactions = new TreeMap<>();
     	public List<BtcTransactionsMonth> txs = new ArrayList<>();
+    	public Set<String> ownAddresses = new TreeSet<>();
 		public long total;
 		public Map<String, Long> totalPayouts = new HashMap<>();
 		
@@ -204,23 +209,6 @@ public class ReportsController {
 		if(transactions.exists()) {
 			try {
 				BtcTransactionReport rep = new BtcTransactionReport();
-				Type tp = new TypeToken<Map<String, BtcTransactionsMonth> >() {}.getType();
-				rep.mapTransactions = (Map<String, BtcTransactionsMonth>) formatter.fromJson(new FileReader(transactions),tp);
-				for(Map.Entry<String, BtcTransactionsMonth> key : rep.mapTransactions.entrySet()) {
-					BtcTransactionsMonth t = key.getValue();
-					t.month = key.getKey();
-					rep.txs.add(t);
-				}
-				for (BtcTransactionsMonth t : rep.txs) {
-					loadPayouts(t);
-					rep.total += t.total;
-					for(String addr: t.totalPayouts.keySet()) {
-						long paid = t.totalPayouts.get(addr);
-						Long pd = rep.totalPayouts.get(addr);
-						rep.totalPayouts.put(addr, (pd == null ? 0 : pd.longValue()) + paid);
-					}
-				}
-				
 				if (btcJsonRpcUser != null) {
 					generateWalletStatus(rep);
 					if(genBalanceReport) {
@@ -231,6 +219,24 @@ public class ReportsController {
 						}
 					}
 				}
+				Type tp = new TypeToken<Map<String, BtcTransactionsMonth> >() {}.getType();
+				rep.mapTransactions = (Map<String, BtcTransactionsMonth>) formatter.fromJson(new FileReader(transactions),tp);
+				for(Map.Entry<String, BtcTransactionsMonth> key : rep.mapTransactions.entrySet()) {
+					BtcTransactionsMonth t = key.getValue();
+					t.month = key.getKey();
+					rep.txs.add(t);
+				}
+				rep.ownAddresses.addAll(rep.walletAddresses.keySet());
+				for (BtcTransactionsMonth t : rep.txs) {
+					loadPayouts(rep, t);
+					rep.total += t.total;
+					for(String addr: t.totalPayouts.keySet()) {
+						long paid = t.totalPayouts.get(addr);
+						Long pd = rep.totalPayouts.get(addr);
+						rep.totalPayouts.put(addr, (pd == null ? 0 : pd.longValue()) + paid);
+					}
+				}
+				
 				if(genBalanceReport) {
 					rep.balance = generateBalanceToPay(rep);
 				} else {
@@ -354,7 +360,7 @@ public class ReportsController {
     @ResponseBody
 	public String getBtcBalanceReport(HttpServletRequest request, HttpServletResponse response) throws SQLException, IOException {
     	BtcToPayBalance blnc = getBitcoinTransactionReport().balance;
-    	if(blnc.totalToPay.isEmpty()) {
+    	if(blnc.zTotalToPay.isEmpty()) {
     		generateBtcReport(true);
     	}
     	return formatter.toJson(getBitcoinTransactionReport().balance);    	
@@ -462,7 +468,7 @@ public class ReportsController {
 	}
 	
 	@SuppressWarnings("unchecked")
-	private void loadPayouts(BtcTransactionsMonth t) throws IOException {
+	private void loadPayouts(BtcTransactionReport rep, BtcTransactionsMonth t) throws IOException {
 		t.totalPayouts = new HashMap<>();
 		t.total = 0;
 		for (String tid : t.transactions) {
@@ -485,13 +491,14 @@ public class ReportsController {
 					String address = (String) in.get("addr");
 					totalIn += ((Number) in.get("value")).longValue();
 					ins.put(address, in.get("value").toString());
+					rep.ownAddresses.add(address);
 				}
 				List<Map<?, ?>> outputs = (List<Map<?, ?>>) payoutObjects.get("out");
 				for (Map<?, ?> payout : outputs) {
 					String address = (String) payout.get("addr");
 					long sum = ((Number) payout.get("value")).longValue();
 					totalOut += sum;
-					if(ins.containsKey(address)) {
+					if(rep.ownAddresses.contains(address)) {
 						continue;
 					}
 					tx.total += sum;
@@ -532,10 +539,10 @@ public class ReportsController {
 		balance.date = dt.getTime();
 		balance.generatedDate = dt.toString();
     	collectAllNeededPayouts(balance);
-    	for(String addrToPay : balance.totalToPay.keySet()) {
+    	for(String addrToPay : balance.zTotalToPay.keySet()) {
 			AddrToPay a = new AddrToPay();
     		a.btcAddress = addrToPay;
-    		a.totalToPay = balance.totalToPay.get(addrToPay);
+    		a.totalToPay = balance.zTotalToPay.get(addrToPay);
     		Long paid = report.totalPayouts.get(addrToPay);
     		if(paid != null) {
     			a.totalPaid = paid.longValue();
@@ -545,8 +552,8 @@ public class ReportsController {
     			balance.toPay.add(a);
     			continue;
     		}
-    		if(balance.osmid.containsKey(addrToPay)) {
-    			a.osmId = balance.osmid.get(addrToPay);
+    		if(balance.zOsmid.containsKey(addrToPay)) {
+    			a.osmId = balance.zOsmid.get(addrToPay);
     		}
     		if(a.toPay < 0) {
     			balance.overpaidCnt++;
@@ -566,16 +573,6 @@ public class ReportsController {
     			balance.toPay.add(a);
     		}
     	}
-    	for(String addrPaid : report.totalPayouts.keySet()) {
-    		if(!balance.totalToPay.containsKey(addrPaid)) {
-    			AddrToPay a = new AddrToPay();
-        		a.btcAddress = addrPaid;
-        		a.totalPaid = report.totalPayouts.get(addrPaid);
-        		a.totalToPay = 0;
-        		a.toPay = - a.totalPaid;
-        		balance.toPay.add(a);
-    		}
-    	}
     	Collections.sort(balance.toPay, new Comparator<AddrToPay>() {
 
 			@Override
@@ -583,6 +580,16 @@ public class ReportsController {
 				return -Long.compare(o1.toPay, o2.toPay);
 			}
 		});
+    	for(String addrPaid : report.totalPayouts.keySet()) {
+    		if(!balance.zTotalToPay.containsKey(addrPaid)) {
+    			AddrToPay a = new AddrToPay();
+        		a.btcAddress = addrPaid;
+        		a.totalPaid = report.totalPayouts.get(addrPaid);
+        		a.totalToPay = 0;
+        		a.toPay = -a.totalPaid;
+        		balance.toPay.add(0, a);
+    		}
+    	}
 		return balance;
 	}
 
@@ -616,11 +623,11 @@ public class ReportsController {
 					}
 					String osmId = payout.get("osmid").toString();
 					long sum = (long) (((Double) payout.get("btc")) * BITCOIN_SATOSHI);
-					toBePaid.osmid.put(address, osmId);
-					if (toBePaid.totalToPay.containsKey(address)) {
-						toBePaid.totalToPay.put(address, toBePaid.totalToPay.get(address) + sum);
+					toBePaid.zOsmid.put(address, osmId);
+					if (toBePaid.zTotalToPay.containsKey(address)) {
+						toBePaid.zTotalToPay.put(address, toBePaid.zTotalToPay.get(address) + sum);
 					} else {
-						toBePaid.totalToPay.put(address, sum);
+						toBePaid.zTotalToPay.put(address, sum);
 					}
 				}
 

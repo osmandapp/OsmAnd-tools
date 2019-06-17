@@ -151,13 +151,13 @@ public class AdminController {
 		if(System.currentTimeMillis() - rep.balance.date > 1000 * 60 * 10) {
 			return err(redirectAttrs, "Generated report is too old");
 		}
-		if(rep.walletTxFee != rep.balance.defaultFee) {
+		if(rep.walletTxFee != rep.balance._defaultFee) {
 			return err(redirectAttrs, "Wallet fee is not equal to default fee");
 		}
-		if(rep.walletEstFee > rep.balance.defaultFee) {
+		if(rep.walletEstFee > rep.balance._defaultFee) {
 			return err(redirectAttrs,
 					String.format("Wallet estimated fee %d is too high (comparing with set %d), try to put increase max waiting blocks or wait some time",
-							rep.walletEstFee, rep.balance.defaultFee));
+							rep.walletEstFee, rep.balance._defaultFee));
 		}
 		if(rep.txs.size() > 0 && !rep.txs.get(0).transactions.get(0).equals(rep.walletLasttx)) {
 			return err(redirectAttrs, 
