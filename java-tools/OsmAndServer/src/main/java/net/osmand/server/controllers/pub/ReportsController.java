@@ -85,8 +85,8 @@ public class ReportsController {
 	public static final int MBTC_SATOSHI = 100 * 1000;
     
 	// MIN PAY FORMULA
-	public static final int AVG_TX_SIZE = 50; // 50 bytes
-	public static final double FEE_PERCENT = 0.05; // fee shouldn't exceed 5%
+	public static final int AVG_TX_SIZE = 35; // 35 bytes
+	public static final double FEE_PERCENT = 0.8; // fee shouldn't exceed 8%
 	public static int FEE_BYTE_SATOSHI = 5; // varies over time in Bitcoin
 	
 	private final String btcJsonRpcUser;
