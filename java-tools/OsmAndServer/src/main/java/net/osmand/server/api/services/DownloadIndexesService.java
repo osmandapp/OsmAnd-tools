@@ -3,6 +3,7 @@ package net.osmand.server.api.services;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -32,6 +33,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonRootName;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.gson.Gson;
 
 @Service
 public class DownloadIndexesService  {
@@ -39,7 +41,7 @@ public class DownloadIndexesService  {
 	private static final Log LOGGER = LogFactory.getLog(DownloadIndexesService.class);
 
 	private static final String INDEX_FILE = "indexes.xml";
-	private static final String DOWNLOD_SETTINGS = "api/settings.json";
+	private static final String DOWNLOAD_SETTINGS = "api/settings.json";
 	
 	@Value("${files.location}")
     private String pathToDownloadFiles;
@@ -50,34 +52,27 @@ public class DownloadIndexesService  {
 	@Value("${web.location}")
     private String websiteLocation;
 
-	private ObjectMapper mapper;
-
 	private DownloadProperties settings;
+
+	private Gson gson;
 	
 	public DownloadIndexesService() {
-		ObjectMapper objectMapper = new ObjectMapper();
-        objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-        objectMapper.configure(DeserializationFeature.UNWRAP_ROOT_VALUE, true);
-
-        this.mapper = objectMapper;
-	}
-	
-	@PostConstruct
-	public boolean reloadConfig() {
-		return reloadConfig(new ArrayList<String>());
+		gson = new Gson();
 	}
 	
 	public DownloadProperties getSettings() {
+		if(settings == null) {
+			reloadConfig(new ArrayList<String>());
+		}
 		return settings;
 	}
 	
 	public boolean reloadConfig(List<String> errors) {
     	try {
-    		this.settings = mapper.readValue(new File(websiteLocation.concat(DOWNLOD_SETTINGS)),
-    				DownloadProperties.class);
+    		settings = gson.fromJson(new FileReader(new File(websiteLocation, DOWNLOAD_SETTINGS)), DownloadProperties.class);
     	} catch (IOException ex) {
     		if(errors != null) {
-    			errors.add(DOWNLOD_SETTINGS + " is invalid: " + ex.getMessage());
+    			errors.add(DOWNLOAD_SETTINGS + " is invalid: " + ex.getMessage());
     		}
             LOGGER.warn(ex.getMessage(), ex);
             return false;
@@ -309,36 +304,11 @@ public class DownloadIndexesService  {
 	    }
 	}
 	
-	@JsonRootName("download")
 	public static class DownloadProperties {
-		@JsonProperty("main_load")
-		private int mainLoad;
-		private List<String> helpServers = new ArrayList<>();
-		private List<String> mainServers = new ArrayList<>();
+		public List<String> osmlive = new ArrayList<>();
+		public List<String> srtm = new ArrayList<>();
+		public List<String> main = new ArrayList<>();
 		
-		@SuppressWarnings("unchecked")
-		@JsonProperty("servers")
-		private void unpackNameFromNestedObject(Map<String, Object> servers) {
-			if(servers.containsKey("help")) {
-				helpServers = (List<String>) servers.get("help");
-			}
-			if (servers.containsKey("main")) {
-				mainServers = (List<String>) servers.get("main");
-			}
-		}
-		
-
-		public List<String> getMainServers() {
-			return mainServers;
-		}
-		
-		public List<String> getHelpServers() {
-			return helpServers;
-		}
-
-		public int getMainLoad() {
-			return mainLoad;
-		}
 
 	}
 }

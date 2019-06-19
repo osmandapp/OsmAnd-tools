@@ -19,6 +19,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.zip.GZIPOutputStream;
 
 import javax.servlet.http.HttpServletResponse;
@@ -807,24 +808,29 @@ public class AdminController {
 	
 	private List<Map<String, Object>> getDownloadSettings() {
 		DownloadProperties dProps = downloadService.getSettings();
-		int ms = dProps.getMainServers().size();
-		int hs = dProps.getHelpServers().size();
-		int mload = ms == 0 ? 0 : dProps.getMainLoad() / ms;
-		int mmload = ms == 0 ? 0 : 100 / ms;
-		int hload = hs == 0 ? 0 : (100-dProps.getMainLoad()) / hs;
+		Set<String> servers = new TreeSet<String>();
+		servers.addAll(dProps.main);
+		servers.addAll(dProps.osmlive);
+		servers.addAll(dProps.srtm);
 		List<Map<String, Object>> list = new ArrayList<>();
-		for(String s : dProps.getMainServers()) {
+		for(String s : servers) {
 			Map<String, Object> mo = new TreeMap<>();
 			mo.put("name", s);
-			mo.put("mainLoad", mload +"%");
-			mo.put("srtmLoad", mmload +"%");
-			list.add(mo);
-		}
-		for(String s : dProps.getHelpServers()) {
-			Map<String, Object> mo = new TreeMap<>();
-			mo.put("name", s);
-			mo.put("mainLoad", hload +"%");
-			mo.put("srtmLoad", "0%");
+			if(dProps.main.contains(s)) {
+				mo.put("maps", 100 / dProps.main.size() +"%");
+			} else {
+				mo.put("maps", "0%");
+			}
+			if(dProps.srtm.contains(s)) {
+				mo.put("srtm", 100 / dProps.srtm.size() +"%");
+			} else {
+				mo.put("srtm", "0%");
+			}
+			if(dProps.osmlive.contains(s)) {
+				mo.put("osmlive", 100 / dProps.osmlive.size() +"%");
+			} else {
+				mo.put("osmlive", "0%");
+			}
 			list.add(mo);
 		}
 		return list;

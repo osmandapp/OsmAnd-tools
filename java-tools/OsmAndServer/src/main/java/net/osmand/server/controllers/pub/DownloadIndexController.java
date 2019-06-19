@@ -211,22 +211,22 @@ public class DownloadIndexController {
 		return isContainAndEqual(param, "yes", params);
 	}
 
-	private boolean computeHelpCondition(MultiValueMap<String, String> params) {
-		// "standard", "<empty>", "road" 
-		// "wikivoyage", "wiki"
-		return !computeOnlyMainCondition(params) && !computeLocalCondition(params);
+	private boolean isSrtm(MultiValueMap<String, String> params) {
+		return isContainAndEqual("srtmcountry", params) || isContainAndEqual("hillshade", params); 
 	}
 	
-	private boolean computeOnlyMainCondition(MultiValueMap<String, String> params) {
-		return isContainAndEqual("srtmcountry", params) || isContainAndEqual("hillshade", params) ||
-				// allow all files
-				isContainAndEqual("aosmc", params) || isContainAndEqual("osmc", params) ||
-				isContainAndEqual("fonts", params) || params.getFirst("inapp") != null;
+	private boolean isLiveMaps(MultiValueMap<String, String> params) {
+		return isContainAndEqual("aosmc", params) || isContainAndEqual("osmc", params);
+	}
+	
+	private boolean isMaps(MultiValueMap<String, String> params) {
+		return  // allow all files
+				// "standard", "<empty>", "road" 
+				// "wikivoyage", "wiki"	
+				// "fonts", "inapp"
+				!isLiveMaps(params) && !isSrtm(params);
 	}
 
-	private boolean computeLocalCondition(MultiValueMap<String, String> params) {
-		return false;
-	}
 
 	@RequestMapping(value = {"/download.php", "/download"}, method = RequestMethod.GET)
 	@ResponseBody
@@ -240,8 +240,7 @@ public class DownloadIndexController {
 			resp.sendError(HttpServletResponse.SC_BAD_REQUEST, "Invalid host name");
 			return;
 		}
-		boolean self = isContainAndEqual("self", "true", params) ||
-				computeLocalCondition(params);
+		boolean self = isContainAndEqual("self", "true", params) ;
 		String proto = headers.getFirst("X-Forwarded-Proto");
 		if(proto == null) {
 			proto = req.getScheme();
@@ -249,8 +248,6 @@ public class DownloadIndexController {
 		if (!self) {
 			ThreadLocalRandom tlr = ThreadLocalRandom.current();
 			int random = tlr.nextInt(100);
-			boolean isHelp = computeHelpCondition(params);
-			boolean isLocal = computeLocalCondition(params);
 			String extraParam = "";
 			if (params.containsKey("aosmc") || params.containsKey("osmc")) {
 				String filename = params.getFirst("file");
@@ -258,12 +255,16 @@ public class DownloadIndexController {
 					extraParam = "&region=" + filename.substring(0, filename.length() - DATE_AND_EXT_STR_LEN).toLowerCase();
 				}
 			}
-			if (servers.getHelpServers().size() > 0 && isHelp && random < (100 - servers.getMainLoad())) {
-				String host = servers.getHelpServers().get(random % servers.getHelpServers().size());
+			if(isSrtm(params) && servers.srtm.size() > 0) {
+				String host = servers.srtm.get(random % servers.srtm.size());
 				resp.setStatus(HttpServletResponse.SC_FOUND);
 				resp.setHeader(HttpHeaders.LOCATION, proto + "://" + host + "/download?" + req.getQueryString() + extraParam);
-			} else if (servers.getMainServers().size() > 0 && !isLocal) {
-				String host = servers.getMainServers().get(random % servers.getMainServers().size());
+			} else if(isLiveMaps(params)  && servers.osmlive.size() > 0) {
+				String host = servers.osmlive.get(random % servers.osmlive.size());
+				resp.setStatus(HttpServletResponse.SC_FOUND);
+				resp.setHeader(HttpHeaders.LOCATION, proto + "://" + host + "/download?" + req.getQueryString() + extraParam);
+			} else if(isMaps(params)  && servers.main.size() > 0) {
+				String host = servers.main.get(random % servers.main.size());
 				resp.setStatus(HttpServletResponse.SC_FOUND);
 				resp.setHeader(HttpHeaders.LOCATION, proto + "://" + host + "/download?" + req.getQueryString() + extraParam);
 			} else {
