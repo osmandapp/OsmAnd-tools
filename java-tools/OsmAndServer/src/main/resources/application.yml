@@ -14,9 +14,8 @@ google:
     preferTokenInfo: true
 
 
-admin:
-  emails:
-      victor.shcherb@gmail.com, dmpr0.ua@gmail.com, alex.crimean@gmail.com, stetsenko.pavlo@gmail.com, prozmeu@gmail.com
+admin.emails: ${ADMIN_EMAILS:victor.shcherb@gmail.com}
+      
 
 logging:
   file: logs/server.log
