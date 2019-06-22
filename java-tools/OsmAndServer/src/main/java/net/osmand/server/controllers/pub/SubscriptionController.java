@@ -17,6 +17,7 @@ import net.osmand.server.api.services.ReceiptValidationService.InAppReceipt;
 import net.osmand.server.utils.BTCAddrValidator;
 import net.osmand.util.Algorithms;
 
+import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,18 +28,31 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.lang.NonNull;
+import org.springframework.lang.Nullable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
 
+import java.net.URLEncoder;
+import java.security.KeyFactory;
+import java.security.NoSuchAlgorithmException;
+import java.security.PrivateKey;
+import java.security.Signature;
+import java.security.spec.InvalidKeySpecException;
+import java.security.spec.PKCS8EncodedKeySpec;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.Collection;
 import java.util.Date;
 import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
 import javax.servlet.http.HttpServletRequest;
@@ -49,9 +63,11 @@ import static net.osmand.server.api.services.ReceiptValidationService.USER_NOT_F
 @RestController
 @RequestMapping("/subscription")
 public class SubscriptionController {
-    private static final Log LOGGER = LogFactory.getLog(SubscriptionController.class);
+    private static final Log LOG = LogFactory.getLog(SubscriptionController.class);
 
     private static final int TIMEOUT = 20000;
+
+    private PrivateKey subscriptionPrivateKey;
 
     @Autowired
     private SupportersRepository supportersRepository;
@@ -79,7 +95,16 @@ public class SubscriptionController {
     @Autowired
     public SubscriptionController(RestTemplateBuilder builder) {
         this.restTemplate = builder.setConnectTimeout(TIMEOUT).setReadTimeout(TIMEOUT).build();
-    }
+		byte[] pkcs8EncodedKey = Base64.getDecoder().decode(System.getenv().get("IOS_SUBSCRIPTION_KEY"));
+		try {
+			KeyFactory factory = KeyFactory.getInstance("EC");
+			subscriptionPrivateKey = factory.generatePrivate(new PKCS8EncodedKeySpec(pkcs8EncodedKey));
+		} catch (NoSuchAlgorithmException e) {
+			LOG.error(e.getMessage(), e);
+		} catch (InvalidKeySpecException e) {
+			LOG.error(e.getMessage(), e);
+		}
+	}
 
     private String encodeCredentialsToBase64(String userName, String password) {
         Base64.Encoder encoder = Base64.getMimeEncoder();
@@ -295,6 +320,8 @@ public class SubscriptionController {
 			Map<String, InAppReceipt> inAppReceipts = validationService.loadInAppReceipts(receiptObj);
 			if (inAppReceipts != null) {
 				if (inAppReceipts.size() == 0) {
+					result.put("eligible_for_introductory_price", "true");
+					result.put("eligible_for_subscription_offer", "false");
 					result.put("result", false);
 					result.put("status", NO_SUBSCRIPTIONS_FOUND_STATUS);
 					return ResponseEntity.ok(jsonMapper.writeValueAsString(result));
@@ -307,8 +334,10 @@ public class SubscriptionController {
 					} else {
 						uId = Long.valueOf(userId);
 					}
-
+					result.put("eligible_for_introductory_price",
+							isEligibleForIntroductoryPrice(inAppReceipts.values()) ? "true" : "false");
 					if (uId == -1) {
+						result.put("eligible_for_subscription_offer", "false");
 						result.put("result", false);
 						result.put("status", USER_NOT_FOUND_STATUS);
 						return ResponseEntity.ok(jsonMapper.writeValueAsString(result));
@@ -327,8 +356,11 @@ public class SubscriptionController {
 						}
 					}
 
-					Map<String, Object> validationResult = validationService.validateReceipt(receiptObj);
+					List<Map<String, String>> activeSubscriptions = new ArrayList<>();
+					Map<String, Object> validationResult = validationService.validateReceipt(receiptObj, activeSubscriptions);
 					result.putAll(validationResult);
+					result.put("eligible_for_subscription_offer",
+							isEligibleForSubscriptionOffer(inAppReceipts.values(), activeSubscriptions) ? "true" : "false");
 
 					return ResponseEntity.ok(jsonMapper.writeValueAsString(result));
 				}
@@ -348,6 +380,101 @@ public class SubscriptionController {
 				result.put("user", userInfoAsMap(s));
 				return s;
 			}
+		}
+		return null;
+	}
+
+	private boolean isEligibleForIntroductoryPrice(@NonNull Collection<InAppReceipt> inAppReceipts) {
+		for (InAppReceipt receipt : inAppReceipts) {
+			String isTrialPeriod = receipt.fields.get("is_trial_period");
+			String isInIntroOfferPeriod = receipt.fields.get("is_in_intro_offer_period");
+			if ("true".equals(isTrialPeriod) || "true".equals(isInIntroOfferPeriod)) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	private boolean isEligibleForSubscriptionOffer(@NonNull Collection<InAppReceipt> inAppReceipts, @NonNull List<Map<String, String>> activeSubscriptions) {
+    	if (activeSubscriptions.size() == 0) {
+			for (InAppReceipt receipt : inAppReceipts) {
+				if (receipt.isSubscription()) {
+					return true;
+				}
+			}
+		}
+    	return false;
+	}
+
+	@PostMapping(path = { "/ios-fetch-signatures" })
+	public ResponseEntity<String> fetchSignaturesIos(HttpServletRequest request) throws Exception {
+		String productIdentifiers = request.getParameter("productIdentifiers");
+		if (!Algorithms.isEmpty(productIdentifiers)) {
+			String userId = request.getParameter("userId");
+			HashMap<String, Object> result = new HashMap<>();
+			List<Map<String, String>> signatures = new ArrayList<>();
+			String[] productIdentifiersArray = productIdentifiers.split(";");
+			for (String productIdentifier : productIdentifiersArray) {
+				String discountIdentifiers = request.getParameter(productIdentifier + "_discounts");
+				if (!Algorithms.isEmpty(discountIdentifiers)) {
+					String[] discountIdentifiersArray = discountIdentifiers.split(";");
+					for (String discountIdentifier : discountIdentifiersArray) {
+						Map<String, String> signatureObj = generateOfferSignature(productIdentifier, discountIdentifier, userId);
+						if (signatureObj != null) {
+							signatures.add(signatureObj);
+						}
+					}
+				}
+			}
+			result.put("signatures", signatures);
+			result.put("status", 0);
+			return ResponseEntity.ok(jsonMapper.writeValueAsString(result));
+		}
+		return error("Product identifiers are not defined.");
+	}
+
+	@Nullable
+	private Map<String, String> generateOfferSignature(String productIdentifier, String offerIdentifier, String userId) {
+    	String appBundleId = "net.osmand.maps";
+		String keyIdentifier = System.getenv().get("IOS_SUBSCRIPTION_KEY_ID");
+		String nonce = UUID.randomUUID().toString().toLowerCase();
+		String timestamp = "" + System.currentTimeMillis() / 1000L;
+		if (Algorithms.isEmpty(userId)) {
+			userId = "00000";
+		}
+		String usernameHash = DigestUtils.md5Hex(userId);
+
+		String source = appBundleId + '\u2063' + keyIdentifier + '\u2063' + productIdentifier + '\u2063' + offerIdentifier + '\u2063' + usernameHash + '\u2063' + nonce + '\u2063' + timestamp;
+		String signatureBase64 = null;
+		if (subscriptionPrivateKey != null) {
+			try {
+				Signature ecdsa = Signature.getInstance("SHA256withECDSA");
+				ecdsa.initSign(subscriptionPrivateKey);
+				ecdsa.update(source.getBytes("UTF-8"));
+				byte[] signature = ecdsa.sign();
+				signatureBase64 = URLEncoder.encode(Base64.getEncoder().encodeToString(signature), "UTF-8");
+			} catch (Exception e) {
+				LOG.error(e.getMessage(), e);
+			}
+		} else {
+			LOG.error("Subscription private key is null " +
+					"(generateOfferSignature" +
+					" productIdentifier=" + productIdentifier +
+					" offerIdentifier=" + offerIdentifier +
+					" usernameHash=" + usernameHash + ")");
+		}
+		if (signatureBase64 != null) {
+			Map<String, String> result = new HashMap<>();
+			result.put("appBundleId", appBundleId);
+			result.put("keyIdentifier", keyIdentifier);
+			result.put("productIdentifier", productIdentifier);
+			result.put("offerIdentifier", offerIdentifier);
+			result.put("userId", userId);
+			result.put("usernameHash", usernameHash);
+			result.put("nonce", nonce);
+			result.put("timestamp", timestamp);
+			result.put("signature", signatureBase64);
+			return result;
 		}
 		return null;
 	}
@@ -397,7 +524,7 @@ public class SubscriptionController {
 		String token = request.getParameter("token");
 		if (isEmpty(token)) {
 			suser.tokenValid = false;
-			LOGGER.warn("Token was not provided: " + toString(request.getParameterMap()));
+			LOG.warn("Token was not provided: " + toString(request.getParameterMap()));
 			// return error("Token is not present: fix will be in OsmAnd 3.2");
 		}
 		Optional<Supporter> sup = supportersRepository.findById(Long.parseLong(userId));
@@ -408,7 +535,7 @@ public class SubscriptionController {
 
 		if (token != null && !token.equals(supporter.token)) {
 			suser.tokenValid = false;
-			LOGGER.warn("Token failed validation: " + toString(request.getParameterMap()));
+			LOG.warn("Token failed validation: " + toString(request.getParameterMap()));
 			// return error("Couldn't validate the token: " + token);
 		}
 		suser.supporter = supporter;

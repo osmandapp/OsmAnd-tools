@@ -49,13 +49,13 @@ public class ReceiptValidationService {
 	}
 
 	@NonNull
-	public Map<String, Object> validateReceipt(@NonNull JsonObject receiptObj) {
+	public Map<String, Object> validateReceipt(@NonNull JsonObject receiptObj, @NonNull List<Map<String, String>> activeSubscriptions) {
 		try {
 			int status = receiptObj.get("status").getAsInt();
 			if (status != 0) {
 				return mapStatus(status);
 			}
-			return checkValidation(receiptObj);
+			return checkValidation(receiptObj, activeSubscriptions);
 		} catch (Exception e) {
 			LOGGER.error(e);
 			return mapStatus(CANNOT_LOAD_RECEIPT_STATUS);
@@ -117,7 +117,7 @@ public class ReceiptValidationService {
 	}
 
 	@NonNull
-	private HashMap<String, Object> checkValidation(JsonObject receiptObj) {
+	private HashMap<String, Object> checkValidation(@NonNull JsonObject receiptObj, @NonNull List<Map<String, String>> activeSubscriptions) {
 		HashMap<String, Object> result = new HashMap<>();
 		//To be determined with which field to compare
 		String bundleId = receiptObj.get("receipt").getAsJsonObject().get("bundle_id").getAsString();
@@ -126,7 +126,6 @@ public class ReceiptValidationService {
 			if (latestReceiptInfoArray.size() > 0) {
 				result.put("result", true);
 				List<String> inAppArray = new ArrayList<>();
-				List<Map<String, String>> subscriptionArray = new ArrayList<>();
 				for (JsonElement jsonElement : latestReceiptInfoArray) {
 					Map<String, String> subscriptionObj = new HashMap<>();
 					JsonObject receipt = jsonElement.getAsJsonObject();
@@ -136,16 +135,16 @@ public class ReceiptValidationService {
 					if (expiresDateElement != null) {
 						long expiresDateMs = expiresDateElement.getAsLong();
 						if (expiresDateMs > System.currentTimeMillis()) {
-							//Subscription is valid
+							//Subscription is valid (active)
 							subscriptionObj.put("expiration_date", Long.toString(expiresDateMs));
-							subscriptionArray.add(subscriptionObj);
+							activeSubscriptions.add(subscriptionObj);
 						}
 					} else {
 						inAppArray.add(productId);
 					}
 				}
 				result.put("in_apps", inAppArray);
-				result.put("subscriptions", subscriptionArray);
+				result.put("subscriptions", activeSubscriptions);
 				result.put("status", 0);
 				return result;
 			} else {
