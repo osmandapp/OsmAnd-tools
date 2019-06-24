@@ -45,7 +45,7 @@ public class ManyToOneRoadCalculation {
 		public int parentEndIndex;
 
 		public double estimateDistanceEnd(GeneralRouter router, int sbottom) {
-			return squareRootDist(0, road.getPoint31YTile(segmentIndex), 0, sbottom) / router.getMaxDefaultSpeed();
+			return squareRootDist(0, road.getPoint31YTile(segmentIndex), 0, sbottom) / router.getMaxSpeed();
 		}
 	}
 
@@ -141,7 +141,7 @@ public class ManyToOneRoadCalculation {
 			List<ManyToManySegment> finalSegmentResult = calculateOneToMany(allSegments, bottomIntersects, sbottom, router,
 					oneTop);
 			for (ManyToManySegment fnsResult : finalSegmentResult) {
-				TLongArrayList set = convertToRoadIds(fnsResult, DISTANCE_THRESHOLD/router.getMaxDefaultSpeed());
+				TLongArrayList set = convertToRoadIds(fnsResult, DISTANCE_THRESHOLD/router.getMaxSpeed());
 				combineWithLocal(sets, set);
 			}
 			System.out.println(oneTop.road.getHighway() + " " + oneTop.road.id + " " + oneTop.segmentIndex + " common ways="+sets.size());
@@ -228,7 +228,7 @@ public class ManyToOneRoadCalculation {
 			finalSegments.add(fs.road.id);
 		}
 		oneTop.distanceFromStart = 0;
-		//oneTop.estimateDistanceToEnd = squareRootDist(0, stop, 0, sbottom) / router.getMaxDefaultSpeed();
+		//oneTop.estimateDistanceToEnd = squareRootDist(0, stop, 0, sbottom) / router.getMaxSpeed();
 		queue.add(oneTop);
 		TLongHashSet visitedSegments = new TLongHashSet();
 		List<ManyToManySegment> finalSegmentResult = new ArrayList<ManyToOneRoadCalculation.ManyToManySegment>();

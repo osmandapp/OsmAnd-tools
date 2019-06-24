@@ -704,7 +704,7 @@ public class MapRouterLayer implements MapPanelLayer {
 //				start = lts[0];
 //				end = lts[lts.length - 1];
 //				System.out.println("Start " + start + " end " + end);
-//				precalculatedRouteDirection = PrecalculatedRouteDirection.build(lts, config.router.getMaxDefaultSpeed());
+//				precalculatedRouteDirection = PrecalculatedRouteDirection.build(lts, config.router.getMaxSpeed());
 //				precalculatedRouteDirection.setFollowNext(true);
 //				config.planRoadDirection = 1;
 
