@@ -264,8 +264,11 @@ public class ImproveRoadConnectivity {
 			visited.add(calcPointIdUnique(segment.getRoad(), ind));
 			int x = road.getPoint31XTile(ind);
 			int y = road.getPoint31YTile(ind);
-			distFromStart += MapUtils.squareDist31TileMetric(px, py, x, y) /
-					ctx.getRouter().defineRoutingSpeed(road) * ctx.getRouter().defineSpeedPriority(road);
+			float spd = ctx.getRouter().defineRoutingSpeed(road) * ctx.getRouter().defineSpeedPriority(road);
+			if(spd > ctx.getRouter().getMaxSpeed()) {
+				spd = ctx.getRouter().getMaxSpeed();
+			}
+			distFromStart += MapUtils.squareDist31TileMetric(px, py, x, y) / spd;
 			RouteSegment rs = ctx.loadRouteSegment(x, y, 0);
 			while(rs != null) {
 				if(!visited.contains(calcPointIdUnique(rs.getRoad(), rs.getSegmentStart()))) {
