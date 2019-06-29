@@ -69,6 +69,7 @@ public class OsmAndLiveReports {
 			} else if(args[0].equals("finalize-previous-month")) {
 				double btc = Double.NaN;
 				double eur = Double.NaN;
+				double btcEurRate = Double.NaN;
 				System.out.println("Previous month is " + prevMonth);
 //				String currentMonth = String.format("%1$tY-%1$tm", new Date());
 				String month = prevMonth;
@@ -84,6 +85,8 @@ public class OsmAndLiveReports {
 						btc = Double.parseDouble(value);
 					} else if(key.equals("--eur")) {
 						eur = Double.parseDouble(value);
+					} else if(key.equals("--btcEurRate")) {
+						btcEurRate = Double.parseDouble(value);
 					}
 				}
 				if(Double.isNaN(btc)) {
@@ -92,7 +95,7 @@ public class OsmAndLiveReports {
 				if(Double.isNaN(eur)) {
 					throw new IllegalArgumentException("You didn't specify amount eur to pay");
 				}
-				finalizeMonth(conn, month, btc, eur);
+				finalizeMonth(conn, month, btc, eur, btcEurRate);
 			} else {
 				throw new UnsupportedOperationException();
 			}
@@ -102,7 +105,7 @@ public class OsmAndLiveReports {
 		}
 	}
 	
-	private static void finalizeMonth(Connection conn, String month, double btc, double eur) throws SQLException, IOException, ParseException {
+	private static void finalizeMonth(Connection conn, String month, double btc, double eur, double actualRate) throws SQLException, IOException, ParseException {
 		LOG.info("Refreshing materialized views ");
 		conn.createStatement().execute("REFRESH MATERIALIZED VIEW  changesets_view");
 		LOG.info("changesets_view refreshed");
@@ -113,6 +116,7 @@ public class OsmAndLiveReports {
 
 		reports.saveReport(btc +"", OsmAndLiveReportType.BTC_VALUE, null, null);
 		reports.saveReport(eur +"", OsmAndLiveReportType.EUR_VALUE, null, null);
+		reports.saveReport(actualRate +"", OsmAndLiveReportType.EUR_BTC_ACTUAL_RATE, null, null);
 		reports.saveReport(((float)eur / btc)+"", OsmAndLiveReportType.EUR_BTC_RATE, null, null);
 		reports.saveReport(reports.getRegionRankingRange() +"", OsmAndLiveReportType.REGION_RANKING_RANGE, null, null);
 		reports.saveReport(reports.getRankingRange() + "", OsmAndLiveReportType.RANKING_RANGE, null, null);
