@@ -358,6 +358,10 @@ public class OsmAndLiveReports {
 
 	private double getEurValue() throws SQLException, IOException {
 		SupportersReport supporters = getReport(OsmAndLiveReportType.SUPPORTERS, null, SupportersReport.class);
+		return getEurValue(supporters);
+	}
+
+	private double getEurValue(SupportersReport supporters) {
 		return supporters.activeCount * 0.4 ; // 1 EUR - 20% (GPlay) - 50% (OsmAnd)
 	}
 	
@@ -666,7 +670,7 @@ public class OsmAndLiveReports {
 					" FROM osm_recipients s left join " + 
 					" 	(SELECT count(*) size, ch.username " +
 					" 	 FROM "+CHANGESETS_VIEW+" ch ";
-		if(eregion) {
+		if (eregion) {
 				q += "   WHERE substr(ch.closed_at_day, 0, 8) = ? " +
 		
 					 "	 GROUP by username) "+
@@ -688,29 +692,29 @@ public class OsmAndLiveReports {
 		
 		report.regionPercentage = 0;
 		SupportersRegion sr = supporters.regions.get(isEmpty(region) ? "" : region);
-		if(sr != null) {
+		if (sr != null) {
 			report.regionPercentage = sr.percent;
 		}
 		report.regionCount = 0;
 		report.regionTotalWeight = 0;
 		int rankingNum = getNumberReport(OsmAndLiveReportType.RANKING_RANGE).intValue();
-		if(!eregion) {
+		if (!eregion) {
 			rankingNum = getNumberReport(OsmAndLiveReportType.REGION_RANKING_RANGE).intValue();
 		}
-		while(rs.next()) {
+		while (rs.next()) {
 			Recipient recipient = new Recipient();
 			recipient.osmid = rs.getString("osmid");
 			recipient.changes = rs.getInt("changes");
 			recipient.btcaddress = rs.getString("btcaddr");
-			if(isEmpty(recipient.btcaddress)) {
+			if (isEmpty(recipient.btcaddress)) {
 				continue;
 			}
 			report.regionCount++;
-			for (int i = 0; i < ranking.rows.size() ; ++i) {
+			for (int i = 0; i < ranking.rows.size(); ++i) {
 				RankingRange range = ranking.rows.get(i);
-				if(recipient.changes >= range.minChanges && recipient.changes <= range.maxChanges) {
+				if (recipient.changes >= range.minChanges && recipient.changes <= range.maxChanges) {
 					recipient.rank = range.rank;
-					recipient.weight = rankingNum + 1 - recipient.rank; 
+					recipient.weight = rankingNum + 1 - recipient.rank;
 					report.regionTotalWeight += recipient.weight;
 					break;
 				}
@@ -723,7 +727,7 @@ public class OsmAndLiveReports {
 		report.regionBtc = report.regionPercentage * report.btc;
 		report.notReadyToPay = Double.isNaN(
 				loadNumberReport(OsmAndLiveReportType.BTC_VALUE));
-		for(int i = 0; i < report.rows.size(); i++) {
+		for (int i = 0; i < report.rows.size(); i++) {
 			Recipient r = report.rows.get(i);
 			if (report.regionTotalWeight > 0) {
 				r.btc = report.regionBtc * r.weight / report.regionTotalWeight;
@@ -734,6 +738,21 @@ public class OsmAndLiveReports {
 		return report;
 	}
 	
+	public double getBtcCollected() throws IOException, SQLException {
+		if(!thisMonth) {
+			SupportersReport supps = getReport(OsmAndLiveReportType.SUPPORTERS, null, SupportersReport.class);
+			// uses supporters report
+			double eurValue = getEurValue(supps);
+			double rate = getNumberReport(OsmAndLiveReportType.EUR_BTC_RATE).doubleValue();
+			if(rate != 0) {
+				return eurValue / rate;
+			}
+			return 0;
+		} else {
+			return getNumberReport(OsmAndLiveReportType.BTC_VALUE).doubleValue();
+		}
+	}
+	
 	
 	public PayoutsReport getPayouts() throws IOException, SQLException {
 		PayoutsReport report = new PayoutsReport();
@@ -741,19 +760,9 @@ public class OsmAndLiveReports {
 		report.payoutTotal = 0d;
 		report.payoutBTCAvailable = getNumberReport(OsmAndLiveReportType.BTC_VALUE).doubleValue();
 		report.payoutEurAvailable = getNumberReport(OsmAndLiveReportType.EUR_VALUE).doubleValue();
-		if(!thisMonth) {
-			// uses supporters report
-			double eurValue = getEurValue();
-			double rate = getNumberReport(OsmAndLiveReportType.EUR_BTC_RATE).doubleValue();
-			if(rate != 0) {
-				report.payoutBTCCollected = eurValue / rate;
-			}
-		} else {
-			report.payoutBTCCollected = report.payoutBTCAvailable;
-		}
-		if (report.payoutBTCAvailable > 0) {
-			report.rate = report.payoutEurAvailable / report.payoutBTCAvailable;
-		}
+		report.rate = getNumberReport(OsmAndLiveReportType.EUR_BTC_RATE).doubleValue();
+		
+		report.payoutBTCCollected = getBtcCollected();
 		for(int i = 0; i < countries.rows.size(); i++) {
 			Country c = countries.rows.get(i);
 			String reg = null;
@@ -1095,6 +1104,7 @@ public class OsmAndLiveReports {
 		
 		public float regionBtc;
 		public float btc;
+		public float btcCollected;
 		public float rate;
 		public float eur;
 		public boolean notReadyToPay;

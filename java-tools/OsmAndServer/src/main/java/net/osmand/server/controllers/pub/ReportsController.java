@@ -473,12 +473,15 @@ public class ReportsController {
 						}
 					}
 				}
-				String worldCollectedMessage = String.format("<p>%.3f mBTC</p><span>total collected%s</span>",
-						rec.btc * 1000, rec.notReadyToPay ? " (may change in the final report)" : "" );
-				String regionCollectedMessage = String.format("<p>%.3f mBTC</p><span>collected for</span>",
+				if(rec.notReadyToPay) {
+					rec.worldCollectedMessage = String.format("<p>%.3f mBTC</p><span>total collected (estimation)</span>",
+							rec.btc * 1000);
+				} else {
+					rec.worldCollectedMessage = String.format("<p>%.3f mBTC</p><span>total payout (%.3f collected)</span>",
+							rec.btc * 1000, reports.getBtcCollected());
+				}
+				rec.regionCollectedMessage = String.format("<p>%.3f mBTC</p><span>collected for</span>",
 						rec.regionBtc * 1000);
-				rec.worldCollectedMessage = worldCollectedMessage;
-				rec.regionCollectedMessage = regionCollectedMessage;
 				rec.payouts = payouts.toString();
 				StringBuilder reportBld = new StringBuilder();
 				if(!rec.notReadyToPay) {
@@ -491,7 +494,7 @@ public class ReportsController {
 							+ "href='https://builder.osmand.net/reports/query_btc_balance_report'>"
 							+ "Cumulative underpaid report</a>");
 				}
-				rec.reports =reportBld.toString();
+				rec.reports = reportBld.toString();
 				return gson.toJson(rec);
 			}
 			return reports.getJsonReport(type, region);
