@@ -12,6 +12,7 @@ import java.sql.Timestamp;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -70,6 +71,7 @@ public class OsmAndLiveReports {
 				double btc = Double.NaN;
 				double eur = Double.NaN;
 				double btcEurRate = Double.NaN;
+				double btcDonation = 0;
 				System.out.println("Previous month is " + prevMonth);
 //				String currentMonth = String.format("%1$tY-%1$tm", new Date());
 				String month = prevMonth;
@@ -87,15 +89,21 @@ public class OsmAndLiveReports {
 						eur = Double.parseDouble(value);
 					} else if(key.equals("--btcEurRate")) {
 						btcEurRate = Double.parseDouble(value);
+					} else if(key.equals("--btcDonation")) {
+						btcDonation = Double.parseDouble(value);
 					}
 				}
 				if(Double.isNaN(btc)) {
 					throw new IllegalArgumentException("You didn't specify amount btc to pay");
 				}
 				if(Double.isNaN(eur)) {
+					eur = btc * btcEurRate;
 					throw new IllegalArgumentException("You didn't specify amount eur to pay");
 				}
-				finalizeMonth(conn, month, btc, eur, btcEurRate);
+				if(Double.isNaN(btcEurRate)) {
+					throw new IllegalArgumentException("You didn't specify amount btc to eur rate");
+				}
+				finalizeMonth(conn, month, btc, eur, btcEurRate, btcDonation);
 			} else {
 				throw new UnsupportedOperationException();
 			}
@@ -105,7 +113,7 @@ public class OsmAndLiveReports {
 		}
 	}
 	
-	private static void finalizeMonth(Connection conn, String month, double btc, double eur, double actualRate) throws SQLException, IOException, ParseException {
+	private static void finalizeMonth(Connection conn, String month, double btc, double eur, double actualRate, double btcDonation) throws SQLException, IOException, ParseException {
 		LOG.info("Refreshing materialized views ");
 		conn.createStatement().execute("REFRESH MATERIALIZED VIEW  changesets_view");
 		LOG.info("changesets_view refreshed");
@@ -117,6 +125,7 @@ public class OsmAndLiveReports {
 		reports.saveReport(btc +"", OsmAndLiveReportType.BTC_VALUE, null, null);
 		reports.saveReport(eur +"", OsmAndLiveReportType.EUR_VALUE, null, null);
 		reports.saveReport(actualRate +"", OsmAndLiveReportType.EUR_BTC_ACTUAL_RATE, null, null);
+		reports.saveReport(btcDonation +"", OsmAndLiveReportType.BTC_DONATION_VALUE, null, null);
 		reports.saveReport(((float)eur / btc)+"", OsmAndLiveReportType.EUR_BTC_RATE, null, null);
 		reports.saveReport(reports.getRegionRankingRange() +"", OsmAndLiveReportType.REGION_RANKING_RANGE, null, null);
 		reports.saveReport(reports.getRankingRange() + "", OsmAndLiveReportType.RANKING_RANGE, null, null);
@@ -188,9 +197,11 @@ public class OsmAndLiveReports {
 	protected static void checkMissingReports(Connection conn) throws SQLException, IOException,
 			ParseException {
 		PreparedStatement ps = conn.prepareStatement("select report, time, accesstime from final_reports where month = ? and name = ? and region = ?");
-		for (int y = 2016; y <= 2018; y++) {
-			int si = y == 2015 ? 8 : 1;
-			int ei = y == 2018 ? 8 : 12;
+		Calendar cd = Calendar.getInstance();
+		for (int y = 2016; y <= cd.get(Calendar.YEAR); y++) {
+			int si = 1;
+			// don't include current month
+			int ei = y == cd.get(Calendar.YEAR) ? cd.get(Calendar.MONTH) : 12;
 			for (int i = si; i <= ei; i++) {
 				int s = 0;
 				String m = i < 10 ? "0" + i : i + "";
@@ -231,10 +242,14 @@ public class OsmAndLiveReports {
 				}
 				checkReport(ps, month, OsmAndLiveReportType.BTC_VALUE, null);
 				checkReport(ps, month, OsmAndLiveReportType.EUR_VALUE, null);
-				if(!checkReport(ps, month, OsmAndLiveReportType.EUR_BTC_RATE, null)){
+				if (!checkReport(ps, month, OsmAndLiveReportType.BTC_DONATION_VALUE, null)) {
+					reports.saveReport(0 + "", OsmAndLiveReportType.BTC_DONATION_VALUE, null, null);
+				}
+				if (!checkReport(ps, month, OsmAndLiveReportType.EUR_BTC_RATE, null)) {
 					Number eur = reports.getNumberReport(OsmAndLiveReportType.EUR_VALUE);
 					Number btc = reports.getNumberReport(OsmAndLiveReportType.BTC_VALUE);
-					reports.saveReport(((float)eur.doubleValue() / btc.doubleValue())+"", OsmAndLiveReportType.EUR_BTC_RATE, null, null);
+					reports.saveReport(((float) eur.doubleValue() / btc.doubleValue()) + "",
+							OsmAndLiveReportType.EUR_BTC_RATE, null, null);
 				}
 				s+=6;
 				System.out.println(String.format("TESTED %d reports", s));
@@ -663,7 +678,9 @@ public class OsmAndLiveReports {
 		SupportersReport supporters = getReport(OsmAndLiveReportType.SUPPORTERS, null, SupportersReport.class);
 		RankingReport ranking = getReport(OsmAndLiveReportType.RANKING, region, RankingReport.class);
 		double eurValue = getNumberReport(OsmAndLiveReportType.EUR_VALUE).doubleValue();
-		double btcValue = getNumberReport(OsmAndLiveReportType.BTC_VALUE).doubleValue();
+		double btcSubscriptionValue = getNumberReport(OsmAndLiveReportType.BTC_VALUE).doubleValue();
+		double btcDonationValue = getNumberReport(OsmAndLiveReportType.BTC_DONATION_VALUE).doubleValue();
+		double btcValue = btcSubscriptionValue + btcDonationValue;
 		double eurBTCRate = getNumberReport(OsmAndLiveReportType.EUR_BTC_RATE).doubleValue();
 		report.month = month;
 		report.region = region;
@@ -673,14 +690,14 @@ public class OsmAndLiveReports {
 					" first_value(s.btcaddr) over (partition by osmid order by updatetime desc) btcaddr " + 
 					" FROM osm_recipients s left join " + 
 					" 	(SELECT count(*) size, ch.username " +
-					" 	 FROM "+CHANGESETS_VIEW+" ch ";
+					" 	 FROM " + CHANGESETS_VIEW + " ch ";
 		if (eregion) {
 				q += "   WHERE substr(ch.closed_at_day, 0, 8) = ? " +
 		
 					 "	 GROUP by username) "+
 					 "t on t.username = s.osmid ORDER by changes desc"; 
 		} else {
-				q += "   						 , "+CHANGESET_COUNTRY_VIEW+" cc " +
+				q += "   						 , " + CHANGESET_COUNTRY_VIEW + " cc " +
 					 "   WHERE ch.id = cc.changesetid  and substr(ch.closed_at_day, 0, 8) = ? "+
 					 " 		   and cc.countryid = (select id from countries where downloadname = ?) " +
 					 
@@ -762,7 +779,9 @@ public class OsmAndLiveReports {
 		PayoutsReport report = new PayoutsReport();
 		CountriesReport countries = getReport(OsmAndLiveReportType.COUNTRIES, null, CountriesReport.class);
 		report.payoutTotal = 0d;
-		report.payoutBTCAvailable = getNumberReport(OsmAndLiveReportType.BTC_VALUE).doubleValue();
+		report.payoutBTCAvailable = getNumberReport(OsmAndLiveReportType.BTC_VALUE).doubleValue() + 
+				getNumberReport(OsmAndLiveReportType.BTC_DONATION_VALUE).doubleValue();
+		
 		report.payoutEurAvailable = getNumberReport(OsmAndLiveReportType.EUR_VALUE).doubleValue();
 		report.rate = getNumberReport(OsmAndLiveReportType.EUR_BTC_RATE).doubleValue();
 		
@@ -954,6 +973,9 @@ public class OsmAndLiveReports {
 			return getEurBTCRate();
 		} else if(type == OsmAndLiveReportType.BTC_VALUE) {
 			return getBtcValue();
+		} else if(type == OsmAndLiveReportType.BTC_DONATION_VALUE) {
+			// enabled only by report
+			return 0;
 		} else if(type == OsmAndLiveReportType.EUR_VALUE) {
 			return getEurValue();
 		} else {
