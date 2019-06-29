@@ -7,6 +7,7 @@ public enum OsmAndLiveReportType {
 	EUR_BTC_RATE("getBTCEurRate", true),
 	BTC_VALUE("getBTCValue", true),
 	EUR_VALUE("getEurValue", true),
+	//BTC_DONATION_VALUE("getBTCDonationValue", true),
 	
 	SUPPORTERS("getSupporters"),
 	COUNTRIES("getCountries"),

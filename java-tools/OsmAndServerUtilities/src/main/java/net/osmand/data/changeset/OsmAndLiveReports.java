@@ -741,6 +741,16 @@ public class OsmAndLiveReports {
 		report.payoutTotal = 0d;
 		report.payoutBTCAvailable = getNumberReport(OsmAndLiveReportType.BTC_VALUE).doubleValue();
 		report.payoutEurAvailable = getNumberReport(OsmAndLiveReportType.EUR_VALUE).doubleValue();
+		if(!thisMonth) {
+			// uses supporters report
+			double eurValue = getEurValue();
+			double rate = getNumberReport(OsmAndLiveReportType.EUR_BTC_RATE).doubleValue();
+			if(rate != 0) {
+				report.payoutBTCCollected = eurValue / rate;
+			}
+		} else {
+			report.payoutBTCCollected = report.payoutBTCAvailable;
+		}
 		if (report.payoutBTCAvailable > 0) {
 			report.rate = report.payoutEurAvailable / report.payoutBTCAvailable;
 		}
@@ -1102,6 +1112,7 @@ public class OsmAndLiveReports {
 		public double rate;
 		public double payoutBTCAvailable;
 		public double payoutEurAvailable;
+		public double payoutBTCCollected;
 		public double payoutTotal;
 		public String month;
 		public List<Payout> payments = new ArrayList<Payout>();
