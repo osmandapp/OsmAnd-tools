@@ -55,6 +55,21 @@ public class OsmAndLiveReports {
 				checkMissingReports(conn);
 			} else if(args[0].equals("refresh-current-month")) {
 				refreshCurrentMonth(conn);
+			} else if(args[0].equals("set-btc-donation-current-month")) {
+				double btcDonation = 0;
+				OsmAndLiveReports reports = new OsmAndLiveReports(conn, null);
+				for(int i = 1; i < args.length; i++) {
+					String value = args[i];
+					String key = "";
+					if(value.contains("=")) {
+						key = value.substring(0, value.indexOf('='));
+						value = value.substring(value.indexOf('=') + 1);
+					}
+					if(key.equals("--btcDonation")) {
+						btcDonation = Double.parseDouble(value);
+					}
+				}
+				reports.saveReport(btcDonation +"", OsmAndLiveReportType.BTC_DONATION_VALUE, null, null);
 			} else if(args[0].equals("finalize-previous-month-total")) {
 				System.out.println("Previous month is " + prevMonth);
 				OsmAndLiveReports reports = new OsmAndLiveReports(conn, prevMonth);
