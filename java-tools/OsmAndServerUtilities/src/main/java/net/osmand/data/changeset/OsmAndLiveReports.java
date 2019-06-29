@@ -969,7 +969,7 @@ public class OsmAndLiveReports {
 	
 	
 	public Number getNumberReport(OsmAndLiveReportType type) throws IOException, SQLException {
-		if (!thisMonth) {
+		if (!thisMonth || type == OsmAndLiveReportType.BTC_DONATION_VALUE) {
 			double ret = loadNumberReport(type);
 			if(!Double.isNaN(ret)) {
 				return ret;
