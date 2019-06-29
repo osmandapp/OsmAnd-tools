@@ -743,7 +743,7 @@ public class OsmAndLiveReports {
 			SupportersReport supps = getReport(OsmAndLiveReportType.SUPPORTERS, null, SupportersReport.class);
 			// uses supporters report
 			double eurValue = getEurValue(supps);
-			double rate = getNumberReport(OsmAndLiveReportType.EUR_BTC_RATE).doubleValue();
+			double rate = getNumberReport(OsmAndLiveReportType.EUR_BTC_ACTUAL_RATE).doubleValue();
 			if(rate != 0) {
 				return eurValue / rate;
 			}
@@ -946,6 +946,8 @@ public class OsmAndLiveReports {
 			return getRankingRange();
 		} else if(type == OsmAndLiveReportType.EUR_BTC_RATE) {
 			return getEurBTCRate();
+		} else if(type == OsmAndLiveReportType.EUR_BTC_ACTUAL_RATE) {
+			return getEurBTCRate();
 		} else if(type == OsmAndLiveReportType.BTC_VALUE) {
 			return getBtcValue();
 		} else if(type == OsmAndLiveReportType.EUR_VALUE) {
@@ -1103,8 +1105,8 @@ public class OsmAndLiveReports {
 		public float regionPercentage;
 		
 		public float regionBtc;
-		public float btc;
 		public float btcCollected;
+		public float btc;
 		public float rate;
 		public float eur;
 		public boolean notReadyToPay;

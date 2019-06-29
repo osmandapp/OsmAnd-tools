@@ -473,10 +473,13 @@ public class ReportsController {
 						}
 					}
 				}
+				
 				if(rec.notReadyToPay) {
+					rec.btcCollected = rec.btc;
 					rec.worldCollectedMessage = String.format("<p>%.3f mBTC</p><span>total collected (estimation)</span>",
 							rec.btc * 1000);
 				} else {
+					rec.btcCollected = (float) (reports.getBtcCollected() * 1000);
 					rec.worldCollectedMessage = String.format("<p>%.3f mBTC</p><span>total payout (%.1f mBTC collected)</span>",
 							rec.btc * 1000, reports.getBtcCollected() * 1000);
 				}

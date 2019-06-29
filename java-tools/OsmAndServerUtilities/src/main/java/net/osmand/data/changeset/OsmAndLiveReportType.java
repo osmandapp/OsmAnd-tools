@@ -5,6 +5,7 @@ public enum OsmAndLiveReportType {
 	RANKING_RANGE("getRankingRange", true),
 	MIN_CHANGES("getMinChanges", true),
 	EUR_BTC_RATE("getBTCEurRate", true),
+	EUR_BTC_ACTUAL_RATE("getBTCEurActualRate", true),
 	BTC_VALUE("getBTCValue", true),
 	EUR_VALUE("getEurValue", true),
 	//BTC_DONATION_VALUE("getBTCDonationValue", true),
