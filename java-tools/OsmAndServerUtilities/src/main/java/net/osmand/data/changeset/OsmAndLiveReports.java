@@ -695,6 +695,7 @@ public class OsmAndLiveReports {
 		double eurValue = getNumberReport(OsmAndLiveReportType.EUR_VALUE).doubleValue();
 		double btcSubscriptionValue = getNumberReport(OsmAndLiveReportType.BTC_VALUE).doubleValue();
 		double btcDonationValue = getNumberReport(OsmAndLiveReportType.BTC_DONATION_VALUE).doubleValue();
+		LOG.info(String.format("BTC subscription value %.3f, btc donation value %.3f", btcSubscriptionValue, btcDonationValue));
 		double btcValue = btcSubscriptionValue + btcDonationValue;
 		double eurBTCRate = getNumberReport(OsmAndLiveReportType.EUR_BTC_RATE).doubleValue();
 		report.month = month;
