@@ -113,7 +113,6 @@ public class OsmAndLiveReports {
 				}
 				if(Double.isNaN(eur)) {
 					eur = btc * btcEurRate;
-					throw new IllegalArgumentException("You didn't specify amount eur to pay");
 				}
 				if(Double.isNaN(btcEurRate)) {
 					throw new IllegalArgumentException("You didn't specify amount btc to eur rate");
