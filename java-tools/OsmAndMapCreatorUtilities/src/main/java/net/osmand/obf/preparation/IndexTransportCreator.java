@@ -1,8 +1,5 @@
 package net.osmand.obf.preparation;
 
-import gnu.trove.list.array.TIntArrayList;
-import gnu.trove.map.hash.TLongObjectHashMap;
-
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
@@ -24,6 +21,14 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
+
+import gnu.trove.list.array.TIntArrayList;
+import gnu.trove.map.hash.TLongObjectHashMap;
 import net.osmand.data.LatLon;
 import net.osmand.data.QuadRect;
 import net.osmand.data.TransportRoute;
@@ -42,10 +47,6 @@ import net.osmand.osm.edit.Way;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import net.sf.junidecode.Junidecode;
-
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-
 import rtree.Element;
 import rtree.IllegalValueException;
 import rtree.LeafElement;
@@ -53,9 +54,6 @@ import rtree.RTree;
 import rtree.RTreeException;
 import rtree.RTreeInsertException;
 import rtree.Rect;
-
-import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
 
 public class IndexTransportCreator extends AbstractIndexPartCreator {
 
@@ -235,23 +233,27 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 					}
 				}
 			}
+			List<TransportStopExit> stopExitList = new ArrayList<>();
+			for (RelationMember entryAlt : e.getMembers()) {
+				if (entryAlt.getEntity() != null && 
+						("subway_entrance".equals(entryAlt.getEntity().getTag(OSMTagKey.RAILWAY)))) {
+					TransportStopExit exit = new TransportStopExit();
+					exit.setId(entryAlt.getEntity().getId());
+					if (entryAlt.getEntity().getTag("ref") != null) {
+						exit.setRef(entryAlt.getEntity().getTag("ref"));
+					}
+					exit.setLocation(entryAlt.getEntity().getLatitude(),entryAlt.getEntity().getLongitude());
+					stopExitList.add(exit);
+				}
+			}
 			for (RelationMember entry : e.getMembers()) {
 				String role = entry.getRole();
-				if ((entry.getEntity() != null && "".equals(role)) && ("station".equals(entry.getEntity().getTag(OSMTagKey.RAILWAY)))) {
-					List<TransportStopExit> stopExitList = new ArrayList<>();
-					for (RelationMember entryAlt : e.getMembers()) {
-						if ((entryAlt.getEntity() != null && "".equals(role)) && ("subway_entrance".equals(entryAlt.getEntity().getTag(OSMTagKey.RAILWAY)))) {
-							TransportStopExit exit = new TransportStopExit();
-							exit.setId(entryAlt.getEntity().getId());
-							if (entryAlt.getEntity().getTag("ref") != null) {
-								exit.setRef(entryAlt.getEntity().getTag("ref"));
-							}
-							exit.setLocation(entryAlt.getEntity().getLatitude(),entryAlt.getEntity().getLongitude());
-							stopExitList.add(exit);
-						}
-					}
+				if ((entry.getEntity() != null && "".equals(role)) && 
+						("station".equals(entry.getEntity().getTag(OSMTagKey.RAILWAY)) || 
+						    "stop".equals(entry.getEntity().getTag(OSMTagKey.RAILWAY))
+								)) {
 					if (entry.getEntity() != null) {
-						exits.put(entry.getEntityId(),stopExitList);
+						exits.put(entry.getEntityId(), stopExitList);
 					}
 				}
 			}

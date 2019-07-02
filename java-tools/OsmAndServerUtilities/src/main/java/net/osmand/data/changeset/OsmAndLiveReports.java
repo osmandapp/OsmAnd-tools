@@ -111,11 +111,11 @@ public class OsmAndLiveReports {
 				if(Double.isNaN(btc)) {
 					throw new IllegalArgumentException("You didn't specify amount btc to pay");
 				}
-				if(Double.isNaN(eur)) {
-					eur = btc * btcEurRate;
-				}
 				if(Double.isNaN(btcEurRate)) {
 					throw new IllegalArgumentException("You didn't specify amount btc to eur rate");
+				}
+				if(Double.isNaN(eur)) {
+					eur = btc * btcEurRate;
 				}
 				finalizeMonth(conn, month, btc, eur, btcEurRate, btcDonation);
 			} else {

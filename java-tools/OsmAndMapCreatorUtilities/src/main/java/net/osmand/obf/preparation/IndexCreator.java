@@ -853,7 +853,7 @@ public class IndexCreator {
 //		creator.deleteOsmDB = false;
 
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
-		String file = rootFolder + "/temp/map.osm";
+		String file = rootFolder + "/temp/map2.osm";
 //		String file = rootFolder + "/maps/basemap/transport.osm.gz";
 //		String file = rootFolder + "/maps/World_seamarks.pbf";
 //		String file = rootFolder + "/repos/resources/test-resources/synthetic_test_rendering.osm";
