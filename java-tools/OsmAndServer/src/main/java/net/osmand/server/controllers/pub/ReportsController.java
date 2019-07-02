@@ -280,9 +280,14 @@ public class ReportsController {
 				rep.walletEstFee = (long) (((Number) estFee.get("feerate")).doubleValue() * MBTC_SATOSHI);
 				rep.walletEstBlocks = (((Number) estFee.get("blocks")).intValue());
 			}
-			List<Map<?, ?>> lastTx = (List<Map<?, ?>>) btcRpcCall("listtransactions", "*", 1);
+			List<Map<?, ?>> lastTx = (List<Map<?, ?>>) btcRpcCall("listtransactions", "*", 10);
 			if (lastTx != null) {
-				rep.walletLasttx = (String) lastTx.get(0).get("txid");
+				for (int i = lastTx.size() - 1; i >= 0; i--) {
+					if ("send".equals(lastTx.get(i).get("category"))) {
+						rep.walletLasttx = (String) lastTx.get(i).get("txid");
+						break;
+					}
+				}
 			}
 		} catch (Exception e) {
 			LOGGER.error("Error to request balance: " + e.getMessage(), e);
