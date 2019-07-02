@@ -248,11 +248,9 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			}
 			for (RelationMember entry : e.getMembers()) {
 				String role = entry.getRole();
-				if ((entry.getEntity() != null && "".equals(role)) && 
-						("station".equals(entry.getEntity().getTag(OSMTagKey.RAILWAY)) || 
-						    "stop".equals(entry.getEntity().getTag(OSMTagKey.RAILWAY))
-								)) {
-					if (entry.getEntity() != null) {
+				if (entry.getEntity() != null) {
+					if (("".equals(role) && "station".equals(entry.getEntity().getTag(OSMTagKey.RAILWAY)))
+							|| "stop".equals(role)) {
 						exits.put(entry.getEntityId(), stopExitList);
 					}
 				}

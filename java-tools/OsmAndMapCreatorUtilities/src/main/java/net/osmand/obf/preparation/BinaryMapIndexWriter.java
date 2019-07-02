@@ -81,6 +81,8 @@ import net.osmand.osm.MapRoutingTypes.MapPointName;
 import net.osmand.osm.MapRoutingTypes.MapRouteType;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Node;
+import net.osmand.osm.edit.Entity.EntityId;
+import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import net.sf.junidecode.Junidecode;
@@ -1342,19 +1344,17 @@ public class BinaryMapIndexWriter {
 		for (Long i : routes) {
 			ts.addRoutes((int) (fp - i));
 		}
-		for (Entry<Entity.EntityId, List<TransportStopExit>> i : exits.entrySet()) {
-			if (id == i.getKey().getId()) {
-				List<TransportStopExit> list = i.getValue();
-				for ( TransportStopExit e : list) {
-					OsmandOdb.TransportStopExit.Builder exit = OsmandOdb.TransportStopExit.newBuilder();
-					LatLon location = e.getLocation();
-					int exitX24 = (int) MapUtils.getTileNumberX(24, location.getLongitude());
-					int exitY24 = (int) MapUtils.getTileNumberY(24, location.getLatitude());
-					exit.setRef(registerString(stringTable, e.getRef()));
-					exit.setDx(exitX24 - bounds.leftX);
-					exit.setDy(exitY24 - bounds.topY);
-					ts.addExits(exit);
-				}
+		List<TransportStopExit> list = exits.get(new EntityId(EntityType.NODE, id));
+		if (list != null) {
+			for (TransportStopExit e : list) {
+				OsmandOdb.TransportStopExit.Builder exit = OsmandOdb.TransportStopExit.newBuilder();
+				LatLon location = e.getLocation();
+				int exitX24 = (int) MapUtils.getTileNumberX(24, location.getLongitude());
+				int exitY24 = (int) MapUtils.getTileNumberY(24, location.getLatitude());
+				exit.setRef(registerString(stringTable, e.getRef()));
+				exit.setDx(exitX24 - bounds.leftX);
+				exit.setDy(exitY24 - bounds.topY);
+				ts.addExits(exit);
 			}
 		}
 
