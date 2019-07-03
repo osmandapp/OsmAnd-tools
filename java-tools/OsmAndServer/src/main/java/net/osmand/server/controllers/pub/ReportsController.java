@@ -371,6 +371,7 @@ public class ReportsController {
     	for(int i = 0; i < batchSize && i < rep.balance.toPay.size(); i++) {
     		AddrToPay add = rep.balance.toPay.get(i);
     		if(add.btcAddress.equals(OSMAND_BTC_DONATION_ADDR)) {
+				batchSize++;
     			continue;
     		}
     		toPay.put(add.btcAddress, ((double)add.toPay / BITCOIN_SATOSHI) + "");
