@@ -59,7 +59,6 @@ import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import com.google.gson.stream.JsonReader;
 
-import net.osmand.bitcoinsender.TransactionAnalyzer;
 import net.osmand.data.changeset.OsmAndLiveReportType;
 import net.osmand.data.changeset.OsmAndLiveReports;
 import net.osmand.data.changeset.OsmAndLiveReports.RecipientsReport;
@@ -68,192 +67,189 @@ import net.osmand.util.Algorithms;
 @RestController
 @RequestMapping("/reports")
 public class ReportsController {
-    protected static final Log LOGGER = LogFactory.getLog(ReportsController.class);
-    public static final String REPORTS_FOLDER = "reports";
-    public static final String TRANSACTIONS_FILE = REPORTS_FOLDER + "/transactions_github.json";
-    private static final String REPORT_URL = "https://osmand.net/reports/query_month_report?report=getPayouts&month=";
-    private static final String TXS_CACHE = REPORTS_FOLDER + "/txs/btc_";
-    private static final String PAYOUTS_CACHE_ID = REPORTS_FOLDER + "/payouts/payout_";
-    private static final String OSMAND_BTC_DONATION_ADDR = "1GRgEnKujorJJ9VBa76g8cp3sfoWtQqSs4";
-    
-    private static final String FEE_ESTIMATED_MODE = "ECONOMICAL";
-    private static int TARGET_NUMBER_OF_BLOCKS = 50;
-    public static final int SOCKET_TIMEOUT = 15 * 1000;
+	protected static final Log LOGGER = LogFactory.getLog(ReportsController.class);
+	public static final String REPORTS_FOLDER = "reports";
+	public static final String TRANSACTIONS_FILE = REPORTS_FOLDER + "/transactions_github.json";
+	private static final String REPORT_URL = "https://osmand.net/reports/query_month_report?report=getPayouts&month=";
+	private static final String TXS_CACHE = REPORTS_FOLDER + "/txs/btc_";
+	private static final String PAYOUTS_CACHE_ID = REPORTS_FOLDER + "/payouts/payout_";
+	private static final String OSMAND_BTC_DONATION_ADDR = "1GRgEnKujorJJ9VBa76g8cp3sfoWtQqSs4";
 
-    private static final int BEGIN_YEAR = 2016;
-    public static final long BITCOIN_SATOSHI = 1000 * 1000 * 100;
+	private static final String FEE_ESTIMATED_MODE = "ECONOMICAL";
+	private static int TARGET_NUMBER_OF_BLOCKS = 50;
+	public static final int SOCKET_TIMEOUT = 15 * 1000;
+
+	private static final int BEGIN_YEAR = 2016;
+	public static final long BITCOIN_SATOSHI = 1000 * 1000 * 100;
 	public static final int MBTC_SATOSHI = 100 * 1000;
-    
+
 	// MIN PAY FORMULA
 	public static final int AVG_TX_SIZE = 35; // 35 bytes
 	public static final double FEE_PERCENT = 0.08; // fee shouldn't exceed 8%
 	public static int FEE_BYTE_SATOSHI = 5; // varies over time in Bitcoin
-	
+
 	private final String btcJsonRpcUser;
 	private final String btcJsonRpcPwd;
-	
-    @Value("${web.location}")
-    private String websiteLocation;
-    
-    @Value("${gen.location}")
-    private String genLocation;
-    
-    @Autowired
-    private DataSource dataSource;
-    
-    private BtcTransactionReport btcTransactionReport = new BtcTransactionReport();
-    
+
+	@Value("${web.location}")
+	private String websiteLocation;
+
+	@Value("${gen.location}")
+	private String genLocation;
+
+	@Autowired
+	private DataSource dataSource;
+
+	private BtcTransactionReport btcTransactionReport = new BtcTransactionReport();
+
 	private CloseableHttpClient httpclient;
 	private RequestConfig requestConfig;
 	private Gson formatter;
-    
-    
-    private ReportsController() {
-    	btcJsonRpcUser = System.getenv("BTC_JSON_RPC_USER");
-    	btcJsonRpcPwd = System.getenv("BTC_JSON_RPC_PWD");
-    	formatter = new Gson();
+
+	private ReportsController() {
+		btcJsonRpcUser = System.getenv("BTC_JSON_RPC_USER");
+		btcJsonRpcPwd = System.getenv("BTC_JSON_RPC_PWD");
+		formatter = new Gson();
 		if (btcJsonRpcUser != null) {
 			httpclient = HttpClientBuilder.create().setSSLHostnameVerifier(new NoopHostnameVerifier())
 					.setConnectionTimeToLive(SOCKET_TIMEOUT, TimeUnit.MILLISECONDS).setMaxConnTotal(20).build();
 			requestConfig = RequestConfig.copy(RequestConfig.custom().build()).setSocketTimeout(SOCKET_TIMEOUT)
 					.setConnectTimeout(SOCKET_TIMEOUT).setConnectionRequestTimeout(SOCKET_TIMEOUT).build();
 		}
-    }
-    
-    public static class AddrToPay {
-    	public long totalPaid;
-    	public long toPay;
-    	public long totalToPay;
-    	public String osmId = "";
+	}
+
+	public static class AddrToPay {
+		public long totalPaid;
+		public long toPay;
+		public long totalToPay;
+		public String osmId = "";
 		public String btcAddress;
-    }
-    
-    public static class BtcToPayBalance {
-    	public int defaultFee ;
-    	public long minToPayoutSat;
-    	
-    	public long date;
-    	public String generatedDate;
-    	
-    	
-    	public long payWithFeeSat;
+	}
+
+	public static class BtcToPayBalance {
+		public int defaultFee;
+		public long minToPayoutSat;
+
+		public long date;
+		public String generatedDate;
+
+		public long payWithFeeSat;
 		public int payWithFeeCnt;
-		
+
 		public long payNoFeeSat;
 		public int payNoFeeCnt;
-		
+
 		public int overpaidCnt;
 		public long overpaidSat;
-		
+
 		public int overpaidFeeCnt;
 		public long overpaidFeeSat;
-		
-    	public List<AddrToPay> toPay = new ArrayList<AddrToPay>();
-    	public List<AddrToPay> allAccounts = new ArrayList<AddrToPay>();
-    	public transient Map<String, Long> totalToPay = new TreeMap<>();
-    	public transient Map<String, String> osmid = new HashMap<>();
-    	
-    	public BtcToPayBalance () {
-    		defaultFee = FEE_BYTE_SATOSHI;
-    		minToPayoutSat = getMinSatoshiPay();
-    	}		
-		
-		
-    }
-    
-    public static class BtcTransactionReport {
-    	// Payouts 
-    	public Map<String, BtcTransactionsMonth> mapTransactions = new TreeMap<>();
-    	public List<BtcTransactionsMonth> txs = new ArrayList<>();
-    	public Set<String> ownAddresses = new TreeSet<>();
+
+		public List<AddrToPay> toPay = new ArrayList<AddrToPay>();
+		public List<AddrToPay> allAccounts = new ArrayList<AddrToPay>();
+		public transient Map<String, Long> totalToPay = new TreeMap<>();
+		public transient Map<String, String> osmid = new HashMap<>();
+
+		public BtcToPayBalance() {
+			defaultFee = FEE_BYTE_SATOSHI;
+			minToPayoutSat = getMinSatoshiPay();
+		}
+
+	}
+
+	public static class BtcTransactionReport {
+		// Payouts
+		public Map<String, BtcTransactionsMonth> mapTransactions = new TreeMap<>();
+		public List<BtcTransactionsMonth> txs = new ArrayList<>();
+		public Set<String> ownAddresses = new TreeSet<>();
 		public long total;
 		public Map<String, Long> totalPayouts = new HashMap<>();
-		
+
 		// To be paid
 		public BtcToPayBalance balance = new BtcToPayBalance();
-		
+
 		// Current local balance
 		public long walletBalance;
-		public Map<String,Float> walletAddresses = new TreeMap<>();
+		public Map<String, Float> walletAddresses = new TreeMap<>();
 		public int walletWaitingBlocks;
 		public long walletTxFee;
 		public int walletEstBlocks;
 		public long walletEstFee;
 		public String walletLasttx;
-		
-		
-    }
-    
-    public static class BtcTransaction {
-    	public String id;
-    	public long total;
-    	public long fee;
-    	public int size = 1;
-    	public int blockIndex = -1;
+
+	}
+
+	public static class BtcTransaction {
+		public String id;
+		public long total;
+		public long fee;
+		public int size = 1;
+		public int blockIndex = -1;
 		public String url;
 		public String rawurl;
-    }
-    
-    public static class BtcTransactionsMonth {
-    	public List<String> transactions = new ArrayList<String>();
-    	public List<BtcTransaction> txValues = new ArrayList<BtcTransaction>();
+	}
+
+	public static class BtcTransactionsMonth {
+		public List<String> transactions = new ArrayList<String>();
+		public List<BtcTransaction> txValues = new ArrayList<BtcTransaction>();
 		public String month;
 		public long total;
 		public long fee;
 		public Map<String, Long> totalPayouts;
 		public int size = 1;
-    }
-    
-    @SuppressWarnings("unchecked")
-	public BtcTransactionReport generateBtcReport(boolean genBalanceReport) {
-			try {
-				BtcTransactionReport rep = new BtcTransactionReport();
-				if (btcJsonRpcUser != null) {
-					if(genBalanceReport) {
-						try {
-							btcRpcCall("settxfee", ((double)FEE_BYTE_SATOSHI ) / MBTC_SATOSHI);
-						} catch (Exception e) {
-							LOGGER.error("Error to set fee: " + e.getMessage(), e);
-						}
-					}
-					generateWalletStatus(rep);
-				}
-				Type tp = new TypeToken<Map<String, BtcTransactionsMonth> >() {}.getType();
-				if(genBalanceReport) {
-					getCacheFile(TRANSACTIONS_FILE).delete();
-				}
-				JsonReader reader = readJsonUrl("https://raw.githubusercontent.com/osmandapp/osmandapp.github.io/master/website/reports/transactions.json", 
-						TRANSACTIONS_FILE, true);
-				rep.mapTransactions = (Map<String, BtcTransactionsMonth>) formatter.fromJson(reader, tp);
-				for(Map.Entry<String, BtcTransactionsMonth> key : rep.mapTransactions.entrySet()) {
-					BtcTransactionsMonth t = key.getValue();
-					t.month = key.getKey();
-					rep.txs.add(t);
-				}
-				rep.ownAddresses.addAll(rep.walletAddresses.keySet());
-				for (BtcTransactionsMonth t : rep.txs) {
-					loadPayouts(rep, t);
-					rep.total += t.total;
-					for(String addr: t.totalPayouts.keySet()) {
-						long paid = t.totalPayouts.get(addr);
-						Long pd = rep.totalPayouts.get(addr);
-						rep.totalPayouts.put(addr, (pd == null ? 0 : pd.longValue()) + paid);
-					}
-				}
-				
-				if(genBalanceReport) {
-					rep.balance = generateBalanceToPay(rep);
-				} else {
-					rep.balance = btcTransactionReport.balance;
-				}
-				btcTransactionReport = rep;
-			} catch (Exception e) {
-				LOGGER.error("Fails to read transactions.json: " + e.getMessage(), e);
-			}
-		
-		return btcTransactionReport;
 	}
 
+	@SuppressWarnings("unchecked")
+	public BtcTransactionReport generateBtcReport(boolean genBalanceReport) {
+		try {
+			BtcTransactionReport rep = new BtcTransactionReport();
+			if (btcJsonRpcUser != null) {
+				if (genBalanceReport) {
+					try {
+						btcRpcCall("settxfee", ((double) FEE_BYTE_SATOSHI) / MBTC_SATOSHI);
+					} catch (Exception e) {
+						LOGGER.error("Error to set fee: " + e.getMessage(), e);
+					}
+				}
+				generateWalletStatus(rep);
+			}
+			Type tp = new TypeToken<Map<String, BtcTransactionsMonth>>() {
+			}.getType();
+			if (genBalanceReport) {
+				getCacheFile(TRANSACTIONS_FILE).delete();
+			}
+			JsonReader reader = readJsonUrl(
+					"https://raw.githubusercontent.com/osmandapp/osmandapp.github.io/master/website/reports/transactions.json",
+					TRANSACTIONS_FILE, true);
+			rep.mapTransactions = (Map<String, BtcTransactionsMonth>) formatter.fromJson(reader, tp);
+			for (Map.Entry<String, BtcTransactionsMonth> key : rep.mapTransactions.entrySet()) {
+				BtcTransactionsMonth t = key.getValue();
+				t.month = key.getKey();
+				rep.txs.add(t);
+			}
+			rep.ownAddresses.addAll(rep.walletAddresses.keySet());
+			for (BtcTransactionsMonth t : rep.txs) {
+				loadPayouts(rep, t);
+				rep.total += t.total;
+				for (String addr : t.totalPayouts.keySet()) {
+					long paid = t.totalPayouts.get(addr);
+					Long pd = rep.totalPayouts.get(addr);
+					rep.totalPayouts.put(addr, (pd == null ? 0 : pd.longValue()) + paid);
+				}
+			}
+
+			if (genBalanceReport) {
+				rep.balance = generateBalanceToPay(rep);
+			} else {
+				rep.balance = btcTransactionReport.balance;
+			}
+			btcTransactionReport = rep;
+		} catch (Exception e) {
+			LOGGER.error("Fails to read transactions.json: " + e.getMessage(), e);
+		}
+
+		return btcTransactionReport;
+	}
 
 	@SuppressWarnings("unchecked")
 	private void generateWalletStatus(BtcTransactionReport rep) {
@@ -263,16 +259,14 @@ public class ReportsController {
 				for (Map<?, ?> addr : adrs) {
 					String address = addr.get("address").toString();
 					Float f = rep.walletAddresses.get(address);
-					rep.walletAddresses.put(address, ((Number)addr.get("amount")).floatValue() + 
-							(f == null ? 0 : f.floatValue()));
+					rep.walletAddresses.put(address,
+							((Number) addr.get("amount")).floatValue() + (f == null ? 0 : f.floatValue()));
 				}
 			}
 			Map<?, ?> winfo = (Map<?, ?>) btcRpcCall("getwalletinfo");
 			if (winfo != null) {
-				rep.walletTxFee = (long) (((Number) winfo.get("paytxfee")).doubleValue()
-						* MBTC_SATOSHI);
-				rep.walletBalance = (long) (((Number) winfo.get("balance")).doubleValue()
-						* BITCOIN_SATOSHI);
+				rep.walletTxFee = (long) (((Number) winfo.get("paytxfee")).doubleValue() * MBTC_SATOSHI);
+				rep.walletBalance = (long) (((Number) winfo.get("balance")).doubleValue() * BITCOIN_SATOSHI);
 			}
 			rep.walletWaitingBlocks = TARGET_NUMBER_OF_BLOCKS;
 			Map<?, ?> estFee = (Map<?, ?>) btcRpcCall("estimatesmartfee", TARGET_NUMBER_OF_BLOCKS, FEE_ESTIMATED_MODE);
@@ -294,8 +288,8 @@ public class ReportsController {
 		}
 	}
 
-
-	private Object btcRpcCall(String method, Object... pms) throws UnsupportedEncodingException, IOException, ClientProtocolException {
+	private Object btcRpcCall(String method, Object... pms)
+			throws UnsupportedEncodingException, IOException, ClientProtocolException {
 		HttpPost httppost = new HttpPost("http://" + btcJsonRpcUser + ":" + btcJsonRpcPwd + "@127.0.0.1:8332/");
 		httppost.setConfig(requestConfig);
 		httppost.addHeader("charset", StandardCharsets.UTF_8.name());
@@ -304,11 +298,11 @@ public class ReportsController {
 		params.put("jsonrpc", "1.0");
 		params.put("id", "server");
 		params.put("method", method);
-		if(pms != null && pms.length > 0) {
+		if (pms != null && pms.length > 0) {
 			params.put("params", Arrays.asList(pms));
 		}
 		StringEntity entity = new StringEntity(formatter.toJson(params));
-		LOGGER.info("Btc rpc send with content: " +  formatter.toJson(params));
+		LOGGER.info("Btc rpc send with content: " + formatter.toJson(params));
 		httppost.setEntity(entity);
 		try (CloseableHttpResponse response = httpclient.execute(httppost)) {
 			HttpEntity ht = response.getEntity();
@@ -316,66 +310,66 @@ public class ReportsController {
 			String result = EntityUtils.toString(buf, StandardCharsets.UTF_8);
 			Map<?, ?> res = formatter.fromJson(new JsonReader(new StringReader(result)), Map.class);
 			LOGGER.info("Result: " + result);
-			if(res.get("result") != null) {
+			if (res.get("result") != null) {
 				return res.get("result");
 			} else {
 				return null;
 			}
 		}
 	}
-    
-    public BtcTransactionReport getBitcoinTransactionReport() {
-    	if(btcTransactionReport.mapTransactions.isEmpty()) {
-    		generateBtcReport(false);
-    	}
+
+	public BtcTransactionReport getBitcoinTransactionReport() {
+		if (btcTransactionReport.mapTransactions.isEmpty()) {
+			generateBtcReport(false);
+		}
 		return btcTransactionReport;
 	}
-    
-    public void reloadConfigs(List<String> errors) {
-    	generateBtcReport(false);
+
+	public void reloadConfigs(List<String> errors) {
+		generateBtcReport(false);
 	}
-    
-    public static class PayoutResult {
-    	public String validationError;
-    	public String txId;
-    }
-    
-    public PayoutResult payOutBitcoin(BtcTransactionReport rep, int batchSize) throws IOException {
-    	PayoutResult res = new PayoutResult();
-    	if(System.currentTimeMillis() - rep.balance.date > 1000 * 60 * 10) {
+
+	public static class PayoutResult {
+		public String validationError;
+		public String txId;
+	}
+
+	public PayoutResult payOutBitcoin(BtcTransactionReport rep, int batchSize) throws IOException {
+		PayoutResult res = new PayoutResult();
+		if (System.currentTimeMillis() - rep.balance.date > 1000 * 60 * 10) {
 			res.validationError = "Generated report is too old";
 			return res;
 		}
-		if(Math.abs(rep.walletTxFee - rep.balance.defaultFee ) > 1) {
+		if (Math.abs(rep.walletTxFee - rep.balance.defaultFee) > 1) {
 			res.validationError = String.format("Wallet fee %d is not equal to default fee %d", rep.walletTxFee,
 					rep.balance.defaultFee);
 			return res;
 		}
-		if(rep.walletEstFee > rep.balance.defaultFee) {
-			res.validationError = 
-					String.format("Wallet estimated fee %d is too high (comparing with set %d), try to put increase max waiting blocks or wait some time",
-							rep.walletEstFee, rep.balance.defaultFee);
+		if (rep.walletEstFee > rep.balance.defaultFee) {
+			res.validationError = String.format(
+					"Wallet estimated fee %d is too high (comparing with set %d), try to put increase max waiting blocks or wait some time",
+					rep.walletEstFee, rep.balance.defaultFee);
 			return res;
 		}
-		if(rep.txs.size() > 0 && !rep.txs.get(0).transactions.get(0).equals(rep.walletLasttx)) {
-			res.validationError =  
-					String.format("Last wallet tx '%s' is not equal to the last transaction in report '%s', update transactions.json and rerun report.",
-							rep.walletLasttx, rep.txs.get(0).transactions.get(0));
+		if (rep.txs.size() > 0 && !rep.txs.get(0).transactions.get(0).equals(rep.walletLasttx)) {
+			res.validationError = String.format(
+					"Last wallet tx '%s' is not equal to the last transaction in report '%s', update transactions.json and rerun report.",
+					rep.walletLasttx, rep.txs.get(0).transactions.get(0));
 			return res;
 		}
-		if(batchSize < 50) {
+		if (batchSize < 50) {
 			res.validationError = "Don't use batch size less than 50";
 			return res;
 		}
-    	Map<String, String> toPay = new LinkedHashMap<String, String>();
-    	for(int i = 0; i < batchSize && i < rep.balance.toPay.size(); i++) {
-    		AddrToPay add = rep.balance.toPay.get(i);
-    		if(add.btcAddress.equals(OSMAND_BTC_DONATION_ADDR)) {
+		Map<String, String> toPay = new LinkedHashMap<String, String>();
+		for (int i = 0; i < batchSize && i < rep.balance.toPay.size(); i++) {
+			AddrToPay add = rep.balance.toPay.get(i);
+			if (add.btcAddress.equals(OSMAND_BTC_DONATION_ADDR)) {
 				batchSize++;
-    			continue;
-    		}
-    		toPay.put(add.btcAddress, ((double)add.toPay / BITCOIN_SATOSHI) + "");
-    	}
+				continue;
+			}
+			toPay.put(add.btcAddress, ((double) add.toPay / BITCOIN_SATOSHI) + "");
+		}
 		if (toPay.size() > 0) {
 			rep.balance.date = 0;
 			res.txId = (String) btcRpcCall("sendmany", "", // dummy default
@@ -389,39 +383,38 @@ public class ReportsController {
 			);
 			generateBtcReport(true);
 		}
-    	return res;
-    }
-    
-    public void updateBitcoinReport(String defaultFee, String waitingBlocks) {
-    	FEE_BYTE_SATOSHI = Algorithms.parseIntSilently(defaultFee, FEE_BYTE_SATOSHI) ;
-    	TARGET_NUMBER_OF_BLOCKS = Algorithms.parseIntSilently(waitingBlocks, TARGET_NUMBER_OF_BLOCKS) ;
-    	generateBtcReport(true);
-    }
-    
-    
-    @RequestMapping(path = { "/query_btc_balance_report"})
-    @ResponseBody
-	public String getBtcBalanceReport(HttpServletRequest request, HttpServletResponse response) throws SQLException, IOException {
-    	BtcToPayBalance blnc = getBitcoinTransactionReport().balance;
-    	if(blnc.totalToPay.isEmpty()) {
-    		generateBtcReport(true);
-    	}
-    	return formatter.toJson(getBitcoinTransactionReport().balance);    	
-    }
-    
-    @RequestMapping(path = { "/query_report", "/query_report.php", 
-    		"/query_month_report", "/query_month_report.php"})
-    @ResponseBody
-	public String getReport(HttpServletRequest request, HttpServletResponse response, 
-			@RequestParam(required = true) String report,
-			@RequestParam(required = false) String month, @RequestParam(required = false) String region) throws SQLException, IOException {
-    	Connection conn = DataSourceUtils.getConnection(dataSource);
-    	
+		return res;
+	}
+
+	public void updateBitcoinReport(String defaultFee, String waitingBlocks) {
+		FEE_BYTE_SATOSHI = Algorithms.parseIntSilently(defaultFee, FEE_BYTE_SATOSHI);
+		TARGET_NUMBER_OF_BLOCKS = Algorithms.parseIntSilently(waitingBlocks, TARGET_NUMBER_OF_BLOCKS);
+		generateBtcReport(true);
+	}
+
+	@RequestMapping(path = { "/query_btc_balance_report" })
+	@ResponseBody
+	public String getBtcBalanceReport(HttpServletRequest request, HttpServletResponse response)
+			throws SQLException, IOException {
+		BtcToPayBalance blnc = getBitcoinTransactionReport().balance;
+		if (blnc.totalToPay.isEmpty()) {
+			generateBtcReport(true);
+		}
+		return formatter.toJson(getBitcoinTransactionReport().balance);
+	}
+
+	@RequestMapping(path = { "/query_report", "/query_report.php", "/query_month_report", "/query_month_report.php" })
+	@ResponseBody
+	public String getReport(HttpServletRequest request, HttpServletResponse response,
+			@RequestParam(required = true) String report, @RequestParam(required = false) String month,
+			@RequestParam(required = false) String region) throws SQLException, IOException {
+		Connection conn = DataSourceUtils.getConnection(dataSource);
+
 		try {
 			if (request.getServletPath().contains("_month_")) {
 				response.setHeader("Content-Description", "json report");
 				response.setHeader("Content-Disposition", String.format("attachment; filename=%s%s%s.json", report,
-						isEmpty(month) ? "" : ("-"+month), isEmpty(region) ? "" : ("-"+region)));
+						isEmpty(month) ? "" : ("-" + month), isEmpty(region) ? "" : ("-" + region)));
 				response.setHeader("Content-Type", "application/json");
 			}
 			OsmAndLiveReports reports = new OsmAndLiveReports(conn, month);
@@ -461,43 +454,44 @@ public class ReportsController {
 						reports.getJsonReport(OsmAndLiveReportType.RANKING, region),
 						reports.getJsonReport(OsmAndLiveReportType.USERS_RANKING, region));
 			}
-			if(report.equals("recipients_by_month")) {
+			if (report.equals("recipients_by_month")) {
 				Gson gson = reports.getJsonFormatter();
-				RecipientsReport rec = reports.getReport(OsmAndLiveReportType.RECIPIENTS, region, RecipientsReport.class);
+				RecipientsReport rec = reports.getReport(OsmAndLiveReportType.RECIPIENTS, region,
+						RecipientsReport.class);
 				BtcTransactionsMonth txs = generateBtcReport(false).mapTransactions.get(month);
-				StringBuilder payouts = new StringBuilder(); 
-				if(txs != null && txs != null) {
-					if(txs.transactions.size() > 0) {
+				StringBuilder payouts = new StringBuilder();
+				if (txs != null && txs != null) {
+					if (txs.transactions.size() > 0) {
 						int i = 1;
 						payouts.append("Payouts:&nbsp;");
-						for(String s : txs.transactions) {
-							if( i > 1) {
+						for (String s : txs.transactions) {
+							if (i > 1) {
 								payouts.append(",&nbsp;");
 							}
-							payouts.append(
-									String.format("<a href='https://blockchain.info/tx/%s'>Transaction #%d</a>", s, i++)); 
+							payouts.append(String.format("<a href='https://blockchain.info/tx/%s'>Transaction #%d</a>",
+									s, i++));
 						}
 					}
 				}
-				
-				if(rec.notReadyToPay) {
+
+				if (rec.notReadyToPay) {
 					rec.btcCollected = rec.btc;
-					rec.worldCollectedMessage = String.format("<p>%.3f mBTC</p><span>total collected (estimation)</span>",
-							rec.btc * 1000);
+					rec.worldCollectedMessage = String
+							.format("<p>%.3f mBTC</p><span>total collected (estimation)</span>", rec.btc * 1000);
 				} else {
 					rec.btcCollected = (float) (reports.getBtcCollected() * 1000);
-					rec.worldCollectedMessage = String.format("<p>%.3f mBTC</p><span>total payout (%.1f mBTC collected)</span>",
-							rec.btc * 1000, reports.getBtcCollected() * 1000);
+					rec.worldCollectedMessage = String.format(
+							"<p>%.3f mBTC</p><span>total payout (%.1f mBTC collected)</span>", rec.btc * 1000,
+							reports.getBtcCollected() * 1000);
 				}
 				rec.regionCollectedMessage = String.format("<p>%.3f mBTC</p><span>collected for</span>",
 						rec.regionBtc * 1000);
 				rec.payouts = payouts.toString();
 				StringBuilder reportBld = new StringBuilder();
-				if(!rec.notReadyToPay) {
-					reportBld.append(
-							String.format("<a type='application/json' "
-									+ "href='/reports/query_month_report?report=total&month=%1$s'  "
-									+ "download='report-%1$s.json' >Download all json reports for %1$s</a>",month));
+				if (!rec.notReadyToPay) {
+					reportBld.append(String.format("<a type='application/json' "
+							+ "href='/reports/query_month_report?report=total&month=%1$s'  "
+							+ "download='report-%1$s.json' >Download all json reports for %1$s</a>", month));
 					reportBld.append(".&nbsp;&nbsp;");
 					reportBld.append("<a type='application/json' "
 							+ "href='https://builder.osmand.net/reports/query_btc_balance_report'>"
@@ -508,14 +502,14 @@ public class ReportsController {
 			}
 			return reports.getJsonReport(type, region);
 		} finally {
-    		DataSourceUtils.releaseConnection(conn, dataSource);
-    	}
+			DataSourceUtils.releaseConnection(conn, dataSource);
+		}
 	}
 
 	private boolean isEmpty(String month) {
 		return month == null || month.length() == 0;
 	}
-	
+
 	@SuppressWarnings("unchecked")
 	private void loadPayouts(BtcTransactionReport rep, BtcTransactionsMonth t) throws IOException {
 		t.totalPayouts = new HashMap<>();
@@ -535,7 +529,7 @@ public class ReportsController {
 				long totalIn = 0;
 				long totalOut = 0;
 				List<Map<?, ?>> inputs = (List<Map<?, ?>>) payoutObjects.get("inputs");
-				for (Map<?, ?> inp: inputs) {
+				for (Map<?, ?> inp : inputs) {
 					Map<?, ?> in = (Map<?, ?>) inp.get("prev_out");
 					String address = (String) in.get("addr");
 					totalIn += ((Number) in.get("value")).longValue();
@@ -547,7 +541,7 @@ public class ReportsController {
 					String address = (String) payout.get("addr");
 					long sum = ((Number) payout.get("value")).longValue();
 					totalOut += sum;
-					if(rep.ownAddresses.contains(address)) {
+					if (rep.ownAddresses.contains(address)) {
 						continue;
 					}
 					tx.total += sum;
@@ -559,10 +553,10 @@ public class ReportsController {
 				}
 				tx.fee = totalIn - totalOut;
 				tx.size = ((Number) payoutObjects.get("size")).intValue();
-				if(payoutObjects.get("block_index") != null) { 
+				if (payoutObjects.get("block_index") != null) {
 					tx.blockIndex = ((Number) payoutObjects.get("block_index")).intValue();
 				}
-				
+
 				t.size += tx.size;
 				t.fee += tx.fee;
 				t.total += tx.total;
@@ -574,73 +568,71 @@ public class ReportsController {
 		}
 	}
 
-	
-	
 	public static long getMinSatoshiPay() {
 		// !!! PAYOUT * FEE_PERCENT >= AVG_TX_SIZE * FEE_BYTE_SATOSHI ;
 		long minPayout = (long) (AVG_TX_SIZE * FEE_BYTE_SATOSHI / FEE_PERCENT);
 		return minPayout;
 	}
-	
+
 	protected BtcToPayBalance generateBalanceToPay(BtcTransactionReport report) throws IOException {
 		BtcToPayBalance balance = new BtcToPayBalance();
 		Date dt = new Date();
 		balance.date = dt.getTime();
 		balance.generatedDate = dt.toString();
-    	collectAllNeededPayouts(balance);
-    	for(String addrToPay : balance.totalToPay.keySet()) {
+		collectAllNeededPayouts(balance);
+		for (String addrToPay : balance.totalToPay.keySet()) {
 			AddrToPay a = new AddrToPay();
-    		a.btcAddress = addrToPay;
-    		a.totalToPay = balance.totalToPay.get(addrToPay);
-    		Long paid = report.totalPayouts.get(addrToPay);
-    		if(paid != null) {
-    			a.totalPaid = paid.longValue();
-    		}
-    		a.toPay = a.totalToPay - a.totalPaid;
-    		balance.allAccounts.add(a);
-    		if(addrToPay.equals(OSMAND_BTC_DONATION_ADDR)) {
-    			balance.toPay.add(a);
-    			continue;
-    		}
-    		if(balance.osmid.containsKey(addrToPay)) {
-    			a.osmId = balance.osmid.get(addrToPay);
-    		}
-    		if(a.toPay < 0) {
-    			balance.overpaidCnt++;
-    			balance.overpaidSat = balance.overpaidSat - a.toPay;
-    			if(a.toPay <= -balance.minToPayoutSat) {
-    				balance.overpaidFeeCnt++;
-        			balance.overpaidFeeSat = balance.overpaidFeeSat - a.toPay;
-        			balance.toPay.add(a);
-    			}
-    		} else if(a.toPay > 0) {
-    			balance.payNoFeeCnt++;
-    			balance.payNoFeeSat = balance.payNoFeeSat + a.toPay;
-    			if(a.toPay >= balance.minToPayoutSat) {
-    				balance.payWithFeeCnt++;
-        			balance.payWithFeeSat = balance.payWithFeeSat + a.toPay;
-    			}
-    			balance.toPay.add(a);
-    		}
-    	}
-    	Collections.sort(balance.toPay, new Comparator<AddrToPay>() {
+			a.btcAddress = addrToPay;
+			a.totalToPay = balance.totalToPay.get(addrToPay);
+			Long paid = report.totalPayouts.get(addrToPay);
+			if (paid != null) {
+				a.totalPaid = paid.longValue();
+			}
+			a.toPay = a.totalToPay - a.totalPaid;
+			balance.allAccounts.add(a);
+			if (addrToPay.equals(OSMAND_BTC_DONATION_ADDR)) {
+				balance.toPay.add(a);
+				continue;
+			}
+			if (balance.osmid.containsKey(addrToPay)) {
+				a.osmId = balance.osmid.get(addrToPay);
+			}
+			if (a.toPay < 0) {
+				balance.overpaidCnt++;
+				balance.overpaidSat = balance.overpaidSat - a.toPay;
+				if (a.toPay <= -balance.minToPayoutSat) {
+					balance.overpaidFeeCnt++;
+					balance.overpaidFeeSat = balance.overpaidFeeSat - a.toPay;
+					balance.toPay.add(a);
+				}
+			} else if (a.toPay > 0) {
+				balance.payNoFeeCnt++;
+				balance.payNoFeeSat = balance.payNoFeeSat + a.toPay;
+				if (a.toPay >= balance.minToPayoutSat) {
+					balance.payWithFeeCnt++;
+					balance.payWithFeeSat = balance.payWithFeeSat + a.toPay;
+				}
+				balance.toPay.add(a);
+			}
+		}
+		Collections.sort(balance.toPay, new Comparator<AddrToPay>() {
 
 			@Override
 			public int compare(AddrToPay o1, AddrToPay o2) {
 				return -Long.compare(o1.toPay, o2.toPay);
 			}
 		});
-    	// Check extra payments
-    	for(String addrPaid : report.totalPayouts.keySet()) {
-    		if(!balance.totalToPay.containsKey(addrPaid)) {
-    			AddrToPay a = new AddrToPay();
-        		a.btcAddress = addrPaid;
-        		a.totalPaid = report.totalPayouts.get(addrPaid);
-        		a.totalToPay = 0;
-        		a.toPay = -a.totalPaid;
-        		balance.toPay.add(0, a);
-    		}
-    	}
+		// Check extra payments
+		for (String addrPaid : report.totalPayouts.keySet()) {
+			if (!balance.totalToPay.containsKey(addrPaid)) {
+				AddrToPay a = new AddrToPay();
+				a.btcAddress = addrPaid;
+				a.totalPaid = report.totalPayouts.get(addrPaid);
+				a.totalToPay = 0;
+				a.toPay = -a.totalPaid;
+				balance.toPay.add(0, a);
+			}
+		}
 		return balance;
 	}
 
@@ -685,7 +677,7 @@ public class ReportsController {
 			}
 		}
 	}
-	
+
 	// Took from net.osmand.bitcoinsender.TransactionAnalyzer (for history)
 	public static String processBTCAddress(String specifiedBtc) {
 		String res = specifiedBtc.replace("-", "").replace(" ", "").trim();
@@ -696,17 +688,15 @@ public class ReportsController {
 			return "1GRgEnKujorJJ9VBa76g8cp3sfoWtQqSs4";
 		} else if (res.equals("13H8LERRKFUTqr2YM9J9bdy6xshzjwSAfw")) {
 			return "1A2PRCVN2tFnF5AXBwXmPyV52gH11uCFaS";
-		} else if (res.equals("3d347aae368d426aae104d50d3bdd695") || 
-				res.equals("3d347aae368d426aae104b50d3bdd695")) {
+		} else if (res.equals("3d347aae368d426aae104d50d3bdd695") || res.equals("3d347aae368d426aae104b50d3bdd695")) {
 			return "18btnN8JczdC5QyYfyv5WBksMTWTPAiqor";
 		} else if (res.equals("1AaUeDeLWvya7ZeZfRubeGXwaVB5v7aToK")) {
 			return null;
 		}
 		return res;
 	}
-	
-	private JsonReader readJsonUrl(String rurl, String id, boolean cache)
-			throws IOException {
+
+	private JsonReader readJsonUrl(String rurl, String id, boolean cache) throws IOException {
 		File fl = getCacheFile(id);
 		fl.getParentFile().mkdirs();
 		if (fl.exists() && cache) {
@@ -733,7 +723,5 @@ public class ReportsController {
 	private File getCacheFile(String id) {
 		return new File(websiteLocation, id);
 	}
-
-
 
 }
