@@ -168,6 +168,7 @@ public class CombineSRTMIntoFile {
 		}
 		if(srtmFileNames.size() > limit) {
 			System.out.println("\n\n!!!!!!!! SKIP BECAUSE LIMIT OF FILES EXCEEDED !!!!!!!!!\n\n");
+			return;
 		}
 //		final File work = new File(directoryWithTargetFiles, "work");
 //		Map<File, String> mp = new HashMap<File, String>();
