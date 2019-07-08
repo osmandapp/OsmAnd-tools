@@ -45,11 +45,14 @@ public class CombineSRTMIntoFile {
 		File directoryWithTargetFiles = new File(args[1]);
 		boolean dryRun = false;
 		String filter = null; // mauritius
+		int limit = 1000;
 		for(int i = 2; i < args.length; i++ ){
 			if("--dry-run".equals(args[i])) {
 				dryRun = true;
-			} else if(args[i].startsWith("--filter")) {
-				filter = args[i].substring("--filter".length());
+			} else if(args[i].startsWith("--filter=")) {
+				filter = args[i].substring("--filter=".length());
+			} else if(args[i].startsWith("--limit=")) {
+				limit = Integer.parseInt(args[i].substring("--limit=".length())); 
 			}
 		}
 		OsmandRegions or = new OsmandRegions();
@@ -78,7 +81,7 @@ public class CombineSRTMIntoFile {
 				String dw = rc.getNameByType(downloadName);
 				System.out.println("Region " + fullName +" " + cnt++ + " out of " + lst.size());
 				try {
-					process(rc, lst.subList(1, lst.size()), dw, directoryWithSRTMFiles, directoryWithTargetFiles, dryRun);
+					process(rc, lst.subList(1, lst.size()), dw, directoryWithSRTMFiles, directoryWithTargetFiles, dryRun, limit);
 				} catch(Exception e) {
 					failedCountries.add(fullName);
 					e.printStackTrace();
@@ -91,7 +94,7 @@ public class CombineSRTMIntoFile {
 	}
 
 	private static void process(BinaryMapDataObject country, List<BinaryMapDataObject> boundaries,
-			String downloadName, File directoryWithSRTMFiles, File directoryWithTargetFiles, boolean dryRun) throws IOException, SQLException, InterruptedException, IllegalArgumentException, XmlPullParserException {
+			String downloadName, File directoryWithSRTMFiles, File directoryWithTargetFiles, boolean dryRun, int limit) throws IOException, SQLException, InterruptedException, IllegalArgumentException, XmlPullParserException {
 		final String suffix = "_" + IndexConstants.BINARY_MAP_VERSION + IndexConstants.BINARY_SRTM_MAP_INDEX_EXT;
 		String name = country.getName();
 		final File targetFile = new File(directoryWithTargetFiles, Algorithms.capitalizeFirstLetterAndLowercase(downloadName+suffix));
@@ -159,6 +162,9 @@ public class CombineSRTMIntoFile {
 		System.out.println("-----------------------------");
 		if(dryRun) {
 			return;
+		}
+		if(srtmFileNames.size() > limit) {
+			System.out.println("\n\n!!!!!!!! SKIP BECAUSE LIMIT OF FILES EXCEEDED !!!!!!!!!\n\n");
 		}
 //		final File work = new File(directoryWithTargetFiles, "work");
 //		Map<File, String> mp = new HashMap<File, String>();
