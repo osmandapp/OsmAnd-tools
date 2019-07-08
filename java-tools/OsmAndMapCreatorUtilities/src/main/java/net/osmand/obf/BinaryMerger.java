@@ -78,9 +78,9 @@ public class BinaryMerger {
 		// test cases show info
 		if (args.length == 1 && "test".equals(args[0])) {
 			in.merger(new String[]{
-					System.getProperty("maps.dir") + "Netherlands_noord-holland_europe_merge.obf",
-//					System.getProperty("maps.dir") + "Netherlands_flevoland_europe.obf",
-					System.getProperty("maps.dir") + "Netherlands_noord-holland_europe.obf"
+					System.getProperty("maps.dir") + "Switzerland_europe_merge.obf",
+					System.getProperty("maps.dir") + "Switzerland_zurich_europe_2.obf_",
+					System.getProperty("maps.dir") + "Switzerland_eastern_europe_2.obf_",
 			});
 		} else {
 			in.merger(args);
@@ -92,11 +92,15 @@ public class BinaryMerger {
 		String pathWithGeneratedMapZips = args[0];
 		String pathToPutJointFiles = args[1];
 		boolean mapFiles = args.length > 2 && args[2].equals("--map");
+		String filter = args.length > 3? args[3] : null;
 		CountryRegion world = new CountryOcbfGeneration().parseDefaultOsmAndRegionStructure();
 		Iterator<CountryRegion> it = world.iterator();
 		while(it.hasNext()) {
 			CountryRegion cr = it.next();
 			if((cr.jointMap && mapFiles) || (cr.jointRoads && !mapFiles)) {
+				if(!Algorithms.isEmpty(filter) && !cr.getDownloadName().toLowerCase().startsWith(filter.toLowerCase())) {
+					continue;
+				}
 				List<CountryRegion> list = cr.getChildren();
 				List<String> sargs = new ArrayList<String>();
 				String ext = "_2" + (mapFiles ? ".obf" : ".road.obf");

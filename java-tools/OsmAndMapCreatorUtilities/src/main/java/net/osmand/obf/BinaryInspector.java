@@ -81,7 +81,7 @@ public class BinaryInspector {
 			in.inspector(new String[] {
 //					"-vpoi",
 					"-vmap", "-vmapobjects",
-					"-vmapcoordinates",
+//					"-vmapcoordinates",
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
 //					"-vaddress", "-vcities","-vstreetgroups",
@@ -89,8 +89,8 @@ public class BinaryInspector {
 //					"-lang=ru",
 					"-zoom=15",
 //					"-bbox=30.51,50.5,30.53,50.4",
-					"-osm="+System.getProperty("maps.dir")+"/basemap/map.obf.osm",
-					System.getProperty("maps.dir")+"/basemap/Transport.obf"
+//					"-osm="+System.getProperty("maps.dir")+"/basemap/map.obf.osm",
+					System.getProperty("maps.dir")+"/Map.obf"
 			});
 		} else {
 			in.inspector(args);
