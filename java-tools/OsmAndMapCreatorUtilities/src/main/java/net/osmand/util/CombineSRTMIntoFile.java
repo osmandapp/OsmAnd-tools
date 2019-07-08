@@ -51,6 +51,9 @@ public class CombineSRTMIntoFile {
 				dryRun = true;
 			} else if(args[i].startsWith("--filter=")) {
 				filter = args[i].substring("--filter=".length());
+				if(filter.length() == 0) {
+					filter = null;
+				}
 			} else if(args[i].startsWith("--limit=")) {
 				limit = Integer.parseInt(args[i].substring("--limit=".length())); 
 			}
