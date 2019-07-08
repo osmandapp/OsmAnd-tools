@@ -50,6 +50,7 @@ import net.osmand.obf.preparation.IndexCreatorSettings;
 import net.osmand.obf.preparation.IndexPoiCreator;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.edit.Node;
+import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.util.Algorithms;
 import net.osmand.util.CountryOcbfGeneration;
 import net.osmand.util.MapUtils;
@@ -79,8 +80,13 @@ public class BinaryMerger {
 		if (args.length == 1 && "test".equals(args[0])) {
 			in.merger(new String[]{
 					System.getProperty("maps.dir") + "Switzerland_europe_merge.obf",
-					System.getProperty("maps.dir") + "Switzerland_zurich_europe_2.obf_",
+					System.getProperty("maps.dir") + "Switzerland_basel_europe_2.obf_",
+					System.getProperty("maps.dir") + "Switzerland_bern_europe_2.obf_",
+					System.getProperty("maps.dir") + "Switzerland_central_europe_2.obf_",
 					System.getProperty("maps.dir") + "Switzerland_eastern_europe_2.obf_",
+					System.getProperty("maps.dir") + "Switzerland_lake-geneva_europe_2.obf_",
+					System.getProperty("maps.dir") + "Switzerland_ticino_europe_2.obf_",
+					System.getProperty("maps.dir") + "Switzerland_zurich_europe_2.obf_",
 			});
 		} else {
 			in.merger(args);
@@ -299,15 +305,27 @@ public class BinaryMerger {
 		}
 		for (int type : BinaryMapAddressReaderAdapter.CITY_TYPES) {
 			Map<City, BinaryMapIndexReader> cityMap = new HashMap<City, BinaryMapIndexReader>();
+			Map<Long, City> cityIds = new HashMap<Long, City>();
 			for (int i = 0; i < addressRegions.length; i++) {
 				AddressRegion region = addressRegions[i];
 				final BinaryMapIndexReader index = indexes[i];
 				for (City city : index.getCities(region, null, type)) {
 					normalizePostcode(city, extractCountryName(index));
-					if (cityMap.containsKey(city)) {
-						cityMap.remove(city);
+					// weird code cause city ids can overlap
+					// probably code to merge cities below is not needed (it called mostly for postcodes)
+					if(cityIds.containsKey(city.getId())) {
+						index.preloadStreets(city, null);
+						City city2 = cityIds.get(city.getId());
+						cityMap.get(city2).preloadStreets(city2, null);
+						if(city.getStreets().size() > city2.getStreets().size()) {
+							cityMap.remove(city2);
+							cityIds.put(city.getId(), city);
+							cityMap.put(city, index);
+						}
+					} else {
+						cityMap.put(city, index);
+						cityIds.put(city.getId(), city);
 					}
-					cityMap.put(city, index);
 				}
 			}
 			List<City> cities = new ArrayList<City>(cityMap.keySet());
