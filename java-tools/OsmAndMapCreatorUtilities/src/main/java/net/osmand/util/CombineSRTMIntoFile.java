@@ -82,7 +82,7 @@ public class CombineSRTMIntoFile {
 			System.out.println(fullName );
 			if(rc != null && rc.containsAdditionalType(srtm)) {
 				String dw = rc.getNameByType(downloadName);
-				System.out.println("Region " + fullName +" " + cnt++ + " out of " + lst.size());
+				System.out.println("Region " + fullName + " " + cnt++ + " out of " + allCountries.size());
 				try {
 					process(rc, lst.subList(1, lst.size()), dw, directoryWithSRTMFiles, directoryWithTargetFiles, dryRun, limit);
 				} catch(Exception e) {
