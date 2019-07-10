@@ -26,7 +26,7 @@ import net.osmand.util.MapUtils;
 public class IndexHeightData {
 	private static final double MINIMAL_DISTANCE = 0;
 	private static final int HEIGHT_ACCURACY = 4;
-	private static final int MAXIMUM_LOADED_DATA = 30; 
+	private static final int MAXIMUM_LOADED_DATA = 50; 
 	private static boolean USE_BILINEAR_INTERPOLATION = false;
 
 	private File srtmData;
