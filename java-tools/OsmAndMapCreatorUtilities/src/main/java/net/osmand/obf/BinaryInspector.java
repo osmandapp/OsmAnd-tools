@@ -80,17 +80,17 @@ public class BinaryInspector {
 		if ("test".equals(args[0])) {
 			in.inspector(new String[] {
 //					"-vpoi",
-					"-vmap", "-vmapobjects",
+//					"-vmap", "-vmapobjects",
 //					"-vmapcoordinates",
 //					"-vrouting",
-//					"-vtransport", "-vtransportschedule",
+					"-vtransport", "-vtransportschedule",
 //					"-vaddress", "-vcities","-vstreetgroups",
 //					"-vstreets", "-vbuildings", "-vintersections",
 //					"-lang=ru",
 					"-zoom=15",
 //					"-bbox=30.51,50.5,30.53,50.4",
 //					"-osm="+System.getProperty("maps.dir")+"/basemap/map.obf.osm",
-					System.getProperty("maps.dir")+"/Map.obf"
+					System.getProperty("maps.dir")+"/Netherlands_noord-holland_europe_2.obf"
 			});
 		} else {
 			in.inspector(args);
@@ -522,8 +522,6 @@ public class BinaryInspector {
 					}
 				} else if (p instanceof PoiRegion && (vInfo != null && vInfo.isVpoi())) {
 					printPOIDetailInfo(vInfo, index, (PoiRegion) p);
-				} else if (p instanceof TransportIndex && (vInfo != null && vInfo.isVtransport())) {
-
 				} else if (p instanceof AddressRegion) {
 					List<CitiesBlock> cities = ((AddressRegion) p).getCities();
 					for (CitiesBlock c : cities) {

@@ -3,7 +3,6 @@ package net.osmand.obf.preparation;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferShort;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -14,19 +13,20 @@ import java.util.Map;
 
 import javax.imageio.ImageIO;
 
+import org.apache.commons.logging.Log;
+import org.xmlpull.v1.XmlPullParser;
+import org.xmlpull.v1.XmlPullParserException;
+
 import net.osmand.PlatformUtil;
 import net.osmand.data.LatLon;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Way;
 import net.osmand.util.MapUtils;
 
-import org.apache.commons.logging.Log;
-import org.xmlpull.v1.XmlPullParser;
-import org.xmlpull.v1.XmlPullParserException;
-
 public class IndexHeightData {
 	private static final double MINIMAL_DISTANCE = 0;
-	private static final int HEIGHT_ACCURACY = 4; 
+	private static final int HEIGHT_ACCURACY = 4;
+	private static final int MAXIMUM_LOADED_DATA = 20; 
 	private static boolean USE_BILINEAR_INTERPOLATION = false;
 
 	private File srtmData;
@@ -356,11 +356,17 @@ public class IndexHeightData {
 		int id = getTileId(lt, ln);
 		TileData tileData = map.get(id);
 		if(tileData == null) {
+			if(map.size() >= MAXIMUM_LOADED_DATA) {
+				log.info(String.format("SRTM: GC srtm data %d.", map.size()));
+				map.clear();
+				System.gc();
+			}
 			tileData = new TileData(id);
 			map.put(id, tileData);
 		}
 		if(!tileData.dataLoaded) {
 			try {
+				log.info(String.format("SRTM: Load srtm data %d: %d %d", id, (int) lt,  (int)ln));
 				tileData.loadData(srtmData);
 			} catch (IOException e) {
 				log.error(e.getMessage(), e);
@@ -476,13 +482,13 @@ public class IndexHeightData {
 		}
 	}
 	
-	private static void simpleTestHeight() {
+	protected static void simpleTestHeight() {
 		IndexHeightData hd = new IndexHeightData();
 		hd.setSrtmData(new File("/Users/victorshcherb/osmand/maps/srtm/"));
 	    cmp(hd, 44.428722,33.711246, 255);
 	}
 
-	private static void testHeight() {
+	protected static void testHeight() {
 		IndexHeightData hd = new IndexHeightData();
 		hd.setSrtmData(new File("/Users/victorshcherb/osmand/maps/srtm/"));
 		
