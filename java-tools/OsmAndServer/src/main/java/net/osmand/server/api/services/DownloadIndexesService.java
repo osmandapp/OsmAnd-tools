@@ -9,19 +9,21 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.Enumeration;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.zip.GZIPOutputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
-import javax.annotation.PostConstruct;
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBException;
 import javax.xml.bind.Marshaller;
-
-import net.osmand.util.Algorithms;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -29,11 +31,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonRootName;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
+
+import net.osmand.util.Algorithms;
 
 @Service
 public class DownloadIndexesService  {
@@ -69,7 +69,9 @@ public class DownloadIndexesService  {
 	
 	public boolean reloadConfig(List<String> errors) {
     	try {
-    		settings = gson.fromJson(new FileReader(new File(websiteLocation, DOWNLOAD_SETTINGS)), DownloadProperties.class);
+    		DownloadProperties s = gson.fromJson(new FileReader(new File(websiteLocation, DOWNLOAD_SETTINGS)), DownloadProperties.class);
+    		s.prepare();
+    		settings = s;
     	} catch (IOException ex) {
     		if(errors != null) {
     			errors.add(DOWNLOAD_SETTINGS + " is invalid: " + ex.getMessage());
@@ -199,7 +201,7 @@ public class DownloadIndexesService  {
 		}
 	}
 
-	private boolean isValid(File file) {
+	protected boolean isZipValid(File file) {
 		boolean isValid = true;
 		if (isZip(file)) {
 			try {
@@ -304,11 +306,108 @@ public class DownloadIndexesService  {
 	    }
 	}
 	
+	
+	public static void main(String[] args) {
+		// small test
+		DownloadProperties dp = new DownloadProperties();
+		dp.osmlive.put("dl1", 1);
+		dp.osmlive.put("dl2", 1);
+		dp.osmlive.put("dl3", 3);
+		dp.prepare();
+		System.out.println(dp.getPercent(DownloadProperties.OSMLIVE, "dl1"));
+		System.out.println(dp.getPercent(DownloadProperties.OSMLIVE, "dl2"));
+		System.out.println(dp.getPercent(DownloadProperties.OSMLIVE, "dl3"));
+		Map<String, Integer> cnts = new TreeMap<String, Integer>();
+		for(String s : dp.servers) {
+			cnts.put(s, 0);
+		}
+		for(int i = 0; i < 1000; i ++) {
+			String s = dp.getServer(DownloadProperties.OSMLIVE);
+			cnts.put(s, cnts.get(s) + 1);
+		}
+		System.out.println(cnts);
+	}
+	
+	private static class DownloadServerCategory {
+	
+		Map<String, Integer> percents = new TreeMap<>();
+		int sum;
+		String[] serverNames;
+		int[] bounds;
+	}
+	
 	public static class DownloadProperties {
-		public List<String> osmlive = new ArrayList<>();
-		public List<String> srtm = new ArrayList<>();
-		public List<String> main = new ArrayList<>();
+		public final static int SRTM = 0;
+		public final static int OSMLIVE = 1;
+		public final static int MAIN = 2;
 		
+		public final static String SELF = "self";
+		
+		Set<String> servers = new TreeSet<String>();
+		DownloadServerCategory[] cats = new DownloadServerCategory[MAIN + 1];
+		
+		Map<String, Integer> osmlive = new HashMap<>(); 
+		Map<String, Integer> srtm = new HashMap<>();
+		Map<String, Integer> main = new HashMap<>();
+		
+		public void prepare() {
+			prepare(OSMLIVE, osmlive);
+			prepare(SRTM, srtm);
+			prepare(MAIN, srtm);
+		}
+		
+		public Set<String> getServers() {
+			return servers;
+		}
+		
+		private void prepare(int tp, Map<String, Integer> mp) {
+			servers.addAll(mp.keySet());
+			DownloadServerCategory cat = new DownloadServerCategory();
+			cats[tp] = cat;
+			for(Integer i : mp.values()) {
+				cat.sum += i;
+			}
+			if(cat.sum > 0) {
+				int ind = 0;
+				cat.bounds = new int[mp.size()];
+				cat.serverNames = new String[mp.size()];
+				for(String server : mp.keySet()) {
+					cat.serverNames[ind] = SELF.equals(server) ? null : server;
+					cat.bounds[ind] = mp.get(server);
+					cat.percents.put(server, 100 * mp.get(server) / cat.sum);
+					ind++;
+				}
+			} else {
+				cat.bounds = new int[0];
+				cat.serverNames = new String[0];
+			}
+			
+		}
+
+		public int getPercent(int type, String s) {
+			Integer p = cats[type].percents.get(s);
+			if(p == null) {
+				return 0;
+			}
+			return p.intValue();
+		}
+		
+		
+		public String getServer(int type) {
+			DownloadServerCategory cat = cats[type];
+			if (cat.sum > 0) {
+				ThreadLocalRandom tlr = ThreadLocalRandom.current();
+				int val = tlr.nextInt(cat.sum);
+				for(int i = 0; i < cat.bounds.length; i++) {
+					if(val >= cat.bounds[i]) {
+						val -= cat.bounds[i];
+					} else {
+						return cat.serverNames[i];
+					}
+				}
+			}
+			return null;
+		}
 
 	}
 }

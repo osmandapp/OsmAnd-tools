@@ -246,8 +246,6 @@ public class DownloadIndexController {
 			proto = req.getScheme();
 		}
 		if (!self) {
-			ThreadLocalRandom tlr = ThreadLocalRandom.current();
-			int random = tlr.nextInt(100);
 			String extraParam = "";
 			if (params.containsKey("aosmc") || params.containsKey("osmc")) {
 				String filename = params.getFirst("file");
@@ -255,16 +253,15 @@ public class DownloadIndexController {
 					extraParam = "&region=" + filename.substring(0, filename.length() - DATE_AND_EXT_STR_LEN).toLowerCase();
 				}
 			}
-			if(isSrtm(params) && servers.srtm.size() > 0) {
-				String host = servers.srtm.get(random % servers.srtm.size());
-				resp.setStatus(HttpServletResponse.SC_FOUND);
-				resp.setHeader(HttpHeaders.LOCATION, proto + "://" + host + "/download?" + req.getQueryString() + extraParam);
-			} else if(isLiveMaps(params)  && servers.osmlive.size() > 0) {
-				String host = servers.osmlive.get(random % servers.osmlive.size());
-				resp.setStatus(HttpServletResponse.SC_FOUND);
-				resp.setHeader(HttpHeaders.LOCATION, proto + "://" + host + "/download?" + req.getQueryString() + extraParam);
-			} else if(isMaps(params)  && servers.main.size() > 0) {
-				String host = servers.main.get(random % servers.main.size());
+			String host = null;
+			if(isSrtm(params)) {
+				host = servers.getServer(DownloadProperties.SRTM);
+			} else if(isLiveMaps(params)) {
+				host = servers.getServer(DownloadProperties.OSMLIVE);
+			} else if(isMaps(params)) {
+				host = servers.getServer(DownloadProperties.MAIN);
+			}
+			if(host != null) {
 				resp.setStatus(HttpServletResponse.SC_FOUND);
 				resp.setHeader(HttpHeaders.LOCATION, proto + "://" + host + "/download?" + req.getQueryString() + extraParam);
 			} else {
