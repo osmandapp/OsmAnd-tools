@@ -353,7 +353,7 @@ public class DownloadIndexesService  {
 		public void prepare() {
 			prepare(OSMLIVE, osmlive);
 			prepare(SRTM, srtm);
-			prepare(MAIN, srtm);
+			prepare(MAIN, main);
 		}
 		
 		public Set<String> getServers() {
