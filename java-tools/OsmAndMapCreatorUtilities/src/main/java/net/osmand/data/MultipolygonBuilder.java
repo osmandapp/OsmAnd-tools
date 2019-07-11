@@ -3,13 +3,13 @@ package net.osmand.data;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.ListIterator;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
-import net.osmand.osm.edit.Way;
-
 import org.apache.commons.logging.Log;
+
+import gnu.trove.map.hash.TLongObjectHashMap;
+import net.osmand.osm.edit.Way;
 
 /**
  * The idea of multipolygon:
@@ -107,7 +107,8 @@ public class MultipolygonBuilder {
 
 	public ArrayList<Ring> combineToRings(List<Way> ways) {
 		// make a list of multiLines (connecter pieces of way)
-		ArrayList<Way> multiLines = new ArrayList<Way>();
+		TLongObjectHashMap<List<Way>> multilineStartPoint = new TLongObjectHashMap<List<Way>>();
+		TLongObjectHashMap<List<Way>> multilineEndPoint = new TLongObjectHashMap<List<Way>>();
 		for (Way toAdd : ways) {
 			if (toAdd.getNodeIds().size() < 2) {
 				continue;
@@ -116,22 +117,33 @@ public class MultipolygonBuilder {
 			Way changedWay = toAdd;
 			Way newWay;
 			do {
-				newWay = null;
-				if (changedWay != null) {
-					ListIterator<Way> it = multiLines.listIterator();
-					while (it.hasNext()) {
-						Way w = it.next();
-						newWay = combineTwoWaysIfHasPoints(changedWay, w);
-						if (newWay != null) {
-							changedWay = newWay;
-							it.remove();
-							break;
-						}
-					}
+				newWay = merge(multilineStartPoint, changedWay.getLastNodeId(), changedWay, 
+						multilineEndPoint, changedWay.getFirstNodeId());
+				if(newWay == null) {
+					newWay = merge(multilineEndPoint, changedWay.getFirstNodeId(), changedWay, 
+							multilineStartPoint, changedWay.getLastNodeId());
+				}
+				if(newWay == null) {
+					newWay = merge(multilineStartPoint, changedWay.getFirstNodeId(), changedWay, 
+							multilineEndPoint, changedWay.getLastNodeId());
+				}
+				if(newWay == null) {
+					newWay = merge(multilineEndPoint, changedWay.getLastNodeId(), changedWay, 
+							multilineStartPoint, changedWay.getFirstNodeId());
+				}
+				if(newWay != null) {
+					changedWay = newWay;
 				}
 			} while (newWay != null);
-			multiLines.add(changedWay);
+			
+			addToMap(multilineStartPoint, changedWay.getFirstNodeId(), changedWay);
+			addToMap(multilineEndPoint, changedWay.getLastNodeId(), changedWay);
 
+		}
+		
+		List<Way> multiLines = new ArrayList<Way>();
+		for(List<Way> lst : multilineStartPoint.valueCollection()) {
+			multiLines.addAll(lst);
 		}
 		ArrayList<Ring> result = new ArrayList<Ring>();
 		for (Way multiLine : multiLines) {
@@ -139,6 +151,34 @@ public class MultipolygonBuilder {
 			result.add(r);
 		}
 		return result;
+	}
+
+	private Way merge(TLongObjectHashMap<List<Way>> endMap, long stNodeId, Way changedWay,
+			TLongObjectHashMap<List<Way>> startMap, long endNodeId) {
+		List<Way> lst = endMap.get(stNodeId);
+		if(lst != null && lst.size() > 0) {
+			Way candToMerge = lst.get(0);
+			Way newWay = combineTwoWaysIfHasPoints(candToMerge, changedWay);
+			List<Way> otherLst = startMap.get(candToMerge.getLastNodeId() == stNodeId ? candToMerge.getFirstNodeId() :
+				candToMerge.getLastNodeId());
+			boolean removed1 = lst.remove(candToMerge) ;
+			boolean removed2 = otherLst != null && otherLst.remove(candToMerge);
+			if(newWay == null || !removed1 || !removed2) {
+				throw new UnsupportedOperationException("Can't merge way: " + changedWay.getId() + " " + stNodeId + " -> " + endNodeId);
+			}
+			return newWay;
+		}
+		
+		return null;
+	}
+
+	private void addToMap(TLongObjectHashMap<List<Way>> mp, long id, Way changedWay) {
+		List<Way> lst = mp.get(id);
+		if(lst == null) {
+			lst = new ArrayList<>();
+			mp.put(id, lst);
+		}
+		lst.add(changedWay);
 	}
 
 	/**

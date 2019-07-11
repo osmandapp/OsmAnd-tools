@@ -81,6 +81,57 @@ public class Ring implements Comparable<Ring> {
 	public boolean containsPoint(double latitude, double longitude) {
 		return MapAlgorithms.containsPoint(getBorder(), latitude, longitude);
 	}
+	
+	/**
+	 * Check if this is in Ring r
+	 * @param r the ring to check
+	 * @return true if this Ring is inside Ring r (false if it is undetermined)
+	 */
+	public boolean speedIsIn(Ring r) {
+		/*
+		 * bi-directional check is needed because some concave rings can intersect
+		 * and would only fail on one of the checks
+		 */
+		List<Node> points = this.getBorder();
+		if(points.size() < 2) {
+			return false;
+		}
+		double minlat = points.get(0).getLatitude();
+		double maxlat = points.get(0).getLatitude();
+		double minlon = points.get(0).getLongitude();
+		double maxlon = points.get(0).getLongitude();
+		// r should contain all nodes of this
+		for (Node n : points) {
+			minlat = Math.min(n.getLatitude(), minlat);
+			maxlat = Math.max(n.getLatitude(), maxlat);
+			minlon = Math.min(n.getLongitude(), minlon);
+			maxlon = Math.max(n.getLongitude(), maxlon);
+		}
+		
+		// r should contain all nodes of this
+		if (!r.containsPoint(minlat, minlon)) {
+			return false;
+		}
+		if (!r.containsPoint(maxlat, minlon)) {
+			return false;
+		}
+		if (!r.containsPoint(minlat, maxlon)) {
+			return false;
+		}
+		if (!r.containsPoint(maxlat, maxlon)) {
+			return false;
+		}
+		// this should not contain a node from r
+		for (Node n : r.getBorder()) {
+			if(n.getLatitude() > minlat && n.getLatitude() < maxlat && 
+					n.getLongitude() > minlon && n.getLongitude() < maxlon) {
+				return false;
+			}
+		}
+
+		return true;
+
+	}
 
 	/**
 	 * Check if this is in Ring r
@@ -89,6 +140,9 @@ public class Ring implements Comparable<Ring> {
 	 * @return true if this Ring is inside Ring r
 	 */
 	public boolean isIn(Ring r) {
+		if(speedIsIn(r)) {
+			return true;
+		}
 		/*
 		 * bi-directional check is needed because some concave rings can intersect
 		 * and would only fail on one of the checks
