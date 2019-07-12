@@ -441,7 +441,7 @@ public class WikivoyageLangPreparation {
 						if(areaCode.length() > 0 && key.equals("Phone")) {
 							value = areaCode + " " + value;
 						}
-						point.desc += key + ": " + value  + ".";
+						point.desc += key + ": " + value; // ". " backward compatible
 					}
 					if (point.hasLocation() && point.name != null && !point.name.isEmpty()) {
 						if (point.category != null) {
