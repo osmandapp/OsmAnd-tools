@@ -21,8 +21,10 @@ import java.sql.SQLException;
 import java.sql.Types;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.GZIPOutputStream;
@@ -382,6 +384,7 @@ public class WikivoyageLangPreparation {
 						point.category = capitalizeFirstLetterAndLowercase(point.category.trim());
 					}
 					String areaCode = "";
+					Map<String, String> extraValues = new LinkedHashMap<String, String>();
 					for (int i = 1; i < info.length; i++) {
 						String field = info[i].trim();
 						String value = "";
@@ -391,6 +394,7 @@ public class WikivoyageLangPreparation {
 							value = value.replaceAll("[\\]\\[]", "");
 							field = field.substring(0, index).trim();
 						}
+						
 						if (!value.isEmpty() && !value.contains("{{")) {
 							try {
 								if (field.equalsIgnoreCase("name") || field.equalsIgnoreCase("nome") || field.equalsIgnoreCase("nom")
@@ -408,30 +412,32 @@ public class WikivoyageLangPreparation {
 								} else if (field.equalsIgnoreCase("content") || field.equalsIgnoreCase("descrizione") 
 										|| field.equalsIgnoreCase("description") || field.equalsIgnoreCase("sobre") || field.equalsIgnoreCase("תיאור")
 										|| field.equalsIgnoreCase("متن")) {
-									point.desc = point.desc = point.desc == null ? value : 
-										point.desc + ". " + value;
+									point.desc = value;
 								} else if (field.equalsIgnoreCase("email") || field.equalsIgnoreCase("מייל") || field.equalsIgnoreCase("پست الکترونیکی")) {
-									point.desc = point.desc == null ? "Email: " + value : 
-										point.desc + ". Email: " + value;
+									extraValues.put("Email", value);
 								} else if (field.equalsIgnoreCase("phone") || field.equalsIgnoreCase("tel") || field.equalsIgnoreCase("téléphone")
 										|| field.equalsIgnoreCase("טלפון") || field.equalsIgnoreCase("تلفن")) {
-									point.desc = point.desc == null ? "Phone: " + areaCode + value : 
-										point.desc + ". Phone: " + areaCode + value;
+									extraValues.put("Phone", value);
 								} else if (field.equalsIgnoreCase("price") || field.equalsIgnoreCase("prezzo") || field.equalsIgnoreCase("prix") 
 										|| field.equalsIgnoreCase("מחיר") || field.equalsIgnoreCase("بها")) {
-									point.desc = point.desc == null ? "Price: " + value : 
-										point.desc + ". Price: " + value;
+									extraValues.put("Price", value);
 								} else if (field.equalsIgnoreCase("hours") || field.equalsIgnoreCase("orari") || field.equalsIgnoreCase("horaire") 
 										|| field.equalsIgnoreCase("funcionamento") || field.equalsIgnoreCase("שעות") || field.equalsIgnoreCase("ساعت‌ها")) {
-									point.desc = point.desc == null ? "Working hours: " + value : 
-										point.desc + ". Working hours: " + value;
+									extraValues.put("Working hours", value);
 								} else if (field.equalsIgnoreCase("directions") || field.equalsIgnoreCase("direction") || field.equalsIgnoreCase("הוראות")
 										|| field.equalsIgnoreCase("مسیرها")) {
-									point.desc = point.desc == null ? "Directions: " + value : 
-										point.desc + " Directions: " + value;
+									extraValues.put("Directions", value);
 								}
 							} catch (Exception e) {}
 						}
+					}
+					for(String key : extraValues.keySet()) {
+						if(point.desc == null) {
+							point.desc = "";
+						} else {
+							point.desc += "\n";
+						}
+						point.desc += extraValues.get(key) + ": \'" + extraValues.get(key)  + "\'.";
 					}
 					if (point.hasLocation() && point.name != null && !point.name.isEmpty()) {
 						if (point.category != null) {
