@@ -437,7 +437,11 @@ public class WikivoyageLangPreparation {
 						} else {
 							point.desc += "\n";
 						}
-						point.desc += extraValues.get(key) + ": \'" + extraValues.get(key)  + "\'.";
+						String value = extraValues.get(key);
+						if(areaCode.length() > 0 && key.equals("Phone")) {
+							value = areaCode + " " + value;
+						}
+						point.desc += key + ": \'" + value  + "\'.";
 					}
 					if (point.hasLocation() && point.name != null && !point.name.isEmpty()) {
 						if (point.category != null) {
