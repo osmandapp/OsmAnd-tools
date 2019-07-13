@@ -7,14 +7,10 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.util.List;
-import java.util.concurrent.ThreadLocalRandom;
 
 import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-
-import net.osmand.server.api.services.DownloadIndexesService;
-import net.osmand.server.api.services.DownloadIndexesService.DownloadProperties;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -33,6 +29,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
+
+import net.osmand.server.api.services.DownloadIndexesService;
+import net.osmand.server.api.services.DownloadIndexesService.DownloadProperties;
+import net.osmand.server.api.services.DownloadIndexesService.DownloadServerSpecialty;
 
 @Controller
 public class DownloadIndexController {
@@ -255,11 +255,11 @@ public class DownloadIndexController {
 			}
 			String host = null;
 			if(isSrtm(params)) {
-				host = servers.getServer(DownloadProperties.SRTM);
+				host = servers.getServer(DownloadServerSpecialty.SRTM);
 			} else if(isLiveMaps(params)) {
-				host = servers.getServer(DownloadProperties.OSMLIVE);
+				host = servers.getServer(DownloadServerSpecialty.OSMLIVE);
 			} else if(isMaps(params)) {
-				host = servers.getServer(DownloadProperties.MAIN);
+				host = servers.getServer(DownloadServerSpecialty.MAIN);
 			}
 			if(host != null) {
 				resp.setStatus(HttpServletResponse.SC_FOUND);

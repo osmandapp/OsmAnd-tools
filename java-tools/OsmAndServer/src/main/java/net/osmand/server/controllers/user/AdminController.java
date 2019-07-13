@@ -19,7 +19,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
-import java.util.TreeSet;
 import java.util.zip.GZIPOutputStream;
 
 import javax.servlet.http.HttpServletResponse;
@@ -52,6 +51,7 @@ import net.osmand.server.api.repo.LotterySeriesRepository.LotterySeries;
 import net.osmand.server.api.repo.LotterySeriesRepository.LotteryStatus;
 import net.osmand.server.api.services.DownloadIndexesService;
 import net.osmand.server.api.services.DownloadIndexesService.DownloadProperties;
+import net.osmand.server.api.services.DownloadIndexesService.DownloadServerSpecialty;
 import net.osmand.server.api.services.EmailSenderService;
 import net.osmand.server.api.services.IpLocationService;
 import net.osmand.server.api.services.LogsAccessService;
@@ -812,9 +812,9 @@ public class AdminController {
 		for(String s : dProps.getServers()) {
 			Map<String, Object> mo = new TreeMap<>();
 			mo.put("name", s);
-			mo.put("maps", dProps.getPercent(DownloadProperties.MAIN, s) + "%");
-			mo.put("srtm", dProps.getPercent(DownloadProperties.SRTM, s) + "%");
-			mo.put("osmlive", dProps.getPercent(DownloadProperties.OSMLIVE, s ) + "%");
+			for(DownloadServerSpecialty sp : DownloadServerSpecialty.values()) {
+				mo.put(sp.name().toLowerCase(), dProps.getPercent(sp, s) + "%");
+			}
 			list.add(mo);
 		}
 		return list;

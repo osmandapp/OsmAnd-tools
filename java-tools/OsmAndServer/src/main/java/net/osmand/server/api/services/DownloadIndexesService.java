@@ -310,19 +310,21 @@ public class DownloadIndexesService  {
 	public static void main(String[] args) {
 		// small test
 		DownloadProperties dp = new DownloadProperties();
-		dp.osmlive.put("dl1", 1);
-		dp.osmlive.put("dl2", 1);
-		dp.osmlive.put("dl3", 3);
+		String key = DownloadServerSpecialty.OSMLIVE.toString().toLowerCase();
+		dp.servers.put(key, new HashMap<>());
+		dp.servers.get(key).put("dl1", 1);
+		dp.servers.get(key).put("dl2", 1);
+		dp.servers.get(key).put("dl3", 3);
 		dp.prepare();
-		System.out.println(dp.getPercent(DownloadProperties.OSMLIVE, "dl1"));
-		System.out.println(dp.getPercent(DownloadProperties.OSMLIVE, "dl2"));
-		System.out.println(dp.getPercent(DownloadProperties.OSMLIVE, "dl3"));
+		System.out.println(dp.getPercent(DownloadServerSpecialty.OSMLIVE, "dl1"));
+		System.out.println(dp.getPercent(DownloadServerSpecialty.OSMLIVE, "dl2"));
+		System.out.println(dp.getPercent(DownloadServerSpecialty.OSMLIVE, "dl3"));
 		Map<String, Integer> cnts = new TreeMap<String, Integer>();
-		for(String s : dp.servers) {
+		for(String s : dp.serverNames) {
 			cnts.put(s, 0);
 		}
 		for(int i = 0; i < 1000; i ++) {
-			String s = dp.getServer(DownloadProperties.OSMLIVE);
+			String s = dp.getServer(DownloadServerSpecialty.OSMLIVE);
 			cnts.put(s, cnts.get(s) + 1);
 		}
 		System.out.println(cnts);
@@ -336,34 +338,41 @@ public class DownloadIndexesService  {
 		int[] bounds;
 	}
 	
-	public static class DownloadProperties {
-		public final static int SRTM = 0;
-		public final static int OSMLIVE = 1;
-		public final static int MAIN = 2;
+	public enum DownloadServerSpecialty {
+		SRTM,
+		HILLSHADE,
+		OSMLIVE,
+		MAIN,
+		WIKI,
+		ROADS
 		
+	}
+	
+	public static class DownloadProperties {
 		public final static String SELF = "self";
 		
-		Set<String> servers = new TreeSet<String>();
-		DownloadServerCategory[] cats = new DownloadServerCategory[MAIN + 1];
-		
-		Map<String, Integer> osmlive = new HashMap<>(); 
-		Map<String, Integer> srtm = new HashMap<>();
-		Map<String, Integer> main = new HashMap<>();
+		Set<String> serverNames = new TreeSet<String>();
+		DownloadServerCategory[] cats = new DownloadServerCategory[DownloadServerSpecialty.values().length];
+		Map<String, Map<String, Integer>> servers = new HashMap<>();
 		
 		public void prepare() {
-			prepare(OSMLIVE, osmlive);
-			prepare(SRTM, srtm);
-			prepare(MAIN, main);
+			for(String s : servers.keySet()) {
+				try {
+					prepare(DownloadServerSpecialty.valueOf(s.toUpperCase()), servers.get(s));
+				} catch (Exception e) {
+					LOGGER.info(e.getMessage(), e);
+				}
+			}
 		}
 		
 		public Set<String> getServers() {
-			return servers;
+			return serverNames;
 		}
 		
-		private void prepare(int tp, Map<String, Integer> mp) {
-			servers.addAll(mp.keySet());
+		private void prepare(DownloadServerSpecialty tp, Map<String, Integer> mp) {
+			serverNames.addAll(mp.keySet());
 			DownloadServerCategory cat = new DownloadServerCategory();
-			cats[tp] = cat;
+			cats[tp.ordinal()] = cat;
 			for(Integer i : mp.values()) {
 				cat.sum += i;
 			}
@@ -384,8 +393,8 @@ public class DownloadIndexesService  {
 			
 		}
 
-		public int getPercent(int type, String s) {
-			Integer p = cats[type].percents.get(s);
+		public int getPercent(DownloadServerSpecialty type, String s) {
+			Integer p = cats[type.ordinal()].percents.get(s);
 			if(p == null) {
 				return 0;
 			}
@@ -393,8 +402,8 @@ public class DownloadIndexesService  {
 		}
 		
 		
-		public String getServer(int type) {
-			DownloadServerCategory cat = cats[type];
+		public String getServer(DownloadServerSpecialty type) {
+			DownloadServerCategory cat = cats[type.ordinal()];
 			if (cat.sum > 0) {
 				ThreadLocalRandom tlr = ThreadLocalRandom.current();
 				int val = tlr.nextInt(cat.sum);
