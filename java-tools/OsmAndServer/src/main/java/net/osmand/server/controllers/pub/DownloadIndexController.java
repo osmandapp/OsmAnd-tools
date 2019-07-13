@@ -212,7 +212,19 @@ public class DownloadIndexController {
 	}
 
 	private boolean isSrtm(MultiValueMap<String, String> params) {
-		return isContainAndEqual("srtmcountry", params) || isContainAndEqual("hillshade", params); 
+		return isContainAndEqual("srtmcountry", params); 
+	}
+	
+	private boolean isHillshade(MultiValueMap<String, String> params) {
+		return isContainAndEqual("hillshade", params); 
+	}
+	
+	private boolean isRoad(MultiValueMap<String, String> params) {
+		return isContainAndEqual("road", params); 
+	}
+	
+	private boolean isWiki(MultiValueMap<String, String> params) {
+		return isContainAndEqual("wikivoyage", params) || isContainAndEqual("wiki", params); 
 	}
 	
 	private boolean isLiveMaps(MultiValueMap<String, String> params) {
@@ -256,9 +268,16 @@ public class DownloadIndexController {
 			String host = null;
 			if(isSrtm(params)) {
 				host = servers.getServer(DownloadServerSpecialty.SRTM);
+			} else if(isHillshade(params)) {
+				host = servers.getServer(DownloadServerSpecialty.HILLSHADE);
 			} else if(isLiveMaps(params)) {
 				host = servers.getServer(DownloadServerSpecialty.OSMLIVE);
-			} else if(isMaps(params)) {
+			} else if(isWiki(params)) {
+				host = servers.getServer(DownloadServerSpecialty.WIKI);
+			} else if(isRoad(params)) {
+				host = servers.getServer(DownloadServerSpecialty.ROADS);
+			
+			} else {
 				host = servers.getServer(DownloadServerSpecialty.MAIN);
 			}
 			if(host != null) {
