@@ -26,13 +26,13 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.zip.GZIPInputStream;
 
-import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.map.hash.TLongObjectHashMap;
 import rtree.RTreeException;
 
@@ -122,11 +122,11 @@ public class ObfDiffGenerator {
 		if (endStopData == null) {
 			return;
 		}
-		TIntObjectHashMap<TransportRoute> startRouteData = fStart.getTransportRoutes();
-		TIntObjectHashMap<TransportRoute> endRouteData = fEnd.getTransportRoutes();
-		if (endRouteData == null) {
-			return;
-		}
+		TLongObjectHashMap<TransportRoute> startRouteData = fStart.getTransportRoutes();
+		TLongObjectHashMap<TransportRoute> endRouteData = fEnd.getTransportRoutes();
+		TLongObjectHashMap<List<Long>> startStopRoutes = fStart.getTransportStopRoutes();
+		TLongObjectHashMap<List<Long>> endStopRoutes = fEnd.getTransportStopRoutes();
+
 		for (Long idx : startStopData.keys()) {
 			TransportStop objS = startStopData.get(idx);
 			TransportStop objE = endStopData.get(idx);
@@ -135,7 +135,7 @@ public class ObfDiffGenerator {
 				if (objE == null) {
 					System.out.println("Transport stop " + idx + " is missing in (2): " + objS);
 				} else {
-					if (!objE.compareStop(objS) || !compareRoutes(objS, startRouteData, objE, endRouteData)) {
+					if (!objE.compareStop(objS) || !compareRoutes(objS, startRouteData, startStopRoutes, objE, endRouteData, endStopRoutes)) {
 						System.out.println("Transport stop " + idx + " is not equal: " + objS + " != " + objE);
 					}
 					endStopData.remove(idx);
@@ -146,7 +146,7 @@ public class ObfDiffGenerator {
 						objS.setDeleted();
 						endStopData.put(idx, objS);
 					}
-				} else if (objE.compareStop(objS) && compareRoutes(objS, startRouteData, objE, endRouteData)) {
+				} else if (objE.compareStop(objS) && compareRoutes(objS, startRouteData, startStopRoutes, objE, endRouteData, endStopRoutes)) {
 					endStopData.remove(idx);
 				}
 			}
@@ -158,21 +158,21 @@ public class ObfDiffGenerator {
 		}
 	}
 
-	private boolean compareRoutes(TransportStop stopS, TIntObjectHashMap<TransportRoute> routesS,
-								  TransportStop stopE, TIntObjectHashMap<TransportRoute> routesE) {
-		int[] refsS = stopS.getReferencesToRoutes();
-		int[] refsE = stopE.getReferencesToRoutes();
-		if (refsS != null && refsE != null && refsS.length == refsE.length) {
+	private boolean compareRoutes(TransportStop stopS, TLongObjectHashMap<TransportRoute> routesS, TLongObjectHashMap<List<Long>> startStopRoutes,
+								  TransportStop stopE, TLongObjectHashMap<TransportRoute> routesE, TLongObjectHashMap<List<Long>> endStopRoutes) {
+		List<Long> routeIdsS = startStopRoutes.get(stopS.getId());
+		List<Long> routeIdsE = endStopRoutes.get(stopE.getId());
+		if (routeIdsS != null && routeIdsE != null && routeIdsS.size() == routeIdsE.size()) {
 			TLongObjectHashMap<TransportRoute> startRoutes = new TLongObjectHashMap<>();
 			TLongObjectHashMap<TransportRoute> endRoutes = new TLongObjectHashMap<>();
-			for (int ref : refsS) {
-				TransportRoute r = routesS.get(ref);
+			for (Long id : routeIdsS) {
+				TransportRoute r = routesS.get(id);
 				if (r != null) {
 					startRoutes.put(r.getId(), r);
 				}
 			}
-			for (int ref : refsE) {
-				TransportRoute r = routesE.get(ref);
+			for (Long id : routeIdsE) {
+				TransportRoute r = routesE.get(id);
 				if (r != null) {
 					endRoutes.put(r.getId(), r);
 				}
@@ -187,7 +187,7 @@ public class ObfDiffGenerator {
 			}
 			return true;
 		}
-		return refsS == null && refsE == null;
+		return routeIdsS == null && routeIdsE == null;
 	}
 
 	private void comparePOI(ObfFileInMemory fStart, ObfFileInMemory fEnd, boolean print, Set<EntityId> modifiedObjIds) {

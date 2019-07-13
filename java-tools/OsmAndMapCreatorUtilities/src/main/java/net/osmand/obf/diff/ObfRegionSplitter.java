@@ -15,6 +15,7 @@ import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.binary.MapZooms.MapZoomPair;
 import net.osmand.binary.RouteDataObject;
 import net.osmand.data.Amenity;
+import net.osmand.data.TransportRoute;
 import net.osmand.data.TransportStop;
 import net.osmand.map.OsmandRegions;
 import net.osmand.map.WorldRegion;
@@ -95,36 +96,25 @@ public class ObfRegionSplitter {
 					obf.putPoiData(poi, true);
 				}
 				TLongObjectHashMap<TransportStop> stops = regionsTransportData.get(regionName);
-				Map<Long, int[]> stopRefs = null;
 				if (stops != null) {
-					stopRefs = new HashMap<>();
 					Collection<TransportStop> stopsCollection = stops.valueCollection();
-					// save references to routes to be restored before next step
-					for (TransportStop stop : stopsCollection) {
-						int[] referencesToRoutes = stop.getReferencesToRoutes();
-						if (referencesToRoutes != null && referencesToRoutes.length > 0) {
-							int[] refsCopy = new int[referencesToRoutes.length];
-							System.arraycopy(referencesToRoutes, 0, refsCopy, 0, referencesToRoutes.length);
-							stopRefs.put(stop.getId(), refsCopy);
+					TLongObjectHashMap<TransportRoute> fileTransportRoutes = fl.getTransportRoutes();
+					TLongObjectHashMap<List<Long>> transportStopRoutes = fl.getTransportStopRoutes();
+					TLongObjectHashMap<TransportRoute> transportRoutes = new TLongObjectHashMap<>();
+					for (TransportStop transportStop : stopsCollection) {
+						List<Long> routeIds = transportStopRoutes.get(transportStop.getId());
+						if (routeIds != null) {
+							for (Long routeId : routeIds) {
+								transportRoutes.put(routeId, fileTransportRoutes.get(routeId));
+							}
 						}
 					}
-					obf.setTransportRoutes(fl.getTransportRoutes());
-					obf.setRoutesIds(fl.getRoutesIds());
+					obf.setTransportRoutes(transportRoutes);
+					obf.setTransportStopRoutes(fl.getTransportStopRoutes());
 					obf.putTransportData(stopsCollection, null, true);
 				}
-				
 				obf.updateTimestamp(fl.getTimestamp());
 				obf.writeFile(result, true);
-
-				if (stopRefs != null) {
-					// restore references to routes
-					for (TransportStop stop : stops.valueCollection()) {
-						int[] refs = stopRefs.get(stop.getId());
-						if (refs != null) {
-							stop.setReferencesToRoutes(refs);
-						}
-					}
-				}
 			}
 		} catch (Exception e) {
 			e.printStackTrace();

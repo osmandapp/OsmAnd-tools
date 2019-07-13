@@ -61,6 +61,7 @@ import java.util.zip.GZIPOutputStream;
 
 import gnu.trove.iterator.TLongObjectIterator;
 import gnu.trove.list.array.TIntArrayList;
+import gnu.trove.map.TIntLongMap;
 import gnu.trove.map.hash.TIntLongHashMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.map.hash.TLongObjectHashMap;
@@ -87,8 +88,8 @@ public class ObfFileInMemory {
 	private TLongObjectHashMap<Map<String, Amenity>> poiObjects = new TLongObjectHashMap<>();
 	
 	private TLongObjectHashMap<TransportStop> transportStops = new TLongObjectHashMap<>();
-	private TIntObjectHashMap<TransportRoute> transportRoutes = new TIntObjectHashMap<>();
-	private TIntLongHashMap routesIds = new TIntLongHashMap();
+	private TLongObjectHashMap<TransportRoute> transportRoutes = new TLongObjectHashMap<>();
+	private TLongObjectHashMap<List<Long>> transportStopRoutes = new TLongObjectHashMap<>();
 
 	public TLongObjectHashMap<BinaryMapDataObject> get(MapZooms.MapZoomPair zoom) {
 		if (!mapObjects.containsKey(zoom)) {
@@ -121,20 +122,20 @@ public class ObfFileInMemory {
 		return transportStops;
 	}
 
-	public TIntObjectHashMap<TransportRoute> getTransportRoutes() {
+	public TLongObjectHashMap<TransportRoute> getTransportRoutes() {
 		return transportRoutes;
 	}
 
-	public void setTransportRoutes(TIntObjectHashMap<TransportRoute> transportRoutes) {
+	public void setTransportRoutes(TLongObjectHashMap<TransportRoute> transportRoutes) {
 		this.transportRoutes = transportRoutes;
 	}
 
-	public TIntLongHashMap getRoutesIds() {
-		return routesIds;
+	public TLongObjectHashMap<List<Long>> getTransportStopRoutes() {
+		return transportStopRoutes;
 	}
 
-	public void setRoutesIds(TIntLongHashMap routesIds) {
-		this.routesIds = routesIds;
+	public void setTransportStopRoutes(TLongObjectHashMap<List<Long>> transportStopRoutes) {
+		this.transportStopRoutes = transportStopRoutes;
 	}
 
 	public void putMapObjects(MapZoomPair pair, Collection<BinaryMapDataObject> objects, boolean override) {
@@ -268,9 +269,9 @@ public class ObfFileInMemory {
 				int[] referencesToRoutes = stop.getReferencesToRoutes();
 				if (referencesToRoutes != null && referencesToRoutes.length > 0) {
 					List<Integer> newReferencesToRoutes = new ArrayList<>();
-					for (int referencesToRoute : referencesToRoutes) {
-						long routeId = routesIds.get(referencesToRoute);
-						if (routeId != routesIds.getNoEntryValue()) {
+					List<Long> routeIds = transportStopRoutes.get(stop.getId());
+					if (routeIds != null) {
+						for (Long routeId : routeIds) {
 							Long newOffset = newRoutesIds.get(routeId);
 							if (newOffset != null) {
 								newReferencesToRoutes.add(newOffset.intValue());
@@ -524,30 +525,35 @@ public class ObfFileInMemory {
 				MapUtils.get31TileNumberY(latbottom),
 				-1, null);
 		List<TransportStop> sti = indexReader.searchTransportIndex(sr);
-		List<Integer> routesData = new ArrayList<>();
-		routesIds.clear();
+		TIntLongMap routesData = new TIntLongHashMap();
 		putTransportData(sti, routesData, override);
 		if (routesData.size() > 0) {
-			int[] array = new int[routesData.size()];
-			for(int i = 0; i < routesData.size(); i++) {
-				array[i] = routesData.get(i);
-			}
-			transportRoutes = indexReader.getTransportRoutes(array);
-			for (int k : transportRoutes.keys()) {
-				TransportRoute route = transportRoutes.get(k);
-				routesIds.put(k, route.getId());
+			int[] filePointers = routesData.keys();
+			TIntObjectHashMap<TransportRoute> transportRoutes = indexReader.getTransportRoutes(filePointers);
+			for (TransportRoute route : transportRoutes.valueCollection()) {
+				long stopId = routesData.get(route.getFileOffset());
+				Long routeId = route.getId();
+				List<Long> stopRoutes = transportStopRoutes.get(stopId);
+				if (stopRoutes == null) {
+					stopRoutes = new ArrayList<>();
+					transportStopRoutes.put(stopId, stopRoutes);
+				}
+				stopRoutes.add(routeId);
+				if (override || !this.transportRoutes.containsKey(routeId)) {
+					this.transportRoutes.put(routeId, route);
+				}
 			}
 		}
 	}
 	
-	public void putTransportData(Collection<TransportStop> newData, Collection<Integer> routesData, boolean override) {
+	public void putTransportData(Collection<TransportStop> newData, TIntLongMap routesStopsData, boolean override) {
 		for (TransportStop ts : newData) {
-			if (routesData != null) {
+			if (routesStopsData != null) {
 				int[] referencesToRoutes = ts.getReferencesToRoutes();
 				if (referencesToRoutes != null && referencesToRoutes.length > 0) {
 					for (int ref : referencesToRoutes) {
-						if (override || !routesData.contains(ref)) {
-							routesData.add(ref);
+						if (override || !routesStopsData.containsKey(ref)) {
+							routesStopsData.put(ref, ts.getId());
 						}
 					}
 				}
