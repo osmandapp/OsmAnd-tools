@@ -243,6 +243,15 @@ public class ObfFileInMemory {
 			Map<Long, Long> newRoutesIds = new LinkedHashMap<>();
 
 			writer.startWriteTransportIndex(Algorithms.capitalizeFirstLetter(name));
+			TLongObjectHashMap<TransportRoute> transportRoutes = new TLongObjectHashMap<>();
+			for (TransportStop transportStop : transportStops.valueCollection()) {
+				List<Long> routeIds = transportStopRoutes.get(transportStop.getId());
+				if (routeIds != null) {
+					for (Long routeId : routeIds) {
+						transportRoutes.put(routeId, this.transportRoutes.get(routeId));
+					}
+				}
+			}
 			if (transportRoutes.size() > 0) {
 				writer.startWriteTransportRoutes();
 				ByteArrayOutputStream ows = new ByteArrayOutputStream();

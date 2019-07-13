@@ -98,18 +98,7 @@ public class ObfRegionSplitter {
 				TLongObjectHashMap<TransportStop> stops = regionsTransportData.get(regionName);
 				if (stops != null) {
 					Collection<TransportStop> stopsCollection = stops.valueCollection();
-					TLongObjectHashMap<TransportRoute> fileTransportRoutes = fl.getTransportRoutes();
-					TLongObjectHashMap<List<Long>> transportStopRoutes = fl.getTransportStopRoutes();
-					TLongObjectHashMap<TransportRoute> transportRoutes = new TLongObjectHashMap<>();
-					for (TransportStop transportStop : stopsCollection) {
-						List<Long> routeIds = transportStopRoutes.get(transportStop.getId());
-						if (routeIds != null) {
-							for (Long routeId : routeIds) {
-								transportRoutes.put(routeId, fileTransportRoutes.get(routeId));
-							}
-						}
-					}
-					obf.setTransportRoutes(transportRoutes);
+					obf.setTransportRoutes(fl.getTransportRoutes());
 					obf.setTransportStopRoutes(fl.getTransportStopRoutes());
 					obf.putTransportData(stopsCollection, null, true);
 				}
