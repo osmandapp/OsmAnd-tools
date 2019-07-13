@@ -516,7 +516,8 @@ public class ObfFileInMemory {
 					 // read all data later
 				}
 			}
-			readTransportData(indexReader, true);
+			// turn off until fix
+			//readTransportData(indexReader, true);
 			updateTimestamp(indexReader.getDateCreated());
 			indexReader.close();
 			raf.close();
