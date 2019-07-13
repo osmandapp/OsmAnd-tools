@@ -7,6 +7,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.Enumeration;
 import java.util.HashMap;
@@ -353,15 +354,12 @@ public class DownloadIndexesService  {
 		
 		Set<String> serverNames = new TreeSet<String>();
 		DownloadServerCategory[] cats = new DownloadServerCategory[DownloadServerSpecialty.values().length];
-		Map<String, Map<String, Integer>> servers = new HashMap<>();
+		Map<String, Map<String, Integer>> servers = new TreeMap<>();
 		
 		public void prepare() {
-			for(String s : servers.keySet()) {
-				try {
-					prepare(DownloadServerSpecialty.valueOf(s.toUpperCase()), servers.get(s));
-				} catch (Exception e) {
-					LOGGER.info(e.getMessage(), e);
-				}
+			for(DownloadServerSpecialty s : DownloadServerSpecialty.values()) {
+				Map<String, Integer> mp = servers.get(s.name().toLowerCase());
+				prepare(s, mp == null ? Collections.emptyMap() : mp);
 			}
 		}
 		
