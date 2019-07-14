@@ -58,8 +58,8 @@ public class OsmAndServerMonitorTasks {
 
 	private static final int MAPS_COUNT_THRESHOLD = 700;
 
-	private static final String[] HOSTS_TO_TEST = new String[] { "download.osmand.net", "dl4.osmand.net",
-			"dl6.osmand.net", "dl1.osmand.net", "dl7.osmand.net",  "dl8.osmand.net",  "dl9.osmand.net"};
+	private static final String[] HOSTS_TO_TEST = new String[] { "download.osmand.net", 
+			 "dl1.osmand.net", "dl6.osmand.net","dl7.osmand.net",  "dl8.osmand.net",  "dl9.osmand.net"};
 	private static final String TILE_SERVER = "https://tile.osmand.net/hd/";
 
 	private static final double PERC = 95;
@@ -77,7 +77,7 @@ public class OsmAndServerMonitorTasks {
 	
 
 	@Value("${monitoring.enabled}")
-    private boolean enabled;
+	private boolean enabled;
 	
 	@Autowired
 	private StringRedisTemplate redisTemplate;
