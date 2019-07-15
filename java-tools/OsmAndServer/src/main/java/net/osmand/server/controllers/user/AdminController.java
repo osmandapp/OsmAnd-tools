@@ -397,7 +397,7 @@ public class AdminController {
 	
 	
 	private BtcTransactionReport getBitcoinReport() {
-		new File(websiteLocation, BTC_REPORT);
+//		new File(websiteLocation, BTC_REPORT);
 		return reports.getBitcoinTransactionReport();
 	}
 	private List<EmailReport> getEmailsDBReport() {

@@ -35,6 +35,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.URLDecoder;
 import java.sql.Connection;
@@ -97,8 +98,7 @@ public class ApiController {
     @GetMapping(path = {"/osmlive_status.php", "/osmlive_status"}, produces = "text/html;charset=UTF-8")
     @ResponseBody
     public FileSystemResource osmLiveStatus() throws IOException  {
-        String procFile = filesLocation.concat(PROC_FILE);
-        FileSystemResource fsr = new FileSystemResource(procFile);
+        FileSystemResource fsr = new FileSystemResource(new File(filesLocation, PROC_FILE));
         return fsr;
     }
     
