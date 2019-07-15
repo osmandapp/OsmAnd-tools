@@ -38,9 +38,14 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
+import org.thymeleaf.IEngineConfiguration;
 import org.thymeleaf.context.IContext;
 import org.thymeleaf.context.WebContext;
 import org.thymeleaf.spring5.SpringTemplateEngine;
+import org.thymeleaf.templateresolver.ITemplateResolver;
+import org.thymeleaf.templateresolver.TemplateResolution;
+
+import com.jcraft.jsch.Logger;
 
 @Controller
 @RequestMapping(path = {"", "ru", "de"  })
@@ -142,6 +147,7 @@ public class WebController {
 				}
 				variables.put("translation", enableTranslation);
 				variables.put("locale_path", localePath);
+				LOGGER.info(String.format("Generate static file %s, localePath %s", file, localePath) );
 				gr = new GeneratedResource();
 				File targetFile = new File(genLocation, file);
 				gr.staticResource = new FileSystemResource(targetFile);
@@ -319,6 +325,7 @@ public class WebController {
 		String l = getLocaleFromRequest(request);
 		if (l.length() > 0) {
 			String fullPath = resourcePath + l + "/" + id;
+			System.out.println(websiteLocation + " " + fullPath);
 			if (new File(websiteLocation, fullPath).exists() || new File(websiteLocation, fullPath + ".html").exists()) {
 				return fullPath;
 			}
