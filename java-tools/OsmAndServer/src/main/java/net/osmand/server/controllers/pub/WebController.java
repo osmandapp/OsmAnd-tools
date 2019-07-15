@@ -320,8 +320,9 @@ public class WebController {
 		String l = getLocaleFromRequest(request);
 		if (l.length() > 0) {
 			String fullPath = resourcePath + l + "/" + id;
-			System.out.println(websiteLocation + " " + fullPath);
+			System.out.println(websiteLocation + " " + fullPath + ".html");
 			if (new File(websiteLocation, fullPath).exists() || new File(websiteLocation, fullPath + ".html").exists()) {
+				System.out.println(websiteLocation + " " + fullPath + " check");
 				return fullPath;
 			}
 		}

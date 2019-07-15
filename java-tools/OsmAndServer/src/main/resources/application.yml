@@ -27,9 +27,9 @@ server:
   port: 8080
   tomcat.max-threads: 5
   connection-timeout: 120000
-files.location: ${user.dir}/../../../help/
-gen.location: ${files.location}/gen/
-web.location: ${files.location}/website/
+files.location: ${user.dir}/../../../help
+gen.location: ${files.location}/gen
+web.location: ${files.location}/website
 
 management:
   endpoints:
@@ -63,9 +63,9 @@ geoip.url: "http://localhost:8081/json/"
 ---
 spring.jpa.hibernate.ddl-auto: validate
 
-files.location: /var/www-download/
-gen.location: ${files.location}/gen/
-web.location: ${files.location}/website/
+files.location: /var/www-download
+gen.location: ${files.location}/gen
+web.location: ${files.location}/website
 
 logging:
   file: /var/log/osmand-server-logs/error.log
