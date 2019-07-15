@@ -84,7 +84,7 @@ public class CalculateOsmChangesets {
         SSLContext.setDefault(ctx);
         
 		// jdbc:postgresql://user:secret@localhost
-		Connection conn = DriverManager.getConnection("jdbc:postgresql://localhost:5433/changeset",
+		Connection conn = DriverManager.getConnection(System.getenv("DB_CONN"),
 				isEmpty(System.getenv("DB_USER")) ? "test" : System.getenv("DB_USER"),
 				isEmpty(System.getenv("DB_PWD")) ? "test" : System.getenv("DB_PWD"));
 		List<String> toQuery = new LinkedList<String>();
@@ -262,7 +262,7 @@ public class CalculateOsmChangesets {
 
 	public static void calculateCountries() throws Exception {
 		// jdbc:postgresql://user:secret@localhost
-		Connection conn = DriverManager.getConnection("jdbc:postgresql://localhost:5433/changeset",
+		Connection conn = DriverManager.getConnection(System.getenv("DB_CONN"),
 				System.getenv("DB_USER"), System.getenv("DB_PWD"));
 		try {
 			Statement stat = conn.createStatement();

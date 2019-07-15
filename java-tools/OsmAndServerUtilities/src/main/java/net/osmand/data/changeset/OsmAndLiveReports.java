@@ -44,7 +44,7 @@ public class OsmAndLiveReports {
 	
 	
 	public static void main(String[] args) throws Exception {
-		Connection conn = DriverManager.getConnection("jdbc:postgresql://localhost:5433/changeset",
+		Connection conn = DriverManager.getConnection(System.getenv("DB_CONN"),
 				isEmpty(System.getenv("DB_USER")) ? "test" : System.getenv("DB_USER"),
 						isEmpty(System.getenv("DB_PWD")) ? "test" : System.getenv("DB_PWD"));
 		if(args != null && args.length > 0) {
@@ -290,46 +290,6 @@ public class OsmAndLiveReports {
 		return true;
 	}
 
-	protected static void migrateData(Connection conn) throws SQLException, ParseException {
-		PreparedStatement ins = conn.prepareStatement(
-				"insert into final_reports(month, region, name, report, time, accesstime) values (?, ?, ?, ?, ?, ?)");
-		SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
-		for(int y= 2015; y <= 2018; y++) {
-			int si = y == 2015 ? 8 : 1;
-			int ei = y == 2018 ? 8 : 12;
-			
-			
-			for (int i = si; i <= ei; i++) {
-				String m = i < 10 ? "0" + i : i + "";
-				String month = y + "-" + m;
-				Connection connFrom = DriverManager.getConnection("jdbc:postgresql://localhost:5433/changeset_" + y
-						+ "_" + m, isEmpty(System.getenv("DB_USER")) ? "test" : System.getenv("DB_USER"),
-						isEmpty(System.getenv("DB_PWD")) ? "test" : System.getenv("DB_PWD"));
-				String r = "select report,region,name from final_reports where month = ?";
-				PreparedStatement p = connFrom.prepareStatement(r);
-				p.setString(1, month);
-				int reports = 0;
-				ResultSet rs = p.executeQuery();
-				Date dt = sdf.parse(month+"-01");
-				while (rs.next()) {
-					ins.setString(1, month);
-					ins.setString(2, rs.getString("region"));
-					ins.setString(3, rs.getString("name"));
-					ins.setString(4, rs.getString("report"));
-					ins.setTimestamp(5, new Timestamp(dt.getTime()));
-					ins.setTimestamp(6, new Timestamp(dt.getTime()));
-					ins.addBatch();
-					reports++;
-
-				}
-				ins.executeBatch();
-				System.out.println("Processs " + month + " " + reports + " reports");
-				connFrom.close();
-
-			}
-		}
-		ins.close();
-	}
 	
 	
 	private String month;
