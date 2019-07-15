@@ -56,6 +56,8 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonIOException;
+import com.google.gson.JsonSyntaxException;
 import com.google.gson.reflect.TypeToken;
 import com.google.gson.stream.JsonReader;
 
@@ -201,6 +203,7 @@ public class ReportsController {
 
 	@SuppressWarnings("unchecked")
 	public BtcTransactionReport generateBtcReport(boolean genBalanceReport) {
+		JsonReader reader = null;
 		try {
 			BtcTransactionReport rep = new BtcTransactionReport();
 			if (btcJsonRpcUser != null) {
@@ -218,10 +221,11 @@ public class ReportsController {
 			if (genBalanceReport) {
 				getCacheFile(TRANSACTIONS_FILE).delete();
 			}
-			JsonReader reader = readJsonUrl(
+			reader = readJsonUrl(
 					"https://raw.githubusercontent.com/osmandapp/osmandapp.github.io/master/website/reports/transactions.json",
 					TRANSACTIONS_FILE, true);
 			rep.mapTransactions = (Map<String, BtcTransactionsMonth>) formatter.fromJson(reader, tp);
+			
 			for (Map.Entry<String, BtcTransactionsMonth> key : rep.mapTransactions.entrySet()) {
 				BtcTransactionsMonth t = key.getValue();
 				t.month = key.getKey();
@@ -246,6 +250,14 @@ public class ReportsController {
 			btcTransactionReport = rep;
 		} catch (Exception e) {
 			LOGGER.error("Fails to read transactions.json: " + e.getMessage(), e);
+		} finally {
+			if(reader != null) {
+				try {
+					reader.close();
+				} catch (IOException e) {
+					LOGGER.info(e.getMessage(), e);
+				}
+			}
 		}
 
 		return btcTransactionReport;
@@ -523,7 +535,13 @@ public class ReportsController {
 			tx.total = 0;
 			t.txValues.add(tx);
 			try {
-				Map<?, ?> payoutObjects = formatter.fromJson(readJsonUrl(tx.rawurl, cacheId, true), Map.class);
+				JsonReader rdr = readJsonUrl(tx.rawurl, cacheId, true);
+				Map<?, ?> payoutObjects;
+				try {
+					payoutObjects = formatter.fromJson(rdr, Map.class);
+				} finally {
+					rdr.close();
+				}
 				// Map<?, ?> data = (Map<?, ?>) payoutObjects.get("data");
 				Map<String, String> ins = new TreeMap<String, String>();
 				long totalIn = 0;
@@ -652,8 +670,13 @@ public class ReportsController {
 					period += "0";
 				}
 				period += month;
-				Map<?, ?> payoutObjects = formatter
-						.fromJson(readJsonUrl(REPORT_URL + period, PAYOUTS_CACHE_ID + month, false), Map.class);
+				JsonReader rdr = readJsonUrl(REPORT_URL + period, PAYOUTS_CACHE_ID + month, false);
+				Map<?, ?> payoutObjects;
+				try {
+					payoutObjects = formatter.fromJson(rdr, Map.class);
+				} finally {
+					rdr.close();
+				}
 				if (payoutObjects == null) {
 					continue;
 				}

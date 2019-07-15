@@ -90,7 +90,7 @@ public class BinaryInspector {
 					"-zoom=15",
 //					"-bbox=30.51,50.5,30.53,50.4",
 //					"-osm="+System.getProperty("maps.dir")+"/basemap/map.obf.osm",
-					System.getProperty("maps.dir")+"/Netherlands_noord-holland_europe_2.obf"
+					System.getProperty("maps.dir")+"/osmlive/Netherlands_noord-holland_europe_19_07_00.obf"
 			});
 		} else {
 			in.inspector(args);
