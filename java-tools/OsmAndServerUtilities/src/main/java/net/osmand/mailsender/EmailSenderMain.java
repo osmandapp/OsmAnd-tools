@@ -305,7 +305,7 @@ public class EmailSenderMain {
 
     @Nullable
     private static Connection getConnection() {
-        String url = "jdbc:postgresql://localhost:5433/changeset";
+        String url = System.getenv("DB_CONN");
         String user = System.getenv("DB_USER");
         String password = System.getenv("DB_PWD");
 
