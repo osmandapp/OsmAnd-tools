@@ -84,7 +84,8 @@ public class MotdService {
 		if (settings != null) {
 			for (DiscountSetting setting : settings.discountSettings) {
 				if (setting.discountCondition.checkCondition(params, locationService)) {
-					message = setting.parseMotdMessageFile(mapper, websiteLocation.concat("api/messages/"));
+					message = setting.parseMotdMessageFile(mapper, 
+							new File(websiteLocation, "api/messages/"));
 					break;
 				}
 			}
@@ -92,17 +93,17 @@ public class MotdService {
         return message;
     }
     
-    public String getSubscriptions(MessageParams params)
+    public File getSubscriptions(MessageParams params)
 			throws IOException, ParseException {
 		MotdSettings settings = getSubscriptionSettings();
 		if (settings != null) {
 			for (DiscountSetting setting : settings.discountSettings) {
 				if (setting.discountCondition.checkCondition(params, locationService)) {
-					return websiteLocation.concat("api/subscriptions/" + setting.file);
+					return new File(websiteLocation, "api/subscriptions/" + setting.file);
 				}
 			}
 		}
-		return websiteLocation.concat("api/subscriptions/empty.json");
+		return new File(websiteLocation, "api/subscriptions/empty.json");
 	}
 
     @PostConstruct
@@ -112,9 +113,9 @@ public class MotdService {
     
     public boolean reloadconfig(List<String> errors) {
     	try {
-    		this.settings = mapper.readValue(new File(websiteLocation.concat(MOTD_SETTINGS)), MotdSettings.class);
+    		this.settings = mapper.readValue(new File(websiteLocation, MOTD_SETTINGS), MotdSettings.class);
     		this.settings.prepare();
-    		this.subscriptionSettings = mapper.readValue(new File(websiteLocation.concat(SUBSCRIPTION_SETTINGS)), MotdSettings.class);
+    		this.subscriptionSettings = mapper.readValue(new File(websiteLocation, SUBSCRIPTION_SETTINGS), MotdSettings.class);
     		this.subscriptionSettings.prepare();
     	} catch (IOException ex) {
     		if(errors != null) {
@@ -153,7 +154,7 @@ public class MotdService {
         public Map<String, String> fields;
         
         
-        protected HashMap<String,Object> parseMotdMessageFile(ObjectMapper mapper, String folder) throws IOException {
+        protected HashMap<String,Object> parseMotdMessageFile(ObjectMapper mapper, File folder) throws IOException {
         	if(file != null && file.length() > 0 && new File(folder, file).exists() ) {
         		TypeReference<HashMap<String,Object>> typeRef = new TypeReference<HashMap<String,Object>>() {};
         		HashMap<String,Object> res = mapper.readValue(new File(folder, file), typeRef);

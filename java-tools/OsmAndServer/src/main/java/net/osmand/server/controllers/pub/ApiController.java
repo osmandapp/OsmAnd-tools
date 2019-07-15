@@ -250,7 +250,7 @@ public class ApiController {
 			}
 		}
 
-		String file = motdService.getSubscriptions(params);
+		File file = motdService.getSubscriptions(params);
 		FileSystemResource fsr = new FileSystemResource(file);
 		return fsr;
 	}

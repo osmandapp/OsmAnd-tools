@@ -228,8 +228,7 @@ public class IndexController {
             xmlWriter.writeStartElement("updates");
             xmlWriter.writeAttribute("file", file);
             xmlWriter.writeAttribute("timestamp", String.valueOf(timestamp));
-            String folder = "aosmc".concat(File.separator).concat(file.toLowerCase()).concat(File.separator);
-            File dir = new File(filesLocation, folder);
+            File dir = new File(filesLocation, "aosmc/"+file.toLowerCase());
             if (dir.isDirectory()) {
                 Stream<File> files = Arrays.stream(dir.listFiles());
                 List<File> sortedFiles = files.sorted(Comparator.comparing(File::getName)).collect(Collectors.toList());
