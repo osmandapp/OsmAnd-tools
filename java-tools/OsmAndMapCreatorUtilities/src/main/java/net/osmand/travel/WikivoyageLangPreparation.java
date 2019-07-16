@@ -435,7 +435,7 @@ public class WikivoyageLangPreparation {
 						if(point.desc == null) {
 							point.desc = "";
 						} else {
-							point.desc += "\n";
+							point.desc += "\n\r";
 						}
 						String value = extraValues.get(key);
 						if(areaCode.length() > 0 && key.equals("Phone")) {
