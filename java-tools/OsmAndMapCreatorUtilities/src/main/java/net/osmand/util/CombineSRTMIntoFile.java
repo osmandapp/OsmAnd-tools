@@ -39,7 +39,7 @@ import rtree.RTree;
 public class CombineSRTMIntoFile {
 	private static final Log log = PlatformUtil.getLog(CombineSRTMIntoFile.class);
 	private static final int NUMBER_OF_FILES_TO_PROCESS_ON_DISK = 50;
-	private static final long SIZE_GB_TO_COMBINE_INRAM = 1l << 30;
+	private static final long SIZE_GB_TO_COMBINE_INRAM = 2l << 30; // 2GB
 
 	public static void main(String[] args) throws IOException {
 		File directoryWithSRTMFiles = new File(args[0]);
