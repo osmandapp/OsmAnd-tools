@@ -38,7 +38,8 @@ import rtree.RTree;
 
 public class CombineSRTMIntoFile {
 	private static final Log log = PlatformUtil.getLog(CombineSRTMIntoFile.class);
-	private static final int NUMBER_OF_FILES_TO_PROCESS_ON_DISK = 20;
+	private static final int NUMBER_OF_FILES_TO_PROCESS_ON_DISK = 50;
+	private static final long SIZE_GB_TO_COMBINE_INRAM = 1l << 30;
 
 	public static void main(String[] args) throws IOException {
 		File directoryWithSRTMFiles = new File(args[0]);
@@ -172,13 +173,14 @@ public class CombineSRTMIntoFile {
 		}
 //		final File work = new File(directoryWithTargetFiles, "work");
 //		Map<File, String> mp = new HashMap<File, String>();
-//		long length = 0;
+		long length = 0;
 		List<File> files = new ArrayList<File>();
 		for(String file : srtmFileNames) {
 			final File fl = new File(directoryWithSRTMFiles, file + ".osm.bz2");
 			if(!fl.exists()) {
 				System.err.println("!! Missing " + name + " because " + file + " doesn't exist");
 			} else {
+				length += fl.length(); 
 				files.add(fl);
 //				File ttf = new File(fl.getParentFile(), Algorithms.capitalizeFirstLetterAndLowercase(file) + "_"+ name + ".obf");
 //				mp.put(ttf, null);
@@ -196,14 +198,15 @@ public class CombineSRTMIntoFile {
 		settings.zoomWaySmoothness = 2;
 		settings.boundary = polygon;
 		IndexCreator ic = new IndexCreator(targetFile.getParentFile(), settings);
-		if(srtmFileNames.size() > NUMBER_OF_FILES_TO_PROCESS_ON_DISK) {
+		
+		if(srtmFileNames.size() > NUMBER_OF_FILES_TO_PROCESS_ON_DISK || length > SIZE_GB_TO_COMBINE_INRAM) {
 			ic.setDialects(DBDialect.SQLITE, DBDialect.SQLITE);
 			System.out.println("SQLITE on disk is used.");
 		} else {
 			ic.setDialects(DBDialect.SQLITE_IN_MEMORY, DBDialect.SQLITE_IN_MEMORY);
 			System.out.println("SQLITE in memory used: be aware whole database is stored in memory.");
 		}
-		ic.setRegionName(name +" contour lines");
+		ic.setRegionName(name + " contour lines");
 		ic.setMapFileName(targetFile.getName());
 		ic.generateIndexes(files.toArray(new File[files.size()]), new ConsoleProgressImplementation(1), null, MapZooms.parseZooms("11-12;13-"),
 				new MapRenderingTypesEncoder(targetFile.getName()), log, true, false);
