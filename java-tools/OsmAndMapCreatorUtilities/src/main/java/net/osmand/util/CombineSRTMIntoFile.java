@@ -191,8 +191,7 @@ public class CombineSRTMIntoFile {
 			return;
 		}
 		// be independent of previous results
-		new File(targetFile.getParentFile(), IndexCreator.TEMP_NODES_DB).delete();
-		RTree.clearCache();
+		
 		IndexCreatorSettings settings = new IndexCreatorSettings();
 		settings.indexMap = true;
 		settings.zoomWaySmoothness = 2;
@@ -208,8 +207,12 @@ public class CombineSRTMIntoFile {
 		}
 		ic.setRegionName(name + " contour lines");
 		ic.setMapFileName(targetFile.getName());
+		File nodesDB = new File(targetFile.getParentFile(), name + "." + IndexCreator.TEMP_NODES_DB);
+		ic.setNodesDBFile(nodesDB);
 		ic.generateIndexes(files.toArray(new File[files.size()]), new ConsoleProgressImplementation(1), null, MapZooms.parseZooms("11-12;13-"),
 				new MapRenderingTypesEncoder(targetFile.getName()), log, true, false);
+		nodesDB.delete();
+		RTree.clearCache();
 //		if(length > Integer.MAX_VALUE) {
 //			System.err.println("!! Can't process " + name + " because too big");
 //		} else {
