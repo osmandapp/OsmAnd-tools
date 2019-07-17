@@ -39,7 +39,7 @@ import rtree.RTree;
 public class CombineSRTMIntoFile {
 	private static final Log log = PlatformUtil.getLog(CombineSRTMIntoFile.class);
 	private static final int NUMBER_OF_FILES_TO_PROCESS_ON_DISK = 50;
-	private static final long SIZE_GB_TO_COMBINE_INRAM = 2l << 30; // 2GB
+	private static final long SIZE_GB_TO_COMBINE_INRAM = 8l << 30; // 8GB
 
 	public static void main(String[] args) throws IOException {
 		File directoryWithSRTMFiles = new File(args[0]);
@@ -203,7 +203,7 @@ public class CombineSRTMIntoFile {
 			ic.setDialects(DBDialect.SQLITE, DBDialect.SQLITE);
 			System.out.println("SQLITE on disk is used.");
 		} else {
-			ic.setDialects(DBDialect.SQLITE_IN_MEMORY, DBDialect.SQLITE_IN_MEMORY);
+			ic.setDialects(DBDialect.SQLITE, DBDialect.SQLITE_IN_MEMORY);
 			System.out.println("SQLITE in memory used: be aware whole database is stored in memory.");
 		}
 		ic.setRegionName(name + " contour lines");
@@ -219,7 +219,6 @@ public class CombineSRTMIntoFile {
 //			final File fl = new File(work, file);
 //			fl.delete();
 //		}
-
 	}
 
 	private static Way convertToWay(BinaryMapDataObject o) {
