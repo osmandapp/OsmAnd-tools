@@ -120,7 +120,6 @@ public class CombineSRTMIntoFile {
 			}
 		}
 		Multipolygon polygon  = bld.build();
-		System.out.println("RINGS OF MULTIPOLYGON ARE " + polygon.areRingsComplete());
 		int rightLon = (int) Math.floor(qr.right);
 		int leftLon = (int) Math.floor(qr.left);
 		int bottomLat = (int) Math.floor(qr.bottom);
@@ -162,20 +161,20 @@ public class CombineSRTMIntoFile {
 			}
 		}
 		System.out.println();
+		System.out.println("-----------------------------");
 		System.out.println("PROCESSING "+name + " lon [" + leftLon + " - " + rightLon + "] lat [" + bottomLat + " - " + topLat
 				+ "] TOTAL " + srtmFileNames.size() + " files " + srtmFileNames);
-		System.out.println("-----------------------------");
 		if(dryRun) {
 			return;
 		}
 		if(srtmFileNames.size() > limit) {
-			System.out.println("\n\n!!!!!!!! SKIP BECAUSE LIMIT OF FILES EXCEEDED !!!!!!!!!\n\n");
+			System.out.println("\n\n!!!!!!!! WARNING BECAUSE LIMIT OF FILES EXCEEDED !!!!!!!!!\n\n");
 			return;
 		}
 		File procFile = new File(directoryWithTargetFiles, dwName + ".proc");
 		boolean locked = !procFile.createNewFile();
 		if (locked) {
-			System.out.println("\n\n!!!!!!!! SKIP FILE IS BEING PROCESSED !!!!!!!!!\n\n");
+			System.out.println("\n\n!!!!!!!! WARNING FILE IS BEING PROCESSED !!!!!!!!!\n\n");
 			return;
 		}
 		
@@ -195,32 +194,31 @@ public class CombineSRTMIntoFile {
 			}
 		}
 		if(files.isEmpty()) {
-			System.err.println("!!! SKIP " + name + " because no files are present to index !!!");
-			return;
-		}
-		// be independent of previous results
-		
-		IndexCreatorSettings settings = new IndexCreatorSettings();
-		settings.indexMap = true;
-		settings.zoomWaySmoothness = 2;
-		settings.boundary = polygon;
-		IndexCreator ic = new IndexCreator(targetFile.getParentFile(), settings);
-		
-		if(srtmFileNames.size() > NUMBER_OF_FILES_TO_PROCESS_ON_DISK || length > SIZE_GB_TO_COMBINE_INRAM) {
-			ic.setDialects(DBDialect.SQLITE, DBDialect.SQLITE);
-			System.out.println("SQLITE on disk is used.");
+			System.err.println("!!! WARNING " + name + " because no files are present to index !!!");
 		} else {
-			ic.setDialects(DBDialect.SQLITE, DBDialect.SQLITE_IN_MEMORY);
-			System.out.println("SQLITE in memory used: be aware whole database is stored in memory.");
+			IndexCreatorSettings settings = new IndexCreatorSettings();
+			settings.indexMap = true;
+			settings.zoomWaySmoothness = 2;
+			settings.boundary = polygon;
+			IndexCreator ic = new IndexCreator(targetFile.getParentFile(), settings);
+
+			if (srtmFileNames.size() > NUMBER_OF_FILES_TO_PROCESS_ON_DISK || length > SIZE_GB_TO_COMBINE_INRAM) {
+				ic.setDialects(DBDialect.SQLITE, DBDialect.SQLITE);
+				System.out.println("SQLITE on disk is used.");
+			} else {
+				ic.setDialects(DBDialect.SQLITE, DBDialect.SQLITE_IN_MEMORY);
+				System.out.println("SQLITE in memory used: be aware whole database is stored in memory.");
+			}
+			ic.setRegionName(name + " contour lines");
+			ic.setMapFileName(targetFile.getName());
+			File nodesDB = new File(targetFile.getParentFile(), dwName + "." + IndexCreator.TEMP_NODES_DB);
+			ic.setNodesDBFile(nodesDB);
+			ic.generateIndexes(files.toArray(new File[files.size()]), new ConsoleProgressImplementation(1), null,
+					MapZooms.parseZooms("11-12;13-"), new MapRenderingTypesEncoder(targetFile.getName()), log, true,
+					false);
+			nodesDB.delete();
+			RTree.clearCache();
 		}
-		ic.setRegionName(name + " contour lines");
-		ic.setMapFileName(targetFile.getName());
-		File nodesDB = new File(targetFile.getParentFile(), dwName + "." + IndexCreator.TEMP_NODES_DB);
-		ic.setNodesDBFile(nodesDB);
-		ic.generateIndexes(files.toArray(new File[files.size()]), new ConsoleProgressImplementation(1), null, MapZooms.parseZooms("11-12;13-"),
-				new MapRenderingTypesEncoder(targetFile.getName()), log, true, false);
-		nodesDB.delete();
-		RTree.clearCache();
 		procFile.delete();
 //		if(length > Integer.MAX_VALUE) {
 //			System.err.println("!! Can't process " + name + " because too big");
