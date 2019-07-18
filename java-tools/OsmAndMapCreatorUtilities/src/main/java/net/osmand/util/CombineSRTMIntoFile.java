@@ -101,7 +101,8 @@ public class CombineSRTMIntoFile {
 			String downloadName, File directoryWithSRTMFiles, File directoryWithTargetFiles, boolean dryRun, int limit) throws IOException, SQLException, InterruptedException, IllegalArgumentException, XmlPullParserException {
 		final String suffix = "_" + IndexConstants.BINARY_MAP_VERSION + IndexConstants.BINARY_SRTM_MAP_INDEX_EXT;
 		String name = country.getName();
-		final File targetFile = new File(directoryWithTargetFiles, Algorithms.capitalizeFirstLetterAndLowercase(downloadName+suffix));
+		String dwName = Algorithms.capitalizeFirstLetterAndLowercase(downloadName + suffix);
+		final File targetFile = new File(directoryWithTargetFiles, dwName);
 		if(targetFile.exists()) {
 			System.out.println("Already processed "+ name);
 			return;
@@ -171,6 +172,12 @@ public class CombineSRTMIntoFile {
 			System.out.println("\n\n!!!!!!!! SKIP BECAUSE LIMIT OF FILES EXCEEDED !!!!!!!!!\n\n");
 			return;
 		}
+		File procFile = new File(directoryWithTargetFiles, dwName + ".proc");
+		if(procFile.createNewFile()) {
+			System.out.println("\n\n!!!!!!!! SKIP FILE IS BEING PROCESSED !!!!!!!!!\n\n");
+			return;
+		}
+		
 //		final File work = new File(directoryWithTargetFiles, "work");
 //		Map<File, String> mp = new HashMap<File, String>();
 		long length = 0;
@@ -207,12 +214,13 @@ public class CombineSRTMIntoFile {
 		}
 		ic.setRegionName(name + " contour lines");
 		ic.setMapFileName(targetFile.getName());
-		File nodesDB = new File(targetFile.getParentFile(), name + "." + IndexCreator.TEMP_NODES_DB);
+		File nodesDB = new File(targetFile.getParentFile(), dwName + "." + IndexCreator.TEMP_NODES_DB);
 		ic.setNodesDBFile(nodesDB);
 		ic.generateIndexes(files.toArray(new File[files.size()]), new ConsoleProgressImplementation(1), null, MapZooms.parseZooms("11-12;13-"),
 				new MapRenderingTypesEncoder(targetFile.getName()), log, true, false);
 		nodesDB.delete();
 		RTree.clearCache();
+		procFile.delete();
 //		if(length > Integer.MAX_VALUE) {
 //			System.err.println("!! Can't process " + name + " because too big");
 //		} else {
