@@ -173,7 +173,8 @@ public class CombineSRTMIntoFile {
 			return;
 		}
 		File procFile = new File(directoryWithTargetFiles, dwName + ".proc");
-		if(procFile.createNewFile()) {
+		boolean locked = !procFile.createNewFile();
+		if (locked) {
 			System.out.println("\n\n!!!!!!!! SKIP FILE IS BEING PROCESSED !!!!!!!!!\n\n");
 			return;
 		}
