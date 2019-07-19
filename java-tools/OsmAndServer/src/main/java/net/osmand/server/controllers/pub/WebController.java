@@ -79,6 +79,7 @@ public class WebController {
 
 	public WebController() {
 	}
+	
 
 	// TOP LEVEL API (redirects and static files)
 	@RequestMapping(path = { "tile_sources.php", "tile_sources.xml", "tile_sources" }, produces = { "application/xml" })
@@ -87,6 +88,14 @@ public class WebController {
 			@RequestParam(required = false) boolean refresh) throws IOException {
 		return new FileSystemResource(new File(websiteLocation, "tile_sources.xml"));
 	}
+	
+	@RequestMapping(path = { "apple-app-site-association" }, produces = { "application/json" })
+	@ResponseBody
+	public FileSystemResource appleAppSiteAssociation() throws IOException {
+		return new FileSystemResource(new File(websiteLocation, "apple-app-site-association"));
+	}
+	
+	
 
 	@RequestMapping(path = { "go" })
 	public void webLocation(HttpServletRequest request, HttpServletResponse response) {
