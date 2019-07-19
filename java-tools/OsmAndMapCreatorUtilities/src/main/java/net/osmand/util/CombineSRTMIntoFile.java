@@ -85,7 +85,7 @@ public class CombineSRTMIntoFile {
 				String dw = rc.getNameByType(downloadName);
 				System.out.println("Region " + fullName + " " + cnt++ + " out of " + allCountries.size());
 				try {
-					process(rc, lst.subList(1, lst.size()), dw, directoryWithSRTMFiles, directoryWithTargetFiles, dryRun, limit);
+					process(rc, lst, dw, directoryWithSRTMFiles, directoryWithTargetFiles, dryRun, limit);
 				} catch(Exception e) {
 					failedCountries.add(fullName);
 					e.printStackTrace();
@@ -111,13 +111,14 @@ public class CombineSRTMIntoFile {
 		Set<String> srtmFileNames = new TreeSet<String>();
 		QuadRect qr = new QuadRect(180, -90, -180, 90);
 		MultipolygonBuilder bld = new MultipolygonBuilder();
-		bld.addOuterWay(convertToWay(country));
-		updateBbox(country, qr);
 		if(boundaries != null) {
 			for (BinaryMapDataObject o : boundaries) {
 				bld.addOuterWay(convertToWay(o));
 				updateBbox(o, qr);
 			}
+		} else {
+			bld.addOuterWay(convertToWay(country));
+			updateBbox(country, qr);			
 		}
 		Multipolygon polygon  = bld.build();
 		int rightLon = (int) Math.floor(qr.right);

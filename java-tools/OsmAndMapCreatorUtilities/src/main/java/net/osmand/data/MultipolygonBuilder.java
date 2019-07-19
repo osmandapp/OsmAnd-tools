@@ -9,7 +9,9 @@ import java.util.TreeSet;
 import org.apache.commons.logging.Log;
 
 import gnu.trove.map.hash.TLongObjectHashMap;
+import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Way;
+import net.osmand.util.MapUtils;
 
 /**
  * The idea of multipolygon:
@@ -117,27 +119,27 @@ public class MultipolygonBuilder {
 			Way changedWay = toAdd;
 			Way newWay;
 			do {
-				newWay = merge(multilineStartPoint, changedWay.getLastNodeId(), changedWay, 
-						multilineEndPoint, changedWay.getFirstNodeId());
+				newWay = merge(multilineStartPoint, getLastId(changedWay), changedWay, 
+						multilineEndPoint, getFirstId(changedWay));
 				if(newWay == null) {
-					newWay = merge(multilineEndPoint, changedWay.getFirstNodeId(), changedWay, 
-							multilineStartPoint, changedWay.getLastNodeId());
+					newWay = merge(multilineEndPoint, getFirstId(changedWay), changedWay, 
+							multilineStartPoint, getLastId(changedWay));
 				}
 				if(newWay == null) {
-					newWay = merge(multilineStartPoint, changedWay.getFirstNodeId(), changedWay, 
-							multilineEndPoint, changedWay.getLastNodeId());
+					newWay = merge(multilineStartPoint, getFirstId(changedWay), changedWay, 
+							multilineEndPoint, getLastId(changedWay));
 				}
 				if(newWay == null) {
-					newWay = merge(multilineEndPoint, changedWay.getLastNodeId(), changedWay, 
-							multilineStartPoint, changedWay.getFirstNodeId());
+					newWay = merge(multilineEndPoint, getLastId(changedWay), changedWay, 
+							multilineStartPoint, getFirstId(changedWay));
 				}
 				if(newWay != null) {
 					changedWay = newWay;
 				}
 			} while (newWay != null);
 			
-			addToMap(multilineStartPoint, changedWay.getFirstNodeId(), changedWay);
-			addToMap(multilineEndPoint, changedWay.getLastNodeId(), changedWay);
+			addToMap(multilineStartPoint, getFirstId(changedWay), changedWay);
+			addToMap(multilineEndPoint, getLastId(changedWay), changedWay);
 
 		}
 		
@@ -159,8 +161,8 @@ public class MultipolygonBuilder {
 		if(lst != null && lst.size() > 0) {
 			Way candToMerge = lst.get(0);
 			Way newWay = combineTwoWaysIfHasPoints(candToMerge, changedWay);
-			List<Way> otherLst = startMap.get(candToMerge.getLastNodeId() == stNodeId ? candToMerge.getFirstNodeId() :
-				candToMerge.getLastNodeId());
+			List<Way> otherLst = startMap.get(
+					getLastId(candToMerge) == stNodeId ? getFirstId(candToMerge) : getLastId(candToMerge));
 			boolean removed1 = lst.remove(candToMerge) ;
 			boolean removed2 = otherLst != null && otherLst.remove(candToMerge);
 			if(newWay == null || !removed1 || !removed2) {
@@ -180,7 +182,17 @@ public class MultipolygonBuilder {
 		}
 		lst.add(changedWay);
 	}
+	
 
+	private long getId(Node n) {
+		if(n == null ) {
+			return - nextRandId();
+		}
+		long l = MapUtils.get31TileNumberY(n.getLatitude());
+		l = (l << 31) | MapUtils.get31TileNumberX(n.getLongitude());
+		return l;
+	}
+	
 	/**
 	 * make a new Way with the nodes from two other ways
 	 *
@@ -192,16 +204,20 @@ public class MultipolygonBuilder {
 		boolean combine = true;
 		boolean firstReverse = false;
 		boolean secondReverse = false;
-		if (w1.getFirstNodeId() == w2.getFirstNodeId()) {
+		long w1f = getFirstId(w1);
+		long w2f = getFirstId(w2);
+		long w1l = getLastId(w1);
+		long w2l = getLastId(w2);
+		if (w1f == w2f) {
 			firstReverse = true;
 			secondReverse = false;
-		} else if (w1.getLastNodeId() == w2.getFirstNodeId()) {
+		} else if (w1l == w2f) {
 			firstReverse = false;
 			secondReverse = false;
-		} else if (w1.getLastNodeId() == w2.getLastNodeId()) {
+		} else if (w1l  == w2l) {
 			firstReverse = false;
 			secondReverse = true;
-		} else if (w1.getFirstNodeId() == w2.getLastNodeId()) {
+		} else if (w1f == w2l) {
 			firstReverse = true;
 			secondReverse = true;
 		} else {
@@ -233,6 +249,16 @@ public class MultipolygonBuilder {
 		return null;
 
 	}
+
+	private long getLastId(Way w1) {
+		return w1.getLastNodeId() > 0 ? w1.getLastNodeId(): getId(w1.getLastNode());
+	}
+
+	private long getFirstId(Way w1) {
+		return w1.getFirstNodeId() > 0 ? w1.getFirstNodeId(): getId(w1.getFirstNode());
+	}
+
+	
 
 	private static long initialValue = -1000;
 	private final static long randomInterval = 5000;
