@@ -19,9 +19,12 @@ import java.io.StringReader;
 import java.lang.reflect.InvocationTargetException;
 import java.net.URL;
 import java.net.URLConnection;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import javax.swing.AbstractAction;
@@ -35,6 +38,17 @@ import javax.swing.SwingUtilities;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
+
+import org.apache.commons.logging.Log;
+import org.json.JSONException;
+import org.json.JSONObject;
+import org.json.JSONTokener;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+import org.xml.sax.InputSource;
+import org.xml.sax.SAXException;
 
 import net.osmand.PlatformUtil;
 import net.osmand.binary.BinaryMapIndexReader;
@@ -54,17 +68,6 @@ import net.osmand.router.RoutingConfiguration;
 import net.osmand.router.RoutingContext;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
-
-import org.apache.commons.logging.Log;
-import org.json.JSONException;
-import org.json.JSONObject;
-import org.json.JSONTokener;
-import org.w3c.dom.Document;
-import org.w3c.dom.Element;
-import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
-import org.xml.sax.InputSource;
-import org.xml.sax.SAXException;
 
 
 
@@ -715,8 +718,14 @@ public class MapRouterLayer implements MapPanelLayer {
 //				config.initialDirection = 0 / 180d * Math.PI; // NORTH
 				// config.NUMBER_OF_DESIRABLE_TILES_IN_MEMORY = 300;
 				// config.ZOOM_TO_LOAD_TILES = 14;
+//				try {
+//					config.routeCalculationTime = new SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.US).parse("19.07.2019 12:40").getTime();
+//				} catch (ParseException e) {
+//				}
+				config.routeCalculationTime = System.currentTimeMillis();
 				final RoutingContext ctx = router.buildRoutingContext(config, DataExtractionSettings.getSettings().useNativeRouting() ? NativeSwingRendering.getDefaultFromSettings() :
 					null, rs, rm);
+				
 				ctx.leftSideNavigation = false;
 				ctx.previouslyCalculatedRoute = previousRoute;
 				log.info("Use " + config.routerName + "mode for routing");

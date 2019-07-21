@@ -1,12 +1,6 @@
 package net.osmand.obf;
 
 
-import gnu.trove.iterator.TIntObjectIterator;
-import gnu.trove.iterator.TLongIterator;
-import gnu.trove.list.array.TIntArrayList;
-import gnu.trove.list.array.TLongArrayList;
-import gnu.trove.map.hash.TIntObjectHashMap;
-
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -28,6 +22,14 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
+import com.google.protobuf.CodedOutputStream;
+import com.google.protobuf.WireFormat;
+
+import gnu.trove.iterator.TIntObjectIterator;
+import gnu.trove.iterator.TLongIterator;
+import gnu.trove.list.array.TIntArrayList;
+import gnu.trove.list.array.TLongArrayList;
+import gnu.trove.map.hash.TIntObjectHashMap;
 import net.osmand.ResultMatcher;
 import net.osmand.binary.BinaryIndexPart;
 import net.osmand.binary.BinaryMapAddressReaderAdapter;
@@ -61,9 +63,6 @@ import net.osmand.osm.MapRenderingTypes;
 import net.osmand.router.TransportRoutePlanner;
 import net.osmand.util.MapUtils;
 
-import com.google.protobuf.CodedOutputStream;
-import com.google.protobuf.WireFormat;
-
 public class BinaryInspector {
 
 
@@ -82,15 +81,15 @@ public class BinaryInspector {
 //					"-vpoi",
 //					"-vmap", "-vmapobjects",
 //					"-vmapcoordinates",
-//					"-vrouting",
-					"-vtransport", "-vtransportschedule",
+					"-vrouting",
+//					"-vtransport", "-vtransportschedule",
 //					"-vaddress", "-vcities","-vstreetgroups",
 //					"-vstreets", "-vbuildings", "-vintersections",
 //					"-lang=ru",
-					"-zoom=15",
+//					"-zoom=15",
 //					"-bbox=30.51,50.5,30.53,50.4",
 //					"-osm="+System.getProperty("maps.dir")+"/basemap/map.obf.osm",
-					System.getProperty("maps.dir")+"/osmlive/Netherlands_noord-holland_europe_19_07_00.obf"
+					System.getProperty("maps.dir")+"/Map.obf"
 			});
 		} else {
 			in.inspector(args);
@@ -505,6 +504,7 @@ public class BinaryInspector {
 					println("\tBounds " + formatLatBounds(ri.getLeftLongitude(), ri.getRightLongitude(),
 							ri.getTopLatitude(), ri.getBottomLatitude()));
 					if ((vInfo != null && vInfo.isVrouting())) {
+						printRouteEncodingRules(ri);
 						printRouteDetailInfo(index, (RouteRegion) p);
 					}
 				} else if (p instanceof MapIndex) {
@@ -540,6 +540,37 @@ public class BinaryInspector {
 			throw e;
 		}
 
+	}
+
+	private void printRouteEncodingRules(RouteRegion ri) {
+		Map<String, Integer> mp = new HashMap<String, Integer>();
+		for (RouteTypeRule rtr : ri.routeEncodingRules) {
+			if (rtr == null) {
+				continue;
+			}
+			String t = rtr.getTag();
+			if (t.contains(":")) {
+				t = t.substring(0, t.indexOf(":"));
+			}
+			if (mp.containsKey(t)) {
+				mp.put(t, mp.get(t) + 1);
+			} else {
+				mp.put(t, 1);
+			}
+		}
+		List<String> tagvalues = new ArrayList<>(mp.keySet());
+		tagvalues.sort(new Comparator<String>() {
+			@Override
+			public int compare(String o1, String o2) {
+				return -Integer.compare(mp.get(o1), mp.get(o2));
+			}
+		});
+		Map<String, Integer> fmt = new LinkedHashMap<String, Integer>();
+		for(String key :tagvalues) {
+			fmt.put(key, mp.get(key));
+		}
+		println(String.format("\tEncoding rules %d: %s",
+				ri.routeEncodingRules.size(), fmt.toString()));
 	}
 
 	private void printRouteDetailInfo(BinaryMapIndexReader index, RouteRegion p) throws IOException {
@@ -580,7 +611,7 @@ public class BinaryInspector {
 				if (nameIds != null) {
 					for (int key : nameIds) {
 						RouteTypeRule rr = obj.region.quickGetEncodingRule(key);
-						b.append(" ").append(rr.getTag()).append("='").append(obj.getNames().get(key)).append("'");
+						b.append(" ").append(rr.getTag()).append("=\"").append(obj.getNames().get(key)).append("\"");
 					}
 				}
 				int pointsLength = obj.getPointsLength();
@@ -595,7 +626,7 @@ public class BinaryInspector {
 							if (names != null) {
 								for (int k = 0; k < names.length; k++) {
 									RouteTypeRule rr = obj.region.quickGetEncodingRule(nametypes[k]);
-									b.append(rr.getTag()).append("='").append(names[k]).append("' ");
+									b.append(rr.getTag()).append("=\"").append(names[k]).append("\" ");
 								}
 							}
 							if (types != null) {
