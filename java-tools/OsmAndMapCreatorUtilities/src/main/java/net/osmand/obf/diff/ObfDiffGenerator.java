@@ -56,7 +56,7 @@ public class ObfDiffGenerator {
 			args[2] = "stdout";
 		}
 		if (args.length < 3) {
-			System.out.println("Usage: <path to old obf> <path to new obf> <[result file name] or [stdout]> <path to diff file (optional)>");
+			System.out.println("Usage: <path to old obf> <path to new obf> <[result file name] or [stdout]> <path to diff file (optional)> <[useTransportData] (optional)>");
 			System.exit(1);
 			return;
 		}
@@ -74,6 +74,7 @@ public class ObfDiffGenerator {
 		File end = new File(args[1]);
 		File diff = args.length < 4 ? null : new File(args[3]);
 		File result = args[2].equals("stdout") ? null : new File(args[2]);
+		boolean useTransportData = args[args.length - 1].equals("useTransportData");
 		if (!start.exists()) {
 			System.err.println("Input Obf file doesn't exist: " + start.getAbsolutePath());
 			System.exit(1);
@@ -84,14 +85,14 @@ public class ObfDiffGenerator {
 			System.exit(1);
 			return;
 		}
-		generateDiff(start, end, result, diff);
+		generateDiff(start, end, result, diff, useTransportData);
 	}
 
-	private void generateDiff(File start, File end, File result, File diff) throws IOException, RTreeException, SQLException {
+	private void generateDiff(File start, File end, File result, File diff, boolean useTransportData) throws IOException, RTreeException, SQLException {
 		ObfFileInMemory fStart = new ObfFileInMemory();
-		fStart.readObfFiles(Collections.singletonList(start));
+		fStart.readObfFiles(Collections.singletonList(start), useTransportData);
 		ObfFileInMemory fEnd = new ObfFileInMemory();
-		fEnd.readObfFiles(Collections.singletonList(end));
+		fEnd.readObfFiles(Collections.singletonList(end), useTransportData);
 		
 		Set<EntityId> modifiedObjIds = null;
 		if (diff != null) {

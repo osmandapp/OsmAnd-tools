@@ -467,7 +467,7 @@ public class ObfFileInMemory {
 		return timestamp;
 	}
 
-	public void readObfFiles(List<File> files) throws IOException {
+	public void readObfFiles(List<File> files, boolean useTransportData) throws IOException {
 		for (int i = 0; i < files.size(); i++) {
 			File inputFile = files.get(i);
 			File nonGzip = inputFile;
@@ -509,8 +509,9 @@ public class ObfFileInMemory {
 					 // read all data later
 				}
 			}
-			// turn off until fix
-			//readTransportData(indexReader, true);
+			if (useTransportData) {
+				readTransportData(indexReader, true);
+			}
 			updateTimestamp(indexReader.getDateCreated());
 			indexReader.close();
 			raf.close();

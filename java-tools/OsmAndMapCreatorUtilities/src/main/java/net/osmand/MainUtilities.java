@@ -132,9 +132,9 @@ public class MainUtilities {
 			} else if (utl.equals("split-obf")) {
 				ObfRegionSplitter.main(subArgsArray);
 			} else if (utl.equals("merge-bulk-osmlive-day")) {
-				ObfDiffMerger.mergeBulkOsmLiveDay(subArgsArray[0]);
+				ObfDiffMerger.mergeBulkOsmLiveDay(subArgsArray);
 			} else if (utl.equals("merge-bulk-osmlive-month")) {
-				ObfDiffMerger.mergeBulkOsmLiveMonth(subArgsArray[0]);
+				ObfDiffMerger.mergeBulkOsmLiveMonth(subArgsArray);
 			} else if (utl.equals("merge-flat-obf")) {
 				ObfDiffMerger.main(subArgsArray);
 			} else if (utl.equals("generate-wikivoyage-raw-lang")) {

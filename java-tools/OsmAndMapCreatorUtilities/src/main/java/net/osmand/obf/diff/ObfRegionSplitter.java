@@ -47,6 +47,7 @@ public class ObfRegionSplitter {
 		File dir = new File(args[1]);
 		String subFolder = args.length > 2 ? args[2] : "";
 		String fileSuffix = args.length > 3 ? args[3] : "";
+		boolean useTransportData = args[args.length - 1].equals("useTransportData");
 		if (!worldObf.exists()) {
 			System.out.println("Incorrect file!");
 			System.exit(1);
@@ -56,7 +57,7 @@ public class ObfRegionSplitter {
 		}
 		try {
 			ObfFileInMemory fl = new ObfFileInMemory();
-			fl.readObfFiles(Collections.singletonList(worldObf));
+			fl.readObfFiles(Collections.singletonList(worldObf), useTransportData);
 			OsmandRegions osmandRegions = new OsmandRegions();
 			osmandRegions.prepareFile();
 			osmandRegions.cacheAllCountries();
