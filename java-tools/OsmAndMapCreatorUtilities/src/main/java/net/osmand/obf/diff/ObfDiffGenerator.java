@@ -13,7 +13,9 @@ import net.osmand.data.TransportStop;
 import net.osmand.obf.BinaryInspector;
 import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.Entity.EntityType;
+import net.osmand.util.Algorithms;
 
+import org.apache.commons.lang3.ArrayUtils;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 
@@ -26,7 +28,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -122,72 +123,103 @@ public class ObfDiffGenerator {
 		if (endStopData == null) {
 			return;
 		}
-		TLongObjectHashMap<TransportRoute> startRouteData = fStart.getTransportRoutes();
-		TLongObjectHashMap<TransportRoute> endRouteData = fEnd.getTransportRoutes();
-		TLongObjectHashMap<List<Long>> startStopRoutes = fStart.getTransportStopRoutes();
-		TLongObjectHashMap<List<Long>> endStopRoutes = fEnd.getTransportStopRoutes();
+		TLongObjectHashMap<TransportStop> endStopDataDeleted = new TLongObjectHashMap<>();
 
-		for (Long idx : startStopData.keys()) {
-			TransportStop objS = startStopData.get(idx);
-			TransportStop objE = endStopData.get(idx);
-			EntityId aid = getMapObjectId(objS);
+		// Walk throught all stops and drop non changed. If stop was deleted - mark it and add to the result.
+		for (Long stopId : startStopData.keys()) {
+			TransportStop stopS = startStopData.get(stopId);
+			TransportStop stopE = endStopData.get(stopId);
+			EntityId aid = getMapObjectId(stopS);
+			long[] routesS = stopS.getRoutesIds();
+			long[] routesE = stopE != null ? stopE.getRoutesIds() : null;
 			if (print) {
-				if (objE == null) {
-					System.out.println("Transport stop " + idx + " is missing in (2): " + objS);
+				if (stopE == null) {
+					System.out.println("Transport stop " + stopId + " is missing in (2): " + stopS);
 				} else {
-					if (!objE.compareStop(objS) || !compareRoutes(objS, startRouteData, startStopRoutes, objE, endRouteData, endStopRoutes)) {
-						System.out.println("Transport stop " + idx + " is not equal: " + objS + " != " + objE);
+					if (!stopE.compareStop(stopS)) {
+						System.out.println("Transport stop " + stopId + " is not equal: " + stopS + " != " + stopE);
 					}
-					endStopData.remove(idx);
+					TransportStop stop = endStopData.remove(stopId);
+					endStopDataDeleted.put(stop.getId(), stop);
 				}
 			} else {
-				if (objE == null) {
+				if (stopE == null) {
 					if (modifiedObjIds == null || modifiedObjIds.contains(aid) || aid == null) {
-						objS.setDeleted();
-						endStopData.put(idx, objS);
+						stopS.setDeleted();
+						endStopData.put(stopId, stopS);
 					}
-				} else if (objE.compareStop(objS) && compareRoutes(objS, startRouteData, startStopRoutes, objE, endRouteData, endStopRoutes)) {
-					endStopData.remove(idx);
+				} else if (stopE.compareStop(stopS)) {
+					TransportStop stop = endStopData.remove(stopId);
+					endStopDataDeleted.put(stop.getId(), stop);
+				} else {
+					if (routesS != null && routesE != null) {
+						for (long routeId : routesS) {
+							if (!Algorithms.containsInArrayL(routesE, routeId)) {
+								stopE.setDeletedRoutesIds(Algorithms.addToArrayL(stopE.getDeletedRoutesIds(), routeId, true));
+							}
+						}
+					}
 				}
 			}
 		}
 		if (print) {
-			for (TransportStop e : endStopData.valueCollection()) {
-				System.out.println("Transport stop " + e.getId() + " is missing in (1): " + e);
+			for (TransportStop s : endStopData.valueCollection()) {
+				System.out.println("Transport stop " + s.getId() + " is missing in (1): " + s);
 			}
 		}
-	}
-
-	private boolean compareRoutes(TransportStop stopS, TLongObjectHashMap<TransportRoute> routesS, TLongObjectHashMap<List<Long>> startStopRoutes,
-								  TransportStop stopE, TLongObjectHashMap<TransportRoute> routesE, TLongObjectHashMap<List<Long>> endStopRoutes) {
-		List<Long> routeIdsS = startStopRoutes.get(stopS.getId());
-		List<Long> routeIdsE = endStopRoutes.get(stopE.getId());
-		if (routeIdsS != null && routeIdsE != null && routeIdsS.size() == routeIdsE.size()) {
-			TLongObjectHashMap<TransportRoute> startRoutes = new TLongObjectHashMap<>();
-			TLongObjectHashMap<TransportRoute> endRoutes = new TLongObjectHashMap<>();
-			for (Long id : routeIdsS) {
-				TransportRoute r = routesS.get(id);
-				if (r != null) {
-					startRoutes.put(r.getId(), r);
+		// Walk throught all routes and drop non changed. If route was deleted - mark it and add to the result.
+		// Remove offsets of non changed routes from stops.
+		TLongObjectHashMap<TransportRoute> startRouteData = fStart.getTransportRoutes();
+		TLongObjectHashMap<TransportRoute> endRouteData = fEnd.getTransportRoutes();
+		for (Long routeId : startRouteData.keys()) {
+			TransportRoute routeS = startRouteData.get(routeId);
+			TransportRoute routeE = endRouteData.get(routeId);
+			EntityId aid = getMapObjectId(routeS);
+			if (print) {
+				if (routeE == null) {
+					System.out.println("Transport route " + routeId + " is missing in (2): " + routeS);
+				} else {
+					if (!routeE.compareRoute(routeS)) {
+						System.out.println("Transport route " + routeId + " is not equal: " + routeS + " != " + routeE);
+					}
+					endRouteData.remove(routeId);
 				}
-			}
-			for (Long id : routeIdsE) {
-				TransportRoute r = routesE.get(id);
-				if (r != null) {
-					endRoutes.put(r.getId(), r);
-				}
-			}
-			if (startRoutes.size() == endRoutes.size()) {
-				for (TransportRoute startRoute : startRoutes.valueCollection()) {
-					TransportRoute endRoute = endRoutes.get(startRoute.getId());
-					if (!startRoute.compareRoute(endRoute)) {
-						return false;
+			} else {
+				if (routeE == null) {
+					if (modifiedObjIds != null && aid != null && !modifiedObjIds.contains(aid)) {
+						throw new IllegalStateException("Transport route " + routeId + " is missing in (2): " + routeS);
+					}
+				} else if (routeE.compareRoute(routeS)) {
+					endRouteData.remove(routeId);
+					int fileOffset = routeE.getFileOffset();
+					for (TransportStop stop : endStopData.valueCollection()) {
+						if (stop.hasReferencesToRoutes()) {
+							stop.setReferencesToRoutes(ArrayUtils.removeElement(stop.getReferencesToRoutes(), fileOffset));
+							stop.setRoutesIds(Algorithms.removeFromArrayL(stop.getRoutesIds(), routeId));
+						}
+					}
+				} else {
+					// Add all forward stops to 2nd file
+					for (TransportStop s : routeE.getForwardStops()) {
+						Long stopId = s.getId();
+						if (!endStopData.containsKey(stopId) && endStopDataDeleted.containsKey(stopId)) {
+							endStopData.put(stopId, endStopDataDeleted.get(stopId));
+						}
+					}
+					// Check if we have all stops in 2nd file
+					for (TransportStop s : routeE.getForwardStops()) {
+						if (!endStopData.containsKey(s.getId())) {
+							throw new IllegalStateException("Transport stop " + s.getId() + " is missing in (2): " + s + " for modified route " + routeId + ": " + routeE);
+						}
 					}
 				}
 			}
-			return true;
 		}
-		return routeIdsS == null && routeIdsE == null;
+		if (print) {
+			for (TransportRoute r : endRouteData.valueCollection()) {
+				System.out.println("Transport route " + r.getId() + " is missing in (1): " + r);
+			}
+		}
 	}
 
 	private void comparePOI(ObfFileInMemory fStart, ObfFileInMemory fEnd, boolean print, Set<EntityId> modifiedObjIds) {

@@ -1315,7 +1315,7 @@ public class BinaryMapIndexWriter {
 	}
 
 	public void writeTransportStop(long id, int x24, int y24, String name, String nameEn, Map<String, String> names, Map<String, Integer> stringTable,
-								   List<Long> routes, Map<Entity.EntityId, List<TransportStopExit>> exits) throws IOException {
+								   List<Long> routesOffsets, List<Long> routesIds, List<Long> deletedRoutes, Map<Entity.EntityId, List<TransportStopExit>> exits) throws IOException {
 		checkPeekState(TRANSPORT_STOPS_TREE);
 
 		Bounds bounds = stackBounds.peek();
@@ -1341,8 +1341,14 @@ public class BinaryMapIndexWriter {
 		}
 		ts.setAdditionalNamePairs(ByteString.copyFrom(mapDataBuf.toArray()));
 
-		for (Long i : routes) {
+		for (Long i : routesOffsets) {
 			ts.addRoutes((int) (fp - i));
+		}
+		for (Long i : routesIds) {
+			ts.addRoutesIds(i);
+		}
+		for (Long i : deletedRoutes) {
+			ts.addDeletedRoutesIds(i);
 		}
 		List<TransportStopExit> list = exits.get(new EntityId(EntityType.NODE, id));
 		if (list != null) {

@@ -1,5 +1,15 @@
 package net.osmand.obf.diff;
 
+import net.osmand.binary.BinaryMapDataObject;
+import net.osmand.binary.MapZooms.MapZoomPair;
+import net.osmand.binary.RouteDataObject;
+import net.osmand.data.Amenity;
+import net.osmand.data.TransportStop;
+import net.osmand.map.OsmandRegions;
+import net.osmand.map.WorldRegion;
+import net.osmand.util.Algorithms;
+import net.osmand.util.MapUtils;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.Collection;
@@ -11,16 +21,6 @@ import java.util.Map;
 import java.util.TreeSet;
 
 import gnu.trove.map.hash.TLongObjectHashMap;
-import net.osmand.binary.BinaryMapDataObject;
-import net.osmand.binary.MapZooms.MapZoomPair;
-import net.osmand.binary.RouteDataObject;
-import net.osmand.data.Amenity;
-import net.osmand.data.TransportRoute;
-import net.osmand.data.TransportStop;
-import net.osmand.map.OsmandRegions;
-import net.osmand.map.WorldRegion;
-import net.osmand.util.Algorithms;
-import net.osmand.util.MapUtils;
 
 public class ObfRegionSplitter {
 	
@@ -99,7 +99,6 @@ public class ObfRegionSplitter {
 				if (stops != null) {
 					Collection<TransportStop> stopsCollection = stops.valueCollection();
 					obf.setTransportRoutes(fl.getTransportRoutes());
-					obf.setTransportStopRoutes(fl.getTransportStopRoutes());
 					obf.putTransportData(stopsCollection, null, true);
 				}
 				obf.updateTimestamp(fl.getTimestamp());
