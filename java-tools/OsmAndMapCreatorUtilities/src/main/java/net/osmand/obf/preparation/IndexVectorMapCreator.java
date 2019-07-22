@@ -1,10 +1,6 @@
 package net.osmand.obf.preparation;
 
 
-import gnu.trove.list.array.TIntArrayList;
-import gnu.trove.map.hash.TLongObjectHashMap;
-import gnu.trove.set.hash.TLongHashSet;
-
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
@@ -24,6 +20,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
+import gnu.trove.list.array.TIntArrayList;
+import gnu.trove.map.hash.TLongObjectHashMap;
+import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.IProgress;
 import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.binary.MapZooms;
@@ -33,7 +35,6 @@ import net.osmand.binary.OsmandOdb.MapDataBlock;
 import net.osmand.data.LatLon;
 import net.osmand.data.Multipolygon;
 import net.osmand.data.MultipolygonBuilder;
-import net.osmand.data.QuadRect;
 import net.osmand.data.Ring;
 import net.osmand.osm.MapRenderingTypes.MapRulType;
 import net.osmand.osm.MapRenderingTypesEncoder;
@@ -49,10 +50,6 @@ import net.osmand.osm.edit.Relation.RelationMember;
 import net.osmand.osm.edit.Way;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
-
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-
 import rtree.Element;
 import rtree.IllegalValueException;
 import rtree.LeafElement;
@@ -160,7 +157,8 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	public void indexMapRelationsAndMultiPolygons(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 		if (e instanceof Relation) {
 			long ts = System.currentTimeMillis();
-			indexMultiPolygon((Relation) e, ctx);
+			Map<String, String> tags = renderingTypes.transformTags(e.getTags(), EntityType.RELATION, EntityConvertApplyType.MAP);
+			indexMultiPolygon((Relation) e, tags, ctx);
 			tagsTransformer.handleRelationPropogatedTags((Relation) e, renderingTypes, ctx, EntityConvertApplyType.MAP);
 			long tm = (System.currentTimeMillis() - ts) / 1000;
 			if (tm > 15 ) {
@@ -179,18 +177,25 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	 * broken multipolygons are also indexed, inner ways are sometimes left out, broken rings are split and closed
 	 * broken multipolygons will normally be logged
 	 * @param e the entity to index
+	 * @param tags
 	 * @param ctx the database context
 	 * @throws SQLException
 	 */
-	private void indexMultiPolygon(Relation e, OsmDbAccessorContext ctx) throws SQLException {
+	private void indexMultiPolygon(Relation e, Map<String, String> tags, OsmDbAccessorContext ctx) throws SQLException {
 		// Don't handle things that aren't multipolygon, and nothing administrative
-		if ((!"multipolygon".equals(e.getTag(OSMTagKey.TYPE)) &&  !"protected_area".equals(e.getTag("boundary")))
-				|| e.getTag(OSMTagKey.ADMIN_LEVEL) != null) {
+		if ("multipolygon".equals(tags.get(OSMTagKey.TYPE.getValue())) || 
+				"protected_area".equals(tags.get("boundary")) ||
+				"low_emission_zone".equals(tags.get("boundary"))
+				) {
 			return;
 		}
+		if(tags.get(OSMTagKey.ADMIN_LEVEL.getValue()) != null) {
+			return;
+		}
+		tags = new LinkedHashMap<>(tags);
 		// some big islands are marked as multipolygon - don't process them (only keep coastlines)
-		boolean polygon = "multipolygon".equals(e.getTag(OSMTagKey.TYPE)) && "island".equals(e.getTag(OSMTagKey.PLACE));
-		if (polygon) {
+		boolean polygonIsland = "multipolygon".equals(tags.get(OSMTagKey.TYPE.getValue())) && "island".equals(tags.get(OSMTagKey.PLACE.getValue()));
+		if (polygonIsland) {
 			int coastlines = 0;
 			int otherWays = 0;
 			ctx.loadEntityRelation((Relation) e);
@@ -198,7 +203,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 
 			for (Entity es : me) {
 				if(es instanceof Way && !((Way) es).getEntityIds().isEmpty()) {
-					boolean coastline = "coastline".equals(es.getTag(OSMTagKey.NATURAL));
+					boolean coastline = "coastline".equals(tags.get(OSMTagKey.NATURAL.getValue()));
 					if (coastline) {
 						coastlines++;
 					} else {
@@ -221,19 +226,19 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 					return;
 				}
 				log.info(String.format("Relation %s %d consists only of coastlines so it was skipped.",
-						e.getTag(OSMTagKey.NAME), e.getId()));
+						tags.get(OSMTagKey.NAME), e.getId()));
 				return;
 			}
 		}
 		
 		MultipolygonBuilder original = createMultipolygonBuilder(e, ctx);
 		try {
-			renderingTypes.encodeEntityWithType(false, e.getModifiableTags(), mapZooms.getLevel(0).getMaxZoom(), typeUse, addtypeUse, namesUse, tempNameUse);
+			renderingTypes.encodeEntityWithType(false, tags, mapZooms.getLevel(0).getMaxZoom(), typeUse, addtypeUse, namesUse, tempNameUse);
 		} catch (RuntimeException es) {
 			es.printStackTrace();
 			return;
 		}
-		List<Map<String, String>> splitEntities = renderingTypes.splitTags(e.getModifiableTags(), EntityType.valueOf(e));
+		List<Map<String, String>> splitEntities = renderingTypes.splitTags(tags, EntityType.valueOf(e));
 
 		// Don't add multipolygons with an unknown type
 		if (typeUse.size() == 0) {
@@ -272,17 +277,17 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			}
 
 			// don't use the relation ids. Create new onesgetInnerRings
-			Map<String, String> stags  = splitEntities == null ? e.getModifiableTags() : splitEntities.get(0);
+			Map<String, String> stags  = splitEntities == null ? tags : splitEntities.get(0);
 			long assignId = assignIdForMultipolygon((Relation) e);
 			createMultipolygonObject(stags, out, innerWays, assignId);
 			if (splitEntities != null) {
 				for (int i = 1; i < splitEntities.size(); i++) {
-					Map<String, String> tags = splitEntities.get(i);
+					Map<String, String> splitTags = splitEntities.get(i);
 					while (generatedIds.contains(assignId)) {
 						assignId += 2;
 					}
 					generatedIds.add(assignId);
-					createMultipolygonObject(tags, out, innerWays, assignId);
+					createMultipolygonObject(splitTags, out, innerWays, assignId);
 				}
 			}
 		}
