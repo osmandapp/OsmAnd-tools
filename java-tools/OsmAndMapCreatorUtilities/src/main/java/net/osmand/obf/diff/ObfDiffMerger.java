@@ -51,7 +51,7 @@ public class ObfDiffMerger {
 	public static void mergeBulkOsmLiveDay(String[] args) {
 		try {
 			String location = args[0];
-			boolean useTransportData = args[args.length - 1].equals("useTransportData");
+			boolean useTransportData = args[args.length - 1].equals("--useTransportData");
 			File folder = new File(location);
 			for (File region : getSortedFiles(folder)) {
 				if (!region.isDirectory()) {
@@ -101,7 +101,7 @@ public class ObfDiffMerger {
 	public static void mergeBulkOsmLiveMonth(String[] args) {
 		try {
 			String location = args[0];
-			boolean useTransportData = args[args.length - 1].equals("useTransportData");
+			boolean useTransportData = args[args.length - 1].equals("--useTransportData");
 			Date currentDate = new Date();
 			String cdate = day.format(currentDate).substring(2);
 			String pdate = day.format(new Date(System.currentTimeMillis() - 1000 * 24 * 60 * 60 * 20)).substring(2);
@@ -190,7 +190,7 @@ public class ObfDiffMerger {
 		File result = new File(args[0]);
 		List<File> inputDiffs = new ArrayList<>();
 		boolean checkTimestamps = false;
-		boolean useTransportData = args[args.length - 1].equals("useTransportData");
+		boolean useTransportData = args[args.length - 1].equals("--useTransportData");
 		for (int i = 1; i < args.length; i++) {
 			if(args[i].equals("--check-timestamp")) {
 				checkTimestamps = true;

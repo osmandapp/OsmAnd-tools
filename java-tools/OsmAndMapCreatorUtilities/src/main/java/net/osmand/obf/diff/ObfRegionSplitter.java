@@ -34,7 +34,7 @@ public class ObfRegionSplitter {
 			args[3] = "_01_00";
 		}
 		if (args.length <= 3) {
-			System.err.println("Usage: <path_to_world_obf_diff> <path_to_result_folder> <subfolder_name> <file_suffix>");
+			System.err.println("Usage: <path_to_world_obf_diff> <path_to_result_folder> <subfolder_name> <file_suffix> <[--useTransportData] (optional)>");
 			return;
 		}
 		
@@ -47,7 +47,7 @@ public class ObfRegionSplitter {
 		File dir = new File(args[1]);
 		String subFolder = args.length > 2 ? args[2] : "";
 		String fileSuffix = args.length > 3 ? args[3] : "";
-		boolean useTransportData = args[args.length - 1].equals("useTransportData");
+		boolean useTransportData = args[args.length - 1].equals("--useTransportData");
 		if (!worldObf.exists()) {
 			System.out.println("Incorrect file!");
 			System.exit(1);
