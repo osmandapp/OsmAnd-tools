@@ -183,10 +183,10 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	 */
 	private void indexMultiPolygon(Relation e, Map<String, String> tags, OsmDbAccessorContext ctx) throws SQLException {
 		// Don't handle things that aren't multipolygon, and nothing administrative
-		if ("multipolygon".equals(tags.get(OSMTagKey.TYPE.getValue())) || 
+		if (!("multipolygon".equals(tags.get(OSMTagKey.TYPE.getValue())) || 
 				"protected_area".equals(tags.get("boundary")) ||
 				"low_emission_zone".equals(tags.get("boundary"))
-				) {
+				)) {
 			return;
 		}
 		if(tags.get(OSMTagKey.ADMIN_LEVEL.getValue()) != null) {
