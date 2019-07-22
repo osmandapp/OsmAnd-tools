@@ -49,6 +49,7 @@ import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -59,6 +60,7 @@ import java.util.TreeMap;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
+import gnu.trove.iterator.TIntIterator;
 import gnu.trove.iterator.TLongObjectIterator;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntLongMap;
@@ -89,7 +91,6 @@ public class ObfFileInMemory {
 	
 	private TLongObjectHashMap<TransportStop> transportStops = new TLongObjectHashMap<>();
 	private TLongObjectHashMap<TransportRoute> transportRoutes = new TLongObjectHashMap<>();
-	private TLongObjectHashMap<List<Long>> transportStopRoutes = new TLongObjectHashMap<>();
 
 	public TLongObjectHashMap<BinaryMapDataObject> get(MapZooms.MapZoomPair zoom) {
 		if (!mapObjects.containsKey(zoom)) {
@@ -128,14 +129,6 @@ public class ObfFileInMemory {
 
 	public void setTransportRoutes(TLongObjectHashMap<TransportRoute> transportRoutes) {
 		this.transportRoutes = transportRoutes;
-	}
-
-	public TLongObjectHashMap<List<Long>> getTransportStopRoutes() {
-		return transportStopRoutes;
-	}
-
-	public void setTransportStopRoutes(TLongObjectHashMap<List<Long>> transportStopRoutes) {
-		this.transportStopRoutes = transportStopRoutes;
 	}
 
 	public void putMapObjects(MapZoomPair pair, Collection<BinaryMapDataObject> objects, boolean override) {
@@ -245,9 +238,9 @@ public class ObfFileInMemory {
 			writer.startWriteTransportIndex(Algorithms.capitalizeFirstLetter(name));
 			TLongObjectHashMap<TransportRoute> transportRoutes = new TLongObjectHashMap<>();
 			for (TransportStop transportStop : transportStops.valueCollection()) {
-				List<Long> routeIds = transportStopRoutes.get(transportStop.getId());
-				if (routeIds != null) {
-					for (Long routeId : routeIds) {
+				long[] routesIds = transportStop.getRoutesIds();
+				if (routesIds != null) {
+					for (long routeId : routesIds) {
 						transportRoutes.put(routeId, this.transportRoutes.get(routeId));
 					}
 				}
@@ -278,9 +271,9 @@ public class ObfFileInMemory {
 				int[] referencesToRoutes = stop.getReferencesToRoutes();
 				if (referencesToRoutes != null && referencesToRoutes.length > 0) {
 					List<Integer> newReferencesToRoutes = new ArrayList<>();
-					List<Long> routeIds = transportStopRoutes.get(stop.getId());
-					if (routeIds != null) {
-						for (Long routeId : routeIds) {
+					long[] routesIds = stop.getRoutesIds();
+					if (routesIds != null) {
+						for (long routeId : routesIds) {
 							Long newOffset = newRoutesIds.get(routeId);
 							if (newOffset != null) {
 								newReferencesToRoutes.add(newOffset.intValue());
@@ -540,17 +533,18 @@ public class ObfFileInMemory {
 		if (routesData.size() > 0) {
 			int[] filePointers = routesData.keys();
 			TIntObjectHashMap<TransportRoute> transportRoutes = indexReader.getTransportRoutes(filePointers);
-			for (TransportRoute route : transportRoutes.valueCollection()) {
-				long stopId = routesData.get(route.getFileOffset());
+			TIntIterator it = transportRoutes.keySet().iterator();
+			while (it.hasNext()) {
+				int offset = it.next();
+				TransportRoute route = transportRoutes.get(offset);
 				Long routeId = route.getId();
-				List<Long> stopRoutes = transportStopRoutes.get(stopId);
-				if (stopRoutes == null) {
-					stopRoutes = new ArrayList<>();
-					transportStopRoutes.put(stopId, stopRoutes);
-				}
-				stopRoutes.add(routeId);
 				if (override || !this.transportRoutes.containsKey(routeId)) {
 					this.transportRoutes.put(routeId, route);
+				}
+				for (TransportStop stop : sti) {
+					if (stop.hasReferencesToRoutes() && Arrays.binarySearch(stop.getReferencesToRoutes(), offset) >= 0) {
+						stop.setRoutesIds(Algorithms.addToArrayL(stop.getRoutesIds(), routeId, true));
+					}
 				}
 			}
 		}
