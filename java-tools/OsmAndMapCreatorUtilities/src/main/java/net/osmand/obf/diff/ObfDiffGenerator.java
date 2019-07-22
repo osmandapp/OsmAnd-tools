@@ -48,10 +48,8 @@ public class ObfDiffGenerator {
 	public static void main(String[] args) throws IOException, RTreeException {
 		if(args.length == 1 && args[0].equals("test")) {
 			args = new String[3];
-			args[0] = "/Users/alexey/tmp/maps/new/Ukraine_kiev_europe.obf";
-			args[1] = "/Users/alexey/tmp/maps/old/Ukraine_kiev_europe.obf";
-			args[0] = "/Users/alexey/tmp/maps/new/Ukraine_crimea_europe.obf";
-			args[1] = "/Users/alexey/tmp/maps/old/Ukraine_crimea_europe.obf";
+			args[0] = "/Users/victorshcherb/osmand/maps/Map.obf";
+			args[1] = "/Users/victorshcherb/osmand/maps/Map2.obf";
 //			args[2] = "/Users/victorshcherb/osmand/maps/diff/Diff.obf";
 			args[2] = "stdout";
 		}
