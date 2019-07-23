@@ -43,8 +43,8 @@ def process_polygons(tags, filename):
 			conditions += " or (\"natural\" <> '' and \"natural\" <> 'water') and \"natural\" <> 'bare_rock' and \"natural\" <> 'rock' and \"natural\" <> 'stone' and \"natural\" <> 'cave_entrance' and \"natural\" <> 'scree' and \"natural\" <> 'fell' and \"natural\" <> 'scrub' and \"natural\" <> 'heath' and \"natural\" <> 'grassland'"
 		elif tag == "wetland" :
 			array.append("wetland")
-			queryFields += ",  wetland"
-			conditions += " or wetland in ('tidalflat')"
+			queryFields += ", tags->'wetland' as \"wetland\""
+			conditions += " or tags->'wetland' <> ''"
 		elif tag == "landuse" :
 			array.append("landuse")
 			queryFields += ", \"landuse\""
@@ -86,10 +86,6 @@ def process_polygons(tags, filename):
 			array.append("faa")
 			queryFields += ", tags->'faa' as \"faa\""
 			conditions += " or tags->'faa' <> ''"
-		elif tag == "wetland" :
-			array.append("wetland")
-			queryFields += ", tags->'wetland' as \"wetland\""
-			conditions += " or tags->'wetland' <> ''"
 		else :
 			array.append(tag)
 			queryFields += ", " + tag
