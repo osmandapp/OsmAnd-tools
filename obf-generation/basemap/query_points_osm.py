@@ -45,6 +45,8 @@ def process_points(cond, filename, array):
 			tag = 'tags->\'seamark:type\' as "seamark:type"'
 		if tag == 'abandoned':
 			tag = 'tags->\'abandoned\' as "abandoned"'
+		if tag == 'population':
+			tag = 'tags->\'population\' as "population"'
 		queryFields += ", " + tag
 
 	for nm in names:
