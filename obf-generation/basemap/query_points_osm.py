@@ -50,7 +50,7 @@ def process_points(cond, filename, array):
 		if tag == 'capital':
 			tag = 'tags->\'capital\' as "capital"'
 		if tag == 'ele':
-			tag = 'tags->\'ele' as "ele"'
+			tag = 'tags->\'ele\' as "ele"'
 		queryFields += ", " + tag
 
 	for nm in names:
