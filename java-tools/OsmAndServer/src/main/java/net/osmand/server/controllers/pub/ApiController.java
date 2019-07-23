@@ -14,6 +14,7 @@ import net.osmand.server.api.repo.EmailUnsubscribedRepository.EmailUnsubscribed;
 import net.osmand.server.api.services.IpLocationService;
 import net.osmand.server.api.services.MotdService;
 import net.osmand.server.api.services.MotdService.MessageParams;
+import net.osmand.util.Algorithms;
 import net.osmand.server.api.services.PlacesService;
 
 import org.apache.commons.logging.Log;
@@ -314,8 +315,14 @@ public class ApiController {
     }
     
     @GetMapping(path = {"/email/unsubscribe"}, produces = "text/html;charset=UTF-8")
-    public String emailUnsubscribe(@RequestParam(required=true) String id, @RequestParam(required=false) String group) throws IOException  {
-		String email = new String(Base64Utils.decodeFromString(URLDecoder.decode(id, "UTF-8")));
+    public String emailUnsubscribe(@RequestParam(required=false) String id, 
+    		@RequestParam(required=false) String email, @RequestParam(required=false) String group) throws IOException  {
+    	if(Algorithms.isEmpty(email)) {
+    		if(Algorithms.isEmpty(id)) {
+    			throw new IllegalArgumentException("Missing email parameter");
+    		}
+    		email = new String(Base64Utils.decodeFromString(URLDecoder.decode(id, "UTF-8")));
+    	}
     	EmailUnsubscribed ent = new EmailUnsubscribedRepository.EmailUnsubscribed();
     	ent.timestamp = new Date();
     	if(group == null) {
@@ -329,8 +336,14 @@ public class ApiController {
     }
     
     @GetMapping(path = {"/email/subscribe"}, produces = "text/html;charset=UTF-8")
-    public String emailSubscribe(@RequestParam(required=true) String id, @RequestParam(required=false) String group) throws IOException  {
-		String email = new String(Base64Utils.decodeFromString(URLDecoder.decode(id, "UTF-8")));
+    public String emailSubscribe(@RequestParam(required=false) String id, 
+    		@RequestParam(required=false) String email, @RequestParam(required=false) String group) throws IOException  {
+    	if(Algorithms.isEmpty(email)) {
+    		if(Algorithms.isEmpty(id)) {
+    			throw new IllegalArgumentException("Missing email parameter");
+    		}
+    		email = new String(Base64Utils.decodeFromString(URLDecoder.decode(id, "UTF-8")));
+    	}
     	unsubscribedRepo.deleteAllByEmail(email);
     	return "pub/email/subscribe";
     }
