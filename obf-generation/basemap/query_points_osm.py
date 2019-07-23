@@ -46,7 +46,7 @@ def process_points(cond, filename, array):
 		if tag == 'abandoned':
 			tag = 'tags->\'abandoned\' as "abandoned"'
 		if tag == 'population':
-			tag = 'tags->\'population' as "population"'
+			tag = 'tags->\'population\' as "population"'
 		queryFields += ", " + tag
 
 	for nm in names:
