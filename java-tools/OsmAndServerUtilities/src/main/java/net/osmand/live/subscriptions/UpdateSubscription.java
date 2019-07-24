@@ -53,7 +53,7 @@ public class UpdateSubscription {
 	private static final long DAY = 1000l * 60 * 60 * 24;
 	private static final long HOUR = 1000l * 60 * 60;
 
-	private static final long MINIMUM_WAIT_TO_REVALIDATE_VALID = 5 * DAY;
+	private static final long MINIMUM_WAIT_TO_REVALIDATE_VALID = 10 * DAY;
 	private static final long MINIMUM_WAIT_TO_REVALIDATE = 12 * HOUR;
 	int changes = 0;
 	int checkChanges = 0;
@@ -179,7 +179,7 @@ public class UpdateSubscription {
 					continue;
 				}
 			}
-			System.out.println(String.format("Validate userid=%d, sku=%s - subscribtion is active %d", userid, sku, activeNow));
+			System.out.println(String.format("Validate userid=%d, sku=%s - subscribtion %s %s is active=%d", userid, sku, startTime, expireTime, activeNow));
 
 			if (this.ios) {
 				processIosSubscription(receiptValidationHelper, userid, pt, sku, payload, startTime, expireTime, tm);
