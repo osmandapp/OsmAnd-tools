@@ -53,11 +53,16 @@ def process_polygons(tags, filename):
 			array.append("leisure")
 			queryFields += ", \"leisure\""
 			conditions += " or (\"leisure\" = 'nature_reserve' or \"leisure\" = 'ski_resort')"
-		elif tag == "admin_level" :
+		elif tag == "admin_level_2" : 
+			array.append("admin_level)
+			queryFields += ", admin_level"
+			admin_level = True
+			conditions += " or (admin_level = '2' and boundary <> 'national_park')"	     
+		elif tag == "admin_level_4" :
 			array.append("admin_level")
 			queryFields += ", admin_level"
 			admin_level = True
-			conditions += " or ((admin_level = '4' or admin_level = '2') and boundary <> 'national_park')"
+			conditions += " or (admin_level = '4' and boundary <> 'national_park')"
 		elif tag == "seamark:type" :
 			array.append("seamark:type")
 			queryFields += ",  tags->'seamark:type' as \"seamark:type\""
@@ -174,8 +179,9 @@ def process_polygons(tags, filename):
 
 if __name__ == "__main__":
 		print "Process polygons"
-		process_polygons(['lake', 'seamark:type', 'seamark:restricted_area:category'], 'polygon_lake_water.osm')
-		process_polygons(['landuse', 'natural', 'wetland', 'historic','leisure'], 'polygon_natural_landuse.osm')
-		process_polygons(['aeroway', 'military', 'abandoned', 'iata', 'icao', 'faa', 'power', 'tourism'], 'polygon_aeroway_military_tourism.osm')
+		#process_polygons(['lake', 'seamark:type', 'seamark:restricted_area:category'], 'polygon_lake_water.osm')
+		#process_polygons(['landuse', 'natural', 'wetland', 'historic','leisure'], 'polygon_natural_landuse.osm')
+		#process_polygons(['aeroway', 'military', 'abandoned', 'iata', 'icao', 'faa', 'power', 'tourism'], 'polygon_aeroway_military_tourism.osm')
 		#-1175256, -1751158 causing troubles 
-#		process_polygons(['admin_level'], 'polygon_admin_level.osm') 
+		process_polygons(['admin_level_2'], 'polygon_admin_level_2.osm') 
+		process_polygons(['admin_level_4'], 'polygon_admin_level_4.osm')
