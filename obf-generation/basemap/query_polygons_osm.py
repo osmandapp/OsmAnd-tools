@@ -10,9 +10,11 @@ def Point(geoStr):
 	coords = regSpaces.split(geoStr.strip())
 	if len(coords) < 2:
 		print "Error point parse " + geoStr
-	return [coords[0],coords[1]]
+	else:
+		return [coords[0],coords[1]]
 
 def LineString(geoStr):
+	print "geoStr from LineString: " + getStr
 	points = geoStr.strip().split(',')
 	points = map(Point,points)
 	return points
