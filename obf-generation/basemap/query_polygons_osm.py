@@ -14,7 +14,7 @@ def Point(geoStr):
 		return [coords[0],coords[1]]
 
 def LineString(geoStr):
-	print "geoStr from LineString: " + getStr
+	print "geoStr from LineString: " + geoStr
 	points = geoStr.strip().split(',')
 	points = map(Point,points)
 	return points
