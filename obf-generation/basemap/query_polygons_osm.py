@@ -8,13 +8,9 @@ import os
 regSpaces = re.compile('\s+')
 def Point(geoStr):
 	coords = regSpaces.split(geoStr.strip())
-	if len(coords) < 2:
-		print "Error point parse " + geoStr
-	else:
-		return [coords[0],coords[1]]
+	return [coords[0],coords[1]]
 
 def LineString(geoStr):
-	print "geoStr from LineString: " + geoStr
 	points = geoStr.strip().split(',')
 	points = map(Point,points)
 	return points
@@ -139,32 +135,35 @@ def process_polygons(tags, filename):
 			rings = parenComma.split(coordinates)
 			first = 0
 			for ring in rings:
-				line = LineString(ring)
-				way_id = way_id - 1;
-				if first == 0:
-					xml += '\t<member type="way" ref="%s" role="outer" />\n' % (way_id)
-					first = 1
-				else:
-					xml += '\t<member type="way" ref="%s" role="inner" />\n' % (way_id)
-	
-				way_xml += '\n<way version="1" id="%s" >\n' % (way_id)
-				if admin_level:
-					way_xml += tags_xml
-				first_node_id = 0
-				first_node = []
-				for c in line:
-					node_id = node_id - 1
-					nid = node_id
-					if first_node_id == 0:
-						first_node_id = node_id
-						first_node = c
-						node_xml += '\n<node id="%s" lat="%s" lon="%s"/>' % (nid, c[1], c[0])
-					elif first_node == c:
-						nid = first_node_id
+				if len(ring) > 0:
+					line = LineString(ring)
+					way_id = way_id - 1;
+					if first == 0:
+						xml += '\t<member type="way" ref="%s" role="outer" />\n' % (way_id)
+						first = 1
 					else:
-						node_xml += '\n<node id="%s" lat="%s" lon="%s"/>' % (nid, c[1], c[0])
-					way_xml += '\t<nd ref="%s" />\n' % (nid)
-				way_xml += '</way>'
+						xml += '\t<member type="way" ref="%s" role="inner" />\n' % (way_id)
+
+					way_xml += '\n<way version="1" id="%s" >\n' % (way_id)
+					if admin_level:
+						way_xml += tags_xml
+					first_node_id = 0
+					first_node = []
+					for c in line:
+						node_id = node_id - 1
+						nid = node_id
+						if first_node_id == 0:
+							first_node_id = node_id
+							first_node = c
+							node_xml += '\n<node id="%s" lat="%s" lon="%s"/>' % (nid, c[1], c[0])
+						elif first_node == c:
+							nid = first_node_id
+						else:
+							node_xml += '\n<node id="%s" lat="%s" lon="%s"/>' % (nid, c[1], c[0])
+						way_xml += '\t<nd ref="%s" />\n' % (nid)
+					way_xml += '</way>'
+				else:
+					print "Empty ring!"
 			xml += '</relation>'	
 			f.write(node_xml)
 			f.write(way_xml)
