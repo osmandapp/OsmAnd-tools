@@ -53,6 +53,8 @@ public class UpdateSubscription {
 	private static final long DAY = 1000l * 60 * 60 * 24;
 	private static final long HOUR = 1000l * 60 * 60;
 
+	private static final long MINIMUM_WAIT_TO_REVALIDATE_VALID = 5 * DAY;
+	private static final long MINIMUM_WAIT_TO_REVALIDATE = 12 * HOUR;
 	int changes = 0;
 	int checkChanges = 0;
 	int deletions = 0;
@@ -158,12 +160,7 @@ public class UpdateSubscription {
 			}
 
 			long checkDiff = checkTime == null ? tm : (tm - checkTime.getTime());
-			// Basically validate non-valid everytime and valid not often than once per 24 hours
-			if (checkDiff < 6 * HOUR || (valid && checkDiff < DAY)) {
-//				if (verifyAll) {
-//					System.out.println(String.format("Skip userid=%d, sku=%s - recently checked %.1f days", userid,
-//							sku, (tm - checkTime.getTime()) / (DAY * 1.0)));
-//				}
+			if (checkDiff < MINIMUM_WAIT_TO_REVALIDATE && !verifyAll) {
 				continue;
 			}
 
@@ -175,13 +172,14 @@ public class UpdateSubscription {
 			}
 			// skip all active and valid if it was validated less than 5 days ago
 			if (activeNow && valid) {
-				if(checkDiff < 5 * DAY || !verifyAll) {
-					if(verifyAll) {
-						System.out.println(String.format("Skip userid=%d, sku=%s - subscribtion is active", userid, sku));
-					}
+				if (checkDiff < MINIMUM_WAIT_TO_REVALIDATE_VALID) {
+//					if (verifyAll) {
+//						System.out.println(String.format("Skip userid=%d, sku=%s - subscribtion is active", userid, sku));
+//					}
 					continue;
 				}
 			}
+			System.out.println(String.format("Validate userid=%d, sku=%s - subscribtion is active %d", userid, sku, activeNow));
 
 			if (this.ios) {
 				processIosSubscription(receiptValidationHelper, userid, pt, sku, payload, startTime, expireTime, tm);
