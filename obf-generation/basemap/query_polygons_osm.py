@@ -54,7 +54,7 @@ def process_polygons(tags, filename):
 			queryFields += ", \"leisure\""
 			conditions += " or (\"leisure\" = 'nature_reserve' or \"leisure\" = 'ski_resort')"
 		elif tag == "admin_level_2" : 
-			array.append("admin_level)
+			array.append("admin_level")
 			queryFields += ", admin_level"
 			admin_level = True
 			conditions += " or (admin_level = '2' and boundary <> 'national_park')"	     
