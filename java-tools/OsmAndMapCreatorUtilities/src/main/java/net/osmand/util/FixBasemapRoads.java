@@ -53,7 +53,7 @@ public class FixBasemapRoads {
     private static float MAXIMAL_DISTANCE_CUT = 400;
     private final static Log LOG = PlatformUtil.getLog(FixBasemapRoads.class);
     
-    private static boolean FILTER_BBOX = true;  
+    private static boolean FILTER_BBOX = false;  
 	private static double LEFT_LON = -3;
 	private static double RIGHT_LON = -1;
 	private static double TOP_LAT = 53;
