@@ -179,10 +179,10 @@ public class UpdateSubscription {
 					continue;
 				}
 			}
-			System.out.println(String.format("Validate userid=%d, sku=%s - subscription %s %s (active=%d)", userid, sku,
+			System.out.println(String.format("Validate userid=%d, sku=%s - subscription %s %s (active=%s)", userid, sku,
 					startTime == null ? "" : new Date(startTime.getTime()),
 					expireTime == null ? "" : new Date(expireTime.getTime()),
-							activeNow));
+							activeNow+""));
 
 			if (this.ios) {
 				processIosSubscription(receiptValidationHelper, userid, pt, sku, payload, startTime, expireTime, tm);
