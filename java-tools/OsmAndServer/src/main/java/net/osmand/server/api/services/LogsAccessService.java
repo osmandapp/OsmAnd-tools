@@ -121,7 +121,8 @@ public class LogsAccessService {
 				Matcher aidMatcher = aidPattern.matcher(l.uri);
 				String aid = aidMatcher.find() ? aidMatcher.group(1) : null ;
 				if(filter != null && filter.length() > 0) {
-					if(!l.uri.contains(filter) && !behaviorMap.containsKey(l.ip) && 
+					if(!l.uri.contains(filter) && 
+							(l.userAgent == null || !l.userAgent.contains(filter)) && !behaviorMap.containsKey(l.ip) && 
 							!behaviorMap.containsKey(aid)) {
 						continue;
 					}
