@@ -248,6 +248,8 @@ public class ApiController {
 			if (i >= 0) {
 				params.appVersion = version.substring(0, i);
 				params.version = version.substring(i + 1);
+			} else {
+				params.version = version;
 			}
 		}
 
@@ -282,6 +284,8 @@ public class ApiController {
 			if (i >= 0) {
 				params.appVersion = version.substring(0, i);
 				params.version = version.substring(i + 1);
+			} else {
+				params.version = version;
 			}
 		}
 		
