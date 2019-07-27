@@ -203,13 +203,13 @@ public class CombineSRTMIntoFile {
 			settings.boundary = polygon;
 			IndexCreator ic = new IndexCreator(targetFile.getParentFile(), settings);
 
-			if (srtmFileNames.size() > NUMBER_OF_FILES_TO_PROCESS_ON_DISK || length > SIZE_GB_TO_COMBINE_INRAM) {
-				ic.setDialects(DBDialect.SQLITE, DBDialect.SQLITE);
-				System.out.println("SQLITE on disk is used.");
-			} else {
+//			if (srtmFileNames.size() > NUMBER_OF_FILES_TO_PROCESS_ON_DISK || length > SIZE_GB_TO_COMBINE_INRAM) {
+//				ic.setDialects(DBDialect.SQLITE, DBDialect.SQLITE);
+//				System.out.println("SQLITE on disk is used.");
+//			} else {
 				ic.setDialects(DBDialect.SQLITE, DBDialect.SQLITE_IN_MEMORY);
-				System.out.println("SQLITE in memory used: be aware whole database is stored in memory.");
-			}
+//				System.out.println("SQLITE in memory used: be aware whole database is stored in memory.");
+//			}
 			ic.setRegionName(name + " contour lines");
 			ic.setMapFileName(targetFile.getName());
 			File nodesDB = new File(targetFile.getParentFile(), dwName + "." + IndexCreator.TEMP_NODES_DB);
