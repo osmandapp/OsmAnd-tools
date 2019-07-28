@@ -276,7 +276,13 @@ public class ObfFileInMemory {
 				if (routesIds != null) {
 					nrefs = new int[routesIds.length];
 					for (int i = 0; i < routesIds.length; i++) {
-						nrefs[i++] = newRoutesIds.get(routesIds[i]).intValue();
+						Long vl = newRoutesIds.get(routesIds[i]);
+						if(vl == null) {
+							throw new IllegalStateException(
+									String.format("Transport stop (%s) has reference to route %d but it wasn't found in the list",
+									stop, routesIds[i] / 2));
+						}
+						nrefs[i] = vl.intValue();
 					}
 				}
 				stop.setReferencesToRoutes(nrefs);

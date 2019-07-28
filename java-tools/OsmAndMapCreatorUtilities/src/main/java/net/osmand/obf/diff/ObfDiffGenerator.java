@@ -114,8 +114,8 @@ public class ObfDiffGenerator {
 	}
 
 	private void compareTransport(ObfFileInMemory fStart, ObfFileInMemory fEnd, boolean print, Set<EntityId> modifiedObjIds) {
-		TLongObjectHashMap<TransportStop> startStopData = fStart.getTransportStops();
-		TLongObjectHashMap<TransportStop> endStopData = fEnd.getTransportStops();
+		TLongObjectHashMap<TransportStop> startStopData = cleanStopsAndAdjustId(fStart.getTransportStops());
+		TLongObjectHashMap<TransportStop> endStopData = cleanStopsAndAdjustId(fEnd.getTransportStops());
 		if (endStopData == null) {
 			return;
 		}
@@ -124,12 +124,13 @@ public class ObfDiffGenerator {
 		for (Long stopId : startStopData.keys()) {
 			TransportStop stopS = startStopData.get(stopId);
 			TransportStop stopE = endStopData.get(stopId);
-			EntityId aid = getTransportStopId(stopS);
 			if (stopE == null) {
 				if (print) {
 					System.out.println("Transport stop " + stopId + " is missing in (2): " + stopS);
 				} else {
-					if (modifiedObjIds == null || modifiedObjIds.contains(aid) || aid == null) {
+					// TODO check both node / way
+					EntityId aid = getTransportEntityId(stopS);
+					if (modifiedObjIds == null || modifiedObjIds.contains(aid)) {
 						stopS.setDeleted();
 						endStopData.put(stopId, stopS);
 					}
@@ -143,7 +144,7 @@ public class ObfDiffGenerator {
 				}
 				if(cmp || print){
 					TransportStop stop = endStopData.remove(stopId);
-					endStopDataDeleted.put(stop.getId(), stop);
+					endStopDataDeleted.put(stopId, stop);
 				}
 			}
 		}
@@ -154,7 +155,7 @@ public class ObfDiffGenerator {
 				}
 			}
 		}
-		// Walk througt all routes and drop non changed. If route was deleted - mark it and add to the result.
+		// Walk through all routes and drop non changed. If route was deleted - mark it and add to the result.
 		// Offsets will be regenerated at write procedure
 		TLongObjectHashMap<TransportRoute> startRouteData = fStart.getTransportRoutes();
 		TLongObjectHashMap<TransportRoute> endRouteData = fEnd.getTransportRoutes();
@@ -162,9 +163,9 @@ public class ObfDiffGenerator {
 		for (Long routeId : startRouteData.keys()) {
 			TransportRoute routeS = startRouteData.get(routeId);
 			TransportRoute routeE = endRouteData.get(routeId);
-			EntityId aid = getTransportRouteId(routeS);
 			routeDeletedStops.clear();
 			if (routeE == null) {
+				EntityId aid = getTransportRouteId(routeS);
 				if (modifiedObjIds != null && !modifiedObjIds.contains(aid)) {
 					throw new IllegalStateException("Transport route " + routeId + " is missing in (2): " + routeS);
 				}
@@ -182,8 +183,10 @@ public class ObfDiffGenerator {
 						System.out.println("Transport route " + routeId + " is not equal: " + routeS + " != " + routeE);
 					}
 					// mark on all previous stops to be deleted
-					for(TransportStop s : routeS.getForwardStops()) {
-						routeDeletedStops.put(adjustTransportRouteStopIdToId(s.getId()), s);
+					if (routeS != null) {
+						for (TransportStop s : routeS.getForwardStops()) {
+							routeDeletedStops.put(adjustTransportRouteStopIdToId(s.getId()), s);
+						}
 					}
 					// don't mark to delete if it will be added
 					for(TransportStop s : routeE.getForwardStops()) {
@@ -192,7 +195,7 @@ public class ObfDiffGenerator {
 						if(!endStopData.contains(stopId)) {
 							if(!endStopDataDeleted.contains(stopId)) {
 								throw new IllegalArgumentException(
-										String.format("Missing stop %ld for route %s", stopId, aid.toString()));
+										String.format("Missing stop %d for route %d: %s", stopId, routeId / 2, s));
 							}
 							endStopData.put(stopId, endStopDataDeleted.get(stopId));
 						}
@@ -208,7 +211,8 @@ public class ObfDiffGenerator {
 				if(!endStopData.contains(stopId)) {
 					if(!endStopDataDeleted.contains(stopId)) {
 						throw new IllegalArgumentException(
-								String.format("Missing stop %ld for route %s", stopId, aid.toString()));
+								String.format("Missing stop %d for route %d: %s", stopId, routeId / 2, 
+										routeDeletedStops.get(stopId)));
 					}
 					endStopData.put(stopId, endStopDataDeleted.get(stopId));
 				}
@@ -220,9 +224,27 @@ public class ObfDiffGenerator {
 		}
 	}
 	
+	private TLongObjectHashMap<TransportStop> cleanStopsAndAdjustId(TLongObjectHashMap<TransportStop> transportStops) {
+		if (transportStops == null) {
+			return null;
+		}
+		TLongObjectHashMap<TransportStop> res = new TLongObjectHashMap<TransportStop>();
+		for (TransportStop s : transportStops.valueCollection()) {
+			s.setRoutesIds(null);
+			s.setDeletedRoutesIds(null);
+			// TODO TEMPORARY SOLUTION
+			res.put(adjustTransportStopIdToId(s.getId()), s);
+		}
+		return res;
+	}
+
 	public static long adjustTransportStopIdToId(long id) {
+		long r = id & 0xffffffffL;
+		if(r  > Integer.MAX_VALUE) {
+			r = r - 0xffffffffL - 1;
+		}
 		// should be just id after fixes
-		return id;
+		return r;
 	}
 
 	public static long adjustTransportRouteStopIdToId(long id) {
@@ -365,13 +387,10 @@ public class ObfDiffGenerator {
 		return null;
 	}
 	
-	private EntityId getTransportStopId(MapObject objS) {
+	private EntityId getTransportEntityId(MapObject objS) {
 		Long id = objS.getId();
-		if ((id % 2) == 0) {
-			return new EntityId(EntityType.NODE, id / 64);
-		} else {
-			return new EntityId(EntityType.WAY, id / 64);
-		}
+		// we didn't store way or node (so it should be checked twice probably) 
+		return new EntityId(EntityType.NODE, id >> (BinaryInspector.SHIFT_ID));
 	}
 
 	private EntityId getTransportRouteId(TransportRoute route) {
