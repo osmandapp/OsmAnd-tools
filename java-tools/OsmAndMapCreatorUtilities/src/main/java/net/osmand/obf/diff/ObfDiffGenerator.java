@@ -45,11 +45,11 @@ public class ObfDiffGenerator {
 	public static void main(String[] args) throws IOException, RTreeException {
 		if(args.length == 1 && args[0].equals("test")) {
 			args = new String[4];
-			args[0] = "/Users/victorshcherb/osmand/maps/19_07_01_00_50_before.obf.gz";
-			args[1] = "/Users/victorshcherb/osmand/maps/19_07_01_00_50_after.obf.gz";
+			args[0] = "/Users/victorshcherb/osmand/maps/19_07_01_00_30_before.obf.gz";
+			args[1] = "/Users/victorshcherb/osmand/maps/19_07_01_00_30_after.obf.gz";
 //			args[2] = "stdout";
-			args[2] = "/Users/victorshcherb/osmand/maps/19_07_01_00_50_diff.obf";
-			args[3] = "/Users/victorshcherb/osmand/maps/19_07_01_00_50_diff.osm.gz";
+			args[2] = "/Users/victorshcherb/osmand/maps/19_07_01_00_30_diff.obf";
+			args[3] = "/Users/victorshcherb/osmand/maps/19_07_01_00_30_diff.osm.gz";
 		}
 		if (args.length < 3) {
 			System.out.println("Usage: <path to old obf> <path to new obf> <[result file name] or [stdout]> <path to diff file (optional)>");
@@ -132,8 +132,9 @@ public class ObfDiffGenerator {
 					EntityId aid = getTransportEntityId(stopS);
 					if (modifiedObjIds == null || modifiedObjIds.contains(aid)) {
 						stopS.setDeleted();
-						endStopData.put(stopId, stopS);
 					}
+					// we need to put stop anyway (but don't mark as deleted)
+					endStopData.put(stopId, stopS);
 				}
 			} else {
 				boolean cmp = stopE.compareStop(stopS);
