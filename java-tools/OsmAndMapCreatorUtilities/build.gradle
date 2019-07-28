@@ -41,6 +41,5 @@ dependencies {
 	implementation 'org.xwiki.rendering:xwiki-rendering-syntax-xhtml:7.1-milestone-2'
 	implementation 'org.xwiki.rendering:xwiki-rendering-syntax-html:7.1-milestone-2'
 	implementation 'org.xwiki.rendering:xwiki-rendering-syntax-xwiki21:7.1-milestone-2'
-	runtime project(path: ':OsmAndMapCreator')
 
 }
