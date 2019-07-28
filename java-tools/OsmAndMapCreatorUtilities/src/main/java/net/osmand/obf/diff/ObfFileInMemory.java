@@ -554,7 +554,7 @@ public class ObfFileInMemory {
 	
 	public void putTransportData(Collection<TransportStop> newData, TIntLongMap routesStopsData, boolean override) {
 		for (TransportStop ts : newData) {
-			Long tid = ts.getId() / 32;
+			Long tid = ts.getId();
 			if (routesStopsData != null) {
 				int[] referencesToRoutes = ts.getReferencesToRoutes();
 				if (referencesToRoutes != null && referencesToRoutes.length > 0) {

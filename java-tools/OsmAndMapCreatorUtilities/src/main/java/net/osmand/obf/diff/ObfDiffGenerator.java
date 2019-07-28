@@ -215,7 +215,7 @@ public class ObfDiffGenerator {
 					// Check if we have all stops in 2nd file
 					for (TransportStop s : routeE.getForwardStops()) {
 						if (!endStopData.containsKey(s.getId())) {
-							throw new IllegalStateException("Transport stop " + s.getId() + " is missing in (2): " + s + " for modified route " + routeId + ": " + routeE);
+							throw new IllegalStateException("Transport stop " + s.getId() / 128 + " is missing in (2): " + s + " for modified route " + routeId / 2 + ": " + routeE);
 						}
 					}
 				}
