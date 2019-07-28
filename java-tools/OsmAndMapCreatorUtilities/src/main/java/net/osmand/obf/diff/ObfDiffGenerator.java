@@ -204,9 +204,8 @@ public class ObfDiffGenerator {
 					endRouteData.remove(routeId);
 				}
 			}
-			for(TransportStop s : routeDeletedStops.valueCollection()) {
-				long stopId = s.getId();
-				if(!endStopData.contains(s.getId())) {
+			for(long stopId : routeDeletedStops.keys()) {
+				if(!endStopData.contains(stopId)) {
 					if(!endStopDataDeleted.contains(stopId)) {
 						throw new IllegalArgumentException(
 								String.format("Missing stop %ld for route %s", stopId, aid.toString()));

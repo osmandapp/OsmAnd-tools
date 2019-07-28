@@ -271,28 +271,15 @@ public class ObfFileInMemory {
 				writer.endWriteTransportRoutes();
 			}
 			for (TransportStop stop : transportStops.valueCollection()) {
-				int[] referencesToRoutes = stop.getReferencesToRoutes();
-				if (referencesToRoutes != null && referencesToRoutes.length > 0) {
-					List<Integer> newReferencesToRoutes = new ArrayList<>();
-					long[] routesIds = stop.getRoutesIds();
-					if (routesIds != null) {
-						for (long routeId : routesIds) {
-							Long newOffset = newRoutesIds.get(routeId);
-							if (newOffset != null) {
-								newReferencesToRoutes.add(newOffset.intValue());
-							}
-						}
-					}
-					if (newReferencesToRoutes.size() == 0) {
-						stop.setReferencesToRoutes(null);
-					} else {
-						int[] refs = new int[newReferencesToRoutes.size()];
-						for (int i = 0; i < newReferencesToRoutes.size(); i++) {
-							refs[i] = newReferencesToRoutes.get(i);
-						}
-						stop.setReferencesToRoutes(refs);
+				long[] routesIds = stop.getRoutesIds();
+				int[] nrefs = null;
+				if (routesIds != null) {
+					nrefs = new int[routesIds.length];
+					for (int i = 0; i < routesIds.length; i++) {
+						nrefs[i++] = newRoutesIds.get(routesIds[i]).intValue();
 					}
 				}
+				stop.setReferencesToRoutes(nrefs);
 			}
 
 			writeTransportStops(indexCreator, writer, transportStops, stringTable, targetFile);
