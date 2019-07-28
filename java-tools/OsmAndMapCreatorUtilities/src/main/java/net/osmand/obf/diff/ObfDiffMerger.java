@@ -51,7 +51,6 @@ public class ObfDiffMerger {
 	public static void mergeBulkOsmLiveDay(String[] args) {
 		try {
 			String location = args[0];
-			boolean useTransportData = args[args.length - 1].equals("--useTransportData");
 			File folder = new File(location);
 			for (File region : getSortedFiles(folder)) {
 				if (!region.isDirectory()) {
@@ -68,7 +67,7 @@ public class ObfDiffMerger {
 					}
 					
 					File flToMerge = new File(region, regionName + "_" + date.getName() + ".obf.gz");
-					boolean processed = new ObfDiffMerger().process(flToMerge, Arrays.asList(date), true, useTransportData);
+					boolean processed = new ObfDiffMerger().process(flToMerge, Arrays.asList(date), true);
 					if(processed) {
 						System.out.println("Processed " + region + " " + date + " .");
 					}
@@ -101,7 +100,6 @@ public class ObfDiffMerger {
 	public static void mergeBulkOsmLiveMonth(String[] args) {
 		try {
 			String location = args[0];
-			boolean useTransportData = args[args.length - 1].equals("--useTransportData");
 			Date currentDate = new Date();
 			String cdate = day.format(currentDate).substring(2);
 			String pdate = day.format(new Date(System.currentTimeMillis() - 1000 * 24 * 60 * 60 * 20)).substring(2);
@@ -127,7 +125,7 @@ public class ObfDiffMerger {
 				Map<String, List<File>> fls = groupFilesByMonth(regionName, days, cdate, allowedMonths);
 				for (String fl : fls.keySet()) {
 					File flToMerge = new File(region, fl);
-					boolean processed = new ObfDiffMerger().process(flToMerge, fls.get(fl), true, useTransportData);
+					boolean processed = new ObfDiffMerger().process(flToMerge, fls.get(fl), true);
 					if(processed) {
 						String s = "";
 						for(File f: fls.get(fl)) {
@@ -190,7 +188,6 @@ public class ObfDiffMerger {
 		File result = new File(args[0]);
 		List<File> inputDiffs = new ArrayList<>();
 		boolean checkTimestamps = false;
-		boolean useTransportData = args[args.length - 1].equals("--useTransportData");
 		for (int i = 1; i < args.length; i++) {
 			if(args[i].equals("--check-timestamp")) {
 				checkTimestamps = true;
@@ -202,10 +199,10 @@ public class ObfDiffMerger {
 			}
 			inputDiffs.add(fl);
 		}
-		process(result, inputDiffs, checkTimestamps, useTransportData);
+		process(result, inputDiffs, checkTimestamps);
 	}
 
-	public boolean process(File result, List<File> inputDiffs, boolean checkTimestamps, boolean useTransportData) throws IOException,
+	public boolean process(File result, List<File> inputDiffs, boolean checkTimestamps) throws IOException,
 			RTreeException, SQLException {
 		List<File> diffs = new ArrayList<>();
 		for(File fl : inputDiffs) {
@@ -241,7 +238,7 @@ public class ObfDiffMerger {
 			}
 		}
 		ObfFileInMemory context = new ObfFileInMemory();
-		context.readObfFiles(diffs, useTransportData);
+		context.readObfFiles(diffs);
 		context.writeFile(result, true);
 		return true;
 	}

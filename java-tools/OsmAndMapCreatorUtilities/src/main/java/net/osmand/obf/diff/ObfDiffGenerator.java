@@ -47,14 +47,17 @@ public class ObfDiffGenerator {
 	
 	public static void main(String[] args) throws IOException, RTreeException {
 		if(args.length == 1 && args[0].equals("test")) {
-			args = new String[3];
+			args = new String[4];
 			args[0] = "/Users/victorshcherb/osmand/maps/Map.obf";
 			args[1] = "/Users/victorshcherb/osmand/maps/Map2.obf";
-//			args[2] = "/Users/victorshcherb/osmand/maps/diff/Diff.obf";
+			args[0] = "/Users/alexey/tmp/map/19_07_01/19_07_01_00_10_before.obf";
+			args[1] = "/Users/alexey/tmp/map/19_07_01/19_07_01_00_10_after.obf";
 			args[2] = "stdout";
+			args[2] = "/Users/alexey/tmp/map/19_07_01/19_07_01_00_10_diff.obf";
+			args[3] = "/Users/alexey/tmp/map/19_07_01/19_07_01_00_10_diff.osm";
 		}
 		if (args.length < 3) {
-			System.out.println("Usage: <path to old obf> <path to new obf> <[result file name] or [stdout]> <path to diff file (optional)> <[--useTransportData] (optional)>");
+			System.out.println("Usage: <path to old obf> <path to new obf> <[result file name] or [stdout]> <path to diff file (optional)>");
 			System.exit(1);
 			return;
 		}
@@ -72,7 +75,6 @@ public class ObfDiffGenerator {
 		File end = new File(args[1]);
 		File diff = args.length < 4 ? null : new File(args[3]);
 		File result = args[2].equals("stdout") ? null : new File(args[2]);
-		boolean useTransportData = args[args.length - 1].equals("--useTransportData");
 		if (!start.exists()) {
 			System.err.println("Input Obf file doesn't exist: " + start.getAbsolutePath());
 			System.exit(1);
@@ -83,14 +85,14 @@ public class ObfDiffGenerator {
 			System.exit(1);
 			return;
 		}
-		generateDiff(start, end, result, diff, useTransportData);
+		generateDiff(start, end, result, diff);
 	}
 
-	private void generateDiff(File start, File end, File result, File diff, boolean useTransportData) throws IOException, RTreeException, SQLException {
+	private void generateDiff(File start, File end, File result, File diff) throws IOException, RTreeException, SQLException {
 		ObfFileInMemory fStart = new ObfFileInMemory();
-		fStart.readObfFiles(Collections.singletonList(start), useTransportData);
+		fStart.readObfFiles(Collections.singletonList(start));
 		ObfFileInMemory fEnd = new ObfFileInMemory();
-		fEnd.readObfFiles(Collections.singletonList(end), useTransportData);
+		fEnd.readObfFiles(Collections.singletonList(end));
 		
 		Set<EntityId> modifiedObjIds = null;
 		if (diff != null) {
@@ -201,6 +203,13 @@ public class ObfDiffGenerator {
 					// Add all forward stops to 2nd file
 					for (TransportStop s : routeE.getForwardStops()) {
 						Long stopId = s.getId();
+						for (TransportStop stop : startStopData.valueCollection()) {
+							if (Math.abs(s.x31 - stop.x31) <= 512 && Math.abs(s.y31 - stop.y31) <= 512 && s.getName().equals(stop.getName())) {
+								stopId = stop.getId();
+								s.setId(stopId);
+								break;
+							}
+						}
 						if (!endStopData.containsKey(stopId) && endStopDataDeleted.containsKey(stopId)) {
 							endStopData.put(stopId, endStopDataDeleted.get(stopId));
 						}

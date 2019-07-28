@@ -241,7 +241,10 @@ public class ObfFileInMemory {
 				long[] routesIds = transportStop.getRoutesIds();
 				if (routesIds != null) {
 					for (long routeId : routesIds) {
-						transportRoutes.put(routeId, this.transportRoutes.get(routeId));
+						TransportRoute route = this.transportRoutes.get(routeId);
+						if (route != null) {
+							transportRoutes.put(routeId, route);
+						}
 					}
 				}
 			}
@@ -467,7 +470,7 @@ public class ObfFileInMemory {
 		return timestamp;
 	}
 
-	public void readObfFiles(List<File> files, boolean useTransportData) throws IOException {
+	public void readObfFiles(List<File> files) throws IOException {
 		for (int i = 0; i < files.size(); i++) {
 			File inputFile = files.get(i);
 			File nonGzip = inputFile;
@@ -509,9 +512,7 @@ public class ObfFileInMemory {
 					 // read all data later
 				}
 			}
-			if (useTransportData) {
-				readTransportData(indexReader, true);
-			}
+			readTransportData(indexReader, true);
 			updateTimestamp(indexReader.getDateCreated());
 			indexReader.close();
 			raf.close();
