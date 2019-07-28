@@ -132,9 +132,11 @@ public class ObfDiffGenerator {
 					EntityId aid = getTransportEntityId(stopS);
 					if (modifiedObjIds == null || modifiedObjIds.contains(aid)) {
 						stopS.setDeleted();
+						endStopData.put(stopId, stopS);
+					} else {
+						// we need to put stop anyway (but don't mark as deleted)
+						endStopDataDeleted.put(stopId, stopS);
 					}
-					// we need to put stop anyway (but don't mark as deleted)
-					endStopData.put(stopId, stopS);
 				}
 			} else {
 				boolean cmp = stopE.compareStop(stopS);
