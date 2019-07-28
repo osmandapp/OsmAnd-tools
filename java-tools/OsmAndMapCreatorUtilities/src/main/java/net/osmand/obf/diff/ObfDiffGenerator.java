@@ -50,11 +50,11 @@ public class ObfDiffGenerator {
 			args = new String[4];
 			args[0] = "/Users/victorshcherb/osmand/maps/Map.obf";
 			args[1] = "/Users/victorshcherb/osmand/maps/Map2.obf";
-			args[0] = "/Users/alexey/tmp/map/19_07_01/19_07_01_00_10_before.obf";
-			args[1] = "/Users/alexey/tmp/map/19_07_01/19_07_01_00_10_after.obf";
+			args[0] = "/Users/alexey/tmp/map/19_07_01/19_07_01_00_30_before.obf";
+			args[1] = "/Users/alexey/tmp/map/19_07_01/19_07_01_00_30_after.obf";
 			args[2] = "stdout";
-			args[2] = "/Users/alexey/tmp/map/19_07_01/19_07_01_00_10_diff.obf";
-			args[3] = "/Users/alexey/tmp/map/19_07_01/19_07_01_00_10_diff.osm";
+			args[2] = "/Users/alexey/tmp/map/19_07_01/19_07_01_00_30_diff.obf";
+			args[3] = "/Users/alexey/tmp/map/19_07_01/19_07_01_00_30_diff.osm";
 		}
 		if (args.length < 3) {
 			System.out.println("Usage: <path to old obf> <path to new obf> <[result file name] or [stdout]> <path to diff file (optional)>");
@@ -175,7 +175,7 @@ public class ObfDiffGenerator {
 		for (Long routeId : startRouteData.keys()) {
 			TransportRoute routeS = startRouteData.get(routeId);
 			TransportRoute routeE = endRouteData.get(routeId);
-			EntityId aid = getMapObjectId(routeS);
+			EntityId aid = getTransportRouteId(routeS);
 			if (print) {
 				if (routeE == null) {
 					System.out.println("Transport route " + routeId + " is missing in (2): " + routeS);
@@ -187,7 +187,7 @@ public class ObfDiffGenerator {
 				}
 			} else {
 				if (routeE == null) {
-					if (modifiedObjIds != null && aid != null && !modifiedObjIds.contains(aid)) {
+					if (modifiedObjIds != null && !modifiedObjIds.contains(aid)) {
 						throw new IllegalStateException("Transport route " + routeId + " is missing in (2): " + routeS);
 					}
 				} else if (routeE.compareRoute(routeS)) {
@@ -204,7 +204,7 @@ public class ObfDiffGenerator {
 					for (TransportStop s : routeE.getForwardStops()) {
 						Long stopId = s.getId();
 						for (TransportStop stop : startStopData.valueCollection()) {
-							if (Math.abs(s.x31 - stop.x31) <= 512 && Math.abs(s.y31 - stop.y31) <= 512 && s.getName().equals(stop.getName())) {
+							if (s.x31 == stop.x31 && s.y31 == stop.y31 && s.getName().equals(stop.getName())) {
 								stopId = stop.getId();
 								s.setId(stopId);
 								break;
@@ -364,7 +364,11 @@ public class ObfDiffGenerator {
 		}
 		return null;
 	}
-	
+
+	private EntityId getTransportRouteId(TransportRoute route) {
+		return new EntityId(EntityType.RELATION, route.getId() >> 1);
+	}
+
 	private EntityId getMapEntityId(long id) {
 		if (id < ID_MULTIPOLYGON_LIMIT && id > 0) {
 			if ((id % 2) == 0) {
