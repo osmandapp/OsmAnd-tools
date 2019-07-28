@@ -581,7 +581,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 				directStops.clear();
 				directGeometry.clear();
 				while (rset.next()) {
-					long idStop = rset.getInt(1);
+					long idStop = rset.getLong(1);
 					String stopName = rset.getString(4);
 					String stopEnName = rset.getString(5);
 					Gson gson = new Gson();
