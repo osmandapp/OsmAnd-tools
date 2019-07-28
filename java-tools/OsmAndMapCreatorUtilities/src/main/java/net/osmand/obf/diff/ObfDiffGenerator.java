@@ -48,13 +48,11 @@ public class ObfDiffGenerator {
 	public static void main(String[] args) throws IOException, RTreeException {
 		if(args.length == 1 && args[0].equals("test")) {
 			args = new String[4];
-			args[0] = "/Users/victorshcherb/osmand/maps/Map.obf";
-			args[1] = "/Users/victorshcherb/osmand/maps/Map2.obf";
-			args[0] = "/Users/alexey/tmp/map/19_07_01/19_07_01_00_30_before.obf";
-			args[1] = "/Users/alexey/tmp/map/19_07_01/19_07_01_00_30_after.obf";
-			args[2] = "stdout";
-			args[2] = "/Users/alexey/tmp/map/19_07_01/19_07_01_00_30_diff.obf";
-			args[3] = "/Users/alexey/tmp/map/19_07_01/19_07_01_00_30_diff.osm";
+			args[0] = "/Users/victorshcherb/osmand/maps/19_07_01_00_50_before.obf.gz";
+			args[1] = "/Users/victorshcherb/osmand/maps/19_07_01_00_50_after.obf.gz";
+//			args[2] = "stdout";
+			args[2] = "/Users/victorshcherb/osmand/maps/19_07_01_00_50_diff.obf";
+			args[3] = "/Users/victorshcherb/osmand/maps/19_07_01_00_50_diff.osm.gz";
 		}
 		if (args.length < 3) {
 			System.out.println("Usage: <path to old obf> <path to new obf> <[result file name] or [stdout]> <path to diff file (optional)>");
@@ -130,7 +128,7 @@ public class ObfDiffGenerator {
 		for (Long stopId : startStopData.keys()) {
 			TransportStop stopS = startStopData.get(stopId);
 			TransportStop stopE = endStopData.get(stopId);
-			EntityId aid = getMapObjectId(stopS);
+			EntityId aid = getTransportStopId(stopS);
 			long[] routesS = stopS.getRoutesIds();
 			long[] routesE = stopE != null ? stopE.getRoutesIds() : null;
 			if (print) {
@@ -363,6 +361,15 @@ public class ObfDiffGenerator {
 			}
 		}
 		return null;
+	}
+	
+	private EntityId getTransportStopId(MapObject objS) {
+		Long id = objS.getId();
+		if ((id % 2) == 0) {
+			return new EntityId(EntityType.NODE, id / 64);
+		} else {
+			return new EntityId(EntityType.WAY, id / 64);
+		}
 	}
 
 	private EntityId getTransportRouteId(TransportRoute route) {

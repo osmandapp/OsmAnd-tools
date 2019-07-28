@@ -554,18 +554,19 @@ public class ObfFileInMemory {
 	
 	public void putTransportData(Collection<TransportStop> newData, TIntLongMap routesStopsData, boolean override) {
 		for (TransportStop ts : newData) {
+			Long tid = ts.getId() / 32;
 			if (routesStopsData != null) {
 				int[] referencesToRoutes = ts.getReferencesToRoutes();
 				if (referencesToRoutes != null && referencesToRoutes.length > 0) {
 					for (int ref : referencesToRoutes) {
 						if (override || !routesStopsData.containsKey(ref)) {
-							routesStopsData.put(ref, ts.getId());
+							routesStopsData.put(ref, tid);
 						}
 					}
 				}
 			}
-			if (override || !transportStops.contains(ts.getId())) {
-				transportStops.put(ts.getId(), ts);
+			if (override || !transportStops.contains(tid)) {
+				transportStops.put(tid, ts);
 			}
 		}
 	}
