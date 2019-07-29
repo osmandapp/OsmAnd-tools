@@ -128,9 +128,10 @@ public class ObfDiffGenerator {
 				if (print) {
 					System.out.println("Transport stop " + stopId + " is missing in (2): " + stopS);
 				} else {
-					// TODO check both node / way
-					EntityId aid = getTransportEntityId(stopS);
-					if (modifiedObjIds == null || modifiedObjIds.contains(aid)) {
+					EntityId aid = getTransportEntityId(stopS, EntityType.NODE);
+					EntityId aidWay = getTransportEntityId(stopS, EntityType.WAY);
+					if (modifiedObjIds == null || modifiedObjIds.contains(aid) || 
+							modifiedObjIds.contains(aidWay)) {
 						stopS.setDeleted();
 						endStopData.put(stopId, stopS);
 					} else {
@@ -235,19 +236,19 @@ public class ObfDiffGenerator {
 		for (TransportStop s : transportStops.valueCollection()) {
 			s.setRoutesIds(null);
 			s.setDeletedRoutesIds(null);
-			// TODO TEMPORARY SOLUTION
 			res.put(adjustTransportStopIdToId(s.getId()), s);
 		}
 		return res;
 	}
 
 	public static long adjustTransportStopIdToId(long id) {
-		long r = id & 0xffffffffL;
-		if(r  > Integer.MAX_VALUE) {
-			r = r - 0xffffffffL - 1;
-		}
+//		long r = id & 0xffffffffL;
+//		if(r  > Integer.MAX_VALUE) {
+//			r = r - 0xffffffffL - 1;
+//		}
 		// should be just id after fixes
-		return r;
+//		return r;
+		return id;
 	}
 
 	public static long adjustTransportRouteStopIdToId(long id) {
@@ -390,10 +391,10 @@ public class ObfDiffGenerator {
 		return null;
 	}
 	
-	private EntityId getTransportEntityId(MapObject objS) {
+	private EntityId getTransportEntityId(MapObject objS, EntityType tp) {
 		Long id = objS.getId();
 		// we didn't store way or node (so it should be checked twice probably) 
-		return new EntityId(EntityType.NODE, id >> (BinaryInspector.SHIFT_ID));
+		return new EntityId(tp, id >> (BinaryInspector.SHIFT_ID));
 	}
 
 	private EntityId getTransportRouteId(TransportRoute route) {
