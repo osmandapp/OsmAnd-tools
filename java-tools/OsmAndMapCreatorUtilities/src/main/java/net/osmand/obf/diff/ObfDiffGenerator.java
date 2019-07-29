@@ -32,6 +32,7 @@ import java.util.TreeMap;
 import java.util.zip.GZIPInputStream;
 
 import gnu.trove.map.hash.TLongObjectHashMap;
+import gnu.trove.set.hash.TLongHashSet;
 import rtree.RTreeException;
 
 public class ObfDiffGenerator {
@@ -45,11 +46,11 @@ public class ObfDiffGenerator {
 	public static void main(String[] args) throws IOException, RTreeException {
 		if(args.length == 1 && args[0].equals("test")) {
 			args = new String[4];
-			args[0] = "/Users/victorshcherb/osmand/maps/olive/19_07_29_20_30_before.obf.gz";
-			args[1] = "/Users/victorshcherb/osmand/maps/olive/19_07_29_20_30_after.obf.gz";
+			args[0] = "/Users/victorshcherb/osmand/maps/olive/19_07_29_20_10_before.obf.gz";
+			args[1] = "/Users/victorshcherb/osmand/maps/olive/19_07_29_20_10_after.obf.gz";
 //			args[2] = "stdout";
-			args[2] = "/Users/victorshcherb/osmand/maps/olive/19_07_29_20_30_diff.obf";
-			args[3] = "/Users/victorshcherb/osmand/maps/olive/19_07_29_20_30_diff.osm.gz";
+			args[2] = "/Users/victorshcherb/osmand/maps/olive/19_07_29_20_10_diff.obf";
+			args[3] = "/Users/victorshcherb/osmand/maps/olive/19_07_29_20_10_diff.osm.gz";
 		}
 		if (args.length < 3) {
 			System.out.println("Usage: <path to old obf> <path to new obf> <[result file name] or [stdout]> <path to diff file (optional)>");
@@ -164,7 +165,9 @@ public class ObfDiffGenerator {
 		TLongObjectHashMap<TransportRoute> startRouteData = fStart.getTransportRoutes();
 		TLongObjectHashMap<TransportRoute> endRouteData = fEnd.getTransportRoutes();
 		TLongObjectHashMap<TransportStop> routeDeletedStops = new TLongObjectHashMap<>();
+		TLongHashSet existingRoutes = new TLongHashSet();
 		for (Long routeId : startRouteData.keys()) {
+			existingRoutes.add(routeId);
 			TransportRoute routeS = startRouteData.get(routeId);
 			TransportRoute routeE = endRouteData.get(routeId);
 			routeDeletedStops.clear();
@@ -196,14 +199,9 @@ public class ObfDiffGenerator {
 					for(TransportStop s : routeE.getForwardStops()) {
 						long stopId = adjustTransportRouteStopIdToId(s.getId());
 						routeDeletedStops.remove(stopId);
-						if(!endStopData.contains(stopId)) {
-							if(!endStopDataDeleted.contains(stopId)) {
-								throw new IllegalArgumentException(
-										String.format("Missing stop %d for route %d: %s", stopId, routeId / 2, s));
-							}
-							endStopData.put(stopId, endStopDataDeleted.get(stopId));
-						}
-						endStopData.get(stopId).addRouteId(routeId);
+						TransportStop originalStop = checkEndStopData(endStopData, endStopDataDeleted, 
+								s, routeId, stopId);
+						originalStop.addRouteId(routeId);
 					}
 					
 				}
@@ -212,20 +210,39 @@ public class ObfDiffGenerator {
 				}
 			}
 			for(long stopId : routeDeletedStops.keys()) {
-				if(!endStopData.contains(stopId)) {
-					if(!endStopDataDeleted.contains(stopId)) {
-						throw new IllegalArgumentException(
-								String.format("Missing stop %d for route %d: %s", stopId, routeId / 2, 
-										routeDeletedStops.get(stopId)));
-					}
-					endStopData.put(stopId, endStopDataDeleted.get(stopId));
-				}
-				TransportStop originalStop = endStopData.get(stopId);
+				TransportStop originalStop = checkEndStopData(endStopData, endStopDataDeleted, 
+						routeDeletedStops.get(stopId), routeId, stopId);
 				originalStop.addDeletedRouteId(routeId);
 			}
 			
 			
 		}
+		
+		for (TransportRoute route : endRouteData.valueCollection()) {
+			if (print) {
+				System.out.println("Transport route " + (route.getId() / 2) + " is missing in (1): " + route);
+			} else if(!existingRoutes.contains(route.getId())){
+				for(TransportStop s : route.getForwardStops()) {
+					long routeId = route.getId().longValue();
+					TransportStop originalStop = checkEndStopData(endStopData, endStopDataDeleted, 
+							s, routeId, s.getId());
+					originalStop.addRouteId(routeId);
+				}
+			}
+		}
+	}
+
+	private TransportStop checkEndStopData(TLongObjectHashMap<TransportStop> endStopData,
+			TLongObjectHashMap<TransportStop> endStopDataDeleted, TransportStop errorStop,
+			long routeId, long stopId) {
+		if(!endStopData.contains(stopId)) {
+			if(!endStopDataDeleted.contains(stopId)) {
+				throw new IllegalArgumentException(
+						String.format("Missing stop %d for route %d: %s", stopId, routeId / 2, errorStop));
+			}
+			endStopData.put(stopId, endStopDataDeleted.get(stopId));
+		}
+		return endStopData.get(stopId);
 	}
 	
 	private TLongObjectHashMap<TransportStop> cleanStopsAndAdjustId(TLongObjectHashMap<TransportStop> transportStops) {
