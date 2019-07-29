@@ -31,6 +31,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.zip.GZIPInputStream;
 
+import gnu.trove.iterator.TLongObjectIterator;
 import gnu.trove.map.hash.TLongObjectHashMap;
 import gnu.trove.set.hash.TLongHashSet;
 import rtree.RTreeException;
@@ -122,9 +123,11 @@ public class ObfDiffGenerator {
 		}
 		TLongObjectHashMap<TransportStop> endStopDataDeleted = new TLongObjectHashMap<>();
 		// Walk through all stops and drop non changed. If stop was deleted - mark it and add to the result.
+		TLongHashSet existingStops = new TLongHashSet();
 		for (Long stopId : startStopData.keys()) {
 			TransportStop stopS = startStopData.get(stopId);
 			TransportStop stopE = endStopData.get(stopId);
+			existingStops.add(stopId);
 			if (stopE == null) {
 				if (print) {
 					System.out.println("Transport stop " + stopId + " is missing in (2): " + stopS);
@@ -153,10 +156,23 @@ public class ObfDiffGenerator {
 				}
 			}
 		}
-		if (print) {
-			for (TransportStop s : endStopData.valueCollection()) {
-				if(!s.isDeleted()) {
+		
+		TLongObjectIterator<TransportStop> stopIterator = endStopData.iterator();
+		while(stopIterator.hasNext()) {
+			stopIterator.advance();
+			TransportStop s = stopIterator.value();
+			if (!s.isDeleted()) {
+				long stopId = stopIterator.key();
+				if (print) {
 					System.out.println("Transport stop " + s.getId() + " is missing in (1): " + s);
+				} else if(!existingStops.contains(stopId)){
+					EntityId aid = getTransportEntityId(s, EntityType.NODE);
+					EntityId aidWay = getTransportEntityId(s, EntityType.WAY);
+					if (modifiedObjIds != null && !modifiedObjIds.contains(aid) && !modifiedObjIds.contains(aidWay)) {
+						// stop was not actually modified (so delete it) it will be possible added back if route was creates
+						stopIterator.remove();
+						endStopDataDeleted.put(stopId, s);
+					}
 				}
 			}
 		}

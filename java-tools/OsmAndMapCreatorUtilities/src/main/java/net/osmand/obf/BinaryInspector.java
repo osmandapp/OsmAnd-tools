@@ -91,8 +91,8 @@ public class BinaryInspector {
 //					"-osm="+System.getProperty("maps.dir")+"/basemap/map.obf.osm",
 					//"/Users/alexey/tmp/map/19_07_01/19_07_01_00_10_before.obf"
 					//"/Users/alexey/tmp/map/19_07_01/19_07_01_00_10_after.obf"
-					System.getProperty("maps.dir")+"/Netherlands_noord-holland_europe_20_10.obf"
-//					System.getProperty("maps.dir")+"/olive/19_07_29_20_10_diff.obf"
+//					System.getProperty("maps.dir")+"/Netherlands_noord-holland_europe_20_10.obf"
+					System.getProperty("maps.dir")+"/olive/19_07_29_20_10_diff.obf"
 			});
 		} else {
 			in.inspector(args);
