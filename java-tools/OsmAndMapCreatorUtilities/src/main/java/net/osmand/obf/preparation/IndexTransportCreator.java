@@ -47,6 +47,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import gnu.trove.list.array.TIntArrayList;
+import gnu.trove.list.array.TLongArrayList;
 import gnu.trove.map.hash.TLongObjectHashMap;
 import rtree.Element;
 import rtree.IllegalValueException;
@@ -119,9 +120,9 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			PreparedStatement selectTransportStop, PreparedStatement selectTransportRouteStop,
 			Map<Long, Long> transportRoutes, Map<String, Integer> stringTable) throws IOException, RTreeException, SQLException {
 		Element[] e = parent.getAllElements();
-		List<Long> routesOffsets = null;
-		List<Long> routesIds = null;
-		List<Long> deletedRoutes = null;
+		TLongArrayList routesOffsets = null;
+		TLongArrayList routesIds = null;
+		TLongArrayList deletedRoutes = null;
 		for (int i = 0; i < parent.getTotalElements(); i++) {
 			Rect re = e[i].getRect();
 			if (e[i].getElementType() == rtree.Node.LEAF_NODE) {
@@ -142,7 +143,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 					}
 					String deletedRoutesStr = rs.getString(7);
 					if (deletedRoutes == null) {
-						deletedRoutes = new ArrayList<>();
+						deletedRoutes = new TLongArrayList();
 					} else {
 						deletedRoutes.clear();
 					}
@@ -157,24 +158,27 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 
 					ResultSet rset = selectTransportRouteStop.executeQuery();
 					if (routesOffsets == null) {
-						routesOffsets = new ArrayList<>();
+						routesOffsets = new TLongArrayList();
 					} else {
 						routesOffsets.clear();
 					}
 					if (routesIds == null) {
-						routesIds = new ArrayList<>();
+						routesIds = new TLongArrayList();
 					} else {
 						routesIds.clear();
 					}
 					while (rset.next()) {
 						long routeId = rset.getLong(1);
-						Long routeOffset = transportRoutes.get(routeId);
-						if (routeOffset == null) {
+						if(transportRoutes.get(routeId) == null) {
 							log.error("Something goes wrong with transport route id = " + routeId);
 						} else {
-							routesOffsets.add(routeOffset);
 							routesIds.add(routeId);
 						}
+					}
+					routesIds.sort();
+					for(long routeId : routesIds.toArray()) {
+						Long routeOffset = transportRoutes.get(routeId);
+						routesOffsets.add(routeOffset);
 					}
 					rset.close();
 					writer.writeTransportStop(id, x24, y24, name, nameEn, names, stringTable, routesOffsets, routesIds, deletedRoutes, exits);
@@ -196,9 +200,6 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 										 TLongObjectHashMap<TransportStop> transportStops,
 										 Map<String, Integer> stringTable) throws IOException, RTreeException, SQLException {
 		Element[] e = parent.getAllElements();
-		List<Long> routesOffsets;
-		List<Long> routesIds;
-		List<Long> deletedRoutes;
 		for (int i = 0; i < parent.getTotalElements(); i++) {
 			Rect re = e[i].getRect();
 			if (e[i].getElementType() == rtree.Node.LEAF_NODE) {
@@ -207,30 +208,24 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 				if (stop != null) {
 					int x24 = (int) MapUtils.getTileNumberX(24, stop.getLocation().getLongitude());
 					int y24 = (int) MapUtils.getTileNumberY(24, stop.getLocation().getLatitude());
-					int[] referencesToRoutes = stop.getReferencesToRoutes();
-					routesOffsets = new ArrayList<>();
-					if (referencesToRoutes != null && referencesToRoutes.length > 0) {
-						for (int referencesToRoute : referencesToRoutes) {
+					TLongArrayList routesOffsets = new TLongArrayList();
+					if (stop.getReferencesToRoutes() != null) {
+						for (int referencesToRoute : stop.getReferencesToRoutes()) {
 							routesOffsets.add((long) referencesToRoute);
 						}
 					}
-					long[] ids = stop.getRoutesIds();
-					routesIds = new ArrayList<>();
-					if (ids != null) {
-						for (long routeId : ids) {
-							routesIds.add(routeId);
-						}
+					TLongArrayList routesIds = new TLongArrayList();
+					if (stop.getRoutesIds() != null) {
+						routesIds.addAll(stop.getRoutesIds());
 					}
-					long[] deletedIds = stop.getDeletedRoutesIds();
-					deletedRoutes = new ArrayList<>();
-					if (deletedIds != null) {
-						for (long routeId : deletedIds) {
-							deletedRoutes.add(routeId);
-						}
+					TLongArrayList deletedRoutes = new TLongArrayList();
+					if (stop.getDeletedRoutesIds() != null) {
+						deletedRoutes.addAll(stop.getDeletedRoutesIds());
 					}
 					Map<Entity.EntityId, List<TransportStopExit>> exits = new HashMap<>();
 					exits.put(new EntityId(Entity.EntityType.NODE, stop.getId()), stop.getExits());
-					writer.writeTransportStop(id, x24, y24, stop.getName(), stop.getEnName(false), stop.getNamesMap(false), stringTable, routesOffsets, routesIds, deletedRoutes, exits);
+					writer.writeTransportStop(id, x24, y24, stop.getName(), stop.getEnName(false), stop.getNamesMap(false), 
+							stringTable, routesOffsets, routesIds, deletedRoutes, exits);
 				} else {
 					log.error("Something goes wrong with transport id = " + id);
 				}
