@@ -241,7 +241,10 @@ public class ObfFileInMemory {
 				long[] routesIds = transportStop.getRoutesIds();
 				if (routesIds != null) {
 					for (long routeId : routesIds) {
-						transportRoutes.put(routeId, this.transportRoutes.get(routeId));
+						TransportRoute route = this.transportRoutes.get(routeId);
+						if (route != null) {
+							transportRoutes.put(routeId, route);
+						}
 					}
 				}
 			}
@@ -268,28 +271,21 @@ public class ObfFileInMemory {
 				writer.endWriteTransportRoutes();
 			}
 			for (TransportStop stop : transportStops.valueCollection()) {
-				int[] referencesToRoutes = stop.getReferencesToRoutes();
-				if (referencesToRoutes != null && referencesToRoutes.length > 0) {
-					List<Integer> newReferencesToRoutes = new ArrayList<>();
-					long[] routesIds = stop.getRoutesIds();
-					if (routesIds != null) {
-						for (long routeId : routesIds) {
-							Long newOffset = newRoutesIds.get(routeId);
-							if (newOffset != null) {
-								newReferencesToRoutes.add(newOffset.intValue());
-							}
+				long[] routesIds = stop.getRoutesIds();
+				int[] nrefs = null;
+				if (routesIds != null) {
+					nrefs = new int[routesIds.length];
+					for (int i = 0; i < routesIds.length; i++) {
+						Long vl = newRoutesIds.get(routesIds[i]);
+						if(vl == null) {
+							throw new IllegalStateException(
+									String.format("Transport stop (%s) has reference to route %d but it wasn't found in the list",
+									stop, routesIds[i] / 2));
 						}
-					}
-					if (newReferencesToRoutes.size() == 0) {
-						stop.setReferencesToRoutes(null);
-					} else {
-						int[] refs = new int[newReferencesToRoutes.size()];
-						for (int i = 0; i < newReferencesToRoutes.size(); i++) {
-							refs[i] = newReferencesToRoutes.get(i);
-						}
-						stop.setReferencesToRoutes(refs);
+						nrefs[i] = vl.intValue();
 					}
 				}
+				stop.setReferencesToRoutes(nrefs);
 			}
 
 			writeTransportStops(indexCreator, writer, transportStops, stringTable, targetFile);
@@ -467,7 +463,7 @@ public class ObfFileInMemory {
 		return timestamp;
 	}
 
-	public void readObfFiles(List<File> files, boolean useTransportData) throws IOException {
+	public void readObfFiles(List<File> files) throws IOException {
 		for (int i = 0; i < files.size(); i++) {
 			File inputFile = files.get(i);
 			File nonGzip = inputFile;
@@ -509,9 +505,7 @@ public class ObfFileInMemory {
 					 // read all data later
 				}
 			}
-			if (useTransportData) {
-				readTransportData(indexReader, true);
-			}
+			readTransportData(indexReader, true);
 			updateTimestamp(indexReader.getDateCreated());
 			indexReader.close();
 			raf.close();
@@ -553,18 +547,19 @@ public class ObfFileInMemory {
 	
 	public void putTransportData(Collection<TransportStop> newData, TIntLongMap routesStopsData, boolean override) {
 		for (TransportStop ts : newData) {
+			Long tid = ts.getId();
 			if (routesStopsData != null) {
 				int[] referencesToRoutes = ts.getReferencesToRoutes();
 				if (referencesToRoutes != null && referencesToRoutes.length > 0) {
 					for (int ref : referencesToRoutes) {
 						if (override || !routesStopsData.containsKey(ref)) {
-							routesStopsData.put(ref, ts.getId());
+							routesStopsData.put(ref, tid);
 						}
 					}
 				}
 			}
-			if (override || !transportStops.contains(ts.getId())) {
-				transportStops.put(ts.getId(), ts);
+			if (override || !transportStops.contains(tid)) {
+				transportStops.put(tid, ts);
 			}
 		}
 	}

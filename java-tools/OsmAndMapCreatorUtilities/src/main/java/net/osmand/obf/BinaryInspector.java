@@ -89,7 +89,9 @@ public class BinaryInspector {
 //					"-zoom=15",
 //					"-bbox=30.51,50.5,30.53,50.4",
 //					"-osm="+System.getProperty("maps.dir")+"/basemap/map.obf.osm",
-					System.getProperty("maps.dir")+"/Map.obf"
+					//"/Users/alexey/tmp/map/19_07_01/19_07_01_00_10_before.obf"
+					//"/Users/alexey/tmp/map/19_07_01/19_07_01_00_10_after.obf"
+					System.getProperty("maps.dir")+"/19_07_01_00_50_before.obf"
 			});
 		} else {
 			in.inspector(args);
