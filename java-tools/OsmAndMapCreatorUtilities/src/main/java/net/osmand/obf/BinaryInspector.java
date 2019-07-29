@@ -91,7 +91,7 @@ public class BinaryInspector {
 //					"-osm="+System.getProperty("maps.dir")+"/basemap/map.obf.osm",
 					//"/Users/alexey/tmp/map/19_07_01/19_07_01_00_10_before.obf"
 					//"/Users/alexey/tmp/map/19_07_01/19_07_01_00_10_after.obf"
-					System.getProperty("maps.dir")+"/19_07_01_00_50_before.obf"
+					System.getProperty("maps.dir")+"/olive/19_07_29_20_30_diff.obf"
 			});
 		} else {
 			in.inspector(args);
@@ -1246,6 +1246,11 @@ public class BinaryInspector {
 				if (route != null) {
 					//lrs.add(route.getRef() + " " + route.getName(verbose.lang));
 					lrs.add(route.getRef() + " " + route.getType());
+				}
+			}
+			if(s.getDeletedRoutesIds() != null) {
+				for (long l : s.getDeletedRoutesIds()) {
+					lrs.add(" -" + (l / 2));
 				}
 			}
 			String exitsString = s.getExitsString();
