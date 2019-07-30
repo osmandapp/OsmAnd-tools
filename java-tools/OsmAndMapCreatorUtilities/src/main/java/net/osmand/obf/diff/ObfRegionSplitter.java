@@ -99,7 +99,7 @@ public class ObfRegionSplitter {
 				if (stops != null) {
 					Collection<TransportStop> stopsCollection = stops.valueCollection();
 					obf.setTransportRoutes(fl.getTransportRoutes());
-					obf.putTransportData(stopsCollection, null, true);
+					obf.putTransportStops(stopsCollection, true);
 				}
 				obf.updateTimestamp(fl.getTimestamp());
 				obf.writeFile(result, true);

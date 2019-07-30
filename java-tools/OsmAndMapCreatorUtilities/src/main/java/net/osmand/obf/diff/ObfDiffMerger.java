@@ -34,10 +34,13 @@ public class ObfDiffMerger {
 		try {
 			if(args.length == 1 && args[0].equals("test")) {
 				args = new String[4];
-				args[0] = "/Users/victorshcherb/osmand/maps/diff/Ukraine_kiev-city_europe-merge.obf";
-				args[1] = "/Users/victorshcherb/osmand/maps/diff/Ukraine_kiev-city_europe.obf";
-				args[2] = "/Users/victorshcherb/osmand/maps/diff/Ukraine_kiev-city_europe_17_09_00.obf.gz";
-				args[3] = "/Users/victorshcherb/osmand/maps/diff/Ukraine_kiev-city_europe_17_09_03.obf.gz";
+				List<String> s = new ArrayList<String>();
+				s.add("/Users/victorshcherb/osmand/maps/Netherlands_noord-holland_europe_merge.obf_");
+				s.add("/Users/victorshcherb/osmand/maps/Netherlands_noord-holland_europe_20_10.obf");
+				s.add("/Users/victorshcherb/osmand/maps/Netherlands_noord-holland_europe_20_20.obf");
+				s.add("/Users/victorshcherb/osmand/maps/Netherlands_noord-holland_europe_20_30.obf");
+//				s.add("/Users/victorshcherb/osmand/maps/Netherlands_noord-holland_europe_22_10.obf");
+				args = s.toArray(new String[0]);
 			}
 			ObfDiffMerger merger = new ObfDiffMerger();
 			merger.mergeChanges(args);

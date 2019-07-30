@@ -502,10 +502,10 @@ public class ObfFileInMemory {
 							 readPoiData(indexReader, pr, ZOOM_LEVEL_POI, true);
 					 putPoiData(rr, true);
 				} else if (p instanceof TransportIndex) {
-					 // read all data later
+					readTransportData(indexReader, (TransportIndex) p, true);
 				}
 			}
-			readTransportData(indexReader, true);
+			
 			updateTimestamp(indexReader.getDateCreated());
 			indexReader.close();
 			raf.close();
@@ -515,18 +515,19 @@ public class ObfFileInMemory {
 		}
 	}
 	
-	public void readTransportData(BinaryMapIndexReader indexReader, boolean override) throws IOException {
+	public void readTransportData(BinaryMapIndexReader indexReader, TransportIndex ind, boolean override) throws IOException {
 		SearchRequest<TransportStop> sr = BinaryMapIndexReader.buildSearchTransportRequest(
 				MapUtils.get31TileNumberX(lonleft),
 				MapUtils.get31TileNumberX(lonright),
 				MapUtils.get31TileNumberY(lattop),
 				MapUtils.get31TileNumberY(latbottom),
 				-1, null);
-		List<TransportStop> sti = indexReader.searchTransportIndex(sr);
-		TIntLongMap routesData = new TIntLongHashMap();
-		putTransportData(sti, routesData, override);
+		List<TransportStop> sti = indexReader.searchTransportIndex(ind, sr);
+		// merged could not be overridden
+		TIntLongMap routesData = putTransportStops(sti, override);
 		if (routesData.size() > 0) {
 			int[] filePointers = routesData.keys();
+			// reads all route
 			TIntObjectHashMap<TransportRoute> transportRoutes = indexReader.getTransportRoutes(filePointers);
 			TIntIterator it = transportRoutes.keySet().iterator();
 			while (it.hasNext()) {
@@ -536,30 +537,57 @@ public class ObfFileInMemory {
 				if (override || !this.transportRoutes.containsKey(routeId)) {
 					this.transportRoutes.put(routeId, route);
 				}
-				for (TransportStop stop : sti) {
-					if (stop.hasReferencesToRoutes() && Arrays.binarySearch(stop.getReferencesToRoutes(), offset) >= 0) {
-						stop.setRoutesIds(Algorithms.addToArrayL(stop.getRoutesIds(), routeId, true));
-					}
-				}
 			}
 		}
 	}
 	
-	public void putTransportData(Collection<TransportStop> newData, TIntLongMap routesStopsData, boolean override) {
+	public TIntLongMap putTransportStops(Collection<TransportStop> newData, boolean override) {
+		TIntLongMap routesStopsData = new TIntLongHashMap(); 
 		for (TransportStop ts : newData) {
 			Long tid = ts.getId();
 			if (routesStopsData != null) {
 				int[] referencesToRoutes = ts.getReferencesToRoutes();
 				if (referencesToRoutes != null && referencesToRoutes.length > 0) {
 					for (int ref : referencesToRoutes) {
-						if (override || !routesStopsData.containsKey(ref)) {
-							routesStopsData.put(ref, tid);
-						}
+						routesStopsData.put(ref, tid);
 					}
 				}
 			}
-			if (override || !transportStops.contains(tid)) {
+			TransportStop previousStop = transportStops.get(tid);
+			if (previousStop != null) {
+				if(override) {
+					mergeStop(ts, previousStop);
+					transportStops.put(tid, ts);
+				} else {
+					mergeStop(previousStop, ts);
+				}
+
+			} else {
 				transportStops.put(tid, ts);
+			}
+		}
+		return routesStopsData;
+	}
+
+	private void mergeStop(TransportStop stopToMergeInto, TransportStop stopToMergeFrom) {
+		boolean ridsNotEmpty = stopToMergeInto.getRoutesIds() != null && stopToMergeInto.getRoutesIds().length > 0;
+		boolean rdidsNotEmpty = stopToMergeInto.getDeletedRoutesIds() != null
+				&& stopToMergeInto.getDeletedRoutesIds().length > 0;
+		// merge into only for new stops that have route ids (!)
+		if (!stopToMergeInto.isDeleted() && (!ridsNotEmpty || !rdidsNotEmpty)) {
+			if (stopToMergeFrom.getRoutesIds() != null) {
+				for (long routeId : stopToMergeFrom.getRoutesIds()) {
+					if (!stopToMergeInto.hasRoute(routeId) && !stopToMergeInto.isRouteDeleted(routeId)) {
+						stopToMergeInto.addRouteId(routeId);
+					}
+				}
+			}
+			if (stopToMergeFrom.getDeletedRoutesIds() != null) {
+				for (long routeId : stopToMergeFrom.getDeletedRoutesIds()) {
+					if (!stopToMergeInto.hasRoute(routeId) && !stopToMergeInto.isRouteDeleted(routeId)) {
+						stopToMergeInto.addDeletedRouteId(routeId);
+					}
+				}
 			}
 		}
 	}
