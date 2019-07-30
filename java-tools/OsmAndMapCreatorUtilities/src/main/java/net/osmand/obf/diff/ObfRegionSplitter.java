@@ -28,10 +28,10 @@ public class ObfRegionSplitter {
 	public static void main(String[] args) throws IOException {
 		if(args.length == 1 && args[0].equals("test")) {
 			args = new String[5];
-			args[0] = "/Users/victorshcherb/osmand/maps/diff/Diff.obf";
-			args[1] = "/Users/victorshcherb/osmand/maps/diff/regions";
+			args[0] = "/Users/victorshcherb/osmand/maps/olive/19_07_29_20_30_diff.obf";
+			args[1] = "/Users/victorshcherb/osmand/maps/olive/regions";
 			args[2] = "";
-			args[3] = "_01_00";
+			args[3] = "_20_30";
 		}
 		if (args.length <= 3) {
 			System.err.println("Usage: <path_to_world_obf_diff> <path_to_result_folder> <subfolder_name> <file_suffix>");
