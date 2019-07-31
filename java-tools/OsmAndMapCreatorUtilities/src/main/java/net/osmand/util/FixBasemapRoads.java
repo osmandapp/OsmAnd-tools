@@ -50,7 +50,7 @@ import net.osmand.osm.io.OsmBaseStorage;
 import net.osmand.osm.io.OsmStorageWriter;
 
 public class FixBasemapRoads {
-    private static float MINIMAL_DISTANCE = 0; // -> 1500? primary
+    private static int MINIMAL_DISTANCE = 2000; // -> 1500? primary
     private static float MAXIMAL_DISTANCE_CUT = 400;
     private final static Log LOG = PlatformUtil.getLog(FixBasemapRoads.class);
     
@@ -64,16 +64,16 @@ public class FixBasemapRoads {
 
 	public static void main(String[] args) throws Exception {
 		if(args == null || args.length == 0) {
-//			String line = "motorway";
-//			line = "trunk";
-			String line = "primary_n";
+			String line = "motorway_n";
+//			String line = "trunk_n";
+//			String line = "primary_n";
 //			line = "secondary";
 //			line = "tertiary";
 //			line = "nlprimary";
 //			line = "nlsecondary";
 			args = new String[] {
 					System.getProperty("maps.dir") + "basemap/line_" + line + ".osm.gz",
-					System.getProperty("maps.dir") + "basemap/proc_line_" + line + ".osm",
+					System.getProperty("maps.dir") + "basemap/proc_" + MINIMAL_DISTANCE + "_line_" + line + ".osm",
 					//System.getProperty("maps.dir") + "route_road.osm.gz"
 					
 			};
@@ -369,17 +369,24 @@ public class FixBasemapRoads {
             endPoint = np;
         }
     }
+    
+    public enum RoadInfoRefType {
+    	REF,
+    	INT_REF,
+    	EMPTY_REF,
+    	ADMIN_LEVEL
+    }
 
     class RoadInfo {
-	    String ref;
+    	final String ref;
+	    final RoadInfoRefType type;
         List<RoadLine> roadLines = new ArrayList<RoadLine>();
         TLongObjectHashMap<List<RoadLine>> startPoints = new TLongObjectHashMap<List<RoadLine>>();
         TLongObjectHashMap<List<RoadLine>> endPoints = new TLongObjectHashMap<List<RoadLine>>();
-		boolean adminLevel;
-		public boolean emptyRef;
 		
-		public RoadInfo(String rf) {
+		public RoadInfo(String rf, RoadInfoRefType type) {
 			this.ref = rf;
+			this.type = type;
 		}
 		
 		public int countRoadLines() {
@@ -548,17 +555,13 @@ public class FixBasemapRoads {
     private TLongObjectHashMap<TLongHashSet> roundabouts = new TLongObjectHashMap<TLongHashSet>();
 
 	private void processRegion(List<EntityId> toWrite) throws IOException {
-		for (String ref : roadInfoMap.keySet()) {
-			RoadInfo ri = roadInfoMap.get(ref);
-			if(!ri.emptyRef && !ri.adminLevel) {
-				processRoadsByRef(toWrite, ri, null);
-			}
-		}
-		// process empty roads
-		for (String ref : roadInfoMap.keySet()) {
-			RoadInfo ri = roadInfoMap.get(ref);
-			if(ri.emptyRef || ri.adminLevel) {
-				processRoadsByRef(toWrite, ri, null);
+		// process in certain order by ref type
+		for (RoadInfoRefType tp : RoadInfoRefType.values()) {
+			for (String ref : roadInfoMap.keySet()) {
+				RoadInfo ri = roadInfoMap.get(ref);
+				if (ri.type == tp) {
+					processRoadsByRef(toWrite, ri, null);
+				}
 			}
 		}
 	}
@@ -570,10 +573,8 @@ public class FixBasemapRoads {
 		combineUniqueIdentifyRoads(ri, emptyRoads);
 		if(verbose) System.out.println(ri.toString("After combine unique: "));
 		
-//			// last step not definite
-//			combineIntoLongestRoad(ri);
-//			if(verbose) System.out.println(ri.toString("After combine longest: "));
-//			combineRoadsWithCut(ri);
+//		combineRoadsWithCut(ri);
+//		if(verbose) System.out.println(ri.toString("After combine with cut: "));
 		
 		ri.compactDeleted();
 		for (RoadLine ls : ri.roadLines) {
@@ -624,18 +625,6 @@ public class FixBasemapRoads {
 		return bld.toString();
 	}
 
-    private void reverseWrongPositionedRoads(RoadInfo ri) {
-        for (RoadLine roadLine : ri.roadLines) {
-        	if(roadLine.isDeleted()) {
-        		continue;
-        	}
-            List<RoadLine> ps = ri.getConnectedLinesEnd(roadLine.beginPoint);
-            List<RoadLine> ws = ri.getConnectedLinesStart(roadLine.endPoint);
-			if (ps.size() == 0 && ws.size() == 0) {
-                ri.reverseRoad(roadLine);
-            }
-        }
-    }
     
     private boolean inSameDirectionLastPoints(RoadLine r2, RoadLine r1) {
         double last1 = directionRoute(r2.getLastPoints(150), true);
@@ -696,37 +685,6 @@ public class FixBasemapRoads {
         } else {
             return -Math.atan2( -x + px, - y + py );
         }
-    }
-
-    private void combineIntoLongestRoad(RoadInfo ri) {
-        boolean merged = true;
-		while (merged) {
-			merged = false;
-			for (RoadLine start : ri.roadLines) {
-				if (start.isDeleted()) {
-					continue;
-				}
-				List<RoadLine> list = ri.getConnectedLinesStart(start.endPoint);
-				double maxDist = 0;
-				RoadLine longest = null;
-				for (RoadLine end : list) {
-					if(end.isDeleted() || start == end || inOppositeDirection(start, end)) {
-						continue;
-					}
-		            if(!ri.isMaxRouteInTheEnd(start)) {
-		            	continue;
-		            }
-					if (end.distance > maxDist) {
-						maxDist = end.distance;
-						longest = end;
-					}
-				}
-				if (longest != null) {
-					merged = true;
-					ri.mergeRoadInto(start, longest, false);
-				}
-			}
-		}
     }
 
 	private void combineUniqueIdentifyRoads(RoadInfo ri, RoadInfo emptyRoads) {
@@ -886,13 +844,16 @@ public class FixBasemapRoads {
 			
 			return;
 		}
+		RoadInfoRefType type = RoadInfoRefType.REF;
 		
 		if (ref == null || ref.isEmpty()) {
+			type = RoadInfoRefType.INT_REF;
 			ref = way.getTag("int_ref");
 		}
 		if (ref == null || ref.isEmpty()) {
 			// too many breaks in between names
 //			ref = way.getTag("name");
+			type = RoadInfoRefType.EMPTY_REF;
 		} else {
 			// fix road inconsistency
 			ref = ref.replace('-', ' ');
@@ -900,18 +861,15 @@ public class FixBasemapRoads {
 				ref = ref.substring(0, ref.indexOf(';'));
 			}
 		}
-		boolean adminLevel = false;
-		boolean emptyRef = false;
 		if((ref == null || ref.isEmpty()) && way.getTag("admin_level") != null) {
+			type = RoadInfoRefType.ADMIN_LEVEL;
 			ref = way.getTag("admin_level");
 			LatLon lt = way.getLatLon();
 			ref += ((int) MapUtils.getTileNumberY(4, lt.getLatitude())) + " "
 					+ ((int) MapUtils.getTileNumberX(4, lt.getLongitude()));
-			adminLevel = true;
 		}
 		
 		if (ref == null || ref.isEmpty()) {
-			emptyRef = true;
 			LatLon lt = way.getLatLon();
 			ref = ((int) MapUtils.getTileNumberY(6, lt.getLatitude())) + " "
 					+ ((int) MapUtils.getTileNumberX(6, lt.getLongitude()));
@@ -919,9 +877,7 @@ public class FixBasemapRoads {
 
 		RoadInfo ri = roadInfoMap.get(ref);
 		if (ri == null) {
-			ri = new RoadInfo(ref);
-			ri.adminLevel = adminLevel;
-			ri.emptyRef = true;
+			ri = new RoadInfo(ref, type);
 			roadInfoMap.put(ref, ri);
 		}
 		ri.registerRoadLine(new RoadLine(way));
