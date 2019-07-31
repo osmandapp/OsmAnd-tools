@@ -50,30 +50,30 @@ import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlPullParserException;
 
 public class FixBasemapRoads {
-    private static float MINIMAL_DISTANCE = 100; // -> 1500? primary
+    private static float MINIMAL_DISTANCE = 0; // -> 1500? primary
     private static float MAXIMAL_DISTANCE_CUT = 400;
     private final static Log LOG = PlatformUtil.getLog(FixBasemapRoads.class);
     
 	private static final int APPROXIMATE_POINT_ZOOM = 21; // 15?
     
     private static boolean FILTER_BBOX = false;  
-	private static double LEFT_LON = -3;
-	private static double RIGHT_LON = -1;
-	private static double TOP_LAT = 53;
-	private static double BOTTOM_LAT = 50;
+    private static double LEFT_LON = 4.12;
+    private static double RIGHT_LON = 4.43;
+    private static double TOP_LAT = 52.15;
+    private static double BOTTOM_LAT = 51.94;
 
 	public static void main(String[] args) throws Exception {
 		if(args == null || args.length == 0) {
-			String line = "motorway";
-			line = "trunk";
-//			line = "primary";
+//			String line = "motorway";
+//			line = "trunk";
+			String line = "primary_n";
 //			line = "secondary";
 //			line = "tertiary";
 //			line = "nlprimary";
 //			line = "nlsecondary";
 			args = new String[] {
 					System.getProperty("maps.dir") + "basemap/line_" + line + ".osm.gz",
-					System.getProperty("maps.dir") + "basemap/proc/proc_line_" + line + ".osm",
+					System.getProperty("maps.dir") + "basemap/proc_line_" + line + ".osm",
 					//System.getProperty("maps.dir") + "route_road.osm.gz"
 					
 			};
@@ -548,34 +548,40 @@ public class FixBasemapRoads {
 
 
 	private void processRegion(List<EntityId> toWrite) throws IOException {
+		// TODO empty roads by quadrants
+		RoadInfo emptyRoads = roadInfoMap.get("");
 		for (String ref : roadInfoMap.keySet()) {
 			RoadInfo ri = roadInfoMap.get(ref);
-			boolean verbose = ri.getTotalDistance() > 40000;
-			if(verbose) System.out.println(ri.toString("Initial:"));
-			// combine unique roads
-			combineUniqueIdentifyRoads(ri);
-			if(verbose) System.out.println(ri.toString("After combine unique: "));
-			
-			reverseWrongPositionedRoads(ri);
-			combineUniqueIdentifyRoads(ri);
-			if(verbose) System.out.println(ri.toString("After combine reverse unique: "));
-			
-			// last step not definite
-			combineIntoLongestRoad(ri);
-			if(verbose) System.out.println(ri.toString("After combine longest: "));
-			combineRoadsWithCut(ri);
-			
-//			ri.compactDeleted();
-			for (RoadLine ls : ri.roadLines) {
-				if (ls.distance > MINIMAL_DISTANCE && !ls.isDeleted()) {
-					ls.combineWaysIntoOneWay();
-					Way w = ls.getFirstWay();
-					String hw = w.getTag(OSMTagKey.HIGHWAY);
-					if(hw != null && hw.endsWith("_link")) {
-						w.putTag("highway", hw.substring(0, hw.length() - "_link".length()));
-					}
-					toWrite.add(ls.getFirstWayId());
+			processRoadsByRef(toWrite, ri, emptyRoads);
+		}
+	}
+
+	private void processRoadsByRef(List<EntityId> toWrite, RoadInfo ri, RoadInfo emptyRoads) {
+		boolean verbose = ri.getTotalDistance() > 40000;
+		if(verbose) System.out.println(ri.toString("Initial:"));
+		// combine unique roads
+		combineUniqueIdentifyRoads(ri, emptyRoads);
+		if(verbose) System.out.println(ri.toString("After combine unique: "));
+		
+//			reverseWrongPositionedRoads(ri);
+//			combineUniqueIdentifyRoads(ri);
+//			if(verbose) System.out.println(ri.toString("After combine reverse unique: "));
+//			
+//			// last step not definite
+//			combineIntoLongestRoad(ri);
+//			if(verbose) System.out.println(ri.toString("After combine longest: "));
+//			combineRoadsWithCut(ri);
+		
+		ri.compactDeleted();
+		for (RoadLine ls : ri.roadLines) {
+			if (ls.distance > MINIMAL_DISTANCE && !ls.isDeleted()) {
+				ls.combineWaysIntoOneWay();
+				Way w = ls.getFirstWay();
+				String hw = w.getTag(OSMTagKey.HIGHWAY);
+				if(hw != null && hw.endsWith("_link")) {
+					w.putTag("highway", hw.substring(0, hw.length() - "_link".length()));
 				}
+				toWrite.add(ls.getFirstWayId());
 			}
 		}
 	}
@@ -626,6 +632,20 @@ public class FixBasemapRoads {
                 ri.reverseRoad(roadLine);
             }
         }
+    }
+    
+    private boolean inSameDirectionLastPoints(RoadLine r2, RoadLine r1) {
+        double last1 = directionRoute(r2.getLastPoints(150), true);
+        double last2 = directionRoute(r1.getLastPoints(150), true);
+        double diff = MapUtils.alignAngleDifference(last2 - last1);
+	    return Math.abs(diff) < Math.PI / 4;
+    }
+    
+    private boolean inSameDirectionFirstPoints(RoadLine end, RoadLine begin) {
+        double last1 = directionRoute(end.getFirstPoints(150), false);
+        double last2 = directionRoute(begin.getFirstPoints(150), false);
+        double diff = MapUtils.alignAngleDifference(last2 - last1);
+	    return Math.abs(diff) < Math.PI / 4;
     }
 
     private boolean inOppositeDirection(RoadLine end, RoadLine begin) {
@@ -706,7 +726,7 @@ public class FixBasemapRoads {
 		}
     }
 
-	private void combineUniqueIdentifyRoads(RoadInfo ri) {
+	private void combineUniqueIdentifyRoads(RoadInfo ri, RoadInfo emptyRoads) {
 		boolean merged = true;
 		Collections.sort(ri.roadLines, new Comparator<RoadLine>() {
 
@@ -714,7 +734,6 @@ public class FixBasemapRoads {
 			public int compare(RoadLine o1, RoadLine o2) {
 				return -Double.compare(o1.distance, o2.distance);
 			}
-
 		});
 		while (merged) {
 			merged = false;
@@ -726,35 +745,68 @@ public class FixBasemapRoads {
 					// line already merged and deleted
 					continue;
 				} else {
-					boolean attachedToEnd = findUniqueRoadToCombine(ri, longRoadToKeep, true);
-					boolean attachedToStart = findUniqueRoadToCombine(ri, longRoadToKeep, false);
+					boolean attachedToEnd = findUniqueRoadToCombine(ri, longRoadToKeep, emptyRoads, true);
+					boolean attachedToStart = findUniqueRoadToCombine(ri, longRoadToKeep, emptyRoads, false);
 					if (attachedToEnd || attachedToStart) {
 						merged = true;
 						inc = 0;
 					}
 				}
+				if(inc == 1 && ri.ref.equals("N211")) {
+					System.out.println(longRoadToKeep.getFirstWayId() + " " + longRoadToKeep.distance);
+				}
 			}
 		}
 	}
 
-	private boolean findUniqueRoadToCombine(RoadInfo ri, RoadLine longRoadToKeep, boolean attachToEnd) {
+	private boolean findUniqueRoadToCombine(RoadInfo ri, RoadLine longRoadToKeep, RoadInfo emptyRoads,
+			boolean attachToEnd) {
 		boolean merged = false;
 		List<RoadLine> list = attachToEnd ? ri.getConnectedLinesStart(longRoadToKeep.endPoint)
 				: ri.getConnectedLinesEnd(longRoadToKeep.beginPoint);
-		boolean maxRoute = attachToEnd ? ri.isMaxRouteInTheEnd(longRoadToKeep)
+		boolean readyToMerge = attachToEnd ? ri.isMaxRouteInTheEnd(longRoadToKeep)
 				: ri.isMaxRouteInTheStart(longRoadToKeep);
-		if (maxRoute) {
-			RoadLine uniqueToCombine = null;
+		RoadLine uniqueToCombine = null;
+		for (RoadLine roadToAttach : list) {
+			if (roadToAttach.isDeleted() || roadToAttach == longRoadToKeep) {
+				continue;
+			}
+			if (attachToEnd) {
+				if (inOppositeDirection(longRoadToKeep, roadToAttach)) {
+					continue;
+				}
+			} else {
+				if (inOppositeDirection(roadToAttach, longRoadToKeep)) {
+					continue;
+				}
+			}
+			if (uniqueToCombine == null) {
+				uniqueToCombine = roadToAttach;
+			} else {
+				// not unique!
+				readyToMerge = false;
+				break;
+			}
+		}
+		if (uniqueToCombine != null) {
+			if(readyToMerge) {
+				merged = true;
+				ri.mergeRoadInto(uniqueToCombine, longRoadToKeep, attachToEnd);
+			}
+		} else {
+			// check reverse connected road (primary / trunks)
+			list = attachToEnd ? ri.getConnectedLinesEnd(longRoadToKeep.endPoint)
+					: ri.getConnectedLinesStart(longRoadToKeep.beginPoint);
 			for (RoadLine roadToAttach : list) {
 				if (roadToAttach.isDeleted() || roadToAttach == longRoadToKeep) {
 					continue;
 				}
-				if(attachToEnd) {
-					if (inOppositeDirection(longRoadToKeep, roadToAttach)) {
+				if (attachToEnd) {
+					if (inSameDirectionLastPoints(longRoadToKeep, roadToAttach)) {
 						continue;
 					}
 				} else {
-					if (inOppositeDirection(roadToAttach, longRoadToKeep)) {
+					if (inSameDirectionFirstPoints(roadToAttach, longRoadToKeep)) {
 						continue;
 					}
 				}
@@ -768,9 +820,11 @@ public class FixBasemapRoads {
 			}
 			if (uniqueToCombine != null) {
 				merged = true;
+				ri.reverseRoad(uniqueToCombine);
 				ri.mergeRoadInto(uniqueToCombine, longRoadToKeep, attachToEnd);
 			}
 		}
+
 		return merged;
 	}
 
