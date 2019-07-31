@@ -1,8 +1,5 @@
 package net.osmand.util;
 
-import gnu.trove.list.array.TLongArrayList;
-import gnu.trove.map.hash.TLongObjectHashMap;
-
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -24,6 +21,13 @@ import java.util.zip.GZIPInputStream;
 
 import javax.xml.stream.XMLStreamException;
 
+import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
+import org.apache.commons.logging.Log;
+import org.xmlpull.v1.XmlPullParserException;
+
+import gnu.trove.iterator.TLongIterator;
+import gnu.trove.map.hash.TLongObjectHashMap;
+import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.PlatformUtil;
 import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.data.LatLon;
@@ -44,10 +48,6 @@ import net.osmand.osm.edit.Way;
 import net.osmand.osm.io.IOsmStorageFilter;
 import net.osmand.osm.io.OsmBaseStorage;
 import net.osmand.osm.io.OsmStorageWriter;
-
-import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
-import org.apache.commons.logging.Log;
-import org.xmlpull.v1.XmlPullParserException;
 
 public class FixBasemapRoads {
     private static float MINIMAL_DISTANCE = 0; // -> 1500? primary
@@ -376,6 +376,7 @@ public class FixBasemapRoads {
         TLongObjectHashMap<List<RoadLine>> startPoints = new TLongObjectHashMap<List<RoadLine>>();
         TLongObjectHashMap<List<RoadLine>> endPoints = new TLongObjectHashMap<List<RoadLine>>();
 		boolean adminLevel;
+		public boolean emptyRef;
 		
 		public RoadInfo(String rf) {
 			this.ref = rf;
@@ -436,43 +437,45 @@ public class FixBasemapRoads {
             toMerge.delete();
         }
 
-        public List<RoadLine> getConnectedLinesStart(long point) {
-            TLongArrayList rs = roundabouts.get(point);
-            if(rs == null) {
-                List<RoadLine> res = startPoints.get(point);
-                if(res != null) {
-                	return res;
-                }
-                return Collections.emptyList();
-            }
-            List<RoadLine> newL = new ArrayList<RoadLine>();
-            for(int i = 0; i < rs.size(); i++){
-                List<RoadLine> lt = startPoints.get(rs.get(i));
-                if(lt != null){
-                    newL.addAll(lt);
-                }
-            }
-            return newL;
-        }
+		public List<RoadLine> getConnectedLinesStart(long point) {
+			TLongHashSet rs = roundabouts.get(point);
+			if (rs == null) {
+				List<RoadLine> res = startPoints.get(point);
+				if (res != null) {
+					return res;
+				}
+				return Collections.emptyList();
+			}
+			List<RoadLine> newL = new ArrayList<RoadLine>();
+			TLongIterator it = rs.iterator();
+			while (it.hasNext()) {
+				List<RoadLine> lt = startPoints.get(it.next());
+				if (lt != null) {
+					newL.addAll(lt);
+				}
+			}
+			return newL;
+		}
 
-        public List<RoadLine> getConnectedLinesEnd(long point) {
-            TLongArrayList rs = roundabouts.get(point);
-            if(rs == null) {
-            	List<RoadLine> res = endPoints.get(point);
-                if(res != null) {
-                	return res;
-                }
-                return Collections.emptyList();
-            }
-            List<RoadLine> newL = new ArrayList<RoadLine>();
-            for(int i = 0; i < rs.size(); i++){
-                List<RoadLine> lt = endPoints.get(rs.get(i));
-                if(lt != null){
-                    newL.addAll(lt);
-                }
-            }
-            return newL;
-        }
+		public List<RoadLine> getConnectedLinesEnd(long point) {
+			TLongHashSet rs = roundabouts.get(point);
+			if (rs == null) {
+				List<RoadLine> res = endPoints.get(point);
+				if (res != null) {
+					return res;
+				}
+				return Collections.emptyList();
+			}
+			List<RoadLine> newL = new ArrayList<RoadLine>();
+			TLongIterator it = rs.iterator();
+			while (it.hasNext()) {
+				List<RoadLine> lt = endPoints.get(it.next());
+				if (lt != null) {
+					newL.addAll(lt);
+				}
+			}
+			return newL;
+		}
 
         public void reverseRoad(RoadLine roadLine) {
             startPoints.get(roadLine.beginPoint).remove(roadLine);
@@ -541,18 +544,22 @@ public class FixBasemapRoads {
 		
     }
 
-
     private Map<String, RoadInfo> roadInfoMap = new LinkedHashMap<String, RoadInfo>();
-    private TLongObjectHashMap<TLongArrayList> roundabouts = new TLongObjectHashMap<TLongArrayList>();
-
-
+    private TLongObjectHashMap<TLongHashSet> roundabouts = new TLongObjectHashMap<TLongHashSet>();
 
 	private void processRegion(List<EntityId> toWrite) throws IOException {
-		// TODO empty roads by quadrants
-		RoadInfo emptyRoads = roadInfoMap.get("");
 		for (String ref : roadInfoMap.keySet()) {
 			RoadInfo ri = roadInfoMap.get(ref);
-			processRoadsByRef(toWrite, ri, emptyRoads);
+			if(!ri.emptyRef && !ri.adminLevel) {
+				processRoadsByRef(toWrite, ri, null);
+			}
+		}
+		// process empty roads
+		for (String ref : roadInfoMap.keySet()) {
+			RoadInfo ri = roadInfoMap.get(ref);
+			if(ri.emptyRef || ri.adminLevel) {
+				processRoadsByRef(toWrite, ri, null);
+			}
 		}
 	}
 
@@ -563,10 +570,6 @@ public class FixBasemapRoads {
 		combineUniqueIdentifyRoads(ri, emptyRoads);
 		if(verbose) System.out.println(ri.toString("After combine unique: "));
 		
-//			reverseWrongPositionedRoads(ri);
-//			combineUniqueIdentifyRoads(ri);
-//			if(verbose) System.out.println(ri.toString("After combine reverse unique: "));
-//			
 //			// last step not definite
 //			combineIntoLongestRoad(ri);
 //			if(verbose) System.out.println(ri.toString("After combine longest: "));
@@ -752,9 +755,6 @@ public class FixBasemapRoads {
 						inc = 0;
 					}
 				}
-				if(inc == 1 && ri.ref.equals("N211")) {
-					System.out.println(longRoadToKeep.getFirstWayId() + " " + longRoadToKeep.distance);
-				}
 			}
 		}
 	}
@@ -862,11 +862,28 @@ public class FixBasemapRoads {
 
 	private void processWay(Way way) {
 		String ref = way.getTag("ref");
-		if (way.getFirstNodeId() == way.getLastNodeId()) {
-			TLongArrayList connectionIds = new TLongArrayList(way.getNodeIds());
-			for (int i = 0; i < connectionIds.size(); i++) {
-				roundabouts.put(connectionIds.get(i), connectionIds);
+		if (way.getFirstNodeId() == way.getLastNodeId() || "roundabout".equals(way.getTag("junction"))) {
+			List<Node> wn = way.getNodes();
+			TLongHashSet allPointSet = new TLongHashSet();
+			for (Node n : wn) {
+				if (n != null) {
+					long pnt = convertLatLon(n.getLatLon());
+					allPointSet.add(pnt);
+					TLongHashSet prev = roundabouts.put(pnt, allPointSet);
+					if (prev != null && prev != allPointSet) {
+						allPointSet.addAll(prev);
+						TLongIterator it = prev.iterator();
+						while (it.hasNext()) {
+							long pntP = it.next();
+							TLongHashSet prevPnts = roundabouts.put(pntP, allPointSet);
+							if (!allPointSet.containsAll(prevPnts)) {
+								throw new IllegalStateException("Error in algorithm");
+							}
+						}
+					}
+				}
 			}
+			
 			return;
 		}
 		
@@ -884,6 +901,7 @@ public class FixBasemapRoads {
 			}
 		}
 		boolean adminLevel = false;
+		boolean emptyRef = false;
 		if((ref == null || ref.isEmpty()) && way.getTag("admin_level") != null) {
 			ref = way.getTag("admin_level");
 			LatLon lt = way.getLatLon();
@@ -891,17 +909,21 @@ public class FixBasemapRoads {
 					+ ((int) MapUtils.getTileNumberX(4, lt.getLongitude()));
 			adminLevel = true;
 		}
+		
 		if (ref == null || ref.isEmpty()) {
+			emptyRef = true;
 			LatLon lt = way.getLatLon();
 			ref = ((int) MapUtils.getTileNumberY(6, lt.getLatitude())) + " "
 					+ ((int) MapUtils.getTileNumberX(6, lt.getLongitude()));
 		}
 
-		if (!roadInfoMap.containsKey(ref)) {
-			roadInfoMap.put(ref, new RoadInfo(ref));
-		}
 		RoadInfo ri = roadInfoMap.get(ref);
-		ri.adminLevel = adminLevel;
+		if (ri == null) {
+			ri = new RoadInfo(ref);
+			ri.adminLevel = adminLevel;
+			ri.emptyRef = true;
+			roadInfoMap.put(ref, ri);
+		}
 		ri.registerRoadLine(new RoadLine(way));
 	}
 
