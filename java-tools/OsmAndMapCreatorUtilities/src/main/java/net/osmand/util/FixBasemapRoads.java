@@ -745,15 +745,21 @@ public class FixBasemapRoads {
 				: ri.isMaxRouteInTheStart(longRoadToKeep);
 		if (maxRoute) {
 			RoadLine uniqueToCombine = null;
-			for (RoadLine end : list) {
-				if (end.isDeleted() || end == longRoadToKeep) {
+			for (RoadLine roadToAttach : list) {
+				if (roadToAttach.isDeleted() || roadToAttach == longRoadToKeep) {
 					continue;
 				}
-				if (inOppositeDirection(longRoadToKeep, end)) {
-					continue;
+				if(attachToEnd) {
+					if (inOppositeDirection(longRoadToKeep, roadToAttach)) {
+						continue;
+					}
+				} else {
+					if (inOppositeDirection(roadToAttach, longRoadToKeep)) {
+						continue;
+					}
 				}
 				if (uniqueToCombine == null) {
-					uniqueToCombine = end;
+					uniqueToCombine = roadToAttach;
 				} else {
 					// not unique!
 					uniqueToCombine = null;

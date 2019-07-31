@@ -89,7 +89,7 @@ public class BinaryInspector {
 //					"-zoom=15",
 //					"-bbox=30.51,50.5,30.53,50.4",
 //					"-osm="+System.getProperty("maps.dir")+"/basemap/map.obf.osm",
-					System.getProperty("maps.dir")+"/Netherlands_noord-holland_europe_merge.obf_"
+					System.getProperty("maps.dir")+"/Netherlands_noord-holland_europe_19_07_29.obf"
 //					System.getProperty("maps.dir")+"/olive/19_07_29_20_20_diff.obf"
 			});
 		} else {
