@@ -50,10 +50,11 @@ import net.osmand.osm.io.OsmBaseStorage;
 import net.osmand.osm.io.OsmStorageWriter;
 
 public class FixBasemapRoads {
-    private static int MINIMAL_DISTANCE = 5000; // -> 1500? primary
+    private static int MINIMAL_DISTANCE = 2000; // -> 1500? primary
     private final static Log LOG = PlatformUtil.getLog(FixBasemapRoads.class);
     
-	private static final int APPROXIMATE_POINT_ZOOM = 21; // 15?
+    // making it less < 31 joins unnecessary roads make merge process more complicated 
+	private static final int APPROXIMATE_POINT_ZOOM = 31; 
     
     private static boolean FILTER_BBOX = false;  
     private static double LEFT_LON = 4.12;
@@ -206,8 +207,8 @@ public class FixBasemapRoads {
 	}
 
     public static long convertLatLon(LatLon l) {
-        long lx = (long) MapUtils.getTileNumberY(APPROXIMATE_POINT_ZOOM, l.getLatitude());
-        lx = (lx << 31) | (int) MapUtils.getTileNumberX(APPROXIMATE_POINT_ZOOM, l.getLongitude());
+        long lx = (long) MapUtils.get31TileNumberY(l.getLatitude()) >> (31 - APPROXIMATE_POINT_ZOOM);
+        lx = (lx << 31) | (int) MapUtils.get31TileNumberX(l.getLongitude()) >> (31 - APPROXIMATE_POINT_ZOOM);
         return lx;
     }
 
@@ -770,11 +771,15 @@ public class FixBasemapRoads {
 			double roadItself = directionRoute(getPoints(!attachToEnd, longRoadToKeep, false));
 			double resDiff = Math.abs(MapUtils.alignAngleDifference(resDirection - roadItself));
 			double roadDiff = Math.abs(MapUtils.alignAngleDifference(roadDirection - roadItself));
-			if(roadDiff < resDiff ) {
-				return true;
-			}
+			return isFirstBetterRoadToAttach(roadDiff, roadToAttach.distance, resDiff, resToAttach.distance); 
 		}
-		return false;
+	}
+
+	private boolean isFirstBetterRoadToAttach(double contAngle1, double dist1, double contAngle2, double dist2) {
+		if(contAngle1 < Math.PI / 6 && contAngle2 < Math.PI / 6) {
+			return dist1 > dist2;
+		}
+		return contAngle1 < contAngle2;
 	}
 
 	private List<Node> getPoints(boolean startAngleOrEnd, RoadLine road, boolean reverseWay) {
@@ -800,7 +805,10 @@ public class FixBasemapRoads {
 
 	private void processWay(Way way) {
 		String ref = way.getTag("ref");
-		if (way.getFirstNodeId() == way.getLastNodeId() || "roundabout".equals(way.getTag("junction"))) {
+		String hw = way.getTag("highway");
+        boolean isLink = hw != null && hw.endsWith("_link");
+		if (way.getFirstNodeId() == way.getLastNodeId() || 
+				"roundabout".equals(way.getTag("junction")) || isLink) {
 			List<Node> wn = way.getNodes();
 			TLongHashSet allPointSet = new TLongHashSet();
 			for (Node n : wn) {
