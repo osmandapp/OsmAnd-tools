@@ -50,8 +50,7 @@ import net.osmand.osm.io.OsmBaseStorage;
 import net.osmand.osm.io.OsmStorageWriter;
 
 public class FixBasemapRoads {
-    private static int MINIMAL_DISTANCE = 2000; // -> 1500? primary
-    private static float MAXIMAL_DISTANCE_CUT = 400;
+    private static int MINIMAL_DISTANCE = 5000; // -> 1500? primary
     private final static Log LOG = PlatformUtil.getLog(FixBasemapRoads.class);
     
 	private static final int APPROXIMATE_POINT_ZOOM = 21; // 15?
@@ -517,31 +516,30 @@ public class FixBasemapRoads {
 			}
         }
 
-		public boolean isMaxRouteInTheEnd(RoadLine roadLine) {
-            boolean maxRoute = true;
-            for (RoadLine rt : getConnectedLinesEnd(roadLine.endPoint)) {
-                if (!rt.isDeleted() && rt != roadLine && isRoute1HigherPriority(rt, roadLine)
-                		&& !inOppositeDirection(roadLine, rt)) {
-                    maxRoute = false;
-                    break;
+		public boolean isRoadTheBestToBeConnected(boolean attachToEnd, RoadLine roadLine, double resDirection) {
+            boolean best = true;
+            for (RoadLine rt : getConnectedLinesEnd(attachToEnd ? roadLine.endPoint : roadLine.beginPoint)) {
+                if (!rt.isDeleted() && rt != roadLine && isRoute1HigherPriority(rt, roadLine)) {
+                	double cd = directionRoute(getPoints(!attachToEnd, rt, false));
+                	if(!oppositeDirectionAngle(cd, resDirection)) {
+                		best = false;
+                		break;
+                	}
                 }
-
             }
-			return maxRoute;
+            for (RoadLine rt : getConnectedLinesStart(attachToEnd ? roadLine.endPoint : roadLine.beginPoint)) {
+                if (!rt.isDeleted() && rt != roadLine && isRoute1HigherPriority(rt, roadLine)) {
+                	double cd = directionRoute(getPoints(!attachToEnd, rt, true));
+                	if(!oppositeDirectionAngle(cd, resDirection)) {
+                		best = false;
+                		break;
+                	}
+                }
+            }
+			return best;
 		}
 		
-		public boolean isMaxRouteInTheStart(RoadLine roadLine) {
-            boolean maxRoute = true;
-            for (RoadLine rt : getConnectedLinesStart(roadLine.beginPoint)) {
-                if (!rt.isDeleted() && rt != roadLine && isRoute1HigherPriority(rt, roadLine)
-                		&& !inOppositeDirection(roadLine, rt)) {
-                    maxRoute = false;
-                    break;
-                }
-
-            }
-			return maxRoute;
-		}
+		
 
 		public String toString(String msg) {
 			return String.format("Road %s - %s %d - segments, %.2f dist", 
@@ -576,8 +574,6 @@ public class FixBasemapRoads {
 		combineRoadsWithLongestRoad(ri, false, emptyRoads);
 		if(verbose) System.out.println(ri.toString("After combine best: "));
 		
-//		combineRoadsWithCut(ri);
-//		if(verbose) System.out.println(ri.toString("After combine with cut: "));
 		
 		ri.compactDeleted();
 		for (RoadLine ls : ri.roadLines) {
@@ -632,65 +628,32 @@ public class FixBasemapRoads {
     private boolean inSameDirectionLastPoints(RoadLine r2, RoadLine r1) {
         double last1 = directionRoute(r2.getLastPoints(150));
         double last2 = directionRoute(r1.getLastPoints(150));
-        double diff = MapUtils.alignAngleDifference(last2 - last1);
-	    return Math.abs(diff) < Math.PI / 4;
+        return sameDirectionAngle(last1, last2);
     }
     
-    private boolean inSameDirectionFirstPoints(RoadLine end, RoadLine begin) {
-        double last1 = directionRoute(end.getFirstPoints(150));
-        double last2 = directionRoute(begin.getFirstPoints(150));
-        double diff = MapUtils.alignAngleDifference(last2 - last1);
-	    return Math.abs(diff) < Math.PI / 4;
+    private boolean inSameDirectionFirstPoints(RoadLine r1, RoadLine r2) {
+        double last1 = directionRoute(r1.getFirstPoints(150));
+        double last2 = directionRoute(r2.getFirstPoints(150));
+        return sameDirectionAngle(last1, last2);
     }
 
     private boolean inOppositeDirection(RoadLine end, RoadLine begin) {
         double last = directionRoute(end.getLastPoints(150));
         double first = directionRoute(begin.getFirstPoints(150));
-        double diff = MapUtils.alignAngleDifference(first - last - Math.PI);
+        return oppositeDirectionAngle(last, first);
+    }
+
+    private boolean sameDirectionAngle(double last1, double last2) {
+		double diff = MapUtils.alignAngleDifference(last2 - last1);
 	    return Math.abs(diff) < Math.PI / 4;
-    }
+	}
 
-    private boolean continuation(RoadLine end, RoadLine begin, boolean reverse) {
-        List<Node> lv = end.getLastPoints(150);
-        double last = directionRoute(lv);
-        List<Node> ltv = new ArrayList<Node>();
-        ltv.add(end.last);
-        if(reverse) {
-        	ltv.add(begin.last);
-        } else {
-        	ltv.add(begin.first);
-        }
-        double cut = directionRoute(ltv);
-        
-        double first;
-        if(reverse){
-        	List<Node> rv = begin.getLastPoints(150);
-        	Collections.reverse(rv);
-        	first = directionRoute(rv);
-        } else {
-        	first = directionRoute(begin.getFirstPoints(150));
-        }
-        double diff = MapUtils.alignAngleDifference(first - last);
-        double diff2 = MapUtils.alignAngleDifference(cut - last);
-        return Math.abs(diff) < Math.PI / 4 && Math.abs(diff2) < Math.PI / 4;
-    }
-    
-    
-    private double continuationAngle(RoadLine end, RoadLine begin, boolean reverse) {
-        List<Node> lv = end.getLastPoints(150);
-        double last = directionRoute(lv);
-        double first;
-        if(reverse){
-        	List<Node> rv = begin.getLastPoints(150);
-        	Collections.reverse(rv);
-        	first = directionRoute(rv);
-        } else {
-        	first = directionRoute(begin.getFirstPoints(150));
-        }
-        double diff = MapUtils.alignAngleDifference(first - last);
-        return Math.abs(diff);
-    }
+	private boolean oppositeDirectionAngle(double last, double first) {
+		double diff = MapUtils.alignAngleDifference(first - last - Math.PI);
+	    return Math.abs(diff) < Math.PI / 4;
+	}
 
+    
     private double directionRoute(List<Node> ns) {
         double x = MapUtils.get31TileNumberX(ns.get(0).getLongitude());
         double y = MapUtils.get31TileNumberY(ns.get(0).getLatitude());
@@ -737,113 +700,102 @@ public class FixBasemapRoads {
 		boolean merged = false;
 		List<RoadLine> list = attachToEnd ? ri.getConnectedLinesStart(longRoadToKeep.endPoint)
 				: ri.getConnectedLinesEnd(longRoadToKeep.beginPoint);
-		boolean readyToMerge = attachToEnd ? ri.isMaxRouteInTheEnd(longRoadToKeep)
-				: ri.isMaxRouteInTheStart(longRoadToKeep);
 		RoadLine resToAttach = null;
+		boolean readyToMerge = true;
+		boolean resToAttachReverse = false;
 		for (RoadLine roadToAttach : list) {
-			if (roadToAttach.isDeleted() || roadToAttach == longRoadToKeep) {
-				continue;
+			boolean attach = checkRoadToAttach(longRoadToKeep, onlyUnique, attachToEnd, resToAttach, resToAttachReverse, roadToAttach, false);
+			if(onlyUnique && attach && resToAttach != null) {
+				readyToMerge = false;
+				break;
 			}
-			if (attachToEnd) {
-				if (inOppositeDirection(longRoadToKeep, roadToAttach)) {
-					continue;
-				}
-			} else {
-				if (inOppositeDirection(roadToAttach, longRoadToKeep)) {
-					continue;
-				}
-			}
-			if (resToAttach == null) {
+			if(attach) {
 				resToAttach = roadToAttach;
-			} else {
-				// not unique!
-				if(onlyUnique) {
-					readyToMerge = false;
-					break;
-				} else {
-					if(attachToEnd) {
-						if(continuationAngle(longRoadToKeep, roadToAttach, false) < continuationAngle(longRoadToKeep, resToAttach, false)) {
-							resToAttach = roadToAttach;
-						}
-					} else {
-						if(continuationAngle(roadToAttach, longRoadToKeep, false) < continuationAngle(resToAttach, longRoadToKeep, false)) {
-							resToAttach = roadToAttach;
-						}
-					}
-					
-				}
+				resToAttachReverse = false;
 			}
 		}
-		if (resToAttach != null) {
-			if(readyToMerge) {
-				merged = true;
-				ri.mergeRoadInto(resToAttach, longRoadToKeep, attachToEnd);
+		// check reverse connected road (primary / trunks)
+		List<RoadLine> rlist = attachToEnd ? ri.getConnectedLinesEnd(longRoadToKeep.endPoint)
+				: ri.getConnectedLinesStart(longRoadToKeep.beginPoint);
+		for (RoadLine roadToAttach : rlist) {
+			boolean attach = checkRoadToAttach(longRoadToKeep, onlyUnique, attachToEnd, resToAttach, resToAttachReverse, roadToAttach, 
+					true);
+			if(onlyUnique && attach && resToAttach != null) {
+				readyToMerge = false;
+				break;
 			}
-		} else {
-			// check reverse connected road (primary / trunks)
-			list = attachToEnd ? ri.getConnectedLinesEnd(longRoadToKeep.endPoint)
-					: ri.getConnectedLinesStart(longRoadToKeep.beginPoint);
-			for (RoadLine roadToAttach : list) {
-				if (roadToAttach.isDeleted() || roadToAttach == longRoadToKeep) {
-					continue;
-				}
-				if (attachToEnd) {
-					if (inSameDirectionLastPoints(longRoadToKeep, roadToAttach)) {
-						continue;
-					}
-				} else {
-					if (inSameDirectionFirstPoints(roadToAttach, longRoadToKeep)) {
-						continue;
-					}
-				}
-				if (resToAttach == null) {
-					resToAttach = roadToAttach;
-				} else {
-					// not unique!
-					resToAttach = null;
-					break;
-				}
+			if(attach) {
+				resToAttach = roadToAttach;
+				resToAttachReverse = true;
 			}
-			if (resToAttach != null) {
+		}
+		if (resToAttach != null && readyToMerge) {
+			double resDirection = directionRoute(getPoints(attachToEnd, resToAttach, resToAttachReverse));
+			readyToMerge = ri.isRoadTheBestToBeConnected(attachToEnd, longRoadToKeep, resDirection);
+			if (readyToMerge) {
 				merged = true;
-				ri.reverseRoad(resToAttach);
+				if (resToAttachReverse) {
+					ri.reverseRoad(resToAttach);
+				}
 				ri.mergeRoadInto(resToAttach, longRoadToKeep, attachToEnd);
 			}
 		}
-
 		return merged;
 	}
 
-    private void combineRoadsWithCut(RoadInfo ri) {
-        for (RoadLine roadLine : ri.roadLines) {
-            if (roadLine.isDeleted()) {
-                continue;
-            }
-            if(!ri.isMaxRouteInTheEnd(roadLine)) {
-            	continue;
-            }
-            if (roadLine.distance > MAXIMAL_DISTANCE_CUT / 2) {
-                for (RoadLine rl : ri.roadLines) {
-                    if (!rl.isDeleted() && roadLine != rl 
-                    		&& rl.distance > MAXIMAL_DISTANCE_CUT / 2){
-                         if(OsmMapUtils.getDistance(roadLine.last, rl.first) < MAXIMAL_DISTANCE_CUT 
-								&& continuation(roadLine, rl, false)) {
-							roadLine.getLastWay().addNode(rl.first);
-							ri.mergeRoadInto(roadLine, rl, false);
-							break;
-						} else if(OsmMapUtils.getDistance(roadLine.last, rl.last) < MAXIMAL_DISTANCE_CUT 
-								&& continuation(roadLine, rl, true)) {
-							ri.reverseRoad(rl);
-							roadLine.getLastWay().addNode(rl.first);
-							ri.mergeRoadInto(roadLine, rl, false);
-							break;
-						}
-                    }
-                }
+	private boolean checkRoadToAttach(RoadLine longRoadToKeep, boolean onlyUnique, boolean attachToEnd,
+			RoadLine resToAttach, boolean resToAttachReverse, RoadLine roadToAttach, boolean reverse) {
+		if (roadToAttach.isDeleted() || roadToAttach == longRoadToKeep) {
+			return false;
+		}
+		if (attachToEnd) {
+			if(reverse && inSameDirectionLastPoints(longRoadToKeep, roadToAttach)) {
+				return false;
+			} else if (!reverse && inOppositeDirection(longRoadToKeep, roadToAttach)) {
+				return false;
+			}
+		} else {
+			if(reverse && inSameDirectionFirstPoints(roadToAttach, longRoadToKeep)) {
+				return false;
+			} else if (!reverse && inOppositeDirection(roadToAttach, longRoadToKeep)) {
+				return false;
+			}
+		}
+		if (resToAttach == null || onlyUnique) {
+			return true;
+		} else {
+			double resDirection = directionRoute(getPoints(attachToEnd, resToAttach, resToAttachReverse));
+			double roadDirection = directionRoute(getPoints(attachToEnd, roadToAttach, reverse));
+			
+			double roadItself = directionRoute(getPoints(!attachToEnd, longRoadToKeep, false));
+			double resDiff = Math.abs(MapUtils.alignAngleDifference(resDirection - roadItself));
+			double roadDiff = Math.abs(MapUtils.alignAngleDifference(roadDirection - roadItself));
+			if(roadDiff < resDiff ) {
+				return true;
+			}
+		}
+		return false;
+	}
 
-            }
-        }
-    }
+	private List<Node> getPoints(boolean startAngleOrEnd, RoadLine road, boolean reverseWay) {
+		List<Node> resToAttachPoints;
+		if(startAngleOrEnd) {
+			if(reverseWay) {
+				resToAttachPoints = road.getLastPoints(150);
+				Collections.reverse(resToAttachPoints);
+			} else {
+				resToAttachPoints = road.getFirstPoints(150);
+			}
+		} else {
+			if(reverseWay) {
+				resToAttachPoints = road.getFirstPoints(150);
+				Collections.reverse(resToAttachPoints);
+			} else {
+				resToAttachPoints = road.getLastPoints(150);
+			}
+		}
+		return resToAttachPoints;
+	}
 
 
 	private void processWay(Way way) {
@@ -884,7 +836,7 @@ public class FixBasemapRoads {
 			type = RoadInfoRefType.EMPTY_REF;
 		} else {
 			// fix road inconsistency
-			ref = ref.replace('-', ' ');
+			ref = ref.replace("-", "").replace(" ", "");
 			if (ref.indexOf(';') != -1) {
 				ref = ref.substring(0, ref.indexOf(';'));
 			}
