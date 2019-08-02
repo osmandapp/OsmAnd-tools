@@ -480,7 +480,7 @@ public class BasemapProcessor {
 					}
 
 				}
-				if (OsmMapUtils.polygonAreaPixels(outer, zoomToEncode) < PIXELS_THRESHOLD_AREA) {
+				if (outer == null || OsmMapUtils.polygonAreaPixels(outer, zoomToEncode) < PIXELS_THRESHOLD_AREA) {
 					continue;
 				}
 				addObject(refId, level, zoomPair, zoomToEncode, outer, inner);
