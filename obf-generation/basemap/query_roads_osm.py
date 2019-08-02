@@ -41,7 +41,7 @@ def process_roads(cond, filename, fields):
 		selectFields += ", " + field	
 	shift = 2
 	# roads faster but doesn't contain ferry & river
-	sql = "select osm_id, ST_AsText(ST_Transform(ST_Simplify(way,50),94326))," + \
+	sql = "select osm_id, ST_AsText(ST_Transform(ST_Simplify(way,50,true),94326))," + \
 	      " name, ref, tags->'int_ref' as int_ref " + selectFields + \
 	      " from planet_osm_line where " + cond + ";"
 	      # "LIMIT 1000"
@@ -78,8 +78,8 @@ def process_roads(cond, filename, fields):
 	f.write('</osm>')
 
 if __name__ == "__main__":
-	#process_roads("highway='motorway' or highway='motorway_link'", "line_motorway.osm", ['highway', 'junction', 'route'])
-	#process_roads("highway='trunk' or highway='trunk_link'", "line_trunk.osm", ['highway', 'junction', 'route'])
+	process_roads("highway='motorway' or highway='motorway_link'", "line_motorway.osm", ['highway', 'junction', 'route'])
+	process_roads("highway='trunk' or highway='trunk_link'", "line_trunk.osm", ['highway', 'junction', 'route'])
 	process_roads("highway='primary' or highway='primary_link'", "line_primary.osm", ['highway', 'junction', 'route'])
 	#process_roads("highway='secondary' or highway='secondary_link'", "line_secondary.osm", ['highway', 'junction', 'route'])
 	#process_roads("railway='rail'", "line_railway.osm", ['railway'])
