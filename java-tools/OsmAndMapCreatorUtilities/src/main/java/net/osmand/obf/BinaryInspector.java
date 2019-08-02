@@ -79,17 +79,18 @@ public class BinaryInspector {
 		if ("test".equals(args[0])) {
 			in.inspector(new String[] {
 //					"-vpoi",
+					"-vmap", "-vstats",
 //					"-vmap", "-vmapobjects",
 //					"-vmapcoordinates",
 //					"-vrouting",
-					"-vtransport", "-vtransportschedule",
+//					"-vtransport", "-vtransportschedule",
 //					"-vaddress", "-vcities","-vstreetgroups",
 //					"-vstreets", "-vbuildings", "-vintersections",
 //					"-lang=ru",
 //					"-zoom=15",
 //					"-bbox=30.51,50.5,30.53,50.4",
 //					"-osm="+System.getProperty("maps.dir")+"/basemap/map.obf.osm",
-					System.getProperty("maps.dir")+"/Netherlands_noord-holland_europe_19_07_29.obf"
+					System.getProperty("maps.dir")+"/World_basemap_2.obf_"
 //					System.getProperty("maps.dir")+"/olive/19_07_29_20_20_diff.obf"
 			});
 		} else {
@@ -870,15 +871,13 @@ public class BinaryInspector {
 				}
 
 				public int compare(long x, long y) {
-			        return (x < y) ? -1 : ((x == y) ? 0 : 1);
+			        return -Long.compare(x, y);
 			    }
 			});
 
 			for (MapStatKey s : stats) {
-				println(s.key + " (" + s.count + ") \t " + s.statObjectSize + " bytes \t coord=" +
-						s.statCoordinatesCount +
-						" (" + s.statCoordinates + " bytes) " +
-						" names " + s.namesLength + " bytes");
+				println(String.format("%-35s [%7d] %8d KB: coord [%7d] %8d KB, names %8d KB  ",s.key, s.count, 
+						s.statObjectSize >> 10, s.statCoordinatesCount, s.statCoordinates >> 10, s.namesLength >> 10));
 			}
 
 		}
@@ -1372,7 +1371,7 @@ public class BinaryInspector {
 		}
 		System.out.println("Inspector is console utility for working with binary indexes of OsmAnd.");
 		System.out.println("It allows print info about file, extract parts and merge indexes.");
-		System.out.println("\nUsage for print info : inspector [-vaddress] [-vcitynames] [-vstreetgroups] [-vstreets] [-vbuildings] [-vintersections] [-vmap] [-vmapobjects] [-vmapcoordinates] [-osm] [-vpoi] [-vrouting] [-vtransport] [-zoom=Zoom] [-bbox=LeftLon,TopLat,RightLon,BottomLat] [file]");
+		System.out.println("\nUsage for print info : inspector [-vaddress] [-vcitynames] [-vstreetgroups] [-vstreets] [-vbuildings] [-vintersections] [-vmap] [-vstats] [-vmapobjects] [-vmapcoordinates] [-osm] [-vpoi] [-vrouting] [-vtransport] [-zoom=Zoom] [-bbox=LeftLon,TopLat,RightLon,BottomLat] [file]");
 		System.out.println("  Prints information about [file] binary index of OsmAnd.");
 		System.out.println("  -v.. more verbose output (like all cities and their streets or all map objects with tags/values and coordinates)");
 		System.out.println("\nUsage for combining indexes : inspector -c file_to_create (file_from_extract ((+|-)parts_to_extract)? )*");
