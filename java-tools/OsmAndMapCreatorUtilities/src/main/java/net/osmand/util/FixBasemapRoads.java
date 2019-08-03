@@ -52,16 +52,17 @@ import net.osmand.osm.io.OsmStorageWriter;
 public class FixBasemapRoads {
 	private final static Log LOG = PlatformUtil.getLog(FixBasemapRoads.class);
     
-	private static int MINIMAL_DISTANCE = 5000; // -> 1500? primary
+	private static int MINIMAL_DISTANCE = 1500; // -> 1500? primary
 	
 	// consider road as link if distance is < 20m
-	private static final double MINIMUM_DISTANCE_LINK = 20;
+	// doesn't work for very short segments for city streets
+	private static final double MINIMUM_DISTANCE_LINK = 150;
 	
 	// distance to measure direction of the road (150 m)
 	private static final double DIST_DIRECTION = 150;
 	
 	// straight angle
-	private static final double STRAIGHT_ANGLE = Math.PI / 2;
+	private static final double ANGLE_TO_ALLOW_DIRECTION = 2 * Math.PI / 3;
 	
 	// metrics penalty = connection distance + shortLengthPenalty + (90 - angle diff) * anglePenalty
 	private static final double METRIC_LENGTH_THRESHOLD = 100;
@@ -396,9 +397,10 @@ public class FixBasemapRoads {
     }
     
     public enum RoadInfoRefType {
+    	// proceed empty ref first (so we can create "roundabouts", "links" from too short roads)
+    	EMPTY_REF,
     	REF,
     	INT_REF,
-    	EMPTY_REF,
     	ADMIN_LEVEL
     }
 
@@ -544,27 +546,34 @@ public class FixBasemapRoads {
 			for (String ref : roadInfoMap.keySet()) {
 				RoadInfo ri = roadInfoMap.get(ref);
 				if (ri.type == tp) {
-					processRoadsByRef(toWrite, ri, null);
+					processRoadsByRef(toWrite, ri);
 				}
 			}
 		}
 	}
 
-	private void processRoadsByRef(List<EntityId> toWrite, RoadInfo ri, RoadInfo emptyRoads) {
+	private void processRoadsByRef(List<EntityId> toWrite, RoadInfo ri) {
 		boolean verbose = ri.getTotalDistance() > 40000;
 		if(verbose) { 
 			System.out.println(ri.toString("Initial:"));
 		}
 		// combine unique roads
-		int merged = combineRoadsWithLongestRoad(ri, true, emptyRoads);
+		int merged = combineRoadsWithLongestRoad(ri, true);
 		if(verbose) {
 			System.out.println(String.format("After combine unique merged (%d): ", merged));
 		}
-		
+		for(RoadLine r : ri.roadLines) {
+			if(r.distance < MINIMUM_DISTANCE_LINK) {
+				for(Way way : r.combinedWays) {
+					addRoadToRoundabouts(way);
+				}
+				r.delete();
+			}
+		}
 		// not needed more than 1
-		for (int i = 0; i < 1; i++) {
-			merged = combineRoadsWithLongestRoad(ri, false, emptyRoads);
-			 if (verbose) System.out.println(ri.toString(String.format("After combine %d best merged (%d): ", i + 1, merged)));
+		for (int run = 0; run < 1; run++) {
+			merged = combineRoadsWithLongestRoad(ri, false);
+			 if (verbose) System.out.println(ri.toString(String.format("After combine %d best merged (%d): ", run + 1, merged)));
 			if (merged == 0) {
 				break;
 			}
@@ -634,7 +643,7 @@ public class FixBasemapRoads {
         return -Math.atan2( x - px, y - py );
     }
 
-	private int combineRoadsWithLongestRoad(RoadInfo ri, boolean combineOnlyUnique, RoadInfo emptyRoads) {
+	private int combineRoadsWithLongestRoad(RoadInfo ri, boolean combineOnlyUnique) {
 		boolean merged = true;
 		Collections.sort(ri.roadLines, new Comparator<RoadLine>() {
 
@@ -654,8 +663,8 @@ public class FixBasemapRoads {
 					// line already merged and deleted
 					continue;
 				} else {
-					boolean attachedToEnd = findRoadToCombine(ri, longRoadToKeep, emptyRoads, combineOnlyUnique, true);
-					boolean attachedToStart = findRoadToCombine(ri, longRoadToKeep, emptyRoads, combineOnlyUnique, false);
+					boolean attachedToEnd = findRoadToCombine(ri, longRoadToKeep, combineOnlyUnique, true);
+					boolean attachedToStart = findRoadToCombine(ri, longRoadToKeep, combineOnlyUnique, false);
 					if (attachedToEnd || attachedToStart) {
 						merged = true;
 						mergedCnt++;
@@ -691,7 +700,7 @@ public class FixBasemapRoads {
 	}
 	
 	
-	private boolean findRoadToCombine(RoadInfo ri, RoadLine longRoadToKeep, RoadInfo emptyRoads,
+	private boolean findRoadToCombine(RoadInfo ri, RoadLine longRoadToKeep, 
 			boolean onlyUnique, boolean attachToEnd) {
 		long point = attachToEnd ? longRoadToKeep.endPoint : longRoadToKeep.beginPoint;
 		double direction = directionRoute(attachToEnd ? longRoadToKeep.getLastPoints(DIST_DIRECTION)
@@ -714,7 +723,7 @@ public class FixBasemapRoads {
 		for (RoadLineConnection r : candidates) {
 			// use angle difference as metric for merging
 			double angle = Math.abs(MapUtils.alignAngleDifference(direction - r.direction));
-			boolean straight = angle < STRAIGHT_ANGLE;
+			boolean straight = angle < ANGLE_TO_ALLOW_DIRECTION;
 			if (!straight) {
 				continue;
 			}
@@ -741,7 +750,7 @@ public class FixBasemapRoads {
 		if (merge != null) {
 			for (RoadLineConnection r : candidates) {
 				double angle = Math.abs(MapUtils.alignAngleDifference(merge.direction - r.direction - Math.PI));
-				boolean straight = angle < STRAIGHT_ANGLE;
+				boolean straight = angle < ANGLE_TO_ALLOW_DIRECTION;
 				if (!straight) {
 					continue;
 				}
@@ -792,30 +801,10 @@ public class FixBasemapRoads {
 		String ref = way.getTag("ref");
 		String hw = way.getTag("highway");
         boolean isLink = hw != null && hw.endsWith("_link");
-        boolean shortDist = MapUtils.getDistance(way.getLastNode().getLatLon(), way.getFirstNode().getLatLon()) < MINIMUM_DISTANCE_LINK;
+        // boolean shortDist = MapUtils.getDistance(way.getLastNode().getLatLon(), way.getFirstNode().getLatLon()) < MINIMUM_DISTANCE_LINK;
 		if (way.getFirstNodeId() == way.getLastNodeId() || 
-				"roundabout".equals(way.getTag("junction")) || isLink || shortDist) {
-			List<Node> wn = way.getNodes();
-			TLongHashSet allPointSet = new TLongHashSet();
-			for (Node n : wn) {
-				if (n != null) {
-					long pnt = convertLatLon(n.getLatLon());
-					allPointSet.add(pnt);
-					TLongHashSet prev = roundabouts.put(pnt, allPointSet);
-					if (prev != null && prev != allPointSet) {
-						allPointSet.addAll(prev);
-						TLongIterator it = prev.iterator();
-						while (it.hasNext()) {
-							long pntP = it.next();
-							TLongHashSet prevPnts = roundabouts.put(pntP, allPointSet);
-							if (!allPointSet.containsAll(prevPnts)) {
-								throw new IllegalStateException("Error in algorithm");
-							}
-						}
-					}
-				}
-			}
-			
+				"roundabout".equals(way.getTag("junction")) || isLink) {
+			addRoadToRoundabouts(way);
 			return;
 		}
 		RoadInfoRefType type = RoadInfoRefType.REF;
@@ -855,6 +844,29 @@ public class FixBasemapRoads {
 			roadInfoMap.put(ref, ri);
 		}
 		ri.registerRoadLine(new RoadLine(way));
+	}
+
+	private void addRoadToRoundabouts(Way way) {
+		List<Node> wn = way.getNodes();
+		TLongHashSet allPointSet = new TLongHashSet();
+		for (Node n : wn) {
+			if (n != null) {
+				long pnt = convertLatLon(n.getLatLon());
+				allPointSet.add(pnt);
+				TLongHashSet prev = roundabouts.put(pnt, allPointSet);
+				if (prev != null && prev != allPointSet) {
+					allPointSet.addAll(prev);
+					TLongIterator it = prev.iterator();
+					while (it.hasNext()) {
+						long pntP = it.next();
+						TLongHashSet prevPnts = roundabouts.put(pntP, allPointSet);
+						if (!allPointSet.containsAll(prevPnts)) {
+							throw new IllegalStateException("Error in algorithm");
+						}
+					}
+				}
+			}
+		}
 	}
 
 }
