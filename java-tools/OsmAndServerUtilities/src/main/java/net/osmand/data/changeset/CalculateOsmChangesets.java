@@ -289,7 +289,7 @@ public class CalculateOsmChangesets {
 				int rx = MapUtils.get31TileNumberX(maxlon);
 				int ty = MapUtils.get31TileNumberY(maxlat);
 				int by = MapUtils.get31TileNumberY(minlat);
-				List<BinaryMapDataObject> objs = or.queryBbox(lx, rx, ty, by);
+				List<BinaryMapDataObject> objs = or.query(lx, rx, ty, by);
 				int cid = 0;
 				for(BinaryMapDataObject o : objs) {
 					if (!or.intersect(o, lx, ty, rx, by)) {

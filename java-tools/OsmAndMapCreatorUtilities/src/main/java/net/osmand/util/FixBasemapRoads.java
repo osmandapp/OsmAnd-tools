@@ -52,7 +52,7 @@ import net.osmand.osm.io.OsmStorageWriter;
 public class FixBasemapRoads {
 	private final static Log LOG = PlatformUtil.getLog(FixBasemapRoads.class);
     
-	private static int MINIMAL_DISTANCE = 1500; // -> 1500? primary
+	private static int MINIMAL_DISTANCE = 20000; // -> 1500? primary
 	
 	// consider road as link if distance is < 20m
 	// doesn't work for very short segments for city streets
@@ -83,9 +83,9 @@ public class FixBasemapRoads {
 
 	public static void main(String[] args) throws Exception {
 		if(args == null || args.length == 0) {
-//			String line = "motorway_n";
+			String line = "motorway_n";
 //			String line = "trunk_n";
-			String line = "primary_n";
+//			String line = "primary_n";
 //			line = "secondary";
 //			line = "tertiary";
 //			line = "nlprimary";
@@ -601,17 +601,12 @@ public class FixBasemapRoads {
 		int rx = MapUtils.get31TileNumberX(qr.right);
 		int by = MapUtils.get31TileNumberY(qr.bottom);
 		int ty = MapUtils.get31TileNumberY(qr.top);
-		List<BinaryMapDataObject> bbox = or.queryBbox(lx, rx, ty, by);
+		List<BinaryMapDataObject> bbox = or.query(lx, rx, ty, by);
 		TreeSet<String> lst = new TreeSet<String>();
 		for (BinaryMapDataObject bo : bbox) {
-//						if (!or.intersect(bo, lx, ty, rx, by)) {
-//							continue;
-//						}
-			if(or.contain(bo, lx/2+rx/2, by/2 + ty/2)) {
-				String dw = or.getDownloadName(bo);
-				if (!Algorithms.isEmpty(dw) && or.isDownloadOfType(bo, OsmandRegions.MAP_TYPE)) {
-					lst.add(dw);
-				}
+			String dw = or.getDownloadName(bo);
+			if (!Algorithms.isEmpty(dw) && or.isDownloadOfType(bo, OsmandRegions.MAP_TYPE)) {
+				lst.add(dw);
 			}
 		}
 		firstWay.putTag(MapRenderingTypesEncoder.OSMAND_REGION_NAME_TAG, serialize(lst));
