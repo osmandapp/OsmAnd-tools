@@ -52,7 +52,7 @@ import net.osmand.osm.io.OsmStorageWriter;
 public class FixBasemapRoads {
 	private final static Log LOG = PlatformUtil.getLog(FixBasemapRoads.class);
     
-	private static int MINIMAL_DISTANCE = 2000; // -> 1500? primary
+	private static int MINIMAL_DISTANCE = 50000; // -> 1500? primary
 	
 	// consider road as link if distance is < 20m
 	// doesn't work for very short segments for city streets
@@ -65,12 +65,19 @@ public class FixBasemapRoads {
 	private static final double ANGLE_TO_ALLOW_DIRECTION = 2 * Math.PI / 3;
 	
 	// metrics penalty = connection distance + shortLengthPenalty + (90 - angle diff) * anglePenalty
-	private static final double METRIC_LENGTH_THRESHOLD = 100;
+	private static final double METRIC_SHORT_LENGTH_THRESHOLD = 100;
 	private static final double METRIC_SHORT_LENGTH_PENALTY = 100;
+	// useful for railways
+	private static final double METRIC_LONG_LENGTH_THRESHOLD = 50000;
+	private static final double METRIC_LONG_LENGTH_BONUS = -100;
 	private static final double METRIC_ANGLE_PENALTY = 50;
 	
 	// making it less < 31 joins unnecessary roads make merge process more complicated 
 	private static final int APPROXIMATE_POINT_ZOOM = 31;
+
+	private static final int ADMIN_LEVEL_ZOOM_SPLIT = 4;
+	private static final int RAILWAY_ZOOM_SPLIT = 4;
+	private static final int REF_EMPTY_ZOOM_SPLIT = 6;
 
 
 	
@@ -83,7 +90,8 @@ public class FixBasemapRoads {
 
 	public static void main(String[] args) throws Exception {
 		if(args == null || args.length == 0) {
-			String line = "motorway_n";
+//			String line = "motorway_n";
+			String line = "railway_n";
 //			String line = "trunk_n";
 //			String line = "primary_n";
 //			line = "secondary";
@@ -571,7 +579,8 @@ public class FixBasemapRoads {
 			}
 		}
 		// not needed more than 1
-		for (int run = 0; run < 1; run++) {
+		int RUNS = 1;
+		for (int run = 0; run < RUNS; run++) {
 			merged = combineRoadsWithLongestRoad(ri, false);
 			 if (verbose) System.out.println(ri.toString(String.format("After combine %d best merged (%d): ", run + 1, merged)));
 			if (merged == 0) {
@@ -781,11 +790,15 @@ public class FixBasemapRoads {
 	private double metric(double angleDiff, double distBetween, double l1, double l2) {
 		double metrics = distBetween;
 		// give X meters penalty in case road is too short
-		if(l1 < METRIC_LENGTH_THRESHOLD) {
+		if(l1 < METRIC_SHORT_LENGTH_THRESHOLD) {
 			metrics += METRIC_SHORT_LENGTH_PENALTY;
+		} else if(l1 > METRIC_LONG_LENGTH_THRESHOLD) {
+			metrics += METRIC_LONG_LENGTH_BONUS;
 		}
-		if(l2 < METRIC_LENGTH_THRESHOLD) {
+		if(l2 < METRIC_SHORT_LENGTH_THRESHOLD) {
 			metrics += METRIC_SHORT_LENGTH_PENALTY;
+		} else if(l2 > METRIC_LONG_LENGTH_THRESHOLD) {
+			metrics += METRIC_LONG_LENGTH_BONUS;
 		}
 		// 90 degrees, penalty - 50 m
 		metrics += angleDiff / (Math.PI / 2) * METRIC_ANGLE_PENALTY;
@@ -819,20 +832,22 @@ public class FixBasemapRoads {
 				ref = ref.substring(0, ref.indexOf(';'));
 			}
 		}
-		if((ref == null || ref.isEmpty()) && way.getTag("admin_level") != null) {
-			type = RoadInfoRefType.ADMIN_LEVEL;
-			ref = way.getTag("admin_level");
+		if(ref == null || ref.isEmpty() || way.getTag("railway") != null) {
 			LatLon lt = way.getLatLon();
-			ref += ((int) MapUtils.getTileNumberY(4, lt.getLatitude())) + " "
-					+ ((int) MapUtils.getTileNumberX(4, lt.getLongitude()));
+			if(way.getTag("admin_level") != null) {
+				type = RoadInfoRefType.ADMIN_LEVEL;
+				ref = way.getTag("admin_level");
+				ref += ((int) MapUtils.getTileNumberY(ADMIN_LEVEL_ZOOM_SPLIT, lt.getLatitude())) + " "
+					+ ((int) MapUtils.getTileNumberX(ADMIN_LEVEL_ZOOM_SPLIT, lt.getLongitude()));
+			} else if(way.getTag("railway") != null) {
+				ref = ((int) MapUtils.getTileNumberY(RAILWAY_ZOOM_SPLIT, lt.getLatitude())) + " "
+						+ ((int) MapUtils.getTileNumberX(RAILWAY_ZOOM_SPLIT, lt.getLongitude()));
+			} else {
+				ref = ((int) MapUtils.getTileNumberY(REF_EMPTY_ZOOM_SPLIT, lt.getLatitude())) + " "
+						+ ((int) MapUtils.getTileNumberX(REF_EMPTY_ZOOM_SPLIT, lt.getLongitude()));	
+			}
 		}
 		
-		if (ref == null || ref.isEmpty()) {
-			LatLon lt = way.getLatLon();
-			ref = ((int) MapUtils.getTileNumberY(6, lt.getLatitude())) + " "
-					+ ((int) MapUtils.getTileNumberX(6, lt.getLongitude()));
-		}
-
 		RoadInfo ri = roadInfoMap.get(ref);
 		if (ri == null) {
 			ri = new RoadInfo(ref, type);
