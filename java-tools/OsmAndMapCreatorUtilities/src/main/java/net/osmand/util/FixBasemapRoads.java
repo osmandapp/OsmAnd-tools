@@ -52,7 +52,7 @@ import net.osmand.osm.io.OsmStorageWriter;
 public class FixBasemapRoads {
 	private final static Log LOG = PlatformUtil.getLog(FixBasemapRoads.class);
     
-	private static int MINIMAL_DISTANCE = 50000; // -> 1500? primary
+	private static int MINIMAL_DISTANCE = 2000; // -> 1500? primary
 	
 	// consider road as link if distance is < 20m
 	// doesn't work for very short segments for city streets
