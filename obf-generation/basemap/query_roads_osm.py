@@ -49,15 +49,18 @@ def process_roads(cond, filename, fields):
 	cursor.execute(sql)
  
 	node_id =-10000000000
+	wd_id =-100000
 	way_id = 0
 	for row in cursor:
 		if row[1] is None:
 			continue;
 		node_xml = ""
 		if way_id == row[0]:
-			print "Warning duplicate road id %s  in db" % row[0]
-			continue
-		way_id = row[0]
+			print "Warning duplicate road id %s in db" % row[0]
+			wd_id = wd_id + 1
+			way_id = wd_id
+		else:
+			way_id = row[0]
 		way_xml = '\n<way version="1" id="%s" >\n' % (way_id)
 		base = shift
 		while base - shift < len(array):
