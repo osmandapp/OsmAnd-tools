@@ -48,13 +48,12 @@ def process_roads(cond, filename, fields):
 	#print sql
 	cursor.execute(sql)
  
-	node_id =-1000000000
+	node_id =-10000000000
 	way_id = 0
 	for row in cursor:
 		if row[1] is None:
 			continue;
 		node_xml = ""
-		way_xml = ""
 		if way_id != row[0]:
 			if way_id != 0:
 				way_xml += '</way>'
@@ -71,7 +70,7 @@ def process_roads(cond, filename, fields):
 			raise Exception("Object " + row[0] + " has bad geometry" + row[1])
 		coordinates = LineString(row[1][len("LINESTRING("):-1])
 		for c in coordinates :
-			node_id = node_id - 1
+			node_id = node_id + 1
 			nid = node_id
 			node_xml += '\n<node id="%s" lat="%s" lon="%s"/>' % (nid, c[1], c[0])
 			way_xml += '\t<nd ref="%s" />\n' % (nid)
