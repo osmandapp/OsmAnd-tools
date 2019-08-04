@@ -43,7 +43,7 @@ def process_roads(cond, filename, fields):
 	# roads faster but doesn't contain ferry & river
 	sql = "select osm_id, ST_AsText(ST_Transform(ST_Simplify(way,50,true),94326))," + \
 	      " name, ref, tags->'int_ref' as int_ref " + selectFields + \
-	      " from planet_osm_line where (" + cond + ") and osm_id > 0 order by osm_id asc;"
+	      " from planet_osm_line where (" + cond + ") and osm_id > 0 order by osm_id asc, pg_column_size(way) desc;"
 	      # "LIMIT 1000"
 	#print sql
 	cursor.execute(sql)
@@ -55,7 +55,8 @@ def process_roads(cond, filename, fields):
 			continue;
 		node_xml = ""
 		if way_id == row[0]:
-			print "Error duplicate road %s " % row[0]	
+			print "Warning duplicate road id %s  in db" % row[0]
+			continue
 		way_id = row[0]
 		way_xml = '\n<way version="1" id="%s" >\n' % (way_id)
 		base = shift
