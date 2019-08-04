@@ -54,8 +54,7 @@ public class FixBasemapRoads {
     
 	private static int MINIMAL_DISTANCE = 2000; // -> 1500? primary
 	
-	// consider road as link if distance is < 20m
-	// doesn't work for very short segments for city streets
+	// In case road is shorter than min distance after stage 1, it is considered as link / roundabout
 	private static final double MINIMUM_DISTANCE_LINK = 150;
 	
 	// distance to measure direction of the road (150 m)
@@ -68,8 +67,9 @@ public class FixBasemapRoads {
 	private static final double METRIC_SHORT_LENGTH_THRESHOLD = 100;
 	private static final double METRIC_SHORT_LENGTH_PENALTY = 100;
 	// useful for railways
-	private static final double METRIC_LONG_LENGTH_THRESHOLD = 50000;
+	private static final double METRIC_LONG_LENGTH_THRESHOLD = 5000;
 	private static final double METRIC_LONG_LENGTH_BONUS = -100;
+	private static final double METRIC_ANGLE_THRESHOLD = Math.PI / 6;
 	private static final double METRIC_ANGLE_PENALTY = 50;
 	
 	// making it less < 31 joins unnecessary roads make merge process more complicated 
@@ -91,9 +91,9 @@ public class FixBasemapRoads {
 	public static void main(String[] args) throws Exception {
 		if(args == null || args.length == 0) {
 //			String line = "motorway_n";
-			String line = "railway_n";
+//			String line = "railway_n";
 //			String line = "trunk_n";
-//			String line = "primary_n";
+			String line = "primary_af";
 //			line = "secondary";
 //			line = "tertiary";
 //			line = "nlprimary";
@@ -161,8 +161,6 @@ public class FixBasemapRoads {
 				if(total % 1000 == 0) {
 					LOG.info("Processed " + total + " ways");
 				}
-				
-				
 				addRegionTag(or, es);
 				transformer.addPropogatedTags(es);
 				Map<String, String> ntags = renderingTypes.transformTags(es.getModifiableTags(), EntityType.WAY, EntityConvertApplyType.MAP);
@@ -411,6 +409,11 @@ public class FixBasemapRoads {
     	INT_REF,
     	ADMIN_LEVEL
     }
+    
+    public enum RoadSimplifyStages {
+    	MERGE_UNIQUE,
+    	MERGE_BEST
+    }
 
     class RoadInfo {
     	final String ref;
@@ -549,59 +552,68 @@ public class FixBasemapRoads {
     private TLongObjectHashMap<TLongHashSet> roundabouts = new TLongObjectHashMap<TLongHashSet>();
 
 	private void processRegion(List<EntityId> toWrite) throws IOException {
+		
 		// process in certain order by ref type
-		for (RoadInfoRefType tp : RoadInfoRefType.values()) {
-			for (String ref : roadInfoMap.keySet()) {
-				RoadInfo ri = roadInfoMap.get(ref);
-				if (ri.type == tp) {
-					processRoadsByRef(toWrite, ri);
+		for (RoadSimplifyStages stage : RoadSimplifyStages.values()) {
+			for (RoadInfoRefType tp : RoadInfoRefType.values()) {
+				for (String ref : roadInfoMap.keySet()) {
+					RoadInfo ri = roadInfoMap.get(ref);
+					if (ri.type == tp) {
+						processRoadsByRef(toWrite, stage, ri);
+					}
 				}
 			}
 		}
 	}
 
-	private void processRoadsByRef(List<EntityId> toWrite, RoadInfo ri) {
+	private void processRoadsByRef(List<EntityId> toWrite, RoadSimplifyStages stage, RoadInfo ri) {
 		boolean verbose = ri.getTotalDistance() > 40000;
-		if(verbose) { 
-			System.out.println(ri.toString("Initial:"));
-		}
-		// combine unique roads
-		int merged = combineRoadsWithLongestRoad(ri, true);
-		if(verbose) {
-			System.out.println(String.format("After combine unique merged (%d): ", merged));
-		}
-		for(RoadLine r : ri.roadLines) {
-			if(r.distance < MINIMUM_DISTANCE_LINK) {
-				for(Way way : r.combinedWays) {
-					addRoadToRoundabouts(way);
+		if (RoadSimplifyStages.MERGE_UNIQUE == stage) {
+			if (verbose) {
+				System.out.println(ri.toString("Initial:"));
+			}
+			// combine unique roads
+			int merged = combineRoadsWithLongestRoad(ri, true);
+			if (verbose) {
+				System.out.println(String.format("After combine unique merged (%d): ", merged));
+			}
+			for (RoadLine r : ri.roadLines) {
+				if (r.distance < MINIMUM_DISTANCE_LINK && !r.isDeleted()) {
+					for (Way way : r.combinedWays) {
+						addRoadToRoundabouts(way);
+					}
+					r.delete();
 				}
-				r.delete();
 			}
-		}
-		// not needed more than 1
-		int RUNS = 1;
-		for (int run = 0; run < RUNS; run++) {
-			merged = combineRoadsWithLongestRoad(ri, false);
-			 if (verbose) System.out.println(ri.toString(String.format("After combine %d best merged (%d): ", run + 1, merged)));
-			if (merged == 0) {
-				break;
+		} else if (RoadSimplifyStages.MERGE_BEST == stage) {
+			// not needed more than 1
+			int RUNS = 1;
+			for (int run = 0; run < RUNS; run++) {
+				int merged = combineRoadsWithLongestRoad(ri, false);
+				if (verbose)
+					System.out.println(
+							ri.toString(String.format("After combine %d best merged (%d): ", run + 1, merged)));
+				if (merged == 0) {
+					break;
+				}
 			}
-		}
 			
-		
-		
-		ri.compactDeleted();
-		for (RoadLine ls : ri.roadLines) {
-			if (ls.distance > MINIMAL_DISTANCE && !ls.isDeleted()) {
-				ls.combineWaysIntoOneWay();
-				Way w = ls.getFirstWay();
-				String hw = w.getTag(OSMTagKey.HIGHWAY);
-				if(hw != null && hw.endsWith("_link")) {
-					w.putTag("highway", hw.substring(0, hw.length() - "_link".length()));
+			ri.compactDeleted();
+			for (RoadLine ls : ri.roadLines) {
+				if (ls.distance > MINIMAL_DISTANCE && !ls.isDeleted()) {
+					ls.combineWaysIntoOneWay();
+					Way w = ls.getFirstWay();
+					String hw = w.getTag(OSMTagKey.HIGHWAY);
+					if(hw != null && hw.endsWith("_link")) {
+						w.putTag("highway", hw.substring(0, hw.length() - "_link".length()));
+					}
+					toWrite.add(ls.getFirstWayId());
 				}
-				toWrite.add(ls.getFirstWayId());
 			}
-		}
+		} 
+		
+		
+		
 	}
 
 	private void addRegionTag(OsmandRegions or, Way firstWay) throws IOException {
@@ -790,18 +802,25 @@ public class FixBasemapRoads {
 	private double metric(double angleDiff, double distBetween, double l1, double l2) {
 		double metrics = distBetween;
 		// give X meters penalty in case road is too short
-		if(l1 < METRIC_SHORT_LENGTH_THRESHOLD) {
-			metrics += METRIC_SHORT_LENGTH_PENALTY;
-		} else if(l1 > METRIC_LONG_LENGTH_THRESHOLD) {
-			metrics += METRIC_LONG_LENGTH_BONUS;
-		}
-		if(l2 < METRIC_SHORT_LENGTH_THRESHOLD) {
-			metrics += METRIC_SHORT_LENGTH_PENALTY;
-		} else if(l2 > METRIC_LONG_LENGTH_THRESHOLD) {
-			metrics += METRIC_LONG_LENGTH_BONUS;
-		}
+		metrics += penaltyDist(l1);
+		metrics += penaltyDist(l2);
 		// 90 degrees, penalty - 50 m
-		metrics += angleDiff / (Math.PI / 2) * METRIC_ANGLE_PENALTY;
+		if(angleDiff > METRIC_ANGLE_THRESHOLD) {
+			metrics += angleDiff / (Math.PI / 2) * METRIC_ANGLE_PENALTY;
+		}
+		return metrics;
+	}
+
+	private double penaltyDist(double l1) {
+		double metrics;
+		if(l1 < METRIC_SHORT_LENGTH_THRESHOLD) {
+			metrics = METRIC_SHORT_LENGTH_PENALTY;
+		} else if(l1 > METRIC_LONG_LENGTH_THRESHOLD) {
+			metrics = METRIC_LONG_LENGTH_BONUS;
+		} else {
+			metrics = METRIC_SHORT_LENGTH_PENALTY +  (l1 - METRIC_SHORT_LENGTH_THRESHOLD) / 
+					(METRIC_LONG_LENGTH_THRESHOLD - METRIC_SHORT_LENGTH_THRESHOLD) * (METRIC_LONG_LENGTH_BONUS - METRIC_SHORT_LENGTH_PENALTY);
+		}	
 		return metrics;
 	}
 

@@ -43,43 +43,50 @@ def process_roads(cond, filename, fields):
 	# roads faster but doesn't contain ferry & river
 	sql = "select osm_id, ST_AsText(ST_Transform(ST_Simplify(way,50,true),94326))," + \
 	      " name, ref, tags->'int_ref' as int_ref " + selectFields + \
-	      " from planet_osm_line where " + cond + ";"
+	      " from planet_osm_line where " + cond + " order by osmid asc;"
 	      # "LIMIT 1000"
 	#print sql
 	cursor.execute(sql)
  
 	node_id =-1000000000
-	way_id = 1
+	way_id = 0
 	for row in cursor:
 		if row[1] is None:
 			continue;
 		node_xml = ""
 		way_xml = ""
-		way_id = way_id + 1
-		way_xml = '\n<way version="1" id="%s" >\n' % (row[0])
-		base = shift
-		while base - shift < len(array):
-			if row[base] is not None:
-				way_xml += '\t<tag k="%s" v="%s" />\n' % (array[base - shift], esc(row[base]))
-			base = base + 1
+		if way_id != row[0]:
+			if way_id != 0:
+				way_xml += '</way>'
+				f.write(way_xml)
+			way_id = row[0]
+			way_xml = '\n<way version="1" id="%s" >\n' % (way_id)
+			base = shift
+			while base - shift < len(array):
+				if row[base] is not None:
+					way_xml += '\t<tag k="%s" v="%s" />\n' % (array[base - shift], esc(row[base]))
+				base = base + 1
+
 		if not row[1].startswith("LINESTRING("):
 			raise Exception("Object " + row[0] + " has bad geometry" + row[1])
 		coordinates = LineString(row[1][len("LINESTRING("):-1])
-
 		for c in coordinates :
 			node_id = node_id - 1
 			nid = node_id
 			node_xml += '\n<node id="%s" lat="%s" lon="%s"/>' % (nid, c[1], c[0])
 			way_xml += '\t<nd ref="%s" />\n' % (nid)
-		way_xml += '</way>'
 		f.write(node_xml)
-		f.write(way_xml)
 		f.write('\n')
+
+
+	if way_id != 0:
+		way_xml += '</way>'
+		f.write(way_xml)
 	f.write('</osm>')
 
 if __name__ == "__main__":
-	process_roads("highway='motorway' or highway='motorway_link'", "line_motorway.osm", ['highway', 'junction', 'route'])
-	process_roads("highway='trunk' or highway='trunk_link'", "line_trunk.osm", ['highway', 'junction', 'route'])
+	#process_roads("highway='motorway' or highway='motorway_link'", "line_motorway.osm", ['highway', 'junction', 'route'])
+	#process_roads("highway='trunk' or highway='trunk_link'", "line_trunk.osm", ['highway', 'junction', 'route'])
 	process_roads("highway='primary' or highway='primary_link'", "line_primary.osm", ['highway', 'junction', 'route'])
 	#process_roads("highway='secondary' or highway='secondary_link'", "line_secondary.osm", ['highway', 'junction', 'route'])
 	#process_roads("railway='rail'", "line_railway.osm", ['railway'])
