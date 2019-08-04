@@ -43,7 +43,7 @@ def process_roads(cond, filename, fields):
 	# roads faster but doesn't contain ferry & river
 	sql = "select osm_id, ST_AsText(ST_Transform(ST_Simplify(way,50,true),94326))," + \
 	      " name, ref, tags->'int_ref' as int_ref " + selectFields + \
-	      " from planet_osm_line where " + cond + " order by osm_id asc;"
+	      " from planet_osm_line where (" + cond + ") and osm_id > 0 order by osm_id asc;"
 	      # "LIMIT 1000"
 	#print sql
 	cursor.execute(sql)
@@ -54,17 +54,15 @@ def process_roads(cond, filename, fields):
 		if row[1] is None:
 			continue;
 		node_xml = ""
-		if way_id != row[0]:
-			if way_id != 0:
-				way_xml += '</way>'
-				f.write(way_xml)
-			way_id = row[0]
-			way_xml = '\n<way version="1" id="%s" >\n' % (way_id)
-			base = shift
-			while base - shift < len(array):
-				if row[base] is not None:
-					way_xml += '\t<tag k="%s" v="%s" />\n' % (array[base - shift], esc(row[base]))
-				base = base + 1
+		if way_id == row[0]:
+			print "Error duplicate road %s " % row[0]	
+		way_id = row[0]
+		way_xml = '\n<way version="1" id="%s" >\n' % (way_id)
+		base = shift
+		while base - shift < len(array):
+			if row[base] is not None:
+				way_xml += '\t<tag k="%s" v="%s" />\n' % (array[base - shift], esc(row[base]))
+			base = base + 1
 
 		if not row[1].startswith("LINESTRING("):
 			raise Exception("Object " + row[0] + " has bad geometry" + row[1])
@@ -75,12 +73,14 @@ def process_roads(cond, filename, fields):
 			node_xml += '\n<node id="%s" lat="%s" lon="%s"/>' % (nid, c[1], c[0])
 			way_xml += '\t<nd ref="%s" />\n' % (nid)
 		f.write(node_xml)
-		f.write('\n')
-
-
-	if way_id != 0:
 		way_xml += '</way>'
 		f.write(way_xml)
+		f.write('\n')
+		
+
+	# if way_id != 0:
+	# 	way_xml += '</way>'
+	# 	f.write(way_xml)
 	f.write('</osm>')
 
 if __name__ == "__main__":
