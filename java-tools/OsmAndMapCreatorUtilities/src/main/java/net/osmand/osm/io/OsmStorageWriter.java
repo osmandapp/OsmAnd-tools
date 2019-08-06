@@ -146,7 +146,6 @@ public class OsmStorageWriter {
 				streamWriter.writeCharacters("\n"+INDENT2);
 				streamWriter.writeEmptyElement(ELEM_ND);
 				streamWriter.writeAttribute(ATTR_REF, String.valueOf(ids.get(i)));
-				streamWriter.writeEndElement();
 			}
 			writeTags(streamWriter, w);
 			writeEndElement(streamWriter, INDENT);
