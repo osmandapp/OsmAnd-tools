@@ -41,7 +41,7 @@ def process_roads(cond, filename, fields):
 		selectFields += ", " + field	
 	shift = 2
 	# roads faster but doesn't contain ferry & river
-	sql = "select osm_id, ST_AsText(ST_Transform(ST_Simplify(way,50,true),94326))," + \
+	sql = "select osm_id, ST_AsText(ST_Transform(ST_Simplify(way,0,true),94326))," + \
 	      " name, ref, tags->'int_ref' as int_ref " + selectFields + \
 	      " from planet_osm_line where (" + cond + ") and osm_id > 0 order by osm_id asc, pg_column_size(way) desc;"
 	      # "LIMIT 1000"
@@ -99,8 +99,8 @@ if __name__ == "__main__":
 	process_roads("railway='rail'", "line_railway.osm", ['railway'])
 	process_roads("highway='tertiary' or highway='tertiary_link'", "line_tertiary.osm", ['highway', 'junction', 'route'])
 	process_roads("route='ferry' or (tags->'seamark:type' in ('separation_line', 'separation_lane', 'separation_boundary'))", "line_ferry.osm", ['route', 'seamark:type'])
-	process_roads("admin_level='4'", "line_admin_level_4.osm", ['admin_level'])
-	process_roads("admin_level='2'", "line_admin_level_2.osm", ['admin_level'])
+	#process_roads("admin_level='4'", "line_admin_level_4.osm", ['admin_level'])
+	#process_roads("admin_level='2'", "line_admin_level_2.osm", ['admin_level'])
 	
 	# not used
 	#	process_roads("(admin_level = '4' or admin_level = '2')", "line_admin_level.osm", ['admin_level'])
