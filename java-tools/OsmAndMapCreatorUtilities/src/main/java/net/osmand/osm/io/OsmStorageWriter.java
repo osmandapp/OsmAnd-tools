@@ -26,6 +26,7 @@ import static net.osmand.osm.io.OsmBaseStorage.ELEM_WAY;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
+import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -119,19 +120,26 @@ public class OsmStorageWriter {
 		// transformer.setOutputProperty(indent, "4");
 		XMLOutputFactory xof = XMLOutputFactory.newInstance();
 		XMLStreamWriter streamWriter = xof.createXMLStreamWriter(new OutputStreamWriter(output));
-
+		NumberFormat nf = NumberFormat.getNumberInstance();
+		nf.setMaximumFractionDigits(8);
 		streamWriter.writeStartDocument();
 		Set<EntityId> nd = new HashSet<Entity.EntityId>();
 		writeStartElement(streamWriter, ELEM_OSM, "");
 		streamWriter.writeAttribute(ATTR_VERSION, "0.6");
 		for (Node n : nodes) {
-			writeStartElement(streamWriter, ELEM_NODE, INDENT);
-			streamWriter.writeAttribute(ATTR_LAT, String.valueOf(n.getLatitude()));
-			streamWriter.writeAttribute(ATTR_LON, String.valueOf(n.getLongitude()));
+			if(n.getTags().isEmpty()) {
+				writeEmptyElement(streamWriter, ELEM_NODE, INDENT);
+			} else {
+				writeStartElement(streamWriter, ELEM_NODE, INDENT);
+			}
+			streamWriter.writeAttribute(ATTR_LAT, nf.format(n.getLatitude()));
+			streamWriter.writeAttribute(ATTR_LON, nf.format(n.getLongitude()));
 			streamWriter.writeAttribute(ATTR_ID, String.valueOf(n.getId()));
 			writeEntityAttributes(streamWriter, n, entityInfo.get(EntityId.valueOf(n)));
-			writeTags(streamWriter, n);
-			writeEndElement(streamWriter, INDENT);
+			if(!n.getTags().isEmpty()) {
+				writeTags(streamWriter, n);
+				writeEndElement(streamWriter, INDENT);
+			}
 			if(skipMissingMembers) {
 				nd.add(EntityId.valueOf(n));
 			}
@@ -143,8 +151,7 @@ public class OsmStorageWriter {
 			writeEntityAttributes(streamWriter, w, entityInfo.get(EntityId.valueOf(w)));
 			TLongArrayList ids = w.getNodeIds();
 			for (int i = 0; i < ids.size(); i++) {
-				streamWriter.writeCharacters("\n"+INDENT2);
-				streamWriter.writeEmptyElement(ELEM_ND);
+				writeEmptyElement(streamWriter, ELEM_ND, INDENT2);
 				streamWriter.writeAttribute(ATTR_REF, String.valueOf(ids.get(i)));
 			}
 			writeTags(streamWriter, w);
@@ -230,6 +237,11 @@ public class OsmStorageWriter {
 		writer.writeCharacters("\n"+indent);
 		writer.writeStartElement(name);
 	}
+	
+	private void writeEmptyElement(XMLStreamWriter writer, String name, String indent) throws XMLStreamException{
+		writer.writeCharacters("\n"+indent);
+		writer.writeEmptyElement(name);
+	}
 
 	private void writeEndElement(XMLStreamWriter writer, String indent) throws XMLStreamException{
 		writer.writeCharacters("\n"+indent);
@@ -238,10 +250,9 @@ public class OsmStorageWriter {
 
 	private void writeTags(XMLStreamWriter writer, Entity e) throws XMLStreamException{
 		for(Entry<String, String> en : e.getTags().entrySet()){
-			writeStartElement(writer, ELEM_TAG, INDENT2);
+			writeEmptyElement(writer, ELEM_TAG, INDENT2);
 			writer.writeAttribute(ATTR_K, replaceInvalid(en.getKey()));
 			writer.writeAttribute(ATTR_V, replaceInvalid(en.getValue()));
-			writer.writeEndElement();
 		}
 	}
 
