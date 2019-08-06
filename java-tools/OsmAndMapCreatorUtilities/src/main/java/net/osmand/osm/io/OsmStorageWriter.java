@@ -143,7 +143,8 @@ public class OsmStorageWriter {
 			writeEntityAttributes(streamWriter, w, entityInfo.get(EntityId.valueOf(w)));
 			TLongArrayList ids = w.getNodeIds();
 			for (int i = 0; i < ids.size(); i++) {
-				writeStartElement(streamWriter, ELEM_ND, INDENT2);
+				streamWriter.writeCharacters("\n"+INDENT2);
+				streamWriter.writeStartElement(ELEM_ND);
 				streamWriter.writeAttribute(ATTR_REF, String.valueOf(ids.get(i)));
 				streamWriter.writeEndElement();
 			}
