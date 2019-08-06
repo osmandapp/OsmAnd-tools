@@ -49,8 +49,10 @@ def process_roads(cond, filename, fields):
 	cursor.execute(sql)
  
 	node_id =-10000000000
-	wd_id =10000000000
+	max_way_id_start = 1000000000
+	wd_id = max_way_id_start
 	way_id = 0
+	extra_way_xml = ""
 	for row in cursor:
 		if row[1] is None:
 			continue;
@@ -77,27 +79,28 @@ def process_roads(cond, filename, fields):
 			node_xml += '\n<node id="%s" lat="%s" lon="%s"/>' % (nid, c[1], c[0])
 			way_xml += '\t<nd ref="%s" />\n' % (nid)
 		f.write(node_xml)
-		way_xml += '</way>'
-		f.write(way_xml)
-		f.write('\n')
-		
+		way_xml += '</way>\n'
+		if way_id > max_way_id_start:
+			extra_way_xml += way_xml
+		else:
+			f.write(way_xml)
 
 	# if way_id != 0:
 	# 	way_xml += '</way>'
-	# 	f.write(way_xml)
+	f.write(extra_way_xml)
 	f.write('</osm>')
 
 if __name__ == "__main__":
 	process_roads("highway='primary' or highway='primary_link'", "line_primary.osm", ['highway', 'junction', 'route'])
 	
-	process_roads("highway='motorway' or highway='motorway_link'", "line_motorway.osm", ['highway', 'junction', 'route'])
-	process_roads("highway='trunk' or highway='trunk_link'", "line_trunk.osm", ['highway', 'junction', 'route'])
-	process_roads("highway='secondary' or highway='secondary_link'", "line_secondary.osm", ['highway', 'junction', 'route'])
-	process_roads("railway='rail'", "line_railway.osm", ['railway'])
-	process_roads("highway='tertiary' or highway='tertiary_link'", "line_tertiary.osm", ['highway', 'junction', 'route'])
-	process_roads("route='ferry' or (tags->'seamark:type' in ('separation_line', 'separation_lane', 'separation_boundary'))", "line_ferry.osm", ['route', 'seamark:type'])
-	process_roads("admin_level='4'", "line_admin_level_4.osm", ['admin_level'])
-	process_roads("admin_level='2'", "line_admin_level_2.osm", ['admin_level'])
+	# process_roads("highway='motorway' or highway='motorway_link'", "line_motorway.osm", ['highway', 'junction', 'route'])
+	# process_roads("highway='trunk' or highway='trunk_link'", "line_trunk.osm", ['highway', 'junction', 'route'])
+	# process_roads("highway='secondary' or highway='secondary_link'", "line_secondary.osm", ['highway', 'junction', 'route'])
+	# process_roads("railway='rail'", "line_railway.osm", ['railway'])
+	# process_roads("highway='tertiary' or highway='tertiary_link'", "line_tertiary.osm", ['highway', 'junction', 'route'])
+	# process_roads("route='ferry' or (tags->'seamark:type' in ('separation_line', 'separation_lane', 'separation_boundary'))", "line_ferry.osm", ['route', 'seamark:type'])
+	# process_roads("admin_level='4'", "line_admin_level_4.osm", ['admin_level'])
+	# process_roads("admin_level='2'", "line_admin_level_2.osm", ['admin_level'])
 	
 	# not used
 	#	process_roads("(admin_level = '4' or admin_level = '2')", "line_admin_level.osm", ['admin_level'])
