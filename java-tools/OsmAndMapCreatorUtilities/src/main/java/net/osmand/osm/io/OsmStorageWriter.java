@@ -1,5 +1,6 @@
 package net.osmand.osm.io;
 
+
 import static net.osmand.osm.io.OsmBaseStorage.ATTR_CHANGESET;
 import static net.osmand.osm.io.OsmBaseStorage.ATTR_ID;
 import static net.osmand.osm.io.OsmBaseStorage.ATTR_K;
@@ -21,19 +22,20 @@ import static net.osmand.osm.io.OsmBaseStorage.ELEM_OSM;
 import static net.osmand.osm.io.OsmBaseStorage.ELEM_RELATION;
 import static net.osmand.osm.io.OsmBaseStorage.ELEM_TAG;
 import static net.osmand.osm.io.OsmBaseStorage.ELEM_WAY;
-import gnu.trove.list.array.TLongArrayList;
 
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.LinkedHashSet;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.Stack;
 
 import javax.xml.stream.FactoryConfigurationError;
@@ -41,14 +43,15 @@ import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamWriter;
 
+import gnu.trove.list.array.TLongArrayList;
 import net.osmand.data.MapObject;
 import net.osmand.osm.edit.Entity;
+import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.EntityInfo;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Relation.RelationMember;
 import net.osmand.osm.edit.Way;
-import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.util.Algorithms;
 
 public class OsmStorageWriter {
@@ -57,10 +60,19 @@ public class OsmStorageWriter {
 	private final String INDENT2 = INDENT + INDENT;
 
 
-	public OsmStorageWriter(){
+
+	public <T extends Entity> List<T> sort(Collection<T> e) {
+		List<T> lst = new ArrayList<T>(e);
+		Collections.sort(lst, new Comparator<T>() {
+
+			@Override
+			public int compare(T o1, T o2) {
+				return Long.compare(o1.getId(), o2.getId());
+			}
+		});
+		return lst;
 	}
-
-
+	
 	public void saveStorage(OutputStream output, OsmBaseStorage storage, Collection<EntityId> interestedObjects,
 			boolean includeLinks) throws XMLStreamException, IOException {
 		Map<EntityId, Entity> entities = storage.getRegisteredEntities();
@@ -92,14 +104,14 @@ public class OsmStorageWriter {
 				}
 			}
 		}
-
-		writeOSM(output, entityInfo, nodes, ways, relations);
+		writeOSM(output, entityInfo, sort(nodes), sort(ways), sort(relations));
 	}
 
 	public void writeOSM(OutputStream output, Map<EntityId, EntityInfo> entityInfo, Collection<Node> nodes,
 			Collection<Way> ways, Collection<Relation> relations) throws FactoryConfigurationError, XMLStreamException {
 		writeOSM(output, entityInfo, nodes, ways, relations, false);
 	}
+	
 	public void writeOSM(OutputStream output, Map<EntityId, EntityInfo> entityInfo, Collection<Node> nodes,
 			Collection<Way> ways, Collection<Relation> relations, boolean skipMissingMembers) throws FactoryConfigurationError, XMLStreamException {
 		// transformer.setOutputProperty(OutputKeys.INDENT, "yes");

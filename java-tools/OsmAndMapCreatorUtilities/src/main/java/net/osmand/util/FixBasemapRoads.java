@@ -155,6 +155,7 @@ public class FixBasemapRoads {
 					}
 				}
 				if(missingNode) {
+					LOG.info(String.format("Missing node for way %d", es.getId()));
 					continue;
 				}
 				total++;
