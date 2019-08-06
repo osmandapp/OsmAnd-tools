@@ -144,7 +144,7 @@ public class OsmStorageWriter {
 			TLongArrayList ids = w.getNodeIds();
 			for (int i = 0; i < ids.size(); i++) {
 				streamWriter.writeCharacters("\n"+INDENT2);
-				streamWriter.writeStartElement(ELEM_ND);
+				streamWriter.writeEmptyElement(ELEM_ND);
 				streamWriter.writeAttribute(ATTR_REF, String.valueOf(ids.get(i)));
 				streamWriter.writeEndElement();
 			}
