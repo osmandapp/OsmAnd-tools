@@ -49,7 +49,7 @@ def process_roads(cond, filename, fields):
 	cursor.execute(sql)
  
 	node_id =-10000000000
-	wd_id =-100000
+	wd_id =10000000000
 	way_id = 0
 	for row in cursor:
 		if row[1] is None:

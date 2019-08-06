@@ -55,6 +55,8 @@ public class BasemapProcessor {
     private static final byte SEA = 0x2;
     private static final byte LAND = 0x1;
     private static final Log log = PlatformUtil.getLog(BasemapProcessor.class);
+	public static final int PIXELS_THRESHOLD_AREA = 24;
+
 
     /**
      * The zoom level for which the tile info is valid.
@@ -438,7 +440,6 @@ public class BasemapProcessor {
 
     }
 
-	final int PIXELS_THRESHOLD_AREA = 24;
 
 	private static long ID = -20;
 	public void processEntity(Entity e) {
