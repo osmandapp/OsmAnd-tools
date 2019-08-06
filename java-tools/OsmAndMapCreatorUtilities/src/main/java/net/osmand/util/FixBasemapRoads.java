@@ -52,7 +52,7 @@ import net.osmand.osm.io.OsmStorageWriter;
 public class FixBasemapRoads {
 	private final static Log LOG = PlatformUtil.getLog(FixBasemapRoads.class);
     
-	private static int MINIMAL_DISTANCE = 10000; // -> 1500? primary
+	private static int MINIMAL_DISTANCE = 2000; // -> 1500? primary
 	
 	// In case road is shorter than min distance after stage 1, it is considered as link / roundabout
 	private static final double MINIMUM_DISTANCE_LINK = 150;
