@@ -9,13 +9,16 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeSet;
 import java.util.zip.GZIPInputStream;
 
@@ -40,6 +43,7 @@ import net.osmand.osm.MapRenderingTypesEncoder.EntityConvertApplyType;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.Entity.EntityType;
+import net.osmand.osm.edit.EntityInfo;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.osm.edit.OsmMapUtils;
@@ -52,7 +56,8 @@ import net.osmand.osm.io.OsmStorageWriter;
 public class FixBasemapRoads {
 	private final static Log LOG = PlatformUtil.getLog(FixBasemapRoads.class);
     
-	private static int MINIMAL_DISTANCE = 2000; // -> 1500? primary
+	private static int PREFERRED_DISTANCE = 30000; // -> 1500? primary
+	private static int MINIMAL_DISTANCE = 7000; // -> 1500? primary
 	
 	// In case road is shorter than min distance after stage 1, it is considered as link / roundabout
 	private static final double MINIMUM_DISTANCE_LINK = 150;
@@ -93,33 +98,49 @@ public class FixBasemapRoads {
 //			String line = "motorway_n";
 //			String line = "railway_n";
 //			String line = "trunk_n";
-			String line = "primary_af";
+//			
+//			String line = "primary_af";
 //			line = "secondary";
 //			line = "tertiary";
 //			line = "nlprimary";
 //			line = "nlsecondary";
+//			String line = "raw_line_motorway_c";
+//			String line = "raw_line_primary_c";
+			String line = "line_primary_t1";
+			
 			args = new String[] {
-					System.getProperty("maps.dir") + "basemap/line_" + line + ".osm.gz",
-					System.getProperty("maps.dir") + "basemap/proc_" + MINIMAL_DISTANCE + "_line_" + line + ".osm",
+					"/home/denisxs/osmand-maps/proc/" + MINIMAL_DISTANCE + "_main.osm",
+					"/home/denisxs/osmand-maps/raw/line_primary_t1.osm",
+					
+					"/home/denisxs/osmand-maps/raw/line_trunk_t1.osm",
+					"/home/denisxs/osmand-maps/raw/line_motorway_t1.osm",
+					
 					//System.getProperty("maps.dir") + "route_road.osm.gz"
 					
 			};
 		}
 		String fileToRead = args[0] ;
 		File read = new File(fileToRead);
-		String fileToWrite =  args[1];
+		String fileToWrite =  args[0];
 		List<File> relationFiles = new ArrayList<>();
+		List<File> filesToRead = new ArrayList<>();
 		if(args.length > 2) {
-			for(int i = 2; i < args.length; i++) {
-				relationFiles.add(new File(args[i]));
+			for(int i = 1; i < args.length; i++) {
+				if(args[i].equals("--route")) {
+					i++;
+					relationFiles.add(new File(args[i]));
+				} else {
+					filesToRead.add(new File(args[i]));
+				}
+				
 			}
 		}
 		File write = new File(fileToWrite);
 		write.createNewFile();
-        new FixBasemapRoads().process(read, write, relationFiles);
+        new FixBasemapRoads().process(write, filesToRead, relationFiles);
 	}
 
-	private void process(File read, File write, List<File> relationFiles) throws  IOException, XMLStreamException, XmlPullParserException, SQLException {
+	private void process(File write, List<File> filesToRead, List<File> relationFiles) throws  IOException, XMLStreamException, XmlPullParserException, SQLException {
 		MapRenderingTypesEncoder renderingTypes = new MapRenderingTypesEncoder("basemap");
 		OsmandRegions or = prepareRegions();
 		TagsTransformer transformer = new TagsTransformer();
@@ -139,33 +160,38 @@ public class FixBasemapRoads {
 			}
 		}
         
-        
-		LOG.info("Parse main file " + read.getName());
-		OsmBaseStorage storage = parseOsmFile(read);
-		Map<EntityId, Entity> entities = new HashMap<EntityId, Entity>( storage.getRegisteredEntities());
+		Map<EntityId, Entity> entities = new HashMap<>();
+		Map<EntityId, EntityInfo> entityInfo = new HashMap<>();
+		for (File read : filesToRead) {
+			LOG.info("Parse main file " + read.getName());
+			OsmBaseStorage storage = parseOsmFile(read);
+			entities.putAll(storage.getRegisteredEntities());
+			entityInfo.putAll(storage.getRegisteredEntityInfo());
+		}
 		int total = 0;
-		for(EntityId e : entities.keySet()){
-			if(e.getType() == EntityType.WAY){
-				Way es = (Way) storage.getRegisteredEntities().get(e);
+		for (Entity e : entities.values()) {
+			if (e instanceof Way) {
+				Way es = (Way) e;
 				boolean missingNode = false;
-				for(Node n : es.getNodes()) {
-					if(n == null) {
+				for (Node n : es.getNodes()) {
+					if (n == null) {
 						missingNode = true;
 						break;
 					}
 				}
-				if(missingNode) {
+				if (missingNode) {
 					LOG.info(String.format("Missing node for way %d", es.getId()));
 					continue;
 				}
 				total++;
-				if(total % 1000 == 0) {
+				if (total % 1000 == 0) {
 					LOG.info("Processed " + total + " ways");
 				}
 				addRegionTag(or, es);
 				transformer.addPropogatedTags(es);
-				Map<String, String> ntags = renderingTypes.transformTags(es.getModifiableTags(), EntityType.WAY, EntityConvertApplyType.MAP);
-				if(es.getModifiableTags() != ntags) {
+				Map<String, String> ntags = renderingTypes.transformTags(es.getModifiableTags(), EntityType.WAY,
+						EntityConvertApplyType.MAP);
+				if (es.getModifiableTags() != ntags) {
 					es.getModifiableTags().putAll(ntags);
 				}
 				processWay(es);
@@ -176,7 +202,7 @@ public class FixBasemapRoads {
 		processRegion(toWrite);
 		OsmStorageWriter writer = new OsmStorageWriter();
 		LOG.info("Writing file... ");
-		writer.saveStorage(new FileOutputStream(write), storage, toWrite, true);
+		writer.saveStorage(new FileOutputStream(write), entities, entityInfo, toWrite, true);
 		LOG.info("DONE");
 	}
 
@@ -414,6 +440,7 @@ public class FixBasemapRoads {
     public enum RoadSimplifyStages {
     	MERGE_UNIQUE,
     	MERGE_BEST,
+    	MERGE_WITH_OTHER_REF,
     	WRITE
     }
 
@@ -556,19 +583,32 @@ public class FixBasemapRoads {
 	private void processRegion(List<EntityId> toWrite) throws IOException {
 		
 		// process in certain order by ref type
-		for (RoadSimplifyStages stage : RoadSimplifyStages.values()) {
+		EnumSet<RoadSimplifyStages> stages = EnumSet.of(RoadSimplifyStages.MERGE_UNIQUE, RoadSimplifyStages.MERGE_BEST);
+		Collection<RoadInfo> infos = roadInfoMap.values();
+		processRoadInfoByStages(infos, stages);
+		RoadInfo global = new RoadInfo("", RoadInfoRefType.REF);
+		for(RoadInfo l : roadInfoMap.values()) {
+			for(RoadLine rl : l.roadLines) {
+				global.registerRoadLine(rl);
+			}
+		}
+		processRoadInfoByStages(Collections.singleton(global), stages);
+		writeWays(toWrite, global);
+	}
+
+	private void processRoadInfoByStages(Collection<RoadInfo> infos, EnumSet<RoadSimplifyStages> stages) {
+		for (RoadSimplifyStages stage : stages) {
 			for (RoadInfoRefType tp : RoadInfoRefType.values()) {
-				for (String ref : roadInfoMap.keySet()) {
-					RoadInfo ri = roadInfoMap.get(ref);
+				for (RoadInfo ri : infos) {
 					if (ri.type == tp) {
-						processRoadsByRef(toWrite, stage, ri);
+						processRoadsByRef(stage, ri);
 					}
 				}
 			}
 		}
 	}
 
-	private void processRoadsByRef(List<EntityId> toWrite, RoadSimplifyStages stage, RoadInfo ri) {
+	private void processRoadsByRef(RoadSimplifyStages stage, RoadInfo ri) {
 		boolean verbose = ri.getTotalDistance() > 40000;
 		if (RoadSimplifyStages.MERGE_UNIQUE == stage) {
 			if (verbose) {
@@ -600,24 +640,23 @@ public class FixBasemapRoads {
 				}
 			}
 			
-			
-		}  else if(RoadSimplifyStages.WRITE == stage) {
-			ri.compactDeleted();
-			for (RoadLine ls : ri.roadLines) {
-				if (ls.distance > MINIMAL_DISTANCE && !ls.isDeleted()) {
-					ls.combineWaysIntoOneWay();
-					Way w = ls.getFirstWay();
-					String hw = w.getTag(OSMTagKey.HIGHWAY);
-					if(hw != null && hw.endsWith("_link")) {
-						w.putTag("highway", hw.substring(0, hw.length() - "_link".length()));
-					}
-					toWrite.add(ls.getFirstWayId());
-				}
-			}
 		}
 		
-		
-		
+	}
+
+	private void writeWays(List<EntityId> toWrite, RoadInfo ri) {
+		ri.compactDeleted();
+		for (RoadLine ls : ri.roadLines) {
+			if (ls.distance > MINIMAL_DISTANCE ) {
+				ls.combineWaysIntoOneWay();
+				Way w = ls.getFirstWay();
+				String hw = w.getTag(OSMTagKey.HIGHWAY);
+				if (hw != null && hw.endsWith("_link")) {
+					w.putTag("highway", hw.substring(0, hw.length() - "_link".length()));
+				}
+				toWrite.add(ls.getFirstWayId());
+			}
+		}
 	}
 
 	private void addRegionTag(OsmandRegions or, Way firstWay) throws IOException {
@@ -833,7 +872,7 @@ public class FixBasemapRoads {
 		String hw = way.getTag("highway");
         boolean isLink = hw != null && hw.endsWith("_link");
         // boolean shortDist = MapUtils.getDistance(way.getLastNode().getLatLon(), way.getFirstNode().getLatLon()) < MINIMUM_DISTANCE_LINK;
-		if (way.getFirstNodeId() == way.getLastNodeId() || 
+		if (convertLatLon(way.getFirstNode().getLatLon()) == convertLatLon(way.getLastNode().getLatLon()) || 
 				"roundabout".equals(way.getTag("junction")) || isLink) {
 			addRoadToRoundabouts(way);
 			return;
