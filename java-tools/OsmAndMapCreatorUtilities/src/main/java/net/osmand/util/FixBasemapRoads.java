@@ -57,7 +57,7 @@ public class FixBasemapRoads {
 	private final static Log LOG = PlatformUtil.getLog(FixBasemapRoads.class);
     
 	private static int PREFERRED_DISTANCE = 30000; // -> 1500? primary
-	private static int MINIMAL_DISTANCE = 7000; // -> 1500? primary
+	private static int MINIMAL_DISTANCE = 3000; // -> 1500? primary
 	
 	// In case road is shorter than min distance after stage 1, it is considered as link / roundabout
 	private static final double MINIMUM_DISTANCE_LINK = 150;
@@ -88,10 +88,10 @@ public class FixBasemapRoads {
 	
 	
     private static boolean FILTER_BBOX = false;  
-    private static double LEFT_LON = 4.12;
-    private static double RIGHT_LON = 4.43;
-    private static double TOP_LAT = 52.15;
-    private static double BOTTOM_LAT = 51.94;
+    private static double LEFT_LON = 3.3;
+    private static double RIGHT_LON = 12.7;
+    private static double TOP_LAT = 54.4;
+    private static double BOTTOM_LAT = 50.2;
 
 	public static void main(String[] args) throws Exception {
 		if(args == null || args.length == 0) {
@@ -109,11 +109,10 @@ public class FixBasemapRoads {
 			String line = "line_primary_t1";
 			
 			args = new String[] {
-					"/home/denisxs/osmand-maps/proc/" + MINIMAL_DISTANCE + "_main.osm",
-					"/home/denisxs/osmand-maps/raw/line_primary_t1.osm",
-					
-					"/home/denisxs/osmand-maps/raw/line_trunk_t1.osm",
-					"/home/denisxs/osmand-maps/raw/line_motorway_t1.osm",
+					"/home/denisxs/osmand-maps/proc/" + MINIMAL_DISTANCE + "_motorway.osm",
+//					"/home/denisxs/osmand-maps/raw/line_primary_t2.osm",
+//					"/home/denisxs/osmand-maps/raw/line_trunk_t2.osm",
+					"/home/denisxs/osmand-maps/raw/line_motorway_t2.osm",
 					
 					//System.getProperty("maps.dir") + "route_road.osm.gz"
 					
@@ -124,7 +123,7 @@ public class FixBasemapRoads {
 		String fileToWrite =  args[0];
 		List<File> relationFiles = new ArrayList<>();
 		List<File> filesToRead = new ArrayList<>();
-		if(args.length > 2) {
+		if(args.length > 1) {
 			for(int i = 1; i < args.length; i++) {
 				if(args[i].equals("--route")) {
 					i++;
@@ -134,7 +133,7 @@ public class FixBasemapRoads {
 				}
 				
 			}
-		}
+		} 
 		File write = new File(fileToWrite);
 		write.createNewFile();
         new FixBasemapRoads().process(write, filesToRead, relationFiles);
