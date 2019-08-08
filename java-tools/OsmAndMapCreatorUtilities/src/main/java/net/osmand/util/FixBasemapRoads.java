@@ -57,7 +57,7 @@ public class FixBasemapRoads {
 	private final static Log LOG = PlatformUtil.getLog(FixBasemapRoads.class);
     
 	private static int PREFERRED_DISTANCE = 30000; // -> 1500? primary
-	private static int MINIMAL_DISTANCE = 3000; // -> 1500? primary
+	private static int MINIMAL_DISTANCE = 20000; // -> 1500? primary
 	
 	// In case road is shorter than min distance after stage 1, it is considered as link / roundabout
 	private static final double MINIMUM_DISTANCE_LINK = 150;
@@ -75,7 +75,7 @@ public class FixBasemapRoads {
 	private static final double METRIC_LONG_LENGTH_THRESHOLD = 5000;
 	private static final double METRIC_LONG_LENGTH_BONUS = -100;
 	private static final double METRIC_ANGLE_THRESHOLD = Math.PI / 6;
-	private static final double METRIC_ANGLE_PENALTY = 50;
+	private static final double METRIC_ANGLE_PENALTY = 50; 
 	
 	// making it less < 31 joins unnecessary roads make merge process more complicated 
 	private static final int APPROXIMATE_POINT_ZOOM = 31;
@@ -87,7 +87,7 @@ public class FixBasemapRoads {
 
 	
 	
-    private static boolean FILTER_BBOX = false;  
+    private static boolean FILTER_BBOX = true;  
     private static double LEFT_LON = 3.3;
     private static double RIGHT_LON = 12.7;
     private static double TOP_LAT = 54.4;
@@ -109,12 +109,12 @@ public class FixBasemapRoads {
 			String line = "line_primary_t1";
 			
 			args = new String[] {
-					"/home/denisxs/osmand-maps/proc/" + MINIMAL_DISTANCE + "_motorway.osm",
-//					"/home/denisxs/osmand-maps/raw/line_primary_t2.osm",
-//					"/home/denisxs/osmand-maps/raw/line_trunk_t2.osm",
-					"/home/denisxs/osmand-maps/raw/line_motorway_t2.osm",
+					"/home/denisxs/osmand-maps/proc/" + MINIMAL_DISTANCE + "proc_" + "master.osm",
+					"/home/denisxs/osmand-maps/raw/line_primary_t3.osm",
+					"/home/denisxs/osmand-maps/raw/line_trunk_t3.osm",
+					"/home/denisxs/osmand-maps/raw/line_motorway_t3.osm",
 					
-					//System.getProperty("maps.dir") + "route_road.osm.gz"
+					"/home/denisxs/osmand-maps/raw/route_road.osm.gz"
 					
 			};
 		}
@@ -123,17 +123,17 @@ public class FixBasemapRoads {
 		String fileToWrite =  args[0];
 		List<File> relationFiles = new ArrayList<>();
 		List<File> filesToRead = new ArrayList<>();
-		if(args.length > 1) {
-			for(int i = 1; i < args.length; i++) {
-				if(args[i].equals("--route")) {
-					i++;
-					relationFiles.add(new File(args[i]));
-				} else {
-					filesToRead.add(new File(args[i]));
-				}
-				
+		
+		for(int i = 1; i < args.length; i++) {
+			if(args[i].equals("--route")) {
+				i++;
+				relationFiles.add(new File(args[i]));
+			} else {
+				filesToRead.add(new File(args[i]));
 			}
-		} 
+			
+		}
+		 
 		File write = new File(fileToWrite);
 		write.createNewFile();
         new FixBasemapRoads().process(write, filesToRead, relationFiles);
@@ -159,49 +159,65 @@ public class FixBasemapRoads {
 			}
 		}
         
-		Map<EntityId, Entity> entities = new HashMap<>();
-		Map<EntityId, EntityInfo> entityInfo = new HashMap<>();
-		for (File read : filesToRead) {
-			LOG.info("Parse main file " + read.getName());
-			OsmBaseStorage storage = parseOsmFile(read);
-			entities.putAll(storage.getRegisteredEntities());
-			entityInfo.putAll(storage.getRegisteredEntityInfo());
-		}
+		Map<EntityId, Entity> mainEntities = new HashMap<>();
+		Map<EntityId, EntityInfo> mainEntityInfo = new HashMap<>();
 		int total = 0;
-		for (Entity e : entities.values()) {
-			if (e instanceof Way) {
-				Way es = (Way) e;
-				boolean missingNode = false;
-				for (Node n : es.getNodes()) {
-					if (n == null) {
-						missingNode = true;
-						break;
+		long nid = -10000000000l;
+		for (File read : filesToRead) {
+			LOG.info("Parse file " + read.getName());
+			OsmBaseStorage storage = parseOsmFile(read);
+			Map<EntityId, Entity> entities = storage.getRegisteredEntities();
+			Map<EntityId, EntityInfo> infos = storage.getRegisteredEntityInfo();
+			for (Entity e : entities.values()) {
+				if (e instanceof Way) {
+					Way w = (Way) e;
+					boolean missingNode = false;
+					EntityId eid = EntityId.valueOf(e);
+					EntityInfo info = infos.get(EntityId.valueOf(e));
+					Way way;
+					if(mainEntities.containsKey(eid)) {
+						way = new Way(nid++);
+					} else {
+						way = new Way(w.getId());
 					}
+					way.copyTags(w);
+					for (Node n : w.getNodes()) {
+						if (n == null) {
+							missingNode = true;
+							break;
+						}
+						Node nnode = new Node(n, nid++);
+						way.addNode(nnode);
+						mainEntities.put(EntityId.valueOf(nnode), nnode);
+					}
+					mainEntities.put(EntityId.valueOf(way), way);
+					mainEntityInfo.put(EntityId.valueOf(way), info);
+					if (missingNode) {
+						LOG.info(String.format("Missing node for way %d", w.getId()));
+						continue;
+					}
+					total++;
+					if (total % 1000 == 0) {
+						LOG.info("Processed " + total + " ways");
+					}
+					addRegionTag(or, way);
+					transformer.addPropogatedTags(way);
+					Map<String, String> ntags = renderingTypes.transformTags(way.getModifiableTags(), EntityType.WAY,
+							EntityConvertApplyType.MAP);
+					if (way.getModifiableTags() != ntags) {
+						way.getModifiableTags().putAll(ntags);
+					}
+					processWay(way);
 				}
-				if (missingNode) {
-					LOG.info(String.format("Missing node for way %d", es.getId()));
-					continue;
-				}
-				total++;
-				if (total % 1000 == 0) {
-					LOG.info("Processed " + total + " ways");
-				}
-				addRegionTag(or, es);
-				transformer.addPropogatedTags(es);
-				Map<String, String> ntags = renderingTypes.transformTags(es.getModifiableTags(), EntityType.WAY,
-						EntityConvertApplyType.MAP);
-				if (es.getModifiableTags() != ntags) {
-					es.getModifiableTags().putAll(ntags);
-				}
-				processWay(es);
 			}
 		}
+		
+		
         List<EntityId> toWrite = new ArrayList<EntityId>();
-
 		processRegion(toWrite);
 		OsmStorageWriter writer = new OsmStorageWriter();
 		LOG.info("Writing file... ");
-		writer.saveStorage(new FileOutputStream(write), entities, entityInfo, toWrite, true);
+		writer.saveStorage(new FileOutputStream(write), mainEntities, mainEntityInfo, toWrite, true);
 		LOG.info("DONE");
 	}
 
