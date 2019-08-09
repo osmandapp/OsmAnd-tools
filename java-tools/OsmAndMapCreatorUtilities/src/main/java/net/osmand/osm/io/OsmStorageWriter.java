@@ -79,6 +79,13 @@ public class OsmStorageWriter {
 		Map<EntityId, Entity> entities = storage.getRegisteredEntities();
 		Map<EntityId, EntityInfo> entityInfo = storage.getRegisteredEntityInfo();
 
+		saveStorage(output, entities, entityInfo, interestedObjects, includeLinks);
+	}
+
+	public void saveStorage(OutputStream output,
+			Map<EntityId, Entity> entities, Map<EntityId, EntityInfo> entityInfo,
+			Collection<EntityId> interestedObjects, boolean includeLinks)
+			throws FactoryConfigurationError, XMLStreamException {
 		Set<Node> nodes = new LinkedHashSet<Node>();
 		Set<Way> ways = new LinkedHashSet<Way>();
 		Set<Relation> relations = new LinkedHashSet<Relation>();
