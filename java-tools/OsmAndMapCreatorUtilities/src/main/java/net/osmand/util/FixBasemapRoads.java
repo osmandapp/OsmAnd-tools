@@ -94,29 +94,13 @@ public class FixBasemapRoads {
 
 	public static void main(String[] args) throws Exception {
 		if(args == null || args.length == 0) {
-//			String line = "motorway_n";
-//			String line = "railway_n";
-//			String line = "trunk_n";
-//			
-//			String line = "primary_af";
-//			line = "secondary";
-//			line = "tertiary";
-//			line = "nlprimary";
-//			line = "nlsecondary";
-//			String line = "raw_line_motorway_c";
-//			String line = "raw_line_primary_c";
-			String line = "line_primary_t1";
-			
 			args = new String[] {
-					"/home/denisxs/osmand-maps/proc/" + MINIMAL_DISTANCE + "_proc_" + "t2.osm",
-					"/home/denisxs/osmand-maps/raw/line_primary_t2.osm",
-					"/home/denisxs/osmand-maps/raw/line_trunk_t2.osm",
-					"/home/denisxs/osmand-maps/raw/line_motorway_t2.osm",
-					
+					"/home/denisxs/osmand-maps/proc/" + MINIMAL_DISTANCE + "_proc_test.osm",
+					"/home/denisxs/osmand-maps/raw/line_combined_c.osm",
 					"/home/denisxs/osmand-maps/raw/route_road.osm.gz"
-					
 			};
 		}
+        
 		String fileToRead = args[0] ;
 		File read = new File(fileToRead);
 		String fileToWrite =  args[0];
@@ -130,7 +114,6 @@ public class FixBasemapRoads {
 			} else {
 				filesToRead.add(new File(args[i]));
 			}
-			
 		}
 		 
 		File write = new File(fileToWrite);
