@@ -96,11 +96,11 @@ def process_roads(cond, filename, fields):
 	f.write('</osm>')
 
 if __name__ == "__main__":
-	#process_roads("highway='primary' or highway='primary_link' or highway='motorway' or highway='motorway_link' or highway='trunk' or highway='trunk_link'", "line_motorway_trunk_primary.osm", ['highway', 'junction', 'route'])
+	process_roads("highway='primary' or highway='primary_link' or highway='motorway' or highway='motorway_link' or highway='trunk' or highway='trunk_link'", "line_motorway_trunk_primary.osm", ['highway', 'junction', 'route'])
 	#process_roads("highway='primary' or highway='primary_link' or highway='motorway' or highway='motorway_link' or highway='trunk' or highway='trunk_link' or highway='secondary' or highway='secondary_link' or highway='tertiary' or highway='tertiary_link'", "line_all_roads.osm", ['highway', 'junction', 'route'])
 	#process_roads("highway='primary' or highway='primary_link'", "line_primary.osm", ['highway', 'junction', 'route'])	
 	#process_roads("highway='motorway' or highway='motorway_link'", "line_motorway.osm", ['highway', 'junction', 'route'])
-	process_roads("highway='trunk' or highway='trunk_link'", "line_trunk_test.osm", ['highway', 'junction', 'route'])
+	#process_roads("highway='trunk' or highway='trunk_link'", "line_trunk_test.osm", ['highway', 'junction', 'route'])
 	#process_roads("highway='secondary' or highway='secondary_link'", "line_secondary.osm", ['highway', 'junction', 'route'])
 	#process_roads("railway='rail'", "line_railway.osm", ['railway'])
 	#process_roads("highway='tertiary' or highway='tertiary_link'", "line_tertiary.osm", ['highway', 'junction', 'route'])
