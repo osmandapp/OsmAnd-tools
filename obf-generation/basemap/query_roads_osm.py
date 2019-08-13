@@ -78,9 +78,9 @@ def process_roads(cond, filename, fields):
 			node_id = node_id + 1
 			nid = node_id
 			if 'e' in c[1]:
-				c[1] = format(c[1], '.10f')
+				c[1] = format(float(c[1]), '.12f')
 			if 'e' in c[0]: 
-				c[0]= format(c[0], '.10f')
+				c[0]= format(float(c[0]), '.12f')
 			node_xml += '\n<node id="%s" lat="%s" lon="%s"/>' % (nid, c[1], c[0])
 			way_xml += '\t<nd ref="%s" />\n' % (nid)
 		f.write(node_xml)
