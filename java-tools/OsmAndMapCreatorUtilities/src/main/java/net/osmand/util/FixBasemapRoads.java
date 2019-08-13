@@ -56,8 +56,8 @@ import net.osmand.osm.io.OsmStorageWriter;
 public class FixBasemapRoads {
 	private final static Log LOG = PlatformUtil.getLog(FixBasemapRoads.class);
     
-	private static int PREFERRED_DISTANCE = 50000; // -> 1500? primary
-	private static int MINIMAL_DISTANCE = 20000; // -> 1500? primary
+	private static int PREFERRED_DISTANCE; // -> 1500? primary
+	private static int MINIMAL_DISTANCE; // -> 1500? primary
 	private static final double MIN_DISTANCE_AVOID_REF = MINIMAL_DISTANCE;
 	
 	// In case road is shorter than min distance after stage 1, it is considered as link / roundabout
@@ -96,18 +96,27 @@ public class FixBasemapRoads {
 		if(args == null || args.length == 0) {
 			args = new String[] {
 					"/home/denisxs/osmand-maps/proc/" + MINIMAL_DISTANCE + "_proc_test.osm",
-					"/home/denisxs/osmand-maps/raw/line_combined_c.osm",
-					"/home/denisxs/osmand-maps/raw/route_road.osm.gz"
+					"10000", "2000",
+					"/home/denisxs/osmand-maps/raw/line_motor_trunk_primary_t.osm",
+					//"/home/denisxs/osmand-maps/raw/route_road.osm.gz"
 			};
 		}
-        
-		String fileToRead = args[0] ;
-		File read = new File(fileToRead);
+
+		try {
+			PREFERRED_DISTANCE = Integer.parseInt(args[1]);
+			MINIMAL_DISTANCE = Integer.parseInt(args[2]);
+		} catch (NumberFormatException nfe) {
+			LOG.info("Using default value");
+			PREFERRED_DISTANCE = 50000;
+			MINIMAL_DISTANCE = 20000;
+		}
+		LOG.info(String.format("Preffered road distance: %1$s, minimal road distance: %2$s", PREFERRED_DISTANCE, MINIMAL_DISTANCE));
+		
 		String fileToWrite =  args[0];
 		List<File> relationFiles = new ArrayList<>();
 		List<File> filesToRead = new ArrayList<>();
 		
-		for(int i = 1; i < args.length; i++) {
+		for(int i = 3; i < args.length; i++) {
 			if(args[i].equals("--route")) {
 				i++;
 				relationFiles.add(new File(args[i]));
