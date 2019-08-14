@@ -453,17 +453,16 @@ public class BasemapProcessor {
 		long refId = -Math.abs(e.getId());
 		
 		boolean coastline = "coastline".equals(e.getTag("natural"));
-		if(mini) {
-			if(!(e instanceof Node) && !(coastline)) {
-				// store only coastline for mini basemap
-				return;
-			}
-		}
 		// save space with ids
-
 		for (int level = 0; level < mapZooms.getLevels().size(); level++) {
 			boolean mostDetailed = level == 0;
 			MapZoomPair zoomPair = mapZooms.getLevel(level);
+			if (mostDetailed) {
+				if (!(e instanceof Node) && !(coastline)) {
+					// store only coastline for mini basemap
+					continue;
+				}
+			}
 			int zoomToEncode = mostDetailed ? Math.max(MOST_DETAILED_APPROXIMATION, zoomPair.getMinZoom() + 1) : zoomPair.getMaxZoom();
 			if (mostDetailed && zoomPair.getMaxZoom() < 10) {
 				throw new IllegalStateException("Zoom pair is not detailed " + zoomPair);
