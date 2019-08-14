@@ -101,26 +101,31 @@ public class FixBasemapRoads {
 					//"/home/denisxs/osmand-maps/raw/route_road.osm.gz"
 			};
 		}
-		int preferredArg = -1;
-		int minDistArg = -1;
-		try {
-			preferredArg = Integer.parseInt(args[1]);
-			minDistArg = Integer.parseInt(args[2]);
-		} catch (NumberFormatException e) {
-			LOG.error("Wrong args, using default values");
-		}
-		PREFERRED_DISTANCE = preferredArg >= 0 ? preferredArg : 50000;
-		MINIMAL_DISTANCE = minDistArg >= 0 ? minDistArg : 20000;
-		LOG.info(String.format("Preferred road distance: %1$s, minimal road distance: %2$s", PREFERRED_DISTANCE, MINIMAL_DISTANCE));
-		
+				
 		String fileToWrite =  args[0];
 		List<File> relationFiles = new ArrayList<>();
 		List<File> filesToRead = new ArrayList<>();
 		
-		for(int i = 3; i < args.length; i++) {
-			if(args[i].equals("--route")) {
+		for(int i = 0; i < args.length; i++) {
+			if(args[i].equals("--routs")) {
 				i++;
 				relationFiles.add(new File(args[i]));
+			} else if (args[i].equals("--pref_dist")) {
+				i++;
+				try {
+					PREFERRED_DISTANCE = Integer.parseInt(args[i]);				
+				} catch (NumberFormatException e) {
+					PREFERRED_DISTANCE = 50000;
+					LOG.error("Wrong arg, should be int");
+				}
+			} else if (args[i].equals("--min_dist")) {
+				i++;
+				try {
+					MINIMAL_DISTANCE = Integer.parseInt(args[i]);				
+				} catch (NumberFormatException e) {
+					MINIMAL_DISTANCE = 20000;
+					LOG.error("Wrong arg, should be int");
+				}
 			} else {
 				filesToRead.add(new File(args[i]));
 			}
