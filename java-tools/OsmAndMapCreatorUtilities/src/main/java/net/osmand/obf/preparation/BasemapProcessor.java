@@ -736,14 +736,8 @@ public class BasemapProcessor {
 			IndexCreator creator = new IndexCreator(folder, settings); //$NON-NLS-1$
 			creator.setDialects(DBDialect.SQLITE_IN_MEMORY, DBDialect.SQLITE_IN_MEMORY);
 			creator.setMapFileName(mini ? "World_basemap_mini_test_2.obf" : "World_basemap_2.obf");
-			ArrayList<File> src = new ArrayList<File>();
-			for (File f : folder.listFiles()) {
-				if (f.getName().endsWith(".osm") || 
-						f.getName().endsWith(".osm.bz2") || 
-						f.getName().endsWith(".osm.gz")) {
-					src.add(f);
-				}
-			}
+			List<File> src = new ArrayList<File>();
+			parseFiles(folder, src);
 
 			// BASEMAP generation
 			// creator.generateBasemapIndex(new ConsoleProgressImplementation(1), null, zooms, rt, log, "basemap",
@@ -759,6 +753,19 @@ public class BasemapProcessor {
 					src.toArray(new File[src.size()]));
 		}
     }
+
+	private static void parseFiles(File folder, List<File> src) {
+		for (File f : folder.listFiles()) {
+			if(f.isDirectory() && f.getName().startsWith("proc_")) {
+				parseFiles(f, src);
+			}
+			if (f.getName().endsWith(".osm") || 
+					f.getName().endsWith(".osm.bz2") || 
+					f.getName().endsWith(".osm.gz")) {
+				src.add(f);
+			}
+		}
+	}
 
 
 }
