@@ -442,7 +442,7 @@ public class BasemapProcessor {
 
 
 	private static long ID = -20;
-	public void processEntity(Entity e) {
+	public void processEntity(boolean mini, Entity e) {
 		if (e instanceof Way) {
 			if ("reverse_coastline".equals(((Way) e).getModifiableTags().get("natural"))) {
 				((Way) e).putTag("natural", "coastline");
@@ -451,6 +451,14 @@ public class BasemapProcessor {
 			}
 		}
 		long refId = -Math.abs(e.getId());
+		
+		boolean coastline = "coastline".equals(e.getTag("natural"));
+		if(mini) {
+			if(!(e instanceof Node) && !(coastline)) {
+				// store only coastline for mini basemap
+				return;
+			}
+		}
 		// save space with ids
 
 		for (int level = 0; level < mapZooms.getLevels().size(); level++) {
@@ -715,8 +723,8 @@ public class BasemapProcessor {
 			}
 			// MapZooms zooms = MapZooms.parseZooms("1-2;3;4-5;6-7;8-9;10-");
 			int zoomSmoothness = mini ? 2 : 2;
-			MapZooms zooms = mini ? MapZooms.parseZooms("1-2;3;4-5;6-") : MapZooms.parseZooms("1-2;3;4-5;6-7;8-9;10-");
-			MOST_DETAILED_APPROXIMATION = mini ? 10 : 11;
+			MapZooms zooms = mini ? MapZooms.parseZooms("1-2;3;4-5;6-7;8-") : MapZooms.parseZooms("1-2;3;4-5;6-7;8-9;10-");
+			MOST_DETAILED_APPROXIMATION = mini ? 8 : 11;
 			IndexCreatorSettings settings = new IndexCreatorSettings();
 			settings.indexMap = true;
 			settings.indexAddress = false;
@@ -747,7 +755,7 @@ public class BasemapProcessor {
 			// ,new File(basemapParent, "10m_populated_places.osm")
 			// );
 
-			creator.generateBasemapIndex(new ConsoleProgressImplementation(1), null, zooms, rt, log, "basemap",
+			creator.generateBasemapIndex(mini, new ConsoleProgressImplementation(1), null, zooms, rt, log, "basemap",
 					src.toArray(new File[src.size()]));
 		}
     }
