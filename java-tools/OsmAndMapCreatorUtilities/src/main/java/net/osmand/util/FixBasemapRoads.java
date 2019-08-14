@@ -87,30 +87,31 @@ public class FixBasemapRoads {
 	
 		
     private static boolean FILTER_BBOX = false;  
-    private static double LEFT_LON = 3.3;
-    private static double RIGHT_LON = 12.7;
-    private static double TOP_LAT = 54.4;
-    private static double BOTTOM_LAT = 50.2;
+    private static double LEFT_LON = 0.0;
+    private static double RIGHT_LON = 12.25;
+    private static double TOP_LAT = 57.25;
+    private static double BOTTOM_LAT = 45.0;
 
 	public static void main(String[] args) throws Exception {
 		if(args == null || args.length == 0) {
 			args = new String[] {
-					"/home/denisxs/osmand-maps/proc/" + MINIMAL_DISTANCE + "_proc_test.osm",
-					"10000", "2000",
-					"/home/denisxs/osmand-maps/raw/line_motor_trunk_primary_t.osm",
+					"/home/denisxs/osmand-maps/proc/" + "line_motorway_trunk_primary_c.osm",
+					"50000", "20000", 
+					"/home/denisxs/osmand-maps/raw/line_mtp_cut.osm",
 					//"/home/denisxs/osmand-maps/raw/route_road.osm.gz"
 			};
 		}
-
+		int preferredArg = -1;
+		int minDistArg = -1;
 		try {
-			PREFERRED_DISTANCE = Integer.parseInt(args[1]);
-			MINIMAL_DISTANCE = Integer.parseInt(args[2]);
-		} catch (NumberFormatException nfe) {
-			LOG.info("Using default value");
-			PREFERRED_DISTANCE = 50000;
-			MINIMAL_DISTANCE = 20000;
+			preferredArg = Integer.parseInt(args[1]);
+			minDistArg = Integer.parseInt(args[2]);
+		} catch (NumberFormatException e) {
+			LOG.error("Wrong args, using default values");
 		}
-		LOG.info(String.format("Preffered road distance: %1$s, minimal road distance: %2$s", PREFERRED_DISTANCE, MINIMAL_DISTANCE));
+		PREFERRED_DISTANCE = preferredArg >= 0 ? preferredArg : 50000;
+		MINIMAL_DISTANCE = minDistArg >= 0 ? minDistArg : 20000;
+		LOG.info(String.format("Preferred road distance: %1$s, minimal road distance: %2$s", PREFERRED_DISTANCE, MINIMAL_DISTANCE));
 		
 		String fileToWrite =  args[0];
 		List<File> relationFiles = new ArrayList<>();
