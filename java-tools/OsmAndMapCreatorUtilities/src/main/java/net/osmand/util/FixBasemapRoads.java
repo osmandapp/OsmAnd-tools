@@ -18,7 +18,6 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.TreeSet;
 import java.util.zip.GZIPInputStream;
 
@@ -56,9 +55,8 @@ import net.osmand.osm.io.OsmStorageWriter;
 public class FixBasemapRoads {
 	private final static Log LOG = PlatformUtil.getLog(FixBasemapRoads.class);
     
-	private static int PREFERRED_DISTANCE; // -> 1500? primary
-	private static int MINIMAL_DISTANCE; // -> 1500? primary
-	private static final double MIN_DISTANCE_AVOID_REF = MINIMAL_DISTANCE;
+	private static int PREFERRED_DISTANCE = 50000; // -> 1500? primary
+	private static int MINIMAL_DISTANCE = 2000; // -> 1500? primary
 	
 	// In case road is shorter than min distance after stage 1, it is considered as link / roundabout
 	private static final double MINIMUM_DISTANCE_LINK = 150;
@@ -93,44 +91,34 @@ public class FixBasemapRoads {
     private static double BOTTOM_LAT = 45.0;
 
 	public static void main(String[] args) throws Exception {
-		if(args == null || args.length == 0) {
+		if(args != null && args.length == 1 && args[1].equals("test")) {
 			args = new String[] {
 					"/home/denisxs/osmand-maps/proc/" + "line_motorway_trunk_primary_c.osm",
-					"50000", "20000", 
 					"/home/denisxs/osmand-maps/raw/line_mtp_cut.osm",
 					//"/home/denisxs/osmand-maps/raw/route_road.osm.gz"
 			};
 		}
-				
 		String fileToWrite =  args[0];
 		List<File> relationFiles = new ArrayList<>();
 		List<File> filesToRead = new ArrayList<>();
 		
+
 		for(int i = 0; i < args.length; i++) {
-			if(args[i].equals("--routs")) {
+			if(args[i].equals("--route-relations")) {
 				i++;
 				relationFiles.add(new File(args[i]));
-			} else if (args[i].equals("--pref_dist")) {
+			} else if(args[i].equals("--min-dist")) {
 				i++;
-				try {
-					PREFERRED_DISTANCE = Integer.parseInt(args[i]);				
-				} catch (NumberFormatException e) {
-					PREFERRED_DISTANCE = 50000;
-					LOG.error("Wrong arg, should be int");
-				}
-			} else if (args[i].equals("--min_dist")) {
+				MINIMAL_DISTANCE = Integer.parseInt(args[i]);
+			} else if(args[i].equals("--pref-dist")) {
 				i++;
-				try {
-					MINIMAL_DISTANCE = Integer.parseInt(args[i]);				
-				} catch (NumberFormatException e) {
-					MINIMAL_DISTANCE = 20000;
-					LOG.error("Wrong arg, should be int");
-				}
+				PREFERRED_DISTANCE = Integer.parseInt(args[i]);
 			} else {
 				filesToRead.add(new File(args[i]));
 			}
 		}
-		 
+		LOG.info(String.format("Preffered road distance: %d, minimal road distance: %d", PREFERRED_DISTANCE, MINIMAL_DISTANCE));
+
 		File write = new File(fileToWrite);
 		write.createNewFile();
         new FixBasemapRoads().process(write, filesToRead, relationFiles);
@@ -554,7 +542,7 @@ public class FixBasemapRoads {
 
         public void mergeRoadInto(RoadLine toMerge, RoadLine toKeep, boolean mergeToEnd) {
         	if(!Algorithms.objectEquals(toMerge.ref, toKeep.ref)) {
-        		if(toKeep.distance > MIN_DISTANCE_AVOID_REF || toMerge.distance > MIN_DISTANCE_AVOID_REF) {
+        		if(toKeep.distance > MINIMAL_DISTANCE || toMerge.distance > MINIMAL_DISTANCE) {
         			toKeep.ref = null;
         		} else if(toMerge.distance > toKeep.distance) {
             		toKeep.ref = toMerge.ref;
