@@ -434,7 +434,7 @@ public class IndexCreator {
 	}
 
 
-	public void generateBasemapIndex(IProgress progress, IOsmStorageFilter addFilter, MapZooms mapZooms,
+	public void generateBasemapIndex(boolean mini, IProgress progress, IOsmStorageFilter addFilter, MapZooms mapZooms,
 			MapRenderingTypesEncoder renderingTypes, Log logMapDataWarn, String regionName, File... readFiles) throws IOException, SQLException, InterruptedException, XmlPullParserException {
 		if (logMapDataWarn == null) {
 			logMapDataWarn = log;
@@ -462,7 +462,7 @@ public class IndexCreator {
 			accessor.iterateOverEntities(progress, EntityType.NODE, new OsmDbVisitor() {
 				@Override
 				public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
-					processor.processEntity(e);
+					processor.processEntity(mini, e);
 					if (settings.indexPOI) {
 						poiCreator.iterateEntity(e, ctx, true);
 					}
@@ -473,7 +473,7 @@ public class IndexCreator {
 			accessor.iterateOverEntities(progress, EntityType.WAY, new OsmDbVisitor() {
 				@Override
 				public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
-					processor.processEntity(e);
+					processor.processEntity(mini, e);
 					if (settings.indexPOI) {
 						poiCreator.iterateEntity(e, ctx, true);
 					}
@@ -486,7 +486,7 @@ public class IndexCreator {
 				@Override
 				public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 					ctx.loadEntityRelation((Relation) e);
-					processor.processEntity(e);
+					processor.processEntity(mini, e);
 				}
 			});
 			accessor.closeReadingConnection();

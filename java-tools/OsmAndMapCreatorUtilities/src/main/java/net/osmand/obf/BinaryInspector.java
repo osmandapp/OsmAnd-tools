@@ -87,10 +87,10 @@ public class BinaryInspector {
 //					"-vaddress", "-vcities","-vstreetgroups",
 //					"-vstreets", "-vbuildings", "-vintersections",
 //					"-lang=ru",
-//					"-zoom=15",
+					"-zoom=7",
 //					"-bbox=30.51,50.5,30.53,50.4",
 //					"-osm="+System.getProperty("maps.dir")+"/basemap/map.obf.osm",
-					System.getProperty("maps.dir")+"/World_basemap_test_2.obf_"
+					System.getProperty("maps.dir")+"/World_basemap_mini_2.obf"
 //					System.getProperty("maps.dir")+"/olive/19_07_29_20_20_diff.obf"
 			});
 		} else {

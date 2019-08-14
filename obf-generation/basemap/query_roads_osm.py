@@ -77,6 +77,10 @@ def process_roads(cond, filename, fields):
 		for c in coordinates :
 			node_id = node_id + 1
 			nid = node_id
+			if 'e' in c[1]:
+				c[1] = format(float(c[1]), '.12f')
+			if 'e' in c[0]: 
+				c[0]= format(float(c[0]), '.12f')
 			node_xml += '\n<node id="%s" lat="%s" lon="%s"/>' % (nid, c[1], c[0])
 			way_xml += '\t<nd ref="%s" />\n' % (nid)
 		f.write(node_xml)
@@ -96,7 +100,7 @@ if __name__ == "__main__":
 	process_roads("highway='primary' or highway='primary_link' or highway='motorway' or highway='motorway_link' or highway='trunk' or highway='trunk_link' or highway='secondary' or highway='secondary_link' or highway='tertiary' or highway='tertiary_link'", "line_all_roads.osm", ['highway', 'junction', 'route'])
 	#process_roads("highway='primary' or highway='primary_link'", "line_primary.osm", ['highway', 'junction', 'route'])	
 	#process_roads("highway='motorway' or highway='motorway_link'", "line_motorway.osm", ['highway', 'junction', 'route'])
-	#process_roads("highway='trunk' or highway='trunk_link'", "line_trunk.osm", ['highway', 'junction', 'route'])
+	#process_roads("highway='trunk' or highway='trunk_link'", "line_trunk_test.osm", ['highway', 'junction', 'route'])
 	#process_roads("highway='secondary' or highway='secondary_link'", "line_secondary.osm", ['highway', 'junction', 'route'])
 	#process_roads("railway='rail'", "line_railway.osm", ['railway'])
 	#process_roads("highway='tertiary' or highway='tertiary_link'", "line_tertiary.osm", ['highway', 'junction', 'route'])
