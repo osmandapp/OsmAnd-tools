@@ -735,7 +735,7 @@ public class BasemapProcessor {
 			
 			IndexCreator creator = new IndexCreator(folder, settings); //$NON-NLS-1$
 			creator.setDialects(DBDialect.SQLITE_IN_MEMORY, DBDialect.SQLITE_IN_MEMORY);
-			creator.setMapFileName(mini ? "World_basemap_mini_test_2.obf" : "World_basemap_2.obf");
+			creator.setMapFileName(mini ? "World_basemap_mini_2.obf" : "World_basemap_2.obf");
 			List<File> src = new ArrayList<File>();
 			parseFiles(folder, src);
 
