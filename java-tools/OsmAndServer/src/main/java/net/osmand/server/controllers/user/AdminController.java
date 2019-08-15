@@ -422,7 +422,14 @@ public class AdminController {
 		public int annualCount;
 		public int annualDiscountCount;
 		
+		public int iosMonthCount;
+		public int iosQuarterCount;
+		public int iosAnnualCount;
+		public int iosAnnualDiscountCount;
+		
 		public int total;
+		public int atotal;
+		public int iostotal;
 		public int totalWeighted;
 		public int totalAvgDuration;
 		
@@ -486,15 +493,21 @@ public class AdminController {
 				}
 				NewSubscriptionReport sr = new NewSubscriptionReport();
 				sr.date = na.date;
-				sr.monthCount = na.monthCount + na.iosMonthCount;
-				sr.annualCount = na.annualCount + na.iosAnnualCount;
-				sr.quarterCount = na.quarterCount + na.iosQuarterCount;
-				sr.annualDiscountCount = na.annualDiscountCount + na.iosAnnualDiscountCount;
+				sr.monthCount = na.monthCount;
+				sr.iosMonthCount = na.iosMonthCount;
+				sr.annualCount = na.annualCount;
+				sr.iosAnnualCount = na.iosAnnualCount;
+				sr.quarterCount = na.quarterCount;
+				sr.iosQuarterCount = na.iosQuarterCount;
+				sr.annualDiscountCount = na.annualDiscountCount;
+				sr.iosAnnualDiscountCount = na.iosAnnualDiscountCount;
 				sr.cancelMonthCount = ca.monthCount + ca.iosMonthCount;
 				sr.cancelAnnualCount = ca.annualCount + ca.iosAnnualCount;
 				sr.cancelQuarterCount = ca.quarterCount + ca.iosQuarterCount;
 				sr.cancelAnnualDiscountCount = ca.annualDiscountCount + ca.iosAnnualDiscountCount;
-				sr.total = sr.monthCount + sr.annualCount + sr.annualDiscountCount + sr.quarterCount;
+				sr.atotal = sr.monthCount + sr.annualCount + sr.annualDiscountCount + sr.quarterCount ;
+				sr.iostotal = sr.iosMonthCount + sr.iosAnnualCount + sr.iosAnnualDiscountCount + sr.iosQuarterCount ;
+				sr.total = sr.atotal + sr.iostotal;
 				sr.totalAvgDuration = na.count > 0 ? na.duration / na.count : 0;
 				sr.cancelTotal = sr.cancelMonthCount + sr.cancelAnnualCount + sr.cancelAnnualDiscountCount
 						+ sr.cancelQuarterCount;
