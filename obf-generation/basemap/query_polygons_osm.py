@@ -95,7 +95,7 @@ def process_polygons(tags, filename):
 			array.append(tag)
 			queryFields += ", " + tag
 			conditions += " or "+tag+" <> ''"
-	sql =( "select osm_id, ST_AsText(ST_Transform(ST_SimplifyPreserveTopology(way, 100), 94326)) " + queryFields +
+	sql =( "select osm_id, ST_AsText(ST_Transform(ST_SimplifyPreserveTopology(way, 1000), 94326)) " + queryFields +
 	       " from planet_osm_polygon where way_area > 10000000"+
 	       " and ("+conditions+") "+
 	       # "LIMIT 1000"
@@ -183,5 +183,5 @@ if __name__ == "__main__":
 		#process_polygons(['landuse', 'natural', 'wetland', 'historic','leisure'], 'polygon_natural_landuse.osm')
 		#process_polygons(['aeroway', 'military', 'abandoned', 'iata', 'icao', 'faa', 'power', 'tourism'], 'polygon_aeroway_military_tourism.osm')
 		#-1175256, -1751158 causing troubles 
-		process_polygons(['admin_level_2'], 'polygon_admin_level_2_test2.osm') 
+		process_polygons(['admin_level_2'], 'polygon_admin_level_2_test3.osm') 
 		#process_polygons(['admin_level_4'], 'polygon_admin_level_4.osm')
