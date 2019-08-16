@@ -95,7 +95,7 @@ def process_polygons(tags, filename):
 			array.append(tag)
 			queryFields += ", " + tag
 			conditions += " or "+tag+" <> ''"
-	sql =( "select osm_id, ST_AsText(ST_Transform(ST_Simplify(way,500),94326)) " + queryFields +
+	sql =( "select osm_id, ST_AsText(ST_Transform(ST_Simplify(way,100),94326)) " + queryFields +
 	       " from planet_osm_polygon where way_area > 10000000"+
 	       " and ("+conditions+") "+
 	       # "LIMIT 1000"
