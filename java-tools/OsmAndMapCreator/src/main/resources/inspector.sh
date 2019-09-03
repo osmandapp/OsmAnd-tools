@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 if [ -z "$JAVA_OPTS" ]; then 
 	JAVA_OPTS="-Xms64M -Xmx512M"
