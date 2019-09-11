@@ -1,10 +1,10 @@
 #!/usr/bin/python
+# -*- coding: utf-8 -*-
 import psycopg2
 import sys
 import pprint
 import re
 import os
-from __future__ import unicode_literals
 
 regSpaces = re.compile('\s+')
 def Point(geoStr):
