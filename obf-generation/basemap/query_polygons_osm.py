@@ -31,7 +31,7 @@ def process_polygons(tags, filename):
 	array = ['name']
 	queryFields = ", name"
 	names = ['name:af', 'name:ar', 'name:az', 'name:be', 'name:bg', 'name:bn', 'name:bpy', 'name:br', 'name:bs', 'name:ca', 'name:ceb', 'name:cs', 'name:cy', 'name:da', 'name:de', 'name:el', 'name:en', 'name:eo', 'name:es', 'name:et', 'name:eu', 'name:id', 'name:fa', 'name:fi', 'name:fr', 'name:fy', 'name:ga', 'name:gl', 'name:he', 'name:hi', 'name:hr', 'name:ht', 'name:hu', 'name:hy', 'name:is', 'name:it', 'name:ja', 'name:ka', 'name:kn', 'name:ko', 'name:ku', 'name:la', 'name:lb', 'name:lt', 'name:lv', 'name:mk', 'name:ml', 'name:mr', 'name:ms', 'name:nds', 'name:new', 'name:nl', 'name:nn', 'name:no', 'name:nv', 'name:os', 'name:pl', 'name:pms', 'name:pt', 'name:ro', 'name:ru', 'name:sc', 'name:sh', 'name:sk', 'name:sl', 'name:sq', 'name:sr', 'name:sv', 'name:sw', 'name:ta', 'name:te', 'name:th', 'name:tl', 'name:tr', 'name:uk', 'name:vi', 'name:vo', 'name:zh']
-	largeStatesList = ['Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut', 'Florida', 'Georgia', 'Hawaii', 'Idaho', 'Illinois', 'Indiana', 'Iowa', 'Kansas', 'Kentucky', 'Louisiana', 'Maine', 'Maryland', 'Massachusetts', 'Michigan', 'Minnesota', 'Mississippi', 'Missouri', 'Montana', 'Nebraska', 'Nevada', 'New Jersey', 'New Mexico', 'New York', 'North Carolina', 'North Dakota', 'Ohio', 'Oklahoma', 'Oregon', 'Pennsylvania', 'South Carolina', 'South Dakota', 'Tennessee', 'Texas', 'Utah', 'Vermont', 'Virginia', 'Washington', 'West Virginia', 'Wisconsin', 'Wyoming', 'Alberta', 'British Columbia', 'Manitoba', 'New Brunswick', 'Newfoundland and Labrador', 'Northwest Territories', 'Nova Scotia', 'Nunavut', 'Ontario', 'Québec', 'Saskatchewan', 'Yukon', 'Western Australia', 'Northern Territory', 'Queensland', 'South Australia', 'New South Wales', 'Victoria', 'Tasmania']
+	largeStatesList = ['Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Florida', 'Georgia', 'Hawaii', 'Idaho', 'Illinois', 'Indiana', 'Iowa', 'Kansas', 'Kentucky', 'Louisiana', 'Maine', 'Maryland', 'Massachusetts', 'Michigan', 'Minnesota', 'Mississippi', 'Missouri', 'Montana', 'Nebraska', 'Nevada', 'New Mexico', 'New York', 'North Carolina', 'North Dakota', 'Ohio', 'Oklahoma', 'Oregon', 'Pennsylvania', 'South Carolina', 'South Dakota', 'Tennessee', 'Texas', 'Utah', 'Vermont', 'Virginia', 'Washington', 'West Virginia', 'Wisconsin', 'Wyoming', 'Alberta', 'British Columbia', 'Manitoba', 'New Brunswick', 'Newfoundland and Labrador', 'Northwest Territories', 'Nova Scotia', 'Nunavut', 'Ontario', 'Québec', 'Saskatchewan', 'Yukon', 'Western Australia', 'Northern Territory', 'Queensland', 'South Australia', 'New South Wales', 'Victoria', 'Tasmania']
 	for nm in names:
 		array.append(nm)
 		queryFields += ", tags->\'" + nm + "\' as \"" + nm + "\""
@@ -122,7 +122,7 @@ def process_polygons(tags, filename):
 		while base - shift < len(array):
 			if row[base] is not None:
 				if admin_level and array[base - shift] == "name" and esc(row[base]) in largeStatesList:
-					tags_xml += '\t<tag k="largeState" v="true" />\n'
+					tags_xml += '\t<tag k="osmand_large_state" v="true" />\n'
 				tags_xml += '\t<tag k="%s" v="%s" />\n' % (array[base - shift], esc(row[base]))
 			base = base + 1
 		# tags_xml += '\t<tag k="coordinates" v="%s" />\n' % row[1]
@@ -188,4 +188,4 @@ if __name__ == "__main__":
 		#process_polygons(['aeroway', 'military', 'abandoned', 'iata', 'icao', 'faa', 'power', 'tourism'], 'polygon_aeroway_military_tourism.osm')
 		#-1175256, -1751158 causing troubles 
 		#process_polygons(['admin_level_2'], 'polygon_admin_level_2.osm') 
-		process_polygons(['admin_level_4'], 'polygon_admin_level_4_test.osm')
+		process_polygons(['admin_level_4'], 'polygon_admin_level_4.osm')
