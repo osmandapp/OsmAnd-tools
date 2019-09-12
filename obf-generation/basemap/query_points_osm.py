@@ -68,7 +68,7 @@ def process_points(cond, filename, array):
 	node_id =-1000
 	parse = re.compile('(-?[\d|\.]+)\s(-?[\d|\.]+)')
 	for row in cursor:
-		checkForLargeState = false;
+		checkForLargeState = False;
 		node_id = row[1] #node_id - 1
 		match = parse.search(row[0])
 		xml = '\n<node version="1" id="%s" lat="%s" lon="%s">\n' % (node_id, match.groups()[1], match.groups()[0])
@@ -78,7 +78,7 @@ def process_points(cond, filename, array):
 				tagName = array[base - shift]
 				value = esc(row[base])
 				if tagName == "name" and value in largeStatesList:
-					checkForLargeState = true;
+					checkForLargeState = True;
 				if tagName == "place" and value == "state" and checkForLargeState:
 					tags_xml += '\t<tag k="osmand_large_state" v="true" />\n'
 				if tagName == "place" and value == "city" :
