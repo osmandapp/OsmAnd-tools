@@ -79,7 +79,7 @@ def process_points(cond, filename, array):
 				value = esc(row[base])
 				if tagName == "name" and value in largeStatesList:
 					checkForLargeState = true;
-				if tagName == "place" and value = "state" and checkForLargeState:
+				if tagName == "place" and value == "state" and checkForLargeState:
 					tags_xml += '\t<tag k="osmand_large_state" v="true" />\n'
 				if tagName == "place" and value == "city" :
 					pop = num(row[2], 0)
