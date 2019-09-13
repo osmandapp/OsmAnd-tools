@@ -179,9 +179,9 @@ def process_polygons(tags, filename):
 
 if __name__ == "__main__":
 		print "Process polygons"
-		process_polygons(['lake', 'seamark:type', 'seamark:restricted_area:category'], 'polygon_lake_water.osm')
-		process_polygons(['landuse', 'natural', 'wetland', 'historic','leisure'], 'polygon_natural_landuse.osm')
-		process_polygons(['aeroway', 'military', 'abandoned', 'iata', 'icao', 'faa', 'power', 'tourism'], 'polygon_aeroway_military_tourism.osm')
+		#process_polygons(['lake', 'seamark:type', 'seamark:restricted_area:category'], 'polygon_lake_water.osm')
+		#process_polygons(['landuse', 'natural', 'wetland', 'historic','leisure'], 'polygon_natural_landuse.osm')
+		#process_polygons(['aeroway', 'military', 'abandoned', 'iata', 'icao', 'faa', 'power', 'tourism'], 'polygon_aeroway_military_tourism.osm')
 		#-1175256, -1751158 causing troubles 
-		process_polygons(['admin_level_2'], 'polygon_admin_level_2.osm') 
+		#process_polygons(['admin_level_2'], 'polygon_admin_level_2.osm') 
 		process_polygons(['admin_level_4'], 'polygon_admin_level_4.osm')
