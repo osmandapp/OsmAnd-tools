@@ -90,9 +90,9 @@ def process_points(cond, filename, array):
 						xml += '\t<tag k="%s" v="%s" />\n' % ("osmand_place_basemap", "city")
 				if checkForAdminCenter and tagName == "place" and ( value == "city" or value == "town"):
 					pop = num(row[2], 0)
-					if (pop > 100000):
+					if pop >= 100000 :
 						pop_tag = "big"
-					else:	
+					elif pop < 100000 :	
 						pop_tag = "small"
 					xml += '\t<tag k="%s" v="%s" />\n' % ("osmand_admin_center", pop_tag)
 				# if tagName == 'name' and row[base+1] is not None and len(row[base+1]) > 0 :
