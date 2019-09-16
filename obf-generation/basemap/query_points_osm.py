@@ -89,7 +89,7 @@ def process_points(cond, filename, array):
 					pop = num(row[2], 0)
 					if pop > 500000	:
 						xml += '\t<tag k="%s" v="%s" />\n' % ("osmand_place_basemap", "city")
-				if checkForAdminCenter and tagName == "place" and ( value == "city" or value == "town"):
+				if checkForAdminCenter and tagName == "place" and value == "city":
 					checkForPopSize = True;
 				if checkForPopSize and tagName == "population":	
 					pop = num(value, 0);
