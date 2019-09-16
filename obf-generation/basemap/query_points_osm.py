@@ -116,12 +116,12 @@ if __name__ == "__main__":
 	process_points("place in ('city','town') ", 'cities.osm', ['name', 'name:en', 'place', 'capital', 'population'])
 	#process_points("place in ('city') ", 'points_only_cities.osm', ['name', 'name:en', 'place', 'capital', 'population'])
 	#process_points("place in ('county') "
-				   " or \"natural\" in ('peak', 'cave_entrance', 'rock', 'waterfall', 'cape', 'volcano', 'stream', 'reef')"
-				   " or tourism in ('alpine_hut') "
-				   " or tags->'seamark:type' in ('light_major') "
-				   " or tags->'seamark:type' in ('harbour') "
-				   " or tags->'abandoned' in ('yes') "
-				   " or (tags->'population' <> '')"
-				   " or aeroway in ('aerodrome', 'airport')", 'points.osm', 
-				   ['name', 'name:en',
-				    'ref', 'ele', 'place','natural', 'seamark:type', 'abandoned', 'aeroway', 'tourism', 'iata', 'icao', 'faa', 'population'])
+	#			   " or \"natural\" in ('peak', 'cave_entrance', 'rock', 'waterfall', 'cape', 'volcano', 'stream', 'reef')"
+	#			   " or tourism in ('alpine_hut') "
+	#			   " or tags->'seamark:type' in ('light_major') "
+	#			   " or tags->'seamark:type' in ('harbour') "
+	#			   " or tags->'abandoned' in ('yes') "
+	#			   " or (tags->'population' <> '')"
+	#			   " or aeroway in ('aerodrome', 'airport')", 'points.osm', 
+	#			   ['name', 'name:en',
+	#			    'ref', 'ele', 'place','natural', 'seamark:type', 'abandoned', 'aeroway', 'tourism', 'iata', 'icao', 'faa', 'population'])
