@@ -64,14 +64,13 @@ def process_points(cond, filename, array):
 	      # "LIMIT 2"
 	print sql
 	cursor.execute(sql)
- 	print adminCentersList
+ 	
 	node_id =-1000
 	parse = re.compile('(-?[\d|\.]+)\s(-?[\d|\.]+)')
 	for row in cursor:
 		checkForLargeState = False;
 		checkAdminCenterForPopSize = False;
 		node_id = row[1] #node_id - 1
-		print node_id
 		if int(node_id) in adminCentersList:
 			checkAdminCenterForPopSize = True;
 		match = parse.search(row[0])
@@ -95,7 +94,7 @@ def process_points(cond, filename, array):
 						pop_size = "large"
 					elif pop < 100000 :	
 						pop_size = "small"
-					xml += '\t<tag k="%s" v="%s" />\n' % ("osmand_admin_center", pop_tag)
+					xml += '\t<tag k="%s" v="%s" />\n' % ("osmand_admin_center", pop_size)
 				# if tagName == 'name' and row[base+1] is not None and len(row[base+1]) > 0 :
 					# value = '' # write name:en instead of name
 				# if tagName == 'name:en' and len(value) > 0 :
