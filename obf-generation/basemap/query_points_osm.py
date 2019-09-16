@@ -69,9 +69,10 @@ def process_points(cond, filename, array):
 	parse = re.compile('(-?[\d|\.]+)\s(-?[\d|\.]+)')
 	for row in cursor:
 		checkForLargeState = False;
-		checkForAdminCenter = False;
-		checkForPopSize = False;
+		checkAdminCenterForPopSize = False;
 		node_id = row[1] #node_id - 1
+		if node_id in adminCentersList:
+			checkAdminCenterForPopSize = True;
 		match = parse.search(row[0])
 		xml = '\n<node version="1" id="%s" lat="%s" lon="%s">\n' % (node_id, match.groups()[1], match.groups()[0])
 		base = shift
@@ -81,22 +82,18 @@ def process_points(cond, filename, array):
 				value = esc(row[base])
 				if tagName == "name" and value in largeStatesList:
 					checkForLargeState = True;
-				if tagName == "name" and value in adminCentersList:
-					checkForAdminCenter = True;
 				if tagName == "place" and value == "state" and checkForLargeState:
 					xml += '\t<tag k="osmand_large_state" v="true" />\n'
 				if tagName == "place" and value == "city" :
 					pop = num(row[2], 0)
 					if pop > 500000	:
 						xml += '\t<tag k="%s" v="%s" />\n' % ("osmand_place_basemap", "city")
-				if checkForAdminCenter and tagName == "place" and value == "city":
-					checkForPopSize = True;
-				if checkForPopSize and tagName == "population":	
+				if checkAdminCenterForPopSize and tagName == "population":	
 					pop = num(value, 0);
 					if pop >= 100000 :
-						pop_tag = "large"
+						pop_size = "large"
 					elif pop < 100000 :	
-						pop_tag = "small"
+						pop_size = "small"
 					xml += '\t<tag k="%s" v="%s" />\n' % ("osmand_admin_center", pop_tag)
 				# if tagName == 'name' and row[base+1] is not None and len(row[base+1]) > 0 :
 					# value = '' # write name:en instead of name
