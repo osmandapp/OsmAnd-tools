@@ -70,6 +70,7 @@ def process_points(cond, filename, array):
 	for row in cursor:
 		checkForLargeState = False;
 		checkForAdminCenter = False;
+		checkForPopSize = False;
 		node_id = row[1] #node_id - 1
 		match = parse.search(row[0])
 		xml = '\n<node version="1" id="%s" lat="%s" lon="%s">\n' % (node_id, match.groups()[1], match.groups()[0])
@@ -89,7 +90,9 @@ def process_points(cond, filename, array):
 					if pop > 500000	:
 						xml += '\t<tag k="%s" v="%s" />\n' % ("osmand_place_basemap", "city")
 				if checkForAdminCenter and tagName == "place" and ( value == "city" or value == "town"):
-					pop = num(row[2], 0)
+					checkForPopSize = true;
+				if checkForPopSize and tagName == "population":	
+					pop = num(value, 0);
 					if pop >= 100000 :
 						pop_tag = "big"
 					elif pop < 100000 :	
