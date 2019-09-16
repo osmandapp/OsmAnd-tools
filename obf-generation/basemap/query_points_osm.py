@@ -71,7 +71,7 @@ def process_points(cond, filename, array):
 		checkForLargeState = False;
 		checkAdminCenterForPopSize = False;
 		node_id = row[1] #node_id - 1
-		if node_id in adminCentersList:
+		if num(node_id, 0) in adminCentersList:
 			checkAdminCenterForPopSize = True;
 		match = parse.search(row[0])
 		xml = '\n<node version="1" id="%s" lat="%s" lon="%s">\n' % (node_id, match.groups()[1], match.groups()[0])
