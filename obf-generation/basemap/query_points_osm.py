@@ -94,7 +94,7 @@ def process_points(cond, filename, array):
 				if checkForPopSize and tagName == "population":	
 					pop = num(value, 0);
 					if pop >= 100000 :
-						pop_tag = "big"
+						pop_tag = "large"
 					elif pop < 100000 :	
 						pop_tag = "small"
 					xml += '\t<tag k="%s" v="%s" />\n' % ("osmand_admin_center", pop_tag)
