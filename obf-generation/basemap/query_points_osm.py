@@ -111,8 +111,8 @@ def process_points(cond, filename, array):
 if __name__ == "__main__":
 	print "Process points"
 	#process_points("place in ('continent','sea','ocean','state','country') "
-				   " or \"natural\" in ('strait')", 'points_main.osm',
-				   ['name', 'name:en', 'place', 'population'])
+	#			   " or \"natural\" in ('strait')", 'points_main.osm',
+	#			   ['name', 'name:en', 'place', 'population'])
 	process_points("place in ('city','town') ", 'cities.osm', ['name', 'name:en', 'place', 'capital', 'population'])
 	#process_points("place in ('city') ", 'points_only_cities.osm', ['name', 'name:en', 'place', 'capital', 'population'])
 	#process_points("place in ('county') "
