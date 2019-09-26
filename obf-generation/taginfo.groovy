@@ -3,7 +3,7 @@ def processType(tp, uniqueset,tags) {
 	def value = tp."@value".text();
 	if ( uniqueset[tg + "=" + value] )  return ;
 	uniqueset[tg + "=" + value] = tg;
-	def notosm = tp."@notosm".text();
+	def notosm = tp."@no_edit".text();
 	if(!tg.contains("osmand") && value != "" && notosm != "true") {
 		def taginfop = [:]
 		taginfop["key"] = tg;
@@ -37,8 +37,8 @@ def processPOItype(tp, uniqueset,tags) {
 	def name = tp."@name".text();
 	if ( uniqueset[tg + "=" + value] )  return ;
 	uniqueset[tg + "=" + value] = tg;
-	def notosm = tp."@notosm".text();
-	if(!tg.contains("osmand") && value != "" && notosm != "true") {
+	def notosm = tp."@no_edit".text();
+	if(!tg.contains("osmand") && notosm != "true") {
 		def taginfop = [:]
 		taginfop["key"] = tg;
 		if(value != "") {
