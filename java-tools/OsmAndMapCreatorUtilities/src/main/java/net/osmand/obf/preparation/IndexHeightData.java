@@ -277,7 +277,8 @@ public class IndexHeightData {
 		if(e.getTag("highway") == null &&
 				e.getTag("cycleway") == null &&
 				e.getTag("footway") == null &&
-				e.getTag("waterway") == null
+				e.getTag("waterway") == null &&
+				e.getTag("piste:type") == null
 		) {
 			return;
 		}
