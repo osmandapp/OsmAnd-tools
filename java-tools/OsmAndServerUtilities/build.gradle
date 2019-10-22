@@ -18,7 +18,7 @@ dependencies {
 	
 	// osmand live subscriptions 
 	implementation(group: 'com.google.oauth-client', name: 'google-oauth-client', version: '1.19.0') { transitive = true }
-    implementation(group: 'com.google.apis', name: 'google-api-services-androidpublisher', version: 'v2-rev84-1.23.0') { transitive = true }
+    implementation(group: 'com.google.apis', name: 'google-api-services-androidpublisher', version: 'v3-rev103-1.25.0') { transitive = true }
 
 	// exception analyzer
     implementation 'com.google.api-client:google-api-client:1.22.0'
