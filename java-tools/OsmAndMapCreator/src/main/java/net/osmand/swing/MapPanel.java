@@ -1168,13 +1168,13 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
             if(sleft < minTile) {
                 sleft = minTile;
             }
-            if(sright > mxTile) {
+            if(sright > mxTile || sright < 0) {
                 sright = mxTile;
             }
             if(stop < minTile) {
                 stop = minTile;
             }
-            if(sbottom > mxTile) {
+            if(sbottom > mxTile || sbottom < 0) {
                 sbottom = mxTile;
             }
 		}
