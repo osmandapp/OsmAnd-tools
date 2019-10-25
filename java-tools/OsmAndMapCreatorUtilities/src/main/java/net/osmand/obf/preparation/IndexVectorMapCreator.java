@@ -36,6 +36,7 @@ import net.osmand.data.LatLon;
 import net.osmand.data.Multipolygon;
 import net.osmand.data.MultipolygonBuilder;
 import net.osmand.data.Ring;
+import net.osmand.map.OsmandRegions;
 import net.osmand.osm.MapRenderingTypes.MapRulType;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.MapRenderingTypesEncoder.EntityConvertApplyType;
@@ -167,9 +168,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		}
 	}
 
-	
 
-	
 
 	/**
 	 * index a multipolygon into the database
@@ -679,9 +678,20 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		}
 		return true;
 	}
-
+	
 	public void iterateMainEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
+		iterateMainEntity(e, ctx, null);
+	}
+	
+	public void iterateMainEntity(Entity e, OsmDbAccessorContext ctx, OsmandRegions or) throws SQLException {
 		if (e instanceof Way || e instanceof Node) {
+			if (or != null && e instanceof Way) {
+				try {
+					addRegionTag(or, e);
+				} catch (IOException e1) {
+					e1.printStackTrace();
+				}
+			}
 			tagsTransformer.addPropogatedTags(e);
 			
 			// manipulate what kind of way to load
@@ -692,7 +702,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			for (int level = 0; level < mapZooms.size(); level++) {
 				processMainEntity(e, originalId, assignedId, level, tags);
 			}
-
+			
 			if (splitTags != null) {
 				EntityId eid = EntityId.valueOf(e);
 				for (int i = 1; i < splitTags.size(); i++) {
@@ -703,10 +713,15 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 					}
 				}
 			}
+			
+			if (or != null & e instanceof Way) {
+				Map<String, String> ntags = renderingTypes.transformTags(e.getModifiableTags(), EntityType.WAY, EntityConvertApplyType.MAP);
+				if (e.getModifiableTags() != ntags) {
+					e.getModifiableTags().putAll(ntags);
+				}
+			}
 		}
 	}
-
-
 
 	protected void processMainEntity(Entity e, long originalId, long assignedId, int level, Map<String, String> tags)
 			throws SQLException {

@@ -11,6 +11,7 @@ public class IndexCreatorSettings {
 	public boolean indexTransport;
 	public boolean indexAddress;
 	public boolean indexRouting;
+	public boolean addRegionTag = false;
 
 	// generate low level roads and maps
 	public boolean generateLowLevel = true;
