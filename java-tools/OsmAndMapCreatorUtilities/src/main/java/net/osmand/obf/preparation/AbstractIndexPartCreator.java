@@ -5,12 +5,23 @@ import java.io.IOException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.TreeSet;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
+import net.osmand.binary.BinaryMapDataObject;
+import net.osmand.data.QuadRect;
+import net.osmand.map.OsmandRegions;
+import net.osmand.osm.MapRenderingTypesEncoder;
+import net.osmand.osm.edit.Entity;
+import net.osmand.osm.edit.Way;
+import net.osmand.util.Algorithms;
+import net.osmand.util.MapUtils;
 import rtree.Element;
 import rtree.Pack;
 import rtree.RTree;
@@ -117,5 +128,37 @@ public class AbstractIndexPartCreator {
 			throw new IOException(e);
 		}
 		return tree;
+	}
+	
+	protected void addRegionTag(OsmandRegions or, Entity entity) throws IOException {
+		if (entity instanceof Way) {
+			QuadRect qr = ((Way) entity).getLatLonBBox();
+			int lx = MapUtils.get31TileNumberX(qr.left);
+			int rx = MapUtils.get31TileNumberX(qr.right);
+			int by = MapUtils.get31TileNumberY(qr.bottom);
+			int ty = MapUtils.get31TileNumberY(qr.top);
+			List<BinaryMapDataObject> bbox = or.query(lx, rx, ty, by);
+			TreeSet<String> lst = new TreeSet<String>();
+			for (BinaryMapDataObject bo : bbox) {
+				String dw = or.getDownloadName(bo);
+				if (!Algorithms.isEmpty(dw) && or.isDownloadOfType(bo, OsmandRegions.MAP_TYPE)) {
+					lst.add(dw);
+				}
+			}
+			entity.putTag(MapRenderingTypesEncoder.OSMAND_REGION_NAME_TAG, serialize(lst));	
+		} 
+	}
+	
+	private static String serialize(TreeSet<String> lst) {
+		StringBuilder bld = new StringBuilder();
+		Iterator<String> it = lst.iterator();
+		while(it.hasNext()) {
+			String next = it.next();
+			if(bld.length() > 0) {
+				bld.append(",");
+			}
+			bld.append(next);
+		}
+		return bld.toString();
 	}
 }

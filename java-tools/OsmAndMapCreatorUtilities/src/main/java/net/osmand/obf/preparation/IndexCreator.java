@@ -23,6 +23,7 @@ import net.osmand.IProgress;
 import net.osmand.IndexConstants;
 import net.osmand.binary.MapZooms;
 import net.osmand.impl.ConsoleProgressImplementation;
+import net.osmand.map.OsmandRegions;
 import net.osmand.obf.preparation.OsmDbAccessor.OsmDbVisitor;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.MapRenderingTypesEncoder;
@@ -91,7 +92,7 @@ public class IndexCreator {
 	private boolean deleteOsmDB = true;
 	private boolean deleteDatabaseIndexes = true;
 	
-
+	OsmandRegions or = null;
 	
 	public IndexCreator(File workingDir, IndexCreatorSettings settings) {
 		this.workingDir = workingDir;
@@ -109,6 +110,9 @@ public class IndexCreator {
 		}
 	}
 
+	public IndexCreatorSettings getSettings() {
+		return settings;
+	}
 	
 	public String getRegionName() {
 		if (regionName == null) {
@@ -207,6 +211,13 @@ public class IndexCreator {
 
 	/* ***** END OF GETTERS/SETTERS ***** */
 
+	private OsmandRegions prepareRegions() throws IOException {
+		OsmandRegions or = new OsmandRegions();
+		or.prepareFile();
+		or.cacheAllCountries();
+		return or;
+	}
+
 	private void iterateMainEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 		if (heightData != null && e instanceof Way) {
 			heightData.proccess((Way) e);
@@ -219,14 +230,14 @@ public class IndexCreator {
 		}
 		if (settings.indexMap) {
 			if (settings.boundary == null || checkBoundary(e)) {
-				indexMapCreator.iterateMainEntity(e, ctx);
+				indexMapCreator.iterateMainEntity(e, ctx, or);
 			}
 		}
 		if (settings.indexAddress) {
 			indexAddressCreator.iterateMainEntity(e, ctx);
 		}
 		if (settings.indexRouting) {
-			indexRouteCreator.iterateMainEntity(e, ctx);
+			indexRouteCreator.iterateMainEntity(e, ctx, or);
 		}
 	}
 
@@ -541,7 +552,6 @@ public class IndexCreator {
 			logMapDataWarn = log;
 		}
 
-
 		if (mapZooms == null) {
 			mapZooms = MapZooms.getDefault();
 		}
@@ -556,6 +566,11 @@ public class IndexCreator {
 		if (renderingTypes == null) {
 			renderingTypes = new MapRenderingTypesEncoder(null, regionName);
 		}
+
+		if (settings.addRegionTag) {
+			or = prepareRegions();
+		}
+
 		this.indexTransportCreator = new IndexTransportCreator(settings);
 		this.indexPoiCreator = new IndexPoiCreator(settings, renderingTypes, overwriteIds);
 		this.indexAddressCreator = new IndexAddressCreator(logMapDataWarn, settings);

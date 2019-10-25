@@ -44,6 +44,7 @@ import net.osmand.binary.OsmandOdb.RouteData;
 import net.osmand.binary.RouteDataObject;
 import net.osmand.binary.RouteDataObject.RestrictionInfo;
 import net.osmand.data.LatLon;
+import net.osmand.map.OsmandRegions;
 import net.osmand.obf.preparation.BinaryMapIndexWriter.RoutePointToWrite;
 import net.osmand.osm.MapRenderingTypes;
 import net.osmand.osm.MapRenderingTypesEncoder;
@@ -171,10 +172,20 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		}
 	}
 
-
 	public void iterateMainEntity(Entity es, OsmDbAccessorContext ctx) throws SQLException {
+		iterateMainEntity(es, ctx, null);
+	}
+
+	public void iterateMainEntity(Entity es, OsmDbAccessorContext ctx, OsmandRegions or) throws SQLException {
 		if (es instanceof Way) {
 			Way e = (Way) es;
+			if (or != null) {
+				try {
+					addRegionTag(or, e);
+				} catch (Exception ex) {
+					ex.printStackTrace();
+				}
+			}
 			tagsTransformer.addPropogatedTags(e);
 			Map<String, String> tags = renderingTypes.transformTags(e.getTags(), EntityType.WAY, EntityConvertApplyType.ROUTING);
 			boolean encoded = routeTypes.encodeEntity(tags, outTypes, names)
@@ -199,6 +210,12 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 							pointNames, names);
 					// generalizeWay(e);
 
+				}
+			}
+			if (or != null) {
+				Map<String, String> ntags = renderingTypes.transformTags(e.getModifiableTags(), EntityType.WAY, EntityConvertApplyType.MAP);
+				if (e.getModifiableTags() != ntags) {
+					e.getModifiableTags().putAll(ntags);
 				}
 			}
 		}

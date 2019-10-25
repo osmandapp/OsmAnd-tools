@@ -118,6 +118,7 @@ public class MainUtilities {
 				settings.indexPOI = true;
 				settings.indexTransport = true;
 				settings.indexRouting = true;
+				checkArgs(subArgs, settings);
 				subArgsArray = scanSrtmFolder(subArgs, settings);
 				IndexCreator ic = new IndexCreator(new File("."), settings);
 				ic.setLastModifiedDate(new File(subArgsArray[0]).lastModified());
@@ -218,7 +219,17 @@ public class MainUtilities {
 		}
 		return subArgs.toArray(new String[subArgs.size()]);
 	}
-
+	
+	private static void checkArgs(List<String> subArgs, IndexCreatorSettings settings) {
+		Iterator<String> it = subArgs.iterator();
+		while(it.hasNext()) {
+			String s = it.next();
+			if (s.equals("--add-region-tags")) {
+				settings.addRegionTag = true;
+			}
+		}
+	}
+	
 	private static void generateAllOsmLiveTests(File testResources, String unpackFolder, boolean delete) throws IOException {
 		// clean all files
 		if (delete) {
