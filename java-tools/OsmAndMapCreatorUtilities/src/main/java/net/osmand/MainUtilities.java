@@ -107,10 +107,11 @@ public class MainUtilities {
 				settings.indexPOI = true;
 				settings.indexTransport = true;
 				settings.indexRouting = true;
-				subArgsArray = scanSrtmFolder(subArgs, settings);
+				scanSrtmFolder(subArgs, settings);
+				checkAddRegionArgsArgs(subArgs, settings);
 				IndexCreator ic = new IndexCreator(new File("."), settings);
-				ic.setLastModifiedDate(new File(subArgsArray[0]).lastModified());
-				generateObf(subArgsArray, ic);
+				ic.setLastModifiedDate(new File(subArgs.get(0)).lastModified());
+				generateObf(toArray(subArgs), ic);
 			} else if (utl.equals("generate-obf-no-address")) {
 				IndexCreatorSettings settings = new IndexCreatorSettings();
 				settings.indexMap = true;
@@ -118,18 +119,19 @@ public class MainUtilities {
 				settings.indexPOI = true;
 				settings.indexTransport = true;
 				settings.indexRouting = true;
-				checkArgs(subArgs, settings);
-				subArgsArray = scanSrtmFolder(subArgs, settings);
+				checkAddRegionArgsArgs(subArgs, settings);
+				scanSrtmFolder(subArgs, settings);
 				IndexCreator ic = new IndexCreator(new File("."), settings);
-				ic.setLastModifiedDate(new File(subArgsArray[0]).lastModified());
-				generateObf(subArgsArray, ic);
+				ic.setLastModifiedDate(new File(subArgs.get(0)).lastModified());
+				generateObf(toArray(subArgs), ic);
 			} else if (utl.equals("generate-map")) {
 				IndexCreatorSettings settings = new IndexCreatorSettings();
 				settings.indexMap = true;
 				IndexCreator ic = new IndexCreator(new File("."), settings);
-				subArgsArray = scanSrtmFolder(subArgs, settings);
-				ic.setLastModifiedDate(new File(subArgsArray[0]).lastModified());
-				generateObf(subArgsArray, ic);
+				scanSrtmFolder(subArgs, settings);
+				checkAddRegionArgsArgs(subArgs, settings);
+				ic.setLastModifiedDate(new File(subArgs.get(0)).lastModified());
+				generateObf(toArray(subArgs), ic);
 			} else if (utl.equals("split-obf")) {
 				ObfRegionSplitter.main(subArgsArray);
 			} else if (utl.equals("merge-bulk-osmlive-day")) {
@@ -175,10 +177,11 @@ public class MainUtilities {
 			} else if (utl.equals("generate-roads")) {
 				IndexCreatorSettings settings = new IndexCreatorSettings();
 				settings.indexRouting = true;
-				subArgsArray = scanSrtmFolder(subArgs, settings);
+				checkAddRegionArgsArgs(subArgs, settings);
+				scanSrtmFolder(subArgs, settings);
 				IndexCreator ic = new IndexCreator(new File("."), settings);
-				ic.setLastModifiedDate(new File(subArgsArray[0]).lastModified());
-				generateObf(subArgsArray, ic);
+				ic.setLastModifiedDate(new File(subArgs.get(0)).lastModified());
+				generateObf(toArray(subArgs), ic);
 			} else if (utl.contentEquals("generate-osmlive-tests")) {
 				if (subArgsArray.length < 1) {
 					System.out.println("Usage: <path_to_directory_with_resources_project> <optional_path_to_unpack_files>");
@@ -208,7 +211,11 @@ public class MainUtilities {
 		}
 	}
 
-	private static String[] scanSrtmFolder(List<String> subArgs, IndexCreatorSettings settings) {
+	private static String[] toArray(List<String> subArgs) {
+		return subArgs.toArray(new String[subArgs.size()]);
+	}
+
+	private static void scanSrtmFolder(List<String> subArgs, IndexCreatorSettings settings) {
 		Iterator<String> it = subArgs.iterator();
 		while(it.hasNext()) {
 			String s = it.next();
@@ -217,15 +224,15 @@ public class MainUtilities {
 				it.remove();
 			}
 		}
-		return subArgs.toArray(new String[subArgs.size()]);
 	}
 	
-	private static void checkArgs(List<String> subArgs, IndexCreatorSettings settings) {
+	private static void checkAddRegionArgsArgs(List<String> subArgs, IndexCreatorSettings settings) {
 		Iterator<String> it = subArgs.iterator();
 		while(it.hasNext()) {
 			String s = it.next();
 			if (s.equals("--add-region-tags")) {
 				settings.addRegionTag = true;
+				it.remove();
 			}
 		}
 	}
