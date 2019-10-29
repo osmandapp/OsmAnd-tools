@@ -722,8 +722,8 @@ public class BasemapProcessor {
 			}
 			// MapZooms zooms = MapZooms.parseZooms("1-2;3;4-5;6-7;8-9;10-");
 			int zoomSmoothness = mini ? 2 : 2;
-			MapZooms zooms = mini ? MapZooms.parseZooms("1-2;3;4-5;6-8;9-") : MapZooms.parseZooms("1-2;3;4-5;6-7;8-9;10-");
-			MOST_DETAILED_APPROXIMATION = mini ? 9 : 11;
+			MapZooms zooms = mini ? MapZooms.parseZooms("1-2;3;4-5;6-8;9-") : MapZooms.parseZooms("1-2;3;4-5;6-8;9-");
+			MOST_DETAILED_APPROXIMATION = mini ? 9 : 9;
 			IndexCreatorSettings settings = new IndexCreatorSettings();
 			settings.indexMap = true;
 			settings.indexAddress = false;
