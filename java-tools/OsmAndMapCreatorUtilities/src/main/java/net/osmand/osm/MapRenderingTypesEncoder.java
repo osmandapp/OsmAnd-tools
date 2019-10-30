@@ -1240,9 +1240,12 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		if ("paved".equals(surface) || "concrete".equals(surface) || "concrete:lanes".equals(surface) || "concrete:plates".equals(surface) || "sett".equals(surface) || "paving_stones".equals(surface) || "metal".equals(surface) || "wood".equals(surface)) {
 			result += 3;
 			result_bicycle_routing += 3;
-		} else if ("compacted".equals(surface) || "fine_gravel".equals(surface) || "grass_paver".equals(surface)) {
+		} else if ("fine_gravel".equals(surface) || "grass_paver".equals(surface)) {
 			result += 4;
 			result_bicycle_routing += 4;
+		} else if ("compacted".equals(surface)) {
+			result += 8;
+			result_bicycle_routing += 8;
 		} else if ("ground".equals(surface) || "earth".equals(surface) || "pebblestone".equals(surface)) {
 			result += 9;
 			result_bicycle_routing += 9;
