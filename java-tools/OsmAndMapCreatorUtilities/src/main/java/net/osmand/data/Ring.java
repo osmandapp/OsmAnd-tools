@@ -2,6 +2,7 @@ package net.osmand.data;
 
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import com.vividsolutions.jts.geom.Coordinate;
@@ -24,6 +25,11 @@ public class Ring implements Comparable<Ring> {
 	 * The order can be changed with methods from this class
 	 */
 //	private final ArrayList<Way> ways;
+	
+	private static final int INDEX_RING_NODES_FAST_CHECK = 1000;
+	private static final int INDEX_SIZE = 100;
+	private double[] indexedRingIntervals = null;
+	private List<Node>[] indexedRingNodes = null;
 
 	/**
 	 * a concatenation of the ways to form the border
@@ -45,6 +51,70 @@ public class Ring implements Comparable<Ring> {
 	 */
 	Ring(Way w) {
 		border = w;
+		indexForFastCheck();
+	}
+
+	@SuppressWarnings("unchecked")
+	private void indexForFastCheck() {
+		if(border.getNodes().size() > INDEX_RING_NODES_FAST_CHECK) {
+			// calculate min/max lat
+			double maxLat = Double.MIN_VALUE;
+			double minLat = Double.MAX_VALUE;
+			Node lastNode = null;
+			for(Node n : border.getNodes()) {
+				if(n == null) {
+					continue;
+				}
+				lastNode = n;
+				if(n.getLatitude() > maxLat) {
+					maxLat = n.getLatitude();
+				} else if(n.getLatitude() < minLat) {
+					minLat = n.getLatitude();
+				}
+			}
+			maxLat += 0.0001;
+			minLat -= 0.0001;
+			// create interval array [minLat, minLat+interval, ..., maxLat]
+			double interval = (maxLat - minLat) / (INDEX_SIZE - 1);
+			indexedRingIntervals = new double[INDEX_SIZE];
+			indexedRingNodes = new List[INDEX_SIZE];
+			for(int i = 0; i < INDEX_SIZE; i++) {
+				indexedRingIntervals[i] = minLat + i * interval;		
+				indexedRingNodes[i] = new ArrayList<Node>();
+			}
+			// split nodes by intervals
+			Node prev = lastNode;
+			for(int i = 0; i < border.getNodes().size(); i++) {
+				Node current = border.getNodes().get(i);
+				if(current == null) {
+					continue;
+				}
+				int i1 = getIndexedLessOrEq(current.getLatitude());
+				int i2 = getIndexedLessOrEq(prev.getLatitude());
+				int min, max;
+				if(i1 > i2) {
+					min = i2;
+					max = i1;
+				} else {
+					min = i1;
+					max = i2;
+				}
+				for (int j = min; j <= max; j++) {
+					indexedRingNodes[j].add(prev);
+					indexedRingNodes[j].add(current);
+				}
+				prev = current;
+			}
+		}
+		
+	}
+
+	private int getIndexedLessOrEq(double latitude) {
+		int ind1 = Arrays.binarySearch(indexedRingIntervals, latitude);
+		if(ind1 < 0) {
+			ind1 = -(ind1 + 1);
+		}
+		return ind1;
 	}
 
 	/**
@@ -79,6 +149,19 @@ public class Ring implements Comparable<Ring> {
 	 * @return yes if the point is inside the ring
 	 */
 	public boolean containsPoint(double latitude, double longitude) {
+		if(indexedRingIntervals != null) {
+			int intersections = 0;
+			int indx = getIndexedLessOrEq(latitude);
+			List<Node> lst = indexedRingNodes[indx];
+			for (int k = 0; k < lst.size(); k += 2) {
+				Node first = lst.get(k);
+				Node last = lst.get(k + 1);
+				if (OsmMapUtils.ray_intersect_lon(first, last, latitude, longitude) != -360.0d) {
+					intersections++;
+				}
+			}
+			return intersections  % 2 == 1;
+		}
 		return MapAlgorithms.containsPoint(getBorder(), latitude, longitude);
 	}
 	

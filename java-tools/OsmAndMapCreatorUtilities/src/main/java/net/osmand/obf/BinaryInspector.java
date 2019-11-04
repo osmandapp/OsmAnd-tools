@@ -79,10 +79,9 @@ public class BinaryInspector {
 		if ("test".equals(args[0])) {
 			in.inspector(new String[] {
 //					"-vpoi",
-//					"-vmap", "-vstats",
 //					"-vmap", "-vmapobjects",
 //					"-vmapcoordinates",
-					"-vrouting",
+//					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
 //					"-vaddress", "-vcities","-vstreetgroups",
 //					"-vstreets", "-vbuildings", "-vintersections",
@@ -90,7 +89,7 @@ public class BinaryInspector {
 //					"-zoom=7",
 //					"-bbox=30.51,50.5,30.53,50.4",
 //					"-osm="+System.getProperty("maps.dir")+"/basemap/map.obf.osm",
-					System.getProperty("maps.dir")+"/Russia_sankt-peterburg_asia_19_09_00.obf"
+					System.getProperty("maps.dir")+"/World_basemap_2.obf"
 //					System.getProperty("maps.dir")+"/olive/19_07_29_20_20_diff.obf"
 			});
 		} else {
