@@ -40,7 +40,7 @@ public class Multipolygon {
 		outerRings.add(outer);
 		innerRings = inner;
 		this.id = id;
-		updateRings();
+		updateRings(true);
 	}
 
 	public MultiPolygon toMultiPolygon() {
@@ -71,6 +71,10 @@ public class Multipolygon {
 	}
 
 	private void updateRings() {
+		updateRings(false);
+	}
+
+	private void updateRings(boolean checkedIsIn) {
 		maxLat = -90;
 		minLat = 90;
 		maxLon = -180;
@@ -88,12 +92,15 @@ public class Multipolygon {
 		for (Ring inner : innerRings) {
 			HashSet<Ring> outContainingRings = new HashSet<Ring>();
 			for (Ring out : outerRings) {
-				if (inner.isIn(out)) {
+				if (checkedIsIn && outerRings.size() == 1) {
 					outContainingRings.add(out);
+				} else {
+					if (inner.isIn(out)) {
+						outContainingRings.add(out);
+					}
 				}
 			}
 			containedInnerInOuter.put(inner, outContainingRings);
-
 		}
 		// keep sorted
 		Collections.sort(innerRings);
