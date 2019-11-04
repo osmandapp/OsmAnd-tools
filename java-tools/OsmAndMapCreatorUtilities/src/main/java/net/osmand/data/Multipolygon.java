@@ -35,12 +35,12 @@ public class Multipolygon {
 		updateRings();
 	}
 
-	public Multipolygon(Ring outer, List<Ring> inner, long id) {
+	public Multipolygon(Ring outer, List<Ring> inner, long id, boolean checkedIsIn) {
 		outerRings = new ArrayList<Ring>();
 		outerRings.add(outer);
 		innerRings = inner;
 		this.id = id;
-		updateRings(true);
+		updateRings(checkedIsIn);
 	}
 
 	public MultiPolygon toMultiPolygon() {
