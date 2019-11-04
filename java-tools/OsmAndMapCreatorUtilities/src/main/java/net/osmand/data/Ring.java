@@ -152,6 +152,9 @@ public class Ring implements Comparable<Ring> {
 		if(indexedRingIntervals != null) {
 			int intersections = 0;
 			int indx = getIndexedLessOrEq(latitude);
+			if(indx == 0 || indx >= indexedRingNodes.length) {
+				return false;
+			}
 			List<Node> lst = indexedRingNodes[indx];
 			for (int k = 0; k < lst.size(); k += 2) {
 				Node first = lst.get(k);
