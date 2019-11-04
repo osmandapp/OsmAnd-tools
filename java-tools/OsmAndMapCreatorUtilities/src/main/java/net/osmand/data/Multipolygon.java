@@ -91,14 +91,14 @@ public class Multipolygon {
 		Collections.sort(outerRings);
 		for (Ring inner : innerRings) {
 			HashSet<Ring> outContainingRings = new HashSet<Ring>();
-			for (Ring out : outerRings) {
-				if (checkedIsIn && outerRings.size() == 1) {
-					outContainingRings.add(out);
-				} else {
+			if (checkedIsIn && outerRings.size() == 1) {
+				outContainingRings.add(outerRings.get(0));
+			} else {
+				for (Ring out : outerRings) {
 					if (inner.isIn(out)) {
 						outContainingRings.add(out);
 					}
-				}
+				}				
 			}
 			containedInnerInOuter.put(inner, outContainingRings);
 		}
