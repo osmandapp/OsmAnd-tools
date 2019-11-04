@@ -93,7 +93,7 @@ public class MultipolygonBuilder {
 					innerIt.remove();
 				}
 			}
-			multipolygons.add(new Multipolygon(outer, innersInsideOuter, id));
+			multipolygons.add(new Multipolygon(outer, innersInsideOuter, id, true));
 		}
 
 		if (inners.size() != 0 && log != null) {
