@@ -26,7 +26,7 @@ public class Ring implements Comparable<Ring> {
 	 */
 //	private final ArrayList<Way> ways;
 	
-	private static final int INDEX_RING_NODES_FAST_CHECK = 1000;
+	private static final int INDEX_RING_NODES_FAST_CHECK = 100;
 	private static final int INDEX_SIZE = 100;
 	private double[] indexedRingIntervals = null;
 	private List<Node>[] indexedRingNodes = null;

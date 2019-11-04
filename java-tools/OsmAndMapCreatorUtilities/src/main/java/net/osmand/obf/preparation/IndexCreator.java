@@ -852,9 +852,9 @@ public class IndexCreator {
 		settings.poiZipLongStrings = false;
 		settings.indexMap = true;
 //		settings.indexAddress = true;
-		settings.indexPOI = true;
-		settings.indexTransport = true;
-		settings.indexRouting = true;
+//		settings.indexPOI = true;
+//		settings.indexTransport = true;
+//		settings.indexRouting = true;
 //		settings.keepOnlySeaObjects = true;
 //		settings.srtmDataFolder = new File(rootFolder + "/maps/srtm/");
 //		settings.gtfsData = new File(rootFolder + "/maps/transport/Netherlands.sqlite");
@@ -868,8 +868,8 @@ public class IndexCreator {
 //		creator.deleteOsmDB = false;
 
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
-		String file = rootFolder + "/temp/map.osm";
-//		String file = rootFolder + "/temp/lake_guron.osm.gz";
+//		String file = rootFolder + "/temp/map.osm";
+		String file = rootFolder + "/temp/lake_guron.osm.gz";
 //		String file = rootFolder + "/maps/World_seamarks.pbf";
 //		String file = rootFolder + "/repos/resources/test-resources/synthetic_test_rendering.osm";
 //		String file = rootFolder + "/repos/resources/test-resources/turn_lanes_test.osm";
