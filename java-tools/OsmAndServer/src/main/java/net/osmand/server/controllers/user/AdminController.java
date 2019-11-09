@@ -11,9 +11,11 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -71,7 +73,6 @@ public class AdminController {
 	private static final Log LOGGER = LogFactory.getLog(AdminController.class);
 	
 	private static final String ACCESS_LOG_REPORTS_FOLDER = "reports";
-	private static final String BTC_REPORT = ReportsController.REPORTS_FOLDER + "/report_underpaid.json.html";
 
 	@Autowired
 	private MotdService motdService;
@@ -104,7 +105,7 @@ public class AdminController {
     private JdbcTemplate jdbcTemplate;
 	
 	@Autowired
-	private IpLocationService locationService;
+	protected IpLocationService locationService;
 	
 	@Autowired
 	private LotterySeriesRepository seriesRepo;
@@ -328,6 +329,7 @@ public class AdminController {
 		model.addAttribute("reports", getReports());
 		model.addAttribute("surveyReport", getSurveyReport());
 		model.addAttribute("subscriptionsReport", getSubscriptionsReport());
+		model.addAttribute("yearSubscriptionsReport", getYearSubscriptionsReport());
 		model.addAttribute("emailsReport", getEmailsDBReport());
 		model.addAttribute("newSubsReport", getNewSubsReport());
 		model.addAttribute("futureCancelReport", getFutureCancelReport());
@@ -447,7 +449,120 @@ public class AdminController {
 		public int revenueGain;
 		public int totalLifeValue;
 		public int cancelTotalLifeValue;
+	}
+	
+	
+	public static class YearSubscriptionReport {
+		public String month;
+		public int[] iOS;
+		public String strIOS;
+		public int[] androidV2Renew;
+		public String strAndroidV2Renew;
+		public int[] androidV2NonRenew;
+		public String strAndroidV2NonRenew;
+		public int[] androidV1Renew;
+		public String strAndroidV1Renew;
+		public int[] androidV1NonRenew;
+		public String strAndroidV1NonRenew;
 		
+		public int[] allTotal;
+		public String strAllTotal;
+		
+		public void total() {
+			allTotal = addArrayToArray(allTotal, iOS);
+			allTotal = addArrayToArray(allTotal, androidV2Renew);
+			allTotal = addArrayToArray(allTotal, androidV1Renew);
+			allTotal = addArrayToArray(allTotal, androidV2NonRenew);
+			allTotal = addArrayToArray(allTotal, androidV1NonRenew);
+			
+			strIOS = total(iOS);
+			strAndroidV2Renew = total(androidV2Renew);
+			strAndroidV1Renew = total(androidV1Renew);
+			strAndroidV2NonRenew = total(androidV2NonRenew);
+			strAndroidV1NonRenew = total(androidV1NonRenew);
+			strAllTotal = total(allTotal);
+		}
+
+		private String total(int[] s) {
+			String r = "";
+			for(int k = 0; k < s.length; k++) {
+				if(k > 0) {
+					r += " / ";
+				}
+				r += s[k];
+			}
+			return r;
+		}
+	}
+	
+	private static int[] addArrayToArray(int[] res, int[] add) {
+		for(int k = 0; k < add.length; k++) {
+			res = addNumberToArr(k + 1, res, add[k]);
+		}
+		return res;
+	}
+	
+	private static int[] addNumberToArr(int pos1Based, int[] arr, int cnt) {
+		int ind = pos1Based - 1;
+		if (arr == null) {
+			arr = new int[pos1Based];
+		}
+		if (arr.length <= ind) {
+			int[] l = new int[pos1Based];
+			System.arraycopy(arr, 0, l, 0, arr.length);
+			arr = l;
+		}
+		arr[ind] += cnt;
+		return arr;
+	}
+ 	
+	
+	public Collection<YearSubscriptionReport> getYearSubscriptionsReport() {
+		final Map<String, YearSubscriptionReport> res = new LinkedHashMap<String, YearSubscriptionReport>(); 
+		jdbcTemplate.query("select  to_char(starttime, 'YYYY-MM') \"start\", " + 
+				"        round(extract(day from expiretime - starttime)/365) \"years\", sku, " + 
+				"        count(*) FILTER (WHERE autorenewing) \"auto\", " + 
+				"        count(*) FILTER (WHERE not autorenewing) \"non-auto\"," + 
+				"        count(*) FILTER (WHERE autorenewing is null) \"auto-null\" " + 
+				"    from supporters_device_sub where valid and  sku like '%annual%'  and extract(day from expiretime - starttime) > 180" + 
+				"    group by \"start\", \"years\", sku " + 
+				"    order by 1, 2, 3;", new RowCallbackHandler() {
+
+					@Override
+					public void processRow(ResultSet rs) throws SQLException {
+						String month = rs.getString(1);
+						int years = rs.getInt(2);
+						String sku = rs.getString(3);
+						int renewing = rs.getInt(4);
+						int nonrenewing = rs.getInt(5);
+						int unknown = rs.getInt(6);
+						YearSubscriptionReport report  = res.get(month);
+						if(report == null) {
+							report = new YearSubscriptionReport();
+							report.month = month;
+							res.put(month, report);
+						}
+						if(sku.startsWith("net.osmand")) {
+							report.iOS = addNumberToArr(years, report.iOS, renewing);
+							report.iOS = addNumberToArr(years, report.iOS, nonrenewing);
+							report.iOS = addNumberToArr(years, report.iOS, unknown);
+						} else if(sku.contains("v1")) {
+							report.androidV1Renew = addNumberToArr(years, report.androidV1Renew, renewing);
+							report.androidV1NonRenew = addNumberToArr(years, report.androidV1NonRenew, nonrenewing);
+							report.androidV1NonRenew = addNumberToArr(years, report.androidV1NonRenew, unknown);
+						} else if(sku.contains("v2")) {
+							report.androidV2Renew = addNumberToArr(years, report.androidV2Renew, renewing);
+							report.androidV2NonRenew = addNumberToArr(years, report.androidV2NonRenew, nonrenewing);
+							report.androidV2NonRenew = addNumberToArr(years, report.androidV2NonRenew, unknown);
+						}
+					}
+
+					
+		});
+		for(YearSubscriptionReport r: res.values()) {
+			r.total();
+		}
+		return res.values();
 	}
 	
 	private List<SubscriptionReport> getFutureCancelReport() {
