@@ -490,9 +490,19 @@ public class AdminController {
 					if (k > 0) {
 						r += " | ";
 					}
-					r += s[k];
-					if(tot != null && s[k] > 0) {
-						r += " (" + (int) s[k] * 100 / tot[k] + "%)";
+					int val = 0;
+					for(int kn = k; kn < s.length; kn++) {
+						val += s[kn];
+					}
+					r += val;
+					if(tot != null) {
+						int totval = 0;
+						for(int kn = k; kn < tot.length; kn++) {
+							totval += s[kn];
+						}
+						if(totval > 0) {
+							r += " (" + (int) val * 100 / totval + "%)";
+						}
 					}
 				}
 			}
