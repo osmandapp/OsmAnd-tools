@@ -498,7 +498,7 @@ public class AdminController {
 					if(tot != null) {
 						int totval = 0;
 						for(int kn = k; kn < tot.length; kn++) {
-							totval += s[kn];
+							totval += tot[kn];
 						}
 						if(totval > 0) {
 							r += " (" + (int) val * 100 / totval + "%)";
