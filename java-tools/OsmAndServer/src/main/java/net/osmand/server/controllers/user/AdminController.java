@@ -474,23 +474,26 @@ public class AdminController {
 			allTotal = addArrayToArray(allTotal, androidV1Renew);
 			allTotal = addArrayToArray(allTotal, androidV2NonRenew);
 			allTotal = addArrayToArray(allTotal, androidV1NonRenew);
-			
-			strIOS = total(iOS);
-			strAndroidV2Renew = total(androidV2Renew);
-			strAndroidV1Renew = total(androidV1Renew);
-			strAndroidV2NonRenew = total(androidV2NonRenew);
-			strAndroidV1NonRenew = total(androidV1NonRenew);
-			strAllTotal = total(allTotal);
+
+			strIOS = total(iOS, allTotal);
+			strAndroidV2Renew = total(androidV2Renew, allTotal);
+			strAndroidV1Renew = total(androidV1Renew, allTotal);
+			strAndroidV2NonRenew = total(androidV2NonRenew, allTotal);
+			strAndroidV1NonRenew = total(androidV1NonRenew, allTotal);
+			strAllTotal = total(allTotal, null);
 		}
 
-		private String total(int[] s) {
+		private String total(int[] s, int[] tot) {
 			String r = "";
 			if (s != null) {
 				for (int k = 0; k < s.length; k++) {
 					if (k > 0) {
-						r += " / ";
+						r += " | ";
 					}
 					r += s[k];
+					if(tot != null && s[k] > 0) {
+						r += " " + (int) s[k] * 100 / tot[k] + "%";
+					}
 				}
 			}
 			return r;
@@ -498,10 +501,10 @@ public class AdminController {
 	}
 	
 	private static int[] addArrayToArray(int[] res, int[] add) {
-		if(add == null) {
+		if (add == null) {
 			return res;
 		}
-		for(int k = 0; k < add.length; k++) {
+		for (int k = 0; k < add.length; k++) {
 			res = addNumberToArr(k + 1, res, add[k]);
 		}
 		return res;
