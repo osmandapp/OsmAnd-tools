@@ -492,7 +492,7 @@ public class AdminController {
 					}
 					r += s[k];
 					if(tot != null && s[k] > 0) {
-						r += " " + (int) s[k] * 100 / tot[k] + "%";
+						r += " (" + (int) s[k] * 100 / tot[k] + "%)";
 					}
 				}
 			}
