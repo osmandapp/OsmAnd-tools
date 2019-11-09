@@ -485,17 +485,22 @@ public class AdminController {
 
 		private String total(int[] s) {
 			String r = "";
-			for(int k = 0; k < s.length; k++) {
-				if(k > 0) {
-					r += " / ";
+			if (s != null) {
+				for (int k = 0; k < s.length; k++) {
+					if (k > 0) {
+						r += " / ";
+					}
+					r += s[k];
 				}
-				r += s[k];
 			}
 			return r;
 		}
 	}
 	
 	private static int[] addArrayToArray(int[] res, int[] add) {
+		if(add == null) {
+			return res;
+		}
 		for(int k = 0; k < add.length; k++) {
 			res = addNumberToArr(k + 1, res, add[k]);
 		}
@@ -517,7 +522,7 @@ public class AdminController {
 	}
  	
 	
-	public Collection<YearSubscriptionReport> getYearSubscriptionsReport() {
+	private Collection<YearSubscriptionReport> getYearSubscriptionsReport() {
 		final Map<String, YearSubscriptionReport> res = new LinkedHashMap<String, YearSubscriptionReport>(); 
 		jdbcTemplate.query("select  to_char(starttime, 'YYYY-MM') \"start\", " + 
 				"        round(extract(day from expiretime - starttime)/365) \"years\", sku, " + 
