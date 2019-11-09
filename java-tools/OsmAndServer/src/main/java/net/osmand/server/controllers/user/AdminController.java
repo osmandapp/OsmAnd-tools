@@ -534,7 +534,7 @@ public class AdminController {
 				"        count(*) FILTER (WHERE autorenewing is null) \"auto-null\" " + 
 				"    from supporters_device_sub where valid and  sku like '%annual%'  and extract(day from expiretime - starttime) > 180" + 
 				"    group by \"start\", \"years\", sku " + 
-				"    order by 1, 2, 3;", new RowCallbackHandler() {
+				"    order by 1 desc, 2, 3;", new RowCallbackHandler() {
 
 					@Override
 					public void processRow(ResultSet rs) throws SQLException {
