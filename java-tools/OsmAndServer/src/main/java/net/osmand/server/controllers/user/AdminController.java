@@ -468,6 +468,18 @@ public class AdminController {
 		public int[] allTotal;
 		public String strAllTotal;
 		
+		public YearSubscriptionReport(String month) {
+			this.month = month;
+		}
+		
+		public void plus(YearSubscriptionReport r) {
+			iOS = addArrayToArray(iOS, r.iOS);
+			androidV2Renew = addArrayToArray(androidV2Renew, r.androidV2Renew);
+			androidV2NonRenew = addArrayToArray(androidV2NonRenew, r.androidV2NonRenew);
+			androidV1Renew = addArrayToArray(androidV1Renew, r.androidV1Renew);
+			androidV1NonRenew = addArrayToArray(androidV1NonRenew, r.androidV1NonRenew);
+		}
+		
 		public void total() {
 			allTotal = addArrayToArray(allTotal, iOS);
 			allTotal = addArrayToArray(allTotal, androidV2Renew);
@@ -556,8 +568,7 @@ public class AdminController {
 						int unknown = rs.getInt(6);
 						YearSubscriptionReport report  = res.get(month);
 						if(report == null) {
-							report = new YearSubscriptionReport();
-							report.month = month;
+							report = new YearSubscriptionReport(month);
 							res.put(month, report);
 						}
 						if(sku.startsWith("net.osmand")) {
@@ -577,10 +588,24 @@ public class AdminController {
 
 					
 		});
+		ArrayList<YearSubscriptionReport> list = new ArrayList<>(res.values());
+		YearSubscriptionReport totalAll = new YearSubscriptionReport("All");
+		Map<String, YearSubscriptionReport> yearsTotal = new TreeMap<String, AdminController.YearSubscriptionReport>();
 		for(YearSubscriptionReport r: res.values()) {
 			r.total();
+			String year = r.month.substring(0, 4);
+			YearSubscriptionReport yearSubscriptionReport = yearsTotal.get(year);
+			if(yearSubscriptionReport == null) {
+				yearSubscriptionReport = new YearSubscriptionReport(year);
+				yearsTotal.put(year, yearSubscriptionReport);
+			}
+			yearSubscriptionReport.plus(r);
+			totalAll.plus(r);
 		}
-		return res.values();
+		totalAll.total();
+		list.addAll(yearsTotal.values());
+		list.add(totalAll);
+		return list;
 	}
 	
 	private List<SubscriptionReport> getFutureCancelReport() {
