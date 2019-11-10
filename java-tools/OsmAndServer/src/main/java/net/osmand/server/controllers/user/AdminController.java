@@ -603,7 +603,10 @@ public class AdminController {
 			totalAll.plus(r);
 		}
 		totalAll.total();
-		list.addAll(yearsTotal.values());
+		for(YearSubscriptionReport y : yearsTotal.values()) {
+			y.total();
+			list.add(y);
+		}
 		list.add(totalAll);
 		return list;
 	}
