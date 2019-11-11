@@ -143,7 +143,7 @@ public class UpdateSubscription {
 
 		AndroidPublisher.Purchases purchases = publisher != null ? publisher.purchases() : null;
 		ReceiptValidationHelper receiptValidationHelper = this.ios ? new ReceiptValidationHelper() : null;
-
+		int TEST_COUNT = 50;
 		while (rs.next()) {
 			long userid = rs.getLong("userid");
 			String pt = rs.getString("purchaseToken");
@@ -158,7 +158,8 @@ public class UpdateSubscription {
 			if ((this.ios && !ios) || (!this.ios && ios)) {
 				continue;
 			}
-
+			// TODO
+			if(!ios) {
 			long checkDiff = checkTime == null ? tm : (tm - checkTime.getTime());
 			if (checkDiff < MINIMUM_WAIT_TO_REVALIDATE && !verifyAll) {
 				continue;
@@ -183,7 +184,11 @@ public class UpdateSubscription {
 					startTime == null ? "" : new Date(startTime.getTime()),
 					expireTime == null ? "" : new Date(expireTime.getTime()),
 							activeNow+""));
-
+			} else {
+				if(TEST_COUNT-- < 0) {
+					break;
+				}
+			}
 			if (this.ios) {
 				processIosSubscription(receiptValidationHelper, userid, pt, sku, payload, startTime, expireTime, tm);
 			} else {
