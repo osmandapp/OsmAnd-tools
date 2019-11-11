@@ -454,8 +454,10 @@ public class AdminController {
 	
 	public static class YearSubscriptionReport {
 		public String month;
-		public int[] iOS;
-		public String strIOS;
+		public int[] iOSRenew;
+		public String strIOSRenew;
+		public int[] iOSNonRenew;
+		public String strIOSNonRenew;
 		public int[] androidV2Renew;
 		public String strAndroidV2Renew;
 		public int[] androidV2NonRenew;
@@ -468,12 +470,19 @@ public class AdminController {
 		public int[] allTotal;
 		public String strAllTotal;
 		
+		public int[] totalLost;
+		public String strTotalLost;
+		
+		public int[] totalKeep;
+		public String strTotalKeep;
+		
 		public YearSubscriptionReport(String month) {
 			this.month = month;
 		}
 		
 		public void plus(YearSubscriptionReport r) {
-			iOS = addArrayToArray(iOS, r.iOS);
+			iOSNonRenew = addArrayToArray(iOSNonRenew, r.iOSNonRenew);
+			iOSRenew = addArrayToArray(iOSRenew, r.iOSRenew);
 			androidV2Renew = addArrayToArray(androidV2Renew, r.androidV2Renew);
 			androidV2NonRenew = addArrayToArray(androidV2NonRenew, r.androidV2NonRenew);
 			androidV1Renew = addArrayToArray(androidV1Renew, r.androidV1Renew);
@@ -481,17 +490,25 @@ public class AdminController {
 		}
 		
 		public void total() {
-			allTotal = addArrayToArray(allTotal, iOS);
-			allTotal = addArrayToArray(allTotal, androidV2Renew);
-			allTotal = addArrayToArray(allTotal, androidV1Renew);
-			allTotal = addArrayToArray(allTotal, androidV2NonRenew);
-			allTotal = addArrayToArray(allTotal, androidV1NonRenew);
+			totalLost = addArrayToArray(totalLost, iOSRenew);
+			totalLost = addArrayToArray(totalLost, androidV2NonRenew);
+			totalLost = addArrayToArray(totalLost, androidV1NonRenew);
+			
+			totalKeep = addArrayToArray(totalKeep, iOSRenew);
+			totalKeep = addArrayToArray(totalKeep, androidV2Renew);
+			totalKeep = addArrayToArray(totalKeep, androidV1Renew);
+			
+			allTotal = addArrayToArray(allTotal, totalKeep);
+			allTotal = addArrayToArray(allTotal, totalLost);
 
-			strIOS = total(iOS, allTotal);
+			strIOSNonRenew = total(iOSNonRenew, allTotal);
+			strIOSNonRenew = total(iOSRenew, allTotal);
 			strAndroidV2Renew = total(androidV2Renew, allTotal);
 			strAndroidV1Renew = total(androidV1Renew, allTotal);
 			strAndroidV2NonRenew = total(androidV2NonRenew, allTotal);
 			strAndroidV1NonRenew = total(androidV1NonRenew, allTotal);
+			strTotalLost = total(totalLost, allTotal);
+			strTotalKeep = total(totalKeep, allTotal);
 			strAllTotal = total(allTotal, null);
 		}
 
@@ -572,9 +589,9 @@ public class AdminController {
 							res.put(month, report);
 						}
 						if(sku.startsWith("net.osmand")) {
-							report.iOS = addNumberToArr(years, report.iOS, renewing);
-							report.iOS = addNumberToArr(years, report.iOS, nonrenewing);
-							report.iOS = addNumberToArr(years, report.iOS, unknown);
+							report.iOSRenew = addNumberToArr(years, report.iOSRenew, renewing);
+							report.iOSNonRenew = addNumberToArr(years, report.iOSNonRenew, nonrenewing);
+							report.iOSNonRenew = addNumberToArr(years, report.iOSNonRenew, unknown);
 						} else if(sku.contains("v1")) {
 							report.androidV1Renew = addNumberToArr(years, report.androidV1Renew, renewing);
 							report.androidV1NonRenew = addNumberToArr(years, report.androidV1NonRenew, nonrenewing);
