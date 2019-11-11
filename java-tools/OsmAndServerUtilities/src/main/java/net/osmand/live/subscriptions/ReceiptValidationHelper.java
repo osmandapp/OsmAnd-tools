@@ -72,7 +72,6 @@ public class ReceiptValidationHelper {
 					}
 				}
 			}
-			
 			String bundleId = receiptObj.get("receipt").getAsJsonObject().get("bundle_id").getAsString();
 			if (bundleId.equals(BUNDLE_ID)) {
 				result = new HashMap<>();
