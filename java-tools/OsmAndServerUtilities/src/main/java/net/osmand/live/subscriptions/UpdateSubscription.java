@@ -92,6 +92,8 @@ public class UpdateSubscription {
 				"WHERE userid = ? and purchaseToken = ? and sku = ?";
 		updCheckQuery = "UPDATE supporters_device_sub SET checktime = ? " +
 					"WHERE userid = ? and purchaseToken = ? and sku = ?";
+		selQuery = "SELECT userid, sku, purchaseToken, payload, checktime, starttime, expiretime, valid " +
+				"FROM supporters_device_sub S where (valid is null or valid=true) order by userid asc";
 	}
 
 	private static class UpdateAndroidSubscription extends UpdateSubscription {
@@ -101,8 +103,6 @@ public class UpdateSubscription {
 			super();
 			this.publisher = publisher;
 			this.ios = false;
-			selQuery = "SELECT userid, sku, purchaseToken, checktime, starttime, expiretime, valid " +
-					"FROM supporters_device_sub S where (valid is null or valid=true) order by userid asc";
 			updQuery = "UPDATE supporters_device_sub SET " +
 					"checktime = ?, starttime = ?, expiretime = ?, autorenewing = ?, kind = ?, orderid = ?, payload = ?, valid = ? " +
 					"WHERE userid = ? and purchaseToken = ? and sku = ?";
@@ -118,10 +118,8 @@ public class UpdateSubscription {
 		UpdateIosSubscription() {
 			super();
 			this.ios = true;
-			selQuery = "SELECT userid, sku, purchaseToken, payload, checktime, starttime, expiretime, valid " +
-					"FROM supporters_device_sub S where (valid is null or valid=true) order by userid asc";
 			updQuery = "UPDATE supporters_device_sub SET " +
-					"checktime = ?, starttime = ?, expiretime = ?, valid = ? " +
+					"checktime = ?, starttime = ?, expiretime = ?, autorenewing = ?, valid = ? " +
 					"WHERE userid = ? and purchaseToken = ? and sku = ?";
 		}
 
@@ -366,12 +364,12 @@ public class UpdateSubscription {
 		} else {
 			updStat.setTimestamp(ind++, expireTime);
 		}
+		if (subscription.getAutoRenewing() == null) {
+			updStat.setNull(ind++, Types.BOOLEAN);
+		} else {
+			updStat.setBoolean(ind++, subscription.getAutoRenewing());
+		}
 		if (!ios) {
-			if (subscription.getAutoRenewing() == null) {
-				updStat.setNull(ind++, Types.BOOLEAN);
-			} else {
-				updStat.setBoolean(ind++, subscription.getAutoRenewing());
-			}
 			updStat.setString(ind++, subscription.getKind());
 			updStat.setString(ind++, subscription.getOrderId());
 			updStat.setString(ind++, subscription.getDeveloperPayload());
