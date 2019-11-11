@@ -37,6 +37,7 @@ public class ReceiptValidationHelper {
 		receiptObj.addProperty("password", System.getenv().get("IOS_SUBSCRIPTION_SECRET"));
 
 		String jsonAnswer = postReceiptJson(receiptObj);
+		System.out.println("IOS receipt: " + jsonAnswer);
 		if (jsonAnswer != null) {
 			JsonObject responseObj = new JsonParser().parse(jsonAnswer).getAsJsonObject();
 			JsonElement statusElement = responseObj.get("status");
