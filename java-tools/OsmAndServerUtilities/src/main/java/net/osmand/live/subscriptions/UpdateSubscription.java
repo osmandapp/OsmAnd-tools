@@ -143,7 +143,6 @@ public class UpdateSubscription {
 
 		AndroidPublisher.Purchases purchases = publisher != null ? publisher.purchases() : null;
 		ReceiptValidationHelper receiptValidationHelper = this.ios ? new ReceiptValidationHelper() : null;
-		int TEST_COUNT = 50;
 		while (rs.next()) {
 			long userid = rs.getLong("userid");
 			String pt = rs.getString("purchaseToken");
@@ -158,7 +157,7 @@ public class UpdateSubscription {
 			if ((this.ios && !ios) || (!this.ios && ios)) {
 				continue;
 			}
-			// TODO
+			// TODO CLEAN
 			if(!ios) {
 			long checkDiff = checkTime == null ? tm : (tm - checkTime.getTime());
 			if (checkDiff < MINIMUM_WAIT_TO_REVALIDATE && !verifyAll) {
@@ -184,10 +183,6 @@ public class UpdateSubscription {
 					startTime == null ? "" : new Date(startTime.getTime()),
 					expireTime == null ? "" : new Date(expireTime.getTime()),
 							activeNow+""));
-			} else {
-				if(TEST_COUNT-- < 0) {
-					break;
-				}
 			}
 			if (this.ios) {
 				processIosSubscription(receiptValidationHelper, userid, pt, sku, payload, startTime, expireTime, tm);
@@ -220,7 +215,7 @@ public class UpdateSubscription {
 			if (result.equals(true)) {
 				JsonObject receiptObj = (JsonObject) map.get("response");
 				if (receiptObj != null) {
-					Map<String, InAppReceipt> inAppReceipts = receiptValidationHelper.loadInAppReceipts(receiptObj);
+					Map<String, InAppReceipt> inAppReceipts = receiptValidationHelper.parseInAppReceipts(receiptObj);
 					if (inAppReceipts != null) {
 						if (inAppReceipts.size() == 0) {
 							kind = "gone";
@@ -234,6 +229,7 @@ public class UpdateSubscription {
 								}
 							}
 							if (foundReceipt != null) {
+								Boolean autoRenewing = foundReceipt.autoRenew;
 								Map<String, String> fields = foundReceipt.fields;
 								String purchaseDateStr = fields.get("original_purchase_date_ms");
 								String expiresDateStr = fields.get("expires_date_ms");
@@ -243,7 +239,9 @@ public class UpdateSubscription {
 										long expiresDateMs = Long.parseLong(expiresDateStr);
 										SubscriptionPurchase subscription = new SubscriptionPurchase()
 												.setStartTimeMillis(purchaseDateMs)
-												.setExpiryTimeMillis(expiresDateMs);
+												.setExpiryTimeMillis(expiresDateMs)
+												.setAutoRenewing(autoRenewing)
+												;
 
 										updateSubscriptionDb(userid, pt, sku, startTime, expireTime, tm, subscription);
 

@@ -18,6 +18,7 @@ import java.net.MalformedURLException;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.TreeMap;
 
 
 public class ReceiptValidationHelper {
@@ -37,7 +38,6 @@ public class ReceiptValidationHelper {
 		receiptObj.addProperty("password", System.getenv().get("IOS_SUBSCRIPTION_SECRET"));
 
 		String jsonAnswer = postReceiptJson(receiptObj);
-		System.out.println("IOS receipt: " + jsonAnswer);
 		if (jsonAnswer != null) {
 			JsonObject responseObj = new JsonParser().parse(jsonAnswer).getAsJsonObject();
 			JsonElement statusElement = responseObj.get("status");
@@ -54,10 +54,25 @@ public class ReceiptValidationHelper {
 		return result;
 	}
 
-	public Map<String, InAppReceipt> loadInAppReceipts(JsonObject receiptObj) {
+	public Map<String, InAppReceipt> parseInAppReceipts(JsonObject receiptObj) {
 		Map<String, InAppReceipt> result = null;
 		int status = receiptObj.get("status").getAsInt();
 		if (status == 0) {
+			JsonElement pendingInfo = receiptObj.get("pending_renewal_info");
+			Map<String, Boolean> autoRenewStatus = new TreeMap<String, Boolean>();
+			if(pendingInfo != null) {
+				JsonArray ar = pendingInfo.getAsJsonArray();
+				for(int i = 0; i < ar.size(); i++) {
+					JsonObject o = ar.get(i).getAsJsonObject();
+					// "auto_renew_product_id", "original_transaction_id", "product_id", "auto_renew_status"
+					JsonElement renewStatus = o.get("auto_renew_status");
+					JsonElement txId = o.get("original_transaction_id");
+					if(renewStatus != null && txId != null) {
+						autoRenewStatus.put(txId.getAsString(), renewStatus.getAsString().equals("1"));
+					}
+				}
+			}
+			
 			String bundleId = receiptObj.get("receipt").getAsJsonObject().get("bundle_id").getAsString();
 			if (bundleId.equals(BUNDLE_ID)) {
 				result = new HashMap<>();
@@ -68,6 +83,9 @@ public class ReceiptValidationHelper {
 						JsonObject recObj = elem.getAsJsonObject();
 						String transactionId = recObj.get("original_transaction_id").getAsString();
 						InAppReceipt receipt = new InAppReceipt();
+						if(autoRenewStatus.containsKey(transactionId)) {
+							receipt.autoRenew = autoRenewStatus.get(transactionId);
+						}
 						for (Map.Entry<String, JsonElement> entry : recObj.entrySet()) {
 							receipt.fields.put(entry.getKey(), entry.getValue().getAsString());
 						}
@@ -144,6 +162,7 @@ public class ReceiptValidationHelper {
 	}
 
 	public static class InAppReceipt {
+		public Boolean autoRenew;
 		public Map<String, String> fields = new HashMap<>();
 
 		public String getProductId() {
