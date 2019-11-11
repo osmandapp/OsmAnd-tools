@@ -155,6 +155,8 @@ public class UpdateSubscription {
 			if ((this.ios && !ios) || (!this.ios && ios)) {
 				continue;
 			}
+			// TODO
+			if(!ios) {
 			long checkDiff = checkTime == null ? tm : (tm - checkTime.getTime());
 			if (checkDiff < MINIMUM_WAIT_TO_REVALIDATE && !verifyAll) {
 				continue;
@@ -179,6 +181,7 @@ public class UpdateSubscription {
 					startTime == null ? "" : new Date(startTime.getTime()),
 					expireTime == null ? "" : new Date(expireTime.getTime()),
 							activeNow+""));
+			}
 			if (this.ios) {
 				processIosSubscription(receiptValidationHelper, userid, pt, sku, payload, startTime, expireTime, tm);
 			} else {
