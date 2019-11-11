@@ -490,7 +490,7 @@ public class AdminController {
 		}
 		
 		public void total() {
-			totalLost = addArrayToArray(totalLost, iOSRenew);
+			totalLost = addArrayToArray(totalLost, iOSNonRenew);
 			totalLost = addArrayToArray(totalLost, androidV2NonRenew);
 			totalLost = addArrayToArray(totalLost, androidV1NonRenew);
 			
@@ -502,7 +502,7 @@ public class AdminController {
 			allTotal = addArrayToArray(allTotal, totalLost);
 
 			strIOSNonRenew = total(iOSNonRenew, allTotal);
-			strIOSNonRenew = total(iOSRenew, allTotal);
+			strIOSRenew = total(iOSRenew, allTotal);
 			strAndroidV2Renew = total(androidV2Renew, allTotal);
 			strAndroidV1Renew = total(androidV1Renew, allTotal);
 			strAndroidV2NonRenew = total(androidV2NonRenew, allTotal);
