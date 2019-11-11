@@ -456,25 +456,33 @@ public class AdminController {
 		public String month;
 		public int[] iOSRenew;
 		public String strIOSRenew;
+		public String strIOSRenewShort;
 		public int[] iOSNonRenew;
 		public String strIOSNonRenew;
+		public String strIOSNonRenewShort;
 		public int[] androidV2Renew;
 		public String strAndroidV2Renew;
+		public String strAndroidV2RenewShort;
 		public int[] androidV2NonRenew;
 		public String strAndroidV2NonRenew;
+		public String strAndroidV2NonRenewShort;
 		public int[] androidV1Renew;
 		public String strAndroidV1Renew;
+		public String strAndroidV1RenewShort;
 		public int[] androidV1NonRenew;
 		public String strAndroidV1NonRenew;
+		public String strAndroidV1NonRenewShort;
 		
 		public int[] allTotal;
 		public String strAllTotal;
 		
 		public int[] totalLost;
 		public String strTotalLost;
+		public String strTotalLostShort;
 		
 		public int[] totalKeep;
 		public String strTotalKeep;
+		public String strTotalKeepShort;
 		
 		public YearSubscriptionReport(String month) {
 			this.month = month;
@@ -502,13 +510,21 @@ public class AdminController {
 			allTotal = addArrayToArray(allTotal, totalLost);
 
 			strIOSNonRenew = total(iOSNonRenew, allTotal);
+			strIOSNonRenewShort = total(iOSNonRenew, null);
 			strIOSRenew = total(iOSRenew, allTotal);
+			strIOSRenewShort = total(iOSRenew, null);
 			strAndroidV2Renew = total(androidV2Renew, allTotal);
+			strAndroidV2RenewShort = total(androidV2Renew, null);
 			strAndroidV1Renew = total(androidV1Renew, allTotal);
+			strAndroidV1RenewShort = total(androidV1Renew, null);
 			strAndroidV2NonRenew = total(androidV2NonRenew, allTotal);
+			strAndroidV2NonRenewShort = total(androidV2NonRenew, null);
 			strAndroidV1NonRenew = total(androidV1NonRenew, allTotal);
+			strAndroidV1NonRenewShort = total(androidV1NonRenew, null);
 			strTotalLost = total(totalLost, allTotal);
+			strTotalLostShort = total(totalLost, null);
 			strTotalKeep = total(totalKeep, allTotal);
+			strTotalKeepShort = total(totalKeep, null);
 			strAllTotal = total(allTotal, null);
 		}
 
