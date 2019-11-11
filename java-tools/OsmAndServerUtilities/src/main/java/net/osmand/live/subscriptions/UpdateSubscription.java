@@ -155,7 +155,7 @@ public class UpdateSubscription {
 			if ((this.ios && !ios) || (!this.ios && ios)) {
 				continue;
 			}
-			// TODO
+			// TODO delete
 			if(!ios) {
 			long checkDiff = checkTime == null ? tm : (tm - checkTime.getTime());
 			if (checkDiff < MINIMUM_WAIT_TO_REVALIDATE && !verifyAll) {
@@ -367,6 +367,7 @@ public class UpdateSubscription {
 		} else {
 			updStat.setTimestamp(ind++, expireTime);
 		}
+		System.out.println("Auto renew status " + subscription.getAutoRenewing());
 		if (subscription.getAutoRenewing() == null) {
 			updStat.setNull(ind++, Types.BOOLEAN);
 		} else {
