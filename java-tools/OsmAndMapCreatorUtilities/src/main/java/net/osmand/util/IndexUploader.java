@@ -150,12 +150,12 @@ public class IndexUploader {
 	}
 
 	public static void main(String[] args) throws IOException, IndexUploadException, RTreeException {
-		if (true) {
-			File src = new File("/Users/victorshcherb/osmand/temp/Luxembourg_europe_2.obf");
-			File dest = new File("/Users/victorshcherb/osmand/maps/Luxembourg_europe_2.road.obf");
-			IndexUploader.extractRoadOnlyFile(src, dest);
-			return;
-		}
+//		if (true) {
+//			File src = new File("/Users/victorshcherb/osmand/temp/Luxembourg_europe_2.obf");
+//			File dest = new File("/Users/victorshcherb/osmand/maps/Luxembourg_europe_2.road.obf");
+//			IndexUploader.extractRoadOnlyFile(src, dest);
+//			return;
+//		}
 		try {
 			String srcPath = extractDirectory(args, 0);
 			String targetPath = srcPath;
