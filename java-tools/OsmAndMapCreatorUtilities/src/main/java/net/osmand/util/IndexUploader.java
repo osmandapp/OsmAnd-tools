@@ -553,11 +553,9 @@ public class IndexUploader {
 		}
 		for (MapRoot r : rts) {
 			if(r.getMaxZoom() <= 10) {
-//				long prev = raf.getFilePointer();
-//				raf.seek(r.getFilePointer());
-//				byte[] BUFFER_TO_READ = new byte[BUFFER_SIZE];
-//				BinaryMerger.copyBinaryPart(ous, BUFFER_TO_READ, raf, r.getFilePointer(), r.getLength());
-//				raf.seek(prev);
+				ous.writeTag(OsmandOdb.OsmAndMapIndex.LEVELS_FIELD_NUMBER, WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
+				BinaryMerger.writeInt(ous, r.getLength());
+				BinaryMerger.copyBinaryPart(ous, new byte[BUFFER_SIZE], raf, r.getFilePointer(), r.getLength());
 				continue;
 			}
 			final TLongObjectHashMap<BinaryMapDataObject> objects = new TLongObjectHashMap<BinaryMapDataObject>();
