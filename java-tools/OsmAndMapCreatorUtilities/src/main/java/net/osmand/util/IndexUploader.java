@@ -150,12 +150,12 @@ public class IndexUploader {
 	}
 
 	public static void main(String[] args) throws IOException, IndexUploadException, RTreeException {
-//		if (true) {
-//			File src = new File("/Users/victorshcherb/osmand/temp/Luxembourg_europe_2.obf");
-//			File dest = new File("/Users/victorshcherb/osmand/maps/Luxembourg_europe_2.road.obf");
-//			IndexUploader.extractRoadOnlyFile(src, dest);
-//			return;
-//		}
+		if (true) {
+			File src = new File("/Users/victorshcherb/osmand/temp/Luxembourg_europe_2.obf");
+			File dest = new File("/Users/victorshcherb/osmand/maps/Luxembourg_europe_2.road.obf");
+			IndexUploader.extractRoadOnlyFile(src, dest);
+			return;
+		}
 		try {
 			String srcPath = extractDirectory(args, 0);
 			String targetPath = srcPath;
@@ -552,11 +552,14 @@ public class IndexUploader {
 			writer.writeMapEncodingRules(part.decodingRules);
 		}
 		for (MapRoot r : rts) {
-//			if(r.getMaxZoom() <= 10) {
+			if(r.getMaxZoom() <= 10) {
+//				long prev = raf.getFilePointer();
+//				raf.seek(r.getFilePointer());
 //				byte[] BUFFER_TO_READ = new byte[BUFFER_SIZE];
 //				BinaryMerger.copyBinaryPart(ous, BUFFER_TO_READ, raf, r.getFilePointer(), r.getLength());
-//				continue;
-//			}
+//				raf.seek(prev);
+				continue;
+			}
 			final TLongObjectHashMap<BinaryMapDataObject> objects = new TLongObjectHashMap<BinaryMapDataObject>();
 			File nonpackRtree = new File(roadOnlyFile.getParentFile(), "nonpack" + r.getMinZoom() + "."
 					+ roadOnlyFile.getName() + ".rtree");
