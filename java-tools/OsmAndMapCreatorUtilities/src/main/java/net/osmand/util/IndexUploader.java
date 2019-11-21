@@ -21,6 +21,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
 import java.util.Enumeration;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.regex.Pattern;
@@ -150,12 +151,12 @@ public class IndexUploader {
 	}
 
 	public static void main(String[] args) throws IOException, IndexUploadException, RTreeException {
-//		if (true) {
-//			File src = new File("/Users/victorshcherb/osmand/temp/Luxembourg_europe_2.obf");
-//			File dest = new File("/Users/victorshcherb/osmand/maps/Luxembourg_europe_2.road.obf");
-//			IndexUploader.extractRoadOnlyFile(src, dest);
-//			return;
-//		}
+		if (true) {
+			File src = new File("/home/madwasp79/OsmAnd-maps/roadsonly/Ukraine_cherkasy_europe_2.obf");
+			File dest = new File("/home/madwasp79/OsmAnd-maps/roadsonly/Ukraine_cherkasy_europe_2.road.obf");
+			IndexUploader.extractRoadOnlyFile(src, dest);
+			return;
+		}
 		try {
 			String srcPath = extractDirectory(args, 0);
 			String targetPath = srcPath;
@@ -511,12 +512,27 @@ public class IndexUploader {
 		byte[] BUFFER_TO_READ = new byte[BUFFER_SIZE];
 		ous.writeInt32(OsmandOdb.OsmAndStructure.VERSION_FIELD_NUMBER, index.getVersion());
 		ous.writeInt64(OsmandOdb.OsmAndStructure.DATECREATED_FIELD_NUMBER, index.getDateCreated());
-
+		log.debug(String.format("Index size: %d", index.getIndexes().size()));
 		for (int i = 0; i < index.getIndexes().size(); i++) {
 			BinaryIndexPart part = index.getIndexes().get(i);
 			if (part instanceof MapIndex) {
+				MapIndex mip = (MapIndex) part;
 				// skip map part
-				copyMapIndex(roadOnlyFile, (MapIndex) part, index, ous, routf);
+				copyMapIndex(roadOnlyFile, mip, index, ous, routf);
+				
+				// copy 9-10 zoom data from deleting:
+				Iterator<MapRoot> it = mip.getRoots().iterator();
+				while (it.hasNext()) {
+					if (it.next().getMinZoom() != 9) {
+						it.remove();
+					}
+				}
+				if (!Algorithms.isEmpty(mip.getRoots())) {
+					//something wrong here, I think
+					ous.writeTag(OsmandOdb.OsmAndStructure.MAPINDEX_FIELD_NUMBER, WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
+					BinaryMerger.writeInt(ous, mip.getRoots().get(0).getLength());
+					BinaryMerger.copyBinaryPart(ous, BUFFER_TO_READ, raf, mip.getRoots().get(0).getFilePointer(), mip.getRoots().get(0).getLength());
+				}				
 				continue;
 			} else if (part instanceof AddressRegion) {
 				ous.writeTag(OsmandOdb.OsmAndStructure.ADDRESSINDEX_FIELD_NUMBER,
@@ -530,6 +546,7 @@ public class IndexUploader {
 			} else if (part instanceof RouteRegion) {
 				ous.writeTag(OsmandOdb.OsmAndStructure.ROUTINGINDEX_FIELD_NUMBER,
 						WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
+//				continue;
 			} else {
 				throw new UnsupportedOperationException();
 			}
