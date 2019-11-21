@@ -515,8 +515,8 @@ public class IndexUploader {
 		for (int i = 0; i < index.getIndexes().size(); i++) {
 			BinaryIndexPart part = index.getIndexes().get(i);
 			if (part instanceof MapIndex) {
-				// skip map part
-				copyMapIndex(roadOnlyFile, (MapIndex) part, index, ous, routf);
+				// copy only part of map index
+				copyMapIndex(roadOnlyFile, (MapIndex) part, index, ous, raf, routf);
 				continue;
 			} else if (part instanceof AddressRegion) {
 				ous.writeTag(OsmandOdb.OsmAndStructure.ADDRESSINDEX_FIELD_NUMBER,
@@ -544,12 +544,19 @@ public class IndexUploader {
 	}
 
 	private static void copyMapIndex(File roadOnlyFile, MapIndex part, BinaryMapIndexReader index,
-			CodedOutputStream ous, RandomAccessFile routf) throws IOException, RTreeException {
+			CodedOutputStream ous, RandomAccessFile raf, RandomAccessFile routf) throws IOException, RTreeException {
 		final List<MapRoot> rts = part.getRoots();
 		BinaryMapIndexWriter writer = new BinaryMapIndexWriter(routf, ous);
 		writer.startWriteMapIndex(part.getName());
-		boolean first = true;
+		if(rts.size() > 0) {
+			writer.writeMapEncodingRules(part.decodingRules);
+		}
 		for (MapRoot r : rts) {
+//			if(r.getMaxZoom() <= 10) {
+//				byte[] BUFFER_TO_READ = new byte[BUFFER_SIZE];
+//				BinaryMerger.copyBinaryPart(ous, BUFFER_TO_READ, raf, r.getFilePointer(), r.getLength());
+//				continue;
+//			}
 			final TLongObjectHashMap<BinaryMapDataObject> objects = new TLongObjectHashMap<BinaryMapDataObject>();
 			File nonpackRtree = new File(roadOnlyFile.getParentFile(), "nonpack" + r.getMinZoom() + "."
 					+ roadOnlyFile.getName() + ".rtree");
@@ -568,10 +575,6 @@ public class IndexUploader {
 				rtree.Node root = rtree.getReadNode(rootIndex);
 				Rect rootBounds = IndexVectorMapCreator.calcBounds(root);
 				if (rootBounds != null) {
-					if(first) {
-						writer.writeMapEncodingRules(part.decodingRules);
-						first = false;
-					}
 					writer.startWriteMapLevelIndex(r.getMinZoom(), r.getMaxZoom(), rootBounds.getMinX(),
 							rootBounds.getMaxX(), rootBounds.getMinY(), rootBounds.getMaxY());
 					IndexVectorMapCreator.writeBinaryMapTree(root, rootBounds, rtree, writer, treeHeader);
