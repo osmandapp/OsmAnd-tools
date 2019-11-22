@@ -79,7 +79,7 @@ public class BinaryInspector {
 		if ("test".equals(args[0])) {
 			in.inspector(new String[] {
 //					"-vpoi",
-//					"-vmap", "-vmapobjects",
+					"-vmap", "-vmapobjects",
 //					"-vmapcoordinates",
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
@@ -89,7 +89,7 @@ public class BinaryInspector {
 //					"-zoom=7",
 //					"-bbox=30.51,50.5,30.53,50.4",
 //					"-osm="+System.getProperty("maps.dir")+"/basemap/map.obf.osm",
-					System.getProperty("maps.dir")+"/World_basemap_2.obf"
+					System.getProperty("maps.dir")+"/Luxembourg_europe_2.road.obf"
 //					System.getProperty("maps.dir")+"/olive/19_07_29_20_20_diff.obf"
 			});
 		} else {
@@ -1012,7 +1012,7 @@ public class BinaryInspector {
 				}
 				TagValuePair pair = obj.getMapIndex().decodeType(order.get(j));
 				if (pair == null) {
-					throw new NullPointerException("Type " + order.get(j) + "was not found");
+					throw new NullPointerException("Type " + order.get(j) + " was not found");
 				}
 				b.append(pair.toSimpleString() + "(" + order.get(j) + ")");
 				b.append(" - ").append(names.get(order.get(j)));

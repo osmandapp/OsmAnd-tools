@@ -548,11 +548,12 @@ public class IndexUploader {
 		final List<MapRoot> rts = part.getRoots();
 		BinaryMapIndexWriter writer = new BinaryMapIndexWriter(routf, ous);
 		writer.startWriteMapIndex(part.getName());
-		if(rts.size() > 0) {
-			writer.writeMapEncodingRules(part.decodingRules);
-		}
+		boolean first = true;
 		for (MapRoot r : rts) {
 			if(r.getMaxZoom() <= 10) {
+				if(first) {
+					throw new UnsupportedOperationException("Can't write top level zoom");
+				}
 				ous.writeTag(OsmandOdb.OsmAndMapIndex.LEVELS_FIELD_NUMBER, WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
 				BinaryMerger.writeInt(ous, r.getLength());
 				BinaryMerger.copyBinaryPart(ous, new byte[BUFFER_SIZE], raf, r.getFilePointer(), r.getLength());
@@ -568,6 +569,10 @@ public class IndexUploader {
 				rtree = new RTree(nonpackRtree.getAbsolutePath());
 				final SearchRequest<BinaryMapDataObject> req = buildSearchRequest(r, objects, rtree);
 				index.searchMapIndex(req, part);
+				if(first) {
+					first = false;
+					writer.writeMapEncodingRules(part.decodingRules);
+				}
 				rtree = AbstractIndexPartCreator.packRtreeFile(rtree, nonpackRtree.getAbsolutePath(),
 						packRtree.getAbsolutePath());
 				TLongObjectHashMap<BinaryFileReference> treeHeader = new TLongObjectHashMap<BinaryFileReference>();
