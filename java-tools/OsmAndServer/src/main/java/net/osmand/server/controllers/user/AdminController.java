@@ -455,34 +455,27 @@ public class AdminController {
 	public static class YearSubscriptionReport {
 		public String month;
 		public int[] iOSRenew;
-		public String strIOSRenew;
-		public String strIOSRenewShort;
+		public String[] strIOSRenew;
 		public int[] iOSNonRenew;
-		public String strIOSNonRenew;
-		public String strIOSNonRenewShort;
+		public String[] strIOSNonRenew;
 		public int[] androidV2Renew;
-		public String strAndroidV2Renew;
-		public String strAndroidV2RenewShort;
+		public String[] strAndroidV2Renew;
 		public int[] androidV2NonRenew;
-		public String strAndroidV2NonRenew;
-		public String strAndroidV2NonRenewShort;
+		public String[] strAndroidV2NonRenew;
 		public int[] androidV1Renew;
-		public String strAndroidV1Renew;
-		public String strAndroidV1RenewShort;
+		public String[] strAndroidV1Renew;
 		public int[] androidV1NonRenew;
-		public String strAndroidV1NonRenew;
-		public String strAndroidV1NonRenewShort;
-		
-		public int[] allTotal;
-		public String strAllTotal;
+		public String[] strAndroidV1NonRenew;
 		
 		public int[] totalLost;
-		public String strTotalLost;
-		public String strTotalLostShort;
+		public String[] strTotalLost;
 		
 		public int[] totalKeep;
-		public String strTotalKeep;
-		public String strTotalKeepShort;
+		public String[] strTotalKeep;
+		
+		public int[] allTotal;
+		public String[] strAllTotal;
+		
 		
 		public YearSubscriptionReport(String month) {
 			this.month = month;
@@ -510,48 +503,40 @@ public class AdminController {
 			allTotal = addArrayToArray(allTotal, totalLost);
 
 			strIOSNonRenew = total(iOSNonRenew, allTotal);
-			strIOSNonRenewShort = total(iOSNonRenew, null);
 			strIOSRenew = total(iOSRenew, allTotal);
-			strIOSRenewShort = total(iOSRenew, null);
 			strAndroidV2Renew = total(androidV2Renew, allTotal);
-			strAndroidV2RenewShort = total(androidV2Renew, null);
 			strAndroidV1Renew = total(androidV1Renew, allTotal);
-			strAndroidV1RenewShort = total(androidV1Renew, null);
 			strAndroidV2NonRenew = total(androidV2NonRenew, allTotal);
-			strAndroidV2NonRenewShort = total(androidV2NonRenew, null);
 			strAndroidV1NonRenew = total(androidV1NonRenew, allTotal);
-			strAndroidV1NonRenewShort = total(androidV1NonRenew, null);
 			strTotalLost = total(totalLost, allTotal);
-			strTotalLostShort = total(totalLost, null);
 			strTotalKeep = total(totalKeep, allTotal);
-			strTotalKeepShort = total(totalKeep, null);
-			strAllTotal = total(allTotal, null);
+			strAllTotal = total(allTotal, allTotal);
 		}
 
-		private String total(int[] s, int[] tot) {
-			String r = "";
+		private String[] total(int[] s, int[] tot) {
+			String[] res = new String[3];
+			StringBuilder r = new StringBuilder();
+			int valsum = 0; 
+			int totval = 0;
+			for(int kn = 0; kn < tot.length; kn++) {
+				totval += tot[kn];
+			}
 			if (s != null) {
 				for (int k = 0; k < s.length; k++) {
 					if (k > 0) {
-						r += " | ";
+						r.append("+");
 					}
-					int val = 0;
-					for(int kn = k; kn < s.length; kn++) {
-						val += s[kn];
-					}
-					r += val;
-					if(tot != null) {
-						int totval = 0;
-						for(int kn = k; kn < tot.length; kn++) {
-							totval += tot[kn];
-						}
-						if(totval > 0) {
-							r += " (" + (int) val * 100 / totval + "%)";
-						}
-					}
+					int val = s[k];
+					r.append(val);
+					valsum += val;
 				}
 			}
-			return r;
+			res[0] = r.toString();
+			res[1] = valsum +"";
+			if (totval > 0) {
+				res[2] = ((int) valsum * 1000 / totval) / 10.0 + "%";
+			}
+			return res;
 		}
 	}
 	
