@@ -571,10 +571,10 @@ public class AdminController {
 		final Map<String, YearSubscriptionReport> res = new LinkedHashMap<String, YearSubscriptionReport>(); 
 		jdbcTemplate.query("select  to_char(starttime, 'YYYY-MM') \"start\", " + 
 				"        round(extract(day from expiretime - starttime)/365) \"years\", sku, " + 
-				"        count(*) FILTER (WHERE autorenewing) \"auto\", " + 
-				"        count(*) FILTER (WHERE not autorenewing) \"non-auto\"," + 
+				"        count(*) FILTER (WHERE autorenewing and valid) \"auto\", " + 
+				"        count(*) FILTER (WHERE not autorenewing or not valid) \"non-auto\"," + 
 				"        count(*) FILTER (WHERE autorenewing is null) \"auto-null\" " + 
-				"    from supporters_device_sub where valid and  sku like '%annual%'  and extract(day from expiretime - starttime) > 180" + 
+				"    from supporters_device_sub where sku like '%annual%'  and extract(day from expiretime - starttime) > 180" + 
 				"    group by \"start\", \"years\", sku " + 
 				"    order by 1 desc, 2, 3;", new RowCallbackHandler() {
 
