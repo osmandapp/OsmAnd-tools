@@ -533,8 +533,10 @@ public class AdminController {
 			}
 			res[0] = r.toString();
 			res[1] = valsum +"";
-			if (totval > 0) {
+			if (totval > 0 && valsum > 0) {
 				res[2] = ((int) valsum * 1000 / totval) / 10.0 + "%";
+			} else {
+				res[2] = "";
 			}
 			return res;
 		}
