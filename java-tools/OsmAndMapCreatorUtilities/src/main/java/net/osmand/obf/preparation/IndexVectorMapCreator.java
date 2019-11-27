@@ -185,7 +185,8 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		if (!("multipolygon".equals(tags.get(OSMTagKey.TYPE.getValue())) || 
 				"protected_area".equals(tags.get("boundary")) ||
 				"low_emission_zone".equals(tags.get("boundary")) ||
-				"national_park".equals(tags.get("boundary"))
+				"national_park".equals(tags.get("boundary")) ||
+				"danger_area".equals(tags.get("military"))
 				)) {
 			return;
 		}
