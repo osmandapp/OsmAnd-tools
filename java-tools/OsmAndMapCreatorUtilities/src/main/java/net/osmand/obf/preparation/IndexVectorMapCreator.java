@@ -69,8 +69,8 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	private static final int MAP_LEVELS_MAX = 1 << MAP_LEVELS_POWER;
 	private static final int LOW_LEVEL_COMBINE_WAY_POINS_LIMIT = 10000;
 	private static final int LOW_LEVEL_ZOOM_TO_COMBINE = 13; // 15 if use combination all the time
-	private static final List<String> NODENETWORKIDS = Arrays.asList("network:type", "icn_ref", "ncn_ref", "rcn_ref", "lcn_ref", "iwn_ref", "nwn_ref", "rwn_ref", "lwn_ref");
-	private static final List<String> NODETYPES = Arrays.asList("icn_ref", "ncn_ref", "rcn_ref", "lcn_ref", "iwn_ref", "nwn_ref", "rwn_ref", "lwn_ref");
+	private static final List<String> NODE_NETWORK_IDS = Arrays.asList("network:type", "expected_rcn_route_relations");
+	private static final List<String> NODE_NETWORKS_REF_TYPES = Arrays.asList("icn_ref", "ncn_ref", "rcn_ref", "lcn_ref", "iwn_ref", "nwn_ref", "rwn_ref", "lwn_ref");
 	private static final String multipleNodeNetworksKey = "multiple_node_networks";
 	private MapRenderingTypesEncoder renderingTypes;
 	private MapZooms mapZooms;
@@ -701,10 +701,10 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 				}
 			}
 			if (e instanceof Node && !Algorithms.isEmpty(e.getTags()) 
-					&& NODENETWORKIDS.contains(e.getTags().entrySet().iterator().next().getKey())) {
+					&& NODE_NETWORK_IDS.contains(e.getTags().entrySet().iterator().next().getKey())) {
 				int networkTypesCount = 0;
 				for (Entry<String, String> tag : e.getTags().entrySet()) {
-					if (NODETYPES.contains(tag.getKey())) {
+					if (NODE_NETWORKS_REF_TYPES.contains(tag.getKey())) {
 						networkTypesCount++;
 					} 
 				}
