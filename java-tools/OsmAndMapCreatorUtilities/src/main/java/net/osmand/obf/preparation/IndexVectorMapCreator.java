@@ -11,6 +11,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
@@ -18,6 +19,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.TreeMap;
 
 import org.apache.commons.logging.Log;
@@ -67,6 +69,9 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	private static final int MAP_LEVELS_MAX = 1 << MAP_LEVELS_POWER;
 	private static final int LOW_LEVEL_COMBINE_WAY_POINS_LIMIT = 10000;
 	private static final int LOW_LEVEL_ZOOM_TO_COMBINE = 13; // 15 if use combination all the time
+	private static final List<String> NODENETWORKIDS = Arrays.asList("network:type", "icn_ref", "ncn_ref", "rcn_ref", "lcn_ref", "iwn_ref", "nwn_ref", "rwn_ref", "lwn_ref");
+	private static final List<String> NODETYPES = Arrays.asList("icn_ref", "ncn_ref", "rcn_ref", "lcn_ref", "iwn_ref", "nwn_ref", "rwn_ref", "lwn_ref");
+	private static final String multipleNodeNetworksKey = "multiple_node_networks";
 	private MapRenderingTypesEncoder renderingTypes;
 	private MapZooms mapZooms;
 
@@ -686,12 +691,25 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	}
 	
 	public void iterateMainEntity(Entity e, OsmDbAccessorContext ctx, OsmandRegions or) throws SQLException {
+	
 		if (e instanceof Way || e instanceof Node) {
 			if (or != null && e instanceof Way) {
 				try {
 					addRegionTag(or, e);
 				} catch (IOException e1) {
 					e1.printStackTrace();
+				}
+			}
+			if (e instanceof Node && !Algorithms.isEmpty(e.getTags()) 
+					&& NODENETWORKIDS.contains(e.getTags().entrySet().iterator().next().getKey())) {
+				int networkTypesCount = 0;
+				for (Entry<String, String> tag : e.getTags().entrySet()) {
+					if (NODETYPES.contains(tag.getKey())) {
+						networkTypesCount++;
+					} 
+				}
+				if (networkTypesCount > 1) {
+					e.putTag(multipleNodeNetworksKey, "true");
 				}
 			}
 			tagsTransformer.addPropogatedTags(e);
