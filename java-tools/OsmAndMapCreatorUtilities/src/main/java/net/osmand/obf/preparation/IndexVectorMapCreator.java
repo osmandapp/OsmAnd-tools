@@ -11,7 +11,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
@@ -19,7 +18,6 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.TreeMap;
 
 import org.apache.commons.logging.Log;
@@ -69,9 +67,6 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	private static final int MAP_LEVELS_MAX = 1 << MAP_LEVELS_POWER;
 	private static final int LOW_LEVEL_COMBINE_WAY_POINS_LIMIT = 10000;
 	private static final int LOW_LEVEL_ZOOM_TO_COMBINE = 13; // 15 if use combination all the time
-	private static final List<String> NODE_NETWORK_IDS = Arrays.asList("network:type", "expected_rcn_route_relations");
-	private static final List<String> NODE_NETWORKS_REF_TYPES = Arrays.asList("icn_ref", "ncn_ref", "rcn_ref", "lcn_ref", "iwn_ref", "nwn_ref", "rwn_ref", "lwn_ref");
-	private static final String multipleNodeNetworksKey = "multiple_node_networks";
 	private MapRenderingTypesEncoder renderingTypes;
 	private MapZooms mapZooms;
 
@@ -691,7 +686,6 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	}
 	
 	public void iterateMainEntity(Entity e, OsmDbAccessorContext ctx, OsmandRegions or) throws SQLException {
-	
 		if (e instanceof Way || e instanceof Node) {
 			if (or != null && e instanceof Way) {
 				try {
@@ -700,18 +694,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 					e1.printStackTrace();
 				}
 			}
-			if (e instanceof Node && !Algorithms.isEmpty(e.getTags()) 
-					&& NODE_NETWORK_IDS.contains(e.getTags().entrySet().iterator().next().getKey())) {
-				int networkTypesCount = 0;
-				for (Entry<String, String> tag : e.getTags().entrySet()) {
-					if (NODE_NETWORKS_REF_TYPES.contains(tag.getKey())) {
-						networkTypesCount++;
-					} 
-				}
-				if (networkTypesCount > 1) {
-					e.putTag(multipleNodeNetworksKey, "true");
-				}
-			}
+			tagsTransformer.addMultipleNetwoksTag(e);
 			tagsTransformer.addPropogatedTags(e);
 			
 			// manipulate what kind of way to load
