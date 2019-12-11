@@ -1,9 +1,11 @@
 package net.osmand.obf.preparation;
 
 import java.sql.SQLException;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -13,6 +15,7 @@ import net.osmand.osm.MapRenderingTypes.MapRulType;
 import net.osmand.osm.MapRenderingTypesEncoder.EntityConvertApplyType;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.edit.Entity;
+import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Relation.RelationMember;
@@ -21,6 +24,9 @@ import net.osmand.util.Algorithms;
 public class TagsTransformer {
 	Map<EntityId, Map<String, String>> propogatedTags = new LinkedHashMap<Entity.EntityId, Map<String, String>>();
 	final static String SPLIT_VALUE= "SPLITVL";
+	private static final List<String> NODE_NETWORK_IDS = Arrays.asList("network:type", "expected_rcn_route_relations");
+	private static final List<String> NODE_NETWORKS_REF_TYPES = Arrays.asList("icn_ref", "ncn_ref", "rcn_ref", "lcn_ref", "iwn_ref", "nwn_ref", "rwn_ref", "lwn_ref");
+	private static final String multipleNodeNetworksKey = "multiple_node_networks";
 	
 	public void handleRelationPropogatedTags(Relation e, MapRenderingTypesEncoder renderingTypes, OsmDbAccessorContext ctx, 
 			EntityConvertApplyType at) throws SQLException {
@@ -71,6 +77,21 @@ public class TagsTransformer {
 			}
 		}
 	
+	}
+	
+	public void addMultipleNetwoksTag(Entity e) {
+		if (e instanceof Node && !Algorithms.isEmpty(e.getTags()) 
+				&& NODE_NETWORK_IDS.contains(e.getTags().entrySet().iterator().next().getKey())) {
+			int networkTypesCount = 0;
+			for (Entry<String, String> tag : e.getTags().entrySet()) {
+				if (NODE_NETWORKS_REF_TYPES.contains(tag.getKey())) {
+					networkTypesCount++;
+				} 
+			}
+			if (networkTypesCount > 1) {
+				e.putTag(multipleNodeNetworksKey, "true");
+			}
+		}
 	}
 	
 	public void addPropogatedTags(Entity e) {

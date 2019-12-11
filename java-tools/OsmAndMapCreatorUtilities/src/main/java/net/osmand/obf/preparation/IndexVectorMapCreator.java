@@ -694,6 +694,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 					e1.printStackTrace();
 				}
 			}
+			tagsTransformer.addMultipleNetwoksTag(e);
 			tagsTransformer.addPropogatedTags(e);
 			
 			// manipulate what kind of way to load
