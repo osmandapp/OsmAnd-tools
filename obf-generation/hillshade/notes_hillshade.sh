@@ -6,10 +6,6 @@
 # and run them with nohup !
 # consider running this world-wide will last a few weeks
 
-mkdir hillshade
-mkdir slopes
-mkdir composite
-
 # Create hillshade and slope tiles (can last hours or 1-2 days)
 for F in data/*.tif
 do
