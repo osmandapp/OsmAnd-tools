@@ -6,6 +6,9 @@
 # and run them with nohup !
 # consider running this world-wide will last a few weeks
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+mkdir -p hillshade
+mkdir -p slopes
+mkdir -p composite
 # 1. Create hillshade and slope tiles (can last hours or 1-2 days)
 for F in data/*.tif
 do
