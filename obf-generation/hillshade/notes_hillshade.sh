@@ -24,7 +24,7 @@ mkdir -p composite
 if [ "$START_STAGE" -le 1 ] && [ "$END_STAGE" -ge 1 ]; then
 	for F in data/*.tif
 	do
-		echo $F
+		echo "$F hillshade"
 		name=$(basename $F)
 		if [ ! -f slopes/s_$name ]; then
 			if [ -f slopes.tif ]; then rm slopes.tif; fi
@@ -40,7 +40,7 @@ if [ "$START_STAGE" -le 2 ] && [ "$END_STAGE" -ge 2 ]; then
 	for F in data/*.tif
 	do
 		if [ -f composed.tif ]; then rm composed.tif; fi
-		echo $F
+		echo "$F composed"
 		name=$(basename $F)
 		composite -quiet -compose Multiply hillshade/hs_$name slopes/s_$name composed.tif
 		convert -level 28%x70% composed.tif composite/c_$name
