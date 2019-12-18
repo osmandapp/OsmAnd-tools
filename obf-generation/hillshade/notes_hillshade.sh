@@ -6,11 +6,9 @@
 # and run them with nohup !
 # consider running this world-wide will last a few weeks
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-START_STAGE=$1
 if [ -z "$START_STAGE" ]; then
    START_STAGE=1
 fi
-END_STAGE=$2
 if [ -z "$END_STAGE" ]; then
    END_STAGE=10
 fi
