@@ -20,9 +20,8 @@ mkdir -p hillshade
 mkdir -p slopes
 mkdir -p composite
 
-
-# 1. Create hillshade and slope tiles (can last hours or 1-2 days)
 if [ "$START_STAGE" -le 1 ] && [ "$END_STAGE" -ge 1 ]; then
+	echo "1. Create hillshade and slope tiles (can last hours or 1-2 days)"
 	for F in data/*.tif
 	do
 		echo "$F hillshade"
@@ -36,8 +35,8 @@ if [ "$START_STAGE" -le 1 ] && [ "$END_STAGE" -ge 1 ]; then
 	done
 fi
 
-# 2. Merge hillshade and slopes tiles with imagemagick (can last hours or 1-2 days)
 if [ "$START_STAGE" -le 2 ] && [ "$END_STAGE" -ge 2 ] && [ "$PROCESS" = "composite" ] ; then
+	echo "2. Merge hillshade and slopes tiles with imagemagick (can last hours or 1-2 days)"
 	for F in data/*.tif
 	do
 		if [ -f composed.tif ]; then rm composed.tif; fi
@@ -49,30 +48,35 @@ if [ "$START_STAGE" -le 2 ] && [ "$END_STAGE" -ge 2 ] && [ "$PROCESS" = "composi
 	done
 fi
 
-# 3. Built a single virtual file vrt, options ensure to keep ocean white
 if [ "$START_STAGE" -le 3 ] && [ "$END_STAGE" -ge 3 ]; then
+	echo "3. Built a single virtual file vrt, options ensure to keep ocean white"
 	gdalbuildvrt -hidenodata -vrtnodata "255" virtualtiff.vrt $PROCESS/*.tif
 fi
-# 4. Merge all tile in a single giant tiff (can last hours or 1-2 days)
+ 
 if [ "$START_STAGE" -le 4 ] && [ "$END_STAGE" -ge 4 ]; then
+	echo "4. Merge all tile in a single giant tiff (can last hours or 1-2 days)"
 	gdal_translate -of GTiff -co "COMPRESS=JPEG" -co "BIGTIFF=YES" -co "TILED=YES" virtualtiff.vrt WGS84-all.tif
 fi
-# 5. Make a small tiff to check before going further
+
 if [ "$START_STAGE" -le 5 ] && [ "$END_STAGE" -ge 5 ]; then
+	echo " 5. Make a small tiff to check before going further"
 	gdalwarp -of GTiff -ts 4000 0 WGS84-all.tif WGS84-all-small.tif
 fi
-# 6. Then re-project to Mercator (can last hours or 1-2 days)
+
 if [ "$START_STAGE" -le 6 ] && [ "$END_STAGE" -ge 6 ]; then
+	echo "6. Then re-project to Mercator (can last hours or 1-2 days)"
 	gdalwarp -of GTiff -co "JPEG_QUALITY=90" -co "BIGTIFF=YES" -co "TILED=YES" -co "COMPRESS=JPEG" \
 		-t_srs "+init=epsg:3857 +over" \
 		-r cubic -order 3 -multi WGS84-all.tif all-3857.tif
 fi
-# 7. Make a small tiff to check before going further
+
 if [ "$START_STAGE" -le 7 ] && [ "$END_STAGE" -ge 7 ]; then
+	echo "7. Make a small tiff to check before going further"
 	gdalwarp -of GTiff -co "COMPRESS=JPEG" -ts 4000 0 all-3857.tif all-small-3857.tif
 fi
-# 8. Create a sqlite containing 256x256 png tiles, in TMS numbering scheme (can last for WEEKS)
+
 if [ "$START_STAGE" -le 8 ] && [ "$END_STAGE" -ge 8 ]; then
+	echo "8. Create a sqlite containing 256x256 png tiles, in TMS numbering scheme (can last for WEEKS)"
 	$DIR/gdal2tiles_gray2alpha_sqlite.py -z 0-11 all-3857.tif
 fi
 # Create country-wide sqlites compatible with Osmand (minutes or hour each, 5-6days complete country list)
