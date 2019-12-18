@@ -31,6 +31,7 @@ if [ "$START_STAGE" -le 1 ] && [ "$END_STAGE" -ge 1 ]; then
 			gdaldem hillshade -z 2 -s 111120 -compute_edges $F hillshade/hs_$name
 			gdaldem slope -compute_edges -s 111120 $F slopes.tif
 			gdaldem color-relief slopes.tif $DIR/color_slope.txt slopes/s_$name	
+			rm slopes.tif || true
 		fi
 	done
 fi
@@ -45,6 +46,7 @@ if [ "$START_STAGE" -le 2 ] && [ "$END_STAGE" -ge 2 ] && [ "$PROCESS" = "composi
 		composite -quiet -compose Multiply hillshade/hs_$name slopes/s_$name composed.tif
 		convert -level 28%x70% composed.tif composite/c_$name
 		$DIR/gdalcopyproj.py hillshade/hs_$name composite/c_$name
+		rm composed.tif || true
 	done
 fi
 
