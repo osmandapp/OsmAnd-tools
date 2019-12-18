@@ -27,6 +27,7 @@ if [ "$START_STAGE" -le 1 ] && [ "$END_STAGE" -ge 1 ]; then
 		echo $F
 		name=$(basename $F)
 		if [ ! -f slopes/s_$name ]; then
+			if [ -f slopes.tif ]; then rm slopes.tif; fi
 			gdaldem hillshade -z 2 -s 111120 -compute_edges $F hillshade/hs_$name
 			gdaldem slope -compute_edges -s 111120 $F slopes.tif
 			gdaldem color-relief slopes.tif $DIR/color_slope.txt slopes/s_$name	
@@ -36,15 +37,15 @@ fi
 
 # 2. Merge hillshade and slopes tiles with imagemagick (can last hours or 1-2 days)
 if [ "$START_STAGE" -le 2 ] && [ "$END_STAGE" -ge 2 ]; then
-for F in data/*.tif
-do
-	rm composed.tif
-	echo $F
-	name=$(basename $F)
-	composite -compose Multiply hillshade/hs_$name slopes/s_$name composed.tif
-	convert -level 28%x70% composed.tif composite/c_$name
-	./gdalcopyproj.py hillshade/hs_$name composite/c_$name
-done
+	for F in data/*.tif
+	do
+		if [ -f composed.tif ]; then rm composed.tif; fi
+		echo $F
+		name=$(basename $F)
+		composite -quiet -compose Multiply hillshade/hs_$name slopes/s_$name composed.tif
+		convert -level 28%x70% composed.tif composite/c_$name
+		$DIR/gdalcopyproj.py hillshade/hs_$name composite/c_$name
+	done
 fi
 
 # 3. Built a single virtual file vrt, options ensure to keep ocean white
@@ -61,9 +62,9 @@ if [ "$START_STAGE" -le 5 ] && [ "$END_STAGE" -ge 5 ]; then
 fi
 # 6. Then re-project to Mercator (can last hours or 1-2 days)
 if [ "$START_STAGE" -le 6 ] && [ "$END_STAGE" -ge 6 ]; then
-gdalwarp -of GTiff -co "JPEG_QUALITY=90" -co "BIGTIFF=YES" -co "TILED=YES" -co "COMPRESS=JPEG" \
-	-t_srs "+init=epsg:3857 +over" \
-	-r cubic -order 3 -multi WGS84-all.tif all-3857.tif
+	gdalwarp -of GTiff -co "JPEG_QUALITY=90" -co "BIGTIFF=YES" -co "TILED=YES" -co "COMPRESS=JPEG" \
+		-t_srs "+init=epsg:3857 +over" \
+		-r cubic -order 3 -multi WGS84-all.tif all-3857.tif
 fi
 # 7. Make a small tiff to check before going further
 if [ "$START_STAGE" -le 7 ] && [ "$END_STAGE" -ge 7 ]; then
@@ -71,7 +72,7 @@ if [ "$START_STAGE" -le 7 ] && [ "$END_STAGE" -ge 7 ]; then
 fi
 # 8. Create a sqlite containing 256x256 png tiles, in TMS numbering scheme (can last for WEEKS)
 if [ "$START_STAGE" -le 8 ] && [ "$END_STAGE" -ge 8 ]; then
-	./gdal2tiles_gray2alpha_sqlite.py -z 0-11 all-3857.tif
+	$DIR/gdal2tiles_gray2alpha_sqlite.py -z 0-11 all-3857.tif
 fi
 # Create country-wide sqlites compatible with Osmand (minutes or hour each, 5-6days complete country list)
 # ./extractSqlite.py -i $WORKSPACE/tools/OsmAndMapCreator/src/net/osmand/map/countries.xml -s $JENKINS_HOME/data/all-3857.tif.sqlitedb -o $JENKINS_HOME/hillshade_sqlite/
