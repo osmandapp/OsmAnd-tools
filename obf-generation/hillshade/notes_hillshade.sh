@@ -7,12 +7,15 @@
 # consider running this world-wide will last a few weeks
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 if [ -z "$START_STAGE" ]; then
-   START_STAGE=1
+	START_STAGE=1
 fi
 if [ -z "$END_STAGE" ]; then
-   END_STAGE=10
+	END_STAGE=10
 fi
-
+# PROCESS: composite, hillshade, slopes
+if [ -z "$PROCESS" ]; then
+	PROCESS=composite
+fi
 mkdir -p hillshade
 mkdir -p slopes
 mkdir -p composite
@@ -34,7 +37,7 @@ if [ "$START_STAGE" -le 1 ] && [ "$END_STAGE" -ge 1 ]; then
 fi
 
 # 2. Merge hillshade and slopes tiles with imagemagick (can last hours or 1-2 days)
-if [ "$START_STAGE" -le 2 ] && [ "$END_STAGE" -ge 2 ]; then
+if [ "$START_STAGE" -le 2 ] && [ "$END_STAGE" -ge 2 ] && [ "$PROCESS" = "composite" ] ; then
 	for F in data/*.tif
 	do
 		if [ -f composed.tif ]; then rm composed.tif; fi
@@ -48,15 +51,15 @@ fi
 
 # 3. Built a single virtual file vrt, options ensure to keep ocean white
 if [ "$START_STAGE" -le 3 ] && [ "$END_STAGE" -ge 3 ]; then
-	gdalbuildvrt -hidenodata -vrtnodata "255" composite.vrt composite/*.tif
+	gdalbuildvrt -hidenodata -vrtnodata "255" virtualtiff.vrt $PROCESS/*.tif
 fi
 # 4. Merge all tile in a single giant tiff (can last hours or 1-2 days)
 if [ "$START_STAGE" -le 4 ] && [ "$END_STAGE" -ge 4 ]; then
-	gdal_translate -of GTiff -co "COMPRESS=JPEG" -co "BIGTIFF=YES" -co "TILED=YES" composite.vrt WGS84-all.tif
+	gdal_translate -of GTiff -co "COMPRESS=JPEG" -co "BIGTIFF=YES" -co "TILED=YES" virtualtiff.vrt WGS84-all.tif
 fi
 # 5. Make a small tiff to check before going further
 if [ "$START_STAGE" -le 5 ] && [ "$END_STAGE" -ge 5 ]; then
-	gdalwarp -of GTiff -ts 4000 0 composite-all.tif WGS84-all-small.tif
+	gdalwarp -of GTiff -ts 4000 0 WGS84-all.tif WGS84-all-small.tif
 fi
 # 6. Then re-project to Mercator (can last hours or 1-2 days)
 if [ "$START_STAGE" -le 6 ] && [ "$END_STAGE" -ge 6 ]; then
