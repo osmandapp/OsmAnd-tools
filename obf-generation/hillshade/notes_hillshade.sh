@@ -62,11 +62,13 @@ fi
 
 if [ "$START_STAGE" -le 5 ] && [ "$END_STAGE" -ge 5 ]; then
 	echo " 5. Make a small tiff to check before going further $(date)"
+	rm WGS84-all-small.tif || true
 	gdalwarp -of GTiff -ts 4000 0 WGS84-all.tif WGS84-all-small.tif
 fi
 
 if [ "$START_STAGE" -le 6 ] && [ "$END_STAGE" -ge 6 ]; then
 	echo "6. Then re-project to Mercator (can last hours or 1-2 days) $(date)"
+	rm  all-3857.tif || true
 	gdalwarp -of GTiff -co "JPEG_QUALITY=90" -co "BIGTIFF=YES" -co "TILED=YES" -co "COMPRESS=JPEG" \
 		-t_srs "+init=epsg:3857 +over" \
 		-r cubic -order 3 -multi WGS84-all.tif all-3857.tif
@@ -74,6 +76,7 @@ fi
 
 if [ "$START_STAGE" -le 7 ] && [ "$END_STAGE" -ge 7 ]; then
 	echo "7. Make a small tiff to check before going further $(date)"
+	rm all-small-3857.tif || true
 	gdalwarp -of GTiff -co "COMPRESS=JPEG" -ts 4000 0 all-3857.tif all-small-3857.tif
 fi
 
