@@ -156,6 +156,7 @@ public class SplitHillshadeIntoRegions {
 				if(unpack1(p) != tileX || unpack2(p) != tileY) {
 					throw new IllegalArgumentException();
 				}
+				System.out.println(" " + tileX + " " + tileY + " " + MAX_ZOOM + " " + isOut);
 //				if(!isOut) {
 				
 					tileNames.add(pack(tileX, tileY));
@@ -183,7 +184,7 @@ public class SplitHillshadeIntoRegions {
 		try(Connection sqliteConn = DBDialect.SQLITE.getDatabaseConnection(sqliteFile.getAbsolutePath(), LOG); 
 			Connection newFile = DBDialect.SQLITE.getDatabaseConnection(targetFile.getAbsolutePath(), LOG)) {
 			prepareNewHillshadeFile(newFile, false, MIN_ZOOM, MAX_ZOOM);
-			PreparedStatement ps = sqliteConn.prepareStatement("SELECT image FROM tiles WHERE x = ?, y = ?, z = ?, s = 0");
+			PreparedStatement ps = sqliteConn.prepareStatement("SELECT image FROM tiles WHERE x = ? AND y = ? AND z = ? AND s = 0");
 			PreparedStatement is = newFile.prepareStatement("INSERT INTO tiles(x, y, z, s, image) VALUES(?, ?, ?, 0, ?)");
 			for(long s : tileNames) {
 				int x = unpack1(s);
