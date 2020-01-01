@@ -119,7 +119,7 @@ public class SplitHillshadeIntoRegions {
 		int topLat = (int) Math.floor(MapUtils.getTileNumberY(MAX_ZOOM, qr.top));
 		boolean onetile = leftLon == rightLon && bottomLat == topLat;
 		for(int tileX = leftLon; tileX <= rightLon; tileX++) {
-			for(int tileY = bottomLat; tileY <= topLat; tileY++) {
+			for(int tileY = topLat; tileY <= bottomLat; tileY++) {
 				double llon = MapUtils.getLongitudeFromTile(MAX_ZOOM, tileX);
 				double rlon = MapUtils.getLongitudeFromTile(MAX_ZOOM, tileX + 1);
 				double tlat = MapUtils.getLatitudeFromTile(MAX_ZOOM, tileY);
