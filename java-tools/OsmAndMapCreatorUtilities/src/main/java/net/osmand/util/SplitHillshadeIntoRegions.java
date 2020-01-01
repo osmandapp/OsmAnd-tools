@@ -33,8 +33,8 @@ import net.osmand.osm.edit.Way;
 
 public class SplitHillshadeIntoRegions {
 	private static final Log LOG = PlatformUtil.getLog(SplitHillshadeIntoRegions.class);
-	private static final int MIN_ZOOM = 1;
-	private static final int MAX_ZOOM = 11;
+	private static int MIN_ZOOM = 1;
+	private static int MAX_ZOOM = 11;
 	private static final int BATCH_SIZE = 100;
 
 	public static void main(String[] args) throws IOException {
@@ -42,9 +42,16 @@ public class SplitHillshadeIntoRegions {
 		File directoryWithTargetFiles = new File(args[1]);
 		boolean dryRun = false;
 		String filter = null; // mauritius
+		String prefix = "Hillshade_";
 		for(int i = 2; i < args.length; i++ ){
 			if("--dry-run".equals(args[i])) {
 				dryRun = true;
+			} else if(args[i].startsWith("--prefix=")) {
+				prefix = args[i].substring("--prefix=".length());
+			} else if(args[i].startsWith("--maxzoom=")) {
+				MAX_ZOOM = Integer.parseInt(args[i].substring("--maxzoom=".length()));
+			} else if(args[i].startsWith("--minzoom=")) {
+				MIN_ZOOM = Integer.parseInt(args[i].substring("--minzoom=".length()));
 			} else if(args[i].startsWith("--filter=")) {
 				filter = args[i].substring("--filter=".length());
 				if(filter.length() == 0) {
@@ -78,7 +85,7 @@ public class SplitHillshadeIntoRegions {
 				String dw = rc.getNameByType(downloadName);
 				System.out.println("Region " + fullName + " " + cnt++ + " out of " + allCountries.size());
 				try {
-					process(rc, lst, dw, sqliteFile, directoryWithTargetFiles, dryRun);
+					process(rc, lst, dw, sqliteFile, directoryWithTargetFiles, prefix, dryRun);
 				} catch(Exception e) {
 					failedCountries.add(fullName);
 					e.printStackTrace();
@@ -91,9 +98,9 @@ public class SplitHillshadeIntoRegions {
 	}
 
 	private static void process(BinaryMapDataObject country, List<BinaryMapDataObject> boundaries,
-			String downloadName, File sqliteFile, File directoryWithTargetFiles, boolean dryRun) throws IOException, SQLException, InterruptedException, IllegalArgumentException, XmlPullParserException {
+			String downloadName, File sqliteFile, File directoryWithTargetFiles, String prefix, boolean dryRun) throws IOException, SQLException, InterruptedException, IllegalArgumentException, XmlPullParserException {
 		String name = country.getName();
-		String dwName = Algorithms.capitalizeFirstLetterAndLowercase(downloadName) + ".hillshade";
+		String dwName = prefix + Algorithms.capitalizeFirstLetterAndLowercase(downloadName) + ".sqlitedb";
 		Set<Long> tileNames = new TreeSet<>();
 		final File targetFile = new File(directoryWithTargetFiles, dwName);
 		if(targetFile.exists()) {
@@ -151,16 +158,15 @@ public class SplitHillshadeIntoRegions {
 						}
 					}
 				}
-				// TODO test
-				long p = pack(tileX, tileY);
-				if(unpack1(p) != tileX || unpack2(p) != tileY) {
-					throw new IllegalArgumentException();
+				if(!isOut) {
+					int x = tileX;
+					int y = tileY;
+					for (int z = MAX_ZOOM; z >= MIN_ZOOM; z--) {
+						tileNames.add(pack(x, y, z));
+						x = x >> 1;
+						y = y >> 1;
+					}
 				}
-				System.out.println(" " + tileX + " " + tileY + " " + MAX_ZOOM + " " + isOut);
-//				if(!isOut) {
-				
-					tileNames.add(pack(tileX, tileY));
-//				}
 			}
 		}
 		System.out.println();
@@ -189,7 +195,7 @@ public class SplitHillshadeIntoRegions {
 			for(long s : tileNames) {
 				int x = unpack1(s);
 				int y = unpack2(s);
-				int z = MAX_ZOOM;
+				int z = unpack3(s);
 				ps.setInt(1, x);
 				ps.setInt(2, y);
 				ps.setInt(3, z);
@@ -236,17 +242,36 @@ public class SplitHillshadeIntoRegions {
 		pStatement.setString(7, "");
 		pStatement.execute();
 	}
-
-	private static long pack(int tileX, int tileY) {
-		return ((long)tileX << 31) + tileY;
+	
+	// @Native public static final long MAX_VALUE = 0x7fffffffffffffffL;
+	// @Native public static final int  MAX_VALUE = 0x7fffffff         ;
+	private static final long MASK1 = 0x00000000ffffff00L;
+	private static final long SHIFT_1 = 8;
+	private static final long MASK2 = 0x00ffffff00000000L;
+	private static final long SHIFT_2 = 32;
+	private static final long MASK3 = 0x00000000000000ffl;
+	private static final long SHIFT_3 = 0;
+	private static long pack(int r1, int r2, int r3) {
+		long l = 0;
+		l |= ((long)r1 << SHIFT_1) & MASK1;
+		l |= ((long)r2 << SHIFT_2) & MASK2;
+		l |= ((long)r3 << SHIFT_3) & MASK3;
+		if(unpack3(l) != r3  || unpack2(l) != r2  || unpack1(l) != r1 ) {
+			throw new IllegalStateException();
+		}
+		return l;
 	}
 	
-	private static int unpack1(long l) {
-		return (int) (l >> 31);
+	private static int unpack3(long l) {
+		return (int) ((l & MASK3) >> SHIFT_3);
 	}
 	
 	private static int unpack2(long l) {
-		return (int) (l - ((long)unpack1(l) << 31));
+		return (int) ((l & MASK2) >> SHIFT_2);
+	}
+	
+	private static int unpack1(long l) {
+		return (int) ((l & MASK1) >> SHIFT_1);
 	}
 
 	private static Way convertToWay(BinaryMapDataObject o) {
