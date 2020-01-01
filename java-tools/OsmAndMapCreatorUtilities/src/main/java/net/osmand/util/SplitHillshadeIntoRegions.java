@@ -2,7 +2,11 @@ package net.osmand.util;
 
 import java.io.File;
 import java.io.IOException;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -13,7 +17,6 @@ import java.util.TreeSet;
 import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlPullParserException;
 
-import net.osmand.IndexConstants;
 import net.osmand.PlatformUtil;
 import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.binary.BinaryMapIndexReader;
@@ -24,13 +27,15 @@ import net.osmand.data.MultipolygonBuilder;
 import net.osmand.data.QuadRect;
 import net.osmand.data.Ring;
 import net.osmand.map.OsmandRegions;
+import net.osmand.obf.preparation.DBDialect;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Way;
 
 public class SplitHillshadeIntoRegions {
 	private static final Log LOG = PlatformUtil.getLog(SplitHillshadeIntoRegions.class);
-	private static final int MIN_ZOOM = 5;
-	private static final int MAX_ZOOM = 13;
+	private static final int MIN_ZOOM = 1;
+	private static final int MAX_ZOOM = 11;
+	private static final int BATCH_SIZE = 100;
 
 	public static void main(String[] args) throws IOException {
 		File sqliteFile = new File(args[0]);
@@ -87,10 +92,9 @@ public class SplitHillshadeIntoRegions {
 
 	private static void process(BinaryMapDataObject country, List<BinaryMapDataObject> boundaries,
 			String downloadName, File sqliteFile, File directoryWithTargetFiles, boolean dryRun) throws IOException, SQLException, InterruptedException, IllegalArgumentException, XmlPullParserException {
-		final String suffix = "_" + IndexConstants.BINARY_MAP_VERSION + IndexConstants.BINARY_SRTM_MAP_INDEX_EXT;
 		String name = country.getName();
-		String dwName = Algorithms.capitalizeFirstLetterAndLowercase(downloadName + suffix);
-		Set<String> tileNames = new TreeSet<String>();
+		String dwName = Algorithms.capitalizeFirstLetterAndLowercase(downloadName) + ".hillshade";
+		Set<Long> tileNames = new TreeSet<>();
 		final File targetFile = new File(directoryWithTargetFiles, dwName);
 		if(targetFile.exists()) {
 			System.out.println("Already processed "+ name);
@@ -114,13 +118,13 @@ public class SplitHillshadeIntoRegions {
 		int bottomLat = (int) Math.floor(MapUtils.getTileNumberY(MAX_ZOOM, qr.bottom));
 		int topLat = (int) Math.floor(MapUtils.getTileNumberY(MAX_ZOOM, qr.top));
 		boolean onetile = leftLon == rightLon && bottomLat == topLat;
-		for(int ilon = leftLon; ilon <= rightLon; ilon++) {
-			for(int ilat = bottomLat; ilat <= topLat; ilat++) {
-				double llon = MapUtils.getLongitudeFromTile(MAX_ZOOM, ilon);
-				double rlon = MapUtils.getLongitudeFromTile(MAX_ZOOM, ilon + 1);
-				double tlat = MapUtils.getLatitudeFromTile(MAX_ZOOM, ilat);
-				double blat = MapUtils.getLatitudeFromTile(MAX_ZOOM, ilat + 1);
-				boolean isOut = !polygon.containsPoint((tlat + blat) * 0.5 , (llon + rlon) * 0.5) && !onetile;
+		for(int tileX = leftLon; tileX <= rightLon; tileX++) {
+			for(int tileY = bottomLat; tileY <= topLat; tileY++) {
+				double llon = MapUtils.getLongitudeFromTile(MAX_ZOOM, tileX);
+				double rlon = MapUtils.getLongitudeFromTile(MAX_ZOOM, tileX + 1);
+				double tlat = MapUtils.getLatitudeFromTile(MAX_ZOOM, tileY);
+				double blat = MapUtils.getLatitudeFromTile(MAX_ZOOM, tileY + 1);
+				boolean isOut = !polygon.containsPoint(tlat / 2 + blat / 2 , llon / 2 + rlon / 2) && !onetile;
 				if (isOut) {
 					LatLon bl = new LatLon(blat, llon);
 					LatLon br = new LatLon(blat, rlon);
@@ -147,9 +151,15 @@ public class SplitHillshadeIntoRegions {
 						}
 					}
 				}
-				if(!isOut) {
-					tileNames.add(ilon + "_" + ilat + "_" + MAX_ZOOM);
+				// TODO test
+				long p = pack(tileX, tileY);
+				if(unpack1(p) != tileX || unpack2(p) != tileY) {
+					throw new IllegalArgumentException();
 				}
+//				if(!isOut) {
+				
+					tileNames.add(pack(tileX, tileY));
+//				}
 			}
 		}
 		System.out.println();
@@ -159,13 +169,83 @@ public class SplitHillshadeIntoRegions {
 		if(dryRun) {
 			return;
 		}
-		File procFile = new File(directoryWithTargetFiles, dwName + ".proc");
+		procFile(sqliteFile, targetFile, tileNames);
+	}
+
+	private static void procFile(File sqliteFile, final File targetFile, Set<Long> tileNames) throws IOException, SQLException {
+		File procFile = new File(targetFile.getParentFile(), targetFile.getName() + ".proc");
 		boolean locked = !procFile.createNewFile();
 		if (locked) {
 			System.out.println("\n\n!!!!!!!! WARNING FILE IS BEING PROCESSED !!!!!!!!!\n\n");
 			return;
 		}
+		int batch = 0;
+		try(Connection sqliteConn = DBDialect.SQLITE.getDatabaseConnection(sqliteFile.getAbsolutePath(), LOG); 
+			Connection newFile = DBDialect.SQLITE.getDatabaseConnection(targetFile.getAbsolutePath(), LOG)) {
+			prepareNewHillshadeFile(newFile, false, MIN_ZOOM, MAX_ZOOM);
+			PreparedStatement ps = sqliteConn.prepareStatement("SELECT image FROM tiles WHERE x = ?, y = ?, z = ?, s = 0");
+			PreparedStatement is = newFile.prepareStatement("INSERT INTO tiles(x, y, z, s, image) VALUES(?, ?, ?, 0, ?)");
+			for(long s : tileNames) {
+				int x = unpack1(s);
+				int y = unpack2(s);
+				int z = MAX_ZOOM;
+				ps.setInt(1, x);
+				ps.setInt(2, y);
+				ps.setInt(3, z);
+				ResultSet rs = ps.executeQuery();
+				if(rs.next()) {
+					byte[] image = rs.getBytes(1);
+					is.setInt(1, x);
+					is.setInt(2, y);
+					is.setInt(3, z);
+					is.setBytes(4, image);
+					is.addBatch();
+					if(batch ++ >= BATCH_SIZE) {
+						batch = 0;
+						is.executeBatch();
+					}
+				}
+				rs.close();
+			}
+			is.executeBatch();
+			is.close();
+			ps.close();
+		};
 		procFile.delete();
+	}
+
+	private static void prepareNewHillshadeFile(Connection newFile, boolean bigPlanet, int minZoom, int maxZoom) throws SQLException {
+		Statement statement = newFile.createStatement();
+		statement.execute("CREATE TABLE tiles (x int, y int, z int, s int, image blob, time long, PRIMARY KEY (x,y,z,s))");
+		statement.execute("CREATE INDEX IND on tiles (x,y,z,s)");
+		statement.execute("CREATE TABLE info(tilenumbering,minzoom,maxzoom,timecolumn,url,rule,referer)");
+		statement.close();
+
+
+		PreparedStatement pStatement = newFile.prepareStatement("INSERT INTO INFO VALUES(?,?,?,?,?,?,?)");
+		String tileNumbering = bigPlanet ? "BigPlanet" : "simple";
+		pStatement.setString(1, tileNumbering);
+		int minNormalZoom = bigPlanet ? 17 - maxZoom : minZoom;
+		int maxNormalZoom = bigPlanet ? 17 - minZoom : maxZoom;
+		pStatement.setInt(2, minNormalZoom);
+		pStatement.setInt(3, maxNormalZoom);
+		pStatement.setString(4, "yes");
+		pStatement.setString(5, "");
+		pStatement.setString(6, "");
+		pStatement.setString(7, "");
+		pStatement.execute();
+	}
+
+	private static long pack(int tileX, int tileY) {
+		return ((long)tileX << 31) + tileY;
+	}
+	
+	private static int unpack1(long l) {
+		return (int) (l >> 31);
+	}
+	
+	private static int unpack2(long l) {
+		return (int) (l - ((long)unpack1(l) << 31));
 	}
 
 	private static Way convertToWay(BinaryMapDataObject o) {
