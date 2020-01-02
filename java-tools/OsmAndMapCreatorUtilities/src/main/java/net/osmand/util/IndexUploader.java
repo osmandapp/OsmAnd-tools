@@ -439,7 +439,7 @@ public class IndexUploader {
 		if (wikiFile != this.wikiProcess) {
 			return null;
 		}
-		if (regionFile) {
+		if (regionFile && !fileName.contains("_ext_")) {
 			extractRoadOnlyFile(
 					mainFile,
 					new File(mainFile.getParentFile(), fileName.replace(IndexConstants.BINARY_MAP_INDEX_EXT,
