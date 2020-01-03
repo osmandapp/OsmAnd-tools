@@ -110,6 +110,7 @@ public class MainUtilities {
 				settings.indexRouting = true;
 				scanSrtmFolder(subArgs, settings);
 				checkAddRegionArgsArgs(subArgs, settings);
+				jpnToEngTransliteration(subArgs, settings);
 				IndexCreator ic = new IndexCreator(new File("."), settings);
 				ic.setLastModifiedDate(new File(subArgs.get(0)).lastModified());
 				generateObf(toArray(subArgs), ic);
@@ -122,6 +123,7 @@ public class MainUtilities {
 				settings.indexRouting = true;
 				checkAddRegionArgsArgs(subArgs, settings);
 				scanSrtmFolder(subArgs, settings);
+				jpnToEngTransliteration(subArgs, settings);
 				IndexCreator ic = new IndexCreator(new File("."), settings);
 				ic.setLastModifiedDate(new File(subArgs.get(0)).lastModified());
 				generateObf(toArray(subArgs), ic);
@@ -224,6 +226,17 @@ public class MainUtilities {
 			String s = it.next();
 			if(s.startsWith("--srtm=")) {
 				settings.srtmDataFolder = new File(s.substring(s.indexOf('=') + 1));
+				it.remove();
+			}
+		}
+	}
+	
+	private static void jpnToEngTransliteration(List<String> subArgs, IndexCreatorSettings settings) {
+		Iterator<String> it = subArgs.iterator();
+		while(it.hasNext()) {
+			String s = it.next();
+			if (s.equals("--jpn-to-eng")) {
+				settings.jpnToEng = true;
 				it.remove();
 			}
 		}

@@ -52,6 +52,7 @@ import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Relation.RelationMember;
 import net.osmand.osm.edit.Way;
 import net.osmand.util.Algorithms;
+import net.osmand.util.JapaneseTranslitHelper;
 import net.osmand.util.MapUtils;
 
 import org.apache.commons.logging.Log;
@@ -439,7 +440,6 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 	public void indexAddressRelation(Relation i, OsmDbAccessorContext ctx) throws SQLException {
 		if ("street".equals(i.getTag(OSMTagKey.TYPE)) || "associatedStreet".equals(i.getTag(OSMTagKey.TYPE))) { //$NON-NLS-1$
-
 			LatLon l = null;
 			String streetName = null;
 			Set<String> isInNames = null;
