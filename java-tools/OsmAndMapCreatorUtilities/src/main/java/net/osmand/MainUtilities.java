@@ -228,7 +228,7 @@ public class MainUtilities {
 			}
 		}
 	}
-	
+		
 	private static void checkAddRegionArgsArgs(List<String> subArgs, IndexCreatorSettings settings) {
 		Iterator<String> it = subArgs.iterator();
 		while(it.hasNext()) {

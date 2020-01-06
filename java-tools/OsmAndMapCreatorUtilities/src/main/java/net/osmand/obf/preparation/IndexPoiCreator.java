@@ -34,10 +34,12 @@ import net.osmand.osm.MapRenderingTypesEncoder.EntityConvertApplyType;
 import net.osmand.osm.PoiType;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityType;
+import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.osm.edit.EntityParser;
 import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Relation.RelationMember;
 import net.osmand.util.Algorithms;
+import net.osmand.util.JapaneseTranslitHelper;
 import net.osmand.util.MapUtils;
 import net.sf.junidecode.Junidecode;
 
@@ -75,7 +77,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	private Map<String, PoiAdditionalType> additionalTypesByTag = new HashMap<String, PoiAdditionalType>();
 	private IndexCreatorSettings settings;
 
-
 	public IndexPoiCreator(IndexCreatorSettings settings, MapRenderingTypesEncoder renderingTypes, boolean overwriteIds) {
 		this.settings = settings;
 		this.renderingTypes = renderingTypes;
@@ -102,8 +103,17 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	}
 
 	public void iterateEntity(Entity e, OsmDbAccessorContext ctx, boolean basemap) throws SQLException {
+		iterateEntity(e, ctx, basemap, false);
+	}
+	
+	public void iterateEntity(Entity e, OsmDbAccessorContext ctx, boolean basemap, boolean translitJapaneseNames) throws SQLException {
 		tempAmenityList.clear();
 		tagsTransform.addPropogatedTags(e);
+		if (translitJapaneseNames && e.getTag(OSMTagKey.NAME_EN.getValue()) == null 
+				&& !Algorithms.isEmpty(e.getTag(OSMTagKey.NAME.getValue()))) {
+			e.putTag(OSMTagKey.NAME_EN.getValue(), 
+					JapaneseTranslitHelper.getEnglishTransliteration(e.getTag(OSMTagKey.NAME.getValue())));
+		}
 		Map<String, String> tags = e.getTags();
 		Map<String, String> etags = renderingTypes.transformTags(tags, EntityType.valueOf(e), EntityConvertApplyType.POI);
 		boolean privateReg = "private".equals(e.getTag("access"));

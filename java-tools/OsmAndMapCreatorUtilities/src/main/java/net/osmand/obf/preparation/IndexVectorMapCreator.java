@@ -50,6 +50,7 @@ import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Relation.RelationMember;
 import net.osmand.osm.edit.Way;
 import net.osmand.util.Algorithms;
+import net.osmand.util.JapaneseTranslitHelper;
 import net.osmand.util.MapUtils;
 import rtree.Element;
 import rtree.IllegalValueException;
@@ -686,6 +687,10 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	}
 	
 	public void iterateMainEntity(Entity e, OsmDbAccessorContext ctx, OsmandRegions or) throws SQLException {
+		iterateMainEntity(e, ctx, or, false);
+	}
+	
+	public void iterateMainEntity(Entity e, OsmDbAccessorContext ctx, OsmandRegions or, boolean translitJapaneseNames) throws SQLException {
 		if (e instanceof Way || e instanceof Node) {
 			if (or != null && e instanceof Way) {
 				try {
@@ -693,6 +698,11 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 				} catch (IOException e1) {
 					e1.printStackTrace();
 				}
+			}
+			if (translitJapaneseNames && Algorithms.isEmpty(e.getTag(OSMTagKey.NAME_EN.getValue())) 
+					&& !Algorithms.isEmpty(e.getTag(OSMTagKey.NAME.getValue()))) {
+				e.putTag(OSMTagKey.NAME_EN.getValue(), 
+						JapaneseTranslitHelper.getEnglishTransliteration(e.getTag(OSMTagKey.NAME.getValue())));
 			}
 			tagsTransformer.addMultipleNetwoksTag(e);
 			tagsTransformer.addPropogatedTags(e);
