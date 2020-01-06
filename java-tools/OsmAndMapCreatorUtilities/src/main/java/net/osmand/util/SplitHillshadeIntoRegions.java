@@ -172,7 +172,7 @@ public class SplitHillshadeIntoRegions {
 		System.out.println();
 		System.out.println("-----------------------------");
 		System.out.println("PROCESSING "+name + " lon [" + leftLon + " - " + rightLon + "] lat [" + bottomLat + " - " + topLat
-				+ "] TOTAL " + tileNames.size() + " files " + tileNames);
+				+ "] TOTAL " + tileNames.size() + " files ");
 		if(dryRun) {
 			return;
 		}
