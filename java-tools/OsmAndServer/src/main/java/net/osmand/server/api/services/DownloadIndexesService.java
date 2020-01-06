@@ -104,6 +104,7 @@ public class DownloadIndexesService  {
 		loadIndexesFromDir(doc.getRoadMaps(), rootFolder, "road-indexes", DownloadType.ROAD_MAP);
 		loadIndexesFromDir(doc.getSrtmMaps(), rootFolder, "srtm-countries", DownloadType.SRTM_MAP);
 		loadIndexesFromDir(doc.getHillshade(), rootFolder, "hillshade", DownloadType.HILLSHADE);
+		loadIndexesFromDir(doc.getSlope(), rootFolder, "slope", DownloadType.SLOPE);
 		return doc;
 	}
 	
@@ -244,6 +245,7 @@ public class DownloadIndexesService  {
 	    WIKIVOYAGE ("wikivoyage"),
 	    ROAD_MAP ("road_region"),
 	    HILLSHADE ("hillshade"),
+	    SLOPE ("slope"),
 	    SRTM_MAP ("srtmcountry");
 
 	    private final String xmlTag;
@@ -267,6 +269,7 @@ public class DownloadIndexesService  {
 			case WIKIVOYAGE:
 				return f.getName().endsWith(".sqlite");
 			case HILLSHADE:
+			case SLOPE:
 				return f.getName().endsWith(".sqlitedb");
 			case FONTS:
 				return f.getName().endsWith(".otf.zip");
@@ -294,6 +297,8 @@ public class DownloadIndexesService  {
 				return String.format("Wikivoyage for %s", regionName);
 			case HILLSHADE:
 				return String.format("Hillshade for %s", regionName);
+			case SLOPE:
+				return String.format("Slope for %s", regionName);
 			case FONTS:
 				return String.format("Fonts %s", regionName);
 			case VOICE:
@@ -342,6 +347,7 @@ public class DownloadIndexesService  {
 	public enum DownloadServerSpecialty {
 		SRTM,
 		HILLSHADE,
+		SLOPE,
 		OSMLIVE,
 		MAIN,
 		WIKI,

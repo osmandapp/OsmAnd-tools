@@ -53,6 +53,9 @@ public class DownloadIndexDocument {
 	@XmlElement(name = "hillshade")
 	private List<DownloadIndex> hillshade = new ArrayList<>();
 	
+	@XmlElement(name = "slope")
+	private List<DownloadIndex> slope = new ArrayList<>();
+	
 	public void prepareMaps() {
 		Comparator<DownloadIndex> cmp = new Comparator<DownloadIndex>() {
 
@@ -64,6 +67,7 @@ public class DownloadIndexDocument {
 		Collections.sort(maps, cmp);
 		Collections.sort(roadMaps, cmp);
 		Collections.sort(srtmMaps, cmp);
+		Collections.sort(slope, cmp);
 		Collections.sort(hillshade, cmp);
 		Collections.sort(inapps, cmp);
 		Collections.sort(voices, cmp);
@@ -110,6 +114,10 @@ public class DownloadIndexDocument {
 
 	public List<DownloadIndex> getHillshade() {
 		return hillshade;
+	}
+	
+	public List<DownloadIndex> getSlope() {
+		return slope;
 	}
 
 	@XmlAttribute

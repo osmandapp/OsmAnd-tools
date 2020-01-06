@@ -183,6 +183,9 @@ public class DownloadIndexController {
 		if (params.containsKey("hillshade")) {
 			return getFileAsResource("hillshade", filename);
 		}
+		if (params.containsKey("slope")) {
+			return getFileAsResource("slope", filename);
+		}
 		if (params.containsKey("inapp")) {
 			String type = params.getFirst("inapp");
 			return getFileAsResource("indexes/inapp/"+type, filename);
@@ -217,6 +220,10 @@ public class DownloadIndexController {
 	
 	private boolean isHillshade(MultiValueMap<String, String> params) {
 		return isContainAndEqual("hillshade", params); 
+	}
+	
+	private boolean isSlope(MultiValueMap<String, String> params) {
+		return isContainAndEqual("slope", params); 
 	}
 	
 	private boolean isRoad(MultiValueMap<String, String> params) {
@@ -268,6 +275,8 @@ public class DownloadIndexController {
 			String host = null;
 			if(isSrtm(params)) {
 				host = servers.getServer(DownloadServerSpecialty.SRTM);
+			} else if(isSlope(params)) {
+				host = servers.getServer(DownloadServerSpecialty.SLOPE);
 			} else if(isHillshade(params)) {
 				host = servers.getServer(DownloadServerSpecialty.HILLSHADE);
 			} else if(isLiveMaps(params)) {

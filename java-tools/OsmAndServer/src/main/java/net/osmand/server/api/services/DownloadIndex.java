@@ -167,6 +167,8 @@ public class DownloadIndex {
 				dt = DownloadIndexesService.DownloadType.SRTM_MAP;
 			} else if (v.equals("hillshade")) {
 				dt = DownloadIndexesService.DownloadType.HILLSHADE;
+			} else if (v.equals("slope")) {
+				dt = DownloadIndexesService.DownloadType.SLOPE;
 			} else if (v.equals("road_map")) {
 				dt = DownloadIndexesService.DownloadType.ROAD_MAP;
 			}
