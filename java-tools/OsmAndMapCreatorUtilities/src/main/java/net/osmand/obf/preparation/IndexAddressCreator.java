@@ -52,7 +52,6 @@ import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Relation.RelationMember;
 import net.osmand.osm.edit.Way;
 import net.osmand.util.Algorithms;
-import net.osmand.util.JapaneseTranslitHelper;
 import net.osmand.util.MapUtils;
 
 import org.apache.commons.logging.Log;

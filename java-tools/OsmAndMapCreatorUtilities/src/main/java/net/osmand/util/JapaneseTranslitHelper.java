@@ -80,6 +80,10 @@ public class JapaneseTranslitHelper {
 			}
 			builder.append(" ");
 		}
+		String result = builder.toString().trim();
+		if (result.endsWith("-")) {
+			result = result.substring(0, result.length()-1);
+		}
 		return builder.toString();
 	}
 
