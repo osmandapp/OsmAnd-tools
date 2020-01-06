@@ -296,9 +296,9 @@ public class DownloadIndexesService  {
 			case WIKIVOYAGE:
 				return String.format("Wikivoyage for %s", regionName);
 			case HILLSHADE:
-				return String.format("Hillshade for %s", regionName);
+				return String.format("%s", regionName);
 			case SLOPE:
-				return String.format("Slope for %s", regionName);
+				return String.format("%s", regionName);
 			case FONTS:
 				return String.format("Fonts %s", regionName);
 			case VOICE:
