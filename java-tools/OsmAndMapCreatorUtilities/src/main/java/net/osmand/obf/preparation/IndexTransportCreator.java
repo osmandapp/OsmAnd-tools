@@ -19,6 +19,7 @@ import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Relation.RelationMember;
 import net.osmand.osm.edit.Way;
 import net.osmand.util.Algorithms;
+import net.osmand.util.JapaneseTranslitHelper;
 import net.osmand.util.MapUtils;
 import net.sf.junidecode.Junidecode;
 
@@ -118,7 +119,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 
 	public void writeBinaryTransportTree(rtree.Node parent, RTree r, BinaryMapIndexWriter writer,
 			PreparedStatement selectTransportStop, PreparedStatement selectTransportRouteStop,
-			Map<Long, Long> transportRoutes, Map<String, Integer> stringTable) throws IOException, RTreeException, SQLException {
+			Map<Long, Long> transportRoutes, Map<String, Integer> stringTable, boolean translitFromJapan) throws IOException, RTreeException, SQLException {
 		Element[] e = parent.getAllElements();
 		TLongArrayList routesOffsets = null;
 		TLongArrayList routesIds = null;
@@ -139,8 +140,13 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 					String nameEn = rs.getString(5);
 					Map<String, String> names = gson.fromJson(rs.getString(6),t);
 					if (nameEn != null && nameEn.equals(Junidecode.unidecode(name))) {
-						nameEn = null;
+						if (translitFromJapan) {
+							nameEn = JapaneseTranslitHelper.getEnglishTransliteration(name);
+						} else {
+							nameEn = null;	
+						}
 					}
+
 					String deletedRoutesStr = rs.getString(7);
 					if (deletedRoutes == null) {
 						deletedRoutes = new TLongArrayList();
@@ -190,7 +196,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 				rtree.Node ns = r.getReadNode(ptr);
 
 				writer.startTransportTreeElement(re.getMinX(), re.getMaxX(), re.getMinY(), re.getMaxY());
-				writeBinaryTransportTree(ns, r, writer, selectTransportStop, selectTransportRouteStop, transportRoutes, stringTable);
+				writeBinaryTransportTree(ns, r, writer, selectTransportStop, selectTransportRouteStop, transportRoutes, stringTable, translitFromJapan);
 				writer.endWriteTransportTreeElement();
 			}
 		}
@@ -530,7 +536,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 
 
 	public void writeBinaryTransportIndex(BinaryMapIndexWriter writer, String regionName,
-			Connection mapConnection) throws IOException, SQLException {
+			Connection mapConnection, boolean translitFromJapan) throws IOException, SQLException {
 		try {
 			closePreparedStatements(transRouteStat, transRouteStopsStat, transStopsStat, transRouteGeometryStat);
 			mapConnection.commit();
@@ -563,7 +569,12 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 				String routeName = rs.getString(3);
 				String routeEnName = rs.getString(4);
 				if (routeEnName != null && routeEnName.equals(Junidecode.unidecode(routeName))) {
-					routeEnName = null;
+					if (translitFromJapan) {
+						routeEnName = JapaneseTranslitHelper.getEnglishTransliteration(routeName);
+					} else {
+						routeEnName = null;	
+					}
+					
 				}
 				String ref = rs.getString(5);
 				String operator = rs.getString(6);
@@ -621,7 +632,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			if (rootBounds != null) {
 				writer.startTransportTreeElement(rootBounds.getMinX(), rootBounds.getMaxX(), rootBounds.getMinY(), rootBounds.getMaxY());
 				writeBinaryTransportTree(root, transportStopsTree, writer, selectTransportStop, selectTransportRouteStop,
-						transportRoutes, stringTable);
+						transportRoutes, stringTable, translitFromJapan);
 				writer.endWriteTransportTreeElement();
 			}
 			selectTransportStop.close();

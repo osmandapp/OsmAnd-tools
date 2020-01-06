@@ -93,8 +93,7 @@ public class IndexCreator {
 	private boolean deleteDatabaseIndexes = true;
 	
 	OsmandRegions or = null;
-	
-	
+		
 	public IndexCreator(File workingDir, IndexCreatorSettings settings) {
 		this.workingDir = workingDir;
 		this.settings = settings;
@@ -218,7 +217,7 @@ public class IndexCreator {
 		or.cacheAllCountries();
 		return or;
 	}
-	
+
 	private void iterateMainEntity(Entity e, OsmDbAccessorContext ctx, boolean translitJapaneseNames) throws SQLException {
 		if (heightData != null && e instanceof Way) {
 			heightData.proccess((Way) e);
@@ -575,7 +574,7 @@ public class IndexCreator {
 		boolean translitJapaneseNames = false;
 		if (regionName.startsWith("Japan")) {
 			translitJapaneseNames = true;
-			System.out.println("region: " + regionName);
+			//System.out.println("region: " + regionName);
 		} 
 
 		this.indexTransportCreator = new IndexTransportCreator(settings);
@@ -698,7 +697,7 @@ public class IndexCreator {
 				if (settings.indexTransport) {
 					setGeneralProgress(progress, "[95 of 100]");
 					progress.startTask("Writing transport index to binary file...", -1);
-					indexTransportCreator.writeBinaryTransportIndex(writer, regionName, mapConnection);
+					indexTransportCreator.writeBinaryTransportIndex(writer, regionName, mapConnection, translitJapaneseNames);
 				}
 				progress.finishTask();
 				writer.close();

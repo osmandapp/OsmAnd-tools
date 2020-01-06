@@ -439,6 +439,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 	public void indexAddressRelation(Relation i, OsmDbAccessorContext ctx) throws SQLException {
 		if ("street".equals(i.getTag(OSMTagKey.TYPE)) || "associatedStreet".equals(i.getTag(OSMTagKey.TYPE))) { //$NON-NLS-1$
+
 			LatLon l = null;
 			String streetName = null;
 			Set<String> isInNames = null;

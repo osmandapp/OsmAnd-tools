@@ -12,7 +12,6 @@ public class IndexCreatorSettings {
 	public boolean indexAddress;
 	public boolean indexRouting;
 	public boolean addRegionTag = false;
-//	public boolean jpnToEng = false;
 
 	// generate low level roads and maps
 	public boolean generateLowLevel = true;
