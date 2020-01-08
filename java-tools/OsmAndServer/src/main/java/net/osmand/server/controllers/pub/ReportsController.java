@@ -220,7 +220,7 @@ public class ReportsController {
 				getCacheFile(TRANSACTIONS_FILE).delete();
 			}
 			reader = readJsonUrl(
-					"https://raw.githubusercontent.com/osmandapp/osmandapp.github.io/master/website/reports/transactions.json",
+					"https://osmand.net/reports/transactions.json",
 					TRANSACTIONS_FILE, true);
 			rep.mapTransactions = (Map<String, BtcTransactionsMonth>) formatter.fromJson(reader, tp);
 			
