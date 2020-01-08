@@ -541,7 +541,7 @@ public class ReportsController {
 					rdr.close();
 				}
 				// Map<?, ?> data = (Map<?, ?>) payoutObjects.get("data");
-				Map<String, String> ins = new TreeMap<String, String>();
+//				Map<String, String> ins = new TreeMap<String, String>();
 				long totalIn = 0;
 				long totalOut = 0;
 				List<Map<?, ?>> inputs = (List<Map<?, ?>>) payoutObjects.get("inputs");
@@ -549,8 +549,10 @@ public class ReportsController {
 					Map<?, ?> in = (Map<?, ?>) inp.get("prev_out");
 					String address = (String) in.get("addr");
 					totalIn += ((Number) in.get("value")).longValue();
-					ins.put(address, in.get("value").toString());
-					rep.ownAddresses.add(address);
+//					ins.put(address, in.get("value").toString());
+					if(address != null) {
+						rep.ownAddresses.add(address);
+					}
 				}
 				List<Map<?, ?>> outputs = (List<Map<?, ?>>) payoutObjects.get("out");
 				for (Map<?, ?> payout : outputs) {
