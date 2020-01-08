@@ -62,6 +62,7 @@ import com.google.gson.stream.JsonReader;
 import net.osmand.data.changeset.OsmAndLiveReportType;
 import net.osmand.data.changeset.OsmAndLiveReports;
 import net.osmand.data.changeset.OsmAndLiveReports.RecipientsReport;
+import net.osmand.server.utils.Bech32;
 import net.osmand.util.Algorithms;
 
 @RestController
@@ -541,15 +542,18 @@ public class ReportsController {
 					rdr.close();
 				}
 				// Map<?, ?> data = (Map<?, ?>) payoutObjects.get("data");
-//				Map<String, String> ins = new TreeMap<String, String>();
+				Map<String, String> ins = new TreeMap<String, String>();
 				long totalIn = 0;
 				long totalOut = 0;
 				List<Map<?, ?>> inputs = (List<Map<?, ?>>) payoutObjects.get("inputs");
 				for (Map<?, ?> inp : inputs) {
 					Map<?, ?> in = (Map<?, ?>) inp.get("prev_out");
 					String address = (String) in.get("addr");
+					if(address == null) {
+						address = convertScriptToAddress((String) in.get("script"));
+					}
 					totalIn += ((Number) in.get("value")).longValue();
-//					ins.put(address, in.get("value").toString());
+					ins.put(address, in.get("value").toString());
 					if(address != null) {
 						rep.ownAddresses.add(address);
 					}
@@ -557,6 +561,9 @@ public class ReportsController {
 				List<Map<?, ?>> outputs = (List<Map<?, ?>>) payoutObjects.get("out");
 				for (Map<?, ?> payout : outputs) {
 					String address = (String) payout.get("addr");
+					if(address == null) {
+						address = convertScriptToAddress((String) payout.get("script"));
+					}
 					long sum = ((Number) payout.get("value")).longValue();
 					totalOut += sum;
 					if (rep.ownAddresses.contains(address)) {
@@ -584,6 +591,19 @@ public class ReportsController {
 				}
 			}
 		}
+	}
+
+	private String convertScriptToAddress(String script) {
+		if(!script.startsWith("0014")) {
+			throw new IllegalArgumentException("Script is not supported: " + script);
+		}
+		String scriptData = script.substring("0014".length());
+		byte[] scriptDataBytes = new byte[scriptData.length() / 2];
+    	for(int i = 0; i < scriptDataBytes.length; i++) {
+    		scriptDataBytes[i] = (byte) Integer.parseInt(scriptData.substring(2 * i, 2 * i + 2), 16);
+    	}
+    	byte[] wdata = Bech32.encodeWitnessData(0, scriptDataBytes);
+    	return Bech32.encode("bc", wdata);
 	}
 
 	public static long getMinSatoshiPay() {

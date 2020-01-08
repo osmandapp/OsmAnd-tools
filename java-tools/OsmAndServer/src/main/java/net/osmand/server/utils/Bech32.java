@@ -1,5 +1,6 @@
 package net.osmand.server.utils;
 
+import java.io.ByteArrayOutputStream;
 import java.util.Arrays;
 import java.util.Locale;
 
@@ -146,4 +147,61 @@ public class Bech32 {
         if (!verifyChecksum(hrp, values)) throw new IllegalArgumentException();
         return new Bech32Data(hrp, Arrays.copyOfRange(values, 0, values.length - 6));
     }
+    
+    /**
+     * Helper for the above constructor.
+     */
+    public static byte[] encodeWitnessData(int witnessVersion, byte[] witnessProgram) throws IllegalArgumentException {
+        byte[] convertedProgram = convertBits(witnessProgram, 0, witnessProgram.length, 8, 5, true);
+        byte[] bytes = new byte[1 + convertedProgram.length];
+        bytes[0] = (byte) (witnessVersion & 0xff);
+        System.arraycopy(convertedProgram, 0, bytes, 1, convertedProgram.length);
+        return bytes;
+    }
+    
+
+    /**
+     * Helper for re-arranging bits into groups.
+     */
+    private static byte[] convertBits(final byte[] in, final int inStart, final int inLen, final int fromBits,
+            final int toBits, final boolean pad) throws IllegalArgumentException {
+        int acc = 0;
+        int bits = 0;
+        ByteArrayOutputStream out = new ByteArrayOutputStream(64);
+        final int maxv = (1 << toBits) - 1;
+        final int max_acc = (1 << (fromBits + toBits - 1)) - 1;
+        for (int i = 0; i < inLen; i++) {
+            int value = in[i + inStart] & 0xff;
+            if ((value >>> fromBits) != 0) {
+                throw new IllegalArgumentException(
+                        String.format("Input value '%X' exceeds '%d' bit size", value, fromBits));
+            }
+            acc = ((acc << fromBits) | value) & max_acc;
+            bits += fromBits;
+            while (bits >= toBits) {
+                bits -= toBits;
+                out.write((acc >>> bits) & maxv);
+            }
+        }
+        if (pad) {
+            if (bits > 0)
+                out.write((acc << (toBits - bits)) & maxv);
+        } else if (bits >= fromBits || ((acc << (toBits - bits)) & maxv) != 0) {
+            throw new IllegalArgumentException("Could not convert bits, invalid padding");
+        }
+        return out.toByteArray();
+    }
+    
+    
+    public static void main(String[] args) {
+    	// 0014de263788c3647b12e4d02246e715025a50faf61b
+    	String str = "de263788c3647b12e4d02246e715025a50faf61b";
+    	byte[] ar = new byte[str.length() / 2];
+    	for(int i = 0; i < ar.length; i++) {
+    		ar[i] = (byte) Integer.parseInt(str.substring(2 * i, 2 * i + 2), 16);
+    	}
+    	byte[] r2 = encodeWitnessData(0, ar);
+		String en = encode("bc", r2);
+		System.out.println(en);
+	}
 }
