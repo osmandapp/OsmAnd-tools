@@ -192,16 +192,4 @@ public class Bech32 {
         return out.toByteArray();
     }
     
-    
-    public static void main(String[] args) {
-    	// 0014de263788c3647b12e4d02246e715025a50faf61b
-    	String str = "de263788c3647b12e4d02246e715025a50faf61b";
-    	byte[] ar = new byte[str.length() / 2];
-    	for(int i = 0; i < ar.length; i++) {
-    		ar[i] = (byte) Integer.parseInt(str.substring(2 * i, 2 * i + 2), 16);
-    	}
-    	byte[] r2 = encodeWitnessData(0, ar);
-		String en = encode("bc", r2);
-		System.out.println(en);
-	}
 }

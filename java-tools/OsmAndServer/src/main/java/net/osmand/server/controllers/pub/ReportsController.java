@@ -554,9 +554,7 @@ public class ReportsController {
 					}
 					totalIn += ((Number) in.get("value")).longValue();
 					ins.put(address, in.get("value").toString());
-					if(address != null) {
-						rep.ownAddresses.add(address);
-					}
+					rep.ownAddresses.add(address);
 				}
 				List<Map<?, ?>> outputs = (List<Map<?, ?>>) payoutObjects.get("out");
 				for (Map<?, ?> payout : outputs) {
@@ -725,10 +723,13 @@ public class ReportsController {
 	public static String processBTCAddress(String specifiedBtc) {
 		String res = specifiedBtc.replace("-", "").replace(" ", "").trim();
 		if (res.equals("3c9e8e73bff140b391e71eae311cdcce")) {
-			return "1GRgEnKujorJJ9VBa76g8cp3sfoWtQqSs4";
+			return OSMAND_BTC_DONATION_ADDR;
+			// second own address
+		} else if (res.equals("3MHyi4qtrmaxEy9A336RMwZaYqUzcbF2gr")) {
+			return OSMAND_BTC_DONATION_ADDR;
 		} else if (res.equals("3")) {
 			// not valid address dmpr0
-			return "1GRgEnKujorJJ9VBa76g8cp3sfoWtQqSs4";
+			return OSMAND_BTC_DONATION_ADDR;
 		} else if (res.equals("13H8LERRKFUTqr2YM9J9bdy6xshzjwSAfw")) {
 			return "1A2PRCVN2tFnF5AXBwXmPyV52gH11uCFaS";
 		} else if (res.equals("3d347aae368d426aae104d50d3bdd695") || res.equals("3d347aae368d426aae104b50d3bdd695")) {
