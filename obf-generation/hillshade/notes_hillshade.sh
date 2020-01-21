@@ -82,7 +82,7 @@ fi
 
 if [ "$START_STAGE" -le 8 ] && [ "$END_STAGE" -ge 8 ]; then
 	echo "8. Create a sqlite containing 256x256 png tiles, in TMS numbering scheme (can last for WEEKS) $(date)"
-	$DIR/gdal2tiles_gray2alpha_sqlite.py -z 0-11 all-3857.tif
+	$DIR/gdal2tiles_gray2alpha_sqlite.py -e -z 0-11 all-3857.tif
 fi
 # Create country-wide sqlites compatible with Osmand (minutes or hour each, 5-6days complete country list)
 # ./extractSqlite.py -i $WORKSPACE/tools/OsmAndMapCreator/src/net/osmand/map/countries.xml -s $JENKINS_HOME/data/all-3857.tif.sqlitedb -o $JENKINS_HOME/hillshade_sqlite/
