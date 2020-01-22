@@ -49,6 +49,7 @@ import javax.swing.filechooser.FileFilter;
 import javax.xml.stream.XMLStreamException;
 
 import net.osmand.MapCreatorVersion;
+import net.osmand.SQLiteBigPlanetIndex;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.CachedOsmandIndexes;
 import net.osmand.data.Amenity;
@@ -630,7 +631,8 @@ public class OsmExtractionUI implements IMapLocationListener {
 							@Override
 							public void run() {
 								try {
-									SQLiteBigPlanetIndex.createSQLiteDatabase(DataExtractionSettings.getSettings().getTilesDirectory(), regionName, map);
+									SQLiteBigPlanetIndex.createSQLiteDatabase( 
+											new net.osmand.SQLiteBigPlanetIndex.SQLiteParams(DataExtractionSettings.getSettings().getTilesDirectory(), regionName, map));
 								} catch (SQLException e1) {
 									throw new IllegalArgumentException(e1);
 								} catch (IOException e1) {

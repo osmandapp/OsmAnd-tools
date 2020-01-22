@@ -78,8 +78,8 @@ public class BinaryInspector {
 		// test cases show info
 		if ("test".equals(args[0])) {
 			in.inspector(new String[] {
-//					"-vpoi",
-					"-vmap", "-vmapobjects",
+					"-vpoi",
+//					"-vmap", "-vmapobjects",
 //					"-vmapcoordinates",
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
@@ -89,8 +89,8 @@ public class BinaryInspector {
 //					"-zoom=7",
 //					"-bbox=30.51,50.5,30.53,50.4",
 //					"-osm="+System.getProperty("maps.dir")+"/basemap/map.obf.osm",
-					System.getProperty("maps.dir")+"/Luxembourg_europe_2.road.obf"
-//					System.getProperty("maps.dir")+"/olive/19_07_29_20_20_diff.obf"
+//					System.getProperty("maps.dir")+"/Germany_schleswig-holstein_europe_20_01_00.obf"
+					System.getProperty("maps.dir")+"/Map.obf"
 			});
 		} else {
 			in.inspector(args);

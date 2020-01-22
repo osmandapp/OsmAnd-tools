@@ -97,6 +97,8 @@ public class MainUtilities {
 				FixBasemapRoads.main(subArgsArray);
 			} else if (utl.equals("generate-ocean-tile")) {
 				OceanTilesCreator.createTilesFile(subArgsArray[0], subArgsArray.length > 1 ? subArgsArray[1] : null);
+			} else if (utl.equals("create-sqlitedb")) {
+				SQLiteBigPlanetIndex.main(subArgsArray);
 			} else if (utl.equals("test-routing")) {
 				net.osmand.router.TestRouting.main(subArgsArray);
 			} else if (utl.equals("generate-ocbf")) {
@@ -314,6 +316,7 @@ public class MainUtilities {
 		System.out.println("\t\t generate-basemap <folder-with-osm-base-files> <optional mini>: generates basemap from prepared osm files");
 		System.out.println("\t\t fix-basemap-roads <input-osm-file> <output-osm-file>: merges and simplifies basemap roads");
 		System.out.println("\t\t merge-index " + BinaryMerger.helpMessage);
+		System.out.println("\t\t create-sqlitedb <dir-with-tiles> [options] <optional sqlitedbfile>: creates .sqlitedb with tiles from directory. USE 'create-sqlitedb --help' to get all params. ");
 		
 		System.out.println("\t\t compare " + BinaryComparator.helpMessage);
 		System.out.println("\t\t generate-from-overpass <path to overpass.xml (must have format 2017_06_18-10_30)> <path to working directory>: The utility converts overpass.xml to obf");
