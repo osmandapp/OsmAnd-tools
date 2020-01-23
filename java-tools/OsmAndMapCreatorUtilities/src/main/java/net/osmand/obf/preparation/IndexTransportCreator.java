@@ -146,7 +146,6 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 							nameEn = null;	
 						}
 					}
-
 					String deletedRoutesStr = rs.getString(7);
 					if (deletedRoutes == null) {
 						deletedRoutes = new TLongArrayList();
@@ -724,6 +723,23 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			}
 			if (color == null) {
 				color = master.getTag(OSMTagKey.COLOUR);
+			}
+		}
+		if (ref == null && route != null) {
+			String name = rel.getTag(OSMTagKey.NAME);
+			if (name != null) {
+				if (name.length() <= 5) {
+					ref = name.toUpperCase();
+				} else if (name.contains(" ") || name.contains("-")) {
+					String[] subnames = name.split(" ");
+					char[] newRef = new char[subnames.length];
+					for (int i = 0; i < subnames.length; i++) {
+						if (!Algorithms.isEmpty(subnames[i])) {
+							newRef[i] = subnames[i].charAt(0);	
+						}
+					}
+					ref = newRef.length <= 5 ? new String(newRef).toUpperCase() : new String(newRef).substring(0, 4).toUpperCase();
+				}
 			}
 		}
 
