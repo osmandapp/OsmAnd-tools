@@ -82,8 +82,9 @@ fi
 if [ "$START_STAGE" -le 8 ] && [ "$END_STAGE" -ge 8 ]; then
 	echo "8. Add alpha to planet"
 	if [ "$PROCESS" = "composite" ] || [ "$PROCESS" = "hillshade" ]; then
-		gdaldem color-relief -alpha WGS84-all.tif hillshade_alpha.txt WGS84-all-tmp.tif -co "COMPRESS=LZW" -co "BIGTIFF=YES" -co "TILED=YES"
+		gdaldem color-relief -alpha WGS84-all.tif $DIR/hillshade_alpha.txt WGS84-all-tmp.tif -co "COMPRESS=LZW" -co "BIGTIFF=YES" -co "TILED=YES"
 		gdal_translate -b 1 -b 4 -colorinterp_1 gray WGS84-all-tmp.tif WGS84-all-alpha.tif -co "COMPRESS=LZW" -co "BIGTIFF=YES" -co "TILED=YES"
+		rm  WGS84-all-tmp.tif || true
 	fi
 fi
 if [ "$START_STAGE" -le 9 ] && [ "$END_STAGE" -ge 9 ]; then
