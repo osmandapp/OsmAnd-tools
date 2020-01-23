@@ -90,10 +90,6 @@ if [ "$START_STAGE" -le 9 ] && [ "$END_STAGE" -ge 9 ]; then
 	echo "9. Split planet to tiles"
 	gdal2tiles.py --processes 3 -e -z 4-11 WGS84-all-alpha.tif tiles/
 fi
-if [ "$START_STAGE" -le 10 ] && [ "$END_STAGE" -ge 10 ]; then
-	echo "10. Create a sqlite containing 256x256 png tiles, in TMS numbering scheme (can last for WEEKS) $(date)"
-	OsmAndMapCreator/utilities.sh create-sqlitedb tiles/ --inverted_y $PROCESS.sqlitedb
-fi
 
 # Create country-wide sqlites compatible with Osmand (minutes or hour each, 5-6days complete country list)
 # ./extractSqlite.py -i $WORKSPACE/tools/OsmAndMapCreator/src/net/osmand/map/countries.xml -s $JENKINS_HOME/data/all-3857.tif.sqlitedb -o $JENKINS_HOME/hillshade_sqlite/
