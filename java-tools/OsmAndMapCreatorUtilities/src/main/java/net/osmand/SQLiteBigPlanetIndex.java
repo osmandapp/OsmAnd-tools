@@ -119,7 +119,7 @@ public class SQLiteBigPlanetIndex {
 		System.out.println("\t\t --minzoom=: minzoom for sqlitedb, otherwise determined automatically");
 		System.out.println("\t\t --maxzoom=: maxzoom for sqlitedb, otherwise determined automatically");
 		
-		System.out.println("\t\t --inverted_y: inverted y");
+		System.out.println("\t\t --inverted_y: inverts y, while insert and request inverted y for url");
 		System.out.println("\t\t --expireminutes: minutes expiration to redownload tile");
 		System.out.println("\t\t --ellipsoid: ellipsoid mercator projection");
 		System.out.println("\t\t --urltemplate=: url template to download new tiles");
@@ -242,6 +242,10 @@ public class SQLiteBigPlanetIndex {
 							try {
 								int i = f.getName().indexOf('.');
 								int y = Integer.parseInt(f.getName().substring(0, i));
+								if(params.invertedY) {
+									y = (1 << zoom) - 1 - y;
+								}
+								
 								buf = new byte[(int) f.length()];
 								if(zoom > maxZoom){
 									maxZoom = zoom;
