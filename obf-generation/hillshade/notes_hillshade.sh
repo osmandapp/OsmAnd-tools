@@ -5,6 +5,7 @@
 # It is strongly advised to split this bash script into smaller ones
 # and run them with nohup !
 # consider running this world-wide will last a few weeks
+cd test
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 if [ -z "$START_STAGE" ]; then
 	START_STAGE=1
@@ -19,7 +20,8 @@ fi
 mkdir -p hillshade
 mkdir -p slopes
 mkdir -p composite
-
+echo dir $DIR
+sleep 1000
 if [ "$START_STAGE" -le 1 ] && [ "$END_STAGE" -ge 1 ]; then
 	echo "1. Create hillshade and slope tiles (can last hours or 1-2 days) $(date)"
 	for F in data/*.tif
@@ -81,8 +83,11 @@ if [ "$START_STAGE" -le 7 ] && [ "$END_STAGE" -ge 7 ]; then
 fi
 
 if [ "$START_STAGE" -le 8 ] && [ "$END_STAGE" -ge 8 ]; then
-	echo "8. Create a sqlite containing 256x256 png tiles, in TMS numbering scheme (can last for WEEKS) $(date)"
-	$DIR/gdal2tiles_gray2alpha_sqlite.py -e -z 0-11 all-3857.tif
+# 	echo "8. "
+# 	if [ "$PROCESS" = "composite" ] || [ "$PROCESS" = "hillshade" ]; then
+#
+# 	$DIR/gdal2tiles_gray2alpha_sqlite.py -e -z 0-11 all-3857.tif
 fi
+#Create a sqlite containing 256x256 png tiles, in TMS numbering scheme (can last for WEEKS) $(date)
 # Create country-wide sqlites compatible with Osmand (minutes or hour each, 5-6days complete country list)
 # ./extractSqlite.py -i $WORKSPACE/tools/OsmAndMapCreator/src/net/osmand/map/countries.xml -s $JENKINS_HOME/data/all-3857.tif.sqlitedb -o $JENKINS_HOME/hillshade_sqlite/
