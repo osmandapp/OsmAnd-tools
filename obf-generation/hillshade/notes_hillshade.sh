@@ -60,7 +60,7 @@ if [ "$START_STAGE" -le 4 ] && [ "$END_STAGE" -ge 4 ]; then
 fi
 
 if [ "$START_STAGE" -le 5 ] && [ "$END_STAGE" -ge 5 ]; then
-	echo " 5. Make a small tiff to check before going further $(date)"
+	echo "5. Make a small tiff to check before going further $(date)"
 	rm WGS84-all-small.tif || true
 	gdalwarp -of GTiff -ts 4000 0 WGS84-all.tif WGS84-all-small.tif
 fi
@@ -80,11 +80,21 @@ if [ "$START_STAGE" -le 7 ] && [ "$END_STAGE" -ge 7 ]; then
 fi
 
 if [ "$START_STAGE" -le 8 ] && [ "$END_STAGE" -ge 8 ]; then
-# 	echo "8. "
-# 	if [ "$PROCESS" = "composite" ] || [ "$PROCESS" = "hillshade" ]; then
-#
-# 	$DIR/gdal2tiles_gray2alpha_sqlite.py -e -z 0-11 all-3857.tif
+	echo "8. Add alpha to planet"
+	if [ "$PROCESS" = "composite" ] || [ "$PROCESS" = "hillshade" ]; then
+		gdaldem color-relief -alpha WGS84-all.tif hillshade_alpha.txt WGS84-all-tmp.tif -co "COMPRESS=LZW" -co "BIGTIFF=YES" -co "TILED=YES"
+		gdal_translate -b 1 -b 4 -colorinterp_1 gray WGS84-all-tmp.tif WGS84-all-alpha.tif -co "COMPRESS=LZW" -co "BIGTIFF=YES" -co "TILED=YES"
+	fi
 fi
+if [ "$START_STAGE" -le 9 ] && [ "$END_STAGE" -ge 9 ]; then
+	echo "9. Split planet to tiles"
+	gdal2tiles.py --processes 3 -e -z 4-11 WGS84-all-alpha.tif tiles/
+fi
+if [ "$START_STAGE" -le 10 ] && [ "$END_STAGE" -ge 10 ]; then
+	echo "10. Create planet sqlitedb"
+	OsmAndMapCreator/utilities.sh create-sqlitedb tiles/ --inverted_y $PROCESS.sqlitedb
+fi
+
 #Create a sqlite containing 256x256 png tiles, in TMS numbering scheme (can last for WEEKS) $(date)
 # Create country-wide sqlites compatible with Osmand (minutes or hour each, 5-6days complete country list)
 # ./extractSqlite.py -i $WORKSPACE/tools/OsmAndMapCreator/src/net/osmand/map/countries.xml -s $JENKINS_HOME/data/all-3857.tif.sqlitedb -o $JENKINS_HOME/hillshade_sqlite/
