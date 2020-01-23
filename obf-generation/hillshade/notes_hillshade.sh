@@ -5,7 +5,6 @@
 # It is strongly advised to split this bash script into smaller ones
 # and run them with nohup !
 # consider running this world-wide will last a few weeks
-cd test
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 if [ -z "$START_STAGE" ]; then
 	START_STAGE=1
@@ -20,8 +19,6 @@ fi
 mkdir -p hillshade
 mkdir -p slopes
 mkdir -p composite
-echo dir $DIR
-sleep 1000
 if [ "$START_STAGE" -le 1 ] && [ "$END_STAGE" -ge 1 ]; then
 	echo "1. Create hillshade and slope tiles (can last hours or 1-2 days) $(date)"
 	for F in data/*.tif
