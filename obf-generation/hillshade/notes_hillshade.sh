@@ -66,30 +66,33 @@ if [ "$START_STAGE" -le 5 ] && [ "$END_STAGE" -ge 5 ]; then
 fi
 
 if [ "$START_STAGE" -le 6 ] && [ "$END_STAGE" -ge 6 ]; then
-	echo "6. Then re-project to Mercator (can last hours or 1-2 days) $(date)"
+	echo "6. [DISABLED NOW] Then re-project to Mercator (can last hours or 1-2 days) $(date)"
 	rm  all-3857.tif || true
-	gdalwarp -of GTiff -co "JPEG_QUALITY=90" -co "BIGTIFF=YES" -co "TILED=YES" -co "COMPRESS=JPEG" \
-		-t_srs "+init=epsg:3857 +over" \
-		-r cubic -order 3 -multi WGS84-all.tif all-3857.tif
+	# gdalwarp -of GTiff -co "JPEG_QUALITY=90" -co "BIGTIFF=YES" -co "TILED=YES" -co "COMPRESS=JPEG" \
+	#	-t_srs "+init=epsg:3857 +over" \
+	#	-r cubic -order 3 -multi WGS84-all.tif all-3857.tif
 fi
 
 if [ "$START_STAGE" -le 7 ] && [ "$END_STAGE" -ge 7 ]; then
-	echo "7. Make a small tiff to check before going further $(date)"
+	echo "7. [DISABLED NOW] Make a small tiff to check before going further $(date)"
 	rm all-small-3857.tif || true
-	gdalwarp -of GTiff -co "COMPRESS=JPEG" -ts 4000 0 all-3857.tif all-small-3857.tif
+	# gdalwarp -of GTiff -co "COMPRESS=JPEG" -ts 4000 0 all-3857.tif all-small-3857.tif
 fi
 
 if [ "$START_STAGE" -le 8 ] && [ "$END_STAGE" -ge 8 ]; then
 	echo "8. Add alpha to planet"
-	if [ "$PROCESS" = "composite" ] || [ "$PROCESS" = "hillshade" ]; then
+	# if [ "$PROCESS" = "composite" ] || [ "$PROCESS" = "hillshade" ]; then
 		gdaldem color-relief -alpha WGS84-all.tif $DIR/hillshade_alpha.txt WGS84-all-tmp.tif -co "COMPRESS=LZW" -co "BIGTIFF=YES" -co "TILED=YES"
 		gdal_translate -b 1 -b 4 -colorinterp_1 gray WGS84-all-tmp.tif WGS84-all-alpha.tif -co "COMPRESS=LZW" -co "BIGTIFF=YES" -co "TILED=YES"
 		rm  WGS84-all-tmp.tif || true
-	fi
+		# mv WGS84-all-alpha.tif WGS84-all.tif
+	# fi
 fi
 if [ "$START_STAGE" -le 9 ] && [ "$END_STAGE" -ge 9 ]; then
 	echo "9. Split planet to tiles"
-	gdal2tiles.py --processes 3 -e -z 4-11 WGS84-all-alpha.tif tiles/
+	rm -rf tiles/
+	# -e option to continue
+	gdal2tiles.py --processes 3 -z 4-11 WGS84-all-alpha.tif tiles/
 fi
 
 # Create country-wide sqlites compatible with Osmand (minutes or hour each, 5-6days complete country list)
