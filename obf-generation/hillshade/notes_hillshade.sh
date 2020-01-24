@@ -56,44 +56,54 @@ fi
  
 if [ "$START_STAGE" -le 4 ] && [ "$END_STAGE" -ge 4 ]; then
 	echo "4. Merge all tile in a single giant tiff (can last hours or 1-2 days) $(date)"
-	gdal_translate -of GTiff -co "COMPRESS=JPEG" -co "BIGTIFF=YES" -co "TILED=YES" virtualtiff.vrt WGS84-all.tif
+	gdal_translate -of GTiff -co "COMPRESS=JPEG" -co "BIGTIFF=YES" -co "TILED=YES" virtualtiff.vrt $PROCESS-WGS84-all.tif
 fi
 
 if [ "$START_STAGE" -le 5 ] && [ "$END_STAGE" -ge 5 ]; then
 	echo "5. Make a small tiff to check before going further $(date)"
-	rm WGS84-all-small.tif || true
-	gdalwarp -of GTiff -ts 4000 0 WGS84-all.tif WGS84-all-small.tif
+	rm $PROCESS-WGS84-all-small.tif || true
+	gdalwarp -of GTiff -ts 4000 0 $PROCESS-WGS84-all.tif $PROCESS-WGS84-all-small.tif
 fi
 
 if [ "$START_STAGE" -le 6 ] && [ "$END_STAGE" -ge 6 ]; then
 	echo "6. [DISABLED NOW] Then re-project to Mercator (can last hours or 1-2 days) $(date)"
-	rm  all-3857.tif || true
+	rm  $PROCESS-all-3857.tif || true
 	# gdalwarp -of GTiff -co "JPEG_QUALITY=90" -co "BIGTIFF=YES" -co "TILED=YES" -co "COMPRESS=JPEG" \
 	#	-t_srs "+init=epsg:3857 +over" \
-	#	-r cubic -order 3 -multi WGS84-all.tif all-3857.tif
+	#	-r cubic -order 3 -multi $PROCESS-WGS84-all.tif $PROCESS-all-3857.tif
 fi
 
 if [ "$START_STAGE" -le 7 ] && [ "$END_STAGE" -ge 7 ]; then
 	echo "7. [DISABLED NOW] Make a small tiff to check before going further $(date)"
-	rm all-small-3857.tif || true
-	# gdalwarp -of GTiff -co "COMPRESS=JPEG" -ts 4000 0 all-3857.tif all-small-3857.tif
+	rm $PROCESS-all-small-3857.tif || true
+	# gdalwarp -of GTiff -co "COMPRESS=JPEG" -ts 4000 0 $PROCESS-all-3857.tif $PROCESS-all-small-3857.tif
 fi
 
 if [ "$START_STAGE" -le 8 ] && [ "$END_STAGE" -ge 8 ]; then
-	echo "8. Add alpha to planet"
-	# if [ "$PROCESS" = "composite" ] || [ "$PROCESS" = "hillshade" ]; then
-		gdaldem color-relief -alpha WGS84-all.tif $DIR/hillshade_alpha.txt WGS84-all-tmp.tif -co "COMPRESS=LZW" -co "BIGTIFF=YES" -co "TILED=YES"
-		gdal_translate -b 1 -b 4 -colorinterp_1 gray WGS84-all-tmp.tif WGS84-all-alpha.tif -co "COMPRESS=LZW" -co "BIGTIFF=YES" -co "TILED=YES"
-		rm  WGS84-all-tmp.tif || true
-		# mv WGS84-all-alpha.tif WGS84-all.tif
-	# fi
+	echo "8. Add alpha or color to planet"
+	if [ "$PROCESS" = "composite" ] || [ "$PROCESS" = "hillshade" ]; then
+		COLOR_SCHEME=hillshade_alpha
+	elif [ "$PROCESS" = "slopes" ]; then
+		COLOR_SCHEME=slopes_orange
+	fi
+	gdaldem color-relief -alpha $PROCESS-WGS84-all.tif $DIR/$COLOR_SCHEME.txt $PROCESS-WGS84-all-tmp.tif -co "COMPRESS=LZW" -co "BIGTIFF=YES" -co "TILED=YES"
+	if [ "$PROCESS" = "composite" ] || [ "$PROCESS" = "hillshade" ]; then
+		gdal_translate -b 1 -b 4 -colorinterp_1 gray $PROCESS-WGS84-all-tmp.tif $PROCESS-WGS84-all-alpha.tif -co "COMPRESS=LZW" -co "BIGTIFF=YES" -co "TILED=YES"
+	fi
+#	rm $PROCESS-WGS84-all-tmp.tif || true
+	# mv WGS84-all-alpha.tif WGS84-all.tif
 fi
 if [ "$START_STAGE" -le 9 ] && [ "$END_STAGE" -ge 9 ]; then
 	echo "9. Split planet to tiles"
 	rm -rf tiles/ || true
 	# -e option to continue
-	gdal2tiles.py --processes 3 -z 4-11 WGS84-all-alpha.tif tiles/
-	rm WGS84-all-alpha.tif || true
+	if [ "$PROCESS" = "composite" ] || [ "$PROCESS" = "hillshade" ]; then
+		NAME_SUFFIX=alpha
+	elif [ "$PROCESS" = "slopes" ]; then
+		NAME_SUFFIX=tmp
+	fi
+	gdal2tiles.py --processes 3 -z 4-11 $PROCESS-WGS84-all-$NAME_SUFFIX.tif tiles/
+	rm $PROCESS-WGS84-all-$NAME_SUFFIX.tif || true
 fi
 
 # Create country-wide sqlites compatible with Osmand (minutes or hour each, 5-6days complete country list)
