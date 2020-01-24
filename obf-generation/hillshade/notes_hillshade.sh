@@ -86,24 +86,22 @@ if [ "$START_STAGE" -le 8 ] && [ "$END_STAGE" -ge 8 ]; then
 	elif [ "$PROCESS" = "slopes" ]; then
 		COLOR_SCHEME=slopes_orange
 	fi
-	gdaldem color-relief -alpha WGS84-all.tif $DIR/$COLOR_SCHEME.txt WGS84-all-tmp.tif -co "COMPRESS=LZW" -co "BIGTIFF=YES" -co "TILED=YES"
+	gdaldem color-relief -alpha WGS84-all.tif $DIR/$COLOR_SCHEME.txt WGS84-all-color.tif -co "COMPRESS=LZW" -co "BIGTIFF=YES" -co "TILED=YES"
+	rm WGS84-all-alpha.tif || true
 	if [ "$PROCESS" = "composite" ] || [ "$PROCESS" = "hillshade" ]; then
-		gdal_translate -b 1 -b 4 -colorinterp_1 gray WGS84-all-tmp.tif WGS84-all-alpha.tif -co "COMPRESS=LZW" -co "BIGTIFF=YES" -co "TILED=YES"
+		gdal_translate -b 1 -b 4 -colorinterp_1 gray WGS84-all-color.tif WGS84-all-alpha.tif -co "COMPRESS=LZW" -co "BIGTIFF=YES" -co "TILED=YES"
+		rm WGS84-all-color.tif || true
+	else
+		mv WGS84-all-color.tif WGS84-all-alpha.tif
 	fi
-#	rm WGS84-all-tmp.tif || true
-	# mv WGS84-all-alpha.tif WGS84-all.tif
 fi
 if [ "$START_STAGE" -le 9 ] && [ "$END_STAGE" -ge 9 ]; then
 	echo "9. Split planet to tiles"
 	rm -rf tiles/ || true
 	# -e option to continue
-	if [ "$PROCESS" = "composite" ] || [ "$PROCESS" = "hillshade" ]; then
-		NAME_SUFFIX=alpha
-	elif [ "$PROCESS" = "slopes" ]; then
-		NAME_SUFFIX=tmp
-	fi
-	gdal2tiles.py --processes 3 -z 4-11 WGS84-all-$NAME_SUFFIX.tif tiles/
-	rm WGS84-all-$NAME_SUFFIX.tif || true
+	gdal2tiles.py --processes 3 -z 4-11 WGS84-all-alpha.tif tiles/
+	rm WGS84-all-alpha.tif || true
+	
 fi
 
 # Create country-wide sqlites compatible with Osmand (minutes or hour each, 5-6days complete country list)
