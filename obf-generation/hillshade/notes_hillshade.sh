@@ -90,9 +90,10 @@ if [ "$START_STAGE" -le 8 ] && [ "$END_STAGE" -ge 8 ]; then
 fi
 if [ "$START_STAGE" -le 9 ] && [ "$END_STAGE" -ge 9 ]; then
 	echo "9. Split planet to tiles"
-	rm -rf tiles/
+	rm -rf tiles/ || true
 	# -e option to continue
 	gdal2tiles.py --processes 3 -z 4-11 WGS84-all-alpha.tif tiles/
+	rm WGS84-all-alpha.tif || true
 fi
 
 # Create country-wide sqlites compatible with Osmand (minutes or hour each, 5-6days complete country list)
