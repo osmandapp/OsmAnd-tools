@@ -197,8 +197,8 @@ public class SplitHillshadeIntoRegions {
 				int y = unpack2(s);
 				int z = unpack3(s);
 				ps.setInt(1, x);
-				int yt = (1 << z) - y - 1;
-				ps.setInt(2, yt);
+				//int yt = (1 << z) - y - 1;
+				ps.setInt(2, y);
 				ps.setInt(3, z);
 				ResultSet rs = ps.executeQuery();
 				if(rs.next()) {
