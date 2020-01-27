@@ -84,6 +84,9 @@ if [ "$START_STAGE" -le 8 ] && [ "$END_STAGE" -ge 8 ]; then
 	if [ "$PROCESS" = "composite" ] || [ "$PROCESS" = "hillshade" ]; then
 		COLOR_SCHEME=hillshade_alpha
 	elif [ "$PROCESS" = "slopes" ]; then
+		if [ ! -z "$COLOR_FILE" ]; then
+			COLOR_SCHEME=$COLOR_FILE
+		fi
 		COLOR_SCHEME=slopes_orange
 	fi
 	gdaldem color-relief -alpha WGS84-all.tif $DIR/$COLOR_SCHEME.txt WGS84-all-color.tif -co "COMPRESS=LZW" -co "BIGTIFF=YES" -co "TILED=YES"
