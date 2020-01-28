@@ -394,7 +394,7 @@ public class ObfDiffGenerator {
 					if (objE == null) {
 						if (modifiedObjIds == null || modifiedObjIds.contains(thisEntityId) || thisEntityId == null) {
 							BinaryMapDataObject obj = new BinaryMapDataObject(idx, objS.getCoordinates(), null,
-									objS.getObjectType(), objS.isArea(), new int[] { deleteId }, null, null);
+									objS.getObjectType(), objS.isArea(), new int[] { deleteId }, null, 0, 0);
 							endData.put(idx, obj);
 						} 
 					} else if (objE.compareBinary(objS, COORDINATES_PRECISION_COMPARE)) {

@@ -106,6 +106,7 @@ public class BinaryMapIndexWriter {
 	protected static final int SHIFT_COORDINATES = BinaryMapIndexReader.SHIFT_COORDINATES;
 	public int MASK_TO_READ = ~((1 << SHIFT_COORDINATES) - 1);
 	private static final int ROUTE_SHIFT_COORDINATES = 4;
+	private static final int LABEL_ZOOM_ENCODE = 31; 
 	private static Log log = LogFactory.getLog(BinaryMapIndexWriter.class);
 
 	private static class Bounds {
@@ -667,6 +668,9 @@ public class BinaryMapIndexWriter {
 		int pcalcy = (ptop >> SHIFT_COORDINATES);
 		int len = coordinates.length / 8;
 		int delta = 1;
+		long sumLabelX = 0;
+		long sumLabelY = 0;
+		int sumLabelCount = 0;
 		for (int i = 0; i < len; i += delta) {
 			int x = Algorithms.parseIntFromBytes(coordinates, i * 8);
 			int y = Algorithms.parseIntFromBytes(coordinates, i * 8 + 4);
@@ -676,6 +680,9 @@ public class BinaryMapIndexWriter {
 			writeRawVarint32(mapDataBuf, CodedOutputStream.encodeZigZag32(ty));
 			pcalcx = pcalcx + tx;
 			pcalcy = pcalcy + ty;
+			sumLabelX += pcalcx;
+			sumLabelY += pcalcy;
+			sumLabelCount++;
 			delta = 1;
 			if (allowCoordinateSimplification) {
 				delta = skipSomeNodes(coordinates, len, i, x, y, false);
@@ -721,14 +728,19 @@ public class BinaryMapIndexWriter {
 			}		
 		}
 		
-		if (labelCoordinates != null && labelCoordinates.length > 0) {
-			int x = Algorithms.parseIntFromBytes(labelCoordinates, 0);
-			int y = Algorithms.parseIntFromBytes(labelCoordinates, 4);
-			int tx = (x >> SHIFT_COORDINATES) - pcalcx;
-			int ty = (y >> SHIFT_COORDINATES) - pcalcy;
-//			System.out.println(String.format("Coords with shift: %d, %d", tx, ty));
-			writeRawVarint32(mapDataBuf, CodedOutputStream.encodeZigZag32(tx));
-			writeRawVarint32(mapDataBuf, CodedOutputStream.encodeZigZag32(ty));
+		if (labelCoordinates != null && labelCoordinates.length > 0 && sumLabelCount > 0) {
+			mapDataBuf.clear();
+			int LABEL_SHIFT = 31 - LABEL_ZOOM_ENCODE;
+			int x = (Algorithms.parseIntFromBytes(labelCoordinates, 0)) >> LABEL_SHIFT;
+			int y = (Algorithms.parseIntFromBytes(labelCoordinates, 4)) >> LABEL_SHIFT;
+			long labelX31 = (sumLabelX / sumLabelCount) << (SHIFT_COORDINATES - LABEL_SHIFT);
+			long labelY31 = (sumLabelY / sumLabelCount) << (SHIFT_COORDINATES - LABEL_SHIFT);
+			// TODO put a threshold
+			writeRawVarint32(mapDataBuf, CodedOutputStream.encodeZigZag32(x - (int) labelX31));
+			writeRawVarint32(mapDataBuf, CodedOutputStream.encodeZigZag32(y - (int) labelY31));
+			data.setLabelcoordinates(ByteString.copyFrom(mapDataBuf.toArray()));
+			COORDINATES_SIZE += CodedOutputStream.computeRawVarint32Size(mapDataBuf.size())
+					+ CodedOutputStream.computeTagSize(MapData.LABELCOORDINATES_FIELD_NUMBER) + mapDataBuf.size();
 		}
 		
 		mapDataBuf.clear();

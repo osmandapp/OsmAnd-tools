@@ -776,7 +776,7 @@ public class BinaryInspector {
 		public int lastObjectTypes;
 		public int lastObjectCoordinates;
 		public int lastObjectCoordinatesCount;
-
+		public int lastObjectLabelCoordinates;
 		public int lastObjectSize;
 
 		private Map<String, MapStatKey> types = new LinkedHashMap<String, BinaryInspector.MapStatKey>();
@@ -819,6 +819,7 @@ public class BinaryInspector {
 				this.lastObjectAdditionalTypes += st.lastObjectAdditionalTypes;
 				this.lastObjectTypes += st.lastObjectTypes;
 				this.lastObjectCoordinates += st.lastObjectCoordinates;
+				this.lastObjectLabelCoordinates += st.lastObjectLabelCoordinates;
 				cnt = obj.getPointsLength();
 				this.lastObjectSize += st.lastObjectSize;
 				if (obj.getPolygonInnerCoordinates() != null) {
@@ -853,7 +854,8 @@ public class BinaryInspector {
 			b = 0;
 			b += out("Header", lastObjectHeaderInfo);
 			b += out("Coordinates", lastObjectCoordinates);
-			out("Coordinates Count(pair)", lastObjectCoordinatesCount);
+			b += out("Label coordinates", lastObjectLabelCoordinates);
+			b += out("Coordinates Count (pairs)", lastObjectCoordinatesCount);
 			b += out("Types", lastObjectTypes);
 			b += out("Additonal Types", lastObjectAdditionalTypes);
 			b += out("Ids", lastObjectIdSize);
