@@ -106,7 +106,7 @@ public class BinaryMapIndexWriter {
 	protected static final int SHIFT_COORDINATES = BinaryMapIndexReader.SHIFT_COORDINATES;
 	public int MASK_TO_READ = ~((1 << SHIFT_COORDINATES) - 1);
 	private static final int ROUTE_SHIFT_COORDINATES = 4;
-	private static final int LABEL_ZOOM_ENCODE = 31; 
+	private static final int LABEL_ZOOM_ENCODE = BinaryMapIndexReader.LABEL_ZOOM_ENCODE; 
 	private static Log log = LogFactory.getLog(BinaryMapIndexWriter.class);
 
 	private static class Bounds {
@@ -732,11 +732,11 @@ public class BinaryMapIndexWriter {
 			int LABEL_SHIFT = 31 - LABEL_ZOOM_ENCODE;
 			int x = (Algorithms.parseIntFromBytes(labelCoordinates, 0)) >> LABEL_SHIFT;
 			int y = (Algorithms.parseIntFromBytes(labelCoordinates, 4)) >> LABEL_SHIFT;
-			long labelX31 = (sumLabelX / sumLabelCount) << (SHIFT_COORDINATES - LABEL_SHIFT);
-			long labelY31 = (sumLabelY / sumLabelCount) << (SHIFT_COORDINATES - LABEL_SHIFT);
+			long labelX = (sumLabelX / sumLabelCount) << (SHIFT_COORDINATES - LABEL_SHIFT);
+			long labelY = (sumLabelY / sumLabelCount) << (SHIFT_COORDINATES - LABEL_SHIFT);
 			// TODO put a threshold
-			writeRawVarint32(mapDataBuf, CodedOutputStream.encodeZigZag32(x - (int) labelX31));
-			writeRawVarint32(mapDataBuf, CodedOutputStream.encodeZigZag32(y - (int) labelY31));
+			writeRawVarint32(mapDataBuf, CodedOutputStream.encodeZigZag32(x - (int) labelX));
+			writeRawVarint32(mapDataBuf, CodedOutputStream.encodeZigZag32(y - (int) labelY));
 			data.setLabelcoordinates(ByteString.copyFrom(mapDataBuf.toArray()));
 			LABEL_COORDINATES_SIZE += CodedOutputStream.computeRawVarint32Size(mapDataBuf.size())
 					+ CodedOutputStream.computeTagSize(MapData.LABELCOORDINATES_FIELD_NUMBER) + mapDataBuf.size();

@@ -54,6 +54,7 @@ import net.osmand.binary.RouteDataObject;
 import net.osmand.data.Amenity;
 import net.osmand.data.Building;
 import net.osmand.data.City;
+import net.osmand.data.LatLon;
 import net.osmand.data.MapObject;
 import net.osmand.data.Street;
 import net.osmand.data.TransportRoute;
@@ -78,7 +79,7 @@ public class BinaryInspector {
 		// test cases show info
 		if ("test".equals(args[0])) {
 			in.inspector(new String[] {
-					"-vpoi",
+//					"-vpoi",
 					"-vmap", "-vmapobjects",
 //					"-vmapcoordinates",
 //					"-vrouting",
@@ -90,7 +91,8 @@ public class BinaryInspector {
 //					"-bbox=30.51,50.5,30.53,50.4",
 //					"-osm="+System.getProperty("maps.dir")+"/basemap/map.obf.osm",
 //					System.getProperty("maps.dir")+"/Germany_schleswig-holstein_europe_20_01_00.obf"
-					"/home/madwasp79/OsmAnd-maps/_Creator/Poly_center.obf"
+					System.getProperty("maps.dir")+"/Poly_center.obf"
+//					System.getProperty("maps.dir")+"/Map.obf"
 			});
 		} else {
 			in.inspector(args);
@@ -972,6 +974,10 @@ public class BinaryInspector {
 			b.append(obj.isArea() ? "Area" : (obj.getPointsLength() > 1 ? "Way" : "Point"));
 		}
 		int[] types = obj.getTypes();
+		if(obj.isLabelSpecified()) {
+			b.append(" ").append(new LatLon(MapUtils.get31LatitudeY(obj.getLabelY()), 
+					MapUtils.get31LongitudeX(obj.getLabelX())));
+		}
 		
 		b.append(" types [");
 		for (int j = 0; j < types.length; j++) {
