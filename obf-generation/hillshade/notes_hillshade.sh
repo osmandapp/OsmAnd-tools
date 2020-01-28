@@ -6,6 +6,11 @@
 # and run them with nohup !
 # consider running this world-wide will last a few weeks
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+#  VARIABLES: START_STAGE, END_STAGE, PROCESS, COLOR_SCHEME
+# LZW, JPEG
+FINAL_COMPRESS="${FINAL_COMPRESSION:-JPEG}"
+INTER_COMPRESS="${INTER_COMPRESS:-LZW}"
+
 if [ -z "$START_STAGE" ]; then
 	START_STAGE=1
 fi
@@ -56,7 +61,7 @@ fi
  
 if [ "$START_STAGE" -le 4 ] && [ "$END_STAGE" -ge 4 ]; then
 	echo "4. Merge all tile in a single giant tiff (can last hours or 1-2 days) $(date)"
-	gdal_translate -of GTiff -co "COMPRESS=LZW" -co "BIGTIFF=YES" -co "TILED=YES" virtualtiff.vrt WGS84-all.tif
+	gdal_translate -of GTiff -co "COMPRESS=$INTER_COMPRESS" -co "BIGTIFF=YES" -co "TILED=YES" virtualtiff.vrt WGS84-all.tif
 fi
 
 if [ "$START_STAGE" -le 5 ] && [ "$END_STAGE" -ge 5 ]; then
@@ -82,20 +87,17 @@ fi
 if [ "$START_STAGE" -le 8 ] && [ "$END_STAGE" -ge 8 ]; then
 	echo "8. Add alpha or color to planet"
 	if [ "$PROCESS" = "composite" ] || [ "$PROCESS" = "hillshade" ]; then
-		COLOR_SCHEME=hillshade_alpha
+		COLOR_SCHEME="${COLOR_SCHEME:-hillshade_alpha}"
 	elif [ "$PROCESS" = "slopes" ]; then
-		COLOR_SCHEME=slopes_orange
-		if [ ! -z "$COLOR_FILE" ]; then
-			COLOR_SCHEME=$COLOR_FILE
-		fi
+		COLOR_SCHEME="${COLOR_SCHEME:-slopes_main}"
 	fi
-	gdaldem color-relief -alpha WGS84-all.tif $DIR/$COLOR_SCHEME.txt WGS84-all-color.tif -co "COMPRESS=LZW" -co "BIGTIFF=YES" -co "TILED=YES"
 	rm WGS84-all-alpha.tif || true
 	if [ "$PROCESS" = "composite" ] || [ "$PROCESS" = "hillshade" ]; then
-		gdal_translate -b 1 -b 4 -colorinterp_1 gray WGS84-all-color.tif WGS84-all-alpha.tif -co "COMPRESS=LZW" -co "BIGTIFF=YES" -co "TILED=YES"
+		gdaldem color-relief -alpha WGS84-all.tif $DIR/$COLOR_SCHEME.txt WGS84-all-color.tif -co "COMPRESS=$INTER_COMPRESS" -co "BIGTIFF=YES" -co "TILED=YES"
+		gdal_translate -b 1 -b 4 -colorinterp_1 gray WGS84-all-color.tif WGS84-all-alpha.tif -co "COMPRESS=$FINAL_COMPRESS" -co "BIGTIFF=YES" -co "TILED=YES"
 		rm WGS84-all-color.tif || true
 	else
-		mv WGS84-all-color.tif WGS84-all-alpha.tif
+		gdaldem color-relief -alpha WGS84-all.tif $DIR/$COLOR_SCHEME.txt WGS84-all-alpha.tif -co "COMPRESS=$FINAL_COMPRESS" -co "BIGTIFF=YES" -co "TILED=YES"
 	fi
 fi
 if [ "$START_STAGE" -le 9 ] && [ "$END_STAGE" -ge 9 ]; then
