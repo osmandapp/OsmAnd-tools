@@ -487,7 +487,6 @@ public class BinaryMapIndexWriter {
 	public static int MAP_DATA_SIZE = 0;
 	public static int STRING_TABLE_SIZE = 0;
 	public static int LABEL_COORDINATES_SIZE = 0;
-	public static int LABEL_COORDINATES_COUNT = 0;
 
 	public static int ROUTE_ID_SIZE = 0;
 	public static int ROUTE_TYPES_SIZE = 0;
@@ -739,7 +738,7 @@ public class BinaryMapIndexWriter {
 			writeRawVarint32(mapDataBuf, CodedOutputStream.encodeZigZag32(x - (int) labelX31));
 			writeRawVarint32(mapDataBuf, CodedOutputStream.encodeZigZag32(y - (int) labelY31));
 			data.setLabelcoordinates(ByteString.copyFrom(mapDataBuf.toArray()));
-			COORDINATES_SIZE += CodedOutputStream.computeRawVarint32Size(mapDataBuf.size())
+			LABEL_COORDINATES_SIZE += CodedOutputStream.computeRawVarint32Size(mapDataBuf.size())
 					+ CodedOutputStream.computeTagSize(MapData.LABELCOORDINATES_FIELD_NUMBER) + mapDataBuf.size();
 		}
 		
@@ -1298,10 +1297,6 @@ public class BinaryMapIndexWriter {
 			} else {
 				i++;
 			}
-		}
-		int afterCompression = ct.size();
-		if(false) {
-			System.out.println(String.format("Compressed routes from %d to %d", beforeCompression, afterCompression));
 		}
 		return ct;
 	}
