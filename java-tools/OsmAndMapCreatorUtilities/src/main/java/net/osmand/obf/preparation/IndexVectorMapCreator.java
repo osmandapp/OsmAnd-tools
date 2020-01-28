@@ -321,7 +321,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 				}
 				innerWays = newinnerWays;
 			}
-			insertBinaryMapRenderObjectIndex(mapTree[level], outerWay, innerWays, namesUse, id, true, typeUse, addtypeUse, true);
+			insertBinaryMapRenderObjectIndex(mapTree[level], outerWay, innerWays, namesUse, id, true, typeUse, addtypeUse, true, true);
 
 		}
 	}
@@ -564,7 +564,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 				List<Node> res = new ArrayList<Node>();
 				OsmMapUtils.simplifyDouglasPeucker(wNodes, zoom - 1 + 8 + zoomWaySmoothness, 3, res, false);
 				if (res.size() > 0) {
-					insertBinaryMapRenderObjectIndex(mapTree[level], res, null, namesUse, id, false, typeUse, addtypeUse, false);
+					insertBinaryMapRenderObjectIndex(mapTree[level], res, null, namesUse, id, false, typeUse, addtypeUse, false, cycle);
 				}
 			}
 
@@ -766,16 +766,17 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 
 		long id = convertBaseIdToGeneratedId(assignedId, level);
 		List<Node> res = null;
+		boolean cycle = false;
 		if (e instanceof Node) {
 			res = Collections.singletonList((Node) e);
 		} else {
 			id |= 1;
-
+			cycle = ((Way) e).getFirstNodeId() == ((Way) e).getLastNodeId();
 			// simplify route id>>1
 			boolean mostDetailedLevel = level == 0 && !mapZooms.isDetailedZoomSimplified();
 			if (!mostDetailedLevel) {
 				int zoomToSimplify = mapZooms.getLevel(level).getMaxZoom() - 1;
-				boolean cycle = ((Way) e).getFirstNodeId() == ((Way) e).getLastNodeId();
+				
 				if (cycle) {
 					res = simplifyCycleWay(((Way) e).getNodes(), zoomToSimplify, zoomWaySmoothness);
 				} else {
@@ -788,7 +789,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		}
 		if (res != null) {
 			validateDuplicate(originalId, id);
-			insertBinaryMapRenderObjectIndex(mapTree[level], res, null, namesUse, id, area, typeUse, addtypeUse, true);
+			insertBinaryMapRenderObjectIndex(mapTree[level], res, null, namesUse, id, area, typeUse, addtypeUse, true, cycle);
 		}
 	}
 
@@ -816,7 +817,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			writer.writeMapEncodingRules(renderingTypes.getEncodingRuleTypes());
 
 			PreparedStatement selectData = mapConnection
-					.prepareStatement("SELECT area, coordinates, innerPolygons, types, additionalTypes, name FROM binary_map_objects WHERE id = ?");
+					.prepareStatement("SELECT area, coordinates, innerPolygons, types, additionalTypes, name, labelCoordinates FROM binary_map_objects WHERE id = ?");
 
 			// write map levels and map index
 			TLongObjectHashMap<BinaryFileReference> treeHeader = new TLongObjectHashMap<BinaryFileReference>();
@@ -927,9 +928,9 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 							addtypeUse[j / 2] = renderingTypes.getTypeByInternalId(ids).getTargetId();
 						}
 					}
-
+					
 					MapData mapData = writer.writeMapData(cid - baseId, parentBounds.getMinX(), parentBounds.getMinY(), rs.getBoolean(1), rs.getBytes(2), rs.getBytes(3),
-							typeUse, addtypeUse, tempNames, null, tempStringTable, dataBlock, level.getMaxZoom() > 15);
+							typeUse, addtypeUse, tempNames,  rs.getBytes(7),  null, tempStringTable, dataBlock, level.getMaxZoom() > 15);
 					if(mapData != null) {
 						dataBlock.addDataObjects(mapData);
 					}
@@ -1014,6 +1015,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 					int[] typeUse = mdo.getTypes();
 					int[] addtypeUse = mdo.getAdditionalTypes();
 					byte[] coordinates = new byte[8 * mdo.getPointsLength()];
+					byte[] labelCoordinates = new byte[0]; //TODO check
 					for (int t = 0; t < mdo.getPointsLength(); t++) {
 						Algorithms.putIntToBytes(coordinates, 8 * t, mdo.getPoint31XTile(t));
 						Algorithms.putIntToBytes(coordinates, 8 * t + 4, mdo.getPoint31YTile(t));
@@ -1035,7 +1037,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 					}
 					MapData mapData = writer.writeMapData(cid - baseId, parentBounds.getMinX(), parentBounds.getMinY(),
 							mdo.isArea(), coordinates, innerPolygonTypes,
-							typeUse, addtypeUse, null, mdo.getOrderedObjectNames(),
+							typeUse, addtypeUse, null, labelCoordinates, mdo.getOrderedObjectNames(),
 							tempStringTable, dataBlock, !doNotSimplify && pair.getMaxZoom() > 15);
 					if (mapData != null) {
 						dataBlock.addDataObjects(mapData);
@@ -1093,7 +1095,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	private void createMapIndexStructure(Connection conn) throws SQLException {
 		Statement stat = conn.createStatement();
 		stat.executeUpdate("create table binary_map_objects (id bigint primary key, name varchar(4096), "
-				+ "area smallint, types binary, additionalTypes binary, coordinates binary, innerPolygons binary)");
+				+ "area smallint, types binary, additionalTypes binary, coordinates binary, innerPolygons binary, labelCoordinates binary)");
 
 		stat.executeUpdate("create table low_level_map_objects (id bigint primary key, start_node bigint, "
 				+ "end_node bigint, name varchar(1024), nodes binary, type binary, addType binary, level smallint)");
@@ -1102,7 +1104,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 
 	private PreparedStatement createStatementMapBinaryInsert(Connection conn) throws SQLException {
 		return conn
-				.prepareStatement("insert into binary_map_objects(id, area, coordinates, innerPolygons, types, additionalTypes, name) values(?, ?, ?, ?, ?, ?, ?)");
+				.prepareStatement("insert into binary_map_objects(id, area, coordinates, innerPolygons, types, additionalTypes, name, labelCoordinates) values(?, ?, ?, ?, ?, ?, ?, ?)");
 	}
 
 	private PreparedStatement createStatementLowLevelMapBinaryInsert(Connection conn) throws SQLException {
@@ -1164,7 +1166,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	}
 
 	private void insertBinaryMapRenderObjectIndex(RTree mapTree, Collection<Node> nodes, List<List<Node>> innerWays,
-			Map<MapRulType, String> names, long id, boolean area, TIntArrayList types, TIntArrayList addTypes, boolean commit)
+			Map<MapRulType, String> names, long id, boolean area, TIntArrayList types, TIntArrayList addTypes, boolean commit, boolean cycle)
 			throws SQLException {
 		boolean init = false;
 		int minX = Integer.MAX_VALUE;
@@ -1176,6 +1178,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		ByteArrayOutputStream binnercoord = new ByteArrayOutputStream();
 		ByteArrayOutputStream btypes = new ByteArrayOutputStream();
 		ByteArrayOutputStream badditionalTypes = new ByteArrayOutputStream();
+		ByteArrayOutputStream blabelCoordinates = new ByteArrayOutputStream();
 
 		try {
 			for (int j = 0; j < types.size(); j++) {
@@ -1198,6 +1201,15 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 					Algorithms.writeInt(bcoordinates, y);
 				}
 			}
+			
+			if (cycle) {
+				LatLon labelll = OsmMapUtils.getComplexPolyCenter(nodes);
+				Algorithms.writeInt(blabelCoordinates, MapUtils.get31TileNumberX(labelll.getLongitude()));	
+				Algorithms.writeInt(blabelCoordinates, MapUtils.get31TileNumberY(labelll.getLatitude()));
+				
+				System.out.println("polycenter = " + labelll.toString() + ", nodes size: "+ nodes.size() + ", x->" + MapUtils.get31TileNumberY(labelll.getLatitude()) + ", y->" + MapUtils.get31TileNumberX(labelll.getLongitude()));
+			}
+			
 
 			if (innerWays != null) {
 				for (List<Node> ws : innerWays) {
@@ -1231,6 +1243,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			mapBinaryStat.setBytes(5, btypes.toByteArray());
 			mapBinaryStat.setBytes(6, badditionalTypes.toByteArray());
 			mapBinaryStat.setString(7, encodeNames(names));
+			mapBinaryStat.setBytes(8, blabelCoordinates.toByteArray());
 			addBatch(mapBinaryStat, commit);
 			try {
 				mapTree.insert(new LeafElement(new Rect(minX, minY, maxX, maxY), id));

@@ -485,6 +485,8 @@ public class BinaryMapIndexWriter {
 	public static int TYPES_SIZE = 0;
 	public static int MAP_DATA_SIZE = 0;
 	public static int STRING_TABLE_SIZE = 0;
+	public static int LABEL_COORDINATES_SIZE = 0;
+	public static int LABEL_COORDINATES_COUNT = 0;
 
 	public static int ROUTE_ID_SIZE = 0;
 	public static int ROUTE_TYPES_SIZE = 0;
@@ -655,7 +657,7 @@ public class BinaryMapIndexWriter {
 	private TByteArrayList typesAddDataBuf = new TByteArrayList();
 
 	public MapData writeMapData(long diffId, int pleft, int ptop, boolean area, byte[] coordinates, byte[] innerPolygonTypes, int[] typeUse,
-			int[] addtypeUse, Map<MapRulType, String> names, Map<Integer, String> namesDiff, Map<String, Integer> stringTable, MapDataBlock.Builder dataBlock,
+			int[] addtypeUse, Map<MapRulType, String> names, byte[] labelCoordinates, Map<Integer, String> namesDiff, Map<String, Integer> stringTable, MapDataBlock.Builder dataBlock,
 			boolean allowCoordinateSimplification)
 			throws IOException {
 		MapData.Builder data = MapData.newBuilder();
@@ -716,9 +718,19 @@ public class BinaryMapIndexWriter {
 						delta = skipSomeNodes(innerPolygonTypes, len, i, x, y, true);
 					}
 				}
-			}
+			}		
 		}
-
+		
+		if (labelCoordinates != null && labelCoordinates.length > 0) {
+			int x = Algorithms.parseIntFromBytes(labelCoordinates, 0);
+			int y = Algorithms.parseIntFromBytes(labelCoordinates, 4);
+			int tx = (x >> SHIFT_COORDINATES) - pcalcx;
+			int ty = (y >> SHIFT_COORDINATES) - pcalcy;
+//			System.out.println(String.format("Coords with shift: %d, %d", tx, ty));
+			writeRawVarint32(mapDataBuf, CodedOutputStream.encodeZigZag32(tx));
+			writeRawVarint32(mapDataBuf, CodedOutputStream.encodeZigZag32(ty));
+		}
+		
 		mapDataBuf.clear();
 		for (int i = 0; i < typeUse.length; i++) {
 			writeRawVarint32(mapDataBuf, typeUse[i]);

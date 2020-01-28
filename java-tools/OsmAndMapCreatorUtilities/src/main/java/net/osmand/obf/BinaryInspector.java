@@ -79,7 +79,7 @@ public class BinaryInspector {
 		if ("test".equals(args[0])) {
 			in.inspector(new String[] {
 					"-vpoi",
-//					"-vmap", "-vmapobjects",
+					"-vmap", "-vmapobjects",
 //					"-vmapcoordinates",
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
@@ -90,7 +90,7 @@ public class BinaryInspector {
 //					"-bbox=30.51,50.5,30.53,50.4",
 //					"-osm="+System.getProperty("maps.dir")+"/basemap/map.obf.osm",
 //					System.getProperty("maps.dir")+"/Germany_schleswig-holstein_europe_20_01_00.obf"
-					System.getProperty("maps.dir")+"/Map.obf"
+					"/home/madwasp79/OsmAnd-maps/_Creator/Poly_center.obf"
 			});
 		} else {
 			in.inspector(args);
@@ -970,6 +970,7 @@ public class BinaryInspector {
 			b.append(obj.isArea() ? "Area" : (obj.getPointsLength() > 1 ? "Way" : "Point"));
 		}
 		int[] types = obj.getTypes();
+		
 		b.append(" types [");
 		for (int j = 0; j < types.length; j++) {
 			if (j > 0) {
@@ -1030,6 +1031,7 @@ public class BinaryInspector {
 				b.append(y).append(" / ").append(x).append(" , ");
 			}
 		}
+		
 	}
 
 
@@ -1131,6 +1133,7 @@ public class BinaryInspector {
 			}
 			tags.append("\t<tag k='").append(pair.tag).append("' v='").append(quoteName(pair.value)).append("' />\n");
 		}
+		
 		if (obj.getAdditionalTypes() != null && obj.getAdditionalTypes().length > 0) {
 			for (int j = 0; j < obj.getAdditionalTypes().length; j++) {
 				int addtype = obj.getAdditionalTypes()[j];
@@ -1157,7 +1160,7 @@ public class BinaryInspector {
 
 		tags.append("\t<tag k=\'").append("original_id").append("' v='").append(obj.getId() >> (SHIFT_ID + 1)).append("'/>\n");
 		tags.append("\t<tag k=\'").append("osmand_id").append("' v='").append(obj.getId()).append("'/>\n");
-
+		
 		if(point) {
 			float lon= (float) MapUtils.get31LongitudeX(obj.getPoint31XTile(0));
 			float lat = (float) MapUtils.get31LatitudeY(obj.getPoint31YTile(0));
@@ -1174,6 +1177,7 @@ public class BinaryInspector {
 				b.append("\t<node id = '" + id + "' version='1' lat='" + lat + "' lon='" + lon + "' />\n");
 				ids.add(id);
 			}
+			
 			long outerId = printWay(ids, b, multipolygon ? null : tags);
 			if (multipolygon) {
 				int[][] polygonInnerCoordinates = obj.getPolygonInnerCoordinates();
@@ -1200,6 +1204,7 @@ public class BinaryInspector {
 				b.append("</relation>\n");
 			}
 		}
+		
 	}
 
 
