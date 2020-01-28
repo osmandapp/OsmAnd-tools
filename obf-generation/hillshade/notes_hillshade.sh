@@ -56,7 +56,7 @@ fi
  
 if [ "$START_STAGE" -le 4 ] && [ "$END_STAGE" -ge 4 ]; then
 	echo "4. Merge all tile in a single giant tiff (can last hours or 1-2 days) $(date)"
-	gdal_translate -of GTiff -co "COMPRESS=JPEG" -co "BIGTIFF=YES" -co "TILED=YES" virtualtiff.vrt WGS84-all.tif
+	gdal_translate -of GTiff -co "COMPRESS=LZW" -co "BIGTIFF=YES" -co "TILED=YES" virtualtiff.vrt WGS84-all.tif
 fi
 
 if [ "$START_STAGE" -le 5 ] && [ "$END_STAGE" -ge 5 ]; then
