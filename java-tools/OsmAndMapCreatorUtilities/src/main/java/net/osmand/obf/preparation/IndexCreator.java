@@ -875,6 +875,7 @@ public class IndexCreator {
 
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 		String file = rootFolder + "/temp/map.osm";
+		file = rootFolder + "/temp/poly_center.osm";
 //		String file = rootFolder + "/temp/lake_nasser.osm.gz";
 //		String file = rootFolder + "/maps/World_seamarks.pbf";
 //		String file = rootFolder + "/repos/resources/test-resources/synthetic_test_rendering.osm";
@@ -893,6 +894,7 @@ public class IndexCreator {
 
 		log.info("WHOLE GENERATION TIME :  " + (System.currentTimeMillis() - time)); //$NON-NLS-1$
 		log.info("COORDINATES_SIZE " + BinaryMapIndexWriter.COORDINATES_SIZE + " count " + BinaryMapIndexWriter.COORDINATES_COUNT); //$NON-NLS-1$ //$NON-NLS-2$
+		log.info("LABEL_COORDINATES_SIZE " + BinaryMapIndexWriter.LABEL_COORDINATES_SIZE); //$NON-NLS-1$ 
 		log.info("TYPES_SIZE " + BinaryMapIndexWriter.TYPES_SIZE); //$NON-NLS-1$
 		log.info("ID_SIZE " + BinaryMapIndexWriter.ID_SIZE); //$NON-NLS-1$
 		log.info("- COORD_TYPES_ID SIZE " + (BinaryMapIndexWriter.COORDINATES_SIZE + BinaryMapIndexWriter.TYPES_SIZE + BinaryMapIndexWriter.ID_SIZE)); //$NON-NLS-1$

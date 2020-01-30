@@ -106,6 +106,8 @@ public class BinaryMapIndexWriter {
 	protected static final int SHIFT_COORDINATES = BinaryMapIndexReader.SHIFT_COORDINATES;
 	public int MASK_TO_READ = ~((1 << SHIFT_COORDINATES) - 1);
 	private static final int ROUTE_SHIFT_COORDINATES = 4;
+	private static final int LABEL_THRESHOLD = 1024; // 20 meters on equator
+	private static final int LABEL_ZOOM_ENCODE = BinaryMapIndexReader.LABEL_ZOOM_ENCODE; 
 	private static Log log = LogFactory.getLog(BinaryMapIndexWriter.class);
 
 	private static class Bounds {
@@ -485,6 +487,7 @@ public class BinaryMapIndexWriter {
 	public static int TYPES_SIZE = 0;
 	public static int MAP_DATA_SIZE = 0;
 	public static int STRING_TABLE_SIZE = 0;
+	public static int LABEL_COORDINATES_SIZE = 0;
 
 	public static int ROUTE_ID_SIZE = 0;
 	public static int ROUTE_TYPES_SIZE = 0;
@@ -655,7 +658,7 @@ public class BinaryMapIndexWriter {
 	private TByteArrayList typesAddDataBuf = new TByteArrayList();
 
 	public MapData writeMapData(long diffId, int pleft, int ptop, boolean area, byte[] coordinates, byte[] innerPolygonTypes, int[] typeUse,
-			int[] addtypeUse, Map<MapRulType, String> names, Map<Integer, String> namesDiff, Map<String, Integer> stringTable, MapDataBlock.Builder dataBlock,
+			int[] addtypeUse, Map<MapRulType, String> names, byte[] labelCoordinates, Map<Integer, String> namesDiff, Map<String, Integer> stringTable, MapDataBlock.Builder dataBlock,
 			boolean allowCoordinateSimplification)
 			throws IOException {
 		MapData.Builder data = MapData.newBuilder();
@@ -665,6 +668,9 @@ public class BinaryMapIndexWriter {
 		int pcalcy = (ptop >> SHIFT_COORDINATES);
 		int len = coordinates.length / 8;
 		int delta = 1;
+		long sumLabelX = 0;
+		long sumLabelY = 0;
+		int sumLabelCount = 0;
 		for (int i = 0; i < len; i += delta) {
 			int x = Algorithms.parseIntFromBytes(coordinates, i * 8);
 			int y = Algorithms.parseIntFromBytes(coordinates, i * 8 + 4);
@@ -674,6 +680,9 @@ public class BinaryMapIndexWriter {
 			writeRawVarint32(mapDataBuf, CodedOutputStream.encodeZigZag32(ty));
 			pcalcx = pcalcx + tx;
 			pcalcy = pcalcy + ty;
+			sumLabelX += pcalcx;
+			sumLabelY += pcalcy;
+			sumLabelCount++;
 			delta = 1;
 			if (allowCoordinateSimplification) {
 				delta = skipSomeNodes(coordinates, len, i, x, y, false);
@@ -716,9 +725,27 @@ public class BinaryMapIndexWriter {
 						delta = skipSomeNodes(innerPolygonTypes, len, i, x, y, true);
 					}
 				}
+			}		
+		}
+		
+		if (labelCoordinates != null && labelCoordinates.length > 0 && sumLabelCount > 0) {
+			mapDataBuf.clear();
+			int LABEL_SHIFT = 31 - LABEL_ZOOM_ENCODE;
+			int x = (Algorithms.parseIntFromBytes(labelCoordinates, 0)) >> LABEL_SHIFT;
+			int y = (Algorithms.parseIntFromBytes(labelCoordinates, 4)) >> LABEL_SHIFT;
+			long labelX = (sumLabelX / sumLabelCount) << (SHIFT_COORDINATES - LABEL_SHIFT);
+			long labelY = (sumLabelY / sumLabelCount) << (SHIFT_COORDINATES - LABEL_SHIFT);
+			// TODO put a threshold
+			boolean isPOI = true;
+			if ((Math.abs(labelX) > LABEL_THRESHOLD && Math.abs(labelY) > LABEL_THRESHOLD) || isPOI) {
+				writeRawVarint32(mapDataBuf, CodedOutputStream.encodeZigZag32(x - (int) labelX));
+				writeRawVarint32(mapDataBuf, CodedOutputStream.encodeZigZag32(y - (int) labelY));
+				data.setLabelcoordinates(ByteString.copyFrom(mapDataBuf.toArray()));
+				LABEL_COORDINATES_SIZE += CodedOutputStream.computeRawVarint32Size(mapDataBuf.size())
+						+ CodedOutputStream.computeTagSize(MapData.LABELCOORDINATES_FIELD_NUMBER) + mapDataBuf.size();
 			}
 		}
-
+		
 		mapDataBuf.clear();
 		for (int i = 0; i < typeUse.length; i++) {
 			writeRawVarint32(mapDataBuf, typeUse[i]);
@@ -1274,10 +1301,6 @@ public class BinaryMapIndexWriter {
 			} else {
 				i++;
 			}
-		}
-		int afterCompression = ct.size();
-		if(false) {
-			System.out.println(String.format("Compressed routes from %d to %d", beforeCompression, afterCompression));
 		}
 		return ct;
 	}
