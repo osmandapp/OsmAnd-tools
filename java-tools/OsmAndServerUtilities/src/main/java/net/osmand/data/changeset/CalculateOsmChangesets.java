@@ -351,19 +351,21 @@ public class CalculateOsmChangesets {
 		WorldRegion worldRegion = or.getWorldRegion();
 		boolean newCountriesInserted = false;
 		if (testMissing) {
-			ResultSet rs = conn.createStatement().executeQuery("SELECT id, fullname from countries");
+			ResultSet rs = conn.createStatement().executeQuery("SELECT id, fullname, map from countries");
 			Set<String> existingMaps = new TreeSet<>();
-			int id = 0;
+			int maxid = 0;
 			while(rs.next()) {
-				id = Math.max(id, rs.getInt(1));
+				maxid = Math.max(maxid, rs.getInt(1));
 				existingMaps.add(rs.getString(2));
 			}
 			rs.close();
 			PreparedStatement insert = conn
 					.prepareStatement("INSERT INTO countries(id, parentid, name, fullname, downloadname, clat, clon, map)"
 							+ " VALUES(?, ?, ?, ?, ?, ?, ?, ?)");
+			PreparedStatement update = conn
+					.prepareStatement("UPDATE countries SET map = ? WHERE fullname = ?");
 			PreparedStatement test = conn
-					.prepareStatement("select id, downloadname, map from countries where fullname = ?");
+					.prepareStatement("SELECT id, downloadname, map FROM countries WHERE fullname = ?");
 			LinkedList<WorldRegion> queue = new LinkedList<WorldRegion>();
 			queue.add(worldRegion);
 			while (!queue.isEmpty()) {
@@ -375,22 +377,28 @@ public class CalculateOsmChangesets {
 					map.put(wr, rs.getInt(1));
 					String downloadName = rs.getString(2);
 					int mp = rs.getInt(3);
-					if(!Algorithms.objectEquals(downloadName, wr.getRegionDownloadName())) {
+					if(wr.isRegionMapDownload() && !Algorithms.objectEquals(downloadName, wr.getRegionDownloadName())) {
 						LOG.error(String.format("Country download name doesn't match '%s' != '%s'", 
 								downloadName, wr.getRegionDownloadName()));
 					} 
-					
-					if(!wr.isRegionMapDownload() && mp != 0) {
+					boolean isMap = mp == 1;
+					if(wr.isRegionMapDownload() != isMap) {
 						LOG.error(String.format("Country '%s' couldn't be downloaded anymore, so database should be updated! '%d' != '%d'", 
 								downloadName, (wr.isRegionMapDownload() ? 1 : 0), mp));
+						// It became available for download
+						if(wr.isRegionMapDownload()) {
+							update.setInt(1, 1);
+							update.setString(2, wr.getRegionId());
+							update.execute();
+						}
 					} 
 					
 				} else {
-					id++;
-					LOG.info(String.format("Insert MISSING country %s with id %d", wr.getRegionId(), id));
+					maxid++;
+					LOG.info(String.format("Insert MISSING country %s with id %d", wr.getRegionId(), maxid));
 					if(insertMissing) {
 						newCountriesInserted = true;
-						insertRegion(map, id, insert, wr);
+						insertRegion(map, maxid, insert, wr);
 					}	
 				}
 				rs.close();
