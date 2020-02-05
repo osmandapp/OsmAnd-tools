@@ -383,13 +383,16 @@ public class CalculateOsmChangesets {
 					} 
 					boolean isMap = mp == 1;
 					if(wr.isRegionMapDownload() != isMap) {
-						LOG.error(String.format("Country '%s' couldn't be downloaded anymore, so database should be updated! '%d' != '%d'", 
-								downloadName, (wr.isRegionMapDownload() ? 1 : 0), mp));
 						// It became available for download
 						if(wr.isRegionMapDownload()) {
+							LOG.info(String.format("Country '%s' changed it is downloaded state, so database will be updated! '%d' -> '1'", 
+									downloadName, mp));
 							update.setInt(1, 1);
 							update.setString(2, wr.getRegionId());
 							update.execute();
+						} else {
+							LOG.error(String.format("Country '%s' couldn't be downloaded anymore, so database should be updated! '%d' -> '0'", 
+									downloadName, mp));
 						}
 					} 
 					
