@@ -81,17 +81,16 @@ public class BinaryInspector {
 			in.inspector(new String[] {
 //					"-vpoi",
 					"-vmap", "-vmapobjects",
-//					"-vmapcoordinates",
+					"-vmapcoordinates",
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
 //					"-vaddress", "-vcities","-vstreetgroups",
 //					"-vstreets", "-vbuildings", "-vintersections",
 //					"-lang=ru",
 //					"-zoom=7",
-//					"-bbox=30.51,50.5,30.53,50.4",
-//					"-osm="+System.getProperty("maps.dir")+"/basemap/map.obf.osm",
-//					System.getProperty("maps.dir")+"/Germany_schleswig-holstein_europe_20_01_00.obf"
-					System.getProperty("maps.dir")+"/Poly_center.obf"
+					"-bbox=4.890,52.37,4.892,52.3692",
+					"-osm="+System.getProperty("maps.dir")+"/map.obf.osm",
+					System.getProperty("maps.dir")+"/Netherlands_noord-holland_europe_2.obf"
 //					System.getProperty("maps.dir")+"/Map.obf"
 			});
 		} else {

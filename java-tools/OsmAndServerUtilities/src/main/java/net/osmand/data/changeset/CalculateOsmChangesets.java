@@ -421,7 +421,7 @@ public class CalculateOsmChangesets {
 //			
 		}
 		map.clear();
-		ResultSet rs = conn.createStatement().executeQuery("select id, fullname from countries");
+		ResultSet rs = conn.createStatement().executeQuery("select id, fullname from countries where map = 1");
 		while(rs.next()) {
 			int id = rs.getInt(1);
 			WorldRegion rd ;
