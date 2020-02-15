@@ -1063,8 +1063,6 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 			
 			double lat = MapUtils.getLatitudeFromTile(zoom, getYTile() + dy);
 			double lon = MapUtils.getLongitudeFromTile(zoom, getXTile() + dx);
-			System.out.println(String.format("%.3f, %.3f [%.2f + %.2f - %.2f + %.2f]", lat, lon,
-					getYTile(), dy,  getXTile(), dx));
 			setLatLon(lat, lon);
 		}
 

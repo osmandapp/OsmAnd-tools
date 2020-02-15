@@ -373,15 +373,14 @@ public class MapRouterLayer implements MapPanelLayer {
 
 	private void addStraightLine(Way w, LatLon s1, LatLon s2) {
 		if(MapUtils.getDistance(s1, s2) > MIN_STRAIGHT_DIST) {
-			double mlat = (s1.getLatitude() + s2.getLatitude()) / 2;
-			double mlon = (s1.getLongitude() + s2.getLongitude()) / 2;
-			LatLon m = new LatLon(mlat, mlon);
+			LatLon m = MapUtils.calculateMidPoint(s1, s2);
 			addStraightLine(w, s1, m);
 			addStraightLine(w, m, s2);
 		} else {
 			w.addNode(new net.osmand.osm.edit.Node(s2.getLatitude(), s2.getLongitude(), -1));
 		}
 	}
+
 
 	private void calcRoute(final RouteCalculationMode m) {
 		new Thread() {
