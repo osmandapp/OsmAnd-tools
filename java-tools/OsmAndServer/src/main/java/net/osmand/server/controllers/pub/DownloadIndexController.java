@@ -238,13 +238,6 @@ public class DownloadIndexController {
 		return isContainAndEqual("aosmc", params) || isContainAndEqual("osmc", params);
 	}
 	
-	private boolean isMaps(MultiValueMap<String, String> params) {
-		return  // allow all files
-				// "standard", "<empty>", "road" 
-				// "wikivoyage", "wiki"	
-				// "fonts", "inapp"
-				!isLiveMaps(params) && !isSrtm(params);
-	}
 
 
 	@RequestMapping(value = {"/download.php", "/download"}, method = RequestMethod.GET)

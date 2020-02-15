@@ -81,17 +81,17 @@ public class BinaryInspector {
 			in.inspector(new String[] {
 //					"-vpoi",
 					"-vmap", "-vmapobjects",
-					"-vmapcoordinates",
+//					"-vmapcoordinates",
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
 //					"-vaddress", "-vcities","-vstreetgroups",
 //					"-vstreets", "-vbuildings", "-vintersections",
 //					"-lang=ru",
-//					"-zoom=7",
-					"-bbox=4.890,52.37,4.892,52.3692",
-					"-osm="+System.getProperty("maps.dir")+"/map.obf.osm",
-					System.getProperty("maps.dir")+"/Netherlands_noord-holland_europe_2.obf"
-//					System.getProperty("maps.dir")+"/Map.obf"
+					"-zoom=6",
+//					"-bbox=4.890,52.37,4.892,52.3692",
+//					"-osm="+System.getProperty("maps.dir")+"/map.obf.osm",
+//					System.getProperty("maps.dir")+"/Netherlands_noord-holland_europe_2.obf"
+					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
 		} else {
 			in.inspector(args);

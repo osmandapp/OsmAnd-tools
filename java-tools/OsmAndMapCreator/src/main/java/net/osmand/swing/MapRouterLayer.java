@@ -19,12 +19,9 @@ import java.io.StringReader;
 import java.lang.reflect.InvocationTargetException;
 import java.net.URL;
 import java.net.URLConnection;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 
 import javax.swing.AbstractAction;
@@ -74,6 +71,8 @@ import net.osmand.util.MapUtils;
 public class MapRouterLayer implements MapPanelLayer {
 
 	private final static Log log = PlatformUtil.getLog(MapRouterLayer.class);
+
+	private static final double MIN_STRAIGHT_DIST = 50000;
 
 	private MapPanel map;
 	private LatLon startRoute ;
@@ -172,19 +171,28 @@ public class MapRouterLayer implements MapPanelLayer {
 		map.add(stopButton);
 	}
 
+	private LatLon getPointFromMenu() {
+		Point popupMenuPoint = map.getPopupMenuPoint();
+		double fy = (popupMenuPoint.y - map.getCenterPointY()) / map.getTileSize();
+		double fx = (popupMenuPoint.x - map.getCenterPointX()) / map.getTileSize();
+		double latitude = MapUtils.checkLatitude(
+				MapUtils.getLatitudeFromTile(map.getZoom(), map.getYTile() + fy));
+		double longitude = MapUtils.checkLongitude( 
+				MapUtils.getLongitudeFromTile(map.getZoom(), map.getXTile() + fx));
+		LatLon l = new LatLon(latitude, longitude);
+		return l;
+	}
+	
 	public void fillPopupMenuWithActions(JPopupMenu menu) {
 		Action start = new AbstractAction("Mark start point") {
 			private static final long serialVersionUID = 507156107455281238L;
 
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				Point popupMenuPoint = map.getPopupMenuPoint();
-				double fy = (popupMenuPoint.y - map.getCenterPointY()) / map.getTileSize();
-				double fx = (popupMenuPoint.x - map.getCenterPointX()) / map.getTileSize();
-				double latitude = MapUtils.getLatitudeFromTile(map.getZoom(), map.getYTile() + fy);
-				double longitude = MapUtils.getLongitudeFromTile(map.getZoom(), map.getXTile() + fx);
-				setStart(new LatLon(latitude, longitude));
+				setStart(getPointFromMenu());
 			}
+
+			
 		};
 		menu.add(start);
 		Action end= new AbstractAction("Mark end point") {
@@ -192,12 +200,7 @@ public class MapRouterLayer implements MapPanelLayer {
 
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				Point popupMenuPoint = map.getPopupMenuPoint();
-				double fy = (popupMenuPoint.y - map.getCenterPointY()) / map.getTileSize();
-				double fx = (popupMenuPoint.x - map.getCenterPointX()) / map.getTileSize();
-				double latitude = MapUtils.getLatitudeFromTile(map.getZoom(), map.getYTile() + fy);
-				double longitude = MapUtils.getLongitudeFromTile(map.getZoom(), map.getXTile() + fx);
-				setEnd(new LatLon(latitude, longitude));
+				setEnd(getPointFromMenu());
 			}
 		};
 		menu.add(end);
@@ -220,12 +223,7 @@ public class MapRouterLayer implements MapPanelLayer {
 
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				Point popupMenuPoint = map.getPopupMenuPoint();
-				double fy = (popupMenuPoint.y - map.getCenterPointY()) / map.getTileSize();
-				double fx = (popupMenuPoint.x - map.getCenterPointX()) / map.getTileSize();
-				double latitude = MapUtils.getLatitudeFromTile(map.getZoom(), map.getYTile() + fy);
-				double longitude = MapUtils.getLongitudeFromTile(map.getZoom(), map.getXTile() + fx);
-				intermediates.add(new LatLon(latitude, longitude));
+				intermediates.add(getPointFromMenu());
 				map.repaint();
 			}
 		};
@@ -317,6 +315,16 @@ public class MapRouterLayer implements MapPanelLayer {
 			}
 		};
 		directions.add(route_YOURS);
+		Action straightRoute = new AbstractAction("Build straight route ") {
+			private static final long serialVersionUID = 8049785829806139142L;
+
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				previousRoute = null;
+				calcStraightRoute();
+			}
+		};
+		directions.add(straightRoute);
 		Action loadGPXFile = new AbstractAction("Load GPX file...") {
 			private static final long serialVersionUID = 507156107455281238L;
 
@@ -346,6 +354,34 @@ public class MapRouterLayer implements MapPanelLayer {
 	}
 
 
+	private void calcStraightRoute() {
+		List<Way> ways = new ArrayList<>();
+		{
+			Way w = new Way(1);
+			w.addNode(new net.osmand.osm.edit.Node(startRoute.getLatitude(), startRoute.getLongitude(), -1));
+			addStraightLine(w, startRoute, endRoute);
+			
+			ways.add(w);
+		}
+		DataTileManager<Way> points = new DataTileManager<Way>(11);
+		for (Way w : ways) {
+			LatLon n = w.getLatLon();
+			points.registerObject(n.getLatitude(), n.getLongitude(), w);
+		}
+		map.setPoints(points);
+	}
+
+	private void addStraightLine(Way w, LatLon s1, LatLon s2) {
+		if(MapUtils.getDistance(s1, s2) > MIN_STRAIGHT_DIST) {
+			double mlat = (s1.getLatitude() + s2.getLatitude()) / 2;
+			double mlon = (s1.getLongitude() + s2.getLongitude()) / 2;
+			LatLon m = new LatLon(mlat, mlon);
+			addStraightLine(w, s1, m);
+			addStraightLine(w, m, s2);
+		} else {
+			w.addNode(new net.osmand.osm.edit.Node(s2.getLatitude(), s2.getLongitude(), -1));
+		}
+	}
 
 	private void calcRoute(final RouteCalculationMode m) {
 		new Thread() {

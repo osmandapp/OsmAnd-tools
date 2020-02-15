@@ -649,6 +649,19 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 		if (map == null) {
 			return null;
 		}
+		long pz = (long) MapUtils.getPowZoom(zoom );
+		while (x < 0) {
+			x += pz;
+		}
+		while (x >= pz) {
+			x -= pz;
+		}
+		while (y < 0) {
+			y += pz;
+		}
+		while (y >= pz) {
+			y -= pz;
+		}
 		String file = getFileForImage(x, y, zoom, map.getTileFormat());
 		if (cache.get(file) == null) {
 			File en = new File(tilesLocation, file);
@@ -750,20 +763,23 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 			double xTileRight = getXTile() + getCenterPointX() / tileSize;
 			double yTileUp = getYTile() - getCenterPointY() / tileSize;
 			double yTileDown = getYTile() + getCenterPointY() / tileSize;
-
-			xStartingImage = -(int) ((xTileLeft - Math.floor(xTileLeft)) * tileSize);
-			yStartingImage = -(int) ((yTileUp - Math.floor(yTileUp)) * tileSize);
-
+			int ixTileLeft = (int) Math.floor(xTileLeft);
+			int iyTileUp = (int) Math.floor(yTileUp);
+			int ixTileRight = (int) Math.ceil(xTileRight);
+			int iyTileDown = (int) Math.ceil(yTileDown);
+			
+			xStartingImage = -(int) ((xTileLeft - ixTileLeft) * tileSize);
+			yStartingImage = -(int) ((yTileUp - iyTileUp) * tileSize);
 			if (loadNecessaryImages) {
 				downloader.refuseAllPreviousRequests();
 			}
-			int tileXCount = ((int) xTileRight - (int) xTileLeft + 1);
-			int tileYCount = ((int) yTileDown - (int) yTileUp + 1);
+			int tileXCount = ixTileRight - ixTileLeft;
+			int tileYCount = iyTileDown - iyTileUp;
 			images = new BufferedImage[tileXCount][tileYCount];
 			for (int i = 0; i < images.length; i++) {
 				for (int j = 0; j < images[i].length; j++) {
-					int x = (int) xTileLeft + i;
-					int y = (int) yTileUp + j;
+					int x = ixTileLeft + i;
+					int y = iyTileUp + j;
 					images[i][j] = getImageFor(x, y, zoom, loadNecessaryImages);
 				}
 			}
@@ -1044,8 +1060,11 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 		public void dragTo(Point p){
 			double dx = (startDragging.x - (double) p.x) / getTileSize();
 			double dy = (startDragging.y - (double) p.y) / getTileSize();
+			
 			double lat = MapUtils.getLatitudeFromTile(zoom, getYTile() + dy);
 			double lon = MapUtils.getLongitudeFromTile(zoom, getXTile() + dx);
+			System.out.println(String.format("%.3f, %.3f [%.2f + %.2f - %.2f + %.2f]", lat, lon,
+					getYTile(), dy,  getXTile(), dx));
 			setLatLon(lat, lon);
 		}
 
