@@ -47,6 +47,7 @@ import org.w3c.dom.NodeList;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 
+import net.osmand.Location;
 import net.osmand.PlatformUtil;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.data.DataTileManager;
@@ -73,6 +74,7 @@ public class MapRouterLayer implements MapPanelLayer {
 	private final static Log log = PlatformUtil.getLog(MapRouterLayer.class);
 
 	private static final double MIN_STRAIGHT_DIST = 50000;
+	private static final double ANGLE_TO_DECLINE = 15;
 
 	private MapPanel map;
 	private LatLon startRoute ;
@@ -321,7 +323,7 @@ public class MapRouterLayer implements MapPanelLayer {
 			@Override
 			public void actionPerformed(ActionEvent e) {
 				previousRoute = null;
-				calcStraightRoute();
+				calcStraightRoute(getPointFromMenu());
 			}
 		};
 		directions.add(straightRoute);
@@ -354,14 +356,33 @@ public class MapRouterLayer implements MapPanelLayer {
 	}
 
 
-	private void calcStraightRoute() {
+	private void calcStraightRoute(LatLon currentLatLon) {
 		List<Way> ways = new ArrayList<>();
 		{
 			Way w = new Way(1);
 			w.addNode(new net.osmand.osm.edit.Node(startRoute.getLatitude(), startRoute.getLongitude(), -1));
 			addStraightLine(w, startRoute, endRoute);
-			
-			ways.add(w);
+			Location c = new Location("");
+			c.setLatitude(currentLatLon.getLatitude());
+			c.setLongitude(currentLatLon.getLongitude());
+			for (; w.getNodes().size() > 1; ) {
+				net.osmand.osm.edit.Node s = w.getNodes().get(0);
+				net.osmand.osm.edit.Node n = w.getNodes().get(1);
+				float bearingTo = s.getLocation().bearingTo(n.getLocation());
+				float bearingTo2 = c.bearingTo(n.getLocation());
+				if(Math.abs(MapUtils.degreesDiff(bearingTo2, bearingTo)) > ANGLE_TO_DECLINE) {
+					w.removeNodeByIndex(0);
+				} else {
+					break;
+				}
+			}
+			Way wr = new Way(2);
+			wr.addNode(new net.osmand.osm.edit.Node(currentLatLon.getLatitude(),currentLatLon.getLongitude(), -1l), 0);
+			addStraightLine(wr, currentLatLon, w.getNodes().get(0).getLatLon());
+			for(int i = 1; i < w.getNodes().size(); i++) {
+				wr.addNode(w.getNodes().get(i));
+			}
+			ways.add(wr);
 		}
 		DataTileManager<Way> points = new DataTileManager<Way>(11);
 		for (Way w : ways) {
