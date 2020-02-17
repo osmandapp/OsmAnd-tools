@@ -365,17 +365,54 @@ public class MapRouterLayer implements MapPanelLayer {
 			Location c = new Location("");
 			c.setLatitude(currentLatLon.getLatitude());
 			c.setLongitude(currentLatLon.getLongitude());
+			double minDist = w.getFirstNode().getLocation().distanceTo(c); 
+			int minInd = 0;
+			LatLon prev = null;
+			// search closest point and save prev
+			for (int ind = 1; ind < w.getNodes().size(); ind++) {
+				float dt = w.getNodes().get(ind).getLocation().distanceTo(c);
+				if(dt < minDist) {
+					minDist = dt;
+					minInd = ind;
+					prev = w.getNodes().get(ind - 1).getLatLon();
+				}
+			}
+			while(minInd > 0) {
+				w.removeNodeByIndex(0);
+				minInd --;
+			}
+			// proceed to the next point with min acceptable bearing
 			for (; w.getNodes().size() > 1; ) {
-				net.osmand.osm.edit.Node s = w.getNodes().get(0);
+				net.osmand.osm.edit.Node s = w.getFirstNode();
 				net.osmand.osm.edit.Node n = w.getNodes().get(1);
-				float bearingTo = s.getLocation().bearingTo(n.getLocation());
+				float bearingTo = c.bearingTo(s.getLocation());
 				float bearingTo2 = c.bearingTo(n.getLocation());
 				if(Math.abs(MapUtils.degreesDiff(bearingTo2, bearingTo)) > ANGLE_TO_DECLINE) {
 					w.removeNodeByIndex(0);
+					prev = s.getLatLon();
 				} else {
 					break;
 				}
 			}
+			
+			if(prev != null) {
+				LatLon f = w.getFirstNode().getLatLon();
+				float bearingTo = c.bearingTo(w.getFirstNode().getLocation());
+				LatLon mp = MapUtils.calculateMidPoint(prev, f);
+				while (MapUtils.getDistance(mp, f) > 100) {
+					Location l = new Location("");
+					l.setLatitude(mp.getLatitude());
+					l.setLongitude(mp.getLongitude());
+					float bearingMid = c.bearingTo(l);
+					if (Math.abs(MapUtils.degreesDiff(bearingMid, bearingTo)) < ANGLE_TO_DECLINE) {
+						prev = mp;
+						w.addNode(new net.osmand.osm.edit.Node(mp.getLatitude(), mp.getLongitude(), -1l), 0);
+						break;
+					}
+					mp = MapUtils.calculateMidPoint(mp, f);
+				} 
+			}
+			
 			Way wr = new Way(2);
 			wr.addNode(new net.osmand.osm.edit.Node(currentLatLon.getLatitude(),currentLatLon.getLongitude(), -1l), 0);
 			addStraightLine(wr, currentLatLon, w.getNodes().get(0).getLatLon());
