@@ -519,6 +519,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			return null;
 		}
 		name = name.trim();
+		name = name.replace("’", "'");
 		if (normalizeStreets) {
 			String newName = name;
 			boolean processed = newName.length() != name.length();
