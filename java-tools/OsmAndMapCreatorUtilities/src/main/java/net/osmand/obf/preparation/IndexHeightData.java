@@ -169,11 +169,11 @@ public class IndexHeightData {
 			if(py <= 0) {
 				py = 1;
 			}
-			if (px >= width) {
-				px = width - 1;
+			if (px >= width - 1) {
+				px = width - 2;
 			}
-			if (py >= height) {
-				py = height - 1;
+			if (py >= height - 1) {
+				py = height - 2;
 			}
 			
 			int ind = px + py * width;
