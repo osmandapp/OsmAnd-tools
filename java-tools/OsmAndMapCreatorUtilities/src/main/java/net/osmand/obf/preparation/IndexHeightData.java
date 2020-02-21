@@ -163,11 +163,11 @@ public class IndexHeightData {
 		}
 
 		private double getElem(int px, int py) {
-			if (px < 0) {
-				px = 0;
+			if (px <= 0) {
+				px = 1;
 			}
-			if(py < 0) {
-				py = 0;
+			if(py <= 0) {
+				py = 1;
 			}
 			if (px >= width) {
 				px = width - 1;
