@@ -629,6 +629,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				}
 			}
 		}
+		
 		return registerStreetInCities(name, names, location, result);
 	}
 
@@ -637,8 +638,28 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		if (result.isEmpty()) {
 			return Collections.emptySet();
 		}
+		List<City> resultWithNames = new ArrayList<>();
+		List<City> resultWithoutNames = new ArrayList<>();
+		
+		for (City c : result) {
+			names = new HashMap<String, String>();
+			Iterator<Entry<String, String>> it = c.getNamesMap(true).entrySet().iterator();
+			while (it.hasNext()) {
+				Entry<String, String> e = it.next();
+				names.put(e.getKey(), "<" + e.getValue() + ">");
+
+			}
+			if (!Algorithms.isEmpty(names)) {
+				resultWithNames.add(c);
+			} else {
+				resultWithoutNames.add(c);
+			}
+		}
+		resultWithNames.addAll(resultWithoutNames);
+		LinkedHashSet<City> sortedResult = new LinkedHashSet<City>(resultWithNames);
+		
 		Set<Long> values = new TreeSet<Long>();
-		for (City city : result) {
+		for (City city : sortedResult) {
 			String nameInCity = name;
 			if (nameInCity == null) {
 				nameInCity = "<" + city.getName() + ">";
@@ -650,16 +671,22 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 				}
 			}
+			
 			long streetId = getOrRegisterStreetIdForCity(nameInCity, names, location, city);
 			values.add(streetId);
 		}
 		return values;
 	}
 
-
 	private long getOrRegisterStreetIdForCity(String name, Map<String, String> names, LatLon location, City city) throws SQLException {
 		String cityPart = findCityPart(location, city);
 		SimpleStreet foundStreet = streetDAO.findStreet(name, city, cityPart);
+		if (name.startsWith("Сакс")) {
+			System.out.println("Name: " + name + ", city part: " + cityPart);
+		}
+		if (foundStreet == null) {
+			foundStreet = streetDAO.findStreetLike(name, city, cityPart);
+		}
 		if (foundStreet == null) {
 			// by default write city with cityPart of the city
 			if (cityPart == null) {
@@ -667,6 +694,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			}
 			if (names != null) {
 				langAttributes.addAll(names.keySet());
+			}
+			if (name.startsWith("Сакс")) {
+				System.out.println("===> New street found: " + name);
 			}
 			return streetDAO.insertStreet(name, names, location, city, cityPart);
 		} else {
@@ -683,6 +713,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				if (addNames != null) {
 					foundStreet = streetDAO.updateStreetLangs(foundStreet, addNames);
 				}
+			}
+			if (name.startsWith("Сакс")) {
+				System.out.println("=====> Street exists, id: " + foundStreet.getId());
 			}
 			return foundStreet.getId();
 		}
