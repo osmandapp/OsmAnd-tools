@@ -108,7 +108,7 @@ public class DBStreetDAO extends AbstractIndexPartCreator {
 		addressStreetNodeStat = createPrepareStatement(mapConnection,"insert into street_node (id, latitude, longitude, street, way) values (?, ?, ?, ?, ?)");
 		addressBuildingStat = createPrepareStatement(mapConnection,"insert into building (id, latitude, longitude, name, name_en, street, postcode, name2, name_en2, lat2, lon2, interval, interpolateType) values (?, ?, ?, ?, ?, ?, ?, ?, ? ,? ,? ,? ,?)");
 		addressSearchStreetStat = createPrepareStatement(mapConnection,"SELECT id,latitude,longitude,langs,name_en FROM street WHERE ? = city AND ? = citypart AND ? = name");
-		addressSearchStreetLikeStat = createPrepareStatement(mapConnection,"SELECT id,latitude,longitude,langs,name_en FROM street WHERE ? = city AND ? = citypart AND name_en LIKE ?");
+		addressSearchStreetLikeStat = createPrepareStatement(mapConnection,"SELECT id,latitude,longitude,langs,name_en FROM street WHERE ? = city AND ? = citypart AND CHARINDEX (?, langs) > 0");
 		addressSearchStreetStatWithoutCityPart = createPrepareStatement(mapConnection,"SELECT id,name,citypart,latitude,longitude,langs,name_en FROM street WHERE ? = city AND ? = name");
 		addressStreetUpdateCityPart = createPrepareStatement(mapConnection,"UPDATE street SET citypart = ? WHERE id = ?");
 		addressStreetLangsUpdate = createPrepareStatement(mapConnection,"UPDATE street SET name_en = ? || name_en, langs = ? WHERE id = ?");
@@ -233,7 +233,7 @@ public class DBStreetDAO extends AbstractIndexPartCreator {
 		}
 		addressSearchStreetLikeStat.setLong(1, city.getId());
 		addressSearchStreetLikeStat.setString(2, cityPart);
-		addressSearchStreetLikeStat.setString(3, "%"+name+"%");
+		addressSearchStreetLikeStat.setString(3, name);
 		ResultSet rs = addressSearchStreetLikeStat.executeQuery();
 		DBStreetDAO.SimpleStreet foundId = null;
 		if (rs.next()) {

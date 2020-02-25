@@ -24,12 +24,12 @@ import java.util.*;
 import net.osmand.exceptionanalyzer.data.ExceptionText;
 
 public class ExceptionAnalyzerMain {
-	 private static final String LABEL = "TRASH";
+	 private static final String LABEL = "Crash";
 //	private static final String LABEL = "OsmAnd Bug";
-	private static final boolean DOWNLOAD_MESSAGES = true;
-    private static final String VERSION_FILTER = "3.0";
+	private static final boolean DOWNLOAD_MESSAGES = false;
+    private static final String VERSION_FILTER = "3.6";
     private static final File FOLDER_WITH_LOGS =  new File(System.getProperty("user.home") + 
-    		"/"+ "attachments_logs");
+    		"/"+ "attachments_logs2");
     
 	/** Application name. */
     private static final String APPLICATION_NAME = "ExceptionAnalyzer";
