@@ -33,6 +33,7 @@ import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.osm.edit.Way;
 import net.osmand.router.RoutingConfiguration.Builder;
+import net.osmand.router.GeneralRouter;
 import net.osmand.router.RoutingConfiguration;
 import net.osmand.router.TransportRoutePlanner;
 import net.osmand.router.TransportRoutePlanner.TransportRouteResult;
@@ -230,7 +231,8 @@ public class MapTransportLayer implements MapPanelLayer {
 						paramsR.put(p, "true");
 					}
 				}
-				TransportRoutingConfiguration cfg = new TransportRoutingConfiguration(builder, paramsR);
+				GeneralRouter prouter = builder.getRouter("public_transport");
+				TransportRoutingConfiguration cfg = new TransportRoutingConfiguration(prouter, paramsR);
 				cfg.useSchedule = schedule;
 				TransportRoutePlanner planner = new TransportRoutePlanner();
 				TransportRoutingContext ctx = new TransportRoutingContext(cfg, rs);
