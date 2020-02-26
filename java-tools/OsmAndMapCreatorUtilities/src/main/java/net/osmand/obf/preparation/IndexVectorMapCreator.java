@@ -1203,7 +1203,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			}
 			
 			if (cycle) {
-				LatLon labelll = OsmMapUtils.getComplexPolyCenter(nodes);
+				LatLon labelll = OsmMapUtils.getComplexPolyCenter(nodes, innerWays);
 				Algorithms.writeInt(blabelCoordinates, MapUtils.get31TileNumberX(labelll.getLongitude()));	
 				Algorithms.writeInt(blabelCoordinates, MapUtils.get31TileNumberY(labelll.getLatitude()));
 			}
