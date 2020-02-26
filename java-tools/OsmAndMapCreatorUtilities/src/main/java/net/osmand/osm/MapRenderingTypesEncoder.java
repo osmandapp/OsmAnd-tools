@@ -1183,7 +1183,13 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 
 
 	private Map<String, String> processExtraTags(Map<String, String> tags) {
-		String routeTag = tags.get("route");
+		String routeTag = "";
+		if(tags.get("route_hiking") != null && tags.get("route_hiking").equals("hiking")) {
+			routeTag = "hiking";
+		}
+		if(tags.get("route_bicycle") != null && tags.get("route_bicycle").equals("bicycle")) {
+			routeTag = "bicycle";
+		}
 		if(tags.containsKey("osmc:symbol")) {
 			tags = new TreeMap<String, String>(tags);
 			// osmc:symbol=black:red:blue_rectangle ->
@@ -1197,9 +1203,11 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 				if ((tokens.length == 4 && isColor(tokens[3])) || (tokens.length == 5 && isColor(tokens[4]))) {
 					String[] ntokens = new String[] { tokens[0], tokens[1], tokens.length == 4 ? "" : tokens[2], "",
 							tokens.length == 4 ? tokens[2] : tokens[3], tokens.length == 4 ? tokens[3] : tokens[4] };
-					addOsmcNewTags(tags, ntokens);
+					addOsmcNewTags(tags, ntokens, "");
+					addOsmcNewTags(tags, ntokens, routeTag+"_");
 				} else {
-					addOsmcNewTags(tags, tokens);
+					addOsmcNewTags(tags, tokens, "");
+					addOsmcNewTags(tags, tokens, routeTag+"_");
 				}
 			}
 			if(tags.containsKey("osmc_text") && (tags.get("osmc_text").equals(tags.get("ref")))) {
@@ -1413,27 +1421,27 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	}
 
 
-	private void addOsmcNewTags(Map<String, String> propogated, String[] tokens) {
+	private void addOsmcNewTags(Map<String, String> propogated, String[] tokens, String routeTag) {
 		if (tokens.length > 0) {
 			String wayColor = tokens[0]; // formatColorToPalette(tokens[0], true);
-			propogated.put("osmc_waycolor", wayColor);
+			propogated.put(routeTag+"osmc_waycolor", wayColor);
 			if (tokens.length > 1) {
 				String bgColor = tokens[1]; // formatColorToPalette(tokens[1], true);
-				propogated.put("osmc_background", bgColor);
+				propogated.put(routeTag+"osmc_background", bgColor);
 				propogated.put("osmc_stub_name", ".");
 				if (tokens.length > 2) {
 					String shpVl = tokens[2]; // formatColorToPalette(tokens[1], true);
-					propogated.put("osmc_foreground", shpVl);
+					propogated.put(routeTag+"osmc_foreground", shpVl);
 					if (tokens.length > 3) {
 						String shp2Vl = tokens[3];
-						propogated.put("osmc_foreground2", shp2Vl);
+						propogated.put(routeTag+"osmc_foreground2", shp2Vl);
 						if (tokens.length > 4) {
 							String txtVl = tokens[4];
-							propogated.put("osmc_text", txtVl);
-							propogated.put("osmc_text_symbol", txtVl);
+							propogated.put(routeTag+"osmc_text", txtVl);
+							propogated.put(routeTag+"osmc_text_symbol", txtVl);
 							if (tokens.length > 5) {
 								String txtcolorVl = tokens[5];
-								propogated.put("osmc_textcolor", txtcolorVl);
+								propogated.put(routeTag+"osmc_textcolor", txtcolorVl);
 							}
 						}
 					}
@@ -1441,7 +1449,6 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			}
 		}
 	}
-
 
 
 	private void osmcBackwardCompatility(Map<String, String> propogated, String[] tokens) {
