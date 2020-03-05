@@ -590,12 +590,16 @@ public class ReportsController {
 			}
 		}
 	}
-
-	private String convertScriptToAddress(String script) {
-		if(!script.startsWith("0014")) {
+	
+	private static String convertScriptToAddress(String script) {
+		if (!script.startsWith("00")) {
 			throw new IllegalArgumentException("Script is not supported: " + script);
 		}
-		String scriptData = script.substring("0014".length());
+		int len = Integer.parseInt(script.substring(2, 4), 16);
+		if (len != (script.length() - 4) / 2) {
+			throw new IllegalArgumentException("Script length is not supported: " + script);
+		}
+		String scriptData = script.substring("xxxx".length());
 		byte[] scriptDataBytes = new byte[scriptData.length() / 2];
     	for(int i = 0; i < scriptDataBytes.length; i++) {
     		scriptDataBytes[i] = (byte) Integer.parseInt(scriptData.substring(2 * i, 2 * i + 2), 16);
