@@ -326,6 +326,17 @@ public class MapRouterLayer implements MapPanelLayer {
 				calcStraightRoute(getPointFromMenu());
 			}
 		};
+		Action saveGPX = new AbstractAction("Save GPX...") {
+
+			private static final long serialVersionUID = 5757334824774850326L;
+
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				// TODO
+			}
+		};
+		directions.add(saveGPX);
+		
 		directions.add(straightRoute);
 		Action loadGPXFile = new AbstractAction("Load GPX file...") {
 			private static final long serialVersionUID = 507156107455281238L;
