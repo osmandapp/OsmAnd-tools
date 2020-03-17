@@ -19,9 +19,12 @@ import java.io.StringReader;
 import java.lang.reflect.InvocationTargetException;
 import java.net.URL;
 import java.net.URLConnection;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import javax.swing.AbstractAction;
@@ -47,6 +50,8 @@ import org.w3c.dom.NodeList;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 
+import net.osmand.GPXUtilities;
+import net.osmand.GPXUtilities.GPXFile;
 import net.osmand.Location;
 import net.osmand.PlatformUtil;
 import net.osmand.binary.BinaryMapIndexReader;
@@ -59,6 +64,7 @@ import net.osmand.osm.edit.Way;
 import net.osmand.router.BinaryRoutePlanner.RouteSegment;
 import net.osmand.router.BinaryRoutePlanner.RouteSegmentVisitor;
 import net.osmand.router.PrecalculatedRouteDirection;
+import net.osmand.router.RouteExporter;
 import net.osmand.router.RoutePlannerFrontEnd;
 import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
 import net.osmand.router.RouteSegmentResult;
@@ -326,16 +332,38 @@ public class MapRouterLayer implements MapPanelLayer {
 				calcStraightRoute(getPointFromMenu());
 			}
 		};
-		Action saveGPX = new AbstractAction("Save GPX...") {
+		if (previousRoute != null) {
+			Action saveGPX = new AbstractAction("Save GPX...") {
 
-			private static final long serialVersionUID = 5757334824774850326L;
+				private static final long serialVersionUID = 5757334824774850326L;
 
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				// TODO
-			}
-		};
-		directions.add(saveGPX);
+				@Override
+				public void actionPerformed(ActionEvent e) {
+					new Thread() {
+						@Override
+						public void run() {
+							List<Way> ways = new ArrayList<>();
+							calculateResult(ways, previousRoute);
+							List<Location> locations = new ArrayList<>();
+							for (Way way : ways) {
+								for (net.osmand.osm.edit.Node node : way.getNodes()) {
+									locations.add(new Location("", node.getLatitude(), node.getLongitude()));
+								}
+							}
+							String name = new SimpleDateFormat("yyyy-MM-dd_HH-mm_EEE", Locale.US).format(new Date());
+							RouteExporter exporter = new RouteExporter(name, previousRoute, locations, null);
+							GPXFile gpxFile = exporter.exportRoute();
+							JFileChooser fileChooser = new JFileChooser();
+							if (fileChooser.showSaveDialog(map) == JFileChooser.APPROVE_OPTION) {
+								File file = fileChooser.getSelectedFile();
+								GPXUtilities.writeGpxFile(file, gpxFile);
+							}
+						}
+					}.start();
+				}
+			};
+			directions.add(saveGPX);
+		}
 		
 		directions.add(straightRoute);
 		Action loadGPXFile = new AbstractAction("Load GPX file...") {
