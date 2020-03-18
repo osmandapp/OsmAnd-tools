@@ -332,13 +332,14 @@ public class MapRouterLayer implements MapPanelLayer {
 				calcStraightRoute(getPointFromMenu());
 			}
 		};
-		if (previousRoute != null) {
-			Action saveGPX = new AbstractAction("Save GPX...") {
+		
+		Action saveGPX = new AbstractAction("Save GPX...") {
 
-				private static final long serialVersionUID = 5757334824774850326L;
+			private static final long serialVersionUID = 5757334824774850326L;
 
-				@Override
-				public void actionPerformed(ActionEvent e) {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				if (previousRoute != null) {
 					new Thread() {
 						@Override
 						public void run() {
@@ -361,9 +362,9 @@ public class MapRouterLayer implements MapPanelLayer {
 						}
 					}.start();
 				}
-			};
-			directions.add(saveGPX);
-		}
+			}
+		};
+		directions.add(saveGPX);
 		
 		directions.add(straightRoute);
 		Action loadGPXFile = new AbstractAction("Load GPX file...") {
