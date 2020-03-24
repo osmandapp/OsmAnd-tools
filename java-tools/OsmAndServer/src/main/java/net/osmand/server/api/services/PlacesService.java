@@ -13,6 +13,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import net.osmand.Location;
+import net.osmand.util.Algorithms;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -140,9 +141,9 @@ public class PlacesService {
     }
 
     private CameraPlace createEmptyCameraPlaceWithTypeOnly(String type) {
-        CameraPlace.CameraPlaceBuilder builder = new CameraPlace.CameraPlaceBuilder();
-        builder.setType(type);
-        return builder.build();
+        CameraPlace p = new CameraPlace();
+        p.setType(type);
+        return p;
     }
     
     
@@ -175,7 +176,7 @@ public class PlacesService {
     private CameraPlace parseFeature(Feature feature, double targetLat, double targetLon, String host, String proto) {
         LngLatAlt coordinates = ((Point) feature.getGeometry()).getCoordinates();
         Map<String, Object> properties = feature.getProperties();
-        CameraPlace.CameraPlaceBuilder cameraBuilder = new CameraPlace.CameraPlaceBuilder();
+        CameraPlace cameraBuilder = new CameraPlace();
         cameraBuilder.setType("mapillary-photo");
         cameraBuilder.setTimestamp((String) properties.get("captured_at"));
         String key = (String) properties.get("key");
@@ -186,6 +187,9 @@ public class PlacesService {
         cameraBuilder.setUrl(buildOsmandPhotoViewerUrl(key, host, proto));
         cameraBuilder.setExternalLink(false);
         cameraBuilder.setUsername((String) properties.get("username"));
+        if(properties.get("pano") instanceof Boolean) {
+        	cameraBuilder.setIs360((Boolean) properties.get("pano"));
+        }
         cameraBuilder.setLat(coordinates.getLatitude());
         cameraBuilder.setLon(coordinates.getLongitude());
         cameraBuilder.setTopIcon("ic_logo_mapillary");
@@ -194,7 +198,7 @@ public class PlacesService {
         cameraBuilder.setBearing(bearing);
         cameraBuilder.setDistance(computeDistance(coordinates.getLatitude(), coordinates.getLongitude(), targetLat,
                 targetLon));
-        return cameraBuilder.build();
+        return cameraBuilder;
     }
 
     private String buildUrl(String path, boolean hires, String photoIdKey, String host, String proto) {
@@ -230,7 +234,9 @@ public class PlacesService {
     private void splitCameraPlaceByAngel(CameraPlace cp, List<CameraPlace> main, List<CameraPlace> rest) {
         double ca = cp.getCa();
         double bearing = cp.getBearing();
-        if (ca > 0d && angleDiff(bearing - ca, 30.0)) {
+        if( cp.is360()) {
+        	main.add(cp);
+        } else if (ca > 0d && angleDiff(bearing - ca, 30.0)) {
             main.add(cp);
         } else if (!(ca > 0d && !angleDiff(bearing - ca, 60.0))) {
         	// exclude all with camera angle and angle more than 60 (keep w/o camera and angle < 60)
@@ -304,7 +310,7 @@ public class PlacesService {
 
     private CameraPlace parseWikimediaImage(double targetLat, double targetLon, String filename, 
     		String title, ImageInfo imageInfo ) {
-        CameraPlace.CameraPlaceBuilder builder = new CameraPlace.CameraPlaceBuilder();
+        CameraPlace builder = new CameraPlace();
         builder.setType("wikimedia-photo");
         builder.setTimestamp(imageInfo.timestamp);
         builder.setKey(filename);
@@ -316,7 +322,7 @@ public class PlacesService {
         builder.setUsername(imageInfo.user);
         builder.setLat(targetLat);
         builder.setLon(targetLon);
-        return builder.build();
+        return builder;
     }
 
     public CameraPlace processWikimediaData(double lat, double lon, String osmImage) {
@@ -346,13 +352,13 @@ public class PlacesService {
             primaryImage = parseWikimediaImage(lat, lon, filename,
             		parseTitle(page), page.getImageinfo().get(0));
         } else {
-            CameraPlace.CameraPlaceBuilder builder = new CameraPlace.CameraPlaceBuilder();
+            CameraPlace builder = new CameraPlace();
             builder.setType("url-photo");
             builder.setImageUrl(osmImage);
             builder.setUrl(osmImage);
             builder.setLat(lat);
             builder.setLon(lon);
-            primaryImage = builder.build();
+            primaryImage = builder;
         }
         return primaryImage;
     }

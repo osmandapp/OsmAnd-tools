@@ -95,14 +95,17 @@ public class SubscriptionController {
     @Autowired
     public SubscriptionController(RestTemplateBuilder builder) {
         this.restTemplate = builder.setConnectTimeout(TIMEOUT).setReadTimeout(TIMEOUT).build();
-		byte[] pkcs8EncodedKey = Base64.getDecoder().decode(System.getenv().get("IOS_SUBSCRIPTION_KEY"));
-		try {
-			KeyFactory factory = KeyFactory.getInstance("EC");
-			subscriptionPrivateKey = factory.generatePrivate(new PKCS8EncodedKeySpec(pkcs8EncodedKey));
-		} catch (NoSuchAlgorithmException e) {
-			LOG.error(e.getMessage(), e);
-		} catch (InvalidKeySpecException e) {
-			LOG.error(e.getMessage(), e);
+        String iosSubscriptionKey = System.getenv().get("IOS_SUBSCRIPTION_KEY");
+		if (!Algorithms.isEmpty(iosSubscriptionKey)) {
+			byte[] pkcs8EncodedKey = Base64.getDecoder().decode(System.getenv().get("IOS_SUBSCRIPTION_KEY"));
+			try {
+				KeyFactory factory = KeyFactory.getInstance("EC");
+				subscriptionPrivateKey = factory.generatePrivate(new PKCS8EncodedKeySpec(pkcs8EncodedKey));
+			} catch (NoSuchAlgorithmException e) {
+				LOG.error(e.getMessage(), e);
+			} catch (InvalidKeySpecException e) {
+				LOG.error(e.getMessage(), e);
+			}
 		}
 	}
 
