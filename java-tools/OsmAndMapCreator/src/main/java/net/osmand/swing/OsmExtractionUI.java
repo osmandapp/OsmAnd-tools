@@ -424,7 +424,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 						locationString += " (CLOSED)";
 					}
 				}
-				mi.setText(sr.localeName + " [" + sr.getFoundWordCount() + ", "+ sr.objectType + "] " + 
+				mi.setText(sr.localeName + " [" + sr.getUnknownPhraseMatchWeight() + ", " + sr.getFoundWordCount() + ", "+ sr.objectType + "] " + 
 						locationString);
 				mi.addActionListener(new ActionListener() {
 
