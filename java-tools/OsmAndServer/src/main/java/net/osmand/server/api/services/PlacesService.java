@@ -231,18 +231,18 @@ public class PlacesService {
         return Math.abs(angle) < diff;
     }
 
-    private void splitCameraPlaceByAngel(CameraPlace cp, List<CameraPlace> main, List<CameraPlace> rest) {
-        double ca = cp.getCa();
-        double bearing = cp.getBearing();
-        if( cp.is360()) {
-        	main.add(cp);
-        } else if (ca > 0d && angleDiff(bearing - ca, 30.0)) {
-            main.add(cp);
-        } else if (!(ca > 0d && !angleDiff(bearing - ca, 60.0))) {
-        	// exclude all with camera angle and angle more than 60 (keep w/o camera and angle < 60)
-            rest.add(cp);
-        }
-    }
+	private void splitCameraPlaceByAngel(CameraPlace cp, List<CameraPlace> main, List<CameraPlace> rest) {
+		double ca = cp.getCa();
+		double bearing = cp.getBearing();
+		if (cp.is360()) {
+			main.add(cp);
+		} else if (ca > 0d && angleDiff(bearing - ca, 30.0)) {
+			main.add(cp);
+		} else if (!(ca > 0d && !angleDiff(bearing - ca, 60.0))) {
+			// exclude all with camera angle and angle more than 60 (keep w/o camera and angle < 60)
+			rest.add(cp);
+		}
+	}
 
     private boolean isPrimaryCameraPlace(CameraPlace cp, String primaryImageKey) {
         return !isEmpty(primaryImageKey) && cp != null && cp.getKey() != null && cp.getKey().equals(primaryImageKey);
