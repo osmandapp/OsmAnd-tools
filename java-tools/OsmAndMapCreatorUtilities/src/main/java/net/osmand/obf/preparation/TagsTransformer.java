@@ -38,10 +38,7 @@ public class TagsTransformer {
 				ctx.loadEntityRelation((Relation) e);
 			}
 			for(RelationMember ids : ((Relation) e).getMembers()) {
-				if(!propogatedTags.containsKey(ids.getEntityId())) {
-					propogatedTags.put(ids.getEntityId(), new LinkedHashMap<String, String>());
-				}
-				Map<String, String> map = propogatedTags.get(ids.getEntityId());
+				Map<String, String> map = getPropogateTagForEntity(ids);
 				Iterator<Entry<MapRulType, Map<MapRulType, String>>> itMain = propogated.entrySet().iterator();
 				while (itMain.hasNext()) {
 					Entry<MapRulType, Map<MapRulType, String>> ev = itMain.next();
@@ -77,6 +74,14 @@ public class TagsTransformer {
 			}
 		}
 	
+	}
+
+	Map<String, String> getPropogateTagForEntity(RelationMember id) {
+		if(!propogatedTags.containsKey(id.getEntityId())) {
+			propogatedTags.put(id.getEntityId(), new LinkedHashMap<String, String>());
+		}
+		Map<String, String> map = propogatedTags.get(id.getEntityId());
+		return map;
 	}
 	
 	public void addMultipleNetwoksTag(Entity e) {

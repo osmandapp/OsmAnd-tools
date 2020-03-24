@@ -163,8 +163,30 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			indexMultiPolygon((Relation) e, tags, ctx);
 			tagsTransformer.handleRelationPropogatedTags((Relation) e, renderingTypes, ctx, EntityConvertApplyType.MAP);
 			long tm = (System.currentTimeMillis() - ts) / 1000;
-			if (tm > 15 ) {
-				log.warn(String.format("Relation %d took %d seconds to process", e.getId(), tm ));
+			if (tm > 15) {
+				log.warn(String.format("Relation %d took %d seconds to process", e.getId(), tm));
+			}
+			handlePublicTransportStopExits(e, ctx);
+		}
+	}
+
+	private void handlePublicTransportStopExits(Entity e, OsmDbAccessorContext ctx) throws SQLException {
+		if ("public_transport".equals(e.getTag("type")) && ctx != null) {
+			ctx.loadEntityRelation((Relation) e);
+			boolean hasExits = false;
+			for (RelationMember ch : ((Relation) e).getMembers()) {
+				if (ch.getEntity() != null && "subway_entrance".equals(ch.getEntity().getTag("railway"))) {
+					hasExits = true;
+					break;
+				}
+			}
+			if (hasExits) {
+				for (RelationMember ch : ((Relation) e).getMembers()) {
+					if (ch.getEntity() != null && ("station".equals(ch.getEntity().getTag("railway"))
+							|| "subway".equals(ch.getEntity().getTag("station")))) {
+						tagsTransformer.getPropogateTagForEntity(ch).put("with_exits", "yes");
+					}
+				}
 			}
 		}
 	}
