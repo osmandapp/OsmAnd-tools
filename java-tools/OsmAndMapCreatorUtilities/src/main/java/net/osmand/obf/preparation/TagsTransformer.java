@@ -110,20 +110,19 @@ public class TagsTransformer {
 
 	private boolean skipPropagationOfDuplicate(Map<MapRulType, Map<MapRulType, String>> propogated,
 			Map<String, String> existing) {
-		int existingWayNetwork = 0,  newWayNetwork = 0,
-				existingCycleNetwork = 0, newCycleNetwork = 0;
-		for(String t : existing.keySet()) {
+		int existingWayNetwork = 0, newWayNetwork = 0, existingCycleNetwork = 0, newCycleNetwork = 0;
+		for (String t : existing.keySet()) {
 			existingWayNetwork = Math.max(existingWayNetwork, networkWayOrder(t));
 			existingCycleNetwork = Math.max(existingWayNetwork, networkCycleOrder(t));
 		}
-		for(MapRulType t : propogated.keySet()) {
+		for (MapRulType t : propogated.keySet()) {
 			newWayNetwork = Math.max(newWayNetwork, networkWayOrder(t.getTag()));
 			newCycleNetwork = Math.max(newCycleNetwork, networkCycleOrder(t.getTag()));
 		}
-		if(newWayNetwork > 0 && newWayNetwork < existingWayNetwork) {
+		if (newWayNetwork > 0 && newWayNetwork < existingWayNetwork) {
 			return true;
 		}
-		if(newCycleNetwork > 0 && newCycleNetwork < existingCycleNetwork) {
+		if (newCycleNetwork > 0 && newCycleNetwork < existingCycleNetwork) {
 			return true;
 		}
 		return false;
