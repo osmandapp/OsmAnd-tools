@@ -978,6 +978,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		for (City c : cities.values()) {
 			if (c.getType() != CityType.DISTRICT &&
 					//c.getType() != CityType.SUBURB &&
+					c.getType() != CityType.BOROUGH &&
 					c.getType() != CityType.NEIGHBOURHOOD) {
 				writeCity(c);
 			}
