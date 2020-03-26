@@ -39,6 +39,9 @@ public class TagsTransformer {
 			}
 			for(RelationMember ids : ((Relation) e).getMembers()) {
 				Map<String, String> map = getPropogateTagForEntity(ids);
+				if (skipPropagationOfDuplicate(propogated, map)) {
+					continue;
+				}
 				Iterator<Entry<MapRulType, Map<MapRulType, String>>> itMain = propogated.entrySet().iterator();
 				while (itMain.hasNext()) {
 					Entry<MapRulType, Map<MapRulType, String>> ev = itMain.next();
@@ -73,7 +76,57 @@ public class TagsTransformer {
 				}
 			}
 		}
+	}
 	
+	private int networkWayOrder(String tag) {
+		switch(tag) {
+		case "network_iwn":
+			return 4;
+		case "network_nwn":
+			return 3;
+		case "network_rwn":
+			return 2;
+		case "network_lwn":
+			return 1;
+		default:
+			return 0;
+		}
+	}
+	
+	private int networkCycleOrder(String tag) {
+		switch(tag) {
+		case "network_icn":
+			return 4;
+		case "network_ncn":
+			return 3;
+		case "network_rcn":
+			return 2;
+		case "network_lcn":
+			return 1;
+		default:
+			return 0;
+		}
+	}
+
+	private boolean skipPropagationOfDuplicate(Map<MapRulType, Map<MapRulType, String>> propogated,
+			Map<String, String> existing) {
+		int existingWayNetwork = 0,  newWayNetwork = 0,
+				existingCycleNetwork = 0, newCycleNetwork = 0;
+		for(String t : existing.keySet()) {
+			existingWayNetwork = Math.max(existingWayNetwork, networkWayOrder(t));
+			existingCycleNetwork = Math.max(existingWayNetwork, networkCycleOrder(t));
+		}
+		for(MapRulType t : propogated.keySet()) {
+			newWayNetwork = Math.max(newWayNetwork, networkWayOrder(t.getTag()));
+			newCycleNetwork = Math.max(newCycleNetwork, networkCycleOrder(t.getTag()));
+		}
+		if(newWayNetwork > 0 && newWayNetwork < existingWayNetwork) {
+			return true;
+		}
+		if(newCycleNetwork > 0 && newCycleNetwork < existingCycleNetwork) {
+			return true;
+		}
+		return false;
 	}
 
 	Map<String, String> getPropogateTagForEntity(RelationMember id) {

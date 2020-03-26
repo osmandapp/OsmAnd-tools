@@ -218,7 +218,7 @@ public class DBStreetDAO extends AbstractIndexPartCreator {
 		ResultSet rs = addressSearchStreetStat.executeQuery();
 		DBStreetDAO.SimpleStreet foundId = null;
 		if (rs.next()) {
-			foundId = new SimpleStreet(rs.getLong(1),name,city.getId(),cityPart,rs.getDouble(2),rs.getDouble(3),
+			foundId = new SimpleStreet(rs.getLong(1), name, city.getId(), cityPart, rs.getDouble(2), rs.getDouble(3),
 					rs.getString(4), rs.getString(5));
 		}
 		rs.close();
