@@ -1204,10 +1204,10 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 					String[] ntokens = new String[] { tokens[0], tokens[1], tokens.length == 4 ? "" : tokens[2], "",
 							tokens.length == 4 ? tokens[2] : tokens[3], tokens.length == 4 ? tokens[3] : tokens[4] };
 					addOsmcNewTags(tags, ntokens, "");
-					addOsmcNewTags(tags, ntokens, routeTag+"_");
+					addOsmcNewTags(tags, ntokens, routeTag + "_");
 				} else {
 					addOsmcNewTags(tags, tokens, "");
-					addOsmcNewTags(tags, tokens, routeTag+"_");
+					addOsmcNewTags(tags, tokens, routeTag + "_");
 				}
 			}
 			if(tags.containsKey("osmc_text") && (tags.get("osmc_text").equals(tags.get("ref")))) {
@@ -1241,11 +1241,13 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		}
 		if (smoothness != null) {
 			smoothness = smoothness.toLowerCase();
-	        }
+		}
 		if (tracktype != null) {
 			tracktype = tracktype.toLowerCase();
 		}
-		if ("paved".equals(surface) || "concrete".equals(surface) || "concrete:lanes".equals(surface) || "concrete:plates".equals(surface) || "sett".equals(surface) || "paving_stones".equals(surface) || "metal".equals(surface) || "wood".equals(surface)) {
+		if ("paved".equals(surface) || "concrete".equals(surface) || "concrete:lanes".equals(surface)
+				|| "concrete:plates".equals(surface) || "sett".equals(surface) || "paving_stones".equals(surface)
+				|| "metal".equals(surface) || "wood".equals(surface)) {
 			result += 3;
 			result_bicycle_routing += 3;
 		} else if ("fine_gravel".equals(surface) || "grass_paver".equals(surface)) {
@@ -1285,7 +1287,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		if ("excellent".equals(smoothness)) {
 			if (("track".equals(highway) || ("path".equals(highway))) && (surface == null)) {
 				result = 7;
- 				result_bicycle_routing = 6;
+				result_bicycle_routing = 6;
 			} else {
 				result -= 5;
 				result_bicycle_routing -= 5;
@@ -1385,16 +1387,17 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 				result_bicycle_routing += 16;
 			}
 		}
-		if (("motorway".equals(highway) || ("motorway_link".equals(highway)) || ("trunk".equals(highway)) || ("trunk_link".equals(highway))
-			|| ("primary".equals(highway)) || ("primary_link".equals(highway)) || ("secondary".equals(highway))
-			|| ("secondary_link".equals(highway)) || ("tertiary".equals(highway)) || ("tertiary_link".equals(highway))
-			|| ("unclassified".equals(highway)) || ("residential".equals(highway)) || ("service".equals(highway))
-			|| ("pedestrian".equals(highway)) || ("living_street".equals(highway))
-			|| ("footway".equals(highway)) || ("cycleway".equals(highway)))
-			&& (surface == null) && (smoothness == null)) {
+		if (("motorway".equals(highway) || ("motorway_link".equals(highway)) || ("trunk".equals(highway))
+				|| ("trunk_link".equals(highway)) || ("primary".equals(highway)) || ("primary_link".equals(highway))
+				|| ("secondary".equals(highway)) || ("secondary_link".equals(highway)) || ("tertiary".equals(highway))
+				|| ("tertiary_link".equals(highway)) || ("unclassified".equals(highway))
+				|| ("residential".equals(highway)) || ("service".equals(highway)) || ("pedestrian".equals(highway))
+				|| ("living_street".equals(highway)) || ("footway".equals(highway)) || ("cycleway".equals(highway)))
+				&& (surface == null) && (smoothness == null)) {
 			result = 100;
 		}
-		if (("track".equals(highway) || "path".equals(highway)) && ((surface == null) && (smoothness == null) && (tracktype == null))) {
+		if (("track".equals(highway) || "path".equals(highway))
+				&& ((surface == null) && (smoothness == null) && (tracktype == null))) {
 			result = 100;
 		}
 		if ("track".equals(highway) && (surface == null) && (smoothness == null) && (tracktype == null)) {
@@ -1416,7 +1419,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		if (result < 0) {
 			result = 0;
 		}
-		int[] result_array = {result,result_bicycle_routing};
+		int[] result_array = { result, result_bicycle_routing };
 		return result_array;
 	}
 
@@ -1424,24 +1427,24 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	private void addOsmcNewTags(Map<String, String> propogated, String[] tokens, String routeTag) {
 		if (tokens.length > 0) {
 			String wayColor = tokens[0]; // formatColorToPalette(tokens[0], true);
-			propogated.put(routeTag+"osmc_waycolor", wayColor);
+			propogated.put(routeTag + "osmc_waycolor", wayColor);
 			if (tokens.length > 1) {
 				String bgColor = tokens[1]; // formatColorToPalette(tokens[1], true);
-				propogated.put(routeTag+"osmc_background", bgColor);
+				propogated.put(routeTag + "osmc_background", bgColor);
 				propogated.put("osmc_stub_name", ".");
 				if (tokens.length > 2) {
 					String shpVl = tokens[2]; // formatColorToPalette(tokens[1], true);
-					propogated.put(routeTag+"osmc_foreground", shpVl);
+					propogated.put(routeTag + "osmc_foreground", shpVl);
 					if (tokens.length > 3) {
 						String shp2Vl = tokens[3];
-						propogated.put(routeTag+"osmc_foreground2", shp2Vl);
+						propogated.put(routeTag + "osmc_foreground2", shp2Vl);
 						if (tokens.length > 4) {
 							String txtVl = tokens[4];
-							propogated.put(routeTag+"osmc_text", txtVl);
-							propogated.put(routeTag+"osmc_text_symbol", txtVl);
+							propogated.put(routeTag + "osmc_text", txtVl);
+							propogated.put(routeTag + "osmc_text_symbol", txtVl);
 							if (tokens.length > 5) {
 								String txtcolorVl = tokens[5];
-								propogated.put(routeTag+"osmc_textcolor", txtcolorVl);
+								propogated.put(routeTag + "osmc_textcolor", txtcolorVl);
 							}
 						}
 					}
