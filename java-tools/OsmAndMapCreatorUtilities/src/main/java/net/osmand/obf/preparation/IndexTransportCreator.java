@@ -960,7 +960,6 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		} catch (NumberFormatException e) {
 			return false;
 		}
-
 		List<Entity> platformsAndStops = new ArrayList<Entity>();
 		List<Entity> platforms = new ArrayList<Entity>();
 		List<Entity> stops = new ArrayList<Entity>();
@@ -994,7 +993,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			Entity genericStopName = null;
 			if(stopArea != null && !Algorithms.isEmpty(stopArea.getTag(OSMTagKey.NAME))) {
 				genericStopName = stopArea;
-			} else if(platformNames.containsKey(EntityId.valueOf(s))){
+			} else if (platformNames.containsKey(EntityId.valueOf(s)) && Algorithms.isEmpty(stop.getName())) {
 				genericStopName = platformNames.get(EntityId.valueOf(s));
 			}
 			if(genericStopName != null) {
