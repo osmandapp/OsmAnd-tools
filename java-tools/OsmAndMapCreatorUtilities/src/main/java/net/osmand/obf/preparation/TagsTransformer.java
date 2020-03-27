@@ -33,11 +33,11 @@ public class TagsTransformer {
 
 		Map<MapRulType, Map<MapRulType, String>> propogated =
 				renderingTypes.getRelationPropogatedTags((Relation)e, at);
-		if(propogated != null && propogated.size() > 0) {
-			if(ctx != null) {
+		if (propogated != null && propogated.size() > 0) {
+			if (ctx != null) {
 				ctx.loadEntityRelation((Relation) e);
 			}
-			for(RelationMember ids : ((Relation) e).getMembers()) {
+			for (RelationMember ids : ((Relation) e).getMembers()) {
 				Map<String, String> map = getPropogateTagForEntity(ids);
 				if (skipPropagationOfDuplicate(propogated, map)) {
 					continue;
@@ -93,19 +93,22 @@ public class TagsTransformer {
 		}
 	}
 	
-	private int networkCycleOrder(String tag) {
-		switch(tag) {
-		case "network_icn":
-			return 4;
-		case "network_ncn":
-			return 3;
-		case "network_rcn":
-			return 2;
-		case "network_lcn":
-			return 1;
-		default:
-			return 0;
+	private int networkCycleOrder(String tag, String value) {
+		if ("network".equals(tag)) {
+			switch (value) {
+			case "icn":
+				return 4;
+			case "ncn":
+				return 3;
+			case "rcn":
+				return 2;
+			case "lcn":
+				return 1;
+			default:
+				return 0;
+			}
 		}
+		return 0;
 	}
 
 	private boolean skipPropagationOfDuplicate(Map<MapRulType, Map<MapRulType, String>> propogated,
@@ -113,11 +116,11 @@ public class TagsTransformer {
 		int existingWayNetwork = 0, newWayNetwork = 0, existingCycleNetwork = 0, newCycleNetwork = 0;
 		for (String t : existing.keySet()) {
 			existingWayNetwork = Math.max(existingWayNetwork, networkWayOrder(t));
-			existingCycleNetwork = Math.max(existingWayNetwork, networkCycleOrder(t));
+			existingCycleNetwork = Math.max(existingCycleNetwork, networkCycleOrder(t, existing.get(t)));
 		}
 		for (MapRulType t : propogated.keySet()) {
 			newWayNetwork = Math.max(newWayNetwork, networkWayOrder(t.getTag()));
-			newCycleNetwork = Math.max(newCycleNetwork, networkCycleOrder(t.getTag()));
+			newCycleNetwork = Math.max(newCycleNetwork, networkCycleOrder(t.getTag(), t.getValue()));
 		}
 		if (newWayNetwork > 0 && newWayNetwork < existingWayNetwork) {
 			return true;
