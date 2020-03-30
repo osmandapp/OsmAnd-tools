@@ -1187,9 +1187,6 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		if(tags.get("route_hiking") != null && tags.get("route_hiking").equals("hiking")) {
 			routeTag = "hiking";
 		}
-		if(tags.get("route_bicycle") != null && tags.get("route_bicycle").equals("bicycle")) {
-			routeTag = "bicycle";
-		}
 		if(tags.containsKey("osmc:symbol")) {
 			tags = new TreeMap<String, String>(tags);
 			// osmc:symbol=black:red:blue_rectangle ->
@@ -1200,14 +1197,14 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			String[] tokens = value.split(":", 6);
 			osmcBackwardCompatility(tags, tokens);
 			if (tokens != null) {
+				String[] tokensToAdd = tokens;
 				if ((tokens.length == 4 && isColor(tokens[3])) || (tokens.length == 5 && isColor(tokens[4]))) {
-					String[] ntokens = new String[] { tokens[0], tokens[1], tokens.length == 4 ? "" : tokens[2], "",
+					tokensToAdd = new String[] { tokens[0], tokens[1], tokens.length == 4 ? "" : tokens[2], "",
 							tokens.length == 4 ? tokens[2] : tokens[3], tokens.length == 4 ? tokens[3] : tokens[4] };
-					addOsmcNewTags(tags, ntokens, "");
-					addOsmcNewTags(tags, ntokens, routeTag + "_");
-				} else {
-					addOsmcNewTags(tags, tokens, "");
-					addOsmcNewTags(tags, tokens, routeTag + "_");
+					
+				addOsmcNewTags(tags, tokensToAdd, "");
+				if(routeTag.length() > 0) {
+					addOsmcNewTags(tags, tokensToAdd, routeTag + "_");
 				}
 			}
 			if(tags.containsKey("osmc_text") && (tags.get("osmc_text").equals(tags.get("ref")))) {
