@@ -1202,9 +1202,11 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 					tokensToAdd = new String[] { tokens[0], tokens[1], tokens.length == 4 ? "" : tokens[2], "",
 							tokens.length == 4 ? tokens[2] : tokens[3], tokens.length == 4 ? tokens[3] : tokens[4] };
 					
-				addOsmcNewTags(tags, tokensToAdd, "");
+				
 				if(routeTag.length() > 0) {
 					addOsmcNewTags(tags, tokensToAdd, routeTag + "_");
+				} else {
+					addOsmcNewTags(tags, tokensToAdd, "");	
 				}
 			}
 			if(tags.containsKey("osmc_text") && (tags.get("osmc_text").equals(tags.get("ref")))) {
