@@ -1201,12 +1201,12 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 				if ((tokens.length == 4 && isColor(tokens[3])) || (tokens.length == 5 && isColor(tokens[4]))) {
 					tokensToAdd = new String[] { tokens[0], tokens[1], tokens.length == 4 ? "" : tokens[2], "",
 							tokens.length == 4 ? tokens[2] : tokens[3], tokens.length == 4 ? tokens[3] : tokens[4] };
-					
+				}	
 				
-				if(routeTag.length() > 0) {
+				if (routeTag.length() > 0) {
 					addOsmcNewTags(tags, tokensToAdd, routeTag + "_");
 				} else {
-					addOsmcNewTags(tags, tokensToAdd, "");	
+					addOsmcNewTags(tags, tokensToAdd, "");
 				}
 			}
 			if(tags.containsKey("osmc_text") && (tags.get("osmc_text").equals(tags.get("ref")))) {
