@@ -68,6 +68,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	private static final int MAP_LEVELS_MAX = 1 << MAP_LEVELS_POWER;
 	private static final int LOW_LEVEL_COMBINE_WAY_POINS_LIMIT = 10000;
 	private static final int LOW_LEVEL_ZOOM_TO_COMBINE = 13; // 15 if use combination all the time
+	private static final int LOW_LEVEL_ZOOM_COASTLINE = 10;
 	private MapRenderingTypesEncoder renderingTypes;
 	private MapZooms mapZooms;
 
@@ -112,6 +113,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	private static boolean VALIDATE_DUPLICATE = false;
 	private TLongObjectHashMap<Long> duplicateIds = new TLongObjectHashMap<Long>();
 	private BasemapProcessor checkSeaTile;
+	
 	
 	private long assignIdForMultipolygon(Relation orig) {
 		long ll = orig.getId();
@@ -506,6 +508,10 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			boolean combined = true;
 			if(minZoom >= LOW_LEVEL_ZOOM_TO_COMBINE) {
 				// disable combine
+				combined = false;
+			}
+			if(minZoom >= LOW_LEVEL_ZOOM_COASTLINE && typeUse.contains(renderingTypes.getCoastlineRuleType().getInternalId())) {
+				// coastline
 				combined = false;
 			}
 			while (combined && wayNodes.size() < LOW_LEVEL_COMBINE_WAY_POINS_LIMIT) {
