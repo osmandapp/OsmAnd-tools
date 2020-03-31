@@ -504,16 +504,18 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 					return -Integer.compare(o1.namesCount, o2.namesCount);
 				}
 			};
-
-			boolean combined = true;
-			if(minZoom >= LOW_LEVEL_ZOOM_TO_COMBINE) {
+			boolean dontCombine = false;
+			if (minZoom >= LOW_LEVEL_ZOOM_TO_COMBINE) {
 				// disable combine
-				combined = false;
+				dontCombine = true;
 			}
-			if(minZoom >= LOW_LEVEL_ZOOM_COASTLINE && typeUse.contains(renderingTypes.getCoastlineRuleType().getInternalId())) {
+			if (minZoom >= LOW_LEVEL_ZOOM_COASTLINE && 
+					typeUse.contains(renderingTypes.getCoastlineRuleType().getInternalId())) {
 				// coastline
-				combined = false;
+				dontCombine = true;
 			}
+			boolean combined = !dontCombine;
+			
 			while (combined && wayNodes.size() < LOW_LEVEL_COMBINE_WAY_POINS_LIMIT) {
 				combined = false;
 				endStat.setLong(1, startNode);
@@ -543,11 +545,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			}
 
 			// combined end point
-			combined = true;
-			if(minZoom >= LOW_LEVEL_ZOOM_TO_COMBINE) {
-				// disable combine
-				combined = false;
-			}
+			combined = !dontCombine;
 			while (combined && wayNodes.size() < LOW_LEVEL_COMBINE_WAY_POINS_LIMIT) {
 				combined = false;
 				startStat.setLong(1, endNode);
