@@ -684,9 +684,9 @@ public class BinaryMapIndexWriter {
 			sumLabelY += pcalcy;
 			sumLabelCount++;
 			delta = 1;
-			if (allowCoordinateSimplification) {
-				delta = skipSomeNodes(coordinates, len, i, x, y, false);
-			}
+//			if (allowCoordinateSimplification) {
+//				delta = skipSomeNodes(coordinates, len, i, x, y, false);
+//			}
 		}
 		COORDINATES_SIZE += CodedOutputStream.computeRawVarint32Size(mapDataBuf.size())
 				+ CodedOutputStream.computeTagSize(MapData.COORDINATES_FIELD_NUMBER) + mapDataBuf.size();
