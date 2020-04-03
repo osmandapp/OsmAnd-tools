@@ -34,7 +34,7 @@ import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.osm.edit.Way;
 import net.osmand.router.RoutingConfiguration.Builder;
 import net.osmand.router.GeneralRouter;
-import net.osmand.router.RoutingConfiguration;
+import net.osmand.router.ptresult.NativeTransportRoutingResult;
 import net.osmand.router.TransportRoutePlanner;
 import net.osmand.router.TransportRoutePlanner.TransportRouteResult;
 import net.osmand.router.TransportRoutePlanner.TransportRouteResultSegment;
@@ -235,9 +235,26 @@ public class MapTransportLayer implements MapPanelLayer {
 				TransportRoutingConfiguration cfg = new TransportRoutingConfiguration(prouter, paramsR);
 				cfg.useSchedule = schedule;
 				TransportRoutePlanner planner = new TransportRoutePlanner();
-				TransportRoutingContext ctx = new TransportRoutingContext(cfg, rs);
-				startProgressThread(ctx);
-				this.results = planner.buildRoute(ctx, start, end);
+
+				TransportRoutingContext ctx = new TransportRoutingContext(cfg, 
+						DataExtractionSettings.getSettings().useNativeRouting() ? NativeSwingRendering.getDefaultFromSettings() : null, rs); 
+				if (ctx.library != null) {
+					NativeTransportRoutingResult[] nativeRes = ctx.library.runNativePTRouting(
+							MapUtils.get31TileNumberX(start.getLongitude()),
+							MapUtils.get31TileNumberY(start.getLatitude()),
+							MapUtils.get31TileNumberX(end.getLongitude()),
+							MapUtils.get31TileNumberY(end.getLatitude()),
+							cfg, ctx.calculationProgress);
+					if (nativeRes.length > 0) {						
+						this.results = TransportRoutePlanner.convertToTransportRoutingResult(nativeRes, cfg);
+					} else {
+						System.out.println("No luck, empty result from Native");
+					}
+				} else {
+					startProgressThread(ctx);
+					this.results = planner.buildRoute(ctx, start, end);	
+				}
+				
 				this.currentRoute = 0;
 				throwExceptionIfRouteNotFound(ctx, results);
 			} catch (Exception e) {
