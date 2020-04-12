@@ -96,6 +96,7 @@ public class DownloadOsmGPX {
 		int batchFetch = 0; 
 		int success = 0;
 		OsmGpxFile lastSuccess = null;
+		System.out.println("Start with id: " + ID_INIT);
 		for (long id = ID_INIT; id < ID_END; id++) {
 			String url = MAIN_GPX_API_ENDPOINT + id + "/details";
 			HttpsURLConnection httpConn = getHttpConnection(url);
