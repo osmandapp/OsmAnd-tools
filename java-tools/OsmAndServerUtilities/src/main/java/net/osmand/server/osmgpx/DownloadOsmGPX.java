@@ -121,12 +121,13 @@ public class DownloadOsmGPX {
 				throw new UnsupportedOperationException("Code: " + responseCode + " id " + id);
 			}
 			if (batchFetch++ > FETCH_INTERVAL) {
+				String lastTime = lastSuccess == null ? "" : lastSuccess.timestamp.toString();
 				if (success > 0) {
 					System.out.println(String.format("Fetched %d gpx from %d - %d (%s). Now: %s ",
-							success, id - FETCH_INTERVAL, id,  lastSuccess == null ? "" : lastSuccess.timestamp.toString(), new Date()));
+							success, id - FETCH_INTERVAL, id,  lastTime, new Date()));
 				} else {
 					System.out.println(String.format("STOP no successful fetch after %d %s",
-							lastSuccess == null ? ID_INIT : lastSuccess.id, lastSuccess == null ? "" : lastSuccess.timestamp.toString()));
+							lastSuccess == null ? ID_INIT : lastSuccess.id, lastTime));
 					break;
 				}
 				batchFetch = 0;
