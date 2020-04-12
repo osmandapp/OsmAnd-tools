@@ -114,7 +114,7 @@ public class DownloadOsmGPX {
 				GZIPInputStream gzipIs = new GZIPInputStream(httpFileConn.getInputStream());
 				r.gpx = Algorithms.readFromInputStream(gzipIs).toString();
 				r.gpxGzip = Algorithms.stringToGzip(r.gpx);
-				lastSuccess = null;
+				lastSuccess = r;
 				insertGPXFile(r);
 				success++;
 			} else {
