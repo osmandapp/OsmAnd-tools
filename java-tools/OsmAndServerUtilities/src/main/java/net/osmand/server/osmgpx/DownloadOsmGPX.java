@@ -247,6 +247,7 @@ public class DownloadOsmGPX {
 				executeSQL("CREATE TABLE " + GPX_FILES_TABLE_NAME + " (id bigint primary key, data bytea)");
 				executeSQL("CREATE TABLE " + GPX_METADATA_TABLE_NAME
 						+ "(id bigint primary key, \"user\" text, \"date\" timestamp, name text, lat float, lon float, "
+						+ " minlat float, minlon float, maxlat float, maxlon float, "
 						+ "pending boolean, description text, visibility text)");
 			}
 		}
