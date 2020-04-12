@@ -16,7 +16,7 @@ public class ServerUtilities {
 		String utl = args[0];
 		List<String> subArgs = new ArrayList<String>(Arrays.asList(args).subList(1, args.length));
 		String[] subArgsArray = subArgs.toArray(new String[args.length - 1]);
-		if (utl.equals("generate-report-underpaid")) {
+		if (utl.equals("update-subscriptions")) {
 			UpdateSubscription.main(subArgsArray);
 		} else if (utl.equals("send-email")) {
 			EmailSenderMain.main(subArgsArray);
