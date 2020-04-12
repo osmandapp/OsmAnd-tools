@@ -112,7 +112,7 @@ public class DownloadOsmGPX {
 					break;
 				}
 				try {
-					if (!r.name.endsWith(".gpx.tar.gz")) {
+					if (!r.name.endsWith(".gpx.tar.gz") && !r.name.endsWith(".gpx.bz2")) {
 						HttpsURLConnection httpFileConn = getHttpConnection(MAIN_GPX_API_ENDPOINT + id + "/data");
 						GZIPInputStream gzipIs = new GZIPInputStream(httpFileConn.getInputStream());
 						r.gpx = Algorithms.readFromInputStream(gzipIs).toString();
