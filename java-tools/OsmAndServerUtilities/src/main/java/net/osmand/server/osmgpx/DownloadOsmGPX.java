@@ -49,7 +49,7 @@ public class DownloadOsmGPX {
 	private static final int PS_INSERT_GPX_DETAILS = 4;
 	private static final long FETCH_INTERVAL = 100;
 	private static final long FETCH_MAX_INTERVAL = 10000;
-	private static final long INITIAL_ID = 100;
+	private static final long INITIAL_ID = 1000;
 	private static final String GPX_METADATA_TABLE_NAME = "osm_gpx_data";
 	private static final String GPX_FILES_TABLE_NAME = "osm_gpx_files";
 	private static final long FETCH_INTERVAL_SLEEP = 2000;
@@ -123,8 +123,8 @@ public class DownloadOsmGPX {
 					System.out.println(String.format("Fetched %d gpx from %d - %d, %s ",
 							success, id - FETCH_INTERVAL, id, new Date()));
 				} else {
-					System.out.println(String.format("STOP no successful fetch for %d, %d ",
-							id - FETCH_INTERVAL, id));
+					System.out.println(String.format("STOP no successful fetch for %d",
+							id - FETCH_INTERVAL));
 					break;
 				}
 				batchFetch = 0;
