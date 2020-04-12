@@ -95,6 +95,7 @@ public class DownloadOsmGPX {
 		long ID_END = ID_INIT + FETCH_MAX_INTERVAL;
 		int batchFetch = 0; 
 		int success = 0;
+		OsmGpxFile lastSuccess = null;
 		for (long id = ID_INIT; id < ID_END; id++) {
 			String url = MAIN_GPX_API_ENDPOINT + id + "/details";
 			HttpsURLConnection httpConn = getHttpConnection(url);
@@ -113,6 +114,7 @@ public class DownloadOsmGPX {
 				GZIPInputStream gzipIs = new GZIPInputStream(httpFileConn.getInputStream());
 				r.gpx = Algorithms.readFromInputStream(gzipIs).toString();
 				r.gpxGzip = Algorithms.stringToGzip(r.gpx);
+				lastSuccess = null;
 				insertGPXFile(r);
 				success++;
 			} else {
@@ -120,11 +122,11 @@ public class DownloadOsmGPX {
 			}
 			if (batchFetch++ > FETCH_INTERVAL) {
 				if (success > 0) {
-					System.out.println(String.format("Fetched %d gpx from %d - %d, %s ",
-							success, id - FETCH_INTERVAL, id, new Date()));
+					System.out.println(String.format("Fetched %d gpx from %d - %d (%s). Now: %s ",
+							success, id - FETCH_INTERVAL, id,  lastSuccess == null ? "" : lastSuccess.timestamp.toString(), new Date()));
 				} else {
-					System.out.println(String.format("STOP no successful fetch for %d",
-							id - FETCH_INTERVAL));
+					System.out.println(String.format("STOP no successful fetch after %d %s",
+							lastSuccess == null ? ID_INIT : lastSuccess.id, lastSuccess == null ? "" : lastSuccess.timestamp.toString()));
 					break;
 				}
 				batchFetch = 0;
