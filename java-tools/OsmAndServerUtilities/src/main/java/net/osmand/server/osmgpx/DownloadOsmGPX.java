@@ -104,6 +104,7 @@ public class DownloadOsmGPX {
 				+ " SET minlat = ?, minlon = ?, maxlat = ?, maxlon = ? where id = ? ");
 		ResultSet rs = dbConn.createStatement().executeQuery("SELECT t.id, t.lat, t.lon, s.data from " + GPX_METADATA_TABLE_NAME + 
 				" t join " + GPX_FILES_TABLE_NAME + " s on s.id = t.id");
+//						+ " where t.maxlat is null");
 		
 		while (rs.next()) {
 			OsmGpxFile r = new OsmGpxFile();
@@ -173,7 +174,7 @@ public class DownloadOsmGPX {
 				String lastTime = lastSuccess == null ? "" : lastSuccess.timestamp.toString();
 				if (success > 0) {
 					System.out.println(String.format("Fetched %d gpx from %d - %d (%s). Now: %s ", success,
-							id - FETCH_INTERVAL, id, lastTime, new Date()));
+							id - FETCH_INTERVAL + 1, id, lastTime, new Date()));
 				} else {
 					System.out.println(String.format("STOP no successful fetch after %d %s",
 							lastSuccess == null ? ID_INIT : lastSuccess.id, lastTime));
