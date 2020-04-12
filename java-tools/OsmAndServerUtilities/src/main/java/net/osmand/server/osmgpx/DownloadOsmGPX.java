@@ -112,19 +112,18 @@ public class DownloadOsmGPX {
 					break;
 				}
 				try {
-					if (!r.name.endsWith(".gpx.tar.gz") && !r.name.endsWith(".gpx.bz2")) {
-						HttpsURLConnection httpFileConn = getHttpConnection(MAIN_GPX_API_ENDPOINT + id + "/data");
-						GZIPInputStream gzipIs = new GZIPInputStream(httpFileConn.getInputStream());
-						r.gpx = Algorithms.readFromInputStream(gzipIs).toString();
-						r.gpxGzip = Algorithms.stringToGzip(r.gpx);
-						lastSuccess = r;
-					}
+					HttpsURLConnection httpFileConn = getHttpConnection(MAIN_GPX_API_ENDPOINT + id + "/data");
+					GZIPInputStream gzipIs = new GZIPInputStream(httpFileConn.getInputStream());
+					r.gpx = Algorithms.readFromInputStream(gzipIs).toString();
+					r.gpxGzip = Algorithms.stringToGzip(r.gpx);
+				} catch (Exception e) {
+					LOG.error(
+							String.format("### ERROR while reading GPX zip %d - %s: %s", r.id, r.name, e.getMessage()));
+				} finally {
+					lastSuccess = r;
 					insertGPXFile(r);
 					success++;
-				} catch (Exception e) {
-					commitAllStatements();
-					LOG.error("ERROR while reading GPX " + r.id);
-					throw e;
+
 				}
 			} else {
 				throw new UnsupportedOperationException("Code: " + responseCode + " id " + id);
