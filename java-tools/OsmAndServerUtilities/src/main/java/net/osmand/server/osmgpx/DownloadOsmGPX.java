@@ -49,7 +49,7 @@ public class DownloadOsmGPX {
 	private static final int PS_INSERT_GPX_DETAILS = 4;
 	private static final long FETCH_INTERVAL = 200;
 	private static final long FETCH_MAX_INTERVAL = 10000;
-	private static final long INITIAL_ID = 1000;
+	private static final long INITIAL_ID = 21997;
 	private static final String GPX_METADATA_TABLE_NAME = "osm_gpx_data";
 	private static final String GPX_FILES_TABLE_NAME = "osm_gpx_files";
 	private static final long FETCH_INTERVAL_SLEEP = 2000;
@@ -91,7 +91,7 @@ public class DownloadOsmGPX {
 	private void downloadGPXMain() throws Exception {
 		initDBConnection();
 		Long maxId = (Long) executeSQLQuery("SELECT max(id) from " + GPX_METADATA_TABLE_NAME);
-		long ID_INIT = maxId == null ? INITIAL_ID : maxId.longValue()  + 1;
+		long ID_INIT = Math.max(INITIAL_ID, maxId == null ? 0 : (maxId.longValue()  + 1));
 		long ID_END = ID_INIT + FETCH_MAX_INTERVAL;
 		int batchFetch = 0; 
 		int success = 0;
@@ -112,12 +112,18 @@ public class DownloadOsmGPX {
 					break;
 				}
 				HttpsURLConnection httpFileConn = getHttpConnection(MAIN_GPX_API_ENDPOINT + id + "/data");
-				GZIPInputStream gzipIs = new GZIPInputStream(httpFileConn.getInputStream());
-				r.gpx = Algorithms.readFromInputStream(gzipIs).toString();
-				r.gpxGzip = Algorithms.stringToGzip(r.gpx);
-				lastSuccess = r;
-				insertGPXFile(r);
-				success++;
+				try {
+					GZIPInputStream gzipIs = new GZIPInputStream(httpFileConn.getInputStream());
+					r.gpx = Algorithms.readFromInputStream(gzipIs).toString();
+					r.gpxGzip = Algorithms.stringToGzip(r.gpx);
+					lastSuccess = r;
+					insertGPXFile(r);
+					success++;
+				} catch (Exception e) {
+					commitAllStatements();
+					LOG.error("ERROR while reading GPX " + r.id);
+					throw e;
+				}
 			} else {
 				throw new UnsupportedOperationException("Code: " + responseCode + " id " + id);
 			}
