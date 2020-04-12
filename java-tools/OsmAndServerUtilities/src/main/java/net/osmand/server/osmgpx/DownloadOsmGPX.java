@@ -1,6 +1,7 @@
 package net.osmand.server.osmgpx;
 
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.StringReader;
 import java.net.MalformedURLException;
@@ -35,6 +36,11 @@ import org.kxml2.io.KXmlParser;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 
+import net.osmand.GPXUtilities;
+import net.osmand.GPXUtilities.GPXFile;
+import net.osmand.GPXUtilities.Track;
+import net.osmand.GPXUtilities.TrkSegment;
+import net.osmand.GPXUtilities.WptPt;
 import net.osmand.PlatformUtil;
 import net.osmand.osm.io.Base64;
 import net.osmand.util.Algorithms;
@@ -116,9 +122,25 @@ public class DownloadOsmGPX {
 					GZIPInputStream gzipIs = new GZIPInputStream(httpFileConn.getInputStream());
 					r.gpx = Algorithms.readFromInputStream(gzipIs).toString();
 					r.gpxGzip = Algorithms.stringToGzip(r.gpx);
+					GPXFile gpxFile = GPXUtilities.loadGPXFile(new ByteArrayInputStream(r.gpx.getBytes()));
+					if (gpxFile != null && gpxFile.error == null) {
+						r.minlat = r.maxlat = r.lat;
+						r.minlon = r.maxlon = r.lon;
+						for (Track t : gpxFile.tracks) {
+							for (TrkSegment s : t.segments) {
+								for (WptPt p : s.points) {
+									r.minlat = Math.min(r.minlat, p.lat);
+									r.maxlat = Math.max(r.maxlat, p.lat);
+									r.minlon = Math.min(r.minlon, p.lon);
+									r.maxlon = Math.max(r.maxlon, p.lon);
+								}
+							}
+						}
+					} else {
+						errorReadingGpx(r, gpxFile.error);
+					}
 				} catch (Exception e) {
-					LOG.error(
-							String.format("### ERROR while reading GPX zip %d - %s: %s", r.id, r.name, e.getMessage()));
+					errorReadingGpx(r, e);
 				} finally {
 					lastSuccess = r;
 					insertGPXFile(r);
@@ -149,26 +171,41 @@ public class DownloadOsmGPX {
 
 
 
-
+	private void errorReadingGpx(OsmGpxFile r, Exception e) {
+		LOG.error(String.format("### ERROR while reading GPX zip %d - %s: %s", r.id, r.name,
+				e != null ? e.getMessage() : ""));
+	}
 
 	private void insertGPXFile(OsmGpxFile r) throws SQLException {
 		PreparedStatementWrapper wrapper = preparedStatements[PS_INSERT_GPX_DETAILS];
 		if(wrapper == null) {
 			wrapper = new PreparedStatementWrapper();
 			wrapper.ps = dbConn.prepareStatement("INSERT INTO " + GPX_METADATA_TABLE_NAME
-					+ "(id, \"user\", \"date\", name, lat, lon, pending, visibility, description) "
-					+ " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)");
+					+ "(id, \"user\", \"date\", name, lat, lon, minlat, minlon, maxlat, maxlon, pending, visibility, description) "
+					+ " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 			preparedStatements[PS_INSERT_GPX_DETAILS] = wrapper;
 		}
-		wrapper.ps.setLong(1, r.id);
-		wrapper.ps.setString(2, r.user);
-		wrapper.ps.setDate(3, new java.sql.Date(r.timestamp.getTime()));
-		wrapper.ps.setString(4, r.name);
-		wrapper.ps.setDouble(5, r.lat);
-		wrapper.ps.setDouble(6, r.lon);
-		wrapper.ps.setBoolean(7, r.pending);
-		wrapper.ps.setString(8, r.visibility);
-		wrapper.ps.setString(9, r.description);
+		int ind = 1;
+		wrapper.ps.setLong(ind++, r.id);
+		wrapper.ps.setString(ind++, r.user);
+		wrapper.ps.setDate(ind++, new java.sql.Date(r.timestamp.getTime()));
+		wrapper.ps.setString(ind++, r.name);
+		wrapper.ps.setDouble(ind++, r.lat);
+		wrapper.ps.setDouble(ind++, r.lon);
+		if (r.minlat == OsmGpxFile.ERROR_NUMBER || r.minlon == OsmGpxFile.ERROR_NUMBER) {
+			wrapper.ps.setNull(ind++, java.sql.Types.FLOAT);
+			wrapper.ps.setNull(ind++, java.sql.Types.FLOAT);
+			wrapper.ps.setNull(ind++, java.sql.Types.FLOAT);
+			wrapper.ps.setNull(ind++, java.sql.Types.FLOAT);
+		} else {
+			wrapper.ps.setDouble(ind++, r.minlat);
+			wrapper.ps.setDouble(ind++, r.minlon);
+			wrapper.ps.setDouble(ind++, r.maxlat);
+			wrapper.ps.setDouble(ind++, r.maxlon);
+		}
+		wrapper.ps.setBoolean(ind++, r.pending);
+		wrapper.ps.setString(ind++, r.visibility);
+		wrapper.ps.setString(ind++, r.description);
 		wrapper.addBatch();
 		
 		PreparedStatementWrapper wrapperFile = preparedStatements[PS_INSERT_GPX_FILE];
@@ -308,6 +345,7 @@ public class DownloadOsmGPX {
 
 	protected static class OsmGpxFile {
 		
+		private static final double ERROR_NUMBER = -1000;
 		long id;
 		String name;
 		Date timestamp;
@@ -317,6 +355,11 @@ public class DownloadOsmGPX {
 		double lat;
 		double lon;
 		String description;
+		
+		double minlat = ERROR_NUMBER;
+		double minlon = ERROR_NUMBER;
+		double maxlat = ERROR_NUMBER;
+		double maxlon = ERROR_NUMBER;
 		
 		String gpx;
 		byte[] gpxGzip;
