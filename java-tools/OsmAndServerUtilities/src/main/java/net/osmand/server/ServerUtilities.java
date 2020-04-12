@@ -22,8 +22,6 @@ public class ServerUtilities {
 			EmailSenderMain.main(subArgsArray);
 		} else if (utl.equals("update-countries-for-changeset")) {
 			CalculateOsmChangesets.calculateCountries();
-		} else if (utl.equals("download-gpx")) {
-			CalculateOsmChangesets.downloadChangesets();
 		} else if (utl.equals("download-changeset")) {
 			CalculateOsmChangesets.downloadChangesets();
 		} else if (utl.equals("download-osm-gpx")) {
