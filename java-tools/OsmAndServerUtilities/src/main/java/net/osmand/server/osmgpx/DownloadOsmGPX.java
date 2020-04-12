@@ -49,7 +49,7 @@ public class DownloadOsmGPX {
 	private static final int PS_INSERT_GPX_DETAILS = 4;
 	private static final long FETCH_INTERVAL = 200;
 	private static final long FETCH_MAX_INTERVAL = 10000;
-	private static final long INITIAL_ID = 22071; // start with 1000, exclude: 22070
+	private static final long INITIAL_ID = 1000; // start with 1000
 	private static final String GPX_METADATA_TABLE_NAME = "osm_gpx_data";
 	private static final String GPX_FILES_TABLE_NAME = "osm_gpx_files";
 	private static final long FETCH_INTERVAL_SLEEP = 2000;
@@ -111,12 +111,14 @@ public class DownloadOsmGPX {
 					System.out.println("STOP on first pending gpx: " + id);
 					break;
 				}
-				HttpsURLConnection httpFileConn = getHttpConnection(MAIN_GPX_API_ENDPOINT + id + "/data");
 				try {
-					GZIPInputStream gzipIs = new GZIPInputStream(httpFileConn.getInputStream());
-					r.gpx = Algorithms.readFromInputStream(gzipIs).toString();
-					r.gpxGzip = Algorithms.stringToGzip(r.gpx);
-					lastSuccess = r;
+					if (!r.name.endsWith(".gpx.tar.gz")) {
+						HttpsURLConnection httpFileConn = getHttpConnection(MAIN_GPX_API_ENDPOINT + id + "/data");
+						GZIPInputStream gzipIs = new GZIPInputStream(httpFileConn.getInputStream());
+						r.gpx = Algorithms.readFromInputStream(gzipIs).toString();
+						r.gpxGzip = Algorithms.stringToGzip(r.gpx);
+						lastSuccess = r;
+					}
 					insertGPXFile(r);
 					success++;
 				} catch (Exception e) {
