@@ -51,10 +51,13 @@ public class DownloadOsmGPX {
 	protected static final Log LOG = PlatformUtil.getLog(DownloadOsmGPX.class);
 	private static final String MAIN_GPX_API_ENDPOINT = "https://api.openstreetmap.org/api/0.6/gpx/";
 	
+	private static final int PS_UPDATE_GPX_DETAILS = 2;
 	private static final int PS_INSERT_GPX_FILE = 3;
 	private static final int PS_INSERT_GPX_DETAILS = 4;
 	private static final long FETCH_INTERVAL = 200;
 	private static final long FETCH_MAX_INTERVAL = 10000;
+	
+	// preindex before 76787 with maxlat/minlat
 	private static final long INITIAL_ID = 1000; // start with 1000
 	private static final String GPX_METADATA_TABLE_NAME = "osm_gpx_data";
 	private static final String GPX_FILES_TABLE_NAME = "osm_gpx_files";
@@ -90,9 +93,41 @@ public class DownloadOsmGPX {
 	
 	public static void main(String[] args) throws Exception {
 		new DownloadOsmGPX().downloadGPXMain();
+//		new DownloadOsmGPX().recalculateMinMaxLatLon();
 	}
 
-	
+	private void recalculateMinMaxLatLon() throws SQLException, IOException {
+		initDBConnection();
+		PreparedStatementWrapper w = new PreparedStatementWrapper();
+		preparedStatements[PS_UPDATE_GPX_DETAILS] = w;
+		w.ps = dbConn.prepareStatement("UPDATE " + GPX_METADATA_TABLE_NAME
+				+ " SET minlat = ?, minlon = ?, maxlat = ?, maxlon = ? where id = ? ");
+		ResultSet rs = dbConn.createStatement().executeQuery("SELECT t.id, t.lat, t.lon, s.data from " + GPX_METADATA_TABLE_NAME + 
+				" t join " + GPX_FILES_TABLE_NAME + " s on s.id = t.id");
+		
+		while (rs.next()) {
+			OsmGpxFile r = new OsmGpxFile();
+			try {
+				r.id = rs.getLong(1);
+				r.lat = rs.getDouble(2);
+				r.lon = rs.getDouble(3);
+				r.gpxGzip = rs.getBytes(4);
+				r.gpx = Algorithms.gzipToString(r.gpxGzip);
+				calculateMinMaxLatLon(r);
+				w.ps.setDouble(1, r.minlat);
+				w.ps.setDouble(2, r.minlon);
+				w.ps.setDouble(3, r.maxlat);
+				w.ps.setDouble(4, r.maxlon);
+				w.ps.setLong(5, r.id);
+				w.addBatch();
+				System.out.println("SUCCESS");
+			} catch (Exception e) {
+				errorReadingGpx(r, e);
+			}
+
+		}
+		commitAllStatements();
+	}
 
 	private void downloadGPXMain() throws Exception {
 		initDBConnection();
@@ -122,23 +157,7 @@ public class DownloadOsmGPX {
 					GZIPInputStream gzipIs = new GZIPInputStream(httpFileConn.getInputStream());
 					r.gpx = Algorithms.readFromInputStream(gzipIs).toString();
 					r.gpxGzip = Algorithms.stringToGzip(r.gpx);
-					GPXFile gpxFile = GPXUtilities.loadGPXFile(new ByteArrayInputStream(r.gpx.getBytes()));
-					if (gpxFile != null && gpxFile.error == null) {
-						r.minlat = r.maxlat = r.lat;
-						r.minlon = r.maxlon = r.lon;
-						for (Track t : gpxFile.tracks) {
-							for (TrkSegment s : t.segments) {
-								for (WptPt p : s.points) {
-									r.minlat = Math.min(r.minlat, p.lat);
-									r.maxlat = Math.max(r.maxlat, p.lat);
-									r.minlon = Math.min(r.minlon, p.lon);
-									r.maxlon = Math.max(r.maxlon, p.lon);
-								}
-							}
-						}
-					} else {
-						errorReadingGpx(r, gpxFile.error);
-					}
+					calculateMinMaxLatLon(r);
 				} catch (Exception e) {
 					errorReadingGpx(r, e);
 				} finally {
@@ -167,6 +186,27 @@ public class DownloadOsmGPX {
 			
 		}
 		commitAllStatements();
+	}
+
+
+	private void calculateMinMaxLatLon(OsmGpxFile r) {
+		GPXFile gpxFile = GPXUtilities.loadGPXFile(new ByteArrayInputStream(r.gpx.getBytes()));
+		if (gpxFile != null && gpxFile.error == null) {
+			r.minlat = r.maxlat = r.lat;
+			r.minlon = r.maxlon = r.lon;
+			for (Track t : gpxFile.tracks) {
+				for (TrkSegment s : t.segments) {
+					for (WptPt p : s.points) {
+						r.minlat = Math.min(r.minlat, p.lat);
+						r.maxlat = Math.max(r.maxlat, p.lat);
+						r.minlon = Math.min(r.minlon, p.lon);
+						r.maxlon = Math.max(r.maxlon, p.lon);
+					}
+				}
+			}
+		} else {
+			errorReadingGpx(r, gpxFile.error);
+		}
 	}
 
 
