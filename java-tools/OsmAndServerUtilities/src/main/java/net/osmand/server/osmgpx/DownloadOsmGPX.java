@@ -47,7 +47,7 @@ public class DownloadOsmGPX {
 	
 	private static final int PS_INSERT_GPX_FILE = 3;
 	private static final int PS_INSERT_GPX_DETAILS = 4;
-	private static final long FETCH_INTERVAL = 100;
+	private static final long FETCH_INTERVAL = 200;
 	private static final long FETCH_MAX_INTERVAL = 10000;
 	private static final long INITIAL_ID = 1000;
 	private static final String GPX_METADATA_TABLE_NAME = "osm_gpx_data";
