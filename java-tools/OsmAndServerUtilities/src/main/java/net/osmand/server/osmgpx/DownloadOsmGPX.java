@@ -153,10 +153,12 @@ public class DownloadOsmGPX {
 			boolean zip = name != null && name.endsWith(".zip");
 			if (type.equals("application/x-gzip")) {
 				GZIPInputStream gzipIs = new GZIPInputStream(inputStream);
-				if(zip) {
+				if (zip) {
 					return parseZip(gzipIs);
 				}
 				return Algorithms.readFromInputStream(gzipIs).toString();
+			} else if (type.equals("application/x-zip")) {
+				return parseZip(inputStream);
 			} else if (type.equals("application/gpx+xml")) {
 				return Algorithms.readFromInputStream(inputStream).toString();
 			} else if (type.equals("application/x-bzip2")) {
