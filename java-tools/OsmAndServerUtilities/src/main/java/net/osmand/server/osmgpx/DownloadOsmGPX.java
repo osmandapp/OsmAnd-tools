@@ -145,7 +145,7 @@ public class DownloadOsmGPX {
 			BZip2CompressorInputStream bzis = new BZip2CompressorInputStream(httpFileConn.getInputStream());
 			return Algorithms.readFromInputStream(bzis).toString();
 		}
-		throw new UnsupportedOperationException("Unsupported content-type: " + type)
+		throw new UnsupportedOperationException("Unsupported content-type: " + type);
 	}
 
 	protected void recalculateMinMaxLatLon(boolean redownload) throws SQLException, IOException {
