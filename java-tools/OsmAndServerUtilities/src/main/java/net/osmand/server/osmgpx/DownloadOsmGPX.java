@@ -158,8 +158,8 @@ public class DownloadOsmGPX {
 		wdata.ps = dbConn.prepareStatement("UPDATE " + GPX_FILES_TABLE_NAME
 				+ " SET data = ? where id = ? ");
 		ResultSet rs = dbConn.createStatement().executeQuery("SELECT t.id, t.lat, t.lon, s.data from "
-				+ GPX_METADATA_TABLE_NAME + " t join " + GPX_FILES_TABLE_NAME + " s on s.id = t.id");
-		// + " where t.maxlat is null");
+				+ GPX_METADATA_TABLE_NAME + " t join " + GPX_FILES_TABLE_NAME + " s on s.id = t.id "
+				+ " where t.maxlat is null");
 
 		long minId = 0;
 		long maxId = 0;
