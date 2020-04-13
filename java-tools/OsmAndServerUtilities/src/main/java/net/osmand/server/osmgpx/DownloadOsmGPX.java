@@ -231,13 +231,15 @@ public class DownloadOsmGPX {
 						wdata.addBatch();
 					}
 				}
-				calculateMinMaxLatLon(r);
-				wgpx.ps.setDouble(1, r.minlat);
-				wgpx.ps.setDouble(2, r.minlon);
-				wgpx.ps.setDouble(3, r.maxlat);
-				wgpx.ps.setDouble(4, r.maxlon);
-				wgpx.ps.setLong(5, r.id);
-				wgpx.addBatch();
+				GPXFile res = calculateMinMaxLatLon(r);
+				if (res != null && r.minlat != OsmGpxFile.ERROR_NUMBER && r.minlon != OsmGpxFile.ERROR_NUMBER) {
+					wgpx.ps.setDouble(1, r.minlat);
+					wgpx.ps.setDouble(2, r.minlon);
+					wgpx.ps.setDouble(3, r.maxlat);
+					wgpx.ps.setDouble(4, r.maxlon);
+					wgpx.ps.setLong(5, r.id);
+					wgpx.addBatch();
+				}
 			} catch (Exception e) {
 				errorReadingGpx(r, e);
 			}
@@ -304,7 +306,7 @@ public class DownloadOsmGPX {
 
 
 
-	private void calculateMinMaxLatLon(OsmGpxFile r) {
+	private GPXFile calculateMinMaxLatLon(OsmGpxFile r) {
 		GPXFile gpxFile = GPXUtilities.loadGPXFile(new ByteArrayInputStream(r.gpx.getBytes()));
 		if (gpxFile != null && gpxFile.error == null) {
 			r.minlat = r.maxlat = r.lat;
@@ -319,15 +321,17 @@ public class DownloadOsmGPX {
 					}
 				}
 			}
+			return gpxFile;
 		} else {
 			errorReadingGpx(r, gpxFile.error);
+			return null;
 		}
 	}
 
 
 
 	private void errorReadingGpx(OsmGpxFile r, Exception e) {
-		LOG.error(String.format("### ERROR while reading GPX zip %d - %s: %s", r.id, r.name,
+		LOG.error(String.format("### ERROR while reading GPX %d - %s: %s", r.id, r.name,
 				e != null ? e.getMessage() : ""));
 	}
 
