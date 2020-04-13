@@ -1,9 +1,12 @@
 package net.osmand.server.osmgpx;
 
 
+import static net.osmand.util.Algorithms.readFromInputStream;
+
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.StringReader;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -24,6 +27,8 @@ import java.util.Date;
 import java.util.List;
 import java.util.TimeZone;
 import java.util.zip.GZIPInputStream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.HttpsURLConnection;
@@ -86,6 +91,11 @@ public class DownloadOsmGPX {
 		String main = args.length  > 0 ? args[0] : "";
 		DownloadOsmGPX utility = new DownloadOsmGPX();
 		if ("test".equals(main)) {
+			String gpx = utility.downloadGpx(57905, "");
+			ByteArrayInputStream is = new ByteArrayInputStream(gpx.getBytes());
+			System.out.println(gpx);
+			GPXUtilities.loadGPXFile(is);
+		} else if ("test".equals(main)) {
 			QueryParams qp = new QueryParams();
 //			qp.minlat = qp.maxlat = 52.35;
 //			qp.minlon = qp.maxlon = 4.89;
@@ -130,24 +140,50 @@ public class DownloadOsmGPX {
 		}
 	}
 	
-	private String downloadGpx(long id)
+	private String downloadGpx(long id, String name)
 			throws NoSuchAlgorithmException, KeyManagementException, IOException, MalformedURLException {
 		HttpsURLConnection httpFileConn = getHttpConnection(MAIN_GPX_API_ENDPOINT + id + "/data");
 		// content-type: application/x-bzip2
 		// content-type: application/x-gzip
-		
-		List<String> hs = httpFileConn.getHeaderFields().get("Content-Type");
-		String type = hs == null || hs.size() == 0 ? "" : hs.get(0);
-		if(type.equals("application/x-gzip")) {
-			GZIPInputStream gzipIs = new GZIPInputStream(httpFileConn.getInputStream());
-			return Algorithms.readFromInputStream(gzipIs).toString();
-		} else if(type.equals("application/gpx+xml")) {
-			return Algorithms.readFromInputStream(httpFileConn.getInputStream()).toString();
-		} else if(type.equals("application/x-bzip2")) {
-			BZip2CompressorInputStream bzis = new BZip2CompressorInputStream(httpFileConn.getInputStream());
-			return Algorithms.readFromInputStream(bzis).toString();
+		InputStream inputStream = null;
+		try {
+			List<String> hs = httpFileConn.getHeaderFields().get("Content-Type");
+			String type = hs == null || hs.size() == 0 ? "" : hs.get(0);
+			inputStream = httpFileConn.getInputStream();
+			boolean zip = name != null && name.endsWith(".zip");
+			if (type.equals("application/x-gzip")) {
+				GZIPInputStream gzipIs = new GZIPInputStream(inputStream);
+				if(zip) {
+					return parseZip(gzipIs);
+				}
+				return Algorithms.readFromInputStream(gzipIs).toString();
+			} else if (type.equals("application/gpx+xml")) {
+				return Algorithms.readFromInputStream(inputStream).toString();
+			} else if (type.equals("application/x-bzip2")) {
+				BZip2CompressorInputStream bzis = new BZip2CompressorInputStream(inputStream);
+				if(zip) {
+					return parseZip(bzis);
+				}
+				return Algorithms.readFromInputStream(bzis).toString();
+			}
+			throw new UnsupportedOperationException("Unsupported content-type: " + type);
+		} finally {
+			if (inputStream != null) {
+				inputStream.close();
+			}
 		}
-		throw new UnsupportedOperationException("Unsupported content-type: " + type);
+	}
+
+	private String parseZip(InputStream inputStream) throws IOException {
+		ZipInputStream zp = new ZipInputStream(inputStream);
+		ZipEntry ze = zp.getNextEntry();
+		while (ze != null) {
+			if (ze.getName().endsWith(".gpx")) {
+				return readFromInputStream(zp).toString();
+			}
+			ze = zp.getNextEntry();
+		}
+		return null;
 	}
 
 	protected void recalculateMinMaxLatLon(boolean redownload) throws SQLException, IOException {
@@ -159,9 +195,9 @@ public class DownloadOsmGPX {
 		preparedStatements[PS_UPDATE_GPX_DATA] = wdata;
 		wdata.ps = dbConn.prepareStatement("UPDATE " + GPX_FILES_TABLE_NAME
 				+ " SET data = ? where id = ? ");
-		ResultSet rs = dbConn.createStatement().executeQuery("SELECT t.id, t.lat, t.lon, s.data from "
+		ResultSet rs = dbConn.createStatement().executeQuery("SELECT t.id, t.name, t.lat, t.lon, s.data from "
 				+ GPX_METADATA_TABLE_NAME + " t join " + GPX_FILES_TABLE_NAME + " s on s.id = t.id "
-				+ " where t.maxlat is null");
+				+ " where t.maxlat is null order by 1 asc");
 
 		long minId = 0;
 		long maxId = 0;
@@ -170,8 +206,9 @@ public class DownloadOsmGPX {
 			OsmGpxFile r = new OsmGpxFile();
 			try {
 				r.id = rs.getLong(1);
-				r.lat = rs.getDouble(2);
-				r.lon = rs.getDouble(3);
+				r.name= rs.getString(2);
+				r.lat = rs.getDouble(3);
+				r.lon = rs.getDouble(4);
 				if (++batchSize == FETCH_INTERVAL) {
 					System.out.println(
 							String.format("Downloaded %d %d - %d, %s ", batchSize, minId, maxId, new Date()));
@@ -179,12 +216,12 @@ public class DownloadOsmGPX {
 					batchSize = 0;
 				}
 				maxId = r.id;
-				r.gpxGzip = rs.getBytes(4);
+				r.gpxGzip = rs.getBytes(5);
 				boolean download = redownload || r.gpxGzip == null;
 				if (!download) {
 					r.gpx = Algorithms.gzipToString(r.gpxGzip);
 				} else {
-					r.gpx = downloadGpx(r.id);
+					r.gpx = downloadGpx(r.id, r.name);
 					if (!Algorithms.isEmpty(r.gpx)) {
 						r.gpxGzip = Algorithms.stringToGzip(r.gpx);
 						wdata.ps.setBytes(1, r.gpxGzip);
@@ -230,7 +267,7 @@ public class DownloadOsmGPX {
 					break;
 				}
 				try {
-					r.gpx = downloadGpx(id);
+					r.gpx = downloadGpx(id, r.name);
 					r.gpxGzip = Algorithms.stringToGzip(r.gpx);
 					calculateMinMaxLatLon(r);
 				} catch (Exception e) {
