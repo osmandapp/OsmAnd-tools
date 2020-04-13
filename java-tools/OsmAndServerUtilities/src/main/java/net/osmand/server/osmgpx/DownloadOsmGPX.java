@@ -86,7 +86,6 @@ public class DownloadOsmGPX {
 		String main = args.length  > 0 ? args[0] : "";
 		DownloadOsmGPX utility = new DownloadOsmGPX();
 		if ("test".equals(main)) {
-			utility.downloadGPXMain();
 			QueryParams qp = new QueryParams();
 //			qp.minlat = qp.maxlat = 52.35;
 //			qp.minlon = qp.maxlon = 4.89;
@@ -142,6 +141,8 @@ public class DownloadOsmGPX {
 		if(type.equals("application/x-gzip")) {
 			GZIPInputStream gzipIs = new GZIPInputStream(httpFileConn.getInputStream());
 			return Algorithms.readFromInputStream(gzipIs).toString();
+		} else if(type.equals("application/gpx+xml")) {
+			return Algorithms.readFromInputStream(httpFileConn.getInputStream()).toString();
 		} else if(type.equals("application/x-bzip2")) {
 			BZip2CompressorInputStream bzis = new BZip2CompressorInputStream(httpFileConn.getInputStream());
 			return Algorithms.readFromInputStream(bzis).toString();
