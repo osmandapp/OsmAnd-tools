@@ -5,7 +5,6 @@ import static net.osmand.util.Algorithms.readFromInputStream;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -62,7 +61,6 @@ import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Way;
 import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.io.Base64;
-import net.osmand.osm.io.OsmBaseStorage;
 import net.osmand.osm.io.OsmStorageWriter;
 import net.osmand.util.Algorithms;
 
@@ -117,6 +115,8 @@ public class DownloadOsmGPX {
 				qp.osmFile = new File(args[1]);
 			}
 			utility.queryGPXForBBOX(qp);
+		} else if ("redownload_tags_and_description".equals(main)) {
+			utility.redownloadTagsDescription();
 		} else if ("recalculateminmax".equals(main)) {
 			utility.recalculateMinMaxLatLon(false);
 		} else if ("recalculateminmax_and_download".equals(main)) {
@@ -212,6 +212,44 @@ public class DownloadOsmGPX {
 			ze = zp.getNextEntry();
 		}
 		return null;
+	}
+	
+	protected void redownloadTagsDescription() throws SQLException, IOException {
+		PreparedStatementWrapper wgpx = new PreparedStatementWrapper();
+		preparedStatements[PS_UPDATE_GPX_DETAILS] = wgpx;
+		wgpx.ps = dbConn.prepareStatement("UPDATE " + GPX_METADATA_TABLE_NAME
+				+ " SET tags = ?, description = ? where id = ?");
+		ResultSet rs = dbConn.createStatement().executeQuery("SELECT id, name from " + GPX_FILES_TABLE_NAME 
+				+ " where description is null order by 1 asc");
+		long minId = 0;
+		long maxId = 0;
+		int batchSize = 0;
+		while (rs.next()) {
+			OsmGpxFile r = new OsmGpxFile();
+			try {
+				r.id = rs.getLong(1);
+				r.name = rs.getString(2);
+				if (++batchSize == FETCH_INTERVAL) {
+					System.out
+							.println(String.format("Downloaded %d %d - %d, %s ", batchSize, minId, maxId, new Date()));
+					minId = r.id;
+					batchSize = 0;
+				}
+				maxId = r.id;
+				String url = MAIN_GPX_API_ENDPOINT + r.id + "/details";
+				HttpsURLConnection httpConn = getHttpConnection(url);
+				StringBuilder sb = Algorithms.readFromInputStream(httpConn.getInputStream());
+				r = parseGPXFiles(new StringReader(sb.toString()), null);
+				wgpx.ps.setString(1, r.description);
+				wgpx.ps.setArray(2, r.tags == null ? null : dbConn.createArrayOf("text", r.tags));
+				wgpx.ps.setLong(3, r.id);
+				wgpx.addBatch();
+			} catch (Exception e) {
+				errorReadingGpx(r, e);
+			}
+
+		}
+		commitAllStatements();
 	}
 
 	protected void recalculateMinMaxLatLon(boolean redownload) throws SQLException, IOException {
