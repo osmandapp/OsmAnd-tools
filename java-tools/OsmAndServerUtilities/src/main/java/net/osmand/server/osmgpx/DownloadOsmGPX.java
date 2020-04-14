@@ -30,6 +30,7 @@ import java.text.NumberFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.TimeZone;
@@ -98,7 +99,7 @@ public class DownloadOsmGPX {
 	}
 	
 	public static void main(String[] args) throws Exception {
-		String main = args.length  > 0 ? args[0] : "";
+		String main = args.length > 0 ? args[0] : "";
 		DownloadOsmGPX utility = new DownloadOsmGPX();
 		if ("test_download".equals(main)) {
 			String gpx = utility.downloadGpx(57905, "");
@@ -107,11 +108,11 @@ public class DownloadOsmGPX {
 			GPXUtilities.loadGPXFile(is);
 		} else if ("test".equals(main)) {
 			QueryParams qp = new QueryParams();
-//			qp.minlat = qp.maxlat = 52.35;
-//			qp.minlon = qp.maxlon = 4.89;
+			// qp.minlat = qp.maxlat = 52.35;
+			// qp.minlon = qp.maxlon = 4.89;
 			qp.minlat = qp.maxlat = 59.1;
 			qp.minlon = qp.maxlon = 17.4;
-//			qp.tag = "car";
+			// qp.tag = "car";
 			if (args.length > 1) {
 				qp.osmFile = new File(args[1]);
 			}
@@ -120,29 +121,32 @@ public class DownloadOsmGPX {
 			QueryParams qp = new QueryParams();
 			for (int i = 1; i < args.length; i++) {
 				String[] s = args[i].split("=");
+				if (s.length == 1) {
+					continue;
+				}
+				String val = s[1].trim();
+				if (val.isEmpty()) {
+					continue;
+				}
 				switch (s[0]) {
 				case "--bbox":
-					if (!s[1].isEmpty()) {
-						String[] vls = s[1].split(",");
-						qp.minlat = Double.parseDouble(vls[0]);
-						qp.minlon = Double.parseDouble(vls[1]);
-						qp.maxlat = Double.parseDouble(vls[2]);
-						qp.maxlon = Double.parseDouble(vls[3]);
-					}
+					String[] vls = val.split(",");
+					qp.minlat = Double.parseDouble(vls[0]);
+					qp.minlon = Double.parseDouble(vls[1]);
+					qp.maxlat = Double.parseDouble(vls[2]);
+					qp.maxlon = Double.parseDouble(vls[3]);
 					break;
 				case "--out":
-					qp.osmFile = new File(s[1]);
+					qp.osmFile = new File(val);
 					break;
 				case "--user":
-					qp.user = s[1];
+					qp.user = val;
 					break;
 				case "--limit":
-					if(!s[1].isEmpty()) {
-						qp.limit = Integer.parseInt(s[1]);
-					}
+					qp.limit = Integer.parseInt(val);
 					break;
 				case "--tag":
-					qp.tag = s[1];
+					qp.tag = val;
 					break;
 				}
 			}
