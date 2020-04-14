@@ -8,6 +8,8 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
 import java.io.StringReader;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -22,15 +24,17 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
+import java.text.NumberFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.TimeZone;
 import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -48,6 +52,7 @@ import org.apache.commons.logging.Log;
 import org.kxml2.io.KXmlParser;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
+import org.xmlpull.v1.XmlSerializer;
 
 import net.osmand.GPXUtilities;
 import net.osmand.GPXUtilities.GPXFile;
@@ -55,13 +60,7 @@ import net.osmand.GPXUtilities.Track;
 import net.osmand.GPXUtilities.TrkSegment;
 import net.osmand.GPXUtilities.WptPt;
 import net.osmand.PlatformUtil;
-import net.osmand.osm.edit.Entity;
-import net.osmand.osm.edit.EntityInfo;
-import net.osmand.osm.edit.Node;
-import net.osmand.osm.edit.Way;
-import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.io.Base64;
-import net.osmand.osm.io.OsmStorageWriter;
 import net.osmand.util.Algorithms;
 
 public class DownloadOsmGPX {
@@ -82,6 +81,7 @@ public class DownloadOsmGPX {
 	private static final String GPX_METADATA_TABLE_NAME = "osm_gpx_data";
 	private static final String GPX_FILES_TABLE_NAME = "osm_gpx_files";
 	private static final long FETCH_INTERVAL_SLEEP = 10000;
+	private final static NumberFormat latLonFormat = new DecimalFormat("0.00#####", new DecimalFormatSymbols());
 
 	static SimpleDateFormat FORMAT = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
 	static SimpleDateFormat FORMAT2 = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss z");
@@ -111,8 +111,40 @@ public class DownloadOsmGPX {
 //			qp.minlon = qp.maxlon = 4.89;
 			qp.minlat = qp.maxlat = 59.1;
 			qp.minlon = qp.maxlon = 17.4;
+//			qp.tag = "car";
 			if (args.length > 1) {
 				qp.osmFile = new File(args[1]);
+			}
+			utility.queryGPXForBBOX(qp);
+		} else if ("query".equals(main)) {
+			QueryParams qp = new QueryParams();
+			for (int i = 1; i < args.length; i++) {
+				String[] s = args[i].split("=");
+				switch (s[0]) {
+				case "--bbox":
+					if (!s[1].isEmpty()) {
+						String[] vls = s[1].split(",");
+						qp.minlat = Double.parseDouble(vls[0]);
+						qp.minlon = Double.parseDouble(vls[1]);
+						qp.maxlat = Double.parseDouble(vls[2]);
+						qp.maxlon = Double.parseDouble(vls[3]);
+					}
+					break;
+				case "--out":
+					qp.osmFile = new File(s[1]);
+					break;
+				case "--user":
+					qp.user = s[1];
+					break;
+				case "--limit":
+					if(!s[1].isEmpty()) {
+						qp.limit = Integer.parseInt(s[1]);
+					}
+					break;
+				case "--tag":
+					qp.tag = s[1];
+					break;
+				}
 			}
 			utility.queryGPXForBBOX(qp);
 		} else if ("redownload_tags_and_description".equals(main)) {
@@ -129,41 +161,112 @@ public class DownloadOsmGPX {
 	
 	
 	protected void queryGPXForBBOX(QueryParams qp) throws SQLException, IOException, FactoryConfigurationError, XMLStreamException {
-		String query = String.format("SELECT t.id, s.data, t.name, t.lat, t.lon from " + GPX_METADATA_TABLE_NAME
+		String conditions = "";
+		if (!Algorithms.isEmpty(qp.user)) {
+			conditions += " and t.\"user\" = '" + qp.user + "'";
+		}
+		if (!Algorithms.isEmpty(qp.tag)) {
+			conditions += " and '" + qp.tag + "' = ANY(t.tags)";
+		}
+		
+		if (qp.minlat != OsmGpxFile.ERROR_NUMBER) {
+			conditions += " and t.maxlat >= " + qp.minlat;
+			conditions += " and t.minlat <= " + qp.maxlat;
+			conditions += " and t.maxlon <= " + qp.minlon;
+			conditions += " and t.minlon <= " + qp.maxlon;
+		}
+		if (qp.limit != -1) {
+			conditions += " limit " + qp.limit;
+		}
+		String query = "SELECT t.id, s.data, t.name, t.description, t.\"user\", t.date, t.tags from " + GPX_METADATA_TABLE_NAME
 				+ " t join " + GPX_FILES_TABLE_NAME + " s on s.id = t.id "
-				+ " where t.maxlat >= %1$f and t.minlat <= %2$f and t.maxlon >= %3$f and t.minlon <= %4$f ",
-				qp.minlat, qp.maxlat, qp.minlon, qp.maxlon);
+				+ " where 1 = 1 " + conditions;
 		System.out.println(query);
 		ResultSet rs = dbConn.createStatement().executeQuery(query);
 		int tracks = 0;
-		GPXFile res = new GPXFile("");
+		int segments = 0;
+		XmlSerializer serializer = null;
+		OutputStream outputStream = null;
+		long id = -10;
+		if(qp.osmFile != null) {
+			outputStream = new FileOutputStream(qp.osmFile);
+			if(qp.osmFile.getName().endsWith(".gz")) {
+				outputStream = new GZIPOutputStream(outputStream);
+			}
+			serializer = PlatformUtil.newSerializer();
+			serializer.setOutput(new OutputStreamWriter(outputStream));
+			serializer.setFeature("http://xmlpull.org/v1/doc/features.html#indent-output", true); //$NON-NLS-1$
+			serializer.startDocument("UTF-8", true); //$NON-NLS-1$
+			serializer.startTag(null, "osm"); //$NON-NLS-1$
+			serializer.attribute(null, "version", "0.6"); //$NON-NLS-1$ //$NON-NLS-2$
+		}
 		while (rs.next()) {
+			long trackid = rs.getLong(1);
 			byte[] cont = rs.getBytes(2);
-			if(cont != null) {
+			String name = rs.getString(3);
+			String description = rs.getString(4);
+			String user = rs.getString(5);
+			Date dt = new Date(rs.getDate(6).getTime());
+			String tags = rs.getString(7);
+			if (cont != null) {
 				ByteArrayInputStream is = new ByteArrayInputStream(Algorithms.gzipToString(cont).getBytes());
 				GPXFile gpxFile = GPXUtilities.loadGPXFile(is);
-				res.tracks.addAll(gpxFile.tracks);
+				for (Track t : gpxFile.tracks) {
+					for (TrkSegment s : t.segments) {
+						if (s.points.isEmpty()) {
+							continue;
+						}
+						segments++;
+						long idStart = id;
+						for (WptPt p : s.points) {
+							long nid = id--;
+							serializer.startTag(null, "node");
+							serializer.attribute(null, "lat", latLonFormat.format(p.lat));
+							serializer.attribute(null, "lon", latLonFormat.format(p.lon));
+							serializer.attribute(null, "id", nid + "");
+							serializer.attribute(null, "action", "modify");
+							serializer.attribute(null, "version", "1");
+							serializer.endTag(null, "node");
+						}
+						long endid = id;
+						serializer.startTag(null, "way");
+						serializer.attribute(null, "id", id-- + "");
+						serializer.attribute(null, "action", "modify");
+						serializer.attribute(null, "version", "1");
+						
+						for (long nid = idStart; nid > endid; nid--) {
+							serializer.startTag(null, "nd");
+							serializer.attribute(null, "ref", nid + "");
+							serializer.endTag(null, "nd");
+						}
+						tagValue(serializer, "trackid", trackid + "");
+						tagValue(serializer, "name", name);
+						tagValue(serializer, "user", user);
+						tagValue(serializer, "date", dt.toString());
+						tagValue(serializer, "description", description);
+						tagValue(serializer, "tags", tags);
+						serializer.endTag(null, "way");
+					}
+				}
 				tracks++;
 			}
 		}
-		System.out.println(String.format("Fetched %d tracks", tracks));
-		if (qp.osmFile != null) {
-			Map<EntityId, Entity> entities = new LinkedHashMap<Entity.EntityId, Entity>();
-			long id = -10;
-			for (Track t : res.tracks) {
-				for (TrkSegment s : t.segments) {
-					Way w = new Way(id--);
-					for (WptPt p : s.points) {
-						Node n = new Node(p.lat, p.lon, id--);
-						w.addNode(n);
-						entities.put(EntityId.valueOf(n), n);
-					}
-					entities.put(EntityId.valueOf(w), w);
-				}
-			}
-			Map<EntityId, EntityInfo> entityInfo = null;
-			new OsmStorageWriter().saveStorage(new FileOutputStream(qp.osmFile), entities, entityInfo, null, true);
+		if(serializer != null) {
+			serializer.endDocument();
+			serializer.flush();
+			outputStream.close();
 		}
+		System.out.println(String.format("Fetched %d tracks %d segments", tracks, segments));
+	}
+
+	private void tagValue(XmlSerializer serializer, String tag, String value) throws IOException {
+		if (Algorithms.isEmpty(value)) {
+			return;
+		}
+		serializer.startTag(null, "tag");
+		serializer.attribute(null, "k", tag);
+		serializer.attribute(null, "v", value);
+		serializer.endTag(null, "tag");
 	}
 	
 	private String downloadGpx(long id, String name)
@@ -621,10 +724,13 @@ public class DownloadOsmGPX {
 
 	protected static class QueryParams {
 		File osmFile;
-		double minlat;
-		double maxlat;
-		double maxlon;
-		double minlon;
+		String tag;
+		int limit = -1;
+		String user;
+		double minlat = OsmGpxFile.ERROR_NUMBER;
+		double maxlat = OsmGpxFile.ERROR_NUMBER;
+		double maxlon = OsmGpxFile.ERROR_NUMBER;
+		double minlon = OsmGpxFile.ERROR_NUMBER;
 	}
 
 	private static class PreparedStatementWrapper {
