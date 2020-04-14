@@ -219,7 +219,7 @@ public class DownloadOsmGPX {
 		preparedStatements[PS_UPDATE_GPX_DETAILS] = wgpx;
 		wgpx.ps = dbConn.prepareStatement("UPDATE " + GPX_METADATA_TABLE_NAME
 				+ " SET description = ?, tags = ? where id = ?");
-		ResultSet rs = dbConn.createStatement().executeQuery("SELECT id, name from " + GPX_FILES_TABLE_NAME 
+		ResultSet rs = dbConn.createStatement().executeQuery("SELECT id, name from " + GPX_METADATA_TABLE_NAME 
 				+ " where description is null order by 1 asc");
 		long minId = 0;
 		long maxId = 0;
