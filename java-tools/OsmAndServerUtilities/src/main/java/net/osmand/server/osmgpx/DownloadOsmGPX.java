@@ -218,7 +218,7 @@ public class DownloadOsmGPX {
 		PreparedStatementWrapper wgpx = new PreparedStatementWrapper();
 		preparedStatements[PS_UPDATE_GPX_DETAILS] = wgpx;
 		wgpx.ps = dbConn.prepareStatement("UPDATE " + GPX_METADATA_TABLE_NAME
-				+ " SET tags = ?, description = ? where id = ?");
+				+ " SET description = ?, tags = ? where id = ?");
 		ResultSet rs = dbConn.createStatement().executeQuery("SELECT id, name from " + GPX_FILES_TABLE_NAME 
 				+ " where description is null order by 1 asc");
 		long minId = 0;
@@ -236,8 +236,7 @@ public class DownloadOsmGPX {
 					batchSize = 0;
 				}
 				maxId = r.id;
-				String url = MAIN_GPX_API_ENDPOINT + r.id + "/details";
-				HttpsURLConnection httpConn = getHttpConnection(url);
+				HttpsURLConnection httpConn = getHttpConnection(MAIN_GPX_API_ENDPOINT + r.id + "/details");
 				StringBuilder sb = Algorithms.readFromInputStream(httpConn.getInputStream());
 				r = parseGPXFiles(new StringReader(sb.toString()), null);
 				wgpx.ps.setString(1, r.description);
