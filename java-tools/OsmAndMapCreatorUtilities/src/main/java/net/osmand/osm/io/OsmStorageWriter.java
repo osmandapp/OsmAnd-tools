@@ -142,7 +142,7 @@ public class OsmStorageWriter {
 			streamWriter.writeAttribute(ATTR_LAT, nf.format(n.getLatitude()));
 			streamWriter.writeAttribute(ATTR_LON, nf.format(n.getLongitude()));
 			streamWriter.writeAttribute(ATTR_ID, String.valueOf(n.getId()));
-			writeEntityAttributes(streamWriter, n, entityInfo.get(EntityId.valueOf(n)));
+			writeEntityAttributes(streamWriter, n, entityInfo == null ? null : entityInfo.get(EntityId.valueOf(n)));
 			if(!n.getTags().isEmpty()) {
 				writeTags(streamWriter, n);
 				writeEndElement(streamWriter, INDENT);
@@ -155,7 +155,7 @@ public class OsmStorageWriter {
 		for (Way w : ways) {
 			writeStartElement(streamWriter, ELEM_WAY, INDENT);
 			streamWriter.writeAttribute(ATTR_ID, String.valueOf(w.getId()));
-			writeEntityAttributes(streamWriter, w, entityInfo.get(EntityId.valueOf(w)));
+			writeEntityAttributes(streamWriter, w, entityInfo == null ? null : entityInfo.get(EntityId.valueOf(w)));
 			TLongArrayList ids = w.getNodeIds();
 			for (int i = 0; i < ids.size(); i++) {
 				writeEmptyElement(streamWriter, ELEM_ND, INDENT2);
@@ -174,7 +174,7 @@ public class OsmStorageWriter {
 			}
 			writeStartElement(streamWriter, ELEM_RELATION, INDENT);
 			streamWriter.writeAttribute(ATTR_ID, String.valueOf(r.getId()));
-			writeEntityAttributes(streamWriter, r, entityInfo.get(EntityId.valueOf(r)));
+			writeEntityAttributes(streamWriter, r, entityInfo == null ? null : entityInfo.get(EntityId.valueOf(r)));
 			for (RelationMember e : r.getMembers()) {
 				if(skipMissingMembers && !nd.contains(e.getEntityId())) {
 					continue;

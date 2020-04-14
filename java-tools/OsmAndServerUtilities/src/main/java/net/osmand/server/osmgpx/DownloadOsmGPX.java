@@ -5,6 +5,8 @@ import static net.osmand.util.Algorithms.readFromInputStream;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.StringReader;
@@ -23,8 +25,11 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.TimeZone;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.ZipEntry;
@@ -36,6 +41,8 @@ import javax.net.ssl.KeyManager;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSession;
 import javax.net.ssl.X509TrustManager;
+import javax.xml.stream.FactoryConfigurationError;
+import javax.xml.stream.XMLStreamException;
 
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
 import org.apache.commons.logging.Log;
@@ -49,6 +56,11 @@ import net.osmand.GPXUtilities.Track;
 import net.osmand.GPXUtilities.TrkSegment;
 import net.osmand.GPXUtilities.WptPt;
 import net.osmand.PlatformUtil;
+import net.osmand.osm.edit.Entity;
+import net.osmand.osm.edit.EntityInfo;
+import net.osmand.osm.edit.Node;
+import net.osmand.osm.edit.Way;
+import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.io.Base64;
 import net.osmand.osm.io.OsmBaseStorage;
 import net.osmand.osm.io.OsmStorageWriter;
@@ -90,7 +102,7 @@ public class DownloadOsmGPX {
 	public static void main(String[] args) throws Exception {
 		String main = args.length  > 0 ? args[0] : "";
 		DownloadOsmGPX utility = new DownloadOsmGPX();
-		if ("test".equals(main)) {
+		if ("test_download".equals(main)) {
 			String gpx = utility.downloadGpx(57905, "");
 			ByteArrayInputStream is = new ByteArrayInputStream(gpx.getBytes());
 			System.out.println(gpx);
@@ -116,7 +128,7 @@ public class DownloadOsmGPX {
 	}
 	
 	
-	protected void queryGPXForBBOX(QueryParams qp) throws SQLException {
+	protected void queryGPXForBBOX(QueryParams qp) throws SQLException, IOException, FactoryConfigurationError, XMLStreamException {
 		String query = String.format("SELECT t.id, s.data, t.name, t.lat, t.lon from " + GPX_METADATA_TABLE_NAME
 				+ " t join " + GPX_FILES_TABLE_NAME + " s on s.id = t.id "
 				+ " where t.maxlat >= %1$f and t.minlat <= %2$f and t.maxlon >= %3$f and t.minlon <= %4$f ",
@@ -136,7 +148,21 @@ public class DownloadOsmGPX {
 		}
 		System.out.println(String.format("Fetched %d tracks", tracks));
 		if (qp.osmFile != null) {
-			GPXUtilities.writeGpxFile(qp.osmFile, res);
+			Map<EntityId, Entity> entities = new LinkedHashMap<Entity.EntityId, Entity>();
+			long id = -10;
+			for (Track t : res.tracks) {
+				for (TrkSegment s : t.segments) {
+					Way w = new Way(id--);
+					for (WptPt p : s.points) {
+						Node n = new Node(p.lat, p.lon, id--);
+						w.addNode(n);
+						entities.put(EntityId.valueOf(n), n);
+					}
+					entities.put(EntityId.valueOf(w), w);
+				}
+			}
+			Map<EntityId, EntityInfo> entityInfo = null;
+			new OsmStorageWriter().saveStorage(new FileOutputStream(qp.osmFile), entities, entityInfo, null, true);
 		}
 	}
 	
@@ -340,8 +366,8 @@ public class DownloadOsmGPX {
 		if(wrapper == null) {
 			wrapper = new PreparedStatementWrapper();
 			wrapper.ps = dbConn.prepareStatement("INSERT INTO " + GPX_METADATA_TABLE_NAME
-					+ "(id, \"user\", \"date\", name, lat, lon, minlat, minlon, maxlat, maxlon, pending, visibility, description) "
-					+ " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+					+ "(id, \"user\", \"date\", name, lat, lon, minlat, minlon, maxlat, maxlon, pending, visibility, tags, description) "
+					+ " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 			preparedStatements[PS_INSERT_GPX_DETAILS] = wrapper;
 		}
 		int ind = 1;
@@ -364,6 +390,7 @@ public class DownloadOsmGPX {
 		}
 		wrapper.ps.setBoolean(ind++, r.pending);
 		wrapper.ps.setString(ind++, r.visibility);
+		wrapper.ps.setArray(ind++, r.tags == null ? null : dbConn.createArrayOf("text", r.tags));
 		wrapper.ps.setString(ind++, r.description);
 		wrapper.addBatch();
 		
@@ -409,7 +436,7 @@ public class DownloadOsmGPX {
 				executeSQL("CREATE TABLE " + GPX_METADATA_TABLE_NAME
 						+ "(id bigint primary key, \"user\" text, \"date\" timestamp, name text, lat float, lon float, "
 						+ " minlat float, minlon float, maxlat float, maxlon float, "
-						+ "pending boolean, description text, visibility text)");
+						+ "pending boolean, tags text[], description text, visibility text)");
 			}
 		}
 	}
@@ -477,6 +504,7 @@ public class DownloadOsmGPX {
 		parser.setInput(inputReader);
 		int tok;
 		OsmGpxFile p = null;
+		List<String> tags = new ArrayList<String>();
 		while((tok = parser.next()) != XmlPullParser.END_DOCUMENT) {
 			if(tok == XmlPullParser.START_TAG) {
 				if(parser.getName().equals("gpx_file")) {
@@ -491,19 +519,41 @@ public class DownloadOsmGPX {
 					p.lat = Double.parseDouble(getAttributeDoubleValue(parser, "lat"));
 					p.lon = Double.parseDouble(getAttributeDoubleValue(parser, "lon"));
 				} else if(parser.getName().equals("description") && p != null) {
-					p.description = parser.getText();
-				}
+					p.description = readText(parser, parser.getName());
+				} else if(parser.getName().equals("tag")) {
+					String value = readText(parser, parser.getName());
+					tags.add(value);
+				} 
 			} else if(tok == XmlPullParser.END_TAG) {
 				if(parser.getName().equals("gpx_file")) {
 					if(p != null && gpxFiles != null) {
 						gpxFiles.add(p);
 					}
-				}
+				} 
 			}
+		}
+		if (tags.size() > 0) {
+			p.tags = tags.toArray(new String[tags.size()]);
 		}
 		return p;
 	}
 
+	private static String readText(XmlPullParser parser, String key) throws XmlPullParserException, IOException {
+		int tok;
+		StringBuilder text = null;
+		while ((tok = parser.next()) != XmlPullParser.END_DOCUMENT) {
+			if (tok == XmlPullParser.END_TAG && parser.getName().equals(key)) {
+				break;
+			} else if (tok == XmlPullParser.TEXT) {
+				if (text == null) {
+					text = new StringBuilder(parser.getText());
+				} else {
+					text.append(parser.getText());
+				}
+			}
+		}
+		return text == null ? null : text.toString();
+	}
 
 	protected static class OsmGpxFile {
 		
@@ -523,6 +573,7 @@ public class DownloadOsmGPX {
 		double maxlat = ERROR_NUMBER;
 		double maxlon = ERROR_NUMBER;
 		
+		String[] tags;
 		String gpx;
 		byte[] gpxGzip;
 	}
