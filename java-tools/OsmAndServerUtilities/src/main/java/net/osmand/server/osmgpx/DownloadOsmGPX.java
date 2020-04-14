@@ -81,7 +81,7 @@ public class DownloadOsmGPX {
 	private static final long INITIAL_ID = 1000; // start with 1000
 	private static final String GPX_METADATA_TABLE_NAME = "osm_gpx_data";
 	private static final String GPX_FILES_TABLE_NAME = "osm_gpx_files";
-	private static final long FETCH_INTERVAL_SLEEP = 2000;
+	private static final long FETCH_INTERVAL_SLEEP = 10000;
 
 	static SimpleDateFormat FORMAT = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
 	static SimpleDateFormat FORMAT2 = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss z");
@@ -234,6 +234,7 @@ public class DownloadOsmGPX {
 							.println(String.format("Downloaded %d %d - %d, %s ", batchSize, minId, maxId, new Date()));
 					minId = r.id;
 					batchSize = 0;
+					Thread.sleep(FETCH_INTERVAL_SLEEP);
 				}
 				maxId = r.id;
 				HttpsURLConnection httpConn = getHttpConnection(MAIN_GPX_API_ENDPOINT + r.id + "/details");
@@ -279,6 +280,9 @@ public class DownloadOsmGPX {
 							String.format("Downloaded %d %d - %d, %s ", batchSize, minId, maxId, new Date()));
 					minId = r.id;
 					batchSize = 0;
+					if (redownload) {
+						Thread.sleep(FETCH_INTERVAL_SLEEP);
+					}
 				}
 				maxId = r.id;
 				r.gpxGzip = rs.getBytes(5);
