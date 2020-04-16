@@ -180,10 +180,10 @@ public class DownloadOsmGPX {
 			conditions += " and '" + qp.tag + "' = ANY(t.tags)";
 		}
 		if (!Algorithms.isEmpty(qp.datestart)) {
-			conditions += " and t.timestamp >= '" + qp.datestart + "'";
+			conditions += " and t.date >= '" + qp.datestart + "'";
 		}
 		if (!Algorithms.isEmpty(qp.dateend)) {
-			conditions += " and t.timestamp <= '" + qp.dateend + "'";
+			conditions += " and t.date <= '" + qp.dateend + "'";
 		}
 		
 		if (qp.minlat != OsmGpxFile.ERROR_NUMBER) {
