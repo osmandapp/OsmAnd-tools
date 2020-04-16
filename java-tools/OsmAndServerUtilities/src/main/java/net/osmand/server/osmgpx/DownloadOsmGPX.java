@@ -486,9 +486,11 @@ public class DownloadOsmGPX {
 				if (success > 0) {
 					System.out.println(String.format("Fetched %d gpx from %d - %d (%s). Now: %s ", success,
 							id - FETCH_INTERVAL + 1, id, lastTime, new Date()));
+					emptyFetch = 0;
 				} else {
-					System.out.println(String.format("No successful fetch after %d %s",
-							lastSuccess == null ? ID_INIT : lastSuccess.id, lastTime));
+					long last = (lastSuccess == null ? ID_INIT : lastSuccess.id) + emptyFetch * FETCH_INTERVAL;
+					System.out.println(String.format("No successful fetch after %d - %d %s ",
+							last,  last + FETCH_INTERVAL, lastTime));
 					if(emptyFetch ++ > MAX_EMPTY_FETCH) {
 						break;
 					}
