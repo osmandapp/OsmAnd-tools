@@ -18,6 +18,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.sql.Array;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -30,7 +31,6 @@ import java.text.NumberFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.TimeZone;
@@ -136,6 +136,7 @@ public class DownloadOsmGPX {
 					qp.maxlat = Double.parseDouble(vls[2]);
 					qp.maxlon = Double.parseDouble(vls[3]);
 					break;
+					
 				case "--out":
 					qp.osmFile = new File(val);
 					break;
@@ -144,6 +145,12 @@ public class DownloadOsmGPX {
 					break;
 				case "--limit":
 					qp.limit = Integer.parseInt(val);
+					break;
+				case "--datestart":
+					qp.datestart = val;
+					break;
+				case "--dateend":
+					qp.dateend = val;
 					break;
 				case "--tag":
 					qp.tag = val;
@@ -171,6 +178,12 @@ public class DownloadOsmGPX {
 		}
 		if (!Algorithms.isEmpty(qp.tag)) {
 			conditions += " and '" + qp.tag + "' = ANY(t.tags)";
+		}
+		if (!Algorithms.isEmpty(qp.datestart)) {
+			conditions += " and t.timestamp >= '" + qp.datestart + "'";
+		}
+		if (!Algorithms.isEmpty(qp.dateend)) {
+			conditions += " and t.timestamp <= '" + qp.dateend + "'";
 		}
 		
 		if (qp.minlat != OsmGpxFile.ERROR_NUMBER) {
@@ -211,7 +224,7 @@ public class DownloadOsmGPX {
 			String description = rs.getString(4);
 			String user = rs.getString(5);
 			Date dt = new Date(rs.getDate(6).getTime());
-			String tags = rs.getString(7);
+			Array tags = rs.getArray(7);
 			if (cont != null) {
 				ByteArrayInputStream is = new ByteArrayInputStream(Algorithms.gzipToString(cont).getBytes());
 				GPXFile gpxFile = GPXUtilities.loadGPXFile(is);
@@ -243,12 +256,19 @@ public class DownloadOsmGPX {
 							serializer.attribute(null, "ref", nid + "");
 							serializer.endTag(null, "nd");
 						}
+						tagValue(serializer, "osmgpx", "track");
 						tagValue(serializer, "trackid", trackid + "");
 						tagValue(serializer, "name", name);
 						tagValue(serializer, "user", user);
 						tagValue(serializer, "date", dt.toString());
 						tagValue(serializer, "description", description);
-						tagValue(serializer, "tags", tags);
+						if (tags != null) {
+							ResultSet rsar = tags.getResultSet();
+							while (rsar.next()) {
+								String tg = rsar.getString(1);
+								tagValue(serializer, "tag_" + tg.toLowerCase(), tg.toLowerCase());
+							}
+						}
 						serializer.endTag(null, "way");
 					}
 				}
@@ -731,6 +751,8 @@ public class DownloadOsmGPX {
 		String tag;
 		int limit = -1;
 		String user;
+		String datestart;
+		String dateend;
 		double minlat = OsmGpxFile.ERROR_NUMBER;
 		double maxlat = OsmGpxFile.ERROR_NUMBER;
 		double maxlon = OsmGpxFile.ERROR_NUMBER;
