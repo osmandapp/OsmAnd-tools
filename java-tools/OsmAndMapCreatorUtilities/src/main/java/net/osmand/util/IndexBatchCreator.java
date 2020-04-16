@@ -329,7 +329,6 @@ public class IndexBatchCreator {
 
 				String regionName = prefix + name;
 				String fileName = Algorithms.capitalizeFirstLetterAndLowercase(prefix + name + suffix);
-				log.warn("----------- Check " + fileName + " -----");
 				if (skipExistingIndexes != null) {
 					File bmif = new File(skipExistingIndexes, fileName + "_" + IndexConstants.BINARY_MAP_VERSION
 							+ IndexConstants.BINARY_MAP_INDEX_EXT);
@@ -338,6 +337,7 @@ public class IndexBatchCreator {
 						continue;
 					}
 				}
+				log.warn("----------- Check " + fileName + " " + url + " ----------");
 				File toSave = downloadFile(url,  fileName);
 				if (toSave != null) {
 					generateIndex(toSave, regionName, regionSpecificData, alreadyGeneratedFiles);
