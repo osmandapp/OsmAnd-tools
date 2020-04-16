@@ -74,8 +74,9 @@ public class DownloadOsmGPX {
 	private static final int PS_UPDATE_GPX_DETAILS = 2;
 	private static final int PS_INSERT_GPX_FILE = 3;
 	private static final int PS_INSERT_GPX_DETAILS = 4;
-	private static final long FETCH_INTERVAL = 1000;
+	private static final long FETCH_INTERVAL = 200;
 	private static final long FETCH_MAX_INTERVAL = 10000;
+	private static final int MAX_EMPTY_FETCH = 20;
 	
 	// preindex before 76787 with maxlat/minlat
 	private static final long INITIAL_ID = 1000; // start with 1000
@@ -265,7 +266,7 @@ public class DownloadOsmGPX {
 						if (tags != null) {
 							ResultSet rsar = tags.getResultSet();
 							while (rsar.next()) {
-								String tg = rsar.getString(1);
+								String tg = rsar.getString(2);
 								tagValue(serializer, "tag_" + tg.toLowerCase(), tg.toLowerCase());
 							}
 						}
@@ -450,6 +451,7 @@ public class DownloadOsmGPX {
 		int success = 0;
 		OsmGpxFile lastSuccess = null;
 		System.out.println("Start with id: " + ID_INIT);
+		int emptyFetch = 0;
 		for (long id = ID_INIT; id < ID_END; id++) {
 			String url = MAIN_GPX_API_ENDPOINT + id + "/details";
 			HttpsURLConnection httpConn = getHttpConnection(url);
@@ -485,9 +487,11 @@ public class DownloadOsmGPX {
 					System.out.println(String.format("Fetched %d gpx from %d - %d (%s). Now: %s ", success,
 							id - FETCH_INTERVAL + 1, id, lastTime, new Date()));
 				} else {
-					System.out.println(String.format("STOP no successful fetch after %d %s",
+					System.out.println(String.format("No successful fetch after %d %s",
 							lastSuccess == null ? ID_INIT : lastSuccess.id, lastTime));
-					break;
+					if(emptyFetch ++ > MAX_EMPTY_FETCH) {
+						break;
+					}
 				}
 				batchFetch = 0;
 				success = 0;
