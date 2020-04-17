@@ -470,7 +470,7 @@ public class DownloadOsmGPX {
 					r.gpx = downloadGpx(id, r.name);
 					r.gpxGzip = Algorithms.stringToGzip(r.gpx);
 					calculateMinMaxLatLon(r);
-				} catch (Exception e) {
+				} catch (Throwable e) {
 					errorReadingGpx(r, e);
 				} finally {
 					lastSuccess = r;
@@ -530,7 +530,7 @@ public class DownloadOsmGPX {
 
 
 
-	private void errorReadingGpx(OsmGpxFile r, Exception e) {
+	private void errorReadingGpx(OsmGpxFile r, Throwable e) {
 		LOG.error(String.format("### ERROR while reading GPX %d - %s: %s", r.id, r.name,
 				e != null ? e.getMessage() : ""));
 	}
