@@ -238,6 +238,9 @@ public class DownloadOsmGPX {
 			serializer.attribute(null, "version", "0.6"); //$NON-NLS-1$ //$NON-NLS-2$
 		}
 		while (rs.next()) {
+			if (tracks % 1000 == 0) {
+				System.out.println(String.format("Fetched %d tracks %d segments", tracks, segments));
+			}
 			long trackid = rs.getLong(1);
 			byte[] cont = rs.getBytes(2);
 			String name = rs.getString(3);
