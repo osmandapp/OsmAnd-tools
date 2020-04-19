@@ -270,6 +270,15 @@ public class DownloadOsmGPX {
 							serializer.attribute(null, "id", nid + "");
 							serializer.attribute(null, "action", "modify");
 							serializer.attribute(null, "version", "1");
+							if (!Double.isNaN(p.ele)) {
+								tagValue(serializer, "ele", latLonFormat.format(p.ele));
+							}
+							if (!Double.isNaN(p.speed)) {
+								tagValue(serializer, "speed", latLonFormat.format(p.speed));
+							}
+							if (!Double.isNaN(p.hdop)) {
+								tagValue(serializer, "hdop", latLonFormat.format(p.hdop));
+							}
 							serializer.endTag(null, "node");
 						}
 						long endid = id;
