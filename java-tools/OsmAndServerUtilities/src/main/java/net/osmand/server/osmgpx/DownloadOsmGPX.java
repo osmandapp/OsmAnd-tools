@@ -209,7 +209,7 @@ public class DownloadOsmGPX {
 		if (qp.minlat != OsmGpxFile.ERROR_NUMBER) {
 			conditions += " and t.maxlat >= " + qp.minlat;
 			conditions += " and t.minlat <= " + qp.maxlat;
-			conditions += " and t.maxlon <= " + qp.minlon;
+			conditions += " and t.maxlon >= " + qp.minlon;
 			conditions += " and t.minlon <= " + qp.maxlon;
 		}
 		if (qp.limit != -1) {
