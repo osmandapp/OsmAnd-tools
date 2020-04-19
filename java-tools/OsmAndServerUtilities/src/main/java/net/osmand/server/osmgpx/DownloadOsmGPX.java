@@ -277,6 +277,8 @@ public class DownloadOsmGPX {
 					serializer.attribute(null, "id", id-- + "");
 					serializer.attribute(null, "action", "modify");
 					serializer.attribute(null, "version", "1");
+					serializer.attribute(null, "lat", latLonFormat.format(gpxFile.findPointToShow().lat));
+					serializer.attribute(null, "lon", latLonFormat.format(gpxFile.findPointToShow().lon));
 					addGenericInfoTags(serializer, gpxInfo);
 					addAnalysisTags(serializer, analysis);
 					addTrackSpecificTags(serializer, tags);
