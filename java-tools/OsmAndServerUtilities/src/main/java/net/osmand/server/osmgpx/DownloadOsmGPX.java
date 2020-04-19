@@ -244,17 +244,45 @@ public class DownloadOsmGPX {
 			if (tracks % 1000 == 0) {
 				System.out.println(String.format("Fetched %d tracks %d segments", tracks, segments));
 			}
-			long trackid = rs.getLong(1);
+			OsmGpxFile gpxInfo = new OsmGpxFile();
+			gpxInfo.id = rs.getLong(1);
 			byte[] cont = rs.getBytes(2);
-			String name = rs.getString(3);
-			String description = rs.getString(4);
-			String user = rs.getString(5);
-			Date dt = new Date(rs.getDate(6).getTime());
+			if (cont == null) {
+				continue;
+			}
+			gpxInfo.name = rs.getString(3);
+			gpxInfo.description = rs.getString(4);
+			gpxInfo.user = rs.getString(5);
+			gpxInfo.timestamp = new Date(rs.getDate(6).getTime());
 			Array tags = rs.getArray(7);
-			if (cont != null) {
-				ByteArrayInputStream is = new ByteArrayInputStream(Algorithms.gzipToString(cont).getBytes());
-				GPXFile gpxFile = GPXUtilities.loadGPXFile(is);
-				GPXTrackAnalysis analysis = gpxFile.getAnalysis(dt.getTime());
+
+			ByteArrayInputStream is = new ByteArrayInputStream(Algorithms.gzipToString(cont).getBytes());
+			GPXFile gpxFile = GPXUtilities.loadGPXFile(is);
+			GPXTrackAnalysis analysis = gpxFile.getAnalysis(gpxInfo.timestamp.getTime());
+			if (qp.details < QueryParams.DETAILS_TRACKS) {
+				boolean validTrack = false;
+				for (Track t : gpxFile.tracks) {
+					for (TrkSegment s : t.segments) {
+						if (s.points.isEmpty()) {
+							continue;
+						}
+						if (!validatedTrackSegment(s, qp)) {
+							continue;
+						}
+						validTrack = true;
+					}
+				}
+				if (validTrack) {
+					serializer.startTag(null, "node");
+					serializer.attribute(null, "id", id-- + "");
+					serializer.attribute(null, "action", "modify");
+					serializer.attribute(null, "version", "1");
+					addGenericInfoTags(serializer, gpxInfo);
+					addAnalysisTags(serializer, analysis);
+					addTrackSpecificTags(serializer, tags);
+					serializer.endTag(null, "node");
+				}
+			} else {
 				for (Track t : gpxFile.tracks) {
 					for (TrkSegment s : t.segments) {
 						if (s.points.isEmpty()) {
@@ -264,70 +292,47 @@ public class DownloadOsmGPX {
 							continue;
 						}
 						segments++;
-						boolean serializeWays = qp.details >= QueryParams.DETAILS_TRACKS;
-						if (serializeWays) {
-							long idStart = id;
-							for (WptPt p : s.points) {
-								long nid = id--;
-								serializer.startTag(null, "node");
-								serializer.attribute(null, "lat", latLonFormat.format(p.lat));
-								serializer.attribute(null, "lon", latLonFormat.format(p.lon));
-								serializer.attribute(null, "id", nid + "");
-								serializer.attribute(null, "action", "modify");
-								serializer.attribute(null, "version", "1");
-								if (qp.details >= QueryParams.DETAILS_ELE_SPEED) {
-									if (!Double.isNaN(p.ele)) {
-										tagValue(serializer, "ele", latLonFormat.format(p.ele));
-									}
-									if (!Double.isNaN(p.speed) && p.speed > 0) {
-										tagValue(serializer, "speed", latLonFormat.format(p.speed));
-									}
-									if (!Double.isNaN(p.hdop)) {
-										tagValue(serializer, "hdop", latLonFormat.format(p.hdop));
-									}
-								}
-								serializer.endTag(null, "node");
-							}
-							long endid = id;
-							serializer.startTag(null, "way");
-							serializer.attribute(null, "id", id-- + "");
-							serializer.attribute(null, "action", "modify");
-							serializer.attribute(null, "version", "1");
-
-							for (long nid = idStart; nid > endid; nid--) {
-								serializer.startTag(null, "nd");
-								serializer.attribute(null, "ref", nid + "");
-								serializer.endTag(null, "nd");
-							}
-						} else {
+						long idStart = id;
+						for (WptPt p : s.points) {
+							long nid = id--;
 							serializer.startTag(null, "node");
-							serializer.attribute(null, "id", id-- + "");
+							serializer.attribute(null, "lat", latLonFormat.format(p.lat));
+							serializer.attribute(null, "lon", latLonFormat.format(p.lon));
+							serializer.attribute(null, "id", nid + "");
 							serializer.attribute(null, "action", "modify");
 							serializer.attribute(null, "version", "1");
-						}
-						tagValue(serializer, "osmgpx", "track");
-						tagValue(serializer, "trackid", trackid + "");
-						tagValue(serializer, "name", name);
-						tagValue(serializer, "user", user);
-						tagValue(serializer, "date", dt.toString());
-						tagValue(serializer, "description", description);
-						addAnalysisTags(serializer, analysis);
-						if (tags != null) {
-							ResultSet rsar = tags.getResultSet();
-							while (rsar.next()) {
-								String tg = rsar.getString(2);
-								tagValue(serializer, "tag_" + tg.toLowerCase(), tg.toLowerCase());
+							if (qp.details >= QueryParams.DETAILS_ELE_SPEED) {
+								if (!Double.isNaN(p.ele)) {
+									tagValue(serializer, "ele", latLonFormat.format(p.ele));
+								}
+								if (!Double.isNaN(p.speed) && p.speed > 0) {
+									tagValue(serializer, "speed", latLonFormat.format(p.speed));
+								}
+								if (!Double.isNaN(p.hdop)) {
+									tagValue(serializer, "hdop", latLonFormat.format(p.hdop));
+								}
 							}
-						}
-						if (serializeWays) {
-							serializer.endTag(null, "way");
-						} else {
 							serializer.endTag(null, "node");
 						}
+						long endid = id;
+						serializer.startTag(null, "way");
+						serializer.attribute(null, "id", id-- + "");
+						serializer.attribute(null, "action", "modify");
+						serializer.attribute(null, "version", "1");
+
+						for (long nid = idStart; nid > endid; nid--) {
+							serializer.startTag(null, "nd");
+							serializer.attribute(null, "ref", nid + "");
+							serializer.endTag(null, "nd");
+						}
+						addGenericInfoTags(serializer, gpxInfo);
+						addAnalysisTags(serializer, analysis);
+						addTrackSpecificTags(serializer, tags);
+						serializer.endTag(null, "way");
 					}
 				}
-				tracks++;
 			}
+			tracks++;
 		}
 		if(serializer != null) {
 			serializer.endDocument();
@@ -335,6 +340,25 @@ public class DownloadOsmGPX {
 			outputStream.close();
 		}
 		System.out.println(String.format("Fetched %d tracks %d segments", tracks, segments));
+	}
+
+	private void addTrackSpecificTags(XmlSerializer serializer, Array tags) throws SQLException, IOException {
+		if (tags != null) {
+			ResultSet rsar = tags.getResultSet();
+			while (rsar.next()) {
+				String tg = rsar.getString(2);
+				tagValue(serializer, "tag_" + tg.toLowerCase(), tg.toLowerCase());
+			}
+		}
+	}
+
+	private void addGenericInfoTags(XmlSerializer serializer, OsmGpxFile gpxInfo) throws IOException {
+		tagValue(serializer, "osmgpx", "track");
+		tagValue(serializer, "trackid", gpxInfo.id + "");
+		tagValue(serializer, "name", gpxInfo.name);
+		tagValue(serializer, "user", gpxInfo.user);
+		tagValue(serializer, "date", gpxInfo.timestamp.toString());
+		tagValue(serializer, "description", gpxInfo.description);
 	}
 
 	private void addAnalysisTags(XmlSerializer serializer, GPXTrackAnalysis analysis) throws IOException {
