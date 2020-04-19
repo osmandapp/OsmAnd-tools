@@ -173,23 +173,19 @@ public class DownloadOsmGPX {
 	
 	protected boolean validatedTrackSegment(TrkSegment t, QueryParams qp) {
 		boolean isOnePointIn = false;
+		boolean testPoints = qp.minlat != OsmGpxFile.ERROR_NUMBER || qp.minlon != OsmGpxFile.ERROR_NUMBER
+				|| qp.maxlat != OsmGpxFile.ERROR_NUMBER || qp.maxlon != OsmGpxFile.ERROR_NUMBER;
 		for (WptPt p : t.points) {
 			if (p.lat >= 90 || p.lat <= -90 || p.lon >= 180 || p.lon <= -180) {
 				return false;
 			}
-			boolean isInP = true;
-			if (qp.minlat != OsmGpxFile.ERROR_NUMBER && p.lat < qp.minlat) {
-				isInP = false;
-			} else if (qp.maxlat != OsmGpxFile.ERROR_NUMBER && p.lat > qp.maxlat) {
-				isInP = false;
-			} else if (qp.minlon != OsmGpxFile.ERROR_NUMBER && p.lon < qp.minlon) {
-				isInP = false;
-			} else if (qp.maxlon != OsmGpxFile.ERROR_NUMBER && p.lon > qp.maxlon) {
-				isInP = false;
+			if (testPoints) {
+				if (p.lat >= qp.minlat && p.lat <= qp.maxlat && p.lon >= qp.minlon && p.lon <= qp.maxlon) {
+					isOnePointIn = true;
+				}
 			}
-			isOnePointIn = isInP || isOnePointIn;
 		}
-		if (!isOnePointIn) {
+		if (testPoints && !isOnePointIn) {
 			return false;
 		}
 		return true;
