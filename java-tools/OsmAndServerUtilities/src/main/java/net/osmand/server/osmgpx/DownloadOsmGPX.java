@@ -171,11 +171,26 @@ public class DownloadOsmGPX {
 		utility.commitAllStatements();
 	}
 	
-	protected boolean validatedTrackSegment(TrkSegment t) {
+	protected boolean validatedTrackSegment(TrkSegment t, QueryParams qp) {
+		boolean isOnePointIn = false;
 		for (WptPt p : t.points) {
 			if (p.lat >= 90 || p.lat <= -90 || p.lon >= 180 || p.lon <= -180) {
 				return false;
 			}
+			boolean isInP = true;
+			if (qp.minlat != OsmGpxFile.ERROR_NUMBER && p.lat < qp.minlat) {
+				isInP = false;
+			} else if (qp.maxlat != OsmGpxFile.ERROR_NUMBER && p.lat > qp.maxlat) {
+				isInP = false;
+			} else if (qp.minlon != OsmGpxFile.ERROR_NUMBER && p.lon < qp.minlon) {
+				isInP = false;
+			} else if (qp.maxlon != OsmGpxFile.ERROR_NUMBER && p.lon > qp.maxlon) {
+				isInP = false;
+			}
+			isOnePointIn = isInP || isOnePointIn;
+		}
+		if (!isOnePointIn) {
+			return false;
 		}
 		return true;
 	}
@@ -242,7 +257,7 @@ public class DownloadOsmGPX {
 						if (s.points.isEmpty()) {
 							continue;
 						}
-						if (!validatedTrackSegment(s)) {
+						if (!validatedTrackSegment(s, qp)) {
 							continue;
 						}
 						segments++;
