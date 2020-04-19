@@ -171,6 +171,14 @@ public class DownloadOsmGPX {
 		utility.commitAllStatements();
 	}
 	
+	protected boolean validatedTrackSegment(TrkSegment t) {
+		for (WptPt p : t.points) {
+			if (p.lat >= 90 || p.lat <= -90 || p.lon >= 180 || p.lon <= -180) {
+				return false;
+			}
+		}
+		return true;
+	}
 	
 	protected void queryGPXForBBOX(QueryParams qp) throws SQLException, IOException, FactoryConfigurationError, XMLStreamException {
 		String conditions = "";
@@ -232,6 +240,9 @@ public class DownloadOsmGPX {
 				for (Track t : gpxFile.tracks) {
 					for (TrkSegment s : t.segments) {
 						if (s.points.isEmpty()) {
+							continue;
+						}
+						if (!validatedTrackSegment(s)) {
 							continue;
 						}
 						segments++;
