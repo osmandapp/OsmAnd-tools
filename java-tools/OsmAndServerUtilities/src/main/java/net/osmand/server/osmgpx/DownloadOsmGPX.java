@@ -57,6 +57,7 @@ import org.xmlpull.v1.XmlSerializer;
 
 import net.osmand.GPXUtilities;
 import net.osmand.GPXUtilities.GPXFile;
+import net.osmand.GPXUtilities.GPXTrackAnalysis;
 import net.osmand.GPXUtilities.Track;
 import net.osmand.GPXUtilities.TrkSegment;
 import net.osmand.GPXUtilities.WptPt;
@@ -137,7 +138,9 @@ public class DownloadOsmGPX {
 					qp.maxlat = Double.parseDouble(vls[2]);
 					qp.maxlon = Double.parseDouble(vls[3]);
 					break;
-					
+				case "--details":
+					qp.details = Integer.parseInt(val);
+					break;
 				case "--out":
 					qp.osmFile = new File(val);
 					break;
@@ -251,6 +254,7 @@ public class DownloadOsmGPX {
 			if (cont != null) {
 				ByteArrayInputStream is = new ByteArrayInputStream(Algorithms.gzipToString(cont).getBytes());
 				GPXFile gpxFile = GPXUtilities.loadGPXFile(is);
+				GPXTrackAnalysis analysis = gpxFile.getAnalysis(dt.getTime());
 				for (Track t : gpxFile.tracks) {
 					for (TrkSegment s : t.segments) {
 						if (s.points.isEmpty()) {
@@ -260,36 +264,46 @@ public class DownloadOsmGPX {
 							continue;
 						}
 						segments++;
-						long idStart = id;
-						for (WptPt p : s.points) {
-							long nid = id--;
-							serializer.startTag(null, "node");
-							serializer.attribute(null, "lat", latLonFormat.format(p.lat));
-							serializer.attribute(null, "lon", latLonFormat.format(p.lon));
-							serializer.attribute(null, "id", nid + "");
+						boolean serializeWays = qp.details >= QueryParams.DETAILS_TRACKS;
+						if (serializeWays) {
+							long idStart = id;
+							for (WptPt p : s.points) {
+								long nid = id--;
+								serializer.startTag(null, "node");
+								serializer.attribute(null, "lat", latLonFormat.format(p.lat));
+								serializer.attribute(null, "lon", latLonFormat.format(p.lon));
+								serializer.attribute(null, "id", nid + "");
+								serializer.attribute(null, "action", "modify");
+								serializer.attribute(null, "version", "1");
+								if (qp.details >= QueryParams.DETAILS_ELE_SPEED) {
+									if (!Double.isNaN(p.ele)) {
+										tagValue(serializer, "ele", latLonFormat.format(p.ele));
+									}
+									if (!Double.isNaN(p.speed) && p.speed > 0) {
+										tagValue(serializer, "speed", latLonFormat.format(p.speed));
+									}
+									if (!Double.isNaN(p.hdop)) {
+										tagValue(serializer, "hdop", latLonFormat.format(p.hdop));
+									}
+								}
+								serializer.endTag(null, "node");
+							}
+							long endid = id;
+							serializer.startTag(null, "way");
+							serializer.attribute(null, "id", id-- + "");
 							serializer.attribute(null, "action", "modify");
 							serializer.attribute(null, "version", "1");
-							if (!Double.isNaN(p.ele)) {
-								tagValue(serializer, "ele", latLonFormat.format(p.ele));
+
+							for (long nid = idStart; nid > endid; nid--) {
+								serializer.startTag(null, "nd");
+								serializer.attribute(null, "ref", nid + "");
+								serializer.endTag(null, "nd");
 							}
-							if (!Double.isNaN(p.speed)) {
-								tagValue(serializer, "speed", latLonFormat.format(p.speed));
-							}
-							if (!Double.isNaN(p.hdop)) {
-								tagValue(serializer, "hdop", latLonFormat.format(p.hdop));
-							}
-							serializer.endTag(null, "node");
-						}
-						long endid = id;
-						serializer.startTag(null, "way");
-						serializer.attribute(null, "id", id-- + "");
-						serializer.attribute(null, "action", "modify");
-						serializer.attribute(null, "version", "1");
-						
-						for (long nid = idStart; nid > endid; nid--) {
-							serializer.startTag(null, "nd");
-							serializer.attribute(null, "ref", nid + "");
-							serializer.endTag(null, "nd");
+						} else {
+							serializer.startTag(null, "node");
+							serializer.attribute(null, "id", id-- + "");
+							serializer.attribute(null, "action", "modify");
+							serializer.attribute(null, "version", "1");
 						}
 						tagValue(serializer, "osmgpx", "track");
 						tagValue(serializer, "trackid", trackid + "");
@@ -297,6 +311,7 @@ public class DownloadOsmGPX {
 						tagValue(serializer, "user", user);
 						tagValue(serializer, "date", dt.toString());
 						tagValue(serializer, "description", description);
+						addAnalysisTags(serializer, analysis);
 						if (tags != null) {
 							ResultSet rsar = tags.getResultSet();
 							while (rsar.next()) {
@@ -304,7 +319,11 @@ public class DownloadOsmGPX {
 								tagValue(serializer, "tag_" + tg.toLowerCase(), tg.toLowerCase());
 							}
 						}
-						serializer.endTag(null, "way");
+						if (serializeWays) {
+							serializer.endTag(null, "way");
+						} else {
+							serializer.endTag(null, "node");
+						}
 					}
 				}
 				tracks++;
@@ -316,6 +335,29 @@ public class DownloadOsmGPX {
 			outputStream.close();
 		}
 		System.out.println(String.format("Fetched %d tracks %d segments", tracks, segments));
+	}
+
+	private void addAnalysisTags(XmlSerializer serializer, GPXTrackAnalysis analysis) throws IOException {
+		tagValue(serializer, "distance", latLonFormat.format(analysis.totalDistance));
+		if (analysis.isTimeSpecified()) {
+			tagValue(serializer, "time_span", analysis.timeSpan + "");
+			tagValue(serializer, "time_span_no_gaps", analysis.timeSpanWithoutGaps + "");
+			tagValue(serializer, "time_moving", analysis.timeMoving + "");
+			tagValue(serializer, "time_moving_no_gaps", analysis.timeMovingWithoutGaps + "");
+		}
+		if (analysis.hasElevationData) {
+			tagValue(serializer, "avg_ele", latLonFormat.format(analysis.avgElevation));
+			tagValue(serializer, "min_ele", latLonFormat.format(analysis.minElevation));
+			tagValue(serializer, "max_ele", latLonFormat.format(analysis.maxElevation));
+			tagValue(serializer, "diff_ele_up", latLonFormat.format(analysis.diffElevationUp));
+			tagValue(serializer, "diff_ele_down", latLonFormat.format(analysis.diffElevationDown));
+		}
+		if (analysis.hasSpeedData) {
+			tagValue(serializer, "avg_speed", latLonFormat.format(analysis.avgSpeed));
+			tagValue(serializer, "max_speed", latLonFormat.format(analysis.maxSpeed));
+			tagValue(serializer, "min_speed", latLonFormat.format(analysis.minSpeed));
+			
+		}
 	}
 
 	private void tagValue(XmlSerializer serializer, String tag, String value) throws IOException {
@@ -787,6 +829,11 @@ public class DownloadOsmGPX {
 	}
 
 	protected static class QueryParams {
+		protected static final int DETAILS_POINTS = 0;
+		protected static final int DETAILS_TRACKS = 1;
+		protected static final int DETAILS_ELE_SPEED = 2;
+		
+		int details = DETAILS_ELE_SPEED;
 		File osmFile;
 		String tag;
 		int limit = -1;
