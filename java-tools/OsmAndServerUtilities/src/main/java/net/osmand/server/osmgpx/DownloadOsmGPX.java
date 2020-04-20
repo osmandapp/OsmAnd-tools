@@ -77,7 +77,7 @@ public class DownloadOsmGPX {
 	private static final int PS_INSERT_GPX_DETAILS = 4;
 	private static final long FETCH_INTERVAL = 200;
 	private static final long FETCH_MAX_INTERVAL = 10000;
-	private static final int MAX_EMPTY_FETCH = 20;
+	private static final int MAX_EMPTY_FETCH = 10;
 	
 	// preindex before 76787 with maxlat/minlat
 	private static final long INITIAL_ID = 1000; // start with 1000
