@@ -593,7 +593,7 @@ public class DownloadOsmGPX {
 					long last = (lastSuccess == null ? ID_INIT : lastSuccess.id) + emptyFetch * FETCH_INTERVAL;
 					System.out.println(String.format("No successful fetch after %d - %d %s ",
 							last,  last + FETCH_INTERVAL, lastTime));
-					if(emptyFetch ++ > MAX_EMPTY_FETCH) {
+					if (++emptyFetch >= MAX_EMPTY_FETCH) {
 						break;
 					}
 				}
