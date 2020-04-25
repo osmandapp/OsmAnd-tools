@@ -201,9 +201,19 @@ public class DownloadOsmGPX {
 		}
 		if (!Algorithms.isEmpty(qp.tag)) {
 //			conditions += " and '" + qp.tag + "' = ANY(t.tags)";
-			String[] tags = qp.tag.split(",");
-			for (String tg : tags) {
-				conditions += " and lower('^'||array_to_string(t.tags,'^','')||'^') like '%^" + tg.toLowerCase() + "^%'";
+			String[] tagsAnd = qp.tag.split(",");
+			for (String tagAnd : tagsAnd) {
+				conditions += " and (";
+				String[] tagsOr = tagAnd.split(";");
+				boolean t = false;
+				for(String tagOr : tagsOr) {
+					if(t) {
+						conditions += " or ";
+					}
+					conditions += " lower('^'||array_to_string(t.tags,'^','')||'^') like '%^" + tagOr.trim().toLowerCase() + "^%'";
+					t = true;
+				}
+				conditions += ")";
 			}
 		}
 		if (!Algorithms.isEmpty(qp.datestart)) {
