@@ -714,16 +714,31 @@ public class BasemapProcessor {
 	        System.out.println("Please specify folder with basemap *.osm or *.osm.bz2 files");
 		} else {
 			boolean mini = false;
+			boolean detailed = false;
 			MapRenderingTypesEncoder rt = new MapRenderingTypesEncoder("basemap");
 			// BASEMAP generation
+			int zoomSmoothness = 2;
+			MapZooms zooms = MapZooms.parseZooms("1-2;3;4-5;6-8;9-");
+			MOST_DETAILED_APPROXIMATION = 9;
+			String fileName = "World_basemap_2.obf";
 			File folder = new File(args[0]);
-			if (args.length >= 2 && args[1].equals("mini")) {
-				mini = true;
+			if (args.length >= 2) { 
+				if (args[1].equals("mini")) {
+					mini = true;
+					zoomSmoothness = 2;
+					zooms =  MapZooms.parseZooms("1-2;3;4-5;6-8;9-");
+					MOST_DETAILED_APPROXIMATION = 9;
+					fileName = "World_basemap_mini_2.obf";
+				} else if(args[1].equals("detailed")) {
+					detailed = true;
+					zoomSmoothness = 2;
+					zooms = MapZooms.parseZooms("1-2;3;4-5;6-7;8-9;10-");
+					MOST_DETAILED_APPROXIMATION = 11;
+					fileName = "World_basemap_detailed_2.obf";
+				}
+				
 			}
 			// MapZooms zooms = MapZooms.parseZooms("1-2;3;4-5;6-7;8-9;10-");
-			int zoomSmoothness = mini ? 2 : 2;
-			MapZooms zooms = mini ? MapZooms.parseZooms("1-2;3;4-5;6-8;9-") : MapZooms.parseZooms("1-2;3;4-5;6-8;9-");
-			MOST_DETAILED_APPROXIMATION = mini ? 9 : 9;
 			IndexCreatorSettings settings = new IndexCreatorSettings();
 			settings.indexMap = true;
 			settings.indexAddress = false;
@@ -735,7 +750,7 @@ public class BasemapProcessor {
 			
 			IndexCreator creator = new IndexCreator(folder, settings); //$NON-NLS-1$
 			creator.setDialects(DBDialect.SQLITE_IN_MEMORY, DBDialect.SQLITE_IN_MEMORY);
-			creator.setMapFileName(mini ? "World_basemap_mini_2.obf" : "World_basemap_2.obf");
+			creator.setMapFileName(fileName);
 			List<File> src = new ArrayList<File>();
 			parseFiles(folder, src);
 
