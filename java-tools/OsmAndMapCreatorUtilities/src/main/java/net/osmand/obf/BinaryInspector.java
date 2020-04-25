@@ -90,7 +90,7 @@ public class BinaryInspector {
 //					"-zoom=6",
 //					"-bbox=4.890,52.37,4.892,52.3692",
 //					"-osm="+System.getProperty("maps.dir")+"/map.obf.osm",
-					System.getProperty("maps.dir")+"/Map.obf"
+					System.getProperty("maps.dir")+"/Wikivoyage.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
 		} else {

@@ -200,7 +200,11 @@ public class DownloadOsmGPX {
 			conditions += " and t.\"user\" = '" + qp.user + "'";
 		}
 		if (!Algorithms.isEmpty(qp.tag)) {
-			conditions += " and '" + qp.tag + "' = ANY(t.tags)";
+//			conditions += " and '" + qp.tag + "' = ANY(t.tags)";
+			String[] tags = qp.tag.split(",");
+			for (String tg : tags) {
+				conditions += " and lower('^'||array_to_string(t.tags,'^','')||'^') like '%^" + tg.toLowerCase() + "^%'";
+			}
 		}
 		if (!Algorithms.isEmpty(qp.datestart)) {
 			conditions += " and t.date >= '" + qp.datestart + "'";
