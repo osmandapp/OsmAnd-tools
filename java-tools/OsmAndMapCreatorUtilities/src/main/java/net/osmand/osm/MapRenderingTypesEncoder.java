@@ -18,7 +18,6 @@ import java.util.Set;
 import java.util.TreeMap;
 
 import net.osmand.PlatformUtil;
-import net.osmand.osm.MapRenderingTypesEncoder.EntityConvertApplyType;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.Node;
@@ -362,8 +361,8 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			EntityConvertApplyType appType) {
 		tags = transformShieldTags(tags, entity, appType);
 		tags = transformIntegrityTags(tags, entity, appType);
-		tags = transformChargingTags(tags, entity);
 		tags = transformOpeningnHoursTags(tags, appType);
+		tags = transformChargingTags(tags, entity);
 		EntityConvertType filter = EntityConvertType.TAG_TRANSFORM;
 		List<EntityConvert> listToConvert = getApplicableConverts(tags, entity, filter, appType);
 		if(listToConvert == null) {
@@ -377,14 +376,13 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	}
 
 	private Map<String, String> transformOpeningnHoursTags(Map<String, String> tags, EntityConvertApplyType appType) {
-		if (appType == EntityConvertApplyType.POI) {
+		if (appType == EntityConvertApplyType.POI && tags.get("opening_hours") != null) {
 			String oh = tags.get("opening_hours");
-			if (oh == null) {
-				return tags;
-			}
+			tags = new LinkedHashMap<>(tags);
 			for (Entry<String, String> e : tags.entrySet()) {
 				if (e.getKey().startsWith("opening_hours:")) {
-					oh += " || " + e.getValue() + " \"" + Algorithms.capitalizeFirstLetter(e.getKey().substring(14)) + "\""; 
+					oh += " || " + e.getValue() + " \"" 
+							+ Algorithms.capitalizeFirstLetter(e.getKey().substring("opening_hours:".length())) + "\""; 
 				}
 			}
 			tags.put("opening_hours", oh);
