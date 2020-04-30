@@ -62,7 +62,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	private static final int CHARACTERS_TO_BUILD = 4;
 	private boolean useInMemoryCreator = true;
 	public static long GENERATE_OBJ_ID = -(1L << 10L);
-	
+	private static final String openHoursTag = "opening_hours";
 	private static int SHIFT_MULTIPOLYGON_IDS = 43;
 	private static int DUPLICATE_SPLIT = 5;
 	public TLongHashSet generatedIds = new TLongHashSet();
@@ -115,7 +115,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					JapaneseTranslitHelper.getEnglishTransliteration(e.getTag(OSMTagKey.NAME.getValue())));
 		}
 		Map<String, String> tags = e.getTags();
-		Map<String, String> etags = renderingTypes.transformTags(tags, EntityType.valueOf(e), EntityConvertApplyType.POI);
+		Map<String, String> etags = renderingTypes.transformTags(processAdditionalOpeningHoursTags(tags), EntityType.valueOf(e), EntityConvertApplyType.POI);
 		boolean privateReg = "private".equals(e.getTag("access"));
 		tempAmenityList = EntityParser.parseAmenities(poiTypes, e, etags, tempAmenityList);
 		if (!tempAmenityList.isEmpty() && poiPreparedStatement != null) {
@@ -170,7 +170,22 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	}
 
 	
-
+	private Map<String, String> processAdditionalOpeningHoursTags(Map<String, String> tagsMap) {
+		String oh = tagsMap.get("opening_hours");
+		if (oh == null) {
+			return tagsMap;
+		}
+		Map<String, String> res = new HashMap<>();
+		for (Entry<String, String> e : tagsMap.entrySet()) {
+			if (e.getKey().startsWith("opening_hours:")) {
+				String addTag = Algorithms.capitalizeFirstLetter(e.getKey().substring(14));
+				oh += " || " + e.getValue() + " \"" + addTag + "\""; 
+			}
+			res.put(e.getKey(), e.getValue());
+		}
+		res.put("opening_hours", oh);
+		return res;
+	}
 
 	public void iterateRelation(Relation e, OsmDbAccessorContext ctx) throws SQLException {
 
