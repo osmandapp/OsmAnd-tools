@@ -63,6 +63,8 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	private static final Log log = LogFactory.getLog(IndexTransportCreator.class);
 
 	private static final int DISTANCE_THRESHOLD = 50;
+	public static final int MISSING_STOP_DISTANCE_THRESHOLD = 1000;
+	public static final String MISSING_STOP_NAME = "#Missing Stop";
 
 	private Set<Long> visitedStops = new HashSet<Long>();
 	private PreparedStatement transRouteStat;
@@ -760,6 +762,28 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		directRoute.setRef(ref);
 		directRoute.setId(directRoute.getId() << 1);
 		if (processTransportRelationV2(rel, directRoute)) { // try new transport relations first
+			List<TransportStop> forwardStops = directRoute.getForwardStops();
+			if(hasRelationIncompleteWays(rel) && forwardStops.size() > 0 && 
+					directRoute.getForwardWays().size() > 1) {
+				List<Way> mergedWays = new ArrayList<>(directRoute.getForwardWays());
+				TransportRoute.mergeRouteWays(mergedWays);
+				TransportRoute.resortWaysToStopsOrder(mergedWays, forwardStops);
+				if(mergedWays.size() > 1) {
+					System.err.println(
+							String.format("ERROR TRANSPORT ROUTE '%d': there are multiple segments (%d) of transport route.", 
+									directRoute.getId() / 2, mergedWays.size()));
+				}
+				Way w = mergedWays.get(0);
+				TransportStop stp = checkStopMissing(forwardStops, w.getFirstNode(), 
+						directRoute.getForwardWays(), w.getId());
+				if (stp != null) {
+					directRoute.getForwardStops().add(0, stp);
+				}
+				stp = checkStopMissing(forwardStops, w.getLastNode(), directRoute.getForwardWays(), w.getId());
+				if (stp != null) {
+					directRoute.getForwardStops().add(stp);
+				}
+			}
 			troutes.add(directRoute);
 		} else {
 			TransportRoute backwardRoute = EntityParser.parserRoute(rel, ref);
@@ -778,6 +802,55 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			}
 		}
 
+	}
+
+
+	private TransportStop checkStopMissing(List<TransportStop> forwardStops, Node node, List<Way> originalWay, long wayId) {
+		TransportStop st = forwardStops.get(0);
+		double firstDistance = MapUtils.getDistance(st.getLocation(), node.getLatitude(), node.getLongitude());
+		for (int i = 1; i < forwardStops.size(); i++) {
+			st = forwardStops.get(i);
+			double firstd = MapUtils.getDistance(st.getLocation(), node.getLatitude(), node.getLongitude());
+			if (firstd < firstDistance) {
+				firstDistance = firstd;
+			}
+		}
+		if (firstDistance > MISSING_STOP_DISTANCE_THRESHOLD) {
+			TransportStop stp = new TransportStop();
+			for(Way w : originalWay) {
+				for(Node n : w.getNodes()) {
+					if(node.getId() == n.getId()) {
+						wayId = w.getId(); 
+					}
+				}
+			}
+			stp.setId(-wayId);
+			stp.setLocation(node.getLatitude(), node.getLongitude());
+			stp.setName(MISSING_STOP_NAME);
+			return stp;
+		}
+		return null;
+	}
+
+
+	private boolean hasRelationIncompleteWays(Relation rel) {
+		boolean relationHasIncompleteWays = false;
+		for (RelationMember rm : rel.getMembers()) {
+			if (rm.getEntity() instanceof Way) {
+				Way w = (Way) rm.getEntity();
+				if(w.getNodeIds().isEmpty()) {
+					relationHasIncompleteWays = true;
+					break;
+				}
+				for (Node n : w.getNodes()) {
+					if (n == null) {
+						relationHasIncompleteWays = true;
+						break;
+					}
+				}
+			}
+		}
+		return relationHasIncompleteWays;
 	}
 
 	private TransportSchedule readSchedule(String ref, List<TransportStop> directStops) throws SQLException {

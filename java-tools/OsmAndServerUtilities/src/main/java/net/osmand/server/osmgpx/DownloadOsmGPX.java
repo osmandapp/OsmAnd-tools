@@ -204,10 +204,10 @@ public class DownloadOsmGPX {
 			String[] tagsAnd = qp.tag.split(",");
 			for (String tagAnd : tagsAnd) {
 				conditions += " and (";
-				String[] tagsOr = tagAnd.split(";");
+				String[] tagsOr = tagAnd.split("\\;");
 				boolean t = false;
 				for(String tagOr : tagsOr) {
-					if(t) {
+					if (t) {
 						conditions += " or ";
 					}
 					conditions += " lower('^'||array_to_string(t.tags,'^','')||'^') like '%^" + tagOr.trim().toLowerCase() + "^%'";

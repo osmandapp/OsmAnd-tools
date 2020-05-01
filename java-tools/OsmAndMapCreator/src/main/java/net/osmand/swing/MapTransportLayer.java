@@ -201,8 +201,9 @@ public class MapTransportLayer implements MapPanelLayer {
 	public void buildRoute(boolean schedule) {
 		long time = System.currentTimeMillis();
 		List<File> files = new ArrayList<File>();
-		for (File f : Algorithms.getSortedFilesVersions(new File(DataExtractionSettings.getSettings().getBinaryFilesDir()))) {
-			if(f.getName().endsWith(".obf")){
+		File folder = new File(DataExtractionSettings.getSettings().getBinaryFilesDir());
+		for (File f : Algorithms.getSortedFilesVersions(folder)) {
+			if (f.getName().endsWith(".obf")) {
 				files.add(f);
 			}
 		}
