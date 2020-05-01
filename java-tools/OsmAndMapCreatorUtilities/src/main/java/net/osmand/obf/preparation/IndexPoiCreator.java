@@ -62,7 +62,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	private static final int CHARACTERS_TO_BUILD = 4;
 	private boolean useInMemoryCreator = true;
 	public static long GENERATE_OBJ_ID = -(1L << 10L);
-	
 	private static int SHIFT_MULTIPOLYGON_IDS = 43;
 	private static int DUPLICATE_SPLIT = 5;
 	public TLongHashSet generatedIds = new TLongHashSet();
@@ -168,9 +167,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			}
 		}
 	}
-
-	
-
 
 	public void iterateRelation(Relation e, OsmDbAccessorContext ctx) throws SQLException {
 
