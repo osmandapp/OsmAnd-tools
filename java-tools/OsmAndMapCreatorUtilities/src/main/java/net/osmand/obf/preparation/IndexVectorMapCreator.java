@@ -939,11 +939,17 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 					}
 					tempNames.clear();
 					decodeNames(rs.getString(6), tempNames);
+					boolean allowWaySimplification = level.getMaxZoom() > 15;
 					byte[] types = rs.getBytes(4);
 					int[] typeUse = new int[types.length / 2];
 					for (int j = 0; j < types.length; j += 2) {
 						int ids = Algorithms.parseSmallIntFromBytes(types, j);
-						typeUse[j / 2] = renderingTypes.getTypeByInternalId(ids).getTargetId();
+						MapRulType mapRulType = renderingTypes.getTypeByInternalId(ids);
+						// example to disable way simplification
+//						if("highway".equals(mapRulType.getTag()) && "tram".equals(mapRulType.getValue())) {
+//							allowWaySimplification = false;
+//						}
+						typeUse[j / 2] = mapRulType.getTargetId();
 					}
 					byte[] addTypes = rs.getBytes(5);
 					int[] addtypeUse = null ;
@@ -951,12 +957,14 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 						addtypeUse = new int[addTypes.length / 2];
 						for (int j = 0; j < addTypes.length; j += 2) {
 							int ids = Algorithms.parseSmallIntFromBytes(addTypes, j);
-							addtypeUse[j / 2] = renderingTypes.getTypeByInternalId(ids).getTargetId();
+							MapRulType mapRulType = renderingTypes.getTypeByInternalId(ids);
+							addtypeUse[j / 2] = mapRulType.getTargetId();
 						}
 					}
 					
+					
 					MapData mapData = writer.writeMapData(cid - baseId, parentBounds.getMinX(), parentBounds.getMinY(), rs.getBoolean(1), rs.getBytes(2), rs.getBytes(3),
-							typeUse, addtypeUse, tempNames,  rs.getBytes(7),  null, tempStringTable, dataBlock, level.getMaxZoom() > 15);
+							typeUse, addtypeUse, tempNames,  rs.getBytes(7),  null, tempStringTable, dataBlock, allowWaySimplification);
 					if(mapData != null) {
 						dataBlock.addDataObjects(mapData);
 					}
