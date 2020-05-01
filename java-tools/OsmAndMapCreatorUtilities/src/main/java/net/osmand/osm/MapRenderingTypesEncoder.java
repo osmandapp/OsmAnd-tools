@@ -378,14 +378,16 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	private Map<String, String> transformOpeningnHoursTags(Map<String, String> tags, EntityConvertApplyType appType) {
 		if (appType == EntityConvertApplyType.POI && tags.get("opening_hours") != null) {
 			String oh = tags.get("opening_hours");
-			tags = new LinkedHashMap<>(tags);
 			for (Entry<String, String> e : tags.entrySet()) {
 				if (e.getKey().startsWith("opening_hours:")) {
 					oh += " || " + e.getValue() + " \"" 
 							+ Algorithms.capitalizeFirstLetter(e.getKey().substring("opening_hours:".length())) + "\""; 
 				}
 			}
-			tags.put("opening_hours", oh);
+			if (oh.length() > tags.get("opening_hours").length()) {				
+				tags = new LinkedHashMap<>(tags);
+				tags.put("opening_hours", oh);
+			}
 		}
 		return tags;
 	}
