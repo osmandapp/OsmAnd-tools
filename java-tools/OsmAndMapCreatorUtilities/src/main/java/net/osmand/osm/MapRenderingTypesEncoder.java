@@ -361,6 +361,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			EntityConvertApplyType appType) {
 		tags = transformShieldTags(tags, entity, appType);
 		tags = transformIntegrityTags(tags, entity, appType);
+		tags = transformOpeningnHoursTags(tags, appType);
 		tags = transformChargingTags(tags, entity);
 		EntityConvertType filter = EntityConvertType.TAG_TRANSFORM;
 		List<EntityConvert> listToConvert = getApplicableConverts(tags, entity, filter, appType);
@@ -374,7 +375,23 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		return rtags;
 	}
 
-
+	private Map<String, String> transformOpeningnHoursTags(Map<String, String> tags, EntityConvertApplyType appType) {
+		if (appType == EntityConvertApplyType.POI && tags.get("opening_hours") != null) {
+			String oh = tags.get("opening_hours");
+			for (Entry<String, String> e : tags.entrySet()) {
+				if (e.getKey().startsWith("opening_hours:")) {
+					oh += " || " + e.getValue() + " \"" 
+							+ Algorithms.capitalizeFirstLetter(e.getKey().substring("opening_hours:".length())) + "\""; 
+				}
+			}
+			if (oh.length() > tags.get("opening_hours").length()) {				
+				tags = new LinkedHashMap<>(tags);
+				tags.put("opening_hours", oh);
+			}
+		}
+		return tags;
+	}
+	
 	private Map<String, String> transformChargingTags(Map<String, String> tags, EntityType entity) {
 		if (entity == EntityType.NODE) {
 			if (socketTypes == null) {
