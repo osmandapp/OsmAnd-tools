@@ -732,7 +732,7 @@ public class BasemapProcessor {
 				} else if(args[1].equals("detailed")) {
 					detailed = true;
 					zoomSmoothness = 2;
-					zooms = MapZooms.parseZooms("1-2;3;4-5;6-7;8-9;10-");
+					zooms = MapZooms.parseZooms("1-2;3;4-5;6-7;8-9;10-11;12-");
 					MOST_DETAILED_APPROXIMATION = 11;
 					fileName = "World_basemap_detailed_2.obf";
 				}
