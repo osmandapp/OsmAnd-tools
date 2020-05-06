@@ -875,9 +875,8 @@ public class IndexCreator {
 
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 //		String file = rootFolder + "/temp/netherlands_train.osm.gz";
-		String file = rootFolder + "/temp/belgium_train.osm.gz";
-//		String file = rootFolder + "/maps/wikivoyage.osm.gz";
-//		String file = rootFolder + "/maps/World_seamarks.pbf";
+//		String file = rootFolder + "/temp/belgium_train.osm.gz";
+		String file = rootFolder + "/temp/ukraine_kiev-city_europe.pbf";
 //		String file = rootFolder + "/repos/resources/test-resources/synthetic_test_rendering.osm";
 //		String file = rootFolder + "/repos/resources/test-resources/turn_lanes_test.osm";
 		int st = file.lastIndexOf('/');
