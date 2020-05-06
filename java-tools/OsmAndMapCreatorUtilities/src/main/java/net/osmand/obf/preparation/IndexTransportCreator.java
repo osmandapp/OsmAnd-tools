@@ -766,7 +766,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			if(hasRelationIncompleteWays(rel) && forwardStops.size() > 0 && 
 					directRoute.getForwardWays().size() > 1) {
 				List<Way> mergedWays = new ArrayList<>(directRoute.getForwardWays());
-				System.out.println(directRoute.getId() / 2 + " " + directRoute.getForwardWays().size()) ;
+				// System.out.println(" Process incomplete route: " + directRoute.getId() / 2 + " " + directRoute.getForwardWays().size()) ;
 				TransportRoute.mergeRouteWays(mergedWays);
 				TransportRoute.resortWaysToStopsOrder(mergedWays, forwardStops);
 				if(mergedWays.size() > 1) {
