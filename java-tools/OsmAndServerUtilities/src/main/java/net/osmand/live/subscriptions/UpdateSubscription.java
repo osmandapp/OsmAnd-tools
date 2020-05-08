@@ -33,6 +33,7 @@ import com.google.api.client.util.store.FileDataStoreFactory;
 import com.google.api.services.androidpublisher.AndroidPublisher;
 import com.google.api.services.androidpublisher.model.InAppProduct;
 import com.google.api.services.androidpublisher.model.InappproductsListResponse;
+import com.google.api.services.androidpublisher.model.IntroductoryPriceInfo;
 import com.google.api.services.androidpublisher.model.SubscriptionPurchase;
 import com.google.gson.JsonObject;
 
@@ -278,6 +279,17 @@ public class UpdateSubscription {
 				subscription = purchases.subscriptions().get(GOOGLE_PACKAGE_NAME_FREE, sku, pt).execute();
 			} else {
 				subscription = purchases.subscriptions().get(GOOGLE_PACKAGE_NAME, sku, pt).execute();
+			}
+			IntroductoryPriceInfo info = subscription.getIntroductoryPriceInfo();
+			System.out.println(String.format("Price: %d %s. IP: %d %s - %d cycles, %s period ", subscription.getPriceAmountMicros(), 
+					subscription.getPriceCurrencyCode(),
+					info == null ? 0 : info.getIntroductoryPriceAmountMicros(), 
+					info == null ? "" : info.getIntroductoryPriceCurrencyCode(),
+					info == null ? 0 : info.getIntroductoryPriceCycles(),
+					info == null ? "" : info.getIntroductoryPricePeriod(),
+							));
+			if(info != null) {
+				System.out.println(info.toPrettyString());
 			}
 			updateSubscriptionDb(userid, pt, sku, startTime, expireTime, tm, subscription);
 		} catch (IOException e) {
