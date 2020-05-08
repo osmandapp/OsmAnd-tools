@@ -105,7 +105,10 @@ public class UpdateSubscription {
 			this.publisher = publisher;
 			this.ios = false;
 			updQuery = "UPDATE supporters_device_sub SET " +
-					"checktime = ?, starttime = ?, expiretime = ?, autorenewing = ?, kind = ?, orderid = ?, payload = ?, valid = ? " +
+					" checktime = ?, starttime = ?, expiretime = ?, autorenewing = ?, " + 
+					" kind = ?, orderid = ?, payload = ?, " +
+					" price = ?, pricecurrency = ?, introprice = ?, intropricecurrency = ?, introcycles = ? , introcyclename = ?, " +
+					" valid = ? " +
 					"WHERE userid = ? and purchaseToken = ? and sku = ?";
 		}
 
@@ -120,7 +123,8 @@ public class UpdateSubscription {
 			super();
 			this.ios = true;
 			updQuery = "UPDATE supporters_device_sub SET " +
-					"checktime = ?, starttime = ?, expiretime = ?, autorenewing = ?, valid = ? " +
+					"checktime = ?, starttime = ?, expiretime = ?, autorenewing = ?, " + 
+					"valid = ? " +
 					"WHERE userid = ? and purchaseToken = ? and sku = ?";
 		}
 
@@ -280,17 +284,6 @@ public class UpdateSubscription {
 			} else {
 				subscription = purchases.subscriptions().get(GOOGLE_PACKAGE_NAME, sku, pt).execute();
 			}
-			IntroductoryPriceInfo info = subscription.getIntroductoryPriceInfo();
-			System.out.println(String.format("Price: %d %s. IP: %d %s - %d cycles, %s period ", subscription.getPriceAmountMicros(), 
-					subscription.getPriceCurrencyCode(),
-					info == null ? 0 : info.getIntroductoryPriceAmountMicros(), 
-					info == null ? "" : info.getIntroductoryPriceCurrencyCode(),
-					info == null ? 0 : info.getIntroductoryPriceCycles(),
-					info == null ? "" : info.getIntroductoryPricePeriod()
-							));
-			if(info != null) {
-				System.out.println(info.toPrettyString());
-			}
 			updateSubscriptionDb(userid, pt, sku, startTime, expireTime, tm, subscription);
 		} catch (IOException e) {
 			boolean gone = false;
@@ -385,6 +378,20 @@ public class UpdateSubscription {
 			updStat.setString(ind++, subscription.getKind());
 			updStat.setString(ind++, subscription.getOrderId());
 			updStat.setString(ind++, subscription.getDeveloperPayload());
+			updStat.setInt(ind++, (int) (subscription.getPriceAmountMicros() / 1000l));
+			updStat.setString(ind++, subscription.getPriceCurrencyCode());
+			IntroductoryPriceInfo info = subscription.getIntroductoryPriceInfo();
+			if (info != null) {
+				updStat.setInt(ind++, (int) (info.getIntroductoryPriceAmountMicros() / 1000l));
+				updStat.setString(ind++, info.getIntroductoryPriceCurrencyCode());
+				updStat.setInt(ind++, (int) info.getIntroductoryPriceCycles());
+				updStat.setString(ind++, info.getIntroductoryPricePeriod());
+			} else {
+				updStat.setNull(ind++, Types.INTEGER);
+				updStat.setNull(ind++, Types.VARCHAR);
+				updStat.setNull(ind++, Types.INTEGER);
+				updStat.setNull(ind++, Types.VARCHAR);
+			}
 		}
 		updStat.setBoolean(ind++, true);
 		updStat.setLong(ind++, userid);
