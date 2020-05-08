@@ -286,7 +286,7 @@ public class UpdateSubscription {
 					info == null ? 0 : info.getIntroductoryPriceAmountMicros(), 
 					info == null ? "" : info.getIntroductoryPriceCurrencyCode(),
 					info == null ? 0 : info.getIntroductoryPriceCycles(),
-					info == null ? "" : info.getIntroductoryPricePeriod(),
+					info == null ? "" : info.getIntroductoryPricePeriod()
 							));
 			if(info != null) {
 				System.out.println(info.toPrettyString());
