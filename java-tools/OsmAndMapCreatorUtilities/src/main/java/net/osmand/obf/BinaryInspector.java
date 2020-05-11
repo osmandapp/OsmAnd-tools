@@ -80,17 +80,18 @@ public class BinaryInspector {
 		if ("test".equals(args[0])) {
 			in.inspector(new String[] {
 //					"-vpoi",
-//					"-vmap", "-vmapobjects",
+					"-vmap", "-vmapobjects",
 //					"-vmapcoordinates",
 //					"-vrouting",
-					"-vtransport", "-vtransportschedule",
+//					"-vtransport", "-vtransportschedule",
 //					"-vaddress", "-vcities","-vstreetgroups",
 //					"-vstreets", "-vbuildings", "-vintersections",
 //					"-lang=ru",
 //					"-zoom=6",
-//					"-bbox=4.890,52.37,4.892,52.3692",
-//					"-osm="+System.getProperty("maps.dir")+"/map.obf.osm",
-					System.getProperty("maps.dir")+"/Netherlands_train.obf"
+					"-bbox=37.5,49.3,37.6,49.2",
+					"-osm="+System.getProperty("maps.dir")+"/map.obf.osm",
+//					System.getProperty("maps.dir")+"/Russia_moscow_asia_2.obf"
+					System.getProperty("maps.dir")+"/Ukraine_kharkiv_europe_17_15.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
 		} else {
