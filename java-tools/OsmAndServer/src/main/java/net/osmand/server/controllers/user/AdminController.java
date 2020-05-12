@@ -655,7 +655,7 @@ public class AdminController {
 		public long valueEnd;
 		@Override
 		public String toString() {
-			return String.format("%d + %d (- %d) <br> € %d + € %d (- € %d)", totalNew / 1000, totalOld / 1000, totalEnd / 1000, 
+			return String.format("%d + %d (- %d) <br> € %d + € %d (- € %d)", totalNew, totalOld, totalEnd, 
 					valueNew / 1000, valueOld / 1000, valueEnd / 1000);
 		}
 		
