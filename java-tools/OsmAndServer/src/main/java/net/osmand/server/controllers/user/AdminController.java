@@ -1037,13 +1037,13 @@ public class AdminController {
 				priceEurMillis = (int) (((double) introPriceMillis * priceEurMillis) / priceMillis);
 			}
 			double rate = rts.getEurRate(pricecurrency, startPeriodTime);
-			if(rate > 0) {
-				if (introPriceMillis >= 0 && currentPeriod == 0) { 
-					priceEurMillis =(int) (introPriceMillis / rate);
-				} else {
-					priceEurMillis = (int) (priceMillis / rate);
-				}
-			} 
+//			if(rate > 0) {
+//				if (introPriceMillis >= 0 && currentPeriod == 0) {
+//					priceEurMillis =(int) (introPriceMillis / rate);
+//				} else {
+//					priceEurMillis = (int) (priceMillis / rate);
+//				}
+//			} 
 		}
 		
 	}
