@@ -1026,10 +1026,10 @@ public class AdminController {
 		protected int priceEurMillis;
 		
 		public void buildUp(Date time, int period, ExchangeRates rts) {
-			startPeriodTime = time.getTime();
-			startPeriodDay = dayFormat.format(time.getTime());
-			startPeriodMonth = monthFormat.format(time.getTime());
-			currentPeriod = period;
+			this.startPeriodTime = time.getTime();
+			this.startPeriodDay = dayFormat.format(time.getTime());
+			this.startPeriodMonth = monthFormat.format(time.getTime());
+			this.currentPeriod = period;
 			
 			
 			priceEurMillis = defPriceEurMillis;
@@ -1037,13 +1037,13 @@ public class AdminController {
 				priceEurMillis = (int) (((double) introPriceMillis * priceEurMillis) / priceMillis);
 			}
 			double rate = rts.getEurRate(pricecurrency, startPeriodTime);
-//			if(rate > 0) {
-//				if (introPriceMillis >= 0 && currentPeriod == 0) {
-//					priceEurMillis =(int) (introPriceMillis / rate);
-//				} else {
-//					priceEurMillis = (int) (priceMillis / rate);
-//				}
-//			} 
+			if(rate > 0) {
+				if (introPriceMillis >= 0 && currentPeriod == 0) {
+					priceEurMillis =(int) (introPriceMillis / rate);
+				} else {
+					priceEurMillis = (int) (priceMillis / rate);
+				}
+			} 
 		}
 		
 	}
