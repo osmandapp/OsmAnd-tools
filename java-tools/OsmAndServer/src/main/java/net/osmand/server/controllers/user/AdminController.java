@@ -693,7 +693,7 @@ public class AdminController {
 			if (filterDuration != -1 && filterDuration != sub.durationMonth) {
 				return;
 			}
-			int eurMillis = sub.defPriceEurMillis;
+			int eurMillis = sub.priceEurMillis;
 			
 			if (sub.currentPeriod > 0) {
 				value.totalOld++;
@@ -986,8 +986,8 @@ public class AdminController {
 
 		public Subscription() {
 		}
+		
 		public Subscription(Subscription s) {
-			this.introPriceMillis = s.introPriceMillis;
 			this.valid = s.valid;
 			this.autorenewing = s.autorenewing;
 			this.startTime = s.startTime;
@@ -995,12 +995,14 @@ public class AdminController {
 			this.pricecurrency = s.pricecurrency;
 			this.sku = s.sku;
 			this.priceMillis = s.priceMillis;
+			this.introPriceMillis = s.introPriceMillis;
 			this.durationMonth = s.durationMonth;
 			this.app = s.app;
 			this.defPriceEurMillis = s.defPriceEurMillis;
 			this.totalPeriods = s.totalPeriods;
 		}
 		
+		protected int priceMillis;
 		protected int introPriceMillis;
 		protected boolean valid;
 		protected boolean autorenewing;
@@ -1008,7 +1010,6 @@ public class AdminController {
 		protected long endTime;
 		protected String pricecurrency;
 		protected String sku;
-		protected int priceMillis;
 		// from sku
 		protected int durationMonth;
 		protected SubAppType app;
@@ -1043,7 +1044,7 @@ public class AdminController {
 				} else {
 					priceEurMillis = (int) (priceMillis / rate);
 				}
-			} 
+			}
 		}
 		
 	}
