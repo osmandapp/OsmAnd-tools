@@ -807,7 +807,7 @@ public class AdminController {
 		ExchangeRates rates = parseExchangeRates();
 		
 		jdbcTemplate.query(
-				"select sku, price, pricecurrency, introprice, starttime, expiretime, autorenewing, valid from supporters_device_sub",
+				"select sku, price, pricecurrency, coalesce(introprice, -1), starttime, expiretime, autorenewing, valid from supporters_device_sub",
 				new RowCallbackHandler() {
 
 					@Override
@@ -839,9 +839,6 @@ public class AdminController {
 						s.priceMillis = rs.getInt(2);
 						s.pricecurrency = rs.getString(3);
 						s.introPriceMillis = rs.getInt(4);
-						if (rs.wasNull()) {
-							s.introPriceMillis = -1;
-						}
 						s.startTime = rs.getDate(5).getTime();
 						s.endTime = rs.getDate(6).getTime();
 						s.autorenewing = rs.getBoolean(7);
@@ -1036,7 +1033,7 @@ public class AdminController {
 			
 			
 			priceEurMillis = defPriceEurMillis;
-			if (introPriceMillis > 0 && currentPeriod == 0 && priceMillis > 0) {
+			if (introPriceMillis >= 0 && currentPeriod == 0 && priceMillis > 0) {
 				priceEurMillis = (int) (((double) introPriceMillis * priceEurMillis) / priceMillis);
 			}
 			double rate = rts.getEurRate(pricecurrency, startPeriodTime);
