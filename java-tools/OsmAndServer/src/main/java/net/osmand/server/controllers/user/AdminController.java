@@ -670,6 +670,7 @@ public class AdminController {
 	public static class AdminGenericSubReportColumn {
 		private Set<SubAppType> filterApp = null;
 		private int filterDuration = -1;
+		private Boolean discount;
 		public final String name;
 		
 		public AdminGenericSubReportColumn(String name) {
@@ -685,6 +686,10 @@ public class AdminController {
 			this.filterDuration = duration;
 			return this;
 		}
+		public AdminGenericSubReportColumn discount(boolean discount) {
+			this.discount = discount;
+			return this;
+		}
 		
 		public void process(Subscription sub, AdminGenericSubReportColumnValue value) {
 			if (filterApp != null && !filterApp.contains(sub.app)) {
@@ -692,6 +697,12 @@ public class AdminController {
 			}
 			if (filterDuration != -1 && filterDuration != sub.durationMonth) {
 				return;
+			}
+			if (discount != null) {
+				boolean d = sub.sku.contains("v2") || sub.introPriceMillis >= 0;
+				if (d != discount) {
+					return;
+				}
 			}
 			int eurMillis = sub.priceEurMillis;
 			
@@ -710,6 +721,8 @@ public class AdminController {
 		public AdminGenericSubReportColumnValue initValue() {
 			return new AdminGenericSubReportColumnValue();
 		}
+
+		
 	}
 	
 	public static class AdminGenericSubReport {
@@ -733,10 +746,12 @@ public class AdminController {
 		AdminGenericSubReport report = new AdminGenericSubReport();
 		report.month = true;
 		report.count = 24;
-		String h = "<br>New + Renew - Cancel";
+		String h = ""; //"<br>New + Renew <br> - Cancel";
 		report.columns.add(new AdminGenericSubReportColumn("All"));
-		report.columns.add(new AdminGenericSubReportColumn("A Y" + h).app(SubAppType.OSMAND).duration(12));
-		report.columns.add(new AdminGenericSubReportColumn("A+ Y" + h).app(SubAppType.OSMAND_PLUS).duration(12));
+		report.columns.add(new AdminGenericSubReportColumn("A Y" + h).app(SubAppType.OSMAND).discount(false).duration(12));
+		report.columns.add(new AdminGenericSubReportColumn("A+ Y" + h).app(SubAppType.OSMAND_PLUS).discount(false).duration(12));
+		report.columns.add(new AdminGenericSubReportColumn("A/2 Y" + h).app(SubAppType.OSMAND).discount(true).duration(12));
+		report.columns.add(new AdminGenericSubReportColumn("A+/2 Y" + h).app(SubAppType.OSMAND_PLUS).discount(true).duration(12));
 		report.columns.add(new AdminGenericSubReportColumn("A Q" + h).app(SubAppType.OSMAND).duration(3));
 		report.columns.add(new AdminGenericSubReportColumn("A+ Q" + h).app(SubAppType.OSMAND_PLUS).duration(3));
 		report.columns.add(new AdminGenericSubReportColumn("A M" + h).app(SubAppType.OSMAND).duration(1));
