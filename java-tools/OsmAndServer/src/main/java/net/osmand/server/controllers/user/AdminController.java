@@ -690,16 +690,19 @@ public class AdminController {
 			if (filterDuration != -1 && filterDuration != sub.durationMonth) {
 				return;
 			}
-			
+			int eurMillis = sub.priceEurMillis;
+			if (sub.introPriceMillis > 0) {
+				eurMillis = (int) (((double) sub.introPriceMillis * sub.priceEurMillis) / sub.priceMillis);
+			}
 			if (sub.currentPeriod > 0) {
 				value.totalOld++;
-				value.valueOld += sub.priceEurMillis;
+				value.valueOld += eurMillis;
 			} else if (sub.currentPeriod == 0) {
 				value.totalNew++;
-				value.valueNew += sub.priceEurMillis;
+				value.valueNew += eurMillis;
 			} else {
 				value.totalEnd++;
-				value.valueEnd += sub.priceEurMillis;
+				value.valueEnd += eurMillis;
 			}
 		}
 
