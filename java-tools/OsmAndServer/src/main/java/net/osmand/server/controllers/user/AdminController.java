@@ -655,10 +655,11 @@ public class AdminController {
 		public long valueEnd;
 		@Override
 		public String toString() {
-			return String.format("+ %d € %d <br>+ %d € %d <br>- %d € %d", 
+			return String.format("%d + %d - %d<br> € %d + %d - %d<br><b>€ %d</b>", 
 					totalNew, valueNew / 1000, 
 					totalOld, valueOld / 1000, 
-					totalEnd, valueEnd / 1000);
+					totalEnd, valueEnd / 1000, 
+					(valueNew + valueOld) / 1000);
 		}
 		
 	}
@@ -728,15 +729,17 @@ public class AdminController {
 		AdminGenericSubReport report = new AdminGenericSubReport();
 		report.month = true;
 		report.count = 24;
-		report.columns.add(new AdminGenericSubReportColumn("A Y").app(SubAppType.OSMAND).duration(12));
-		report.columns.add(new AdminGenericSubReportColumn("A+ Y").app(SubAppType.OSMAND_PLUS).duration(12));
-		report.columns.add(new AdminGenericSubReportColumn("A Q").app(SubAppType.OSMAND).duration(3));
-		report.columns.add(new AdminGenericSubReportColumn("A+ Q").app(SubAppType.OSMAND_PLUS).duration(3));
-		report.columns.add(new AdminGenericSubReportColumn("A M").app(SubAppType.OSMAND).duration(1));
-		report.columns.add(new AdminGenericSubReportColumn("A+ M").app(SubAppType.OSMAND_PLUS).duration(1));
-		report.columns.add(new AdminGenericSubReportColumn("I Y").app(SubAppType.IOS).duration(12));
-		report.columns.add(new AdminGenericSubReportColumn("I Q").app(SubAppType.IOS).duration(3));
-		report.columns.add(new AdminGenericSubReportColumn("I M").app(SubAppType.IOS).duration(1));
+		String h = "<br>New + Renew - Cancel";
+		report.columns.add(new AdminGenericSubReportColumn("All"));
+		report.columns.add(new AdminGenericSubReportColumn("A Y" + h).app(SubAppType.OSMAND).duration(12));
+		report.columns.add(new AdminGenericSubReportColumn("A+ Y" + h).app(SubAppType.OSMAND_PLUS).duration(12));
+		report.columns.add(new AdminGenericSubReportColumn("A Q" + h).app(SubAppType.OSMAND).duration(3));
+		report.columns.add(new AdminGenericSubReportColumn("A+ Q" + h).app(SubAppType.OSMAND_PLUS).duration(3));
+		report.columns.add(new AdminGenericSubReportColumn("A M" + h).app(SubAppType.OSMAND).duration(1));
+		report.columns.add(new AdminGenericSubReportColumn("A+ M" + h).app(SubAppType.OSMAND_PLUS).duration(1));
+		report.columns.add(new AdminGenericSubReportColumn("I Y" + h).app(SubAppType.IOS).duration(12));
+		report.columns.add(new AdminGenericSubReportColumn("I Q" + h).app(SubAppType.IOS).duration(3));
+		report.columns.add(new AdminGenericSubReportColumn("I M" + h).app(SubAppType.IOS).duration(1));
 		
 		buildReport(report);
 		return report;
