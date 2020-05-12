@@ -650,12 +650,13 @@ public class AdminController {
 		public int totalNew;
 		public int totalOld;
 		public int totalEnd;
-		public int valueNew;
-		public int valueOld;
-		public int valueEnd;
+		public long valueNew;
+		public long valueOld;
+		public long valueEnd;
 		@Override
 		public String toString() {
-			return String.format("%d + %d (- %d) <br> € %d + € %d (- € %d)", totalNew, totalOld, totalEnd, valueNew, valueOld, valueOld);
+			return String.format("%d + %d (- %d) <br> € %d + € %d (- € %d)", totalNew / 1000, totalOld / 1000, totalEnd / 1000, 
+					valueNew / 1000, valueOld / 1000, valueEnd / 1000);
 		}
 		
 	}
@@ -688,11 +689,11 @@ public class AdminController {
 			}
 			
 			if (sub.currentPeriod > 0) {
-				value.totalNew++;
-				value.valueNew += sub.priceEurMillis;
-			} else if (sub.currentPeriod == 0) {
 				value.totalOld++;
 				value.valueOld += sub.priceEurMillis;
+			} else if (sub.currentPeriod == 0) {
+				value.totalNew++;
+				value.valueNew += sub.priceEurMillis;
 			} else {
 				value.totalEnd++;
 				value.valueEnd += sub.priceEurMillis;
