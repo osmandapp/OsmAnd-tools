@@ -330,8 +330,9 @@ public class AdminController {
 		model.addAttribute("downloadServers", getDownloadSettings());
 		model.addAttribute("reports", getReports());
 		model.addAttribute("surveyReport", getSurveyReport());
-		List<Subscription> subs = parseSubsscriptions();
-		model.addAttribute("testSubReport", getTestSubsReport(subs));
+		
+		List<Subscription> allSubs = parseSubscriptions();
+		model.addAttribute("testSubReport", getMonthlyRevenueReport(allSubs));
 		
 		model.addAttribute("subscriptionsReport", getSubscriptionsReport());
 		model.addAttribute("yearSubscriptionsReport", getYearSubscriptionsReport());
@@ -728,7 +729,7 @@ public class AdminController {
 	}
 	
 	
-	private AdminGenericSubReport getTestSubsReport(List<Subscription> subs) {
+	private AdminGenericSubReport getMonthlyRevenueReport(List<Subscription> subs) {
 		AdminGenericSubReport report = new AdminGenericSubReport();
 		report.month = true;
 		report.count = 24;
@@ -800,7 +801,7 @@ public class AdminController {
 	}
 
 
-	private List<Subscription> parseSubsscriptions() {
+	private List<Subscription> parseSubscriptions() {
 		Calendar c = Calendar.getInstance();
 		List<Subscription> subs = new ArrayList<AdminController.Subscription>();
 		ExchangeRates rates = parseExchangeRates();
@@ -867,7 +868,7 @@ public class AdminController {
 	private ExchangeRates parseExchangeRates() {
 		SimpleDateFormat dayFormat = new SimpleDateFormat("yyyy-MM-dd");
 		ExchangeRates rates = new ExchangeRates();
-		jdbcTemplate.query("select currency, month, eurrate exchange_rates", new RowCallbackHandler() {
+		jdbcTemplate.query("select currency, month, eurrate from exchange_rates", new RowCallbackHandler() {
 
 			@Override
 			public void processRow(ResultSet rs) throws SQLException {
