@@ -731,7 +731,7 @@ public class AdminController {
 		Calendar c = Calendar.getInstance();
 		c.setTimeInMillis(System.currentTimeMillis());
 		for (int i = 0; i < report.count; i++) {
-			c.add(-1, report.month ? Calendar.MONTH : Calendar.DAY_OF_MONTH);
+			c.add(report.month ? Calendar.MONTH : Calendar.DAY_OF_MONTH, -1);
 			List<AdminGenericSubReportColumnValue> lst = new ArrayList<>();
 			for(AdminGenericSubReportColumn col : report.columns) {
 				lst.add(col.initValue());
@@ -751,7 +751,7 @@ public class AdminController {
 						Subscription main = createSub(rs);
 						c.setTimeInMillis(main.startTime);
 						if (main.totalPeriods > 1) {
-							c.add(main.durationMonth, Calendar.MONTH);
+							c.add(Calendar.MONTH, main.durationMonth);
 							main.endPeriod = dateFormat.format(c.getTime());
 						}
 						report.addResult(main);
@@ -760,7 +760,7 @@ public class AdminController {
 							Subscription nextPeriod = new Subscription(main);
 
 							nextPeriod.startPeriod = prev.startPeriod;
-							c.add(main.durationMonth, Calendar.MONTH);
+							c.add(Calendar.MONTH, main.durationMonth);
 							nextPeriod.endPeriod = dateFormat.format(c.getTime());
 							nextPeriod.startPeriod = prev.endPeriod;
 							nextPeriod.currentPeriod = i;
