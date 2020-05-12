@@ -11,9 +11,11 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Calendar;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.EnumSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -328,6 +330,7 @@ public class AdminController {
 		model.addAttribute("downloadServers", getDownloadSettings());
 		model.addAttribute("reports", getReports());
 		model.addAttribute("surveyReport", getSurveyReport());
+		model.addAttribute("testSubReport", getTestSubsReport());
 		model.addAttribute("subscriptionsReport", getSubscriptionsReport());
 		model.addAttribute("yearSubscriptionsReport", getYearSubscriptionsReport());
 		model.addAttribute("emailsReport", getEmailsDBReport());
@@ -632,7 +635,6 @@ public class AdminController {
 	}
 	
 	private List<SubscriptionReport> getFutureCancelReport() {
-
 		List<SubscriptionReport> result = jdbcTemplate
 				.query(
 						"select date_trunc('day', expiretime) d,  count(*), sku,  EXTRACT(DAY FROM sum(expiretime-starttime)) " +
@@ -642,6 +644,176 @@ public class AdminController {
 		mergeSubscriptionReports(result);
 		return result;
 	}	
+	
+	
+	public static class AdminGenericSubReportColumnValue {
+		public int total;
+		@Override
+		public String toString() {
+			return String.format("%d", total);
+		}
+		
+	}
+	
+	public static class AdminGenericSubReportColumn {
+		private Set<SubAppType> filterApp = null;
+		private int filterDuration = -1;
+		public final String name;
+		
+		public AdminGenericSubReportColumn(String name) {
+			this.name = name;
+		}
+		
+		public AdminGenericSubReportColumn app(SubAppType... vls) {
+			this.filterApp = EnumSet.of(vls[0], vls);
+			return this;
+		}
+		
+		public AdminGenericSubReportColumn duration(int duration) {
+			this.filterDuration = duration;
+			return this;
+		}
+		
+		public void process(Subscription sub, AdminGenericSubReportColumnValue value) {
+			if (filterApp != null && !filterApp.contains(sub.app)) {
+				return;
+			}
+			if (filterDuration != -1 && filterDuration != sub.durationMonth) {
+				return;
+			}
+			value.total++;
+		}
+
+		public AdminGenericSubReportColumnValue initValue() {
+			return new AdminGenericSubReportColumnValue();
+		}
+	}
+	
+	public static class AdminGenericSubReport {
+		public boolean month; // month or day
+		public int count; 
+		public List<AdminGenericSubReportColumn> columns = new ArrayList<>();
+		public Map<String, List<AdminGenericSubReportColumnValue>> values = new LinkedHashMap<>();
+
+		public void addResult(Subscription s) {
+			List<AdminGenericSubReportColumnValue> vls = values.get(s.startPeriod);
+			if (vls != null) {
+				for (int i = 0; i < columns.size(); i++) {
+					columns.get(i).process(s, vls.get(i));
+				}
+			}
+		}
+	}
+	
+	
+	private AdminGenericSubReport getTestSubsReport() {
+		AdminGenericSubReport report = new AdminGenericSubReport();
+		report.month = true;
+		report.count = 24;
+		report.columns.add(new AdminGenericSubReportColumn("A M").app(SubAppType.OSMAND).duration(1));
+		report.columns.add(new AdminGenericSubReportColumn("A Q").app(SubAppType.OSMAND).duration(3));
+		report.columns.add(new AdminGenericSubReportColumn("A Y").app(SubAppType.OSMAND).duration(12));
+		report.columns.add(new AdminGenericSubReportColumn("A+ M").app(SubAppType.OSMAND_PLUS).duration(1));
+		report.columns.add(new AdminGenericSubReportColumn("A+ Q").app(SubAppType.OSMAND_PLUS).duration(3));
+		report.columns.add(new AdminGenericSubReportColumn("A+ Y").app(SubAppType.OSMAND_PLUS).duration(12));
+		report.columns.add(new AdminGenericSubReportColumn("I M").app(SubAppType.IOS).duration(1));
+		report.columns.add(new AdminGenericSubReportColumn("I Q").app(SubAppType.IOS).duration(3));
+		report.columns.add(new AdminGenericSubReportColumn("I Y").app(SubAppType.IOS).duration(12));
+		
+		buildReport(report);
+		return report;
+	}
+
+
+	private void buildReport(AdminGenericSubReport report) {
+		SimpleDateFormat dateFormat = report.month ? new SimpleDateFormat("yyyy-MM")
+				: new SimpleDateFormat("yyyy-MM-dd");
+		Calendar c = Calendar.getInstance();
+		c.setTimeInMillis(System.currentTimeMillis());
+		for (int i = 0; i < report.count; i++) {
+			c.add(-1, report.month ? Calendar.MONTH : Calendar.DAY_OF_MONTH);
+			List<AdminGenericSubReportColumnValue> lst = new ArrayList<>();
+			for(AdminGenericSubReportColumn col : report.columns) {
+				lst.add(col.initValue());
+			}
+			report.values.put(dateFormat.format(c.getTime()), lst);
+		}
+
+		jdbcTemplate.query(
+				"select sku, price, pricecurrency, introprice, starttime, expiretime, autorenewing, valid from supporters_device_sub",
+				new RowCallbackHandler() {
+
+					@Override
+					public void processRow(ResultSet rs) throws SQLException {
+						if (rs.getDate(5) == null || rs.getDate(6) == null) {
+							return;
+						}
+						Subscription main = createSub(rs);
+						c.setTimeInMillis(main.startTime);
+						if (main.totalPeriods > 1) {
+							c.add(main.durationMonth, Calendar.MONTH);
+							main.endPeriod = dateFormat.format(c.getTime());
+						}
+						report.addResult(main);
+						Subscription prev = main;
+						for (int i = 1; i < main.totalPeriods; i++) {
+							Subscription nextPeriod = new Subscription(main);
+
+							nextPeriod.startPeriod = prev.startPeriod;
+							c.add(main.durationMonth, Calendar.MONTH);
+							nextPeriod.endPeriod = dateFormat.format(c.getTime());
+							nextPeriod.startPeriod = prev.endPeriod;
+							nextPeriod.currentPeriod = i;
+
+							report.addResult(nextPeriod);
+
+							prev = nextPeriod;
+						}
+					}
+
+					private Subscription createSub(ResultSet rs) throws SQLException {
+						Subscription s = new Subscription();
+						s.sku = rs.getString(1);
+						s.priceMillis = rs.getInt(2);
+						s.pricecurrency = rs.getString(3);
+						s.introPriceMillis = rs.getInt(4);
+						if (rs.wasNull()) {
+							s.introPriceMillis = -1;
+						}
+						s.startTime = rs.getDate(5).getTime();
+						s.endTime = rs.getDate(6).getTime();
+						s.autorenewing = rs.getBoolean(7);
+						s.valid = rs.getBoolean(8);
+						setDefaultSkuValues(s);
+						s.totalPeriods = (int) Math
+								.round((s.endTime - s.startTime) / (1000.0 * 24 * 24 * 60 * 30 * s.durationMonth));
+						s.startPeriod = dateFormat.format(s.startTime);
+						s.endPeriod = dateFormat.format(s.endTime);
+						return s;
+					}
+				});
+	}
+	
+	private void setDefaultSkuValues(Subscription s) {
+		switch(s.sku) {
+		case "osm_free_live_subscription_2": s.app = SubAppType.OSMAND; s.durationMonth = 1; s.priceEurMillis = 1800; break;
+		case "osm_live_subscription_2": s.app = SubAppType.OSMAND_PLUS; s.durationMonth = 1; s.priceEurMillis = 1200; break;
+		
+		case "osm_live_subscription_annual_free_v1": s.app = SubAppType.OSMAND; s.durationMonth = 12; s.priceEurMillis = 8000; break;
+		case "osm_live_subscription_annual_full_v1": s.app = SubAppType.OSMAND_PLUS; s.durationMonth = 12; s.priceEurMillis = 6000;  break;
+		case "osm_live_subscription_annual_free_v2": s.app = SubAppType.OSMAND; s.durationMonth = 12; s.priceEurMillis = 4000; break;
+		case "osm_live_subscription_annual_full_v2": s.app = SubAppType.OSMAND_PLUS;  s.durationMonth = 12; s.priceEurMillis = 3000; break;
+		case "osm_live_subscription_3_months_free_v1": s.app = SubAppType.OSMAND; s.durationMonth = 3; s.priceEurMillis = 4000; break;
+		case "osm_live_subscription_3_months_full_v1": s.app = SubAppType.OSMAND_PLUS; s.durationMonth = 3; s.priceEurMillis = 3000; break;
+		case "osm_live_subscription_monthly_free_v1": s.app = SubAppType.OSMAND; s.durationMonth = 1; s.priceEurMillis = 2000; break;
+		case "osm_live_subscription_monthly_full_v1": s.app = SubAppType.OSMAND_PLUS;  s.durationMonth = 1; s.priceEurMillis = 1500;  break;
+
+		case "net.osmand.maps.subscription.monthly_v1":s.app = SubAppType.IOS; s.durationMonth = 1; s.priceEurMillis = 2000; break;
+		case "net.osmand.maps.subscription.3months_v1": s.app = SubAppType.IOS; s.durationMonth = 3; s.priceEurMillis = 4000; break;
+		case "net.osmand.maps.subscription.annual_v1": s.app = SubAppType.IOS; s.durationMonth = 12; s.priceEurMillis = 8000; break;
+		default: throw new UnsupportedOperationException("Unsupported subscription " + s.sku);
+		};
+	}
 	
 	private List<NewSubscriptionReport> getNewSubsReport() {
 		List<SubscriptionReport> cancelled = jdbcTemplate
@@ -707,6 +879,55 @@ public class AdminController {
 			}
 		}
 		return result;
+	}
+	
+	public static class SubscriptionMonthReport {
+		public String date;
+	}
+	
+	public static enum SubAppType {
+		OSMAND_PLUS,
+		IOS,
+		OSMAND
+	}
+	public static class Subscription {
+		
+		public Subscription() {
+		}
+		public Subscription(Subscription s) {
+			this.introPriceMillis = s.introPriceMillis;
+			this.valid = s.valid;
+			this.autorenewing = s.autorenewing;
+			this.startTime = s.startTime;
+			this.endTime = s.endTime;
+			this.pricecurrency = s.pricecurrency;
+			this.sku = s.sku;
+			this.priceMillis = s.priceMillis;
+			this.durationMonth = s.durationMonth;
+			this.app = s.app;
+			this.priceEurMillis = s.priceEurMillis;
+			this.totalPeriods = s.totalPeriods;
+		}
+		
+		protected int introPriceMillis;
+		protected boolean valid;
+		protected boolean autorenewing;
+		protected long startTime;
+		protected long endTime;
+		protected String pricecurrency;
+		protected String sku;
+		protected int priceMillis;
+		// from sku
+		protected int durationMonth;
+		protected SubAppType app;
+		protected int priceEurMillis;
+		
+		// period number
+		protected int totalPeriods;
+		protected int currentPeriod;
+		protected String startPeriod;
+		protected String endPeriod;
+		
 	}
 	
 	public static class SubscriptionReport {
