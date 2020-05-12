@@ -647,10 +647,15 @@ public class AdminController {
 	
 	
 	public static class AdminGenericSubReportColumnValue {
-		public int total;
+		public int totalNew;
+		public int totalOld;
+		public int totalEnd;
+		public int valueNew;
+		public int valueOld;
+		public int valueEnd;
 		@Override
 		public String toString() {
-			return String.format("%d", total);
+			return String.format("%d + %d (- %d) <br> € %d + € %d (- € %d)", totalNew, totalOld, totalEnd, valueEnd);
 		}
 		
 	}
@@ -681,7 +686,17 @@ public class AdminController {
 			if (filterDuration != -1 && filterDuration != sub.durationMonth) {
 				return;
 			}
-			value.total++;
+			
+			if (sub.currentPeriod > 0) {
+				value.totalNew++;
+				value.valueNew += sub.priceEurMillis;
+			} else if (sub.currentPeriod == 0) {
+				value.totalOld++;
+				value.valueOld += sub.priceEurMillis;
+			} else {
+				value.totalEnd++;
+				value.valueEnd += sub.priceEurMillis;
+			}
 		}
 
 		public AdminGenericSubReportColumnValue initValue() {
@@ -731,12 +746,12 @@ public class AdminController {
 		Calendar c = Calendar.getInstance();
 		c.setTimeInMillis(System.currentTimeMillis());
 		for (int i = 0; i < report.count; i++) {
-			c.add(report.month ? Calendar.MONTH : Calendar.DAY_OF_MONTH, -1);
 			List<AdminGenericSubReportColumnValue> lst = new ArrayList<>();
 			for(AdminGenericSubReportColumn col : report.columns) {
 				lst.add(col.initValue());
 			}
 			report.values.put(dateFormat.format(c.getTime()), lst);
+			c.add(report.month ? Calendar.MONTH : Calendar.DAY_OF_MONTH, -1);
 		}
 
 		jdbcTemplate.query(
@@ -749,6 +764,9 @@ public class AdminController {
 							return;
 						}
 						Subscription main = createSub(rs);
+						if (main.totalPeriods <= 0) {
+							return;
+						}
 						c.setTimeInMillis(main.startTime);
 						if (main.totalPeriods > 1) {
 							c.add(Calendar.MONTH, main.durationMonth);
@@ -766,9 +784,13 @@ public class AdminController {
 							nextPeriod.currentPeriod = i;
 
 							report.addResult(nextPeriod);
-
 							prev = nextPeriod;
 						}
+						c.setTimeInMillis(main.endTime);
+						Subscription endPeriod = new Subscription(main);
+						endPeriod.startPeriod = dateFormat.format(c.getTime());
+						endPeriod.currentPeriod = -1;
+						report.addResult(endPeriod);
 					}
 
 					private Subscription createSub(ResultSet rs) throws SQLException {
