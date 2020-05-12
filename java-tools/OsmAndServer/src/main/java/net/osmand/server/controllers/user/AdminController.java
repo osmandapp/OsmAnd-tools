@@ -330,7 +330,9 @@ public class AdminController {
 		model.addAttribute("downloadServers", getDownloadSettings());
 		model.addAttribute("reports", getReports());
 		model.addAttribute("surveyReport", getSurveyReport());
-		model.addAttribute("testSubReport", getTestSubsReport());
+		List<Subscription> subs = parseSubsscriptions();
+		model.addAttribute("testSubReport", getTestSubsReport(subs));
+		
 		model.addAttribute("subscriptionsReport", getSubscriptionsReport());
 		model.addAttribute("yearSubscriptionsReport", getYearSubscriptionsReport());
 		model.addAttribute("emailsReport", getEmailsDBReport());
@@ -690,10 +692,8 @@ public class AdminController {
 			if (filterDuration != -1 && filterDuration != sub.durationMonth) {
 				return;
 			}
-			int eurMillis = sub.priceEurMillis;
-			if (sub.introPriceMillis > 0) {
-				eurMillis = (int) (((double) sub.introPriceMillis * sub.priceEurMillis) / sub.priceMillis);
-			}
+			int eurMillis = sub.defPriceEurMillis;
+			
 			if (sub.currentPeriod > 0) {
 				value.totalOld++;
 				value.valueOld += eurMillis;
@@ -718,7 +718,7 @@ public class AdminController {
 		public Map<String, List<AdminGenericSubReportColumnValue>> values = new LinkedHashMap<>();
 
 		public void addResult(Subscription s) {
-			List<AdminGenericSubReportColumnValue> vls = values.get(s.startPeriod);
+			List<AdminGenericSubReportColumnValue> vls = values.get(month ? s.startPeriodMonth : s.startPeriodDay);
 			if (vls != null) {
 				for (int i = 0; i < columns.size(); i++) {
 					columns.get(i).process(s, vls.get(i));
@@ -728,7 +728,7 @@ public class AdminController {
 	}
 	
 	
-	private AdminGenericSubReport getTestSubsReport() {
+	private AdminGenericSubReport getTestSubsReport(List<Subscription> subs) {
 		AdminGenericSubReport report = new AdminGenericSubReport();
 		report.month = true;
 		report.count = 24;
@@ -743,15 +743,47 @@ public class AdminController {
 		report.columns.add(new AdminGenericSubReportColumn("I Y" + h).app(SubAppType.IOS).duration(12));
 		report.columns.add(new AdminGenericSubReportColumn("I Q" + h).app(SubAppType.IOS).duration(3));
 		report.columns.add(new AdminGenericSubReportColumn("I M" + h).app(SubAppType.IOS).duration(1));
-		
-		buildReport(report);
+		buildReport(report, subs);
 		return report;
 	}
+	
+	private static class ExchangeRate {
+		private long time;
+		private double eurRate;
+	}
+	
+	private static class ExchangeRates {
+		Map<String, List<ExchangeRate>> currencies = new LinkedHashMap<>();
 
+		public void add(String cur, long time, double eurRate) {
+			ExchangeRate r = new ExchangeRate();
+			r.time = time;
+			r.eurRate = eurRate;
+			if(currencies.containsKey(cur)) {
+				currencies.put(cur, new ArrayList<>());
+			}
+			currencies.get(cur).add(r);
+		}
+		
+		public double getEurRate(String cur, long time) {
+			List<ExchangeRate> lst = currencies.get(cur);
+			if (lst != null) {
+				ExchangeRate ne = lst.get(0);
+				for (int i = 1; i < lst.size(); i++) {
+					if (Math.abs(time - lst.get(i).time) < Math.abs(time - ne.time)) {
+						ne = lst.get(i);
+					}
+				}
+				return ne.eurRate;
+			}
+			return 0;
+		}
+		
+	}
 
-	private void buildReport(AdminGenericSubReport report) {
-		SimpleDateFormat dateFormat = report.month ? new SimpleDateFormat("yyyy-MM")
-				: new SimpleDateFormat("yyyy-MM-dd");
+	private void buildReport(AdminGenericSubReport report, List<Subscription> subs) {
+		SimpleDateFormat dayFormat = new SimpleDateFormat("yyyy-MM-dd");
+		SimpleDateFormat dateFormat = report.month ? new SimpleDateFormat("yyyy-MM") : dayFormat;
 		Calendar c = Calendar.getInstance();
 		c.setTimeInMillis(System.currentTimeMillis());
 		for (int i = 0; i < report.count; i++) {
@@ -762,7 +794,17 @@ public class AdminController {
 			report.values.put(dateFormat.format(c.getTime()), lst);
 			c.add(report.month ? Calendar.MONTH : Calendar.DAY_OF_MONTH, -1);
 		}
+		for(Subscription s : subs) {
+			report.addResult(s);
+		}
+	}
 
+
+	private List<Subscription> parseSubsscriptions() {
+		Calendar c = Calendar.getInstance();
+		List<Subscription> subs = new ArrayList<AdminController.Subscription>();
+		ExchangeRates rates = parseExchangeRates();
+		
 		jdbcTemplate.query(
 				"select sku, price, pricecurrency, introprice, starttime, expiretime, autorenewing, valid from supporters_device_sub",
 				new RowCallbackHandler() {
@@ -777,29 +819,17 @@ public class AdminController {
 							return;
 						}
 						c.setTimeInMillis(main.startTime);
-						if (main.totalPeriods > 1) {
-							c.add(Calendar.MONTH, main.durationMonth);
-							main.endPeriod = dateFormat.format(c.getTime());
-						}
-						report.addResult(main);
-						Subscription prev = main;
+						subs.add(main);
 						for (int i = 1; i < main.totalPeriods; i++) {
 							Subscription nextPeriod = new Subscription(main);
-
-							nextPeriod.startPeriod = prev.startPeriod;
 							c.add(Calendar.MONTH, main.durationMonth);
-							nextPeriod.endPeriod = dateFormat.format(c.getTime());
-							nextPeriod.startPeriod = prev.endPeriod;
-							nextPeriod.currentPeriod = i;
-
-							report.addResult(nextPeriod);
-							prev = nextPeriod;
+							nextPeriod.buildUp(c.getTime(), i, rates);
+							subs.add(nextPeriod);
 						}
 						c.setTimeInMillis(main.endTime);
 						Subscription endPeriod = new Subscription(main);
-						endPeriod.startPeriod = dateFormat.format(c.getTime());
-						endPeriod.currentPeriod = -1;
-						report.addResult(endPeriod);
+						endPeriod.buildUp(c.getTime(), -1, rates);
+						subs.add(endPeriod);
 					}
 
 					private Subscription createSub(ResultSet rs) throws SQLException {
@@ -826,30 +856,52 @@ public class AdminController {
 							s.totalMonths--;
 						}
 						s.totalPeriods = (int) Math.round((double) s.totalMonths / s.durationMonth);
-						s.startPeriod = dateFormat.format(s.startTime);
-						s.endPeriod = dateFormat.format(s.endTime);
+						s.buildUp(new Date(s.startTime), 0, rates);
 						return s;
 					}
 				});
+		return subs;
+	}
+
+
+	private ExchangeRates parseExchangeRates() {
+		SimpleDateFormat dayFormat = new SimpleDateFormat("yyyy-MM-dd");
+		ExchangeRates rates = new ExchangeRates();
+		jdbcTemplate.query("select currency, month, eurrate exchange_rates", new RowCallbackHandler() {
+
+			@Override
+			public void processRow(ResultSet rs) throws SQLException {
+				try {
+					Date parse = dayFormat.parse(rs.getString(2));
+					String cur = rs.getString(1);
+					double eurRate = rs.getDouble(3);
+					rates.add(cur, parse.getTime(), eurRate);
+				} catch (ParseException e) {
+					e.printStackTrace();
+				}
+			}
+
+		});
+		return rates;
 	}
 	
 	private void setDefaultSkuValues(Subscription s) {
 		switch(s.sku) {
-		case "osm_free_live_subscription_2": s.app = SubAppType.OSMAND; s.durationMonth = 1; s.priceEurMillis = 1800; break;
-		case "osm_live_subscription_2": s.app = SubAppType.OSMAND_PLUS; s.durationMonth = 1; s.priceEurMillis = 1200; break;
+		case "osm_free_live_subscription_2": s.app = SubAppType.OSMAND; s.durationMonth = 1; s.defPriceEurMillis = 1800; break;
+		case "osm_live_subscription_2": s.app = SubAppType.OSMAND_PLUS; s.durationMonth = 1; s.defPriceEurMillis = 1200; break;
 		
-		case "osm_live_subscription_annual_free_v1": s.app = SubAppType.OSMAND; s.durationMonth = 12; s.priceEurMillis = 8000; break;
-		case "osm_live_subscription_annual_full_v1": s.app = SubAppType.OSMAND_PLUS; s.durationMonth = 12; s.priceEurMillis = 6000;  break;
-		case "osm_live_subscription_annual_free_v2": s.app = SubAppType.OSMAND; s.durationMonth = 12; s.priceEurMillis = 4000; break;
-		case "osm_live_subscription_annual_full_v2": s.app = SubAppType.OSMAND_PLUS;  s.durationMonth = 12; s.priceEurMillis = 3000; break;
-		case "osm_live_subscription_3_months_free_v1": s.app = SubAppType.OSMAND; s.durationMonth = 3; s.priceEurMillis = 4000; break;
-		case "osm_live_subscription_3_months_full_v1": s.app = SubAppType.OSMAND_PLUS; s.durationMonth = 3; s.priceEurMillis = 3000; break;
-		case "osm_live_subscription_monthly_free_v1": s.app = SubAppType.OSMAND; s.durationMonth = 1; s.priceEurMillis = 2000; break;
-		case "osm_live_subscription_monthly_full_v1": s.app = SubAppType.OSMAND_PLUS;  s.durationMonth = 1; s.priceEurMillis = 1500;  break;
+		case "osm_live_subscription_annual_free_v1": s.app = SubAppType.OSMAND; s.durationMonth = 12; s.defPriceEurMillis = 8000; break;
+		case "osm_live_subscription_annual_full_v1": s.app = SubAppType.OSMAND_PLUS; s.durationMonth = 12; s.defPriceEurMillis = 6000;  break;
+		case "osm_live_subscription_annual_free_v2": s.app = SubAppType.OSMAND; s.durationMonth = 12; s.defPriceEurMillis = 4000; break;
+		case "osm_live_subscription_annual_full_v2": s.app = SubAppType.OSMAND_PLUS;  s.durationMonth = 12; s.defPriceEurMillis = 3000; break;
+		case "osm_live_subscription_3_months_free_v1": s.app = SubAppType.OSMAND; s.durationMonth = 3; s.defPriceEurMillis = 4000; break;
+		case "osm_live_subscription_3_months_full_v1": s.app = SubAppType.OSMAND_PLUS; s.durationMonth = 3; s.defPriceEurMillis = 3000; break;
+		case "osm_live_subscription_monthly_free_v1": s.app = SubAppType.OSMAND; s.durationMonth = 1; s.defPriceEurMillis = 2000; break;
+		case "osm_live_subscription_monthly_full_v1": s.app = SubAppType.OSMAND_PLUS;  s.durationMonth = 1; s.defPriceEurMillis = 1500;  break;
 
-		case "net.osmand.maps.subscription.monthly_v1":s.app = SubAppType.IOS; s.durationMonth = 1; s.priceEurMillis = 2000; break;
-		case "net.osmand.maps.subscription.3months_v1": s.app = SubAppType.IOS; s.durationMonth = 3; s.priceEurMillis = 4000; break;
-		case "net.osmand.maps.subscription.annual_v1": s.app = SubAppType.IOS; s.durationMonth = 12; s.priceEurMillis = 8000; break;
+		case "net.osmand.maps.subscription.monthly_v1":s.app = SubAppType.IOS; s.durationMonth = 1; s.defPriceEurMillis = 2000; break;
+		case "net.osmand.maps.subscription.3months_v1": s.app = SubAppType.IOS; s.durationMonth = 3; s.defPriceEurMillis = 4000; break;
+		case "net.osmand.maps.subscription.annual_v1": s.app = SubAppType.IOS; s.durationMonth = 12; s.defPriceEurMillis = 8000; break;
 		default: throw new UnsupportedOperationException("Unsupported subscription " + s.sku);
 		};
 	}
@@ -931,6 +983,9 @@ public class AdminController {
 	}
 	public static class Subscription {
 		
+		static SimpleDateFormat dayFormat = new SimpleDateFormat("yyyy-MM-dd");
+		static SimpleDateFormat monthFormat = new SimpleDateFormat("yyyy-MM");
+
 		public Subscription() {
 		}
 		public Subscription(Subscription s) {
@@ -944,7 +999,7 @@ public class AdminController {
 			this.priceMillis = s.priceMillis;
 			this.durationMonth = s.durationMonth;
 			this.app = s.app;
-			this.priceEurMillis = s.priceEurMillis;
+			this.defPriceEurMillis = s.defPriceEurMillis;
 			this.totalPeriods = s.totalPeriods;
 		}
 		
@@ -959,14 +1014,39 @@ public class AdminController {
 		// from sku
 		protected int durationMonth;
 		protected SubAppType app;
-		protected int priceEurMillis;
+		protected int defPriceEurMillis;
 		
 		// period number
 		protected int totalMonths;
 		protected int totalPeriods;
+		
+		// current calcualted 
 		protected int currentPeriod;
-		protected String startPeriod;
-		protected String endPeriod;
+		protected String startPeriodDay;
+		protected long startPeriodTime;
+		protected String startPeriodMonth;
+		protected int priceEurMillis;
+		
+		public void buildUp(Date time, int period, ExchangeRates rts) {
+			startPeriodTime = time.getTime();
+			startPeriodDay = dayFormat.format(time.getTime());
+			startPeriodMonth = monthFormat.format(time.getTime());
+			currentPeriod = period;
+			
+			
+			priceEurMillis = defPriceEurMillis;
+			if (introPriceMillis > 0 && currentPeriod == 0 && priceMillis > 0) {
+				priceEurMillis = (int) (((double) introPriceMillis * priceEurMillis) / priceMillis);
+			}
+			double rate = rts.getEurRate(pricecurrency, startPeriodTime);
+			if(rate > 0) {
+				if (introPriceMillis >= 0 && currentPeriod == 0) { 
+					priceEurMillis =(int) (introPriceMillis / rate);
+				} else {
+					priceEurMillis = (int) (priceMillis / rate);
+				}
+			} 
+		}
 		
 	}
 	
