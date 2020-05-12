@@ -760,7 +760,7 @@ public class AdminController {
 			ExchangeRate r = new ExchangeRate();
 			r.time = time;
 			r.eurRate = eurRate;
-			if(currencies.containsKey(cur)) {
+			if (!currencies.containsKey(cur)) {
 				currencies.put(cur, new ArrayList<>());
 			}
 			currencies.get(cur).add(r);
