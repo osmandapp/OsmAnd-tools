@@ -655,8 +655,10 @@ public class AdminController {
 		public long valueEnd;
 		@Override
 		public String toString() {
-			return String.format("%d + %d (- %d) <br> € %d + € %d (- € %d)", totalNew, totalOld, totalEnd, 
-					valueNew / 1000, valueOld / 1000, valueEnd / 1000);
+			return String.format("+ %d € %d <br>+ %d € %d <br>- %d € %d", 
+					totalNew, valueNew / 1000, 
+					totalOld, valueOld / 1000, 
+					totalEnd, valueEnd / 1000);
 		}
 		
 	}
@@ -726,15 +728,15 @@ public class AdminController {
 		AdminGenericSubReport report = new AdminGenericSubReport();
 		report.month = true;
 		report.count = 24;
-		report.columns.add(new AdminGenericSubReportColumn("A M").app(SubAppType.OSMAND).duration(1));
-		report.columns.add(new AdminGenericSubReportColumn("A Q").app(SubAppType.OSMAND).duration(3));
 		report.columns.add(new AdminGenericSubReportColumn("A Y").app(SubAppType.OSMAND).duration(12));
-		report.columns.add(new AdminGenericSubReportColumn("A+ M").app(SubAppType.OSMAND_PLUS).duration(1));
-		report.columns.add(new AdminGenericSubReportColumn("A+ Q").app(SubAppType.OSMAND_PLUS).duration(3));
 		report.columns.add(new AdminGenericSubReportColumn("A+ Y").app(SubAppType.OSMAND_PLUS).duration(12));
-		report.columns.add(new AdminGenericSubReportColumn("I M").app(SubAppType.IOS).duration(1));
-		report.columns.add(new AdminGenericSubReportColumn("I Q").app(SubAppType.IOS).duration(3));
+		report.columns.add(new AdminGenericSubReportColumn("A Q").app(SubAppType.OSMAND).duration(3));
+		report.columns.add(new AdminGenericSubReportColumn("A+ Q").app(SubAppType.OSMAND_PLUS).duration(3));
+		report.columns.add(new AdminGenericSubReportColumn("A M").app(SubAppType.OSMAND).duration(1));
+		report.columns.add(new AdminGenericSubReportColumn("A+ M").app(SubAppType.OSMAND_PLUS).duration(1));
 		report.columns.add(new AdminGenericSubReportColumn("I Y").app(SubAppType.IOS).duration(12));
+		report.columns.add(new AdminGenericSubReportColumn("I Q").app(SubAppType.IOS).duration(3));
+		report.columns.add(new AdminGenericSubReportColumn("I M").app(SubAppType.IOS).duration(1));
 		
 		buildReport(report);
 		return report;
@@ -808,8 +810,16 @@ public class AdminController {
 						s.autorenewing = rs.getBoolean(7);
 						s.valid = rs.getBoolean(8);
 						setDefaultSkuValues(s);
-						s.totalPeriods = (int) Math
-								.round((s.endTime - s.startTime) / (1000.0 * 24 * 24 * 60 * 30 * s.durationMonth));
+						c.setTimeInMillis(s.startTime);
+						while(c.getTimeInMillis() < s.endTime) {
+							c.add(Calendar.MONTH, 1);
+							s.totalMonths++;
+						}
+						// we rolled up more than 14 days in future 
+						if(c.getTimeInMillis() - s.endTime > 1000 * 60 * 60 * 24 * 14) {
+							s.totalMonths--;
+						}
+						s.totalPeriods = (int) Math.round((double) s.totalMonths / s.durationMonth);
 						s.startPeriod = dateFormat.format(s.startTime);
 						s.endPeriod = dateFormat.format(s.endTime);
 						return s;
@@ -946,6 +956,7 @@ public class AdminController {
 		protected int priceEurMillis;
 		
 		// period number
+		protected int totalMonths;
 		protected int totalPeriods;
 		protected int currentPeriod;
 		protected String startPeriod;
