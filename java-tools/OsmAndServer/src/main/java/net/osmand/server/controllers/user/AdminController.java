@@ -50,6 +50,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 
+import gnu.trove.list.array.TIntArrayList;
 import net.osmand.server.api.repo.LotterySeriesRepository;
 import net.osmand.server.api.repo.LotterySeriesRepository.LotterySeries;
 import net.osmand.server.api.repo.LotterySeriesRepository.LotteryStatus;
@@ -877,6 +878,41 @@ public class AdminController {
 						return s;
 					}
 				});
+		// calculate retention rate
+		Map<String, TIntArrayList> skuRetentions = new LinkedHashMap<String, TIntArrayList>();
+		for (Subscription s : subs) {
+			TIntArrayList retentionList = skuRetentions.get(s.sku);
+			if (retentionList == null) {
+				retentionList = new TIntArrayList();
+				skuRetentions.put(s.sku, retentionList);
+			}
+			if (s.currentPeriod == 0) {
+				boolean ended = s.isEnded();
+				while (retentionList.size() <= 2 * (s.currentPeriod + 1)) {
+					retentionList.add(0);
+				}
+				for (int i = 0; i < s.totalPeriods; i++) {
+					int ind = 2 * i + 1;
+					if (i == s.totalPeriods - 1) {
+						if (ended) {
+							retentionList.setQuick(ind, retentionList.getQuick(ind) + 1);
+						}
+					} else {
+						retentionList.setQuick(ind, retentionList.getQuick(ind) + 1);
+						retentionList.setQuick(ind + 1, retentionList.getQuick(ind + 1) + 1);
+					}
+				}
+			}
+		}
+		System.out.println("!!! RETENTIONS: ");
+		for (String s : skuRetentions.keySet()) {
+			System.out.println(skuRetentions.get(s));
+		}
+		for(Subscription s : subs) {
+			if(s.currentPeriod == 0) {
+				s.calculateLTVValue(skuRetentions.get(s.sku));
+			}
+		}
 		return subs;
 	}
 
@@ -1041,13 +1077,33 @@ public class AdminController {
 		
 		// current calculated 
 		protected int currentPeriod;
+		protected boolean introPeriod;
 		protected String startPeriodDay;
 		protected long startPeriodTime;
 		protected String startPeriodMonth;
+		protected int fullPriceEurMillis;
+		protected int introPriceEurMillis;
 		protected int priceEurMillis;
+		
 		protected int priceLTVEurMillis;
 		
-		public void calculateLTVValue() {
+		private boolean isEnded() {
+			boolean ended = (System.currentTimeMillis() - endTime) >= 1000l * 60 * 60 * 24 * 10;
+			return !autorenewing || ended; 
+		}
+		
+		public void calculateLTVValue(TIntArrayList retentionsList) {
+			double futureRetention = retention;
+			for (int i = currentPeriod + 1; i < totalPeriods; i++) {
+				futureRetention *= retention;
+				priceLTVEurMillis += fullPriceEurMillis;
+			}
+			if (currentPeriod >= 0) {
+				priceLTVEurMillis += introPriceEurMillis;
+			}
+			if (!isEnded()) {
+				priceLTVEurMillis += (long) (futureRetention * fullPriceEurMillis / (1 - retention));
+			}
 		}
 		
 		public void buildUp(Date time, int period, ExchangeRates rts) {
@@ -1056,8 +1112,8 @@ public class AdminController {
 			this.startPeriodMonth = monthFormat.format(time.getTime());
 			this.currentPeriod = period;
 			
-			int fullPriceEurMillis = defPriceEurMillis;
-			int introPriceEurMillis = defPriceEurMillis;
+			this.fullPriceEurMillis = defPriceEurMillis;
+			this.introPriceEurMillis = defPriceEurMillis;
 			if (introPriceMillis >= 0 && priceMillis > 0) {
 				introPriceEurMillis = (int) (((double) introPriceMillis * priceEurMillis) / priceMillis);
 			}
@@ -1070,26 +1126,14 @@ public class AdminController {
 					introPriceEurMillis = (int) (priceMillis / rate);
 				}
 			}
-			if (currentPeriod == 0) {
+			this.introPeriod = currentPeriod == 0 && introPriceEurMillis != fullPriceEurMillis;
+			if (this.introPeriod) {
 				priceEurMillis = introPriceEurMillis;
 			} else {
 				priceEurMillis = fullPriceEurMillis;	
 			}
 			
-			boolean ended = (System.currentTimeMillis() - endTime) >= 1000l * 60 * 60 * 24 * 10;
-			double futureRetention = retention;
-			for (int i = currentPeriod + 1; i < totalPeriods; i++) {
-				futureRetention *= retention;
-				priceLTVEurMillis += fullPriceEurMillis;
-			}
-			if (currentPeriod >= 0) {
-				priceLTVEurMillis += introPriceEurMillis;
-			}
-			if (autorenewing && !ended) {
-				priceLTVEurMillis += (long) (futureRetention * fullPriceEurMillis / (1 - retention));
-			}
 			
-			calculateLTVValue();
 		}
 		
 	}
