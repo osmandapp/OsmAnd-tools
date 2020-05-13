@@ -784,6 +784,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 						directRoute.getForwardWays(), w.getId());
 				if (stp != null) {
 					directRoute.getForwardStops().add(0, stp);
+					addIncompleteRoute(directRoute.getId(), directRoute);
 				}
 				stp = checkStopMissing(forwardStops, w.getLastNode(), directRoute.getForwardWays(), w.getId());
 				if (stp != null) {

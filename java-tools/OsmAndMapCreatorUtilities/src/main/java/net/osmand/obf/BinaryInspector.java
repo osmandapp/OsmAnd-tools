@@ -54,6 +54,7 @@ import net.osmand.binary.RouteDataObject;
 import net.osmand.data.Amenity;
 import net.osmand.data.Building;
 import net.osmand.data.City;
+import net.osmand.data.IncompleteTransportRoute;
 import net.osmand.data.LatLon;
 import net.osmand.data.MapObject;
 import net.osmand.data.Street;
@@ -90,7 +91,9 @@ public class BinaryInspector {
 //					"-zoom=6",
 //					"-bbox=4.890,52.37,4.892,52.3692",
 //					"-osm="+System.getProperty("maps.dir")+"/map.obf.osm",
-					System.getProperty("maps.dir")+"/Netherlands_train.obf"
+//					System.getProperty("maps.dir")+"/Netherlands_train.obf"
+					"/home/madwasp79/OsmAnd-maps/_Creator/Belgium_europe.obf"
+
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
 		} else {
@@ -1271,7 +1274,7 @@ public class BinaryInspector {
 			for(TransportStop stop : st.getForwardStops()) {
 				stopsString.add(stop.getName(verbose.lang));
 			}
-			println("  " + st.getRef() + " " + st.getType() + " " + st.getName(verbose.lang) + ": " + stopsString);
+			println("  " + st.getRef() + " " + st.getType() + " " + st.getName(verbose.lang) + " (id: " + st.getId() + "): " + stopsString);
 			if(verbose.vtransportschedule) {
 				TransportSchedule sc = st.getSchedule();
 				if (sc != null) {
@@ -1307,6 +1310,11 @@ public class BinaryInspector {
 					println("   " + bld.toString());
 				}
 			}
+		}
+		println("\nIncomplete Routes:");
+		for (IncompleteTransportRoute itr : index.getIncompleteRoutes()) {
+			println(String.format("  Route id - %d, offset - %d", itr.getRouteId(), itr.getRouteOffset()));
+//					+ ", ref - s%, type - %s, operator - %s", itr.getRouteId(), itr.getRouteOffset(), itr.getRef(), itr.getOperator(), itr.getOperator()));
 		}
 	}
 
