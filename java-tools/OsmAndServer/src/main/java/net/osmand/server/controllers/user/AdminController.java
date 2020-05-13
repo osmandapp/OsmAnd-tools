@@ -888,11 +888,11 @@ public class AdminController {
 			}
 			if (s.currentPeriod == 0) {
 				boolean ended = s.isEnded();
-				while (retentionList.size() < 2 * (s.totalPeriods + 1)) {
+				while (retentionList.size() < 2 * s.totalPeriods) {
 					retentionList.add(0);
 				}
 				for (int i = 0; i < s.totalPeriods; i++) {
-					int ind = 2 * i + 1;
+					int ind = 2 * i;
 					if (i == s.totalPeriods - 1) {
 						if (ended) {
 							retentionList.setQuick(ind, retentionList.getQuick(ind) + 1);
@@ -906,7 +906,7 @@ public class AdminController {
 		}
 		System.out.println("!!! RETENTIONS: ");
 		for (String s : skuRetentions.keySet()) {
-			System.out.println(skuRetentions.get(s));
+			System.out.println(s + " " + skuRetentions.get(s));
 		}
 		for(Subscription s : subs) {
 			if(s.currentPeriod == 0) {
@@ -1089,20 +1089,23 @@ public class AdminController {
 		
 		private boolean isEnded() {
 			boolean ended = (System.currentTimeMillis() - endTime) >= 1000l * 60 * 60 * 24 * 10;
-			return !autorenewing || ended; 
+			return ended; 
 		}
 		
 		public void calculateLTVValue(TIntArrayList retentionsList) {
-			double futureRetention = retention;
 			for (int i = currentPeriod + 1; i < totalPeriods; i++) {
-				futureRetention *= retention;
 				priceLTVEurMillis += fullPriceEurMillis;
 			}
 			if (currentPeriod >= 0) {
 				priceLTVEurMillis += introPriceEurMillis;
 			}
-			if (!isEnded()) {
-				priceLTVEurMillis += (long) (futureRetention * fullPriceEurMillis / (1 - retention));
+			if (autorenewing && !isEnded()) {
+				if (2 * totalPeriods + 1 < retentionsList.size() && retentionsList.get(2 * totalPeriods) > 0
+						&& retentionsList.get(2 * totalPeriods + 1) > 0) {
+					retention = Math.min(0.95, ((double) retentionsList.get(2 * totalPeriods + 1))
+							/ retentionsList.get(2 * totalPeriods));
+				}
+				priceLTVEurMillis += (long) (fullPriceEurMillis * ( 1 - 1 / (1 - retention)));
 			}
 		}
 		
