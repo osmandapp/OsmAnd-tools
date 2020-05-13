@@ -1056,7 +1056,7 @@ public class AdminController {
 		}
 		
 		public String getSku() {
-			return sku + (introPeriod ? "-%" : "";
+			return sku + (introPeriod ? "-%" : "");
 		}
 
 		public Subscription(Subscription s) {
