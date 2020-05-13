@@ -662,6 +662,13 @@ public class AdminController {
 		public long valueNewLTV;
 		@Override
 		public String toString() {
+			return toString(false);
+		}
+		
+		public String toString(boolean shortVersion) {
+			if (shortVersion) {
+				return String.format("%d<br>€ %d" + totalNew, valueNewLTV / 1000);
+			}
 			return String.format("<b>%d</b><br>" +
 			// "€ %d + € %d<br>"+
 					"+%d -%d<br><b>€ %d</b><br>€ %d", totalNew, totalOld, totalEnd,
