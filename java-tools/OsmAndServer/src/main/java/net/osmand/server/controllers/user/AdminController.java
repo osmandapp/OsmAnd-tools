@@ -668,7 +668,7 @@ public class AdminController {
 		
 		public String toString(int formatVersion) {
 			if (formatVersion == 1) {
-				return String.format("%d %d<br>€ %d", totalNew, valueNewLTV / 1000, (valueNew + valueOld) / 1000);
+				return String.format("%d € %d<br>€ %d", totalNew, valueNewLTV / 1000, (valueNew + valueOld) / 1000);
 			}
 			return String.format("<b>%d</b><br>" +
 			// "€ %d + € %d<br>"+
