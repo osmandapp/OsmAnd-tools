@@ -888,7 +888,7 @@ public class AdminController {
 			}
 			if (s.currentPeriod == 0) {
 				boolean ended = s.isEnded();
-				while (retentionList.size() <= 2 * (s.currentPeriod + 1)) {
+				while (retentionList.size() < 2 * (s.totalPeriods + 1)) {
 					retentionList.add(0);
 				}
 				for (int i = 0; i < s.totalPeriods; i++) {
