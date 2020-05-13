@@ -233,6 +233,9 @@ public class UpdateSubscription {
 								Map<String, String> fields = foundReceipt.fields;
 								String purchaseDateStr = fields.get("original_purchase_date_ms");
 								String expiresDateStr = fields.get("expires_date_ms");
+								System.out.println("!");
+								System.out.println(foundReceipt);
+								System.out.println(fields);
 								if (!Algorithms.isEmpty(expiresDateStr)) {
 									try {
 										long purchaseDateMs = Long.parseLong(purchaseDateStr);
