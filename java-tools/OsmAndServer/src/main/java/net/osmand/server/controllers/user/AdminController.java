@@ -619,7 +619,7 @@ public class AdminController {
 			String activeStr = active > 0 ? (active + " ") : "";
 			return String.format("%s<b>+%d</b><br>" +
 			// "€ %d + € %d<br>"+
-					"+%d -%d<br><b>€ %d</b><br>€ %d", 
+					"•%d -%d<br><b>€ %d</b><br>€ %d", 
 					activeStr, totalNew, 
 					totalOld, totalEnd,
 					// valueNew / 1000, valueOld / 1000, valueEnd / 1000,
