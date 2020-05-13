@@ -856,10 +856,10 @@ public class IndexCreator {
 		String rootFolder = "/Users/victorshcherb/osmand/";
 		IndexCreatorSettings settings = new IndexCreatorSettings();
 		settings.poiZipLongStrings = false;
-//		settings.indexMap = true;
+		settings.indexMap = true;
 //		settings.indexAddress = true;
 //		settings.indexPOI = true;
-		settings.indexTransport = true;
+//		settings.indexTransport = true;
 //		settings.indexRouting = true;
 //		settings.keepOnlySeaObjects = true;
 //		settings.srtmDataFolder = new File(rootFolder + "/maps/srtm/");
@@ -874,9 +874,9 @@ public class IndexCreator {
 //		creator.deleteOsmDB = false;
 
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
-//		String file = rootFolder + "/temp/netherlands_train.osm.gz";
+		String file = rootFolder + "/temp/map.osm";
 //		String file = rootFolder + "/temp/belgium_train.osm.gz";
-		String file = rootFolder + "/temp/denmark_capital-region_europe.pbf";
+//		String file = rootFolder + "/temp/denmark_capital-region_europe.pbf";
 //		String file = rootFolder + "/repos/resources/test-resources/synthetic_test_rendering.osm";
 //		String file = rootFolder + "/repos/resources/test-resources/turn_lanes_test.osm";
 		int st = file.lastIndexOf('/');

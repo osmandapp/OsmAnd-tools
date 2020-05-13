@@ -341,7 +341,6 @@ public class AdminController {
 		model.addAttribute("yearSubscriptionsReport", getYearSubscriptionsReport());
 		model.addAttribute("emailsReport", getEmailsDBReport());
 		model.addAttribute("newSubsReport", getNewSubsReport());
-		model.addAttribute("futureCancelReport", getFutureCancelReport());
 		model.addAttribute("btc", getBitcoinReport());
 		model.addAttribute("polls", pollsService.getPollsConfig(false));
 		return "admin/info";
@@ -640,19 +639,9 @@ public class AdminController {
 		return list;
 	}
 	
-	private List<SubscriptionReport> getFutureCancelReport() {
-		List<SubscriptionReport> result = jdbcTemplate
-				.query(
-						"select date_trunc('day', expiretime) d,  count(*), sku,  EXTRACT(DAY FROM sum(expiretime-starttime)) " +
-						"from supporters_device_sub where  " +
-						"expiretime > now() +  interval '1 days' and expiretime < now() +  interval '40 days' " +
-						"group by date_trunc('day', expiretime), sku order by 1 asc" , getRowMapper());
-		mergeSubscriptionReports(result);
-		return result;
-	}	
-	
 	
 	public static class AdminGenericSubReportColumnValue {
+		public int active;
 		public int totalNew;
 		public int totalOld;
 		public int totalEnd;
@@ -668,11 +657,14 @@ public class AdminController {
 		
 		public String toString(int formatVersion) {
 			if (formatVersion == 1) {
-				return String.format("%d € %d<br>€ %d", totalNew, valueNewLTV / 1000, (valueNew + valueOld) / 1000);
+				return String.format("%d, € %d<br>€ %d", totalNew, valueNewLTV / 1000, (valueNew + valueOld) / 1000);
 			}
-			return String.format("<b>%d</b><br>" +
+			String activeStr = active > 0 ? (active + " ") : "";
+			return String.format("%s<b>+%d</b><br>" +
 			// "€ %d + € %d<br>"+
-					"+%d -%d<br><b>€ %d</b><br>€ %d", totalNew, totalOld, totalEnd,
+					"+%d -%d<br><b>€ %d</b><br>€ %d", 
+					activeStr, totalNew, 
+					totalOld, totalEnd,
 					// valueNew / 1000, valueOld / 1000, valueEnd / 1000,
 					(valueNew + valueOld) / 1000, valueNewLTV / 1000);
 		}
@@ -704,20 +696,10 @@ public class AdminController {
 		}
 		
 		public void process(Subscription sub, AdminGenericSubReportColumnValue value) {
-			if (filterApp != null && !filterApp.contains(sub.app)) {
+			if(!filter(sub)) {
 				return;
-			}
-			if (filterDuration != -1 && filterDuration != sub.durationMonth) {
-				return;
-			}
-			if (discount != null) {
-				boolean d = sub.sku.contains("v2") || sub.introPriceMillis >= 0;
-				if (d != discount) {
-					return;
-				}
 			}
 			int eurMillis = sub.priceEurMillis;
-			
 			if (sub.currentPeriod > 0) {
 				value.totalOld++;
 				value.valueOld += eurMillis;
@@ -729,6 +711,22 @@ public class AdminController {
 				value.totalEnd++;
 				value.valueEnd += eurMillis;
 			}
+		}
+
+		public boolean filter(Subscription sub) {
+			if (filterApp != null && !filterApp.contains(sub.app)) {
+				return false;
+			}
+			if (filterDuration != -1 && filterDuration != sub.durationMonth) {
+				return false;
+			}
+			if (discount != null) {
+				boolean d = sub.sku.contains("v2") || sub.introPriceMillis >= 0;
+				if (d != discount) {
+					return false;
+				}
+			}
+			return true;
 		}
 
 		public AdminGenericSubReportColumnValue initValue() {
@@ -749,6 +747,21 @@ public class AdminController {
 			if (vls != null) {
 				for (int i = 0; i < columns.size(); i++) {
 					columns.get(i).process(s, vls.get(i));
+				}
+			}
+			if(s.currentPeriod == 0 && month) {
+				Calendar c = Calendar.getInstance();
+				c.setTimeInMillis(s.startPeriodTime);
+				while (c.getTimeInMillis() < s.endTime) {
+					vls = values.get(Subscription.monthFormat.format(c.getTime()));
+					if (vls != null) {
+						for (int i = 0; i < columns.size(); i++) {
+							if (columns.get(i).filter(s)) {
+								vls.get(i).active++;
+							}
+						}
+					}
+					c.add(Calendar.MONTH, 1);
 				}
 			}
 		}
