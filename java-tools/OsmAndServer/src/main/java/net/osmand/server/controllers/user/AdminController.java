@@ -332,15 +332,16 @@ public class AdminController {
 		model.addAttribute("downloadServers", getDownloadSettings());
 		model.addAttribute("reports", getReports());
 		model.addAttribute("surveyReport", getSurveyReport());
+		// TODO delete
+		model.addAttribute("subscriptionsReport", getSubscriptionsReport());
 		
 		List<Subscription> allSubs = parseSubscriptions();
 		model.addAttribute("subRevenueReportMonth", getRevenueReport(allSubs, true, 24));
 		model.addAttribute("subRevenueReportDay", getRevenueReport(allSubs, false, 60));
 		
-		model.addAttribute("subscriptionsReport", getSubscriptionsReport());
-		model.addAttribute("yearSubscriptionsReport", getYearSubscriptionsReport());
+		
+		model.addAttribute("yearSubscriptionsReport", getYearSubscriptionsRetentionReport());
 		model.addAttribute("emailsReport", getEmailsDBReport());
-		model.addAttribute("newSubsReport", getNewSubsReport());
 		model.addAttribute("btc", getBitcoinReport());
 		model.addAttribute("polls", pollsService.getPollsConfig(false));
 		return "admin/info";
@@ -575,7 +576,7 @@ public class AdminController {
 	}
  	
 	
-	private Collection<YearSubscriptionReport> getYearSubscriptionsReport() {
+	private Collection<YearSubscriptionReport> getYearSubscriptionsRetentionReport() {
 		final Map<String, YearSubscriptionReport> res = new LinkedHashMap<String, YearSubscriptionReport>(); 
 		jdbcTemplate.query("select  to_char(starttime, 'YYYY-MM') \"start\", " + 
 				"        round(extract(day from expiretime - starttime)/365) \"years\", sku, " + 
@@ -998,71 +999,6 @@ public class AdminController {
 		};
 	}
 	
-	private List<NewSubscriptionReport> getNewSubsReport() {
-		List<SubscriptionReport> cancelled = jdbcTemplate
-				.query(	"SELECT O.d, A.cnt, A.sku, A.dur from ( " +
-						"	SELECT date_trunc('day', generate_series(now() - '90 days'::interval, now(), '1 day'::interval)) as d" +
-						") O left join ( " +
-						"	SELECT date_trunc('day', expiretime) d,  count(*) cnt, sku, extract(day FROM sum(expiretime-starttime) ) dur "+
-						"   FROM supporters_device_sub " +
-						"	WHERE expiretime < now() - interval '9 hours' and expiretime > now() -  interval '90 days' " +
-						"	GROUP BY date_trunc('day', expiretime), sku " +
-						") A on A.d = O.d order by 1 desc", getRowMapper());
-		mergeSubscriptionReports(cancelled);
-		List<SubscriptionReport> newActive = jdbcTemplate
-				.query(	"SELECT O.d, A.cnt, A.sku, A.dur from ( " +
-						"	SELECT date_trunc('day', generate_series(now() - '90 days'::interval, now(), '1 day'::interval)) as d" +
-						") O left join ( " +
-						"	SELECT date_trunc('day', starttime) d,  count(*) cnt, sku, extract(day FROM sum(expiretime-starttime) ) dur " +
-						"   FROM supporters_device_sub  " +
-						"	WHERE starttime > now() -  interval '90 days' " +
-						"	GROUP BY date_trunc('day', starttime), sku " +
-						") A on A.d = O.d order by 1 desc", getRowMapper());
-		mergeSubscriptionReports(newActive);
-		List<NewSubscriptionReport> result = new ArrayList<AdminController.NewSubscriptionReport>();
-		if (newActive.size() == cancelled.size()) {
-			for (int i = 0; i < newActive.size(); i++) {
-				SubscriptionReport na = newActive.get(i);
-				SubscriptionReport ca = cancelled.get(i);
-				if (!ca.date.equals(na.date)) {
-					continue;
-				}
-				NewSubscriptionReport sr = new NewSubscriptionReport();
-				sr.date = na.date;
-				sr.monthCount = na.monthCount;
-				sr.iosMonthCount = na.iosMonthCount;
-				sr.annualCount = na.annualCount;
-				sr.iosAnnualCount = na.iosAnnualCount;
-				sr.quarterCount = na.quarterCount;
-				sr.iosQuarterCount = na.iosQuarterCount;
-				sr.annualDiscountCount = na.annualDiscountCount;
-				sr.iosAnnualDiscountCount = na.iosAnnualDiscountCount;
-				sr.cancelMonthCount = ca.monthCount + ca.iosMonthCount;
-				sr.cancelAnnualCount = ca.annualCount + ca.iosAnnualCount;
-				sr.cancelQuarterCount = ca.quarterCount + ca.iosQuarterCount;
-				sr.cancelAnnualDiscountCount = ca.annualDiscountCount + ca.iosAnnualDiscountCount;
-				sr.atotal = sr.monthCount + sr.annualCount + sr.annualDiscountCount + sr.quarterCount ;
-				sr.iostotal = sr.iosMonthCount + sr.iosAnnualCount + sr.iosAnnualDiscountCount + sr.iosQuarterCount ;
-				sr.total = sr.atotal + sr.iostotal;
-				sr.totalAvgDuration = na.count > 0 ? na.duration / na.count : 0;
-				sr.cancelTotal = sr.cancelMonthCount + sr.cancelAnnualCount + sr.cancelAnnualDiscountCount
-						+ sr.cancelQuarterCount;
-				sr.cancelTotalAvgDuration = ca.count > 0 ? ca.duration / ca.count : 0;
-
-				sr.totalWeighted = (int) na.annualValue;
-				sr.cancelTotalWeighted = (int) ca.annualValue;
-				sr.totalLifeValue = (int) na.totalLifeValue;
-				sr.cancelTotalLifeValue = (int) ca.totalLifeValue;
-
-				sr.revenueGain = (int) (na.value - ca.value);
-				sr.delta = sr.total - sr.cancelTotal;
-				sr.deltaWeighted = sr.totalWeighted - sr.cancelTotalWeighted;
-
-				result.add(sr);
-			}
-		}
-		return result;
-	}
 	
 	public static class SubscriptionMonthReport {
 		public String date;
