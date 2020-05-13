@@ -1405,6 +1405,13 @@ public class BinaryMapIndexWriter {
 			ir.setOperator(registerString(stringTable, tr.getOperator()));
 			ir.setRef(registerString(stringTable, tr.getRef()));
 			ir.setType(registerString(stringTable, tr.getType()));
+//			we don't need this 
+			if (tr.getForwardStops().get(0).isMissingStop()) {
+				ir.addMissingStops(tr.getForwardStops().get(0).getFileOffset());
+			}
+			if (tr.getForwardStops().get(tr.getForwardStops().size()-1).isMissingStop()) {
+				ir.addMissingStops(tr.getForwardStops().get(tr.getForwardStops().size()-1).getFileOffset());
+			}
 			irs.addRoutes(ir);
 		}
 		codedOutStream.writeMessage(OsmAndTransportIndex.INCOMPLETEROUTES_FIELD_NUMBER, irs.build());
