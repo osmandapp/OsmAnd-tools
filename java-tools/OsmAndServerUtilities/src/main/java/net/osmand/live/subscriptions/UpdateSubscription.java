@@ -215,6 +215,7 @@ public class UpdateSubscription {
 			if (result.equals(true)) {
 				JsonObject receiptObj = (JsonObject) map.get("response");
 				if (receiptObj != null) {
+					System.out.println(map);
 					Map<String, InAppReceipt> inAppReceipts = receiptValidationHelper.parseInAppReceipts(receiptObj);
 					if (inAppReceipts != null) {
 						if (inAppReceipts.size() == 0) {
