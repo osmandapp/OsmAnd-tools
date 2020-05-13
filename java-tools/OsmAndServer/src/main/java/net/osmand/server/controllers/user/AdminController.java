@@ -50,6 +50,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 
+import gnu.trove.list.array.TFloatArrayList;
 import gnu.trove.list.array.TIntArrayList;
 import net.osmand.server.api.repo.LotterySeriesRepository;
 import net.osmand.server.api.repo.LotterySeriesRepository.LotterySeries;
@@ -881,12 +882,12 @@ public class AdminController {
 		// calculate retention rate
 		Map<String, TIntArrayList> skuRetentions = new LinkedHashMap<String, TIntArrayList>();
 		for (Subscription s : subs) {
-			TIntArrayList retentionList = skuRetentions.get(s.sku);
-			if (retentionList == null) {
-				retentionList = new TIntArrayList();
-				skuRetentions.put(s.sku, retentionList);
-			}
 			if (s.currentPeriod == 0) {
+				TIntArrayList retentionList = skuRetentions.get(s.getSku());
+				if (retentionList == null) {
+					retentionList = new TIntArrayList();
+					skuRetentions.put(s.getSku(), retentionList);
+				}
 				boolean ended = s.isEnded();
 				while (retentionList.size() < 2 * s.totalPeriods) {
 					retentionList.add(0);
@@ -904,13 +905,24 @@ public class AdminController {
 				}
 			}
 		}
-		System.out.println("!!! RETENTIONS: ");
+		System.out.println("Annual retentions: ");
 		for (String s : skuRetentions.keySet()) {
+			TIntArrayList arrays = skuRetentions.get(s);
+			StringBuilder bld = new StringBuilder();
+			bld.append(s).append(" - ");
+			for(int i = 0; i < arrays.size(); i+=2) {
+				int t = arrays.get(i);
+				int l = arrays.get(i + 1);
+				if(t == 0 || l == 0) {
+					break;
+				}
+				bld.append(((100 * l) / t)).append("%, ");
+			}
 			System.out.println(s + " " + skuRetentions.get(s));
 		}
 		for(Subscription s : subs) {
 			if(s.currentPeriod == 0) {
-				s.calculateLTVValue(skuRetentions.get(s.sku));
+				s.calculateLTVValue(skuRetentions.get(s.getSku()));
 			}
 		}
 		return subs;
@@ -1043,6 +1055,10 @@ public class AdminController {
 		public Subscription() {
 		}
 		
+		public String getSku() {
+			return sku + (introPeriod ? "-%" : "";
+		}
+
 		public Subscription(Subscription s) {
 			this.valid = s.valid;
 			this.autorenewing = s.autorenewing;
