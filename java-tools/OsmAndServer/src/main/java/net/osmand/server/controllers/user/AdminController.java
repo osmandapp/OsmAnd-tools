@@ -1129,7 +1129,8 @@ public class AdminController {
 			if (currentPeriod >= 0) {
 				priceLTVEurMillis += introPriceEurMillis;
 			}
-			if (autorenewing && !isEnded()) {
+			// we could take into account autorenewing but retention will change 
+			if (!isEnded()) {
 				if (2 * totalPeriods + 1 < retentionsList.size() && retentionsList.get(2 * totalPeriods) > 0
 						&& retentionsList.get(2 * totalPeriods + 1) > 0) {
 					retention = Math.min(0.95, ((double) retentionsList.get(2 * totalPeriods + 1))
