@@ -656,15 +656,16 @@ public class AdminController {
 		public long valueNew;
 		public long valueOld;
 		public long valueEnd;
+		public long valueNewLTV;
 		@Override
 		public String toString() {
 			return String.format("%d + %d<br>" +
 					//		"€ %d + € %d<br>"+ 
-					"-%d - € %d<br><b>€ %d</b>", 
+					"-%d - € %d<br><b>€ %d</b><br>€ %d", 
 					totalNew, totalOld, 
 //					valueNew / 1000, valueOld / 1000, 
 					totalEnd, valueEnd / 1000, 
-					(valueNew + valueOld) / 1000);
+					(valueNew + valueOld) / 1000, valueNewLTV/ 1000);
 		}
 		
 	}
@@ -713,6 +714,7 @@ public class AdminController {
 				value.valueOld += eurMillis;
 			} else if (sub.currentPeriod == 0) {
 				value.totalNew++;
+				value.valueNewLTV += sub.priceLTVEurMillis;
 				value.valueNew += eurMillis;
 			} else {
 				value.totalEnd++;
@@ -902,21 +904,21 @@ public class AdminController {
 	
 	private void setDefaultSkuValues(Subscription s) {
 		switch(s.sku) {
-		case "osm_free_live_subscription_2": s.app = SubAppType.OSMAND; s.durationMonth = 1; s.defPriceEurMillis = 1800; break;
-		case "osm_live_subscription_2": s.app = SubAppType.OSMAND_PLUS; s.durationMonth = 1; s.defPriceEurMillis = 1200; break;
+		case "osm_free_live_subscription_2": s.app = SubAppType.OSMAND; s.retention = 0.8;  s.defPriceEurMillis = 1800; break;
+		case "osm_live_subscription_2": s.app = SubAppType.OSMAND_PLUS; s.retention = 0.8; s.durationMonth = 1; s.defPriceEurMillis = 1200; break;
 		
-		case "osm_live_subscription_annual_free_v1": s.app = SubAppType.OSMAND; s.durationMonth = 12; s.defPriceEurMillis = 8000; break;
-		case "osm_live_subscription_annual_full_v1": s.app = SubAppType.OSMAND_PLUS; s.durationMonth = 12; s.defPriceEurMillis = 6000;  break;
-		case "osm_live_subscription_annual_free_v2": s.app = SubAppType.OSMAND; s.durationMonth = 12; s.defPriceEurMillis = 4000; break;
-		case "osm_live_subscription_annual_full_v2": s.app = SubAppType.OSMAND_PLUS;  s.durationMonth = 12; s.defPriceEurMillis = 3000; break;
-		case "osm_live_subscription_3_months_free_v1": s.app = SubAppType.OSMAND; s.durationMonth = 3; s.defPriceEurMillis = 4000; break;
-		case "osm_live_subscription_3_months_full_v1": s.app = SubAppType.OSMAND_PLUS; s.durationMonth = 3; s.defPriceEurMillis = 3000; break;
-		case "osm_live_subscription_monthly_free_v1": s.app = SubAppType.OSMAND; s.durationMonth = 1; s.defPriceEurMillis = 2000; break;
-		case "osm_live_subscription_monthly_full_v1": s.app = SubAppType.OSMAND_PLUS;  s.durationMonth = 1; s.defPriceEurMillis = 1500;  break;
+		case "osm_live_subscription_annual_free_v1": s.app = SubAppType.OSMAND; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 8000; break;
+		case "osm_live_subscription_annual_full_v1": s.app = SubAppType.OSMAND_PLUS; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 6000;  break;
+		case "osm_live_subscription_annual_free_v2": s.app = SubAppType.OSMAND; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 4000; break;
+		case "osm_live_subscription_annual_full_v2": s.app = SubAppType.OSMAND_PLUS;  s.retention = 0.8; s.durationMonth = 12; s.defPriceEurMillis = 3000; break;
+		case "osm_live_subscription_3_months_free_v1": s.app = SubAppType.OSMAND; s.retention = 0.4; s.durationMonth = 3; s.defPriceEurMillis = 4000; break;
+		case "osm_live_subscription_3_months_full_v1": s.app = SubAppType.OSMAND_PLUS; s.retention = 0.4; s.durationMonth = 3; s.defPriceEurMillis = 3000; break;
+		case "osm_live_subscription_monthly_free_v1": s.app = SubAppType.OSMAND; s.retention = 0.3; s.durationMonth = 1; s.defPriceEurMillis = 2000; break;
+		case "osm_live_subscription_monthly_full_v1": s.app = SubAppType.OSMAND_PLUS;  s.retention = 0.3; s.durationMonth = 1; s.defPriceEurMillis = 1500;  break;
 
-		case "net.osmand.maps.subscription.monthly_v1":s.app = SubAppType.IOS; s.durationMonth = 1; s.defPriceEurMillis = 2000; break;
-		case "net.osmand.maps.subscription.3months_v1": s.app = SubAppType.IOS; s.durationMonth = 3; s.defPriceEurMillis = 4000; break;
-		case "net.osmand.maps.subscription.annual_v1": s.app = SubAppType.IOS; s.durationMonth = 12; s.defPriceEurMillis = 8000; break;
+		case "net.osmand.maps.subscription.monthly_v1":s.app = SubAppType.IOS; s.retention = 0.1; s.durationMonth = 1; s.defPriceEurMillis = 2000; break;
+		case "net.osmand.maps.subscription.3months_v1": s.app = SubAppType.IOS; s.retention = 0.4; s.durationMonth = 3; s.defPriceEurMillis = 4000; break;
+		case "net.osmand.maps.subscription.annual_v1": s.app = SubAppType.IOS; s.retention = 0.5; s.durationMonth = 12; s.defPriceEurMillis = 8000; break;
 		default: throw new UnsupportedOperationException("Unsupported subscription " + s.sku);
 		};
 	}
@@ -998,6 +1000,7 @@ public class AdminController {
 	}
 	public static class Subscription {
 		
+		public double retention;
 		static SimpleDateFormat dayFormat = new SimpleDateFormat("yyyy-MM-dd");
 		static SimpleDateFormat monthFormat = new SimpleDateFormat("yyyy-MM");
 
@@ -1036,12 +1039,16 @@ public class AdminController {
 		protected int totalMonths;
 		protected int totalPeriods;
 		
-		// current calcualted 
+		// current calculated 
 		protected int currentPeriod;
 		protected String startPeriodDay;
 		protected long startPeriodTime;
 		protected String startPeriodMonth;
 		protected int priceEurMillis;
+		protected int priceLTVEurMillis;
+		
+		public void calculateLTVValue() {
+		}
 		
 		public void buildUp(Date time, int period, ExchangeRates rts) {
 			this.startPeriodTime = time.getTime();
@@ -1049,19 +1056,40 @@ public class AdminController {
 			this.startPeriodMonth = monthFormat.format(time.getTime());
 			this.currentPeriod = period;
 			
-			
-			priceEurMillis = defPriceEurMillis;
-			if (introPriceMillis >= 0 && currentPeriod == 0 && priceMillis > 0) {
-				priceEurMillis = (int) (((double) introPriceMillis * priceEurMillis) / priceMillis);
+			int fullPriceEurMillis = defPriceEurMillis;
+			int introPriceEurMillis = defPriceEurMillis;
+			if (introPriceMillis >= 0 && priceMillis > 0) {
+				introPriceEurMillis = (int) (((double) introPriceMillis * priceEurMillis) / priceMillis);
 			}
 			double rate = rts.getEurRate(pricecurrency, startPeriodTime);
 			if(rate > 0) {
-				if (introPriceMillis >= 0 && currentPeriod == 0) {
-					priceEurMillis =(int) (introPriceMillis / rate);
+				fullPriceEurMillis = (int) (priceMillis / rate);
+				if (introPriceMillis >= 0) {
+					introPriceEurMillis =(int) (introPriceMillis / rate);
 				} else {
-					priceEurMillis = (int) (priceMillis / rate);
+					introPriceEurMillis = (int) (priceMillis / rate);
 				}
 			}
+			if (currentPeriod == 0) {
+				priceEurMillis = introPriceEurMillis;
+			} else {
+				priceEurMillis = fullPriceEurMillis;	
+			}
+			
+			boolean ended = (System.currentTimeMillis() - endTime) >= 1000l * 60 * 60 * 24 * 10;
+			double futureRetention = retention;
+			for (int i = currentPeriod + 1; i < totalPeriods; i++) {
+				futureRetention *= retention;
+				priceLTVEurMillis += fullPriceEurMillis;
+			}
+			if (currentPeriod >= 0) {
+				priceLTVEurMillis += introPriceEurMillis;
+			}
+			if (autorenewing && !ended) {
+				priceLTVEurMillis += (long) (futureRetention * fullPriceEurMillis / (1 - retention));
+			}
+			
+			calculateLTVValue();
 		}
 		
 	}
