@@ -93,7 +93,7 @@ public class UpdateSubscription {
 				"WHERE userid = ? and purchaseToken = ? and sku = ?";
 		updCheckQuery = "UPDATE supporters_device_sub SET checktime = ? " +
 					"WHERE userid = ? and purchaseToken = ? and sku = ?";
-		selQuery = "SELECT userid, sku, purchaseToken, payload, checktime, starttime, expiretime, valid " +
+		selQuery = "SELECT userid, sku, purchaseToken, payload, checktime, starttime, expiretime, valid, coalesce(introcycles, -1) introcycles " +
 				"FROM supporters_device_sub S where (valid is null or valid=true) order by userid asc";
 	}
 
@@ -124,6 +124,7 @@ public class UpdateSubscription {
 			this.ios = true;
 			updQuery = "UPDATE supporters_device_sub SET " +
 					"checktime = ?, starttime = ?, expiretime = ?, autorenewing = ?, " + 
+					"introcycles = ? , " +
 					"valid = ? " +
 					"WHERE userid = ? and purchaseToken = ? and sku = ?";
 		}
@@ -154,6 +155,7 @@ public class UpdateSubscription {
 			Timestamp checkTime = rs.getTimestamp("checktime");
 			Timestamp startTime = rs.getTimestamp("starttime");
 			Timestamp expireTime = rs.getTimestamp("expiretime");
+			int introcycles = rs.getInt("introcycles");
 			boolean valid = rs.getBoolean("valid");
 			long tm = System.currentTimeMillis();
 			boolean ios = sku.startsWith("net.osmand.maps.subscription.");
@@ -185,7 +187,7 @@ public class UpdateSubscription {
 					expireTime == null ? "" : new Date(expireTime.getTime()),
 							activeNow+""));
 			if (this.ios) {
-				processIosSubscription(receiptValidationHelper, userid, pt, sku, payload, startTime, expireTime, tm);
+				processIosSubscription(receiptValidationHelper, userid, pt, sku, payload, startTime, expireTime, tm, introcycles);
 			} else {
 				processAndroidSubscription(purchases, userid, pt, sku, startTime, expireTime, tm);
 			}
@@ -204,7 +206,8 @@ public class UpdateSubscription {
 		}
 	}
 
-	private void processIosSubscription(ReceiptValidationHelper receiptValidationHelper, long userid, String pt, String sku, String payload, Timestamp startTime, Timestamp expireTime, long tm) throws SQLException {
+	private void processIosSubscription(ReceiptValidationHelper receiptValidationHelper, long userid, String pt, String sku, String payload, Timestamp startTime, Timestamp expireTime, long tm, 
+			int introcycles) throws SQLException {
 		try {
 			String reason = null;
 			String kind = "";
@@ -215,7 +218,6 @@ public class UpdateSubscription {
 			if (result.equals(true)) {
 				JsonObject receiptObj = (JsonObject) map.get("response");
 				if (receiptObj != null) {
-					System.out.println(map);
 					Map<String, InAppReceipt> inAppReceipts = receiptValidationHelper.parseInAppReceipts(receiptObj);
 					if (inAppReceipts != null) {
 						if (inAppReceipts.size() == 0) {
@@ -234,14 +236,19 @@ public class UpdateSubscription {
 								Map<String, String> fields = foundReceipt.fields;
 								String purchaseDateStr = fields.get("original_purchase_date_ms");
 								String expiresDateStr = fields.get("expires_date_ms");
-								System.out.println("!");
-								System.out.println(foundReceipt);
-								System.out.println(fields);
+								boolean introPeriod = "true".equals(fields.get("is_in_intro_offer_period"));
+								
 								if (!Algorithms.isEmpty(expiresDateStr)) {
 									try {
 										long purchaseDateMs = Long.parseLong(purchaseDateStr);
+										IntroductoryPriceInfo ipo = null;
+										if(introcycles != -1 || introPeriod) {
+											ipo = new IntroductoryPriceInfo();
+											ipo.setIntroductoryPriceCycles(1);
+										}
 										long expiresDateMs = Long.parseLong(expiresDateStr);
 										SubscriptionPurchase subscription = new SubscriptionPurchase()
+												.setIntroductoryPriceInfo(ipo)
 												.setStartTimeMillis(purchaseDateMs)
 												.setExpiryTimeMillis(expiresDateMs)
 												.setAutoRenewing(autoRenewing)
@@ -378,7 +385,14 @@ public class UpdateSubscription {
 		} else {
 			updStat.setBoolean(ind++, subscription.getAutoRenewing());
 		}
-		if (!ios) {
+		if (ios) {
+			IntroductoryPriceInfo info = subscription.getIntroductoryPriceInfo();
+			if (info != null) {
+				updStat.setInt(ind++, (int) info.getIntroductoryPriceCycles());
+			} else {
+				updStat.setNull(ind++, Types.INTEGER);
+			}
+		} else {
 			updStat.setString(ind++, subscription.getKind());
 			updStat.setString(ind++, subscription.getOrderId());
 			updStat.setString(ind++, subscription.getDeveloperPayload());
