@@ -616,10 +616,10 @@ public class AdminController {
 			if (formatVersion == 1) {
 				return String.format("%d, € %d<br>€ %d", totalNew, valueNewLTV / 1000, (valueNew + valueOld) / 1000);
 			}
-			String activeStr = active > 0 ? (active + " ") : "";
+			String activeStr = active > 0 ? (active + "&nbsp;") : "";
 			return String.format("%s<b>+%d</b><br>" +
 			// "€ %d + € %d<br>"+
-					"•%d -%d<br><b>€ %d</b><br>€ %d", 
+					"•%d&nbsp;-%d<br><b>€ %d</b><br>€&nbsp;%d", 
 					activeStr, totalNew, 
 					totalOld, totalEnd,
 					// valueNew / 1000, valueOld / 1000, valueEnd / 1000,
