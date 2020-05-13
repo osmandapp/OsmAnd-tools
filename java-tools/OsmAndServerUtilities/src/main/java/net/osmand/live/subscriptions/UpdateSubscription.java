@@ -93,7 +93,7 @@ public class UpdateSubscription {
 				"WHERE userid = ? and purchaseToken = ? and sku = ?";
 		updCheckQuery = "UPDATE supporters_device_sub SET checktime = ? " +
 					"WHERE userid = ? and purchaseToken = ? and sku = ?";
-		selQuery = "SELECT userid, sku, purchaseToken, payload, checktime, starttime, expiretime, valid, coalesce(introcycles, -1) introcycles " +
+		selQuery = "SELECT userid, sku, purchaseToken, payload, checktime, starttime, expiretime, valid, introcycles " +
 				"FROM supporters_device_sub S where (valid is null or valid=true) order by userid asc";
 	}
 
@@ -242,7 +242,7 @@ public class UpdateSubscription {
 									try {
 										long purchaseDateMs = Long.parseLong(purchaseDateStr);
 										IntroductoryPriceInfo ipo = null;
-										if(introcycles != -1 || introPeriod) {
+										if(introcycles > 0 || introPeriod) {
 											ipo = new IntroductoryPriceInfo();
 											ipo.setIntroductoryPriceCycles(1);
 										}
