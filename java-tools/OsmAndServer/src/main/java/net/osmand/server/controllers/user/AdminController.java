@@ -959,21 +959,21 @@ public class AdminController {
 	
 	private void setDefaultSkuValues(Subscription s) {
 		switch(s.sku) {
-		case "osm_free_live_subscription_2": s.app = SubAppType.OSMAND; s.retention = 0.8;  s.defPriceEurMillis = 1800; break;
-		case "osm_live_subscription_2": s.app = SubAppType.OSMAND_PLUS; s.retention = 0.8; s.durationMonth = 1; s.defPriceEurMillis = 1200; break;
+		case "osm_free_live_subscription_2": s.app = SubAppType.OSMAND; s.retention = 0.9;  s.defPriceEurMillis = 1800; break;
+		case "osm_live_subscription_2": s.app = SubAppType.OSMAND_PLUS; s.retention = 0.9; s.durationMonth = 1; s.defPriceEurMillis = 1200; break;
 		
-		case "osm_live_subscription_annual_free_v1": s.app = SubAppType.OSMAND; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 8000; break;
-		case "osm_live_subscription_annual_full_v1": s.app = SubAppType.OSMAND_PLUS; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 6000;  break;
+		case "osm_live_subscription_annual_free_v1": s.app = SubAppType.OSMAND; s.retention = 0.65; s.durationMonth = 12; s.defPriceEurMillis = 8000; break;
+		case "osm_live_subscription_annual_full_v1": s.app = SubAppType.OSMAND_PLUS; s.retention = 0.73; s.durationMonth = 12; s.defPriceEurMillis = 6000;  break;
 		case "osm_live_subscription_annual_free_v2": s.app = SubAppType.OSMAND; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 4000; break;
-		case "osm_live_subscription_annual_full_v2": s.app = SubAppType.OSMAND_PLUS;  s.retention = 0.8; s.durationMonth = 12; s.defPriceEurMillis = 3000; break;
-		case "osm_live_subscription_3_months_free_v1": s.app = SubAppType.OSMAND; s.retention = 0.4; s.durationMonth = 3; s.defPriceEurMillis = 4000; break;
-		case "osm_live_subscription_3_months_full_v1": s.app = SubAppType.OSMAND_PLUS; s.retention = 0.4; s.durationMonth = 3; s.defPriceEurMillis = 3000; break;
-		case "osm_live_subscription_monthly_free_v1": s.app = SubAppType.OSMAND; s.retention = 0.3; s.durationMonth = 1; s.defPriceEurMillis = 2000; break;
-		case "osm_live_subscription_monthly_full_v1": s.app = SubAppType.OSMAND_PLUS;  s.retention = 0.3; s.durationMonth = 1; s.defPriceEurMillis = 1500;  break;
+		case "osm_live_subscription_annual_full_v2": s.app = SubAppType.OSMAND_PLUS;  s.retention = 0.81; s.durationMonth = 12; s.defPriceEurMillis = 3000; break;
+		case "osm_live_subscription_3_months_free_v1": s.app = SubAppType.OSMAND; s.retention = 0.72; s.durationMonth = 3; s.defPriceEurMillis = 4000; break;
+		case "osm_live_subscription_3_months_full_v1": s.app = SubAppType.OSMAND_PLUS; s.retention = 0.83; s.durationMonth = 3; s.defPriceEurMillis = 3000; break;
+		case "osm_live_subscription_monthly_free_v1": s.app = SubAppType.OSMAND; s.retention = 0.82; s.durationMonth = 1; s.defPriceEurMillis = 2000; break;
+		case "osm_live_subscription_monthly_full_v1": s.app = SubAppType.OSMAND_PLUS;  s.retention = 0.89; s.durationMonth = 1; s.defPriceEurMillis = 1500;  break;
 
-		case "net.osmand.maps.subscription.monthly_v1":s.app = SubAppType.IOS; s.retention = 0.1; s.durationMonth = 1; s.defPriceEurMillis = 2000; break;
-		case "net.osmand.maps.subscription.3months_v1": s.app = SubAppType.IOS; s.retention = 0.4; s.durationMonth = 3; s.defPriceEurMillis = 4000; break;
-		case "net.osmand.maps.subscription.annual_v1": s.app = SubAppType.IOS; s.retention = 0.5; s.durationMonth = 12; s.defPriceEurMillis = 8000; break;
+		case "net.osmand.maps.subscription.monthly_v1":s.app = SubAppType.IOS; s.retention = 0.85; s.durationMonth = 1; s.defPriceEurMillis = 2000; break;
+		case "net.osmand.maps.subscription.3months_v1": s.app = SubAppType.IOS; s.retention = 0.61; s.durationMonth = 3; s.defPriceEurMillis = 4000; break;
+		case "net.osmand.maps.subscription.annual_v1": s.app = SubAppType.IOS; s.retention = 0.65; s.durationMonth = 12; s.defPriceEurMillis = 8000; break;
 		default: throw new UnsupportedOperationException("Unsupported subscription " + s.sku);
 		};
 	}
@@ -1128,7 +1128,7 @@ public class AdminController {
 					retention = Math.min(0.95, ((double) retentionsList.get(2 * totalPeriods + 1))
 							/ retentionsList.get(2 * totalPeriods));
 				}
-				priceLTVEurMillis += (long) (fullPriceEurMillis * ( 1 - 1 / (1 - retention)));
+				priceLTVEurMillis += (long) (fullPriceEurMillis * retention / (1 - retention));
 			}
 		}
 		
