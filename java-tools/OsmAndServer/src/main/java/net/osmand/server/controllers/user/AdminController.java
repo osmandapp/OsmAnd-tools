@@ -334,7 +334,8 @@ public class AdminController {
 		model.addAttribute("surveyReport", getSurveyReport());
 		
 		List<Subscription> allSubs = parseSubscriptions();
-		model.addAttribute("testSubReport", getMonthlyRevenueReport(allSubs));
+		model.addAttribute("subRevenueReportMonth", getRevenueReport(allSubs, true, 24));
+		model.addAttribute("subRevenueReportDay", getRevenueReport(allSubs, false, 60));
 		
 		model.addAttribute("subscriptionsReport", getSubscriptionsReport());
 		model.addAttribute("yearSubscriptionsReport", getYearSubscriptionsReport());
@@ -746,10 +747,10 @@ public class AdminController {
 	}
 	
 	
-	private AdminGenericSubReport getMonthlyRevenueReport(List<Subscription> subs) {
+	private AdminGenericSubReport getRevenueReport(List<Subscription> subs, boolean month, int length) {
 		AdminGenericSubReport report = new AdminGenericSubReport();
-		report.month = true;
-		report.count = 24;
+		report.month = month;
+		report.count = length;
 		String h = ""; //"<br>New + Renew <br> - Cancel";
 		report.columns.add(new AdminGenericSubReportColumn("All"));
 		report.columns.add(new AdminGenericSubReportColumn("A Y" + h).app(SubAppType.OSMAND).discount(false).duration(12));
