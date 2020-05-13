@@ -732,6 +732,8 @@ public class AdminController {
 		report.count = length;
 		String h = ""; //"<br>New + Renew <br> - Cancel";
 		report.columns.add(new AdminGenericSubReportColumn("All"));
+		report.columns.add(new AdminGenericSubReportColumn("Android" + h).app(SubAppType.OSMAND,SubAppType.OSMAND_PLUS));
+		report.columns.add(new AdminGenericSubReportColumn("IOS" + h).app(SubAppType.IOS));
 		report.columns.add(new AdminGenericSubReportColumn("A Y" + h).app(SubAppType.OSMAND).discount(false).duration(12));
 		report.columns.add(new AdminGenericSubReportColumn("A+ Y" + h).app(SubAppType.OSMAND_PLUS).discount(false).duration(12));
 		report.columns.add(new AdminGenericSubReportColumn("A/2 Y" + h).app(SubAppType.OSMAND).discount(true).duration(12));
