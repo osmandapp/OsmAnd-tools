@@ -918,7 +918,7 @@ public class AdminController {
 				}
 				bld.append(((100 * l) / t)).append("%, ");
 			}
-			System.out.println(s + " " + skuRetentions.get(s));
+			System.out.println(bld.toString());
 		}
 		for(Subscription s : subs) {
 			if(s.currentPeriod == 0) {
