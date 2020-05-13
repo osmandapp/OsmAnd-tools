@@ -47,6 +47,7 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import gnu.trove.impl.hash.TLongHash;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.list.array.TLongArrayList;
 import gnu.trove.map.hash.TLongObjectHashMap;
@@ -83,6 +84,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 
 
 	private static Set<String> acceptedRoutes = new HashSet<String>();
+	private TLongObjectHashMap<TransportRoute> incompleteRoutesMap = new TLongObjectHashMap<TransportRoute>();
 
 	private PreparedStatement gtfsSelectRoute;
 	private PreparedStatement gtfsSelectStopTimes;
@@ -615,8 +617,12 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 					directGeometry.add(bytes);
 				}
 				TransportSchedule schedule = readSchedule(ref, directStops);
-				writer.writeTransportRoute(idRoute, routeName, routeEnName, ref, operator, type, dist, color, directStops, 
+				long ptr = writer.writeTransportRoute(idRoute, routeName, routeEnName, ref, operator, type, dist, color, directStops, 
 						directGeometry, stringTable, transportRoutes, schedule);
+				System.out.println(String.format("pointer for route %s (id: %d)- %d", routeName, idRoute, ptr));
+				if (isRouteIncomplete(idRoute)) {
+					incompleteRoutesMap.get(idRoute).setFileOffset((int)ptr); //what is right - int or long?
+				}
 			}
 			rs.close();
 			selectTransportRouteData.close();
@@ -639,8 +645,9 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			selectTransportStop.close();
 			selectTransportRouteStop.close();
 
+			writer.writeIncompleteTransportRoutes(incompleteRoutesMap.valueCollection(), stringTable);
 			writer.writeTransportStringTable(stringTable);
-
+			
 			writer.endWriteTransportIndex();
 			writer.flush();
 			log.info(gtfsStats);
@@ -782,6 +789,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 				stp = checkStopMissing(forwardStops, w.getLastNode(), directRoute.getForwardWays(), w.getId());
 				if (stp != null) {
 					directRoute.getForwardStops().add(stp);
+					addIncompleteRoute(directRoute.getId(), directRoute);
 				}
 			}
 			troutes.add(directRoute);
@@ -804,6 +812,14 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 
 	}
 
+	
+	private void addIncompleteRoute(long routeId, TransportRoute t) {
+		incompleteRoutesMap.put(routeId, t);
+	}
+	
+	public boolean isRouteIncomplete(long routeId) {
+		return incompleteRoutesMap.contains(routeId);
+	}
 
 	private TransportStop checkStopMissing(List<TransportStop> forwardStops, Node node, List<Way> originalWay, long wayId) {
 		TransportStop st = forwardStops.get(0);
@@ -965,11 +981,6 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		}
 		return null;
 	}
-	
-	
-	
-	
-
 
 	private int parseTime(String str) {
 		int f1 = str.indexOf(':');
@@ -1215,10 +1226,5 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 					+ ", errorsTimeParsing=" + errorsTimeParsing + ", successTripsParsing=" + successTripsParsing
 					+ ", errorsTripsStopCounts=" + errorsTripsStopCounts + "]";
 		}
-		
-		
-		
-		
-		
 	}
 }
