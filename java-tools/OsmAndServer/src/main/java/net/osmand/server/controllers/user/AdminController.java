@@ -750,10 +750,10 @@ public class AdminController {
 					columns.get(i).process(s, vls.get(i));
 				}
 			}
-			if(s.currentPeriod == 0 && month) {
+			if (s.currentPeriod == 0 && month) {
 				Calendar c = Calendar.getInstance();
 				c.setTimeInMillis(s.startPeriodTime);
-				while (c.getTimeInMillis() < s.endTime) {
+				for (int k = 0; k < s.totalMonths; k++) {
 					vls = values.get(Subscription.monthFormat.format(c.getTime()));
 					if (vls != null) {
 						for (int i = 0; i < columns.size(); i++) {
