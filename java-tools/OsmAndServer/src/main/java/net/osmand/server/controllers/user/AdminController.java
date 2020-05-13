@@ -909,16 +909,23 @@ public class AdminController {
 		for (String s : skuRetentions.keySet()) {
 			TIntArrayList arrays = skuRetentions.get(s);
 			StringBuilder bld = new StringBuilder();
-			bld.append(s).append(" - ");
+			double partLeft = 1;
+			double sum = 1;
+			double retained = 1;
 			for(int i = 0; i < arrays.size(); i+=2) {
 				int t = arrays.get(i);
 				int l = arrays.get(i + 1);
 				if(t == 0 || l == 0) {
 					break;
 				}
-				bld.append(((100 * l) / t)).append("%, ");
+				retained = ((double) l) / t;
+				partLeft = partLeft * retained;
+				sum += partLeft;
+				bld.append(((int) (100 * retained))).append("%, ");
 			}
-			System.out.println(bld.toString());
+			retained = Math.min(retained, 0.9);
+			sum += partLeft * retained / (1 - retained); // add tail
+			System.out.println(s + " - " + ((float) sum) + " " + bld.toString());
 		}
 		for(Subscription s : subs) {
 			if(s.currentPeriod == 0) {
