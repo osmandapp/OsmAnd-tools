@@ -678,7 +678,7 @@ public class AdminController {
 				return false;
 			}
 			if (discount != null) {
-				boolean d = sub.sku.contains("v2") || sub.introPriceMillis >= 0;
+				boolean d = sub.sku.contains("v2") || sub.introPriceMillis >= 0 || sub.introCycles > 0;
 				if (d != discount) {
 					return false;
 				}
@@ -807,7 +807,7 @@ public class AdminController {
 		ExchangeRates rates = parseExchangeRates();
 		
 		jdbcTemplate.query(
-				"select sku, price, pricecurrency, coalesce(introprice, -1), starttime, expiretime, autorenewing, valid from supporters_device_sub",
+				"select sku, price, pricecurrency, coalesce(introprice, -1), starttime, expiretime, autorenewing, valid, introcycles from supporters_device_sub",
 				new RowCallbackHandler() {
 
 					@Override
@@ -843,6 +843,7 @@ public class AdminController {
 						s.endTime = rs.getDate(6).getTime();
 						s.autorenewing = rs.getBoolean(7);
 						s.valid = rs.getBoolean(8);
+						s.introCycles = rs.getInt(9);
 						setDefaultSkuValues(s);
 						c.setTimeInMillis(s.startTime);
 						while(c.getTimeInMillis() < s.endTime) {
@@ -989,6 +990,7 @@ public class AdminController {
 			this.sku = s.sku;
 			this.priceMillis = s.priceMillis;
 			this.introPriceMillis = s.introPriceMillis;
+			this.introCycles = s.introCycles;
 			this.durationMonth = s.durationMonth;
 			this.app = s.app;
 			this.defPriceEurMillis = s.defPriceEurMillis;
@@ -996,6 +998,7 @@ public class AdminController {
 		}
 		
 		protected int priceMillis;
+		protected int introCycles;
 		protected int introPriceMillis;
 		protected boolean valid;
 		protected boolean autorenewing;
@@ -1055,6 +1058,9 @@ public class AdminController {
 			
 			this.fullPriceEurMillis = defPriceEurMillis;
 			this.introPriceEurMillis = defPriceEurMillis;
+			if(this.introCycles > 0) {
+				this.introPriceEurMillis = defPriceEurMillis / 2;
+			}
 			if (introPriceMillis >= 0 && priceMillis > 0) {
 				introPriceEurMillis = (int) (((double) introPriceMillis * priceEurMillis) / priceMillis);
 			}
