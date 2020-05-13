@@ -660,14 +660,15 @@ public class AdminController {
 		public long valueOld;
 		public long valueEnd;
 		public long valueNewLTV;
+		
 		@Override
 		public String toString() {
-			return toString(false);
+			return toString(0);
 		}
 		
-		public String toString(boolean shortVersion) {
-			if (shortVersion) {
-				return String.format("%d<br>€ %d" + totalNew, valueNewLTV / 1000);
+		public String toString(int formatVersion) {
+			if (formatVersion == 1) {
+				return String.format("%d %d<br>€ %d" + totalNew, valueNewLTV / 1000, (valueNew + valueOld) / 1000);
 			}
 			return String.format("<b>%d</b><br>" +
 			// "€ %d + € %d<br>"+
