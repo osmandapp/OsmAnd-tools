@@ -616,14 +616,21 @@ public class AdminController {
 			if (formatVersion == 1) {
 				return String.format("%d, € %d<br>€ %d", totalNew, valueNewLTV / 1000, (valueNew + valueOld) / 1000);
 			}
-			String activeStr = active > 0 ? (active + "&nbsp;") : "";
-			return String.format("%s<b>+%d</b><br>" +
-			// "€ %d + € %d<br>"+
-					"•%d&nbsp;-%d<br><b>€ %d</b><br>€&nbsp;%d", 
-					activeStr, totalNew, 
-					totalOld, totalEnd,
-					// valueNew / 1000, valueOld / 1000, valueEnd / 1000,
-					(valueNew + valueOld) / 1000, valueNewLTV / 1000);
+			StringBuilder row = new StringBuilder();
+			if(active > 0) {
+				row.append(active).append("&nbsp;");
+			}
+			row.append(String.format("<b>%d</b>", totalNew));
+			if (formatVersion == 2 || formatVersion == 3) {
+				row.append(String.format("<br>•%d&nbsp;-%d", totalOld, totalEnd));
+			}
+			if (formatVersion == 3 && (totalOld + totalEnd > 0)) {
+				row.append(String.format("<br>-%d%%", (totalEnd * 100) / (totalEnd + totalOld)));
+			}
+			row.append(String.format("<br><b>€ %d</b>", (valueNew + valueOld) / 1000));
+			row.append(String.format("<br>€ %d", valueNewLTV / 1000));
+			
+			return row.toString();
 		}
 		
 	}
