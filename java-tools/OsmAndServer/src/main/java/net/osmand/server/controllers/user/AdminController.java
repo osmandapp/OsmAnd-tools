@@ -618,14 +618,12 @@ public class AdminController {
 			}
 			StringBuilder row = new StringBuilder();
 			if(active > 0) {
-				row.append(active).append("&nbsp;");
+				row.append(active).append("<br>");
 			}
-			row.append(String.format("<b>%d</b>", totalNew));
+			row.append(String.format("<b>+%d</b>&nbsp;-%d", totalNew, totalEnd));
 			if (formatVersion == 2 || formatVersion == 3) {
-				row.append(String.format("<br>•%d&nbsp;-%d", totalOld, totalEnd));
-			}
-			if (formatVersion == 3 && (totalOld + totalEnd > 0)) {
-				row.append(String.format("<br>-%d%%", (totalEnd * 100) / (totalEnd + totalOld)));
+				row.append(String.format("<br>•%d&nbsp;-%d%%", totalOld + totalEnd,
+						(totalEnd * 100) / (totalEnd + totalOld)));
 			}
 			row.append(String.format("<br><b>€ %d</b>", (valueNew + valueOld) / 1000));
 			row.append(String.format("<br>€ %d", valueNewLTV / 1000));
@@ -948,7 +946,7 @@ public class AdminController {
 	
 	private void setDefaultSkuValues(Subscription s) {
 		switch(s.sku) {
-		case "osm_free_live_subscription_2": s.app = SubAppType.OSMAND; s.retention = 0.9;  s.defPriceEurMillis = 1800; break;
+		case "osm_free_live_subscription_2": s.app = SubAppType.OSMAND; s.retention = 0.9; s.durationMonth = 1; s.defPriceEurMillis = 1800; break;
 		case "osm_live_subscription_2": s.app = SubAppType.OSMAND_PLUS; s.retention = 0.9; s.durationMonth = 1; s.defPriceEurMillis = 1200; break;
 		
 		case "osm_live_subscription_annual_free_v1": s.app = SubAppType.OSMAND; s.retention = 0.65; s.durationMonth = 12; s.defPriceEurMillis = 8000; break;
