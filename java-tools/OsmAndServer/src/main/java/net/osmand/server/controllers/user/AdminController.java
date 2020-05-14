@@ -621,7 +621,7 @@ public class AdminController {
 				row.append(active).append("<br>");
 			}
 			row.append(String.format("<b>+%d</b>&nbsp;-%d", totalNew, totalEnd));
-			if (formatVersion == 2 || formatVersion == 3) {
+			if ((formatVersion == 2 || formatVersion == 3) && (totalEnd + totalOld) > 0) {
 				row.append(String.format("<br>•%d&nbsp;-%d%%", totalOld + totalEnd,
 						(totalEnd * 100) / (totalEnd + totalOld)));
 			}
