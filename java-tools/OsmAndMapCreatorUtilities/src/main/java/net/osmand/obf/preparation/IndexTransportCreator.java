@@ -822,7 +822,6 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		if (insertNode != null) {
 			for (int i = 0; i < directRoute.getForwardStops().size(); i++) {
 				TransportStop ts = directRoute.getForwardStops().get(i);
-				// TODO test id 
 				if (ts.getId() == insertNode.getId()) {
 					int insertInd = before ? i  : i + 1;
 					directRoute.getForwardStops().add(insertInd, stp);
