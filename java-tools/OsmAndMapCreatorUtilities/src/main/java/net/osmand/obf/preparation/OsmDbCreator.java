@@ -131,23 +131,21 @@ public class OsmDbCreator implements IOsmStorageFilter {
 			return getConvertId(id, ord, hash);
 		} else {
 			Relation r = (Relation) e;
-			// important keep order!
-			Map<RelationMember, EntityId> p = new LinkedHashMap<>();
-
+			// important keep order of all relation members !!!
 			for (RelationMember i : r.getMembers()) {
+				long oldId = i.getEntityId().getId().longValue();
+				EntityType entityType = i.getEntityId().getType();
 				if (i.getEntityId().getType() != EntityType.RELATION) {
-					Long ll = simpleConvertId ? ((Long)getSimpleConvertId(i.getEntityId().getId().longValue(), i.getEntityId().getType(), false)) : 
-						getGeneratedId(i.getEntityId().getId().longValue(), i.getEntityId().getType().ordinal());
-					if (ll != null) {
-						p.put(i, new EntityId(i.getEntityId().getType(), ll));
+					Long newId ;
+					if(simpleConvertId) {
+						newId = getSimpleConvertId(oldId, entityType, false);
+					} else {
+						newId = getGeneratedId(oldId, entityType.ordinal());
+					}
+					if (newId != null) {
+						r.update(i, new EntityId(entityType, newId));
 					}
 				}
-			}
-			Iterator<Entry<RelationMember, EntityId>> it = p.entrySet().iterator();
-			while (it.hasNext()) {
-				Entry<RelationMember, EntityId> es = it.next();
-				r.remove(es.getKey());
-				r.addMember(es.getValue().getId(), es.getValue().getType(), es.getKey().getRole());
 			}
 			if (simpleConvertId) {
 				return getSimpleConvertId(id, EntityType.RELATION, true);
@@ -257,9 +255,9 @@ public class OsmDbCreator implements IOsmStorageFilter {
 		initIds("node", nodeIds);
 		initIds("ways", wayIds);
 		initRelationIds("relations", relationIds);
-		prepNode = dbConn.prepareStatement("insert into node values (?, ?, ?, ?)"); //$NON-NLS-1$
-		prepWays = dbConn.prepareStatement("insert into ways values (?, ?, ?, ?, ?)"); //$NON-NLS-1$
-		prepRelations = dbConn.prepareStatement("insert into relations values (?, ?, ?, ?, ?, ?, ?)"); //$NON-NLS-1$
+		prepNode = dbConn.prepareStatement("insert into node(id, latitude, longitude, tags) values (?, ?, ?, ?)"); //$NON-NLS-1$
+		prepWays = dbConn.prepareStatement("insert into ways(id, node, ord, tags, boundary) values (?, ?, ?, ?, ?)"); //$NON-NLS-1$
+		prepRelations = dbConn.prepareStatement("insert into relations(id, member, type, role, ord, tags, del) values (?, ?, ?, ?, ?, ?, ?)"); //$NON-NLS-1$
 		dbConn.setAutoCommit(false);
 	}
 

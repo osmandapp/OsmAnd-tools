@@ -767,14 +767,13 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		directRoute.setType(route);
 		directRoute.setRef(ref);
 		directRoute.setId(directRoute.getId() << 1);
+		List<Node> incompleteNodes = getIncompeteStops(rel);
 		if (processTransportRelationV2(rel, directRoute)) { // try new transport relations first
 			List<TransportStop> forwardStops = directRoute.getForwardStops();
 			if (hasRelationIncompleteWays(rel) && forwardStops.size() > 0 && directRoute.getForwardWays().size() > 1) {
 				List<Way> mergedWays = new ArrayList<>(directRoute.getForwardWays());
 				TransportRoute.mergeRouteWays(mergedWays);
 				TransportRoute.resortWaysToStopsOrder(mergedWays, forwardStops);
-				
-				List<Node> incompleteNodes = getIncompeteStops(rel);
 				for (Way w : mergedWays) {
 					TransportStop stp = checkStopMissing(forwardStops, w.getFirstNode(), directRoute.getForwardWays(),
 							w.getId());
