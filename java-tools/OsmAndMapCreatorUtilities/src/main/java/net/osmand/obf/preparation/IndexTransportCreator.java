@@ -887,8 +887,8 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 					}
 					missingPrevious = true;
 				} else {
+					previousStop = (Node) rm.getEntity();
 					if (missingPrevious) {
-						previousStop = (Node) rm.getEntity();
 						missingStopsAfterStop.add(previousStop);
 						missingPrevious = false;
 					}
