@@ -12,6 +12,7 @@ import net.osmand.data.TransportStopExit;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
+import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.EntityParser;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
@@ -618,7 +619,6 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 				TransportSchedule schedule = readSchedule(ref, directStops);
 				long ptr = writer.writeTransportRoute(idRoute, routeName, routeEnName, ref, operator, type, dist, color, directStops, 
 						directGeometry, stringTable, transportRoutes, schedule);
-				System.out.println(String.format("pointer for route %s (id: %d)- %d", routeName, idRoute, ptr));
 				if (isRouteIncomplete(idRoute)) {
 					incompleteRoutesMap.get(idRoute).setFileOffset((int)ptr); //what is right - int or long?
 				}
@@ -769,27 +769,22 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		directRoute.setId(directRoute.getId() << 1);
 		if (processTransportRelationV2(rel, directRoute)) { // try new transport relations first
 			List<TransportStop> forwardStops = directRoute.getForwardStops();
-			if(hasRelationIncompleteWays(rel) && forwardStops.size() > 0 && 
-					directRoute.getForwardWays().size() > 1) {
+			if (hasRelationIncompleteWays(rel) && forwardStops.size() > 0 && directRoute.getForwardWays().size() > 1) {
 				List<Way> mergedWays = new ArrayList<>(directRoute.getForwardWays());
 				TransportRoute.mergeRouteWays(mergedWays);
 				TransportRoute.resortWaysToStopsOrder(mergedWays, forwardStops);
-				if(mergedWays.size() > 1) {
-					System.err.println(
-							String.format("ERROR TRANSPORT ROUTE '%d': there are multiple segments (%d) of transport route.", 
-									directRoute.getId() / 2, mergedWays.size()));
-				}
-				Way w = mergedWays.get(0);
-				TransportStop stp = checkStopMissing(forwardStops, w.getFirstNode(), 
-						directRoute.getForwardWays(), w.getId());
-				if (stp != null) {
-					directRoute.getForwardStops().add(0, stp);
-					addIncompleteRoute(directRoute.getId(), directRoute);
-				}
-				stp = checkStopMissing(forwardStops, w.getLastNode(), directRoute.getForwardWays(), w.getId());
-				if (stp != null) {
-					directRoute.getForwardStops().add(stp);
-					addIncompleteRoute(directRoute.getId(), directRoute);
+				
+				List<Node> incompleteNodes = getIncompeteStops(rel);
+				for (Way w : mergedWays) {
+					TransportStop stp = checkStopMissing(forwardStops, w.getFirstNode(), directRoute.getForwardWays(),
+							w.getId());
+					if (stp != null) {
+						insertMissingStop(directRoute, incompleteNodes, stp, true);
+					}
+					stp = checkStopMissing(forwardStops, w.getLastNode(), directRoute.getForwardWays(), w.getId());
+					if (stp != null) {
+						insertMissingStop(directRoute, incompleteNodes, stp, false);
+					}
 				}
 			}
 			troutes.add(directRoute);
@@ -810,6 +805,33 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			}
 		}
 
+	}
+
+
+	private void insertMissingStop(TransportRoute directRoute, List<Node> nds, TransportStop stp, boolean before) {
+		Node insertNode = null;
+		for (int i = 0; i < nds.size(); i += 2) {
+			Node insertNodeNew = before ? nds.get(i + 1) : nds.get(i);
+			if (insertNode == null) {
+				insertNode = insertNodeNew;
+			} else if (insertNodeNew != null
+					&& MapUtils.getDistance(insertNodeNew.getLatLon(), stp.getLocation()) < MapUtils
+							.getDistance(insertNode.getLatLon(), stp.getLocation())) {
+				insertNode = insertNodeNew;
+			}
+		}
+		if (insertNode != null) {
+			for (int i = 0; i < directRoute.getForwardStops().size(); i++) {
+				TransportStop ts = directRoute.getForwardStops().get(i);
+				// TODO test id 
+				if (ts.getId() == insertNode.getId()) {
+					int insertInd = before ? i  : i + 1;
+					directRoute.getForwardStops().add(insertInd, stp);
+					break;
+				}
+			}
+			addIncompleteRoute(directRoute.getId(), directRoute);
+		}
 	}
 
 	
@@ -849,12 +871,43 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	}
 
 
+	// returns array of stops (as node) after which and before there is a missing stop
+	// null means missing is first stop or last stop and it should be inserted before 2nd element
+	private List<Node> getIncompeteStops(Relation rel) {
+		List<Node> missingStopsAfterStop = new ArrayList<Node>();
+		boolean missingPrevious = false;
+		Node previousStop = null;
+		for (RelationMember rm : rel.getMembers()) {
+			boolean node = rm.getEntityId().getType() == EntityType.NODE;
+			// TODO add role "platform"
+			if (node && ("stop".equals(rm.getRole()))) {
+				if (rm.getEntity() == null) {
+					if (!missingPrevious) {
+						missingStopsAfterStop.add(previousStop);
+					}
+					missingPrevious = true;
+				} else {
+					if (missingPrevious) {
+						previousStop = (Node) rm.getEntity();
+						missingStopsAfterStop.add(previousStop);
+						missingPrevious = false;
+					}
+				}
+			}
+		}
+		if (missingPrevious) {
+			missingStopsAfterStop.add(null);
+		}
+		return missingStopsAfterStop;
+	}
+	
+
 	private boolean hasRelationIncompleteWays(Relation rel) {
 		boolean relationHasIncompleteWays = false;
 		for (RelationMember rm : rel.getMembers()) {
 			if (rm.getEntity() instanceof Way) {
 				Way w = (Way) rm.getEntity();
-				if(w.getNodeIds().isEmpty()) {
+				if (w.getNodeIds().isEmpty()) {
 					relationHasIncompleteWays = true;
 					break;
 				}
