@@ -65,7 +65,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 
 	private static final int DISTANCE_THRESHOLD = 50;
 	public static final int MISSING_STOP_DISTANCE_THRESHOLD = 1000;
-	public static final String MISSING_STOP_NAME = "#Missing Stop";
+	public static final String MISSING_STOP_NAME = TransportStop.MISSING_STOP_NAME;
 
 	private Set<Long> visitedStops = new HashSet<Long>();
 	private PreparedStatement transRouteStat;
@@ -772,7 +772,6 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			List<TransportStop> forwardStops = directRoute.getForwardStops();
 			if (hasRelationIncompleteWays(rel) && forwardStops.size() > 0 && directRoute.getForwardWays().size() > 1) {
 				List<Way> mergedWays = new ArrayList<>(directRoute.getForwardWays());
-//				 System.out.println(" Process incomplete route: " + directRoute.getId() / 2 + " " + directRoute.getForwardWays().size()) ;
 				TransportRoute.mergeRouteWays(mergedWays);
 				TransportRoute.resortWaysToStopsOrder(mergedWays, forwardStops);
 				for (Way w : mergedWays) {
