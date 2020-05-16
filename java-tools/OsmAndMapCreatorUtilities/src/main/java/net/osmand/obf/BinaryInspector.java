@@ -1311,11 +1311,6 @@ public class BinaryInspector {
 				}
 			}
 		}
-		println("\nIncomplete Routes:");
-		for (IncompleteTransportRoute itr : index.getIncompleteRoutes()) {
-			println(String.format("  Route id - %d, offset - %d", itr.getRouteId(), itr.getRouteOffset()));
-//					+ ", ref - s%, type - %s, operator - %s", itr.getRouteId(), itr.getRouteOffset(), itr.getRef(), itr.getOperator(), itr.getOperator()));
-		}
 	}
 
 
