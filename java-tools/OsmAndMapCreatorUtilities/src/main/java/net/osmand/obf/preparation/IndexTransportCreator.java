@@ -620,7 +620,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 				long ptr = writer.writeTransportRoute(idRoute, routeName, routeEnName, ref, operator, type, dist, color, directStops, 
 						directGeometry, stringTable, transportRoutes, schedule);
 				if (isRouteIncomplete(idRoute)) {
-					incompleteRoutesMap.get(idRoute).setFileOffset((int)ptr); //what is right - int or long?
+					incompleteRoutesMap.get(idRoute).setFileOffset((int) ptr);
 				}
 			}
 			rs.close();
