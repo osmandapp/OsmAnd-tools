@@ -945,10 +945,9 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 					for (int j = 0; j < types.length; j += 2) {
 						int ids = Algorithms.parseSmallIntFromBytes(types, j);
 						MapRulType mapRulType = renderingTypes.getTypeByInternalId(ids);
-						// example to disable way simplification
-//						if("highway".equals(mapRulType.getTag()) && "tram".equals(mapRulType.getValue())) {
-//							allowWaySimplification = false;
-//						}
+						if("railway".equals(mapRulType.getTag()) && "tram".equals(mapRulType.getValue())) {
+							allowWaySimplification = false;
+						}
 						typeUse[j / 2] = mapRulType.getTargetId();
 					}
 					byte[] addTypes = rs.getBytes(5);

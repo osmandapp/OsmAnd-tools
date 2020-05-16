@@ -11,9 +11,11 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Calendar;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.EnumSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -48,6 +50,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 
+import gnu.trove.list.array.TIntArrayList;
 import net.osmand.server.api.repo.LotterySeriesRepository;
 import net.osmand.server.api.repo.LotterySeriesRepository.LotterySeries;
 import net.osmand.server.api.repo.LotterySeriesRepository.LotteryStatus;
@@ -328,11 +331,13 @@ public class AdminController {
 		model.addAttribute("downloadServers", getDownloadSettings());
 		model.addAttribute("reports", getReports());
 		model.addAttribute("surveyReport", getSurveyReport());
-		model.addAttribute("subscriptionsReport", getSubscriptionsReport());
-		model.addAttribute("yearSubscriptionsReport", getYearSubscriptionsReport());
+		List<Subscription> allSubs = parseSubscriptions();
+		model.addAttribute("subRevenueReportMonth", getRevenueReport(allSubs, true, 24));
+		model.addAttribute("subRevenueReportDay", getRevenueReport(allSubs, false, 60));
+		
+		
+		model.addAttribute("yearSubscriptionsReport", getYearSubscriptionsRetentionReport());
 		model.addAttribute("emailsReport", getEmailsDBReport());
-		model.addAttribute("newSubsReport", getNewSubsReport());
-		model.addAttribute("futureCancelReport", getFutureCancelReport());
 		model.addAttribute("btc", getBitcoinReport());
 		model.addAttribute("polls", pollsService.getPollsConfig(false));
 		return "admin/info";
@@ -410,49 +415,9 @@ public class AdminController {
 		return er;
 	}
 	
-	public static class ActiveSubscriptionReport {
-		public String date;
-		public SubscriptionReport a; // active 
-		public SubscriptionReport n; // new
-		public SubscriptionReport c; // cancelled
-	}
-	
-	public static class NewSubscriptionReport {
-		public String date;
-		public int monthCount;
-		public int quarterCount;
-		public int annualCount;
-		public int annualDiscountCount;
-		
-		public int iosMonthCount;
-		public int iosQuarterCount;
-		public int iosAnnualCount;
-		public int iosAnnualDiscountCount;
-		
-		public int total;
-		public int atotal;
-		public int iostotal;
-		public int totalWeighted;
-		public int totalAvgDuration;
-		
-		public int cancelMonthCount;
-		public int cancelQuarterCount;
-		public int cancelAnnualCount;
-		public int cancelAnnualDiscountCount;
-		
-		public int cancelTotal;
-		public int cancelTotalWeighted;
-		public int cancelTotalAvgDuration;
-		
-		public int delta;
-		public int deltaWeighted;
-		public int revenueGain;
-		public int totalLifeValue;
-		public int cancelTotalLifeValue;
-	}
 	
 	
-	public static class YearSubscriptionReport {
+	public static class YearSubscriptionRetentionReport {
 		public String month;
 		public int[] iOSRenew;
 		public String[] strIOSRenew;
@@ -477,11 +442,11 @@ public class AdminController {
 		public String[] strAllTotal;
 		
 		
-		public YearSubscriptionReport(String month) {
+		public YearSubscriptionRetentionReport(String month) {
 			this.month = month;
 		}
 		
-		public void plus(YearSubscriptionReport r) {
+		public void plus(YearSubscriptionRetentionReport r) {
 			iOSNonRenew = addArrayToArray(iOSNonRenew, r.iOSNonRenew);
 			iOSRenew = addArrayToArray(iOSRenew, r.iOSRenew);
 			androidV2Renew = addArrayToArray(androidV2Renew, r.androidV2Renew);
@@ -567,8 +532,8 @@ public class AdminController {
 	}
  	
 	
-	private Collection<YearSubscriptionReport> getYearSubscriptionsReport() {
-		final Map<String, YearSubscriptionReport> res = new LinkedHashMap<String, YearSubscriptionReport>(); 
+	private Collection<YearSubscriptionRetentionReport> getYearSubscriptionsRetentionReport() {
+		final Map<String, YearSubscriptionRetentionReport> res = new LinkedHashMap<String, YearSubscriptionRetentionReport>(); 
 		jdbcTemplate.query("select  to_char(starttime, 'YYYY-MM') \"start\", " + 
 				"        round(extract(day from expiretime - starttime)/365) \"years\", sku, " + 
 				"        count(*) FILTER (WHERE autorenewing and valid) \"auto\", " + 
@@ -586,9 +551,9 @@ public class AdminController {
 						int renewing = rs.getInt(4);
 						int nonrenewing = rs.getInt(5);
 						int unknown = rs.getInt(6);
-						YearSubscriptionReport report  = res.get(month);
+						YearSubscriptionRetentionReport report  = res.get(month);
 						if(report == null) {
-							report = new YearSubscriptionReport(month);
+							report = new YearSubscriptionRetentionReport(month);
 							res.put(month, report);
 						}
 						if(sku.startsWith("net.osmand")) {
@@ -608,22 +573,22 @@ public class AdminController {
 
 					
 		});
-		ArrayList<YearSubscriptionReport> list = new ArrayList<>(res.values());
-		YearSubscriptionReport totalAll = new YearSubscriptionReport("All");
-		Map<String, YearSubscriptionReport> yearsTotal = new TreeMap<String, AdminController.YearSubscriptionReport>();
-		for(YearSubscriptionReport r: res.values()) {
+		ArrayList<YearSubscriptionRetentionReport> list = new ArrayList<>(res.values());
+		YearSubscriptionRetentionReport totalAll = new YearSubscriptionRetentionReport("All");
+		Map<String, YearSubscriptionRetentionReport> yearsTotal = new TreeMap<String, AdminController.YearSubscriptionRetentionReport>();
+		for(YearSubscriptionRetentionReport r: res.values()) {
 			r.total();
 			String year = r.month.substring(0, 4);
-			YearSubscriptionReport yearSubscriptionReport = yearsTotal.get(year);
+			YearSubscriptionRetentionReport yearSubscriptionReport = yearsTotal.get(year);
 			if(yearSubscriptionReport == null) {
-				yearSubscriptionReport = new YearSubscriptionReport(year);
+				yearSubscriptionReport = new YearSubscriptionRetentionReport(year);
 				yearsTotal.put(year, yearSubscriptionReport);
 			}
 			yearSubscriptionReport.plus(r);
 			totalAll.plus(r);
 		}
 		totalAll.total();
-		for(YearSubscriptionReport y : yearsTotal.values()) {
+		for(YearSubscriptionRetentionReport y : yearsTotal.values()) {
 			y.total();
 			list.add(y);
 		}
@@ -631,270 +596,499 @@ public class AdminController {
 		return list;
 	}
 	
-	private List<SubscriptionReport> getFutureCancelReport() {
-
-		List<SubscriptionReport> result = jdbcTemplate
-				.query(
-						"select date_trunc('day', expiretime) d,  count(*), sku,  EXTRACT(DAY FROM sum(expiretime-starttime)) " +
-						"from supporters_device_sub where  " +
-						"expiretime > now() +  interval '1 days' and expiretime < now() +  interval '40 days' " +
-						"group by date_trunc('day', expiretime), sku order by 1 asc" , getRowMapper());
-		mergeSubscriptionReports(result);
-		return result;
-	}	
 	
-	private List<NewSubscriptionReport> getNewSubsReport() {
-		List<SubscriptionReport> cancelled = jdbcTemplate
-				.query(	"SELECT O.d, A.cnt, A.sku, A.dur from ( " +
-						"	SELECT date_trunc('day', generate_series(now() - '90 days'::interval, now(), '1 day'::interval)) as d" +
-						") O left join ( " +
-						"	SELECT date_trunc('day', expiretime) d,  count(*) cnt, sku, extract(day FROM sum(expiretime-starttime) ) dur "+
-						"   FROM supporters_device_sub " +
-						"	WHERE expiretime < now() - interval '9 hours' and expiretime > now() -  interval '90 days' " +
-						"	GROUP BY date_trunc('day', expiretime), sku " +
-						") A on A.d = O.d order by 1 desc", getRowMapper());
-		mergeSubscriptionReports(cancelled);
-		List<SubscriptionReport> newActive = jdbcTemplate
-				.query(	"SELECT O.d, A.cnt, A.sku, A.dur from ( " +
-						"	SELECT date_trunc('day', generate_series(now() - '90 days'::interval, now(), '1 day'::interval)) as d" +
-						") O left join ( " +
-						"	SELECT date_trunc('day', starttime) d,  count(*) cnt, sku, extract(day FROM sum(expiretime-starttime) ) dur " +
-						"   FROM supporters_device_sub  " +
-						"	WHERE starttime > now() -  interval '90 days' " +
-						"	GROUP BY date_trunc('day', starttime), sku " +
-						") A on A.d = O.d order by 1 desc", getRowMapper());
-		mergeSubscriptionReports(newActive);
-		List<NewSubscriptionReport> result = new ArrayList<AdminController.NewSubscriptionReport>();
-		if (newActive.size() == cancelled.size()) {
-			for (int i = 0; i < newActive.size(); i++) {
-				SubscriptionReport na = newActive.get(i);
-				SubscriptionReport ca = cancelled.get(i);
-				if (!ca.date.equals(na.date)) {
-					continue;
-				}
-				NewSubscriptionReport sr = new NewSubscriptionReport();
-				sr.date = na.date;
-				sr.monthCount = na.monthCount;
-				sr.iosMonthCount = na.iosMonthCount;
-				sr.annualCount = na.annualCount;
-				sr.iosAnnualCount = na.iosAnnualCount;
-				sr.quarterCount = na.quarterCount;
-				sr.iosQuarterCount = na.iosQuarterCount;
-				sr.annualDiscountCount = na.annualDiscountCount;
-				sr.iosAnnualDiscountCount = na.iosAnnualDiscountCount;
-				sr.cancelMonthCount = ca.monthCount + ca.iosMonthCount;
-				sr.cancelAnnualCount = ca.annualCount + ca.iosAnnualCount;
-				sr.cancelQuarterCount = ca.quarterCount + ca.iosQuarterCount;
-				sr.cancelAnnualDiscountCount = ca.annualDiscountCount + ca.iosAnnualDiscountCount;
-				sr.atotal = sr.monthCount + sr.annualCount + sr.annualDiscountCount + sr.quarterCount ;
-				sr.iostotal = sr.iosMonthCount + sr.iosAnnualCount + sr.iosAnnualDiscountCount + sr.iosQuarterCount ;
-				sr.total = sr.atotal + sr.iostotal;
-				sr.totalAvgDuration = na.count > 0 ? na.duration / na.count : 0;
-				sr.cancelTotal = sr.cancelMonthCount + sr.cancelAnnualCount + sr.cancelAnnualDiscountCount
-						+ sr.cancelQuarterCount;
-				sr.cancelTotalAvgDuration = ca.count > 0 ? ca.duration / ca.count : 0;
-
-				sr.totalWeighted = (int) na.annualValue;
-				sr.cancelTotalWeighted = (int) ca.annualValue;
-				sr.totalLifeValue = (int) na.totalLifeValue;
-				sr.cancelTotalLifeValue = (int) ca.totalLifeValue;
-
-				sr.revenueGain = (int) (na.value - ca.value);
-				sr.delta = sr.total - sr.cancelTotal;
-				sr.deltaWeighted = sr.totalWeighted - sr.cancelTotalWeighted;
-
-				result.add(sr);
-			}
+	public static class AdminGenericSubReportColumnValue {
+		public int active;
+		public int totalNew;
+		public int totalOld;
+		public int totalEnd;
+		public long valueNew;
+		public long valueOld;
+		public long valueEnd;
+		public long valueNewLTV;
+		
+		@Override
+		public String toString() {
+			return toString(0);
 		}
-		return result;
-	}
-	
-	public static class SubscriptionReport {
-		public String date;
-		public int count;
-		public int duration;
 		
-		public int annualCount;
-		public int monthCount;
-		public int annualDiscountCount;
-		public int quarterCount;
-		public int iosAnnualCount;
-		public int iosAnnualDiscountCount;
-		public int iosQuarterCount;
-		public int iosMonthCount;
-		public double annualValue;
-		public double value;
-		public double totalLifeValue;
-		public double valueOfAnnuals;
-		public double valueOfQuarterly;
-		public double valueOfMonthly;
-		
-		public void merge(SubscriptionReport c) {
-			count += c.count;
-			duration += c.duration;
-			annualCount += c.annualCount;
-			monthCount += c.monthCount;
-			annualDiscountCount += c.annualDiscountCount;
-			quarterCount += c.quarterCount;
-			iosAnnualCount += c.iosAnnualCount;
-			iosAnnualDiscountCount += c.iosAnnualDiscountCount;
-			iosQuarterCount += c.iosQuarterCount;
-			iosMonthCount += c.iosMonthCount;
-			annualValue += c.annualValue;
-			totalLifeValue += c.totalLifeValue;
-			valueOfAnnuals += c.valueOfAnnuals;
-			valueOfMonthly += c.valueOfMonthly;
-			valueOfQuarterly += c.valueOfQuarterly;
-			value += c.value;
+		public String toString(int formatVersion) {
+			if (formatVersion == 1) {
+				return String.format("%d, € %d<br>€ %d", totalNew, valueNewLTV / 1000, (valueNew + valueOld) / 1000);
+			}
+			StringBuilder row = new StringBuilder();
+			if(active > 0) {
+				row.append(active).append("<br>");
+			}
+			row.append(String.format("<b>+%d</b>&nbsp;-%d", totalNew, totalEnd));
+			if ((formatVersion == 2 || formatVersion == 3) && (totalEnd + totalOld) > 0) {
+				row.append(String.format("<br>•%d&nbsp;-%d%%", totalOld + totalEnd,
+						(totalEnd * 100) / (totalEnd + totalOld)));
+			}
+			row.append(String.format("<br><b>€ %d</b>", (valueNew + valueOld) / 1000));
+			row.append(String.format("<br>€ %d", valueNewLTV / 1000));
 			
+			return row.toString();
+		}
+		
+	}
+	
+	public static class AdminGenericSubReportColumn {
+		private Set<SubAppType> filterApp = null;
+		private int filterDuration = -1;
+		private Boolean discount;
+		public final String name;
+		
+		public AdminGenericSubReportColumn(String name) {
+			this.name = name;
+		}
+		
+		public AdminGenericSubReportColumn app(SubAppType... vls) {
+			this.filterApp = EnumSet.of(vls[0], vls);
+			return this;
+		}
+		
+		public AdminGenericSubReportColumn duration(int duration) {
+			this.filterDuration = duration;
+			return this;
+		}
+		public AdminGenericSubReportColumn discount(boolean discount) {
+			this.discount = discount;
+			return this;
+		}
+		
+		public void process(Subscription sub, AdminGenericSubReportColumnValue value) {
+			if(!filter(sub)) {
+				return;
+			}
+			int eurMillis = sub.priceEurMillis;
+			if (sub.currentPeriod > 0) {
+				value.totalOld++;
+				value.valueOld += eurMillis;
+			} else if (sub.currentPeriod == 0) {
+				value.totalNew++;
+				value.valueNewLTV += sub.priceLTVEurMillis;
+				value.valueNew += eurMillis;
+			} else {
+				value.totalEnd++;
+				value.valueEnd += eurMillis;
+			}
+		}
+
+		public boolean filter(Subscription sub) {
+			if (filterApp != null && !filterApp.contains(sub.app)) {
+				return false;
+			}
+			if (filterDuration != -1 && filterDuration != sub.durationMonth) {
+				return false;
+			}
+			if (discount != null) {
+				boolean d = sub.sku.contains("v2") || sub.introPriceMillis >= 0 || sub.introCycles > 0;
+				if (d != discount) {
+					return false;
+				}
+			}
+			return true;
+		}
+
+		public AdminGenericSubReportColumnValue initValue() {
+			return new AdminGenericSubReportColumnValue();
+		}
+
+		
+	}
+	
+	public static class AdminGenericSubReport {
+		public boolean month; // month or day
+		public int count; 
+		public List<AdminGenericSubReportColumn> columns = new ArrayList<>();
+		public Map<String, List<AdminGenericSubReportColumnValue>> values = new LinkedHashMap<>();
+
+		public void addResult(Subscription s) {
+			List<AdminGenericSubReportColumnValue> vls = values.get(month ? s.startPeriodMonth : s.startPeriodDay);
+			if (vls != null) {
+				for (int i = 0; i < columns.size(); i++) {
+					columns.get(i).process(s, vls.get(i));
+				}
+			}
+			if (s.currentPeriod == 0 && month) {
+				Calendar c = Calendar.getInstance();
+				c.setTimeInMillis(s.startPeriodTime);
+				for (int k = 0; k < s.totalMonths; k++) {
+					c.add(Calendar.MONTH, 1);
+					vls = values.get(Subscription.monthFormat.format(c.getTime()));
+					if (vls != null) {
+						for (int i = 0; i < columns.size(); i++) {
+							if (columns.get(i).filter(s)) {
+								vls.get(i).active++;
+							}
+						}
+					}
+					
+				}
+			}
 		}
 	}
 	
-	private void addSubCount(SubscriptionReport sr, int cnt, String sku, int duration) {
-		double value = 0;
-		int periodMonth = 0;
-		switch(sku) {
-		case "osm_live_subscription_2": sr.monthCount+=cnt; periodMonth = 1; value = 1.2; break; 
-		case "osm_free_live_subscription_2": sr.monthCount+=cnt; periodMonth = 1; value = 1.8; break;
-		case "osm_live_subscription_annual_free_v1": sr.annualCount+=cnt; periodMonth = 12; value = 8; break;
-		case "osm_live_subscription_annual_free_v2": sr.annualDiscountCount+=cnt; periodMonth = 12; value = 4; break;
-		case "osm_live_subscription_annual_full_v1": sr.annualCount+=cnt; periodMonth = 12; value = 6; break;
-		case "osm_live_subscription_annual_full_v2": sr.annualDiscountCount+=cnt; periodMonth = 12; value = 3; break;
-		case "osm_live_subscription_monthly_free_v1": sr.monthCount+=cnt; periodMonth = 1; value = 2; break;
-		case "osm_live_subscription_monthly_full_v1": sr.monthCount+=cnt; periodMonth = 1; value = 1.5; break;
-		case "osm_live_subscription_3_months_free_v1": sr.quarterCount+=cnt; periodMonth = 3; value = 4; break;
-		case "osm_live_subscription_3_months_full_v1": sr.quarterCount+=cnt; periodMonth = 3; value = 3; break;
-		case "net.osmand.maps.subscription.monthly_v1": sr.iosMonthCount+=cnt; periodMonth = 1; value = 2; break;
-		case "net.osmand.maps.subscription.3months_v1": sr.iosQuarterCount+=cnt; periodMonth = 3; value =4; break;
-		case "net.osmand.maps.subscription.annual_v1": sr.iosAnnualCount+=cnt; periodMonth = 12; value = 8; break;
-		default: throw new UnsupportedOperationException("Unsupported subscription " + sku);
-		};
-		double revenuePerPeriod = cnt * value;
-		sr.annualValue += revenuePerPeriod * (12 / periodMonth);
-		sr.value += revenuePerPeriod;
-		sr.totalLifeValue += value * duration / (periodMonth * 30.0);
-		if(periodMonth == 12) {
-			sr.valueOfAnnuals += revenuePerPeriod; 	
-		} else if(periodMonth == 3) {
-			sr.valueOfQuarterly += revenuePerPeriod;
-		} else if(periodMonth == 1) {
-			sr.valueOfMonthly += revenuePerPeriod;
-		}
+	
+	private AdminGenericSubReport getRevenueReport(List<Subscription> subs, boolean month, int length) {
+		AdminGenericSubReport report = new AdminGenericSubReport();
+		report.month = month;
+		report.count = length;
+		String h = ""; //"<br>New + Renew <br> - Cancel";
+		report.columns.add(new AdminGenericSubReportColumn("All"));
+		report.columns.add(new AdminGenericSubReportColumn("Android" + h).app(SubAppType.OSMAND,SubAppType.OSMAND_PLUS));
+		report.columns.add(new AdminGenericSubReportColumn("IOS" + h).app(SubAppType.IOS));
+		report.columns.add(new AdminGenericSubReportColumn("A Y" + h).app(SubAppType.OSMAND).discount(false).duration(12));
+		report.columns.add(new AdminGenericSubReportColumn("A+ Y" + h).app(SubAppType.OSMAND_PLUS).discount(false).duration(12));
+		report.columns.add(new AdminGenericSubReportColumn("A/2 Y" + h).app(SubAppType.OSMAND).discount(true).duration(12));
+		report.columns.add(new AdminGenericSubReportColumn("A+/2 Y" + h).app(SubAppType.OSMAND_PLUS).discount(true).duration(12));
+		report.columns.add(new AdminGenericSubReportColumn("A Q" + h).app(SubAppType.OSMAND).duration(3));
+		report.columns.add(new AdminGenericSubReportColumn("A+ Q" + h).app(SubAppType.OSMAND_PLUS).duration(3));
+		report.columns.add(new AdminGenericSubReportColumn("A M" + h).app(SubAppType.OSMAND).duration(1));
+		report.columns.add(new AdminGenericSubReportColumn("A+ M" + h).app(SubAppType.OSMAND_PLUS).duration(1));
+		report.columns.add(new AdminGenericSubReportColumn("I Y" + h).app(SubAppType.IOS).discount(false).duration(12));
+		report.columns.add(new AdminGenericSubReportColumn("I/2 Y" + h).app(SubAppType.IOS).discount(true).duration(12));
+		report.columns.add(new AdminGenericSubReportColumn("I Q" + h).app(SubAppType.IOS).duration(3));
+		report.columns.add(new AdminGenericSubReportColumn("I M" + h).app(SubAppType.IOS).duration(1));
+		buildReport(report, subs);
+		return report;
 	}
 	
+	private static class ExchangeRate {
+		private long time;
+		private double eurRate;
+	}
 	
-	private List<ActiveSubscriptionReport> getSubscriptionsReport() {
-		List<SubscriptionReport> news = jdbcTemplate
-				.query(  "SELECT date_trunc('day', now() - a.month * interval '1 month'), count(*), t.sku, extract(day FROM sum(t.expiretime-t.starttime) ) "	+
-						 "FROM (select generate_series(0, 24) as month) a join supporters_device_sub t  "	+
-						 "ON t.starttime > now()  - (a.month + 1) * interval '1 month' and t.starttime < now() - a.month * interval '1 month' "	+
-						 "GROUP BY a.month, t.sku ORDER BY 1 desc, 2 desc", getRowMapper());
-		mergeSubscriptionReports(news);
-		
-		List<SubscriptionReport> cancelled = jdbcTemplate
-				.query(  "SELECT date_trunc('day', now() - a.month * interval '1 month'), count(*), t.sku, extract(day FROM sum(t.expiretime-t.starttime) ) "	+
-						 "FROM (select generate_series(0, 24) as month) a join supporters_device_sub t  "	+
-						 "ON t.expiretime > now()  - (a.month + 1) * interval '1 month' and t.expiretime < now() - a.month * interval '1 month' "	+
-						 "GROUP BY a.month, t.sku ORDER BY 1 desc, 2 desc", getRowMapper());
-		mergeSubscriptionReports(cancelled);
-		
-		List<SubscriptionReport> active = jdbcTemplate
-				.query(  "SELECT date_trunc('day', now() - a.month * interval '1 month'), count(*), t.sku, extract(day FROM sum(t.expiretime-t.starttime) ) "	+
-						 "FROM (select generate_series(0, 24) as month) a join supporters_device_sub t  "	+
-						 "ON t.expiretime > now()  - a.month * interval '1 month' and t.starttime < now() - a.month * interval '1 month' "	+
-						 "GROUP BY a.month, t.sku ORDER BY 1 desc, 2 desc", getRowMapper());
-		mergeSubscriptionReports(active);
-		
-		for(int i = 0; i < active.size() - 1; i++) {
-			SubscriptionReport currentMonth = active.get(i);
-			SubscriptionReport prevMonth = active.get(i + 1);
-			// store difference of value instead of value
-			// the operation could be inverted by restoring from last value
-			currentMonth.valueOfAnnuals = currentMonth.valueOfAnnuals - prevMonth.valueOfAnnuals;
-			currentMonth.valueOfQuarterly = currentMonth.valueOfQuarterly - prevMonth.valueOfQuarterly;
-			currentMonth.valueOfMonthly = currentMonth.valueOfMonthly - prevMonth.valueOfMonthly;
-		}
-		// calculate revenue by going from the end 
-		for(int i = active.size() - 1; i >= 0; i--) {
-			SubscriptionReport currentMonth = active.get(i);
-			if(i + 12 < active.size()) {
-				SubscriptionReport prevYearMonth = active.get(i + 12);
-				// prevYearMonth.valueOfAnnuals already has revenue instead of value
-				currentMonth.valueOfAnnuals += prevYearMonth.valueOfAnnuals;
+	private static class ExchangeRates {
+		Map<String, List<ExchangeRate>> currencies = new LinkedHashMap<>();
+
+		public void add(String cur, long time, double eurRate) {
+			ExchangeRate r = new ExchangeRate();
+			r.time = time;
+			r.eurRate = eurRate;
+			if (!currencies.containsKey(cur)) {
+				currencies.put(cur, new ArrayList<>());
 			}
+			currencies.get(cur).add(r);
 		}
 		
-		for(int i = active.size() - 1; i >= 0; i--) {
-			SubscriptionReport currentMonth = active.get(i);
-			if(i + 3 < active.size()) {
-				SubscriptionReport prevQuarterMonth = active.get(i + 3);
-				// prevYearMonth.valueOfAnnuals already has revenue instead of value
-				currentMonth.valueOfQuarterly += prevQuarterMonth.valueOfQuarterly;
+		public double getEurRate(String cur, long time) {
+			List<ExchangeRate> lst = currencies.get(cur);
+			if (lst != null) {
+				ExchangeRate ne = lst.get(0);
+				for (int i = 1; i < lst.size(); i++) {
+					if (Math.abs(time - lst.get(i).time) < Math.abs(time - ne.time)) {
+						ne = lst.get(i);
+					}
+				}
+				return ne.eurRate;
 			}
+			return 0;
 		}
 		
-		for(int i = active.size() - 1; i >= 0; i--) {
-			SubscriptionReport currentMonth = active.get(i);
-			if (i + 1 < active.size()) {
-				SubscriptionReport prevMonth = active.get(i + 1);
-				// prevYearMonth.valueOfAnnuals already has revenue instead of value
-				currentMonth.valueOfMonthly += prevMonth.valueOfMonthly;
+	}
+
+	private void buildReport(AdminGenericSubReport report, List<Subscription> subs) {
+		SimpleDateFormat dayFormat = new SimpleDateFormat("yyyy-MM-dd");
+		SimpleDateFormat dateFormat = report.month ? new SimpleDateFormat("yyyy-MM") : dayFormat;
+		Calendar c = Calendar.getInstance();
+		c.setTimeInMillis(System.currentTimeMillis());
+		for (int i = 0; i < report.count; i++) {
+			List<AdminGenericSubReportColumnValue> lst = new ArrayList<>();
+			for(AdminGenericSubReportColumn col : report.columns) {
+				lst.add(col.initValue());
 			}
+			report.values.put(dateFormat.format(c.getTime()), lst);
+			c.add(report.month ? Calendar.MONTH : Calendar.DAY_OF_MONTH, -1);
 		}
-		
-		List<ActiveSubscriptionReport> res = new ArrayList<ActiveSubscriptionReport>();
-		if(news.size() == active.size() && active.size() == cancelled.size()) {
-			for(int i = 0; i < active.size(); i++) {
-				ActiveSubscriptionReport a = new ActiveSubscriptionReport();
-				a.date = active.get(i).date;
-				a.a = active.get(i);
-				a.n = news.get(i);
-				a.c = cancelled.get(i);
-				res.add(a);
-			}
+		for(Subscription s : subs) {
+			report.addResult(s);
 		}
-		
-		return res;
 	}
 
 
+	private List<Subscription> parseSubscriptions() {
+		Calendar c = Calendar.getInstance();
+		List<Subscription> subs = new ArrayList<AdminController.Subscription>();
+		ExchangeRates rates = parseExchangeRates();
+		
+		jdbcTemplate.query(
+				"select sku, price, pricecurrency, coalesce(introprice, -1), starttime, expiretime, autorenewing, valid, introcycles from supporters_device_sub",
+				new RowCallbackHandler() {
 
-	private RowMapper<SubscriptionReport> getRowMapper() {
-		return new RowMapper<SubscriptionReport>() {
+					@Override
+					public void processRow(ResultSet rs) throws SQLException {
+						if (rs.getDate(5) == null || rs.getDate(6) == null) {
+							return;
+						}
+						Subscription main = createSub(rs);
+						if (main.totalPeriods <= 0) {
+							return;
+						}
+						c.setTimeInMillis(main.startTime);
+						subs.add(main);
+						for (int i = 1; i < main.totalPeriods; i++) {
+							Subscription nextPeriod = new Subscription(main);
+							c.add(Calendar.MONTH, main.durationMonth);
+							nextPeriod.buildUp(c.getTime(), i, rates);
+							subs.add(nextPeriod);
+						}
+						c.setTimeInMillis(main.endTime);
+						Subscription endPeriod = new Subscription(main);
+						endPeriod.buildUp(c.getTime(), -1, rates);
+						subs.add(endPeriod);
+					}
+
+					private Subscription createSub(ResultSet rs) throws SQLException {
+						Subscription s = new Subscription();
+						s.sku = rs.getString(1);
+						s.priceMillis = rs.getInt(2);
+						s.pricecurrency = rs.getString(3);
+						s.introPriceMillis = rs.getInt(4);
+						s.startTime = rs.getDate(5).getTime();
+						s.endTime = rs.getDate(6).getTime();
+						s.autorenewing = rs.getBoolean(7);
+						s.valid = rs.getBoolean(8);
+						s.introCycles = rs.getInt(9);
+						setDefaultSkuValues(s);
+						c.setTimeInMillis(s.startTime);
+						while(c.getTimeInMillis() < s.endTime) {
+							c.add(Calendar.MONTH, 1);
+							s.totalMonths++;
+						}
+						// we rolled up more than 14 days in future 
+						if(c.getTimeInMillis() - s.endTime > 1000 * 60 * 60 * 24 * 14) {
+							s.totalMonths--;
+						}
+						s.totalPeriods = (int) Math.round((double) s.totalMonths / s.durationMonth);
+						s.buildUp(new Date(s.startTime), 0, rates);
+						return s;
+					}
+				});
+		// calculate retention rate
+		Map<String, TIntArrayList> skuRetentions = new LinkedHashMap<String, TIntArrayList>();
+		for (Subscription s : subs) {
+			if (s.currentPeriod == 0) {
+				TIntArrayList retentionList = skuRetentions.get(s.getSku());
+				if (retentionList == null) {
+					retentionList = new TIntArrayList();
+					skuRetentions.put(s.getSku(), retentionList);
+				}
+				boolean ended = s.isEnded();
+				while (retentionList.size() < 2 * s.totalPeriods) {
+					retentionList.add(0);
+				}
+				for (int i = 0; i < s.totalPeriods; i++) {
+					int ind = 2 * i;
+					if (i == s.totalPeriods - 1) {
+						if (ended) {
+							retentionList.setQuick(ind, retentionList.getQuick(ind) + 1);
+						}
+					} else {
+						retentionList.setQuick(ind, retentionList.getQuick(ind) + 1);
+						retentionList.setQuick(ind + 1, retentionList.getQuick(ind + 1) + 1);
+					}
+				}
+			}
+		}
+		System.out.println("Annual retentions: ");
+		for (String s : skuRetentions.keySet()) {
+			TIntArrayList arrays = skuRetentions.get(s);
+			StringBuilder bld = new StringBuilder();
+			double partLeft = 1;
+			double sum = 1;
+			double retained = 1;
+			for(int i = 0; i < arrays.size(); i+=2) {
+				int t = arrays.get(i);
+				int l = arrays.get(i + 1);
+				if(t == 0 || l == 0) {
+					break;
+				}
+				retained = ((double) l) / t;
+				partLeft = partLeft * retained;
+				sum += partLeft;
+				bld.append(((int) (100 * retained))).append("%, ");
+			}
+			retained = Math.min(retained, 0.9);
+			sum += partLeft * retained / (1 - retained); // add tail
+			System.out.println(s + " - " + ((float) sum) + " " + bld.toString());
+		}
+		for(Subscription s : subs) {
+			if(s.currentPeriod == 0) {
+				s.calculateLTVValue(skuRetentions.get(s.getSku()));
+			}
+		}
+		return subs;
+	}
+
+
+	private ExchangeRates parseExchangeRates() {
+		SimpleDateFormat dayFormat = new SimpleDateFormat("yyyy-MM-dd");
+		ExchangeRates rates = new ExchangeRates();
+		jdbcTemplate.query("select currency, month, eurrate from exchange_rates", new RowCallbackHandler() {
 
 			@Override
-			public SubscriptionReport mapRow(ResultSet rs, int rowNum) throws SQLException {
-				SubscriptionReport sr = new SubscriptionReport();
-				sr.date = String.format("%1$tF", rs.getDate(1));
-				sr.duration += rs.getInt(4);
-				String sku = rs.getString(3);
-				if (sku != null && sku.length() > 0) {
-					int cnt = rs.getInt(2);
-					sr.count += cnt;
-					addSubCount(sr, cnt, sku, sr.duration);
+			public void processRow(ResultSet rs) throws SQLException {
+				try {
+					Date parse = dayFormat.parse(rs.getString(2));
+					String cur = rs.getString(1);
+					double eurRate = rs.getDouble(3);
+					rates.add(cur, parse.getTime(), eurRate);
+				} catch (ParseException e) {
+					e.printStackTrace();
 				}
-				return sr;
 			}
+
+		});
+		return rates;
+	}
+	
+	private void setDefaultSkuValues(Subscription s) {
+		switch(s.sku) {
+		case "osm_free_live_subscription_2": s.app = SubAppType.OSMAND; s.retention = 0.9; s.durationMonth = 1; s.defPriceEurMillis = 1800; break;
+		case "osm_live_subscription_2": s.app = SubAppType.OSMAND_PLUS; s.retention = 0.9; s.durationMonth = 1; s.defPriceEurMillis = 1200; break;
+		
+		case "osm_live_subscription_annual_free_v1": s.app = SubAppType.OSMAND; s.retention = 0.65; s.durationMonth = 12; s.defPriceEurMillis = 8000; break;
+		case "osm_live_subscription_annual_full_v1": s.app = SubAppType.OSMAND_PLUS; s.retention = 0.73; s.durationMonth = 12; s.defPriceEurMillis = 6000;  break;
+		case "osm_live_subscription_annual_free_v2": s.app = SubAppType.OSMAND; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 4000; break;
+		case "osm_live_subscription_annual_full_v2": s.app = SubAppType.OSMAND_PLUS;  s.retention = 0.81; s.durationMonth = 12; s.defPriceEurMillis = 3000; break;
+		case "osm_live_subscription_3_months_free_v1": s.app = SubAppType.OSMAND; s.retention = 0.72; s.durationMonth = 3; s.defPriceEurMillis = 4000; break;
+		case "osm_live_subscription_3_months_full_v1": s.app = SubAppType.OSMAND_PLUS; s.retention = 0.83; s.durationMonth = 3; s.defPriceEurMillis = 3000; break;
+		case "osm_live_subscription_monthly_free_v1": s.app = SubAppType.OSMAND; s.retention = 0.82; s.durationMonth = 1; s.defPriceEurMillis = 2000; break;
+		case "osm_live_subscription_monthly_full_v1": s.app = SubAppType.OSMAND_PLUS;  s.retention = 0.89; s.durationMonth = 1; s.defPriceEurMillis = 1500;  break;
+
+		case "net.osmand.maps.subscription.monthly_v1":s.app = SubAppType.IOS; s.retention = 0.85; s.durationMonth = 1; s.defPriceEurMillis = 2000; break;
+		case "net.osmand.maps.subscription.3months_v1": s.app = SubAppType.IOS; s.retention = 0.61; s.durationMonth = 3; s.defPriceEurMillis = 4000; break;
+		case "net.osmand.maps.subscription.annual_v1": s.app = SubAppType.IOS; s.retention = 0.65; s.durationMonth = 12; s.defPriceEurMillis = 8000; break;
+		default: throw new UnsupportedOperationException("Unsupported subscription " + s.sku);
 		};
 	}
+	
+	
+	public static class SubscriptionMonthReport {
+		public String date;
+	}
+	
+	public static enum SubAppType {
+		OSMAND_PLUS,
+		IOS,
+		OSMAND
+	}
+	public static class Subscription {
+		
+		public double retention;
+		static SimpleDateFormat dayFormat = new SimpleDateFormat("yyyy-MM-dd");
+		static SimpleDateFormat monthFormat = new SimpleDateFormat("yyyy-MM");
 
+		public Subscription() {
+		}
+		
+		public String getSku() {
+			return sku + (introPeriod ? "-%" : "");
+		}
 
-
-	private void mergeSubscriptionReports(List<SubscriptionReport> result) {
-		Iterator<SubscriptionReport> it = result.iterator();
-		if(it.hasNext()) {
-			SubscriptionReport prev = it.next();
-			while(it.hasNext()) {
-				SubscriptionReport c = it.next();
-				if(c.date.equals(prev.date)) {
-					prev.merge(c);
-					it.remove();
-				} else {
-					prev = c;
+		public Subscription(Subscription s) {
+			this.valid = s.valid;
+			this.autorenewing = s.autorenewing;
+			this.startTime = s.startTime;
+			this.endTime = s.endTime;
+			this.pricecurrency = s.pricecurrency;
+			this.sku = s.sku;
+			this.priceMillis = s.priceMillis;
+			this.introPriceMillis = s.introPriceMillis;
+			this.introCycles = s.introCycles;
+			this.durationMonth = s.durationMonth;
+			this.app = s.app;
+			this.defPriceEurMillis = s.defPriceEurMillis;
+			this.totalPeriods = s.totalPeriods;
+		}
+		
+		protected int priceMillis;
+		protected int introCycles;
+		protected int introPriceMillis;
+		protected boolean valid;
+		protected boolean autorenewing;
+		protected long startTime;
+		protected long endTime;
+		protected String pricecurrency;
+		protected String sku;
+		// from sku
+		protected int durationMonth;
+		protected SubAppType app;
+		protected int defPriceEurMillis;
+		
+		// period number
+		protected int totalMonths;
+		protected int totalPeriods;
+		
+		// current calculated 
+		protected int currentPeriod;
+		protected boolean introPeriod;
+		protected String startPeriodDay;
+		protected long startPeriodTime;
+		protected String startPeriodMonth;
+		protected int fullPriceEurMillis;
+		protected int introPriceEurMillis;
+		protected int priceEurMillis;
+		
+		protected int priceLTVEurMillis;
+		
+		private boolean isEnded() {
+			boolean ended = (System.currentTimeMillis() - endTime) >= 1000l * 60 * 60 * 24 * 10;
+			return ended; 
+		}
+		
+		public void calculateLTVValue(TIntArrayList retentionsList) {
+			for (int i = currentPeriod + 1; i < totalPeriods; i++) {
+				priceLTVEurMillis += fullPriceEurMillis;
+			}
+			if (currentPeriod >= 0) {
+				priceLTVEurMillis += introPriceEurMillis;
+			}
+			// we could take into account autorenewing but retention will change 
+			if (!isEnded()) {
+				if (2 * totalPeriods + 1 < retentionsList.size() && retentionsList.get(2 * totalPeriods) > 0
+						&& retentionsList.get(2 * totalPeriods + 1) > 0) {
+					retention = Math.min(0.95, ((double) retentionsList.get(2 * totalPeriods + 1))
+							/ retentionsList.get(2 * totalPeriods));
 				}
+				priceLTVEurMillis += (long) (fullPriceEurMillis * retention / (1 - retention));
+			}
+		}
+		
+		public void buildUp(Date time, int period, ExchangeRates rts) {
+			this.startPeriodTime = time.getTime();
+			this.startPeriodDay = dayFormat.format(time.getTime());
+			this.startPeriodMonth = monthFormat.format(time.getTime());
+			this.currentPeriod = period;
+			
+			this.fullPriceEurMillis = defPriceEurMillis;
+			this.introPriceEurMillis = defPriceEurMillis;
+			if(this.introCycles > 0) {
+				this.introPriceEurMillis = defPriceEurMillis / 2;
+			}
+			if (introPriceMillis >= 0 && priceMillis > 0) {
+				introPriceEurMillis = (int) (((double) introPriceMillis * priceEurMillis) / priceMillis);
+			}
+			double rate = rts.getEurRate(pricecurrency, startPeriodTime);
+			if(rate > 0) {
+				fullPriceEurMillis = (int) (priceMillis / rate);
+				if (introPriceMillis >= 0) {
+					introPriceEurMillis =(int) (introPriceMillis / rate);
+				} else {
+					introPriceEurMillis = (int) (priceMillis / rate);
+				}
+			}
+			this.introPeriod = currentPeriod == 0 && introPriceEurMillis != fullPriceEurMillis;
+			if (this.introPeriod) {
+				priceEurMillis = introPriceEurMillis;
+			} else {
+				priceEurMillis = fullPriceEurMillis;	
 			}
 		}
 	}
+	
 	
 	private static class SurveyReport {
 		public String date;
