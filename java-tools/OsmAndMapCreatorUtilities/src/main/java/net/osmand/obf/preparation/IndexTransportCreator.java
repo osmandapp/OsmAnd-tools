@@ -774,12 +774,14 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 				// here ways are changed !!!
 				directRoute.mergeForwardWays();
 				for (Way w : directRoute.getForwardWays()) {
+					// way id are not correct after merge! could be fixed in future, so missing stops will be consistent
+					// we need to avoid duplicate ids in completely different stops
 					TransportStop stp = checkStopMissing(forwardStops, w.getFirstNode(), directRoute.getForwardWays(),
-							w.getId());
+							w.getId() << 1);
 					if (stp != null) {
 						insertMissingStop(directRoute, incompleteNodes, stp, true);
 					}
-					stp = checkStopMissing(forwardStops, w.getLastNode(), directRoute.getForwardWays(), w.getId());
+					stp = checkStopMissing(forwardStops, w.getLastNode(), directRoute.getForwardWays(), (w.getId() << 1) + 1);
 					if (stp != null) {
 						insertMissingStop(directRoute, incompleteNodes, stp, false);
 					}
@@ -852,13 +854,6 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		}
 		if (firstDistance > MISSING_STOP_DISTANCE_THRESHOLD) {
 			TransportStop stp = new TransportStop();
-			for(Way w : originalWay) {
-				for(Node n : w.getNodes()) {
-					if(node.getId() == n.getId()) {
-						wayId = w.getId(); 
-					}
-				}
-			}
 			stp.setId(-wayId);
 			stp.setLocation(node.getLatitude(), node.getLongitude());
 			stp.setName(MISSING_STOP_NAME);
