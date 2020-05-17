@@ -613,7 +613,7 @@ public class AdminController {
 		}
 		
 		public String toString(int formatVersion) {
-			if (formatVersion == 1) {
+			if (formatVersion == 0) {
 				return String.format("%d, € %d<br>€ %d", totalNew, valueNewLTV / 1000, (valueNew + valueOld) / 1000);
 			}
 			StringBuilder row = new StringBuilder();
@@ -621,12 +621,16 @@ public class AdminController {
 				row.append(active).append("<br>");
 			}
 			row.append(String.format("<b>+%d</b>&nbsp;-%d", totalNew, totalEnd));
-			if ((formatVersion == 2 || formatVersion == 3) && (totalEnd + totalOld) > 0) {
+			if ((formatVersion & (1 << 1)) == 1 && (totalEnd + totalOld) > 0) {
 				row.append(String.format("<br>•%d&nbsp;-%d%%", totalOld + totalEnd,
 						(totalEnd * 100) / (totalEnd + totalOld)));
 			}
-			row.append(String.format("<br><b>€ %d</b>", (valueNew + valueOld) / 1000));
-			row.append(String.format("<br>€ %d", valueNewLTV / 1000));
+			if ((formatVersion & (1 << 2)) == 1) {
+				row.append(String.format("<br><b>€ %d</b>", (valueNew + valueOld) / 1000));
+			}
+			if ((formatVersion & (1 << 3)) == 1) {
+				row.append(String.format("<br>€ %d", valueNewLTV / 1000));
+			}
 			
 			return row.toString();
 		}
@@ -703,6 +707,26 @@ public class AdminController {
 		public int count; 
 		public List<AdminGenericSubReportColumn> columns = new ArrayList<>();
 		public Map<String, List<AdminGenericSubReportColumnValue>> values = new LinkedHashMap<>();
+		public List<Subscription> subs;
+		
+		public Map<String, List<AdminGenericSubReportColumnValue>> getValues(int limit) {
+			SimpleDateFormat dayFormat = new SimpleDateFormat("yyyy-MM-dd");
+			SimpleDateFormat dateFormat = month ? new SimpleDateFormat("yyyy-MM") : dayFormat;
+			Calendar c = Calendar.getInstance();
+			c.setTimeInMillis(System.currentTimeMillis());
+			for (int i = 0; i < limit; i++) {
+				List<AdminGenericSubReportColumnValue> lst = new ArrayList<>();
+				for(AdminGenericSubReportColumn col : columns) {
+					lst.add(col.initValue());
+				}
+				values.put(dateFormat.format(c.getTime()), lst);
+				c.add(month ? Calendar.MONTH : Calendar.DAY_OF_MONTH, -1);
+			}
+			for(Subscription s : subs) {
+				addResult(s);
+			}
+			return values;
+		}
 
 		public void addResult(Subscription s) {
 			List<AdminGenericSubReportColumnValue> vls = values.get(month ? s.startPeriodMonth : s.startPeriodDay);
@@ -731,10 +755,10 @@ public class AdminController {
 	}
 	
 	
-	private AdminGenericSubReport getRevenueReport(List<Subscription> subs, boolean month, int length) {
+	private AdminGenericSubReport getRevenueReport(List<Subscription> subs, boolean month) {
 		AdminGenericSubReport report = new AdminGenericSubReport();
 		report.month = month;
-		report.count = length;
+		report.subs = subs;
 		String h = ""; //"<br>New + Renew <br> - Cancel";
 		report.columns.add(new AdminGenericSubReportColumn("All"));
 		report.columns.add(new AdminGenericSubReportColumn("Android" + h).app(SubAppType.OSMAND,SubAppType.OSMAND_PLUS));
@@ -751,7 +775,6 @@ public class AdminController {
 		report.columns.add(new AdminGenericSubReportColumn("I/2 Y" + h).app(SubAppType.IOS).discount(true).duration(12));
 		report.columns.add(new AdminGenericSubReportColumn("I Q" + h).app(SubAppType.IOS).duration(3));
 		report.columns.add(new AdminGenericSubReportColumn("I M" + h).app(SubAppType.IOS).duration(1));
-		buildReport(report, subs);
 		return report;
 	}
 	
@@ -787,24 +810,6 @@ public class AdminController {
 			return 0;
 		}
 		
-	}
-
-	private void buildReport(AdminGenericSubReport report, List<Subscription> subs) {
-		SimpleDateFormat dayFormat = new SimpleDateFormat("yyyy-MM-dd");
-		SimpleDateFormat dateFormat = report.month ? new SimpleDateFormat("yyyy-MM") : dayFormat;
-		Calendar c = Calendar.getInstance();
-		c.setTimeInMillis(System.currentTimeMillis());
-		for (int i = 0; i < report.count; i++) {
-			List<AdminGenericSubReportColumnValue> lst = new ArrayList<>();
-			for(AdminGenericSubReportColumn col : report.columns) {
-				lst.add(col.initValue());
-			}
-			report.values.put(dateFormat.format(c.getTime()), lst);
-			c.add(report.month ? Calendar.MONTH : Calendar.DAY_OF_MONTH, -1);
-		}
-		for(Subscription s : subs) {
-			report.addResult(s);
-		}
 	}
 
 
