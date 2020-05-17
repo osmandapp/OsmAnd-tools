@@ -12,6 +12,7 @@ import net.osmand.data.TransportStopExit;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
+import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.EntityParser;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
@@ -64,7 +65,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 
 	private static final int DISTANCE_THRESHOLD = 50;
 	public static final int MISSING_STOP_DISTANCE_THRESHOLD = 1000;
-	public static final String MISSING_STOP_NAME = "#Missing Stop";
+	public static final String MISSING_STOP_NAME = TransportStop.MISSING_STOP_NAME;
 
 	private Set<Long> visitedStops = new HashSet<Long>();
 	private PreparedStatement transRouteStat;
@@ -83,6 +84,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 
 
 	private static Set<String> acceptedRoutes = new HashSet<String>();
+	private TLongObjectHashMap<TransportRoute> incompleteRoutesMap = new TLongObjectHashMap<TransportRoute>();
 
 	private PreparedStatement gtfsSelectRoute;
 	private PreparedStatement gtfsSelectStopTimes;
@@ -615,8 +617,11 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 					directGeometry.add(bytes);
 				}
 				TransportSchedule schedule = readSchedule(ref, directStops);
-				writer.writeTransportRoute(idRoute, routeName, routeEnName, ref, operator, type, dist, color, directStops, 
+				long ptr = writer.writeTransportRoute(idRoute, routeName, routeEnName, ref, operator, type, dist, color, directStops, 
 						directGeometry, stringTable, transportRoutes, schedule);
+				if (isRouteIncomplete(idRoute)) {
+					incompleteRoutesMap.get(idRoute).setFileOffset((int) ptr);
+				}
 			}
 			rs.close();
 			selectTransportRouteData.close();
@@ -639,8 +644,9 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			selectTransportStop.close();
 			selectTransportRouteStop.close();
 
+			writer.writeIncompleteTransportRoutes(incompleteRoutesMap.valueCollection(), stringTable);
 			writer.writeTransportStringTable(stringTable);
-
+			
 			writer.endWriteTransportIndex();
 			writer.flush();
 			log.info(gtfsStats);
@@ -761,28 +767,24 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		directRoute.setType(route);
 		directRoute.setRef(ref);
 		directRoute.setId(directRoute.getId() << 1);
+		List<Node> incompleteNodes = getIncompeteStops(rel);
 		if (processTransportRelationV2(rel, directRoute)) { // try new transport relations first
 			List<TransportStop> forwardStops = directRoute.getForwardStops();
-			if(hasRelationIncompleteWays(rel) && forwardStops.size() > 0 && 
-					directRoute.getForwardWays().size() > 1) {
-				List<Way> mergedWays = new ArrayList<>(directRoute.getForwardWays());
-//				 System.out.println(" Process incomplete route: " + directRoute.getId() / 2 + " " + directRoute.getForwardWays().size()) ;
-				TransportRoute.mergeRouteWays(mergedWays);
-				TransportRoute.resortWaysToStopsOrder(mergedWays, forwardStops);
-				if(mergedWays.size() > 1) {
-					System.err.println(
-							String.format("ERROR TRANSPORT ROUTE '%d': there are multiple segments (%d) of transport route.", 
-									directRoute.getId() / 2, mergedWays.size()));
-				}
-				Way w = mergedWays.get(0);
-				TransportStop stp = checkStopMissing(forwardStops, w.getFirstNode(), 
-						directRoute.getForwardWays(), w.getId());
-				if (stp != null) {
-					directRoute.getForwardStops().add(0, stp);
-				}
-				stp = checkStopMissing(forwardStops, w.getLastNode(), directRoute.getForwardWays(), w.getId());
-				if (stp != null) {
-					directRoute.getForwardStops().add(stp);
+			if (hasRelationIncompleteWays(rel) && forwardStops.size() > 0 && directRoute.getForwardWays().size() > 1) {
+				// here ways are changed !!!
+				directRoute.mergeForwardWays();
+				for (Way w : directRoute.getForwardWays()) {
+					// way id are not correct after merge! could be fixed in future, so missing stops will be consistent
+					// we need to avoid duplicate ids in completely different stops
+					TransportStop stp = checkStopMissing(forwardStops, w.getFirstNode(), directRoute.getForwardWays(),
+							w.getId() << 1);
+					if (stp != null) {
+						insertMissingStop(directRoute, incompleteNodes, stp, true);
+					}
+					stp = checkStopMissing(forwardStops, w.getLastNode(), directRoute.getForwardWays(), (w.getId() << 1) + 1);
+					if (stp != null) {
+						insertMissingStop(directRoute, incompleteNodes, stp, false);
+					}
 				}
 			}
 			troutes.add(directRoute);
@@ -806,6 +808,40 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	}
 
 
+	private void insertMissingStop(TransportRoute directRoute, List<Node> nds, TransportStop stp, boolean before) {
+		Node insertNode = null;
+		for (int i = 0; i < nds.size(); i += 2) {
+			Node insertNodeNew = before ? nds.get(i + 1) : nds.get(i);
+			if (insertNode == null) {
+				insertNode = insertNodeNew;
+			} else if (insertNodeNew != null
+					&& MapUtils.getDistance(insertNodeNew.getLatLon(), stp.getLocation()) < MapUtils
+							.getDistance(insertNode.getLatLon(), stp.getLocation())) {
+				insertNode = insertNodeNew;
+			}
+		}
+		if (insertNode != null) {
+			for (int i = 0; i < directRoute.getForwardStops().size(); i++) {
+				TransportStop ts = directRoute.getForwardStops().get(i);
+				if (ts.getId() == insertNode.getId()) {
+					int insertInd = before ? i  : i + 1;
+					directRoute.getForwardStops().add(insertInd, stp);
+					break;
+				}
+			}
+			addIncompleteRoute(directRoute.getId(), directRoute);
+		}
+	}
+
+	
+	private void addIncompleteRoute(long routeId, TransportRoute t) {
+		incompleteRoutesMap.put(routeId, t);
+	}
+	
+	public boolean isRouteIncomplete(long routeId) {
+		return incompleteRoutesMap.contains(routeId);
+	}
+
 	private TransportStop checkStopMissing(List<TransportStop> forwardStops, Node node, List<Way> originalWay, long wayId) {
 		TransportStop st = forwardStops.get(0);
 		double firstDistance = MapUtils.getDistance(st.getLocation(), node.getLatitude(), node.getLongitude());
@@ -818,13 +854,6 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		}
 		if (firstDistance > MISSING_STOP_DISTANCE_THRESHOLD) {
 			TransportStop stp = new TransportStop();
-			for(Way w : originalWay) {
-				for(Node n : w.getNodes()) {
-					if(node.getId() == n.getId()) {
-						wayId = w.getId(); 
-					}
-				}
-			}
 			stp.setId(-wayId);
 			stp.setLocation(node.getLatitude(), node.getLongitude());
 			stp.setName(MISSING_STOP_NAME);
@@ -834,12 +863,43 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	}
 
 
+	// returns array of stops (as node) after which and before there is a missing stop
+	// null means missing is first stop or last stop and it should be inserted before 2nd element
+	private List<Node> getIncompeteStops(Relation rel) {
+		List<Node> missingStopsAfterStop = new ArrayList<Node>();
+		boolean missingPrevious = false;
+		Node previousStop = null;
+		for (RelationMember rm : rel.getMembers()) {
+			boolean node = rm.getEntityId().getType() == EntityType.NODE;
+			// TODO add role "platform"
+			if (node && ("stop".equals(rm.getRole()))) {
+				if (rm.getEntity() == null) {
+					if (!missingPrevious) {
+						missingStopsAfterStop.add(previousStop);
+					}
+					missingPrevious = true;
+				} else {
+					previousStop = (Node) rm.getEntity();
+					if (missingPrevious) {
+						missingStopsAfterStop.add(previousStop);
+						missingPrevious = false;
+					}
+				}
+			}
+		}
+		if (missingPrevious) {
+			missingStopsAfterStop.add(null);
+		}
+		return missingStopsAfterStop;
+	}
+	
+
 	private boolean hasRelationIncompleteWays(Relation rel) {
 		boolean relationHasIncompleteWays = false;
 		for (RelationMember rm : rel.getMembers()) {
 			if (rm.getEntity() instanceof Way) {
 				Way w = (Way) rm.getEntity();
-				if(w.getNodeIds().isEmpty()) {
+				if (w.getNodeIds().isEmpty()) {
 					relationHasIncompleteWays = true;
 					break;
 				}
@@ -966,11 +1026,6 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		}
 		return null;
 	}
-	
-	
-	
-	
-
 
 	private int parseTime(String str) {
 		int f1 = str.indexOf(':');
@@ -1216,10 +1271,5 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 					+ ", errorsTimeParsing=" + errorsTimeParsing + ", successTripsParsing=" + successTripsParsing
 					+ ", errorsTripsStopCounts=" + errorsTripsStopCounts + "]";
 		}
-		
-		
-		
-		
-		
 	}
 }

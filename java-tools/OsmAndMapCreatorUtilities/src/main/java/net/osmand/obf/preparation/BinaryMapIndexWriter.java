@@ -6,6 +6,7 @@ import gnu.trove.list.array.TByteArrayList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.list.array.TLongArrayList;
 import gnu.trove.map.TIntObjectMap;
+import gnu.trove.map.hash.TLongObjectHashMap;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -1171,7 +1172,7 @@ public class BinaryMapIndexWriter {
 		log.info("TRANSPORT INDEX SIZE : " + len);
 	}
 
-	public void writeTransportRoute(long idRoute, String routeName, String routeEnName, String ref, String operator, String type, int dist, String color,
+	public long writeTransportRoute(long idRoute, String routeName, String routeEnName, String ref, String operator, String type, int dist, String color,
 			List<TransportStop> directStops, List<byte[]> directRoute, Map<String, Integer> stringTable, Map<Long, Long> transportRoutesRegistry,
 			TransportSchedule schedule) throws IOException {
 		checkPeekState(TRANSPORT_ROUTES);
@@ -1234,11 +1235,14 @@ public class BinaryMapIndexWriter {
 			tRoute.addScheduleTrip(sched.build());
 		}
 		codedOutStream.writeTag(OsmandOdb.TransportRoutes.ROUTES_FIELD_NUMBER, FieldType.MESSAGE.getWireType());
+		long ptr = -1;
 		if (transportRoutesRegistry != null) {
-			transportRoutesRegistry.put(idRoute, getFilePointer());
+			ptr = getFilePointer();
+			transportRoutesRegistry.put(idRoute, ptr);
 		}
 		
 		codedOutStream.writeMessageNoTag(tRoute.build());
+		return ptr;
 	}
 
 
@@ -1390,7 +1394,22 @@ public class BinaryMapIndexWriter {
 
 		codedOutStream.writeMessageNoTag(ts.build());
 	}
-
+	
+	public void writeIncompleteTransportRoutes(Collection<net.osmand.data.TransportRoute> incompleteRoutes, Map<String, Integer> stringTable) throws IOException {
+		checkPeekState(TRANSPORT_INDEX_INIT);
+		OsmandOdb.IncompleteTransportRoutes.Builder irs = OsmandOdb.IncompleteTransportRoutes.newBuilder();
+		for (net.osmand.data.TransportRoute tr : incompleteRoutes) {
+			OsmandOdb.IncompleteTransportRoute.Builder ir = OsmandOdb.IncompleteTransportRoute.newBuilder();
+			ir.setId(tr.getId());
+			ir.setRouteRef(tr.getFileOffset());
+			ir.setOperator(registerString(stringTable, tr.getOperator()));
+			ir.setRef(registerString(stringTable, tr.getRef()));
+			ir.setType(registerString(stringTable, tr.getType()));
+			irs.addRoutes(ir);
+		}
+		codedOutStream.writeMessage(OsmAndTransportIndex.INCOMPLETEROUTES_FIELD_NUMBER, irs.build());
+	}
+	
 	public void writeTransportStringTable(Map<String, Integer> stringTable) throws IOException {
 		checkPeekState(TRANSPORT_INDEX_INIT);
 		// expect linked hash map

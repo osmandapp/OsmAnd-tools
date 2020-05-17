@@ -156,10 +156,25 @@ public class MapTransportLayer implements MapPanelLayer {
 		}
 		calculateResult(ways, r);
 		DataTileManager<Way> points = new DataTileManager<Way>(11);
+		int ind = -1;
 		for (Way w : ways) {
-			LatLon n = w.getLatLon();
-			if(n != null) {
-				points.registerObject(n.getLatitude(), n.getLongitude(), w);
+			Way wl = new Way(ind--);
+			Node node = w.getFirstNode();
+			wl.addNode(node);
+			long tile = points.evaluateTile(node.getLatitude(), node.getLongitude());
+			for(int i = 1; i < w.getNodes().size(); i++) {
+				Node nnode = w.getNodes().get(i);
+				long ntile = points.evaluateTile(nnode.getLatitude(), nnode.getLongitude());
+				wl.addNode(nnode);
+				if(tile != ntile) {
+					points.registerObject(wl.getFirstNode().getLatitude(), wl.getFirstNode().getLongitude(), wl);
+					tile = ntile;
+					wl = new Way(ind--);
+					wl.addNode(nnode);
+				}
+			}
+			if(wl.getNodes().size() > 0) {
+				points.registerObject(wl.getFirstNode().getLatitude(), wl.getFirstNode().getLongitude(), wl);
 			}
 		}
 		map.setPoints(points);
