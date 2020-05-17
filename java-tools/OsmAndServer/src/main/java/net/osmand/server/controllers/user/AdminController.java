@@ -621,14 +621,14 @@ public class AdminController {
 				row.append(active).append("<br>");
 			}
 			row.append(String.format("<b>+%d</b>&nbsp;-%d", totalNew, totalEnd));
-			if ((formatVersion & (1 << 1)) == 1 && (totalEnd + totalOld) > 0) {
+			if ((formatVersion & (1 << 1)) > 0 && (totalEnd + totalOld) > 0) {
 				row.append(String.format("<br>•%d&nbsp;-%d%%", totalOld + totalEnd,
 						(totalEnd * 100) / (totalEnd + totalOld)));
 			}
-			if ((formatVersion & (1 << 2)) == 1) {
+			if ((formatVersion & (1 << 2)) > 0) {
 				row.append(String.format("<br><b>€ %d</b>", (valueNew + valueOld) / 1000));
 			}
-			if ((formatVersion & (1 << 3)) == 1) {
+			if ((formatVersion & (1 << 3)) > 0) {
 				row.append(String.format("<br>€ %d", valueNewLTV / 1000));
 			}
 			
