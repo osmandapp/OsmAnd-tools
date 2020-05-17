@@ -397,6 +397,7 @@ public class MapRouterLayer implements MapPanelLayer {
 
 
 	private void calcStraightRoute(LatLon currentLatLon) {
+		System.out.println("Distance: " + MapUtils.getDistance(startRoute, endRoute));
 		List<Way> ways = new ArrayList<>();
 		{
 			Way w = new Way(1);

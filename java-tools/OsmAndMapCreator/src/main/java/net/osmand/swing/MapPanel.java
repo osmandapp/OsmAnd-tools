@@ -669,7 +669,9 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 				ArrayList<String> list = new ArrayList<String>(cache.keySet());
 				for (int i = 0; i < list.size(); i += 2) {
 					Image remove = cache.remove(list.get(i));
-					remove.flush();
+					if (remove != null) {
+						remove.flush();
+					}
 				}
 				if (log.isInfoEnabled()) {
 					log.info("Before running gc on map tiles. Total Memory : " + (Runtime.getRuntime().totalMemory() >> 20) + " Mb. Used memory : " //$NON-NLS-1$ //$NON-NLS-2$
