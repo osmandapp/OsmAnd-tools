@@ -332,8 +332,8 @@ public class AdminController {
 		model.addAttribute("reports", getReports());
 		model.addAttribute("surveyReport", getSurveyReport());
 		List<Subscription> allSubs = parseSubscriptions();
-		model.addAttribute("subRevenueReportMonth", getRevenueReport(allSubs, true, 24));
-		model.addAttribute("subRevenueReportDay", getRevenueReport(allSubs, false, 60));
+		model.addAttribute("subRevenueReportMonth", getRevenueReport(allSubs, true));
+		model.addAttribute("subRevenueReportDay", getRevenueReport(allSubs, false));
 		
 		
 		model.addAttribute("yearSubscriptionsReport", getYearSubscriptionsRetentionReport());
