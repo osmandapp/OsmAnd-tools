@@ -174,7 +174,7 @@ public class WebController {
 	}
 
 	// WEBSITE
-	@RequestMapping(path = { "/apps", "/apps.html" })
+	@RequestMapping(path = { "/apps", "/apps.html", "/open-gpx", "/open-gpx.html" })
 	@ResponseBody
 	public FileSystemResource apps(HttpServletRequest request, HttpServletResponse response) {
 		return generateStaticResource("pub/apps.html", "apps.html", request, response);
