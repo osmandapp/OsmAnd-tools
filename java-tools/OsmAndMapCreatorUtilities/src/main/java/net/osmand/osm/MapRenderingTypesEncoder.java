@@ -1219,7 +1219,8 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 					tokensToAdd = new String[] { tokens[0], tokens[1], tokens.length == 4 ? "" : tokens[2], "",
 							tokens.length == 4 ? tokens[2] : tokens[3], tokens.length == 4 ? tokens[3] : tokens[4] };
 				}
-				addOsmcNewTags(tags, tokensToAdd, "");
+				// don't mix hiking_osmc with default bicycle osmc
+				// addOsmcNewTags(tags, tokensToAdd, "");
 				if (routeTag.length() > 0) {
 					addOsmcNewTags(tags, tokensToAdd, routeTag + "_");
 				} else {
