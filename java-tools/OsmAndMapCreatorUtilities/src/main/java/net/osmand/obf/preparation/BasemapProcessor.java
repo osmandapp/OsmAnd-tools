@@ -749,7 +749,8 @@ public class BasemapProcessor {
 			settings.zoomWaySmoothness = zoomSmoothness;
 			
 			IndexCreator creator = new IndexCreator(folder, settings); //$NON-NLS-1$
-			creator.setDialects(DBDialect.SQLITE_IN_MEMORY, DBDialect.SQLITE_IN_MEMORY);
+			creator.setDialects(
+					detailed ? DBDialect.SQLITE : DBDialect.SQLITE_IN_MEMORY, DBDialect.SQLITE_IN_MEMORY);
 			creator.setMapFileName(fileName);
 			List<File> src = new ArrayList<File>();
 			parseFiles(folder, src);

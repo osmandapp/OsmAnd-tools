@@ -91,7 +91,7 @@ public class BinaryInspector {
 //					"-bbox=37.5,49.3,37.6,49.2",
 //					"-osm="+System.getProperty("maps.dir")+"/map.obf.osm",
 //					System.getProperty("maps.dir")+"/Russia_moscow_asia_2.obf"
-					System.getProperty("maps.dir")+"/Map.obf"
+					System.getProperty("maps.dir")+"/Test_czech_route.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
 		} else {
