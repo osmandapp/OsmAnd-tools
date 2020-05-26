@@ -67,6 +67,34 @@ public class UpdateSubscription {
 	protected PreparedStatement delStat;
 	protected PreparedStatement updCheckStat;
 	protected boolean ios;
+	private AndroidPublisher publisher;
+	
+	private static class UpdateParams {
+		public boolean verifyAll;
+		public boolean verbose;
+	}
+	
+	public UpdateSubscription(AndroidPublisher publisher, boolean ios) {
+		this.ios = ios;
+		this.publisher = publisher;
+		delQuery = "UPDATE supporters_device_sub SET valid = false, kind = ?, checktime = ? "
+				+ "WHERE userid = ? and purchaseToken = ? and sku = ?";
+		updCheckQuery = "UPDATE supporters_device_sub SET checktime = ? "
+				+ "WHERE userid = ? and purchaseToken = ? and sku = ?";
+		selQuery = "SELECT userid, sku, purchaseToken, payload, checktime, starttime, expiretime, valid, introcycles "
+				+ "FROM supporters_device_sub S where (valid is null or valid=true) order by userid asc";
+		if (ios) {
+			updQuery = "UPDATE supporters_device_sub SET "
+					+ "checktime = ?, starttime = ?, expiretime = ?, autorenewing = ?, " + "introcycles = ? , "
+					+ "valid = ? " + "WHERE userid = ? and purchaseToken = ? and sku = ?";
+		} else {
+			updQuery = "UPDATE supporters_device_sub SET "
+					+ " checktime = ?, starttime = ?, expiretime = ?, autorenewing = ?, "
+					+ " kind = ?, orderid = ?, payload = ?, "
+					+ " price = ?, pricecurrency = ?, introprice = ?, intropricecurrency = ?, introcycles = ? , introcyclename = ?, "
+					+ " valid = ? " + "WHERE userid = ? and purchaseToken = ? and sku = ?";
+		}
+	}
 
 	public static void main(String[] args) throws JSONException, IOException, SQLException, ClassNotFoundException, GeneralSecurityException {
 		AndroidPublisher publisher = getPublisherApi(args[0]);
@@ -78,68 +106,30 @@ public class UpdateSubscription {
 		Class.forName("org.postgresql.Driver");
 		Connection conn = DriverManager.getConnection(System.getenv("DB_CONN"),
 				System.getenv("DB_USER"), System.getenv("DB_PWD"));
-		boolean verifyAll = false;
+		boolean android = true;
+		boolean ios = true;
+		UpdateParams up = new UpdateParams();
 		for (int i = 1; i < args.length; i++) {
 			if ("-verifyall".equals(args[i])) {
-				verifyAll = true;
+				up.verifyAll = true;
+			} else if ("-verbose".equals(args[i])) {
+				up.verbose = true;
+			} else if ("-onlyandroid".equals(args[i])) {
+				ios = false;
+			} else if ("-onlyios".equals(args[i])) {
+				android = false;
 			}
 		}
-		new UpdateAndroidSubscription(publisher).queryPurchases(conn, verifyAll);
-		new UpdateIosSubscription().queryPurchases(conn, verifyAll);
-	}
-
-	public UpdateSubscription() {
-		delQuery = "UPDATE supporters_device_sub SET valid = false, kind = ?, checktime = ? " +
-				"WHERE userid = ? and purchaseToken = ? and sku = ?";
-		updCheckQuery = "UPDATE supporters_device_sub SET checktime = ? " +
-					"WHERE userid = ? and purchaseToken = ? and sku = ?";
-		selQuery = "SELECT userid, sku, purchaseToken, payload, checktime, starttime, expiretime, valid, introcycles " +
-				"FROM supporters_device_sub S where (valid is null or valid=true) order by userid asc";
-	}
-
-	private static class UpdateAndroidSubscription extends UpdateSubscription {
-		private AndroidPublisher publisher;
-
-		UpdateAndroidSubscription(AndroidPublisher publisher) {
-			super();
-			this.publisher = publisher;
-			this.ios = false;
-			updQuery = "UPDATE supporters_device_sub SET " +
-					" checktime = ?, starttime = ?, expiretime = ?, autorenewing = ?, " + 
-					" kind = ?, orderid = ?, payload = ?, " +
-					" price = ?, pricecurrency = ?, introprice = ?, intropricecurrency = ?, introcycles = ? , introcyclename = ?, " +
-					" valid = ? " +
-					"WHERE userid = ? and purchaseToken = ? and sku = ?";
+		if (android) {
+			new UpdateSubscription(publisher, false).queryPurchases(conn, up);
 		}
-
-		@Override
-		void queryPurchases(Connection conn, boolean verifyAll) throws SQLException {
-			queryPurchasesImpl(publisher, conn, verifyAll);
+		if (ios) {
+			new UpdateSubscription(null, true).queryPurchases(conn, up);
 		}
 	}
 
-	private static class UpdateIosSubscription extends UpdateSubscription {
-		UpdateIosSubscription() {
-			super();
-			this.ios = true;
-			updQuery = "UPDATE supporters_device_sub SET " +
-					"checktime = ?, starttime = ?, expiretime = ?, autorenewing = ?, " + 
-					"introcycles = ? , " +
-					"valid = ? " +
-					"WHERE userid = ? and purchaseToken = ? and sku = ?";
-		}
-
-		@Override
-		void queryPurchases(Connection conn, boolean verifyAll) throws SQLException {
-			queryPurchasesImpl(null, conn, verifyAll);
-		}
-	}
-
-	void queryPurchases(Connection conn, boolean verifyAll) throws SQLException {
-		// non implemented
-	}
-
-	void queryPurchasesImpl(AndroidPublisher publisher, Connection conn, boolean verifyAll) throws SQLException {
+	
+	void queryPurchases(Connection conn, UpdateParams pms) throws SQLException {
 		ResultSet rs = conn.createStatement().executeQuery(selQuery);
 		updStat = conn.prepareStatement(updQuery);
 		delStat = conn.prepareStatement(delQuery);
@@ -159,11 +149,11 @@ public class UpdateSubscription {
 			boolean valid = rs.getBoolean("valid");
 			long tm = System.currentTimeMillis();
 			boolean ios = sku.startsWith("net.osmand.maps.subscription.");
-			if ((this.ios && !ios) || (!this.ios && ios)) {
+			if (this.ios != ios) {
 				continue;
 			}
 			long checkDiff = checkTime == null ? tm : (tm - checkTime.getTime());
-			if (checkDiff < MINIMUM_WAIT_TO_REVALIDATE && !verifyAll) {
+			if (checkDiff < MINIMUM_WAIT_TO_REVALIDATE && !pms.verifyAll) {
 				continue;
 			}
 
@@ -187,9 +177,9 @@ public class UpdateSubscription {
 					expireTime == null ? "" : new Date(expireTime.getTime()),
 							activeNow+""));
 			if (this.ios) {
-				processIosSubscription(receiptValidationHelper, userid, pt, sku, payload, startTime, expireTime, tm, introcycles);
+				processIosSubscription(receiptValidationHelper, userid, pt, sku, payload, startTime, expireTime, tm, introcycles, pms.verbose);
 			} else {
-				processAndroidSubscription(purchases, userid, pt, sku, startTime, expireTime, tm);
+				processAndroidSubscription(purchases, userid, pt, sku, startTime, expireTime, tm, pms.verbose);
 			}
 		}
 		if (deletions > 0) {
@@ -207,7 +197,7 @@ public class UpdateSubscription {
 	}
 
 	private void processIosSubscription(ReceiptValidationHelper receiptValidationHelper, long userid, String pt, String sku, String payload, Timestamp startTime, Timestamp expireTime, long tm, 
-			int introcycles) throws SQLException {
+			int introcycles, boolean verbose) throws SQLException {
 		try {
 			String reason = null;
 			String kind = "";
@@ -218,6 +208,9 @@ public class UpdateSubscription {
 			if (result.equals(true)) {
 				JsonObject receiptObj = (JsonObject) map.get("response");
 				if (receiptObj != null) {
+					if(verbose) {
+						System.out.println("Result: " + receiptObj.toString());
+					}
 					Map<String, InAppReceipt> inAppReceipts = receiptValidationHelper.parseInAppReceipts(receiptObj);
 					if (inAppReceipts != null) {
 						if (inAppReceipts.size() == 0) {
@@ -287,13 +280,16 @@ public class UpdateSubscription {
 		}
 	}
 
-	private void processAndroidSubscription(AndroidPublisher.Purchases purchases, long userid, String pt, String sku, Timestamp startTime, Timestamp expireTime, long tm) throws SQLException {
+	private void processAndroidSubscription(AndroidPublisher.Purchases purchases, long userid, String pt, String sku, Timestamp startTime, Timestamp expireTime, long tm, boolean verbose) throws SQLException {
 		SubscriptionPurchase subscription;
 		try {
 			if (sku.startsWith("osm_free") || sku.contains("_free_")) {
 				subscription = purchases.subscriptions().get(GOOGLE_PACKAGE_NAME_FREE, sku, pt).execute();
 			} else {
 				subscription = purchases.subscriptions().get(GOOGLE_PACKAGE_NAME, sku, pt).execute();
+			}
+			if (verbose) {
+				System.out.println("Result: " + subscription.toPrettyString());
 			}
 			updateSubscriptionDb(userid, pt, sku, startTime, expireTime, tm, subscription);
 		} catch (IOException e) {
@@ -434,30 +430,6 @@ public class UpdateSubscription {
 
 	
 	private static AndroidPublisher getPublisherApi(String file) throws JSONException, IOException, GeneralSecurityException {
-//		Properties properties = new Properties();
-//		properties.load(new FileInputStream(file));
-//		GOOGLE_CLIENT_CODE = properties.getProperty("GOOGLE_CLIENT_CODE");
-//		GOOGLE_CLIENT_ID = properties.getProperty("GOOGLE_CLIENT_ID");
-//		GOOGLE_CLIENT_SECRET = properties.getProperty("GOOGLE_CLIENT_SECRET");
-//		GOOGLE_REDIRECT_URI = properties.getProperty("GOOGLE_REDIRECT_URI");
-//		TOKEN = properties.getProperty("TOKEN");
-//		generateAuthUrl();
-//		String token = getRefreshToken();
-//		String accessToken = getAccessToken(token);
-//		TokenResponse tokenResponse = new TokenResponse();
-//
-//		System.out.println("refresh token=" + token);
-//		System.out.println("access token=" + accessToken);
-//
-//		tokenResponse.setAccessToken(accessToken);
-//		tokenResponse.setRefreshToken(token);
-//		tokenResponse.setExpiresInSeconds(3600L);
-//		tokenResponse.setScope("https://www.googleapis.com/auth/androidpublisher");
-//		tokenResponse.setTokenType("Bearer");
-//		HttpRequestInitializer credential = new GoogleCredential.Builder().setTransport(httpTransport)
-//		.setJsonFactory(jsonFactory).setClientSecrets(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET).build()
-//		.setFromTokenResponse(tokenResponse);
-
 		List<String> scopes = new ArrayList<String>();
 		scopes.add("https://www.googleapis.com/auth/androidpublisher");
 	    File dataStoreDir = new File(new File(file).getParentFile(), ".credentials");
