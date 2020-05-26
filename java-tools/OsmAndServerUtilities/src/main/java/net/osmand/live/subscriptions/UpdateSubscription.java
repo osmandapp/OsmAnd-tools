@@ -122,7 +122,7 @@ public class UpdateSubscription {
 			} else if ("-onlyandroid".equals(args[i])) {
 				ios = false;
 			} else if ("-revalidateinvalid".equals(args[i])) {
-				ios = false;
+				revalidateinvalid = true;
 			} else if ("-onlyios".equals(args[i])) {
 				android = false;
 			}
