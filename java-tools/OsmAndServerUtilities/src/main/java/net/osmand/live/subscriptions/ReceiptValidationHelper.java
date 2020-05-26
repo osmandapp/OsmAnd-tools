@@ -16,7 +16,9 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -26,12 +28,26 @@ public class ReceiptValidationHelper {
 	private final static String PRODUCTION_URL = "https://buy.itunes.apple.com/verifyReceipt";
 	private final static String BUNDLE_ID = "net.osmand.maps";
 
-	public final static int SANDBOX_ERROR_CODE = 1000;
 	public final static int NO_RESPONSE_ERROR_CODE = 1100;
+	// https://developer.apple.com/documentation/appstorereceipts/status
+	// The user account cannot be found or has been deleted.
+	public static final int USER_GONE = 21010;
+	
+	// This receipt is from the test environment, but it was sent to the production environment for verification.
+	public static final int SANDBOX_ERROR_CODE_TEST = 21007;
+	
+	
+	
+	
+	
+	public static class ReceiptResult {
+		public boolean result;
+		public int error;
+		public JsonObject response;
+	}
 
-	public Map<String, Object> loadReceipt(String receipt) {
-		Map<String, Object> result = new HashMap<>();
-		result.put("result", false);
+	public ReceiptResult loadReceipt(String receipt) {
+		ReceiptResult result = new ReceiptResult();
 
 		JsonObject receiptObj = new JsonObject();
 		receiptObj.addProperty("receipt-data", receipt);
@@ -42,54 +58,50 @@ public class ReceiptValidationHelper {
 			JsonObject responseObj = new JsonParser().parse(jsonAnswer).getAsJsonObject();
 			JsonElement statusElement = responseObj.get("status");
 			int status = statusElement != null ? statusElement.getAsInt() : 0;
-			if (status == 21007) {
-				result.put("error", SANDBOX_ERROR_CODE);
+			if (status > 0) {
+				result.error = status;
 			} else {
-				result.put("result", true);
-				result.put("response", responseObj);
+				result.result = true;
+				result.response = responseObj;
 			}
 		} else {
-			result.put("error", NO_RESPONSE_ERROR_CODE);
+			result.error = NO_RESPONSE_ERROR_CODE;
 		}
 		return result;
 	}
 
-	public Map<String, InAppReceipt> parseInAppReceipts(JsonObject receiptObj) {
-		Map<String, InAppReceipt> result = null;
-		int status = receiptObj.get("status").getAsInt();
-		if (status == 0) {
-			JsonElement pendingInfo = receiptObj.get("pending_renewal_info");
-			Map<String, Boolean> autoRenewStatus = new TreeMap<String, Boolean>();
-			if(pendingInfo != null) {
-				JsonArray ar = pendingInfo.getAsJsonArray();
-				for(int i = 0; i < ar.size(); i++) {
-					JsonObject o = ar.get(i).getAsJsonObject();
-					// "auto_renew_product_id", "original_transaction_id", "product_id", "auto_renew_status"
-					JsonElement renewStatus = o.get("auto_renew_status");
-					JsonElement txId = o.get("original_transaction_id");
-					if(renewStatus != null && txId != null) {
-						autoRenewStatus.put(txId.getAsString(), renewStatus.getAsString().equals("1"));
-					}
+	public List<InAppReceipt> parseInAppReceipts(JsonObject receiptObj) {
+		List<InAppReceipt> result = new ArrayList<ReceiptValidationHelper.InAppReceipt>();
+		JsonElement pendingInfo = receiptObj.get("pending_renewal_info");
+		Map<String, Boolean> autoRenewStatus = new TreeMap<String, Boolean>();
+		if (pendingInfo != null) {
+			JsonArray ar = pendingInfo.getAsJsonArray();
+			for (int i = 0; i < ar.size(); i++) {
+				JsonObject o = ar.get(i).getAsJsonObject();
+				// "auto_renew_product_id", "original_transaction_id", "product_id", "auto_renew_status"
+				JsonElement renewStatus = o.get("auto_renew_status");
+				JsonElement txId = o.get("original_transaction_id");
+				if (renewStatus != null && txId != null) {
+					autoRenewStatus.put(txId.getAsString(), renewStatus.getAsString().equals("1"));
 				}
 			}
-			String bundleId = receiptObj.get("receipt").getAsJsonObject().get("bundle_id").getAsString();
-			if (bundleId.equals(BUNDLE_ID)) {
-				result = new HashMap<>();
-				JsonElement receiptInfo = receiptObj.get("latest_receipt_info");
-				if (receiptInfo != null) {
-					JsonArray receiptArray = receiptInfo.getAsJsonArray();
-					for (JsonElement elem : receiptArray) {
-						JsonObject recObj = elem.getAsJsonObject();
-						String transactionId = recObj.get("original_transaction_id").getAsString();
-						InAppReceipt receipt = new InAppReceipt();
-						if(autoRenewStatus.containsKey(transactionId)) {
-							receipt.autoRenew = autoRenewStatus.get(transactionId);
-						}
-						for (Map.Entry<String, JsonElement> entry : recObj.entrySet()) {
-							receipt.fields.put(entry.getKey(), entry.getValue().getAsString());
-						}
-						result.put(transactionId, receipt);
+		}
+		String bundleId = receiptObj.get("receipt").getAsJsonObject().get("bundle_id").getAsString();
+		if (bundleId.equals(BUNDLE_ID)) {
+			JsonElement receiptInfo = receiptObj.get("latest_receipt_info");
+			if (receiptInfo != null) {
+				JsonArray receiptArray = receiptInfo.getAsJsonArray();
+				for (JsonElement elem : receiptArray) {
+					JsonObject recObj = elem.getAsJsonObject();
+					String transactionId = recObj.get("original_transaction_id").getAsString();
+					InAppReceipt receipt = new InAppReceipt();
+					if (autoRenewStatus.containsKey(transactionId)) {
+						receipt.autoRenew = autoRenewStatus.get(transactionId);
 					}
+					for (Map.Entry<String, JsonElement> entry : recObj.entrySet()) {
+						receipt.fields.put(entry.getKey(), entry.getValue().getAsString());
+					}
+					result.add(receipt);
 				}
 			}
 		}

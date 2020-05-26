@@ -38,6 +38,7 @@ import com.google.api.services.androidpublisher.model.SubscriptionPurchase;
 import com.google.gson.JsonObject;
 
 import net.osmand.live.subscriptions.ReceiptValidationHelper.InAppReceipt;
+import net.osmand.live.subscriptions.ReceiptValidationHelper.ReceiptResult;
 
 
 public class UpdateSubscription {
@@ -203,19 +204,15 @@ public class UpdateSubscription {
 		try {
 			String reasonToDelete = null;
 			String kind = "";
-
-			Map<String, Object> map = receiptValidationHelper.loadReceipt(payload);
-			Object result = map.get("result");
-			Object error = map.get("error");
-			Object response = map.get("response");
-			if (Boolean.TRUE.equals(result) && response instanceof JsonObject) {
-				JsonObject receiptObj = (JsonObject) map.get("response");
+			ReceiptResult loadReceipt = receiptValidationHelper.loadReceipt(payload);
+			if (loadReceipt.result) {
+				JsonObject receiptObj = loadReceipt.response;
 				if (verbose) {
 					System.out.println("Result: " + receiptObj.toString());
 				}
 				try {
-					Map<String, InAppReceipt> inAppReceipts = receiptValidationHelper.parseInAppReceipts(receiptObj);
-					if (inAppReceipts == null || inAppReceipts.size() == 0) {
+					List<InAppReceipt> inAppReceipts = receiptValidationHelper.parseInAppReceipts(receiptObj);
+					if (inAppReceipts.isEmpty()) {
 						kind = "empty";
 						reasonToDelete = "empty in apps.";
 					} else {
@@ -223,17 +220,17 @@ public class UpdateSubscription {
 						int introCycles = 0;
 						long startDate = 0;
 						long expiresDate = 0;
-						for (InAppReceipt receipt : inAppReceipts.values()) {
+						for (InAppReceipt receipt : inAppReceipts) {
 							if (sku.equals(receipt.getProductId())) {
 								Map<String, String> fields = receipt.fields;
-								// purchase_date_ms is continuation
+								// purchase_date_ms is purchase date of prolongation
 								boolean introPeriod = "true".equals(fields.get("is_in_intro_offer_period"));
-								long startDateMs = Long.parseLong(fields.get("original_purchase_date_ms"));
-								long expiresDateMs = Long.parseLong(fields.get("expires_date_ms"));
-								if (expiresDateMs > expiresDate) {
+								long inAppStartDateMs = Long.parseLong(fields.get("original_purchase_date_ms"));
+								long inAppExpiresDateMs = Long.parseLong(fields.get("expires_date_ms"));
+								if (inAppExpiresDateMs > expiresDate) {
 									autoRenewing = receipt.autoRenew;
-									expiresDate = expiresDateMs;
-									startDate = startDateMs;
+									expiresDate = inAppExpiresDateMs;
+									startDate = inAppStartDateMs;
 								}
 								if (introPeriod) {
 									introCycles++;
@@ -270,10 +267,15 @@ public class UpdateSubscription {
 				}
 
 			}
-			if (Integer.valueOf(ReceiptValidationHelper.SANDBOX_ERROR_CODE).equals(error)) {
+			if (loadReceipt.error == ReceiptValidationHelper.SANDBOX_ERROR_CODE_TEST) {
 				// sandbox: do not update anymore
 				kind = "invalid";
 				reasonToDelete = "receipt from sandbox environment";
+			}
+			if (loadReceipt.error == ReceiptValidationHelper.USER_GONE) {
+				// sandbox: do not update anymore
+				kind = "invalid";
+				reasonToDelete = "user gone";
 			}
 			if (reasonToDelete != null) {
 				deleteSubscription(userid, pt, sku, tm, reasonToDelete, kind);
