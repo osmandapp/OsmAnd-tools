@@ -79,7 +79,7 @@ public class UpdateSubscription {
 		this.ios = ios;
 		this.publisher = publisher;
 		delQuery = "UPDATE supporters_device_sub SET valid = false, kind = ?, checktime = ? "
-				+ "WHERE userid = ? and purchaseToken = ? and sku = ?";
+				+ "WHERE userid = ? and (purchaseToken = ? or purchasetoken is null) and sku = ?";
 		updCheckQuery = "UPDATE supporters_device_sub SET checktime = ? "
 				+ "WHERE userid = ? and purchaseToken = ? and sku = ?";
 		String requestValid = "(valid is null or valid=true)";
