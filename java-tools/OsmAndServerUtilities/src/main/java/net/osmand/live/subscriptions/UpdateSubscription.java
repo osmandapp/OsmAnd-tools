@@ -90,14 +90,14 @@ public class UpdateSubscription {
 				+ "FROM supporters_device_sub S where " + requestValid + " order by userid asc";
 		if (ios) {
 			updQuery = "UPDATE supporters_device_sub SET "
-					+ "checktime = ?, starttime = ?, expiretime = ?, autorenewing = ?, " + "introcycles = ? , "
-					+ "valid = ? " + "WHERE userid = ? and purchaseToken = ? and sku = ?";
+					+ " checktime = ?, starttime = ?, expiretime = ?, autorenewing = ?, " + "introcycles = ? , "
+					+ " valid = ? " + " WHERE userid = ? and purchaseToken = ? and sku = ?";
 		} else {
 			updQuery = "UPDATE supporters_device_sub SET "
 					+ " checktime = ?, starttime = ?, expiretime = ?, autorenewing = ?, "
 					+ " kind = ?, orderid = ?, payload = ?, "
 					+ " price = ?, pricecurrency = ?, introprice = ?, intropricecurrency = ?, introcycles = ? , introcyclename = ?, "
-					+ " valid = ? " + "WHERE userid = ? and purchaseToken = ? and sku = ?";
+					+ " valid = ? " + " WHERE userid = ? and purchaseToken = ? and sku = ?";
 		}
 	}
 
@@ -414,7 +414,8 @@ public class UpdateSubscription {
 				updStat.setNull(ind++, Types.VARCHAR);
 			}
 		}
-		updStat.setBoolean(ind++, true);
+		boolean expired = tm - subscription.getExpiryTimeMillis() > MAX_WAITING_TIME_TO_EXPIRE;
+		updStat.setBoolean(ind++, !expired);
 		updStat.setLong(ind++, userid);
 		updStat.setString(ind++, pt);
 		updStat.setString(ind, sku);
