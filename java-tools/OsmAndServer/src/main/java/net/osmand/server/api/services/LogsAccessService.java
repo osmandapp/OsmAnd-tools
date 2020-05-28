@@ -195,7 +195,7 @@ public class LogsAccessService {
 			}
 			if(presentation != LogsPresentation.PLAIN) {
 				out.write(String.format("{\"errors\" : %d, \"rows\" : %d, \"parseTime\" : %d, \"readTime\" : %d, "
-						+ "\"begin\":\"%3$tF %3$tT\", \"end\":\"%4$tF %4$tT\", ", err, rows, 
+						+ "\"begin\":\"%5$tF %5$tT\", \"end\":\"%6$tF %6$tT\", ", err, rows, 
 						parseTime.getTotalTimeMillis(), readTime.getTotalTimeMillis(), beginDate, endDate).getBytes());
 			}
 			if(presentation == LogsPresentation.BEHAVIOR) {
