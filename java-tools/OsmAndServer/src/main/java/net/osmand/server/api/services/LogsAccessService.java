@@ -59,7 +59,7 @@ public class LogsAccessService {
     	STATS
     }
     
-	public void parseLogs(Date startTime, Date endTime, boolean parseRegion, int limit, String filter, LogsPresentation presentation, 
+	public void parseLogs(Date startTime, Date endTime, boolean parseRegion, long limit, String filter, LogsPresentation presentation, 
 			OutputStream out) throws IOException {
 		gson = new GsonBuilder().setPrettyPrinting().create();
 		Parser<LogEntry> parser = new HttpdLoglineParser<>(LogEntry.class, APACHE_LOG_FORMAT);
@@ -68,8 +68,8 @@ public class LogsAccessService {
 		Pattern aidPattern = Pattern.compile("aid=([a-z,0-9]*)");
 		Map<String, UserAccount> behaviorMap = new LinkedHashMap<String, UserAccount>();
 		Map<String, Stat> stats = new LinkedHashMap<String, Stat>();
-		if(presentation == LogsPresentation.BEHAVIOR && limit < 0) {
-			limit = 100000;
+		if (presentation == LogsPresentation.BEHAVIOR && limit < 0) {
+			limit = 10000000l;
 		}
 		Date beginDate = null;
 		Date endDate = null;
@@ -89,10 +89,12 @@ public class LogsAccessService {
 				out.write((LogEntry.toCSVHeader() + "\n").getBytes());
 			}
 			out.flush();
+			int totalRows =0 ;
 			while (found && (ln = raf.readLine()) != null) {
 				if(raf.getFilePointer() > currentLimit) {
 					break;
 				}
+				totalRows++;
 				l.clear();
 				try {
 					parser.parse(l, ln);
@@ -104,20 +106,22 @@ public class LogsAccessService {
 					}
 					continue;
 				}
-				if(startTime != null && startTime.getTime() > l.date.getTime()) {
+				if (startTime != null && startTime.getTime() > l.date.getTime()) {
 					continue;
 				}
-				if(endTime != null && endTime.getTime() < l.date.getTime()) {
+				if (endTime != null && endTime.getTime() < l.date.getTime()) {
 					break;
 				}
-				if(l.date == null) {
+				if (l.date == null) {
 					continue;
 				}
-				if(beginDate == null) {
+				if (beginDate == null) {
 					beginDate = l.date;
 				}
 				endDate = l.date;
-				
+				if (totalRows >= limit && limit != -1) {
+					break;
+				}
 				Matcher aidMatcher = aidPattern.matcher(l.uri);
 				String aid = aidMatcher.find() ? aidMatcher.group(1) : null ;
 				if(filter != null && filter.length() > 0) {
@@ -166,9 +170,7 @@ public class LogsAccessService {
 				} else {
 					out.write((l.toCSVString() + "\n").getBytes());
 				}
-				if(rows >= limit && limit != -1) {
-					break;
-				}
+				
 				if(rows % 1000 == 0) {
 					out.flush();
 				}
