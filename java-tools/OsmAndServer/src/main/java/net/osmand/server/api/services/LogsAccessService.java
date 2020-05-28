@@ -68,6 +68,7 @@ public class LogsAccessService {
 		StopWatch parseTime = new StopWatch();
 		Date beginDate = null;
 		Date endDate = null;
+		long totalRows;
 		int rows = 0;
 		int err = 0;
 		OutputStream out;
@@ -88,8 +89,10 @@ public class LogsAccessService {
 		if (logFile.exists()) {
 			readLogFile(logFile, startTime, endTime, parseRegion, limit, uriFilter, logFilter, presentation, r);
 		}
-		logFile = new File(DEFAULT_LOG_LOCATION, "access.log");
-		readLogFile(logFile, startTime, endTime, parseRegion, limit, uriFilter, logFilter, presentation, r);
+		if (r.totalRows < limit || limit < 0) {
+			logFile = new File(DEFAULT_LOG_LOCATION, "access.log");
+			readLogFile(logFile, startTime, endTime, parseRegion, limit, uriFilter, logFilter, presentation, r);
+		}
 		
 		
 		if (presentation != LogsPresentation.PLAIN) {
@@ -162,7 +165,6 @@ public class LogsAccessService {
 				r.out.write((LogEntry.toCSVHeader() + "\n").getBytes());
 			}
 			r.out.flush();
-			int totalRows = 0;
 			bufferedReader = new BufferedReader(new FileReader(raf.getFD()));
 			while (found) {
 				r.readTime.start();
@@ -174,8 +176,8 @@ public class LogsAccessService {
 				if (raf.getFilePointer() > currentLimit) {
 					break;
 				}
-				totalRows++;
-				if (totalRows >= limit && limit != -1) {
+				r.totalRows++;
+				if (r.totalRows >= limit && limit != -1) {
 					break;
 				}
 				if (logFilter != null && logFilter.length() > 0 && !ln.contains(logFilter)) {
