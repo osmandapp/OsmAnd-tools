@@ -35,6 +35,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StopWatch;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -69,12 +70,13 @@ public class LogsAccessService {
 		Map<String, UserAccount> behaviorMap = new LinkedHashMap<String, UserAccount>();
 		Map<String, Stat> stats = new LinkedHashMap<String, Stat>();
 		if (presentation == LogsPresentation.BEHAVIOR && limit < 0) {
-			limit = 10000000l;
+			limit = 1000000l;
 		}
+		StopWatch readTime = new StopWatch();
+		StopWatch parseTime = new StopWatch();
 		Date beginDate = null;
 		Date endDate = null;
 		try {
-			String ln = null;
 			LogEntry l = new LogEntry();
 			long currentLimit = raf.length();
 			int rows = 0;
@@ -90,7 +92,13 @@ public class LogsAccessService {
 			}
 			out.flush();
 			int totalRows = 0;
-			while (found && (ln = raf.readLine()) != null) {
+			while (found) {
+				readTime.start();
+				String ln = raf.readLine();
+				readTime.stop();
+				if (ln == null) {
+					break;
+				}
 				if(raf.getFilePointer() > currentLimit) {
 					break;
 				}
@@ -107,7 +115,9 @@ public class LogsAccessService {
 //				}
 				l.clear();
 				try {
+					parseTime.start();
 					parser.parse(l, ln);
+					parseTime.stop();
 				} catch (Exception e) {
 					if (err++ % 100 == 0) {
 						if(presentation == LogsPresentation.PLAIN) {
@@ -184,8 +194,9 @@ public class LogsAccessService {
 				}
 			}
 			if(presentation != LogsPresentation.PLAIN) {
-				out.write(String.format("{\"errors\" : %d, \"rows\" : %d, "
-						+ "\"begin\":\"%3$tF %3$tT\", \"end\":\"%4$tF %4$tT\", ", err, rows, beginDate, endDate).getBytes());
+				out.write(String.format("{\"errors\" : %d, \"rows\" : %d, \"parseTime\" : %d, \"readTime\" : %d, "
+						+ "\"begin\":\"%3$tF %3$tT\", \"end\":\"%4$tF %4$tT\", ", err, rows, 
+						parseTime.getTotalTimeMillis(), readTime.getTotalTimeMillis(), beginDate, endDate).getBytes());
 			}
 			if(presentation == LogsPresentation.BEHAVIOR) {
 				out.write("\n\"accounts\" : [".getBytes());
