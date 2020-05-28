@@ -1,6 +1,8 @@
 package net.osmand.server.api.services;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
@@ -24,12 +26,6 @@ import java.util.TreeMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import nl.basjes.parse.core.Field;
-import nl.basjes.parse.core.Parser;
-import nl.basjes.parse.core.Parser.SetterPolicy;
-import nl.basjes.parse.httpdlog.HttpdLoglineParser;
-import nl.basjes.parse.httpdlog.dissectors.TimeStampDissector;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
@@ -40,6 +36,12 @@ import org.springframework.util.StopWatch;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.annotations.Expose;
+
+import nl.basjes.parse.core.Field;
+import nl.basjes.parse.core.Parser;
+import nl.basjes.parse.core.Parser.SetterPolicy;
+import nl.basjes.parse.httpdlog.HttpdLoglineParser;
+import nl.basjes.parse.httpdlog.dissectors.TimeStampDissector;
 
 @Service
 
@@ -66,6 +68,7 @@ public class LogsAccessService {
 		Parser<LogEntry> parser = new HttpdLoglineParser<>(LogEntry.class, APACHE_LOG_FORMAT);
 		File logFile = new File(DEFAULT_LOG_LOCATION, "access.log");
 		RandomAccessFile raf = new RandomAccessFile(logFile, "r");
+		BufferedReader bufferedReader = null;
 		Pattern aidPattern = Pattern.compile("aid=([a-z,0-9]*)");
 		Map<String, UserAccount> behaviorMap = new LinkedHashMap<String, UserAccount>();
 		Map<String, Stat> stats = new LinkedHashMap<String, Stat>();
@@ -92,9 +95,10 @@ public class LogsAccessService {
 			}
 			out.flush();
 			int totalRows = 0;
+			bufferedReader = new BufferedReader(new FileReader(raf.getFD()));
 			while (found) {
 				readTime.start();
-				String ln = raf.readLine();
+				String ln = bufferedReader.readLine();
 				readTime.stop();
 				if (ln == null) {
 					break;
@@ -241,6 +245,9 @@ public class LogsAccessService {
 			}
 			out.close();
 		} finally {
+			if (bufferedReader != null) {
+				bufferedReader.close();
+			}
 			raf.close();
 		}
 	}
