@@ -89,7 +89,7 @@ public class LogsAccessService {
 				out.write((LogEntry.toCSVHeader() + "\n").getBytes());
 			}
 			out.flush();
-			int totalRows =0 ;
+			int totalRows = 0;
 			while (found && (ln = raf.readLine()) != null) {
 				if(raf.getFilePointer() > currentLimit) {
 					break;
@@ -98,12 +98,13 @@ public class LogsAccessService {
 				if (totalRows >= limit && limit != -1) {
 					break;
 				}
-				if (filter != null && filter.length() > 0 && presentation != LogsPresentation.BEHAVIOR) {
-					// quick filter is not correct for behavior
-					if (!ln.contains(filter)) {
-						continue;
-					}
-				}
+				// not correct behavior
+//				if (filter != null && filter.length() > 0 && presentation != LogsPresentation.BEHAVIOR) {
+//					// quick filter is not correct for behavior
+//					if (!ln.contains(filter)) {
+//						continue;
+//					}
+//				}
 				l.clear();
 				try {
 					parser.parse(l, ln);
