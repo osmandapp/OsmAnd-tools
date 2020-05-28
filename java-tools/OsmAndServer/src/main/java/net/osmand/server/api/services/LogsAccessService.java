@@ -98,8 +98,7 @@ public class LogsAccessService {
 				if (totalRows >= limit && limit != -1) {
 					break;
 				}
-				//presentation != LogsPresentation.BEHAVIOR
-				if (filter != null && filter.length() > 0) {
+				if (filter != null && filter.length() > 0 && presentation != LogsPresentation.BEHAVIOR) {
 					// quick filter is not correct for behavior
 					if (!ln.contains(filter)) {
 						continue;
