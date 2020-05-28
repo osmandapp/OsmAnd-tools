@@ -95,6 +95,16 @@ public class LogsAccessService {
 					break;
 				}
 				totalRows++;
+				if (totalRows >= limit && limit != -1) {
+					break;
+				}
+				//presentation != LogsPresentation.BEHAVIOR
+				if (filter != null && filter.length() > 0) {
+					// quick filter is not correct for behavior
+					if (!ln.contains(filter)) {
+						continue;
+					}
+				}
 				l.clear();
 				try {
 					parser.parse(l, ln);
@@ -119,9 +129,7 @@ public class LogsAccessService {
 					beginDate = l.date;
 				}
 				endDate = l.date;
-				if (totalRows >= limit && limit != -1) {
-					break;
-				}
+				
 				Matcher aidMatcher = aidPattern.matcher(l.uri);
 				String aid = aidMatcher.find() ? aidMatcher.group(1) : null ;
 				if(filter != null && filter.length() > 0) {
