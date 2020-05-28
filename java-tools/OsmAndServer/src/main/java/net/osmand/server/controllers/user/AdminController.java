@@ -269,7 +269,8 @@ public class AdminController {
 	public void loadLogs(@RequestParam(required=false) String starttime, 
 			@RequestParam(required = false) String endtime,
 			@RequestParam(required = false) String region,
-			@RequestParam(required = false) String filter,
+			@RequestParam(required = false) String uriFilter,
+			@RequestParam(required = false) String logFilter,
 			@RequestParam(required = false) int limit,
 			@RequestParam(required = false) String gzip,
 			@RequestParam(required = false) String behavior,
@@ -300,7 +301,7 @@ public class AdminController {
 		} else if(statAnalysis) {
 			presentation = LogsPresentation.STATS;
 		}
-		logsAccessService.parseLogs(startTime, endTime, parseRegion, limit, filter, presentation, out);
+		logsAccessService.parseLogs(startTime, endTime, parseRegion, limit, uriFilter, logFilter, presentation, out);
 		response.flushBuffer();
 		response.getOutputStream().close();
 		
@@ -1202,10 +1203,10 @@ public class AdminController {
 	private List<Map<String, Object>> getDownloadSettings() {
 		DownloadProperties dProps = downloadService.getSettings();
 		List<Map<String, Object>> list = new ArrayList<>();
-		for(String s : dProps.getServers()) {
+		for (String s : dProps.getServers()) {
 			Map<String, Object> mo = new TreeMap<>();
 			mo.put("name", s);
-			for(DownloadServerSpecialty sp : DownloadServerSpecialty.values()) {
+			for (DownloadServerSpecialty sp : DownloadServerSpecialty.values()) {
 				mo.put(sp.name().toLowerCase(), dProps.getPercent(sp, s) + "%");
 			}
 			list.add(mo);

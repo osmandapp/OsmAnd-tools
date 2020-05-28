@@ -2,6 +2,7 @@ package net.osmand.server.api.services;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -62,70 +63,134 @@ public class LogsAccessService {
     	STATS
     }
     
-	public void parseLogs(Date startTime, Date endTime, boolean parseRegion, long limit, String filter, LogsPresentation presentation, 
-			OutputStream out) throws IOException {
-		gson = new GsonBuilder().setPrettyPrinting().create();
-		Parser<LogEntry> parser = new HttpdLoglineParser<>(LogEntry.class, APACHE_LOG_FORMAT);
-		File logFile = new File(DEFAULT_LOG_LOCATION, "access.log");
-		RandomAccessFile raf = new RandomAccessFile(logFile, "r");
-		BufferedReader bufferedReader = null;
-		Pattern aidPattern = Pattern.compile("aid=([a-z,0-9]*)");
-		Map<String, UserAccount> behaviorMap = new LinkedHashMap<String, UserAccount>();
-		Map<String, Stat> stats = new LinkedHashMap<String, Stat>();
-		if (presentation == LogsPresentation.BEHAVIOR && limit < 0) {
-			limit = 1000000l;
-		}
-		StopWatch readTime = new StopWatch();
+    public static class LogParsingResult {
+    	StopWatch readTime = new StopWatch();
 		StopWatch parseTime = new StopWatch();
 		Date beginDate = null;
 		Date endDate = null;
+		int rows = 0;
+		int err = 0;
+		OutputStream out;
+		Map<String, UserAccount> behaviorMap = new LinkedHashMap<String, UserAccount>();
+		Map<String, Stat> stats = new LinkedHashMap<String, Stat>();
+    }
+    
+	public void parseLogs(Date startTime, Date endTime, boolean parseRegion, long limit, String uriFilter, String logFilter,
+			LogsPresentation presentation, 
+			OutputStream out) throws IOException {
+		gson = new GsonBuilder().setPrettyPrinting().create();
+		LogParsingResult r = new LogParsingResult();
+		r.out = out;
+		if (presentation == LogsPresentation.BEHAVIOR && limit < 0) {
+			limit = 1000000l;
+		}
+		File logFile = new File(DEFAULT_LOG_LOCATION, "access.log.1");
+		if (logFile.exists()) {
+			readLogFile(logFile, startTime, endTime, parseRegion, limit, uriFilter, logFilter, presentation, r);
+		}
+		logFile = new File(DEFAULT_LOG_LOCATION, "access.log");
+		readLogFile(logFile, startTime, endTime, parseRegion, limit, uriFilter, logFilter, presentation, r);
+		
+		
+		if (presentation != LogsPresentation.PLAIN) {
+			out.write(String
+					.format("{\"errors\" : %d, \"rows\" : %d, \"parseTime\" : %d, \"readTime\" : %d, "
+							+ "\"begin\":\"%5$tF %5$tT\", \"end\":\"%6$tF %6$tT\", ", r.err, r.rows,
+							r.parseTime.getTotalTimeMillis(), r.readTime.getTotalTimeMillis(), r.beginDate, r.endDate).getBytes());
+		}
+		if (presentation == LogsPresentation.BEHAVIOR) {
+			out.write("\n\"accounts\" : [".getBytes());
+			Iterator<Entry<String, UserAccount>> i = r.behaviorMap.entrySet().iterator();
+			boolean f = true;
+			while (i.hasNext()) {
+				Entry<String, UserAccount> nxt = i.next();
+				UserAccount v = nxt.getValue();
+				if (!nxt.getKey().equals(v.aid)) {
+					continue;
+				}
+				if (!f) {
+					out.write(",\n".getBytes());
+				} else {
+					f = false;
+				}
+				int duration = (int) ((v.maxdate - v.mindate) / (60 * 1000l));
+				v.duration = String.format("%02d:%02d", duration / 60, duration % 60);
+				out.write(gson.toJson(v).getBytes());
+			}
+
+			out.write("]}".getBytes());
+		} else if (presentation == LogsPresentation.STATS) {
+			out.write("\n\"stats\" : ".getBytes());
+			List<Stat> sortStats = new ArrayList<Stat>(r.stats.values());
+			r.stats.clear();
+			Collections.sort(sortStats, new Comparator<Stat>() {
+
+				@Override
+				public int compare(Stat o1, Stat o2) {
+					return -Integer.compare(o1.uniqueCount, o2.uniqueCount);
+				}
+
+			});
+			for (Stat s : sortStats) {
+				s.calculateFollowUps(sortStats);
+				r.stats.put(s.uri, s);
+			}
+
+			out.write(gson.toJson(r.stats).getBytes());
+			out.write("}".getBytes());
+		}
+		out.close();
+
+	}
+
+	private void readLogFile(File logFile, Date startTime, Date endTime, boolean parseRegion, long limit, String uriFilter,
+			String logFilter, LogsPresentation presentation, LogParsingResult r)
+			throws FileNotFoundException, IOException {
+		RandomAccessFile raf = new RandomAccessFile(logFile, "r");
+		BufferedReader bufferedReader = null;
+		Parser<LogEntry> parser = new HttpdLoglineParser<>(LogEntry.class, APACHE_LOG_FORMAT);
 		try {
+			Pattern aidPattern = Pattern.compile("aid=([a-z,0-9]*)");
 			LogEntry l = new LogEntry();
 			long currentLimit = raf.length();
-			int rows = 0;
-			int err = 0;
-			
 			boolean found = true;
 			if(startTime != null) {
 				found = seekStartTime(parser, startTime, raf);
 			}
 			
 			if (presentation == LogsPresentation.PLAIN) {
-				out.write((LogEntry.toCSVHeader() + "\n").getBytes());
+				r.out.write((LogEntry.toCSVHeader() + "\n").getBytes());
 			}
-			out.flush();
+			r.out.flush();
 			int totalRows = 0;
 			bufferedReader = new BufferedReader(new FileReader(raf.getFD()));
 			while (found) {
-				readTime.start();
+				r.readTime.start();
 				String ln = bufferedReader.readLine();
-				readTime.stop();
+				r.readTime.stop();
 				if (ln == null) {
 					break;
 				}
-				if(raf.getFilePointer() > currentLimit) {
+				if (raf.getFilePointer() > currentLimit) {
 					break;
 				}
 				totalRows++;
 				if (totalRows >= limit && limit != -1) {
 					break;
 				}
-				// not correct behavior
-//				if (filter != null && filter.length() > 0 && presentation != LogsPresentation.BEHAVIOR) {
-//					// quick filter is not correct for behavior
-//					if (!ln.contains(filter)) {
-//						continue;
-//					}
-//				}
+				if (logFilter != null && logFilter.length() > 0 && !ln.contains(logFilter)) {
+					// quick filter is not correct for behavior
+					continue;
+				}
 				l.clear();
 				try {
-					parseTime.start();
+					r.parseTime.start();
 					parser.parse(l, ln);
-					parseTime.stop();
+					r.parseTime.stop();
 				} catch (Exception e) {
-					if (err++ % 100 == 0) {
+					if (r.err++ % 100 == 0) {
 						if(presentation == LogsPresentation.PLAIN) {
-							out.write(String.format("Error parsing %d\n", err).getBytes());
+							r.out.write(String.format("Error parsing %d\n", r.err).getBytes());
 						}
 					}
 					continue;
@@ -139,23 +204,21 @@ public class LogsAccessService {
 				if (l.date == null) {
 					continue;
 				}
-				if (beginDate == null) {
-					beginDate = l.date;
+				if (r.beginDate == null) {
+					r.beginDate = l.date;
 				}
-				endDate = l.date;
+				r.endDate = l.date;
 				
 				Matcher aidMatcher = aidPattern.matcher(l.uri);
 				String aid = aidMatcher.find() ? aidMatcher.group(1) : null ;
-				if(filter != null && filter.length() > 0) {
-					if(!l.uri.contains(filter) && 
-							(l.userAgent == null || !l.userAgent.contains(filter)) && !behaviorMap.containsKey(l.ip) && 
-							!behaviorMap.containsKey(aid)) {
+				if (uriFilter != null && uriFilter.length() > 0) {
+					if (!l.uri.contains(uriFilter) && !r.behaviorMap.containsKey(l.ip) && !r.behaviorMap.containsKey(aid)) {
 						continue;
 					}
 				}
-				rows++;
+				r.rows++;
 				UserAccount accountAid = presentation == LogsPresentation.BEHAVIOR ? retrieveUniqueAccount(aid, l,
-						behaviorMap) : null;
+						r.behaviorMap) : null;
 				if(parseRegion) {
 					l.region = locationService.getField(l.ip, IpLocationService.COUNTRY_NAME);
 					if(accountAid != null) {
@@ -182,68 +245,21 @@ public class LogsAccessService {
 							uri = uri.substring(0, i);
 						}
 					}
-					Stat stat = stats.get(uri);
+					Stat stat = r.stats.get(uri);
 					if(stat == null) {
 						stat = new Stat();
 						stat.uri = uri;
-						stats.put(uri, stat);
+						r.stats.put(uri, stat);
 					}
 					stat.add(aid, l);
 				} else {
-					out.write((l.toCSVString() + "\n").getBytes());
+					r.out.write((l.toCSVString() + "\n").getBytes());
 				}
 				
-				if(rows % 1000 == 0) {
-					out.flush();
+				if(r.rows % 1000 == 0) {
+					r.out.flush();
 				}
 			}
-			if(presentation != LogsPresentation.PLAIN) {
-				out.write(String.format("{\"errors\" : %d, \"rows\" : %d, \"parseTime\" : %d, \"readTime\" : %d, "
-						+ "\"begin\":\"%5$tF %5$tT\", \"end\":\"%6$tF %6$tT\", ", err, rows, 
-						parseTime.getTotalTimeMillis(), readTime.getTotalTimeMillis(), beginDate, endDate).getBytes());
-			}
-			if(presentation == LogsPresentation.BEHAVIOR) {
-				out.write("\n\"accounts\" : [".getBytes());
-				Iterator<Entry<String, UserAccount>> i = behaviorMap.entrySet().iterator();
-				boolean f = true;
-				while (i.hasNext()) {
-					Entry<String, UserAccount> nxt = i.next();
-					UserAccount v = nxt.getValue();
-					if (!nxt.getKey().equals(v.aid)) {
-						continue;
-					}
-					if(!f) {
-						out.write(",\n".getBytes());
-					} else {
-						f = false;
-					}
-					int duration = (int) ((v.maxdate - v.mindate) / (60 * 1000l));
-					v.duration = String.format("%02d:%02d", duration / 60, duration % 60);
-					out.write(gson.toJson(v).getBytes());
-				}
-				
-				out.write("]}".getBytes());
-			} else if(presentation == LogsPresentation.STATS) {
-				out.write("\n\"stats\" : ".getBytes());
-				List<Stat> sortStats = new ArrayList<Stat>(stats.values());
-				stats.clear();
-				Collections.sort(sortStats, new Comparator<Stat>(){
-
-					@Override
-					public int compare(Stat o1, Stat o2) {
-						return -Integer.compare(o1.uniqueCount, o2.uniqueCount);
-					}
-					
-				});
-				for(Stat s : sortStats) {
-					s.calculateFollowUps(sortStats);
-					stats.put(s.uri, s);
-				}
-
-				out.write(gson.toJson(stats).getBytes());
-				out.write("}".getBytes());
-			}
-			out.close();
 		} finally {
 			if (bufferedReader != null) {
 				bufferedReader.close();
