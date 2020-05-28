@@ -85,6 +85,10 @@ public class LogsAccessService {
 		if (presentation == LogsPresentation.BEHAVIOR && limit < 0) {
 			limit = 1000000l;
 		}
+		if (presentation == LogsPresentation.PLAIN) {
+			r.out.write((LogEntry.toCSVHeader() + "\n").getBytes());
+			r.out.flush();
+		}
 		File logFile = new File(DEFAULT_LOG_LOCATION, "access.log.1");
 		if (logFile.exists()) {
 			readLogFile(logFile, startTime, endTime, parseRegion, limit, uriFilter, logFilter, presentation, r);
@@ -161,10 +165,7 @@ public class LogsAccessService {
 				found = seekStartTime(parser, startTime, raf);
 			}
 			
-			if (presentation == LogsPresentation.PLAIN) {
-				r.out.write((LogEntry.toCSVHeader() + "\n").getBytes());
-			}
-			r.out.flush();
+			
 			bufferedReader = new BufferedReader(new FileReader(raf.getFD()));
 			while (found) {
 				r.readTime.start();
@@ -198,12 +199,16 @@ public class LogsAccessService {
 					continue;
 				}
 				if (startTime != null && startTime.getTime() > l.date.getTime()) {
+					// don't count row to limit
+					r.totalRows--;
 					continue;
 				}
 				if (endTime != null && endTime.getTime() < l.date.getTime()) {
 					break;
 				}
 				if (l.date == null) {
+					// don't count row to limit
+					r.totalRows--;
 					continue;
 				}
 				if (r.beginDate == null) {
