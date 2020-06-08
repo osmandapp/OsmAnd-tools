@@ -748,7 +748,6 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 	}
 
 	public void iterateMainEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
-		Map<String, String> tags = e.getTags();
 		// index not only buildings but also nodes that belongs to addr:interpolation ways
 		// currently not supported because nodes are indexed first with buildings
 		String interpolation = e.getTag(OSMTagKey.ADDR_INTERPOLATION);
@@ -814,6 +813,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			}
 		}
 		String street2 = e.getTag(OSMTagKey.ADDR_STREET2);
+		if (Algorithms.isEmpty(street2)) {
+			street2 = e.getTag(OSMTagKey.ADDR2_STREET);
+		}
 		if ((houseName != null || houseNumber != null)) {
 			if (e instanceof Relation) {
 				ctx.loadEntityRelation((Relation) e);
@@ -861,26 +863,29 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 						}
 						building.setName(hname.substring(0, i));
 						building.setName2(hname.substring(i + 1));
-					} else if ((street2 != null) && !street2.isEmpty()) {
-						int secondNumber = hname.indexOf('/');
-						if (secondNumber == -1 || !(secondNumber < hname.length() - 1)) {
-							building.setName(hname + additionalHname);
-						} else {
-							building.setName(hname.substring(0, secondNumber) + additionalHname);
-							Building building2 = EntityParser.parseBuilding(e);
-							building2.setName(hname.substring(secondNumber + 1) + additionalHname);
-							Set<Long> ids2OfStreet = getStreetInCity(e.getIsInNames(), street2, null, l);
-							ids2OfStreet.removeAll(idsOfStreet); //remove duplicated entries!
-							if (!ids2OfStreet.isEmpty()) {
-								streetDAO.writeBuilding(ids2OfStreet, building2);
-							} else {
-								building.setName2(building2.getName() + additionalHname);
-							}
-						}
 					} else {
 						building.setName(hname + additionalHname);
 					}
-
+					if (!Algorithms.isEmpty(street2)) {
+						String secondHno= e.getTag(OSMTagKey.ADDR2_HOUSE_NUMBER);
+						String firstNo = building.getName();
+						int secondNumberInd = hname.indexOf('/');
+						if (secondNumberInd != -1 && secondNumberInd < hname.length() - 1 &&
+								Algorithms.isEmpty(secondHno)) {
+							firstNo = hname.substring(0, secondNumberInd) + additionalHname;
+							secondHno = hname.substring(secondNumberInd + 1);
+						}
+						if (secondHno != null) {
+							Building building2 = EntityParser.parseBuilding(e);
+							building2.setName(hname.substring(secondNumberInd + 1) + additionalHname);
+							Set<Long> ids2OfStreet = getStreetInCity(e.getIsInNames(), street2, null, l);
+							ids2OfStreet.removeAll(idsOfStreet); // remove duplicated entries!
+							if (!ids2OfStreet.isEmpty()) {
+								streetDAO.writeBuilding(ids2OfStreet, building2);
+								building.setName(firstNo);
+							}
+						}
+					} 
 					streetDAO.writeBuilding(idsOfStreet, building);
 				}
 			}
