@@ -966,8 +966,9 @@ public class MapRouterLayer implements MapPanelLayer {
 				net.osmand.osm.edit.Node n = new net.osmand.osm.edit.Node(l.getLatitude(), l.getLongitude(), -1);
 				if (prevWayNode != null) {
 					if (OsmMapUtils.getDistance(prevWayNode, n) > 0) {
-						System.out.println("Warning not connected road " + " " + s.getObject().id + " dist "
-								+ OsmMapUtils.getDistance(prevWayNode, n));
+						System.out.println(
+								String.format("Not connected road '%f m' (prev %s - current %s),  %d ind %s" ,
+										OsmMapUtils.getDistance(prevWayNode, n), prevWayNode.getLatLon(), n.getLatLon(), i, s.getObject()));
 					}
 					prevWayNode = null;
 				}
