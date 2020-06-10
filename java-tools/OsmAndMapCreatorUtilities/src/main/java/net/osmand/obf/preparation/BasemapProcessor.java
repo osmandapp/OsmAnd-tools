@@ -718,7 +718,7 @@ public class BasemapProcessor {
 			MapRenderingTypesEncoder rt = new MapRenderingTypesEncoder("basemap");
 			// BASEMAP generation
 			int zoomSmoothness = 2;
-			MapZooms zooms = MapZooms.parseZooms("1-2;3;4-5;6-8;9-");
+			MapZooms zooms = MapZooms.parseZooms("1-2;3;4-5;6-7;8-9;10-11;12-");
 			MOST_DETAILED_APPROXIMATION = 9;
 			String fileName = "World_basemap_2.obf";
 			File folder = new File(args[0]);
