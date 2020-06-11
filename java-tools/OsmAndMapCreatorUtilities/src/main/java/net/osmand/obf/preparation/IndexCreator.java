@@ -856,7 +856,7 @@ public class IndexCreator {
 		String rootFolder = "/Users/victorshcherb/osmand/";
 		IndexCreatorSettings settings = new IndexCreatorSettings();
 		settings.poiZipLongStrings = false;
-//		settings.indexMap = true;
+		settings.indexMap = true;
 //		settings.indexAddress = true;
 //		settings.indexPOI = true;
 //		settings.indexTransport = true;
