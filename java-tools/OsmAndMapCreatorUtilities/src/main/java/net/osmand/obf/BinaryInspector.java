@@ -79,8 +79,8 @@ public class BinaryInspector {
 		// test cases show info
 		if ("test".equals(args[0])) {
 			in.inspector(new String[] {
-//					"-vpoi",
-					"-vmap", "-vmapobjects",
+					"-vpoi",
+//					"-vmap", "-vmapobjects",
 //					"-vmapcoordinates",
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
@@ -88,10 +88,11 @@ public class BinaryInspector {
 //					"-vstreets", "-vbuildings", "-vintersections",
 //					"-lang=ru",
 //					"-zoom=6",
+					"-bbox=30.47,50.39,30.48,50.38",
 //					"-bbox=37.5,49.3,37.6,49.2",
 //					"-osm="+System.getProperty("maps.dir")+"/map.obf.osm",
 //					System.getProperty("maps.dir")+"/Russia_moscow_asia_2.obf"
-					System.getProperty("maps.dir")+"/Test_czech_route.obf"
+					System.getProperty("maps.dir")+"/Ukraine_europe_2.wiki.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
 		} else {
@@ -1324,16 +1325,10 @@ public class BinaryInspector {
 				new ResultMatcher<Amenity>() {
 					@Override
 					public boolean publish(Amenity object) {
-						Iterator<Entry<String, String>> it = object.getAdditionalInfo().entrySet().iterator();
-						String s = "";
-						while (it.hasNext()) {
-							Entry<String, String> e = it.next();
-							if (e.getValue().startsWith(" gz ")) {
-								s += " " + e.getKey() + "=...";
-							} else {
-								s += " " + e.getKey() + "=" + e.getValue();
-							}
-						}
+						StringBuilder s = new StringBuilder();
+						printNames(" ", object.getAdditionalInfo(), s);
+						printNames(" name:", object.getNamesMap(true), s);
+						
 
 						long id = (object.getId() );
 						if(id > 0) {
@@ -1342,6 +1337,18 @@ public class BinaryInspector {
 						println(object.getType().getKeyName() + ": " + object.getSubType() + " " + object.getName() +
 								" " + object.getLocation() + " osmid=" + id + " " + s);
 						return false;
+					}
+
+					private void printNames(String prefix, Map<String, String> mp, StringBuilder s) {
+						Iterator<Entry<String, String>> it = mp.entrySet().iterator();
+						while (it.hasNext()) {
+							Entry<String, String> e = it.next();
+							if (e.getValue().startsWith(" gz ")) {
+								s.append(prefix + e.getKey() + "='gzip ...'");
+							} else {
+								s.append(prefix + e.getKey() + "='" + e.getValue() + "'");
+							}
+						}
 					}
 
 					@Override

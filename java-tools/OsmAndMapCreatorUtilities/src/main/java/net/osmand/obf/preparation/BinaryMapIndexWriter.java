@@ -1,12 +1,12 @@
 package net.osmand.obf.preparation;
 
 
+
 import gnu.trove.list.TLongList;
 import gnu.trove.list.array.TByteArrayList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.list.array.TLongArrayList;
 import gnu.trove.map.TIntObjectMap;
-import gnu.trove.map.hash.TLongObjectHashMap;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -98,8 +98,8 @@ import com.google.protobuf.WireFormat.FieldType;
 
 public class BinaryMapIndexWriter {
 
-	private static final boolean USE_DEPRECATED_POI_NAME_ADD_INFO_STRUCTURE = true;
-	private static final boolean USE_DEPRECATED_POI_NAME_STRUCTURE = true;
+	private static final boolean USE_DEPRECATED_POI_NAME_ADD_INFO_STRUCTURE = false;
+	private static final boolean USE_DEPRECATED_POI_NAME_STRUCTURE = false;
 
 	private RandomAccessFile raf;
 	private CodedOutputStream codedOutStream;
@@ -1289,7 +1289,6 @@ public class BinaryMapIndexWriter {
 			}
 		}
 		// simple merge lines
-		int beforeCompression = ct.size();
 		for (int i = 0; i < ct.size() - 1;) {
 			TLongArrayList head = ct.get(i);
 			int j = i + 1;

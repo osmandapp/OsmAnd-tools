@@ -433,18 +433,23 @@ public class CalculateOsmChangesets {
 		}
 		map.clear();
 		ResultSet rs = conn.createStatement().executeQuery("select id, fullname from countries where map = 1");
+		StringBuilder updateMissingRegions = new StringBuilder();
 		while(rs.next()) {
 			int id = rs.getInt(1);
 			WorldRegion rd ;
-			if(rs.getString(2).equals("world")) {
+			if (rs.getString(2).equals("world")) {
 				rd = worldRegion;
 			} else {
 				rd = or.getRegionData(rs.getString(2));
 			}
 			if(rd == null) {
-				throw new UnsupportedOperationException(rs.getString(2) + " not found");
+				updateMissingRegions.append("\n UPDATE countries set map = 0 where id =  "  + id + ";");
+			} else {
+				map.put(rd, id);
 			}
-			map.put(rd, id);
+		}
+		if (updateMissingRegions.length() > 0) {
+			throw new UnsupportedOperationException("Some regions were deleted and not present any more. Consider to run in database: " + updateMissingRegions);
 		}
 
 //		Iterator<Entry<WorldRegion, Integer>> it = map.entrySet().iterator();
