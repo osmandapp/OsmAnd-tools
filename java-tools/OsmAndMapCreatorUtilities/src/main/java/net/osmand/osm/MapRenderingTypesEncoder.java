@@ -1203,7 +1203,9 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 
 	private Map<String, String> processExtraTags(Map<String, String> tags) {
 		String routeTag = "";
-		if(tags.get("route_hiking") != null && tags.get("route_hiking").equals("hiking")) {
+		if((tags.get("route_hiking") != null && tags.get("route_hiking").equals("hiking")) 
+				|| (tags.get("route_foot") != null && tags.get("route_foot").equals("foot")) 
+				|| (tags.get("route_walking") != null && tags.get("route_walking").equals("walking"))) {
 			routeTag = "hiking";
 		}
 		if(tags.containsKey("osmc:symbol")) {
