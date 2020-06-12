@@ -350,7 +350,7 @@ public class CalculateOsmChangesets {
 		WorldRegion worldRegion = or.getWorldRegion();
 		boolean newCountriesInserted = false;
 		if (testMissing) {
-			ResultSet rs = conn.createStatement().executeQuery("SELECT id, fullname, map from countries");
+			ResultSet rs = conn.createStatement().executeQuery("SELECT id, fullname, map from countries where map = 1");
 			Set<String> existingMaps = new TreeSet<>();
 			int maxid = 0;
 			while (rs.next()) {
@@ -417,7 +417,7 @@ public class CalculateOsmChangesets {
 			insert.close();
 			if (!existingMaps.isEmpty()) {
 				for (String mp : existingMaps) {
-					LOG.error(String.format("Country '%s' should be deleted", mp));
+					LOG.error(String.format("Country '%s' should be deleted (update to map = 0 in db)", mp));
 				}
 			}
 		}
