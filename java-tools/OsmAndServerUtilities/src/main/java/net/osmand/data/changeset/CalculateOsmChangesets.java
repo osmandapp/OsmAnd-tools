@@ -59,30 +59,30 @@ public class CalculateOsmChangesets {
 		FORMAT.setTimeZone(TimeZone.getTimeZone("UTC"));
 		FORMAT2.setTimeZone(TimeZone.getTimeZone("UTC"));
 	}
+
 	public static void main(String[] args) throws Exception {
 		downloadChangesets();
 	}
-	
 
 	public static void downloadChangesets() throws Exception {
 		// configure the SSLContext with a TrustManager
-        SSLContext ctx = SSLContext.getInstance("TLS");
-        ctx.init(new KeyManager[0], new X509TrustManager[] { new X509TrustManager() {
+		SSLContext ctx = SSLContext.getInstance("TLS");
+		ctx.init(new KeyManager[0], new X509TrustManager[] { new X509TrustManager() {
 			@Override
 			public X509Certificate[] getAcceptedIssuers() {
 				return null;
 			}
-			
+
 			@Override
 			public void checkServerTrusted(X509Certificate[] arg0, String arg1) throws CertificateException {
 			}
-			
+
 			@Override
 			public void checkClientTrusted(X509Certificate[] arg0, String arg1) throws CertificateException {
 			}
-		}}, new SecureRandom());
-        SSLContext.setDefault(ctx);
-        
+		} }, new SecureRandom());
+		SSLContext.setDefault(ctx);
+
 		// jdbc:postgresql://user:secret@localhost
 		Connection conn = DriverManager.getConnection(System.getenv("DB_CONN"),
 				isEmpty(System.getenv("DB_USER")) ? "test" : System.getenv("DB_USER"),
@@ -96,7 +96,8 @@ public class CalculateOsmChangesets {
 		PreparedStatement selChangeset = conn.prepareStatement("SELECT 1 from changesets where id = ?");
 		PreparedStatement delPrepare = conn.prepareStatement("DELETE FROM pending_changesets where id = ?");
 		PreparedStatement selPrepare = conn.prepareStatement("SELECT 1 from pending_changesets where id = ?");
-		PreparedStatement insPrepare = conn.prepareStatement("INSERT INTO pending_changesets(id, created_at) VALUES(?, ?)");
+		PreparedStatement insPrepare = conn
+				.prepareStatement("INSERT INTO pending_changesets(id, created_at) VALUES(?, ?)");
 		int insChangesets = 0;
 		int pChangesets = 0;
 		int insPChangesets = 0;
@@ -104,34 +105,34 @@ public class CalculateOsmChangesets {
 		try {
 			// read pending changesets
 			ResultSet rs = conn.createStatement().executeQuery("SELECT distinct id from pending_changesets");
-			while(rs.next()) {
+			while (rs.next()) {
 				long pend = rs.getLong(1);
-				
-				toQuery.add(pend+"");
-//				start = Math.max(pend + 1, start);
+
+				toQuery.add(pend + "");
+				// start = Math.max(pend + 1, start);
 			}
-			
+
 			LOG.info("Pending " + toQuery);
 			rs.close();
 			pChangesets = toQuery.size();
 			// get maximum available changeset & read other
 			ResultSet max = conn.createStatement().executeQuery("SELECT max(id) from changesets");
-			if(max.next()) {
+			if (max.next()) {
 				long maxAvailbleId = max.getLong(1);
 				start = Math.max(maxAvailbleId + 1, start);
 			}
 			max.close();
-			while(toQuery.size() <  MAX_QUERIES * MAX_QUERY_1) {
-				toQuery.add(start+"");
+			while (toQuery.size() < MAX_QUERIES * MAX_QUERY_1) {
+				toQuery.add(start + "");
 				start++;
 			}
-			
+
 			// load changesets
 			// maxdate = None
-			while(!toQuery.isEmpty()) {
+			while (!toQuery.isEmpty()) {
 				String url = "https://api.openstreetmap.org//api/0.6/changesets?changesets=";
-				for(int i = 0; i < MAX_QUERY_1; i++) {
-					if(i > 0) {
+				for (int i = 0; i < MAX_QUERY_1; i++) {
+					if (i > 0) {
 						url += ",";
 					}
 					url += toQuery.remove(0);
@@ -139,19 +140,19 @@ public class CalculateOsmChangesets {
 				LOG.info("Query " + url);
 				HttpsURLConnection con = (HttpsURLConnection) new URL(url).openConnection();
 				con.setHostnameVerifier(new HostnameVerifier() {
-		            @Override
-		            public boolean verify(String arg0, SSLSession arg1) {
-		                return true;
-		            }
-		        });
+					@Override
+					public boolean verify(String arg0, SSLSession arg1) {
+						return true;
+					}
+				});
 				StringBuilder sb = Algorithms.readFromInputStream(con.getInputStream());
 				XmlPullParser parser = new KXmlParser();
 				parser.setInput(new StringReader(sb.toString()));
 				int tok;
 				ChangesetProps p = null;
-				while((tok = parser.next()) != XmlPullParser.END_DOCUMENT) {
-					if(tok == XmlPullParser.START_TAG) {
-						if(parser.getName().equals("changeset")) {
+				while ((tok = parser.next()) != XmlPullParser.END_DOCUMENT) {
+					if (tok == XmlPullParser.START_TAG) {
+						if (parser.getName().equals("changeset")) {
 							p = new ChangesetProps();
 							p.closedAt = parser.getAttributeValue("", "closed_at");
 							p.changesCount = Integer.parseInt(parser.getAttributeValue("", "changes_count"));
@@ -164,17 +165,17 @@ public class CalculateOsmChangesets {
 							p.uid = parser.getAttributeValue("", "uid");
 							p.id = parser.getAttributeValue("", "id");
 							p.createdAt = parser.getAttributeValue("", "created_at");
-						} else if(parser.getName().equals("tag") && p != null) {
+						} else if (parser.getName().equals("tag") && p != null) {
 							String k = parser.getAttributeValue("", "k");
 							String v = parser.getAttributeValue("", "v");
-							if(k.equals("created_by")) {
+							if (k.equals("created_by")) {
 								p.createdBy = v;
 							}
 							p.tags.put(k, v);
 						}
-					} else if(tok == XmlPullParser.END_TAG) {
-						if(parser.getName().equals("changeset")) {
-							if(!isEmpty(p.closedAt)) {
+					} else if (tok == XmlPullParser.END_TAG) {
+						if (parser.getName().equals("changeset")) {
+							if (!isEmpty(p.closedAt)) {
 								selChangeset.setString(1, p.id);
 								if (!selChangeset.executeQuery().next()) {
 									insChangeset.setString(1, p.id);
@@ -195,15 +196,15 @@ public class CalculateOsmChangesets {
 									insChangeset.executeUpdate();
 									insChangesets++;
 								}
-								
+
 								delPrepare.setString(1, p.id);
 								int upd = delPrepare.executeUpdate();
-								if(upd > 0) {
+								if (upd > 0) {
 									delPChangesets++;
 								}
 							} else {
 								selPrepare.setString(1, p.id);
-								
+
 								if (!selPrepare.executeQuery().next()) {
 									insPrepare.setString(1, p.id);
 									insPrepare.setString(2, p.createdAt.replace('T', ' '));
@@ -212,25 +213,25 @@ public class CalculateOsmChangesets {
 								}
 							}
 							p = null;
-							
+
 						}
 					}
 				}
 			}
-			
-			System.out.println("Pending changesets before: " + pChangesets + 
-					", processed changesets: " + (MAX_QUERY_1 * MAX_QUERIES - pChangesets));
-			if(insChangesets > 0) {
+
+			System.out.println("Pending changesets before: " + pChangesets + ", processed changesets: "
+					+ (MAX_QUERY_1 * MAX_QUERIES - pChangesets));
+			if (insChangesets > 0) {
 				System.out.println("Successfully inserted changeset: " + insChangesets);
 			}
-			if(insPChangesets > 0) {
+			if (insPChangesets > 0) {
 				System.out.println("Successfully inserted pending changesets: " + insPChangesets);
 			}
-			if(delPChangesets > 0) {
+			if (delPChangesets > 0) {
 				System.out.println("Successfully deleted pending changesets: " + delPChangesets);
 			}
 			System.out.println("DONE");
-		} catch(Exception e) {
+		} catch (Exception e) {
 			LOG.error(e.getMessage(), e);
 			throw new RuntimeException(e);
 		} finally {
@@ -239,7 +240,6 @@ public class CalculateOsmChangesets {
 
 	}
 
-
 	private static Timestamp parseTimestamp(String p) throws ParseException {
 		try {
 			return new Timestamp(FORMAT2.parse(p).getTime());
@@ -247,10 +247,10 @@ public class CalculateOsmChangesets {
 			return new Timestamp(FORMAT.parse(p).getTime());
 		}
 	}
-		
+
 	private static String getAttributeDoubleValue(XmlPullParser parser, String key) {
 		String vl = parser.getAttributeValue("", key);
-		if(isEmpty(vl)) {
+		if (isEmpty(vl)) {
 			return "0";
 		}
 		return vl;
@@ -262,8 +262,8 @@ public class CalculateOsmChangesets {
 
 	public static void calculateCountries() throws Exception {
 		// jdbc:postgresql://user:secret@localhost
-		Connection conn = DriverManager.getConnection(System.getenv("DB_CONN"),
-				System.getenv("DB_USER"), System.getenv("DB_PWD"));
+		Connection conn = DriverManager.getConnection(System.getenv("DB_CONN"), System.getenv("DB_USER"),
+				System.getenv("DB_PWD"));
 		try {
 			Statement stat = conn.createStatement();
 			ResultSet rs = stat.executeQuery("SELECT COUNT(*) FROM countries");
@@ -271,15 +271,14 @@ public class CalculateOsmChangesets {
 			rs.close();
 			Map<WorldRegion, Integer> map = new LinkedHashMap<WorldRegion, Integer>();
 			OsmandRegions or = initCountriesTable(conn, empty, map);
-			PreparedStatement ps = conn
-					.prepareStatement("INSERT INTO changeset_country(changesetid, countryid, small)"
-							+ " VALUES(?, ?, ?)");
+			PreparedStatement ps = conn.prepareStatement(
+					"INSERT INTO changeset_country(changesetid, countryid, small)" + " VALUES(?, ?, ?)");
 			rs = stat.executeQuery("select id, minlat, minlon, maxlat, maxlon from changesets C "
 					+ " where (maxlat <> 0 or minlat <> 0 or maxlon <> 0 or minlon <> 0) and "
 					+ "not exists (select 1 from changeset_country CC where CC.changesetid=C.id) limit " + FETCH_LIMIT);
 			int batch = 0;
 			int batchInd = 1;
-			while(rs.next()) {
+			while (rs.next()) {
 				double minlat = rs.getDouble(2);
 				double minlon = rs.getDouble(3);
 				double maxlat = rs.getDouble(4);
@@ -291,26 +290,27 @@ public class CalculateOsmChangesets {
 				int by = MapUtils.get31TileNumberY(minlat);
 				List<BinaryMapDataObject> objs = or.query(lx, rx, ty, by);
 				int cid = 0;
-				for(BinaryMapDataObject o : objs) {
+				for (BinaryMapDataObject o : objs) {
 					if (!or.intersect(o, lx, ty, rx, by)) {
 						continue;
 					}
 					String full = or.getFullName(o);
 					WorldRegion reg = or.getRegionData(full);
-					if(reg.isRegionMapDownload() && !full.toLowerCase().startsWith("world_")) {
+					if (reg.isRegionMapDownload() && !full.toLowerCase().startsWith("world_")) {
 						cid++;
 						if (cid > MAX_COUNTRY_SIZE) {
 							continue;
 						}
-						// System.out.println(changesetId  + " " + full + " " + reg.getLocaleName() + " " + map.get(reg));
-						if(map.get(reg) == null) {
+						// System.out.println(changesetId + " " + full + " " + reg.getLocaleName() + " " +
+						// map.get(reg));
+						if (map.get(reg) == null) {
 							throw new UnsupportedOperationException("Not found " + changesetId + " " + full);
 						}
 						boolean small = true;
 						List<WorldRegion> subs = reg.getSubregions();
-						if(subs != null) {
-							for(WorldRegion sub : subs) {
-								if(sub.isRegionMapDownload()) {
+						if (subs != null) {
+							for (WorldRegion sub : subs) {
+								if (sub.isRegionMapDownload()) {
 									small = false;
 									break;
 								}
@@ -323,27 +323,26 @@ public class CalculateOsmChangesets {
 					}
 
 				}
-				if(batch ++ > BATCH_SIZE) {
-					
-					System.out.println("Execute batch " + (batchInd++) +" by " + BATCH_SIZE);
+				if (batch++ > BATCH_SIZE) {
+
+					System.out.println("Execute batch " + (batchInd++) + " by " + BATCH_SIZE);
 					ps.executeBatch();
 					batch = 0;
 				}
 			}
 			ps.executeBatch();
 
-
-
 		} finally {
 			conn.close();
 		}
 
 	}
-	
+
 	private static boolean testMissing = true;
 	private static boolean insertMissing = true;
 
-	private static OsmandRegions initCountriesTable(Connection conn, boolean empty, Map<WorldRegion, Integer> map) throws IOException, SQLException {
+	private static OsmandRegions initCountriesTable(Connection conn, boolean empty, Map<WorldRegion, Integer> map)
+			throws IOException, SQLException {
 
 		OsmandRegions or = new OsmandRegions();
 		or.prepareFile();
@@ -354,16 +353,15 @@ public class CalculateOsmChangesets {
 			ResultSet rs = conn.createStatement().executeQuery("SELECT id, fullname, map from countries");
 			Set<String> existingMaps = new TreeSet<>();
 			int maxid = 0;
-			while(rs.next()) {
+			while (rs.next()) {
 				maxid = Math.max(maxid, rs.getInt(1));
 				existingMaps.add(rs.getString(2));
 			}
 			rs.close();
-			PreparedStatement insert = conn
-					.prepareStatement("INSERT INTO countries(id, parentid, name, fullname, downloadname, clat, clon, map)"
+			PreparedStatement insert = conn.prepareStatement(
+					"INSERT INTO countries(id, parentid, name, fullname, downloadname, clat, clon, map)"
 							+ " VALUES(?, ?, ?, ?, ?, ?, ?, ?)");
-			PreparedStatement update = conn
-					.prepareStatement("UPDATE countries SET map = ? WHERE fullname = ?");
+			PreparedStatement update = conn.prepareStatement("UPDATE countries SET map = ? WHERE fullname = ?");
 			PreparedStatement test = conn
 					.prepareStatement("SELECT id, downloadname, map FROM countries WHERE fullname = ?");
 			LinkedList<WorldRegion> queue = new LinkedList<WorldRegion>();
@@ -372,103 +370,110 @@ public class CalculateOsmChangesets {
 				WorldRegion wr = queue.pollFirst();
 				test.setString(1, wr.getRegionId());
 				rs = test.executeQuery();
-				if(rs.next()) {
+				if (rs.next()) {
 					existingMaps.remove(wr.getRegionId());
 					map.put(wr, rs.getInt(1));
 					String downloadName = rs.getString(2);
 					int mp = rs.getInt(3);
-					if(wr.isRegionMapDownload() && !Algorithms.objectEquals(downloadName, wr.getRegionDownloadName())) {
-						LOG.error(String.format("Country download name doesn't match '%s' != '%s'", 
-								downloadName, wr.getRegionDownloadName()));
-					} 
+					if (wr.isRegionMapDownload()
+							&& !Algorithms.objectEquals(downloadName, wr.getRegionDownloadName())) {
+						LOG.error(String.format("Country download name doesn't match '%s' != '%s'", downloadName,
+								wr.getRegionDownloadName()));
+					}
 					boolean isMap = mp == 1;
-					if(wr.isRegionMapDownload() != isMap) {
+					if (wr.isRegionMapDownload() != isMap) {
 						// It became available for download
-						if(wr.isRegionMapDownload()) {
-							LOG.info(String.format("Country '%s' changed it is downloaded state, so database will be updated! '%d' -> '1'", 
+						if (wr.isRegionMapDownload()) {
+							LOG.info(String.format(
+									"Country '%s' changed it is downloaded state, so database will be updated! '%d' -> '1'",
 									downloadName, mp));
 							update.setInt(1, 1);
 							update.setString(2, wr.getRegionId());
 							update.execute();
 						} else {
-							LOG.error(String.format("Country '%s' couldn't be downloaded anymore, so database should be updated! '%d' -> '0'", 
+							LOG.error(String.format(
+									"Country '%s' couldn't be downloaded anymore, so database should be updated! '%d' -> '0'",
 									downloadName, mp));
 						}
-					} 
-					
+					}
+
 				} else {
 					maxid++;
 					LOG.info(String.format("Insert MISSING country %s with id %d", wr.getRegionId(), maxid));
-					if(insertMissing) {
+					if (insertMissing) {
 						newCountriesInserted = true;
 						insertRegion(map, maxid, insert, wr);
-					}	
+					}
 				}
 				rs.close();
-				
+
 				List<WorldRegion> lst = wr.getSubregions();
-				if(lst != null) {
+				if (lst != null) {
 					queue.addAll(lst);
 				}
-				
+
 			}
 			insert.executeBatch();
 			insert.close();
-			if(!existingMaps.isEmpty()) {
-				for(String mp : existingMaps) {
+			if (!existingMaps.isEmpty()) {
+				for (String mp : existingMaps) {
 					LOG.error(String.format("Country '%s' should be deleted", mp));
 				}
 			}
 		}
-		
-		if(newCountriesInserted) {
-			PreparedStatement del =
-					conn.prepareStatement("delete from changeset_country where changesetid in (select id from changesets where closed_at_day > ?)");
+
+		if (newCountriesInserted) {
+			PreparedStatement del = conn.prepareStatement(
+					"delete from changeset_country where changesetid in (select id from changesets where closed_at_day > ?)");
 			String currentMonth = String.format("%1$tY-%1$tm", new Date());
 			LOG.info(String.format("Regenerate all countries changeset since %s", currentMonth + "-01"));
-			del.setString(1, currentMonth+"-01");
+			del.setString(1, currentMonth + "-01");
 			del.executeUpdate();
 			del.close();
-//			
+			//
 		}
 		map.clear();
 		ResultSet rs = conn.createStatement().executeQuery("select id, fullname from countries where map = 1");
 		StringBuilder updateMissingRegions = new StringBuilder();
-		while(rs.next()) {
+		StringBuilder missingRegions = new StringBuilder();
+		while (rs.next()) {
 			int id = rs.getInt(1);
-			WorldRegion rd ;
-			if (rs.getString(2).equals("world")) {
+			String regionName = rs.getString(2);
+			WorldRegion rd;
+			if (regionName.equals("world")) {
 				rd = worldRegion;
 			} else {
-				rd = or.getRegionData(rs.getString(2));
+				rd = or.getRegionData(regionName);
 			}
-			if(rd == null) {
-				updateMissingRegions.append("\n UPDATE countries set map = 0 where id =  "  + id + ";");
+			if (rd == null) {
+				updateMissingRegions.append("\n UPDATE countries set map = 0 where id =  " + id + ";");
+				missingRegions.append(regionName).append(", ");
 			} else {
 				map.put(rd, id);
 			}
 		}
 		if (updateMissingRegions.length() > 0) {
-			throw new UnsupportedOperationException("Some regions were deleted and not present any more. Consider to run in database: " + updateMissingRegions);
+			throw new UnsupportedOperationException("Some regions (" + missingRegions.toString()
+					+ ") were deleted and not present any more. Consider to run in database: " + updateMissingRegions);
 		}
 
-//		Iterator<Entry<WorldRegion, Integer>> it = map.entrySet().iterator();
-//		while(it.hasNext()){
-//			Entry<WorldRegion, Integer> e = it.next();
-//		}
+		// Iterator<Entry<WorldRegion, Integer>> it = map.entrySet().iterator();
+		// while(it.hasNext()){
+		// Entry<WorldRegion, Integer> e = it.next();
+		// }
 
 		return or;
 	}
-
 
 	private static void insertRegion(Map<WorldRegion, Integer> map, int id, PreparedStatement ps, WorldRegion wr)
 			throws SQLException {
 		map.put(wr, id);
 		ps.setInt(1, id);
 		WorldRegion parent = wr.getSuperregion();
-		if(parent != null) {
-			if(!map.containsKey(parent)) {
-				throw new IllegalStateException(String.format("Regions are disconnected %s %s", wr.getLocaleName(), parent.getLocaleName()));
+		if (parent != null) {
+			if (!map.containsKey(parent)) {
+				throw new IllegalStateException(
+						String.format("Regions are disconnected %s %s", wr.getLocaleName(), parent.getLocaleName()));
 			}
 			ps.setInt(2, map.get(parent));
 		} else {
@@ -478,7 +483,7 @@ public class CalculateOsmChangesets {
 		ps.setString(3, wr.getLocaleName());
 		ps.setString(4, wr.getRegionId());
 		ps.setString(5, wr.getRegionDownloadName());
-		if(wr.getRegionCenter() != null) {
+		if (wr.getRegionCenter() != null) {
 			ps.setDouble(6, wr.getRegionCenter().getLatitude());
 			ps.setDouble(7, wr.getRegionCenter().getLongitude());
 		} else {
@@ -489,7 +494,6 @@ public class CalculateOsmChangesets {
 		ps.addBatch();
 	}
 
-	
 	private static class ChangesetProps {
 
 		public String uid;
@@ -505,6 +509,6 @@ public class CalculateOsmChangesets {
 		public String minLon;
 		public String maxLat;
 		public String maxLon;
-		
+
 	}
 }
