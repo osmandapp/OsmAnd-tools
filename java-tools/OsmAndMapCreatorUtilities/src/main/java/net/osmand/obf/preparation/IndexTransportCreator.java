@@ -45,6 +45,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -767,8 +768,8 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		directRoute.setType(route);
 		directRoute.setRef(ref);
 		directRoute.setId(directRoute.getId() << 1);
-		List<Node> incompleteNodes = getIncompeteStops(rel);
 		if (processTransportRelationV2(rel, directRoute)) { // try new transport relations first
+			List<Entity> incompleteNodes = getIncompleteStops(rel, directRoute);
 			List<TransportStop> forwardStops = directRoute.getForwardStops();
 			if (hasRelationIncompleteWays(rel) && forwardStops.size() > 0 && directRoute.getForwardWays().size() > 1) {
 				// here ways are changed !!!
@@ -808,10 +809,10 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	}
 
 
-	private void insertMissingStop(TransportRoute directRoute, List<Node> nds, TransportStop stp, boolean before) {
-		Node insertNode = null;
+	private void insertMissingStop(TransportRoute directRoute, List<Entity> nds, TransportStop stp, boolean before) {
+		Entity insertNode = null;
 		for (int i = 0; i < nds.size(); i += 2) {
-			Node insertNodeNew = before ? nds.get(i + 1) : nds.get(i);
+			Entity insertNodeNew = before ? nds.get(i + 1) : nds.get(i);
 			if (insertNode == null) {
 				insertNode = insertNodeNew;
 			} else if (insertNodeNew != null
@@ -821,12 +822,21 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			}
 		}
 		if (insertNode != null) {
-			for (int i = 0; i < directRoute.getForwardStops().size(); i++) {
-				TransportStop ts = directRoute.getForwardStops().get(i);
+			List<TransportStop> forwardStops = directRoute.getForwardStops();
+			for (int i = 0; i < forwardStops.size(); i++) {
+				TransportStop ts = forwardStops.get(i);
 				if (ts.getId() == insertNode.getId()) {
 					int insertInd = before ? i  : i + 1;
-					directRoute.getForwardStops().add(insertInd, stp);
-					break;
+					boolean alreadyExistMissing = false;
+					if(before && i > 0 && forwardStops.get(i - 1).isMissingStop()) {
+						alreadyExistMissing = true;
+					} else if(!before && i < forwardStops.size() - 1 && forwardStops.get(i + 1).isMissingStop()) {
+						alreadyExistMissing = true;
+					}
+					if (!alreadyExistMissing) {
+						forwardStops.add(insertInd, stp);
+						break;
+					}
 				}
 			}
 			addIncompleteRoute(directRoute.getId(), directRoute);
@@ -864,26 +874,29 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 
 
 	// returns array of stops (as node) after which and before there is a missing stop
+	// [<stop-next-missing>, <stop-before-missing>, <stop-next-missing-2>, <stop-before-missing-2>, ...] 
 	// null means missing is first stop or last stop and it should be inserted before 2nd element
-	private List<Node> getIncompeteStops(Relation rel) {
-		List<Node> missingStopsAfterStop = new ArrayList<Node>();
+	private List<Entity> getIncompleteStops(Relation rel, TransportRoute directRoute) {
+		List<Entity> missingStopsAfterStop = new ArrayList<Entity>();
 		boolean missingPrevious = false;
-		Node previousStop = null;
+		Entity previousStop = null;
+		Set<Long> stopPlatformIds = new TreeSet<>();
+		for(TransportStop s : directRoute.getForwardStops()) {
+			stopPlatformIds.add(s.getId());
+		}
 		for (RelationMember rm : rel.getMembers()) {
-			boolean node = rm.getEntityId().getType() == EntityType.NODE;
-			// TODO add role "platform"
-			if (node && ("stop".equals(rm.getRole()))) {
-				if (rm.getEntity() == null) {
-					if (!missingPrevious) {
-						missingStopsAfterStop.add(previousStop);
-					}
-					missingPrevious = true;
-				} else {
-					previousStop = (Node) rm.getEntity();
-					if (missingPrevious) {
-						missingStopsAfterStop.add(previousStop);
-						missingPrevious = false;
-					}
+//			boolean node = rm.getEntityId().getType() == EntityType.NODE;
+			boolean validNode = ("stop".equals(rm.getRole()) || "platform".equals(rm.getRole()));
+			if (rm.getEntity() == null && validNode) {
+				if (!missingPrevious) {
+					missingStopsAfterStop.add(previousStop);
+				}
+				missingPrevious = true;
+			} else if (stopPlatformIds.contains(rm.getEntityId().getId())) {
+				previousStop = rm.getEntity();
+				if (missingPrevious) {
+					missingStopsAfterStop.add(previousStop);
+					missingPrevious = false;
 				}
 			}
 		}

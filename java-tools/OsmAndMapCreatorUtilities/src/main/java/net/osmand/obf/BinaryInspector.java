@@ -79,20 +79,20 @@ public class BinaryInspector {
 		// test cases show info
 		if ("test".equals(args[0])) {
 			in.inspector(new String[] {
-					"-vpoi",
+//					"-vpoi",
 //					"-vmap", "-vmapobjects",
 //					"-vmapcoordinates",
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
-//					"-vaddress", "-vcities","-vstreetgroups",
-//					"-vstreets", "-vbuildings", "-vintersections",
+					"-vaddress", "-vcities","-vstreetgroups",
+					"-vstreets", "-vbuildings", "-vintersections",
 //					"-lang=ru",
 //					"-zoom=6",
-					"-bbox=30.47,50.39,30.48,50.38",
+//					"-bbox=30.47,50.39,30.48,50.38",
 //					"-bbox=37.5,49.3,37.6,49.2",
 //					"-osm="+System.getProperty("maps.dir")+"/map.obf.osm",
 //					System.getProperty("maps.dir")+"/Russia_moscow_asia_2.obf"
-					System.getProperty("maps.dir")+"/Ukraine_europe_2.wiki.obf"
+					System.getProperty("maps.dir")+"/Map.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
 		} else {
@@ -742,13 +742,13 @@ public class BinaryInspector {
 					if (buildings != null && !buildings.isEmpty() && verbose.vbuildings) {
 						println("\t\t\t\tBuildings:");
 						for (Building b : buildings) {
-							println(MessageFormat.format("\t\t\t\t{0} [{1,number,#} {2} ]",
-									new Object[]{b.getName(verbose.lang), b.getId(), b.getPostcode() == null ? "" : b.getPostcode()}));
+							println("\t\t\t\t" + b.getName(verbose.lang)
+									+ (b.getPostcode() == null ? "" : " postcode:" + b.getPostcode()));
 						}
 					}
 
 					if (intersections != null && !intersections.isEmpty() && verbose.vintersections) {
-						print("\t\t\t\tIntersects with:");
+						println("\t\t\t\tIntersects with:");
 						for (Street s : intersections) {
 							println("\t\t\t\t\t" + s.getName(verbose.lang));
 						}
