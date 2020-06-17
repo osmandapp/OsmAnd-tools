@@ -1,5 +1,6 @@
 package net.osmand.obf;
 
+
 import net.osmand.PlatformUtil;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.BinaryMapIndexTestReader;
