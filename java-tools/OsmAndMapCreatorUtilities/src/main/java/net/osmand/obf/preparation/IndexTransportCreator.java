@@ -1,5 +1,6 @@
 package net.osmand.obf.preparation;
 
+
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
@@ -12,7 +13,6 @@ import net.osmand.data.TransportStopExit;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
-import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.EntityParser;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
@@ -60,12 +60,13 @@ import rtree.RTreeException;
 import rtree.RTreeInsertException;
 import rtree.Rect;
 
+
 public class IndexTransportCreator extends AbstractIndexPartCreator {
 
 	private static final Log log = LogFactory.getLog(IndexTransportCreator.class);
 
 	private static final int DISTANCE_THRESHOLD = 50;
-	public static final int MISSING_STOP_DISTANCE_THRESHOLD = 1000;
+	public static final int MISSING_STOP_DISTANCE_THRESHOLD = 30;
 	public static final String MISSING_STOP_NAME = TransportStop.MISSING_STOP_NAME;
 
 	private Set<Long> visitedStops = new HashSet<Long>();
@@ -76,7 +77,8 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	private RTree transportStopsTree;
 	private Map<Long, Relation> masterRoutes = new HashMap<Long, Relation>();
 	private Connection gtfsConnection;
-	
+
+	private static final long TEST_ROUTE_ID_MISSING_STOPS = 192037l;
 	
 	// Note: in future when we need more information from stop_area relation, it is better to memorize relations itself
 	// now we need only specific names of stops and platforms
@@ -771,24 +773,25 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		if (processTransportRelationV2(rel, directRoute)) { // try new transport relations first
 			List<Entity> incompleteNodes = getIncompleteStops(rel, directRoute);
 			List<TransportStop> forwardStops = directRoute.getForwardStops();
+			if (directRoute.getId().longValue() / 2  == TEST_ROUTE_ID_MISSING_STOPS) {
+				System.out.println(directRoute.getName() + ":");
+			}
 			if (hasRelationIncompleteWays(rel) && forwardStops.size() > 0 && directRoute.getForwardWays().size() > 1) {
 				// here ways are changed !!!
 				directRoute.mergeForwardWays();
 				for (Way w : directRoute.getForwardWays()) {
 					// way id are not correct after merge! could be fixed in future, so missing stops will be consistent
 					// we need to avoid duplicate ids in completely different stops
-					TransportStop stp = checkStopMissing(forwardStops, w.getFirstNode(), directRoute.getForwardWays(),
-							w.getId() << 1);
-					if (stp != null) {
-						insertMissingStop(directRoute, incompleteNodes, stp, true);
-					}
-					stp = checkStopMissing(forwardStops, w.getLastNode(), directRoute.getForwardWays(), (w.getId() << 1) + 1);
-					if (stp != null) {
-						insertMissingStop(directRoute, incompleteNodes, stp, false);
-					}
+					insertMissingStop(directRoute, incompleteNodes, w.getFirstNode(), w.getId() << 1, true);
+					insertMissingStop(directRoute, incompleteNodes, w.getLastNode(), (w.getId() << 1) + 1, false);
 				}
 			}
 			troutes.add(directRoute);
+			if (directRoute.getId().longValue() / 2  == TEST_ROUTE_ID_MISSING_STOPS) {
+				for (TransportStop s : directRoute.getForwardStops()) {
+					System.out.println(" " + s.getId() / 64l + " " + s.getName());
+				}
+			}
 		} else {
 			TransportRoute backwardRoute = EntityParser.parserRoute(rel, ref);
 			backwardRoute.setOperator(operator);
@@ -809,19 +812,26 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	}
 
 
-	private void insertMissingStop(TransportRoute directRoute, List<Entity> nds, TransportStop stp, boolean before) {
+	private void insertMissingStop(TransportRoute directRoute, List<Entity> incompleteStops, 
+			Node node, long wayId, boolean before) {
 		Entity insertNode = null;
-		for (int i = 0; i < nds.size(); i += 2) {
-			Entity insertNodeNew = before ? nds.get(i + 1) : nds.get(i);
+		LatLon loc = node.getLatLon();
+		for (int i = 0; i < incompleteStops.size(); i += 2) {
+			Entity insertNodeNew = before ? incompleteStops.get(i + 1) : incompleteStops.get(i);
 			if (insertNode == null) {
 				insertNode = insertNodeNew;
 			} else if (insertNodeNew != null
-					&& MapUtils.getDistance(insertNodeNew.getLatLon(), stp.getLocation()) < MapUtils
-							.getDistance(insertNode.getLatLon(), stp.getLocation())) {
+					&& MapUtils.getDistance(insertNodeNew.getLatLon(), loc) < MapUtils
+							.getDistance(insertNode.getLatLon(), loc)) {
 				insertNode = insertNodeNew;
 			}
 		}
-		if (insertNode != null) {
+		if (insertNode != null && 
+				MapUtils.getDistance(insertNode.getLatLon(), loc) > MISSING_STOP_DISTANCE_THRESHOLD) {
+			TransportStop stp = new TransportStop();
+			stp.setId(-wayId);
+			stp.setLocation(node.getLatitude(), node.getLongitude());
+			stp.setName(MISSING_STOP_NAME);
 			List<TransportStop> forwardStops = directRoute.getForwardStops();
 			for (int i = 0; i < forwardStops.size(); i++) {
 				TransportStop ts = forwardStops.get(i);
@@ -852,26 +862,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		return incompleteRoutesMap.contains(routeId);
 	}
 
-	private TransportStop checkStopMissing(List<TransportStop> forwardStops, Node node, List<Way> originalWay, long wayId) {
-		TransportStop st = forwardStops.get(0);
-		double firstDistance = MapUtils.getDistance(st.getLocation(), node.getLatitude(), node.getLongitude());
-		for (int i = 1; i < forwardStops.size(); i++) {
-			st = forwardStops.get(i);
-			double firstd = MapUtils.getDistance(st.getLocation(), node.getLatitude(), node.getLongitude());
-			if (firstd < firstDistance) {
-				firstDistance = firstd;
-			}
-		}
-		if (firstDistance > MISSING_STOP_DISTANCE_THRESHOLD) {
-			TransportStop stp = new TransportStop();
-			stp.setId(-wayId);
-			stp.setLocation(node.getLatitude(), node.getLongitude());
-			stp.setName(MISSING_STOP_NAME);
-			return stp;
-		}
-		return null;
-	}
-
+	
 
 	// returns array of stops (as node) after which and before there is a missing stop
 	// [<stop-next-missing>, <stop-before-missing>, <stop-next-missing-2>, <stop-before-missing-2>, ...] 
