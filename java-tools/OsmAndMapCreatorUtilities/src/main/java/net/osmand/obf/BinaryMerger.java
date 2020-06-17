@@ -1,8 +1,38 @@
 package net.osmand.obf;
 
 
-import static net.osmand.obf.preparation.IndexCreator.REMOVE_POI_DB;
-import gnu.trove.set.hash.TLongHashSet;
+import com.google.protobuf.CodedOutputStream;
+import com.google.protobuf.WireFormat;
+
+import net.osmand.PlatformUtil;
+import net.osmand.ResultMatcher;
+import net.osmand.binary.BinaryIndexPart;
+import net.osmand.binary.BinaryMapAddressReaderAdapter;
+import net.osmand.binary.BinaryMapAddressReaderAdapter.AddressRegion;
+import net.osmand.binary.BinaryMapIndexReader;
+import net.osmand.binary.BinaryMapPoiReaderAdapter.PoiRegion;
+import net.osmand.binary.OsmandOdb;
+import net.osmand.data.Amenity;
+import net.osmand.data.City;
+import net.osmand.data.LatLon;
+import net.osmand.data.MapObject;
+import net.osmand.data.Postcode;
+import net.osmand.data.Street;
+import net.osmand.obf.preparation.BinaryFileReference;
+import net.osmand.obf.preparation.BinaryMapIndexWriter;
+import net.osmand.obf.preparation.IndexAddressCreator;
+import net.osmand.obf.preparation.IndexCreator;
+import net.osmand.obf.preparation.IndexCreatorSettings;
+import net.osmand.obf.preparation.IndexPoiCreator;
+import net.osmand.osm.MapRenderingTypesEncoder;
+import net.osmand.osm.edit.Node;
+import net.osmand.util.Algorithms;
+import net.osmand.util.CountryOcbfGeneration;
+import net.osmand.util.CountryOcbfGeneration.CountryRegion;
+import net.osmand.util.MapUtils;
+
+import org.apache.commons.logging.Log;
+import org.xmlpull.v1.XmlPullParserException;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -28,39 +58,9 @@ import java.util.TreeSet;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
-import net.osmand.PlatformUtil;
-import net.osmand.ResultMatcher;
-import net.osmand.binary.BinaryIndexPart;
-import net.osmand.binary.BinaryMapAddressReaderAdapter;
-import net.osmand.binary.BinaryMapAddressReaderAdapter.AddressRegion;
-import net.osmand.binary.BinaryMapIndexReader;
-import net.osmand.binary.BinaryMapPoiReaderAdapter.PoiRegion;
-import net.osmand.binary.OsmandOdb;
-import net.osmand.data.Amenity;
-import net.osmand.data.City;
-import net.osmand.data.LatLon;
-import net.osmand.data.MapObject;
-import net.osmand.data.Postcode;
-import net.osmand.data.Street;
-import net.osmand.obf.preparation.BinaryFileReference;
-import net.osmand.obf.preparation.BinaryMapIndexWriter;
-import net.osmand.obf.preparation.IndexAddressCreator;
-import net.osmand.obf.preparation.IndexCreator;
-import net.osmand.obf.preparation.IndexCreatorSettings;
-import net.osmand.obf.preparation.IndexPoiCreator;
-import net.osmand.osm.MapRenderingTypesEncoder;
-import net.osmand.osm.edit.Node;
-import net.osmand.osm.edit.Entity.EntityId;
-import net.osmand.util.Algorithms;
-import net.osmand.util.CountryOcbfGeneration;
-import net.osmand.util.MapUtils;
-import net.osmand.util.CountryOcbfGeneration.CountryRegion;
+import gnu.trove.set.hash.TLongHashSet;
 
-import org.apache.commons.logging.Log;
-import org.xmlpull.v1.XmlPullParserException;
-
-import com.google.protobuf.CodedOutputStream;
-import com.google.protobuf.WireFormat;
+import static net.osmand.obf.preparation.IndexCreator.REMOVE_POI_DB;
 
 public class BinaryMerger {
 
@@ -471,30 +471,45 @@ public class BinaryMerger {
 		raf.seek(old);
 	}
 
-	public void combineParts(File fileToExtract, List<File> files, Set<Integer> combineParts) throws IOException, SQLException {
-		BinaryMapIndexReader[] indexes = new BinaryMapIndexReader[files.size()];
-		RandomAccessFile[] rafs = new RandomAccessFile[files.size()];
+	public void combineParts(File fileToExtract, List<File> files, List<BinaryMapIndexReader> readers, Set<Integer> combineParts) throws IOException, SQLException {
+		boolean combineFiles = files != null;
+		BinaryMapIndexReader[] indexes =  combineFiles ? new BinaryMapIndexReader[files.size()] : readers.toArray(new BinaryMapIndexReader[readers.size()]);
+		RandomAccessFile[] rafs = combineFiles ? new RandomAccessFile[files.size()] : null;
 		long dateCreated = 0;
 		int version = -1;
 		// Go through all files and validate consistency
 		int c = 0;
-		for (File f : files) {
-			if (f.getAbsolutePath().equals(fileToExtract.getAbsolutePath())) {
-				System.err.println("Error : Input file is equal to output file " + f.getAbsolutePath());
-				return;
-			}
-			rafs[c] = new RandomAccessFile(f.getAbsolutePath(), "r");
-			indexes[c] = new BinaryMapIndexReader(rafs[c], f);
-			dateCreated = Math.max(dateCreated, indexes[c].getDateCreated());
-			if (version == -1) {
-				version = indexes[c].getVersion();
-			} else {
-				if (indexes[c].getVersion() != version) {
-					System.err.println("Error : Different input files has different input versions " + indexes[c].getVersion() + " != " + version);
+		if (combineFiles) {
+			for (File f : files) {
+				if (f.getAbsolutePath().equals(fileToExtract.getAbsolutePath())) {
+					System.err.println("Error : Input file is equal to output file " + f.getAbsolutePath());
 					return;
 				}
+				rafs[c] = new RandomAccessFile(f.getAbsolutePath(), "r");
+				indexes[c] = new BinaryMapIndexReader(rafs[c], f);
+				dateCreated = Math.max(dateCreated, indexes[c].getDateCreated());
+				if (version == -1) {
+					version = indexes[c].getVersion();
+				} else {
+					if (indexes[c].getVersion() != version) {
+						System.err.println("Error : Different input files has different input versions " + indexes[c].getVersion() + " != " + version);
+						return;
+					}
+				}
+				c++;
 			}
-			c++;
+		} else {
+			for (BinaryMapIndexReader index : indexes) {
+				dateCreated = Math.max(dateCreated, index.getDateCreated());
+				if (version == -1) {
+					version = index.getVersion();
+				} else {
+					if (index.getVersion() != version) {
+						System.err.println("Error : Different input files has different input versions " + index.getVersion() + " != " + version);
+						return;
+					}
+				}
+			}
 		}
 
 		// write files
@@ -502,11 +517,11 @@ public class BinaryMerger {
 		BinaryMapIndexWriter writer = new BinaryMapIndexWriter(rafToExtract, dateCreated);
 		CodedOutputStream ous = writer.getCodedOutStream();
 		byte[] BUFFER_TO_READ = new byte[BUFFER_SIZE];
-		AddressRegion[] addressRegions = new AddressRegion[files.size()];
-		PoiRegion[] poiRegions = new PoiRegion[files.size()];
+		AddressRegion[] addressRegions = new AddressRegion[combineFiles ? files.size() : readers.size()];
+		PoiRegion[] poiRegions = new PoiRegion[combineFiles ? files.size() : readers.size()];
 		for (int k = 0; k < indexes.length; k++) {
 			BinaryMapIndexReader index = indexes[k];
-			RandomAccessFile raf = rafs[k];
+			RandomAccessFile raf = rafs != null ? rafs[k] : null;
 			for (int i = 0; i < index.getIndexes().size(); i++) {
 				BinaryIndexPart part = index.getIndexes().get(i);
 				if (combineParts.contains(part.getFieldNumber())) {
@@ -515,7 +530,7 @@ public class BinaryMerger {
 					} else if (part.getFieldNumber() == OsmandOdb.OsmAndStructure.POIINDEX_FIELD_NUMBER) {
 						poiRegions[k] = (PoiRegion) part;
 					}
-				} else {
+				} else if (raf != null) {
 					ous.writeTag(part.getFieldNumber(), WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
 					writeInt(ous, part.getLength());
 					copyBinaryPart(ous, BUFFER_TO_READ, raf, part.getFilePointer(), part.getLength());
@@ -585,7 +600,7 @@ public class BinaryMerger {
 				throw new IOException("Cannot delete file " + outputFile);
 			}
 		}
-		combineParts(outputFile, parts, combineParts);
+		combineParts(outputFile, parts, null, combineParts);
 		for (File f : toDelete) {
 			if (!f.delete()) {
 				throw new IOException("Cannot delete file " + outputFile);
