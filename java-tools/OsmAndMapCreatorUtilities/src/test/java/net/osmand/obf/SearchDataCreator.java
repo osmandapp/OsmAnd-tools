@@ -41,9 +41,8 @@ class SearchDataCreator extends BinaryMerger {
 		// test cases show info
 		if (args.length == 1 && "test".equals(args[0])) {
 			in.merger(new String[]{
-					"/Users/alexey/OsmAnd/android/OsmAnd-java/src/test/resources/search/carrer_de_vic.obf",
-					//"/Users/alexey/OsmAnd/android/OsmAnd-java/src/test/resources/search/burger_king.json",
-					"/Users/alexey/OsmAnd/android/OsmAnd-java/src/test/resources/search/carrer_de_vic.data.json",
+					"/Users/alexey/OsmAnd/resources/test-resources/search/hisar.obf",
+					"/Users/alexey/OsmAnd/resources/test-resources/search/hisar.data.json",
 			});
 		} else {
 			in.merger(args);
