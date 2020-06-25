@@ -73,7 +73,6 @@ public class MapTransportLayer implements MapPanelLayer {
 	@Override
 	public void initLayer(MapPanel map) {
 		this.map = map;
-		fillPopupMenuWithActions(map.getPopupMenu());
 		JPanel btnPanel = new JPanel();
 		btnPanel.setLayout(new BoxLayout(btnPanel, BoxLayout.LINE_AXIS));
 //		btnPanel.setBackground(new Color(255, 255, 255, 0));

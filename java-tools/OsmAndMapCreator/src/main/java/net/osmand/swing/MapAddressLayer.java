@@ -53,7 +53,6 @@ public class MapAddressLayer implements MapPanelLayer {
 	@Override
 	public void initLayer(MapPanel map) {
 		this.map = map;
-		fillPopupMenuWithActions(map.getPopupMenu());
 	}
 
 	public void fillPopupMenuWithActions(JPopupMenu menu) {

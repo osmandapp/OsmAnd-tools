@@ -137,7 +137,12 @@ public class MapInformationLayer implements MapPanelLayer {
 		
 		
 
-		JPopupMenu popupMenu = map.getPopupMenu();
+		applySettings();
+
+	}
+	
+	@Override
+	public void fillPopupMenuWithActions(JPopupMenu popupMenu) {
 		Action selectMenu = new AbstractAction("Select point...") {
 			private static final long serialVersionUID = -3022499800877796459L;
 
@@ -154,9 +159,6 @@ public class MapInformationLayer implements MapPanelLayer {
 
 		};
 		popupMenu.add(selectMenu);
-
-		applySettings();
-
 	}
 
 	public void setAreaButtonVisible(boolean b){

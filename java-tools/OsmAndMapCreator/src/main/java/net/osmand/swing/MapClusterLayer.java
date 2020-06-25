@@ -54,18 +54,16 @@ public class MapClusterLayer implements MapPanelLayer {
 	@Override
 	public void initLayer(MapPanel map) {
 		this.map = map;
-		fillPopupMenuWithActions(map.getPopupMenu());
 	}
 
 	public void fillPopupMenuWithActions(JPopupMenu menu) {
-		Action clustering= new AbstractAction("Clustering roads") {
+		Action clustering = new AbstractAction("Clustering roads") {
 			private static final long serialVersionUID = 444678942490247133L;
 
 			@Override
 			public void actionPerformed(ActionEvent e) {
 				clusteringRoadActions();
 			}
-
 
 		};
 		menu.add(clustering);

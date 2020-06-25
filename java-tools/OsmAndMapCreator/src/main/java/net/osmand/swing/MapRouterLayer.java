@@ -52,6 +52,9 @@ import org.xml.sax.SAXException;
 
 import net.osmand.GPXUtilities;
 import net.osmand.GPXUtilities.GPXFile;
+import net.osmand.GPXUtilities.Track;
+import net.osmand.GPXUtilities.TrkSegment;
+import net.osmand.GPXUtilities.WptPt;
 import net.osmand.Location;
 import net.osmand.PlatformUtil;
 import net.osmand.binary.BinaryMapIndexReader;
@@ -82,6 +85,8 @@ public class MapRouterLayer implements MapPanelLayer {
 	private static final double MIN_STRAIGHT_DIST = 50000;
 	private static final double ANGLE_TO_DECLINE = 15;
 
+	protected static final double SPLIT_GPX_DIST = 150;
+
 	private MapPanel map;
 	private LatLon startRoute ;
 	private LatLon endRoute ;
@@ -93,6 +98,7 @@ public class MapRouterLayer implements MapPanelLayer {
 	private JButton nextTurn;
 	private JButton playPauseButton;
 	private JButton stopButton;
+	private GPXFile selectedGPXFile;
 
 	private List<RouteSegmentResult> previousRoute;
 	public ActionListener setStartActionListener = new ActionListener(){
@@ -131,7 +137,6 @@ public class MapRouterLayer implements MapPanelLayer {
 	@Override
 	public void initLayer(MapPanel map) {
 		this.map = map;
-		fillPopupMenuWithActions(map.getPopupMenu());
 		startRoute =  DataExtractionSettings.getSettings().getStartLocation();
 		endRoute =  DataExtractionSettings.getSettings().getEndLocation();
 
@@ -191,7 +196,7 @@ public class MapRouterLayer implements MapPanelLayer {
 		return l;
 	}
 	
-	public void fillPopupMenuWithActions(JPopupMenu menu) {
+	public void fillPopupMenuWithActions(JPopupMenu menu ) {
 		Action start = new AbstractAction("Mark start point") {
 			private static final long serialVersionUID = 507156107455281238L;
 
@@ -286,22 +291,54 @@ public class MapRouterLayer implements MapPanelLayer {
 			}
 		};
 		directions.add(selfBaseRoute);
+		
+		if (selectedGPXFile != null) {
+			Action recalculate = new AbstractAction("Calculate GPX route (OsmAnd)") {
+				private static final long serialVersionUID = 507156107455281238L;
 
-		Action recalculate = new AbstractAction("Rebuild route (OsmAnd)") {
-			private static final long serialVersionUID = 507156107455281238L;
+				@Override
+				public void actionPerformed(ActionEvent e) {
+					if (selectedGPXFile.hasTrkPt()) {
+						TrkSegment trkSegment = selectedGPXFile.tracks.get(0).segments.get(0);
+						LatLon last = null;
+						double adist = 0;
+						intermediates.clear();
+						for (WptPt pt : trkSegment.points) {
+							LatLon ll = toLatLon(pt);
+							if (last == null) {
+								startRoute = ll;
+							} else {
+								adist += MapUtils.getDistance(ll, last);
+							}
+							if (adist > SPLIT_GPX_DIST) {
+								intermediates.add(ll);
+								adist = 0;
+							}
+							last = ll;
+						}
+						endRoute = last;
+						calcRoute(RouteCalculationMode.NORMAL);
+					}
+				}
 
-			@Override
-			public boolean isEnabled() {
-//				return previousRoute != null;
-				return true;
-			}
+				private LatLon toLatLon(WptPt wptPt) {
+					return new LatLon(wptPt.lat, wptPt.lon);
+				}
+			};
+			directions.add(recalculate);
+		}
 
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				calcRoute(RouteCalculationMode.NORMAL);
-			}
-		};
-		directions.add(recalculate);
+		if (previousRoute != null) {
+			Action recalculate = new AbstractAction("Rebuild route (OsmAnd)") {
+				private static final long serialVersionUID = 507156107455281238L;
+
+				@Override
+				public void actionPerformed(ActionEvent e) {
+					calcRoute(RouteCalculationMode.NORMAL);
+				}
+			};
+			directions.add(recalculate);
+		}
 
 		Action route_YOURS = new AbstractAction("Build route (YOURS)") {
 			private static final long serialVersionUID = 507156107455281238L;
@@ -318,6 +355,7 @@ public class MapRouterLayer implements MapPanelLayer {
 							points.registerObject(n.getLatitude(), n.getLongitude(), w);
 						}
 						map.setPoints(points);
+						map.fillPopupActions();
 					}
 				}.start();
 			}
@@ -330,69 +368,108 @@ public class MapRouterLayer implements MapPanelLayer {
 			public void actionPerformed(ActionEvent e) {
 				previousRoute = null;
 				calcStraightRoute(getPointFromMenu());
+				map.fillPopupActions();
 			}
 		};
 		
-		Action saveGPX = new AbstractAction("Save GPX...") {
+		if (previousRoute != null) {
+			Action saveGPX = new AbstractAction("Save GPX...") {
+				private static final long serialVersionUID = 5757334824774850326L;
 
-			private static final long serialVersionUID = 5757334824774850326L;
-
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				if (previousRoute != null) {
-					new Thread() {
-						@Override
-						public void run() {
-							List<Way> ways = new ArrayList<>();
-							calculateResult(ways, previousRoute);
-							List<Location> locations = new ArrayList<>();
-							for (Way way : ways) {
-								for (net.osmand.osm.edit.Node node : way.getNodes()) {
-									locations.add(new Location("", node.getLatitude(), node.getLongitude()));
-								}
-							}
-							String name = new SimpleDateFormat("yyyy-MM-dd_HH-mm_EEE", Locale.US).format(new Date());
-							RouteExporter exporter = new RouteExporter(name, previousRoute, locations, null);
-							GPXFile gpxFile = exporter.exportRoute();
-							JFileChooser fileChooser = new JFileChooser();
-							if (fileChooser.showSaveDialog(map) == JFileChooser.APPROVE_OPTION) {
-								File file = fileChooser.getSelectedFile();
-								GPXUtilities.writeGpxFile(file, gpxFile);
-							}
-						}
-					}.start();
-				}
-			}
-		};
-		directions.add(saveGPX);
-		
-		directions.add(straightRoute);
-		Action loadGPXFile = new AbstractAction("Load GPX file...") {
-			private static final long serialVersionUID = 507156107455281238L;
-
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				new Thread(){
-					@Override
-					public void run() {
-						JFileChooser fileChooser = new JFileChooser();
-						if (fileChooser.showOpenDialog(map) == JFileChooser.APPROVE_OPTION) {
-							File file = fileChooser.getSelectedFile();
-							DataTileManager<Way> points = new DataTileManager<Way>(11);
-							List<Way> ways = parseGPX(file);
-							for (Way w : ways) {
-								LatLon n = w.getLatLon();
-								points.registerObject(n.getLatitude(), n.getLongitude(), w);
-							}
-							// load from file
-							map.setPoints(points);
+				@Override
+				public void actionPerformed(ActionEvent e) {
+					// new Thread() {
+					// @Override
+					// public void run() {
+					List<Way> ways = new ArrayList<>();
+					calculateResult(ways, previousRoute);
+					List<Location> locations = new ArrayList<>();
+					for (Way way : ways) {
+						for (net.osmand.osm.edit.Node node : way.getNodes()) {
+							locations.add(new Location("", node.getLatitude(), node.getLongitude()));
 						}
 					}
-				}.start();
-			}
-		};
-		menu.add(loadGPXFile);
+					String name = new SimpleDateFormat("yyyy-MM-dd_HH-mm_EEE", Locale.US).format(new Date());
+					RouteExporter exporter = new RouteExporter(name, previousRoute, locations, null);
+					GPXFile gpxFile = exporter.exportRoute();
+					JFileChooser fileChooser = new JFileChooser(
+							DataExtractionSettings.getSettings().getDefaultWorkingDir());
+					if (fileChooser.showSaveDialog(map) == JFileChooser.APPROVE_OPTION) {
+						File file = fileChooser.getSelectedFile();
+						GPXUtilities.writeGpxFile(file, gpxFile);
+					}
+					// }
+					// }.start();
+				}
+			};
+			directions.add(saveGPX);
+		}
 		
+		directions.add(straightRoute);
+		
+		if(selectedGPXFile == null) {
+			Action loadGPXFile = new AbstractAction("Load GPX file...") {
+				private static final long serialVersionUID = 507156107455281238L;
+
+				@Override
+				public void actionPerformed(ActionEvent e) {
+					// new Thread() {
+					// @Override
+					// public void run() {
+					JFileChooser fileChooser = new JFileChooser(DataExtractionSettings.getSettings().getDefaultWorkingDir());
+					if (fileChooser.showOpenDialog(map) == JFileChooser.APPROVE_OPTION) {
+						File file = fileChooser.getSelectedFile();
+						selectedGPXFile = GPXUtilities.loadGPXFile(file);
+						displayGpxFile();
+						map.fillPopupActions();
+					}
+					// }
+					// }.start();
+				}
+				
+			};
+			menu.add(loadGPXFile);			
+		} else {
+			AbstractAction redisplayGPXFile = new AbstractAction("Redisplay GPX file") {
+				private static final long serialVersionUID = 507156107455281238L;
+
+				@Override
+				public void actionPerformed(ActionEvent e) {
+					displayGpxFile();
+				}
+			};
+			menu.add(redisplayGPXFile);
+			
+			AbstractAction unselectGPXFile = new AbstractAction("Unselect GPX file") {
+				private static final long serialVersionUID = 507156107455281238L;
+
+				@Override
+				public void actionPerformed(ActionEvent e) {
+					DataTileManager<Way> points = new DataTileManager<Way>(11);
+					map.setPoints(points);
+					selectedGPXFile = null;
+					map.fillPopupActions();
+				}
+			};
+			menu.add(unselectGPXFile);
+		}
+		
+	}
+	
+	private void displayGpxFile() {
+		DataTileManager<Way> points = new DataTileManager<Way>(11);
+		for (Track t : selectedGPXFile.tracks) {
+			for (TrkSegment ts : t.segments) {
+				Way w = new Way(-1);
+				for (WptPt p : ts.points) {
+					w.addNode(new net.osmand.osm.edit.Node(p.lat, p.lon, -1));
+				}
+				LatLon n = w.getLatLon();
+				points.registerObject(n.getLatitude(), n.getLongitude(), w);
+			}
+		}
+		// load from file
+		map.setPoints(points);
 	}
 
 
@@ -493,6 +570,14 @@ public class MapRouterLayer implements MapPanelLayer {
 						points.registerObject(n.getLatitude(), n.getLongitude(), w);
 					}
 					map.setPoints(points);
+					map.fillPopupActions();
+				}
+				
+				if (selectedGPXFile != null) {
+					
+					JOptionPane.showMessageDialog(OsmExtractionUI.MAIN_APP.getFrame(),
+							"Check validity of GPX File", "GPX route correction",
+							JOptionPane.INFORMATION_MESSAGE);
 				}
 			}
 		}.start();
@@ -926,17 +1011,17 @@ public class MapRouterLayer implements MapPanelLayer {
 			@Override
 			public void run() {
 				while(ctx.calculationProgress != null && !ctx.calculationProgress.isCancelled) {
-					float p = Math.max(ctx.calculationProgress.distanceFromBegin, ctx.calculationProgress.distanceFromEnd);
-					float all = 1.25f * ctx.calculationProgress.totalEstimatedDistance;
+//					float p = Math.max(ctx.calculationProgress.distanceFromBegin, ctx.calculationProgress.distanceFromEnd);
+//					float all = 1.25f * ctx.calculationProgress.totalEstimatedDistance;
 //							while (p > all * 0.9) {
 //								all *= 1.2;
 //							}
-					if(all > 0 ) {
-						int  t = (int) (p*p/(all*all)* 100.0f);
+//					if(all > 0 ) {
+//						int  t = (int) (p*p/(all*all)* 100.0f);
 //								int  t = (int) (p/all*100f);
 //						System.out.println("Progress " + t + " % " +
 //								ctx.calculationProgress.distanceFromBegin + " " + ctx.calculationProgress.distanceFromEnd+" " + all);
-					}
+//					}
 					try {
 						sleep(100);
 					} catch (InterruptedException e) {
