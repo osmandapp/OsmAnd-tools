@@ -858,8 +858,8 @@ public class IndexCreator {
 //		settings.poiZipLongStrings = false;
 //		settings.indexMap = true;
 //		settings.indexAddress = true;
-//		settings.indexPOI = true;
-		settings.indexTransport = true;
+		settings.indexPOI = true;
+//		settings.indexTransport = true;
 //		settings.indexRouting = true;
 //		settings.keepOnlySeaObjects = true;
 //		settings.srtmDataFolder = new File(rootFolder + "/maps/srtm/");
@@ -874,9 +874,9 @@ public class IndexCreator {
 //		creator.deleteOsmDB = false;
 
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
-//		String file = rootFolder + "/temp/map.osm";
+		String file = rootFolder + "/temp/map.osm";
 //		String file = rootFolder + "/temp/netherlands_gelderland_europe_route.osm.gz";
-		String file = rootFolder + "/temp/netherlands_limburg_europe_route.osm.gz";
+//		String file = rootFolder + "/temp/netherlands_limburg_europe_route.osm.gz";
 //		String file = rootFolder + "/temp/netherlands_noord-brabant_europe_route.osm.gz";
 //		String file = rootFolder + "/maps/wikivoyage.osm.gz";
 //		String file = rootFolder + "/maps/World_seamarks.pbf";

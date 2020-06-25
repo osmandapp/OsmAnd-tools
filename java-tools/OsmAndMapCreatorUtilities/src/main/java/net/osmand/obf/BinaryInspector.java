@@ -79,13 +79,13 @@ public class BinaryInspector {
 		// test cases show info
 		if ("test".equals(args[0])) {
 			in.inspector(new String[] {
-//					"-vpoi",
+					"-vpoi",
 //					"-vmap", "-vmapobjects",
 //					"-vmapcoordinates",
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
-					"-vaddress", "-vcities","-vstreetgroups",
-					"-vstreets", "-vbuildings", "-vintersections",
+//					"-vaddress", "-vcities","-vstreetgroups",
+//					"-vstreets", "-vbuildings", "-vintersections",
 //					"-lang=ru",
 //					"-zoom=6",
 //					"-bbox=30.47,50.39,30.48,50.38",

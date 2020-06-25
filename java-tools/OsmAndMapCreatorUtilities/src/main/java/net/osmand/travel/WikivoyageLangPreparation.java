@@ -446,13 +446,13 @@ public class WikivoyageLangPreparation {
 					if (point.hasLocation() && point.name != null && !point.name.isEmpty()) {
 						if (point.category != null) {
 							if (category.equalsIgnoreCase("see") || category.equalsIgnoreCase("do")) {
-								point.setColor(15461130);
+								point.setColor(0xffEBEB0A);
 							} else if (category.equalsIgnoreCase("eat") || category.equalsIgnoreCase("drink")) {
-								point.setColor(15400960);
+								point.setColor(0xffEB0000);
 							} else if (category.equalsIgnoreCase("sleep")) {
-								point.setColor(3279595);
+								point.setColor(0xff320AEB);
 							} else if (category.equalsIgnoreCase("buy") || category.equalsIgnoreCase("listing")) {
-								point.setColor(3336970);
+								point.setColor(0xff32EB0A);
 							}
 						}
 						points.add(point);
