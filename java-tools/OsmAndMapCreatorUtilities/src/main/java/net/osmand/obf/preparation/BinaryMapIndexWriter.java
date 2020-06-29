@@ -1397,10 +1397,11 @@ public class BinaryMapIndexWriter {
 	public void writeIncompleteTransportRoutes(Collection<net.osmand.data.TransportRoute> incompleteRoutes, Map<String, Integer> stringTable) throws IOException {
 		checkPeekState(TRANSPORT_INDEX_INIT);
 		OsmandOdb.IncompleteTransportRoutes.Builder irs = OsmandOdb.IncompleteTransportRoutes.newBuilder();
+		long fp = getFilePointer() + 3;
 		for (net.osmand.data.TransportRoute tr : incompleteRoutes) {
 			OsmandOdb.IncompleteTransportRoute.Builder ir = OsmandOdb.IncompleteTransportRoute.newBuilder();
 			ir.setId(tr.getId());
-			ir.setRouteRef(tr.getFileOffset());
+			ir.setRouteRef((int) fp - tr.getFileOffset());
 			ir.setOperator(registerString(stringTable, tr.getOperator()));
 			ir.setRef(registerString(stringTable, tr.getRef()));
 			ir.setType(registerString(stringTable, tr.getType()));
