@@ -1155,11 +1155,14 @@ public class BinaryMapIndexWriter {
 		return size;
 	}
 
+	private long transportIndexOffset = 0;
+
 	public void startWriteTransportIndex(String name) throws IOException {
 		pushState(TRANSPORT_INDEX_INIT, OSMAND_STRUCTURE_INIT);
 		codedOutStream.writeTag(OsmandOdb.OsmAndStructure.TRANSPORTINDEX_FIELD_NUMBER, WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
 		stackBounds.push(new Bounds(0, 0, 0, 0)); // for transport stops tree
 		preserveInt32Size();
+		transportIndexOffset = getFilePointer(); //transport index offset
 		if (name != null) {
 			codedOutStream.writeString(OsmandOdb.OsmAndTransportIndex.NAME_FIELD_NUMBER, name);
 		}
@@ -1397,11 +1400,10 @@ public class BinaryMapIndexWriter {
 	public void writeIncompleteTransportRoutes(Collection<net.osmand.data.TransportRoute> incompleteRoutes, Map<String, Integer> stringTable) throws IOException {
 		checkPeekState(TRANSPORT_INDEX_INIT);
 		OsmandOdb.IncompleteTransportRoutes.Builder irs = OsmandOdb.IncompleteTransportRoutes.newBuilder();
-		long fp = getFilePointer() + 3;
 		for (net.osmand.data.TransportRoute tr : incompleteRoutes) {
 			OsmandOdb.IncompleteTransportRoute.Builder ir = OsmandOdb.IncompleteTransportRoute.newBuilder();
 			ir.setId(tr.getId());
-			ir.setRouteRef((int) fp - tr.getFileOffset());
+			ir.setRouteRef(tr.getFileOffset() - (int) transportIndexOffset);
 			ir.setOperator(registerString(stringTable, tr.getOperator()));
 			ir.setRef(registerString(stringTable, tr.getRef()));
 			ir.setType(registerString(stringTable, tr.getType()));
