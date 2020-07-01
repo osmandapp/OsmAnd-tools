@@ -93,7 +93,6 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	private PreparedStatement gtfsSelectStopTimes;
 	
 	private GtfsInfoStats gtfsStats = new GtfsInfoStats(); 
-
 	
 	static {
 		acceptedRoutes.add("bus"); //$NON-NLS-1$
@@ -557,7 +556,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			PreparedStatement selectTransportRouteGeometry = mapConnection.prepareStatement("SELECT S.geometry " + 
 					"FROM transport_route_geometry S WHERE S.route = ? order by S.ind"); //$NON-NLS-1$
 
-			writer.startWriteTransportIndex(regionName);
+			long transportIndexOffset = writer.startWriteTransportIndex(regionName);
 
 			writer.startWriteTransportRoutes();
 
@@ -647,7 +646,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			selectTransportStop.close();
 			selectTransportRouteStop.close();
 
-			writer.writeIncompleteTransportRoutes(incompleteRoutesMap.valueCollection(), stringTable);
+			writer.writeIncompleteTransportRoutes(incompleteRoutesMap.valueCollection(), stringTable, transportIndexOffset);
 			writer.writeTransportStringTable(stringTable);
 			
 			writer.endWriteTransportIndex();
@@ -1275,5 +1274,5 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 					+ ", errorsTimeParsing=" + errorsTimeParsing + ", successTripsParsing=" + successTripsParsing
 					+ ", errorsTripsStopCounts=" + errorsTripsStopCounts + "]";
 		}
-	}
+	}	
 }
