@@ -758,15 +758,18 @@ public class IndexUploader {
 		try {
 			log.info("Upload index " + fileName);
 			File toUpload = zipFile;
-			File logFile = new File(fileName.substring(0, fileName.lastIndexOf('.')) + IndexConstants.GEN_LOG_EXT);
 			boolean uploaded = uploadFileToServer(toUpload, summary, uc);
 			// remove source file if file was split
 			if (uploaded && targetDirectory != null && !targetDirectory.equals(directory)) {
+				File logFile = new File(fileName.substring(0, fileName.lastIndexOf('.')) + IndexConstants.GEN_LOG_EXT);
+				File logFileUploaded = new File(targetDirectory, logFile.getName());
 				File toBackup = new File(targetDirectory, toUpload.getName());
 				if (toBackup.exists()) {
 					toBackup.delete();
 				}
+				
 				if (logFile.exists()) {
+					logFileUploaded.delete();
 					logFile.renameTo(new File(targetDirectory, logFile.getName()));
 				}
 				if (!toUpload.renameTo(toBackup)) {
