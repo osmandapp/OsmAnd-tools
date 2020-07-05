@@ -750,27 +750,28 @@ public class IndexUploader {
 
 	private void uploadIndex(File srcFile, File zipFile, String summary, UploadCredentials uc) {
 		double mbLengh = (double) zipFile.length() / MB;
-		String fileName = zipFile.getName();
+		File toUpload = zipFile;
+		String fileName = toUpload.getName();
+		String logFileName = fileName.substring(0, fileName.lastIndexOf('.')) + IndexConstants.GEN_LOG_EXT;
 		if (mbLengh < MIN_SIZE_TO_UPLOAD) {
 			log.info("Skip uploading index due to size " + fileName);
 			// do not upload small files
 		}
 		try {
-			log.info("Upload index " + fileName);
-			File toUpload = zipFile;
+			log.info("Upload index " + fileName + " (log file: " + logFileName + ")" );
 			boolean uploaded = uploadFileToServer(toUpload, summary, uc);
 			// remove source file if file was split
 			if (uploaded && targetDirectory != null && !targetDirectory.equals(directory)) {
-				File logFile = new File(fileName.substring(0, fileName.lastIndexOf('.')) + IndexConstants.GEN_LOG_EXT);
-				File logFileUploaded = new File(targetDirectory, logFile.getName());
-				File toBackup = new File(targetDirectory, toUpload.getName());
+				File toBackup = new File(targetDirectory, fileName);
+				File logFile = new File(zipFile.getParentFile(), logFileName);
+				File logFileUploaded = new File(targetDirectory, logFileName);
 				if (toBackup.exists()) {
 					toBackup.delete();
 				}
 				
 				if (logFile.exists()) {
 					logFileUploaded.delete();
-					logFile.renameTo(new File(targetDirectory, logFile.getName()));
+					logFile.renameTo(logFileUploaded);
 				}
 				if (!toUpload.renameTo(toBackup)) {
 					FileOutputStream fout = new FileOutputStream(toBackup);
