@@ -29,7 +29,6 @@ import java.util.zip.ZipException;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
 
-import javax.xml.parsers.DocumentBuilderFactory;
 
 import net.osmand.IndexConstants;
 import net.osmand.PlatformUtil;
@@ -54,8 +53,6 @@ import net.osmand.obf.preparation.BinaryMapIndexWriter;
 import net.osmand.obf.preparation.IndexVectorMapCreator;
 
 import org.apache.commons.logging.Log;
-import org.w3c.dom.Document;
-import org.w3c.dom.Element;
 
 import rtree.LeafElement;
 import rtree.RTree;
@@ -136,7 +133,6 @@ public class IndexUploader {
 	private boolean roadProcess;
 	private boolean wikiProcess;
 	private boolean srtmProcess;
-	private boolean tourProcess;
 
 	public IndexUploader(String path, String targetPath) throws IndexUploadException {
 		directory = new File(path);
@@ -218,9 +214,6 @@ public class IndexUploader {
 				start++;
 			} else if (args[start].startsWith("--srtm")) {
 				srtmProcess = true;
-				start++;
-			} else if (args[start].startsWith("--tour")) {
-				tourProcess = true;
 				start++;
 			}
 		} while (p != start);
@@ -309,8 +302,7 @@ public class IndexUploader {
 		}
 
 		protected boolean fileCanBeUploaded(File f) {
-			if ((!f.isFile() && !f.getName().contains(IndexConstants.TOUR_INDEX_EXT))
-					|| f.getName().endsWith(IndexBatchCreator.GEN_LOG_EXT)) {
+			if (!f.isFile() || f.getName().endsWith(IndexBatchCreator.GEN_LOG_EXT)) {
 				return false;
 			}
 			boolean matches = internalPatternMatches(f.getName(), matchers);
@@ -339,14 +331,6 @@ public class IndexUploader {
 					log.info("Process file " + f.getName());
 					File unzippedFolder = unzip(f);
 					File mainFile = unzippedFolder;
-					if (!unzippedFolder.getName().endsWith(IndexConstants.TOUR_INDEX_EXT)
-							&& unzippedFolder.isDirectory()) {
-						for (File fs : unzippedFolder.listFiles()) {
-							if (!fs.getName().endsWith(IndexBatchCreator.GEN_LOG_EXT)) {
-								mainFile = fs;
-							}
-						}
-					}
 					boolean skip = false;
 					try {
 						String description = checkfileAndGetDescription(mainFile);
@@ -423,14 +407,9 @@ public class IndexUploader {
 		boolean srtmFile = mainFile.getName().contains(".srtm");
 		boolean roadFile = mainFile.getName().contains(".road");
 		boolean wikiFile = mainFile.getName().contains(".wiki");
-		boolean tourFile = fileName.endsWith(IndexConstants.TOUR_INDEX_EXT)
-				|| fileName.endsWith(IndexConstants.TOUR_INDEX_EXT_ZIP);
 		boolean worldFile = fileName.toLowerCase().contains("basemap") || fileName.toLowerCase().contains("world");
-		boolean regionFile = !srtmFile && !roadFile && !wikiFile && !tourFile && !worldFile;
+		boolean regionFile = !srtmFile && !roadFile && !wikiFile && !worldFile;
 		if (srtmFile != this.srtmProcess) {
-			return null;
-		}
-		if (tourFile != this.tourProcess) {
 			return null;
 		}
 		if (roadFile != this.roadProcess) {
@@ -446,19 +425,7 @@ public class IndexUploader {
 							IndexConstants.BINARY_ROAD_MAP_INDEX_EXT)));
 		}
 
-		if (tourFile) {
-			File fl = new File(mainFile, "inventory.xml");
-			if (!fl.exists()) {
-				System.err.println("inventory.xml doesn't exist " + fl.getAbsolutePath());
-				return null;
-			}
-			try {
-				Document doc = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(fl);
-				return ((Element) doc.getElementsByTagName("shortDescription").item(0)).getTextContent();
-			} catch (Exception e) {
-				throw new OneFileException("Not supported file format " + fileName, e);
-			}
-		} else if (fileName.endsWith(IndexConstants.BINARY_MAP_INDEX_EXT)
+		if (fileName.endsWith(IndexConstants.BINARY_MAP_INDEX_EXT)
 				|| fileName.endsWith(IndexConstants.BINARY_MAP_INDEX_EXT_ZIP)) {
 			RandomAccessFile raf = null;
 			try {
@@ -735,12 +702,12 @@ public class IndexUploader {
 	}
 
 	private File unzip(File f) throws OneFileException {
+		ZipFile zipFile = null;
 		try {
 			if (!Algorithms.isZipFile(f)) {
 				return f;
 			}
 			log.info("Unzipping file: " + f.getName());
-			ZipFile zipFile;
 			zipFile = new ZipFile(f);
 			Enumeration<? extends ZipEntry> entries = zipFile.entries();
 			long slastModified = f.lastModified();
@@ -770,6 +737,14 @@ public class IndexUploader {
 			throw new OneFileException("cannot unzip:" + e.getMessage(), e);
 		} catch (IOException e) {
 			throw new OneFileException("cannot unzip:" + e.getMessage(), e);
+		} finally {
+			if (zipFile != null) {
+				try {
+					zipFile.close();
+				} catch (IOException e) {
+					throw new OneFileException("cannot unzip:" + e.getMessage(), e);
+				}
+			}
 		}
 	}
 
