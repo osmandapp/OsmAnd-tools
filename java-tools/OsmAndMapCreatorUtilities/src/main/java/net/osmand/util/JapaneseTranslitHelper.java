@@ -9,37 +9,18 @@ import com.atilika.kuromoji.ipadic.Tokenizer;
 
 public class JapaneseTranslitHelper {
 
-	private static boolean japanese;
-
 	private static Tokenizer tokenizer;
 	private static Map<String, String> katakanaMap = new HashMap<>();
 
-	private JapaneseTranslitHelper() {
-		// TODO Auto-generated constructor stub
-	}
-
-	public static boolean isJapanese() {
-		return japanese;
-	}
-
-	public static void setJapanese(boolean japanese) {
-		JapaneseTranslitHelper.japanese = japanese;
-	}
-
 	public static String getEnglishTransliteration(String text) {
 		return japanese2Romaji(text);
-//		return text;
-		
 	}
 
 	private static String japanese2Romaji(String text) {
-
 		if (tokenizer == null) {
 			tokenizer = new Tokenizer();
 		}
-
 		boolean capitalizeWords = true;
-
 		List<Token> tokens = tokenizer.tokenize(text);
 
 		StringBuilder builder = new StringBuilder();
@@ -48,41 +29,38 @@ public class JapaneseTranslitHelper {
 		}
 		for (Token token : tokens) {
 			String type = token.getAllFeaturesArray()[1];
-
 			if (token.getAllFeaturesArray()[0].equals("記号")) {
 				builder.append(token.getSurface());
 				continue;
 			}
 			switch (token.getAllFeaturesArray()[1]) {
-				case "数":
-				case "アルファベット":
-				case "サ変接続":
+			case "数":
+			case "アルファベット":
+			case "サ変接続":
+				builder.append(token.getSurface());
+				continue;
+			default:
+				String lastFeature = token.getAllFeaturesArray()[8];
+				if (lastFeature.equals("*")) {
 					builder.append(token.getSurface());
-					continue;
-				default:
-					String lastFeature = token.getAllFeaturesArray()[8];
-					if (lastFeature.equals("*")) {
-						builder.append(token.getSurface());
+				} else {
+					String romaji = convertKanaToRomaji(token.getAllFeaturesArray()[8]);
+					if (capitalizeWords) {
+						builder.append(romaji.substring(0, 1).toUpperCase());
+						builder.append(romaji.substring(1));
 					} else {
-						String romaji = convertKanaToRomaji(token.getAllFeaturesArray()[8]);
-
-						if (capitalizeWords) {
-							builder.append(romaji.substring(0, 1).toUpperCase());
-							builder.append(romaji.substring(1));
-						} else {
-							if (token.getSurface()
-								.equals(token.getPronunciation())) {
-								romaji = romaji.toUpperCase();
-							}
-							builder.append(romaji);
+						if (token.getSurface().equals(token.getPronunciation())) {
+							romaji = romaji.toUpperCase();
 						}
+						builder.append(romaji);
 					}
+				}
 			}
 			builder.append(" ");
 		}
 		String result = builder.toString().trim();
 		if (result.endsWith("-")) {
-			result = result.substring(0, result.length()-1);
+			result = result.substring(0, result.length() - 1);
 		}
 		return builder.toString();
 	}

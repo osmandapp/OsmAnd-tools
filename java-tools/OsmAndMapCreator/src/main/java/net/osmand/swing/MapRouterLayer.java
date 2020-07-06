@@ -19,6 +19,7 @@ import java.io.StringReader;
 import java.lang.reflect.InvocationTargetException;
 import java.net.URL;
 import java.net.URLConnection;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -944,10 +945,10 @@ public class MapRouterLayer implements MapPanelLayer {
 //				config.initialDirection = 0 / 180d * Math.PI; // NORTH
 				// config.NUMBER_OF_DESIRABLE_TILES_IN_MEMORY = 300;
 				// config.ZOOM_TO_LOAD_TILES = 14;
-//				try {
-//					config.routeCalculationTime = new SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.US).parse("19.07.2019 12:40").getTime();
-//				} catch (ParseException e) {
-//				}
+				try {
+					config.routeCalculationTime = new SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.US).parse("19.07.2019 12:40").getTime();
+				} catch (Exception e) {
+				}
 				config.routeCalculationTime = System.currentTimeMillis();
 				final RoutingContext ctx = router.buildRoutingContext(config, DataExtractionSettings.getSettings().useNativeRouting() ? NativeSwingRendering.getDefaultFromSettings() :
 					null, rs, rm);
