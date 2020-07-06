@@ -446,17 +446,17 @@ public class WikivoyageLangPreparation {
 					if (point.hasLocation() && point.name != null && !point.name.isEmpty()) {
 						if (point.category != null) {
 							if (category.equalsIgnoreCase("see") || category.equalsIgnoreCase("do")) {
-								point.setColor(0xffEBEB0A);
-								point.setIconName("amenity_cave");
+								point.setColor(0xCC10A37E);
+								point.setIconName("special_photo_camera");
 							} else if (category.equalsIgnoreCase("eat") || category.equalsIgnoreCase("drink")) {
-								point.setColor(0xffEB0000);
-								point.setIconName("amenity_bar");
+								point.setColor(0xCCCA2D1D);
+								point.setIconName("restaurants");
 							} else if (category.equalsIgnoreCase("sleep")) {
-								point.setColor(0xff320AEB);
-								point.setIconName("fuel");
+								point.setColor(0xCC0E53C9);
+								point.setIconName("tourism_hotel");
 							} else if (category.equalsIgnoreCase("buy") || category.equalsIgnoreCase("listing")) {
-								point.setColor(0xff32EB0A);
-								point.setIconName("fuel");
+								point.setColor(0xCC8F2BAB);
+								point.setIconName("shop_department_store");
 							}
 						}
 						points.add(point);
