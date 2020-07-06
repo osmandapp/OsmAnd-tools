@@ -447,12 +447,16 @@ public class WikivoyageLangPreparation {
 						if (point.category != null) {
 							if (category.equalsIgnoreCase("see") || category.equalsIgnoreCase("do")) {
 								point.setColor(0xffEBEB0A);
+								point.setIconName("amenity_cave");
 							} else if (category.equalsIgnoreCase("eat") || category.equalsIgnoreCase("drink")) {
 								point.setColor(0xffEB0000);
+								point.setIconName("amenity_bar");
 							} else if (category.equalsIgnoreCase("sleep")) {
 								point.setColor(0xff320AEB);
+								point.setIconName("fuel");
 							} else if (category.equalsIgnoreCase("buy") || category.equalsIgnoreCase("listing")) {
 								point.setColor(0xff32EB0A);
+								point.setIconName("fuel");
 							}
 						}
 						points.add(point);
