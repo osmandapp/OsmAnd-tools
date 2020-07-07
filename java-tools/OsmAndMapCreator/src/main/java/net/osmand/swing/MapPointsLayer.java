@@ -41,12 +41,12 @@ public class MapPointsLayer implements MapPanelLayer {
 	private static class LineObject {
 		Way w;
 		Line2D line;
-		boolean middle;
-		public LineObject(Way w, Line2D line, boolean middle) {
+		boolean nameDraw;
+		public LineObject(Way w, Line2D line, boolean nameDraw) {
 			super();
 			this.w = w;
 			this.line = line;
-			this.middle = middle;
+			this.nameDraw = nameDraw;
 		}
 
 	}
@@ -92,9 +92,9 @@ public class MapPointsLayer implements MapPanelLayer {
 				int i = 0;
 				int k;
 				String s = pointsToDraw.get(p);
-				while((k =s.indexOf('\n')) != -1) {
+				while ((k = s.indexOf('\n')) != -1) {
 					g.drawString(s.substring(0, k), p.x, (p.y + i++ * 15));
-					s = s.substring(k+1);
+					s = s.substring(k + 1);
 				}
 				g.drawString(s, p.x, (p.y + i++ * 15));
 			}
@@ -110,7 +110,7 @@ public class MapPointsLayer implements MapPanelLayer {
 			String name = null;
 			boolean white = false;
 			if(w != null) {
-				if (e.middle) {
+				if (e.nameDraw) {
 					name = w.getTag("name");
 				}
 				white = "white".equalsIgnoreCase(w.getTag("color"));
@@ -126,14 +126,16 @@ public class MapPointsLayer implements MapPanelLayer {
 					(p.getY2() - p.getY1())*(p.getY2() - p.getY1())) +1;
 			yPoints[3] = yPoints[0] = 0;
 			yPoints[2] = yPoints[1] = 2;
-			for(int i=0; i< 4; i++){
+			for (int i = 0; i < 4; i++) {
 				Point2D po = transform.transform(new Point(xPoints[i], yPoints[i]), null);
 				xPoints[i] = (int) po.getX();
 				yPoints[i] = (int) po.getY();
 			}
 			g.drawPolygon(xPoints, yPoints, 4);
 			g.fillPolygon(xPoints, yPoints, 4);
-			if(name != null && map.getZoom() >= 16) {
+			if(name != null && name.length() > 0 && map.getZoom() >= 16) {
+				g.drawOval((int) p.getX2(), (int) p.getY2(), 6, 6);
+				
 				Font prevFont = g.getFont();
 				Color prevColor = g.getColor();
 				AffineTransform prev = g.getTransform();
@@ -198,7 +200,9 @@ public class MapPointsLayer implements MapPanelLayer {
 							int pixX = (int) (MapUtils.getPixelShiftX(map.getZoom(), n.getLongitude(), map.getLongitude(), map.getTileSize()) + map.getCenterPointX());
 							int pixY = (int) (MapUtils.getPixelShiftY(map.getZoom(), n.getLatitude(), map.getLatitude(), map.getTileSize()) + map.getCenterPointY());
 							if (i > 0) {
-								linesToDraw.add(new LineObject((Way) e, new Line2D.Float(pixX, pixY, prevPixX, prevPixY), i == nodes.size() / 2));
+								// i == nodes.size() / 2
+								linesToDraw.add(new LineObject((Way) e, new Line2D.Float(pixX, pixY, prevPixX, prevPixY), i == 1));
+								
 							}
 							prevPixX = pixX;
 							prevPixY = pixY;
