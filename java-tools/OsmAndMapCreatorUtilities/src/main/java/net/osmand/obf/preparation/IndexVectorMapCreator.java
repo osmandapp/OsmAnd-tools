@@ -68,7 +68,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	private static final int MAP_LEVELS_MAX = 1 << MAP_LEVELS_POWER;
 	private static final int LOW_LEVEL_COMBINE_WAY_POINS_LIMIT = 10000;
 	private static final int LOW_LEVEL_ZOOM_TO_COMBINE = 13; // 15 if use combination all the time
-	private static final int LOW_LEVEL_ZOOM_COASTLINE = 10;
+	private static final int LOW_LEVEL_ZOOM_COASTLINE = 8;
 	private MapRenderingTypesEncoder renderingTypes;
 	private MapZooms mapZooms;
 
