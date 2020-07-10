@@ -232,6 +232,7 @@ public class MapAddressLayer implements MapPanelLayer {
 				complete.add(r);
 			}
 		}
+		su.filterDuplicateRegionResults(complete);
 		return minBuildingDistance;
 	}
 

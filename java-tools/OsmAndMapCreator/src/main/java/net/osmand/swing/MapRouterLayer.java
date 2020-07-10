@@ -955,7 +955,7 @@ public class MapRouterLayer implements MapPanelLayer {
 				
 				ctx.leftSideNavigation = false;
 				ctx.previouslyCalculatedRoute = previousRoute;
-				log.info("Use " + config.routerName + "mode for routing");
+				log.info("Use " + config.routerName + " mode for routing");
 				final DataTileManager<Entity> points = new DataTileManager<Entity>(11);
 				map.setPoints(points);
 				ctx.setVisitor(createSegmentVisitor(animateRoutingCalculation, points));
