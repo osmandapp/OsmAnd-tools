@@ -20,6 +20,7 @@ import java.util.TreeSet;
 import java.util.zip.GZIPInputStream;
 
 import net.osmand.server.TelegramBotManager;
+import net.osmand.util.Algorithms;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -358,8 +359,24 @@ public class OsmAndServerMonitorTasks {
 	}
 
 	private String getTirexStatus() {
+		try {
+			StringBuilder rs = Algorithms.readFromInputStream(new URL("https://mapnik.osmand.net/tirex-status.json").openStream());
+			String res = prepareTirexResult(rs.toString());
+			StringBuilder date = Algorithms.readFromInputStream(new URL("https://mapnik.osmand.net/osmupdate/state.txt").openStream());
+			res += "\nTile DB: " + date;
+			return res;
+		} catch (Exception e) {
+			return "Error: " + e.getMessage();
+		}
+	}
+	
+	protected String getOwnTirexStatus() {
 		String txStatus = "tirex-status -r";
 		String res = runCmd(txStatus, new File("."), null);
+		return prepareTirexResult(res);
+	}
+
+	private String prepareTirexResult(String res) {
 		if(res != null) {
 			JSONObject jsonObject = null;
 			try {
