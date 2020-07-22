@@ -2,6 +2,7 @@ package net.osmand.obf.diff;
 
 import net.osmand.PlatformUtil;
 import net.osmand.binary.BinaryMapDataObject;
+import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.BinaryMapIndexReader.MapIndex;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
 import net.osmand.binary.MapZooms.MapZoomPair;
@@ -31,8 +32,14 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.zip.GZIPInputStream;
 
+import gnu.trove.iterator.TLongIterator;
 import gnu.trove.iterator.TLongObjectIterator;
+import gnu.trove.list.array.TIntArrayList;
+import gnu.trove.list.array.TLongArrayList;
+import gnu.trove.map.TLongObjectMap;
+import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.map.hash.TLongObjectHashMap;
+import gnu.trove.procedure.TLongObjectProcedure;
 import gnu.trove.set.hash.TLongHashSet;
 import rtree.RTreeException;
 
@@ -47,11 +54,11 @@ public class ObfDiffGenerator {
 	public static void main(String[] args) throws IOException, RTreeException {
 		if(args.length == 1 && args[0].equals("test")) {
 			args = new String[4];
-			args[0] = "/Users/victorshcherb/osmand/maps/olive/19_07_29_20_30_before.obf.gz";
-			args[1] = "/Users/victorshcherb/osmand/maps/olive/19_07_29_20_30_after.obf.gz";
+			args[0] = "/home/madwasp79/OsmAnd-maps/osmlive/20_07_14_11_30_before.obf.gz";
+			args[1] = "/home/madwasp79/OsmAnd-maps/osmlive/20_07_14_11_30_after.obf.gz";
 //			args[2] = "stdout";
-			args[2] = "/Users/victorshcherb/osmand/maps/olive/19_07_29_20_30_diff.obf";
-			args[3] = "/Users/victorshcherb/osmand/maps/olive/19_07_29_20_30_diff.osm.gz";
+			args[2] = "/home/madwasp79/OsmAnd-maps/osmlive/20_07_14_11_30_diff.obf";
+			args[3] = "/home/madwasp79/OsmAnd-maps/osmlive/20_07_14_11_30_diff.osm.gz";
 		}
 		if (args.length < 3) {
 			System.out.println("Usage: <path to old obf> <path to new obf> <[result file name] or [stdout]> <path to diff file (optional)>");
@@ -91,17 +98,19 @@ public class ObfDiffGenerator {
 		ObfFileInMemory fEnd = new ObfFileInMemory();
 		fEnd.readObfFiles(Collections.singletonList(end));
 		
+		TLongObjectHashMap<TLongArrayList> relationDiffs = new TLongObjectHashMap<TLongArrayList>();
+		TLongObjectHashMap<Map<String, String>> relRulesToDelete = new TLongObjectHashMap<Map<String,String>>();
 		Set<EntityId> modifiedObjIds = null;
 		if (diff != null) {
 			try {
-				modifiedObjIds = DiffParser.fetchModifiedIds(diff);
+				modifiedObjIds = DiffParser.fetchModifiedIds(diff, relationDiffs, relRulesToDelete);
 			} catch (IOException | XmlPullParserException e) {
 				e.printStackTrace();
 			}
 		}
 
 		System.out.println("Comparing the files...");
-		compareMapData(fStart, fEnd, result == null, modifiedObjIds);
+		compareMapData(fStart, fEnd, result == null, modifiedObjIds, relationDiffs, relRulesToDelete);
 		compareRouteData(fStart, fEnd, result == null, modifiedObjIds);
 		comparePOI(fStart, fEnd, result == null, modifiedObjIds);
 		compareTransport(fStart, fEnd, result == null, modifiedObjIds);
@@ -355,7 +364,8 @@ public class ObfDiffGenerator {
 	}
 
 
-	private void compareMapData(ObfFileInMemory fStart, ObfFileInMemory fEnd, boolean print, Set<EntityId> modifiedObjIds) {
+	private void compareMapData(ObfFileInMemory fStart, ObfFileInMemory fEnd, boolean print, Set<EntityId> modifiedObjIds,
+			TLongObjectHashMap<TLongArrayList> relationDiffs, TLongObjectHashMap<Map<String, String>> relRulesToDelete) {
 		fStart.filterAllZoomsBelow(13);
 		fEnd.filterAllZoomsBelow(13);		
 		MapIndex mi = fEnd.getMapIndex();
@@ -396,7 +406,17 @@ public class ObfDiffGenerator {
 							BinaryMapDataObject obj = new BinaryMapDataObject(idx, objS.getCoordinates(), null,
 									objS.getObjectType(), objS.isArea(), new int[] { deleteId }, null, 0, 0);
 							endData.put(idx, obj);
-						} 
+						} else {
+							BinaryMapDataObject copy = new BinaryMapDataObject(objS);
+							checkForRelationChanges(copy, relationDiffs, relRulesToDelete, mi);
+							if (!copy.compareBinary(objS, COORDINATES_PRECISION_COMPARE)) {
+//								BinaryMapDataObject deletedObj = new BinaryMapDataObject(idx, objS.getCoordinates(), null,
+//										objS.getObjectType(), objS.isArea(), new int[] { deleteId }, null, 0, 0);
+//								endData.put(idx, deletedObj); 
+								endData.put(idx, copy); //how to change index?
+							}
+							
+						}
 					} else if (objE.compareBinary(objS, COORDINATES_PRECISION_COMPARE)) {
 						endData.remove(idx);
 					}
@@ -408,6 +428,44 @@ public class ObfDiffGenerator {
 				}
 			}
 		}
+
+	}
+
+	private boolean checkForRelationChanges(final BinaryMapDataObject obj, TLongObjectHashMap<TLongArrayList> relationDiffs, 
+			TLongObjectHashMap<Map<String, String>> relRulesToDelete, BinaryMapIndexReader.MapIndex mi) {
+		
+		TLongObjectIterator<TLongArrayList> it = relationDiffs.iterator();
+		while (it.hasNext()) {
+			it.advance();
+			long ekey = it.key();
+			if (ekey != 0 && it.value().contains(obj.getId()>>7)) {
+				TIntArrayList objNamesOrder = obj.getNamesOrder();
+				TIntObjectHashMap<String> objNames = obj.getObjectNames();
+				int[] nameKeys = objNames.keys();
+				TIntArrayList nTypes = new TIntArrayList(obj.getTypes());
+				TIntArrayList nAddTypes = new TIntArrayList(obj.getAdditionalTypes());
+				for (Entry<String, String> rule : relRulesToDelete.get(ekey).entrySet()) {
+					Integer rlid = mi.getRule(rule.getKey(), rule.getValue());
+					if (rlid != null) {
+						nTypes.remove(rlid);
+						nAddTypes.remove(rlid);
+					} else {
+						for (int idx : nameKeys) {
+							if (objNames.get(idx) != null && rule.getValue() != null && objNames.get(idx).equals(rule.getValue())) {
+								objNames.remove(idx);
+								objNamesOrder.remove(idx);
+							};
+						}
+					}
+				}
+				obj.setNamesOrder(objNamesOrder);
+				obj.setObjectNames(objNames);
+				obj.setTypes(nTypes.toArray());
+				obj.setAdditionalTypes(nAddTypes.toArray());
+				return true;
+			}
+		}
+		return false;
 
 	}
 
@@ -509,13 +567,31 @@ public class ObfDiffGenerator {
 	private static class DiffParser {
 		
 		private static final String ATTR_ID = "id";
+		private static final String ATTR_REF = "ref";
+		private static final String ATTR_DELETE = "delete";
+		private static final String ATTR_MODIFY = "modify";
 		private static final String TYPE_RELATION = "relation";
 		private static final String TYPE_WAY = "way";
 		private static final String TYPE_NODE = "node";
-
-		public static Set<EntityId> fetchModifiedIds(File diff) throws IOException, XmlPullParserException {
+		private static final String TYPE_MEMBER = "member";
+		private static final String TYPE_OLD = "old";
+		private static final String TYPE_NEW = "new";
+		private static final String TYPE_ACTION = "action";
+		private static final String TAG = "tag";
+		
+		public static Set<EntityId> fetchModifiedIds(File diff, TLongObjectHashMap<TLongArrayList> relationDiffs, 
+				TLongObjectHashMap<Map<String, String>> relRulesToDelete) throws IOException, XmlPullParserException {
 			Set<EntityId> result = new HashSet<>();
 			InputStream fis ;
+			long relId = -1;
+			boolean isRelation = false;
+			boolean isOld = false;
+			boolean isDeleted = false;
+			TLongArrayList deletedWays = new TLongArrayList();
+			TLongArrayList oldWays = new TLongArrayList();
+			TLongArrayList newWays = new TLongArrayList();
+			TLongObjectHashMap<Map<String, String>> relRules = new TLongObjectHashMap<Map<String,String>>();
+			
 			if(diff.getName().endsWith(".gz")) {
 				fis = new GZIPInputStream(new FileInputStream(diff));
 			} else {
@@ -524,21 +600,83 @@ public class ObfDiffGenerator {
 			XmlPullParser parser = PlatformUtil.newXMLPullParser();
 			parser.setInput(fis, "UTF-8");
 			int tok;
+			
 			while ((tok = parser.next()) != XmlPullParser.END_DOCUMENT) {
 				if (tok == XmlPullParser.START_TAG ) {
 					String name = parser.getName();
-					if (TYPE_NODE.equals(name)) {
+					switch(name) {
+					case TYPE_NODE:
 						result.add(new EntityId(EntityType.NODE, parseLong(parser, ATTR_ID, -1)));
-					} else if (TYPE_WAY.equals(name) ) {
-						result.add(new EntityId(EntityType.WAY, parseLong(parser, ATTR_ID, -1)));
-					} else if (TYPE_RELATION.equals(name)) {
-						result.add(new EntityId(EntityType.RELATION, parseLong(parser, ATTR_ID, -1)));
-					}	
+						break;
+					case TYPE_WAY:
+						long wayId = parseLong(parser, ATTR_ID, -1);
+						if (isDeleted && isOld) {
+							deletedWays.add(wayId);
+							isDeleted = false;
+							isOld = false;
+						}
+						result.add(new EntityId(EntityType.WAY, wayId));
+						break;
+					case TYPE_RELATION:
+						isRelation = true;
+						relId = parseLong(parser, ATTR_ID, -1);
+						result.add(new EntityId(EntityType.RELATION, relId));
+						break;
+					case TYPE_OLD:
+						isOld = true;
+						break;
+					case TYPE_NEW:
+						isOld = false;
+						break;
+					case TYPE_MEMBER:
+						if (isRelation && TYPE_WAY.equals(parser.getAttributeValue(0))) {
+							if (isOld) {
+								oldWays.add(parseLong(parser, ATTR_REF, -1));
+							} else {
+								newWays.add(parseLong(parser, ATTR_REF, -1));
+							}
+						}
+						break;
+					case TYPE_ACTION:
+						if (ATTR_DELETE.equals(parser.getAttributeValue(0)) 
+								|| ATTR_MODIFY.equals(parser.getAttributeValue(0))) {
+							isDeleted = true;
+						}
+						break;
+					case TAG:
+						if (isOld && isRelation) {
+							if (relRules.get(relId) == null) {
+								relRules.put(relId, new HashMap<String, String>());
+							}
+							relRules.get(relId).put(parser.getAttributeValue(0), parser.getAttributeValue(1));
+						}
+						break;
+					}
+					
+				} else if (tok == XmlPullParser.END_TAG) {
+					if (isRelation && TYPE_NEW.equals(parser.getName())) {
+						isRelation = false;
+						TLongIterator it = oldWays.iterator();
+						while (it.hasNext()) {
+							long id = it.next();
+							if (newWays.contains(id) || deletedWays.contains(id)) {
+								it.remove();
+							}
+						}
+						if (!oldWays.isEmpty()) {
+							relationDiffs.put(relId, new TLongArrayList(oldWays));
+							relRulesToDelete.put(relId, relRules.get(relId));
+							
+						}
+						oldWays.clear();
+						newWays.clear();
+					}
+
 				}
 			}
 			return result;
 		}
-		
+
 		protected static long parseLong(XmlPullParser parser, String name, long defVal){
 			long ret = defVal; 
 			String value = parser.getAttributeValue("", name);
