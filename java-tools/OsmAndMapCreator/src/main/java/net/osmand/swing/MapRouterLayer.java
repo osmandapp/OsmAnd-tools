@@ -19,7 +19,6 @@ import java.io.StringReader;
 import java.lang.reflect.InvocationTargetException;
 import java.net.URL;
 import java.net.URLConnection;
-import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -964,7 +963,7 @@ public class MapRouterLayer implements MapPanelLayer {
 				startProgressThread(ctx);
 				try {
 					List<RouteSegmentResult> searchRoute = gpx ? router.searchGpxRoute(
-							new GpxRouteApproximation(ctx), intermediates).res : router.searchRoute(ctx, start, end,
+							new GpxRouteApproximation(ctx), intermediates).result : router.searchRoute(ctx, start, end,
 							intermediates, precalculatedRouteDirection);
 					throwExceptionIfRouteNotFound(ctx, searchRoute);
 					System.out.println("External native time " + (System.nanoTime() - nt) / 1.0e9f);

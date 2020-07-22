@@ -183,7 +183,7 @@ public class MapAddressLayer implements MapPanelLayer {
 		List<GeocodingResult> res = su.reverseGeocodingSearch(ctx, lat, lon, false);
 		minBuildingDistance = justifyResults(list, su, complete, res);
 //		complete.addAll(res);
-		Collections.sort(complete, GeocodingUtilities.DISTANCE_COMPARATOR);
+//		Collections.sort(complete, GeocodingUtilities.DISTANCE_COMPARATOR);
 		long lid = -1;
 		for (GeocodingResult r : complete) {
 			if (r.building != null &&
