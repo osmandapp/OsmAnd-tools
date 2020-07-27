@@ -19,7 +19,6 @@ import java.io.StringReader;
 import java.lang.reflect.InvocationTargetException;
 import java.net.URL;
 import java.net.URLConnection;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.LinkedHashMap;

@@ -79,8 +79,8 @@ public class BinaryInspector {
 		// test cases show info
 		if ("test".equals(args[0])) {
 			in.inspector(new String[] {
-					"-vpoi",
-//					"-vmap", "-vmapobjects",
+//					"-vpoi",
+					"-vmap", //"-vmapobjects",
 //					"-vmapcoordinates",
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
@@ -92,7 +92,7 @@ public class BinaryInspector {
 //					"-bbox=37.5,49.3,37.6,49.2",
 //					"-osm="+System.getProperty("maps.dir")+"/map.obf.osm",
 //					System.getProperty("maps.dir")+"/Russia_moscow_asia_2.obf"
-					System.getProperty("maps.dir")+"/Map.obf"
+					System.getProperty("maps.dir")+"/Switzerland_bern_europe_2.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
 		} else {
@@ -514,6 +514,7 @@ public class BinaryInspector {
 				} else if (p instanceof MapIndex) {
 					MapIndex m = ((MapIndex) p);
 					int j = 1;
+					
 					for (MapRoot mi : m.getRoots()) {
 						println(MessageFormat.format("\t{4}.{5} Map level minZoom = {0}, maxZoom = {1}, size = {2,number,#} bytes \n\t\tBounds {3}",
 								new Object[] {
@@ -523,6 +524,7 @@ public class BinaryInspector {
 					}
 					if ((vInfo != null && vInfo.isVmap())) {
 						printMapDetailInfo(index, m);
+						printMapEncodingRules(m);
 					}
 				} else if (p instanceof PoiRegion && (vInfo != null && vInfo.isVpoi())) {
 					printPOIDetailInfo(vInfo, index, (PoiRegion) p);
@@ -570,11 +572,40 @@ public class BinaryInspector {
 			}
 		});
 		Map<String, Integer> fmt = new LinkedHashMap<String, Integer>();
-		for(String key :tagvalues) {
+		for (String key : tagvalues) {
 			fmt.put(key, mp.get(key));
 		}
-		println(String.format("\tEncoding rules %d: %s",
-				ri.routeEncodingRules.size(), fmt.toString()));
+		println(String.format("\tEncoding rules %d (%d KB): %s", ri.routeEncodingRules.size(), ri.routeEncodingRulesBytes / 1024, fmt.toString()));
+	}
+	
+	private void printMapEncodingRules(MapIndex ri) {
+		Map<String, Integer> mp = new HashMap<String, Integer>();
+		for (TagValuePair rtr : ri.decodingRules.valueCollection()) {
+			if (rtr == null) {
+				continue;
+			}
+			String t = rtr.tag;
+			if (t.contains(":")) {
+				t = t.substring(0, t.indexOf(":"));
+			}
+			if (mp.containsKey(t)) {
+				mp.put(t, mp.get(t) + 1);
+			} else {
+				mp.put(t, 1);
+			}
+		}
+		List<String> tagvalues = new ArrayList<>(mp.keySet());
+		tagvalues.sort(new Comparator<String>() {
+			@Override
+			public int compare(String o1, String o2) {
+				return -Integer.compare(mp.get(o1), mp.get(o2));
+			}
+		});
+		Map<String, Integer> fmt = new LinkedHashMap<String, Integer>();
+		for (String key : tagvalues) {
+			fmt.put(key, mp.get(key));
+		}
+		println(String.format("\tEncoding rules %d (%d KB): %s", ri.decodingRules.size(), ri.encodingRulesSizeBytes / 1024, fmt.toString()));
 	}
 
 	private void printRouteDetailInfo(BinaryMapIndexReader index, RouteRegion p) throws IOException {
