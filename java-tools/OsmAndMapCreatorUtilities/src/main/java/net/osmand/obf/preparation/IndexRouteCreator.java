@@ -50,6 +50,7 @@ import net.osmand.osm.MapRenderingTypes;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.MapRenderingTypesEncoder.EntityConvertApplyType;
 import net.osmand.osm.MapRoutingTypes;
+import net.osmand.osm.TagsTransformer;
 import net.osmand.osm.MapRoutingTypes.MapPointName;
 import net.osmand.osm.MapRoutingTypes.MapRouteType;
 import net.osmand.osm.edit.Entity;
@@ -161,9 +162,10 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 				// mark as speed cameras
 				while(from.hasNext()) {
 					Entity n = from.next().getEntity();
-					if(n instanceof Node) {
-						tagsTransformer.registerPropogatedTag(new EntityId(EntityType.NODE, n.getId()), 
-								"highway", "speed_camera");
+					if (n instanceof Node) {
+						Map<String, String> mp = tagsTransformer
+								.getPropogateTagForEntity(new EntityId(EntityType.NODE, n.getId()));
+						mp.put("highway", "speed_camera");
 					}
 				}
 
@@ -186,7 +188,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 					ex.printStackTrace();
 				}
 			}
-			tagsTransformer.addPropogatedTags(e);
+			tagsTransformer.addPropogatedTags(EntityConvertApplyType.ROUTING, e);
 			Map<String, String> tags = renderingTypes.transformTags(e.getTags(), EntityType.WAY, EntityConvertApplyType.ROUTING);
 			boolean encoded = routeTypes.encodeEntity(tags, outTypes, names)
 					&& e.getNodes().size() >= 2;
@@ -194,7 +196,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 				// Load point with tags!
 				ctx.loadEntityWay(e);
 				for(Node n : e.getNodes()) {
-					tagsTransformer.addPropogatedTags(n);
+					tagsTransformer.addPropogatedTags(EntityConvertApplyType.ROUTING, n);
 				}
 				routeTypes.encodePointTypes(e, pointTypes, pointNames, false);
 				addWayToIndex(e.getId(), e.getNodes(), mapRouteInsertStat, routeTree, outTypes, pointTypes, pointNames, names);

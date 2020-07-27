@@ -36,8 +36,8 @@ import net.osmand.data.LatLon;
 import net.osmand.data.QuadRect;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.map.OsmandRegions;
-import net.osmand.obf.preparation.TagsTransformer;
 import net.osmand.osm.MapRenderingTypesEncoder;
+import net.osmand.osm.TagsTransformer;
 import net.osmand.osm.MapRenderingTypesEncoder.EntityConvertApplyType;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
@@ -186,7 +186,7 @@ public class FixBasemapRoads {
 						LOG.info("Processed " + total + " ways");
 					}
 					addRegionTag(or, way);
-					transformer.addPropogatedTags(way);
+					transformer.addPropogatedTags(EntityConvertApplyType.MAP, way);
 					Map<String, String> ntags = renderingTypes.transformTags(way.getModifiableTags(), EntityType.WAY,
 							EntityConvertApplyType.MAP);
 					if (way.getModifiableTags() != ntags) {

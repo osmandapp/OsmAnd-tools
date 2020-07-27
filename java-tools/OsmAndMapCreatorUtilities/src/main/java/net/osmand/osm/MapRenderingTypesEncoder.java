@@ -18,11 +18,11 @@ import java.util.Set;
 import java.util.TreeMap;
 
 import net.osmand.PlatformUtil;
+import net.osmand.osm.MapRenderingTypes.MapRulType;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
-import net.osmand.osm.edit.Relation;
 import net.osmand.util.Algorithms;
 
 import org.apache.commons.logging.Log;
@@ -75,57 +75,9 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		return rt;
 	}
 
-	private MapRulType getRelationalTagValue(String tag, String val) {
-		MapRulType rType = getRuleType(tag, val);
-		if(rType != null && rType.relation) {
-			return rType;
-		}
-		return null;
-	}
 
-	public Map<MapRulType, Map<MapRulType, String>> getRelationPropogatedTags(Relation relation,  EntityConvertApplyType at) {
-		Map<MapRulType, Map<MapRulType, String>> propogated = new LinkedHashMap<MapRulType, Map<MapRulType, String>>();
-		Map<String, String> ts = relation.getTags();
-		ts = transformTags(ts, EntityType.RELATION, at);
-		ts = processExtraTags(ts);
-		Iterator<Entry<String, String>> its = ts.entrySet().iterator();
-		while (its.hasNext()) {
-			Entry<String, String> ev = its.next();
-			MapRulType rule = getRelationalTagValue(ev.getKey(), ev.getValue());
-			if (rule != null) {
-				String value = ev.getValue();
-				LinkedHashMap<MapRulType, String> pr = new LinkedHashMap<MapRulType, String>();
+	
 
-				addRuleToPropogated(pr, ts, rule, value);
-				if (pr.size() > 0) {
-					propogated.put(rule, pr);
-				}
-			}
-		}
-		return propogated;
-	}
-
-
-
-	protected void addRuleToPropogated(Map<MapRulType, String> propogated, Map<String, String> ts, MapRulType rule,
-			String value) {
-		if (rule.names != null) {
-			for (int i = 0; i < rule.names.length; i++) {
-				String tag = rule.names[i].tagValuePattern.tag.substring(rule.namePrefix.length());
-				if(ts.containsKey(tag)) {
-					propogated.put(rule.names[i], ts.get(tag));
-//				} else if(rule.relationGroup) {
-//					propogated.put(rule.names[i], "");
-				}
-			}
-		}
-		propogated.put(rule, value);
-	}
-
-
-	private MapRulType getRuleType(String tag, String val) {
-		return getRuleType(tag, val, false, false);
-	}
 
 	private MapRulType getMapRuleType(String tag, String val) {
 		return getRuleType(tag, val, false, true);
@@ -272,35 +224,18 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	protected void parseAndRegisterTypeFromXML(XmlPullParser parser, MapRulType parent) {
 		String tag = lc(parser.getAttributeValue("", "tag"));
 		MapRulType rtype = parseBaseRuleType(parser, parent, tag);
-		registerOnlyMap(parser, rtype);
+		registerMapRule(parser, rtype);
 		if("true".equals(parser.getAttributeValue("", "lang"))) {
 			for (String lng : langs) {
 				tag = lc(parser.getAttributeValue("", "tag")) + ":" + lng;
 				if(!types.containsKey(constructRuleKey(tag, null))){
 					MapRulType retype = parseBaseRuleType(parser, parent, tag);
-					registerOnlyMap(parser, retype);
+					registerMapRule(parser, retype);
 				}
 			}
 		}
 	}
 
-
-
-	private void registerOnlyMap(XmlPullParser parser, MapRulType rtype) {
-		String val = parser.getAttributeValue("", "minzoom"); //$NON-NLS-1$
-		if (rtype.isMain()) {
-			rtype.minzoom = 15;
-		}
-		if (val != null) {
-			rtype.minzoom = Integer.parseInt(val);
-		}
-		val = parser.getAttributeValue("", "maxzoom"); //$NON-NLS-1$
-		rtype.maxzoom = 31;
-		if (val != null) {
-			rtype.maxzoom = Integer.parseInt(val);
-		}
-		registerRuleType(rtype);
-	}
 
 	public boolean encodeEntityWithType(Entity e, int zoom, TIntArrayList outTypes,
 			TIntArrayList outAddTypes, TreeMap<MapRulType, String> namesToEncode, List<MapRulType> tempListNotUsed) {
@@ -316,8 +251,6 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		tags = transformTags(tags, node ? EntityType.NODE : EntityType.WAY, EntityConvertApplyType.MAP);
 		boolean area = "yes".equals(tags.get("area"));
 		tags = processExtraTags(tags);
-
-
 		for (String tag : tags.keySet()) {
 			String val = tags.get(tag);
 			if(tag.equals("seamark:notice:orientation")){
@@ -1201,7 +1134,8 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	}
 
 
-	private Map<String, String> processExtraTags(Map<String, String> tags) {
+	public Map<String, String> processExtraTags(Map<String, String> tags) {
+		// TODO route
 		String routeTag = "";
 		if((tags.get("route_hiking") != null && tags.get("route_hiking").equals("hiking")) 
 				|| (tags.get("route_foot") != null && tags.get("route_foot").equals("foot")) 
@@ -1558,5 +1492,6 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		public List<TagValuePattern> ifNotTags = new ArrayList<MapRenderingTypes.TagValuePattern>();
 		public List<TagValuePattern> toTags = new ArrayList<MapRenderingTypes.TagValuePattern>();
 	}
+	
 
 }

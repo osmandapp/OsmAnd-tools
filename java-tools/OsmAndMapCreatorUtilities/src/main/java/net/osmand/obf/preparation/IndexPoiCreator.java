@@ -32,6 +32,7 @@ import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.MapRenderingTypesEncoder.EntityConvertApplyType;
 import net.osmand.osm.PoiType;
+import net.osmand.osm.TagsTransformer;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
@@ -107,7 +108,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	
 	public void iterateEntity(Entity e, OsmDbAccessorContext ctx, boolean basemap, boolean translitJapaneseNames) throws SQLException {
 		tempAmenityList.clear();
-		tagsTransform.addPropogatedTags(e);
+		tagsTransform.addPropogatedTags(EntityConvertApplyType.POI, e);
 		if (translitJapaneseNames && e.getTag(OSMTagKey.NAME_EN.getValue()) == null 
 				&& !Algorithms.isEmpty(e.getTag(OSMTagKey.NAME.getValue()))) {
 			e.putTag(OSMTagKey.NAME_EN.getValue(), 
@@ -175,9 +176,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			boolean index = poiTypes.parseAmenity(t, tags.get(t), true, tags) != null;
 			if (index) {
 				ctx.loadEntityRelation(e);
-				for (RelationMember id : ((Relation) e).getMembers()) {
-					tagsTransform.registerPropogatedTag(id.getEntityId(), t, tags.get(t));
-				}
 			}
 		}
 		tagsTransform.handleRelationPropogatedTags(e, renderingTypes, ctx, EntityConvertApplyType.POI);

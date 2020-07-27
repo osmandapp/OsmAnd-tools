@@ -39,6 +39,7 @@ import net.osmand.data.Ring;
 import net.osmand.map.OsmandRegions;
 import net.osmand.osm.MapRenderingTypes.MapRulType;
 import net.osmand.osm.MapRenderingTypesEncoder;
+import net.osmand.osm.TagsTransformer;
 import net.osmand.osm.MapRenderingTypesEncoder.EntityConvertApplyType;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
@@ -186,7 +187,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 				for (RelationMember ch : ((Relation) e).getMembers()) {
 					if (ch.getEntity() != null && ("station".equals(ch.getEntity().getTag("railway"))
 							|| "subway".equals(ch.getEntity().getTag("station")))) {
-						tagsTransformer.getPropogateTagForEntity(ch).put("with_exits", "yes");
+						tagsTransformer.getPropogateTagForEntity(ch.getEntityId()).put("with_exits", "yes");
 					}
 				}
 			}
@@ -731,7 +732,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 						JapaneseTranslitHelper.getEnglishTransliteration(e.getTag(OSMTagKey.NAME.getValue())));
 			}
 			tagsTransformer.addMultipleNetwoksTag(e);
-			tagsTransformer.addPropogatedTags(e);
+			tagsTransformer.addPropogatedTags(EntityConvertApplyType.MAP, e);
 			
 			// manipulate what kind of way to load
 			long originalId = e.getId();

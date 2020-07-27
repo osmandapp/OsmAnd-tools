@@ -80,7 +80,7 @@ public class BinaryInspector {
 		if ("test".equals(args[0])) {
 			in.inspector(new String[] {
 //					"-vpoi",
-					"-vmap", //"-vmapobjects",
+					"-vmap", "-vmapobjects",
 //					"-vmapcoordinates",
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
@@ -88,11 +88,11 @@ public class BinaryInspector {
 //					"-vstreets", "-vbuildings", "-vintersections",
 //					"-lang=ru",
 //					"-zoom=6",
-//					"-bbox=30.47,50.39,30.48,50.38",
-//					"-bbox=37.5,49.3,37.6,49.2",
+					"-bbox=4.76373,52.32439,4.76920,52.32203",
 //					"-osm="+System.getProperty("maps.dir")+"/map.obf.osm",
-//					System.getProperty("maps.dir")+"/Russia_moscow_asia_2.obf"
-					System.getProperty("maps.dir")+"/Switzerland_bern_europe_2.obf"
+					System.getProperty("maps.dir")+"/Netherlands_map.obf"
+//					System.getProperty("maps.dir")+"/Test_czech_route.obf"
+//					System.getProperty("maps.dir")+"/Netherlands_noord-holland_europe_2.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
 		} else {
