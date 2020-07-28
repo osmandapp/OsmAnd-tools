@@ -30,73 +30,21 @@ public class TagsTransformer {
 	private static final String multipleNodeNetworksKey = "multiple_node_networks";
 	
 	private static final int MAX_RELATION_GROUP = 10;
+	private static final String RELATION_SORT_TAG = "relation_sort:";
 	
-	//////// TODO BLOCK ////////
-	private int networkWayOrder(String tag) {
-		switch (tag) {
-		case "network_iwn":
-			return 4;
-		case "network_nwn":
-			return 3;
-		case "network_rwn":
-			return 2;
-		case "network_lwn":
-			return 1;
-		default:
-			return 0;
-		}
+	private static class RenderingSortGroup {
+		String relationGroupKeyString;
+		String relationGroupValueString;
 	}
-
-	private int networkCycleOrder(String tag, String value) {
-		if ("network".equals(tag)) {
-			switch (value) {
-			case "icn":
-				return 4;
-			case "ncn":
-				return 3;
-			case "rcn":
-				return 2;
-			case "lcn":
-				return 1;
-			default:
-				return 0;
-			}
-		}
-		return 0;
-	}
-
-	private boolean skipPropagationOfDuplicate(Map<MapRulType, Map<MapRulType, String>> propogated,
-			Map<String, String> existing) {
-		int existingWayNetwork = 0, newWayNetwork = 0, existingCycleNetwork = 0, newCycleNetwork = 0;
-		for (String t : existing.keySet()) {
-			existingWayNetwork = Math.max(existingWayNetwork, networkWayOrder(t));
-			existingCycleNetwork = Math.max(existingCycleNetwork, networkCycleOrder(t, existing.get(t)));
-		}
-		for (MapRulType t : propogated.keySet()) {
-			newWayNetwork = Math.max(newWayNetwork, networkWayOrder(t.getTag()));
-			newCycleNetwork = Math.max(newCycleNetwork, networkCycleOrder(t.getTag(), t.getValue()));
-		}
-		if (newWayNetwork > 0 && newWayNetwork < existingWayNetwork) {
-			return true;
-		}
-		if (newCycleNetwork > 0 && newCycleNetwork < existingCycleNetwork) {
-			return true;
-		}
-		return false;
-	}
-	//////// TODO BLOCK ////////
 	
-	private Map<String, String> processNameTags(Relation relation, MapRenderingTypesEncoder renderingTypes,
+	private Map<String, String> processNameTags(Map<String, String> relationTags, MapRenderingTypesEncoder renderingTypes,
 			Map<String, String> relationNameTags, Map<String, String> relationNames) {
 		if (relationNames != null) {
 			for (Entry<String, String> e : relationNames.entrySet()) {
 				String sourceTag = e.getKey();
 				String targetTag = e.getValue();
-				String vl = relation.getTag(sourceTag);
+				String vl = relationTags.get(sourceTag);
 				if (!Algorithms.isEmpty(vl)) {
-					if (relationNameTags == null) {
-						relationNameTags = new LinkedHashMap<String, String>();
-					}
 					renderingTypes.checkOrCreateTextRule(targetTag);
 					relationNameTags.put(targetTag, vl);
 				}
@@ -105,82 +53,56 @@ public class TagsTransformer {
 		return relationNameTags;
 	}
 	
-	public void handleRelationPropogatedTags(Relation relation, MapRenderingTypesEncoder renderingTypes, OsmDbAccessorContext ctx, 
-			EntityConvertApplyType at) throws SQLException {
-		Map<String, String> relationNameTags = null;
-		Map<String, String> relationPutTags = null;
-		Map<String, String> relationGroupNameTags = null;
-		
-		Map<String, String> relationTags = relation.getTags();
-		relationTags = renderingTypes.transformTags(relationTags, EntityType.RELATION, at);
-		relationTags = renderingTypes.processExtraTags(relationTags);
-		
+	private void processRelationTags(MapRenderingTypesEncoder renderingTypes, Map<String, String> relationNameTags,
+			Map<String, String> relationPutTags, Map<String, String> relationGroupNameTags,
+			Map<String, String> relationTags, RenderingSortGroup g) {
 		for (Entry<String, String> ev : relationTags.entrySet()) {
 			String key = ev.getKey();
 			String value = ev.getValue();
 			MapRulType rule = renderingTypes.getRuleType(key, value, false, false);
 			if (rule != null && rule.relation) {
-				if (relationPutTags == null) {
-					relationPutTags = new LinkedHashMap<String, String>();
-				}
 				if (rule.isAdditionalOrText()) {
 					relationPutTags.put(key, value);
+					g.relationGroupKeyString = key;
+					g.relationGroupValueString = value;
 				} else {
 					// for main tags propagate "route_hiking", "route_road", etc
-					relationPutTags.put(key + "_" + value, "");
-					relationNameTags = processNameTags(relation, renderingTypes, relationNameTags, rule.relationNames);
-					relationGroupNameTags = processNameTags(relation, renderingTypes, relationGroupNameTags,
-							rule.relationGroupNameTags);
-				}
-			}
-		}
-		if (!Algorithms.isEmpty(relationPutTags)) {
-			if (ctx != null) {
-				ctx.loadEntityRelation(relation);
-			}
-			for (RelationMember ids : relation.getMembers()) {
-				Map<String, String> map = getPropogateTagForEntity(ids.getEntityId());
-				// TODO 
-//				if (skipPropagationOfDuplicate(relationNameTags, map)) {
-//					continue;
-//				}
-				if(relationPutTags != null) {
-					// here we could sort but this is exceptional case of overwriting
-					map.putAll(relationPutTags);
-//					for (Entry<String, String> es : relationAdditionalTags.entrySet()) {
-//						String key = es.getKey();
-//						String value = es.getValue();
-//						map.put(key, value);
-//					}
-				}
-				if (relationNameTags != null) {
-					for (Entry<String, String> es : relationNameTags.entrySet()) {
-						String key = es.getKey();
-						String res = sortAndAttachUniqueValue(map.get(key), es.getValue());
-						map.put(key, res);
+					String mainTag = key + "_" + value;
+					relationPutTags.put(mainTag, "");
+					g.relationGroupKeyString = mainTag;
+					String sortValue = "";
+					if (rule.relationSortTags != null) {
+						for (Entry<String, List<String>> sortTag : rule.relationSortTags.entrySet()) {
+							String vl = relationTags.get(sortTag.getKey());
+							int index = sortTag.getValue().indexOf(vl);
+							if (index < 0) {
+								index = sortTag.getValue().size();
+							}
+							char ch = (char) ('a' + index);
+							sortValue += ch;
+						}
 					}
-				}
-				if (relationGroupNameTags != null) {
-					int modifier = 0;
-					boolean modifierExists = true;
-					while (modifierExists && modifier++ < MAX_RELATION_GROUP) {
-						modifierExists = false;
-						for (Entry<String, String> es : relationGroupNameTags.entrySet()) {
-							String key = es.getKey();
-							String s = addModifier(key, modifier);
-							if (map.containsKey(s)) {
-								modifierExists = true;
-								break;
+					g.relationGroupValueString = sortValue;
+					
+					processNameTags(relationTags, renderingTypes, relationNameTags, rule.relationNames);
+					processNameTags(relationTags, renderingTypes, relationGroupNameTags,
+							rule.relationGroupNameTags);
+					if (rule.additionalTags != null) {
+						for (Entry<String, String> atag : rule.additionalTags.entrySet()) {
+							String tvalue = relationTags.get(atag.getKey());
+							if (!Algorithms.isEmpty(tvalue)) {
+								renderingTypes.checkOrCreateAdditional(atag.getValue(), tvalue);
+								relationPutTags.put(atag.getValue(), tvalue);
 							}
 						}
 					}
-					if (!modifierExists) {
-						for (Entry<String, String> es : relationGroupNameTags.entrySet()) {
-							String key = es.getKey();
-							String value = es.getValue();
-							String newKey = addModifier(key, modifier);
-							renderingTypes.checkOrCreateTextRule(newKey);
-							map.put(newKey, value);
+					if (rule.relationGroupAdditionalTags != null) {
+						for (Entry<String, String> atag : rule.relationGroupAdditionalTags.entrySet()) {
+							String tvalue = relationTags.get(atag.getKey());
+							if (!Algorithms.isEmpty(tvalue)) {
+								renderingTypes.checkOrCreateAdditional(atag.getValue(), tvalue);
+								relationGroupNameTags.put(atag.getValue(), tvalue);
+							}
 						}
 					}
 				}
@@ -188,6 +110,70 @@ public class TagsTransformer {
 		}
 	}
 	
+	public void handleRelationPropogatedTags(Relation relation, MapRenderingTypesEncoder renderingTypes, OsmDbAccessorContext ctx, 
+			EntityConvertApplyType at) throws SQLException {
+		Map<String, String> relationNameTags = new LinkedHashMap<String, String>();
+		Map<String, String> relationPutTags = new LinkedHashMap<String, String>();
+		Map<String, String> relationGroupNameTags = new LinkedHashMap<String, String>();
+		
+		Map<String, String> relationTags = relation.getTags();
+		relationTags = renderingTypes.transformTags(relationTags, EntityType.RELATION, at);
+		relationTags = renderingTypes.processExtraTags(relationTags);
+		RenderingSortGroup rsg = new RenderingSortGroup();
+		processRelationTags(renderingTypes, 
+				relationNameTags, relationPutTags, relationGroupNameTags, relationTags, rsg);
+		if (!Algorithms.isEmpty(relationPutTags)) {
+			if (ctx != null) {
+				ctx.loadEntityRelation(relation);
+			}
+			for (RelationMember ids : relation.getMembers()) {
+				Map<String, String> map = getPropogateTagForEntity(ids.getEntityId());
+				boolean overwriteAdditionalTags = true;
+				if (map.containsKey(RELATION_SORT_TAG + rsg.relationGroupKeyString)) {
+					String vl = map.get(RELATION_SORT_TAG + rsg.relationGroupKeyString);
+					if (rsg.relationGroupValueString.compareTo(vl) <= 0) {
+						overwriteAdditionalTags = false;
+					}
+				}
+
+				if (overwriteAdditionalTags) {
+					map.put(RELATION_SORT_TAG + rsg.relationGroupKeyString, rsg.relationGroupValueString);
+					map.putAll(relationPutTags);
+					if (relationNameTags.size() > 0) {
+						for (Entry<String, String> es : relationNameTags.entrySet()) {
+							String key = es.getKey();
+							String res = sortAndAttachUniqueValue(map.get(key), es.getValue());
+							map.put(key, res);
+						}
+					}
+				}
+				if (relationGroupNameTags.size() > 0) {
+					int modifier = 1;
+					// TODO add group names according to sort
+					while (modifier < MAX_RELATION_GROUP) {
+						String sortKey = RELATION_SORT_TAG + modifier + ":" + rsg.relationGroupKeyString;
+						if (!map.containsKey(sortKey)) {
+							map.put(sortKey, rsg.relationGroupValueString);
+							break;
+						}
+						modifier++;
+					}
+					for (Entry<String, String> es : relationGroupNameTags.entrySet()) {
+						String key = es.getKey();
+						String value = es.getValue();
+						String newKey = addModifier(key, modifier);
+						if (renderingTypes.getRuleType(key, value, false, false).isAdditional()) {
+							renderingTypes.checkOrCreateAdditional(newKey, value);
+						} else {
+							renderingTypes.checkOrCreateTextRule(newKey);
+						}
+						map.put(newKey, value);
+					}
+				}
+			}
+		}
+	}
+
 	private String addModifier(String key, int modifier) {
 		if (key.indexOf(":") >= 0) {
 			for (String lang : MapRenderingTypes.langs) {
