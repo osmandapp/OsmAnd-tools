@@ -106,8 +106,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			Map<String, String> mp = new HashMap<String, String>();
 			for (int i = 0; i < parser.getAttributeCount(); i++) {
 				String at = parser.getAttributeName(i);
-				mp.put(at, parser.getAttributeValue("", at
-						).replace("*", ind+""));
+				mp.put(at, parser.getAttributeValue("", at).replace("*", ind + ""));
 			}
 			EntityConvert ec = new EntityConvert();
 			String tg = mp.get("if_region_name"); //$NON-NLS-1$
@@ -250,7 +249,6 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		namesToEncode.clear();
 		tags = transformTags(tags, node ? EntityType.NODE : EntityType.WAY, EntityConvertApplyType.MAP);
 		boolean area = "yes".equals(tags.get("area"));
-		tags = processExtraTags(tags);
 		for (String tag : tags.keySet()) {
 			String val = tags.get(tag);
 			if(tag.equals("seamark:notice:orientation")){
@@ -294,21 +292,22 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			EntityConvertApplyType appType) {
 		tags = transformShieldTags(tags, entity, appType);
 		tags = transformIntegrityTags(tags, entity, appType);
-		tags = transformOpeningnHoursTags(tags, appType);
+		tags = transformOpeningHoursTags(tags, appType);
 		tags = transformChargingTags(tags, entity);
+		tags = transformOsmcAndColorTags(tags);
 		EntityConvertType filter = EntityConvertType.TAG_TRANSFORM;
 		List<EntityConvert> listToConvert = getApplicableConverts(tags, entity, filter, appType);
-		if(listToConvert == null) {
+		if (listToConvert == null) {
 			return tags;
 		}
 		Map<String, String> rtags = new LinkedHashMap<String, String>(tags);
-		for(EntityConvert ec : listToConvert){
+		for (EntityConvert ec : listToConvert) {
 			applyTagTransforms(rtags, ec, entity, tags);
 		}
 		return rtags;
 	}
 
-	private Map<String, String> transformOpeningnHoursTags(Map<String, String> tags, EntityConvertApplyType appType) {
+	private Map<String, String> transformOpeningHoursTags(Map<String, String> tags, EntityConvertApplyType appType) {
 		String originalOH = tags.get("opening_hours");
 		if (appType == EntityConvertApplyType.POI && originalOH != null) {
 			String oh = originalOH;
@@ -451,11 +450,11 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 					exisitingRefs.add(vl);
 					exisitingRefs.add(vl.replaceAll("-", "").replaceAll(" ", "")); // E 17, E-17, E17
 					if (tags.get("ref:colour") != null && modifier != -1 && 
-							tags.get("road_ref:colour_"+modifier) == null && rfs.contains(vl)) {
-						if(missingColors == null) {
+							tags.get("road_ref:colour_" + modifier) == null && rfs.contains(vl)) {
+						if (missingColors == null) {
 							missingColors = new LinkedHashMap<String, String>();
 						}
-						missingColors.put("road_ref:colour_"+modifier, tags.get("ref:colour"));
+						missingColors.put("road_ref:colour_" + modifier, tags.get("ref:colour"));
 					}
 				}
 			}
@@ -468,17 +467,17 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 				tags = new LinkedHashMap<String, String>(tags);
 				for (String r : rfs) {
 					String s = r.replaceAll("-", "").replaceAll(" ", "");
-					if(r.length() == 0 || exisitingRefs.contains(s)) {
+					if (r.length() == 0 || exisitingRefs.contains(s)) {
 						continue;
 					}
 					tags.put("route_road", "");
-					tags.put("road_ref_"+maxModifier, r);
+					tags.put("road_ref_" + maxModifier, r);
 					if (tags.get("ref:colour") != null) {
-						tags.put("road_ref:colour_"+maxModifier, tags.get("ref:colour"));
+						tags.put("road_ref:colour_" + maxModifier, tags.get("ref:colour"));
 					}
 					String network = getNetwork(r);
-					if(!Algorithms.isEmpty(network)) {
-						tags.put("road_network_"+maxModifier, network);
+					if (!Algorithms.isEmpty(network)) {
+						tags.put("road_network_" + maxModifier, network);
 					}
 					maxModifier++;
 				}
@@ -973,8 +972,8 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	private void prepareColorTag(Map<String, String> tags, String tag) {
 		String vl = tags.get(tag);
 		vl = formatColorToPalette(vl, false);
-		tags.put("colour_"+vl, "");
-		tags.put("color_"+vl, "");
+		tags.put("colour_" + vl, "");
+		tags.put("color_" + vl, "");
 	}
 
 	private void sortAndUpdateTypes(TIntArrayList outTypes) {
@@ -1106,6 +1105,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			"wolfshook",
 			"rectangle_line",
 	}));
+	
 	final java.util.Map<String, String> precolors = new java.util.HashMap<String, String>();
 	{
             precolors.put("white_red_diamond","red");
@@ -1134,15 +1134,12 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	}
 
 
-	public Map<String, String> processExtraTags(Map<String, String> tags) {
-		// TODO route
+	public Map<String, String> transformOsmcAndColorTags(Map<String, String> tags) {
 		String routeTag = "";
-		if((tags.get("route_hiking") != null && tags.get("route_hiking").equals("hiking")) 
-				|| (tags.get("route_foot") != null && tags.get("route_foot").equals("foot")) 
-				|| (tags.get("route_walking") != null && tags.get("route_walking").equals("walking"))) {
+		if (tags.get("route_hiking") != null || tags.get("route_foot") != null || tags.get("route_walking") != null) {
 			routeTag = "hiking";
 		}
-		if(tags.containsKey("osmc:symbol")) {
+		if (tags.containsKey("osmc:symbol")) {
 			tags = new TreeMap<String, String>(tags);
 			// osmc:symbol=black:red:blue_rectangle ->
 			// 1.For backwards compatibility (already done) - osmc_shape=bar, osmc_symbol=black, osmc_symbol_red_blue_name=.
@@ -1165,19 +1162,19 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 					addOsmcNewTags(tags, tokensToAdd, "");
 				}
 			}
-			if(tags.containsKey("osmc_text") && (tags.get("osmc_text").equals(tags.get("ref")))) {
+			if (tags.containsKey("osmc_text") && (tags.get("osmc_text").equals(tags.get("ref")))) {
 				tags.put("ref", "");
 			}
 		}
-		if(tags.containsKey("color")) {
+		if (tags.containsKey("color")) {
 			tags = new TreeMap<String, String>(tags);
 			prepareColorTag(tags, "color");
 		}
-		if(tags.containsKey("colour")) {
+		if (tags.containsKey("colour")) {
 			tags = new TreeMap<String, String>(tags);
 			prepareColorTag(tags, "colour");
 		}
-		
+
 		return tags;
 	}
 	

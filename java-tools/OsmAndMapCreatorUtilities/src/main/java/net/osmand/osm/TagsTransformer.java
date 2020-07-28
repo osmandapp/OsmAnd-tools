@@ -118,7 +118,6 @@ public class TagsTransformer {
 		
 		Map<String, String> relationTags = relation.getTags();
 		relationTags = renderingTypes.transformTags(relationTags, EntityType.RELATION, at);
-		relationTags = renderingTypes.processExtraTags(relationTags);
 		RenderingSortGroup rsg = new RenderingSortGroup();
 		processRelationTags(renderingTypes, 
 				relationNameTags, relationPutTags, relationGroupNameTags, relationTags, rsg);
@@ -131,6 +130,9 @@ public class TagsTransformer {
 				boolean overwriteAdditionalTags = true;
 				if (map.containsKey(RELATION_SORT_TAG + rsg.relationGroupKeyString)) {
 					String vl = map.get(RELATION_SORT_TAG + rsg.relationGroupKeyString);
+//					System.out.println(String.format("CC %s: %s %s - %d",rsg.relationGroupKeyString,
+//							rsg.relationGroupValueString, vl,
+//							rsg.relationGroupValueString.compareTo(vl)));
 					if (rsg.relationGroupValueString.compareTo(vl) <= 0) {
 						overwriteAdditionalTags = false;
 					}
