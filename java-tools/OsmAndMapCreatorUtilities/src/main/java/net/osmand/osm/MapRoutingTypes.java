@@ -27,16 +27,16 @@ import org.apache.commons.logging.LogFactory;
 
 public class MapRoutingTypes {
 	private static final Log log = LogFactory.getLog(MapRoutingTypes.class);
-	private static Set<String> TAGS_TO_SAVE = new HashSet<String>();
-	private static Set<String> TAGS_TO_ACCEPT = new HashSet<String>();
-	private static Map<String, String> TAGS_TO_REPLACE = new HashMap<String, String>();
-	private static Map<String, String> TAGS_TYPE = new HashMap<String, String>();
-	private static Set<String> TAGS_RELATION_TO_ACCEPT = new HashSet<String>();
-	private static Set<String> TAGS_TEXT = new HashSet<String>();
-	private static Set<String> BASE_TAGS_TEXT = new HashSet<String>();
-	private static Set<String> BASE_TAGS_TO_SAVE = new HashSet<String>();
-	private static Map<String, String> BASE_TAGS_TO_REPLACE = new HashMap<String, String>();
-	private static char TAG_DELIMETER = '/'; //$NON-NLS-1$
+	private static final char TAG_DELIMETER = '/'; //$NON-NLS-1$
+	private Set<String> TAGS_TO_SAVE = new HashSet<String>();
+	private Set<String> TAGS_TO_ACCEPT = new HashSet<String>();
+	private Map<String, String> TAGS_TO_REPLACE = new HashMap<String, String>();
+	private Map<String, String> TAGS_TYPE = new HashMap<String, String>();
+	private Set<String> TAGS_RELATION_TO_ACCEPT = new HashSet<String>();
+	private Set<String> TAGS_TEXT = new HashSet<String>();
+	private Set<String> BASE_TAGS_TEXT = new HashSet<String>();
+	private Set<String> BASE_TAGS_TO_SAVE = new HashSet<String>();
+	private Map<String, String> BASE_TAGS_TO_REPLACE = new HashMap<String, String>();
 
 	private Map<String, MapRouteType> types = new LinkedHashMap<String, MapRoutingTypes.MapRouteType>();
 	private List<MapRouteType> listTypes = new ArrayList<MapRoutingTypes.MapRouteType>();
@@ -46,16 +46,16 @@ public class MapRoutingTypes {
 
 	public MapRoutingTypes(MapRenderingTypesEncoder baseTypes) {
 		this.encoder = baseTypes;
-		for(MapRouteTag tg :  baseTypes.getRouteTags() ) {
+		for (MapRouteTag tg : baseTypes.getRouteTags()) {
 			String t = tg.tag;
-			if(tg.value != null) {
+			if (tg.value != null) {
 				t += TAG_DELIMETER + tg.value;
 			}
-			if(!Algorithms.isEmpty(tg.type)) {
+			if (!Algorithms.isEmpty(tg.type)) {
 				TAGS_TYPE.put(t, tg.type);
 			}
-			if(tg.register) {
-				if(tg.relation) {
+			if (tg.register) {
+				if (tg.relation) {
 					TAGS_RELATION_TO_ACCEPT.add(t);
 				}
 				TAGS_TO_ACCEPT.add(t);
@@ -68,13 +68,13 @@ public class MapRoutingTypes {
 					BASE_TAGS_TO_REPLACE.put(t, t2);
 				}
 				TAGS_TO_REPLACE.put(t, t2);
-			} else if(tg.text) {
-				if(tg.base) {
+			} else if (tg.text) {
+				if (tg.base) {
 					BASE_TAGS_TEXT.add(t);
 				}
 				TAGS_TEXT.add(t);
-			} else if(tg.amend) {
-				if(tg.base) {
+			} else if (tg.amend) {
+				if (tg.base) {
 					BASE_TAGS_TO_SAVE.add(t);
 				}
 				TAGS_TO_SAVE.add(t);

@@ -41,12 +41,6 @@ public class RelationTagsPropagation {
 		public Map<String, String> putThroughTags = new LinkedHashMap<String, String>();
 		public Map<String, List<PropagateTagGroup>> relationGroupTags = new LinkedHashMap<String, List<PropagateTagGroup>>();
 		
-		
-		public Map<String, String> getTags() {
-			
-			return putThroughTags;
-		}
-		
 	}
 	
 	private Map<String, String> processNameTags(Map<String, String> relationTags, MapRenderingTypesEncoder renderingTypes,
@@ -108,7 +102,7 @@ public class RelationTagsPropagation {
 						}
 					}
 					// handle relation groups
-					if (!rule.relationGroupAdditionalTags.isEmpty() || !rule.relationGroupNameTags.isEmpty()) {
+					if (rule.relationGroupAdditionalTags != null || rule.relationGroupNameTags != null) {
 						PropagateTagGroup gr = new PropagateTagGroup();
 						gr.orderValue = sortValue;
 						gr.groupKey = Algorithms.isEmpty(rule.relationGroupPrefix) ? mainTag : rule.relationGroupPrefix;
@@ -122,7 +116,9 @@ public class RelationTagsPropagation {
 								}
 							}
 						}
-						propagateRelationGroups.add(gr);
+						if (!gr.tags.isEmpty()) {
+							propagateRelationGroups.add(gr);
+						}
 					}
 				}
 			}
@@ -154,12 +150,14 @@ public class RelationTagsPropagation {
 //							rsg.relationGroupValueString.compareTo(vl)));
 					entityTags.putThroughTags.put(sortKey, rsg.relationGroupValueString);
 					entityTags.putThroughTags.putAll(propagateRelationAdditionalTags);
-					if (propagateRelationNameTags.size() > 0) {
-						for (Entry<String, String> es : propagateRelationNameTags.entrySet()) {
-							String key = es.getKey();
-							String res = sortAndAttachUniqueValue(entityTags.putThroughTags.get(key), es.getValue());
-							entityTags.putThroughTags.put(key, res);
-						}
+					
+				}
+				if (propagateRelationNameTags.size() > 0) {
+					for (Entry<String, String> es : propagateRelationNameTags.entrySet()) {
+						String key = es.getKey();
+						String oldValue = entityTags.putThroughTags.get(key);
+						String res = sortAndAttachUniqueValue(oldValue, es.getValue());
+						entityTags.putThroughTags.put(key, res);
 					}
 				}
 				for(PropagateTagGroup g : propagateRelationGroups) {

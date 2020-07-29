@@ -9,7 +9,6 @@ import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -199,27 +198,34 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 
 	@Override
 	protected void parseRouteTagFromXML(XmlPullParser parser) {
-		MapRouteTag rtype = new MapRouteTag();
-		String mode = parser.getAttributeValue("", "mode"); //$NON-NLS-1$
-		rtype.tag = lc(parser.getAttributeValue("", "tag")); //$NON-NLS-1$
-		rtype.value = lc(parser.getAttributeValue("", "value")); //$NON-NLS-1$
-		rtype.tag2 = lc(parser.getAttributeValue("", "tag2")); //$NON-NLS-1$
-		rtype.value2 = lc(parser.getAttributeValue("", "value2")); //$NON-NLS-1$
-		rtype.base = Boolean.parseBoolean(parser.getAttributeValue("", "base"));
-		rtype.replace = "replace".equalsIgnoreCase(mode);
-		rtype.register = "register".equalsIgnoreCase(mode);
-		rtype.type = lc(parser.getAttributeValue("", "type"));
-		rtype.amend = "amend".equalsIgnoreCase(mode);
-		rtype.text = "text".equalsIgnoreCase(mode);
-		rtype.relation = Boolean.parseBoolean(parser.getAttributeValue("", "relation"));
-		routeTags.add(rtype);
+		String seq = parser.getAttributeValue("", "seq");
+		if(Algorithms.isEmpty(seq)) {
+			seq = "1:1";
+		}
+		String[] ls = seq.split(":");
+		for (int ind = Integer.parseInt(ls[0]); ind <= Integer.parseInt(ls[1]); ind++) {
+			MapRouteTag rtype = new MapRouteTag();
+			String mode = parser.getAttributeValue("", "mode"); //$NON-NLS-1$
+			rtype.tag = lc(parser.getAttributeValue("", "tag"), ind); //$NON-NLS-1$
+			rtype.value = lc(parser.getAttributeValue("", "value"), ind); //$NON-NLS-1$
+			rtype.tag2 = lc(parser.getAttributeValue("", "tag2"), ind); //$NON-NLS-1$
+			rtype.value2 = lc(parser.getAttributeValue("", "value2"), ind); //$NON-NLS-1$
+			rtype.base = Boolean.parseBoolean(parser.getAttributeValue("", "base"));
+			rtype.replace = "replace".equalsIgnoreCase(mode);
+			rtype.register = "register".equalsIgnoreCase(mode);
+			rtype.type = lc(parser.getAttributeValue("", "type"), ind);
+			rtype.amend = "amend".equalsIgnoreCase(mode);
+			rtype.text = "text".equalsIgnoreCase(mode);
+			rtype.relation = Boolean.parseBoolean(parser.getAttributeValue("", "relation"));
+			routeTags.add(rtype);
+		}
 	}
 
 
 
-	private String lc(String a) {
+	private String lc(String a, int seq) {
 		if(a != null) {
-			return a.toLowerCase();
+			return a.toLowerCase().replace("*", seq+"");
 		}
 		return a;
 	}
@@ -228,15 +234,22 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 
 	@Override
 	protected void parseAndRegisterTypeFromXML(XmlPullParser parser, MapRulType parent) {
-		String tag = lc(parser.getAttributeValue("", "tag"));
-		MapRulType rtype = parseBaseRuleType(parser, parent, tag);
-		registerMapRule(parser, rtype);
-		if("true".equals(parser.getAttributeValue("", "lang"))) {
-			for (String lng : langs) {
-				tag = lc(parser.getAttributeValue("", "tag")) + ":" + lng;
-				if(!types.containsKey(constructRuleKey(tag, null))){
-					MapRulType retype = parseBaseRuleType(parser, parent, tag);
-					registerMapRule(parser, retype);
+		String seq = parser.getAttributeValue("", "seq");
+		if(Algorithms.isEmpty(seq)) {
+			seq = "1:1";
+		}
+		String[] ls = seq.split(":");
+		for (int ind = Integer.parseInt(ls[0]); ind <= Integer.parseInt(ls[1]); ind++) {
+			String tag = lc(parser.getAttributeValue("", "tag"), ind);
+			MapRulType rtype = parseBaseRuleType(parser, parent, tag);
+			registerMapRule(parser, rtype);
+			if ("true".equals(parser.getAttributeValue("", "lang"))) {
+				for (String lng : langs) {
+					tag = lc(parser.getAttributeValue("", "tag"), ind) + ":" + lng;
+					if (!types.containsKey(constructRuleKey(tag, null))) {
+						MapRulType retype = parseBaseRuleType(parser, parent, tag);
+						registerMapRule(parser, retype);
+					}
 				}
 			}
 		}
@@ -450,64 +463,73 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	private Map<String, String> transformShieldTags(Map<String, String> tags, EntityType entity,
 			EntityConvertApplyType appType) {
 		
-		// TODO fix
+		// Fix backward compatibility for 3.8 
+		if (entity == EntityType.WAY) {
+			// road_ref_*
+//			for (int modifier = 1; modifier < 10; modifier++) {
+//				String ref = tags.get("route_road_" + modifier + "_ref");
+//				if (!Algorithms.isEmpty(ref)) {
+//					exisitingRefs.add(ref);
+//					exisitingRefs.add(ref.replaceAll("-", "").replaceAll(" ", "")); // E 17, E-17, E17
+//					maxModifier = modifier + 1;
+//					String routeRoadRefColorTag = "route_road_" + modifier + "_ref:colour";
+//					if (!Algorithms.isEmpty(wayRefColor) && tags.get(routeRoadRefColorTag) == null
+//							&& wayRefs.contains(ref)) {
+//						tags.put(routeRoadRefColorTag, wayRefColor);
+//					}
+//				}
+//			}
+		}
+		
 		if(entity == EntityType.WAY && !Algorithms.isEmpty(tags.get("ref")) && tags.containsKey("highway")) {
-			String ref = tags.get("ref");
-			Set<String> rfs = new LinkedHashSet<String>();
-			for(String r : Arrays.asList(ref.split(";"))) {
-				rfs.add(r.trim());
+			String wayRef = tags.get("ref");
+			String wayRefColor = tags.get("ref:colour");
+			Set<String> wayRefs = new LinkedHashSet<String>();
+			for(String r : Arrays.asList(wayRef.split(";"))) {
+				wayRefs.add(r.trim());
 			}
-			Iterator<Entry<String, String>> it = tags.entrySet().iterator();
-			int maxModifier = 1;
 			Set<String> exisitingRefs = new LinkedHashSet<String>();
-			Map<String, String> missingColors = null;
-			while(it.hasNext()) {
-				Entry<String, String> e = it.next();
-				String tag = e.getKey();
-				String vl = e.getValue();
-				// TODO fix
-				if(tag.startsWith("road_ref_")) {
-					String sf = Algorithms.extractOnlyIntegerSuffix(tag);
-					int modifier = -1;
-					if(sf.length() > 0) {
-						try {
-							modifier = Integer.parseInt(sf);
-							maxModifier = Math.max(maxModifier, 1 + modifier);
-						} catch (NumberFormatException e1) {
-							e1.printStackTrace();
-						}
+			int maxModifier = 1;
+			for(int modifier = 1; modifier < 10; modifier++) {
+				String ref = tags.get("route_road_" + modifier + "_ref");
+				if (!Algorithms.isEmpty(ref)) {
+					exisitingRefs.add(ref);
+					exisitingRefs.add(ref.replaceAll("-", "").replaceAll(" ", "")); // E 17, E-17, E17
+					maxModifier = modifier + 1;
+					String routeRoadRefColorTag = "route_road_" + modifier + "_ref:colour";
+					if (!Algorithms.isEmpty(wayRefColor)
+							&& tags.get(routeRoadRefColorTag) == null && wayRefs.contains(ref)) {
+						tags.put(routeRoadRefColorTag, wayRefColor);
 					}
-					exisitingRefs.add(vl);
-					exisitingRefs.add(vl.replaceAll("-", "").replaceAll(" ", "")); // E 17, E-17, E17
-					if (tags.get("ref:colour") != null && modifier != -1 && 
-							tags.get("road_ref:colour_" + modifier) == null && rfs.contains(vl)) {
-						if (missingColors == null) {
-							missingColors = new LinkedHashMap<String, String>();
-						}
-						missingColors.put("road_ref:colour_" + modifier, tags.get("ref:colour"));
-					}
-				}
+				} 
 			}
-			rfs.removeAll(exisitingRefs);
-			if(missingColors != null) {
+			wayRefs.removeAll(exisitingRefs);
+			if (wayRefs.size() > 0) {
 				tags = new LinkedHashMap<String, String>(tags);
-				tags.putAll(missingColors);
-			}
-			if (rfs.size() > 0) {
-				tags = new LinkedHashMap<String, String>(tags);
-				for (String r : rfs) {
-					String s = r.replaceAll("-", "").replaceAll(" ", "");
-					if (r.length() == 0 || exisitingRefs.contains(s)) {
+				for (String ref : wayRefs) {
+					String s = ref.replaceAll("-", "").replaceAll(" ", "");
+					if (ref.length() == 0 || exisitingRefs.contains(s)) {
 						continue;
 					}
+					checkOrMainRule("route_road", "", 1);
 					tags.put("route_road", "");
-					tags.put("road_ref_" + maxModifier, r);
-					if (tags.get("ref:colour") != null) {
-						tags.put("road_ref:colour_" + maxModifier, tags.get("ref:colour"));
+					
+					String basePart = "route_road_" + maxModifier;
+					checkOrCreateAdditional(basePart, "");
+					tags.put(basePart, "");
+					
+					checkOrCreateTextRule(basePart + "_ref");
+					tags.put(basePart + "_ref", ref);
+					
+					
+					if (!Algorithms.isEmpty(wayRefColor)) {
+						checkOrCreateTextRule(basePart + "_ref:colour");
+						tags.put(basePart + "_ref:colour", wayRefColor);
 					}
-					String network = getNetwork(r);
-					if (!Algorithms.isEmpty(network)) {
-						tags.put("road_network_" + maxModifier, network);
+					String wayRefNetwork = getNetwork(ref);
+					if (!Algorithms.isEmpty(wayRefNetwork)) {
+						checkOrCreateTextRule(basePart + "_network");
+						tags.put(basePart + "_network", wayRefNetwork);
 					}
 					maxModifier++;
 				}
@@ -515,7 +537,6 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 
 		}
 		
-		// TODO fix
 		if(entity == EntityType.WAY && tags.containsKey("highway") && tags.containsKey("name")) {
 			tags = new LinkedHashMap<String, String>(tags);
 			String name = tags.get("name");
@@ -523,7 +544,6 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 				tags.put("tch", "yes");
 			}
 		}
-		// TODO fix
 		if (entity == EntityType.WAY && tags.containsKey("highway")) {
 			tags = new LinkedHashMap<String, String>(tags);
 			int i = 1;
