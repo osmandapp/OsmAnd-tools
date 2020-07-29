@@ -1203,10 +1203,6 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 
 
 	public Map<String, String> transformOsmcAndColorTags(Map<String, String> tags) {
-		String routeTag = "";
-		if (tags.get("route_hiking") != null || tags.get("route_foot") != null || tags.get("route_walking") != null) {
-			routeTag = "hiking";
-		}
 		if (tags.containsKey("osmc:symbol")) {
 			tags = new TreeMap<String, String>(tags);
 			// osmc:symbol=black:red:blue_rectangle ->
@@ -1222,13 +1218,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 					tokensToAdd = new String[] { tokens[0], tokens[1], tokens.length == 4 ? "" : tokens[2], "",
 							tokens.length == 4 ? tokens[2] : tokens[3], tokens.length == 4 ? tokens[3] : tokens[4] };
 				}
-				// don't mix hiking_osmc with default bicycle osmc
-				// addOsmcNewTags(tags, tokensToAdd, "");
-				if (routeTag.length() > 0) {
-					addOsmcNewTags(tags, tokensToAdd, routeTag + "_");
-				} else {
-					addOsmcNewTags(tags, tokensToAdd, "");
-				}
+				addOsmcNewTags(tags, tokensToAdd, "");
 			}
 			if (tags.containsKey("osmc_text") && (tags.get("osmc_text").equals(tags.get("ref")))) {
 				tags.put("ref", "");
