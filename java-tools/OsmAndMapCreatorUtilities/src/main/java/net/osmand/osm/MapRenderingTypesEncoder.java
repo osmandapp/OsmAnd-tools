@@ -1204,7 +1204,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 
 	public Map<String, String> transformOsmcAndColorTags(Map<String, String> tags) {
 		if (tags.containsKey("osmc:symbol")) {
-			tags = new TreeMap<String, String>(tags);
+			tags = new LinkedHashMap<String, String>(tags);
 			// osmc:symbol=black:red:blue_rectangle ->
 			// 1.For backwards compatibility (already done) - osmc_shape=bar, osmc_symbol=black, osmc_symbol_red_blue_name=.
 			// 2.New tags: osmc_waycolor=black, osmc_background=red, osmc_foreground=blue_rectangle, osmc_foreground2,
@@ -1225,11 +1225,11 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			}
 		}
 		if (tags.containsKey("color")) {
-			tags = new TreeMap<String, String>(tags);
+			tags = new LinkedHashMap<String, String>(tags);
 			prepareColorTag(tags, "color");
 		}
 		if (tags.containsKey("colour")) {
-			tags = new TreeMap<String, String>(tags);
+			tags = new LinkedHashMap<String, String>(tags);
 			prepareColorTag(tags, "colour");
 		}
 
