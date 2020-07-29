@@ -80,17 +80,23 @@ public class BinaryInspector {
 		if ("test".equals(args[0])) {
 			in.inspector(new String[] {
 //					"-vpoi",
-//					"-vmap", "-vmapobjects",
+					"-vmap", "-vmapobjects",
 //					"-vmapcoordinates",
-					"-vrouting",
+//					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
 //					"-vaddress", "-vcities","-vstreetgroups",
 //					"-vstreets", "-vbuildings", "-vintersections",
 //					"-lang=ru",
 //					"-zoom=6",
-					"-bbox=4.76373,52.32439,4.76920,52.32203",
+					// road
+//					"-bbox=4.76373,52.32439,4.76920,52.32203",
+					// rcn_ref
+//					"-bbox=4.85757,52.27553,4.86031,52.27435",
+					
 //					"-osm="+System.getProperty("maps.dir")+"/map.obf.osm",
 					System.getProperty("maps.dir")+"/Netherlands_map.obf"
+//					System.getProperty("maps.dir")+"/Netherlands_rcn_ref.obf"
+					
 //					System.getProperty("maps.dir")+"/Test_czech_route.obf"
 //					System.getProperty("maps.dir")+"/Netherlands_noord-holland_europe_2.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"

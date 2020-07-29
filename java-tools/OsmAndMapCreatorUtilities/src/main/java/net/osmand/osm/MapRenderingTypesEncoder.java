@@ -42,10 +42,11 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	public static final String OSMAND_REGION_NAME_TAG = "osmand_region_name";
 	
 	private static final Collection<String> NODE_NETWORK_IDS = Arrays.asList("network:type", "expected_rcn_route_relations");
-	// TODO ??? transformed tags? 
 	private static final Collection<String> NODE_NETWORKS_REF_TYPES = 
 			new TreeSet<>(Arrays.asList("icn_ref", "ncn_ref", "rcn_ref", "lcn_ref", "iwn_ref", "nwn_ref", "rwn_ref", "lwn_ref"));
-	private static final String multipleNodeNetworksKey = "multiple_node_networks";
+	private static final String NODE_NETWORK_TAG = "node_network_point";
+	private static final String NODE_NETWORK_MULTIPLE_VALUE = "multiple";
+	private static final boolean DELETE_AFTER_38_RELEASE = false;
 	
 	private Map<String, TIntArrayList> socketTypes;
 	
@@ -319,13 +320,37 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		EntityConvertType filter = EntityConvertType.TAG_TRANSFORM;
 		List<EntityConvert> listToConvert = getApplicableConverts(tags, entity, filter, appType);
 		if (listToConvert == null) {
-			return tags;
+			return postTransform(tags);
 		}
 		Map<String, String> rtags = new LinkedHashMap<String, String>(tags);
 		for (EntityConvert ec : listToConvert) {
 			applyTagTransforms(rtags, ec, entity, tags);
 		}
-		return rtags;
+		return postTransform(rtags);
+	}
+
+	private Map<String, String> postTransform(Map<String, String> tags) {
+		if(DELETE_AFTER_38_RELEASE) {
+			return tags;
+		}
+		boolean transform = false;
+		for (String t : tags.keySet()) {
+			if (t.startsWith("route_road_")) {
+				transform = true;
+			}
+		}
+		if (transform) {
+			Map<String, String> rtags = new LinkedHashMap<String, String>(tags);
+			for (String t : tags.keySet()) {
+				if (t.startsWith("route_road_") && t.length() > "route_road_".length() + 3) {
+					String tag = t.substring("route_road_".length() + 2);
+					String ind = t.substring("route_road_".length(), "route_road_".length() + 1);
+					rtags.put("road_" + tag + "_" + ind, tags.get(t));
+				}
+			}
+			return rtags;
+		}
+		return tags;
 	}
 
 	private Map<String, String> transformOpeningHoursTags(Map<String, String> tags, EntityConvertApplyType appType) {
@@ -454,7 +479,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		}
 		if (networkTypesCount > 1 && networkId) {
 			Map<String, String> rtags = new LinkedHashMap<String, String>(tags);
-			rtags.put(multipleNodeNetworksKey, "true");
+			rtags.put(NODE_NETWORK_TAG, NODE_NETWORK_MULTIPLE_VALUE);
 			return rtags;
 		}
 		return tags;
@@ -462,24 +487,6 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 
 	private Map<String, String> transformShieldTags(Map<String, String> tags, EntityType entity,
 			EntityConvertApplyType appType) {
-		
-		// Fix backward compatibility for 3.8 
-		if (entity == EntityType.WAY) {
-			// road_ref_*
-//			for (int modifier = 1; modifier < 10; modifier++) {
-//				String ref = tags.get("route_road_" + modifier + "_ref");
-//				if (!Algorithms.isEmpty(ref)) {
-//					exisitingRefs.add(ref);
-//					exisitingRefs.add(ref.replaceAll("-", "").replaceAll(" ", "")); // E 17, E-17, E17
-//					maxModifier = modifier + 1;
-//					String routeRoadRefColorTag = "route_road_" + modifier + "_ref:colour";
-//					if (!Algorithms.isEmpty(wayRefColor) && tags.get(routeRoadRefColorTag) == null
-//							&& wayRefs.contains(ref)) {
-//						tags.put(routeRoadRefColorTag, wayRefColor);
-//					}
-//				}
-//			}
-		}
 		
 		if(entity == EntityType.WAY && !Algorithms.isEmpty(tags.get("ref")) && tags.containsKey("highway")) {
 			String wayRef = tags.get("ref");

@@ -51,6 +51,7 @@ public class RelationTagsPropagation {
 				String targetTag = e.getValue();
 				String vl = relationTags.get(sourceTag);
 				if (!Algorithms.isEmpty(vl)) {
+					// TODO create text rule or not
 					renderingTypes.checkOrCreateTextRule(targetTag);
 					relationNameTags.put(targetTag, vl);
 				}
