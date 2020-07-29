@@ -495,7 +495,8 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			for(String r : Arrays.asList(wayRef.split(";"))) {
 				wayRefs.add(r.trim());
 			}
-			Set<String> exisitingRefs = new LinkedHashSet<String>();
+			Set<String> exisitingRefs = new LinkedHashSet<>();
+			Map<String, String> missingColors = new LinkedHashMap<>();
 			int maxModifier = 1;
 			for(int modifier = 1; modifier < 10; modifier++) {
 				String ref = tags.get("route_road_" + modifier + "_ref");
@@ -506,13 +507,14 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 					String routeRoadRefColorTag = "route_road_" + modifier + "_ref:colour";
 					if (!Algorithms.isEmpty(wayRefColor)
 							&& tags.get(routeRoadRefColorTag) == null && wayRefs.contains(ref)) {
-						tags.put(routeRoadRefColorTag, wayRefColor);
+						missingColors.put(routeRoadRefColorTag, wayRefColor);
 					}
 				} 
 			}
 			wayRefs.removeAll(exisitingRefs);
-			if (wayRefs.size() > 0) {
+			if (wayRefs.size() > 0 || missingColors.size() > 0) {
 				tags = new LinkedHashMap<String, String>(tags);
+				tags.putAll(missingColors);
 				for (String ref : wayRefs) {
 					String s = ref.replaceAll("-", "").replaceAll(" ", "");
 					if (ref.length() == 0 || exisitingRefs.contains(s)) {
