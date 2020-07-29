@@ -40,6 +40,7 @@ import net.osmand.map.OsmandRegions;
 import net.osmand.osm.MapRenderingTypes.MapRulType;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.TagsTransformer;
+import net.osmand.osm.TagsTransformer.PropagateEntityTags;
 import net.osmand.osm.MapRenderingTypesEncoder.EntityConvertApplyType;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
@@ -187,7 +188,8 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 				for (RelationMember ch : ((Relation) e).getMembers()) {
 					if (ch.getEntity() != null && ("station".equals(ch.getEntity().getTag("railway"))
 							|| "subway".equals(ch.getEntity().getTag("station")))) {
-						tagsTransformer.getPropogateTagForEntity(ch.getEntityId()).put("with_exits", "yes");
+						PropagateEntityTags p = tagsTransformer.getPropogateTagForEntity(ch.getEntityId());
+						p.putThroughTags.put("with_exits", "yes");
 					}
 				}
 			}
@@ -727,7 +729,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 				e.putTag(OSMTagKey.NAME_EN.getValue(), 
 						JapaneseTranslitHelper.getEnglishTransliteration(e.getTag(OSMTagKey.NAME.getValue())));
 			}
-			tagsTransformer.addPropogatedTags(EntityConvertApplyType.MAP, e);
+			tagsTransformer.addPropogatedTags(renderingTypes, EntityConvertApplyType.MAP, e);
 			// manipulate what kind of way to load
 			long originalId = e.getId();
 			long assignedId = e.getId();

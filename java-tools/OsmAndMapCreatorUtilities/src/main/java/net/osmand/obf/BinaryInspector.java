@@ -88,10 +88,10 @@ public class BinaryInspector {
 //					"-vstreets", "-vbuildings", "-vintersections",
 //					"-lang=ru",
 //					"-zoom=6",
-//					"-bbox=4.76373,52.32439,4.76920,52.32203",
+					"-bbox=4.76373,52.32439,4.76920,52.32203",
 //					"-osm="+System.getProperty("maps.dir")+"/map.obf.osm",
-//					System.getProperty("maps.dir")+"/Netherlands_map.obf"
-					System.getProperty("maps.dir")+"/Test_czech_route.obf"
+					System.getProperty("maps.dir")+"/Netherlands_map.obf"
+//					System.getProperty("maps.dir")+"/Test_czech_route.obf"
 //					System.getProperty("maps.dir")+"/Netherlands_noord-holland_europe_2.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});

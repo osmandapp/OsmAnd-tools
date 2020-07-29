@@ -874,8 +874,8 @@ public class IndexCreator {
 //		creator.deleteOsmDB = false;
 
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
-//		String file = rootFolder + "/temp/netherlands_map.osm";
-		String file = rootFolder + "/temp/test_czech_route.osm";
+		String file = rootFolder + "/temp/netherlands_map.osm";
+//		String file = rootFolder + "/temp/test_czech_route.osm";
 //		String file = rootFolder + "/repos/resources/test-resources/synthetic_test_rendering.osm";
 //		String file = rootFolder + "/repos/resources/test-resources/turn_lanes_test.osm";
 		int st = file.lastIndexOf('/');

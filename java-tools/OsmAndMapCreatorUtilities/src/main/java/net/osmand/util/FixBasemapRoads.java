@@ -186,7 +186,7 @@ public class FixBasemapRoads {
 						LOG.info("Processed " + total + " ways");
 					}
 					addRegionTag(or, way);
-					transformer.addPropogatedTags(EntityConvertApplyType.MAP, way);
+					transformer.addPropogatedTags(renderingTypes, EntityConvertApplyType.MAP, way);
 					Map<String, String> ntags = renderingTypes.transformTags(way.getModifiableTags(), EntityType.WAY,
 							EntityConvertApplyType.MAP);
 					if (way.getModifiableTags() != ntags) {
