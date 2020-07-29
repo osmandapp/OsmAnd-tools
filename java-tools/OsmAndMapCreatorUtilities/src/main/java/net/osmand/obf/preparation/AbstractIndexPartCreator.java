@@ -130,22 +130,27 @@ public class AbstractIndexPartCreator {
 		return tree;
 	}
 	
-	protected void addRegionTag(OsmandRegions or, Entity entity) throws IOException {
+	protected void addRegionTag(OsmandRegions or, Entity entity) {
 		if (entity instanceof Way) {
-			QuadRect qr = ((Way) entity).getLatLonBBox();
-			int lx = MapUtils.get31TileNumberX(qr.left);
-			int rx = MapUtils.get31TileNumberX(qr.right);
-			int by = MapUtils.get31TileNumberY(qr.bottom);
-			int ty = MapUtils.get31TileNumberY(qr.top);
-			List<BinaryMapDataObject> bbox = or.query(lx, rx, ty, by);
-			TreeSet<String> lst = new TreeSet<String>();
-			for (BinaryMapDataObject bo : bbox) {
-				String dw = or.getDownloadName(bo);
-				if (!Algorithms.isEmpty(dw) && or.isDownloadOfType(bo, OsmandRegions.MAP_TYPE)) {
-					lst.add(dw);
+			try {
+				QuadRect qr = ((Way) entity).getLatLonBBox();
+				int lx = MapUtils.get31TileNumberX(qr.left);
+				int rx = MapUtils.get31TileNumberX(qr.right);
+				int by = MapUtils.get31TileNumberY(qr.bottom);
+				int ty = MapUtils.get31TileNumberY(qr.top);
+				List<BinaryMapDataObject> bbox = or.query(lx, rx, ty, by);
+
+				TreeSet<String> lst = new TreeSet<String>();
+				for (BinaryMapDataObject bo : bbox) {
+					String dw = or.getDownloadName(bo);
+					if (!Algorithms.isEmpty(dw) && or.isDownloadOfType(bo, OsmandRegions.MAP_TYPE)) {
+						lst.add(dw);
+					}
 				}
+				entity.putTag(MapRenderingTypesEncoder.OSMAND_REGION_NAME_TAG, serialize(lst));
+			} catch (IOException e) {
+				throw new RuntimeException(e);
 			}
-			entity.putTag(MapRenderingTypesEncoder.OSMAND_REGION_NAME_TAG, serialize(lst));	
 		} 
 	}
 	

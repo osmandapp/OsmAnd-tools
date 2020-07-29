@@ -253,7 +253,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 					return;
 				}
 				log.info(String.format("Relation %s %d consists only of coastlines so it was skipped.",
-						tags.get(OSMTagKey.NAME), e.getId()));
+						tags.get(OSMTagKey.NAME.getValue()), e.getId()));
 				return;
 			}
 		}
@@ -719,21 +719,15 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	
 	public void iterateMainEntity(Entity e, OsmDbAccessorContext ctx, OsmandRegions or, boolean translitJapaneseNames) throws SQLException {
 		if (e instanceof Way || e instanceof Node) {
-			if (or != null && e instanceof Way) {
-				try {
-					addRegionTag(or, e);
-				} catch (IOException e1) {
-					e1.printStackTrace();
-				}
+			if (or != null) {
+				addRegionTag(or, e);
 			}
 			if (translitJapaneseNames && Algorithms.isEmpty(e.getTag(OSMTagKey.NAME_EN.getValue())) 
 					&& !Algorithms.isEmpty(e.getTag(OSMTagKey.NAME.getValue()))) {
 				e.putTag(OSMTagKey.NAME_EN.getValue(), 
 						JapaneseTranslitHelper.getEnglishTransliteration(e.getTag(OSMTagKey.NAME.getValue())));
 			}
-			tagsTransformer.addMultipleNetwoksTag(e);
 			tagsTransformer.addPropogatedTags(EntityConvertApplyType.MAP, e);
-			
 			// manipulate what kind of way to load
 			long originalId = e.getId();
 			long assignedId = e.getId();
@@ -751,13 +745,6 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 					for (int level = 0; level < mapZooms.size(); level++) {
 						processMainEntity(e, originalId, assignedId, level, stags);
 					}
-				}
-			}
-			
-			if (or != null & e instanceof Way) {
-				Map<String, String> ntags = renderingTypes.transformTags(e.getModifiableTags(), EntityType.WAY, EntityConvertApplyType.MAP);
-				if (e.getModifiableTags() != ntags) {
-					e.getModifiableTags().putAll(ntags);
 				}
 			}
 		}
@@ -1049,7 +1036,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 					int[] typeUse = mdo.getTypes();
 					int[] addtypeUse = mdo.getAdditionalTypes();
 					byte[] coordinates = new byte[8 * mdo.getPointsLength()];
-					byte[] labelCoordinates = new byte[0]; //TODO check
+					byte[] labelCoordinates = new byte[0]; 
 					for (int t = 0; t < mdo.getPointsLength(); t++) {
 						Algorithms.putIntToBytes(coordinates, 8 * t, mdo.getPoint31XTile(t));
 						Algorithms.putIntToBytes(coordinates, 8 * t + 4, mdo.getPoint31YTile(t));

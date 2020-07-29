@@ -4,6 +4,7 @@ import gnu.trove.list.array.TIntArrayList;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -16,9 +17,9 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 
 import net.osmand.PlatformUtil;
-import net.osmand.osm.MapRenderingTypes.MapRulType;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.Node;
@@ -40,6 +41,12 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	private MapRulType coastlineRuleType;
 	private String regionName;
 	public static final String OSMAND_REGION_NAME_TAG = "osmand_region_name";
+	
+	private static final Collection<String> NODE_NETWORK_IDS = Arrays.asList("network:type", "expected_rcn_route_relations");
+	// TODO ??? transformed tags? 
+	private static final Collection<String> NODE_NETWORKS_REF_TYPES = 
+			new TreeSet<>(Arrays.asList("icn_ref", "ncn_ref", "rcn_ref", "lcn_ref", "iwn_ref", "nwn_ref", "rwn_ref", "lwn_ref"));
+	private static final String multipleNodeNetworksKey = "multiple_node_networks";
 	
 	private Map<String, TIntArrayList> socketTypes;
 	
@@ -295,6 +302,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		tags = transformOpeningHoursTags(tags, appType);
 		tags = transformChargingTags(tags, entity);
 		tags = transformOsmcAndColorTags(tags);
+		tags = transformAddMultipleNetwoksTag(tags);
 		EntityConvertType filter = EntityConvertType.TAG_TRANSFORM;
 		List<EntityConvert> listToConvert = getApplicableConverts(tags, entity, filter, appType);
 		if (listToConvert == null) {
@@ -419,9 +427,30 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		}
 		return tags;
 	}
+	
+	private Map<String, String> transformAddMultipleNetwoksTag(Map<String, String> tags) {
+		int networkTypesCount = 0;
+		boolean networkId = false;
+		for (String tag : tags.keySet()) {
+			if (NODE_NETWORKS_REF_TYPES.contains(tag)) {
+				networkTypesCount++;
+			}
+			if (NODE_NETWORK_IDS.contains(tag)) {
+				networkId = true;
+			}
+		}
+		if (networkTypesCount > 1 && networkId) {
+			Map<String, String> rtags = new LinkedHashMap<String, String>(tags);
+			rtags.put(multipleNodeNetworksKey, "true");
+			return rtags;
+		}
+		return tags;
+	}
 
 	private Map<String, String> transformShieldTags(Map<String, String> tags, EntityType entity,
 			EntityConvertApplyType appType) {
+		
+		// TODO fix
 		if(entity == EntityType.WAY && !Algorithms.isEmpty(tags.get("ref")) && tags.containsKey("highway")) {
 			String ref = tags.get("ref");
 			Set<String> rfs = new LinkedHashSet<String>();
@@ -436,6 +465,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 				Entry<String, String> e = it.next();
 				String tag = e.getKey();
 				String vl = e.getValue();
+				// TODO fix
 				if(tag.startsWith("road_ref_")) {
 					String sf = Algorithms.extractOnlyIntegerSuffix(tag);
 					int modifier = -1;
@@ -484,6 +514,8 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			}
 
 		}
+		
+		// TODO fix
 		if(entity == EntityType.WAY && tags.containsKey("highway") && tags.containsKey("name")) {
 			tags = new LinkedHashMap<String, String>(tags);
 			String name = tags.get("name");
@@ -491,12 +523,15 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 				tags.put("tch", "yes");
 			}
 		}
-		if(entity == EntityType.WAY && tags.containsKey("highway")) {
+		// TODO fix
+		if (entity == EntityType.WAY && tags.containsKey("highway")) {
 			tags = new LinkedHashMap<String, String>(tags);
 			int i = 1;
 			while (i < 10) {
 				String name = tags.get("road_name_" + i);
-				if (name != null && (name.toLowerCase().contains("transcanad") || name.toLowerCase().contains("trans canad") || name.toLowerCase().contains("trans-canad") || name.toLowerCase().contains("yellowhead"))) {
+				if (name != null && (name.toLowerCase().contains("transcanad")
+						|| name.toLowerCase().contains("trans canad") || name.toLowerCase().contains("trans-canad")
+						|| name.toLowerCase().contains("yellowhead"))) {
 					tags.put("tch", "yes");
 				}
 				i++;
