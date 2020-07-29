@@ -37,7 +37,7 @@ import net.osmand.data.QuadRect;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.map.OsmandRegions;
 import net.osmand.osm.MapRenderingTypesEncoder;
-import net.osmand.osm.TagsTransformer;
+import net.osmand.osm.RelationTagsPropagation;
 import net.osmand.osm.MapRenderingTypesEncoder.EntityConvertApplyType;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
@@ -127,7 +127,7 @@ public class FixBasemapRoads {
 	private void process(File write, List<File> filesToRead, List<File> relationFiles) throws  IOException, XMLStreamException, XmlPullParserException, SQLException {
 		MapRenderingTypesEncoder renderingTypes = new MapRenderingTypesEncoder("basemap");
 		OsmandRegions or = prepareRegions();
-		TagsTransformer transformer = new TagsTransformer();
+		RelationTagsPropagation transformer = new RelationTagsPropagation();
 		for(File relFile : relationFiles) {
 			LOG.info("Parse relations file " + relFile.getName());
 			OsmBaseStorage storage = parseOsmFile(relFile);

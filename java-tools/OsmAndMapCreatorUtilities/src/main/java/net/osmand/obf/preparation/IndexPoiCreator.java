@@ -32,7 +32,7 @@ import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.MapRenderingTypesEncoder.EntityConvertApplyType;
 import net.osmand.osm.PoiType;
-import net.osmand.osm.TagsTransformer;
+import net.osmand.osm.RelationTagsPropagation;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
@@ -69,7 +69,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 	private boolean overwriteIds;
 	private List<Amenity> tempAmenityList = new ArrayList<Amenity>();
-	TagsTransformer tagsTransform = new TagsTransformer();
+	RelationTagsPropagation tagsTransform = new RelationTagsPropagation();
 
 	private final MapRenderingTypesEncoder renderingTypes;
 	private MapPoiTypes poiTypes;

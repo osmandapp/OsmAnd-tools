@@ -39,8 +39,8 @@ import net.osmand.data.Ring;
 import net.osmand.map.OsmandRegions;
 import net.osmand.osm.MapRenderingTypes.MapRulType;
 import net.osmand.osm.MapRenderingTypesEncoder;
-import net.osmand.osm.TagsTransformer;
-import net.osmand.osm.TagsTransformer.PropagateEntityTags;
+import net.osmand.osm.RelationTagsPropagation;
+import net.osmand.osm.RelationTagsPropagation.PropagateEntityTags;
 import net.osmand.osm.MapRenderingTypesEncoder.EntityConvertApplyType;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
@@ -94,7 +94,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		}
 	};
 	TreeMap<MapRulType, String> namesUse = new TreeMap<MapRulType, String>(comparator);
-	TagsTransformer tagsTransformer = new TagsTransformer();
+	RelationTagsPropagation tagsTransformer = new RelationTagsPropagation();
 	TIntArrayList addtypeUse = new TIntArrayList(8);
 
 	private PreparedStatement mapBinaryStat;

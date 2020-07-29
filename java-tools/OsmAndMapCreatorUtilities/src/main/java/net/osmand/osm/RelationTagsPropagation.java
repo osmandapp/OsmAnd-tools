@@ -21,7 +21,7 @@ import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Relation.RelationMember;
 import net.osmand.util.Algorithms;
 
-public class TagsTransformer {
+public class RelationTagsPropagation {
 	final static String SPLIT_VALUE= "SPLITVL";
 	private static final String RELATION_SORT_TAG = "relation_sort:";
 	private Map<EntityId, PropagateEntityTags> propogatedTags = new LinkedHashMap<Entity.EntityId, PropagateEntityTags>();
@@ -164,7 +164,7 @@ public class TagsTransformer {
 				}
 				for(PropagateTagGroup g : propagateRelationGroups) {
 					if(!entityTags.relationGroupTags.containsKey(g.groupKey)) {
-						entityTags.relationGroupTags.put(g.groupKey, new ArrayList<TagsTransformer.PropagateTagGroup>());
+						entityTags.relationGroupTags.put(g.groupKey, new ArrayList<RelationTagsPropagation.PropagateTagGroup>());
 					}
 					entityTags.relationGroupTags.get(g.groupKey).add(g);
 				}

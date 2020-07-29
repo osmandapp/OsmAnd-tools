@@ -50,8 +50,8 @@ import net.osmand.osm.MapRenderingTypes;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.MapRenderingTypesEncoder.EntityConvertApplyType;
 import net.osmand.osm.MapRoutingTypes;
-import net.osmand.osm.TagsTransformer;
-import net.osmand.osm.TagsTransformer.PropagateEntityTags;
+import net.osmand.osm.RelationTagsPropagation;
+import net.osmand.osm.RelationTagsPropagation.PropagateEntityTags;
 import net.osmand.osm.MapRoutingTypes.MapPointName;
 import net.osmand.osm.MapRoutingTypes.MapRouteType;
 import net.osmand.osm.edit.Entity;
@@ -85,7 +85,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 	private RTree routeTree = null;
 	private RTree baserouteTree = null;
 	private MapRoutingTypes routeTypes;
-	TagsTransformer tagsTransformer = new TagsTransformer();
+	RelationTagsPropagation tagsTransformer = new RelationTagsPropagation();
 
 	private final static float DOUGLAS_PEUKER_DISTANCE = 15;
 
