@@ -522,20 +522,20 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 					tags.put("route_road", "");
 					
 					String basePart = "route_road_" + maxModifier;
-					checkOrCreateAdditional(basePart, "");
+					checkOrCreateAdditional(basePart, "", null);
 					tags.put(basePart, "");
 					
-					checkOrCreateTextRule(basePart + "_ref");
+					checkOrCreateTextRule(basePart + "_ref", getRuleType("ref", null, appType));
 					tags.put(basePart + "_ref", ref);
 					
 					
 					if (!Algorithms.isEmpty(wayRefColor)) {
-						checkOrCreateTextRule(basePart + "_ref:colour");
+						checkOrCreateTextRule(basePart + "_ref:colour", getRuleType("ref:colour", null, appType));
 						tags.put(basePart + "_ref:colour", wayRefColor);
 					}
 					String wayRefNetwork = getNetwork(ref);
 					if (!Algorithms.isEmpty(wayRefNetwork)) {
-						checkOrCreateTextRule(basePart + "_network");
+						checkOrCreateTextRule(basePart + "_network", getRuleType("network", null, appType));
 						tags.put(basePart + "_network", wayRefNetwork);
 					}
 					maxModifier++;
@@ -566,6 +566,10 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		}
 		tags = transformRouteRoadTags(tags);
 		return tags;
+	}
+
+	protected MapRulType getRuleType(String tag, String val, EntityConvertApplyType appType) {
+		return getRuleType(tag, val, appType == EntityConvertApplyType.POI, appType != EntityConvertApplyType.POI);
 	}
 
 	private Map<String, String> transformRouteRoadTags(Map<String, String> tags) {

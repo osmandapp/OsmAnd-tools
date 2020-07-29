@@ -44,16 +44,18 @@ public class RelationTagsPropagation {
 	}
 	
 	private Map<String, String> processNameTags(Map<String, String> relationTags, MapRenderingTypesEncoder renderingTypes,
-			Map<String, String> relationNameTags, Map<String, String> relationNames) {
+			Map<String, String> relationNameTags, Map<String, String> relationNames, EntityConvertApplyType at) {
 		if (relationNames != null) {
 			for (Entry<String, String> e : relationNames.entrySet()) {
 				String sourceTag = e.getKey();
 				String targetTag = e.getValue();
 				String vl = relationTags.get(sourceTag);
 				if (!Algorithms.isEmpty(vl)) {
-					// TODO create text rule or not
-					renderingTypes.checkOrCreateTextRule(targetTag);
-					relationNameTags.put(targetTag, vl);
+					MapRulType rt = renderingTypes.getRuleType(sourceTag, null, at);
+					if (rt != null) {
+						renderingTypes.checkOrCreateTextRule(targetTag, rt);
+						relationNameTags.put(targetTag, vl);
+					}
 				}
 			}
 		}
@@ -62,7 +64,7 @@ public class RelationTagsPropagation {
 	
 	private void processRelationTags(MapRenderingTypesEncoder renderingTypes, Map<String, String> propagateRelationNameTags,
 			Map<String, String> propagateRelationAdditionalTags, List<PropagateTagGroup>  propagateRelationGroups,
-			Map<String, String> relationTags, RenderingSortGroup g) {
+			Map<String, String> relationTags, RenderingSortGroup g, EntityConvertApplyType at) {
 		for (Entry<String, String> ev : relationTags.entrySet()) {
 			String key = ev.getKey();
 			String value = ev.getValue();
@@ -91,14 +93,16 @@ public class RelationTagsPropagation {
 					}
 					g.relationGroupValueString = sortValue;
 					
-					processNameTags(relationTags, renderingTypes, propagateRelationNameTags, rule.relationNames);
+					processNameTags(relationTags, renderingTypes, propagateRelationNameTags, rule.relationNames, at);
 					if (rule.additionalTags != null) {
 						for (Entry<String, String> atag : rule.additionalTags.entrySet()) {
-							// TODO create additional or not
 							String tvalue = relationTags.get(atag.getKey());
 							if (!Algorithms.isEmpty(tvalue)) {
-								renderingTypes.checkOrCreateAdditional(atag.getValue(), tvalue);
-								propagateRelationAdditionalTags.put(atag.getValue(), tvalue);
+								MapRulType rt = renderingTypes.getRuleType(atag.getKey(), tvalue, at );
+								if(rt != null) {
+									renderingTypes.checkOrCreateAdditional(atag.getValue(), tvalue, rt);
+									propagateRelationAdditionalTags.put(atag.getValue(), tvalue);
+								}
 							}
 						}
 					}
@@ -107,12 +111,11 @@ public class RelationTagsPropagation {
 						PropagateTagGroup gr = new PropagateTagGroup();
 						gr.orderValue = sortValue;
 						gr.groupKey = Algorithms.isEmpty(rule.relationGroupPrefix) ? mainTag : rule.relationGroupPrefix;
-						processNameTags(relationTags, renderingTypes, gr.tags, rule.relationGroupNameTags);
+						processNameTags(relationTags, renderingTypes, gr.tags, rule.relationGroupNameTags, at);
 						if (rule.relationGroupAdditionalTags != null) {
 							for (Entry<String, String> atag : rule.relationGroupAdditionalTags.entrySet()) {
 								String tvalue = relationTags.get(atag.getKey());
 								if (!Algorithms.isEmpty(tvalue)) {
-									renderingTypes.checkOrCreateAdditional(atag.getValue(), tvalue);
 									gr.tags.put(atag.getValue(), tvalue);
 								}
 							}
@@ -136,7 +139,7 @@ public class RelationTagsPropagation {
 		relationTags = renderingTypes.transformTags(relationTags, EntityType.RELATION, at);
 		RenderingSortGroup rsg = new RenderingSortGroup();
 		processRelationTags(renderingTypes, 
-				propagateRelationNameTags, propagateRelationAdditionalTags, propagateRelationGroups, relationTags, rsg);
+				propagateRelationNameTags, propagateRelationAdditionalTags, propagateRelationGroups, relationTags, rsg, at);
 		if (!Algorithms.isEmpty(propagateRelationAdditionalTags)) {
 			if (ctx != null) {
 				ctx.loadEntityRelation(relation);
@@ -206,19 +209,18 @@ public class RelationTagsPropagation {
 				int mod = 1;
 				for (PropagateTagGroup g : groups) {
 					String groupPart = g.groupKey + "_" + mod ;
-					renderingTypes.checkOrCreateAdditional(groupPart, "");
+					renderingTypes.checkOrCreateAdditional(groupPart, "", null);
 					e.putTag(groupPart, "");
 					for (Entry<String, String> te : g.tags.entrySet()) {
 						String targetTag = groupPart+ "_" + te.getKey();
 						String targetValue = te.getValue();
-						// TODO register additional according to main rule tag
 						MapRulType rt = renderingTypes.getRuleType(te.getKey(), targetValue, false, false);
 						if (rt == null) {
 							// ignore non existing
 						} else if(rt.isAdditional()) {
-							renderingTypes.checkOrCreateAdditional(targetTag, targetValue);
+							renderingTypes.checkOrCreateAdditional(targetTag, targetValue, rt);
 						} else {
-							renderingTypes.checkOrCreateTextRule(targetTag);
+							renderingTypes.checkOrCreateTextRule(targetTag, rt);
 						}
 						e.putTag(targetTag, targetValue);
 					}
