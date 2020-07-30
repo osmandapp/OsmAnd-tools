@@ -26,9 +26,13 @@ public class RelationTagsPropagation {
 	private static final String RELATION_SORT_TAG = "relation_sort:";
 	private Map<EntityId, PropagateEntityTags> propogatedTags = new LinkedHashMap<Entity.EntityId, PropagateEntityTags>();
 	
-	private static class RenderingSortGroup {
+	private static class RelationRulePropagation {
 		String relationGroupKeyString;
 		String relationGroupValueString;
+		
+		Map<String, String> relationNameTags = new LinkedHashMap<String, String>();
+		Map<String, String> relationAdditionalTags = new LinkedHashMap<String, String>();
+		List<PropagateTagGroup> relationGroups = new ArrayList<>();
 	}
 	
 	public static class PropagateTagGroup {
@@ -71,23 +75,27 @@ public class RelationTagsPropagation {
 		return relationNameTags;
 	}
 	
-	private void processRelationTags(MapRenderingTypesEncoder renderingTypes, Map<String, String> propagateRelationNameTags,
-			Map<String, String> propagateRelationAdditionalTags, List<PropagateTagGroup>  propagateRelationGroups,
-			Map<String, String> relationTags, RenderingSortGroup g, EntityConvertApplyType at) {
+	private List<RelationRulePropagation> processRelationTags(MapRenderingTypesEncoder renderingTypes, Map<String, String> relationTags, EntityConvertApplyType at) {
+		List<RelationRulePropagation> res = null;
 		for (Entry<String, String> ev : relationTags.entrySet()) {
 			String key = ev.getKey();
 			String value = ev.getValue();
 			MapRulType rule = renderingTypes.getRuleType(key, value, false, false);
 			if (rule != null && rule.relation) {
+				RelationRulePropagation rrp = new RelationRulePropagation();
+				if(res == null) {
+					res = new ArrayList<RelationTagsPropagation.RelationRulePropagation>();
+				}
+				res.add(rrp);
 				if (rule.isAdditionalOrText()) {
-					propagateRelationAdditionalTags.put(key, value);
-					g.relationGroupKeyString = key;
-					g.relationGroupValueString = value;
+					rrp.relationAdditionalTags.put(key, value);
+					rrp.relationGroupKeyString = key;
+					rrp.relationGroupValueString = value;
 				} else {
 					// for main tags propagate "route_hiking", "route_road", etc
 					String mainTag = key + "_" + value;
-					propagateRelationAdditionalTags.put(mainTag, "");
-					g.relationGroupKeyString = mainTag;
+					rrp.relationAdditionalTags.put(mainTag, "");
+					rrp.relationGroupKeyString = mainTag;
 					String sortValue = "";
 					if (rule.relationSortTags != null) {
 						for (Entry<String, List<String>> sortTag : rule.relationSortTags.entrySet()) {
@@ -100,17 +108,17 @@ public class RelationTagsPropagation {
 							sortValue += ch;
 						}
 					}
-					g.relationGroupValueString = sortValue;
-					
-					processNameTags(relationTags, renderingTypes, propagateRelationNameTags, rule.relationNames, at);
+					rrp.relationGroupValueString = sortValue;
+
+					processNameTags(relationTags, renderingTypes, rrp.relationNameTags, rule.relationNames, at);
 					if (rule.additionalTags != null) {
 						for (Entry<String, String> atag : rule.additionalTags.entrySet()) {
 							String tvalue = relationTags.get(atag.getKey());
 							if (!Algorithms.isEmpty(tvalue)) {
-								MapRulType rt = renderingTypes.getRuleType(atag.getKey(), tvalue, at );
-								if(rt != null) {
+								MapRulType rt = renderingTypes.getRuleType(atag.getKey(), tvalue, at);
+								if (rt != null) {
 									renderingTypes.checkOrCreateAdditional(atag.getValue(), tvalue, rt);
-									propagateRelationAdditionalTags.put(atag.getValue(), tvalue);
+									rrp.relationAdditionalTags.put(atag.getValue(), tvalue);
 								}
 							}
 						}
@@ -130,52 +138,52 @@ public class RelationTagsPropagation {
 							}
 						}
 						if (!gr.tags.isEmpty()) {
-							propagateRelationGroups.add(gr);
+							rrp.relationGroups.add(gr);
 						}
 					}
 				}
 			}
 		}
+		return res;
 	}
 	
 	public void handleRelationPropogatedTags(Relation relation, MapRenderingTypesEncoder renderingTypes, OsmDbAccessorContext ctx, 
 			EntityConvertApplyType at) throws SQLException {
-		Map<String, String> propagateRelationNameTags = new LinkedHashMap<String, String>();
-		Map<String, String> propagateRelationAdditionalTags = new LinkedHashMap<String, String>();
-		List<PropagateTagGroup> propagateRelationGroups = new ArrayList<>();
-		
 		Map<String, String> relationTags = relation.getTags();
 		relationTags = renderingTypes.transformTags(relationTags, EntityType.RELATION, at);
-		RenderingSortGroup rsg = new RenderingSortGroup();
-		processRelationTags(renderingTypes, 
-				propagateRelationNameTags, propagateRelationAdditionalTags, propagateRelationGroups, relationTags, rsg, at);
-		if (!Algorithms.isEmpty(propagateRelationAdditionalTags)) {
+		List<RelationRulePropagation> lst = processRelationTags(renderingTypes, relationTags, at);
+		if (lst != null) {
 			if (ctx != null) {
 				ctx.loadEntityRelation(relation);
 			}
 			for (RelationMember ids : relation.getMembers()) {
 				PropagateEntityTags entityTags = getPropogateTagForEntity(ids.getEntityId());
-				String sortKey = RELATION_SORT_TAG + rsg.relationGroupKeyString;
-				if (!entityTags.putThroughTags.containsKey(sortKey) || 
-						rsg.relationGroupValueString.compareTo(entityTags.putThroughTags.get(sortKey)) > 0) {
-					entityTags.putThroughTags.put(sortKey, rsg.relationGroupValueString);
-					entityTags.putThroughTags.putAll(propagateRelationAdditionalTags);
-					
-				}
-				if (propagateRelationNameTags.size() > 0) {
-					for (Entry<String, String> es : propagateRelationNameTags.entrySet()) {
-						String key = es.getKey();
-						String oldValue = entityTags.putThroughTags.get(key);
-						String res = sortAndAttachUniqueValue(oldValue, es.getValue());
-						entityTags.putThroughTags.put(key, res);
+				for (RelationRulePropagation p : lst) {
+					String sortKey = RELATION_SORT_TAG + p.relationGroupKeyString;
+					// System.out.println(relation + " " + ids + " " + sortKey + " " + rsg.relationGroupValueString);
+					if (!entityTags.putThroughTags.containsKey(sortKey)
+							|| p.relationGroupValueString.compareTo(entityTags.putThroughTags.get(sortKey)) < 0) {
+						entityTags.putThroughTags.put(sortKey, p.relationGroupValueString);
+						entityTags.putThroughTags.putAll(p.relationAdditionalTags);
+
+					}
+					if (p.relationNameTags.size() > 0) {
+						for (Entry<String, String> es : p.relationNameTags.entrySet()) {
+							String key = es.getKey();
+							String oldValue = entityTags.putThroughTags.get(key);
+							String res = sortAndAttachUniqueValue(oldValue, es.getValue());
+							entityTags.putThroughTags.put(key, res);
+						}
+					}
+					for (PropagateTagGroup g : p.relationGroups) {
+						if (!entityTags.relationGroupTags.containsKey(g.groupKey)) {
+							entityTags.relationGroupTags.put(g.groupKey,
+									new ArrayList<RelationTagsPropagation.PropagateTagGroup>());
+						}
+						entityTags.relationGroupTags.get(g.groupKey).add(g);
 					}
 				}
-				for(PropagateTagGroup g : propagateRelationGroups) {
-					if(!entityTags.relationGroupTags.containsKey(g.groupKey)) {
-						entityTags.relationGroupTags.put(g.groupKey, new ArrayList<RelationTagsPropagation.PropagateTagGroup>());
-					}
-					entityTags.relationGroupTags.get(g.groupKey).add(g);
-				}
+				
 			}
 		}
 	}

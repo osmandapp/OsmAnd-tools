@@ -98,7 +98,8 @@ public class BinaryInspector {
 //					System.getProperty("maps.dir")+"/Netherlands_rcn_ref.obf"
 //					System.getProperty("maps.dir")+"/Test_czech_route.obf"
 //					System.getProperty("maps.dir")+"/Czech_rwn.obf"
-					System.getProperty("maps.dir")+"/Us_new-jersey_northamerica.obf"
+//					System.getProperty("maps.dir")+"/Us_new-jersey_northamerica.obf"
+					System.getProperty("maps.dir")+"/Germany_nwn.obf"
 					
 //					System.getProperty("maps.dir")+"/Netherlands_noord-holland_europe_2.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
