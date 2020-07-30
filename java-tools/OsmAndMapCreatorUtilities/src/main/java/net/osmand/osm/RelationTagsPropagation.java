@@ -35,12 +35,21 @@ public class RelationTagsPropagation {
 		public Map<String, String> tags = new LinkedHashMap<String, String>();
 		public String orderValue = "";
 		public String groupKey = "";
+		
+		@Override
+		public String toString() {
+			return groupKey + " " + orderValue + " - " + tags;
+		}
 	}
 	
 	public static class PropagateEntityTags {
 		public Map<String, String> putThroughTags = new LinkedHashMap<String, String>();
 		public Map<String, List<PropagateTagGroup>> relationGroupTags = new LinkedHashMap<String, List<PropagateTagGroup>>();
 		
+		@Override
+		public String toString() {
+			return putThroughTags + " " + relationGroupTags;
+		}
 	}
 	
 	private Map<String, String> processNameTags(Map<String, String> relationTags, MapRenderingTypesEncoder renderingTypes,
@@ -54,8 +63,8 @@ public class RelationTagsPropagation {
 					MapRulType rt = renderingTypes.getRuleType(sourceTag, null, at);
 					if (rt != null) {
 						renderingTypes.checkOrCreateTextRule(targetTag, rt);
-						relationNameTags.put(targetTag, vl);
 					}
+					relationNameTags.put(targetTag, vl);
 				}
 			}
 		}
@@ -149,9 +158,6 @@ public class RelationTagsPropagation {
 				String sortKey = RELATION_SORT_TAG + rsg.relationGroupKeyString;
 				if (!entityTags.putThroughTags.containsKey(sortKey) || 
 						rsg.relationGroupValueString.compareTo(entityTags.putThroughTags.get(sortKey)) > 0) {
-//					System.out.println(String.format("CC %s: %s %s - %d",rsg.relationGroupKeyString,
-//							rsg.relationGroupValueString, vl,
-//							rsg.relationGroupValueString.compareTo(vl)));
 					entityTags.putThroughTags.put(sortKey, rsg.relationGroupValueString);
 					entityTags.putThroughTags.putAll(propagateRelationAdditionalTags);
 					
