@@ -33,6 +33,11 @@ public class RelationTagsPropagation {
 		Map<String, String> relationNameTags = new LinkedHashMap<String, String>();
 		Map<String, String> relationAdditionalTags = new LinkedHashMap<String, String>();
 		List<PropagateTagGroup> relationGroups = new ArrayList<>();
+		@Override
+		public String toString() {
+			return String.format("%s - %s: %s %s %s", relationGroupKeyString, relationGroupValueString,
+					relationNameTags, relationAdditionalTags, relationGroups);
+		}
 	}
 	
 	public static class PropagateTagGroup {
@@ -93,7 +98,7 @@ public class RelationTagsPropagation {
 					rrp.relationGroupValueString = value;
 				} else {
 					// for main tags propagate "route_hiking", "route_road", etc
-					String mainTag = key + "_" + value;
+					String mainTag = Algorithms.isEmpty(value) ? key : key + "_" + value;
 					rrp.relationAdditionalTags.put(mainTag, "");
 					rrp.relationGroupKeyString = mainTag;
 					String sortValue = "";
@@ -160,7 +165,7 @@ public class RelationTagsPropagation {
 				PropagateEntityTags entityTags = getPropogateTagForEntity(ids.getEntityId());
 				for (RelationRulePropagation p : lst) {
 					String sortKey = RELATION_SORT_TAG + p.relationGroupKeyString;
-					// System.out.println(relation + " " + ids + " " + sortKey + " " + rsg.relationGroupValueString);
+//					System.out.println(relation + " " + ids + " " + sortKey + " " + p);
 					if (!entityTags.putThroughTags.containsKey(sortKey)
 							|| p.relationGroupValueString.compareTo(entityTags.putThroughTags.get(sortKey)) < 0) {
 						entityTags.putThroughTags.put(sortKey, p.relationGroupValueString);

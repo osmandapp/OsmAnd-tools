@@ -147,7 +147,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			if ("no".equals(mp.get("poi")) || "false".equals(mp.get("poi"))) {
 				ec.applyToType.remove(EntityConvertApplyType.POI);
 			}
-			parseConvertCol(mp, ec.toTags, "to_");
+			parseConvertCol(mp, ec.toTags, "to_", "");
 			tg = mp.get("from_tag"); //$NON-NLS-1$
 			String value = mp.get("from_value"); //$NON-NLS-1$
 			if (tg != null) {
@@ -172,6 +172,11 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 
 
 	protected void parseConvertCol(Map<String, String> mp, List<TagValuePattern> col, String prefix) {
+		parseConvertCol(mp, col, prefix, null);
+	}
+	
+	protected void parseConvertCol(Map<String, String> mp, List<TagValuePattern> col, String prefix, 
+			String emptyVal) {
 		for (int i = 1; i <= 20; i++) {
 			String tg = mp.get(prefix +"tag" + i); //$NON-NLS-1$
 			String value = mp.get(prefix +"value" + i); //$NON-NLS-1$
@@ -180,7 +185,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 				tg = tgPrefix;
 			}
 			if (tg != null) {
-				TagValuePattern pt = new TagValuePattern(tg, "".equals(value) ? null : value);
+				TagValuePattern pt = new TagValuePattern(tg, "".equals(value) ? emptyVal : value);
 				pt.tagPrefix = tgPrefix;
 				col.add(pt);
 				String substr = mp.get(prefix +"substr" + i); //$NON-NLS-1$
@@ -760,7 +765,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		tags.remove(ec.fromTag.tag);
 		for(TagValuePattern ift : ec.toTags) {
 			String vl = ift.value;
-			if(vl == null) {
+			if (vl == null) {
 				vl = fromValue;
 			}
 			vl = processSubstr(ift, vl);
