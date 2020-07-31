@@ -86,17 +86,18 @@ public class RelationTagsPropagation {
 			String key = ev.getKey();
 			String value = ev.getValue();
 			MapRulType rule = renderingTypes.getRuleType(key, value, false, false);
-			if (rule != null && rule.relation) {
+			if (rule != null && (rule.relation || rule.relationGroup)) {
 				RelationRulePropagation rrp = new RelationRulePropagation();
 				if(res == null) {
 					res = new ArrayList<RelationTagsPropagation.RelationRulePropagation>();
 				}
 				res.add(rrp);
-				if (rule.isAdditionalOrText()) {
+				if (rule.relation) {
 					rrp.relationAdditionalTags.put(key, value);
 					rrp.relationGroupKeyString = key;
 					rrp.relationGroupValueString = value;
-				} else {
+					processNameTags(relationTags, renderingTypes, rrp.relationNameTags, rule.relationNames, at);
+				} else if (rule.relationGroup) {
 					// for main tags propagate "route_hiking", "route_road", etc
 					String mainTag = Algorithms.isEmpty(value) ? key : key + "_" + value;
 					rrp.relationAdditionalTags.put(mainTag, "");

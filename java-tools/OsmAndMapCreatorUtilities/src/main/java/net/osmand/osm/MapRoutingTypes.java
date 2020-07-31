@@ -26,13 +26,12 @@ import org.apache.commons.logging.LogFactory;
 
 
 public class MapRoutingTypes {
-	private static final Log log = LogFactory.getLog(MapRoutingTypes.class);
+	protected static final Log log = LogFactory.getLog(MapRoutingTypes.class);
 	private static final char TAG_DELIMETER = '/'; //$NON-NLS-1$
 	private Set<String> TAGS_TO_SAVE = new HashSet<String>();
 	private Set<String> TAGS_TO_ACCEPT = new HashSet<String>();
 	private Map<String, String> TAGS_TO_REPLACE = new HashMap<String, String>();
 	private Map<String, String> TAGS_TYPE = new HashMap<String, String>();
-	private Set<String> TAGS_RELATION_TO_ACCEPT = new HashSet<String>();
 	private Set<String> TAGS_TEXT = new HashSet<String>();
 	private Set<String> BASE_TAGS_TEXT = new HashSet<String>();
 	private Set<String> BASE_TAGS_TO_SAVE = new HashSet<String>();
@@ -55,9 +54,6 @@ public class MapRoutingTypes {
 				TAGS_TYPE.put(t, tg.type);
 			}
 			if (tg.register) {
-				if (tg.relation) {
-					TAGS_RELATION_TO_ACCEPT.add(t);
-				}
 				TAGS_TO_ACCEPT.add(t);
 			} else if (tg.replace) {
 				String t2 = tg.tag2;
@@ -114,37 +110,6 @@ public class MapRoutingTypes {
 		return nameRuleType;
 	}
 
-	public Map<String, String> getRouteRelationPropogatedTags(Map<String, String> tags) {
-		Map<String, String> propogated = null;
-		for(Entry<String, String> es : tags.entrySet()) {
-			String tag = es.getKey();
-			String value = converBooleanValue(es.getValue());
-			if(contains(TAGS_RELATION_TO_ACCEPT, tag, value) && validateType(tag, value)) {
-				propogated = new LinkedHashMap<String, String>();
-				propogated.put(tag, value);
-				break;
-			}
-		}
-		if(propogated == null) {
-			return propogated;
-		}
-
-		for(Entry<String, String> es : tags.entrySet()) {
-			String tag = es.getKey();
-			String value = converBooleanValue(es.getValue());
-			// do not propogate text tags they could be wrong
-//			if(TAGS_TEXT.contains(tag)) {
-//				propogated.put(tag, value);
-//			}
-			if(contains(TAGS_TO_ACCEPT, tag, value) ||
-					startsWith(TAGS_TO_SAVE, tag, value)) {
-				if(validateType(tag, value)) {
-					propogated.put(tag, value);
-				}
-			}
-		}
-		return propogated;
-	}
 
 	private boolean validateType(String tag, String value) {
 		String tp = TAGS_TYPE.get(tag);

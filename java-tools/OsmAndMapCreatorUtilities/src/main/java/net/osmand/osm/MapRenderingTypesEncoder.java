@@ -222,7 +222,6 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			rtype.type = lc(parser.getAttributeValue("", "type"), ind);
 			rtype.amend = "amend".equalsIgnoreCase(mode);
 			rtype.text = "text".equalsIgnoreCase(mode);
-			rtype.relation = Boolean.parseBoolean(parser.getAttributeValue("", "relation"));
 			routeTags.add(rtype);
 		}
 	}
@@ -1507,7 +1506,6 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	}
 
 	public static class MapRouteTag {
-		boolean relation;
 		String tag;
 		String value;
 		String tag2;
