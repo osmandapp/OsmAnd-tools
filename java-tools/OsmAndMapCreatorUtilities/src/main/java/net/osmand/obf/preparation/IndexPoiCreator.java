@@ -1,8 +1,5 @@
 package net.osmand.obf.preparation;
 
-import gnu.trove.list.array.TIntArrayList;
-import gnu.trove.set.hash.TLongHashSet;
-
 import java.io.File;
 import java.io.IOException;
 import java.sql.Connection;
@@ -23,6 +20,11 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
+import gnu.trove.list.array.TIntArrayList;
+import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.IProgress;
 import net.osmand.IndexConstants;
 import net.osmand.binary.BinaryMapPoiReaderAdapter;
@@ -35,17 +37,13 @@ import net.osmand.osm.PoiType;
 import net.osmand.osm.RelationTagsPropagation;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityType;
-import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.osm.edit.EntityParser;
+import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.osm.edit.Relation;
-import net.osmand.osm.edit.Relation.RelationMember;
 import net.osmand.util.Algorithms;
 import net.osmand.util.JapaneseTranslitHelper;
 import net.osmand.util.MapUtils;
 import net.sf.junidecode.Junidecode;
-
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 
 public class IndexPoiCreator extends AbstractIndexPartCreator {
 
@@ -647,6 +645,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 	private void parsePrefix(String name, PoiTileBox data, Map<String, Set<PoiTileBox>> poiData) {
 		int prev = -1;
+		name = Algorithms.normalizeSearchText(name);
 		for (int i = 0; i <= name.length(); i++) {
 			if (i == name.length() || 
 					(!Character.isLetter(name.charAt(i)) && !Character.isDigit(name.charAt(i)) )) {

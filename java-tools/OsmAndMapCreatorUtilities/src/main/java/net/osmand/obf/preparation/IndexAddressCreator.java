@@ -1210,6 +1210,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 	private static void parsePrefix(String name, MapObject data, Map<String, List<MapObject>> namesIndex) {
 		int prev = -1;
 		List<String> namesToAdd = new ArrayList<>();
+		name = Algorithms.normalizeSearchText(name);
 		name = stripBraces(name);
 		
 		for (int i = 0; i <= name.length(); i++) {
