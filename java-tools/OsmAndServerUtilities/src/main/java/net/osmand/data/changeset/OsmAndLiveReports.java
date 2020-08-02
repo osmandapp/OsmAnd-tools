@@ -735,12 +735,12 @@ public class OsmAndLiveReports {
 	}
 	
 	public double getBtcCollected() throws IOException, SQLException {
-		if(!thisMonth) {
+		if (!thisMonth) {
 			SupportersReport supps = getReport(OsmAndLiveReportType.SUPPORTERS, null, SupportersReport.class);
 			// uses supporters report
 			double eurValue = getEurValue(supps);
 			double rate = getNumberReport(OsmAndLiveReportType.EUR_BTC_ACTUAL_RATE).doubleValue();
-			if(rate != 0) {
+			if (rate != 0) {
 				return eurValue / rate;
 			}
 			return 0;
