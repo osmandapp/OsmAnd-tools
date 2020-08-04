@@ -25,6 +25,8 @@ import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.SwingUtilities;
 
+import org.apache.commons.logging.Log;
+
 import net.osmand.PlatformUtil;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.data.DataTileManager;
@@ -32,18 +34,16 @@ import net.osmand.data.LatLon;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.osm.edit.Way;
-import net.osmand.router.RoutingConfiguration.Builder;
 import net.osmand.router.GeneralRouter;
 import net.osmand.router.NativeTransportRoutingResult;
+import net.osmand.router.RoutingConfiguration.Builder;
 import net.osmand.router.TransportRoutePlanner;
-import net.osmand.router.TransportRoutePlanner.TransportRouteResult;
 import net.osmand.router.TransportRoutePlanner.TransportRouteResultSegment;
-import net.osmand.router.TransportRoutePlanner.TransportRoutingContext;
+import net.osmand.router.TransportRouteResult;
 import net.osmand.router.TransportRoutingConfiguration;
+import net.osmand.router.TransportRoutingContext;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
-
-import org.apache.commons.logging.Log;
 
 
 

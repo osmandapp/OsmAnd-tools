@@ -91,9 +91,9 @@ public class BinaryInspector {
 					// road
 					"-latlon=48.8416,17.4115",
 //					"-osm="+System.getProperty("maps.dir")+"/map.obf.osm",
-//					System.getProperty("maps.dir")+"/Czech-republic_jihovychod_europe_2.obf"
+					System.getProperty("maps.dir")+"/Czech-republic_jihovychod_europe_2.obf"
 //					System.getProperty("maps.dir")+"/Map.obf"
-					System.getProperty("maps.dir")+"/Czech-republic_jihovychod_europe_part.obf"
+//					System.getProperty("maps.dir")+"/Czech-republic_jihovychod_europe_part.obf"
 					
 //					System.getProperty("maps.dir")+"/Hungary_europe.obf"
 //					System.getProperty("maps.dir")+"/Hungary_europe_2.obf"
@@ -1326,7 +1326,7 @@ public class BinaryInspector {
 					int prevTime = 0;
 					for (int i : tripIntervalsList) {
 						i = i + prevTime;
-						String tm = TransportRoutePlanner.formatTransporTime(i);
+						String tm = TransportRoutePlanner.formatTransportTime(i);
 						bld.append(tm);
 						prevTime = i;
 					}
@@ -1338,14 +1338,14 @@ public class BinaryInspector {
 					for(int k = 0; k < st.getForwardStops().size(); k++) {
 						TransportStop stp = st.getForwardStops().get(k);
 						if(k == 0) {
-							bld.append(String.format("%6.6s %s, ", stp.getName(), TransportRoutePlanner.formatTransporTime(atm)));
+							bld.append(String.format("%6.6s %s, ", stp.getName(), TransportRoutePlanner.formatTransportTime(atm)));
 						} else {
 							atm += avgStopIntervals[k - 1];
 							if(avgWaitIntervals.length > k && avgWaitIntervals[k] > 0)  {
-								bld.append(String.format("%6.6s %s - %s, ", stp.getName(), TransportRoutePlanner.formatTransporTime(atm),
-										TransportRoutePlanner.formatTransporTime(avgWaitIntervals[k] + atm)));
+								bld.append(String.format("%6.6s %s - %s, ", stp.getName(), TransportRoutePlanner.formatTransportTime(atm),
+										TransportRoutePlanner.formatTransportTime(avgWaitIntervals[k] + atm)));
 							} else {
-								bld.append(String.format("%6.6s %s, ", stp.getName(), TransportRoutePlanner.formatTransporTime(atm)));
+								bld.append(String.format("%6.6s %s, ", stp.getName(), TransportRoutePlanner.formatTransportTime(atm)));
 							}
 						}
 					}
