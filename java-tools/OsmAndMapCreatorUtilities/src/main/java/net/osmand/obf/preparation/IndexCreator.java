@@ -881,7 +881,7 @@ public class IndexCreator {
 //		String file = rootFolder + "/temp/us_new-jersey_northamerica.osm";
 //		String file = rootFolder + "/temp/germany_nwn.osm";
 //		String file = rootFolder + "/temp/test_germany.osm";
-		String file = rootFolder + "/temp/map.osm";
+		String file = rootFolder + "/temp/Czech-republic_jihovychod_europe_part.osm";
 		
 //		String file = rootFolder + "/repos/resources/test-resources/synthetic_test_rendering.osm";
 //		String file = rootFolder + "/repos/resources/test-resources/turn_lanes_test.osm";

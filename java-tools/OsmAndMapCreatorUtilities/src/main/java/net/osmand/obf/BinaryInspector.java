@@ -89,22 +89,14 @@ public class BinaryInspector {
 //					"-lang=ru",
 //					"-zoom=6",
 					// road
-//					"-bbox=4.76373,52.32439,4.76920,52.32203",
-					// rcn_ref
-//					"-bbox=4.85757,52.27553,4.86031,52.27435",
-					
+					"-latlon=48.8416,17.4115",
 //					"-osm="+System.getProperty("maps.dir")+"/map.obf.osm",
-//					System.getProperty("maps.dir")+"/Netherlands_map.obf"
-//					System.getProperty("maps.dir")+"/Netherlands_rcn_ref.obf"
-//					System.getProperty("maps.dir")+"/Test_czech_route.obf"
-//					System.getProperty("maps.dir")+"/Czech_rwn.obf"
-//					System.getProperty("maps.dir")+"/Us_new-jersey_northamerica.obf"
-//					System.getProperty("maps.dir")+"/Germany_nwn.obf"
-//					System.getProperty("maps.dir")+"/Test_germany.obf"
-					System.getProperty("maps.dir")+"/Map.obf"
+//					System.getProperty("maps.dir")+"/Czech-republic_jihovychod_europe_2.obf"
+//					System.getProperty("maps.dir")+"/Map.obf"
+					System.getProperty("maps.dir")+"/Czech-republic_jihovychod_europe_part.obf"
 					
-					
-//					System.getProperty("maps.dir")+"/Netherlands_noord-holland_europe_2.obf"
+//					System.getProperty("maps.dir")+"/Hungary_europe.obf"
+//					System.getProperty("maps.dir")+"/Hungary_europe_2.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
 		} else {
@@ -231,6 +223,15 @@ public class BinaryInspector {
 					lang = params[i].substring("-lang=".length());
 				} else if (params[i].startsWith("-zoom=")) {
 					zoom = Integer.parseInt(params[i].substring("-zoom=".length()));
+				} else if (params[i].startsWith("-latlon=")) {
+					String[] values = params[i].substring("-latlon=".length()).split(",");
+					double latmid = Double.parseDouble(values[0]);
+					double lonmid = Double.parseDouble(values[1]);
+					double dist = 0.005;
+					lonleft = lonmid - dist;
+					lattop = latmid + dist;
+					lonright = lonmid + dist;
+					latbottom = latmid - dist;
 				} else if (params[i].startsWith("-bbox=")) {
 					String[] values = params[i].substring("-bbox=".length()).split(",");
 					lonleft = Double.parseDouble(values[0]);
