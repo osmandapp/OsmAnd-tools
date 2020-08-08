@@ -56,6 +56,7 @@ import net.osmand.GPXUtilities.Track;
 import net.osmand.GPXUtilities.TrkSegment;
 import net.osmand.GPXUtilities.WptPt;
 import net.osmand.Location;
+import net.osmand.LocationsHolder;
 import net.osmand.PlatformUtil;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.data.DataTileManager;
@@ -69,6 +70,7 @@ import net.osmand.router.BinaryRoutePlanner.RouteSegmentVisitor;
 import net.osmand.router.PrecalculatedRouteDirection;
 import net.osmand.router.RouteExporter;
 import net.osmand.router.RoutePlannerFrontEnd;
+import net.osmand.router.RoutePlannerFrontEnd.GpxPoint;
 import net.osmand.router.RoutePlannerFrontEnd.GpxRouteApproximation;
 import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
 import net.osmand.router.RouteSegmentResult;
@@ -962,8 +964,10 @@ public class MapRouterLayer implements MapPanelLayer {
 				long nt = System.nanoTime();
 				startProgressThread(ctx);
 				try {
+					GpxRouteApproximation gctx = new GpxRouteApproximation(ctx);
+					List<GpxPoint> gpxPoints = router.generateGpxPoints(gctx, new LocationsHolder(intermediates));
 					List<RouteSegmentResult> searchRoute = gpx ? router.searchGpxRoute(
-							new GpxRouteApproximation(ctx), intermediates).result : router.searchRoute(ctx, start, end,
+							gctx, gpxPoints).result : router.searchRoute(ctx, start, end,
 							intermediates, precalculatedRouteDirection);
 					throwExceptionIfRouteNotFound(ctx, searchRoute);
 					System.out.println("External native time " + (System.nanoTime() - nt) / 1.0e9f);
