@@ -89,12 +89,10 @@ public class BinaryInspector {
 //					"-lang=ru",
 //					"-zoom=6",
 					// road
-					"-latlon=48.8416,17.4115",
+//					"-latlon=48.8416,17.4115",
 //					"-osm="+System.getProperty("maps.dir")+"/map.obf.osm",
-					System.getProperty("maps.dir")+"/Czech-republic_jihovychod_europe_2.obf"
-//					System.getProperty("maps.dir")+"/Map.obf"
-//					System.getProperty("maps.dir")+"/Czech-republic_jihovychod_europe_part.obf"
-					
+//					System.getProperty("maps.dir")+"/Netherlands_rcn_ref.obf"
+					System.getProperty("maps.dir")+"/Map.obf"
 //					System.getProperty("maps.dir")+"/Hungary_europe.obf"
 //					System.getProperty("maps.dir")+"/Hungary_europe_2.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"

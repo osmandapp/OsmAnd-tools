@@ -166,7 +166,6 @@ public class RelationTagsPropagation {
 				PropagateEntityTags entityTags = getPropogateTagForEntity(ids.getEntityId());
 				for (RelationRulePropagation p : lst) {
 					String sortKey = RELATION_SORT_TAG + p.relationGroupKeyString;
-//					System.out.println(relation + " " + ids + " " + sortKey + " " + p);
 					if (!entityTags.putThroughTags.containsKey(sortKey)
 							|| p.relationGroupValueString.compareTo(entityTags.putThroughTags.get(sortKey)) < 0) {
 						entityTags.putThroughTags.put(sortKey, p.relationGroupValueString);
