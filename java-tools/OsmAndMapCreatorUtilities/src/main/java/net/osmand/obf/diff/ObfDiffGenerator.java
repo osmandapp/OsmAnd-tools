@@ -190,7 +190,8 @@ public class ObfDiffGenerator {
 			if (routeE == null) {
 				EntityId aid = getTransportRouteId(routeS);
 				if (modifiedObjIds != null && !modifiedObjIds.contains(aid)) {
-					throw new IllegalStateException("Transport route " + routeId + " is missing in (2): " + routeS);
+					continue; //TODO: TEMPORARY
+//					throw new IllegalStateException("Transport route " + routeId + " is missing in (2): " + routeS);
 				}
 				// mark route as deleted on all stops!
 				for(TransportStop s : routeS.getForwardStops()) {
