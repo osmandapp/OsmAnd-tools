@@ -966,9 +966,9 @@ public class MapRouterLayer implements MapPanelLayer {
 				try {
 					GpxRouteApproximation gctx = new GpxRouteApproximation(ctx);
 					List<GpxPoint> gpxPoints = router.generateGpxPoints(gctx, new LocationsHolder(intermediates));
-					List<RouteSegmentResult> searchRoute = gpx ? router.searchGpxRoute(
-							gctx, gpxPoints).result : router.searchRoute(ctx, start, end,
-							intermediates, precalculatedRouteDirection);
+					List<RouteSegmentResult> searchRoute = gpx ? 
+							router.searchGpxRoute(gctx, gpxPoints, null).result : 
+							router.searchRoute(ctx, start, end, intermediates, precalculatedRouteDirection);
 					throwExceptionIfRouteNotFound(ctx, searchRoute);
 					System.out.println("External native time " + (System.nanoTime() - nt) / 1.0e9f);
 					if (animateRoutingCalculation) {
