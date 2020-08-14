@@ -444,7 +444,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 			}
 
 		} catch (SQLException ex) {
-			log.error("Could not save in db (entity " + entityId + ") ", ex); //$NON-NLS-1$
+			log.error("TODO FIX: Could not save in db (entity " + entityId + ") ", ex); //$NON-NLS-1$
 		}
 		// do not add to storage
 		return false;
