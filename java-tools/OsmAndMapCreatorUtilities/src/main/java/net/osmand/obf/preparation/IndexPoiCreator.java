@@ -161,7 +161,12 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 							first = false;
 						}
 					}
-					insertAmenityIntoPoi(a);
+					try {
+						insertAmenityIntoPoi(a);
+					} catch (Exception excpt) {
+						System.out.println("TODO FIX " + a.getId() + " " + excpt);
+						excpt.printStackTrace();
+					}
 				}
 			}
 		}
