@@ -284,16 +284,20 @@ public class OsmDbCreator implements IOsmStorageFilter {
 	}
 
 	public void finishLoading() throws SQLException {
-		if (currentCountNode > 0) {
-			prepNode.executeBatch();
-		}
-		prepNode.close();
-		if (currentWaysCount > 0) {
-			prepWays.executeBatch();
-		}
-		prepWays.close();
-		if (currentRelationsCount > 0) {
-			prepRelations.executeBatch();
+		try {
+			if (currentCountNode > 0) {
+				prepNode.executeBatch();
+			}
+			prepNode.close();
+			if (currentWaysCount > 0) {
+				prepWays.executeBatch();
+			}
+			prepWays.close();
+			if (currentRelationsCount > 0) {
+				prepRelations.executeBatch();
+			}
+		} catch (SQLException ex) {
+			log.error("TODO FIX: Could not save in db ", ex); //$NON-NLS-1$
 		}
 		prepRelations.close();
 		if (delNode != null) {
