@@ -9,7 +9,12 @@ jar {
 }
 
 task collectMdpiIcons(type: Copy) {
-	from("../../../resources/rendering_styles/style-icons/drawable-mdpi/")
+	from("../../../resources/rendering_styles/style-icons/map-shaders-png/drawable-mdpi")
+	into "src/main/resources/resources"
+}
+
+task collectMdpiIcons2(type: Copy) {
+	from("../../../resources/rendering_styles/style-icons/map-icons-png/drawable-mdpi")
 	into "src/main/resources/resources"
 }
 
@@ -64,7 +69,7 @@ task buildDistribution(type: Zip) {
 }
 
 compileJava {
-    dependsOn collectMdpiIcons, collectFonts
+    dependsOn collectMdpiIcons, collectMdpiIcons2, collectFonts
 }
 
 dependencies {
