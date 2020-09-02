@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 ''' ogr2osm beta
@@ -351,13 +351,13 @@ def getTransform(layer):
         # Some python magic: skip reprojection altogether by using a dummy
         # lamdba funcion. Otherwise, the lambda will be a call to the OGR
         # reprojection stuff.
-        reproject = lambda geometry: None
+        reproject = lambda(geometry): None
     else:
         destSpatialRef = osr.SpatialReference()
         # Destionation projection will *always* be EPSG:4326, WGS84 lat-lon
         destSpatialRef.ImportFromEPSG(4326)
         coordTrans = osr.CoordinateTransformation(spatialRef, destSpatialRef)
-        reproject = lambda geometry: geometry.Transform(coordTrans)
+        reproject = lambda(geometry): geometry.Transform(coordTrans)
 
     return reproject
 
@@ -376,7 +376,7 @@ def getFeatureTags(ogrfeature, fieldNames):
     tags = {}
     for i in range(len(fieldNames)):
         # The field needs to be put into the appropriate encoding and leading or trailing spaces stripped
-        tags[fieldNames[i]] = ogrfeature.GetFieldAsString(i).strip()
+        tags[fieldNames[i].decode(options.encoding)] = ogrfeature.GetFieldAsString(i).decode(options.encoding).strip()
     return translations.filterTags(tags)
 
 def parseLayer(layer):
@@ -598,7 +598,7 @@ def output():
                     tag = etree.Element('tag', {'k':key, 'v':value})
                     xmlobject.append(tag)
                     
-            f.write(etree.tostring(xmlobject, encoding="unicode"))
+            f.write(etree.tostring(xmlobject))
             f.write('\n')
             
         for way in ways:
@@ -615,7 +615,7 @@ def output():
                     tag = etree.Element('tag', {'k':key, 'v':value})
                     xmlobject.append(tag)
                     
-            f.write(etree.tostring(xmlobject, encoding="unicode"))
+            f.write(etree.tostring(xmlobject))
             f.write('\n')
             
         for relation in relations:
@@ -635,7 +635,7 @@ def output():
                     tag = etree.Element('tag', {'k':key, 'v':value})
                     xmlobject.append(tag)
                     
-            f.write(etree.tostring(xmlobject, encoding="unicode"))
+            f.write(etree.tostring(xmlobject))
             f.write('\n')
             
         f.write('</osm>')
