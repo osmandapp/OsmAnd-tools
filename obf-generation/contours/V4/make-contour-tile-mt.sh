@@ -48,7 +48,7 @@ process_tiff ()
 		if [ $? -ne 0 ]; then echo $(date)' Error creating shapefile' & exit 4;fi
 	
 		echo "Building osm file …"
-		time ${working_dir}/ogr2osm.py ${TMP_DIR}$filename.shp -o $outdir$filename.osm -t contours.py
+		time ${working_dir}/ogr2osm.py ${TMP_DIR}$filename.shp -o $outdir$filename.osm -e 4326 -t contours.py
 		if [ $? -ne 0 ]; then echo $(date)' Error creating OSM file' & exit 5;fi
 	
 		echo "Compressing to osm.bz2 …"
