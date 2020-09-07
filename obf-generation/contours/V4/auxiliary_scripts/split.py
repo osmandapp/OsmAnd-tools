@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-# Script splits geotiff by 1° x 1° tiles (WGS 84) with overlap (bufferX,bufferY)
+# Script splits geotiff by 1° x 1° tiles (WGS 84) with overlap (bufferX, bufferY)
 
 import sys
 import os
@@ -15,12 +15,12 @@ from qgis.core import (
 )
 
 def main():
-	tileStartX = -178 # lon min +1 (W,E)   left
-	tileEndX = 178 # lon max +1 (W,E)     right
+	tileStartX = -180 # lon min +1 (W,E)   left
+	tileEndX = 180 # lon max +1 (W,E)     right
 	tileStartY = 84 # lat max +1 (N,S) top
-	tileEndY = 53 # lat min +1 (N,S)   bottom
-	targetBaseFolder = "/mnt/data/ArcticDEM"
-	rasterLayer = "/mnt/intel240/arcticdemv2.tif"
+	tileEndY = 56 # lat min +1 (N,S)   bottom
+	targetBaseFolder = "/mnt/data/ArcticDEM/tiles_resized_2"
+	rasterLayer = "/mnt/data/ArcticDEM/tiles_resized/arcticdem.vrt"
 
 	stepX = 1
 	stepY = 1
@@ -43,6 +43,7 @@ def main():
 	lon_str = "E"
 	lat = 0
 	lon = 0
+
 
 	#######  MAIN   #######
 
@@ -92,9 +93,9 @@ def main():
 			QgsVectorFileWriter.writeAsVectorFormat(tileLayer, targetBaseFolder + "/tile.geojson", "UTF-8", tileLayer.crs(), driverName="GeoJSON")
 	#		crs = rasterLayer.crs()
 	#		print (crs.toProj4())
-	#-ts 3602 3602
-			warpArgs = "-ot Int16 -q -multi -co COMPRESS=LZW -co PREDICTOR=2 -co ZLEVEL=6 -co NUM_THREADS=3 -t_srs 'EPSG:4326' -r cubicspline -crop_to_cutline -cutline " + targetBaseFolder + "/tile.geojson " + rasterLayer + " " + targetBaseFolder + "/tiles/" + tileId + ".tif"
-			if (not os.path.exists(targetBaseFolder + "/tiles/" + tileId + ".tif")):
+	#
+			warpArgs = "-ts 3602 3602 -ot Int16 -q -multi -co COMPRESS=LZW -co PREDICTOR=2 -co ZLEVEL=6 -co NUM_THREADS=7 -t_srs 'EPSG:4326' -r cubicspline -crop_to_cutline -cutline " + targetBaseFolder + "/tile.geojson " + rasterLayer + " " + targetBaseFolder + "/" + tileId + ".tif"
+			if (not os.path.exists(targetBaseFolder + "/" + tileId + ".tif")):
 				os.environ["CPL_DEBUG"] = "OFF"
 				os.system("gdalwarp" + " " + warpArgs)
 			#remove the temporary tile
