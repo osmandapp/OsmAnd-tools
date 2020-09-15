@@ -360,9 +360,9 @@ public class OsmAndServerMonitorTasks {
 
 	private String getTirexStatus() {
 		try {
-			StringBuilder rs = Algorithms.readFromInputStream(new URL("https://mapnik.osmand.net/tirex-status.json").openStream());
+			StringBuilder rs = Algorithms.readFromInputStream(new URL("https://maptile.osmand.net/tirex-status.json").openStream());
 			String res = prepareTirexResult(rs.toString());
-			StringBuilder date = Algorithms.readFromInputStream(new URL("https://mapnik.osmand.net/osmupdate/state.txt").openStream());
+			StringBuilder date = Algorithms.readFromInputStream(new URL("https://maptile.osmand.net/osmupdate/state.txt").openStream());
 			res += "\nTile DB: " + date;
 			return res;
 		} catch (Exception e) {
