@@ -390,10 +390,10 @@ public class OsmAndServerMonitorTasks {
 		return result;
 	}
 	
-	private String addToResult(String pr, String result, String ln, String suf) {
+	private String addToResult(String pr, String result, String suf, String ln) {
 		String vl = ln.substring(suf.length()).trim();
-		if(!vl.equals("0")) {
-			result += pr+"-"+vl+", ";
+		if (!vl.equals("0")) {
+			result += pr + "-" + vl + ", ";
 		}
 		return result;
 	}
