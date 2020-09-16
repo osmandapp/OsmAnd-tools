@@ -360,7 +360,7 @@ public class OsmAndServerMonitorTasks {
 
 	private String getTirexStatus() {
 		try {
-			String res  = Algorithms.readFromInputStream(new URL("https://maptile.osmand.net/access_stats.txt").openStream()).toString();
+			String res = Algorithms.readFromInputStream(new URL("https://maptile.osmand.net/access_stats.txt").openStream()).toString();
 			res = prepareAccessStats(res);
 			
 			StringBuilder rs = Algorithms.readFromInputStream(new URL("https://maptile.osmand.net/renderd.stats").openStream());
@@ -375,13 +375,13 @@ public class OsmAndServerMonitorTasks {
 	
 	private String prepareAccessStats(String lns) {
 		String[] spl = lns.split("\n");
-		if (spl.length > 2) {
+		if (spl.length >= 2) {
 			String result = "\n";
-			String[] percs = spl[0].split(" ");
+			String[] percents = spl[0].split(" ");
 			String[] timings = spl[1].split(" ");
-			for (int i = 0; i < timings.length && i < percs.length; i++) {
+			for (int i = 0; i < timings.length && i < percents.length; i++) {
 				double d = Double.parseDouble(timings[i].trim());
-				result += String.format("%.2f (%s) ", d, percs[i]);
+				result += String.format("%.2f (%s) ", d, percents[i]);
 			}
 			return result;
 		}
