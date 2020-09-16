@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.text.SimpleDateFormat;
@@ -373,15 +374,15 @@ public class OsmAndServerMonitorTasks {
 		}
 	}
 	
-	private String prepareAccessStats(String lns) {
+	private static String prepareAccessStats(String lns) {
 		String[] spl = lns.split("\n");
 		if (spl.length >= 2) {
 			String result = "\n";
-			String[] percents = spl[0].split(" ");
-			String[] timings = spl[1].split(" ");
-			for (int i = 0; i < timings.length && i < percents.length; i++) {
+			String[] percents = spl[0].split("\\s+");
+			String[] timings = spl[1].split("\\s+");
+			for (int i = 1; i < timings.length && i < percents.length; i++) {
 				double d = Double.parseDouble(timings[i].trim());
-				result += String.format("%.2f (%s) ", d, percents[i]);
+				result += String.format("%.2fs (%s) ", d, percents[i]);
 			}
 			return result;
 		}
