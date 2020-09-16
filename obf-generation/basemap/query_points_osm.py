@@ -91,7 +91,7 @@ def process_points(cond, filename, array):
 	f.write('</osm>')
 
 if __name__ == "__main__":
-	print "Process points"
+	print("Process points")
 	process_points("place in ('continent','sea','ocean','state','country') "
 				   " or \"natural\" in ('strait')", 'points_main.osm',
 				   ['name', 'name:en', 'place', 'population'])
