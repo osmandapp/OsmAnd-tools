@@ -168,7 +168,7 @@ def process_polygons(tags, filename):
 						way_xml += '\t<nd ref="%s" />\n' % (nid)
 					way_xml += '</way>'
 				else:
-					print "Empty ring!"
+					print("Empty ring!")
 			xml += '</relation>'	
 			f.write(node_xml)
 			f.write(way_xml)
@@ -178,7 +178,7 @@ def process_polygons(tags, filename):
 	f.write('</osm>')
 
 if __name__ == "__main__":
-		print "Process polygons"
+		print("Process polygons")
 		process_polygons(['lake', 'seamark:type', 'seamark:restricted_area:category'], 'polygon_lake_water.osm')
 		process_polygons(['landuse', 'natural', 'wetland', 'historic','leisure'], 'polygon_natural_landuse.osm')
 		process_polygons(['aeroway', 'military', 'abandoned', 'iata', 'icao', 'faa', 'power', 'tourism'], 'polygon_aeroway_military_tourism.osm')
