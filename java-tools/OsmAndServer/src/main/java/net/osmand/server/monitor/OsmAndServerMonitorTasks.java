@@ -361,6 +361,8 @@ public class OsmAndServerMonitorTasks {
 	private String getTirexStatus() {
 		try {
 			String res  = Algorithms.readFromInputStream(new URL("https://maptile.osmand.net/access_stats.txt").openStream()).toString();
+			res = prepareAccessStats(res);
+			
 			StringBuilder rs = Algorithms.readFromInputStream(new URL("https://maptile.osmand.net/renderd.stats").openStream());
 			res += prepareRenderdResult(rs.toString());
 			StringBuilder date = Algorithms.readFromInputStream(new URL("https://maptile.osmand.net/osmupdate/state.txt").openStream());
@@ -371,8 +373,23 @@ public class OsmAndServerMonitorTasks {
 		}
 	}
 	
+	private String prepareAccessStats(String lns) {
+		String[] spl = lns.split("\n");
+		if (spl.length > 2) {
+			String result = "\n";
+			String[] percs = spl[0].split(" ");
+			String[] timings = spl[1].split(" ");
+			for (int i = 0; i < timings.length && i < percs.length; i++) {
+				double d = Double.parseDouble(timings[i].trim());
+				result += String.format("%.2f (%s) ", d, percs[i]);
+			}
+			return result;
+		}
+		return "";
+	}
+
 	private String prepareRenderdResult(String res) {
-		String result = "\nTile queue:";
+		String result = "\nTile queue: ";
 		String[] lns = res.split("\n");
 		for (String ln : lns) {
 			if (ln.startsWith("ReqQueueLength:")) {
@@ -393,7 +410,7 @@ public class OsmAndServerMonitorTasks {
 	private String addToResult(String pr, String result, String suf, String ln) {
 		String vl = ln.substring(suf.length()).trim();
 		if (!vl.equals("0")) {
-			result += pr + "-" + vl + ", ";
+			result += pr + "-" + vl + " ";
 		}
 		return result;
 	}
