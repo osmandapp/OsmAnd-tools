@@ -360,8 +360,9 @@ public class OsmAndServerMonitorTasks {
 
 	private String getTirexStatus() {
 		try {
-			StringBuilder rs = Algorithms.readFromInputStream(new URL("https://maptile.osmand.net/tirex-status.json").openStream());
-			String res = prepareTirexResult(rs.toString());
+			String res  = Algorithms.readFromInputStream(new URL("https://maptile.osmand.net/access_stats.txt").openStream()).toString();
+			StringBuilder rs = Algorithms.readFromInputStream(new URL("https://maptile.osmand.net/renderd.stats").openStream());
+			res += prepareRenderdResult(rs.toString());
 			StringBuilder date = Algorithms.readFromInputStream(new URL("https://maptile.osmand.net/osmupdate/state.txt").openStream());
 			res += "\nTile DB: " + date;
 			return res;
@@ -370,6 +371,33 @@ public class OsmAndServerMonitorTasks {
 		}
 	}
 	
+	private String prepareRenderdResult(String res) {
+		String result = "\nTile queue:";
+		String[] lns = res.split("\n");
+		for (String ln : lns) {
+			if (ln.startsWith("ReqQueueLength:")) {
+				result = addToResult("Q", result, "ReqQueueLength:", ln);
+			} else if (ln.startsWith("ReqPrioQueueLength:")) {
+				result = addToResult("PQ", result, "ReqPrioQueueLength:", ln);
+			} else if (ln.startsWith("ReqLowQueueLength:")) {
+				result = addToResult("LQ", result, "ReqLowQueueLength:", ln);
+			} else if (ln.startsWith("ReqBulkQueueLength:")) {
+				result = addToResult("BQ", result, "ReqBulkQueueLength:", ln);
+			} else if (ln.startsWith("DirtQueueLength:")) {
+				result = addToResult("DQ", result, "DirtQueueLength:", ln);
+			}
+		}
+		return result;
+	}
+	
+	private String addToResult(String pr, String result, String ln, String suf) {
+		String vl = ln.substring(suf.length()).trim();
+		if(!vl.equals("0")) {
+			result += pr+"-"+vl+", ";
+		}
+		return result;
+	}
+
 	protected String getOwnTirexStatus() {
 		String txStatus = "tirex-status -r";
 		String res = runCmd(txStatus, new File("."), null);
