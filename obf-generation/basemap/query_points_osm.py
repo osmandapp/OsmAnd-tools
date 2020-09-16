@@ -59,7 +59,7 @@ def process_points(cond, filename, array):
 	sql = "select ST_AsText(ST_Transform(way,94326)), osm_id  " + queryFields + \
 	      " from planet_osm_point where " + cond + ";"
 	      # "LIMIT 2"
-	print sql
+	print(sql)
 	cursor.execute(sql)
  	
 	node_id =-1000
