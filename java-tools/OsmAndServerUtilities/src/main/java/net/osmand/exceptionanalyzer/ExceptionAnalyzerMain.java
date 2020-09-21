@@ -73,11 +73,11 @@ public class ExceptionAnalyzerMain {
      * @return an authorized Credential object.
      * @throws IOException
      */
-    public static Credential authorize(String clientScretFile) throws IOException {
+    public static Credential authorize(String clientSecretJson) throws IOException {
         // Load client secrets.
-        InputStream in = Algorithms.isEmpty(clientScretFile)  ?
+        InputStream in = Algorithms.isEmpty(clientSecretJson)  ?
                 ExceptionAnalyzerMain.class.getResourceAsStream("/client_secret.json") :
-                new FileInputStream(clientScretFile);
+                new FileInputStream(clientSecretJson);
         GoogleClientSecrets clientSecrets =
                 GoogleClientSecrets.load(JSON_FACTORY, new InputStreamReader(in));
         in.close();
